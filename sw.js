@@ -6,7 +6,7 @@
    ⚠ IMPORTANTE: SUPABASE_URL y SUPABASE_KEY están duplicados acá y en
    index.html. Si rotás la publishable key, hay que actualizar AMBOS.
    ========================================================= */
-const SW_VERSION = "v1.3-vir";
+const SW_VERSION = "v1.4-vir";
 
 const SUPABASE_URL = "https://hrxfctzncixxqmpfhskv.supabase.co";
 const SUPABASE_KEY = "sb_publishable_BqpAgZH6ty-9wft10_YMhw_0rcIPuWT";
@@ -102,7 +102,7 @@ async function trySendOneReport(payload) {
         "apikey":        SUPABASE_KEY,
         "Authorization": "Bearer " + SUPABASE_KEY,
         "Content-Type":  "application/json",
-        "Prefer":        "return=minimal"
+        "Prefer":        "return=representation"
       },
       body: JSON.stringify({
         client_id:   payload.id,
@@ -117,7 +117,15 @@ async function trySendOneReport(payload) {
     });
     clearTimeout(t);
     if (!res) return { ok: false, networkFail: true };
-    if (res.ok || res.status === 409) return { ok: true, status: res.status };
+    if (res.ok) {
+      let created_at = null;
+      try {
+        const body = await res.json();
+        if (Array.isArray(body) && body[0]) created_at = body[0].created_at || null;
+      } catch {}
+      return { ok: true, status: res.status, created_at };
+    }
+    if (res.status === 409) return { ok: true, status: 409 };
     return { ok: false, networkFail: false, status: res.status };
   } catch (e) {
     return { ok: false, networkFail: true };
@@ -125,16 +133,17 @@ async function trySendOneReport(payload) {
 }
 
 /* ============== Aviso a la página ============== */
-async function notifyClientsItemSent(item) {
+async function notifyClientsItemSent(item, createdAt) {
   try {
     const clients = await self.clients.matchAll({ includeUncontrolled: true });
     for (const c of clients) {
       try {
         c.postMessage({
-          type:   "ITEM_SENT",
-          id:     item.id,
-          legajo: item.legajo,
-          fecha:  item.fecha
+          type:      "ITEM_SENT",
+          id:        item.id,
+          legajo:    item.legajo,
+          fecha:     item.fecha,
+          createdAt: createdAt || null
         });
       } catch {}
     }
@@ -153,7 +162,7 @@ async function flushQueueInSW() {
     if (r.ok) {
       try { await idbDelete(item.id); } catch {}
       // Aviso a cualquier página abierta para que limpie LS y actualice UI.
-      notifyClientsItemSent(item);
+      notifyClientsItemSent(item, r.created_at);
     } else {
       // Anotar intento en IDB y auditar (intento 1 y cada 5).
       const newAttempts = (item.attempts || 0) + 1;
