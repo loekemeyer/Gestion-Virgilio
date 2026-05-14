@@ -104,7 +104,7 @@ button {
   opacity:0.6;
 }
 
-/* ✅ aviso de reportes pendientes (sin enviar a Google Sheets) */
+/* ✅ aviso de reportes pendientes (se reintenta solo en background) */
 #pendingIndicator{
   display: none;
   margin-top: 12px;
@@ -116,7 +116,6 @@ button {
   text-align: center;
   color: #900;
   font-weight: bold;
-  cursor: pointer;
 }
 </style>
 </head>
@@ -604,7 +603,7 @@ function updatePendingIndicator() {
   const count = readQueue().length;
   if (count > 0) {
     el.style.display = "block";
-    el.textContent = `⚠️ ${count} reporte(s) sin enviar — Tocá para reintentar`;
+    el.textContent = `⚠️ ${count} reporte(s) sin enviar — se reenviarán al volver la red`;
   } else {
     el.style.display = "none";
     el.textContent = "";
@@ -709,9 +708,6 @@ document.addEventListener("visibilitychange", () => {
 
 /* Reintento periódico de seguridad cada 30s. */
 setInterval(flushQueue, 30000);
-
-/* Reintento manual al tocar el banner de pendientes. */
-document.getElementById("pendingIndicator")?.addEventListener("click", flushQueue);
 
 /* Nota: no usamos navigator.sendBeacon porque no permite headers custom y
    Supabase requiere "apikey" + "Authorization". El "keepalive: true" del
