@@ -222,6 +222,33 @@ button {
 .status-sent   { background: #d1fae5; color: #065f46; }
 .status-failed { background: #fee2e2; color: #991b1b; }
 .status-queued { background: #fef3c7; color: #92400e; }
+
+/* Badge de versión y estado de sincronización (esquina inferior derecha) */
+#versionBadge{
+  position: fixed;
+  bottom: 8px;
+  right: 8px;
+  z-index: 50;
+  font-size: 12px;
+  font-weight: bold;
+  padding: 4px 10px;
+  border-radius: 12px;
+  background: #f0fdf4;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+  pointer-events: none;        /* no se puede tocar; es solo visual */
+  font-family: monospace;
+}
+#versionBadge.pending{
+  background: #fffbeb;
+  color: #92400e;
+  border-color: #fde68a;
+}
+#versionBadge.error{
+  background: #fef2f2;
+  color: #991b1b;
+  border-color: #fecaca;
+}
 </style>
 </head>
 
@@ -229,6 +256,9 @@ button {
 
 <!-- Botón flotante: historial de días anteriores -->
 <button id="btnHistDias" title="Historial de días anteriores">📅</button>
+
+<!-- Badge de versión + estado de cola (abajo a la derecha) -->
+<div id="versionBadge">v1.0 ✓</div>
 
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
@@ -1037,16 +1067,34 @@ async function flushQueue() {
   }
 }
 
+const APP_VERSION = "v1.0";
+
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
-  if (!el) return;
-  const count = readQueue().length;
-  if (count > 0) {
-    el.style.display = "block";
-    el.textContent = `⚠️ ${count} reporte(s) sin enviar — se reenviarán al volver la red`;
-  } else {
-    el.style.display = "none";
-    el.textContent = "";
+  const q = readQueue();
+  const count = q.length;
+  if (el) {
+    if (count > 0) {
+      el.style.display = "block";
+      el.textContent = `⚠️ ${count} reporte(s) sin enviar — se reenviarán al volver la red`;
+    } else {
+      el.style.display = "none";
+      el.textContent = "";
+    }
+  }
+  // Badge de versión + estado (siempre visible en esquina inferior derecha)
+  const vb = document.getElementById("versionBadge");
+  if (vb) {
+    if (count === 0) {
+      vb.textContent = `${APP_VERSION} ✓`;
+      vb.className = "";
+    } else if (q.some(x => x.lastErr && !x.lastErr.startsWith("network"))) {
+      vb.textContent = `${APP_VERSION} ⚠ ${count}`;
+      vb.className = "error";
+    } else {
+      vb.textContent = `${APP_VERSION} ⏳ ${count}`;
+      vb.className = "pending";
+    }
   }
 }
 
