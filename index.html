@@ -3,7 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#1e6bd6">
 <title>Reporte Empleados</title>
+<!-- PWA: manifiesto + ícono. Permite "Agregar a pantalla de inicio" en Chrome
+     Android y mejora la fiabilidad del Background Sync del Service Worker. -->
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="apple-touch-icon" href="icon.svg">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; }
@@ -258,7 +264,7 @@ button {
 <button id="btnHistDias" title="Historial de días anteriores">📅</button>
 
 <!-- Badge de versión + estado de cola (abajo a la derecha) -->
-<div id="versionBadge">v1.4 ✓</div>
+<div id="versionBadge">v1.5 ✓</div>
 
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
@@ -1198,7 +1204,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v1.4";
+const APP_VERSION = "v1.5";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
