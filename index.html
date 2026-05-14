@@ -350,6 +350,18 @@ function formatDayLong(fecha) {
   return `${p[2]}/${p[1]}/${p[0]}`;
 }
 
+/* Escapa HTML para evitar inyección al renderizar via innerHTML.
+   El campo "texto" lo escribe el operario y podría contener < > & etc. */
+function escapeHtml(s) {
+  if (s == null) return "";
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 /* =========================================================
    ÚLTIMO LEGAJO (persistente entre cierres de app)
    Se guarda al confirmar "Continuar" y se precarga al abrir.
@@ -439,10 +451,10 @@ function renderLegajoHistory(legajo) {
   container.className = "history-list";
   container.innerHTML = hist.map(h => `
     <div class="history-item">
-      <div class="line1">${h.opcion} — ${h.descripcion}${statusBadge(h.status)}</div>
+      <div class="line1">${escapeHtml(h.opcion)} — ${escapeHtml(h.descripcion)}${statusBadge(h.status)}</div>
       <div class="line2">
-        ${h.texto ? `Dato: <b>${h.texto}</b><br>` : ""}
-        ${h.ts ? `Fecha: ${formatDateTime(h.ts)}` : ""}
+        ${h.texto ? `Dato: <b>${escapeHtml(h.texto)}</b><br>` : ""}
+        ${h.ts ? `Fecha: ${escapeHtml(formatDateTime(h.ts))}` : ""}
       </div>
     </div>
   `).join("");
@@ -504,16 +516,16 @@ function openHistoryModal() {
   const previas = getAllPrevDaysForLegajo(legajoStr);
   const content = document.getElementById("histModalContent");
   if (!previas.length) {
-    content.innerHTML = `<div class="history-empty">No hay reportes de días anteriores guardados en este dispositivo para el legajo ${legajoStr}.</div>`;
+    content.innerHTML = `<div class="history-empty">No hay reportes de días anteriores guardados en este dispositivo para el legajo ${escapeHtml(legajoStr)}.</div>`;
   } else {
     content.innerHTML = previas.map(d => `
       <div class="hist-day-block">
-        <div class="hist-day-title">${formatDayLong(d.fecha)} (${d.items.length})</div>
+        <div class="hist-day-title">${escapeHtml(formatDayLong(d.fecha))} (${d.items.length})</div>
         ${d.items.map(it => `
           <div class="hist-day-item">
-            <b>${it.opcion}</b> — ${it.descripcion}${statusBadge(it.status)}
-            ${it.texto ? ` — <i>${it.texto}</i>` : ""}
-            ${it.ts ? `<br><span style="color:#666;font-size:12px;">${formatDateTime(it.ts)}</span>` : ""}
+            <b>${escapeHtml(it.opcion)}</b> — ${escapeHtml(it.descripcion)}${statusBadge(it.status)}
+            ${it.texto ? ` — <i>${escapeHtml(it.texto)}</i>` : ""}
+            ${it.ts ? `<br><span style="color:#666;font-size:12px;">${escapeHtml(formatDateTime(it.ts))}</span>` : ""}
           </div>
         `).join("")}
       </div>
