@@ -590,6 +590,11 @@ legajoInput.addEventListener("input", () => {
 const CORE_CODES   = ["EP","TP","AP","TAP"];
 const TOGGLE_CODES = ["CR","CC","RT","MG","RI","EI","AT","PB","Limp","PC","Perm","CT"];
 
+/* Códigos de TIEMPO MUERTO. Cuando uno está abierto, se bloquea todo lo
+   demás hasta cerrarlo (tocando el mismo botón otra vez). El resto de
+   los toggles (CR, MG, CC, RT, RI, EI, Perm) NO bloquean. */
+const DEAD_TIME_CODES = ["AT","PB","Limp","PC","CT"];
+
 function readStateMap(){
   try { return JSON.parse(localStorage.getItem(STATE_KEY)) || {}; }
   catch { return {}; }
@@ -637,23 +642,46 @@ function toggleStartOrEnd(legajo, code){
    BLOQUEO: si hay cualquier toggle activo (no-core), NO se puede seleccionar EP/TP/AP/TAP
    + deshabilitado visual
    ========================================================= */
-function getAnyBlockingToggleActive(legajo){
+/* Cualquier toggle abierto (regla VIEJA: bloquea EP/TP/AP/TAP). */
+function getAnyToggleActive(legajo){
   const st = getLegajoState(legajo);
-  const keys = Object.keys(st.toggles || {});
+  if (!st.toggles) return null;
+  const keys = Object.keys(st.toggles);
   return keys[0] || null;
 }
 
+/* Tiempo muerto abierto (regla NUEVA: bloquea TODO menos el mismo botón).
+   Solo AT, PB, Limp, PC y CT. */
+function getActiveDeadTime(legajo){
+  const st = getLegajoState(legajo);
+  if (!st.toggles) return null;
+  for (const code of DEAD_TIME_CODES) {
+    if (st.toggles[code]) return code;
+  }
+  return null;
+}
+
+/* Aplica las dos reglas:
+   - Si hay tiempo muerto activo: TODOS los botones quedan deshabilitados
+     menos el mismo botón del tiempo muerto (para poder cerrarlo).
+   - Si NO hay tiempo muerto pero sí hay algún toggle activo (CR, MG, etc):
+     solo se deshabilitan EP/TP/AP/TAP, los demás botones quedan tocables. */
 function updateCoreButtonsState(){
   const legajoStr = String(legajoInput.value || "");
-  const blocking = getAnyBlockingToggleActive(legajoStr);
+  const deadTime  = getActiveDeadTime(legajoStr);
+  const anyToggle = getAnyToggleActive(legajoStr);
 
   document.querySelectorAll(".box").forEach(b=>{
     const code = b.querySelector(".box-title")?.innerText?.trim();
     if (!code) return;
-    if (CORE_CODES.includes(code)) {
-      if (blocking) b.classList.add("disabled");
-      else b.classList.remove("disabled");
+    let disabled = false;
+    if (deadTime && code !== deadTime) {
+      disabled = true;                                            // regla nueva
+    } else if (CORE_CODES.includes(code) && anyToggle) {
+      disabled = true;                                            // regla vieja
     }
+    if (disabled) b.classList.add("disabled");
+    else          b.classList.remove("disabled");
   });
 }
 
@@ -677,9 +705,9 @@ function renderPendingSuggestion(){
   box.innerHTML = "";
   if(!legajo) return;
 
-  // ✅ SI HAY BLOQUEO (cualquier toggle activo), NO MOSTRAR sugerencias
-  const blocking = getAnyBlockingToggleActive(legajo);
-  if (blocking) return;
+  // Si hay CUALQUIER toggle activo, EP/TP/AP/TAP están bloqueados;
+  // ocultar la sugerencia (no se podría tocar igual).
+  if (getAnyToggleActive(legajo)) return;
 
   const st = getLegajoState(legajo);
 
@@ -749,11 +777,21 @@ function backToLegajo() {
 function selectOption(code) {
   const legajoStr = String(legajoInput.value || "");
 
-  // bloqueo de core
+  // Regla 1 (NUEVA): si hay TIEMPO MUERTO abierto (AT/PB/Limp/PC/CT),
+  // solo se puede tocar ese mismo código para cerrarlo. Todo lo demás bloqueado.
+  const deadTime = getActiveDeadTime(legajoStr);
+  if (deadTime && code !== deadTime) {
+    alert(`Tenés un tiempo muerto abierto: ${deadTime} — ${desc[deadTime]}\nTocá ${deadTime} de nuevo para terminarlo antes de hacer otra cosa.`);
+    updateCoreButtonsState();
+    return;
+  }
+
+  // Regla 2 (VIEJA): si hay CUALQUIER toggle abierto (CR, MG, RT, etc.),
+  // EP/TP/AP/TAP siguen bloqueados como hasta ahora.
   if (CORE_CODES.includes(code)) {
-    const blocking = getAnyBlockingToggleActive(legajoStr);
-    if (blocking) {
-      alert(`Tenés una acción pendiente: ${blocking} — ${desc[blocking]}\nTerminála antes de usar EP/TP/AP/TAP.`);
+    const anyToggle = getAnyToggleActive(legajoStr);
+    if (anyToggle) {
+      alert(`Tenés una acción pendiente: ${anyToggle} — ${desc[anyToggle]}\nTerminála antes de usar EP/TP/AP/TAP.`);
       updateCoreButtonsState();
       return;
     }
