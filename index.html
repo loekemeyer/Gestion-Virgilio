@@ -204,6 +204,21 @@ button {
   border-top: 1px solid #f0f0f0;
 }
 .hist-day-item:first-child{ border-top: none; }
+
+/* Badge de estado por reporte (queued / sent / failed) */
+.status-badge{
+  display: inline-block;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-weight: bold;
+  margin-left: 6px;
+  vertical-align: middle;
+  line-height: 1.3;
+}
+.status-sent   { background: #d1fae5; color: #065f46; }
+.status-failed { background: #fee2e2; color: #991b1b; }
+.status-queued { background: #fef3c7; color: #92400e; }
 </style>
 </head>
 
@@ -352,9 +367,29 @@ function writeDayHist(fecha, legajo, arr) {
 function pushHistoryForLegajo(legajo, item) {
   const fecha = getTodayKey();
   const arr = readDayHist(fecha, legajo);
-  arr.unshift(item);
+  arr.unshift({ ...item, status: item.status || "queued" });
   if (arr.length > HIST_MAX_PER_DAY) arr.length = HIST_MAX_PER_DAY;
   writeDayHist(fecha, legajo, arr);
+}
+
+/* Marca un item del historial como sent / failed / queued. */
+function setHistoryItemStatus(legajo, fecha, itemId, status, sentAtIso) {
+  if (!legajo || !fecha || !itemId) return false;
+  const arr = readDayHist(fecha, legajo);
+  const i = arr.findIndex(it => it.id === itemId);
+  if (i < 0) return false;
+  arr[i].status = status;
+  if (sentAtIso) arr[i].sentAt = sentAtIso;
+  writeDayHist(fecha, legajo, arr);
+  return true;
+}
+
+/* Pintar el badge según el status del item. */
+function statusBadge(status) {
+  if (status === "sent")   return ` <span class="status-badge status-sent">✓ enviado</span>`;
+  if (status === "failed") return ` <span class="status-badge status-failed">⚠ falló</span>`;
+  if (status === "queued") return ` <span class="status-badge status-queued">⏳ en cola</span>`;
+  return "";
 }
 function getAllPrevDaysForLegajo(legajo) {
   const today = getTodayKey();
@@ -390,7 +425,7 @@ function renderLegajoHistory(legajo) {
   container.className = "history-list";
   container.innerHTML = hist.map(h => `
     <div class="history-item">
-      <div class="line1">${h.opcion} — ${h.descripcion}</div>
+      <div class="line1">${h.opcion} — ${h.descripcion}${statusBadge(h.status)}</div>
       <div class="line2">
         ${h.texto ? `Dato: <b>${h.texto}</b><br>` : ""}
         ${h.ts ? `Fecha: ${formatDateTime(h.ts)}` : ""}
@@ -462,7 +497,7 @@ function openHistoryModal() {
         <div class="hist-day-title">${formatDayLong(d.fecha)} (${d.items.length})</div>
         ${d.items.map(it => `
           <div class="hist-day-item">
-            <b>${it.opcion}</b> — ${it.descripcion}
+            <b>${it.opcion}</b> — ${it.descripcion}${statusBadge(it.status)}
             ${it.texto ? ` — <i>${it.texto}</i>` : ""}
             ${it.ts ? `<br><span style="color:#666;font-size:12px;">${formatDateTime(it.ts)}</span>` : ""}
           </div>
@@ -740,7 +775,14 @@ function writeQueue(arr) {
 }
 function enqueueReport(payload) {
   const arr = readQueue();
-  arr.push({ id: payload.id, payload, attempts: 0, addedAt: Date.now() });
+  arr.push({
+    id: payload.id,
+    payload,
+    attempts: 0,
+    addedAt: Date.now(),
+    legajo: String(payload.legajo || ""),
+    fecha:  getTodayKey()
+  });
   writeQueue(arr);
   updatePendingIndicator();
 }
@@ -750,7 +792,10 @@ function removeFromQueue(id) {
 }
 
 /* Intenta enviar UN payload a Supabase.
-   Devuelve true si llegó al server (o si ya estaba: 409 = dedup OK). */
+   Devuelve { ok, networkFail, status }:
+     - ok=true            -> aceptado (201 ó 409 dedup)
+     - ok=false, networkFail=true  -> sin respuesta (timeout, sin red, CORS)
+     - ok=false, networkFail=false -> el server respondió con error (4xx/5xx) */
 async function trySendOneReport(payload) {
   try {
     // Corte duro a los 12s para no quedarnos esperando si la red se cuelga.
@@ -777,15 +822,23 @@ async function trySendOneReport(payload) {
       signal: ctrl.signal
     });
     clearTimeout(t);
-    if (!res) return false;
+    if (!res) return { ok: false, networkFail: true };
     // 201 Created = ok. 409 Conflict = ya existía (reintento exitoso de un envío previo).
-    return res.ok || res.status === 409;
+    if (res.ok || res.status === 409) return { ok: true, status: res.status };
+    // Server respondió pero rechazó: data inválida, CHECK falló, etc. No reintentar al toque.
+    return { ok: false, networkFail: false, status: res.status };
   } catch (e) {
-    return false;
+    // fetch tiró: timeout, offline, CORS, etc.
+    return { ok: false, networkFail: true };
   }
 }
 
-/* Vacía la cola intentando enviar todo lo pendiente. */
+/* Vacía la cola intentando enviar lo pendiente.
+   - Procesa hasta BATCH_SIZE items por pasada.
+   - Si la red cae (networkFail), corta para no martillar.
+   - Si un item lo rechaza el server (data inválida), sigue con los demás
+     en lugar de bloquear toda la cola. */
+const BATCH_SIZE = 20;
 let flushing = false;
 async function flushQueue() {
   if (flushing) return;
@@ -798,21 +851,40 @@ async function flushQueue() {
     const arr = readQueue();
     if (!arr.length) return;
 
-    for (const item of arr.slice()) {
-      const ok = await trySendOneReport(item.payload);
-      if (ok) {
+    const batch = arr.slice(0, BATCH_SIZE);
+    let historyChanged = false;
+    for (const item of batch) {
+      const r = await trySendOneReport(item.payload);
+      if (r.ok) {
         removeFromQueue(item.id);
+        if (setHistoryItemStatus(item.legajo, item.fecha, item.id, "sent", new Date().toISOString())) {
+          historyChanged = true;
+        }
       } else {
-        // Anotar intento y cortar: si la red está caída, no martillar.
+        // Anotar intento en la cola
         const cur = readQueue();
         const i = cur.findIndex(x => x.id === item.id);
         if (i >= 0) {
           cur[i].attempts = (cur[i].attempts || 0) + 1;
           cur[i].lastTry  = Date.now();
+          cur[i].lastErr  = r.networkFail ? "network" : `server_${r.status||"?"}`;
           writeQueue(cur);
         }
-        break;
+        // Solo marcar "failed" en el historial si fue rechazo del server.
+        // Si fue networkFail, dejarlo como "queued" — va a reintentar solo.
+        if (!r.networkFail) {
+          if (setHistoryItemStatus(item.legajo, item.fecha, item.id, "failed")) {
+            historyChanged = true;
+          }
+        }
+        // Red caída: no insistir con el resto del batch.
+        if (r.networkFail) break;
+        // Server rejection: seguir con el próximo item de la cola.
       }
+    }
+    // Si la pantalla de legajo está visible y cambió algún status, refresco.
+    if (historyChanged && legajoInput && !legajoScreen.classList.contains("hidden")) {
+      renderLegajoHistory(legajoInput.value);
     }
   } finally {
     flushing = false;
@@ -874,7 +946,9 @@ async function send() {
 
   /* ---- historial local ---- */
   pushHistoryForLegajo(legajoStr, {
-    ts: payload.ts, opcion, descripcion, texto
+    ts: payload.ts, opcion, descripcion, texto,
+    id: payload.id,           // permite actualizar el status cuando se confirme el envío
+    status: "queued"
   });
 
   /* ---- estado / pendientes locales ---- */
@@ -905,14 +979,20 @@ async function send() {
   const sendBtn = document.getElementById("sendBtn");
   if (sendBtn) { sendBtn.disabled = true; sendBtn.innerText = "Enviando..."; }
 
-  const ok = await trySendOneReport(payload);
+  const r = await trySendOneReport(payload);
 
   if (sendBtn) { sendBtn.disabled = false; sendBtn.innerText = "Enviar"; }
 
-  if (ok) {
+  if (r.ok) {
     removeFromQueue(payload.id);
+    setHistoryItemStatus(legajoStr, getTodayKey(), payload.id, "sent", new Date().toISOString());
     alert("Reporte enviado correctamente");
   } else {
+    // Si fue rechazo del server (datos inválidos, etc.) marco "failed" en el historial.
+    // Si fue caída de red, dejo "queued" — se reintenta solo.
+    if (!r.networkFail) {
+      setHistoryItemStatus(legajoStr, getTodayKey(), payload.id, "failed");
+    }
     alert("⚠️ Sin conexión o sin respuesta del servidor.\nTu reporte quedó guardado y se reenviará automáticamente cuando vuelva la red.");
   }
 
@@ -951,17 +1031,23 @@ document.getElementById("btnHistDias")?.addEventListener("click", openHistoryMod
 renderLegajoHistory("");
 updatePendingIndicator();
 
-/* Cuando vuelve la red o se reactiva la pestaña, reintenta. */
-window.addEventListener("online", flushQueue);
-window.addEventListener("focus",  flushQueue);
+/* Cuando vuelve la red, drená la cola de manera agresiva durante 3s
+   (en lugar de un solo intento aislado). */
+window.addEventListener("online", async () => {
+  const end = Date.now() + 3000;
+  while (Date.now() < end && readQueue().length) await flushQueue();
+});
+
+/* Foco / visibilidad: reintento normal. */
+window.addEventListener("focus", flushQueue);
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") flushQueue();
   // También aprovecho a chequear cambio de día por si la app quedó abierta cruzando medianoche.
   cleanupIfDayChanged();
 });
 
-/* Reintento periódico de seguridad cada 30s. */
-setInterval(flushQueue, 30000);
+/* Reintento periódico cada 3 s (antes 30 s). */
+setInterval(flushQueue, 3000);
 
 /* Nota: no usamos navigator.sendBeacon porque no permite headers custom y
    Supabase requiere "apikey" + "Authorization". El "keepalive: true" del
