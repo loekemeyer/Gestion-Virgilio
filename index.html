@@ -103,6 +103,21 @@ button {
   pointer-events:none;
   opacity:0.6;
 }
+
+/* ✅ aviso de reportes pendientes (sin enviar a Google Sheets) */
+#pendingIndicator{
+  display: none;
+  margin-top: 12px;
+  padding: 12px;
+  background: #ffe0e0;
+  border: 2px solid #d33;
+  border-radius: 8px;
+  font-size: 18px;
+  text-align: center;
+  color: #900;
+  font-weight: bold;
+  cursor: pointer;
+}
 </style>
 </head>
 
@@ -118,6 +133,9 @@ button {
     <div class="history-title">Últimos 2 reportes de este legajo</div>
     <div id="legajoHistoryContent" class="history-empty">Ingresá tu legajo para ver el historial</div>
   </div>
+
+  <!-- Aviso: hay reportes que aún no se enviaron a Google Sheets -->
+  <div id="pendingIndicator"></div>
 
   <button class="primary-btn" onclick="goToOptions()">Continuar</button>
   <div class="small" id="status"></div>
@@ -149,7 +167,7 @@ button {
       <input id="textInput" class="text-input">
     </div>
 
-    <button class="primary-btn" onclick="send()">Enviar</button>
+    <button id="sendBtn" class="primary-btn" onclick="send()">Enviar</button>
     <div id="error" class="error"></div>
 
   </div>
@@ -477,25 +495,127 @@ function resetSelection() {
 }
 
 /* =========================================================
+   COLA DE ENVÍOS (offline-first)
+   Resuelve: reportes que se perdían cuando la red estaba caída,
+   porque el fetch anterior tenía .catch(()=>{}) y se mostraba
+   "Reporte enviado correctamente" aunque no hubiera llegado.
+   ========================================================= */
+const QUEUE_KEY = "legajo_queue_virgilio_v1";
+
+function readQueue() {
+  try { return JSON.parse(localStorage.getItem(QUEUE_KEY)) || []; }
+  catch { return []; }
+}
+function writeQueue(arr) {
+  try { localStorage.setItem(QUEUE_KEY, JSON.stringify(arr)); } catch {}
+}
+function enqueueReport(payload) {
+  const arr = readQueue();
+  arr.push({ id: payload.id, payload, attempts: 0, addedAt: Date.now() });
+  writeQueue(arr);
+  updatePendingIndicator();
+}
+function removeFromQueue(id) {
+  writeQueue(readQueue().filter(it => it.id !== id));
+  updatePendingIndicator();
+}
+
+/* Intenta enviar UN payload. Devuelve true si parece haber llegado al server. */
+async function trySendOneReport(payload) {
+  try {
+    // Corte duro a los 12s para no quedarnos esperando si la red se cuelga.
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 12000);
+    const res = await fetch(GOOGLE_SCRIPT_URL, {
+      method: "POST",
+      body: JSON.stringify(payload),
+      keepalive: true,        // sobrevive a cambios de pantalla / cierres rápidos
+      signal: ctrl.signal
+    });
+    clearTimeout(t);
+    // Sin Content-Type explícito: GAS recibe el body como text/plain (sin preflight CORS).
+    return !!(res && (res.ok || res.status === 0 || res.type === "opaque"));
+  } catch (e) {
+    return false;
+  }
+}
+
+/* Vacía la cola intentando enviar todo lo pendiente. */
+let flushing = false;
+async function flushQueue() {
+  if (flushing) return;
+  if (typeof navigator !== "undefined" && navigator.onLine === false) {
+    updatePendingIndicator();
+    return;
+  }
+  flushing = true;
+  try {
+    const arr = readQueue();
+    if (!arr.length) return;
+
+    for (const item of arr.slice()) {
+      const ok = await trySendOneReport(item.payload);
+      if (ok) {
+        removeFromQueue(item.id);
+      } else {
+        // Anotar intento y cortar: si la red está caída, no martillar.
+        const cur = readQueue();
+        const i = cur.findIndex(x => x.id === item.id);
+        if (i >= 0) {
+          cur[i].attempts = (cur[i].attempts || 0) + 1;
+          cur[i].lastTry  = Date.now();
+          writeQueue(cur);
+        }
+        break;
+      }
+    }
+  } finally {
+    flushing = false;
+    updatePendingIndicator();
+  }
+}
+
+function updatePendingIndicator() {
+  const el = document.getElementById("pendingIndicator");
+  if (!el) return;
+  const count = readQueue().length;
+  if (count > 0) {
+    el.style.display = "block";
+    el.textContent = `⚠️ ${count} reporte(s) sin enviar — Tocá para reintentar`;
+  } else {
+    el.style.display = "none";
+    el.textContent = "";
+  }
+}
+
+/* =========================================================
    ENVÍO
    ========================================================= */
-function send() {
-  const legajoStr = String(legajoInput.value || "");
-  const opcion = selected;
+async function send() {
+  const legajoStr   = String(legajoInput.value || "");
+  const opcion      = selected;
   const descripcion = desc[selected] || "";
-  const texto = (textInput.value || "").toUpperCase();
+  const texto       = (textInput.value || "").toUpperCase();
 
-  /* ---- historial ---- */
-  if (legajoStr && opcion) {
-    pushHistoryForLegajo(legajoStr, {
-      ts: Date.now(),
-      opcion,
-      descripcion,
-      texto
-    });
-  }
+  if (!legajoStr) { alert("Falta el número de legajo"); return; }
+  if (!opcion)    { alert("Falta seleccionar una opción"); return; }
 
-  /* ---- estado / pendientes ---- */
+  // ID único por reporte: permite dedup en el Apps Script si se quisiera.
+  const payload = {
+    legajo: legajoInput.value,
+    opcion,
+    descripcion,
+    texto,
+    ts: Date.now(),
+    id: Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 8)
+  };
+
+  /* ---- historial local ---- */
+  pushHistoryForLegajo(legajoStr, {
+    ts: payload.ts, opcion, descripcion, texto
+  });
+
+  /* ---- estado / pendientes locales ---- */
   if (opcion === "EP") {
     const st = getLegajoState(legajoStr);
     st.picking = { active:true, value:texto };
@@ -517,17 +637,22 @@ function send() {
     toggleStartOrEnd(legajoStr, opcion);
   }
 
-  fetch(GOOGLE_SCRIPT_URL,{
-    method:"POST",
-    body:JSON.stringify({
-      legajo: legajoInput.value,
-      opcion: selected,
-      descripcion: desc[selected],
-      texto: texto
-    })
-  }).catch(()=>{});
+  /* ---- ENCOLAR SIEMPRE antes de tocar la red ---- */
+  enqueueReport(payload);
 
-  alert("Reporte enviado correctamente");
+  const sendBtn = document.getElementById("sendBtn");
+  if (sendBtn) { sendBtn.disabled = true; sendBtn.innerText = "Enviando..."; }
+
+  const ok = await trySendOneReport(payload);
+
+  if (sendBtn) { sendBtn.disabled = false; sendBtn.innerText = "Enviar"; }
+
+  if (ok) {
+    removeFromQueue(payload.id);
+    alert("Reporte enviado correctamente");
+  } else {
+    alert("⚠️ Sin conexión o sin respuesta del servidor.\nTu reporte quedó guardado y se reenviará automáticamente cuando vuelva la red.");
+  }
 
   resetSelection();
   optionsScreen.classList.add("hidden");
@@ -540,10 +665,49 @@ function send() {
 
   updateCoreButtonsState();
   renderPendingSuggestion();
+  updatePendingIndicator();
+
+  // Por si quedaron otros pendientes acumulados de intentos previos.
+  flushQueue();
 }
 
-/* init */
+/* =========================================================
+   init + reintentos automáticos de la cola
+   ========================================================= */
 renderLegajoHistory("");
+updatePendingIndicator();
+
+/* Cuando vuelve la red o se reactiva la pestaña, reintenta. */
+window.addEventListener("online", flushQueue);
+window.addEventListener("focus",  flushQueue);
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") flushQueue();
+});
+
+/* Reintento periódico de seguridad cada 30s. */
+setInterval(flushQueue, 30000);
+
+/* Reintento manual al tocar el banner de pendientes. */
+document.getElementById("pendingIndicator")?.addEventListener("click", flushQueue);
+
+/* Último recurso al cerrar/ocultar la pestaña: sendBeacon entrega los
+   pendientes en background. Si el servidor deduplica por "id", no hay
+   problema con que también sigan en cola por las dudas. */
+window.addEventListener("pagehide", () => {
+  if (!navigator.sendBeacon) return;
+  const arr = readQueue();
+  for (const item of arr) {
+    try {
+      navigator.sendBeacon(
+        GOOGLE_SCRIPT_URL,
+        new Blob([JSON.stringify(item.payload)], { type: "text/plain;charset=UTF-8" })
+      );
+    } catch (e) {}
+  }
+});
+
+/* Intento inicial al abrir la app. */
+flushQueue();
 </script>
 
 </body>
