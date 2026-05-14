@@ -264,7 +264,7 @@ button {
 <button id="btnHistDias" title="Historial de días anteriores">📅</button>
 
 <!-- Badge de versión + estado de cola (abajo a la derecha) -->
-<div id="versionBadge">v1.6 ✓</div>
+<div id="versionBadge">v1.7 ✓</div>
 
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
@@ -522,16 +522,22 @@ function renderLegajoHistory(legajo) {
   // Orden defensivo: más reciente arriba, más viejo abajo.
   hist.sort((a, b) => (b.ts || 0) - (a.ts || 0));
   container.className = "history-list";
-  container.innerHTML = hist.map(h => `
-    <div class="history-item">
-      <div class="line1">${escapeHtml(h.opcion)} — ${escapeHtml(h.descripcion)}${statusBadge(h.status)}</div>
-      <div class="line2">
-        ${h.texto ? `Dato: <b>${escapeHtml(h.texto)}</b><br>` : ""}
-        ${h.ts ? `Fecha: ${escapeHtml(formatDateTime(h.ts))}` : ""}
-        ${h.createdAt ? `<br>Llegó al server: ${escapeHtml(formatDateTime(h.createdAt))}` : ""}
+  container.innerHTML = hist.map(h => {
+    // "Llegó al server" usa createdAt (si Supabase lo devolvió) o sentAt
+    // (la hora en que el cliente recibió la confirmación 201, que para
+    // efectos prácticos es cuando llegó a Supabase).
+    const arrived = h.createdAt || h.sentAt;
+    return `
+      <div class="history-item">
+        <div class="line1">${escapeHtml(h.opcion)} — ${escapeHtml(h.descripcion)}${statusBadge(h.status)}</div>
+        <div class="line2">
+          ${h.texto ? `Dato: <b>${escapeHtml(h.texto)}</b><br>` : ""}
+          ${h.ts ? `Fecha: ${escapeHtml(formatDateTime(h.ts))}` : ""}
+          ${arrived ? `<br>Llegó al server: ${escapeHtml(formatDateTime(arrived))}` : ""}
+        </div>
       </div>
-    </div>
-  `).join("");
+    `;
+  }).join("");
 }
 
 /* =========================================================
@@ -606,14 +612,17 @@ function openHistoryModal() {
     content.innerHTML = previas.map(d => `
       <div class="hist-day-block">
         <div class="hist-day-title">${escapeHtml(formatDayLong(d.fecha))} (${d.items.length})</div>
-        ${d.items.map(it => `
-          <div class="hist-day-item">
-            <b>${escapeHtml(it.opcion)}</b> — ${escapeHtml(it.descripcion)}${statusBadge(it.status)}
-            ${it.texto ? ` — <i>${escapeHtml(it.texto)}</i>` : ""}
-            ${it.ts ? `<br><span style="color:#666;font-size:12px;">${escapeHtml(formatDateTime(it.ts))}</span>` : ""}
-            ${it.createdAt ? `<br><span style="color:#666;font-size:12px;">Llegó al server: ${escapeHtml(formatDateTime(it.createdAt))}</span>` : ""}
-          </div>
-        `).join("")}
+        ${d.items.map(it => {
+          const arrived = it.createdAt || it.sentAt;
+          return `
+            <div class="hist-day-item">
+              <b>${escapeHtml(it.opcion)}</b> — ${escapeHtml(it.descripcion)}${statusBadge(it.status)}
+              ${it.texto ? ` — <i>${escapeHtml(it.texto)}</i>` : ""}
+              ${it.ts ? `<br><span style="color:#666;font-size:12px;">${escapeHtml(formatDateTime(it.ts))}</span>` : ""}
+              ${arrived ? `<br><span style="color:#666;font-size:12px;">Llegó al server: ${escapeHtml(formatDateTime(arrived))}</span>` : ""}
+            </div>
+          `;
+        }).join("")}
       </div>
     `).join("");
   }
@@ -1198,7 +1207,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v1.6";
+const APP_VERSION = "v1.7";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
