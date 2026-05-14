@@ -320,9 +320,10 @@ let selected = null;
 /* =========================================================
    STORAGE LOCAL — versiones e identificadores
    ========================================================= */
-const STATE_KEY      = "legajo_state_virgilio_v1";
-const HIST_V2_PREFIX = "legajo_hist_virgilio_v2";       // keys: <prefix>::AAAA-MM-DD::<legajo>
-const DAY_GUARD_KEY  = "legajo_day_guard_virgilio_v1";  // última fecha vista (hora Arg)
+const STATE_KEY       = "legajo_state_virgilio_v1";
+const HIST_V2_PREFIX  = "legajo_hist_virgilio_v2";        // keys: <prefix>::AAAA-MM-DD::<legajo>
+const DAY_GUARD_KEY   = "legajo_day_guard_virgilio_v1";   // última fecha vista (hora Arg)
+const LAST_LEGAJO_KEY = "legajo_last_virgilio_v1";        // último legajo usado en este celular
 
 const TZ_AR           = "America/Argentina/Buenos_Aires";
 const MAX_PROD_DAYS   = 10;        // se retienen N días PRODUCTIVOS (con datos), no calendario
@@ -347,6 +348,19 @@ function formatDateTime(ts) {
 function formatDayLong(fecha) {
   const p = fecha.split("-");
   return `${p[2]}/${p[1]}/${p[0]}`;
+}
+
+/* =========================================================
+   ÚLTIMO LEGAJO (persistente entre cierres de app)
+   Se guarda al confirmar "Continuar" y se precarga al abrir.
+   Si otro operario quiere usar el mismo celular: solo borra y reescribe.
+   ========================================================= */
+function saveLastLegajo(legajo) {
+  try { localStorage.setItem(LAST_LEGAJO_KEY, String(legajo || "")); } catch {}
+}
+function readLastLegajo() {
+  try { return localStorage.getItem(LAST_LEGAJO_KEY) || ""; }
+  catch { return ""; }
 }
 
 /* =========================================================
@@ -672,6 +686,7 @@ Object.keys(filas).forEach(rowId => {
    ========================================================= */
 function goToOptions() {
   if (!legajoInput.value) return alert("Ingresá el número de legajo");
+  saveLastLegajo(legajoInput.value);    // persistir para próximas aperturas
   legajoScreen.classList.add("hidden");
   optionsScreen.classList.remove("hidden");
   document.getElementById("btnHistDias")?.classList.add("hidden");
@@ -1116,11 +1131,9 @@ async function send() {
   legajoScreen.classList.remove("hidden");
   document.getElementById("btnHistDias")?.classList.remove("hidden");
 
+  // No se borra el legajo: el operario suele encadenar varios reportes seguidos.
+  // Para cambiar de operario alcanza con tocar el input y reescribir.
   renderLegajoHistory(legajoInput.value);
-
-  legajoInput.value = "";
-  renderLegajoHistory("");
-
   updateCoreButtonsState();
   renderPendingSuggestion();
   updatePendingIndicator();
@@ -1201,7 +1214,19 @@ if ("serviceWorker" in navigator) {
   navigator.serviceWorker.addEventListener("message", handleServiceWorkerMessage);
 }
 
-renderLegajoHistory("");
+/* Precargar el último legajo guardado (para que el operario no tenga
+   que reescribirlo cada vez que abre la app). Si nunca usó la app en
+   este celular, el input queda vacío. */
+const _prevLegajo = readLastLegajo();
+if (_prevLegajo) {
+  legajoInput.value = _prevLegajo;
+  renderLegajoHistory(_prevLegajo);
+  updateCoreButtonsState();
+  renderPendingSuggestion();
+} else {
+  renderLegajoHistory("");
+}
+
 updatePendingIndicator();
 
 /* Cuando vuelve la red, drená la cola de manera agresiva durante 3s
