@@ -11,7 +11,7 @@ const SW_VERSION = "v1.0-vir";
 const SUPABASE_URL = "https://hrxfctzncixxqmpfhskv.supabase.co";
 const SUPABASE_KEY = "sb_publishable_BqpAgZH6ty-9wft10_YMhw_0rcIPuWT";
 const SUPABASE_TABLE_ENDPOINT =
-  SUPABASE_URL + "/rest/v1/registros_produccion_virgilio";
+  SUPABASE_URL + "/rest/v1/Registros_Produccion_Virgilio";
 
 const IDB_NAME    = "registro-prod-virgilio";
 const IDB_VERSION = 1;
