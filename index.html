@@ -906,6 +906,42 @@ async function trySendOneReport(payload) {
   }
 }
 
+/* =========================================================
+   AUDITORÍA REMOTA: registra eventos de envío fallido en la tabla
+   Auditoria_Produccion_Virgilio. Best-effort, fire-and-forget.
+   Si la tabla no existe o no hay red, el log se descarta silencioso.
+   ========================================================= */
+const AUDIT_ENDPOINT =
+  SUPABASE_URL + "/rest/v1/Auditoria_Produccion_Virgilio";
+
+function logErrorToAudit(payload, attempts, r) {
+  try {
+    const body = {
+      client_id:   payload.id || null,
+      legajo:      payload.legajo || null,
+      opcion:      payload.opcion || null,
+      descripcion: payload.descripcion || null,
+      texto:       payload.texto || null,
+      ts_cliente:  payload.ts ? new Date(payload.ts).toISOString() : null,
+      ts_inicio:   payload.ts_inicio_iso || null,
+      intentos:    attempts || 1,
+      motivo:      r.networkFail ? "network" : `server_${r.status || "?"}`,
+      user_agent:  (typeof navigator !== "undefined" && navigator.userAgent) || null
+    };
+    fetch(AUDIT_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "apikey":        SUPABASE_KEY,
+        "Authorization": "Bearer " + SUPABASE_KEY,
+        "Content-Type":  "application/json",
+        "Prefer":        "return=minimal"
+      },
+      body: JSON.stringify(body),
+      keepalive: true
+    }).catch(() => {});
+  } catch { /* fire and forget */ }
+}
+
 /* Vacía la cola intentando enviar lo pendiente.
    - Procesa hasta BATCH_SIZE items por pasada.
    - Si la red cae (networkFail), corta para no martillar.
@@ -937,11 +973,17 @@ async function flushQueue() {
         // Anotar intento en la cola
         const cur = readQueue();
         const i = cur.findIndex(x => x.id === item.id);
+        let newAttempts = (item.attempts || 0) + 1;
         if (i >= 0) {
-          cur[i].attempts = (cur[i].attempts || 0) + 1;
+          cur[i].attempts = newAttempts;
           cur[i].lastTry  = Date.now();
           cur[i].lastErr  = r.networkFail ? "network" : `server_${r.status||"?"}`;
           writeQueue(cur);
+          newAttempts = cur[i].attempts;
+        }
+        // Auditoría remota: 1er intento y cada 5 (para no spamear)
+        if (newAttempts === 1 || newAttempts % 5 === 0) {
+          logErrorToAudit(item.payload, newAttempts, r);
         }
         // Solo marcar "failed" en el historial si fue rechazo del server.
         // Si fue networkFail, dejarlo como "queued" — va a reintentar solo.

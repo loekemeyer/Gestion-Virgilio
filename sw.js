@@ -12,6 +12,8 @@ const SUPABASE_URL = "https://hrxfctzncixxqmpfhskv.supabase.co";
 const SUPABASE_KEY = "sb_publishable_BqpAgZH6ty-9wft10_YMhw_0rcIPuWT";
 const SUPABASE_TABLE_ENDPOINT =
   SUPABASE_URL + "/rest/v1/Registros_Produccion_Virgilio";
+const AUDIT_ENDPOINT =
+  SUPABASE_URL + "/rest/v1/Auditoria_Produccion_Virgilio";
 
 const IDB_NAME    = "registro-prod-virgilio";
 const IDB_VERSION = 1;
@@ -51,6 +53,42 @@ function idbDelete(id) {
     r.onsuccess = () => res();
     r.onerror   = () => rej(r.error);
   }));
+}
+function idbPut(item) {
+  return idbOpen().then(db => new Promise((res, rej) => {
+    const tx = db.transaction(IDB_STORE, "readwrite");
+    const r = tx.objectStore(IDB_STORE).put(item);
+    r.onsuccess = () => res();
+    r.onerror   = () => rej(r.error);
+  }));
+}
+
+/* ============== Auditoría remota (best-effort) ============== */
+function logErrorToAudit(payload, attempts, r) {
+  try {
+    const body = {
+      client_id:   payload.id || null,
+      legajo:      payload.legajo || null,
+      opcion:      payload.opcion || null,
+      descripcion: payload.descripcion || null,
+      texto:       payload.texto || null,
+      ts_cliente:  payload.ts ? new Date(payload.ts).toISOString() : null,
+      ts_inicio:   payload.ts_inicio_iso || null,
+      intentos:    attempts || 1,
+      motivo:      r.networkFail ? "network" : `server_${r.status || "?"}`,
+      user_agent:  (self.navigator && self.navigator.userAgent) || "sw"
+    };
+    fetch(AUDIT_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "apikey":        SUPABASE_KEY,
+        "Authorization": "Bearer " + SUPABASE_KEY,
+        "Content-Type":  "application/json",
+        "Prefer":        "return=minimal"
+      },
+      body: JSON.stringify(body)
+    }).catch(() => {});
+  } catch { /* fire and forget */ }
 }
 
 /* ============== Envío a Supabase ============== */
@@ -97,13 +135,23 @@ async function flushQueueInSW() {
     const r = await trySendOneReport(item.payload);
     if (r.ok) {
       try { await idbDelete(item.id); } catch {}
-    } else if (r.networkFail) {
-      // Red caída: cortar, pedirle al browser que reintente otro sync.
-      hadNetworkFail = true;
-      break;
+    } else {
+      // Anotar intento en IDB y auditar (intento 1 y cada 5).
+      const newAttempts = (item.attempts || 0) + 1;
+      item.attempts = newAttempts;
+      item.lastTry  = Date.now();
+      item.lastErr  = r.networkFail ? "network" : `server_${r.status || "?"}`;
+      try { await idbPut(item); } catch {}
+      if (newAttempts === 1 || newAttempts % 5 === 0) {
+        logErrorToAudit(item.payload, newAttempts, r);
+      }
+      if (r.networkFail) {
+        hadNetworkFail = true;
+        break;
+      }
+      // Rechazo del server: seguir con los demás. Quedan en IDB y la
+      // página los va a mostrar como ⚠ falló cuando reconcile corra.
     }
-    // Rechazo del server (4xx/5xx): seguir con los demás. Quedan en IDB y la
-    // página los va a mostrar como ⚠ falló cuando reconcile corra.
   }
   // Throw -> el browser planifica reintento del sync con backoff.
   if (hadNetworkFail) throw new Error("network_down");
