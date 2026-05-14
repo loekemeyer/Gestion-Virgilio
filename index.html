@@ -143,6 +143,9 @@ button {
   align-items: center;
   justify-content: center;
 }
+/* Override del .hidden global: el ID es más específico que la clase,
+   así que sin esta regla el botón queda visible en la pantalla de tareas. */
+#btnHistDias.hidden { display: none; }
 
 /* Modal de historial de días anteriores */
 #histModal{
