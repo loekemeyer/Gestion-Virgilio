@@ -258,7 +258,7 @@ button {
 <button id="btnHistDias" title="Historial de días anteriores">📅</button>
 
 <!-- Badge de versión + estado de cola (abajo a la derecha) -->
-<div id="versionBadge">v1.1 ✓</div>
+<div id="versionBadge">v1.2 ✓</div>
 
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
@@ -482,6 +482,8 @@ function renderLegajoHistory(legajo) {
     container.innerText = "No hay reportes hoy para este legajo en este dispositivo.";
     return;
   }
+  // Orden defensivo: más reciente arriba, más viejo abajo.
+  hist.sort((a, b) => (b.ts || 0) - (a.ts || 0));
   container.className = "history-list";
   container.innerHTML = hist.map(h => `
     <div class="history-item">
@@ -552,6 +554,8 @@ function openHistoryModal() {
   if (!previas.length) {
     content.innerHTML = `<div class="history-empty">No hay reportes de días anteriores guardados en este dispositivo para el legajo ${escapeHtml(legajoStr)}.</div>`;
   } else {
+    // Orden defensivo dentro de cada día: más reciente arriba.
+    previas.forEach(d => d.items.sort((a, b) => (b.ts || 0) - (a.ts || 0)));
     content.innerHTML = previas.map(d => `
       <div class="hist-day-block">
         <div class="hist-day-title">${escapeHtml(formatDayLong(d.fecha))} (${d.items.length})</div>
@@ -1106,7 +1110,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v1.1";
+const APP_VERSION = "v1.2";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
