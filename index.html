@@ -590,6 +590,11 @@ legajoInput.addEventListener("input", () => {
 const CORE_CODES   = ["EP","TP","AP","TAP"];
 const TOGGLE_CODES = ["CR","CC","RT","MG","RI","EI","AT","PB","Limp","PC","Perm","CT"];
 
+/* Códigos de TIEMPO MUERTO. Cuando uno está abierto, se bloquea todo lo
+   demás hasta cerrarlo (tocando el mismo botón otra vez). El resto de
+   los toggles (CR, MG, CC, RT, RI, EI, Perm) NO bloquean. */
+const DEAD_TIME_CODES = ["AT","PB","Limp","PC","CT"];
+
 function readStateMap(){
   try { return JSON.parse(localStorage.getItem(STATE_KEY)) || {}; }
   catch { return {}; }
@@ -637,22 +642,30 @@ function toggleStartOrEnd(legajo, code){
    BLOQUEO: si hay cualquier toggle activo (no-core), NO se puede seleccionar EP/TP/AP/TAP
    + deshabilitado visual
    ========================================================= */
+/* Devuelve el código del TIEMPO MUERTO actualmente abierto, o null.
+   Solo AT, PB, Limp, PC y CT cuentan como bloqueantes. */
 function getAnyBlockingToggleActive(legajo){
   const st = getLegajoState(legajo);
-  const keys = Object.keys(st.toggles || {});
-  return keys[0] || null;
+  if (!st.toggles) return null;
+  for (const code of DEAD_TIME_CODES) {
+    if (st.toggles[code]) return code;
+  }
+  return null;
 }
 
+/* Si hay un tiempo muerto activo, deshabilita TODOS los botones menos el
+   mismo (para poder cerrarlo). Sin tiempo muerto, todo habilitado. */
 function updateCoreButtonsState(){
   const legajoStr = String(legajoInput.value || "");
-  const blocking = getAnyBlockingToggleActive(legajoStr);
+  const deadTime = getAnyBlockingToggleActive(legajoStr);
 
   document.querySelectorAll(".box").forEach(b=>{
     const code = b.querySelector(".box-title")?.innerText?.trim();
     if (!code) return;
-    if (CORE_CODES.includes(code)) {
-      if (blocking) b.classList.add("disabled");
-      else b.classList.remove("disabled");
+    if (deadTime && code !== deadTime) {
+      b.classList.add("disabled");
+    } else {
+      b.classList.remove("disabled");
     }
   });
 }
@@ -749,14 +762,13 @@ function backToLegajo() {
 function selectOption(code) {
   const legajoStr = String(legajoInput.value || "");
 
-  // bloqueo de core
-  if (CORE_CODES.includes(code)) {
-    const blocking = getAnyBlockingToggleActive(legajoStr);
-    if (blocking) {
-      alert(`Tenés una acción pendiente: ${blocking} — ${desc[blocking]}\nTerminála antes de usar EP/TP/AP/TAP.`);
-      updateCoreButtonsState();
-      return;
-    }
+  // Bloqueo por TIEMPO MUERTO: si hay AT/PB/Limp/PC/CT abierto, solo se
+  // puede tocar ese mismo código (para cerrarlo). El resto queda inhabilitado.
+  const deadTime = getAnyBlockingToggleActive(legajoStr);
+  if (deadTime && code !== deadTime) {
+    alert(`Tenés un tiempo muerto abierto: ${deadTime} — ${desc[deadTime]}\nTocá ${deadTime} de nuevo para terminarlo antes de hacer otra cosa.`);
+    updateCoreButtonsState();
+    return;
   }
 
   selected = code;
