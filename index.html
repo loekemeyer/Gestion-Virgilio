@@ -103,10 +103,140 @@ button {
   pointer-events:none;
   opacity:0.6;
 }
+
+/* ✅ aviso de reportes pendientes (se reintenta solo en background) */
+#pendingIndicator{
+  display: none;
+  margin-top: 12px;
+  padding: 12px;
+  background: #ffe0e0;
+  border: 2px solid #d33;
+  border-radius: 8px;
+  font-size: 18px;
+  text-align: center;
+  color: #900;
+  font-weight: bold;
+}
+
+/* Resumen de hoy: lista scrolleable con todos los reportes del día */
+.history-list{
+  max-height: 360px;
+  overflow-y: auto;
+  text-align: left;
+}
+
+/* Botón flotante 📅 (historial de días anteriores) */
+#btnHistDias{
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 2px solid #cbd5e1;
+  background: #f8fafc;
+  font-size: 22px;
+  cursor: pointer;
+  z-index: 100;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Modal de historial de días anteriores */
+#histModal{
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 200;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 24px 8px;
+  overflow-y: auto;
+}
+#histModal.show{ display: flex; }
+.hist-modal-card{
+  background: #fff;
+  border-radius: 12px;
+  padding: 16px;
+  width: 100%;
+  max-width: 600px;
+  max-height: 92vh;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+.hist-modal-header{
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  position: sticky;
+  top: 0;
+  background: #fff;
+  padding-bottom: 8px;
+}
+.hist-modal-title{ font-size: 18px; font-weight: bold; }
+.hist-modal-close{
+  background: #eee;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 16px;
+  padding: 6px 14px;
+  cursor: pointer;
+}
+.hist-day-block{
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+}
+.hist-day-title{
+  font-size: 16px;
+  font-weight: bold;
+  margin-bottom: 8px;
+  color: #1e6bd6;
+}
+.hist-day-item{
+  font-size: 14px;
+  padding: 6px 0;
+  border-top: 1px solid #f0f0f0;
+}
+.hist-day-item:first-child{ border-top: none; }
+
+/* Badge de estado por reporte (queued / sent / failed) */
+.status-badge{
+  display: inline-block;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-weight: bold;
+  margin-left: 6px;
+  vertical-align: middle;
+  line-height: 1.3;
+}
+.status-sent   { background: #d1fae5; color: #065f46; }
+.status-failed { background: #fee2e2; color: #991b1b; }
+.status-queued { background: #fef3c7; color: #92400e; }
 </style>
 </head>
 
 <body>
+
+<!-- Botón flotante: historial de días anteriores -->
+<button id="btnHistDias" title="Historial de días anteriores">📅</button>
+
+<!-- Modal: historial de días anteriores (oculto por defecto) -->
+<div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
+  <div class="hist-modal-card">
+    <div class="hist-modal-header">
+      <div class="hist-modal-title">Historial de días anteriores</div>
+      <button class="hist-modal-close" onclick="closeHistoryModal()">Cerrar</button>
+    </div>
+    <div id="histModalContent"></div>
+  </div>
+</div>
 
 <!-- ================= LEGAJO ================= -->
 <div id="legajoScreen">
@@ -115,9 +245,12 @@ button {
 
   <!-- 👇 espacio para historial -->
   <div id="legajoHistorySpace">
-    <div class="history-title">Últimos 2 reportes de este legajo</div>
-    <div id="legajoHistoryContent" class="history-empty">Ingresá tu legajo para ver el historial</div>
+    <div class="history-title">Resumen de hoy</div>
+    <div id="legajoHistoryContent" class="history-empty">Ingresá tu legajo para ver el resumen</div>
   </div>
+
+  <!-- Aviso: hay reportes que aún no se enviaron a Google Sheets -->
+  <div id="pendingIndicator"></div>
 
   <button class="primary-btn" onclick="goToOptions()">Continuar</button>
   <div class="small" id="status"></div>
@@ -149,15 +282,23 @@ button {
       <input id="textInput" class="text-input">
     </div>
 
-    <button class="primary-btn" onclick="send()">Enviar</button>
+    <button id="sendBtn" class="primary-btn" onclick="send()">Enviar</button>
     <div id="error" class="error"></div>
 
   </div>
 </div>
 
 <script>
-const GOOGLE_SCRIPT_URL =
-"https://script.google.com/macros/s/AKfycbwtBRC-bEeVkFNa8MQnJwJr_L4DalBVoS6N8H9C1Z0vh2CLI29Sep7ZZIIVKz6eOGzj/exec";
+/* =========================================================
+   SUPABASE
+   Org "Gestion Productiva" / Proyecto "Control Partes Talleristas".
+   La publishable key es pública por diseño (va embebida en la HTML
+   servida por GitHub Pages). La RLS permite SOLO INSERT con esta key.
+   ========================================================= */
+const SUPABASE_URL  = "https://hrxfctzncixxqmpfhskv.supabase.co";
+const SUPABASE_KEY  = "sb_publishable_BqpAgZH6ty-9wft10_YMhw_0rcIPuWT";
+const SUPABASE_TABLE_ENDPOINT =
+  SUPABASE_URL + "/rest/v1/Registros_Produccion_Virgilio";
 
 const filas = {
   row1: ["EP","TP","AP","TAP","CR","CC"],
@@ -177,62 +318,211 @@ const desc = {
 let selected = null;
 
 /* =========================================================
-   STORAGE LOCAL (reemplaza cookies)
+   STORAGE LOCAL — versiones e identificadores
    ========================================================= */
-const HISTORY_KEY  = "legajo_history_virgilio_v1";
-const STATE_KEY    = "legajo_state_virgilio_v1";
+const STATE_KEY       = "legajo_state_virgilio_v1";
+const HIST_V2_PREFIX  = "legajo_hist_virgilio_v2";        // keys: <prefix>::AAAA-MM-DD::<legajo>
+const DAY_GUARD_KEY   = "legajo_day_guard_virgilio_v1";   // última fecha vista (hora Arg)
+const LAST_LEGAJO_KEY = "legajo_last_virgilio_v1";        // último legajo usado en este celular
+
+const TZ_AR           = "America/Argentina/Buenos_Aires";
+const MAX_PROD_DAYS   = 10;        // se retienen N días PRODUCTIVOS (con datos), no calendario
+const HIST_MAX_PER_DAY = 700;      // tope de reportes por día por legajo en localStorage
+const SURVIVING_TOGGLES = ["CR","MG"]; // únicos toggles que sobreviven al cambio de día
 
 /* =========================================================
-   HISTORIAL (últimos 2)
+   FECHA / TIMESTAMP
    ========================================================= */
-function readHistoryMap() {
-  try { return JSON.parse(localStorage.getItem(HISTORY_KEY)) || {}; }
-  catch { return {}; }
-}
-function writeHistoryMap(map) {
-  localStorage.setItem(HISTORY_KEY, JSON.stringify(map));
+function getTodayKey() {
+  // YYYY-MM-DD en hora de Buenos Aires (independiente de la TZ del dispositivo)
+  const d = new Date(new Date().toLocaleString("en-US", { timeZone: TZ_AR }));
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,"0");
+  const dd = String(d.getDate()).padStart(2,"0");
+  return `${y}-${m}-${dd}`;
 }
 function formatDateTime(ts) {
   try { return new Date(ts).toLocaleString("es-AR"); }
   catch { return ""; }
 }
+function formatDayLong(fecha) {
+  const p = fecha.split("-");
+  return `${p[2]}/${p[1]}/${p[0]}`;
+}
+
+/* =========================================================
+   ÚLTIMO LEGAJO (persistente entre cierres de app)
+   Se guarda al confirmar "Continuar" y se precarga al abrir.
+   Si otro operario quiere usar el mismo celular: solo borra y reescribe.
+   ========================================================= */
+function saveLastLegajo(legajo) {
+  try { localStorage.setItem(LAST_LEGAJO_KEY, String(legajo || "")); } catch {}
+}
+function readLastLegajo() {
+  try { return localStorage.getItem(LAST_LEGAJO_KEY) || ""; }
+  catch { return ""; }
+}
+
+/* =========================================================
+   HISTORIAL POR DÍA Y LEGAJO
+   - Una key por (fecha, legajo). El "Resumen de hoy" es el array de hoy.
+   - El modal 📅 muestra todos los días anteriores con datos.
+   ========================================================= */
+function histKey(fecha, legajo) {
+  return `${HIST_V2_PREFIX}::${fecha}::${legajo}`;
+}
+function readDayHist(fecha, legajo) {
+  try { return JSON.parse(localStorage.getItem(histKey(fecha, legajo)) || "[]"); }
+  catch { return []; }
+}
+function writeDayHist(fecha, legajo, arr) {
+  try { localStorage.setItem(histKey(fecha, legajo), JSON.stringify(arr)); } catch {}
+}
 function pushHistoryForLegajo(legajo, item) {
-  const map = readHistoryMap();
-  if (!map[legajo]) map[legajo] = [];
-  map[legajo].unshift(item);
-  map[legajo] = map[legajo].slice(0,2);
-  writeHistoryMap(map);
+  const fecha = getTodayKey();
+  const arr = readDayHist(fecha, legajo);
+  arr.unshift({ ...item, status: item.status || "queued" });
+  if (arr.length > HIST_MAX_PER_DAY) arr.length = HIST_MAX_PER_DAY;
+  writeDayHist(fecha, legajo, arr);
 }
-function getHistoryForLegajo(legajo) {
-  const map = readHistoryMap();
-  const arr = map[legajo];
-  return Array.isArray(arr) ? arr : [];
+
+/* Marca un item del historial como sent / failed / queued. */
+function setHistoryItemStatus(legajo, fecha, itemId, status, sentAtIso) {
+  if (!legajo || !fecha || !itemId) return false;
+  const arr = readDayHist(fecha, legajo);
+  const i = arr.findIndex(it => it.id === itemId);
+  if (i < 0) return false;
+  arr[i].status = status;
+  if (sentAtIso) arr[i].sentAt = sentAtIso;
+  writeDayHist(fecha, legajo, arr);
+  return true;
 }
+
+/* Pintar el badge según el status del item. */
+function statusBadge(status) {
+  if (status === "sent")   return ` <span class="status-badge status-sent">✓ enviado</span>`;
+  if (status === "failed") return ` <span class="status-badge status-failed">⚠ falló</span>`;
+  if (status === "queued") return ` <span class="status-badge status-queued">⏳ en cola</span>`;
+  return "";
+}
+function getAllPrevDaysForLegajo(legajo) {
+  const today = getTodayKey();
+  const result = []; // [{ fecha, items }]
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (!k || !k.startsWith(HIST_V2_PREFIX + "::")) continue;
+    const parts = k.split("::");
+    if (parts.length !== 3) continue;
+    if (parts[2] !== legajo || parts[1] === today) continue;
+    try {
+      const items = JSON.parse(localStorage.getItem(k) || "[]");
+      if (items.length) result.push({ fecha: parts[1], items });
+    } catch {}
+  }
+  result.sort((a,b) => b.fecha.localeCompare(a.fecha));
+  return result;
+}
+
 function renderLegajoHistory(legajo) {
   const container = document.getElementById("legajoHistoryContent");
   if (!legajo) {
     container.className = "history-empty";
-    container.innerText = "Ingresá tu legajo para ver el historial";
+    container.innerText = "Ingresá tu legajo para ver el resumen";
     return;
   }
-
-  const hist = getHistoryForLegajo(String(legajo));
+  const hist = readDayHist(getTodayKey(), String(legajo));
   if (!hist.length) {
     container.className = "history-empty";
-    container.innerText = "No hay reportes guardados para este legajo en este dispositivo.";
+    container.innerText = "No hay reportes hoy para este legajo en este dispositivo.";
     return;
   }
-
-  container.className = "";
+  container.className = "history-list";
   container.innerHTML = hist.map(h => `
     <div class="history-item">
-      <div class="line1">${h.opcion} — ${h.descripcion}</div>
+      <div class="line1">${h.opcion} — ${h.descripcion}${statusBadge(h.status)}</div>
       <div class="line2">
         ${h.texto ? `Dato: <b>${h.texto}</b><br>` : ""}
         ${h.ts ? `Fecha: ${formatDateTime(h.ts)}` : ""}
       </div>
     </div>
   `).join("");
+}
+
+/* =========================================================
+   LIMPIEZA AL CAMBIAR DE DÍA
+   1) Retiene los últimos N días PRODUCTIVOS (los que tienen datos),
+      no se cuentan días sin trabajo.
+   2) Borra del estado los toggles que NO sobreviven al día siguiente:
+      todos menos "CR" y "MG". Picking y armado quedan intactos.
+   Nunca toca lo que ya se mandó a Supabase.
+   ========================================================= */
+function cleanupIfDayChanged() {
+  const today = getTodayKey();
+  const last  = localStorage.getItem(DAY_GUARD_KEY);
+  if (last === today) return;
+
+  // (1) Retención de N días productivos
+  const dates = new Set();
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (!k || !k.startsWith(HIST_V2_PREFIX + "::")) continue;
+    const parts = k.split("::");
+    if (parts.length === 3) dates.add(parts[1]);
+  }
+  const keep = new Set(
+    Array.from(dates).sort((a,b) => b.localeCompare(a)).slice(0, MAX_PROD_DAYS)
+  );
+  const toDelete = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (!k || !k.startsWith(HIST_V2_PREFIX + "::")) continue;
+    const parts = k.split("::");
+    if (parts.length === 3 && !keep.has(parts[1])) toDelete.push(k);
+  }
+  toDelete.forEach(k => localStorage.removeItem(k));
+
+  // (2) Limpiar toggles que NO sobreviven al día siguiente
+  const map = readStateMap();
+  for (const leg of Object.keys(map)) {
+    const st = map[leg];
+    if (!st || !st.toggles) continue;
+    for (const code of Object.keys(st.toggles)) {
+      if (!SURVIVING_TOGGLES.includes(code)) delete st.toggles[code];
+    }
+  }
+  writeStateMap(map);
+
+  localStorage.setItem(DAY_GUARD_KEY, today);
+}
+
+/* =========================================================
+   MODAL "Historial de días anteriores"
+   ========================================================= */
+function openHistoryModal() {
+  const legajoStr = String(legajoInput.value || "").trim();
+  if (!legajoStr) { alert("Ingresá tu legajo primero"); return; }
+  const previas = getAllPrevDaysForLegajo(legajoStr);
+  const content = document.getElementById("histModalContent");
+  if (!previas.length) {
+    content.innerHTML = `<div class="history-empty">No hay reportes de días anteriores guardados en este dispositivo para el legajo ${legajoStr}.</div>`;
+  } else {
+    content.innerHTML = previas.map(d => `
+      <div class="hist-day-block">
+        <div class="hist-day-title">${formatDayLong(d.fecha)} (${d.items.length})</div>
+        ${d.items.map(it => `
+          <div class="hist-day-item">
+            <b>${it.opcion}</b> — ${it.descripcion}${statusBadge(it.status)}
+            ${it.texto ? ` — <i>${it.texto}</i>` : ""}
+            ${it.ts ? `<br><span style="color:#666;font-size:12px;">${formatDateTime(it.ts)}</span>` : ""}
+          </div>
+        `).join("")}
+      </div>
+    `).join("");
+  }
+  document.getElementById("histModal").classList.add("show");
+}
+function closeHistoryModal() {
+  document.getElementById("histModal").classList.remove("show");
 }
 
 /* Live render historial al tipear legajo */
@@ -288,8 +578,12 @@ function isToggleEnding(legajo, code){
 function toggleStartOrEnd(legajo, code){
   const st = getLegajoState(legajo);
   const wasActive = !!st.toggles[code];
-  if (wasActive) delete st.toggles[code];
-  else st.toggles[code] = true;
+  if (wasActive) {
+    delete st.toggles[code];
+  } else {
+    // Guarda el ts de apertura como ISO string; truthiness sigue funcionando.
+    st.toggles[code] = new Date().toISOString();
+  }
   setLegajoState(legajo, st);
   return { started: !wasActive, ended: wasActive };
 }
@@ -392,8 +686,10 @@ Object.keys(filas).forEach(rowId => {
    ========================================================= */
 function goToOptions() {
   if (!legajoInput.value) return alert("Ingresá el número de legajo");
+  saveLastLegajo(legajoInput.value);    // persistir para próximas aperturas
   legajoScreen.classList.add("hidden");
   optionsScreen.classList.remove("hidden");
+  document.getElementById("btnHistDias")?.classList.add("hidden");
   renderPendingSuggestion();
   updateCoreButtonsState();
 }
@@ -401,6 +697,7 @@ function goToOptions() {
 function backToLegajo() {
   optionsScreen.classList.add("hidden");
   legajoScreen.classList.remove("hidden");
+  document.getElementById("btnHistDias")?.classList.remove("hidden");
   renderLegajoHistory(legajoInput.value);
 }
 
@@ -477,73 +774,489 @@ function resetSelection() {
 }
 
 /* =========================================================
+   COLA DE ENVÍOS (offline-first)
+   Resuelve: reportes que se perdían cuando la red estaba caída,
+   porque el fetch anterior tenía .catch(()=>{}) y se mostraba
+   "Reporte enviado correctamente" aunque no hubiera llegado.
+   ========================================================= */
+const QUEUE_KEY = "legajo_queue_virgilio_v1";
+
+function readQueue() {
+  try { return JSON.parse(localStorage.getItem(QUEUE_KEY)) || []; }
+  catch { return []; }
+}
+function writeQueue(arr) {
+  try { localStorage.setItem(QUEUE_KEY, JSON.stringify(arr)); } catch {}
+}
+
+/* =========================================================
+   IndexedDB — espejo de la cola, accesible al Service Worker.
+   localStorage es solo accesible desde la página (no desde el SW),
+   así que duplicamos cada item en IDB para que el SW pueda enviarlo
+   en background aunque la app esté cerrada.
+   ========================================================= */
+const IDB_NAME    = "registro-prod-virgilio";
+const IDB_VERSION = 1;
+const IDB_STORE   = "queue";
+let _idbDbPromise = null;
+function idbOpen() {
+  if (_idbDbPromise) return _idbDbPromise;
+  if (!("indexedDB" in window)) {
+    _idbDbPromise = Promise.reject(new Error("IDB no disponible"));
+    return _idbDbPromise;
+  }
+  _idbDbPromise = new Promise((resolve, reject) => {
+    const req = indexedDB.open(IDB_NAME, IDB_VERSION);
+    req.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains(IDB_STORE)) {
+        db.createObjectStore(IDB_STORE, { keyPath: "id" });
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror   = () => reject(req.error);
+  });
+  return _idbDbPromise;
+}
+function idbPut(item) {
+  return idbOpen().then(db => new Promise((res, rej) => {
+    const tx = db.transaction(IDB_STORE, "readwrite");
+    const r = tx.objectStore(IDB_STORE).put(item);
+    r.onsuccess = () => res();
+    r.onerror   = () => rej(r.error);
+  }));
+}
+function idbDelete(id) {
+  return idbOpen().then(db => new Promise((res, rej) => {
+    const tx = db.transaction(IDB_STORE, "readwrite");
+    const r = tx.objectStore(IDB_STORE).delete(id);
+    r.onsuccess = () => res();
+    r.onerror   = () => rej(r.error);
+  }));
+}
+function idbGetAll() {
+  return idbOpen().then(db => new Promise((res, rej) => {
+    const tx = db.transaction(IDB_STORE, "readonly");
+    const r = tx.objectStore(IDB_STORE).getAll();
+    r.onsuccess = () => res(r.result || []);
+    r.onerror   = () => rej(r.error);
+  }));
+}
+
+/* Pide al SW que reintente la cola apenas pueda (Background Sync API).
+   En navegadores sin soporte (Safari iOS), falla silencioso y dependemos
+   del setInterval/online de la página. */
+async function registerBackgroundSync() {
+  if (!("serviceWorker" in navigator)) return;
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    if (reg && "sync" in reg) {
+      await reg.sync.register("flush-queue");
+    }
+  } catch { /* no soportado, sin drama */ }
+}
+
+function enqueueReport(payload) {
+  const item = {
+    id: payload.id,
+    payload,
+    attempts: 0,
+    addedAt: Date.now(),
+    legajo: String(payload.legajo || ""),
+    fecha:  getTodayKey()
+  };
+  // Doble escritura: LS (rápido, para la página) e IDB (visible al SW).
+  const arr = readQueue();
+  arr.push(item);
+  writeQueue(arr);
+  idbPut(item).catch(() => {});
+  updatePendingIndicator();
+  registerBackgroundSync();   // pide al browser que despache aunque cerremos la app
+}
+function removeFromQueue(id) {
+  writeQueue(readQueue().filter(it => it.id !== id));
+  idbDelete(id).catch(() => {});
+  updatePendingIndicator();
+}
+
+/* Intenta enviar UN payload a Supabase.
+   Devuelve { ok, networkFail, status }:
+     - ok=true            -> aceptado (201 ó 409 dedup)
+     - ok=false, networkFail=true  -> sin respuesta (timeout, sin red, CORS)
+     - ok=false, networkFail=false -> el server respondió con error (4xx/5xx) */
+async function trySendOneReport(payload) {
+  try {
+    // Corte duro a los 12s para no quedarnos esperando si la red se cuelga.
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 12000);
+    const res = await fetch(SUPABASE_TABLE_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "apikey":        SUPABASE_KEY,
+        "Authorization": "Bearer " + SUPABASE_KEY,
+        "Content-Type":  "application/json",
+        "Prefer":        "return=minimal"
+      },
+      body: JSON.stringify({
+        client_id:   payload.id,                              // UNIQUE en la tabla -> dedup
+        legajo:      payload.legajo,
+        opcion:      payload.opcion,
+        descripcion: payload.descripcion,
+        texto:       payload.texto,
+        ts_cliente:  new Date(payload.ts).toISOString(),
+        ts_inicio:   payload.ts_inicio_iso || null            // solo poblado en cierres
+      }),
+      keepalive: true,        // sobrevive a cambios de pantalla / cierres rápidos
+      signal: ctrl.signal
+    });
+    clearTimeout(t);
+    if (!res) return { ok: false, networkFail: true };
+    // 201 Created = ok. 409 Conflict = ya existía (reintento exitoso de un envío previo).
+    if (res.ok || res.status === 409) return { ok: true, status: res.status };
+    // Server respondió pero rechazó: data inválida, CHECK falló, etc. No reintentar al toque.
+    return { ok: false, networkFail: false, status: res.status };
+  } catch (e) {
+    // fetch tiró: timeout, offline, CORS, etc.
+    return { ok: false, networkFail: true };
+  }
+}
+
+/* =========================================================
+   AUDITORÍA REMOTA: registra eventos de envío fallido en la tabla
+   Auditoria_Produccion_Virgilio. Best-effort, fire-and-forget.
+   Si la tabla no existe o no hay red, el log se descarta silencioso.
+   ========================================================= */
+const AUDIT_ENDPOINT =
+  SUPABASE_URL + "/rest/v1/Auditoria_Produccion_Virgilio";
+
+function logErrorToAudit(payload, attempts, r) {
+  try {
+    const body = {
+      client_id:   payload.id || null,
+      legajo:      payload.legajo || null,
+      opcion:      payload.opcion || null,
+      descripcion: payload.descripcion || null,
+      texto:       payload.texto || null,
+      ts_cliente:  payload.ts ? new Date(payload.ts).toISOString() : null,
+      ts_inicio:   payload.ts_inicio_iso || null,
+      intentos:    attempts || 1,
+      motivo:      r.networkFail ? "network" : `server_${r.status || "?"}`,
+      user_agent:  (typeof navigator !== "undefined" && navigator.userAgent) || null
+    };
+    fetch(AUDIT_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "apikey":        SUPABASE_KEY,
+        "Authorization": "Bearer " + SUPABASE_KEY,
+        "Content-Type":  "application/json",
+        "Prefer":        "return=minimal"
+      },
+      body: JSON.stringify(body),
+      keepalive: true
+    }).catch(() => {});
+  } catch { /* fire and forget */ }
+}
+
+/* Vacía la cola intentando enviar lo pendiente.
+   - Procesa hasta BATCH_SIZE items por pasada.
+   - Si la red cae (networkFail), corta para no martillar.
+   - Si un item lo rechaza el server (data inválida), sigue con los demás
+     en lugar de bloquear toda la cola. */
+const BATCH_SIZE = 20;
+let flushing = false;
+async function flushQueue() {
+  if (flushing) return;
+  if (typeof navigator !== "undefined" && navigator.onLine === false) {
+    updatePendingIndicator();
+    return;
+  }
+  flushing = true;
+  try {
+    const arr = readQueue();
+    if (!arr.length) return;
+
+    const batch = arr.slice(0, BATCH_SIZE);
+    let historyChanged = false;
+    for (const item of batch) {
+      const r = await trySendOneReport(item.payload);
+      if (r.ok) {
+        removeFromQueue(item.id);
+        if (setHistoryItemStatus(item.legajo, item.fecha, item.id, "sent", new Date().toISOString())) {
+          historyChanged = true;
+        }
+      } else {
+        // Anotar intento en la cola
+        const cur = readQueue();
+        const i = cur.findIndex(x => x.id === item.id);
+        let newAttempts = (item.attempts || 0) + 1;
+        if (i >= 0) {
+          cur[i].attempts = newAttempts;
+          cur[i].lastTry  = Date.now();
+          cur[i].lastErr  = r.networkFail ? "network" : `server_${r.status||"?"}`;
+          writeQueue(cur);
+          newAttempts = cur[i].attempts;
+        }
+        // Auditoría remota: 1er intento y cada 5 (para no spamear)
+        if (newAttempts === 1 || newAttempts % 5 === 0) {
+          logErrorToAudit(item.payload, newAttempts, r);
+        }
+        // Solo marcar "failed" en el historial si fue rechazo del server.
+        // Si fue networkFail, dejarlo como "queued" — va a reintentar solo.
+        if (!r.networkFail) {
+          if (setHistoryItemStatus(item.legajo, item.fecha, item.id, "failed")) {
+            historyChanged = true;
+          }
+        }
+        // Red caída: no insistir con el resto del batch.
+        if (r.networkFail) break;
+        // Server rejection: seguir con el próximo item de la cola.
+      }
+    }
+    // Si la pantalla de legajo está visible y cambió algún status, refresco.
+    if (historyChanged && legajoInput && !legajoScreen.classList.contains("hidden")) {
+      renderLegajoHistory(legajoInput.value);
+    }
+  } finally {
+    flushing = false;
+    updatePendingIndicator();
+  }
+}
+
+function updatePendingIndicator() {
+  const el = document.getElementById("pendingIndicator");
+  if (!el) return;
+  const count = readQueue().length;
+  if (count > 0) {
+    el.style.display = "block";
+    el.textContent = `⚠️ ${count} reporte(s) sin enviar — se reenviarán al volver la red`;
+  } else {
+    el.style.display = "none";
+    el.textContent = "";
+  }
+}
+
+/* =========================================================
    ENVÍO
    ========================================================= */
-function send() {
-  const legajoStr = String(legajoInput.value || "");
-  const opcion = selected;
+async function send() {
+  const legajoStr   = String(legajoInput.value || "");
+  const opcion      = selected;
   const descripcion = desc[selected] || "";
-  const texto = (textInput.value || "").toUpperCase();
+  const texto       = (textInput.value || "").toUpperCase();
 
-  /* ---- historial ---- */
-  if (legajoStr && opcion) {
-    pushHistoryForLegajo(legajoStr, {
-      ts: Date.now(),
-      opcion,
-      descripcion,
-      texto
-    });
+  if (!legajoStr) { alert("Falta el número de legajo"); return; }
+  if (!opcion)    { alert("Falta seleccionar una opción"); return; }
+
+  // ID único por reporte: permite dedup en el server (UNIQUE en client_id).
+  const nowMs  = Date.now();
+  const nowIso = new Date(nowMs).toISOString();
+  const payload = {
+    legajo: legajoInput.value,
+    opcion,
+    descripcion,
+    texto,
+    ts: nowMs,
+    id: nowMs.toString(36) + "_" + Math.random().toString(36).slice(2, 8),
+    ts_inicio_iso: null   // se completa abajo si esta acción es un CIERRE
+  };
+
+  /* ---- ts_inicio para cierres (capturar ANTES de modificar el estado) ---- */
+  if (opcion === "TP") {
+    const st = getLegajoState(legajoStr);
+    payload.ts_inicio_iso = (st.picking && st.picking.ts_inicio) || null;
+  } else if (opcion === "TAP") {
+    const st = getLegajoState(legajoStr);
+    payload.ts_inicio_iso = (st.armado && st.armado.ts_inicio) || null;
+  } else if (TOGGLE_CODES.includes(opcion)) {
+    const st = getLegajoState(legajoStr);
+    const cur = st.toggles && st.toggles[opcion];
+    // string = ISO de apertura (estamos cerrando); true = legacy sin ts; undefined = abriendo
+    if (typeof cur === "string") payload.ts_inicio_iso = cur;
   }
 
-  /* ---- estado / pendientes ---- */
+  /* ---- historial local ---- */
+  pushHistoryForLegajo(legajoStr, {
+    ts: payload.ts, opcion, descripcion, texto,
+    id: payload.id,           // permite actualizar el status cuando se confirme el envío
+    status: "queued"
+  });
+
+  /* ---- estado / pendientes locales ---- */
   if (opcion === "EP") {
     const st = getLegajoState(legajoStr);
-    st.picking = { active:true, value:texto };
+    st.picking = { active:true, value:texto, ts_inicio: nowIso };
     setLegajoState(legajoStr, st);
   } else if (opcion === "TP") {
     const st = getLegajoState(legajoStr);
-    st.picking = { active:false, value:"" };
+    st.picking = { active:false, value:"", ts_inicio: null };
     setLegajoState(legajoStr, st);
   } else if (opcion === "AP") {
     const st = getLegajoState(legajoStr);
-    st.armado = { active:true, value:texto };
+    st.armado = { active:true, value:texto, ts_inicio: nowIso };
     setLegajoState(legajoStr, st);
   } else if (opcion === "TAP") {
     const st = getLegajoState(legajoStr);
-    st.armado = { active:false, value:"" };
+    st.armado = { active:false, value:"", ts_inicio: null };
     setLegajoState(legajoStr, st);
   } else if (TOGGLE_CODES.includes(opcion)) {
-    // 1ra vez inicia / 2da termina
+    // 1ra vez abre (guarda ts ISO); 2da vez cierra (borra)
     toggleStartOrEnd(legajoStr, opcion);
   }
 
-  fetch(GOOGLE_SCRIPT_URL,{
-    method:"POST",
-    body:JSON.stringify({
-      legajo: legajoInput.value,
-      opcion: selected,
-      descripcion: desc[selected],
-      texto: texto
-    })
-  }).catch(()=>{});
+  /* ---- ENCOLAR SIEMPRE antes de tocar la red ---- */
+  enqueueReport(payload);
 
-  alert("Reporte enviado correctamente");
+  const sendBtn = document.getElementById("sendBtn");
+  if (sendBtn) { sendBtn.disabled = true; sendBtn.innerText = "Enviando..."; }
+
+  const r = await trySendOneReport(payload);
+
+  if (sendBtn) { sendBtn.disabled = false; sendBtn.innerText = "Enviar"; }
+
+  if (r.ok) {
+    removeFromQueue(payload.id);
+    setHistoryItemStatus(legajoStr, getTodayKey(), payload.id, "sent", new Date().toISOString());
+    alert("Reporte enviado correctamente");
+  } else {
+    // Si fue rechazo del server (datos inválidos, etc.) marco "failed" en el historial.
+    // Si fue caída de red, dejo "queued" — se reintenta solo.
+    if (!r.networkFail) {
+      setHistoryItemStatus(legajoStr, getTodayKey(), payload.id, "failed");
+    }
+    alert("⚠️ Sin conexión o sin respuesta del servidor.\nTu reporte quedó guardado y se reenviará automáticamente cuando vuelva la red.");
+  }
 
   resetSelection();
   optionsScreen.classList.add("hidden");
   legajoScreen.classList.remove("hidden");
+  document.getElementById("btnHistDias")?.classList.remove("hidden");
 
+  // No se borra el legajo: el operario suele encadenar varios reportes seguidos.
+  // Para cambiar de operario alcanza con tocar el input y reescribir.
   renderLegajoHistory(legajoInput.value);
-
-  legajoInput.value = "";
-  renderLegajoHistory("");
-
   updateCoreButtonsState();
   renderPendingSuggestion();
+  updatePendingIndicator();
+
+  // Por si quedaron otros pendientes acumulados de intentos previos.
+  flushQueue();
 }
 
-/* init */
-renderLegajoHistory("");
+/* =========================================================
+   SERVICE WORKER — registra sw.js y reconcilia LS ↔ IDB
+   ========================================================= */
+async function registerServiceWorker() {
+  if (!("serviceWorker" in navigator)) return;
+  try {
+    const reg = await navigator.serviceWorker.register("sw.js", { updateViaCache: "none" });
+    // Re-chequear updates cada 60 s por si hubo deploy nuevo.
+    setInterval(() => { reg.update().catch(() => {}); }, 60000);
+  } catch (e) {
+    console.warn("SW no se pudo registrar:", e);
+  }
+}
+
+/* Asegura que todo lo de LS también esté en IDB (caso típico: instalación
+   previa al SW, items viejos en LS sin reflejar en IDB todavía). */
+async function migrateQueueToIDB() {
+  const ls = readQueue();
+  for (const it of ls) {
+    try { await idbPut(it); } catch {}
+  }
+}
+
+/* El SW nos avisa cuando manda un item con éxito (ver postMessage en sw.js).
+   Lo borramos de LS y actualizamos el historial en tiempo real, sin depender
+   de inferencias frágiles del tipo "está en LS pero no en IDB". */
+function handleServiceWorkerMessage(event) {
+  const d = event.data;
+  if (!d || d.type !== "ITEM_SENT") return;
+  // Limpiar de la cola local
+  const filtered = readQueue().filter(it => it.id !== d.id);
+  writeQueue(filtered);
+  // Marcar como ✓ enviado en el historial
+  if (d.legajo && d.fecha && d.id) {
+    setHistoryItemStatus(d.legajo, d.fecha, d.id, "sent", new Date().toISOString());
+  }
+  updatePendingIndicator();
+  // Re-render si el operario está mirando la pantalla de legajo
+  if (legajoInput && !legajoScreen.classList.contains("hidden")) {
+    renderLegajoHistory(legajoInput.value);
+  }
+}
+
+/* =========================================================
+   init + reintentos automáticos de la cola
+   ========================================================= */
+
+/* Borrar storage del historial v1 (formato viejo, ya no se usa). One-shot. */
+try { localStorage.removeItem("legajo_history_virgilio_v1"); } catch {}
+
+/* Si cambió el día (hora Argentina): retener últimos N días productivos
+   y limpiar los toggles que NO sobreviven al día siguiente. */
+cleanupIfDayChanged();
+
+/* Bind del botón flotante 📅 */
+document.getElementById("btnHistDias")?.addEventListener("click", openHistoryModal);
+
+/* SW + IDB: registrar el SW, replicar la cola completa de LS a IDB para
+   que el SW la vea, y volver a pedir un background sync si la cola tiene
+   items pendientes de versiones anteriores. */
+registerServiceWorker();
+migrateQueueToIDB()
+  .then(() => {
+    if (readQueue().length > 0) registerBackgroundSync();
+  })
+  .catch(() => {});
+
+/* Escuchar mensajes del SW (ITEM_SENT cuando despachó un reporte). */
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.addEventListener("message", handleServiceWorkerMessage);
+}
+
+/* Precargar el último legajo guardado (para que el operario no tenga
+   que reescribirlo cada vez que abre la app). Si nunca usó la app en
+   este celular, el input queda vacío. */
+const _prevLegajo = readLastLegajo();
+if (_prevLegajo) {
+  legajoInput.value = _prevLegajo;
+  renderLegajoHistory(_prevLegajo);
+  updateCoreButtonsState();
+  renderPendingSuggestion();
+} else {
+  renderLegajoHistory("");
+}
+
+updatePendingIndicator();
+
+/* Cuando vuelve la red, drená la cola de manera agresiva durante 3s
+   (en lugar de un solo intento aislado). */
+window.addEventListener("online", async () => {
+  const end = Date.now() + 3000;
+  while (Date.now() < end && readQueue().length) await flushQueue();
+});
+
+/* Foco / visibilidad: reintento. Si el SW envió cosas mientras estábamos
+   escondidos, el handler de mensajes ITEM_SENT ya actualizó la UI; lo que
+   no haya alcanzado a propagarse se resuelve en el próximo flushQueue
+   (server retorna 409 por client_id duplicado y se trata como éxito). */
+window.addEventListener("focus", flushQueue);
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") flushQueue();
+  // También aprovecho a chequear cambio de día por si la app quedó abierta cruzando medianoche.
+  cleanupIfDayChanged();
+});
+
+/* Reintento periódico cada 3 s (antes 30 s). */
+setInterval(flushQueue, 3000);
+
+/* Nota: no usamos navigator.sendBeacon porque no permite headers custom y
+   Supabase requiere "apikey" + "Authorization". El "keepalive: true" del
+   fetch en trySendOneReport ya cubre el cierre rápido de pestaña; lo que
+   no alcance a salir queda en cola y se reintenta al reabrir la app. */
+
+/* Intento inicial al abrir la app. */
+flushQueue();
 </script>
 
 </body>
