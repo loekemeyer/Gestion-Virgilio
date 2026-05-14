@@ -258,7 +258,7 @@ button {
 <button id="btnHistDias" title="Historial de días anteriores">📅</button>
 
 <!-- Badge de versión + estado de cola (abajo a la derecha) -->
-<div id="versionBadge">v1.0 ✓</div>
+<div id="versionBadge">v1.1 ✓</div>
 
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
@@ -276,16 +276,17 @@ button {
   <h1>Ingresá tu número de legajo</h1>
   <input id="legajoInput" type="number" inputmode="numeric">
 
+  <button class="primary-btn" onclick="goToOptions()">Continuar</button>
+
+  <!-- Aviso: hay reportes que aún no se enviaron -->
+  <div id="pendingIndicator"></div>
+
   <!-- 👇 espacio para historial -->
   <div id="legajoHistorySpace">
     <div class="history-title">Resumen de hoy</div>
     <div id="legajoHistoryContent" class="history-empty">Ingresá tu legajo para ver el resumen</div>
   </div>
 
-  <!-- Aviso: hay reportes que aún no se enviaron a Google Sheets -->
-  <div id="pendingIndicator"></div>
-
-  <button class="primary-btn" onclick="goToOptions()">Continuar</button>
   <div class="small" id="status"></div>
   <div id="legajoError" class="error"></div>
 </div>
@@ -835,17 +836,17 @@ function selectOption(code) {
     textInput.placeholder = "Ejemplo: A12B";
   }
 
-  // Avisos
-  if (["AT","PB","Limp","PC","CT"].includes(code)) {
+  // Avisos:
+  // - AT/PB/Limp/PC/CT ya bloquean toda la pantalla cuando están abiertos,
+  //   así que no hace falta el "acordate de poner lo mismo al terminar":
+  //   el operario solo puede tocar ese botón para cerrarlo.
+  // - Perm sí lo mantenemos: avisa al operario que si vuelve el mismo
+  //   día tiene que cerrar el permiso.
+  if (["Perm"].includes(code)) {
     aviso.classList.remove("hidden");
-    aviso.innerText = "Acordate de poner lo mismo al terminar";
+    aviso.innerText = "Acordate de poner lo mismo si regresas en el mismo dia";
   } else {
-    if (["Perm"].includes(code)) {
-      aviso.classList.remove("hidden");
-      aviso.innerText = "Acordate de poner lo mismo si regresas en el mismo dia";
-    } else {
-      aviso.classList.add("hidden");
-    }
+    aviso.classList.add("hidden");
   }
 
   updateCoreButtonsState();
@@ -1105,7 +1106,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v1.0";
+const APP_VERSION = "v1.1";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
