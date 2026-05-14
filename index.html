@@ -258,7 +258,7 @@ button {
 <button id="btnHistDias" title="Historial de días anteriores">📅</button>
 
 <!-- Badge de versión + estado de cola (abajo a la derecha) -->
-<div id="versionBadge">v1.2 ✓</div>
+<div id="versionBadge">v1.3 ✓</div>
 
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
@@ -364,6 +364,12 @@ const MAX_PROD_DAYS   = 10;        // se retienen N días PRODUCTIVOS (con datos
 const HIST_MAX_PER_DAY = 700;      // tope de reportes por día por legajo en localStorage
 const SURVIVING_TOGGLES = ["CR","MG"]; // únicos toggles que sobreviven al cambio de día
 
+/* Auto-cierre al fin de jornada para toggles abiertos que quedaron sin cerrar.
+   Si la limpieza del día siguiente encuentra alguno de estos abierto, genera
+   un registro de cierre con ts_cliente = fin de jornada del día en que se abrió. */
+const WORKDAY_END_HOUR_AR = 17;    // 17:00 hora Argentina (la jornada termina ahí)
+const AUTO_CLOSE_CODES    = ["AT","PB","Limp","PC","CT","Perm"];
+
 /* =========================================================
    FECHA / TIMESTAMP
    ========================================================= */
@@ -382,6 +388,24 @@ function formatDateTime(ts) {
 function formatDayLong(fecha) {
   const p = fecha.split("-");
   return `${p[2]}/${p[1]}/${p[0]}`;
+}
+
+/* "YYYY-MM-DD" en hora Argentina, a partir de un ISO o ms. */
+function isoToDayKey(isoOrMs) {
+  const ts = typeof isoOrMs === "number" ? isoOrMs : new Date(isoOrMs).getTime();
+  const d = new Date(new Date(ts).toLocaleString("en-US", { timeZone: TZ_AR }));
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,"0");
+  const dd = String(d.getDate()).padStart(2,"0");
+  return `${y}-${m}-${dd}`;
+}
+
+/* Date para el FIN DE JORNADA Argentina (WORKDAY_END_HOUR_AR:00) del día
+   correspondiente al ts dado. Argentina no usa DST, así que UTC-3 fijo. */
+function endOfWorkdayArgFor(isoOrMs) {
+  const dayKey = isoToDayKey(isoOrMs);
+  const hh = String(WORKDAY_END_HOUR_AR).padStart(2,"0");
+  return new Date(`${dayKey}T${hh}:00:00-03:00`);
 }
 
 /* Escapa HTML para evitar inyección al renderizar via innerHTML.
@@ -425,7 +449,11 @@ function writeDayHist(fecha, legajo, arr) {
   try { localStorage.setItem(histKey(fecha, legajo), JSON.stringify(arr)); } catch {}
 }
 function pushHistoryForLegajo(legajo, item) {
-  const fecha = getTodayKey();
+  pushHistoryForLegajoOnDay(legajo, getTodayKey(), item);
+}
+/* Idem pero escribiendo en la fecha que se pase explícitamente.
+   Lo usa el auto-cierre, que escribe en la fecha en que se abrió el toggle. */
+function pushHistoryForLegajoOnDay(legajo, fecha, item) {
   const arr = readDayHist(fecha, legajo);
   arr.unshift({ ...item, status: item.status || "queued" });
   if (arr.length > HIST_MAX_PER_DAY) arr.length = HIST_MAX_PER_DAY;
@@ -529,13 +557,22 @@ function cleanupIfDayChanged() {
   }
   toDelete.forEach(k => localStorage.removeItem(k));
 
-  // (2) Limpiar toggles que NO sobreviven al día siguiente
+  // (2) Auto-cierre + limpieza de toggles que NO sobreviven al día siguiente.
+  //     Antes de borrar el flag de localStorage, si el toggle está en
+  //     AUTO_CLOSE_CODES y tiene ts_inicio guardado, encolamos un cierre
+  //     automático con ts_cliente = fin de jornada del día en que se abrió.
   const map = readStateMap();
   for (const leg of Object.keys(map)) {
     const st = map[leg];
     if (!st || !st.toggles) continue;
     for (const code of Object.keys(st.toggles)) {
-      if (!SURVIVING_TOGGLES.includes(code)) delete st.toggles[code];
+      if (SURVIVING_TOGGLES.includes(code)) continue;
+      const cur = st.toggles[code];
+      const tsInicioIso = (typeof cur === "string") ? cur : null;
+      if (tsInicioIso && AUTO_CLOSE_CODES.includes(code)) {
+        try { enqueueAutoClose(leg, code, tsInicioIso); } catch {}
+      }
+      delete st.toggles[code];
     }
   }
   writeStateMap(map);
@@ -945,13 +982,18 @@ async function registerBackgroundSync() {
 }
 
 function enqueueReport(payload) {
+  // fecha = día (hora Arg) del ts del payload. Para un reporte normal
+  // payload.ts es Date.now() así que cae en hoy. Para un auto-cierre del
+  // día anterior, payload.ts es las 17:00 de ayer y la fecha va a ser ayer
+  // — así el setHistoryItemStatus actualiza el ítem en el archivo correcto.
+  const fechaHist = payload.ts ? isoToDayKey(payload.ts) : getTodayKey();
   const item = {
     id: payload.id,
     payload,
     attempts: 0,
     addedAt: Date.now(),
     legajo: String(payload.legajo || ""),
-    fecha:  getTodayKey()
+    fecha:  fechaHist
   };
   // Doble escritura: LS (rápido, para la página) e IDB (visible al SW).
   const arr = readQueue();
@@ -960,6 +1002,38 @@ function enqueueReport(payload) {
   idbPut(item).catch(() => {});
   updatePendingIndicator();
   registerBackgroundSync();   // pide al browser que despache aunque cerremos la app
+}
+
+/* Genera un cierre automático para un toggle que quedó abierto al cambiar
+   de día. ts_cliente = fin de jornada (17:00 Arg) del día en que se abrió. */
+function enqueueAutoClose(legajo, code, tsInicioIso) {
+  const endTs   = endOfWorkdayArgFor(tsInicioIso);
+  const startTs = new Date(tsInicioIso).getTime();
+  // Defensa: si los timestamps son inválidos (localStorage corrupto), abortar.
+  if (isNaN(endTs.getTime()) || isNaN(startTs)) return;
+  // Si el fin de jornada calculado es <= el ts_inicio (caso raro: el operario
+  // abrió un Perm después de las 17:00 y no volvió), no auto-cerramos —
+  // queda como apertura suelta y Logística la trata como excepción.
+  if (endTs.getTime() <= startTs) return;
+
+  const nowMs = endTs.getTime();
+  const id    = nowMs.toString(36) + "_auto_" + Math.random().toString(36).slice(2, 8);
+  const descr = desc[code] || "";
+  const payload = {
+    legajo:        legajo,
+    opcion:        code,
+    descripcion:   descr,
+    texto:         "",
+    ts:            nowMs,
+    id:            id,
+    ts_inicio_iso: tsInicioIso
+  };
+  // El cierre auto va al historial del día en que se abrió, no al de hoy.
+  pushHistoryForLegajoOnDay(legajo, isoToDayKey(nowMs), {
+    ts: nowMs, opcion: code, descripcion: descr,
+    texto: "", id: id, status: "queued"
+  });
+  enqueueReport(payload);
 }
 function removeFromQueue(id) {
   writeQueue(readQueue().filter(it => it.id !== id));
@@ -1110,7 +1184,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v1.2";
+const APP_VERSION = "v1.3";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
