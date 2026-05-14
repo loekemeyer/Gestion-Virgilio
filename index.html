@@ -174,8 +174,16 @@ button {
 </div>
 
 <script>
-const GOOGLE_SCRIPT_URL =
-"https://script.google.com/macros/s/AKfycbwtBRC-bEeVkFNa8MQnJwJr_L4DalBVoS6N8H9C1Z0vh2CLI29Sep7ZZIIVKz6eOGzj/exec";
+/* =========================================================
+   SUPABASE
+   Org "Gestion Productiva" / Proyecto "Control Partes Talleristas".
+   La publishable key es pública por diseño (va embebida en la HTML
+   servida por GitHub Pages). La RLS permite SOLO INSERT con esta key.
+   ========================================================= */
+const SUPABASE_URL  = "https://hrxfctzncixxqmpfhskv.supabase.co";
+const SUPABASE_KEY  = "sb_publishable_BqpAgZH6ty-9wft10_YMhw_0rcIPuWT";
+const SUPABASE_TABLE_ENDPOINT =
+  SUPABASE_URL + "/rest/v1/registros_produccion_virgilio";
 
 const filas = {
   row1: ["EP","TP","AP","TAP","CR","CC"],
@@ -520,21 +528,36 @@ function removeFromQueue(id) {
   updatePendingIndicator();
 }
 
-/* Intenta enviar UN payload. Devuelve true si parece haber llegado al server. */
+/* Intenta enviar UN payload a Supabase.
+   Devuelve true si llegó al server (o si ya estaba: 409 = dedup OK). */
 async function trySendOneReport(payload) {
   try {
     // Corte duro a los 12s para no quedarnos esperando si la red se cuelga.
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), 12000);
-    const res = await fetch(GOOGLE_SCRIPT_URL, {
+    const res = await fetch(SUPABASE_TABLE_ENDPOINT, {
       method: "POST",
-      body: JSON.stringify(payload),
+      headers: {
+        "apikey":        SUPABASE_KEY,
+        "Authorization": "Bearer " + SUPABASE_KEY,
+        "Content-Type":  "application/json",
+        "Prefer":        "return=minimal"
+      },
+      body: JSON.stringify({
+        client_id:   payload.id,                              // UNIQUE en la tabla -> dedup
+        legajo:      payload.legajo,
+        opcion:      payload.opcion,
+        descripcion: payload.descripcion,
+        texto:       payload.texto,
+        ts_cliente:  new Date(payload.ts).toISOString()
+      }),
       keepalive: true,        // sobrevive a cambios de pantalla / cierres rápidos
       signal: ctrl.signal
     });
     clearTimeout(t);
-    // Sin Content-Type explícito: GAS recibe el body como text/plain (sin preflight CORS).
-    return !!(res && (res.ok || res.status === 0 || res.type === "opaque"));
+    if (!res) return false;
+    // 201 Created = ok. 409 Conflict = ya existía (reintento exitoso de un envío previo).
+    return res.ok || res.status === 409;
   } catch (e) {
     return false;
   }
@@ -690,21 +713,10 @@ setInterval(flushQueue, 30000);
 /* Reintento manual al tocar el banner de pendientes. */
 document.getElementById("pendingIndicator")?.addEventListener("click", flushQueue);
 
-/* Último recurso al cerrar/ocultar la pestaña: sendBeacon entrega los
-   pendientes en background. Si el servidor deduplica por "id", no hay
-   problema con que también sigan en cola por las dudas. */
-window.addEventListener("pagehide", () => {
-  if (!navigator.sendBeacon) return;
-  const arr = readQueue();
-  for (const item of arr) {
-    try {
-      navigator.sendBeacon(
-        GOOGLE_SCRIPT_URL,
-        new Blob([JSON.stringify(item.payload)], { type: "text/plain;charset=UTF-8" })
-      );
-    } catch (e) {}
-  }
-});
+/* Nota: no usamos navigator.sendBeacon porque no permite headers custom y
+   Supabase requiere "apikey" + "Authorization". El "keepalive: true" del
+   fetch en trySendOneReport ya cubre el cierre rápido de pestaña; lo que
+   no alcance a salir queda en cola y se reintenta al reabrir la app. */
 
 /* Intento inicial al abrir la app. */
 flushQueue();
