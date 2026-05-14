@@ -773,21 +773,94 @@ function readQueue() {
 function writeQueue(arr) {
   try { localStorage.setItem(QUEUE_KEY, JSON.stringify(arr)); } catch {}
 }
+
+/* =========================================================
+   IndexedDB — espejo de la cola, accesible al Service Worker.
+   localStorage es solo accesible desde la página (no desde el SW),
+   así que duplicamos cada item en IDB para que el SW pueda enviarlo
+   en background aunque la app esté cerrada.
+   ========================================================= */
+const IDB_NAME    = "registro-prod-virgilio";
+const IDB_VERSION = 1;
+const IDB_STORE   = "queue";
+let _idbDbPromise = null;
+function idbOpen() {
+  if (_idbDbPromise) return _idbDbPromise;
+  if (!("indexedDB" in window)) {
+    _idbDbPromise = Promise.reject(new Error("IDB no disponible"));
+    return _idbDbPromise;
+  }
+  _idbDbPromise = new Promise((resolve, reject) => {
+    const req = indexedDB.open(IDB_NAME, IDB_VERSION);
+    req.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains(IDB_STORE)) {
+        db.createObjectStore(IDB_STORE, { keyPath: "id" });
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror   = () => reject(req.error);
+  });
+  return _idbDbPromise;
+}
+function idbPut(item) {
+  return idbOpen().then(db => new Promise((res, rej) => {
+    const tx = db.transaction(IDB_STORE, "readwrite");
+    const r = tx.objectStore(IDB_STORE).put(item);
+    r.onsuccess = () => res();
+    r.onerror   = () => rej(r.error);
+  }));
+}
+function idbDelete(id) {
+  return idbOpen().then(db => new Promise((res, rej) => {
+    const tx = db.transaction(IDB_STORE, "readwrite");
+    const r = tx.objectStore(IDB_STORE).delete(id);
+    r.onsuccess = () => res();
+    r.onerror   = () => rej(r.error);
+  }));
+}
+function idbGetAll() {
+  return idbOpen().then(db => new Promise((res, rej) => {
+    const tx = db.transaction(IDB_STORE, "readonly");
+    const r = tx.objectStore(IDB_STORE).getAll();
+    r.onsuccess = () => res(r.result || []);
+    r.onerror   = () => rej(r.error);
+  }));
+}
+
+/* Pide al SW que reintente la cola apenas pueda (Background Sync API).
+   En navegadores sin soporte (Safari iOS), falla silencioso y dependemos
+   del setInterval/online de la página. */
+async function registerBackgroundSync() {
+  if (!("serviceWorker" in navigator)) return;
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    if (reg && "sync" in reg) {
+      await reg.sync.register("flush-queue");
+    }
+  } catch { /* no soportado, sin drama */ }
+}
+
 function enqueueReport(payload) {
-  const arr = readQueue();
-  arr.push({
+  const item = {
     id: payload.id,
     payload,
     attempts: 0,
     addedAt: Date.now(),
     legajo: String(payload.legajo || ""),
     fecha:  getTodayKey()
-  });
+  };
+  // Doble escritura: LS (rápido, para la página) e IDB (visible al SW).
+  const arr = readQueue();
+  arr.push(item);
   writeQueue(arr);
+  idbPut(item).catch(() => {});
   updatePendingIndicator();
+  registerBackgroundSync();   // pide al browser que despache aunque cerremos la app
 }
 function removeFromQueue(id) {
   writeQueue(readQueue().filter(it => it.id !== id));
+  idbDelete(id).catch(() => {});
   updatePendingIndicator();
 }
 
@@ -1015,6 +1088,58 @@ async function send() {
 }
 
 /* =========================================================
+   SERVICE WORKER — registra sw.js y reconcilia LS ↔ IDB
+   ========================================================= */
+async function registerServiceWorker() {
+  if (!("serviceWorker" in navigator)) return;
+  try {
+    const reg = await navigator.serviceWorker.register("sw.js", { updateViaCache: "none" });
+    // Re-chequear updates cada 60 s por si hubo deploy nuevo.
+    setInterval(() => { reg.update().catch(() => {}); }, 60000);
+  } catch (e) {
+    console.warn("SW no se pudo registrar:", e);
+  }
+}
+
+/* Si un item está en LS pero NO en IDB, asumimos que el SW ya lo envió
+   y lo borró de IDB. Lo limpiamos de LS y marcamos el historial como ✓ enviado. */
+async function reconcileQueueWithIDB() {
+  let idbItems;
+  try { idbItems = await idbGetAll(); } catch { return; }
+  const idbIds = new Set(idbItems.map(x => x.id));
+  const ls = readQueue();
+  if (!ls.length) return;
+  const stillQueued = [];
+  let recovered = 0;
+  for (const it of ls) {
+    if (idbIds.has(it.id)) {
+      stillQueued.push(it);
+    } else {
+      if (it.legajo && it.fecha && it.id) {
+        setHistoryItemStatus(it.legajo, it.fecha, it.id, "sent", new Date().toISOString());
+      }
+      recovered++;
+    }
+  }
+  if (recovered > 0) {
+    writeQueue(stillQueued);
+    updatePendingIndicator();
+    if (legajoInput && !legajoScreen.classList.contains("hidden")) {
+      renderLegajoHistory(legajoInput.value);
+    }
+  }
+}
+
+/* Asegura que todo lo de LS también esté en IDB (caso típico: instalación
+   previa al SW, items viejos en LS sin reflejar en IDB todavía). */
+async function migrateQueueToIDB() {
+  const ls = readQueue();
+  for (const it of ls) {
+    try { await idbPut(it); } catch {}
+  }
+}
+
+/* =========================================================
    init + reintentos automáticos de la cola
    ========================================================= */
 
@@ -1028,6 +1153,13 @@ cleanupIfDayChanged();
 /* Bind del botón flotante 📅 */
 document.getElementById("btnHistDias")?.addEventListener("click", openHistoryModal);
 
+/* SW + IDB: registrar, reconciliar lo que el SW haya enviado en background,
+   y replicar la cola completa de LS a IDB para que el SW la vea. */
+registerServiceWorker();
+reconcileQueueWithIDB()
+  .then(migrateQueueToIDB)
+  .catch(() => {});
+
 renderLegajoHistory("");
 updatePendingIndicator();
 
@@ -1038,10 +1170,15 @@ window.addEventListener("online", async () => {
   while (Date.now() < end && readQueue().length) await flushQueue();
 });
 
-/* Foco / visibilidad: reintento normal. */
-window.addEventListener("focus", flushQueue);
+/* Foco / visibilidad: reintento + reconciliación con lo que el SW haya
+   despachado en background mientras la app estaba escondida o sin foco. */
+function onAppForeground() {
+  flushQueue();
+  reconcileQueueWithIDB().catch(() => {});
+}
+window.addEventListener("focus", onAppForeground);
 document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "visible") flushQueue();
+  if (document.visibilityState === "visible") onAppForeground();
   // También aprovecho a chequear cambio de día por si la app quedó abierta cruzando medianoche.
   cleanupIfDayChanged();
 });
