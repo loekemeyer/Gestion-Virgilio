@@ -1143,41 +1143,32 @@ async function registerServiceWorker() {
   }
 }
 
-/* Si un item está en LS pero NO en IDB, asumimos que el SW ya lo envió
-   y lo borró de IDB. Lo limpiamos de LS y marcamos el historial como ✓ enviado. */
-async function reconcileQueueWithIDB() {
-  let idbItems;
-  try { idbItems = await idbGetAll(); } catch { return; }
-  const idbIds = new Set(idbItems.map(x => x.id));
-  const ls = readQueue();
-  if (!ls.length) return;
-  const stillQueued = [];
-  let recovered = 0;
-  for (const it of ls) {
-    if (idbIds.has(it.id)) {
-      stillQueued.push(it);
-    } else {
-      if (it.legajo && it.fecha && it.id) {
-        setHistoryItemStatus(it.legajo, it.fecha, it.id, "sent", new Date().toISOString());
-      }
-      recovered++;
-    }
-  }
-  if (recovered > 0) {
-    writeQueue(stillQueued);
-    updatePendingIndicator();
-    if (legajoInput && !legajoScreen.classList.contains("hidden")) {
-      renderLegajoHistory(legajoInput.value);
-    }
-  }
-}
-
 /* Asegura que todo lo de LS también esté en IDB (caso típico: instalación
    previa al SW, items viejos en LS sin reflejar en IDB todavía). */
 async function migrateQueueToIDB() {
   const ls = readQueue();
   for (const it of ls) {
     try { await idbPut(it); } catch {}
+  }
+}
+
+/* El SW nos avisa cuando manda un item con éxito (ver postMessage en sw.js).
+   Lo borramos de LS y actualizamos el historial en tiempo real, sin depender
+   de inferencias frágiles del tipo "está en LS pero no en IDB". */
+function handleServiceWorkerMessage(event) {
+  const d = event.data;
+  if (!d || d.type !== "ITEM_SENT") return;
+  // Limpiar de la cola local
+  const filtered = readQueue().filter(it => it.id !== d.id);
+  writeQueue(filtered);
+  // Marcar como ✓ enviado en el historial
+  if (d.legajo && d.fecha && d.id) {
+    setHistoryItemStatus(d.legajo, d.fecha, d.id, "sent", new Date().toISOString());
+  }
+  updatePendingIndicator();
+  // Re-render si el operario está mirando la pantalla de legajo
+  if (legajoInput && !legajoScreen.classList.contains("hidden")) {
+    renderLegajoHistory(legajoInput.value);
   }
 }
 
@@ -1195,12 +1186,20 @@ cleanupIfDayChanged();
 /* Bind del botón flotante 📅 */
 document.getElementById("btnHistDias")?.addEventListener("click", openHistoryModal);
 
-/* SW + IDB: registrar, reconciliar lo que el SW haya enviado en background,
-   y replicar la cola completa de LS a IDB para que el SW la vea. */
+/* SW + IDB: registrar el SW, replicar la cola completa de LS a IDB para
+   que el SW la vea, y volver a pedir un background sync si la cola tiene
+   items pendientes de versiones anteriores. */
 registerServiceWorker();
-reconcileQueueWithIDB()
-  .then(migrateQueueToIDB)
+migrateQueueToIDB()
+  .then(() => {
+    if (readQueue().length > 0) registerBackgroundSync();
+  })
   .catch(() => {});
+
+/* Escuchar mensajes del SW (ITEM_SENT cuando despachó un reporte). */
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.addEventListener("message", handleServiceWorkerMessage);
+}
 
 renderLegajoHistory("");
 updatePendingIndicator();
@@ -1212,15 +1211,13 @@ window.addEventListener("online", async () => {
   while (Date.now() < end && readQueue().length) await flushQueue();
 });
 
-/* Foco / visibilidad: reintento + reconciliación con lo que el SW haya
-   despachado en background mientras la app estaba escondida o sin foco. */
-function onAppForeground() {
-  flushQueue();
-  reconcileQueueWithIDB().catch(() => {});
-}
-window.addEventListener("focus", onAppForeground);
+/* Foco / visibilidad: reintento. Si el SW envió cosas mientras estábamos
+   escondidos, el handler de mensajes ITEM_SENT ya actualizó la UI; lo que
+   no haya alcanzado a propagarse se resuelve en el próximo flushQueue
+   (server retorna 409 por client_id duplicado y se trata como éxito). */
+window.addEventListener("focus", flushQueue);
 document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "visible") onAppForeground();
+  if (document.visibilityState === "visible") flushQueue();
   // También aprovecho a chequear cambio de día por si la app quedó abierta cruzando medianoche.
   cleanupIfDayChanged();
 });

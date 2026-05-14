@@ -124,6 +124,23 @@ async function trySendOneReport(payload) {
   }
 }
 
+/* ============== Aviso a la página ============== */
+async function notifyClientsItemSent(item) {
+  try {
+    const clients = await self.clients.matchAll({ includeUncontrolled: true });
+    for (const c of clients) {
+      try {
+        c.postMessage({
+          type:   "ITEM_SENT",
+          id:     item.id,
+          legajo: item.legajo,
+          fecha:  item.fecha
+        });
+      } catch {}
+    }
+  } catch {}
+}
+
 /* ============== Flush en background ============== */
 async function flushQueueInSW() {
   let items;
@@ -135,6 +152,8 @@ async function flushQueueInSW() {
     const r = await trySendOneReport(item.payload);
     if (r.ok) {
       try { await idbDelete(item.id); } catch {}
+      // Aviso a cualquier página abierta para que limpie LS y actualice UI.
+      notifyClientsItemSent(item);
     } else {
       // Anotar intento en IDB y auditar (intento 1 y cada 5).
       const newAttempts = (item.attempts || 0) + 1;
@@ -177,3 +196,8 @@ self.addEventListener("message", (event) => {
     event.waitUntil(flushQueueInSW().catch(() => {}));
   }
 });
+
+/* Fetch handler vacío. No interceptamos requests (no hacemos offline caching
+   del HTML, solo Background Sync). Algunos navegadores son quisquillosos
+   con SWs que no tienen handler de fetch para considerarlo "completo". */
+self.addEventListener("fetch", () => {});
