@@ -258,7 +258,7 @@ button {
 <button id="btnHistDias" title="Historial de días anteriores">📅</button>
 
 <!-- Badge de versión + estado de cola (abajo a la derecha) -->
-<div id="versionBadge">v1.3 ✓</div>
+<div id="versionBadge">v1.4 ✓</div>
 
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
@@ -460,14 +460,17 @@ function pushHistoryForLegajoOnDay(legajo, fecha, item) {
   writeDayHist(fecha, legajo, arr);
 }
 
-/* Marca un item del historial como sent / failed / queued. */
-function setHistoryItemStatus(legajo, fecha, itemId, status, sentAtIso) {
+/* Marca un item del historial como sent / failed / queued.
+   - sentAtIso: hora en que el cliente recibió la confirmación.
+   - createdAtIso: timestamp REAL del INSERT en Supabase (server clock). */
+function setHistoryItemStatus(legajo, fecha, itemId, status, sentAtIso, createdAtIso) {
   if (!legajo || !fecha || !itemId) return false;
   const arr = readDayHist(fecha, legajo);
   const i = arr.findIndex(it => it.id === itemId);
   if (i < 0) return false;
   arr[i].status = status;
-  if (sentAtIso) arr[i].sentAt = sentAtIso;
+  if (sentAtIso)    arr[i].sentAt    = sentAtIso;
+  if (createdAtIso) arr[i].createdAt = createdAtIso;
   writeDayHist(fecha, legajo, arr);
   return true;
 }
@@ -519,6 +522,7 @@ function renderLegajoHistory(legajo) {
       <div class="line2">
         ${h.texto ? `Dato: <b>${escapeHtml(h.texto)}</b><br>` : ""}
         ${h.ts ? `Fecha: ${escapeHtml(formatDateTime(h.ts))}` : ""}
+        ${h.createdAt ? `<br>Llegó al server: ${escapeHtml(formatDateTime(h.createdAt))}` : ""}
       </div>
     </div>
   `).join("");
@@ -601,6 +605,7 @@ function openHistoryModal() {
             <b>${escapeHtml(it.opcion)}</b> — ${escapeHtml(it.descripcion)}${statusBadge(it.status)}
             ${it.texto ? ` — <i>${escapeHtml(it.texto)}</i>` : ""}
             ${it.ts ? `<br><span style="color:#666;font-size:12px;">${escapeHtml(formatDateTime(it.ts))}</span>` : ""}
+            ${it.createdAt ? `<br><span style="color:#666;font-size:12px;">Llegó al server: ${escapeHtml(formatDateTime(it.createdAt))}</span>` : ""}
           </div>
         `).join("")}
       </div>
@@ -1057,7 +1062,7 @@ async function trySendOneReport(payload) {
         "apikey":        SUPABASE_KEY,
         "Authorization": "Bearer " + SUPABASE_KEY,
         "Content-Type":  "application/json",
-        "Prefer":        "return=minimal"
+        "Prefer":        "return=representation"  // ← pedir la fila para sacar created_at
       },
       body: JSON.stringify({
         client_id:   payload.id,                              // UNIQUE en la tabla -> dedup
@@ -1073,9 +1078,18 @@ async function trySendOneReport(payload) {
     });
     clearTimeout(t);
     if (!res) return { ok: false, networkFail: true };
-    // 201 Created = ok. 409 Conflict = ya existía (reintento exitoso de un envío previo).
-    if (res.ok || res.status === 409) return { ok: true, status: res.status };
-    // Server respondió pero rechazó: data inválida, CHECK falló, etc. No reintentar al toque.
+    // 201 Created = ok. Parseamos el body para sacar created_at.
+    if (res.ok) {
+      let created_at = null;
+      try {
+        const body = await res.json();
+        if (Array.isArray(body) && body[0]) created_at = body[0].created_at || null;
+      } catch { /* body no parseable; sigue sin created_at */ }
+      return { ok: true, status: res.status, created_at };
+    }
+    // 409 Conflict = ya existía (reintento exitoso de un envío previo).
+    if (res.status === 409) return { ok: true, status: 409 };
+    // Server respondió pero rechazó: data inválida, etc. No reintentar al toque.
     return { ok: false, networkFail: false, status: res.status };
   } catch (e) {
     // fetch tiró: timeout, offline, CORS, etc.
@@ -1143,7 +1157,7 @@ async function flushQueue() {
       const r = await trySendOneReport(item.payload);
       if (r.ok) {
         removeFromQueue(item.id);
-        if (setHistoryItemStatus(item.legajo, item.fecha, item.id, "sent", new Date().toISOString())) {
+        if (setHistoryItemStatus(item.legajo, item.fecha, item.id, "sent", new Date().toISOString(), r.created_at)) {
           historyChanged = true;
         }
       } else {
@@ -1184,7 +1198,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v1.3";
+const APP_VERSION = "v1.4";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -1295,7 +1309,7 @@ async function send() {
 
   if (r.ok) {
     removeFromQueue(payload.id);
-    setHistoryItemStatus(legajoStr, getTodayKey(), payload.id, "sent", new Date().toISOString());
+    setHistoryItemStatus(legajoStr, getTodayKey(), payload.id, "sent", new Date().toISOString(), r.created_at);
     alert("Reporte enviado correctamente");
   } else {
     // Si fue rechazo del server (datos inválidos, etc.) marco "failed" en el historial.
@@ -1356,7 +1370,7 @@ function handleServiceWorkerMessage(event) {
   writeQueue(filtered);
   // Marcar como ✓ enviado en el historial
   if (d.legajo && d.fecha && d.id) {
-    setHistoryItemStatus(d.legajo, d.fecha, d.id, "sent", new Date().toISOString());
+    setHistoryItemStatus(d.legajo, d.fecha, d.id, "sent", new Date().toISOString(), d.createdAt);
   }
   updatePendingIndicator();
   // Re-render si el operario está mirando la pantalla de legajo
