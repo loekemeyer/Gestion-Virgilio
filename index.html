@@ -264,7 +264,7 @@ button {
 <button id="btnHistDias" title="Historial de días anteriores">📅</button>
 
 <!-- Badge de versión + estado de cola (abajo a la derecha) -->
-<div id="versionBadge">v1.5 ✓</div>
+<div id="versionBadge">v1.6 ✓</div>
 
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
@@ -1068,7 +1068,10 @@ async function trySendOneReport(payload) {
         "apikey":        SUPABASE_KEY,
         "Authorization": "Bearer " + SUPABASE_KEY,
         "Content-Type":  "application/json",
-        "Prefer":        "return=representation"  // ← pedir la fila para sacar created_at
+        "Prefer":        "return=minimal"  // anon NO tiene SELECT en RLS; pedir
+                                            // return=representation hace que el
+                                            // server devuelva 4xx aunque el INSERT
+                                            // en sí esté bien. Mantener minimal.
       },
       body: JSON.stringify({
         client_id:   payload.id,                              // UNIQUE en la tabla -> dedup
@@ -1084,18 +1087,9 @@ async function trySendOneReport(payload) {
     });
     clearTimeout(t);
     if (!res) return { ok: false, networkFail: true };
-    // 201 Created = ok. Parseamos el body para sacar created_at.
-    if (res.ok) {
-      let created_at = null;
-      try {
-        const body = await res.json();
-        if (Array.isArray(body) && body[0]) created_at = body[0].created_at || null;
-      } catch { /* body no parseable; sigue sin created_at */ }
-      return { ok: true, status: res.status, created_at };
-    }
-    // 409 Conflict = ya existía (reintento exitoso de un envío previo).
-    if (res.status === 409) return { ok: true, status: 409 };
-    // Server respondió pero rechazó: data inválida, etc. No reintentar al toque.
+    // 201 Created = ok. 409 Conflict = ya existía (reintento exitoso).
+    if (res.ok || res.status === 409) return { ok: true, status: res.status };
+    // Server respondió pero rechazó. No reintentar al toque.
     return { ok: false, networkFail: false, status: res.status };
   } catch (e) {
     // fetch tiró: timeout, offline, CORS, etc.
@@ -1204,7 +1198,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v1.5";
+const APP_VERSION = "v1.6";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
