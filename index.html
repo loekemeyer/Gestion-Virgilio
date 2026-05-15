@@ -77,8 +77,23 @@ button {
 .box-title { font-size: 18px; font-weight: bold; }
 .box-desc { font-size: 10px; margin-top: 3px; }
 
-.top-bar { display: flex; align-items: center; margin-bottom: 6px; }
+.top-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
 .back-top { font-size: 28px; cursor: pointer; }
+
+/* Botón rojo "Terminar Día" en la barra superior de la pantalla de opciones */
+#btnTerminarDia{
+  background: #dc2626;
+  color: #fff;
+  border: 2px solid #991b1b;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 15px;
+  font-weight: bold;
+  cursor: pointer;
+  margin: 0;
+  width: auto;
+  line-height: 1;
+}
 
 .selected-container { display: flex; align-items: center; justify-content: center; margin-top: 16px; }
 .back-arrow { font-size: 32px; cursor: pointer; margin-right: 10px; }
@@ -108,6 +123,19 @@ button {
   border-color:#aaa;
   pointer-events:none;
   opacity:0.6;
+}
+
+/* ⚠ tarea pendiente: hay un EP/AP o toggle abierto sin cerrar.
+   El botón correspondiente queda con borde rojo. Si está además
+   disabled (por bloqueo), gana el borde rojo igual. */
+.box.pending{
+  border-color: #d33;
+  background: #fff5f5;
+}
+.box.disabled.pending,
+.box.pending.disabled{
+  border-color: #d33;
+  background: #ddd;
 }
 
 /* ✅ aviso de reportes pendientes (se reintenta solo en background) */
@@ -153,8 +181,9 @@ button {
    así que sin esta regla el botón queda visible en la pantalla de tareas. */
 #btnHistDias.hidden { display: none; }
 
-/* Modal de historial de días anteriores */
-#histModal{
+/* Modales (historial de días anteriores y "Terminar Día") */
+#histModal,
+#terminarDiaModal{
   display: none;
   position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
@@ -165,11 +194,14 @@ button {
   padding: 24px 8px;
   overflow-y: auto;
 }
-#histModal.show{ display: flex; }
+#histModal.show,
+#terminarDiaModal.show{ display: flex; }
 .hist-modal-card{
   background: #fff;
   border-radius: 12px;
-  padding: 16px;
+  /* sin padding-top: el header sticky aporta el propio para que su fondo
+     blanco cubra completamente la parte superior y nada "asome" arriba */
+  padding: 0 16px 16px 16px;
   width: 100%;
   max-width: 600px;
   max-height: 92vh;
@@ -180,11 +212,13 @@ button {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
   position: sticky;
   top: 0;
+  z-index: 10;
   background: #fff;
-  padding-bottom: 8px;
+  padding: 16px 0 12px 0;
+  margin: 0 0 12px 0;
+  border-bottom: 1px solid #e5e7eb;
 }
 .hist-modal-title{ font-size: 18px; font-weight: bold; }
 .hist-modal-close{
@@ -264,7 +298,7 @@ button {
 <button id="btnHistDias" title="Historial de días anteriores">📅</button>
 
 <!-- Badge de versión + estado de cola (abajo a la derecha) -->
-<div id="versionBadge">v1.7 ✓</div>
+<div id="versionBadge">v1.16 ✓</div>
 
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
@@ -274,6 +308,23 @@ button {
       <button class="hist-modal-close" onclick="closeHistoryModal()">Cerrar</button>
     </div>
     <div id="histModalContent"></div>
+  </div>
+</div>
+
+<!-- Modal: confirmación de "Terminar Día" -->
+<div id="terminarDiaModal" onclick="if(event.target.id==='terminarDiaModal') closeTerminarDia()">
+  <div class="hist-modal-card">
+    <div class="hist-modal-header">
+      <div class="hist-modal-title">Terminar día</div>
+      <button class="hist-modal-close" onclick="closeTerminarDia()">Cancelar</button>
+    </div>
+    <div id="terminarDiaContent"></div>
+    <button id="btnConfirmarTerminarDia" onclick="confirmarTerminarDia()"
+            style="background:#dc2626; color:#fff; border:2px solid #991b1b;
+                   border-radius:8px; margin-top:14px; padding:14px;
+                   font-size:18px; font-weight:bold; width:100%; cursor:pointer;">
+      Sí, terminar día
+    </button>
   </div>
 </div>
 
@@ -302,6 +353,7 @@ button {
 
   <div class="top-bar">
     <div class="back-top" onclick="backToLegajo()">←</div>
+    <button id="btnTerminarDia" onclick="terminarDia()">Terminar Día</button>
   </div>
 
   <div class="row row-6" id="row1"></div>
@@ -372,9 +424,17 @@ const SURVIVING_TOGGLES = ["CR","MG"]; // únicos toggles que sobreviven al camb
 
 /* Auto-cierre al fin de jornada para toggles abiertos que quedaron sin cerrar.
    Si la limpieza del día siguiente encuentra alguno de estos abierto, genera
-   un registro de cierre con ts_cliente = fin de jornada del día en que se abrió. */
+   un registro de cierre con ts_cliente = fin de jornada del día en que se abrió.
+   Incluye CC/RT/RI/EI: si el operario olvidó cerrarlos y pasó el día, generamos
+   igual el cierre (con texto vacío). Lo normal es que los cierre Terminar Día
+   con cantidad; este auto-cierre es solo red de seguridad para el caso raro. */
 const WORKDAY_END_HOUR_AR = 17;    // 17:00 hora Argentina (la jornada termina ahí)
-const AUTO_CLOSE_CODES    = ["AT","PB","Limp","PC","CT","Perm"];
+const AUTO_CLOSE_CODES    = ["AT","PB","Limp","PC","CT","Perm","CC","RT","RI","EI"];
+
+/* Toggles que al cerrarse manualmente piden una cantidad/dato en el texto.
+   En Terminar Día, los abiertos de este grupo abren un input en el modal y
+   no se puede confirmar sin completar todos los campos. */
+const CLOSE_NEEDS_INPUT_CODES = ["CC","RT","RI","EI"];
 
 /* =========================================================
    FECHA / TIMESTAMP
@@ -457,6 +517,15 @@ function writeDayHist(fecha, legajo, arr) {
 function pushHistoryForLegajo(legajo, item) {
   pushHistoryForLegajoOnDay(legajo, getTodayKey(), item);
 }
+/* Saca del historial de HOY todos los items con cierta opción. Lo usa
+   confirmarTerminarDia para limpiar FJ previas (de v1.10/v1.11 con id
+   random, o de la misma versión cuando se cierra el día por segunda
+   vez) antes de pushear la nueva. */
+function removeHistoryItemsByOpcionForToday(legajo, opcion) {
+  const fecha = getTodayKey();
+  const arr   = readDayHist(fecha, legajo).filter(it => it.opcion !== opcion);
+  writeDayHist(fecha, legajo, arr);
+}
 /* Idem pero escribiendo en la fecha que se pase explícitamente.
    Lo usa el auto-cierre, que escribe en la fecha en que se abrió el toggle. */
 function pushHistoryForLegajoOnDay(legajo, fecha, item) {
@@ -527,11 +596,15 @@ function renderLegajoHistory(legajo) {
     // (la hora en que el cliente recibió la confirmación 201, que para
     // efectos prácticos es cuando llegó a Supabase).
     const arrived = h.createdAt || h.sentAt;
+    // El "Dato" del FJ es el JSON con conteos; técnico, confunde al
+    // operario. Para FJ ocultamos esa línea pero la entrada se muestra
+    // igual (con su badge de estado, error incluido).
+    const showDato = h.opcion !== "FJ" && h.texto;
     return `
       <div class="history-item">
         <div class="line1">${escapeHtml(h.opcion)} — ${escapeHtml(h.descripcion)}${statusBadge(h.status)}</div>
         <div class="line2">
-          ${h.texto ? `Dato: <b>${escapeHtml(h.texto)}</b><br>` : ""}
+          ${showDato ? `Dato: <b>${escapeHtml(h.texto)}</b><br>` : ""}
           ${h.ts ? `Fecha: ${escapeHtml(formatDateTime(h.ts))}` : ""}
           ${arrived ? `<br>Llegó al server: ${escapeHtml(formatDateTime(arrived))}` : ""}
         </div>
@@ -614,10 +687,12 @@ function openHistoryModal() {
         <div class="hist-day-title">${escapeHtml(formatDayLong(d.fecha))} (${d.items.length})</div>
         ${d.items.map(it => {
           const arrived = it.createdAt || it.sentAt;
+          // FJ: ocultar el "Dato" (JSON técnico), mostrar la entrada igual.
+          const showDato = it.opcion !== "FJ" && it.texto;
           return `
             <div class="hist-day-item">
               <b>${escapeHtml(it.opcion)}</b> — ${escapeHtml(it.descripcion)}${statusBadge(it.status)}
-              ${it.texto ? ` — <i>${escapeHtml(it.texto)}</i>` : ""}
+              ${showDato ? ` — <i>${escapeHtml(it.texto)}</i>` : ""}
               ${it.ts ? `<br><span style="color:#666;font-size:12px;">${escapeHtml(formatDateTime(it.ts))}</span>` : ""}
               ${arrived ? `<br><span style="color:#666;font-size:12px;">Llegó al server: ${escapeHtml(formatDateTime(arrived))}</span>` : ""}
             </div>
@@ -630,6 +705,310 @@ function openHistoryModal() {
 }
 function closeHistoryModal() {
   document.getElementById("histModal").classList.remove("show");
+}
+
+/* =========================================================
+   "TERMINAR DÍA" — modal de confirmación + ejecución
+   ========================================================= */
+
+/* Cuenta los reportes del día por opción para este legajo. */
+function getTodaySummaryForLegajo(legajo) {
+  // El FJ es un marcador interno; no lo mostramos en el resumen para no
+  // confundir al operario.
+  const hist = readDayHist(getTodayKey(), String(legajo))
+    .filter(it => it.opcion !== "FJ");
+  const counts = {};
+  for (const it of hist) {
+    counts[it.opcion] = (counts[it.opcion] || 0) + 1;
+  }
+  return { total: hist.length, counts };
+}
+
+/* Devuelve qué pendientes tiene el legajo, separados en 3 grupos:
+   - sobreviven        : continúan al día siguiente (picking/armado/CR/MG)
+   - seCierranAuto     : se cierran ahora con texto="" (AT/PB/Limp/PC/CT/Perm)
+   - seCierranConInput : se cierran ahora pero piden cantidad (CC/RT/RI/EI) */
+function getPendingsForLegajo(legajo) {
+  const st = getLegajoState(legajo);
+  const sobreviven        = [];
+  const seCierranAuto     = [];
+  const seCierranConInput = [];
+  if (st.picking && st.picking.active) {
+    sobreviven.push({ tipo: "Picking", desc: "Picking en curso", valor: st.picking.value || "" });
+  }
+  if (st.armado && st.armado.active) {
+    sobreviven.push({ tipo: "Armado", desc: "Armado en curso", valor: st.armado.value || "" });
+  }
+  if (st.toggles) {
+    for (const code of Object.keys(st.toggles)) {
+      const item = { tipo: code, desc: desc[code] || "", valor: "" };
+      if (SURVIVING_TOGGLES.includes(code))             sobreviven.push(item);
+      else if (CLOSE_NEEDS_INPUT_CODES.includes(code))  seCierranConInput.push(item);
+      else                                              seCierranAuto.push(item);
+    }
+  }
+  // Mantengo seCierran como unión para compatibilidad con código viejo.
+  return { sobreviven, seCierranAuto, seCierranConInput,
+           seCierran: [...seCierranAuto, ...seCierranConInput] };
+}
+
+function terminarDia() {
+  const legajoStr = String(legajoInput.value || "");
+  if (!legajoStr) { alert("Falta el número de legajo"); return; }
+
+  const summary  = getTodaySummaryForLegajo(legajoStr);
+  const pendings = getPendingsForLegajo(legajoStr);
+
+  const opcionesOrden = Object.keys(summary.counts).sort();
+  const summaryHtml = opcionesOrden.length
+    ? `<ul style="margin:6px 0 0 0; padding-left:20px;">
+         ${opcionesOrden.map(op =>
+           `<li><b>${escapeHtml(op)}</b> — ${escapeHtml(desc[op] || "")}: ${summary.counts[op]}</li>`).join("")}
+       </ul>`
+    : `<div class="history-empty">Sin reportes hoy.</div>`;
+
+  const sobrevivenHtml = pendings.sobreviven.length
+    ? `<ul style="margin:6px 0 0 0; padding-left:20px;">
+         ${pendings.sobreviven.map(p =>
+           `<li>${escapeHtml(p.tipo)}${p.valor ? ` <i>${escapeHtml(p.valor)}</i>` : ""}${p.desc ? ` — ${escapeHtml(p.desc)}` : ""}</li>`).join("")}
+       </ul>`
+    : "<div style='color:#666; font-size:14px;'>Ninguno.</div>";
+
+  // Toggles auto-cerrables sin input (AT/PB/Limp/PC/CT/Perm)
+  const seCierranAutoHtml = pendings.seCierranAuto.length
+    ? `<ul style="margin:6px 0 0 0; padding-left:20px;">
+         ${pendings.seCierranAuto.map(p =>
+           `<li><b>${escapeHtml(p.tipo)}</b> — ${escapeHtml(p.desc)}</li>`).join("")}
+       </ul>`
+    : "";
+
+  // Toggles que piden cantidad (CC/RT/RI/EI): input por cada uno
+  const seCierranConInputHtml = pendings.seCierranConInput.length
+    ? pendings.seCierranConInput.map(p => `
+        <div style="margin: 8px 0;">
+          <label style="display:block; font-size:14px; margin-bottom:3px;">
+            <b>${escapeHtml(p.tipo)}</b> — ${escapeHtml(p.desc)}: <span style="color:#991b1b;">cantidad</span>
+          </label>
+          <input type="text" id="td_input_${escapeHtml(p.tipo)}"
+                 inputmode="numeric"
+                 style="width:100%; padding:8px; border:2px solid #ca8a04;
+                        border-radius:6px; font-size:16px; box-sizing:border-box;"
+                 placeholder="Cantidad...">
+        </div>`).join("")
+    : "";
+
+  // Detectar si ya hubo un FJ hoy: bandera para mostrar advertencia.
+  const prevFJ = readDayHist(getTodayKey(), legajoStr).find(it => it.opcion === "FJ");
+  const warnHtml = prevFJ
+    ? `<div style="margin-bottom:14px; padding:10px; background:#fef9c3;
+                   border:2px solid #ca8a04; border-radius:8px;">
+         <b style="color:#854d0e;">⚠ Ya cerraste el día hoy${
+           prevFJ.ts ? ` a las ${escapeHtml(formatDateTime(prevFJ.ts).split(" ")[1] || "")}` : ""
+         }.</b><br>
+         Si confirmás, se va a <b>reemplazar</b> el reporte anterior con uno nuevo
+         (queda una sola fila por día por legajo en el servidor).
+       </div>`
+    : "";
+
+  const html = `
+    ${warnHtml}
+    <div style="margin-bottom:14px;">
+      <b>Legajo:</b> ${escapeHtml(legajoStr)}<br>
+      <b>Reportes hechos hoy:</b> ${summary.total}
+      ${summaryHtml}
+    </div>
+
+    <div style="margin-bottom:14px; padding:10px; background:#f0f9ff; border-radius:8px;">
+      <b style="color:#075985;">⏸ Continúan al día siguiente:</b>
+      ${sobrevivenHtml}
+    </div>
+
+    ${pendings.seCierranAuto.length ? `
+      <div style="padding:10px; background:#fef2f2; border-radius:8px; margin-bottom:14px;">
+        <b style="color:#991b1b;">⛔ Se cierran ahora:</b>
+        ${seCierranAutoHtml}
+      </div>
+    ` : ""}
+
+    ${pendings.seCierranConInput.length ? `
+      <div style="padding:10px; background:#fffbeb; border:2px solid #ca8a04; border-radius:8px;">
+        <b style="color:#854d0e;">📝 Necesitan cantidad antes de cerrar:</b>
+        <div style="font-size:12px; color:#854d0e; margin: 4px 0 8px 0;">
+          Completá el dato para cada uno. Sin esto no se puede terminar el día.
+        </div>
+        ${seCierranConInputHtml}
+      </div>
+    ` : ""}
+
+    ${(!pendings.seCierranAuto.length && !pendings.seCierranConInput.length) ? `
+      <div style="padding:10px; background:#f0fdf4; border-radius:8px;">
+        <span style="color:#166534;">Sin toggles abiertos para cerrar.</span>
+      </div>
+    ` : ""}
+  `;
+
+  document.getElementById("terminarDiaContent").innerHTML = html;
+  document.getElementById("terminarDiaModal").classList.add("show");
+}
+
+function closeTerminarDia() {
+  document.getElementById("terminarDiaModal").classList.remove("show");
+}
+
+/* Bulk "replay" del día — UNA llamada con array de filas y Prefer:
+   resolution=ignore-duplicates. Recupera lo que se haya perdido, sin
+   generar duplicados de lo que ya estaba.
+   Filtra items sin id (legacy) que no podríamos dedup-ear. */
+async function bulkSendDayReplay(legajoStr, historySnapshot) {
+  const bulkPayload = (historySnapshot || [])
+    .filter(item => item && item.id)
+    .map(item => ({
+      client_id:   item.id,
+      legajo:      legajoStr,
+      opcion:      item.opcion,
+      descripcion: item.descripcion || (desc[item.opcion] || ""),
+      texto:       item.texto || "",
+      ts_cliente:  new Date(item.ts || Date.now()).toISOString(),
+      ts_inicio:   item.ts_inicio_iso || null
+    }));
+  if (!bulkPayload.length) return;
+  try {
+    // Igual que en el upsert del FJ: PostgREST necesita ?on_conflict=client_id
+    // para saber qué constraint usar; sin esto el ignore-duplicates no se
+    // aplica y los conflictos tiran 409 abortando el batch.
+    await fetch(SUPABASE_TABLE_ENDPOINT + "?on_conflict=client_id", {
+      method: "POST",
+      headers: {
+        "apikey":        SUPABASE_KEY,
+        "Authorization": "Bearer " + SUPABASE_KEY,
+        "Content-Type":  "application/json",
+        "Prefer":        "resolution=ignore-duplicates,return=minimal"
+      },
+      body: JSON.stringify(bulkPayload),
+      keepalive: true
+    });
+  } catch (e) { /* best effort — si falla, los reportes individuales que
+                   no se hayan enviado siguen reintentándose por su cuenta */ }
+}
+
+async function confirmarTerminarDia() {
+  const legajoStr = String(legajoInput.value || "");
+  if (!legajoStr) { closeTerminarDia(); return; }
+
+  // Capturar pendientes ANTES de tocar el estado, así el resumen y la
+  // limpieza son consistentes.
+  const summary = getTodaySummaryForLegajo(legajoStr);
+  const st = getLegajoState(legajoStr);
+
+  // Validación de cantidades para los toggles CC/RT/RI/EI: si alguno
+  // está abierto, el operario tiene que completar el input del modal
+  // antes de confirmar. Sin completar => alerta y no cierra nada.
+  const closeInputs = {};   // code -> cantidad escrita
+  const pendNow = getPendingsForLegajo(legajoStr);
+  for (const p of pendNow.seCierranConInput) {
+    const el = document.getElementById("td_input_" + p.tipo);
+    const v  = (el && el.value || "").trim();
+    if (!v) {
+      alert(`Falta completar la cantidad para ${p.tipo} (${p.desc}). Tenés que ponerla antes de terminar el día.`);
+      if (el) { el.focus(); el.style.borderColor = "#dc2626"; }
+      return;
+    }
+    closeInputs[p.tipo] = v;
+  }
+
+  const nowMs  = Date.now();
+  const nowIso = new Date(nowMs).toISOString();
+
+  // 0) RE-ENVIAR todos los reportes del día como red de seguridad — UNA SOLA
+  //    llamada bulk con array (PostgREST acepta) y Prefer: resolution=
+  //    ignore-duplicates: el server inserta los que faltan y descarta los
+  //    duplicados por UNIQUE(client_id) sin tirar error.
+  //    - Si ya estaba (envío original llegó OK): se descarta. Sin duplicado.
+  //    - Si se había perdido: se inserta ahora, recuperado.
+  //    - Si llega después un mensaje original que estaba en cola con el mismo
+  //      client_id: el envío individual también es dedup-eado (UNIQUE).
+  //    Snapshot tomado ANTES de los auto-cierres + FJ para no duplicar esos
+  //    items recién creados — esos van por la cola normal (1-3 items).
+  //    FJ previos de hoy (raro: solo si tocaron Terminar Día dos veces) se
+  //    excluyen para no clonarlos como otra FJ con el mismo id.
+  const todayHistSnapshot = readDayHist(getTodayKey(), legajoStr)
+    .filter(it => it.opcion !== "FJ");
+  bulkSendDayReplay(legajoStr, todayHistSnapshot);   // best-effort, no await
+
+  // 1) Auto-cerrar TODOS los toggles no-sobrevivientes con ts_cliente = ahora.
+  //    NO usamos enqueueAutoClose (que pone ts_cliente=17:00) porque acá el
+  //    operario está cerrando manualmente, en este momento.
+  if (st.toggles) {
+    for (const code of Object.keys(st.toggles)) {
+      if (SURVIVING_TOGGLES.includes(code)) continue;
+      const cur = st.toggles[code];
+      const tsInicioIso = (typeof cur === "string") ? cur : null;
+      // Para CC/RT/RI/EI el texto del cierre viene del input del modal
+      // (ya validado más arriba). Para AT/PB/Limp/PC/CT/Perm el texto
+      // queda vacío como antes.
+      const textoCierre = CLOSE_NEEDS_INPUT_CODES.includes(code)
+        ? (closeInputs[code] || "")
+        : "";
+      const closeId = nowMs.toString(36) + "_fjclose_" + code + "_" + Math.random().toString(36).slice(2, 6);
+      const closePayload = {
+        legajo: legajoStr,
+        opcion: code,
+        descripcion: desc[code] || "",
+        texto: textoCierre,
+        ts: nowMs,
+        id: closeId,
+        ts_inicio_iso: tsInicioIso
+      };
+      pushHistoryForLegajo(legajoStr, {
+        ts: nowMs, opcion: code, descripcion: closePayload.descripcion,
+        texto: textoCierre, id: closeId, status: "queued",
+        ts_inicio_iso: tsInicioIso
+      });
+      enqueueReport(closePayload);
+      delete st.toggles[code];
+    }
+    setLegajoState(legajoStr, st);
+  }
+
+  // 2) Reporte FJ "Fin de Jornada" con resumen del día como JSON en texto.
+  //    client_id DETERMINÍSTICO por (legajo, día) -> si tocan Terminar Día
+  //    dos veces el mismo día, el server hace UPDATE (merge-duplicates)
+  //    en vez de insertar otra fila. Una sola FJ por día por legajo.
+  const fjId    = "fj_" + legajoStr + "_" + getTodayKey();
+  const fjTexto = JSON.stringify(summary.counts);
+  const fjPayload = {
+    legajo: legajoStr,
+    opcion: "FJ",
+    descripcion: "Fin de Jornada",
+    texto: fjTexto,
+    ts: nowMs,
+    id: fjId,
+    ts_inicio_iso: null
+  };
+  // Si ya había una FJ de hoy en el historial local (de este Terminar Día
+  // o de uno previo con id random pre-v1.12), la sacamos antes de pushear
+  // la nueva, así queda una sola entrada de FJ en el historial local.
+  removeHistoryItemsByOpcionForToday(legajoStr, "FJ");
+  pushHistoryForLegajo(legajoStr, {
+    ts: nowMs, opcion: "FJ", descripcion: "Fin de Jornada",
+    texto: fjTexto, id: fjId, status: "queued"
+  });
+  enqueueReport(fjPayload);
+
+  // 3) Forzar flush ahora — antes de que el operario cierre el celular.
+  flushQueue();
+
+  // 4) Cerrar modal + volver a pantalla de legajo. NO se borra el legajo
+  //    guardado: si mañana vuelve el mismo operario, ya lo tiene precargado.
+  closeTerminarDia();
+  resetSelection();
+  optionsScreen.classList.add("hidden");
+  legajoScreen.classList.remove("hidden");
+  document.getElementById("btnHistDias")?.classList.remove("hidden");
+  renderLegajoHistory(legajoInput.value);
+  updateCoreButtonsState();
+  renderPendingSuggestion();
+  updatePendingIndicator();
 }
 
 /* Live render historial al tipear legajo */
@@ -656,6 +1035,11 @@ const TOGGLE_CODES = ["CR","CC","RT","MG","RI","EI","AT","PB","Limp","PC","Perm"
    demás hasta cerrarlo (tocando el mismo botón otra vez). El resto de
    los toggles (CR, MG, CC, RT, RI, EI, Perm) NO bloquean. */
 const DEAD_TIME_CODES = ["AT","PB","Limp","PC","CT"];
+
+/* Botones SIEMPRE tocables — no se les aplica NINGUNA regla de bloqueo
+   impuesta por otras tareas. Caso de uso: el operario está en limpieza
+   y necesita ir al baño / a comer; al volver, sigue limpieza. */
+const ALWAYS_ALLOWED_CODES = ["PB","PC"];
 
 function readStateMap(){
   try { return JSON.parse(localStorage.getItem(STATE_KEY)) || {}; }
@@ -727,23 +1111,39 @@ function getActiveDeadTime(legajo){
    - Si hay tiempo muerto activo: TODOS los botones quedan deshabilitados
      menos el mismo botón del tiempo muerto (para poder cerrarlo).
    - Si NO hay tiempo muerto pero sí hay algún toggle activo (CR, MG, etc):
-     solo se deshabilitan EP/TP/AP/TAP, los demás botones quedan tocables. */
+     solo se deshabilitan EP/TP/AP/TAP, los demás botones quedan tocables.
+   - PB y PC nunca se deshabilitan (siempre tocables).
+   - Además, marca con borde rojo (.pending) los botones que correspondan
+     a tareas abiertas sin cerrar. */
 function updateCoreButtonsState(){
   const legajoStr = String(legajoInput.value || "");
   const deadTime  = getActiveDeadTime(legajoStr);
   const anyToggle = getAnyToggleActive(legajoStr);
+  const st        = legajoStr ? getLegajoState(legajoStr) : null;
+  const pickingActive = !!(st && st.picking && st.picking.active);
+  const armadoActive  = !!(st && st.armado  && st.armado.active);
 
   document.querySelectorAll(".box").forEach(b=>{
     const code = b.querySelector(".box-title")?.innerText?.trim();
     if (!code) return;
+
+    // ===== DISABLED =====
     let disabled = false;
-    if (deadTime && code !== deadTime) {
+    if (ALWAYS_ALLOWED_CODES.includes(code)) {
+      disabled = false;                                           // PB/PC siempre tocables
+    } else if (deadTime && code !== deadTime) {
       disabled = true;                                            // regla nueva
     } else if (CORE_CODES.includes(code) && anyToggle) {
       disabled = true;                                            // regla vieja
     }
-    if (disabled) b.classList.add("disabled");
-    else          b.classList.remove("disabled");
+    b.classList.toggle("disabled", disabled);
+
+    // ===== PENDING (borde rojo) =====
+    let pending = false;
+    if ((code === "EP" || code === "TP") && pickingActive) pending = true;
+    else if ((code === "AP" || code === "TAP") && armadoActive) pending = true;
+    else if (TOGGLE_CODES.includes(code) && st && st.toggles && st.toggles[code]) pending = true;
+    b.classList.toggle("pending", pending);
   });
 }
 
@@ -839,23 +1239,26 @@ function backToLegajo() {
 function selectOption(code) {
   const legajoStr = String(legajoInput.value || "");
 
-  // Regla 1 (NUEVA): si hay TIEMPO MUERTO abierto (AT/PB/Limp/PC/CT),
-  // solo se puede tocar ese mismo código para cerrarlo. Todo lo demás bloqueado.
-  const deadTime = getActiveDeadTime(legajoStr);
-  if (deadTime && code !== deadTime) {
-    alert(`Tenés un tiempo muerto abierto: ${deadTime} — ${desc[deadTime]}\nTocá ${deadTime} de nuevo para terminarlo antes de hacer otra cosa.`);
-    updateCoreButtonsState();
-    return;
-  }
-
-  // Regla 2 (VIEJA): si hay CUALQUIER toggle abierto (CR, MG, RT, etc.),
-  // EP/TP/AP/TAP siguen bloqueados como hasta ahora.
-  if (CORE_CODES.includes(code)) {
-    const anyToggle = getAnyToggleActive(legajoStr);
-    if (anyToggle) {
-      alert(`Tenés una acción pendiente: ${anyToggle} — ${desc[anyToggle]}\nTerminála antes de usar EP/TP/AP/TAP.`);
+  // Excepción: PB y PC siempre se pueden tocar — no aplican reglas de bloqueo.
+  if (!ALWAYS_ALLOWED_CODES.includes(code)) {
+    // Regla 1 (NUEVA): si hay TIEMPO MUERTO abierto (AT/PB/Limp/PC/CT),
+    // solo se puede tocar ese mismo código para cerrarlo. Todo lo demás bloqueado.
+    const deadTime = getActiveDeadTime(legajoStr);
+    if (deadTime && code !== deadTime) {
+      alert(`Tenés un tiempo muerto abierto: ${deadTime} — ${desc[deadTime]}\nTocá ${deadTime} de nuevo para terminarlo antes de hacer otra cosa.`);
       updateCoreButtonsState();
       return;
+    }
+
+    // Regla 2 (VIEJA): si hay CUALQUIER toggle abierto (CR, MG, RT, etc.),
+    // EP/TP/AP/TAP siguen bloqueados como hasta ahora.
+    if (CORE_CODES.includes(code)) {
+      const anyToggle = getAnyToggleActive(legajoStr);
+      if (anyToggle) {
+        alert(`Tenés una acción pendiente: ${anyToggle} — ${desc[anyToggle]}\nTerminála antes de usar EP/TP/AP/TAP.`);
+        updateCoreButtonsState();
+        return;
+      }
     }
   }
 
@@ -1051,7 +1454,8 @@ function enqueueAutoClose(legajo, code, tsInicioIso) {
   // El cierre auto va al historial del día en que se abrió, no al de hoy.
   pushHistoryForLegajoOnDay(legajo, isoToDayKey(nowMs), {
     ts: nowMs, opcion: code, descripcion: descr,
-    texto: "", id: id, status: "queued"
+    texto: "", id: id, status: "queued",
+    ts_inicio_iso: tsInicioIso
   });
   enqueueReport(payload);
 }
@@ -1071,16 +1475,26 @@ async function trySendOneReport(payload) {
     // Corte duro a los 12s para no quedarnos esperando si la red se cuelga.
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), 12000);
-    const res = await fetch(SUPABASE_TABLE_ENDPOINT, {
+    // FJ usa client_id determinístico (fj_<legajo>_<YYYY-MM-DD>) y merge-duplicates
+    // para que un segundo Terminar Día del mismo día actualice (UPDATE) el FJ
+    // anterior en vez de fallar con 409. Para todo lo demás, return=minimal normal.
+    // IMPORTANTE: PostgREST necesita ?on_conflict=client_id en la URL para que
+    // el UPSERT use el UNIQUE constraint correcto (sin esto, asume el PK
+    // y el merge-duplicates no se aplica → 409).
+    const isFJ   = (payload.opcion === "FJ");
+    const url    = isFJ
+      ? SUPABASE_TABLE_ENDPOINT + "?on_conflict=client_id"
+      : SUPABASE_TABLE_ENDPOINT;
+    const prefer = isFJ
+      ? "resolution=merge-duplicates,return=minimal"
+      : "return=minimal";
+    const res = await fetch(url, {
       method: "POST",
       headers: {
         "apikey":        SUPABASE_KEY,
         "Authorization": "Bearer " + SUPABASE_KEY,
         "Content-Type":  "application/json",
-        "Prefer":        "return=minimal"  // anon NO tiene SELECT en RLS; pedir
-                                            // return=representation hace que el
-                                            // server devuelva 4xx aunque el INSERT
-                                            // en sí esté bien. Mantener minimal.
+        "Prefer":        prefer
       },
       body: JSON.stringify({
         client_id:   payload.id,                              // UNIQUE en la tabla -> dedup
@@ -1207,7 +1621,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v1.7";
+const APP_VERSION = "v1.16";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -1280,7 +1694,8 @@ async function send() {
   /* ---- historial local ---- */
   pushHistoryForLegajo(legajoStr, {
     ts: payload.ts, opcion, descripcion, texto,
-    id: payload.id,           // permite actualizar el status cuando se confirme el envío
+    id: payload.id,                          // permite actualizar el status cuando se confirme el envío
+    ts_inicio_iso: payload.ts_inicio_iso || null,  // necesario para "replay" desde Terminar Día
     status: "queued"
   });
 

@@ -6,7 +6,7 @@
    ⚠ IMPORTANTE: SUPABASE_URL y SUPABASE_KEY están duplicados acá y en
    index.html. Si rotás la publishable key, hay que actualizar AMBOS.
    ========================================================= */
-const SW_VERSION = "v1.7-vir";
+const SW_VERSION = "v1.16-vir";
 
 const SUPABASE_URL = "https://hrxfctzncixxqmpfhskv.supabase.co";
 const SUPABASE_KEY = "sb_publishable_BqpAgZH6ty-9wft10_YMhw_0rcIPuWT";
@@ -96,13 +96,24 @@ async function trySendOneReport(payload) {
   try {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), SEND_TIMEOUT_MS);
-    const res = await fetch(SUPABASE_TABLE_ENDPOINT, {
+    // Espejo de la lógica del index.html: para FJ usamos upsert
+    // (merge-duplicates + ?on_conflict=client_id) para que un segundo
+    // Terminar Día actualice la fila en lugar de generar 409 y dejar
+    // los datos desactualizados. El resto va con INSERT normal.
+    const isFJ   = (payload.opcion === "FJ");
+    const url    = isFJ
+      ? SUPABASE_TABLE_ENDPOINT + "?on_conflict=client_id"
+      : SUPABASE_TABLE_ENDPOINT;
+    const prefer = isFJ
+      ? "resolution=merge-duplicates,return=minimal"
+      : "return=minimal";
+    const res = await fetch(url, {
       method: "POST",
       headers: {
         "apikey":        SUPABASE_KEY,
         "Authorization": "Bearer " + SUPABASE_KEY,
         "Content-Type":  "application/json",
-        "Prefer":        "return=minimal"
+        "Prefer":        prefer
       },
       body: JSON.stringify({
         client_id:   payload.id,
