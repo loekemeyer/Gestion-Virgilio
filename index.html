@@ -110,6 +110,19 @@ button {
   opacity:0.6;
 }
 
+/* ⚠ tarea pendiente: hay un EP/AP o toggle abierto sin cerrar.
+   El botón correspondiente queda con borde rojo. Si está además
+   disabled (por bloqueo), gana el borde rojo igual. */
+.box.pending{
+  border-color: #d33;
+  background: #fff5f5;
+}
+.box.disabled.pending,
+.box.pending.disabled{
+  border-color: #d33;
+  background: #ddd;
+}
+
 /* ✅ aviso de reportes pendientes (se reintenta solo en background) */
 #pendingIndicator{
   display: none;
@@ -264,7 +277,7 @@ button {
 <button id="btnHistDias" title="Historial de días anteriores">📅</button>
 
 <!-- Badge de versión + estado de cola (abajo a la derecha) -->
-<div id="versionBadge">v1.7 ✓</div>
+<div id="versionBadge">v1.8 ✓</div>
 
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
@@ -657,6 +670,11 @@ const TOGGLE_CODES = ["CR","CC","RT","MG","RI","EI","AT","PB","Limp","PC","Perm"
    los toggles (CR, MG, CC, RT, RI, EI, Perm) NO bloquean. */
 const DEAD_TIME_CODES = ["AT","PB","Limp","PC","CT"];
 
+/* Botones SIEMPRE tocables — no se les aplica NINGUNA regla de bloqueo
+   impuesta por otras tareas. Caso de uso: el operario está en limpieza
+   y necesita ir al baño / a comer; al volver, sigue limpieza. */
+const ALWAYS_ALLOWED_CODES = ["PB","PC"];
+
 function readStateMap(){
   try { return JSON.parse(localStorage.getItem(STATE_KEY)) || {}; }
   catch { return {}; }
@@ -727,23 +745,39 @@ function getActiveDeadTime(legajo){
    - Si hay tiempo muerto activo: TODOS los botones quedan deshabilitados
      menos el mismo botón del tiempo muerto (para poder cerrarlo).
    - Si NO hay tiempo muerto pero sí hay algún toggle activo (CR, MG, etc):
-     solo se deshabilitan EP/TP/AP/TAP, los demás botones quedan tocables. */
+     solo se deshabilitan EP/TP/AP/TAP, los demás botones quedan tocables.
+   - PB y PC nunca se deshabilitan (siempre tocables).
+   - Además, marca con borde rojo (.pending) los botones que correspondan
+     a tareas abiertas sin cerrar. */
 function updateCoreButtonsState(){
   const legajoStr = String(legajoInput.value || "");
   const deadTime  = getActiveDeadTime(legajoStr);
   const anyToggle = getAnyToggleActive(legajoStr);
+  const st        = legajoStr ? getLegajoState(legajoStr) : null;
+  const pickingActive = !!(st && st.picking && st.picking.active);
+  const armadoActive  = !!(st && st.armado  && st.armado.active);
 
   document.querySelectorAll(".box").forEach(b=>{
     const code = b.querySelector(".box-title")?.innerText?.trim();
     if (!code) return;
+
+    // ===== DISABLED =====
     let disabled = false;
-    if (deadTime && code !== deadTime) {
+    if (ALWAYS_ALLOWED_CODES.includes(code)) {
+      disabled = false;                                           // PB/PC siempre tocables
+    } else if (deadTime && code !== deadTime) {
       disabled = true;                                            // regla nueva
     } else if (CORE_CODES.includes(code) && anyToggle) {
       disabled = true;                                            // regla vieja
     }
-    if (disabled) b.classList.add("disabled");
-    else          b.classList.remove("disabled");
+    b.classList.toggle("disabled", disabled);
+
+    // ===== PENDING (borde rojo) =====
+    let pending = false;
+    if ((code === "EP" || code === "TP") && pickingActive) pending = true;
+    else if ((code === "AP" || code === "TAP") && armadoActive) pending = true;
+    else if (TOGGLE_CODES.includes(code) && st && st.toggles && st.toggles[code]) pending = true;
+    b.classList.toggle("pending", pending);
   });
 }
 
@@ -839,23 +873,26 @@ function backToLegajo() {
 function selectOption(code) {
   const legajoStr = String(legajoInput.value || "");
 
-  // Regla 1 (NUEVA): si hay TIEMPO MUERTO abierto (AT/PB/Limp/PC/CT),
-  // solo se puede tocar ese mismo código para cerrarlo. Todo lo demás bloqueado.
-  const deadTime = getActiveDeadTime(legajoStr);
-  if (deadTime && code !== deadTime) {
-    alert(`Tenés un tiempo muerto abierto: ${deadTime} — ${desc[deadTime]}\nTocá ${deadTime} de nuevo para terminarlo antes de hacer otra cosa.`);
-    updateCoreButtonsState();
-    return;
-  }
-
-  // Regla 2 (VIEJA): si hay CUALQUIER toggle abierto (CR, MG, RT, etc.),
-  // EP/TP/AP/TAP siguen bloqueados como hasta ahora.
-  if (CORE_CODES.includes(code)) {
-    const anyToggle = getAnyToggleActive(legajoStr);
-    if (anyToggle) {
-      alert(`Tenés una acción pendiente: ${anyToggle} — ${desc[anyToggle]}\nTerminála antes de usar EP/TP/AP/TAP.`);
+  // Excepción: PB y PC siempre se pueden tocar — no aplican reglas de bloqueo.
+  if (!ALWAYS_ALLOWED_CODES.includes(code)) {
+    // Regla 1 (NUEVA): si hay TIEMPO MUERTO abierto (AT/PB/Limp/PC/CT),
+    // solo se puede tocar ese mismo código para cerrarlo. Todo lo demás bloqueado.
+    const deadTime = getActiveDeadTime(legajoStr);
+    if (deadTime && code !== deadTime) {
+      alert(`Tenés un tiempo muerto abierto: ${deadTime} — ${desc[deadTime]}\nTocá ${deadTime} de nuevo para terminarlo antes de hacer otra cosa.`);
       updateCoreButtonsState();
       return;
+    }
+
+    // Regla 2 (VIEJA): si hay CUALQUIER toggle abierto (CR, MG, RT, etc.),
+    // EP/TP/AP/TAP siguen bloqueados como hasta ahora.
+    if (CORE_CODES.includes(code)) {
+      const anyToggle = getAnyToggleActive(legajoStr);
+      if (anyToggle) {
+        alert(`Tenés una acción pendiente: ${anyToggle} — ${desc[anyToggle]}\nTerminála antes de usar EP/TP/AP/TAP.`);
+        updateCoreButtonsState();
+        return;
+      }
     }
   }
 
@@ -1207,7 +1244,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v1.7";
+const APP_VERSION = "v1.8";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
