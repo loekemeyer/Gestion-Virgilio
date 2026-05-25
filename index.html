@@ -101,8 +101,131 @@ button {
 .selected-desc { margin-left: 12px; font-size: 18px; font-weight: bold; }
 
 .label { margin-top: 14px; font-size: 22px; text-align: center; white-space: pre-line; }
-.text-input { width: 100%; height: 68px; font-size: 64px ; border:6px solid ; text-align: center; margin-top: 8px; text-transform: uppercase; }
-.text-input::placeholder { font-size: 26px; color: #aaa; }
+
+/* Label + input + botón Enviar en línea, todos juntos a la izquierda. */
+.label-send-row{
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 14px;
+  margin-top: 14px;
+  flex-wrap: wrap;       /* en celular angosto, baja a 2 filas */
+}
+.label-send-row #inputLabel{
+  margin-top: 0;
+  text-align: left;
+  flex: 0 0 auto;        /* label al ancho de su contenido */
+  white-space: nowrap;
+}
+.label-send-row #textInput{
+  flex: 0 0 auto;        /* ancho fijo */
+  width: 7ch;            /* aprox 6 caracteres + margen para que respire */
+  min-width: 0;
+  margin-top: 0;
+}
+.primary-btn-inline{
+  width: auto !important;
+  min-width: 140px;
+  padding: 16px 32px !important;
+  margin-top: 0 !important;
+  font-size: 26px !important;
+  font-weight: bold;
+  flex: 0 0 auto;
+}
+
+.text-input {
+  width: 100%;
+  height: 48px;
+  font-size: 32px;
+  border: 3px solid;
+  text-align: center;
+  margin-top: 6px;
+  text-transform: uppercase;
+}
+.text-input::placeholder { font-size: 18px; color: #aaa; }
+
+/* Lista de tandas planificadas (PPP) — boxes con ancho fijo (4 chars),
+   agrupados por fecha de entrega. */
+#tandasList{
+  margin-top: 12px;
+}
+#tandasList.hidden{ display: none; }
+/* Contenedor que pone los grupos de días lado a lado cuando entran en la
+   misma fila (optimizado para celular: 26/05 con 1 chip y 28/05 con 2 caben
+   juntos en una sola fila). */
+.tandas-day-grid{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px 18px;
+  align-items: flex-start;
+}
+.tandas-day-group{
+  margin-bottom: 0;
+  /* Recuadro que agrupa visualmente fecha + chips de ese día */
+  border: 2px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 8px 10px 10px 10px;
+  background: #fff;
+}
+.tandas-day-header{
+  font-size: 16px;
+  font-weight: bold;
+  color: #1e6bd6;
+  margin-bottom: 6px;
+}
+.tandas-chips{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.tanda-chip{
+  /* Override del global "button { width:100%; margin-top:14px; padding:16px }". */
+  width: auto;
+  min-width: 72px;
+  margin-top: 0;
+  margin-bottom: 0;
+  text-align: center;
+  background: #e0f2fe;
+  border: 2px solid #1e6bd6;
+  color: #1e6bd6;
+  padding: 10px 6px;
+  border-radius: 8px;
+  font-size: 22px;
+  font-weight: bold;
+  cursor: pointer;
+  user-select: none;
+  font-family: Arial, sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+.tanda-chip:active{
+  background: #1e6bd6;
+  color: #fff;
+  transform: scale(0.96);
+}
+.tandas-list-empty,
+.tandas-list-label{
+  font-size: 14px;
+  color: #999;
+  font-style: italic;
+}
+/* Botón "Ver más días" cuando hay más de 3 fechas */
+.tandas-more-btn{
+  width: auto;
+  min-width: 0;
+  margin-top: 8px;
+  background: #f1f5f9;
+  border: 2px dashed #94a3b8;
+  color: #475569;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+  display: inline-block;
+}
+.tandas-more-btn:active{
+  background: #e2e8f0;
+}
 
 .error { color: red; margin-top: 10px; font-size: 18px; text-align: center; }
 .small { font-size: 14px; color: #666; text-align:center; margin-top:6px; }
@@ -137,6 +260,42 @@ button {
   border-color: #d33;
   background: #ddd;
 }
+
+/* Banner "Deshacer último mensaje" — visible 60s después de send() */
+#undoBanner{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 12px 14px;
+  background: #fef3c7;
+  border: 2px solid #f59e0b;
+  border-radius: 8px;
+  font-size: 16px;
+  color: #92400e;
+  font-weight: bold;
+}
+#undoBanner.hidden{ display: none; }
+#undoBannerText{
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.undo-btn{
+  width: auto !important;
+  min-width: 0 !important;
+  padding: 8px 18px !important;
+  margin: 0 !important;
+  background: #dc2626;
+  color: #fff;
+  border: 2px solid #991b1b;
+  border-radius: 6px;
+  font-weight: bold;
+  font-size: 15px;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+.undo-btn:active{ background: #991b1b; }
 
 /* ✅ aviso de reportes pendientes (se reintenta solo en background) */
 #pendingIndicator{
@@ -180,6 +339,821 @@ button {
 /* Override del .hidden global: el ID es más específico que la clase,
    así que sin esta regla el botón queda visible en la pantalla de tareas. */
 #btnHistDias.hidden { display: none; }
+
+/* Botón flotante 📊 (monitor de operarios — supervisor) */
+#btnMonitor{
+  position: fixed;
+  bottom: 12px;
+  left: 12px;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 2px solid #cbd5e1;
+  background: #f8fafc;
+  font-size: 22px;
+  cursor: pointer;
+  z-index: 100;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#btnMonitor.hidden { display: none; }
+
+/* Modal monitor */
+#monitorModal{
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 200;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 16px 4px;
+  overflow-y: auto;
+}
+#monitorModal.show{ display: flex; }
+.monitor-card{
+  background: #fff;
+  border-radius: 12px;
+  padding: 0 10px 14px 10px;
+  width: 100%;
+  max-width: 900px;
+  max-height: 96vh;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+.monitor-header{
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: #fff;
+  padding: 12px 0 10px 0;
+  margin: 0 0 8px 0;
+  border-bottom: 1px solid #e5e7eb;
+}
+.monitor-title{ font-size: 18px; font-weight: bold; }
+.monitor-meta{ font-size: 11px; color: #666; margin-top: 2px; }
+.monitor-table{
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.monitor-table th{
+  background: #f1f5f9;
+  text-align: left;
+  padding: 8px 6px;
+  font-size: 12px;
+  border-bottom: 2px solid #cbd5e1;
+  position: sticky;
+  top: 60px;
+  z-index: 5;
+}
+.monitor-table td{
+  padding: 8px 6px;
+  border-bottom: 1px solid #eef2f7;
+  vertical-align: middle;
+}
+.monitor-table td.center, .monitor-table th.center{ text-align: center; }
+.monitor-table td.num, .monitor-table th.num{ text-align: right; font-variant-numeric: tabular-nums; }
+.monitor-tanda{ font-weight: bold; color: #1e6bd6; }
+.status-icon{ font-size: 20px; line-height: 1; }
+.status-pend{ color: #94a3b8; }
+.status-curso{ color: #d97706; }
+.status-done{ color: #16a34a; }
+
+/* Spinner segmentado (reemplaza al ⏰ para indicar "en curso") — 12 barras
+   con opacity fade en cascada, da la ilusión de rotación. */
+.status-spinner{
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  vertical-align: middle;
+  line-height: 0;
+}
+.status-spinner svg{
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.status-spinner rect{
+  fill: currentColor;
+  animation: spinner-fade 1.1s linear infinite;
+}
+@keyframes spinner-fade{
+  0%, 100% { opacity: 0.15; }
+  10%      { opacity: 1; }
+}
+
+/* Fila con algo en curso (EP o AP sin cerrar) — resaltada amarillo
+   (DESACTIVADO POR AHORA — descomentar para volver al color amarillo/marrón) */
+/* .monitor-table tr.row-curso td{ background: #fef9c3; } */
+/* Fila con tanda trabajada pero sin Op=SI en PPP — alerta roja
+   (DESACTIVADO POR AHORA: la columna "Fecha Salida" ya muestra (F Pk)
+   como indicador; descomentar estos bloques para volver al rojo) */
+/*
+.monitor-table tr.row-missing-si td{
+  background: #fee2e2;
+  color: #991b1b;
+  font-weight: bold;
+}
+.monitor-table tr.row-curso.row-missing-si td{
+  background: #fecaca;
+  color: #7f1d1d;
+}
+*/
+
+/* #monitorModal.tv .monitor-table tr.row-curso td{ background: #422006; color: #fde68a; } */
+/*
+#monitorModal.tv .monitor-table tr.row-missing-si td{
+  background: #7f1d1d;
+  color: #fecaca;
+  font-weight: bold;
+}
+#monitorModal.tv .monitor-table tr.row-curso.row-missing-si td{
+  background: #991b1b;
+  color: #fee2e2;
+}
+
+/* Flash verde de 2s cuando una tanda cambia de estado (⏰ → ✅ o similar).
+   Usado para que el supervisor mirando la TV note el cambio sin estar atento. */
+@keyframes row-flash-anim {
+  0%   { background-color: #22c55e; color: #052e16; }
+  100% { background-color: transparent; color: inherit; }
+}
+.monitor-table tr.row-flash td{
+  animation: row-flash-anim 2s ease-out;
+}
+#monitorModal.tv .monitor-table tr.row-flash td{
+  animation: row-flash-anim 2s ease-out;
+}
+*/
+
+/* monitor-totales-side ahora arma 2 columnas externas:
+     col-boxes  → stack vertical de filas (hoy + 5 días anteriores), cada fila
+                  es .totales-row con 3 boxes (Picking/Pedido/Empleados).
+     col-fc     → stack vertical de FC card + Total por día card.
+   Así las filas de días anteriores quedan justo debajo de la de hoy, aunque
+   el FC card tenga muchas tandas y sea alto. */
+.totales-col-boxes{
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+.totales-col-fc{
+  /* FC y Total uno al lado del otro (no apilados) */
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  align-items: flex-start;
+}
+.totales-row{
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+/* Cuadro "Total por día" — a la derecha del card "Tandas a FC" */
+.monitor-total-card{
+  border: 2px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 10px;
+  background: #f8fafc;
+}
+.monitor-total-title{
+  font-weight: bold;
+  font-size: 14px;
+  margin-bottom: 8px;
+  color: #1e6bd6;
+}
+.monitor-total-table{
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.monitor-total-table td{
+  padding: 4px 8px;
+  border-bottom: 1px solid #eef2f7;
+}
+.monitor-total-table th{
+  text-align: left;
+  padding: 4px 8px;
+  font-size: 11px;
+  background: #f1f5f9;
+  border-bottom: 1px solid #cbd5e1;
+  color: #475569;
+}
+.monitor-total-table th.center, .monitor-total-table td.center{ text-align: center; }
+.monitor-total-table th.num, .monitor-total-table td.num{
+  text-align: right;
+  font-weight: bold;
+  font-variant-numeric: tabular-nums;
+  color: #1e6bd6;
+}
+/* Celdas mergeadas con rowspan: Fecha (izq) y Total (der). */
+.monitor-total-table td[rowspan]{
+  vertical-align: middle;
+  border-right: 1px solid #cbd5e1;
+}
+.monitor-total-table td.total-cell{
+  border-right: none;
+  border-left: 1px solid #cbd5e1;
+  font-size: 15px;
+}
+.monitor-total-table td.fecha-cell{ font-weight: bold; }
+
+/* Color del M3 del camión según estado de armado:
+   verde=todas armadas, naranja=algunas, rojo=ninguna.
+   La celda Total (rowspan, del día) no se colorea — queda en azul. */
+.monitor-total-table tr.tandas-done td.num:not(.total-cell){ color: #16a34a; }
+.monitor-total-table tr.tandas-partial td.num:not(.total-cell){ color: #f97316; }
+.monitor-total-table tr.tandas-pending td.num:not(.total-cell){ color: #dc2626; }
+
+/* Total por día — modo TV */
+#monitorModal.tv .monitor-total-card{
+  background: #111827;
+  border: 3px solid #334155;
+  padding: clamp(8px, 1.2vh, 14px) clamp(10px, 1.5vh, 18px);
+  color: #cbd5e1;
+}
+#monitorModal.tv .monitor-total-title{
+  font-size: clamp(13px, 1.7vh, 22px);
+  color: #94a3b8;
+  margin-bottom: clamp(6px, 1vh, 10px);
+}
+#monitorModal.tv .monitor-total-table{
+  font-size: clamp(14px, 2vh, 26px);
+}
+#monitorModal.tv .monitor-total-table td{
+  border-bottom: 1px solid #334155;
+}
+#monitorModal.tv .monitor-total-table th{
+  background: #1e293b;
+  color: #cbd5e1;
+  font-size: clamp(11px, 1.4vh, 18px);
+  border-bottom: 2px solid #334155;
+}
+#monitorModal.tv .monitor-total-table td.num{
+  color: #60a5fa;
+  font-weight: 900;
+  font-size: clamp(14px, 2vh, 24px);
+}
+#monitorModal.tv .monitor-total-table td.total-cell{
+  font-size: clamp(16px, 2.4vh, 28px);
+  border-left-color: #334155;
+}
+#monitorModal.tv .monitor-total-table td[rowspan]{
+  border-right-color: #334155;
+}
+#monitorModal.tv .monitor-total-table td.fecha-cell{
+  color: #cbd5e1;
+}
+/* Estados de armado en TV (tonos más claros para contraste sobre fondo dark) */
+#monitorModal.tv .monitor-total-table tr.tandas-done td.num:not(.total-cell){ color: #22c55e; }
+#monitorModal.tv .monitor-total-table tr.tandas-partial td.num:not(.total-cell){ color: #fb923c; }
+#monitorModal.tv .monitor-total-table tr.tandas-pending td.num:not(.total-cell){ color: #ef4444; }
+
+/* Card "+ Fuera de ventana" — tandas planificadas con Fecha Entrega
+   posterior a la ventana visible (3 días). Click para expandir/colapsar. */
+.beyond-card{
+  border: 2px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #f8fafc;
+  cursor: pointer;
+  user-select: none;
+  /* Vive debajo de la tabla — separación visual y ancho ajustado al contenido. */
+  margin-top: 8px;
+  width: fit-content;
+  max-width: 100%;
+}
+.beyond-card:hover{ background: #f1f5f9; }
+.beyond-summary{
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.beyond-label{ font-weight: bold; color: #475569; }
+.beyond-count{ color: #1e6bd6; font-weight: bold; }
+.beyond-toggle{ margin-left: auto; transition: transform 0.2s; color: #94a3b8; }
+.beyond-card.expanded .beyond-toggle{ transform: rotate(180deg); }
+.beyond-detail{
+  display: none;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #e2e8f0;
+}
+.beyond-card.expanded .beyond-detail{ display: block; }
+.beyond-day{ margin-bottom: 8px; font-size: 12px; }
+.beyond-day:last-child{ margin-bottom: 0; }
+.beyond-day-header{ font-weight: bold; color: #1e6bd6; margin-bottom: 2px; }
+.beyond-day-tandas{ color: #475569; word-break: break-all; line-height: 1.4; }
+
+/* TV mode */
+#monitorModal.tv .beyond-card{
+  background: #111827;
+  border: 3px solid #334155;
+  padding: clamp(8px, 1.2vh, 14px) clamp(10px, 1.5vh, 18px);
+  color: #cbd5e1;
+}
+#monitorModal.tv .beyond-card:hover{ background: #1f2937; }
+#monitorModal.tv .beyond-summary{ font-size: clamp(13px, 1.7vh, 22px); }
+#monitorModal.tv .beyond-label{ color: #94a3b8; }
+#monitorModal.tv .beyond-count{ color: #60a5fa; }
+#monitorModal.tv .beyond-toggle{ color: #94a3b8; }
+#monitorModal.tv .beyond-detail{ border-top-color: #334155; }
+#monitorModal.tv .beyond-day{ font-size: clamp(12px, 1.5vh, 20px); }
+#monitorModal.tv .beyond-day-header{ color: #60a5fa; }
+#monitorModal.tv .beyond-day-tandas{ color: #94a3b8; }
+
+.monitor-totales{
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+/* POPUP MODE (PC normal): tabla arriba, totales en grid 2 cols abajo.
+   En TV mode esto se sobreescribe a grid 50/50 lado a lado. */
+.monitor-flex{ display: block; }
+.monitor-flex .monitor-table-wrap{ width: 100%; overflow: visible; }
+.monitor-flex .monitor-table{ width: 100%; }
+.monitor-totales-side{
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+/* Alert mini abajo de los totales — ocupa ambas columnas en popup */
+.monitor-totales-side .monitor-alerts{
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 6px 10px;
+  font-size: 11px;
+  gap: 8px;
+}
+.monitor-totales-side .monitor-alert-title{ font-size: 11px; }
+.monitor-totales-side .monitor-alert-chip{ font-size: 11px; padding: 2px 6px; }
+.monitor-tot-box{
+  border: 2px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 10px;
+  text-align: center;
+}
+.monitor-tot-label{ font-size: 12px; color: #555; }
+.monitor-tot-value{ font-size: 22px; font-weight: bold; color: #1e6bd6; margin-top: 2px; }
+
+/* Boxes de día (M3 Picking/Pedido/Empleados) clickeables → modal de
+   rendimiento por operario. */
+.day-box-clickable{
+  cursor: pointer;
+  transition: transform 0.1s, box-shadow 0.1s;
+}
+.day-box-clickable:hover{
+  box-shadow: 0 0 0 2px #60a5fa;
+}
+.day-box-clickable:active{
+  transform: scale(0.97);
+}
+.monitor-loading{ text-align: center; padding: 40px 12px; color: #666; }
+
+/* Banner de alertas — tandas trabajadas pero no en PPP */
+.monitor-alerts{
+  background: #fee2e2;
+  border: 2px solid #dc2626;
+  color: #7f1d1d;
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin: 0 0 10px 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+.monitor-alert-title{
+  font-size: 14px;
+  font-weight: 900;
+  flex-shrink: 0;
+}
+.monitor-alert-list{
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  flex: 1;
+}
+.monitor-alert-chip{
+  background: #fff;
+  color: #991b1b;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: bold;
+  border: 1px solid #991b1b;
+}
+#monitorModal.tv .monitor-totales-side .monitor-alerts{
+  background: #450a0a;
+  border-color: #ef4444;
+  color: #fecaca;
+  padding: clamp(6px, 0.8vh, 10px) clamp(8px, 0.6vw, 14px);
+  gap: clamp(6px, 0.6vw, 12px);
+  flex: 0 0 auto;
+  margin: 0;
+}
+#monitorModal.tv .monitor-totales-side .monitor-alert-title{
+  font-size: clamp(11px, 1.2vh, 16px);
+  color: #fecaca;
+}
+#monitorModal.tv .monitor-totales-side .monitor-alert-chip{
+  background: #fee2e2;
+  color: #7f1d1d;
+  font-size: clamp(11px, 1.2vh, 16px);
+  padding: clamp(2px, 0.3vh, 5px) clamp(5px, 0.4vw, 9px);
+  border: 1px solid #fee2e2;
+}
+.monitor-error{ background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; padding: 10px; border-radius: 8px; margin: 10px 0; font-size: 13px; }
+
+/* Banner "sin conexión" — visible cuando los fetches fallan pero tenemos
+   el último estado conocido en pantalla. */
+#monitorOfflineBanner{
+  background: #fef3c7;
+  color: #92400e;
+  border: 2px solid #f59e0b;
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin: 8px 0;
+  font-size: 14px;
+  font-weight: bold;
+  text-align: center;
+}
+#monitorOfflineBanner.hidden{ display: none; }
+#monitorModal.tv #monitorOfflineBanner{
+  background: #422006;
+  color: #fde68a;
+  border-color: #f59e0b;
+  font-size: clamp(14px, 1.8vh, 22px);
+  padding: clamp(8px, 1.2vh, 16px) clamp(10px, 1.2vw, 18px);
+}
+.monitor-refresh{
+  font-size: 11px;
+  color: #16a34a;
+  margin-left: 8px;
+}
+.monitor-refresh.stale{ color: #d97706; }
+
+/* Botón Modo TV en header del modal */
+.btn-tv{
+  background: #0f172a;
+  color: #fff;
+  border: 2px solid #0f172a;
+  border-radius: 6px;
+  font-size: 14px;
+  padding: 6px 12px;
+  cursor: pointer;
+  margin-right: 6px;
+}
+
+/* =====================================================
+   MOBILE — el monitor también se puede mirar desde un celu.
+   Apilamos cosas verticalmente para no romper el layout.
+   ===================================================== */
+@media (max-width: 768px){
+  /* Cuadros del monitor: una sola columna, no dos */
+  .monitor-totales-side{
+    grid-template-columns: 1fr;
+  }
+  /* FC + Total → apilados (no en fila como en desktop) */
+  .totales-col-fc{
+    flex-direction: column;
+  }
+  /* Las filas de boxes del día se acomodan con wrap */
+  .totales-row{
+    gap: 6px;
+  }
+  /* Cards más chicas */
+  .monitor-fc-card,
+  .monitor-total-card{
+    width: 100%;
+    box-sizing: border-box;
+  }
+  /* Header del monitor con más respiración */
+  .monitor-title{ font-size: 16px; }
+  .monitor-meta{ font-size: 10px; }
+  /* Tabla con scroll horizontal por si las celdas no entran */
+  .monitor-table-wrap{
+    overflow-x: auto;
+  }
+  /* Modal: padding chico para que el modal use casi todo el ancho */
+  #monitorModal{ padding: 8px 4px; }
+  .monitor-card{ padding: 0 6px 10px 6px; }
+  .monitor-header{ padding: 8px 0 6px 0; }
+}
+
+/* =====================================================
+   MODO TV — fullscreen adaptativo (no scroll).
+   Tamaños en clamp(vh) para escalar de monitor chico a 32".
+   ===================================================== */
+#monitorModal.tv{
+  padding: 0;
+  background: #0b1220;
+}
+#monitorModal.tv .monitor-card{
+  max-width: 100%;
+  max-height: 100vh;
+  height: 100vh;
+  border-radius: 0;
+  background: #0b1220;
+  color: #e5e7eb;
+  padding: 0 12px 12px 12px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+#monitorModal.tv .monitor-header{
+  background: #0b1220;
+  border-bottom: 2px solid #1e293b;
+  padding: clamp(8px, 1.2vh, 16px) 0;
+  flex: 0 0 auto;
+}
+#monitorModal.tv .monitor-title{
+  font-size: clamp(22px, 3.2vh, 44px);
+  color: #f8fafc;
+  letter-spacing: 0.5px;
+}
+#monitorModal.tv .monitor-meta{
+  font-size: clamp(11px, 1.4vh, 18px);
+  color: #94a3b8;
+  margin-top: 2px;
+}
+#monitorModal.tv .monitor-refresh{
+  font-size: clamp(12px, 1.5vh, 20px);
+  color: #4ade80;
+}
+#monitorModal.tv .monitor-refresh.stale{ color: #facc15; }
+#monitorModal.tv .btn-tv,
+#monitorModal.tv .hist-modal-close{
+  font-size: clamp(13px, 1.6vh, 20px);
+  padding: clamp(8px, 1vh, 12px) clamp(12px, 1.5vw, 22px);
+}
+#monitorModal.tv .monitor-table{
+  /* Estética tipo Excel: texto uniforme y compacto en toda la grilla.
+     Subido ~30% respecto al draft anterior para mejorar legibilidad sin
+     romper la proporción tabla/panel derecho. */
+  font-size: clamp(17px, 2.4vh, 32px);
+}
+#monitorModal.tv .monitor-table th{
+  background: #1e293b;
+  color: #cbd5e1;
+  font-size: clamp(17px, 2.3vh, 30px);
+  /* Más alto que antes para que los headers de 2 líneas
+     (Fecha/Salida, Pedido/Separado) respiren. */
+  padding: clamp(14px, 2.1vh, 28px) clamp(3px, 0.3vw, 7px);
+  line-height: 1.15;
+  top: 0;
+  border-bottom: 3px solid #334155;
+}
+#monitorModal.tv .monitor-table td{
+  /* Padding horizontal apretado; vertical normal para que las filas respiren. */
+  padding: clamp(3px, 0.55vh, 8px) clamp(3px, 0.3vw, 7px);
+  line-height: 1.1;
+  border-bottom: 1px solid #1e293b;
+}
+#monitorModal.tv .monitor-tanda{
+  /* Tamaño heredado de .monitor-table (estilo Excel: texto uniforme).
+     Solo conservamos color y bold para distinguir el código de tanda. */
+  color: #60a5fa;
+  font-weight: bold;
+}
+#monitorModal.tv .status-icon{
+  /* Íconos ✅/⏰ al tamaño del texto de la tabla, estilo Excel compacto. */
+  font-size: clamp(20px, 3.1vh, 42px);
+  vertical-align: middle;
+}
+#monitorModal.tv .status-pend  { color: #475569; }
+#monitorModal.tv .status-curso { color: #fbbf24; }
+#monitorModal.tv .status-done  { color: #22c55e; }
+#monitorModal.tv #monitorContent{
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+}
+#monitorModal.tv .monitor-flex{
+  display: grid;
+  /* Izq: tabla al ancho de su contenido (estilo Excel, sin estirarse).
+     Der: el resto del viewport para los cuadros de totales. */
+  grid-template-columns: max-content 1fr;
+  gap: 16px;
+  width: 100%;
+  height: 100%;
+  align-items: stretch;
+  min-height: 0;
+}
+#monitorModal.tv .monitor-table{
+  /* Sobreescribe el width: 100% global — en TV la tabla se ajusta al
+     contenido de sus columnas. */
+  width: auto;
+}
+#monitorModal.tv .monitor-table-wrap{
+  overflow-y: auto;
+  min-height: 0;
+  height: 100%;
+}
+#monitorModal.tv .monitor-flex .monitor-table{
+  width: 100%;
+}
+#monitorModal.tv .monitor-flex .monitor-table thead th{
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+#monitorModal.tv .monitor-totales-side{
+  flex: none;
+  width: 100%;
+  display: grid;
+  /* 2 columnas externas al tamaño de su contenido:
+       col-boxes (Picking/Pedido/Empleados de hoy + 5 días anteriores apilados)
+       col-fc    (Tandas a FC + Total por día apilados)
+     Los días anteriores quedan alineados verticalmente con la fila de hoy. */
+  grid-template-columns: max-content max-content;
+  gap: 8px;
+  align-content: start;             /* pegados arriba */
+  align-items: start;               /* cada cuadro = alto del contenido (no se estira) */
+  justify-content: start;           /* y a la izquierda de la columna derecha */
+  position: static;
+  height: 100%;
+}
+#monitorModal.tv .monitor-tot-box{
+  border: 3px solid #334155;
+  background: #111827;
+  /* Compacto: padding y ancho reducidos respecto a la versión anterior. */
+  padding: clamp(3px, 0.5vh, 7px) clamp(7px, 1.1vh, 13px);
+  width: clamp(95px, 11vw, 165px);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;             /* label y value usan el ancho del box */
+}
+#monitorModal.tv .monitor-tot-label{
+  /* Match con el header "Tanda" de la tabla (.monitor-table th en TV). */
+  font-size: clamp(13px, 1.7vh, 22px);
+  font-family: Arial, Helvetica, sans-serif;
+  color: #94a3b8;
+  margin-bottom: 2px;
+  text-align: center;               /* "M3 Picking" centrado sobre "del día dd/mm" */
+}
+#monitorModal.tv .monitor-tot-value{
+  /* Match con los códigos de tanda tipo "C02D" (.monitor-tanda en TV). */
+  font-size: clamp(20px, 3vh, 40px);
+  font-family: Arial, Helvetica, sans-serif;
+  color: #60a5fa;
+  line-height: 1;
+  font-weight: 900;
+  text-align: center;               /* x,x centrado en el box */
+}
+#monitorModal.tv .monitor-error{ font-size: 22px; }
+#monitorModal.tv .monitor-loading{ font-size: 24px; color: #94a3b8; }
+
+/* Tandas a FC — bloque a la derecha con tandas ya terminadas (picking + separado).
+   En el grid de .monitor-totales-side ocupa ambas columnas. */
+.monitor-fc-card{
+  border: 2px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 10px;
+  background: #f8fafc;
+  /* Ocupa una sola celda del grid de .monitor-totales-side; el cuadro
+     "Total por día" se ubica a la derecha en la otra celda. */
+}
+.monitor-fc-title{
+  font-weight: bold;
+  font-size: 14px;
+  margin-bottom: 8px;
+  color: #166534;
+}
+.monitor-fc-table{
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.monitor-fc-table th{
+  text-align: left;
+  padding: 4px 6px;
+  background: #f1f5f9;
+  font-size: 11px;
+  border-bottom: 1px solid #cbd5e1;
+  color: #475569;
+}
+.monitor-fc-table td{
+  padding: 4px 6px;
+  border-bottom: 1px solid #eef2f7;
+}
+.monitor-fc-table th.num, .monitor-fc-table td.num{ text-align: right; font-variant-numeric: tabular-nums; }
+.monitor-fc-table th.center, .monitor-fc-table td.center{ text-align: center; }
+.fc-tanda{
+  font-weight: bold;
+  color: #16a34a;
+}
+
+/* Tandas a FC — modo TV (verde oscuro, fuentes escaladas) */
+#monitorModal.tv .monitor-fc-card{
+  background: #052e16;
+  border: 3px solid #166534;
+  padding: clamp(8px, 1.2vh, 14px) clamp(10px, 1.5vh, 18px);
+  color: #d1fae5;
+}
+#monitorModal.tv .monitor-fc-title{
+  font-size: clamp(13px, 1.7vh, 22px);
+  color: #86efac;
+  margin-bottom: clamp(6px, 1vh, 10px);
+}
+#monitorModal.tv .monitor-fc-table{
+  font-size: clamp(14px, 2vh, 26px);
+}
+#monitorModal.tv .monitor-fc-table th{
+  background: #14532d;
+  color: #bbf7d0;
+  font-size: clamp(11px, 1.4vh, 18px);
+  border-bottom: 2px solid #166534;
+}
+#monitorModal.tv .monitor-fc-table td{
+  border-bottom: 1px solid #166534;
+}
+#monitorModal.tv .fc-tanda{
+  color: #4ade80;
+  font-weight: 900;
+  font-size: clamp(16px, 2.4vh, 28px);
+}
+
+/* Celdas de código de tanda clickeables — abren modal con NPs + m3. */
+.tanda-clickable{ cursor: pointer; }
+.tanda-clickable:hover{ text-decoration: underline; }
+
+/* Modal de detalle de tanda — z-index sobre el monitor (200) para que
+   se vea por encima en modo TV. */
+#tandaModal{
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.65);
+  z-index: 300;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 24px 8px;
+  overflow-y: auto;
+}
+#tandaModal.show{ display: flex; }
+.tanda-modal-card{
+  background: #fff;
+  border-radius: 12px;
+  padding: 0 16px 16px 16px;
+  width: 100%;
+  max-width: 560px;
+  max-height: 92vh;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+.tanda-modal-header{
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: #fff;
+  padding: 16px 0 12px 0;
+  margin: 0 0 12px 0;
+  border-bottom: 1px solid #e5e7eb;
+}
+.tanda-modal-title{ font-size: 18px; font-weight: bold; color: #1e6bd6; }
+.tanda-modal-table{
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.tanda-modal-table th{
+  background: #f1f5f9;
+  text-align: left;
+  padding: 6px 8px;
+  font-size: 11px;
+  border-bottom: 2px solid #cbd5e1;
+  color: #475569;
+}
+.tanda-modal-table td{
+  padding: 6px 8px;
+  border-bottom: 1px solid #eef2f7;
+}
+.tanda-modal-table th.num, .tanda-modal-table td.num{
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.tanda-modal-table th.center, .tanda-modal-table td.center{ text-align: center; }
+/* Filas del modal de detalle de camión coloreadas según armado de cada tanda. */
+.tanda-modal-table tr.tanda-armado td{ color: #16a34a; }
+.tanda-modal-table tr.tanda-no-armado td{ color: #dc2626; }
 
 /* Modales (historial de días anteriores y "Terminar Día") */
 #histModal,
@@ -297,8 +1271,42 @@ button {
 <!-- Botón flotante: historial de días anteriores -->
 <button id="btnHistDias" title="Historial de días anteriores">📅</button>
 
+<!-- Botón flotante: monitor de operarios (supervisor) -->
+<button id="btnMonitor" title="Monitor de operarios" onclick="openMonitor()">📊</button>
+
+<!-- Modal: monitor de operarios -->
+<div id="monitorModal" onclick="if(event.target.id==='monitorModal') closeMonitor()">
+  <div class="monitor-card">
+    <div class="monitor-header">
+      <div>
+        <div class="monitor-title">Monitor de Operarios <span id="monitorRefresh" class="monitor-refresh"></span></div>
+        <div class="monitor-meta" id="monitorMeta"></div>
+      </div>
+      <div>
+        <button class="hist-modal-close" onclick="closeMonitor()">Cerrar</button>
+      </div>
+    </div>
+    <div id="monitorOfflineBanner" class="hidden"></div>
+    <div id="monitorContent">
+      <div class="monitor-loading">Cargando…</div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: detalle de una tanda (NPs + m3) — se abre al clickear el código
+     en la tabla principal o en "Tandas a FC". -->
+<div id="tandaModal" onclick="if(event.target.id==='tandaModal') closeTandaModal()">
+  <div class="tanda-modal-card">
+    <div class="tanda-modal-header">
+      <div class="tanda-modal-title">Tanda</div>
+      <button class="hist-modal-close" onclick="closeTandaModal()">Cerrar</button>
+    </div>
+    <div class="tanda-modal-body"></div>
+  </div>
+</div>
+
 <!-- Badge de versión + estado de cola (abajo a la derecha) -->
-<div id="versionBadge">v1.16 ✓</div>
+<div id="versionBadge">v1.17 ✓</div>
 
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
@@ -338,6 +1346,12 @@ button {
   <!-- Aviso: hay reportes que aún no se enviaron -->
   <div id="pendingIndicator"></div>
 
+  <!-- Deshacer último mensaje — visible 60s después de enviar -->
+  <div id="undoBanner" class="hidden">
+    <div id="undoBannerText"></div>
+    <button id="undoBtn" class="undo-btn" onclick="undoLastSent()">Deshacer</button>
+  </div>
+
   <!-- 👇 espacio para historial -->
   <div id="legajoHistorySpace">
     <div class="history-title">Resumen de hoy</div>
@@ -370,11 +1384,15 @@ button {
     </div>
     <div id="aviso" class="hidden aviso-label"></div>
     <div id="inputArea" class="hidden">
-      <div id="inputLabel" class="label"></div>
-      <input id="textInput" class="text-input">
+      <div id="tandasList" class="hidden"></div>
+      <div class="label-send-row">
+        <div id="inputLabel" class="label"></div>
+        <input id="textInput" class="text-input">
+        <button id="sendBtnInline" class="primary-btn primary-btn-inline send-btn-shared" onclick="send()">Enviar</button>
+      </div>
     </div>
 
-    <button id="sendBtn" class="primary-btn" onclick="send()">Enviar</button>
+    <button id="sendBtn" class="primary-btn send-btn-shared" onclick="send()">Enviar</button>
     <div id="error" class="error"></div>
 
   </div>
@@ -1225,6 +2243,7 @@ function goToOptions() {
   legajoScreen.classList.add("hidden");
   optionsScreen.classList.remove("hidden");
   document.getElementById("btnHistDias")?.classList.add("hidden");
+  document.getElementById("btnMonitor")?.classList.add("hidden");
   renderPendingSuggestion();
   updateCoreButtonsState();
 }
@@ -1233,7 +2252,235 @@ function backToLegajo() {
   optionsScreen.classList.add("hidden");
   legajoScreen.classList.remove("hidden");
   document.getElementById("btnHistDias")?.classList.remove("hidden");
+  document.getElementById("btnMonitor")?.classList.remove("hidden");
   renderLegajoHistory(legajoInput.value);
+}
+
+/* Lista de tandas planificadas (Op=SI) del PPP — fetched cuando el operario
+   abre EP/TP/AP/TAP/CC para que pueda tocar una en vez de tipearla.
+   Cache 30 s, se rinde solo si la fetch falla. */
+let _pppOperatorCache    = null;
+let _pppOperatorTs       = 0;
+let _tandasListExpanded  = false;   // se resetea cada vez que se oculta la lista
+let _tandasListMode      = "all";   // "all" | "pickingDone" | "notStarted"
+let _activityStatusCache = null;    // { pickingStarted, pickingDone, armadoStarted, armadoDone }
+let _activityStatusTs    = 0;
+const PPP_OPERATOR_TTL_MS     = 30000;
+const ACTIVITY_STATUS_TTL_MS  = 10000;
+const TANDAS_LIST_VISIBLE_DAYS = 3;
+
+/* Devuelve TODAS las tandas reales del PPP (con fecha de entrega válida,
+   excluyendo "S/Tanda"). Cada item lleva su flag opIsSi para que cada modo
+   decida si lo necesita o no:
+     EP / TP / CC → exigen opIsSi=true (solo planificadas)
+     AP / TAP     → no exigen Op=SI (incluyen tandas con actividad sin SI,
+                    como C04G que está siendo trabajada pero le falta el SI) */
+async function getPppTandasForOperator() {
+  const now = Date.now();
+  if (_pppOperatorCache && (now - _pppOperatorTs) < PPP_OPERATOR_TTL_MS) {
+    return _pppOperatorCache;
+  }
+  try {
+    const sheetMap = await fetchMonitorSheet();
+    const items = [];
+    for (const v of sheetMap.values()) {
+      if (!v.tanda || v.tanda === "S/Tanda") continue;
+      if (!v.fechaEntregaRaw) continue;
+      items.push({
+        tanda: v.tanda,
+        opIsSi: !!v.opIsSi,
+        fechaRaw: v.fechaEntregaRaw,
+        fechaDisplay: v.fechaEntrega
+      });
+    }
+    _pppOperatorCache = items;
+    _pppOperatorTs = Date.now();
+    return items;
+  } catch (e) {
+    console.warn("[operator] PPP fetch fallido:", e.message);
+    return _pppOperatorCache || [];
+  }
+}
+
+/* Trae el estado de Picking y Armado de los últimos 7 días. Devuelve sets:
+     pickingStarted:    tandas con cualquier EP o TP (normalizado: trim+upper)
+     pickingDone:       último EP/TP es TP (normalizado, ✅ en columna Picking)
+     pickingDoneStrict: idem pickingDone pero texto EXACTO (sin trim). Usado
+                        por TP para no excluir tandas con TP mal tipeado.
+     armadoStarted:     tandas con cualquier AP o TAP (normalizado)
+     armadoDone:        último AP/TAP es TAP (normalizado, ✅ Pedido Separado)
+     armadoDoneStrict:  idem armadoDone pero texto EXACTO (sin trim). Usado
+                        por AP para no excluir tandas con TAP mal tipeado
+                        (ej: "C02D " con espacio no excluye al PPP "C02D").
+   Cache 10s. */
+async function getActivityStatus() {
+  const now = Date.now();
+  if (_activityStatusCache && (now - _activityStatusTs) < ACTIVITY_STATUS_TTL_MS) {
+    return _activityStatusCache;
+  }
+  const empty = {
+    pickingStarted:    new Set(),
+    pickingDone:       new Set(),
+    pickingDoneStrict: new Set(),
+    armadoStarted:     new Set(),
+    armadoDone:        new Set(),
+    armadoDoneStrict:  new Set()
+  };
+  try {
+    const since = new Date(Date.now() - 7*24*60*60*1000).toISOString();
+    const url = SUPABASE_TABLE_ENDPOINT +
+      "?opcion=in.(EP,TP,AP,TAP)" +
+      "&ts_cliente=gte." + encodeURIComponent(since) +
+      "&order=ts_cliente.asc" +
+      "&limit=10000" +
+      "&select=opcion,texto,ts_cliente";
+    const r = await fetch(url, {
+      headers: { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY }
+    });
+    if (!r.ok) throw new Error("Supabase HTTP " + r.status);
+    const data = await r.json();
+    const lastPick       = new Map();   // normalizado
+    const lastPickStrict = new Map();   // texto exacto
+    const lastArm        = new Map();   // normalizado
+    const lastArmStrict  = new Map();   // texto exacto
+    const status = {
+      pickingStarted:    new Set(),
+      pickingDone:       new Set(),
+      pickingDoneStrict: new Set(),
+      armadoStarted:     new Set(),
+      armadoDone:        new Set(),
+      armadoDoneStrict:  new Set()
+    };
+    for (const ev of data) {
+      const tRaw  = ev.texto || "";
+      const tNorm = tRaw.trim().toUpperCase();
+      if (!tNorm) continue;
+      const ts = ev.ts_cliente;
+      if (ev.opcion === "EP" || ev.opcion === "TP") {
+        status.pickingStarted.add(tNorm);
+        const cur = lastPick.get(tNorm);
+        if (!cur || ts > cur.ts) lastPick.set(tNorm, { opcion: ev.opcion, ts });
+        const curS = lastPickStrict.get(tRaw);
+        if (!curS || ts > curS.ts) lastPickStrict.set(tRaw, { opcion: ev.opcion, ts });
+      } else if (ev.opcion === "AP" || ev.opcion === "TAP") {
+        status.armadoStarted.add(tNorm);
+        const cur = lastArm.get(tNorm);
+        if (!cur || ts > cur.ts) lastArm.set(tNorm, { opcion: ev.opcion, ts });
+        const curS = lastArmStrict.get(tRaw);
+        if (!curS || ts > curS.ts) lastArmStrict.set(tRaw, { opcion: ev.opcion, ts });
+      }
+    }
+    for (const [t, ev] of lastPick)       if (ev.opcion === "TP")  status.pickingDone.add(t);
+    for (const [t, ev] of lastPickStrict) if (ev.opcion === "TP")  status.pickingDoneStrict.add(t);
+    for (const [t, ev] of lastArm)        if (ev.opcion === "TAP") status.armadoDone.add(t);
+    for (const [t, ev] of lastArmStrict)  if (ev.opcion === "TAP") status.armadoDoneStrict.add(t);
+    _activityStatusCache = status;
+    _activityStatusTs    = Date.now();
+    return status;
+  } catch (e) {
+    console.warn("[operator] activity status fetch fallido:", e.message);
+    return _activityStatusCache || empty;
+  }
+}
+
+/* filterMode (opcional, persistido en _tandasListMode):
+     "all"          → solo Op=SI (CC)
+     "notStarted"   → Op=SI Y sin EP/TP todavía (EP)
+     "pickingCurso" → EP empezado pero sin TP — incluye no-SI — (TP: ⏰ en
+                      columna Picking del monitor)
+     "pickingDone"  → TP confirmado Y sin TAP todavía — incluye no-SI — (AP)
+     "armadoCurso"  → AP empezado pero sin TAP — incluye no-SI — (TAP) */
+async function populateTandasList(filterMode) {
+  if (filterMode != null) _tandasListMode = filterMode;
+  const container = document.getElementById("tandasList");
+  if (!container) return;
+  container.classList.remove("hidden");
+  container.innerHTML = `<div class="tandas-list-label">Cargando lista…</div>`;
+  const items = await getPppTandasForOperator();
+  let filtered;
+  if (_tandasListMode === "notStarted") {
+    const s = await getActivityStatus();
+    filtered = items.filter(it => it.opIsSi && !s.pickingStarted.has(it.tanda.toUpperCase()));
+  } else if (_tandasListMode === "pickingCurso") {
+    const s = await getActivityStatus();
+    // pickingStarted: lenient (cualquier EP/TP entra como "empezado").
+    // pickingDoneStrict: exacto, así un TP con espacio ("C02D ") no excluye
+    // al PPP "C02D" — la tanda sigue apareciendo como en curso para cerrar.
+    filtered = items.filter(it => {
+      const k = it.tanda.toUpperCase();
+      return s.pickingStarted.has(k) && !s.pickingDoneStrict.has(it.tanda);
+    });
+  } else if (_tandasListMode === "pickingDone") {
+    const s = await getActivityStatus();
+    // pickingDone: lenient (normalizado), así matchea aunque haya tipos.
+    // armadoDoneStrict: exacto, para que un TAP con espacio extra ("C02D ")
+    // no excluya la tanda PPP "C02D" del filtro de AP.
+    filtered = items.filter(it => {
+      const k = it.tanda.toUpperCase();
+      return s.pickingDone.has(k) && !s.armadoDoneStrict.has(it.tanda);
+    });
+  } else if (_tandasListMode === "armadoCurso") {
+    const s = await getActivityStatus();
+    filtered = items.filter(it => {
+      const k = it.tanda.toUpperCase();
+      return s.armadoStarted.has(k) && !s.armadoDone.has(k);
+    });
+  } else {
+    filtered = items.filter(it => it.opIsSi);
+  }
+  if (!filtered.length) {
+    const msg = _tandasListMode === "pickingDone"
+      ? "No hay tandas con Picking terminado disponibles para armado."
+      : _tandasListMode === "pickingCurso"
+        ? "No hay pickings en curso para terminar."
+        : _tandasListMode === "notStarted"
+          ? "Todas las tandas ya tienen Picking iniciado."
+          : _tandasListMode === "armadoCurso"
+            ? "No hay armados en curso para terminar."
+            : "No se pudo cargar la lista — escribí el nro a mano.";
+    container.innerHTML = `<div class="tandas-list-empty">${msg}</div>`;
+    return;
+  }
+  // Agrupar por fecha de entrega
+  const byDate = new Map();
+  for (const it of filtered) {
+    if (!byDate.has(it.fechaRaw)) byDate.set(it.fechaRaw, { fechaDisplay: it.fechaDisplay, codes: new Set() });
+    byDate.get(it.fechaRaw).codes.add(it.tanda);
+  }
+  const grouped = [...byDate.entries()].sort().map(([raw, g]) => ({
+    fechaRaw: raw,
+    fechaDisplay: g.fechaDisplay,
+    codes: [...g.codes].sort()
+  }));
+  // Mostrar solo los primeros N días; botón "Ver más" expande el resto.
+  const visible = _tandasListExpanded
+    ? grouped
+    : grouped.slice(0, TANDAS_LIST_VISIBLE_DAYS);
+  const hidden = grouped.length - visible.length;
+  const groupsHtml = visible.map(g => `
+    <div class="tandas-day-group">
+      <div class="tandas-day-header">${escapeHtml(g.fechaDisplay)}</div>
+      <div class="tandas-chips">
+        ${g.codes.map(c => `<button class="tanda-chip" type="button" data-code="${escapeHtml(c)}" onclick="textInput.value=this.dataset.code;textInput.focus()">${escapeHtml(c)}</button>`).join("")}
+      </div>
+    </div>
+  `).join("");
+  const moreBtnHtml = hidden > 0
+    ? `<button class="tandas-more-btn" type="button" onclick="expandTandasList()">Ver más (+${hidden} ${hidden === 1 ? "día" : "días"})</button>`
+    : "";
+  container.innerHTML = `<div class="tandas-day-grid">${groupsHtml}</div>${moreBtnHtml}`;
+}
+
+function expandTandasList() {
+  _tandasListExpanded = true;
+  populateTandasList();
+}
+
+function hideTandasList() {
+  const container = document.getElementById("tandasList");
+  if (container) container.classList.add("hidden");
+  _tandasListExpanded = false;   // próxima apertura empieza colapsado
+  _tandasListMode    = "all";    // y sin filtro hasta que selectOption pase otro
 }
 
 function selectOption(code) {
@@ -1272,8 +2519,10 @@ function selectOption(code) {
   inputArea.classList.add("hidden");
   textInput.value = "";
   textInput.placeholder = "";
+  hideTandasList();
 
   // ======= REGLA: toggles muestran input SOLO al TERMINAR (y algunos nunca)
+  let showsTandaList = false;
   if (TOGGLE_CODES.includes(code)) {
   const ending = isToggleEnding(legajoStr, code);
 
@@ -1285,10 +2534,11 @@ function selectOption(code) {
 
     if (code === "CC") {
       inputLabel.innerText = "Ingresar Nro Picking";
-      textInput.placeholder = "Ejemplo: A12";
+      textInput.placeholder = "Ej: A12";
+      showsTandaList = true;
     } else {
       inputLabel.innerText = "Indicar Cantidad";
-      textInput.placeholder = "Ejemplo: 100";
+      textInput.placeholder = "Ej: 100";
     }
   }
 }
@@ -1297,8 +2547,38 @@ function selectOption(code) {
   else if (["EP","TP","AP","TAP"].includes(code)) {
     inputArea.classList.remove("hidden");
     inputLabel.innerText = "Ingresar Nro Picking";
-    textInput.placeholder = "Ejemplo: A12B";
+    textInput.placeholder = "Ej: A12B";
+    showsTandaList = true;
+    // Pre-fill: si el operario está cerrando algo (TP/TAP) y tiene una abierta
+    // en su estado local, la ponemos ya en el input para que solo confirme.
+    const st = getLegajoState(legajoStr);
+    if (code === "TP" && st.picking && st.picking.active && st.picking.value) {
+      textInput.value = st.picking.value;
+    } else if (code === "TAP" && st.armado && st.armado.active && st.armado.value) {
+      textInput.value = st.armado.value;
+    }
   }
+
+  // Mostrar lista de tandas planificadas cuando el campo es nro de picking.
+  // EP  → sin empezar (sin EP/TP previo)
+  // TP  → pickings en curso (= ⏰ en columna Picking del monitor)
+  // AP  → con TP confirmado y sin TAP
+  // TAP → armados en curso (= ⏰ en Pedido Separado)
+  // CC  → todas (Op=SI)
+  if (showsTandaList) {
+    const mode = code === "EP"  ? "notStarted"
+               : code === "TP"  ? "pickingCurso"
+               : code === "AP"  ? "pickingDone"
+               : code === "TAP" ? "armadoCurso"
+               : "all";
+    populateTandasList(mode);
+  }
+
+  // Toggle entre los 2 botones Enviar:
+  //   - input visible → muestra el INLINE (al lado del label) y oculta el de abajo
+  //   - input oculto  → muestra el de abajo y oculta el inline
+  const showingInput = !inputArea.classList.contains("hidden");
+  document.getElementById("sendBtn").classList.toggle("hidden", showingInput);
 
   // Avisos:
   // - AT/PB/Limp/PC/CT ya bloquean toda la pantalla cuando están abiertos,
@@ -1319,6 +2599,7 @@ function selectOption(code) {
 function resetSelection() {
   selected = null;
   selectedArea.classList.add("hidden");
+  hideTandasList();
 }
 
 /* =========================================================
@@ -1621,7 +2902,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v1.16";
+const APP_VERSION = "v1.17";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -1655,6 +2936,68 @@ function updatePendingIndicator() {
 /* =========================================================
    ENVÍO
    ========================================================= */
+/* ============ DESHACER ÚLTIMO MENSAJE (60s) ============ */
+let _lastSentReport = null;     // { payload, legajo, prevState }
+let _undoTimerId    = null;
+const UNDO_WINDOW_MS = 60000;
+
+function showUndoBanner() {
+  if (!_lastSentReport) return;
+  const banner = document.getElementById("undoBanner");
+  const text   = document.getElementById("undoBannerText");
+  if (!banner || !text) return;
+  banner.classList.remove("hidden");
+  const start = Date.now();
+  function updateText() {
+    const remaining = Math.ceil((UNDO_WINDOW_MS - (Date.now() - start)) / 1000);
+    if (remaining <= 0) {
+      _lastSentReport = null;
+      hideUndoBanner();
+      return;
+    }
+    const p = _lastSentReport.payload;
+    const tx = p.texto ? ` "${p.texto}"` : "";
+    text.textContent = `↩ Último: ${p.opcion}${tx} — ${remaining}s`;
+  }
+  updateText();
+  if (_undoTimerId) clearInterval(_undoTimerId);
+  _undoTimerId = setInterval(updateText, 1000);
+}
+
+function hideUndoBanner() {
+  const banner = document.getElementById("undoBanner");
+  if (banner) banner.classList.add("hidden");
+  if (_undoTimerId) { clearInterval(_undoTimerId); _undoTimerId = null; }
+}
+
+async function undoLastSent() {
+  if (!_lastSentReport) return;
+  if (!confirm("¿Borrar este último mensaje?")) return;
+  const { payload, prevState, legajo } = _lastSentReport;
+  // 1) Restaurar el estado local previo (picking/armado/toggles).
+  setLegajoState(legajo, prevState);
+  // 2) Sacar del queue (por si todavía no se sincronizó).
+  removeFromQueue(payload.id);
+  // 3) Sacar del historial local.
+  const fecha = isoToDayKey(payload.ts);
+  const hist  = readDayHist(fecha, legajo);
+  writeDayHist(fecha, legajo, hist.filter(it => it.id !== payload.id));
+  // 4) DELETE en Supabase (fire-and-forget — si no llegó, 404 silencioso).
+  fetch(SUPABASE_TABLE_ENDPOINT + "?client_id=eq." + encodeURIComponent(payload.id), {
+    method: "DELETE",
+    headers: { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY }
+  }).catch(() => {});
+  // 5) Limpiar el banner.
+  _lastSentReport = null;
+  hideUndoBanner();
+  // 6) Refrescar UI.
+  renderLegajoHistory(legajo);
+  updateCoreButtonsState();
+  renderPendingSuggestion();
+  updatePendingIndicator();
+  alert("Mensaje deshecho.");
+}
+
 async function send() {
   const legajoStr   = String(legajoInput.value || "");
   const opcion      = selected;
@@ -1676,6 +3019,9 @@ async function send() {
     id: nowMs.toString(36) + "_" + Math.random().toString(36).slice(2, 8),
     ts_inicio_iso: null   // se completa abajo si esta acción es un CIERRE
   };
+
+  /* ---- snapshot del estado para "Deshacer" (ANTES de mutarlo) ---- */
+  const stateBeforeChange = JSON.parse(JSON.stringify(getLegajoState(legajoStr)));
 
   /* ---- ts_inicio para cierres (capturar ANTES de modificar el estado) ---- */
   if (opcion === "TP") {
@@ -1724,12 +3070,14 @@ async function send() {
   /* ---- ENCOLAR SIEMPRE antes de tocar la red ---- */
   enqueueReport(payload);
 
-  const sendBtn = document.getElementById("sendBtn");
-  if (sendBtn) { sendBtn.disabled = true; sendBtn.innerText = "Enviando..."; }
+  // Hay 2 botones Enviar (uno inline al lado del label, otro abajo). Updateo
+  // ambos así no importa cuál esté visible.
+  const sendBtns = document.querySelectorAll(".send-btn-shared");
+  sendBtns.forEach(b => { b.disabled = true; b.innerText = "Enviando..."; });
 
   const r = await trySendOneReport(payload);
 
-  if (sendBtn) { sendBtn.disabled = false; sendBtn.innerText = "Enviar"; }
+  sendBtns.forEach(b => { b.disabled = false; b.innerText = "Enviar"; });
 
   if (r.ok) {
     removeFromQueue(payload.id);
@@ -1755,6 +3103,10 @@ async function send() {
   updateCoreButtonsState();
   renderPendingSuggestion();
   updatePendingIndicator();
+
+  // Habilitar "Deshacer" para este último mensaje (60s).
+  _lastSentReport = { payload, legajo: legajoStr, prevState: stateBeforeChange };
+  showUndoBanner();
 
   // Por si quedaron otros pendientes acumulados de intentos previos.
   flushQueue();
@@ -1875,6 +3227,1075 @@ setInterval(flushQueue, 3000);
 
 /* Intento inicial al abrir la app. */
 flushQueue();
+
+/* =========================================================
+   MONITOR DE OPERARIOS (supervisor)
+   - Lee Google Sheet (pestaña Programación) vía CSV publicado.
+   - Toma filas con Op=SI.
+   - Agrupa por Tanda (col A). Suma M3, toma Fecha Entrega.
+   - Cruza contra Supabase eventos EP/TP/AP/TAP (texto=Tanda) para
+     determinar status Picking y Separado de cada tanda.
+   - Auto-refresh cada 3 s mientras el modal esté abierto.
+   ========================================================= */
+/* Endpoint gviz: NO usa el cache CDN de "publicar en la web" (1-5 min),
+   refleja los cambios en segundos. Requiere que el Google Sheet esté
+   compartido como "Anyone with the link → Viewer". Si no está compartido,
+   el endpoint devuelve HTML de login y el monitor muestra error. */
+const MONITOR_CSV_URL =
+  "https://docs.google.com/spreadsheets/d/1-16YXe0xq6x9i-Yhk5cm5V3VqvQ0PWZtcDbm8OeeKW0/gviz/tq?tqx=out:csv&gid=1947169223";
+
+/* Hoja "PPP Excel Pedidos Entregados 2026" — fallback de M3 para tandas
+   que ya no están en la programación diaria. Mismo documento, otro gid.
+   Refrescada en cache cada 5 min. */
+const MONITOR_HISTORIC_CSV_URL =
+  "https://docs.google.com/spreadsheets/d/1-16YXe0xq6x9i-Yhk5cm5V3VqvQ0PWZtcDbm8OeeKW0/gviz/tq?tqx=out:csv&gid=2146771217";
+const HISTORIC_REFRESH_MS = 5 * 60 * 1000;
+let historicMap        = null;   // Map<tandaUpper, m3 sumado>
+let historicLastFetch  = 0;
+let historicInflight   = null;   // Promise para evitar fetch en paralelo
+
+const MONITOR_REFRESH_MS = 1000;     // ciclo principal — refresca eventos Supabase
+const PPP_TTL_MS         = 3000;     // PPP (Google Sheet) cacheado este tiempo
+let monitorIntervalId = null;
+let monitorLastOkTs   = 0;
+let _pppCache         = null;
+let _pppCacheTs       = 0;
+let beyondExpanded    = false;   // estado del card "+ Fuera de ventana"
+let _monitorSheetCache = null;   // último sheetMap renderizado (para showTandaDetail)
+let _monitorTotalCache = null;   // último totalByDate (para showCamionDetail)
+let _prevStatusMap     = new Map();   // último statusMap para detectar cambios y flashar
+let _audioCtx          = null;        // creado en el primer click (autoplay policy)
+
+function playMonitorBeep() {
+  try {
+    if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const ctx = _audioCtx;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(880, ctx.currentTime);   // A5
+    gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.15, ctx.currentTime + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.35);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.4);
+  } catch (e) { /* audio bloqueado por el browser, ignorar */ }
+}
+
+function toggleBeyondDetail() {
+  beyondExpanded = !beyondExpanded;
+  const card = document.querySelector(".beyond-card");
+  if (card) card.classList.toggle("expanded", beyondExpanded);
+}
+
+/* Muestra modal con los NP que componen una tanda y su m3 individual.
+   Disparado desde el onclick del <td class="monitor-tanda" data-tanda="...">. */
+function showTandaDetail(tandaCode) {
+  if (!_monitorSheetCache || !tandaCode) return;
+  const entry = _monitorSheetCache.get(String(tandaCode).toUpperCase());
+  if (!entry) { alert("Tanda no encontrada: " + tandaCode); return; }
+  const pedidos = entry.pedidos || [];
+  let bodyHtml = `
+    <div style="font-size:14px; color:#475569; margin-bottom:12px;">
+      <b>Total:</b> ${pedidos.length} NP · ${entry.m3.toFixed(3).replace(".", ",")} m3
+    </div>`;
+  if (!pedidos.length) {
+    bodyHtml += `<div class="history-empty">Sin NPs registrados.</div>`;
+  } else {
+    bodyHtml += `
+      <table class="tanda-modal-table">
+        <thead>
+          <tr><th>N° NP</th><th>Razon Social</th><th class="num">M3</th></tr>
+        </thead>
+        <tbody>`;
+    for (const p of pedidos) {
+      bodyHtml += `
+          <tr>
+            <td>${escapeHtml(p.np || "—")}</td>
+            <td>${escapeHtml(p.razonSocial || "")}</td>
+            <td class="num">${(p.m3 || 0).toFixed(3).replace(".", ",")}</td>
+          </tr>`;
+    }
+    bodyHtml += `</tbody></table>`;
+  }
+  const m = document.getElementById("tandaModal");
+  m.querySelector(".tanda-modal-title").textContent = "Tanda " + entry.tanda;
+  m.querySelector(".tanda-modal-body").innerHTML = bodyHtml;
+  m.classList.add("show");
+}
+
+function closeTandaModal() {
+  document.getElementById("tandaModal").classList.remove("show");
+}
+
+/* Muestra modal con el desglose de rendimiento por operario para un día.
+   Por cada legajo: m3 picqueados, m3 armados, total m3, horas trabajadas
+   (1ra → última acción) y promedio m3/h. Reusa el tandaModal. */
+async function showDayBreakdown(dayKey, dayLabel) {
+  if (!dayKey) return;
+  const m = document.getElementById("tandaModal");
+  m.querySelector(".tanda-modal-title").textContent = "Rendimiento del día " + (dayLabel || dayKey);
+  m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">Cargando…</div>`;
+  m.classList.add("show");
+  try {
+    // Fetch eventos del día completo (00:00 a 23:59:59 hora Argentina)
+    const dayStartIso = new Date(`${dayKey}T00:00:00-03:00`).toISOString();
+    const dayEndIso   = new Date(`${dayKey}T23:59:59-03:00`).toISOString();
+    const url = SUPABASE_TABLE_ENDPOINT +
+      "?ts_cliente=gte." + encodeURIComponent(dayStartIso) +
+      "&ts_cliente=lte." + encodeURIComponent(dayEndIso) +
+      "&order=ts_cliente.asc" +
+      "&limit=5000" +
+      "&select=opcion,texto,legajo,ts_cliente";
+    const r = await fetch(url, {
+      headers: { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY }
+    });
+    if (!r.ok) throw new Error("Supabase HTTP " + r.status);
+    const events = await r.json();
+    // Agrupar por legajo
+    const perLegajo = new Map();
+    for (const ev of events) {
+      const leg = String(ev.legajo || "").trim();
+      if (!leg) continue;
+      if (!perLegajo.has(leg)) perLegajo.set(leg, {
+        firstTs: ev.ts_cliente,
+        lastTs: ev.ts_cliente,
+        pickedTandas: new Set(),
+        armedTandas: new Set()
+      });
+      const p = perLegajo.get(leg);
+      p.lastTs = ev.ts_cliente;
+      const tanda = (ev.texto || "").trim().toUpperCase();
+      if (tanda) {
+        if (ev.opcion === "TP")  p.pickedTandas.add(tanda);
+        if (ev.opcion === "TAP") p.armedTandas.add(tanda);
+      }
+    }
+    if (!perLegajo.size) {
+      m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">Sin registros para ese día.</div>`;
+      return;
+    }
+    // Resolver m3 por tanda (sheetMap actual → histórico → 0)
+    const sheetMap = _monitorSheetCache || new Map();
+    const historic = await getHistoricMap();
+    const tandaM3 = (t) => {
+      const e = sheetMap.get(t);
+      if (e) return e.m3;
+      return historic.get(t) || 0;
+    };
+    // Calcular fila por legajo y ordenar por m3 total desc
+    const rows = [...perLegajo.entries()].map(([leg, p]) => {
+      const m3Pick = [...p.pickedTandas].reduce((s, t) => s + tandaM3(t), 0);
+      const m3Arm  = [...p.armedTandas ].reduce((s, t) => s + tandaM3(t), 0);
+      const m3Total = m3Pick + m3Arm;
+      const horas = Math.max(0, (new Date(p.lastTs) - new Date(p.firstTs)) / 3600000);
+      const m3PerH = horas > 0 ? m3Total / horas : 0;
+      return { leg, m3Pick, m3Arm, m3Total, horas, m3PerH };
+    }).sort((a, b) => b.m3Total - a.m3Total);
+    const fmt = (n, d=1) => (n||0).toFixed(d).replace(".", ",");
+    const bodyHtml = `
+      <div style="font-size:14px; color:#475569; margin-bottom:12px;">
+        <b>${perLegajo.size} operario(s)</b> trabajaron el día <b>${escapeHtml(dayLabel || dayKey)}</b>
+      </div>
+      <table class="tanda-modal-table">
+        <thead>
+          <tr>
+            <th>Legajo</th>
+            <th class="num">Picking m3</th>
+            <th class="num">Armado m3</th>
+            <th class="num">Total m3</th>
+            <th class="num">Horas</th>
+            <th class="num">m3/h</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map(r => `
+            <tr>
+              <td><b>${escapeHtml(r.leg)}</b></td>
+              <td class="num">${fmt(r.m3Pick)}</td>
+              <td class="num">${fmt(r.m3Arm)}</td>
+              <td class="num"><b>${fmt(r.m3Total)}</b></td>
+              <td class="num">${fmt(r.horas)}</td>
+              <td class="num">${fmt(r.m3PerH, 2)}</td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>`;
+    m.querySelector(".tanda-modal-body").innerHTML = bodyHtml;
+  } catch (e) {
+    m.querySelector(".tanda-modal-body").innerHTML =
+      `<div class="monitor-error">Error: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+/* Muestra modal con las tandas que componen un camión del día y el estado
+   de armado individual (verde=armado, rojo=no armado). Reusa el tandaModal. */
+function showCamionDetail(dateKey, camion) {
+  if (!_monitorTotalCache || !dateKey || !camion) return;
+  const dayData = _monitorTotalCache.get(dateKey);
+  if (!dayData) return;
+  const camData = dayData.byCamion.get(camion);
+  if (!camData) { alert("Camión no encontrado: " + camion); return; }
+  const tandas = [...camData.tandas].sort((a, b) => a.code.localeCompare(b.code));
+  let bodyHtml = `
+    <div style="font-size:14px; color:#475569; margin-bottom:12px;">
+      <b>Fecha:</b> ${escapeHtml(dayData.fechaDisplay)} ·
+      <b>Total:</b> ${camData.tandas.length} tandas · ${camData.sum.toFixed(1).replace(".", ",")} m3 ·
+      <b>Armadas:</b> ${camData.tandasArmadas}/${camData.tandas.length}
+    </div>
+    <table class="tanda-modal-table">
+      <thead>
+        <tr><th>Tanda</th><th class="num">M3</th><th class="center">Armado</th></tr>
+      </thead>
+      <tbody>`;
+  for (const t of tandas) {
+    const cls = t.armado ? "tanda-armado" : "tanda-no-armado";
+    const txt = t.armado ? "✓ Sí" : "✗ No";
+    bodyHtml += `
+        <tr class="${cls}">
+          <td>${escapeHtml(t.code)}</td>
+          <td class="num">${(t.m3 || 0).toFixed(3).replace(".", ",")}</td>
+          <td class="center"><b>${txt}</b></td>
+        </tr>`;
+  }
+  bodyHtml += `</tbody></table>`;
+  const m = document.getElementById("tandaModal");
+  m.querySelector(".tanda-modal-title").textContent = "Camión " + camion;
+  m.querySelector(".tanda-modal-body").innerHTML = bodyHtml;
+  m.classList.add("show");
+}
+
+function openMonitor() {
+  const m = document.getElementById("monitorModal");
+  m.classList.add("show");
+  // TV mode: forzar con URL ?monitor=tv (la tele bookmarkea esa URL),
+  // o auto-detect en pantallas grandes (≥1600px de ancho).
+  const urlParams = new URLSearchParams(window.location.search);
+  const forceTv = urlParams.get("monitor") === "tv";
+  const isLarge = window.innerWidth >= 1600;
+  if (forceTv || isLarge) {
+    m.classList.add("tv");
+  } else {
+    m.classList.remove("tv");
+  }
+  refreshMonitor();
+  if (monitorIntervalId) clearInterval(monitorIntervalId);
+  monitorIntervalId = setInterval(refreshMonitor, MONITOR_REFRESH_MS);
+}
+
+function closeMonitor() {
+  const m = document.getElementById("monitorModal");
+  m.classList.remove("show");
+  m.classList.remove("tv");
+  if (monitorIntervalId) { clearInterval(monitorIntervalId); monitorIntervalId = null; }
+  // Reset del snapshot — al reabrir, el primer refresh no flashea masivo.
+  _prevStatusMap = new Map();
+}
+
+function toggleMonitorTV() {
+  const m = document.getElementById("monitorModal");
+  const btn = document.getElementById("btnMonitorTV");
+  const isTV = m.classList.toggle("tv");
+  if (isTV) {
+    btn.textContent = "⛶ Salir TV";
+    if (m.requestFullscreen) m.requestFullscreen().catch(()=>{});
+  } else {
+    btn.textContent = "📺 TV";
+    if (document.fullscreenElement) document.exitFullscreen().catch(()=>{});
+  }
+}
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && document.getElementById("monitorModal").classList.contains("show")) {
+    closeMonitor();
+  }
+});
+
+/* Parser CSV simple — soporta campos entre comillas con comas y comillas
+   escapadas dobles ("a""b" -> a"b). Suficiente para CSV publicado de Sheets. */
+function parseCSV(text) {
+  const rows = [];
+  let row = [], field = "", inQ = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQ) {
+      if (c === '"' && text[i+1] === '"') { field += '"'; i++; }
+      else if (c === '"') { inQ = false; }
+      else { field += c; }
+    } else {
+      if (c === '"') inQ = true;
+      else if (c === ',') { row.push(field); field = ""; }
+      else if (c === '\n') { row.push(field); rows.push(row); row = []; field = ""; }
+      else if (c === '\r') { /* skip */ }
+      else { field += c; }
+    }
+  }
+  if (field.length || row.length) { row.push(field); rows.push(row); }
+  return rows;
+}
+
+/* Convierte "0,289" -> 0.289. "" o no-numérico -> 0. */
+function monitorParseM3(s) {
+  if (!s) return 0;
+  const n = parseFloat(String(s).replace(/\./g, "").replace(",", "."));
+  return isNaN(n) ? 0 : n;
+}
+
+/* "2026-05-22 0:00:00" o "2026-05-22" o "22/5" -> "22/05". "" si no parsea.
+   El endpoint gviz puede devolver la columna Fecha Entrega como "D/M" (sin
+   año) si el formato de la celda es corto en el sheet. */
+function monitorFmtFecha(s) {
+  if (!s) return "";
+  const m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return `${m[3]}/${m[2]}`;
+  const m2 = String(s).match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+  if (m2) return `${m2[1].padStart(2,"0")}/${m2[2].padStart(2,"0")}`;
+  const m3 = String(s).match(/^(\d{1,2})\/(\d{1,2})\s*$/);
+  if (m3) return `${m3[1].padStart(2,"0")}/${m3[2].padStart(2,"0")}`;
+  return String(s).slice(0, 10);
+}
+
+/* Parsea fecha de entrega y devuelve "YYYY-MM-DD" para comparar. "" si no parsea.
+   También maneja "D/M" sin año (asume año actual). */
+function monitorRawFecha(s) {
+  if (!s) return "";
+  const m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+  const m2 = String(s).match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+  if (m2) {
+    let y = m2[3]; if (y.length === 2) y = "20" + y;
+    return `${y}-${m2[2].padStart(2,"0")}-${m2[1].padStart(2,"0")}`;
+  }
+  const m3 = String(s).match(/^(\d{1,2})\/(\d{1,2})\s*$/);
+  if (m3) {
+    const y = new Date().getFullYear();
+    return `${y}-${m3[2].padStart(2,"0")}-${m3[1].padStart(2,"0")}`;
+  }
+  return "";
+}
+
+/* Extrae el "camión" de un código de tanda: la primera secuencia de dígitos.
+   Ej: C03A → "03", C03B → "03" (mismo camión), B58E → "58".
+   Si no hay dígitos (RETIRA, LA ANONIMA), devuelve el código tal cual. */
+function tandaCamion(code) {
+  const m = String(code || "").match(/\d+/);
+  return m ? m[0] : String(code || "");
+}
+
+/* Fechas a mostrar en el monitor:
+   1) TODAS las fechas pasadas que tienen tandas planificadas (Op=SI) sin
+      salir del sheet — significa que están atrasadas pero aún en cola.
+   2) Las próximas 3 fechas FUTURAS con tandas planificadas (los días sin
+      tandas — feriados, fines de semana — no consumen slot).
+   Devuelve array ordenado de "YYYY-MM-DD". */
+function targetDeliveryDates(sheetMap) {
+  const d = new Date();
+  const todayKey = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+  // Solo fechas que tienen al menos una tanda con Op=SI
+  const datesPlanned = new Set();
+  for (const v of sheetMap.values()) {
+    if (v.fechaEntregaRaw && v.opIsSi) datesPlanned.add(v.fechaEntregaRaw);
+  }
+  const all = [...datesPlanned].sort();
+  const past   = all.filter(x => x <= todayKey);          // todas las pasadas/hoy
+  const future = all.filter(x => x >  todayKey).slice(0, 3);
+  return [...past, ...future];
+}
+
+/* Encuentra índice de header buscando fila con "tanda" (substring, para
+   tolerar el endpoint gviz que combina título y header → "Programacion Tanda")
+   y "op" exacto. */
+function findMonitorHeader(rows) {
+  for (let i = 0; i < Math.min(rows.length, 10); i++) {
+    const r = rows[i].map(x => (x||"").trim().toLowerCase());
+    const hasTanda = r.some(c => c.includes("tanda"));
+    if (hasTanda && r.includes("op")) return i;
+  }
+  return -1;
+}
+
+/* Lee el CSV y devuelve mapa Tanda -> { tanda, m3, fechaEntrega }. */
+async function fetchMonitorSheet() {
+  // cache-busting para evitar respuesta cacheada del CDN de Google
+  const url = MONITOR_CSV_URL + "&_=" + Date.now();
+  const r = await fetch(url, { cache: "no-store" });
+  if (!r.ok) throw new Error("CSV HTTP " + r.status);
+  const text = await r.text();
+  const rows = parseCSV(text);
+  const headerIdx = findMonitorHeader(rows);
+  if (headerIdx < 0) throw new Error("Header no encontrado en CSV");
+  const header = rows[headerIdx].map(x => (x||"").trim().toLowerCase());
+  // "tanda" busca por substring para tolerar el header concatenado de gviz
+  // ("Programacion Tanda"). Las demás cols matchean exactamente.
+  const cTanda = header.findIndex(h => h.includes("tanda"));
+  const cM3    = header.indexOf("m3");
+  const cOp    = header.indexOf("op");
+  const cFE    = header.indexOf("fecha entrega");
+  const cNP    = header.indexOf("n° np");
+  const cRS    = header.indexOf("razon social");
+  const acc = new Map();
+  for (let i = headerIdx + 1; i < rows.length; i++) {
+    const r = rows[i];
+    if (!r) continue;
+    const tanda = (r[cTanda]||"").trim();
+    const op    = (r[cOp]||"").trim().toUpperCase();
+    const m3 = monitorParseM3(r[cM3]);
+    const fe = (r[cFE]||"").trim();
+    const np = cNP >= 0 ? (r[cNP]||"").trim() : "";
+    const rs = cRS >= 0 ? (r[cRS]||"").trim() : "";
+    const feRaw = monitorRawFecha(fe);
+    // Filas sin código de tanda: las agrupamos bajo "S/Tanda" por fecha.
+    // Si tampoco hay fecha no podemos ubicarlas, skip.
+    let displayTanda, mapKey;
+    if (tanda) {
+      displayTanda = tanda;
+      mapKey = tanda.toUpperCase();
+    } else if (feRaw) {
+      displayTanda = "S/Tanda";
+      mapKey = "S/TANDA__" + feRaw;
+    } else {
+      continue;
+    }
+    if (!acc.has(mapKey)) acc.set(mapKey, {
+      tanda: displayTanda,
+      _key: mapKey,                 // identificador único para click handlers
+      m3: 0,
+      fechaEntrega: monitorFmtFecha(fe),
+      fechaEntregaRaw: feRaw,
+      // Filas sin código de tanda se consideran planificadas (la operadora
+      // todavía no escribió el nro pero el pedido ya está cargado).
+      opIsSi: !tanda,
+      pedidos: []                   // [{ np, m3, razonSocial }] — alimenta el modal
+    });
+    const entry = acc.get(mapKey);
+    entry.m3 += m3;
+    // Si CUALQUIER fila de esta tanda tiene Op=SI, marcamos la tanda como SI.
+    if (op === "SI") entry.opIsSi = true;
+    if (np || m3) entry.pedidos.push({ np, m3, razonSocial: rs });
+  }
+  return acc;
+}
+
+/* Lee la hoja "PPP Excel Pedidos Entregados 2026" y devuelve
+   Map<tandaUpper, m3 total>. Hay varias filas por tanda (una por pedido)
+   y sumamos los m3 de col G "Mt3".
+   ⚠ NO usar col H "Mt3 FC": pese al nombre, NO es m3 — son códigos chicos
+   (zonas/V) tipo 4, 7, 21, 16 que inflaban los totales hasta órdenes de
+   magnitud por encima de lo real. Solo col G. */
+async function fetchHistoricSheet() {
+  const url = MONITOR_HISTORIC_CSV_URL + "&_=" + Date.now();
+  const r = await fetch(url, { cache: "no-store" });
+  if (!r.ok) throw new Error("Histórico CSV HTTP " + r.status);
+  const text = await r.text();
+  const rows = parseCSV(text);
+  if (!rows.length) return new Map();
+  // Header en fila 0 (sin filas de título arriba como en el sheet principal).
+  const header = rows[0].map(x => (x||"").trim().toLowerCase());
+  const cTanda = header.indexOf("tanda");
+  const cMt3   = header.indexOf("mt3");
+  if (cTanda < 0 || cMt3 < 0) {
+    throw new Error("Histórico: faltan columnas Tanda/Mt3");
+  }
+  const acc = new Map();
+  for (let i = 1; i < rows.length; i++) {
+    const r = rows[i];
+    if (!r) continue;
+    const tanda = (r[cTanda]||"").trim();
+    if (!tanda) continue;
+    const m3 = monitorParseM3(r[cMt3]);
+    const key = tanda.toUpperCase();
+    acc.set(key, (acc.get(key) || 0) + m3);
+  }
+  return acc;
+}
+
+/* Cache + lazy refresh. La hoja histórica no cambia tan seguido como la
+   programación diaria → refresh cada 5 min. Si un fetch falla, devolvemos
+   el cache anterior para no romper el monitor. */
+function getHistoricMap() {
+  const now = Date.now();
+  if (historicMap && (now - historicLastFetch) < HISTORIC_REFRESH_MS) {
+    return Promise.resolve(historicMap);
+  }
+  if (historicInflight) return historicInflight;
+  historicInflight = fetchHistoricSheet()
+    .then(m => {
+      historicMap = m;
+      historicLastFetch = Date.now();
+      historicInflight = null;
+      return m;
+    })
+    .catch(e => {
+      historicInflight = null;
+      console.warn("[monitor] histórico:", e.message);
+      // Devolvemos el cache anterior (puede ser null en el primer fetch fallido).
+      return historicMap || new Map();
+    });
+  return historicInflight;
+}
+
+/* Trae eventos para alimentar el monitor.
+   Hace 3 queries:
+   A) Eventos EP/TP/AP/TAP filtrados por TANDA (target tandas del sheet)
+      sin filtro de fecha — para determinar el status de cada tanda
+      (mirando TODOS sus eventos, no solo los de hoy).
+   B) Eventos EP/TP/AP/TAP de HOY (cualquier tanda) — para totales del día
+      y para detectar tandas trabajadas que no están en el sheet (alertas).
+   C) Legajos DISTINTOS de HOY (cualquier opción) — para el cuadro
+      "Empleados Trabajando Hoy". PostgREST no tiene DISTINCT, dedup-eamos
+      en cliente.
+   ⚠ Por qué varias queries: Supabase corta a 1000 filas. Filtrar por tanda
+   en (A) mantiene el resultado acotado. (B) y (C) son chicos (~50-300/día).
+   Devuelve: { statusMap, alertasOffSheet, empleadosHoy }
+     statusMap: TANDA -> { picking, separado, doneTodayP, doneTodayA } */
+async function fetchMonitorEvents(targetTandaKeys, sheetMap) {
+  const now = new Date();
+  const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startTodayMs = startToday.getTime();
+  const endTodayMs   = startTodayMs + 24*60*60*1000;
+  const startTodayIso = startToday.toISOString();
+  // Ventana extendida: hoy + 10 días para atrás (cubre 5 días productivos
+   // aunque haya domingos, feriados o días sin trabajo en el medio).
+  const start6DaysIso = new Date(startTodayMs - 10*24*60*60*1000).toISOString();
+  const headers = { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY };
+
+  // Query A: status por tanda (todos los eventos para target tandas)
+  let dataA = [];
+  if (targetTandaKeys.length) {
+    const urlA = SUPABASE_TABLE_ENDPOINT +
+      "?opcion=in.(EP,TP,AP,TAP)" +
+      "&texto=in.(" + targetTandaKeys.join(",") + ")" +
+      "&order=ts_cliente.asc" +
+      "&limit=5000" +
+      "&select=opcion,texto,ts_cliente";
+    const rA = await fetch(urlA, { headers });
+    if (!rA.ok) throw new Error("Supabase HTTP " + rA.status + " (status query)");
+    dataA = await rA.json();
+  }
+
+  // Query B: eventos EP/TP/AP/TAP de los últimos 6 días — totales/alertas de
+  // hoy + acumulados por día anterior para las filas históricas del monitor.
+  const urlB = SUPABASE_TABLE_ENDPOINT +
+    "?opcion=in.(EP,TP,AP,TAP)" +
+    "&ts_cliente=gte." + encodeURIComponent(start6DaysIso) +
+    "&order=ts_cliente.asc" +
+    "&limit=10000" +
+    "&select=opcion,texto,ts_cliente";
+  const rB = await fetch(urlB, { headers });
+  if (!rB.ok) throw new Error("Supabase HTTP " + rB.status + " (today query)");
+  const dataB = await rB.json();
+
+  // Query C: legajos + ts de los últimos 6 días (cualquier opción, incluye
+  // FJ/Perm/Limp/etc.). Dedup por día en cliente.
+  const urlC = SUPABASE_TABLE_ENDPOINT +
+    "?ts_cliente=gte." + encodeURIComponent(start6DaysIso) +
+    "&limit=20000" +
+    "&select=legajo,ts_cliente";
+  const rC = await fetch(urlC, { headers });
+  if (!rC.ok) throw new Error("Supabase HTTP " + rC.status + " (legajos query)");
+  const dataC = await rC.json();
+
+  // Per-day legajos (dayKey hora Argentina -> Set<legajo>)
+  const perDayLegajos = new Map();
+  for (const ev of dataC) {
+    const legajo = String(ev.legajo || "").trim();
+    if (!legajo) continue;
+    const dayKey = isoToDayKey(ev.ts_cliente);
+    if (!perDayLegajos.has(dayKey)) perDayLegajos.set(dayKey, new Set());
+    perDayLegajos.get(dayKey).add(legajo);
+  }
+  const todayKey = isoToDayKey(startTodayMs);
+  const empleadosHoy = perDayLegajos.has(todayKey) ? perDayLegajos.get(todayKey).size : 0;
+
+  // Procesar A: último evento de Picking (EP/TP) y Armado (AP/TAP) por tanda.
+  const lastPick = new Map();
+  const lastArm  = new Map();
+  for (const ev of dataA) {
+    const t = (ev.texto || "").trim().toUpperCase();
+    if (!t) continue;
+    const ts = ev.ts_cliente;
+    if (ev.opcion === "EP" || ev.opcion === "TP") {
+      const cur = lastPick.get(t);
+      if (!cur || ts > cur.ts) lastPick.set(t, { opcion: ev.opcion, ts });
+    } else if (ev.opcion === "AP" || ev.opcion === "TAP") {
+      const cur = lastArm.get(t);
+      if (!cur || ts > cur.ts) lastArm.set(t, { opcion: ev.opcion, ts });
+    }
+  }
+  const statusMap = new Map();
+  const tandas = new Set([...lastPick.keys(), ...lastArm.keys()]);
+  for (const t of tandas) {
+    const p = lastPick.get(t);
+    const a = lastArm.get(t);
+    statusMap.set(t, {
+      picking:  !p ? null : (p.opcion === "TP"  ? "done" : "curso"),
+      separado: !a ? null : (a.opcion === "TAP" ? "done" : "curso"),
+      doneTodayP: false,
+      doneTodayA: false
+    });
+  }
+
+  // Procesar B:
+  //   - HOY: marcar TP/TAP en statusMap + recolectar alertas off-sheet
+  //   - TODOS los días: armar perDay (dayKey -> Set<tanda> TP y Set<tanda> TAP)
+  //     para alimentar las filas de los días anteriores en el monitor.
+  const alertasSet = new Set();
+  const perDay = new Map();   // dayKey -> { donePSet, doneASet }
+  for (const ev of dataB) {
+    const t = (ev.texto || "").trim().toUpperCase();
+    if (!t) continue;
+    const tsMs = new Date(ev.ts_cliente).getTime();
+    const dayKey = isoToDayKey(tsMs);
+
+    // Acumulador por día (incluye hoy + 5 anteriores)
+    if (!perDay.has(dayKey)) perDay.set(dayKey, { donePSet: new Set(), doneASet: new Set() });
+    const dayAgg = perDay.get(dayKey);
+    if (ev.opcion === "TP")  dayAgg.donePSet.add(t);
+    if (ev.opcion === "TAP") dayAgg.doneASet.add(t);
+
+    // Lógica de HOY (existente): alerts off-sheet y done-today en statusMap.
+    if (tsMs >= startTodayMs && tsMs < endTodayMs) {
+      if (!sheetMap.has(t)) {
+        alertasSet.add(t);
+      } else {
+        const s = statusMap.get(t);
+        if (s) {
+          if (ev.opcion === "TP")  s.doneTodayP = true;
+          if (ev.opcion === "TAP") s.doneTodayA = true;
+        }
+      }
+    }
+  }
+
+  // Armar pastDays: los 5 últimos días PRODUCTIVOS (con algún registro), del
+  // más reciente al más viejo. Saltea automáticamente domingos/feriados o
+  // cualquier día sin actividad. M3 sale del sheetMap actual; si la tanda ya
+  // no está, caemos al historicMap.
+  const historic = await getHistoricMap();
+  const productiveDays = [...perDayLegajos.keys()]
+    .filter(d => d < todayKey)         // excluimos hoy
+    .sort()
+    .reverse()                          // del más reciente al más viejo
+    .slice(0, 5);                       // máximo 5
+  const pastDays = [];
+  for (const dayKey of productiveDays) {
+    const [, m, dd] = dayKey.split("-");
+    const label = `${dd}/${m}`;
+    let totPick = 0, totSep = 0;
+    const p = perDay.get(dayKey);
+    if (p) {
+      for (const tanda of p.donePSet) {
+        const entry = sheetMap.get(tanda);
+        if (entry) totPick += entry.m3;
+        else if (historic.has(tanda)) totPick += historic.get(tanda);
+      }
+      for (const tanda of p.doneASet) {
+        const entry = sheetMap.get(tanda);
+        if (entry) totSep += entry.m3;
+        else if (historic.has(tanda)) totSep += historic.get(tanda);
+      }
+    }
+    const empleados = perDayLegajos.get(dayKey).size;
+    pastDays.push({ key: dayKey, label, totPick, totSep, empleados });
+  }
+
+  return { statusMap, alertasOffSheet: [...alertasSet].sort(), empleadosHoy, pastDays };
+}
+
+function statusIconToday(s) {
+  // Solo eventos de HOY. null/undefined -> celda vacía.
+  if (s === "done")  return `<span class="status-icon status-done" title="Terminado hoy">✅</span>`;
+  if (s === "curso") {
+    // 12 barras alrededor del centro, con animation-delay escalonado en
+    // -1/12 s para crear el efecto de rotación.
+    let bars = "";
+    for (let i = 0; i < 12; i++) {
+      const delay = (-i / 12).toFixed(3);
+      bars += `<rect x="47" y="10" width="6" height="22" rx="2" transform="rotate(${i*30} 50 50)" style="animation-delay:${delay}s"/>`;
+    }
+    return `<span class="status-icon status-curso status-spinner" title="En curso hoy"><svg viewBox="0 0 100 100">${bars}</svg></span>`;
+  }
+  return "";
+}
+
+function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, empleadosHoy, pastDays, errMsg) {
+  // Cacheamos sheetMap para que showTandaDetail() pueda leer los NPs/m3
+  // de la tanda clickeada en el modal.
+  _monitorSheetCache = sheetMap;
+  // Detectar tandas que cambiaron de estado vs el render anterior →
+  // se les pinta flash verde y suena un beep.
+  const changedTandas = new Set();
+  for (const [t, ev] of statusMap) {
+    const prev = _prevStatusMap.get(t);
+    if (!prev) continue;   // primera vez que aparece, no flashar
+    if (prev.picking !== ev.picking || prev.separado !== ev.separado) {
+      changedTandas.add(t);
+    }
+  }
+  if (changedTandas.size && _prevStatusMap.size > 0) {
+    playMonitorBeep();
+  }
+  // Snapshot del statusMap actual para el próximo refresh
+  _prevStatusMap = new Map();
+  for (const [t, ev] of statusMap) _prevStatusMap.set(t, { picking: ev.picking, separado: ev.separado });
+
+  const content = document.getElementById("monitorContent");
+  if (errMsg) {
+    content.innerHTML = `<div class="monitor-error">${escapeHtml(errMsg)}</div>` + (content.innerHTML || "");
+    return;
+  }
+
+  // Filtro principal: SOLO tandas cuya Fecha Entrega esté en las próximas 3
+  // fechas del sheet (saltea días vacíos: feriados, weekends, sin planificar).
+  const targetSet = new Set(targetDates);
+  // Reglas de visibilidad:
+  //   - Op=SI                                  -> aparece SIEMPRE
+  //   - Op vacío + cualquier evento histórico  -> aparece marcado missingSi (rojo)
+  //   - Op vacío + sin eventos                 -> NO aparece
+  // Status (picking/separado) usa TODOS los eventos históricos de la tanda
+  // (no solo hoy) — si EP/TP/AP/TAP existieron antes, el tilde aparece igual.
+  const tandas = [];
+  for (const [k, v] of sheetMap) {
+    if (!targetSet.has(v.fechaEntregaRaw)) continue;
+    const ev = statusMap.get(k) || { picking: null, separado: null, doneTodayP: false, doneTodayA: false };
+    const hasAny = (ev.picking !== null || ev.separado !== null);
+    if (!v.opIsSi && !hasAny) continue;
+    tandas.push({ ...v, ev, missingSi: !v.opIsSi });
+  }
+
+  // Orden:
+  //   rank 0 = algo en curso (⏰)
+  //   rank 1 = incompleta (1 done + 1 vacío)
+  //   rank 2 = planificada sin actividad
+  //   rank 3 = doble ✅
+  const rankRow = (ev) => {
+    const hasCurso = (ev.picking === "curso" || ev.separado === "curso");
+    const bothDone = (ev.picking === "done"  && ev.separado === "done");
+    const noActivity = (ev.picking === null && ev.separado === null);
+    if (hasCurso) return 0;
+    if (bothDone) return 3;
+    if (noActivity) return 2;
+    return 1;
+  };
+  // FE más cercana primero → urgencia → alfabético
+  tandas.sort((a,b) =>
+    a.fechaEntregaRaw.localeCompare(b.fechaEntregaRaw) ||
+    (rankRow(a.ev) - rankRow(b.ev)) ||
+    a.tanda.localeCompare(b.tanda)
+  );
+
+  // Totales del día (M3 TERMINADOS HOY: TP/TAP de hoy) — alimentan los
+  // cajones grandes "M3 Picking del día" y "M3 Pedido del día".
+  // tandasFC = picking Y separado completados → van al panel "Tandas a FC".
+  // Total por día de entrega — SOLO suma las que están en FC, no todas las
+  // planificadas (alimenta el cuadro "Total por día" a la derecha).
+  let totPickToday = 0, totSepToday = 0;
+  let rowsHtml = "";
+  const tandasFC = [];
+  const totalByDate = new Map();   // fechaRaw -> { fechaDisplay, totalSum, byCamion }
+
+  for (const t of tandas) {
+    const ev = t.ev;
+    if (!t.missingSi) {
+      if (ev.doneTodayP) totPickToday += t.m3;
+      if (ev.doneTodayA) totSepToday  += t.m3;
+    }
+    // Total por día — desglosado por camión (cada número de tanda agrupa
+    // las que comparten el mismo número: C03A + C03B = camión 03).
+    {
+      const key = t.fechaEntregaRaw || "_";
+      if (!totalByDate.has(key)) {
+        totalByDate.set(key, {
+          fechaDisplay: t.fechaEntrega,
+          totalSum: 0,
+          byCamion: new Map()   // camion -> { sum, tandas[], tandasArmadas }
+        });
+      }
+      const g = totalByDate.get(key);
+      g.totalSum += t.m3;
+      const cam = tandaCamion(t.tanda);
+      if (!g.byCamion.has(cam)) g.byCamion.set(cam, { sum: 0, tandas: [], tandasArmadas: 0 });
+      const c = g.byCamion.get(cam);
+      c.sum += t.m3;
+      c.tandas.push({ code: t.tanda, m3: t.m3, armado: ev.separado === "done" });
+      if (ev.separado === "done") c.tandasArmadas++;
+    }
+    const bothDone = (ev.picking === "done" && ev.separado === "done");
+    if (bothDone && !t.missingSi) {
+      tandasFC.push(t);
+      continue;       // las terminadas no van a la tabla principal
+    }
+    const isCurso = (ev.picking === "curso" || ev.separado === "curso");
+    const cls = [];
+    if (isCurso)        cls.push("row-curso");
+    if (t.missingSi)    cls.push("row-missing-si");
+    if (changedTandas.has(t.tanda.toUpperCase())) cls.push("row-flash");
+    const m3Txt = t.m3.toFixed(1).replace(".", ",");
+    const feTxt = t.missingSi
+      ? `${escapeHtml(t.fechaEntrega)}<br>(F Pk)`
+      : escapeHtml(t.fechaEntrega);
+    rowsHtml += `
+      <tr class="${cls.join(" ")}">
+        <td class="monitor-tanda tanda-clickable" data-tanda="${escapeHtml(t._key || t.tanda)}" onclick="showTandaDetail(this.dataset.tanda)">${escapeHtml(t.tanda)}</td>
+        <td class="num">${m3Txt}</td>
+        <td class="center">${feTxt}</td>
+        <td class="center">${statusIconToday(ev.picking)}</td>
+        <td class="center">${statusIconToday(ev.separado)}</td>
+      </tr>`;
+  }
+  const todayStr = new Date().toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit" });
+  const todayKey = isoToDayKey(Date.now());   // YYYY-MM-DD para showDayBreakdown
+  const fmtDM = (raw) => { const [, m, d] = raw.split("-"); return `${d}/${m}`; };
+  const targetLabel = targetDates.length
+    ? targetDates.map(fmtDM).join(", ")
+    : "—";
+  const alertHtml = alertasOffSheet.length ? `
+    <div class="monitor-alerts">
+      <div class="monitor-alert-title">⚠ Tandas trabajadas que NO están en PPP — alguien se equivocó:</div>
+      <div class="monitor-alert-list">
+        ${alertasOffSheet.map(t => `<span class="monitor-alert-chip">${escapeHtml(t)}</span>`).join("")}
+      </div>
+    </div>` : "";
+  const leftHtml = rowsHtml ? `
+    <table class="monitor-table">
+      <thead>
+        <tr>
+          <th>Tanda</th>
+          <th class="num">M3</th>
+          <th class="center">Fecha<br>Salida</th>
+          <th class="center">Picking</th>
+          <th class="center">Pedido<br>Separado</th>
+        </tr>
+      </thead>
+      <tbody>${rowsHtml}</tbody>
+    </table>
+  ` : (tandas.length
+        ? `<div class="monitor-loading">Todas las tandas terminadas para ${targetLabel} ✅</div>`
+        : `<div class="monitor-loading">Sin tandas planificadas para las próximas fechas (${targetLabel}).</div>`);
+
+  // Panel "Tandas a FC" — tandas con picking + separado completados.
+  const totalFcM3 = tandasFC.reduce((s, t) => s + (t.m3 || 0), 0);
+  const fcHtml = tandasFC.length ? `
+    <div class="monitor-fc-card">
+      <div class="monitor-fc-title">Tandas a FC (${totalFcM3.toFixed(1).replace(".", ",")} m3)</div>
+      <table class="monitor-fc-table">
+        <thead>
+          <tr>
+            <th>Tanda</th>
+            <th class="num">M3</th>
+            <th class="center">Fecha Salida</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${tandasFC.map(t => `
+            <tr>
+              <td class="fc-tanda tanda-clickable" data-tanda="${escapeHtml(t._key || t.tanda)}" onclick="showTandaDetail(this.dataset.tanda)">${escapeHtml(t.tanda)}</td>
+              <td class="num">${t.m3.toFixed(1).replace(".", ",")}</td>
+              <td class="center">${escapeHtml(t.fechaEntrega)}</td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
+  ` : "";
+
+  // Card "+ Fuera de ventana" — tandas planificadas (Op=SI) cuya fecha de
+  // entrega es POSTERIOR a la última fecha de la ventana visible. Cuenta
+  // cuántas tandas y cuántos m3 quedaron sin mostrar, agrupados por fecha.
+  const maxTarget = targetDates.length ? targetDates[targetDates.length - 1] : "";
+  const beyondByDate = new Map();
+  let beyondTotalTandas = 0;
+  let beyondTotalM3 = 0;
+  for (const [, v] of sheetMap) {
+    if (!v.opIsSi || !v.fechaEntregaRaw) continue;
+    if (!maxTarget || v.fechaEntregaRaw <= maxTarget) continue;
+    if (!beyondByDate.has(v.fechaEntregaRaw)) {
+      beyondByDate.set(v.fechaEntregaRaw, { fechaDisplay: v.fechaEntrega, tandas: [], sumM3: 0 });
+    }
+    const g = beyondByDate.get(v.fechaEntregaRaw);
+    g.tandas.push(v.tanda);
+    g.sumM3 += v.m3;
+    beyondTotalTandas++;
+    beyondTotalM3 += v.m3;
+  }
+  const beyondHtml = beyondTotalTandas > 0 ? `
+    <div class="beyond-card${beyondExpanded ? ' expanded' : ''}" onclick="toggleBeyondDetail()">
+      <div class="beyond-summary">
+        <span class="beyond-label">+ Fuera de ventana:</span>
+        <span class="beyond-count">${beyondTotalTandas} tandas · ${beyondTotalM3.toFixed(1).replace(".", ",")} m3</span>
+        <span class="beyond-toggle">▼</span>
+      </div>
+      <div class="beyond-detail">
+        ${[...beyondByDate.entries()].sort().map(([, g]) => `
+          <div class="beyond-day">
+            <div class="beyond-day-header">${escapeHtml(g.fechaDisplay)} · ${g.tandas.length} tandas · ${g.sumM3.toFixed(1).replace(".", ",")} m3</div>
+            <div class="beyond-day-tandas">${g.tandas.sort().map(t => escapeHtml(t)).join(", ")}</div>
+          </div>
+        `).join("")}
+      </div>
+    </div>
+  ` : "";
+
+  // Cuadro "Total por día" — m3 de tandas del día, desglosado por camión
+  // (cada número de tanda agrupa las que comparten el mismo número: C03A +
+  // C03B = camión 03). Fecha y Total se mergean (rowspan) cuando hay varios
+  // camiones en el mismo día.
+  _monitorTotalCache = totalByDate;   // para que showCamionDetail() pueda leerlo
+  const totalEntries = [...totalByDate.entries()].sort();
+  const totalHtml = totalEntries.length ? `
+    <div class="monitor-total-card">
+      <div class="monitor-total-title">Total por día</div>
+      <table class="monitor-total-table">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th class="center">Camión</th>
+            <th class="num">M3</th>
+            <th class="num">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${totalEntries.map(([dateKey, g]) => {
+            const camions = [...g.byCamion.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+            const n = camions.length || 1;
+            const totalCell = `<td class="num total-cell" rowspan="${n}">${g.totalSum.toFixed(1).replace(".", ",")}</td>`;
+            const fechaCell = `<td class="fecha-cell" rowspan="${n}">${escapeHtml(g.fechaDisplay)}</td>`;
+            if (!camions.length) {
+              return `<tr>${fechaCell}<td></td><td class="num"></td>${totalCell}</tr>`;
+            }
+            return camions.map(([cam, c], i) => {
+              // Color del camión según cuántas de sus tandas están armadas:
+              //   todas → verde · algunas → naranja · ninguna → rojo
+              const armadas = c.tandasArmadas;
+              const total   = c.tandas.length;
+              const statusClass = armadas === 0
+                ? "tandas-pending"
+                : (armadas >= total ? "tandas-done" : "tandas-partial");
+              return `
+                <tr class="${statusClass}">
+                  ${i === 0 ? fechaCell : ""}
+                  <td class="center cam-cell tanda-clickable" data-date="${escapeHtml(dateKey)}" data-cam="${escapeHtml(cam)}" onclick="showCamionDetail(this.dataset.date, this.dataset.cam)">${escapeHtml(cam)}</td>
+                  <td class="num">${c.sum.toFixed(1).replace(".", ",")}</td>
+                  ${i === 0 ? totalCell : ""}
+                </tr>
+              `;
+            }).join("");
+          }).join("")}
+        </tbody>
+      </table>
+    </div>
+  ` : "";
+
+  const tableHtml = `
+    <div class="monitor-flex">
+      <div class="monitor-table-wrap">
+        ${leftHtml}
+        ${beyondHtml}
+      </div>
+      <div class="monitor-totales monitor-totales-side">
+        <div class="totales-col-boxes">
+          <div class="totales-row">
+            <div class="monitor-tot-box day-box-clickable" data-day-key="${escapeHtml(todayKey)}" data-day-label="${escapeHtml(todayStr)}" onclick="showDayBreakdown(this.dataset.dayKey, this.dataset.dayLabel)">
+              <div class="monitor-tot-label">M3 Picking<br>del día ${todayStr}</div>
+              <div class="monitor-tot-value">${totPickToday.toFixed(1).replace(".", ",")}</div>
+            </div>
+            <div class="monitor-tot-box day-box-clickable" data-day-key="${escapeHtml(todayKey)}" data-day-label="${escapeHtml(todayStr)}" onclick="showDayBreakdown(this.dataset.dayKey, this.dataset.dayLabel)">
+              <div class="monitor-tot-label">M3 Pedido<br>del día ${todayStr}</div>
+              <div class="monitor-tot-value">${totSepToday.toFixed(1).replace(".", ",")}</div>
+            </div>
+            <div class="monitor-tot-box day-box-clickable" data-day-key="${escapeHtml(todayKey)}" data-day-label="${escapeHtml(todayStr)}" onclick="showDayBreakdown(this.dataset.dayKey, this.dataset.dayLabel)">
+              <div class="monitor-tot-label">Empleados<br>Trabajando Hoy</div>
+              <div class="monitor-tot-value">${empleadosHoy != null ? empleadosHoy : "—"}</div>
+            </div>
+          </div>
+          ${(pastDays || []).map(d => `
+            <div class="totales-row">
+              <div class="monitor-tot-box day-box-clickable" data-day-key="${escapeHtml(d.key)}" data-day-label="${escapeHtml(d.label)}" onclick="showDayBreakdown(this.dataset.dayKey, this.dataset.dayLabel)">
+                <div class="monitor-tot-label">M3 Picking<br>del día ${escapeHtml(d.label)}</div>
+                <div class="monitor-tot-value">${d.totPick.toFixed(1).replace(".", ",")}</div>
+              </div>
+              <div class="monitor-tot-box day-box-clickable" data-day-key="${escapeHtml(d.key)}" data-day-label="${escapeHtml(d.label)}" onclick="showDayBreakdown(this.dataset.dayKey, this.dataset.dayLabel)">
+                <div class="monitor-tot-label">M3 Pedido<br>del día ${escapeHtml(d.label)}</div>
+                <div class="monitor-tot-value">${d.totSep.toFixed(1).replace(".", ",")}</div>
+              </div>
+              <div class="monitor-tot-box day-box-clickable" data-day-key="${escapeHtml(d.key)}" data-day-label="${escapeHtml(d.label)}" onclick="showDayBreakdown(this.dataset.dayKey, this.dataset.dayLabel)">
+                <div class="monitor-tot-label">Empleados<br>Trabajando ${escapeHtml(d.label)}</div>
+                <div class="monitor-tot-value">${d.empleados}</div>
+              </div>
+            </div>
+          `).join("")}
+        </div>
+        <div class="totales-col-fc">
+          ${fcHtml}
+          ${totalHtml}
+        </div>
+        ${alertHtml}
+      </div>
+    </div>
+  `;
+  content.innerHTML = tableHtml;
+  const countCurso = tandas.filter(t => t.ev.picking === "curso" || t.ev.separado === "curso").length;
+  document.getElementById("monitorMeta").textContent =
+    `${tandas.length} tanda(s) entrega ${targetLabel} · ${countCurso} en curso · ${tandasFC.length} a FC · eventos ${MONITOR_REFRESH_MS/1000}s · PPP ${PPP_TTL_MS/1000}s`;
+}
+
+async function refreshMonitor() {
+  const refrEl = document.getElementById("monitorRefresh");
+  try {
+    // 1) Sheet primero (necesitamos target dates + tandas para query de eventos).
+    //    Cacheado por PPP_TTL_MS para no martillar Google Sheets en cada tick
+    //    de 1s — refresca recién cuando el cache expira (3s default).
+    const nowMs = Date.now();
+    let sheetMap;
+    if (_pppCache && (nowMs - _pppCacheTs) < PPP_TTL_MS) {
+      sheetMap = _pppCache;
+    } else {
+      sheetMap = await fetchMonitorSheet();
+      _pppCache = sheetMap;
+      _pppCacheTs = Date.now();
+    }
+    const targetDates = targetDeliveryDates(sheetMap);
+    const targetSet = new Set(targetDates);
+    const targetTandaKeys = [];
+    for (const [k, v] of sheetMap) {
+      if (targetSet.has(v.fechaEntregaRaw)) targetTandaKeys.push(k);
+    }
+    // 2) Eventos: status por tanda + alertas de hoy + empleados de hoy + 5 días anteriores
+    const { statusMap, alertasOffSheet, empleadosHoy, pastDays } = await fetchMonitorEvents(targetTandaKeys, sheetMap);
+    monitorLastOkTs = Date.now();
+    renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, empleadosHoy, pastDays, null);
+    if (refrEl) { refrEl.textContent = "● al día"; refrEl.classList.remove("stale"); }
+    // Si el fetch anda, ocultar banner offline (puede que estuviera mostrándose).
+    document.getElementById("monitorOfflineBanner")?.classList.add("hidden");
+  } catch (e) {
+    if (refrEl) {
+      const ageSec = monitorLastOkTs ? Math.round((Date.now()-monitorLastOkTs)/1000) : -1;
+      refrEl.textContent = monitorLastOkTs
+        ? `● desactualizado (${ageSec}s) — ${e.message}`
+        : `● error: ${e.message}`;
+      refrEl.classList.add("stale");
+    }
+    // Banner amarillo bien visible — mantenemos el último estado en pantalla.
+    const offlineBanner = document.getElementById("monitorOfflineBanner");
+    if (offlineBanner) {
+      if (monitorLastOkTs) {
+        const d = new Date(monitorLastOkTs);
+        const hh = String(d.getHours()).padStart(2, "0");
+        const mm = String(d.getMinutes()).padStart(2, "0");
+        offlineBanner.textContent = `⚠ Sin conexión — datos al ${hh}:${mm} (${Math.round((Date.now()-monitorLastOkTs)/1000)}s)`;
+        offlineBanner.classList.remove("hidden");
+      } else {
+        offlineBanner.classList.add("hidden");
+      }
+    }
+    if (!monitorLastOkTs) {
+      document.getElementById("monitorContent").innerHTML =
+        `<div class="monitor-error">No se pudo cargar: ${escapeHtml(e.message)}</div>`;
+    }
+  }
+}
 </script>
 
 </body>
