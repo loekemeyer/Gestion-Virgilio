@@ -2991,7 +2991,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v1.30";
+const APP_VERSION = "v1.31";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -3799,6 +3799,33 @@ async function showDayBreakdown(dayKey, dayLabel) {
               <td class="num">${r.jornadaH ? fmt(m3PerHJorn, 2) : "—"}</td>
             </tr>`;
           }).join("")}
+          ${(() => {
+            // Fila Total equipo — sumas + promedio ponderado de m3/h jornada
+            // sobre las jornadas conocidas (rows con jornadaH > 0).
+            const tot = rows.reduce((acc, r) => {
+              acc.m3Pick  += r.m3Pick;
+              acc.m3Arm   += r.m3Arm;
+              acc.m3Total += r.m3Total;
+              if (r.jornadaH && r.jornadaH > 0) {
+                acc.jornadaH += r.jornadaH;
+                acc.comidaH  += r.comidaH || 0;
+              }
+              return acc;
+            }, { m3Pick:0, m3Arm:0, m3Total:0, jornadaH:0, comidaH:0 });
+            const teamM3PerH = tot.jornadaH > 0 ? tot.m3Total / tot.jornadaH : 0;
+            return `
+            <tr style="background:#f1f5f9;font-weight:700;border-top:2px solid #94a3b8;">
+              <td>Total equipo (${rows.length})</td>
+              <td class="num">—</td>
+              <td class="num">—</td>
+              <td class="num">${tot.comidaH > 0 ? fmt(tot.comidaH, 2) + " h" : "—"}</td>
+              <td class="num">${tot.jornadaH > 0 ? fmt(tot.jornadaH, 2) + " h" : "—"}</td>
+              <td class="num">${fmt(tot.m3Pick)}</td>
+              <td class="num">${fmt(tot.m3Arm)}</td>
+              <td class="num">${fmt(tot.m3Total)}</td>
+              <td class="num">${tot.jornadaH > 0 ? fmt(teamM3PerH, 2) : "—"}</td>
+            </tr>`;
+          })()}
         </tbody>
       </table>
       ${sinLegajoHtml}`;
