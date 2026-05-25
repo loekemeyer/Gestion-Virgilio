@@ -1305,7 +1305,7 @@ button {
 #versionBadge{
   position: fixed;
   bottom: 8px;
-  left: 8px;       /* movido a la izquierda para no chocar con el QR */
+  right: 8px;      /* a la derecha — el QR solo aparece con el monitor abierto */
   z-index: 50;
   font-size: 12px;
   font-weight: bold;
@@ -1371,7 +1371,7 @@ button {
 </div>
 
 <!-- Badge de versión + estado de cola (abajo a la izquierda) -->
-<div id="versionBadge">v1.23 ✓</div>
+<div id="versionBadge">v1.24 ✓</div>
 
 <!-- QR de fichada (TOTP rotativo) — abajo a la derecha. Genera tokens cada
      30s que apuntan a la app FichadaQR; los operarios escanean para fichar. -->
@@ -1380,7 +1380,9 @@ button {
   <canvas id="qrCanvas" width="180" height="180" aria-label="QR de fichada"></canvas>
   <div class="qr-countdown">Próximo en <strong id="qrSecs">--</strong>s</div>
 </div>
-<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"
+        onerror="this.onerror=null;this.src='https://unpkg.com/qrcode@1.5.4/build/qrcode.min.js'"
+        crossorigin="anonymous"></script>
 
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
@@ -2976,7 +2978,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v1.23";
+const APP_VERSION = "v1.24";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -3341,34 +3343,48 @@ function _fichadaSecondsUntilNext(periodSec) {
 }
 
 let _qrLastToken = null;
+function _qrRenderToCanvas(canvas, text) {
+  return new Promise((resolve, reject) => {
+    QRCode.toCanvas(canvas, text, {
+      width: 320, margin: 1, errorCorrectionLevel: "M",
+      color: { dark: "#202124", light: "#ffffff" }
+    }, (err) => err ? reject(err) : resolve());
+  });
+}
 async function tickFichadaQr() {
   const canvas = document.getElementById("qrCanvas");
   const secsEl = document.getElementById("qrSecs");
-  if (!canvas || !secsEl || typeof QRCode === "undefined") return;
+  if (!canvas || !secsEl) return;
+  if (typeof QRCode === "undefined") return;
   try {
     const token = await _fichadaBuildToken(FICHADA_HMAC_SECRET, FICHADA_PERIOD_SEC);
     if (token !== _qrLastToken) {
       _qrLastToken = token;
       const url = FICHADA_BASE_URL + "?t=" + encodeURIComponent(token);
-      // El canvas se renderiza al tamaño que tenga (CSS controla el visual,
-      // el width/height del canvas es interno).
-      QRCode.toCanvas(canvas, url, {
-        width: 320, margin: 1, errorCorrectionLevel: "M",
-        color: { dark: "#202124", light: "#ffffff" }
-      });
+      await _qrRenderToCanvas(canvas, url);
     }
     const left = _fichadaSecondsUntilNext(FICHADA_PERIOD_SEC);
     secsEl.textContent = String(Math.max(0, Math.ceil(left)));
   } catch (e) {
-    console.warn("[QR] tick error:", e.message);
+    console.warn("[QR] tick error:", e.message || e);
+    secsEl.textContent = "err";
   }
 }
-// Esperar a que cargue el script del CDN (defer-like)
+// Esperar a que cargue el script del CDN. Si tarda mucho (>5s), avisar.
+let _qrStartAttempts = 0;
 function _startFichadaQr() {
   if (typeof QRCode === "undefined") {
+    _qrStartAttempts++;
+    if (_qrStartAttempts > 50) {   // 50 * 200ms = 10s
+      console.error("[QR] La librería QRCode no cargó. Verificá la conexión a internet.");
+      const secsEl = document.getElementById("qrSecs");
+      if (secsEl) secsEl.textContent = "sin lib";
+      return;
+    }
     setTimeout(_startFichadaQr, 200);
     return;
   }
+  console.log("[QR] QRCode lib lista, arrancando ticks");
   tickFichadaQr();
   setInterval(tickFichadaQr, 250);
 }
