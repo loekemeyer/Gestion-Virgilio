@@ -1371,7 +1371,7 @@ button {
 </div>
 
 <!-- Badge de versión + estado de cola (abajo a la izquierda) -->
-<div id="versionBadge">v1.25 ✓</div>
+<div id="versionBadge">v1.26 ✓</div>
 
 <!-- QR de fichada (TOTP rotativo) — abajo a la derecha. Genera tokens cada
      30s que apuntan a la app FichadaQR; los operarios escanean para fichar. -->
@@ -1383,6 +1383,10 @@ button {
 <!-- Librería qrcode-generator (Kazuhiko Arase, MIT) — hosteada local para
      que ande sin internet en el depósito. -->
 <script src="qrcode.js"></script>
+<!-- Config del módulo de fichada (compartido con fichada.html). El secret
+     hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
+     archivo evitamos que se desincronicen. -->
+<script src="fichada-config.js"></script>
 
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
@@ -2978,7 +2982,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v1.25";
+const APP_VERSION = "v1.26";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -3313,11 +3317,17 @@ flushQueue();
    El operario escanea con el celu, abre el form, marca Entrada/
    Comida Inicia/Comida Termina/Salida y envía a un Google Form.
 
-   ⚠ FICHADA_HMAC_SECRET debe COINCIDIR con el hmacSecret del
-   config.js de FichadaQR. Si lo cambian allá, cambiarlo acá. */
-const FICHADA_HMAC_SECRET = "CAMBIAR-ESTE-SECRETO-LARGO-Y-ALEATORIO-1234567890abcdef";
-const FICHADA_PERIOD_SEC  = 30;
-const FICHADA_BASE_URL    = "https://loekemeyer.github.io/FichadaQR/";
+   El secreto, periodo y demás vienen de fichada-config.js — mismo archivo
+   que carga fichada.html, así no se desincronizan. */
+const FICHADA_HMAC_SECRET = (window.FICHADA_CONFIG && window.FICHADA_CONFIG.hmacSecret) || "";
+const FICHADA_PERIOD_SEC  = (window.FICHADA_CONFIG && window.FICHADA_CONFIG.tokenPeriodSec) || 30;
+function buildFichadaUrl(token) {
+  // URL absoluta hacia fichada.html en el mismo dominio, con el token como
+  // query string. El celu del operario lo escanea y aterriza en el form.
+  const u = new URL("./fichada.html", location.href);
+  u.searchParams.set("t", token);
+  return u.toString();
+}
 
 async function _fichadaHmacSha256Hex(secret, message) {
   const enc = new TextEncoder();
@@ -3389,7 +3399,7 @@ async function tickFichadaQr() {
     const token = await _fichadaBuildToken(FICHADA_HMAC_SECRET, FICHADA_PERIOD_SEC);
     if (token !== _qrLastToken) {
       _qrLastToken = token;
-      const url = FICHADA_BASE_URL + "?t=" + encodeURIComponent(token);
+      const url = buildFichadaUrl(token);
       _qrRenderToCanvas(canvas, url, {
         width: 320, margin: 1, errorCorrectionLevel: "M",
         color: { dark: "#202124", light: "#ffffff" }
