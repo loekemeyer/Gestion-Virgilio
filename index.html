@@ -1489,6 +1489,15 @@ const SUPABASE_URL  = "https://hrxfctzncixxqmpfhskv.supabase.co";
 const SUPABASE_KEY  = "sb_publishable_BqpAgZH6ty-9wft10_YMhw_0rcIPuWT";
 const SUPABASE_TABLE_ENDPOINT =
   SUPABASE_URL + "/rest/v1/Registros_Produccion_Virgilio";
+/* Fichadas de ingreso vienen del QR (fichada.html → Supabase). El monitor
+   las cruza con PC/FJ de Registros_Produccion_Virgilio para calcular
+   jornada. Empleados se usa para resolver email→legajo cuando el QR no
+   tenia legajo todavia (cuando un operario nuevo todavia no esta
+   linkeado en la tabla). */
+const SUPABASE_FICHADAS_ENDPOINT =
+  SUPABASE_URL + "/rest/v1/Fichadas_Virgilio";
+const SUPABASE_EMPLEADOS_ENDPOINT =
+  SUPABASE_URL + "/rest/v1/Empleados";
 
 const filas = {
   row1: ["EP","TP","AP","TAP","CR","CC"],
@@ -2982,7 +2991,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v1.27";
+const APP_VERSION = "v1.28";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -3561,21 +3570,83 @@ async function showDayBreakdown(dayKey, dayLabel) {
   m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">Cargando…</div>`;
   m.classList.add("show");
   try {
-    // Fetch eventos del día completo (00:00 a 23:59:59 hora Argentina)
+    // Fetch eventos del día completo (00:00 a 23:59:59 hora Argentina).
+    // ts_inicio se trae también porque para PC (Paré Comida) la duración
+    // del corte es ts_cliente - ts_inicio (es un toggle: abre y cierra).
     const dayStartIso = new Date(`${dayKey}T00:00:00-03:00`).toISOString();
     const dayEndIso   = new Date(`${dayKey}T23:59:59-03:00`).toISOString();
-    const url = SUPABASE_TABLE_ENDPOINT +
+    const evUrl = SUPABASE_TABLE_ENDPOINT +
       "?ts_cliente=gte." + encodeURIComponent(dayStartIso) +
       "&ts_cliente=lte." + encodeURIComponent(dayEndIso) +
       "&order=ts_cliente.asc" +
       "&limit=5000" +
-      "&select=opcion,texto,legajo,ts_cliente";
-    const r = await fetch(url, {
-      headers: { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY }
-    });
-    if (!r.ok) throw new Error("Supabase HTTP " + r.status);
-    const events = await r.json();
-    // Agrupar por legajo
+      "&select=opcion,texto,legajo,ts_cliente,ts_inicio";
+    // Fichadas de ingreso del día (la pueden haber registrado varias veces
+    // por error → nos quedamos con la PRIMERA del día por legajo).
+    const fichUrl = SUPABASE_FICHADAS_ENDPOINT +
+      "?ts_cliente=gte." + encodeURIComponent(dayStartIso) +
+      "&ts_cliente=lte." + encodeURIComponent(dayEndIso) +
+      "&tipo=eq.ingreso" +
+      "&order=ts_cliente.asc" +
+      "&limit=2000" +
+      "&select=email,legajo,ts_cliente";
+    const [r, rf] = await Promise.all([
+      fetch(evUrl,   { headers: { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY } }),
+      fetch(fichUrl, { headers: { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY } })
+    ]);
+    if (!r.ok)  throw new Error("Supabase HTTP " + r.status);
+    if (!rf.ok) throw new Error("Fichadas HTTP " + rf.status);
+    const events   = await r.json();
+    const fichadas = await rf.json();
+
+    // Para fichadas sin legajo cargado, intento resolverlo ahora con
+    // un solo round-trip a Empleados filtrando por email IN (...).
+    const emailsSinLegajo = [...new Set(
+      fichadas
+        .filter(f => !f.legajo && f.email)
+        .map(f => String(f.email).toLowerCase())
+    )];
+    let emailToLegajo = new Map();
+    if (emailsSinLegajo.length) {
+      try {
+        const inList = "(" + emailsSinLegajo.map(e => `"${e.replace(/"/g, '')}"`).join(",") + ")";
+        const empUrl = SUPABASE_EMPLEADOS_ENDPOINT +
+          "?email=in." + encodeURIComponent(inList) +
+          "&select=Legajo,email";
+        const re = await fetch(empUrl, { headers: { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY } });
+        if (re.ok) {
+          const emps = await re.json();
+          for (const e of emps) {
+            if (e.email && e.Legajo != null) emailToLegajo.set(String(e.email).toLowerCase(), String(e.Legajo));
+          }
+        }
+      } catch (_) { /* best-effort: si falla seguimos sin legajo */ }
+    }
+
+    // Ingreso por legajo: nos quedamos con el ts_cliente MÁS TEMPRANO del
+    // día. Si una misma persona escaneó dos veces el QR, el primer ingreso
+    // gana (los siguientes son ruido/error).
+    const ingresoByLegajo = new Map();      // legajo -> Date
+    const emailByLegajo   = new Map();      // legajo -> email (para mostrar)
+    const fichadasSinLegajo = [];           // ingresos cuyo email no está en Empleados
+    for (const f of fichadas) {
+      let leg = f.legajo;
+      if (!leg && f.email) {
+        leg = emailToLegajo.get(String(f.email).toLowerCase()) || null;
+      }
+      const tsIngreso = new Date(f.ts_cliente);
+      if (!leg) {
+        fichadasSinLegajo.push({ email: f.email || "(sin email)", ts: tsIngreso });
+        continue;
+      }
+      const legStr = String(leg);
+      const prev = ingresoByLegajo.get(legStr);
+      if (!prev || tsIngreso < prev) ingresoByLegajo.set(legStr, tsIngreso);
+      if (f.email) emailByLegajo.set(legStr, f.email);
+    }
+
+    // Agrupar eventos por legajo. Además de pickeds/armadas, calculamos
+    // sumatoria de PC (duración de comidas) y el FJ del día si existe.
     const perLegajo = new Map();
     for (const ev of events) {
       const leg = String(ev.legajo || "").trim();
@@ -3584,7 +3655,9 @@ async function showDayBreakdown(dayKey, dayLabel) {
         firstTs: ev.ts_cliente,
         lastTs: ev.ts_cliente,
         pickedTandas: new Set(),
-        armedTandas: new Set()
+        armedTandas: new Set(),
+        comidaMs: 0,
+        fjTs: null
       });
       const p = perLegajo.get(leg);
       p.lastTs = ev.ts_cliente;
@@ -3593,8 +3666,32 @@ async function showDayBreakdown(dayKey, dayLabel) {
         if (ev.opcion === "TP")  p.pickedTandas.add(tanda);
         if (ev.opcion === "TAP") p.armedTandas.add(tanda);
       }
+      if (ev.opcion === "PC" && ev.ts_inicio) {
+        const dur = new Date(ev.ts_cliente) - new Date(ev.ts_inicio);
+        if (dur > 0 && dur < 8 * 3600 * 1000) p.comidaMs += dur; // tope: 8h sanity
+      }
+      if (ev.opcion === "FJ") {
+        // Último FJ del día gana (raros casos de doble FJ).
+        p.fjTs = ev.ts_cliente;
+      }
     }
-    if (!perLegajo.size) {
+
+    // Mergeamos legajos que solo aparecen en fichadas (fichó pero no
+    // mandó ninguna acción todavía) para que aparezcan en la tabla.
+    for (const [leg, ts] of ingresoByLegajo.entries()) {
+      if (!perLegajo.has(leg)) {
+        perLegajo.set(leg, {
+          firstTs: ts.toISOString(),
+          lastTs:  ts.toISOString(),
+          pickedTandas: new Set(),
+          armedTandas:  new Set(),
+          comidaMs: 0,
+          fjTs: null
+        });
+      }
+    }
+
+    if (!perLegajo.size && !fichadasSinLegajo.length) {
       m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">Sin registros para ese día.</div>`;
       return;
     }
@@ -3611,11 +3708,58 @@ async function showDayBreakdown(dayKey, dayLabel) {
       const m3Pick = [...p.pickedTandas].reduce((s, t) => s + tandaM3(t), 0);
       const m3Arm  = [...p.armedTandas ].reduce((s, t) => s + tandaM3(t), 0);
       const m3Total = m3Pick + m3Arm;
+      // Horas "trabajadas" (primer evento → último evento) — se mantiene
+      // para no romper la comparación histórica, pero la jornada nueva
+      // usa ingreso + FJ + descuento de PC.
       const horas = Math.max(0, (new Date(p.lastTs) - new Date(p.firstTs)) / 3600000);
       const m3PerH = horas > 0 ? m3Total / horas : 0;
-      return { leg, m3Pick, m3Arm, m3Total, horas, m3PerH };
+
+      // ===== Jornada =====
+      const ingreso  = ingresoByLegajo.get(leg) || null;
+      const fjTs     = p.fjTs ? new Date(p.fjTs) : null;
+      const comidaH  = p.comidaMs / 3600000;
+      let jornadaH   = null;
+      let jornadaNota = "";
+      if (ingreso && fjTs) {
+        jornadaH = Math.max(0, (fjTs - ingreso) / 3600000 - comidaH);
+      } else if (ingreso && !fjTs) {
+        // Si todavía no terminó la jornada, mostramos provisional con
+        // último evento o "ahora" (si el día es hoy).
+        const endTs = isTodayKey(dayKey) ? new Date() : new Date(p.lastTs);
+        jornadaH = Math.max(0, (endTs - ingreso) / 3600000 - comidaH);
+        jornadaNota = isTodayKey(dayKey) ? " *(en curso)*" : " *(sin FJ)*";
+      } else if (!ingreso && fjTs) {
+        jornadaNota = " *(sin ingreso)*";
+      } else {
+        jornadaNota = " *(sin ingreso)*";
+      }
+
+      return {
+        leg, m3Pick, m3Arm, m3Total, horas, m3PerH,
+        ingreso, fjTs, comidaH, jornadaH, jornadaNota,
+        email: emailByLegajo.get(leg) || ""
+      };
     }).sort((a, b) => b.m3Total - a.m3Total);
     const fmt = (n, d=1) => (n||0).toFixed(d).replace(".", ",");
+    const hhmm = (d) => {
+      if (!d) return "—";
+      // Mostramos en hora Argentina (UTC-3 fijo).
+      const ar = new Date(d.getTime() - 0); // d ya es Date; ajuste de TZ con toLocale
+      try {
+        return ar.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Argentina/Buenos_Aires" });
+      } catch { return ar.toISOString().slice(11, 16); }
+    };
+    const jornadaCell = (r) => {
+      if (r.jornadaH == null) return `<span style="color:#94a3b8">${escapeHtml(r.jornadaNota.replace(/\*/g,'') || '—')}</span>`;
+      const txt = fmt(r.jornadaH, 2) + " h";
+      const nota = r.jornadaNota ? ` <span style="color:#94a3b8;font-size:11px">${escapeHtml(r.jornadaNota.replace(/\*/g,''))}</span>` : "";
+      return `<b>${txt}</b>${nota}`;
+    };
+    const sinLegajoHtml = fichadasSinLegajo.length ? `
+      <div style="margin-top:14px;padding:10px 12px;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;font-size:13px;color:#9a3412;">
+        ⚠ <b>${fichadasSinLegajo.length} fichada(s)</b> sin legajo (email no linkeado en Empleados):
+        ${fichadasSinLegajo.map(f => `<div style="margin-top:4px">• ${escapeHtml(f.email)} — ${hhmm(f.ts)}</div>`).join("")}
+      </div>` : "";
     const bodyHtml = `
       <div style="font-size:14px; color:#475569; margin-bottom:12px;">
         <b>${perLegajo.size} operario(s)</b> trabajaron el día <b>${escapeHtml(dayLabel || dayKey)}</b>
@@ -3624,31 +3768,52 @@ async function showDayBreakdown(dayKey, dayLabel) {
         <thead>
           <tr>
             <th>Legajo</th>
+            <th class="num">Ingreso</th>
+            <th class="num">FJ</th>
+            <th class="num">PC</th>
+            <th class="num">Jornada</th>
             <th class="num">Picking m3</th>
             <th class="num">Armado m3</th>
             <th class="num">Total m3</th>
-            <th class="num">Horas</th>
-            <th class="num">m3/h</th>
+            <th class="num">m3/h jornada</th>
           </tr>
         </thead>
         <tbody>
-          ${rows.map(r => `
+          ${rows.map(r => {
+            const m3PerHJorn = (r.jornadaH && r.jornadaH > 0) ? r.m3Total / r.jornadaH : 0;
+            return `
             <tr>
-              <td><b>${escapeHtml(r.leg)}</b></td>
+              <td><b>${escapeHtml(r.leg)}</b>${r.email ? `<div style="font-size:11px;color:#94a3b8">${escapeHtml(r.email)}</div>` : ""}</td>
+              <td class="num">${hhmm(r.ingreso)}</td>
+              <td class="num">${hhmm(r.fjTs)}</td>
+              <td class="num">${r.comidaH > 0 ? fmt(r.comidaH, 2) + " h" : "—"}</td>
+              <td class="num">${jornadaCell(r)}</td>
               <td class="num">${fmt(r.m3Pick)}</td>
               <td class="num">${fmt(r.m3Arm)}</td>
               <td class="num"><b>${fmt(r.m3Total)}</b></td>
-              <td class="num">${fmt(r.horas)}</td>
-              <td class="num">${fmt(r.m3PerH, 2)}</td>
-            </tr>
-          `).join("")}
+              <td class="num">${r.jornadaH ? fmt(m3PerHJorn, 2) : "—"}</td>
+            </tr>`;
+          }).join("")}
         </tbody>
-      </table>`;
+      </table>
+      ${sinLegajoHtml}`;
     m.querySelector(".tanda-modal-body").innerHTML = bodyHtml;
   } catch (e) {
     m.querySelector(".tanda-modal-body").innerHTML =
       `<div class="monitor-error">Error: ${escapeHtml(e.message)}</div>`;
   }
+}
+
+/* Helper: comparar dayKey contra hoy en hora Argentina. */
+function isTodayKey(dayKey) {
+  try {
+    const now = new Date();
+    const ar = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "America/Argentina/Buenos_Aires",
+      year: "numeric", month: "2-digit", day: "2-digit"
+    }).format(now); // "YYYY-MM-DD"
+    return ar === dayKey;
+  } catch { return false; }
 }
 
 /* Muestra modal con las tandas que componen un camión del día y el estado
@@ -4009,27 +4174,82 @@ async function fetchMonitorEvents(targetTandaKeys, sheetMap) {
   if (!rB.ok) throw new Error("Supabase HTTP " + rB.status + " (today query)");
   const dataB = await rB.json();
 
-  // Query C: legajos + ts de los últimos 6 días (cualquier opción, incluye
-  // FJ/Perm/Limp/etc.). Dedup por día en cliente.
+  // Query C: legajos + ts + opcion de los últimos 6 días (cualquier opción,
+  // incluye FJ/Perm/Limp/etc.). Dedup por día en cliente. opcion se usa para
+  // marcar quién ya cerró jornada hoy (tiene FJ).
   const urlC = SUPABASE_TABLE_ENDPOINT +
     "?ts_cliente=gte." + encodeURIComponent(start6DaysIso) +
     "&limit=20000" +
-    "&select=legajo,ts_cliente";
+    "&select=legajo,ts_cliente,opcion";
   const rC = await fetch(urlC, { headers });
   if (!rC.ok) throw new Error("Supabase HTTP " + rC.status + " (legajos query)");
   const dataC = await rC.json();
 
-  // Per-day legajos (dayKey hora Argentina -> Set<legajo>)
+  // Query D: fichadas de ingreso de HOY (Supabase Fichadas_Virgilio).
+  // Si la query falla (red flaky, RLS mal), no rompemos el monitor — el
+  // resumen de ingresos aparecerá vacío y listo.
+  const todayStartIso = new Date(startTodayMs).toISOString();
+  const todayEndIso   = new Date(endTodayMs).toISOString();
+  const urlD = SUPABASE_FICHADAS_ENDPOINT +
+    "?ts_cliente=gte." + encodeURIComponent(todayStartIso) +
+    "&ts_cliente=lt."  + encodeURIComponent(todayEndIso) +
+    "&tipo=eq.ingreso" +
+    "&order=ts_cliente.asc" +
+    "&limit=2000" +
+    "&select=email,legajo,ts_cliente";
+  let dataD = [];
+  try {
+    const rD = await fetch(urlD, { headers });
+    if (rD.ok) dataD = await rD.json();
+  } catch (_) { dataD = []; }
+
+  // Per-day legajos (dayKey hora Argentina -> Set<legajo>) y per-day legajos
+  // que cerraron jornada (FJ). Esto permite saber, dentro del resumen de
+  // ingresos del día, cuántos siguen "en jornada" (fichaste pero no FJ).
   const perDayLegajos = new Map();
+  const perDayFJ      = new Map();   // dayKey -> Set<legajo> con FJ
   for (const ev of dataC) {
     const legajo = String(ev.legajo || "").trim();
     if (!legajo) continue;
     const dayKey = isoToDayKey(ev.ts_cliente);
     if (!perDayLegajos.has(dayKey)) perDayLegajos.set(dayKey, new Set());
     perDayLegajos.get(dayKey).add(legajo);
+    if (ev.opcion === "FJ") {
+      if (!perDayFJ.has(dayKey)) perDayFJ.set(dayKey, new Set());
+      perDayFJ.get(dayKey).add(legajo);
+    }
   }
   const todayKey = isoToDayKey(startTodayMs);
   const empleadosHoy = perDayLegajos.has(todayKey) ? perDayLegajos.get(todayKey).size : 0;
+
+  // Resumen de fichadas de HOY (para el panel del monitor).
+  //   total       : cuántos ingresos únicos por legajo se registraron
+  //   sinLegajo   : ingresos cuyo email no resuelve a legajo (warning)
+  //   enJornada   : con ingreso pero SIN FJ todavía (siguen trabajando)
+  //   cerrados    : con ingreso Y FJ (terminaron jornada hoy)
+  const fichadosHoyByLeg = new Map();    // legajo -> primer Date
+  const fichadosSinLeg   = [];           // [{email, ts}]
+  for (const f of dataD) {
+    const ts = new Date(f.ts_cliente);
+    const leg = f.legajo ? String(f.legajo) : null;
+    if (!leg) {
+      fichadosSinLeg.push({ email: f.email || "(sin email)", ts });
+      continue;
+    }
+    const prev = fichadosHoyByLeg.get(leg);
+    if (!prev || ts < prev) fichadosHoyByLeg.set(leg, ts);
+  }
+  const fjsHoy = perDayFJ.get(todayKey) || new Set();
+  let cerrados = 0, enJornada = 0;
+  for (const leg of fichadosHoyByLeg.keys()) {
+    if (fjsHoy.has(leg)) cerrados++; else enJornada++;
+  }
+  const fichadasResumen = {
+    total:    fichadosHoyByLeg.size,
+    enJornada,
+    cerrados,
+    sinLegajo: fichadosSinLeg.length
+  };
 
   // Procesar A: último evento de Picking (EP/TP) y Armado (AP/TAP) por tanda.
   const lastPick = new Map();
@@ -4123,7 +4343,7 @@ async function fetchMonitorEvents(targetTandaKeys, sheetMap) {
     pastDays.push({ key: dayKey, label, totPick, totSep, empleados });
   }
 
-  return { statusMap, alertasOffSheet: [...alertasSet].sort(), empleadosHoy, pastDays };
+  return { statusMap, alertasOffSheet: [...alertasSet].sort(), empleadosHoy, pastDays, fichadasResumen };
 }
 
 function statusIconToday(s) {
@@ -4142,7 +4362,32 @@ function statusIconToday(s) {
   return "";
 }
 
-function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, empleadosHoy, pastDays, errMsg) {
+/* Barra compacta encima de los totales del día que muestra cuántos
+   empleados fichaste hoy, cuántos siguen en jornada (sin FJ) y cuántos
+   cerraron. Si hay fichadas con email no linkeado en Empleados, lo
+   marca en naranja como warning. Clickeable: abre el modal del día. */
+function renderFichadasBar(resumen, todayKey, todayLabel) {
+  if (!resumen || resumen.total === 0 && resumen.sinLegajo === 0) return "";
+  const chip = (label, value, color) =>
+    `<span style="display:inline-flex;align-items:center;gap:4px;background:${color}1A;color:${color};border:1px solid ${color}55;border-radius:999px;padding:2px 9px;font-weight:600;font-size:0.85em;">${label}: <b>${value}</b></span>`;
+  const warn = resumen.sinLegajo > 0
+    ? chip("⚠ Sin legajo", resumen.sinLegajo, "#ea580c")
+    : "";
+  return `
+    <div class="monitor-fichadas-bar day-box-clickable"
+         data-day-key="${escapeHtml(todayKey)}"
+         data-day-label="${escapeHtml(todayLabel)}"
+         onclick="showDayBreakdown(this.dataset.dayKey, this.dataset.dayLabel)"
+         style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:6px 10px;margin-bottom:6px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;font-size:0.95em;color:#334155;cursor:pointer;">
+      <span style="font-weight:700;">Ingresos hoy</span>
+      ${chip("Fichados", resumen.total, "#0284c7")}
+      ${chip("En jornada", resumen.enJornada, "#16a34a")}
+      ${chip("FJ", resumen.cerrados, "#7c3aed")}
+      ${warn}
+    </div>`;
+}
+
+function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, empleadosHoy, pastDays, errMsg, fichadasResumen) {
   // Cacheamos sheetMap para que showTandaDetail() pueda leer los NPs/m3
   // de la tanda clickeada en el modal.
   _monitorSheetCache = sheetMap;
@@ -4418,6 +4663,7 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
       </div>
       <div class="monitor-totales monitor-totales-side">
         <div class="totales-col-boxes">
+          ${renderFichadasBar(fichadasResumen, todayKey, todayStr)}
           <div class="totales-row">
             <div class="monitor-tot-box day-box-clickable" data-day-key="${escapeHtml(todayKey)}" data-day-label="${escapeHtml(todayStr)}" onclick="showDayBreakdown(this.dataset.dayKey, this.dataset.dayLabel)">
               <div class="monitor-tot-label">M3 Picking<br>del día ${todayStr}</div>
@@ -4487,7 +4733,7 @@ async function refreshMonitor() {
       if (wideTargetSet.has(v.fechaEntregaRaw)) targetTandaKeys.push(k);
     }
     // 2) Eventos: status por tanda + alertas de hoy + empleados de hoy + 5 días anteriores
-    const { statusMap, alertasOffSheet, empleadosHoy, pastDays } = await fetchMonitorEvents(targetTandaKeys, sheetMap);
+    const { statusMap, alertasOffSheet, empleadosHoy, pastDays, fichadasResumen } = await fetchMonitorEvents(targetTandaKeys, sheetMap);
     monitorLastOkTs = Date.now();
     // 3) Decidir cuántos días mostrar: por default los próximos 3, pero si
     //    quedan ≤ 3 tandas activas (sin TAP confirmado), expandimos a 7 para
@@ -4503,7 +4749,7 @@ async function refreshMonitor() {
       activeInNarrow++;
     }
     const targetDates = activeInNarrow <= 3 ? wideTargetDates : narrowDates;
-    renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, empleadosHoy, pastDays, null);
+    renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, empleadosHoy, pastDays, null, fichadasResumen);
     if (refrEl) { refrEl.textContent = "● al día"; refrEl.classList.remove("stale"); }
     // Si el fetch anda, ocultar banner offline (puede que estuviera mostrándose).
     document.getElementById("monitorOfflineBanner")?.classList.add("hidden");

@@ -1,3 +1,11 @@
+/* =========================================================
+   fichada.js — Ingreso Virgilio (Supabase)
+   El QR es solo para ingreso. La fichada se manda a la tabla
+   "Fichadas_Virgilio" en Supabase. Después, el monitor de Virgilio
+   cruza el email contra la tabla "Empleados" para resolver legajo
+   y calcular la jornada combinando con PC (Paré Comida) y FJ (Fin
+   Jornada) que se envían desde la app principal.
+   ========================================================= */
 (function () {
   const cfg = window.FICHADA_CONFIG;
   const { verifyToken } = window.FichadaToken;
@@ -11,11 +19,14 @@
   const clearBtn = document.getElementById("clear-btn");
   const statusEl = document.getElementById("form-status");
   const emailErr = document.getElementById("email-error");
-  const eventoErr = document.getElementById("evento-error");
-  const sink = document.getElementById("gforms_sink");
 
   const params = new URLSearchParams(location.search);
   const token = params.get("t");
+
+  const SUPABASE_URL = cfg.supabaseUrl;
+  const SUPABASE_KEY = cfg.supabaseKey;
+  const FICHADAS_ENDPOINT = SUPABASE_URL + "/rest/v1/Fichadas_Virgilio";
+  const EMPLEADOS_ENDPOINT = SUPABASE_URL + "/rest/v1/Empleados";
 
   init();
 
@@ -72,7 +83,6 @@
     clearBtn.addEventListener("click", () => {
       form.reset();
       emailErr.hidden = true;
-      eventoErr.hidden = true;
       statusEl.textContent = "";
       statusEl.removeAttribute("data-state");
     });
@@ -81,19 +91,12 @@
   async function onSubmit(e) {
     e.preventDefault();
     emailErr.hidden = true;
-    eventoErr.hidden = true;
 
-    const email = emailInput.value.trim();
-    const eventoEl = form.querySelector('input[name="evento"]:checked');
-    const evento = eventoEl ? eventoEl.value : "";
+    const email = emailInput.value.trim().toLowerCase();
 
     if (!isEmail(email)) {
       emailErr.hidden = false;
       emailInput.focus();
-      return;
-    }
-    if (!evento) {
-      eventoErr.hidden = false;
       return;
     }
 
@@ -118,76 +121,102 @@
 
     submitBtn.disabled = true;
     statusEl.removeAttribute("data-state");
-    statusEl.textContent = "Enviando...";
+    statusEl.textContent = "Registrando ingreso...";
 
     try {
-      await submitToGoogleForm(email, evento);
+      // Antes de insertar, intento cruzar email -> legajo para que
+      // quede guardado directamente en la fila de fichada. Si no
+      // encuentra, igual registra el ingreso con legajo=null y el
+      // monitor avisa al supervisor.
+      let legajo = null;
+      try {
+        legajo = await lookupLegajoByEmail(email);
+      } catch (_) {
+        // Si falla el lookup (red flaky), seguimos igual y dejamos
+        // legajo=null. Lo importante es no perder el ingreso.
+        legajo = null;
+      }
+
+      await submitFichadaToSupabase(email, legajo);
       statusEl.dataset.state = "ok";
-      statusEl.textContent = 'Fichaste "' + evento + '" correctamente.';
+      statusEl.textContent = legajo
+        ? "Ingreso registrado (legajo " + legajo + ")."
+        : "Ingreso registrado. Avisale al encargado si tu email no aparece linkeado.";
       resetAfterSuccess();
     } catch (err) {
       statusEl.dataset.state = "error";
       statusEl.textContent =
-        "No se pudo enviar la fichada. Reintenta en unos segundos.";
+        "No se pudo registrar el ingreso. Reintenta en unos segundos.";
     } finally {
       submitBtn.disabled = false;
     }
   }
 
-  function submitToGoogleForm(email, evento) {
-    return new Promise((resolve, reject) => {
-      if (
-        !cfg.eventoEntryId ||
-        cfg.eventoEntryId.indexOf("REEMPLAZAR") !== -1
-      ) {
-        reject(new Error("eventoEntryId no configurado"));
-        return;
-      }
-      if (
-        cfg.emailMode === "entry" &&
-        (!cfg.emailEntryId || cfg.emailEntryId.indexOf("REEMPLAZAR") !== -1)
-      ) {
-        reject(new Error("emailEntryId no configurado"));
-        return;
-      }
-
-      const ghost = document.createElement("form");
-      ghost.action = cfg.formActionUrl;
-      ghost.method = "POST";
-      ghost.target = "gforms_sink";
-      ghost.style.display = "none";
-
-      addHidden(ghost, cfg.eventoEntryId, evento);
-      if (cfg.emailMode === "entry") {
-        addHidden(ghost, cfg.emailEntryId, email);
-      } else {
-        addHidden(ghost, "emailAddress", email);
-      }
-      addHidden(ghost, "fvv", "1");
-      addHidden(ghost, "draftResponse", "[]");
-      addHidden(ghost, "pageHistory", "0");
-
-      document.body.appendChild(ghost);
-
-      let settled = false;
-      const onLoad = () => {
-        if (settled) return;
-        settled = true;
-        sink.removeEventListener("load", onLoad);
-        ghost.remove();
-        resolve();
-      };
-      sink.addEventListener("load", onLoad);
-      ghost.submit();
-
-      setTimeout(() => {
-        if (settled) return;
-        settled = true;
-        sink.removeEventListener("load", onLoad);
-        ghost.remove();
-        reject(new Error("timeout"));
-      }, 8000);
+  async function lookupLegajoByEmail(email) {
+    // Empleados tiene columna email (lowercase recomendado) y Legajo.
+    // Filtramos por email exacto en lowercase.
+    const url =
+      EMPLEADOS_ENDPOINT +
+      "?email=eq." +
+      encodeURIComponent(email) +
+      "&select=Legajo&limit=1";
+    const res = await fetch(url, {
+      method: "GET",
+      headers: {
+        apikey: SUPABASE_KEY,
+        Authorization: "Bearer " + SUPABASE_KEY,
+      },
     });
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!Array.isArray(data) || data.length === 0) return null;
+    const leg = data[0].Legajo;
+    return leg != null ? String(leg) : null;
+  }
+
+  async function submitFichadaToSupabase(email, legajo) {
+    const clientId = makeClientId();
+    const body = {
+      client_id: clientId,
+      email: email,
+      legajo: legajo, // puede ser null si no se encontró
+      tipo: "ingreso",
+      ts_cliente: new Date().toISOString(),
+      user_agent: navigator.userAgent || null,
+    };
+
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 12000);
+
+    try {
+      const res = await fetch(FICHADAS_ENDPOINT, {
+        method: "POST",
+        headers: {
+          apikey: SUPABASE_KEY,
+          Authorization: "Bearer " + SUPABASE_KEY,
+          "Content-Type": "application/json",
+          Prefer: "return=minimal",
+        },
+        body: JSON.stringify(body),
+        signal: ctrl.signal,
+      });
+      clearTimeout(t);
+      if (!res.ok && res.status !== 409) {
+        throw new Error("server_" + res.status);
+      }
+    } catch (e) {
+      clearTimeout(t);
+      throw e;
+    }
+  }
+
+  function makeClientId() {
+    // Mismo formato que usa la app principal: ts + random base36.
+    return (
+      Date.now().toString(36) +
+      "-" +
+      Math.random().toString(36).slice(2, 10)
+    );
   }
 
   function resetAfterSuccess() {
@@ -200,14 +229,6 @@
     } else {
       userEmailLbl.textContent = "(sin correo)";
     }
-  }
-
-  function addHidden(formEl, name, value) {
-    const inp = document.createElement("input");
-    inp.type = "hidden";
-    inp.name = name;
-    inp.value = value;
-    formEl.appendChild(inp);
   }
 
   function isEmail(s) {

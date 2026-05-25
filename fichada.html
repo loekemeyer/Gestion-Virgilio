@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Registro de entradas-salidas Esnaola</title>
+    <title>Ingreso Virgilio</title>
     <link rel="stylesheet" href="fichada.css" />
   </head>
   <body>
@@ -11,12 +11,12 @@
       <article class="form-card form-card--title">
         <div class="form-card__accent"></div>
         <div class="form-card__body">
-          <h1 class="form-title">Registro de entradas-salidas Esnaola</h1>
+          <h1 class="form-title">Ingreso Virgilio</h1>
           <p class="form-account">
             <span id="user-email">no-iniciado@correo.com</span>
             <button type="button" id="change-account" class="link">Cambiar de cuenta</button>
           </p>
-          <p class="form-required-note">* Indica que la pregunta es obligatoria</p>
+          <p class="form-required-note">Tocá Enviar para registrar tu ingreso.</p>
         </div>
       </article>
 
@@ -41,41 +41,8 @@
           </div>
         </article>
 
-        <article class="form-card">
-          <div class="form-card__body">
-            <p class="question-label">Evento <span class="req">*</span></p>
-            <ul class="radio-list" role="radiogroup" aria-required="true">
-              <li>
-                <label class="radio-row">
-                  <input type="radio" name="evento" value="Entrada" required />
-                  <span>Entrada</span>
-                </label>
-              </li>
-              <li>
-                <label class="radio-row">
-                  <input type="radio" name="evento" value="Comida Inicia" />
-                  <span>Comida Inicia</span>
-                </label>
-              </li>
-              <li>
-                <label class="radio-row">
-                  <input type="radio" name="evento" value="Comida Termina" />
-                  <span>Comida Termina</span>
-                </label>
-              </li>
-              <li>
-                <label class="radio-row">
-                  <input type="radio" name="evento" value="Salida" />
-                  <span>Salida</span>
-                </label>
-              </li>
-            </ul>
-            <p class="error-msg" id="evento-error" hidden>Seleccioná una opción.</p>
-          </div>
-        </article>
-
         <div class="form-actions">
-          <button type="submit" class="btn-primary" id="submit-btn">Enviar</button>
+          <button type="submit" class="btn-primary" id="submit-btn">Registrar Ingreso</button>
           <button type="button" class="btn-link" id="clear-btn">Borrar formulario</button>
         </div>
 
@@ -83,11 +50,10 @@
       </form>
 
       <footer class="form-footer">
-        <p>Este contenido se reenvía al formulario original de Google.</p>
+        <p>Tu ingreso queda registrado en el sistema Virgilio.</p>
       </footer>
     </main>
 
-    <iframe name="gforms_sink" id="gforms_sink" title="sink" hidden></iframe>
     <script src="fichada-config.js"></script>
     <script src="fichada-totp.js"></script>
     <script src="fichada.js"></script>
