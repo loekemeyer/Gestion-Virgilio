@@ -413,18 +413,23 @@ button {
   color: #f8fafc;
 }
 
-/* QR de fichada — abajo a la derecha, fijo en toda la app */
+/* QR de fichada — abajo a la derecha, solo visible cuando el monitor está
+   abierto. La regla #monitorModal.show ~ #qrFichadaBox hace el override. */
 #qrFichadaBox{
+  display: none;
   position: fixed;
   bottom: 8px;
   right: 8px;
-  z-index: 60;
+  z-index: 250;          /* sobre el modal del monitor (z-index 200) */
   background: #fff;
   border: 2px solid #1e6bd6;
   border-radius: 8px;
   padding: 6px 8px 8px 8px;
   text-align: center;
   box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+#monitorModal.show ~ #qrFichadaBox{
+  display: block;
 }
 #qrFichadaBox .qr-label{
   font-size: 12px;
@@ -1366,7 +1371,7 @@ button {
 </div>
 
 <!-- Badge de versión + estado de cola (abajo a la izquierda) -->
-<div id="versionBadge">v1.22 ✓</div>
+<div id="versionBadge">v1.23 ✓</div>
 
 <!-- QR de fichada (TOTP rotativo) — abajo a la derecha. Genera tokens cada
      30s que apuntan a la app FichadaQR; los operarios escanean para fichar. -->
@@ -2971,7 +2976,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v1.22";
+const APP_VERSION = "v1.23";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -3746,10 +3751,11 @@ function tandaCamion(code) {
 /* Fechas a mostrar en el monitor:
    1) TODAS las fechas pasadas que tienen tandas planificadas (Op=SI) sin
       salir del sheet — significa que están atrasadas pero aún en cola.
-   2) Las próximas 3 fechas FUTURAS con tandas planificadas (los días sin
+   2) Las próximas N fechas FUTURAS con tandas planificadas (los días sin
       tandas — feriados, fines de semana — no consumen slot).
-   Devuelve array ordenado de "YYYY-MM-DD". */
-function targetDeliveryDates(sheetMap) {
+   Devuelve array ordenado de "YYYY-MM-DD". N por default = 3. */
+function targetDeliveryDates(sheetMap, futureCount) {
+  const N = futureCount || 3;
   const d = new Date();
   const todayKey = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
   // Solo fechas que tienen al menos una tanda con Op=SI
@@ -3759,7 +3765,7 @@ function targetDeliveryDates(sheetMap) {
   }
   const all = [...datesPlanned].sort();
   const past   = all.filter(x => x <= todayKey);          // todas las pasadas/hoy
-  const future = all.filter(x => x >  todayKey).slice(0, 3);
+  const future = all.filter(x => x >  todayKey).slice(0, N);
   return [...past, ...future];
 }
 
@@ -4415,15 +4421,31 @@ async function refreshMonitor() {
       _pppCache = sheetMap;
       _pppCacheTs = Date.now();
     }
-    const targetDates = targetDeliveryDates(sheetMap);
-    const targetSet = new Set(targetDates);
+    // Fetcheamos siempre la ventana ANCHA (7 días futuros + pasados) así
+    // tenemos eventos para todas las tandas que potencialmente se muestran.
+    const wideTargetDates = targetDeliveryDates(sheetMap, 7);
+    const wideTargetSet   = new Set(wideTargetDates);
     const targetTandaKeys = [];
     for (const [k, v] of sheetMap) {
-      if (targetSet.has(v.fechaEntregaRaw)) targetTandaKeys.push(k);
+      if (wideTargetSet.has(v.fechaEntregaRaw)) targetTandaKeys.push(k);
     }
     // 2) Eventos: status por tanda + alertas de hoy + empleados de hoy + 5 días anteriores
     const { statusMap, alertasOffSheet, empleadosHoy, pastDays } = await fetchMonitorEvents(targetTandaKeys, sheetMap);
     monitorLastOkTs = Date.now();
+    // 3) Decidir cuántos días mostrar: por default los próximos 3, pero si
+    //    quedan ≤ 3 tandas activas (sin TAP confirmado), expandimos a 7 para
+    //    que el supervisor pueda planear adelante.
+    const narrowDates = targetDeliveryDates(sheetMap, 3);
+    const narrowSet   = new Set(narrowDates);
+    let activeInNarrow = 0;
+    for (const [k, v] of sheetMap) {
+      if (!narrowSet.has(v.fechaEntregaRaw)) continue;
+      if (!v.opIsSi) continue;
+      const ev = statusMap.get(k) || {};
+      if (ev.picking === "done" && ev.separado === "done") continue;
+      activeInNarrow++;
+    }
+    const targetDates = activeInNarrow <= 3 ? wideTargetDates : narrowDates;
     renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, empleadosHoy, pastDays, null);
     if (refrEl) { refrEl.textContent = "● al día"; refrEl.classList.remove("stale"); }
     // Si el fetch anda, ocultar banner offline (puede que estuviera mostrándose).
