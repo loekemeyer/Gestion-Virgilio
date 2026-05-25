@@ -12,7 +12,8 @@
 <link rel="apple-touch-icon" href="icon.svg">
 
 <style>
-body { font-family: Arial, sans-serif; margin: 0; padding: 12px; }
+body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
+html { overflow-x: hidden; }
 .hidden { display: none; }
 
 button {
@@ -1311,7 +1312,7 @@ button {
 </div>
 
 <!-- Badge de versión + estado de cola (abajo a la derecha) -->
-<div id="versionBadge">v1.19 ✓</div>
+<div id="versionBadge">v1.20 ✓</div>
 
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
@@ -2907,7 +2908,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v1.19";
+const APP_VERSION = "v1.20";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
