@@ -137,7 +137,12 @@
         legajo = null;
       }
 
+      // Supabase es la fuente de verdad — si falla, fallamos toda la fichada.
+      // El Google Form es un mirror para el sheet de fichadas Esnaola
+      // (legacy), best-effort: si falla no se nota, Supabase ya guardó.
       await submitFichadaToSupabase(email, legajo);
+      submitToGoogleFormMirror(email).catch(() => {/* fire-and-forget */});
+
       statusEl.dataset.state = "ok";
       statusEl.textContent = legajo
         ? "Ingreso registrado (legajo " + legajo + ")."
@@ -219,6 +224,77 @@
       "-" +
       Math.random().toString(36).slice(2, 10)
     );
+  }
+
+  // Bridge al Google Form (mirror del sheet de fichadas Esnaola).
+  // Postea como "Entrada" + email. Usa el pattern ghost-form + iframe sink
+  // porque Google Forms no permite POST con fetch() por CORS — pero sí
+  // acepta un form submit clásico apuntando a un iframe oculto.
+  // Best-effort: si falla, no rompemos. Supabase es la fuente de verdad.
+  function submitToGoogleFormMirror(email) {
+    return new Promise((resolve, reject) => {
+      try {
+        if (!cfg.formActionUrl) { resolve(); return; }
+        if (!cfg.eventoEntryId || cfg.eventoEntryId.indexOf("REEMPLAZAR") !== -1) {
+          resolve(); return;
+        }
+        const sink = document.getElementById("gforms_sink");
+        if (!sink) { resolve(); return; }
+
+        const ghost = document.createElement("form");
+        ghost.action = cfg.formActionUrl;
+        ghost.method = "POST";
+        ghost.target = "gforms_sink";
+        ghost.style.display = "none";
+
+        const addHidden = (name, value) => {
+          const inp = document.createElement("input");
+          inp.type = "hidden";
+          inp.name = name;
+          inp.value = value;
+          ghost.appendChild(inp);
+        };
+
+        // Como el QR es solo para ingreso, siempre "Entrada".
+        addHidden(cfg.eventoEntryId, "Entrada");
+        if (cfg.emailMode === "entry") {
+          addHidden(cfg.emailEntryId, email);
+        } else {
+          addHidden("emailAddress", email);
+        }
+        // Boilerplate que Google Forms espera en el POST.
+        addHidden("fvv", "1");
+        addHidden("draftResponse", "[]");
+        addHidden("pageHistory", "0");
+
+        document.body.appendChild(ghost);
+
+        let settled = false;
+        const cleanup = () => {
+          sink.removeEventListener("load", onLoad);
+          try { ghost.remove(); } catch {}
+        };
+        const onLoad = () => {
+          if (settled) return;
+          settled = true;
+          cleanup();
+          resolve();
+        };
+        sink.addEventListener("load", onLoad);
+        ghost.submit();
+
+        // Timeout chico — si Google tarda demasiado damos por fallida la
+        // mirror y seguimos. La fichada ya quedó en Supabase.
+        setTimeout(() => {
+          if (settled) return;
+          settled = true;
+          cleanup();
+          reject(new Error("timeout"));
+        }, 6000);
+      } catch (e) {
+        reject(e);
+      }
+    });
   }
 
   function resetAfterSuccess() {
