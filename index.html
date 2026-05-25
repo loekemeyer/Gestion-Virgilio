@@ -370,7 +370,7 @@ button {
   align-items: flex-start;
   justify-content: center;
   padding: 16px 4px;
-  overflow-y: auto;
+  overflow: hidden;          /* sin scroll del modal */
 }
 #monitorModal.show{ display: flex; }
 .monitor-card{
@@ -380,7 +380,7 @@ button {
   width: 100%;
   max-width: 900px;
   max-height: 96vh;
-  overflow-y: auto;
+  overflow: hidden;          /* sin scroll de la card */
   box-sizing: border-box;
 }
 .monitor-header{
@@ -844,9 +844,9 @@ button {
   /* Header del monitor con más respiración */
   .monitor-title{ font-size: 16px; }
   .monitor-meta{ font-size: 10px; }
-  /* Tabla con scroll horizontal por si las celdas no entran */
+  /* Tabla SIN scroll horizontal — si no entra, se cortan las celdas. */
   .monitor-table-wrap{
-    overflow-x: auto;
+    overflow: hidden;
   }
   /* Modal: padding chico para que el modal use casi todo el ancho */
   #monitorModal{ padding: 8px 4px; }
@@ -959,7 +959,7 @@ button {
   width: auto;
 }
 #monitorModal.tv .monitor-table-wrap{
-  overflow-y: auto;
+  overflow: hidden;          /* sin scroll del wrapper de la tabla */
   min-height: 0;
   height: 100%;
 }
@@ -1306,7 +1306,7 @@ button {
 </div>
 
 <!-- Badge de versión + estado de cola (abajo a la derecha) -->
-<div id="versionBadge">v1.17 ✓</div>
+<div id="versionBadge">v1.18 ✓</div>
 
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
@@ -2902,7 +2902,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v1.17";
+const APP_VERSION = "v1.18";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
