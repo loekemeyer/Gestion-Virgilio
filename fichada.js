@@ -153,11 +153,13 @@
   }
 
   async function lookupLegajoByEmail(email) {
-    // Empleados tiene columna email (lowercase recomendado) y Legajo.
-    // Filtramos por email exacto en lowercase.
+    // Empleados tiene columna email y Legajo. Usamos ilike (case-insensitive)
+    // para tolerar que el supervisor haya cargado el email con mayúsculas
+    // diferentes a las que escribe el operario. ilike sin wildcards = match
+    // exacto pero case-insensitive.
     const url =
       EMPLEADOS_ENDPOINT +
-      "?email=eq." +
+      "?email=ilike." +
       encodeURIComponent(email) +
       "&select=Legajo&limit=1";
     const res = await fetch(url, {
