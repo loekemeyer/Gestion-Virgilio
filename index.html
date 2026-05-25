@@ -397,6 +397,60 @@ button {
   border-bottom: 1px solid #e5e7eb;
 }
 .monitor-title{ font-size: 18px; font-weight: bold; }
+
+/* Reloj en el header del monitor — formato "ddd dd/mm HH:MM" */
+#monitorClock{
+  font-family: Arial, monospace;
+  font-size: 14px;
+  font-weight: bold;
+  color: #1e6bd6;
+  white-space: nowrap;
+  margin: 0 12px;
+  align-self: center;
+}
+#monitorModal.tv #monitorClock{
+  font-size: clamp(18px, 2.4vh, 32px);
+  color: #f8fafc;
+}
+
+/* QR de fichada — abajo a la derecha, fijo en toda la app */
+#qrFichadaBox{
+  position: fixed;
+  bottom: 8px;
+  right: 8px;
+  z-index: 60;
+  background: #fff;
+  border: 2px solid #1e6bd6;
+  border-radius: 8px;
+  padding: 6px 8px 8px 8px;
+  text-align: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+#qrFichadaBox .qr-label{
+  font-size: 12px;
+  font-weight: bold;
+  color: #1e6bd6;
+  margin-bottom: 4px;
+  letter-spacing: 0.5px;
+}
+#qrFichadaBox #qrCanvas{
+  display: block;
+  margin: 0 auto;
+  width: 180px;
+  height: 180px;
+}
+#qrFichadaBox .qr-countdown{
+  font-size: 11px;
+  color: #666;
+  margin-top: 4px;
+}
+#qrFichadaBox #qrSecs{ color: #1e6bd6; }
+/* En modo TV (monitor fullscreen abierto), agrandar el QR para que se
+   escanee desde lejos. */
+#monitorModal.tv.show ~ #qrFichadaBox #qrCanvas{
+  width: clamp(180px, 16vh, 260px);
+  height: clamp(180px, 16vh, 260px);
+}
 .monitor-meta{ font-size: 11px; color: #666; margin-top: 2px; }
 .monitor-table{
   width: 100%;
@@ -1246,7 +1300,7 @@ button {
 #versionBadge{
   position: fixed;
   bottom: 8px;
-  right: 8px;
+  left: 8px;       /* movido a la izquierda para no chocar con el QR */
   z-index: 50;
   font-size: 12px;
   font-weight: bold;
@@ -1284,9 +1338,10 @@ button {
   <div class="monitor-card">
     <div class="monitor-header">
       <div>
-        <div class="monitor-title">Monitor de Operarios <span id="monitorRefresh" class="monitor-refresh"></span></div>
+        <div class="monitor-title">Monitor Virgilio <span id="monitorRefresh" class="monitor-refresh"></span></div>
         <div class="monitor-meta" id="monitorMeta"></div>
       </div>
+      <div id="monitorClock"></div>
       <div>
         <button class="hist-modal-close" onclick="closeMonitor()">Cerrar</button>
       </div>
@@ -1310,8 +1365,17 @@ button {
   </div>
 </div>
 
-<!-- Badge de versión + estado de cola (abajo a la derecha) -->
-<div id="versionBadge">v1.21 ✓</div>
+<!-- Badge de versión + estado de cola (abajo a la izquierda) -->
+<div id="versionBadge">v1.22 ✓</div>
+
+<!-- QR de fichada (TOTP rotativo) — abajo a la derecha. Genera tokens cada
+     30s que apuntan a la app FichadaQR; los operarios escanean para fichar. -->
+<div id="qrFichadaBox">
+  <div class="qr-label">Fichada</div>
+  <canvas id="qrCanvas" width="180" height="180" aria-label="QR de fichada"></canvas>
+  <div class="qr-countdown">Próximo en <strong id="qrSecs">--</strong>s</div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js" crossorigin="anonymous"></script>
 
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
@@ -2907,7 +2971,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v1.21";
+const APP_VERSION = "v1.22";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -3232,6 +3296,96 @@ setInterval(flushQueue, 3000);
 
 /* Intento inicial al abrir la app. */
 flushQueue();
+
+/* ============================================================
+   QR DE FICHADA (TOTP rotativo) — integración con FichadaQR
+   ============================================================
+   El QR de la esquina inferior derecha genera tokens HMAC-SHA256
+   cada 30s. Cada token se codifica en una URL que apunta al form
+   de FichadaQR (https://loekemeyer.github.io/FichadaQR/?t=...).
+   El operario escanea con el celu, abre el form, marca Entrada/
+   Comida Inicia/Comida Termina/Salida y envía a un Google Form.
+
+   ⚠ FICHADA_HMAC_SECRET debe COINCIDIR con el hmacSecret del
+   config.js de FichadaQR. Si lo cambian allá, cambiarlo acá. */
+const FICHADA_HMAC_SECRET = "CAMBIAR-ESTE-SECRETO-LARGO-Y-ALEATORIO-1234567890abcdef";
+const FICHADA_PERIOD_SEC  = 30;
+const FICHADA_BASE_URL    = "https://loekemeyer.github.io/FichadaQR/";
+
+async function _fichadaHmacSha256Hex(secret, message) {
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw", enc.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
+  );
+  const sig = await crypto.subtle.sign("HMAC", key, enc.encode(message));
+  return Array.from(new Uint8Array(sig))
+    .map(b => b.toString(16).padStart(2, "0")).join("");
+}
+function _fichadaCurrentBucket(periodSec) {
+  return Math.floor(Date.now() / 1000 / periodSec);
+}
+async function _fichadaBuildToken(secret, periodSec) {
+  const bucket = _fichadaCurrentBucket(periodSec);
+  const sig = (await _fichadaHmacSha256Hex(secret, String(bucket))).slice(0, 16);
+  return bucket + "." + sig;
+}
+function _fichadaSecondsUntilNext(periodSec) {
+  const nowSec = Date.now() / 1000;
+  const nextStart = (Math.floor(nowSec / periodSec) + 1) * periodSec;
+  return nextStart - nowSec;
+}
+
+let _qrLastToken = null;
+async function tickFichadaQr() {
+  const canvas = document.getElementById("qrCanvas");
+  const secsEl = document.getElementById("qrSecs");
+  if (!canvas || !secsEl || typeof QRCode === "undefined") return;
+  try {
+    const token = await _fichadaBuildToken(FICHADA_HMAC_SECRET, FICHADA_PERIOD_SEC);
+    if (token !== _qrLastToken) {
+      _qrLastToken = token;
+      const url = FICHADA_BASE_URL + "?t=" + encodeURIComponent(token);
+      // El canvas se renderiza al tamaño que tenga (CSS controla el visual,
+      // el width/height del canvas es interno).
+      QRCode.toCanvas(canvas, url, {
+        width: 320, margin: 1, errorCorrectionLevel: "M",
+        color: { dark: "#202124", light: "#ffffff" }
+      });
+    }
+    const left = _fichadaSecondsUntilNext(FICHADA_PERIOD_SEC);
+    secsEl.textContent = String(Math.max(0, Math.ceil(left)));
+  } catch (e) {
+    console.warn("[QR] tick error:", e.message);
+  }
+}
+// Esperar a que cargue el script del CDN (defer-like)
+function _startFichadaQr() {
+  if (typeof QRCode === "undefined") {
+    setTimeout(_startFichadaQr, 200);
+    return;
+  }
+  tickFichadaQr();
+  setInterval(tickFichadaQr, 250);
+}
+_startFichadaQr();
+
+/* ============================================================
+   RELOJ EN EL HEADER DEL MONITOR — formato "ddd dd/mm HH:MM"
+   ============================================================ */
+function updateMonitorClock() {
+  const el = document.getElementById("monitorClock");
+  if (!el) return;
+  const d = new Date();
+  const dias = ["dom","lun","mar","mié","jue","vie","sáb"];
+  const ddd = dias[d.getDay()];
+  const dd  = String(d.getDate()).padStart(2, "0");
+  const mm  = String(d.getMonth()+1).padStart(2, "0");
+  const HH  = String(d.getHours()).padStart(2, "0");
+  const MM  = String(d.getMinutes()).padStart(2, "0");
+  el.textContent = `${ddd} ${dd}/${mm} ${HH}:${MM}`;
+}
+updateMonitorClock();
+setInterval(updateMonitorClock, 30000);   // refresca cada 30s
 
 /* =========================================================
    MONITOR DE OPERARIOS (supervisor)
