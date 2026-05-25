@@ -6,12 +6,9 @@ window.FICHADA_CONFIG = {
   formActionUrl:
     "https://docs.google.com/forms/d/e/1FAIpQLScjwID9-oLoXfay0BKMGsfZL-prFwZI5SDFKs8d-i1MllkjfA/formResponse",
 
-  // TODO: ID del campo "Evento".
-  // Como obtenerlo: en el editor del Form, menu ... -> "Obtener enlace prerellenado",
-  // elegi "Entrada", copia el enlace. Vas a ver algo como:
-  //   .../formResponse?entry.123456789=Entrada
-  // El numero despues de "entry." es el valor que va aca.
-  eventoEntryId: "entry.REEMPLAZAR_EVENTO_ID",
+  // ID del campo "Evento" del Google Form "Registro de entradas-salidas Esnaola".
+  // Opciones del campo: Entrada / Comida Inicia / Comida Termina / Salida.
+  eventoEntryId: "entry.1604904801",
 
   // Modo de envio del correo electronico:
   //   "emailAddress" -> Form configurado con "Recolectar correos -> Entrada del responder".
