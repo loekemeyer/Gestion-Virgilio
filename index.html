@@ -991,10 +991,9 @@ button {
 #monitorModal.tv .monitor-tot-box{
   border: 3px solid #334155;
   background: #111827;
-  /* Compacto pero con el ancho justo para que "Trabajando 23/05" entre
-     en una sola línea sin wrap. */
+  /* Ancho justo para "del día 25/5" en una línea (≈ 13 chars). */
   padding: clamp(3px, 0.5vh, 7px) clamp(7px, 1.1vh, 13px);
-  width: clamp(120px, 14vw, 220px);
+  width: clamp(100px, 11vw, 165px);
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -1312,7 +1311,7 @@ button {
 </div>
 
 <!-- Badge de versión + estado de cola (abajo a la derecha) -->
-<div id="versionBadge">v1.20 ✓</div>
+<div id="versionBadge">v1.21 ✓</div>
 
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
@@ -2908,7 +2907,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v1.20";
+const APP_VERSION = "v1.21";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -4212,7 +4211,7 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
               <div class="monitor-tot-value">${totSepToday.toFixed(1).replace(".", ",")}</div>
             </div>
             <div class="monitor-tot-box day-box-clickable" data-day-key="${escapeHtml(todayKey)}" data-day-label="${escapeHtml(todayStr)}" onclick="showDayBreakdown(this.dataset.dayKey, this.dataset.dayLabel)">
-              <div class="monitor-tot-label">Empleados<br>Trabajando Hoy</div>
+              <div class="monitor-tot-label">Empleados<br>Hoy</div>
               <div class="monitor-tot-value">${empleadosHoy != null ? empleadosHoy : "—"}</div>
             </div>
           </div>
@@ -4227,7 +4226,7 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
                 <div class="monitor-tot-value">${d.totSep.toFixed(1).replace(".", ",")}</div>
               </div>
               <div class="monitor-tot-box day-box-clickable" data-day-key="${escapeHtml(d.key)}" data-day-label="${escapeHtml(d.label)}" onclick="showDayBreakdown(this.dataset.dayKey, this.dataset.dayLabel)">
-                <div class="monitor-tot-label">Empleados<br>Trabajando ${escapeHtml(d.label)}</div>
+                <div class="monitor-tot-label">Empleados<br>${escapeHtml(d.label)}</div>
                 <div class="monitor-tot-value">${d.empleados}</div>
               </div>
             </div>
