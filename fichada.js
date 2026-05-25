@@ -234,12 +234,20 @@
   function submitToGoogleFormMirror(email) {
     return new Promise((resolve, reject) => {
       try {
-        if (!cfg.formActionUrl) { resolve(); return; }
+        console.log("[bridge-form] submit Entrada para", email);
+        if (!cfg.formActionUrl) {
+          console.warn("[bridge-form] sin formActionUrl en config, skip");
+          resolve(); return;
+        }
         if (!cfg.eventoEntryId || cfg.eventoEntryId.indexOf("REEMPLAZAR") !== -1) {
+          console.warn("[bridge-form] eventoEntryId invalido:", cfg.eventoEntryId);
           resolve(); return;
         }
         const sink = document.getElementById("gforms_sink");
-        if (!sink) { resolve(); return; }
+        if (!sink) {
+          console.warn("[bridge-form] iframe gforms_sink NO existe en el DOM");
+          resolve(); return;
+        }
 
         const ghost = document.createElement("form");
         ghost.action = cfg.formActionUrl;
@@ -277,21 +285,32 @@
         const onLoad = () => {
           if (settled) return;
           settled = true;
+          console.log("[bridge-form] iframe LOAD — POST procesado por Google");
           cleanup();
           resolve();
         };
         sink.addEventListener("load", onLoad);
-        ghost.submit();
+        try {
+          ghost.submit();
+          console.log("[bridge-form] ghost.submit() ejecutado");
+        } catch (subErr) {
+          console.error("[bridge-form] ghost.submit() tiro:", subErr);
+          cleanup();
+          reject(subErr);
+          return;
+        }
 
         // Timeout chico — si Google tarda demasiado damos por fallida la
         // mirror y seguimos. La fichada ya quedó en Supabase.
         setTimeout(() => {
           if (settled) return;
           settled = true;
+          console.warn("[bridge-form] TIMEOUT — iframe no disparo load en 6s. Probable bloqueo iOS/CSP/red.");
           cleanup();
           reject(new Error("timeout"));
         }, 6000);
       } catch (e) {
+        console.error("[bridge-form] excepcion:", e);
         reject(e);
       }
     });
