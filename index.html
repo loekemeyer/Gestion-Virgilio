@@ -2991,7 +2991,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v1.31";
+const APP_VERSION = "v1.32";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -3762,8 +3762,17 @@ async function showDayBreakdown(dayKey, dayLabel) {
     };
     const sinLegajoHtml = fichadasSinLegajo.length ? `
       <div style="margin-top:14px;padding:10px 12px;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;font-size:13px;color:#9a3412;">
-        ⚠ <b>${fichadasSinLegajo.length} fichada(s)</b> sin legajo (email no linkeado en Empleados):
-        ${fichadasSinLegajo.map(f => `<div style="margin-top:4px">• ${escapeHtml(f.email)} — ${hhmm(f.ts)}</div>`).join("")}
+        ⚠ <b>${fichadasSinLegajo.length} fichada(s)</b> sin legajo (email no linkeado en Empleados).
+        <div style="font-size:11px;color:#c2410c;margin-top:2px;margin-bottom:6px;">
+          Click en el email para copiarlo y pegarlo en Supabase Studio → tabla "Empleados" → columna email.
+        </div>
+        ${fichadasSinLegajo.map(f => `
+          <div style="margin-top:4px">
+            <span class="copy-email" data-email="${escapeHtml(f.email)}" style="cursor:pointer;text-decoration:underline;text-decoration-style:dotted;" title="Click para copiar"
+                  onclick="copyEmailFromSpan(this)">${escapeHtml(f.email)}</span>
+            — ${hhmm(f.ts)}
+          </div>
+        `).join("")}
       </div>` : "";
     const bodyHtml = `
       <div style="font-size:14px; color:#475569; margin-bottom:12px;">
@@ -3834,6 +3843,32 @@ async function showDayBreakdown(dayKey, dayLabel) {
     m.querySelector(".tanda-modal-body").innerHTML =
       `<div class="monitor-error">Error: ${escapeHtml(e.message)}</div>`;
   }
+}
+
+/* Copia el email del data-attribute al clipboard y da feedback visual.
+   Usado en el banner ⚠ Sin legajo del modal de rendimiento — el supervisor
+   clickea el email y lo pega en Supabase Studio (tabla Empleados).
+   Manejamos browsers viejos sin clipboard API con un fallback textarea. */
+function copyEmailFromSpan(el) {
+  const email = el.dataset.email || el.textContent || "";
+  const showFeedback = (ok) => {
+    const orig = el.textContent;
+    el.textContent = ok ? `${email} (copiado!)` : `${email} (no se pudo copiar)`;
+    setTimeout(() => { el.textContent = orig; }, 1500);
+  };
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(email).then(() => showFeedback(true), () => showFeedback(false));
+      return;
+    }
+    // Fallback: textarea + execCommand (HTTP, browsers viejos)
+    const ta = document.createElement("textarea");
+    ta.value = email; ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select();
+    const ok = document.execCommand("copy");
+    document.body.removeChild(ta);
+    showFeedback(ok);
+  } catch { showFeedback(false); }
 }
 
 /* Helper: comparar dayKey contra hoy en hora Argentina. */
