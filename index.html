@@ -2991,7 +2991,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v1.29";
+const APP_VERSION = "v1.30";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -3635,7 +3635,9 @@ async function showDayBreakdown(dayKey, dayLabel) {
     for (const f of fichadas) {
       let leg = f.legajo;
       if (!leg && f.email) {
-        leg = emailToLegajo.get(String(f.email).toLowerCase()) || null;
+        // .trim() para que coincida con la clave normalizada del Map
+        // (que sí trimea). Sin esto, " a@b.com" no matchearía a "a@b.com".
+        leg = emailToLegajo.get(String(f.email).toLowerCase().trim()) || null;
       }
       const tsIngreso = new Date(f.ts_cliente);
       if (!leg) {

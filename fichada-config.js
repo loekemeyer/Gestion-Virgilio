@@ -17,8 +17,9 @@ window.FICHADA_CONFIG = {
   // Secreto compartido entre index.html (genera el QR) y fichada.html
   // (verifica el token). ADVERTENCIA: este valor queda visible en el JS
   // publico de ambas paginas. Es disuasivo, no barrera criptografica.
-  // Reemplazar por una cadena larga y aleatoria (32+ caracteres).
-  hmacSecret: "CAMBIAR-ESTE-SECRETO-LARGO-Y-ALEATORIO-1234567890abcdef",
+  // Si lo cambias, las tokens generadas antes del deploy quedan
+  // invalidadas durante la ventana de rotacion (30s default).
+  hmacSecret: "5gzwxCtxT55dVUKV6y1nUpIsy3OnbpOaaha7DyLAlcGXNFzuBJHsRHTSklOSNj7",
 
   // Duracion de cada token en segundos. Mas corto = mas seguro, pero
   // exige relojes mas sincronizados entre TV y celulares.
