@@ -266,8 +266,7 @@
 
     const SUPABASE_URL = "https://hrxfctzncixxqmpfhskv.supabase.co";
     const SUPABASE_KEY = "sb_publishable_BqpAgZH6ty-9wft10_YMhw_0rcIPuWT";
-    const FICHADAS_ENDPOINT  = SUPABASE_URL + "/rest/v1/Fichadas_Virgilio";
-    const REGISTROS_ENDPOINT = SUPABASE_URL + "/rest/v1/Registros_Produccion_Virgilio";
+    const HISTORICO_ENDPOINT = SUPABASE_URL + "/rest/v1/Fichadas_Historico";
     const EMPLEADOS_ENDPOINT = SUPABASE_URL + "/rest/v1/Empleados";
     const SUPABASE_HEADERS = {
       "apikey":        SUPABASE_KEY,
@@ -317,34 +316,27 @@
 
     // Trae para un dia (YYYY-MM-DD) un mapa legajo -> { entrada, ci, ct, salida }
     // con objetos Date (o null para los que no hubo evento).
+    // Lee de Fichadas_Historico — tabla consolidada que tiene los 4 eventos
+    // en filas separadas (Entrada / Comida Inicia / Comida Termina / Salida).
     async function fetchSupabaseTimesForDate(dateStr) {
       if (!dateStr) return new Map();
       const dayStart = new Date(dateStr + "T00:00:00-03:00").toISOString();
       const dayEnd   = new Date(dateStr + "T23:59:59-03:00").toISOString();
 
-      const fichadasUrl = FICHADAS_ENDPOINT +
-        "?ts_cliente=gte." + encodeURIComponent(dayStart) +
-        "&ts_cliente=lte." + encodeURIComponent(dayEnd) +
-        "&tipo=eq.ingreso" +
-        "&order=ts_cliente.asc" +
+      // Solo nos importan filas con legajo (las que tienen email linkeado en
+      // Empleados). Filtramos por legajo not null para evitar traer las
+      // 11k+ del histórico de los demás operarios.
+      const url = HISTORICO_ENDPOINT +
+        "?ts_evento=gte." + encodeURIComponent(dayStart) +
+        "&ts_evento=lte." + encodeURIComponent(dayEnd) +
+        "&legajo=not.is.null" +
+        "&order=ts_evento.asc" +
         "&limit=5000" +
-        "&select=email,legajo,ts_cliente";
-      const eventosUrl = REGISTROS_ENDPOINT +
-        "?ts_cliente=gte." + encodeURIComponent(dayStart) +
-        "&ts_cliente=lte." + encodeURIComponent(dayEnd) +
-        "&opcion=in.(PC,FJ)" +
-        "&order=ts_cliente.asc" +
-        "&limit=5000" +
-        "&select=legajo,opcion,ts_cliente,ts_inicio";
+        "&select=legajo,evento,ts_evento";
 
-      const [fr, er] = await Promise.all([
-        fetch(fichadasUrl, { headers: SUPABASE_HEADERS }),
-        fetch(eventosUrl,  { headers: SUPABASE_HEADERS })
-      ]);
-      if (!fr.ok) throw new Error("Fichadas HTTP " + fr.status);
-      if (!er.ok) throw new Error("Registros HTTP " + er.status);
-      const fichadas = await fr.json();
-      const eventos  = await er.json();
+      const r = await fetch(url, { headers: SUPABASE_HEADERS });
+      if (!r.ok) throw new Error("Historico HTTP " + r.status);
+      const data = await r.json();
 
       const byLegajo = new Map();
       const row = (leg) => {
@@ -353,34 +345,27 @@
         return byLegajo.get(k);
       };
 
-      // Entrada — earliest Fichadas_Virgilio per legajo
-      for (const f of fichadas) {
-        if (!f.legajo) continue;
-        const t = new Date(f.ts_cliente);
-        const r0 = row(f.legajo);
-        if (!r0.entrada || t < r0.entrada) r0.entrada = t;
-      }
-
-      // PC + FJ
-      for (const ev of eventos) {
+      for (const ev of data) {
         if (!ev.legajo) continue;
         const r0 = row(ev.legajo);
-        if (ev.opcion === "PC") {
-          // Evento PC CIERRE  → ts_inicio = Comida Inicia, ts_cliente = Comida Termina
-          // Evento PC APERTURA → ts_inicio = null,       ts_cliente = Comida Inicia
-          if (ev.ts_inicio) {
-            const ci = new Date(ev.ts_inicio);
-            const ct = new Date(ev.ts_cliente);
-            if (!r0.ci || ci < r0.ci) r0.ci = ci;
-            if (!r0.ct || ct > r0.ct) r0.ct = ct;
-          } else {
-            const ci = new Date(ev.ts_cliente);
-            if (!r0.ci || ci < r0.ci) r0.ci = ci;
-          }
-        } else if (ev.opcion === "FJ") {
-          const sal = new Date(ev.ts_cliente);
-          // Si hay 2 FJ raros, agarra el último
-          if (!r0.salida || sal > r0.salida) r0.salida = sal;
+        const t = new Date(ev.ts_evento);
+        switch (ev.evento) {
+          case "Entrada":
+            // Earliest entrada del día gana
+            if (!r0.entrada || t < r0.entrada) r0.entrada = t;
+            break;
+          case "Comida Inicia":
+            // Earliest CI del día gana (raros casos de 2 CI: agarra el primero)
+            if (!r0.ci || t < r0.ci) r0.ci = t;
+            break;
+          case "Comida Termina":
+            // Latest CT del día gana (raros casos de 2 CT: agarra el último)
+            if (!r0.ct || t > r0.ct) r0.ct = t;
+            break;
+          case "Salida":
+            // Latest Salida del día gana
+            if (!r0.salida || t > r0.salida) r0.salida = t;
+            break;
         }
       }
 

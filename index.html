@@ -1496,6 +1496,8 @@ const SUPABASE_TABLE_ENDPOINT =
    linkeado en la tabla). */
 const SUPABASE_FICHADAS_ENDPOINT =
   SUPABASE_URL + "/rest/v1/Fichadas_Virgilio";
+const SUPABASE_HISTORICO_ENDPOINT =
+  SUPABASE_URL + "/rest/v1/Fichadas_Historico";
 const SUPABASE_EMPLEADOS_ENDPOINT =
   SUPABASE_URL + "/rest/v1/Empleados";
 
@@ -2796,21 +2798,23 @@ function enqueueReport(payload) {
   updatePendingIndicator();
   registerBackgroundSync();   // pide al browser que despache aunque cerremos la app
 
-  // Bridge legacy al Google Form (mirror del sheet de fichadas Esnaola).
-  // Best-effort, fire-and-forget — si falla no afecta nada porque la fuente
-  // de verdad es Supabase. Solo se dispara para PC (Comida Inicia/Termina)
-  // y FJ (Salida); el ingreso lo manda directo fichada.html.
-  mirrorOperatorEventToGoogleForm(payload).catch(() => {});
+  // Mirror a Fichadas_Historico — tabla consolidada de fichadas
+  // (Entrada/Comida Inicia/Comida Termina/Salida) que combina los
+  // operarios Virgilio con los importados del Google Sheet legacy.
+  // Best-effort, fire-and-forget: si falla, el evento ya quedó en
+  // Registros_Produccion_Virgilio (fuente de verdad para producción).
+  mirrorOperatorEventToHistorico(payload).catch(() => {});
 }
 
 /* =====================================================================
-   Mirror legacy de eventos PC/FJ al Google Form de fichadas Esnaola.
+   Mirror de eventos PC/FJ al Fichadas_Historico de Supabase.
    ---------------------------------------------------------------------
-   Solo manda al Form los eventos que correspondan a una fichada de
-   horario. Resuelve legajo -> email via Empleados (cacheado en memoria)
-   y postea con ghost-form + iframe sink. Cada press del operario genera
-   un POST inmediato, así que el "Marca temporal" del sheet refleja el
-   momento real del evento.
+   Solo se mandan los eventos que representan una fichada de horario:
+   - PC apertura (toggle 1ra vez)  → 'Comida Inicia'
+   - PC cierre   (toggle 2da vez)  → 'Comida Termina'
+   - FJ                            → 'Salida'
+   - La Entrada la manda fichada.html directamente al hacer el QR.
+   Resuelve legajo -> email vía Empleados (cacheado por sesion).
    ===================================================================== */
 const _legajoEmailCache = new Map();   // legajo -> email|null (null = no tiene)
 async function _resolveEmailForLegajo(legajo) {
@@ -2835,62 +2839,46 @@ async function _resolveEmailForLegajo(legajo) {
   } catch { return null; }
 }
 
-function _mapOpcionToGoogleEvento(payload) {
+function _mapOpcionToFichadaEvento(payload) {
   if (!payload || !payload.opcion) return null;
   if (payload.opcion === "FJ") return "Salida";
   if (payload.opcion === "PC") {
-    // PC es toggle: la 1ra vez sin ts_inicio_iso = apertura (Comida Inicia),
-    // la 2da con ts_inicio_iso = cierre (Comida Termina).
+    // PC es toggle: 1ra vez sin ts_inicio_iso = apertura (Comida Inicia),
+    // 2da vez con ts_inicio_iso = cierre (Comida Termina).
     return payload.ts_inicio_iso ? "Comida Termina" : "Comida Inicia";
   }
   return null;
 }
 
-async function mirrorOperatorEventToGoogleForm(payload) {
-  const evento = _mapOpcionToGoogleEvento(payload);
-  if (!evento) return;            // opcion que no nos interesa mirrorear
-  const cfg = window.FICHADA_CONFIG;
-  if (!cfg || !cfg.formActionUrl || !cfg.eventoEntryId) return;
+async function mirrorOperatorEventToHistorico(payload) {
+  const evento = _mapOpcionToFichadaEvento(payload);
+  if (!evento) return;            // opcion fuera del scope (EP, TP, etc.)
   const email = await _resolveEmailForLegajo(payload.legajo);
-  if (!email) return;             // sin email no podemos identificar al operario en el sheet
-  _submitToGoogleFormGhost(email, evento, cfg);
-}
-
-function _submitToGoogleFormGhost(email, evento, cfg) {
+  if (!email) return;             // sin email no podemos identificar al operario en la tabla
+  const tsIso = payload.ts ? new Date(payload.ts).toISOString() : new Date().toISOString();
+  const body = {
+    ts_evento: tsIso,
+    evento:    evento,
+    email:     email,
+    legajo:    String(payload.legajo)
+  };
   try {
-    const sink = document.getElementById("gforms_sink");
-    if (!sink) return;
-    const ghost = document.createElement("form");
-    ghost.action = cfg.formActionUrl;
-    ghost.method = "POST";
-    ghost.target = "gforms_sink";
-    ghost.style.display = "none";
-    const addHidden = (name, value) => {
-      const inp = document.createElement("input");
-      inp.type = "hidden"; inp.name = name; inp.value = value;
-      ghost.appendChild(inp);
-    };
-    addHidden(cfg.eventoEntryId, evento);
-    if (cfg.emailMode === "entry") {
-      addHidden(cfg.emailEntryId, email);
-    } else {
-      addHidden("emailAddress", email);
+    const r = await fetch(SUPABASE_HISTORICO_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "apikey":        SUPABASE_KEY,
+        "Authorization": "Bearer " + SUPABASE_KEY,
+        "Content-Type":  "application/json",
+        "Prefer":        "return=minimal,resolution=ignore-duplicates"
+      },
+      body: JSON.stringify(body)
+    });
+    if (!r.ok && r.status !== 409) {
+      console.warn("[historico] HTTP", r.status, "para", evento, email);
     }
-    addHidden("fvv", "1");
-    addHidden("draftResponse", "[]");
-    addHidden("pageHistory", "0");
-    document.body.appendChild(ghost);
-    let cleaned = false;
-    const cleanup = () => { if (cleaned) return; cleaned = true;
-      sink.removeEventListener("load", onLoad);
-      try { ghost.remove(); } catch {}
-    };
-    const onLoad = () => cleanup();
-    sink.addEventListener("load", onLoad);
-    ghost.submit();
-    // Cleanup defensivo en caso de que el iframe nunca dispare load.
-    setTimeout(cleanup, 8000);
-  } catch { /* fire-and-forget */ }
+  } catch (e) {
+    console.warn("[historico] fetch fallo:", e && e.message);
+  }
 }
 
 /* Genera un cierre automático para un toggle que quedó abierto al cambiar
@@ -3087,7 +3075,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v1.38";
+const APP_VERSION = "v1.39";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -4992,13 +4980,6 @@ async function refreshMonitor() {
   }
 }
 </script>
-
-<!-- Iframe oculto para los POST al Google Form (mirror del sheet de
-     fichadas Esnaola). Necesario porque el form submit cross-origin
-     necesita un target — sin esto la pagina navegaria a la confirmacion
-     de Google. La respuesta cae en este iframe y la app sigue donde
-     estaba. Usado por mirrorOperatorEventToGoogleForm() abajo. -->
-<iframe name="gforms_sink" id="gforms_sink" style="display:none" aria-hidden="true"></iframe>
 
 </body>
 </html>
