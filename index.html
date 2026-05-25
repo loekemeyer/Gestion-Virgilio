@@ -3087,7 +3087,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v1.35";
+const APP_VERSION = "v1.36";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -3459,6 +3459,39 @@ function _fichadaSecondsUntilNext(periodSec) {
 
 let _qrLastToken = null;
 
+/* ⚠ FLAG TEMPORAL: deshabilita el QR rotativo y muestra cartel
+   "EN CONSTRUCCIÓN" en su lugar. Activado mientras se debuggea el
+   bridge al Google Sheet de fichadas Esnaola. Para reactivar el QR
+   cuando el flujo end-to-end (Supabase + Sheet) esté confirmado:
+   cambiar a `false` y bumpear version. */
+const QR_DISABLED = true;
+
+/* Cartel "EN CONSTRUCCIÓN" pintado en el canvas en vez del QR.
+   Naranja para que sea bien visible desde lejos en la TV. */
+function _qrRenderConstruccion(canvas) {
+  const size = 320;
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  // fondo amarillo bandera
+  ctx.fillStyle = "#fde68a";
+  ctx.fillRect(0, 0, size, size);
+  // borde naranja
+  ctx.strokeStyle = "#ea580c";
+  ctx.lineWidth = 8;
+  ctx.strokeRect(4, 4, size - 8, size - 8);
+  // icono ⚠
+  ctx.fillStyle = "#9a3412";
+  ctx.font = "bold 80px system-ui, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText("⚠", size / 2, size / 2 - 50);
+  // texto principal
+  ctx.font = "bold 32px system-ui, sans-serif";
+  ctx.fillText("EN", size / 2, size / 2 + 30);
+  ctx.fillText("CONSTRUCCIÓN", size / 2, size / 2 + 70);
+}
+
 /* Render usando qrcode-generator (variable global "qrcode"). Pinta el QR
    directamente en el canvas con fillRect por cada módulo. */
 function _qrRenderToCanvas(canvas, text, opts) {
@@ -3519,6 +3552,21 @@ async function tickFichadaQr() {
 }
 let _qrStartAttempts = 0;
 function _startFichadaQr() {
+  // Bypass del QR rotativo mientras se debuggea el bridge al sheet.
+  // Pinta el cartel "EN CONSTRUCCIÓN" una vez y no arranca ticks.
+  if (QR_DISABLED) {
+    const canvas = document.getElementById("qrCanvas");
+    const secsEl = document.getElementById("qrSecs");
+    const labelEl = document.querySelector("#qrFichadaBox .qr-label");
+    const countdownEl = document.querySelector("#qrFichadaBox .qr-countdown");
+    if (canvas) _qrRenderConstruccion(canvas);
+    if (labelEl) labelEl.textContent = "Fichada";
+    // Escondemos el contador (no tiene sentido sin tokens rotando).
+    if (countdownEl) countdownEl.style.display = "none";
+    if (secsEl) secsEl.textContent = "—";
+    console.log("[QR] Deshabilitado — mostrando cartel En Construcción");
+    return;
+  }
   if (typeof qrcode === "undefined") {
     _qrStartAttempts++;
     if (_qrStartAttempts > 50) {
