@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Monitor Fichadas Esnaola — Virgilio</title>
+  <style>
+    /* ============================================================
+       Estética estilo Google Sheets: gridlines finas grises, headers
+       de columna en gris claro, secciones en gris medio centradas.
+       Pensado para TV (32") y desktop. Responsivo para mobile abajo.
+       ============================================================ */
+    :root {
+      --grid: #bdbdbd;
+      --grid-strong: #757575;
+      --bg: #f5f5f5;
+      --bg-card: #ffffff;
+      --bg-section: #d0d0d0;
+      --bg-header: #ecebeb;
+      --bg-spacer: #f5f5f5;
+      --text: #202124;
+      --text-muted: #5f6368;
+      --accent: #1a73e8;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      padding: 14px 18px 32px;
+    }
+    header {
+      display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+    h1 {
+      margin: 0;
+      font-size: clamp(18px, 2vw, 26px);
+      font-weight: 600;
+    }
+    #meta {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+    #meta.stale { color: #c2410c; }
+    #meta .dot {
+      display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+      background: #16a34a; margin-right: 4px; vertical-align: middle;
+    }
+    #meta.stale .dot { background: #ea580c; }
+
+    .wrap {
+      background: var(--bg-card);
+      border: 1px solid var(--grid);
+      overflow-x: auto;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      table-layout: fixed;
+      font-size: clamp(11px, 1.1vw, 14px);
+    }
+    th, td {
+      border: 1px solid var(--grid);
+      padding: 4px 8px;
+      text-align: left;
+      vertical-align: middle;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    /* Headers de columnas */
+    thead th {
+      background: var(--bg-header);
+      font-weight: 600;
+      text-align: center;
+      border-color: var(--grid-strong);
+      color: var(--text);
+    }
+    thead th.day-group {
+      background: #e3e3e3;
+      border-bottom: 2px solid var(--grid-strong);
+    }
+    thead th.day-date {
+      background: #efefef;
+      font-weight: 500;
+      color: var(--text-muted);
+    }
+    /* Section headers (Pellegrini, Esnaola, Virgilio, etc.) */
+    tr.section-row td {
+      background: var(--bg-section);
+      text-align: center;
+      font-weight: 600;
+      font-size: clamp(12px, 1.2vw, 15px);
+      letter-spacing: 0.2px;
+      padding: 6px 8px;
+      color: #1a1a1a;
+    }
+    /* Spacer rows */
+    tr.spacer-row td {
+      background: var(--bg-spacer);
+      padding: 0;
+      height: 8px;
+      border-left: none;
+      border-right: none;
+    }
+    /* Employee rows */
+    tr.emp-row td.col-email {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    tr.emp-row td.col-empresa,
+    tr.emp-row td.col-leg {
+      text-align: center;
+      color: var(--text-muted);
+    }
+    tr.emp-row td.col-leg { font-weight: 600; color: var(--text); }
+    tr.emp-row td.col-nombre { font-weight: 500; }
+    tr.emp-row td.col-time {
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.95em;
+    }
+    tr.emp-row td.col-time.empty { color: #bdbdbd; }
+    tr.emp-row td.col-sep {
+      background: var(--bg-spacer);
+      border-top: none;
+      border-bottom: none;
+      padding: 0;
+      width: 8px;
+    }
+    thead th.col-sep {
+      background: var(--bg-spacer);
+      border-top: none;
+      border-bottom: none;
+      padding: 0;
+      width: 8px;
+    }
+    /* highlight today's date */
+    thead th.day-date.today { background: #d2e3fc; color: #174ea6; }
+
+    /* col widths para que se vea ordenado */
+    col.col-email   { width: 18%; }
+    col.col-empresa { width: 8%; }
+    col.col-leg     { width: 5%; }
+    col.col-nombre  { width: 13%; }
+    col.col-time    { width: 4.5%; }
+    col.col-sep     { width: 8px; }
+
+    .empty-state {
+      padding: 40px;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+    .error-state {
+      padding: 16px;
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      color: #991b1b;
+      border-radius: 6px;
+      margin: 12px 0;
+      font-size: 13px;
+    }
+    footer {
+      margin-top: 16px;
+      font-size: 11px;
+      color: var(--text-muted);
+      text-align: center;
+    }
+    footer a { color: var(--accent); }
+
+    @media (max-width: 700px) {
+      body { padding: 8px; }
+      table { font-size: 10px; }
+      th, td { padding: 3px 4px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Registro de Entradas-Salidas</h1>
+    <span id="meta"><span class="dot"></span>Cargando…</span>
+  </header>
+
+  <div class="wrap">
+    <table id="grid">
+      <colgroup>
+        <col class="col-email" />
+        <col class="col-empresa" />
+        <col class="col-leg" />
+        <col class="col-nombre" />
+        <col class="col-time" /><col class="col-time" /><col class="col-time" /><col class="col-time" />
+        <col class="col-sep" />
+        <col class="col-time" /><col class="col-time" /><col class="col-time" /><col class="col-time" />
+        <col class="col-sep" />
+        <col class="col-time" /><col class="col-time" /><col class="col-time" /><col class="col-time" />
+      </colgroup>
+      <thead id="grid-head"></thead>
+      <tbody id="grid-body">
+        <tr><td colspan="17" class="empty-state">Cargando datos del sheet…</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <footer>
+    Datos en vivo desde el sheet
+    <a href="https://docs.google.com/spreadsheets/d/19jF76wpbkVi7qBYNQ6BeZe1w5skJojljLJZttaOBD8g/edit?gid=1548577326" target="_blank" rel="noopener">Registro de entradas-salidas Esnaola</a>
+    · refresh cada 60s
+  </footer>
+
+  <script>
+    // ============================================================
+    // Monitor de Fichadas Esnaola
+    // ------------------------------------------------------------
+    // Baja el sheet via gviz/tq?tqx=out:csv (mismo truco que el
+    // monitor de tandas), parsea, detecta secciones (rows con texto
+    // en col 0 y resto vacío que no son emails) y renderiza la
+    // misma estética del sheet.
+    // ============================================================
+    const SHEET_URL = "https://docs.google.com/spreadsheets/d/19jF76wpbkVi7qBYNQ6BeZe1w5skJojljLJZttaOBD8g/gviz/tq?tqx=out:csv&gid=1548577326";
+    const REFRESH_MS = 60000;
+    let lastOkTs = null;
+
+    // Indices de columnas en el CSV del sheet
+    const COL = {
+      email:   0,
+      empresa: 1,
+      leg:     2,
+      nombre:  3,
+      // 3 grupos de día, cada uno con 4 sub-columnas (Entrada, CI, CT, Salida).
+      // Entre cada grupo hay una columna spacer (col 8 y col 13).
+      hoy:       { entrada: 4,  ci: 5,  ct: 6,  salida: 7 },
+      anterior:  { entrada: 9,  ci: 10, ct: 11, salida: 12 },
+      manual:    { entrada: 14, ci: 15, ct: 16, salida: 17 },
+    };
+
+    async function load() {
+      const meta = document.getElementById("meta");
+      try {
+        const r = await fetch(SHEET_URL + "&_=" + Date.now(), { cache: "no-store" });
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        const text = await r.text();
+        const rows = parseCSV(text);
+        if (!rows.length) throw new Error("CSV vacío");
+        render(rows);
+        lastOkTs = Date.now();
+        meta.classList.remove("stale");
+        meta.innerHTML = `<span class="dot"></span>Actualizado ${nowHHMM()}`;
+      } catch (e) {
+        meta.classList.add("stale");
+        const age = lastOkTs ? Math.round((Date.now() - lastOkTs) / 1000) + "s" : "—";
+        meta.innerHTML = `<span class="dot"></span>Error al actualizar (último OK hace ${age}): ${escapeHtml(e.message || e)}`;
+      }
+    }
+
+    function render(rows) {
+      // ---- Header: 3 filas ----
+      // Row 0: "Hoy" / "Día Anterior" / "Búsqueda Manual" labels (row 0 del CSV)
+      // Row 1: fechas debajo (row 1 del CSV)
+      // Row 2: column headers (EMAIL, Empresa, Leg, NOMBRE, Entrada, CI, CT, Salida x3)
+      const labelRow = rows[0] || [];
+      const dateRow  = rows[1] || [];
+      const dayHoy   = labelRow[COL.hoy.entrada]      || "Hoy";
+      const dayAnt   = labelRow[COL.anterior.entrada] || "Día Anterior";
+      const dayMan   = labelRow[COL.manual.entrada]   || "Búsqueda Manual";
+      const dateHoy  = dateRow[COL.hoy.entrada]       || "";
+      const dateAnt  = dateRow[COL.anterior.entrada]  || "";
+      const dateMan  = dateRow[COL.manual.entrada]    || "";
+
+      const head = document.getElementById("grid-head");
+      head.innerHTML = `
+        <tr>
+          <th rowspan="3">EMAIL</th>
+          <th rowspan="3">Empresa</th>
+          <th rowspan="3">Leg</th>
+          <th rowspan="3">NOMBRE</th>
+          <th colspan="4" class="day-group">${escapeHtml(dayHoy)}</th>
+          <th rowspan="3" class="col-sep"></th>
+          <th colspan="4" class="day-group">${escapeHtml(dayAnt)}</th>
+          <th rowspan="3" class="col-sep"></th>
+          <th colspan="4" class="day-group">${escapeHtml(dayMan)}</th>
+        </tr>
+        <tr>
+          <th colspan="4" class="day-date today">${escapeHtml(dateHoy)}</th>
+          <th colspan="4" class="day-date">${escapeHtml(dateAnt)}</th>
+          <th colspan="4" class="day-date">${escapeHtml(dateMan)}</th>
+        </tr>
+        <tr>
+          <th>Entrada</th><th>Comida<br>Inicia</th><th>Comida<br>Termina</th><th>Salida</th>
+          <th>Entrada</th><th>Comida<br>Inicia</th><th>Comida<br>Termina</th><th>Salida</th>
+          <th>Entrada</th><th>Comida<br>Inicia</th><th>Comida<br>Termina</th><th>Salida</th>
+        </tr>`;
+
+      // ---- Body: empezamos desde row 3 ----
+      const body = document.getElementById("grid-body");
+      let html = "";
+      for (let i = 3; i < rows.length; i++) {
+        const r = rows[i] || [];
+        const col0 = (r[COL.email]   || "").trim();
+        const col1 = (r[COL.empresa] || "").trim();
+        const col2 = (r[COL.leg]     || "").trim();
+        const col3 = (r[COL.nombre]  || "").trim();
+
+        // Spacer row (todo vacío)
+        if (!col0 && !col1 && !col2 && !col3) {
+          html += `<tr class="spacer-row"><td colspan="17"></td></tr>`;
+          continue;
+        }
+
+        // Section header: tiene texto en col 0 pero vacío en col 1-3 y NO es email
+        const isEmail = /@/.test(col0);
+        if (!isEmail && col0 && !col1 && !col2 && !col3) {
+          html += `<tr class="section-row"><td colspan="17">${escapeHtml(col0)}</td></tr>`;
+          continue;
+        }
+
+        // Employee row
+        const t = (idx) => {
+          const v = (r[idx] || "").trim();
+          if (!v) return `<td class="col-time empty">—</td>`;
+          return `<td class="col-time">${escapeHtml(v)}</td>`;
+        };
+        html += `
+          <tr class="emp-row">
+            <td class="col-email">${escapeHtml(col0)}</td>
+            <td class="col-empresa">${escapeHtml(col1)}</td>
+            <td class="col-leg">${escapeHtml(col2)}</td>
+            <td class="col-nombre">${escapeHtml(col3)}</td>
+            ${t(COL.hoy.entrada)}${t(COL.hoy.ci)}${t(COL.hoy.ct)}${t(COL.hoy.salida)}
+            <td class="col-sep"></td>
+            ${t(COL.anterior.entrada)}${t(COL.anterior.ci)}${t(COL.anterior.ct)}${t(COL.anterior.salida)}
+            <td class="col-sep"></td>
+            ${t(COL.manual.entrada)}${t(COL.manual.ci)}${t(COL.manual.ct)}${t(COL.manual.salida)}
+          </tr>`;
+      }
+      body.innerHTML = html || `<tr><td colspan="17" class="empty-state">Sheet vacío.</td></tr>`;
+    }
+
+    // ============================================================
+    // Helpers
+    // ============================================================
+    function parseCSV(text) {
+      // Parser CSV simple — soporta comillas, comas dentro de comillas,
+      // comillas dobles escapadas ("" -> "). El sheet de Google viene
+      // con LF (sin CR), pero por las dudas tratamos ambos.
+      const rows = [];
+      let row = [];
+      let cell = "";
+      let inQuote = false;
+      for (let i = 0; i < text.length; i++) {
+        const c = text[i];
+        if (inQuote) {
+          if (c === '"' && text[i + 1] === '"') { cell += '"'; i++; }
+          else if (c === '"') { inQuote = false; }
+          else cell += c;
+        } else {
+          if (c === '"') inQuote = true;
+          else if (c === ',') { row.push(cell); cell = ""; }
+          else if (c === '\n') { row.push(cell); rows.push(row); row = []; cell = ""; }
+          else if (c === '\r') { /* skip */ }
+          else cell += c;
+        }
+      }
+      if (cell !== "" || row.length) { row.push(cell); rows.push(row); }
+      return rows;
+    }
+
+    function escapeHtml(s) {
+      return String(s == null ? "" : s)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    function nowHHMM() {
+      const d = new Date();
+      return String(d.getHours()).padStart(2, "0") + ":" +
+             String(d.getMinutes()).padStart(2, "0");
+    }
+
+    load();
+    setInterval(load, REFRESH_MS);
+  </script>
+</body>
+</html>
