@@ -990,9 +990,10 @@ button {
 #monitorModal.tv .monitor-tot-box{
   border: 3px solid #334155;
   background: #111827;
-  /* Compacto: padding y ancho reducidos respecto a la versión anterior. */
+  /* Compacto pero con el ancho justo para que "Trabajando 23/05" entre
+     en una sola línea sin wrap. */
   padding: clamp(3px, 0.5vh, 7px) clamp(7px, 1.1vh, 13px);
-  width: clamp(95px, 11vw, 165px);
+  width: clamp(120px, 14vw, 220px);
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -1005,6 +1006,10 @@ button {
   color: #94a3b8;
   margin-bottom: 2px;
   text-align: center;               /* "M3 Picking" centrado sobre "del día dd/mm" */
+  /* No wrappear "Trabajando 23/05" en 2 líneas — si no entra, ellipsis. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 #monitorModal.tv .monitor-tot-value{
   /* Match con los códigos de tanda tipo "C02D" (.monitor-tanda en TV). */
@@ -1306,7 +1311,7 @@ button {
 </div>
 
 <!-- Badge de versión + estado de cola (abajo a la derecha) -->
-<div id="versionBadge">v1.18 ✓</div>
+<div id="versionBadge">v1.19 ✓</div>
 
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
@@ -2902,7 +2907,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v1.18";
+const APP_VERSION = "v1.19";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
