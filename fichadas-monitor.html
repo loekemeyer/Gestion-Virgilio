@@ -16,11 +16,13 @@
       --bg: #f5f5f5;
       --bg-card: #ffffff;
       --bg-section: #d0d0d0;
+      --bg-section-virgilio: #c8e6c9;     /* verde clarito para resaltar Virgilio */
       --bg-header: #ecebeb;
       --bg-spacer: #f5f5f5;
       --text: #202124;
       --text-muted: #5f6368;
       --accent: #1a73e8;
+      --supabase: #3ecf8e;                 /* color brand de Supabase, marker */
     }
     * { box-sizing: border-box; }
     html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); }
@@ -47,6 +49,23 @@
       background: #16a34a; margin-right: 4px; vertical-align: middle;
     }
     #meta.stale .dot { background: #ea580c; }
+    #legend {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-left: auto;
+    }
+    #legend .pill {
+      display: inline-block; padding: 2px 8px; border-radius: 999px;
+      font-weight: 500; margin-left: 6px;
+    }
+    #legend .pill.sb {
+      background: rgba(62, 207, 142, 0.15); color: #047857;
+      border: 1px solid rgba(62, 207, 142, 0.4);
+    }
+    #legend .pill.sh {
+      background: rgba(26, 115, 232, 0.1); color: #1554b5;
+      border: 1px solid rgba(26, 115, 232, 0.3);
+    }
 
     .wrap {
       background: var(--bg-card);
@@ -95,6 +114,9 @@
       padding: 6px 8px;
       color: #1a1a1a;
     }
+    tr.section-row.virgilio td {
+      background: var(--bg-section-virgilio);
+    }
     /* Spacer rows */
     tr.spacer-row td {
       background: var(--bg-spacer);
@@ -122,6 +144,11 @@
       font-size: 0.95em;
     }
     tr.emp-row td.col-time.empty { color: #bdbdbd; }
+    /* Para marcar que las celdas son fed by Supabase (vs sheet),
+       le ponemos un underline punteado verde tenue. */
+    tr.emp-row.supabase td.col-time:not(.empty) {
+      border-bottom: 2px solid rgba(62, 207, 142, 0.6);
+    }
     tr.emp-row td.col-sep {
       background: var(--bg-spacer);
       border-top: none;
@@ -174,6 +201,7 @@
       body { padding: 8px; }
       table { font-size: 10px; }
       th, td { padding: 3px 4px; }
+      #legend { display: none; }
     }
   </style>
 </head>
@@ -181,6 +209,10 @@
   <header>
     <h1>Registro de Entradas-Salidas</h1>
     <span id="meta"><span class="dot"></span>Cargando…</span>
+    <span id="legend">
+      <span class="pill sh">Sheet</span> Pellegrini · Esnaola · Home Office · etc
+      <span class="pill sb">Supabase</span> Virgilio
+    </span>
   </header>
 
   <div class="wrap">
@@ -198,28 +230,50 @@
       </colgroup>
       <thead id="grid-head"></thead>
       <tbody id="grid-body">
-        <tr><td colspan="17" class="empty-state">Cargando datos del sheet…</td></tr>
+        <tr><td colspan="17" class="empty-state">Cargando datos…</td></tr>
       </tbody>
     </table>
   </div>
 
   <footer>
-    Datos en vivo desde el sheet
+    Estructura + no-Virgilio desde el sheet
     <a href="https://docs.google.com/spreadsheets/d/19jF76wpbkVi7qBYNQ6BeZe1w5skJojljLJZttaOBD8g/edit?gid=1548577326" target="_blank" rel="noopener">Registro de entradas-salidas Esnaola</a>
-    · refresh cada 60s
+    · Virgilio desde Supabase en vivo · refresh cada 60s
   </footer>
 
   <script>
     // ============================================================
-    // Monitor de Fichadas Esnaola
+    // Monitor de Fichadas Esnaola — modo C (híbrido)
     // ------------------------------------------------------------
-    // Baja el sheet via gviz/tq?tqx=out:csv (mismo truco que el
-    // monitor de tandas), parsea, detecta secciones (rows con texto
-    // en col 0 y resto vacío que no son emails) y renderiza la
-    // misma estética del sheet.
+    // - El sheet (gid 1548577326) provee estructura: secciones,
+    //   columnas, fechas Hoy/Día Anterior/Búsqueda Manual y los
+    //   tiempos para empleados NO-Virgilio.
+    // - Para empleados en la sección "Virgilio" (los nuestros),
+    //   bajamos las fichadas directamente de Supabase y
+    //   sobreescribimos las celdas. Asi no dependemos del bridge
+    //   form→sheet — los Virgilio aparecen aunque ese bridge este
+    //   roto.
+    //
+    // Fuentes Supabase:
+    //   Fichadas_Virgilio          → Entrada (por email)
+    //   Registros_Produccion_Virgilio opcion=PC → Comida Inicia / Termina
+    //   Registros_Produccion_Virgilio opcion=FJ → Salida
+    //   Empleados                  → mapeo email <-> Legajo
     // ============================================================
+
     const SHEET_URL = "https://docs.google.com/spreadsheets/d/19jF76wpbkVi7qBYNQ6BeZe1w5skJojljLJZttaOBD8g/gviz/tq?tqx=out:csv&gid=1548577326";
     const REFRESH_MS = 60000;
+
+    const SUPABASE_URL = "https://hrxfctzncixxqmpfhskv.supabase.co";
+    const SUPABASE_KEY = "sb_publishable_BqpAgZH6ty-9wft10_YMhw_0rcIPuWT";
+    const FICHADAS_ENDPOINT  = SUPABASE_URL + "/rest/v1/Fichadas_Virgilio";
+    const REGISTROS_ENDPOINT = SUPABASE_URL + "/rest/v1/Registros_Produccion_Virgilio";
+    const EMPLEADOS_ENDPOINT = SUPABASE_URL + "/rest/v1/Empleados";
+    const SUPABASE_HEADERS = {
+      "apikey":        SUPABASE_KEY,
+      "Authorization": "Bearer " + SUPABASE_KEY
+    };
+
     let lastOkTs = null;
 
     // Indices de columnas en el CSV del sheet
@@ -228,22 +282,140 @@
       empresa: 1,
       leg:     2,
       nombre:  3,
-      // 3 grupos de día, cada uno con 4 sub-columnas (Entrada, CI, CT, Salida).
-      // Entre cada grupo hay una columna spacer (col 8 y col 13).
       hoy:       { entrada: 4,  ci: 5,  ct: 6,  salida: 7 },
       anterior:  { entrada: 9,  ci: 10, ct: 11, salida: 12 },
       manual:    { entrada: 14, ci: 15, ct: 16, salida: 17 },
     };
 
+    // Cache de Empleados (cambia poco, lo refrescamos cada 10 min)
+    let _empleadosCache = null;
+    let _empleadosCacheTs = 0;
+    const EMPLEADOS_TTL = 10 * 60 * 1000;
+    async function getEmpleadosMap() {
+      const now = Date.now();
+      if (_empleadosCache && now - _empleadosCacheTs < EMPLEADOS_TTL) {
+        return _empleadosCache;
+      }
+      const url = EMPLEADOS_ENDPOINT +
+        "?email=not.is.null" +
+        "&select=Legajo,email" +
+        "&limit=2000";
+      const r = await fetch(url, { headers: SUPABASE_HEADERS });
+      if (!r.ok) throw new Error("Empleados HTTP " + r.status);
+      const data = await r.json();
+      // Map: email (lower+trim) -> Legajo (string)
+      const m = new Map();
+      for (const e of data) {
+        if (e.email && e.Legajo != null) {
+          m.set(String(e.email).toLowerCase().trim(), String(e.Legajo));
+        }
+      }
+      _empleadosCache = m;
+      _empleadosCacheTs = now;
+      return m;
+    }
+
+    // Trae para un dia (YYYY-MM-DD) un mapa legajo -> { entrada, ci, ct, salida }
+    // con objetos Date (o null para los que no hubo evento).
+    async function fetchSupabaseTimesForDate(dateStr) {
+      if (!dateStr) return new Map();
+      const dayStart = new Date(dateStr + "T00:00:00-03:00").toISOString();
+      const dayEnd   = new Date(dateStr + "T23:59:59-03:00").toISOString();
+
+      const fichadasUrl = FICHADAS_ENDPOINT +
+        "?ts_cliente=gte." + encodeURIComponent(dayStart) +
+        "&ts_cliente=lte." + encodeURIComponent(dayEnd) +
+        "&tipo=eq.ingreso" +
+        "&order=ts_cliente.asc" +
+        "&limit=5000" +
+        "&select=email,legajo,ts_cliente";
+      const eventosUrl = REGISTROS_ENDPOINT +
+        "?ts_cliente=gte." + encodeURIComponent(dayStart) +
+        "&ts_cliente=lte." + encodeURIComponent(dayEnd) +
+        "&opcion=in.(PC,FJ)" +
+        "&order=ts_cliente.asc" +
+        "&limit=5000" +
+        "&select=legajo,opcion,ts_cliente,ts_inicio";
+
+      const [fr, er] = await Promise.all([
+        fetch(fichadasUrl, { headers: SUPABASE_HEADERS }),
+        fetch(eventosUrl,  { headers: SUPABASE_HEADERS })
+      ]);
+      if (!fr.ok) throw new Error("Fichadas HTTP " + fr.status);
+      if (!er.ok) throw new Error("Registros HTTP " + er.status);
+      const fichadas = await fr.json();
+      const eventos  = await er.json();
+
+      const byLegajo = new Map();
+      const row = (leg) => {
+        const k = String(leg);
+        if (!byLegajo.has(k)) byLegajo.set(k, { entrada: null, ci: null, ct: null, salida: null });
+        return byLegajo.get(k);
+      };
+
+      // Entrada — earliest Fichadas_Virgilio per legajo
+      for (const f of fichadas) {
+        if (!f.legajo) continue;
+        const t = new Date(f.ts_cliente);
+        const r0 = row(f.legajo);
+        if (!r0.entrada || t < r0.entrada) r0.entrada = t;
+      }
+
+      // PC + FJ
+      for (const ev of eventos) {
+        if (!ev.legajo) continue;
+        const r0 = row(ev.legajo);
+        if (ev.opcion === "PC") {
+          // Evento PC CIERRE  → ts_inicio = Comida Inicia, ts_cliente = Comida Termina
+          // Evento PC APERTURA → ts_inicio = null,       ts_cliente = Comida Inicia
+          if (ev.ts_inicio) {
+            const ci = new Date(ev.ts_inicio);
+            const ct = new Date(ev.ts_cliente);
+            if (!r0.ci || ci < r0.ci) r0.ci = ci;
+            if (!r0.ct || ct > r0.ct) r0.ct = ct;
+          } else {
+            const ci = new Date(ev.ts_cliente);
+            if (!r0.ci || ci < r0.ci) r0.ci = ci;
+          }
+        } else if (ev.opcion === "FJ") {
+          const sal = new Date(ev.ts_cliente);
+          // Si hay 2 FJ raros, agarra el último
+          if (!r0.salida || sal > r0.salida) r0.salida = sal;
+        }
+      }
+
+      return byLegajo;
+    }
+
     async function load() {
       const meta = document.getElementById("meta");
       try {
+        // 1) Sheet (estructura + no-Virgilio)
         const r = await fetch(SHEET_URL + "&_=" + Date.now(), { cache: "no-store" });
-        if (!r.ok) throw new Error("HTTP " + r.status);
+        if (!r.ok) throw new Error("Sheet HTTP " + r.status);
         const text = await r.text();
         const rows = parseCSV(text);
-        if (!rows.length) throw new Error("CSV vacío");
-        render(rows);
+        if (!rows.length) throw new Error("Sheet vacío");
+
+        // 2) Parsear estructura (secciones + filas) y dates
+        const parsed = parseSheetStructure(rows);
+
+        // 3) Para los 3 dates, traer Supabase. Si alguna date no parsea, skip.
+        const empleadosMap = await getEmpleadosMap();
+        const sbResults = await Promise.all([
+          parsed.dates.hoy      ? fetchSupabaseTimesForDate(parsed.dates.hoy)      : Promise.resolve(new Map()),
+          parsed.dates.anterior ? fetchSupabaseTimesForDate(parsed.dates.anterior) : Promise.resolve(new Map()),
+          parsed.dates.manual   ? fetchSupabaseTimesForDate(parsed.dates.manual)   : Promise.resolve(new Map()),
+        ]);
+        const sbByDate = {
+          hoy:      sbResults[0],
+          anterior: sbResults[1],
+          manual:   sbResults[2]
+        };
+
+        // 4) Render
+        render(parsed, sbByDate, empleadosMap);
+
         lastOkTs = Date.now();
         meta.classList.remove("stale");
         meta.innerHTML = `<span class="dot"></span>Actualizado ${nowHHMM()}`;
@@ -251,14 +423,14 @@
         meta.classList.add("stale");
         const age = lastOkTs ? Math.round((Date.now() - lastOkTs) / 1000) + "s" : "—";
         meta.innerHTML = `<span class="dot"></span>Error al actualizar (último OK hace ${age}): ${escapeHtml(e.message || e)}`;
+        console.error("[fichadas-monitor]", e);
       }
     }
 
-    function render(rows) {
-      // ---- Header: 3 filas ----
-      // Row 0: "Hoy" / "Día Anterior" / "Búsqueda Manual" labels (row 0 del CSV)
-      // Row 1: fechas debajo (row 1 del CSV)
-      // Row 2: column headers (EMAIL, Empresa, Leg, NOMBRE, Entrada, CI, CT, Salida x3)
+    // ============================================================
+    // Parseo del sheet
+    // ============================================================
+    function parseSheetStructure(rows) {
       const labelRow = rows[0] || [];
       const dateRow  = rows[1] || [];
       const dayHoy   = labelRow[COL.hoy.entrada]      || "Hoy";
@@ -268,33 +440,8 @@
       const dateAnt  = dateRow[COL.anterior.entrada]  || "";
       const dateMan  = dateRow[COL.manual.entrada]    || "";
 
-      const head = document.getElementById("grid-head");
-      head.innerHTML = `
-        <tr>
-          <th rowspan="3">EMAIL</th>
-          <th rowspan="3">Empresa</th>
-          <th rowspan="3">Leg</th>
-          <th rowspan="3">NOMBRE</th>
-          <th colspan="4" class="day-group">${escapeHtml(dayHoy)}</th>
-          <th rowspan="3" class="col-sep"></th>
-          <th colspan="4" class="day-group">${escapeHtml(dayAnt)}</th>
-          <th rowspan="3" class="col-sep"></th>
-          <th colspan="4" class="day-group">${escapeHtml(dayMan)}</th>
-        </tr>
-        <tr>
-          <th colspan="4" class="day-date today">${escapeHtml(dateHoy)}</th>
-          <th colspan="4" class="day-date">${escapeHtml(dateAnt)}</th>
-          <th colspan="4" class="day-date">${escapeHtml(dateMan)}</th>
-        </tr>
-        <tr>
-          <th>Entrada</th><th>Comida<br>Inicia</th><th>Comida<br>Termina</th><th>Salida</th>
-          <th>Entrada</th><th>Comida<br>Inicia</th><th>Comida<br>Termina</th><th>Salida</th>
-          <th>Entrada</th><th>Comida<br>Inicia</th><th>Comida<br>Termina</th><th>Salida</th>
-        </tr>`;
-
-      // ---- Body: empezamos desde row 3 ----
-      const body = document.getElementById("grid-body");
-      let html = "";
+      const items = [];  // [{type: 'section'|'spacer'|'emp', ...}]
+      let currentSection = "";
       for (let i = 3; i < rows.length; i++) {
         const r = rows[i] || [];
         const col0 = (r[COL.email]   || "").trim();
@@ -302,48 +449,186 @@
         const col2 = (r[COL.leg]     || "").trim();
         const col3 = (r[COL.nombre]  || "").trim();
 
-        // Spacer row (todo vacío)
         if (!col0 && !col1 && !col2 && !col3) {
+          items.push({ type: "spacer" });
+          continue;
+        }
+        const isEmail = /@/.test(col0);
+        if (!isEmail && col0 && !col1 && !col2 && !col3) {
+          currentSection = col0;
+          items.push({ type: "section", text: col0, isVirgilio: /^Virgilio/i.test(col0) });
+          continue;
+        }
+        // Employee row
+        const isVirgilioSection = /^Virgilio/i.test(currentSection);
+        items.push({
+          type: "emp",
+          email: col0,
+          empresa: col1,
+          legSheet: col2,    // el legajo como lo escribe el sheet ("C8", "237", etc)
+          nombre: col3,
+          isVirgilio: isVirgilioSection,
+          // tiempos del sheet (solo se usan si NO es virgilio)
+          sheetTimes: {
+            hoy:      pickTimes(r, COL.hoy),
+            anterior: pickTimes(r, COL.anterior),
+            manual:   pickTimes(r, COL.manual)
+          }
+        });
+      }
+
+      return {
+        labels: { hoy: dayHoy, anterior: dayAnt, manual: dayMan },
+        dates: {
+          hoy:      parseSheetDate(dateHoy),
+          anterior: parseSheetDate(dateAnt),
+          manual:   parseSheetDate(dateMan)
+        },
+        rawDates: { hoy: dateHoy, anterior: dateAnt, manual: dateMan },
+        items
+      };
+    }
+
+    function pickTimes(row, colIdx) {
+      return {
+        entrada: (row[colIdx.entrada] || "").trim(),
+        ci:      (row[colIdx.ci]      || "").trim(),
+        ct:      (row[colIdx.ct]      || "").trim(),
+        salida:  (row[colIdx.salida]  || "").trim()
+      };
+    }
+
+    // "25/05/26", "22/5", "19/05/26", "5/1/2026" → "YYYY-MM-DD"
+    function parseSheetDate(s) {
+      if (!s) return null;
+      const m = String(s).trim().match(/^(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?$/);
+      if (!m) return null;
+      let day = parseInt(m[1], 10);
+      let month = parseInt(m[2], 10);
+      let year = m[3] ? parseInt(m[3], 10) : new Date().getFullYear();
+      if (year < 100) year += 2000;
+      if (!day || !month || month < 1 || month > 12) return null;
+      return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    }
+
+    // ============================================================
+    // Render
+    // ============================================================
+    function render(parsed, sbByDate, empleadosMap) {
+      const head = document.getElementById("grid-head");
+      head.innerHTML = `
+        <tr>
+          <th rowspan="3">EMAIL</th>
+          <th rowspan="3">Empresa</th>
+          <th rowspan="3">Leg</th>
+          <th rowspan="3">NOMBRE</th>
+          <th colspan="4" class="day-group">${escapeHtml(parsed.labels.hoy)}</th>
+          <th rowspan="3" class="col-sep"></th>
+          <th colspan="4" class="day-group">${escapeHtml(parsed.labels.anterior)}</th>
+          <th rowspan="3" class="col-sep"></th>
+          <th colspan="4" class="day-group">${escapeHtml(parsed.labels.manual)}</th>
+        </tr>
+        <tr>
+          <th colspan="4" class="day-date today">${escapeHtml(parsed.rawDates.hoy)}</th>
+          <th colspan="4" class="day-date">${escapeHtml(parsed.rawDates.anterior)}</th>
+          <th colspan="4" class="day-date">${escapeHtml(parsed.rawDates.manual)}</th>
+        </tr>
+        <tr>
+          <th>Entrada</th><th>Comida<br>Inicia</th><th>Comida<br>Termina</th><th>Salida</th>
+          <th>Entrada</th><th>Comida<br>Inicia</th><th>Comida<br>Termina</th><th>Salida</th>
+          <th>Entrada</th><th>Comida<br>Inicia</th><th>Comida<br>Termina</th><th>Salida</th>
+        </tr>`;
+
+      const body = document.getElementById("grid-body");
+      let html = "";
+      for (const it of parsed.items) {
+        if (it.type === "spacer") {
           html += `<tr class="spacer-row"><td colspan="17"></td></tr>`;
           continue;
         }
-
-        // Section header: tiene texto en col 0 pero vacío en col 1-3 y NO es email
-        const isEmail = /@/.test(col0);
-        if (!isEmail && col0 && !col1 && !col2 && !col3) {
-          html += `<tr class="section-row"><td colspan="17">${escapeHtml(col0)}</td></tr>`;
+        if (it.type === "section") {
+          const cls = it.isVirgilio ? "section-row virgilio" : "section-row";
+          html += `<tr class="${cls}"><td colspan="17">${escapeHtml(it.text)}</td></tr>`;
           continue;
         }
-
-        // Employee row
-        const t = (idx) => {
-          const v = (r[idx] || "").trim();
-          if (!v) return `<td class="col-time empty">—</td>`;
-          return `<td class="col-time">${escapeHtml(v)}</td>`;
+        // emp row
+        const times = resolveTimesForEmp(it, sbByDate, empleadosMap);
+        const cellsForDate = (d) => {
+          const t = times[d];
+          const cell = (val) => val
+            ? `<td class="col-time">${escapeHtml(val)}</td>`
+            : `<td class="col-time empty">—</td>`;
+          return cell(t.entrada) + cell(t.ci) + cell(t.ct) + cell(t.salida);
         };
+        const cls = it.isVirgilio ? "emp-row supabase" : "emp-row";
         html += `
-          <tr class="emp-row">
-            <td class="col-email">${escapeHtml(col0)}</td>
-            <td class="col-empresa">${escapeHtml(col1)}</td>
-            <td class="col-leg">${escapeHtml(col2)}</td>
-            <td class="col-nombre">${escapeHtml(col3)}</td>
-            ${t(COL.hoy.entrada)}${t(COL.hoy.ci)}${t(COL.hoy.ct)}${t(COL.hoy.salida)}
+          <tr class="${cls}">
+            <td class="col-email">${escapeHtml(it.email)}</td>
+            <td class="col-empresa">${escapeHtml(it.empresa)}</td>
+            <td class="col-leg">${escapeHtml(it.legSheet)}</td>
+            <td class="col-nombre">${escapeHtml(it.nombre)}</td>
+            ${cellsForDate("hoy")}
             <td class="col-sep"></td>
-            ${t(COL.anterior.entrada)}${t(COL.anterior.ci)}${t(COL.anterior.ct)}${t(COL.anterior.salida)}
+            ${cellsForDate("anterior")}
             <td class="col-sep"></td>
-            ${t(COL.manual.entrada)}${t(COL.manual.ci)}${t(COL.manual.ct)}${t(COL.manual.salida)}
+            ${cellsForDate("manual")}
           </tr>`;
       }
-      body.innerHTML = html || `<tr><td colspan="17" class="empty-state">Sheet vacío.</td></tr>`;
+      body.innerHTML = html || `<tr><td colspan="17" class="empty-state">Sin datos.</td></tr>`;
+    }
+
+    // Decide qué tiempos usar para cada empleado:
+    //   Virgilio → Supabase (lookup por email -> legajo)
+    //   Otros    → sheet directo
+    function resolveTimesForEmp(emp, sbByDate, empleadosMap) {
+      if (!emp.isVirgilio) {
+        return {
+          hoy:      emp.sheetTimes.hoy,
+          anterior: emp.sheetTimes.anterior,
+          manual:   emp.sheetTimes.manual
+        };
+      }
+      const legajo = emp.email ? empleadosMap.get(String(emp.email).toLowerCase().trim()) : null;
+      if (!legajo) {
+        // Virgilio pero email no esta linkeado en Empleados.
+        // Caemos al sheet por si el bridge llego (mejor algo que nada).
+        return {
+          hoy:      emp.sheetTimes.hoy,
+          anterior: emp.sheetTimes.anterior,
+          manual:   emp.sheetTimes.manual
+        };
+      }
+      return {
+        hoy:      sbRowToTimes(sbByDate.hoy.get(legajo)),
+        anterior: sbRowToTimes(sbByDate.anterior.get(legajo)),
+        manual:   sbRowToTimes(sbByDate.manual.get(legajo))
+      };
+    }
+    function sbRowToTimes(row) {
+      if (!row) return { entrada: "", ci: "", ct: "", salida: "" };
+      return {
+        entrada: row.entrada ? hhmm(row.entrada) : "",
+        ci:      row.ci      ? hhmm(row.ci)      : "",
+        ct:      row.ct      ? hhmm(row.ct)      : "",
+        salida:  row.salida  ? hhmm(row.salida)  : ""
+      };
+    }
+    function hhmm(d) {
+      if (!(d instanceof Date) || isNaN(d.getTime())) return "";
+      try {
+        return d.toLocaleTimeString("es-AR", {
+          hour: "2-digit", minute: "2-digit",
+          timeZone: "America/Argentina/Buenos_Aires"
+        });
+      } catch {
+        return d.toISOString().slice(11, 16);
+      }
     }
 
     // ============================================================
     // Helpers
     // ============================================================
     function parseCSV(text) {
-      // Parser CSV simple — soporta comillas, comas dentro de comillas,
-      // comillas dobles escapadas ("" -> "). El sheet de Google viene
-      // con LF (sin CR), pero por las dudas tratamos ambos.
       const rows = [];
       let row = [];
       let cell = "";
