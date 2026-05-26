@@ -6,7 +6,7 @@
    ⚠ IMPORTANTE: SUPABASE_URL y SUPABASE_KEY están duplicados acá y en
    index.html. Si rotás la publishable key, hay que actualizar AMBOS.
    ========================================================= */
-const SW_VERSION = "v1.42-vir";
+const SW_VERSION = "v1.43-vir";
 
 /* Cache del HTML para servir offline (último deploy bueno) cuando no hay red. */
 const HTML_CACHE = "html-" + SW_VERSION;

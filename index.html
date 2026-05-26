@@ -1371,7 +1371,7 @@ button {
 </div>
 
 <!-- Badge de versión + estado de cola (abajo a la izquierda) -->
-<div id="versionBadge">v1.42 ✓</div>
+<div id="versionBadge">v1.43 ✓</div>
 
 <!-- QR de fichada (TOTP rotativo) — abajo a la derecha. Genera tokens cada
      30s que apuntan a la app FichadaQR; los operarios escanean para fichar. -->
@@ -1479,6 +1479,52 @@ button {
 </div>
 
 <script>
+/* =========================================================
+   DIAG v1.43 — overlay de errores en pantalla.
+   La TV no tiene consola, así que capturamos errores no atrapados y
+   rejections y los mostramos arriba de todo. Quitar cuando se resuelva.
+   ========================================================= */
+(function(){
+  function box(){
+    var b = document.getElementById("__diagBox");
+    if(!b){
+      b = document.createElement("div");
+      b.id = "__diagBox";
+      b.style.cssText = "position:fixed;left:0;right:0;top:0;z-index:2147483647;"+
+        "background:#111;color:#eee;font:13px/1.45 monospace;padding:8px 30px 8px 8px;"+
+        "max-height:65vh;overflow:auto;white-space:pre-wrap;border-bottom:3px solid #555;";
+      var x = document.createElement("button");
+      x.textContent = "×";
+      x.style.cssText = "position:fixed;right:6px;top:4px;z-index:2147483647;background:#eee;"+
+        "color:#111;border:0;font:bold 18px monospace;padding:0 9px;cursor:pointer;";
+      x.onclick = function(){ b.style.display="none"; x.style.display="none"; };
+      (document.body||document.documentElement).appendChild(b);
+      (document.body||document.documentElement).appendChild(x);
+    }
+    return b;
+  }
+  function log(msg, color){
+    try{
+      var b = box();
+      var d = document.createElement("div");
+      d.style.color = color || "#fca5a5";
+      d.textContent = msg;
+      b.appendChild(d);
+      b.scrollTop = b.scrollHeight;
+    }catch(_){}
+  }
+  window.__diag = function(t, detail){ log("• " + t + (detail ? (" — " + detail) : ""), "#86efac"); };
+  window.addEventListener("error", function(e){
+    log("⚠ " + (e.message || "error") + "\n  en " + (e.filename || "?") + ":" +
+        (e.lineno || "?") + ":" + (e.colno || "?") +
+        ((e.error && e.error.stack) ? ("\n  " + e.error.stack) : ""), "#fca5a5");
+  });
+  window.addEventListener("unhandledrejection", function(e){
+    var r = e.reason;
+    log("⚠ promise sin catch: " + ((r && (r.stack || r.message)) || String(r)), "#fca5a5");
+  });
+})();
+
 /* =========================================================
    SUPABASE
    Org "Gestion Productiva" / Proyecto "Control Partes Talleristas".
@@ -3075,7 +3121,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v1.42";
+const APP_VERSION = "v1.43";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -4979,6 +5025,9 @@ async function refreshMonitor() {
     }
   }
 }
+
+/* DIAG v1.43: si llegamos acá, el top-level del script corrió completo. */
+try { window.__diag && window.__diag("script init OK v1.43"); } catch (_) {}
 </script>
 
 </body>
