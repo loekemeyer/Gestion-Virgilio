@@ -6,7 +6,7 @@
    ⚠ IMPORTANTE: SUPABASE_URL y SUPABASE_KEY están duplicados acá y en
    index.html. Si rotás la publishable key, hay que actualizar AMBOS.
    ========================================================= */
-const SW_VERSION = "v1.41-vir";
+const SW_VERSION = "v1.42-vir";
 
 /* Cache del HTML para servir offline (último deploy bueno) cuando no hay red. */
 const HTML_CACHE = "html-" + SW_VERSION;
@@ -230,7 +230,9 @@ self.addEventListener("fetch", (event) => {
   event.respondWith((async () => {
     try {
       // cache:"no-store" => ignora el cache HTTP del navegador y va a la red.
-      const fresh = await fetch(req, { cache: "no-store" });
+      // Pedimos por URL (no el Request en modo "navigate") para evitar el
+      // pitfall de construir un Request navigate con init.
+      const fresh = await fetch(req.url, { cache: "no-store" });
       if (fresh && fresh.ok) {
         (await caches.open(HTML_CACHE)).put(req, fresh.clone());
       }
