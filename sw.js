@@ -6,7 +6,10 @@
    ⚠ IMPORTANTE: SUPABASE_URL y SUPABASE_KEY están duplicados acá y en
    index.html. Si rotás la publishable key, hay que actualizar AMBOS.
    ========================================================= */
-const SW_VERSION = "v1.40-vir";
+const SW_VERSION = "v1.41-vir";
+
+/* Cache del HTML para servir offline (último deploy bueno) cuando no hay red. */
+const HTML_CACHE = "html-" + SW_VERSION;
 
 const SUPABASE_URL = "https://hrxfctzncixxqmpfhskv.supabase.co";
 const SUPABASE_KEY = "sb_publishable_BqpAgZH6ty-9wft10_YMhw_0rcIPuWT";
@@ -194,7 +197,14 @@ self.addEventListener("install", () => {
   self.skipWaiting();
 });
 self.addEventListener("activate", (event) => {
-  event.waitUntil(self.clients.claim());
+  event.waitUntil((async () => {
+    // Borrar caches de HTML de versiones anteriores.
+    const keys = await caches.keys();
+    await Promise.all(
+      keys.filter(k => k !== HTML_CACHE).map(k => caches.delete(k))
+    );
+    await self.clients.claim();
+  })());
 });
 self.addEventListener("sync", (event) => {
   if (event.tag === "flush-queue") {
@@ -209,7 +219,27 @@ self.addEventListener("message", (event) => {
   }
 });
 
-/* Fetch handler vacío. No interceptamos requests (no hacemos offline caching
-   del HTML, solo Background Sync). Algunos navegadores son quisquillosos
-   con SWs que no tienen handler de fetch para considerarlo "completo". */
-self.addEventListener("fetch", () => {});
+/* Fetch handler: SOLO maneja navegaciones same-origin (el HTML) en modo
+   network-first, salteando el cache HTTP caprichoso de smart TVs / WebViews
+   viejos. Todo lo demás (incluidas las llamadas a Supabase, que son
+   cross-origin) pasa de largo sin interceptar, preservando el Background Sync. */
+self.addEventListener("fetch", (event) => {
+  const req = event.request;
+  if (req.mode !== "navigate") return;                          // solo el HTML
+  if (new URL(req.url).origin !== self.location.origin) return; // no tocar cross-origin
+  event.respondWith((async () => {
+    try {
+      // cache:"no-store" => ignora el cache HTTP del navegador y va a la red.
+      const fresh = await fetch(req, { cache: "no-store" });
+      if (fresh && fresh.ok) {
+        (await caches.open(HTML_CACHE)).put(req, fresh.clone());
+      }
+      return fresh;
+    } catch (e) {
+      // Offline: devolver el último HTML guardado.
+      return (await caches.match(req)) ||
+             (await caches.match("./")) ||
+             Promise.reject(e);
+    }
+  })());
+});
