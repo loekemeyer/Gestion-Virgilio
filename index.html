@@ -1828,7 +1828,7 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
 </div>
 
 <!-- Badge de versión + estado de cola (abajo a la izquierda) -->
-<div id="versionBadge">v1.64 ✓</div>
+<div id="versionBadge">v1.65 ✓</div>
 
 <!-- QR de fichada (TOTP rotativo) — abajo a la derecha. Genera tokens cada
      30s que apuntan a la app FichadaQR; los operarios escanean para fichar. -->
@@ -3566,7 +3566,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v1.64";
+const APP_VERSION = "v1.65";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -6875,9 +6875,11 @@ function setLegajoTitle(text) {
   else { h.classList.add("hidden"); }
 }
 
-/* Mensaje a mostrar en la pantalla deslogueada tras un rechazo
-   (p. ej. email no autorizado). showLoggedOut() lo consume una vez. */
-let pendingAuthMsg = null;
+/* Leyenda de rechazo (email no autorizado). Persiste en la pantalla de login
+   hasta que el usuario vuelva a intentar (signInWithGoogle la limpia). NO se
+   consume en el primer render: si no, el segundo showLoggedOut (disparado por
+   el evento de signOut) la borraría y el aviso desaparecería al instante. */
+let rejectedMsg = null;
 
 function showLoggedOut() {
   window.__isSupervisor = false;
@@ -6889,7 +6891,7 @@ function showLoggedOut() {
   setLegajoTitle("Producción Virgilio");
   const btn = $("googleSignInBtn");
   if (btn) btn.disabled = false;
-  if (pendingAuthMsg) { setAuthStatus(pendingAuthMsg, true); pendingAuthMsg = null; }
+  if (rejectedMsg) setAuthStatus(rejectedMsg, true);
   else setAuthStatus("Iniciá sesión para continuar", false);
 }
 
@@ -6933,9 +6935,10 @@ async function showLoggedIn(user) {
   // 2) Operario: debe estar en Empleados (allowlist).
   const emp = await resolveEmpleadoByEmail(email);
   if (emp) { showOperario(emp); return; }
-  // 3) No autorizado -> signOut inmediato (no le damos acceso usable).
-  pendingAuthMsg = "La cuenta " + email + " no está autorizada. " +
-    "Pedile al supervisor que cargue tu email en Empleados.";
+  // 3) No autorizado -> signOut inmediato (no le damos acceso usable) y dejamos
+  //    la leyenda fija en la pantalla de login.
+  rejectedMsg = "La cuenta " + email + " no está autorizada. " +
+    "Pedile al supervisor que te dé acceso.";
   try { await sb.auth.signOut(); } catch (_e) {}
   showLoggedOut();
 }
@@ -6951,6 +6954,7 @@ async function applyAuthState() {
 }
 
 window.signInWithGoogle = async function () {
+  rejectedMsg = null;  // nuevo intento: limpiamos la leyenda de rechazo previa
   const btn = $("googleSignInBtn");
   if (btn) btn.disabled = true;
   setAuthStatus("Redirigiendo a Google…", false);
