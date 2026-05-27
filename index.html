@@ -1213,39 +1213,44 @@ button {
    se vayan abajo. Aplica siempre al monitor (que abre en .tv), sin depender de
    la altura del viewport (algunas TV reportan alturas raras).
    ===================================================== */
-#monitorModal.tv .monitor-title{ font-size: 22px; }
-#monitorModal.tv .monitor-meta{ font-size: 11px; }
-#monitorModal.tv #monitorClock{ font-size: 18px; }
-#monitorModal.tv .monitor-refresh{ font-size: 12px; }
-#monitorModal.tv .monitor-header{ padding: 6px 0; }
+#monitorModal.tv .monitor-title{ font-size: 19px; }
+#monitorModal.tv .monitor-meta{ font-size: 10px; }
+#monitorModal.tv #monitorClock{ font-size: 15px; }
+#monitorModal.tv .monitor-refresh{ font-size: 11px; }
+#monitorModal.tv .monitor-header{ padding: 5px 0; }
+/* Espacios entre columnas reducidos para ganar ancho */
+#monitorModal.tv .monitor-flex{ gap: 10px; }
+#monitorModal.tv .monitor-totales-side{ gap: 8px; }
+#monitorModal.tv .totales-col-fc{ gap: 6px; }
 /* Tabla principal ANGOSTA (fuente y padding chicos) */
-#monitorModal.tv .monitor-table{ font-size: 14px; }
-#monitorModal.tv .monitor-table th{ font-size: 13px; padding: 6px 4px; }
-#monitorModal.tv .monitor-table td{ padding: 3px 4px; }
-#monitorModal.tv .status-icon{ font-size: 18px; }
-#monitorModal.tv .monitor-legajo{ font-size: 0.72em; }
-/* Cuadrados ANGOSTOS: una sola columna vertical (no se expanden a lo ancho) */
-#monitorModal.tv .totales-day-rows{ flex-flow: column nowrap; max-height: none; gap: 5px; }
-#monitorModal.tv .monitor-tot-box{ width: 92px; padding: 3px 6px; }
-#monitorModal.tv .monitor-tot-label{ font-size: 11px; }
-#monitorModal.tv .monitor-tot-value{ font-size: 20px; }
+#monitorModal.tv .monitor-table{ font-size: 12px; }
+#monitorModal.tv .monitor-table th{ font-size: 11px; padding: 5px 3px; line-height: 1.1; }
+#monitorModal.tv .monitor-table td{ padding: 2px 3px; }
+#monitorModal.tv .status-icon{ font-size: 16px; }
+#monitorModal.tv .monitor-legajo{ font-size: 0.7em; }
+/* Cuadrados ANGOSTOS: una sola columna vertical, bien chicos */
+#monitorModal.tv .totales-day-rows{ flex-flow: column nowrap; max-height: none; gap: 4px; }
+#monitorModal.tv .totales-row{ gap: 4px; }
+#monitorModal.tv .monitor-tot-box{ width: 72px; padding: 2px 4px; }
+#monitorModal.tv .monitor-tot-label{ font-size: 9px; }
+#monitorModal.tv .monitor-tot-value{ font-size: 16px; }
 /* Tablas FC / Total por día compactas */
 #monitorModal.tv .monitor-total-card,
-#monitorModal.tv .monitor-fc-card{ padding: 7px 9px; }
+#monitorModal.tv .monitor-fc-card{ padding: 6px 7px; }
 #monitorModal.tv .monitor-total-title,
-#monitorModal.tv .monitor-fc-title{ font-size: 14px; margin-bottom: 5px; }
-#monitorModal.tv .monitor-total-table{ font-size: 13px; }
-#monitorModal.tv .monitor-total-table th{ font-size: 11px; padding: 3px 6px; }
-#monitorModal.tv .monitor-total-table td{ padding: 2px 6px; }
-#monitorModal.tv .monitor-total-table td.num{ font-size: 13px; }
-#monitorModal.tv .monitor-total-table td.total-cell{ font-size: 16px; }
-#monitorModal.tv .monitor-fc-table{ font-size: 13px; }
+#monitorModal.tv .monitor-fc-title{ font-size: 12px; margin-bottom: 4px; }
+#monitorModal.tv .monitor-total-table{ font-size: 11px; }
+#monitorModal.tv .monitor-total-table th{ font-size: 10px; padding: 2px 4px; }
+#monitorModal.tv .monitor-total-table td{ padding: 2px 4px; }
+#monitorModal.tv .monitor-total-table td.num{ font-size: 11px; }
+#monitorModal.tv .monitor-total-table td.total-cell{ font-size: 14px; }
+#monitorModal.tv .monitor-fc-table{ font-size: 11px; }
 #monitorModal.tv .monitor-fc-table th,
-#monitorModal.tv .monitor-fc-table td{ padding: 3px 6px; }
+#monitorModal.tv .monitor-fc-table td{ padding: 2px 4px; }
 /* Leyenda de operarios + "fuera de ventana" compactos */
-#monitorModal.tv .monitor-legend{ font-size: 12px; }
-#monitorModal.tv .beyond-summary{ font-size: 14px; }
-#monitorModal.tv .beyond-day{ font-size: 12px; }
+#monitorModal.tv .monitor-legend{ font-size: 11px; }
+#monitorModal.tv .beyond-summary{ font-size: 12px; }
+#monitorModal.tv .beyond-day{ font-size: 11px; }
 
 /* Tandas a FC — bloque a la derecha con tandas ya terminadas (picking + separado).
    En el grid de .monitor-totales-side ocupa ambas columnas. */
@@ -1859,7 +1864,7 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
 </div>
 
 <!-- Badge de versión + estado de cola (abajo a la izquierda) -->
-<div id="versionBadge">v1.78 ✓</div>
+<div id="versionBadge">v1.79 ✓</div>
 
 <!-- QR de fichada (TOTP rotativo) — abajo a la derecha. Genera tokens cada
      30s que apuntan a la app FichadaQR; los operarios escanean para fichar. -->
@@ -3606,7 +3611,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v1.78";
+const APP_VERSION = "v1.79";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
