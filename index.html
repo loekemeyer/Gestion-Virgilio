@@ -1810,7 +1810,7 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
 </div>
 
 <!-- Badge de versión + estado de cola (abajo a la izquierda) -->
-<div id="versionBadge">v1.62 ✓</div>
+<div id="versionBadge">v1.63 ✓</div>
 
 <!-- QR de fichada (TOTP rotativo) — abajo a la derecha. Genera tokens cada
      30s que apuntan a la app FichadaQR; los operarios escanean para fichar. -->
@@ -3535,7 +3535,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v1.62";
+const APP_VERSION = "v1.63";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -6796,15 +6796,36 @@ async function resolveLegajoByEmail(email) {
   } catch (_e) { return null; }
 }
 
+/* Mensaje a mostrar en la pantalla deslogueada tras un rechazo
+   (p. ej. email no autorizado). showLoggedOut() lo consume una vez. */
+let pendingAuthMsg = null;
+
 function showLoggedOut() {
   $("authBlock").classList.remove("hidden");
   $("legajoEntry").classList.add("hidden");
+  const row = $("authUserRow");
+  if (row) row.classList.add("hidden");
   const btn = $("googleSignInBtn");
   if (btn) btn.disabled = false;
-  setAuthStatus("Iniciá sesión para continuar", false);
+  if (pendingAuthMsg) { setAuthStatus(pendingAuthMsg, true); pendingAuthMsg = null; }
+  else setAuthStatus("Iniciá sesión para continuar", false);
 }
 
 async function showLoggedIn(user) {
+  // Allowlist: sólo entran los emails ya cargados en Empleados. Si el email
+  // no está autorizado, lo deslogueamos al instante (no creamos una "sesión
+  // usable" para cuentas de Google ajenas) y volvemos a la pantalla de login.
+  const legajo = await resolveLegajoByEmail(user.email);
+  if (!legajo) {
+    pendingAuthMsg = "La cuenta " + (user.email || "") + " no está autorizada. " +
+      "Pedile al supervisor que cargue tu email en Empleados.";
+    try { await sb.auth.signOut(); } catch (_e) {}
+    // signOut dispara onAuthStateChange -> applyAuthState -> showLoggedOut,
+    // que mostrará pendingAuthMsg. Por las dudas lo forzamos también acá.
+    showLoggedOut();
+    return;
+  }
+  // Email autorizado: revelamos la entrada de legajo ya pre-rellenada.
   $("authBlock").classList.add("hidden");
   $("legajoEntry").classList.remove("hidden");
   const row = $("authUserRow");
@@ -6812,22 +6833,14 @@ async function showLoggedIn(user) {
     row.classList.remove("hidden");
     $("authUserEmail").textContent = user.email || "";
   }
-  const legajo = await resolveLegajoByEmail(user.email);
   const input = $("legajoInput");
-  if (legajo) {
-    if (input) input.value = legajo;
-    try {
-      if (typeof saveLastLegajo === "function") saveLastLegajo(legajo);
-      if (typeof renderLegajoHistory === "function") renderLegajoHistory(legajo);
-      if (typeof updateCoreButtonsState === "function") updateCoreButtonsState();
-      if (typeof renderPendingSuggestion === "function") renderPendingSuggestion();
-    } catch (_e) {}
-  } else {
-    // Email logueado pero sin legajo vinculado en Empleados.
-    setAuthStatus("Tu cuenta (" + (user.email || "") + ") no está vinculada a un legajo. Pedile al supervisor que cargue tu email en Empleados.", true);
-    $("authBlock").classList.remove("hidden");
-    if (input) input.value = "";
-  }
+  if (input) input.value = legajo;
+  try {
+    if (typeof saveLastLegajo === "function") saveLastLegajo(legajo);
+    if (typeof renderLegajoHistory === "function") renderLegajoHistory(legajo);
+    if (typeof updateCoreButtonsState === "function") updateCoreButtonsState();
+    if (typeof renderPendingSuggestion === "function") renderPendingSuggestion();
+  } catch (_e) {}
 }
 
 async function applyAuthState() {

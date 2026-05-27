@@ -88,17 +88,27 @@ Todo vive en `index.html`, alternando con la clase `.hidden` (no hay router):
   mostrando sólo el botón "Iniciar sesión con Google" (`#authBlock`); la entrada
   de legajo (`#legajoEntry`, input + "Continuar") queda oculta hasta que haya
   sesión. Tras loguear, se resuelve `email → Legajo` consultando la tabla
-  `Empleados` (`email=eq.<mail>&select=Legajo`, SELECT anónimo permitido por RLS)
-  y se **pre-rellena** el input; el operario confirma con "Continuar". La sesión
-  la persiste `supabase-js` en `localStorage`, así las próximas veces entra solo.
+  `Empleados` (`email=eq.<mail>&select=Legajo`, SELECT anónimo permitido por RLS).
+  **Allowlist estricta:** sólo entran emails ya cargados en `Empleados`. Si el
+  email logueado no matchea ninguno, se llama `signOut()` al instante y se vuelve
+  a la pantalla de login con el aviso "no autorizada" (no se le da acceso usable a
+  cuentas de Google ajenas). Si matchea, se **pre-rellena** el input con el Legajo
+  y el operario confirma con "Continuar". La sesión la persiste `supabase-js` en
+  `localStorage`, así las próximas veces entra solo. Para **autorizar** a alguien
+  nuevo, el supervisor carga su email en `Empleados`.
   El cliente de auth es un `<script type="module">` al final del `index.html` que
   importa `@supabase/supabase-js@2` desde CDN (jsdelivr). Muestra "Resumen de
   hoy", la cola de pendientes y el banner de "deshacer último mensaje".
   - **Requisitos de config (fuera del código):** provider Google habilitado en
     Supabase Auth · la URL de GitHub Pages (`https://loekemeyer.github.io/tv-v/`)
-    en la allowlist de *Redirect URLs* · "Allow new user signups" habilitado ·
-    consent screen de Google OAuth en producción (o el operario como test user) ·
-    el `email` del empleado cargado en `Empleados` (hoy sólo ~9 de 58 lo tienen).
+    en la allowlist de *Redirect URLs* · consent screen de Google OAuth en
+    producción (o el operario como test user) · el `email` del empleado cargado
+    en `Empleados` (hoy sólo ~9 de 58 lo tienen).
+  - La allowlist es a nivel app (chequeo contra `Empleados` + `signOut`). Una
+    cuenta de Google ajena que complete el OAuth igual crea una fila transitoria
+    en `auth.users`, pero queda deslogueada y sin acceso. Para impedir incluso esa
+    creación habría que un *before-user-created hook* o desactivar signups a nivel
+    proyecto (afecta también al otro programa que comparte el Auth).
   - El límite de "sólo 2 mails" del otro programa que usa el mismo proyecto Auth
     es lógica de *esa* app, **no** una restricción de Supabase (no hay hook ni
     trigger en el esquema `auth`): no afecta a esta app.
