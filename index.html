@@ -502,18 +502,18 @@ button {
   margin-top: 4px;
 }
 #qrFichadaBox #qrSecs{ color: #1e6bd6; }
-/* En modo TV: QR abajo a la DERECHA y toda la sección bien chica (recuadro,
-   textos y código). */
-#monitorModal.tv.show ~ #qrFichadaBox{
-  right: 8px;
-  left: auto;
-  padding: 3px 5px 5px 5px;
-}
-#monitorModal.tv.show ~ #qrFichadaBox .qr-label{ font-size: 9px; margin-bottom: 1px; letter-spacing: 0; }
-#monitorModal.tv.show ~ #qrFichadaBox .qr-countdown{ font-size: 8px; margin-top: 1px; }
+/* TV en pantalla ANCHA (PC viendo el monitor): QR tamaño original. */
 #monitorModal.tv.show ~ #qrFichadaBox #qrCanvas{
-  width: clamp(40px, 4.5vh, 56px);
-  height: clamp(40px, 4.5vh, 56px);
+  width: clamp(140px, 11vh, 190px);
+  height: clamp(140px, 11vh, 190px);
+}
+/* Viewport ANGOSTO (TV box en Chrome modo ordenador, ~980px): QR chico y
+   compacto, abajo a la derecha. (En PC ancha NO aplica → queda grande.) */
+@media (max-width: 1150px){
+  #monitorModal.tv.show ~ #qrFichadaBox{ right: 8px; left: auto; padding: 3px 5px 5px 5px; }
+  #monitorModal.tv.show ~ #qrFichadaBox .qr-label{ font-size: 9px; margin-bottom: 1px; letter-spacing: 0; }
+  #monitorModal.tv.show ~ #qrFichadaBox .qr-countdown{ font-size: 8px; margin-top: 1px; }
+  #monitorModal.tv.show ~ #qrFichadaBox #qrCanvas{ width: clamp(40px, 4.5vh, 56px); height: clamp(40px, 4.5vh, 56px); }
 }
 .monitor-meta{ font-size: 11px; color: #666; margin-top: 2px; }
 .monitor-table{
@@ -1215,11 +1215,13 @@ button {
 #monitorModal.tv .monitor-loading{ font-size: 24px; color: #94a3b8; }
 
 /* =====================================================
-   MONITOR TV — modo COMPACTO. La tabla principal y los cuadrados quedan
-   ANGOSTOS para que "Tandas a FC" y "Total por día" entren a la derecha y NO
-   se vayan abajo. Aplica siempre al monitor (que abre en .tv), sin depender de
-   la altura del viewport (algunas TV reportan alturas raras).
+   MONITOR — modo COMPACTO SOLO EN VIEWPORT ANGOSTO (≤1150px), p.ej. el TV box
+   con Chrome en "modo ordenador" (~980px). Achica la tabla principal y los
+   cuadrados para que "Tandas a FC" y "Total por día" entren a la derecha sin
+   irse abajo. En PC con pantalla ancha NO aplica → el monitor se ve grande
+   como al inicio.
    ===================================================== */
+@media (max-width: 1150px){
 #monitorModal.tv .monitor-title{ font-size: 19px; }
 #monitorModal.tv .monitor-meta{ font-size: 10px; }
 #monitorModal.tv #monitorClock{ font-size: 15px; }
@@ -1261,6 +1263,7 @@ button {
 #monitorModal.tv .monitor-legend{ font-size: 11px; }
 #monitorModal.tv .beyond-summary{ font-size: 12px; }
 #monitorModal.tv .beyond-day{ font-size: 11px; }
+}  /* fin @media (max-width: 1150px) — modo compacto del monitor */
 
 /* Tandas a FC — bloque a la derecha con tandas ya terminadas (picking + separado).
    En el grid de .monitor-totales-side ocupa ambas columnas. */
@@ -1874,7 +1877,7 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
 </div>
 
 <!-- Badge de versión + estado de cola (abajo a la izquierda) -->
-<div id="versionBadge">v1.83 ✓</div>
+<div id="versionBadge">v1.84 ✓</div>
 
 <!-- QR de fichada (TOTP rotativo) — abajo a la derecha. Genera tokens cada
      30s que apuntan a la app FichadaQR; los operarios escanean para fichar. -->
@@ -3621,7 +3624,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v1.83";
+const APP_VERSION = "v1.84";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
