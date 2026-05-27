@@ -505,8 +505,8 @@ button {
 /* En modo TV (monitor fullscreen abierto) mantenemos el QR a un tamaño
    parecido al de PC — antes crecía hasta 260px y quedaba demasiado grande. */
 #monitorModal.tv.show ~ #qrFichadaBox #qrCanvas{
-  width: clamp(90px, 8vh, 120px);
-  height: clamp(90px, 8vh, 120px);
+  width: clamp(72px, 7vh, 100px);
+  height: clamp(72px, 7vh, 100px);
 }
 .monitor-meta{ font-size: 11px; color: #666; margin-top: 2px; }
 .monitor-table{
@@ -1864,7 +1864,7 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
 </div>
 
 <!-- Badge de versión + estado de cola (abajo a la izquierda) -->
-<div id="versionBadge">v1.79 ✓</div>
+<div id="versionBadge">v1.80 ✓</div>
 
 <!-- QR de fichada (TOTP rotativo) — abajo a la derecha. Genera tokens cada
      30s que apuntan a la app FichadaQR; los operarios escanean para fichar. -->
@@ -3611,7 +3611,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v1.79";
+const APP_VERSION = "v1.80";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
