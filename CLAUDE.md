@@ -30,8 +30,6 @@ inventes**.
 
 ## Git
 
-- Desarrollar en la branch **`claude/fix-virgilio-production-GoGCS`**, commitear y
-  pushear ahí. No pushear a otra branch sin permiso explícito.
-- `main` es lo que queda **online** (GitHub Pages). Llevar cambios a `main` =
-  publicarlos en vivo: confirmarlo con el usuario antes.
+- **Este es un repo de PRUEBA** (`tv-v`), espejo de Producción Virgilio. Trabajar
+  **directo en `main`**: commitear y pushear ahí sin preguntar.
 - Estilo de commits: `vX.YZ: descripción` cuando hay bump de versión.
