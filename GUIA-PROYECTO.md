@@ -119,15 +119,7 @@ Todo vive en `index.html`, alternando con la clase `.hidden` (no hay router):
     en `load` muestra el **panel "Administración"** (`showKioskAdminPanel()`: revela
     `#supervisorPanel` con los 4 botones, oculta login/operario y el botón Salir). NO
     auto-abre nada: en la TV se elige qué ver. Todo **sin Google y sin depender de
-    `supabase.js`** (el módulo de auth detecta `__tvKioskMode` y no inicializa).
-  - **Compatibilidad con TV viejas (`legacy-tv`):** los Smart TV / TV box (LG webOS,
-    Chromium ~38/53) NO soportan CSS Grid, `clamp()` ni `gap` de flexbox — que el monitor
-    usa para layout y tamaños. Un `<script>` al inicio del body detecta esto con
-    `CSS.supports(...)` y agrega `<html class="legacy-tv">`. Hay un bloque CSS
-    `html.legacy-tv #monitorModal.tv ...` que reescribe el monitor con **float** (en vez
-    de grid), **tamaños fijos grandes** (en vez de clamp) y **márgenes** (en vez de gap),
-    pensado para 1366×768 (LG 32LJ600B). No afecta navegadores modernos (siguen con
-    grid/clamp). Para probar el modo viejo: forzar `document.documentElement.classList.add('legacy-tv')`. `MONITOR_TV_KEY` es constante en
+    `supabase.js`** (el módulo de auth detecta `__tvKioskMode` y no inicializa). `MONITOR_TV_KEY` es constante en
     `index.html` (hoy `"virgilio-tv"`); cambiala para rotar la clave (los devices ya
     enrolados siguen hasta que se borren los datos del navegador). Para des-enrolar un
     device: borrar datos del navegador. El resto (celulares/PC) sigue con login Google.
