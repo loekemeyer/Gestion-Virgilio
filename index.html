@@ -27,6 +27,7 @@ button {
 .primary-btn { background: #1e6bd6; color: white; border: none; }
 
 /* ---------- PANTALLA LEGAJO ---------- */
+#legajoScreen { padding-top: 30px; }  /* despeja el #userTag fijo arriba-izq */
 #legajoScreen h1 { font-size: 36px; text-align: center; }
 #legajoInput { width: 100%; font-size: 34px; padding: 12px; text-align: center; border: 6px solid; }
 
@@ -40,6 +41,22 @@ button {
 .google-btn svg { width: 26px; height: 26px; flex: 0 0 auto; }
 #authStatus { text-align: center; margin-top: 12px; min-height: 22px; }
 #authStatus.error { color: #c0392b; font-weight: bold; }
+.operario-greeting {
+  text-align: center; font-size: 26px; font-weight: bold; color: #1f1f1f;
+  margin: 8px 0 16px;
+}
+.auth-logout-row { text-align: center; margin-top: 10px; }
+.auth-logout-row .auth-logout-btn { display: inline-block; }
+/* Nombre del usuario logueado, fijo arriba a la izquierda. */
+#userTag {
+  position: fixed; top: 8px; left: 8px; z-index: 60;
+  background: #eef2ff; color: #1e3a8a; border: 1px solid #c7d2fe;
+  font-size: 13px; font-weight: bold; padding: 4px 12px; border-radius: 12px;
+  max-width: 60vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+#userTag.hidden { display: none; }
+/* En la pantalla de opciones, bajamos la top-bar para no tapar el #userTag. */
+#optionsScreen .top-bar { margin-top: 30px; }
 .auth-user-row {
   display: flex; align-items: center; justify-content: space-between;
   gap: 10px; margin-bottom: 12px; font-size: 15px; color: #444;
@@ -1711,18 +1728,19 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
 <!-- Botón flotante: historial de días anteriores -->
 <button id="btnHistDias" title="Historial de días anteriores">📅</button>
 
-<!-- Botón flotante: monitor de operarios (supervisor) -->
-<button id="btnMonitor" title="Monitor de operarios" onclick="openMonitor()">📊</button>
+<!-- Botones flotantes de SUPERVISOR (📊 📋 ⚠ 📈). Ocultos por defecto;
+     el módulo de auth los muestra solo si el email es supervisor. -->
+<button id="btnMonitor" class="hidden" title="Monitor de operarios" onclick="openMonitor()">📊</button>
 
 <!-- Botón flotante 📋 — pantalla de facturación (NPs a FC para ventas).
      Acceso directo desde URL con ?monitor=fc para colgar en el 2do monitor. -->
-<button id="btnFacturacion" title="Facturación — NPs a FC" onclick="openFacturacion()">📋</button>
+<button id="btnFacturacion" class="hidden" title="Facturación — NPs a FC" onclick="openFacturacion()">📋</button>
 
 <!-- Botón flotante ⚠ — abre el Monitor Virgilio directo en la pestaña Inconsistencias -->
-<button id="btnIncons" title="Inconsistencias" onclick="openInconsistencias()">⚠</button>
+<button id="btnIncons" class="hidden" title="Inconsistencias" onclick="openInconsistencias()">⚠</button>
 
 <!-- Botón flotante 📈 — gráficos de productividad picking y pedido -->
-<button id="btnAnalisis" title="Análisis Productividad" onclick="openAnalisis()">📈</button>
+<button id="btnAnalisis" class="hidden" title="Análisis Productividad" onclick="openAnalisis()">📈</button>
 
 <!-- Modal: monitor de operarios -->
 <div id="monitorModal" onclick="if(event.target.id==='monitorModal') closeMonitor()">
@@ -1810,7 +1828,7 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
 </div>
 
 <!-- Badge de versión + estado de cola (abajo a la izquierda) -->
-<div id="versionBadge">v1.63 ✓</div>
+<div id="versionBadge">v1.64 ✓</div>
 
 <!-- QR de fichada (TOTP rotativo) — abajo a la derecha. Genera tokens cada
      30s que apuntan a la app FichadaQR; los operarios escanean para fichar. -->
@@ -1855,9 +1873,12 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
   </div>
 </div>
 
+<!-- Nombre del usuario logueado — arriba a la izquierda, persistente. -->
+<div id="userTag" class="hidden"></div>
+
 <!-- ================= LEGAJO ================= -->
 <div id="legajoScreen">
-  <h1>Ingresá tu número de legajo</h1>
+  <h1 id="legajoTitle">Producción Virgilio</h1>
 
   <!-- Login con Google (obligatorio). Visible mientras no haya sesión. -->
   <div id="authBlock">
@@ -1868,14 +1889,24 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
     <div id="authStatus" class="small">Iniciá sesión para continuar</div>
   </div>
 
-  <!-- Entrada de legajo. Oculta hasta que haya sesión de Google. -->
+  <!-- OPERARIO: tras loguear se muestra el nombre (no se tipea legajo).
+       #legajoInput queda oculto pero conserva el valor para el resto del código. -->
   <div id="legajoEntry" class="hidden">
-    <div id="authUserRow" class="auth-user-row hidden">
-      <span class="auth-user-email" id="authUserEmail"></span>
+    <div id="operarioGreeting" class="operario-greeting"></div>
+    <input id="legajoInput" type="number" inputmode="numeric" style="display:none">
+    <button class="primary-btn" onclick="goToOptions()">Continuar</button>
+    <div class="auth-logout-row">
       <button class="auth-logout-btn" onclick="signOutGoogle()">Salir</button>
     </div>
-    <input id="legajoInput" type="number" inputmode="numeric">
-    <button class="primary-btn" onclick="goToOptions()">Continuar</button>
+  </div>
+
+  <!-- SUPERVISOR: solo n8n / logistica. Ve los botones flotantes de abajo. -->
+  <div id="supervisorPanel" class="hidden">
+    <div class="operario-greeting" id="supGreeting"></div>
+    <p class="small" style="text-align:center">Usá los botones de abajo a la izquierda para ver los monitores.</p>
+    <div class="auth-logout-row">
+      <button class="auth-logout-btn" onclick="signOutGoogle()">Salir</button>
+    </div>
   </div>
 
   <!-- Aviso: hay reportes que aún no se enviaron -->
@@ -3535,7 +3566,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v1.63";
+const APP_VERSION = "v1.64";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -4506,7 +4537,19 @@ function showCamionDetail(dateKey, camion) {
   m.classList.add("show");
 }
 
+/* Gate de supervisor: solo los emails en SUPERVISOR_EMAILS (ver módulo de auth
+   al final del body) pueden abrir monitores. Cubre tanto los botones flotantes
+   como el acceso por URL directa (?monitor=tv/fc/incons). */
+function requireSupervisor() {
+  if (!window.__isSupervisor) {
+    alert("Solo los supervisores pueden ver los monitores.");
+    return false;
+  }
+  return true;
+}
+
 function openMonitor() {
+  if (!requireSupervisor()) return;
   const m = document.getElementById("monitorModal");
   m.classList.add("show");
   // Siempre en modo TV (fondo azul, tablero completo): aunque la pantalla sea
@@ -4521,6 +4564,7 @@ function openMonitor() {
 
 /* Abre el monitor directo en la pestaña de Inconsistencias (botón flotante ⚠). */
 function openInconsistencias() {
+  if (!requireSupervisor()) return;
   openMonitor();
   setMonitorTab("incons");
 }
@@ -4538,6 +4582,7 @@ function closeMonitor() {
 let _analisisIntervalId = null;
 
 function openAnalisis() {
+  if (!requireSupervisor()) return;
   const m = document.getElementById("analisisModal");
   m.classList.add("show");
   if (typeof Chart !== "undefined" && typeof refreshProductivityCharts === "function") {
@@ -4583,14 +4628,18 @@ document.addEventListener("keydown", (e) => {
 // La smart TV colgada en planta no puede clickear el botón 📊 con el control
 // remoto. Con la URL ?monitor=tv (o ?monitor=1) el monitor se abre SOLO al
 // cargar la página: basta apuntar el navegador de la tele a esa URL.
-window.addEventListener("load", () => {
-  const v = new URLSearchParams(location.search).get("monitor");
+// El auto-open ya NO ocurre en 'load': la TV/monitor requiere sesión de
+// supervisor. Guardamos el parámetro y el módulo de auth (al final del body)
+// llama a maybeAutoOpenMonitor() recién cuando confirma un email supervisor.
+window.__pendingMonitorParam = new URLSearchParams(location.search).get("monitor");
+window.maybeAutoOpenMonitor = function () {
+  const v = window.__pendingMonitorParam;
+  if (!v) return;
+  window.__pendingMonitorParam = null; // una sola vez
   if (v === "tv" || v === "1") openMonitor();
-  // ?monitor=fc → abre la pantalla de facturación directo. La PC del 2do
-  // monitor de ventas bookmark-ea esta URL y al cargar entra al dashboard.
-  if (v === "fc") openFacturacion();
-  if (v === "incons") openInconsistencias();
-});
+  else if (v === "fc") openFacturacion();   // 2do monitor de ventas
+  else if (v === "incons") openInconsistencias();
+};
 
 /* Parser CSV simple — soporta campos entre comillas con comas y comillas
    escapadas dobles ("a""b" -> a"b). Suficiente para CSV publicado de Sheets. */
@@ -5941,6 +5990,7 @@ async function fetchFacturadosHoy(force){
 }
 
 function openFacturacion(){
+  if (!requireSupervisor()) return;
   document.getElementById("facturacionModal").classList.add("show");
   facTick();
   if (_facIntervalId) clearInterval(_facIntervalId);
@@ -6782,18 +6832,47 @@ function setAuthStatus(msg, isError) {
   el.classList.toggle("error", !!isError);
 }
 
-/* email -> Legajo vía tabla Empleados (anon SELECT permitido por RLS). */
-async function resolveLegajoByEmail(email) {
+/* Supervisores: ven los monitores y los botones flotantes. No necesitan estar
+   en Empleados (no tienen legajo de operario). */
+const SUPERVISOR_EMAILS = ["loekemeyer.n8n@gmail.com", "loekemeyer.logistica@gmail.com"];
+function isSupervisorEmail(email) {
+  return SUPERVISOR_EMAILS.indexOf((email || "").toLowerCase().trim()) !== -1;
+}
+
+/* email -> {legajo, nombre} vía tabla Empleados (anon SELECT permitido por RLS). */
+async function resolveEmpleadoByEmail(email) {
   if (!email) return null;
   const url = SB_URL + "/rest/v1/Empleados?email=eq." +
-    encodeURIComponent(email.toLowerCase().trim()) + "&select=Legajo&limit=1";
+    encodeURIComponent(email.toLowerCase().trim()) + "&select=Legajo,Empleado&limit=1";
   try {
     const r = await fetch(url, { headers: { apikey: SB_KEY, Authorization: "Bearer " + SB_KEY } });
     if (!r.ok) return null;
     const data = await r.json();
-    return (Array.isArray(data) && data.length && data[0].Legajo != null)
-      ? String(data[0].Legajo).trim() : null;
+    if (Array.isArray(data) && data.length && data[0].Legajo != null) {
+      return { legajo: String(data[0].Legajo).trim(), nombre: String(data[0].Empleado || "").trim() };
+    }
+    return null;
   } catch (_e) { return null; }
+}
+
+function setSupervisorButtons(show) {
+  ["btnMonitor", "btnFacturacion", "btnIncons", "btnAnalisis"].forEach((id) => {
+    const b = $(id); if (b) b.classList.toggle("hidden", !show);
+  });
+}
+
+function setUserTag(text) {
+  const t = $("userTag");
+  if (!t) return;
+  if (text) { t.textContent = text; t.classList.remove("hidden"); }
+  else { t.textContent = ""; t.classList.add("hidden"); }
+}
+
+function setLegajoTitle(text) {
+  const h = $("legajoTitle");
+  if (!h) return;
+  if (text) { h.textContent = text; h.classList.remove("hidden"); }
+  else { h.classList.add("hidden"); }
 }
 
 /* Mensaje a mostrar en la pantalla deslogueada tras un rechazo
@@ -6801,46 +6880,64 @@ async function resolveLegajoByEmail(email) {
 let pendingAuthMsg = null;
 
 function showLoggedOut() {
+  window.__isSupervisor = false;
   $("authBlock").classList.remove("hidden");
   $("legajoEntry").classList.add("hidden");
-  const row = $("authUserRow");
-  if (row) row.classList.add("hidden");
+  $("supervisorPanel").classList.add("hidden");
+  setSupervisorButtons(false);
+  setUserTag(null);
+  setLegajoTitle("Producción Virgilio");
   const btn = $("googleSignInBtn");
   if (btn) btn.disabled = false;
   if (pendingAuthMsg) { setAuthStatus(pendingAuthMsg, true); pendingAuthMsg = null; }
   else setAuthStatus("Iniciá sesión para continuar", false);
 }
 
-async function showLoggedIn(user) {
-  // Allowlist: sólo entran los emails ya cargados en Empleados. Si el email
-  // no está autorizado, lo deslogueamos al instante (no creamos una "sesión
-  // usable" para cuentas de Google ajenas) y volvemos a la pantalla de login.
-  const legajo = await resolveLegajoByEmail(user.email);
-  if (!legajo) {
-    pendingAuthMsg = "La cuenta " + (user.email || "") + " no está autorizada. " +
-      "Pedile al supervisor que cargue tu email en Empleados.";
-    try { await sb.auth.signOut(); } catch (_e) {}
-    // signOut dispara onAuthStateChange -> applyAuthState -> showLoggedOut,
-    // que mostrará pendingAuthMsg. Por las dudas lo forzamos también acá.
-    showLoggedOut();
-    return;
-  }
-  // Email autorizado: revelamos la entrada de legajo ya pre-rellenada.
+function showSupervisor(email) {
+  window.__isSupervisor = true;
   $("authBlock").classList.add("hidden");
+  $("legajoEntry").classList.add("hidden");
+  $("supervisorPanel").classList.remove("hidden");
+  $("supGreeting").textContent = "Supervisor";
+  setSupervisorButtons(true);
+  setUserTag(email);
+  setLegajoTitle(null);
+  // Si la URL pedía abrir un monitor/TV (?monitor=tv/fc/incons), ahora sí.
+  try { if (typeof window.maybeAutoOpenMonitor === "function") window.maybeAutoOpenMonitor(); } catch (_e) {}
+}
+
+function showOperario(emp) {
+  window.__isSupervisor = false;
+  $("authBlock").classList.add("hidden");
+  $("supervisorPanel").classList.add("hidden");
+  setSupervisorButtons(false);
   $("legajoEntry").classList.remove("hidden");
-  const row = $("authUserRow");
-  if (row) {
-    row.classList.remove("hidden");
-    $("authUserEmail").textContent = user.email || "";
-  }
+  const nombre = emp.nombre || "";
+  $("operarioGreeting").textContent = nombre ? ("Hola, " + nombre) : ("Legajo " + emp.legajo);
+  setUserTag(nombre || ("Legajo " + emp.legajo));
+  setLegajoTitle(null);
   const input = $("legajoInput");
-  if (input) input.value = legajo;
+  if (input) input.value = emp.legajo;
   try {
-    if (typeof saveLastLegajo === "function") saveLastLegajo(legajo);
-    if (typeof renderLegajoHistory === "function") renderLegajoHistory(legajo);
+    if (typeof saveLastLegajo === "function") saveLastLegajo(emp.legajo);
+    if (typeof renderLegajoHistory === "function") renderLegajoHistory(emp.legajo);
     if (typeof updateCoreButtonsState === "function") updateCoreButtonsState();
     if (typeof renderPendingSuggestion === "function") renderPendingSuggestion();
   } catch (_e) {}
+}
+
+async function showLoggedIn(user) {
+  const email = user.email || "";
+  // 1) Supervisor por email (no requiere estar en Empleados).
+  if (isSupervisorEmail(email)) { showSupervisor(email); return; }
+  // 2) Operario: debe estar en Empleados (allowlist).
+  const emp = await resolveEmpleadoByEmail(email);
+  if (emp) { showOperario(emp); return; }
+  // 3) No autorizado -> signOut inmediato (no le damos acceso usable).
+  pendingAuthMsg = "La cuenta " + email + " no está autorizada. " +
+    "Pedile al supervisor que cargue tu email en Empleados.";
+  try { await sb.auth.signOut(); } catch (_e) {}
+  showLoggedOut();
 }
 
 async function applyAuthState() {
@@ -6857,7 +6954,9 @@ window.signInWithGoogle = async function () {
   const btn = $("googleSignInBtn");
   if (btn) btn.disabled = true;
   setAuthStatus("Redirigiendo a Google…", false);
-  const redirectTo = window.location.origin + window.location.pathname;
+  // Preservamos el query (?monitor=tv/fc) para que tras el login la TV vuelva
+  // a la misma URL y auto-abra el monitor. supabase-js limpia ?code/&state.
+  const redirectTo = window.location.origin + window.location.pathname + window.location.search;
   const { error } = await sb.auth.signInWithOAuth({ provider: "google", options: { redirectTo } });
   if (error) {
     if (btn) btn.disabled = false;

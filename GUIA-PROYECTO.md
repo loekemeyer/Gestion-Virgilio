@@ -85,30 +85,43 @@ Todo vive en `index.html`, alternando con la clase `.hidden` (no hay router):
 
 - **Pantalla de legajo** (`#legajoScreen`): **login obligatorio con Google**
   (Supabase Auth, provider Google del proyecto `hrxfctzncixxqmpfhskv`). Arranca
-  mostrando sólo el botón "Iniciar sesión con Google" (`#authBlock`); la entrada
-  de legajo (`#legajoEntry`, input + "Continuar") queda oculta hasta que haya
-  sesión. Tras loguear, se resuelve `email → Legajo` consultando la tabla
-  `Empleados` (`email=eq.<mail>&select=Legajo`, SELECT anónimo permitido por RLS).
-  **Allowlist estricta:** sólo entran emails ya cargados en `Empleados`. Si el
-  email logueado no matchea ninguno, se llama `signOut()` al instante y se vuelve
-  a la pantalla de login con el aviso "no autorizada" (no se le da acceso usable a
-  cuentas de Google ajenas). Si matchea, se **pre-rellena** el input con el Legajo
-  y el operario confirma con "Continuar". La sesión la persiste `supabase-js` en
-  `localStorage`, así las próximas veces entra solo. Para **autorizar** a alguien
-  nuevo, el supervisor carga su email en `Empleados`.
-  El cliente de auth es un `<script type="module">` al final del `index.html` que
-  importa `@supabase/supabase-js@2` desde CDN (jsdelivr). Muestra "Resumen de
-  hoy", la cola de pendientes y el banner de "deshacer último mensaje".
+  mostrando sólo el botón "Iniciar sesión con Google" (`#authBlock`). Tras loguear,
+  el módulo de auth decide el **rol** por email y muestra la pantalla acorde:
+  - **Supervisor** (emails en `SUPERVISOR_EMAILS`: `loekemeyer.n8n@gmail.com`,
+    `loekemeyer.logistica@gmail.com`): se muestran los **botones flotantes**
+    (📊 monitor, 📋 facturación, ⚠ inconsistencias, 📈 análisis) y puede abrir los
+    monitores. No necesita estar en `Empleados` ni tiene legajo. Ve `#supervisorPanel`.
+  - **Operario** (email cargado en `Empleados`): se resuelve `email → {Legajo, Empleado}`
+    (`select=Legajo,Empleado`). Ya **no se tipea el legajo**: se muestra el **nombre**
+    (`#userTag` arriba a la izquierda, persistente, + saludo "Hola, {nombre}") y se
+    confirma con "Continuar". El `#legajoInput` queda oculto (`display:none`) pero
+    conserva el Legajo resuelto, así todo el código que lee `legajoInput.value`
+    (~15 lugares: envíos, historial) sigue funcionando sin cambios. **No** ve los
+    botones de supervisor.
+  - **No autorizado** (ni supervisor ni en `Empleados`): `signOut()` inmediato +
+    aviso "no autorizada". No se le da acceso usable.
+  - **Gate de monitores:** `requireSupervisor()` protege `openMonitor/openFacturacion/
+    openInconsistencias/openAnalisis` (vía `window.__isSupervisor`), así no se entra
+    por la URL directa. El auto-open por URL (`?monitor=tv/fc/incons`) ya no corre en
+    `load`: se difiere a `maybeAutoOpenMonitor()`, que el módulo de auth llama sólo si
+    el email es supervisor. O sea **la TV de pared también requiere sesión supervisor**
+    (se loguea una vez con logistica; la sesión persiste y reabre el monitor sola).
+  - La sesión la persiste `supabase-js` en `localStorage`. El cliente de auth es un
+    `<script type="module">` al final del `index.html` que importa
+    `@supabase/supabase-js@2` desde CDN (jsdelivr). El `redirectTo` preserva el query
+    (`?monitor=tv`) para que la TV vuelva a la misma URL tras el login.
+  - **Para autorizar a un operario nuevo:** cargar su `email` en `Empleados`. Para un
+    supervisor nuevo: agregar el email a `SUPERVISOR_EMAILS` en `index.html`.
   - **Requisitos de config (fuera del código):** provider Google habilitado en
     Supabase Auth · la URL de GitHub Pages (`https://loekemeyer.github.io/tv-v/`)
     en la allowlist de *Redirect URLs* · consent screen de Google OAuth en
     producción (o el operario como test user) · el `email` del empleado cargado
     en `Empleados` (hoy sólo ~9 de 58 lo tienen).
-  - La allowlist es a nivel app (chequeo contra `Empleados` + `signOut`). Una
-    cuenta de Google ajena que complete el OAuth igual crea una fila transitoria
-    en `auth.users`, pero queda deslogueada y sin acceso. Para impedir incluso esa
-    creación habría que un *before-user-created hook* o desactivar signups a nivel
-    proyecto (afecta también al otro programa que comparte el Auth).
+  - La allowlist es a nivel app (chequeo contra `Empleados`/`SUPERVISOR_EMAILS` +
+    `signOut`). Una cuenta de Google ajena que complete el OAuth igual crea una fila
+    transitoria en `auth.users`, pero queda deslogueada y sin acceso. El login es una
+    **puerta de UI**, no el candado de los datos (la app lee/escribe con la clave
+    pública anon igual que antes; el blindaje real de datos sería RLS).
   - El límite de "sólo 2 mails" del otro programa que usa el mismo proyecto Auth
     es lógica de *esa* app, **no** una restricción de Supabase (no hay hook ni
     trigger en el esquema `auth`): no afecta a esta app.
