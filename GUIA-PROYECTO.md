@@ -108,10 +108,17 @@ Todo vive en `index.html`, alternando con la clase `.hidden` (no hay router):
     `load`: se difiere a `maybeAutoOpenMonitor()`, que el módulo de auth llama sólo si
     el email es supervisor. O sea **la TV de pared también requiere sesión supervisor**
     (se loguea una vez con logistica; la sesión persiste y reabre el monitor sola).
-  - La sesión la persiste `supabase-js` en `localStorage`. El cliente de auth es un
-    `<script type="module">` al final del `index.html` que importa
-    `@supabase/supabase-js@2` desde CDN (jsdelivr). El `redirectTo` preserva el query
-    (`?monitor=tv`) para que la TV vuelva a la misma URL tras el login.
+  - **Duración de la sesión:** `supabase-js` la persiste en `localStorage` y dura
+    **todo el día** (cerrar el navegador NO desloguea). Se cierra: (a) al cambiar de
+    día — `applyAuthState` compara `vir_auth_day` (día BsAs guardado al loguear) con
+    `getTodayKey()` y si difiere hace `signOut`; (b) al confirmar **Terminar Día**
+    (`confirmarTerminarDia` llama `window.endDaySignOut()`). Así a la mañana siguiente
+    o tras finalizar el día se vuelve a pedir login.
+  - **supabase-js va SELF-HOSTED**: `supabase.js` (bundle UMD, ~200 KB) en la raíz del
+    repo, cargado con `<script src="supabase.js">` (expone el global `supabase`). NO se
+    usa CDN, así el login no depende de un tercero. El `redirectTo` preserva el query
+    (`?monitor=tv`) para que la TV vuelva a la misma URL tras el login. (Para actualizar
+    la lib: `npm pack @supabase/supabase-js@2` y copiar `dist/umd/supabase.js`.)
   - **Para autorizar a un operario nuevo:** cargar su `email` en `Empleados`. Para un
     supervisor nuevo: agregar el email a `SUPERVISOR_EMAILS` en `index.html`.
   - **Requisitos de config (fuera del código):** provider Google habilitado en

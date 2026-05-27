@@ -1819,7 +1819,7 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
 </div>
 
 <!-- Badge de versión + estado de cola (abajo a la izquierda) -->
-<div id="versionBadge">v1.68 ✓</div>
+<div id="versionBadge">v1.69 ✓</div>
 
 <!-- QR de fichada (TOTP rotativo) — abajo a la derecha. Genera tokens cada
      30s que apuntan a la app FichadaQR; los operarios escanean para fichar. -->
@@ -2606,6 +2606,10 @@ async function confirmarTerminarDia() {
   updateCoreButtonsState();
   renderPendingSuggestion();
   updatePendingIndicator();
+
+  // Terminó el día: cerramos la sesión de Google para que la próxima vez
+  // (más tarde o mañana) pida login de nuevo. La cola ya quedó encolada.
+  if (typeof window.endDaySignOut === "function") window.endDaySignOut();
 }
 
 /* Live render historial al tipear legajo */
@@ -3562,7 +3566,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v1.68";
+const APP_VERSION = "v1.69";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -6779,13 +6783,18 @@ async function refreshProductivityCharts(){
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
      La pantalla de legajo arranca mostrando solo el botón de Google.
-     Tras loguear, resolvemos email -> Legajo en Empleados y
-     pre-rellenamos el input; el operario confirma con "Continuar".
-     La sesión la persiste supabase-js en localStorage: las próximas
-     veces entra solo sin volver a loguear.
+     Tras loguear resolvemos email -> rol (supervisor / operario) y mostramos
+     la pantalla acorde. La sesión la persiste supabase-js en localStorage:
+     dura todo el día (cerrar el navegador no desloguea); se cierra al cambiar
+     de día y al confirmar "Terminar Día".
+
+     supabase-js va SELF-HOSTED (supabase.js, bundle UMD) en vez de CDN, para
+     no depender de un tercero: si el CDN está caído/bloqueado el login igual
+     funciona. Expone el global `supabase`.
      ========================================================= -->
-<script type="module">
-import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+<script src="supabase.js"></script>
+<script>
+const { createClient } = supabase;   // global del bundle UMD self-hosted
 
 const SB_URL = "https://hrxfctzncixxqmpfhskv.supabase.co";
 const SB_KEY = "sb_publishable_BqpAgZH6ty-9wft10_YMhw_0rcIPuWT";
@@ -6914,10 +6923,30 @@ async function showLoggedIn(user) {
   showLoggedOut();
 }
 
+/* Día (BsAs) en que se aceptó la sesión. La sesión persiste todo el día
+   (cerrar el navegador no desloguea), pero al cambiar de día se cierra y se
+   vuelve a pedir login. También se cierra al confirmar "Terminar Día". */
+const AUTH_DAY_KEY = "vir_auth_day";
+function todayKeyBsAs() {
+  try { return (typeof window.getTodayKey === "function") ? window.getTodayKey() : null; }
+  catch (_e) { return null; }
+}
+
 async function applyAuthState() {
   let session = null;
   try { session = (await sb.auth.getSession()).data.session; } catch (_e) {}
   if (session && session.user && session.user.email) {
+    const today = todayKeyBsAs();
+    const storedDay = localStorage.getItem(AUTH_DAY_KEY);
+    if (today && storedDay && storedDay !== today) {
+      // Sesión iniciada un día anterior: la cerramos para pedir login de nuevo.
+      localStorage.removeItem(AUTH_DAY_KEY);
+      rejectedMsg = null;
+      try { await sb.auth.signOut(); } catch (_e) {}
+      showLoggedOut();
+      return;
+    }
+    if (today) localStorage.setItem(AUTH_DAY_KEY, today);
     await showLoggedIn(session.user);
   } else {
     showLoggedOut();
@@ -6942,6 +6971,13 @@ window.signInWithGoogle = async function () {
 window.signOutGoogle = async function () {
   try { await sb.auth.signOut(); } catch (_e) {}
   window.location.reload();
+};
+
+/* Cierre de sesión al terminar el día (lo llama confirmarTerminarDia). No
+   recarga: el evento de signOut lleva la UI a la pantalla de login. La cola
+   de envíos vive en IndexedDB / Background Sync y no depende de esta sesión. */
+window.endDaySignOut = async function () {
+  try { await sb.auth.signOut(); } catch (_e) {}
 };
 
 sb.auth.onAuthStateChange(() => { applyAuthState(); });
