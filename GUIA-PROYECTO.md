@@ -106,15 +106,21 @@ Todo vive en `index.html`, alternando con la clase `.hidden` (no hay router):
     openInconsistencias/openAnalisis` (vía `window.__isSupervisor`), así no se entra
     por la URL directa. El auto-open por URL (`?monitor=tv/fc/incons`) se difiere a
     `maybeAutoOpenMonitor()`, que el módulo de auth llama sólo si el email es supervisor.
-  - **Modo kiosko (TV box / pantalla de pared, SIN login):** como el TV box no puede
-    loguearse con Google (navegador viejo / Google bloquea su webview), se accede al
-    monitor con una **URL + clave**: `?monitor=tv&key=<MONITOR_TV_KEY>` (también `fc`,
-    `incons`). Si la clave coincide, el main script setea `window.__tvKioskMode=true` +
-    `window.__isSupervisor=true` y abre el monitor en `load`, **sin pasar por Google y
-    sin depender de `supabase.js`** (el módulo de auth detecta `__tvKioskMode` y no
-    inicializa). `MONITOR_TV_KEY` es una constante en `index.html` (hoy `"virgilio-tv"`);
-    cambiala para rotar la clave. El TV box es el único apuntado a esa URL → en la
-    práctica es el único dispositivo que no inicia sesión; el resto sigue con Google.
+  - **Modo kiosko (TV box / pantalla de pared, SIN login), con enrolamiento:** como el
+    TV box no puede loguearse con Google (navegador viejo / webview bloqueado), se
+    accede al monitor con una **URL + clave que se usa UNA sola vez**:
+    `?monitor=tv&key=<MONITOR_TV_KEY>` (también `fc`, `incons`). Flujo:
+    1. Primera vez en ese dispositivo: la clave válida marca el device como kiosko en
+       `localStorage` (`vir_tv_kiosk=1`) y **borra la clave de la URL** con
+       `history.replaceState` (queda `?monitor=tv` pelado, la clave no queda a la vista).
+    2. De ahí en más, ese TV entra con `?monitor=tv` solo. Un dispositivo no enrolado
+       que lea esa URL en la pantalla **no entra** (no tiene flag ni clave) → login.
+    El main script setea `window.__tvKioskMode=true` + `window.__isSupervisor=true` y
+    abre el monitor en `load`, **sin Google y sin depender de `supabase.js`** (el módulo
+    de auth detecta `__tvKioskMode` y no inicializa). `MONITOR_TV_KEY` es constante en
+    `index.html` (hoy `"virgilio-tv"`); cambiala para rotar la clave (los devices ya
+    enrolados siguen hasta que se borren los datos del navegador). Para des-enrolar un
+    device: borrar datos del navegador. El resto (celulares/PC) sigue con login Google.
   - **Duración de la sesión:** `supabase-js` la persiste en `localStorage` y dura
     **todo el día** (cerrar el navegador NO desloguea). Se cierra: (a) al cambiar de
     día — `applyAuthState` compara `vir_auth_day` (día BsAs guardado al loguear) con

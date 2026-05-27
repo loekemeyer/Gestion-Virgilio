@@ -1819,7 +1819,7 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
 </div>
 
 <!-- Badge de versión + estado de cola (abajo a la izquierda) -->
-<div id="versionBadge">v1.70 ✓</div>
+<div id="versionBadge">v1.71 ✓</div>
 
 <!-- QR de fichada (TOTP rotativo) — abajo a la derecha. Genera tokens cada
      30s que apuntan a la app FichadaQR; los operarios escanean para fichar. -->
@@ -3566,7 +3566,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v1.70";
+const APP_VERSION = "v1.71";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -4646,10 +4646,28 @@ window.maybeAutoOpenMonitor = function () {
   else if (v === "incons") openInconsistencias();
 };
 
-// Modo kiosko (pantalla de pared, sin login): URL con clave válida.
-if (window.__pendingMonitorParam && _monParams.get("key") === MONITOR_TV_KEY) {
+// Modo kiosko (pantalla de pared, sin login). Para que la clave NO quede a la
+// vista en la barra del TV (cualquiera podría copiarla), usamos enrolamiento:
+//  1) La primera vez se abre con ?monitor=tv&key=<MONITOR_TV_KEY>.
+//  2) Si la clave es válida, marcamos ESTE dispositivo como kiosko en
+//     localStorage y BORRAMOS la clave de la URL (queda ?monitor=tv pelado).
+//  3) De ahí en más, ese TV entra con ?monitor=tv solo (sin clave visible).
+// Un celular que lea ?monitor=tv en la pantalla NO entra: no tiene el
+// enrolamiento ni la clave. (Para des-enrolar: borrar datos del navegador.)
+const KIOSK_FLAG = "vir_tv_kiosk";
+const _kioskEnrolled = (function () { try { return localStorage.getItem(KIOSK_FLAG) === "1"; } catch (_e) { return false; } })();
+const _keyValid = _monParams.get("key") === MONITOR_TV_KEY;
+if (window.__pendingMonitorParam && (_keyValid || _kioskEnrolled)) {
   window.__tvKioskMode = true;     // el módulo de auth lo respeta y no pide login
   window.__isSupervisor = true;    // sólo para que requireSupervisor() deje abrir
+  if (_keyValid) {
+    try { localStorage.setItem(KIOSK_FLAG, "1"); } catch (_e) {}
+    try {
+      const u = new URL(location.href);
+      u.searchParams.delete("key");   // sacamos la clave de la URL visible
+      history.replaceState(null, "", u.pathname + u.search + u.hash);
+    } catch (_e) {}
+  }
   window.addEventListener("load", () => {
     try { window.maybeAutoOpenMonitor(); } catch (_e) {}
   });
