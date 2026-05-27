@@ -502,18 +502,18 @@ button {
   margin-top: 4px;
 }
 #qrFichadaBox #qrSecs{ color: #1e6bd6; }
-/* En modo TV: QR chico y movido abajo a la IZQUIERDA, para que no se
-   superponga (ni tape) la tabla "Total por día" que va abajo a la derecha. */
+/* En modo TV: QR abajo a la DERECHA y toda la sección bien chica (recuadro,
+   textos y código). */
 #monitorModal.tv.show ~ #qrFichadaBox{
-  left: 8px;
-  right: auto;
-  padding: 4px 6px 6px 6px;
+  right: 8px;
+  left: auto;
+  padding: 3px 5px 5px 5px;
 }
-#monitorModal.tv.show ~ #qrFichadaBox .qr-label{ font-size: 11px; margin-bottom: 2px; }
-#monitorModal.tv.show ~ #qrFichadaBox .qr-countdown{ font-size: 10px; margin-top: 2px; }
+#monitorModal.tv.show ~ #qrFichadaBox .qr-label{ font-size: 9px; margin-bottom: 1px; letter-spacing: 0; }
+#monitorModal.tv.show ~ #qrFichadaBox .qr-countdown{ font-size: 8px; margin-top: 1px; }
 #monitorModal.tv.show ~ #qrFichadaBox #qrCanvas{
-  width: clamp(56px, 6vh, 80px);
-  height: clamp(56px, 6vh, 80px);
+  width: clamp(44px, 5vh, 64px);
+  height: clamp(44px, 5vh, 64px);
 }
 .monitor-meta{ font-size: 11px; color: #666; margin-top: 2px; }
 .monitor-table{
@@ -1871,7 +1871,7 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
 </div>
 
 <!-- Badge de versión + estado de cola (abajo a la izquierda) -->
-<div id="versionBadge">v1.81 ✓</div>
+<div id="versionBadge">v1.82 ✓</div>
 
 <!-- QR de fichada (TOTP rotativo) — abajo a la derecha. Genera tokens cada
      30s que apuntan a la app FichadaQR; los operarios escanean para fichar. -->
@@ -3618,7 +3618,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v1.81";
+const APP_VERSION = "v1.82";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
