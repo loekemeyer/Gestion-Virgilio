@@ -1265,6 +1265,43 @@ button {
 #monitorModal.tv .beyond-day{ font-size: 11px; }
 }  /* fin @media (max-width: 1150px) — modo compacto del monitor */
 
+/* =====================================================
+   MONITOR EN CELULAR (≤760px): una sola columna (apilado) con tamaños CÓMODOS.
+   Anula el ultra-compacto de la TV (que era para apretar a lo ancho); en el
+   celular hay scroll vertical, así que priorizamos legibilidad. Va después del
+   bloque compacto para ganarle.
+   ===================================================== */
+@media (max-width: 760px){
+  #monitorModal.tv .monitor-flex{ grid-template-columns: 1fr; gap: 10px; }
+  #monitorModal.tv #monitorContent{ padding-bottom: 0; }
+  #monitorModal.tv .monitor-title{ font-size: 22px; }
+  #monitorModal.tv #monitorClock{ font-size: 16px; }
+  /* Tabla principal cómoda */
+  #monitorModal.tv .monitor-table{ font-size: 16px; }
+  #monitorModal.tv .monitor-table th{ font-size: 14px; padding: 9px 5px; }
+  #monitorModal.tv .monitor-table td{ padding: 6px 5px; }
+  #monitorModal.tv .status-icon{ font-size: 24px; }
+  /* Cuadrados: 3 por fila ocupando el ancho */
+  #monitorModal.tv .monitor-totales-side{ display: block; }
+  #monitorModal.tv .totales-col-boxes{ width: 100%; align-items: stretch; }
+  #monitorModal.tv .totales-day-rows{ flex-flow: column nowrap; max-height: none; width: 100%; gap: 6px; }
+  #monitorModal.tv .totales-row{ width: 100%; gap: 6px; flex-wrap: nowrap; }
+  #monitorModal.tv .monitor-tot-box{ flex: 1 1 0; width: auto; padding: 6px 4px; }
+  #monitorModal.tv .monitor-tot-label{ font-size: 12px; white-space: normal; }
+  #monitorModal.tv .monitor-tot-value{ font-size: 24px; }
+  /* Cards de tablas a ancho completo y legibles */
+  #monitorModal.tv .totales-col-fc{ display: block; }
+  #monitorModal.tv .monitor-fc-card,
+  #monitorModal.tv .monitor-total-card{ width: 100%; box-sizing: border-box; margin-top: 10px; }
+  #monitorModal.tv .monitor-total-table,
+  #monitorModal.tv .monitor-fc-table{ font-size: 14px; }
+  #monitorModal.tv .monitor-total-table th,
+  #monitorModal.tv .monitor-fc-table th{ font-size: 12px; }
+  #monitorModal.tv .monitor-total-title,
+  #monitorModal.tv .monitor-fc-title{ font-size: 15px; }
+  #monitorModal.tv .monitor-legend{ font-size: 13px; }
+}
+
 /* Tandas a FC — bloque a la derecha con tandas ya terminadas (picking + separado).
    En el grid de .monitor-totales-side ocupa ambas columnas. */
 .monitor-fc-card{
@@ -1877,7 +1914,7 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
 </div>
 
 <!-- Badge de versión + estado de cola (abajo a la izquierda) -->
-<div id="versionBadge">v1.84 ✓</div>
+<div id="versionBadge">v1.85 ✓</div>
 
 <!-- QR de fichada (TOTP rotativo) — abajo a la derecha. Genera tokens cada
      30s que apuntan a la app FichadaQR; los operarios escanean para fichar. -->
@@ -3624,7 +3661,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v1.84";
+const APP_VERSION = "v1.85";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
