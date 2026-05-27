@@ -88,16 +88,18 @@ Todo vive en `index.html`, alternando con la clase `.hidden` (no hay router):
   mostrando sólo el botón "Iniciar sesión con Google" (`#authBlock`). Tras loguear,
   el módulo de auth decide el **rol** por email y muestra la pantalla acorde:
   - **Supervisor** (emails en `SUPERVISOR_EMAILS`: `loekemeyer.n8n@gmail.com`,
-    `loekemeyer.logistica@gmail.com`): se muestran los **botones flotantes**
-    (📊 monitor, 📋 facturación, ⚠ inconsistencias, 📈 análisis) y puede abrir los
-    monitores. No necesita estar en `Empleados` ni tiene legajo. Ve `#supervisorPanel`.
+    `loekemeyer.logistica@gmail.com`): ve `#supervisorPanel` con **4 botones grandes
+    centrados** (📊 Monitor de operarios, 📋 Facturación, ⚠ Inconsistencias,
+    📈 Análisis de productividad). No necesita estar en `Empleados` ni tiene legajo.
+    (Los antiguos botones flotantes de abajo se eliminaron.)
   - **Operario** (email cargado en `Empleados`): se resuelve `email → {Legajo, Empleado}`
-    (`select=Legajo,Empleado`). Ya **no se tipea el legajo**: se muestra el **nombre**
-    (`#userTag` arriba a la izquierda, persistente, + saludo "Hola, {nombre}") y se
-    confirma con "Continuar". El `#legajoInput` queda oculto (`display:none`) pero
-    conserva el Legajo resuelto, así todo el código que lee `legajoInput.value`
-    (~15 lugares: envíos, historial) sigue funcionando sin cambios. **No** ve los
-    botones de supervisor.
+    (`select=Legajo,Empleado`). Ya **no se tipea el legajo** y **salta directo a la
+    grilla de opciones** (EP/TP/...) vía `goToOptions()`. El **nombre** se muestra en
+    `#userTag` arriba a la izquierda (persistente, también en opciones). El `#legajoInput`
+    queda oculto (`display:none`) pero conserva el Legajo, así todo el código que lee
+    `legajoInput.value` (~15 lugares: envíos, historial) sigue funcionando sin cambios.
+    El `#legajoEntry` (saludo "Hola, {nombre}" + Continuar + Salir) queda como pantalla
+    de "volver" (botón ← de opciones) y para el logout. **No** ve nada de supervisor.
   - **No autorizado** (ni supervisor ni en `Empleados`): `signOut()` inmediato +
     aviso "no autorizada". No se le da acceso usable.
   - **Gate de monitores:** `requireSupervisor()` protege `openMonitor/openFacturacion/

@@ -45,8 +45,19 @@ button {
   text-align: center; font-size: 26px; font-weight: bold; color: #1f1f1f;
   margin: 8px 0 16px;
 }
-.auth-logout-row { text-align: center; margin-top: 10px; }
+.auth-logout-row { text-align: center; margin-top: 18px; }
 .auth-logout-row .auth-logout-btn { display: inline-block; }
+/* Botones grandes del supervisor (centrados, alargados, con título). */
+.sup-actions {
+  max-width: 460px; margin: 7vh auto 0;
+  display: flex; flex-direction: column; gap: 16px;
+}
+.sup-action-btn {
+  width: 100%; margin: 0; display: flex; align-items: center; gap: 16px;
+  padding: 24px 22px; font-size: 22px; font-weight: bold; text-align: left;
+  background: #1e6bd6; color: #fff; border: none; border-radius: 14px; cursor: pointer;
+}
+.sup-action-btn .sup-ico { font-size: 30px; flex: 0 0 auto; line-height: 1; }
 /* Nombre del usuario logueado, fijo arriba a la izquierda. */
 #userTag {
   position: fixed; top: 8px; left: 8px; z-index: 60;
@@ -1728,19 +1739,9 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
 <!-- Botón flotante: historial de días anteriores -->
 <button id="btnHistDias" title="Historial de días anteriores">📅</button>
 
-<!-- Botones flotantes de SUPERVISOR (📊 📋 ⚠ 📈). Ocultos por defecto;
-     el módulo de auth los muestra solo si el email es supervisor. -->
-<button id="btnMonitor" class="hidden" title="Monitor de operarios" onclick="openMonitor()">📊</button>
+<!-- Los accesos de supervisor (monitor, facturación, inconsistencias, análisis)
+     ahora son botones grandes centrados dentro de #supervisorPanel. -->
 
-<!-- Botón flotante 📋 — pantalla de facturación (NPs a FC para ventas).
-     Acceso directo desde URL con ?monitor=fc para colgar en el 2do monitor. -->
-<button id="btnFacturacion" class="hidden" title="Facturación — NPs a FC" onclick="openFacturacion()">📋</button>
-
-<!-- Botón flotante ⚠ — abre el Monitor Virgilio directo en la pestaña Inconsistencias -->
-<button id="btnIncons" class="hidden" title="Inconsistencias" onclick="openInconsistencias()">⚠</button>
-
-<!-- Botón flotante 📈 — gráficos de productividad picking y pedido -->
-<button id="btnAnalisis" class="hidden" title="Análisis Productividad" onclick="openAnalisis()">📈</button>
 
 <!-- Modal: monitor de operarios -->
 <div id="monitorModal" onclick="if(event.target.id==='monitorModal') closeMonitor()">
@@ -1828,7 +1829,7 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
 </div>
 
 <!-- Badge de versión + estado de cola (abajo a la izquierda) -->
-<div id="versionBadge">v1.65 ✓</div>
+<div id="versionBadge">v1.66 ✓</div>
 
 <!-- QR de fichada (TOTP rotativo) — abajo a la derecha. Genera tokens cada
      30s que apuntan a la app FichadaQR; los operarios escanean para fichar. -->
@@ -1900,10 +1901,14 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
     </div>
   </div>
 
-  <!-- SUPERVISOR: solo n8n / logistica. Ve los botones flotantes de abajo. -->
+  <!-- SUPERVISOR (solo n8n / logistica): botones grandes centrados. -->
   <div id="supervisorPanel" class="hidden">
-    <div class="operario-greeting" id="supGreeting"></div>
-    <p class="small" style="text-align:center">Usá los botones de abajo a la izquierda para ver los monitores.</p>
+    <div class="sup-actions">
+      <button class="sup-action-btn" onclick="openMonitor()"><span class="sup-ico">📊</span><span>Monitor de operarios</span></button>
+      <button class="sup-action-btn" onclick="openFacturacion()"><span class="sup-ico">📋</span><span>Facturación</span></button>
+      <button class="sup-action-btn" onclick="openInconsistencias()"><span class="sup-ico">⚠</span><span>Inconsistencias</span></button>
+      <button class="sup-action-btn" onclick="openAnalisis()"><span class="sup-ico">📈</span><span>Análisis de productividad</span></button>
+    </div>
     <div class="auth-logout-row">
       <button class="auth-logout-btn" onclick="signOutGoogle()">Salir</button>
     </div>
@@ -3566,7 +3571,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v1.65";
+const APP_VERSION = "v1.66";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -6855,10 +6860,9 @@ async function resolveEmpleadoByEmail(email) {
   } catch (_e) { return null; }
 }
 
-function setSupervisorButtons(show) {
-  ["btnMonitor", "btnFacturacion", "btnIncons", "btnAnalisis"].forEach((id) => {
-    const b = $(id); if (b) b.classList.toggle("hidden", !show);
-  });
+function setHistorySpace(show) {
+  const h = $("legajoHistorySpace");
+  if (h) h.style.display = show ? "" : "none";
 }
 
 function setUserTag(text) {
@@ -6886,7 +6890,7 @@ function showLoggedOut() {
   $("authBlock").classList.remove("hidden");
   $("legajoEntry").classList.add("hidden");
   $("supervisorPanel").classList.add("hidden");
-  setSupervisorButtons(false);
+  setHistorySpace(true);
   setUserTag(null);
   setLegajoTitle("Producción Virgilio");
   const btn = $("googleSignInBtn");
@@ -6900,8 +6904,7 @@ function showSupervisor(email) {
   $("authBlock").classList.add("hidden");
   $("legajoEntry").classList.add("hidden");
   $("supervisorPanel").classList.remove("hidden");
-  $("supGreeting").textContent = "Supervisor";
-  setSupervisorButtons(true);
+  setHistorySpace(false);   // el "Resumen de hoy" no aplica al supervisor
   setUserTag(email);
   setLegajoTitle(null);
   // Si la URL pedía abrir un monitor/TV (?monitor=tv/fc/incons), ahora sí.
@@ -6912,8 +6915,10 @@ function showOperario(emp) {
   window.__isSupervisor = false;
   $("authBlock").classList.add("hidden");
   $("supervisorPanel").classList.add("hidden");
-  setSupervisorButtons(false);
+  // Dejamos #legajoEntry listo (saludo + Salir) como pantalla de "volver",
+  // pero saltamos directo a la grilla de opciones (EP/TP/...).
   $("legajoEntry").classList.remove("hidden");
+  setHistorySpace(true);
   const nombre = emp.nombre || "";
   $("operarioGreeting").textContent = nombre ? ("Hola, " + nombre) : ("Legajo " + emp.legajo);
   setUserTag(nombre || ("Legajo " + emp.legajo));
@@ -6925,6 +6930,7 @@ function showOperario(emp) {
     if (typeof renderLegajoHistory === "function") renderLegajoHistory(emp.legajo);
     if (typeof updateCoreButtonsState === "function") updateCoreButtonsState();
     if (typeof renderPendingSuggestion === "function") renderPendingSuggestion();
+    if (typeof goToOptions === "function") goToOptions();   // directo a los botones
   } catch (_e) {}
 }
 
