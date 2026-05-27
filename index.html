@@ -1819,7 +1819,7 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
 </div>
 
 <!-- Badge de versión + estado de cola (abajo a la izquierda) -->
-<div id="versionBadge">v1.69 ✓</div>
+<div id="versionBadge">v1.70 ✓</div>
 
 <!-- QR de fichada (TOTP rotativo) — abajo a la derecha. Genera tokens cada
      30s que apuntan a la app FichadaQR; los operarios escanean para fichar. -->
@@ -3566,7 +3566,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v1.69";
+const APP_VERSION = "v1.70";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -4625,13 +4625,18 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
-// La smart TV colgada en planta no puede clickear el botón 📊 con el control
-// remoto. Con la URL ?monitor=tv (o ?monitor=1) el monitor se abre SOLO al
-// cargar la página: basta apuntar el navegador de la tele a esa URL.
-// El auto-open ya NO ocurre en 'load': la TV/monitor requiere sesión de
-// supervisor. Guardamos el parámetro y el módulo de auth (al final del body)
-// llama a maybeAutoOpenMonitor() recién cuando confirma un email supervisor.
-window.__pendingMonitorParam = new URLSearchParams(location.search).get("monitor");
+// La smart TV / TV box colgada en planta no puede loguearse con Google (su
+// navegador es viejo y/o Google bloquea su webview). Para esas pantallas de
+// pared usamos una URL con clave que NO requiere login:
+//     ?monitor=tv&key=LACLAVE   (también fc / incons)
+// Si la clave coincide, entramos directo al monitor en "modo kiosko": le damos
+// rol supervisor sólo para ver el tablero y abrimos sin pasar por Google. Esto
+// funciona aunque la librería de auth (supabase.js) no cargue en ese navegador.
+// Cambiá MONITOR_TV_KEY para rotar la clave. El resto de los dispositivos
+// (celulares, PC) siguen entrando con login de Google normal.
+const MONITOR_TV_KEY = "virgilio-tv";
+const _monParams = new URLSearchParams(location.search);
+window.__pendingMonitorParam = _monParams.get("monitor");
 window.maybeAutoOpenMonitor = function () {
   const v = window.__pendingMonitorParam;
   if (!v) return;
@@ -4640,6 +4645,15 @@ window.maybeAutoOpenMonitor = function () {
   else if (v === "fc") openFacturacion();   // 2do monitor de ventas
   else if (v === "incons") openInconsistencias();
 };
+
+// Modo kiosko (pantalla de pared, sin login): URL con clave válida.
+if (window.__pendingMonitorParam && _monParams.get("key") === MONITOR_TV_KEY) {
+  window.__tvKioskMode = true;     // el módulo de auth lo respeta y no pide login
+  window.__isSupervisor = true;    // sólo para que requireSupervisor() deje abrir
+  window.addEventListener("load", () => {
+    try { window.maybeAutoOpenMonitor(); } catch (_e) {}
+  });
+}
 
 /* Parser CSV simple — soporta campos entre comillas con comas y comillas
    escapadas dobles ("a""b" -> a"b). Suficiente para CSV publicado de Sheets. */
@@ -6794,6 +6808,15 @@ async function refreshProductivityCharts(){
      ========================================================= -->
 <script src="supabase.js"></script>
 <script>
+(function initAuth() {
+// Pantalla de pared (modo kiosko, ?monitor=...&key=): sin login, no inicializamos auth.
+if (window.__tvKioskMode) return;
+// Si supabase.js no cargó (navegador muy viejo), no rompemos la página: el
+// resto de la app sigue andando, sólo que el login no está disponible.
+if (typeof supabase === "undefined") {
+  console.warn("supabase-js no disponible: login deshabilitado en este navegador");
+  return;
+}
 const { createClient } = supabase;   // global del bundle UMD self-hosted
 
 const SB_URL = "https://hrxfctzncixxqmpfhskv.supabase.co";
@@ -6982,6 +7005,7 @@ window.endDaySignOut = async function () {
 
 sb.auth.onAuthStateChange(() => { applyAuthState(); });
 applyAuthState();
+})();
 </script>
 
 </body>

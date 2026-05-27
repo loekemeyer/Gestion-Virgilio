@@ -104,10 +104,17 @@ Todo vive en `index.html`, alternando con la clase `.hidden` (no hay router):
     aviso "no autorizada". No se le da acceso usable.
   - **Gate de monitores:** `requireSupervisor()` protege `openMonitor/openFacturacion/
     openInconsistencias/openAnalisis` (vía `window.__isSupervisor`), así no se entra
-    por la URL directa. El auto-open por URL (`?monitor=tv/fc/incons`) ya no corre en
-    `load`: se difiere a `maybeAutoOpenMonitor()`, que el módulo de auth llama sólo si
-    el email es supervisor. O sea **la TV de pared también requiere sesión supervisor**
-    (se loguea una vez con logistica; la sesión persiste y reabre el monitor sola).
+    por la URL directa. El auto-open por URL (`?monitor=tv/fc/incons`) se difiere a
+    `maybeAutoOpenMonitor()`, que el módulo de auth llama sólo si el email es supervisor.
+  - **Modo kiosko (TV box / pantalla de pared, SIN login):** como el TV box no puede
+    loguearse con Google (navegador viejo / Google bloquea su webview), se accede al
+    monitor con una **URL + clave**: `?monitor=tv&key=<MONITOR_TV_KEY>` (también `fc`,
+    `incons`). Si la clave coincide, el main script setea `window.__tvKioskMode=true` +
+    `window.__isSupervisor=true` y abre el monitor en `load`, **sin pasar por Google y
+    sin depender de `supabase.js`** (el módulo de auth detecta `__tvKioskMode` y no
+    inicializa). `MONITOR_TV_KEY` es una constante en `index.html` (hoy `"virgilio-tv"`);
+    cambiala para rotar la clave. El TV box es el único apuntado a esa URL → en la
+    práctica es el único dispositivo que no inicia sesión; el resto sigue con Google.
   - **Duración de la sesión:** `supabase-js` la persiste en `localStorage` y dura
     **todo el día** (cerrar el navegador NO desloguea). Se cierra: (a) al cambiar de
     día — `applyAuthState` compara `vir_auth_day` (día BsAs guardado al loguear) con
