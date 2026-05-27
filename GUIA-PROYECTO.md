@@ -116,8 +116,10 @@ Todo vive en `index.html`, alternando con la clase `.hidden` (no hay router):
     2. De ahí en más, ese TV entra con `?monitor=tv` solo. Un dispositivo no enrolado
        que lea esa URL en la pantalla **no entra** (no tiene flag ni clave) → login.
     El main script setea `window.__tvKioskMode=true` + `window.__isSupervisor=true` y
-    abre el monitor en `load`, **sin Google y sin depender de `supabase.js`** (el módulo
-    de auth detecta `__tvKioskMode` y no inicializa). `MONITOR_TV_KEY` es constante en
+    en `load` muestra el **panel "Administración"** (`showKioskAdminPanel()`: revela
+    `#supervisorPanel` con los 4 botones, oculta login/operario y el botón Salir). NO
+    auto-abre nada: en la TV se elige qué ver. Todo **sin Google y sin depender de
+    `supabase.js`** (el módulo de auth detecta `__tvKioskMode` y no inicializa). `MONITOR_TV_KEY` es constante en
     `index.html` (hoy `"virgilio-tv"`); cambiala para rotar la clave (los devices ya
     enrolados siguen hasta que se borren los datos del navegador). Para des-enrolar un
     device: borrar datos del navegador. El resto (celulares/PC) sigue con login Google.
