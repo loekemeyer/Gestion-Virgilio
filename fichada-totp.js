@@ -1,5 +1,5 @@
 // Token rotativo tipo TOTP basado en HMAC-SHA256 + ventana de tiempo.
-// Compartido entre qr.html (genera) e index.html (verifica).
+// Compartido entre index.html (genera el QR) y fichada.html (verifica).
 (function () {
   async function hmacSha256Hex(secret, message) {
     const enc = new TextEncoder();

@@ -9,7 +9,7 @@
      Android y mejora la fiabilidad del Background Sync del Service Worker. -->
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/svg+xml" href="icon.svg">
-<link rel="apple-touch-icon" href="icon.svg">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -397,6 +397,9 @@ button {
   border-bottom: 1px solid #e5e7eb;
 }
 .monitor-title{ font-size: 18px; font-weight: bold; }
+/* Logo de la app en los headers del Monitor Virgilio y de Facturación (ventas).
+   Escala con el tamaño del título (em), así se agranda solo en modo TV. */
+.hdr-logo{ height: 1.3em; width: auto; vertical-align: middle; margin-right: 8px; }
 
 /* Reloj en el header del monitor — formato "ddd dd/mm HH:MM" */
 #monitorClock{
@@ -450,11 +453,11 @@ button {
   margin-top: 4px;
 }
 #qrFichadaBox #qrSecs{ color: #1e6bd6; }
-/* En modo TV (monitor fullscreen abierto), agrandar el QR para que se
-   escanee desde lejos. */
+/* En modo TV (monitor fullscreen abierto) mantenemos el QR a un tamaño
+   parecido al de PC — antes crecía hasta 260px y quedaba demasiado grande. */
 #monitorModal.tv.show ~ #qrFichadaBox #qrCanvas{
-  width: clamp(180px, 16vh, 260px);
-  height: clamp(180px, 16vh, 260px);
+  width: clamp(140px, 11vh, 190px);
+  height: clamp(140px, 11vh, 190px);
 }
 .monitor-meta{ font-size: 11px; color: #666; margin-top: 2px; }
 .monitor-table{
@@ -480,6 +483,27 @@ button {
 .monitor-table td.center, .monitor-table th.center{ text-align: center; }
 .monitor-table td.num, .monitor-table th.num{ text-align: right; font-variant-numeric: tabular-nums; }
 .monitor-tanda{ font-weight: bold; color: #1e6bd6; }
+/* Celda de estado del monitor (Picking / Pedido Separado): grid de 3 columnas
+   (1fr | icono | 1fr) para que el ✅/⏰ quede centrado en la columna y el legajo
+   del que empezó vaya a la derecha SIN pisar el icono (cada uno en su track). */
+.status-wrap{ display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; min-width: 4.2em; }
+.status-wrap .status-icon{ grid-column: 2; }
+.monitor-legajo{
+  grid-column: 3; justify-self: start; margin-left: 4px;
+  font-size: 11px; color: #64748b; font-weight: 600; white-space: nowrap;
+}
+#monitorModal.tv .monitor-legajo{ color: #94a3b8; font-size: 0.8em; }
+/* Leyenda de operarios — abajo de "Fuera de ventana", lista ordenada por legajo. */
+.monitor-legend{
+  margin-top: 10px; padding: 8px 10px; border-top: 1px solid #e2e8f0;
+  font-size: 13px; color: #334155; line-height: 1.55;
+}
+.monitor-legend .legend-title{ font-weight: bold; color: #475569; margin-bottom: 3px; }
+.monitor-legend .legend-item{ display: block; white-space: nowrap; }
+.monitor-legend .legend-item b{ color: #1e6bd6; }
+#monitorModal.tv .monitor-legend{ border-top-color: #334155; color: #cbd5e1; font-size: 0.9em; }
+#monitorModal.tv .monitor-legend .legend-title{ color: #94a3b8; }
+#monitorModal.tv .monitor-legend .legend-item b{ color: #60a5fa; }
 .status-icon{ font-size: 20px; line-height: 1; }
 .status-pend{ color: #94a3b8; }
 .status-curso{ color: #d97706; }
@@ -537,6 +561,7 @@ button {
   background: #991b1b;
   color: #fee2e2;
 }
+*/
 
 /* Flash verde de 2s cuando una tanda cambia de estado (⏰ → ✅ o similar).
    Usado para que el supervisor mirando la TV note el cambio sin estar atento. */
@@ -550,7 +575,6 @@ button {
 #monitorModal.tv .monitor-table tr.row-flash td{
   animation: row-flash-anim 2s ease-out;
 }
-*/
 
 /* monitor-totales-side ahora arma 2 columnas externas:
      col-boxes  → stack vertical de filas (hoy + 5 días anteriores), cada fila
@@ -564,13 +588,62 @@ button {
   gap: 8px;
   align-items: flex-start;
 }
+/* Stack vertical de filas de día (hoy + días anteriores). En modo TV puede
+   reflowear a varias columnas para que entre en la altura del viewport. */
+.totales-day-rows{
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
 .totales-col-fc{
-  /* FC y Total uno al lado del otro (no apilados) */
+  /* FC + Total + Charts uno al lado del otro (no apilados) */
   display: flex;
   flex-direction: row;
   gap: 8px;
   align-items: flex-start;
+  flex-wrap: wrap;
 }
+/* Cards de gráficos productividad (Picking + Pedido) — a la derecha de
+   Total por día. Apilados verticalmente entre sí. */
+.monitor-charts-col{
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1 1 320px;
+  min-width: 280px;
+}
+.monitor-chart-card{
+  border: 2px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #f8fafc;
+}
+.monitor-chart-title{
+  font-weight: bold;
+  font-size: 13px;
+  margin-bottom: 6px;
+  color: #1e6bd6;
+}
+.monitor-chart-canvas-wrap{
+  position: relative;
+  height: 180px;
+  width: 100%;
+}
+.monitor-chart-empty{
+  font-size: 12px;
+  color: #64748b;
+  text-align: center;
+  padding: 20px 8px;
+}
+/* TV mode: charts oscuros y un poco más altos */
+#monitorModal.tv .monitor-chart-card{
+  background: #1f2937;
+  border-color: #334155;
+}
+#monitorModal.tv .monitor-chart-title{ color: #60a5fa; font-size: clamp(13px, 1.6vh, 18px); }
+#monitorModal.tv .monitor-chart-canvas-wrap{ height: clamp(180px, 22vh, 280px); }
+#monitorModal.tv .monitor-chart-empty{ color: #94a3b8; }
 .totales-row{
   display: flex;
   gap: 8px;
@@ -866,17 +939,20 @@ button {
 }
 .monitor-refresh.stale{ color: #d97706; }
 
-/* Botón Modo TV en header del modal */
-.btn-tv{
-  background: #0f172a;
-  color: #fff;
-  border: 2px solid #0f172a;
-  border-radius: 6px;
-  font-size: 14px;
-  padding: 6px 12px;
-  cursor: pointer;
-  margin-right: 6px;
+/* Barra "Ingresos hoy" sobre los totales del día (adapta a TV dark). */
+.monitor-fichadas-bar{
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  padding: 6px 10px; margin-bottom: 6px;
+  background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+  font-size: 0.95em; color: #334155; cursor: pointer;
 }
+#monitorModal.tv .monitor-fichadas-bar{
+  background: #111827; border-color: #334155; color: #cbd5e1;
+  font-size: clamp(13px, 1.6vh, 20px);
+}
+/* Fila de "Tandas a FC" con todos sus NPs facturados. */
+.monitor-fc-table tr.row-facturada td{ background: #dcfce7; }
+#monitorModal.tv .monitor-fc-table tr.row-facturada td{ background: #14532d; }
 
 /* =====================================================
    MOBILE — el monitor también se puede mirar desde un celu.
@@ -915,7 +991,7 @@ button {
 }
 
 /* =====================================================
-   MODO TV — fullscreen adaptativo (no scroll).
+   MODO TV — fullscreen adaptativo (con scroll si el contenido no entra).
    Tamaños en clamp(vh) para escalar de monitor chico a 32".
    ===================================================== */
 #monitorModal.tv{
@@ -930,7 +1006,7 @@ button {
   background: #0b1220;
   color: #e5e7eb;
   padding: 0 12px 12px 12px;
-  overflow: hidden;
+  overflow-y: auto;          /* scroll si el tablero no entra (TVs chicas / 32") */
   display: flex;
   flex-direction: column;
 }
@@ -955,7 +1031,6 @@ button {
   color: #4ade80;
 }
 #monitorModal.tv .monitor-refresh.stale{ color: #facc15; }
-#monitorModal.tv .btn-tv,
 #monitorModal.tv .hist-modal-close{
   font-size: clamp(13px, 1.6vh, 20px);
   padding: clamp(8px, 1vh, 12px) clamp(12px, 1.5vw, 22px);
@@ -998,8 +1073,7 @@ button {
 #monitorModal.tv .status-curso { color: #fbbf24; }
 #monitorModal.tv .status-done  { color: #22c55e; }
 #monitorModal.tv #monitorContent{
-  flex: 1 1 auto;
-  min-height: 0;
+  flex: 1 0 auto;            /* no encoger: alto natural; la card scrollea si hace falta */
   display: flex;
 }
 #monitorModal.tv .monitor-flex{
@@ -1009,8 +1083,7 @@ button {
   grid-template-columns: max-content 1fr;
   gap: 16px;
   width: 100%;
-  height: 100%;
-  align-items: stretch;
+  align-items: start;
   min-height: 0;
 }
 #monitorModal.tv .monitor-table{
@@ -1019,9 +1092,14 @@ button {
   width: auto;
 }
 #monitorModal.tv .monitor-table-wrap{
-  overflow: hidden;          /* sin scroll del wrapper de la tabla */
+  overflow: visible;         /* que la tabla no se recorte; scrollea la card */
   min-height: 0;
-  height: 100%;
+  height: auto;
+}
+/* Celular / pantalla angosta: el grid de 2 columnas del monitor TV no entra
+   de lado a lado → se apila en una sola columna. */
+@media (max-width: 760px){
+  #monitorModal.tv .monitor-flex{ grid-template-columns: 1fr; }
 }
 #monitorModal.tv .monitor-flex .monitor-table{
   width: 100%;
@@ -1034,25 +1112,34 @@ button {
 #monitorModal.tv .monitor-totales-side{
   flex: none;
   width: 100%;
-  display: grid;
-  /* 2 columnas externas al tamaño de su contenido:
-       col-boxes (Picking/Pedido/Empleados de hoy + 5 días anteriores apilados)
-       col-fc    (Tandas a FC + Total por día apilados)
-     Los días anteriores quedan alineados verticalmente con la fila de hoy. */
-  grid-template-columns: max-content max-content;
-  gap: 8px;
-  align-content: start;             /* pegados arriba */
-  align-items: start;               /* cada cuadro = alto del contenido (no se estira) */
-  justify-content: start;           /* y a la izquierda de la columna derecha */
+  /* Flex con wrap: col-boxes (días) y col-fc (Tandas a FC) van lado a lado y,
+     si no hay ancho, col-fc baja debajo. Responsive para TVs 32" y monitores
+     chicos sin que el panel se salga de pantalla. */
+  display: flex;
+  flex-wrap: wrap;
+  gap: clamp(8px, 1.2vw, 16px);
+  align-content: flex-start;        /* pegados arriba */
+  align-items: flex-start;          /* cada cuadro = alto del contenido (no se estira) */
+  justify-content: flex-start;
   position: static;
-  height: 100%;
+  height: auto;
 }
+/* Las filas de día reflowean en columnas para entrar en la altura disponible:
+   en una TV 32" donde 6 filas no entran verticales, pasan a 2-3 columnas. */
+#monitorModal.tv .totales-day-rows{
+  flex-flow: column wrap;
+  max-height: calc(100vh - 190px);  /* deja lugar para header + barra fichadas */
+  align-content: flex-start;
+  gap: clamp(4px, 0.8vh, 8px) clamp(8px, 0.8vw, 14px);
+}
+/* Cada fila de día = 3 boxes en una línea (no wrappear dentro de la columna) */
+#monitorModal.tv .totales-row{ flex-wrap: nowrap; }
 #monitorModal.tv .monitor-tot-box{
   border: 3px solid #334155;
   background: #111827;
   /* Ancho justo para "del día 25/5" en una línea (≈ 13 chars). */
-  padding: clamp(3px, 0.5vh, 7px) clamp(7px, 1.1vh, 13px);
-  width: clamp(100px, 11vw, 165px);
+  padding: clamp(3px, 0.5vh, 7px) clamp(6px, 1vh, 12px);
+  width: clamp(88px, 9vw, 150px);
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -1327,7 +1414,276 @@ button {
   color: #991b1b;
   border-color: #fecaca;
 }
+
+/* ===== Pestañas del monitor + Hoja de inconsistencias ===== */
+.monitor-tabs{ display:flex; gap:6px; padding:6px 0 0; }
+.monitor-tab{ border:none; background:#e2e8f0; color:#334155; padding:7px 14px; border-radius:8px 8px 0 0; font-size:13px; font-weight:600; cursor:pointer; }
+.monitor-tab.active{ background:#fff; color:#0f172a; box-shadow:0 -2px 0 #2563eb inset; }
+.incons-badge{ display:inline-block; min-width:18px; padding:0 5px; margin-left:5px; border-radius:9px; background:#94a3b8; color:#fff; font-size:11px; line-height:18px; text-align:center; }
+.incons-badge.inc-badge-alta{ background:#dc2626; }
+.inc-days{ display:flex; flex-wrap:wrap; gap:5px; margin:8px 0; }
+.inc-day{ border:1px solid #cbd5e1; background:#f8fafc; color:#334155; padding:4px 9px; border-radius:6px; font-size:12px; cursor:pointer; }
+.inc-day.active{ background:#2563eb; color:#fff; border-color:#2563eb; }
+.inc-summary{ font-size:13px; color:#475569; margin:6px 0 10px; }
+.inc-alta-txt{ color:#dc2626; font-weight:600; }
+.inc-table td{ vertical-align:top; }
+.inc-chip{ display:inline-block; padding:1px 7px; border-radius:6px; font-size:11px; font-weight:700; color:#fff; }
+.inc-chip.inc-alta{ background:#dc2626; }
+.inc-chip.inc-media{ background:#d97706; }
+.inc-row-alta td{ background:#fef2f2; }
+.inc-row-media td{ background:#fffbeb; }
+.inc-nom{ font-size:11px; color:#94a3b8; }
+#monitorModal.tv .monitor-tab{ background:#1e293b; color:#cbd5e1; font-size:18px; padding:10px 20px; }
+#monitorModal.tv .monitor-tab.active{ background:#0f172a; color:#fff; }
+#monitorModal.tv .inc-summary{ color:#cbd5e1; font-size:18px; }
+#monitorModal.tv .inc-row-alta td{ background:#450a0a; color:#fecaca; }
+#monitorModal.tv .inc-row-media td{ background:#451a03; color:#fed7aa; }
+#monitorModal.tv .inc-day{ background:#1e293b; color:#cbd5e1; border-color:#334155; font-size:15px; }
+#monitorModal.tv .inc-nom{ color:#64748b; }
+/* ============================================================
+   FACTURACIÓN — pantalla 2do monitor para ventas
+   Tick por NP. Cuando todos los NPs de una tanda están tickeados,
+   monitor Virgilio muestra ✅ en "Tandas a FC".
+   ============================================================ */
+#btnFacturacion{
+  position: fixed;
+  bottom: 12px;
+  left: 70px;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 2px solid #cbd5e1;
+  background: #f8fafc;
+  font-size: 22px;
+  cursor: pointer;
+  z-index: 100;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#btnFacturacion.hidden{ display: none; }
+
+/* 3er botón flotante: ⚠ Inconsistencias — a la derecha del de Facturación. */
+#btnIncons{
+  position: fixed;
+  bottom: 12px;
+  left: 128px;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 2px solid #cbd5e1;
+  background: #f8fafc;
+  font-size: 22px;
+  cursor: pointer;
+  z-index: 100;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#btnIncons.hidden{ display: none; }
+
+/* 4to botón flotante: 📈 Análisis Productividad — a la derecha de ⚠ */
+#btnAnalisis{
+  position: fixed;
+  bottom: 12px;
+  left: 186px;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 2px solid #cbd5e1;
+  background: #f8fafc;
+  font-size: 22px;
+  cursor: pointer;
+  z-index: 100;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#btnAnalisis.hidden{ display: none; }
+
+/* Modal Análisis Productividad — pantalla completa oscura */
+#analisisModal{
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: #0b1220;
+  z-index: 200;
+  flex-direction: column;
+  overflow-y: auto;
+}
+#analisisModal.show{ display: flex; }
+.analisis-header{
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px 12px;
+  background: #0b1220;
+  border-bottom: 1px solid #1e293b;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.analisis-title{
+  font-size: clamp(18px, 2.5vh, 28px);
+  font-weight: bold;
+  color: #f8fafc;
+}
+.analisis-body{
+  flex: 1;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 900px;
+  width: 100%;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+#analisisModal .monitor-chart-card{
+  background: #1f2937;
+  border-color: #334155;
+}
+#analisisModal .monitor-chart-title{ color: #60a5fa; font-size: clamp(13px, 1.6vh, 18px); }
+#analisisModal .monitor-chart-canvas-wrap{ height: clamp(200px, 30vh, 400px); }
+#analisisModal .monitor-chart-empty{ color: #94a3b8; }
+
+/* Modal a pantalla completa pero contenido limitado a 1100px centrado —
+   no tiene sentido estirar las filas al ancho de un monitor 24". */
+#facturacionModal{
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: #f1f5f9;
+  z-index: 200;
+  overflow: auto;
+  padding: 12px;
+}
+#facturacionModal.show{ display: block; }
+.fac-banner,
+.fac-top,
+.fac-group,
+.fac-cierre,
+.fac-empty{
+  max-width: 1100px;
+  margin-left: auto;
+  margin-right: auto;
+}
+.fac-banner{
+  background: #fef3c7; border: 2px solid #f59e0b; color: #78350f;
+  padding: 8px 12px; border-radius: 6px; margin-bottom: 10px;
+  font-size: 13px; font-weight: bold; text-align: center;
+}
+.fac-top{
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 12px; flex-wrap: wrap; gap: 8px;
+}
+.fac-top h1{ font-size: 22px; margin: 0; color: #0f172a; }
+.fac-stats{ display: flex; gap: 6px; align-items: center; font-size: 13px; flex-wrap: wrap; }
+.fac-chip{ background: #fff; border: 1px solid #cbd5e1; border-radius: 6px; padding: 4px 10px; font-weight: bold; font-size: 12px; }
+.fac-chip.green{ border-color: #16a34a; color: #15803d; }
+.fac-chip.blue{ border-color: #1e6bd6; color: #1e3a8a; }
+.fac-chip.orange{ border-color: #f59e0b; color: #92400e; }
+.fac-dot{ display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #94a3b8; margin-right: 5px; vertical-align: middle; }
+.fac-dot.ok{ background: #16a34a; }
+.fac-dot.err{ background: #dc2626; }
+.fac-close-btn{
+  background: #dc2626; color: #fff; border: none; border-radius: 6px;
+  padding: 5px 12px; font-size: 13px; font-weight: bold; cursor: pointer;
+}
+/* Botón ↺ Revertir — destructivo pero menos prominente que Cerrar.
+   Disabled cuando no hay nada que revertir. */
+.fac-btn-revertir{
+  background: #fff; color: #92400e; border: 1px solid #f59e0b; border-radius: 6px;
+  padding: 4px 10px; font-size: 12px; font-weight: bold; cursor: pointer;
+}
+.fac-btn-revertir:hover:not(:disabled){ background: #fef3c7; }
+.fac-btn-revertir:disabled{ opacity: 0.45; cursor: not-allowed; }
+.fac-group{
+  background: #fff; border: 1px solid #cbd5e1; border-radius: 8px;
+  margin-bottom: 8px; overflow: hidden;
+  transition: opacity .5s, transform .5s;
+}
+.fac-group.fading{ opacity: 0; transform: scale(.95); }
+.fac-group-head{
+  background: linear-gradient(90deg, #1e6bd6, #1e3a8a); color: #fff;
+  padding: 6px 12px; display: flex; justify-content: space-between;
+  align-items: center; flex-wrap: wrap; gap: 8px;
+}
+.fac-tanda-code{ font-size: 17px; font-weight: bold; font-family: Consolas, Menlo, monospace; letter-spacing: 1px; }
+.fac-tanda-meta{ font-size: 12px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.fac-tanda-meta .lbl{ opacity: .75; }
+.fac-tanda-meta b{ font-weight: bold; }
+.fac-progress{ background: rgba(255,255,255,.18); border-radius: 4px; padding: 2px 8px; font-weight: bold; font-size: 11px; }
+.fac-progress.complete{ background: #16a34a; }
+/* table-layout fixed: las cols mantienen el ancho que les asignamos —
+   evita que Razón Social y Dirección se estiren al infinito. */
+table.fac-np-tbl{ width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; line-height: 1.25; }
+table.fac-np-tbl th{
+  background: #f1f5f9; color: #475569; font-weight: bold; font-size: 11px;
+  text-align: left; padding: 6px 8px; border-bottom: 1px solid #cbd5e1;
+  text-transform: uppercase; letter-spacing: .3px;
+}
+table.fac-np-tbl th.num{ text-align: right; }
+table.fac-np-tbl th.center{ text-align: center; }
+table.fac-np-tbl tbody tr{ border-bottom: 1px solid #f1f5f9; transition: opacity .3s, transform .3s, background .15s; }
+table.fac-np-tbl tbody tr:last-child{ border-bottom: none; }
+table.fac-np-tbl tbody tr:hover{ background: #f8fafc; }
+table.fac-np-tbl tbody tr.fading{ opacity: 0; transform: translateX(20px); }
+table.fac-np-tbl td{ padding: 3px 8px; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+table.fac-np-tbl td.num{ text-align: right; font-variant-numeric: tabular-nums; }
+table.fac-np-tbl td.center{ text-align: center; }
+.fac-np-cell{ font-family: monospace; font-weight: bold; color: #1e6bd6; font-size: 13px; }
+.fac-cod-cell{ font-family: monospace; color: #475569; font-size: 12px; }
+.fac-dir-cell{ color: #475569; font-size: 12px; }
+/* Cabecera grupo eliminada — la tanda ahora es una col más. Para no perder
+   el agrupamiento visual, las filas de cada tanda comparten un fondo sutil
+   alternado (zebra por tanda, no por fila). */
+.fac-tanda-col{ font-family: Consolas, Menlo, monospace; font-weight: bold; color: #1e6bd6; font-size: 13px; letter-spacing: 0.5px; }
+table.fac-np-tbl tbody tr.fac-tanda-alt td{ background: #f8fafc; }
+table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
+.fac-table-wrap{
+  background: #fff; border: 1px solid #cbd5e1; border-radius: 8px;
+  overflow: hidden; max-width: 1100px; margin: 0 auto;
+}
+.fac-btn-tick{
+  background: #16a34a; color: #fff; border: none; border-radius: 4px;
+  padding: 1px 10px; font-size: 13px; font-weight: bold; cursor: pointer;
+  transition: background .15s, transform .1s; line-height: 1.4;
+}
+.fac-btn-tick:hover{ background: #15803d; }
+.fac-btn-tick:active{ transform: scale(.93); }
+.fac-empty{ padding: 32px 20px; text-align: center; color: #64748b; font-size: 15px; background: #fff; border-radius: 8px; border: 1px solid #cbd5e1; }
+.fac-cierre{
+  background: #fff; border: 2px solid #1e6bd6; border-radius: 8px; padding: 12px; margin-top: 12px;
+  display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;
+}
+.fac-cierre-info{ font-size: 13px; color: #475569; }
+.fac-cierre-info b{ color: #0f172a; font-size: 14px; }
+.fac-btn-cierre{
+  background: #1e6bd6; color: #fff; border: none; border-radius: 6px;
+  padding: 10px 22px; font-size: 15px; font-weight: bold; cursor: pointer;
+}
+.fac-btn-cierre:hover{ background: #1e3a8a; }
+.fac-btn-cierre:disabled{ background: #94a3b8; cursor: not-allowed; }
+.fac-toast{
+  position: fixed; bottom: 20px; right: 20px; background: #0f172a; color: #fff;
+  padding: 10px 18px; border-radius: 6px; font-size: 14px; font-weight: bold;
+  opacity: 0; transform: translateY(20px); transition: opacity .25s, transform .25s;
+  z-index: 1000; pointer-events: none;
+}
+.fac-toast.show{ opacity: 1; transform: translateY(0); }
 </style>
+
+<!-- jsPDF + autotable para generar PDF de cierre de facturación (Marianela).
+     CDN ~150KB total. Solo se usa al apretar "Terminé de facturar". -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<!-- Chart.js para gráficos de productividad picking/pedido en el monitor.
+     CDN ~80KB. Bundle UMD para que window.Chart esté disponible. -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 
 <body>
@@ -1338,12 +1694,22 @@ button {
 <!-- Botón flotante: monitor de operarios (supervisor) -->
 <button id="btnMonitor" title="Monitor de operarios" onclick="openMonitor()">📊</button>
 
+<!-- Botón flotante 📋 — pantalla de facturación (NPs a FC para ventas).
+     Acceso directo desde URL con ?monitor=fc para colgar en el 2do monitor. -->
+<button id="btnFacturacion" title="Facturación — NPs a FC" onclick="openFacturacion()">📋</button>
+
+<!-- Botón flotante ⚠ — abre el Monitor Virgilio directo en la pestaña Inconsistencias -->
+<button id="btnIncons" title="Inconsistencias" onclick="openInconsistencias()">⚠</button>
+
+<!-- Botón flotante 📈 — gráficos de productividad picking y pedido -->
+<button id="btnAnalisis" title="Análisis Productividad" onclick="openAnalisis()">📈</button>
+
 <!-- Modal: monitor de operarios -->
 <div id="monitorModal" onclick="if(event.target.id==='monitorModal') closeMonitor()">
   <div class="monitor-card">
     <div class="monitor-header">
       <div>
-        <div class="monitor-title">Monitor Virgilio <span id="monitorRefresh" class="monitor-refresh"></span></div>
+        <div class="monitor-title"><img class="hdr-logo" src="icon.svg" alt=""><span id="monitorTitleText">Monitor Virgilio</span> <span id="monitorRefresh" class="monitor-refresh"></span></div>
         <div class="monitor-meta" id="monitorMeta"></div>
       </div>
       <div id="monitorClock"></div>
@@ -1355,6 +1721,29 @@ button {
     <div id="monitorContent">
       <div class="monitor-loading">Cargando…</div>
     </div>
+    <div id="inconsContent" class="hidden">
+      <div class="monitor-loading">Cargando…</div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Análisis Productividad — gráficos picking y pedido m3/h -->
+<div id="analisisModal">
+  <div class="analisis-header">
+    <div class="analisis-title">📈 Análisis Productividad</div>
+    <button class="hist-modal-close" onclick="closeAnalisis()" style="background:#1e293b;color:#f8fafc;border-color:#334155;">Cerrar</button>
+  </div>
+  <div class="analisis-body">
+    <div id="prodChartPicking" class="monitor-chart-card">
+      <div class="monitor-chart-title">📊 Productividad Picking (m3/h)</div>
+      <div class="monitor-chart-canvas-wrap"><canvas id="prodCanvasPicking"></canvas></div>
+    </div>
+    <div id="prodChartPickingEmpty" class="monitor-chart-card monitor-chart-empty" style="display:none">Sin datos de picking en los últimos 7 días</div>
+    <div id="prodChartPedido" class="monitor-chart-card">
+      <div class="monitor-chart-title">📈 Productividad Pedido (m3/h)</div>
+      <div class="monitor-chart-canvas-wrap"><canvas id="prodCanvasPedido"></canvas></div>
+    </div>
+    <div id="prodChartPedidoEmpty" class="monitor-chart-card monitor-chart-empty" style="display:none">Sin datos de pedido en los últimos 7 días</div>
   </div>
 </div>
 
@@ -1370,8 +1759,38 @@ button {
   </div>
 </div>
 
+<!-- Modal: pantalla de facturación (NPs a FC). Pensada para el 2do monitor
+     de la oficina ventas. Tick por NP individual. Cuando todos los NPs de
+     una tanda están tickeados, monitor Virgilio muestra ✅ en esa tanda.
+     Marianela al final del día aprieta "Terminé" → genera PDF reparto. -->
+<div id="facturacionModal">
+  <div class="fac-banner" id="facBanner" style="display:none"></div>
+  <div class="fac-top">
+    <h1><img class="hdr-logo" src="icon.svg" alt="">Facturación — NPs a FC</h1>
+    <div class="fac-stats">
+      <span class="fac-chip blue">Tandas: <span id="facCntTandas">0</span></span>
+      <span class="fac-chip orange">NPs pendientes: <span id="facCntPend">0</span></span>
+      <span class="fac-chip green">NPs facturados hoy: <span id="facCntDone">0</span></span>
+      <button id="facBtnRevertir" class="fac-btn-revertir" disabled onclick="facRevertir()" title="Borra todos los ticks pendientes de cierre">↺ Revertir</button>
+      <span class="fac-chip"><span class="fac-dot" id="facDot"></span><span id="facStatusTxt">Cargando…</span></span>
+      <button class="fac-close-btn" onclick="closeFacturacion()">Cerrar</button>
+    </div>
+  </div>
+  <div id="facContainer">
+    <div class="fac-empty">Cargando tandas…</div>
+  </div>
+  <div class="fac-cierre">
+    <div class="fac-cierre-info">
+      <b>📄 Cierre de jornada</b><br>
+      Genera PDF de reparto para mañana con todos los NPs facturados hoy. Los NPs sin tickear quedan pendientes para mañana.
+    </div>
+    <button class="fac-btn-cierre" id="facBtnCierre" disabled onclick="generateFacturacionPDF()">Terminé — Generar PDF</button>
+  </div>
+  <div class="fac-toast" id="facToast"></div>
+</div>
+
 <!-- Badge de versión + estado de cola (abajo a la izquierda) -->
-<div id="versionBadge">v1.43 ✓</div>
+<div id="versionBadge">v1.58 ✓</div>
 
 <!-- QR de fichada (TOTP rotativo) — abajo a la derecha. Genera tokens cada
      30s que apuntan a la app FichadaQR; los operarios escanean para fichar. -->
@@ -1480,52 +1899,6 @@ button {
 
 <script>
 /* =========================================================
-   DIAG v1.43 — overlay de errores en pantalla.
-   La TV no tiene consola, así que capturamos errores no atrapados y
-   rejections y los mostramos arriba de todo. Quitar cuando se resuelva.
-   ========================================================= */
-(function(){
-  function box(){
-    var b = document.getElementById("__diagBox");
-    if(!b){
-      b = document.createElement("div");
-      b.id = "__diagBox";
-      b.style.cssText = "position:fixed;left:0;right:0;top:0;z-index:2147483647;"+
-        "background:#111;color:#eee;font:13px/1.45 monospace;padding:8px 30px 8px 8px;"+
-        "max-height:65vh;overflow:auto;white-space:pre-wrap;border-bottom:3px solid #555;";
-      var x = document.createElement("button");
-      x.textContent = "×";
-      x.style.cssText = "position:fixed;right:6px;top:4px;z-index:2147483647;background:#eee;"+
-        "color:#111;border:0;font:bold 18px monospace;padding:0 9px;cursor:pointer;";
-      x.onclick = function(){ b.style.display="none"; x.style.display="none"; };
-      (document.body||document.documentElement).appendChild(b);
-      (document.body||document.documentElement).appendChild(x);
-    }
-    return b;
-  }
-  function log(msg, color){
-    try{
-      var b = box();
-      var d = document.createElement("div");
-      d.style.color = color || "#fca5a5";
-      d.textContent = msg;
-      b.appendChild(d);
-      b.scrollTop = b.scrollHeight;
-    }catch(_){}
-  }
-  window.__diag = function(t, detail){ log("• " + t + (detail ? (" — " + detail) : ""), "#86efac"); };
-  window.addEventListener("error", function(e){
-    log("⚠ " + (e.message || "error") + "\n  en " + (e.filename || "?") + ":" +
-        (e.lineno || "?") + ":" + (e.colno || "?") +
-        ((e.error && e.error.stack) ? ("\n  " + e.error.stack) : ""), "#fca5a5");
-  });
-  window.addEventListener("unhandledrejection", function(e){
-    var r = e.reason;
-    log("⚠ promise sin catch: " + ((r && (r.stack || r.message)) || String(r)), "#fca5a5");
-  });
-})();
-
-/* =========================================================
    SUPABASE
    Org "Gestion Productiva" / Proyecto "Control Partes Talleristas".
    La publishable key es pública por diseño (va embebida en la HTML
@@ -1546,6 +1919,13 @@ const SUPABASE_HISTORICO_ENDPOINT =
   SUPABASE_URL + "/rest/v1/Fichadas_Historico";
 const SUPABASE_EMPLEADOS_ENDPOINT =
   SUPABASE_URL + "/rest/v1/Empleados";
+// Pantalla facturación: 1 row por NP facturado. cierre_id se llena cuando
+// Marianela aprieta "Terminé". El monitor Virgilio cruza esta tabla para
+// mostrar ✅ en "Tandas a FC" cuando todos los NPs están facturados.
+const SUPABASE_FACTURACION_NP_ENDPOINT =
+  SUPABASE_URL + "/rest/v1/Facturacion_NP";
+const SUPABASE_FACTURACION_CIERRES_ENDPOINT =
+  SUPABASE_URL + "/rest/v1/Facturacion_Cierres";
 
 const filas = {
   row1: ["EP","TP","AP","TAP","CR","CC"],
@@ -1604,7 +1984,7 @@ function getTodayKey() {
 }
 function formatDateTime(ts) {
   try { return new Date(ts).toLocaleString("es-AR"); }
-  catch { return ""; }
+  catch (_e) { return ""; }
 }
 function formatDayLong(fecha) {
   const p = fecha.split("-");
@@ -1647,11 +2027,11 @@ function escapeHtml(s) {
    Si otro operario quiere usar el mismo celular: solo borra y reescribe.
    ========================================================= */
 function saveLastLegajo(legajo) {
-  try { localStorage.setItem(LAST_LEGAJO_KEY, String(legajo || "")); } catch {}
+  try { localStorage.setItem(LAST_LEGAJO_KEY, String(legajo || "")); } catch (_e) {}
 }
 function readLastLegajo() {
   try { return localStorage.getItem(LAST_LEGAJO_KEY) || ""; }
-  catch { return ""; }
+  catch (_e) { return ""; }
 }
 
 /* =========================================================
@@ -1664,10 +2044,10 @@ function histKey(fecha, legajo) {
 }
 function readDayHist(fecha, legajo) {
   try { return JSON.parse(localStorage.getItem(histKey(fecha, legajo)) || "[]"); }
-  catch { return []; }
+  catch (_e) { return []; }
 }
 function writeDayHist(fecha, legajo, arr) {
-  try { localStorage.setItem(histKey(fecha, legajo), JSON.stringify(arr)); } catch {}
+  try { localStorage.setItem(histKey(fecha, legajo), JSON.stringify(arr)); } catch (_e) {}
 }
 function pushHistoryForLegajo(legajo, item) {
   pushHistoryForLegajoOnDay(legajo, getTodayKey(), item);
@@ -1685,7 +2065,7 @@ function removeHistoryItemsByOpcionForToday(legajo, opcion) {
    Lo usa el auto-cierre, que escribe en la fecha en que se abrió el toggle. */
 function pushHistoryForLegajoOnDay(legajo, fecha, item) {
   const arr = readDayHist(fecha, legajo);
-  arr.unshift({ ...item, status: item.status || "queued" });
+  arr.unshift(Object.assign({}, item, { status: item.status || "queued" }));
   if (arr.length > HIST_MAX_PER_DAY) arr.length = HIST_MAX_PER_DAY;
   writeDayHist(fecha, legajo, arr);
 }
@@ -1724,7 +2104,7 @@ function getAllPrevDaysForLegajo(legajo) {
     try {
       const items = JSON.parse(localStorage.getItem(k) || "[]");
       if (items.length) result.push({ fecha: parts[1], items });
-    } catch {}
+    } catch (_e) {}
   }
   result.sort((a,b) => b.fecha.localeCompare(a.fecha));
   return result;
@@ -1814,7 +2194,7 @@ function cleanupIfDayChanged() {
       const cur = st.toggles[code];
       const tsInicioIso = (typeof cur === "string") ? cur : null;
       if (tsInicioIso && AUTO_CLOSE_CODES.includes(code)) {
-        try { enqueueAutoClose(leg, code, tsInicioIso); } catch {}
+        try { enqueueAutoClose(leg, code, tsInicioIso); } catch (_e) {}
       }
       delete st.toggles[code];
     }
@@ -2022,7 +2402,7 @@ async function bulkSendDayReplay(legajoStr, historySnapshot) {
       legajo:      legajoStr,
       opcion:      item.opcion,
       descripcion: item.descripcion || (desc[item.opcion] || ""),
-      texto:       item.texto || "",
+      texto:       (item.texto || "").trim(),
       ts_cliente:  new Date(item.ts || Date.now()).toISOString(),
       ts_inicio:   item.ts_inicio_iso || null
     }));
@@ -2072,7 +2452,6 @@ async function confirmarTerminarDia() {
   }
 
   const nowMs  = Date.now();
-  const nowIso = new Date(nowMs).toISOString();
 
   // 0) RE-ENVIAR todos los reportes del día como red de seguridad — UNA SOLA
   //    llamada bulk con array (PostgREST acepta) y Prefer: resolution=
@@ -2102,7 +2481,7 @@ async function confirmarTerminarDia() {
       // (ya validado más arriba). Para AT/PB/Limp/PC/CT/Perm el texto
       // queda vacío como antes.
       const textoCierre = CLOSE_NEEDS_INPUT_CODES.includes(code)
-        ? (closeInputs[code] || "")
+        ? (closeInputs[code] || "").trim()
         : "";
       const closeId = nowMs.toString(36) + "_fjclose_" + code + "_" + Math.random().toString(36).slice(2, 6);
       const closePayload = {
@@ -2159,7 +2538,7 @@ async function confirmarTerminarDia() {
   resetSelection();
   optionsScreen.classList.add("hidden");
   legajoScreen.classList.remove("hidden");
-  document.getElementById("btnHistDias")?.classList.remove("hidden");
+  document.getElementById("btnHistDias").classList.remove("hidden");
   renderLegajoHistory(legajoInput.value);
   updateCoreButtonsState();
   renderPendingSuggestion();
@@ -2198,7 +2577,7 @@ const ALWAYS_ALLOWED_CODES = ["PB","PC"];
 
 function readStateMap(){
   try { return JSON.parse(localStorage.getItem(STATE_KEY)) || {}; }
-  catch { return {}; }
+  catch (_e) { return {}; }
 }
 function writeStateMap(map){
   localStorage.setItem(STATE_KEY, JSON.stringify(map));
@@ -2279,7 +2658,8 @@ function updateCoreButtonsState(){
   const armadoActive  = !!(st && st.armado  && st.armado.active);
 
   document.querySelectorAll(".box").forEach(b=>{
-    const code = b.querySelector(".box-title")?.innerText?.trim();
+    const titleEl = b.querySelector(".box-title");
+    const code = (titleEl && titleEl.innerText) ? titleEl.innerText.trim() : "";
     if (!code) return;
 
     // ===== DISABLED =====
@@ -2379,8 +2759,7 @@ function goToOptions() {
   saveLastLegajo(legajoInput.value);    // persistir para próximas aperturas
   legajoScreen.classList.add("hidden");
   optionsScreen.classList.remove("hidden");
-  document.getElementById("btnHistDias")?.classList.add("hidden");
-  document.getElementById("btnMonitor")?.classList.add("hidden");
+  document.getElementById("btnHistDias").classList.add("hidden");
   renderPendingSuggestion();
   updateCoreButtonsState();
 }
@@ -2388,8 +2767,7 @@ function goToOptions() {
 function backToLegajo() {
   optionsScreen.classList.add("hidden");
   legajoScreen.classList.remove("hidden");
-  document.getElementById("btnHistDias")?.classList.remove("hidden");
-  document.getElementById("btnMonitor")?.classList.remove("hidden");
+  document.getElementById("btnHistDias").classList.remove("hidden");
   renderLegajoHistory(legajoInput.value);
 }
 
@@ -2725,7 +3103,7 @@ function selectOption(code) {
   //   día tiene que cerrar el permiso.
   if (["Perm"].includes(code)) {
     aviso.classList.remove("hidden");
-    aviso.innerText = "Acordate de poner lo mismo si regresas en el mismo dia";
+    aviso.innerText = "Acordate de poner lo mismo si regresás en el mismo día";
   } else {
     aviso.classList.add("hidden");
   }
@@ -2749,10 +3127,10 @@ const QUEUE_KEY = "legajo_queue_virgilio_v1";
 
 function readQueue() {
   try { return JSON.parse(localStorage.getItem(QUEUE_KEY)) || []; }
-  catch { return []; }
+  catch (_e) { return []; }
 }
 function writeQueue(arr) {
-  try { localStorage.setItem(QUEUE_KEY, JSON.stringify(arr)); } catch {}
+  try { localStorage.setItem(QUEUE_KEY, JSON.stringify(arr)); } catch (_e) {}
 }
 
 /* =========================================================
@@ -2819,7 +3197,7 @@ async function registerBackgroundSync() {
     if (reg && "sync" in reg) {
       await reg.sync.register("flush-queue");
     }
-  } catch { /* no soportado, sin drama */ }
+  } catch (_e) { /* no soportado, sin drama */ }
 }
 
 function enqueueReport(payload) {
@@ -2882,7 +3260,7 @@ async function _resolveEmailForLegajo(legajo) {
       : null;
     _legajoEmailCache.set(key, email);
     return email;
-  } catch { return null; }
+  } catch (_e) { return null; }
 }
 
 function _mapOpcionToFichadaEvento(payload) {
@@ -3053,7 +3431,7 @@ function logErrorToAudit(payload, attempts, r) {
       body: JSON.stringify(body),
       keepalive: true
     }).catch(() => {});
-  } catch { /* fire and forget */ }
+  } catch (_e) { /* fire and forget */ }
 }
 
 /* Vacía la cola intentando enviar lo pendiente.
@@ -3121,7 +3499,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v1.43";
+const APP_VERSION = "v1.61";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -3218,10 +3596,10 @@ async function undoLastSent() {
 }
 
 async function send() {
-  const legajoStr   = String(legajoInput.value || "");
+  const legajoStr   = String(legajoInput.value || "").trim();
   const opcion      = selected;
   const descripcion = desc[selected] || "";
-  const texto       = (textInput.value || "").toUpperCase();
+  const texto       = (textInput.value || "").trim().toUpperCase();
 
   if (!legajoStr) { alert("Falta el número de legajo"); return; }
   if (!opcion)    { alert("Falta seleccionar una opción"); return; }
@@ -3230,7 +3608,7 @@ async function send() {
   const nowMs  = Date.now();
   const nowIso = new Date(nowMs).toISOString();
   const payload = {
-    legajo: legajoInput.value,
+    legajo: legajoStr,
     opcion,
     descripcion,
     texto,
@@ -3314,7 +3692,7 @@ async function send() {
   resetSelection();
   optionsScreen.classList.add("hidden");
   legajoScreen.classList.remove("hidden");
-  document.getElementById("btnHistDias")?.classList.remove("hidden");
+  document.getElementById("btnHistDias").classList.remove("hidden");
 
   // No se borra el legajo: el operario suele encadenar varios reportes seguidos.
   // Para cambiar de operario alcanza con tocar el input y reescribir.
@@ -3350,7 +3728,7 @@ async function registerServiceWorker() {
 async function migrateQueueToIDB() {
   const ls = readQueue();
   for (const it of ls) {
-    try { await idbPut(it); } catch {}
+    try { await idbPut(it); } catch (_e) {}
   }
 }
 
@@ -3379,14 +3757,14 @@ function handleServiceWorkerMessage(event) {
    ========================================================= */
 
 /* Borrar storage del historial v1 (formato viejo, ya no se usa). One-shot. */
-try { localStorage.removeItem("legajo_history_virgilio_v1"); } catch {}
+try { localStorage.removeItem("legajo_history_virgilio_v1"); } catch (_e) {}
 
 /* Si cambió el día (hora Argentina): retener últimos N días productivos
    y limpiar los toggles que NO sobreviven al día siguiente. */
 cleanupIfDayChanged();
 
 /* Bind del botón flotante 📅 */
-document.getElementById("btnHistDias")?.addEventListener("click", openHistoryModal);
+document.getElementById("btnHistDias").addEventListener("click", openHistoryModal);
 
 /* SW + IDB: registrar el SW, replicar la cola completa de LS a IDB para
    que el SW la vea, y volver a pedir un background sync si la cola tiene
@@ -3493,12 +3871,13 @@ function _fichadaSecondsUntilNext(periodSec) {
 
 let _qrLastToken = null;
 
-/* ⚠ FLAG TEMPORAL: deshabilita el QR rotativo y muestra cartel
-   "EN CONSTRUCCIÓN" en su lugar. Activado mientras se debuggea el
-   bridge al Google Sheet de fichadas Esnaola. Para reactivar el QR
-   cuando el flujo end-to-end (Supabase + Sheet) esté confirmado:
-   cambiar a `false` y bumpear version. */
-const QR_DISABLED = true;
+/* QR de fichada rotativo (TOTP) — HABILITADO. El flujo end-to-end está
+   verificado contra Supabase: fichada.html inserta el ingreso en
+   Fichadas_Virgilio y lo espeja en Fichadas_Historico (RLS: rol anon con
+   INSERT OK en ambas; imported_at/created_at tienen default now()), y el
+   legajo se resuelve por email desde Empleados (anon SELECT OK).
+   Si hubiera que frenarlo de nuevo, poner true: muestra "EN CONSTRUCCIÓN". */
+const QR_DISABLED = false;
 
 /* Cartel "EN CONSTRUCCIÓN" pintado en el canvas en vez del QR.
    Naranja para que sea bien visible desde lejos en la TV. */
@@ -3823,6 +4202,7 @@ async function showDayBreakdown(dayKey, dayLabel) {
         continue;
       }
       const legStr = String(leg);
+      if (legStr === "0" || legStr === "1") continue;   // test/basura
       const prev = ingresoByLegajo.get(legStr);
       if (!prev || tsIngreso < prev) ingresoByLegajo.set(legStr, tsIngreso);
       if (f.email) emailByLegajo.set(legStr, f.email);
@@ -3833,7 +4213,7 @@ async function showDayBreakdown(dayKey, dayLabel) {
     const perLegajo = new Map();
     for (const ev of events) {
       const leg = String(ev.legajo || "").trim();
-      if (!leg) continue;
+      if (!leg || leg === "0" || leg === "1") continue;   // 0/1 = test/basura
       if (!perLegajo.has(leg)) perLegajo.set(leg, {
         firstTs: ev.ts_cliente,
         lastTs: ev.ts_cliente,
@@ -3927,10 +4307,10 @@ async function showDayBreakdown(dayKey, dayLabel) {
     const hhmm = (d) => {
       if (!d) return "—";
       // Mostramos en hora Argentina (UTC-3 fijo).
-      const ar = new Date(d.getTime() - 0); // d ya es Date; ajuste de TZ con toLocale
+      const ar = d; // d ya es Date; el ajuste de TZ lo hace toLocaleTimeString con timeZone
       try {
         return ar.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Argentina/Buenos_Aires" });
-      } catch { return ar.toISOString().slice(11, 16); }
+      } catch (_e) { return ar.toISOString().slice(11, 16); }
     };
     const jornadaCell = (r) => {
       if (r.jornadaH == null) return `<span style="color:#94a3b8">${escapeHtml(r.jornadaNota.replace(/\*/g,'') || '—')}</span>`;
@@ -4046,7 +4426,7 @@ function copyEmailFromSpan(el) {
     const ok = document.execCommand("copy");
     document.body.removeChild(ta);
     showFeedback(ok);
-  } catch { showFeedback(false); }
+  } catch (_e) { showFeedback(false); }
 }
 
 /* Helper: comparar dayKey contra hoy en hora Argentina. */
@@ -4058,7 +4438,7 @@ function isTodayKey(dayKey) {
       year: "numeric", month: "2-digit", day: "2-digit"
     }).format(now); // "YYYY-MM-DD"
     return ar === dayKey;
-  } catch { return false; }
+  } catch (_e) { return false; }
 }
 
 /* Muestra modal con las tandas que componen un camión del día y el estado
@@ -4101,19 +4481,20 @@ function showCamionDetail(dateKey, camion) {
 function openMonitor() {
   const m = document.getElementById("monitorModal");
   m.classList.add("show");
-  // TV mode: forzar con URL ?monitor=tv (la tele bookmarkea esa URL),
-  // o auto-detect en pantallas grandes (≥1600px de ancho).
-  const urlParams = new URLSearchParams(window.location.search);
-  const forceTv = urlParams.get("monitor") === "tv";
-  const isLarge = window.innerWidth >= 1600;
-  if (forceTv || isLarge) {
-    m.classList.add("tv");
-  } else {
-    m.classList.remove("tv");
-  }
+  // Siempre en modo TV (fondo azul, tablero completo): aunque la pantalla sea
+  // chica, mostramos la visualización entera en vez del popup blanco.
+  m.classList.add("tv");
   refreshMonitor();
   if (monitorIntervalId) clearInterval(monitorIntervalId);
   monitorIntervalId = setInterval(refreshMonitor, MONITOR_REFRESH_MS);
+  setMonitorTab("monitor");
+  startInconsAutoRefresh();
+}
+
+/* Abre el monitor directo en la pestaña de Inconsistencias (botón flotante ⚠). */
+function openInconsistencias() {
+  openMonitor();
+  setMonitorTab("incons");
 }
 
 function closeMonitor() {
@@ -4121,8 +4502,35 @@ function closeMonitor() {
   m.classList.remove("show");
   m.classList.remove("tv");
   if (monitorIntervalId) { clearInterval(monitorIntervalId); monitorIntervalId = null; }
+  stopInconsAutoRefresh();
   // Reset del snapshot — al reabrir, el primer refresh no flashea masivo.
   _prevStatusMap = new Map();
+}
+
+let _analisisIntervalId = null;
+
+function openAnalisis() {
+  const m = document.getElementById("analisisModal");
+  m.classList.add("show");
+  if (typeof Chart !== "undefined" && typeof refreshProductivityCharts === "function") {
+    refreshProductivityCharts();
+  }
+  if (_analisisIntervalId) clearInterval(_analisisIntervalId);
+  _analisisIntervalId = setInterval(function() {
+    if (typeof refreshProductivityCharts === "function") refreshProductivityCharts();
+  }, PROD_REFRESH_MS);
+}
+
+function closeAnalisis() {
+  const m = document.getElementById("analisisModal");
+  m.classList.remove("show");
+  if (_analisisIntervalId) { clearInterval(_analisisIntervalId); _analisisIntervalId = null; }
+  if (typeof _prodPickRef !== "undefined" && _prodPickRef.chart){
+    try { _prodPickRef.chart.destroy(); } catch(_e){} _prodPickRef.chart = null;
+  }
+  if (typeof _prodPedRef !== "undefined" && _prodPedRef.chart){
+    try { _prodPedRef.chart.destroy(); } catch(_e){} _prodPedRef.chart = null;
+  }
 }
 
 function toggleMonitorTV() {
@@ -4142,6 +4550,18 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && document.getElementById("monitorModal").classList.contains("show")) {
     closeMonitor();
   }
+});
+
+// La smart TV colgada en planta no puede clickear el botón 📊 con el control
+// remoto. Con la URL ?monitor=tv (o ?monitor=1) el monitor se abre SOLO al
+// cargar la página: basta apuntar el navegador de la tele a esa URL.
+window.addEventListener("load", () => {
+  const v = new URLSearchParams(location.search).get("monitor");
+  if (v === "tv" || v === "1") openMonitor();
+  // ?monitor=fc → abre la pantalla de facturación directo. La PC del 2do
+  // monitor de ventas bookmark-ea esta URL y al cargar entra al dashboard.
+  if (v === "fc") openFacturacion();
+  if (v === "incons") openInconsistencias();
 });
 
 /* Parser CSV simple — soporta campos entre comillas con comas y comillas
@@ -4267,6 +4687,12 @@ async function fetchMonitorSheet() {
   const cFE    = header.indexOf("fecha entrega");
   const cNP    = header.indexOf("n° np");
   const cRS    = header.indexOf("razon social");
+  // Cols extra para pantalla facturación: cod cliente, dirección, localidad,
+  // zona. Si no existen (índice -1) los pedidos quedan con string vacío.
+  const cCod    = header.indexOf("cod");
+  const cDir    = header.indexOf("direccion entrega");
+  const cBarrio = header.indexOf("barrio entrega");
+  const cZona   = header.indexOf("zona");
   const acc = new Map();
   for (let i = headerIdx + 1; i < rows.length; i++) {
     const r = rows[i];
@@ -4305,7 +4731,14 @@ async function fetchMonitorSheet() {
     entry.m3 += m3;
     // Si CUALQUIER fila de esta tanda tiene Op=SI, marcamos la tanda como SI.
     if (op === "SI") entry.opIsSi = true;
-    if (np || m3) entry.pedidos.push({ np, m3, razonSocial: rs });
+    if (np || m3) entry.pedidos.push({
+      np, m3, razonSocial: rs,
+      // Campos extra para pantalla facturación (PDF Marianela)
+      cod:       cCod    >= 0 ? (r[cCod]    || "").trim() : "",
+      direccion: cDir    >= 0 ? (r[cDir]    || "").trim() : "",
+      barrio:    cBarrio >= 0 ? (r[cBarrio] || "").trim() : "",
+      zona:      cZona   >= 0 ? (r[cZona]   || "").trim() : ""
+    });
   }
   return acc;
 }
@@ -4382,6 +4815,37 @@ function getHistoricMap() {
    en (A) mantiene el resultado acotado. (B) y (C) son chicos (~50-300/día).
    Devuelve: { statusMap, alertasOffSheet, empleadosHoy }
      statusMap: TANDA -> { picking, separado, doneTodayP, doneTodayA } */
+/* Cache legajo -> nombre (tabla Empleados) para la leyenda del monitor
+   "Leg 8: Juan Farias". Refresca cada 1h; ante error mantiene lo cacheado. */
+let _empleadosNombres   = new Map();
+let _empleadosNombresTs = 0;
+const EMPLEADOS_TTL_MS  = 60 * 60 * 1000;
+async function getEmpleadosNombres() {
+  const now = Date.now();
+  if (_empleadosNombres.size && (now - _empleadosNombresTs) < EMPLEADOS_TTL_MS) {
+    return _empleadosNombres;
+  }
+  try {
+    const url = SUPABASE_EMPLEADOS_ENDPOINT + "?select=Legajo,Empleado&limit=5000";
+    const r = await fetch(url, {
+      headers: { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY }
+    });
+    if (!r.ok) throw new Error("Supabase HTTP " + r.status);
+    const data = await r.json();
+    const map = new Map();
+    for (const e of data) {
+      const leg = String(e.Legajo || "").trim();
+      const nom = (e.Empleado || "").trim();
+      if (leg && nom) map.set(leg, nom);
+    }
+    if (map.size) { _empleadosNombres = map; _empleadosNombresTs = Date.now(); }
+    return _empleadosNombres;
+  } catch (e) {
+    console.warn("[monitor] nombres de empleados fetch fallido:", e.message);
+    return _empleadosNombres;
+  }
+}
+
 async function fetchMonitorEvents(targetTandaKeys, sheetMap) {
   const now = new Date();
   const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -4401,7 +4865,7 @@ async function fetchMonitorEvents(targetTandaKeys, sheetMap) {
       "&texto=in.(" + targetTandaKeys.join(",") + ")" +
       "&order=ts_cliente.asc" +
       "&limit=5000" +
-      "&select=opcion,texto,ts_cliente";
+      "&select=opcion,texto,ts_cliente,legajo";
     const rA = await fetch(urlA, { headers });
     if (!rA.ok) throw new Error("Supabase HTTP " + rA.status + " (status query)");
     dataA = await rA.json();
@@ -4455,7 +4919,7 @@ async function fetchMonitorEvents(targetTandaKeys, sheetMap) {
   const perDayFJ      = new Map();   // dayKey -> Set<legajo> con FJ
   for (const ev of dataC) {
     const legajo = String(ev.legajo || "").trim();
-    if (!legajo) continue;
+    if (!legajo || legajo === "0" || legajo === "1") continue;   // 0/1 = test/basura
     const dayKey = isoToDayKey(ev.ts_cliente);
     if (!perDayLegajos.has(dayKey)) perDayLegajos.set(dayKey, new Set());
     perDayLegajos.get(dayKey).add(legajo);
@@ -4477,6 +4941,7 @@ async function fetchMonitorEvents(targetTandaKeys, sheetMap) {
   for (const f of dataD) {
     const ts = new Date(f.ts_cliente);
     const leg = f.legajo ? String(f.legajo) : null;
+    if (leg === "0" || leg === "1") continue;   // test/basura
     if (!leg) {
       fichadosSinLeg.push({ email: f.email || "(sin email)", ts });
       continue;
@@ -4497,18 +4962,31 @@ async function fetchMonitorEvents(targetTandaKeys, sheetMap) {
   };
 
   // Procesar A: último evento de Picking (EP/TP) y Armado (AP/TAP) por tanda.
+  // startPick/startArm guardan el legajo del que EMPEZÓ (último EP / último AP)
+  // para mostrarlo al lado del ✅/⏰ en el monitor.
   const lastPick = new Map();
   const lastArm  = new Map();
+  const startPick = new Map();   // tanda -> { legajo, ts }  (último EP)
+  const startArm  = new Map();   // tanda -> { legajo, ts }  (último AP)
   for (const ev of dataA) {
     const t = (ev.texto || "").trim().toUpperCase();
     if (!t) continue;
-    const ts = ev.ts_cliente;
+    const ts  = ev.ts_cliente;
+    const leg = String(ev.legajo || "").trim();
     if (ev.opcion === "EP" || ev.opcion === "TP") {
       const cur = lastPick.get(t);
       if (!cur || ts > cur.ts) lastPick.set(t, { opcion: ev.opcion, ts });
+      if (ev.opcion === "EP") {
+        const cs = startPick.get(t);
+        if (!cs || ts > cs.ts) startPick.set(t, { legajo: leg, ts });
+      }
     } else if (ev.opcion === "AP" || ev.opcion === "TAP") {
       const cur = lastArm.get(t);
       if (!cur || ts > cur.ts) lastArm.set(t, { opcion: ev.opcion, ts });
+      if (ev.opcion === "AP") {
+        const cs = startArm.get(t);
+        if (!cs || ts > cs.ts) startArm.set(t, { legajo: leg, ts });
+      }
     }
   }
   const statusMap = new Map();
@@ -4516,11 +4994,15 @@ async function fetchMonitorEvents(targetTandaKeys, sheetMap) {
   for (const t of tandas) {
     const p = lastPick.get(t);
     const a = lastArm.get(t);
+    const sp = startPick.get(t);
+    const sa = startArm.get(t);
     statusMap.set(t, {
       picking:  !p ? null : (p.opcion === "TP"  ? "done" : "curso"),
       separado: !a ? null : (a.opcion === "TAP" ? "done" : "curso"),
       doneTodayP: false,
-      doneTodayA: false
+      doneTodayA: false,
+      pickLegajo: sp ? sp.legajo : null,
+      sepLegajo:  sa ? sa.legajo : null
     });
   }
 
@@ -4607,6 +5089,23 @@ function statusIconToday(s) {
   return "";
 }
 
+/* Legajo del que EMPEZÓ la tanda (EP picking / AP armado). Se posiciona
+   absoluto a la derecha de la celda (ver .monitor-legajo en el CSS). Vacío si
+   no se conoce el legajo o la celda no tiene estado. */
+function monitorLegajoTag(legajo, state) {
+  if (!legajo || state == null) return "";
+  return `<span class="monitor-legajo" title="Lo empezó el legajo ${escapeHtml(String(legajo))}">${escapeHtml(String(legajo))}</span>`;
+}
+
+/* Celda de Picking / Pedido Separado: icono centrado en la columna + legajo
+   colgado a la derecha. El wrapper .status-wrap (block, full width) es el
+   contexto de posicionamiento para que el legajo no descentre el icono. */
+function statusCell(state, legajo) {
+  const icon = statusIconToday(state);
+  if (!icon) return "";   // sin actividad → celda vacía
+  return `<span class="status-wrap">${icon}${monitorLegajoTag(legajo, state)}</span>`;
+}
+
 /* Barra compacta encima de los totales del día que muestra cuántos
    empleados fichaste hoy, cuántos siguen en jornada (sin FJ) y cuántos
    cerraron. Si hay fichadas con email no linkeado en Empleados, lo
@@ -4622,8 +5121,7 @@ function renderFichadasBar(resumen, todayKey, todayLabel) {
     <div class="monitor-fichadas-bar day-box-clickable"
          data-day-key="${escapeHtml(todayKey)}"
          data-day-label="${escapeHtml(todayLabel)}"
-         onclick="showDayBreakdown(this.dataset.dayKey, this.dataset.dayLabel)"
-         style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:6px 10px;margin-bottom:6px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;font-size:0.95em;color:#334155;cursor:pointer;">
+         onclick="showDayBreakdown(this.dataset.dayKey, this.dataset.dayLabel)">
       <span style="font-weight:700;">Ingresos hoy</span>
       ${chip("Fichados", resumen.total, "#0284c7")}
       ${chip("En jornada", resumen.enJornada, "#16a34a")}
@@ -4671,10 +5169,10 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
   const tandas = [];
   for (const [k, v] of sheetMap) {
     if (!targetSet.has(v.fechaEntregaRaw)) continue;
-    const ev = statusMap.get(k) || { picking: null, separado: null, doneTodayP: false, doneTodayA: false };
+    const ev = statusMap.get(k) || { picking: null, separado: null, doneTodayP: false, doneTodayA: false, pickLegajo: null, sepLegajo: null };
     const hasAny = (ev.picking !== null || ev.separado !== null);
     if (!v.opIsSi && !hasAny) continue;
-    tandas.push({ ...v, ev, missingSi: !v.opIsSi });
+    tandas.push(Object.assign({}, v, { ev: ev, missingSi: !v.opIsSi }));
   }
 
   // Orden:
@@ -4753,8 +5251,8 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
         <td class="monitor-tanda tanda-clickable" data-tanda="${escapeHtml(t._key || t.tanda)}" onclick="showTandaDetail(this.dataset.tanda)">${escapeHtml(t.tanda)}</td>
         <td class="num">${m3Txt}</td>
         <td class="center">${feTxt}</td>
-        <td class="center">${statusIconToday(ev.picking)}</td>
-        <td class="center">${statusIconToday(ev.separado)}</td>
+        <td class="center">${statusCell(ev.picking, ev.pickLegajo)}</td>
+        <td class="center">${statusCell(ev.separado, ev.sepLegajo)}</td>
       </tr>`;
   }
   const todayStr = new Date().toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit" });
@@ -4788,7 +5286,17 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
         : `<div class="monitor-loading">Sin tandas planificadas para las próximas fechas (${targetLabel}).</div>`);
 
   // Panel "Tandas a FC" — tandas con picking + separado completados.
+  // Marca con ✅ las tandas cuyos NPs están todos facturados.
+  // El set _facNpsHoy se mantiene fresco con fetchFacturadosHoy() — TTL 4s.
+  // Lo disparamos fire-and-forget acá para que la próxima vuelta del monitor
+  // (cada 1s) ya tenga datos nuevos sin bloquear este render.
+  if (typeof fetchFacturadosHoy === "function") fetchFacturadosHoy().catch(() => {});
   const totalFcM3 = tandasFC.reduce((s, t) => s + (t.m3 || 0), 0);
+  const facturadas = (typeof _facNpsHoy !== "undefined") ? _facNpsHoy : new Set();
+  const isTandaFacturada = (t) => {
+    if (!t.pedidos || !t.pedidos.length) return false;
+    return t.pedidos.every(p => p.np && facturadas.has(p.np));
+  };
   const fcHtml = tandasFC.length ? `
     <div class="monitor-fc-card">
       <div class="monitor-fc-title">Tandas a FC (${totalFcM3.toFixed(1).replace(".", ",")} m3)</div>
@@ -4798,16 +5306,20 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
             <th>Tanda</th>
             <th class="num">M3</th>
             <th class="center">Fecha Salida</th>
+            <th class="center">FC ✓</th>
           </tr>
         </thead>
         <tbody>
-          ${tandasFC.map(t => `
-            <tr>
+          ${tandasFC.map(t => {
+            const facturada = isTandaFacturada(t);
+            return `
+            <tr${facturada ? ' class="row-facturada"' : ''}>
               <td class="fc-tanda tanda-clickable" data-tanda="${escapeHtml(t._key || t.tanda)}" onclick="showTandaDetail(this.dataset.tanda)">${escapeHtml(t.tanda)}</td>
               <td class="num">${t.m3.toFixed(1).replace(".", ",")}</td>
               <td class="center">${escapeHtml(t.fechaEntrega)}</td>
-            </tr>
-          `).join("")}
+              <td class="center" style="font-size:18px;color:#16a34a;font-weight:bold">${facturada ? "✅" : ""}</td>
+            </tr>`;
+          }).join("")}
         </tbody>
       </table>
     </div>
@@ -4900,15 +5412,32 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
     </div>
   ` : "";
 
+  // Leyenda de legajos abajo del monitor: "Leg 8: Juan Farias".
+  const legajosVistos = new Set();
+  for (const t of tandas) {
+    if (t.ev.pickLegajo) legajosVistos.add(String(t.ev.pickLegajo));
+    if (t.ev.sepLegajo)  legajosVistos.add(String(t.ev.sepLegajo));
+  }
+  const legendHtml = legajosVistos.size ? `
+    <div class="monitor-legend">
+      <div class="legend-title">Operarios en pantalla</div>
+      ${[...legajosVistos]
+          .sort((a,b) => (parseInt(a,10)||0) - (parseInt(b,10)||0))
+          .map(l => `<span class="legend-item"><b>Leg ${escapeHtml(l)}:</b> ${escapeHtml(_empleadosNombres.get(l) || "—")}</span>`)
+          .join("")}
+    </div>` : "";
+
   const tableHtml = `
     <div class="monitor-flex">
       <div class="monitor-table-wrap">
         ${leftHtml}
         ${beyondHtml}
+        ${legendHtml}
       </div>
       <div class="monitor-totales monitor-totales-side">
         <div class="totales-col-boxes">
           ${renderFichadasBar(fichadasResumen, todayKey, todayStr)}
+          <div class="totales-day-rows">
           <div class="totales-row">
             <div class="monitor-tot-box day-box-clickable" data-day-key="${escapeHtml(todayKey)}" data-day-label="${escapeHtml(todayStr)}" onclick="showDayBreakdown(this.dataset.dayKey, this.dataset.dayLabel)">
               <div class="monitor-tot-label">M3 Picking<br>del día ${todayStr}</div>
@@ -4939,6 +5468,7 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
               </div>
             </div>
           `).join("")}
+          </div>
         </div>
         <div class="totales-col-fc">
           ${fcHtml}
@@ -4952,6 +5482,7 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
   const countCurso = tandas.filter(t => t.ev.picking === "curso" || t.ev.separado === "curso").length;
   document.getElementById("monitorMeta").textContent =
     `${tandas.length} tanda(s) entrega ${targetLabel} · ${countCurso} en curso · ${tandasFC.length} a FC · eventos ${MONITOR_REFRESH_MS/1000}s · PPP ${PPP_TTL_MS/1000}s`;
+
 }
 
 async function refreshMonitor() {
@@ -4980,24 +5511,25 @@ async function refreshMonitor() {
     // 2) Eventos: status por tanda + alertas de hoy + empleados de hoy + 5 días anteriores
     const { statusMap, alertasOffSheet, empleadosHoy, pastDays, fichadasResumen } = await fetchMonitorEvents(targetTandaKeys, sheetMap);
     monitorLastOkTs = Date.now();
-    // 3) Decidir cuántos días mostrar: por default los próximos 3, pero si
-    //    quedan ≤ 3 tandas activas (sin TAP confirmado), expandimos a 7 para
-    //    que el supervisor pueda planear adelante.
+    // 3) Decidir cuántos días mostrar: por default los próximos 3. Pero si en
+    //    la ventana corta ya quedan POCOS pickings por hacer (≤3), expandimos
+    //    a 7 días — así, cuando están terminando los pickings, el monitor
+    //    adelanta y muestra las tandas de los próximos días automáticamente.
     const narrowDates = targetDeliveryDates(sheetMap, 3);
     const narrowSet   = new Set(narrowDates);
-    let activeInNarrow = 0;
+    let pickingsPendientes = 0;
     for (const [k, v] of sheetMap) {
       if (!narrowSet.has(v.fechaEntregaRaw)) continue;
       if (!v.opIsSi) continue;
       const ev = statusMap.get(k) || {};
-      if (ev.picking === "done" && ev.separado === "done") continue;
-      activeInNarrow++;
+      if (ev.picking !== "done") pickingsPendientes++;
     }
-    const targetDates = activeInNarrow <= 3 ? wideTargetDates : narrowDates;
+    const targetDates = pickingsPendientes <= 3 ? wideTargetDates : narrowDates;
+    await getEmpleadosNombres();   // legajo -> nombre para la leyenda (cacheado 1h)
     renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, empleadosHoy, pastDays, null, fichadasResumen);
     if (refrEl) { refrEl.textContent = "● al día"; refrEl.classList.remove("stale"); }
     // Si el fetch anda, ocultar banner offline (puede que estuviera mostrándose).
-    document.getElementById("monitorOfflineBanner")?.classList.add("hidden");
+    document.getElementById("monitorOfflineBanner").classList.add("hidden");
   } catch (e) {
     if (refrEl) {
       const ageSec = monitorLastOkTs ? Math.round((Date.now()-monitorLastOkTs)/1000) : -1;
@@ -5026,8 +5558,1173 @@ async function refreshMonitor() {
   }
 }
 
-/* DIAG v1.43: si llegamos acá, el top-level del script corrió completo. */
-try { window.__diag && window.__diag("script init OK v1.43"); } catch (_) {}
+/* =========================================================================
+   HOJA DE INCONSISTENCIAS  (pestaña del monitor)
+   Cruza los eventos de Registros_Produccion_Virgilio de un día contra cómo
+   DEBERÍA operar el sistema y lista alertas para que el supervisor intervenga.
+   Reglas documentadas en GUIA-PROYECTO.md § 12.
+   ========================================================================= */
+const INCONS_REFRESH_MS = 20000;          // refresco propio (más lento que el monitor 1s)
+let _inconsIntervalId = null;
+let _inconsDayKey = null;                 // YYYY-MM-DD (BA); null => hoy
+let _inconsActive = false;                // pestaña visible
+
+const INC_DUR_CORE_MAX_MIN   = 8 * 60;    // picking/armado cerrado > 8h = absurdo
+const INC_DUR_TOGGLE_MAX_MIN = 3 * 60;    // toggle (CR,CC,RT,...) cerrado > 3h
+const INC_COMIDA_MAX_MIN     = 90;        // comida > 1h30
+const INC_OPEN_TODAY_MIN     = 180;       // tarea abierta hoy > 3h sin cerrar
+const INC_GAP_MIN            = 90;        // hueco de inactividad > 1h30
+const INC_JORNADA_MAX_MIN    = 12 * 60;   // jornada > 12h
+
+const INC_CORE   = ["EP", "TP", "AP", "TAP"];
+const INC_TOGGLE = ["CR", "CC", "RT", "MG", "RI", "EI", "AT", "PB", "Limp", "PC", "Perm", "CT"];
+const INC_DESC = {
+  EP: "Picking", TP: "Picking", AP: "Armado", TAP: "Armado", CR: "Control Remitos",
+  CC: "Carga Camión", RT: "Recepción Mercadería", MG: "Guardado Góndola",
+  RI: "Recepción Insumos", EI: "Entrega Insumos", AT: "Atendí Timbre",
+  PB: "Baño", Limp: "Limpieza", Perm: "Permiso", PC: "Comida", CT: "Conteo", FJ: "Fin Jornada"
+};
+
+function inconsDayKey() { return _inconsDayKey || getTodayKey(); }
+function _incMin(ms) { return ms / 60000; }
+function _incHora(iso) {
+  try {
+    return new Date(iso).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Argentina/Buenos_Aires" });
+  } catch (_e) { return String(iso).slice(11, 16); }
+}
+
+function setMonitorTab(tab) {
+  const cont = document.getElementById("monitorContent");
+  const inc  = document.getElementById("inconsContent");
+  _inconsActive = (tab === "incons");
+  if (cont) cont.classList.toggle("hidden", _inconsActive);
+  if (inc)  inc.classList.toggle("hidden", !_inconsActive);
+  // Sin pestañas: el título refleja qué vista se está mostrando.
+  const titleEl = document.getElementById("monitorTitleText");
+  if (titleEl) titleEl.textContent = _inconsActive ? "Inconsistencias" : "Monitor Virgilio";
+  if (_inconsActive) refreshInconsistencias();
+}
+
+function startInconsAutoRefresh() {
+  if (_inconsIntervalId) clearInterval(_inconsIntervalId);
+  refreshInconsistencias();   // pobla el badge aunque la pestaña no esté activa
+  _inconsIntervalId = setInterval(refreshInconsistencias, INCONS_REFRESH_MS);
+}
+function stopInconsAutoRefresh() {
+  if (_inconsIntervalId) { clearInterval(_inconsIntervalId); _inconsIntervalId = null; }
+  _inconsActive = false;
+}
+
+async function fetchInconsEvents(dayKey) {
+  const dayStartIso = new Date(`${dayKey}T00:00:00-03:00`).toISOString();
+  const dayEndIso   = new Date(`${dayKey}T23:59:59-03:00`).toISOString();
+  const url = SUPABASE_TABLE_ENDPOINT +
+    "?ts_cliente=gte." + encodeURIComponent(dayStartIso) +
+    "&ts_cliente=lte." + encodeURIComponent(dayEndIso) +
+    "&order=ts_cliente.asc&limit=5000" +
+    "&select=opcion,texto,legajo,ts_cliente,ts_inicio";
+  const r = await fetch(url, { headers: { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY } });
+  if (!r.ok) throw new Error("HTTP " + r.status);
+  return await r.json();
+}
+
+// Set de tandas válidas: las del sheet de programación + el histórico.
+async function inconsValidTandas() {
+  const s = new Set();
+  try {
+    const sheet = _monitorSheetCache || _pppCache;
+    if (sheet) for (const k of sheet.keys()) s.add(k);
+    const hist = await getHistoricMap();
+    if (hist) for (const k of hist.keys()) s.add(k);
+  } catch (_) { /* sin planilla: no se chequea pedido inválido */ }
+  return s;
+}
+
+function computeInconsistencias(events, dayKey, validTandas) {
+  const hoy = isTodayKey(dayKey);
+  const nowMs = Date.now();
+  const out = [];
+  const add = (sev, cat, legajo, hora, detalle) => out.push({ sev, cat, legajo, hora, detalle });
+
+  // Excluir legajos test/basura (0 y 1)
+  const evs = events.filter(e => {
+    const l = String(e.legajo || "").trim();
+    return l && l !== "0" && l !== "1";
+  });
+
+  // Pedido cargado por más de un operario (mismo rol)
+  const tandaClosers = new Map();   // tanda -> {TP:Set, TAP:Set}
+  for (const e of evs) {
+    if (e.opcion !== "TP" && e.opcion !== "TAP") continue;
+    const t = String(e.texto || "").trim().toUpperCase();
+    if (!t) continue;
+    if (!tandaClosers.has(t)) tandaClosers.set(t, { TP: new Set(), TAP: new Set() });
+    tandaClosers.get(t)[e.opcion].add(String(e.legajo).trim());
+  }
+  for (const [t, c] of tandaClosers) {
+    if (c.TP.size > 1)  add("alta", "Pedido duplicado", [...c.TP].join("/"),  "", `Tanda ${t}: picking (TP) cargado por ${c.TP.size} operarios`);
+    if (c.TAP.size > 1) add("alta", "Pedido duplicado", [...c.TAP].join("/"), "", `Tanda ${t}: armado (TAP) cargado por ${c.TAP.size} operarios`);
+  }
+
+  // Agrupar por legajo
+  const byLeg = new Map();
+  for (const e of evs) {
+    const l = String(e.legajo).trim();
+    if (!byLeg.has(l)) byLeg.set(l, []);
+    byLeg.get(l).push(e);
+  }
+
+  for (const [leg, list] of byLeg) {
+    list.sort((a, b) => new Date(a.ts_cliente) - new Date(b.ts_cliente));
+    const fjs = list.filter(e => e.opcion === "FJ");
+    const fjTs = fjs.length ? new Date(fjs[fjs.length - 1].ts_cliente) : null;
+    const firstTs = new Date(list[0].ts_cliente);
+    const lastTs  = new Date(list[list.length - 1].ts_cliente);
+
+    if (fjs.length > 1) add("alta", "Secuencia", leg, _incHora(fjs[fjs.length - 1].ts_cliente), `${fjs.length} Fin de Jornada (FJ) en el día`);
+
+    if (fjTs) for (const e of list) {
+      if (e.opcion === "FJ") continue;
+      if (new Date(e.ts_cliente) > fjTs) add("alta", "Secuencia", leg, _incHora(e.ts_cliente), `${INC_DESC[e.opcion] || e.opcion} después de Fin de Jornada`);
+    }
+
+    if (!hoy && !fjTs && list.some(e => INC_CORE.includes(e.opcion))) {
+      add("alta", "Secuencia", leg, _incHora(lastTs.toISOString()), "Jornada con producción pero SIN Fin de Jornada (FJ)");
+    }
+
+    const comidaMs = list
+      .filter(e => e.opcion === "PC" && e.ts_inicio && new Date(e.ts_cliente) > new Date(e.ts_inicio))
+      .reduce((s, e) => s + Math.min(new Date(e.ts_cliente) - new Date(e.ts_inicio), 8 * 3600 * 1000), 0);
+    const endJ = fjTs || lastTs;
+    const jornMin = _incMin((endJ - firstTs) - comidaMs);
+    if (jornMin > INC_JORNADA_MAX_MIN) add("media", "Tiempos", leg, "", `Jornada de ${(jornMin / 60).toFixed(1)} h (> ${INC_JORNADA_MAX_MIN / 60} h)`);
+
+    for (const e of list) {
+      if (!e.ts_inicio) continue;
+      const dur = new Date(e.ts_cliente) - new Date(e.ts_inicio);
+      if (dur <= 0) continue;
+      const durMin = _incMin(dur);
+      if (e.opcion === "TP" || e.opcion === "TAP") {
+        if (durMin > INC_DUR_CORE_MAX_MIN) add("alta", "Duración", leg, _incHora(e.ts_cliente), `${INC_DESC[e.opcion]} ${String(e.texto || "").toUpperCase()} duró ${(durMin / 60).toFixed(1)} h`);
+      } else if (e.opcion === "PC") {
+        if (durMin > INC_COMIDA_MAX_MIN) add("media", "Tiempos", leg, _incHora(e.ts_cliente), `Comida de ${Math.round(durMin)} min (> ${INC_COMIDA_MAX_MIN} min)`);
+      } else if (INC_TOGGLE.includes(e.opcion)) {
+        if (durMin > INC_DUR_TOGGLE_MAX_MIN) add("media", "Duración", leg, _incHora(e.ts_cliente), `${INC_DESC[e.opcion] || e.opcion} duró ${(durMin / 60).toFixed(1)} h`);
+      }
+    }
+
+    const pcCloses = list.filter(e => e.opcion === "PC" && e.ts_inicio);
+    if (pcCloses.length > 1) add("media", "Tiempos", leg, "", `${pcCloses.length} comidas (PC) en el día`);
+
+    // Secuencia EP/TP y AP/TAP por tanda
+    const seqPairs = [["EP", "TP", "Picking"], ["AP", "TAP", "Armado"]];
+    for (const [openOp, closeOp, label] of seqPairs) {
+      const opens = new Map();
+      const lastOpenTs = new Map();
+      for (const e of list) {
+        const t = String(e.texto || "").trim().toUpperCase() || "(sin código)";
+        if (e.opcion === openOp) {
+          opens.set(t, (opens.get(t) || 0) + 1);
+          lastOpenTs.set(t, e.ts_cliente);
+        } else if (e.opcion === closeOp) {
+          if ((opens.get(t) || 0) > 0) opens.set(t, opens.get(t) - 1);
+          else add("alta", "Secuencia", leg, _incHora(e.ts_cliente), `${label} ${t}: "${closeOp}" sin "${openOp}" previo`);
+        }
+      }
+      for (const [t, n] of opens) {
+        if (n <= 0) continue;
+        if (hoy) {
+          const ageMin = _incMin(nowMs - new Date(lastOpenTs.get(t)).getTime());
+          if (ageMin > INC_OPEN_TODAY_MIN) add("media", "Sin cerrar", leg, _incHora(lastOpenTs.get(t)), `${label} ${t} abierto hace ${(ageMin / 60).toFixed(1)} h (sin cerrar)`);
+        } else {
+          add("alta", "Sin cerrar", leg, _incHora(lastOpenTs.get(t)), `${label} ${t} quedó sin cerrar`);
+        }
+      }
+    }
+
+    // Pedido inválido (no está en la planilla PPP)
+    if (validTandas && validTandas.size) {
+      const vistos = new Set();
+      for (const e of list) {
+        if (!INC_CORE.includes(e.opcion)) continue;
+        const t = String(e.texto || "").trim().toUpperCase();
+        if (!t || vistos.has(t)) continue;
+        vistos.add(t);
+        if (!validTandas.has(t)) add("alta", "Pedido inválido", leg, _incHora(e.ts_cliente), `Tanda ${t} no está en la planilla PPP`);
+      }
+    }
+
+    // Hueco de inactividad (sólo cuando NO había tarea en curso)
+    let inProgress = 0;
+    for (let i = 0; i < list.length; i++) {
+      const e = list[i];
+      if (i > 0 && e.opcion !== "FJ") {
+        const gapMin = _incMin(new Date(e.ts_cliente) - new Date(list[i - 1].ts_cliente));
+        if (inProgress === 0 && gapMin > INC_GAP_MIN) {
+          add("media", "Tiempos", leg, _incHora(e.ts_cliente), `Hueco de ${(gapMin / 60).toFixed(1)} h sin actividad (${_incHora(list[i - 1].ts_cliente)}→${_incHora(e.ts_cliente)})`);
+        }
+      }
+      if (e.opcion === "FJ") { /* neutral */ }
+      else if (e.ts_inicio) inProgress = Math.max(0, inProgress - 1);   // cierre
+      else inProgress++;                                                // apertura
+    }
+  }
+
+  const sevRank = { alta: 0, media: 1 };
+  out.sort((a, b) => (sevRank[a.sev] - sevRank[b.sev]) || String(a.legajo).localeCompare(String(b.legajo)));
+  return out;
+}
+
+function inconsDayOptions() {
+  const out = [];
+  const t = getTodayKey();
+  const [y, m, d] = t.split("-").map(Number);
+  const base = new Date(Date.UTC(y, m - 1, d));
+  for (let i = 0; i < 7; i++) {
+    const dd = new Date(base);
+    dd.setUTCDate(base.getUTCDate() - i);
+    out.push(dd.toISOString().slice(0, 10));
+  }
+  return out;
+}
+function setInconsDay(k) { _inconsDayKey = k; refreshInconsistencias(); }
+
+function inconsDaySelectorHtml(dayKey) {
+  const opts = inconsDayOptions();
+  const hoy = getTodayKey();
+  return `<div class="inc-days">` + opts.map(k => {
+    const [Y, M, D] = k.split("-");
+    const lbl = (k === hoy) ? "Hoy" : `${D}/${M}`;
+    return `<button class="inc-day ${k === dayKey ? "active" : ""}" onclick="setInconsDay('${k}')">${lbl}</button>`;
+  }).join("") + `</div>`;
+}
+
+function inconsSevChip(sev) {
+  return sev === "alta"
+    ? `<span class="inc-chip inc-alta">ALTA</span>`
+    : `<span class="inc-chip inc-media">media</span>`;
+}
+
+function renderInconsistencias(rows, dayKey, totalEv) {
+  const cont  = document.getElementById("inconsContent");
+  const badge = document.getElementById("inconsBadge");
+  const altas = rows.filter(r => r.sev === "alta").length;
+  const medias = rows.length - altas;
+  if (badge) {
+    badge.textContent = String(rows.length);
+    badge.classList.toggle("hidden", rows.length === 0);
+    badge.classList.toggle("inc-badge-alta", altas > 0);
+  }
+  if (!cont) return;
+  const esHoy = (dayKey === getTodayKey());
+  const head = inconsDaySelectorHtml(dayKey) + `
+    <div class="inc-summary">
+      <b>${rows.length}</b> inconsistencia(s) — <span class="inc-alta-txt">${altas} alta(s)</span>, ${medias} media(s)
+      · ${totalEv} eventos el ${esHoy ? "día de hoy" : dayKey}
+    </div>`;
+  if (!rows.length) {
+    cont.innerHTML = head + `<div class="monitor-loading">Sin inconsistencias detectadas ✅</div>`;
+    return;
+  }
+  const body = rows.map(r => {
+    const nombre = _empleadosNombres.get(String(r.legajo)) || "";
+    return `<tr class="inc-row inc-row-${r.sev}">
+      <td>${inconsSevChip(r.sev)}</td>
+      <td>${escapeHtml(r.cat)}</td>
+      <td><b>${escapeHtml(String(r.legajo))}</b>${nombre ? `<div class="inc-nom">${escapeHtml(nombre)}</div>` : ""}</td>
+      <td class="num">${escapeHtml(r.hora || "—")}</td>
+      <td>${escapeHtml(r.detalle)}</td>
+    </tr>`;
+  }).join("");
+  cont.innerHTML = head + `
+    <table class="monitor-table inc-table">
+      <thead><tr><th>Sev.</th><th>Categoría</th><th>Legajo</th><th class="num">Hora</th><th>Detalle</th></tr></thead>
+      <tbody>${body}</tbody>
+    </table>`;
+}
+
+async function refreshInconsistencias() {
+  const dayKey = inconsDayKey();
+  const cont = document.getElementById("inconsContent");
+  if (!cont) return;
+  try {
+    const [events, validTandas] = await Promise.all([
+      fetchInconsEvents(dayKey),
+      inconsValidTandas(),
+      getEmpleadosNombres().catch(() => null)
+    ]);
+    const rows = computeInconsistencias(events, dayKey, validTandas);
+    renderInconsistencias(rows, dayKey, events.length);
+  } catch (e) {
+    if (_inconsActive) {
+      cont.innerHTML = inconsDaySelectorHtml(dayKey) +
+        `<div class="monitor-error">No se pudo cargar inconsistencias: ${escapeHtml(e.message)}</div>`;
+    }
+  }
+}
+/* ============================================================
+   FACTURACIÓN — pantalla para 2do monitor (ventas).
+   Reusa fetchMonitorSheet() del monitor y _pppCache (PPP_TTL_MS).
+   Tick por NP persistido en Supabase tabla Facturacion_NP. Sincroniza
+   cross-PC (la PC de ventas tickea, el monitor Virgilio ve el ✅).
+   Reset diario implícito: NPs con cierre_id están "archivados" y no
+   aparecen más en pantalla; NPs sin cierre_id siguen pendientes.
+   ============================================================ */
+const FAC_REFRESH_MS = 5000;
+const FAC_NPS_TTL_MS = 4000;          // cache local del set de NPs facturados
+let _facIntervalId = null;
+let _facLastTandas = [];
+let _facToastTimer = null;
+// Set de NPs facturados pendientes de cierre (lo que se ve como tickeado).
+// Lo lee también el monitor Virgilio para marcar ✅ en "Tandas a FC".
+let _facNpsHoy        = new Set();
+let _facNpsHoyTs      = 0;
+let _facNpsInflight   = null;   // promesa para evitar fetch paralelo
+
+function facTodayKey(){
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+}
+
+/* Trae NPs con cierre_id IS NULL (=pendientes de cierre) desde Supabase.
+   Cacheado FAC_NPS_TTL_MS para no martillar la DB. El monitor Virgilio
+   también llama acá → cache compartido. */
+async function fetchFacturadosHoy(force){
+  const now = Date.now();
+  if (!force && (now - _facNpsHoyTs) < FAC_NPS_TTL_MS) return _facNpsHoy;
+  if (_facNpsInflight) return _facNpsInflight;
+  _facNpsInflight = (async () => {
+    try{
+      const url = SUPABASE_FACTURACION_NP_ENDPOINT
+        + "?cierre_id=is.null&select=np&limit=5000";
+      const r = await fetch(url, {
+        headers: { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY }
+      });
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      const data = await r.json();
+      _facNpsHoy = new Set(data.map(x => String(x.np)));
+      _facNpsHoyTs = Date.now();
+      return _facNpsHoy;
+    } finally {
+      _facNpsInflight = null;
+    }
+  })();
+  return _facNpsInflight;
+}
+
+function openFacturacion(){
+  document.getElementById("facturacionModal").classList.add("show");
+  facTick();
+  if (_facIntervalId) clearInterval(_facIntervalId);
+  _facIntervalId = setInterval(facTick, FAC_REFRESH_MS);
+}
+function closeFacturacion(){
+  document.getElementById("facturacionModal").classList.remove("show");
+  if (_facIntervalId){ clearInterval(_facIntervalId); _facIntervalId = null; }
+}
+
+function facShowToast(msg){
+  const el = document.getElementById("facToast");
+  if (!el) return;
+  el.textContent = msg;
+  el.classList.add("show");
+  clearTimeout(_facToastTimer);
+  _facToastTimer = setTimeout(() => el.classList.remove("show"), 2500);
+}
+
+function facSetStatus(ok, txt){
+  const dot = document.getElementById("facDot");
+  if (dot) dot.className = "fac-dot " + (ok ? "ok" : "err");
+  const t = document.getElementById("facStatusTxt");
+  if (t) t.textContent = txt;
+}
+
+/* Determina qué tandas están en estado FC (picking + separado done).
+   Hace una query similar a fetchMonitorEvents pero acotada y simplificada:
+   solo necesitamos último EP/TP y último AP/TAP por tanda. */
+async function facFetchFcKeys(targetTandaKeys){
+  if (!targetTandaKeys.length) return new Set();
+  // Filtro texto=in.(...) con tandas target — evita el limit de 1000
+  const filter = targetTandaKeys.map(t => encodeURIComponent(t)).join(",");
+  const url = SUPABASE_TABLE_ENDPOINT
+    + "?opcion=in.(EP,TP,AP,TAP)"
+    + "&texto=in.(" + filter + ")"
+    + "&order=ts_cliente.asc"
+    + "&select=opcion,texto,ts_cliente"
+    + "&limit=2000";
+  const r = await fetch(url, {
+    headers: { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY }
+  });
+  if (!r.ok) throw new Error("Supabase HTTP " + r.status);
+  const data = await r.json();
+  const lastP = new Map(), lastA = new Map();
+  for (const ev of data){
+    const t = (ev.texto || "").trim().toUpperCase();
+    if (!t) continue;
+    if (ev.opcion === "EP" || ev.opcion === "TP"){
+      const cur = lastP.get(t);
+      if (!cur || ev.ts_cliente > cur.ts) lastP.set(t, { op: ev.opcion, ts: ev.ts_cliente });
+    } else if (ev.opcion === "AP" || ev.opcion === "TAP"){
+      const cur = lastA.get(t);
+      if (!cur || ev.ts_cliente > cur.ts) lastA.set(t, { op: ev.opcion, ts: ev.ts_cliente });
+    }
+  }
+  const fc = new Set();
+  for (const k of targetTandaKeys){
+    const p = lastP.get(k), a = lastA.get(k);
+    if (p && p.op === "TP" && a && a.op === "TAP") fc.add(k);
+  }
+  return fc;
+}
+
+function facRender(tandas){
+  // Aplanamos: una fila por NP pendiente, llevando tanda + fecha salida
+  // como cols (antes vivían en el header de cada grupo, ahora se repiten
+  // por fila). Permite ordenar/filtrar globalmente sin agrupación visual.
+  const filas = [];
+  const tandasVisibles = new Set();
+  for (const t of tandas){
+    for (const p of t.pedidos){
+      if (_facNpsHoy.has(p.np)) continue;
+      filas.push({
+        np: p.np,
+        cod: p.cod || "",
+        rs: p.razonSocial || "",
+        dir: p.direccion || "",
+        m3: p.m3,
+        barrio: p.barrio || "",
+        zona: p.zona || "",
+        tanda: t.tanda,
+        fechaSalida: t.fechaEntrega,
+        fechaEntregaRaw: t.fechaEntregaRaw || "",
+        _feRaw: t.fechaEntregaRaw || null
+      });
+      tandasVisibles.add(t.tanda);
+    }
+  }
+
+  // Orden: fecha salida ASC → tanda ASC → NP ASC
+  filas.sort((a,b) =>
+    (a.fechaEntregaRaw || "").localeCompare(b.fechaEntregaRaw || "")
+    || (a.tanda || "").localeCompare(b.tanda || "")
+    || (a.np || "").localeCompare(b.np || "")
+  );
+
+  document.getElementById("facCntTandas").textContent = tandasVisibles.size;
+  document.getElementById("facCntPend").textContent = filas.length;
+  document.getElementById("facCntDone").textContent = _facNpsHoy.size;
+  document.getElementById("facBtnCierre").disabled = _facNpsHoy.size === 0;
+  const btnRev = document.getElementById("facBtnRevertir");
+  if (btnRev) btnRev.disabled = _facNpsHoy.size === 0;
+
+  const container = document.getElementById("facContainer");
+  if (!filas.length){
+    container.innerHTML = `<div class="fac-empty">${tandas.length ? "✅ Todos los NPs facturados" : "⏳ Sin tandas listas para facturar"}</div>`;
+    return;
+  }
+
+  // Zebra por tanda: cada vez que cambia la tanda, flip de fondo. Reemplaza
+  // el header de grupo dando agrupamiento visual sin ocupar espacio.
+  let prevTanda = null;
+  let altFlag = false;
+  const rowsHtml = filas.map(f => {
+    if (f.tanda !== prevTanda){ altFlag = !altFlag; prevTanda = f.tanda; }
+    const args = JSON.stringify({
+      np: f.np, tanda: f.tanda, m3: f.m3 || 0,
+      rs: f.rs, cod: f.cod, feRaw: f._feRaw
+    })
+      .replace(/&/g, "&amp;")
+      .replace(/'/g, "&apos;")
+      .replace(/</g, "&lt;");
+    return `
+      <tr data-fac-np="${escapeHtml(f.np)}" class="${altFlag ? 'fac-tanda-alt' : ''}">
+        <td class="fac-tanda-col">${escapeHtml(f.tanda)}</td>
+        <td class="center">${escapeHtml(f.fechaSalida)}</td>
+        <td class="fac-np-cell">${escapeHtml(f.np)}</td>
+        <td class="fac-cod-cell">${escapeHtml(f.cod)}</td>
+        <td>${escapeHtml(f.rs)}</td>
+        <td class="fac-dir-cell">${escapeHtml(f.dir)}</td>
+        <td class="num">${f.m3 ? f.m3.toFixed(1).replace(".",",") : ""}</td>
+        <td>${escapeHtml(f.barrio)}</td>
+        <td>${escapeHtml(f.zona)}</td>
+        <td class="center"><button class="fac-btn-tick" data-args='${args}' onclick="facTickNP(this)">✓</button></td>
+      </tr>`;
+  }).join("");
+
+  container.innerHTML = `
+    <div class="fac-table-wrap">
+      <table class="fac-np-tbl">
+        <thead>
+          <tr>
+            <th style="width:55px">Tanda</th>
+            <th class="center" style="width:60px">Salida</th>
+            <th style="width:60px">NP</th>
+            <th style="width:45px">Cod</th>
+            <th style="width:175px">Razón Social</th>
+            <th style="width:195px">Dirección</th>
+            <th class="num" style="width:40px">M3</th>
+            <th style="width:115px">Localidad</th>
+            <th style="width:135px">Zona</th>
+            <th class="center" style="width:75px">Acción</th>
+          </tr>
+        </thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>
+    </div>`;
+}
+
+/* Tick por NP — POST a Supabase.
+   Resolución merge-duplicates por si ventas hace doble click. El UPSERT
+   no falla aunque el NP ya esté facturado. */
+window.facTickNP = async function(btn){
+  let args;
+  try { args = JSON.parse(btn.dataset.args); }
+  catch(e){ facShowToast("Error leyendo NP"); return; }
+  const { np, tanda, m3, rs, cod, feRaw } = args;
+  btn.disabled = true;
+
+  // Optimistic UI
+  _facNpsHoy.add(np);
+  const row = document.querySelector(`tr[data-fac-np="${CSS.escape(np)}"]`);
+  if (row) row.classList.add("fading");
+
+  try {
+    const r = await fetch(SUPABASE_FACTURACION_NP_ENDPOINT + "?on_conflict=np", {
+      method: "POST",
+      headers: {
+        "apikey":         SUPABASE_KEY,
+        "Authorization":  "Bearer " + SUPABASE_KEY,
+        "Content-Type":   "application/json",
+        "Prefer":         "resolution=merge-duplicates"
+      },
+      body: JSON.stringify({
+        np,
+        tanda,
+        m3: m3 || null,
+        razon_social: rs || null,
+        cod_cliente: cod || null,
+        fecha_salida: feRaw || null
+      })
+    });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+  } catch (e) {
+    // Rollback optimista
+    _facNpsHoy.delete(np);
+    facShowToast("Error guardando: " + e.message);
+    facRender(_facLastTandas);
+    return;
+  }
+
+  // Si la tanda quedó 100% tickeada, avisar con toast distinto
+  const tandaObj = _facLastTandas.find(t => (t.tanda || "") === tanda);
+  if (tandaObj && tandaObj.pedidos.every(p => _facNpsHoy.has(p.np))){
+    facShowToast(`Tanda ${tanda} completa ✓`);
+  } else {
+    facShowToast(`NP ${np} facturado`);
+  }
+  setTimeout(() => facRender(_facLastTandas), 350);
+};
+
+/* Revertir: borra todos los ticks pendientes de cierre (cierre_id IS NULL).
+   Confirmación obligatoria — destructivo. Útil cuando ventas se equivoca
+   masivamente o se está testeando. */
+window.facRevertir = async function(){
+  if (!_facNpsHoy.size){ facShowToast("No hay nada que revertir"); return; }
+  const confirma = confirm(
+    `¿Borrar ${_facNpsHoy.size} ticks pendientes de cierre?\n\n` +
+    "Esto borra los NPs facturados de Supabase (los que aún no están en un cierre). " +
+    "El monitor Virgilio dejará de mostrar ✅. No afecta cierres pasados."
+  );
+  if (!confirma) return;
+
+  const btn = document.getElementById("facBtnRevertir");
+  if (btn) btn.disabled = true;
+
+  try {
+    const r = await fetch(SUPABASE_FACTURACION_NP_ENDPOINT + "?cierre_id=is.null", {
+      method: "DELETE",
+      headers: {
+        "apikey":        SUPABASE_KEY,
+        "Authorization": "Bearer " + SUPABASE_KEY,
+        "Prefer":        "return=minimal"
+      }
+    });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    _facNpsHoy = new Set();
+    _facNpsHoyTs = Date.now();
+    facRender(_facLastTandas);
+    facShowToast("Ticks revertidos ✓");
+  } catch (e) {
+    facShowToast("Error: " + e.message);
+    if (btn) btn.disabled = false;
+  }
+};
+
+async function facTick(){
+  try{
+    // Reusa el cache de PPP del monitor (PPP_TTL_MS = 3s)
+    let sheetMap;
+    const nowMs = Date.now();
+    if (_pppCache && (nowMs - _pppCacheTs) < PPP_TTL_MS){
+      sheetMap = _pppCache;
+    } else {
+      sheetMap = await fetchMonitorSheet();
+      _pppCache = sheetMap;
+      _pppCacheTs = Date.now();
+    }
+
+    // Filtra a planificadas (Op=SI) con NPs
+    const tandasPlan = [...sheetMap.values()].filter(t => t.opIsSi && t.pedidos.length > 0);
+    const keys = tandasPlan.map(t => t._key || t.tanda.toUpperCase());
+
+    // Paralelo: tandas FC + NPs ya facturados. Promise.all con .catch por
+    // promesa = mismo efecto que allSettled, sin depender de ese API (ES2021)
+    // que no existe en navegadores de TVs viejas.
+    const _facPar = await Promise.all([
+      facFetchFcKeys(keys).catch(function(e){ console.warn("[fac] FC keys:", e); return new Set(); }),
+      fetchFacturadosHoy(true).catch(function(){ return null; })
+    ]);
+    const fcKeys = _facPar[0] || new Set();
+
+    let tandasFC = tandasPlan.filter(t => fcKeys.has(t._key || t.tanda.toUpperCase()));
+    let modoFallback = false;
+    if (!tandasFC.length && keys.length){
+      // Fallback dev: si no hay tandas con FC real, muestra todas las
+      // planificadas de hoy/futuro para que se vea la UI.
+      modoFallback = true;
+      const today = facTodayKey();
+      tandasFC = tandasPlan.filter(t => (t.fechaEntregaRaw || "") >= today);
+    }
+
+    tandasFC.sort((a,b) =>
+      (a.fechaEntregaRaw || "").localeCompare(b.fechaEntregaRaw || "")
+      || a.tanda.localeCompare(b.tanda)
+    );
+
+    _facLastTandas = tandasFC;
+    facRender(tandasFC);
+
+    const banner = document.getElementById("facBanner");
+    if (modoFallback){
+      facSetStatus(true, `Sin Tandas FC reales — mostrando ${tandasFC.length} planificadas`);
+      banner.innerHTML = "⚠ Modo desarrollo — mostrando TODAS las tandas planificadas (no hay picking+separado terminados aún). En operación normal solo aparecen Tandas a FC reales.";
+      banner.style.display = "block";
+    } else {
+      facSetStatus(true, `${tandasFC.length} tandas FC · ${_facNpsHoy.size} NPs facturados · refresh ${FAC_REFRESH_MS/1000}s`);
+      banner.style.display = "none";
+    }
+  } catch (e){
+    facSetStatus(false, "Error: " + e.message);
+    console.error("[fac]", e);
+  }
+}
+
+/* Cierre Marianela: crea row en Facturacion_Cierres → PATCH cierre_id en
+   todos los NPs facturados → genera PDF. Si algún paso falla, abortamos
+   y avisamos. Los NPs no quedan "huérfanos" porque el PATCH es atomico
+   por NP (PostgREST). */
+async function generateFacturacionPDF(){
+  if (!_facNpsHoy.size){ facShowToast("No hay NPs facturados"); return; }
+  if (!window.jspdf || !window.jspdf.jsPDF){
+    facShowToast("jsPDF no cargó — refrescá la página");
+    return;
+  }
+
+  const btn = document.getElementById("facBtnCierre");
+  btn.disabled = true;
+  btn.textContent = "Generando cierre…";
+
+  // 1) Junta filas (PPP × NPs facturados)
+  const filas = [];
+  for (const t of _facLastTandas){
+    for (const p of t.pedidos){
+      if (!_facNpsHoy.has(p.np)) continue;
+      filas.push({
+        np: p.np, cod: p.cod, rs: p.razonSocial, dir: p.direccion,
+        m3: p.m3, barrio: p.barrio, zona: p.zona,
+        tanda: t.tanda, feRaw: t.fechaEntregaRaw
+      });
+    }
+  }
+  if (!filas.length){
+    facShowToast("No hay NPs en PPP que coincidan");
+    btn.disabled = false; btn.textContent = "Terminé — Generar PDF";
+    return;
+  }
+
+  // Orden: zona → barrio (localidad) → tanda → NP
+  filas.sort((a,b) =>
+    (a.zona || "").localeCompare(b.zona || "")
+    || (a.barrio || "").localeCompare(b.barrio || "")
+    || (a.tanda || "").localeCompare(b.tanda || "")
+    || (a.np || "").localeCompare(b.np || "")
+  );
+
+  // Fecha de reparto = mañana (es lo que sale al día siguiente)
+  const d = new Date(); d.setDate(d.getDate() + 1);
+  const fechaReparto = `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()}`;
+  const fechaCierreISO = facTodayKey();
+  const fechaRepartoISO = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+
+  // 2) INSERT cierre → recupera id
+  let cierreId = null;
+  try {
+    const rC = await fetch(SUPABASE_FACTURACION_CIERRES_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "apikey":         SUPABASE_KEY,
+        "Authorization":  "Bearer " + SUPABASE_KEY,
+        "Content-Type":   "application/json",
+        "Prefer":         "return=representation"
+      },
+      body: JSON.stringify({
+        fecha_cierre:  fechaCierreISO,
+        fecha_reparto: fechaRepartoISO,
+        cant_nps:      filas.length,
+        cant_tandas:   [...new Set(filas.map(f => f.tanda))].length
+      })
+    });
+    if (!rC.ok) throw new Error("HTTP " + rC.status);
+    const cierreRow = await rC.json();
+    cierreId = Array.isArray(cierreRow) ? cierreRow[0].id : cierreRow.id;
+  } catch (e) {
+    facShowToast("Error creando cierre: " + e.message);
+    btn.disabled = false; btn.textContent = "Terminé — Generar PDF";
+    return;
+  }
+
+  // 3) PATCH cierre_id en todos los NPs facturados pendientes
+  try {
+    const npsCsv = filas.map(f => encodeURIComponent(f.np)).join(",");
+    const rP = await fetch(
+      SUPABASE_FACTURACION_NP_ENDPOINT + "?np=in.(" + npsCsv + ")&cierre_id=is.null",
+      {
+        method: "PATCH",
+        headers: {
+          "apikey":         SUPABASE_KEY,
+          "Authorization":  "Bearer " + SUPABASE_KEY,
+          "Content-Type":   "application/json",
+          "Prefer":         "return=minimal"
+        },
+        body: JSON.stringify({ cierre_id: cierreId })
+      }
+    );
+    if (!rP.ok) throw new Error("HTTP " + rP.status);
+  } catch (e) {
+    facShowToast("Cierre creado pero error asociando NPs: " + e.message);
+    // No abortamos — igual generamos el PDF
+  }
+
+  // 4) Refresca set local (los NPs ahora tienen cierre_id → desaparecen)
+  _facNpsHoy = new Set();
+  _facNpsHoyTs = Date.now();
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+
+  // Tabla pegada al margen superior — sin título ni fecha porque el repartidor
+  // ya sabe de qué día es por el nombre del archivo.
+  doc.autoTable({
+    startY: 10,
+    head: [["NP", "Tanda", "Cod", "Razón Social", "M3", "Dirección", "Localidad", "Zona"]],
+    body: filas.map(f => [
+      f.np, f.tanda, f.cod, f.rs,
+      f.m3 ? f.m3.toFixed(1).replace(".", ",") : "",
+      f.dir, f.barrio, f.zona
+    ]),
+    styles: { fontSize: 9, cellPadding: 2 },
+    headStyles: { fillColor: [30,107,214], textColor: 255, fontStyle: "bold" },
+    columnStyles: {
+      0: { cellWidth: 18, halign: "center" },                  // NP
+      1: { cellWidth: 18, halign: "center" },                  // Tanda
+      2: { cellWidth: 16, halign: "center" },                  // Cod
+      3: { cellWidth: 55 },                                    // Razón Social
+      4: { cellWidth: 14, halign: "right" },                   // M3
+      5: { cellWidth: 60 },                                    // Dirección
+      6: { cellWidth: 35 },                                    // Localidad
+      7: { cellWidth: 40 }                                     // Zona
+    },
+    didParseCell: function(data){
+      // Resalta filas donde cambia la zona — facilita lectura del repartidor.
+      // Zona es la última col → index 7 con el nuevo orden.
+      if (data.section === "body" && data.column.index === 7){
+        const prev = data.row.index > 0 ? filas[data.row.index - 1].zona : null;
+        if (data.row.raw[7] !== prev){
+          data.cell.styles.fillColor = [219, 234, 254];
+          data.cell.styles.fontStyle = "bold";
+        }
+      }
+    }
+  });
+
+  doc.save(`Reparto_${fechaReparto.replace(/\//g, "-")}.pdf`);
+  facShowToast(`Cierre generado · ${filas.length} NPs ✓`);
+  btn.disabled = false; btn.textContent = "Terminé — Generar PDF";
+  facRender(_facLastTandas);
+}
+
+/* ============================================================
+   PRODUCTIVIDAD — gráficos picking + pedido (m3/h por operario).
+   - Eje X: últimos 7 días
+   - Eje Y: m3/hora, ticks cada 0.2
+   - 1 línea por operario activo (al menos 1 op en el rango)
+   - Días sin datos quedan como hueco (no se grafican en 0)
+   Refresca cada 30s (no por tick de 1s del monitor — costoso).
+   ============================================================ */
+const PROD_DAYS_BACK     = 7;
+const PROD_REFRESH_MS    = 30 * 1000;
+const PROD_DATA_TTL_MS   = 25 * 1000;
+let _prodChartPicking    = null;
+let _prodChartPedido     = null;
+let _prodDataCache       = null;
+let _prodDataTs          = 0;
+let _prodInflight        = null;
+let _prodLastRenderTs    = 0;
+
+/* Paleta — 12 colores distinguibles para hasta 12 operarios. Si hay más,
+   loopea. Mismos colores para Picking y Pedido por operario (legajo). */
+const PROD_COLORS = [
+  "#1e6bd6","#16a34a","#f59e0b","#dc2626","#7c3aed","#0891b2",
+  "#ea580c","#65a30d","#db2777","#0284c7","#9333ea","#ca8a04"
+];
+function prodColorFor(legajo, idx){
+  // Hash determinista para que el color de un legajo no cambie entre renders
+  // si se agrega/quita un operario. Fallback al idx si el hash falla.
+  if (legajo){
+    let h = 0;
+    for (let i=0; i<legajo.length; i++) h = (h*31 + legajo.charCodeAt(i)) | 0;
+    return PROD_COLORS[Math.abs(h) % PROD_COLORS.length];
+  }
+  return PROD_COLORS[idx % PROD_COLORS.length];
+}
+
+/* Trae eventos EP/TP/AP/TAP de los últimos N días, parea EP↔TP y AP↔TAP
+   por (legajo,tanda), calcula m3/h por (operario, día, operación).
+   Cacheado PROD_DATA_TTL_MS para que renders sucesivos no martillen. */
+async function fetchProductivityData(daysBack){
+  daysBack = daysBack || PROD_DAYS_BACK;
+  const now = Date.now();
+  if (_prodDataCache && (now - _prodDataTs) < PROD_DATA_TTL_MS) return _prodDataCache;
+  if (_prodInflight) return _prodInflight;
+
+  _prodInflight = (async () => {
+    try {
+      // Rango de días: hoy hacia atrás
+      const today = new Date();
+      const dayKeys = [];
+      const dayLabels = [];
+      for (let i = daysBack - 1; i >= 0; i--){
+        const d = new Date(today);
+        d.setDate(d.getDate() - i);
+        const dk = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+        dayKeys.push(dk);
+        dayLabels.push(`${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}`);
+      }
+      const sinceDate = new Date(today);
+      sinceDate.setDate(sinceDate.getDate() - daysBack);
+      sinceDate.setHours(0, 0, 0, 0);
+      const sinceIso = sinceDate.toISOString();
+
+      // Eventos
+      const url = SUPABASE_TABLE_ENDPOINT
+        + "?opcion=in.(EP,TP,AP,TAP)"
+        + "&ts_cliente=gte." + encodeURIComponent(sinceIso)
+        + "&order=ts_cliente.asc"
+        + "&select=opcion,texto,legajo,ts_cliente"
+        + "&limit=5000";
+      const r = await fetch(url, {
+        headers: { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY }
+      });
+      if (!r.ok) throw new Error("Supabase HTTP " + r.status);
+      const events = await r.json();
+
+      // m3 por tanda: union PPP cache + Historico
+      const m3ByTanda = new Map();
+      if (_pppCache){
+        for (const [k, v] of _pppCache){
+          if (v && v.m3 > 0) m3ByTanda.set(k, v.m3);
+        }
+      }
+      try {
+        const hist = await getHistoricMap();
+        for (const [k, m] of hist){
+          if (m > 0 && !m3ByTanda.has(k)) m3ByTanda.set(k, m);
+        }
+      } catch(e){ /* sin histórico, seguimos con PPP */ }
+
+      // Empleados
+      let empleados = new Map();
+      try { empleados = await getEmpleadosNombres(); } catch(e){}
+
+      // Pareo EP/TP, AP/TAP por (legajo, tanda)
+      const openPicks = new Map();   // key legajo+"|"+tanda → ts
+      const openArms  = new Map();
+      // result: dayKey → legajo → {picking:{m3,ms}, pedido:{m3,ms}}
+      const result = new Map();
+      const getCell = (legajo, dayKey) => {
+        if (!result.has(dayKey)) result.set(dayKey, new Map());
+        const dm = result.get(dayKey);
+        if (!dm.has(legajo)) dm.set(legajo, {
+          picking: { m3: 0, ms: 0, items: [] },
+          pedido:  { m3: 0, ms: 0, items: [] }
+        });
+        return dm.get(legajo);
+      };
+
+      for (const ev of events){
+        const op    = ev.opcion;
+        const leg   = String(ev.legajo || "").trim();
+        const tanda = String(ev.texto || "").trim().toUpperCase();
+        if (!leg || leg === "0" || leg === "1" || !tanda) continue;   // 0/1 = test
+        const ts = new Date(ev.ts_cliente).getTime();
+        const k = leg + "|" + tanda;
+
+        if (op === "EP"){
+          openPicks.set(k, ts);
+        } else if (op === "TP"){
+          const startTs = openPicks.get(k);
+          if (startTs == null) continue;
+          openPicks.delete(k);
+          const dur = ts - startTs;
+          if (dur <= 0) continue;
+          const m3 = m3ByTanda.get(tanda) || 0;
+          if (m3 <= 0) continue;
+          const dk = isoToDayKey(ts);
+          // Solo nos importan los días dentro del rango
+          if (!dayKeys.includes(dk)) continue;
+          const cell = getCell(leg, dk);
+          cell.picking.m3 += m3;
+          cell.picking.ms += dur;
+          cell.picking.items.push({ tanda, m3, ms: dur });
+        } else if (op === "AP"){
+          openArms.set(k, ts);
+        } else if (op === "TAP"){
+          const startTs = openArms.get(k);
+          if (startTs == null) continue;
+          openArms.delete(k);
+          const dur = ts - startTs;
+          if (dur <= 0) continue;
+          const m3 = m3ByTanda.get(tanda) || 0;
+          if (m3 <= 0) continue;
+          const dk = isoToDayKey(ts);
+          if (!dayKeys.includes(dk)) continue;
+          const cell = getCell(leg, dk);
+          cell.pedido.m3 += m3;
+          cell.pedido.ms += dur;
+          cell.pedido.items.push({ tanda, m3, ms: dur });
+        }
+      }
+
+      // Construye series por operación
+      const buildSeries = (opKey) => {
+        const legActivos = new Set();
+        for (const dm of result.values()){
+          for (const [leg, cell] of dm){
+            if (cell[opKey].m3 > 0 && cell[opKey].ms > 0) legActivos.add(leg);
+          }
+        }
+        const series = [];
+        let idx = 0;
+        for (const leg of [...legActivos].sort()){
+          const data = dayKeys.map(dk => {
+            const dm = result.get(dk);
+            if (!dm) return null;
+            const cell = dm.get(leg);
+            if (!cell) return null;
+            const hours = cell[opKey].ms / (1000 * 60 * 60);
+            if (hours <= 0) return null;
+            return +(cell[opKey].m3 / hours).toFixed(2);
+          });
+          series.push({
+            legajo: leg,
+            name: empleados.get(leg) || `Leg ${leg}`,
+            color: prodColorFor(leg, idx),
+            data
+          });
+          idx++;
+        }
+        return series;
+      };
+
+      const buildDetail = (opKey) => {
+        const m = new Map();
+        for (const [dk, dm] of result){
+          for (const [leg, cell] of dm){
+            if (cell[opKey].items.length) m.set(leg + "|" + dk, cell[opKey]);
+          }
+        }
+        return m;
+      };
+      const out = {
+        dayKeys,
+        dayLabels,
+        picking: buildSeries("picking"),
+        pedido:  buildSeries("pedido"),
+        detailPicking: buildDetail("picking"),
+        detailPedido:  buildDetail("pedido")
+      };
+      _prodDataCache = out;
+      _prodDataTs = Date.now();
+      return out;
+    } finally {
+      _prodInflight = null;
+    }
+  })();
+  return _prodInflight;
+}
+
+/* Muestra la composición del promedio m3/h de un operario en un día:
+   las tandas que hizo, con m3 y tiempo, que suman el promedio del punto.
+   Reusa el #tandaModal. */
+function showProdBreakdown(opLabel, name, dayLabel, detail){
+  const m = document.getElementById("tandaModal");
+  if (!m || !detail) return;
+  const items = (detail.items || []).slice().sort((a, b) => b.m3 - a.m3);
+  const totM3 = detail.m3 || 0;
+  const totH  = (detail.ms || 0) / 3600000;
+  const prom  = totH > 0 ? totM3 / totH : 0;
+  const fmt = (n, d = 2) => (n || 0).toFixed(d).replace(".", ",");
+  const rows = items.map(it => {
+    const h = it.ms / 3600000;
+    const mh = h > 0 ? it.m3 / h : 0;
+    return `<tr><td>${escapeHtml(it.tanda)}</td><td class="num">${fmt(it.m3, 3)}</td><td class="num">${Math.round(it.ms / 60000)} min</td><td class="num">${fmt(mh)}</td></tr>`;
+  }).join("");
+  m.querySelector(".tanda-modal-title").textContent = "Composición del promedio";
+  m.querySelector(".tanda-modal-body").innerHTML = `
+    <div style="font-size:14px;color:#475569;margin-bottom:10px;">
+      <b>${escapeHtml(name)}</b> · ${escapeHtml(opLabel)} · ${escapeHtml(dayLabel)}<br>
+      Promedio <b>${fmt(prom)} m3/h</b> = ${fmt(totM3, 3)} m3 ÷ ${fmt(totH)} h · ${items.length} tanda(s)
+    </div>
+    <table class="tanda-modal-table">
+      <thead><tr><th>Tanda</th><th class="num">m3</th><th class="num">Tiempo</th><th class="num">m3/h</th></tr></thead>
+      <tbody>${rows || `<tr><td colspan="4">Sin detalle</td></tr>`}</tbody>
+    </table>`;
+  m.classList.add("show");
+}
+
+/* Renderiza un line chart Chart.js sobre un canvas dado.
+   - Línea por operario, color determinista por legajo
+   - Días sin datos quedan como hueco (spanGaps:false) — no caen a 0
+   - Eje Y empieza en 0, max auto, stepSize 0.2 */
+function renderProdChart(canvasId, labels, series, instanceRef, dayKeys, detailMap, opLabel){
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return null;
+  // Destruir instancia previa si existe
+  if (instanceRef && instanceRef.chart){
+    try { instanceRef.chart.destroy(); } catch(e){}
+    instanceRef.chart = null;
+  }
+  if (!series.length){
+    return null;
+  }
+  const isTV = document.getElementById("monitorModal").classList.contains("tv");
+  const textColor = isTV ? "#cbd5e1" : "#475569";
+  const gridColor = isTV ? "rgba(148,163,184,0.18)" : "rgba(15,23,42,0.08)";
+  const datasets = series.map(s => ({
+    label: s.name,
+    data: s.data,
+    borderColor: s.color,
+    backgroundColor: s.color + "33",
+    pointBackgroundColor: s.color,
+    pointBorderColor: s.color,
+    pointRadius: 3,
+    pointHoverRadius: 6,
+    borderWidth: 2,
+    tension: 0.2,
+    spanGaps: false
+  }));
+  const chart = new Chart(canvas, {
+    type: "line",
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      interaction: { mode: "nearest", intersect: false },
+      onClick: (evt, els) => {
+        if (!els || !els.length) return;
+        const el = els[0];
+        const s = series[el.datasetIndex];
+        if (!s || !dayKeys || !detailMap) return;
+        const detail = detailMap.get(s.legajo + "|" + dayKeys[el.index]);
+        if (detail) showProdBreakdown(opLabel || "", s.name, labels[el.index], detail);
+      },
+      onHover: (evt, els) => {
+        const c = evt && evt.native && evt.native.target;
+        if (c) c.style.cursor = (els && els.length) ? "pointer" : "default";
+      },
+      plugins: {
+        legend: {
+          position: "bottom",
+          labels: { color: textColor, font: { size: 10 }, boxWidth: 12, padding: 6 }
+        },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => {
+              const v = ctx.parsed.y;
+              return (v == null) ? "" : `${ctx.dataset.label}: ${v.toFixed(2)} m3/h`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks: { color: textColor, font: { size: 10 } },
+          grid:  { color: gridColor }
+        },
+        y: {
+          beginAtZero: true,
+          ticks: { color: textColor, font: { size: 10 }, stepSize: 0.2 },
+          grid:  { color: gridColor },
+          title: { display: true, text: "m3/h", color: textColor, font: { size: 11 } }
+        }
+      }
+    }
+  });
+  if (instanceRef) instanceRef.chart = chart;
+  return chart;
+}
+
+/* Refresca ambos charts. Llamado:
+   - Una vez al abrir el monitor (después del primer renderMonitor)
+   - Cada PROD_REFRESH_MS por su propio interval
+   - Cada vez que el DOM de monitor se recrea (renderMonitor pisa innerHTML
+     → canvases nuevos → hay que re-init Chart.js) */
+const _prodPickRef = { chart: null };
+const _prodPedRef  = { chart: null };
+async function refreshProductivityCharts(){
+  try {
+    const data = await fetchProductivityData();
+    const containerP = document.getElementById("prodChartPicking");
+    const containerA = document.getElementById("prodChartPedido");
+    if (!containerP || !containerA) return;
+    const emptyP = document.getElementById("prodChartPickingEmpty");
+    const emptyA = document.getElementById("prodChartPedidoEmpty");
+    // Picking
+    if (data.picking.length === 0){
+      if (emptyP) emptyP.style.display = "block";
+      containerP.style.display = "none";
+      if (_prodPickRef.chart){ try{_prodPickRef.chart.destroy();}catch(e){} _prodPickRef.chart = null; }
+    } else {
+      if (emptyP) emptyP.style.display = "none";
+      containerP.style.display = "block";
+      renderProdChart("prodCanvasPicking", data.dayLabels, data.picking, _prodPickRef, data.dayKeys, data.detailPicking, "Picking");
+    }
+    // Pedido
+    if (data.pedido.length === 0){
+      if (emptyA) emptyA.style.display = "block";
+      containerA.style.display = "none";
+      if (_prodPedRef.chart){ try{_prodPedRef.chart.destroy();}catch(e){} _prodPedRef.chart = null; }
+    } else {
+      if (emptyA) emptyA.style.display = "none";
+      containerA.style.display = "block";
+      renderProdChart("prodCanvasPedido", data.dayLabels, data.pedido, _prodPedRef, data.dayKeys, data.detailPedido, "Pedido");
+    }
+    _prodLastRenderTs = Date.now();
+  } catch (e){
+    console.warn("[prod] refresh:", e.message);
+  }
+}
 </script>
 
 </body>

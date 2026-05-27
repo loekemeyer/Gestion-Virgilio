@@ -53,8 +53,8 @@
     statusEl.dataset.state = "error";
     statusEl.classList.add("form-status--banner");
     statusEl.textContent = token
-      ? "El codigo QR expiro. Volve a escanear el QR de la pantalla de fichada."
-      : "Esta pagina solo es accesible escaneando el QR de fichada de la sede.";
+      ? "El código QR expiró. Volvé a escanear el QR de la pantalla de fichada."
+      : "Esta página solo es accesible escaneando el QR de fichada de la sede.";
   }
 
   function setupEmailMemory() {
@@ -110,7 +110,7 @@
     if (!stillValid) {
       statusEl.dataset.state = "error";
       statusEl.textContent =
-        "El codigo QR expiro mientras llenabas el formulario. Escanea uno nuevo.";
+        "El código QR expiró mientras llenabas el formulario. Escaneá uno nuevo.";
       return;
     }
 

@@ -652,7 +652,7 @@
           hour: "2-digit", minute: "2-digit",
           timeZone: "America/Argentina/Buenos_Aires"
         });
-      } catch {
+      } catch (_e) {
         return d.toISOString().slice(11, 16);
       }
     }
