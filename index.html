@@ -30,6 +30,26 @@ button {
 #legajoScreen h1 { font-size: 36px; text-align: center; }
 #legajoInput { width: 100%; font-size: 34px; padding: 12px; text-align: center; border: 6px solid; }
 
+/* ---------- LOGIN GOOGLE ---------- */
+.google-btn {
+  display: flex; align-items: center; justify-content: center; gap: 12px;
+  background: #fff; color: #1f1f1f; border: 1px solid #dadce0;
+  font-weight: 600; cursor: pointer;
+}
+.google-btn:disabled { opacity: .6; cursor: default; }
+.google-btn svg { width: 26px; height: 26px; flex: 0 0 auto; }
+#authStatus { text-align: center; margin-top: 12px; min-height: 22px; }
+#authStatus.error { color: #c0392b; font-weight: bold; }
+.auth-user-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; margin-bottom: 12px; font-size: 15px; color: #444;
+}
+.auth-user-email { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.auth-logout-btn {
+  width: auto; margin: 0; padding: 6px 14px; font-size: 14px;
+  background: #eee; color: #333; border: 1px solid #ccc; flex: 0 0 auto;
+}
+
 /* 👇 espacio donde se verá el historial (ACHICADO) */
 #legajoHistorySpace{
   margin-top: 12px;
@@ -1790,7 +1810,7 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
 </div>
 
 <!-- Badge de versión + estado de cola (abajo a la izquierda) -->
-<div id="versionBadge">v1.58 ✓</div>
+<div id="versionBadge">v1.62 ✓</div>
 
 <!-- QR de fichada (TOTP rotativo) — abajo a la derecha. Genera tokens cada
      30s que apuntan a la app FichadaQR; los operarios escanean para fichar. -->
@@ -1838,9 +1858,25 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
 <!-- ================= LEGAJO ================= -->
 <div id="legajoScreen">
   <h1>Ingresá tu número de legajo</h1>
-  <input id="legajoInput" type="number" inputmode="numeric">
 
-  <button class="primary-btn" onclick="goToOptions()">Continuar</button>
+  <!-- Login con Google (obligatorio). Visible mientras no haya sesión. -->
+  <div id="authBlock">
+    <button id="googleSignInBtn" class="google-btn" onclick="signInWithGoogle()">
+      <svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+      Iniciar sesión con Google
+    </button>
+    <div id="authStatus" class="small">Iniciá sesión para continuar</div>
+  </div>
+
+  <!-- Entrada de legajo. Oculta hasta que haya sesión de Google. -->
+  <div id="legajoEntry" class="hidden">
+    <div id="authUserRow" class="auth-user-row hidden">
+      <span class="auth-user-email" id="authUserEmail"></span>
+      <button class="auth-logout-btn" onclick="signOutGoogle()">Salir</button>
+    </div>
+    <input id="legajoInput" type="number" inputmode="numeric">
+    <button class="primary-btn" onclick="goToOptions()">Continuar</button>
+  </div>
 
   <!-- Aviso: hay reportes que aún no se enviaron -->
   <div id="pendingIndicator"></div>
@@ -3499,7 +3535,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v1.61";
+const APP_VERSION = "v1.62";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -3781,18 +3817,10 @@ if ("serviceWorker" in navigator) {
   navigator.serviceWorker.addEventListener("message", handleServiceWorkerMessage);
 }
 
-/* Precargar el último legajo guardado (para que el operario no tenga
-   que reescribirlo cada vez que abre la app). Si nunca usó la app en
-   este celular, el input queda vacío. */
-const _prevLegajo = readLastLegajo();
-if (_prevLegajo) {
-  legajoInput.value = _prevLegajo;
-  renderLegajoHistory(_prevLegajo);
-  updateCoreButtonsState();
-  renderPendingSuggestion();
-} else {
-  renderLegajoHistory("");
-}
+/* El legajo ya no se precarga desde el dispositivo: el login con Google
+   (módulo al final del body) resuelve email -> Legajo y rellena el input
+   recién cuando hay sesión. Hasta entonces el "Resumen de hoy" queda vacío. */
+renderLegajoHistory("");
 
 updatePendingIndicator();
 
@@ -6725,6 +6753,112 @@ async function refreshProductivityCharts(){
     console.warn("[prod] refresh:", e.message);
   }
 }
+</script>
+
+<!-- =========================================================
+     LOGIN GOOGLE (Supabase Auth) — obligatorio.
+     La pantalla de legajo arranca mostrando solo el botón de Google.
+     Tras loguear, resolvemos email -> Legajo en Empleados y
+     pre-rellenamos el input; el operario confirma con "Continuar".
+     La sesión la persiste supabase-js en localStorage: las próximas
+     veces entra solo sin volver a loguear.
+     ========================================================= -->
+<script type="module">
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+
+const SB_URL = "https://hrxfctzncixxqmpfhskv.supabase.co";
+const SB_KEY = "sb_publishable_BqpAgZH6ty-9wft10_YMhw_0rcIPuWT";
+
+const sb = createClient(SB_URL, SB_KEY, {
+  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: "pkce" }
+});
+
+const $ = (id) => document.getElementById(id);
+
+function setAuthStatus(msg, isError) {
+  const el = $("authStatus");
+  if (!el) return;
+  el.textContent = msg || "";
+  el.classList.toggle("error", !!isError);
+}
+
+/* email -> Legajo vía tabla Empleados (anon SELECT permitido por RLS). */
+async function resolveLegajoByEmail(email) {
+  if (!email) return null;
+  const url = SB_URL + "/rest/v1/Empleados?email=eq." +
+    encodeURIComponent(email.toLowerCase().trim()) + "&select=Legajo&limit=1";
+  try {
+    const r = await fetch(url, { headers: { apikey: SB_KEY, Authorization: "Bearer " + SB_KEY } });
+    if (!r.ok) return null;
+    const data = await r.json();
+    return (Array.isArray(data) && data.length && data[0].Legajo != null)
+      ? String(data[0].Legajo).trim() : null;
+  } catch (_e) { return null; }
+}
+
+function showLoggedOut() {
+  $("authBlock").classList.remove("hidden");
+  $("legajoEntry").classList.add("hidden");
+  const btn = $("googleSignInBtn");
+  if (btn) btn.disabled = false;
+  setAuthStatus("Iniciá sesión para continuar", false);
+}
+
+async function showLoggedIn(user) {
+  $("authBlock").classList.add("hidden");
+  $("legajoEntry").classList.remove("hidden");
+  const row = $("authUserRow");
+  if (row) {
+    row.classList.remove("hidden");
+    $("authUserEmail").textContent = user.email || "";
+  }
+  const legajo = await resolveLegajoByEmail(user.email);
+  const input = $("legajoInput");
+  if (legajo) {
+    if (input) input.value = legajo;
+    try {
+      if (typeof saveLastLegajo === "function") saveLastLegajo(legajo);
+      if (typeof renderLegajoHistory === "function") renderLegajoHistory(legajo);
+      if (typeof updateCoreButtonsState === "function") updateCoreButtonsState();
+      if (typeof renderPendingSuggestion === "function") renderPendingSuggestion();
+    } catch (_e) {}
+  } else {
+    // Email logueado pero sin legajo vinculado en Empleados.
+    setAuthStatus("Tu cuenta (" + (user.email || "") + ") no está vinculada a un legajo. Pedile al supervisor que cargue tu email en Empleados.", true);
+    $("authBlock").classList.remove("hidden");
+    if (input) input.value = "";
+  }
+}
+
+async function applyAuthState() {
+  let session = null;
+  try { session = (await sb.auth.getSession()).data.session; } catch (_e) {}
+  if (session && session.user && session.user.email) {
+    await showLoggedIn(session.user);
+  } else {
+    showLoggedOut();
+  }
+}
+
+window.signInWithGoogle = async function () {
+  const btn = $("googleSignInBtn");
+  if (btn) btn.disabled = true;
+  setAuthStatus("Redirigiendo a Google…", false);
+  const redirectTo = window.location.origin + window.location.pathname;
+  const { error } = await sb.auth.signInWithOAuth({ provider: "google", options: { redirectTo } });
+  if (error) {
+    if (btn) btn.disabled = false;
+    setAuthStatus("No se pudo iniciar sesión: " + error.message, true);
+  }
+};
+
+window.signOutGoogle = async function () {
+  try { await sb.auth.signOut(); } catch (_e) {}
+  window.location.reload();
+};
+
+sb.auth.onAuthStateChange(() => { applyAuthState(); });
+applyAuthState();
 </script>
 
 </body>

@@ -83,10 +83,25 @@ de pedidos de un Google Sheet.
 
 Todo vive en `index.html`, alternando con la clase `.hidden` (no hay router):
 
-- **Pantalla de legajo** (`#legajoScreen`): input numérico de legajo + "Continuar".
-  Muestra "Resumen de hoy", la cola de mensajes pendientes y el banner de
-  "deshacer último mensaje". **No hay login**: la identidad es sólo el número de
-  legajo (se recuerda el último en `localStorage`).
+- **Pantalla de legajo** (`#legajoScreen`): **login obligatorio con Google**
+  (Supabase Auth, provider Google del proyecto `hrxfctzncixxqmpfhskv`). Arranca
+  mostrando sólo el botón "Iniciar sesión con Google" (`#authBlock`); la entrada
+  de legajo (`#legajoEntry`, input + "Continuar") queda oculta hasta que haya
+  sesión. Tras loguear, se resuelve `email → Legajo` consultando la tabla
+  `Empleados` (`email=eq.<mail>&select=Legajo`, SELECT anónimo permitido por RLS)
+  y se **pre-rellena** el input; el operario confirma con "Continuar". La sesión
+  la persiste `supabase-js` en `localStorage`, así las próximas veces entra solo.
+  El cliente de auth es un `<script type="module">` al final del `index.html` que
+  importa `@supabase/supabase-js@2` desde CDN (jsdelivr). Muestra "Resumen de
+  hoy", la cola de pendientes y el banner de "deshacer último mensaje".
+  - **Requisitos de config (fuera del código):** provider Google habilitado en
+    Supabase Auth · la URL de GitHub Pages (`https://loekemeyer.github.io/tv-v/`)
+    en la allowlist de *Redirect URLs* · "Allow new user signups" habilitado ·
+    consent screen de Google OAuth en producción (o el operario como test user) ·
+    el `email` del empleado cargado en `Empleados` (hoy sólo ~9 de 58 lo tienen).
+  - El límite de "sólo 2 mails" del otro programa que usa el mismo proyecto Auth
+    es lógica de *esa* app, **no** una restricción de Supabase (no hay hook ni
+    trigger en el esquema `auth`): no afecta a esta app.
 - **Pantalla de opciones** (`#optionsScreen`): la grilla de botones de acción +
   botón rojo **"Terminar Día"** (dispara el `FJ`).
 - **Botones flotantes**: 📅 historial de días anteriores · 📊 **monitor** del supervisor.
