@@ -1819,7 +1819,7 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
 </div>
 
 <!-- Badge de versión + estado de cola (abajo a la izquierda) -->
-<div id="versionBadge">v1.67 ✓</div>
+<div id="versionBadge">v1.68 ✓</div>
 
 <!-- QR de fichada (TOTP rotativo) — abajo a la derecha. Genera tokens cada
      30s que apuntan a la app FichadaQR; los operarios escanean para fichar. -->
@@ -3562,7 +3562,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v1.67";
+const APP_VERSION = "v1.68";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -6881,8 +6881,8 @@ function showOperario(emp) {
   window.__isSupervisor = false;
   $("authBlock").classList.add("hidden");
   $("supervisorPanel").classList.add("hidden");
-  // Dejamos #legajoEntry listo (saludo + Salir) como pantalla de "volver",
-  // pero saltamos directo a la grilla de opciones (EP/TP/...).
+  // El operario aterriza en esta pantalla: saludo + "Continuar" + "Resumen de
+  // hoy" (historial de sus acciones del día). Desde acá pasa a la grilla EP/TP.
   $("legajoEntry").classList.remove("hidden");
   setHistorySpace(true);
   const nombre = emp.nombre || "";
@@ -6896,7 +6896,6 @@ function showOperario(emp) {
     if (typeof renderLegajoHistory === "function") renderLegajoHistory(emp.legajo);
     if (typeof updateCoreButtonsState === "function") updateCoreButtonsState();
     if (typeof renderPendingSuggestion === "function") renderPendingSuggestion();
-    if (typeof goToOptions === "function") goToOptions();   // directo a los botones
   } catch (_e) {}
 }
 
