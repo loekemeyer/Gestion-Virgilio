@@ -41,6 +41,22 @@ button {
 .google-btn svg { width: 26px; height: 26px; flex: 0 0 auto; }
 #authStatus { text-align: center; margin-top: 12px; min-height: 22px; }
 #authStatus.error { color: #c0392b; font-weight: bold; }
+
+/* Alternativa al Google sign-in: entrada con número de legajo. */
+.auth-divider {
+  display: flex; align-items: center; gap: 12px;
+  margin: 24px 0 12px; color: #888; font-size: 14px;
+}
+.auth-divider::before, .auth-divider::after {
+  content: ""; flex: 1; height: 1px; background: #dadce0;
+}
+#legajoLoginInput {
+  width: 100%; font-size: 22px; padding: 12px; text-align: center;
+  border: 1px solid #dadce0; border-radius: 6px; box-sizing: border-box;
+}
+#legajoLoginError {
+  min-height: 18px; text-align: center; color: #c0392b; margin-top: 6px;
+}
 .operario-greeting {
   text-align: center; font-size: 26px; font-weight: bold; color: #1f1f1f;
   margin: 8px 0 16px;
@@ -1973,6 +1989,15 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
       Iniciar sesión con Google
     </button>
     <div id="authStatus" class="small">Iniciá sesión para continuar</div>
+
+    <!-- Alternativa: entrar con el número de legajo (sin Google). Resuelve
+         contra Empleados y guarda una sesión local que dura el día. -->
+    <div class="auth-divider"><span>o</span></div>
+    <div id="legajoLoginRow">
+      <input id="legajoLoginInput" type="number" inputmode="numeric" placeholder="Tu número de legajo">
+      <button class="primary-btn" onclick="loginWithLegajo()">Entrar con legajo</button>
+      <div id="legajoLoginError" class="small error"></div>
+    </div>
   </div>
 
   <!-- OPERARIO: tras loguear se muestra el nombre (no se tipea legajo).
@@ -3661,7 +3686,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v1.85";
+const APP_VERSION = "v1.86";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -6986,6 +7011,22 @@ async function resolveEmpleadoByEmail(email) {
   } catch (_e) { return null; }
 }
 
+/* Inverso: legajo -> {legajo, nombre} para el login alternativo sin Google. */
+async function resolveEmpleadoByLegajo(legajo) {
+  if (!legajo) return null;
+  const url = SB_URL + "/rest/v1/Empleados?Legajo=eq." +
+    encodeURIComponent(String(legajo).trim()) + "&select=Legajo,Empleado&limit=1";
+  try {
+    const r = await fetch(url, { headers: { apikey: SB_KEY, Authorization: "Bearer " + SB_KEY } });
+    if (!r.ok) return null;
+    const data = await r.json();
+    if (Array.isArray(data) && data.length && data[0].Legajo != null) {
+      return { legajo: String(data[0].Legajo).trim(), nombre: String(data[0].Empleado || "").trim() };
+    }
+    return null;
+  } catch (_e) { return null; }
+}
+
 function setHistorySpace(show) {
   const h = $("legajoHistorySpace");
   if (h) h.style.display = show ? "" : "none";
@@ -7078,16 +7119,38 @@ async function showLoggedIn(user) {
    (cerrar el navegador no desloguea), pero al cambiar de día se cierra y se
    vuelve a pedir login. También se cierra al confirmar "Terminar Día". */
 const AUTH_DAY_KEY = "vir_auth_day";
+/* Sesión de operario iniciada con el número de legajo (sin Google). Guarda
+   {legajo, nombre, day} y se valida por día igual que la de Google. */
+const LEGAJO_AUTH_KEY = "vir_legajo_auth";
 function todayKeyBsAs() {
   try { return (typeof window.getTodayKey === "function") ? window.getTodayKey() : null; }
   catch (_e) { return null; }
+}
+function loadLegajoSession() {
+  try {
+    const raw = localStorage.getItem(LEGAJO_AUTH_KEY);
+    if (!raw) return null;
+    const obj = JSON.parse(raw);
+    if (!obj || !obj.legajo) return null;
+    return obj;
+  } catch (_e) { return null; }
+}
+function saveLegajoSession(emp, day) {
+  try {
+    localStorage.setItem(LEGAJO_AUTH_KEY, JSON.stringify({
+      legajo: emp.legajo, nombre: emp.nombre || "", day: day || ""
+    }));
+  } catch (_e) {}
+}
+function clearLegajoSession() {
+  try { localStorage.removeItem(LEGAJO_AUTH_KEY); } catch (_e) {}
 }
 
 async function applyAuthState() {
   let session = null;
   try { session = (await sb.auth.getSession()).data.session; } catch (_e) {}
+  const today = todayKeyBsAs();
   if (session && session.user && session.user.email) {
-    const today = todayKeyBsAs();
     const storedDay = localStorage.getItem(AUTH_DAY_KEY);
     if (today && storedDay && storedDay !== today) {
       // Sesión iniciada un día anterior: la cerramos para pedir login de nuevo.
@@ -7099,9 +7162,16 @@ async function applyAuthState() {
     }
     if (today) localStorage.setItem(AUTH_DAY_KEY, today);
     await showLoggedIn(session.user);
-  } else {
-    showLoggedOut();
+    return;
   }
+  // Sin Google session: chequeo sesión iniciada con legajo. Vale el mismo día.
+  const legSess = loadLegajoSession();
+  if (legSess && today && legSess.day === today) {
+    showOperario({ legajo: legSess.legajo, nombre: legSess.nombre || "" });
+    return;
+  }
+  if (legSess) clearLegajoSession();   // era de otro día — limpiar
+  showLoggedOut();
 }
 
 window.signInWithGoogle = async function () {
@@ -7120,6 +7190,7 @@ window.signInWithGoogle = async function () {
 };
 
 window.signOutGoogle = async function () {
+  clearLegajoSession();
   try { await sb.auth.signOut(); } catch (_e) {}
   window.location.reload();
 };
@@ -7128,7 +7199,32 @@ window.signOutGoogle = async function () {
    recarga: el evento de signOut lleva la UI a la pantalla de login. La cola
    de envíos vive en IndexedDB / Background Sync y no depende de esta sesión. */
 window.endDaySignOut = async function () {
+  clearLegajoSession();
   try { await sb.auth.signOut(); } catch (_e) {}
+  // Si no había sesión de Google, el evento de signOut no se dispara —
+  // forzamos el cambio de UI a la pantalla de login.
+  showLoggedOut();
+};
+
+/* Login alternativo sin Google: el operario tipea su número de legajo y lo
+   resolvemos contra Empleados (mismo lookup que email->legajo). No usa
+   Supabase Auth; la sesión se guarda en localStorage y dura el día. */
+window.loginWithLegajo = async function () {
+  const input = $("legajoLoginInput");
+  const errEl = $("legajoLoginError");
+  if (errEl) errEl.textContent = "";
+  const raw = input ? String(input.value || "").trim() : "";
+  if (!raw) {
+    if (errEl) errEl.textContent = "Ingresá tu número de legajo";
+    return;
+  }
+  const emp = await resolveEmpleadoByLegajo(raw);
+  if (!emp) {
+    if (errEl) errEl.textContent = "No encontramos ese legajo en Empleados. Avisá al supervisor.";
+    return;
+  }
+  saveLegajoSession(emp, todayKeyBsAs() || "");
+  showOperario({ legajo: emp.legajo, nombre: emp.nombre });
 };
 
 sb.auth.onAuthStateChange(() => { applyAuthState(); });
