@@ -1844,29 +1844,6 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
      ahora son botones grandes centrados dentro de #supervisorPanel. -->
 
 
-<!-- Modal: monitor de operarios -->
-<div id="monitorModal" onclick="if(event.target.id==='monitorModal') closeMonitor()">
-  <div class="monitor-card">
-    <div class="monitor-header">
-      <div>
-        <div class="monitor-title"><img class="hdr-logo" src="icon.svg" alt=""><span id="monitorTitleText">Monitor Virgilio</span> <span id="monitorRefresh" class="monitor-refresh"></span></div>
-        <div class="monitor-meta" id="monitorMeta"></div>
-      </div>
-      <div id="monitorClock"></div>
-      <div>
-        <button class="hist-modal-close" onclick="closeMonitor()">Cerrar</button>
-      </div>
-    </div>
-    <div id="monitorOfflineBanner" class="hidden"></div>
-    <div id="monitorContent">
-      <div class="monitor-loading">Cargando…</div>
-    </div>
-    <div id="inconsContent" class="hidden">
-      <div class="monitor-loading">Cargando…</div>
-    </div>
-  </div>
-</div>
-
 <!-- Modal: Análisis Productividad — gráficos picking y pedido m3/h -->
 <div id="analisisModal">
   <div class="analisis-header">
@@ -1884,18 +1861,6 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
       <div class="monitor-chart-canvas-wrap"><canvas id="prodCanvasPedido"></canvas></div>
     </div>
     <div id="prodChartPedidoEmpty" class="monitor-chart-card monitor-chart-empty" style="display:none">Sin datos de pedido en los últimos 7 días</div>
-  </div>
-</div>
-
-<!-- Modal: detalle de una tanda (NPs + m3) — se abre al clickear el código
-     en la tabla principal o en "Tandas a FC". -->
-<div id="tandaModal" onclick="if(event.target.id==='tandaModal') closeTandaModal()">
-  <div class="tanda-modal-card">
-    <div class="tanda-modal-header">
-      <div class="tanda-modal-title">Tanda</div>
-      <button class="hist-modal-close" onclick="closeTandaModal()">Cerrar</button>
-    </div>
-    <div class="tanda-modal-body"></div>
   </div>
 </div>
 
@@ -2015,9 +1980,7 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
   <div id="supervisorPanel" class="hidden">
     <h1 class="sup-title">Administración</h1>
     <div class="sup-actions">
-      <button class="sup-action-btn" onclick="openMonitor()"><span class="sup-ico">📊</span><span>Monitor de operarios</span></button>
       <button class="sup-action-btn" onclick="openFacturacion()"><span class="sup-ico">📋</span><span>Facturación</span></button>
-      <button class="sup-action-btn" onclick="openInconsistencias()"><span class="sup-ico">⚠</span><span>Inconsistencias</span></button>
       <button class="sup-action-btn" onclick="openAnalisis()"><span class="sup-ico">📈</span><span>Análisis de productividad</span></button>
     </div>
     <div class="auth-logout-row">
@@ -3686,7 +3649,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v1.86";
+const APP_VERSION = "v1.87";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -4668,37 +4631,6 @@ function requireSupervisor() {
   return true;
 }
 
-function openMonitor() {
-  if (!requireSupervisor()) return;
-  const m = document.getElementById("monitorModal");
-  m.classList.add("show");
-  // Siempre en modo TV (fondo azul, tablero completo): aunque la pantalla sea
-  // chica, mostramos la visualización entera en vez del popup blanco.
-  m.classList.add("tv");
-  refreshMonitor();
-  if (monitorIntervalId) clearInterval(monitorIntervalId);
-  monitorIntervalId = setInterval(refreshMonitor, MONITOR_REFRESH_MS);
-  setMonitorTab("monitor");
-  startInconsAutoRefresh();
-}
-
-/* Abre el monitor directo en la pestaña de Inconsistencias (botón flotante ⚠). */
-function openInconsistencias() {
-  if (!requireSupervisor()) return;
-  openMonitor();
-  setMonitorTab("incons");
-}
-
-function closeMonitor() {
-  const m = document.getElementById("monitorModal");
-  m.classList.remove("show");
-  m.classList.remove("tv");
-  if (monitorIntervalId) { clearInterval(monitorIntervalId); monitorIntervalId = null; }
-  stopInconsAutoRefresh();
-  // Reset del snapshot — al reabrir, el primer refresh no flashea masivo.
-  _prevStatusMap = new Map();
-}
-
 let _analisisIntervalId = null;
 
 function openAnalisis() {
@@ -4726,87 +4658,16 @@ function closeAnalisis() {
   }
 }
 
-function toggleMonitorTV() {
-  const m = document.getElementById("monitorModal");
-  const btn = document.getElementById("btnMonitorTV");
-  const isTV = m.classList.toggle("tv");
-  if (isTV) {
-    btn.textContent = "⛶ Salir TV";
-    if (m.requestFullscreen) m.requestFullscreen().catch(()=>{});
-  } else {
-    btn.textContent = "📺 TV";
-    if (document.fullscreenElement) document.exitFullscreen().catch(()=>{});
-  }
-}
-
-document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && document.getElementById("monitorModal").classList.contains("show")) {
-    closeMonitor();
-  }
-});
-
-// La smart TV / TV box colgada en planta no puede loguearse con Google (su
-// navegador es viejo y/o Google bloquea su webview). Para esas pantallas de
-// pared usamos una URL con clave que NO requiere login:
-//     ?monitor=tv&key=LACLAVE   (también fc / incons)
-// Si la clave coincide, entramos directo al monitor en "modo kiosko": le damos
-// rol supervisor sólo para ver el tablero y abrimos sin pasar por Google. Esto
-// funciona aunque la librería de auth (supabase.js) no cargue en ese navegador.
-// Cambiá MONITOR_TV_KEY para rotar la clave. El resto de los dispositivos
-// (celulares, PC) siguen entrando con login de Google normal.
-const MONITOR_TV_KEY = "virgilio-tv";
+/* Auto-abrir Facturación si la URL trae ?monitor=fc. Pensado para colgar la
+   pantalla de Facturación en el 2do monitor de ventas. Sigue requiriendo login. */
 const _monParams = new URLSearchParams(location.search);
 window.__pendingMonitorParam = _monParams.get("monitor");
 window.maybeAutoOpenMonitor = function () {
   const v = window.__pendingMonitorParam;
   if (!v) return;
   window.__pendingMonitorParam = null; // una sola vez
-  if (v === "tv" || v === "1") openMonitor();
-  else if (v === "fc") openFacturacion();   // 2do monitor de ventas
-  else if (v === "incons") openInconsistencias();
+  if (v === "fc") openFacturacion();
 };
-
-// Modo kiosko (pantalla de pared, sin login). Para que la clave NO quede a la
-// vista en la barra del TV (cualquiera podría copiarla), usamos enrolamiento:
-//  1) La primera vez se abre con ?monitor=tv&key=<MONITOR_TV_KEY>.
-//  2) Si la clave es válida, marcamos ESTE dispositivo como kiosko en
-//     localStorage y BORRAMOS la clave de la URL (queda ?monitor=tv pelado).
-//  3) De ahí en más, ese TV entra con ?monitor=tv solo (sin clave visible).
-// Un celular que lea ?monitor=tv en la pantalla NO entra: no tiene el
-// enrolamiento ni la clave. (Para des-enrolar: borrar datos del navegador.)
-const KIOSK_FLAG = "vir_tv_kiosk";
-const _kioskEnrolled = (function () { try { return localStorage.getItem(KIOSK_FLAG) === "1"; } catch (_e) { return false; } })();
-const _keyValid = _monParams.get("key") === MONITOR_TV_KEY;
-if (window.__pendingMonitorParam && (_keyValid || _kioskEnrolled)) {
-  window.__tvKioskMode = true;     // el módulo de auth lo respeta y no pide login
-  window.__isSupervisor = true;    // sólo para que requireSupervisor() deje abrir
-  if (_keyValid) {
-    try { localStorage.setItem(KIOSK_FLAG, "1"); } catch (_e) {}
-    try {
-      const u = new URL(location.href);
-      u.searchParams.delete("key");   // sacamos la clave de la URL visible
-      history.replaceState(null, "", u.pathname + u.search + u.hash);
-    } catch (_e) {}
-  }
-  // En la TV mostramos el panel "Administración" con los botones, y el usuario
-  // elige qué abrir (Monitor / Facturación / Inconsistencias / Análisis). No
-  // auto-abrimos nada.
-  window.addEventListener("load", () => {
-    try { showKioskAdminPanel(); } catch (_e) {}
-  });
-}
-
-/* Muestra el panel Administración en modo kiosko (TV, sin login). Replica el
-   estado "supervisor" pero sin sesión: oculta login/operario y el botón Salir. */
-function showKioskAdminPanel() {
-  const hide = (id) => { const e = document.getElementById(id); if (e) e.classList.add("hidden"); };
-  const show = (id) => { const e = document.getElementById(id); if (e) e.classList.remove("hidden"); };
-  hide("authBlock"); hide("legajoEntry"); show("supervisorPanel");
-  const h = document.getElementById("legajoHistorySpace"); if (h) h.style.display = "none";
-  hide("legajoTitle");
-  // En kiosko no hay sesión que cerrar: ocultamos la fila de "Salir".
-  document.querySelectorAll("#supervisorPanel .auth-logout-row").forEach((el) => el.classList.add("hidden"));
-}
 
 /* Parser CSV simple — soporta campos entre comillas con comas y comillas
    escapadas dobles ("a""b" -> a"b). Suficiente para CSV publicado de Sheets. */
