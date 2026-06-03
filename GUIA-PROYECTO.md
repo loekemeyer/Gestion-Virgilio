@@ -4,7 +4,21 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-05-27 · Versión app al documentar: **v1.58**
+> Última actualización: 2026-06-03 · Versión app al documentar: **v2.45**
+>
+> Nota: **v2.45** re-aplica el parche **"entrar con legajo"** (de Producción
+> Virgilio v1.86): debajo del botón de Google, la pantalla de login tiene un
+> input para tipear el legajo; se resuelve contra `Empleados` y la sesión
+> (`vir_legajo_auth`) dura el día. Se había perdido al rebasar sobre tv-v.
+>
+> Nota: **v2.44** parte de la base **tv-v v2.43** (monitor en vivo + kiosko TV
+> actualizados: tablas Mts3 x Hora, Parcial, Total por día, FC ✓, legajo en
+> picking, duraciones cross-day, etc.) y le re-aplica dos features de operario:
+> **(a) Llegada Tarde (`LT`)** automática y **(b) continuar tarea al día
+> siguiente** (ver § 4). Importante: el **tiempo de LT NO se cuenta como
+> trabajado** en el monitor (se excluye `opcion="LT"` en `fetchMonitorDayStats`,
+> `showDayBreakdown` y `fetchProductivityData`). Sede `V` quedó con jornada
+> **08:00–17:00** en `Empleados`.
 >
 > Nota: v1.49 (de otra branch) agregó la **pantalla de Facturación** (botón 🧾,
 > tick por NP, tabla `Facturacion_NP`) y **gráficos de productividad** (Chart.js:
@@ -120,7 +134,7 @@ Todo vive en `index.html`, alternando con la clase `.hidden` (no hay router):
     `#supervisorPanel` con los 4 botones, oculta login/operario y el botón Salir). NO
     auto-abre nada: en la TV se elige qué ver. Todo **sin Google y sin depender de
     `supabase.js`** (el módulo de auth detecta `__tvKioskMode` y no inicializa). `MONITOR_TV_KEY` es constante en
-    `index.html` (hoy `"virgilio-tv"`); cambiala para rotar la clave (los devices ya
+    `index.html` (hoy `"tv"`); cambiala para rotar la clave (los devices ya
     enrolados siguen hasta que se borren los datos del navegador). Para des-enrolar un
     device: borrar datos del navegador. El resto (celulares/PC) sigue con login Google.
   - **Duración de la sesión:** `supabase-js` la persiste en `localStorage` y dura
@@ -230,6 +244,7 @@ Definidos en `index.html` (objeto `desc`, ~línea 1531). Los botones se arman en
 | `PC` | Paré Comida | TOGGLE / tiempo muerto | No |
 | `CT` | Conteo | TOGGLE / tiempo muerto | No |
 | `FJ` | Fin de Jornada | (botón "Terminar Día") | `texto` = JSON con los conteos del día |
+| `LT` | Llegada Tarde | (automático) | `texto` = minutos de demora; `ts_inicio` = inicio de jornada, `ts_cliente` = primer mensaje. **NO cuenta como trabajado** en el monitor |
 
 **Grupos (constantes en `index.html`):**
 - `CORE_CODES = [EP, TP, AP, TAP]` — el trabajo medible (picking / armado).
@@ -239,6 +254,28 @@ Definidos en `index.html` (objeto `desc`, ~línea 1531). Los botones se arman en
 - `CLOSE_NEEDS_INPUT_CODES = [CC, RT, RI, EI]` — piden dato al cerrar.
 - `SURVIVING_TOGGLES = [CR, MG]` — sobreviven la medianoche; el resto se autocierra.
 - `AUTO_CLOSE_CODES = [AT, PB, Limp, PC, CT, Perm, CC, RT, RI, EI]` — se autocierran a las **17:00** (`WORKDAY_END_HOUR_AR = 17`) del día si quedaron abiertos.
+
+### Continuar tarea al día siguiente (v2.44)
+
+Al **Terminar Día**, por cada tarea abierta que sobrevive (Picking, Armado,
+`CR`, `MG`) el operario elige **Continúa mañana** o **Finalizar ahora**:
+- **Continúa** → se marca `st.continuar[<tipo>] = <YYYY-MM-DD>` y la tarea se
+  arrastra. Al día siguiente, `renderPendingSuggestion()` muestra un botón verde
+  **"▶ Continuar [tarea]"**; al tocarlo se borra la marca, se dispara la
+  evaluación de `LT`, y el cierre real se hace luego con `TP`/`TAP`/toggle.
+- **Finalizar ahora** → cierra en el acto (Picking/Armado piden el dato de
+  cierre y emiten `TP`/`TAP`; `CR`/`MG` cierran el toggle) y limpia el estado.
+
+### Llegada Tarde (`LT`, v2.44)
+
+`LT` = minutos entre `hora_entrada` del empleado (`Empleados`) y el **primer
+mensaje del día** del operario. Se evalúa en la primera acción del día
+(`maybeRegisterLateArrival`): el primer reporte que envía **o** el botón
+**"▶ Continuar [tarea]"**. Se registra **una** `LT` por día por legajo
+(`client_id = lt_<legajo>_<día>`). Si no hay `hora_entrada`, o el primer mensaje
+fue sin conexión, no se marca. El **tiempo de LT es no trabajado**: el monitor
+lo excluye de horas/productividad (guard `opcion==="LT"` en
+`fetchMonitorDayStats`, `showDayBreakdown` y `fetchProductivityData`).
 
 ---
 

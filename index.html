@@ -581,27 +581,22 @@ button {
 .status-curso{ color: #d97706; }
 .status-done{ color: #16a34a; }
 
-/* Spinner segmentado (reemplaza al ⏰ para indicar "en curso") — 12 barras
-   con opacity fade en cascada, da la ilusión de rotación. */
+/* Spinner liviano: un círculo CSS con rotate (1 sola animación GPU-accelerated,
+   reemplaza al spinner de 12 barras SVG que era pesado con muchas tandas en
+   curso a la vez). */
 .status-spinner{
   display: inline-block;
-  width: 1em;
-  height: 1em;
+  width: 0.8em;
+  height: 0.8em;
   vertical-align: middle;
-  line-height: 0;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  box-sizing: border-box;
+  animation: spinner-rotate 1.1s linear infinite;
 }
-.status-spinner svg{
-  width: 100%;
-  height: 100%;
-  display: block;
-}
-.status-spinner rect{
-  fill: currentColor;
-  animation: spinner-fade 1.1s linear infinite;
-}
-@keyframes spinner-fade{
-  0%, 100% { opacity: 0.15; }
-  10%      { opacity: 1; }
+@keyframes spinner-rotate {
+  to { transform: rotate(360deg); }
 }
 
 /* Fila con algo en curso (EP o AP sin cerrar) — resaltada amarillo
@@ -1097,15 +1092,15 @@ button {
   padding: clamp(8px, 1vh, 12px) clamp(12px, 1.5vw, 22px);
 }
 #monitorModal.tv .monitor-table{
-  /* Estética tipo Excel: texto uniforme y compacto en toda la grilla.
-     Subido ~30% respecto al draft anterior para mejorar legibilidad sin
-     romper la proporción tabla/panel derecho. */
-  font-size: clamp(17px, 2.4vh, 32px);
+  /* Estética tipo Excel. Tope de fuente bajado: con el panel derecho lleno
+     (Mts3xHora + Parcial + Ayer + FC + Total) la tabla NO puede crecer hasta
+     comerse el 100% del ancho — necesitamos ~50% para el panel. */
+  font-size: clamp(16px, min(1.9vw, 3.6vh), 30px);
 }
 #monitorModal.tv .monitor-table th{
   background: #1e293b;
   color: #cbd5e1;
-  font-size: clamp(17px, 2.3vh, 30px);
+  font-size: clamp(15px, min(1.7vw, 3.4vh), 26px);
   /* Más alto que antes para que los headers de 2 líneas
      (Fecha/Salida, Pedido/Separado) respiren. */
   padding: clamp(14px, 2.1vh, 28px) clamp(3px, 0.3vw, 7px);
@@ -1127,7 +1122,7 @@ button {
 }
 #monitorModal.tv .status-icon{
   /* Íconos ✅/⏰ al tamaño del texto de la tabla, estilo Excel compacto. */
-  font-size: clamp(20px, 3.1vh, 42px);
+  font-size: clamp(20px, min(2.4vw, 4.4vh), 36px);
   vertical-align: middle;
 }
 #monitorModal.tv .status-pend  { color: #475569; }
@@ -1138,14 +1133,211 @@ button {
   display: flex;
 }
 #monitorModal.tv .monitor-flex{
-  display: grid;
-  /* Izq: tabla al ancho de su contenido (estilo Excel, sin estirarse).
-     Der: el resto del viewport para los cuadros de totales. */
-  grid-template-columns: max-content 1fr;
+  /* Pasamos de grid a flex para poder estirar el lado derecho al ALTO del
+     viewport (grid no estira la fila a la altura del contenedor). Así el
+     bloque inferior (FC + Total) puede pegarse al borde de abajo. */
+  display: flex;
+  flex-direction: row;
   gap: 16px;
   width: 100%;
-  align-items: start;
+  align-items: stretch;
   min-height: 0;
+  flex: 1 1 auto;
+}
+#monitorModal.tv .monitor-table-wrap{
+  /* Override del `.monitor-flex .monitor-table-wrap { width: 100% }` global —
+     en TV mode el wrap debe tomar el ancho DE LA TABLA (content), no estirarse
+     a 55vw dejando hueco vacío al costado. min-width:0 permite achicarse si el
+     panel derecho lo necesita. */
+  flex: 0 1 auto;
+  width: auto;
+  min-width: 0;
+  max-width: 55vw;
+  overflow-x: auto;
+}
+/* Lado derecho: stack vertical. Top stays at top, bottom is anchored to the
+   bottom via margin-top: auto en .monitor-right-bottom. */
+#monitorModal.tv .monitor-right-side{
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: stretch;
+  min-width: 0;
+}
+/* NO margin-top:auto — antes empujaba FC+Total al borde inferior dejando un
+   hueco enorme entre los stats y los cards. El mockup los tiene fluyendo
+   natural debajo de los stats. */
+/* Fila de arriba: Mts3xHora + Parcial + Ayer en línea (wrap si no entra). */
+#monitorModal.tv .monitor-right-top{
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+#monitorModal.tv .monitor-stats-row{
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+  flex-wrap: nowrap;       /* mockup: las 3 tablas en una sola fila */
+  min-width: 0;
+}
+/* Mts3xHora se expande para tomar el ancho sobrante; Parcial y Ayer
+   son del ancho de su contenido (chiquitos). */
+#monitorModal.tv .monitor-stats-row > .monitor-stats-card:first-child{
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+#monitorModal.tv .monitor-stats-row > .monitor-stats-card:not(:first-child){
+  flex: 0 0 auto;
+}
+/* En pantallas angostas (TV box ~980px, laptops chicas) los 3 cards de stats
+   ya NO se envuelven (era el bug del "28/05 abajo de Mts3xHora" en la TV 32").
+   Quedan los 3 en una fila compartiendo el ancho (cada uno flex:1 1 0) y
+   tipografía/padding más chicos para que el contenido entre. */
+@media (max-width: 1100px){
+  #monitorModal.tv .monitor-stats-row{ flex-wrap: nowrap; gap: 4px; }
+  #monitorModal.tv .monitor-stats-row > .monitor-stats-card{
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  #monitorModal.tv .monitor-stats-table th,
+  #monitorModal.tv .monitor-stats-table td{
+    padding: clamp(2px, 0.4vh, 5px) clamp(2px, 0.3vw, 6px);
+    font-size: clamp(10px, 1.5vw, 16px);
+  }
+  #monitorModal.tv .monitor-stats-table th.stats-title{
+    font-size: clamp(11px, 1.7vw, 18px);
+    padding: clamp(3px, 0.6vh, 7px) clamp(3px, 0.3vw, 6px);
+  }
+  #monitorModal.tv .monitor-stats-table th.op-name{
+    font-size: clamp(9px, 1.3vw, 14px);
+    max-width: clamp(48px, 7vw, 90px);
+  }
+}
+/* Fila de abajo: FC + Total uno al lado del otro. nowrap para que NUNCA se
+   apilen en una sola columna. Cada card recibe la mitad del ancho del panel
+   via flex: 1 1 0. El padding-right (reserva del QR fixed) se setea por
+   regime más abajo (.vp-narrow/medium/wide/xwide). */
+#monitorModal.tv .monitor-right-bottom{
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  flex-wrap: nowrap;
+  min-width: 0;
+}
+#monitorModal.tv .monitor-right-bottom > .monitor-fc-card,
+#monitorModal.tv .monitor-right-bottom > .monitor-total-card{
+  flex: 1 1 0;
+  min-width: 0;
+}
+/* Cards de stats (Mts3xHora / Parcial / Ayer) — borde claro estilo Excel.
+   display:flex para que la tabla adentro pueda estirarse al alto del card
+   (si no, la tabla queda en su alto natural y abajo queda hueco). */
+.monitor-stats-card{
+  border: 2px solid #cbd5e1;
+  border-radius: 6px;
+  background: #f8fafc;
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.monitor-stats-table{
+  border-collapse: collapse;
+  width: 100%;       /* ocupa todo el ancho disponible del card */
+  flex: 1 1 auto;    /* y todo el alto disponible — las filas se expanden */
+  height: 100%;
+}
+.monitor-stats-table th,
+.monitor-stats-table td{
+  border: 1px solid #cbd5e1;
+  padding: 6px 10px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  vertical-align: middle;
+}
+/* Alturas FIJAS por fila para que las líneas alineen horizontalmente entre
+   los 3 cards de stats (Mts3xHora / Parcial / Ayer). Sin esto, la fila de
+   nombres de operario de Mts3xHora wrappea a 2 líneas y empuja las filas
+   de datos hacia abajo — desalineando con Parcial/Ayer cuyos headers son
+   más bajos. */
+.monitor-stats-table thead tr:first-child > *{ height: 2.4em; }    /* title */
+.monitor-stats-table thead tr:nth-child(2) > *{ height: 2.8em; }   /* header (op names / Total m3) */
+.monitor-stats-table tbody > tr > *{ height: 2em; }                /* filas de datos */
+.monitor-stats-table th.stats-title{
+  font-weight: bold;
+  background: transparent;
+  font-size: 14px;
+}
+.monitor-stats-table th.op-name{
+  font-weight: bold;
+  font-size: 13px;
+  white-space: normal;
+  word-break: break-word;
+  max-width: 90px;
+  line-height: 1.15;
+}
+.monitor-stats-table th.row-label{
+  font-weight: bold;
+  text-align: center;
+  background: transparent;
+}
+.monitor-stats-table td.num{
+  font-weight: bold;
+  text-align: center;
+}
+.monitor-stats-table td.stats-empty{
+  color: #94a3b8;
+  padding: 12px;
+  font-style: italic;
+}
+.monitor-stats-table td.stats-nodata{ color: #94a3b8; }
+.monitor-stats-table .row-unit{ font-size: 0.7em; color: #94a3b8; font-weight: normal; }
+#monitorModal.tv .monitor-stats-table .row-unit{ color: #94a3b8; }
+/* Modo TV: stats con fondo oscuro, bordes blancos, fuente proporcional. */
+#monitorModal.tv .monitor-stats-card{
+  background: #0b1220;
+  border-color: #ffffff;
+  border-width: 2px;
+}
+#monitorModal.tv .monitor-stats-table th,
+#monitorModal.tv .monitor-stats-table td{
+  border-color: #ffffff;
+  color: #f1f5f9;
+  padding: clamp(6px, 1.1vh, 14px) clamp(8px, 0.8vw, 18px);
+  font-size: clamp(14px, 1.7vw, 24px);
+}
+#monitorModal.tv .monitor-stats-table th.stats-title{
+  font-size: clamp(15px, 1.8vw, 26px);
+  padding: clamp(8px, 1.2vh, 16px) clamp(8px, 0.8vw, 16px);
+}
+#monitorModal.tv .monitor-stats-table th.op-name{
+  font-size: clamp(13px, 1.5vw, 22px);
+  color: #f1f5f9;
+  max-width: clamp(80px, 9vw, 160px);
+}
+#monitorModal.tv .monitor-stats-table th.row-label{
+  font-size: clamp(14px, 1.7vw, 24px);
+  color: #f1f5f9;
+}
+#monitorModal.tv .monitor-stats-table td.num{
+  color: #f8fafc;
+}
+#monitorModal.tv .monitor-stats-table td.stats-empty{
+  color: #94a3b8;
+}
+/* Split en 2 columnas para Tandas a FC y Total por día cuando la lista es larga. */
+.monitor-fc-cols,
+.monitor-total-cols{
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+.monitor-fc-cols > table,
+.monitor-total-cols > table{
+  flex: 1 1 0;
+  min-width: 0;
 }
 #monitorModal.tv .monitor-table{
   /* Sobreescribe el width: 100% global — en TV la tabla se ajusta al
@@ -1157,13 +1349,24 @@ button {
   min-height: 0;
   height: auto;
 }
-/* Celular / pantalla angosta: el grid de 2 columnas del monitor TV no entra
-   de lado a lado → se apila en una sola columna. */
+/* Celular / pantalla angosta: el flex se apila en una sola columna. */
 @media (max-width: 760px){
-  #monitorModal.tv .monitor-flex{ grid-template-columns: 1fr; }
+  #monitorModal.tv .monitor-flex{ flex-direction: column; }
+  #monitorModal.tv .monitor-table-wrap{ flex: 1 1 auto; width: 100%; }
+  #monitorModal.tv .monitor-right-side{ flex: 1 1 auto; width: 100%; }
+  /* En celular no anclamos al fondo: el contenido va naturalmente uno abajo
+     del otro para que se pueda scrollear. */
+  #monitorModal.tv .monitor-right-bottom{ margin-top: 0; }
 }
 #monitorModal.tv .monitor-flex .monitor-table{
-  width: 100%;
+  /* Ancho según contenido: columnas pegadas a su texto, sin estirar la tabla
+     al 100% (eso metía espacio muerto entre Tanda/M3/Fecha/Picking/Pedido).
+     El tamaño de la tabla lo da la fuente, no el estiramiento. */
+  width: auto;
+}
+/* En celular sí conviene que llene el ancho (una sola columna). */
+@media (max-width: 760px){
+  #monitorModal.tv .monitor-flex .monitor-table{ width: 100%; }
 }
 #monitorModal.tv .monitor-flex .monitor-table thead th{
   position: sticky;
@@ -1250,11 +1453,13 @@ button {
 #monitorModal.tv .monitor-flex{ gap: 10px; }
 #monitorModal.tv .monitor-totales-side{ gap: 8px; }
 #monitorModal.tv .totales-col-fc{ gap: 6px; }
-/* Tabla principal ANGOSTA (fuente y padding chicos) */
-#monitorModal.tv .monitor-table{ font-size: 12px; }
-#monitorModal.tv .monitor-table th{ font-size: 11px; padding: 5px 3px; line-height: 1.1; }
-#monitorModal.tv .monitor-table td{ padding: 2px 3px; }
-#monitorModal.tv .status-icon{ font-size: 16px; }
+/* Tabla principal: como ahora se estira (1fr) para llenar el ancho hasta el
+   panel derecho, la fuente puede crecer con vw aunque el viewport sea angosto
+   (TV box ~980px) — el min-content de la tabla sigue entrando al lado de FC. */
+#monitorModal.tv .monitor-table{ font-size: clamp(13px, 1.7vw, 22px); }
+#monitorModal.tv .monitor-table th{ font-size: clamp(12px, 1.5vw, 18px); padding: 5px 4px; line-height: 1.1; }
+#monitorModal.tv .monitor-table td{ padding: 3px 4px; }
+#monitorModal.tv .status-icon{ font-size: clamp(18px, 2.2vw, 28px); }
 #monitorModal.tv .monitor-legajo{ font-size: 0.7em; }
 /* Cuadrados ANGOSTOS: una sola columna vertical, bien chicos */
 #monitorModal.tv .totales-day-rows{ flex-flow: column nowrap; max-height: none; gap: 4px; }
@@ -1387,6 +1592,95 @@ button {
   font-weight: 900;
   font-size: clamp(16px, 2.4vh, 28px);
 }
+
+/* ============================================================
+   MONITOR — layout responsive por regime de viewport.
+   JS clasifica el ancho y aplica .vp-narrow / .vp-medium / .vp-wide
+   / .vp-xwide al modal. Reactivo a resize en vivo.
+   Target: TV 32" en modo ordenador (~980 narrow), TV 32" nativa
+   (1366 medium), TV/PC 1080p (1920 wide), TV 4K 65" (3840 xwide).
+   ============================================================ */
+/* --- MAX-WIDTH DE LA TABLA PRINCIPAL --- */
+#monitorModal.tv.vp-narrow .monitor-table-wrap{ max-width: 60vw; }
+#monitorModal.tv.vp-medium .monitor-table-wrap{ max-width: 55vw; }
+#monitorModal.tv.vp-wide   .monitor-table-wrap{ max-width: 50vw; }
+#monitorModal.tv.vp-xwide  .monitor-table-wrap{ max-width: 50vw; }
+
+/* --- FUENTE TABLA PRINCIPAL --- */
+#monitorModal.tv.vp-narrow .monitor-table{ font-size: clamp(13px, 1.7vw, 22px); }
+#monitorModal.tv.vp-narrow .monitor-table th{ font-size: clamp(12px, 1.5vw, 18px); padding: 5px 4px; line-height: 1.1; }
+#monitorModal.tv.vp-medium .monitor-table{ font-size: clamp(16px, 1.6vw, 26px); }
+#monitorModal.tv.vp-medium .monitor-table th{ font-size: clamp(14px, 1.4vw, 22px); padding: 7px 5px; }
+#monitorModal.tv.vp-wide   .monitor-table{ font-size: clamp(18px, 1.4vw, 30px); }
+#monitorModal.tv.vp-wide   .monitor-table th{ font-size: clamp(16px, 1.3vw, 26px); padding: 9px 6px; }
+#monitorModal.tv.vp-xwide  .monitor-table{ font-size: clamp(28px, 1.6vw, 56px); }
+#monitorModal.tv.vp-xwide  .monitor-table th{ font-size: clamp(24px, 1.4vw, 48px); padding: 14px 9px; }
+
+/* Iconos ✅ / ⏰ proporcionales */
+#monitorModal.tv.vp-narrow .status-icon{ font-size: clamp(18px, 2.2vw, 28px); }
+#monitorModal.tv.vp-medium .status-icon{ font-size: clamp(22px, 2.2vw, 36px); }
+#monitorModal.tv.vp-wide   .status-icon{ font-size: clamp(24px, 1.8vw, 40px); }
+#monitorModal.tv.vp-xwide  .status-icon{ font-size: clamp(36px, 2.2vw, 72px); }
+
+/* --- CARDS DE STATS (Mts3xHora + Parcial + Ayer) --- */
+/* Default base + escala por regime */
+#monitorModal.tv.vp-narrow .monitor-stats-table th,
+#monitorModal.tv.vp-narrow .monitor-stats-table td{
+  font-size: clamp(10px, 1.3vw, 16px);
+  padding: clamp(2px, 0.5vh, 5px) clamp(3px, 0.4vw, 7px);
+}
+#monitorModal.tv.vp-narrow .monitor-stats-table th.stats-title{ font-size: clamp(11px, 1.5vw, 18px); }
+#monitorModal.tv.vp-narrow .monitor-stats-table th.op-name{
+  font-size: clamp(9px, 1.2vw, 14px);
+  max-width: clamp(48px, 7vw, 90px);
+}
+#monitorModal.tv.vp-medium .monitor-stats-table th,
+#monitorModal.tv.vp-medium .monitor-stats-table td{
+  font-size: clamp(13px, 1.2vw, 19px);
+  padding: clamp(5px, 0.8vh, 9px) clamp(6px, 0.6vw, 11px);
+}
+#monitorModal.tv.vp-medium .monitor-stats-table th.stats-title{ font-size: clamp(14px, 1.4vw, 22px); }
+#monitorModal.tv.vp-medium .monitor-stats-table th.op-name{ font-size: clamp(12px, 1.1vw, 17px); }
+#monitorModal.tv.vp-wide .monitor-stats-table th,
+#monitorModal.tv.vp-wide .monitor-stats-table td{
+  font-size: clamp(15px, 1.2vw, 24px);
+  padding: clamp(7px, 1vh, 14px) clamp(9px, 0.7vw, 18px);
+}
+#monitorModal.tv.vp-wide .monitor-stats-table th.stats-title{ font-size: clamp(16px, 1.4vw, 26px); }
+#monitorModal.tv.vp-wide .monitor-stats-table th.op-name{ font-size: clamp(14px, 1.1vw, 22px); }
+#monitorModal.tv.vp-xwide .monitor-stats-table th,
+#monitorModal.tv.vp-xwide .monitor-stats-table td{
+  font-size: clamp(22px, 1.3vw, 44px);
+  padding: clamp(12px, 1.2vh, 24px) clamp(14px, 0.8vw, 28px);
+}
+#monitorModal.tv.vp-xwide .monitor-stats-table th.stats-title{ font-size: clamp(24px, 1.5vw, 48px); }
+#monitorModal.tv.vp-xwide .monitor-stats-table th.op-name{ font-size: clamp(20px, 1.2vw, 40px); }
+
+/* --- FC + TOTAL CARDS --- */
+/* En TODOS los regimes (incluso narrow) van side-by-side: si los apilamos en
+   narrow, Total quedaba abajo de FC y no se veía en el TV 32 sin scrollear.
+   En narrow las sub-columnas internas NO se splittean (renderMonitor checkea
+   window.innerWidth ≤ 1100 y deja todo en 1 columna) → cada card más angosto. */
+#monitorModal.tv.vp-narrow .monitor-right-bottom > .monitor-fc-card,
+#monitorModal.tv.vp-narrow .monitor-right-bottom > .monitor-total-card{ flex: 1 1 0; min-width: 0; }
+/* Fuente de FC y Total por regime */
+#monitorModal.tv.vp-narrow .monitor-fc-table,
+#monitorModal.tv.vp-narrow .monitor-total-table{ font-size: clamp(10px, 1.2vw, 15px); }
+#monitorModal.tv.vp-medium .monitor-fc-table,
+#monitorModal.tv.vp-medium .monitor-total-table{ font-size: clamp(13px, 1.1vw, 18px); }
+#monitorModal.tv.vp-wide   .monitor-fc-table,
+#monitorModal.tv.vp-wide   .monitor-total-table{ font-size: clamp(15px, 1vw, 22px); }
+#monitorModal.tv.vp-xwide  .monitor-fc-table,
+#monitorModal.tv.vp-xwide  .monitor-total-table{ font-size: clamp(22px, 1.2vw, 40px); }
+
+/* --- PADDING-RIGHT PARA RESERVAR ESPACIO DEL QR (bottom-right fixed) --- */
+/* Medido en una TV 32" reportando 979x494 (narrow): el QR ocupaba ~150px en
+   pantalla. El padding anterior de 88px no alcanzaba y tapaba la columna
+   "Total" del Total por día. Subido para reservar bien la franja. */
+#monitorModal.tv.vp-narrow .monitor-right-bottom{ padding-right: clamp(140px, 16vw, 180px); }
+#monitorModal.tv.vp-medium .monitor-right-bottom{ padding-right: clamp(160px, 13vw, 240px); }
+#monitorModal.tv.vp-wide   .monitor-right-bottom{ padding-right: clamp(200px, 12vw, 300px); }
+#monitorModal.tv.vp-xwide  .monitor-right-bottom{ padding-right: clamp(280px, 10vw, 440px); }
 
 /* Celdas de código de tanda clickeables — abren modal con NPs + m3. */
 .tanda-clickable{ cursor: pointer; }
@@ -1698,6 +1992,28 @@ button {
 #analisisModal .monitor-chart-title{ color: #60a5fa; font-size: clamp(13px, 1.6vh, 18px); }
 #analisisModal .monitor-chart-canvas-wrap{ height: clamp(200px, 30vh, 400px); }
 #analisisModal .monitor-chart-empty{ color: #94a3b8; }
+/* Producción por día — filas de 4 columnas: día | M3 Picking | M3 Pedido | Empleados */
+.analisis-day-totals{ display: flex; flex-direction: column; gap: 8px; }
+.analisis-day-row{
+  display: grid; grid-template-columns: 1.1fr 1fr 1fr 1fr; gap: 8px;
+  align-items: stretch;
+}
+.analisis-day-label{
+  display: flex; align-items: center; justify-content: center;
+  background: #0b1220; border: 2px solid #1e3a8a; border-radius: 8px;
+  padding: 6px 10px; font-weight: bold; color: #f8fafc;
+}
+.analisis-day-row.is-today .analisis-day-label{ background:#1e3a8a; color:#fff; }
+.analisis-day-box{
+  background: #0b1220; border: 2px solid #334155; border-radius: 8px;
+  padding: 6px 10px; text-align: center;
+}
+.analisis-day-box-label{ font-size: 12px; color: #94a3b8; }
+.analisis-day-box-value{ font-size: 22px; font-weight: 900; color: #60a5fa; line-height: 1.1; }
+@media (max-width: 760px){
+  .analisis-day-row{ grid-template-columns: 1fr 1fr 1fr; }
+  .analisis-day-label{ grid-column: 1 / -1; }
+}
 
 /* Modal a pantalla completa pero contenido limitado a 1100px centrado —
    no tiene sentido estirar las filas al ancho de un monitor 24". */
@@ -1844,6 +2160,29 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
      ahora son botones grandes centrados dentro de #supervisorPanel. -->
 
 
+<!-- Modal: monitor de operarios -->
+<div id="monitorModal" onclick="if(event.target.id==='monitorModal') closeMonitor()">
+  <div class="monitor-card">
+    <div class="monitor-header">
+      <div>
+        <div class="monitor-title"><img class="hdr-logo" src="icon.svg" alt=""><span id="monitorTitleText">Monitor Virgilio</span> <span id="monitorRefresh" class="monitor-refresh"></span><span id="monitorVpInfo" style="color:#888;font-size:12px;margin-left:8px"></span><span id="monitorCountdown" style="color:#888;font-size:12px;margin-left:8px"></span></div>
+        <div class="monitor-meta" id="monitorMeta"></div>
+      </div>
+      <div id="monitorClock"></div>
+      <div>
+        <button class="hist-modal-close" onclick="closeMonitor()">Cerrar</button>
+      </div>
+    </div>
+    <div id="monitorOfflineBanner" class="hidden"></div>
+    <div id="monitorContent">
+      <div class="monitor-loading">Cargando…</div>
+    </div>
+    <div id="inconsContent" class="hidden">
+      <div class="monitor-loading">Cargando…</div>
+    </div>
+  </div>
+</div>
+
 <!-- Modal: Análisis Productividad — gráficos picking y pedido m3/h -->
 <div id="analisisModal">
   <div class="analisis-header">
@@ -1851,6 +2190,14 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
     <button class="hist-modal-close" onclick="closeAnalisis()" style="background:#1e293b;color:#f8fafc;border-color:#334155;">Cerrar</button>
   </div>
   <div class="analisis-body">
+    <!-- Producción por día: m3 picking + m3 pedido + empleados, hoy y últimos
+         días. Usa m3 del Sheet PPP (NO restringido a tandas a FC). -->
+    <div id="analisisDayTotalsCard" class="monitor-chart-card">
+      <div class="monitor-chart-title">📊 Producción por día (m³)</div>
+      <div id="analisisDayTotals" class="analisis-day-totals">
+        <div class="monitor-chart-empty">Cargando…</div>
+      </div>
+    </div>
     <div id="prodChartPicking" class="monitor-chart-card">
       <div class="monitor-chart-title">📊 Productividad Picking (m3/h)</div>
       <div class="monitor-chart-canvas-wrap"><canvas id="prodCanvasPicking"></canvas></div>
@@ -1861,6 +2208,18 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
       <div class="monitor-chart-canvas-wrap"><canvas id="prodCanvasPedido"></canvas></div>
     </div>
     <div id="prodChartPedidoEmpty" class="monitor-chart-card monitor-chart-empty" style="display:none">Sin datos de pedido en los últimos 7 días</div>
+  </div>
+</div>
+
+<!-- Modal: detalle de una tanda (NPs + m3) — se abre al clickear el código
+     en la tabla principal o en "Tandas a FC". -->
+<div id="tandaModal" onclick="if(event.target.id==='tandaModal') closeTandaModal()">
+  <div class="tanda-modal-card">
+    <div class="tanda-modal-header">
+      <div class="tanda-modal-title">Tanda</div>
+      <button class="hist-modal-close" onclick="closeTandaModal()">Cerrar</button>
+    </div>
+    <div class="tanda-modal-body"></div>
   </div>
 </div>
 
@@ -1895,7 +2254,7 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
 </div>
 
 <!-- Badge de versión + estado de cola (abajo a la izquierda) -->
-<div id="versionBadge">v1.85 ✓</div>
+<div id="versionBadge">v2.04 ✓</div>
 
 <!-- QR de fichada (TOTP rotativo) — abajo a la derecha. Genera tokens cada
      30s que apuntan a la app FichadaQR; los operarios escanean para fichar. -->
@@ -1980,7 +2339,9 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
   <div id="supervisorPanel" class="hidden">
     <h1 class="sup-title">Administración</h1>
     <div class="sup-actions">
+      <button class="sup-action-btn" onclick="openMonitor()"><span class="sup-ico">📊</span><span>Monitor de operarios</span></button>
       <button class="sup-action-btn" onclick="openFacturacion()"><span class="sup-ico">📋</span><span>Facturación</span></button>
+      <button class="sup-action-btn" onclick="openInconsistencias()"><span class="sup-ico">⚠</span><span>Inconsistencias</span></button>
       <button class="sup-action-btn" onclick="openAnalisis()"><span class="sup-ico">📈</span><span>Análisis de productividad</span></button>
     </div>
     <div class="auth-logout-row">
@@ -2085,7 +2446,8 @@ const desc = {
   RT:"Recepción Mercadería", MG:"Guardado a Góndola",
   RI:"Recepción Insumos", EI:"Entrega Insumos",
   AT:"Atendí Timbre", PB:"Paré Baño", Limp:"Limpieza",
-  Perm:"Permiso de Salida", PC:"Paré Comida",CT:"Conteo"
+  Perm:"Permiso de Salida", PC:"Paré Comida",CT:"Conteo",
+  LT:"Llegada Tarde"
 };
 
 let selected = null;
@@ -2448,11 +2810,37 @@ function terminarDia() {
        </ul>`
     : `<div class="history-empty">Sin reportes hoy.</div>`;
 
+  // Por cada tarea que puede arrastrarse (Picking/Armado/CR/MG) preguntamos si
+  // continúa mañana. "Finalizar ahora" pide el dato de cierre (solo Picking y
+  // Armado lo necesitan: la tanda/pedido) y la cierra al confirmar.
   const sobrevivenHtml = pendings.sobreviven.length
-    ? `<ul style="margin:6px 0 0 0; padding-left:20px;">
-         ${pendings.sobreviven.map(p =>
-           `<li>${escapeHtml(p.tipo)}${p.valor ? ` <i>${escapeHtml(p.valor)}</i>` : ""}${p.desc ? ` — ${escapeHtml(p.desc)}` : ""}</li>`).join("")}
-       </ul>`
+    ? pendings.sobreviven.map(p => {
+        const tipo = p.tipo;
+        const needsInput = (tipo === "Picking" || tipo === "Armado");
+        const valEsc = escapeHtml(p.valor || "");
+        return `
+        <div style="margin:8px 0; padding:8px; border:1px solid #bae6fd; border-radius:6px; background:#fff;">
+          <div><b>${escapeHtml(tipo)}</b>${p.valor ? ` <i>${valEsc}</i>` : ""}${p.desc ? ` — ${escapeHtml(p.desc)}` : ""}</div>
+          <div style="margin-top:6px; font-size:14px;">
+            <label style="margin-right:14px;">
+              <input type="radio" name="td_cont_${escapeHtml(tipo)}" value="si" checked
+                     onchange="var w=document.getElementById('td_closewrap_${escapeHtml(tipo)}'); if(w) w.style.display='none';">
+              Continúa mañana
+            </label>
+            <label>
+              <input type="radio" name="td_cont_${escapeHtml(tipo)}" value="no"
+                     onchange="var w=document.getElementById('td_closewrap_${escapeHtml(tipo)}'); if(w) w.style.display='block';">
+              Finalizar ahora
+            </label>
+          </div>
+          ${needsInput ? `
+            <div id="td_closewrap_${escapeHtml(tipo)}" style="display:none; margin-top:6px;">
+              <input type="text" id="td_close_${escapeHtml(tipo)}" value="${valEsc}"
+                     placeholder="Dato para cerrar (tanda/pedido)"
+                     style="width:100%; padding:8px; border:2px solid #38bdf8; border-radius:6px; font-size:16px; box-sizing:border-box;">
+            </div>` : ""}
+        </div>`;
+      }).join("")
     : "<div style='color:#666; font-size:14px;'>Ninguno.</div>";
 
   // Toggles auto-cerrables sin input (AT/PB/Limp/PC/CT/Perm)
@@ -2500,7 +2888,7 @@ function terminarDia() {
     </div>
 
     <div style="margin-bottom:14px; padding:10px; background:#f0f9ff; border-radius:8px;">
-      <b style="color:#075985;">⏸ Continúan al día siguiente:</b>
+      <b style="color:#075985;">⏸ Tareas abiertas — ¿continúan mañana?</b>
       ${sobrevivenHtml}
     </div>
 
@@ -2597,6 +2985,26 @@ async function confirmarTerminarDia() {
     closeInputs[p.tipo] = v;
   }
 
+  // Decisiones de "¿continúa mañana?" para las tareas que sobreviven
+  // (Picking/Armado/CR/MG). "no" => finalizar ahora; Picking/Armado piden el
+  // dato de cierre (tanda/pedido), que validamos ANTES de tocar el estado.
+  const contDecisions = [];   // { tipo, continua, closeText }
+  for (const p of pendNow.sobreviven) {
+    const sel = document.querySelector('input[name="td_cont_' + p.tipo + '"]:checked');
+    const continua = !sel || sel.value === "si";   // default: continúa mañana
+    let closeText = "";
+    if (!continua && (p.tipo === "Picking" || p.tipo === "Armado")) {
+      const el = document.getElementById("td_close_" + p.tipo);
+      closeText = (el && el.value || "").trim();
+      if (!closeText) {
+        alert(`Para finalizar el ${p.tipo} tenés que poner el dato de cierre (tanda/pedido).`);
+        if (el) { el.focus(); el.style.borderColor = "#dc2626"; }
+        return;
+      }
+    }
+    contDecisions.push({ tipo: p.tipo, continua, closeText });
+  }
+
   const nowMs  = Date.now();
 
   // 0) RE-ENVIAR todos los reportes del día como red de seguridad — UNA SOLA
@@ -2649,6 +3057,53 @@ async function confirmarTerminarDia() {
     }
     setLegajoState(legajoStr, st);
   }
+
+  // 1b) Procesar las decisiones de continuar/finalizar de Picking/Armado/CR/MG.
+  //     "Continúa" => se marca para mostrar el botón "Continuar" mañana y se
+  //     deja la tarea abierta (se arrastra). "Finalizar ahora" => se emite el
+  //     cierre (TP/TAP o cierre de toggle) y se limpia el estado.
+  const todayKeyFJ = getTodayKey();
+  for (const d of contDecisions) {
+    if (d.continua) {
+      st.continuar[d.tipo] = todayKeyFJ;   // fecha en que se decidió continuar
+      continue;
+    }
+    if (d.tipo === "Picking" || d.tipo === "Armado") {
+      const isPick = d.tipo === "Picking";
+      const code   = isPick ? "TP" : "TAP";
+      const tsIni  = isPick ? (st.picking && st.picking.ts_inicio)
+                            : (st.armado  && st.armado.ts_inicio);
+      const closeId = nowMs.toString(36) + "_fjclose_" + code + "_" + Math.random().toString(36).slice(2, 6);
+      const payload = {
+        legajo: legajoStr, opcion: code, descripcion: desc[code] || "",
+        texto: d.closeText, ts: nowMs, id: closeId, ts_inicio_iso: tsIni || null
+      };
+      pushHistoryForLegajo(legajoStr, {
+        ts: nowMs, opcion: code, descripcion: payload.descripcion,
+        texto: d.closeText, id: closeId, status: "queued", ts_inicio_iso: tsIni || null
+      });
+      enqueueReport(payload);
+      if (isPick) st.picking = { active:false, value:"", ts_inicio:null };
+      else        st.armado  = { active:false, value:"", ts_inicio:null };
+    } else {
+      // CR / MG: se cierra el toggle (sin dato).
+      const cur   = st.toggles ? st.toggles[d.tipo] : null;
+      const tsIni = (typeof cur === "string") ? cur : null;
+      const closeId = nowMs.toString(36) + "_fjclose_" + d.tipo + "_" + Math.random().toString(36).slice(2, 6);
+      const payload = {
+        legajo: legajoStr, opcion: d.tipo, descripcion: desc[d.tipo] || "",
+        texto: "", ts: nowMs, id: closeId, ts_inicio_iso: tsIni
+      };
+      pushHistoryForLegajo(legajoStr, {
+        ts: nowMs, opcion: d.tipo, descripcion: payload.descripcion,
+        texto: "", id: closeId, status: "queued", ts_inicio_iso: tsIni
+      });
+      enqueueReport(payload);
+      if (st.toggles) delete st.toggles[d.tipo];
+    }
+    if (st.continuar) delete st.continuar[d.tipo];   // finalizada: sin marca
+  }
+  setLegajoState(legajoStr, st);
 
   // 2) Reporte FJ "Fin de Jornada" con resumen del día como JSON en texto.
   //    client_id DETERMINÍSTICO por (legajo, día) -> si tocan Terminar Día
@@ -2736,12 +3191,15 @@ function getLegajoState(legajo){
   const map = readStateMap();
   const key = String(legajo || "");
   if (!map[key]) {
-    map[key] = { picking: {active:false,value:""}, armado:{active:false,value:""}, toggles:{} };
+    map[key] = { picking: {active:false,value:""}, armado:{active:false,value:""}, toggles:{}, continuar:{} };
     writeStateMap(map);
   } else {
     map[key].picking = map[key].picking || {active:false,value:""};
     map[key].armado  = map[key].armado  || {active:false,value:""};
     map[key].toggles = map[key].toggles || {};
+    // continuar: marca por tipo de tarea ("Picking"/"Armado"/"CR"/"MG") con la
+    // fecha (YYYY-MM-DD) del día en que el operario dijo "sí, continúo mañana".
+    map[key].continuar = map[key].continuar || {};
   }
   return map[key];
 }
@@ -2852,14 +3310,52 @@ function renderPendingSuggestion(){
   box.innerHTML = "";
   if(!legajo) return;
 
-  // Si hay CUALQUIER toggle activo, EP/TP/AP/TAP están bloqueados;
-  // ocultar la sugerencia (no se podría tocar igual).
+  const st    = getLegajoState(legajo);
+  const today = getTodayKey();
+  const cont  = st.continuar || {};
+  const continuarShown = new Set();
+
+  // (0) Botones "Continuar [tarea]": tareas que en un día anterior se marcaron
+  //     "continúo mañana" y siguen abiertas. Se muestran arriba de todo,
+  //     incluso con un toggle activo. Al tocarlo el operario confirma que
+  //     retoma la tarea (se quita la marca) y se evalúa la Llegada Tarde (LT);
+  //     el cierre real se hace luego con Fin Picking / Fin Armado / toggle.
+  const continuarDefs = [
+    { tipo:"Picking", activa: !!(st.picking && st.picking.active), valor: (st.picking && st.picking.value) || "" },
+    { tipo:"Armado",  activa: !!(st.armado  && st.armado.active),  valor: (st.armado  && st.armado.value)  || "" },
+    { tipo:"CR",      activa: !!(st.toggles && st.toggles.CR),     valor: "" },
+    { tipo:"MG",      activa: !!(st.toggles && st.toggles.MG),     valor: "" }
+  ];
+  for (const cd of continuarDefs) {
+    const marca = cont[cd.tipo];
+    if (!marca || !cd.activa || marca >= today) continue;   // solo si viene de antes
+    const etiqueta = cd.tipo === "CR" ? "Control Remitos"
+                   : cd.tipo === "MG" ? "Guardado a Góndola" : cd.tipo;
+    const btn = document.createElement("button");
+    btn.className = "primary-btn";
+    btn.style.background = "#16a34a";
+    btn.innerText = `▶ Continuar ${etiqueta}${cd.valor ? ` (${cd.valor})` : ""}`;
+    btn.onclick = async ()=>{
+      // El botón "Continuar" cuenta como el primer mensaje del día del operario
+      // que retoma su tarea: dispara la evaluación de Llegada Tarde (LT) contra
+      // su hora_entrada (idempotente: una sola LT por día por legajo).
+      await maybeRegisterLateArrival(legajo, Date.now());
+      const s = getLegajoState(legajo);
+      if (s.continuar) delete s.continuar[cd.tipo];
+      setLegajoState(legajo, s);
+      renderPendingSuggestion();
+      try { updateCoreButtonsState(); } catch(_e){}
+    };
+    box.appendChild(btn);
+    continuarShown.add(cd.tipo);
+  }
+
+  // Si hay CUALQUIER toggle activo, EP/TP/AP/TAP están bloqueados; no mostramos
+  // la sugerencia de "terminar" picking/armado (no se podría tocar igual).
   if (getAnyToggleActive(legajo)) return;
 
-  const st = getLegajoState(legajo);
-
-  // PICKING
-  if (st.picking && st.picking.active && st.picking.value) {
+  // PICKING (sugerencia para terminar) — salvo que ya se muestre "Continuar".
+  if (st.picking && st.picking.active && st.picking.value && !continuarShown.has("Picking")) {
     const btn = document.createElement("button");
     btn.className = "primary-btn";
     btn.innerText = `Tenés un Picking pendiente (${st.picking.value}) — Presioná para terminar`;
@@ -2872,7 +3368,7 @@ function renderPendingSuggestion(){
   }
 
   // ARMADO
-  if (st.armado && st.armado.active && st.armado.value) {
+  if (st.armado && st.armado.active && st.armado.value && !continuarShown.has("Armado")) {
     const btn = document.createElement("button");
     btn.className = "primary-btn";
     btn.innerText = `Tenés un Armado pendiente (${st.armado.value}) — Presioná para terminar`;
@@ -3413,6 +3909,72 @@ async function _resolveEmailForLegajo(legajo) {
   } catch (_e) { return null; }
 }
 
+/* Resuelve la hora_entrada (jornada) del legajo desde Empleados, cacheada por
+   sesión. Devuelve "HH:MM:SS" o null (sin horario cargado / error). */
+const _legajoHoraEntradaCache = new Map();   // legajo -> "HH:MM:SS" | null
+async function _resolveHoraEntrada(legajo) {
+  if (!legajo) return null;
+  const key = String(legajo).trim();
+  if (!key) return null;
+  if (_legajoHoraEntradaCache.has(key)) return _legajoHoraEntradaCache.get(key);
+  try {
+    const url = SUPABASE_URL +
+      "/rest/v1/Empleados?Legajo=eq." + encodeURIComponent(key) +
+      "&select=hora_entrada&limit=1";
+    const r = await fetch(url, {
+      headers: { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY }
+    });
+    if (!r.ok) return null;       // no cacheamos error: probamos de nuevo después
+    const data = await r.json();
+    const he = (Array.isArray(data) && data.length && data[0].hora_entrada)
+      ? String(data[0].hora_entrada).trim()
+      : null;
+    _legajoHoraEntradaCache.set(key, he);
+    return he;
+  } catch (_e) { return null; }
+}
+
+/* LLEGADA TARDE (LT)
+   Llegada tarde = tiempo entre el inicio de jornada (hora_entrada del empleado)
+   y el PRIMER mensaje del día del operario. Si el primer mensaje es posterior
+   a la hora de entrada, se registra UN evento LT por día por legajo:
+     - opcion = "LT", texto = minutos de demora
+     - ts_inicio = inicio de jornada (HH:MM del día, hora Arg, UTC-3)
+     - ts_cliente = momento del primer mensaje
+   El monitor NO debe contar este tramo como trabajado (es tiempo no trabajado).
+   Si el empleado no tiene hora_entrada cargada, no se puede determinar y no se
+   marca. client_id determinístico (lt_<legajo>_<día>) => sin duplicados. */
+async function maybeRegisterLateArrival(legajoStr, nowMs) {
+  try {
+    const day  = getTodayKey();
+    const hist = readDayHist(day, legajoStr);
+    if (hist.some(it => it.opcion === "LT")) return;   // ya marcada hoy
+    if (hist.length > 0) return;                        // no es el primer mensaje
+    const horaEntrada = await _resolveHoraEntrada(legajoStr);
+    if (!horaEntrada) return;                           // sin horario => no se evalúa
+    const hhmmss = horaEntrada.length === 5 ? horaEntrada + ":00" : horaEntrada;
+    const startMs = new Date(`${day}T${hhmmss}-03:00`).getTime();
+    if (!(nowMs > startMs)) return;                     // llegó en horario o antes
+    const minutosTarde = Math.round((nowMs - startMs) / 60000);
+    const ltId = "lt_" + legajoStr + "_" + day;
+    const payload = {
+      legajo: legajoStr,
+      opcion: "LT",
+      descripcion: "Llegada Tarde",
+      texto: String(minutosTarde),
+      ts: nowMs,
+      id: ltId,
+      ts_inicio_iso: new Date(startMs).toISOString()
+    };
+    pushHistoryForLegajo(legajoStr, {
+      ts: nowMs, opcion: "LT", descripcion: "Llegada Tarde",
+      texto: String(minutosTarde), id: ltId, status: "queued",
+      ts_inicio_iso: payload.ts_inicio_iso
+    });
+    enqueueReport(payload);
+  } catch (_e) { /* best effort: nunca bloquea el reporte del operario */ }
+}
+
 function _mapOpcionToFichadaEvento(payload) {
   if (!payload || !payload.opcion) return null;
   if (payload.opcion === "FJ") return "Salida";
@@ -3649,7 +4211,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v1.87";
+const APP_VERSION = "v2.46";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -3783,6 +4345,10 @@ async function send() {
     // string = ISO de apertura (estamos cerrando); true = legacy sin ts; undefined = abriendo
     if (typeof cur === "string") payload.ts_inicio_iso = cur;
   }
+
+  /* ---- llegada tarde (LT): se evalúa en el PRIMER mensaje del día, ANTES
+          de registrar este reporte en el historial ---- */
+  await maybeRegisterLateArrival(legajoStr, nowMs);
 
   /* ---- historial local ---- */
   pushHistoryForLegajo(legajoStr, {
@@ -4183,9 +4749,10 @@ let historicMap        = null;   // Map<tandaUpper, m3 sumado>
 let historicLastFetch  = 0;
 let historicInflight   = null;   // Promise para evitar fetch en paralelo
 
-const MONITOR_REFRESH_MS = 1000;     // ciclo principal — refresca eventos Supabase
+const MONITOR_REFRESH_MS = 30000;    // ciclo principal — 30s para bajar consumo Supabase
 const PPP_TTL_MS         = 3000;     // PPP (Google Sheet) cacheado este tiempo
 let monitorIntervalId = null;
+let _monitorCountdownIntervalId = null;
 let monitorLastOkTs   = 0;
 let _pppCache         = null;
 let _pppCacheTs       = 0;
@@ -4257,6 +4824,230 @@ function showTandaDetail(tandaCode) {
 
 function closeTandaModal() {
   document.getElementById("tandaModal").classList.remove("show");
+}
+
+/* Popup con el desglose por tanda al hacer click en una celda de la tabla
+   Mts3 x Hora. Reutiliza el #tandaModal genérico. Para cierres cross-day
+   muestra ts_inicio con fecha (apertura ayer) y ts_cliente con hora — así
+   se ve claro por qué la duración cuenta solo el tiempo laboral del operario. */
+function showOperarioActivityDetail(legajo, activity) {
+  // activity: "pick" / "arm" / "cc" / "mov"
+  if (!_monitorLiveStats || !_monitorLiveStats.today) return;
+  const stats = _monitorLiveStats.today;
+  const dayKey = _monitorLiveStats.todayKey;
+  const op = (stats.perOperario || []).find(o => o.legajo === String(legajo));
+  if (!op) return;
+  const label = { pick:"Picking", arm:"Pedido", cc:"Carga Camión", mov:"Movimientos" }[activity];
+  const m = document.getElementById("tandaModal");
+  m.querySelector(".tanda-modal-title").textContent =
+    `${op.nombre} — ${label} (${dayKey.slice(8,10)}/${dayKey.slice(5,7)})`;
+
+  const fmtN = (n, d=1) => (Math.round((n||0) * Math.pow(10,d)) / Math.pow(10,d)).toFixed(d).replace(".", ",");
+  const fmtTime = (iso) => {
+    if (!iso) return "—";
+    try {
+      return new Date(iso).toLocaleString("es-AR", {
+        day:"2-digit", month:"2-digit", hour:"2-digit", minute:"2-digit",
+        timeZone:"America/Argentina/Buenos_Aires"
+      });
+    } catch { return iso; }
+  };
+  const fmtDur = (ms) => {
+    const min = Math.round(ms / 60000);
+    const h = Math.floor(min / 60); const m2 = min % 60;
+    return h > 0 ? `${h}h ${m2}min` : `${m2}min`;
+  };
+
+  if (activity === "mov") {
+    // Detalle por toggle: apertura, cierre y cuánto tardó (minutos).
+    const totalH = (op.movMin || 0) / 60;
+    const totalMin = Math.round(op.movMin || 0);
+    const movArr = op.movDetail || [];
+    const movLabel = {
+      MG: "Guardado a Góndola", RI: "Recepción Insumos",
+      EI: "Entrega Insumos",    RT: "Recepción Mercadería",
+      AT: "Atendí Timbre",      PB: "Paré Baño",
+      Limp: "Limpieza"
+    };
+    const fmtMin = (ms) => `${Math.round(ms / 60000)} min`;
+    if (!movArr.length) {
+      m.querySelector(".tanda-modal-body").innerHTML =
+        `<div style="font-size:14px;">Total ${fmtN(totalH,1)} h sin detalle de eventos.</div>`;
+      m.classList.add("show");
+      return;
+    }
+    const movRows = movArr
+      .slice().sort((a,b) => new Date(a.ts_inicio) - new Date(b.ts_inicio))
+      .map(d => `
+      <tr>
+        <td><b>${escapeHtml(d.opcion)}</b> <span style="color:#666;font-size:11px">${escapeHtml(movLabel[d.opcion] || "")}</span>${d.texto ? ` <span style="color:#1e6bd6;font-size:11px">${escapeHtml(d.texto)}</span>` : ''}</td>
+        <td>${fmtTime(d.ts_inicio)}</td>
+        <td>${fmtTime(d.ts_cliente)}</td>
+        <td style="text-align:right;font-variant-numeric:tabular-nums"><b>${fmtMin(d.durMs)}</b></td>
+      </tr>`).join("");
+    m.querySelector(".tanda-modal-body").innerHTML = `
+      <div style="font-size:14px; margin-bottom:10px;">
+        <b>Total:</b> ${fmtN(totalH,1)} h <span style="color:#666">(${totalMin} min · ${movArr.length} eventos)</span>
+      </div>
+      <table class="tanda-modal-table">
+        <thead><tr>
+          <th>Movimiento</th>
+          <th>Apertura</th>
+          <th>Cierre</th>
+          <th style="text-align:right">Tardó</th>
+        </tr></thead>
+        <tbody>${movRows}</tbody>
+      </table>`;
+    m.classList.add("show");
+    return;
+  }
+
+  const detailArr = activity === "pick" ? op.pickedDetail
+                 : activity === "arm"  ? op.armedDetail
+                 : activity === "cc"   ? op.ccDetail : [];
+  const totalM3 = activity === "pick" ? op.m3Pick
+                : activity === "arm"  ? op.m3Arm
+                : activity === "cc"   ? op.m3CC : 0;
+  const totalH = activity === "pick" ? op.pickH
+              : activity === "arm"  ? op.armH
+              : activity === "cc"   ? op.ccH : 0;
+  const m3h = totalH > 0 ? totalM3 / totalH : 0;
+
+  if (!detailArr || !detailArr.length) {
+    m.querySelector(".tanda-modal-body").innerHTML =
+      `<div style="font-size:14px; color:#666;">Sin cierres registrados de ${label} hoy.</div>`;
+    m.classList.add("show");
+    return;
+  }
+
+  const fmtTimeHm = (iso) => {
+    if (!iso) return "—";
+    try {
+      return new Date(iso).toLocaleString("es-AR", {
+        hour:"2-digit", minute:"2-digit", timeZone:"America/Argentina/Buenos_Aires"
+      });
+    } catch { return iso; }
+  };
+  const cuentaFor = (d) => {
+    const b = d.breakdown || {};
+    if (b.sameDay !== false) return "";
+    // Cross-day: armar la formula
+    const openMin = Math.round((b.openPortion||0) / 60000);
+    const closeMin = Math.round((b.closePortion||0) / 60000);
+    const interMin = Math.round((b.intermediatePortion||0) / 60000);
+    const totMin = Math.round((d.durMs||0) / 60000);
+    const fjLabel = b.fjReal ? "FJ" : "hora_salida";
+    const ingLabel = b.ingresoReal ? "ingreso" : "hora_entrada";
+    const openTxt = `<b>${fmtTimeHm(d.ts_inicio)} → ${fmtTimeHm(new Date(b.fjOpenMs).toISOString())}</b> <span style="color:#666">(${fjLabel} día anterior)</span> = ${openMin} min`;
+    const closeTxt = `<b>${fmtTimeHm(new Date(b.closeStartMs).toISOString())} → ${fmtTimeHm(d.ts_cliente)}</b> <span style="color:#666">(${ingLabel} día cierre)</span> = ${closeMin} min`;
+    const interTxt = interMin > 0 ? ` + ${interMin} min (días intermedios completos)` : "";
+    return `<div style="font-size:11px; color:#444; padding:3px 6px; background:#fffbeb; line-height:1.4;">
+      ${openTxt} <b>+</b> ${closeTxt}${interTxt} = <b>${totMin} min</b>
+    </div>`;
+  };
+  const rows = detailArr.map(d => {
+    const inicio = fmtTime(d.ts_inicio);
+    const cierre = fmtTime(d.ts_cliente);
+    const crossDay = isoToDayKey(d.ts_inicio) !== isoToDayKey(d.ts_cliente);
+    const m3Txt = (d.m3 != null && d.m3 > 0) ? fmtN(d.m3, 1) : "—";
+    const cuentaHtml = cuentaFor(d);
+    return `<tr${crossDay ? ' style="background:#fff7ed"' : ''}>
+        <td><b>${escapeHtml(d.tanda)}</b></td>
+        <td style="text-align:right;font-variant-numeric:tabular-nums">${m3Txt}</td>
+        <td>${inicio}${crossDay ? ' <span style="color:#9a3412;font-size:11px">(día anterior)</span>' : ''}</td>
+        <td>${cierre}</td>
+        <td style="text-align:right;font-variant-numeric:tabular-nums"><b>${fmtDur(d.durMs)}</b></td>
+      </tr>${cuentaHtml ? `<tr><td colspan="5" style="padding:0">${cuentaHtml}</td></tr>` : ''}`;
+  }).join("");
+
+  m.querySelector(".tanda-modal-body").innerHTML = `
+    <div style="font-size:14px; margin-bottom:10px;">
+      <b>Total:</b> ${fmtN(totalM3,1)} m3 / ${fmtN(totalH,2)} h
+      &nbsp;·&nbsp; <b style="color:#1e6bd6">${fmtN(m3h,1)} m3/h</b>
+    </div>
+    <table class="tanda-modal-table">
+      <thead><tr>
+        <th>Tanda</th>
+        <th style="text-align:right">m3</th>
+        <th>Apertura</th>
+        <th>Cierre</th>
+        <th style="text-align:right">Tardó</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div style="margin-top:10px; font-size:12px; color:#666;">
+      Las filas con fondo naranja son cierres cross-day: la apertura fue
+      el día anterior. La duración contada es el tiempo laboral del operario
+      (apertura → fin de jornada del día de apertura + ingreso del día del
+      cierre → cierre).
+    </div>`;
+  m.classList.add("show");
+}
+
+/* Popup con los EVENTOS (mensajes) de una tanda en Picking o Pedido Separado.
+   Se abre al clickear la celda de estado en el monitor. Trae los registros
+   desde Supabase ordenados por hora descendente. */
+async function showTandaMessages(tandaCode, kind) {
+  if (!tandaCode) return;
+  const tandaUpper = String(tandaCode).trim().toUpperCase();
+  let opciones, titulo;
+  if (kind === "separado")   { opciones = ["AP", "TAP"];          titulo = `Tanda ${tandaUpper} — Pedido Separado`; }
+  else if (kind === "all")   { opciones = ["EP","TP","AP","TAP"]; titulo = `Tanda ${tandaUpper} — Eventos`; }
+  else                       { opciones = ["EP", "TP"];           titulo = `Tanda ${tandaUpper} — Picking`; }
+
+  const m = document.getElementById("tandaModal");
+  m.querySelector(".tanda-modal-title").textContent = titulo;
+  m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">Cargando…</div>`;
+  m.classList.add("show");
+
+  try {
+    const url = SUPABASE_TABLE_ENDPOINT +
+      "?select=ts_cliente,ts_inicio,opcion,descripcion,legajo,texto" +
+      "&opcion=in.(" + opciones.join(",") + ")" +
+      "&texto=ilike." + encodeURIComponent(tandaUpper) +
+      "&order=ts_cliente.desc&limit=100";
+    const r = await fetch(url, {
+      headers: { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY }
+    });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const data = await r.json();
+    // El filtro `ilike` matchea case-insensitive; reforzamos por las dudas.
+    const evs = data.filter(e => (e.texto || "").trim().toUpperCase() === tandaUpper);
+    if (!evs.length) {
+      m.querySelector(".tanda-modal-body").innerHTML =
+        `<div class="history-empty">Sin eventos para ${tandaUpper} en ${kind === "separado" ? "Pedido Separado" : "Picking"}.</div>`;
+      return;
+    }
+    const rowsHtml = evs.map(e => {
+      const ts = new Date(e.ts_cliente);
+      const fecha = ts.toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", timeZone: "America/Argentina/Buenos_Aires" });
+      const hora  = ts.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Argentina/Buenos_Aires" });
+      const leg = String(e.legajo || "").trim();
+      const nom = _empleadosNombres.get(leg) || "";
+      const ini = nom ? initialsFromName(nom, leg) : "";
+      const operario = nom
+        ? `${escapeHtml(nom)} <span style="color:#94a3b8">(${escapeHtml(ini)} · ${escapeHtml(leg)})</span>`
+        : `Leg ${escapeHtml(leg)}`;
+      return `
+        <tr>
+          <td class="center">${escapeHtml(fecha)}<br><b>${escapeHtml(hora)}</b></td>
+          <td class="center"><b>${escapeHtml(e.opcion || "")}</b></td>
+          <td>${escapeHtml(e.descripcion || "")}</td>
+          <td>${operario}</td>
+        </tr>`;
+    }).join("");
+    m.querySelector(".tanda-modal-body").innerHTML = `
+      <div style="font-size:14px; color:#475569; margin-bottom:10px;">
+        <b>${evs.length}</b> evento(s) — más recientes arriba.
+      </div>
+      <table class="tanda-modal-table">
+        <thead><tr><th class="center">Fecha / Hora</th><th class="center">Cód</th><th>Descripción</th><th>Operario</th></tr></thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>`;
+  } catch (e) {
+    m.querySelector(".tanda-modal-body").innerHTML =
+      `<div class="history-empty" style="color:#dc2626">Error cargando eventos: ${escapeHtml(e.message || String(e))}</div>`;
+  }
 }
 
 /* Muestra modal con el desglose de rendimiento por operario para un día.
@@ -4356,6 +5147,7 @@ async function showDayBreakdown(dayKey, dayLabel) {
     for (const ev of events) {
       const leg = String(ev.legajo || "").trim();
       if (!leg || leg === "0" || leg === "1") continue;   // 0/1 = test/basura
+      if (ev.opcion === "LT") continue;   // LT = llegada tarde: tiempo NO trabajado
       if (!perLegajo.has(leg)) perLegajo.set(leg, {
         firstTs: ev.ts_cliente,
         lastTs: ev.ts_cliente,
@@ -4545,6 +5337,278 @@ async function showDayBreakdown(dayKey, dayLabel) {
   }
 }
 
+/* ---------- Stats por día para el panel derecho del monitor ----------
+   Devuelve, para un dayKey YYYY-MM-DD:
+     {
+       perOperario: [{ legajo, nombre, m3Pick, m3Arm, jornadaH, m3hPick, m3hArm }],
+       totals: { pickM3, pickHsum, pickM3h, sepM3, sepHsum, sepM3h }
+     }
+   La jornada se calcula igual que en showDayBreakdown (ingreso → FJ menos PC;
+   si hoy y sin FJ, ingreso → ahora). m3 por tanda sale de _monitorSheetCache
+   (PPP del día) o de la histórica. Cacheado por dayKey con TTL corto. */
+let _monitorDayStatsCache = new Map();
+// Stats vivos para los popups de desglose por operario (legajo, actividad).
+// Setteado en renderMonitor; leído por showOperarioActivityDetail.
+let _monitorLiveStats = { todayKey: null, today: null, yesterdayKey: null, yesterday: null };
+const MONITOR_DAY_STATS_TTL_MS = 15000;
+async function fetchMonitorDayStats(dayKey) {
+  const cached = _monitorDayStatsCache.get(dayKey);
+  if (cached && (Date.now() - cached.ts) < MONITOR_DAY_STATS_TTL_MS) return cached.data;
+
+  const dayStartIso = new Date(`${dayKey}T00:00:00-03:00`).toISOString();
+  const dayEndIso   = new Date(`${dayKey}T23:59:59-03:00`).toISOString();
+  // Para cierres cross-day, queremos el FJ REAL del día de la apertura
+  // (día anterior). Fetcheamos solo los FJ de ese día (consulta chica).
+  const prevDayStartIso = new Date(new Date(`${dayKey}T00:00:00-03:00`).getTime() - 24*3600*1000).toISOString();
+  const prevDayEndIso   = dayStartIso;
+  const evUrl = SUPABASE_TABLE_ENDPOINT +
+    "?ts_cliente=gte." + encodeURIComponent(dayStartIso) +
+    "&ts_cliente=lte." + encodeURIComponent(dayEndIso) +
+    "&order=ts_cliente.asc&limit=5000" +
+    "&select=opcion,texto,legajo,ts_cliente,ts_inicio";
+  const fichUrl = SUPABASE_FICHADAS_ENDPOINT +
+    "?ts_cliente=gte." + encodeURIComponent(dayStartIso) +
+    "&ts_cliente=lte." + encodeURIComponent(dayEndIso) +
+    "&tipo=eq.ingreso&order=ts_cliente.asc&limit=2000" +
+    "&select=legajo,ts_cliente";
+  const fjPrevUrl = SUPABASE_TABLE_ENDPOINT +
+    "?ts_cliente=gte." + encodeURIComponent(prevDayStartIso) +
+    "&ts_cliente=lt."  + encodeURIComponent(prevDayEndIso) +
+    "&opcion=eq.FJ&order=ts_cliente.desc&limit=1000" +
+    "&select=legajo,ts_cliente";
+  const headers = { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY };
+  const [r, rf, rfj, nombres, historic] = await Promise.all([
+    fetch(evUrl,    { headers }),
+    fetch(fichUrl,  { headers }),
+    fetch(fjPrevUrl,{ headers }),
+    getEmpleadosNombres(),
+    getHistoricMap()
+  ]);
+  if (!r.ok)  throw new Error("Eventos HTTP " + r.status);
+  if (!rf.ok) throw new Error("Fichadas HTTP " + rf.status);
+  // FJ del día anterior por operario (el último de ese día). best-effort:
+  // si el fetch falla seguimos sin él, usando hora_salida programada.
+  const fjPrevByLegajo = new Map();
+  if (rfj.ok) {
+    const fjData = await rfj.json();
+    for (const f of fjData) {
+      const leg = String(f.legajo || "").trim();
+      if (!leg) continue;
+      const ts = new Date(f.ts_cliente);
+      const prev = fjPrevByLegajo.get(leg);
+      if (!prev || ts > prev) fjPrevByLegajo.set(leg, ts);
+    }
+  }
+  const events = await r.json();
+  const fichadas = await rf.json();
+
+  // Ingreso por legajo: el más temprano del día (descarta dobles fichadas).
+  const ingresoByLegajo = new Map();
+  for (const f of fichadas) {
+    const leg = String(f.legajo || "").trim();
+    if (!leg || leg === "0" || leg === "1") continue;
+    const ts = new Date(f.ts_cliente);
+    const prev = ingresoByLegajo.get(leg);
+    if (!prev || ts < prev) ingresoByLegajo.set(leg, ts);
+  }
+
+  // Códigos que contamos como "movimientos" en la tabla Mts3xHora:
+  // toggles internos cuyo TIEMPO (sumatoria de duraciones cerradas) interesa
+  // saber por operario. Cuentan PB y Limp también (decisión del supervisor).
+  const MOV_TOGGLE_CODES = new Set(["MG", "RI", "EI", "RT", "AT", "PB", "Limp"]);
+
+  // Lookup m3 por tanda: sheetMap actual primero (más fresco), después la
+  // histórica del Sheet. ANTES del loop de eventos porque el detail necesita
+  // m3 al momento de procesar cada cierre (era TDZ con const declarado abajo).
+  const sheetMap = _monitorSheetCache || new Map();
+  const tandaM3 = (t) => {
+    const e = sheetMap.get(t);
+    if (e && e.m3 != null) return e.m3;
+    return historic.get(t) || 0;
+  };
+  // Horarios por operario (entrada/salida de la tabla Empleados). Fallback
+  // 08:00-17:00 si no figura. Para "llegan tarde" usamos la fichada real del
+  // día del cierre cuando existe (más precisa que la hora programada).
+  const horariosMap = getEmpleadosHorarios();
+  const tsOfHourOnDay = (dayKey, hours) => {
+    const h = Math.floor(hours);
+    const min = Math.floor((hours - h) * 60);
+    const sec = Math.round((hours - h - min/60) * 3600);
+    const iso = `${dayKey}T${String(h).padStart(2,'0')}:${String(min).padStart(2,'0')}:${String(sec).padStart(2,'0')}-03:00`;
+    return new Date(iso).getTime();
+  };
+  // Duración real de un cierre (TP/TAP/CC) en ms:
+  //   - Mismo día: ts_cliente - ts_inicio.
+  //   - Cross-day: (ts_inicio → horaSalida día apertura)
+  //              + N días intermedios × horas laborales
+  //              + (ingreso real día cierre [o horaEntrada] → ts_cliente).
+  //     "Ingreso real": fichada del día del cierre si existe (refleja llegadas
+  //     tarde); si no, la horaEntrada programada del operario.
+  const computeClosureDur = (leg, tsInicioMs, tsClienteMs, outBreakdown) => {
+    const dayOpen = isoToDayKey(tsInicioMs);
+    const dayClose = isoToDayKey(tsClienteMs);
+    if (dayOpen === dayClose) {
+      const dur = Math.max(0, tsClienteMs - tsInicioMs);
+      if (outBreakdown) {
+        outBreakdown.sameDay = true;
+        outBreakdown.openPortion = dur;
+        outBreakdown.closePortion = 0;
+        outBreakdown.intermediatePortion = 0;
+      }
+      return dur;
+    }
+    const h = horariosMap.get(String(leg)) || {};
+    const horaEntrada = parseHHMMtoHours(h.entrada) ?? 8;
+    const horaSalida  = parseHHMMtoHours(h.salida)  ?? 17;
+    const workH = Math.max(0, horaSalida - horaEntrada);
+    // Pedazo del día de apertura: ts_inicio → FJ real (si existe en
+    // fjPrevByLegajo para el dayOpen) o hora_salida programada como fallback.
+    const fjRealAyer = fjPrevByLegajo.get(String(leg));
+    const sameDayAsPrev = fjRealAyer && isoToDayKey(fjRealAyer.getTime()) === dayOpen;
+    const fjOpenMs = sameDayAsPrev
+      ? fjRealAyer.getTime()
+      : tsOfHourOnDay(dayOpen, horaSalida);
+    const openPortion = Math.max(0, Math.min(fjOpenMs, tsClienteMs) - tsInicioMs);
+    // Pedazo del día de cierre: max(ingreso_real, hora_entrada) → ts_cliente.
+    // Solo usamos ingreso_real cuando es del MISMO día que el cierre (sirve
+    // sólo para 1 cruce; si son varios, usamos la hora programada).
+    let closeStartMs;
+    const ingresoActual = ingresoByLegajo.get(String(leg));
+    const sameDayIngreso = ingresoActual && isoToDayKey(ingresoActual.getTime()) === dayClose;
+    if (sameDayIngreso) {
+      closeStartMs = ingresoActual.getTime();
+    } else {
+      closeStartMs = tsOfHourOnDay(dayClose, horaEntrada);
+    }
+    closeStartMs = Math.max(closeStartMs, tsInicioMs);
+    const closePortion = Math.max(0, tsClienteMs - closeStartMs);
+    // Días intermedios (raro): cada uno cuenta como una jornada completa.
+    const dStart = new Date(dayOpen  + "T00:00:00-03:00").getTime();
+    const dEnd   = new Date(dayClose + "T00:00:00-03:00").getTime();
+    const nCrossings = Math.round((dEnd - dStart) / (24 * 3600 * 1000));
+    const intermediateDays = Math.max(0, nCrossings - 1);
+    const intermediatePortion = intermediateDays * workH * 3600 * 1000;
+    if (outBreakdown) {
+      outBreakdown.sameDay = false;
+      outBreakdown.openPortion = openPortion;        // ts_inicio → FJ del día apertura
+      outBreakdown.closePortion = closePortion;       // ingreso día cierre → ts_cliente
+      outBreakdown.intermediatePortion = intermediatePortion;
+      outBreakdown.fjOpenMs = fjOpenMs;
+      outBreakdown.closeStartMs = closeStartMs;
+      outBreakdown.fjReal = sameDayAsPrev;            // true si usamos FJ real (no horaSalida)
+      outBreakdown.ingresoReal = sameDayIngreso;      // true si usamos ingreso real (no horaEntrada)
+    }
+    return openPortion + intermediatePortion + closePortion;
+  };
+  const perLegajo = new Map();
+  for (const ev of events) {
+    const leg = String(ev.legajo || "").trim();
+    if (!leg || leg === "0" || leg === "1") continue;
+    if (ev.opcion === "LT") continue;   // LT = llegada tarde: tiempo NO trabajado, no cuenta
+    if (!perLegajo.has(leg)) perLegajo.set(leg, {
+      firstTs: ev.ts_cliente, lastTs: ev.ts_cliente,
+      // Sets para deduplicar m3 (si una tanda tiene múltiples TP por error).
+      // *Detail = lista de cierres con info para el popup (uno por evento).
+      pickedTandas: new Set(), pickedDetail: [], pickMs: 0,
+      armedTandas:  new Set(), armedDetail:  [], armMs:  0,
+      ccTandas:     new Set(), ccDetail:     [], ccMs:   0,
+      comidaMs: 0, movMs: 0, movDetail: [], fjTs: null
+    });
+    const p = perLegajo.get(leg);
+    p.lastTs = ev.ts_cliente;
+    const tanda = (ev.texto || "").trim().toUpperCase();
+    if (tanda && ev.ts_inicio) {
+      // Duración real (ms) + breakdown (cómo se calculó) usando el helper.
+      const _br = {};
+      const dur = computeClosureDur(leg, new Date(ev.ts_inicio).getTime(), new Date(ev.ts_cliente).getTime(), _br);
+      const durOK = dur > 0 && dur < 24 * 3600 * 1000;
+      const detail = { tanda, m3: tandaM3(tanda), ts_inicio: ev.ts_inicio, ts_cliente: ev.ts_cliente, durMs: dur, breakdown: _br };
+      if (ev.opcion === "TP"  && durOK) { p.pickedTandas.add(tanda); p.pickedDetail.push(detail); p.pickMs += dur; }
+      if (ev.opcion === "TAP" && durOK) { p.armedTandas.add(tanda);  p.armedDetail.push(detail);  p.armMs  += dur; }
+      if (ev.opcion === "CC"  && durOK) { p.ccTandas.add(tanda);     p.ccDetail.push(detail);     p.ccMs   += dur; }
+    }
+    if (ev.opcion === "PC" && ev.ts_inicio) {
+      const dur = new Date(ev.ts_cliente) - new Date(ev.ts_inicio);
+      if (dur > 0 && dur < 8 * 3600 * 1000) p.comidaMs += dur;
+    }
+    // Toggles de movimiento: sumar duración cuando se cierra (ts_inicio set)
+    // y guardar el evento en movDetail para el popup.
+    if (MOV_TOGGLE_CODES.has(ev.opcion) && ev.ts_inicio) {
+      const dur = new Date(ev.ts_cliente) - new Date(ev.ts_inicio);
+      if (dur > 0 && dur < 8 * 3600 * 1000) {
+        p.movMs += dur;
+        p.movDetail.push({
+          opcion: ev.opcion,
+          texto: ev.texto || "",
+          ts_inicio: ev.ts_inicio,
+          ts_cliente: ev.ts_cliente,
+          durMs: dur
+        });
+      }
+    }
+    if (ev.opcion === "FJ") p.fjTs = ev.ts_cliente;
+  }
+
+  const isToday = isTodayKey(dayKey);
+  const perOperario = [];
+  for (const [leg, p] of perLegajo) {
+    // Filtramos a los que NO tocaron nada del trabajo medible (picking, pedido,
+    // CC con tanda, ni movimientos). Si tocaron pero no tenemos m³ cargado en
+    // el sheet (típico en tandas C-prefix nuevas), igual aparecen.
+    if (p.pickedTandas.size === 0 && p.armedTandas.size === 0
+        && p.ccTandas.size === 0 && p.movMs === 0) continue;
+    const m3Pick = [...p.pickedTandas].reduce((s, t) => s + tandaM3(t), 0);
+    const m3Arm  = [...p.armedTandas ].reduce((s, t) => s + tandaM3(t), 0);
+    const m3CC   = [...p.ccTandas    ].reduce((s, t) => s + tandaM3(t), 0);
+    // HORAS por actividad: suma real de (ts_cliente - ts_inicio) de los
+    // cierres TP/TAP/CC. Si TP cerró un EP de ayer, dur = ts hoy - ts ayer.
+    // m3/h = m3 / horas reales de esa actividad (no de la jornada entera ni
+    // de "primer evento a último evento" — esos daban valores absurdos).
+    const pickH = p.pickMs / 3600000;
+    const armH  = p.armMs  / 3600000;
+    const ccH   = p.ccMs   / 3600000;
+    const m3hPick = (pickH > 0 && m3Pick > 0) ? m3Pick / pickH : 0;
+    const m3hArm  = (armH  > 0 && m3Arm  > 0) ? m3Arm  / armH  : 0;
+    const m3hCC   = (ccH   > 0 && m3CC   > 0) ? m3CC   / ccH   : 0;
+    const movMin  = p.movMs / 60000;
+    perOperario.push({
+      legajo: leg,
+      nombre: nombres.get(leg) || ("Leg " + leg),
+      m3Pick, m3Arm, m3CC,
+      pickH, armH, ccH,
+      m3hPick, m3hArm, m3hCC, movMin,
+      pickedDetail: p.pickedDetail,
+      armedDetail:  p.armedDetail,
+      ccDetail:     p.ccDetail,
+      movDetail:    p.movDetail,
+      didPick: p.pickedTandas.size > 0,
+      didArm:  p.armedTandas.size  > 0,
+      didCC:   p.ccTandas.size     > 0,
+      didMov:  p.movMs > 0
+    });
+  }
+  // Totales: sumamos m3 y horas REALES por actividad (no por operario completo)
+  // así el total m3/h refleja la productividad real de la actividad ese día.
+  let pickM3 = 0, pickHsum = 0, sepM3 = 0, sepHsum = 0;
+  let ccM3 = 0, ccHsum = 0, movMinTot = 0;
+  for (const o of perOperario) {
+    pickM3 += o.m3Pick; pickHsum += o.pickH;
+    sepM3  += o.m3Arm;  sepHsum  += o.armH;
+    ccM3   += o.m3CC;   ccHsum   += o.ccH;
+    movMinTot += o.movMin;
+  }
+  const totals = {
+    pickM3, pickHsum, pickM3h: pickHsum > 0 ? pickM3 / pickHsum : 0,
+    sepM3,  sepHsum,  sepM3h:  sepHsum  > 0 ? sepM3  / sepHsum  : 0,
+    ccM3,   ccHsum,   ccM3h:   ccHsum   > 0 ? ccM3   / ccHsum   : 0,
+    movMin: movMinTot
+  };
+  perOperario.sort((a, b) => (b.m3Pick + b.m3Arm + b.m3CC) - (a.m3Pick + a.m3Arm + a.m3CC));
+  const data = { perOperario, totals };
+  _monitorDayStatsCache.set(dayKey, { ts: Date.now(), data });
+  return data;
+}
+
 /* Copia el email del data-attribute al clipboard y da feedback visual.
    Usado en el banner ⚠ Sin legajo del modal de rendimiento — el supervisor
    clickea el email y lo pega en Supabase Studio (tabla Empleados).
@@ -4585,39 +5649,82 @@ function isTodayKey(dayKey) {
 
 /* Muestra modal con las tandas que componen un camión del día y el estado
    de armado individual (verde=armado, rojo=no armado). Reusa el tandaModal. */
-function showCamionDetail(dateKey, camion) {
+async function showCamionDetail(dateKey, camion) {
   if (!_monitorTotalCache || !dateKey || !camion) return;
   const dayData = _monitorTotalCache.get(dateKey);
   if (!dayData) return;
   const camData = dayData.byCamion.get(camion);
   if (!camData) { alert("Camión no encontrado: " + camion); return; }
   const tandas = [...camData.tandas].sort((a, b) => a.code.localeCompare(b.code));
-  let bodyHtml = `
+
+  const m = document.getElementById("tandaModal");
+  m.querySelector(".tanda-modal-title").textContent = "Camión " + camion;
+  // Render inicial con placeholders mientras se traen los operarios
+  const headerHtml = `
     <div style="font-size:14px; color:#475569; margin-bottom:12px;">
       <b>Fecha:</b> ${escapeHtml(dayData.fechaDisplay)} ·
       <b>Total:</b> ${camData.tandas.length} tandas · ${camData.sum.toFixed(1).replace(".", ",")} m3 ·
       <b>Armadas:</b> ${camData.tandasArmadas}/${camData.tandas.length}
-    </div>
+    </div>`;
+  m.querySelector(".tanda-modal-body").innerHTML = headerHtml + `<div class="history-empty">Cargando operarios…</div>`;
+  m.classList.add("show");
+
+  // Traemos TP/TAP de esas tandas y nos quedamos con los del día solicitado.
+  const byTanda = new Map();
+  for (const t of tandas) byTanda.set(t.code.toUpperCase(), { picker: null, armador: null });
+  try {
+    const codes = [...byTanda.keys()].map(c => encodeURIComponent(c)).join(",");
+    const url = SUPABASE_TABLE_ENDPOINT
+      + "?select=opcion,texto,legajo,ts_cliente"
+      + "&opcion=in.(TP,TAP)"
+      + "&texto=in.(" + codes + ")"
+      + "&order=ts_cliente.desc&limit=500";
+    const r = await fetch(url, { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY } });
+    if (r.ok) {
+      const events = await r.json();
+      for (const e of events) {
+        // No filtramos por fecha: dateKey es la fecha de ENTREGA pero TP/TAP
+        // se hicieron antes. Los eventos vienen ordenados desc, nos quedamos
+        // con el primero (más reciente) por tanda y opción.
+        const t = String(e.texto || "").trim().toUpperCase();
+        const slot = byTanda.get(t);
+        if (!slot) continue;
+        const leg = String(e.legajo || "").trim();
+        if (e.opcion === "TP"  && !slot.picker)  slot.picker  = leg;
+        if (e.opcion === "TAP" && !slot.armador) slot.armador = leg;
+      }
+    }
+  } catch (_e) { /* sin operarios: se renderiza con guiones */ }
+
+  const tagFor = (leg) => {
+    if (!leg) return `<span style="color:#94a3b8">—</span>`;
+    const nom = _empleadosNombres.get(leg) || "";
+    const display = nom || `Leg ${leg}`;
+    const title = nom ? `${nom} (legajo ${leg})` : `Legajo ${leg}`;
+    return `<span title="${escapeHtml(title)}">${escapeHtml(display)}</span>`;
+  };
+
+  let bodyHtml = headerHtml + `
     <table class="tanda-modal-table">
       <thead>
-        <tr><th>Tanda</th><th class="num">M3</th><th class="center">Armado</th></tr>
+        <tr><th>Tanda</th><th class="center">Picking</th><th class="center">Pedido</th><th class="num">M3</th><th class="center">Armado</th></tr>
       </thead>
       <tbody>`;
   for (const t of tandas) {
     const cls = t.armado ? "tanda-armado" : "tanda-no-armado";
     const txt = t.armado ? "✓ Sí" : "✗ No";
+    const slot = byTanda.get(t.code.toUpperCase()) || { picker: null, armador: null };
     bodyHtml += `
         <tr class="${cls}">
           <td>${escapeHtml(t.code)}</td>
+          <td class="center">${tagFor(slot.picker)}</td>
+          <td class="center">${tagFor(slot.armador)}</td>
           <td class="num">${(t.m3 || 0).toFixed(3).replace(".", ",")}</td>
           <td class="center"><b>${txt}</b></td>
         </tr>`;
   }
   bodyHtml += `</tbody></table>`;
-  const m = document.getElementById("tandaModal");
-  m.querySelector(".tanda-modal-title").textContent = "Camión " + camion;
   m.querySelector(".tanda-modal-body").innerHTML = bodyHtml;
-  m.classList.add("show");
 }
 
 /* Gate de supervisor: solo los emails en SUPERVISOR_EMAILS (ver módulo de auth
@@ -4631,17 +5738,148 @@ function requireSupervisor() {
   return true;
 }
 
+/* Clasifica el ancho del viewport en 4 regimes y aplica la clase al modal del
+   monitor. CSS arma los layouts por regime para que sea responsive de un TV
+   32" rendereando 980px hasta un TV 4K 65" rendereando 3840px.
+     - narrow : ≤ 1100 px   (TV box en "modo ordenador" ~980, laptops chicas)
+     - medium : 1101-1600   (laptops grandes, TV 32" en 1366)
+     - wide   : 1601-2400   (PC HD/FHD, TV 1920×1080)
+     - xwide  : > 2400 px   (4K — TV 65" o monitor desktop 4K)
+   Guarda el size exacto en data-vp-size para mostrar en el meta (debug). */
+function classifyAndApplyMonitorVp() {
+  const m = document.getElementById("monitorModal");
+  if (!m || !m.classList.contains("show")) return;
+  const w = window.innerWidth, h = window.innerHeight;
+  let vp;
+  if (w <= 1100) vp = "narrow";
+  else if (w <= 1600) vp = "medium";
+  else if (w <= 2400) vp = "wide";
+  else vp = "xwide";
+  if (m.dataset.vp !== vp) {
+    m.classList.remove("vp-narrow", "vp-medium", "vp-wide", "vp-xwide");
+    m.classList.add("vp-" + vp);
+    m.dataset.vp = vp;
+  }
+  m.dataset.vpSize = w + "x" + h;
+}
+let _monitorVpListener = null;
+function openMonitor() {
+  if (!requireSupervisor()) return;
+  const m = document.getElementById("monitorModal");
+  m.classList.add("show");
+  // Siempre en modo TV (fondo azul, tablero completo): aunque la pantalla sea
+  // chica, mostramos la visualización entera en vez del popup blanco.
+  m.classList.add("tv");
+  // Detectar resolución del viewport y aplicar la clase de regime correspondiente.
+  // Se reevalúa en cada resize para que rotar/mover ventana ajuste el layout vivo.
+  classifyAndApplyMonitorVp();
+  if (!_monitorVpListener) {
+    _monitorVpListener = () => classifyAndApplyMonitorVp();
+    window.addEventListener("resize", _monitorVpListener);
+  }
+  refreshMonitor();
+  if (monitorIntervalId) clearInterval(monitorIntervalId);
+  // Mismo intervalo para kiosko y modo normal (MONITOR_REFRESH_MS = 30 s).
+  const refreshMs = MONITOR_REFRESH_MS;
+  monitorIntervalId = setInterval(refreshMonitor, refreshMs);
+  // Contador regresivo visible para el operario
+  let _nextRefreshAt = Date.now() + MONITOR_REFRESH_MS;
+  window._monitorSetNextRefresh = () => { _nextRefreshAt = Date.now() + MONITOR_REFRESH_MS; };
+  if (_monitorCountdownIntervalId) clearInterval(_monitorCountdownIntervalId);
+  _monitorCountdownIntervalId = setInterval(() => {
+    const el = document.getElementById("monitorCountdown");
+    if (!el) return;
+    const seg = Math.max(0, Math.ceil((_nextRefreshAt - Date.now()) / 1000));
+    el.textContent = seg > 0 ? `próximo refresh en ${seg}s` : "refrescando...";
+  }, 1000);
+  setMonitorTab("monitor");
+  startInconsAutoRefresh();
+}
+
+/* Abre el monitor directo en la pestaña de Inconsistencias (botón flotante ⚠). */
+function openInconsistencias() {
+  if (!requireSupervisor()) return;
+  openMonitor();
+  setMonitorTab("incons");
+}
+
+function closeMonitor() {
+  const m = document.getElementById("monitorModal");
+  m.classList.remove("show");
+  m.classList.remove("tv");
+  m.classList.remove("vp-narrow", "vp-medium", "vp-wide", "vp-xwide");
+  delete m.dataset.vp;
+  delete m.dataset.vpSize;
+  if (_monitorVpListener) {
+    window.removeEventListener("resize", _monitorVpListener);
+    _monitorVpListener = null;
+  }
+  if (monitorIntervalId) { clearInterval(monitorIntervalId); monitorIntervalId = null; }
+  if (_monitorCountdownIntervalId) { clearInterval(_monitorCountdownIntervalId); _monitorCountdownIntervalId = null; }
+  stopInconsAutoRefresh();
+  // Reset del snapshot — al reabrir, el primer refresh no flashea masivo.
+  _prevStatusMap = new Map();
+}
+
 let _analisisIntervalId = null;
+
+/* Trae los m3 hechos por día (today + 5 anteriores) y los renderiza en la
+   sección "Producción por día" del modal Análisis. Usa el sheet PPP para los
+   m3 por tanda y los eventos TP/TAP de Supabase para saber cuáles se hicieron
+   cada día — NO restringe a tandas a FC. */
+async function refreshAnalisisDayTotals(){
+  const container = document.getElementById("analisisDayTotals");
+  if (!container) return;
+  try {
+    const sheetMap = await fetchMonitorSheet();
+    // Compartimos el sheet con el cache global de PPP para que el gráfico
+    // de productividad (que lee _pppCache directo) también tenga estos m³.
+    _pppCache = sheetMap;
+    _pppCacheTs = Date.now();
+    const wideDates = targetDeliveryDates(sheetMap, 7);
+    const targetSet = new Set(wideDates);
+    const targetTandaKeys = [];
+    for (const [k, v] of sheetMap) if (targetSet.has(v.fechaEntregaRaw)) targetTandaKeys.push(k);
+    const { statusMap, empleadosHoy, pastDays } = await fetchMonitorEvents(targetTandaKeys, sheetMap);
+    // Today: m3 con TP done hoy (picking) y m3 con TAP done hoy (separado).
+    // No restringimos a tandas con ambas terminadas (no usamos "m3 FC").
+    let todayPick = 0, todaySep = 0;
+    for (const [k, v] of sheetMap) {
+      if (!v.opIsSi) continue;
+      const ev = statusMap.get(k);
+      if (!ev) continue;
+      if (ev.doneTodayP) todayPick += v.m3;
+      if (ev.doneTodayA) todaySep  += v.m3;
+    }
+    const todayStr = new Date().toLocaleDateString("es-AR", { day:"2-digit", month:"2-digit", timeZone:"America/Argentina/Buenos_Aires" });
+    const fmt = n => (n || 0).toFixed(1).replace(".", ",");
+    const rows = [
+      { label: `Hoy ${todayStr}`, totPick: todayPick, totSep: todaySep, empleados: empleadosHoy != null ? empleadosHoy : "—", isToday: true },
+      ...(pastDays || []).map(d => ({ label: d.label, totPick: d.totPick, totSep: d.totSep, empleados: d.empleados, isToday: false }))
+    ];
+    container.innerHTML = rows.map(r => `
+      <div class="analisis-day-row${r.isToday ? ' is-today' : ''}">
+        <div class="analisis-day-label">${escapeHtml(r.label)}</div>
+        <div class="analisis-day-box"><div class="analisis-day-box-label">M³ Picking</div><div class="analisis-day-box-value">${fmt(r.totPick)}</div></div>
+        <div class="analisis-day-box"><div class="analisis-day-box-label">M³ Pedido</div><div class="analisis-day-box-value">${fmt(r.totSep)}</div></div>
+        <div class="analisis-day-box"><div class="analisis-day-box-label">Empleados</div><div class="analisis-day-box-value">${escapeHtml(String(r.empleados))}</div></div>
+      </div>`).join("");
+  } catch (e) {
+    container.innerHTML = `<div class="monitor-chart-empty">Error: ${escapeHtml(e.message || String(e))}</div>`;
+  }
+}
 
 function openAnalisis() {
   if (!requireSupervisor()) return;
   const m = document.getElementById("analisisModal");
   m.classList.add("show");
+  refreshAnalisisDayTotals();
   if (typeof Chart !== "undefined" && typeof refreshProductivityCharts === "function") {
     refreshProductivityCharts();
   }
   if (_analisisIntervalId) clearInterval(_analisisIntervalId);
   _analisisIntervalId = setInterval(function() {
+    refreshAnalisisDayTotals();
     if (typeof refreshProductivityCharts === "function") refreshProductivityCharts();
   }, PROD_REFRESH_MS);
 }
@@ -4658,16 +5896,87 @@ function closeAnalisis() {
   }
 }
 
-/* Auto-abrir Facturación si la URL trae ?monitor=fc. Pensado para colgar la
-   pantalla de Facturación en el 2do monitor de ventas. Sigue requiriendo login. */
+function toggleMonitorTV() {
+  const m = document.getElementById("monitorModal");
+  const btn = document.getElementById("btnMonitorTV");
+  const isTV = m.classList.toggle("tv");
+  if (isTV) {
+    btn.textContent = "⛶ Salir TV";
+    if (m.requestFullscreen) m.requestFullscreen().catch(()=>{});
+  } else {
+    btn.textContent = "📺 TV";
+    if (document.fullscreenElement) document.exitFullscreen().catch(()=>{});
+  }
+}
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && document.getElementById("monitorModal").classList.contains("show")) {
+    closeMonitor();
+  }
+});
+
+// La smart TV / TV box colgada en planta no puede loguearse con Google (su
+// navegador es viejo y/o Google bloquea su webview). Para esas pantallas de
+// pared usamos una URL con clave que NO requiere login:
+//     ?monitor=tv&key=LACLAVE   (también fc / incons)
+// Si la clave coincide, entramos directo al monitor en "modo kiosko": le damos
+// rol supervisor sólo para ver el tablero y abrimos sin pasar por Google. Esto
+// funciona aunque la librería de auth (supabase.js) no cargue en ese navegador.
+// Cambiá MONITOR_TV_KEY para rotar la clave. El resto de los dispositivos
+// (celulares, PC) siguen entrando con login de Google normal.
+const MONITOR_TV_KEY = "tv";
 const _monParams = new URLSearchParams(location.search);
 window.__pendingMonitorParam = _monParams.get("monitor");
 window.maybeAutoOpenMonitor = function () {
   const v = window.__pendingMonitorParam;
   if (!v) return;
   window.__pendingMonitorParam = null; // una sola vez
-  if (v === "fc") openFacturacion();
+  if (v === "tv" || v === "1") openMonitor();
+  else if (v === "fc") openFacturacion();   // 2do monitor de ventas
+  else if (v === "incons") openInconsistencias();
 };
+
+// Modo kiosko (pantalla de pared, sin login). Para que la clave NO quede a la
+// vista en la barra del TV (cualquiera podría copiarla), usamos enrolamiento:
+//  1) La primera vez se abre con ?monitor=tv&key=<MONITOR_TV_KEY>.
+//  2) Si la clave es válida, marcamos ESTE dispositivo como kiosko en
+//     localStorage y BORRAMOS la clave de la URL (queda ?monitor=tv pelado).
+//  3) De ahí en más, ese TV entra con ?monitor=tv solo (sin clave visible).
+// Un celular que lea ?monitor=tv en la pantalla NO entra: no tiene el
+// enrolamiento ni la clave. (Para des-enrolar: borrar datos del navegador.)
+const KIOSK_FLAG = "vir_tv_kiosk";
+const _kioskEnrolled = (function () { try { return localStorage.getItem(KIOSK_FLAG) === "1"; } catch (_e) { return false; } })();
+const _keyValid = _monParams.get("key") === MONITOR_TV_KEY;
+if (window.__pendingMonitorParam && (_keyValid || _kioskEnrolled)) {
+  window.__tvKioskMode = true;     // el módulo de auth lo respeta y no pide login
+  window.__isSupervisor = true;    // sólo para que requireSupervisor() deje abrir
+  if (_keyValid) {
+    try { localStorage.setItem(KIOSK_FLAG, "1"); } catch (_e) {}
+    try {
+      const u = new URL(location.href);
+      u.searchParams.delete("key");   // sacamos la clave de la URL visible
+      history.replaceState(null, "", u.pathname + u.search + u.hash);
+    } catch (_e) {}
+  }
+  // En la TV mostramos el panel "Administración" con los botones, y el usuario
+  // elige qué abrir (Monitor / Facturación / Inconsistencias / Análisis). No
+  // auto-abrimos nada.
+  window.addEventListener("load", () => {
+    try { showKioskAdminPanel(); } catch (_e) {}
+  });
+}
+
+/* Muestra el panel Administración en modo kiosko (TV, sin login). Replica el
+   estado "supervisor" pero sin sesión: oculta login/operario y el botón Salir. */
+function showKioskAdminPanel() {
+  const hide = (id) => { const e = document.getElementById(id); if (e) e.classList.add("hidden"); };
+  const show = (id) => { const e = document.getElementById(id); if (e) e.classList.remove("hidden"); };
+  hide("authBlock"); hide("legajoEntry"); show("supervisorPanel");
+  const h = document.getElementById("legajoHistorySpace"); if (h) h.style.display = "none";
+  hide("legajoTitle");
+  // En kiosko no hay sesión que cerrar: ocultamos la fila de "Salir".
+  document.querySelectorAll("#supervisorPanel .auth-logout-row").forEach((el) => el.classList.add("hidden"));
+}
 
 /* Parser CSV simple — soporta campos entre comillas con comas y comillas
    escapadas dobles ("a""b" -> a"b). Suficiente para CSV publicado de Sheets. */
@@ -4697,6 +6006,37 @@ function monitorParseM3(s) {
   if (!s) return 0;
   const n = parseFloat(String(s).replace(/\./g, "").replace(",", "."));
   return isNaN(n) ? 0 : n;
+}
+
+/* PERSISTENCIA de m³ por tanda (localStorage). Necesario para Productividad:
+   la PPP "Programacion Diaria" solo tiene las tandas a entregar HOY, así que
+   tandas como C12A (entregada anteayer) ya no están ahí. Y la histórica puede
+   tardar en recibirlas. Acá las recordamos: cada vez que vemos una tanda con
+   m³ > 0 en cualquier fuente, la guardamos. Sobrevive a recargas del navegador. */
+const PERSISTED_M3_KEY = "vir_tanda_m3";
+let _persistedM3 = null;
+function loadPersistedM3() {
+  if (_persistedM3) return _persistedM3;
+  try {
+    const json = localStorage.getItem(PERSISTED_M3_KEY);
+    _persistedM3 = json ? new Map(Object.entries(JSON.parse(json))) : new Map();
+  } catch (_e) { _persistedM3 = new Map(); }
+  return _persistedM3;
+}
+let _persistedDirty = false;
+function rememberTandaM3(tanda, m3) {
+  if (!tanda || !(m3 > 0)) return;
+  const map = loadPersistedM3();
+  const key = String(tanda).toUpperCase().trim();
+  if (!key) return;
+  if (map.get(key) !== m3) { map.set(key, m3); _persistedDirty = true; }
+}
+function flushPersistedM3() {
+  if (!_persistedDirty || !_persistedM3) return;
+  try {
+    localStorage.setItem(PERSISTED_M3_KEY, JSON.stringify(Object.fromEntries(_persistedM3)));
+    _persistedDirty = false;
+  } catch (_e) {}
 }
 
 /* "2026-05-22 0:00:00" o "2026-05-22" o "22/5" -> "22/05". "" si no parsea.
@@ -4787,7 +6127,9 @@ async function fetchMonitorSheet() {
   // "tanda" busca por substring para tolerar el header concatenado de gviz
   // ("Programacion Tanda"). Las demás cols matchean exactamente.
   const cTanda = header.findIndex(h => h.includes("tanda"));
-  const cM3    = header.indexOf("m3");
+  // m3 NORMAL: acepta "m3" o "mt3", EXCLUYE cualquier header con "fc" (si el
+  // sheet tiene "M3" y "M3 FC", siempre quedamos con la normal).
+  const cM3    = header.findIndex(h => (h === "m3" || h === "mt3") && !h.includes("fc"));
   const cOp    = header.indexOf("op");
   const cFE    = header.indexOf("fecha entrega");
   const cNP    = header.indexOf("n° np");
@@ -4845,6 +6187,10 @@ async function fetchMonitorSheet() {
       zona:      cZona   >= 0 ? (r[cZona]   || "").trim() : ""
     });
   }
+  // Persistimos cada tanda con m³ > 0 para que sobreviva cuando salga de la
+  // PPP "Programacion Diaria" (mañana ya no estará pero la recordamos).
+  for (const [k, v] of acc) { if (v && v.m3 > 0) rememberTandaM3(k, v.m3); }
+  flushPersistedM3();
   return acc;
 }
 
@@ -4864,10 +6210,14 @@ async function fetchHistoricSheet() {
   // Header en fila 0 (sin filas de título arriba como en el sheet principal).
   const header = rows[0].map(x => (x||"").trim().toLowerCase());
   const cTanda = header.indexOf("tanda");
-  const cMt3   = header.indexOf("mt3");
+  // Busca la columna de m3 NORMAL: acepta "mt3" o "m3", pero EXCLUYE cualquier
+  // header que contenga "fc" (la hoja tiene "Mt3" y "Mt3 FC", y la FC está mal
+  // cargada — siempre usamos la normal).
+  const cMt3 = header.findIndex(h => (h === "mt3" || h === "m3") && !h.includes("fc"));
   if (cTanda < 0 || cMt3 < 0) {
-    throw new Error("Histórico: faltan columnas Tanda/Mt3");
+    throw new Error("Histórico: faltan columnas Tanda/Mt3 (encabezados: " + header.join("|") + ")");
   }
+  console.log("[historic] col Mt3 (normal) =", header[cMt3], "@col", cMt3, "| FC ignorada");
   const acc = new Map();
   for (let i = 1; i < rows.length; i++) {
     const r = rows[i];
@@ -4878,6 +6228,8 @@ async function fetchHistoricSheet() {
     const key = tanda.toUpperCase();
     acc.set(key, (acc.get(key) || 0) + m3);
   }
+  for (const [k, v] of acc) { if (v > 0) rememberTandaM3(k, v); }
+  flushPersistedM3();
   return acc;
 }
 
@@ -4921,34 +6273,54 @@ function getHistoricMap() {
    Devuelve: { statusMap, alertasOffSheet, empleadosHoy }
      statusMap: TANDA -> { picking, separado, doneTodayP, doneTodayA } */
 /* Cache legajo -> nombre (tabla Empleados) para la leyenda del monitor
-   "Leg 8: Juan Farias". Refresca cada 1h; ante error mantiene lo cacheado. */
+   "Leg 8: Juan Farias". Refresca cada 1h; ante error mantiene lo cacheado.
+   Ahora también cacheamos el horario laboral por legajo (hora_entrada,
+   hora_salida) — sirve para calcular el "tiempo nocturno" a restar en
+   cierres cross-day por operario. */
 let _empleadosNombres   = new Map();
+let _empleadosHorarios  = new Map();   // legajo -> { entrada: "HH:MM:SS", salida: "HH:MM:SS" }
 let _empleadosNombresTs = 0;
 const EMPLEADOS_TTL_MS  = 60 * 60 * 1000;
+function getEmpleadosHorarios() { return _empleadosHorarios; }
 async function getEmpleadosNombres() {
   const now = Date.now();
   if (_empleadosNombres.size && (now - _empleadosNombresTs) < EMPLEADOS_TTL_MS) {
     return _empleadosNombres;
   }
   try {
-    const url = SUPABASE_EMPLEADOS_ENDPOINT + "?select=Legajo,Empleado&limit=5000";
+    const url = SUPABASE_EMPLEADOS_ENDPOINT + "?select=Legajo,Empleado,hora_entrada,hora_salida&limit=5000";
     const r = await fetch(url, {
       headers: { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY }
     });
     if (!r.ok) throw new Error("Supabase HTTP " + r.status);
     const data = await r.json();
-    const map = new Map();
+    const mapN = new Map();
+    const mapH = new Map();
     for (const e of data) {
       const leg = String(e.Legajo || "").trim();
       const nom = (e.Empleado || "").trim();
-      if (leg && nom) map.set(leg, nom);
+      if (leg && nom) mapN.set(leg, nom);
+      if (leg && (e.hora_entrada || e.hora_salida)) {
+        mapH.set(leg, { entrada: e.hora_entrada, salida: e.hora_salida });
+      }
     }
-    if (map.size) { _empleadosNombres = map; _empleadosNombresTs = Date.now(); }
+    if (mapN.size) {
+      _empleadosNombres = mapN;
+      _empleadosHorarios = mapH;
+      _empleadosNombresTs = Date.now();
+    }
     return _empleadosNombres;
   } catch (e) {
     console.warn("[monitor] nombres de empleados fetch fallido:", e.message);
     return _empleadosNombres;
   }
+}
+/* "HH:MM:SS" → horas fraccionarias (ej. "08:30:00" → 8.5). null → null. */
+function parseHHMMtoHours(s) {
+  if (!s) return null;
+  const m = String(s).match(/^(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?/);
+  if (!m) return null;
+  return Number(m[1]) + Number(m[2])/60 + (Number(m[3]||0))/3600;
 }
 
 async function fetchMonitorEvents(targetTandaKeys, sheetMap) {
@@ -5182,36 +6554,59 @@ function statusIconToday(s) {
   // Solo eventos de HOY. null/undefined -> celda vacía.
   if (s === "done")  return `<span class="status-icon status-done" title="Terminado hoy">✅</span>`;
   if (s === "curso") {
-    // 12 barras alrededor del centro, con animation-delay escalonado en
-    // -1/12 s para crear el efecto de rotación.
-    let bars = "";
-    for (let i = 0; i < 12; i++) {
-      const delay = (-i / 12).toFixed(3);
-      bars += `<rect x="47" y="10" width="6" height="22" rx="2" transform="rotate(${i*30} 50 50)" style="animation-delay:${delay}s"/>`;
-    }
-    return `<span class="status-icon status-curso status-spinner" title="En curso hoy"><svg viewBox="0 0 100 100">${bars}</svg></span>`;
+    // Spinner CSS liviano (1 elemento, 1 animation) — antes eran 12 rects SVG
+    // que trababan la pc cuando había muchas tandas en curso.
+    return `<span class="status-icon status-curso status-spinner" title="En curso hoy"></span>`;
   }
   return "";
 }
 
-/* Legajo del que EMPEZÓ la tanda (EP picking / AP armado). Se posiciona
-   absoluto a la derecha de la celda (ver .monitor-legajo en el CSS). Vacío si
-   no se conoce el legajo o la celda no tiene estado. */
+/* Override por legajo: si querés iniciales custom para alguien (p.ej. "JF" en
+   vez del default "FJ"), ponelo acá. Mapa legajo (string) -> iniciales. */
+const INITIALS_OVERRIDE_BY_LEGAJO = {
+  "8": "JF"   // Farias Juan Hilario
+};
+
+/* Iniciales: primera letra de las 2 primeras palabras del campo Empleado,
+   tal cual está cargado (sin asumir qué es apellido y qué es nombre). Para
+   nombres de 1 sola palabra devuelve 1 inicial. Ej: "Farias Juan Hilario" →
+   "FJ", "Franco Ortiz" → "FO", "Pruebas" → "P". Si el legajo está en el
+   override, devuelve directamente el valor configurado. */
+function initialsFromName(name, legajo) {
+  const leg = legajo != null ? String(legajo).trim() : "";
+  if (leg && INITIALS_OVERRIDE_BY_LEGAJO[leg]) return INITIALS_OVERRIDE_BY_LEGAJO[leg];
+  if (!name) return "";
+  const parts = String(name).trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "";
+  if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+  return parts[0].charAt(0).toUpperCase() + parts[1].charAt(0).toUpperCase();
+}
+
+/* Iniciales del operario que EMPEZÓ la tanda (EP picking / AP armado), al lado
+   del icono de estado. Si no hay nombre cacheado, cae al número de legajo.
+   El nombre completo va en el tooltip (hover). */
 function monitorLegajoTag(legajo, state) {
   if (!legajo || state == null) return "";
-  return `<span class="monitor-legajo" title="Lo empezó el legajo ${escapeHtml(String(legajo))}">${escapeHtml(String(legajo))}</span>`;
+  const legStr = String(legajo).trim();
+  const nombre = _empleadosNombres.get(legStr) || "";
+  const display = nombre ? initialsFromName(nombre, legStr) : legStr;
+  const title = nombre
+    ? `Lo empezó ${nombre} (legajo ${legStr})`
+    : `Lo empezó el legajo ${legStr}`;
+  return `<span class="monitor-legajo" title="${escapeHtml(title)}">${escapeHtml(display)}</span>`;
 }
 
-/* Celda de Picking / Pedido Separado: icono centrado en la columna + legajo
-   colgado a la derecha. El wrapper .status-wrap (block, full width) es el
-   contexto de posicionamiento para que el legajo no descentre el icono. */
-function statusCell(state, legajo) {
+/* Celda de Picking / Pedido Separado: icono centrado en la columna + iniciales
+   del operario que la empezó. Clickeable: abre el popup con los eventos de
+   esa tanda de ese lado (EP/TP para picking, AP/TAP para separado). */
+function statusCell(state, legajo, tanda, kind) {
   const icon = statusIconToday(state);
-  if (!icon) return "";   // sin actividad → celda vacía
-  return `<span class="status-wrap">${icon}${monitorLegajoTag(legajo, state)}</span>`;
+  if (!icon) return "";   // sin actividad → celda vacía no clickeable
+  const t = String(tanda || "").trim();
+  return `<span class="status-wrap tanda-clickable" data-tanda="${escapeHtml(t)}" data-kind="${escapeHtml(kind)}" onclick="showTandaMessages(this.dataset.tanda, this.dataset.kind)">${icon}${monitorLegajoTag(legajo, state)}</span>`;
 }
 
-function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, empleadosHoy, pastDays, errMsg, fichadasResumen) {
+function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, empleadosHoy, pastDays, errMsg, fichadasResumen, todayStats, yesterdayStats, todayKey, yesterdayKey) {
   // Cacheamos sheetMap para que showTandaDetail() pueda leer los NPs/m3
   // de la tanda clickeada en el modal.
   _monitorSheetCache = sheetMap;
@@ -5286,6 +6681,11 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
   let rowsHtml = "";
   const tandasFC = [];
   const totalByDate = new Map();   // fechaRaw -> { fechaDisplay, totalSum, byCamion }
+  // De las planificadas SIN actividad mostramos las primeras N (las más
+  // próximas por fecha) para anticipar el trabajo que viene. Las activas se
+  // muestran todas; las terminadas van al cuadro "Tandas a FC".
+  const MAX_PLANNED_NO_ACT = 6;
+  let plannedShown = 0;
 
   for (const t of tandas) {
     const ev = t.ev;
@@ -5318,6 +6718,14 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
       tandasFC.push(t);
       continue;       // las terminadas no van a la tabla principal
     }
+    // Tabla principal: TODAS las tandas con actividad actual (picking o
+    // separado empezado/terminado) + las primeras MAX_PLANNED_NO_ACT
+    // planificadas sin nada hecho (las más próximas por fecha), para anticipar.
+    const hasAny = (ev.picking !== null || ev.separado !== null);
+    if (!hasAny) {
+      if (plannedShown >= MAX_PLANNED_NO_ACT) continue;
+      plannedShown++;
+    }
     const isCurso = (ev.picking === "curso" || ev.separado === "curso");
     const cls = [];
     if (isCurso)        cls.push("row-curso");
@@ -5332,12 +6740,15 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
         <td class="monitor-tanda tanda-clickable" data-tanda="${escapeHtml(t._key || t.tanda)}" onclick="showTandaDetail(this.dataset.tanda)">${escapeHtml(t.tanda)}</td>
         <td class="num">${m3Txt}</td>
         <td class="center">${feTxt}</td>
-        <td class="center">${statusCell(ev.picking, ev.pickLegajo)}</td>
-        <td class="center">${statusCell(ev.separado, ev.sepLegajo)}</td>
+        <td class="center">${statusCell(ev.picking, ev.pickLegajo, t.tanda, "picking")}</td>
+        <td class="center">${statusCell(ev.separado, ev.sepLegajo, t.tanda, "separado")}</td>
       </tr>`;
   }
   const todayStr = new Date().toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit" });
-  const todayKey = isoToDayKey(Date.now());   // YYYY-MM-DD para showDayBreakdown
+  // todayKey/yesterdayKey ahora vienen como parámetros desde refreshMonitor —
+  // los usaba acá showDayBreakdown indirectamente, pero ya está cubierto.
+  if (!todayKey) todayKey = isoToDayKey(Date.now());
+  if (!yesterdayKey) yesterdayKey = isoToDayKey(Date.now() - 24*3600*1000);
   const fmtDM = (raw) => { const [, m, d] = raw.split("-"); return `${d}/${m}`; };
   const targetLabel = targetDates.length
     ? targetDates.map(fmtDM).join(", ")
@@ -5378,33 +6789,47 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
     if (!t.pedidos || !t.pedidos.length) return false;
     return t.pedidos.every(p => p.np && facturadas.has(p.np));
   };
+  // Tabla "Tandas a FC": se parte en 2 columnas cuando supera FC_SPLIT_AT filas
+  // para que la lista no quede súper alta y entre al lado del resto del panel.
+  const FC_SPLIT_AT = 8;
+  const renderFcTableBody = (items) => items.map(t => {
+    const facturada = isTandaFacturada(t);
+    return `
+      <tr${facturada ? ' class="row-facturada"' : ''}>
+        <td class="fc-tanda tanda-clickable" data-tanda="${escapeHtml(t._key || t.tanda)}" onclick="showTandaDetail(this.dataset.tanda)">${escapeHtml(t.tanda)}</td>
+        <td class="num">${t.m3.toFixed(1).replace(".", ",")}</td>
+        <td class="center tanda-clickable" data-tanda="${escapeHtml(t._key || t.tanda)}" onclick="showTandaMessages(this.dataset.tanda, 'all')">${escapeHtml(t.fechaEntrega)}</td>
+        <td class="center" style="font-size:18px;color:#16a34a;font-weight:bold">${facturada ? "✅" : ""}</td>
+      </tr>`;
+  }).join("");
+  const renderFcTable = (items) => `
+    <table class="monitor-fc-table">
+      <thead>
+        <tr>
+          <th>Tanda</th>
+          <th class="num">M3</th>
+          <th class="center">Fecha<br>Salida</th>
+          <th class="center">FC ✓</th>
+        </tr>
+      </thead>
+      <tbody>${renderFcTableBody(items)}</tbody>
+    </table>`;
+  // En narrow (TV 32 modo ordenador ~980px) NO splitteamos: si splitteamos +
+  // ponemos FC y Total side-by-side, las sub-columnas quedan ilegibles. En
+  // narrow cada card es de 1 columna sola, así caben los 2 lado a lado.
+  const _isNarrow = window.innerWidth <= 1100;
+  let fcInner;
+  if (tandasFC.length > FC_SPLIT_AT && !_isNarrow) {
+    const half = Math.ceil(tandasFC.length / 2);
+    fcInner = `<div class="monitor-fc-cols">${renderFcTable(tandasFC.slice(0, half))}${renderFcTable(tandasFC.slice(half))}</div>`;
+  } else {
+    fcInner = renderFcTable(tandasFC);
+  }
   const fcHtml = tandasFC.length ? `
     <div class="monitor-fc-card">
       <div class="monitor-fc-title">Tandas a FC (${totalFcM3.toFixed(1).replace(".", ",")} m3)</div>
-      <table class="monitor-fc-table">
-        <thead>
-          <tr>
-            <th>Tanda</th>
-            <th class="num">M3</th>
-            <th class="center">Fecha Salida</th>
-            <th class="center">FC ✓</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${tandasFC.map(t => {
-            const facturada = isTandaFacturada(t);
-            return `
-            <tr${facturada ? ' class="row-facturada"' : ''}>
-              <td class="fc-tanda tanda-clickable" data-tanda="${escapeHtml(t._key || t.tanda)}" onclick="showTandaDetail(this.dataset.tanda)">${escapeHtml(t.tanda)}</td>
-              <td class="num">${t.m3.toFixed(1).replace(".", ",")}</td>
-              <td class="center">${escapeHtml(t.fechaEntrega)}</td>
-              <td class="center" style="font-size:18px;color:#16a34a;font-weight:bold">${facturada ? "✅" : ""}</td>
-            </tr>`;
-          }).join("")}
-        </tbody>
-      </table>
-    </div>
-  ` : "";
+      ${fcInner}
+    </div>` : "";
 
   // Card "+ Fuera de ventana" — tandas planificadas (Op=SI) cuya fecha de
   // entrega es POSTERIOR a la última fecha de la ventana visible. Cuenta
@@ -5449,49 +6874,163 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
   // camiones en el mismo día.
   _monitorTotalCache = totalByDate;   // para que showCamionDetail() pueda leerlo
   const totalEntries = [...totalByDate.entries()].sort();
+  // Helper render: tabla de "Total por día" para un subset de entries.
+  // Se separa así para poder partir la lista en 2 columnas cuando es larga.
+  const renderTotalTable = (entries) => `
+    <table class="monitor-total-table">
+      <thead>
+        <tr>
+          <th>Fecha</th>
+          <th class="center">Camión</th>
+          <th class="num">M3</th>
+          <th class="num">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${entries.map(([dateKey, g]) => {
+          const camions = [...g.byCamion.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+          const n = camions.length || 1;
+          const totalCell = `<td class="num total-cell" rowspan="${n}">${g.totalSum.toFixed(1).replace(".", ",")}</td>`;
+          const fechaCell = `<td class="fecha-cell" rowspan="${n}">${escapeHtml(g.fechaDisplay)}</td>`;
+          if (!camions.length) {
+            return `<tr>${fechaCell}<td></td><td class="num"></td>${totalCell}</tr>`;
+          }
+          return camions.map(([cam, c], i) => {
+            const armadas = c.tandasArmadas;
+            const total   = c.tandas.length;
+            const statusClass = armadas === 0
+              ? "tandas-pending"
+              : (armadas >= total ? "tandas-done" : "tandas-partial");
+            return `
+              <tr class="${statusClass}">
+                ${i === 0 ? fechaCell : ""}
+                <td class="center cam-cell tanda-clickable" data-date="${escapeHtml(dateKey)}" data-cam="${escapeHtml(cam)}" onclick="showCamionDetail(this.dataset.date, this.dataset.cam)">${escapeHtml(cam)}</td>
+                <td class="num">${c.sum.toFixed(1).replace(".", ",")}</td>
+                ${i === 0 ? totalCell : ""}
+              </tr>`;
+          }).join("");
+        }).join("")}
+      </tbody>
+    </table>`;
+  // En narrow no splitteamos (queda 1 sola tabla por card) para que FC y Total
+  // entren side-by-side sin que las sub-columnas se vuelvan ilegibles.
+  let totalInner;
+  if (_isNarrow) {
+    totalInner = renderTotalTable(totalEntries);
+  } else {
+    const halfTot = Math.ceil(totalEntries.length / 2);
+    totalInner = `<div class="monitor-total-cols">${renderTotalTable(totalEntries.slice(0, halfTot))}${renderTotalTable(totalEntries.slice(halfTot))}</div>`;
+  }
   const totalHtml = totalEntries.length ? `
     <div class="monitor-total-card">
       <div class="monitor-total-title">Total por día</div>
-      <table class="monitor-total-table">
+      ${totalInner}
+    </div>` : "";
+
+  // ====== Panel de stats arriba a la derecha: Mts3 x Hora + Parcial hoy + Ayer
+  // Datos calculados por fetchMonitorDayStats (m3 por operario + horas de jornada).
+  const dayKeyLabel = (k) => k ? `${k.slice(8,10)}/${k.slice(5,7)}` : "";
+  const fmt1 = (n) => (Math.round((n||0)*10)/10).toFixed(1).replace(".", ",");
+  const shortNameOperario = (name) => {
+    // Empleados se cargan como "Apellido Nombre [Segundo]" → mostrar "Nombre Apellido".
+    if (!name) return "";
+    const parts = String(name).trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 1) return parts[0];
+    return parts[1] + " " + parts[0];
+  };
+  // Renderiza el nombre apellido en 2 líneas (cada palabra escapeada va en
+  // su propia fila), p.ej. "Insaurralde Matias" → "Insaurralde<br>Matias".
+  const renderOperarioName = (name) => {
+    const short = shortNameOperario(name);
+    return short.split(/\s+/).map(escapeHtml).join("<br>");
+  };
+  // Cache para los popups (al hacer click en una celda de Mts3xHora).
+  _monitorLiveStats = { todayKey, today: todayStats, yesterdayKey, yesterday: yesterdayStats };
+  const operariosHoy = (todayStats && todayStats.perOperario) || [];
+  const emptyTot = { pickM3:0, pickM3h:0, sepM3:0, sepM3h:0, ccM3:0, ccM3h:0, movMin:0 };
+  const totHoy  = (todayStats     && todayStats.totals)     || emptyTot;
+  const totAyer = (yesterdayStats && yesterdayStats.totals) || emptyTot;
+  // Cada celda clickeable abre el popup con el desglose por tanda. El
+  // atributo onclick lo bindeamos solo cuando el operario tocó esa actividad
+  // (no tiene sentido abrirlo en celdas "—").
+  const _clk = (leg, act) => `onclick="showOperarioActivityDetail('${leg}','${act}')" style="cursor:pointer" title="Click para ver el desglose"`;
+  const cellM3h = (val, did, msg, leg, act) => {
+    if (val > 0) return `<td class="num" ${_clk(leg, act)}>${fmt1(val)}</td>`;
+    if (did)     return `<td class="num stats-nodata" title="${msg}" ${_clk(leg, act)}>·</td>`;
+    return `<td class="num">—</td>`;
+  };
+  const cellMin = (val, did, leg) => {
+    if (val > 0) return `<td class="num" ${_clk(leg, "mov")}>${fmt1(val / 60)}</td>`;
+    if (did)     return `<td class="num stats-nodata" ${_clk(leg, "mov")}>·</td>`;
+    return `<td class="num">—</td>`;
+  };
+
+  const mtshoraHtml = operariosHoy.length ? `
+    <div class="monitor-stats-card">
+      <table class="monitor-stats-table monitor-stats-mtshora">
         <thead>
+          <tr><th colspan="${operariosHoy.length + 1}" class="stats-title">Mts3 x Hora (${dayKeyLabel(todayKey)})</th></tr>
           <tr>
-            <th>Fecha</th>
-            <th class="center">Camión</th>
-            <th class="num">M3</th>
-            <th class="num">Total</th>
+            <th></th>
+            ${operariosHoy.map(o => `<th class="op-name" title="${escapeHtml(o.nombre)}">${renderOperarioName(o.nombre)}</th>`).join("")}
           </tr>
         </thead>
         <tbody>
-          ${totalEntries.map(([dateKey, g]) => {
-            const camions = [...g.byCamion.entries()].sort((a, b) => a[0].localeCompare(b[0]));
-            const n = camions.length || 1;
-            const totalCell = `<td class="num total-cell" rowspan="${n}">${g.totalSum.toFixed(1).replace(".", ",")}</td>`;
-            const fechaCell = `<td class="fecha-cell" rowspan="${n}">${escapeHtml(g.fechaDisplay)}</td>`;
-            if (!camions.length) {
-              return `<tr>${fechaCell}<td></td><td class="num"></td>${totalCell}</tr>`;
-            }
-            return camions.map(([cam, c], i) => {
-              // Color del camión según cuántas de sus tandas están armadas:
-              //   todas → verde · algunas → naranja · ninguna → rojo
-              const armadas = c.tandasArmadas;
-              const total   = c.tandas.length;
-              const statusClass = armadas === 0
-                ? "tandas-pending"
-                : (armadas >= total ? "tandas-done" : "tandas-partial");
-              return `
-                <tr class="${statusClass}">
-                  ${i === 0 ? fechaCell : ""}
-                  <td class="center cam-cell tanda-clickable" data-date="${escapeHtml(dateKey)}" data-cam="${escapeHtml(cam)}" onclick="showCamionDetail(this.dataset.date, this.dataset.cam)">${escapeHtml(cam)}</td>
-                  <td class="num">${c.sum.toFixed(1).replace(".", ",")}</td>
-                  ${i === 0 ? totalCell : ""}
-                </tr>
-              `;
-            }).join("");
-          }).join("")}
+          <tr>
+            <th class="row-label">Picking</th>
+            ${operariosHoy.map(o => cellM3h(o.m3hPick, o.didPick, "Hizo picking pero falta m³ en el sheet", o.legajo, "pick")).join("")}
+          </tr>
+          <tr>
+            <th class="row-label">Pedido</th>
+            ${operariosHoy.map(o => cellM3h(o.m3hArm, o.didArm, "Hizo pedido pero falta m³ en el sheet", o.legajo, "arm")).join("")}
+          </tr>
+          <tr>
+            <th class="row-label">CC</th>
+            ${operariosHoy.map(o => cellM3h(o.m3hCC, o.didCC, "Cargó camión pero falta m³ en el sheet", o.legajo, "cc")).join("")}
+          </tr>
+          <tr>
+            <th class="row-label">Movim.<br><span class="row-unit">(h)</span></th>
+            ${operariosHoy.map(o => cellMin(o.movMin, o.didMov, o.legajo)).join("")}
+          </tr>
         </tbody>
       </table>
-    </div>
-  ` : "";
+    </div>` : `
+    <div class="monitor-stats-card">
+      <table class="monitor-stats-table monitor-stats-mtshora">
+        <thead>
+          <tr><th class="stats-title">Mts3 x Hora (${dayKeyLabel(todayKey)})</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="stats-empty">Sin actividad hoy todavía</td></tr>
+        </tbody>
+      </table>
+    </div>`;
+  // Los labels Picking/Pedido/CC/Movim NO van acá — quedan implícitos por la
+  // tabla Mts3 x Hora de al lado (orden: Picking, Pedido, CC, Movim). La fila
+  // Movim. muestra TOTAL HORAS (no es un m³/h) en una celda con colspan=2.
+  const renderParcial = (title, t) => `
+    <div class="monitor-stats-card">
+      <table class="monitor-stats-table monitor-stats-parcial">
+        <thead>
+          <tr><th colspan="2" class="stats-title">${title}</th></tr>
+          <tr>
+            <th class="num">Total<br>m3</th>
+            <th class="num">m3 x<br>Hora</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td class="num">${fmt1(t.pickM3)}</td><td class="num">${fmt1(t.pickM3h)}</td></tr>
+          <tr><td class="num">${fmt1(t.sepM3)}</td><td class="num">${fmt1(t.sepM3h)}</td></tr>
+          <tr><td class="num">${fmt1(t.ccM3)}</td><td class="num">${fmt1(t.ccM3h)}</td></tr>
+          <tr><td class="num" colspan="2">${fmt1((t.movMin || 0) / 60)} h</td></tr>
+        </tbody>
+      </table>
+    </div>`;
+  const statsHtml = `<div class="monitor-stats-row">
+    ${mtshoraHtml}
+    ${renderParcial("Parcial " + dayKeyLabel(todayKey), totHoy)}
+    ${renderParcial(dayKeyLabel(yesterdayKey), totAyer)}
+  </div>`;
 
   // Leyenda de legajos abajo del monitor: "Leg 8: Juan Farias".
   const legajosVistos = new Set();
@@ -5499,14 +7038,9 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
     if (t.ev.pickLegajo) legajosVistos.add(String(t.ev.pickLegajo));
     if (t.ev.sepLegajo)  legajosVistos.add(String(t.ev.sepLegajo));
   }
-  const legendHtml = legajosVistos.size ? `
-    <div class="monitor-legend">
-      <div class="legend-title">Operarios en pantalla</div>
-      ${[...legajosVistos]
-          .sort((a,b) => (parseInt(a,10)||0) - (parseInt(b,10)||0))
-          .map(l => `<span class="legend-item"><b>Leg ${escapeHtml(l)}:</b> ${escapeHtml(_empleadosNombres.get(l) || "—")}</span>`)
-          .join("")}
-    </div>` : "";
+  // Leyenda "Operarios en pantalla" sacada — los nombres ya van en el tooltip
+  // de las iniciales en las celdas de Picking/Pedido Separado.
+  const legendHtml = "";
 
   const tableHtml = `
     <div class="monitor-flex">
@@ -5515,53 +7049,31 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
         ${beyondHtml}
         ${legendHtml}
       </div>
-      <div class="monitor-totales monitor-totales-side">
-        <div class="totales-col-boxes">
-          <div class="totales-day-rows">
-          <div class="totales-row">
-            <div class="monitor-tot-box day-box-clickable" data-day-key="${escapeHtml(todayKey)}" data-day-label="${escapeHtml(todayStr)}" onclick="showDayBreakdown(this.dataset.dayKey, this.dataset.dayLabel)">
-              <div class="monitor-tot-label">M3 Picking<br>del día ${todayStr}</div>
-              <div class="monitor-tot-value">${totPickToday.toFixed(1).replace(".", ",")}</div>
-            </div>
-            <div class="monitor-tot-box day-box-clickable" data-day-key="${escapeHtml(todayKey)}" data-day-label="${escapeHtml(todayStr)}" onclick="showDayBreakdown(this.dataset.dayKey, this.dataset.dayLabel)">
-              <div class="monitor-tot-label">M3 Pedido<br>del día ${todayStr}</div>
-              <div class="monitor-tot-value">${totSepToday.toFixed(1).replace(".", ",")}</div>
-            </div>
-            <div class="monitor-tot-box day-box-clickable" data-day-key="${escapeHtml(todayKey)}" data-day-label="${escapeHtml(todayStr)}" onclick="showDayBreakdown(this.dataset.dayKey, this.dataset.dayLabel)">
-              <div class="monitor-tot-label">Empleados<br>Hoy</div>
-              <div class="monitor-tot-value">${empleadosHoy != null ? empleadosHoy : "—"}</div>
-            </div>
-          </div>
-          ${(pastDays || []).map(d => `
-            <div class="totales-row">
-              <div class="monitor-tot-box day-box-clickable" data-day-key="${escapeHtml(d.key)}" data-day-label="${escapeHtml(d.label)}" onclick="showDayBreakdown(this.dataset.dayKey, this.dataset.dayLabel)">
-                <div class="monitor-tot-label">M3 Picking<br>del día ${escapeHtml(d.label)}</div>
-                <div class="monitor-tot-value">${d.totPick.toFixed(1).replace(".", ",")}</div>
-              </div>
-              <div class="monitor-tot-box day-box-clickable" data-day-key="${escapeHtml(d.key)}" data-day-label="${escapeHtml(d.label)}" onclick="showDayBreakdown(this.dataset.dayKey, this.dataset.dayLabel)">
-                <div class="monitor-tot-label">M3 Pedido<br>del día ${escapeHtml(d.label)}</div>
-                <div class="monitor-tot-value">${d.totSep.toFixed(1).replace(".", ",")}</div>
-              </div>
-              <div class="monitor-tot-box day-box-clickable" data-day-key="${escapeHtml(d.key)}" data-day-label="${escapeHtml(d.label)}" onclick="showDayBreakdown(this.dataset.dayKey, this.dataset.dayLabel)">
-                <div class="monitor-tot-label">Empleados<br>${escapeHtml(d.label)}</div>
-                <div class="monitor-tot-value">${d.empleados}</div>
-              </div>
-            </div>
-          `).join("")}
-          </div>
+      <div class="monitor-right-side">
+        <div class="monitor-right-top">
+          ${statsHtml}
+          ${alertHtml}
         </div>
-        <div class="totales-col-fc">
+        <div class="monitor-right-bottom">
           ${fcHtml}
           ${totalHtml}
         </div>
-        ${alertHtml}
       </div>
     </div>
   `;
   content.innerHTML = tableHtml;
   const countCurso = tandas.filter(t => t.ev.picking === "curso" || t.ev.separado === "curso").length;
+  const _mm = document.getElementById("monitorModal");
+  // Resolución del viewport sale al lado del status "● al día" (no en la
+  // barra meta). Acá solo dejamos los conteos.
   document.getElementById("monitorMeta").textContent =
-    `${tandas.length} tanda(s) entrega ${targetLabel} · ${countCurso} en curso · ${tandasFC.length} a FC · eventos ${MONITOR_REFRESH_MS/1000}s · PPP ${PPP_TTL_MS/1000}s`;
+    `${tandas.length} tanda(s) entrega ${targetLabel} · ${countCurso} en curso · ${tandasFC.length} a FC`;
+  const _vpEl = document.getElementById("monitorVpInfo");
+  if (_vpEl && _mm && _mm.dataset.vpSize) {
+    _vpEl.textContent = `${_mm.dataset.vpSize} (${_mm.dataset.vp || "?"})`;
+  } else if (_vpEl) {
+    _vpEl.textContent = "";
+  }
 
 }
 
@@ -5606,7 +7118,16 @@ async function refreshMonitor() {
     }
     const targetDates = pickingsPendientes <= 3 ? wideTargetDates : narrowDates;
     await getEmpleadosNombres();   // legajo -> nombre para la leyenda (cacheado 1h)
-    renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, empleadosHoy, pastDays, null, fichadasResumen);
+    // Stats por operario para el panel de la derecha (Mts3 x Hora) — hoy + ayer.
+    // Cacheado 15s para no martillar Supabase en cada tick. Best-effort: si falla,
+    // las tablas salen vacías y el resto del monitor sigue funcionando.
+    const todayKeyAr  = isoToDayKey(Date.now());
+    const yesterdayKeyAr = isoToDayKey(Date.now() - 24 * 3600 * 1000);
+    const [todayStats, yesterdayStats] = await Promise.all([
+      fetchMonitorDayStats(todayKeyAr).catch(e => { console.warn("[monitor] dayStats hoy:", e.message); return null; }),
+      fetchMonitorDayStats(yesterdayKeyAr).catch(e => { console.warn("[monitor] dayStats ayer:", e.message); return null; })
+    ]);
+    renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, empleadosHoy, pastDays, null, fichadasResumen, todayStats, yesterdayStats, todayKeyAr, yesterdayKeyAr);
     if (refrEl) { refrEl.textContent = "● al día"; refrEl.classList.remove("stale"); }
     // Si el fetch anda, ocultar banner offline (puede que estuviera mostrándose).
     document.getElementById("monitorOfflineBanner").classList.add("hidden");
@@ -5636,6 +7157,7 @@ async function refreshMonitor() {
         `<div class="monitor-error">No se pudo cargar: ${escapeHtml(e.message)}</div>`;
     }
   }
+  if (typeof window._monitorSetNextRefresh === "function") window._monitorSetNextRefresh();
 }
 
 /* =========================================================================
@@ -6157,12 +7679,38 @@ function facRender(tandas){
 /* Tick por NP — POST a Supabase.
    Resolución merge-duplicates por si ventas hace doble click. El UPSERT
    no falla aunque el NP ya esté facturado. */
+/* Headers autenticados para escrituras en Facturación. RLS de Facturacion_NP /
+   _Cierres exige rol `authenticated`, así que mandamos el JWT del usuario
+   logueado (Supabase Auth). Si no hay sesión (kiosko TV, deslogueado) devuelve
+   null y el caller cancela mostrando aviso para loguearse. */
+async function facAuthWriteHeaders(extra) {
+  let token = null;
+  try {
+    if (window.sbAuth) token = await window.sbAuth.getAccessToken();
+  } catch (_e) {}
+  if (!token) return null;
+  const h = {
+    "apikey":        SUPABASE_KEY,
+    "Authorization": "Bearer " + token,
+    "Content-Type":  "application/json"
+  };
+  if (extra) Object.assign(h, extra);
+  return h;
+}
+
 window.facTickNP = async function(btn){
   let args;
   try { args = JSON.parse(btn.dataset.args); }
   catch(e){ facShowToast("Error leyendo NP"); return; }
   const { np, tanda, m3, rs, cod, feRaw } = args;
   btn.disabled = true;
+
+  const headers = await facAuthWriteHeaders({ Prefer: "resolution=merge-duplicates" });
+  if (!headers) {
+    btn.disabled = false;
+    facShowToast("Iniciá sesión con Google para tickear");
+    return;
+  }
 
   // Optimistic UI
   _facNpsHoy.add(np);
@@ -6172,19 +7720,18 @@ window.facTickNP = async function(btn){
   try {
     const r = await fetch(SUPABASE_FACTURACION_NP_ENDPOINT + "?on_conflict=np", {
       method: "POST",
-      headers: {
-        "apikey":         SUPABASE_KEY,
-        "Authorization":  "Bearer " + SUPABASE_KEY,
-        "Content-Type":   "application/json",
-        "Prefer":         "resolution=merge-duplicates"
-      },
+      headers,
       body: JSON.stringify({
         np,
         tanda,
         m3: m3 || null,
         razon_social: rs || null,
         cod_cliente: cod || null,
-        fecha_salida: feRaw || null
+        fecha_salida: feRaw || null,
+        // Si la NP ya estaba cerrada (de un cierre anterior), reabrirla:
+        // sin esto el merge-duplicates no toca cierre_id y la NP queda
+        // "ya cerrada" → fetchFacturadosHoy no la trae → el tilde se cae.
+        cierre_id: null
       })
     });
     if (!r.ok) throw new Error("HTTP " + r.status);
@@ -6221,14 +7768,17 @@ window.facRevertir = async function(){
   const btn = document.getElementById("facBtnRevertir");
   if (btn) btn.disabled = true;
 
+  const headers = await facAuthWriteHeaders({ Prefer: "return=minimal" });
+  if (!headers) {
+    if (btn) btn.disabled = false;
+    facShowToast("Iniciá sesión con Google para revertir");
+    return;
+  }
+
   try {
     const r = await fetch(SUPABASE_FACTURACION_NP_ENDPOINT + "?cierre_id=is.null", {
       method: "DELETE",
-      headers: {
-        "apikey":        SUPABASE_KEY,
-        "Authorization": "Bearer " + SUPABASE_KEY,
-        "Prefer":        "return=minimal"
-      }
+      headers
     });
     if (!r.ok) throw new Error("HTTP " + r.status);
     _facNpsHoy = new Set();
@@ -6347,17 +7897,18 @@ async function generateFacturacionPDF(){
   const fechaCierreISO = facTodayKey();
   const fechaRepartoISO = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 
-  // 2) INSERT cierre → recupera id
+  // 2) INSERT cierre → recupera id (con JWT del usuario logueado)
+  const hCierre = await facAuthWriteHeaders({ Prefer: "return=representation" });
+  if (!hCierre) {
+    facShowToast("Iniciá sesión con Google para cerrar facturación");
+    btn.disabled = false; btn.textContent = "Terminé — Generar PDF";
+    return;
+  }
   let cierreId = null;
   try {
     const rC = await fetch(SUPABASE_FACTURACION_CIERRES_ENDPOINT, {
       method: "POST",
-      headers: {
-        "apikey":         SUPABASE_KEY,
-        "Authorization":  "Bearer " + SUPABASE_KEY,
-        "Content-Type":   "application/json",
-        "Prefer":         "return=representation"
-      },
+      headers: hCierre,
       body: JSON.stringify({
         fecha_cierre:  fechaCierreISO,
         fecha_reparto: fechaRepartoISO,
@@ -6374,21 +7925,13 @@ async function generateFacturacionPDF(){
     return;
   }
 
-  // 3) PATCH cierre_id en todos los NPs facturados pendientes
+  // 3) PATCH cierre_id en todos los NPs facturados pendientes (mismo JWT)
   try {
+    const hPatch = await facAuthWriteHeaders({ Prefer: "return=minimal" });
     const npsCsv = filas.map(f => encodeURIComponent(f.np)).join(",");
     const rP = await fetch(
       SUPABASE_FACTURACION_NP_ENDPOINT + "?np=in.(" + npsCsv + ")&cierre_id=is.null",
-      {
-        method: "PATCH",
-        headers: {
-          "apikey":         SUPABASE_KEY,
-          "Authorization":  "Bearer " + SUPABASE_KEY,
-          "Content-Type":   "application/json",
-          "Prefer":         "return=minimal"
-        },
-        body: JSON.stringify({ cierre_id: cierreId })
-      }
+      { method: "PATCH", headers: hPatch, body: JSON.stringify({ cierre_id: cierreId }) }
     );
     if (!rP.ok) throw new Error("HTTP " + rP.status);
   } catch (e) {
@@ -6519,8 +8062,22 @@ async function fetchProductivityData(daysBack){
       if (!r.ok) throw new Error("Supabase HTTP " + r.status);
       const events = await r.json();
 
-      // m3 por tanda: union PPP cache + Historico
+      // m3 por tanda: union PPP cache + Historico.
+      // Si _pppCache no está cargado (p. ej. el monitor nunca se abrió),
+      // lo poblamos acá para no perder los m³ de las tandas activas.
+      if (!_pppCache) {
+        try {
+          const fresh = await fetchMonitorSheet();
+          _pppCache = fresh;
+          _pppCacheTs = Date.now();
+        } catch (_e) { /* sin PPP, seguimos con histórica */ }
+      }
       const m3ByTanda = new Map();
+      // 1) Cache local persistente — tandas que vimos alguna vez con m³ > 0.
+      //    Sobrevive a recargas y a que la tanda salga de la PPP del día.
+      const persisted = loadPersistedM3();
+      for (const [k, m] of persisted){ if (m > 0) m3ByTanda.set(k, m); }
+      // 2) PPP "Programacion Diaria" actual (sobrescribe persistido si difiere).
       if (_pppCache){
         for (const [k, v] of _pppCache){
           if (v && v.m3 > 0) m3ByTanda.set(k, v.m3);
@@ -6552,10 +8109,17 @@ async function fetchProductivityData(daysBack){
         return dm.get(legajo);
       };
 
+      // Debug: contadores y tandas sin m3 (para diagnóstico)
+      const _missingM3 = new Set();
+      const _pairedNoM3 = new Set();
+      let _tpsTotal = 0, _tpsPaired = 0, _tpsWithM3 = 0;
+      let _tapsTotal = 0, _tapsPaired = 0, _tapsWithM3 = 0;
+
       for (const ev of events){
         const op    = ev.opcion;
         const leg   = String(ev.legajo || "").trim();
         const tanda = String(ev.texto || "").trim().toUpperCase();
+        if (op === "LT") continue;   // LT = llegada tarde: tiempo NO trabajado, no entra a productividad
         if (!leg || leg === "0" || leg === "1" || !tanda) continue;   // 0/1 = test
         const ts = new Date(ev.ts_cliente).getTime();
         const k = leg + "|" + tanda;
@@ -6563,13 +8127,16 @@ async function fetchProductivityData(daysBack){
         if (op === "EP"){
           openPicks.set(k, ts);
         } else if (op === "TP"){
+          _tpsTotal++;
           const startTs = openPicks.get(k);
           if (startTs == null) continue;
+          _tpsPaired++;
           openPicks.delete(k);
           const dur = ts - startTs;
           if (dur <= 0) continue;
           const m3 = m3ByTanda.get(tanda) || 0;
-          if (m3 <= 0) continue;
+          if (m3 <= 0) { _missingM3.add(tanda); _pairedNoM3.add(tanda); continue; }
+          _tpsWithM3++;
           const dk = isoToDayKey(ts);
           // Solo nos importan los días dentro del rango
           if (!dayKeys.includes(dk)) continue;
@@ -6580,13 +8147,16 @@ async function fetchProductivityData(daysBack){
         } else if (op === "AP"){
           openArms.set(k, ts);
         } else if (op === "TAP"){
+          _tapsTotal++;
           const startTs = openArms.get(k);
           if (startTs == null) continue;
+          _tapsPaired++;
           openArms.delete(k);
           const dur = ts - startTs;
           if (dur <= 0) continue;
           const m3 = m3ByTanda.get(tanda) || 0;
-          if (m3 <= 0) continue;
+          if (m3 <= 0) { _missingM3.add(tanda); _pairedNoM3.add(tanda); continue; }
+          _tapsWithM3++;
           const dk = isoToDayKey(ts);
           if (!dayKeys.includes(dk)) continue;
           const cell = getCell(leg, dk);
@@ -6595,6 +8165,16 @@ async function fetchProductivityData(daysBack){
           cell.pedido.items.push({ tanda, m3, ms: dur });
         }
       }
+
+      // Debug: resumen del por qué entran/no entran tandas al gráfico.
+      console.log("[productividad] TPs:", _tpsTotal, "| con EP:", _tpsPaired, "| con m3:", _tpsWithM3,
+        "|| TAPs:", _tapsTotal, "| con AP:", _tapsPaired, "| con m3:", _tapsWithM3);
+      if (_missingM3.size){
+        console.warn("[productividad] " + _missingM3.size + " tanda(s) SIN m3 en cache (PPP ni histórica). Cargá su Mt3 en el Sheet:\n  " +
+          [..._missingM3].sort().join(", "));
+      }
+      console.log("[productividad] m3ByTanda cargado:", m3ByTanda.size, "tandas. Muestra:",
+        [...m3ByTanda.entries()].slice(0, 5));
 
       // Construye series por operación
       const buildSeries = (opKey) => {
@@ -7086,6 +8666,18 @@ window.loginWithLegajo = async function () {
   }
   saveLegajoSession(emp, todayKeyBsAs() || "");
   showOperario({ legajo: emp.legajo, nombre: emp.nombre });
+};
+
+/* Token JWT del usuario logueado, para que el resto de la app pueda mandar
+   requests autenticados a Supabase (p. ej. tickear en Facturación con RLS
+   `authenticated`). Devuelve null si no hay sesión (kiosko / deslogueado). */
+window.sbAuth = {
+  getAccessToken: async function () {
+    try {
+      const { data } = await sb.auth.getSession();
+      return data && data.session ? data.session.access_token : null;
+    } catch (_e) { return null; }
+  }
 };
 
 sb.auth.onAuthStateChange(() => { applyAuthState(); });
