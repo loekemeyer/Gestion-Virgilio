@@ -151,7 +151,7 @@ Todo vive en `index.html`, alternando con la clase `.hidden` (no hay router):
   - **Para autorizar a un operario nuevo:** cargar su `email` en `Empleados`. Para un
     supervisor nuevo: agregar el email a `SUPERVISOR_EMAILS` en `index.html`.
   - **Requisitos de config (fuera del código):** provider Google habilitado en
-    Supabase Auth · la URL de GitHub Pages (`https://loekemeyer.github.io/tv-v/`)
+    Supabase Auth · la URL de GitHub Pages (`https://loekemeyer.github.io/Produccion-Virgilio/`)
     en la allowlist de *Redirect URLs* · consent screen de Google OAuth en
     producción (o el operario como test user) · el `email` del empleado cargado
     en `Empleados` (hoy sólo ~9 de 58 lo tienen).
