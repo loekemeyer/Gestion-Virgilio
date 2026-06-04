@@ -6,9 +6,11 @@
 <title>Monitor Virgilio</title>
 <!-- URL limpia para colgar una smart TV: /Produccion-Virgilio/monitor
      Redirige al monitor en modo TV (la app lo abre solo con ?monitor=tv).
-     Meta-refresh para navegadores viejos + JS replace como atajo. -->
-<meta http-equiv="refresh" content="0; url=/Produccion-Virgilio/?monitor=tv">
-<script>location.replace("/Produccion-Virgilio/?monitor=tv");</script>
+     Le agregamos un cache-buster (?v=<timestamp>) para que la TV vieja baje
+     SIEMPRE el index.html fresco y no quede pegada a una versión cacheada.
+     Meta-refresh (2 s) como fallback sin JS; el JS corre primero y es el que bustea. -->
+<meta http-equiv="refresh" content="2; url=/Produccion-Virgilio/?monitor=tv">
+<script>location.replace("/Produccion-Virgilio/?monitor=tv&v=" + Date.now().toString(36));</script>
 </head>
 <body style="margin:0;font-family:system-ui,Arial,sans-serif;background:#0b1220;color:#cbd5e1;padding:24px">
   Abriendo el monitor…

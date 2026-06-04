@@ -83,7 +83,7 @@ de pedidos de un Google Sheet.
 | Archivo | Rol |
 |---|---|
 | `index.html` | **La app completa** (~6.600 líneas): pantalla de operario + monitor + toda la lógica JS/CSS. Es el archivo central. |
-| `sw.js` | Service Worker. **NO cachea HTML/assets**: sólo hace Background Sync de la cola offline (IndexedDB). `SW_VERSION = "v1.52-vir"`. |
+| `sw.js` | Service Worker. **NO cachea HTML/assets**: sólo hace Background Sync de la cola offline (IndexedDB). `SW_VERSION = "v2.47-vir"`. |
 | `manifest.json` | Manifiesto PWA. |
 | `fichada.html` / `fichada.js` / `fichada-config.js` / `fichada-totp.js` / `fichada.css` | Sistema de **fichada por QR rotativo (TOTP)**. La página `fichada.html` se abre escaneando el QR y registra el **ingreso**. |
 | `fichadas-monitor.html` | Tablero **independiente** "Monitor Fichadas Esnaola" (lee de `Fichadas_Historico` y sincroniza otro Google Sheet distinto). No está enlazado desde `index.html`. |
@@ -167,7 +167,8 @@ Todo vive en `index.html`, alternando con la clase `.hidden` (no hay router):
   botón rojo **"Terminar Día"** (dispara el `FJ`).
 - **Botones flotantes**: 📅 historial de días anteriores · 📊 **monitor** del supervisor.
 - **Monitor**: se abre con 📊 o automáticamente con `?monitor=tv` (o si la pantalla
-  mide ≥1600 px). La URL `/Produccion-Virgilio/monitor` entra directo en modo TV.
+  mide ≥1600 px). La URL `/Produccion-Virgilio/monitor` entra directo en modo TV
+  (con **cache-buster** automático para no quedar pegada a una versión vieja, ver § 10).
   Tiene **dos pestañas**: **Monitor** (tablero de tandas) e **Inconsistencias**
   (hoja de alertas, ver § 12).
 
@@ -370,15 +371,28 @@ En `showDayBreakdown` (monitor, por operario por día):
 
 ## 10. Versionado y cache
 
-- `index.html`: `APP_VERSION = "v1.46"`. Badge en pantalla `#versionBadge`:
-  `"v1.46 ✓"` (sin cola), `"v1.46 ⏳ N"` (pendientes), `"v1.46 ⚠ N"` (error).
-  **Sirve para confirmar qué versión cargó cada pantalla.**
-- `sw.js`: `SW_VERSION = "v1.46-vir"`. **No precachea nada**; el handler de `fetch`
+- `index.html`: `APP_VERSION = "v2.47"`. Badge en pantalla `#versionBadge`:
+  `"v2.47 ✓"` (sin cola), `"v2.47 ⏳ N"` (pendientes), `"v2.47 ⚠ N"` (error).
+  **Sirve para confirmar qué versión cargó cada pantalla** (mirá el badge en la TV
+  para saber si está al día).
+- `sw.js`: `SW_VERSION = "v2.47-vir"`. **No precachea nada**; el handler de `fetch`
   está vacío. Usa `skipWaiting()` + `clients.claim()`. La página hace
-  `reg.update()` cada 60 s con `updateViaCache:"none"`.
+  `reg.update()` cada 60 s con `updateViaCache:"none"` (esto **sólo actualiza el
+  SW**; NO recarga la app ni cambia lo que se ve en pantalla).
 - Por eso, el problema de "la TV muestra una versión vieja" es **cache HTTP del
-  navegador/TV**, no del SW. Subir la versión y refrescar (o forzar recarga en la
-  TV) lo resuelve.
+  navegador/TV**, no del SW: la TV vieja se queda pegada al `index.html` cacheado
+  hasta que se la fuerza a bajar uno nuevo.
+- **Cache-buster para refrescar una TV pegada (v2.47+):**
+  - *Manual* (tipeado en el control remoto): agregar `?v=N` (o `&v=N`) a la URL —
+    ej. `?monitor=tv&v=1`; la próxima vez subir el número (`v=2`, …). Otra URL =
+    otra entrada de caché → baja el HTML fresco. La app **lee sólo `monitor`/`key`**,
+    ignora `v`/`cb`, y tras cargar los **borra de la URL** con `history.replaceState`
+    (`stripCacheBuster()` en `index.html`), así queda `?monitor=tv` limpio para el
+    siguiente refresco. También se acepta `cb` por compatibilidad.
+  - *Automático*: la ruta corta **`/monitor`** (`monitor/index.html`) redirige con
+    `?monitor=tv&v=<timestamp>`, así esa entrada baja **siempre** el HTML fresco sin
+    tipear nada. (Ojo: si `/monitor` ya quedó cacheado viejo en esa TV, forzarlo una
+    vez con `/monitor?z` para bajar el redirect nuevo.)
 
 ---
 

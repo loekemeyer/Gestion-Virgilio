@@ -4211,7 +4211,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v2.46";
+const APP_VERSION = "v2.47";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -5927,6 +5927,20 @@ document.addEventListener("keydown", (e) => {
 const MONITOR_TV_KEY = "tv";
 const _monParams = new URLSearchParams(location.search);
 window.__pendingMonitorParam = _monParams.get("monitor");
+// Cache-buster para la TV: ?v= (o ?cb=) sólo sirve para forzar al navegador
+// viejo de la TV a bajar el index.html FRESCO (otra URL = otra entrada de
+// caché HTTP). No lo lee nadie de la app. Una vez cargado el código nuevo lo
+// sacamos de la URL visible, así queda ?monitor=tv limpio y el próximo refresco
+// se hace tipeando un valor corto distinto (v=1, v=2, …) desde el control remoto.
+(function stripCacheBuster() {
+  if (!_monParams.has("v") && !_monParams.has("cb")) return;
+  try {
+    const u = new URL(location.href);
+    u.searchParams.delete("v");
+    u.searchParams.delete("cb");
+    history.replaceState(null, "", u.pathname + u.search + u.hash);
+  } catch (_e) {}
+})();
 window.maybeAutoOpenMonitor = function () {
   const v = window.__pendingMonitorParam;
   if (!v) return;
