@@ -4,7 +4,20 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-03 · Versión app al documentar: **v2.45**
+> Última actualización: 2026-06-05 · Versión app al documentar: **v2.48**
+>
+> Nota: **v2.48** arregla el bug "Sin tandas planificadas" cuando la pestaña
+> "PPP Excel Programacion Diaria" tiene sub-tablas previas largas. El sheet
+> tiene 3 sub-tablas antes de la sección "Programacion" real: "Pedidos con
+> Problemas o Nuevos", "Pedidos de Super a Programar" y "Pedidos a Programar".
+> Esta última trae un header con "Op" pero **sin** "Fecha Entrega" (cols L-M
+> vacías). Si las sub-tablas anteriores crecen y empujan el header bueno fuera
+> de las primeras 10 filas, el parser viejo agarraba el header incompleto y
+> ninguna tanda quedaba con `Fecha Entrega` → monitor vacío con `● al día`.
+> Fix: `findMonitorHeader` (index.html:6121) ahora exige tanda+op+`fecha entrega`
+> en la 1ra pasada y busca en las primeras 50 filas (fallback al comportamiento
+> viejo para no romper otros sheets). Caso real visto el 2026-06-05: el header
+> de "Programacion" estaba en la fila 11 del CSV, fuera del rango de 10.
 >
 > Nota: **v2.45** re-aplica el parche **"entrar con legajo"** (de Producción
 > Virgilio v1.86): debajo del botón de Google, la pantalla de login tiene un

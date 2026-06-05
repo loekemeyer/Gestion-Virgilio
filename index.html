@@ -4211,7 +4211,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v2.47";
+const APP_VERSION = "v2.48";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -6116,10 +6116,24 @@ function targetDeliveryDates(sheetMap, futureCount) {
 }
 
 /* Encuentra índice de header buscando fila con "tanda" (substring, para
-   tolerar el endpoint gviz que combina título y header → "Programacion Tanda")
-   y "op" exacto. */
+   tolerar el endpoint gviz que combina título y header → "Programacion Tanda"),
+   "op" y "fecha entrega" exactos.
+   v2.48: 1ra pasada exige "fecha entrega" → así descarta headers de sub-tablas
+   incompletas. El sheet "PPP Excel Programacion Diaria" tiene 3 sub-tablas
+   antes de la sección "Programacion" real: "Pedidos con Problemas o Nuevos",
+   "Pedidos de Super a Programar" y "Pedidos a Programar". La última tiene un
+   header con "Op" pero sin "Fecha Entrega" (cols L-M vacías). Si esa sub-tabla
+   crece y empuja el header bueno fuera de las primeras 10 filas, antes el
+   parser agarraba el header incompleto y todas las tandas quedaban sin fecha
+   → "Sin tandas planificadas". Rango ampliado a 50 filas + fallback al
+   comportamiento viejo si no hay ningún header con "fecha entrega". */
 function findMonitorHeader(rows) {
-  for (let i = 0; i < Math.min(rows.length, 10); i++) {
+  for (let i = 0; i < Math.min(rows.length, 50); i++) {
+    const r = rows[i].map(x => (x||"").trim().toLowerCase());
+    const hasTanda = r.some(c => c.includes("tanda"));
+    if (hasTanda && r.includes("op") && r.includes("fecha entrega")) return i;
+  }
+  for (let i = 0; i < Math.min(rows.length, 50); i++) {
     const r = rows[i].map(x => (x||"").trim().toLowerCase());
     const hasTanda = r.some(c => c.includes("tanda"));
     if (hasTanda && r.includes("op")) return i;
