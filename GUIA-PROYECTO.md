@@ -4,7 +4,16 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-05 · Versión app al documentar: **v2.50**
+> Última actualización: 2026-06-05 · Versión app al documentar: **v2.51**
+>
+> Nota: **v2.51** — en **modo kiosko** (TV de pared, `?monitor=tv&key=tv`) el
+> handler de `load` ahora llama a `maybeAutoOpenMonitor()` además de
+> `showKioskAdminPanel()`, así la TV **entra directo a la vista que pide la URL**
+> (`?monitor=tv`→Monitor, `fc`→Facturación, `incons`→Inconsistencias) en cada
+> recarga, en vez de quedarse en el panel "Administración". El panel queda de
+> fondo: si se cierra la vista, sigue estando para elegir otra. (Antes el kiosko
+> no auto-abría nada porque `initAuth()` corta en `__tvKioskMode` antes de llamar
+> a `maybeAutoOpenMonitor()`.)
 >
 > Nota: **v2.50** — `fetchMonitorSheet` ahora lee la pestaña "PPP Excel
 > Programacion Diaria" por **posición de columna FIJA**, no por nombre de
@@ -167,8 +176,11 @@ Todo vive en `index.html`, alternando con la clase `.hidden` (no hay router):
        que lea esa URL en la pantalla **no entra** (no tiene flag ni clave) → login.
     El main script setea `window.__tvKioskMode=true` + `window.__isSupervisor=true` y
     en `load` muestra el **panel "Administración"** (`showKioskAdminPanel()`: revela
-    `#supervisorPanel` con los 4 botones, oculta login/operario y el botón Salir). NO
-    auto-abre nada: en la TV se elige qué ver. Todo **sin Google y sin depender de
+    `#supervisorPanel` con los 4 botones, oculta login/operario y el botón Salir) **como
+    fondo** y, desde **v2.51**, **auto-abre directo la vista que pide la URL**
+    (`maybeAutoOpenMonitor()`: `?monitor=tv`→Monitor, `fc`→Facturación, `incons`→
+    Inconsistencias) — la TV de pared va derecho al tablero en cada recarga; si se
+    cierra esa vista, queda el panel detrás para elegir otra. Todo **sin Google y sin depender de
     `supabase.js`** (el módulo de auth detecta `__tvKioskMode` y no inicializa). `MONITOR_TV_KEY` es constante en
     `index.html` (hoy `"tv"`); cambiala para rotar la clave (los devices ya
     enrolados siguen hasta que se borren los datos del navegador). Para des-enrolar un

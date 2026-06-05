@@ -4211,7 +4211,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v2.50";
+const APP_VERSION = "v2.51";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -5972,11 +5972,13 @@ if (window.__pendingMonitorParam && (_keyValid || _kioskEnrolled)) {
       history.replaceState(null, "", u.pathname + u.search + u.hash);
     } catch (_e) {}
   }
-  // En la TV mostramos el panel "Administración" con los botones, y el usuario
-  // elige qué abrir (Monitor / Facturación / Inconsistencias / Análisis). No
-  // auto-abrimos nada.
+  // En la TV mostramos el panel "Administración" (los 4 botones) COMO FONDO y
+  // auto-abrimos DIRECTO la vista que pide la URL (?monitor=tv/fc/incons): es
+  // una pantalla de pared, no queremos que alguien tenga que tocar el botón en
+  // cada recarga. Si esa vista se cierra, queda el panel detrás para elegir otra.
   window.addEventListener("load", () => {
     try { showKioskAdminPanel(); } catch (_e) {}
+    try { if (typeof window.maybeAutoOpenMonitor === "function") window.maybeAutoOpenMonitor(); } catch (_e) {}
   });
 }
 
