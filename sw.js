@@ -6,7 +6,7 @@
    ⚠ IMPORTANTE: SUPABASE_URL y SUPABASE_KEY están duplicados acá y en
    index.html. Si rotás la publishable key, hay que actualizar AMBOS.
    ========================================================= */
-const SW_VERSION = "v2.51-vir";
+const SW_VERSION = "v2.52-vir";
 
 const SUPABASE_URL = "https://hrxfctzncixxqmpfhskv.supabase.co";
 const SUPABASE_KEY = "sb_publishable_BqpAgZH6ty-9wft10_YMhw_0rcIPuWT";
@@ -194,7 +194,17 @@ self.addEventListener("install", () => {
   self.skipWaiting();
 });
 self.addEventListener("activate", (event) => {
-  event.waitUntil(self.clients.claim());
+  event.waitUntil((async () => {
+    // Borrar cualquier caché vieja. Versiones MUY viejas del SW precacheaban el
+    // HTML y dejaban pantallas (TVs) pegadas a un index.html viejo aunque se
+    // cambiara la URL. Hoy NO cacheamos nada, así que limpiamos todo lo que haya
+    // quedado de antes → cuando un device agarra este SW, se auto-despega.
+    try {
+      const names = await caches.keys();
+      await Promise.all(names.map((n) => caches.delete(n)));
+    } catch (e) { /* no-op */ }
+    await self.clients.claim();
+  })());
 });
 self.addEventListener("sync", (event) => {
   if (event.tag === "flush-queue") {

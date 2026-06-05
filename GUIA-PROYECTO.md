@@ -4,7 +4,19 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-05 · Versión app al documentar: **v2.51**
+> Última actualización: 2026-06-05 · Versión app al documentar: **v2.52**
+>
+> Nota: **v2.52** — (a) el `#versionBadge` ya **no trae versión hardcodeada** en el
+> HTML (antes decía `v2.04 ✓` y nunca se actualizó → engañaba el diagnóstico):
+> queda **vacío** y lo llena el JS (`updatePendingIndicator`). **Regla de
+> diagnóstico:** si el badge muestra versión → el JS corrió; si queda **vacío** →
+> el JS NO corrió (navegador que no parsea el código / error). (b) El Service
+> Worker, en `activate`, ahora **borra todas las cachés viejas** (`caches.delete`):
+> versiones MUY viejas del SW precacheaban el HTML y dejaban TVs pegadas a un
+> `index.html` viejo aunque se cambiara la URL; con esto, cualquier device que
+> agarre el SW nuevo se auto-despega. ⚠ Un navegador que NO pueda ejecutar el JS
+> (ES2017) tampoco corre el SW nuevo → para esos hay que **borrar datos del
+> navegador** a mano (o usar una página de monitor en ES5, aún no existe).
 >
 > Nota: **v2.51** — en **modo kiosko** (TV de pared, `?monitor=tv&key=tv`) el
 > handler de `load` ahora llama a `maybeAutoOpenMonitor()` además de
