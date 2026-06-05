@@ -4,7 +4,23 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-05 · Versión app al documentar: **v2.49**
+> Última actualización: 2026-06-05 · Versión app al documentar: **v2.50**
+>
+> Nota: **v2.50** — `fetchMonitorSheet` ahora lee la pestaña "PPP Excel
+> Programacion Diaria" por **posición de columna FIJA**, no por nombre de
+> encabezado. La pestaña tiene sub-tablas apiladas con encabezados repetidos,
+> incompletos y duplicados por gviz; depender del header era frágil. Layout fijo
+> (índices, 0-based): `Tanda=0, Tipo=1, N° NP=2, Fecha Recep=3, Cod=4, Razon
+> Social=5, M3=6, V=7, Direccion=8, Barrio=9, Op=10, Fecha Entrega=11, Fecha
+> Fc=12, Zona=13, Observaciones=14`. Se recorren TODAS las filas y se toman como
+> pedido sólo las que tienen **N° NP** (las de título/encabezado/total no lo
+> traen). `opIsSi` respeta la columna `Op`. Sanity-guard: si no hay ningún
+> encabezado reconocible (p.ej. una página de login HTML) tira error; si lo hay
+> pero las columnas no caen donde se esperan, avisa por consola (señal de que
+> cambió el Excel → actualizar el objeto `C` en `fetchMonitorSheet`). ⚠ **Si se
+> reordena/agrega una columna en el Excel, hay que actualizar esos índices.**
+> Validado contra el CSV real del 2026-06-05. (v2.48/v2.49 fueron pasos previos:
+> detección de header tolerante; v2.50 la reemplaza por posición fija.)
 >
 > Nota: **v2.49** arregla del todo el bug "Sin tandas planificadas" en la pestaña
 > "PPP Excel Programacion Diaria" (la que lee el monitor, `gid=1947169223`). Esa

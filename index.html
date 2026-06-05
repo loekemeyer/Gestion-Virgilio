@@ -4211,7 +4211,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v2.49";
+const APP_VERSION = "v2.50";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -6163,43 +6163,44 @@ async function fetchMonitorSheet() {
   if (!r.ok) throw new Error("CSV HTTP " + r.status);
   const text = await r.text();
   const rows = parseCSV(text);
-  const headerIdx = findMonitorHeader(rows);
-  if (headerIdx < 0) throw new Error("Header no encontrado en CSV");
-  // dedupeHeaderCell colapsa los labels que gviz duplica ("Op Op" → "op", etc.)
-  // así el match exacto de columnas funciona en este sheet de sub-tablas.
-  const header = rows[headerIdx].map(dedupeHeaderCell);
-  // "tanda" busca por substring para tolerar el header concatenado de gviz
-  // ("Programacion Tanda"). Las demás cols matchean exactamente.
-  const cTanda = header.findIndex(h => h.includes("tanda"));
-  // m3 NORMAL: acepta "m3" o "mt3", EXCLUYE cualquier header con "fc" (si el
-  // sheet tiene "M3" y "M3 FC", siempre quedamos con la normal).
-  const cM3    = header.findIndex(h => (h === "m3" || h === "mt3") && !h.includes("fc"));
-  const cOp    = header.indexOf("op");
-  const cFE    = header.indexOf("fecha entrega");
-  const cNP    = header.indexOf("n° np");
-  const cRS    = header.indexOf("razon social");
-  // Cols extra para pantalla facturación: cod cliente, dirección, localidad,
-  // zona. Si no existen (índice -1) los pedidos quedan con string vacío.
-  const cCod    = header.indexOf("cod");
-  const cDir    = header.indexOf("direccion entrega");
-  const cBarrio = header.indexOf("barrio entrega");
-  const cZona   = header.indexOf("zona");
+  // ── Lectura por POSICIÓN FIJA ──────────────────────────────────────────
+  // Las columnas de "PPP Excel Programacion Diaria" SIEMPRE vienen en este
+  // orden (las arma el Excel). Leemos por ÍNDICE, no por nombre de encabezado:
+  // así no nos afectan los títulos que gviz duplica ("Op Op"), las sub-tablas
+  // apiladas ("Problemas o Nuevos", "Super a Programar", …) ni cuánto crezcan.
+  // ⚠ Si cambiás el orden/las columnas en el Excel, actualizá estos índices
+  // (el monitor avisa por consola si detecta un desajuste — ver abajo).
+  const C = { TANDA: 0, NP: 2, COD: 4, RS: 5, M3: 6, DIR: 8, BARRIO: 9, OP: 10, FE: 11, ZONA: 13 };
+  // Sanity-guard: si la respuesta NO es el sheet (p.ej. una página HTML de
+  // login), no hay ningún encabezado reconocible → cortamos. Y si SÍ hay header
+  // pero las columnas no caen donde las esperamos, avisamos (no rompemos):
+  // señal de que cambió el Excel y hay que actualizar los índices de arriba.
+  const hdrIdx = findMonitorHeader(rows);
+  if (hdrIdx < 0) throw new Error("Header no encontrado en CSV (¿la respuesta no es el sheet?)");
+  const _h = rows[hdrIdx].map(dedupeHeaderCell);
+  if (!((_h[C.TANDA] || "").includes("tanda") && _h[C.OP] === "op" &&
+        _h[C.FE] === "fecha entrega" && (_h[C.M3] === "m3" || _h[C.M3] === "mt3"))) {
+    console.warn("[monitor] ⚠ El encabezado no coincide con las posiciones fijas " +
+      "(¿cambió el Excel?): Tanda@" + C.TANDA + "=" + _h[C.TANDA] + " · Op@" + C.OP +
+      "=" + _h[C.OP] + " · FechaEntrega@" + C.FE + "=" + _h[C.FE] + " · M3@" + C.M3 + "=" + _h[C.M3]);
+  }
   const acc = new Map();
-  for (let i = headerIdx + 1; i < rows.length; i++) {
+  for (let i = 0; i < rows.length; i++) {
     const r = rows[i];
     if (!r) continue;
-    const tanda = (r[cTanda]||"").trim();
-    const op    = (r[cOp]||"").trim().toUpperCase();
-    const m3 = monitorParseM3(r[cM3]);
-    const fe = (r[cFE]||"").trim();
-    const np = cNP >= 0 ? (r[cNP]||"").trim() : "";
-    const rs = cRS >= 0 ? (r[cRS]||"").trim() : "";
+    const np = (r[C.NP] || "").trim();
+    // Sólo filas con N° NP real = pedidos. Descarta títulos de sección
+    // ("Programacion", "Pedidos a Programar"…), los encabezados repetidos de
+    // cada sub-tabla y las filas "Total Cxx:" (ninguno trae número de pedido).
+    if (!/\d/.test(np)) continue;
+    const tanda = (r[C.TANDA] || "").trim();
+    const op    = (r[C.OP]    || "").trim().toUpperCase();
+    const m3    = monitorParseM3(r[C.M3]);
+    const fe    = (r[C.FE]    || "").trim();
+    const rs    = (r[C.RS]    || "").trim();
     const feRaw = monitorRawFecha(fe);
-    // Saltear las filas de encabezado repetidas de cada sub-tabla: su col Op
-    // dice "Op" (literal) y/o su col Tanda dice "Tanda". No son pedidos.
-    if (op === "OP" || tanda.toLowerCase() === "tanda") continue;
-    // Filas sin código de tanda: las agrupamos bajo "S/Tanda" por fecha.
-    // Si tampoco hay fecha no podemos ubicarlas, skip.
+    // Con código de tanda → esa tanda. Sin código pero con fecha → "S/Tanda"
+    // (pedido cargado que todavía no tiene nro de tanda). Sin ninguno → skip.
     let displayTanda, mapKey;
     if (tanda) {
       displayTanda = tanda;
@@ -6216,25 +6217,22 @@ async function fetchMonitorSheet() {
       m3: 0,
       fechaEntrega: monitorFmtFecha(fe),
       fechaEntregaRaw: feRaw,
-      // opIsSi se prende SOLO si alguna fila de la tanda trae Op=SI (abajo).
-      // Antes las filas sin código de tanda se asumían planificadas (!tanda),
-      // pero al recorrer TODAS las sub-tablas eso metía los pedidos "a Programar"
-      // / "con Problemas" (Op vacío) como S/Tanda y, peor, sus fechas futuras
-      // desplazaban tandas reales de la ventana de próximas fechas. Respetamos Op.
+      // opIsSi se prende SOLO si alguna fila de la tanda trae Op=SI (abajo), así
+      // los pedidos "a Programar"/"con Problemas" (Op vacío) NO se cuentan como
+      // planificados ni sus fechas desplazan tandas reales de la ventana.
       opIsSi: false,
-      pedidos: []                   // [{ np, m3, razonSocial }] — alimenta el modal
+      pedidos: []                   // [{ np, m3, razonSocial, … }] — alimenta el modal
     });
     const entry = acc.get(mapKey);
     entry.m3 += m3;
-    // Si CUALQUIER fila de esta tanda tiene Op=SI, marcamos la tanda como SI.
-    if (op === "SI") entry.opIsSi = true;
-    if (np || m3) entry.pedidos.push({
+    if (op === "SI") entry.opIsSi = true;   // si CUALQUIER fila de la tanda trae Op=SI
+    entry.pedidos.push({
       np, m3, razonSocial: rs,
-      // Campos extra para pantalla facturación (PDF Marianela)
-      cod:       cCod    >= 0 ? (r[cCod]    || "").trim() : "",
-      direccion: cDir    >= 0 ? (r[cDir]    || "").trim() : "",
-      barrio:    cBarrio >= 0 ? (r[cBarrio] || "").trim() : "",
-      zona:      cZona   >= 0 ? (r[cZona]   || "").trim() : ""
+      // Campos extra para la pantalla de facturación (PDF).
+      cod:       (r[C.COD]    || "").trim(),
+      direccion: (r[C.DIR]    || "").trim(),
+      barrio:    (r[C.BARRIO] || "").trim(),
+      zona:      (r[C.ZONA]   || "").trim()
     });
   }
   // Persistimos cada tanda con m³ > 0 para que sobreviva cuando salga de la
