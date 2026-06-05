@@ -4,20 +4,27 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-05 · Versión app al documentar: **v2.48**
+> Última actualización: 2026-06-05 · Versión app al documentar: **v2.49**
 >
-> Nota: **v2.48** arregla el bug "Sin tandas planificadas" cuando la pestaña
-> "PPP Excel Programacion Diaria" tiene sub-tablas previas largas. El sheet
-> tiene 3 sub-tablas antes de la sección "Programacion" real: "Pedidos con
-> Problemas o Nuevos", "Pedidos de Super a Programar" y "Pedidos a Programar".
-> Esta última trae un header con "Op" pero **sin** "Fecha Entrega" (cols L-M
-> vacías). Si las sub-tablas anteriores crecen y empujan el header bueno fuera
-> de las primeras 10 filas, el parser viejo agarraba el header incompleto y
-> ninguna tanda quedaba con `Fecha Entrega` → monitor vacío con `● al día`.
-> Fix: `findMonitorHeader` (index.html:6121) ahora exige tanda+op+`fecha entrega`
-> en la 1ra pasada y busca en las primeras 50 filas (fallback al comportamiento
-> viejo para no romper otros sheets). Caso real visto el 2026-06-05: el header
-> de "Programacion" estaba en la fila 11 del CSV, fuera del rango de 10.
+> Nota: **v2.49** arregla del todo el bug "Sin tandas planificadas" en la pestaña
+> "PPP Excel Programacion Diaria" (la que lee el monitor, `gid=1947169223`). Esa
+> pestaña tiene **varias sub-tablas apiladas** ("Pedidos con Problemas o Nuevos",
+> "…Super a Programar", "…a Programar", "Programacion"), cada una con su fila de
+> encabezado. Dos problemas: (1) gviz **duplica** los labels del header bueno
+> ("Op Op", "M3 M3", "Fecha Entrega Fecha Entrega") → el match exacto de columnas
+> fallaba; (2) los headers de las sub-tablas son **incompletos** (traen "Op" pero
+> la col "Fecha Entrega" vacía). Cuando las sub-tablas crecen, el parser agarraba
+> un header parcial y ninguna tanda quedaba con fecha → monitor vacío con `● al
+> día`. Fix (index.html, `fetchMonitorSheet`/`findMonitorHeader`): `dedupeHeaderCell`
+> colapsa los labels duplicados, `findMonitorHeader` exige tanda+op+`fecha entrega`
+> (1ra pasada) escaneando 50 filas, se saltean las filas de encabezado repetidas
+> (`Op`/`Tanda` literales) y `opIsSi` pasa a respetar la columna `Op` (antes
+> `!tanda` marcaba como planificadas las filas sin código de tanda → los pedidos
+> "a Programar"/"con Problemas" con Op vacío entraban como `S/Tanda` y sus fechas
+> futuras desplazaban tandas reales de la ventana). Validado contra el CSV real
+> del 2026-06-05 (header en fila 0 ya de-duplicada; C19H/C32C/C31A salen para hoy).
+> **v2.48** fue un intento previo insuficiente (no contemplaba los labels
+> duplicados ni el header incompleto).
 >
 > Nota: **v2.45** re-aplica el parche **"entrar con legajo"** (de Producción
 > Virgilio v1.86): debajo del botón de Google, la pantalla de login tiene un

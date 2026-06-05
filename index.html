@@ -4211,7 +4211,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v2.48";
+const APP_VERSION = "v2.49";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -6115,28 +6115,42 @@ function targetDeliveryDates(sheetMap, futureCount) {
   return [...past, ...future];
 }
 
-/* Encuentra índice de header buscando fila con "tanda" (substring, para
-   tolerar el endpoint gviz que combina título y header → "Programacion Tanda"),
-   "op" y "fecha entrega" exactos.
-   v2.48: 1ra pasada exige "fecha entrega" → así descarta headers de sub-tablas
-   incompletas. El sheet "PPP Excel Programacion Diaria" tiene 3 sub-tablas
-   antes de la sección "Programacion" real: "Pedidos con Problemas o Nuevos",
-   "Pedidos de Super a Programar" y "Pedidos a Programar". La última tiene un
-   header con "Op" pero sin "Fecha Entrega" (cols L-M vacías). Si esa sub-tabla
-   crece y empuja el header bueno fuera de las primeras 10 filas, antes el
-   parser agarraba el header incompleto y todas las tandas quedaban sin fecha
-   → "Sin tandas planificadas". Rango ampliado a 50 filas + fallback al
-   comportamiento viejo si no hay ningún header con "fecha entrega". */
+/* gviz a veces DUPLICA cada label del header cuando el sheet tiene 2 filas de
+   encabezado apiladas (título + headers) → "Op Op", "M3 M3", "Fecha Entrega
+   Fecha Entrega". Esta función colapsa esos duplicados EXACTOS: "op op" → "op",
+   "fecha entrega fecha entrega" → "fecha entrega". Deja intactos los labels
+   normales (1 sola vez) y los que no son duplicado exacto (p.ej. el 1er cell
+   "Pedidos con Problemas o Nuevos … Tanda", que igual matchea por substring). */
+function dedupeHeaderCell(x) {
+  const t = (x || "").trim().toLowerCase().replace(/\s+/g, " ");
+  if (!t) return "";
+  const w = t.split(" ");
+  if (w.length >= 2 && w.length % 2 === 0) {
+    const half = w.length / 2;
+    let same = true;
+    for (let i = 0; i < half; i++) { if (w[i] !== w[half + i]) { same = false; break; } }
+    if (same) return w.slice(0, half).join(" ");
+  }
+  return t;
+}
+
+/* Encuentra el índice del header. El sheet "PPP Excel Programacion Diaria" tiene
+   varias sub-tablas apiladas ("Pedidos con Problemas o Nuevos", "…Super a
+   Programar", "…a Programar", "Programacion"), cada una con su propia fila de
+   encabezado — y algunas INCOMPLETAS (traen "Op" pero la col "Fecha Entrega"
+   vacía). El header bueno es el que rotula TODAS las columnas: tanda + op +
+   fecha entrega. Por eso la 1ra pasada exige los tres (sobre los labels ya
+   de-duplicados con dedupeHeaderCell); la 2da es fallback (tanda + op) para
+   sheets normales. Rango de 50 filas porque las sub-tablas previas empujan el
+   header bueno hacia abajo (caso real 2026-06-05: header en fila 11 del CSV). */
 function findMonitorHeader(rows) {
   for (let i = 0; i < Math.min(rows.length, 50); i++) {
-    const r = rows[i].map(x => (x||"").trim().toLowerCase());
-    const hasTanda = r.some(c => c.includes("tanda"));
-    if (hasTanda && r.includes("op") && r.includes("fecha entrega")) return i;
+    const r = rows[i].map(dedupeHeaderCell);
+    if (r.some(c => c.includes("tanda")) && r.includes("op") && r.includes("fecha entrega")) return i;
   }
   for (let i = 0; i < Math.min(rows.length, 50); i++) {
-    const r = rows[i].map(x => (x||"").trim().toLowerCase());
-    const hasTanda = r.some(c => c.includes("tanda"));
-    if (hasTanda && r.includes("op")) return i;
+    const r = rows[i].map(dedupeHeaderCell);
+    if (r.some(c => c.includes("tanda")) && r.includes("op")) return i;
   }
   return -1;
 }
@@ -6151,7 +6165,9 @@ async function fetchMonitorSheet() {
   const rows = parseCSV(text);
   const headerIdx = findMonitorHeader(rows);
   if (headerIdx < 0) throw new Error("Header no encontrado en CSV");
-  const header = rows[headerIdx].map(x => (x||"").trim().toLowerCase());
+  // dedupeHeaderCell colapsa los labels que gviz duplica ("Op Op" → "op", etc.)
+  // así el match exacto de columnas funciona en este sheet de sub-tablas.
+  const header = rows[headerIdx].map(dedupeHeaderCell);
   // "tanda" busca por substring para tolerar el header concatenado de gviz
   // ("Programacion Tanda"). Las demás cols matchean exactamente.
   const cTanda = header.findIndex(h => h.includes("tanda"));
@@ -6179,6 +6195,9 @@ async function fetchMonitorSheet() {
     const np = cNP >= 0 ? (r[cNP]||"").trim() : "";
     const rs = cRS >= 0 ? (r[cRS]||"").trim() : "";
     const feRaw = monitorRawFecha(fe);
+    // Saltear las filas de encabezado repetidas de cada sub-tabla: su col Op
+    // dice "Op" (literal) y/o su col Tanda dice "Tanda". No son pedidos.
+    if (op === "OP" || tanda.toLowerCase() === "tanda") continue;
     // Filas sin código de tanda: las agrupamos bajo "S/Tanda" por fecha.
     // Si tampoco hay fecha no podemos ubicarlas, skip.
     let displayTanda, mapKey;
@@ -6197,9 +6216,12 @@ async function fetchMonitorSheet() {
       m3: 0,
       fechaEntrega: monitorFmtFecha(fe),
       fechaEntregaRaw: feRaw,
-      // Filas sin código de tanda se consideran planificadas (la operadora
-      // todavía no escribió el nro pero el pedido ya está cargado).
-      opIsSi: !tanda,
+      // opIsSi se prende SOLO si alguna fila de la tanda trae Op=SI (abajo).
+      // Antes las filas sin código de tanda se asumían planificadas (!tanda),
+      // pero al recorrer TODAS las sub-tablas eso metía los pedidos "a Programar"
+      // / "con Problemas" (Op vacío) como S/Tanda y, peor, sus fechas futuras
+      // desplazaban tandas reales de la ventana de próximas fechas. Respetamos Op.
+      opIsSi: false,
       pedidos: []                   // [{ np, m3, razonSocial }] — alimenta el modal
     });
     const entry = acc.get(mapKey);
