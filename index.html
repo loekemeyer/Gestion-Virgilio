@@ -1752,6 +1752,12 @@ button {
 /* Picking interactivo (pop-up al "Empecé Picking"): un artículo por vez. */
 .pk-flow{ display: flex; flex-direction: column; gap: 12px; padding: 4px 2px 2px; }
 .pk-prog{ font-size: 14px; color: #64748b; }
+.pk-nav{ display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.pk-navbtn{ background: #f1f5f9; color: #1e6bd6; border: 1px solid #cbd5e1; border-radius: 10px; padding: 8px 14px; font-size: 15px; font-weight: bold; cursor: pointer; }
+.pk-navbtn:disabled{ color: #cbd5e1; cursor: default; }
+.pk-nav-mid{ font-size: 14px; color: #64748b; }
+.pk-confirmed{ font-size: 14px; color: #15803d; background: #ecfdf5; border-radius: 8px; padding: 8px 10px; }
+.pk-confirmed .pk-falta{ color: #d97706; }
 .pk-bar{ height: 10px; background: #e2e8f0; border-radius: 5px; overflow: hidden; }
 .pk-bar > i{ display: block; height: 100%; background: #16a34a; }
 .pk-cod-row{ display: flex; justify-content: space-between; align-items: baseline; }
@@ -4095,11 +4101,13 @@ async function trySendOneReport(payload) {
     // IMPORTANTE: PostgREST necesita ?on_conflict=client_id en la URL para que
     // el UPSERT use el UNIQUE constraint correcto (sin esto, asume el PK
     // y el merge-duplicates no se aplica → 409).
-    const isFJ   = (payload.opcion === "FJ");
-    const url    = isFJ
+    // FJ y PKC usan client_id determinístico + merge-duplicates (upsert): reenviar
+    // o corregir actualiza la fila en vez de fallar con 409 / duplicar.
+    const isUpsert = (payload.opcion === "FJ" || payload.opcion === "PKC");
+    const url    = isUpsert
       ? SUPABASE_TABLE_ENDPOINT + "?on_conflict=client_id"
       : SUPABASE_TABLE_ENDPOINT;
-    const prefer = isFJ
+    const prefer = isUpsert
       ? "resolution=merge-duplicates,return=minimal"
       : "return=minimal";
     const res = await fetch(url, {
@@ -4235,7 +4243,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v2.54";
+const APP_VERSION = "v2.55";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -4886,21 +4894,28 @@ async function showPickingList(tanda, legajo) {
 
 function pkFmt(n) { const r = Math.round(n * 100) / 100; return (r === Math.round(r) ? String(Math.round(r)) : String(r)).replace(".", ","); }
 
+function pkCount() { return _pk ? Object.keys(_pk.results).length : 0; }
+
 function pkRender() {
   const m = document.getElementById("tandaModal");
   if (!m || !_pk) return;
   const body = m.querySelector(".tanda-modal-body");
   const N = _pk.items.length;
-  if (_pk.idx >= N) { pkRenderDone(body, N); return; }
+  const nav = `<div class="pk-nav">
+      <button class="pk-navbtn" ${_pk.idx <= 0 ? "disabled" : ""} onclick="pkPrev()">← Atrás</button>
+      <span class="pk-nav-mid">${_pk.idx >= N ? "Resumen" : "Artículo " + (_pk.idx + 1) + " de " + N}</span>
+      <button class="pk-navbtn" ${_pk.idx >= N ? "disabled" : ""} onclick="pkNext()">Adelante →</button>
+    </div>
+    <div class="pk-bar"><i style="width:${Math.round((pkCount() / N) * 100)}%"></i></div>`;
+  if (_pk.idx >= N) { pkRenderDone(body, N, nav); return; }
   const it = _pk.items[_pk.idx];
-  const head = `<div class="pk-prog">Artículo ${_pk.idx + 1} de ${N}</div>` +
-               `<div class="pk-bar"><i style="width:${Math.round((_pk.idx / N) * 100)}%"></i></div>`;
+  const confirmed = _pk.results[it.art];
   if (_pk.mode === "fInput") {
-    body.innerHTML = `<div class="pk-flow">${head}
+    body.innerHTML = `<div class="pk-flow">${nav}
       <div class="pk-cod-row"><span class="pk-cod-big">${escapeHtml(it.art)}</span><span class="pk-sector">sector —</span></div>
       <div class="pk-fq">
         <div class="pk-fq-q">¿Cuántas cajas pusiste? <span class="pk-fq-esp">(pedidas: ${pkFmt(it.esp)})</span></div>
-        <input id="pkFqty" class="pk-fq-input" type="number" inputmode="numeric" min="0" value="${pkFmt(it.esp)}">
+        <input id="pkFqty" class="pk-fq-input" type="number" inputmode="numeric" min="0" value="${pkFmt(confirmed != null ? confirmed : it.esp)}">
       </div>
       <button class="pk-btn pk-ok" onclick="pkConfirmF()">Confirmar</button>
       <button class="pk-btn pk-cancel" onclick="pkCancelF()">Volver</button>
@@ -4908,33 +4923,41 @@ function pkRender() {
     setTimeout(() => { const i = document.getElementById("pkFqty"); if (i) { i.focus(); i.select(); } }, 40);
     return;
   }
-  body.innerHTML = `<div class="pk-flow">${head}
+  const confLine = (confirmed != null)
+    ? `<div class="pk-confirmed">✓ Ya confirmaste <b>${pkFmt(confirmed)}</b>${confirmed < it.esp ? ` <span class="pk-falta">(faltaron ${pkFmt(it.esp - confirmed)})</span>` : ""} — podés cambiarlo</div>`
+    : ``;
+  body.innerHTML = `<div class="pk-flow">${nav}
     <div class="pk-cod-row"><span class="pk-cod-lbl">CÓDIGO</span><span class="pk-sector">sector —</span></div>
     <div class="pk-cod-big">${escapeHtml(it.art)}</div>
     <div class="pk-cajas">Levantá <b>${pkFmt(it.esp)}</b> cajas</div>
+    ${confLine}
     <button class="pk-btn pk-ok" onclick="pkOk()">✓ Ok — puse ${pkFmt(it.esp)}</button>
     <button class="pk-btn pk-f" onclick="pkF()">F — no está todo</button>
   </div>`;
 }
 
-function pkRenderDone(body, N) {
-  let falt = 0;
+function pkRenderDone(body, N, nav) {
+  let falt = 0; const conf = pkCount(); const pend = N - conf;
   for (const it of _pk.items) { const r = _pk.results[it.art]; if (r != null && r < it.esp) falt++; }
-  body.innerHTML = `<div class="pk-flow pk-doneflow">
+  body.innerHTML = `<div class="pk-flow">${nav || ""}<div class="pk-doneflow">
     <div class="pk-done-ico">✓</div>
     <div class="pk-done-t">Picking completo</div>
-    <div class="pk-done-s">${N} artículo(s) · ${falt ? `<b style="color:#d97706">${falt} con faltante</b>` : "sin faltantes"}</div>
+    <div class="pk-done-s">${conf} de ${N} confirmados${pend ? ` · <b style="color:#64748b">${pend} sin confirmar</b>` : ""}${falt ? ` · <b style="color:#d97706">${falt} con faltante</b>` : ""}</div>
     <button class="pk-btn pk-ok" onclick="pkFinishPicking()">✓ Terminé el picking</button>
     <button class="pk-btn pk-cancel" onclick="pkClose()">Cerrar (sigo después)</button>
-  </div>`;
+  </div></div>`;
 }
+
+function pkAdvance() { if (_pk) { _pk.idx = Math.min(_pk.idx + 1, _pk.items.length); _pk.mode = "item"; pkRender(); } }
+function pkPrev() { if (_pk) { _pk.idx = Math.max(_pk.idx - 1, 0); _pk.mode = "item"; pkRender(); } }
+function pkNext() { if (_pk) { _pk.idx = Math.min(_pk.idx + 1, _pk.items.length); _pk.mode = "item"; pkRender(); } }
 
 function pkOk() {
   if (!_pk || _pk.idx >= _pk.items.length) return;
   const it = _pk.items[_pk.idx];
   _pk.results[it.art] = it.esp;
   pkSendDetail(it.art, it.esp, it.esp);
-  _pk.idx++; _pk.mode = "item"; pkRender();
+  pkAdvance();
 }
 function pkF() { if (_pk) { _pk.mode = "fInput"; pkRender(); } }
 function pkCancelF() { if (_pk) { _pk.mode = "item"; pkRender(); } }
@@ -4946,7 +4969,7 @@ function pkConfirmF() {
   if (isNaN(real) || real < 0) real = 0;
   _pk.results[it.art] = real;
   pkSendDetail(it.art, it.esp, real);
-  _pk.idx++; _pk.mode = "item"; pkRender();
+  pkAdvance();
 }
 function pkClose() { _pk = null; closeTandaModal(); }
 
@@ -4976,7 +4999,10 @@ function pkSendDetail(art, esp, real) {
     descripcion: "Picking artículo",
     texto: (_pk.tanda + "|" + art + "|" + esp + "|" + real).toUpperCase(),
     ts: nowMs,
-    id: nowMs.toString(36) + "_" + Math.random().toString(36).slice(2, 8),
+    // client_id determinístico → reenviar/corregir el mismo artículo hace UPSERT
+    // (merge-duplicates) en vez de duplicar. Por eso se puede ir y volver.
+    id: ("pkc_" + _pk.legajo + "_" + _pk.tanda + "_" + String(art).toUpperCase() + "_" + getTodayKey())
+          .replace(/[^a-zA-Z0-9_\-]/g, ""),
     ts_inicio_iso: null
   };
   try {

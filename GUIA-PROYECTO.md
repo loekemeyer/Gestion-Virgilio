@@ -4,7 +4,17 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-05 · Versión app al documentar: **v2.54**
+> Última actualización: 2026-06-05 · Versión app al documentar: **v2.55**
+>
+> Nota: **v2.55** — el picking interactivo ahora tiene **navegación ← Atrás /
+> Adelante →** entre artículos (se puede ir y volver; al revisitar uno confirmado
+> muestra "ya confirmaste X (faltaron Y) — podés cambiarlo"). Para que ir y volver
+> NO duplique registros, el evento `PKC` pasa a **client_id determinístico**
+> (`pkc_<legajo>_<tanda>_<art>_<día>`) y **upsert** (merge-duplicates): reenviar o
+> corregir hace UPDATE de la misma fila. Se extendió el `isUpsert` (antes solo FJ)
+> en `trySendOneReport` de `index.html` y `sw.js` para incluir `PKC`. Funciones
+> nuevas: `pkPrev`/`pkNext`/`pkAdvance`/`pkCount`. El popup se mantiene (no es
+> pantalla completa).
 >
 > Nota: **v2.54** — el pop-up de picking pasó de **solo-lectura** a **flujo
 > interactivo de a un artículo**: muestra `CÓDIGO` + cajas a levantar (y `sector`
