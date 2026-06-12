@@ -4,7 +4,22 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-05 · Versión app al documentar: **v2.53**
+> Última actualización: 2026-06-05 · Versión app al documentar: **v2.54**
+>
+> Nota: **v2.54** — el pop-up de picking pasó de **solo-lectura** a **flujo
+> interactivo de a un artículo**: muestra `CÓDIGO` + cajas a levantar (y `sector`
+> en gris hasta que se suba el orden de góndola), y el operario confirma con
+> **Ok** (puso lo pedido → siguiente directo) o **F** (no está todo → anota
+> cuántas cajas puso). Cada confirmación **se guarda en Supabase** como un evento
+> nuevo **`PKC`** ("Picking artículo") por la **cola offline** (no se pierde sin
+> red): `texto = "TANDA|CÓDIGO|ESPERADAS|REALES"` (ej. `A15C|502|5|3`), un evento
+> por artículo. Reporte de faltantes: `where opcion='PKC'`, `split('|')` →
+> faltante = esperadas − reales. Funciones en `index.html`: `showPickingList`
+> (ahora arma `items[{art,esp}]` ordenados y abre el flujo), `pkRender`, `pkOk`,
+> `pkF`/`pkConfirmF`, `pkSendDetail`. Al terminar todos los artículos, la pantalla
+> final ofrece **"Terminé el picking"** (`pkFinishPicking`) que dispara el `TP`
+> reusando `send()` (setea `selected="TP"` + el código de tanda). Pendiente: orden
+> de góndola + sector real (cuando se suba ese dato).
 >
 > Nota: **v2.53** — **lista de picking** (pop-up al "Empecé Picking"). Cuando el
 > operario manda `EP` con una tanda, aparece un modal (reusa `#tandaModal`) con
@@ -321,6 +336,7 @@ Definidos en `index.html` (objeto `desc`, ~línea 1531). Los botones se arman en
 | `CT` | Conteo | TOGGLE / tiempo muerto | No |
 | `FJ` | Fin de Jornada | (botón "Terminar Día") | `texto` = JSON con los conteos del día |
 | `LT` | Llegada Tarde | (automático) | `texto` = minutos de demora; `ts_inicio` = inicio de jornada, `ts_cliente` = primer mensaje. **NO cuenta como trabajado** en el monitor |
+| `PKC` | Picking artículo | (detalle de picking, v2.54) | `texto` = `TANDA\|CÓDIGO\|ESPERADAS\|REALES` (ej. `A15C\|502\|5\|3`). Un evento por artículo confirmado en el flujo de picking. El monitor lo ignora (no está en los grupos). |
 
 **Grupos (constantes en `index.html`):**
 - `CORE_CODES = [EP, TP, AP, TAP]` — el trabajo medible (picking / armado).

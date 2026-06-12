@@ -1749,12 +1749,29 @@ button {
 .tanda-modal-table tr.tanda-armado td{ color: #16a34a; }
 .tanda-modal-table tr.tanda-no-armado td{ color: #dc2626; }
 
-/* Lista de picking (pop-up al "Empecé Picking"): qué artículos levantar. */
-.pk-sub{ font-size: 13px; color: #64748b; margin: 2px 0 10px; }
-.pk-table td.pk-cod{ font-weight: bold; font-size: 17px; }
-.pk-table td.num{ font-size: 17px; font-weight: bold; }
-.pk-desg{ font-size: 12px; font-weight: normal; color: #94a3b8; }
-.pk-table tfoot th{ background: #eef2ff; font-size: 15px; border-top: 2px solid #c7d2fe; padding: 8px; }
+/* Picking interactivo (pop-up al "Empecé Picking"): un artículo por vez. */
+.pk-flow{ display: flex; flex-direction: column; gap: 12px; padding: 4px 2px 2px; }
+.pk-prog{ font-size: 14px; color: #64748b; }
+.pk-bar{ height: 10px; background: #e2e8f0; border-radius: 5px; overflow: hidden; }
+.pk-bar > i{ display: block; height: 100%; background: #16a34a; }
+.pk-cod-row{ display: flex; justify-content: space-between; align-items: baseline; }
+.pk-cod-lbl{ font-size: 13px; color: #94a3b8; letter-spacing: .06em; }
+.pk-sector{ font-size: 13px; color: #cbd5e1; }
+.pk-cod-big{ font-size: 54px; font-weight: 800; color: #0f172a; line-height: 1; }
+.pk-cajas{ font-size: 22px; color: #334155; background: #eff6ff; border: 2px solid #1e6bd6; border-radius: 12px; padding: 12px 16px; text-align: center; }
+.pk-cajas b{ font-size: 30px; color: #1e6bd6; }
+.pk-btn{ width: 100%; border: none; border-radius: 12px; padding: 16px; font-size: 19px; font-weight: bold; color: #fff; cursor: pointer; box-sizing: border-box; }
+.pk-ok{ background: #16a34a; }
+.pk-f{ background: #f59e0b; }
+.pk-cancel{ background: #e2e8f0; color: #334155; font-weight: 600; font-size: 16px; padding: 12px; }
+.pk-fq{ background: #fff7ed; border: 2px solid #f59e0b; border-radius: 12px; padding: 14px; }
+.pk-fq-q{ font-size: 16px; color: #334155; margin-bottom: 8px; }
+.pk-fq-esp{ color: #94a3b8; font-size: 14px; }
+.pk-fq-input{ width: 100%; font-size: 34px; font-weight: bold; text-align: center; padding: 10px; border: 2px solid #cbd5e1; border-radius: 10px; box-sizing: border-box; }
+.pk-doneflow{ align-items: center; text-align: center; gap: 10px; padding: 18px 6px; }
+.pk-done-ico{ width: 64px; height: 64px; border-radius: 50%; background: #16a34a; color: #fff; font-size: 38px; line-height: 64px; }
+.pk-done-t{ font-size: 22px; font-weight: bold; color: #0f172a; }
+.pk-done-s{ font-size: 15px; color: #64748b; }
 
 /* Modales (historial de días anteriores y "Terminar Día") */
 #histModal,
@@ -2454,7 +2471,7 @@ const desc = {
   RI:"Recepción Insumos", EI:"Entrega Insumos",
   AT:"Atendí Timbre", PB:"Paré Baño", Limp:"Limpieza",
   Perm:"Permiso de Salida", PC:"Paré Comida",CT:"Conteo",
-  LT:"Llegada Tarde"
+  LT:"Llegada Tarde", PKC:"Picking artículo"
 };
 
 let selected = null;
@@ -4218,7 +4235,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v2.53";
+const APP_VERSION = "v2.54";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -4412,8 +4429,8 @@ async function send() {
     alert("⚠️ Sin conexión o sin respuesta del servidor.\nTu reporte quedó guardado y se reenviará automáticamente cuando vuelva la red.");
   }
 
-  // Al EMPEZAR PICKING: pop-up con los artículos a levantar para esa tanda.
-  if (opcion === "EP" && (texto || "").trim()) showPickingList(texto);
+  // Al EMPEZAR PICKING: flujo interactivo de artículos a levantar (Ok / F).
+  if (opcion === "EP" && (texto || "").trim()) showPickingList(texto, legajoStr);
 
   resetSelection();
   optionsScreen.classList.add("hidden");
@@ -4814,15 +4831,23 @@ async function fetchPickingBase() {
   return map;
 }
 
-/* Pop-up con la lista de artículos a levantar para una tanda. Reutiliza
-   #tandaModal (overlay + botón Cerrar). */
-async function showPickingList(tanda) {
+/* =========================================================
+   PICKING INTERACTIVO — un artículo por vez, con confirmación.
+   El operario va Ok (puso lo pedido) o F (no está todo → anota cuántas puso).
+   Cada confirmación emite un evento PKC a Supabase por la cola offline:
+   texto = "TANDA|CODIGO|ESPERADAS|REALES". Reutiliza #tandaModal.
+   (El SECTOR de góndola queda en gris hasta que se suba ese dato; el orden
+    es numérico por ahora.)
+   ========================================================= */
+let _pk = null;   // { tanda, legajo, items:[{art,esp}], idx, results:{art:real}, mode }
+
+async function showPickingList(tanda, legajo) {
   const tNorm = (tanda || "").trim().toUpperCase();
   if (!tNorm) return;
   const m = document.getElementById("tandaModal");
   if (!m) return;
-  m.querySelector(".tanda-modal-title").textContent = "📋 Levantar — Tanda " + tNorm;
-  m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">Cargando lista de artículos…</div>`;
+  m.querySelector(".tanda-modal-title").textContent = "Picking — Tanda " + tNorm;
+  m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">Cargando artículos…</div>`;
   m.classList.add("show");
   try {
     const [sheetMap, pickBase] = await Promise.all([fetchMonitorSheet(), fetchPickingBase()]);
@@ -4836,48 +4861,131 @@ async function showPickingList(tanda) {
         }
       }
     }
-    const agg = {}, det = {};
-    for (const np of nps) {
-      for (const it of (pickBase.get(np) || [])) {
-        agg[it.art] = (agg[it.art] || 0) + it.cajas;
-        (det[it.art] = det[it.art] || []).push(it.cajas);
-      }
+    // Sumar cajas por código entre todos los pedidos de la tanda.
+    const agg = {};
+    for (const np of nps) for (const it of (pickBase.get(np) || [])) agg[it.art] = (agg[it.art] || 0) + it.cajas;
+    const numKey = (c) => { const mm = String(c).match(/^(\d+)/); return mm ? parseInt(mm[1], 10) : Number.MAX_SAFE_INTEGER; };
+    const items = Object.keys(agg)
+      .sort((a, b) => (numKey(a) - numKey(b)) || (a < b ? -1 : a > b ? 1 : 0))
+      .map(art => ({ art: art, esp: agg[art] }));
+    if (!items.length) {
+      _pk = null;
+      m.querySelector(".tanda-modal-body").innerHTML =
+        `<div class="history-empty">No encontré artículos para la tanda <b>${escapeHtml(tNorm)}</b>.<br>` +
+        (nps.length ? `Pedidos ${nps.map(escapeHtml).join(", ")} — sin filas en la base de picking.` : `La tanda no figura en la programación de hoy.`) + `</div>`;
+      return;
     }
-    renderPickingList(m, tNorm, nps, agg, det);
+    _pk = { tanda: tNorm, legajo: String(legajo || (typeof legajoInput !== "undefined" && legajoInput.value) || "").trim(), items: items, idx: 0, results: {}, mode: "item" };
+    pkRender();
   } catch (e) {
+    _pk = null;
     m.querySelector(".tanda-modal-body").innerHTML =
-      `<div class="history-empty">No se pudo cargar la lista (¿sin conexión?).<br><small>${escapeHtml(e.message || "")}</small></div>`;
+      `<div class="history-empty">No se pudo cargar (¿sin conexión?).<br><small>${escapeHtml(e.message || "")}</small></div>`;
   }
 }
 
-function renderPickingList(m, tanda, nps, agg, det) {
+function pkFmt(n) { const r = Math.round(n * 100) / 100; return (r === Math.round(r) ? String(Math.round(r)) : String(r)).replace(".", ","); }
+
+function pkRender() {
+  const m = document.getElementById("tandaModal");
+  if (!m || !_pk) return;
   const body = m.querySelector(".tanda-modal-body");
-  const arts = Object.keys(agg);
-  if (!arts.length) {
-    body.innerHTML = `<div class="history-empty">No encontré artículos para la tanda <b>${escapeHtml(tanda)}</b>.<br>` +
-      (nps.length
-        ? `Pedidos ${nps.map(escapeHtml).join(", ")} — sin filas en "PPP Excel Base Datos Pedidos".`
-        : `La tanda no figura en la programación de hoy.`) + `</div>`;
+  const N = _pk.items.length;
+  if (_pk.idx >= N) { pkRenderDone(body, N); return; }
+  const it = _pk.items[_pk.idx];
+  const head = `<div class="pk-prog">Artículo ${_pk.idx + 1} de ${N}</div>` +
+               `<div class="pk-bar"><i style="width:${Math.round((_pk.idx / N) * 100)}%"></i></div>`;
+  if (_pk.mode === "fInput") {
+    body.innerHTML = `<div class="pk-flow">${head}
+      <div class="pk-cod-row"><span class="pk-cod-big">${escapeHtml(it.art)}</span><span class="pk-sector">sector —</span></div>
+      <div class="pk-fq">
+        <div class="pk-fq-q">¿Cuántas cajas pusiste? <span class="pk-fq-esp">(pedidas: ${pkFmt(it.esp)})</span></div>
+        <input id="pkFqty" class="pk-fq-input" type="number" inputmode="numeric" min="0" value="${pkFmt(it.esp)}">
+      </div>
+      <button class="pk-btn pk-ok" onclick="pkConfirmF()">Confirmar</button>
+      <button class="pk-btn pk-cancel" onclick="pkCancelF()">Volver</button>
+    </div>`;
+    setTimeout(() => { const i = document.getElementById("pkFqty"); if (i) { i.focus(); i.select(); } }, 40);
     return;
   }
-  // Orden numérico por código (501, 502, 580E…). Después: orden de góndola.
-  const numKey = (c) => { const mm = String(c).match(/^(\d+)/); return mm ? parseInt(mm[1], 10) : Number.MAX_SAFE_INTEGER; };
-  arts.sort((a, b) => (numKey(a) - numKey(b)) || (a < b ? -1 : a > b ? 1 : 0));
-  const fmt = (n) => { const r = Math.round(n * 100) / 100; return (r === Math.round(r) ? String(Math.round(r)) : String(r)).replace(".", ","); };
-  let total = 0;
-  const trs = arts.map(art => {
-    const cj = agg[art]; total += cj;
-    const d = det[art];
-    const desg = d.length > 1 ? ` <span class="pk-desg">(${d.map(fmt).join(" + ")})</span>` : "";
-    return `<tr><td class="pk-cod">${escapeHtml(art)}</td><td class="num">${fmt(cj)}${desg}</td></tr>`;
-  }).join("");
-  body.innerHTML = `
-    <div class="pk-sub">${nps.length} pedido(s): ${nps.map(escapeHtml).join(", ")}</div>
-    <table class="tanda-modal-table pk-table">
-      <thead><tr><th>Código</th><th class="num">Cajas</th></tr></thead>
-      <tbody>${trs}</tbody>
-      <tfoot><tr><th>TOTAL</th><th class="num">${fmt(total)}</th></tr></tfoot>
-    </table>`;
+  body.innerHTML = `<div class="pk-flow">${head}
+    <div class="pk-cod-row"><span class="pk-cod-lbl">CÓDIGO</span><span class="pk-sector">sector —</span></div>
+    <div class="pk-cod-big">${escapeHtml(it.art)}</div>
+    <div class="pk-cajas">Levantá <b>${pkFmt(it.esp)}</b> cajas</div>
+    <button class="pk-btn pk-ok" onclick="pkOk()">✓ Ok — puse ${pkFmt(it.esp)}</button>
+    <button class="pk-btn pk-f" onclick="pkF()">F — no está todo</button>
+  </div>`;
+}
+
+function pkRenderDone(body, N) {
+  let falt = 0;
+  for (const it of _pk.items) { const r = _pk.results[it.art]; if (r != null && r < it.esp) falt++; }
+  body.innerHTML = `<div class="pk-flow pk-doneflow">
+    <div class="pk-done-ico">✓</div>
+    <div class="pk-done-t">Picking completo</div>
+    <div class="pk-done-s">${N} artículo(s) · ${falt ? `<b style="color:#d97706">${falt} con faltante</b>` : "sin faltantes"}</div>
+    <button class="pk-btn pk-ok" onclick="pkFinishPicking()">✓ Terminé el picking</button>
+    <button class="pk-btn pk-cancel" onclick="pkClose()">Cerrar (sigo después)</button>
+  </div>`;
+}
+
+function pkOk() {
+  if (!_pk || _pk.idx >= _pk.items.length) return;
+  const it = _pk.items[_pk.idx];
+  _pk.results[it.art] = it.esp;
+  pkSendDetail(it.art, it.esp, it.esp);
+  _pk.idx++; _pk.mode = "item"; pkRender();
+}
+function pkF() { if (_pk) { _pk.mode = "fInput"; pkRender(); } }
+function pkCancelF() { if (_pk) { _pk.mode = "item"; pkRender(); } }
+function pkConfirmF() {
+  if (!_pk || _pk.idx >= _pk.items.length) return;
+  const it = _pk.items[_pk.idx];
+  const inp = document.getElementById("pkFqty");
+  let real = inp ? parseFloat(String(inp.value).replace(",", ".")) : 0;
+  if (isNaN(real) || real < 0) real = 0;
+  _pk.results[it.art] = real;
+  pkSendDetail(it.art, it.esp, real);
+  _pk.idx++; _pk.mode = "item"; pkRender();
+}
+function pkClose() { _pk = null; closeTandaModal(); }
+
+/* Pantalla final → sugerir "TP" (Fin Picking). Reusa el flujo de envío normal
+   (toma ts_inicio del EP → duración, historial, etc.) seteando la acción y el
+   código de tanda como si el operario tocara TP + Enviar. */
+function pkFinishPicking() {
+  const tanda = _pk ? _pk.tanda : "";
+  _pk = null;
+  closeTandaModal();
+  if (!tanda) return;
+  try {
+    selected = "TP";
+    if (typeof textInput !== "undefined" && textInput) textInput.value = tanda;
+    send();   // hace todo el cierre de picking (igual que tocar TP)
+  } catch (e) { console.warn("pkFinishPicking:", e); }
+}
+
+/* Emite el evento PKC (detalle de picking de un artículo) por la cola offline.
+   Un evento por artículo confirmado; el SW lo reenvía si no hay red. */
+function pkSendDetail(art, esp, real) {
+  if (!_pk) return;
+  const nowMs = Date.now();
+  const payload = {
+    legajo: _pk.legajo,
+    opcion: "PKC",
+    descripcion: "Picking artículo",
+    texto: (_pk.tanda + "|" + art + "|" + esp + "|" + real).toUpperCase(),
+    ts: nowMs,
+    id: nowMs.toString(36) + "_" + Math.random().toString(36).slice(2, 8),
+    ts_inicio_iso: null
+  };
+  try {
+    enqueueReport(payload);
+    if (typeof trySendOneReport === "function") {
+      trySendOneReport(payload).then(r => { if (r && r.ok) removeFromQueue(payload.id); }).catch(() => {});
+    }
+  } catch (_e) { /* queda en cola; el SW reintenta */ }
+  try { updatePendingIndicator(); } catch (_e) {}
 }
 let historicInflight   = null;   // Promise para evitar fetch en paralelo
 
