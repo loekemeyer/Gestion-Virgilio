@@ -4,7 +4,17 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-12 · Versión app al documentar: **v2.64**
+> Última actualización: 2026-06-12 · Versión app al documentar: **v2.65**
+>
+> Nota: **v2.65** — armado guiado (sigue apagado): **(a) m³ desde la hoja
+> `VolumenArticulos`** (`fetchVolumenArticulos`, gid por `&sheet=VolumenArticulos`;
+> detecta col código + col m³ por header) — ya NO se lee de la base de pedidos.
+> **(b) Sueltas nunca**: `arPackLios` reparte las cajas en **`round(total/lío)`**
+> líos (mín 1) lo más parejo posible, así lo que sobra se **agrega a otro lío o se
+> junta entre sí** (mismo m³). Ej.: 11 cajas/lío 5 → **[6,5]**; con override
+> 321=4, 11 cajas → **[4,4,3]**; 3 → [3]; 6 → [6]. Cada lío muestra su total de
+> cajas. (Edge: si una caja/m³ tiene 1 sola unidad en el pedido, queda 1 lío de
+> 1 — inevitable, no se puede mezclar con otra caja.)
 >
 > Nota: **v2.64** — dos cosas. (a) **Picking: no se puede terminar con artículos
 > salteados.** Si el operario usó "Adelante" y dejó artículos sin marcar Ok/F,

@@ -1778,9 +1778,8 @@ button {
 .ar-lio-list{ display: flex; flex-direction: column; gap: 6px; }
 .ar-lio-line{ display: flex; align-items: center; gap: 10px; background: #f5f3ff; border: 1px solid #ddd6fe; border-radius: 8px; padding: 8px 12px; }
 .ar-lio-n{ font-size: 13px; font-weight: 800; color: #fff; background: #7c3aed; border-radius: 6px; padding: 3px 8px; white-space: nowrap; }
-.ar-lio-c{ font-size: 18px; font-weight: bold; color: #0f172a; }
-.ar-lio-line.ar-suelta{ background: #fff7ed; border-color: #fed7aa; }
-.ar-lio-line.ar-suelta .ar-lio-n{ background: #f59e0b; }
+.ar-lio-c{ font-size: 18px; font-weight: bold; color: #0f172a; flex: 1; }
+.ar-lio-cnt{ font-size: 13px; font-weight: bold; color: #7c3aed; white-space: nowrap; }
 .pk-btn{ width: 100%; border: none; border-radius: 12px; padding: 16px; font-size: 19px; font-weight: bold; color: #fff; cursor: pointer; box-sizing: border-box; }
 .pk-ok{ background: #16a34a; }
 .pk-f{ background: #f59e0b; }
@@ -4360,7 +4359,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v2.64";
+const APP_VERSION = "v2.65";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -4932,7 +4931,14 @@ const PICKING_BASE_CSV_URL =
 const PICK_BASE_TTL_MS = 5 * 60 * 1000;   // hoja grande (~20k filas) → cache 5 min
 let _pickBaseCache   = null;   // Map<pedido(NP), [{art, cajas}]>
 let _pickBaseCacheTs = 0;
-let _pickM3Cache     = null;   // Map<códigoArt(UP), m3(number)> — para armado por caja (v2.63)
+
+/* m³ por artículo: sale de la hoja "VolumenArticulos" (NO de la base de pedidos).
+   Se usa para el armado por caja (mismo m³ = misma caja). v2.65. */
+const VOLUMEN_ART_CSV_URL =
+  "https://docs.google.com/spreadsheets/d/1-16YXe0xq6x9i-Yhk5cm5V3VqvQ0PWZtcDbm8OeeKW0/gviz/tq?tqx=out:csv&sheet=" +
+  encodeURIComponent("VolumenArticulos");
+let _pickM3Cache     = null;   // Map<códigoArt(UP), m3(number)>
+let _pickM3CacheTs   = 0;
 
 function pickNormNp(v) {
   let s = (v == null ? "" : String(v)).trim();
@@ -4954,19 +4960,15 @@ async function fetchPickingBase() {
   const r = await fetch(PICKING_BASE_CSV_URL + "&_=" + now, { cache: "no-store" });
   if (!r.ok) throw new Error("Base Datos Pedidos HTTP " + r.status);
   const rows = parseCSV(await r.text());
-  let cPed = 0, cArt = 2, cCaj = 5, cM3 = -1;
+  let cPed = 0, cArt = 2, cCaj = 5;
   for (let i = 0; i < Math.min(rows.length, 5); i++) {
     const h = rows[i].map(dedupeHeaderCell);
     const ip = h.indexOf("pedido");
     const ia = h.findIndex(x => x === "artículo" || x === "articulo");
     const ic = h.findIndex(x => x.indexOf("cajas") >= 0);
-    // m³ por artículo (para armado por caja, v2.63): tolera "m3 volumen", "mt3",
-    // "volumen", etc. Si no está la columna, el armado guiado queda inactivo.
-    const im = h.findIndex(x => x.indexOf("m3") >= 0 || x.indexOf("mt3") >= 0 || x.indexOf("volum") >= 0);
-    if (ip >= 0 && ia >= 0) { cPed = ip; cArt = ia; if (ic >= 0) cCaj = ic; if (im >= 0) cM3 = im; break; }
+    if (ip >= 0 && ia >= 0) { cPed = ip; cArt = ia; if (ic >= 0) cCaj = ic; break; }
   }
   const map = new Map();
-  const m3map = new Map();
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i]; if (!row) continue;
     const ped = pickNormNp(row[cPed]);
@@ -4975,14 +4977,39 @@ async function fetchPickingBase() {
     if (!art) continue;
     if (!map.has(ped)) map.set(ped, []);
     map.get(ped).push({ art: art, cajas: pickParseCajas(row[cCaj]) });
-    if (cM3 >= 0) {
-      const v = pickParseCajas(row[cM3]);               // mismo parser (coma decimal)
-      if (v > 0) m3map.set(String(art).toUpperCase(), v);
-    }
   }
   _pickBaseCache = map; _pickBaseCacheTs = Date.now();
-  _pickM3Cache = m3map;
   return map;
+}
+
+/* Baja la hoja "VolumenArticulos" (artículo → m³) y la cachea. Detecta por
+   header la columna de código (artículo/código) y la de m³ (m3/volumen). Si no
+   están, devuelve un Map vacío → el armado guiado no se activa. v2.65. */
+async function fetchVolumenArticulos() {
+  const now = Date.now();
+  if (_pickM3Cache && (now - _pickM3CacheTs) < PICK_BASE_TTL_MS) return _pickM3Cache;
+  const r = await fetch(VOLUMEN_ART_CSV_URL + "&_=" + now, { cache: "no-store" });
+  if (!r.ok) throw new Error("VolumenArticulos HTTP " + r.status);
+  const rows = parseCSV(await r.text());
+  let cArt = -1, cM3 = -1;
+  for (let i = 0; i < Math.min(rows.length, 5); i++) {
+    const h = rows[i].map(dedupeHeaderCell);
+    const ia = h.findIndex(x => x === "artículo" || x === "articulo" || x === "código" || x === "codigo" || x === "cod" || x.indexOf("artic") >= 0 || x.indexOf("codig") >= 0);
+    const im = h.findIndex(x => x.indexOf("m3") >= 0 || x.indexOf("mt3") >= 0 || x.indexOf("volum") >= 0);
+    if (ia >= 0 && im >= 0) { cArt = ia; cM3 = im; break; }
+  }
+  const m3map = new Map();
+  if (cArt >= 0 && cM3 >= 0) {
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i]; if (!row) continue;
+      const art = (row[cArt] || "").trim();
+      if (!art || !/^[0-9]/.test(art)) continue;        // saltea header y basura
+      const v = pickParseCajas(row[cM3]);               // parser con coma decimal
+      if (v > 0) m3map.set(art.toUpperCase(), v);
+    }
+  }
+  _pickM3Cache = m3map; _pickM3CacheTs = Date.now();
+  return m3map;
 }
 
 /* =========================================================
@@ -5251,19 +5278,30 @@ function arNumOf(c) { const mm = String(c).match(/^(\d+)/); return mm ? parseInt
    orden. Devuelve { lios:[[{art,cajas}]], sueltas:[{art,cajas}] } para decir
    exactamente QUÉ juntar en cada lío (lo sobrante < lioSize queda en sueltas). */
 function arPackLios(items, lioSize) {
-  const lios = []; let cur = []; let curCount = 0;
+  const total = items.reduce((s, x) => s + x.cajas, 0);
+  if (total <= 0) return { lios: [] };
+  // SUELTAS NUNCA: lo que sobra se reparte. Cantidad de líos = redondeo de
+  // total/lioSize (mín 1); se distribuye lo más parejo posible (sin caja suelta).
+  const nLios = Math.max(1, Math.round(total / lioSize));
+  const base = Math.floor(total / nLios);
+  let extra = total - base * nLios;            // cuántos líos llevan +1
+  const sizes = [];
+  for (let i = 0; i < nLios; i++) { sizes.push(base + (extra > 0 ? 1 : 0)); if (extra > 0) extra--; }
+  const lios = [];
+  let li = 0, cur = [], curCount = 0;
   for (const it of items) {
     let rem = it.cajas;
-    while (rem > 0) {
-      const take = Math.min(lioSize - curCount, rem);
+    while (rem > 0 && li < nLios) {
+      const take = Math.min(sizes[li] - curCount, rem);
       const last = cur[cur.length - 1];
       if (last && last.art === it.art) last.cajas += take;
       else cur.push({ art: it.art, cajas: take });
       curCount += take; rem -= take;
-      if (curCount >= lioSize) { lios.push(cur); cur = []; curCount = 0; }
+      if (curCount >= sizes[li]) { lios.push(cur); cur = []; curCount = 0; li++; }
     }
   }
-  return { lios: lios, sueltas: cur };   // cur = lo que no completó un lío
+  if (cur.length) lios.push(cur);              // red de seguridad (no debería)
+  return { lios: lios };
 }
 
 function arCompTxt(comp) {
@@ -5292,7 +5330,7 @@ async function showArmadoGuide(pedido, legajo) {
   m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">Cargando armado…</div>`;
   m.classList.add("show");
   try {
-    await fetchPickingBase();                    // llena _pickBaseCache + _pickM3Cache
+    await Promise.all([fetchPickingBase(), fetchVolumenArticulos()]);  // ítems del pedido + m³ por artículo
     const items = (_pickBaseCache && _pickBaseCache.get(ped)) || [];
     const m3map = _pickM3Cache || new Map();
     if (!m3map.size) {                           // sheet sin columna de m³ → no se puede agrupar
@@ -5318,9 +5356,8 @@ async function showArmadoGuide(pedido, legajo) {
     const mkBox = (m3v, label, its, lio) => {
       const total = its.reduce((s, x) => s + x.cajas, 0);
       const pk = arPackLios(its, lio);
-      const sueltas = pk.sueltas.reduce((s, x) => s + x.cajas, 0);
       return { m3: m3v, label: label, lio: lio, items: its, total: total,
-               lios: pk.lios.length, sueltas: sueltas, liosComp: pk.lios, sueltaComp: pk.sueltas };
+               lios: pk.lios.length, liosComp: pk.lios };
     };
     const boxes = [...groups.values()]
       .sort((a, b) => a.m3 - b.m3)
@@ -5333,8 +5370,7 @@ async function showArmadoGuide(pedido, legajo) {
       return;
     }
     _ar = { pedido: ped, legajo: String(legajo || "").trim(), boxes: boxes, idx: 0, done: new Set(),
-            totLios: boxes.reduce((s, b) => s + b.lios, 0),
-            totSueltas: boxes.reduce((s, b) => s + b.sueltas, 0) };
+            totLios: boxes.reduce((s, b) => s + b.lios, 0) };
     arRender();
   } catch (e) {
     _ar = null;
@@ -5361,16 +5397,13 @@ function arRender() {
     .sort((x, y) => arNumOf(x.art) - arNumOf(y.art))
     .map(it => `<div class="ar-item"><span class="ar-item-cod">${escapeHtml(it.art)}</span><span class="ar-item-cajas">${pkFmt(it.cajas)} caja${it.cajas === 1 ? "" : "s"}</span></div>`)
     .join("");
-  // Composición concreta: qué cajas juntar en cada lío.
-  let liosHtml = b.liosComp.map((comp, i) =>
-    `<div class="ar-lio-line"><span class="ar-lio-n">Lío ${i + 1}</span><span class="ar-lio-c">${arCompTxt(comp)}</span></div>`).join("");
-  if (b.sueltaComp && b.sueltaComp.length) {
-    liosHtml += `<div class="ar-lio-line ar-suelta"><span class="ar-lio-n">Sueltas</span><span class="ar-lio-c">${arCompTxt(b.sueltaComp)}</span></div>`;
-  }
-  const resumen = (b.lios > 0 ? `<b>${b.lios}</b> lío${b.lios === 1 ? "" : "s"} de ${b.lio}` : "sin lío completo")
-    + (b.sueltas > 0 ? ` + <b>${pkFmt(b.sueltas)}</b> suelta${b.sueltas === 1 ? "" : "s"}` : "");
-  const totBanner = `Pedido ${escapeHtml(_ar.pedido)} · <b>${_ar.totLios}</b> lío${_ar.totLios === 1 ? "" : "s"} en total`
-    + (_ar.totSueltas > 0 ? ` + ${pkFmt(_ar.totSueltas)} suelta${_ar.totSueltas === 1 ? "" : "s"}` : "");
+  // Composición concreta: qué cajas juntar en cada lío (con su total de cajas).
+  const liosHtml = b.liosComp.map((comp, i) => {
+    const cnt = comp.reduce((s, c) => s + c.cajas, 0);
+    return `<div class="ar-lio-line"><span class="ar-lio-n">Lío ${i + 1}</span><span class="ar-lio-c">${arCompTxt(comp)}</span><span class="ar-lio-cnt">${pkFmt(cnt)}</span></div>`;
+  }).join("");
+  const resumen = `<b>${b.lios}</b> lío${b.lios === 1 ? "" : "s"}`;
+  const totBanner = `Pedido ${escapeHtml(_ar.pedido)} · <b>${_ar.totLios}</b> lío${_ar.totLios === 1 ? "" : "s"} en total`;
   body.innerHTML = `<div class="pk-flow">${nav}
     <div class="ar-tot-banner">${totBanner}</div>
     <div class="pk-cod-row"><span class="pk-cod-lbl">CAJA</span><span class="pk-sector">${escapeHtml(b.label)}</span></div>
@@ -5390,7 +5423,7 @@ function arRenderDone(body, N, nav) {
     <div class="pk-done-ico">✓</div>
     <div class="pk-done-t">Armado listo</div>
     <div class="pk-done-s">${conf} de ${N} cajas armadas${pend ? ` · <b style="color:#64748b">${pend} sin marcar</b>` : ""}</div>
-    <div class="pk-done-s"><b>${_ar.totLios}</b> lío${_ar.totLios === 1 ? "" : "s"} en total${_ar.totSueltas > 0 ? ` + ${pkFmt(_ar.totSueltas)} suelta${_ar.totSueltas === 1 ? "" : "s"}` : ""}</div>
+    <div class="pk-done-s"><b>${_ar.totLios}</b> lío${_ar.totLios === 1 ? "" : "s"} en total</div>
     <button class="pk-btn pk-ok" onclick="arFinish()">✓ Terminé el armado</button>
     <button class="pk-btn pk-cancel" onclick="arClose()">Cerrar (sigo después)</button>
   </div></div>`;
