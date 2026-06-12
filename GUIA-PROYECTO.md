@@ -4,7 +4,15 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-12 · Versión app al documentar: **v2.61**
+> Última actualización: 2026-06-12 · Versión app al documentar: **v2.62**
+>
+> Nota: **v2.62** — **cantidad de cajas por defecto al cerrar RT**. Al tocar RT
+> para **cerrarlo** (2º toque, "Indicar Cantidad" en `selectOption`), el campo ya
+> viene **pre-cargado** con las cajas que contó el Modo OP (editable). Para que
+> cada recepción muestre **lo suyo** y no se acumule entre recepciones del día,
+> el contador se **reinicia a 0 cada vez que se abre RT** (`recepcionResetCajas`
+> en el hook de `send()`). El cierre por Terminar Día sigue igual (read-only). Es
+> el mismo acumulador `localStorage` de v2.61.
 >
 > Nota: **v2.61** — **Modo OP de Recepción integrado en RT**. Al tocar **`RT`**
 > (Recepción Mercadería, 1er toque/apertura) se abre el **Modo OP** portado de

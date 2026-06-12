@@ -2591,6 +2591,13 @@ function recepcionCajasDelDia(legajo) {
   } catch (_e) { /* no-op */ }
   return total;
 }
+/* Arranca en 0 el contador de cajas para una nueva sesión de RT (cada vez que el
+   operario abre RT). Así, al cerrar, la cantidad por defecto es la de ESA
+   recepción y no se acumula entre recepciones del mismo día. */
+function recepcionResetCajas(legajo) {
+  try { localStorage.setItem("vir_recepcion_cajas_" + String(legajo || "") + "_" + getTodayKey(), "0"); }
+  catch (_e) { /* no-op */ }
+}
 function formatDayLong(fecha) {
   const p = fecha.split("-");
   return `${p[2]}/${p[1]}/${p[0]}`;
@@ -2964,8 +2971,8 @@ function terminarDia() {
                         border-radius:6px; font-size:16px; box-sizing:border-box; font-weight:900;">
           <div style="font-size:12px; color:#166534; margin-top:3px;">
             ${autoRT > 0
-              ? "Total de cajas que cargaste en Recepción hoy. No hace falta que lo escribas."
-              : "No cargaste recepción por Modo OP hoy. Si recibiste algo, cargalo tocando RT antes de cerrar."}
+              ? "Cajas que cargaste por el Modo OP de Recepción. No hace falta que lo escribas."
+              : "No cargaste recepción por Modo OP. Si recibiste algo, cargalo tocando RT antes de cerrar."}
           </div>
         </div>`;
         }
@@ -3819,6 +3826,12 @@ function selectOption(code) {
     } else {
       inputLabel.innerText = "Indicar Cantidad";
       textInput.placeholder = "Ej: 100";
+      // RT: la cantidad de cajas ya la contó el Modo OP de Recepción. La dejamos
+      // puesta por defecto para que el operario solo confirme (la puede ajustar).
+      if (code === "RT") {
+        const autoRT = recepcionCajasDelDia(legajoStr);
+        if (autoRT > 0) textInput.value = String(autoRT);
+      }
     }
   }
 }
@@ -4332,7 +4345,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v2.61";
+const APP_VERSION = "v2.62";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -4539,6 +4552,7 @@ async function send() {
   if (opcion === "RT") {
     const stRT = getLegajoState(legajoStr);
     if (stRT && stRT.toggles && stRT.toggles.RT) {
+      recepcionResetCajas(legajoStr);   // nueva sesión: el contador de cajas arranca en 0
       try { if (typeof window.openRecepcionOp === "function") window.openRecepcionOp(legajoStr, getTodayKey()); }
       catch (_e) { /* el módulo puede no haber cargado (sin red): RT igual quedó abierto */ }
     }
