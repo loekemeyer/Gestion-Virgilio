@@ -4376,7 +4376,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v2.67";
+const APP_VERSION = "v2.68";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -8487,6 +8487,10 @@ let _facToastTimer = null;
 let _facNpsHoy        = new Set();
 let _facNpsHoyTs      = 0;
 let _facNpsInflight   = null;   // promesa para evitar fetch paralelo
+// NP tildados con POST OK en esta sesión, aún no confirmados por la lectura del
+// server. Se mergean en _facNpsHoy en cada fetch para que NO "vuelvan" a la lista
+// mientras la lectura se actualiza; se sueltan cuando el server ya los trae.
+let _facTickedLocal   = new Set();
 
 function facTodayKey(){
   const d = new Date();
@@ -8503,7 +8507,7 @@ async function fetchFacturadosHoy(force){
   _facNpsInflight = (async () => {
     try{
       const url = SUPABASE_FACTURACION_NP_ENDPOINT
-        + "?cierre_id=is.null&select=np&limit=5000";
+        + "?cierre_id=is.null&select=np&limit=5000&_=" + Date.now();
       // Leer con el MISMO contexto que la escritura: si hay sesión (supervisor
       // logueado en el módulo de facturación), usar su JWT. Sin esto, las RLS que
       // exigen rol authenticated devuelven vacío con la key anónima → el NP recién
@@ -8511,10 +8515,17 @@ async function fetchFacturadosHoy(force){
       // (sin sesión) cae al anónimo como antes.
       let headers = await facAuthWriteHeaders();
       if (!headers) headers = { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY };
-      const r = await fetch(url, { headers });
+      const r = await fetch(url, { headers, cache: "no-store" });   // anti-caché: sin esto el refresco leía la lista vieja
       if (!r.ok) throw new Error("HTTP " + r.status);
       const data = await r.json();
-      _facNpsHoy = new Set(data.map(x => String(x.np)));
+      const serverSet = new Set(data.map(x => String(x.np)));
+      // Refuerzo: mantener ocultos los NP recién tildados (POST OK) hasta que la
+      // lectura del server los confirme — así no "vuelven" por un read atrasado.
+      const _pend = [];
+      _facTickedLocal.forEach(function (np) { if (!serverSet.has(np)) _pend.push(np); });
+      _facTickedLocal = new Set(_pend);
+      _facTickedLocal.forEach(function (np) { serverSet.add(np); });
+      _facNpsHoy = serverSet;
       _facNpsHoyTs = Date.now();
       return _facNpsHoy;
     } finally {
@@ -8745,6 +8756,7 @@ window.facTickNP = async function(btn){
       })
     });
     if (!r.ok) throw new Error("HTTP " + r.status);
+    _facTickedLocal.add(np);   // POST OK → mantener oculto aunque la lectura tarde
   } catch (e) {
     // Rollback optimista
     _facNpsHoy.delete(np);
@@ -8792,6 +8804,7 @@ window.facRevertir = async function(){
     });
     if (!r.ok) throw new Error("HTTP " + r.status);
     _facNpsHoy = new Set();
+    _facTickedLocal = new Set();   // se borraron los ticks → soltar el refuerzo
     _facNpsHoyTs = Date.now();
     facRender(_facLastTandas);
     facShowToast("Ticks revertidos ✓");
@@ -8951,6 +8964,7 @@ async function generateFacturacionPDF(){
 
   // 4) Refresca set local (los NPs ahora tienen cierre_id → desaparecen)
   _facNpsHoy = new Set();
+  _facTickedLocal = new Set();   // cerrados → soltar el refuerzo local
   _facNpsHoyTs = Date.now();
 
   const { jsPDF } = window.jspdf;

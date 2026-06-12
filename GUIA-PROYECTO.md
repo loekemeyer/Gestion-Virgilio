@@ -4,7 +4,16 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-12 · Versión app al documentar: **v2.67**
+> Última actualización: 2026-06-12 · Versión app al documentar: **v2.68**
+>
+> Nota: **v2.68** — **facturación, el NP tildado seguía volviendo (v2.67 no
+> alcanzó)**. Causa real: `fetchFacturadosHoy` era el **único** fetch sin
+> anti-caché → el refresco leía la lista **vieja** (sin el NP recién facturado) y
+> la fila reaparecía. Fix: `&_=Date.now()` + `cache:"no-store"`. Además, refuerzo
+> `_facTickedLocal`: los NP tildados con **POST OK** se mantienen ocultos aunque
+> la lectura tarde/falle, y se sueltan cuando el server los confirma (se limpia en
+> Revertir y en el Cierre). Antes el `_facNpsHoy` se reconstruía del server en
+> cada ciclo y descartaba el tilde optimista.
 >
 > Nota: **v2.67** — **fix facturación: el NP tildado "volvía" a la lista**. El
 > tilde se **escribía** con el JWT del supervisor (`facAuthWriteHeaders`) pero
