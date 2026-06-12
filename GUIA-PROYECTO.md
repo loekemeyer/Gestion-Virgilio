@@ -4,7 +4,20 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-05 · Versión app al documentar: **v2.59**
+> Última actualización: 2026-06-12 · Versión app al documentar: **v2.60**
+>
+> Nota: **v2.60** — **aviso Telegram por códigos sin planimetría**. Al armar el
+> picking, si hay códigos que no figuran en `window.GONDOLA` (planimetria.js),
+> la app emite **un** evento **`PSP`** por tanda/legajo/día (`texto =
+> TANDA|COD1,COD2`, id `psp_<legajo>_<tanda>_<día>` + upsert) por la cola
+> offline. Un trigger de Supabase (`trg_sin_planim_telegram` →
+> `notificar_sin_planimetria_telegram()`, **solo INSERT** a propósito: reabrir
+> el picking upsertea y NO re-avisa) lo manda al bot `@Faltantes_Virgilio_bot`
+> (mismo bot/chat que faltantes). Guard: si planimetria.js no cargó (`GONDOLA`
+> vacío) NO avisa (serían todos falsos positivos). Función
+> `pkNotifySinPlanim` en `index.html`; `PSP` agregado al `isUpsert` de ambos
+> `trySendOneReport` (index + sw).
+>
 >
 > Nota: **v2.59** — **planimetría / orden de góndola activado** en el picking. Se
 > agregó **`planimetria.js`** (`window.GONDOLA = { "502":["A01",1], … }`, 315
@@ -377,6 +390,7 @@ Definidos en `index.html` (objeto `desc`, ~línea 1531). Los botones se arman en
 | `LT` | Llegada Tarde | (automático) | `texto` = minutos de demora; `ts_inicio` = inicio de jornada, `ts_cliente` = primer mensaje. **NO cuenta como trabajado** en el monitor |
 | `PKC` | Picking artículo | (detalle de picking, v2.54) | `texto` = `TANDA\|CÓDIGO\|ESPERADAS\|REALES` (ej. `A15C\|502\|5\|3`). Un evento por artículo confirmado en el flujo de picking. El monitor lo ignora (no está en los grupos). |
 | `CCN` | Carga Camión NP | (detalle de carga, v2.57) | `texto` = `NP\|TANDA` (ej. `97754\|C47B`). Un evento por NP marcada como cargada al camión. id determinístico `ccn_<legajo>_<np>_<día>` + upsert. El monitor lo ignora. |
+| `PSP` | Picking sin planimetría | (automático, v2.60) | `texto` = `TANDA\|COD1,COD2` (códigos del picking que no están en `planimetria.js`). UNO por tanda/legajo/día (id `psp_<legajo>_<tanda>_<día>` + upsert). Dispara aviso Telegram vía trigger `trg_sin_planim_telegram` (solo INSERT → no spamea al reabrir). El monitor lo ignora. |
 
 **Grupos (constantes en `index.html`):**
 - `CORE_CODES = [EP, TP, AP, TAP]` — el trabajo medible (picking / armado).
