@@ -2338,6 +2338,11 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
      que ande sin internet en el depósito. -->
 <script src="qrcode.js"></script>
 <script src="planimetria.js"></script>
+<!-- Modo OP de Recepción de Mercadería (se abre al tocar RT). Módulo aislado bajo
+     #rcpRoot, con su propio cliente Supabase (login anónimo). Portado de la app
+     Control-Carga-Remitos-FC. Suma las cajas del día a localStorage para que RT
+     se cierre con esa cantidad sin pedirla a mano. -->
+<script type="module" src="recepcion.js"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -2567,6 +2572,24 @@ function getTodayKey() {
 function formatDateTime(ts) {
   try { return new Date(ts).toLocaleString("es-AR"); }
   catch (_e) { return ""; }
+}
+/* Total de cajas que el operario cargó hoy por el Modo OP de Recepción
+   (recepcion.js lo va sumando en localStorage). Se usa para cerrar RT con esa
+   cantidad sin pedirla a mano. De paso limpia las claves de días viejos. */
+function recepcionCajasDelDia(legajo) {
+  const hoy = getTodayKey();
+  const prefijo = "vir_recepcion_cajas_" + String(legajo || "") + "_";
+  let total = 0;
+  try {
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const k = localStorage.key(i);
+      if (k && k.indexOf(prefijo) === 0) {
+        if (k === prefijo + hoy) total = parseInt(localStorage.getItem(k), 10) || 0;
+        else localStorage.removeItem(k);   // día viejo: no sirve, lo borro
+      }
+    }
+  } catch (_e) { /* no-op */ }
+  return total;
 }
 function formatDayLong(fecha) {
   const p = fecha.split("-");
@@ -2925,9 +2948,28 @@ function terminarDia() {
        </ul>`
     : "";
 
-  // Toggles que piden cantidad (CC/RT/RI/EI): input por cada uno
+  // Toggles que piden cantidad (CC/RI/EI): input por cada uno. RT es especial:
+  // su cantidad se calcula sola del Modo OP de Recepción (no se pide a mano).
   const seCierranConInputHtml = pendings.seCierranConInput.length
-    ? pendings.seCierranConInput.map(p => `
+    ? pendings.seCierranConInput.map(p => {
+        if (p.tipo === "RT") {
+          const autoRT = recepcionCajasDelDia(legajoStr);
+          return `
+        <div style="margin: 8px 0;">
+          <label style="display:block; font-size:14px; margin-bottom:3px;">
+            <b>RT</b> — ${escapeHtml(p.desc)}: <span style="color:#166534;">cajas (calculado del Modo OP)</span>
+          </label>
+          <input type="text" id="td_input_RT" value="${autoRT}" readonly
+                 style="width:100%; padding:8px; border:2px solid #16a34a; background:#f0fdf4;
+                        border-radius:6px; font-size:16px; box-sizing:border-box; font-weight:900;">
+          <div style="font-size:12px; color:#166534; margin-top:3px;">
+            ${autoRT > 0
+              ? "Total de cajas que cargaste en Recepción hoy. No hace falta que lo escribas."
+              : "No cargaste recepción por Modo OP hoy. Si recibiste algo, cargalo tocando RT antes de cerrar."}
+          </div>
+        </div>`;
+        }
+        return `
         <div style="margin: 8px 0;">
           <label style="display:block; font-size:14px; margin-bottom:3px;">
             <b>${escapeHtml(p.tipo)}</b> — ${escapeHtml(p.desc)}: <span style="color:#991b1b;">cantidad</span>
@@ -2937,7 +2979,8 @@ function terminarDia() {
                  style="width:100%; padding:8px; border:2px solid #ca8a04;
                         border-radius:6px; font-size:16px; box-sizing:border-box;"
                  placeholder="Cantidad...">
-        </div>`).join("")
+        </div>`;
+      }).join("")
     : "";
 
   // Detectar si ya hubo un FJ hoy: bandera para mostrar advertencia.
@@ -3049,6 +3092,8 @@ async function confirmarTerminarDia() {
   const closeInputs = {};   // code -> cantidad escrita
   const pendNow = getPendingsForLegajo(legajoStr);
   for (const p of pendNow.seCierranConInput) {
+    // RT: la cantidad sale sola del Modo OP de Recepción (no se pide ni se valida).
+    if (p.tipo === "RT") { closeInputs.RT = String(recepcionCajasDelDia(legajoStr)); continue; }
     const el = document.getElementById("td_input_" + p.tipo);
     const v  = (el && el.value || "").trim();
     if (!v) {
@@ -4287,7 +4332,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v2.60";
+const APP_VERSION = "v2.61";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -4487,6 +4532,16 @@ async function send() {
   if (opcion === "CC") {
     const stCC = getLegajoState(legajoStr);
     if (stCC && stCC.toggles && stCC.toggles.CC) showCargaCamion(legajoStr);
+  }
+  // Al INICIAR recepción (1er toque de RT): Modo OP de Recepción (recepcion.js).
+  // Anota cajas por código; el total del día se usa para cerrar RT sin pedir
+  // la cantidad a mano (ver recepcionCajasDelDia + Terminar Día).
+  if (opcion === "RT") {
+    const stRT = getLegajoState(legajoStr);
+    if (stRT && stRT.toggles && stRT.toggles.RT) {
+      try { if (typeof window.openRecepcionOp === "function") window.openRecepcionOp(legajoStr, getTodayKey()); }
+      catch (_e) { /* el módulo puede no haber cargado (sin red): RT igual quedó abierto */ }
+    }
   }
 
   resetSelection();

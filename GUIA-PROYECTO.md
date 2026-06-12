@@ -4,7 +4,24 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-12 · Versión app al documentar: **v2.60**
+> Última actualización: 2026-06-12 · Versión app al documentar: **v2.61**
+>
+> Nota: **v2.61** — **Modo OP de Recepción integrado en RT**. Al tocar **`RT`**
+> (Recepción Mercadería, 1er toque/apertura) se abre el **Modo OP** portado de
+> la app `Control-Carga-Remitos-FC` (v1.13.0): elegir Talleristas / Prov. Art.
+> Terminado → buscar → línea **LK/CH** + fecha → N° RTO/FC → grilla de códigos
+> con pop-up de cajas → resumen → confirmar. Graba en `Entregas Tallerista
+> Virgilio` / `Entregas Prov AT` + deja el pendiente en `Control_Modo_OP` (mismo
+> Supabase `hrxfctzncixxqmpfhskv`, pero con **login anónimo** vía `supabase-js`
+> para pasar RLS). Vive en **`recepcion.js`** (`<script type="module">`),
+> aislado bajo `#rcpRoot` (DOM + CSS scopeados, no choca con el `button{}` global
+> de Producción). Expone `window.openRecepcionOp(legajo, dayKey)`; el hook está
+> en `send()` (`if (opcion === "RT" && toggles.RT)`). **Necesita conexión** (lee
+> y escribe datos vivos), a diferencia del resto de la app. **Cantidad de RT
+> automática**: cada confirmación suma las cajas a `localStorage`
+> (`vir_recepcion_cajas_<legajo>_<día>`); al **Terminar Día**, RT se cierra con
+> ese total (`recepcionCajasDelDia`) **sin pedir el número a mano** — el campo es
+> read-only y la validación no lo bloquea. Anular un envío resta del acumulador.
 >
 > Nota: **v2.60** — **aviso Telegram por códigos sin planimetría**. Al armar el
 > picking, si hay códigos que no figuran en `window.GONDOLA` (planimetria.js),
@@ -376,7 +393,7 @@ Definidos en `index.html` (objeto `desc`, ~línea 1531). Los botones se arman en
 | `TAP` | Terminé Armado Pedido | CORE (cierre) | Sí — código de pedido |
 | `CR` | Control Remitos | TOGGLE | No |
 | `CC` | Inicio/Fin Carga Camión | TOGGLE | Sí, al cerrar (Nro) |
-| `RT` | Recepción Mercadería | TOGGLE | Sí, al cerrar (cantidad) |
+| `RT` | Recepción Mercadería | TOGGLE | Sí, al cerrar: `texto` = cantidad de cajas, **calculada sola** del Modo OP de Recepción (suma del día en `localStorage`, ver v2.61). Al abrir RT se lanza el Modo OP (`recepcion.js`). |
 | `MG` | Guardado a Góndola | TOGGLE | No |
 | `RI` | Recepción Insumos | TOGGLE | Sí, al cerrar (cantidad) |
 | `EI` | Entrega Insumos | TOGGLE | Sí, al cerrar (cantidad) |
