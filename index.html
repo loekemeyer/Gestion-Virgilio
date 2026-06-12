@@ -1749,6 +1749,13 @@ button {
 .tanda-modal-table tr.tanda-armado td{ color: #16a34a; }
 .tanda-modal-table tr.tanda-no-armado td{ color: #dc2626; }
 
+/* Lista de picking (pop-up al "Empecé Picking"): qué artículos levantar. */
+.pk-sub{ font-size: 13px; color: #64748b; margin: 2px 0 10px; }
+.pk-table td.pk-cod{ font-weight: bold; font-size: 17px; }
+.pk-table td.num{ font-size: 17px; font-weight: bold; }
+.pk-desg{ font-size: 12px; font-weight: normal; color: #94a3b8; }
+.pk-table tfoot th{ background: #eef2ff; font-size: 15px; border-top: 2px solid #c7d2fe; padding: 8px; }
+
 /* Modales (historial de días anteriores y "Terminar Día") */
 #histModal,
 #terminarDiaModal{
@@ -4211,7 +4218,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v2.52";
+const APP_VERSION = "v2.53";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -4404,6 +4411,9 @@ async function send() {
     }
     alert("⚠️ Sin conexión o sin respuesta del servidor.\nTu reporte quedó guardado y se reenviará automáticamente cuando vuelva la red.");
   }
+
+  // Al EMPEZAR PICKING: pop-up con los artículos a levantar para esa tanda.
+  if (opcion === "EP" && (texto || "").trim()) showPickingList(texto);
 
   resetSelection();
   optionsScreen.classList.add("hidden");
@@ -4747,6 +4757,128 @@ const MONITOR_HISTORIC_CSV_URL =
 const HISTORIC_REFRESH_MS = 5 * 60 * 1000;
 let historicMap        = null;   // Map<tandaUpper, m3 sumado>
 let historicLastFetch  = 0;
+
+/* =========================================================
+   LISTA DE PICKING — pop-up al "Empecé Picking"
+   Cruza la tanda con sus pedidos ("PPP Excel Programacion Diaria", vía
+   fetchMonitorSheet → sheetMap.pedidos) y los artículos de cada pedido
+   ("PPP Excel Base Datos Pedidos"), suma las cajas por código y las muestra
+   ordenadas numéricamente. (Después: orden de góndola en vez de numérico.)
+   ========================================================= */
+const PICKING_BASE_CSV_URL =
+  "https://docs.google.com/spreadsheets/d/1-16YXe0xq6x9i-Yhk5cm5V3VqvQ0PWZtcDbm8OeeKW0/gviz/tq?tqx=out:csv&sheet=" +
+  encodeURIComponent("PPP Excel Base Datos Pedidos");
+const PICK_BASE_TTL_MS = 5 * 60 * 1000;   // hoja grande (~20k filas) → cache 5 min
+let _pickBaseCache   = null;   // Map<pedido(NP), [{art, cajas}]>
+let _pickBaseCacheTs = 0;
+
+function pickNormNp(v) {
+  let s = (v == null ? "" : String(v)).trim();
+  if (/^\d+\.0+$/.test(s)) s = s.replace(/\.0+$/, "");   // "97754.0" -> "97754"
+  return s;
+}
+function pickParseCajas(s) {
+  if (s == null) return 0;
+  const n = parseFloat(String(s).trim().replace(",", "."));
+  return isNaN(n) ? 0 : n;
+}
+
+/* Baja "PPP Excel Base Datos Pedidos" (pedido → artículos + cajas) y la cachea.
+   Lee por posición: Pedido=A, Artículo=C, Cantidad Cajas=F (con detección de
+   header por las dudas, tolerando los labels que gviz a veces duplica). */
+async function fetchPickingBase() {
+  const now = Date.now();
+  if (_pickBaseCache && (now - _pickBaseCacheTs) < PICK_BASE_TTL_MS) return _pickBaseCache;
+  const r = await fetch(PICKING_BASE_CSV_URL + "&_=" + now, { cache: "no-store" });
+  if (!r.ok) throw new Error("Base Datos Pedidos HTTP " + r.status);
+  const rows = parseCSV(await r.text());
+  let cPed = 0, cArt = 2, cCaj = 5;
+  for (let i = 0; i < Math.min(rows.length, 5); i++) {
+    const h = rows[i].map(dedupeHeaderCell);
+    const ip = h.indexOf("pedido");
+    const ia = h.findIndex(x => x === "artículo" || x === "articulo");
+    const ic = h.findIndex(x => x.indexOf("cajas") >= 0);
+    if (ip >= 0 && ia >= 0) { cPed = ip; cArt = ia; if (ic >= 0) cCaj = ic; break; }
+  }
+  const map = new Map();
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i]; if (!row) continue;
+    const ped = pickNormNp(row[cPed]);
+    if (!ped || !/^\d/.test(ped)) continue;             // saltea header y basura
+    const art = (row[cArt] || "").trim();
+    if (!art) continue;
+    if (!map.has(ped)) map.set(ped, []);
+    map.get(ped).push({ art: art, cajas: pickParseCajas(row[cCaj]) });
+  }
+  _pickBaseCache = map; _pickBaseCacheTs = Date.now();
+  return map;
+}
+
+/* Pop-up con la lista de artículos a levantar para una tanda. Reutiliza
+   #tandaModal (overlay + botón Cerrar). */
+async function showPickingList(tanda) {
+  const tNorm = (tanda || "").trim().toUpperCase();
+  if (!tNorm) return;
+  const m = document.getElementById("tandaModal");
+  if (!m) return;
+  m.querySelector(".tanda-modal-title").textContent = "📋 Levantar — Tanda " + tNorm;
+  m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">Cargando lista de artículos…</div>`;
+  m.classList.add("show");
+  try {
+    const [sheetMap, pickBase] = await Promise.all([fetchMonitorSheet(), fetchPickingBase()]);
+    const entry = sheetMap.get(tNorm);
+    const nps = [];
+    if (entry && entry.pedidos) {
+      for (const p of entry.pedidos) {
+        for (const part of String(p.np || "").split(/[,/]/)) {
+          const n = pickNormNp(part);
+          if (n && /\d/.test(n) && nps.indexOf(n) < 0) nps.push(n);
+        }
+      }
+    }
+    const agg = {}, det = {};
+    for (const np of nps) {
+      for (const it of (pickBase.get(np) || [])) {
+        agg[it.art] = (agg[it.art] || 0) + it.cajas;
+        (det[it.art] = det[it.art] || []).push(it.cajas);
+      }
+    }
+    renderPickingList(m, tNorm, nps, agg, det);
+  } catch (e) {
+    m.querySelector(".tanda-modal-body").innerHTML =
+      `<div class="history-empty">No se pudo cargar la lista (¿sin conexión?).<br><small>${escapeHtml(e.message || "")}</small></div>`;
+  }
+}
+
+function renderPickingList(m, tanda, nps, agg, det) {
+  const body = m.querySelector(".tanda-modal-body");
+  const arts = Object.keys(agg);
+  if (!arts.length) {
+    body.innerHTML = `<div class="history-empty">No encontré artículos para la tanda <b>${escapeHtml(tanda)}</b>.<br>` +
+      (nps.length
+        ? `Pedidos ${nps.map(escapeHtml).join(", ")} — sin filas en "PPP Excel Base Datos Pedidos".`
+        : `La tanda no figura en la programación de hoy.`) + `</div>`;
+    return;
+  }
+  // Orden numérico por código (501, 502, 580E…). Después: orden de góndola.
+  const numKey = (c) => { const mm = String(c).match(/^(\d+)/); return mm ? parseInt(mm[1], 10) : Number.MAX_SAFE_INTEGER; };
+  arts.sort((a, b) => (numKey(a) - numKey(b)) || (a < b ? -1 : a > b ? 1 : 0));
+  const fmt = (n) => { const r = Math.round(n * 100) / 100; return (r === Math.round(r) ? String(Math.round(r)) : String(r)).replace(".", ","); };
+  let total = 0;
+  const trs = arts.map(art => {
+    const cj = agg[art]; total += cj;
+    const d = det[art];
+    const desg = d.length > 1 ? ` <span class="pk-desg">(${d.map(fmt).join(" + ")})</span>` : "";
+    return `<tr><td class="pk-cod">${escapeHtml(art)}</td><td class="num">${fmt(cj)}${desg}</td></tr>`;
+  }).join("");
+  body.innerHTML = `
+    <div class="pk-sub">${nps.length} pedido(s): ${nps.map(escapeHtml).join(", ")}</div>
+    <table class="tanda-modal-table pk-table">
+      <thead><tr><th>Código</th><th class="num">Cajas</th></tr></thead>
+      <tbody>${trs}</tbody>
+      <tfoot><tr><th>TOTAL</th><th class="num">${fmt(total)}</th></tr></tfoot>
+    </table>`;
+}
 let historicInflight   = null;   // Promise para evitar fetch en paralelo
 
 const MONITOR_REFRESH_MS = 30000;    // ciclo principal — 30s para bajar consumo Supabase

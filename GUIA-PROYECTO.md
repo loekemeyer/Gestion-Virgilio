@@ -4,7 +4,22 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-05 · Versión app al documentar: **v2.52**
+> Última actualización: 2026-06-05 · Versión app al documentar: **v2.53**
+>
+> Nota: **v2.53** — **lista de picking** (pop-up al "Empecé Picking"). Cuando el
+> operario manda `EP` con una tanda, aparece un modal (reusa `#tandaModal`) con
+> los **artículos a levantar**: cruza la tanda → sus pedidos (`PPP Excel
+> Programacion Diaria`, vía `fetchMonitorSheet` → `sheetMap.pedidos[].np`) con los
+> artículos de cada pedido (hoja **`PPP Excel Base Datos Pedidos`**, ~20k filas:
+> `Pedido | Fecha | Artículo | … | Cantidad Cajas`), **suma las cajas por código**
+> y las muestra **ordenadas numéricamente** (después: orden de góndola). La base se
+> baja por gviz **por nombre** (`&sheet=PPP Excel Base Datos Pedidos`, no por gid)
+> y se cachea 5 min (`fetchPickingBase`). Si la tanda no está o no hay conexión, el
+> modal lo avisa. Funciones nuevas en `index.html`: `fetchPickingBase`,
+> `showPickingList`, `renderPickingList`; enganche en el flujo de envío (rama
+> `opcion === "EP"`). La hoja `PPP Excel Base Datos Pedidos` la pushea la macro de
+> Excel (vía `handleCargaPPPSync_`, ALLOWED_SHEETS), igual que Programación y
+> Pedidos Entregados.
 >
 > Nota: **v2.52** — (a) el `#versionBadge` ya **no trae versión hardcodeada** en el
 > HTML (antes decía `v2.04 ✓` y nunca se actualizó → engañaba el diagnóstico):
