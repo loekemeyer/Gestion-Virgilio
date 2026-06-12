@@ -5268,15 +5268,15 @@ const ARMADO_GUIADO_ACTIVO = false;     // ← poner en true para activarlo (tra
 const LIO_DEFAULT = 5;                   // cajas por lío (default; el parámetro es por m³)
 const LIO_OVERRIDE_COD = { "321": 4 };   // override sembrado por código → se aplica a SU m³
 
-let _ar = null;   // { pedido, legajo, boxes:[{m3,label,lio,items,total,lios,sueltas}], idx, done:Set }
+let _ar = null;   // { pedido, legajo, boxes:[{m3,label,lio,items,total,lios,liosComp}], idx, done:Set, totLios }
 
 function arM3Key(v) { return (Math.round(v * 10000) / 10000).toFixed(4); }
 function arM3Disp(v) { return String(Math.round(v * 10000) / 10000).replace(".", ","); }
 function arNumOf(c) { const mm = String(c).match(/^(\d+)/); return mm ? parseInt(mm[1], 10) : Number.MAX_SAFE_INTEGER; }
 
-/* Empaqueta las cajas de una caja (mismo m³) en líos de `lioSize`, llenando en
-   orden. Devuelve { lios:[[{art,cajas}]], sueltas:[{art,cajas}] } para decir
-   exactamente QUÉ juntar en cada lío (lo sobrante < lioSize queda en sueltas). */
+/* Reparte las cajas de una caja (mismo m³) en líos, SIN dejar sueltas: arma
+   round(total/lioSize) líos (mín 1) lo más parejos posible. Devuelve
+   { lios:[[{art,cajas}]] } para decir exactamente QUÉ juntar en cada lío. */
 function arPackLios(items, lioSize) {
   const total = items.reduce((s, x) => s + x.cajas, 0);
   if (total <= 0) return { lios: [] };
