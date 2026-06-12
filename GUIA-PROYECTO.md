@@ -4,7 +4,18 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-05 · Versión app al documentar: **v2.58**
+> Última actualización: 2026-06-05 · Versión app al documentar: **v2.59**
+>
+> Nota: **v2.59** — **planimetría / orden de góndola activado** en el picking. Se
+> agregó **`planimetria.js`** (`window.GONDOLA = { "502":["A01",1], … }`, 315
+> artículos código→[sector, orden]) generado de la hoja **"Picking"** del Excel
+> `AAA_PPP_Vigente.xlsm` (cols Emp·Cod·Sector·Orden). `showPickingList` ahora
+> **ordena los artículos por el `orden` de góndola** (los sin planimetría caen al
+> final, numérico) y le adjunta el **sector**; `pkRender` muestra `Sector: A01`
+> real (antes placeholder). Para actualizar la planimetría: re-subir el Excel y
+> regenerar `planimetria.js` desde la hoja "Picking". `index.html` lo carga con
+> `<script src="planimetria.js">`.
+>
 >
 > Nota: **v2.58** — **vista "Faltantes"** en el panel del supervisor (botón 📦,
 > modal `#faltantesModal`). Lee los eventos `PKC` del día elegido (selector hoy +

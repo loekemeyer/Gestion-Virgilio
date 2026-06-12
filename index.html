@@ -1762,7 +1762,7 @@ button {
 .pk-bar > i{ display: block; height: 100%; background: #16a34a; }
 .pk-cod-row{ display: flex; justify-content: space-between; align-items: baseline; }
 .pk-cod-lbl{ font-size: 13px; color: #94a3b8; letter-spacing: .06em; }
-.pk-sector{ font-size: 12px; color: #94a3b8; background: #f1f5f9; border-radius: 6px; padding: 2px 8px; }
+.pk-sector{ font-size: 14px; font-weight: bold; color: #1e6bd6; background: #eff6ff; border-radius: 6px; padding: 3px 10px; }
 .pk-cod-big{ font-size: 54px; font-weight: 800; color: #0f172a; line-height: 1; }
 .pk-cajas{ font-size: 22px; color: #334155; background: #eff6ff; border: 2px solid #1e6bd6; border-radius: 12px; padding: 12px 16px; text-align: center; }
 .pk-cajas b{ font-size: 30px; color: #1e6bd6; }
@@ -2337,6 +2337,7 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
 <!-- Librería qrcode-generator (Kazuhiko Arase, MIT) — hosteada local para
      que ande sin internet en el depósito. -->
 <script src="qrcode.js"></script>
+<script src="planimetria.js"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -4285,7 +4286,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v2.58";
+const APP_VERSION = "v2.59";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -4919,10 +4920,16 @@ async function showPickingList(tanda, legajo) {
     // Sumar cajas por código entre todos los pedidos de la tanda.
     const agg = {};
     for (const np of nps) for (const it of (pickBase.get(np) || [])) agg[it.art] = (agg[it.art] || 0) + it.cajas;
+    // Orden de góndola (planimetría, window.GONDOLA): ordena por el "orden" de
+    // cada código y le adjunta su sector. Los códigos sin planimetría caen al
+    // final, ordenados numéricamente entre sí.
+    const G = (typeof window !== "undefined" && window.GONDOLA) ? window.GONDOLA : {};
+    const gOf = (c) => G[String(c).toUpperCase()] || null;
+    const gOrden = (c) => { const e = gOf(c); return (e && typeof e[1] === "number") ? e[1] : Number.MAX_SAFE_INTEGER; };
     const numKey = (c) => { const mm = String(c).match(/^(\d+)/); return mm ? parseInt(mm[1], 10) : Number.MAX_SAFE_INTEGER; };
     const items = Object.keys(agg)
-      .sort((a, b) => (numKey(a) - numKey(b)) || (a < b ? -1 : a > b ? 1 : 0))
-      .map(art => ({ art: art, esp: agg[art] }));
+      .sort((a, b) => (gOrden(a) - gOrden(b)) || (numKey(a) - numKey(b)) || (a < b ? -1 : a > b ? 1 : 0))
+      .map(art => { const e = gOf(art); return { art: art, esp: agg[art], sector: (e && e[0]) ? e[0] : "—" }; });
     if (!items.length) {
       _pk = null;
       m.querySelector(".tanda-modal-body").innerHTML =
@@ -4959,7 +4966,7 @@ function pkRender() {
   const confirmed = _pk.results[it.art];
   if (_pk.mode === "fInput") {
     body.innerHTML = `<div class="pk-flow">${nav}
-      <div class="pk-cod-row"><span class="pk-cod-big">${escapeHtml(it.art)}</span><span class="pk-sector">Sector: —</span></div>
+      <div class="pk-cod-row"><span class="pk-cod-big">${escapeHtml(it.art)}</span><span class="pk-sector">Sector: ${escapeHtml(it.sector || "—")}</span></div>
       <div class="pk-fq">
         <div class="pk-fq-q">¿Cuántas cajas pusiste? <span class="pk-fq-esp">(pedidas: ${pkFmt(it.esp)})</span></div>
         <input id="pkFqty" class="pk-fq-input" type="number" inputmode="numeric" min="0" value="${pkFmt(confirmed != null ? confirmed : it.esp)}">
@@ -4974,7 +4981,7 @@ function pkRender() {
     ? `<div class="pk-confirmed">✓ Ya confirmaste <b>${pkFmt(confirmed)}</b>${confirmed < it.esp ? ` <span class="pk-falta">(faltaron ${pkFmt(it.esp - confirmed)})</span>` : ""} — podés cambiarlo</div>`
     : ``;
   body.innerHTML = `<div class="pk-flow">${nav}
-    <div class="pk-cod-row"><span class="pk-cod-lbl">CÓDIGO</span><span class="pk-sector">Sector: —</span></div>
+    <div class="pk-cod-row"><span class="pk-cod-lbl">CÓDIGO</span><span class="pk-sector">Sector: ${escapeHtml(it.sector || "—")}</span></div>
     <div class="pk-cod-big">${escapeHtml(it.art)}</div>
     <div class="pk-cajas">Levantá <b>${pkFmt(it.esp)}</b> cajas</div>
     ${confLine}
