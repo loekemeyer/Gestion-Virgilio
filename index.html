@@ -4376,7 +4376,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v2.66";
+const APP_VERSION = "v2.67";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -8504,9 +8504,14 @@ async function fetchFacturadosHoy(force){
     try{
       const url = SUPABASE_FACTURACION_NP_ENDPOINT
         + "?cierre_id=is.null&select=np&limit=5000";
-      const r = await fetch(url, {
-        headers: { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY }
-      });
+      // Leer con el MISMO contexto que la escritura: si hay sesión (supervisor
+      // logueado en el módulo de facturación), usar su JWT. Sin esto, las RLS que
+      // exigen rol authenticated devuelven vacío con la key anónima → el NP recién
+      // tildado no aparece como facturado y la fila "vuelve" a la lista. La TV
+      // (sin sesión) cae al anónimo como antes.
+      let headers = await facAuthWriteHeaders();
+      if (!headers) headers = { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY };
+      const r = await fetch(url, { headers });
       if (!r.ok) throw new Error("HTTP " + r.status);
       const data = await r.json();
       _facNpsHoy = new Set(data.map(x => String(x.np)));

@@ -4,7 +4,14 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-12 · Versión app al documentar: **v2.66**
+> Última actualización: 2026-06-12 · Versión app al documentar: **v2.67**
+>
+> Nota: **v2.67** — **fix facturación: el NP tildado "volvía" a la lista**. El
+> tilde se **escribía** con el JWT del supervisor (`facAuthWriteHeaders`) pero
+> `fetchFacturadosHoy` **leía con la key anónima**; si las RLS de `Facturacion_NP`
+> exigen rol `authenticated` para `SELECT`, el refresco anónimo no veía el NP
+> recién facturado y la fila reaparecía en cada ciclo. Ahora `fetchFacturadosHoy`
+> lee con el **JWT** si hay sesión (cae a anónimo solo para la TV sin login).
 >
 > Nota: **v2.66** — **picking que no se pierde si se bloquea el celular**. El
 > estado del picking interactivo (`_pk`) ahora se **persiste en `localStorage`**
