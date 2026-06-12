@@ -1789,6 +1789,26 @@ button {
 .cc-npnum{ font-size: 18px; font-weight: bold; color: #0f172a; }
 .cc-rs{ font-size: 13px; color: #64748b; margin-left: auto; text-align: right; }
 
+/* Modal Faltantes (vista supervisor). */
+#faltantesModal{ display:none; position:fixed; inset:0; z-index:1200; background:#0b1220; color:#f8fafc; flex-direction:column; }
+#faltantesModal.show{ display:flex; }
+.falt-header{ display:flex; justify-content:space-between; align-items:center; padding:14px 16px; background:#0f172a; border-bottom:1px solid #1f2937; }
+.falt-title{ font-size:20px; font-weight:bold; }
+.falt-days{ display:flex; gap:6px; flex-wrap:wrap; padding:10px 16px; background:#0f172a; }
+.falt-day{ background:#1e293b; color:#cbd5e1; border:1px solid #334155; border-radius:8px; padding:6px 12px; font-size:14px; cursor:pointer; }
+.falt-day.on{ background:#1e6bd6; color:#fff; border-color:#1e6bd6; }
+.falt-body{ flex:1; overflow:auto; padding:14px 16px; }
+.falt-summary{ font-size:15px; color:#fbbf24; font-weight:bold; margin:0 0 14px; }
+.falt-empty{ color:#94a3b8; padding:24px; text-align:center; }
+.falt-tanda{ background:#111827; border:1px solid #1f2937; border-radius:10px; padding:12px 14px; margin-bottom:12px; }
+.falt-tanda-h{ font-size:16px; font-weight:bold; color:#f8fafc; margin-bottom:8px; }
+.falt-table{ width:100%; border-collapse:collapse; }
+.falt-table th{ font-size:12px; color:#94a3b8; text-align:left; padding:4px 8px; border-bottom:1px solid #1f2937; }
+.falt-table th.num{ text-align:right; }
+.falt-table td{ font-size:15px; padding:7px 8px; border-bottom:1px solid #1f2937; }
+.falt-table td.num{ text-align:right; }
+.falt-table td.falt{ color:#f87171; font-weight:bold; }
+
 /* Modales (historial de días anteriores y "Terminar Día") */
 #histModal,
 #terminarDiaModal{
@@ -2251,6 +2271,17 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
   </div>
 </div>
 
+<!-- Modal: Faltantes del picking (vista supervisor). Lee los eventos PKC y
+     agrupa por tanda los artículos donde se puso menos de lo pedido. -->
+<div id="faltantesModal">
+  <div class="falt-header">
+    <div class="falt-title">📦 Faltantes — Picking</div>
+    <button class="hist-modal-close" onclick="closeFaltantes()" style="background:#1e293b;color:#f8fafc;border-color:#334155;">Cerrar</button>
+  </div>
+  <div class="falt-days" id="faltantesDays"></div>
+  <div class="falt-body" id="faltantesBody"><div class="falt-empty">Cargando…</div></div>
+</div>
+
 <!-- Modal: detalle de una tanda (NPs + m3) — se abre al clickear el código
      en la tabla principal o en "Tandas a FC". -->
 <div id="tandaModal" onclick="if(event.target.id==='tandaModal') closeTandaModal()">
@@ -2383,6 +2414,7 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
       <button class="sup-action-btn" onclick="openFacturacion()"><span class="sup-ico">📋</span><span>Facturación</span></button>
       <button class="sup-action-btn" onclick="openInconsistencias()"><span class="sup-ico">⚠</span><span>Inconsistencias</span></button>
       <button class="sup-action-btn" onclick="openAnalisis()"><span class="sup-ico">📈</span><span>Análisis de productividad</span></button>
+      <button class="sup-action-btn" onclick="openFaltantes()"><span class="sup-ico">📦</span><span>Faltantes</span></button>
     </div>
     <div class="auth-logout-row">
       <button class="auth-logout-btn" onclick="signOutGoogle()">Salir</button>
@@ -4253,7 +4285,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v2.57";
+const APP_VERSION = "v2.58";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -6265,6 +6297,92 @@ function closeAnalisis() {
   }
   if (typeof _prodPedRef !== "undefined" && _prodPedRef.chart){
     try { _prodPedRef.chart.destroy(); } catch(_e){} _prodPedRef.chart = null;
+  }
+}
+
+/* =========================================================
+   FALTANTES — vista del supervisor (de los eventos PKC).
+   Selector de día (hoy + 6) → lee PKC del día → agrupa por tanda los
+   artículos donde real < esperadas. Auto-refresco 20s. Corre en el navegador
+   con la clave pública (igual que el resto del monitor).
+   ========================================================= */
+let _faltantesDay = null;
+let _faltantesIntervalId = null;
+
+function openFaltantes() {
+  if (!requireSupervisor()) return;
+  const m = document.getElementById("faltantesModal");
+  if (!m) return;
+  _faltantesDay = getTodayKey();
+  m.classList.add("show");
+  renderFaltantesDays();
+  refreshFaltantes();
+  if (_faltantesIntervalId) clearInterval(_faltantesIntervalId);
+  _faltantesIntervalId = setInterval(refreshFaltantes, 20000);
+}
+function closeFaltantes() {
+  const m = document.getElementById("faltantesModal");
+  if (m) m.classList.remove("show");
+  if (_faltantesIntervalId) { clearInterval(_faltantesIntervalId); _faltantesIntervalId = null; }
+}
+function _faltLbl(k) { return k ? k.slice(8, 10) + "/" + k.slice(5, 7) : ""; }
+function renderFaltantesDays() {
+  const sel = document.getElementById("faltantesDays");
+  if (!sel) return;
+  let html = "";
+  for (let i = 0; i < 7; i++) {
+    const k = isoToDayKey(Date.now() - i * 86400000);
+    html += `<button class="falt-day${k === _faltantesDay ? " on" : ""}" onclick="faltantesSetDay('${k}')">${i === 0 ? "Hoy" : _faltLbl(k)}</button>`;
+  }
+  sel.innerHTML = html;
+}
+function faltantesSetDay(k) { _faltantesDay = k; renderFaltantesDays(); refreshFaltantes(); }
+
+async function refreshFaltantes() {
+  const body = document.getElementById("faltantesBody");
+  if (!body) return;
+  const dayKey = _faltantesDay || getTodayKey();
+  try {
+    const url = SUPABASE_TABLE_ENDPOINT +
+      "?opcion=eq.PKC" +
+      "&ts_cliente=gte." + encodeURIComponent(dayKey + "T00:00:00-03:00") +
+      "&ts_cliente=lte." + encodeURIComponent(dayKey + "T23:59:59.999-03:00") +
+      "&select=legajo,texto,ts_cliente&order=ts_cliente.desc&limit=8000";
+    const r = await fetch(url, { headers: { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const data = await r.json();
+    const byTanda = {}, seen = new Set();
+    for (const ev of data) {
+      const p = String(ev.texto || "").split("|");
+      if (p.length < 4) continue;
+      const tanda = (p[0] || "").trim(), art = (p[1] || "").trim();
+      const esp = parseFloat(String(p[2]).replace(",", ".")), real = parseFloat(String(p[3]).replace(",", "."));
+      if (!tanda || !art || isNaN(esp) || isNaN(real) || real >= esp) continue;   // solo faltantes
+      const k = tanda + "|" + art + "|" + (ev.legajo || "");
+      if (seen.has(k)) continue;   // orden desc → el primero es el más reciente
+      seen.add(k);
+      (byTanda[tanda] = byTanda[tanda] || []).push({ art, esp, real, falta: esp - real, legajo: ev.legajo || "" });
+    }
+    const tandas = Object.keys(byTanda).sort();
+    if (!tandas.length) {
+      body.innerHTML = `<div class="falt-empty">✓ Sin faltantes el ${_faltLbl(dayKey)}.</div>`;
+      return;
+    }
+    const numKey = (c) => { const mm = String(c).match(/^(\d+)/); return mm ? parseInt(mm[1], 10) : 9e9; };
+    let totArts = 0, totCajas = 0, html = "";
+    for (const tanda of tandas) {
+      const arr = byTanda[tanda].sort((a, b) => (numKey(a.art) - numKey(b.art)) || (a.art < b.art ? -1 : 1));
+      let tFalt = 0;
+      const rows = arr.map(x => {
+        totArts++; totCajas += x.falta; tFalt += x.falta;
+        return `<tr><td>${escapeHtml(x.art)}</td><td class="num">${x.real}</td><td class="num">${x.esp}</td><td class="num falt">${x.falta}</td><td>${escapeHtml(x.legajo)}</td></tr>`;
+      }).join("");
+      html += `<div class="falt-tanda"><div class="falt-tanda-h">Tanda ${escapeHtml(tanda)} · <b>${tFalt}</b> cajas faltan</div>` +
+        `<table class="falt-table"><thead><tr><th>Artículo</th><th class="num">Puso</th><th class="num">Pedía</th><th class="num">Falta</th><th>Legajo</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    }
+    body.innerHTML = `<div class="falt-summary">${tandas.length} tanda(s) con faltante · ${totArts} artículo(s) · ${totCajas} cajas faltantes</div>` + html;
+  } catch (e) {
+    body.innerHTML = `<div class="falt-empty">No se pudo cargar: ${escapeHtml(e.message || "")}</div>`;
   }
 }
 

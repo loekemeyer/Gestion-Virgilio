@@ -4,7 +4,15 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-05 · Versión app al documentar: **v2.57**
+> Última actualización: 2026-06-05 · Versión app al documentar: **v2.58**
+>
+> Nota: **v2.58** — **vista "Faltantes"** en el panel del supervisor (botón 📦,
+> modal `#faltantesModal`). Lee los eventos `PKC` del día elegido (selector hoy +
+> 6) con la clave pública (REST, igual que el resto del monitor), filtra los que
+> tienen `real < esperadas` y los **agrupa por tanda** (Artículo · Puso · Pedía ·
+> Falta · Legajo) + resumen (tandas / artículos / cajas faltantes). Auto-refresco
+> 20s. Funciones: `openFaltantes`/`refreshFaltantes`/`faltantesSetDay`.
+>
 >
 > Nota: **v2.57** — **Carga Camión**: al iniciar `CC` (1er toque), el operario ve un
 > checklist de las **NP de las tandas con armado terminado** (`TAP`, de
