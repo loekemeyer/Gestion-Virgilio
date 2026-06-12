@@ -1779,6 +1779,16 @@ button {
 .pk-done-t{ font-size: 22px; font-weight: bold; color: #0f172a; }
 .pk-done-s{ font-size: 15px; color: #64748b; }
 
+/* Carga Camión — checklist de NPs. */
+.cc-sub{ font-size: 14px; color: #64748b; margin: 2px 0 10px; }
+.cc-tanda{ font-size: 13px; font-weight: bold; color: #1e6bd6; margin: 12px 0 4px; }
+.cc-np{ display: flex; align-items: center; gap: 10px; padding: 11px 10px; border: 2px solid #e2e8f0; border-radius: 10px; margin-bottom: 6px; cursor: pointer; }
+.cc-np.cc-on{ background: #ecfdf5; border-color: #16a34a; }
+.cc-chk{ width: 24px; height: 24px; border-radius: 6px; border: 2px solid #cbd5e1; display: inline-flex; align-items: center; justify-content: center; color: #fff; font-weight: bold; flex: 0 0 auto; }
+.cc-np.cc-on .cc-chk{ border-color: #16a34a; background: #16a34a; }
+.cc-npnum{ font-size: 18px; font-weight: bold; color: #0f172a; }
+.cc-rs{ font-size: 13px; color: #64748b; margin-left: auto; text-align: right; }
+
 /* Modales (historial de días anteriores y "Terminar Día") */
 #histModal,
 #terminarDiaModal{
@@ -2477,7 +2487,7 @@ const desc = {
   RI:"Recepción Insumos", EI:"Entrega Insumos",
   AT:"Atendí Timbre", PB:"Paré Baño", Limp:"Limpieza",
   Perm:"Permiso de Salida", PC:"Paré Comida",CT:"Conteo",
-  LT:"Llegada Tarde", PKC:"Picking artículo"
+  LT:"Llegada Tarde", PKC:"Picking artículo", CCN:"Carga Camión NP"
 };
 
 let selected = null;
@@ -4103,7 +4113,7 @@ async function trySendOneReport(payload) {
     // y el merge-duplicates no se aplica → 409).
     // FJ y PKC usan client_id determinístico + merge-duplicates (upsert): reenviar
     // o corregir actualiza la fila en vez de fallar con 409 / duplicar.
-    const isUpsert = (payload.opcion === "FJ" || payload.opcion === "PKC");
+    const isUpsert = (payload.opcion === "FJ" || payload.opcion === "PKC" || payload.opcion === "CCN");
     const url    = isUpsert
       ? SUPABASE_TABLE_ENDPOINT + "?on_conflict=client_id"
       : SUPABASE_TABLE_ENDPOINT;
@@ -4243,7 +4253,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v2.56";
+const APP_VERSION = "v2.57";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -4439,6 +4449,11 @@ async function send() {
 
   // Al EMPEZAR PICKING: flujo interactivo de artículos a levantar (Ok / F).
   if (opcion === "EP" && (texto || "").trim()) showPickingList(texto, legajoStr);
+  // Al INICIAR carga camión (1er toque de CC): checklist de NPs listas (TAP).
+  if (opcion === "CC") {
+    const stCC = getLegajoState(legajoStr);
+    if (stCC && stCC.toggles && stCC.toggles.CC) showCargaCamion(legajoStr);
+  }
 
   resetSelection();
   optionsScreen.classList.add("hidden");
@@ -5013,6 +5028,97 @@ function pkSendDetail(art, esp, real) {
   } catch (_e) { /* queda en cola; el SW reintenta */ }
   try { updatePendingIndicator(); } catch (_e) {}
 }
+/* =========================================================
+   CARGA CAMIÓN — checklist de NPs listas para cargar.
+   Al iniciar CC, muestra las NP de las tandas con armado terminado (TAP, de
+   getActivityStatus().armadoDone) y el operario tilda las que cargó. Cada NP
+   marcada → evento CCN a Supabase (texto = "NP|TANDA"), por la cola offline.
+   Reutiliza #tandaModal.
+   ========================================================= */
+let _cc = null;   // { legajo, items:[{tanda,np,rs}], checked:Set<np> }
+
+async function showCargaCamion(legajo) {
+  const m = document.getElementById("tandaModal"); if (!m) return;
+  m.querySelector(".tanda-modal-title").textContent = "🚛 Carga Camión — NPs listas";
+  m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">Cargando NPs…</div>`;
+  m.classList.add("show");
+  try {
+    const [status, sheetMap] = await Promise.all([getActivityStatus(), fetchMonitorSheet()]);
+    const seen = new Set(); const items = [];
+    for (const tandaNorm of status.armadoDone) {       // tandas con TAP (armado terminado)
+      const entry = sheetMap.get(tandaNorm);
+      if (!entry || !entry.pedidos) continue;          // solo las que están en el PPP actual
+      for (const p of entry.pedidos) {
+        for (const part of String(p.np || "").split(/[,/]/)) {
+          const np = part.trim();
+          if (np && /\d/.test(np) && !seen.has(np)) { seen.add(np); items.push({ tanda: entry.tanda, np: np, rs: p.razonSocial || "" }); }
+        }
+      }
+    }
+    items.sort((a, b) => a.tanda.localeCompare(b.tanda) || a.np.localeCompare(b.np));
+    if (!items.length) {
+      _cc = null;
+      m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">No hay NPs de tandas con armado terminado (TAP) en el PPP de hoy.</div>`;
+      return;
+    }
+    _cc = { legajo: String(legajo || "").trim(), items: items, checked: new Set() };
+    ccRender();
+  } catch (e) {
+    _cc = null;
+    m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">No se pudo cargar (¿sin conexión?).<br><small>${escapeHtml(e.message || "")}</small></div>`;
+  }
+}
+
+function ccRender() {
+  const m = document.getElementById("tandaModal"); if (!m || !_cc) return;
+  const byTanda = {};
+  for (const it of _cc.items) (byTanda[it.tanda] = byTanda[it.tanda] || []).push(it);
+  let html = `<div class="cc-sub">Tocá las NP que cargaste al camión:</div>`;
+  for (const tanda of Object.keys(byTanda)) {
+    html += `<div class="cc-tanda">Tanda ${escapeHtml(tanda)}</div>`;
+    for (const it of byTanda[tanda]) {
+      const on = _cc.checked.has(it.np);
+      html += `<div class="cc-np${on ? " cc-on" : ""}" onclick="ccToggle('${String(it.np).replace(/[^0-9A-Za-z]/g, "")}')">` +
+              `<span class="cc-chk">${on ? "✓" : ""}</span>` +
+              `<span class="cc-npnum">${escapeHtml(it.np)}</span>` +
+              `<span class="cc-rs">${escapeHtml(it.rs)}</span></div>`;
+    }
+  }
+  html += `<button class="pk-btn pk-ok" onclick="ccSave()">Guardar (${_cc.checked.size} cargadas)</button>` +
+          `<button class="pk-btn pk-cancel" onclick="ccClose()">Cerrar</button>`;
+  m.querySelector(".tanda-modal-body").innerHTML = html;
+}
+
+function ccToggle(np) {
+  if (!_cc) return;
+  if (_cc.checked.has(np)) _cc.checked.delete(np); else _cc.checked.add(np);
+  ccRender();
+}
+function ccClose() { _cc = null; closeTandaModal(); }
+function ccSave() {
+  if (!_cc) return;
+  const legajo = _cc.legajo;
+  const sel = _cc.items.filter(it => _cc.checked.has(it.np));
+  _cc = null; closeTandaModal();
+  for (const it of sel) ccSendDetail(legajo, it.np, it.tanda);
+  if (sel.length) { try { alert("Guardadas " + sel.length + " NP cargadas al camión."); } catch (_e) {} }
+}
+function ccSendDetail(legajo, np, tanda) {
+  const nowMs = Date.now();
+  const payload = {
+    legajo: legajo, opcion: "CCN", descripcion: "Carga Camión NP",
+    texto: (String(np) + "|" + String(tanda)).toUpperCase(),
+    ts: nowMs,
+    id: ("ccn_" + legajo + "_" + np + "_" + getTodayKey()).replace(/[^a-zA-Z0-9_\-]/g, ""),
+    ts_inicio_iso: null
+  };
+  try {
+    enqueueReport(payload);
+    if (typeof trySendOneReport === "function") trySendOneReport(payload).then(r => { if (r && r.ok) removeFromQueue(payload.id); }).catch(() => {});
+  } catch (_e) {}
+  try { updatePendingIndicator(); } catch (_e) {}
+}
+
 let historicInflight   = null;   // Promise para evitar fetch en paralelo
 
 const MONITOR_REFRESH_MS = 30000;    // ciclo principal — 30s para bajar consumo Supabase

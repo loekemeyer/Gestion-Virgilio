@@ -4,7 +4,17 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-05 · Versión app al documentar: **v2.55**
+> Última actualización: 2026-06-05 · Versión app al documentar: **v2.57**
+>
+> Nota: **v2.57** — **Carga Camión**: al iniciar `CC` (1er toque), el operario ve un
+> checklist de las **NP de las tandas con armado terminado** (`TAP`, de
+> `getActivityStatus().armadoDone` cruzado con `fetchMonitorSheet` para los NP) y
+> **tilda las que cargó**. Cada NP marcada → evento **`CCN`** (texto = `NP|TANDA`)
+> por la cola offline, con id determinístico `ccn_<legajo>_<np>_<día>` + upsert.
+> Funciones: `showCargaCamion`/`ccRender`/`ccToggle`/`ccSave`/`ccSendDetail`.
+> (v2.56: sector del picking como placeholder visible.)
+>
+> Nota: **v2.55** — el picking interactivo ahora tiene navegación ← Atrás /
 >
 > Nota: **v2.55** — el picking interactivo ahora tiene **navegación ← Atrás /
 > Adelante →** entre artículos (se puede ir y volver; al revisitar uno confirmado
@@ -347,6 +357,7 @@ Definidos en `index.html` (objeto `desc`, ~línea 1531). Los botones se arman en
 | `FJ` | Fin de Jornada | (botón "Terminar Día") | `texto` = JSON con los conteos del día |
 | `LT` | Llegada Tarde | (automático) | `texto` = minutos de demora; `ts_inicio` = inicio de jornada, `ts_cliente` = primer mensaje. **NO cuenta como trabajado** en el monitor |
 | `PKC` | Picking artículo | (detalle de picking, v2.54) | `texto` = `TANDA\|CÓDIGO\|ESPERADAS\|REALES` (ej. `A15C\|502\|5\|3`). Un evento por artículo confirmado en el flujo de picking. El monitor lo ignora (no está en los grupos). |
+| `CCN` | Carga Camión NP | (detalle de carga, v2.57) | `texto` = `NP\|TANDA` (ej. `97754\|C47B`). Un evento por NP marcada como cargada al camión. id determinístico `ccn_<legajo>_<np>_<día>` + upsert. El monitor lo ignora. |
 
 **Grupos (constantes en `index.html`):**
 - `CORE_CODES = [EP, TP, AP, TAP]` — el trabajo medible (picking / armado).
