@@ -3450,6 +3450,23 @@ function renderPendingSuggestion(){
   box.innerHTML = "";
   if(!legajo) return;
 
+  // (−1) Picking interactivo en curso, guardado solo: botón para retomarlo
+  // EXACTO donde quedó. Cubre el caso de que se bloquee el celular / se cierre la
+  // app a mitad del picking — antes se perdía todo. Va arriba de todo.
+  try {
+    const savedPk = pkLoadSaved(legajo);
+    if (savedPk) {
+      const hechos = Object.keys(savedPk.results || {}).length;
+      const total  = (savedPk.items || []).length;
+      const btn = document.createElement("button");
+      btn.className = "primary-btn";
+      btn.style.background = "#7c3aed";
+      btn.innerText = `▶ Seguir picking tanda ${savedPk.tanda} (${hechos}/${total})`;
+      btn.onclick = () => pkResume(legajo);
+      box.appendChild(btn);
+    }
+  } catch (_e) { /* no-op */ }
+
   const st    = getLegajoState(legajo);
   const today = getTodayKey();
   const cont  = st.continuar || {};
@@ -4359,7 +4376,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v2.65";
+const APP_VERSION = "v2.66";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -5024,6 +5041,47 @@ async function fetchVolumenArticulos() {
    ========================================================= */
 let _pk = null;   // { tanda, legajo, items:[{art,esp}], idx, results:{art:real}, mode }
 
+/* Persistencia del picking en curso. Se guarda en cada render, así si se bloquea
+   el celular / el navegador mata la pestaña, al reabrir NO se pierde lo hecho: se
+   retoma con el botón "Seguir picking" (pkResume) o al re-tocar EP de esa tanda.
+   Guarda los ítems también → la reanudación anda incluso sin conexión. */
+const PK_SAVE_PREFIX = "vir_pk_";
+function pkSave() {
+  try {
+    if (!_pk || !_pk.legajo) return;
+    localStorage.setItem(PK_SAVE_PREFIX + _pk.legajo, JSON.stringify({
+      day: getTodayKey(), tanda: _pk.tanda, legajo: _pk.legajo,
+      items: _pk.items, idx: _pk.idx, results: _pk.results, mode: _pk.mode
+    }));
+  } catch (_e) { /* localStorage lleno / privado: no rompe el picking */ }
+}
+function pkLoadSaved(legajo) {
+  try {
+    const raw = localStorage.getItem(PK_SAVE_PREFIX + String(legajo || ""));
+    if (!raw) return null;
+    const s = JSON.parse(raw);
+    if (!s || s.day !== getTodayKey() || !s.items || !s.items.length) { pkClearSaved(legajo); return null; }
+    return s;
+  } catch (_e) { return null; }
+}
+function pkClearSaved(legajo) {
+  try { localStorage.removeItem(PK_SAVE_PREFIX + String(legajo || "")); } catch (_e) { /* no-op */ }
+}
+
+/* Retoma un picking guardado (botón "Seguir picking"): restaura el estado tal
+   cual quedó y reabre el modal. No re-baja el sheet → anda offline. */
+function pkResume(legajo) {
+  const saved = pkLoadSaved(legajo);
+  if (!saved) return;
+  const m = document.getElementById("tandaModal");
+  if (!m) return;
+  m.querySelector(".tanda-modal-title").textContent = "Picking — Tanda " + saved.tanda;
+  _pk = { tanda: saved.tanda, legajo: saved.legajo, items: saved.items,
+          idx: saved.idx || 0, results: saved.results || {}, mode: saved.mode || "item" };
+  m.classList.add("show");
+  pkRender();
+}
+
 async function showPickingList(tanda, legajo) {
   const tNorm = (tanda || "").trim().toUpperCase();
   if (!tNorm) return;
@@ -5065,6 +5123,18 @@ async function showPickingList(tanda, legajo) {
       return;
     }
     _pk = { tanda: tNorm, legajo: String(legajo || (typeof legajoInput !== "undefined" && legajoInput.value) || "").trim(), items: items, idx: 0, results: {}, mode: "item" };
+    // Si ya había un picking guardado de ESTA tanda hoy (se bloqueó el cel, etc.),
+    // restaurar lo ya marcado y la posición sobre los ítems frescos del sheet.
+    try {
+      const saved = pkLoadSaved(_pk.legajo);
+      if (saved && saved.tanda === tNorm) {
+        for (const art of Object.keys(saved.results || {})) {
+          if (items.some(it => it.art === art)) _pk.results[art] = saved.results[art];
+        }
+        _pk.idx = Math.min(saved.idx || 0, items.length);
+        _pk.mode = "item";
+      }
+    } catch (_e) { /* si algo falla, arranca limpio */ }
     pkRender();
     pkNotifySinPlanim(tNorm, _pk.legajo, items, G);   // aviso Telegram si hay códigos sin planimetría
   } catch (e) {
@@ -5081,6 +5151,7 @@ function pkCount() { return _pk ? Object.keys(_pk.results).length : 0; }
 function pkRender() {
   const m = document.getElementById("tandaModal");
   if (!m || !_pk) return;
+  pkSave();   // persistir el estado en CADA cambio (anti pérdida por bloqueo de pantalla)
   const body = m.querySelector(".tanda-modal-body");
   const N = _pk.items.length;
   const nav = `<div class="pk-nav">
@@ -5188,8 +5259,10 @@ function pkFinishPicking() {
     if (pendIdx >= 0) { _pk.idx = pendIdx; _pk.mode = "item"; pkRender(); return; }
   }
   const tanda = _pk ? _pk.tanda : "";
+  const legajo = _pk ? _pk.legajo : "";
   _pk = null;
   closeTandaModal();
+  if (legajo) pkClearSaved(legajo);   // picking terminado → borrar el guardado
   if (!tanda) return;
   try {
     selected = "TP";

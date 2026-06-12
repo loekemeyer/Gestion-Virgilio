@@ -4,7 +4,17 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-12 · Versión app al documentar: **v2.65**
+> Última actualización: 2026-06-12 · Versión app al documentar: **v2.66**
+>
+> Nota: **v2.66** — **picking que no se pierde si se bloquea el celular**. El
+> estado del picking interactivo (`_pk`) ahora se **persiste en `localStorage`**
+> (`vir_pk_<legajo>`, incluye los ítems → reanuda offline) en **cada render**
+> (`pkSave` en `pkRender`). Al reabrir, `renderPendingSuggestion` muestra
+> **"▶ Seguir picking tanda X (hechos/total)"** que retoma exacto donde quedó
+> (`pkResume`). Re-tocar EP de la misma tanda también restaura lo ya marcado
+> (`showPickingList` mergea los `results` guardados). Se borra al terminar
+> (`pkClearSaved` en `pkFinishPicking`); los guardados de días anteriores se
+> ignoran y limpian. Antes, si el navegador mataba la pestaña, se perdía todo.
 >
 > Nota: **v2.65** — armado guiado (sigue apagado): **(a) m³ desde la hoja
 > `VolumenArticulos`** (`fetchVolumenArticulos`, gid por `&sheet=VolumenArticulos`;
