@@ -4,7 +4,18 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-12 · Versión app al documentar: **v2.63**
+> Última actualización: 2026-06-12 · Versión app al documentar: **v2.64**
+>
+> Nota: **v2.64** — dos cosas. (a) **Picking: no se puede terminar con artículos
+> salteados.** Si el operario usó "Adelante" y dejó artículos sin marcar Ok/F,
+> la pantalla final (`pkRenderDone`) **bloquea** "Terminé el picking", lista los
+> que faltan y ofrece "Completar los que faltan →" (`pkGoFirstPending` salta al
+> primer pendiente). `pkFinishPicking` tiene el mismo guard. Hay que marcar cada
+> uno (Ok o F) sí o sí. (b) **Armado guiado (v2.63): total de líos del pedido +
+> composición de cada lío.** Ahora muestra un banner "Pedido X · N líos en total"
+> y, por caja, **qué juntar en cada lío** (`arPackLios` empaqueta en orden:
+> "Lío 1: 505×5", "Lío 2: 505×2 + 586×3", "Sueltas: 586×1"). Sigue apagado por
+> defecto.
 >
 > Nota: **v2.63** — **armado guiado por caja (OPCIONAL, apagado por defecto)**.
 > Al tocar **AP** (Empecé Armado Pedido), si `ARMADO_GUIADO_ACTIVO === true` y el

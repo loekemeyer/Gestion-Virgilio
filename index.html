@@ -1767,13 +1767,20 @@ button {
 .pk-cajas{ font-size: 22px; color: #334155; background: #eff6ff; border: 2px solid #1e6bd6; border-radius: 12px; padding: 12px 16px; text-align: center; }
 .pk-cajas b{ font-size: 30px; color: #1e6bd6; }
 /* Armado guiado por caja (v2.63) */
+.ar-tot-banner{ font-size: 16px; font-weight: bold; color: #5b21b6; background: #f5f3ff; border: 2px solid #7c3aed; border-radius: 10px; padding: 10px 12px; text-align: center; }
+.ar-tot-banner b{ font-size: 20px; }
 .ar-items{ display: flex; flex-direction: column; gap: 6px; }
 .ar-item{ display: flex; justify-content: space-between; align-items: center; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 12px; }
 .ar-item-cod{ font-size: 22px; font-weight: 800; color: #0f172a; }
 .ar-item-cajas{ font-size: 16px; font-weight: bold; color: #334155; }
-.ar-total{ font-size: 15px; color: #64748b; text-align: right; }
-.ar-lio{ font-size: 22px; color: #334155; background: #f5f3ff; border: 2px solid #7c3aed; border-radius: 12px; padding: 14px 16px; text-align: center; }
-.ar-lio b{ font-size: 28px; color: #7c3aed; }
+.ar-total{ font-size: 15px; color: #475569; text-align: center; }
+.ar-lio-hd{ font-size: 14px; font-weight: bold; color: #7c3aed; letter-spacing: .04em; }
+.ar-lio-list{ display: flex; flex-direction: column; gap: 6px; }
+.ar-lio-line{ display: flex; align-items: center; gap: 10px; background: #f5f3ff; border: 1px solid #ddd6fe; border-radius: 8px; padding: 8px 12px; }
+.ar-lio-n{ font-size: 13px; font-weight: 800; color: #fff; background: #7c3aed; border-radius: 6px; padding: 3px 8px; white-space: nowrap; }
+.ar-lio-c{ font-size: 18px; font-weight: bold; color: #0f172a; }
+.ar-lio-line.ar-suelta{ background: #fff7ed; border-color: #fed7aa; }
+.ar-lio-line.ar-suelta .ar-lio-n{ background: #f59e0b; }
 .pk-btn{ width: 100%; border: none; border-radius: 12px; padding: 16px; font-size: 19px; font-weight: bold; color: #fff; cursor: pointer; box-sizing: border-box; }
 .pk-ok{ background: #16a34a; }
 .pk-f{ background: #f59e0b; }
@@ -4353,7 +4360,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v2.63";
+const APP_VERSION = "v2.64";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -5087,13 +5094,35 @@ function pkRender() {
 function pkRenderDone(body, N, nav) {
   let falt = 0; const conf = pkCount(); const pend = N - conf;
   for (const it of _pk.items) { const r = _pk.results[it.art]; if (r != null && r < it.esp) falt++; }
+  // Si saltearon artículos con "Adelante" sin marcar Ok/F, NO se puede terminar:
+  // hay que marcar cada uno (Ok o F) sí o sí. Listamos los que faltan.
+  if (pend > 0) {
+    const faltanList = _pk.items.filter(it => _pk.results[it.art] == null).map(it => escapeHtml(it.art));
+    body.innerHTML = `<div class="pk-flow">${nav || ""}<div class="pk-doneflow">
+      <div class="pk-done-ico" style="color:#dc2626">!</div>
+      <div class="pk-done-t">Te faltan ${pend} sin marcar</div>
+      <div class="pk-done-s">Marcá <b>Ok</b> o <b>F</b> en cada uno antes de terminar.<br>Faltan: <b>${faltanList.join(", ")}</b></div>
+      <button class="pk-btn pk-ok" onclick="pkGoFirstPending()">Completar los que faltan →</button>
+      <button class="pk-btn pk-cancel" onclick="pkClose()">Cerrar (sigo después)</button>
+    </div></div>`;
+    return;
+  }
   body.innerHTML = `<div class="pk-flow">${nav || ""}<div class="pk-doneflow">
     <div class="pk-done-ico">✓</div>
     <div class="pk-done-t">Picking completo</div>
-    <div class="pk-done-s">${conf} de ${N} confirmados${pend ? ` · <b style="color:#64748b">${pend} sin confirmar</b>` : ""}${falt ? ` · <b style="color:#d97706">${falt} con faltante</b>` : ""}</div>
+    <div class="pk-done-s">${conf} de ${N} confirmados${falt ? ` · <b style="color:#d97706">${falt} con faltante</b>` : ""}</div>
     <button class="pk-btn pk-ok" onclick="pkFinishPicking()">✓ Terminé el picking</button>
     <button class="pk-btn pk-cancel" onclick="pkClose()">Cerrar (sigo después)</button>
   </div></div>`;
+}
+/* Salta al primer artículo sin marcar (Ok/F). Lo usa el botón "Completar los
+   que faltan" cuando quedó alguno salteado con "Adelante". */
+function pkGoFirstPending() {
+  if (!_pk) return;
+  const i = _pk.items.findIndex(it => _pk.results[it.art] == null);
+  _pk.idx = i >= 0 ? i : 0;
+  _pk.mode = "item";
+  pkRender();
 }
 
 function pkAdvance() { if (_pk) { _pk.idx = Math.min(_pk.idx + 1, _pk.items.length); _pk.mode = "item"; pkRender(); } }
@@ -5125,6 +5154,12 @@ function pkClose() { _pk = null; closeTandaModal(); }
    (toma ts_inicio del EP → duración, historial, etc.) seteando la acción y el
    código de tanda como si el operario tocara TP + Enviar. */
 function pkFinishPicking() {
+  // Guard: no terminar si quedó algún artículo sin marcar (Ok/F). Salta al
+  // primero pendiente en vez de cerrar — refuerzo del bloqueo de pkRenderDone.
+  if (_pk) {
+    const pendIdx = _pk.items.findIndex(it => _pk.results[it.art] == null);
+    if (pendIdx >= 0) { _pk.idx = pendIdx; _pk.mode = "item"; pkRender(); return; }
+  }
   const tanda = _pk ? _pk.tanda : "";
   _pk = null;
   closeTandaModal();
@@ -5212,6 +5247,29 @@ function arM3Key(v) { return (Math.round(v * 10000) / 10000).toFixed(4); }
 function arM3Disp(v) { return String(Math.round(v * 10000) / 10000).replace(".", ","); }
 function arNumOf(c) { const mm = String(c).match(/^(\d+)/); return mm ? parseInt(mm[1], 10) : Number.MAX_SAFE_INTEGER; }
 
+/* Empaqueta las cajas de una caja (mismo m³) en líos de `lioSize`, llenando en
+   orden. Devuelve { lios:[[{art,cajas}]], sueltas:[{art,cajas}] } para decir
+   exactamente QUÉ juntar en cada lío (lo sobrante < lioSize queda en sueltas). */
+function arPackLios(items, lioSize) {
+  const lios = []; let cur = []; let curCount = 0;
+  for (const it of items) {
+    let rem = it.cajas;
+    while (rem > 0) {
+      const take = Math.min(lioSize - curCount, rem);
+      const last = cur[cur.length - 1];
+      if (last && last.art === it.art) last.cajas += take;
+      else cur.push({ art: it.art, cajas: take });
+      curCount += take; rem -= take;
+      if (curCount >= lioSize) { lios.push(cur); cur = []; curCount = 0; }
+    }
+  }
+  return { lios: lios, sueltas: cur };   // cur = lo que no completó un lío
+}
+
+function arCompTxt(comp) {
+  return (comp || []).map(c => escapeHtml(c.art) + "×" + pkFmt(c.cajas)).join(" + ");
+}
+
 /* m³(key) → cajas por lío. Siembra los overrides por código resolviendo SU m³,
    así "321 va de 4" se aplica a la caja (m³) de ese código. */
 function arLioPorM3() {
@@ -5257,26 +5315,26 @@ async function showArmadoGuide(pedido, legajo) {
       }
     }
     const lioMap = arLioPorM3();
+    const mkBox = (m3v, label, its, lio) => {
+      const total = its.reduce((s, x) => s + x.cajas, 0);
+      const pk = arPackLios(its, lio);
+      const sueltas = pk.sueltas.reduce((s, x) => s + x.cajas, 0);
+      return { m3: m3v, label: label, lio: lio, items: its, total: total,
+               lios: pk.lios.length, sueltas: sueltas, liosComp: pk.lios, sueltaComp: pk.sueltas };
+    };
     const boxes = [...groups.values()]
       .sort((a, b) => a.m3 - b.m3)
-      .map(g => {
-        const total = g.items.reduce((s, x) => s + x.cajas, 0);
-        const lio = lioMap[arM3Key(g.m3)] || LIO_DEFAULT;
-        return { m3: g.m3, label: arM3Disp(g.m3) + " m³", lio: lio, items: g.items,
-                 total: total, lios: Math.floor(total / lio), sueltas: total % lio };
-      });
-    if (sinM3.length) {
-      const total = sinM3.reduce((s, x) => s + x.cajas, 0);
-      boxes.push({ m3: null, label: "Sin m³ (revisar)", lio: LIO_DEFAULT, items: sinM3,
-                   total: total, lios: Math.floor(total / LIO_DEFAULT), sueltas: total % LIO_DEFAULT });
-    }
+      .map(g => mkBox(g.m3, arM3Disp(g.m3) + " m³", g.items, lioMap[arM3Key(g.m3)] || LIO_DEFAULT));
+    if (sinM3.length) boxes.push(mkBox(null, "Sin m³ (revisar)", sinM3, LIO_DEFAULT));
     if (!boxes.length) {
       _ar = null;
       m.querySelector(".tanda-modal-body").innerHTML =
         `<div class="history-empty">No encontré ítems para el pedido <b>${escapeHtml(ped)}</b>.<br><br><button class="pk-btn pk-cancel" onclick="arClose()">Cerrar</button></div>`;
       return;
     }
-    _ar = { pedido: ped, legajo: String(legajo || "").trim(), boxes: boxes, idx: 0, done: new Set() };
+    _ar = { pedido: ped, legajo: String(legajo || "").trim(), boxes: boxes, idx: 0, done: new Set(),
+            totLios: boxes.reduce((s, b) => s + b.lios, 0),
+            totSueltas: boxes.reduce((s, b) => s + b.sueltas, 0) };
     arRender();
   } catch (e) {
     _ar = null;
@@ -5303,14 +5361,23 @@ function arRender() {
     .sort((x, y) => arNumOf(x.art) - arNumOf(y.art))
     .map(it => `<div class="ar-item"><span class="ar-item-cod">${escapeHtml(it.art)}</span><span class="ar-item-cajas">${pkFmt(it.cajas)} caja${it.cajas === 1 ? "" : "s"}</span></div>`)
     .join("");
-  const lioTxt = b.lios > 0
-    ? `<b>${b.lios}</b> lío${b.lios === 1 ? "" : "s"} de ${b.lio}` + (b.sueltas > 0 ? ` + <b>${b.sueltas}</b> suelta${b.sueltas === 1 ? "" : "s"}` : "")
-    : `<b>${b.sueltas}</b> caja${b.sueltas === 1 ? "" : "s"} suelta${b.sueltas === 1 ? "" : "s"} (no llega a un lío de ${b.lio})`;
+  // Composición concreta: qué cajas juntar en cada lío.
+  let liosHtml = b.liosComp.map((comp, i) =>
+    `<div class="ar-lio-line"><span class="ar-lio-n">Lío ${i + 1}</span><span class="ar-lio-c">${arCompTxt(comp)}</span></div>`).join("");
+  if (b.sueltaComp && b.sueltaComp.length) {
+    liosHtml += `<div class="ar-lio-line ar-suelta"><span class="ar-lio-n">Sueltas</span><span class="ar-lio-c">${arCompTxt(b.sueltaComp)}</span></div>`;
+  }
+  const resumen = (b.lios > 0 ? `<b>${b.lios}</b> lío${b.lios === 1 ? "" : "s"} de ${b.lio}` : "sin lío completo")
+    + (b.sueltas > 0 ? ` + <b>${pkFmt(b.sueltas)}</b> suelta${b.sueltas === 1 ? "" : "s"}` : "");
+  const totBanner = `Pedido ${escapeHtml(_ar.pedido)} · <b>${_ar.totLios}</b> lío${_ar.totLios === 1 ? "" : "s"} en total`
+    + (_ar.totSueltas > 0 ? ` + ${pkFmt(_ar.totSueltas)} suelta${_ar.totSueltas === 1 ? "" : "s"}` : "");
   body.innerHTML = `<div class="pk-flow">${nav}
+    <div class="ar-tot-banner">${totBanner}</div>
     <div class="pk-cod-row"><span class="pk-cod-lbl">CAJA</span><span class="pk-sector">${escapeHtml(b.label)}</span></div>
     <div class="ar-items">${itemsHtml}</div>
-    <div class="ar-total">Total: <b>${pkFmt(b.total)}</b> cajas</div>
-    <div class="ar-lio">Armá ${lioTxt}</div>
+    <div class="ar-total">Total de esta caja: <b>${pkFmt(b.total)}</b> cajas → ${resumen}</div>
+    <div class="ar-lio-hd">Juntá así:</div>
+    <div class="ar-lio-list">${liosHtml || '<div class="ar-lio-line"><span class="ar-lio-c">—</span></div>'}</div>
     ${isDone ? `<div class="pk-confirmed">✓ Caja marcada como armada — podés revisarla</div>` : ``}
     <button class="pk-btn pk-ok" onclick="arConfirm()">✓ Armé esta caja</button>
     <button class="pk-btn pk-cancel" onclick="arClose()">Cerrar (sigo después)</button>
@@ -5323,6 +5390,7 @@ function arRenderDone(body, N, nav) {
     <div class="pk-done-ico">✓</div>
     <div class="pk-done-t">Armado listo</div>
     <div class="pk-done-s">${conf} de ${N} cajas armadas${pend ? ` · <b style="color:#64748b">${pend} sin marcar</b>` : ""}</div>
+    <div class="pk-done-s"><b>${_ar.totLios}</b> lío${_ar.totLios === 1 ? "" : "s"} en total${_ar.totSueltas > 0 ? ` + ${pkFmt(_ar.totSueltas)} suelta${_ar.totSueltas === 1 ? "" : "s"}` : ""}</div>
     <button class="pk-btn pk-ok" onclick="arFinish()">✓ Terminé el armado</button>
     <button class="pk-btn pk-cancel" onclick="arClose()">Cerrar (sigo después)</button>
   </div></div>`;
