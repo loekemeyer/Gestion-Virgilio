@@ -1766,6 +1766,14 @@ button {
 .pk-cod-big{ font-size: 54px; font-weight: 800; color: #0f172a; line-height: 1; }
 .pk-cajas{ font-size: 22px; color: #334155; background: #eff6ff; border: 2px solid #1e6bd6; border-radius: 12px; padding: 12px 16px; text-align: center; }
 .pk-cajas b{ font-size: 30px; color: #1e6bd6; }
+/* Armado guiado por caja (v2.63) */
+.ar-items{ display: flex; flex-direction: column; gap: 6px; }
+.ar-item{ display: flex; justify-content: space-between; align-items: center; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 12px; }
+.ar-item-cod{ font-size: 22px; font-weight: 800; color: #0f172a; }
+.ar-item-cajas{ font-size: 16px; font-weight: bold; color: #334155; }
+.ar-total{ font-size: 15px; color: #64748b; text-align: right; }
+.ar-lio{ font-size: 22px; color: #334155; background: #f5f3ff; border: 2px solid #7c3aed; border-radius: 12px; padding: 14px 16px; text-align: center; }
+.ar-lio b{ font-size: 28px; color: #7c3aed; }
 .pk-btn{ width: 100%; border: none; border-radius: 12px; padding: 16px; font-size: 19px; font-weight: bold; color: #fff; cursor: pointer; box-sizing: border-box; }
 .pk-ok{ background: #16a34a; }
 .pk-f{ background: #f59e0b; }
@@ -4345,7 +4353,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v2.62";
+const APP_VERSION = "v2.63";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -4541,6 +4549,9 @@ async function send() {
 
   // Al EMPEZAR PICKING: flujo interactivo de artículos a levantar (Ok / F).
   if (opcion === "EP" && (texto || "").trim()) showPickingList(texto, legajoStr);
+  // Al EMPEZAR ARMADO (AP): armado guiado por caja/m³ (OPCIONAL, apagado por
+  // defecto; showArmadoGuide corta solo si la flag está en false). No bloquea AP.
+  if (opcion === "AP" && (texto || "").trim()) showArmadoGuide(texto, legajoStr);
   // Al INICIAR carga camión (1er toque de CC): checklist de NPs listas (TAP).
   if (opcion === "CC") {
     const stCC = getLegajoState(legajoStr);
@@ -4914,6 +4925,7 @@ const PICKING_BASE_CSV_URL =
 const PICK_BASE_TTL_MS = 5 * 60 * 1000;   // hoja grande (~20k filas) → cache 5 min
 let _pickBaseCache   = null;   // Map<pedido(NP), [{art, cajas}]>
 let _pickBaseCacheTs = 0;
+let _pickM3Cache     = null;   // Map<códigoArt(UP), m3(number)> — para armado por caja (v2.63)
 
 function pickNormNp(v) {
   let s = (v == null ? "" : String(v)).trim();
@@ -4935,15 +4947,19 @@ async function fetchPickingBase() {
   const r = await fetch(PICKING_BASE_CSV_URL + "&_=" + now, { cache: "no-store" });
   if (!r.ok) throw new Error("Base Datos Pedidos HTTP " + r.status);
   const rows = parseCSV(await r.text());
-  let cPed = 0, cArt = 2, cCaj = 5;
+  let cPed = 0, cArt = 2, cCaj = 5, cM3 = -1;
   for (let i = 0; i < Math.min(rows.length, 5); i++) {
     const h = rows[i].map(dedupeHeaderCell);
     const ip = h.indexOf("pedido");
     const ia = h.findIndex(x => x === "artículo" || x === "articulo");
     const ic = h.findIndex(x => x.indexOf("cajas") >= 0);
-    if (ip >= 0 && ia >= 0) { cPed = ip; cArt = ia; if (ic >= 0) cCaj = ic; break; }
+    // m³ por artículo (para armado por caja, v2.63): tolera "m3 volumen", "mt3",
+    // "volumen", etc. Si no está la columna, el armado guiado queda inactivo.
+    const im = h.findIndex(x => x.indexOf("m3") >= 0 || x.indexOf("mt3") >= 0 || x.indexOf("volum") >= 0);
+    if (ip >= 0 && ia >= 0) { cPed = ip; cArt = ia; if (ic >= 0) cCaj = ic; if (im >= 0) cM3 = im; break; }
   }
   const map = new Map();
+  const m3map = new Map();
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i]; if (!row) continue;
     const ped = pickNormNp(row[cPed]);
@@ -4952,8 +4968,13 @@ async function fetchPickingBase() {
     if (!art) continue;
     if (!map.has(ped)) map.set(ped, []);
     map.get(ped).push({ art: art, cajas: pickParseCajas(row[cCaj]) });
+    if (cM3 >= 0) {
+      const v = pickParseCajas(row[cM3]);               // mismo parser (coma decimal)
+      if (v > 0) m3map.set(String(art).toUpperCase(), v);
+    }
   }
   _pickBaseCache = map; _pickBaseCacheTs = Date.now();
+  _pickM3Cache = m3map;
   return map;
 }
 
@@ -5170,6 +5191,165 @@ function pkNotifySinPlanim(tanda, legajo, items, G) {
     }
     try { updatePendingIndicator(); } catch (_e2) {}
   } catch (_e) { /* best-effort: nunca rompe el picking */ }
+}
+
+/* =========================================================
+   ARMADO GUIADO POR CAJA (v2.63) — OPCIONAL, APAGADO POR DEFECTO.
+   Al tocar AP (Empecé Armado Pedido), si está activo y el sheet tiene la columna
+   de m³, guía el armado del pedido agrupando los ítems por CAJA (mismo m³ = misma
+   caja) y diciendo cuántos LÍOS armar (líos de LIO_DEFAULT cajas; el parámetro se
+   define por m³, con override sembrado por código). Reutiliza #tandaModal y los
+   estilos pk-*. NO bloquea nada: es saltable y, si falta el m³, ni se activa.
+   ⚠ NO obligatorio hasta el OK del dueño → ARMADO_GUIADO_ACTIVO = false.
+   ========================================================= */
+const ARMADO_GUIADO_ACTIVO = false;     // ← poner en true para activarlo (tras el OK)
+const LIO_DEFAULT = 5;                   // cajas por lío (default; el parámetro es por m³)
+const LIO_OVERRIDE_COD = { "321": 4 };   // override sembrado por código → se aplica a SU m³
+
+let _ar = null;   // { pedido, legajo, boxes:[{m3,label,lio,items,total,lios,sueltas}], idx, done:Set }
+
+function arM3Key(v) { return (Math.round(v * 10000) / 10000).toFixed(4); }
+function arM3Disp(v) { return String(Math.round(v * 10000) / 10000).replace(".", ","); }
+function arNumOf(c) { const mm = String(c).match(/^(\d+)/); return mm ? parseInt(mm[1], 10) : Number.MAX_SAFE_INTEGER; }
+
+/* m³(key) → cajas por lío. Siembra los overrides por código resolviendo SU m³,
+   así "321 va de 4" se aplica a la caja (m³) de ese código. */
+function arLioPorM3() {
+  const out = {};
+  const m3 = _pickM3Cache || new Map();
+  for (const cod of Object.keys(LIO_OVERRIDE_COD)) {
+    const v = m3.get(String(cod).toUpperCase());
+    if (v > 0) out[arM3Key(v)] = LIO_OVERRIDE_COD[cod];
+  }
+  return out;
+}
+
+async function showArmadoGuide(pedido, legajo) {
+  if (!ARMADO_GUIADO_ACTIVO) return;            // apagado: AP funciona como hoy
+  const ped = pickNormNp(pedido);
+  if (!ped) return;
+  const m = document.getElementById("tandaModal");
+  if (!m) return;
+  m.querySelector(".tanda-modal-title").textContent = "Armado — Pedido " + ped;
+  m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">Cargando armado…</div>`;
+  m.classList.add("show");
+  try {
+    await fetchPickingBase();                    // llena _pickBaseCache + _pickM3Cache
+    const items = (_pickBaseCache && _pickBaseCache.get(ped)) || [];
+    const m3map = _pickM3Cache || new Map();
+    if (!m3map.size) {                           // sheet sin columna de m³ → no se puede agrupar
+      _ar = null;
+      m.querySelector(".tanda-modal-body").innerHTML =
+        `<div class="history-empty">El armado guiado necesita la columna de m³ en el sheet, que todavía no está.<br>Por ahora armá como siempre.<br><br><button class="pk-btn pk-cancel" onclick="arClose()">Cerrar</button></div>`;
+      return;
+    }
+    // Agrupar por caja (= m³). Ítems sin m³ van a un grupo aparte al final.
+    const groups = new Map();
+    const sinM3 = [];
+    for (const it of items) {
+      const v = m3map.get(String(it.art).toUpperCase());
+      if (v > 0) {
+        const k = arM3Key(v);
+        if (!groups.has(k)) groups.set(k, { m3: v, items: [] });
+        groups.get(k).items.push({ art: it.art, cajas: it.cajas });
+      } else {
+        sinM3.push({ art: it.art, cajas: it.cajas });
+      }
+    }
+    const lioMap = arLioPorM3();
+    const boxes = [...groups.values()]
+      .sort((a, b) => a.m3 - b.m3)
+      .map(g => {
+        const total = g.items.reduce((s, x) => s + x.cajas, 0);
+        const lio = lioMap[arM3Key(g.m3)] || LIO_DEFAULT;
+        return { m3: g.m3, label: arM3Disp(g.m3) + " m³", lio: lio, items: g.items,
+                 total: total, lios: Math.floor(total / lio), sueltas: total % lio };
+      });
+    if (sinM3.length) {
+      const total = sinM3.reduce((s, x) => s + x.cajas, 0);
+      boxes.push({ m3: null, label: "Sin m³ (revisar)", lio: LIO_DEFAULT, items: sinM3,
+                   total: total, lios: Math.floor(total / LIO_DEFAULT), sueltas: total % LIO_DEFAULT });
+    }
+    if (!boxes.length) {
+      _ar = null;
+      m.querySelector(".tanda-modal-body").innerHTML =
+        `<div class="history-empty">No encontré ítems para el pedido <b>${escapeHtml(ped)}</b>.<br><br><button class="pk-btn pk-cancel" onclick="arClose()">Cerrar</button></div>`;
+      return;
+    }
+    _ar = { pedido: ped, legajo: String(legajo || "").trim(), boxes: boxes, idx: 0, done: new Set() };
+    arRender();
+  } catch (e) {
+    _ar = null;
+    m.querySelector(".tanda-modal-body").innerHTML =
+      `<div class="history-empty">No se pudo cargar (¿sin conexión?).<br><small>${escapeHtml(e.message || "")}</small><br><br><button class="pk-btn pk-cancel" onclick="arClose()">Cerrar</button></div>`;
+  }
+}
+
+function arRender() {
+  const m = document.getElementById("tandaModal");
+  if (!m || !_ar) return;
+  const body = m.querySelector(".tanda-modal-body");
+  const N = _ar.boxes.length;
+  const nav = `<div class="pk-nav">
+      <button class="pk-navbtn" ${_ar.idx <= 0 ? "disabled" : ""} onclick="arPrev()">← Atrás</button>
+      <span class="pk-nav-mid">${_ar.idx >= N ? "Resumen" : "Caja " + (_ar.idx + 1) + " de " + N}</span>
+      <button class="pk-navbtn" ${_ar.idx >= N ? "disabled" : ""} onclick="arNext()">Adelante →</button>
+    </div>
+    <div class="pk-bar"><i style="width:${Math.round((_ar.done.size / N) * 100)}%"></i></div>`;
+  if (_ar.idx >= N) { arRenderDone(body, N, nav); return; }
+  const b = _ar.boxes[_ar.idx];
+  const isDone = _ar.done.has(_ar.idx);
+  const itemsHtml = b.items.slice()
+    .sort((x, y) => arNumOf(x.art) - arNumOf(y.art))
+    .map(it => `<div class="ar-item"><span class="ar-item-cod">${escapeHtml(it.art)}</span><span class="ar-item-cajas">${pkFmt(it.cajas)} caja${it.cajas === 1 ? "" : "s"}</span></div>`)
+    .join("");
+  const lioTxt = b.lios > 0
+    ? `<b>${b.lios}</b> lío${b.lios === 1 ? "" : "s"} de ${b.lio}` + (b.sueltas > 0 ? ` + <b>${b.sueltas}</b> suelta${b.sueltas === 1 ? "" : "s"}` : "")
+    : `<b>${b.sueltas}</b> caja${b.sueltas === 1 ? "" : "s"} suelta${b.sueltas === 1 ? "" : "s"} (no llega a un lío de ${b.lio})`;
+  body.innerHTML = `<div class="pk-flow">${nav}
+    <div class="pk-cod-row"><span class="pk-cod-lbl">CAJA</span><span class="pk-sector">${escapeHtml(b.label)}</span></div>
+    <div class="ar-items">${itemsHtml}</div>
+    <div class="ar-total">Total: <b>${pkFmt(b.total)}</b> cajas</div>
+    <div class="ar-lio">Armá ${lioTxt}</div>
+    ${isDone ? `<div class="pk-confirmed">✓ Caja marcada como armada — podés revisarla</div>` : ``}
+    <button class="pk-btn pk-ok" onclick="arConfirm()">✓ Armé esta caja</button>
+    <button class="pk-btn pk-cancel" onclick="arClose()">Cerrar (sigo después)</button>
+  </div>`;
+}
+
+function arRenderDone(body, N, nav) {
+  const conf = _ar.done.size; const pend = N - conf;
+  body.innerHTML = `<div class="pk-flow">${nav || ""}<div class="pk-doneflow">
+    <div class="pk-done-ico">✓</div>
+    <div class="pk-done-t">Armado listo</div>
+    <div class="pk-done-s">${conf} de ${N} cajas armadas${pend ? ` · <b style="color:#64748b">${pend} sin marcar</b>` : ""}</div>
+    <button class="pk-btn pk-ok" onclick="arFinish()">✓ Terminé el armado</button>
+    <button class="pk-btn pk-cancel" onclick="arClose()">Cerrar (sigo después)</button>
+  </div></div>`;
+}
+
+function arPrev() { if (_ar) { _ar.idx = Math.max(_ar.idx - 1, 0); arRender(); } }
+function arNext() { if (_ar) { _ar.idx = Math.min(_ar.idx + 1, _ar.boxes.length); arRender(); } }
+function arConfirm() {
+  if (!_ar || _ar.idx >= _ar.boxes.length) return;
+  _ar.done.add(_ar.idx);
+  _ar.idx = Math.min(_ar.idx + 1, _ar.boxes.length);
+  arRender();
+}
+function arClose() { _ar = null; closeTandaModal(); }
+
+/* Pantalla final → sugerir "TAP" (Terminé Armado Pedido), igual que el picking
+   sugiere TP: setea la acción + el código de pedido y manda. */
+function arFinish() {
+  const ped = _ar ? _ar.pedido : "";
+  _ar = null;
+  closeTandaModal();
+  if (!ped) return;
+  try {
+    selected = "TAP";
+    if (typeof textInput !== "undefined" && textInput) textInput.value = ped;
+    send();
+  } catch (e) { console.warn("arFinish:", e); }
 }
 /* =========================================================
    CARGA CAMIÓN — checklist de NPs listas para cargar.

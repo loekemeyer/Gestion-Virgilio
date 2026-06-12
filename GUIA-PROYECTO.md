@@ -4,7 +4,24 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-12 · Versión app al documentar: **v2.62**
+> Última actualización: 2026-06-12 · Versión app al documentar: **v2.63**
+>
+> Nota: **v2.63** — **armado guiado por caja (OPCIONAL, apagado por defecto)**.
+> Al tocar **AP** (Empecé Armado Pedido), si `ARMADO_GUIADO_ACTIVO === true` y el
+> sheet **"PPP Excel Base Datos Pedidos"** tiene una columna de **m³** (header que
+> contenga `m3`/`mt3`/`volum` — lo lee `fetchPickingBase` → `_pickM3Cache`), abre
+> una guía interactiva (reusa `#tandaModal` + estilos `pk-*`): agrupa los ítems
+> del pedido por **caja = mismo m³** (ítems distintos con igual m³ van juntos) y
+> dice cuántos **líos** armar. Lío = `LIO_DEFAULT` (**5**) cajas; el parámetro es
+> **por m³**, con override sembrado por código (`LIO_OVERRIDE_COD = {"321":4}` →
+> se aplica a la caja/m³ de ese código). Lo que no llega a un lío queda **suelto**.
+> Termina sugiriendo **TAP** (igual que el picking sugiere TP). Funciones
+> `showArmadoGuide`/`arRender`/`arConfirm`/`arFinish`; hook en `send()`
+> (`opcion === "AP"`). **No obligatorio / no rompe nada**: la flag está en
+> **false** (no se les muestra a los operarios), es saltable, y si falta el m³ ni
+> se activa (AP funciona como hoy). Pendiente del dueño: confirmar la
+> hoja/columna real del m³, y dar OK para activarlo. (Aún no emite evento de
+> detalle por caja — se agrega cuando se active.)
 >
 > Nota: **v2.62** — **cantidad de cajas por defecto al cerrar RT**. Al tocar RT
 > para **cerrarlo** (2º toque, "Indicar Cantidad" en `selectOption`), el campo ya
