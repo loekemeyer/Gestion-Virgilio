@@ -629,9 +629,11 @@ function arEsLogFabr() {
 function arSaveCodeRemote(cod) {
   const cods = opState.tallCods || {};
   const rows = [];
-  if (cods.LK) rows.push({ Cod_Art: cod, Cod_Tallerista: cods.LK, Linea: "LK" });
-  if (cods.CH) rows.push({ Cod_Art: cod, Cod_Tallerista: cods.CH, Linea: "CH" });
-  if (!rows.length && opState.tallCod) rows.push({ Cod_Art: cod, Cod_Tallerista: opState.tallCod, Linea: opState.linea });
+  // Desc: "" → la tabla exige la columna Desc NOT NULL; al agregar a mano no hay
+  // descripción, va vacía (satisface la restricción).
+  if (cods.LK) rows.push({ Cod_Art: cod, Cod_Tallerista: cods.LK, Linea: "LK", Desc: "" });
+  if (cods.CH) rows.push({ Cod_Art: cod, Cod_Tallerista: cods.CH, Linea: "CH", Desc: "" });
+  if (!rows.length && opState.tallCod) rows.push({ Cod_Art: cod, Cod_Tallerista: opState.tallCod, Linea: opState.linea, Desc: "" });
   if (!rows.length) return;
   try {
     supabase.from("Articulos Virgilio X Tallerista").insert(rows)
@@ -639,8 +641,7 @@ function arSaveCodeRemote(cod) {
         if (res && res.error) {
           console.warn("alta artículo Log/Fabr:", res.error.message);
           alert("El código quedó para esta carga, pero NO se pudo guardar fijo en la base:\n" +
-                res.error.message +
-                "\n\nProbablemente falte el permiso de inserción (RLS) en \"Articulos Virgilio X Tallerista\". Avisá al admin.");
+                res.error.message + "\n\nAvisá al admin.");
         }
       })
       .catch(function () {});

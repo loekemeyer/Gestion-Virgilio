@@ -4,7 +4,11 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-16 · Versión app al documentar: **v2.71**
+> Última actualización: 2026-06-16 · Versión app al documentar: **v2.72**
+>
+> Nota: **v2.72** — fix del alta de Log/Fabr: la tabla `Articulos Virgilio X
+> Tallerista` tiene la columna **`Desc` NOT NULL**, así que `arSaveCodeRemote`
+> ahora manda `Desc: ""` en cada fila. (No era RLS: la tabla sí acepta INSERT.)
 >
 > Nota: **v2.71** — los artículos agregados a Log/Fabr con "+" ahora se guardan
 > en **`Articulos Virgilio X Tallerista`** (la MISMA tabla que lee la grilla),
