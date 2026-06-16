@@ -743,7 +743,9 @@ opCajasInput.addEventListener("keydown", e => {
   if (e.key === "Enter") { e.preventDefault(); opCajasNext.click(); }
 });
 opCajasClose.onclick = closeCajas;
-opCajasModal.addEventListener("click", e => { if (e.target === opCajasModal) closeCajas(); });
+// Antes: tocar el fondo oscuro cerraba el pop-up. Lo sacamos para que NO se cierre
+// solo si el empleado tarda en cargar / toca fuera sin querer — solo se cierra con
+// la ✕ o al cargar el número. (Pedido: "que se mantenga".)
 opCajasNext.onclick = () => {
   const n = parseInt(opCajasInput.value, 10) || 0;
   if (n > 0) opState.cargas[opState.cajasCod] = n;
