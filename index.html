@@ -1780,6 +1780,13 @@ button {
 .ar-lio-n{ font-size: 13px; font-weight: 800; color: #fff; background: #7c3aed; border-radius: 6px; padding: 3px 8px; white-space: nowrap; }
 .ar-lio-c{ font-size: 18px; font-weight: bold; color: #0f172a; flex: 1; }
 .ar-lio-cnt{ font-size: 13px; font-weight: bold; color: #7c3aed; white-space: nowrap; }
+/* Overlay del panel Admin de Recepción embebido (v2.75) */
+.recp-admin-overlay{ display: none; position: fixed; inset: 0; z-index: 1250; background: #0b1220; flex-direction: column; }
+.recp-admin-overlay.show{ display: flex; }
+.recp-admin-bar{ display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 14px; background: #0b1220; color: #f8fafc; border-bottom: 1px solid #334155; }
+.recp-admin-title{ font-size: 18px; font-weight: bold; }
+.recp-admin-close{ width: auto; margin: 0; padding: 10px 18px; background: #1e293b; color: #f8fafc; border: 1px solid #334155; border-radius: 8px; font-size: 15px; font-weight: bold; cursor: pointer; }
+.recp-admin-frame{ flex: 1; width: 100%; border: 0; background: #fff; }
 .pk-btn{ width: 100%; border: none; border-radius: 12px; padding: 16px; font-size: 19px; font-weight: bold; color: #fff; cursor: pointer; box-sizing: border-box; }
 .pk-ok{ background: #16a34a; }
 .pk-f{ background: #f59e0b; }
@@ -2435,10 +2442,24 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
       <button class="sup-action-btn" onclick="openInconsistencias()"><span class="sup-ico">⚠</span><span>Inconsistencias</span></button>
       <button class="sup-action-btn" onclick="openAnalisis()"><span class="sup-ico">📈</span><span>Análisis de productividad</span></button>
       <button class="sup-action-btn" onclick="openFaltantes()"><span class="sup-ico">📦</span><span>Faltantes</span></button>
+      <button class="sup-action-btn" onclick="openRecepcionAdmin()"><span class="sup-ico">🏭</span><span>Recepción (Admin)</span></button>
     </div>
     <div class="auth-logout-row">
       <button class="auth-logout-btn" onclick="signOutGoogle()">Salir</button>
     </div>
+  </div>
+
+  <!-- Overlay: panel Admin de Recepción de Mercadería, EMBEBIDO (mismo dominio
+       loekemeyer.github.io → comparte sesión/almacenamiento, anda como nativo).
+       Reusa la app ya deployada (Control-Carga-Remitos-FC) sin duplicar código.
+       Solo supervisores. El iframe carga recién al abrir (lazy). -->
+  <div id="recepcionAdminOverlay" class="recp-admin-overlay">
+    <div class="recp-admin-bar">
+      <span class="recp-admin-title">🏭 Recepción — Admin</span>
+      <button class="recp-admin-close" onclick="closeRecepcionAdmin()">Cerrar</button>
+    </div>
+    <iframe id="recepcionAdminFrame" class="recp-admin-frame" title="Recepción — Admin"
+            allow="camera; clipboard-write"></iframe>
   </div>
 
   <!-- Aviso: hay reportes que aún no se enviaron -->
@@ -4376,7 +4397,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v2.74";
+const APP_VERSION = "v2.75";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -6773,6 +6794,22 @@ function closeAnalisis() {
    ========================================================= */
 let _faltantesDay = null;
 let _faltantesIntervalId = null;
+
+/* Panel Admin de Recepción: abre la app de Recepción de Mercadería embebida en un
+   iframe (mismo dominio → comparte sesión/almacenamiento, anda como nativa). El
+   src se setea recién al abrir (lazy) y se reusa. Solo supervisores. v2.75. */
+const RECEPCION_ADMIN_URL = "https://loekemeyer.github.io/Control-Carga-Remitos-FC/";
+function openRecepcionAdmin() {
+  if (!requireSupervisor()) return;
+  const fr = document.getElementById("recepcionAdminFrame");
+  if (fr && !fr.getAttribute("src")) fr.setAttribute("src", RECEPCION_ADMIN_URL);
+  const ov = document.getElementById("recepcionAdminOverlay");
+  if (ov) ov.classList.add("show");
+}
+function closeRecepcionAdmin() {
+  const ov = document.getElementById("recepcionAdminOverlay");
+  if (ov) ov.classList.remove("show");
+}
 
 function openFaltantes() {
   if (!requireSupervisor()) return;
@@ -9455,7 +9492,7 @@ function setAuthStatus(msg, isError) {
 
 /* Supervisores: ven los monitores y los botones flotantes. No necesitan estar
    en Empleados (no tienen legajo de operario). */
-const SUPERVISOR_EMAILS = ["loekemeyer.n8n@gmail.com", "loekemeyer.logistica@gmail.com"];
+const SUPERVISOR_EMAILS = ["loekemeyer.n8n@gmail.com", "loekemeyer.logistica@gmail.com", "comexloekemeyer@gmail.com"];
 function isSupervisorEmail(email) {
   return SUPERVISOR_EMAILS.indexOf((email || "").toLowerCase().trim()) !== -1;
 }

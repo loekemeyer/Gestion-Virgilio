@@ -4,7 +4,18 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-16 · Versión app al documentar: **v2.74**
+> Última actualización: 2026-06-16 · Versión app al documentar: **v2.75**
+>
+> Nota: **v2.75** — **acceso al panel Admin de Recepción + nuevo supervisor**.
+> (a) Se agregó `comexloekemeyer@gmail.com` a `SUPERVISOR_EMAILS` (ve los
+> monitores de Producción + el botón nuevo). (b) Botón **"🏭 Recepción (Admin)"**
+> en `#supervisorPanel` que abre `openRecepcionAdmin()`: un overlay
+> (`#recepcionAdminOverlay`, z-index 1250) con la app de Recepción
+> (`Control-Carga-Remitos-FC`) **embebida en un iframe**. Como las dos apps están
+> en el **mismo dominio** (`loekemeyer.github.io`), el iframe **comparte
+> sesión/almacenamiento** y anda como nativo, sin duplicar las ~1500 líneas del
+> Admin ni mantener dos copias. El `src` se setea lazy al abrir. (Alternativa
+> descartada por ahora: copiar todo el Admin dentro de Producción.)
 >
 > Nota: **v2.74** — Recepción: el pop-up de **cajas** ya **no se cierra al tocar
 > el fondo** (se sacó el handler de backdrop-dismiss de `#opCajasModal`). Así, si
