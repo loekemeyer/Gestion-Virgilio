@@ -4,7 +4,16 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-12 · Versión app al documentar: **v2.68**
+> Última actualización: 2026-06-16 · Versión app al documentar: **v2.69**
+>
+> Nota: **v2.69** — **Recepción (Modo OP): agregar artículos a Log/Fabr con "+"**.
+> En la grilla de códigos de **Log/Fabr** (solo ese tallerista) aparece un botón
+> **"+"**; al tocarlo pide un código nuevo, lo agrega a la grilla, abre el pop-up
+> de cajas y lo deja **fijo** para próximas recepciones. Persistencia en
+> **localStorage** del dispositivo (`vir_recp_extra_<claveTall>`, ver
+> `arEsLogFabr`/`arLoadExtras`/`arSaveExtra`/`arAddCode` en `recepcion.js`).
+> ⚠ Es **por dispositivo** (no se comparte entre celulares todavía). El módulo
+> `recepcion.js` ahora se carga con `?v=2.69` para bustear caché en cada cambio.
 >
 > Nota: **v2.68** — **facturación, el NP tildado seguía volviendo (v2.67 no
 > alcanzó)**. Causa real: `fetchFacturadosHoy` era el **único** fetch sin

@@ -83,6 +83,8 @@ const RCP_CSS = `
 #rcpRoot .opCodeBtn{ aspect-ratio:1/1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; font-weight:900; font-size:18px; border:2px solid var(--border); border-radius:12px; background:#fff; cursor:pointer; padding:6px; text-align:center; }
 #rcpRoot .opCodeBtn .cnt{ font-size:12px; font-weight:800; color:var(--ok); }
 #rcpRoot .opCodeBtn.loaded{ background:#eef7ee; border-color:var(--ok); color:#333; }
+#rcpRoot .opCodeBtn.opCodeAdd{ border:2px dashed var(--ok); color:var(--ok); background:#f6fff8; }
+#rcpRoot .opCodeAddPlus{ font-size:34px; line-height:1; font-weight:900; }
 #rcpRoot .opLineRow{ display:flex; gap:14px; margin-top:14px; }
 #rcpRoot .opLineBtn{ flex:1; height:90px; font-size:24px; font-weight:900; border-radius:14px; border:2px solid var(--border); background:#fff; cursor:pointer; }
 #rcpRoot .opLineBtn.active{ background:#111; color:#fff; border-color:#111; }
@@ -558,6 +560,17 @@ async function renderArticulos() {
         opState.articulos.push({ Cod_Art: r.Cod_Art, Desc: r.Desc || "" });
       }
     });
+    // Log/Fabr: sumar los códigos agregados a mano con "+" (quedan fijos en
+    // localStorage del dispositivo). Se mergean sin el filtro de "empieza con
+    // número" porque son agregados a propósito por el operario.
+    if (arEsLogFabr()) {
+      arLoadExtras(opState.tallNombre).forEach(cod => {
+        const c = String(cod || "").trim();
+        if (c && !opState.articulos.some(a => String(a.Cod_Art).toUpperCase() === c.toUpperCase())) {
+          opState.articulos.push({ Cod_Art: c, Desc: "" });
+        }
+      });
+    }
   }
 
   drawArticulosGrid();
@@ -565,14 +578,16 @@ async function renderArticulos() {
 
 function drawArticulosGrid() {
   opBody.innerHTML = "";
-  if (!opState.articulos || opState.articulos.length === 0) {
+  const hayArts = opState.articulos && opState.articulos.length > 0;
+  // Sin códigos: aviso normal, salvo en Log/Fabr (ahí igual mostramos el "+").
+  if (!hayArts && !arEsLogFabr()) {
     opBody.innerHTML = '<div class="opEmpty">No hay códigos para la línea ' + opState.linea + '.</div>';
     opActions.innerHTML = "";
     return;
   }
   const grid = document.createElement("div");
   grid.className = "opGrid codes";
-  opState.articulos.forEach(a => {
+  (opState.articulos || []).forEach(a => {
     const cajas = opState.cargas[a.Cod_Art];
     const b = document.createElement("button");
     b.type = "button";
@@ -581,6 +596,16 @@ function drawArticulosGrid() {
     b.onclick = () => openCajas(a.Cod_Art);
     grid.appendChild(b);
   });
+  // Log/Fabr: botón "+" para agregar un artículo nuevo (queda fijo).
+  if (arEsLogFabr()) {
+    const addBtn = document.createElement("button");
+    addBtn.type = "button";
+    addBtn.className = "opCodeBtn opCodeAdd";
+    addBtn.innerHTML = '<span class="opCodeAddPlus">+</span>';
+    addBtn.title = "Agregar artículo a Log/Fabr";
+    addBtn.onclick = arAddCode;
+    grid.appendChild(addBtn);
+  }
   opBody.appendChild(grid);
 
   const total = Object.values(opState.cargas).filter(n => n > 0).length;
@@ -591,6 +616,46 @@ function drawArticulosGrid() {
   enviarBtn.disabled = total === 0;
   enviarBtn.onclick = renderResumen;
   opActions.appendChild(enviarBtn);
+}
+
+/* ============== Agregar artículo a Log/Fabr (botón "+") ==============
+   Solo para el tallerista Log/Fabr: deja agregar un código a mano que queda
+   FIJO en las opciones (persistido en localStorage de este dispositivo). */
+function arEsLogFabr() {
+  return opState.tipo === 'tallerista' && claveTall(opState.tallNombre || "") === claveTall("Log/Fabr");
+}
+function recpExtraKey(tallNombre) {
+  return "vir_recp_extra_" + claveTall(tallNombre || "");
+}
+function arLoadExtras(tallNombre) {
+  try {
+    const raw = localStorage.getItem(recpExtraKey(tallNombre));
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? arr : [];
+  } catch (e) { return []; }
+}
+function arSaveExtra(tallNombre, cod) {
+  try {
+    const arr = arLoadExtras(tallNombre);
+    if (arr.indexOf(cod) < 0) {
+      arr.push(cod);
+      localStorage.setItem(recpExtraKey(tallNombre), JSON.stringify(arr));
+    }
+  } catch (e) { /* localStorage lleno/privado: no rompe nada */ }
+}
+function arAddCode() {
+  let cod = prompt("Código del artículo nuevo para Log/Fabr:");
+  if (cod == null) return;                       // canceló
+  cod = String(cod).trim().toUpperCase();
+  if (!cod) return;
+  if (!opState.articulos) opState.articulos = [];
+  const existe = opState.articulos.some(a => String(a.Cod_Art).toUpperCase() === cod);
+  if (!existe) {
+    opState.articulos.push({ Cod_Art: cod, Desc: "" });
+    arSaveExtra(opState.tallNombre, cod);        // queda fijo para próximas veces
+  }
+  drawArticulosGrid();
+  openCajas(cod);                                // que le cargue las cajas ya mismo
 }
 
 /* ============== Paso 5: resumen ============== */
