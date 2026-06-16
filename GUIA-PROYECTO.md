@@ -339,6 +339,11 @@ de pedidos de un Google Sheet.
 - Repo: `loekemeyer/produccion-virgilio` · se publica desde la branch **`main`**
   (lo que llega a `main` queda online en ~1 min; cada pantalla lo ve al refrescar).
 - Branch de desarrollo actual: **`claude/fix-virgilio-production-GoGCS`**.
+- **Play Store**: la PWA se publica como **TWA** (envoltorio Android que abre la
+  web a pantalla completa). Cómo generar el `.aab` y publicar: ver
+  **`PLAY-STORE.md`**. Config en `twa-manifest.json`; íconos PNG en `icons/`;
+  Digital Asset Links en `.well-known/assetlinks.json` (¡va en la raíz del
+  origen, no bajo `/Produccion-Virgilio/`!).
 
 ---
 
@@ -353,7 +358,11 @@ de pedidos de un Google Sheet.
 | `fichadas-monitor.html` | Tablero **independiente** "Monitor Fichadas Esnaola" (lee de `Fichadas_Historico` y sincroniza otro Google Sheet distinto). No está enlazado desde `index.html`. |
 | `monitor/index.html` | Shim de **redirección**: da la URL limpia `/Produccion-Virgilio/monitor` → redirige a `/?monitor=tv` (para colgar la Smart TV). |
 | `qrcode.js` | Librería vendorizada para generar QR. |
-| `icon.svg` | Ícono. |
+| `icon.svg` | Ícono (fuente vectorial). |
+| `icons/` | Íconos PNG 192/512 + maskable + ícono 512 para la ficha de Play (generados desde `icon.svg`). Requeridos por la PWA/TWA. |
+| `twa-manifest.json` | Config de Bubblewrap para empaquetar la TWA (Play Store). |
+| `.well-known/assetlinks.json` | Plantilla de Digital Asset Links (verificación de la TWA). |
+| `PLAY-STORE.md` | Guía paso a paso para generar el `.aab` y publicar en Google Play. |
 
 ---
 
