@@ -93,7 +93,9 @@ El resultado es `app-release-signed.aab`.
 
 ## 2) Crear la app en Play Console y subir el `.aab`
 
-1. <https://play.google.com/console> → **Crear app**.
+1. <https://play.google.com/console> (cuenta de desarrollador **ThomasLoke** —
+   este nombre es el **editor** que se muestra en la ficha, no el package id) →
+   **Crear app**.
    - Nombre: `Producción Virgilio`
    - Idioma: Español (Argentina)
    - App / Gratis.
