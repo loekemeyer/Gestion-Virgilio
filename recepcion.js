@@ -587,7 +587,13 @@ function drawArticulosGrid() {
   }
   const grid = document.createElement("div");
   grid.className = "opGrid codes";
-  (opState.articulos || []).forEach(a => {
+  // Orden numérico por código (el agregado a mano queda en su lugar, no al final).
+  const numKey = c => { const m = String(c).match(/^(\d+)/); return m ? parseInt(m[1], 10) : Number.MAX_SAFE_INTEGER; };
+  const artsOrden = (opState.articulos || []).slice().sort((a, b) =>
+    (numKey(a.Cod_Art) - numKey(b.Cod_Art))
+    || (String(a.Cod_Art) < String(b.Cod_Art) ? -1 : String(a.Cod_Art) > String(b.Cod_Art) ? 1 : 0)
+  );
+  artsOrden.forEach(a => {
     const cajas = opState.cargas[a.Cod_Art];
     const b = document.createElement("button");
     b.type = "button";

@@ -4,7 +4,12 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-16 · Versión app al documentar: **v2.69**
+> Última actualización: 2026-06-16 · Versión app al documentar: **v2.70**
+>
+> Nota: **v2.70** — Recepción: la grilla de códigos se muestra **ordenada por
+> valor numérico** del código (`drawArticulosGrid` ordena por los dígitos
+> iniciales, desempate alfabético). Así el artículo agregado a mano con "+" en
+> Log/Fabr queda en su **lugar numérico**, no al final. (`recepcion.js?v=2.70`.)
 >
 > Nota: **v2.69** — **Recepción (Modo OP): agregar artículos a Log/Fabr con "+"**.
 > En la grilla de códigos de **Log/Fabr** (solo ese tallerista) aparece un botón
