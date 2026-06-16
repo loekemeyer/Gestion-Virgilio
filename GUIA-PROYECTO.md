@@ -4,7 +4,12 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-16 · Versión app al documentar: **v2.73**
+> Última actualización: 2026-06-16 · Versión app al documentar: **v2.74**
+>
+> Nota: **v2.74** — Recepción: el pop-up de **cajas** ya **no se cierra al tocar
+> el fondo** (se sacó el handler de backdrop-dismiss de `#opCajasModal`). Así, si
+> el empleado tarda en cargar el número o toca fuera sin querer, el pop-up **se
+> mantiene**; solo se cierra con la ✕ o al confirmar el número.
 >
 > Nota: **v2.73** — al agregar un código a Log/Fabr, en vez de dejar `Desc`
 > vacío, `arSaveCodeRemote` **busca el mismo `Cod_Art` en `Articulos Virgilio X
