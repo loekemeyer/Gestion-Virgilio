@@ -4,7 +4,17 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-16 · Versión app al documentar: **v2.70**
+> Última actualización: 2026-06-16 · Versión app al documentar: **v2.71**
+>
+> Nota: **v2.71** — los artículos agregados a Log/Fabr con "+" ahora se guardan
+> en **`Articulos Virgilio X Tallerista`** (la MISMA tabla que lee la grilla),
+> NO en localStorage ni en una tabla aparte → quedan fijos y **compartidos entre
+> dispositivos**. `arAddCode` inserta una fila por línea (LK y CH) con el
+> `Cod_Tallerista` de Log/Fabr (`arSaveCodeRemote`); la lectura normal de
+> `renderArticulos` ya las trae (y en Log/Fabr se relaja el filtro "empieza con
+> número"). Best-effort: si falla el insert (RLS), avisa con `alert`. ⚠ Requiere
+> que la tabla acepte **INSERT** para el rol de la app (policy RLS, SQL por chat);
+> y que esa tabla **no se pise** con la sync del Excel. (`?v=2.71`.)
 >
 > Nota: **v2.70** — Recepción: la grilla de códigos se muestra **ordenada por
 > valor numérico** del código (`drawArticulosGrid` ordena por los dígitos

@@ -553,24 +553,16 @@ async function renderArticulos() {
     if (error) { opBody.innerHTML = '<div class="opEmpty" style="color:var(--danger)">Error: ' + error.message + '</div>'; return; }
     const vistos = new Set();
     opState.articulos = [];
+    // En Log/Fabr no aplicamos el filtro "empieza con número" (ahí van los
+    // códigos agregados a mano con "+", que ya viven en la misma tabla).
+    const permitirNoNum = arEsLogFabr();
     lista.forEach(r => {
       const codArt = String(r.Cod_Art || "").trim();
-      if (codArt && /^[0-9]/.test(codArt) && !vistos.has(r.Cod_Art)) {
+      if (codArt && (permitirNoNum || /^[0-9]/.test(codArt)) && !vistos.has(r.Cod_Art)) {
         vistos.add(r.Cod_Art);
         opState.articulos.push({ Cod_Art: r.Cod_Art, Desc: r.Desc || "" });
       }
     });
-    // Log/Fabr: sumar los códigos agregados a mano con "+" (quedan fijos en
-    // localStorage del dispositivo). Se mergean sin el filtro de "empieza con
-    // número" porque son agregados a propósito por el operario.
-    if (arEsLogFabr()) {
-      arLoadExtras(opState.tallNombre).forEach(cod => {
-        const c = String(cod || "").trim();
-        if (c && !opState.articulos.some(a => String(a.Cod_Art).toUpperCase() === c.toUpperCase())) {
-          opState.articulos.push({ Cod_Art: c, Desc: "" });
-        }
-      });
-    }
   }
 
   drawArticulosGrid();
@@ -625,29 +617,34 @@ function drawArticulosGrid() {
 }
 
 /* ============== Agregar artículo a Log/Fabr (botón "+") ==============
-   Solo para el tallerista Log/Fabr: deja agregar un código a mano que queda
-   FIJO en las opciones (persistido en localStorage de este dispositivo). */
+   Solo para el tallerista Log/Fabr. El código nuevo se inserta en la MISMA tabla
+   que lee la grilla ("Articulos Virgilio X Tallerista"), para las dos líneas de
+   Log/Fabr → queda fijo y compartido entre dispositivos, SIN tablas extra. */
 function arEsLogFabr() {
   return opState.tipo === 'tallerista' && claveTall(opState.tallNombre || "") === claveTall("Log/Fabr");
 }
-function recpExtraKey(tallNombre) {
-  return "vir_recp_extra_" + claveTall(tallNombre || "");
-}
-function arLoadExtras(tallNombre) {
+/* Guarda el código en "Articulos Virgilio X Tallerista" (best-effort). Inserta
+   una fila por línea de Log/Fabr (LK y CH) usando su Cod_Tallerista, así aparece
+   en ambas y en cualquier dispositivo. Si RLS no deja insertar, avisa. */
+function arSaveCodeRemote(cod) {
+  const cods = opState.tallCods || {};
+  const rows = [];
+  if (cods.LK) rows.push({ Cod_Art: cod, Cod_Tallerista: cods.LK, Linea: "LK" });
+  if (cods.CH) rows.push({ Cod_Art: cod, Cod_Tallerista: cods.CH, Linea: "CH" });
+  if (!rows.length && opState.tallCod) rows.push({ Cod_Art: cod, Cod_Tallerista: opState.tallCod, Linea: opState.linea });
+  if (!rows.length) return;
   try {
-    const raw = localStorage.getItem(recpExtraKey(tallNombre));
-    const arr = raw ? JSON.parse(raw) : [];
-    return Array.isArray(arr) ? arr : [];
-  } catch (e) { return []; }
-}
-function arSaveExtra(tallNombre, cod) {
-  try {
-    const arr = arLoadExtras(tallNombre);
-    if (arr.indexOf(cod) < 0) {
-      arr.push(cod);
-      localStorage.setItem(recpExtraKey(tallNombre), JSON.stringify(arr));
-    }
-  } catch (e) { /* localStorage lleno/privado: no rompe nada */ }
+    supabase.from("Articulos Virgilio X Tallerista").insert(rows)
+      .then(function (res) {
+        if (res && res.error) {
+          console.warn("alta artículo Log/Fabr:", res.error.message);
+          alert("El código quedó para esta carga, pero NO se pudo guardar fijo en la base:\n" +
+                res.error.message +
+                "\n\nProbablemente falte el permiso de inserción (RLS) en \"Articulos Virgilio X Tallerista\". Avisá al admin.");
+        }
+      })
+      .catch(function () {});
+  } catch (e) { /* no-op */ }
 }
 function arAddCode() {
   let cod = prompt("Código del artículo nuevo para Log/Fabr:");
@@ -657,8 +654,8 @@ function arAddCode() {
   if (!opState.articulos) opState.articulos = [];
   const existe = opState.articulos.some(a => String(a.Cod_Art).toUpperCase() === cod);
   if (!existe) {
-    opState.articulos.push({ Cod_Art: cod, Desc: "" });
-    arSaveExtra(opState.tallNombre, cod);        // queda fijo para próximas veces
+    opState.articulos.push({ Cod_Art: cod, Desc: "" });   // mostrar al instante
+    arSaveCodeRemote(cod);                                  // guardar fijo (compartido)
   }
   drawArticulosGrid();
   openCajas(cod);                                // que le cargue las cajas ya mismo
