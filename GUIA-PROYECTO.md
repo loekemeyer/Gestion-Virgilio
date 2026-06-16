@@ -4,11 +4,19 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-16 · Versión app al documentar: **v2.72**
+> Última actualización: 2026-06-16 · Versión app al documentar: **v2.73**
+>
+> Nota: **v2.73** — al agregar un código a Log/Fabr, en vez de dejar `Desc`
+> vacío, `arSaveCodeRemote` **busca el mismo `Cod_Art` en `Articulos Virgilio X
+> Tallerista` (cualquier tallerista) y copia TODAS sus columnas** (Desc, UxB y
+> cualquier otro dato del artículo); solo cambia `Cod_Tallerista` + `Linea`
+> (borra `id`/`created_at`/`updated_at` para que las regenere la DB). Así el alta
+> queda completa con la descripción y los datos que el sistema usa después. Si el
+> código no existe en ningún lado, cae a un alta mínima (`Desc: ""`).
 >
 > Nota: **v2.72** — fix del alta de Log/Fabr: la tabla `Articulos Virgilio X
 > Tallerista` tiene la columna **`Desc` NOT NULL**, así que `arSaveCodeRemote`
-> ahora manda `Desc: ""` en cada fila. (No era RLS: la tabla sí acepta INSERT.)
+> mandaba `Desc: ""`. (No era RLS: la tabla sí acepta INSERT.)
 >
 > Nota: **v2.71** — los artículos agregados a Log/Fabr con "+" ahora se guardan
 > en **`Articulos Virgilio X Tallerista`** (la MISMA tabla que lee la grilla),

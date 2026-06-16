@@ -623,28 +623,43 @@ function drawArticulosGrid() {
 function arEsLogFabr() {
   return opState.tipo === 'tallerista' && claveTall(opState.tallNombre || "") === claveTall("Log/Fabr");
 }
-/* Guarda el código en "Articulos Virgilio X Tallerista" (best-effort). Inserta
-   una fila por línea de Log/Fabr (LK y CH) usando su Cod_Tallerista, así aparece
-   en ambas y en cualquier dispositivo. Si RLS no deja insertar, avisa. */
-function arSaveCodeRemote(cod) {
-  const cods = opState.tallCods || {};
-  const rows = [];
-  // Desc: "" → la tabla exige la columna Desc NOT NULL; al agregar a mano no hay
-  // descripción, va vacía (satisface la restricción).
-  if (cods.LK) rows.push({ Cod_Art: cod, Cod_Tallerista: cods.LK, Linea: "LK", Desc: "" });
-  if (cods.CH) rows.push({ Cod_Art: cod, Cod_Tallerista: cods.CH, Linea: "CH", Desc: "" });
-  if (!rows.length && opState.tallCod) rows.push({ Cod_Art: cod, Cod_Tallerista: opState.tallCod, Linea: opState.linea, Desc: "" });
-  if (!rows.length) return;
+/* Guarda el código en "Articulos Virgilio X Tallerista" (best-effort).
+   MAESTRO: busca una fila existente del MISMO código (cualquier tallerista) y
+   COPIA todas sus columnas (Desc, UxB y cualquier otro dato del artículo);
+   solo cambia Cod_Tallerista + Línea. Así el alta queda con la descripción y
+   demás datos que el sistema usa después, sin dejar nada vacío. Inserta una fila
+   por cada línea de Log/Fabr (LK y CH) → aparece en ambas y en cualquier device.
+   Si el código no existe en ningún lado, cae a un alta mínima (Desc: ""). */
+async function arSaveCodeRemote(cod) {
+  let base = null;
   try {
-    supabase.from("Articulos Virgilio X Tallerista").insert(rows)
-      .then(function (res) {
-        if (res && res.error) {
-          console.warn("alta artículo Log/Fabr:", res.error.message);
-          alert("El código quedó para esta carga, pero NO se pudo guardar fijo en la base:\n" +
-                res.error.message + "\n\nAvisá al admin.");
-        }
-      })
-      .catch(function () {});
+    const res = await supabase.from("Articulos Virgilio X Tallerista")
+      .select("*").eq("Cod_Art", cod).limit(1);
+    if (!res.error && res.data && res.data.length) base = res.data[0];
+  } catch (e) { /* sin red: alta mínima */ }
+
+  const cods = opState.tallCods || {};
+  const dest = [];
+  if (cods.LK) dest.push({ codTall: cods.LK, linea: "LK" });
+  if (cods.CH) dest.push({ codTall: cods.CH, linea: "CH" });
+  if (!dest.length && opState.tallCod) dest.push({ codTall: opState.tallCod, linea: opState.linea });
+  if (!dest.length) return;
+
+  const rows = dest.map(function (d) {
+    const row = base ? Object.assign({}, base) : { Cod_Art: cod, Desc: "" };
+    delete row.id; delete row.created_at; delete row.updated_at;   // PK/auto: que las genere la DB
+    row.Cod_Art = cod;
+    row.Cod_Tallerista = d.codTall;
+    row.Linea = d.linea;
+    return row;
+  });
+  try {
+    const ins = await supabase.from("Articulos Virgilio X Tallerista").insert(rows);
+    if (ins && ins.error) {
+      console.warn("alta artículo Log/Fabr:", ins.error.message);
+      alert("El código quedó para esta carga, pero NO se pudo guardar fijo en la base:\n" +
+            ins.error.message + "\n\nAvisá al admin.");
+    }
   } catch (e) { /* no-op */ }
 }
 function arAddCode() {
