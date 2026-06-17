@@ -4,7 +4,16 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-16 · Versión app al documentar: **v2.76**
+> Última actualización: 2026-06-16 · Versión app al documentar: **v2.77**
+>
+> Nota: **v2.77** — **picking: aclarar Nacional/Importado en pares de planimetría**.
+> Si un código tiene su par (base + E) cargado en `planimetria.js` **en el MISMO
+> sector** (ej. `580`/`580E` en C19), al pickearlo el operario ve un aviso y dos
+> botones **Nacional / Importado**; lo que toca **define el código que se registra**
+> en el `PKC` (Nacional→`580`, Importado→`580E`) — así no se cruzan los stocks.
+> `showPickingList` calcula `dual` por ítem (`dualOf`); `pkRender` muestra el paso
+> de aclaración; `pkClarify`/`pkReclarify` setean `it.pick`; `pkOk`/`pkConfirmF`
+> mandan el código elegido. **Activo** desde que existe el par `580`/`580E` (v2.76).
 >
 > Nota: **v2.76** — **planimetría: alta del código `580`**. Se agregó `"580":["C19",60]`
 > a `window.GONDOLA` (planimetria.js), mismo sector y orden que `580E` (C19, 60).
