@@ -4,7 +4,13 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-16 · Versión app al documentar: **v2.75**
+> Última actualización: 2026-06-16 · Versión app al documentar: **v2.76**
+>
+> Nota: **v2.76** — **planimetría: alta del código `580`**. Se agregó `"580":["C19",60]`
+> a `window.GONDOLA` (planimetria.js), mismo sector y orden que `580E` (C19, 60).
+> Antes solo existía `580E`; un picking con el código `580` pelado caía sin
+> planimetría (orden al final + evento `PSP`/aviso Telegram). `index.html` ahora
+> carga `planimetria.js?v=2.76` para bustear caché.
 >
 > Nota: **v2.75** — **acceso al panel Admin de Recepción + nuevo supervisor**.
 > (a) Se agregó `comexloekemeyer@gmail.com` a `SUPERVISOR_EMAILS` (ve los

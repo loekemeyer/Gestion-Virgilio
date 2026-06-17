@@ -2358,7 +2358,7 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
 <!-- Librería qrcode-generator (Kazuhiko Arase, MIT) — hosteada local para
      que ande sin internet en el depósito. -->
 <script src="qrcode.js"></script>
-<script src="planimetria.js"></script>
+<script src="planimetria.js?v=2.76"></script>
 <!-- Modo OP de Recepción de Mercadería (se abre al tocar RT). Módulo aislado bajo
      #rcpRoot, con su propio cliente Supabase (login anónimo). Portado de la app
      Control-Carga-Remitos-FC. Suma las cajas del día a localStorage para que RT
@@ -4397,7 +4397,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v2.75";
+const APP_VERSION = "v2.76";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
