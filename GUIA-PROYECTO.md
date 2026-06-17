@@ -4,7 +4,16 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-16 · Versión app al documentar: **v2.77**
+> Última actualización: 2026-06-16 · Versión app al documentar: **v2.78**
+>
+> Nota: **v2.78** — **planimetría: alta de 13 códigos** que aparecían en la base de
+> pedidos sin posición de góndola: `758`→Ñ56, `071`→C10, `255`→G10, `724`→G15,
+> `256`→G20, `828`→L08, `548`→A64, `29`→F12, `556`→A65, `30`→A72, `830`→L05,
+> `396`→A65, `759`→Ñ59, `441`→J28 (mismo orden que `441E`). El orden de los
+> sectores nuevos se interpoló por posición. Nota: `441`/`441E` quedan en el mismo
+> sector (J28) → activan el aviso Nacional/Importado (v2.77). Pendiente: `809E`
+> tenía dos sectores pedidos (M13 "de chef" —ya existía— y J13 "de loeke"); no se
+> puede tener un código en dos sectores → quedó solo M13. `planimetria.js?v=2.78`.
 >
 > Nota: **v2.77** — **picking: aclarar Nacional/Importado en pares de planimetría**.
 > Si un código tiene su par (base + E) cargado en `planimetria.js` **en el MISMO
