@@ -4,7 +4,11 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-16 · Versión app al documentar: **v2.78**
+> Última actualización: 2026-06-16 · Versión app al documentar: **v2.79**
+>
+> Nota: **v2.79** — **planimetría: se borró `441E`** (código fantasma, no existe;
+> solo existe `441`). Queda `441`→J28 sin par E → sin aviso Nacional/Importado.
+> `planimetria.js?v=2.79`.
 >
 > Nota: **v2.78** — **planimetría: alta de 13 códigos** que aparecían en la base de
 > pedidos sin posición de góndola: `758`→Ñ56, `071`→C10, `255`→G10, `724`→G15,
