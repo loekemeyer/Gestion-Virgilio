@@ -4,7 +4,15 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-18 · Versión app al documentar: **v2.82**
+> Última actualización: 2026-06-18 · Versión app al documentar: **v2.83**
+>
+> Nota: **v2.83** — **rediseño estético del modal Faltantes** (vista supervisor).
+> Antes los chips de fecha y el "Cerrar" salían a todo el ancho (heredaban el
+> `button{width:100%}` global). Ahora: header prolijo con "Cerrar" compacto, chips de
+> fecha redondeados en fila scrolleable, resumen en 3 tarjetas (tandas / artículos /
+> cajas faltantes en ámbar), y cada tanda como card con badge rojo y tabla con
+> jerarquía (Falta resaltada en chip, Puso/Pedía atenuados, números tabulares). Solo
+> CSS/markup, misma lógica/datos (`.falt-*`, `refreshFaltantes`).
 >
 > Nota: **v2.82** — **las dos plantas en un repo** (reemplaza al repo `App-Produccion`,
 > que se borra). Virgilio queda en la **raíz** (sin cambios), Cervantes se **copia** en

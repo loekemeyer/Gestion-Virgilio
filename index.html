@@ -1836,24 +1836,51 @@ button {
 .cc-rs{ font-size: 13px; color: #64748b; margin-left: auto; text-align: right; }
 
 /* Modal Faltantes (vista supervisor). */
-#faltantesModal{ display:none; position:fixed; inset:0; z-index:1200; background:#0b1220; color:#f8fafc; flex-direction:column; }
+#faltantesModal{ display:none; position:fixed; inset:0; z-index:1200; background:#0b1220; color:#f1f5f9; flex-direction:column; }
 #faltantesModal.show{ display:flex; }
-.falt-header{ display:flex; justify-content:space-between; align-items:center; padding:14px 16px; background:#0f172a; border-bottom:1px solid #1f2937; }
-.falt-title{ font-size:20px; font-weight:bold; }
-.falt-days{ display:flex; gap:6px; flex-wrap:wrap; padding:10px 16px; background:#0f172a; }
-.falt-day{ background:#1e293b; color:#cbd5e1; border:1px solid #334155; border-radius:8px; padding:6px 12px; font-size:14px; cursor:pointer; }
-.falt-day.on{ background:#1e6bd6; color:#fff; border-color:#1e6bd6; }
-.falt-body{ flex:1; overflow:auto; padding:14px 16px; }
-.falt-summary{ font-size:15px; color:#fbbf24; font-weight:bold; margin:0 0 14px; }
-.falt-empty{ color:#94a3b8; padding:24px; text-align:center; }
-.falt-tanda{ background:#111827; border:1px solid #1f2937; border-radius:10px; padding:12px 14px; margin-bottom:12px; }
-.falt-tanda-h{ font-size:16px; font-weight:bold; color:#f8fafc; margin-bottom:8px; }
+
+.falt-header{ display:flex; justify-content:space-between; align-items:center; gap:12px; padding:15px 20px; background:linear-gradient(180deg,#111d33,#0f172a); border-bottom:1px solid #1e293b; }
+.falt-title{ font-size:19px; font-weight:800; letter-spacing:.2px; display:flex; align-items:center; gap:9px; }
+.falt-title .falt-ico{ font-size:22px; }
+.falt-title .falt-dim{ color:#94a3b8; font-weight:600; }
+/* override del global button{ width:100%; padding:16px; font-size:22px; margin-top:14px } */
+.falt-close{ width:auto; margin:0; flex:0 0 auto; padding:9px 18px; font-size:14px; font-weight:700; background:#1e293b; color:#e2e8f0; border:1px solid #334155; border-radius:9px; cursor:pointer; transition:background .12s,border-color .12s; }
+.falt-close:hover{ background:#334155; border-color:#475569; }
+
+.falt-days{ display:flex; gap:8px; padding:12px 20px; background:#0f172a; border-bottom:1px solid #1e293b; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:thin; }
+.falt-day{ width:auto; margin:0; flex:0 0 auto; background:#1a2536; color:#cbd5e1; border:1px solid #2b3a4f; border-radius:999px; padding:7px 16px; font-size:13.5px; font-weight:600; cursor:pointer; white-space:nowrap; transition:background .12s,color .12s,border-color .12s; }
+.falt-day:hover{ background:#22324a; color:#fff; }
+.falt-day.on{ background:#2563eb; color:#fff; border-color:#2563eb; box-shadow:0 2px 10px rgba(37,99,235,.45); }
+
+.falt-body{ flex:1; overflow:auto; padding:18px 20px 28px; }
+
+/* Resumen: tarjetas de stats */
+.falt-summary{ display:flex; flex-wrap:wrap; gap:10px; margin:0 0 18px; }
+.falt-stat{ flex:1 1 130px; background:#0f1a2e; border:1px solid #1e293b; border-radius:12px; padding:12px 16px; }
+.falt-stat .n{ font-size:24px; font-weight:800; line-height:1; }
+.falt-stat .l{ font-size:11px; color:#94a3b8; margin-top:6px; text-transform:uppercase; letter-spacing:.4px; }
+.falt-stat.amber{ border-color:#7c5e1a; background:linear-gradient(180deg,#241f0c,#15120a); }
+.falt-stat.amber .n{ color:#fbbf24; }
+
+.falt-empty{ color:#94a3b8; padding:44px 24px; text-align:center; font-size:15px; }
+
+/* Card por tanda */
+.falt-tanda{ background:#0f1729; border:1px solid #1e293b; border-radius:14px; margin-bottom:14px; overflow:hidden; }
+.falt-tanda-h{ display:flex; justify-content:space-between; align-items:center; gap:10px; padding:13px 16px; background:#13203a; border-bottom:1px solid #1e293b; }
+.falt-tanda-name{ font-size:16px; font-weight:800; color:#f1f5f9; }
+.falt-tanda-badge{ font-size:13px; font-weight:800; color:#fecaca; background:#7f1d1d; border:1px solid #b91c1c; padding:4px 12px; border-radius:999px; white-space:nowrap; }
+
 .falt-table{ width:100%; border-collapse:collapse; }
-.falt-table th{ font-size:12px; color:#94a3b8; text-align:left; padding:4px 8px; border-bottom:1px solid #1f2937; }
+.falt-table th{ font-size:11px; color:#7f8ea3; text-align:left; font-weight:700; text-transform:uppercase; letter-spacing:.5px; padding:9px 16px; background:#0d1424; }
 .falt-table th.num{ text-align:right; }
-.falt-table td{ font-size:15px; padding:7px 8px; border-bottom:1px solid #1f2937; }
-.falt-table td.num{ text-align:right; }
-.falt-table td.falt{ color:#f87171; font-weight:bold; }
+.falt-table td{ font-size:15px; padding:10px 16px; border-top:1px solid #16202f; }
+.falt-table td.num{ text-align:right; font-variant-numeric:tabular-nums; }
+.falt-table .c-art{ font-weight:700; color:#f1f5f9; }
+.falt-table .c-muted{ color:#8aa0b8; }
+.falt-table .c-leg{ color:#94a3b8; }
+.falt-table td.falt{ text-align:right; }
+.falt-table td.falt span{ display:inline-block; min-width:44px; color:#fca5a5; font-weight:800; background:rgba(239,68,68,.13); border:1px solid rgba(239,68,68,.32); border-radius:7px; padding:2px 9px; font-variant-numeric:tabular-nums; }
+.falt-table tbody tr:hover td{ background:#11192b; }
 
 /* Modales (historial de días anteriores y "Terminar Día") */
 #histModal,
@@ -2321,8 +2348,8 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
      agrupa por tanda los artículos donde se puso menos de lo pedido. -->
 <div id="faltantesModal">
   <div class="falt-header">
-    <div class="falt-title">📦 Faltantes — Picking</div>
-    <button class="hist-modal-close" onclick="closeFaltantes()" style="background:#1e293b;color:#f8fafc;border-color:#334155;">Cerrar</button>
+    <div class="falt-title"><span class="falt-ico">📦</span> Faltantes <span class="falt-dim">— Picking</span></div>
+    <button class="falt-close" onclick="closeFaltantes()">Cerrar</button>
   </div>
   <div class="falt-days" id="faltantesDays"></div>
   <div class="falt-body" id="faltantesBody"><div class="falt-empty">Cargando…</div></div>
@@ -4455,7 +4482,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v2.82";
+const APP_VERSION = "v2.83";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -7125,12 +7152,18 @@ async function refreshFaltantes() {
       let tFalt = 0;
       const rows = arr.map(x => {
         totArts++; totCajas += x.falta; tFalt += x.falta;
-        return `<tr><td>${escapeHtml(x.art)}</td><td class="num">${x.real}</td><td class="num">${x.esp}</td><td class="num falt">${x.falta}</td><td>${escapeHtml(x.legajo)}</td></tr>`;
+        return `<tr><td class="c-art">${escapeHtml(x.art)}</td><td class="num c-muted">${x.real}</td><td class="num c-muted">${x.esp}</td><td class="falt"><span>${x.falta}</span></td><td class="c-leg">${escapeHtml(x.legajo)}</td></tr>`;
       }).join("");
-      html += `<div class="falt-tanda"><div class="falt-tanda-h">Tanda ${escapeHtml(tanda)} · <b>${tFalt}</b> cajas faltan</div>` +
+      html += `<div class="falt-tanda"><div class="falt-tanda-h"><span class="falt-tanda-name">Tanda ${escapeHtml(tanda)}</span><span class="falt-tanda-badge">${tFalt} cajas faltan</span></div>` +
         `<table class="falt-table"><thead><tr><th>Artículo</th><th class="num">Puso</th><th class="num">Pedía</th><th class="num">Falta</th><th>Legajo</th></tr></thead><tbody>${rows}</tbody></table></div>`;
     }
-    body.innerHTML = `<div class="falt-summary">${tandas.length} tanda(s) con faltante · ${totArts} artículo(s) · ${totCajas} cajas faltantes</div>` + html;
+    const _pl = (n, s, p) => (n === 1 ? s : p);
+    body.innerHTML =
+      `<div class="falt-summary">` +
+        `<div class="falt-stat"><div class="n">${tandas.length}</div><div class="l">${_pl(tandas.length, "tanda con falta", "tandas con falta")}</div></div>` +
+        `<div class="falt-stat"><div class="n">${totArts}</div><div class="l">${_pl(totArts, "artículo", "artículos")}</div></div>` +
+        `<div class="falt-stat amber"><div class="n">${totCajas}</div><div class="l">cajas faltantes</div></div>` +
+      `</div>` + html;
   } catch (e) {
     body.innerHTML = `<div class="falt-empty">No se pudo cargar: ${escapeHtml(e.message || "")}</div>`;
   }
