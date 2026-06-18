@@ -15,10 +15,13 @@
 > `fetchHistoricSheet` y `fetchPickingBase` quedaron como *dispatcher* +
 > `…FromSheets` + `…FromSupabase` (mismo Map de salida; el m³ se lee **numérico**,
 > sin `monitorParseM3`); helper nuevo `supaFetchAll` (pagina PostgREST con `Range`
-> + `count=exact`). La **macro del Excel** carga las tablas con la `service_role`
-> key (contrato + rollout en `MIGRACION-SUPABASE-PPP.md`). **No cambia nada** hasta
-> poner `PPP_SOURCE` en `"auto"`/`"supabase"` y que la macro escriba. Alcance: NO
-> incluye `VolumenArticulos` ni la planimetría.
+> + `count=exact`). La carga la hace el **Apps Script** (`handleCargaPPPSync_`, el
+> que ya escribe las hojas vía el Web App al que postea el Excel): un hook lo
+> **espeja** en las tablas con **reemplazo total** (DELETE all + INSERT) y la
+> `service_role` key del proyecto Virgilio (ver `MIGRACION-SUPABASE-PPP.md` +
+> `apps-script/sync-ppp-supabase.gs`). Tablas con `id` autonumérico (sin clave
+> natural). **No cambia nada** hasta poner `PPP_SOURCE` en `"auto"`/`"supabase"` y
+> que el hook escriba. Alcance: NO incluye `VolumenArticulos` ni la planimetría.
 >
 > Nota: **v2.79** — **planimetría: se borró `441E`** (código fantasma, no existe;
 > solo existe `441`). Queda `441`→J28 sin par E → sin aviso Nacional/Importado.
@@ -554,22 +557,24 @@ legajo↔nombre y legajo↔email.
 user_agent, ts_inicio/ts_cliente).
 
 **Tablas PPP (espejo de Google Sheets, v2.80 — opcionales: se leen sólo si
-`PPP_SOURCE` ≠ `"sheets"`):**
-- **`PPP_Programacion_Diaria`** ← hoja "PPP Excel Programacion Diaria". 1 fila por
-  N° NP. Cols: `np` (PK), `tanda`, `tipo`, `fecha_recep`, `cod`, `razon_social`,
+`PPP_SOURCE` ≠ `"sheets"`):** cada una con `id` autonumérico y carga por
+**reemplazo total** (DELETE all + INSERT), igual que el `clearContents`+`setValues`
+del Apps Script → se permiten filas repetidas, fiel a la hoja.
+- **`PPP_Programacion_Diaria`** ← hoja "PPP Excel Programacion Diaria" (1 fila por
+  N° NP). Cols: `np`, `tanda`, `tipo`, `fecha_recep`, `cod`, `razon_social`,
   `m3` (numeric), `v`, `direccion`, `barrio`, `op`, `fecha_entrega`, `fecha_fc`,
-  `zona`, `observaciones`, `synced_at`.
+  `zona`, `observaciones`.
 - **`PPP_Pedidos_Entregados`** ← hoja "PPP Excel Pedidos Entregados 2026" (m³
-  histórico). Cols: `np` (PK), `tanda`, `fecha`, `cod`, `razon_social`, `mt3`
-  (numeric, col Mt3 — NO "Mt3 FC"), `synced_at`.
-- **`PPP_Base_Pedidos`** ← hoja "PPP Excel Base Datos Pedidos" (~20k). Artículos
-  por pedido para el picking. Cols: `pedido`+`articulo` (PK compuesta), `cajas`
-  (numeric), `synced_at`. La macro pre-agrega cajas por pedido+artículo.
+  histórico). Cols: `tanda`, `mt3` (numeric, col Mt3 — NO "Mt3 FC").
+- **`PPP_Base_Pedidos`** ← hoja "PPP Excel Base Datos Pedidos". Una fila por línea.
+  Cols: `pedido`, `articulo`, `cajas` (numeric).
 
-Las escribe la **macro del Excel** con la `service_role` key (bypassa RLS); la app
-sólo las **lee** (RLS `select` para `anon`/`authenticated`). m³ va **numérico** (no
-texto con coma). DDL en `sql/ppp_supabase.sql`; diseño/ingesta en
-`MIGRACION-SUPABASE-PPP.md`.
+Las escribe el **Apps Script** (`handleCargaPPPSync_`, el que ya escribe las hojas)
+con la `service_role` key del proyecto Virgilio (bypassa RLS); ⚠ las props Supabase
+que ya tiene ese script apuntan a OTRO proyecto (`kwkclwhmoygunqmlegrg`, la web), por
+eso el hook usa props nuevas `SUPABASE_VIRGILIO_*`. La app sólo las **lee** (RLS
+`select` para `anon`/`authenticated`). DDL en `sql/ppp_supabase.sql`; hook en
+`apps-script/sync-ppp-supabase.gs`; diseño en `MIGRACION-SUPABASE-PPP.md`.
 
 ---
 
