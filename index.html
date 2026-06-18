@@ -1787,6 +1787,26 @@ button {
 .recp-admin-title{ font-size: 18px; font-weight: bold; }
 .recp-admin-close{ width: auto; margin: 0; padding: 10px 18px; background: #1e293b; color: #f8fafc; border: 1px solid #334155; border-radius: 8px; font-size: 15px; font-weight: bold; cursor: pointer; }
 .recp-admin-frame{ flex: 1; width: 100%; border: 0; background: #fff; }
+/* Editor de Planimetría (v2.78) */
+.planim-body{ flex: 1; overflow: auto; padding: 14px; background: #f8fafc; display: flex; flex-direction: column; gap: 12px; }
+.planim-add{ background: #fff; border: 2px solid #1e6bd6; border-radius: 10px; padding: 12px; }
+.planim-add-t{ font-size: 14px; font-weight: bold; color: #1e6bd6; margin-bottom: 8px; }
+.planim-add-row{ display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.planim-inp{ height: 42px; font-size: 16px; border: 2px solid #cbd5e1; border-radius: 8px; padding: 0 10px; box-sizing: border-box; width: auto; margin: 0; }
+.planim-inp-num{ max-width: 90px; }
+.planim-search{ width: 100%; }
+.planim-hint{ font-size: 12px; color: #64748b; margin-top: 8px; }
+.planim-btn-save{ width: auto; margin: 0; padding: 0 16px; height: 42px; background: #16a34a; color: #fff; border: 0; border-radius: 8px; font-weight: bold; cursor: pointer; }
+.planim-btn-del{ width: auto; margin: 0; padding: 0 12px; height: 38px; background: #fff; color: #b42318; border: 1px solid #fecaca; border-radius: 8px; font-weight: bold; cursor: pointer; }
+.planim-list{ display: flex; flex-direction: column; gap: 6px; }
+.planim-row{ display: flex; gap: 8px; align-items: center; background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 10px; flex-wrap: wrap; }
+.planim-row-cod{ font-size: 18px; font-weight: 800; color: #0f172a; min-width: 64px; }
+.planim-status{ font-size: 13px; color: #475569; min-height: 18px; text-align: center; }
+.planim-empty{ color: #94a3b8; padding: 10px; text-align: center; }
+.planim-near{ display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
+.planim-near-t{ font-size: 12px; font-weight: bold; color: #475569; }
+.planim-near-row{ display: flex; align-items: center; gap: 8px; font-size: 15px; color: #0f172a; }
+.planim-near-ord{ display: inline-block; min-width: 34px; text-align: center; font-size: 13px; font-weight: 800; color: #fff; background: #1e6bd6; border-radius: 6px; padding: 2px 6px; }
 .pk-btn{ width: 100%; border: none; border-radius: 12px; padding: 16px; font-size: 19px; font-weight: bold; color: #fff; cursor: pointer; box-sizing: border-box; }
 .pk-ok{ background: #16a34a; }
 .pk-f{ background: #f59e0b; }
@@ -1816,24 +1836,51 @@ button {
 .cc-rs{ font-size: 13px; color: #64748b; margin-left: auto; text-align: right; }
 
 /* Modal Faltantes (vista supervisor). */
-#faltantesModal{ display:none; position:fixed; inset:0; z-index:1200; background:#0b1220; color:#f8fafc; flex-direction:column; }
+#faltantesModal{ display:none; position:fixed; inset:0; z-index:1200; background:#0b1220; color:#f1f5f9; flex-direction:column; }
 #faltantesModal.show{ display:flex; }
-.falt-header{ display:flex; justify-content:space-between; align-items:center; padding:14px 16px; background:#0f172a; border-bottom:1px solid #1f2937; }
-.falt-title{ font-size:20px; font-weight:bold; }
-.falt-days{ display:flex; gap:6px; flex-wrap:wrap; padding:10px 16px; background:#0f172a; }
-.falt-day{ background:#1e293b; color:#cbd5e1; border:1px solid #334155; border-radius:8px; padding:6px 12px; font-size:14px; cursor:pointer; }
-.falt-day.on{ background:#1e6bd6; color:#fff; border-color:#1e6bd6; }
-.falt-body{ flex:1; overflow:auto; padding:14px 16px; }
-.falt-summary{ font-size:15px; color:#fbbf24; font-weight:bold; margin:0 0 14px; }
-.falt-empty{ color:#94a3b8; padding:24px; text-align:center; }
-.falt-tanda{ background:#111827; border:1px solid #1f2937; border-radius:10px; padding:12px 14px; margin-bottom:12px; }
-.falt-tanda-h{ font-size:16px; font-weight:bold; color:#f8fafc; margin-bottom:8px; }
+
+.falt-header{ display:flex; justify-content:space-between; align-items:center; gap:12px; padding:15px 20px; background:linear-gradient(180deg,#111d33,#0f172a); border-bottom:1px solid #1e293b; }
+.falt-title{ font-size:19px; font-weight:800; letter-spacing:.2px; display:flex; align-items:center; gap:9px; }
+.falt-title .falt-ico{ font-size:22px; }
+.falt-title .falt-dim{ color:#94a3b8; font-weight:600; }
+/* override del global button{ width:100%; padding:16px; font-size:22px; margin-top:14px } */
+.falt-close{ width:auto; margin:0; flex:0 0 auto; padding:9px 18px; font-size:14px; font-weight:700; background:#1e293b; color:#e2e8f0; border:1px solid #334155; border-radius:9px; cursor:pointer; transition:background .12s,border-color .12s; }
+.falt-close:hover{ background:#334155; border-color:#475569; }
+
+.falt-days{ display:flex; gap:8px; padding:12px 20px; background:#0f172a; border-bottom:1px solid #1e293b; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:thin; }
+.falt-day{ width:auto; margin:0; flex:0 0 auto; background:#1a2536; color:#cbd5e1; border:1px solid #2b3a4f; border-radius:999px; padding:7px 16px; font-size:13.5px; font-weight:600; cursor:pointer; white-space:nowrap; transition:background .12s,color .12s,border-color .12s; }
+.falt-day:hover{ background:#22324a; color:#fff; }
+.falt-day.on{ background:#2563eb; color:#fff; border-color:#2563eb; box-shadow:0 2px 10px rgba(37,99,235,.45); }
+
+.falt-body{ flex:1; overflow:auto; padding:18px 20px 28px; }
+
+/* Resumen: tarjetas de stats */
+.falt-summary{ display:flex; flex-wrap:wrap; gap:10px; margin:0 0 18px; }
+.falt-stat{ flex:1 1 130px; background:#0f1a2e; border:1px solid #1e293b; border-radius:12px; padding:12px 16px; }
+.falt-stat .n{ font-size:24px; font-weight:800; line-height:1; }
+.falt-stat .l{ font-size:11px; color:#94a3b8; margin-top:6px; text-transform:uppercase; letter-spacing:.4px; }
+.falt-stat.amber{ border-color:#7c5e1a; background:linear-gradient(180deg,#241f0c,#15120a); }
+.falt-stat.amber .n{ color:#fbbf24; }
+
+.falt-empty{ color:#94a3b8; padding:44px 24px; text-align:center; font-size:15px; }
+
+/* Card por tanda */
+.falt-tanda{ background:#0f1729; border:1px solid #1e293b; border-radius:14px; margin-bottom:14px; overflow:hidden; }
+.falt-tanda-h{ display:flex; justify-content:space-between; align-items:center; gap:10px; padding:13px 16px; background:#13203a; border-bottom:1px solid #1e293b; }
+.falt-tanda-name{ font-size:16px; font-weight:800; color:#f1f5f9; }
+.falt-tanda-badge{ font-size:13px; font-weight:800; color:#fecaca; background:#7f1d1d; border:1px solid #b91c1c; padding:4px 12px; border-radius:999px; white-space:nowrap; }
+
 .falt-table{ width:100%; border-collapse:collapse; }
-.falt-table th{ font-size:12px; color:#94a3b8; text-align:left; padding:4px 8px; border-bottom:1px solid #1f2937; }
+.falt-table th{ font-size:11px; color:#7f8ea3; text-align:left; font-weight:700; text-transform:uppercase; letter-spacing:.5px; padding:9px 16px; background:#0d1424; }
 .falt-table th.num{ text-align:right; }
-.falt-table td{ font-size:15px; padding:7px 8px; border-bottom:1px solid #1f2937; }
-.falt-table td.num{ text-align:right; }
-.falt-table td.falt{ color:#f87171; font-weight:bold; }
+.falt-table td{ font-size:15px; padding:10px 16px; border-top:1px solid #16202f; }
+.falt-table td.num{ text-align:right; font-variant-numeric:tabular-nums; }
+.falt-table .c-art{ font-weight:700; color:#f1f5f9; }
+.falt-table .c-muted{ color:#8aa0b8; }
+.falt-table .c-leg{ color:#94a3b8; }
+.falt-table td.falt{ text-align:right; }
+.falt-table td.falt span{ display:inline-block; min-width:44px; color:#fca5a5; font-weight:800; background:rgba(239,68,68,.13); border:1px solid rgba(239,68,68,.32); border-radius:7px; padding:2px 9px; font-variant-numeric:tabular-nums; }
+.falt-table tbody tr:hover td{ background:#11192b; }
 
 /* Modales (historial de días anteriores y "Terminar Día") */
 #histModal,
@@ -2301,8 +2348,8 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
      agrupa por tanda los artículos donde se puso menos de lo pedido. -->
 <div id="faltantesModal">
   <div class="falt-header">
-    <div class="falt-title">📦 Faltantes — Picking</div>
-    <button class="hist-modal-close" onclick="closeFaltantes()" style="background:#1e293b;color:#f8fafc;border-color:#334155;">Cerrar</button>
+    <div class="falt-title"><span class="falt-ico">📦</span> Faltantes <span class="falt-dim">— Picking</span></div>
+    <button class="falt-close" onclick="closeFaltantes()">Cerrar</button>
   </div>
   <div class="falt-days" id="faltantesDays"></div>
   <div class="falt-body" id="faltantesBody"><div class="falt-empty">Cargando…</div></div>
@@ -2363,7 +2410,7 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
 <!-- Librería qrcode-generator (Kazuhiko Arase, MIT) — hosteada local para
      que ande sin internet en el depósito. -->
 <script src="qrcode.js"></script>
-<script src="planimetria.js?v=2.79"></script>
+<script src="planimetria.js?v=2.80"></script>
 <!-- Modo OP de Recepción de Mercadería (se abre al tocar RT). Módulo aislado bajo
      #rcpRoot, con su propio cliente Supabase (login anónimo). Portado de la app
      Control-Carga-Remitos-FC. Suma las cajas del día a localStorage para que RT
@@ -2407,6 +2454,7 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
 
 <!-- ================= LEGAJO ================= -->
 <div id="legajoScreen">
+  <a href="selector/" style="display:inline-block;margin:0 0 10px;padding:6px 12px;font-size:13px;font-weight:600;color:#1e6bd6;background:#eaf1fb;border:1px solid #cfe0f7;border-radius:999px;text-decoration:none;">← Cambiar planta</a>
   <h1 id="legajoTitle">Producción Virgilio</h1>
 
   <!-- Login con Google (obligatorio). Visible mientras no haya sesión. -->
@@ -2448,6 +2496,7 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
       <button class="sup-action-btn" onclick="openAnalisis()"><span class="sup-ico">📈</span><span>Análisis de productividad</span></button>
       <button class="sup-action-btn" onclick="openFaltantes()"><span class="sup-ico">📦</span><span>Faltantes</span></button>
       <button class="sup-action-btn" onclick="openRecepcionAdmin()"><span class="sup-ico">🏭</span><span>Recepción (Admin)</span></button>
+      <button class="sup-action-btn" onclick="openPlanimEditor()"><span class="sup-ico">🗺️</span><span>Editar Planimetría</span></button>
     </div>
     <div class="auth-logout-row">
       <button class="auth-logout-btn" onclick="signOutGoogle()">Salir</button>
@@ -2465,6 +2514,32 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
     </div>
     <iframe id="recepcionAdminFrame" class="recp-admin-frame" title="Recepción — Admin"
             allow="camera; clipboard-write"></iframe>
+  </div>
+
+  <!-- Overlay: editor de Planimetría (solo supervisores). Edita la tabla Supabase
+       "Planimetria" que se mergea sobre planimetria.js. -->
+  <div id="planimEditorOverlay" class="recp-admin-overlay">
+    <div class="recp-admin-bar">
+      <span class="recp-admin-title">🗺️ Editar Planimetría</span>
+      <button class="recp-admin-close" onclick="closePlanimEditor()">Cerrar</button>
+    </div>
+    <div class="planim-body">
+      <div class="planim-add">
+        <div class="planim-add-t">Agregar / actualizar ubicación</div>
+        <div class="planim-add-row">
+          <input id="planimNewCod" class="planim-inp" type="text" placeholder="Código (ej. 580)">
+          <input id="planimNewSec" class="planim-inp" type="text" placeholder="Sector (ej. C19)">
+          <input id="planimNewOrd" class="planim-inp planim-inp-num" type="number" inputmode="numeric" placeholder="Orden">
+          <button class="planim-btn-save" onclick="planimAdd()">Guardar</button>
+        </div>
+        <input id="planimRef" class="planim-inp planim-search" type="text" placeholder="🧭 ¿Al lado de qué código o sector va? — te muestro los órdenes cercanos" oninput="planimNearby(this.value)">
+        <div id="planimNearby" class="planim-near"></div>
+        <div class="planim-hint">Para el par Nacional/Importado: cargá <b>580</b> y <b>580E</b> con el <b>mismo sector</b>.</div>
+      </div>
+      <input id="planimSearch" class="planim-inp planim-search" type="text" placeholder="🔍 Buscar código o sector para editar…" oninput="planimRender(this.value)">
+      <div id="planimList" class="planim-list"></div>
+      <div id="planimStatus" class="planim-status"></div>
+    </div>
   </div>
 
   <!-- Aviso: hay reportes que aún no se enviaron -->
@@ -2566,6 +2641,11 @@ const SUPABASE_PPP_ENTREGADOS_ENDPOINT = SUPABASE_URL + "/rest/v1/PPP_Pedidos_En
 const SUPABASE_PPP_BASE_ENDPOINT       = SUPABASE_URL + "/rest/v1/PPP_Base_Pedidos";
 const SUPABASE_FACTURACION_CIERRES_ENDPOINT =
   SUPABASE_URL + "/rest/v1/Facturacion_Cierres";
+// Planimetría editable (tabla Supabase). El operario/monitor la lee (anon) y la
+// MERGEA sobre la planimetría estática (planimetria.js); el supervisor la edita
+// desde el panel Admin. Si no existe la tabla / sin red → queda la estática. v2.78.
+const SUPABASE_PLANIMETRIA_ENDPOINT =
+  SUPABASE_URL + "/rest/v1/Planimetria";
 
 const filas = {
   row1: ["EP","TP","AP","TAP","CR","CC"],
@@ -4417,7 +4497,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v2.80";
+const APP_VERSION = "v2.84";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -4709,6 +4789,26 @@ cleanupIfDayChanged();
 
 /* Bind del botón flotante 📅 */
 document.getElementById("btnHistDias").addEventListener("click", openHistoryModal);
+
+/* Planimetría editable: baja la tabla "Planimetria" de Supabase (anon) y la
+   MERGEA sobre window.GONDOLA (la de planimetria.js). Lo que está en Supabase
+   pisa/agrega a la estática. Si la tabla no existe o no hay red, no rompe nada:
+   queda la planimetría estática. v2.78. */
+async function loadPlanimetriaRemote() {
+  try {
+    const r = await fetch(SUPABASE_PLANIMETRIA_ENDPOINT + "?select=cod,sector,orden&limit=5000&_=" + Date.now(),
+      { headers: { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+    if (!r.ok) return;
+    const rows = await r.json();
+    if (!Array.isArray(rows) || !rows.length) return;
+    if (!window.GONDOLA) window.GONDOLA = {};
+    rows.forEach(function (row) {
+      const cod = String(row.cod || "").trim().toUpperCase();
+      if (cod) window.GONDOLA[cod] = [String(row.sector || ""), (row.orden != null ? Number(row.orden) : 0)];
+    });
+  } catch (_e) { /* offline / sin tabla: queda la planimetría estática */ }
+}
+loadPlanimetriaRemote();   // al arrancar (para que el picking tenga la planimetría fresca)
 
 /* SW + IDB: registrar el SW, replicar la cola completa de LS a IDB para
    que el SW la vea, y volver a pedir un background sync si la cola tiene
@@ -6939,6 +7039,134 @@ function closeRecepcionAdmin() {
   if (ov) ov.classList.remove("show");
 }
 
+/* ===== Editor de Planimetría — escribe DIRECTO a Supabase (tabla "Planimetria").
+   Cada cambio se guarda con el JWT del supervisor; window.GONDOLA se actualiza al
+   instante para que el picking lo use ya. Solo supervisores. v2.78. ===== */
+function openPlanimEditor() {
+  if (!requireSupervisor()) return;
+  const ov = document.getElementById("planimEditorOverlay");
+  if (ov) ov.classList.add("show");
+  const s = document.getElementById("planimSearch");
+  planimRender(s ? s.value : "");
+}
+function closePlanimEditor() {
+  const ov = document.getElementById("planimEditorOverlay");
+  if (ov) ov.classList.remove("show");
+}
+function planimSetStatus(msg, ok) {
+  const el = document.getElementById("planimStatus");
+  if (el) { el.textContent = msg || ""; el.style.color = (ok === false) ? "#b42318" : "#166534"; }
+}
+function planimRender(filter) {
+  const list = document.getElementById("planimList");
+  if (!list) return;
+  const G = window.GONDOLA || {};
+  const f = String(filter || "").trim().toUpperCase();
+  if (!f) { list.innerHTML = '<div class="planim-empty">Buscá un código o sector para editarlo. Para uno nuevo, usá el form de arriba.</div>'; return; }
+  const keys = Object.keys(G).filter(function (k) {
+    const e = G[k] || [];
+    return k.indexOf(f) >= 0 || String(e[0] || "").toUpperCase().indexOf(f) >= 0;
+  }).sort();
+  if (!keys.length) { list.innerHTML = '<div class="planim-empty">Nada coincide con "' + escapeHtml(filter) + '".</div>'; return; }
+  list.innerHTML = keys.slice(0, 100).map(function (k) {
+    const e = G[k] || ["", 0];
+    const kE = escapeHtml(k);
+    return '<div class="planim-row">' +
+      '<span class="planim-row-cod">' + kE + '</span>' +
+      '<input class="planim-inp" id="planimSec_' + kE + '" type="text" value="' + escapeHtml(String(e[0] || "")) + '" placeholder="Sector">' +
+      '<input class="planim-inp planim-inp-num" id="planimOrd_' + kE + '" type="number" inputmode="numeric" value="' + (e[1] != null ? Number(e[1]) : 0) + '">' +
+      '<button class="planim-btn-save" onclick="planimSaveRow(\'' + kE + '\')">Guardar</button>' +
+      '<button class="planim-btn-del" onclick="planimDeleteRow(\'' + kE + '\')">Borrar</button>' +
+    '</div>';
+  }).join("") + (keys.length > 100 ? '<div class="planim-empty">Mostrando 100 de ' + keys.length + ' — afiná la búsqueda.</div>' : "");
+}
+async function planimUpsert(cod, sector, orden) {
+  const headers = await facAuthWriteHeaders({ "Prefer": "resolution=merge-duplicates,return=minimal" });
+  if (!headers) { planimSetStatus("Iniciá sesión con Google para editar.", false); return false; }
+  try {
+    const r = await fetch(SUPABASE_PLANIMETRIA_ENDPOINT + "?on_conflict=cod", {
+      method: "POST", headers: headers, body: JSON.stringify({ cod: cod, sector: sector, orden: orden })
+    });
+    if (!r.ok) { planimSetStatus("Error guardando en Supabase: HTTP " + r.status, false); return false; }
+    return true;
+  } catch (_e) { planimSetStatus("Sin conexión: NO se guardó en Supabase.", false); return false; }
+}
+async function planimSaveRow(cod) {
+  const c = String(cod).toUpperCase();
+  const secEl = document.getElementById("planimSec_" + c);
+  const ordEl = document.getElementById("planimOrd_" + c);
+  const sector = secEl ? secEl.value.trim() : "";
+  const orden = ordEl ? (parseInt(ordEl.value, 10) || 0) : 0;
+  if (await planimUpsert(c, sector, orden)) {
+    if (!window.GONDOLA) window.GONDOLA = {};
+    window.GONDOLA[c] = [sector, orden];
+    planimSetStatus("✓ " + c + " guardado en Supabase.", true);
+  }
+}
+async function planimAdd() {
+  const codEl = document.getElementById("planimNewCod");
+  const secEl = document.getElementById("planimNewSec");
+  const ordEl = document.getElementById("planimNewOrd");
+  const cod = codEl ? codEl.value.trim().toUpperCase() : "";
+  if (!cod) { planimSetStatus("Falta el código.", false); return; }
+  const sector = secEl ? secEl.value.trim() : "";
+  const orden = ordEl ? (parseInt(ordEl.value, 10) || 0) : 0;
+  if (await planimUpsert(cod, sector, orden)) {
+    if (!window.GONDOLA) window.GONDOLA = {};
+    window.GONDOLA[cod] = [sector, orden];
+    planimSetStatus("✓ " + cod + " guardado en Supabase.", true);
+    if (codEl) codEl.value = ""; if (secEl) secEl.value = ""; if (ordEl) ordEl.value = "";
+    const s = document.getElementById("planimSearch");
+    planimRender(s ? s.value : "");
+  }
+}
+async function planimDeleteRow(cod) {
+  const c = String(cod).toUpperCase();
+  if (!confirm("¿Borrar " + c + " de la planimetría (Supabase)?\n\n(Si el código venía del archivo base, puede reaparecer; los agregados acá se borran del todo.)")) return;
+  const headers = await facAuthWriteHeaders({ "Prefer": "return=minimal" });
+  if (!headers) { planimSetStatus("Iniciá sesión con Google para editar.", false); return; }
+  try {
+    const r = await fetch(SUPABASE_PLANIMETRIA_ENDPOINT + "?cod=eq." + encodeURIComponent(c), { method: "DELETE", headers: headers });
+    if (!r.ok) { planimSetStatus("Error borrando: HTTP " + r.status, false); return; }
+    if (window.GONDOLA) delete window.GONDOLA[c];
+    planimSetStatus("✓ " + c + " borrado de Supabase.", true);
+    const s = document.getElementById("planimSearch");
+    planimRender(s ? s.value : "");
+  } catch (_e) { planimSetStatus("Sin conexión: no se borró.", false); }
+}
+/* Muestra las ubicaciones CERCANAS (por orden) a un código/sector de referencia,
+   con su número de orden, para elegir bien el orden de la ubicación nueva. Lee de
+   window.GONDOLA (planimetría estática + lo que ya esté en Supabase). */
+function planimNearby(ref) {
+  const box = document.getElementById("planimNearby");
+  if (!box) return;
+  const r = String(ref || "").trim().toUpperCase();
+  if (!r) { box.innerHTML = ""; return; }
+  const G = window.GONDOLA || {};
+  const ordOf = (e) => (e && typeof e[1] === "number") ? e[1] : (parseInt(e && e[1], 10) || 0);
+  const all = Object.keys(G)
+    .map(function (k) { const e = G[k] || ["", 0]; return { cod: k, sector: String(e[0] || ""), orden: ordOf(e) }; })
+    .sort(function (a, b) { return a.orden - b.orden; });
+  if (!all.length) { box.innerHTML = ""; return; }
+  // Orden objetivo: si la referencia es un código, su orden; si es un sector, el menor de ese sector.
+  let target = null;
+  if (G[r]) target = ordOf(G[r]);
+  else {
+    const inSec = all.filter(function (x) { return x.sector.toUpperCase().indexOf(r) >= 0; });
+    if (inSec.length) target = inSec[0].orden;
+  }
+  if (target == null) { box.innerHTML = '<div class="planim-empty">No encontré "' + escapeHtml(ref) + '". Probá con un código o sector que ya exista.</div>'; return; }
+  // Ventana: 4 anteriores y 4 siguientes por orden alrededor del más cercano al target.
+  let idx = 0, best = Infinity;
+  all.forEach(function (x, i) { const d = Math.abs(x.orden - target); if (d < best) { best = d; idx = i; } });
+  const win = all.slice(Math.max(0, idx - 4), Math.min(all.length, idx + 5));
+  box.innerHTML = '<div class="planim-near-t">Ubicaciones cercanas (por orden):</div>' +
+    win.map(function (x) {
+      return '<div class="planim-near-row"><span class="planim-near-ord">' + x.orden + '</span>' +
+             '<b>' + escapeHtml(x.cod) + '</b> — ' + escapeHtml(x.sector) + '</div>';
+    }).join("");
+}
+
 function openFaltantes() {
   if (!requireSupervisor()) return;
   const m = document.getElementById("faltantesModal");
@@ -7005,12 +7233,18 @@ async function refreshFaltantes() {
       let tFalt = 0;
       const rows = arr.map(x => {
         totArts++; totCajas += x.falta; tFalt += x.falta;
-        return `<tr><td>${escapeHtml(x.art)}</td><td class="num">${x.real}</td><td class="num">${x.esp}</td><td class="num falt">${x.falta}</td><td>${escapeHtml(x.legajo)}</td></tr>`;
+        return `<tr><td class="c-art">${escapeHtml(x.art)}</td><td class="num c-muted">${x.real}</td><td class="num c-muted">${x.esp}</td><td class="falt"><span>${x.falta}</span></td><td class="c-leg">${escapeHtml(x.legajo)}</td></tr>`;
       }).join("");
-      html += `<div class="falt-tanda"><div class="falt-tanda-h">Tanda ${escapeHtml(tanda)} · <b>${tFalt}</b> cajas faltan</div>` +
+      html += `<div class="falt-tanda"><div class="falt-tanda-h"><span class="falt-tanda-name">Tanda ${escapeHtml(tanda)}</span><span class="falt-tanda-badge">${tFalt} cajas faltan</span></div>` +
         `<table class="falt-table"><thead><tr><th>Artículo</th><th class="num">Puso</th><th class="num">Pedía</th><th class="num">Falta</th><th>Legajo</th></tr></thead><tbody>${rows}</tbody></table></div>`;
     }
-    body.innerHTML = `<div class="falt-summary">${tandas.length} tanda(s) con faltante · ${totArts} artículo(s) · ${totCajas} cajas faltantes</div>` + html;
+    const _pl = (n, s, p) => (n === 1 ? s : p);
+    body.innerHTML =
+      `<div class="falt-summary">` +
+        `<div class="falt-stat"><div class="n">${tandas.length}</div><div class="l">${_pl(tandas.length, "tanda con falta", "tandas con falta")}</div></div>` +
+        `<div class="falt-stat"><div class="n">${totArts}</div><div class="l">${_pl(totArts, "artículo", "artículos")}</div></div>` +
+        `<div class="falt-stat amber"><div class="n">${totCajas}</div><div class="l">cajas faltantes</div></div>` +
+      `</div>` + html;
   } catch (e) {
     body.innerHTML = `<div class="falt-empty">No se pudo cargar: ${escapeHtml(e.message || "")}</div>`;
   }

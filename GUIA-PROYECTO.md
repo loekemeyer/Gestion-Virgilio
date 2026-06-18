@@ -4,38 +4,63 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-18 · Versión app al documentar: **v2.80**
+> Última actualización: 2026-06-18 · Versión app al documentar: **v2.84**
 >
-> Nota: **v2.80** — **migración PPP a Supabase (lado app + esquema; sin activar)**.
-> Se prepararon 3 tablas que espejan las hojas de Google que lee la app —
-> `PPP_Programacion_Diaria`, `PPP_Pedidos_Entregados`, `PPP_Base_Pedidos` (DDL en
-> `sql/ppp_supabase.sql`) — para sacar la dependencia de Google y **poder calcular
-> m³ por SQL**. `index.html` elige la fuente con el flag **`PPP_SOURCE`** (`"sheets"`
-> default / `"auto"` con fallback a Sheets / `"supabase"`): `fetchMonitorSheet`,
-> `fetchHistoricSheet` y `fetchPickingBase` quedaron como *dispatcher* +
-> `…FromSheets` + `…FromSupabase` (mismo Map de salida; el m³ se lee **numérico**,
-> sin `monitorParseM3`); helper nuevo `supaFetchAll` (pagina PostgREST con `Range`
-> + `count=exact`). La carga la hace el **Apps Script** (`handleCargaPPPSync_`, el
-> que ya escribe las hojas vía el Web App al que postea el Excel): un hook lo
-> **espeja** en las tablas con **reemplazo total** (DELETE all + INSERT) y la
-> `service_role` key del proyecto Virgilio (ver `MIGRACION-SUPABASE-PPP.md` +
-> `apps-script/sync-ppp-supabase.gs`). Tablas con `id` autonumérico (sin clave
-> natural). **Activado en `"auto"`** (la app lee Supabase y cae a Sheets si falta);
-> el hook del Apps Script ya escribe ambos. Alcance: NO incluye `VolumenArticulos`
-> ni la planimetría.
+> Nota: **v2.84** — **lectura PPP desde Supabase ACTIVADA** (programación / pedidos
+> / m³ migrados de Google Sheets a Supabase). 3 tablas espejan las hojas que lee la
+> app — `PPP_Programacion_Diaria`, `PPP_Pedidos_Entregados`, `PPP_Base_Pedidos` (DDL
+> en `sql/ppp_supabase.sql`) — para sacar la dependencia de Google y **poder calcular
+> m³ por SQL**. `index.html` elige la fuente con el flag **`PPP_SOURCE`** (`"sheets"` /
+> `"auto"` con fallback a Sheets / `"supabase"`), hoy en **`"auto"`**:
+> `fetchMonitorSheet`, `fetchHistoricSheet` y `fetchPickingBase` quedaron como
+> *dispatcher* + `…FromSheets` + `…FromSupabase` (mismo Map; m³ leído **numérico**,
+> sin `monitorParseM3`); helper `supaFetchAll` (pagina PostgREST con `Range` +
+> `count=exact`). La carga la hace el **Apps Script** (`handleCargaPPPSync_`, el que ya
+> escribe las hojas): un hook las **espeja** con **reemplazo total** (DELETE all +
+> INSERT) y la `service_role` key del proyecto Virgilio — props
+> `SUPABASE_VIRGILIO_URL`/`_SERVICE_KEY` (ver `MIGRACION-SUPABASE-PPP.md` +
+> `apps-script/sync-ppp-supabase.gs`). Tablas con `id` autonumérico. Alcance: NO
+> incluye `VolumenArticulos` ni la planimetría.
 >
-> Nota: **v2.79** — **planimetría: se borró `441E`** (código fantasma, no existe;
-> solo existe `441`). Queda `441`→J28 sin par E → sin aviso Nacional/Importado.
-> `planimetria.js?v=2.79`.
+> Nota: **v2.83** — **rediseño estético del modal Faltantes** (vista supervisor).
+> Antes los chips de fecha y el "Cerrar" salían a todo el ancho (heredaban el
+> `button{width:100%}` global). Ahora: header prolijo con "Cerrar" compacto, chips de
+> fecha redondeados en fila scrolleable, resumen en 3 tarjetas (tandas / artículos /
+> cajas faltantes en ámbar), y cada tanda como card con badge rojo y tabla con
+> jerarquía (Falta resaltada en chip, Puso/Pedía atenuados, números tabulares). Solo
+> CSS/markup, misma lógica/datos (`.falt-*`, `refreshFaltantes`).
 >
-> Nota: **v2.78** — **planimetría: alta de 13 códigos** que aparecían en la base de
-> pedidos sin posición de góndola: `758`→Ñ56, `071`→C10, `255`→G10, `724`→G15,
-> `256`→G20, `828`→L08, `548`→A64, `29`→F12, `556`→A65, `30`→A72, `830`→L05,
-> `396`→A65, `759`→Ñ59, `441`→J28 (mismo orden que `441E`). El orden de los
-> sectores nuevos se interpoló por posición. Nota: `441`/`441E` quedan en el mismo
-> sector (J28) → activan el aviso Nacional/Importado (v2.77). Pendiente: `809E`
-> tenía dos sectores pedidos (M13 "de chef" —ya existía— y J13 "de loeke"); no se
-> puede tener un código en dos sectores → quedó solo M13. `planimetria.js?v=2.78`.
+> Nota: **v2.82** — **las dos plantas en un repo** (reemplaza al repo `App-Produccion`,
+> que se borra). Virgilio queda en la **raíz** (sin cambios), Cervantes se **copia** en
+> **`/cervantes/`** (repo fuente `Registro-Produccion-2.0`, commit `d2d6a59`), y el
+> **`/selector/`** ("¿Dónde vas a trabajar hoy?") linkea a ambas (`../` y `../cervantes/`).
+> Cada app tiene botón **"← Cambiar planta"** → `selector/`. La entrada por defecto
+> sigue siendo Virgilio (raíz). ⚠ `/cervantes/` es copia → re-sincronizar si cambia en
+> su repo. Detalle en `CLAUDE.md` (sección "Estructura: dos apps en un repo").
+>
+> Nota: **v2.81** — editor de Planimetría: se **sacó** el botón "subir toda" y se
+> agregó un **ayudante de ubicaciones aledañas** (`planimNearby`): al escribir un
+> código/sector de referencia, muestra las ubicaciones cercanas **por orden** (4
+> antes y 4 después) con su número de orden y sector → para elegir bien el orden de
+> la ubicación nueva. Lee de `window.GONDOLA` (estática + lo que ya esté en Supabase).
+>
+> Nota: **v2.80** — **editor de Planimetría en el panel Admin (a Supabase)**.
+> Botón "🗺️ Editar Planimetría" (supervisores) → overlay para agregar/editar/borrar
+> códigos (cod, sector, orden) y cargar los pares Nacional/Importado. **Cada cambio
+> se escribe DIRECTO a Supabase** (tabla `Planimetria`, upsert con el JWT del
+> supervisor), no solo local. La app al arrancar baja `Planimetria` (anon) y la
+> **mergea sobre planimetria.js** (`loadPlanimetriaRemote` → `window.GONDOLA`); si
+> no hay tabla/red queda la estática. Botón "Subir toda la planimetría actual"
+> (`planimSeedAll`). ⚠ Requiere crear la tabla `Planimetria` + RLS (SQL por chat).
+> Primera parte del editor self-service (faltan mails y talleristas).
+>
+> Nota: **v2.79** — **planimetría: se borró `441E`** (código fantasma; solo existe
+> `441`→J28, sin par E → sin aviso Nacional/Importado).
+>
+> Nota: **v2.78** — **planimetría: alta de 13 códigos** sin góndola en la base de
+> pedidos (758→Ñ56, 071→C10, 255→G10, 724→G15, 256→G20, 828→L08, 548→A64, 29→F12,
+> 556→A65, 30→A72, 830→L05, 396→A65, 759→Ñ59, 441→J28; orden interpolado). `809E`
+> quedó solo en M13 (no puede estar en dos sectores).
 >
 > Nota: **v2.77** — **picking: aclarar Nacional/Importado en pares de planimetría**.
 > Si un código tiene su par (base + E) cargado en `planimetria.js` **en el MISMO
@@ -414,7 +439,7 @@ de pedidos de un Google Sheet.
 | Archivo | Rol |
 |---|---|
 | `index.html` | **La app completa** (~6.600 líneas): pantalla de operario + monitor + toda la lógica JS/CSS. Es el archivo central. |
-| `sw.js` | Service Worker. **NO cachea HTML/assets**: sólo hace Background Sync de la cola offline (IndexedDB). `SW_VERSION = "v2.80-vir"`. |
+| `sw.js` | Service Worker. **NO cachea HTML/assets**: sólo hace Background Sync de la cola offline (IndexedDB). `SW_VERSION = "v2.84-vir"`. |
 | `manifest.json` | Manifiesto PWA. |
 | `fichada.html` / `fichada.js` / `fichada-config.js` / `fichada-totp.js` / `fichada.css` | Sistema de **fichada por QR rotativo (TOTP)**. La página `fichada.html` se abre escaneando el QR y registra el **ingreso**. |
 | `fichadas-monitor.html` | Tablero **independiente** "Monitor Fichadas Esnaola" (lee de `Fichadas_Historico` y sincroniza otro Google Sheet distinto). No está enlazado desde `index.html`. |
@@ -740,11 +765,11 @@ En `showDayBreakdown` (monitor, por operario por día):
 
 ## 10. Versionado y cache
 
-- `index.html`: `APP_VERSION = "v2.80"`. Badge en pantalla `#versionBadge`:
-  `"v2.80 ✓"` (sin cola), `"v2.80 ⏳ N"` (pendientes), `"v2.80 ⚠ N"` (error).
+- `index.html`: `APP_VERSION = "v2.84"`. Badge en pantalla `#versionBadge`:
+  `"v2.84 ✓"` (sin cola), `"v2.84 ⏳ N"` (pendientes), `"v2.84 ⚠ N"` (error).
   **Sirve para confirmar qué versión cargó cada pantalla** (mirá el badge en la TV
   para saber si está al día).
-- `sw.js`: `SW_VERSION = "v2.80-vir"`. **No precachea nada**; el handler de `fetch`
+- `sw.js`: `SW_VERSION = "v2.84-vir"`. **No precachea nada**; el handler de `fetch`
   está vacío. Usa `skipWaiting()` + `clients.claim()`. La página hace
   `reg.update()` cada 60 s con `updateViaCache:"none"` (esto **sólo actualiza el
   SW**; NO recarga la app ni cambia lo que se ve en pantalla).
