@@ -2549,6 +2549,21 @@ const SUPABASE_EMPLEADOS_ENDPOINT =
 // mostrar ✅ en "Tandas a FC" cuando todos los NPs están facturados.
 const SUPABASE_FACTURACION_NP_ENDPOINT =
   SUPABASE_URL + "/rest/v1/Facturacion_NP";
+
+/* ───────────────────────────────────────────────────────────────────────────
+   FUENTE DE DATOS PPP (programación / pedidos / m³). Históricamente sale de
+   Google Sheets (gviz CSV). Estas tablas espejan esas hojas en Supabase para
+   sacar la dependencia de Google y poder calcular m³ por SQL. Las llena la
+   macro del Excel con la service_role key. Ver MIGRACION-SUPABASE-PPP.md y
+   sql/ppp_supabase.sql.
+     "sheets"   = como siempre (Google Sheets).        ← DEFAULT: no cambia nada
+     "auto"     = intenta Supabase y cae a Sheets si está vacío/falla (transición)
+     "supabase" = solo Supabase (corta la dependencia de Google)
+   ─────────────────────────────────────────────────────────────────────────── */
+const PPP_SOURCE = "sheets";
+const SUPABASE_PPP_PROG_ENDPOINT       = SUPABASE_URL + "/rest/v1/PPP_Programacion_Diaria";
+const SUPABASE_PPP_ENTREGADOS_ENDPOINT = SUPABASE_URL + "/rest/v1/PPP_Pedidos_Entregados";
+const SUPABASE_PPP_BASE_ENDPOINT       = SUPABASE_URL + "/rest/v1/PPP_Base_Pedidos";
 const SUPABASE_FACTURACION_CIERRES_ENDPOINT =
   SUPABASE_URL + "/rest/v1/Facturacion_Cierres";
 
@@ -4402,7 +4417,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v2.79";
+const APP_VERSION = "v2.80";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -4994,12 +5009,79 @@ function pickParseCajas(s) {
   return isNaN(n) ? 0 : n;
 }
 
-/* Baja "PPP Excel Base Datos Pedidos" (pedido → artículos + cajas) y la cachea.
-   Lee por posición: Pedido=A, Artículo=C, Cantidad Cajas=F (con detección de
-   header por las dudas, tolerando los labels que gviz a veces duplica). */
+/* Trae TODAS las filas de un endpoint PostgREST paginando con Range (Supabase
+   corta a max-rows, ~1000). Usa Content-Range (Prefer: count=exact) para saber
+   el total — necesario porque "PPP Excel Base Datos Pedidos" tiene ~20k filas.
+   Lee con la key pública (anon). v2.80. */
+async function supaFetchAll(endpoint, query) {
+  const out = [];
+  let from = 0, total = Infinity;
+  while (from < total) {
+    const r = await fetch(endpoint + "?" + query + "&_=" + Date.now(), {
+      cache: "no-store",
+      headers: {
+        apikey: SUPABASE_KEY,
+        Authorization: "Bearer " + SUPABASE_KEY,
+        "Range-Unit": "items",
+        Range: from + "-" + (from + 999),
+        Prefer: "count=exact"
+      }
+    });
+    if (!r.ok && r.status !== 206) throw new Error("Supabase " + endpoint + " HTTP " + r.status);
+    const chunk = await r.json();
+    const got = Array.isArray(chunk) ? chunk.length : 0;
+    for (let i = 0; i < got; i++) out.push(chunk[i]);
+    const cr = r.headers.get("content-range") || "";
+    const slash = cr.indexOf("/");
+    if (slash >= 0) { const t = parseInt(cr.slice(slash + 1), 10); if (!isNaN(t)) total = t; }
+    else if (got < 1000) { total = from + got; }   // sin header → heurística
+    if (!got) break;
+    from += got;
+  }
+  return out;
+}
+
+/* Dispatcher de la base de pedidos (picking). Cache 5 min. Fuente según
+   PPP_SOURCE: Supabase (PPP_Base_Pedidos) o Google Sheets. */
 async function fetchPickingBase() {
   const now = Date.now();
   if (_pickBaseCache && (now - _pickBaseCacheTs) < PICK_BASE_TTL_MS) return _pickBaseCache;
+  let map = null;
+  if (PPP_SOURCE !== "sheets") {
+    try { map = await fetchPickingBaseFromSupabase(); }
+    catch (e) {
+      if (PPP_SOURCE === "supabase") throw e;
+      console.warn("[picking] Supabase base falló, caigo a Sheets:", e.message); map = null;
+    }
+    if (map && !map.size && PPP_SOURCE === "auto") map = null;   // vacío → fallback
+  }
+  if (!map) map = await fetchPickingBaseFromSheets();
+  _pickBaseCache = map; _pickBaseCacheTs = Date.now();
+  return map;
+}
+
+/* Lee PPP_Base_Pedidos en Supabase → Map<pedido(NP), [{art, cajas}]>. La macro
+   pre-agrega (pedido,artículo) sumando cajas; el picking suma por código igual,
+   así el resultado es idéntico al de Sheets. cajas es numérico en la DB. v2.80. */
+async function fetchPickingBaseFromSupabase() {
+  const rows = await supaFetchAll(SUPABASE_PPP_BASE_ENDPOINT, "select=pedido,articulo,cajas");
+  const map = new Map();
+  for (let i = 0; i < rows.length; i++) {
+    const ped = pickNormNp(rows[i].pedido);
+    if (!ped) continue;
+    const art = (rows[i].articulo == null ? "" : String(rows[i].articulo)).trim();
+    if (!art) continue;
+    if (!map.has(ped)) map.set(ped, []);
+    map.get(ped).push({ art: art, cajas: Number(rows[i].cajas) || 0 });
+  }
+  return map;
+}
+
+/* Baja "PPP Excel Base Datos Pedidos" (pedido → artículos + cajas) de Google
+   Sheets. Lee por posición: Pedido=A, Artículo=C, Cantidad Cajas=F (con detección
+   de header por las dudas, tolerando los labels que gviz a veces duplica). */
+async function fetchPickingBaseFromSheets() {
+  const now = Date.now();
   const r = await fetch(PICKING_BASE_CSV_URL + "&_=" + now, { cache: "no-store" });
   if (!r.ok) throw new Error("Base Datos Pedidos HTTP " + r.status);
   const rows = parseCSV(await r.text());
@@ -5021,7 +5103,6 @@ async function fetchPickingBase() {
     if (!map.has(ped)) map.set(ped, []);
     map.get(ped).push({ art: art, cajas: pickParseCajas(row[cCaj]) });
   }
-  _pickBaseCache = map; _pickBaseCacheTs = Date.now();
   return map;
 }
 
@@ -7196,8 +7277,70 @@ function findMonitorHeader(rows) {
   return -1;
 }
 
-/* Lee el CSV y devuelve mapa Tanda -> { tanda, m3, fechaEntrega }. */
+/* Dispatcher de la fuente PPP (ver PPP_SOURCE). Intenta Supabase si corresponde
+   y cae a Sheets en modo "auto". Aplica los side-effects de m³ persistido sobre
+   el Map resultante, venga de donde venga. v2.80. */
 async function fetchMonitorSheet() {
+  let acc = null;
+  if (PPP_SOURCE !== "sheets") {
+    try { acc = await fetchMonitorFromSupabase(); }
+    catch (e) {
+      if (PPP_SOURCE === "supabase") throw e;
+      console.warn("[monitor] Supabase PPP falló, caigo a Sheets:", e.message); acc = null;
+    }
+    if (acc && !acc.size && PPP_SOURCE === "auto") acc = null;   // vacío → fallback
+  }
+  if (!acc) acc = await fetchMonitorFromSheets();
+  // Persistimos cada tanda con m³ > 0 para que sobreviva cuando salga de la PPP
+  // "Programacion Diaria" (mañana ya no estará pero la recordamos).
+  for (const [k, v] of acc) { if (v && v.m3 > 0) rememberTandaM3(k, v.m3); }
+  flushPersistedM3();
+  return acc;
+}
+
+/* Igual que fetchMonitorFromSheets pero leyendo PPP_Programacion_Diaria en
+   Supabase (mismas columnas que el layout fijo del Excel). El m³ ya es numérico
+   en la DB → se lee directo (NO pasa por monitorParseM3, que asume coma decimal
+   de texto y rompería un número real). v2.80. */
+async function fetchMonitorFromSupabase() {
+  const rows = await supaFetchAll(SUPABASE_PPP_PROG_ENDPOINT,
+    "select=tanda,np,cod,razon_social,m3,direccion,barrio,op,fecha_entrega,zona");
+  const acc = new Map();
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i]; if (!r) continue;
+    const np = (r.np == null ? "" : String(r.np)).trim();
+    if (!/\d/.test(np)) continue;                       // solo filas con N° NP real
+    const tanda = (r.tanda == null ? "" : String(r.tanda)).trim();
+    const op    = (r.op    == null ? "" : String(r.op)).trim().toUpperCase();
+    const m3    = Number(r.m3) || 0;
+    const fe    = (r.fecha_entrega == null ? "" : String(r.fecha_entrega)).trim();
+    const rs    = (r.razon_social  == null ? "" : String(r.razon_social)).trim();
+    const feRaw = monitorRawFecha(fe);
+    let displayTanda, mapKey;
+    if (tanda) { displayTanda = tanda; mapKey = tanda.toUpperCase(); }
+    else if (feRaw) { displayTanda = "S/Tanda"; mapKey = "S/TANDA__" + feRaw; }
+    else continue;
+    if (!acc.has(mapKey)) acc.set(mapKey, {
+      tanda: displayTanda, _key: mapKey, m3: 0,
+      fechaEntrega: monitorFmtFecha(fe), fechaEntregaRaw: feRaw,
+      opIsSi: false, pedidos: []
+    });
+    const entry = acc.get(mapKey);
+    entry.m3 += m3;
+    if (op === "SI") entry.opIsSi = true;
+    entry.pedidos.push({
+      np, m3, razonSocial: rs,
+      cod:       (r.cod       == null ? "" : String(r.cod)).trim(),
+      direccion: (r.direccion == null ? "" : String(r.direccion)).trim(),
+      barrio:    (r.barrio    == null ? "" : String(r.barrio)).trim(),
+      zona:      (r.zona      == null ? "" : String(r.zona)).trim()
+    });
+  }
+  return acc;
+}
+
+/* Lee el CSV (Google Sheets) y devuelve mapa Tanda -> { tanda, m3, fechaEntrega, … }. */
+async function fetchMonitorFromSheets() {
   // cache-busting para evitar respuesta cacheada del CDN de Google
   const url = MONITOR_CSV_URL + "&_=" + Date.now();
   const r = await fetch(url, { cache: "no-store" });
@@ -7276,10 +7419,6 @@ async function fetchMonitorSheet() {
       zona:      (r[C.ZONA]   || "").trim()
     });
   }
-  // Persistimos cada tanda con m³ > 0 para que sobreviva cuando salga de la
-  // PPP "Programacion Diaria" (mañana ya no estará pero la recordamos).
-  for (const [k, v] of acc) { if (v && v.m3 > 0) rememberTandaM3(k, v.m3); }
-  flushPersistedM3();
   return acc;
 }
 
@@ -7289,7 +7428,7 @@ async function fetchMonitorSheet() {
    ⚠ NO usar col H "Mt3 FC": pese al nombre, NO es m3 — son códigos chicos
    (zonas/V) tipo 4, 7, 21, 16 que inflaban los totales hasta órdenes de
    magnitud por encima de lo real. Solo col G. */
-async function fetchHistoricSheet() {
+async function fetchHistoricFromSheets() {
   const url = MONITOR_HISTORIC_CSV_URL + "&_=" + Date.now();
   const r = await fetch(url, { cache: "no-store" });
   if (!r.ok) throw new Error("Histórico CSV HTTP " + r.status);
@@ -7317,8 +7456,39 @@ async function fetchHistoricSheet() {
     const key = tanda.toUpperCase();
     acc.set(key, (acc.get(key) || 0) + m3);
   }
+  return acc;
+}
+
+/* Dispatcher histórico (ver PPP_SOURCE): Supabase (PPP_Pedidos_Entregados) o
+   Sheets. Suma m³ por tanda y persiste el m³ visto, venga de donde venga. v2.80. */
+async function fetchHistoricSheet() {
+  let acc = null;
+  if (PPP_SOURCE !== "sheets") {
+    try { acc = await fetchHistoricFromSupabase(); }
+    catch (e) {
+      if (PPP_SOURCE === "supabase") throw e;
+      console.warn("[historic] Supabase falló, caigo a Sheets:", e.message); acc = null;
+    }
+    if (acc && !acc.size && PPP_SOURCE === "auto") acc = null;   // vacío → fallback
+  }
+  if (!acc) acc = await fetchHistoricFromSheets();
   for (const [k, v] of acc) { if (v > 0) rememberTandaM3(k, v); }
   flushPersistedM3();
+  return acc;
+}
+
+/* Suma mt3 por tanda desde PPP_Pedidos_Entregados (mt3 numérico en la DB → se
+   lee directo, sin monitorParseM3). Devuelve Map<tandaUpper, m3 total>. v2.80. */
+async function fetchHistoricFromSupabase() {
+  const rows = await supaFetchAll(SUPABASE_PPP_ENTREGADOS_ENDPOINT, "select=tanda,mt3");
+  const acc = new Map();
+  for (let i = 0; i < rows.length; i++) {
+    const tanda = (rows[i].tanda == null ? "" : String(rows[i].tanda)).trim();
+    if (!tanda) continue;
+    const m3 = Number(rows[i].mt3) || 0;
+    const key = tanda.toUpperCase();
+    acc.set(key, (acc.get(key) || 0) + m3);
+  }
   return acc;
 }
 

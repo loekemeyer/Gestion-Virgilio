@@ -4,7 +4,21 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-16 · Versión app al documentar: **v2.79**
+> Última actualización: 2026-06-18 · Versión app al documentar: **v2.80**
+>
+> Nota: **v2.80** — **migración PPP a Supabase (lado app + esquema; sin activar)**.
+> Se prepararon 3 tablas que espejan las hojas de Google que lee la app —
+> `PPP_Programacion_Diaria`, `PPP_Pedidos_Entregados`, `PPP_Base_Pedidos` (DDL en
+> `sql/ppp_supabase.sql`) — para sacar la dependencia de Google y **poder calcular
+> m³ por SQL**. `index.html` elige la fuente con el flag **`PPP_SOURCE`** (`"sheets"`
+> default / `"auto"` con fallback a Sheets / `"supabase"`): `fetchMonitorSheet`,
+> `fetchHistoricSheet` y `fetchPickingBase` quedaron como *dispatcher* +
+> `…FromSheets` + `…FromSupabase` (mismo Map de salida; el m³ se lee **numérico**,
+> sin `monitorParseM3`); helper nuevo `supaFetchAll` (pagina PostgREST con `Range`
+> + `count=exact`). La **macro del Excel** carga las tablas con la `service_role`
+> key (contrato + rollout en `MIGRACION-SUPABASE-PPP.md`). **No cambia nada** hasta
+> poner `PPP_SOURCE` en `"auto"`/`"supabase"` y que la macro escriba. Alcance: NO
+> incluye `VolumenArticulos` ni la planimetría.
 >
 > Nota: **v2.79** — **planimetría: se borró `441E`** (código fantasma, no existe;
 > solo existe `441`). Queda `441`→J28 sin par E → sin aviso Nacional/Importado.
@@ -396,7 +410,7 @@ de pedidos de un Google Sheet.
 | Archivo | Rol |
 |---|---|
 | `index.html` | **La app completa** (~6.600 líneas): pantalla de operario + monitor + toda la lógica JS/CSS. Es el archivo central. |
-| `sw.js` | Service Worker. **NO cachea HTML/assets**: sólo hace Background Sync de la cola offline (IndexedDB). `SW_VERSION = "v2.47-vir"`. |
+| `sw.js` | Service Worker. **NO cachea HTML/assets**: sólo hace Background Sync de la cola offline (IndexedDB). `SW_VERSION = "v2.80-vir"`. |
 | `manifest.json` | Manifiesto PWA. |
 | `fichada.html` / `fichada.js` / `fichada-config.js` / `fichada-totp.js` / `fichada.css` | Sistema de **fichada por QR rotativo (TOTP)**. La página `fichada.html` se abre escaneando el QR y registra el **ingreso**. |
 | `fichadas-monitor.html` | Tablero **independiente** "Monitor Fichadas Esnaola" (lee de `Fichadas_Historico` y sincroniza otro Google Sheet distinto). No está enlazado desde `index.html`. |
@@ -539,6 +553,24 @@ legajo↔nombre y legajo↔email.
 **`Auditoria_Produccion_Virgilio`** — auditoría de envíos (intentos, motivos,
 user_agent, ts_inicio/ts_cliente).
 
+**Tablas PPP (espejo de Google Sheets, v2.80 — opcionales: se leen sólo si
+`PPP_SOURCE` ≠ `"sheets"`):**
+- **`PPP_Programacion_Diaria`** ← hoja "PPP Excel Programacion Diaria". 1 fila por
+  N° NP. Cols: `np` (PK), `tanda`, `tipo`, `fecha_recep`, `cod`, `razon_social`,
+  `m3` (numeric), `v`, `direccion`, `barrio`, `op`, `fecha_entrega`, `fecha_fc`,
+  `zona`, `observaciones`, `synced_at`.
+- **`PPP_Pedidos_Entregados`** ← hoja "PPP Excel Pedidos Entregados 2026" (m³
+  histórico). Cols: `np` (PK), `tanda`, `fecha`, `cod`, `razon_social`, `mt3`
+  (numeric, col Mt3 — NO "Mt3 FC"), `synced_at`.
+- **`PPP_Base_Pedidos`** ← hoja "PPP Excel Base Datos Pedidos" (~20k). Artículos
+  por pedido para el picking. Cols: `pedido`+`articulo` (PK compuesta), `cajas`
+  (numeric), `synced_at`. La macro pre-agrega cajas por pedido+artículo.
+
+Las escribe la **macro del Excel** con la `service_role` key (bypassa RLS); la app
+sólo las **lee** (RLS `select` para `anon`/`authenticated`). m³ va **numérico** (no
+texto con coma). DDL en `sql/ppp_supabase.sql`; diseño/ingesta en
+`MIGRACION-SUPABASE-PPP.md`.
+
 ---
 
 ## 4. Códigos de acción (`opcion`)
@@ -638,10 +670,14 @@ lo excluye de horas/productividad (guard `opcion==="LT"` en
 
 ## 7. De dónde salen los metros cúbicos (m³)
 
-> **CRÍTICO: los m³ NO están en Supabase.** Salen de un **Google Sheet**. Por eso
-> no se pueden calcular desde un entorno sin acceso a Google (p. ej. el sandbox de
-> Claude, que tiene Google fuera de la allowlist). La **app sí** los muestra
-> porque corre en el navegador.
+> **CRÍTICO (por defecto): los m³ NO están en Supabase.** Salen de un **Google
+> Sheet**, así que no se pueden calcular desde un entorno sin acceso a Google
+> (p. ej. el sandbox de Claude, que tiene Google fuera de la allowlist). La **app
+> sí** los muestra porque corre en el navegador.
+>
+> **v2.80** prepara moverlos a Supabase (tablas `PPP_*`, flag `PPP_SOURCE`): una
+> vez que la macro las cargó y el flag está activo, **el m³ se consulta por SQL**
+> (§ 11). Ver `MIGRACION-SUPABASE-PPP.md`.
 
 - Documento Sheet: `1-16YXe0xq6x9i-Yhk5cm5V3VqvQ0PWZtcDbm8OeeKW0`.
 - **Histórico** (todos los pedidos entregados): hoja "PPP Excel Pedidos Entregados
@@ -654,6 +690,10 @@ lo excluye de horas/productividad (guard `opcion==="LT"` en
   el histórico, si no, 0. `monitorParseM3` entiende coma decimal (`"0,289"` → 0.289).
 - El monitor ya calcula y muestra **m³ de picking / m³ de armado / total / m³ por
   hora por operario** en el modal **"Rendimiento del día"** (`showDayBreakdown`).
+- **v2.80 — m³ migrables a Supabase:** si `PPP_SOURCE` ≠ `"sheets"`, el m³ sale de
+  `PPP_Programacion_Diaria.m3` / `PPP_Pedidos_Entregados.mt3` (numérico) en vez del
+  Sheet → **se puede calcular por SQL** (§ 11). Por defecto sigue saliendo del Sheet;
+  la carga la hace la macro (ver `MIGRACION-SUPABASE-PPP.md`).
 
 ---
 
@@ -694,11 +734,11 @@ En `showDayBreakdown` (monitor, por operario por día):
 
 ## 10. Versionado y cache
 
-- `index.html`: `APP_VERSION = "v2.47"`. Badge en pantalla `#versionBadge`:
-  `"v2.47 ✓"` (sin cola), `"v2.47 ⏳ N"` (pendientes), `"v2.47 ⚠ N"` (error).
+- `index.html`: `APP_VERSION = "v2.80"`. Badge en pantalla `#versionBadge`:
+  `"v2.80 ✓"` (sin cola), `"v2.80 ⏳ N"` (pendientes), `"v2.80 ⚠ N"` (error).
   **Sirve para confirmar qué versión cargó cada pantalla** (mirá el badge en la TV
   para saber si está al día).
-- `sw.js`: `SW_VERSION = "v2.47-vir"`. **No precachea nada**; el handler de `fetch`
+- `sw.js`: `SW_VERSION = "v2.80-vir"`. **No precachea nada**; el handler de `fetch`
   está vacío. Usa `skipWaiting()` + `clients.claim()`. La página hace
   `reg.update()` cada 60 s con `updateViaCache:"none"` (esto **sólo actualiza el
   SW**; NO recarga la app ni cambia lo que se ve en pantalla).
@@ -753,8 +793,18 @@ from "Registros_Produccion_Virgilio"
 where ts_cliente >= now() - interval '7 days' group by 1 order by 1;
 ```
 
-**m³** → **no se pueden** desde SQL (ver § 7). Mirar el monitor ("Rendimiento del
-día") o exportar el Sheet.
+**m³ por SQL:** por defecto **no** se puede (viven en el Sheet, § 7) → mirar el
+monitor o exportar. **Desde v2.80**, si la macro ya cargó las tablas `PPP_*`, el m³
+**sí** sale por SQL:
+```sql
+-- m³ por tanda (programación del día) — requiere PPP_Programacion_Diaria cargada
+select upper(tanda) tanda, round(sum(m3)::numeric,3) m3
+from "PPP_Programacion_Diaria" where coalesce(tanda,'')<>''
+group by upper(tanda) order by 1;
+-- m³ histórico por tanda
+select upper(tanda) tanda, round(sum(mt3)::numeric,3) m3
+from "PPP_Pedidos_Entregados" group by upper(tanda) order by 1;
+```
 
 **Notas de datos:** legajos `1` (= "Pruebas") y `0` son test/basura, excluirlos.
 Operarios reales vistos recientemente: 104 (Jhonny Moncayo), 237 (Franco Ortiz),
