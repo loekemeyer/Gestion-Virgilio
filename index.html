@@ -1803,7 +1803,10 @@ button {
 .planim-row-cod{ font-size: 18px; font-weight: 800; color: #0f172a; min-width: 64px; }
 .planim-status{ font-size: 13px; color: #475569; min-height: 18px; text-align: center; }
 .planim-empty{ color: #94a3b8; padding: 10px; text-align: center; }
-.planim-seed{ width: auto; margin: 0; padding: 4px 10px; font-size: 12px; font-weight: bold; background: #eef2ff; color: #3730a3; border: 1px solid #c7d2fe; border-radius: 6px; cursor: pointer; }
+.planim-near{ display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
+.planim-near-t{ font-size: 12px; font-weight: bold; color: #475569; }
+.planim-near-row{ display: flex; align-items: center; gap: 8px; font-size: 15px; color: #0f172a; }
+.planim-near-ord{ display: inline-block; min-width: 34px; text-align: center; font-size: 13px; font-weight: 800; color: #fff; background: #1e6bd6; border-radius: 6px; padding: 2px 6px; }
 .pk-btn{ width: 100%; border: none; border-radius: 12px; padding: 16px; font-size: 19px; font-weight: bold; color: #fff; cursor: pointer; box-sizing: border-box; }
 .pk-ok{ background: #16a34a; }
 .pk-f{ background: #f59e0b; }
@@ -2494,14 +2497,16 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
     </div>
     <div class="planim-body">
       <div class="planim-add">
-        <div class="planim-add-t">Agregar / actualizar código</div>
+        <div class="planim-add-t">Agregar / actualizar ubicación</div>
         <div class="planim-add-row">
           <input id="planimNewCod" class="planim-inp" type="text" placeholder="Código (ej. 580)">
           <input id="planimNewSec" class="planim-inp" type="text" placeholder="Sector (ej. C19)">
           <input id="planimNewOrd" class="planim-inp planim-inp-num" type="number" inputmode="numeric" placeholder="Orden">
           <button class="planim-btn-save" onclick="planimAdd()">Guardar</button>
         </div>
-        <div class="planim-hint">Para el par Nacional/Importado: cargá <b>580</b> y <b>580E</b> con el <b>mismo sector</b>. · <button class="planim-seed" onclick="planimSeedAll()">⬆ Subir toda la planimetría actual a Supabase</button></div>
+        <input id="planimRef" class="planim-inp planim-search" type="text" placeholder="🧭 ¿Al lado de qué código o sector va? — te muestro los órdenes cercanos" oninput="planimNearby(this.value)">
+        <div id="planimNearby" class="planim-near"></div>
+        <div class="planim-hint">Para el par Nacional/Importado: cargá <b>580</b> y <b>580E</b> con el <b>mismo sector</b>.</div>
       </div>
       <input id="planimSearch" class="planim-inp planim-search" type="text" placeholder="🔍 Buscar código o sector para editar…" oninput="planimRender(this.value)">
       <div id="planimList" class="planim-list"></div>
@@ -4449,7 +4454,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v2.80";
+const APP_VERSION = "v2.81";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -7020,20 +7025,37 @@ async function planimDeleteRow(cod) {
     planimRender(s ? s.value : "");
   } catch (_e) { planimSetStatus("Sin conexión: no se borró.", false); }
 }
-/* Sube TODA la planimetría actual (window.GONDOLA) a Supabase de una, para tenerla
-   completa y editable allá (one-time, idempotente por upsert). */
-async function planimSeedAll() {
+/* Muestra las ubicaciones CERCANAS (por orden) a un código/sector de referencia,
+   con su número de orden, para elegir bien el orden de la ubicación nueva. Lee de
+   window.GONDOLA (planimetría estática + lo que ya esté en Supabase). */
+function planimNearby(ref) {
+  const box = document.getElementById("planimNearby");
+  if (!box) return;
+  const r = String(ref || "").trim().toUpperCase();
+  if (!r) { box.innerHTML = ""; return; }
   const G = window.GONDOLA || {};
-  const rows = Object.keys(G).map(function (k) { const e = G[k] || ["", 0]; return { cod: k, sector: String(e[0] || ""), orden: (e[1] != null ? Number(e[1]) : 0) }; });
-  if (!rows.length) { planimSetStatus("No hay planimetría para subir.", false); return; }
-  if (!confirm("¿Subir TODA la planimetría actual (" + rows.length + " códigos) a Supabase?")) return;
-  const headers = await facAuthWriteHeaders({ "Prefer": "resolution=merge-duplicates,return=minimal" });
-  if (!headers) { planimSetStatus("Iniciá sesión con Google.", false); return; }
-  try {
-    const r = await fetch(SUPABASE_PLANIMETRIA_ENDPOINT + "?on_conflict=cod", { method: "POST", headers: headers, body: JSON.stringify(rows) });
-    if (!r.ok) { planimSetStatus("Error subiendo: HTTP " + r.status, false); return; }
-    planimSetStatus("✓ Subí " + rows.length + " códigos a Supabase.", true);
-  } catch (_e) { planimSetStatus("Sin conexión.", false); }
+  const ordOf = (e) => (e && typeof e[1] === "number") ? e[1] : (parseInt(e && e[1], 10) || 0);
+  const all = Object.keys(G)
+    .map(function (k) { const e = G[k] || ["", 0]; return { cod: k, sector: String(e[0] || ""), orden: ordOf(e) }; })
+    .sort(function (a, b) { return a.orden - b.orden; });
+  if (!all.length) { box.innerHTML = ""; return; }
+  // Orden objetivo: si la referencia es un código, su orden; si es un sector, el menor de ese sector.
+  let target = null;
+  if (G[r]) target = ordOf(G[r]);
+  else {
+    const inSec = all.filter(function (x) { return x.sector.toUpperCase().indexOf(r) >= 0; });
+    if (inSec.length) target = inSec[0].orden;
+  }
+  if (target == null) { box.innerHTML = '<div class="planim-empty">No encontré "' + escapeHtml(ref) + '". Probá con un código o sector que ya exista.</div>'; return; }
+  // Ventana: 4 anteriores y 4 siguientes por orden alrededor del más cercano al target.
+  let idx = 0, best = Infinity;
+  all.forEach(function (x, i) { const d = Math.abs(x.orden - target); if (d < best) { best = d; idx = i; } });
+  const win = all.slice(Math.max(0, idx - 4), Math.min(all.length, idx + 5));
+  box.innerHTML = '<div class="planim-near-t">Ubicaciones cercanas (por orden):</div>' +
+    win.map(function (x) {
+      return '<div class="planim-near-row"><span class="planim-near-ord">' + x.orden + '</span>' +
+             '<b>' + escapeHtml(x.cod) + '</b> — ' + escapeHtml(x.sector) + '</div>';
+    }).join("");
 }
 
 function openFaltantes() {

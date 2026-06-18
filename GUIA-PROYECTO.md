@@ -4,7 +4,13 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-17 · Versión app al documentar: **v2.80**
+> Última actualización: 2026-06-18 · Versión app al documentar: **v2.81**
+>
+> Nota: **v2.81** — editor de Planimetría: se **sacó** el botón "subir toda" y se
+> agregó un **ayudante de ubicaciones aledañas** (`planimNearby`): al escribir un
+> código/sector de referencia, muestra las ubicaciones cercanas **por orden** (4
+> antes y 4 después) con su número de orden y sector → para elegir bien el orden de
+> la ubicación nueva. Lee de `window.GONDOLA` (estática + lo que ya esté en Supabase).
 >
 > Nota: **v2.80** — **editor de Planimetría en el panel Admin (a Supabase)**.
 > Botón "🗺️ Editar Planimetría" (supervisores) → overlay para agregar/editar/borrar
