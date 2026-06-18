@@ -64,7 +64,7 @@
       <p class="card-desc">Picking · Armado · Carga de camión · Recepción</p>
       <span class="card-go">→</span>
     </a>
-    <a class="card cer" id="cardCer" href="#" onclick="return irCervantes(event)">
+    <a class="card cer" id="cardCer" href="../cervantes/" onclick="recordar('cervantes')">
       <span class="badge">Última vez</span>
       <p class="card-name">Cervantes</p>
       <p class="card-desc">Registro de producción · Matrices · Cajas</p>
@@ -78,18 +78,11 @@
   </footer>
 
   <script>
-    /* URL pública de la app Cervantes (repo Registro-Produccion-2.0, servido por
-       GitHub Pages). Si la URL cambia, editá esta constante. */
-    var CERVANTES_URL = "https://loekemeyer.github.io/Registro-Produccion-2.0/";
+    /* Las dos apps viven en este mismo repo: Virgilio en la raíz (../) y Cervantes
+       en ../cervantes/. El selector solo linkea a esas subcarpetas. */
     var LS_KEY = "appprod_ultima_planta";
 
     function recordar(planta){ try { localStorage.setItem(LS_KEY, planta); } catch(e){} }
-    function irCervantes(ev){
-      ev.preventDefault();
-      recordar("cervantes");
-      window.location.href = CERVANTES_URL;
-      return false;
-    }
     /* Marca con "Última vez" la planta usada la última vez (ayuda visual; NO
        redirige solo, porque la asignación puede cambiar día a día). */
     (function(){
