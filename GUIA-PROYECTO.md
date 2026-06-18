@@ -4,7 +4,11 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-18 · Versión app al documentar: **v2.88**
+> Última actualización: 2026-06-18 · Versión app al documentar: **v2.89**
+>
+> Nota: **v2.89** — **planimetría: ajustes**. Se borraron `030`, `830`, `828`, `029`
+> (no vigentes). `255`(G10) y `724`(G15) pasan a orden 75/76 (justo tras G07).
+> `548` comparte lugar con `565` (A64). `planimetria.js?v=2.89`.
 >
 > Nota: **v2.88** — el aviso "preguntá a Marianela" ahora solo aparece cuando hay una
 > **decisión de reparto real**. Por cada artículo faltante exige: **pickearon >1 caja**
