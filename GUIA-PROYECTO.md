@@ -4,7 +4,16 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-18 · Versión app al documentar: **v2.84**
+> Última actualización: 2026-06-18 · Versión app al documentar: **v2.85**
+>
+> Nota: **v2.85** — **Faltantes: "quién pidió" (NP + Cód cliente)**. Bajo cada
+> artículo faltante, una sub-fila lista los **NP** que pidieron ese artículo en la
+> tanda, con su **Cód cliente + Razón Social + cajas pedidas** (orden por cajas desc).
+> Cruce: `fetchMonitorSheet` (tanda→NPs + `cod`/`razonSocial`) × `fetchPickingBase`
+> (NP→artículos+cajas), cacheado 2 min (`faltGetEnrich`). Con la lectura PPP desde
+> Supabase (v2.84, `PPP_SOURCE`) **ya no depende de Google** si la fuente es Supabase.
+> Matchea el par Nac/Imp (`580E`↔`580`). Funciones: `faltGetEnrich`, `quienPidio`/
+> `whoRow` en `refreshFaltantes`.
 >
 > Nota: **v2.84** — **lectura PPP desde Supabase ACTIVADA** (programación / pedidos
 > / m³ migrados de Google Sheets a Supabase). 3 tablas espejan las hojas que lee la

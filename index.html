@@ -1881,6 +1881,16 @@ button {
 .falt-table td.falt{ text-align:right; }
 .falt-table td.falt span{ display:inline-block; min-width:44px; color:#fca5a5; font-weight:800; background:rgba(239,68,68,.13); border:1px solid rgba(239,68,68,.32); border-radius:7px; padding:2px 9px; font-variant-numeric:tabular-nums; }
 .falt-table tbody tr:hover td{ background:#11192b; }
+/* Sub-fila "quién pidió" (NP + Cód cliente) debajo de cada artículo faltante */
+.falt-table tr.falt-who td{ border-top:none; padding:0 16px 11px 16px; background:transparent; }
+.falt-who-l{ font-size:10.5px; font-weight:800; color:#6b7f96; text-transform:uppercase; letter-spacing:.5px; margin-right:4px; }
+.falt-np{ display:inline-flex; align-items:center; gap:6px; font-size:12.5px; color:#cbd5e1; background:#0c1525; border:1px solid #22324a; border-radius:8px; padding:3px 10px; margin:4px 6px 0 0; white-space:nowrap; }
+.falt-np .np-n{ font-weight:800; color:#e2e8f0; }
+.falt-np .np-cod{ color:#7dd3fc; font-weight:700; }
+.falt-np .np-rs{ color:#94a3b8; max-width:230px; overflow:hidden; text-overflow:ellipsis; }
+.falt-np .np-cj{ color:#fca5a5; font-weight:800; }
+.falt-who-none{ font-size:12px; color:#5b6b80; font-style:italic; }
+.falt-note{ font-size:12.5px; color:#fbbf24; margin:-8px 0 16px; opacity:.9; }
 
 /* Modales (historial de días anteriores y "Terminar Día") */
 #histModal,
@@ -4497,7 +4507,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v2.84";
+const APP_VERSION = "v2.85";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -7196,6 +7206,20 @@ function renderFaltantesDays() {
 }
 function faltantesSetDay(k) { _faltantesDay = k; renderFaltantesDays(); refreshFaltantes(); }
 
+/* Cruce con la planilla de pedidos para el detalle "quién pidió" (NP + Cód
+   cliente) de cada artículo faltante: tanda→NPs (fetchMonitorSheet) + NP→artículos
+   (fetchPickingBase). fetchMonitorSheet NO cachea solo → guardamos 2 min para no
+   re-bajar la planilla en cada auto-refresh (cada 20s). Sale de Google Sheets, así
+   que solo anda con acceso a Google (navegador del supervisor). */
+let _faltEnrich = null, _faltEnrichTs = 0;
+async function faltGetEnrich() {
+  const now = Date.now();
+  if (_faltEnrich && (now - _faltEnrichTs) < 120000) return _faltEnrich;
+  const [sheetMap, pickBase] = await Promise.all([fetchMonitorSheet(), fetchPickingBase()]);
+  _faltEnrich = { sheetMap, pickBase }; _faltEnrichTs = now;
+  return _faltEnrich;
+}
+
 async function refreshFaltantes() {
   const body = document.getElementById("faltantesBody");
   if (!body) return;
@@ -7227,24 +7251,66 @@ async function refreshFaltantes() {
       return;
     }
     const numKey = (c) => { const mm = String(c).match(/^(\d+)/); return mm ? parseInt(mm[1], 10) : 9e9; };
+
+    // Enriquecer con QUIÉN pidió cada artículo faltante (NP + Cód cliente). Sale de
+    // la planilla de pedidos (Google Sheets); si no hay acceso, se muestran los
+    // faltantes igual, sin ese detalle.
+    let enrich = null;
+    try { enrich = await faltGetEnrich(); } catch (_e) { enrich = null; }
+    const quienPidio = (tanda, art) => {
+      if (!enrich) return null;                                  // sin planilla
+      const entry = enrich.sheetMap.get(String(tanda).trim().toUpperCase());
+      if (!entry || !entry.pedidos) return [];
+      const wantU = String(art).toUpperCase(), wantBase = wantU.replace(/E$/, "");
+      const out = [], seenNp = new Set();
+      for (const p of entry.pedidos) {
+        for (const part of String(p.np || "").split(/[,/]/)) {
+          const np = pickNormNp(part);
+          if (!np || !/\d/.test(np) || seenNp.has(np)) continue;
+          seenNp.add(np);
+          let cajas = 0;
+          for (const it of (enrich.pickBase.get(np) || [])) {
+            const aU = String(it.art).toUpperCase();
+            if (aU === wantU || aU.replace(/E$/, "") === wantBase) cajas += it.cajas;   // matchea par Nac/Imp
+          }
+          if (cajas > 0) out.push({ np, cod: (p.cod || "").trim(), rs: (p.razonSocial || "").trim(), cajas });
+        }
+      }
+      return out.sort((a, b) => b.cajas - a.cajas);
+    };
+    const whoRow = (tanda, art) => {
+      const q = quienPidio(tanda, art);
+      if (q === null) return "";                                 // sin acceso → sin sub-fila
+      if (!q.length) return `<tr class="falt-who"><td colspan="5"><span class="falt-who-l">Pidieron</span><span class="falt-who-none">no figura en la planilla de pedidos</span></td></tr>`;
+      const chips = q.map(x =>
+        `<span class="falt-np"><span class="np-n">NP ${escapeHtml(x.np)}</span>` +
+        (x.cod ? `<span class="np-cod">${escapeHtml(x.cod)}</span>` : "") +
+        (x.rs ? `<span class="np-rs">${escapeHtml(x.rs)}</span>` : "") +
+        `<span class="np-cj">${x.cajas} cj</span></span>`
+      ).join("");
+      return `<tr class="falt-who"><td colspan="5"><span class="falt-who-l">Pidieron</span>${chips}</td></tr>`;
+    };
+
     let totArts = 0, totCajas = 0, html = "";
     for (const tanda of tandas) {
       const arr = byTanda[tanda].sort((a, b) => (numKey(a.art) - numKey(b.art)) || (a.art < b.art ? -1 : 1));
       let tFalt = 0;
       const rows = arr.map(x => {
         totArts++; totCajas += x.falta; tFalt += x.falta;
-        return `<tr><td class="c-art">${escapeHtml(x.art)}</td><td class="num c-muted">${x.real}</td><td class="num c-muted">${x.esp}</td><td class="falt"><span>${x.falta}</span></td><td class="c-leg">${escapeHtml(x.legajo)}</td></tr>`;
+        const main = `<tr><td class="c-art">${escapeHtml(x.art)}</td><td class="num c-muted">${x.real}</td><td class="num c-muted">${x.esp}</td><td class="falt"><span>${x.falta}</span></td><td class="c-leg">${escapeHtml(x.legajo)}</td></tr>`;
+        return main + whoRow(tanda, x.art);
       }).join("");
       html += `<div class="falt-tanda"><div class="falt-tanda-h"><span class="falt-tanda-name">Tanda ${escapeHtml(tanda)}</span><span class="falt-tanda-badge">${tFalt} cajas faltan</span></div>` +
         `<table class="falt-table"><thead><tr><th>Artículo</th><th class="num">Puso</th><th class="num">Pedía</th><th class="num">Falta</th><th>Legajo</th></tr></thead><tbody>${rows}</tbody></table></div>`;
     }
     const _pl = (n, s, p) => (n === 1 ? s : p);
+    const note = enrich ? "" : `<div class="falt-note">⚠ No pude cargar NP/cliente (sin acceso a la planilla de pedidos desde esta pantalla).</div>`;
     body.innerHTML =
       `<div class="falt-summary">` +
         `<div class="falt-stat"><div class="n">${tandas.length}</div><div class="l">${_pl(tandas.length, "tanda con falta", "tandas con falta")}</div></div>` +
         `<div class="falt-stat"><div class="n">${totArts}</div><div class="l">${_pl(totArts, "artículo", "artículos")}</div></div>` +
         `<div class="falt-stat amber"><div class="n">${totCajas}</div><div class="l">cajas faltantes</div></div>` +
-      `</div>` + html;
+      `</div>` + note + html;
   } catch (e) {
     body.innerHTML = `<div class="falt-empty">No se pudo cargar: ${escapeHtml(e.message || "")}</div>`;
   }
