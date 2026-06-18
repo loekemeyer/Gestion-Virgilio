@@ -4,7 +4,15 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-18 · Versión app al documentar: **v2.85**
+> Última actualización: 2026-06-18 · Versión app al documentar: **v2.86**
+>
+> Nota: **v2.86** — **Faltantes: estimar quién quedó SIN SERVIR**. En la sub-fila
+> "Pidieron" se reparten las cajas que el operario **puso** entre los NP **sirviendo
+> primero a los pedidos más grandes**; cada NP queda marcado **"sin servir"** (pedido
+> entero sin cubrir, badge rojo), **"faltan N"** (parcial, ámbar) o **"✓ completo"**
+> (verde). El reparto descompone exactamente la `falta` por NP. Es un **estimado**
+> (no se conoce el reparto real; se aclara con `title` en "Pidieron"). `quienPidio`
+> ahora recibe el `puso` y setea `faltaCj`; `whoRow` pinta el estado.
 >
 > Nota: **v2.85** — **Faltantes: "quién pidió" (NP + Cód cliente)**. Bajo cada
 > artículo faltante, una sub-fila lista los **NP** que pidieron ese artículo en la

@@ -1888,7 +1888,13 @@ button {
 .falt-np .np-n{ font-weight:800; color:#e2e8f0; }
 .falt-np .np-cod{ color:#7dd3fc; font-weight:700; }
 .falt-np .np-rs{ color:#94a3b8; max-width:230px; overflow:hidden; text-overflow:ellipsis; }
-.falt-np .np-cj{ color:#fca5a5; font-weight:800; }
+.falt-np .np-cj{ color:#cbd5e1; font-weight:800; }
+.falt-np.ns{ background:rgba(239,68,68,.14); border-color:rgba(239,68,68,.45); }
+.falt-np.pp{ border-color:rgba(251,191,36,.42); }
+.falt-np .np-st{ font-size:10.5px; font-weight:800; padding:1px 7px; border-radius:6px; margin-left:2px; text-transform:uppercase; letter-spacing:.3px; }
+.falt-np .np-ns{ color:#fee2e2; background:#b91c1c; }
+.falt-np .np-pp{ color:#fde68a; background:#78550c; }
+.falt-np .np-ok{ color:#86efac; background:rgba(34,197,94,.16); }
 .falt-who-none{ font-size:12px; color:#5b6b80; font-style:italic; }
 .falt-note{ font-size:12.5px; color:#fbbf24; margin:-8px 0 16px; opacity:.9; }
 
@@ -4507,7 +4513,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v2.85";
+const APP_VERSION = "v2.86";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -7257,7 +7263,7 @@ async function refreshFaltantes() {
     // faltantes igual, sin ese detalle.
     let enrich = null;
     try { enrich = await faltGetEnrich(); } catch (_e) { enrich = null; }
-    const quienPidio = (tanda, art) => {
+    const quienPidio = (tanda, art, puso) => {
       if (!enrich) return null;                                  // sin planilla
       const entry = enrich.sheetMap.get(String(tanda).trim().toUpperCase());
       if (!entry || !entry.pedidos) return [];
@@ -7276,19 +7282,34 @@ async function refreshFaltantes() {
           if (cajas > 0) out.push({ np, cod: (p.cod || "").trim(), rs: (p.razonSocial || "").trim(), cajas });
         }
       }
-      return out.sort((a, b) => b.cajas - a.cajas);
+      out.sort((a, b) => b.cajas - a.cajas);
+      // ESTIMADO de "quién quedó sin servir": se reparten las cajas que el operario
+      // PUSO sirviendo primero a los pedidos más grandes; lo que no alcanza queda sin
+      // cubrir (entero → "sin servir", o parcial → "faltan N"). No sabemos el reparto
+      // real, por eso es un estimado (se aclara en la UI).
+      let avail = (typeof puso === "number" && puso >= 0) ? puso : 0;
+      for (const x of out) {
+        const served = Math.min(avail, x.cajas);
+        avail -= served;
+        x.faltaCj = Math.round((x.cajas - served) * 100) / 100;   // cajas que NO le llegaron
+      }
+      return out;
     };
-    const whoRow = (tanda, art) => {
-      const q = quienPidio(tanda, art);
+    const whoRow = (tanda, art, puso) => {
+      const q = quienPidio(tanda, art, puso);
       if (q === null) return "";                                 // sin acceso → sin sub-fila
       if (!q.length) return `<tr class="falt-who"><td colspan="5"><span class="falt-who-l">Pidieron</span><span class="falt-who-none">no figura en la planilla de pedidos</span></td></tr>`;
-      const chips = q.map(x =>
-        `<span class="falt-np"><span class="np-n">NP ${escapeHtml(x.np)}</span>` +
-        (x.cod ? `<span class="np-cod">${escapeHtml(x.cod)}</span>` : "") +
-        (x.rs ? `<span class="np-rs">${escapeHtml(x.rs)}</span>` : "") +
-        `<span class="np-cj">${x.cajas} cj</span></span>`
-      ).join("");
-      return `<tr class="falt-who"><td colspan="5"><span class="falt-who-l">Pidieron</span>${chips}</td></tr>`;
+      const chips = q.map(x => {
+        let cls = "", st = "";
+        if (x.cajas > 0 && x.faltaCj >= x.cajas)      { cls = " ns"; st = `<span class="np-st np-ns">sin servir</span>`; }
+        else if (x.faltaCj > 0)                        { cls = " pp"; st = `<span class="np-st np-pp">faltan ${x.faltaCj}</span>`; }
+        else                                           { st = `<span class="np-st np-ok">✓ completo</span>`; }
+        return `<span class="falt-np${cls}"><span class="np-n">NP ${escapeHtml(x.np)}</span>` +
+          (x.cod ? `<span class="np-cod">${escapeHtml(x.cod)}</span>` : "") +
+          (x.rs ? `<span class="np-rs">${escapeHtml(x.rs)}</span>` : "") +
+          `<span class="np-cj">${x.cajas} cj</span>${st}</span>`;
+      }).join("");
+      return `<tr class="falt-who"><td colspan="5"><span class="falt-who-l" title="Estimado: se asume servir primero a los pedidos más grandes">Pidieron</span>${chips}</td></tr>`;
     };
 
     let totArts = 0, totCajas = 0, html = "";
@@ -7298,7 +7319,7 @@ async function refreshFaltantes() {
       const rows = arr.map(x => {
         totArts++; totCajas += x.falta; tFalt += x.falta;
         const main = `<tr><td class="c-art">${escapeHtml(x.art)}</td><td class="num c-muted">${x.real}</td><td class="num c-muted">${x.esp}</td><td class="falt"><span>${x.falta}</span></td><td class="c-leg">${escapeHtml(x.legajo)}</td></tr>`;
-        return main + whoRow(tanda, x.art);
+        return main + whoRow(tanda, x.art, x.real);
       }).join("");
       html += `<div class="falt-tanda"><div class="falt-tanda-h"><span class="falt-tanda-name">Tanda ${escapeHtml(tanda)}</span><span class="falt-tanda-badge">${tFalt} cajas faltan</span></div>` +
         `<table class="falt-table"><thead><tr><th>Artículo</th><th class="num">Puso</th><th class="num">Pedía</th><th class="num">Falta</th><th>Legajo</th></tr></thead><tbody>${rows}</tbody></table></div>`;
