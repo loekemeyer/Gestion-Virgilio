@@ -4,7 +4,14 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-18 · Versión app al documentar: **v2.81**
+> Última actualización: 2026-06-18 · Versión app al documentar: **v2.82**
+>
+> Nota: **v2.82** — **selector de planta** rescatado del repo `App-Produccion`
+> (que se va a borrar). Vive en `/selector/` y **linkea a las apps publicadas**
+> (Virgilio = raíz `../`, Cervantes = su propio Pages) en vez de copiarlas, así no
+> quedan viejas. La app Virgilio suma un botón **"← Cambiar planta"** en
+> `#legajoScreen` → `selector/`. Detalle en `CLAUDE.md` (sección "Selector de planta").
+> La raíz sigue siendo la app Virgilio (el selector NO es la entrada por defecto).
 >
 > Nota: **v2.81** — editor de Planimetría: se **sacó** el botón "subir toda" y se
 > agregó un **ayudante de ubicaciones aledañas** (`planimNearby`): al escribir un

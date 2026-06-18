@@ -28,6 +28,28 @@ inventes**.
 - **Versión**: `APP_VERSION` en `index.html` y `SW_VERSION` en `sw.js`.
 - Legajos `0` y `1` (Pruebas) son test/basura: excluir de reportes.
 
+## Selector de planta (`/selector/`)
+
+Subcarpeta con un **selector "¿Dónde vas a trabajar hoy?"** (Virgilio / Cervantes).
+Rescatado del repo `App-Produccion` (que combinaba ambas apps **por copia**; se
+descartó por la pena de mantener copias viejas). Acá el selector **NO copia las
+apps: linkea a las publicadas**, así nunca quedan viejas:
+
+- **Virgilio** → `../` (la raíz de este repo).
+- **Cervantes** → `https://loekemeyer.github.io/Registro-Produccion-2.0/` (constante
+  `CERVANTES_URL` en `selector/index.html`; ajustar si cambia la URL/repo de Cervantes).
+- Recuerda la última planta usada (`localStorage` `appprod_ultima_planta`) y la marca
+  "Última vez", pero **no redirige solo** (la asignación cambia día a día).
+- `selector/sw.js` no cachea (mismo patrón que las apps). Archivos: `index.html`,
+  `manifest.json`, `sw.js`, `icon.svg`.
+- La app Virgilio (raíz) tiene un botón **"← Cambiar planta"** en `#legajoScreen` que
+  va a `selector/`.
+- El selector NO es la entrada por defecto (la raíz sigue siendo la app Virgilio). Si
+  algún día se quiere que sea la entrada, mover el selector a la raíz y Virgilio a una
+  subcarpeta (cambia la URL actual y la app de Play Store).
+- Para verlo online: `https://loekemeyer.github.io/<repo>/selector/`. Requiere que
+  **Cervantes** tenga su propio GitHub Pages activo para que su tarjeta no dé 404.
+
 ## Git
 
 - **Este es un repo de PRUEBA** (`tv-v`), espejo de Producción Virgilio. Trabajar
