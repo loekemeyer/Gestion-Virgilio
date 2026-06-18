@@ -2556,11 +2556,11 @@ const SUPABASE_FACTURACION_NP_ENDPOINT =
    sacar la dependencia de Google y poder calcular m³ por SQL. Las llena la
    macro del Excel con la service_role key. Ver MIGRACION-SUPABASE-PPP.md y
    sql/ppp_supabase.sql.
-     "sheets"   = como siempre (Google Sheets).        ← DEFAULT: no cambia nada
+     "sheets"   = como siempre (Google Sheets).
      "auto"     = intenta Supabase y cae a Sheets si está vacío/falla (transición)
      "supabase" = solo Supabase (corta la dependencia de Google)
    ─────────────────────────────────────────────────────────────────────────── */
-const PPP_SOURCE = "sheets";
+const PPP_SOURCE = "auto";   // v2.80: lee Supabase, cae a Sheets si falta/falla
 const SUPABASE_PPP_PROG_ENDPOINT       = SUPABASE_URL + "/rest/v1/PPP_Programacion_Diaria";
 const SUPABASE_PPP_ENTREGADOS_ENDPOINT = SUPABASE_URL + "/rest/v1/PPP_Pedidos_Entregados";
 const SUPABASE_PPP_BASE_ENDPOINT       = SUPABASE_URL + "/rest/v1/PPP_Base_Pedidos";

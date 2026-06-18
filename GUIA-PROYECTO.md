@@ -20,8 +20,9 @@
 > **espeja** en las tablas con **reemplazo total** (DELETE all + INSERT) y la
 > `service_role` key del proyecto Virgilio (ver `MIGRACION-SUPABASE-PPP.md` +
 > `apps-script/sync-ppp-supabase.gs`). Tablas con `id` autonumérico (sin clave
-> natural). **No cambia nada** hasta poner `PPP_SOURCE` en `"auto"`/`"supabase"` y
-> que el hook escriba. Alcance: NO incluye `VolumenArticulos` ni la planimetría.
+> natural). **Activado en `"auto"`** (la app lee Supabase y cae a Sheets si falta);
+> el hook del Apps Script ya escribe ambos. Alcance: NO incluye `VolumenArticulos`
+> ni la planimetría.
 >
 > Nota: **v2.79** — **planimetría: se borró `441E`** (código fantasma, no existe;
 > solo existe `441`). Queda `441`→J28 sin par E → sin aviso Nacional/Importado.
