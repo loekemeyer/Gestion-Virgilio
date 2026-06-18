@@ -1898,6 +1898,21 @@ button {
 .falt-who-none{ font-size:12px; color:#5b6b80; font-style:italic; }
 .falt-note{ font-size:12.5px; color:#fbbf24; margin:-8px 0 16px; opacity:.9; }
 
+/* Aviso "preguntá a Marianela" (armador, tanda con faltantes) */
+#marianelaModal{ display:none; position:fixed; inset:0; z-index:1300; background:rgba(2,6,23,.74); align-items:center; justify-content:center; padding:20px; }
+#marianelaModal.show{ display:flex; }
+.mar-card{ background:#1c1407; border:2px solid #f59e0b; border-radius:18px; padding:24px 22px; max-width:440px; width:100%; text-align:center; box-shadow:0 24px 70px rgba(0,0,0,.55); }
+.mar-ico{ font-size:46px; line-height:1; }
+.mar-title{ font-size:21px; font-weight:800; color:#fde68a; margin:10px 0 6px; }
+.mar-tanda{ font-size:13.5px; font-weight:700; color:#fbbf24; margin:6px 0; }
+.mar-arts{ display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin:8px 0 2px; }
+.mar-art{ font-size:13.5px; color:#fed7aa; background:rgba(245,158,11,.12); border:1px solid rgba(245,158,11,.4); border-radius:8px; padding:4px 10px; }
+.mar-art b{ color:#fca5a5; }
+.mar-msg{ font-size:17px; color:#fff; margin:16px 0 20px; line-height:1.45; }
+.mar-msg b{ color:#fbbf24; font-size:20px; letter-spacing:.3px; }
+.mar-btn{ width:100%; margin:0; padding:14px; font-size:17px; font-weight:800; background:#f59e0b; color:#241803; border:none; border-radius:10px; cursor:pointer; }
+.mar-btn:hover{ background:#fbbf24; }
+
 /* Modales (historial de días anteriores y "Terminar Día") */
 #histModal,
 #terminarDiaModal{
@@ -2369,6 +2384,18 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
   </div>
   <div class="falt-days" id="faltantesDays"></div>
   <div class="falt-body" id="faltantesBody"><div class="falt-empty">Cargando…</div></div>
+</div>
+
+<!-- Aviso al armador: si la tanda del pedido se pickeó con faltantes, preguntar a
+     Marianela cómo repartir antes de separar (v2.87). Lo abre showMarianelaAviso. -->
+<div id="marianelaModal">
+  <div class="mar-card">
+    <div class="mar-ico">⚠️</div>
+    <div class="mar-title">Esta tanda se pickeó con faltantes</div>
+    <div id="marianelaBody"></div>
+    <div class="mar-msg">Antes de separar los pedidos, preguntale a <b>MARIANELA</b> cómo repartir lo que hay.</div>
+    <button class="mar-btn" onclick="closeMarianela()">Entendido</button>
+  </div>
 </div>
 
 <!-- Modal: detalle de una tanda (NPs + m3) — se abre al clickear el código
@@ -4513,7 +4540,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v2.86";
+const APP_VERSION = "v2.87";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -4711,7 +4738,12 @@ async function send() {
   if (opcion === "EP" && (texto || "").trim()) showPickingList(texto, legajoStr);
   // Al EMPEZAR ARMADO (AP): armado guiado por caja/m³ (OPCIONAL, apagado por
   // defecto; showArmadoGuide corta solo si la flag está en false). No bloquea AP.
-  if (opcion === "AP" && (texto || "").trim()) showArmadoGuide(texto, legajoStr);
+  if (opcion === "AP" && (texto || "").trim()) {
+    showArmadoGuide(texto, legajoStr);
+    // Si la tanda de este pedido se pickeó con faltantes, avisar que pregunte a
+    // Marianela cómo repartir antes de separar (v2.87).
+    showMarianelaAviso(texto, legajoStr);
+  }
   // Al INICIAR carga camión (1er toque de CC): checklist de NPs listas (TAP).
   if (opcion === "CC") {
     const stCC = getLegajoState(legajoStr);
@@ -5790,6 +5822,73 @@ function arFinish() {
     send();
   } catch (e) { console.warn("arFinish:", e); }
 }
+
+/* =========================================================
+   AVISO "PREGUNTÁ A MARIANELA" (v2.87).
+   Cuando el armador EMPIEZA el separado (AP) de un pedido cuya TANDA se pickeó
+   con faltantes, le avisa que le pregunte a Marianela cómo repartir (ella decide
+   a qué cliente va el stock que alcanzó). El código de AP puede ser la tanda o el
+   pedido (NP): se prueba como tanda y, si no, se busca la tanda del NP en la PPP.
+   Lee los PKC con real<esp de esa tanda (últimos 5 días). Si no hay, no muestra nada.
+   ========================================================= */
+async function faltantesDeTanda(tanda) {
+  const t = String(tanda || "").trim().toUpperCase();
+  if (!t) return [];
+  try {
+    const since = encodeURIComponent(new Date(Date.now() - 5 * 86400000).toISOString());
+    const url = SUPABASE_TABLE_ENDPOINT + "?opcion=eq.PKC&texto=ilike." +
+      encodeURIComponent(t + "|") + "*&ts_cliente=gte." + since +
+      "&select=texto&order=ts_cliente.desc&limit=4000";
+    const r = await fetch(url, { headers: { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+    if (!r.ok) return [];
+    const data = await r.json();
+    const seen = new Set(), out = [];
+    for (const ev of data) {
+      const p = String(ev.texto || "").split("|");
+      if (p.length < 4 || (p[0] || "").trim().toUpperCase() !== t) continue;
+      const art = (p[1] || "").trim();
+      const esp = parseFloat(String(p[2]).replace(",", ".")), real = parseFloat(String(p[3]).replace(",", "."));
+      if (!art || isNaN(esp) || isNaN(real) || real >= esp || seen.has(art)) continue;
+      seen.add(art); out.push({ art, falta: esp - real });               // desc → 1er PKC = el más reciente
+    }
+    return out;
+  } catch (_e) { return []; }
+}
+async function showMarianelaAviso(codigo, legajo) {
+  const code = String(codigo || "").trim().toUpperCase();
+  if (!code) return;
+  try {
+    let tanda = code, falt = await faltantesDeTanda(code);
+    if (!falt.length) {
+      // No es una tanda con faltantes → puede ser un PEDIDO (NP): buscamos su tanda.
+      let enr = null; try { enr = await faltGetEnrich(); } catch (_e) {}
+      if (enr && enr.sheetMap) {
+        const np = pickNormNp(code);
+        for (const [k, v] of enr.sheetMap) {
+          if (!v || !v.pedidos) continue;
+          if (v.pedidos.some(p => String(p.np || "").split(/[,/]/).map(s => pickNormNp(s)).indexOf(np) >= 0)) {
+            tanda = String(v.tanda || k).trim().toUpperCase(); break;
+          }
+        }
+        if (tanda && tanda !== code) falt = await faltantesDeTanda(tanda);
+      }
+    }
+    if (!falt.length) return;                          // sin faltantes → no se muestra
+    falt.sort((a, b) => b.falta - a.falta);
+    const chips = falt.map(f => `<span class="mar-art">Art ${escapeHtml(f.art)} <b>−${f.falta}</b></span>`).join("");
+    const body = document.getElementById("marianelaBody");
+    if (body) body.innerHTML =
+      `<div class="mar-tanda">Tanda ${escapeHtml(tanda)} · ${falt.length} artículo(s) con falta</div>` +
+      `<div class="mar-arts">${chips}</div>`;
+    const ov = document.getElementById("marianelaModal");
+    if (ov) ov.classList.add("show");
+  } catch (_e) { /* sin red: no se muestra el aviso */ }
+}
+function closeMarianela() {
+  const ov = document.getElementById("marianelaModal");
+  if (ov) ov.classList.remove("show");
+}
+
 /* =========================================================
    CARGA CAMIÓN — checklist de NPs listas para cargar.
    Al iniciar CC, muestra las NP de las tandas con armado terminado (TAP, de

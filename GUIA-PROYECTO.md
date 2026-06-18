@@ -4,7 +4,16 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-18 · Versión app al documentar: **v2.86**
+> Última actualización: 2026-06-18 · Versión app al documentar: **v2.87**
+>
+> Nota: **v2.87** — **aviso "preguntá a Marianela" al armar una tanda con faltantes**.
+> Cuando el armador EMPIEZA el separado (`AP`) de un pedido cuya **tanda se pickeó con
+> faltantes**, se abre un modal (`#marianelaModal`) que le dice que **le pregunte a
+> Marianela** cómo repartir, y le muestra los artículos cortos. El código de `AP` puede
+> ser la tanda o el pedido (NP): se prueba como tanda y, si no, se busca la tanda del NP
+> en la PPP (`faltGetEnrich`). Detección por los `PKC` con `real<esp` de esa tanda
+> (últimos 5 días). Funciones: `showMarianelaAviso`/`faltantesDeTanda`/`closeMarianela`;
+> hook en `send()` (rama `AP`). Si no hay faltantes (o sin red) no muestra nada.
 >
 > Nota: **v2.86** — **Faltantes: estimar quién quedó SIN SERVIR**. En la sub-fila
 > "Pidieron" se reparten las cajas que el operario **puso** entre los NP **sirviendo
