@@ -4,7 +4,14 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-18 · Versión app al documentar: **v2.87**
+> Última actualización: 2026-06-18 · Versión app al documentar: **v2.88**
+>
+> Nota: **v2.88** — el aviso "preguntá a Marianela" ahora solo aparece cuando hay una
+> **decisión de reparto real**. Por cada artículo faltante exige: **pickearon >1 caja**
+> (`real>1`), **falta >1 caja** (sino va a un solo cliente) y el artículo lo pidió
+> **más de 1 pedido** (se cuenta con `enr`/PPP, `contarPedidos`). Si ningún artículo
+> califica, el modal NO se muestra. `faltantesDeTanda` ahora devuelve `esp`/`real`;
+> el chip muestra "N pedidos". Sin acceso a la PPP, degrada a los gates de cajas.
 >
 > Nota: **v2.87** — **aviso "preguntá a Marianela" al armar una tanda con faltantes**.
 > Cuando el armador EMPIEZA el separado (`AP`) de un pedido cuya **tanda se pickeó con

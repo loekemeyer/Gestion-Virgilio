@@ -1908,6 +1908,7 @@ button {
 .mar-arts{ display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin:8px 0 2px; }
 .mar-art{ font-size:13.5px; color:#fed7aa; background:rgba(245,158,11,.12); border:1px solid rgba(245,158,11,.4); border-radius:8px; padding:4px 10px; }
 .mar-art b{ color:#fca5a5; }
+.mar-art .mar-np{ font-size:11px; font-weight:700; color:#fde68a; background:rgba(0,0,0,.25); border-radius:6px; padding:1px 6px; margin-left:3px; }
 .mar-msg{ font-size:17px; color:#fff; margin:16px 0 20px; line-height:1.45; }
 .mar-msg b{ color:#fbbf24; font-size:20px; letter-spacing:.3px; }
 .mar-btn{ width:100%; margin:0; padding:14px; font-size:17px; font-weight:800; background:#f59e0b; color:#241803; border:none; border-radius:10px; cursor:pointer; }
@@ -4540,7 +4541,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v2.87";
+const APP_VERSION = "v2.88";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -5849,7 +5850,7 @@ async function faltantesDeTanda(tanda) {
       const art = (p[1] || "").trim();
       const esp = parseFloat(String(p[2]).replace(",", ".")), real = parseFloat(String(p[3]).replace(",", "."));
       if (!art || isNaN(esp) || isNaN(real) || real >= esp || seen.has(art)) continue;
-      seen.add(art); out.push({ art, falta: esp - real });               // desc → 1er PKC = el más reciente
+      seen.add(art); out.push({ art, esp, real, falta: esp - real });    // desc → 1er PKC = el más reciente
     }
     return out;
   } catch (_e) { return []; }
@@ -5858,27 +5859,60 @@ async function showMarianelaAviso(codigo, legajo) {
   const code = String(codigo || "").trim().toUpperCase();
   if (!code) return;
   try {
+    // 1) Faltantes de la tanda (probando el código como tanda; si no, como pedido → su tanda).
+    let enr = null; try { enr = await faltGetEnrich(); } catch (_e) {}
     let tanda = code, falt = await faltantesDeTanda(code);
-    if (!falt.length) {
-      // No es una tanda con faltantes → puede ser un PEDIDO (NP): buscamos su tanda.
-      let enr = null; try { enr = await faltGetEnrich(); } catch (_e) {}
-      if (enr && enr.sheetMap) {
-        const np = pickNormNp(code);
-        for (const [k, v] of enr.sheetMap) {
-          if (!v || !v.pedidos) continue;
-          if (v.pedidos.some(p => String(p.np || "").split(/[,/]/).map(s => pickNormNp(s)).indexOf(np) >= 0)) {
-            tanda = String(v.tanda || k).trim().toUpperCase(); break;
-          }
+    if (!falt.length && enr && enr.sheetMap) {
+      const np = pickNormNp(code);
+      for (const [k, v] of enr.sheetMap) {
+        if (!v || !v.pedidos) continue;
+        if (v.pedidos.some(p => String(p.np || "").split(/[,/]/).map(s => pickNormNp(s)).indexOf(np) >= 0)) {
+          tanda = String(v.tanda || k).trim().toUpperCase(); break;
         }
-        if (tanda && tanda !== code) falt = await faltantesDeTanda(tanda);
       }
+      if (tanda && tanda !== code) falt = await faltantesDeTanda(tanda);
     }
-    if (!falt.length) return;                          // sin faltantes → no se muestra
-    falt.sort((a, b) => b.falta - a.falta);
-    const chips = falt.map(f => `<span class="mar-art">Art ${escapeHtml(f.art)} <b>−${f.falta}</b></span>`).join("");
+    if (!falt.length) return;
+    // 2) Mostrar SOLO si hay una decisión de reparto: por cada artículo faltante,
+    //    pickearon >1 caja, falta >1 (sino va a un solo cliente) y lo pidió MÁS de
+    //    1 pedido. La cantidad de pedidos que pidieron el artículo sale de la PPP.
+    const contarPedidos = (art) => {
+      if (!enr || !enr.sheetMap) return null;                 // no se pudo determinar
+      const entry = enr.sheetMap.get(String(tanda).trim().toUpperCase());
+      if (!entry || !entry.pedidos) return null;
+      const wantU = String(art).toUpperCase(), wantBase = wantU.replace(/E$/, "");
+      const seenNp = new Set(); let n = 0;
+      for (const p of entry.pedidos) {
+        for (const part of String(p.np || "").split(/[,/]/)) {
+          const np = pickNormNp(part);
+          if (!np || !/\d/.test(np) || seenNp.has(np)) continue;
+          seenNp.add(np);
+          let cajas = 0;
+          for (const it of (enr.pickBase.get(np) || [])) {
+            const aU = String(it.art).toUpperCase();
+            if (aU === wantU || aU.replace(/E$/, "") === wantBase) cajas += it.cajas;
+          }
+          if (cajas > 0) n++;                                  // este pedido pidió el artículo
+        }
+      }
+      return n;
+    };
+    const relevantes = [];
+    for (const f of falt) {
+      if (!(f.real > 1) || !(f.falta > 1)) continue;          // pickearon >1 y falta >1
+      const n = contarPedidos(f.art);
+      if (n !== null && n <= 1) continue;                     // un solo pedido → no hay reparto
+      relevantes.push({ art: f.art, falta: f.falta, nped: n });
+    }
+    if (!relevantes.length) return;                           // nada para distribuir → no se muestra
+    relevantes.sort((a, b) => b.falta - a.falta);
+    const chips = relevantes.map(f =>
+      `<span class="mar-art">Art ${escapeHtml(f.art)} <b>−${f.falta}</b>` +
+      (f.nped ? ` <span class="mar-np">${f.nped} pedidos</span>` : "") + `</span>`
+    ).join("");
     const body = document.getElementById("marianelaBody");
     if (body) body.innerHTML =
-      `<div class="mar-tanda">Tanda ${escapeHtml(tanda)} · ${falt.length} artículo(s) con falta</div>` +
+      `<div class="mar-tanda">Tanda ${escapeHtml(tanda)} · hay que repartir entre pedidos</div>` +
       `<div class="mar-arts">${chips}</div>`;
     const ov = document.getElementById("marianelaModal");
     if (ov) ov.classList.add("show");
