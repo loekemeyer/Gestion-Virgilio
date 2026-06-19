@@ -4541,7 +4541,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v2.89";
+const APP_VERSION = "v2.90";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -5359,8 +5359,24 @@ async function showPickingList(tanda, legajo) {
       }
     }
     // Sumar cajas por código entre todos los pedidos de la tanda.
-    const agg = {};
-    for (const np of nps) for (const it of (pickBase.get(np) || [])) agg[it.art] = (agg[it.art] || 0) + it.cajas;
+    const aggFrom = (base) => {
+      const a = {};
+      for (const np of nps) for (const it of (base.get(np) || [])) a[it.art] = (a[it.art] || 0) + it.cajas;
+      return a;
+    };
+    let agg = aggFrom(pickBase);
+    // Mirror de Supabase desactualizado: si a ALGÚN NP de la tanda le faltan filas en
+    // la base (Supabase aún no sincronizó esos pedidos), reintento con la base de
+    // Google Sheets (la que usa la oficina, siempre al día) y sano el cache. Así el
+    // picking no queda vacío por un sync atrasado. v2.89.
+    const npsSinFilas = nps.filter(np => !(pickBase.get(np) || []).length);
+    if (npsSinFilas.length && typeof PPP_SOURCE !== "undefined" && PPP_SOURCE !== "sheets") {
+      try {
+        const sheetBase = await fetchPickingBaseFromSheets();
+        const agg2 = aggFrom(sheetBase);
+        if (Object.keys(agg2).length) { agg = agg2; _pickBaseCache = sheetBase; _pickBaseCacheTs = Date.now(); }
+      } catch (_e) { /* sin Sheets: queda lo que trajo Supabase */ }
+    }
     // Orden de góndola (planimetría, window.GONDOLA): ordena por el "orden" de
     // cada código y le adjunta su sector. Los códigos sin planimetría caen al
     // final, ordenados numéricamente entre sí.
