@@ -4,7 +4,19 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-19 · Versión app al documentar: **v2.97**
+> Última actualización: 2026-06-19 · Versión app al documentar: **v2.98**
+>
+> Nota: **v2.98** — **integrado el flujo de LOGIN GLOBAL + selector de planta in-app +
+> rebrand a "Producción"** (del branch `claude/login-global-flow`, otra sesión).
+> Ahora: login (Google/legajo) → **`#plantSelector`** (Virgilio / Cervantes, sesión
+> compartida, no re-pide login) → `chooseVirgilio()` → `_renderIdentity()` →
+> `showSupervisor`/`showOperario` (mis pantallas). Funciones: `showSelector`,
+> `_routeAfterAuth`, `_renderIdentity`, `chooseVirgilio/Cervantes`, `cambiarPlanta`,
+> botón `#btnCambiarPlanta`. Cervantes (`cervGate`) levanta la sesión compartida y
+> redirige a la raíz si no hay. Rebrand: íconos/manifest/twa. ⚠ Mi **`/selector/`
+> standalone (v2.82) quedó REDUNDANTE** (ahora el selector es in-app); no se borró —
+> queda como página huérfana, se puede limpiar después. Se integró sobre mi v2.97
+> (cherry-pick limpio: las zonas no se solapaban; mis features v2.9x intactas).
 >
 > Nota: **v2.97** — **PPP Fase 1: importador de Excel → Supabase**. Los botones del
 > módulo PPP ahora **leen el `.xls`/`.xlsx`** (SheetJS lazy desde CDN —
