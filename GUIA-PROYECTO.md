@@ -4,7 +4,12 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-19 · Versión app al documentar: **v3.30**
+> Última actualización: 2026-06-19 · Versión app al documentar: **v3.31**
+>
+> Nota: **v3.31** — PPP: en Programación, dentro de **cada día** las tandas se **ordenan por
+> camión (color)** y no por número: Sur/Oeste · Norte · Centro · Súper · Retira (y dentro de
+> cada camión, por tanda). Así lo que va junto queda junto aunque el N° de tanda no sea
+> consecutivo (`_pppCamKey` en el sort del tab Programación).
 >
 > Nota: **v3.30** — PPP: **botonera de tanda en 2 modos separados** (pedido del usuario, antes
 > se mezclaba). La franja tiene **✓ Controlar** (verde) y **✏️ Editar** (ámbar); cada botón abre

@@ -4847,7 +4847,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.30";
+const APP_VERSION = "v3.31";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -8324,6 +8324,14 @@ function _pppRuta(pedidos) {
   let best = "", bn = 0; for (const k in cnt) if (cnt[k] > bn) { bn = cnt[k]; best = k; }
   return best;
 }
+/* Orden de camión (para agrupar en un día lo que va junto, por color): Sur/Oeste · Norte
+   · Centro · Súper · Retira · resto. */
+function _pppCamKey(pedidos) {
+  const r = _pppRuta(pedidos);
+  if (r) return ({ so: 1, n: 2, c: 3, ret: 5 })[r] || 9;
+  if (pedidos.some(pppEsSuper)) return 4;   // tanda de súper
+  return 9;
+}
 /* Lista de N° Pedido para la franja: colapsa SOLO corridas consecutivas en rango
    "inicio/sufijo" (p. ej. 97757,97758,…,97763 → 97757/63). No consecutivos: van sueltos. */
 function _pppNpFmt(nps) {
@@ -8502,7 +8510,7 @@ function pppRenderProg() {
       const d = byD[dk], dt = _pppFechaDate(d.fecha), dia = dt ? DOW[dt.getDay()] : "";
       html += '<div class="ppp-sec-t ppp-sec-done">🗓️ ' + (dia ? dia + " " : "") + escapeHtml(d.fecha) + ' · ' + d.ped.length + ' ped · ' + _pppM3Sum(d.ped).toFixed(2) + ' m³</div>';
       const byT = {}, ordt = []; for (const p of d.ped) { const t = _pppTieneTanda(p) ? p.tanda.toUpperCase() : "—"; if (!(t in byT)) ordt.push(t); (byT[t] = byT[t] || []).push(p); }
-      ordt.sort();
+      ordt.sort(function (a, b) { return _pppCamKey(byT[a]) - _pppCamKey(byT[b]) || (a < b ? -1 : a > b ? 1 : 0); });   // agrupa por camión (color), luego por tanda
       for (const t of ordt) {
         const es = pppEsSuper(byT[t][0]);
         const pencil = (t !== "—") ? ' <button class="ppp-pencil-btn" onclick="event.stopPropagation();pppSetMode(\'__BLOCKID__\',\'edit\')" title="Editar: fecha / mover / devolver">✏️ Editar</button>' : '';
