@@ -4,7 +4,16 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-19 · Versión app al documentar: **v2.98**
+> Última actualización: 2026-06-19 · Versión app al documentar: **v2.99**
+>
+> Nota: **v2.99** — **#1 Carga Recepción: "Carga Manual" auto-navega al form**. Como no
+> hay deep-link (repo privado), al elegir "Carga Manual" se carga la app y, por ser
+> **mismo origen**, `recpAutoNav` busca dentro del iframe un botón/link hacia "Recepción
+> de Mercadería" (keywords) y lo clickea (reintenta ~5,5s; fallback al home). `recpOpen`
+> fuerza recarga (about:blank→url) y, si algún día se setea `RECEPCION_CARGA_URL` con un
+> deep-link real, lo abre directo sin heurística. ⚠ **Heurístico sin probar** (no tengo
+> acceso a esa app); si no acierta el botón, hace falta el deep-link o el texto exacto
+> del botón del home.
 >
 > Nota: **v2.98** — **integrado el flujo de LOGIN GLOBAL + selector de planta in-app +
 > rebrand a "Producción"** (del branch `claude/login-global-flow`, otra sesión).
