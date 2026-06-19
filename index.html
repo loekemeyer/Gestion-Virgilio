@@ -2220,12 +2220,15 @@ button {
 .fac-dot.ok{ background: #16a34a; }
 .fac-dot.err{ background: #dc2626; }
 .fac-close-btn{
+  width: auto; margin: 0 0 0 auto; flex: 0 0 auto;   /* override del button{width:100%} global */
   background: #dc2626; color: #fff; border: none; border-radius: 6px;
-  padding: 5px 12px; font-size: 13px; font-weight: bold; cursor: pointer;
+  padding: 6px 16px; font-size: 13px; font-weight: bold; cursor: pointer;
 }
+.fac-close-btn:hover{ background: #b91c1c; }
 /* Botón ↺ Revertir — destructivo pero menos prominente que Cerrar.
    Disabled cuando no hay nada que revertir. */
 .fac-btn-revertir{
+  width: auto; margin: 0; flex: 0 0 auto;            /* override del button{width:100%} global */
   background: #fff; color: #92400e; border: 1px solid #f59e0b; border-radius: 6px;
   padding: 4px 10px; font-size: 12px; font-weight: bold; cursor: pointer;
 }
@@ -2425,8 +2428,8 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
       <span class="fac-chip green">NPs facturados hoy: <span id="facCntDone">0</span></span>
       <button id="facBtnRevertir" class="fac-btn-revertir" disabled onclick="facRevertir()" title="Borra todos los ticks pendientes de cierre">↺ Revertir</button>
       <span class="fac-chip"><span class="fac-dot" id="facDot"></span><span id="facStatusTxt">Cargando…</span></span>
-      <button class="fac-close-btn" onclick="closeFacturacion()">Cerrar</button>
     </div>
+    <button class="fac-close-btn" onclick="closeFacturacion()">Cerrar</button>
   </div>
   <div id="facContainer">
     <div class="fac-empty">Cargando tandas…</div>
@@ -4541,7 +4544,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v2.91";
+const APP_VERSION = "v2.92";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");

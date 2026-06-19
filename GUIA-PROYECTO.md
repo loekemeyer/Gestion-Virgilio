@@ -4,7 +4,14 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-19 · Versión app al documentar: **v2.91**
+> Última actualización: 2026-06-19 · Versión app al documentar: **v2.92**
+>
+> Nota: **v2.92** — **Facturación: se reubicó el botón "Cerrar"**. Estaba como barra
+> roja a todo el ancho en el medio del header (heredaba el `button{width:100%}` global,
+> igual que pasaba en Faltantes). Ahora es un botón **compacto arriba a la derecha**
+> (`.fac-close-btn` con `width:auto; margin-left:auto`, sacado de `.fac-stats` y puesto
+> como hijo directo de `.fac-top`). De paso, `↺ Revertir` también quedó compacto (no
+> más barra). Solo CSS/markup.
 >
 > Nota: **v2.91** — el fallback del picking (v2.90) ahora también cubre el **monitor**
 > (faltantes / quién pidió / aviso Marianela). Helper `faltEnsureBase(enr, tandas)`:
