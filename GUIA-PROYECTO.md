@@ -4,7 +4,21 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-19 · Versión app al documentar: **v3.09**
+> Última actualización: 2026-06-19 · Versión app al documentar: **v3.10**
+>
+> Nota: **v3.10** — PPP: **Zona automática desde el Barrio** (réplica de la lógica del
+> Excel real `AAA_PPP_Vigente`). La Zona NO se escribe: sale del barrio de entrega
+> buscado en la tabla `Resumen Prog`!AC:AD del Excel (**84 barrios → 10 zonas**: Z1 CABA
+> Sur, Z2 CABA Centro, Z3 CABA Oeste, Z4 GBA Sur, Z5 GBA Oeste, Z6 GBA Norte, Z7 GBA
+> Norte Lejos, Super, Retira, Expo). Tabla embebida en `PPP_BARRIO_ZONA`; match
+> normalizado (sin acentos/mayúsc/paréntesis) en `pppNormBarrio`/`pppZonaDeBarrio`. La
+> Zona se muestra como **chip de color** por zona; barrios fuera de tabla muestran un
+> selector "⚠ asignar" y se **recuerdan** por barrio (`vir_ppp_zona_ovr`), extendiendo
+> la tabla como en el Excel. **Auditoría del Excel real** (para fases siguientes): hoja
+> `Programacion Diaria` = 1 fila/pedido en secciones apiladas (Problemas / Súper a
+> Programar / a Programar / Programación con `Total CXX:`); súper = Tipo KRIKOS, un
+> camión por súper; camiones por ruta fija Z1+Z3+Z4 / Z5+Z6+Z7 / Z2 solo / Retira /
+> Súpers; `Resumen Prog` agrupa por Fecha Entrega+Zona y calcula demora promedio. SOLO LOCAL.
 >
 > Nota: **v3.09** — PPP: **Tanda y Fecha Entrega editables a mano** (no vienen del Excel).
 > Cada fila tiene un input para **Tanda** (primera columna) y otro para **Fecha Entrega**.

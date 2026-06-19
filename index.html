@@ -1883,6 +1883,11 @@ button {
 .ppp-edit::placeholder{ color:#cbd5e1; }
 .ppp-edit-tanda{ font-family:Consolas,Menlo,monospace; font-weight:700; text-transform:uppercase; max-width:96px; }
 .ppp-edit-fe{ max-width:118px; }
+.ppp-zchip{ display:inline-block; padding:3px 9px; border-radius:999px; font-size:11px; font-weight:800; white-space:nowrap; color:#fff; }
+.ppp-zchip.z1{ background:#0ea5e9; } .ppp-zchip.z2{ background:#6366f1; } .ppp-zchip.z3{ background:#8b5cf6; }
+.ppp-zchip.z4{ background:#ec4899; } .ppp-zchip.z5{ background:#f59e0b; } .ppp-zchip.z6{ background:#10b981; }
+.ppp-zchip.z7{ background:#14b8a6; } .ppp-zchip.zsuper{ background:#b45309; } .ppp-zchip.zretira{ background:#64748b; } .ppp-zchip.zexpo{ background:#0f172a; }
+.ppp-zsel{ max-width:128px; border-color:#fca5a5; background:#fff1f2; }
 .ppp-subir-btn:hover{ background:#15803d; }
 .planim-near{ display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
 .planim-near-t{ font-size: 12px; font-weight: bold; color: #475569; }
@@ -4744,7 +4749,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.09";
+const APP_VERSION = "v3.10";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -7819,6 +7824,32 @@ function pppSetEdit(np, field, val, regroup) {
   pppSaveEdits();
   if (regroup) pppRenderProg();
 }
+/* ===== Zona automática desde el Barrio de entrega =====
+   Réplica de la lógica del Excel: la Zona NO se escribe a mano, sale del BARRIO
+   (col "Localidad/Barrio Entrega") buscado en la tabla 'Resumen Prog'!AC:AD (84
+   barrios → 10 zonas). Match normalizado (sin acentos/mayúsc/paréntesis). Los
+   barrios que no estén en la tabla se asignan a mano una vez y se recuerdan
+   (overrides locales), extendiendo la tabla igual que en el Excel. */
+const PPP_BARRIO_ZONA = {"almagro":"Zona 2 - CABA Centro", "avellaneda":"Zona 4 - GBA Sur", "balvanera":"Zona 2 - CABA Centro", "banfield":"Zona 4 - GBA Sur", "barracas":"Zona 1 - CABA Sur", "belgrano":"Zona 2 - CABA Centro", "bella vista":"Zona 6 - GBA Norte", "berazategui":"Zona 4 - GBA Sur", "bernal":"Zona 4 - GBA Sur", "boedo":"Zona 2 - CABA Centro", "burzaco":"Zona 2 - CABA Centro", "caballito":"Zona 2 - CABA Centro", "campo de mayo":"Super", "caseros":"Zona 5 - GBA Oeste", "chilavert":"Zona 6 - GBA Norte", "ciudadela":"Zona 5 - GBA Oeste", "constitucion":"Zona 1 - CABA Sur", "esteban echeverria":"Super", "f.varela":"Zona 4 - GBA Sur", "flores":"Zona 3 - CABA Oeste", "gregorio de laferrere":"Zona 5 - GBA Oeste", "guernica":"Zona 4 - GBA Sur", "hurlingham":"Zona 5 - GBA Oeste", "ituzaingo":"Zona 5 - GBA Oeste", "jose c paz":"Zona 6 - GBA Norte", "la boca":"Zona 1 - CABA Sur", "lanus":"Zona 3 - CABA Oeste", "lomas de zamora":"Zona 4 - GBA Sur", "lugano":"Zona 3 - CABA Oeste", "lujan":"Zona 5 - GBA Oeste", "martinez":"Zona 6 - GBA Norte", "mataderos":"Zona 3 - CABA Oeste", "mercado central":"Zona 5 - GBA Oeste", "merlo":"Zona 5 - GBA Oeste", "monserrat":"Zona 2 - CABA Centro", "monte grande":"Zona 4 - GBA Sur", "moreno":"Zona 5 - GBA Oeste", "moron":"Zona 5 - GBA Oeste", "muniz":"Zona 6 - GBA Norte", "nueva pompeya":"Zona 1 - CABA Sur", "nunez":"Zona 2 - CABA Centro", "once":"Zona 2 - CABA Centro", "p.patricios":"Zona 1 - CABA Sur", "palermo":"Zona 2 - CABA Centro", "palomar":"Zona 5 - GBA Oeste", "parque avellaneda":"Zona 3 - CABA Oeste", "parque chacabuco":"Zona 3 - CABA Oeste", "parque patricios":"Zona 1 - CABA Sur", "paternal":"Zona 3 - CABA Oeste", "pilar":"Zona 7 - GBA Norte Lejos", "platanos":"Zona 4 - GBA Sur", "pompeya":"Zona 1 - CABA Sur", "puerto madero":"Zona 2 - CABA Centro", "quilmes":"Zona 4 - GBA Sur", "quilmes oeste":"Zona 4 - GBA Sur", "rafael calzada":"Zona 4 - GBA Sur", "recoleta":"Zona 2 - CABA Centro", "remedios de escalada":"Zona 4 - GBA Sur", "retira":"Retira", "retiro":"Zona 2 - CABA Centro", "san antonio de padua":"Zona 5 - GBA Oeste", "san cristobal":"Zona 2 - CABA Centro", "san isidro":"Zona 7 - GBA Norte Lejos", "san justo":"Zona 5 - GBA Oeste", "san martin":"Zona 6 - GBA Norte", "san miguel":"Zona 6 - GBA Norte", "santa cruz de la sierra":"Expo", "soldati":"Zona 1 - CABA Sur", "temperley":"Zona 4 - GBA Sur", "tigre":"Zona 7 - GBA Norte Lejos", "tortuguita":"Super", "tortuguitas":"Super", "v. maipu - san martin":"Zona 6 - GBA Norte", "v.alsina":"Zona 4 - GBA Sur", "vicente lopez":"Zona 7 - GBA Norte Lejos", "villa ballester":"Zona 6 - GBA Norte", "villa del parque":"Zona 3 - CABA Oeste", "villa general mitre":"Zona 3 - CABA Oeste", "villa lugano":"Zona 3 - CABA Oeste", "villa luro":"Zona 1 - CABA Sur", "villa lynch":"Zona 6 - GBA Norte", "villa ortuzar":"Zona 2 - CABA Centro", "villa soldati":"Zona 1 - CABA Sur", "villa urquiza":"Zona 2 - CABA Centro"};
+const PPP_ZONAS = ["Zona 1 - CABA Sur", "Zona 2 - CABA Centro", "Zona 3 - CABA Oeste", "Zona 4 - GBA Sur", "Zona 5 - GBA Oeste", "Zona 6 - GBA Norte", "Zona 7 - GBA Norte Lejos", "Super", "Retira", "Expo"];
+const PPP_ZONA_SHORT = { "Zona 1 - CABA Sur": "Z1 Sur", "Zona 2 - CABA Centro": "Z2 Centro", "Zona 3 - CABA Oeste": "Z3 Oeste", "Zona 4 - GBA Sur": "Z4 GBA Sur", "Zona 5 - GBA Oeste": "Z5 GBA O", "Zona 6 - GBA Norte": "Z6 GBA N", "Zona 7 - GBA Norte Lejos": "Z7 Lejos", "Super": "Super", "Retira": "Retira", "Expo": "Expo" };
+function pppNormBarrio(s) { s = String(s == null ? "" : s).normalize("NFKD").replace(/[̀-ͯ]/g, ""); s = s.replace(/\([^)]*\)/g, ""); return s.replace(/\s+/g, " ").trim().toLowerCase(); }
+const PPP_ZONA_OVR_KEY = "vir_ppp_zona_ovr"; let _pppZonaOvr = null;
+function pppLoadZonaOvr() { if (_pppZonaOvr) return _pppZonaOvr; try { _pppZonaOvr = JSON.parse(localStorage.getItem(PPP_ZONA_OVR_KEY) || "{}"); } catch (_e) { _pppZonaOvr = {}; } if (!_pppZonaOvr || typeof _pppZonaOvr !== "object") _pppZonaOvr = {}; return _pppZonaOvr; }
+function pppSaveZonaOvr() { try { localStorage.setItem(PPP_ZONA_OVR_KEY, JSON.stringify(_pppZonaOvr || {})); } catch (_e) {} }
+function pppZonaDeBarrio(barrio) { const k = pppNormBarrio(barrio); if (!k) return ""; return pppLoadZonaOvr()[k] || PPP_BARRIO_ZONA[k] || ""; }
+function pppAsignarZona(np, zona) { np = String(np); const arr = _pppParsed.prog || []; let b = ""; for (const p of arr) { if (String(p.np) === np) { b = p.localidad || ""; break; } } if (!b || !zona) return; const o = pppLoadZonaOvr(); o[pppNormBarrio(b)] = zona; pppSaveZonaOvr(); pppRenderProg(); }
+function pppZonaClass(z) { if (z === "Super") return "zsuper"; if (z === "Retira") return "zretira"; if (z === "Expo") return "zexpo"; const m = /Zona\s*(\d)/.exec(z); return m ? ("z" + m[1]) : ""; }
+function pppZonaCell(p) {
+  const b = p.localidad || "", z = pppZonaDeBarrio(b);
+  if (z) return '<span class="ppp-zchip ' + pppZonaClass(z) + '">' + escapeHtml(PPP_ZONA_SHORT[z] || z) + '</span>';
+  if (b) {
+    const npE = escapeHtml(String(p.np));
+    const opt = '<option value="">⚠ asignar…</option>' + PPP_ZONAS.map(function (zz) { return '<option value="' + escapeHtml(zz) + '">' + escapeHtml(PPP_ZONA_SHORT[zz] || zz) + '</option>'; }).join("");
+    return '<select class="ppp-edit ppp-zsel" onchange="pppAsignarZona(\'' + npE + '\',this.value)">' + opt + '</select>';
+  }
+  return '';
+}
 function pppRenderProg() {
   const box = document.getElementById("pppPreview"); if (!box) return;
   const ed = pppLoadEdits();
@@ -7884,7 +7915,7 @@ function pppRenderProg() {
         '</td><td class="ppp-cli">' + escapeHtml(p.razon_social || "") + '</td><td class="num">' + (p.m3 != null && p.m3 !== "" ? Number(p.m3).toFixed(2) : "") +
         '</td><td>' + escapeHtml(p.localidad || "") + '</td>' +
         '<td><input class="ppp-edit ppp-edit-fe" value="' + feEd + '" placeholder="dd/mm/aaaa" onchange="pppSetEdit(\'' + npE + '\',\'fecha_entrega\',this.value.trim(),false)"></td>' +
-        '<td>' + escapeHtml(p.zona || "") + '</td><td>' + btn + '</td></tr>';
+        '<td>' + pppZonaCell(p) + '</td><td>' + btn + '</td></tr>';
     }
     html += '</tbody></table></div></div>';
   }
