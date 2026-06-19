@@ -4780,7 +4780,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.16";
+const APP_VERSION = "v3.17";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -8040,7 +8040,9 @@ function _pppRowTr(p) {
   const feEd = escapeHtml(p.fecha_entrega || "");
   const btn = (_pppTab === "ent")
     ? '<button class="ppp-row-btn ppp-undo" onclick="pppDeshacer(\'' + npE + '\')">↺ Deshacer</button>'
-    : '<button class="ppp-row-btn ppp-ent" onclick="pppEntregar(\'' + npE + '\')">✓ Entregado</button>';
+    : (_pppTab === "plan")
+      ? '<button class="ppp-row-btn ppp-ent" onclick="pppEntregar(\'' + npE + '\')">✓ Entregado</button>'
+      : '';   // en "A Programar" no va el botón Entregado (el pedido aún no está programado)
   return '<tr>' +
     '<td><input class="ppp-edit ppp-edit-tanda" value="' + tEd + '" placeholder="—" onchange="pppSetEdit(\'' + npE + '\',\'tanda\',this.value.trim().toUpperCase(),true)"></td>' +
     '<td>' + escapeHtml(p.cod || "") + '</td><td><b>' + npE + '</b></td><td>' + escapeHtml(p.fecha || "") +

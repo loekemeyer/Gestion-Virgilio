@@ -4,7 +4,10 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-19 · Versión app al documentar: **v3.16**
+> Última actualización: 2026-06-19 · Versión app al documentar: **v3.17**
+>
+> Nota: **v3.17** — PPP: el botón **"Entregado" ya NO aparece en 📥 A Programar** (el pedido
+> todavía no está programado); va **solo en 🗓️ Programación** (y "↺ Deshacer" en Entregados).
 >
 > Nota: **v3.16** — PPP: **ciclo de vida del pedido**. (a) Columna **"Listo FC"** en
 > Programación: se **tilda sola** cuando el operario termina el armado de la tanda (evento
