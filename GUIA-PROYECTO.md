@@ -4,7 +4,16 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-19 · Versión app al documentar: **v3.01**
+> Última actualización: 2026-06-19 · Versión app al documentar: **v3.02**
+>
+> Nota: **v3.02** — **PPP: mapeo de columnas configurable** (fix del import). El
+> "Formato PPP" tiene su propio layout (NO el de Programacion Diaria): el NP es de 5
+> dígitos y antes se tomaba mal el cód. cliente como NP. Ahora al Importar Formato PPP
+> aparece un panel para **elegir qué columna es cada campo** (NP/Tanda/Cliente/Cód/m³/
+> Zona/Localidad), con **auto-guess por patrón** (`_pppGuessMap`: 5díg→NP, 4díg→cód,
+> decimal→m³, texto largo→cliente) y se **guarda en localStorage** (`PPP_MAP_KEY`).
+> `pppApplyMapping` arma los pedidos y `pppRenderProg` agrupa por la Tanda elegida.
+> Sigue SOLO LOCAL. Pendiente del usuario: pulir estética si hace falta.
 >
 > Nota: **v3.01** — **#4 (parte 1): editor de Mails autorizados (supervisores)**.
 > Botón "✉️ Mails autorizados" (panel Admin) → overlay para agregar/borrar mails de

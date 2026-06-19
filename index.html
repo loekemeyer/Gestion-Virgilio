@@ -1836,6 +1836,12 @@ button {
 .ppp-prev-table th{ text-align:left; padding:6px 9px; background:#f8fafc; color:#475569; border-bottom:1px solid #e2e8f0; font-weight:bold; }
 .ppp-prev-table td{ padding:5px 9px; border-bottom:1px solid #f1f5f9; color:#0f172a; }
 .ppp-subir-btn{ width:100%; margin:14px 0 0; padding:14px; font-size:16px; font-weight:bold; background:#16a34a; color:#fff; border:none; border-radius:10px; cursor:pointer; }
+.ppp-map{ background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:14px; }
+.ppp-map-t{ font-size:13px; color:#334155; margin-bottom:10px; }
+.ppp-map-row{ display:flex; align-items:center; gap:10px; margin-bottom:8px; }
+.ppp-map-row label{ flex:0 0 200px; font-size:14px; font-weight:600; color:#0f172a; }
+.ppp-map-row select{ flex:1 1 auto; min-width:0; height:38px; font-size:14px; border:2px solid #cbd5e1; border-radius:8px; padding:0 8px; background:#fff; }
+@media (max-width:560px){ .ppp-map-row{ flex-direction:column; align-items:stretch; gap:3px; } .ppp-map-row label{ flex:none; } }
 /* Vista PPP (Programación / Entregados) */
 .ppp-tabs{ display:flex; gap:8px; margin:14px 0 12px; }
 .ppp-tab{ width:auto; margin:0; flex:1 1 0; padding:10px; font-size:14px; font-weight:bold; background:#eef2ff; color:#3730a3; border:1px solid #c7d2fe; border-radius:10px; cursor:pointer; }
@@ -4686,7 +4692,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.01";
+const APP_VERSION = "v3.02";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -7494,14 +7500,105 @@ function pppImportar(tipo) {
       const wb = XLSX.read(buf, { type: "array" });
       const ws = wb.Sheets[wb.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: "" });
-      const mapped = (tipo === "base") ? pppMapBase(rows) : pppMapProg(rows);
-      _pppParsed[tipo] = mapped;
-      if (tipo === "prog") { _pppEntregados = new Set(); _pppTab = "prog"; pppRenderProg(); }
-      else pppRenderBase(f.name, rows.length, mapped);
-      pppSetStatus(mapped.length ? ("✓ " + f.name + ": " + mapped.length + " filas (SOLO LOCAL — no subo nada a Supabase todavía).") : "No saqué filas válidas — ¿es la hoja/columnas correctas?", mapped.length > 0);
+      if (tipo === "prog") {
+        _pppRawProg = rows; pppShowMapping(f.name);
+        pppSetStatus("Mapeá las columnas y tocá \"Ver PPP\".");
+      } else {
+        const mapped = pppMapBase(rows); _pppParsed.base = mapped;
+        pppRenderBase(f.name, rows.length, mapped);
+        pppSetStatus(mapped.length ? ("✓ " + f.name + ": " + mapped.length + " filas (SOLO LOCAL).") : "No saqué filas válidas.", mapped.length > 0);
+      }
     } catch (e) { pppSetStatus("Error leyendo el Excel: " + (e.message || e), false); }
   };
   inp.click();
+}
+/* ===== Mapeo de columnas del "Formato PPP" — el Excel tiene su propio layout, así
+   que el usuario elige qué columna es cada campo (con un auto-guess por patrón). Se
+   guarda en localStorage para no re-mapear. ===== */
+let _pppRawProg = null;
+const PPP_MAP_KEY = "vir_ppp_map_prog";
+const PPP_FIELDS = [
+  { k: "np", label: "N° Pedido (NP, 5 díg.)" },
+  { k: "tanda", label: "Tanda (agrupar por)" },
+  { k: "razon_social", label: "Cliente (razón social)" },
+  { k: "cod", label: "Cód. cliente (4 díg.)" },
+  { k: "m3", label: "m³" },
+  { k: "zona", label: "Zona" },
+  { k: "localidad", label: "Localidad / Entrega" }
+];
+function _pppColLetter(i) { return i < 26 ? String.fromCharCode(65 + i) : ("C" + (i + 1)); }
+function _pppColSamples(rows, ci) {
+  const out = [];
+  for (let r = 0; r < rows.length && out.length < 2; r++) {
+    const v = rows[r] && rows[r][ci]; const s = (v == null ? "" : String(v)).trim();
+    if (s) out.push(s);
+  }
+  return out;
+}
+function _pppGuessMap(rows, ncols) {
+  const cls = [];
+  for (let c = 0; c < ncols; c++) {
+    let n5 = 0, n4 = 0, dec = 0, txt = 0, tlen = 0;
+    for (let r = 0; r < rows.length; r++) {
+      const v = rows[r] && rows[r][c]; const s = (v == null ? "" : String(v)).trim(); if (!s) continue;
+      const num = s.replace(/\.0+$/, "");
+      if (/^\d{5}$/.test(num)) n5++;
+      else if (/^\d{4}$/.test(num)) n4++;
+      else if (/^\d+([.,]\d+)?$/.test(s) && parseFloat(s.replace(",", ".")) < 1000) dec++;
+      else { txt++; tlen += s.length; }
+    }
+    cls.push({ c: c, n5: n5, n4: n4, dec: dec, txt: txt, avglen: txt ? tlen / txt : 0 });
+  }
+  const pickMax = function (key) { let b = 0, bi = -1; for (const x of cls) if (x[key] > b) { b = x[key]; bi = x.c; } return bi; };
+  const m = { np: pickMax("n5"), cod: pickMax("n4"), m3: pickMax("dec"), tanda: -1, zona: -1, localidad: -1 };
+  let bl = -1; m.razon_social = -1;
+  for (const x of cls) if (x.txt > 0 && x.avglen > bl) { bl = x.avglen; m.razon_social = x.c; }
+  return m;
+}
+function pppShowMapping(fname) {
+  const box = document.getElementById("pppPreview"); if (!box) return;
+  const rows = _pppRawProg || [];
+  if (!rows.length) { box.innerHTML = '<div class="planim-empty">Excel vacío.</div>'; return; }
+  let ncols = 0; for (const r of rows) if (r && r.length > ncols) ncols = r.length;
+  let saved = null; try { saved = JSON.parse(localStorage.getItem(PPP_MAP_KEY) || "null"); } catch (_e) {}
+  const guess = _pppGuessMap(rows, ncols);
+  const opt = function (sel) {
+    let s = '<option value="-1"' + (sel == -1 ? " selected" : "") + '>— ninguna —</option>';
+    for (let c = 0; c < ncols; c++) {
+      const samp = _pppColSamples(rows, c).join(" · ").slice(0, 26);
+      s += '<option value="' + c + '"' + (sel == c ? " selected" : "") + '>Col ' + _pppColLetter(c) + (samp ? "  (" + escapeHtml(samp) + ")" : "") + '</option>';
+    }
+    return s;
+  };
+  let html = '<div class="ppp-map"><div class="ppp-map-t">Mapeá las columnas de <b>' + escapeHtml(fname) + '</b> (' + ncols + ' cols). El número entre paréntesis es un ejemplo de esa columna:</div>';
+  for (const f of PPP_FIELDS) {
+    const sel = (saved && saved[f.k] != null) ? saved[f.k] : guess[f.k];
+    html += '<div class="ppp-map-row"><label>' + f.label + '</label><select id="pppmap_' + f.k + '">' + opt(sel) + '</select></div>';
+  }
+  html += '<button class="ppp-subir-btn" onclick="pppApplyMapping()">Ver PPP →</button></div>';
+  box.innerHTML = html;
+}
+function pppApplyMapping() {
+  const rows = _pppRawProg || [];
+  const m = {};
+  for (const f of PPP_FIELDS) { const el = document.getElementById("pppmap_" + f.k); m[f.k] = el ? parseInt(el.value, 10) : -1; }
+  try { localStorage.setItem(PPP_MAP_KEY, JSON.stringify(m)); } catch (_e) {}
+  const get = function (r, ci) { return (ci >= 0 && r && r[ci] != null) ? String(r[ci]).trim() : ""; };
+  const num = function (r, ci) { const s = get(r, ci); if (!s) return null; const n = parseFloat(s.replace(",", ".")); return isNaN(n) ? null : n; };
+  const out = [];
+  for (const r of rows) {
+    if (!r) continue;
+    const np = get(r, m.np).replace(/\.0+$/, "");
+    if (!/^\d/.test(np)) continue;            // fila = pedido sólo si NP arranca con dígito (saltea header)
+    out.push({
+      np: np, tanda: (get(r, m.tanda) || "—"), razon_social: get(r, m.razon_social),
+      cod: get(r, m.cod).replace(/\.0+$/, ""), m3: num(r, m.m3), zona: get(r, m.zona),
+      localidad: get(r, m.localidad)
+    });
+  }
+  _pppParsed.prog = out; _pppEntregados = new Set(); _pppTab = "prog";
+  pppRenderProg();
+  pppSetStatus("✓ " + out.length + " pedidos (SOLO LOCAL). ¿Quedó bien el mapeo? Si no, reimportá y ajustá.", out.length > 0);
 }
 /* Base de pedidos: solo un vistazo (es data para el picking, sin "formato"). */
 function pppRenderBase(fname, totalRows, mapped) {
@@ -7544,7 +7641,7 @@ function pppRenderProg() {
     const ps = byT[t];
     html += '<div class="ppp-tanda"><div class="ppp-tanda-h"><span class="ppp-tanda-name">Tanda ' + escapeHtml(t) + '</span>' +
       '<span class="ppp-tanda-meta">' + ps.length + ' ped · ' + m3sum(ps).toFixed(2) + ' m³</span></div>' +
-      '<div class="ppp-tablewrap"><table class="ppp-tbl"><thead><tr><th>NP</th><th>Cliente</th><th>Cód</th><th class="num">m³</th><th>Zona</th><th>Entrega</th><th></th></tr></thead><tbody>';
+      '<div class="ppp-tablewrap"><table class="ppp-tbl"><thead><tr><th>NP</th><th>Cliente</th><th>Cód</th><th class="num">m³</th><th>Zona</th><th>Localidad</th><th></th></tr></thead><tbody>';
     for (const p of ps) {
       const npE = escapeHtml(String(p.np));
       const btn = (_pppTab === "ent")
@@ -7552,7 +7649,7 @@ function pppRenderProg() {
         : '<button class="ppp-row-btn ppp-ent" onclick="pppEntregar(\'' + npE + '\')">✓ Entregado</button>';
       html += '<tr><td><b>' + npE + '</b></td><td class="ppp-cli">' + escapeHtml(p.razon_social || "") + '</td><td>' + escapeHtml(p.cod || "") +
         '</td><td class="num">' + (p.m3 != null && p.m3 !== "" ? Number(p.m3).toFixed(2) : "") + '</td><td>' + escapeHtml(p.zona || "") +
-        '</td><td>' + escapeHtml(p.fecha_entrega || "") + '</td><td>' + btn + '</td></tr>';
+        '</td><td>' + escapeHtml(p.localidad || p.fecha_entrega || "") + '</td><td>' + btn + '</td></tr>';
     }
     html += '</tbody></table></div></div>';
   }
