@@ -4,7 +4,14 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-19 · Versión app al documentar: **v2.90**
+> Última actualización: 2026-06-19 · Versión app al documentar: **v2.91**
+>
+> Nota: **v2.91** — el fallback del picking (v2.90) ahora también cubre el **monitor**
+> (faltantes / quién pidió / aviso Marianela). Helper `faltEnsureBase(enr, tandas)`:
+> si a los NP de las tandas mostradas les faltan filas en la base (mirror de Supabase
+> atrasado), trae la base de Google Sheets y **mergea** los NP faltantes en
+> `enr.pickBase` (mismo objeto que cachea el picking → sana ambos). Enganchado en
+> `refreshFaltantes` y `showMarianelaAviso`. No hace nada si la fuente ya es Sheets.
 >
 > Nota: **v2.90** — **fix picking vacío por mirror de Supabase atrasado**. Si una tanda
 > tiene NP que **todavía no están en `PPP_Base_Pedidos`** (Supabase), el picking

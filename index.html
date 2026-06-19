@@ -4541,7 +4541,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v2.90";
+const APP_VERSION = "v2.91";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -5889,6 +5889,7 @@ async function showMarianelaAviso(codigo, legajo) {
       if (tanda && tanda !== code) falt = await faltantesDeTanda(tanda);
     }
     if (!falt.length) return;
+    if (enr) { try { await faltEnsureBase(enr, [tanda]); } catch (_e) {} }  // sana NP atrasados en Supabase
     // 2) Mostrar SOLO si hay una decisión de reparto: por cada artículo faltante,
     //    pickearon >1 caja, falta >1 (sino va a un solo cliente) y lo pidió MÁS de
     //    1 pedido. La cantidad de pedidos que pidieron el artículo sale de la PPP.
@@ -7374,6 +7375,34 @@ async function faltGetEnrich() {
   _faltEnrich = { sheetMap, pickBase }; _faltEnrichTs = now;
   return _faltEnrich;
 }
+/* Igual que el fallback del picking, pero para el monitor (faltantes / quién pidió /
+   aviso Marianela): si a los NP de las tandas dadas les faltan filas en la base
+   (mirror de Supabase atrasado), trae la base de Google Sheets y **mergea** los NP
+   faltantes en `enr.pickBase` (que es el MISMO objeto que cachea el picking → sana
+   ambos). No hace nada si la fuente ya es Sheets o si no falta ningún NP. v2.91. */
+async function faltEnsureBase(enr, tandas) {
+  if (!enr || !enr.sheetMap || !enr.pickBase) return;
+  if (typeof PPP_SOURCE === "undefined" || PPP_SOURCE === "sheets") return;
+  const need = new Set();
+  for (const t of (tandas || [])) {
+    const entry = enr.sheetMap.get(String(t).trim().toUpperCase());
+    if (!entry || !entry.pedidos) continue;
+    for (const p of entry.pedidos) for (const part of String(p.np || "").split(/[,/]/)) {
+      const np = pickNormNp(part); if (np && /\d/.test(np)) need.add(np);
+    }
+  }
+  let faltan = false;
+  for (const np of need) { if (!(enr.pickBase.get(np) || []).length) { faltan = true; break; } }
+  if (!faltan) return;
+  try {
+    const sheetBase = await fetchPickingBaseFromSheets();
+    for (const np of need) {
+      if (!(enr.pickBase.get(np) || []).length && (sheetBase.get(np) || []).length) {
+        enr.pickBase.set(np, sheetBase.get(np));
+      }
+    }
+  } catch (_e) { /* sin Sheets: queda lo que trajo Supabase */ }
+}
 
 async function refreshFaltantes() {
   const body = document.getElementById("faltantesBody");
@@ -7412,6 +7441,7 @@ async function refreshFaltantes() {
     // faltantes igual, sin ese detalle.
     let enrich = null;
     try { enrich = await faltGetEnrich(); } catch (_e) { enrich = null; }
+    if (enrich) { try { await faltEnsureBase(enrich, tandas); } catch (_e) {} }  // sana NP atrasados en Supabase
     const quienPidio = (tanda, art, puso) => {
       if (!enrich) return null;                                  // sin planilla
       const entry = enrich.sheetMap.get(String(tanda).trim().toUpperCase());
