@@ -4,7 +4,17 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-19 · Versión app al documentar: **v3.11**
+> Última actualización: 2026-06-19 · Versión app al documentar: **v3.12**
+>
+> Nota: **v3.12** — PPP Fase 2: **botón "Sugerir tandas"** (armado automático asistido).
+> Barra con **m³/tanda** (capacidad, default **6**) y **N° base** (default 60), persistidos
+> en `vir_ppp_cfg`. `pppSugerirTandas`: dentro de cada **zona** ordena por **fecha de
+> recepción** (más vieja primero) y empaca por **cliente** (los pedidos de un mismo cód van
+> juntos) hasta llegar a la capacidad; al pasarse abre otra tanda; un cliente que solo ya
+> supera la cap queda en su tanda. **Súper** = una tanda por cliente. **No pisa** tandas ya
+> puestas a mano ni programa pedidos **sin zona** (primero asignarles el barrio). Códigos
+> `C<base><A,B,C…>`. Escribe como edits (editable/reversible); "borrar tandas" limpia todas.
+> Capacidad real del negocio: **6 m³ por camión/día**.
 >
 > Nota: **v3.11** — PPP Fase 1 completa: **acumulación + 3 secciones + detección de súper**.
 > **Acumulación**: importar el Formato PPP ya NO reemplaza — los pedidos del día **se suman**

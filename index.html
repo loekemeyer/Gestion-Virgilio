@@ -1894,6 +1894,13 @@ button {
 .ppp-sec-t.ppp-sec-done{ background:#dcfce7; color:#166534; border:1px solid #bbf7d0; }
 .ppp-tanda.ppp-tanda-super{ border:1px solid #fcd34d; }
 .ppp-tanda.ppp-tanda-super .ppp-tanda-h{ background:linear-gradient(90deg,#d97706,#92400e); }
+.ppp-toolbar{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:10px 12px; margin:6px 0 4px; }
+.ppp-sug-btn{ padding:9px 16px; font-size:14px; font-weight:800; border:none; border-radius:10px; background:#7c3aed; color:#fff; cursor:pointer; }
+.ppp-sug-btn:hover{ background:#6d28d9; }
+.ppp-tool-l{ font-size:12px; font-weight:700; color:#475569; display:flex; align-items:center; gap:6px; }
+.ppp-tool-inp{ width:84px; height:34px; font-size:14px; border:1px solid #cbd5e1; border-radius:8px; padding:0 8px; }
+.ppp-tool-n{ width:64px; font-family:Consolas,Menlo,monospace; }
+.ppp-tool-clear{ margin-left:auto; padding:7px 12px; font-size:12px; font-weight:700; border:1px solid #fecaca; border-radius:8px; background:#fff; color:#b42318; cursor:pointer; }
 .ppp-subir-btn:hover{ background:#15803d; }
 .planim-near{ display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
 .planim-near-t{ font-size: 12px; font-weight: bold; color: #475569; }
@@ -4755,7 +4762,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.11";
+const APP_VERSION = "v3.12";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -7869,6 +7876,56 @@ function pppSetEdit(np, field, val, regroup) {
   pppSaveEdits();
   if (regroup) pppRenderProg();
 }
+/* ===== Fase 2: "Sugerir tandas" (armado automático asistido) =====
+   Dentro de cada zona, ordena por fecha de recepción (más vieja primero) y junta
+   pedidos manteniendo los de un mismo cliente JUNTOS, hasta llegar a X m³ por tanda
+   (configurable). Los súper: una tanda por cliente. NO pisa tandas ya asignadas a
+   mano, ni programa pedidos sin zona (primero hay que asignarles el barrio). El
+   resultado se escribe como edits (igual que tipear la tanda) → editable/reversible. */
+const PPP_CFG_KEY = "vir_ppp_cfg";
+function pppGetCfg() { let c = {}; try { c = JSON.parse(localStorage.getItem(PPP_CFG_KEY) || "{}"); } catch (_e) {} return { cap: (c && c.cap != null ? +c.cap : 6), baseN: (c && c.baseN != null ? String(c.baseN) : "60") }; }
+function pppSetCfg(k, v) { const c = pppGetCfg(); if (k === "cap") c.cap = parseFloat(String(v).replace(",", ".")) || 6; else c.baseN = String(v).trim() || "60"; try { localStorage.setItem(PPP_CFG_KEY, JSON.stringify(c)); } catch (_e) {} }
+function _pppLetter(i) { let s = ""; i = i | 0; do { s = String.fromCharCode(65 + (i % 26)) + s; i = Math.floor(i / 26) - 1; } while (i >= 0); return s; }
+function pppSugerirTandas() {
+  const cfg = pppGetCfg(), cap = cfg.cap > 0 ? cfg.cap : 1.5, baseN = cfg.baseN || "60";
+  if (!_pppEntregados) _pppEntregados = new Set();
+  const ed = pppLoadEdits();
+  const tandaDe = function (p) { const e = ed[String(p.np)]; const t = (e && e.tanda != null) ? e.tanda : (p.tanda || ""); return (t && t !== "—") ? t : ""; };
+  const pend = (_pppParsed.prog || []).filter(function (p) { return !_pppEntregados.has(String(p.np)) && !tandaDe(p); });
+  if (!pend.length) { pppSetStatus("No hay pedidos sin tanda para sugerir.", false); return; }
+  let idx = 0; const next = function () { return "C" + baseN + _pppLetter(idx++); };
+  const assign = function (ps, code) { for (const p of ps) (ed[String(p.np)] = ed[String(p.np)] || {}).tanda = code; };
+  let nT = 0;
+  // Súper: una tanda por cliente.
+  const sup = pend.filter(pppEsSuper), bySupC = {}, supOrd = [];
+  for (const p of sup) { const k = String(p.cod || p.razon_social); if (!(k in bySupC)) supOrd.push(k); (bySupC[k] = bySupC[k] || []).push(p); }
+  for (const k of supOrd) { assign(bySupC[k], next()); nT++; }
+  // Resto CON zona: por zona, ordenar por fecha de recepción, empacar por cliente ≤ cap.
+  const resto = pend.filter(function (p) { return !pppEsSuper(p) && pppZonaDeBarrio(p.localidad); });
+  const byZ = {}; for (const p of resto) { const z = pppZonaDeBarrio(p.localidad); (byZ[z] = byZ[z] || []).push(p); }
+  const zorder = Object.keys(byZ).sort(function (a, b) { const ia = PPP_ZONAS.indexOf(a), ib = PPP_ZONAS.indexOf(b); return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib); });
+  for (const z of zorder) {
+    const byC = {}, cord = [];
+    for (const p of byZ[z]) { const k = String(p.cod || p.razon_social); if (!(k in byC)) cord.push(k); (byC[k] = byC[k] || []).push(p); }
+    cord.sort(function (a, b) { const fa = Math.min.apply(null, byC[a].map(function (p) { return +_pppFechaKey(p.fecha); })); const fb = Math.min.apply(null, byC[b].map(function (p) { return +_pppFechaKey(p.fecha); })); return fa - fb; });
+    let bucket = [], bm3 = 0;
+    const flush = function () { if (bucket.length) { assign(bucket, next()); nT++; bucket = []; bm3 = 0; } };
+    for (const k of cord) {
+      const ps = byC[k], m3 = _pppM3Sum(ps);
+      if (bucket.length && (bm3 + m3) > cap) flush();
+      bucket = bucket.concat(ps); bm3 += m3;
+      if (bm3 >= cap) flush();
+    }
+    flush();
+  }
+  pppSaveEdits(); pppRenderProg();
+  const sinZona = pend.filter(function (p) { return !pppEsSuper(p) && !pppZonaDeBarrio(p.localidad); }).length;
+  pppSetStatus("🪄 " + nT + " tandas sugeridas" + (sinZona ? " · " + sinZona + " quedaron sin zona (asigná el barrio)" : "") + ". Revisá y ajustá.", true);
+}
+function pppLimpiarTandas() {
+  if (!confirm("¿Borrar TODAS las tandas asignadas? Los pedidos vuelven a 'Pedidos a Programar'.")) return;
+  const ed = pppLoadEdits(); for (const k in ed) { if (ed[k]) delete ed[k].tanda; } pppSaveEdits(); pppRenderProg();
+}
 /* ===== Zona automática desde el Barrio de entrega =====
    Réplica de la lógica del Excel: la Zona NO se escribe a mano, sale del BARRIO
    (col "Localidad/Barrio Entrega") buscado en la tabla 'Resumen Prog'!AC:AD (84
@@ -7963,7 +8020,14 @@ function pppRenderProg() {
     for (const t of Object.keys(byT).sort()) html += _pppBlock(t === "—" ? "Sin tanda" : ("Tanda " + escapeHtml(t)), "", byT[t].length + " ped · " + _pppM3Sum(byT[t]).toFixed(2) + " m³", byT[t]);
     box.innerHTML = html; return;
   }
-  // ===== Tab "Programación" → 3 secciones (réplica del Excel) =====
+  // ===== Tab "Programación" → barra de "Sugerir tandas" + 3 secciones (réplica del Excel) =====
+  const cfg = pppGetCfg();
+  html += '<div class="ppp-toolbar">' +
+    '<button class="ppp-sug-btn" onclick="pppSugerirTandas()">🪄 Sugerir tandas</button>' +
+    '<label class="ppp-tool-l">m³/tanda <input class="ppp-tool-inp" type="number" step="0.1" min="0.1" value="' + cfg.cap + '" onchange="pppSetCfg(\'cap\',this.value)"></label>' +
+    '<label class="ppp-tool-l">N° base <input class="ppp-tool-inp ppp-tool-n" value="' + escapeHtml(cfg.baseN) + '" onchange="pppSetCfg(\'baseN\',this.value)"></label>' +
+    '<button class="ppp-tool-clear" onclick="pppLimpiarTandas()">borrar tandas</button>' +
+    '</div>';
   const sup = prog.filter(pppEsSuper);
   const resto = prog.filter(function (p) { return !pppEsSuper(p); });
   const aProg = resto.filter(function (p) { return !_pppTieneTanda(p); });
