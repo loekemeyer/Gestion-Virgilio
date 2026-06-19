@@ -4875,7 +4875,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.33";
+const APP_VERSION = "v3.34";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -6410,23 +6410,27 @@ function liosRender() {
             `<span class="cc-rs">${escapeHtml(it.rs)}</span>` +
             `<input class="lios-inp" type="number" min="0" inputmode="numeric" id="${_liosId(it.np)}" placeholder="líos"></div>`;
   }
-  html += `<button class="pk-btn pk-ok" onclick="liosSave()">Guardar líos</button>` +
-          `<button class="pk-btn pk-cancel" onclick="liosClose()">Después</button>`;
+  html += `<div class="cc-sub" style="margin-top:8px">Tenés que completar <b>todos</b>. Si un pedido no lleva líos, poné <b>0</b>.</div>` +
+          `<button class="pk-btn pk-ok" onclick="liosSave()">Guardar líos</button>`;
   m.querySelector(".tanda-modal-body").innerHTML = html;
 }
 function liosClose() { _lios = null; closeTandaModal(); }
 function liosSave() {
   if (!_lios) return;
-  const legajo = _lios.legajo, tanda = _lios.tanda;
-  let n = 0;
+  // Obligatorio: TODOS los pedidos deben tener un número (0 vale). No se puede dejar vacío.
+  const faltan = [];
   for (const it of _lios.nps) {
     const inp = document.getElementById(_liosId(it.np));
-    const v = inp ? parseInt(inp.value, 10) : NaN;
-    if (!isNaN(v) && v >= 0 && inp.value !== "") { liosSend(legajo, it.np, v, tanda); n++; }
+    const raw = inp ? String(inp.value).trim() : "";
+    const v = parseInt(raw, 10);
+    if (raw === "" || isNaN(v) || v < 0) { faltan.push(it.np); if (inp) inp.style.borderColor = "#dc2626"; }
+    else if (inp) inp.style.borderColor = "";
   }
+  if (faltan.length) { try { alert("Faltan los líos de " + faltan.length + " pedido(s). Completá todos (si no lleva, poné 0)."); } catch (_e) {} return; }
+  const legajo = _lios.legajo, tanda = _lios.tanda, nps = _lios.nps.slice();
+  for (const it of nps) { const inp = document.getElementById(_liosId(it.np)); liosSend(legajo, it.np, parseInt(inp.value, 10), tanda); }
   _lios = null; closeTandaModal();
-  if (n) { try { alert("Guardados los líos de " + n + " pedido(s)."); } catch (_e) {} }
-  else { try { alert("No anotaste líos. Lo podés hacer después volviendo a TAP."); } catch (_e) {} }
+  try { alert("✓ Líos guardados (" + nps.length + " pedidos)."); } catch (_e) {}
 }
 function liosSend(legajo, np, lios, tanda) {
   const nowMs = Date.now();
@@ -6518,6 +6522,9 @@ function showTandaDetail(tandaCode) {
 }
 
 function closeTandaModal() {
+  // Líos obligatorios: el modal de líos NO se cierra (ni por Cerrar ni tocando afuera)
+  // hasta completar todos los pedidos. Sale solo con "Guardar líos".
+  if (_lios) { try { alert("Antes de salir, completá los líos de todos los pedidos (si alguno no lleva, poné 0)."); } catch (_e) {} return; }
   document.getElementById("tandaModal").classList.remove("show");
 }
 
