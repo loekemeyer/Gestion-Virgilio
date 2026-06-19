@@ -4,7 +4,13 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-19 · Versión app al documentar: **v3.26**
+> Última actualización: 2026-06-19 · Versión app al documentar: **v3.27**
+>
+> Nota: **v3.27** — PPP: **alarma de tanda VENCIDA**. Si una tanda programada tiene Fecha de
+> Entrega **en el pasado** y sigue en Programación (no entregada), la franja se pone **roja,
+> con badge "⏰ ¡VENCIDA!" y una sacudida (shake) periódica** para que la operadora la
+> reprograme. Clase `.ppp-vencida` (chequea `_pppFechaDate(fe) < hoy` en `_pppBlock`),
+> animación `pppShake`.
 >
 > Nota: **v3.26** — PPP: **franja de tanda rediseñada**. (a) La **Fecha de Entrega quedó en
 > columna propia alineada** (franja en CSS grid: caret · nombre · resumen · fecha · meta). (b)
