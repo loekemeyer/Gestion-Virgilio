@@ -4,7 +4,12 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-19 · Versión app al documentar: **v3.17**
+> Última actualización: 2026-06-19 · Versión app al documentar: **v3.18**
+>
+> Nota: **v3.18** — PPP: el **m³/tanda (0,8) es un objetivo modificable, no un tope duro**.
+> Se sacó el cartel "⚠ > 0,8 m³" de las tandas grandes: pasarse es normal (un cliente con
+> varios NP queda junto aunque supere 0,8) y se programan igual. La capacidad se edita en
+> la barra; nada bloquea tandas > objetivo.
 >
 > Nota: **v3.17** — PPP: el botón **"Entregado" ya NO aparece en 📥 A Programar** (el pedido
 > todavía no está programado); va **solo en 🗓️ Programación** (y "↺ Deshacer" en Entregados).
