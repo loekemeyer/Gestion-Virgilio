@@ -4776,7 +4776,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.14";
+const APP_VERSION = "v3.15";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -7948,7 +7948,7 @@ function pppLimpiarTandas() {
 function _pppDeliveryDate(idx) {
   const d = new Date(); d.setHours(12, 0, 0, 0);
   let count = -1;
-  while (count < idx) { d.setDate(d.getDate() + 1); if (d.getDay() !== 0) count++; }   // saltea domingos
+  while (count < idx) { d.setDate(d.getDate() + 1); const wd = d.getDay(); if (wd !== 0 && wd !== 6) count++; }   // entrega sólo Lun-Vie (no Sáb/Dom)
   const p = function (n) { return String(n).padStart(2, "0"); };
   return p(d.getDate()) + "/" + p(d.getMonth() + 1) + "/" + d.getFullYear();
 }

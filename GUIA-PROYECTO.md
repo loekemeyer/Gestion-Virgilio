@@ -4,7 +4,10 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-19 · Versión app al documentar: **v3.14**
+> Última actualización: 2026-06-19 · Versión app al documentar: **v3.15**
+>
+> Nota: **v3.15** — PPP: las **entregas son sólo Lun–Vie** (no Sáb/Dom). `_pppDeliveryDate`
+> ahora saltea sábado **y** domingo al asignar las fechas de entrega automáticas.
 >
 > Nota: **v3.14** — PPP: **flujo en 2 etapas** (refinado por el usuario). (a) **Todo lo
 > importado cae en la solapa 📥 "A Programar"** (no programado). (b) Ahí se **arman tandas**
