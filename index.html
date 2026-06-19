@@ -1873,16 +1873,23 @@ button {
 .ppp-tanda{ background:#fff; border:1px solid #e2e8f0; border-radius:12px; margin-bottom:12px; overflow:hidden; }
 .ppp-tanda.ppp-tanda-none{ border:1px solid #fcd34d; }
 .ppp-tanda.ppp-tanda-none .ppp-tanda-h{ background:linear-gradient(90deg,#d97706,#b45309); }
-.ppp-tanda-h{ display:flex; justify-content:flex-start; align-items:center; gap:6px 14px; flex-wrap:wrap; padding:10px 14px; background:linear-gradient(90deg,#1e6bd6,#1e3a8a); color:#fff; cursor:pointer; }
+.ppp-tanda-h{ display:grid; grid-template-columns:18px 210px 460px 124px minmax(0,1fr); align-items:center; gap:0 14px; padding:10px 14px; background:linear-gradient(90deg,#1e6bd6,#1e3a8a); color:#fff; cursor:pointer; }
 .ppp-tanda-h:hover{ filter:brightness(1.06); }
-.ppp-tanda-name{ font-size:15px; font-weight:800; font-family:Consolas,Menlo,monospace; letter-spacing:.5px; min-width:120px; }
-.ppp-tanda-meta{ font-size:12px; opacity:.92; white-space:nowrap; display:inline-flex; align-items:center; gap:10px; margin-left:auto; }
+.ppp-tanda-h.rt-so{ background:linear-gradient(90deg,#1e6bd6,#1e3a8a); }
+.ppp-tanda-h.rt-n{ background:linear-gradient(90deg,#0d9488,#115e59); }
+.ppp-tanda-h.rt-c{ background:linear-gradient(90deg,#7c3aed,#5b21b6); }
+.ppp-tanda-h.rt-ret{ background:linear-gradient(90deg,#64748b,#334155); }
+.rtleg{ display:inline-block; padding:2px 9px; border-radius:999px; color:#fff; font-weight:700; font-size:11px; margin:0 2px; }
+.rtleg.rt-so{ background:#1e6bd6; } .rtleg.rt-n{ background:#0d9488; } .rtleg.rt-c{ background:#7c3aed; } .rtleg.rt-ret{ background:#64748b; } .rtleg.rt-sup{ background:#b45309; }
+.ppp-tanda-name{ font-size:15px; font-weight:800; font-family:Consolas,Menlo,monospace; letter-spacing:.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
+.ppp-tanda-meta{ font-size:12px; opacity:.95; white-space:nowrap; display:inline-flex; align-items:center; gap:10px; justify-self:end; }
 .ppp-caret{ font-size:12px; opacity:.85; transition:transform .15s; display:inline-block; }
 .ppp-tanda.ppp-open .ppp-caret{ transform:rotate(90deg); }
-.ppp-tanda-sum{ display:inline-flex; flex-wrap:wrap; align-items:center; gap:3px 12px; font-size:12px; opacity:.96; min-width:0; }
+.ppp-tanda-sum{ display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; font-size:12px; opacity:.96; }
 .ppp-sum-np{ font-family:Consolas,Menlo,monospace; font-weight:700; }
 .ppp-sum-raz{ font-weight:600; }
-.ppp-sum-fe{ background:rgba(255,255,255,.18); padding:1px 8px; border-radius:999px; font-weight:700; }
+.ppp-tanda-fe{ white-space:nowrap; }
+.ppp-sum-fe{ background:rgba(255,255,255,.20); padding:2px 9px; border-radius:999px; font-weight:700; font-size:12px; }
 .ppp-tanda .ppp-tablewrap{ display:none; }
 .ppp-tanda.ppp-open .ppp-tablewrap{ display:block; }
 .ppp-tablewrap{ overflow-x:auto; }
@@ -4818,7 +4825,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.25";
+const APP_VERSION = "v3.26";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -8240,26 +8247,64 @@ function _pppRowTr(p) {
     '<td>' + (_pppEntregado(p) ? '<span class="ppp-fc ok2" title="Cargado al camión (CC)">✓ Entregado</span>' : '<span class="ppp-fc">·</span>') + '</td>' +
     '<td>' + btn + '</td></tr>';
 }
-let _pppBlockSeq = 0;
-function pppToggleBlock(id) { const el = document.getElementById(id); if (el) el.classList.toggle("ppp-open"); }
-function _pppBlock(name, cls, meta, pedidos, headerExtra) {
-  const id = "pppb" + (_pppBlockSeq++);
-  // Datos principales para la franja (colapsada): N° Pedido, Razón Social, Fecha de Entrega.
-  const nps = pedidos.map(function (p) { return String(p.np); });
-  const npStr = nps.slice(0, 8).join(", ") + (nps.length > 8 ? " +" + (nps.length - 8) : "");
+let _pppOpen = new Set();   // ids de bloques abiertos (por clave estable → persiste entre renders)
+function _pppKid(k) { return "pppb_" + String(k).replace(/[^A-Za-z0-9]/g, "_"); }
+function pppToggleBlock(id) { const el = document.getElementById(id); if (!el) return; el.classList.toggle("ppp-open"); if (el.classList.contains("ppp-open")) _pppOpen.add(id); else _pppOpen.delete(id); }
+function pppAbrirControlar(id) { const el = document.getElementById(id); if (el) el.classList.add("ppp-open"); _pppOpen.add(id); }
+/* Ruta/camión del bloque según la zona de sus pedidos (para colorear la franja por camión):
+   so = Z1·Z3·Z4 (Sur/Oeste) · n = Z5·Z6·Z7 (Norte) · c = Z2 (Centro) · ret = Retira. */
+function _pppRuta(pedidos) {
+  const cnt = {};
+  for (const p of pedidos) {
+    let r = "";
+    if (pppEsSuper(p)) { continue; }
+    const z = pppZonaDeBarrio(p.localidad);
+    if (z === "Zona 1 - CABA Sur" || z === "Zona 3 - CABA Oeste" || z === "Zona 4 - GBA Sur") r = "so";
+    else if (z === "Zona 5 - GBA Oeste" || z === "Zona 6 - GBA Norte" || z === "Zona 7 - GBA Norte Lejos") r = "n";
+    else if (z === "Zona 2 - CABA Centro") r = "c";
+    else if (z === "Retira") r = "ret";
+    if (r) cnt[r] = (cnt[r] || 0) + 1;
+  }
+  let best = "", bn = 0; for (const k in cnt) if (cnt[k] > bn) { bn = cnt[k]; best = k; }
+  return best;
+}
+/* Lista de N° Pedido para la franja: colapsa SOLO corridas consecutivas en rango
+   "inicio/sufijo" (p. ej. 97757,97758,…,97763 → 97757/63). No consecutivos: van sueltos. */
+function _pppNpFmt(nps) {
+  const nums = nps.map(function (x) { return /^\d+$/.test(x) ? parseInt(x, 10) : null; });
+  if (nums.some(function (n) { return n == null; })) return nps.join(", ");
+  const arr = nums.slice().sort(function (a, b) { return a - b; });
+  const out = []; let i = 0;
+  while (i < arr.length) {
+    let j = i;
+    while (j + 1 < arr.length && arr[j + 1] === arr[j] + 1) j++;
+    const a = String(arr[i]), b = String(arr[j]);
+    if (j > i) { let k = 0; while (k < a.length && k < b.length && a[k] === b[k]) k++; out.push(a + "/" + b.slice(Math.max(0, Math.min(k, b.length - 2)))); }
+    else out.push(a);
+    i = j + 1;
+  }
+  return out.join(", ");
+}
+function _pppBlock(key, name, cls, meta, pedidos, headerExtra) {
+  const id = _pppKid(key);
+  const open = _pppOpen.has(id) ? " ppp-open" : "";
+  const ruta = _pppRuta(pedidos);
+  const rcls = (ruta && cls.indexOf("ppp-tanda-super") < 0) ? (" rt-" + ruta) : "";
+  // Datos principales para la franja (colapsada): Razón Social · N° Pedido · Fecha de Entrega.
+  const npStr = _pppNpFmt(pedidos.map(function (p) { return String(p.np); }));
   const raz = []; const _r = {}; for (const p of pedidos) { const r = (p.razon_social || "").trim(); if (r && !_r[r]) { _r[r] = 1; raz.push(r); } }
   const razStr = raz.slice(0, 3).join(" · ") + (raz.length > 3 ? " +" + (raz.length - 3) : "");
   const fes = []; const _f = {}; for (const p of pedidos) { const f = (p.fecha_entrega || "").trim(); if (f && !_f[f]) { _f[f] = 1; fes.push(f); } }
-  const sum =
-    (razStr ? '<span class="ppp-sum-raz">' + escapeHtml(razStr) + '</span>' : '') +
-    '<span class="ppp-sum-np">' + escapeHtml(npStr) + '</span>' +
-    (fes.length ? '<span class="ppp-sum-fe">📅 ' + escapeHtml(fes.join(" / ")) + '</span>' : '');
-  let h = '<div class="ppp-tanda ' + cls + '" id="' + id + '">' +
-    '<div class="ppp-tanda-h" onclick="pppToggleBlock(\'' + id + '\')">' +
+  const sum = (razStr ? '<span class="ppp-sum-raz">' + escapeHtml(razStr) + '</span> ' : '') + '<span class="ppp-sum-np">' + escapeHtml(npStr) + '</span>';
+  const feHtml = fes.length ? '<span class="ppp-sum-fe">📅 ' + escapeHtml(fes.join(" / ")) + '</span>' : '';
+  const hx = (headerExtra || "").replace(/__BLOCKID__/g, id);
+  let h = '<div class="ppp-tanda ' + cls + open + '" id="' + id + '">' +
+    '<div class="ppp-tanda-h' + rcls + '" onclick="pppToggleBlock(\'' + id + '\')">' +
       '<span class="ppp-caret">▸</span>' +
       '<span class="ppp-tanda-name">' + name + '</span>' +
       '<span class="ppp-tanda-sum">' + sum + '</span>' +
-      '<span class="ppp-tanda-meta">' + meta + (headerExtra || "") + '</span>' +
+      '<span class="ppp-tanda-fe">' + feHtml + '</span>' +
+      '<span class="ppp-tanda-meta">' + meta + hx + '</span>' +
     '</div>' +
     '<div class="ppp-tablewrap"><table class="ppp-tbl">' + PPP_THEAD + '<tbody>';
   for (const p of pedidos) h += _pppRowTr(p);
@@ -8371,13 +8416,14 @@ function pppRenderProg() {
   if (_pppTab === "ent") {
     if (!entreg.length) { html += '<div class="planim-empty">Nada entregado todavía.</div>'; box.innerHTML = html; return; }
     const byT = {}; for (const p of entreg) { const t = _pppTieneTanda(p) ? p.tanda.toUpperCase() : "—"; (byT[t] = byT[t] || []).push(p); }
-    for (const t of Object.keys(byT).sort()) html += _pppBlock(t === "—" ? "Sin tanda" : ("Tanda " + escapeHtml(t)), "", byT[t].length + " ped · " + _pppM3Sum(byT[t]).toFixed(2) + " m³", byT[t]);
+    for (const t of Object.keys(byT).sort()) html += _pppBlock("ent_" + t, t === "—" ? "Sin tanda" : ("Tanda " + escapeHtml(t)), "", byT[t].length + " ped · " + _pppM3Sum(byT[t]).toFixed(2) + " m³", byT[t]);
     box.innerHTML = html; return;
   }
   if (_pppTab === "plan") {
     // PROGRAMACIÓN — pedidos programados, agrupados por Fecha de Entrega → por tanda.
     // (La columna "Listo FC" se actualiza sola: pppRefreshArmado se llama al entrar al tab.)
     if (!programados.length) { html += '<div class="planim-empty">Todavía no hay nada programado. Andá a <b>📥 A Programar</b>, armá las tandas y tocá <b>✅ Confirmar y programar</b>.</div>'; box.innerHTML = html; return; }
+    html += '<div class="ppp-res-leg">🎨 Color por camión: <span class="rtleg rt-so">Sur/Oeste</span> <span class="rtleg rt-n">Norte</span> <span class="rtleg rt-c">Centro</span> <span class="rtleg rt-ret">Retira</span> <span class="rtleg rt-sup">Súper</span>. Tocá una tanda para abrirla.</div>';
     const DOW = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
     const byD = {}; for (const p of programados) { const k = _pppFechaKey(p.fecha_entrega || ""); if (!byD[k]) byD[k] = { fecha: p.fecha_entrega || "—", ped: [] }; byD[k].ped.push(p); }
     for (const dk of Object.keys(byD).sort()) {
@@ -8387,8 +8433,8 @@ function pppRenderProg() {
       ordt.sort();
       for (const t of ordt) {
         const es = pppEsSuper(byT[t][0]);
-        const entBtn = (t !== "—") ? ' <button class="ppp-tanda-ent" onclick="event.stopPropagation();pppControlarTanda(\'' + escapeHtml(t) + '\')">✓ Controlar tanda</button>' : '';
-        html += _pppBlock((es ? "🛒 " : "") + (t === "—" ? "Sin tanda" : "Tanda " + escapeHtml(t)), es ? "ppp-tanda-super" : "", byT[t].length + " ped · " + _pppM3Sum(byT[t]).toFixed(2) + " m³", byT[t], entBtn);
+        const entBtn = (t !== "—") ? ' <button class="ppp-tanda-ent" onclick="event.stopPropagation();pppAbrirControlar(\'__BLOCKID__\')">✓ Controlar</button>' : '';
+        html += _pppBlock("plan_" + dk + "_" + t, (es ? "🛒 " : "") + (t === "—" ? "Sin tanda" : "Tanda " + escapeHtml(t)), es ? "ppp-tanda-super" : "", byT[t].length + " ped · " + _pppM3Sum(byT[t]).toFixed(2) + " m³", byT[t], entBtn);
       }
     }
     box.innerHTML = html; return;
@@ -8413,7 +8459,7 @@ function pppRenderProg() {
   else {
     const byC = {}, ord = [];
     for (const p of sup) { const k = String(p.cod || p.razon_social || "?"); if (!(k in byC)) ord.push(k); (byC[k] = byC[k] || []).push(p); }
-    for (const k of ord) { const ps = byC[k]; const ok = ' <button class="ppp-ok-btn" onclick="event.stopPropagation();pppOkSuper(\'' + escapeHtml(String(ps[0].np)) + '\')">✓ OK → Programar</button>'; html += _pppBlock("🛒 " + escapeHtml(ps[0].razon_social || ("Cliente " + k)), "ppp-tanda-super", ps.length + " ped · " + _pppM3Sum(ps).toFixed(2) + " m³", ps, ok); }
+    for (const k of ord) { const ps = byC[k]; const ok = ' <button class="ppp-ok-btn" onclick="event.stopPropagation();pppOkSuper(\'' + escapeHtml(String(ps[0].np)) + '\')">✓ OK → Programar</button>'; html += _pppBlock("sup_" + k, "🛒 " + escapeHtml(ps[0].razon_social || ("Cliente " + k)), "ppp-tanda-super", ps.length + " ped · " + _pppM3Sum(ps).toFixed(2) + " m³", ps, ok); }
   }
   // TANDAS ARMADAS — con tanda, sin confirmar (listas para programar).
   html += '<div class="ppp-sec-t ppp-sec-done">🧩 Tandas armadas — sin confirmar · ' + armadas.length + '</div>';
@@ -8421,7 +8467,7 @@ function pppRenderProg() {
   else {
     const byT = {}, ord = []; for (const p of armadas) { const t = p.tanda.toUpperCase(); if (!(t in byT)) ord.push(t); (byT[t] = byT[t] || []).push(p); }
     ord.sort();
-    for (const t of ord) { const ok = ' <button class="ppp-ok-btn" onclick="event.stopPropagation();pppOkTanda(\'' + escapeHtml(t) + '\')">✓ OK → Programar</button>'; html += _pppBlock("Tanda " + escapeHtml(t), "", byT[t].length + " ped · " + _pppM3Sum(byT[t]).toFixed(2) + " m³", byT[t], ok); }
+    for (const t of ord) { const ok = ' <button class="ppp-ok-btn" onclick="event.stopPropagation();pppOkTanda(\'' + escapeHtml(t) + '\')">✓ OK → Programar</button>'; html += _pppBlock("arm_" + t, "Tanda " + escapeHtml(t), "", byT[t].length + " ped · " + _pppM3Sum(byT[t]).toFixed(2) + " m³", byT[t], ok); }
   }
   // SIN TANDA — por zona, ordenado por fecha de recepción.
   html += '<div class="ppp-sec-t ppp-sec-prog">📋 Sin tanda — por zona, ordenado por fecha de recepción · ' + sinTanda.length + '</div>';
@@ -8434,7 +8480,7 @@ function pppRenderProg() {
       const ps = byZ[z].slice().sort(function (a, b) { return _pppFechaKey(a.fecha).localeCompare(_pppFechaKey(b.fecha)); });
       const none = (z === "— sin zona —");
       const chip = (!none && PPP_ZONA_SHORT[z]) ? ('<span class="ppp-zchip ' + pppZonaClass(z) + '">' + escapeHtml(PPP_ZONA_SHORT[z]) + '</span> ') : "";
-      html += _pppBlock(chip + escapeHtml(z), none ? "ppp-tanda-none" : "", ps.length + " ped · " + _pppM3Sum(ps).toFixed(2) + " m³", ps);
+      html += _pppBlock("zona_" + z, chip + escapeHtml(z), none ? "ppp-tanda-none" : "", ps.length + " ped · " + _pppM3Sum(ps).toFixed(2) + " m³", ps);
     }
   }
   box.innerHTML = html;

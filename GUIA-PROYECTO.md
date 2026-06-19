@@ -4,7 +4,18 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-19 · Versión app al documentar: **v3.25**
+> Última actualización: 2026-06-19 · Versión app al documentar: **v3.26**
+>
+> Nota: **v3.26** — PPP: **franja de tanda rediseñada**. (a) La **Fecha de Entrega quedó en
+> columna propia alineada** (franja en CSS grid: caret · nombre · resumen · fecha · meta). (b)
+> **Color por camión/ruta** (`_pppRuta` + clases `rt-so/rt-n/rt-c/rt-ret` en `.ppp-tanda-h`):
+> Sur/Oeste azul · Norte teal · Centro violeta · Retira gris · Súper ámbar; legend arriba de
+> Programación. (c) El botón **"✓ Controlar" ahora ABRE la tanda** (`pppAbrirControlar` vía
+> placeholder `__BLOCKID__`) para tildar **pedido por pedido** (cada fila tiene su "✓
+> Controlado"). (d) **El estado abierto/cerrado de cada tanda PERSISTE** entre renders
+> (`_pppOpen` por clave estable `_pppKid`), así controlar un pedido no cierra la tanda.
+> (e) En la franja, los **N° Pedido consecutivos se colapsan en rango** `inicio/sufijo`
+> (`_pppNpFmt`): 97757…97763 → **97757/63**; los no consecutivos quedan sueltos.
 >
 > Nota: **v3.25** — PPP: **(a) tandas colapsables (acordeón)**. Cada bloque arranca
 > **cerrado**; la franja azul muestra los datos clave (**Razón Social · N° Pedido · 📅 Fecha
