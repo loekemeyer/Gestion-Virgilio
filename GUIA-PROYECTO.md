@@ -4,7 +4,13 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-19 · Versión app al documentar: **v3.05**
+> Última actualización: 2026-06-19 · Versión app al documentar: **v3.06**
+>
+> Nota: **v3.06** — PPP: la detección de columnas no levantaba varios campos. Ahora
+> `pppDetectProgCols` elige la fila de encabezado **por puntaje** (la que más keywords
+> tiene) y se agregó un **diagnóstico desplegable** en la vista (`.ppp-diag`,
+> `_pppLastDetect`) que muestra qué columna detectó cada campo + los **encabezados
+> reales** del Excel, para ajustar las palabras clave si algo cae en "✗ FALTA".
 >
 > Nota: **v3.05** — **PPP: formato fijo (sin panel de mapeo)**. Por pedido del usuario
 > se sacó el panel de elegir columnas. Ahora el **Formato PPP** detecta las columnas

@@ -1837,6 +1837,10 @@ button {
 .ppp-imp-btn.ppp-drag{ background:#15803d; outline:3px dashed #86efac; outline-offset:-6px; }
 .ppp-drophint{ font-size:12px; color:#64748b; margin:8px 2px 0; text-align:center; }
 .ppp-baseinfo{ font-size:13px; color:#334155; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:8px 12px; margin-top:12px; }
+.ppp-diag{ background:#fff7ed; border:1px solid #fed7aa; border-radius:8px; padding:8px 12px; margin-bottom:12px; font-size:12px; color:#9a3412; }
+.ppp-diag summary{ cursor:pointer; font-weight:bold; }
+.ppp-diag-grid{ display:flex; flex-wrap:wrap; gap:6px 14px; margin:8px 0; }
+.ppp-diag-grid b{ color:#0f172a; } .ppp-diag-h{ word-break:break-word; }
 .ppp-baseinfo .ppp-base-none{ color:#94a3b8; } .ppp-baseinfo .ppp-base-local{ color:#94a3b8; font-size:12px; }
 .ppp-preview{ margin-top:14px; }
 .ppp-prev-h{ font-size:13px; color:#334155; margin-bottom:8px; } .ppp-prev-h code{ background:#eef2ff; color:#3730a3; padding:1px 5px; border-radius:4px; }
@@ -4729,7 +4733,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.05";
+const APP_VERSION = "v3.06";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -7572,10 +7576,14 @@ function _pppFecha(v) {
   return s;
 }
 function pppDetectProgCols(rows) {
-  let hr = 0;
-  for (let i = 0; i < Math.min(rows.length, 8); i++) {
-    const join = (rows[i] || []).map(function (x) { return String(x == null ? "" : x).toLowerCase(); }).join("|");
-    if (/tanda|pedido|raz[oó]n|cliente/.test(join)) { hr = i; break; }
+  // Fila de encabezado = la que MÁS palabras clave de campos tenga (primeras 10 filas).
+  const KW = ["tanda", "cod", "pedido", "fecha", "raz", "social", "m3", "mt3", "localidad", "zona", "cliente"];
+  let hr = 0, best = -1;
+  for (let i = 0; i < Math.min(rows.length, 10); i++) {
+    const cells = (rows[i] || []).map(function (x) { return String(x == null ? "" : x).toLowerCase().trim(); });
+    let score = 0;
+    for (const cc of cells) { for (const k of KW) { if (cc.indexOf(k) >= 0) { score++; break; } } }
+    if (score > best) { best = score; hr = i; }
   }
   const header = (rows[hr] || []).map(function (x) { return String(x == null ? "" : x).toLowerCase().trim(); });
   const find = function (test) { for (let c = 0; c < header.length; c++) if (header[c] && test(header[c])) return c; return -1; };
@@ -7592,8 +7600,10 @@ function pppDetectProgCols(rows) {
   m.zona = find(function (h) { return has(h, "zona"); });
   return { hr: hr, header: header, map: m };
 }
+let _pppLastDetect = null;
 function pppBuildProg(rows) {
   const d = pppDetectProgCols(rows), m = d.map;
+  _pppLastDetect = d;                                  // para el diagnóstico de la vista
   const get = function (r, ci) { return (ci >= 0 && r && r[ci] != null) ? String(r[ci]).trim() : ""; };
   const fe = function (r, ci) { return (ci >= 0 && r) ? _pppFecha(r[ci]) : ""; };
   const out = [];
@@ -7757,6 +7767,15 @@ function pppRenderProg() {
       '<button class="ppp-tab ' + (_pppTab === "prog" ? "on" : "") + '" onclick="pppTab(\'prog\')">📋 Programación (' + prog.length + ')</button>' +
       '<button class="ppp-tab ' + (_pppTab === "ent" ? "on" : "") + '" onclick="pppTab(\'ent\')">✅ Entregados (' + entreg.length + ')</button>' +
     '</div>';
+  // Diagnóstico del mapeo (para tunear si alguna columna no levanta).
+  if (_pppLastDetect) {
+    const dg = _pppLastDetect;
+    const colN = function (i) { return i >= 0 ? ("col " + (i < 26 ? String.fromCharCode(65 + i) : ("C" + (i + 1)))) : "✗ FALTA"; };
+    const fl = [["Tanda", "tanda"], ["Cód", "cod"], ["NP", "np"], ["Fecha", "fecha"], ["Razón", "razon_social"], ["m³", "m3"], ["Local.", "localidad"], ["F.Entr", "fecha_entrega"], ["Zona", "zona"]];
+    html += '<details class="ppp-diag"><summary>🔧 Mapeo detectado (tocá si algo no levanta)</summary>' +
+      '<div class="ppp-diag-grid">' + fl.map(function (x) { return '<span>' + x[0] + ': <b>' + colN(dg.map[x[1]]) + '</b></span>'; }).join("") + '</div>' +
+      '<div class="ppp-diag-h">Encabezados leídos del Excel: <i>' + escapeHtml((dg.header || []).filter(Boolean).join("  |  ") || "(ninguno)") + '</i></div></details>';
+  }
   if (!tandas.length) { html += '<div class="planim-empty">' + (_pppTab === "ent" ? "Nada entregado todavía." : "Sin pedidos pendientes.") + '</div>'; box.innerHTML = html; return; }
   for (const t of tandas) {
     const ps = byT[t];
