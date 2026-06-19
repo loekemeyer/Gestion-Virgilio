@@ -4,7 +4,17 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-19 · Versión app al documentar: **v2.93**
+> Última actualización: 2026-06-19 · Versión app al documentar: **v2.94**
+>
+> Nota: **v2.94** — dos cosas. **(a) FIX Inconsistencias mostraba el tablero del Monitor.**
+> Como el monitor abre SIEMPRE en modo TV y la regla `#monitorModal.tv #monitorContent`
+> (display:flex) le ganaba en especificidad al `.hidden` que pone `setMonitorTab("incons")`,
+> el tablero se veía encima de Inconsistencias. Se acotó la regla con `:not(.hidden)`
+> → ahora al cambiar de pestaña, `#monitorContent` se oculta y se ve `#inconsContent`
+> (que ya tenía estilos TV). **(b) Editor de Planimetría más ordenado**: título de sección
+> "Buscar y editar ubicaciones" + **fila de encabezados** (Código · Sector · Orden ·
+> Acciones) alineada con las columnas de cada fila (`.planim-list-head`/`.plh-*`,
+> `planimRender` prepende el header; inputs con `.planim-row-sec`/`.planim-row-ord`).
 >
 > Nota: **v2.93** — **panel Administración en grilla tipo teclado**. Los botones grandes
 > (`.sup-actions`/`.sup-action-btn`) pasaron de una columna a **grid de 3 columnas**

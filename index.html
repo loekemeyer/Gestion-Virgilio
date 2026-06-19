@@ -1133,7 +1133,10 @@ button {
 #monitorModal.tv .status-pend  { color: #475569; }
 #monitorModal.tv .status-curso { color: #fbbf24; }
 #monitorModal.tv .status-done  { color: #22c55e; }
-#monitorModal.tv #monitorContent{
+/* :not(.hidden) → en la pestaña Inconsistencias, #monitorContent lleva .hidden y
+   esta regla (más específica que .hidden) NO debe forzar su display, sino se ve el
+   tablero encima de Inconsistencias. */
+#monitorModal.tv #monitorContent:not(.hidden){
   flex: 1 0 auto;            /* no encoger: alto natural; la card scrollea si hace falta */
   display: flex;
 }
@@ -1804,8 +1807,13 @@ button {
 .planim-btn-save{ width: auto; margin: 0; padding: 0 16px; height: 42px; background: #16a34a; color: #fff; border: 0; border-radius: 8px; font-weight: bold; cursor: pointer; }
 .planim-btn-del{ width: auto; margin: 0; padding: 0 12px; height: 38px; background: #fff; color: #b42318; border: 1px solid #fecaca; border-radius: 8px; font-weight: bold; cursor: pointer; }
 .planim-list{ display: flex; flex-direction: column; gap: 6px; }
+.planim-sec-t{ font-size: 14px; font-weight: bold; color: #1e6bd6; margin: 18px 0 8px; }
+.planim-list-head{ display: flex; gap: 8px; align-items: center; padding: 2px 10px 0; font-size: 11px; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: .4px; }
+.plh-cod{ flex: 0 0 64px; } .plh-sec{ flex: 1 1 120px; } .plh-ord{ flex: 0 0 90px; } .plh-act{ flex: 0 0 auto; margin-left: auto; }
 .planim-row{ display: flex; gap: 8px; align-items: center; background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 10px; flex-wrap: wrap; }
-.planim-row-cod{ font-size: 18px; font-weight: 800; color: #0f172a; min-width: 64px; }
+.planim-row-cod{ font-size: 18px; font-weight: 800; color: #0f172a; flex: 0 0 64px; }
+.planim-row-sec{ flex: 1 1 120px; min-width: 100px; }
+.planim-row-ord{ flex: 0 0 90px; }
 .planim-status{ font-size: 13px; color: #475569; min-height: 18px; text-align: center; }
 .planim-empty{ color: #94a3b8; padding: 10px; text-align: center; }
 .planim-near{ display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
@@ -2588,6 +2596,7 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
         <div id="planimNearby" class="planim-near"></div>
         <div class="planim-hint">Para el par Nacional/Importado: cargá <b>580</b> y <b>580E</b> con el <b>mismo sector</b>.</div>
       </div>
+      <div class="planim-sec-t">Buscar y editar ubicaciones</div>
       <input id="planimSearch" class="planim-inp planim-search" type="text" placeholder="🔍 Buscar código o sector para editar…" oninput="planimRender(this.value)">
       <div id="planimList" class="planim-list"></div>
       <div id="planimStatus" class="planim-status"></div>
@@ -4549,7 +4558,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v2.93";
+const APP_VERSION = "v2.94";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -7242,13 +7251,14 @@ function planimRender(filter) {
     return k.indexOf(f) >= 0 || String(e[0] || "").toUpperCase().indexOf(f) >= 0;
   }).sort();
   if (!keys.length) { list.innerHTML = '<div class="planim-empty">Nada coincide con "' + escapeHtml(filter) + '".</div>'; return; }
-  list.innerHTML = keys.slice(0, 100).map(function (k) {
+  const head = '<div class="planim-list-head"><span class="plh-cod">Código</span><span class="plh-sec">Sector</span><span class="plh-ord">Orden</span><span class="plh-act">Acciones</span></div>';
+  list.innerHTML = head + keys.slice(0, 100).map(function (k) {
     const e = G[k] || ["", 0];
     const kE = escapeHtml(k);
     return '<div class="planim-row">' +
       '<span class="planim-row-cod">' + kE + '</span>' +
-      '<input class="planim-inp" id="planimSec_' + kE + '" type="text" value="' + escapeHtml(String(e[0] || "")) + '" placeholder="Sector">' +
-      '<input class="planim-inp planim-inp-num" id="planimOrd_' + kE + '" type="number" inputmode="numeric" value="' + (e[1] != null ? Number(e[1]) : 0) + '">' +
+      '<input class="planim-inp planim-row-sec" id="planimSec_' + kE + '" type="text" value="' + escapeHtml(String(e[0] || "")) + '" placeholder="Sector">' +
+      '<input class="planim-inp planim-inp-num planim-row-ord" id="planimOrd_' + kE + '" type="number" inputmode="numeric" value="' + (e[1] != null ? Number(e[1]) : 0) + '">' +
       '<button class="planim-btn-save" onclick="planimSaveRow(\'' + kE + '\')">Guardar</button>' +
       '<button class="planim-btn-del" onclick="planimDeleteRow(\'' + kE + '\')">Borrar</button>' +
     '</div>';
