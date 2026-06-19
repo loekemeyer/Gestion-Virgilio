@@ -4733,7 +4733,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.06";
+const APP_VERSION = "v3.07";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -7590,13 +7590,14 @@ function pppDetectProgCols(rows) {
   const has = function (h, k) { return h.indexOf(k) >= 0; };
   const m = {};
   m.tanda = find(function (h) { return has(h, "tanda"); });
-  m.cod = find(function (h) { return has(h, "cod") && has(h, "cli"); }); if (m.cod < 0) m.cod = find(function (h) { return has(h, "cod"); });
   m.np = find(function (h) { return has(h, "pedido") || h === "np" || has(h, "nro") || has(h, "n°"); });
+  // "codigo" = cód cliente; "cliente" = razón social. Cód = tiene "cod" pero NO "cliente".
+  m.cod = find(function (h) { return (has(h, "cod") || has(h, "codig")) && !has(h, "cliente"); });
+  m.razon_social = find(function (h) { return has(h, "raz") || has(h, "social") || (has(h, "cliente") && !has(h, "cod")); });
+  m.m3 = find(function (h) { return has(h, "m3") || has(h, "mt3") || has(h, "mts") || has(h, "m³") || has(h, "metro"); });
+  m.localidad = find(function (h) { return has(h, "localidad") || (has(h, "loc") && has(h, "entrega")); });
   m.fecha_entrega = find(function (h) { return has(h, "fecha") && has(h, "entrega"); });
-  m.localidad = find(function (h) { return has(h, "localidad"); });
   m.fecha = find(function (h) { return has(h, "fecha") && !has(h, "entrega") && !has(h, "fc"); });
-  m.razon_social = find(function (h) { return has(h, "raz") || has(h, "social"); });
-  m.m3 = find(function (h) { return has(h, "m3") || has(h, "mt3") || has(h, "m³") || has(h, "metro"); });
   m.zona = find(function (h) { return has(h, "zona"); });
   return { hr: hr, header: header, map: m };
 }
@@ -7779,7 +7780,8 @@ function pppRenderProg() {
   if (!tandas.length) { html += '<div class="planim-empty">' + (_pppTab === "ent" ? "Nada entregado todavía." : "Sin pedidos pendientes.") + '</div>'; box.innerHTML = html; return; }
   for (const t of tandas) {
     const ps = byT[t];
-    html += '<div class="ppp-tanda"><div class="ppp-tanda-h"><span class="ppp-tanda-name">Tanda ' + escapeHtml(t) + '</span>' +
+    const tlabel = (t === "—") ? "Sin tanda asignada" : ("Tanda " + escapeHtml(t));
+    html += '<div class="ppp-tanda"><div class="ppp-tanda-h"><span class="ppp-tanda-name">' + tlabel + '</span>' +
       '<span class="ppp-tanda-meta">' + ps.length + ' ped · ' + m3sum(ps).toFixed(2) + ' m³</span></div>' +
       '<div class="ppp-tablewrap"><table class="ppp-tbl"><thead><tr><th>Cód Cli</th><th>N° Pedido</th><th>Fecha</th><th>Razón Social</th><th class="num">m³</th><th>Localidad Entrega</th><th>Fecha Entrega</th><th>Zona</th><th></th></tr></thead><tbody>';
     for (const p of ps) {

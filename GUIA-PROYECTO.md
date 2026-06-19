@@ -4,7 +4,19 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-19 · Versión app al documentar: **v3.06**
+> Última actualización: 2026-06-19 · Versión app al documentar: **v3.07**
+>
+> Nota: **v3.07** — PPP: **fix de keywords** en `pppDetectProgCols` para que peguen con
+> los encabezados REALES del Excel "Formato PPP" que usa el usuario:
+> `pedido | fecha | codigo | cliente | mts 3 | vendedor | dir. entrega | loc. entrega |
+> prov. entrega`. Mapeo: **Cód Cli ← codigo**, **N° Pedido ← pedido**, **Fecha ← fecha**,
+> **Razón Social ← cliente**, **m³ ← mts 3**, **Localidad Entrega ← loc. entrega**.
+> ⚠ **Ese Excel NO trae Tanda, Fecha Entrega ni Zona** (son campos que hoy completa la
+> planificación; el usuario dijo que Zona/Fecha Entrega "se rellenan después"). Por eso la
+> "unificación por tanda" todavía no puede salir de este archivo — **falta definir de dónde
+> sale la Tanda** (asignar en la PPP / otro Excel / cruce por NP). Mientras tanto, si ningún
+> pedido tiene tanda, el grupo se rotula **"Sin tanda asignada"** (antes "Tanda —"). Sigue
+> SOLO LOCAL.
 >
 > Nota: **v3.06** — PPP: la detección de columnas no levantaba varios campos. Ahora
 > `pppDetectProgCols` elige la fila de encabezado **por puntaje** (la que más keywords
