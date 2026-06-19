@@ -1840,7 +1840,11 @@ button {
 .ppp-diag{ background:#fff7ed; border:1px solid #fed7aa; border-radius:8px; padding:8px 12px; margin-bottom:12px; font-size:12px; color:#9a3412; }
 .ppp-diag summary{ cursor:pointer; font-weight:bold; }
 .ppp-diag-grid{ display:flex; flex-wrap:wrap; gap:6px 14px; margin:8px 0; }
-.ppp-diag-grid b{ color:#0f172a; } .ppp-diag-h{ word-break:break-word; }
+.ppp-diag-grid b{ color:#0f172a; } .ppp-diag-h{ word-break:break-word; } .ppp-falta{ color:#b42318; }
+.ppp-diag-tbl{ width:100%; border-collapse:collapse; margin-top:8px; font-size:11px; }
+.ppp-diag-tbl th{ text-align:left; padding:3px 8px; color:#9a3412; border-bottom:1px solid #fed7aa; }
+.ppp-diag-tbl td{ padding:3px 8px; border-bottom:1px solid #ffedd5; color:#0f172a; vertical-align:top; }
+.ppp-diag-tbl td:first-child{ font-family:Consolas,Menlo,monospace; font-weight:bold; color:#9a3412; }
 .ppp-baseinfo .ppp-base-none{ color:#94a3b8; } .ppp-baseinfo .ppp-base-local{ color:#94a3b8; font-size:12px; }
 .ppp-preview{ margin-top:14px; }
 .ppp-prev-h{ font-size:13px; color:#334155; margin-bottom:8px; } .ppp-prev-h code{ background:#eef2ff; color:#3730a3; padding:1px 5px; border-radius:4px; }
@@ -4733,7 +4737,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.07";
+const APP_VERSION = "v3.08";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -7576,30 +7580,71 @@ function _pppFecha(v) {
   return s;
 }
 function pppDetectProgCols(rows) {
-  // Fila de encabezado = la que MÁS palabras clave de campos tenga (primeras 10 filas).
-  const KW = ["tanda", "cod", "pedido", "fecha", "raz", "social", "m3", "mt3", "localidad", "zona", "cliente"];
+  // ── 1) Fila de encabezado = la que MÁS palabras clave de campos tenga ──
+  const KW = ["tanda", "cod", "pedido", "fecha", "raz", "social", "m3", "mt3", "mts", "localidad", "zona", "cliente", "entrega", "vendedor", "prov"];
   let hr = 0, best = -1;
-  for (let i = 0; i < Math.min(rows.length, 10); i++) {
+  for (let i = 0; i < Math.min(rows.length, 12); i++) {
     const cells = (rows[i] || []).map(function (x) { return String(x == null ? "" : x).toLowerCase().trim(); });
     let score = 0;
-    for (const cc of cells) { for (const k of KW) { if (cc.indexOf(k) >= 0) { score++; break; } } }
+    for (const cc of cells) { if (!cc) continue; for (const k of KW) { if (cc.indexOf(k) >= 0) { score++; break; } } }
     if (score > best) { best = score; hr = i; }
   }
   const header = (rows[hr] || []).map(function (x) { return String(x == null ? "" : x).toLowerCase().trim(); });
-  const find = function (test) { for (let c = 0; c < header.length; c++) if (header[c] && test(header[c])) return c; return -1; };
-  const has = function (h, k) { return h.indexOf(k) >= 0; };
+
+  // ── 2) Stats por columna sobre las filas de DATOS (no el encabezado) ──
+  //  El encabezado puede venir disperso (celdas vacías/combinadas) y NO alinear con
+  //  los datos. Por eso detectamos por el PATRÓN de los datos, no por la posición del
+  //  texto del encabezado.
+  let ncols = header.length;
+  for (let i = hr + 1; i < rows.length; i++) { const r = rows[i]; if (r && r.length > ncols) ncols = r.length; }
+  const ndata = Math.max(0, rows.length - hr - 1);
+  const stat = [];
+  for (let c = 0; c < ncols; c++) {
+    let n5 = 0, n4 = 0, dec = 0, dat = 0, txt = 0, tlen = 0, tot = 0; const samp = [];
+    for (let i = hr + 1; i < rows.length; i++) {
+      const v = rows[i] && rows[i][c];
+      if (v == null || v === "") continue;
+      tot++;
+      if (samp.length < 2) samp.push(v instanceof Date ? _pppFecha(v) : String(v).trim());
+      if (v instanceof Date) { dat++; continue; }
+      const s = String(v).trim(); if (!s) continue;
+      const num = s.replace(/\.0+$/, "");
+      if (/^\d{5}$/.test(num)) n5++;
+      else if (/^\d{4}$/.test(num)) { const ni = parseInt(num, 10); if (ni > 30000 && ni < 60000) dat++; else n4++; }
+      else if (/^\d{1,4}[.,]\d+$/.test(s) && parseFloat(s.replace(",", ".")) < 2000) dec++;
+      else if (/^\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4}$/.test(s)) dat++;
+      else { txt++; tlen += s.length; }
+    }
+    stat.push({ c: c, n5: n5, n4: n4, dec: dec, dat: dat, txt: txt, tot: tot, avg: txt ? tlen / txt : 0, header: header[c] || "", samp: samp });
+  }
+
+  // ── 3) Realinear encabezados con datos: el k-ésimo encabezado NO vacío corresponde
+  //  a la k-ésima columna CON datos (así el texto del header vuelve a "pegar" con su dato). ──
+  const hdrCols = []; for (let c = 0; c < header.length; c++) if (header[c]) hdrCols.push(c);
+  const dataCols = stat.filter(function (s) { return s.tot >= 2; }).map(function (s) { return s.c; });
+  const align = hdrCols.length === dataCols.length && dataCols.length > 0;
+  const logHdr = {};
+  for (let k = 0; k < dataCols.length; k++) logHdr[dataCols[k]] = align ? header[hdrCols[k]] : (header[dataCols[k]] || "");
+  const hh = function (c, k) { return (logHdr[c] || "").indexOf(k) >= 0; };
+
+  // ── 4) Asignar: numéricos/fecha por PATRÓN; texto (razón/localidad) por header lógico ──
+  const used = {};
+  const pickMax = function (key) { let b = 0, bi = -1; for (const s of stat) { if (used[s.c]) continue; if (s[key] > b) { b = s[key]; bi = s.c; } } if (bi >= 0) used[bi] = 1; return bi; };
   const m = {};
-  m.tanda = find(function (h) { return has(h, "tanda"); });
-  m.np = find(function (h) { return has(h, "pedido") || h === "np" || has(h, "nro") || has(h, "n°"); });
-  // "codigo" = cód cliente; "cliente" = razón social. Cód = tiene "cod" pero NO "cliente".
-  m.cod = find(function (h) { return (has(h, "cod") || has(h, "codig")) && !has(h, "cliente"); });
-  m.razon_social = find(function (h) { return has(h, "raz") || has(h, "social") || (has(h, "cliente") && !has(h, "cod")); });
-  m.m3 = find(function (h) { return has(h, "m3") || has(h, "mt3") || has(h, "mts") || has(h, "m³") || has(h, "metro"); });
-  m.localidad = find(function (h) { return has(h, "localidad") || (has(h, "loc") && has(h, "entrega")); });
-  m.fecha_entrega = find(function (h) { return has(h, "fecha") && has(h, "entrega"); });
-  m.fecha = find(function (h) { return has(h, "fecha") && !has(h, "entrega") && !has(h, "fc"); });
-  m.zona = find(function (h) { return has(h, "zona"); });
-  return { hr: hr, header: header, map: m };
+  m.np = pickMax("n5");            // N° Pedido = 5 dígitos (97xxx / 44xxx)
+  m.fecha = pickMax("dat");        // Fecha = la columna con más fechas
+  m.cod = pickMax("n4");           // Cód Cliente = 4 dígitos
+  m.m3 = pickMax("dec");           // m³ = decimales
+  const textCols = stat.filter(function (s) { return !used[s.c] && s.txt >= Math.max(1, s.tot * 0.5); });
+  const byHdr = function (pred) { for (const s of textCols) { if (used[s.c]) continue; if (pred(s.c)) { used[s.c] = 1; return s.c; } } return -1; };
+  m.razon_social = byHdr(function (c) { return hh(c, "cliente") || hh(c, "raz") || hh(c, "social"); });
+  if (m.razon_social < 0) { let b = -1, bi = -1; for (const s of textCols) { if (used[s.c]) continue; if (s.avg > b) { b = s.avg; bi = s.c; } } if (bi >= 0) { used[bi] = 1; m.razon_social = bi; } }
+  m.localidad = byHdr(function (c) { return hh(c, "localidad") || (hh(c, "loc") && !hh(c, "prov") && !hh(c, "dir")); });
+  const byHdrAny = function (pred) { for (const s of stat) { if (used[s.c]) continue; if (pred(s.c)) { used[s.c] = 1; return s.c; } } return -1; };
+  m.tanda = byHdrAny(function (c) { return hh(c, "tanda"); });
+  m.zona = byHdrAny(function (c) { return hh(c, "zona"); });
+  m.fecha_entrega = byHdrAny(function (c) { return hh(c, "fecha") && hh(c, "entrega"); });
+  return { hr: hr, header: header, map: m, stat: stat, align: align, logHdr: logHdr };
 }
 let _pppLastDetect = null;
 function pppBuildProg(rows) {
@@ -7771,11 +7816,18 @@ function pppRenderProg() {
   // Diagnóstico del mapeo (para tunear si alguna columna no levanta).
   if (_pppLastDetect) {
     const dg = _pppLastDetect;
-    const colN = function (i) { return i >= 0 ? ("col " + (i < 26 ? String.fromCharCode(65 + i) : ("C" + (i + 1)))) : "✗ FALTA"; };
-    const fl = [["Tanda", "tanda"], ["Cód", "cod"], ["NP", "np"], ["Fecha", "fecha"], ["Razón", "razon_social"], ["m³", "m3"], ["Local.", "localidad"], ["F.Entr", "fecha_entrega"], ["Zona", "zona"]];
-    html += '<details class="ppp-diag"><summary>🔧 Mapeo detectado (tocá si algo no levanta)</summary>' +
-      '<div class="ppp-diag-grid">' + fl.map(function (x) { return '<span>' + x[0] + ': <b>' + colN(dg.map[x[1]]) + '</b></span>'; }).join("") + '</div>' +
-      '<div class="ppp-diag-h">Encabezados leídos del Excel: <i>' + escapeHtml((dg.header || []).filter(Boolean).join("  |  ") || "(ninguno)") + '</i></div></details>';
+    const cl = function (i) { return i < 26 ? String.fromCharCode(65 + i) : ("A" + String.fromCharCode(65 + (i - 26))); };
+    const colN = function (i) { return i >= 0 ? ("col " + cl(i)) : "✗ FALTA"; };
+    const fl = [["Cód", "cod"], ["N° Pedido", "np"], ["Fecha", "fecha"], ["Razón", "razon_social"], ["m³", "m3"], ["Localidad", "localidad"], ["Tanda", "tanda"], ["F.Entr", "fecha_entrega"], ["Zona", "zona"]];
+    // Dump por columna (encabezado + ejemplos) = la "verdad" del Excel, para ajustar si algo no pega.
+    let dump = "";
+    for (const s of (dg.stat || [])) {
+      if (!s.header && !(s.samp && s.samp.length)) continue;
+      dump += '<tr><td><b>' + cl(s.c) + '</b></td><td>' + escapeHtml(s.header || "·") + '</td><td>' + escapeHtml((s.samp || []).join(" · ").slice(0, 44)) + '</td></tr>';
+    }
+    html += '<details class="ppp-diag"><summary>🔧 Mapeo detectado (tocá para ver las columnas)</summary>' +
+      '<div class="ppp-diag-grid">' + fl.map(function (x) { const i = dg.map[x[1]]; return '<span>' + x[0] + ': <b' + (i < 0 ? ' class="ppp-falta"' : '') + '>' + colN(i) + '</b></span>'; }).join("") + '</div>' +
+      '<table class="ppp-diag-tbl"><thead><tr><th>Col</th><th>Encabezado</th><th>Ejemplos</th></tr></thead><tbody>' + dump + '</tbody></table></details>';
   }
   if (!tandas.length) { html += '<div class="planim-empty">' + (_pppTab === "ent" ? "Nada entregado todavía." : "Sin pedidos pendientes.") + '</div>'; box.innerHTML = html; return; }
   for (const t of tandas) {

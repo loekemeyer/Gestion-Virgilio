@@ -4,7 +4,18 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-19 · Versión app al documentar: **v3.07**
+> Última actualización: 2026-06-19 · Versión app al documentar: **v3.08**
+>
+> Nota: **v3.08** — PPP: **detección por PATRÓN de datos** (reescritura de
+> `pppDetectProgCols`). El Excel "Formato PPP" trae el **encabezado disperso** (celdas
+> vacías/combinadas) que NO alinea con las filas de datos → la detección por nombre de
+> columna agarraba columnas vacías (Cód/Razón/m³ salían en blanco). Ahora se detecta por
+> el **patrón del dato**: N° Pedido = 5 dígitos, Cód = 4 dígitos, m³ = decimal, Fecha =
+> fechas; y para los textos (Razón Social / Localidad) se **realinea** el encabezado
+> (k-ésimo header no vacío ↔ k-ésima columna con datos) y se usa el nombre lógico. Esto
+> sigue la posición REAL del dato, sin importar columnas vacías intercaladas. Además el
+> **diagnóstico 🔧** ahora vuelca **columna por columna** (letra + encabezado + 2 ejemplos)
+> para ver la "verdad" del Excel. Tanda/Fecha Entrega/Zona pueden seguir vacías. SOLO LOCAL.
 >
 > Nota: **v3.07** — PPP: **fix de keywords** en `pppDetectProgCols` para que peguen con
 > los encabezados REALES del Excel "Formato PPP" que usa el usuario:
