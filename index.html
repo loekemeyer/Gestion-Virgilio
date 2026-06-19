@@ -4726,7 +4726,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.03";
+const APP_VERSION = "v3.04";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -7581,21 +7581,27 @@ function _pppColSamples(rows, ci) {
 function _pppGuessMap(rows, ncols) {
   const cls = [];
   for (let c = 0; c < ncols; c++) {
-    let n5 = 0, n4 = 0, dec = 0, txt = 0, tlen = 0;
+    let n5 = 0, n4 = 0, dec = 0, txt = 0, tlen = 0, tand = 0, zona = 0;
     for (let r = 0; r < rows.length; r++) {
       const v = rows[r] && rows[r][c]; const s = (v == null ? "" : String(v)).trim(); if (!s) continue;
       const num = s.replace(/\.0+$/, "");
       if (/^\d{5}$/.test(num)) n5++;
       else if (/^\d{4}$/.test(num)) n4++;
       else if (/^\d+([.,]\d+)?$/.test(s) && parseFloat(s.replace(",", ".")) < 1000) dec++;
-      else { txt++; tlen += s.length; }
+      else { txt++; tlen += s.length;
+        if (s.length <= 6 && /[A-Za-z]/.test(s) && /\d/.test(s)) tand++;   // C41A, C42B…
+        if (/zona/i.test(s)) zona++;
+      }
     }
-    cls.push({ c: c, n5: n5, n4: n4, dec: dec, txt: txt, avglen: txt ? tlen / txt : 0 });
+    cls.push({ c: c, n5: n5, n4: n4, dec: dec, txt: txt, avglen: txt ? tlen / txt : 0, tand: tand, zona: zona });
   }
-  const pickMax = function (key) { let b = 0, bi = -1; for (const x of cls) if (x[key] > b) { b = x[key]; bi = x.c; } return bi; };
-  const m = { np: pickMax("n5"), cod: pickMax("n4"), m3: pickMax("dec"), tanda: -1, zona: -1, localidad: -1 };
-  let bl = -1; m.razon_social = -1;
-  for (const x of cls) if (x.txt > 0 && x.avglen > bl) { bl = x.avglen; m.razon_social = x.c; }
+  const used = {};
+  const pick = function (key) { let b = 0, bi = -1; for (const x of cls) { if (used[x.c]) continue; if (x[key] > b) { b = x[key]; bi = x.c; } } if (bi >= 0) used[bi] = 1; return bi; };
+  const pickText = function () { let b = -1, bi = -1; for (const x of cls) { if (used[x.c]) continue; if (x.txt > 0 && x.avglen > b) { b = x.avglen; bi = x.c; } } if (bi >= 0) used[bi] = 1; return bi; };
+  const m = {};
+  m.np = pick("n5"); m.tanda = pick("tand"); m.cod = pick("n4"); m.m3 = pick("dec"); m.zona = pick("zona");
+  m.razon_social = pickText();     // texto más largo restante = razón social
+  m.localidad = pickText();        // siguiente texto = localidad
   return m;
 }
 function pppShowMapping(fname) {
@@ -7615,7 +7621,7 @@ function pppShowMapping(fname) {
   };
   let html = '<div class="ppp-map"><div class="ppp-map-t">Mapeá las columnas de <b>' + escapeHtml(fname) + '</b> (' + ncols + ' cols). El número entre paréntesis es un ejemplo de esa columna:</div>';
   for (const f of PPP_FIELDS) {
-    const sel = (saved && saved[f.k] != null) ? saved[f.k] : guess[f.k];
+    const sel = (saved && saved[f.k] != null && saved[f.k] >= 0) ? saved[f.k] : guess[f.k];
     html += '<div class="ppp-map-row"><label>' + f.label + '</label><select id="pppmap_' + f.k + '">' + opt(sel) + '</select></div>';
   }
   html += '<button class="ppp-subir-btn" onclick="pppApplyMapping()">Ver PPP →</button></div>';

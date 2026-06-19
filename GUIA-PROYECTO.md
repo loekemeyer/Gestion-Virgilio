@@ -4,7 +4,14 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-19 · Versión app al documentar: **v3.03**
+> Última actualización: 2026-06-19 · Versión app al documentar: **v3.04**
+>
+> Nota: **v3.04** — PPP: el auto-guess del mapeo ahora también detecta **Tanda**
+> (texto corto alfanumérico tipo C41A), **Zona** (valores con "zona") y **Localidad**
+> (siguiente columna de texto) — antes quedaban en "ninguna" y salían vacías.
+> `_pppGuessMap` usa un set de columnas ya usadas (cada col se asigna una vez).
+> Además `pppShowMapping` respeta el mapeo guardado solo si la columna es válida
+> (`>=0`); si un campo quedó sin mapear, cae al auto-guess mejorado.
 >
 > Nota: **v3.03** — dos cosas. **(a) PPP: drag-drop** — además del click, podés
 > **arrastrar el `.xls` encima** de cada botón de importar (`pppHandleFile` compartido
