@@ -2017,6 +2017,10 @@ button {
 .cc-np.cc-on .cc-chk{ border-color: #16a34a; background: #16a34a; }
 .cc-npnum{ font-size: 18px; font-weight: bold; color: #0f172a; }
 .cc-rs{ font-size: 13px; color: #64748b; margin-left: auto; text-align: right; }
+.lios-row{ cursor: default; }
+.lios-row .cc-rs{ margin-left: 0; flex: 1 1 auto; }
+.lios-inp{ width: 84px; height: 40px; font-size: 17px; text-align: center; border: 2px solid #cbd5e1; border-radius: 10px; flex: 0 0 auto; }
+.lios-inp:focus{ outline: none; border-color: #1e6bd6; }
 
 /* Modal Faltantes (vista supervisor). */
 #faltantesModal{ display:none; position:fixed; inset:0; z-index:1200; background:#0b1220; color:#f1f5f9; flex-direction:column; }
@@ -4871,7 +4875,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.32";
+const APP_VERSION = "v3.33";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -5080,6 +5084,8 @@ async function send() {
     const stCC = getLegajoState(legajoStr);
     if (stCC && stCC.toggles && stCC.toggles.CC) showCargaCamion(legajoStr);
   }
+  // Al TERMINAR ARMADO (TAP): anotar cuántos líos lleva cada NP de la tanda.
+  if (opcion === "TAP" && (texto || "").trim()) showLiosModal(legajoStr, texto);
   // Al INICIAR recepción (1er toque de RT): Modo OP de Recepción (recepcion.js).
   // Anota cajas por código; el total del día se usa para cerrar RT sin pedir
   // la cantidad a mano (ver recepcionCajasDelDia + Terminar Día).
@@ -6353,6 +6359,81 @@ function ccSendDetail(legajo, np, tanda) {
     ts: nowMs,
     id: ("ccn_" + legajo + "_" + np + "_" + getTodayKey()).replace(/[^a-zA-Z0-9_\-]/g, ""),
     ts_inicio_iso: null
+  };
+  try {
+    enqueueReport(payload);
+    if (typeof trySendOneReport === "function") trySendOneReport(payload).then(r => { if (r && r.ok) removeFromQueue(payload.id); }).catch(() => {});
+  } catch (_e) {}
+  try { updatePendingIndicator(); } catch (_e) {}
+}
+
+/* =========================================================
+   PARTE 1 — Al TERMINAR ARMADO (TAP) el operario anota cuántos LÍOS lleva cada
+   pedido (NP) de la tanda. Cada NP → evento "TAL" (texto = NP|LÍOS|TANDA), por la
+   cola offline. Lo lee después Control Remitos (CR) para mostrar la columna Líos.
+   Reusa #tandaModal y fetchMonitorSheet() (igual que Carga Camión).
+   ========================================================= */
+let _lios = null;   // { legajo, tanda, nps:[{np, rs}] }
+async function showLiosModal(legajo, tanda) {
+  const m = document.getElementById("tandaModal"); if (!m) return;
+  const tn = String(tanda || "").trim().toUpperCase();
+  m.querySelector(".tanda-modal-title").textContent = "📦 Líos por pedido — Tanda " + tn;
+  m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">Cargando pedidos…</div>`;
+  m.classList.add("show");
+  try {
+    const sheetMap = await fetchMonitorSheet();
+    const entry = sheetMap.get(tn);
+    const nps = []; const seen = new Set();
+    if (entry && entry.pedidos) {
+      for (const p of entry.pedidos) {
+        for (const part of String(p.np || "").split(/[,/]/)) {
+          const np = part.trim();
+          if (np && /\d/.test(np) && !seen.has(np)) { seen.add(np); nps.push({ np: np, rs: p.razonSocial || "" }); }
+        }
+      }
+    }
+    if (!nps.length) { _lios = null; m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">No encontré pedidos de la tanda ${escapeHtml(tn)} en el PPP de hoy.</div><button class="pk-btn pk-cancel" onclick="liosClose()">Cerrar</button>`; return; }
+    _lios = { legajo: String(legajo || "").trim(), tanda: tn, nps: nps };
+    liosRender();
+  } catch (e) {
+    _lios = null;
+    m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">No se pudo cargar (¿sin conexión?). Podés anotar los líos más tarde.</div><button class="pk-btn pk-cancel" onclick="liosClose()">Cerrar</button>`;
+  }
+}
+function _liosId(np) { return "lios_" + String(np).replace(/[^0-9A-Za-z]/g, ""); }
+function liosRender() {
+  const m = document.getElementById("tandaModal"); if (!m || !_lios) return;
+  let html = `<div class="cc-sub">Anotá cuántos <b>líos</b> lleva cada pedido:</div>`;
+  for (const it of _lios.nps) {
+    html += `<div class="cc-np lios-row">` +
+            `<span class="cc-npnum">${escapeHtml(it.np)}</span>` +
+            `<span class="cc-rs">${escapeHtml(it.rs)}</span>` +
+            `<input class="lios-inp" type="number" min="0" inputmode="numeric" id="${_liosId(it.np)}" placeholder="líos"></div>`;
+  }
+  html += `<button class="pk-btn pk-ok" onclick="liosSave()">Guardar líos</button>` +
+          `<button class="pk-btn pk-cancel" onclick="liosClose()">Después</button>`;
+  m.querySelector(".tanda-modal-body").innerHTML = html;
+}
+function liosClose() { _lios = null; closeTandaModal(); }
+function liosSave() {
+  if (!_lios) return;
+  const legajo = _lios.legajo, tanda = _lios.tanda;
+  let n = 0;
+  for (const it of _lios.nps) {
+    const inp = document.getElementById(_liosId(it.np));
+    const v = inp ? parseInt(inp.value, 10) : NaN;
+    if (!isNaN(v) && v >= 0 && inp.value !== "") { liosSend(legajo, it.np, v, tanda); n++; }
+  }
+  _lios = null; closeTandaModal();
+  if (n) { try { alert("Guardados los líos de " + n + " pedido(s)."); } catch (_e) {} }
+  else { try { alert("No anotaste líos. Lo podés hacer después volviendo a TAP."); } catch (_e) {} }
+}
+function liosSend(legajo, np, lios, tanda) {
+  const nowMs = Date.now();
+  const payload = {
+    legajo: legajo, opcion: "TAL", descripcion: "Líos por NP (TAP)",
+    texto: (String(np) + "|" + String(lios) + "|" + String(tanda)).toUpperCase(),
+    ts: nowMs, id: nowMs.toString(36) + "_" + Math.random().toString(36).slice(2, 8), ts_inicio_iso: null
   };
   try {
     enqueueReport(payload);
