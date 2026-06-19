@@ -4,7 +4,16 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-19 · Versión app al documentar: **v3.00**
+> Última actualización: 2026-06-19 · Versión app al documentar: **v3.01**
+>
+> Nota: **v3.01** — **#4 (parte 1): editor de Mails autorizados (supervisores)**.
+> Botón "✉️ Mails autorizados" (panel Admin) → overlay para agregar/borrar mails de
+> supervisor. Tabla Supabase `Supervisores_Virgilio` (email) que se **mergea sobre los
+> 3 fijos** de `SUPERVISOR_EMAILS` (los fijos no se borran → no hay lockout).
+> `loadSupervisoresRemotos` la baja (anon) y `isSupervisorEmail` chequea fijos + remotos;
+> `showLoggedIn` la espera antes del check. Escribe con el JWT del supervisor
+> (`mailsAdd`/`mailsDelete`). ⚠ Requiere crear la tabla + RLS (SQL por chat). Falta la
+> parte 2 de #4: editor de **Talleristas de Recepción** (tabla `Codigos X Tallerista`).
 >
 > Nota: **v3.00** — **PPP Fase 2 (vista, SOLO LOCAL)**. Por pedido del usuario, el PPP
 > ahora **no escribe nada en Supabase** (banner "EN PRUEBAS — SOLO LOCAL"; `pppSubir`

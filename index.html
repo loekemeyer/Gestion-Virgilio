@@ -1819,6 +1819,9 @@ button {
 .planim-row-cod{ font-size: 18px; font-weight: 800; color: #0f172a; flex: 0 0 64px; }
 .planim-row-sec{ flex: 1 1 120px; min-width: 100px; }
 .planim-row-ord{ flex: 0 0 90px; }
+.mails-row{ display:flex; align-items:center; gap:10px; background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:10px 12px; }
+.mails-mail{ flex:1 1 auto; font-size:15px; color:#0f172a; word-break:break-all; }
+.mails-fijo{ flex:0 0 auto; font-size:11px; font-weight:800; color:#475569; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:999px; padding:2px 10px; text-transform:uppercase; letter-spacing:.4px; }
 .planim-status{ font-size: 13px; color: #475569; min-height: 18px; text-align: center; }
 .planim-empty{ color: #94a3b8; padding: 10px; text-align: center; }
 /* Módulo PPP (placeholder/scaffolding) */
@@ -2593,6 +2596,7 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
       <button class="sup-action-btn" onclick="openRecepcionAdmin()"><span class="sup-ico">🏭</span><span>Carga Recepción Mercadería</span></button>
       <button class="sup-action-btn" onclick="openPlanimEditor()"><span class="sup-ico">🗺️</span><span>Editar Planimetría</span></button>
       <button class="sup-action-btn" onclick="openPPP()"><span class="sup-ico">🗓️</span><span>PPP</span></button>
+      <button class="sup-action-btn" onclick="openMailsEditor()"><span class="sup-ico">✉️</span><span>Mails autorizados</span></button>
     </div>
     <div class="auth-logout-row">
       <button class="auth-logout-btn" onclick="signOutGoogle()">Salir</button>
@@ -2702,6 +2706,28 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
       </div>
       <div id="pppPreview" class="ppp-preview"></div>
       <div id="pppStatus" class="planim-status"></div>
+    </div>
+  </div>
+
+  <!-- Editor de Mails autorizados (supervisores). Tabla Supabase Supervisores_Virgilio,
+       se mergea sobre los 3 fijos del código (no se puede dejar a nadie afuera). -->
+  <div id="mailsEditorOverlay" class="recp-admin-overlay">
+    <div class="recp-admin-bar">
+      <span class="recp-admin-title">✉️ Mails autorizados (supervisores)</span>
+      <button class="recp-admin-close" onclick="closeMailsEditor()">Cerrar</button>
+    </div>
+    <div class="planim-body">
+      <div class="planim-add">
+        <div class="planim-add-t">Agregar supervisor</div>
+        <div class="planim-add-row">
+          <input id="mailsNew" class="planim-inp planim-search" type="email" placeholder="mail@gmail.com" autocomplete="off">
+          <button class="planim-btn-save" onclick="mailsAdd()">Agregar</button>
+        </div>
+        <div class="planim-hint">El supervisor puede ver los monitores y el panel Admin. Los 3 mails <b>fijos</b> del sistema no se pueden borrar (evita quedarse afuera).</div>
+      </div>
+      <div class="planim-sec-t">Autorizados</div>
+      <div id="mailsList" class="planim-list"></div>
+      <div id="mailsStatus" class="planim-status"></div>
     </div>
   </div>
 
@@ -4660,7 +4686,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.00";
+const APP_VERSION = "v3.01";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -7550,6 +7576,67 @@ async function pppSubir(tipo) {
     }
     pppSetStatus("✓ Listo: " + table + " quedó con " + rows.length + " filas.", true);
   } catch (e) { pppSetStatus("Sin conexión / error: " + (e.message || e), false); }
+}
+
+/* ===== Editor de Mails autorizados (supervisores) — tabla Supabase
+   Supervisores_Virgilio, se mergea sobre los 3 fijos. Escribe con el JWT del
+   supervisor (igual que Planimetría). Requiere la tabla + RLS (SQL por chat). v3.01. */
+function openMailsEditor() {
+  if (!requireSupervisor()) return;
+  const ov = document.getElementById("mailsEditorOverlay");
+  if (ov) ov.classList.add("show");
+  mailsSetStatus("");
+  if (_supervisoresRemotos === null) loadSupervisoresRemotos().then(mailsRender);
+  else mailsRender();
+}
+function closeMailsEditor() {
+  const ov = document.getElementById("mailsEditorOverlay");
+  if (ov) ov.classList.remove("show");
+}
+function mailsSetStatus(msg, ok) {
+  const el = document.getElementById("mailsStatus");
+  if (el) { el.textContent = msg || ""; el.style.color = (ok === false) ? "#b42318" : "#166534"; }
+}
+function mailsRender() {
+  const list = document.getElementById("mailsList");
+  if (!list) return;
+  const fijos = SUPERVISOR_EMAILS.map(function (e) {
+    return '<div class="mails-row"><span class="mails-mail">' + escapeHtml(e) + '</span><span class="mails-fijo">fijo</span></div>';
+  }).join("");
+  const rem = Array.from(_supervisoresRemotos || []).filter(function (e) { return SUPERVISOR_EMAILS.indexOf(e) === -1; }).sort();
+  const remh = rem.length ? rem.map(function (e) {
+    const eE = escapeHtml(e);
+    return '<div class="mails-row"><span class="mails-mail">' + eE + '</span><button class="planim-btn-del" onclick="mailsDelete(\'' + eE.replace(/'/g, "\\'") + '\')">Borrar</button></div>';
+  }).join("") : '<div class="planim-empty">No hay supervisores agregados (solo los 3 fijos).</div>';
+  list.innerHTML = fijos + remh;
+}
+async function mailsAdd() {
+  const inp = document.getElementById("mailsNew");
+  const email = inp ? inp.value.toLowerCase().trim() : "";
+  if (!email || email.indexOf("@") < 1) { mailsSetStatus("Poné un mail válido.", false); return; }
+  if (SUPERVISOR_EMAILS.indexOf(email) !== -1) { mailsSetStatus("Ese mail ya es supervisor fijo.", false); return; }
+  const headers = await facAuthWriteHeaders({ "Prefer": "resolution=merge-duplicates,return=minimal" });
+  if (!headers) { mailsSetStatus("Iniciá sesión con Google para editar.", false); return; }
+  try {
+    const r = await fetch(SUPABASE_SUPERVISORES_ENDPOINT + "?on_conflict=email", { method: "POST", headers: headers, body: JSON.stringify({ email: email }) });
+    if (!r.ok) { mailsSetStatus("Error guardando: HTTP " + r.status + " (¿creaste la tabla + RLS?)", false); return; }
+    if (!_supervisoresRemotos) _supervisoresRemotos = new Set();
+    _supervisoresRemotos.add(email);
+    if (inp) inp.value = "";
+    mailsRender(); mailsSetStatus("✓ " + email + " agregado como supervisor.", true);
+  } catch (_e) { mailsSetStatus("Sin conexión: no se guardó.", false); }
+}
+async function mailsDelete(email) {
+  const e = String(email).toLowerCase().trim();
+  if (!confirm("¿Sacar a " + e + " de supervisores?")) return;
+  const headers = await facAuthWriteHeaders({ "Prefer": "return=minimal" });
+  if (!headers) { mailsSetStatus("Iniciá sesión con Google para editar.", false); return; }
+  try {
+    const r = await fetch(SUPABASE_SUPERVISORES_ENDPOINT + "?email=eq." + encodeURIComponent(e), { method: "DELETE", headers: headers });
+    if (!r.ok) { mailsSetStatus("Error borrando: HTTP " + r.status, false); return; }
+    if (_supervisoresRemotos) _supervisoresRemotos.delete(e);
+    mailsRender(); mailsSetStatus("✓ " + e + " sacado.", true);
+  } catch (_e) { mailsSetStatus("Sin conexión: no se borró.", false); }
 }
 
 function openPlanimEditor() {
@@ -10555,8 +10642,23 @@ function setAuthStatus(msg, isError) {
 /* Supervisores: ven los monitores y los botones flotantes. No necesitan estar
    en Empleados (no tienen legajo de operario). */
 const SUPERVISOR_EMAILS = ["loekemeyer.n8n@gmail.com", "loekemeyer.logistica@gmail.com", "comexloekemeyer@gmail.com"];
+/* Supervisores extra, editables desde la app (tabla Supabase Supervisores_Virgilio).
+   Se MERGEAN sobre los 3 fijos de arriba → los fijos siempre son supervisores (no
+   hay forma de quedarse afuera). null = todavía no se cargó. v3.01. */
+let _supervisoresRemotos = null;
+const SUPABASE_SUPERVISORES_ENDPOINT = SUPABASE_URL + "/rest/v1/Supervisores_Virgilio";
+async function loadSupervisoresRemotos() {
+  try {
+    const r = await fetch(SUPABASE_SUPERVISORES_ENDPOINT + "?select=email", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+    if (!r.ok) { if (_supervisoresRemotos === null) _supervisoresRemotos = new Set(); return; }
+    const data = await r.json();
+    _supervisoresRemotos = new Set((data || []).map(function (x) { return String(x.email || "").toLowerCase().trim(); }).filter(Boolean));
+  } catch (_e) { if (_supervisoresRemotos === null) _supervisoresRemotos = new Set(); }
+}
 function isSupervisorEmail(email) {
-  return SUPERVISOR_EMAILS.indexOf((email || "").toLowerCase().trim()) !== -1;
+  const e = (email || "").toLowerCase().trim();
+  if (SUPERVISOR_EMAILS.indexOf(e) !== -1) return true;
+  return !!(_supervisoresRemotos && _supervisoresRemotos.has(e));
 }
 
 /* email -> {legajo, nombre} vía tabla Empleados (anon SELECT permitido por RLS). */
@@ -10715,6 +10817,7 @@ function _routeAfterAuth() {
 
 async function showLoggedIn(user) {
   const email = user.email || "";
+  if (_supervisoresRemotos === null) { await loadSupervisoresRemotos(); }  // mails editables
   // 1) Supervisor por email (no requiere estar en Empleados).
   if (isSupervisorEmail(email)) {
     __identity = { type: "supervisor", email: email, nombre: email };
