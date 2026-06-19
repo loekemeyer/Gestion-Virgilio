@@ -1839,6 +1839,8 @@ button {
 .ppp-baseinfo{ font-size:13px; color:#334155; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:8px 12px; margin-top:12px; }
 .ppp-imp-mini{ position:relative; display:inline-block; margin-bottom:4px; }
 .ppp-imp-toggle{ padding:6px 12px; font-size:13px; font-weight:700; border:1px solid #1e6bd6; border-radius:8px; background:#fff; color:#1e6bd6; cursor:pointer; }
+.ppp-sup-toggle{ margin-left:8px; border-color:#d97706; color:#b45309; }
+.ppp-sup-toggle:hover{ background:#fffbeb; }
 .ppp-imp-toggle:hover{ background:#eff6ff; }
 .ppp-imp-menu{ position:absolute; top:calc(100% + 6px); left:0; z-index:20; background:#fff; border:1px solid #e2e8f0; border-radius:12px; box-shadow:0 12px 30px rgba(2,6,23,.18); padding:12px; min-width:300px; display:flex; flex-direction:column; gap:8px; }
 .ppp-imp-menu.hidden{ display:none; }
@@ -2840,8 +2842,30 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
           <div id="pppBaseInfo" class="ppp-baseinfo"></div>
         </div>
       </div>
+      <button class="ppp-imp-toggle ppp-sup-toggle" onclick="openPppSupers()" title="Agregar/quitar clientes súper">🛒 Clientes súper</button>
       <div id="pppPreview" class="ppp-preview"></div>
       <div id="pppStatus" class="planim-status"></div>
+    </div>
+  </div>
+
+  <!-- Editor de clientes súper (lista que detecta los pedidos que van solos por súper). -->
+  <div id="pppSupersOverlay" class="recp-admin-overlay">
+    <div class="recp-admin-bar">
+      <span class="recp-admin-title">🛒 Clientes Súper</span>
+      <button class="recp-admin-close" onclick="closePppSupers()">Cerrar</button>
+    </div>
+    <div class="planim-body">
+      <div class="planim-add">
+        <div class="planim-add-t">Agregar cliente súper</div>
+        <div class="planim-add-row">
+          <input id="pppSupCod" class="planim-inp planim-inp-num" placeholder="Cód (ej. 801)">
+          <input id="pppSupNom" class="planim-inp" placeholder="Nombre (ej. Coto C.I.C.S.A.)">
+          <button class="planim-btn-save" onclick="pppSuperAdd()">Agregar</button>
+        </div>
+        <div class="planim-hint">Los pedidos de estos clientes (por <b>código</b>) se separan solos como súper, con su propia tanda y fecha. También se detectan los de Tipo <b>KRIKOS</b> o barrio <b>Súper</b>.</div>
+      </div>
+      <div class="planim-sec-t">Lista de súper</div>
+      <div id="pppSupersList" class="planim-list"></div>
     </div>
   </div>
 
@@ -4847,7 +4871,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.31";
+const APP_VERSION = "v3.32";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -7903,6 +7927,36 @@ function pppEsSuper(p) {
   const cod = String(p.cod || "").trim();
   if (cod) { for (const s of pppLoadSupers()) { if (s.cod && String(s.cod) === cod) return true; } }
   return false;
+}
+/* Editor de la lista de clientes súper (agregar/quitar). Persistido en vir_ppp_supers. */
+function openPppSupers() { if (!requireSupervisor()) return; const ov = document.getElementById("pppSupersOverlay"); if (ov) ov.classList.add("show"); pppSupersRender(); }
+function closePppSupers() { const ov = document.getElementById("pppSupersOverlay"); if (ov) ov.classList.remove("show"); }
+function pppSupersRender() {
+  const list = document.getElementById("pppSupersList"); if (!list) return;
+  const sup = pppLoadSupers();
+  if (!sup.length) { list.innerHTML = '<div class="planim-empty">Sin clientes súper en la lista.</div>'; return; }
+  list.innerHTML = sup.slice().sort(function (a, b) { return String(a.nombre || a.cod).localeCompare(String(b.nombre || b.cod)); }).map(function (s) {
+    const idx = sup.indexOf(s);
+    return '<div class="tall-row"><span class="tall-name">' + escapeHtml(s.nombre || ("Cód " + s.cod)) + '</span>' +
+      '<span class="tall-lin">cód ' + escapeHtml(String(s.cod || "—")) + '</span>' +
+      '<button class="planim-btn-del" onclick="pppSuperDel(' + idx + ')">Borrar</button></div>';
+  }).join("");
+}
+function pppSuperAdd() {
+  const ci = document.getElementById("pppSupCod"), ni = document.getElementById("pppSupNom");
+  const c = (ci ? ci.value : "").trim().replace(/\.0+$/, ""), n = (ni ? ni.value : "").trim();
+  if (!c && !n) { alert("Poné al menos el código o el nombre."); return; }
+  const sup = pppLoadSupers();
+  if (c && sup.some(function (s) { return String(s.cod) === c; })) { alert("Ese código ya está en la lista."); return; }
+  sup.push({ cod: c, nombre: n || ("Cód " + c) }); _pppSupers = sup; pppSaveSupers();
+  if (ci) ci.value = ""; if (ni) ni.value = "";
+  pppSupersRender(); pppRenderProg();
+}
+function pppSuperDel(i) {
+  const sup = pppLoadSupers(); if (i < 0 || i >= sup.length) return;
+  if (!confirm("¿Quitar \"" + (sup[i].nombre || sup[i].cod) + "\" de la lista de súper?")) return;
+  sup.splice(i, 1); _pppSupers = sup; pppSaveSupers();
+  pppSupersRender(); pppRenderProg();
 }
 function pppDragOver(e, el) { if (e) { e.preventDefault(); e.stopPropagation(); } if (el) el.classList.add("ppp-drag"); }
 function pppDragLeave(e, el) { if (el) el.classList.remove("ppp-drag"); }
