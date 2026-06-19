@@ -4,7 +4,15 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-19 · Versión app al documentar: **v3.21**
+> Última actualización: 2026-06-19 · Versión app al documentar: **v3.22**
+>
+> Nota: **v3.22** — PPP: **estado actual PRECARGADO** (semilla). El estado de la PPP del
+> Excel `AAA_PPP_Vigente` quedó **embebido** en `PPP_SEED` (123 pedidos · 83 programados en
+> 7 días · 8 súper). `pppSeedIfNeeded()` (llamado en `openPPP`) lo carga **una sola vez** en
+> `localStorage` (`vir_ppp_pedidos` + `vir_ppp_edits`), marcado con `vir_ppp_seeded_v1`. Así
+> al abrir la PPP ya está todo cargado **sin importar nada**. Temporal hasta Supabase (para
+> re-sembrar: borrar la clave `vir_ppp_seeded_v1`). La migración por archivo (v3.21) sigue
+> disponible.
 >
 > Nota: **v3.21** — PPP: **migración del estado actual desde el Excel**. Si en "Importar
 > Formato PPP" se sube el Excel de la PPP completo (hoja **"Programacion Diaria"**, 15 cols
