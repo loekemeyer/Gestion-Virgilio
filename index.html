@@ -4326,6 +4326,13 @@ function selectOption(code) {
     }
   }
 
+  // CC ya abierto: el botón CC RE-ABRE el popup de Carga Camión (no lo cierra).
+  // El cierre se hace SOLO con "Terminé Carga Camión" dentro del popup.
+  if (code === "CC") {
+    const stCC = getLegajoState(legajoStr);
+    if (stCC && stCC.toggles && stCC.toggles.CC) { showCargaCamion(legajoStr); return; }
+  }
+
   selected = code;
   selectedArea.classList.remove("hidden");
 
@@ -4875,7 +4882,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.34";
+const APP_VERSION = "v3.35";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -6284,36 +6291,52 @@ function closeMarianela() {
    Reutiliza #tandaModal.
    ========================================================= */
 let _cc = null;   // { legajo, items:[{tanda,np,rs}], checked:Set<np> }
+let _ccWakeLock = null;
+function _ccKey(legajo) { return "vir_cc_checked_" + legajo + "_" + getTodayKey(); }
+function ccSaveChecked(legajo, set) { try { localStorage.setItem(_ccKey(legajo), JSON.stringify(Array.from(set || []))); } catch (_e) {} }
+function ccLoadChecked(legajo) { try { const a = JSON.parse(localStorage.getItem(_ccKey(legajo)) || "[]"); return new Set(Array.isArray(a) ? a.map(String) : []); } catch (_e) { return new Set(); } }
+function ccClearChecked(legajo) { try { localStorage.removeItem(_ccKey(legajo)); } catch (_e) {} }
+async function ccWakeLock() { try { if ("wakeLock" in navigator) _ccWakeLock = await navigator.wakeLock.request("screen"); } catch (_e) {} }
+function ccReleaseWakeLock() { try { if (_ccWakeLock) { _ccWakeLock.release(); _ccWakeLock = null; } } catch (_e) {} }
 
 async function showCargaCamion(legajo) {
   const m = document.getElementById("tandaModal"); if (!m) return;
-  m.querySelector(".tanda-modal-title").textContent = "🚛 Carga Camión — NPs listas";
-  m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">Cargando NPs…</div>`;
+  const leg = String(legajo || "").trim();
+  m.querySelector(".tanda-modal-title").textContent = "🚛 Carga Camión — NP facturados";
+  m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">Cargando NP facturados…</div>`;
   m.classList.add("show");
+  ccWakeLock();
   try {
-    const [status, sheetMap] = await Promise.all([getActivityStatus(), fetchMonitorSheet()]);
-    const seen = new Set(); const items = [];
-    for (const tandaNorm of status.armadoDone) {       // tandas con TAP (armado terminado)
-      const entry = sheetMap.get(tandaNorm);
-      if (!entry || !entry.pedidos) continue;          // solo las que están en el PPP actual
+    const [facSet, sheetMap] = await Promise.all([fetchFacturadosHoy(true), fetchMonitorSheet()]);
+    const idx = {};
+    for (const [, entry] of sheetMap) {
+      if (!entry || !entry.pedidos) continue;
       for (const p of entry.pedidos) {
         for (const part of String(p.np || "").split(/[,/]/)) {
-          const np = part.trim();
-          if (np && /\d/.test(np) && !seen.has(np)) { seen.add(np); items.push({ tanda: entry.tanda, np: np, rs: p.razonSocial || "" }); }
+          const np = part.trim().replace(/\.0+$/, "");
+          if (np && /\d/.test(np) && !idx[np]) idx[np] = { tanda: entry.tanda, rs: p.razonSocial || "" };
         }
       }
     }
-    items.sort((a, b) => a.tanda.localeCompare(b.tanda) || a.np.localeCompare(b.np));
+    const items = [];
+    for (const npRaw of facSet) {
+      const np = String(npRaw).trim().replace(/\.0+$/, "");
+      if (!np) continue;
+      const info = idx[np] || { tanda: "—", rs: "" };
+      items.push({ np: np, tanda: info.tanda || "—", rs: info.rs });
+    }
+    items.sort((a, b) => String(a.tanda).localeCompare(String(b.tanda)) || a.np.localeCompare(b.np));
     if (!items.length) {
-      _cc = null;
-      m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">No hay NPs de tandas con armado terminado (TAP) en el PPP de hoy.</div>`;
+      _cc = null; ccReleaseWakeLock();
+      m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">No hay NP facturados pendientes hoy.</div><button class="pk-btn pk-cancel" onclick="ccClose()">Cerrar</button>`;
       return;
     }
-    _cc = { legajo: String(legajo || "").trim(), items: items, checked: new Set() };
+    const saved = ccLoadChecked(leg);
+    _cc = { legajo: leg, items: items, checked: new Set(items.filter(it => saved.has(it.np)).map(it => it.np)) };
     ccRender();
   } catch (e) {
-    _cc = null;
-    m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">No se pudo cargar (¿sin conexión?).<br><small>${escapeHtml(e.message || "")}</small></div>`;
+    _cc = null; ccReleaseWakeLock();
+    m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">No se pudo cargar (¿sin conexión?).<br><small>${escapeHtml(e.message || "")}</small></div><button class="pk-btn pk-cancel" onclick="ccClose()">Cerrar</button>`;
   }
 }
 
@@ -6321,8 +6344,8 @@ function ccRender() {
   const m = document.getElementById("tandaModal"); if (!m || !_cc) return;
   const byTanda = {};
   for (const it of _cc.items) (byTanda[it.tanda] = byTanda[it.tanda] || []).push(it);
-  let html = `<div class="cc-sub">Tocá las NP que cargaste al camión:</div>`;
-  for (const tanda of Object.keys(byTanda)) {
+  let html = `<div class="cc-sub">NP <b>facturados</b> pendientes — tocá los que <b>cargaste al camión</b>:</div>`;
+  for (const tanda of Object.keys(byTanda).sort()) {
     html += `<div class="cc-tanda">Tanda ${escapeHtml(tanda)}</div>`;
     for (const it of byTanda[tanda]) {
       const on = _cc.checked.has(it.np);
@@ -6332,24 +6355,39 @@ function ccRender() {
               `<span class="cc-rs">${escapeHtml(it.rs)}</span></div>`;
     }
   }
-  html += `<button class="pk-btn pk-ok" onclick="ccSave()">Guardar (${_cc.checked.size} cargadas)</button>` +
-          `<button class="pk-btn pk-cancel" onclick="ccClose()">Cerrar</button>`;
+  html += `<button class="pk-btn pk-ok" onclick="ccFinish()">🚛 Terminé Carga Camión (${_cc.checked.size} cargadas)</button>` +
+          `<button class="pk-btn pk-cancel" onclick="ccClose()">Cerrar (sigo después)</button>`;
   m.querySelector(".tanda-modal-body").innerHTML = html;
 }
 
-function ccToggle(np) {
+function ccToggle(npClean) {
   if (!_cc) return;
-  if (_cc.checked.has(np)) _cc.checked.delete(np); else _cc.checked.add(np);
+  const it = _cc.items.find(x => String(x.np).replace(/[^0-9A-Za-z]/g, "") === String(npClean));
+  if (!it) return;
+  if (_cc.checked.has(it.np)) _cc.checked.delete(it.np); else _cc.checked.add(it.np);
+  ccSaveChecked(_cc.legajo, _cc.checked);
   ccRender();
 }
-function ccClose() { _cc = null; closeTandaModal(); }
-function ccSave() {
+function ccClose() { ccReleaseWakeLock(); _cc = null; closeTandaModal(); }   // minimiza (CC sigue abierto, re-abrís tocando CC)
+function ccFinish() {
   if (!_cc) return;
   const legajo = _cc.legajo;
   const sel = _cc.items.filter(it => _cc.checked.has(it.np));
-  _cc = null; closeTandaModal();
-  for (const it of sel) ccSendDetail(legajo, it.np, it.tanda);
-  if (sel.length) { try { alert("Guardadas " + sel.length + " NP cargadas al camión."); } catch (_e) {} }
+  for (const it of sel) ccSendDetail(legajo, it.np, it.tanda);   // CCN por cada NP cargada
+  ccSendClose(legajo);                                           // cierre CC
+  ccClearChecked(legajo);
+  _cc = null; ccReleaseWakeLock(); closeTandaModal();
+  try { alert("🚛 Carga Camión terminada. " + sel.length + " NP cargadas."); } catch (_e) {}
+}
+function ccSendClose(legajo) {
+  const st = getLegajoState(legajo);
+  const openIso = (st.toggles && typeof st.toggles.CC === "string") ? st.toggles.CC : null;
+  try { if (st.toggles && st.toggles.CC) toggleStartOrEnd(legajo, "CC"); } catch (_e) {}   // cierra el toggle CC
+  const nowMs = Date.now();
+  const payload = { legajo: legajo, opcion: "CC", descripcion: "Inicio/Fin Carga Camión", texto: "", ts: nowMs, id: nowMs.toString(36) + "_" + Math.random().toString(36).slice(2, 8), ts_inicio_iso: openIso };
+  try { pushHistoryForLegajo(legajo, { ts: nowMs, opcion: "CC", descripcion: "Inicio/Fin Carga Camión", texto: "", id: payload.id, ts_inicio_iso: openIso, status: "queued" }); } catch (_e) {}
+  try { enqueueReport(payload); if (typeof trySendOneReport === "function") trySendOneReport(payload).then(r => { if (r && r.ok) removeFromQueue(payload.id); }).catch(() => {}); } catch (_e) {}
+  try { updatePendingIndicator(); updateCoreButtonsState(); } catch (_e) {}
 }
 function ccSendDetail(legajo, np, tanda) {
   const nowMs = Date.now();
