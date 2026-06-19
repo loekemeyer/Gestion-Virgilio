@@ -1888,6 +1888,12 @@ button {
 .ppp-zchip.z4{ background:#ec4899; } .ppp-zchip.z5{ background:#f59e0b; } .ppp-zchip.z6{ background:#10b981; }
 .ppp-zchip.z7{ background:#14b8a6; } .ppp-zchip.zsuper{ background:#b45309; } .ppp-zchip.zretira{ background:#64748b; } .ppp-zchip.zexpo{ background:#0f172a; }
 .ppp-zsel{ max-width:128px; border-color:#fca5a5; background:#fff1f2; }
+.ppp-sec-t{ font-size:14px; font-weight:800; margin:18px 0 8px; padding:7px 12px; border-radius:8px; }
+.ppp-sec-t.ppp-sec-super{ background:#fef3c7; color:#92400e; border:1px solid #fcd34d; }
+.ppp-sec-t.ppp-sec-prog{ background:#dbeafe; color:#1e40af; border:1px solid #bfdbfe; }
+.ppp-sec-t.ppp-sec-done{ background:#dcfce7; color:#166534; border:1px solid #bbf7d0; }
+.ppp-tanda.ppp-tanda-super{ border:1px solid #fcd34d; }
+.ppp-tanda.ppp-tanda-super .ppp-tanda-h{ background:linear-gradient(90deg,#d97706,#92400e); }
 .ppp-subir-btn:hover{ background:#15803d; }
 .planim-near{ display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
 .planim-near-t{ font-size: 12px; font-weight: bold; color: #475569; }
@@ -4749,7 +4755,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.10";
+const APP_VERSION = "v3.11";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -7487,7 +7493,9 @@ function openPPP() {
   if (!requireSupervisor()) return;
   const ov = document.getElementById("pppOverlay");
   if (ov) ov.classList.add("show");
+  if (!_pppParsed.prog || !_pppParsed.prog.length) { const st = pppLoadPedidosStore(); if (st.length) _pppParsed.prog = st; }
   pppShowBaseInfo();
+  pppRenderProg();
 }
 function closePPP() {
   const ov = document.getElementById("pppOverlay");
@@ -7557,10 +7565,10 @@ async function pppHandleFile(tipo, f) {                 // de click o de drag-dr
     const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: "" });
     if (tipo === "prog") {
       const r = pppBuildProg(rows);
-      _pppParsed.prog = r.pedidos; _pppEntregados = new Set(); _pppTab = "prog";
-      pppRenderProg();
-      if (r.pedidos.length) pppSetStatus("✓ " + f.name + ": " + r.pedidos.length + " pedidos en " + r.tandas + " tanda(s) (SOLO LOCAL).", true);
-      else pppSetStatus("No reconocí las columnas. Encabezados que leí: " + (r.headerStr || "—"), false);
+      if (!r.pedidos.length) { pppSetStatus("No reconocí las columnas. Encabezados que leí: " + (r.headerStr || "—"), false); return; }
+      const res = pppMergePedidos(r.pedidos);            // SE SUMAN a lo que ya estaba (dedupe por NP)
+      _pppTab = "prog"; pppRenderProg();
+      pppSetStatus("✓ " + f.name + ": " + res.add + " nuevos · " + res.upd + " actualizados · " + res.total + " pedidos en total (SOLO LOCAL).", true);
     } else {
       const mapped = pppMapBase(rows); _pppParsed.base = mapped;   // se guarda para subir después
       try { localStorage.setItem(PPP_BASE_TS_KEY, String(Date.now())); } catch (_e) {}
@@ -7656,6 +7664,7 @@ function pppDetectProgCols(rows) {
   m.tanda = byHdrAny(function (c) { return hh(c, "tanda"); });
   m.zona = byHdrAny(function (c) { return hh(c, "zona"); });
   m.fecha_entrega = byHdrAny(function (c) { return hh(c, "fecha") && hh(c, "entrega"); });
+  m.tipo = byHdrAny(function (c) { return hh(c, "tipo"); });   // WEB/COT/KRIKOS si viene
   return { hr: hr, header: header, map: m, stat: stat, align: align, logHdr: logHdr };
 }
 let _pppLastDetect = null;
@@ -7671,7 +7680,7 @@ function pppBuildProg(rows) {
     if (!/\d/.test(np)) continue;
     const m3s = get(r, m.m3); const m3v = m3s ? parseFloat(m3s.replace(",", ".")) : NaN;
     out.push({
-      tanda: get(r, m.tanda) || "—", cod: get(r, m.cod).replace(/\.0+$/, ""), np: np,
+      tanda: get(r, m.tanda) || "—", cod: get(r, m.cod).replace(/\.0+$/, ""), np: np, tipo: get(r, m.tipo),
       fecha: fe(r, m.fecha), razon_social: get(r, m.razon_social),
       m3: isNaN(m3v) ? null : m3v, localidad: get(r, m.localidad), fecha_entrega: fe(r, m.fecha_entrega),
       zona: get(r, m.zona)
@@ -7679,6 +7688,42 @@ function pppBuildProg(rows) {
   }
   const tset = {}; for (const p of out) tset[p.tanda] = 1;
   return { pedidos: out, tandas: Object.keys(tset).length, headerStr: d.header.filter(Boolean).join(", ").slice(0, 140) };
+}
+/* ===== Acumulación: los pedidos del día SE SUMAN a los que ya estaban (dedupe por
+   N° NP) y se persisten local (sobrevive recarga). Reemplaza al "replace total". ===== */
+const PPP_PEDIDOS_KEY = "vir_ppp_pedidos";
+function pppLoadPedidosStore() { try { const a = JSON.parse(localStorage.getItem(PPP_PEDIDOS_KEY) || "[]"); return Array.isArray(a) ? a : []; } catch (_e) { return []; } }
+function pppSavePedidos(arr) { try { localStorage.setItem(PPP_PEDIDOS_KEY, JSON.stringify(arr || [])); } catch (_e) {} }
+function pppMergePedidos(nuevos) {
+  const cur = (_pppParsed.prog && _pppParsed.prog.length) ? _pppParsed.prog : pppLoadPedidosStore();
+  const byNp = {}, ordenNp = [];
+  for (const p of cur) { const k = String(p.np); if (!(k in byNp)) ordenNp.push(k); byNp[k] = p; }
+  let add = 0, upd = 0;
+  for (const n of (nuevos || [])) {
+    const k = String(n.np);
+    if (k in byNp) { byNp[k] = Object.assign({}, byNp[k], n); upd++; }   // actualiza datos del Excel; los edits (tanda/fe) viven aparte
+    else { byNp[k] = n; ordenNp.push(k); add++; }
+  }
+  const merged = ordenNp.map(function (k) { return byNp[k]; });
+  _pppParsed.prog = merged; pppSavePedidos(merged);
+  return { add: add, upd: upd, total: merged.length };
+}
+/* ===== Detección de SÚPER (van solos: un camión por súper). Tres señales (lo pedido):
+   (1) lista de clientes súper (editable, sembrada con los 4 actuales),
+   (2) Tipo = KRIKOS si el Excel lo trae,
+   (3) Zona = "Super" según la tabla de barrios (Esteban Echeverria, Campo de Mayo…). ===== */
+const PPP_SUPER_KEY = "vir_ppp_supers";
+const PPP_SUPER_SEED = [{ cod: "801", nombre: "Coto C.I.C.S.A." }, { cod: "2686", nombre: "Dorinka S.R.L" }, { cod: "4263", nombre: "Matiz SA" }, { cod: "771", nombre: "S.A.Imp Y Exp De La Patagonia" }];
+let _pppSupers = null;
+function pppLoadSupers() { if (_pppSupers) return _pppSupers; try { _pppSupers = JSON.parse(localStorage.getItem(PPP_SUPER_KEY) || "null"); } catch (_e) { _pppSupers = null; } if (!Array.isArray(_pppSupers)) { _pppSupers = PPP_SUPER_SEED.slice(); pppSaveSupers(); } return _pppSupers; }
+function pppSaveSupers() { try { localStorage.setItem(PPP_SUPER_KEY, JSON.stringify(_pppSupers || [])); } catch (_e) {} }
+function pppEsSuper(p) {
+  if (!p) return false;
+  if (String(p.tipo || "").toUpperCase().indexOf("KRIKOS") >= 0) return true;
+  if (pppZonaDeBarrio(p.localidad) === "Super") return true;
+  const cod = String(p.cod || "").trim();
+  if (cod) { for (const s of pppLoadSupers()) { if (s.cod && String(s.cod) === cod) return true; } }
+  return false;
 }
 function pppDragOver(e, el) { if (e) { e.preventDefault(); e.stopPropagation(); } if (el) el.classList.add("ppp-drag"); }
 function pppDragLeave(e, el) { if (el) el.classList.remove("ppp-drag"); }
@@ -7850,6 +7895,32 @@ function pppZonaCell(p) {
   }
   return '';
 }
+/* Encabezado y fila <tr> reusados por todas las secciones de la PPP. */
+const PPP_THEAD = '<thead><tr><th>Tanda</th><th>Cód Cli</th><th>N° Pedido</th><th>Fecha</th><th>Razón Social</th><th class="num">m³</th><th>Localidad / Barrio</th><th>Fecha Entrega</th><th>Zona</th><th></th></tr></thead>';
+function _pppTieneTanda(p) { const t = (p.tanda || "").trim(); return !!t && t !== "—"; }
+function _pppFechaKey(s) { const m = /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/.exec(String(s || "")); if (!m) return "99999999"; let y = m[3]; if (y.length === 2) y = "20" + y; return y + String(m[2]).padStart(2, "0") + String(m[1]).padStart(2, "0"); }
+function _pppM3Sum(arr) { return arr.reduce(function (s, p) { return s + (Number(p.m3) || 0); }, 0); }
+function _pppRowTr(p) {
+  const npE = escapeHtml(String(p.np));
+  const tEd = escapeHtml(p.tanda && p.tanda !== "—" ? p.tanda : "");
+  const feEd = escapeHtml(p.fecha_entrega || "");
+  const btn = (_pppTab === "ent")
+    ? '<button class="ppp-row-btn ppp-undo" onclick="pppDeshacer(\'' + npE + '\')">↺ Deshacer</button>'
+    : '<button class="ppp-row-btn ppp-ent" onclick="pppEntregar(\'' + npE + '\')">✓ Entregado</button>';
+  return '<tr>' +
+    '<td><input class="ppp-edit ppp-edit-tanda" value="' + tEd + '" placeholder="—" onchange="pppSetEdit(\'' + npE + '\',\'tanda\',this.value.trim().toUpperCase(),true)"></td>' +
+    '<td>' + escapeHtml(p.cod || "") + '</td><td><b>' + npE + '</b></td><td>' + escapeHtml(p.fecha || "") +
+    '</td><td class="ppp-cli">' + escapeHtml(p.razon_social || "") + '</td><td class="num">' + (p.m3 != null && p.m3 !== "" ? Number(p.m3).toFixed(2) : "") +
+    '</td><td>' + escapeHtml(p.localidad || "") + '</td>' +
+    '<td><input class="ppp-edit ppp-edit-fe" value="' + feEd + '" placeholder="dd/mm/aaaa" onchange="pppSetEdit(\'' + npE + '\',\'fecha_entrega\',this.value.trim(),false)"></td>' +
+    '<td>' + pppZonaCell(p) + '</td><td>' + btn + '</td></tr>';
+}
+function _pppBlock(name, cls, meta, pedidos) {
+  let h = '<div class="ppp-tanda ' + cls + '"><div class="ppp-tanda-h"><span class="ppp-tanda-name">' + name + '</span><span class="ppp-tanda-meta">' + meta + '</span></div>' +
+    '<div class="ppp-tablewrap"><table class="ppp-tbl">' + PPP_THEAD + '<tbody>';
+  for (const p of pedidos) h += _pppRowTr(p);
+  return h + '</tbody></table></div></div>';
+}
 function pppRenderProg() {
   const box = document.getElementById("pppPreview"); if (!box) return;
   const ed = pppLoadEdits();
@@ -7861,30 +7932,22 @@ function pppRenderProg() {
     return o;
   };
   const all = (_pppParsed.prog || []).map(merge);
-  if (!all.length) { box.innerHTML = '<div class="planim-empty">Importá el Formato PPP.</div>'; return; }
+  if (!all.length) { box.innerHTML = '<div class="planim-empty">Importá el <b>Formato PPP</b> — los pedidos del día se suman a los que ya estaban.</div>'; return; }
   if (!_pppEntregados) _pppEntregados = new Set();
   const ent = _pppEntregados;
   const prog = all.filter(function (p) { return !ent.has(String(p.np)); });
   const entreg = all.filter(function (p) { return ent.has(String(p.np)); });
-  const rows = (_pppTab === "ent") ? entreg : prog;
-  const m3sum = function (arr) { return arr.reduce(function (s, p) { return s + (Number(p.m3) || 0); }, 0); };
-  const tval = function (p) { const t = (p.tanda || "").trim(); return (!t || t === "—") ? "—" : t.toUpperCase(); };
-  const byT = {};
-  for (const p of rows) { const t = tval(p); (byT[t] = byT[t] || []).push(p); }
-  // "Sin tanda asignada" (—) PRIMERO: ahí están los pedidos por asignar; luego el resto A→Z.
-  const tandas = Object.keys(byT).sort(function (a, b) { if (a === "—") return -1; if (b === "—") return 1; return a < b ? -1 : a > b ? 1 : 0; });
   let html =
     '<div class="ppp-tabs">' +
       '<button class="ppp-tab ' + (_pppTab === "prog" ? "on" : "") + '" onclick="pppTab(\'prog\')">📋 Programación (' + prog.length + ')</button>' +
       '<button class="ppp-tab ' + (_pppTab === "ent" ? "on" : "") + '" onclick="pppTab(\'ent\')">✅ Entregados (' + entreg.length + ')</button>' +
     '</div>';
-  // Diagnóstico del mapeo (para tunear si alguna columna no levanta).
+  // Diagnóstico del mapeo (tocá para ver las columnas del Excel).
   if (_pppLastDetect) {
     const dg = _pppLastDetect;
     const cl = function (i) { return i < 26 ? String.fromCharCode(65 + i) : ("A" + String.fromCharCode(65 + (i - 26))); };
     const colN = function (i) { return i >= 0 ? ("col " + cl(i)) : "✗ FALTA"; };
     const fl = [["Cód", "cod"], ["N° Pedido", "np"], ["Fecha", "fecha"], ["Razón", "razon_social"], ["m³", "m3"], ["Localidad", "localidad"], ["Tanda", "tanda"], ["F.Entr", "fecha_entrega"], ["Zona", "zona"]];
-    // Dump por columna (encabezado + ejemplos) = la "verdad" del Excel, para ajustar si algo no pega.
     let dump = "";
     for (const s of (dg.stat || [])) {
       if (!s.header && !(s.samp && s.samp.length)) continue;
@@ -7894,30 +7957,45 @@ function pppRenderProg() {
       '<div class="ppp-diag-grid">' + fl.map(function (x) { const i = dg.map[x[1]]; return '<span>' + x[0] + ': <b' + (i < 0 ? ' class="ppp-falta"' : '') + '>' + colN(i) + '</b></span>'; }).join("") + '</div>' +
       '<table class="ppp-diag-tbl"><thead><tr><th>Col</th><th>Encabezado</th><th>Ejemplos</th></tr></thead><tbody>' + dump + '</tbody></table></details>';
   }
-  if (!tandas.length) { html += '<div class="planim-empty">' + (_pppTab === "ent" ? "Nada entregado todavía." : "Sin pedidos pendientes.") + '</div>'; box.innerHTML = html; return; }
-  for (const t of tandas) {
-    const ps = byT[t];
-    const none = (t === "—");
-    const tlabel = none ? "Sin tanda asignada — escribila en la columna Tanda ✏️" : ("Tanda " + escapeHtml(t));
-    html += '<div class="ppp-tanda' + (none ? " ppp-tanda-none" : "") + '"><div class="ppp-tanda-h"><span class="ppp-tanda-name">' + tlabel + '</span>' +
-      '<span class="ppp-tanda-meta">' + ps.length + ' ped · ' + m3sum(ps).toFixed(2) + ' m³</span></div>' +
-      '<div class="ppp-tablewrap"><table class="ppp-tbl"><thead><tr><th>Tanda</th><th>Cód Cli</th><th>N° Pedido</th><th>Fecha</th><th>Razón Social</th><th class="num">m³</th><th>Localidad Entrega</th><th>Fecha Entrega</th><th>Zona</th><th></th></tr></thead><tbody>';
-    for (const p of ps) {
-      const npE = escapeHtml(String(p.np));
-      const tEd = escapeHtml(p.tanda && p.tanda !== "—" ? p.tanda : "");
-      const feEd = escapeHtml(p.fecha_entrega || "");
-      const btn = (_pppTab === "ent")
-        ? '<button class="ppp-row-btn ppp-undo" onclick="pppDeshacer(\'' + npE + '\')">↺ Deshacer</button>'
-        : '<button class="ppp-row-btn ppp-ent" onclick="pppEntregar(\'' + npE + '\')">✓ Entregado</button>';
-      html += '<tr>' +
-        '<td><input class="ppp-edit ppp-edit-tanda" value="' + tEd + '" placeholder="—" onchange="pppSetEdit(\'' + npE + '\',\'tanda\',this.value.trim().toUpperCase(),true)"></td>' +
-        '<td>' + escapeHtml(p.cod || "") + '</td><td><b>' + npE + '</b></td><td>' + escapeHtml(p.fecha || "") +
-        '</td><td class="ppp-cli">' + escapeHtml(p.razon_social || "") + '</td><td class="num">' + (p.m3 != null && p.m3 !== "" ? Number(p.m3).toFixed(2) : "") +
-        '</td><td>' + escapeHtml(p.localidad || "") + '</td>' +
-        '<td><input class="ppp-edit ppp-edit-fe" value="' + feEd + '" placeholder="dd/mm/aaaa" onchange="pppSetEdit(\'' + npE + '\',\'fecha_entrega\',this.value.trim(),false)"></td>' +
-        '<td>' + pppZonaCell(p) + '</td><td>' + btn + '</td></tr>';
+  if (_pppTab === "ent") {
+    if (!entreg.length) { html += '<div class="planim-empty">Nada entregado todavía.</div>'; box.innerHTML = html; return; }
+    const byT = {}; for (const p of entreg) { const t = _pppTieneTanda(p) ? p.tanda.toUpperCase() : "—"; (byT[t] = byT[t] || []).push(p); }
+    for (const t of Object.keys(byT).sort()) html += _pppBlock(t === "—" ? "Sin tanda" : ("Tanda " + escapeHtml(t)), "", byT[t].length + " ped · " + _pppM3Sum(byT[t]).toFixed(2) + " m³", byT[t]);
+    box.innerHTML = html; return;
+  }
+  // ===== Tab "Programación" → 3 secciones (réplica del Excel) =====
+  const sup = prog.filter(pppEsSuper);
+  const resto = prog.filter(function (p) { return !pppEsSuper(p); });
+  const aProg = resto.filter(function (p) { return !_pppTieneTanda(p); });
+  const done = resto.filter(_pppTieneTanda);
+  // (1) SÚPER — cada cliente súper su propia tanda (un camión por súper).
+  html += '<div class="ppp-sec-t ppp-sec-super">🛒 Súper — cada uno va solo (un camión por súper) · ' + sup.length + '</div>';
+  if (!sup.length) html += '<div class="planim-empty">Sin súper en cola.</div>';
+  else {
+    const byC = {}, ord = [];
+    for (const p of sup) { const k = String(p.cod || p.razon_social || "?"); if (!(k in byC)) ord.push(k); (byC[k] = byC[k] || []).push(p); }
+    for (const k of ord) { const ps = byC[k]; html += _pppBlock("🛒 " + escapeHtml(ps[0].razon_social || ("Cliente " + k)), "ppp-tanda-super", ps.length + " ped · " + _pppM3Sum(ps).toFixed(2) + " m³", ps); }
+  }
+  // (2) PEDIDOS A PROGRAMAR — sin tanda, agrupados por ZONA, ordenados por fecha de recepción (más viejo primero).
+  html += '<div class="ppp-sec-t ppp-sec-prog">📋 Pedidos a Programar — asigná la Tanda · ' + aProg.length + '</div>';
+  if (!aProg.length) html += '<div class="planim-empty">Nada para programar 👌</div>';
+  else {
+    const byZ = {}; for (const p of aProg) { const z = pppZonaDeBarrio(p.localidad) || "— sin zona —"; (byZ[z] = byZ[z] || []).push(p); }
+    const ordZ = function (z) { const i = PPP_ZONAS.indexOf(z); return i < 0 ? 99 : i; };
+    const zs = Object.keys(byZ).sort(function (a, b) { return ordZ(a) - ordZ(b) || (a < b ? -1 : 1); });
+    for (const z of zs) {
+      const ps = byZ[z].slice().sort(function (a, b) { return _pppFechaKey(a.fecha).localeCompare(_pppFechaKey(b.fecha)); });
+      const none = (z === "— sin zona —");
+      const chip = (!none && PPP_ZONA_SHORT[z]) ? ('<span class="ppp-zchip ' + pppZonaClass(z) + '">' + escapeHtml(PPP_ZONA_SHORT[z]) + '</span> ') : "";
+      html += _pppBlock(chip + escapeHtml(z), none ? "ppp-tanda-none" : "", ps.length + " ped · " + _pppM3Sum(ps).toFixed(2) + " m³", ps);
     }
-    html += '</tbody></table></div></div>';
+  }
+  // (3) PROGRAMADOS — con tanda, agrupados por tanda (con su total m³).
+  html += '<div class="ppp-sec-t ppp-sec-done">✅ Programados · ' + done.length + '</div>';
+  if (!done.length) html += '<div class="planim-empty">Todavía no programaste nada.</div>';
+  else {
+    const byT = {}; for (const p of done) { const t = p.tanda.toUpperCase(); (byT[t] = byT[t] || []).push(p); }
+    for (const t of Object.keys(byT).sort()) html += _pppBlock("Tanda " + escapeHtml(t), "", byT[t].length + " ped · " + _pppM3Sum(byT[t]).toFixed(2) + " m³", byT[t]);
   }
   box.innerHTML = html;
 }

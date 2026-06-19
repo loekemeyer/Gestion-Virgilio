@@ -4,7 +4,20 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-19 · Versión app al documentar: **v3.10**
+> Última actualización: 2026-06-19 · Versión app al documentar: **v3.11**
+>
+> Nota: **v3.11** — PPP Fase 1 completa: **acumulación + 3 secciones + detección de súper**.
+> **Acumulación**: importar el Formato PPP ya NO reemplaza — los pedidos del día **se suman**
+> a los existentes (dedupe por N° NP; si el NP repite, actualiza sus datos del Excel y
+> conserva los edits de tanda/fecha). Persistido en `localStorage` `vir_ppp_pedidos`
+> (`pppMergePedidos`/`pppLoadPedidosStore`); `openPPP` lo recarga al abrir. Status: "X
+> nuevos · Y actualizados · Z total". **3 secciones** (réplica del Excel): 🛒 **Súper**
+> (cada cliente súper su propia tanda), 📋 **Pedidos a Programar** (sin tanda, agrupados por
+> **Zona** y ordenados por **fecha de recepción** más vieja primero), ✅ **Programados**
+> (con tanda, agrupados por tanda con total m³). Asignar la Tanda mueve el pedido de "a
+> Programar" a "Programados" en vivo. **Súper** = (1) lista de clientes editable
+> `vir_ppp_supers` sembrada con los 4 actuales (Coto/Dorinka/Matiz/S.A.Imp Exp Patagonia),
+> (2) Tipo=KRIKOS si el Excel lo trae, (3) Zona=Super del barrio (`pppEsSuper`). SOLO LOCAL.
 >
 > Nota: **v3.10** — PPP: **Zona automática desde el Barrio** (réplica de la lógica del
 > Excel real `AAA_PPP_Vigente`). La Zona NO se escribe: sale del barrio de entrega
