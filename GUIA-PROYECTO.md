@@ -4,7 +4,15 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-19 · Versión app al documentar: **v3.27**
+> Última actualización: 2026-06-19 · Versión app al documentar: **v3.28**
+>
+> Nota: **v3.28** — PPP: **editar tanda (✏️ lápiz)** en Programación. El botón ✏️ abre la
+> tanda en **modo edición** (`pppEditTanda`, clase `.ppp-edit-mode`) y muestra un panel:
+> **(1) cambiar la Fecha de Entrega de toda la tanda** (date input → `pppTandaFecha`, aplica
+> a todos los NP de la tanda); **(2) mover** un pedido a otra tanda = cambiar su **Tanda** en
+> la fila (input ya existente, sigue programado); **(3) devolver a "A Programar"**: botón ↩
+> por fila (`pppPedidoAProgramar`) y botón "↩ toda la tanda" (`pppTandaAProgramar`) que le
+> sacan tanda+fecha+programación. Helper `_pppTandaNps`.
 >
 > Nota: **v3.27** — PPP: **alarma de tanda VENCIDA**. Si una tanda programada tiene Fecha de
 > Entrega **en el pasado** y sigue en Programación (no entregada), la franja se pone **roja,

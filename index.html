@@ -1934,6 +1934,17 @@ button {
 .ppp-tanda-ent:hover{ background:rgba(255,255,255,.35); }
 .ppp-ok-btn{ margin-left:8px; padding:3px 12px; font-size:12px; font-weight:800; border:none; border-radius:7px; background:#fff; color:#166534; cursor:pointer; }
 .ppp-ok-btn:hover{ background:#dcfce7; }
+.ppp-pencil-btn{ padding:3px 9px; font-size:13px; border:none; border-radius:7px; background:rgba(255,255,255,.22); color:#fff; cursor:pointer; }
+.ppp-pencil-btn:hover{ background:rgba(255,255,255,.42); }
+.ppp-edit-panel{ display:none; }
+.ppp-tanda.ppp-open.ppp-edit-mode .ppp-edit-panel{ display:flex; flex-wrap:wrap; gap:10px 16px; align-items:center; padding:10px 14px; background:#fffbeb; border-bottom:1px solid #fde68a; }
+.ppp-ep-l{ font-size:13px; font-weight:700; color:#92400e; display:inline-flex; align-items:center; gap:8px; }
+.ppp-ep-date{ height:32px; border:1px solid #cbd5e1; border-radius:7px; padding:0 8px; font-size:13px; }
+.ppp-ep-btn{ padding:7px 12px; font-size:13px; font-weight:700; border:none; border-radius:8px; background:#1e6bd6; color:#fff; cursor:pointer; }
+.ppp-ep-btn.ppp-ep-back{ background:#b42318; }
+.ppp-ep-hint{ font-size:12px; color:#78716c; }
+.ppp-row-back{ display:none; margin-right:6px; padding:4px 9px; font-size:13px; font-weight:800; border:1px solid #fecaca; border-radius:7px; background:#fff; color:#b42318; cursor:pointer; }
+.ppp-tanda.ppp-edit-mode .ppp-row-back{ display:inline-block; }
 .ppp-tool-l{ font-size:12px; font-weight:700; color:#475569; display:flex; align-items:center; gap:6px; }
 .ppp-tool-inp{ width:84px; height:34px; font-size:14px; border:1px solid #cbd5e1; border-radius:8px; padding:0 8px; }
 .ppp-tool-n{ width:64px; font-family:Consolas,Menlo,monospace; }
@@ -4829,7 +4840,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.27";
+const APP_VERSION = "v3.28";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -8249,12 +8260,39 @@ function _pppRowTr(p) {
     '<td>' + pppZonaCell(p) + '</td>' +
     '<td>' + (_pppListoFC(p) ? '<span class="ppp-fc ok" title="Armado terminado (TAP)">✓ Listo</span>' : '<span class="ppp-fc">·</span>') + '</td>' +
     '<td>' + (_pppEntregado(p) ? '<span class="ppp-fc ok2" title="Cargado al camión (CC)">✓ Entregado</span>' : '<span class="ppp-fc">·</span>') + '</td>' +
-    '<td>' + btn + '</td></tr>';
+    '<td><button class="ppp-row-back" onclick="pppPedidoAProgramar(\'' + npE + '\')" title="Sacar de la tanda → A Programar">↩</button>' + btn + '</td></tr>';
 }
 let _pppOpen = new Set();   // ids de bloques abiertos (por clave estable → persiste entre renders)
 function _pppKid(k) { return "pppb_" + String(k).replace(/[^A-Za-z0-9]/g, "_"); }
 function pppToggleBlock(id) { const el = document.getElementById(id); if (!el) return; el.classList.toggle("ppp-open"); if (el.classList.contains("ppp-open")) _pppOpen.add(id); else _pppOpen.delete(id); }
 function pppAbrirControlar(id) { const el = document.getElementById(id); if (el) el.classList.add("ppp-open"); _pppOpen.add(id); }
+/* ===== Editar tanda (✏️): cambiar la fecha de toda la tanda, mover pedidos a otra tanda
+   (cambiando su Tanda en la fila) y devolver pedidos a "A Programar". ===== */
+function pppEditTanda(id, tanda) { const el = document.getElementById(id); if (!el) return; el.classList.add("ppp-open"); _pppOpen.add(id); el.classList.toggle("ppp-edit-mode"); }
+function _pppTandaNps(tanda) {
+  const ed = pppLoadEdits(), t = String(tanda).toUpperCase(), out = [];
+  for (const p of (_pppParsed.prog || [])) { const e = ed[String(p.np)]; const pt = ((e && e.tanda != null ? e.tanda : p.tanda) || "").toUpperCase(); if (pt === t) out.push(String(p.np)); }
+  return out;
+}
+function pppTandaFecha(id, tanda) {
+  const inp = document.getElementById(id + "_d"); if (!inp || !inp.value) { pppSetStatus("Elegí una fecha primero.", false); return; }
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(inp.value); if (!m) return;
+  const f = m[3] + "/" + m[2] + "/" + m[1];
+  const ed = pppLoadEdits();
+  for (const np of _pppTandaNps(tanda)) { (ed[np] = ed[np] || {}).fecha_entrega = f; }
+  pppSaveEdits(); pppRenderProg(); pppSetStatus("✓ Tanda " + String(tanda).toUpperCase() + ": fecha de entrega → " + f + ".", true);
+}
+function pppTandaAProgramar(tanda) {
+  const t = String(tanda).toUpperCase(); if (!confirm("¿Devolver toda la tanda " + t + " a 'A Programar'? (le saca la tanda, la fecha y la programación)")) return;
+  const ed = pppLoadEdits();
+  for (const np of _pppTandaNps(t)) { ed[np] = ed[np] || {}; ed[np].tanda = "—"; delete ed[np].programmed; delete ed[np].fecha_entrega; }
+  pppSaveEdits(); pppRenderProg(); pppSetStatus("↩ Tanda " + t + " devuelta a A Programar.", true);
+}
+function pppPedidoAProgramar(np) {
+  const ed = pppLoadEdits(), k = String(np);
+  ed[k] = ed[k] || {}; ed[k].tanda = "—"; delete ed[k].programmed; delete ed[k].fecha_entrega;
+  pppSaveEdits(); pppRenderProg(); pppSetStatus("↩ Pedido " + k + " devuelto a A Programar.", true);
+}
 /* Ruta/camión del bloque según la zona de sus pedidos (para colorear la franja por camión):
    so = Z1·Z3·Z4 (Sur/Oeste) · n = Z5·Z6·Z7 (Norte) · c = Z2 (Centro) · ret = Retira. */
 function _pppRuta(pedidos) {
@@ -8289,7 +8327,7 @@ function _pppNpFmt(nps) {
   }
   return out.join(", ");
 }
-function _pppBlock(key, name, cls, meta, pedidos, headerExtra) {
+function _pppBlock(key, name, cls, meta, pedidos, headerExtra, editTanda) {
   const id = _pppKid(key);
   const open = _pppOpen.has(id) ? " ppp-open" : "";
   const ruta = _pppRuta(pedidos);
@@ -8312,8 +8350,16 @@ function _pppBlock(key, name, cls, meta, pedidos, headerExtra) {
       '<span class="ppp-tanda-sum">' + sum + '</span>' +
       '<span class="ppp-tanda-fe">' + feHtml + '</span>' +
       '<span class="ppp-tanda-meta">' + meta + hx + '</span>' +
-    '</div>' +
-    '<div class="ppp-tablewrap"><table class="ppp-tbl">' + PPP_THEAD + '<tbody>';
+    '</div>';
+  if (editTanda) {
+    const te = escapeHtml(String(editTanda));
+    h += '<div class="ppp-edit-panel">' +
+      '<span class="ppp-ep-l">📅 Fecha de toda la tanda <input type="date" class="ppp-ep-date" id="' + id + '_d"> <button class="ppp-ep-btn" onclick="pppTandaFecha(\'' + id + '\',\'' + te + '\')">Aplicar</button></span>' +
+      '<button class="ppp-ep-btn ppp-ep-back" onclick="pppTandaAProgramar(\'' + te + '\')">↩ Toda la tanda a A Programar</button>' +
+      '<span class="ppp-ep-hint">Para <b>mover</b> un pedido a otra tanda: cambiá su <b>Tanda</b> en la fila. Para <b>sacarlo</b>: ↩ en su fila.</span>' +
+      '</div>';
+  }
+  h += '<div class="ppp-tablewrap"><table class="ppp-tbl">' + PPP_THEAD + '<tbody>';
   for (const p of pedidos) h += _pppRowTr(p);
   return h + '</tbody></table></div></div>';
 }
@@ -8440,8 +8486,9 @@ function pppRenderProg() {
       ordt.sort();
       for (const t of ordt) {
         const es = pppEsSuper(byT[t][0]);
+        const pencil = (t !== "—") ? ' <button class="ppp-pencil-btn" onclick="event.stopPropagation();pppEditTanda(\'__BLOCKID__\',\'' + escapeHtml(t) + '\')" title="Editar tanda: fecha / mover / devolver">✏️</button>' : '';
         const entBtn = (t !== "—") ? ' <button class="ppp-tanda-ent" onclick="event.stopPropagation();pppAbrirControlar(\'__BLOCKID__\')">✓ Controlar</button>' : '';
-        html += _pppBlock("plan_" + dk + "_" + t, (es ? "🛒 " : "") + (t === "—" ? "Sin tanda" : "Tanda " + escapeHtml(t)), es ? "ppp-tanda-super" : "", byT[t].length + " ped · " + _pppM3Sum(byT[t]).toFixed(2) + " m³", byT[t], entBtn);
+        html += _pppBlock("plan_" + dk + "_" + t, (es ? "🛒 " : "") + (t === "—" ? "Sin tanda" : "Tanda " + escapeHtml(t)), es ? "ppp-tanda-super" : "", byT[t].length + " ped · " + _pppM3Sum(byT[t]).toFixed(2) + " m³", byT[t], pencil + entBtn, (t !== "—" ? t : null));
       }
     }
     box.innerHTML = html; return;
