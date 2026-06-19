@@ -4,7 +4,19 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-19 · Versión app al documentar: **v3.13**
+> Última actualización: 2026-06-19 · Versión app al documentar: **v3.14**
+>
+> Nota: **v3.14** — PPP: **flujo en 2 etapas** (refinado por el usuario). (a) **Todo lo
+> importado cae en la solapa 📥 "A Programar"** (no programado). (b) Ahí se **arman tandas**
+> (`🪄 Sugerir tandas`) con tope **m³/tanda = 0,8** (`tandaCap`, antes 6 era mal); los súper
+> quedan exentos (van solos por su fecha de entrega). (c) **`✅ Confirmar y programar`**
+> (`pppConfirmarProgramar`) pasa las tandas a **🗓️ "Programación"** asignándoles **Fecha de
+> Entrega automática**: empaca las tandas en días de entrega a **m³/día = 6** (`dayCap`,
+> máximo por día), priorizando fecha de recepción vieja; fecha base = próximo día,
+> **saltea domingos** (`_pppDeliveryDate`). Los súper se programan por SU fecha (no usan el
+> cupo de 6). Estado nuevo `programmed` en `vir_ppp_edits`. Solapas: 📥 A Programar · 🗓️
+> Programación (por fecha de entrega → tanda) · 🚚 Resumen (usa programados) · ✅ Entregados.
+> `borrar tandas` resetea tanda+programación. Config en `vir_ppp_cfg` {tandaCap,dayCap,baseN}.
 >
 > Nota: **v3.13** — PPP Fase 3: **tab 🚚 Resumen de camiones** (réplica de `Resumen Prog`).
 > Agrupa los pedidos **por Fecha de Entrega**; suma m³ **por zona** (los súper cuentan en
