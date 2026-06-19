@@ -4,7 +4,16 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-19 · Versión app al documentar: **v3.12**
+> Última actualización: 2026-06-19 · Versión app al documentar: **v3.13**
+>
+> Nota: **v3.13** — PPP Fase 3: **tab 🚚 Resumen de camiones** (réplica de `Resumen Prog`).
+> Agrupa los pedidos **por Fecha de Entrega**; suma m³ **por zona** (los súper cuentan en
+> "Súper", no en su zona geográfica); arma camiones por **ruta fija**: Sur/Oeste=Z1+Z3+Z4 ·
+> Norte=Z5+Z6+Z7 · Centro=Z2 · Súper (uno por cliente) · Retira (sin camión). Cada ruta a
+> **6 m³/día** → `ceil(m³/cap)` camiones. Muestra m³ por zona (chips), desglose de camiones
+> y **demora promedio** (Fecha Entrega − Fecha Recep) por día + total. `pppResumenHtml`,
+> `_pppFechaDate`. **Verificado**: el mapeo de zona coincide con el Excel en 104/104 filas y
+> los totales por zona dan idénticos al `Resumen Prog`. SOLO LOCAL.
 >
 > Nota: **v3.12** — PPP Fase 2: **botón "Sugerir tandas"** (armado automático asistido).
 > Barra con **m³/tanda** (capacidad, default **6**) y **N° base** (default 60), persistidos

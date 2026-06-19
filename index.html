@@ -1901,6 +1901,17 @@ button {
 .ppp-tool-inp{ width:84px; height:34px; font-size:14px; border:1px solid #cbd5e1; border-radius:8px; padding:0 8px; }
 .ppp-tool-n{ width:64px; font-family:Consolas,Menlo,monospace; }
 .ppp-tool-clear{ margin-left:auto; padding:7px 12px; font-size:12px; font-weight:700; border:1px solid #fecaca; border-radius:8px; background:#fff; color:#b42318; cursor:pointer; }
+.ppp-res{ display:flex; flex-direction:column; gap:10px; }
+.ppp-res-note{ font-size:13px; color:#92400e; background:#fffbeb; border:1px solid #fde68a; border-radius:8px; padding:8px 12px; margin-bottom:8px; }
+.ppp-res-day{ background:#fff; border:1px solid #e2e8f0; border-radius:12px; overflow:hidden; }
+.ppp-res-h{ display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; padding:10px 14px; background:linear-gradient(90deg,#0f172a,#334155); color:#fff; }
+.ppp-res-fecha{ font-size:15px; font-weight:800; }
+.ppp-res-kpi{ font-size:13px; font-weight:700; opacity:.95; }
+.ppp-res-zonas{ display:flex; flex-wrap:wrap; gap:6px; padding:10px 14px; border-bottom:1px solid #f1f5f9; }
+.ppp-res-muted{ color:#94a3b8; }
+.ppp-res-cams{ display:flex; flex-direction:column; gap:4px; padding:10px 14px; }
+.ppp-res-cam{ font-size:13px; color:#0f172a; }
+.ppp-res-tot{ margin-top:4px; padding:12px 14px; background:#0b1220; color:#fff; border-radius:12px; font-size:14px; text-align:right; }
 .ppp-subir-btn:hover{ background:#15803d; }
 .planim-near{ display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
 .planim-near-t{ font-size: 12px; font-weight: bold; color: #475569; }
@@ -4762,7 +4773,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.12";
+const APP_VERSION = "v3.13";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -7956,6 +7967,7 @@ function pppZonaCell(p) {
 const PPP_THEAD = '<thead><tr><th>Tanda</th><th>Cód Cli</th><th>N° Pedido</th><th>Fecha</th><th>Razón Social</th><th class="num">m³</th><th>Localidad / Barrio</th><th>Fecha Entrega</th><th>Zona</th><th></th></tr></thead>';
 function _pppTieneTanda(p) { const t = (p.tanda || "").trim(); return !!t && t !== "—"; }
 function _pppFechaKey(s) { const m = /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/.exec(String(s || "")); if (!m) return "99999999"; let y = m[3]; if (y.length === 2) y = "20" + y; return y + String(m[2]).padStart(2, "0") + String(m[1]).padStart(2, "0"); }
+function _pppFechaDate(s) { const m = /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/.exec(String(s || "")); if (!m) return null; let y = +m[3]; if (y < 100) y += 2000; const d = new Date(y, +m[2] - 1, +m[1]); return isNaN(d.getTime()) ? null : d; }
 function _pppM3Sum(arr) { return arr.reduce(function (s, p) { return s + (Number(p.m3) || 0); }, 0); }
 function _pppRowTr(p) {
   const npE = escapeHtml(String(p.np));
@@ -7978,6 +7990,71 @@ function _pppBlock(name, cls, meta, pedidos) {
   for (const p of pedidos) h += _pppRowTr(p);
   return h + '</tbody></table></div></div>';
 }
+/* ===== Fase 3: Resumen de camiones por día de ENTREGA (réplica de 'Resumen Prog').
+   Agrupa los pedidos por Fecha de Entrega; suma m³ por zona (los súper cuentan en
+   "Súper", no en su zona geográfica); arma camiones por RUTA fija:
+   Ruta Sur/Oeste = Z1+Z3+Z4 · Ruta Norte = Z5+Z6+Z7 · Ruta Centro = Z2 · Súper (uno
+   por cliente) · Retira (sin camión). Cada camión hasta la capacidad (6 m³/día →
+   ceil(m³/cap) camiones por ruta). Demora prom = promedio (Fecha Entrega − Fecha Recep). */
+const PPP_ZKEYS = ["Zona 1 - CABA Sur", "Zona 2 - CABA Centro", "Zona 3 - CABA Oeste", "Zona 4 - GBA Sur", "Zona 5 - GBA Oeste", "Zona 6 - GBA Norte", "Zona 7 - GBA Norte Lejos", "Retira", "Super", "Expo"];
+function pppResumenHtml(prog) {
+  const conF = prog.filter(function (p) { return (p.fecha_entrega || "").trim(); });
+  const sinF = prog.length - conF.length;
+  let head = '';
+  if (sinF) head += '<div class="ppp-res-note">⏳ ' + sinF + ' pedido(s) sin Fecha de Entrega — no entran al resumen (asigná la fecha en Programación).</div>';
+  if (!conF.length) return head + '<div class="planim-empty">Sin pedidos con Fecha de Entrega todavía.</div>';
+  const CAP = pppGetCfg().cap > 0 ? pppGetCfg().cap : 6;
+  const byD = {};
+  for (const p of conF) { const k = _pppFechaKey(p.fecha_entrega); if (!byD[k]) byD[k] = { fecha: p.fecha_entrega, ped: [] }; byD[k].ped.push(p); }
+  const dias = Object.keys(byD).sort();
+  const ceilT = function (m) { return m > 0 ? Math.ceil((m - 1e-9) / CAP) : 0; };
+  const DOW = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+  const fmt = function (n) { return (Math.round(n * 100) / 100).toFixed(2); };
+  let totM3 = 0, totCam = 0, totDem = 0, totDemN = 0;
+  let html = head + '<div class="ppp-res">';
+  for (const dk of dias) {
+    const d = byD[dk], ped = d.ped;
+    const Z = {}; PPP_ZKEYS.forEach(function (z) { Z[z] = 0; }); let sinz = 0;
+    const supCli = {};
+    for (const p of ped) {
+      const m3 = Number(p.m3) || 0;
+      const z = pppEsSuper(p) ? "Super" : (pppZonaDeBarrio(p.localidad) || "");
+      if (pppEsSuper(p)) { const k = String(p.cod || p.razon_social || "?"); if (!supCli[k]) supCli[k] = { n: p.razon_social || ("Cliente " + k), m3: 0 }; supCli[k].m3 += m3; }
+      if (!z) { sinz += m3; continue; }
+      Z[z] += m3;
+    }
+    const z1 = Z["Zona 1 - CABA Sur"], z2 = Z["Zona 2 - CABA Centro"], z3 = Z["Zona 3 - CABA Oeste"], z4 = Z["Zona 4 - GBA Sur"], z5 = Z["Zona 5 - GBA Oeste"], z6 = Z["Zona 6 - GBA Norte"], z7 = Z["Zona 7 - GBA Norte Lejos"], zret = Z["Retira"], zsup = Z["Super"], zexp = Z["Expo"];
+    const total = ped.reduce(function (s, p) { return s + (Number(p.m3) || 0); }, 0);
+    const surOeste = z1 + z3 + z4, norte = z5 + z6 + z7, centro = z2;
+    let nSup = 0; for (const k in supCli) nSup += Math.max(1, ceilT(supCli[k].m3));
+    const nCam = ceilT(surOeste) + ceilT(norte) + ceilT(centro) + nSup;
+    let dem = 0, dn = 0; for (const p of ped) { const a = _pppFechaDate(p.fecha), b = _pppFechaDate(p.fecha_entrega); if (a && b) { dem += (b - a) / 86400000; dn++; } }
+    const demProm = dn ? dem / dn : null;
+    totM3 += total; totCam += nCam; totDem += dem; totDemN += dn;
+    const dt = _pppFechaDate(d.fecha), dia = dt ? DOW[dt.getDay()] : "";
+    // chips de zona con m³
+    const chips = [];
+    const addChip = function (z, m) { if (m > 0.0001) chips.push('<span class="ppp-zchip ' + pppZonaClass(z) + '">' + (PPP_ZONA_SHORT[z] || z) + ' ' + fmt(m) + '</span>'); };
+    addChip("Zona 1 - CABA Sur", z1); addChip("Zona 2 - CABA Centro", z2); addChip("Zona 3 - CABA Oeste", z3); addChip("Zona 4 - GBA Sur", z4);
+    addChip("Zona 5 - GBA Oeste", z5); addChip("Zona 6 - GBA Norte", z6); addChip("Zona 7 - GBA Norte Lejos", z7); addChip("Super", zsup); addChip("Retira", zret); addChip("Expo", zexp);
+    if (sinz > 0.0001) chips.push('<span class="ppp-zchip" style="background:#94a3b8">sin zona ' + fmt(sinz) + '</span>');
+    // camiones por ruta
+    const cams = [];
+    if (surOeste > 0.0001) cams.push('<div class="ppp-res-cam">🚚 <b>Ruta Sur/Oeste</b> (Z1·Z3·Z4): ' + fmt(surOeste) + ' m³ — <b>' + ceilT(surOeste) + '</b> camión' + (ceilT(surOeste) > 1 ? 'es' : '') + '</div>');
+    if (norte > 0.0001) cams.push('<div class="ppp-res-cam">🚚 <b>Ruta Norte</b> (Z5·Z6·Z7): ' + fmt(norte) + ' m³ — <b>' + ceilT(norte) + '</b> camión' + (ceilT(norte) > 1 ? 'es' : '') + '</div>');
+    if (centro > 0.0001) cams.push('<div class="ppp-res-cam">🚚 <b>Ruta Centro</b> (Z2): ' + fmt(centro) + ' m³ — <b>' + ceilT(centro) + '</b> camión' + (ceilT(centro) > 1 ? 'es' : '') + '</div>');
+    const supNames = Object.keys(supCli).map(function (k) { return escapeHtml(supCli[k].n) + ' ' + fmt(supCli[k].m3); });
+    if (supNames.length) cams.push('<div class="ppp-res-cam">🛒 <b>Súper</b>: ' + nSup + ' camión' + (nSup > 1 ? 'es' : '') + ' · ' + supNames.join(' · ') + '</div>');
+    if (zret > 0.0001) cams.push('<div class="ppp-res-cam">📦 <b>Retira</b>: ' + fmt(zret) + ' m³ (sin camión)</div>');
+    html += '<div class="ppp-res-day"><div class="ppp-res-h"><span class="ppp-res-fecha">' + dia + ' ' + escapeHtml(d.fecha) + '</span>' +
+      '<span class="ppp-res-kpi">' + fmt(total) + ' m³ · ' + nCam + ' camion' + (nCam === 1 ? '' : 'es') + (demProm != null ? ' · demora ' + (Math.round(demProm * 10) / 10) + ' d' : '') + '</span></div>' +
+      '<div class="ppp-res-zonas">' + (chips.join("") || '<span class="ppp-res-muted">—</span>') + '</div>' +
+      '<div class="ppp-res-cams">' + cams.join("") + '</div></div>';
+  }
+  const demT = totDemN ? (Math.round(totDem / totDemN * 10) / 10) : null;
+  html += '<div class="ppp-res-tot">TOTAL: <b>' + fmt(totM3) + ' m³</b> · <b>' + totCam + '</b> camiones' + (demT != null ? ' · demora prom <b>' + demT + ' d</b>' : '') + '</div>';
+  return html + '</div>';
+}
 function pppRenderProg() {
   const box = document.getElementById("pppPreview"); if (!box) return;
   const ed = pppLoadEdits();
@@ -7997,6 +8074,7 @@ function pppRenderProg() {
   let html =
     '<div class="ppp-tabs">' +
       '<button class="ppp-tab ' + (_pppTab === "prog" ? "on" : "") + '" onclick="pppTab(\'prog\')">📋 Programación (' + prog.length + ')</button>' +
+      '<button class="ppp-tab ' + (_pppTab === "resumen" ? "on" : "") + '" onclick="pppTab(\'resumen\')">🚚 Resumen</button>' +
       '<button class="ppp-tab ' + (_pppTab === "ent" ? "on" : "") + '" onclick="pppTab(\'ent\')">✅ Entregados (' + entreg.length + ')</button>' +
     '</div>';
   // Diagnóstico del mapeo (tocá para ver las columnas del Excel).
@@ -8014,6 +8092,7 @@ function pppRenderProg() {
       '<div class="ppp-diag-grid">' + fl.map(function (x) { const i = dg.map[x[1]]; return '<span>' + x[0] + ': <b' + (i < 0 ? ' class="ppp-falta"' : '') + '>' + colN(i) + '</b></span>'; }).join("") + '</div>' +
       '<table class="ppp-diag-tbl"><thead><tr><th>Col</th><th>Encabezado</th><th>Ejemplos</th></tr></thead><tbody>' + dump + '</tbody></table></details>';
   }
+  if (_pppTab === "resumen") { html += pppResumenHtml(prog); box.innerHTML = html; return; }
   if (_pppTab === "ent") {
     if (!entreg.length) { html += '<div class="planim-empty">Nada entregado todavía.</div>'; box.innerHTML = html; return; }
     const byT = {}; for (const p of entreg) { const t = _pppTieneTanda(p) ? p.tanda.toUpperCase() : "—"; (byT[t] = byT[t] || []).push(p); }
