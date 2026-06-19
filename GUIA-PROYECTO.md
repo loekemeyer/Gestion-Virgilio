@@ -4,7 +4,16 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-19 · Versión app al documentar: **v3.20**
+> Última actualización: 2026-06-19 · Versión app al documentar: **v3.21**
+>
+> Nota: **v3.21** — PPP: **migración del estado actual desde el Excel**. Si en "Importar
+> Formato PPP" se sube el Excel de la PPP completo (hoja **"Programacion Diaria"**, 15 cols
+> por posición con secciones), se **autodetecta** (`pppEsPPPCompleta`) y se carga TODO
+> (`pppLoadProgCompleta`/`pppImportarCompleta`): lo de la sección **Programación** con tanda
+> → **ya programado** con su fecha de entrega; **súper** → por su fecha; el resto → **A
+> Programar**. Verificado con `AAA_PPP_Vigente`: **123 pedidos** (75 programados en 7 días
+> de entrega, 8 súper, 39 a programar). Lee la hoja "Programacion Diaria" aunque no sea la
+> primera. El Formato PPP simple (export del día) se sigue detectando y acumulando como antes.
 >
 > Nota: **v3.20** — PPP: el encabezado de cada tanda ahora **alinea a la izquierda** (m³ +
 > botón OK/Entregada a la altura de la columna Fecha, `min-width` en `.ppp-tanda-name` +

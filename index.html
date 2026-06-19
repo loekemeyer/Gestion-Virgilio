@@ -4782,7 +4782,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.20";
+const APP_VERSION = "v3.21";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -7582,6 +7582,68 @@ function pppMapProg(rows) {                          // por posición; fila = pe
   return out;
 }
 const PPP_BASE_TS_KEY = "vir_ppp_base_ts";
+/* ===== Migración: cargar la PPP COMPLETA desde el Excel actual (hoja "Programacion
+   Diaria", 15 columnas por posición, con secciones). Detecta los títulos de sección y
+   carga todo: lo que está en "Programación" con tanda → ya programado (con su fecha);
+   los súper → por su fecha; lo demás → A Programar. Layout (por posición):
+   Tanda0 · Tipo1 · NP2 · FechaRecep3 · Cod4 · Razon5 · M3·6 · V7 · Direccion8 · Barrio9
+   · Op10 · FechaEntrega11 · FechaFc12 · Zona13 · Obs14. ===== */
+function pppEsPPPCompleta(rows) {
+  let hits = 0;
+  for (let i = 0; i < Math.min(rows.length, 160); i++) {
+    const c = (rows[i] && rows[i][0] != null) ? String(rows[i][0]).toLowerCase().trim() : "";
+    if (!c) continue;
+    if (c.indexOf("pedidos a programar") >= 0 || (c.indexOf("super") >= 0 && c.indexOf("program") >= 0) || c.indexOf("pedidos con problema") >= 0 || c.indexOf("programacion") === 0 || c.indexOf("programación") === 0) hits++;
+  }
+  return hits >= 2;
+}
+function pppLoadProgCompleta(rows) {
+  let section = "";
+  const ped = [], edits = {};
+  for (const r of rows) {
+    if (!r) continue;
+    const c0 = _pppS(r[0]).toLowerCase();
+    if (c0) {
+      if (c0.indexOf("problema") >= 0) { section = "problemas"; continue; }
+      if (c0.indexOf("super") >= 0 && c0.indexOf("program") >= 0) { section = "super"; continue; }
+      if (c0.indexOf("pedidos a programar") >= 0) { section = "aprogramar"; continue; }
+      if (c0.indexOf("programacion") === 0 || c0.indexOf("programación") === 0) { section = "programacion"; continue; }
+      if (c0 === "tanda") continue;   // fila de encabezado de columnas
+    }
+    const np = _pppS(r[2]).replace(/\.0+$/, "");
+    if (!/^\d/.test(np)) continue;    // saltea filas "Total CXX:" / vacías
+    const tanda = _pppS(r[0]).toUpperCase();
+    const tipo = _pppS(r[1]);
+    const barrio = _pppS(r[9]);
+    const fe = _pppFecha(r[11]);
+    ped.push({
+      np: np, tanda: tanda || "—", tipo: tipo, fecha: _pppFecha(r[3]),
+      cod: _pppS(r[4]).replace(/\.0+$/, ""), razon_social: _pppS(r[5]),
+      m3: _pppNum(r[6]), localidad: barrio, fecha_entrega: fe, zona: _pppS(r[13])
+    });
+    const isSuper = (section === "super") || (tipo.toUpperCase().indexOf("KRIKOS") >= 0) || (pppZonaDeBarrio(barrio) === "Super");
+    if (isSuper) {
+      const e = {}; if (tanda && tanda !== "—") e.tanda = tanda; if (fe) { e.fecha_entrega = fe; e.programmed = true; }
+      if (Object.keys(e).length) edits[np] = e;
+    } else if (section === "programacion" && tanda && tanda !== "—") {
+      edits[np] = { tanda: tanda, fecha_entrega: fe, programmed: true };
+    } else if (tanda && tanda !== "—") {
+      edits[np] = { tanda: tanda };   // tiene tanda pero no en sección Programación → tanda armada sin confirmar
+    }
+  }
+  return { ped: ped, edits: edits };
+}
+function pppImportarCompleta(rows, fname) {
+  const r = pppLoadProgCompleta(rows);
+  if (!r.ped.length) { pppSetStatus("No reconocí la 'Programación Diaria' en " + fname + ".", false); return; }
+  const res = pppMergePedidos(r.ped);
+  const ed = pppLoadEdits();
+  let nProg = 0;
+  for (const np in r.edits) { ed[np] = Object.assign(ed[np] || {}, r.edits[np]); if (r.edits[np].programmed) nProg++; }
+  pppSaveEdits();
+  _pppTab = "plan"; pppRenderProg(); pppRefreshArmado();
+  pppSetStatus("✓ PPP completa cargada (" + fname + "): " + res.total + " pedidos · " + nProg + " ya programados (migración del Excel actual). SOLO LOCAL.", true);
+}
 async function pppHandleFile(tipo, f) {                 // de click o de drag-drop
   if ((tipo !== "base" && tipo !== "prog") || !f) return;
   pppSetStatus("Leyendo " + f.name + "…");
@@ -7589,9 +7651,11 @@ async function pppHandleFile(tipo, f) {                 // de click o de drag-dr
     const XLSX = await pppLoadXlsx();
     const buf = await f.arrayBuffer();
     const wb = XLSX.read(buf, { type: "array", cellDates: true });   // cellDates → fechas como Date
-    const ws = wb.Sheets[wb.SheetNames[0]];
+    let ws = wb.Sheets[wb.SheetNames[0]];
+    if (tipo === "prog") { const pd = wb.SheetNames.find(function (n) { return /programaci/i.test(n); }); if (pd) ws = wb.Sheets[pd]; }   // migración: hoja "Programacion Diaria"
     const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: "" });
     if (tipo === "prog") {
+      if (pppEsPPPCompleta(rows)) { pppImportarCompleta(rows, f.name); return; }   // Excel de la PPP completo → migración del estado actual
       const r = pppBuildProg(rows);
       if (!r.pedidos.length) { pppSetStatus("No reconocí las columnas. Encabezados que leí: " + (r.headerStr || "—"), false); return; }
       const res = pppMergePedidos(r.pedidos);            // SE SUMAN a lo que ya estaba (dedupe por NP)
