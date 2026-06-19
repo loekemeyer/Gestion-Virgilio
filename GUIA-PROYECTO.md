@@ -4,7 +4,15 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-19 · Versión app al documentar: **v3.28**
+> Última actualización: 2026-06-19 · Versión app al documentar: **v3.30**
+>
+> Nota: **v3.30** — PPP: **botonera de tanda en 2 modos separados** (pedido del usuario, antes
+> se mezclaba). La franja tiene **✓ Controlar** (verde) y **✏️ Editar** (ámbar); cada botón abre
+> SU modo, excluyente (`pppSetMode` con `_pppMode` por id, persiste entre renders). En **modo
+> Controlar** se ve solo lo de tildar entregas ("✓ Controlar TODA la tanda" + "✓ Controlado"
+> por fila `.ppp-ctrl-only`; inputs bloqueados). En **modo Editar** solo lo de corregir (panel
+> de fecha + "↩ toda la tanda" + "↩" por fila `.ppp-edit-only`; inputs Tanda/Fecha editables).
+> Borde izq. verde/ámbar según el modo. (v3.29: badge VENCIDA en blanco bold legible.)
 >
 > Nota: **v3.28** — PPP: **editar tanda (✏️ lápiz)** en Programación. El botón ✏️ abre la
 > tanda en **modo edición** (`pppEditTanda`, clase `.ppp-edit-mode`) y muestra un panel:

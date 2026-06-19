@@ -1944,7 +1944,14 @@ button {
 .ppp-ep-btn.ppp-ep-back{ background:#b42318; }
 .ppp-ep-hint{ font-size:12px; color:#78716c; }
 .ppp-row-back{ display:none; margin-right:6px; padding:4px 9px; font-size:13px; font-weight:800; border:1px solid #fecaca; border-radius:7px; background:#fff; color:#b42318; cursor:pointer; }
-.ppp-tanda.ppp-edit-mode .ppp-row-back{ display:inline-block; }
+/* Modos separados: en CONTROL se ve solo lo de controlar; en EDITAR solo lo de editar. */
+.ppp-ctrl-only{ display:none !important; } .ppp-tanda.ppp-ctrl-mode .ppp-ctrl-only{ display:inline-block !important; }
+.ppp-edit-only{ display:none !important; } .ppp-tanda.ppp-edit-mode .ppp-edit-only{ display:inline-block !important; }
+.ppp-ctrl-panel{ display:none; } .ppp-tanda.ppp-open.ppp-ctrl-mode .ppp-ctrl-panel{ display:flex; flex-wrap:wrap; gap:10px 16px; align-items:center; padding:10px 14px; background:#ecfdf5; border-bottom:1px solid #a7f3d0; }
+.ppp-ep-btn.ppp-ep-ctrl{ background:#16a34a; }
+.ppp-tanda.ppp-ctrl-mode .ppp-edit{ pointer-events:none; opacity:.65; }   /* en Controlar los inputs no se editan */
+.ppp-tanda.ppp-ctrl-mode .ppp-tanda-h{ box-shadow:inset 4px 0 0 #16a34a; }
+.ppp-tanda.ppp-edit-mode .ppp-tanda-h{ box-shadow:inset 4px 0 0 #f59e0b; }
 .ppp-tool-l{ font-size:12px; font-weight:700; color:#475569; display:flex; align-items:center; gap:6px; }
 .ppp-tool-inp{ width:84px; height:34px; font-size:14px; border:1px solid #cbd5e1; border-radius:8px; padding:0 8px; }
 .ppp-tool-n{ width:64px; font-family:Consolas,Menlo,monospace; }
@@ -4840,7 +4847,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.29";
+const APP_VERSION = "v3.30";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -8249,7 +8256,7 @@ function _pppRowTr(p) {
   const btn = (_pppTab === "ent")
     ? '<button class="ppp-row-btn ppp-undo" onclick="pppDeshacer(\'' + npE + '\')">↺ Deshacer</button>'
     : (_pppTab === "plan")
-      ? '<button class="ppp-row-btn ppp-ent" onclick="pppControlar(\'' + npE + '\')">✓ Controlado</button>'
+      ? '<button class="ppp-row-btn ppp-ent ppp-ctrl-only" onclick="pppControlar(\'' + npE + '\')">✓ Controlado</button>'
       : '';   // en "A Programar" no va botón (el pedido aún no está programado)
   return '<tr>' +
     '<td><input class="ppp-edit ppp-edit-tanda" value="' + tEd + '" placeholder="—" onchange="pppSetEdit(\'' + npE + '\',\'tanda\',this.value.trim().toUpperCase(),true)"></td>' +
@@ -8260,15 +8267,22 @@ function _pppRowTr(p) {
     '<td>' + pppZonaCell(p) + '</td>' +
     '<td>' + (_pppListoFC(p) ? '<span class="ppp-fc ok" title="Armado terminado (TAP)">✓ Listo</span>' : '<span class="ppp-fc">·</span>') + '</td>' +
     '<td>' + (_pppEntregado(p) ? '<span class="ppp-fc ok2" title="Cargado al camión (CC)">✓ Entregado</span>' : '<span class="ppp-fc">·</span>') + '</td>' +
-    '<td><button class="ppp-row-back" onclick="pppPedidoAProgramar(\'' + npE + '\')" title="Sacar de la tanda → A Programar">↩</button>' + btn + '</td></tr>';
+    '<td><button class="ppp-row-back ppp-edit-only" onclick="pppPedidoAProgramar(\'' + npE + '\')" title="Sacar de la tanda → A Programar">↩</button>' + btn + '</td></tr>';
 }
 let _pppOpen = new Set();   // ids de bloques abiertos (por clave estable → persiste entre renders)
+let _pppMode = {};          // id -> "ctrl" | "edit" (modos separados; persisten entre renders)
 function _pppKid(k) { return "pppb_" + String(k).replace(/[^A-Za-z0-9]/g, "_"); }
-function pppToggleBlock(id) { const el = document.getElementById(id); if (!el) return; el.classList.toggle("ppp-open"); if (el.classList.contains("ppp-open")) _pppOpen.add(id); else _pppOpen.delete(id); }
-function pppAbrirControlar(id) { const el = document.getElementById(id); if (el) el.classList.add("ppp-open"); _pppOpen.add(id); }
+function pppToggleBlock(id) { const el = document.getElementById(id); if (!el) return; el.classList.toggle("ppp-open"); if (el.classList.contains("ppp-open")) _pppOpen.add(id); else { _pppOpen.delete(id); delete _pppMode[id]; el.classList.remove("ppp-ctrl-mode", "ppp-edit-mode"); } }
+/* DOS modos separados por tanda: ✓ Controlar (tildar lo entregado) y ✏️ Editar (corregir
+   fecha / mover / devolver). Tocar el mismo botón cierra; uno excluye al otro. ===== */
+function pppSetMode(id, mode) {
+  const el = document.getElementById(id);
+  if (_pppMode[id] === mode) { delete _pppMode[id]; _pppOpen.delete(id); if (el) el.classList.remove("ppp-ctrl-mode", "ppp-edit-mode", "ppp-open"); return; }
+  _pppMode[id] = mode; _pppOpen.add(id);
+  if (el) { el.classList.remove("ppp-ctrl-mode", "ppp-edit-mode"); el.classList.add(mode === "edit" ? "ppp-edit-mode" : "ppp-ctrl-mode", "ppp-open"); }
+}
 /* ===== Editar tanda (✏️): cambiar la fecha de toda la tanda, mover pedidos a otra tanda
    (cambiando su Tanda en la fila) y devolver pedidos a "A Programar". ===== */
-function pppEditTanda(id, tanda) { const el = document.getElementById(id); if (!el) return; el.classList.add("ppp-open"); _pppOpen.add(id); el.classList.toggle("ppp-edit-mode"); }
 function _pppTandaNps(tanda) {
   const ed = pppLoadEdits(), t = String(tanda).toUpperCase(), out = [];
   for (const p of (_pppParsed.prog || [])) { const e = ed[String(p.np)]; const pt = ((e && e.tanda != null ? e.tanda : p.tanda) || "").toUpperCase(); if (pt === t) out.push(String(p.np)); }
@@ -8330,6 +8344,7 @@ function _pppNpFmt(nps) {
 function _pppBlock(key, name, cls, meta, pedidos, headerExtra, editTanda) {
   const id = _pppKid(key);
   const open = _pppOpen.has(id) ? " ppp-open" : "";
+  const modeCls = _pppMode[id] === "edit" ? " ppp-edit-mode" : (_pppMode[id] === "ctrl" ? " ppp-ctrl-mode" : "");
   const ruta = _pppRuta(pedidos);
   const rcls = (ruta && cls.indexOf("ppp-tanda-super") < 0) ? (" rt-" + ruta) : "";
   // Datos principales para la franja (colapsada): Razón Social · N° Pedido · Fecha de Entrega.
@@ -8343,7 +8358,7 @@ function _pppBlock(key, name, cls, meta, pedidos, headerExtra, editTanda) {
   const sum = (razStr ? '<span class="ppp-sum-raz">' + escapeHtml(razStr) + '</span> ' : '') + '<span class="ppp-sum-np">' + escapeHtml(npStr) + '</span>';
   const feHtml = fes.length ? '<span class="ppp-sum-fe' + (venc ? ' ppp-fe-venc' : '') + '">' + (venc ? '⏰ ' : '📅 ') + escapeHtml(fes.join(" / ")) + (venc ? ' ¡VENCIDA!' : '') + '</span>' : '';
   const hx = (headerExtra || "").replace(/__BLOCKID__/g, id);
-  let h = '<div class="ppp-tanda ' + cls + open + (venc ? ' ppp-vencida' : '') + '" id="' + id + '">' +
+  let h = '<div class="ppp-tanda ' + cls + open + modeCls + (venc ? ' ppp-vencida' : '') + '" id="' + id + '">' +
     '<div class="ppp-tanda-h' + rcls + '" onclick="pppToggleBlock(\'' + id + '\')">' +
       '<span class="ppp-caret">▸</span>' +
       '<span class="ppp-tanda-name">' + name + '</span>' +
@@ -8353,6 +8368,10 @@ function _pppBlock(key, name, cls, meta, pedidos, headerExtra, editTanda) {
     '</div>';
   if (editTanda) {
     const te = escapeHtml(String(editTanda));
+    // Panel de CONTROL (modo ✓ Controlar): tildar toda la tanda o pedido por pedido.
+    h += '<div class="ppp-ctrl-panel"><button class="ppp-ep-btn ppp-ep-ctrl" onclick="pppControlarTanda(\'' + te + '\')">✓ Controlar TODA la tanda</button>' +
+      '<span class="ppp-ep-hint">o tildá <b>pedido por pedido</b> con ✓ Controlado en cada fila.</span></div>';
+    // Panel de EDICIÓN (modo ✏️): cambiar fecha / devolver.
     h += '<div class="ppp-edit-panel">' +
       '<span class="ppp-ep-l">📅 Fecha de toda la tanda <input type="date" class="ppp-ep-date" id="' + id + '_d"> <button class="ppp-ep-btn" onclick="pppTandaFecha(\'' + id + '\',\'' + te + '\')">Aplicar</button></span>' +
       '<button class="ppp-ep-btn ppp-ep-back" onclick="pppTandaAProgramar(\'' + te + '\')">↩ Toda la tanda a A Programar</button>' +
@@ -8486,8 +8505,8 @@ function pppRenderProg() {
       ordt.sort();
       for (const t of ordt) {
         const es = pppEsSuper(byT[t][0]);
-        const pencil = (t !== "—") ? ' <button class="ppp-pencil-btn" onclick="event.stopPropagation();pppEditTanda(\'__BLOCKID__\',\'' + escapeHtml(t) + '\')" title="Editar tanda: fecha / mover / devolver">✏️</button>' : '';
-        const entBtn = (t !== "—") ? ' <button class="ppp-tanda-ent" onclick="event.stopPropagation();pppAbrirControlar(\'__BLOCKID__\')">✓ Controlar</button>' : '';
+        const pencil = (t !== "—") ? ' <button class="ppp-pencil-btn" onclick="event.stopPropagation();pppSetMode(\'__BLOCKID__\',\'edit\')" title="Editar: fecha / mover / devolver">✏️ Editar</button>' : '';
+        const entBtn = (t !== "—") ? ' <button class="ppp-tanda-ent" onclick="event.stopPropagation();pppSetMode(\'__BLOCKID__\',\'ctrl\')" title="Marcar entregas">✓ Controlar</button>' : '';
         html += _pppBlock("plan_" + dk + "_" + t, (es ? "🛒 " : "") + (t === "—" ? "Sin tanda" : "Tanda " + escapeHtml(t)), es ? "ppp-tanda-super" : "", byT[t].length + " ped · " + _pppM3Sum(byT[t]).toFixed(2) + " m³", byT[t], pencil + entBtn, (t !== "—" ? t : null));
       }
     }
