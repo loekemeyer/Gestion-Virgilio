@@ -4,7 +4,17 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-19 · Versión app al documentar: **v3.15**
+> Última actualización: 2026-06-19 · Versión app al documentar: **v3.16**
+>
+> Nota: **v3.16** — PPP: **ciclo de vida del pedido**. (a) Columna **"Listo FC"** en
+> Programación: se **tilda sola** cuando el operario termina el armado de la tanda (evento
+> **`TAP`**) — se lee de Supabase con `getActivityStatus().armadoDone` (`_pppArmadoDone`,
+> `_pppListoFC`, `pppRefreshArmado`; es solo lectura, no rompe el "solo local"). Botón "🔄
+> Estado operarios" + auto al abrir/entrar a Programación. (b) **Entregado → Entregados**:
+> botón por pedido **y por tanda** (`✓ Entregada`, `pppEntregarTanda`); **persistido** en
+> `vir_ppp_entregados` (sobrevive recarga). Flujo completo: descarga → 📥 A Programar →
+> armar+confirmar → 🗓️ Programación (Listo FC al armar) → Marianela marca Entregado → ✅
+> Entregados.
 >
 > Nota: **v3.15** — PPP: las **entregas son sólo Lun–Vie** (no Sáb/Dom). `_pppDeliveryDate`
 > ahora saltea sábado **y** domingo al asignar las fechas de entrega automáticas.

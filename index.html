@@ -1900,6 +1900,10 @@ button {
 .ppp-confirm-btn{ padding:9px 16px; font-size:14px; font-weight:800; border:none; border-radius:10px; background:#16a34a; color:#fff; cursor:pointer; }
 .ppp-confirm-btn:hover{ background:#15803d; }
 .ppp-over{ font-size:11px; font-weight:800; color:#fde68a; }
+.ppp-fc{ font-size:12px; color:#cbd5e1; font-weight:700; }
+.ppp-fc.ok{ color:#fff; background:#16a34a; border-radius:999px; padding:2px 8px; font-weight:800; }
+.ppp-tanda-ent{ margin-left:8px; padding:3px 10px; font-size:11px; font-weight:800; border:none; border-radius:7px; background:rgba(255,255,255,.22); color:#fff; cursor:pointer; }
+.ppp-tanda-ent:hover{ background:rgba(255,255,255,.35); }
 .ppp-tool-l{ font-size:12px; font-weight:700; color:#475569; display:flex; align-items:center; gap:6px; }
 .ppp-tool-inp{ width:84px; height:34px; font-size:14px; border:1px solid #cbd5e1; border-radius:8px; padding:0 8px; }
 .ppp-tool-n{ width:64px; font-family:Consolas,Menlo,monospace; }
@@ -4776,7 +4780,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.15";
+const APP_VERSION = "v3.16";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -7517,6 +7521,7 @@ function openPPP() {
   if (!_pppParsed.prog || !_pppParsed.prog.length) { const st = pppLoadPedidosStore(); if (st.length) _pppParsed.prog = st; }
   pppShowBaseInfo();
   pppRenderProg();
+  pppRefreshArmado();
 }
 function closePPP() {
   const ov = document.getElementById("pppOverlay");
@@ -7866,13 +7871,30 @@ function pppRenderBase(fname, totalRows, mapped) {
     '<div class="ppp-prev-h"><b>Base Pedidos</b> · <b>' + mapped.length + '</b> filas (de ' + totalRows + ' del Excel) — es para el picking. Muestra de 6:</div>' +
     '<div class="ppp-prev-tablewrap"><table class="ppp-prev-table"><thead><tr>' + th + '</tr></thead><tbody>' + tr + '</tbody></table></div>';
 }
-/* Vista de la PPP (Programación), agrupada por tanda, con botón "Entregado" que
-   mueve el pedido a la pestaña "Entregados". TODO LOCAL (en memoria) por ahora. */
+/* Vista de la PPP. Entregados se persiste (vir_ppp_entregados) para sobrevivir recarga.
+   "Listo para FC" se autocompleta leyendo de Supabase las tandas con ARMADO TERMINADO
+   (evento TAP de los operarios) vía getActivityStatus().armadoDone — es un READ, no
+   rompe el "solo local" (no escribe la PPP). */
+const PPP_ENT_KEY = "vir_ppp_entregados";
 let _pppEntregados = null;
+let _pppArmadoDone = null;            // Set de tandas (UPPER) con TAP (armado terminado → Listo para FC)
 let _pppTab = "prog";
-function pppTab(t) { _pppTab = t; pppRenderProg(); }
-function pppEntregar(np) { if (!_pppEntregados) _pppEntregados = new Set(); _pppEntregados.add(String(np)); pppRenderProg(); }
-function pppDeshacer(np) { if (_pppEntregados) _pppEntregados.delete(String(np)); pppRenderProg(); }
+function pppLoadEntregados() { if (_pppEntregados) return _pppEntregados; let a = []; try { a = JSON.parse(localStorage.getItem(PPP_ENT_KEY) || "[]"); } catch (_e) {} _pppEntregados = new Set(Array.isArray(a) ? a.map(String) : []); return _pppEntregados; }
+function pppSaveEntregados() { try { localStorage.setItem(PPP_ENT_KEY, JSON.stringify(Array.from(pppLoadEntregados()))); } catch (_e) {} }
+function pppTab(t) { _pppTab = t; pppRenderProg(); if (t === "plan" || t === "ent" || t === "resumen") pppRefreshArmado(); }
+function pppEntregar(np) { pppLoadEntregados().add(String(np)); pppSaveEntregados(); pppRenderProg(); }
+function pppDeshacer(np) { pppLoadEntregados().delete(String(np)); pppSaveEntregados(); pppRenderProg(); }
+function pppEntregarTanda(tanda) {
+  const t = String(tanda || "").toUpperCase(); if (!t || t === "—") return;
+  const ed = pppLoadEdits(), set = pppLoadEntregados();
+  for (const p of (_pppParsed.prog || [])) { const e = ed[String(p.np)]; const pt = ((e && e.tanda != null ? e.tanda : p.tanda) || "").toUpperCase(); if (pt === t) set.add(String(p.np)); }
+  pppSaveEntregados(); pppRenderProg();
+}
+async function pppRefreshArmado() {
+  try { const s = await getActivityStatus(); _pppArmadoDone = (s && s.armadoDone) || new Set(); pppRenderProg(); }
+  catch (_e) { if (!_pppArmadoDone) _pppArmadoDone = new Set(); }
+}
+function _pppListoFC(p) { const t = (p.tanda || "").trim().toUpperCase(); return !!(_pppArmadoDone && t && t !== "—" && _pppArmadoDone.has(t)); }
 /* Tanda y Fecha Entrega NO vienen del Excel: se escriben a mano por pedido. Se guardan
    en localStorage por N° Pedido (sobreviven recarga; SOLO LOCAL) y se mergean al render. */
 const PPP_EDITS_KEY = "vir_ppp_edits";
@@ -8007,7 +8029,7 @@ function pppZonaCell(p) {
   return '';
 }
 /* Encabezado y fila <tr> reusados por todas las secciones de la PPP. */
-const PPP_THEAD = '<thead><tr><th>Tanda</th><th>Cód Cli</th><th>N° Pedido</th><th>Fecha</th><th>Razón Social</th><th class="num">m³</th><th>Localidad / Barrio</th><th>Fecha Entrega</th><th>Zona</th><th></th></tr></thead>';
+const PPP_THEAD = '<thead><tr><th>Tanda</th><th>Cód Cli</th><th>N° Pedido</th><th>Fecha</th><th>Razón Social</th><th class="num">m³</th><th>Localidad / Barrio</th><th>Fecha Entrega</th><th>Zona</th><th>Listo FC</th><th></th></tr></thead>';
 function _pppTieneTanda(p) { const t = (p.tanda || "").trim(); return !!t && t !== "—"; }
 function _pppFechaKey(s) { const m = /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/.exec(String(s || "")); if (!m) return "99999999"; let y = m[3]; if (y.length === 2) y = "20" + y; return y + String(m[2]).padStart(2, "0") + String(m[1]).padStart(2, "0"); }
 function _pppFechaDate(s) { const m = /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/.exec(String(s || "")); if (!m) return null; let y = +m[3]; if (y < 100) y += 2000; const d = new Date(y, +m[2] - 1, +m[1]); return isNaN(d.getTime()) ? null : d; }
@@ -8025,10 +8047,12 @@ function _pppRowTr(p) {
     '</td><td class="ppp-cli">' + escapeHtml(p.razon_social || "") + '</td><td class="num">' + (p.m3 != null && p.m3 !== "" ? Number(p.m3).toFixed(2) : "") +
     '</td><td>' + escapeHtml(p.localidad || "") + '</td>' +
     '<td><input class="ppp-edit ppp-edit-fe" value="' + feEd + '" placeholder="dd/mm/aaaa" onchange="pppSetEdit(\'' + npE + '\',\'fecha_entrega\',this.value.trim(),false)"></td>' +
-    '<td>' + pppZonaCell(p) + '</td><td>' + btn + '</td></tr>';
+    '<td>' + pppZonaCell(p) + '</td>' +
+    '<td>' + (_pppListoFC(p) ? '<span class="ppp-fc ok" title="Armado terminado (TAP)">✓ Listo</span>' : '<span class="ppp-fc">·</span>') + '</td>' +
+    '<td>' + btn + '</td></tr>';
 }
-function _pppBlock(name, cls, meta, pedidos) {
-  let h = '<div class="ppp-tanda ' + cls + '"><div class="ppp-tanda-h"><span class="ppp-tanda-name">' + name + '</span><span class="ppp-tanda-meta">' + meta + '</span></div>' +
+function _pppBlock(name, cls, meta, pedidos, headerExtra) {
+  let h = '<div class="ppp-tanda ' + cls + '"><div class="ppp-tanda-h"><span class="ppp-tanda-name">' + name + '</span><span class="ppp-tanda-meta">' + meta + (headerExtra || "") + '</span></div>' +
     '<div class="ppp-tablewrap"><table class="ppp-tbl">' + PPP_THEAD + '<tbody>';
   for (const p of pedidos) h += _pppRowTr(p);
   return h + '</tbody></table></div></div>';
@@ -8111,8 +8135,7 @@ function pppRenderProg() {
   };
   const all = (_pppParsed.prog || []).map(merge);
   if (!all.length) { box.innerHTML = '<div class="planim-empty">Importá el <b>Formato PPP</b> — los pedidos del día se suman a los que ya estaban y caen en <b>A Programar</b>.</div>'; return; }
-  if (!_pppEntregados) _pppEntregados = new Set();
-  const ent = _pppEntregados;
+  const ent = pppLoadEntregados();
   const notEnt = all.filter(function (p) { return !ent.has(String(p.np)); });
   const entreg = all.filter(function (p) { return ent.has(String(p.np)); });
   const programados = notEnt.filter(function (p) { return p.programmed; });
@@ -8148,6 +8171,8 @@ function pppRenderProg() {
   }
   if (_pppTab === "plan") {
     // PROGRAMACIÓN — pedidos programados, agrupados por Fecha de Entrega → por tanda.
+    html += '<div class="ppp-toolbar"><button class="ppp-tool-clear" style="margin-left:0" onclick="pppRefreshArmado()">🔄 Estado operarios (Listo FC)</button>' +
+      '<span class="ppp-tool-l" style="color:#64748b">La columna <b>Listo FC</b> se tilda sola cuando el operario termina el armado (TAP) de la tanda.</span></div>';
     if (!programados.length) { html += '<div class="planim-empty">Todavía no hay nada programado. Andá a <b>📥 A Programar</b>, armá las tandas y tocá <b>✅ Confirmar y programar</b>.</div>'; box.innerHTML = html; return; }
     const DOW = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
     const byD = {}; for (const p of programados) { const k = _pppFechaKey(p.fecha_entrega || ""); if (!byD[k]) byD[k] = { fecha: p.fecha_entrega || "—", ped: [] }; byD[k].ped.push(p); }
@@ -8156,7 +8181,11 @@ function pppRenderProg() {
       html += '<div class="ppp-sec-t ppp-sec-done">🗓️ ' + (dia ? dia + " " : "") + escapeHtml(d.fecha) + ' · ' + d.ped.length + ' ped · ' + _pppM3Sum(d.ped).toFixed(2) + ' m³</div>';
       const byT = {}, ordt = []; for (const p of d.ped) { const t = _pppTieneTanda(p) ? p.tanda.toUpperCase() : "—"; if (!(t in byT)) ordt.push(t); (byT[t] = byT[t] || []).push(p); }
       ordt.sort();
-      for (const t of ordt) { const es = pppEsSuper(byT[t][0]); html += _pppBlock((es ? "🛒 " : "") + (t === "—" ? "Sin tanda" : "Tanda " + escapeHtml(t)), es ? "ppp-tanda-super" : "", byT[t].length + " ped · " + _pppM3Sum(byT[t]).toFixed(2) + " m³", byT[t]); }
+      for (const t of ordt) {
+        const es = pppEsSuper(byT[t][0]);
+        const entBtn = (t !== "—") ? ' <button class="ppp-tanda-ent" onclick="pppEntregarTanda(\'' + escapeHtml(t) + '\')">✓ Entregada</button>' : '';
+        html += _pppBlock((es ? "🛒 " : "") + (t === "—" ? "Sin tanda" : "Tanda " + escapeHtml(t)), es ? "ppp-tanda-super" : "", byT[t].length + " ped · " + _pppM3Sum(byT[t]).toFixed(2) + " m³", byT[t], entBtn);
+      }
     }
     box.innerHTML = html; return;
   }
