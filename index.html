@@ -1816,6 +1816,11 @@ button {
 .planim-row-ord{ flex: 0 0 90px; }
 .planim-status{ font-size: 13px; color: #475569; min-height: 18px; text-align: center; }
 .planim-empty{ color: #94a3b8; padding: 10px; text-align: center; }
+/* Módulo PPP (placeholder/scaffolding) */
+.ppp-warn{ background:#fffbeb; border:1px solid #f59e0b; color:#92400e; border-radius:8px; padding:10px 12px; font-size:13px; margin-bottom:14px; }
+.ppp-imp-row{ display:flex; gap:12px; flex-wrap:wrap; }
+.ppp-imp-btn{ flex:1 1 220px; width:auto; margin:0; min-height:84px; display:flex; align-items:center; justify-content:center; gap:10px; padding:16px; font-size:17px; font-weight:bold; background:#1e6bd6; color:#fff; border:none; border-radius:12px; cursor:pointer; }
+.ppp-imp-btn:hover{ background:#1d4ed8; } .ppp-imp-btn span{ font-size:22px; }
 .planim-near{ display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
 .planim-near-t{ font-size: 12px; font-weight: bold; color: #475569; }
 .planim-near-row{ display: flex; align-items: center; gap: 8px; font-size: 15px; color: #0f172a; }
@@ -2555,8 +2560,9 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
       <button class="sup-action-btn" onclick="openInconsistencias()"><span class="sup-ico">⚠</span><span>Inconsistencias</span></button>
       <button class="sup-action-btn" onclick="openAnalisis()"><span class="sup-ico">📈</span><span>Análisis de productividad</span></button>
       <button class="sup-action-btn" onclick="openFaltantes()"><span class="sup-ico">📦</span><span>Faltantes</span></button>
-      <button class="sup-action-btn" onclick="openRecepcionAdmin()"><span class="sup-ico">🏭</span><span>Recepción (Admin)</span></button>
+      <button class="sup-action-btn" onclick="openRecepcionAdmin()"><span class="sup-ico">🏭</span><span>Carga Recepción Mercadería</span></button>
       <button class="sup-action-btn" onclick="openPlanimEditor()"><span class="sup-ico">🗺️</span><span>Editar Planimetría</span></button>
+      <button class="sup-action-btn" onclick="openPPP()"><span class="sup-ico">🗓️</span><span>PPP</span></button>
     </div>
     <div class="auth-logout-row">
       <button class="auth-logout-btn" onclick="signOutGoogle()">Salir</button>
@@ -2600,6 +2606,22 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
       <input id="planimSearch" class="planim-inp planim-search" type="text" placeholder="🔍 Buscar código o sector para editar…" oninput="planimRender(this.value)">
       <div id="planimList" class="planim-list"></div>
       <div id="planimStatus" class="planim-status"></div>
+    </div>
+  </div>
+
+  <!-- Módulo PPP (supervisor) — placeholder; el contenido se define después. -->
+  <div id="pppOverlay" class="recp-admin-overlay">
+    <div class="recp-admin-bar">
+      <span class="recp-admin-title">🗓️ PPP</span>
+      <button class="recp-admin-close" onclick="closePPP()">Cerrar</button>
+    </div>
+    <div class="planim-body">
+      <div class="ppp-warn">⚠ <b>EN PRUEBAS — NO ACTIVADO.</b> No reemplaza al Excel todavía: los botones aún no escriben en Supabase.</div>
+      <div class="ppp-imp-row">
+        <button class="ppp-imp-btn" onclick="pppImportar('base')"><span>⬆</span> Importar Base Pedidos</button>
+        <button class="ppp-imp-btn" onclick="pppImportar('prog')"><span>⬆</span> Importar Formato PPP</button>
+      </div>
+      <div id="pppStatus" class="planim-status">Cuando esté activo: cada botón sube su hoja a Supabase (reemplazo total) para nutrir lo que hoy carga el Excel.</div>
     </div>
   </div>
 
@@ -4558,7 +4580,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v2.94";
+const APP_VERSION = "v2.95";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -7225,6 +7247,29 @@ function closeRecepcionAdmin() {
 /* ===== Editor de Planimetría — escribe DIRECTO a Supabase (tabla "Planimetria").
    Cada cambio se guarda con el JWT del supervisor; window.GONDOLA se actualiza al
    instante para que el picking lo use ya. Solo supervisores. v2.78. ===== */
+/* ===== Módulo PPP (supervisor) — reemplazará el sync Excel→Supabase de la PPP.
+   Por ahora SOLO scaffolding: dos botones de importar que aún NO escriben en
+   Supabase (la app con la key pública solo puede leer esas tablas; el write real
+   necesita una Edge Function con service_role). NO activado. v2.95. ===== */
+function openPPP() {
+  if (!requireSupervisor()) return;
+  const ov = document.getElementById("pppOverlay");
+  if (ov) ov.classList.add("show");
+}
+function closePPP() {
+  const ov = document.getElementById("pppOverlay");
+  if (ov) ov.classList.remove("show");
+}
+function pppImportar(tipo) {
+  // Inerte a propósito hasta que esté 100%. No toca Supabase.
+  const hoja = tipo === "base" ? "Base Pedidos → PPP_Base_Pedidos"
+             : tipo === "prog" ? "Formato PPP → PPP_Programacion_Diaria"
+             : "PPP";
+  const el = document.getElementById("pppStatus");
+  const msg = "⏸ Módulo en pruebas — todavía NO activado. (" + hoja + "). Falta: definir la fuente del archivo y crear la Edge Function de escritura.";
+  if (el) el.textContent = msg; else alert(msg);
+}
+
 function openPlanimEditor() {
   if (!requireSupervisor()) return;
   const ov = document.getElementById("planimEditorOverlay");

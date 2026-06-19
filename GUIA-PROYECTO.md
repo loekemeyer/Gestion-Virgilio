@@ -4,7 +4,20 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-19 · Versión app al documentar: **v2.94**
+> Última actualización: 2026-06-19 · Versión app al documentar: **v2.95**
+>
+> Nota: **v2.95** — tres cosas en el panel Admin. **(a)** Botón **"Recepción (Admin)" →
+> "Carga Recepción Mercadería"** (sigue llamando a `openRecepcionAdmin`, iframe de
+> `Control-Carga-Remitos-FC`). **(b)** Nuevo botón **"🗓️ PPP"** (`openPPP`/`#pppOverlay`)
+> — **scaffolding, NO activado**: dos botones "Importar Base Pedidos" / "Importar Formato
+> PPP" inertes (`pppImportar` no toca Supabase). Objetivo: **reemplazar el sync
+> Excel→Supabase** de la PPP, subiendo las hojas a `PPP_Base_Pedidos` /
+> `PPP_Programacion_Diaria` (reemplazo total). ⚠ El write real necesita una **Edge
+> Function con service_role** (la app con key pública SOLO lee esas tablas; ver
+> `sql/ppp_supabase.sql`). Pendiente: fuente del archivo + Edge Function. **(c)**
+> Pendiente del chooser **Pendientes / Carga Manual** en Carga Recepción — bloqueado: el
+> repo `Control-Carga-Remitos-FC` es **privado** y github.io está fuera del allowlist →
+> falta el deep-link de cada pantalla.
 >
 > Nota: **v2.94** — dos cosas. **(a) FIX Inconsistencias mostraba el tablero del Monitor.**
 > Como el monitor abre SIEMPRE en modo TV y la regla `#monitorModal.tv #monitorContent`
