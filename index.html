@@ -4782,7 +4782,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.22";
+const APP_VERSION = "v3.23";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -8263,7 +8263,11 @@ function pppRenderProg() {
     if (e.programmed != null) o.programmed = e.programmed;
     return o;
   };
-  const all = (_pppParsed.prog || []).map(merge);
+  // Dedupe por N° Pedido: un NP aparece UNA sola vez (si está duplicado en los datos,
+  // o ya está programado/entregado, no se vuelve a considerar). El estado por NP
+  // (programado/entregado en los edits/entregados) define en qué solapa cae.
+  const all = []; const _vistos = {};
+  for (const p of (_pppParsed.prog || [])) { const k = String(p.np).trim(); if (!k || _vistos[k]) continue; _vistos[k] = 1; all.push(merge(p)); }
   if (!all.length) { box.innerHTML = '<div class="planim-empty">Importá el <b>Formato PPP</b> — los pedidos del día se suman a los que ya estaban y caen en <b>A Programar</b>.</div>'; return; }
   const ent = pppLoadEntregados();
   const notEnt = all.filter(function (p) { return !ent.has(String(p.np)); });

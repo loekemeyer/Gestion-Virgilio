@@ -4,7 +4,13 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-19 · Versión app al documentar: **v3.22**
+> Última actualización: 2026-06-19 · Versión app al documentar: **v3.23**
+>
+> Nota: **v3.23** — PPP: **dedupe por N° Pedido** en `pppRenderProg` (codeado, automático en
+> cada render): un NP aparece **una sola vez** y cae en una única solapa según su estado por
+> NP (Entregado > Programado > A Programar). Si un pedido ya está programado o entregado, **no
+> se vuelve a mostrar en "A Programar"** aunque venga repetido en los datos (p. ej. al
+> reimportar el Formato PPP del día con pedidos ya programados).
 >
 > Nota: **v3.22** — PPP: **estado actual PRECARGADO** (semilla). El estado de la PPP del
 > Excel `AAA_PPP_Vigente` quedó **embebido** en `PPP_SEED` (123 pedidos · 83 programados en
