@@ -4,7 +4,17 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-19 · Versión app al documentar: **v2.99**
+> Última actualización: 2026-06-19 · Versión app al documentar: **v3.00**
+>
+> Nota: **v3.00** — **PPP Fase 2 (vista, SOLO LOCAL)**. Por pedido del usuario, el PPP
+> ahora **no escribe nada en Supabase** (banner "EN PRUEBAS — SOLO LOCAL"; `pppSubir`
+> queda dormido). Al **Importar Formato PPP** se renderiza la **Programación** linda
+> (`pppRenderProg`): agrupada **por tanda** (card azul con N pedidos + m³), tabla
+> NP·Cliente·Cód·m³·Zona·Entrega, y botón **"✓ Entregado"** por pedido que lo mueve a
+> la pestaña **"Entregados"** (estado local en memoria, `_pppEntregados`/`pppEntregar`/
+> `pppDeshacer`/`pppTab`). **Importar Base Pedidos** muestra solo un vistazo
+> (`pppRenderBase`, es data para el picking). Falta (cuando guste el formato): conectar
+> a Supabase (subir + Entregado→`PPP_Pedidos_Entregados`) y el vínculo con Facturación.
 >
 > Nota: **v2.99** — **#1 Carga Recepción: "Carga Manual" auto-navega al form**. Como no
 > hay deep-link (repo privado), al elegir "Carga Manual" se carga la app y, por ser
