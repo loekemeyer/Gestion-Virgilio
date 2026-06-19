@@ -1826,6 +1826,14 @@ button {
 .ppp-imp-row{ display:flex; gap:12px; flex-wrap:wrap; }
 .ppp-imp-btn{ flex:1 1 220px; width:auto; margin:0; min-height:84px; display:flex; align-items:center; justify-content:center; gap:10px; padding:16px; font-size:17px; font-weight:bold; background:#1e6bd6; color:#fff; border:none; border-radius:12px; cursor:pointer; }
 .ppp-imp-btn:hover{ background:#1d4ed8; } .ppp-imp-btn span{ font-size:22px; }
+.ppp-preview{ margin-top:14px; }
+.ppp-prev-h{ font-size:13px; color:#334155; margin-bottom:8px; } .ppp-prev-h code{ background:#eef2ff; color:#3730a3; padding:1px 5px; border-radius:4px; }
+.ppp-prev-tablewrap{ overflow-x:auto; border:1px solid #e2e8f0; border-radius:8px; }
+.ppp-prev-table{ width:100%; border-collapse:collapse; font-size:12px; background:#fff; white-space:nowrap; }
+.ppp-prev-table th{ text-align:left; padding:6px 9px; background:#f8fafc; color:#475569; border-bottom:1px solid #e2e8f0; font-weight:bold; }
+.ppp-prev-table td{ padding:5px 9px; border-bottom:1px solid #f1f5f9; color:#0f172a; }
+.ppp-subir-btn{ width:100%; margin:14px 0 0; padding:14px; font-size:16px; font-weight:bold; background:#16a34a; color:#fff; border:none; border-radius:10px; cursor:pointer; }
+.ppp-subir-btn:hover{ background:#15803d; }
 .planim-near{ display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
 .planim-near-t{ font-size: 12px; font-weight: bold; color: #475569; }
 .planim-near-row{ display: flex; align-items: center; gap: 8px; font-size: 15px; color: #0f172a; }
@@ -2626,12 +2634,13 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
       <button class="recp-admin-close" onclick="closePPP()">Cerrar</button>
     </div>
     <div class="planim-body">
-      <div class="ppp-warn">⚠ <b>EN PRUEBAS — NO ACTIVADO.</b> No reemplaza al Excel todavía: los botones aún no escriben en Supabase.</div>
+      <div class="ppp-warn">⚠ <b>EN PRUEBAS.</b> Elegís el Excel (.xls/.xlsx) → ves el <b>preview</b> → recién al confirmar sube a Supabase (<b>reemplazo total</b> de esa tabla). Requiere correr <b>1 vez</b> el SQL de permisos (te lo paso por chat).</div>
       <div class="ppp-imp-row">
         <button class="ppp-imp-btn" onclick="pppImportar('base')"><span>⬆</span> Importar Base Pedidos</button>
         <button class="ppp-imp-btn" onclick="pppImportar('prog')"><span>⬆</span> Importar Formato PPP</button>
       </div>
-      <div id="pppStatus" class="planim-status">Cuando esté activo: cada botón sube su hoja a Supabase (reemplazo total) para nutrir lo que hoy carga el Excel.</div>
+      <div id="pppPreview" class="ppp-preview"></div>
+      <div id="pppStatus" class="planim-status"></div>
     </div>
   </div>
 
@@ -4590,7 +4599,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v2.96";
+const APP_VERSION = "v2.97";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -7292,14 +7301,108 @@ function closePPP() {
   const ov = document.getElementById("pppOverlay");
   if (ov) ov.classList.remove("show");
 }
-function pppImportar(tipo) {
-  // Inerte a propósito hasta que esté 100%. No toca Supabase.
-  const hoja = tipo === "base" ? "Base Pedidos → PPP_Base_Pedidos"
-             : tipo === "prog" ? "Formato PPP → PPP_Programacion_Diaria"
-             : "PPP";
+/* ===== Importador PPP (Fase 1). Lee el .xls en el navegador (SheetJS lazy desde
+   CDN — el sandbox no puede vendorearlo, pero el navegador del supervisor sí lo
+   baja), mapea columnas IGUAL que el Apps Script, muestra preview y al confirmar
+   hace REEMPLAZO TOTAL (DELETE + INSERT) en la tabla con el JWT del supervisor.
+   ⚠ Requiere policy RLS de escritura para supervisores (SQL aparte). v2.97. ===== */
+let _pppParsed = { base: null, prog: null };
+const PPP_TABLE = { base: "PPP_Base_Pedidos", prog: "PPP_Programacion_Diaria" };
+const PPP_HOJA  = { base: "Base Pedidos", prog: "Formato PPP (Programación)" };
+let _pppXlsxP = null;
+function pppLoadXlsx() {
+  if (window.XLSX) return Promise.resolve(window.XLSX);
+  if (_pppXlsxP) return _pppXlsxP;
+  _pppXlsxP = new Promise(function (res, rej) {
+    const s = document.createElement("script");
+    s.src = "https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js";
+    s.onload = function () { window.XLSX ? res(window.XLSX) : rej(new Error("SheetJS no cargó")); };
+    s.onerror = function () { _pppXlsxP = null; rej(new Error("No pude cargar SheetJS (revisá internet)")); };
+    document.head.appendChild(s);
+  });
+  return _pppXlsxP;
+}
+function pppSetStatus(msg, ok) {
   const el = document.getElementById("pppStatus");
-  const msg = "⏸ Módulo en pruebas — todavía NO activado. (" + hoja + "). Falta: definir la fuente del archivo y crear la Edge Function de escritura.";
-  if (el) el.textContent = msg; else alert(msg);
+  if (el) { el.textContent = msg || ""; el.style.color = (ok === false) ? "#b42318" : (ok === true ? "#166534" : "#475569"); }
+}
+function _pppS(v) { return v == null ? "" : String(v).trim(); }
+function _pppNum(v) { if (v == null || v === "") return null; const n = parseFloat(String(v).replace(",", ".")); return isNaN(n) ? null : n; }
+function pppMapBase(rows) {                          // Pedido=A(0), Art=C(2), Cajas=F(5)
+  const out = [];
+  for (const r of rows) {
+    if (!r) continue;
+    const ped = _pppS(r[0]).replace(/\.0+$/, "");
+    if (!/^\d/.test(ped)) continue;
+    const art = _pppS(r[2]); if (!art) continue;
+    out.push({ pedido: ped, articulo: art, cajas: _pppNum(r[5]) });
+  }
+  return out;
+}
+function pppMapProg(rows) {                          // por posición; fila = pedido si col C (NP) tiene dígito
+  const out = [];
+  for (const r of rows) {
+    if (!r) continue;
+    const np = _pppS(r[2]); if (!/\d/.test(np)) continue;
+    out.push({
+      np: np, tanda: _pppS(r[0]), tipo: _pppS(r[1]), fecha_recep: _pppS(r[3]),
+      cod: _pppS(r[4]), razon_social: _pppS(r[5]), m3: _pppNum(r[6]), v: _pppS(r[7]),
+      direccion: _pppS(r[8]), barrio: _pppS(r[9]), op: _pppS(r[10]),
+      fecha_entrega: _pppS(r[11]), fecha_fc: _pppS(r[12]), zona: _pppS(r[13]), observaciones: _pppS(r[14])
+    });
+  }
+  return out;
+}
+function pppImportar(tipo) {
+  if (tipo !== "base" && tipo !== "prog") return;
+  const inp = document.createElement("input");
+  inp.type = "file"; inp.accept = ".xls,.xlsx";
+  inp.onchange = async function () {
+    const f = inp.files && inp.files[0]; if (!f) return;
+    pppSetStatus("Leyendo " + f.name + "…");
+    try {
+      const XLSX = await pppLoadXlsx();
+      const buf = await f.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: "" });
+      const mapped = (tipo === "base") ? pppMapBase(rows) : pppMapProg(rows);
+      _pppParsed[tipo] = mapped;
+      pppRenderPreview(tipo, f.name, rows.length, mapped);
+      pppSetStatus(mapped.length ? ("✓ Leí " + f.name + ": " + mapped.length + " filas válidas. Revisá el preview y confirmá.") : "No saqué filas válidas — ¿es la hoja/columnas correctas?", mapped.length > 0);
+    } catch (e) { pppSetStatus("Error leyendo el Excel: " + (e.message || e), false); }
+  };
+  inp.click();
+}
+function pppRenderPreview(tipo, fname, totalRows, mapped) {
+  const box = document.getElementById("pppPreview"); if (!box) return;
+  if (!mapped.length) { box.innerHTML = '<div class="planim-empty">No saqué filas válidas de ' + escapeHtml(fname) + '.</div>'; return; }
+  const cols = Object.keys(mapped[0]);
+  const th = cols.map(function (c) { return "<th>" + escapeHtml(c) + "</th>"; }).join("");
+  const tr = mapped.slice(0, 5).map(function (o) { return "<tr>" + cols.map(function (c) { return "<td>" + escapeHtml(String(o[c] == null ? "" : o[c])) + "</td>"; }).join("") + "</tr>"; }).join("");
+  box.innerHTML =
+    '<div class="ppp-prev-h"><b>' + escapeHtml(PPP_HOJA[tipo]) + '</b> → <code>' + PPP_TABLE[tipo] + '</code> · <b>' + mapped.length + '</b> filas (de ' + totalRows + ' del Excel) · muestra de 5:</div>' +
+    '<div class="ppp-prev-tablewrap"><table class="ppp-prev-table"><thead><tr>' + th + '</tr></thead><tbody>' + tr + '</tbody></table></div>' +
+    '<button class="ppp-subir-btn" onclick="pppSubir(\'' + tipo + '\')">⬆ Subir a Supabase (reemplazo total de ' + PPP_TABLE[tipo] + ')</button>';
+}
+async function pppSubir(tipo) {
+  const rows = _pppParsed[tipo];
+  if (!rows || !rows.length) { pppSetStatus("Importá un Excel primero.", false); return; }
+  const table = PPP_TABLE[tipo];
+  const endpoint = SUPABASE_URL + "/rest/v1/" + encodeURIComponent(table);
+  const headers = await facAuthWriteHeaders({ "Prefer": "return=minimal" });
+  if (!headers) { pppSetStatus("Iniciá sesión con Google (supervisor) para subir.", false); return; }
+  if (!confirm("¿Reemplazar TODO " + table + " con " + rows.length + " filas?\n(Borra lo que haya y carga esto.)")) return;
+  pppSetStatus("Subiendo " + rows.length + " filas a " + table + "…");
+  try {
+    const del = await fetch(endpoint + "?id=not.is.null", { method: "DELETE", headers: headers });
+    if (!del.ok && del.status !== 404) { pppSetStatus("Error borrando " + table + ": HTTP " + del.status + " — ¿corriste el SQL de permisos?", false); return; }
+    for (let i = 0; i < rows.length; i += 1000) {
+      const r = await fetch(endpoint, { method: "POST", headers: headers, body: JSON.stringify(rows.slice(i, i + 1000)) });
+      if (!r.ok) { pppSetStatus("Error subiendo (desde fila " + i + "): HTTP " + r.status, false); return; }
+    }
+    pppSetStatus("✓ Listo: " + table + " quedó con " + rows.length + " filas.", true);
+  } catch (e) { pppSetStatus("Sin conexión / error: " + (e.message || e), false); }
 }
 
 function openPlanimEditor() {

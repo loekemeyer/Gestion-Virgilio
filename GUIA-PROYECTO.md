@@ -4,7 +4,19 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-19 · Versión app al documentar: **v2.96**
+> Última actualización: 2026-06-19 · Versión app al documentar: **v2.97**
+>
+> Nota: **v2.97** — **PPP Fase 1: importador de Excel → Supabase**. Los botones del
+> módulo PPP ahora **leen el `.xls`/`.xlsx`** (SheetJS lazy desde CDN —
+> `pppLoadXlsx`—, el navegador del supervisor lo baja), **mapean columnas IGUAL que el
+> Apps Script** (`pppMapBase`: Pedido=A/Art=C/Cajas=F → `PPP_Base_Pedidos`; `pppMapProg`:
+> por posición, fila=pedido si col C tiene NP → `PPP_Programacion_Diaria`), muestran
+> **preview** (5 filas) y al confirmar hacen **reemplazo total** (DELETE+INSERT por
+> lotes de 1000) con el **JWT del supervisor** (`facAuthWriteHeaders`/`pppSubir`).
+> ⚠ Requiere **1 SQL una vez**: policies RLS de escritura para los mails de supervisor
+> en `PPP_Base_Pedidos` y `PPP_Programacion_Diaria` (hoy solo escribe el service_role).
+> Falta **Fase 2**: generar la vista PPP (Programación) linda + botones "Entregado" que
+> muevan el pedido a `PPP_Pedidos_Entregados`, vinculado a Facturación.
 >
 > Nota: **v2.96** — **Carga Recepción Mercadería: chooser Pendientes / Carga Manual**.
 > Al abrir (`openRecepcionAdmin`) ahora aparece un chooser con dos tarjetas; el iframe
