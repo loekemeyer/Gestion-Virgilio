@@ -4,7 +4,17 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-19 · Versión app al documentar: **v3.23**
+> Última actualización: 2026-06-19 · Versión app al documentar: **v3.24**
+>
+> Nota: **v3.24** — PPP: **3 retoques de UI**. (a) Los dos botones gigantes de importar se
+> reemplazaron por **un botón mínimo "⬆ Importar Excel ▾"** que abre un **popup**
+> (`pppToggleImport`/`pppCloseImport`, `#pppImportMenu`) con las dos opciones (Formato PPP /
+> Base Pedidos) y el dato de última importación de Base Pedidos adentro. (b) Se **sacó la
+> barra "🔄 Estado operarios (Listo FC)"** de Programación (el Listo FC se refresca solo al
+> entrar al tab). (c) **Resumen rediseñado como TABLA compacta** estilo Excel (`Resumen
+> Prog`): una fila por día de entrega, columnas Z1..Z7 / Retira / Súper / Total / Camiones /
+> Demora, fila TOTAL, con tinte de color por zona — **entra todo en una sola hoja**
+> (`pppResumenHtml`, `.ppp-restbl`).
 >
 > Nota: **v3.23** — PPP: **dedupe por N° Pedido** en `pppRenderProg` (codeado, automático en
 > cada render): un NP aparece **una sola vez** y cae en una única solapa según su estado por
