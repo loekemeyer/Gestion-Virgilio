@@ -4,7 +4,16 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-19 · Versión app al documentar: **v3.18**
+> Última actualización: 2026-06-19 · Versión app al documentar: **v3.19**
+>
+> Nota: **v3.19** — PPP: **OK por tanda**. Cada tanda armada (y cada súper) en 📥 A Programar
+> tiene un botón **✓ OK → Programar** que la **saca de A Programar** y la pasa a 🗓️
+> Programación. La **Fecha de Entrega se elige automática**: `_pppScheduleTandas` la mete en
+> el **día más temprano con lugar** según los **m³ ya programados ese día** y el tope **6
+> m³/día** (`dayCap`); una tanda gigante (> día) se lleva un día vacío. Los **súper van por
+> su fecha preestablecida** (no usan el cupo). `pppOkTanda`/`pppOkSuper` comparten el
+> scheduler con **✅ Confirmar todas** (`pppConfirmarProgramar`, hace todas por prioridad de
+> fecha de recepción). Reversible con "borrar tandas".
 >
 > Nota: **v3.18** — PPP: el **m³/tanda (0,8) es un objetivo modificable, no un tope duro**.
 > Se sacó el cartel "⚠ > 0,8 m³" de las tandas grandes: pasarse es normal (un cliente con

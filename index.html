@@ -1904,6 +1904,8 @@ button {
 .ppp-fc.ok{ color:#fff; background:#16a34a; border-radius:999px; padding:2px 8px; font-weight:800; }
 .ppp-tanda-ent{ margin-left:8px; padding:3px 10px; font-size:11px; font-weight:800; border:none; border-radius:7px; background:rgba(255,255,255,.22); color:#fff; cursor:pointer; }
 .ppp-tanda-ent:hover{ background:rgba(255,255,255,.35); }
+.ppp-ok-btn{ margin-left:8px; padding:3px 12px; font-size:12px; font-weight:800; border:none; border-radius:7px; background:#fff; color:#166534; cursor:pointer; }
+.ppp-ok-btn:hover{ background:#dcfce7; }
 .ppp-tool-l{ font-size:12px; font-weight:700; color:#475569; display:flex; align-items:center; gap:6px; }
 .ppp-tool-inp{ width:84px; height:34px; font-size:14px; border:1px solid #cbd5e1; border-radius:8px; padding:0 8px; }
 .ppp-tool-n{ width:64px; font-family:Consolas,Menlo,monospace; }
@@ -4780,7 +4782,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.18";
+const APP_VERSION = "v3.19";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -7974,33 +7976,76 @@ function _pppDeliveryDate(idx) {
   const p = function (n) { return String(n).padStart(2, "0"); };
   return p(d.getDate()) + "/" + p(d.getMonth() + 1) + "/" + d.getFullYear();
 }
-function pppConfirmarProgramar() {
-  if (!_pppEntregados) _pppEntregados = new Set();
+/* Programa tandas (no súper) metiéndolas en el día de entrega más temprano con lugar
+   (≤ m³/día). Comparte la lógica entre el "OK" por tanda y "Confirmar todas". */
+function _pppScheduleTandas(arr) {
   const ed = pppLoadEdits();
   const dayCap = pppGetCfg().dayCap > 0 ? pppGetCfg().dayCap : 6;
-  const isProg = function (np) { const e = ed[String(np)]; return !!(e && e.programmed); };
+  const load = {};            // fecha de entrega -> m³ ya programado (no súper)
+  for (const p of (_pppParsed.prog || [])) {
+    const e = ed[String(p.np)]; if (!(e && e.programmed) || pppEsSuper(p)) continue;
+    const f = (e.fecha_entrega != null ? e.fecha_entrega : p.fecha_entrega) || ""; if (f) load[f] = (load[f] || 0) + (Number(p.m3) || 0);
+  }
+  for (const T of arr) {
+    let idx = 0, date;
+    for (;;) { date = _pppDeliveryDate(idx); const cur = load[date] || 0; if (cur === 0 || (cur + T.m3) <= dayCap + 1e-9) break; if (++idx > 400) break; }
+    for (const p of T.ped) { const k = String(p.np); ed[k] = ed[k] || {}; ed[k].fecha_entrega = date; ed[k].programmed = true; }
+    load[date] = (load[date] || 0) + T.m3;
+  }
+  pppSaveEdits();
+}
+function _pppTandaPend(t) {            // pedidos no-súper, sin programar y sin entregar, de la tanda t
+  const ed = pppLoadEdits(), set = pppLoadEntregados();
+  return (_pppParsed.prog || []).filter(function (p) {
+    if (set.has(String(p.np))) return false;
+    const e = ed[String(p.np)]; if (e && e.programmed) return false;
+    if (pppEsSuper(p)) return false;
+    const tt = ((e && e.tanda != null ? e.tanda : p.tanda) || "").toUpperCase();
+    return tt === t;
+  });
+}
+/* OK por tanda: la saca de "A Programar" y la pasa a "Programación" con fecha de entrega. */
+function pppOkTanda(tanda) {
+  const t = String(tanda || "").toUpperCase(); if (!t || t === "—") return;
+  const ped = _pppTandaPend(t); if (!ped.length) return;
+  _pppScheduleTandas([{ m3: _pppM3Sum(ped), ped: ped }]);
+  pppRenderProg();
+  pppSetStatus("✅ Tanda " + t + " → Programación.", true);
+}
+function pppOkSuper(np) {
+  np = String(np); const ed = pppLoadEdits(), set = pppLoadEntregados();
+  let cod = "", base = null;
+  for (const p of (_pppParsed.prog || [])) { if (String(p.np) === np) { cod = String(p.cod || ""); base = p; break; } }
+  if (!base) return;
+  const ped = (_pppParsed.prog || []).filter(function (p) {
+    if (set.has(String(p.np))) return false;
+    const e = ed[String(p.np)]; if (e && e.programmed) return false;
+    if (!pppEsSuper(p)) return false;
+    return cod ? String(p.cod) === cod : (p.razon_social === base.razon_social);
+  });
+  if (!ped.length) return;
+  let sinF = 0;
+  for (const p of ped) { const e = ed[String(p.np)]; const f = String(((e && e.fecha_entrega != null) ? e.fecha_entrega : p.fecha_entrega) || "").trim(); if (!f) { sinF++; continue; } const k = String(p.np); ed[k] = ed[k] || {}; ed[k].programmed = true; ed[k].fecha_entrega = f; }
+  pppSaveEdits(); pppRenderProg();
+  if (sinF === ped.length) pppSetStatus("⚠ Poné la Fecha de Entrega del súper y dale OK de nuevo.", false);
+  else pppSetStatus("✅ Súper → Programación" + (sinF ? " (" + sinF + " sin fecha quedaron en A Programar)" : "") + ".", true);
+}
+/* Confirmar TODAS las tandas armadas de una (por prioridad de fecha de recepción). */
+function pppConfirmarProgramar() {
+  const ed = pppLoadEdits(), set = pppLoadEntregados();
   const tandaDe = function (p) { const e = ed[String(p.np)]; const t = (e && e.tanda != null) ? e.tanda : (p.tanda || ""); return (t && t !== "—") ? t.toUpperCase() : ""; };
-  const feDe = function (p) { const e = ed[String(p.np)]; const f = (e && e.fecha_entrega != null) ? e.fecha_entrega : (p.fecha_entrega || ""); return String(f || "").trim(); };
-  const pend = (_pppParsed.prog || []).filter(function (p) { return !_pppEntregados.has(String(p.np)) && !isProg(p.np); });
+  const pend = (_pppParsed.prog || []).filter(function (p) { return !set.has(String(p.np)) && !(ed[String(p.np)] && ed[String(p.np)].programmed); });
   const conTanda = pend.filter(function (p) { return !pppEsSuper(p) && tandaDe(p); });
   const supers = pend.filter(pppEsSuper);
   if (!conTanda.length && !supers.length) { pppSetStatus("No hay tandas para programar. Armá las tandas primero (🪄 Sugerir tandas).", false); return; }
-  const setProg = function (ped, dstr) { for (const p of ped) { const k = String(p.np); ed[k] = ed[k] || {}; ed[k].fecha_entrega = dstr; ed[k].programmed = true; } };
   const byT = {}, tlist = [];
   for (const p of conTanda) { const t = tandaDe(p); if (!byT[t]) { byT[t] = { m3: 0, minF: "99999999", ped: [] }; tlist.push(t); } byT[t].ped.push(p); byT[t].m3 += Number(p.m3) || 0; const fk = _pppFechaKey(p.fecha); if (fk < byT[t].minF) byT[t].minF = fk; }
   tlist.sort(function (a, b) { return byT[a].minF.localeCompare(byT[b].minF) || (a < b ? -1 : 1); });
-  let dayIdx = 0, dayM3 = 0, nProg = 0;
-  for (const t of tlist) {
-    const tm = byT[t].m3;
-    if (dayM3 > 0 && (dayM3 + tm) > dayCap) { dayIdx++; dayM3 = 0; }
-    setProg(byT[t].ped, _pppDeliveryDate(dayIdx)); nProg += byT[t].ped.length;
-    dayM3 += tm;
-  }
-  const nDias = conTanda.length ? (dayIdx + 1) : 0;
-  let supSinFecha = 0;
-  for (const p of supers) { const f = feDe(p); if (f) { const k = String(p.np); ed[k] = ed[k] || {}; ed[k].programmed = true; ed[k].fecha_entrega = f; nProg++; } else supSinFecha++; }
+  _pppScheduleTandas(tlist.map(function (t) { return { m3: byT[t].m3, ped: byT[t].ped }; }));
+  let nSup = 0, supSinFecha = 0;
+  for (const p of supers) { const e = ed[String(p.np)]; const f = String(((e && e.fecha_entrega != null) ? e.fecha_entrega : p.fecha_entrega) || "").trim(); if (f) { const k = String(p.np); ed[k] = ed[k] || {}; ed[k].programmed = true; ed[k].fecha_entrega = f; nSup++; } else supSinFecha++; }
   pppSaveEdits(); _pppTab = "plan"; pppRenderProg();
-  pppSetStatus("✅ " + nProg + " pedidos programados" + (nDias ? " en " + nDias + " día(s) a " + dayCap + " m³/día" : "") + (supSinFecha ? " · ⚠ " + supSinFecha + " súper sin fecha (poné la fecha de entrega y confirmá de nuevo)" : "") + ".", true);
+  pppSetStatus("✅ Programado: " + tlist.length + " tanda(s)" + (nSup ? " + " + nSup + " súper" : "") + (supSinFecha ? " · ⚠ " + supSinFecha + " súper sin fecha" : "") + ".", true);
 }
 /* ===== Zona automática desde el Barrio de entrega =====
    Réplica de la lógica del Excel: la Zona NO se escribe a mano, sale del BARRIO
@@ -8195,7 +8240,7 @@ function pppRenderProg() {
   const cfg = pppGetCfg();
   html += '<div class="ppp-toolbar">' +
     '<button class="ppp-sug-btn" onclick="pppSugerirTandas()">🪄 Sugerir tandas</button>' +
-    '<button class="ppp-confirm-btn" onclick="pppConfirmarProgramar()">✅ Confirmar y programar</button>' +
+    '<button class="ppp-confirm-btn" onclick="pppConfirmarProgramar()">✅ Confirmar todas</button>' +
     '<label class="ppp-tool-l">m³/tanda <input class="ppp-tool-inp" type="number" step="0.1" min="0.1" value="' + cfg.tandaCap + '" onchange="pppSetCfg(\'tandaCap\',this.value)"></label>' +
     '<label class="ppp-tool-l">m³/día <input class="ppp-tool-inp" type="number" step="0.5" min="0.5" value="' + cfg.dayCap + '" onchange="pppSetCfg(\'dayCap\',this.value)"></label>' +
     '<label class="ppp-tool-l">N° base <input class="ppp-tool-inp ppp-tool-n" value="' + escapeHtml(cfg.baseN) + '" onchange="pppSetCfg(\'baseN\',this.value)"></label>' +
@@ -8211,7 +8256,7 @@ function pppRenderProg() {
   else {
     const byC = {}, ord = [];
     for (const p of sup) { const k = String(p.cod || p.razon_social || "?"); if (!(k in byC)) ord.push(k); (byC[k] = byC[k] || []).push(p); }
-    for (const k of ord) { const ps = byC[k]; html += _pppBlock("🛒 " + escapeHtml(ps[0].razon_social || ("Cliente " + k)), "ppp-tanda-super", ps.length + " ped · " + _pppM3Sum(ps).toFixed(2) + " m³", ps); }
+    for (const k of ord) { const ps = byC[k]; const ok = ' <button class="ppp-ok-btn" onclick="pppOkSuper(\'' + escapeHtml(String(ps[0].np)) + '\')">✓ OK → Programar</button>'; html += _pppBlock("🛒 " + escapeHtml(ps[0].razon_social || ("Cliente " + k)), "ppp-tanda-super", ps.length + " ped · " + _pppM3Sum(ps).toFixed(2) + " m³", ps, ok); }
   }
   // TANDAS ARMADAS — con tanda, sin confirmar (listas para programar).
   html += '<div class="ppp-sec-t ppp-sec-done">🧩 Tandas armadas — sin confirmar · ' + armadas.length + '</div>';
@@ -8219,7 +8264,7 @@ function pppRenderProg() {
   else {
     const byT = {}, ord = []; for (const p of armadas) { const t = p.tanda.toUpperCase(); if (!(t in byT)) ord.push(t); (byT[t] = byT[t] || []).push(p); }
     ord.sort();
-    for (const t of ord) { html += _pppBlock("Tanda " + escapeHtml(t), "", byT[t].length + " ped · " + _pppM3Sum(byT[t]).toFixed(2) + " m³", byT[t]); }
+    for (const t of ord) { const ok = ' <button class="ppp-ok-btn" onclick="pppOkTanda(\'' + escapeHtml(t) + '\')">✓ OK → Programar</button>'; html += _pppBlock("Tanda " + escapeHtml(t), "", byT[t].length + " ped · " + _pppM3Sum(byT[t]).toFixed(2) + " m³", byT[t], ok); }
   }
   // SIN TANDA — por zona, ordenado por fecha de recepción.
   html += '<div class="ppp-sec-t ppp-sec-prog">📋 Sin tanda — por zona, ordenado por fecha de recepción · ' + sinTanda.length + '</div>';
