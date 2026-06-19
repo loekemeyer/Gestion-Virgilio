@@ -4,7 +4,15 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-19 · Versión app al documentar: **v2.95**
+> Última actualización: 2026-06-19 · Versión app al documentar: **v2.96**
+>
+> Nota: **v2.96** — **Carga Recepción Mercadería: chooser Pendientes / Carga Manual**.
+> Al abrir (`openRecepcionAdmin`) ahora aparece un chooser con dos tarjetas; el iframe
+> de `Control-Carga-Remitos-FC` carga recién al elegir (`recpOpen`), con botón **← Volver**
+> (`recpShowChooser`). **Pendientes** → home de la app (como antes). **Carga Manual** →
+> `RECEPCION_CARGA_URL` ⚠ **TODO**: hoy cae al home; falta el **deep-link real** de la
+> pantalla "Recepción de Mercadería" (repo privado + github.io bloqueado en el sandbox →
+> el usuario tiene que pasar el `#hash`/`?param` de esa pantalla).
 >
 > Nota: **v2.95** — tres cosas en el panel Admin. **(a)** Botón **"Recepción (Admin)" →
 > "Carga Recepción Mercadería"** (sigue llamando a `openRecepcionAdmin`, iframe de
