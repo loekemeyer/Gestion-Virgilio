@@ -4,7 +4,18 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-19 · Versión app al documentar: **v3.24**
+> Última actualización: 2026-06-19 · Versión app al documentar: **v3.25**
+>
+> Nota: **v3.25** — PPP: **(a) tandas colapsables (acordeón)**. Cada bloque arranca
+> **cerrado**; la franja azul muestra los datos clave (**Razón Social · N° Pedido · 📅 Fecha
+> de Entrega**) y al **tocarla se expande** el detalle (`_pppBlock` con id + `pppToggleBlock`,
+> caret ▸/▾, `.ppp-tanda .ppp-tablewrap{display:none}`). Los botones del header llevan
+> `event.stopPropagation()` para no abrir/cerrar al clickearlos. **(b) Ciclo Entregado →
+> Controlado**: la columna **"Entregado"** se nutre sola del evento **CCN** (carga de camión
+> por NP que marcan los operarios) — `pppRefreshEntregado`/`_pppEntregadoCC`, lectura de
+> Supabase. El botón manual ahora es **"✓ Controlado"** (lo marca la operadora,
+> `pppControlar`/`pppControlarTanda`): **recién al Controlar** el pedido pasa a **"Pedidos
+> Entregados"** (tab renombrado). "Listo FC" sigue del evento TAP. Todo lectura, sigue SOLO LOCAL.
 >
 > Nota: **v3.24** — PPP: **3 retoques de UI**. (a) Los dos botones gigantes de importar se
 > reemplazaron por **un botón mínimo "⬆ Importar Excel ▾"** que abre un **popup**
