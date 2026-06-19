@@ -1866,9 +1866,9 @@ button {
 .ppp-tanda{ background:#fff; border:1px solid #e2e8f0; border-radius:12px; margin-bottom:12px; overflow:hidden; }
 .ppp-tanda.ppp-tanda-none{ border:1px solid #fcd34d; }
 .ppp-tanda.ppp-tanda-none .ppp-tanda-h{ background:linear-gradient(90deg,#d97706,#b45309); }
-.ppp-tanda-h{ display:flex; justify-content:space-between; align-items:center; gap:10px; padding:10px 14px; background:linear-gradient(90deg,#1e6bd6,#1e3a8a); color:#fff; }
-.ppp-tanda-name{ font-size:16px; font-weight:800; font-family:Consolas,Menlo,monospace; letter-spacing:.5px; }
-.ppp-tanda-meta{ font-size:12px; opacity:.92; white-space:nowrap; }
+.ppp-tanda-h{ display:flex; justify-content:flex-start; align-items:center; gap:6px 16px; flex-wrap:wrap; padding:10px 14px; background:linear-gradient(90deg,#1e6bd6,#1e3a8a); color:#fff; }
+.ppp-tanda-name{ font-size:16px; font-weight:800; font-family:Consolas,Menlo,monospace; letter-spacing:.5px; min-width:420px; }
+.ppp-tanda-meta{ font-size:12px; opacity:.92; white-space:nowrap; display:inline-flex; align-items:center; gap:10px; }
 .ppp-tablewrap{ overflow-x:auto; }
 .ppp-tbl{ width:100%; border-collapse:collapse; font-size:13px; white-space:nowrap; }
 .ppp-tbl th{ text-align:left; padding:7px 12px; background:#f8fafc; color:#475569; border-bottom:1px solid #e2e8f0; font-size:11px; text-transform:uppercase; letter-spacing:.3px; }
@@ -4782,7 +4782,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.19";
+const APP_VERSION = "v3.20";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");

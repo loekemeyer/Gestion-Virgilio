@@ -4,7 +4,11 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-19 · Versión app al documentar: **v3.19**
+> Última actualización: 2026-06-19 · Versión app al documentar: **v3.20**
+>
+> Nota: **v3.20** — PPP: el encabezado de cada tanda ahora **alinea a la izquierda** (m³ +
+> botón OK/Entregada a la altura de la columna Fecha, `min-width` en `.ppp-tanda-name` +
+> `flex-wrap`) para que el botón **no quede cortado** a la derecha en pantallas anchas.
 >
 > Nota: **v3.19** — PPP: **OK por tanda**. Cada tanda armada (y cada súper) en 📥 A Programar
 > tiene un botón **✓ OK → Programar** que la **saca de A Programar** y la pasa a 🗓️
