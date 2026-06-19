@@ -4,7 +4,13 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-19 · Versión app al documentar: **v3.31**
+> Última actualización: 2026-06-19 · Versión app al documentar: **v3.32**
+>
+> Nota: **v3.32** — PPP: **editor de clientes súper**. Botón **🛒 Clientes súper** en la PPP →
+> overlay `#pppSupersOverlay` para **agregar (cód + nombre) / borrar**; persiste en
+> `vir_ppp_supers` (`openPppSupers`/`pppSuperAdd`/`pppSuperDel`/`pppSupersRender`) y re-renderiza
+> la PPP. La detección de súper sigue siendo: lista de clientes (por cód) + Tipo KRIKOS +
+> barrio/zona Súper.
 >
 > Nota: **v3.31** — PPP: en Programación, dentro de **cada día** las tandas se **ordenan por
 > camión (color)** y no por número: Sur/Oeste · Norte · Centro · Súper · Retira (y dentro de
