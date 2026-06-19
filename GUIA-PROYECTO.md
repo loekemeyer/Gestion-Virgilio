@@ -4,7 +4,12 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-19 · Versión app al documentar: **v2.92**
+> Última actualización: 2026-06-19 · Versión app al documentar: **v2.93**
+>
+> Nota: **v2.93** — **panel Administración en grilla tipo teclado**. Los botones grandes
+> (`.sup-actions`/`.sup-action-btn`) pasaron de una columna a **grid de 3 columnas**
+> (ícono arriba + texto centrado, tarjetas), que usa el ancho de la pantalla; en celular
+> (≤560px) baja a **2 columnas**. Solo CSS.
 >
 > Nota: **v2.92** — **Facturación: se reubicó el botón "Cerrar"**. Estaba como barra
 > roja a todo el ancho en el medio del header (heredaba el `button{width:100%}` global,

@@ -66,15 +66,20 @@ button {
 /* Panel de Administración (supervisor): título + botones grandes centrados. */
 .sup-title { text-align: center; font-size: 32px; margin: 5vh 0 0; }
 .sup-actions {
-  max-width: 460px; margin: 24px auto 0;
-  display: flex; flex-direction: column; gap: 16px;
+  max-width: min(1040px, 94vw); margin: 24px auto 0;
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px;   /* tipo teclado 3 col */
 }
 .sup-action-btn {
-  width: 100%; margin: 0; display: flex; align-items: center; gap: 16px;
-  padding: 24px 22px; font-size: 22px; font-weight: bold; text-align: left;
-  background: #1e6bd6; color: #fff; border: none; border-radius: 14px; cursor: pointer;
+  width: 100%; margin: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+  min-height: 118px; padding: 18px 14px; font-size: 18px; font-weight: bold; text-align: center;
+  line-height: 1.2; background: #1e6bd6; color: #fff; border: none; border-radius: 14px; cursor: pointer;
+  transition: background .12s, transform .06s;
 }
-.sup-action-btn .sup-ico { font-size: 30px; flex: 0 0 auto; line-height: 1; }
+.sup-action-btn:hover { background: #1d4ed8; }
+.sup-action-btn:active { transform: scale(.97); }
+.sup-action-btn .sup-ico { font-size: 34px; flex: 0 0 auto; line-height: 1; }
+@media (max-width: 560px) { .sup-actions { grid-template-columns: repeat(2, 1fr); gap: 12px; } }
 /* Nombre del usuario logueado, fijo arriba a la izquierda. */
 #userTag {
   position: fixed; top: 8px; left: 8px; z-index: 60;
@@ -4544,7 +4549,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v2.92";
+const APP_VERSION = "v2.93";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
