@@ -4,7 +4,16 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-19 · Versión app al documentar: **v3.04**
+> Última actualización: 2026-06-19 · Versión app al documentar: **v3.05**
+>
+> Nota: **v3.05** — **PPP: formato fijo (sin panel de mapeo)**. Por pedido del usuario
+> se sacó el panel de elegir columnas. Ahora el **Formato PPP** detecta las columnas
+> **por el NOMBRE del encabezado** (`pppDetectProgCols`: tanda/cod cli/pedido/fecha/
+> razón/m3/localidad/fecha entrega/zona) y arma la vista agrupada por tanda con esas
+> 9 columnas (m³ a **2 decimales**; fechas formateadas DD/MM/YYYY, `cellDates`+`_pppFecha`).
+> **Base Pedidos** ya NO muestra tabla: solo la **fecha/hora de la última importación**
+> (`#pppBaseInfo`/`pppShowBaseInfo`, persistida en `localStorage` `vir_ppp_base_ts`).
+> Sigue SOLO LOCAL. (El panel de mapeo y `_pppGuessMap` quedaron dormidos.)
 >
 > Nota: **v3.04** — PPP: el auto-guess del mapeo ahora también detecta **Tanda**
 > (texto corto alfanumérico tipo C41A), **Zona** (valores con "zona") y **Localidad**
