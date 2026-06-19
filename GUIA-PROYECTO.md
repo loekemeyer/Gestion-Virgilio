@@ -4,7 +4,17 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-19 · Versión app al documentar: **v3.02**
+> Última actualización: 2026-06-19 · Versión app al documentar: **v3.03**
+>
+> Nota: **v3.03** — dos cosas. **(a) PPP: drag-drop** — además del click, podés
+> **arrastrar el `.xls` encima** de cada botón de importar (`pppHandleFile` compartido
+> por click y drop; `pppDragOver`/`pppDrop`; highlight `.ppp-drag`). **(b) #4 parte 2:
+> editor de Talleristas de Recepción** — botón "👷 Talleristas de Recepción" (panel
+> Admin) → overlay que lee `Codigos X Tallerista` (id, Nombre, Linea LK/CH, Codigo),
+> agrupa por Nombre y muestra el código LK/CH editable + agregar/borrar. Escribe con
+> el JWT del supervisor (la RLS de esa tabla ya permite INSERT/UPDATE/DELETE a
+> authenticated → no hace falta SQL). `tallLoad`/`tallRender`/`tallSaveCod`/`tallAdd`/
+> `tallDelete`. Con esto, #4 (Mails + Talleristas) queda completo.
 >
 > Nota: **v3.02** — **PPP: mapeo de columnas configurable** (fix del import). El
 > "Formato PPP" tiene su propio layout (NO el de Programacion Diaria): el NP es de 5

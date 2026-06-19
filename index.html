@@ -1822,6 +1822,11 @@ button {
 .mails-row{ display:flex; align-items:center; gap:10px; background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:10px 12px; }
 .mails-mail{ flex:1 1 auto; font-size:15px; color:#0f172a; word-break:break-all; }
 .mails-fijo{ flex:0 0 auto; font-size:11px; font-weight:800; color:#475569; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:999px; padding:2px 10px; text-transform:uppercase; letter-spacing:.4px; }
+.tall-row{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:8px 12px; }
+.tall-name{ flex:1 1 160px; font-size:15px; font-weight:700; color:#0f172a; min-width:120px; }
+.tall-cod-wrap{ display:flex; align-items:center; gap:5px; }
+.tall-lin{ font-size:11px; font-weight:800; color:#475569; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:6px; padding:3px 7px; }
+.tall-cod{ width:80px; height:38px; font-size:15px; border:2px solid #cbd5e1; border-radius:8px; padding:0 8px; box-sizing:border-box; }
 .planim-status{ font-size: 13px; color: #475569; min-height: 18px; text-align: center; }
 .planim-empty{ color: #94a3b8; padding: 10px; text-align: center; }
 /* Módulo PPP (placeholder/scaffolding) */
@@ -1829,6 +1834,8 @@ button {
 .ppp-imp-row{ display:flex; gap:12px; flex-wrap:wrap; }
 .ppp-imp-btn{ flex:1 1 220px; width:auto; margin:0; min-height:84px; display:flex; align-items:center; justify-content:center; gap:10px; padding:16px; font-size:17px; font-weight:bold; background:#1e6bd6; color:#fff; border:none; border-radius:12px; cursor:pointer; }
 .ppp-imp-btn:hover{ background:#1d4ed8; } .ppp-imp-btn span{ font-size:22px; }
+.ppp-imp-btn.ppp-drag{ background:#15803d; outline:3px dashed #86efac; outline-offset:-6px; }
+.ppp-drophint{ font-size:12px; color:#64748b; margin:8px 2px 0; text-align:center; }
 .ppp-preview{ margin-top:14px; }
 .ppp-prev-h{ font-size:13px; color:#334155; margin-bottom:8px; } .ppp-prev-h code{ background:#eef2ff; color:#3730a3; padding:1px 5px; border-radius:4px; }
 .ppp-prev-tablewrap{ overflow-x:auto; border:1px solid #e2e8f0; border-radius:8px; }
@@ -2603,6 +2610,7 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
       <button class="sup-action-btn" onclick="openPlanimEditor()"><span class="sup-ico">🗺️</span><span>Editar Planimetría</span></button>
       <button class="sup-action-btn" onclick="openPPP()"><span class="sup-ico">🗓️</span><span>PPP</span></button>
       <button class="sup-action-btn" onclick="openMailsEditor()"><span class="sup-ico">✉️</span><span>Mails autorizados</span></button>
+      <button class="sup-action-btn" onclick="openTallEditor()"><span class="sup-ico">👷</span><span>Talleristas de Recepción</span></button>
     </div>
     <div class="auth-logout-row">
       <button class="auth-logout-btn" onclick="signOutGoogle()">Salir</button>
@@ -2707,9 +2715,10 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
     <div class="planim-body">
       <div class="ppp-warn">⚠ <b>EN PRUEBAS — SOLO LOCAL.</b> Importás el Excel y lo ves acá; <b>todavía NO se escribe nada en Supabase</b>. Ajustamos el formato y, cuando te guste, lo conectamos.</div>
       <div class="ppp-imp-row">
-        <button class="ppp-imp-btn" onclick="pppImportar('base')"><span>⬆</span> Importar Base Pedidos</button>
-        <button class="ppp-imp-btn" onclick="pppImportar('prog')"><span>⬆</span> Importar Formato PPP</button>
+        <button class="ppp-imp-btn" onclick="pppImportar('base')" ondragover="pppDragOver(event,this)" ondragleave="pppDragLeave(event,this)" ondrop="pppDrop(event,'base',this)"><span>⬆</span> Importar Base Pedidos</button>
+        <button class="ppp-imp-btn" onclick="pppImportar('prog')" ondragover="pppDragOver(event,this)" ondragleave="pppDragLeave(event,this)" ondrop="pppDrop(event,'prog',this)"><span>⬆</span> Importar Formato PPP</button>
       </div>
+      <div class="ppp-drophint">💡 Tocá un botón <b>o arrastrá el archivo .xls encima</b> del que quieras.</div>
       <div id="pppPreview" class="ppp-preview"></div>
       <div id="pppStatus" class="planim-status"></div>
     </div>
@@ -2734,6 +2743,31 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
       <div class="planim-sec-t">Autorizados</div>
       <div id="mailsList" class="planim-list"></div>
       <div id="mailsStatus" class="planim-status"></div>
+    </div>
+  </div>
+
+  <!-- Editor de Talleristas de Recepción. Tabla Supabase "Codigos X Tallerista"
+       (Nombre, Linea LK/CH, Codigo). La RLS ya deja escribir a authenticated. -->
+  <div id="tallEditorOverlay" class="recp-admin-overlay">
+    <div class="recp-admin-bar">
+      <span class="recp-admin-title">👷 Talleristas de Recepción</span>
+      <button class="recp-admin-close" onclick="closeTallEditor()">Cerrar</button>
+    </div>
+    <div class="planim-body">
+      <div class="planim-add">
+        <div class="planim-add-t">Agregar tallerista</div>
+        <div class="planim-add-row">
+          <input id="tallNewNombre" class="planim-inp" type="text" placeholder="Nombre">
+          <input id="tallNewLK" class="planim-inp planim-inp-num" type="text" placeholder="Cód LK">
+          <input id="tallNewCH" class="planim-inp planim-inp-num" type="text" placeholder="Cód CH">
+          <button class="planim-btn-save" onclick="tallAdd()">Agregar</button>
+        </div>
+        <div class="planim-hint">Cada tallerista tiene un código por línea (<b>LK</b> / <b>CH</b>). Podés dejar uno vacío y completarlo después.</div>
+      </div>
+      <div class="planim-sec-t">Talleristas</div>
+      <input id="tallSearch" class="planim-inp planim-search" type="text" placeholder="🔍 Buscar tallerista…" oninput="tallRender(this.value)">
+      <div id="tallList" class="planim-list"></div>
+      <div id="tallStatus" class="planim-status"></div>
     </div>
   </div>
 
@@ -4692,7 +4726,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.02";
+const APP_VERSION = "v3.03";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -7487,29 +7521,38 @@ function pppMapProg(rows) {                          // por posición; fila = pe
   }
   return out;
 }
+async function pppHandleFile(tipo, f) {                 // de click o de drag-drop
+  if ((tipo !== "base" && tipo !== "prog") || !f) return;
+  pppSetStatus("Leyendo " + f.name + "…");
+  try {
+    const XLSX = await pppLoadXlsx();
+    const buf = await f.arrayBuffer();
+    const wb = XLSX.read(buf, { type: "array" });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: "" });
+    if (tipo === "prog") {
+      _pppRawProg = rows; pppShowMapping(f.name);
+      pppSetStatus("Mapeá las columnas y tocá \"Ver PPP\".");
+    } else {
+      const mapped = pppMapBase(rows); _pppParsed.base = mapped;
+      pppRenderBase(f.name, rows.length, mapped);
+      pppSetStatus(mapped.length ? ("✓ " + f.name + ": " + mapped.length + " filas (SOLO LOCAL).") : "No saqué filas válidas.", mapped.length > 0);
+    }
+  } catch (e) { pppSetStatus("Error leyendo el Excel: " + (e.message || e), false); }
+}
+function pppDragOver(e, el) { if (e) { e.preventDefault(); e.stopPropagation(); } if (el) el.classList.add("ppp-drag"); }
+function pppDragLeave(e, el) { if (el) el.classList.remove("ppp-drag"); }
+function pppDrop(e, tipo, el) {
+  if (e) { e.preventDefault(); e.stopPropagation(); }
+  if (el) el.classList.remove("ppp-drag");
+  const f = e && e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+  if (f) pppHandleFile(tipo, f);
+}
 function pppImportar(tipo) {
   if (tipo !== "base" && tipo !== "prog") return;
   const inp = document.createElement("input");
   inp.type = "file"; inp.accept = ".xls,.xlsx";
-  inp.onchange = async function () {
-    const f = inp.files && inp.files[0]; if (!f) return;
-    pppSetStatus("Leyendo " + f.name + "…");
-    try {
-      const XLSX = await pppLoadXlsx();
-      const buf = await f.arrayBuffer();
-      const wb = XLSX.read(buf, { type: "array" });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: "" });
-      if (tipo === "prog") {
-        _pppRawProg = rows; pppShowMapping(f.name);
-        pppSetStatus("Mapeá las columnas y tocá \"Ver PPP\".");
-      } else {
-        const mapped = pppMapBase(rows); _pppParsed.base = mapped;
-        pppRenderBase(f.name, rows.length, mapped);
-        pppSetStatus(mapped.length ? ("✓ " + f.name + ": " + mapped.length + " filas (SOLO LOCAL).") : "No saqué filas válidas.", mapped.length > 0);
-      }
-    } catch (e) { pppSetStatus("Error leyendo el Excel: " + (e.message || e), false); }
-  };
+  inp.onchange = function () { const f = inp.files && inp.files[0]; if (f) pppHandleFile(tipo, f); };
   inp.click();
 }
 /* ===== Mapeo de columnas del "Formato PPP" — el Excel tiene su propio layout, así
@@ -7734,6 +7777,113 @@ async function mailsDelete(email) {
     if (_supervisoresRemotos) _supervisoresRemotos.delete(e);
     mailsRender(); mailsSetStatus("✓ " + e + " sacado.", true);
   } catch (_e) { mailsSetStatus("Sin conexión: no se borró.", false); }
+}
+
+/* ===== Editor de Talleristas de Recepción — tabla Supabase "Codigos X Tallerista"
+   (id, Nombre, Linea LK/CH, Codigo). La RLS ya permite que authenticated (supervisor
+   logueado) escriba, así que se usa el JWT del supervisor. Agrupa por Nombre y muestra
+   el código de cada línea (LK/CH), editable. v3.03. ===== */
+let _tallData = null;
+const SUPABASE_TALL_ENDPOINT = SUPABASE_URL + "/rest/v1/" + encodeURIComponent("Codigos X Tallerista");
+function openTallEditor() {
+  if (!requireSupervisor()) return;
+  const ov = document.getElementById("tallEditorOverlay");
+  if (ov) ov.classList.add("show");
+  tallSetStatus("Cargando…");
+  tallLoad();
+}
+function closeTallEditor() {
+  const ov = document.getElementById("tallEditorOverlay");
+  if (ov) ov.classList.remove("show");
+}
+function tallSetStatus(msg, ok) {
+  const el = document.getElementById("tallStatus");
+  if (el) { el.textContent = msg || ""; el.style.color = (ok === false) ? "#b42318" : "#166534"; }
+}
+async function tallLoad() {
+  try {
+    const r = await fetch(SUPABASE_TALL_ENDPOINT + "?select=id,Nombre,Linea,Codigo&order=Nombre", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+    if (!r.ok) { tallSetStatus("Error cargando: HTTP " + r.status, false); return; }
+    _tallData = await r.json();
+    const s = document.getElementById("tallSearch");
+    tallRender(s ? s.value : ""); tallSetStatus("");
+  } catch (_e) { tallSetStatus("Sin conexión.", false); }
+}
+function tallRender(filter) {
+  const list = document.getElementById("tallList"); if (!list) return;
+  const data = _tallData || [];
+  const byN = {};
+  for (const row of data) {
+    const n = String(row.Nombre || "").trim(); if (!n) continue;
+    if (!byN[n]) byN[n] = { LK: null, CH: null };
+    const lin = String(row.Linea || "").trim().toUpperCase();
+    if (lin === "LK") byN[n].LK = row; else if (lin === "CH") byN[n].CH = row;
+  }
+  let nombres = Object.keys(byN).sort(function (a, b) { return a.toLowerCase() < b.toLowerCase() ? -1 : 1; });
+  const f = String(filter || "").trim().toLowerCase();
+  if (f) nombres = nombres.filter(function (n) { return n.toLowerCase().indexOf(f) >= 0; });
+  if (!nombres.length) { list.innerHTML = '<div class="planim-empty">' + (f ? "Nada coincide." : "Sin talleristas.") + "</div>"; return; }
+  const codInput = function (nE, lin, row) {
+    const val = row ? escapeHtml(String(row.Codigo == null ? "" : row.Codigo)) : "";
+    return '<span class="tall-cod-wrap"><span class="tall-lin">' + lin + '</span>' +
+      '<input class="tall-cod" data-id="' + (row ? row.id : "") + '" data-nombre="' + nE + '" data-linea="' + lin + '" value="' + val + '" onchange="tallSaveCod(this)"></span>';
+  };
+  list.innerHTML = nombres.map(function (n) {
+    const t = byN[n], nE = escapeHtml(n);
+    return '<div class="tall-row"><span class="tall-name">' + nE + '</span>' +
+      codInput(nE, "LK", t.LK) + codInput(nE, "CH", t.CH) +
+      '<button class="planim-btn-del" data-nombre="' + nE + '" onclick="tallDelete(this.getAttribute(\'data-nombre\'))">Borrar</button></div>';
+  }).join("");
+}
+async function tallSaveCod(el) {
+  const id = el.getAttribute("data-id");
+  const nombre = el.getAttribute("data-nombre");
+  const linea = el.getAttribute("data-linea");
+  const cod = el.value.trim();
+  const headers = await facAuthWriteHeaders({ "Prefer": "return=minimal" });
+  if (!headers) { tallSetStatus("Iniciá sesión con Google.", false); return; }
+  try {
+    let r;
+    if (id) r = await fetch(SUPABASE_TALL_ENDPOINT + "?id=eq." + encodeURIComponent(id), { method: "PATCH", headers: headers, body: JSON.stringify({ Codigo: cod || null }) });
+    else r = await fetch(SUPABASE_TALL_ENDPOINT, { method: "POST", headers: headers, body: JSON.stringify({ Nombre: nombre, Linea: linea, Codigo: cod || null }) });
+    if (!r.ok) { tallSetStatus("Error guardando: HTTP " + r.status, false); return; }
+    await tallLoad();
+    tallSetStatus("✓ " + nombre + " (" + linea + ") guardado.", true);
+  } catch (_e) { tallSetStatus("Sin conexión.", false); }
+}
+async function tallAdd() {
+  const nEl = document.getElementById("tallNewNombre");
+  const nombre = nEl ? nEl.value.trim() : "";
+  if (!nombre) { tallSetStatus("Falta el nombre.", false); return; }
+  const lk = (document.getElementById("tallNewLK") || {}).value;
+  const ch = (document.getElementById("tallNewCH") || {}).value;
+  const rows = [
+    { Nombre: nombre, Linea: "LK", Codigo: (lk || "").trim() || null },
+    { Nombre: nombre, Linea: "CH", Codigo: (ch || "").trim() || null }
+  ];
+  const headers = await facAuthWriteHeaders({ "Prefer": "return=minimal" });
+  if (!headers) { tallSetStatus("Iniciá sesión con Google.", false); return; }
+  try {
+    const r = await fetch(SUPABASE_TALL_ENDPOINT, { method: "POST", headers: headers, body: JSON.stringify(rows) });
+    if (!r.ok) { tallSetStatus("Error agregando: HTTP " + r.status, false); return; }
+    if (nEl) nEl.value = "";
+    const lkEl = document.getElementById("tallNewLK"); if (lkEl) lkEl.value = "";
+    const chEl = document.getElementById("tallNewCH"); if (chEl) chEl.value = "";
+    await tallLoad();
+    tallSetStatus("✓ " + nombre + " agregado.", true);
+  } catch (_e) { tallSetStatus("Sin conexión.", false); }
+}
+async function tallDelete(nombre) {
+  const n = String(nombre || "");
+  if (!n || !confirm("¿Borrar al tallerista " + n + " (todas sus líneas LK/CH)?")) return;
+  const headers = await facAuthWriteHeaders({ "Prefer": "return=minimal" });
+  if (!headers) { tallSetStatus("Iniciá sesión con Google.", false); return; }
+  try {
+    const r = await fetch(SUPABASE_TALL_ENDPOINT + "?Nombre=eq." + encodeURIComponent(n), { method: "DELETE", headers: headers });
+    if (!r.ok) { tallSetStatus("Error borrando: HTTP " + r.status, false); return; }
+    await tallLoad();
+    tallSetStatus("✓ " + n + " borrado.", true);
+  } catch (_e) { tallSetStatus("Sin conexión.", false); }
 }
 
 function openPlanimEditor() {
