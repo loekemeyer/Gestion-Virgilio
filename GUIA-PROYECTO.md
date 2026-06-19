@@ -4,7 +4,16 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-19 · Versión app al documentar: **v3.08**
+> Última actualización: 2026-06-19 · Versión app al documentar: **v3.09**
+>
+> Nota: **v3.09** — PPP: **Tanda y Fecha Entrega editables a mano** (no vienen del Excel).
+> Cada fila tiene un input para **Tanda** (primera columna) y otro para **Fecha Entrega**.
+> Lo tipeado se guarda en `localStorage` `vir_ppp_edits` **por N° Pedido** (sobrevive
+> recarga y reimportación del mismo Excel; SOLO LOCAL) y se mergea al render
+> (`pppLoadEdits`/`pppSaveEdits`/`pppSetEdit`). Al escribir una Tanda, el pedido se
+> reagrupa en vivo (re-render). Los pedidos **sin tanda** quedan en el grupo
+> **"Sin tanda asignada"** que aparece **primero** (tarjeta ámbar) para cargarlos cómodo;
+> el resto de las tandas, A→Z. Fecha Entrega no reagrupa (solo guarda). Sigue SOLO LOCAL.
 >
 > Nota: **v3.08** — PPP: **detección por PATRÓN de datos** (reescritura de
 > `pppDetectProgCols`). El Excel "Formato PPP" trae el **encabezado disperso** (celdas
