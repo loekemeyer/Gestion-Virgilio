@@ -4,7 +4,24 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-20 · Versión app al documentar: **v3.40**
+> Última actualización: 2026-06-20 · Versión app al documentar: **v3.41**
+>
+> Nota: **v3.41** — **PPP: auto-carga del Excel desde una carpeta local** (File System
+> Access API; pedido del usuario). En vez de importar a mano, el supervisor **elige el
+> archivo una vez** (botón "Elegir archivo" en el menú ⬆ Importar, para Formato PPP y/o
+> Base Pedidos) y la app lo **levanta solo** al abrir la PPP y cada 3 min mientras esté
+> abierta. ⚠ **Solo Chrome/Edge en PC** (la API no existe en Safari/Firefox/iOS → ahí se
+> degrada y queda solo el import manual, que **sigue disponible**). El **handle** se
+> guarda en IndexedDB (DB aparte `vir-fs-handles`, sobrevive recargas); tras reiniciar el
+> navegador el permiso se re-confirma con **1 clic** ("🔓 Reconectar"). **ANTI-DUPLICADO**
+> (los 2 reportes se pisan a diario en la misma ruta): guarda una **firma** por archivo en
+> `vir_ppp_auto` (`{name,meta,hash,ts}`) — `meta`=lastModified+size, `hash`=SHA-256 del
+> contenido; si la `meta` no cambió, o el `hash` es igual a lo último importado, **NO**
+> re-importa (evita duplicar). Si cambió, llama al mismo `pppHandleFile` (que ya dedupea
+> por NP y conserva las ediciones de tanda). Funciones: `fshOpen/Get/Set/Del`,
+> `pppAutoPick/Check/CheckAll/Start/Stop/Forget/Reconnect/RenderStatus`, `_sha256Hex`,
+> `_fshPerm`; `pppHandleFile` ahora acepta `(tipo,f,buf,quiet)`. UI en `#pppAutoBox`
+> dentro del menú de import. Sigue SOLO LOCAL.
 >
 > Nota: **v3.40** — **PPP: sugerir agregar un pedido de "A Programar" a una tanda YA
 > en Programación del mismo cliente** (pedido del usuario). En el tab 📥 A Programar,

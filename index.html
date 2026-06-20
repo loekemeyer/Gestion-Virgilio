@@ -1945,6 +1945,22 @@ button {
 .ppp-match-info{ font-size:12px; color:#475569; }
 .ppp-match-btn{ margin-left:auto; padding:7px 14px; font-size:13px; font-weight:800; border:none; border-radius:9px; background:#4f46e5; color:#fff; cursor:pointer; white-space:nowrap; }
 .ppp-match-btn:hover{ background:#4338ca; }
+/* Auto-carga PPP/Base desde una carpeta local (File System Access API, Chrome/Edge PC). */
+.ppp-auto{ margin-top:10px; padding-top:8px; border-top:1px dashed #cbd5e1; }
+.ppp-auto-h{ font-size:12px; font-weight:800; color:#334155; margin-bottom:6px; }
+.ppp-auto-no{ font-size:12px; color:#64748b; }
+.ppp-auto-row{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding:4px 0; font-size:12px; }
+.ppp-auto-l{ font-weight:700; color:#1e293b; min-width:92px; }
+.ppp-auto-on{ color:#166534; font-weight:700; }
+.ppp-auto-off{ color:#94a3b8; }
+.ppp-auto-warn{ color:#b45309; font-weight:700; }
+.ppp-auto-btns{ margin-left:auto; display:flex; gap:6px; flex-wrap:wrap; }
+.ppp-auto-btn{ padding:4px 10px; font-size:12px; font-weight:700; border:1px solid #cbd5e1; border-radius:7px; background:#fff; color:#334155; cursor:pointer; }
+.ppp-auto-btn:hover{ background:#f1f5f9; }
+.ppp-auto-btn-go{ background:#4f46e5; border-color:#4f46e5; color:#fff; }
+.ppp-auto-btn-go:hover{ background:#4338ca; }
+.ppp-auto-btn-x{ color:#b42318; }
+.ppp-auto-hint{ font-size:11px; color:#78716c; margin-top:6px; }
 .ppp-over{ font-size:11px; font-weight:800; color:#fde68a; }
 .ppp-fc{ font-size:12px; color:#cbd5e1; font-weight:700; }
 .ppp-fc.ok{ color:#fff; background:#16a34a; border-radius:999px; padding:2px 8px; font-weight:800; }
@@ -2887,6 +2903,7 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
           <button class="ppp-imp-btn" onclick="pppImportar('base');pppCloseImport()" ondragover="pppDragOver(event,this)" ondragleave="pppDragLeave(event,this)" ondrop="pppDrop(event,'base',this);pppCloseImport()"><span>⬆</span> Importar Base Pedidos</button>
           <div class="ppp-drophint">💡 Tocá un botón o arrastrá el .xls encima.</div>
           <div id="pppBaseInfo" class="ppp-baseinfo"></div>
+          <div id="pppAutoBox" class="ppp-auto"></div>
         </div>
       </div>
       <button class="ppp-imp-toggle ppp-sup-toggle" onclick="openPppSupers()" title="Agregar/quitar clientes súper">🛒 Clientes súper</button>
@@ -4931,7 +4948,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.40";
+const APP_VERSION = "v3.41";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -7975,12 +7992,15 @@ function openPPP() {
   pppRefreshArmado();
   pppRefreshEntregado();
   pppRefreshControlado();   // controlados (CRN) + chequeo de carga sin controlar vencida (alarma + Telegram)
+  pppAutoRenderStatus();    // auto-carga (File System Access): estado + arranque del chequeo
+  pppAutoStart();
 }
-function pppToggleImport() { const m = document.getElementById("pppImportMenu"); if (!m) return; m.classList.toggle("hidden"); if (!m.classList.contains("hidden")) pppShowBaseInfo(); }
+function pppToggleImport() { const m = document.getElementById("pppImportMenu"); if (!m) return; m.classList.toggle("hidden"); if (!m.classList.contains("hidden")) { pppShowBaseInfo(); pppAutoRenderStatus(); } }
 function pppCloseImport() { const m = document.getElementById("pppImportMenu"); if (m) m.classList.add("hidden"); }
 function closePPP() {
   const ov = document.getElementById("pppOverlay");
   if (ov) ov.classList.remove("show");
+  pppAutoStop();
 }
 /* ===== Importador PPP (Fase 1). Lee el .xls en el navegador (SheetJS lazy desde
    CDN — el sandbox no puede vendorearlo, pero el navegador del supervisor sí lo
@@ -8097,12 +8117,12 @@ function pppImportarCompleta(rows, fname) {
   _pppTab = "plan"; pppRenderProg(); pppRefreshArmado(); pppRefreshEntregado(); pppRefreshControlado();
   pppSetStatus("✓ PPP completa cargada (" + fname + "): " + res.total + " pedidos · " + nProg + " ya programados (migración del Excel actual). SOLO LOCAL.", true);
 }
-async function pppHandleFile(tipo, f) {                 // de click o de drag-drop
+async function pppHandleFile(tipo, f, buf, quiet) {     // de click, drag-drop o auto-carga
   if ((tipo !== "base" && tipo !== "prog") || !f) return;
-  pppSetStatus("Leyendo " + f.name + "…");
+  pppSetStatus((quiet ? "🔁 Auto: " : "") + "Leyendo " + f.name + "…");
   try {
     const XLSX = await pppLoadXlsx();
-    const buf = await f.arrayBuffer();
+    if (!buf) buf = await f.arrayBuffer();
     const wb = XLSX.read(buf, { type: "array", cellDates: true });   // cellDates → fechas como Date
     let ws = wb.Sheets[wb.SheetNames[0]];
     if (tipo === "prog") { const pd = wb.SheetNames.find(function (n) { return /programaci/i.test(n); }); if (pd) ws = wb.Sheets[pd]; }   // migración: hoja "Programacion Diaria"
@@ -8112,7 +8132,7 @@ async function pppHandleFile(tipo, f) {                 // de click o de drag-dr
       const r = pppBuildProg(rows);
       if (!r.pedidos.length) { pppSetStatus("No reconocí las columnas. Encabezados que leí: " + (r.headerStr || "—"), false); return; }
       const res = pppMergePedidos(r.pedidos);            // SE SUMAN a lo que ya estaba (dedupe por NP)
-      _pppTab = "prog"; pppRenderProg();
+      if (!quiet) _pppTab = "prog"; pppRenderProg();
       pppSetStatus("✓ " + f.name + ": " + res.add + " nuevos · " + res.upd + " actualizados · " + res.total + " pedidos en total (SOLO LOCAL).", true);
     } else {
       const mapped = pppMapBase(rows); _pppParsed.base = mapped;   // se guarda para subir después
@@ -8132,6 +8152,133 @@ function pppShowBaseInfo() {
   el.innerHTML = '📦 <b>Base Pedidos</b> — última importación: <b>' +
     p(d.getDate()) + "/" + p(d.getMonth() + 1) + "/" + d.getFullYear() + " " + p(d.getHours()) + ":" + p(d.getMinutes()) +
     '</b> <span class="ppp-base-local">(solo local)</span>';
+}
+/* ===== Auto-carga de PPP / Base desde una carpeta local (File System Access API) =====
+   Pedido del usuario: en vez de importar el Excel a mano, elegir el archivo UNA vez y
+   que la app lo levante solo cuando cambia. Anda en Chrome/Edge de PC (la API no existe
+   en Safari/Firefox/iOS). El handle se guarda en IndexedDB (sobrevive recargas); el
+   permiso se re-confirma con 1 clic tras reiniciar el navegador. ANTI-DUPLICADO: guarda
+   una firma (fecha+tamaño y hash SHA-256 del contenido) de lo último importado; si el
+   archivo es el mismo que ayer (o tiene los mismos datos), NO lo re-importa. El import
+   manual sigue disponible. ===== */
+const FSH_DB = "vir-fs-handles", FSH_STORE = "handles";
+let _fshDbP = null;
+function fshOpen() {
+  if (_fshDbP) return _fshDbP;
+  _fshDbP = new Promise(function (res, rej) {
+    if (!("indexedDB" in window)) { rej(new Error("IDB no disponible")); return; }
+    const rq = indexedDB.open(FSH_DB, 1);
+    rq.onupgradeneeded = function (e) { const db = e.target.result; if (!db.objectStoreNames.contains(FSH_STORE)) db.createObjectStore(FSH_STORE); };
+    rq.onsuccess = function () { res(rq.result); };
+    rq.onerror = function () { rej(rq.error); };
+  });
+  return _fshDbP;
+}
+function fshGet(key) { return fshOpen().then(function (db) { return new Promise(function (res, rej) { const tx = db.transaction(FSH_STORE, "readonly"); const r = tx.objectStore(FSH_STORE).get(key); r.onsuccess = function () { res(r.result || null); }; r.onerror = function () { rej(r.error); }; }); }); }
+function fshSet(key, val) { return fshOpen().then(function (db) { return new Promise(function (res, rej) { const tx = db.transaction(FSH_STORE, "readwrite"); const r = tx.objectStore(FSH_STORE).put(val, key); r.onsuccess = function () { res(); }; r.onerror = function () { rej(r.error); }; }); }); }
+function fshDel(key) { return fshOpen().then(function (db) { return new Promise(function (res, rej) { const tx = db.transaction(FSH_STORE, "readwrite"); const r = tx.objectStore(FSH_STORE).delete(key); r.onsuccess = function () { res(); }; r.onerror = function () { rej(r.error); }; }); }); }
+
+const PPP_AUTO_KEY = "vir_ppp_auto";   // { prog:{name,meta,hash,ts}, base:{...} }
+const PPP_AUTO_LABEL = { prog: "Formato PPP", base: "Base Pedidos" };
+function pppAutoLoad() { try { return JSON.parse(localStorage.getItem(PPP_AUTO_KEY) || "{}") || {}; } catch (_e) { return {}; } }
+function pppAutoSave(o) { try { localStorage.setItem(PPP_AUTO_KEY, JSON.stringify(o || {})); } catch (_e) {} }
+let _pppAutoNeedsPerm = {}, _pppAutoErr = {}, _pppAutoTimer = null, _pppAutoBusy = false;
+
+async function _sha256Hex(buf) {
+  try { if (!(window.crypto && crypto.subtle)) return null; const h = await crypto.subtle.digest("SHA-256", buf); return Array.from(new Uint8Array(h)).map(function (b) { return b.toString(16).padStart(2, "0"); }).join(""); }
+  catch (_e) { return null; }
+}
+async function _fshPerm(handle, interactive) {
+  try {
+    if (!handle.queryPermission) return "granted";
+    const opts = { mode: "read" };
+    let st = await handle.queryPermission(opts);
+    if (st === "granted") return "granted";
+    if (interactive && handle.requestPermission) st = await handle.requestPermission(opts);
+    return st;
+  } catch (_e) { return "denied"; }
+}
+function _pppAutoWhen(ts) { const d = new Date(ts), p = function (n) { return String(n).padStart(2, "0"); }; const same = d.toDateString() === new Date().toDateString(); return (same ? "hoy" : p(d.getDate()) + "/" + p(d.getMonth() + 1)) + " " + p(d.getHours()) + ":" + p(d.getMinutes()); }
+
+async function pppAutoPick(tipo) {
+  if (!window.showOpenFilePicker) { pppSetStatus("Auto-carga: usá Chrome o Edge en PC.", false); return; }
+  try {
+    const picked = await window.showOpenFilePicker({ multiple: false, types: [{ description: "Excel", accept: { "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"], "application/vnd.ms-excel": [".xls"], "application/vnd.ms-excel.sheet.macroEnabled.12": [".xlsm"] } }] });
+    const handle = picked && picked[0]; if (!handle) return;
+    await fshSet(tipo, handle);
+    const o = pppAutoLoad(); o[tipo] = { name: handle.name }; pppAutoSave(o);   // limpia firma → fuerza importar ahora
+    _pppAutoNeedsPerm[tipo] = false; _pppAutoErr[tipo] = "";
+    pppAutoRenderStatus();
+    await pppAutoCheck(tipo, { interactive: true });
+  } catch (e) { if (e && e.name === "AbortError") return; pppSetStatus("No se pudo elegir el archivo: " + (e.message || e), false); }
+}
+function pppAutoForget(tipo) {
+  fshDel(tipo).catch(function () {});
+  const o = pppAutoLoad(); delete o[tipo]; pppAutoSave(o);
+  _pppAutoNeedsPerm[tipo] = false; _pppAutoErr[tipo] = "";
+  pppAutoRenderStatus(); pppSetStatus("Auto-carga de " + (PPP_AUTO_LABEL[tipo] || tipo) + " desconectada.", true);
+}
+async function pppAutoCheck(tipo, opts) {
+  opts = opts || {};
+  if (!window.showOpenFilePicker) return;
+  let handle = null;
+  try { handle = await fshGet(tipo); } catch (_e) { handle = null; }
+  if (!handle) return;
+  const perm = await _fshPerm(handle, !!opts.interactive);
+  if (perm !== "granted") { _pppAutoNeedsPerm[tipo] = true; pppAutoRenderStatus(); return; }
+  _pppAutoNeedsPerm[tipo] = false;
+  let file;
+  try { file = await handle.getFile(); } catch (_e) { _pppAutoErr[tipo] = "no encuentro el archivo"; pppAutoRenderStatus(); return; }
+  _pppAutoErr[tipo] = "";
+  const meta = String(file.lastModified) + ":" + String(file.size);
+  const o = pppAutoLoad(); const prev = o[tipo] || {};
+  if (prev.meta === meta && prev.hash) {                    // sin cambios → no re-importa
+    if (opts.interactive) pppSetStatus("✓ " + (PPP_AUTO_LABEL[tipo] || tipo) + ": sin cambios (ya estaba al día).", true);
+    return;
+  }
+  const buf = await file.arrayBuffer();
+  const hash = await _sha256Hex(buf);
+  if (hash && prev.hash === hash) {                         // mismos DATOS aunque cambió la fecha → no duplicar
+    o[tipo] = { name: file.name, meta: meta, hash: hash, ts: prev.ts || Date.now() }; pppAutoSave(o);
+    if (opts.interactive) pppSetStatus("✓ " + (PPP_AUTO_LABEL[tipo] || tipo) + ": mismos datos, no se duplicó.", true);
+    pppAutoRenderStatus(); return;
+  }
+  await pppHandleFile(tipo, file, buf, true);               // importa (parse + merge/dedupe por NP), sin cambiar de tab
+  o[tipo] = { name: file.name, meta: meta, hash: hash || ("m:" + meta), ts: Date.now() }; pppAutoSave(o);
+  pppAutoRenderStatus();
+}
+async function pppAutoCheckAll(interactive) {
+  if (_pppAutoBusy) return; _pppAutoBusy = true;
+  try { await pppAutoCheck("prog", { interactive: interactive }); await pppAutoCheck("base", { interactive: interactive }); }
+  finally { _pppAutoBusy = false; }
+}
+function pppAutoReconnect() { pppAutoCheckAll(true); }
+function pppAutoStart() {
+  if (!window.showOpenFilePicker) return;
+  pppAutoCheckAll(false);
+  if (_pppAutoTimer) clearInterval(_pppAutoTimer);
+  _pppAutoTimer = setInterval(function () { const ov = document.getElementById("pppOverlay"); if (document.visibilityState === "visible" && ov && ov.classList.contains("show")) pppAutoCheckAll(false); }, 3 * 60 * 1000);
+}
+function pppAutoStop() { if (_pppAutoTimer) { clearInterval(_pppAutoTimer); _pppAutoTimer = null; } }
+function pppAutoRenderStatus() {
+  const box = document.getElementById("pppAutoBox"); if (!box) return;
+  if (!window.showOpenFilePicker) { box.innerHTML = '<div class="ppp-auto-h">🔁 Auto-carga</div><div class="ppp-auto-no">No disponible en este navegador. Usá <b>Chrome o Edge en PC</b> (seguí con el import manual de arriba).</div>'; return; }
+  const o = pppAutoLoad();
+  const row = function (tipo) {
+    const c = o[tipo] || {}, need = _pppAutoNeedsPerm[tipo], err = _pppAutoErr[tipo];
+    let st;
+    if (!c.name) st = '<span class="ppp-auto-off">sin configurar</span>';
+    else if (need) st = '<span class="ppp-auto-warn">🔒 permiso pendiente</span>';
+    else if (err) st = '<span class="ppp-auto-warn">⚠ ' + escapeHtml(err) + '</span>';
+    else st = '<span class="ppp-auto-on">✓ ' + escapeHtml(c.name) + (c.ts ? ' · ' + _pppAutoWhen(c.ts) : '') + '</span>';
+    let b = '<button class="ppp-auto-btn" onclick="pppAutoPick(\'' + tipo + '\')">' + (c.name ? 'Cambiar' : 'Elegir archivo') + '</button>';
+    if (c.name && need) b += '<button class="ppp-auto-btn ppp-auto-btn-go" onclick="pppAutoReconnect()">🔓 Reconectar</button>';
+    else if (c.name) b += '<button class="ppp-auto-btn" onclick="pppAutoCheckAll(true)">Revisar ahora</button>';
+    if (c.name) b += '<button class="ppp-auto-btn ppp-auto-btn-x" onclick="pppAutoForget(\'' + tipo + '\')">Quitar</button>';
+    return '<div class="ppp-auto-row"><span class="ppp-auto-l">' + escapeHtml(PPP_AUTO_LABEL[tipo]) + '</span>' + st + '<span class="ppp-auto-btns">' + b + '</span></div>';
+  };
+  box.innerHTML = '<div class="ppp-auto-h">🔁 Auto-carga desde tu PC (Chrome/Edge)</div>' + row("prog") + row("base") +
+    '<div class="ppp-auto-hint">Elegís el archivo una vez; cada vez que abrís la PPP reviso si cambió y lo levanto solo. Si es igual a lo último, no lo re-importa.</div>';
 }
 /* Formato PPP: detecta las columnas por el NOMBRE del encabezado (sin panel). */
 function _pppFecha(v) {
