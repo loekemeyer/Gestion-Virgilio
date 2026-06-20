@@ -2900,7 +2900,7 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
         <button class="ppp-imp-toggle" onclick="pppToggleImport()">⬆ Importar Excel ▾</button>
         <div id="pppImportMenu" class="ppp-imp-menu hidden">
           <button class="ppp-imp-btn" onclick="pppImportar('prog');pppCloseImport()" ondragover="pppDragOver(event,this)" ondragleave="pppDragLeave(event,this)" ondrop="pppDrop(event,'prog',this);pppCloseImport()"><span>⬆</span> Importar Formato PPP</button>
-          <button class="ppp-imp-btn" onclick="pppImportar('base');pppCloseImport()" ondragover="pppDragOver(event,this)" ondragleave="pppDragLeave(event,this)" ondrop="pppDrop(event,'base',this);pppCloseImport()"><span>⬆</span> Importar Base Pedidos</button>
+          <button class="ppp-imp-btn" onclick="pppImportar('base');pppCloseImport()" ondragover="pppDragOver(event,this)" ondragleave="pppDragLeave(event,this)" ondrop="pppDrop(event,'base',this);pppCloseImport()"><span>⬆</span> Importar Base Pedidos (Picking)</button>
           <div class="ppp-drophint">💡 Tocá un botón o arrastrá el .xls encima.</div>
           <div id="pppBaseInfo" class="ppp-baseinfo"></div>
           <div id="pppAutoBox" class="ppp-auto"></div>
@@ -4948,7 +4948,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.41";
+const APP_VERSION = "v3.42";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -8147,9 +8147,9 @@ async function pppHandleFile(tipo, f, buf, quiet) {     // de click, drag-drop o
 function pppShowBaseInfo() {
   const el = document.getElementById("pppBaseInfo"); if (!el) return;
   let ts = NaN; try { ts = parseInt(localStorage.getItem(PPP_BASE_TS_KEY) || "", 10); } catch (_e) {}
-  if (!ts || isNaN(ts)) { el.innerHTML = '<span class="ppp-base-none">📦 Base Pedidos: nunca importada.</span>'; return; }
+  if (!ts || isNaN(ts)) { el.innerHTML = '<span class="ppp-base-none">📦 Base Pedidos (Picking): nunca importada.</span>'; return; }
   const d = new Date(ts), p = function (n) { return String(n).padStart(2, "0"); };
-  el.innerHTML = '📦 <b>Base Pedidos</b> — última importación: <b>' +
+  el.innerHTML = '📦 <b>Base Pedidos (Picking)</b> — última importación: <b>' +
     p(d.getDate()) + "/" + p(d.getMonth() + 1) + "/" + d.getFullYear() + " " + p(d.getHours()) + ":" + p(d.getMinutes()) +
     '</b> <span class="ppp-base-local">(solo local)</span>';
 }
@@ -8179,7 +8179,7 @@ function fshSet(key, val) { return fshOpen().then(function (db) { return new Pro
 function fshDel(key) { return fshOpen().then(function (db) { return new Promise(function (res, rej) { const tx = db.transaction(FSH_STORE, "readwrite"); const r = tx.objectStore(FSH_STORE).delete(key); r.onsuccess = function () { res(); }; r.onerror = function () { rej(r.error); }; }); }); }
 
 const PPP_AUTO_KEY = "vir_ppp_auto";   // { prog:{name,meta,hash,ts}, base:{...} }
-const PPP_AUTO_LABEL = { prog: "Formato PPP", base: "Base Pedidos" };
+const PPP_AUTO_LABEL = { prog: "Formato PPP", base: "Base Pedidos (Picking)" };
 function pppAutoLoad() { try { return JSON.parse(localStorage.getItem(PPP_AUTO_KEY) || "{}") || {}; } catch (_e) { return {}; } }
 function pppAutoSave(o) { try { localStorage.setItem(PPP_AUTO_KEY, JSON.stringify(o || {})); } catch (_e) {} }
 let _pppAutoNeedsPerm = {}, _pppAutoErr = {}, _pppAutoTimer = null, _pppAutoBusy = false;

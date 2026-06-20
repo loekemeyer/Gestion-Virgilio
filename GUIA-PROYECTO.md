@@ -4,7 +4,17 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-20 · Versión app al documentar: **v3.41**
+> Última actualización: 2026-06-20 · Versión app al documentar: **v3.42**
+>
+> Nota: **v3.42** — **El "picking" ya estaba en la auto-carga (v3.41), era cuestión de
+> nombre**: el archivo del picking es el que la app llama **"Base Pedidos"**
+> (`PPP Excel Base Datos Pedidos`, Pedido·Artículo·Cajas) — la misma fuente que usa el
+> picking en vivo. Se **renombró a "Base Pedidos (Picking)"** en el botón de import, en
+> el cartel de "última importación" y en la fila de auto-carga (`PPP_AUTO_LABEL.base`),
+> para que se vea claro que ese slot ES el picking. Comportamiento idéntico al Formato
+> PPP (elegir 1 vez → auto-levanta al cambiar, con anti-duplicado por firma). Aclaración:
+> el picking *en vivo* (flujo EP `fetchPickingBase`) sigue leyendo de Google Sheets /
+> Supabase (se refresca solo); este import local de Base Pedidos sigue SOLO LOCAL.
 >
 > Nota: **v3.41** — **PPP: auto-carga del Excel desde una carpeta local** (File System
 > Access API; pedido del usuario). En vez de importar a mano, el supervisor **elige el
