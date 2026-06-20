@@ -2022,6 +2022,22 @@ button {
 .lios-inp{ width: 84px; height: 40px; font-size: 17px; text-align: center; border: 2px solid #cbd5e1; border-radius: 10px; flex: 0 0 auto; }
 .lios-inp:focus{ outline: none; border-color: #1e6bd6; }
 
+/* Control Remitos (CR): descarga de los NP que se cargaron al camión.
+   Columnas: NP · Cód · Razón Social · Líos · Recibido (tic). Los que pasaron
+   el plazo de control (30 hs, o viernes→lunes 12 hs) van en rojo y temblando. */
+.cr-np{ cursor: pointer; gap: 9px; }
+.cr-np .cc-npnum{ font-size: 16px; flex: 0 0 auto; }
+.cr-cod{ font-size: 12px; font-weight: 700; color: #64748b; font-family: ui-monospace, Menlo, Consolas, monospace; flex: 0 0 auto; }
+.cr-np .cc-rs{ margin-left: 0; flex: 1 1 auto; text-align: left; }
+.cr-lios{ font-size: 12px; font-weight: 800; color: #b45309; background: #fef3c7; border-radius: 999px; padding: 2px 9px; flex: 0 0 auto; white-space: nowrap; }
+.cr-lios.cr-lios0{ color: #64748b; background: #f1f5f9; }
+.cr-venc-tag{ font-size: 11px; font-weight: 900; color: #fff; background: #dc2626; border-radius: 6px; padding: 2px 7px; flex: 0 0 auto; letter-spacing: .3px; }
+.cr-np.cr-venc{ border-color: #dc2626; background: #fef2f2; animation: cr-shake 1.1s ease-in-out infinite; }
+.cr-np.cr-venc .cc-npnum{ color: #b91c1c; }
+.cr-np.cc-on{ animation: none; }
+.cr-np.cr-venc.cc-on{ border-color: #16a34a; background: #ecfdf5; }
+@keyframes cr-shake{ 0%,100%{ transform: translateX(0); } 20%{ transform: translateX(-3px); } 40%{ transform: translateX(3px); } 60%{ transform: translateX(-2px); } 80%{ transform: translateX(2px); } }
+
 /* Modal Faltantes (vista supervisor). */
 #faltantesModal{ display:none; position:fixed; inset:0; z-index:1200; background:#0b1220; color:#f1f5f9; flex-direction:column; }
 #faltantesModal.show{ display:flex; }
@@ -4332,6 +4348,12 @@ function selectOption(code) {
     const stCC = getLegajoState(legajoStr);
     if (stCC && stCC.toggles && stCC.toggles.CC) { showCargaCamion(legajoStr); return; }
   }
+  // CR ya abierto: el botón CR RE-ABRE el popup de Control Remitos (no lo cierra).
+  // El cierre se hace SOLO con "Terminé" dentro del popup.
+  if (code === "CR") {
+    const stCR = getLegajoState(legajoStr);
+    if (stCR && stCR.toggles && stCR.toggles.CR) { showControlRemitos(legajoStr); return; }
+  }
 
   selected = code;
   selectedArea.classList.remove("hidden");
@@ -4742,7 +4764,7 @@ async function trySendOneReport(payload) {
     // y el merge-duplicates no se aplica → 409).
     // FJ y PKC usan client_id determinístico + merge-duplicates (upsert): reenviar
     // o corregir actualiza la fila en vez de fallar con 409 / duplicar.
-    const isUpsert = (payload.opcion === "FJ" || payload.opcion === "PKC" || payload.opcion === "CCN" || payload.opcion === "PSP");
+    const isUpsert = (payload.opcion === "FJ" || payload.opcion === "PKC" || payload.opcion === "CCN" || payload.opcion === "PSP" || payload.opcion === "CRN");
     const url    = isUpsert
       ? SUPABASE_TABLE_ENDPOINT + "?on_conflict=client_id"
       : SUPABASE_TABLE_ENDPOINT;
@@ -4882,7 +4904,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.35";
+const APP_VERSION = "v3.36";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -5090,6 +5112,11 @@ async function send() {
   if (opcion === "CC") {
     const stCC = getLegajoState(legajoStr);
     if (stCC && stCC.toggles && stCC.toggles.CC) showCargaCamion(legajoStr);
+  }
+  // Al INICIAR Control Remitos (1er toque de CR): lista de NP cargadas al camión.
+  if (opcion === "CR") {
+    const stCR = getLegajoState(legajoStr);
+    if (stCR && stCR.toggles && stCR.toggles.CR) showControlRemitos(legajoStr);
   }
   // Al TERMINAR ARMADO (TAP): anotar cuántos líos lleva cada NP de la tanda.
   if (opcion === "TAP" && (texto || "").trim()) showLiosModal(legajoStr, texto);
@@ -6484,6 +6511,179 @@ function liosSend(legajo, np, lios, tanda) {
   try { updatePendingIndicator(); } catch (_e) {}
 }
 
+/* =========================================================
+   CONTROL REMITOS (CR) — descarga. El operario abre CR y ve la lista de NP que
+   YA se cargaron al camión (eventos CCN), con NP · Cód cliente · Razón Social ·
+   Líos (los anotados en TAP/TAL) · Recibido (tic). Tilda lo que bajó y toca
+   «Terminé»: por cada NP tildada manda CRN (texto = "NP|TANDA") y cierra el
+   toggle CR. Los CRN dan por CONTROLADO el pedido → la PPP los saca de
+   programación diaria y los manda a Pedidos Entregados. Reutiliza #tandaModal.
+   Plazo: desde que se cargó hay 30 hs para controlar; si vence sáb/dom (incluye
+   las cargas del viernes) se corre al lunes 12:00 → si pasó, va en rojo y temblando.
+   ========================================================= */
+let _cr = null;   // { legajo, items:[{np,tanda,cod,rs,lios,loadMs,venc}], checked:Set<np> }
+let _crWakeLock = null;
+function _crKey(legajo) { return "vir_cr_checked_" + legajo + "_" + getTodayKey(); }
+function crSaveChecked(legajo, set) { try { localStorage.setItem(_crKey(legajo), JSON.stringify(Array.from(set || []))); } catch (_e) {} }
+function crLoadChecked(legajo) { try { const a = JSON.parse(localStorage.getItem(_crKey(legajo)) || "[]"); return new Set(Array.isArray(a) ? a.map(String) : []); } catch (_e) { return new Set(); } }
+function crClearChecked(legajo) { try { localStorage.removeItem(_crKey(legajo)); } catch (_e) {} }
+async function crWakeLock() { try { if ("wakeLock" in navigator) _crWakeLock = await navigator.wakeLock.request("screen"); } catch (_e) {} }
+function crReleaseWakeLock() { try { if (_crWakeLock) { _crWakeLock.release(); _crWakeLock = null; } } catch (_e) {} }
+
+/* Plazo de control: 30 hs desde la carga (CCN). Si el vencimiento cae sábado o
+   domingo (las cargas del viernes caen ahí), se corre al lunes 12:00. AR = UTC-3. */
+function crDeadline(loadMs) {
+  const dl = loadMs + 30 * 3600 * 1000;
+  const ar = new Date(dl - 3 * 3600 * 1000);   // wall-clock AR leído por getUTC*
+  const wd = ar.getUTCDay();                    // 0=Dom .. 6=Sáb
+  if (wd === 6 || wd === 0) {
+    const add = wd === 6 ? 2 : 1;               // sáb→+2, dom→+1 ⇒ lunes
+    return Date.UTC(ar.getUTCFullYear(), ar.getUTCMonth(), ar.getUTCDate() + add, 15, 0, 0); // 12:00 AR = 15:00 UTC
+  }
+  return dl;
+}
+function crVencido(loadMs) { return loadMs > 0 && Date.now() > crDeadline(loadMs); }
+
+/* Junta lo necesario para CR: CCN (NP cargadas + cuándo + tanda), TAL (líos por
+   NP), CRN (NP ya controladas) y el PPP del día (cód + razón social por NP). */
+async function fetchCRData() {
+  const since = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
+  const headers = { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY };
+  const ccnUrl = SUPABASE_TABLE_ENDPOINT + "?opcion=eq.CCN&ts_cliente=gte." + encodeURIComponent(since) + "&select=texto,ts_cliente&order=ts_cliente.asc&limit=20000";
+  const talUrl = SUPABASE_TABLE_ENDPOINT + "?opcion=eq.TAL&ts_cliente=gte." + encodeURIComponent(since) + "&select=texto&limit=20000";
+  const crnUrl = SUPABASE_TABLE_ENDPOINT + "?opcion=eq.CRN&ts_cliente=gte." + encodeURIComponent(since) + "&select=texto&limit=20000";
+  const [ccnR, talR, crnR, sheetMap] = await Promise.all([
+    fetch(ccnUrl, { headers, cache: "no-store" }).then(r => r.ok ? r.json() : []),
+    fetch(talUrl, { headers, cache: "no-store" }).then(r => r.ok ? r.json() : []),
+    fetch(crnUrl, { headers, cache: "no-store" }).then(r => r.ok ? r.json() : []),
+    fetchMonitorSheet().catch(() => new Map())
+  ]);
+  const loaded = new Map();   // NP -> { tanda, loadMs } (primera carga)
+  for (const ev of ccnR) {
+    const parts = String(ev.texto || "").split("|");
+    const np = parts[0].trim().replace(/\.0+$/, "");
+    const tanda = (parts[1] || "").trim().toUpperCase();
+    if (!np) continue;
+    const ms = ev.ts_cliente ? new Date(ev.ts_cliente).getTime() : 0;
+    const prev = loaded.get(np);
+    if (!prev) loaded.set(np, { tanda: tanda || "—", loadMs: ms });
+    else { if (tanda && prev.tanda === "—") prev.tanda = tanda; if (ms && (!prev.loadMs || ms < prev.loadMs)) prev.loadMs = ms; }
+  }
+  const lios = new Map();      // NP -> cantidad de líos
+  for (const ev of talR) { const p = String(ev.texto || "").split("|"); const np = p[0].trim().replace(/\.0+$/, ""); const v = parseInt(p[1], 10); if (np && !isNaN(v)) lios.set(np, v); }
+  const controlled = new Set();// NP ya controladas (CRN)
+  for (const ev of crnR) { const np = String(ev.texto || "").split("|")[0].trim().replace(/\.0+$/, ""); if (np) controlled.add(np); }
+  const meta = {};             // NP -> { cod, rs } desde el PPP del día
+  for (const [, entry] of sheetMap) { if (!entry || !entry.pedidos) continue; for (const p of entry.pedidos) { for (const part of String(p.np || "").split(/[,/]/)) { const np = part.trim().replace(/\.0+$/, ""); if (np && /\d/.test(np) && !meta[np]) meta[np] = { cod: p.cod || "", rs: p.razonSocial || "" }; } } }
+  return { loaded, lios, controlled, meta };
+}
+
+async function showControlRemitos(legajo) {
+  const m = document.getElementById("tandaModal"); if (!m) return;
+  const leg = String(legajo || "").trim();
+  m.querySelector(".tanda-modal-title").textContent = "📋 Control Remitos — descarga";
+  m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">Cargando pedidos cargados al camión…</div>`;
+  m.classList.add("show");
+  crWakeLock();
+  try {
+    const data = await fetchCRData();
+    const items = [];
+    for (const [np, info] of data.loaded) {
+      if (data.controlled.has(np)) continue;   // ya controlado → fuera (ya pasó a Entregados)
+      const meta = data.meta[np] || {};
+      items.push({ np: np, tanda: info.tanda || "—", cod: meta.cod || "", rs: meta.rs || "", lios: data.lios.has(np) ? data.lios.get(np) : null, loadMs: info.loadMs || 0, venc: crVencido(info.loadMs || 0) });
+    }
+    // Vencidos primero (los molestos arriba), después por tanda y NP.
+    items.sort((a, b) => (b.venc ? 1 : 0) - (a.venc ? 1 : 0) || String(a.tanda).localeCompare(String(b.tanda)) || a.np.localeCompare(b.np));
+    if (!items.length) {
+      _cr = null; crReleaseWakeLock();
+      m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">No hay pedidos cargados al camión pendientes de control.</div><button class="pk-btn pk-cancel" onclick="crClose()">Cerrar</button>`;
+      return;
+    }
+    const saved = crLoadChecked(leg);
+    _cr = { legajo: leg, items: items, checked: new Set(items.filter(it => saved.has(it.np)).map(it => it.np)) };
+    crRender();
+  } catch (e) {
+    _cr = null; crReleaseWakeLock();
+    m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">No se pudo cargar (¿sin conexión?).<br><small>${escapeHtml(e.message || "")}</small></div><button class="pk-btn pk-cancel" onclick="crClose()">Cerrar</button>`;
+  }
+}
+
+function crRender() {
+  const m = document.getElementById("tandaModal"); if (!m || !_cr) return;
+  const vencCount = _cr.items.filter(it => it.venc).length;
+  let html = `<div class="cc-sub">Tildá <b>Recibido</b> en cada pedido que bajaste del camión. Al tocar «Terminé» pasan a <b>Pedidos Entregados</b>.</div>`;
+  if (vencCount) html += `<div class="cc-sub" style="color:#b91c1c;font-weight:800;">⚠ ${vencCount} pedido(s) <b>VENCIDOS</b> — cargados hace +30 hs sin controlar.</div>`;
+  const byTanda = {};
+  for (const it of _cr.items) (byTanda[it.tanda] = byTanda[it.tanda] || []).push(it);
+  for (const tanda of Object.keys(byTanda).sort()) {
+    html += `<div class="cc-tanda">Tanda ${escapeHtml(tanda)}</div>`;
+    for (const it of byTanda[tanda]) {
+      const on = _cr.checked.has(it.np);
+      const liosTxt = it.lios == null ? "s/líos" : (it.lios + (it.lios === 1 ? " lío" : " líos"));
+      const liosCls = (it.lios == null || it.lios === 0) ? " cr-lios0" : "";
+      html += `<div class="cc-np cr-np${on ? " cc-on" : ""}${it.venc ? " cr-venc" : ""}" onclick="crToggle('${String(it.np).replace(/[^0-9A-Za-z]/g, "")}')">` +
+              `<span class="cc-npnum">${escapeHtml(it.np)}</span>` +
+              (it.cod ? `<span class="cr-cod">#${escapeHtml(it.cod)}</span>` : "") +
+              `<span class="cc-rs">${escapeHtml(it.rs || "—")}</span>` +
+              (it.venc ? `<span class="cr-venc-tag">VENCIDO</span>` : "") +
+              `<span class="cr-lios${liosCls}">${escapeHtml(liosTxt)}</span>` +
+              `<span class="cc-chk">${on ? "✓" : ""}</span></div>`;
+    }
+  }
+  html += `<button class="pk-btn pk-ok" onclick="crFinish()">✓ Terminé (${_cr.checked.size} controladas)</button>` +
+          `<button class="pk-btn pk-cancel" onclick="crClose()">Cerrar (sigo después)</button>`;
+  m.querySelector(".tanda-modal-body").innerHTML = html;
+}
+
+function crToggle(npClean) {
+  if (!_cr) return;
+  const it = _cr.items.find(x => String(x.np).replace(/[^0-9A-Za-z]/g, "") === String(npClean));
+  if (!it) return;
+  if (_cr.checked.has(it.np)) _cr.checked.delete(it.np); else _cr.checked.add(it.np);
+  crSaveChecked(_cr.legajo, _cr.checked);
+  crRender();
+}
+function crClose() { crReleaseWakeLock(); _cr = null; closeTandaModal(); }   // minimiza (CR sigue abierto, re-abrís tocando CR)
+function crFinish() {
+  if (!_cr) return;
+  const legajo = _cr.legajo;
+  const sel = _cr.items.filter(it => _cr.checked.has(it.np));
+  if (!sel.length) { try { alert("Tildá al menos un pedido recibido, o tocá «Cerrar» para salir."); } catch (_e) {} return; }
+  for (const it of sel) crSendDetail(legajo, it.np, it.tanda);   // CRN por cada NP controlada
+  crSendClose(legajo);                                           // cierre del toggle CR
+  crClearChecked(legajo);
+  // Reflejar ya mismo en la PPP local (operadora): controlados → Pedidos Entregados.
+  try { const ent = pppLoadEntregados(); for (const it of sel) ent.add(String(it.np)); pppSaveEntregados(); if (typeof pppRenderProg === "function") pppRenderProg(); } catch (_e) {}
+  _cr = null; crReleaseWakeLock(); closeTandaModal();
+  try { alert("✓ Control de remitos terminado. " + sel.length + " pedido(s) controlados → Pedidos Entregados."); } catch (_e) {}
+}
+function crSendDetail(legajo, np, tanda) {
+  const nowMs = Date.now();
+  const payload = {
+    legajo: legajo, opcion: "CRN", descripcion: "Control Remito NP",
+    texto: (String(np) + "|" + String(tanda)).toUpperCase(),
+    ts: nowMs,
+    id: ("crn_" + legajo + "_" + np + "_" + getTodayKey()).replace(/[^a-zA-Z0-9_\-]/g, ""),
+    ts_inicio_iso: null
+  };
+  try {
+    enqueueReport(payload);
+    if (typeof trySendOneReport === "function") trySendOneReport(payload).then(r => { if (r && r.ok) removeFromQueue(payload.id); }).catch(() => {});
+  } catch (_e) {}
+  try { updatePendingIndicator(); } catch (_e) {}
+}
+function crSendClose(legajo) {
+  const st = getLegajoState(legajo);
+  const openIso = (st.toggles && typeof st.toggles.CR === "string") ? st.toggles.CR : null;
+  try { if (st.toggles && st.toggles.CR) toggleStartOrEnd(legajo, "CR"); } catch (_e) {}   // cierra el toggle CR
+  const nowMs = Date.now();
+  const payload = { legajo: legajo, opcion: "CR", descripcion: "Control Remitos", texto: "", ts: nowMs, id: nowMs.toString(36) + "_" + Math.random().toString(36).slice(2, 8), ts_inicio_iso: openIso };
+  try { pushHistoryForLegajo(legajo, { ts: nowMs, opcion: "CR", descripcion: "Control Remitos", texto: "", id: payload.id, ts_inicio_iso: openIso, status: "queued" }); } catch (_e) {}
+  try { enqueueReport(payload); if (typeof trySendOneReport === "function") trySendOneReport(payload).then(r => { if (r && r.ok) removeFromQueue(payload.id); }).catch(() => {}); } catch (_e) {}
+  try { updatePendingIndicator(); updateCoreButtonsState(); } catch (_e) {}
+}
+
 let historicInflight   = null;   // Promise para evitar fetch en paralelo
 
 const MONITOR_REFRESH_MS = 30000;    // ciclo principal — 30s para bajar consumo Supabase
@@ -6563,6 +6763,11 @@ function closeTandaModal() {
   // Líos obligatorios: el modal de líos NO se cierra (ni por Cerrar ni tocando afuera)
   // hasta completar todos los pedidos. Sale solo con "Guardar líos".
   if (_lios) { try { alert("Antes de salir, completá los líos de todos los pedidos (si alguno no lleva, poné 0)."); } catch (_e) {} return; }
+  // Si se cierra por el backdrop o la × (no por el botón "Cerrar (sigo después)"),
+  // soltar el wake lock y limpiar el estado de Carga Camión / Control Remitos. El
+  // toggle sigue abierto en Supabase, así que re-tocar CC/CR vuelve a abrir el popup.
+  if (_cc) { try { ccReleaseWakeLock(); } catch (_e) {} _cc = null; }
+  if (_cr) { try { crReleaseWakeLock(); } catch (_e) {} _cr = null; }
   document.getElementById("tandaModal").classList.remove("show");
 }
 
@@ -8214,7 +8419,7 @@ let _pppArmadoDone = null;            // Set de tandas (UPPER) con TAP (armado t
 let _pppTab = "prog";
 function pppLoadEntregados() { if (_pppEntregados) return _pppEntregados; let a = []; try { a = JSON.parse(localStorage.getItem(PPP_ENT_KEY) || "[]"); } catch (_e) {} _pppEntregados = new Set(Array.isArray(a) ? a.map(String) : []); return _pppEntregados; }
 function pppSaveEntregados() { try { localStorage.setItem(PPP_ENT_KEY, JSON.stringify(Array.from(pppLoadEntregados()))); } catch (_e) {} }
-function pppTab(t) { _pppTab = t; pppRenderProg(); if (t === "plan" || t === "ent" || t === "resumen") { pppRefreshArmado(); pppRefreshEntregado(); } }
+function pppTab(t) { _pppTab = t; pppRenderProg(); if (t === "plan" || t === "ent" || t === "resumen") { pppRefreshArmado(); pppRefreshEntregado(); pppRefreshControlado(); } }
 /* "Controlado" (manual, lo marca la operadora) → recién ahí el pedido pasa a Pedidos
    Entregados. _pppEntregados = NPs controlados (persistido en vir_ppp_entregados). */
 function pppControlar(np) { pppLoadEntregados().add(String(np)); pppSaveEntregados(); pppRenderProg(); }
@@ -8244,6 +8449,27 @@ async function pppRefreshEntregado() {
     for (const ev of data) { const t = String(ev.texto || "").split("|")[0].trim().replace(/\.0+$/, ""); if (t) set.add(t); }
     _pppEntregadoCC = set; pppRenderProg();
   } catch (_e) { if (!_pppEntregadoCC) _pppEntregadoCC = new Set(); }
+}
+/* "Controlado" también se nutre del operario: cuando descarga en Control Remitos
+   manda CRN por cada NP. Esos NP se MERGEAN al set de controlados (vir_ppp_entregados)
+   → coexisten con el "Controlado" manual de la operadora y salen de programación a
+   Pedidos Entregados. Es LECTURA de Supabase (no rompe el "solo local"). */
+let _pppControladoCR = null;
+async function pppRefreshControlado() {
+  try {
+    const since = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString();
+    const url = SUPABASE_TABLE_ENDPOINT + "?opcion=eq.CRN&ts_cliente=gte." + encodeURIComponent(since) + "&select=texto&limit=20000";
+    const r = await fetch(url, { headers: { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY } });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const data = await r.json();
+    const set = new Set();
+    for (const ev of data) { const t = String(ev.texto || "").split("|")[0].trim().replace(/\.0+$/, ""); if (t) set.add(t); }
+    _pppControladoCR = set;
+    const ent = pppLoadEntregados(); let changed = false;
+    for (const np of set) { if (!ent.has(np)) { ent.add(np); changed = true; } }
+    if (changed) pppSaveEntregados();
+    pppRenderProg();
+  } catch (_e) { if (!_pppControladoCR) _pppControladoCR = new Set(); }
 }
 function _pppListoFC(p) { const t = (p.tanda || "").trim().toUpperCase(); return !!(_pppArmadoDone && t && t !== "—" && _pppArmadoDone.has(t)); }
 function _pppEntregado(p) { return !!(_pppEntregadoCC && _pppEntregadoCC.has(String(p.np))); }

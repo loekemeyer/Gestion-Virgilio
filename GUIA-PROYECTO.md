@@ -4,7 +4,35 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-19 · Versión app al documentar: **v3.32**
+> Última actualización: 2026-06-20 · Versión app al documentar: **v3.36**
+>
+> Nota: **v3.36** — **Control Remitos (CR)** para el operario (cierre del ciclo de entrega).
+> El botón **CR** de la botonera (ya existía como toggle, label "Control Remitos") abre un popup
+> (`showControlRemitos`, reusa `#tandaModal`) con la **lista de NP que YA se cargaron al camión**
+> (eventos **CCN**), mostrando **NP · Cód cliente · Razón Social · Líos · Recibido (tic)**. Cód y
+> Razón salen del PPP del día (`fetchMonitorSheet`); **Líos** de los eventos **TAL** (anotados al
+> terminar armado, ver v3.34); el tilde "Recibido" lo marca el operario. Al tocar **«Terminé»**:
+> (1) manda un evento **CRN** (`texto="NP|TANDA"`, client_id determinístico `crn_<legajo>_<np>_<día>`,
+> upsert) por cada NP tildada, y (2) **cierra el toggle CR** (evento `CR`). Persistencia del
+> tildado en `vir_cr_checked_<legajo>_<día>`; **Wake Lock** para que no se salga si se bloquea el
+> cel; re-tocar CR re-abre el popup (no cierra). **Integración PPP**: `pppRefreshControlado` lee los
+> **CRN** y los **mergea al set de controlados** (`vir_ppp_entregados`) → esos pedidos salen de
+> Programación y pasan a **Pedidos Entregados**, **coexistiendo** con el "✓ Controlado" manual de la
+> operadora (los dos caminos valen). **Plazo de control / alarma VENCIDO**: desde que se cargó (CCN)
+> hay **30 hs** para controlar; si el vencimiento cae **sábado/domingo (incluye las cargas del
+> viernes)** se corre al **lunes 12:00** (`crDeadline`/`crVencido`, AR=UTC-3). Los NP vencidos van
+> **arriba, en rojo y temblando** (`.cr-venc`) dentro del popup. **Pendiente (Parte 4)**: aviso a
+> **Telegram** + alarma roja grande en la vista de la operadora cuando hay cargado-sin-controlar
+> vencido (requiere disparador/cron server-side en Supabase, ver § Telegram).
+>
+> Nota: **v3.33–v3.35** — Ciclo de entrega del **operario** (previo a CR). **v3.33/34 (Líos)**: al
+> mandar **TAP** (terminé armado) se abre un popup que **obliga** a anotar cuántos **líos** lleva
+> cada NP de la tanda (`showLiosModal`; si no lleva, poné **0**; no se puede dejar vacío ni salir sin
+> completar). Cada NP → evento **TAL** (`texto="NP|LÍOS|TANDA"`). **v3.35 (Carga Camión)**: al iniciar
+> **CC** se abre un checklist con **las NP facturadas pendientes** (las ya FC por admin,
+> `fetchFacturadosHoy`) agrupadas por tanda; el operario tilda lo que cargó (Wake Lock activo). El
+> botón **"🚛 Terminé Carga Camión"** manda **CCN** (`texto="NP|TANDA"`) por cada NP tildada y
+> **cierra** el toggle CC. Re-tocar CC re-abre el checklist; "Cerrar (sigo después)" minimiza.
 >
 > Nota: **v3.32** — PPP: **editor de clientes súper**. Botón **🛒 Clientes súper** en la PPP →
 > overlay `#pppSupersOverlay` para **agregar (cód + nombre) / borrar**; persiste en
@@ -1033,6 +1061,8 @@ Definidos en `index.html` (objeto `desc`, ~línea 1531). Los botones se arman en
 | `PKC` | Picking artículo | (detalle de picking, v2.54) | `texto` = `TANDA\|CÓDIGO\|ESPERADAS\|REALES` (ej. `A15C\|502\|5\|3`). Un evento por artículo confirmado en el flujo de picking. El monitor lo ignora (no está en los grupos). |
 | `CCN` | Carga Camión NP | (detalle de carga, v2.57) | `texto` = `NP\|TANDA` (ej. `97754\|C47B`). Un evento por NP marcada como cargada al camión. id determinístico `ccn_<legajo>_<np>_<día>` + upsert. El monitor lo ignora. |
 | `PSP` | Picking sin planimetría | (automático, v2.60) | `texto` = `TANDA\|COD1,COD2` (códigos del picking que no están en `planimetria.js`). UNO por tanda/legajo/día (id `psp_<legajo>_<tanda>_<día>` + upsert). Dispara aviso Telegram vía trigger `trg_sin_planim_telegram` (solo INSERT → no spamea al reabrir). El monitor lo ignora. |
+| `TAL` | Líos por NP (TAP) | (detalle de armado, v3.34) | `texto` = `NP\|LÍOS\|TANDA` (ej. `97754\|3\|C47B`). Un evento por NP de la tanda al terminar armado (popup obligatorio tras `TAP`; si no lleva, `0`). Lo lee Control Remitos para la columna Líos. id aleatorio (no upsert). El monitor lo ignora. |
+| `CRN` | Control Remito NP | (detalle de control, v3.36) | `texto` = `NP\|TANDA` (ej. `97754\|C47B`). Un evento por NP marcada como **recibida/controlada** en Control Remitos (`CR`). id determinístico `crn_<legajo>_<np>_<día>` + upsert. La PPP lo lee (`pppRefreshControlado`) y pasa el pedido a **Pedidos Entregados**. El monitor lo ignora. |
 
 **Grupos (constantes en `index.html`):**
 - `CORE_CODES = [EP, TP, AP, TAP]` — el trabajo medible (picking / armado).

@@ -6,7 +6,7 @@
    ⚠ IMPORTANTE: SUPABASE_URL y SUPABASE_KEY están duplicados acá y en
    index.html. Si rotás la publishable key, hay que actualizar AMBOS.
    ========================================================= */
-const SW_VERSION = "v3.35-vir";
+const SW_VERSION = "v3.36-vir";
 
 const SUPABASE_URL = "https://hrxfctzncixxqmpfhskv.supabase.co";
 const SUPABASE_KEY = "sb_publishable_BqpAgZH6ty-9wft10_YMhw_0rcIPuWT";
@@ -100,7 +100,7 @@ async function trySendOneReport(payload) {
     // (merge-duplicates + ?on_conflict=client_id) para que un segundo
     // Terminar Día actualice la fila en lugar de generar 409 y dejar
     // los datos desactualizados. El resto va con INSERT normal.
-    const isUpsert = (payload.opcion === "FJ" || payload.opcion === "PKC" || payload.opcion === "CCN" || payload.opcion === "PSP");
+    const isUpsert = (payload.opcion === "FJ" || payload.opcion === "PKC" || payload.opcion === "CCN" || payload.opcion === "PSP" || payload.opcion === "CRN");
     const url    = isUpsert
       ? SUPABASE_TABLE_ENDPOINT + "?on_conflict=client_id"
       : SUPABASE_TABLE_ENDPOINT;
