@@ -4,7 +4,22 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-20 · Versión app al documentar: **v3.36**
+> Última actualización: 2026-06-20 · Versión app al documentar: **v3.37**
+>
+> Nota: **v3.37** — **Alarma + aviso Telegram de "cargado sin controlar y vencido"** (Parte 4, cierra
+> el ciclo de CR). En la PPP de la operadora, un pedido **cargado al camión (CCN) pero NO controlado**
+> (ni CRN ni manual) que **pasó el plazo** (`crVencido`: 30 hs; viernes→lunes 12 hs) se marca **en rojo
+> grande y temblando**: la tanda (`.ppp-cargvenc` + badge "🚨 SIN CONTROLAR" parpadeante en la franja)
+> y la fila del pedido (`.ppp-cargvenc-row`, celda "🚨 SIN CONTROLAR" en lugar de "Entregado"). Lógica:
+> `pppRefreshEntregado` ahora trae también `ts_cliente` y arma `_pppLoadMs` (NP→ms de la 1ª carga);
+> helper `_pppCargaVencida(p)`. **Telegram**: `pppCheckCargaVencida()` emite **un evento `CRA`** por NP
+> vencida (`texto="NP|TANDA|RAZÓN"`, client_id `cra_<np>_<día>` + upsert) y el trigger Supabase
+> **`trg_carga_sin_control_telegram`** (función `notificar_carga_sin_control_telegram`, **AFTER INSERT**,
+> mismo bot/chat `@Faltantes_Virgilio_bot` que faltantes/planimetría, vía `net.http_post`) lo reenvía.
+> Como el trigger es **AFTER INSERT** y el id es determinístico+upsert, **avisa 1 sola vez por NP/día**
+> (re-emisiones son UPDATE → no re-disparan). El chequeo corre al abrir la PPP y en cada cambio de
+> pestaña (`pppRefreshControlado`/`pppRefreshEntregado`); exige tener cargados CCN **y** CRN para no dar
+> falsos positivos. El evento `CRA` usa legajo `0` (test/basura, excluido de reportes).
 >
 > Nota: **v3.36** — **Control Remitos (CR)** para el operario (cierre del ciclo de entrega).
 > El botón **CR** de la botonera (ya existía como toggle, label "Control Remitos") abre un popup
@@ -21,9 +36,8 @@
 > operadora (los dos caminos valen). **Plazo de control / alarma VENCIDO**: desde que se cargó (CCN)
 > hay **30 hs** para controlar; si el vencimiento cae **sábado/domingo (incluye las cargas del
 > viernes)** se corre al **lunes 12:00** (`crDeadline`/`crVencido`, AR=UTC-3). Los NP vencidos van
-> **arriba, en rojo y temblando** (`.cr-venc`) dentro del popup. **Pendiente (Parte 4)**: aviso a
-> **Telegram** + alarma roja grande en la vista de la operadora cuando hay cargado-sin-controlar
-> vencido (requiere disparador/cron server-side en Supabase, ver § Telegram).
+> **arriba, en rojo y temblando** (`.cr-venc`) dentro del popup. (La alarma en la vista de la operadora
+> + aviso Telegram se agregó en **v3.37**.)
 >
 > Nota: **v3.33–v3.35** — Ciclo de entrega del **operario** (previo a CR). **v3.33/34 (Líos)**: al
 > mandar **TAP** (terminé armado) se abre un popup que **obliga** a anotar cuántos **líos** lleva
@@ -1063,6 +1077,7 @@ Definidos en `index.html` (objeto `desc`, ~línea 1531). Los botones se arman en
 | `PSP` | Picking sin planimetría | (automático, v2.60) | `texto` = `TANDA\|COD1,COD2` (códigos del picking que no están en `planimetria.js`). UNO por tanda/legajo/día (id `psp_<legajo>_<tanda>_<día>` + upsert). Dispara aviso Telegram vía trigger `trg_sin_planim_telegram` (solo INSERT → no spamea al reabrir). El monitor lo ignora. |
 | `TAL` | Líos por NP (TAP) | (detalle de armado, v3.34) | `texto` = `NP\|LÍOS\|TANDA` (ej. `97754\|3\|C47B`). Un evento por NP de la tanda al terminar armado (popup obligatorio tras `TAP`; si no lleva, `0`). Lo lee Control Remitos para la columna Líos. id aleatorio (no upsert). El monitor lo ignora. |
 | `CRN` | Control Remito NP | (detalle de control, v3.36) | `texto` = `NP\|TANDA` (ej. `97754\|C47B`). Un evento por NP marcada como **recibida/controlada** en Control Remitos (`CR`). id determinístico `crn_<legajo>_<np>_<día>` + upsert. La PPP lo lee (`pppRefreshControlado`) y pasa el pedido a **Pedidos Entregados**. El monitor lo ignora. |
+| `CRA` | Carga sin control (vencido) | (automático, v3.37) | `texto` = `NP\|TANDA\|RAZÓN`. Lo emite la PPP (`pppCheckCargaVencida`) cuando un pedido **cargado (CCN) sigue sin controlar (CRN/manual)** pasado el plazo (`crVencido`). id determinístico `cra_<np>_<día>` + upsert; legajo `0`. Dispara aviso Telegram vía trigger `trg_carga_sin_control_telegram` (**AFTER INSERT** → 1 vez por NP/día). El monitor lo ignora. |
 
 **Grupos (constantes en `index.html`):**
 - `CORE_CODES = [EP, TP, AP, TAP]` — el trabajo medible (picking / armado).

@@ -1887,6 +1887,14 @@ button {
 .ppp-tanda.ppp-vencida .ppp-tanda-h{ background:linear-gradient(90deg,#dc2626,#7f1d1d); animation:pppShake 2.2s ease-in-out infinite; }
 .ppp-fe-venc{ background:rgba(0,0,0,.32); color:#fff; font-weight:800; }
 @keyframes pppShake{ 0%,80%,100%{ transform:translateX(0); } 82%{ transform:translateX(-5px); } 84%{ transform:translateX(5px); } 86%{ transform:translateX(-5px); } 88%{ transform:translateX(5px); } 90%{ transform:translateX(-3px); } 92%{ transform:translateX(3px); } 94%{ transform:translateX(0); } }
+/* CARGA VENCIDA (cargado al camión, sin controlar, pasado el plazo) — rojo grande y molesto. */
+.ppp-tanda.ppp-cargvenc{ border:3px solid #dc2626; box-shadow:0 0 0 2px #fecaca, 0 6px 18px rgba(220,38,38,.35); }
+.ppp-tanda.ppp-cargvenc .ppp-tanda-h{ background:linear-gradient(90deg,#dc2626,#991b1b); animation:pppShake 1.3s ease-in-out infinite; }
+.ppp-cargvenc-badge{ display:inline-block; background:#fff; color:#b91c1c; font-weight:900; font-size:11px; letter-spacing:.4px; padding:2px 8px; border-radius:6px; animation:pppBlink 1s steps(1) infinite; }
+.ppp-cargvenc-row > td{ background:#fef2f2 !important; }
+.ppp-cargvenc-row .ppp-cli{ color:#b91c1c; font-weight:800; }
+.ppp-fc.cargvenc{ color:#fff; background:#dc2626; border-radius:999px; padding:2px 8px; font-weight:900; white-space:nowrap; animation:pppBlink 1s steps(1) infinite; }
+@keyframes pppBlink{ 0%,100%{ opacity:1; } 50%{ opacity:.5; } }
 .ppp-tanda-name{ font-size:15px; font-weight:800; font-family:Consolas,Menlo,monospace; letter-spacing:.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
 .ppp-tanda-meta{ font-size:12px; opacity:.95; white-space:nowrap; display:inline-flex; align-items:center; gap:10px; justify-self:end; }
 .ppp-caret{ font-size:12px; opacity:.85; transition:transform .15s; display:inline-block; }
@@ -4764,7 +4772,7 @@ async function trySendOneReport(payload) {
     // y el merge-duplicates no se aplica → 409).
     // FJ y PKC usan client_id determinístico + merge-duplicates (upsert): reenviar
     // o corregir actualiza la fila en vez de fallar con 409 / duplicar.
-    const isUpsert = (payload.opcion === "FJ" || payload.opcion === "PKC" || payload.opcion === "CCN" || payload.opcion === "PSP" || payload.opcion === "CRN");
+    const isUpsert = (payload.opcion === "FJ" || payload.opcion === "PKC" || payload.opcion === "CCN" || payload.opcion === "PSP" || payload.opcion === "CRN" || payload.opcion === "CRA");
     const url    = isUpsert
       ? SUPABASE_TABLE_ENDPOINT + "?on_conflict=client_id"
       : SUPABASE_TABLE_ENDPOINT;
@@ -4904,7 +4912,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.36";
+const APP_VERSION = "v3.37";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -7946,6 +7954,7 @@ function openPPP() {
   pppRenderProg();
   pppRefreshArmado();
   pppRefreshEntregado();
+  pppRefreshControlado();   // controlados (CRN) + chequeo de carga sin controlar vencida (alarma + Telegram)
 }
 function pppToggleImport() { const m = document.getElementById("pppImportMenu"); if (!m) return; m.classList.toggle("hidden"); if (!m.classList.contains("hidden")) pppShowBaseInfo(); }
 function pppCloseImport() { const m = document.getElementById("pppImportMenu"); if (m) m.classList.add("hidden"); }
@@ -8065,7 +8074,7 @@ function pppImportarCompleta(rows, fname) {
   let nProg = 0;
   for (const np in r.edits) { ed[np] = Object.assign(ed[np] || {}, r.edits[np]); if (r.edits[np].programmed) nProg++; }
   pppSaveEdits();
-  _pppTab = "plan"; pppRenderProg(); pppRefreshArmado(); pppRefreshEntregado();
+  _pppTab = "plan"; pppRenderProg(); pppRefreshArmado(); pppRefreshEntregado(); pppRefreshControlado();
   pppSetStatus("✓ PPP completa cargada (" + fname + "): " + res.total + " pedidos · " + nProg + " ya programados (migración del Excel actual). SOLO LOCAL.", true);
 }
 async function pppHandleFile(tipo, f) {                 // de click o de drag-drop
@@ -8438,17 +8447,24 @@ async function pppRefreshArmado() {
   catch (_e) { if (!_pppArmadoDone) _pppArmadoDone = new Set(); }
 }
 let _pppEntregadoCC = null;
+let _pppLoadMs = null;   // NP -> ms de la PRIMERA carga (CCN), para el plazo de control
 async function pppRefreshEntregado() {
   try {
     const since = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString();
-    const url = SUPABASE_TABLE_ENDPOINT + "?opcion=eq.CCN&ts_cliente=gte." + encodeURIComponent(since) + "&select=texto&limit=20000";
+    const url = SUPABASE_TABLE_ENDPOINT + "?opcion=eq.CCN&ts_cliente=gte." + encodeURIComponent(since) + "&select=texto,ts_cliente&limit=20000";
     const r = await fetch(url, { headers: { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY } });
     if (!r.ok) throw new Error("HTTP " + r.status);
     const data = await r.json();
-    const set = new Set();
-    for (const ev of data) { const t = String(ev.texto || "").split("|")[0].trim().replace(/\.0+$/, ""); if (t) set.add(t); }
-    _pppEntregadoCC = set; pppRenderProg();
-  } catch (_e) { if (!_pppEntregadoCC) _pppEntregadoCC = new Set(); }
+    const set = new Set(); const loadMs = new Map();
+    for (const ev of data) {
+      const t = String(ev.texto || "").split("|")[0].trim().replace(/\.0+$/, ""); if (!t) continue;
+      set.add(t);
+      const ms = ev.ts_cliente ? new Date(ev.ts_cliente).getTime() : 0;
+      if (ms && (!loadMs.has(t) || ms < loadMs.get(t))) loadMs.set(t, ms);
+    }
+    _pppEntregadoCC = set; _pppLoadMs = loadMs; pppRenderProg();
+    try { pppCheckCargaVencida(); } catch (_e) {}   // si CRN ya estaba cargado, chequea acá (orden async)
+  } catch (_e) { if (!_pppEntregadoCC) _pppEntregadoCC = new Set(); if (!_pppLoadMs) _pppLoadMs = new Map(); }
 }
 /* "Controlado" también se nutre del operario: cuando descarga en Control Remitos
    manda CRN por cada NP. Esos NP se MERGEAN al set de controlados (vir_ppp_entregados)
@@ -8469,10 +8485,43 @@ async function pppRefreshControlado() {
     for (const np of set) { if (!ent.has(np)) { ent.add(np); changed = true; } }
     if (changed) pppSaveEntregados();
     pppRenderProg();
+    try { pppCheckCargaVencida(); } catch (_e) {}   // avisa a Telegram lo cargado sin controlar y vencido
   } catch (_e) { if (!_pppControladoCR) _pppControladoCR = new Set(); }
 }
 function _pppListoFC(p) { const t = (p.tanda || "").trim().toUpperCase(); return !!(_pppArmadoDone && t && t !== "—" && _pppArmadoDone.has(t)); }
 function _pppEntregado(p) { return !!(_pppEntregadoCC && _pppEntregadoCC.has(String(p.np))); }
+/* CARGADO (CCN) pero NO controlado (CRN ni manual) y con el plazo de control VENCIDO
+   (crVencido = 30 hs; viernes→lunes 12 hs). Es la alarma "rojo grande y molesto". */
+function _pppCargaVencida(p) {
+  const np = String(p.np);
+  if (!_pppEntregadoCC || !_pppEntregadoCC.has(np)) return false;          // no se cargó
+  if (_pppControladoCR && _pppControladoCR.has(np)) return false;          // ya controlado (CRN)
+  try { if (pppLoadEntregados().has(np)) return false; } catch (_e) {}     // ya controlado (manual)
+  const ms = (_pppLoadMs && _pppLoadMs.get(np)) || 0;
+  return typeof crVencido === "function" ? crVencido(ms) : false;
+}
+/* Avisa a Telegram (1 vez por NP/día, vía evento CRA + trigger trg_carga_sin_control_telegram)
+   por cada pedido cargado sin controlar y vencido que está en la programación activa.
+   El id determinístico cra_<np>_<día> + upsert ⇒ el trigger (AFTER INSERT) no re-spamea. */
+let _pppCraSent = new Set();
+function pppCheckCargaVencida() {
+  // Exige AMBOS datasets cargados (cargas CCN y controlados CRN); si falta uno, esperamos
+  // a la próxima pasada — así no avisamos a Telegram un "sin controlar" que en realidad sí lo está.
+  if (!_pppParsed || !_pppParsed.prog || !_pppLoadMs || !_pppControladoCR) return;
+  for (const p of _pppParsed.prog) {
+    if (!_pppCargaVencida(p)) continue;
+    const np = String(p.np);
+    const id = ("cra_" + np + "_" + getTodayKey()).replace(/[^a-zA-Z0-9_\-]/g, "");
+    if (_pppCraSent.has(id)) continue;
+    _pppCraSent.add(id);
+    const ed = pppLoadEdits()[np] || {};
+    const tanda = ((ed.tanda != null ? ed.tanda : p.tanda) || "—").toString().toUpperCase();
+    const razon = (p.razon_social || "").toString().slice(0, 40);
+    const nowMs = Date.now();
+    const payload = { legajo: "0", opcion: "CRA", descripcion: "Carga sin control (vencido)", texto: (np + "|" + tanda + "|" + razon), ts: nowMs, id: id, ts_inicio_iso: null };
+    try { enqueueReport(payload); if (typeof trySendOneReport === "function") trySendOneReport(payload).then(r => { if (r && r.ok) removeFromQueue(payload.id); }).catch(() => {}); } catch (_e) {}
+  }
+}
 /* Tanda y Fecha Entrega NO vienen del Excel: se escriben a mano por pedido. Se guardan
    en localStorage por N° Pedido (sobreviven recarga; SOLO LOCAL) y se mergean al render. */
 const PPP_EDITS_KEY = "vir_ppp_edits";
@@ -8664,7 +8713,8 @@ function _pppRowTr(p) {
     : (_pppTab === "plan")
       ? '<button class="ppp-row-btn ppp-ent ppp-ctrl-only" onclick="pppControlar(\'' + npE + '\')">✓ Controlado</button>'
       : '';   // en "A Programar" no va botón (el pedido aún no está programado)
-  return '<tr>' +
+  const cargVenc = _pppCargaVencida(p);
+  return '<tr' + (cargVenc ? ' class="ppp-cargvenc-row"' : '') + '>' +
     '<td><input class="ppp-edit ppp-edit-tanda" value="' + tEd + '" placeholder="—" onchange="pppSetEdit(\'' + npE + '\',\'tanda\',this.value.trim().toUpperCase(),true)"></td>' +
     '<td>' + escapeHtml(p.cod || "") + '</td><td><b>' + npE + '</b></td><td>' + escapeHtml(p.fecha || "") +
     '</td><td class="ppp-cli">' + escapeHtml(p.razon_social || "") + '</td><td class="num">' + (p.m3 != null && p.m3 !== "" ? Number(p.m3).toFixed(2) : "") +
@@ -8672,7 +8722,9 @@ function _pppRowTr(p) {
     '<td><input class="ppp-edit ppp-edit-fe" value="' + feEd + '" placeholder="dd/mm/aaaa" onchange="pppSetEdit(\'' + npE + '\',\'fecha_entrega\',this.value.trim(),false)"></td>' +
     '<td>' + pppZonaCell(p) + '</td>' +
     '<td>' + (_pppListoFC(p) ? '<span class="ppp-fc ok" title="Armado terminado (TAP)">✓ Listo</span>' : '<span class="ppp-fc">·</span>') + '</td>' +
-    '<td>' + (_pppEntregado(p) ? '<span class="ppp-fc ok2" title="Cargado al camión (CC)">✓ Entregado</span>' : '<span class="ppp-fc">·</span>') + '</td>' +
+    '<td>' + (cargVenc
+        ? '<span class="ppp-fc cargvenc" title="Cargado al camión y SIN controlar pasado el plazo (30 hs; viernes→lunes 12 hs)">🚨 SIN CONTROLAR</span>'
+        : (_pppEntregado(p) ? '<span class="ppp-fc ok2" title="Cargado al camión (CC)">✓ Entregado</span>' : '<span class="ppp-fc">·</span>')) + '</td>' +
     '<td><button class="ppp-row-back ppp-edit-only" onclick="pppPedidoAProgramar(\'' + npE + '\')" title="Sacar de la tanda → A Programar">↩</button>' + btn + '</td></tr>';
 }
 let _pppOpen = new Set();   // ids de bloques abiertos (por clave estable → persiste entre renders)
@@ -8769,10 +8821,14 @@ function _pppBlock(key, name, cls, meta, pedidos, headerExtra, editTanda) {
   // VENCIDA: fecha de entrega en el pasado y todavía en Programación (no entregados) → alarma.
   let venc = false;
   if (_pppTab !== "ent") { const hoy = new Date(); hoy.setHours(0, 0, 0, 0); for (const f of fes) { const d = _pppFechaDate(f); if (d && d < hoy) { venc = true; break; } } }
-  const sum = (razStr ? '<span class="ppp-sum-raz">' + escapeHtml(razStr) + '</span> ' : '') + '<span class="ppp-sum-np">' + escapeHtml(npStr) + '</span>';
+  // CARGA VENCIDA: algún pedido cargado al camión pero sin controlar pasado el plazo → rojo molesto.
+  let cargVenc = false;
+  if (_pppTab !== "ent") { for (const p of pedidos) { if (_pppCargaVencida(p)) { cargVenc = true; break; } } }
+  const cargBadge = cargVenc ? '<span class="ppp-cargvenc-badge">🚨 SIN CONTROLAR</span> ' : '';
+  const sum = cargBadge + (razStr ? '<span class="ppp-sum-raz">' + escapeHtml(razStr) + '</span> ' : '') + '<span class="ppp-sum-np">' + escapeHtml(npStr) + '</span>';
   const feHtml = fes.length ? '<span class="ppp-sum-fe' + (venc ? ' ppp-fe-venc' : '') + '">' + (venc ? '⏰ ' : '📅 ') + escapeHtml(fes.join(" / ")) + (venc ? ' ¡VENCIDA!' : '') + '</span>' : '';
   const hx = (headerExtra || "").replace(/__BLOCKID__/g, id);
-  let h = '<div class="ppp-tanda ' + cls + open + modeCls + (venc ? ' ppp-vencida' : '') + '" id="' + id + '">' +
+  let h = '<div class="ppp-tanda ' + cls + open + modeCls + (venc ? ' ppp-vencida' : '') + (cargVenc ? ' ppp-cargvenc' : '') + '" id="' + id + '">' +
     '<div class="ppp-tanda-h' + rcls + '" onclick="pppToggleBlock(\'' + id + '\')">' +
       '<span class="ppp-caret">▸</span>' +
       '<span class="ppp-tanda-name">' + name + '</span>' +
