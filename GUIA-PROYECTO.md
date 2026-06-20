@@ -4,7 +4,18 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-20 · Versión app al documentar: **v3.39**
+> Última actualización: 2026-06-20 · Versión app al documentar: **v3.40**
+>
+> Nota: **v3.40** — **PPP: sugerir agregar un pedido de "A Programar" a una tanda YA
+> en Programación del mismo cliente** (pedido del usuario). En el tab 📥 A Programar,
+> arriba, aparece un cuadro 🔗 (`.ppp-match-box`) con cada **cliente que ya tiene tanda
+> en Programación** y sus pedidos sueltos; el botón **"→ Agregar a Tanda CXX · 📅 fecha"**
+> (`pppAddToProgrammedTanda`) los mete en esa tanda (setea `tanda` + `fecha_entrega` +
+> `programmed` en los edits) **aunque pase el m³/tanda objetivo (0,8)** → los pedidos de
+> un mismo cliente quedan juntos. Match por **cód cliente** (`_pppCliKey`; si no hay cód,
+> razón social); si el cliente tiene varias tandas programadas toma la de **fecha de
+> entrega más temprana**. Excluye súper (van por su propia vía). Cálculo + banner en
+> `pppRenderProg` (tab A Programar). Sólo toca edits locales (`vir_ppp_edits`) → SOLO LOCAL.
 >
 > Nota: **v3.39** — **CR: la tabla va como lista plana** (pedido del usuario): se
 > sacó la fila separadora **"TANDA …"** (y su CSS `.cr-tanda-row`). `crRender` ahora

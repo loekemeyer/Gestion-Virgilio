@@ -1936,6 +1936,15 @@ button {
 .ppp-sug-btn:hover{ background:#6d28d9; }
 .ppp-confirm-btn{ padding:9px 16px; font-size:14px; font-weight:800; border:none; border-radius:10px; background:#16a34a; color:#fff; cursor:pointer; }
 .ppp-confirm-btn:hover{ background:#15803d; }
+/* Sugerencia: agregar un pedido de A Programar a una tanda YA en Programación (mismo cliente). */
+.ppp-match-box{ background:#eef2ff; border:1px solid #c7d2fe; border-radius:10px; padding:10px 12px; margin:8px 0 4px; }
+.ppp-match-h{ font-size:13px; font-weight:800; color:#3730a3; margin-bottom:6px; }
+.ppp-match-row{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:7px 0; border-top:1px solid #ddd6fe; }
+.ppp-match-row:first-of-type{ border-top:none; }
+.ppp-match-cli{ font-size:13px; font-weight:800; color:#1e293b; }
+.ppp-match-info{ font-size:12px; color:#475569; }
+.ppp-match-btn{ margin-left:auto; padding:7px 14px; font-size:13px; font-weight:800; border:none; border-radius:9px; background:#4f46e5; color:#fff; cursor:pointer; white-space:nowrap; }
+.ppp-match-btn:hover{ background:#4338ca; }
 .ppp-over{ font-size:11px; font-weight:800; color:#fde68a; }
 .ppp-fc{ font-size:12px; color:#cbd5e1; font-weight:700; }
 .ppp-fc.ok{ color:#fff; background:#16a34a; border-radius:999px; padding:2px 8px; font-weight:800; }
@@ -4922,7 +4931,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.39";
+const APP_VERSION = "v3.40";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -8776,6 +8785,26 @@ function pppPedidoAProgramar(np) {
   ed[k] = ed[k] || {}; ed[k].tanda = "—"; delete ed[k].programmed; delete ed[k].fecha_entrega;
   pppSaveEdits(); pppRenderProg(); pppSetStatus("↩ Pedido " + k + " devuelto a A Programar.", true);
 }
+/* Clave de cliente para cruzar pedidos (cód si hay; si no, razón social). */
+function _pppCliKey(p) { return String((p && (p.cod || p.razon_social)) || "").trim().toUpperCase(); }
+/* Agrega pedidos (de A Programar) a una tanda YA programada del mismo cliente: les pone
+   esa tanda + su fecha de entrega + programmed → entran a Programación junto a los del
+   cliente, aunque la tanda pase el m³ objetivo (pedido del usuario). */
+function pppAddToProgrammedTanda(npsCsv, tanda) {
+  const t = String(tanda || "").toUpperCase(); if (!t) return;
+  const nps = String(npsCsv || "").split(",").map(function (s) { return s.trim(); }).filter(Boolean);
+  if (!nps.length) return;
+  const ed = pppLoadEdits();
+  let fecha = "";
+  for (const p of (_pppParsed.prog || [])) {
+    const e = ed[String(p.np)]; if (!(e && e.programmed)) continue;
+    const pt = ((e.tanda != null ? e.tanda : p.tanda) || "").toUpperCase();
+    if (pt === t) { const f = String((e.fecha_entrega != null ? e.fecha_entrega : p.fecha_entrega) || "").trim(); if (f) { fecha = f; break; } }
+  }
+  for (const np of nps) { const k = String(np); ed[k] = ed[k] || {}; ed[k].tanda = t; ed[k].programmed = true; if (fecha) ed[k].fecha_entrega = fecha; }
+  pppSaveEdits(); pppRenderProg();
+  pppSetStatus("🔗 " + nps.length + " pedido(s) → Tanda " + t + (fecha ? " (entrega " + fecha + ")" : "") + " en Programación.", true);
+}
 /* Ruta/camión del bloque según la zona de sus pedidos (para colorear la franja por camión):
    so = Z1·Z3·Z4 (Sur/Oeste) · n = Z5·Z6·Z7 (Norte) · c = Z2 (Centro) · ret = Retira. */
 function _pppRuta(pedidos) {
@@ -9003,6 +9032,37 @@ function pppRenderProg() {
     '<label class="ppp-tool-l">N° base <input class="ppp-tool-inp ppp-tool-n" value="' + escapeHtml(cfg.baseN) + '" onchange="pppSetCfg(\'baseN\',this.value)"></label>' +
     '<button class="ppp-tool-clear" onclick="pppLimpiarTandas()">borrar tandas</button>' +
     '</div>';
+  // ===== Sugerencia: pedido en A Programar cuyo CLIENTE ya tiene tanda en Programación =====
+  // → ofrecer meterlo en esa tanda ya hecha (aunque pase el m³/tanda objetivo).
+  const _progByCli = {};
+  for (const p of programados) {
+    const ck = _pppCliKey(p), t = (p.tanda || "").trim().toUpperCase();
+    if (!ck || !t || t === "—") continue;
+    const fk = _pppFechaKey(p.fecha_entrega || "");
+    if (!_progByCli[ck] || fk < _progByCli[ck].fechaKey) _progByCli[ck] = { tanda: t, fecha: p.fecha_entrega || "", fechaKey: fk };
+  }
+  const _sugByCli = {}, _sugOrd = [];
+  for (const p of aProgramar) {
+    if (pppEsSuper(p)) continue;
+    const ck = _pppCliKey(p), hit = _progByCli[ck]; if (!hit) continue;
+    if ((p.tanda || "").trim().toUpperCase() === hit.tanda) continue;   // ya está en esa tanda
+    if (!_sugByCli[ck]) { _sugByCli[ck] = { tanda: hit.tanda, fecha: hit.fecha, ped: [], cli: (p.razon_social || ("Cliente " + (p.cod || ck))) }; _sugOrd.push(ck); }
+    _sugByCli[ck].ped.push(p);
+  }
+  if (_sugOrd.length) {
+    html += '<div class="ppp-match-box"><div class="ppp-match-h">🔗 Clientes que YA tienen tanda en Programación — agregá estos pedidos a esa tanda (aunque pase ' + cfg.tandaCap + ' m³):</div>';
+    for (const ck of _sugOrd) {
+      const s = _sugByCli[ck];
+      const npsCsv = s.ped.map(function (p) { return String(p.np); }).join(",");
+      const npsFmt = _pppNpFmt(s.ped.map(function (p) { return String(p.np); }));
+      html += '<div class="ppp-match-row">' +
+        '<span class="ppp-match-cli">' + escapeHtml(s.cli) + '</span>' +
+        '<span class="ppp-match-info">' + s.ped.length + ' ped · NP ' + escapeHtml(npsFmt) + ' · ' + _pppM3Sum(s.ped).toFixed(2) + ' m³</span>' +
+        '<button class="ppp-match-btn" onclick="pppAddToProgrammedTanda(\'' + npsCsv + '\',\'' + escapeHtml(s.tanda) + '\')">→ Agregar a Tanda ' + escapeHtml(s.tanda) + (s.fecha ? ' · 📅 ' + escapeHtml(s.fecha) : '') + '</button>' +
+        '</div>';
+    }
+    html += '</div>';
+  }
   const sup = aProgramar.filter(pppEsSuper);
   const resto = aProgramar.filter(function (p) { return !pppEsSuper(p); });
   const armadas = resto.filter(_pppTieneTanda);
