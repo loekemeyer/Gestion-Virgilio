@@ -2030,21 +2030,32 @@ button {
 .lios-inp{ width: 84px; height: 40px; font-size: 17px; text-align: center; border: 2px solid #cbd5e1; border-radius: 10px; flex: 0 0 auto; }
 .lios-inp:focus{ outline: none; border-color: #1e6bd6; }
 
-/* Control Remitos (CR): descarga de los NP que se cargaron al camión.
-   Columnas: NP · Cód · Razón Social · Líos · Recibido (tic). Los que pasaron
-   el plazo de control (30 hs, o viernes→lunes 12 hs) van en rojo y temblando. */
-.cr-np{ cursor: pointer; gap: 9px; }
-.cr-np .cc-npnum{ font-size: 16px; flex: 0 0 auto; }
-.cr-cod{ font-size: 12px; font-weight: 700; color: #64748b; font-family: ui-monospace, Menlo, Consolas, monospace; flex: 0 0 auto; }
-.cr-np .cc-rs{ margin-left: 0; flex: 1 1 auto; text-align: left; }
-.cr-lios{ font-size: 12px; font-weight: 800; color: #b45309; background: #fef3c7; border-radius: 999px; padding: 2px 9px; flex: 0 0 auto; white-space: nowrap; }
-.cr-lios.cr-lios0{ color: #64748b; background: #f1f5f9; }
-.cr-venc-tag{ font-size: 11px; font-weight: 900; color: #fff; background: #dc2626; border-radius: 6px; padding: 2px 7px; flex: 0 0 auto; letter-spacing: .3px; }
-.cr-np.cr-venc{ border-color: #dc2626; background: #fef2f2; animation: cr-shake 1.1s ease-in-out infinite; }
-.cr-np.cr-venc .cc-npnum{ color: #b91c1c; }
-.cr-np.cc-on{ animation: none; }
-.cr-np.cr-venc.cc-on{ border-color: #16a34a; background: #ecfdf5; }
-@keyframes cr-shake{ 0%,100%{ transform: translateX(0); } 20%{ transform: translateX(-3px); } 40%{ transform: translateX(3px); } 60%{ transform: translateX(-2px); } 80%{ transform: translateX(2px); } }
+/* Control Remitos (CR): TABLA de los NP cargados al camión (CCN) pendientes de
+   control. Columnas: NP · Cod Cliente · Razón Social · Líos · Controlado (tic).
+   Los que pasaron el plazo de control (30 hs, o viernes→lunes 12 hs) van en rojo
+   y pulsando para llamar la atención. */
+.cr-tablewrap{ overflow-x: auto; -webkit-overflow-scrolling: touch; margin-top: 4px; }
+.cr-table{ width: 100%; border-collapse: collapse; font-size: 14px; }
+.cr-table th{ text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .3px; color: #64748b; font-weight: 800; padding: 8px 6px; border-bottom: 2px solid #e2e8f0; position: sticky; top: 0; background: #fff; z-index: 1; white-space: nowrap; }
+.cr-table th.cr-th-c{ text-align: center; }
+.cr-table td{ padding: 10px 6px; border-bottom: 1px solid #eef2f7; vertical-align: middle; }
+.cr-tanda-row td{ background: #eff4ff; color: #1e6bd6; font-weight: 800; font-size: 12px; text-transform: uppercase; letter-spacing: .3px; padding: 7px 8px; }
+.cr-row{ cursor: pointer; }
+.cr-row:active > td{ background: #f1f5f9; }
+.cr-row.cc-on > td{ background: #ecfdf5; }
+.cr-td-np{ font-size: 16px; font-weight: 800; color: #0f172a; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cr-td-cod{ font-size: 13px; font-weight: 700; color: #475569; font-family: ui-monospace, Menlo, Consolas, monospace; white-space: nowrap; }
+.cr-td-rs{ font-size: 13px; color: #334155; min-width: 90px; }
+.cr-td-lios{ text-align: center; font-size: 15px; font-weight: 800; color: #b45309; white-space: nowrap; }
+.cr-td-lios.cr-lios0{ color: #94a3b8; font-weight: 600; }
+.cr-td-ctrl{ text-align: center; }
+.cr-chk{ width: 26px; height: 26px; border-radius: 7px; border: 2px solid #cbd5e1; display: inline-flex; align-items: center; justify-content: center; color: #fff; font-weight: bold; font-size: 16px; }
+.cr-row.cc-on .cr-chk{ border-color: #16a34a; background: #16a34a; }
+.cr-venc-tag{ display: inline-block; font-size: 10px; font-weight: 900; color: #fff; background: #dc2626; border-radius: 5px; padding: 1px 6px; margin-left: 6px; letter-spacing: .3px; vertical-align: middle; }
+.cr-row.cr-venc > td{ animation: cr-rowpulse 1.1s ease-in-out infinite; }
+.cr-row.cr-venc .cr-td-np{ color: #b91c1c; }
+.cr-row.cr-venc.cc-on > td{ animation: none; background: #ecfdf5; }
+@keyframes cr-rowpulse{ 0%,100%{ background: #fee2e2; } 50%{ background: #fecaca; } }
 
 /* Modal Faltantes (vista supervisor). */
 #faltantesModal{ display:none; position:fixed; inset:0; z-index:1200; background:#0b1220; color:#f1f5f9; flex-direction:column; }
@@ -4912,7 +4923,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.37";
+const APP_VERSION = "v3.38";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -6521,8 +6532,9 @@ function liosSend(legajo, np, lios, tanda) {
 
 /* =========================================================
    CONTROL REMITOS (CR) — descarga. El operario abre CR y ve la lista de NP que
-   YA se cargaron al camión (eventos CCN), con NP · Cód cliente · Razón Social ·
-   Líos (los anotados en TAP/TAL) · Recibido (tic). Tilda lo que bajó y toca
+   YA se cargaron al camión (eventos CCN), en una TABLA con columnas NP · Cod
+   Cliente · Razón Social · Líos (los anotados en TAP/TAL) · Controlado (tic).
+   Tilda lo que controló y toca
    «Terminé»: por cada NP tildada manda CRN (texto = "NP|TANDA") y cierra el
    toggle CR. Los CRN dan por CONTROLADO el pedido → la PPP los saca de
    programación diaria y los manda a Pedidos Entregados. Reutiliza #tandaModal.
@@ -6620,25 +6632,30 @@ async function showControlRemitos(legajo) {
 function crRender() {
   const m = document.getElementById("tandaModal"); if (!m || !_cr) return;
   const vencCount = _cr.items.filter(it => it.venc).length;
-  let html = `<div class="cc-sub">Tildá <b>Recibido</b> en cada pedido que bajaste del camión. Al tocar «Terminé» pasan a <b>Pedidos Entregados</b>.</div>`;
+  let html = `<div class="cc-sub">Tildá <b>Controlado</b> en cada pedido que controlaste al bajarlo del camión. Al tocar «Terminé» pasan a <b>Pedidos Entregados</b>.</div>`;
   if (vencCount) html += `<div class="cc-sub" style="color:#b91c1c;font-weight:800;">⚠ ${vencCount} pedido(s) <b>VENCIDOS</b> — cargados hace +30 hs sin controlar.</div>`;
   const byTanda = {};
   for (const it of _cr.items) (byTanda[it.tanda] = byTanda[it.tanda] || []).push(it);
+  let rows = "";
   for (const tanda of Object.keys(byTanda).sort()) {
-    html += `<div class="cc-tanda">Tanda ${escapeHtml(tanda)}</div>`;
+    rows += `<tr class="cr-tanda-row"><td colspan="5">Tanda ${escapeHtml(tanda)}</td></tr>`;
     for (const it of byTanda[tanda]) {
       const on = _cr.checked.has(it.np);
-      const liosTxt = it.lios == null ? "s/líos" : (it.lios + (it.lios === 1 ? " lío" : " líos"));
-      const liosCls = (it.lios == null || it.lios === 0) ? " cr-lios0" : "";
-      html += `<div class="cc-np cr-np${on ? " cc-on" : ""}${it.venc ? " cr-venc" : ""}" onclick="crToggle('${String(it.np).replace(/[^0-9A-Za-z]/g, "")}')">` +
-              `<span class="cc-npnum">${escapeHtml(it.np)}</span>` +
-              (it.cod ? `<span class="cr-cod">#${escapeHtml(it.cod)}</span>` : "") +
-              `<span class="cc-rs">${escapeHtml(it.rs || "—")}</span>` +
-              (it.venc ? `<span class="cr-venc-tag">VENCIDO</span>` : "") +
-              `<span class="cr-lios${liosCls}">${escapeHtml(liosTxt)}</span>` +
-              `<span class="cc-chk">${on ? "✓" : ""}</span></div>`;
+      const liosNull = (it.lios == null);
+      const liosTxt = liosNull ? "—" : String(it.lios);
+      const liosCls = (liosNull || it.lios === 0) ? " cr-lios0" : "";
+      rows += `<tr class="cr-row${on ? " cc-on" : ""}${it.venc ? " cr-venc" : ""}" onclick="crToggle('${String(it.np).replace(/[^0-9A-Za-z]/g, "")}')">` +
+              `<td class="cr-td-np">${escapeHtml(it.np)}</td>` +
+              `<td class="cr-td-cod">${it.cod ? escapeHtml(it.cod) : "—"}</td>` +
+              `<td class="cr-td-rs">${escapeHtml(it.rs || "—")}${it.venc ? `<span class="cr-venc-tag">VENCIDO</span>` : ""}</td>` +
+              `<td class="cr-td-lios${liosCls}">${liosTxt}</td>` +
+              `<td class="cr-td-ctrl"><span class="cr-chk">${on ? "✓" : ""}</span></td></tr>`;
     }
   }
+  html += `<div class="cr-tablewrap"><table class="cr-table"><thead><tr>` +
+          `<th>NP</th><th>Cod Cliente</th><th>Razón Social</th>` +
+          `<th class="cr-th-c">Líos</th><th class="cr-th-c">Controlado</th>` +
+          `</tr></thead><tbody>${rows}</tbody></table></div>`;
   html += `<button class="pk-btn pk-ok" onclick="crFinish()">✓ Terminé (${_cr.checked.size} controladas)</button>` +
           `<button class="pk-btn pk-cancel" onclick="crClose()">Cerrar (sigo después)</button>`;
   m.querySelector(".tanda-modal-body").innerHTML = html;

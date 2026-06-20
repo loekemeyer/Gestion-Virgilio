@@ -4,7 +4,19 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-20 · Versión app al documentar: **v3.37**
+> Última actualización: 2026-06-20 · Versión app al documentar: **v3.38**
+>
+> Nota: **v3.38** — **Control Remitos (CR): la lista pasó a TABLA con columnas
+> fijas** (pedido del usuario). El popup `crRender` ahora arma una tabla con
+> encabezados **NP · Cod Cliente · Razón Social · Líos · Controlado** (antes era
+> una lista de tarjetas agrupadas y el tilde se rotulaba "Recibido"). La última
+> columna **Controlado** es el tic que marca el operario; el flujo no cambió:
+> tildar → «Terminé» emite **CRN** por NP y pasa el pedido a Pedidos Entregados.
+> Se mantiene el agrupado por tanda como **fila separadora** (no es columna) y el
+> resaltado de **VENCIDO** (fila roja + chip "VENCIDO" en Razón Social; el
+> "temblando" por `translateX` se reemplazó por un **pulso de fondo**
+> `cr-rowpulse`, más robusto en `<tr>`). Sólo cambia la presentación: datos,
+> eventos (`CRN`/`CR`) y persistencia (`vir_cr_checked_<legajo>_<día>`) intactos.
 >
 > Nota: **v3.37** — **Alarma + aviso Telegram de "cargado sin controlar y vencido"** (Parte 4, cierra
 > el ciclo de CR). En la PPP de la operadora, un pedido **cargado al camión (CCN) pero NO controlado**
@@ -24,7 +36,7 @@
 > Nota: **v3.36** — **Control Remitos (CR)** para el operario (cierre del ciclo de entrega).
 > El botón **CR** de la botonera (ya existía como toggle, label "Control Remitos") abre un popup
 > (`showControlRemitos`, reusa `#tandaModal`) con la **lista de NP que YA se cargaron al camión**
-> (eventos **CCN**), mostrando **NP · Cód cliente · Razón Social · Líos · Recibido (tic)**. Cód y
+> (eventos **CCN**), mostrando **NP · Cod Cliente · Razón Social · Líos · Controlado (tic)** (tabla desde v3.38). Cód y
 > Razón salen del PPP del día (`fetchMonitorSheet`); **Líos** de los eventos **TAL** (anotados al
 > terminar armado, ver v3.34); el tilde "Recibido" lo marca el operario. Al tocar **«Terminé»**:
 > (1) manda un evento **CRN** (`texto="NP|TANDA"`, client_id determinístico `crn_<legajo>_<np>_<día>`,
