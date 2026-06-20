@@ -4,7 +4,14 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-20 · Versión app al documentar: **v3.38**
+> Última actualización: 2026-06-20 · Versión app al documentar: **v3.39**
+>
+> Nota: **v3.39** — **CR: la tabla va como lista plana** (pedido del usuario): se
+> sacó la fila separadora **"TANDA …"** (y su CSS `.cr-tanda-row`). `crRender` ahora
+> itera `_cr.items` directo, sin agrupar. El orden de `showControlRemitos` se mantiene
+> (**vencidos primero, luego por tanda y NP**) → las NP de una misma tanda quedan
+> juntas igual, sin encabezado. Columnas intactas: NP · Cod Cliente · Razón Social ·
+> Líos · Controlado.
 >
 > Nota: **v3.38** — **Control Remitos (CR): la lista pasó a TABLA con columnas
 > fijas** (pedido del usuario). El popup `crRender` ahora arma una tabla con
