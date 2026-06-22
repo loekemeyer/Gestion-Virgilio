@@ -4948,7 +4948,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.43";
+const APP_VERSION = "v3.44";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -5546,8 +5546,15 @@ let historicLastFetch  = 0;
    ("PPP Excel Base Datos Pedidos"), suma las cajas por código y las muestra
    ordenadas numéricamente. (Después: orden de góndola en vez de numérico.)
    ========================================================= */
+// Base del picking. /export?format=csv devuelve los valores como TEXTO (respeta los
+// códigos importados "035E" y el cero adelante "026"). gviz queda de RESPALDO: coacciona
+// la columna a número y descarta los importados (ver v3.43). v3.44.
+const PICKING_BASE_DOC = "1-16YXe0xq6x9i-Yhk5cm5V3VqvQ0PWZtcDbm8OeeKW0";
+const PICKING_BASE_GID = "845301421";   // pestaña "PPP Excel Base Datos Pedidos"
 const PICKING_BASE_CSV_URL =
-  "https://docs.google.com/spreadsheets/d/1-16YXe0xq6x9i-Yhk5cm5V3VqvQ0PWZtcDbm8OeeKW0/gviz/tq?tqx=out:csv&sheet=" +
+  "https://docs.google.com/spreadsheets/d/" + PICKING_BASE_DOC + "/export?format=csv&gid=" + PICKING_BASE_GID;
+const PICKING_BASE_CSV_URL_GVIZ =
+  "https://docs.google.com/spreadsheets/d/" + PICKING_BASE_DOC + "/gviz/tq?tqx=out:csv&sheet=" +
   encodeURIComponent("PPP Excel Base Datos Pedidos");
 const PICK_BASE_TTL_MS = 5 * 60 * 1000;   // hoja grande (~20k filas) → cache 5 min
 let _pickBaseCache   = null;   // Map<pedido(NP), [{art, cajas}]>
@@ -5645,9 +5652,20 @@ async function fetchPickingBaseFromSupabase() {
    de header por las dudas, tolerando los labels que gviz a veces duplica). */
 async function fetchPickingBaseFromSheets() {
   const now = Date.now();
-  const r = await fetch(PICKING_BASE_CSV_URL + "&_=" + now, { cache: "no-store" });
-  if (!r.ok) throw new Error("Base Datos Pedidos HTTP " + r.status);
-  const rows = parseCSV(await r.text());
+  let text = null;
+  // Preferimos /export?format=csv (TEXTO: respeta "035E" y el cero). Si falla o devuelve
+  // HTML (login/permiso), caemos a gviz (coacciona a número y pierde los importados, pero
+  // no deja el picking vacío). v3.44.
+  try {
+    const r = await fetch(PICKING_BASE_CSV_URL + "&_=" + now, { cache: "no-store" });
+    if (r.ok) { const t = await r.text(); if (t && t.slice(0, 64).trim().charAt(0) !== "<") text = t; }
+  } catch (_e) { /* probamos gviz */ }
+  if (text == null) {
+    const r2 = await fetch(PICKING_BASE_CSV_URL_GVIZ + "&_=" + now, { cache: "no-store" });
+    if (!r2.ok) throw new Error("Base Datos Pedidos HTTP " + r2.status);
+    text = await r2.text();
+  }
+  const rows = parseCSV(text);
   let cPed = 0, cArt = 2, cCaj = 5;
   for (let i = 0; i < Math.min(rows.length, 5); i++) {
     const h = rows[i].map(dedupeHeaderCell);

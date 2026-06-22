@@ -4,7 +4,18 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-20 · Versión app al documentar: **v3.43**
+> Última actualización: 2026-06-20 · Versión app al documentar: **v3.44**
+>
+> Nota: **v3.44** — **Origen del fix de importados (E) en el picking**: `fetchPickingBaseFromSheets`
+> ahora lee la base por **`/export?format=csv&gid=845301421`** (pestaña "PPP Excel Base Datos
+> Pedidos") en vez de **gviz**. El `export` devuelve los valores **como texto** → respeta los
+> códigos `035E` y el cero adelante `026`, que gviz coaccionaba a número y descartaba (v3.43).
+> **gviz queda de respaldo** (`PICKING_BASE_CSV_URL_GVIZ`): si el export falla o devuelve HTML
+> (login/permiso), cae a gviz para no dejar el picking vacío (detecta HTML con `slice(0,64).trim()`
+> empezando en `<`). Con esto, hasta una tanda pickeada **antes** de sincronizar a Supabase trae
+> bien los importados. Constantes nuevas `PICKING_BASE_DOC` / `PICKING_BASE_GID`. ⚠ El `export`
+> requiere que la hoja sea accesible por link (igual que gviz); si algún día deja de andar, revisar
+> el compartido del Sheet.
 >
 > Nota: **v3.43** — **FIX picking: los códigos IMPORTADOS (terminados en "E") no se
 > pickeaban**. Diagnóstico (datos): en 60 días, 0 de 398 `PKC` tenían código E, pese a que
