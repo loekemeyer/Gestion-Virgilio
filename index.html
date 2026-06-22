@@ -4951,7 +4951,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.45";
+const APP_VERSION = "v3.46";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -7472,8 +7472,14 @@ async function fetchMonitorDayStats(dayKey) {
       return dur;
     }
     const h = horariosMap.get(String(leg)) || {};
-    const horaEntrada = parseHHMMtoHours(h.entrada) ?? 8;
-    const horaSalida  = parseHHMMtoHours(h.salida)  ?? 17;
+    // ⚠ ES2017: NO usar `??` (rompe el parseo en navegadores viejos de TV —
+    // Chrome 75 del TV box, browser webOS de la LG — y tumba TODO el <script>,
+    // incluido el modo kiosko). parseHHMMtoHours devuelve null o un número (0 es
+    // válido = medianoche), así que el fallback va sólo cuando es null/undefined.
+    const _he = parseHHMMtoHours(h.entrada);
+    const horaEntrada = (_he == null) ? 8 : _he;
+    const _hs = parseHHMMtoHours(h.salida);
+    const horaSalida  = (_hs == null) ? 17 : _hs;
     const workH = Math.max(0, horaSalida - horaEntrada);
     // Pedazo del día de apertura: ts_inicio → FJ real (si existe en
     // fjPrevByLegajo para el dayOpen) o hora_salida programada como fallback.
@@ -9921,7 +9927,11 @@ function rememberTandaM3(tanda, m3) {
 function flushPersistedM3() {
   if (!_persistedDirty || !_persistedM3) return;
   try {
-    localStorage.setItem(PERSISTED_M3_KEY, JSON.stringify(Object.fromEntries(_persistedM3)));
+    // ES2017: Object.fromEntries es Chrome 73+; lo evitamos para los navegadores
+    // viejos de TV (LG webOS). Armamos el objeto plano a mano desde el Map.
+    const _obj = {};
+    _persistedM3.forEach((v, k) => { _obj[k] = v; });
+    localStorage.setItem(PERSISTED_M3_KEY, JSON.stringify(_obj));
     _persistedDirty = false;
   } catch (_e) {}
 }

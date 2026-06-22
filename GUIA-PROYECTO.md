@@ -4,7 +4,22 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-22 · Versión app al documentar: **v3.45**
+> Última actualización: 2026-06-22 · Versión app al documentar: **v3.46**
+>
+> Nota: **v3.46** — **FIX crítico de compatibilidad: la app NO cargaba en navegadores
+> viejos de TV** (kiosko/monitor). El bloque principal de `<script>` de `index.html`
+> usaba el operador **`??` (nullish coalescing, ES2020)** en `parseHHMMtoHours(...) ?? 8/17`
+> (cálculo de horas trabajadas). `??` recién existe desde **Chrome 80**; el **TV box tiene
+> Chrome 75** y la **TV LG** (webOS) es aún más vieja → tiraban **SyntaxError** y abortaba
+> TODO el bloque principal de JS, que incluye el código de **modo kiosko** (`?monitor=tv&key=tv`).
+> Síntoma: la URL entraba con `&key=tv` pero **NO se borraba la clave** ni abría el Monitor
+> → caía al **login** (el `<script>` de `initAuth` es otro bloque y sí parseaba). Se
+> reemplazó `?? N` por un chequeo `(_x == null) ? N : _x` (ES2017, mismas semánticas: el
+> default solo si es null/undefined, respeta el `0`=medianoche). También se reescribió un
+> `Object.fromEntries` (Chrome 73+) a mano por la LG. **Regla:** el proyecto apunta a
+> **ES2017** — NO usar `??`, `?.`, `||=`, `?.()`, `replaceAll`, `Promise.allSettled`
+> ni nada ≥ES2018 en `index.html` (rompe las TVs). Diagnóstico rápido (v2.52): si el
+> `#versionBadge` queda **vacío** = el JS NO corrió (parse error en un navegador viejo).
 >
 > Nota: **v3.45** — **Se separó el "Control Remitos" en DOS botones** (pedido del usuario).
 > Toda la lógica de descarga (popup `showControlRemitos`: tabla de NP cargadas al camión,
