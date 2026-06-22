@@ -4,7 +4,16 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-22 · Versión app al documentar: **v3.46**
+> Última actualización: 2026-06-22 · Versión app al documentar: **v3.47**
+>
+> Nota: **v3.47** — **Carga Camión: botón "Terminar sin cargar por app"** (pedido del usuario).
+> El popup de Carga Camión (`showCargaCamion`) cuando **falla la carga de la lista** (HTTP 400 /
+> sin conexión) o **no hay NP facturados** sólo ofrecía "Cerrar" (que **minimiza** y deja el
+> toggle `CC` abierto → el operario quedaba trabado). Se agregó **"✓ Terminar Carga Camión (sin
+> cargar por app)"** (`ccEndWithoutLoading`) que **cierra el toggle CC** (evento `CC`, con
+> `ts_inicio`) **sin** mandar ningún `CCN` — escape para cuando se cargó el camión sin usar la
+> app o la lista no levanta. Pide confirmación. (El flujo normal ya podía cerrar con "Terminé
+> (0 cargadas)"; esto cubre los estados de error/vacío donde ese botón no aparecía.)
 >
 > Nota: **v3.46** — **FIX crítico de compatibilidad: la app NO cargaba en navegadores
 > viejos de TV** (kiosko/monitor). El bloque principal de `<script>` de `index.html`
@@ -992,7 +1001,7 @@ de pedidos de un Google Sheet.
 | Archivo | Rol |
 |---|---|
 | `index.html` | **La app completa** (~6.600 líneas): pantalla de operario + monitor + toda la lógica JS/CSS. Es el archivo central. |
-| `sw.js` | Service Worker. **NO cachea HTML/assets**: sólo hace Background Sync de la cola offline (IndexedDB). `SW_VERSION = "v3.45-vir"`. |
+| `sw.js` | Service Worker. **NO cachea HTML/assets**: sólo hace Background Sync de la cola offline (IndexedDB). `SW_VERSION = "v3.47-vir"`. |
 | `manifest.json` | Manifiesto PWA. |
 | `fichada.html` / `fichada.js` / `fichada-config.js` / `fichada-totp.js` / `fichada.css` | Sistema de **fichada por QR rotativo (TOTP)**. La página `fichada.html` se abre escaneando el QR y registra el **ingreso**. |
 | `fichadas-monitor.html` | Tablero **independiente** "Monitor Fichadas Esnaola" (lee de `Fichadas_Historico` y sincroniza otro Google Sheet distinto). No está enlazado desde `index.html`. |
@@ -1322,11 +1331,11 @@ En `showDayBreakdown` (monitor, por operario por día):
 
 ## 10. Versionado y cache
 
-- `index.html`: `APP_VERSION = "v3.45"`. Badge en pantalla `#versionBadge`:
-  `"v3.45 ✓"` (sin cola), `"v3.45 ⏳ N"` (pendientes), `"v3.45 ⚠ N"` (error).
+- `index.html`: `APP_VERSION = "v3.47"`. Badge en pantalla `#versionBadge`:
+  `"v3.47 ✓"` (sin cola), `"v3.47 ⏳ N"` (pendientes), `"v3.47 ⚠ N"` (error).
   **Sirve para confirmar qué versión cargó cada pantalla** (mirá el badge en la TV
   para saber si está al día).
-- `sw.js`: `SW_VERSION = "v3.45-vir"`. **No precachea nada**; el handler de `fetch`
+- `sw.js`: `SW_VERSION = "v3.47-vir"`. **No precachea nada**; el handler de `fetch`
   está vacío. Usa `skipWaiting()` + `clients.claim()`. La página hace
   `reg.update()` cada 60 s con `updateViaCache:"none"` (esto **sólo actualiza el
   SW**; NO recarga la app ni cambia lo que se ve en pantalla).

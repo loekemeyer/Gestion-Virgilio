@@ -4951,7 +4951,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.46";
+const APP_VERSION = "v3.47";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -6423,7 +6423,7 @@ async function showCargaCamion(legajo) {
     items.sort((a, b) => String(a.tanda).localeCompare(String(b.tanda)) || a.np.localeCompare(b.np));
     if (!items.length) {
       _cc = null; ccReleaseWakeLock();
-      m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">No hay NP facturados pendientes hoy.</div><button class="pk-btn pk-cancel" onclick="ccClose()">Cerrar</button>`;
+      m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">No hay NP facturados pendientes hoy.</div><button class="pk-btn pk-ok" onclick="ccEndWithoutLoading('${leg}')">✓ Terminar Carga Camión (sin cargar por app)</button><button class="pk-btn pk-cancel" onclick="ccClose()">Cerrar (sigo después)</button>`;
       return;
     }
     const saved = ccLoadChecked(leg);
@@ -6431,7 +6431,7 @@ async function showCargaCamion(legajo) {
     ccRender();
   } catch (e) {
     _cc = null; ccReleaseWakeLock();
-    m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">No se pudo cargar (¿sin conexión?).<br><small>${escapeHtml(e.message || "")}</small></div><button class="pk-btn pk-cancel" onclick="ccClose()">Cerrar</button>`;
+    m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">No se pudo cargar (¿sin conexión?).<br><small>${escapeHtml(e.message || "")}</small></div><button class="pk-btn pk-ok" onclick="ccEndWithoutLoading('${leg}')">✓ Terminar Carga Camión (sin cargar por app)</button><button class="pk-btn pk-cancel" onclick="ccClose()">Cerrar (sigo después)</button>`;
   }
 }
 
@@ -6464,6 +6464,17 @@ function ccToggle(npClean) {
   ccRender();
 }
 function ccClose() { ccReleaseWakeLock(); _cc = null; closeTandaModal(); }   // minimiza (CC sigue abierto, re-abrís tocando CC)
+/* Cierra/termina la Carga Camión SIN registrar NP por la app (escape para cuando
+   la lista no carga —HTTP 400/sin conexión— o se cargó el camión sin usar la app).
+   Cierra el toggle CC igual (evento CC) pero NO manda ningún CCN. */
+function ccEndWithoutLoading(legajo) {
+  const leg = String(legajo || (_cc && _cc.legajo) || "").trim();
+  try { if (!confirm("¿Terminar la Carga Camión sin cargar los NP por la app?\nSe da por cerrada igual (no se registran NP).")) return; } catch (_e) {}
+  try { ccSendClose(leg); } catch (_e) {}     // cierra el toggle CC (sin CCN)
+  try { ccClearChecked(leg); } catch (_e) {}
+  _cc = null; ccReleaseWakeLock(); closeTandaModal();
+  try { alert("🚛 Carga Camión cerrada sin cargar NP por la app."); } catch (_e) {}
+}
 function ccFinish() {
   if (!_cc) return;
   const legajo = _cc.legajo;
