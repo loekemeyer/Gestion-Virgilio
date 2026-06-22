@@ -4,7 +4,16 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-22 · Versión app al documentar: **v3.50**
+> Última actualización: 2026-06-22 · Versión app al documentar: **v3.51**
+>
+> Nota: **v3.51** — **Ajuste del QR de fichada en el TV box**: el QR de v3.50 (clamp 140px) quedaba
+> ~3px más ancho que el espacio reservado a la derecha (`padding-right` ~157px del `.monitor-right-bottom`)
+> y **tapaba un pedacito de "Total por día"**. Se baja a `clamp(120px, 24vh, 150px)` → entra con ~17px
+> de aire, sigue ~3× más grande que el original (40px) y no se solapa. Además se **centra dentro de su
+> zona** (`bottom: 20px; right: 12px` en vez de pegado a la esquina 8/8) → márgenes parejos arriba/abajo
+> e izq/der. (Nota: con MUCHAS tandas a FC,
+> las últimas filas siguen sin entrar en la TV; se evaluó una banda full-width multi-columna pero se
+> descartó porque al haber muchas tandas en la tabla izquierda no hay forma de que entre todo en 494px.)
 >
 > Nota: **v3.50** — **Monitor TV en pantallas CORTAS/achatadas** (TV box ~979×494 "modo
 > ordenador"): el layout escalaba por **ancho** (vp-narrow/medium/wide) pero faltaba el eje de
@@ -1368,8 +1377,8 @@ En `showDayBreakdown` (monitor, por operario por día):
 
 ## 10. Versionado y cache
 
-- `index.html`: `APP_VERSION = "v3.50"`. Badge en pantalla `#versionBadge`:
-  `"v3.50 ✓"` (sin cola), `"v3.50 ⏳ N"` (pendientes), `"v3.50 ⚠ N"` (error).
+- `index.html`: `APP_VERSION = "v3.51"`. Badge en pantalla `#versionBadge`:
+  `"v3.51 ✓"` (sin cola), `"v3.51 ⏳ N"` (pendientes), `"v3.51 ⚠ N"` (error).
   **Sirve para confirmar qué versión cargó cada pantalla** (mirá el badge en la TV
   para saber si está al día).
 - `sw.js`: `SW_VERSION = "v3.47-vir"`. **No precachea nada**; el handler de `fetch`

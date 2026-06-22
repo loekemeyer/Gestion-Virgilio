@@ -2594,11 +2594,13 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
   #monitorModal.tv #monitorContent{ padding-bottom: 4px; }
 
   /* QR de fichada más grande (se escanea de lejos); escala con el alto. Gana
-     por orden a la regla chica de @media(max-width:1150px). */
-  #monitorModal.tv.show ~ #qrFichadaBox{ padding: 6px 8px 8px 8px; }
+     por orden a la regla chica de @media(max-width:1150px). bottom/right ajustados
+     para que quede CENTRADO en su zona (entre los stats arriba y "Total por día"
+     a la izquierda), no pegado a la esquina. */
+  #monitorModal.tv.show ~ #qrFichadaBox{ padding: 6px 8px 8px 8px; bottom: 20px; right: 12px; }
   #monitorModal.tv.show ~ #qrFichadaBox .qr-label{ font-size: 12px; margin-bottom: 3px; letter-spacing: 0.3px; }
   #monitorModal.tv.show ~ #qrFichadaBox .qr-countdown{ font-size: 11px; margin-top: 3px; }
-  #monitorModal.tv.show ~ #qrFichadaBox #qrCanvas{ width: clamp(140px, 28vh, 180px); height: clamp(140px, 28vh, 180px); }
+  #monitorModal.tv.show ~ #qrFichadaBox #qrCanvas{ width: clamp(120px, 24vh, 150px); height: clamp(120px, 24vh, 150px); }
 }
 </style>
 
@@ -4997,7 +4999,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.50";
+const APP_VERSION = "v3.51";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
