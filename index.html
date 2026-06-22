@@ -3008,7 +3008,7 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
   </div>
 
   <div class="row row-6" id="row1"></div>
-  <div class="row row-5" id="row2"></div>
+  <div class="row row-6" id="row2"></div>
   <div class="row row-5" id="row3"></div>
   <div id="pendingSuggestion"></div>
 
@@ -3087,13 +3087,14 @@ const SUPABASE_PLANIMETRIA_ENDPOINT =
 
 const filas = {
   row1: ["EP","TP","AP","TAP","CR","CC"],
-  row2: ["RT","MG","RI","EI","CT"],
+  row2: ["RR","RT","MG","RI","EI","CT"],
   row3: ["AT","PB","Limp","Perm","PC"]
 };
 
 const desc = {
   EP:"Empecé Picking", TP:"Fin Picking", AP:"Empecé Armado Pedido",
   TAP:"Terminé Armado Pedido", CR:"Control Remitos", CC:"Inicio/Fin Carga Camión",
+  RR:"Recepción Remitos",
   RT:"Recepción Mercadería", MG:"Guardado a Góndola",
   RI:"Recepción Insumos", EI:"Entrega Insumos",
   AT:"Atendí Timbre", PB:"Paré Baño", Limp:"Limpieza",
@@ -3115,7 +3116,7 @@ const LAST_LEGAJO_KEY = "legajo_last_virgilio_v1";        // último legajo usad
 const TZ_AR           = "America/Argentina/Buenos_Aires";
 const MAX_PROD_DAYS   = 10;        // se retienen N días PRODUCTIVOS (con datos), no calendario
 const HIST_MAX_PER_DAY = 700;      // tope de reportes por día por legajo en localStorage
-const SURVIVING_TOGGLES = ["CR","MG"]; // únicos toggles que sobreviven al cambio de día
+const SURVIVING_TOGGLES = ["CR","RR","MG"]; // únicos toggles que sobreviven al cambio de día
 
 /* Auto-cierre al fin de jornada para toggles abiertos que quedaron sin cerrar.
    Si la limpieza del día siguiente encuentra alguno de estos abierto, genera
@@ -3785,7 +3786,7 @@ async function confirmarTerminarDia() {
       if (isPick) st.picking = { active:false, value:"", ts_inicio:null };
       else        st.armado  = { active:false, value:"", ts_inicio:null };
     } else {
-      // CR / MG: se cierra el toggle (sin dato).
+      // CR / RR / MG: se cierra el toggle (sin dato).
       const cur   = st.toggles ? st.toggles[d.tipo] : null;
       const tsIni = (typeof cur === "string") ? cur : null;
       const closeId = nowMs.toString(36) + "_fjclose_" + d.tipo + "_" + Math.random().toString(36).slice(2, 6);
@@ -3867,11 +3868,11 @@ legajoInput.addEventListener("input", () => {
    - toggles: { CR:true, AT:true, ... } (1ra vez inicia, 2da termina)
    ========================================================= */
 const CORE_CODES   = ["EP","TP","AP","TAP"];
-const TOGGLE_CODES = ["CR","CC","RT","MG","RI","EI","AT","PB","Limp","PC","Perm","CT"];
+const TOGGLE_CODES = ["CR","RR","CC","RT","MG","RI","EI","AT","PB","Limp","PC","Perm","CT"];
 
 /* Códigos de TIEMPO MUERTO. Cuando uno está abierto, se bloquea todo lo
    demás hasta cerrarlo (tocando el mismo botón otra vez). El resto de
-   los toggles (CR, MG, CC, RT, RI, EI, Perm) NO bloquean. */
+   los toggles (CR, RR, MG, CC, RT, RI, EI, Perm) NO bloquean. */
 const DEAD_TIME_CODES = ["AT","PB","Limp","PC","CT"];
 
 /* Botones SIEMPRE tocables — no se les aplica NINGUNA regla de bloqueo
@@ -4040,12 +4041,14 @@ function renderPendingSuggestion(){
     { tipo:"Picking", activa: !!(st.picking && st.picking.active), valor: (st.picking && st.picking.value) || "" },
     { tipo:"Armado",  activa: !!(st.armado  && st.armado.active),  valor: (st.armado  && st.armado.value)  || "" },
     { tipo:"CR",      activa: !!(st.toggles && st.toggles.CR),     valor: "" },
+    { tipo:"RR",      activa: !!(st.toggles && st.toggles.RR),     valor: "" },
     { tipo:"MG",      activa: !!(st.toggles && st.toggles.MG),     valor: "" }
   ];
   for (const cd of continuarDefs) {
     const marca = cont[cd.tipo];
     if (!marca || !cd.activa || marca >= today) continue;   // solo si viene de antes
     const etiqueta = cd.tipo === "CR" ? "Control Remitos"
+                   : cd.tipo === "RR" ? "Recepción Remitos"
                    : cd.tipo === "MG" ? "Guardado a Góndola" : cd.tipo;
     const btn = document.createElement("button");
     btn.className = "primary-btn";
@@ -4392,11 +4395,11 @@ function selectOption(code) {
     const stCC = getLegajoState(legajoStr);
     if (stCC && stCC.toggles && stCC.toggles.CC) { showCargaCamion(legajoStr); return; }
   }
-  // CR ya abierto: el botón CR RE-ABRE el popup de Control Remitos (no lo cierra).
+  // RR ya abierto: el botón RR RE-ABRE el popup de Recepción Remitos (no lo cierra).
   // El cierre se hace SOLO con "Terminé" dentro del popup.
-  if (code === "CR") {
-    const stCR = getLegajoState(legajoStr);
-    if (stCR && stCR.toggles && stCR.toggles.CR) { showControlRemitos(legajoStr); return; }
+  if (code === "RR") {
+    const stRR = getLegajoState(legajoStr);
+    if (stRR && stRR.toggles && stRR.toggles.RR) { showControlRemitos(legajoStr); return; }
   }
 
   selected = code;
@@ -4417,7 +4420,7 @@ function selectOption(code) {
   const ending = isToggleEnding(legajoStr, code);
 
   // Estos NUNCA piden input
-  const NEVER_INPUT = ["AT","PB","Limp","PC","Perm","MG","CR","CT"];  // 👈 CR agregado y CT
+  const NEVER_INPUT = ["AT","PB","Limp","PC","Perm","MG","CR","RR","CT"];  // 👈 CR/RR y CT no piden cantidad
 
   if (ending && !NEVER_INPUT.includes(code)) {
     inputArea.classList.remove("hidden");
@@ -4948,7 +4951,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.44";
+const APP_VERSION = "v3.45";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -5157,10 +5160,10 @@ async function send() {
     const stCC = getLegajoState(legajoStr);
     if (stCC && stCC.toggles && stCC.toggles.CC) showCargaCamion(legajoStr);
   }
-  // Al INICIAR Control Remitos (1er toque de CR): lista de NP cargadas al camión.
-  if (opcion === "CR") {
-    const stCR = getLegajoState(legajoStr);
-    if (stCR && stCR.toggles && stCR.toggles.CR) showControlRemitos(legajoStr);
+  // Al INICIAR Recepción Remitos (1er toque de RR): lista de NP cargadas al camión.
+  if (opcion === "RR") {
+    const stRR = getLegajoState(legajoStr);
+    if (stRR && stRR.toggles && stRR.toggles.RR) showControlRemitos(legajoStr);
   }
   // Al TERMINAR ARMADO (TAP): anotar cuántos líos lleva cada NP de la tanda.
   if (opcion === "TAP" && (texto || "").trim()) showLiosModal(legajoStr, texto);
@@ -6577,12 +6580,12 @@ function liosSend(legajo, np, lios, tanda) {
 }
 
 /* =========================================================
-   CONTROL REMITOS (CR) — descarga. El operario abre CR y ve la lista de NP que
+   RECEPCIÓN REMITOS (RR) — descarga. El operario abre RR y ve la lista de NP que
    YA se cargaron al camión (eventos CCN), en una TABLA con columnas NP · Cod
    Cliente · Razón Social · Líos (los anotados en TAP/TAL) · Controlado (tic).
    Tilda lo que controló y toca
    «Terminé»: por cada NP tildada manda CRN (texto = "NP|TANDA") y cierra el
-   toggle CR. Los CRN dan por CONTROLADO el pedido → la PPP los saca de
+   toggle RR. Los CRN dan por CONTROLADO el pedido → la PPP los saca de
    programación diaria y los manda a Pedidos Entregados. Reutiliza #tandaModal.
    Plazo: desde que se cargó hay 30 hs para controlar; si vence sáb/dom (incluye
    las cargas del viernes) se corre al lunes 12:00 → si pasó, va en rojo y temblando.
@@ -6647,7 +6650,7 @@ async function fetchCRData() {
 async function showControlRemitos(legajo) {
   const m = document.getElementById("tandaModal"); if (!m) return;
   const leg = String(legajo || "").trim();
-  m.querySelector(".tanda-modal-title").textContent = "📋 Control Remitos — descarga";
+  m.querySelector(".tanda-modal-title").textContent = "📋 Recepción Remitos — descarga";
   m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">Cargando pedidos cargados al camión…</div>`;
   m.classList.add("show");
   crWakeLock();
@@ -6710,14 +6713,14 @@ function crToggle(npClean) {
   crSaveChecked(_cr.legajo, _cr.checked);
   crRender();
 }
-function crClose() { crReleaseWakeLock(); _cr = null; closeTandaModal(); }   // minimiza (CR sigue abierto, re-abrís tocando CR)
+function crClose() { crReleaseWakeLock(); _cr = null; closeTandaModal(); }   // minimiza (RR sigue abierto, re-abrís tocando RR)
 function crFinish() {
   if (!_cr) return;
   const legajo = _cr.legajo;
   const sel = _cr.items.filter(it => _cr.checked.has(it.np));
   if (!sel.length) { try { alert("Tildá al menos un pedido recibido, o tocá «Cerrar» para salir."); } catch (_e) {} return; }
   for (const it of sel) crSendDetail(legajo, it.np, it.tanda);   // CRN por cada NP controlada
-  crSendClose(legajo);                                           // cierre del toggle CR
+  crSendClose(legajo);                                           // cierre del toggle RR
   crClearChecked(legajo);
   // Reflejar ya mismo en la PPP local (operadora): controlados → Pedidos Entregados.
   try { const ent = pppLoadEntregados(); for (const it of sel) ent.add(String(it.np)); pppSaveEntregados(); if (typeof pppRenderProg === "function") pppRenderProg(); } catch (_e) {}
@@ -6741,11 +6744,11 @@ function crSendDetail(legajo, np, tanda) {
 }
 function crSendClose(legajo) {
   const st = getLegajoState(legajo);
-  const openIso = (st.toggles && typeof st.toggles.CR === "string") ? st.toggles.CR : null;
-  try { if (st.toggles && st.toggles.CR) toggleStartOrEnd(legajo, "CR"); } catch (_e) {}   // cierra el toggle CR
+  const openIso = (st.toggles && typeof st.toggles.RR === "string") ? st.toggles.RR : null;
+  try { if (st.toggles && st.toggles.RR) toggleStartOrEnd(legajo, "RR"); } catch (_e) {}   // cierra el toggle RR
   const nowMs = Date.now();
-  const payload = { legajo: legajo, opcion: "CR", descripcion: "Control Remitos", texto: "", ts: nowMs, id: nowMs.toString(36) + "_" + Math.random().toString(36).slice(2, 8), ts_inicio_iso: openIso };
-  try { pushHistoryForLegajo(legajo, { ts: nowMs, opcion: "CR", descripcion: "Control Remitos", texto: "", id: payload.id, ts_inicio_iso: openIso, status: "queued" }); } catch (_e) {}
+  const payload = { legajo: legajo, opcion: "RR", descripcion: "Recepción Remitos", texto: "", ts: nowMs, id: nowMs.toString(36) + "_" + Math.random().toString(36).slice(2, 8), ts_inicio_iso: openIso };
+  try { pushHistoryForLegajo(legajo, { ts: nowMs, opcion: "RR", descripcion: "Recepción Remitos", texto: "", id: payload.id, ts_inicio_iso: openIso, status: "queued" }); } catch (_e) {}
   try { enqueueReport(payload); if (typeof trySendOneReport === "function") trySendOneReport(payload).then(r => { if (r && r.ok) removeFromQueue(payload.id); }).catch(() => {}); } catch (_e) {}
   try { updatePendingIndicator(); updateCoreButtonsState(); } catch (_e) {}
 }
@@ -11186,9 +11189,10 @@ const INC_GAP_MIN            = 90;        // hueco de inactividad > 1h30
 const INC_JORNADA_MAX_MIN    = 12 * 60;   // jornada > 12h
 
 const INC_CORE   = ["EP", "TP", "AP", "TAP"];
-const INC_TOGGLE = ["CR", "CC", "RT", "MG", "RI", "EI", "AT", "PB", "Limp", "PC", "Perm", "CT"];
+const INC_TOGGLE = ["CR", "RR", "CC", "RT", "MG", "RI", "EI", "AT", "PB", "Limp", "PC", "Perm", "CT"];
 const INC_DESC = {
   EP: "Picking", TP: "Picking", AP: "Armado", TAP: "Armado", CR: "Control Remitos",
+  RR: "Recepción Remitos",
   CC: "Carga Camión", RT: "Recepción Mercadería", MG: "Guardado Góndola",
   RI: "Recepción Insumos", EI: "Entrega Insumos", AT: "Atendí Timbre",
   PB: "Baño", Limp: "Limpieza", Perm: "Permiso", PC: "Comida", CT: "Conteo", FJ: "Fin Jornada"

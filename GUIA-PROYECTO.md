@@ -4,7 +4,19 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-20 · Versión app al documentar: **v3.44**
+> Última actualización: 2026-06-22 · Versión app al documentar: **v3.45**
+>
+> Nota: **v3.45** — **Se separó el "Control Remitos" en DOS botones** (pedido del usuario).
+> Toda la lógica de descarga (popup `showControlRemitos`: tabla de NP cargadas al camión,
+> tildar **Controlado**, «Terminé» → un **CRN** por NP + pasar a Pedidos Entregados) pasó del
+> botón **CR** a un botón NUEVO **RR = "Recepción Remitos"** (en `filas.row2`). **RR** es ahora
+> el toggle que abre/re-abre el popup (1er toque = abre + evento `RR` apertura; «Terminé» =
+> `CRN` por NP + cierra el toggle `RR`); reusa todo el código `_cr*`/`crRender`/`fetchCRData`
+> (sólo cambió a qué toggle se ata). **CR = "Control Remitos"** quedó como **toggle plano**: el
+> operario sólo lo toca **al inicio y al fin** (sin popup, no pide cantidad). Ambos están en
+> `SURVIVING_TOGGLES` (`["CR","RR","MG"]`), `TOGGLE_CODES`, `NEVER_INPUT`, `INC_TOGGLE`/`INC_DESC`
+> y la sugerencia "Continuar". Los eventos **CRN/CRA** y la integración PPP (controlados →
+> Pedidos Entregados) **no cambiaron** (siguen leyendo `CRN`).
 >
 > Nota: **v3.44** — **Origen del fix de importados (E) en el picking**: `fetchPickingBaseFromSheets`
 > ahora lee la base por **`/export?format=csv&gid=845301421`** (pestaña "PPP Excel Base Datos
@@ -1141,7 +1153,8 @@ Definidos en `index.html` (objeto `desc`, ~línea 1531). Los botones se arman en
 | `TP` | Fin Picking | CORE (cierre) | Sí — código de tanda |
 | `AP` | Empecé Armado Pedido | CORE (inicio) | Sí — código de pedido |
 | `TAP` | Terminé Armado Pedido | CORE (cierre) | Sí — código de pedido |
-| `CR` | Control Remitos | TOGGLE | No |
+| `CR` | Control Remitos | TOGGLE | No — **toggle plano** (sólo inicio/fin, sin popup, desde v3.43) |
+| `RR` | Recepción Remitos | TOGGLE | No — abre el popup de descarga (tabla NP cargadas → tildar Controlado → «Terminé» = `CRN` por NP); desde v3.43 lleva la lógica que antes tenía `CR` |
 | `CC` | Inicio/Fin Carga Camión | TOGGLE | Sí, al cerrar (Nro) |
 | `RT` | Recepción Mercadería | TOGGLE | Sí, al cerrar: `texto` = cantidad de cajas, **calculada sola** del Modo OP de Recepción (suma del día en `localStorage`, ver v2.61). Al abrir RT se lanza el Modo OP (`recepcion.js`). |
 | `MG` | Guardado a Góndola | TOGGLE | No |
@@ -1159,28 +1172,28 @@ Definidos en `index.html` (objeto `desc`, ~línea 1531). Los botones se arman en
 | `CCN` | Carga Camión NP | (detalle de carga, v2.57) | `texto` = `NP\|TANDA` (ej. `97754\|C47B`). Un evento por NP marcada como cargada al camión. id determinístico `ccn_<legajo>_<np>_<día>` + upsert. El monitor lo ignora. |
 | `PSP` | Picking sin planimetría | (automático, v2.60) | `texto` = `TANDA\|COD1,COD2` (códigos del picking que no están en `planimetria.js`). UNO por tanda/legajo/día (id `psp_<legajo>_<tanda>_<día>` + upsert). Dispara aviso Telegram vía trigger `trg_sin_planim_telegram` (solo INSERT → no spamea al reabrir). El monitor lo ignora. |
 | `TAL` | Líos por NP (TAP) | (detalle de armado, v3.34) | `texto` = `NP\|LÍOS\|TANDA` (ej. `97754\|3\|C47B`). Un evento por NP de la tanda al terminar armado (popup obligatorio tras `TAP`; si no lleva, `0`). Lo lee Control Remitos para la columna Líos. id aleatorio (no upsert). El monitor lo ignora. |
-| `CRN` | Control Remito NP | (detalle de control, v3.36) | `texto` = `NP\|TANDA` (ej. `97754\|C47B`). Un evento por NP marcada como **recibida/controlada** en Control Remitos (`CR`). id determinístico `crn_<legajo>_<np>_<día>` + upsert. La PPP lo lee (`pppRefreshControlado`) y pasa el pedido a **Pedidos Entregados**. El monitor lo ignora. |
+| `CRN` | Control Remito NP | (detalle de control, v3.36) | `texto` = `NP\|TANDA` (ej. `97754\|C47B`). Un evento por NP marcada como **recibida/controlada** en Recepción Remitos (`RR`, antes `CR`). id determinístico `crn_<legajo>_<np>_<día>` + upsert. La PPP lo lee (`pppRefreshControlado`) y pasa el pedido a **Pedidos Entregados**. El monitor lo ignora. |
 | `CRA` | Carga sin control (vencido) | (automático, v3.37) | `texto` = `NP\|TANDA\|RAZÓN`. Lo emite la PPP (`pppCheckCargaVencida`) cuando un pedido **cargado (CCN) sigue sin controlar (CRN/manual)** pasado el plazo (`crVencido`). id determinístico `cra_<np>_<día>` + upsert; legajo `0`. Dispara aviso Telegram vía trigger `trg_carga_sin_control_telegram` (**AFTER INSERT** → 1 vez por NP/día). El monitor lo ignora. |
 
 **Grupos (constantes en `index.html`):**
 - `CORE_CODES = [EP, TP, AP, TAP]` — el trabajo medible (picking / armado).
-- `TOGGLE_CODES = [CR, CC, RT, MG, RI, EI, AT, PB, Limp, PC, Perm, CT]` — abren y cierran.
+- `TOGGLE_CODES = [CR, RR, CC, RT, MG, RI, EI, AT, PB, Limp, PC, Perm, CT]` — abren y cierran.
 - `DEAD_TIME_CODES = [AT, PB, Limp, PC, CT]` — mientras están abiertos **bloquean todo**.
 - `ALWAYS_ALLOWED_CODES = [PB, PC]` — nunca se bloquean.
 - `CLOSE_NEEDS_INPUT_CODES = [CC, RT, RI, EI]` — piden dato al cerrar.
-- `SURVIVING_TOGGLES = [CR, MG]` — sobreviven la medianoche; el resto se autocierra.
+- `SURVIVING_TOGGLES = [CR, RR, MG]` — sobreviven la medianoche; el resto se autocierra.
 - `AUTO_CLOSE_CODES = [AT, PB, Limp, PC, CT, Perm, CC, RT, RI, EI]` — se autocierran a las **17:00** (`WORKDAY_END_HOUR_AR = 17`) del día si quedaron abiertos.
 
 ### Continuar tarea al día siguiente (v2.44)
 
 Al **Terminar Día**, por cada tarea abierta que sobrevive (Picking, Armado,
-`CR`, `MG`) el operario elige **Continúa mañana** o **Finalizar ahora**:
+`CR`, `RR`, `MG`) el operario elige **Continúa mañana** o **Finalizar ahora**:
 - **Continúa** → se marca `st.continuar[<tipo>] = <YYYY-MM-DD>` y la tarea se
   arrastra. Al día siguiente, `renderPendingSuggestion()` muestra un botón verde
   **"▶ Continuar [tarea]"**; al tocarlo se borra la marca, se dispara la
   evaluación de `LT`, y el cierre real se hace luego con `TP`/`TAP`/toggle.
 - **Finalizar ahora** → cierra en el acto (Picking/Armado piden el dato de
-  cierre y emiten `TP`/`TAP`; `CR`/`MG` cierran el toggle) y limpia el estado.
+  cierre y emiten `TP`/`TAP`; `CR`/`RR`/`MG` cierran el toggle) y limpia el estado.
 
 ### Llegada Tarde (`LT`, v2.44)
 
