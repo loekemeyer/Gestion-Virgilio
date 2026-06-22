@@ -4951,7 +4951,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.47";
+const APP_VERSION = "v3.48";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -5262,7 +5262,9 @@ document.getElementById("btnHistDias").addEventListener("click", openHistoryModa
    queda la planimetría estática. v2.78. */
 async function loadPlanimetriaRemote() {
   try {
-    const r = await fetch(SUPABASE_PLANIMETRIA_ENDPOINT + "?select=cod,sector,orden&limit=5000&_=" + Date.now(),
+    // OJO: sin `&_=`+Date.now() acá. PostgREST lo interpreta como filtro de una
+    // columna inexistente y devuelve 400. El anti-caché lo da `cache:"no-store"`.
+    const r = await fetch(SUPABASE_PLANIMETRIA_ENDPOINT + "?select=cod,sector,orden&limit=5000",
       { headers: { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY }, cache: "no-store" });
     if (!r.ok) return;
     const rows = await r.json();
@@ -5590,7 +5592,9 @@ async function supaFetchAll(endpoint, query) {
   const out = [];
   let from = 0, total = Infinity;
   while (from < total) {
-    const r = await fetch(endpoint + "?" + query + "&_=" + Date.now(), {
+    // Sin cache-buster `&_=` en la URL: PostgREST lo toma como filtro de columna
+    // inexistente → 400. El anti-caché ya lo da `cache:"no-store"`.
+    const r = await fetch(endpoint + "?" + query, {
       cache: "no-store",
       headers: {
         apikey: SUPABASE_KEY,
@@ -11533,8 +11537,11 @@ async function fetchFacturadosHoy(force){
   if (_facNpsInflight) return _facNpsInflight;
   _facNpsInflight = (async () => {
     try{
+      // Sin `&_=`+Date.now(): PostgREST lo toma como filtro de columna inexistente
+      // y devuelve 400 (rompía Facturación y la Carga Camión). El anti-caché lo
+      // da `cache:"no-store"` de abajo.
       const url = SUPABASE_FACTURACION_NP_ENDPOINT
-        + "?cierre_id=is.null&select=np&limit=5000&_=" + Date.now();
+        + "?cierre_id=is.null&select=np&limit=5000";
       // Leer con el MISMO contexto que la escritura: si hay sesión (supervisor
       // logueado en el módulo de facturación), usar su JWT. Sin esto, las RLS que
       // exigen rol authenticated devuelven vacío con la key anónima → el NP recién

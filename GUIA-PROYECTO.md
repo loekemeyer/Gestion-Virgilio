@@ -4,7 +4,22 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-22 · Versión app al documentar: **v3.47**
+> Última actualización: 2026-06-22 · Versión app al documentar: **v3.48**
+>
+> Nota: **v3.48** — **FIX crítico: HTTP 400 en Facturación, Carga Camión, PPP-Supabase y
+> Planimetría** por el cache-buster `&_=<timestamp>` en las URLs de Supabase. **Causa**: PostgREST
+> (Supabase actualizó la versión y se volvió estricto) interpreta `_=1782…` como un **filtro sobre
+> una columna inexistente `_`** y responde **400**. Confirmado en los logs de la API: de los GET
+> recientes, los que llevaban `&_=` daban **400** y los que no, **200**. Síntomas: el operario tocaba
+> **Carga Camión** y veía "No se pudo cargar (¿sin conexión?). HTTP 400" (`fetchFacturadosHoy` no
+> tiene fallback); en **Facturación** el monitor de ventas mostraba "NPs facturados hoy: 0", el
+> botón "Terminé — Generar PDF" gris y **NPs ya cerrados reaparecían** (al fallar la query,
+> `_facNpsHoy` quedaba vacío → no ocultaba nada ni contaba). **Fix**: se quitó `&_=`+`Date.now()` de
+> las 3 llamadas REST a Supabase (`fetchFacturadosHoy`, `supaFetchAll`/PPP, `loadPlanimetriaRemote`);
+> el anti-caché ya lo daba `cache:"no-store"`. Los cache-busters `&_=` de las URLs **CSV de Google**
+> (picking, volumen, monitor PPP/histórico, fichadas-monitor) se mantienen: Google sí los tolera.
+> ⚠ Regla: **nunca** poner `&_=`/params desconocidos en URLs de PostgREST/Supabase; cache-bustear con
+> `cache:"no-store"`.
 >
 > Nota: **v3.47** — **Carga Camión: botón "Terminar sin cargar por app"** (pedido del usuario).
 > El popup de Carga Camión (`showCargaCamion`) cuando **falla la carga de la lista** (HTTP 400 /
