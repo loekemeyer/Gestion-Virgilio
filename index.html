@@ -4999,7 +4999,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.54";
+const APP_VERSION = "v3.55";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -11750,15 +11750,10 @@ async function facFetchFcKeys(targetTandaKeys){
       if (!cur || ev.ts_cliente > cur.ts) lastA.set(t, { op: ev.opcion, ts: ev.ts_cliente });
     }
   }
-  // Go-live: solo cuentan como "a facturar" las tandas cuyo ARMADO terminó (TAP)
-  // desde el arranque del flujo (mismo corte que el CC, CC_REPARTO_DESDE_ISO). Las
-  // de antes ya se facturaron/entregaron afuera de la app (no hay CCN/CRN) y solo
-  // ensuciaban la lista de pendientes. v3.54.
-  const _desdeMs = new Date(CC_REPARTO_DESDE_ISO).getTime();
   const fc = new Set();
   for (const k of targetTandaKeys){
     const p = lastP.get(k), a = lastA.get(k);
-    if (p && p.op === "TP" && a && a.op === "TAP" && new Date(a.ts).getTime() >= _desdeMs) fc.add(k);
+    if (p && p.op === "TP" && a && a.op === "TAP") fc.add(k);
   }
   return fc;
 }
