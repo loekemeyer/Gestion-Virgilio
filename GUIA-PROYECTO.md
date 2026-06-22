@@ -977,7 +977,7 @@ de pedidos de un Google Sheet.
 | Archivo | Rol |
 |---|---|
 | `index.html` | **La app completa** (~6.600 líneas): pantalla de operario + monitor + toda la lógica JS/CSS. Es el archivo central. |
-| `sw.js` | Service Worker. **NO cachea HTML/assets**: sólo hace Background Sync de la cola offline (IndexedDB). `SW_VERSION = "v2.84-vir"`. |
+| `sw.js` | Service Worker. **NO cachea HTML/assets**: sólo hace Background Sync de la cola offline (IndexedDB). `SW_VERSION = "v3.45-vir"`. |
 | `manifest.json` | Manifiesto PWA. |
 | `fichada.html` / `fichada.js` / `fichada-config.js` / `fichada-totp.js` / `fichada.css` | Sistema de **fichada por QR rotativo (TOTP)**. La página `fichada.html` se abre escaneando el QR y registra el **ingreso**. |
 | `fichadas-monitor.html` | Tablero **independiente** "Monitor Fichadas Esnaola" (lee de `Fichadas_Historico` y sincroniza otro Google Sheet distinto). No está enlazado desde `index.html`. |
@@ -1307,11 +1307,11 @@ En `showDayBreakdown` (monitor, por operario por día):
 
 ## 10. Versionado y cache
 
-- `index.html`: `APP_VERSION = "v2.84"`. Badge en pantalla `#versionBadge`:
-  `"v2.84 ✓"` (sin cola), `"v2.84 ⏳ N"` (pendientes), `"v2.84 ⚠ N"` (error).
+- `index.html`: `APP_VERSION = "v3.45"`. Badge en pantalla `#versionBadge`:
+  `"v3.45 ✓"` (sin cola), `"v3.45 ⏳ N"` (pendientes), `"v3.45 ⚠ N"` (error).
   **Sirve para confirmar qué versión cargó cada pantalla** (mirá el badge en la TV
   para saber si está al día).
-- `sw.js`: `SW_VERSION = "v2.84-vir"`. **No precachea nada**; el handler de `fetch`
+- `sw.js`: `SW_VERSION = "v3.45-vir"`. **No precachea nada**; el handler de `fetch`
   está vacío. Usa `skipWaiting()` + `clients.claim()`. La página hace
   `reg.update()` cada 60 s con `updateViaCache:"none"` (esto **sólo actualiza el
   SW**; NO recarga la app ni cambia lo que se ve en pantalla).
