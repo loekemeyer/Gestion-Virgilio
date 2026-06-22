@@ -2554,6 +2554,52 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
   z-index: 1000; pointer-events: none;
 }
 .fac-toast.show{ opacity: 1; transform: translateY(0); }
+
+/* ====== Monitor TV — viewport CORTO/achatado (TV box ~979x494 en Chrome modo
+   ordenador, etc.). El layout del monitor escala por ANCHO (vp-narrow/medium/
+   wide) pero NO tenía eje de ALTO: a poca altura el panel derecho (stats + FC +
+   Total) no entra y los cards de abajo quedan cortados (hay que scrollear).
+   Acá comprimimos los verticales para que entre SIN scroll, y de paso
+   agrandamos el QR de fichada (en angosto quedaba a 40px desperdiciando el
+   espacio reservado a la derecha). Es CSS-only: se auto-aplica por alto, sin
+   depender del JS de regímenes. Va al FINAL del <style> a propósito, para ganar
+   por orden de fuente a las reglas base del modo TV / vp-narrow. ====== */
+@media (max-height: 560px){
+  #monitorModal.tv .monitor-header{ padding: 3px 0; }
+  #monitorModal.tv .monitor-title{ font-size: 20px; }
+  #monitorModal.tv .monitor-meta{ font-size: 11px; margin-top: 0; }
+  #monitorModal.tv .monitor-card{ padding: 0 8px 6px 8px; }
+
+  #monitorModal.tv .monitor-flex{ gap: 6px; }
+  #monitorModal.tv .monitor-right-side{ gap: 4px; }
+  #monitorModal.tv .monitor-right-top{ gap: 4px; }
+  #monitorModal.tv .monitor-right-bottom{ gap: 6px; }
+
+  #monitorModal.tv .monitor-table th{ padding-top: 5px; padding-bottom: 5px; }
+  #monitorModal.tv .monitor-table td{ padding-top: 2px; padding-bottom: 2px; }
+
+  #monitorModal.tv .monitor-stats-table th,
+  #monitorModal.tv .monitor-stats-table td{ padding-top: 2px; padding-bottom: 2px; }
+  #monitorModal.tv .monitor-stats-table th.stats-title{ padding-top: 3px; padding-bottom: 3px; }
+
+  #monitorModal.tv .monitor-fc-card,
+  #monitorModal.tv .monitor-total-card{ padding: 4px 7px 5px 7px; }
+  #monitorModal.tv .monitor-fc-title,
+  #monitorModal.tv .monitor-total-title{ margin-bottom: 3px; }
+  #monitorModal.tv .monitor-fc-table th,
+  #monitorModal.tv .monitor-fc-table td,
+  #monitorModal.tv .monitor-total-table th,
+  #monitorModal.tv .monitor-total-table td{ padding-top: 2px; padding-bottom: 2px; }
+
+  #monitorModal.tv #monitorContent{ padding-bottom: 4px; }
+
+  /* QR de fichada más grande (se escanea de lejos); escala con el alto. Gana
+     por orden a la regla chica de @media(max-width:1150px). */
+  #monitorModal.tv.show ~ #qrFichadaBox{ padding: 6px 8px 8px 8px; }
+  #monitorModal.tv.show ~ #qrFichadaBox .qr-label{ font-size: 12px; margin-bottom: 3px; letter-spacing: 0.3px; }
+  #monitorModal.tv.show ~ #qrFichadaBox .qr-countdown{ font-size: 11px; margin-top: 3px; }
+  #monitorModal.tv.show ~ #qrFichadaBox #qrCanvas{ width: clamp(140px, 28vh, 180px); height: clamp(140px, 28vh, 180px); }
+}
 </style>
 
 <!-- jsPDF + autotable para generar PDF de cierre de facturación (Marianela).
@@ -4951,7 +4997,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.49";
+const APP_VERSION = "v3.50";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");

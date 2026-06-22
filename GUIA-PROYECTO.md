@@ -4,7 +4,17 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-22 · Versión app al documentar: **v3.49**
+> Última actualización: 2026-06-22 · Versión app al documentar: **v3.50**
+>
+> Nota: **v3.50** — **Monitor TV en pantallas CORTAS/achatadas** (TV box ~979×494 "modo
+> ordenador"): el layout escalaba por **ancho** (vp-narrow/medium/wide) pero faltaba el eje de
+> **alto** → a poca altura el panel derecho (stats + FC + Total) no entraba y los cards de abajo
+> ("Tandas a FC", "Total por día") quedaban cortados (había que scrollear). **Fix CSS-only**: nuevo
+> bloque `@media (max-height: 560px)` al **final** del `<style>` (gana por orden de fuente a las
+> reglas base del modo TV/vp-narrow) que comprime los verticales (header, paddings de tablas, gaps)
+> para que entre **sin scroll**. Además **agranda el QR de fichada** en angosto: estaba clavado a
+> 40px desperdiciando el ~espacio reservado a la derecha → ahora `clamp(140px, 28vh, 180px)`. No
+> toca el JS ni afecta TVs de alto normal (>560px).
 >
 > Nota: **v3.49** — **FIX Facturación: un NP ya facturado reaparecía como pendiente** (y al
 > re-tildarlo se reabría, dejando cierres huérfanos). Síntoma: tildabas un NP, dabas "Terminé —
@@ -1358,8 +1368,8 @@ En `showDayBreakdown` (monitor, por operario por día):
 
 ## 10. Versionado y cache
 
-- `index.html`: `APP_VERSION = "v3.47"`. Badge en pantalla `#versionBadge`:
-  `"v3.47 ✓"` (sin cola), `"v3.47 ⏳ N"` (pendientes), `"v3.47 ⚠ N"` (error).
+- `index.html`: `APP_VERSION = "v3.50"`. Badge en pantalla `#versionBadge`:
+  `"v3.50 ✓"` (sin cola), `"v3.50 ⏳ N"` (pendientes), `"v3.50 ⚠ N"` (error).
   **Sirve para confirmar qué versión cargó cada pantalla** (mirá el badge en la TV
   para saber si está al día).
 - `sw.js`: `SW_VERSION = "v3.47-vir"`. **No precachea nada**; el handler de `fetch`
