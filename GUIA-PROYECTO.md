@@ -4,7 +4,15 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-22 · Versión app al documentar: **v3.52**
+> Última actualización: 2026-06-22 · Versión app al documentar: **v3.53**
+>
+> Nota: **v3.53** — **Contador "NPs facturados hoy" ya no se resetea al "Generar PDF"**. Mostraba
+> `_facNpsHoy.size` (facturados **pendientes de cierre**), así que al cerrar (PDF) los NP pasaban a
+> tener `cierre_id` y el contador volvía a **0** (parecía que no se había facturado nada). Ahora
+> cuenta los NP con **`facturado_at` de hoy** (BsAs), con o sin cierre → nuevo `_facCountHoy`, que
+> `fetchFacturadosTodos` calcula (suma `facturado_at,np` al select). El chip "NPs facturados hoy" y la
+> línea de estado usan `_facCountHoy`. Los botones "Generar PDF"/"Revertir" siguen atados a
+> `_facNpsHoy` (los pendientes de cierre, que sí es lo que se cierra/revierte).
 >
 > Nota: **v3.52** — **Carga Camión (CC) = el REPARTO, no los facturados sin cerrar** (cambio de
 > modelo, pedido del usuario). Antes el CC mostraba los facturados **sin cerrar** (`cierre_id IS

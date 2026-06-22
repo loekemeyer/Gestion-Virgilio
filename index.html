@@ -4999,7 +4999,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.52";
+const APP_VERSION = "v3.53";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -11608,6 +11608,10 @@ let _facTickedLocal   = new Set();
 let _facNpsTodos      = new Set();
 let _facNpsTodosTs    = 0;
 let _facNpsTodosInflight = null;
+// Cantidad de NP facturados HOY (facturado_at = hoy BsAs), con o sin cierre. Es
+// el contador "NPs facturados hoy": NO se resetea a 0 al "Generar PDF" (antes
+// mostraba _facNpsHoy = pendientes de cierre, que tras el PDF queda en 0). v3.53.
+let _facCountHoy      = 0;
 
 function facTodayKey(){
   const d = new Date();
@@ -11667,13 +11671,18 @@ async function fetchFacturadosTodos(force){
   _facNpsTodosInflight = (async () => {
     try{
       const url = SUPABASE_FACTURACION_NP_ENDPOINT
-        + "?select=np&order=facturado_at.desc&limit=5000";
+        + "?select=np,facturado_at&order=facturado_at.desc&limit=5000";
       let headers = await facAuthWriteHeaders();
       if (!headers) headers = { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY };
       const r = await fetch(url, { headers, cache: "no-store" });
       if (!r.ok) throw new Error("HTTP " + r.status);
       const data = await r.json();
       _facNpsTodos = new Set(data.map(x => String(x.np)));
+      // "facturados hoy" = NP con facturado_at de hoy (BsAs UTC-3), cerrados o no.
+      const _hoyMs = new Date(facTodayKey() + "T00:00:00-03:00").getTime();
+      _facCountHoy = data.reduce(function (n, x) {
+        return n + ((x.facturado_at && new Date(x.facturado_at).getTime() >= _hoyMs) ? 1 : 0);
+      }, 0);
       _facNpsTodosTs = Date.now();
       return _facNpsTodos;
     } finally {
@@ -11787,7 +11796,7 @@ function facRender(tandas){
 
   document.getElementById("facCntTandas").textContent = tandasVisibles.size;
   document.getElementById("facCntPend").textContent = filas.length;
-  document.getElementById("facCntDone").textContent = _facNpsHoy.size;
+  document.getElementById("facCntDone").textContent = _facCountHoy;
   document.getElementById("facBtnCierre").disabled = _facNpsHoy.size === 0;
   const btnRev = document.getElementById("facBtnRevertir");
   if (btnRev) btnRev.disabled = _facNpsHoy.size === 0;
@@ -12020,7 +12029,7 @@ async function facTick(){
       banner.innerHTML = "⚠ Modo desarrollo — mostrando TODAS las tandas planificadas (no hay picking+separado terminados aún). En operación normal solo aparecen Tandas a FC reales.";
       banner.style.display = "block";
     } else {
-      facSetStatus(true, `${tandasFC.length} tandas FC · ${_facNpsHoy.size} NPs facturados · refresh ${FAC_REFRESH_MS/1000}s`);
+      facSetStatus(true, `${tandasFC.length} tandas FC · ${_facCountHoy} NPs facturados hoy · refresh ${FAC_REFRESH_MS/1000}s`);
       banner.style.display = "none";
     }
   } catch (e){
