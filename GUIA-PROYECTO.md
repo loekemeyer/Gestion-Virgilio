@@ -4,7 +4,23 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-22 · Versión app al documentar: **v3.51**
+> Última actualización: 2026-06-22 · Versión app al documentar: **v3.52**
+>
+> Nota: **v3.52** — **Carga Camión (CC) = el REPARTO, no los facturados sin cerrar** (cambio de
+> modelo, pedido del usuario). Antes el CC mostraba los facturados **sin cerrar** (`cierre_id IS
+> NULL`) y al "Generar PDF" desaparecían — al revés de lo correcto. Ahora el ciclo termina cuando se
+> **carga al camión**, no cuando se factura. **Nuevo CC** (`fetchCCData` + `showCargaCamion`): muestra
+> los NP **facturados y CERRADOS** (`cierre_id` no nulo = ya pasaron por "Generar PDF" / están en un
+> reparto) **menos** los ya cargados (eventos **`CCN`**). O sea: aparecen **al Generar PDF**, y
+> desaparecen **al cargarlos** (en la próxima apertura, tras "Terminé"). Mismo patrón que Control
+> Remitos (cargados − controlados), un paso antes. **Sin ventana de tiempo**: si un NP del reparto no
+> se cargó, queda visible (se ve el error) hasta que se carga. **Corte de arranque**
+> `CC_REPARTO_DESDE_ISO = 2026-06-22`: lo facturado/cerrado antes se asume entregado a mano (había
+> 279 cerrados sin ningún CCN — el flujo de CC por app es nuevo) y NO ensucia la pantalla.
+> `Facturacion_NP` ya trae tanda/razón social → el CC no usa el Google Sheet. **El PDF / cierre NO
+> cambió.** Monitor: el **✅ "Tandas a FC" ahora PERSISTE** tras el PDF (usa `_facNpsTodos` además de
+> `_facNpsHoy`; antes desaparecía al cerrar); la tanda sigue saliendo del panel sola al entregarse
+> (`CRN`).
 >
 > Nota: **v3.51** — **Ajuste del QR de fichada en el TV box**: el QR de v3.50 (clamp 140px) quedaba
 > ~3px más ancho que el espacio reservado a la derecha (`padding-right` ~157px del `.monitor-right-bottom`)

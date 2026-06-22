@@ -4999,7 +4999,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.51";
+const APP_VERSION = "v3.52";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -6431,11 +6431,14 @@ function closeMarianela() {
 }
 
 /* =========================================================
-   CARGA CAMIÓN — checklist de NPs listas para cargar.
-   Al iniciar CC, muestra las NP de las tandas con armado terminado (TAP, de
-   getActivityStatus().armadoDone) y el operario tilda las que cargó. Cada NP
-   marcada → evento CCN a Supabase (texto = "NP|TANDA"), por la cola offline.
-   Reutiliza #tandaModal.
+   CARGA CAMIÓN — checklist del REPARTO para cargar al camión.
+   Muestra los NP que ya pasaron por "Generar PDF" (facturados y CERRADOS = están
+   en un reparto) y que TODAVÍA no se cargaron al camión (sin evento CCN). El
+   operario tilda los que cargó; al "Terminé" cada uno → evento CCN (texto =
+   "NP|TANDA") por la cola offline, y en la próxima apertura ya no aparecen.
+   Solo cuenta repartos desde CC_REPARTO_DESDE_ISO (lo previo se asume cargado a
+   mano). Mismo patrón que Control Remitos (cargados − controlados), un paso
+   antes. Reutiliza #tandaModal. v3.50.
    ========================================================= */
 let _cc = null;   // { legajo, items:[{tanda,np,rs}], checked:Set<np> }
 let _ccWakeLock = null;
@@ -6446,36 +6449,57 @@ function ccClearChecked(legajo) { try { localStorage.removeItem(_ccKey(legajo));
 async function ccWakeLock() { try { if ("wakeLock" in navigator) _ccWakeLock = await navigator.wakeLock.request("screen"); } catch (_e) {} }
 function ccReleaseWakeLock() { try { if (_ccWakeLock) { _ccWakeLock.release(); _ccWakeLock = null; } } catch (_e) {} }
 
+/* Fecha de arranque del CC por app (BsAs). Los repartos cerrados ANTES de esto
+   se asumen ya cargados/entregados a mano (no existía el flujo de CC por app) y
+   NO se muestran. De acá en adelante: todo NP facturado+cerrado que NO se haya
+   cargado (sin CCN) aparece, hasta que se cargue (sin ventana de tiempo). v3.50. */
+const CC_REPARTO_DESDE_ISO = "2026-06-22T00:00:00-03:00";
+
+/* Arma el REPARTO del CC: NP facturados Y CERRADOS (cierre_id no nulo = pasaron
+   por "Generar PDF") desde CC_REPARTO_DESDE_ISO, MENOS los ya cargados al camión
+   (eventos CCN). Facturacion_NP ya trae tanda y razón social → sin Google Sheet.
+   Sin &_= en las URLs (PostgREST lo rechaza con 400). */
+async function fetchCCData() {
+  const headers = { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY };
+  const repUrl = SUPABASE_FACTURACION_NP_ENDPOINT
+    + "?cierre_id=not.is.null&facturado_at=gte." + encodeURIComponent(CC_REPARTO_DESDE_ISO)
+    + "&select=np,tanda,razon_social&limit=20000";
+  const ccnUrl = SUPABASE_TABLE_ENDPOINT
+    + "?opcion=eq.CCN&ts_cliente=gte." + encodeURIComponent(CC_REPARTO_DESDE_ISO)
+    + "&select=texto&limit=20000";
+  const _par = await Promise.all([
+    fetch(repUrl, { headers, cache: "no-store" }).then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); }),
+    fetch(ccnUrl, { headers, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; })
+  ]);
+  const repR = _par[0], ccnR = _par[1];
+  const cargados = new Set();
+  for (const ev of ccnR) {
+    const np = String(ev.texto || "").split("|")[0].trim().replace(/\.0+$/, "");
+    if (np) cargados.add(np);
+  }
+  const items = []; const seen = new Set();
+  for (const row of repR) {
+    const np = String(row.np || "").trim().replace(/\.0+$/, "");
+    if (!np || seen.has(np) || cargados.has(np)) continue;   // ya cargado → fuera
+    seen.add(np);
+    items.push({ np: np, tanda: (String(row.tanda || "").trim() || "—"), rs: row.razon_social || "" });
+  }
+  return items;
+}
+
 async function showCargaCamion(legajo) {
   const m = document.getElementById("tandaModal"); if (!m) return;
   const leg = String(legajo || "").trim();
-  m.querySelector(".tanda-modal-title").textContent = "🚛 Carga Camión — NP facturados";
-  m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">Cargando NP facturados…</div>`;
+  m.querySelector(".tanda-modal-title").textContent = "🚛 Carga Camión — reparto";
+  m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">Cargando reparto…</div>`;
   m.classList.add("show");
   ccWakeLock();
   try {
-    const [facSet, sheetMap] = await Promise.all([fetchFacturadosHoy(true), fetchMonitorSheet()]);
-    const idx = {};
-    for (const [, entry] of sheetMap) {
-      if (!entry || !entry.pedidos) continue;
-      for (const p of entry.pedidos) {
-        for (const part of String(p.np || "").split(/[,/]/)) {
-          const np = part.trim().replace(/\.0+$/, "");
-          if (np && /\d/.test(np) && !idx[np]) idx[np] = { tanda: entry.tanda, rs: p.razonSocial || "" };
-        }
-      }
-    }
-    const items = [];
-    for (const npRaw of facSet) {
-      const np = String(npRaw).trim().replace(/\.0+$/, "");
-      if (!np) continue;
-      const info = idx[np] || { tanda: "—", rs: "" };
-      items.push({ np: np, tanda: info.tanda || "—", rs: info.rs });
-    }
+    const items = await fetchCCData();
     items.sort((a, b) => String(a.tanda).localeCompare(String(b.tanda)) || a.np.localeCompare(b.np));
     if (!items.length) {
       _cc = null; ccReleaseWakeLock();
-      m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">No hay NP facturados pendientes hoy.</div><button class="pk-btn pk-ok" onclick="ccEndWithoutLoading('${leg}')">✓ Terminar Carga Camión (sin cargar por app)</button><button class="pk-btn pk-cancel" onclick="ccClose()">Cerrar (sigo después)</button>`;
+      m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">No hay reparto pendiente de cargar.<br><small>Aparece cuando Ventas genera el PDF de facturación.</small></div><button class="pk-btn pk-ok" onclick="ccEndWithoutLoading('${leg}')">✓ Terminar Carga Camión (sin cargar por app)</button><button class="pk-btn pk-cancel" onclick="ccClose()">Cerrar (sigo después)</button>`;
       return;
     }
     const saved = ccLoadChecked(leg);
@@ -6491,7 +6515,7 @@ function ccRender() {
   const m = document.getElementById("tandaModal"); if (!m || !_cc) return;
   const byTanda = {};
   for (const it of _cc.items) (byTanda[it.tanda] = byTanda[it.tanda] || []).push(it);
-  let html = `<div class="cc-sub">NP <b>facturados</b> pendientes — tocá los que <b>cargaste al camión</b>:</div>`;
+  let html = `<div class="cc-sub">NP del <b>reparto</b> — tocá los que <b>cargaste al camión</b>:</div>`;
   for (const tanda of Object.keys(byTanda).sort()) {
     html += `<div class="cc-tanda">Tanda ${escapeHtml(tanda)}</div>`;
     for (const it of byTanda[tanda]) {
@@ -10866,11 +10890,17 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
   // Lo disparamos fire-and-forget acá para que la próxima vuelta del monitor
   // (cada 1s) ya tenga datos nuevos sin bloquear este render.
   if (typeof fetchFacturadosHoy === "function") fetchFacturadosHoy().catch(() => {});
+  if (typeof fetchFacturadosTodos === "function") fetchFacturadosTodos().catch(() => {});
   const totalFcM3 = tandasFC.reduce((s, t) => s + (t.m3 || 0), 0);
-  const facturadas = (typeof _facNpsHoy !== "undefined") ? _facNpsHoy : new Set();
+  // ✅ "facturada" = todos sus NP facturados, con o SIN cierre. Usamos también
+  // _facNpsTodos (todos los de Facturacion_NP) para que el ✅ PERSISTA después de
+  // "Generar PDF" (antes usaba solo _facNpsHoy = sin cerrar → el ✅ desaparecía al
+  // cerrar). La tanda igual sale del panel sola al entregarse (CRN). v3.50.
+  const _facHoy   = (typeof _facNpsHoy   !== "undefined") ? _facNpsHoy   : new Set();
+  const _facTodos = (typeof _facNpsTodos !== "undefined") ? _facNpsTodos : new Set();
   const isTandaFacturada = (t) => {
     if (!t.pedidos || !t.pedidos.length) return false;
-    return t.pedidos.every(p => p.np && facturadas.has(p.np));
+    return t.pedidos.every(p => p.np && (_facHoy.has(p.np) || _facTodos.has(p.np)));
   };
   // Tabla "Tandas a FC": se parte en 2 columnas cuando supera FC_SPLIT_AT filas
   // para que la lista no quede súper alta y entre al lado del resto del panel.
