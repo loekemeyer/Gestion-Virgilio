@@ -4,7 +4,22 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-20 · Versión app al documentar: **v3.42**
+> Última actualización: 2026-06-20 · Versión app al documentar: **v3.43**
+>
+> Nota: **v3.43** — **FIX picking: los códigos IMPORTADOS (terminados en "E") no se
+> pickeaban**. Diagnóstico (datos): en 60 días, 0 de 398 `PKC` tenían código E, pese a que
+> los E son ~25% de la base. El picking suma la base por NP; cuando a la tanda le faltaban
+> NP en Supabase (pedidos del día sin sincronizar), el fallback **reemplazaba TODO** el
+> agregado con la hoja de Google (`fetchPickingBaseFromSheets`). Esa hoja, leída vía
+> **gviz** (`tqx=out:csv`), **infiere la columna Artículo como NUMÉRICA** → descarta los
+> códigos **texto** `035E` (los devuelve vacíos → `if(!art)continue` los saltea) y les saca
+> el cero (`026`→`26`). Por eso desaparecían los importados de toda la tanda. **Fix (app)**:
+> el fallback ahora **solo rellena los NP faltantes** desde Sheets, **sin pisar** los que
+> Supabase trae bien (con la E) → apenas la tanda sincroniza a Supabase, el picking muestra
+> los importados. ⚠ **Pendiente (origen)**: una tanda pickeada ANTES de sincronizar todavía
+> cae a gviz (sin E); se cierra haciendo que la hoja entregue la columna **Artículo como
+> TEXTO** (formato Texto plano en el Sheet, o leerla con `/export?format=csv&gid=…` en vez
+> de gviz). La base correcta vive en `PPP_Base_Pedidos` (Supabase).
 >
 > Nota: **v3.42** — **El "picking" ya estaba en la auto-carga (v3.41), era cuestión de
 > nombre**: el archivo del picking es el que la app llama **"Base Pedidos"**

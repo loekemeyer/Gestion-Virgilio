@@ -4948,7 +4948,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.42";
+const APP_VERSION = "v3.43";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -5779,16 +5779,19 @@ async function showPickingList(tanda, legajo) {
       return a;
     };
     let agg = aggFrom(pickBase);
-    // Mirror de Supabase desactualizado: si a ALGÚN NP de la tanda le faltan filas en
-    // la base (Supabase aún no sincronizó esos pedidos), reintento con la base de
-    // Google Sheets (la que usa la oficina, siempre al día) y sano el cache. Así el
-    // picking no queda vacío por un sync atrasado. v2.89.
+    // Mirror de Supabase desatrasado: si a ALGÚN NP de la tanda le faltan filas en la
+    // base de Supabase (todavía no sincronizó), BACKFILL solo esos NP desde Google
+    // Sheets — SIN pisar los que sí están en Supabase. ⚠ La hoja gviz devuelve los
+    // códigos SIN la "E" del importado (y sin el cero adelante); Supabase sí los trae
+    // bien. Antes se reemplazaba TODO el agg con la hoja y se perdían los importados
+    // (códigos E) de toda la tanda. v3.43.
     const npsSinFilas = nps.filter(np => !(pickBase.get(np) || []).length);
     if (npsSinFilas.length && typeof PPP_SOURCE !== "undefined" && PPP_SOURCE !== "sheets") {
       try {
         const sheetBase = await fetchPickingBaseFromSheets();
-        const agg2 = aggFrom(sheetBase);
-        if (Object.keys(agg2).length) { agg = agg2; _pickBaseCache = sheetBase; _pickBaseCacheTs = Date.now(); }
+        for (const np of npsSinFilas) {
+          for (const it of (sheetBase.get(np) || [])) agg[it.art] = (agg[it.art] || 0) + it.cajas;
+        }
       } catch (_e) { /* sin Sheets: queda lo que trajo Supabase */ }
     }
     // Orden de góndola (planimetría, window.GONDOLA): ordena por el "orden" de
