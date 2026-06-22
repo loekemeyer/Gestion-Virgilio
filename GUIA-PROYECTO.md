@@ -4,7 +4,19 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-22 · Versión app al documentar: **v3.48**
+> Última actualización: 2026-06-22 · Versión app al documentar: **v3.49**
+>
+> Nota: **v3.49** — **FIX Facturación: un NP ya facturado reaparecía como pendiente** (y al
+> re-tildarlo se reabría, dejando cierres huérfanos). Síntoma: tildabas un NP, dabas "Terminé —
+> Generar PDF" (se generaba el cierre OK) y **el NP volvía a la lista** con su ✓, en un loop; cada
+> vuelta dejaba el cierre anterior con 0 NPs. **Causa**: `facRender` ocultaba sólo los facturados
+> **pendientes de cierre** (`_facNpsHoy` = `cierre_id IS NULL`), no los ya **cerrados**; si la tanda
+> seguía en FC, el NP cerrado reaparecía. **Fix**: nuevo set **`_facNpsTodos`** (todos los NP en
+> `Facturacion_NP`, con o sin cierre, vía `fetchFacturadosTodos`) y `facRender` ahora excluye
+> `_facNpsHoy` **o** `_facNpsTodos` → un NP facturado (pendiente o cerrado) **no vuelve** a la lista.
+> `facRevertir` saca los revertidos de `_facNpsTodos` para que sí vuelvan a pendientes. Se mantiene
+> el conteo "facturados hoy" sobre `_facNpsHoy` (pendientes de cierre) y la Carga Camión sigue
+> leyendo `cierre_id IS NULL`.
 >
 > Nota: **v3.48** — **FIX crítico: HTTP 400 en Facturación, Carga Camión, PPP-Supabase y
 > Planimetría** por el cache-buster `&_=<timestamp>` en las URLs de Supabase. **Causa**: PostgREST

@@ -4951,7 +4951,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.48";
+const APP_VERSION = "v3.49";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -11522,6 +11522,14 @@ let _facNpsInflight   = null;   // promesa para evitar fetch paralelo
 // server. Se mergean en _facNpsHoy en cada fetch para que NO "vuelvan" a la lista
 // mientras la lectura se actualiza; se sueltan cuando el server ya los trae.
 let _facTickedLocal   = new Set();
+// Set de TODOS los NP ya facturados (con O SIN cierre). La lista de "pendientes"
+// los excluye: un NP ya facturado —incluso uno ya CERRADO cuya tanda sigue en
+// FC— NO debe reaparecer como pendiente. Antes sólo se ocultaban los pendientes
+// de cierre (_facNpsHoy), así que los cerrados volvían a la lista, se podían
+// re-tildar (reabriéndolos) y cada cierre nuevo dejaba huérfano al anterior.
+let _facNpsTodos      = new Set();
+let _facNpsTodosTs    = 0;
+let _facNpsTodosInflight = null;
 
 function facTodayKey(){
   const d = new Date();
@@ -11567,6 +11575,34 @@ async function fetchFacturadosHoy(force){
     }
   })();
   return _facNpsInflight;
+}
+
+/* Trae el set de TODOS los NP en Facturacion_NP (cualquier cierre_id), para que
+   la lista de pendientes excluya los ya facturados (pendientes Y cerrados). Mismo
+   patrón de auth/anti-caché que fetchFacturadosHoy (sin &_= → si no, PostgREST
+   400). order=facturado_at.desc + limit 5000 prioriza los más recientes (las
+   tandas FC son recientes → sus NP entran seguro). */
+async function fetchFacturadosTodos(force){
+  const now = Date.now();
+  if (!force && (now - _facNpsTodosTs) < FAC_NPS_TTL_MS) return _facNpsTodos;
+  if (_facNpsTodosInflight) return _facNpsTodosInflight;
+  _facNpsTodosInflight = (async () => {
+    try{
+      const url = SUPABASE_FACTURACION_NP_ENDPOINT
+        + "?select=np&order=facturado_at.desc&limit=5000";
+      let headers = await facAuthWriteHeaders();
+      if (!headers) headers = { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY };
+      const r = await fetch(url, { headers, cache: "no-store" });
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      const data = await r.json();
+      _facNpsTodos = new Set(data.map(x => String(x.np)));
+      _facNpsTodosTs = Date.now();
+      return _facNpsTodos;
+    } finally {
+      _facNpsTodosInflight = null;
+    }
+  })();
+  return _facNpsTodosInflight;
 }
 
 function openFacturacion(){
@@ -11643,7 +11679,10 @@ function facRender(tandas){
   const tandasVisibles = new Set();
   for (const t of tandas){
     for (const p of t.pedidos){
-      if (_facNpsHoy.has(p.np)) continue;
+      // Oculta los ya facturados: _facNpsHoy = pendientes de cierre (tilde
+      // optimista incluido) y _facNpsTodos = TODOS los de Facturacion_NP (también
+      // los ya CERRADOS → no reaparecen ni se pueden re-tildar).
+      if (_facNpsHoy.has(p.np) || _facNpsTodos.has(p.np)) continue;
       filas.push({
         np: p.np,
         cod: p.cod || "",
@@ -11837,6 +11876,10 @@ window.facRevertir = async function(){
       headers
     });
     if (!r.ok) throw new Error("HTTP " + r.status);
+    // Los revertidos se borraron de Facturacion_NP → deben volver a "pendientes":
+    // sacarlos también de _facNpsTodos y forzar su refresco en el próximo facTick.
+    _facNpsHoy.forEach(function(np){ _facNpsTodos.delete(np); });
+    _facNpsTodosTs = 0;
     _facNpsHoy = new Set();
     _facTickedLocal = new Set();   // se borraron los ticks → soltar el refuerzo
     _facNpsHoyTs = Date.now();
@@ -11870,7 +11913,8 @@ async function facTick(){
     // que no existe en navegadores de TVs viejas.
     const _facPar = await Promise.all([
       facFetchFcKeys(keys).catch(function(e){ console.warn("[fac] FC keys:", e); return new Set(); }),
-      fetchFacturadosHoy(true).catch(function(){ return null; })
+      fetchFacturadosHoy(true).catch(function(){ return null; }),
+      fetchFacturadosTodos(true).catch(function(){ return null; })   // para excluir ya-facturados (incl. cerrados)
     ]);
     const fcKeys = _facPar[0] || new Set();
 
