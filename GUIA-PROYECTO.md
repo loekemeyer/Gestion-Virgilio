@@ -4,7 +4,17 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-22 · Versión app al documentar: **v3.53**
+> Última actualización: 2026-06-22 · Versión app al documentar: **v3.54**
+>
+> Nota: **v3.54** — **"NPs a FC" (a facturar): corte de go-live por fecha de ARMADO (TAP)**. La lista
+> mostraba TODAS las tandas FC (picking+armado terminados) no facturadas, incluido el **backlog** ya
+> entregado **fuera de la app** (se hacían los toggles CC/CR pero nunca el detalle por NP → **0 CCN /
+> 0 CRN**, así que el sistema no sabe que se entregaron). Un corte por *fecha de entrega* NO sirve
+> (casi todas son del mismo día). La señal que separa el backlog de lo nuevo es el **TAP**: el viejo
+> terminó armado el 18-19/06; lo pendiente real (ej. C52C) terminó el 22/06. **Fix**: `facFetchFcKeys`
+> ahora exige que el último **TAP** de la tanda sea **≥ `CC_REPARTO_DESDE_ISO`** (mismo go-live que el
+> CC, 2026-06-22). Así el backlog desaparece de "a facturar" y queda lo armado desde el arranque. (El
+> panel "Tandas a FC" del **monitor** usa otra lógica y por ahora NO lleva este corte.)
 >
 > Nota: **v3.53** — **Contador "NPs facturados hoy" ya no se resetea al "Generar PDF"**. Mostraba
 > `_facNpsHoy.size` (facturados **pendientes de cierre**), así que al cerrar (PDF) los NP pasaban a
