@@ -4,7 +4,21 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-22 · Versión app al documentar: **v3.57**
+> Última actualización: 2026-06-22 · Versión app al documentar: **v3.58**
+>
+> Nota: **v3.58** — **Recepción → Pendientes: botón "Procesar" + checklist de Marianela +
+> horas en vivo**. (a) El botón de cada pendiente ahora dice **"Procesar"** (antes "Listo").
+> (b) Cada fila muestra **⏱ "hace X h Y min"** desde `created_at` (cuándo se cargó por RT),
+> refrescado **en vivo** cada 30 s (`pendFmtElapsed`/`pendTickElapsed`/`_pendTimer`). (c) Al
+> tocar **Procesar** se abre un **checklist** (`pendAbrirChecklist`/`renderChecklist`, step
+> `"checklist"`) que Marianela tiene que confirmar: **Carga a ISIS · Control Partes Talleristas
+> (botones Corresponde / No corresponde) · Faltantes x Día · Enviar la foto del remito**. Recién
+> con los 4 tildados se habilita **"✓ Procesar recepción"**, que hace **SOLO UPDATE** de la fila
+> existente (`estado='procesado'`) → **no se duplica en Supabase**, y vuelve a la lista (la
+> recepción ya sale de Pendientes). ⚠ Por ahora el checklist es un **gate** (no persiste qué
+> tildó); si se quiere auditoría (ISIS/corresponde/etc.) se agrega columna + se guarda en el
+> mismo UPDATE. La foto del remito es un **tilde de confirmación** (no sube archivo todavía).
+> `recepcion.js?v=3.58`.
 >
 > Nota: **v3.57** — **Recepción (supervisor): menú LOCAL Carga / Pendientes + checklist
 > "Pendientes"**. El botón "Carga Recepción Mercadería" ahora abre `window.openRecepcionMenu()`

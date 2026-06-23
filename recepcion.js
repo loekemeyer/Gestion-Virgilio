@@ -119,8 +119,22 @@ const RCP_CSS = `
 #rcpRoot .pendMeta{ font-size:13px; color:#666; margin-top:2px; }
 #rcpRoot .pendDet{ font-size:14px; color:#333; margin-top:4px; word-break:break-word; }
 #rcpRoot .pendTot{ font-size:13px; font-weight:800; color:var(--ok); margin-top:4px; }
+#rcpRoot .pendElapsed{ font-size:13px; font-weight:900; color:#b45309; margin-top:4px; }
 #rcpRoot .pendListo{ flex:0 0 auto; align-self:stretch; min-width:96px; font-size:16px; font-weight:900; border:0; border-radius:12px; background:var(--ok); color:#fff; cursor:pointer; padding:0 16px; }
 #rcpRoot .pendListo:disabled{ opacity:.5; cursor:default; }
+#rcpRoot .chkList{ display:flex; flex-direction:column; gap:12px; }
+#rcpRoot .chkRow{ display:flex; align-items:center; gap:14px; width:100%; text-align:left; border:2px solid var(--border); border-radius:12px; padding:16px; background:#fff; cursor:pointer; font-size:18px; font-weight:800; color:#111; }
+#rcpRoot .chkRow.on{ border-color:var(--ok); background:#eef7ee; }
+#rcpRoot .chkBox{ flex:0 0 auto; width:34px; height:34px; border-radius:9px; border:2px solid #cbd5e1; display:flex; align-items:center; justify-content:center; font-size:22px; font-weight:900; color:#fff; }
+#rcpRoot .chkRow.on .chkBox, #rcpRoot .chkItem2.on .chkBox{ background:var(--ok); border-color:var(--ok); }
+#rcpRoot .chkTxt{ flex:1; }
+#rcpRoot .chkItem2{ border:2px solid var(--border); border-radius:12px; padding:16px; background:#fff; }
+#rcpRoot .chkItem2.on{ border-color:var(--ok); background:#eef7ee; }
+#rcpRoot .chkItem2Top{ display:flex; align-items:center; gap:14px; font-size:18px; font-weight:800; color:#111; }
+#rcpRoot .chkPartesBtns{ display:flex; gap:12px; margin-top:14px; }
+#rcpRoot .chkPartesBtn{ flex:1; height:58px; font-size:17px; font-weight:900; border:2px solid var(--border); border-radius:12px; background:#fff; color:#111; cursor:pointer; }
+#rcpRoot .chkPartesBtn.sel{ background:var(--ok); color:#fff; border-color:var(--ok); }
+#rcpRoot .chkPartesBtn.no.sel{ background:var(--danger); border-color:var(--danger); }
 `;
 
 /* ============== DOM (inyectado dentro de #rcpRoot) ============== */
@@ -218,11 +232,13 @@ function openOp() {
   opPage.classList.add("open");
   renderTipoElegir();
 }
-function closeOp() { opPage.classList.remove("open"); }
+let _pendTimer = null;   // timer del "hace X hs" en vivo de Pendientes
+function closeOp() { opPage.classList.remove("open"); if (_pendTimer) { clearInterval(_pendTimer); _pendTimer = null; } }
 opClose.onclick = closeOp;
 
 opBack.onclick = () => {
-  if (opState.step === "tipo" || opState.step === "pend") renderMenu();
+  if (opState.step === "checklist") renderPendientes();
+  else if (opState.step === "tipo" || opState.step === "pend") renderMenu();
   else if (opState.step === "lista") renderTipoElegir();
   else if (opState.step === "linea") renderLista(opState.tipo);
   else if (opState.step === "remito") renderLinea();
@@ -966,6 +982,23 @@ async function renderPendientes() {
   list.className = "pendList";
   rows.forEach(r => list.appendChild(pendItem(r)));
   opBody.appendChild(list);
+  if (_pendTimer) clearInterval(_pendTimer);
+  _pendTimer = setInterval(pendTickElapsed, 30000);   // "hace X hs" en vivo (cada 30 s)
+}
+/* "Hace X h Y min" desde created_at (cuándo se cargó por RT). Se refresca en vivo. */
+function pendFmtElapsed(ms) {
+  let mins = Math.floor((Date.now() - ms) / 60000);
+  if (mins < 0) mins = 0;
+  const h = Math.floor(mins / 60), m = mins % 60;
+  if (h <= 0) return "hace " + m + " min";
+  return "hace " + h + " h" + (m ? " " + m + " min" : "");
+}
+function pendTickElapsed() {
+  if (opState.step !== "pend") { if (_pendTimer) { clearInterval(_pendTimer); _pendTimer = null; } return; }
+  document.querySelectorAll("#rcpRoot .pendElapsed").forEach(function (el) {
+    const ts = parseInt(el.getAttribute("data-ts"), 10);
+    if (ts) el.textContent = "⏱ " + pendFmtElapsed(ts);
+  });
 }
 function pendItem(r) {
   const card = document.createElement("div");
@@ -993,27 +1026,88 @@ function pendItem(r) {
   const tot = document.createElement("div");
   tot.className = "pendTot";
   tot.textContent = "Total: " + (r.cantidad_total != null ? r.cantidad_total : "—") + " cajas";
-  info.appendChild(top); info.appendChild(meta); info.appendChild(det); info.appendChild(tot);
+  const tsMs = r.created_at ? new Date(r.created_at).getTime() : 0;
+  const elapsed = document.createElement("div");
+  elapsed.className = "pendElapsed";
+  elapsed.setAttribute("data-ts", String(tsMs || 0));
+  elapsed.textContent = tsMs ? ("⏱ " + pendFmtElapsed(tsMs)) : "";
+  info.appendChild(top); info.appendChild(meta);
+  if (tsMs) info.appendChild(elapsed);
+  info.appendChild(det); info.appendChild(tot);
   const btn = document.createElement("button");
   btn.type = "button"; btn.className = "pendListo";
-  btn.textContent = "✓ Listo";
-  btn.onclick = () => pendMarcarListo(r.id, card, btn);
+  btn.textContent = "Procesar";
+  btn.onclick = () => pendAbrirChecklist(r);
   card.appendChild(info); card.appendChild(btn);
   return card;
 }
-async function pendMarcarListo(id, card, btn) {
-  btn.disabled = true; const prev = btn.textContent; btn.textContent = "…";
+/* ===== Checklist de Marianela (al tocar "Procesar") ============================
+   4 confirmaciones: Carga a ISIS · Control Partes Talleristas (corresponde / no
+   corresponde) · Faltantes x Día · Enviar la foto del remito. Recién con todo
+   tildado se habilita "Procesar recepción", que hace SOLO UPDATE de la fila
+   existente en Control_Modo_OP (estado='procesado') → NO se duplica en Supabase. */
+function pendChkComplete() {
+  const c = opState.chk;
+  return !!(c && c.isis && c.partes && c.faltantes && c.foto);
+}
+function pendChkRow(label, on, onClick) {
+  const row = document.createElement("button");
+  row.type = "button"; row.className = "chkRow" + (on ? " on" : "");
+  const box = document.createElement("span"); box.className = "chkBox"; box.textContent = on ? "✓" : "";
+  const txt = document.createElement("span"); txt.className = "chkTxt"; txt.textContent = label;
+  row.appendChild(box); row.appendChild(txt);
+  row.onclick = onClick;
+  return row;
+}
+function renderChecklist() {
+  const c = opState.chk;
+  opBody.innerHTML = "";
+  const wrap = document.createElement("div"); wrap.className = "chkList";
+  wrap.appendChild(pendChkRow("Carga a ISIS", c.isis, () => { c.isis = !c.isis; renderChecklist(); }));
+  // Control Partes Talleristas — corresponde / no corresponde
+  const it2 = document.createElement("div"); it2.className = "chkItem2" + (c.partes ? " on" : "");
+  const top = document.createElement("div"); top.className = "chkItem2Top";
+  const box2 = document.createElement("span"); box2.className = "chkBox"; box2.textContent = c.partes ? "✓" : "";
+  const txt2 = document.createElement("span"); txt2.className = "chkTxt"; txt2.textContent = "Control Partes Talleristas";
+  top.appendChild(box2); top.appendChild(txt2);
+  const btns = document.createElement("div"); btns.className = "chkPartesBtns";
+  const bC = document.createElement("button"); bC.type = "button"; bC.className = "chkPartesBtn" + (c.partes === "corresponde" ? " sel" : ""); bC.textContent = "Corresponde";
+  bC.onclick = () => { c.partes = "corresponde"; renderChecklist(); };
+  const bN = document.createElement("button"); bN.type = "button"; bN.className = "chkPartesBtn no" + (c.partes === "no" ? " sel" : ""); bN.textContent = "No corresponde";
+  bN.onclick = () => { c.partes = "no"; renderChecklist(); };
+  btns.appendChild(bC); btns.appendChild(bN);
+  it2.appendChild(top); it2.appendChild(btns);
+  wrap.appendChild(it2);
+  wrap.appendChild(pendChkRow("Faltantes x Día", c.faltantes, () => { c.faltantes = !c.faltantes; renderChecklist(); }));
+  wrap.appendChild(pendChkRow("Enviar la foto del remito", c.foto, () => { c.foto = !c.foto; renderChecklist(); }));
+  opBody.appendChild(wrap);
+  opActions.innerHTML = "";
+  const conf = document.createElement("button");
+  conf.type = "button"; conf.className = "btnSend"; conf.textContent = "✓ Procesar recepción";
+  conf.disabled = !pendChkComplete();
+  conf.onclick = () => pendProcesarConfirm();
+  opActions.appendChild(conf);
+}
+function pendAbrirChecklist(r) {
+  opState.step = "checklist";
+  opState.chk = { id: r.id, isis: false, partes: null, faltantes: false, foto: false };
+  opSetBack(true);
+  opTitle.textContent = "Procesar — checklist";
+  opSubtitle.textContent = (r.nombre || "") + (r.remito ? " · RTO/FC " + r.remito : "");
+  renderChecklist();
+}
+async function pendProcesarConfirm() {
+  if (!pendChkComplete()) return;
+  const id = opState.chk.id;
+  const conf = opActions.querySelector("button");
+  if (conf) { conf.disabled = true; conf.textContent = "Procesando…"; }
   await sessionReady;
   let err = null;
-  try { const r = await supabase.from("Control_Modo_OP").update({ estado: "listo" }).eq("id", id); err = r.error; }
+  // SOLO UPDATE de la fila ya cargada (no re-inserta → no se duplica en Supabase).
+  try { const r = await supabase.from("Control_Modo_OP").update({ estado: "procesado" }).eq("id", id); err = r.error; }
   catch (e) { err = e; }
-  if (err) { btn.disabled = false; btn.textContent = prev; alert("No se pudo marcar Listo: " + (err.message || "")); return; }
-  card.style.transition = "opacity .2s"; card.style.opacity = "0";
-  setTimeout(() => {
-    const list = card.parentNode;
-    if (list) list.removeChild(card);
-    if (list && !list.children.length) opBody.innerHTML = '<div class="opOk">✓ No hay recepciones pendientes.</div>';
-  }, 220);
+  if (err) { if (conf) { conf.disabled = false; conf.textContent = "✓ Procesar recepción"; } alert("No se pudo procesar: " + (err.message || "")); return; }
+  renderPendientes();   // vuelve a la lista, ya sin esta recepción
 }
 
 /* ============== API pública para Producción ============== */
