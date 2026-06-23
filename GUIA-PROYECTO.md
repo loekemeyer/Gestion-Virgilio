@@ -4,7 +4,17 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-22 · Versión app al documentar: **v3.59**
+> Última actualización: 2026-06-22 · Versión app al documentar: **v3.60**
+>
+> Nota: **v3.60** — **Pendientes pasó de TABLA horizontal a TARJETAS verticales** (pedido del
+> usuario; evita scroll horizontal y deja los controles grandes/claros). Cada recepción = una
+> tarjeta: header (Tallerista + Tipo + RTO/FC), meta (Fecha · Hora · Marca · ⏱ Demora en vivo),
+> Entrega (detalle + total), y debajo las acciones en filas: **Carga ISIS** (tilde), **Control
+> Partes Talleristas** (tilde "Corresponde" + botón "No corresponde"), **Faltantes x Día**
+> (tilde), **Foto RTO** (adjuntar/arrastrar → Storage). Pie con **Enviar** → código de 4 díg.
+> El tilde se rediseñó (checkmark dibujado con `::after`, más prolijo). Misma lógica de
+> persistencia viva en Supabase de v3.59 (UPDATE por toque, nada en localStorage; `pendCard`/
+> `pendCheckRow`/`pendPartesRow`/`pendFotoRow` reemplazan las celdas de tabla). `recepcion.js?v=3.60`.
 >
 > Nota: **v3.59** — **Pendientes (Marianela) = TABLA con acciones por fila, todo en
 > Supabase (NADA en localStorage)**. Columnas: Fecha · Hora · Demora (en vivo, "Xhs"/"X,5hs"

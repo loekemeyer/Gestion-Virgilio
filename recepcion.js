@@ -135,26 +135,35 @@ const RCP_CSS = `
 #rcpRoot .chkPartesBtn{ flex:1; height:58px; font-size:17px; font-weight:900; border:2px solid var(--border); border-radius:12px; background:#fff; color:#111; cursor:pointer; }
 #rcpRoot .chkPartesBtn.sel{ background:var(--ok); color:#fff; border-color:var(--ok); }
 #rcpRoot .chkPartesBtn.no.sel{ background:var(--danger); border-color:var(--danger); }
-/* Pendientes = TABLA (Marianela): ticks + No corresponde + foto + Enviar (código). */
-#rcpRoot .pendTblWrap{ overflow-x:auto; -webkit-overflow-scrolling:touch; }
-#rcpRoot .pendTbl{ border-collapse:collapse; width:100%; font-size:13px; background:#fff; }
-#rcpRoot .pendTbl th{ background:#f1f5f9; border:1px solid var(--border); padding:6px 8px; font-weight:900; color:#334155; text-align:center; white-space:nowrap; line-height:1.1; }
-#rcpRoot .pendTbl td{ border:1px solid var(--border); padding:6px 8px; vertical-align:middle; white-space:nowrap; }
-#rcpRoot .pendTbl td.pendEntrega{ white-space:normal; min-width:110px; font-variant-numeric:tabular-nums; }
-#rcpRoot .pendTbl td.pendDemora{ font-weight:900; color:#b45309; text-align:center; }
-#rcpRoot .pendActCell{ text-align:center; }
-#rcpRoot .tickBtn{ width:38px; height:38px; border-radius:9px; border:2px solid #cbd5e1; background:#fff; font-size:20px; font-weight:900; color:#fff; cursor:pointer; }
+/* Pendientes (Marianela) = TARJETAS verticales (sin scroll horizontal): tilde + No
+   corresponde + foto (adjuntar/arrastrar) + Enviar (código). */
+#rcpRoot .pendCards{ display:flex; flex-direction:column; gap:14px; max-width:640px; margin:0 auto; }
+#rcpRoot .pendCard{ border:2px solid var(--border); border-radius:14px; background:#fff; padding:14px 16px; }
+#rcpRoot .pendCard.sentRow{ border-color:var(--ok); background:#f6fff8; }
+#rcpRoot .pcHead{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+#rcpRoot .pcName{ font-size:18px; font-weight:900; color:#111; }
+#rcpRoot .pcTag{ font-size:11px; font-weight:800; color:#a06000; background:#fff7e6; border:1px solid #ffd98a; border-radius:999px; padding:2px 8px; }
+#rcpRoot .pcRto{ margin-left:auto; font-size:13px; font-weight:800; color:#475569; white-space:nowrap; }
+#rcpRoot .pcMeta{ font-size:13px; color:#666; margin-top:3px; }
+#rcpRoot .pcDemora{ font-weight:900; color:#b45309; }
+#rcpRoot .pcEntrega{ font-size:14px; color:#333; margin-top:6px; font-variant-numeric:tabular-nums; word-break:break-word; }
+#rcpRoot .pcActs{ margin-top:12px; border-top:1px solid #eee; padding-top:12px; display:flex; flex-direction:column; gap:12px; }
+#rcpRoot .pcRow{ display:flex; align-items:center; gap:12px; }
+#rcpRoot .pcRow.pcFotoRow{ flex-wrap:wrap; }
+#rcpRoot .pcLbl{ font-size:16px; font-weight:800; color:#111; }
+#rcpRoot .tickBtn{ width:28px; height:28px; border-radius:8px; border:2px solid #cbd5e1; background:#fff; font-size:0; cursor:pointer; position:relative; padding:0; flex:0 0 auto; }
 #rcpRoot .tickBtn.on{ background:var(--ok); border-color:var(--ok); }
-#rcpRoot .pendPartesCell{ white-space:normal; }
-#rcpRoot .noBtn{ display:block; margin:6px auto 0; padding:5px 8px; font-size:11px; font-weight:800; border:2px solid var(--border); border-radius:8px; background:#fff; color:#111; cursor:pointer; white-space:nowrap; }
+#rcpRoot .tickBtn.on::after{ content:""; position:absolute; left:50%; top:46%; width:7px; height:13px; border:solid #fff; border-width:0 3px 3px 0; transform:translate(-50%,-50%) rotate(45deg); }
+#rcpRoot .noBtn{ margin-left:auto; padding:8px 12px; font-size:12px; font-weight:800; border:2px solid var(--border); border-radius:9px; background:#fff; color:#111; cursor:pointer; white-space:nowrap; }
 #rcpRoot .noBtn.on{ background:var(--danger); border-color:var(--danger); color:#fff; }
-#rcpRoot .fotoDrop{ display:inline-flex; align-items:center; justify-content:center; min-width:92px; min-height:40px; padding:6px 10px; border:2px dashed #cbd5e1; border-radius:10px; background:#fff; cursor:pointer; font-weight:800; font-size:12px; color:#475569; }
+#rcpRoot .pcFotoRow .fotoDrop{ flex:1; }
+#rcpRoot .fotoDrop{ display:inline-flex; align-items:center; justify-content:center; min-width:160px; min-height:46px; padding:8px 12px; border:2px dashed #cbd5e1; border-radius:10px; background:#fff; cursor:pointer; font-weight:800; font-size:13px; color:#475569; }
 #rcpRoot .fotoDrop.has{ border-style:solid; border-color:var(--ok); color:var(--ok); background:#eef7ee; }
 #rcpRoot .fotoDrop.drag{ border-color:#1e6bd6; background:#eff6ff; }
-#rcpRoot .enviarBtn{ padding:9px 16px; font-size:14px; font-weight:900; border:0; border-radius:10px; background:#111; color:#fff; cursor:pointer; }
+#rcpRoot .pcFoot{ margin-top:14px; display:flex; align-items:center; justify-content:flex-end; gap:12px; }
+#rcpRoot .enviarBtn{ padding:11px 22px; font-size:16px; font-weight:900; border:0; border-radius:11px; background:#111; color:#fff; cursor:pointer; }
 #rcpRoot .enviarBtn:disabled{ opacity:.4; cursor:default; }
-#rcpRoot .codigoBox{ font-size:22px; font-weight:900; letter-spacing:3px; color:#0a7a2f; font-variant-numeric:tabular-nums; }
-#rcpRoot .sentRow td{ background:#f6fff8; }
+#rcpRoot .codigoBox{ font-size:26px; font-weight:900; letter-spacing:4px; color:#0a7a2f; font-variant-numeric:tabular-nums; }
 `;
 
 /* ============== DOM (inyectado dentro de #rcpRoot) ============== */
@@ -249,6 +258,7 @@ function opResetState() {
 function openOp() {
   opResetState();
   opState.fromMenu = false;     // operario (RT) entra directo a la carga, sin menú
+  opPage.classList.remove("pendWide");
   opPage.classList.add("open");
   renderTipoElegir();
 }
@@ -955,6 +965,7 @@ async function anularModoOP(pendId) {
 function renderMenu() {
   opState.step = "menu";
   opState.fromMenu = true;
+  opPage.classList.remove("pendWide");
   opSetBack(false);
   opTitle.textContent = "Recepción de Mercadería";
   opSubtitle.textContent = "";
@@ -999,17 +1010,9 @@ async function renderPendientes() {
   if (!rows.length) { opBody.innerHTML = '<div class="opOk">✓ No hay recepciones pendientes.</div>'; return; }
   _pendRows = {};
   opBody.innerHTML = "";
-  const wrap = document.createElement("div"); wrap.className = "pendTblWrap";
-  const tbl = document.createElement("table"); tbl.className = "pendTbl";
-  tbl.innerHTML = '<thead><tr>' +
-    '<th>Fecha</th><th>Hora</th><th>Demora</th><th>RTO/FC</th><th>Tipo</th><th>Marca</th><th>Tallerista</th><th>Entrega</th>' +
-    '<th>Carga<br>ISIS</th><th>Control<br>Partes</th><th>Faltantes<br>x Día</th><th>Foto<br>RTO</th><th>Enviar</th>' +
-    '</tr></thead>';
-  const tb = document.createElement("tbody");
-  rows.forEach(function (r) { tb.appendChild(pendRow(r)); });
-  tbl.appendChild(tb);
-  wrap.appendChild(tbl);
-  opBody.appendChild(wrap);
+  const list = document.createElement("div"); list.className = "pendCards";
+  rows.forEach(function (r) { list.appendChild(pendCard(r)); });
+  opBody.appendChild(list);
   if (_pendTimer) clearInterval(_pendTimer);
   _pendTimer = setInterval(pendTickElapsed, 30000);   // refresca "Demora" en vivo
 }
@@ -1035,58 +1038,77 @@ function pendTickElapsed() {
   if (opState.step !== "pend") { if (_pendTimer) { clearInterval(_pendTimer); _pendTimer = null; } return; }
   document.querySelectorAll("#rcpRoot .pendDemora").forEach(function (el) {
     const ts = parseInt(el.getAttribute("data-ts"), 10);
-    if (ts) el.textContent = pendFmtDemora(ts);
+    if (ts) el.textContent = "⏱ " + pendFmtDemora(ts);
   });
 }
-function pendRow(r) {
+function pendCard(r) {
   const id = r.id;
   _pendRows[id] = { isis: !!r.isis, partes: r.control_partes || null, faltantes: !!r.faltantes, foto_url: r.foto_url || null, sent: false };
   const tsMs = r.created_at ? new Date(r.created_at).getTime() : 0;
-  const tr = document.createElement("tr");
-  tr.setAttribute("data-id", String(id));
-  tr.appendChild(pendTd(pendFmtFecha(r.fecha, tsMs)));
-  tr.appendChild(pendTd(pendFmtHora(tsMs)));
-  const dem = pendTd(tsMs ? pendFmtDemora(tsMs) : "", "pendDemora"); dem.setAttribute("data-ts", String(tsMs || 0));
-  tr.appendChild(dem);
-  tr.appendChild(pendTd(r.remito || ""));
-  tr.appendChild(pendTd(r.tipo === "prov_at" ? "Prov. AT" : "Tallerista"));
-  tr.appendChild(pendTd(r.linea || ""));
-  tr.appendChild(pendTd(r.nombre || ""));
-  const ent = document.createElement("td"); ent.className = "pendEntrega";
-  String(r.detalle || "").split(" · ").forEach(function (line) { if (line) { const d = document.createElement("div"); d.textContent = line; ent.appendChild(d); } });
-  tr.appendChild(ent);
-  tr.appendChild(pendTickCell(id, "isis"));
-  tr.appendChild(pendPartesCell(id));
-  tr.appendChild(pendTickCell(id, "faltantes"));
-  tr.appendChild(pendFotoCell(id));
-  tr.appendChild(pendEnviarCell(id, r.codigo));
-  return tr;
+  const card = document.createElement("div"); card.className = "pendCard"; card.setAttribute("data-id", String(id));
+  const head = document.createElement("div"); head.className = "pcHead";
+  const name = document.createElement("span"); name.className = "pcName"; name.textContent = r.nombre || "—";
+  const tag = document.createElement("span"); tag.className = "pcTag"; tag.textContent = (r.tipo === "prov_at") ? "Prov. AT" : "Tallerista";
+  const rto = document.createElement("span"); rto.className = "pcRto"; rto.textContent = r.remito ? ("RTO/FC " + r.remito) : "";
+  head.appendChild(name); head.appendChild(tag); head.appendChild(rto);
+  card.appendChild(head);
+  const meta = document.createElement("div"); meta.className = "pcMeta";
+  const mp = [pendFmtFecha(r.fecha, tsMs)]; if (tsMs) mp.push(pendFmtHora(tsMs)); if (r.linea) mp.push(r.linea);
+  meta.textContent = mp.filter(Boolean).join(" · ");
+  if (tsMs) {
+    const dem = document.createElement("span"); dem.className = "pcDemora pendDemora"; dem.setAttribute("data-ts", String(tsMs));
+    dem.textContent = "⏱ " + pendFmtDemora(tsMs);
+    meta.appendChild(document.createTextNode(" · ")); meta.appendChild(dem);
+  }
+  card.appendChild(meta);
+  const ent = document.createElement("div"); ent.className = "pcEntrega";
+  ent.textContent = (r.detalle || "") + (r.cantidad_total != null ? "   ·   " + r.cantidad_total + " cajas" : "");
+  card.appendChild(ent);
+  const acts = document.createElement("div"); acts.className = "pcActs";
+  acts.appendChild(pendCheckRow(id, "isis", "Carga ISIS"));
+  acts.appendChild(pendPartesRow(id));
+  acts.appendChild(pendCheckRow(id, "faltantes", "Faltantes x Día"));
+  acts.appendChild(pendFotoRow(id));
+  card.appendChild(acts);
+  const foot = document.createElement("div"); foot.className = "pcFoot";
+  if (r.codigo) {
+    const lab = document.createElement("span"); lab.className = "pcLbl"; lab.textContent = "Código:";
+    const c = document.createElement("div"); c.className = "codigoBox"; c.textContent = r.codigo;
+    foot.appendChild(lab); foot.appendChild(c); card.classList.add("sentRow");
+  } else {
+    const b = document.createElement("button"); b.type = "button"; b.className = "enviarBtn"; b.textContent = "Enviar"; b.disabled = !pendRowComplete(id);
+    b.onclick = function () { pendEnviar(id, foot); };
+    foot.appendChild(b);
+  }
+  card.appendChild(foot);
+  return card;
 }
 /* Cada cambio se PERSISTE en Supabase al toque (UPDATE de la fila; no duplica, nada
-   en localStorage). Al recargar, la fila vuelve con lo ya guardado. */
+   en localStorage). Al recargar, la tarjeta vuelve con lo ya guardado. */
 async function pendPersist(id, patch) {
   await sessionReady;
   const r = await supabase.from("Control_Modo_OP").update(patch).eq("id", id);
   if (r.error) throw r.error;
 }
-function pendTickCell(id, field) {
-  const cell = document.createElement("td"); cell.className = "pendActCell";
+function pendCheckRow(id, field, label) {
+  const row = document.createElement("div"); row.className = "pcRow";
   const b = document.createElement("button"); b.type = "button"; b.className = "tickBtn" + (_pendRows[id][field] ? " on" : "");
-  b.textContent = _pendRows[id][field] ? "✓" : "";
   b.onclick = async function () {
     if (_pendRows[id].sent) return;
     const nv = !_pendRows[id][field]; b.disabled = true;
-    try { await pendPersist(id, field === "isis" ? { isis: nv } : { faltantes: nv }); _pendRows[id][field] = nv; b.classList.toggle("on", nv); b.textContent = nv ? "✓" : ""; }
+    try { await pendPersist(id, field === "isis" ? { isis: nv } : { faltantes: nv }); _pendRows[id][field] = nv; b.classList.toggle("on", nv); }
     catch (e) { alert("No se pudo guardar: " + (e.message || e)); }
     b.disabled = false; pendRefreshEnviar(id);
   };
-  cell.appendChild(b); return cell;
+  const lbl = document.createElement("span"); lbl.className = "pcLbl"; lbl.textContent = label;
+  row.appendChild(b); row.appendChild(lbl); return row;
 }
-function pendPartesCell(id) {
-  const cell = document.createElement("td"); cell.className = "pendActCell pendPartesCell";
+function pendPartesRow(id) {
+  const row = document.createElement("div"); row.className = "pcRow";
   const tick = document.createElement("button"); tick.type = "button"; tick.className = "tickBtn";
+  const lbl = document.createElement("span"); lbl.className = "pcLbl"; lbl.textContent = "Control Partes Talleristas";
   const no = document.createElement("button"); no.type = "button"; no.className = "noBtn"; no.textContent = "No corresponde";
-  function sync() { const v = _pendRows[id].partes; tick.classList.toggle("on", v === "corresponde"); tick.textContent = v === "corresponde" ? "✓" : ""; no.classList.toggle("on", v === "no"); }
+  function sync() { const v = _pendRows[id].partes; tick.classList.toggle("on", v === "corresponde"); no.classList.toggle("on", v === "no"); }
   async function setVal(v) {
     if (_pendRows[id].sent) return;
     const nv = (_pendRows[id].partes === v) ? null : v; tick.disabled = no.disabled = true;
@@ -1096,29 +1118,27 @@ function pendPartesCell(id) {
   }
   tick.onclick = function () { setVal("corresponde"); };
   no.onclick = function () { setVal("no"); };
-  sync(); cell.appendChild(tick); cell.appendChild(no); return cell;
+  sync(); row.appendChild(tick); row.appendChild(lbl); row.appendChild(no); return row;
 }
-function pendFotoCell(id) {
-  const cell = document.createElement("td"); cell.className = "pendActCell pendFotoCell";
+function pendFotoRow(id) {
+  const row = document.createElement("div"); row.className = "pcRow pcFotoRow";
+  const lbl = document.createElement("span"); lbl.className = "pcLbl"; lbl.textContent = "Foto RTO";
   const drop = document.createElement("label"); drop.className = "fotoDrop" + (_pendRows[id].foto_url ? " has" : "");
   const input = document.createElement("input"); input.type = "file"; input.accept = "image/*"; input.style.display = "none";
-  const txt = document.createElement("span"); txt.className = "fotoTxt"; txt.textContent = _pendRows[id].foto_url ? "✓ Foto" : "📎 Adjuntar";
+  const txt = document.createElement("span"); txt.className = "fotoTxt"; txt.textContent = _pendRows[id].foto_url ? "✓ Foto" : "📎 Adjuntar o arrastrar";
   drop.appendChild(input); drop.appendChild(txt);
   async function setFile(file) {
     if (!file || _pendRows[id].sent) return;
     txt.textContent = "Subiendo…";
-    try {
-      const url = await pendUploadFoto(id, file);
-      await pendPersist(id, { foto_url: url });
-      _pendRows[id].foto_url = url; drop.classList.add("has"); txt.textContent = "✓ Foto";
-    } catch (e) { txt.textContent = _pendRows[id].foto_url ? "✓ Foto" : "📎 Adjuntar"; alert("No se pudo subir la foto: " + (e.message || e)); }
+    try { const url = await pendUploadFoto(id, file); await pendPersist(id, { foto_url: url }); _pendRows[id].foto_url = url; drop.classList.add("has"); txt.textContent = "✓ Foto"; }
+    catch (e) { txt.textContent = _pendRows[id].foto_url ? "✓ Foto" : "📎 Adjuntar o arrastrar"; alert("No se pudo subir la foto: " + (e.message || e)); }
     pendRefreshEnviar(id);
   }
   input.onchange = function () { if (input.files && input.files[0]) setFile(input.files[0]); };
   drop.ondragover = function (e) { e.preventDefault(); drop.classList.add("drag"); };
   drop.ondragleave = function () { drop.classList.remove("drag"); };
   drop.ondrop = function (e) { e.preventDefault(); drop.classList.remove("drag"); const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; if (f) setFile(f); };
-  cell.appendChild(drop); return cell;
+  row.appendChild(lbl); row.appendChild(drop); return row;
 }
 async function pendUploadFoto(id, file) {
   await sessionReady;
@@ -1131,28 +1151,22 @@ async function pendUploadFoto(id, file) {
 }
 function pendRowComplete(id) { const s = _pendRows[id]; return !!(s && s.isis && s.partes && s.faltantes && s.foto_url); }
 function pendRefreshEnviar(id) {
-  const tr = document.querySelector('#rcpRoot .pendTbl tr[data-id="' + id + '"]');
-  if (!tr) return; const b = tr.querySelector(".enviarBtn");
+  const card = document.querySelector('#rcpRoot .pendCard[data-id="' + id + '"]');
+  if (!card) return; const b = card.querySelector(".enviarBtn");
   if (b && !_pendRows[id].sent) b.disabled = !pendRowComplete(id);
 }
-function pendEnviarCell(id, codigoExistente) {
-  const cell = document.createElement("td"); cell.className = "pendActCell pendEnviarCell";
-  if (codigoExistente) { const c = document.createElement("div"); c.className = "codigoBox"; c.textContent = codigoExistente; cell.appendChild(c); return cell; }
-  const b = document.createElement("button"); b.type = "button"; b.className = "enviarBtn"; b.textContent = "Enviar";
-  b.disabled = !pendRowComplete(id);
-  b.onclick = function () { pendEnviar(id, cell); };
-  cell.appendChild(b); return cell;
-}
-async function pendEnviar(id, cell) {
+async function pendEnviar(id, foot) {
   if (!pendRowComplete(id) || _pendRows[id].sent) return;
-  const b = cell.querySelector(".enviarBtn"); if (b) { b.disabled = true; b.textContent = "Enviando…"; }
+  const b = foot.querySelector(".enviarBtn"); if (b) { b.disabled = true; b.textContent = "Enviando…"; }
   try {
     const codigo = await pendGenCodigo();
     await pendPersist(id, { estado: "procesado", procesado_at: new Date().toISOString(), codigo: codigo });
     _pendRows[id].sent = true;
-    cell.innerHTML = "";
-    const c = document.createElement("div"); c.className = "codigoBox"; c.textContent = codigo; cell.appendChild(c);
-    const tr = cell.parentNode; if (tr) tr.classList.add("sentRow");
+    foot.innerHTML = "";
+    const lab = document.createElement("span"); lab.className = "pcLbl"; lab.textContent = "Código:";
+    const c = document.createElement("div"); c.className = "codigoBox"; c.textContent = codigo;
+    foot.appendChild(lab); foot.appendChild(c);
+    const card = foot.parentNode; if (card) card.classList.add("sentRow");
   } catch (e) {
     if (b) { b.disabled = false; b.textContent = "Enviar"; }
     alert("No se pudo enviar: " + (e.message || e));
