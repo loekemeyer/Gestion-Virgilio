@@ -4,7 +4,22 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-23 · Versión app al documentar: **v3.69**
+> Última actualización: 2026-06-23 · Versión app al documentar: **v3.70**
+>
+> Nota: **v3.70** — **Planimetría: alias con cero adelante 026/027/057** (reporte de campo:
+> tanda **C54D**, legajo 8, "SIN PLANIMETRÍA"). Mismo patrón de ceros que la "E" (v3.43/44): el
+> picking lee la base por `/export` y trae los códigos **como texto con cero adelante** (`026`),
+> pero `planimetria.js` (`window.GONDOLA`) los tenía **sin** cero (`26`). El lookup es exacto
+> (`gOf = G[String(c).toUpperCase()]`, **no normaliza** ceros) → `G["026"]` no encontraba `"26"` →
+> `PSP` (Picking sin planimetría) + aviso Telegram. **Fix de datos**: se agregaron a `planimetria.js`
+> los alias `"026":["F01",107]` (=`26`), `"027":["F05",106]` (=`27`), `"057":["B57",18]` (=`57`) —
+> **mismo sector** que su gemelo. Bump del cache-buster `planimetria.js?v=3.70` (si no, el browser
+> sirve el cacheado). ⚠ `planimetria.js` es **generado** de la hoja "Picking" de `AAA_PPP_Vigente.xlsm`:
+> si se regenera, estos alias se pierden salvo que se sumen también a esa hoja (o se cargue por el
+> editor de planimetría → Supabase, que mergea sobre la estática y sobrevive a la regeneración).
+> 💡 Pendiente/opción ofrecida: **normalizar ceros en el lookup** (`gOf` probar `G[cod]` y
+> `G[cod.replace(/^0+/,"")]`) cerraría toda la clase de bug de una, sin alias manuales (no implementado
+> por ahora: toca la lógica de pares Nacional/Importado y el aviso PSP).
 >
 > Nota: **v3.69** — **Control Remitos (CR): pasa de *toggle plano* a una pantalla de control**
 > (pedido del usuario; cierra "los facturados con líos tienen que aparecer en CC **y en CR**").
