@@ -4,7 +4,12 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-23 · Versión app al documentar: **v3.70**
+> Última actualización: 2026-06-23 · Versión app al documentar: **v3.71**
+>
+> Nota: **v3.71** — **Planimetría: más alias con cero adelante 031/099** (mismo caso que v3.70).
+> Se agregaron a `planimetria.js`: `"031":["H45",158]` (=`31`) y `"099":["L09",177]` (=`99`),
+> mismo sector que su gemelo. Cache-buster `planimetria.js?v=3.71`. Mismo ⚠ que v3.70 (son alias
+> manuales sobre el archivo generado; si se regenera del Excel, re-agregarlos).
 >
 > Nota: **v3.70** — **Planimetría: alias con cero adelante 026/027/057** (reporte de campo:
 > tanda **C54D**, legajo 8, "SIN PLANIMETRÍA"). Mismo patrón de ceros que la "E" (v3.43/44): el
