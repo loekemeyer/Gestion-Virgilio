@@ -146,7 +146,7 @@ const RCP_CSS = `
 #rcpRoot .pcTag{ font-size:11px; font-weight:800; color:#a06000; background:#fff7e6; border:1px solid #ffd98a; border-radius:999px; padding:2px 8px; }
 #rcpRoot .pcRto{ margin-left:auto; font-size:13px; font-weight:800; color:#475569; white-space:nowrap; }
 #rcpRoot .pcMeta{ font-size:13px; color:#666; margin-top:3px; }
-#rcpRoot .pcDemora{ font-weight:900; color:#b45309; }
+#rcpRoot .pcDemora{ font-weight:900; color:#b45309; font-size:18px; vertical-align:middle; }
 #rcpRoot .pcEntrega{ font-size:14px; color:#333; margin-top:6px; font-variant-numeric:tabular-nums; word-break:break-word; }
 #rcpRoot .pcActs{ margin-top:10px; border-top:1px solid #eee; padding-top:10px; display:flex; flex-direction:column; gap:10px; }
 #rcpRoot .pcRow{ display:flex; align-items:center; gap:12px; }

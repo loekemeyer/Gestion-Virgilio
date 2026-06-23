@@ -4,7 +4,10 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-22 · Versión app al documentar: **v3.63**
+> Última actualización: 2026-06-22 · Versión app al documentar: **v3.64**
+>
+> Nota: **v3.64** — Pendientes: la **Demora** (`.pcDemora`, "⏱ Xhs") se agranda a 18px (vs 13px
+> del resto de la meta) para que se note. `recepcion.js?v=3.64`.
 >
 > Nota: **v3.63** — Pendientes: las tarjetas tienen **ancho fijo** (360px) en vez de estirarse
 > (`1fr`) → cada una mide siempre lo mismo haya 2 o 7, y entran las que quepan por fila
