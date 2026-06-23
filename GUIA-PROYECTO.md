@@ -4,7 +4,25 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-23 · Versión app al documentar: **v3.68**
+> Última actualización: 2026-06-23 · Versión app al documentar: **v3.69**
+>
+> Nota: **v3.69** — **Control Remitos (CR): pasa de *toggle plano* a una pantalla de control**
+> (pedido del usuario; cierra "los facturados con líos tienen que aparecer en CC **y en CR**").
+> **Modelo confirmado por el usuario**: CR y CC **se nutren los dos de los NP facturados** del
+> reparto (misma fuente: `Facturacion_NP` cerrados ≥ `CC_REPARTO_DESDE_ISO`), pero son **pasos
+> independientes** — un NP está en CC hasta que se **carga** (`CCN`) y en CR hasta que se
+> **controla** (`CCR`). **RR se nutre de lo que marca CC** (`CCN`), eso **no cambió**. Al tocar
+> **CR** se abre un popup (`showControlRemitosCR`/`fetchCCRData`/`ccrRender`, espejo de Carga
+> Camión) con NP · Razón Social · **Líos** (de `TAL`) · **Controlado** (tic); al «Terminé Control»
+> manda un **`CCR`** (`texto="NP|TANDA"`, id determinístico `ccr_<legajo>_<np>_<día>` + upsert) por
+> NP tildada y cierra el toggle CR. **El NP controlado desaparece SÓLO de CR** (no resta `CCN`) y
+> **`CCR` NO alimenta RR** (a diferencia de CC, que sí: RR lee `CCN`). `CCR` está en el `isUpsert`
+> (index.html + sw.js); lo **ignoran** el monitor y el módulo de inconsistencias (no está en
+> `INC_CORE`/`INC_TOGGLE`), igual que `CCN`/`CRN`. Wiring del botón CR igual que CC/RR (re-toque
+> re-abre el popup; el cierre es sólo por «Terminé»). 📦 **A futuro (guardado, NO implementado)**:
+> medir **productividad de CC y CR en m³/hora** = Σ m³ de los NP con `CCN` (CC) / `CCR` (CR) sobre
+> el **tiempo del toggle** (ej.: 2 m³ en 1 h → 2 m³/h). Los eventos ya llevan `NP|TANDA` + timestamp
+> y el toggle CR/CC ya registra apertura/cierre → alcanza para cruzar los m³ (del PPP/Sheet) después.
 >
 > Nota: **v3.68** — **Carga Camión (CC): ahora muestra la cantidad de líos por NP** (📦), pedido
 > del usuario ("los NP facturados tienen que aparecer en CC … con la cantidad de líos"). Los líos
@@ -1370,7 +1388,7 @@ Definidos en `index.html` (objeto `desc`, ~línea 1531). Los botones se arman en
 | `TP` | Fin Picking | CORE (cierre) | Sí — código de tanda |
 | `AP` | Empecé Armado Pedido | CORE (inicio) | Sí — código de pedido |
 | `TAP` | Terminé Armado Pedido | CORE (cierre) | Sí — código de pedido |
-| `CR` | Control Remitos | TOGGLE | No — **toggle plano** (sólo inicio/fin, sin popup, desde v3.43) |
+| `CR` | Control Remitos | TOGGLE | Sí — abre **popup de control de facturados** (`showControlRemitosCR`, v3.69): lista de facturados del reparto + Líos + tic **Controlado** → `CCR` por NP + cierra el toggle. (Fue toggle plano sin popup en v3.43–v3.68.) |
 | `RR` | Recepción Remitos | TOGGLE | No — abre el popup de descarga (tabla NP cargadas → tildar Controlado → «Terminé» = `CRN` por NP); desde v3.43 lleva la lógica que antes tenía `CR` |
 | `CC` | Inicio/Fin Carga Camión | TOGGLE | Sí, al cerrar (Nro) |
 | `RT` | Recepción Mercadería | TOGGLE | Sí, al cerrar: `texto` = cantidad de cajas, **calculada sola** del Modo OP de Recepción (suma del día en `localStorage`, ver v2.61). Al abrir RT se lanza el Modo OP (`recepcion.js`). |
@@ -1391,6 +1409,7 @@ Definidos en `index.html` (objeto `desc`, ~línea 1531). Los botones se arman en
 | `TAL` | Líos por NP (TAP) | (detalle de armado, v3.34) | `texto` = `NP\|LÍOS\|TANDA` (ej. `97754\|3\|C47B`). Un evento por NP de la tanda al terminar armado (popup obligatorio tras `TAP`; si no lleva, `0`). Lo lee Control Remitos para la columna Líos. id aleatorio (no upsert). El monitor lo ignora. |
 | `CRN` | Control Remito NP | (detalle de control, v3.36) | `texto` = `NP\|TANDA` (ej. `97754\|C47B`). Un evento por NP marcada como **recibida/controlada** en Recepción Remitos (`RR`, antes `CR`). id determinístico `crn_<legajo>_<np>_<día>` + upsert. La PPP lo lee (`pppRefreshControlado`) y pasa el pedido a **Pedidos Entregados**. El monitor lo ignora. |
 | `CRA` | Carga sin control (vencido) | (automático, v3.37) | `texto` = `NP\|TANDA\|RAZÓN`. Lo emite la PPP (`pppCheckCargaVencida`) cuando un pedido **cargado (CCN) sigue sin controlar (CRN/manual)** pasado el plazo (`crVencido`). id determinístico `cra_<np>_<día>` + upsert; legajo `0`. Dispara aviso Telegram vía trigger `trg_carga_sin_control_telegram` (**AFTER INSERT** → 1 vez por NP/día). El monitor lo ignora. |
+| `CCR` | Control Remito CR NP | (detalle de control CR, v3.69) | `texto` = `NP\|TANDA` (ej. `97754\|C47B`). Un evento por NP marcada como **controlada** en **Control Remitos (CR)** — paso **independiente** de la Carga Camión. id determinístico `ccr_<legajo>_<np>_<día>` + upsert. El NP sale **sólo de CR** (`fetchCCRData` lo resta de los facturados). ⚠ **NO alimenta RR** (RR lee `CCN`, no `CCR`). El monitor y las inconsistencias lo ignoran. Con el tiempo del toggle CR + los m³ sirve para medir productividad de CR (m³/h). |
 
 **Grupos (constantes en `index.html`):**
 - `CORE_CODES = [EP, TP, AP, TAP]` — el trabajo medible (picking / armado).
