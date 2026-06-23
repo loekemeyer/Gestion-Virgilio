@@ -4,7 +4,21 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-22 · Versión app al documentar: **v3.58**
+> Última actualización: 2026-06-22 · Versión app al documentar: **v3.59**
+>
+> Nota: **v3.59** — **Pendientes (Marianela) = TABLA con acciones por fila, todo en
+> Supabase (NADA en localStorage)**. Columnas: Fecha · Hora · Demora (en vivo, "Xhs"/"X,5hs"
+> desde `created_at`) · RTO/FC · Tipo · Marca (línea) · Tallerista · Entrega (detalle) ·
+> **Carga ISIS** (tick) · **Control Partes** (tick "Corresponde" + botón "No corresponde") ·
+> **Faltantes x Día** (tick) · **Foto RTO** (adjuntar/arrastrar → sube a Storage bucket
+> `remitos`) · **Enviar**. Cada tick/foto se **persiste al toque** (`pendPersist` = UPDATE de
+> la fila; **no duplica**, y al recargar la fila vuelve con lo guardado — columnas nuevas en
+> `Control_Modo_OP`: `isis bool`, `control_partes text`, `faltantes bool`, `foto_url text`,
+> `codigo text`). **Enviar** (habilitado con los 4 completos) genera un **código de 4 dígitos
+> único del día** (`pendGenCodigo`), lo guarda con `estado='procesado'` + `procesado_at`, y lo
+> muestra en la fila. Se reemplazó el checklist en pantalla aparte (v3.58) por esta tabla.
+> Storage: bucket público `remitos` + policies insert/select para anon/authenticated.
+> `recepcion.js?v=3.59`.
 >
 > Nota: **v3.58** — **Recepción → Pendientes: botón "Procesar" + checklist de Marianela +
 > horas en vivo**. (a) El botón de cada pendiente ahora dice **"Procesar"** (antes "Listo").

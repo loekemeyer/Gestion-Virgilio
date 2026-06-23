@@ -135,6 +135,26 @@ const RCP_CSS = `
 #rcpRoot .chkPartesBtn{ flex:1; height:58px; font-size:17px; font-weight:900; border:2px solid var(--border); border-radius:12px; background:#fff; color:#111; cursor:pointer; }
 #rcpRoot .chkPartesBtn.sel{ background:var(--ok); color:#fff; border-color:var(--ok); }
 #rcpRoot .chkPartesBtn.no.sel{ background:var(--danger); border-color:var(--danger); }
+/* Pendientes = TABLA (Marianela): ticks + No corresponde + foto + Enviar (código). */
+#rcpRoot .pendTblWrap{ overflow-x:auto; -webkit-overflow-scrolling:touch; }
+#rcpRoot .pendTbl{ border-collapse:collapse; width:100%; font-size:13px; background:#fff; }
+#rcpRoot .pendTbl th{ background:#f1f5f9; border:1px solid var(--border); padding:6px 8px; font-weight:900; color:#334155; text-align:center; white-space:nowrap; line-height:1.1; }
+#rcpRoot .pendTbl td{ border:1px solid var(--border); padding:6px 8px; vertical-align:middle; white-space:nowrap; }
+#rcpRoot .pendTbl td.pendEntrega{ white-space:normal; min-width:110px; font-variant-numeric:tabular-nums; }
+#rcpRoot .pendTbl td.pendDemora{ font-weight:900; color:#b45309; text-align:center; }
+#rcpRoot .pendActCell{ text-align:center; }
+#rcpRoot .tickBtn{ width:38px; height:38px; border-radius:9px; border:2px solid #cbd5e1; background:#fff; font-size:20px; font-weight:900; color:#fff; cursor:pointer; }
+#rcpRoot .tickBtn.on{ background:var(--ok); border-color:var(--ok); }
+#rcpRoot .pendPartesCell{ white-space:normal; }
+#rcpRoot .noBtn{ display:block; margin:6px auto 0; padding:5px 8px; font-size:11px; font-weight:800; border:2px solid var(--border); border-radius:8px; background:#fff; color:#111; cursor:pointer; white-space:nowrap; }
+#rcpRoot .noBtn.on{ background:var(--danger); border-color:var(--danger); color:#fff; }
+#rcpRoot .fotoDrop{ display:inline-flex; align-items:center; justify-content:center; min-width:92px; min-height:40px; padding:6px 10px; border:2px dashed #cbd5e1; border-radius:10px; background:#fff; cursor:pointer; font-weight:800; font-size:12px; color:#475569; }
+#rcpRoot .fotoDrop.has{ border-style:solid; border-color:var(--ok); color:var(--ok); background:#eef7ee; }
+#rcpRoot .fotoDrop.drag{ border-color:#1e6bd6; background:#eff6ff; }
+#rcpRoot .enviarBtn{ padding:9px 16px; font-size:14px; font-weight:900; border:0; border-radius:10px; background:#111; color:#fff; cursor:pointer; }
+#rcpRoot .enviarBtn:disabled{ opacity:.4; cursor:default; }
+#rcpRoot .codigoBox{ font-size:22px; font-weight:900; letter-spacing:3px; color:#0a7a2f; font-variant-numeric:tabular-nums; }
+#rcpRoot .sentRow td{ background:#f6fff8; }
 `;
 
 /* ============== DOM (inyectado dentro de #rcpRoot) ============== */
@@ -237,8 +257,7 @@ function closeOp() { opPage.classList.remove("open"); if (_pendTimer) { clearInt
 opClose.onclick = closeOp;
 
 opBack.onclick = () => {
-  if (opState.step === "checklist") renderPendientes();
-  else if (opState.step === "tipo" || opState.step === "pend") renderMenu();
+  if (opState.step === "tipo" || opState.step === "pend") renderMenu();
   else if (opState.step === "lista") renderTipoElegir();
   else if (opState.step === "linea") renderLista(opState.tipo);
   else if (opState.step === "remito") renderLinea();
@@ -954,160 +973,202 @@ function renderMenu() {
   cont.appendChild(bc); cont.appendChild(bp);
   opBody.appendChild(cont);
 }
+let _pendRows = {};   // id -> estado vivo (espejo de lo persistido en Supabase). NADA en localStorage.
 async function renderPendientes() {
   opState.step = "pend";
   opSetBack(true);
   opTitle.textContent = "Pendientes";
-  opSubtitle.textContent = "Recepciones cargadas, sin revisar.";
+  opSubtitle.textContent = "Recepciones cargadas. Tildá, adjuntá la foto y tocá Enviar.";
   opActions.innerHTML = "";
   opBody.innerHTML = '<div class="opEmpty">Cargando…</div>';
   await sessionReady;
   let res;
   try {
     res = await supabase.from("Control_Modo_OP")
-      .select("id,fecha,tipo,nombre,linea,remito,detalle,cantidad_total,created_at")
+      .select("id,fecha,tipo,nombre,linea,remito,detalle,cantidad_total,created_at,isis,control_partes,faltantes,foto_url,codigo")
       .eq("estado", "pendiente")
-      .order("created_at", { ascending: false })
+      .order("created_at", { ascending: true })
       .limit(300);
   } catch (e) { res = { error: e }; }
   if (opState.step !== "pend") return;
   if (res.error) {
-    opBody.innerHTML = '<div class="opEmpty" style="color:var(--danger)">No se pudo leer Pendientes (¿falta la tabla Control_Modo_OP o sus permisos?).<br><small>' + (res.error.message || "") + '</small></div>';
+    opBody.innerHTML = '<div class="opEmpty" style="color:var(--danger)">No se pudo leer Pendientes (¿permisos de Control_Modo_OP?).<br><small>' + (res.error.message || "") + '</small></div>';
     return;
   }
   const rows = res.data || [];
   if (!rows.length) { opBody.innerHTML = '<div class="opOk">✓ No hay recepciones pendientes.</div>'; return; }
+  _pendRows = {};
   opBody.innerHTML = "";
-  const list = document.createElement("div");
-  list.className = "pendList";
-  rows.forEach(r => list.appendChild(pendItem(r)));
-  opBody.appendChild(list);
+  const wrap = document.createElement("div"); wrap.className = "pendTblWrap";
+  const tbl = document.createElement("table"); tbl.className = "pendTbl";
+  tbl.innerHTML = '<thead><tr>' +
+    '<th>Fecha</th><th>Hora</th><th>Demora</th><th>RTO/FC</th><th>Tipo</th><th>Marca</th><th>Tallerista</th><th>Entrega</th>' +
+    '<th>Carga<br>ISIS</th><th>Control<br>Partes</th><th>Faltantes<br>x Día</th><th>Foto<br>RTO</th><th>Enviar</th>' +
+    '</tr></thead>';
+  const tb = document.createElement("tbody");
+  rows.forEach(function (r) { tb.appendChild(pendRow(r)); });
+  tbl.appendChild(tb);
+  wrap.appendChild(tbl);
+  opBody.appendChild(wrap);
   if (_pendTimer) clearInterval(_pendTimer);
-  _pendTimer = setInterval(pendTickElapsed, 30000);   // "hace X hs" en vivo (cada 30 s)
+  _pendTimer = setInterval(pendTickElapsed, 30000);   // refresca "Demora" en vivo
 }
-/* "Hace X h Y min" desde created_at (cuándo se cargó por RT). Se refresca en vivo. */
-function pendFmtElapsed(ms) {
-  let mins = Math.floor((Date.now() - ms) / 60000);
-  if (mins < 0) mins = 0;
-  const h = Math.floor(mins / 60), m = mins % 60;
-  if (h <= 0) return "hace " + m + " min";
-  return "hace " + h + " h" + (m ? " " + m + " min" : "");
+function pendTd(txt, cls) { const c = document.createElement("td"); if (cls) c.className = cls; c.textContent = txt; return c; }
+function pendFmtFecha(fecha, tsMs) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(fecha || ""));
+  if (m) return m[3] + "-" + m[2];
+  if (tsMs) { const d = new Date(tsMs); return String(d.getDate()).padStart(2, "0") + "-" + String(d.getMonth() + 1).padStart(2, "0"); }
+  return "";
+}
+function pendFmtHora(tsMs) {
+  if (!tsMs) return "";
+  try { return new Date(tsMs).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Argentina/Buenos_Aires" }); }
+  catch (_e) { const d = new Date(tsMs); return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0"); }
+}
+function pendFmtDemora(tsMs) {
+  let hh = Math.round((Date.now() - tsMs) / 1800000);   // medias horas
+  if (hh < 0) hh = 0;
+  const h = hh / 2;
+  return (Number.isInteger(h) ? String(h) : (Math.floor(h) + ",5")) + "hs";
 }
 function pendTickElapsed() {
   if (opState.step !== "pend") { if (_pendTimer) { clearInterval(_pendTimer); _pendTimer = null; } return; }
-  document.querySelectorAll("#rcpRoot .pendElapsed").forEach(function (el) {
+  document.querySelectorAll("#rcpRoot .pendDemora").forEach(function (el) {
     const ts = parseInt(el.getAttribute("data-ts"), 10);
-    if (ts) el.textContent = "⏱ " + pendFmtElapsed(ts);
+    if (ts) el.textContent = pendFmtDemora(ts);
   });
 }
-function pendItem(r) {
-  const card = document.createElement("div");
-  card.className = "pendItem";
-  const info = document.createElement("div");
-  info.className = "pendInfo";
-  const top = document.createElement("div");
-  top.className = "pendTop";
-  const name = document.createElement("span");
-  name.className = "pendName";
-  name.textContent = r.nombre || "—";
-  const tag = document.createElement("span");
-  tag.className = "pendTag";
-  tag.textContent = (r.tipo === "prov_at") ? "Prov. AT" : "Tallerista";
-  top.appendChild(name); top.appendChild(tag);
-  const meta = document.createElement("div");
-  meta.className = "pendMeta";
-  let metaTxt = String(r.fecha || "");
-  if (r.linea) metaTxt += " · Línea " + r.linea;
-  if (r.remito) metaTxt += " · RTO/FC " + r.remito;
-  meta.textContent = metaTxt;
-  const det = document.createElement("div");
-  det.className = "pendDet";
-  det.textContent = r.detalle || "";
-  const tot = document.createElement("div");
-  tot.className = "pendTot";
-  tot.textContent = "Total: " + (r.cantidad_total != null ? r.cantidad_total : "—") + " cajas";
+function pendRow(r) {
+  const id = r.id;
+  _pendRows[id] = { isis: !!r.isis, partes: r.control_partes || null, faltantes: !!r.faltantes, foto_url: r.foto_url || null, sent: false };
   const tsMs = r.created_at ? new Date(r.created_at).getTime() : 0;
-  const elapsed = document.createElement("div");
-  elapsed.className = "pendElapsed";
-  elapsed.setAttribute("data-ts", String(tsMs || 0));
-  elapsed.textContent = tsMs ? ("⏱ " + pendFmtElapsed(tsMs)) : "";
-  info.appendChild(top); info.appendChild(meta);
-  if (tsMs) info.appendChild(elapsed);
-  info.appendChild(det); info.appendChild(tot);
-  const btn = document.createElement("button");
-  btn.type = "button"; btn.className = "pendListo";
-  btn.textContent = "Procesar";
-  btn.onclick = () => pendAbrirChecklist(r);
-  card.appendChild(info); card.appendChild(btn);
-  return card;
+  const tr = document.createElement("tr");
+  tr.setAttribute("data-id", String(id));
+  tr.appendChild(pendTd(pendFmtFecha(r.fecha, tsMs)));
+  tr.appendChild(pendTd(pendFmtHora(tsMs)));
+  const dem = pendTd(tsMs ? pendFmtDemora(tsMs) : "", "pendDemora"); dem.setAttribute("data-ts", String(tsMs || 0));
+  tr.appendChild(dem);
+  tr.appendChild(pendTd(r.remito || ""));
+  tr.appendChild(pendTd(r.tipo === "prov_at" ? "Prov. AT" : "Tallerista"));
+  tr.appendChild(pendTd(r.linea || ""));
+  tr.appendChild(pendTd(r.nombre || ""));
+  const ent = document.createElement("td"); ent.className = "pendEntrega";
+  String(r.detalle || "").split(" · ").forEach(function (line) { if (line) { const d = document.createElement("div"); d.textContent = line; ent.appendChild(d); } });
+  tr.appendChild(ent);
+  tr.appendChild(pendTickCell(id, "isis"));
+  tr.appendChild(pendPartesCell(id));
+  tr.appendChild(pendTickCell(id, "faltantes"));
+  tr.appendChild(pendFotoCell(id));
+  tr.appendChild(pendEnviarCell(id, r.codigo));
+  return tr;
 }
-/* ===== Checklist de Marianela (al tocar "Procesar") ============================
-   4 confirmaciones: Carga a ISIS · Control Partes Talleristas (corresponde / no
-   corresponde) · Faltantes x Día · Enviar la foto del remito. Recién con todo
-   tildado se habilita "Procesar recepción", que hace SOLO UPDATE de la fila
-   existente en Control_Modo_OP (estado='procesado') → NO se duplica en Supabase. */
-function pendChkComplete() {
-  const c = opState.chk;
-  return !!(c && c.isis && c.partes && c.faltantes && c.foto);
-}
-function pendChkRow(label, on, onClick) {
-  const row = document.createElement("button");
-  row.type = "button"; row.className = "chkRow" + (on ? " on" : "");
-  const box = document.createElement("span"); box.className = "chkBox"; box.textContent = on ? "✓" : "";
-  const txt = document.createElement("span"); txt.className = "chkTxt"; txt.textContent = label;
-  row.appendChild(box); row.appendChild(txt);
-  row.onclick = onClick;
-  return row;
-}
-function renderChecklist() {
-  const c = opState.chk;
-  opBody.innerHTML = "";
-  const wrap = document.createElement("div"); wrap.className = "chkList";
-  wrap.appendChild(pendChkRow("Carga a ISIS", c.isis, () => { c.isis = !c.isis; renderChecklist(); }));
-  // Control Partes Talleristas — corresponde / no corresponde
-  const it2 = document.createElement("div"); it2.className = "chkItem2" + (c.partes ? " on" : "");
-  const top = document.createElement("div"); top.className = "chkItem2Top";
-  const box2 = document.createElement("span"); box2.className = "chkBox"; box2.textContent = c.partes ? "✓" : "";
-  const txt2 = document.createElement("span"); txt2.className = "chkTxt"; txt2.textContent = "Control Partes Talleristas";
-  top.appendChild(box2); top.appendChild(txt2);
-  const btns = document.createElement("div"); btns.className = "chkPartesBtns";
-  const bC = document.createElement("button"); bC.type = "button"; bC.className = "chkPartesBtn" + (c.partes === "corresponde" ? " sel" : ""); bC.textContent = "Corresponde";
-  bC.onclick = () => { c.partes = "corresponde"; renderChecklist(); };
-  const bN = document.createElement("button"); bN.type = "button"; bN.className = "chkPartesBtn no" + (c.partes === "no" ? " sel" : ""); bN.textContent = "No corresponde";
-  bN.onclick = () => { c.partes = "no"; renderChecklist(); };
-  btns.appendChild(bC); btns.appendChild(bN);
-  it2.appendChild(top); it2.appendChild(btns);
-  wrap.appendChild(it2);
-  wrap.appendChild(pendChkRow("Faltantes x Día", c.faltantes, () => { c.faltantes = !c.faltantes; renderChecklist(); }));
-  wrap.appendChild(pendChkRow("Enviar la foto del remito", c.foto, () => { c.foto = !c.foto; renderChecklist(); }));
-  opBody.appendChild(wrap);
-  opActions.innerHTML = "";
-  const conf = document.createElement("button");
-  conf.type = "button"; conf.className = "btnSend"; conf.textContent = "✓ Procesar recepción";
-  conf.disabled = !pendChkComplete();
-  conf.onclick = () => pendProcesarConfirm();
-  opActions.appendChild(conf);
-}
-function pendAbrirChecklist(r) {
-  opState.step = "checklist";
-  opState.chk = { id: r.id, isis: false, partes: null, faltantes: false, foto: false };
-  opSetBack(true);
-  opTitle.textContent = "Procesar — checklist";
-  opSubtitle.textContent = (r.nombre || "") + (r.remito ? " · RTO/FC " + r.remito : "");
-  renderChecklist();
-}
-async function pendProcesarConfirm() {
-  if (!pendChkComplete()) return;
-  const id = opState.chk.id;
-  const conf = opActions.querySelector("button");
-  if (conf) { conf.disabled = true; conf.textContent = "Procesando…"; }
+/* Cada cambio se PERSISTE en Supabase al toque (UPDATE de la fila; no duplica, nada
+   en localStorage). Al recargar, la fila vuelve con lo ya guardado. */
+async function pendPersist(id, patch) {
   await sessionReady;
-  let err = null;
-  // SOLO UPDATE de la fila ya cargada (no re-inserta → no se duplica en Supabase).
-  try { const r = await supabase.from("Control_Modo_OP").update({ estado: "procesado" }).eq("id", id); err = r.error; }
-  catch (e) { err = e; }
-  if (err) { if (conf) { conf.disabled = false; conf.textContent = "✓ Procesar recepción"; } alert("No se pudo procesar: " + (err.message || "")); return; }
-  renderPendientes();   // vuelve a la lista, ya sin esta recepción
+  const r = await supabase.from("Control_Modo_OP").update(patch).eq("id", id);
+  if (r.error) throw r.error;
+}
+function pendTickCell(id, field) {
+  const cell = document.createElement("td"); cell.className = "pendActCell";
+  const b = document.createElement("button"); b.type = "button"; b.className = "tickBtn" + (_pendRows[id][field] ? " on" : "");
+  b.textContent = _pendRows[id][field] ? "✓" : "";
+  b.onclick = async function () {
+    if (_pendRows[id].sent) return;
+    const nv = !_pendRows[id][field]; b.disabled = true;
+    try { await pendPersist(id, field === "isis" ? { isis: nv } : { faltantes: nv }); _pendRows[id][field] = nv; b.classList.toggle("on", nv); b.textContent = nv ? "✓" : ""; }
+    catch (e) { alert("No se pudo guardar: " + (e.message || e)); }
+    b.disabled = false; pendRefreshEnviar(id);
+  };
+  cell.appendChild(b); return cell;
+}
+function pendPartesCell(id) {
+  const cell = document.createElement("td"); cell.className = "pendActCell pendPartesCell";
+  const tick = document.createElement("button"); tick.type = "button"; tick.className = "tickBtn";
+  const no = document.createElement("button"); no.type = "button"; no.className = "noBtn"; no.textContent = "No corresponde";
+  function sync() { const v = _pendRows[id].partes; tick.classList.toggle("on", v === "corresponde"); tick.textContent = v === "corresponde" ? "✓" : ""; no.classList.toggle("on", v === "no"); }
+  async function setVal(v) {
+    if (_pendRows[id].sent) return;
+    const nv = (_pendRows[id].partes === v) ? null : v; tick.disabled = no.disabled = true;
+    try { await pendPersist(id, { control_partes: nv }); _pendRows[id].partes = nv; sync(); }
+    catch (e) { alert("No se pudo guardar: " + (e.message || e)); }
+    tick.disabled = no.disabled = false; pendRefreshEnviar(id);
+  }
+  tick.onclick = function () { setVal("corresponde"); };
+  no.onclick = function () { setVal("no"); };
+  sync(); cell.appendChild(tick); cell.appendChild(no); return cell;
+}
+function pendFotoCell(id) {
+  const cell = document.createElement("td"); cell.className = "pendActCell pendFotoCell";
+  const drop = document.createElement("label"); drop.className = "fotoDrop" + (_pendRows[id].foto_url ? " has" : "");
+  const input = document.createElement("input"); input.type = "file"; input.accept = "image/*"; input.style.display = "none";
+  const txt = document.createElement("span"); txt.className = "fotoTxt"; txt.textContent = _pendRows[id].foto_url ? "✓ Foto" : "📎 Adjuntar";
+  drop.appendChild(input); drop.appendChild(txt);
+  async function setFile(file) {
+    if (!file || _pendRows[id].sent) return;
+    txt.textContent = "Subiendo…";
+    try {
+      const url = await pendUploadFoto(id, file);
+      await pendPersist(id, { foto_url: url });
+      _pendRows[id].foto_url = url; drop.classList.add("has"); txt.textContent = "✓ Foto";
+    } catch (e) { txt.textContent = _pendRows[id].foto_url ? "✓ Foto" : "📎 Adjuntar"; alert("No se pudo subir la foto: " + (e.message || e)); }
+    pendRefreshEnviar(id);
+  }
+  input.onchange = function () { if (input.files && input.files[0]) setFile(input.files[0]); };
+  drop.ondragover = function (e) { e.preventDefault(); drop.classList.add("drag"); };
+  drop.ondragleave = function () { drop.classList.remove("drag"); };
+  drop.ondrop = function (e) { e.preventDefault(); drop.classList.remove("drag"); const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; if (f) setFile(f); };
+  cell.appendChild(drop); return cell;
+}
+async function pendUploadFoto(id, file) {
+  await sessionReady;
+  const ext = (file.name && file.name.indexOf(".") >= 0) ? file.name.split(".").pop().toLowerCase().replace(/[^a-z0-9]/g, "") : "jpg";
+  const path = id + "_" + Date.now() + "." + (ext || "jpg");
+  const up = await supabase.storage.from("remitos").upload(path, file, { upsert: true, contentType: file.type || "image/jpeg" });
+  if (up.error) throw up.error;
+  const pub = supabase.storage.from("remitos").getPublicUrl(path);
+  return (pub && pub.data) ? pub.data.publicUrl : null;
+}
+function pendRowComplete(id) { const s = _pendRows[id]; return !!(s && s.isis && s.partes && s.faltantes && s.foto_url); }
+function pendRefreshEnviar(id) {
+  const tr = document.querySelector('#rcpRoot .pendTbl tr[data-id="' + id + '"]');
+  if (!tr) return; const b = tr.querySelector(".enviarBtn");
+  if (b && !_pendRows[id].sent) b.disabled = !pendRowComplete(id);
+}
+function pendEnviarCell(id, codigoExistente) {
+  const cell = document.createElement("td"); cell.className = "pendActCell pendEnviarCell";
+  if (codigoExistente) { const c = document.createElement("div"); c.className = "codigoBox"; c.textContent = codigoExistente; cell.appendChild(c); return cell; }
+  const b = document.createElement("button"); b.type = "button"; b.className = "enviarBtn"; b.textContent = "Enviar";
+  b.disabled = !pendRowComplete(id);
+  b.onclick = function () { pendEnviar(id, cell); };
+  cell.appendChild(b); return cell;
+}
+async function pendEnviar(id, cell) {
+  if (!pendRowComplete(id) || _pendRows[id].sent) return;
+  const b = cell.querySelector(".enviarBtn"); if (b) { b.disabled = true; b.textContent = "Enviando…"; }
+  try {
+    const codigo = await pendGenCodigo();
+    await pendPersist(id, { estado: "procesado", procesado_at: new Date().toISOString(), codigo: codigo });
+    _pendRows[id].sent = true;
+    cell.innerHTML = "";
+    const c = document.createElement("div"); c.className = "codigoBox"; c.textContent = codigo; cell.appendChild(c);
+    const tr = cell.parentNode; if (tr) tr.classList.add("sentRow");
+  } catch (e) {
+    if (b) { b.disabled = false; b.textContent = "Enviar"; }
+    alert("No se pudo enviar: " + (e.message || e));
+  }
+}
+async function pendGenCodigo() {
+  await sessionReady;
+  const usados = new Set();
+  try {
+    const since = new Date(); since.setHours(0, 0, 0, 0);
+    const r = await supabase.from("Control_Modo_OP").select("codigo").gte("created_at", since.toISOString()).not("codigo", "is", null);
+    if (r.data) r.data.forEach(function (x) { if (x.codigo) usados.add(String(x.codigo)); });
+  } catch (_e) {}
+  let c, tries = 0;
+  do { c = String(Math.floor(1000 + Math.random() * 9000)); tries++; } while (usados.has(c) && tries < 200);
+  return c;
 }
 
 /* ============== API pública para Producción ============== */
