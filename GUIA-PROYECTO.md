@@ -4,7 +4,19 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-22 · Versión app al documentar: **v3.56**
+> Última actualización: 2026-06-22 · Versión app al documentar: **v3.57**
+>
+> Nota: **v3.57** — **Recepción (supervisor): menú LOCAL Carga / Pendientes + checklist
+> "Pendientes"**. El botón "Carga Recepción Mercadería" ahora abre `window.openRecepcionMenu()`
+> (en `recepcion.js`): un menú con **✍️ Carga Manual** (el flujo del operario) y **📋 Pendientes**.
+> **Pendientes** lista las recepciones cargadas leyendo **`Control_Modo_OP`** (`estado='pendiente'`,
+> orden por `created_at` desc) — fecha · tallerista/prov · línea · RTO/FC · detalle (códigos·cajas) ·
+> total — con un botón **✓ Listo** por fila que la marca revisada (`update estado='listo'`) y la saca
+> de la lista. Lee/escribe con la sesión anónima del módulo (`supabase` en recepcion.js). Navegación:
+> nuevo flag `opState.fromMenu` (operario RT entra directo a la carga sin "Atrás"; el supervisor ve
+> "Atrás" → vuelve al menú); `opResetState` extraído de `openOp`. ⚠ Requiere la tabla
+> **`Control_Modo_OP`** + RLS (insert/select/update para anon/authenticated) — SQL por chat; si falta,
+> Pendientes avisa "¿falta la tabla/permisos?". `recepcion.js?v=3.57`.
 >
 > Nota: **v3.56** — **"Carga Recepción Mercadería" (supervisor) ahora es 100% LOCAL**. El
 > usuario **borró** la app externa `Control-Carga-Remitos-FC`, así que el iframe del panel

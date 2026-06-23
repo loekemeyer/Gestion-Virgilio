@@ -110,6 +110,17 @@ const RCP_CSS = `
 #rcpRoot .modalClose{ background:#fff; border:1px solid var(--border); width:32px; height:32px; border-radius:50%; cursor:pointer; font-size:14px; font-weight:900; }
 #rcpRoot .btnCancel{ padding:10px 16px; border-radius:10px; border:1px solid var(--border); background:#fff; font-weight:900; cursor:pointer; }
 #rcpRoot .btnSend{ padding:10px 16px; border-radius:10px; border:0; background:#111; color:#fff; font-weight:900; cursor:pointer; }
+#rcpRoot .pendList{ display:flex; flex-direction:column; gap:10px; }
+#rcpRoot .pendItem{ display:flex; align-items:center; gap:12px; border:2px solid var(--border); border-radius:12px; padding:12px 14px; background:#fff; }
+#rcpRoot .pendInfo{ flex:1; min-width:0; }
+#rcpRoot .pendTop{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+#rcpRoot .pendName{ font-size:18px; font-weight:900; color:#111; }
+#rcpRoot .pendTag{ font-size:11px; font-weight:800; color:#a06000; background:#fff7e6; border:1px solid #ffd98a; border-radius:999px; padding:2px 8px; }
+#rcpRoot .pendMeta{ font-size:13px; color:#666; margin-top:2px; }
+#rcpRoot .pendDet{ font-size:14px; color:#333; margin-top:4px; word-break:break-word; }
+#rcpRoot .pendTot{ font-size:13px; font-weight:800; color:var(--ok); margin-top:4px; }
+#rcpRoot .pendListo{ flex:0 0 auto; align-self:stretch; min-width:96px; font-size:16px; font-weight:900; border:0; border-radius:12px; background:var(--ok); color:#fff; cursor:pointer; padding:0 16px; }
+#rcpRoot .pendListo:disabled{ opacity:.5; cursor:default; }
 `;
 
 /* ============== DOM (inyectado dentro de #rcpRoot) ============== */
@@ -192,7 +203,7 @@ function opTodayStr() {
 }
 
 /* ============== Navegación ============== */
-function openOp() {
+function opResetState() {
   opState.step = null;
   opState.tipo = null;
   opState.entidades = null;
@@ -200,6 +211,10 @@ function openOp() {
   opState.articulosManual = null;
   opState.linea = null; opState.fecha = opTodayStr();
   opState.remito = ""; opState.articulos = null; opState.cargas = {};
+}
+function openOp() {
+  opResetState();
+  opState.fromMenu = false;     // operario (RT) entra directo a la carga, sin menú
   opPage.classList.add("open");
   renderTipoElegir();
 }
@@ -207,7 +222,8 @@ function closeOp() { opPage.classList.remove("open"); }
 opClose.onclick = closeOp;
 
 opBack.onclick = () => {
-  if (opState.step === "lista") renderTipoElegir();
+  if (opState.step === "tipo" || opState.step === "pend") renderMenu();
+  else if (opState.step === "lista") renderTipoElegir();
   else if (opState.step === "linea") renderLista(opState.tipo);
   else if (opState.step === "remito") renderLinea();
   else if (opState.step === "articulos") renderRemito();
@@ -321,7 +337,7 @@ function listaPorTipo(tipo, filtro) {
 /* ============== Paso 1: elegir tipo ============== */
 async function renderTipoElegir() {
   opState.step = "tipo";
-  opSetBack(false);
+  opSetBack(opState.fromMenu === true);   // sólo muestra "Atrás" si se entró por el menú (supervisor)
   opTitle.textContent = "¿Qué vas a cargar?";
   opSubtitle.textContent = "";
   opActions.innerHTML = "";
@@ -896,9 +912,120 @@ async function anularModoOP(pendId) {
   alert("No se encontró la carga."); return false;
 }
 
+/* ============== Menú (supervisor) + Pendientes ==============
+   El supervisor entra por "Carga Recepción Mercadería" → menú LOCAL con dos
+   opciones: Carga Manual (el mismo flujo del operario) y Pendientes (checklist
+   de las recepciones cargadas, leídas de Control_Modo_OP). Todo embebido, sin
+   iframe. "Listo" marca la recepción como revisada (estado='listo'). */
+function renderMenu() {
+  opState.step = "menu";
+  opState.fromMenu = true;
+  opSetBack(false);
+  opTitle.textContent = "Recepción de Mercadería";
+  opSubtitle.textContent = "";
+  opActions.innerHTML = "";
+  opBody.innerHTML = "";
+  const cont = document.createElement("div");
+  cont.className = "opTipoBtns";
+  const bc = document.createElement("button");
+  bc.type = "button"; bc.className = "opTipoBtn";
+  bc.textContent = "✍️ Carga Manual";
+  bc.onclick = () => { opResetState(); renderTipoElegir(); };   // fromMenu sigue true → "Atrás" vuelve al menú
+  const bp = document.createElement("button");
+  bp.type = "button"; bp.className = "opTipoBtn";
+  bp.textContent = "📋 Pendientes";
+  bp.onclick = () => renderPendientes();
+  cont.appendChild(bc); cont.appendChild(bp);
+  opBody.appendChild(cont);
+}
+async function renderPendientes() {
+  opState.step = "pend";
+  opSetBack(true);
+  opTitle.textContent = "Pendientes";
+  opSubtitle.textContent = "Recepciones cargadas, sin revisar.";
+  opActions.innerHTML = "";
+  opBody.innerHTML = '<div class="opEmpty">Cargando…</div>';
+  await sessionReady;
+  let res;
+  try {
+    res = await supabase.from("Control_Modo_OP")
+      .select("id,fecha,tipo,nombre,linea,remito,detalle,cantidad_total,created_at")
+      .eq("estado", "pendiente")
+      .order("created_at", { ascending: false })
+      .limit(300);
+  } catch (e) { res = { error: e }; }
+  if (opState.step !== "pend") return;
+  if (res.error) {
+    opBody.innerHTML = '<div class="opEmpty" style="color:var(--danger)">No se pudo leer Pendientes (¿falta la tabla Control_Modo_OP o sus permisos?).<br><small>' + (res.error.message || "") + '</small></div>';
+    return;
+  }
+  const rows = res.data || [];
+  if (!rows.length) { opBody.innerHTML = '<div class="opOk">✓ No hay recepciones pendientes.</div>'; return; }
+  opBody.innerHTML = "";
+  const list = document.createElement("div");
+  list.className = "pendList";
+  rows.forEach(r => list.appendChild(pendItem(r)));
+  opBody.appendChild(list);
+}
+function pendItem(r) {
+  const card = document.createElement("div");
+  card.className = "pendItem";
+  const info = document.createElement("div");
+  info.className = "pendInfo";
+  const top = document.createElement("div");
+  top.className = "pendTop";
+  const name = document.createElement("span");
+  name.className = "pendName";
+  name.textContent = r.nombre || "—";
+  const tag = document.createElement("span");
+  tag.className = "pendTag";
+  tag.textContent = (r.tipo === "prov_at") ? "Prov. AT" : "Tallerista";
+  top.appendChild(name); top.appendChild(tag);
+  const meta = document.createElement("div");
+  meta.className = "pendMeta";
+  let metaTxt = String(r.fecha || "");
+  if (r.linea) metaTxt += " · Línea " + r.linea;
+  if (r.remito) metaTxt += " · RTO/FC " + r.remito;
+  meta.textContent = metaTxt;
+  const det = document.createElement("div");
+  det.className = "pendDet";
+  det.textContent = r.detalle || "";
+  const tot = document.createElement("div");
+  tot.className = "pendTot";
+  tot.textContent = "Total: " + (r.cantidad_total != null ? r.cantidad_total : "—") + " cajas";
+  info.appendChild(top); info.appendChild(meta); info.appendChild(det); info.appendChild(tot);
+  const btn = document.createElement("button");
+  btn.type = "button"; btn.className = "pendListo";
+  btn.textContent = "✓ Listo";
+  btn.onclick = () => pendMarcarListo(r.id, card, btn);
+  card.appendChild(info); card.appendChild(btn);
+  return card;
+}
+async function pendMarcarListo(id, card, btn) {
+  btn.disabled = true; const prev = btn.textContent; btn.textContent = "…";
+  await sessionReady;
+  let err = null;
+  try { const r = await supabase.from("Control_Modo_OP").update({ estado: "listo" }).eq("id", id); err = r.error; }
+  catch (e) { err = e; }
+  if (err) { btn.disabled = false; btn.textContent = prev; alert("No se pudo marcar Listo: " + (err.message || "")); return; }
+  card.style.transition = "opacity .2s"; card.style.opacity = "0";
+  setTimeout(() => {
+    const list = card.parentNode;
+    if (list) list.removeChild(card);
+    if (list && !list.children.length) opBody.innerHTML = '<div class="opOk">✓ No hay recepciones pendientes.</div>';
+  }, 220);
+}
+
 /* ============== API pública para Producción ============== */
 window.openRecepcionOp = function (legajo, dayKey) {
   RECP.legajo = String(legajo || "").trim() || null;
   RECP.dayKey = dayKey || opTodayStr();
   openOp();
+};
+/* Menú de Recepción (supervisor "Carga Recepción Mercadería"): Carga / Pendientes, LOCALES. */
+window.openRecepcionMenu = function () {
+  RECP.legajo = null;
+  RECP.dayKey = opTodayStr();
+  opPage.classList.add("open");
+  renderMenu();
 };
