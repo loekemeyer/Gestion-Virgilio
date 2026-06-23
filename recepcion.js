@@ -110,31 +110,6 @@ const RCP_CSS = `
 #rcpRoot .modalClose{ background:#fff; border:1px solid var(--border); width:32px; height:32px; border-radius:50%; cursor:pointer; font-size:14px; font-weight:900; }
 #rcpRoot .btnCancel{ padding:10px 16px; border-radius:10px; border:1px solid var(--border); background:#fff; font-weight:900; cursor:pointer; }
 #rcpRoot .btnSend{ padding:10px 16px; border-radius:10px; border:0; background:#111; color:#fff; font-weight:900; cursor:pointer; }
-#rcpRoot .pendList{ display:flex; flex-direction:column; gap:10px; }
-#rcpRoot .pendItem{ display:flex; align-items:center; gap:12px; border:2px solid var(--border); border-radius:12px; padding:12px 14px; background:#fff; }
-#rcpRoot .pendInfo{ flex:1; min-width:0; }
-#rcpRoot .pendTop{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
-#rcpRoot .pendName{ font-size:18px; font-weight:900; color:#111; }
-#rcpRoot .pendTag{ font-size:11px; font-weight:800; color:#a06000; background:#fff7e6; border:1px solid #ffd98a; border-radius:999px; padding:2px 8px; }
-#rcpRoot .pendMeta{ font-size:13px; color:#666; margin-top:2px; }
-#rcpRoot .pendDet{ font-size:14px; color:#333; margin-top:4px; word-break:break-word; }
-#rcpRoot .pendTot{ font-size:13px; font-weight:800; color:var(--ok); margin-top:4px; }
-#rcpRoot .pendElapsed{ font-size:13px; font-weight:900; color:#b45309; margin-top:4px; }
-#rcpRoot .pendListo{ flex:0 0 auto; align-self:stretch; min-width:96px; font-size:16px; font-weight:900; border:0; border-radius:12px; background:var(--ok); color:#fff; cursor:pointer; padding:0 16px; }
-#rcpRoot .pendListo:disabled{ opacity:.5; cursor:default; }
-#rcpRoot .chkList{ display:flex; flex-direction:column; gap:12px; }
-#rcpRoot .chkRow{ display:flex; align-items:center; gap:14px; width:100%; text-align:left; border:2px solid var(--border); border-radius:12px; padding:16px; background:#fff; cursor:pointer; font-size:18px; font-weight:800; color:#111; }
-#rcpRoot .chkRow.on{ border-color:var(--ok); background:#eef7ee; }
-#rcpRoot .chkBox{ flex:0 0 auto; width:34px; height:34px; border-radius:9px; border:2px solid #cbd5e1; display:flex; align-items:center; justify-content:center; font-size:22px; font-weight:900; color:#fff; }
-#rcpRoot .chkRow.on .chkBox, #rcpRoot .chkItem2.on .chkBox{ background:var(--ok); border-color:var(--ok); }
-#rcpRoot .chkTxt{ flex:1; }
-#rcpRoot .chkItem2{ border:2px solid var(--border); border-radius:12px; padding:16px; background:#fff; }
-#rcpRoot .chkItem2.on{ border-color:var(--ok); background:#eef7ee; }
-#rcpRoot .chkItem2Top{ display:flex; align-items:center; gap:14px; font-size:18px; font-weight:800; color:#111; }
-#rcpRoot .chkPartesBtns{ display:flex; gap:12px; margin-top:14px; }
-#rcpRoot .chkPartesBtn{ flex:1; height:58px; font-size:17px; font-weight:900; border:2px solid var(--border); border-radius:12px; background:#fff; color:#111; cursor:pointer; }
-#rcpRoot .chkPartesBtn.sel{ background:var(--ok); color:#fff; border-color:var(--ok); }
-#rcpRoot .chkPartesBtn.no.sel{ background:var(--danger); border-color:var(--danger); }
 /* Pendientes (Marianela) = TARJETAS verticales (sin scroll horizontal): tilde + No
    corresponde + foto (adjuntar/arrastrar) + Enviar (código). */
 #rcpRoot .opPage.pendWide .opPageInner{ max-width:none; }   /* PC: usa todo el ancho */
@@ -1018,7 +993,6 @@ async function renderPendientes() {
   if (_pendTimer) clearInterval(_pendTimer);
   _pendTimer = setInterval(pendTickElapsed, 30000);   // refresca "Demora" en vivo
 }
-function pendTd(txt, cls) { const c = document.createElement("td"); if (cls) c.className = cls; c.textContent = txt; return c; }
 function pendFmtFecha(fecha, tsMs) {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(fecha || ""));
   if (m) return m[3] + "-" + m[2];

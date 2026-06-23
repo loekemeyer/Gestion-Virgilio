@@ -4,7 +4,14 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-22 · Versión app al documentar: **v3.64**
+> Última actualización: 2026-06-22 · Versión app al documentar: **v3.65**
+>
+> Nota: **v3.65** — limpieza post-auditoría de `recepcion.js`: se sacó el **CSS muerto** que
+> quedó de los reworks de Pendientes (bloque del checklist `chk*` de v3.58 y de las tarjetas
+> v1 `pendList`/`pendItem`/`pendElapsed`/…) y la función **`pendTd`** (la usaba la versión
+> tabla, ya no). Sin cambios de comportamiento. Auditoría: sintaxis OK, sin funciones
+> rotas/llamadas-sin-definir; backend OK (columnas + RLS de `Control_Modo_OP`, bucket
+> `remitos`, policies de Entregas), 0 archivos huérfanos. `recepcion.js?v=3.65`.
 >
 > Nota: **v3.64** — Pendientes: la **Demora** (`.pcDemora`, "⏱ Xhs") se agranda a 18px (vs 13px
 > del resto de la meta) para que se note. `recepcion.js?v=3.64`.
