@@ -4,7 +4,17 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-23 · Versión app al documentar: **v3.71**
+> Última actualización: 2026-06-23 · Versión app al documentar: **v3.72**
+>
+> Nota: **v3.72** — **Planimetría: alias con cero adelante para TODOS los códigos de 2 dígitos**
+> (pedido del usuario, generaliza v3.70/v3.71). En vez de ir uno por uno, se agregó a `planimetria.js`
+> el alias `"0XX":["sector",orden]` = `"XX"` para **cada código numérico de 2 dígitos** (12 nuevos:
+> 052,053,054,055,058,059,066,067,070,034,043,097 — los 5 previos 026/027/031/057/099 ya estaban →
+> 17 en total). Mismo sector que el gemelo, sin colisiones (el script saltea los que ya tenían alias).
+> Cache-buster `planimetria.js?v=3.72`. ⚠ Siguen siendo alias **sobre el archivo generado**: si se
+> regenera del Excel se pierden (re-correr el script o que la hoja "Picking" ya traiga el cero). Los
+> códigos de **1 dígito no existen** en la planimetría, y los de **3+** ya vienen completos, así que
+> con esto queda cubierto todo el rango de ceros adelante numéricos.
 >
 > Nota: **v3.71** — **Planimetría: más alias con cero adelante 031/099** (mismo caso que v3.70).
 > Se agregaron a `planimetria.js`: `"031":["H45",158]` (=`31`) y `"099":["L09",177]` (=`99`),
