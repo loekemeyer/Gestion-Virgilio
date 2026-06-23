@@ -4,7 +4,18 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-22 · Versión app al documentar: **v3.55**
+> Última actualización: 2026-06-22 · Versión app al documentar: **v3.56**
+>
+> Nota: **v3.56** — **"Carga Recepción Mercadería" (supervisor) ahora es 100% LOCAL**. El
+> usuario **borró** la app externa `Control-Carga-Remitos-FC`, así que el iframe del panel
+> Admin daba **404**. Se quitó el iframe (overlay `#recepcionAdminOverlay`, `recpOpen`,
+> `recpShowChooser`, `recpAutoNav`, `closeRecepcionAdmin`, `RECEPCION_ADMIN_URL`/`_CARGA_URL`)
+> y `openRecepcionAdmin` ahora abre el **Modo OP embebido** `window.openRecepcionOp()` de
+> `recepcion.js` (el mismo que usan los operarios al tocar **RT**), sin legajo (no toca el
+> acumulador de cajas del RT). ⚠ Para que **guarde** hace falta la **policy RLS de INSERT**
+> en `Entregas Tallerista Virgilio` / `Entregas Prov AT` (sesión anónima → rol
+> `authenticated`); si no, salta *"new row violates row-level security policy"*. La opción
+> **"Pendientes"** del chooser viejo no quedó embebida (era la home de la app borrada).
 >
 > Nota: **v3.55** — **Revertido el corte de v3.54** en `facFetchFcKeys`. El backlog de tandas viejas
 > en "a facturar" no era por falta de un corte en el código, sino porque **la PPP no estaba

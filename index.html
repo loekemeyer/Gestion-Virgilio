@@ -2891,23 +2891,9 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
     </div>
   </div>
 
-  <!-- Overlay: panel Admin de Recepción de Mercadería, EMBEBIDO (mismo dominio
-       loekemeyer.github.io → comparte sesión/almacenamiento, anda como nativo).
-       Reusa la app ya deployada (Control-Carga-Remitos-FC) sin duplicar código.
-       Solo supervisores. El iframe carga recién al abrir (lazy). -->
-  <div id="recepcionAdminOverlay" class="recp-admin-overlay">
-    <div class="recp-admin-bar">
-      <button id="recpBackBtn" class="recp-admin-back" onclick="recpShowChooser()" style="display:none">← Volver</button>
-      <span class="recp-admin-title">🏭 Carga Recepción Mercadería</span>
-      <button class="recp-admin-close" onclick="closeRecepcionAdmin()">Cerrar</button>
-    </div>
-    <div id="recpChooser" class="recp-chooser">
-      <button class="recp-choice" onclick="recpOpen('pend')"><span class="recp-choice-ico">📋</span><span>Pendientes</span></button>
-      <button class="recp-choice" onclick="recpOpen('carga')"><span class="recp-choice-ico">✍️</span><span>Carga Manual</span></button>
-    </div>
-    <iframe id="recepcionAdminFrame" class="recp-admin-frame" title="Recepción"
-            allow="camera; clipboard-write" style="display:none"></iframe>
-  </div>
+  <!-- "Carga Recepción Mercadería" (supervisor) usa el Modo OP EMBEBIDO de recepcion.js
+       (window.openRecepcionOp). El viejo iframe a Control-Carga-Remitos-FC se quitó: esa
+       app se borró y la recepción ahora es 100% local. -->
 
   <!-- Overlay: editor de Planimetría (solo supervisores). Edita la tabla Supabase
        "Planimetria" que se mergea sobre planimetria.js. -->
@@ -4999,7 +4985,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.55";
+const APP_VERSION = "v3.56";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -8012,83 +7998,14 @@ function closeAnalisis() {
 let _faltantesDay = null;
 let _faltantesIntervalId = null;
 
-/* Panel Admin de Recepción: abre la app de Recepción de Mercadería embebida en un
-   iframe (mismo dominio → comparte sesión/almacenamiento, anda como nativa). El
-   src se setea recién al abrir (lazy) y se reusa. Solo supervisores. v2.75. */
-const RECEPCION_ADMIN_URL = "https://loekemeyer.github.io/Control-Carga-Remitos-FC/";
-/* Deep-link al form "Recepción de Mercadería" (Carga Manual). ⚠ TODO: reemplazar por
-   la URL real de esa pantalla. La app es repo PRIVADO y github.io está bloqueado en el
-   sandbox → falta que el usuario pase el #hash/?param de esa pantalla. Por ahora cae al
-   home (igual que Pendientes). */
-const RECEPCION_CARGA_URL = RECEPCION_ADMIN_URL;
+/* "Carga Recepción Mercadería" (supervisor): abre el Modo OP de Recepción EMBEBIDO
+   (recepcion.js, el mismo que usan los operarios al tocar RT). Sin legajo → no toca el
+   acumulador de cajas del RT. (Antes abría un iframe a Control-Carga-Remitos-FC, app que
+   el usuario borró → daba 404. Ahora la recepción es 100% local.) v3.56. */
 function openRecepcionAdmin() {
   if (!requireSupervisor()) return;
-  const ov = document.getElementById("recepcionAdminOverlay");
-  if (ov) ov.classList.add("show");
-  recpShowChooser();                 // siempre arranca en el chooser
-}
-function recpShowChooser() {
-  const ch = document.getElementById("recpChooser");
-  const fr = document.getElementById("recepcionAdminFrame");
-  const bk = document.getElementById("recpBackBtn");
-  if (ch) ch.style.display = "";
-  if (fr) fr.style.display = "none";
-  if (bk) bk.style.display = "none";
-}
-function recpOpen(which) {
-  const fr = document.getElementById("recepcionAdminFrame");
-  const ch = document.getElementById("recpChooser");
-  const bk = document.getElementById("recpBackBtn");
-  if (ch) ch.style.display = "none";
-  if (fr) fr.style.display = "";
-  if (bk) bk.style.display = "";
-  if (!fr) return;
-  // Si algún día seteás un deep-link real en RECEPCION_CARGA_URL, lo abrimos directo;
-  // si no, cargamos el home y NAVEGAMOS POR DENTRO hasta el form (mismo origen).
-  const hasDeepLink = (which === "carga") && (RECEPCION_CARGA_URL !== RECEPCION_ADMIN_URL);
-  const url = hasDeepLink ? RECEPCION_CARGA_URL : RECEPCION_ADMIN_URL;
-  fr.onload = function () {
-    let blank = false;
-    try { blank = (fr.contentWindow.location.href || "").indexOf("about:blank") === 0; } catch (_e) {}
-    if (blank) return;                                   // ignoramos el load del blank
-    fr.onload = null;                                    // el load real: una sola vez
-    if (which === "carga" && !hasDeepLink) recpAutoNav(); // sin deep-link → auto-navegar al form
-  };
-  // about:blank fuerza la recarga aunque la URL se repita → siempre arranca del home.
-  fr.src = "about:blank";
-  setTimeout(function () { fr.src = url; }, 30);
-}
-/* "Carga Manual" sin deep-link: como el iframe es MISMO ORIGEN (loekemeyer.github.io),
-   buscamos dentro de la app un botón/link que lleve al form "Recepción de Mercadería"
-   y lo clickeamos. Reintenta ~5,5s mientras la app renderiza. Si no lo encuentra,
-   queda en el home (sin romper nada). ⚠ Heurístico: no pude probarlo (la app es repo
-   privado / github.io bloqueado en el sandbox). v2.99. */
-function recpAutoNav() {
-  const fr = document.getElementById("recepcionAdminFrame");
-  if (!fr) return;
-  const KEYS = ["recepcion de merc", "recepción de merc", "carga manual", "mercader", "nueva recep", "recep"];
-  let tries = 0;
-  const tick = function () {
-    tries++;
-    try {
-      const doc = fr.contentDocument || (fr.contentWindow && fr.contentWindow.document);
-      if (doc && doc.body) {
-        const els = doc.querySelectorAll("button, a, [role='button'], [onclick]");
-        for (const k of KEYS) {
-          for (let i = 0; i < els.length; i++) {
-            const t = (els[i].textContent || "").trim().toLowerCase().replace(/\s+/g, " ");
-            if (t && t.length <= 45 && t.indexOf(k) >= 0) { try { els[i].click(); } catch (_e) {} return; }
-          }
-        }
-      }
-    } catch (_e) { return; }                              // cross-origin/no accesible → no se puede
-    if (tries < 14) setTimeout(tick, 400);
-  };
-  setTimeout(tick, 350);
-}
-function closeRecepcionAdmin() {
-  const ov = document.getElementById("recepcionAdminOverlay");
-  if (ov) ov.classList.remove("show");
+  if (typeof window.openRecepcionOp === "function") window.openRecepcionOp();
+  else alert("El módulo de Recepción no cargó. Refrescá la página e intentá de nuevo.");
 }
 
 /* ===== Editor de Planimetría — escribe DIRECTO a Supabase (tabla "Planimetria").
