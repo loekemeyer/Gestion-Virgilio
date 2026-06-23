@@ -2058,6 +2058,8 @@ button {
 .cc-np.cc-on .cc-chk{ border-color: #16a34a; background: #16a34a; }
 .cc-npnum{ font-size: 18px; font-weight: bold; color: #0f172a; }
 .cc-rs{ font-size: 13px; color: #64748b; margin-left: auto; text-align: right; }
+.cc-lios{ flex: 0 0 auto; font-size: 14px; font-weight: 800; color: #b45309; white-space: nowrap; }
+.cc-lios.cc-lios0{ color: #94a3b8; font-weight: 600; }
 .lios-row{ cursor: default; }
 .lios-row .cc-rs{ margin-left: 0; flex: 1 1 auto; }
 .lios-inp{ width: 84px; height: 40px; font-size: 17px; text-align: center; border: 2px solid #cbd5e1; border-radius: 10px; flex: 0 0 auto; }
@@ -4993,7 +4995,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.67";
+const APP_VERSION = "v3.68";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -6455,28 +6457,41 @@ const CC_REPARTO_DESDE_ISO = "2026-06-22T00:00:00-03:00";
    Sin &_= en las URLs (PostgREST lo rechaza con 400). */
 async function fetchCCData() {
   const headers = { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY };
+  const sinceTal = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
   const repUrl = SUPABASE_FACTURACION_NP_ENDPOINT
     + "?cierre_id=not.is.null&facturado_at=gte." + encodeURIComponent(CC_REPARTO_DESDE_ISO)
     + "&select=np,tanda,razon_social&limit=20000";
   const ccnUrl = SUPABASE_TABLE_ENDPOINT
     + "?opcion=eq.CCN&ts_cliente=gte." + encodeURIComponent(CC_REPARTO_DESDE_ISO)
     + "&select=texto&limit=20000";
+  // Líos por NP: eventos TAL (anotados al terminar armado). Mismo origen que usa Recepción Remitos.
+  const talUrl = SUPABASE_TABLE_ENDPOINT
+    + "?opcion=eq.TAL&ts_cliente=gte." + encodeURIComponent(sinceTal)
+    + "&select=texto&limit=20000";
   const _par = await Promise.all([
     fetch(repUrl, { headers, cache: "no-store" }).then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); }),
-    fetch(ccnUrl, { headers, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; })
+    fetch(ccnUrl, { headers, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }),
+    fetch(talUrl, { headers, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; })
   ]);
-  const repR = _par[0], ccnR = _par[1];
+  const repR = _par[0], ccnR = _par[1], talR = _par[2];
   const cargados = new Set();
   for (const ev of ccnR) {
     const np = String(ev.texto || "").split("|")[0].trim().replace(/\.0+$/, "");
     if (np) cargados.add(np);
+  }
+  const lios = new Map();
+  for (const ev of talR) {
+    const p = String(ev.texto || "").split("|");
+    const np = p[0].trim().replace(/\.0+$/, "");
+    const v = parseInt(p[1], 10);
+    if (np && !isNaN(v)) lios.set(np, v);
   }
   const items = []; const seen = new Set();
   for (const row of repR) {
     const np = String(row.np || "").trim().replace(/\.0+$/, "");
     if (!np || seen.has(np) || cargados.has(np)) continue;   // ya cargado → fuera
     seen.add(np);
-    items.push({ np: np, tanda: (String(row.tanda || "").trim() || "—"), rs: row.razon_social || "" });
+    items.push({ np: np, tanda: (String(row.tanda || "").trim() || "—"), rs: row.razon_social || "", lios: lios.has(np) ? lios.get(np) : null });
   }
   return items;
 }
@@ -6514,10 +6529,14 @@ function ccRender() {
     html += `<div class="cc-tanda">Tanda ${escapeHtml(tanda)}</div>`;
     for (const it of byTanda[tanda]) {
       const on = _cc.checked.has(it.np);
+      const liosNull = (it.lios == null);
+      const liosTxt = liosNull ? "—" : String(it.lios);
+      const liosCls = (liosNull || it.lios === 0) ? " cc-lios0" : "";
       html += `<div class="cc-np${on ? " cc-on" : ""}" onclick="ccToggle('${String(it.np).replace(/[^0-9A-Za-z]/g, "")}')">` +
               `<span class="cc-chk">${on ? "✓" : ""}</span>` +
               `<span class="cc-npnum">${escapeHtml(it.np)}</span>` +
-              `<span class="cc-rs">${escapeHtml(it.rs)}</span></div>`;
+              `<span class="cc-rs">${escapeHtml(it.rs)}</span>` +
+              `<span class="cc-lios${liosCls}" title="líos">📦 ${liosTxt}</span></div>`;
     }
   }
   html += `<button class="pk-btn pk-ok" onclick="ccFinish()">🚛 Terminé Carga Camión (${_cc.checked.size} cargadas)</button>` +

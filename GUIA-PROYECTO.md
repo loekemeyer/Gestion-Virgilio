@@ -4,7 +4,18 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-22 · Versión app al documentar: **v3.67**
+> Última actualización: 2026-06-23 · Versión app al documentar: **v3.68**
+>
+> Nota: **v3.68** — **Carga Camión (CC): ahora muestra la cantidad de líos por NP** (📦), pedido
+> del usuario ("los NP facturados tienen que aparecer en CC … con la cantidad de líos"). Los líos
+> salen de los eventos **TAL** (anotados al terminar armado), el **mismo origen** que ya usa
+> Recepción Remitos (RR). `fetchCCData` ahora también trae los `TAL` (ventana 7 días) y arma un
+> `Map` NP→líos; cada item lleva `lios` (o `null` si el armador no lo cargó). `ccRender` agrega
+> `📦 N` por fila (gris `—` si no hay dato, gris si es 0; clases `.cc-lios`/`.cc-lios0`). No cambia
+> qué NP aparecen (siguen siendo el reparto: facturados+cerrados − cargados) ni los eventos.
+> ⚠ **Pendiente (a definir con el usuario)**: hacer que **CR = Control Remitos** (hoy *toggle plano*
+> desde la v3.45, sin lista; distinto de RR) muestre también los facturados con líos — falta decidir
+> si CR sólo **muestra** la lista o además lleva un tic "Controlado" registrado (evento nuevo).
 >
 > Nota: **v3.67** — Editor de Planimetría, polish estético: todo el cuerpo se acota a una
 > **columna centrada de 560px** (`.planim-body{align-items:center}` + `.planim-body > *{max-width:560px}`)
