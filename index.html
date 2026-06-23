@@ -1814,11 +1814,12 @@ button {
 .planim-list{ display: flex; flex-direction: column; gap: 6px; }
 .planim-sec-t{ font-size: 14px; font-weight: bold; color: #1e6bd6; margin: 18px 0 8px; }
 .planim-list-head{ display: flex; gap: 8px; align-items: center; padding: 2px 10px 0; font-size: 11px; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: .4px; }
-.plh-cod{ flex: 0 0 64px; } .plh-sec{ flex: 1 1 120px; } .plh-ord{ flex: 0 0 90px; } .plh-act{ flex: 0 0 auto; margin-left: auto; }
+.plh-cod{ flex: 0 0 64px; } .plh-sec{ flex: 0 1 220px; } .plh-ord{ flex: 0 0 90px; } .plh-act{ flex: 0 0 auto; margin-left: auto; }
 .planim-row{ display: flex; gap: 8px; align-items: center; background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 10px; flex-wrap: wrap; }
 .planim-row-cod{ font-size: 18px; font-weight: 800; color: #0f172a; flex: 0 0 64px; }
-.planim-row-sec{ flex: 1 1 120px; min-width: 100px; }
+.planim-row-sec{ flex: 0 1 220px; min-width: 100px; }
 .planim-row-ord{ flex: 0 0 90px; }
+.planim-row .planim-btn-save{ margin-left: auto; }   /* acciones a la derecha (alinean con "Acciones") */
 .mails-row{ display:flex; align-items:center; gap:10px; background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:10px 12px; }
 .mails-mail{ flex:1 1 auto; font-size:15px; color:#0f172a; word-break:break-all; }
 .mails-fijo{ flex:0 0 auto; font-size:11px; font-weight:800; color:#475569; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:999px; padding:2px 10px; text-transform:uppercase; letter-spacing:.4px; }
@@ -4985,7 +4986,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.65";
+const APP_VERSION = "v3.66";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -9489,14 +9490,18 @@ function planimRender(filter) {
   if (!list) return;
   const G = window.GONDOLA || {};
   const f = String(filter || "").trim().toUpperCase();
-  if (!f) { list.innerHTML = '<div class="planim-empty">Buscá un código o sector para editarlo. Para uno nuevo, usá el form de arriba.</div>'; return; }
+  // Sin búsqueda → muestra TODO. Con búsqueda → filtra por código o sector. Siempre
+  // ordenado por N° de orden (orden de góndola), no alfabético.
+  const ordOf = function (k) { const o = Number((G[k] || [])[1]); return isNaN(o) ? Number.MAX_SAFE_INTEGER : o; };
   const keys = Object.keys(G).filter(function (k) {
+    if (!f) return true;
     const e = G[k] || [];
     return k.indexOf(f) >= 0 || String(e[0] || "").toUpperCase().indexOf(f) >= 0;
-  }).sort();
-  if (!keys.length) { list.innerHTML = '<div class="planim-empty">Nada coincide con "' + escapeHtml(filter) + '".</div>'; return; }
+  }).sort(function (a, b) { return ordOf(a) - ordOf(b) || (a < b ? -1 : a > b ? 1 : 0); });
+  if (!keys.length) { list.innerHTML = '<div class="planim-empty">' + (f ? 'Nada coincide con "' + escapeHtml(filter) + '".' : 'No hay ubicaciones cargadas todavía.') + '</div>'; return; }
   const head = '<div class="planim-list-head"><span class="plh-cod">Código</span><span class="plh-sec">Sector</span><span class="plh-ord">Orden</span><span class="plh-act">Acciones</span></div>';
-  list.innerHTML = head + keys.slice(0, 100).map(function (k) {
+  const CAP = 500;
+  list.innerHTML = head + keys.slice(0, CAP).map(function (k) {
     const e = G[k] || ["", 0];
     const kE = escapeHtml(k);
     return '<div class="planim-row">' +
@@ -9506,7 +9511,7 @@ function planimRender(filter) {
       '<button class="planim-btn-save" onclick="planimSaveRow(\'' + kE + '\')">Guardar</button>' +
       '<button class="planim-btn-del" onclick="planimDeleteRow(\'' + kE + '\')">Borrar</button>' +
     '</div>';
-  }).join("") + (keys.length > 100 ? '<div class="planim-empty">Mostrando 100 de ' + keys.length + ' — afiná la búsqueda.</div>' : "");
+  }).join("") + (keys.length > CAP ? '<div class="planim-empty">Mostrando ' + CAP + ' de ' + keys.length + ' — afiná la búsqueda.</div>' : "");
 }
 async function planimUpsert(cod, sector, orden) {
   const headers = await facAuthWriteHeaders({ "Prefer": "resolution=merge-duplicates,return=minimal" });

@@ -4,7 +4,16 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-22 · Versión app al documentar: **v3.65**
+> Última actualización: 2026-06-22 · Versión app al documentar: **v3.66**
+>
+> Nota: **v3.66** — Editor de Planimetría: (a) el buscador **vacío ahora muestra TODAS las
+> ubicaciones** (antes pedía buscar algo) **ordenadas por N° de orden** (orden de góndola, no
+> alfabético) — `planimRender` ordena por `ordOf`, cap 500. (b) La columna **Sector** dejó de
+> ocupar el 100% (`flex:1 1 120px` → `flex:0 1 220px` en `.plh-sec`/`.planim-row-sec`) y los
+> botones Guardar/Borrar se alinean a la derecha (`margin-left:auto`). Además, **limpieza en
+> Supabase**: se deduplicaron policies RLS (se borraron las `{authenticated}`-solo que estaban
+> de más en `Control_Modo_OP` y `Entregas …`, quedando las `{anon,authenticated}`) y se
+> normalizó la única fila `estado='listo'` → `'procesado'`.
 >
 > Nota: **v3.65** — limpieza post-auditoría de `recepcion.js`: se sacó el **CSS muerto** que
 > quedó de los reworks de Pendientes (bloque del checklist `chk*` de v3.58 y de las tarjetas
