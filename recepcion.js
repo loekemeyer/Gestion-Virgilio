@@ -137,8 +137,9 @@ const RCP_CSS = `
 #rcpRoot .chkPartesBtn.no.sel{ background:var(--danger); border-color:var(--danger); }
 /* Pendientes (Marianela) = TARJETAS verticales (sin scroll horizontal): tilde + No
    corresponde + foto (adjuntar/arrastrar) + Enviar (código). */
-#rcpRoot .pendCards{ display:flex; flex-direction:column; gap:14px; max-width:640px; margin:0 auto; }
-#rcpRoot .pendCard{ border:2px solid var(--border); border-radius:14px; background:#fff; padding:14px 16px; }
+#rcpRoot .opPage.pendWide .opPageInner{ max-width:none; }   /* PC: usa todo el ancho */
+#rcpRoot .pendCards{ display:grid; grid-template-columns:repeat(auto-fill, minmax(340px, 1fr)); gap:12px; align-items:start; }
+#rcpRoot .pendCard{ border:2px solid var(--border); border-radius:14px; background:#fff; padding:12px 14px; }
 #rcpRoot .pendCard.sentRow{ border-color:var(--ok); background:#f6fff8; }
 #rcpRoot .pcHead{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
 #rcpRoot .pcName{ font-size:18px; font-weight:900; color:#111; }
@@ -147,7 +148,7 @@ const RCP_CSS = `
 #rcpRoot .pcMeta{ font-size:13px; color:#666; margin-top:3px; }
 #rcpRoot .pcDemora{ font-weight:900; color:#b45309; }
 #rcpRoot .pcEntrega{ font-size:14px; color:#333; margin-top:6px; font-variant-numeric:tabular-nums; word-break:break-word; }
-#rcpRoot .pcActs{ margin-top:12px; border-top:1px solid #eee; padding-top:12px; display:flex; flex-direction:column; gap:12px; }
+#rcpRoot .pcActs{ margin-top:10px; border-top:1px solid #eee; padding-top:10px; display:flex; flex-direction:column; gap:10px; }
 #rcpRoot .pcRow{ display:flex; align-items:center; gap:12px; }
 #rcpRoot .pcRow.pcFotoRow{ flex-wrap:wrap; }
 #rcpRoot .pcLbl{ font-size:16px; font-weight:800; color:#111; }
@@ -160,7 +161,7 @@ const RCP_CSS = `
 #rcpRoot .fotoDrop{ display:inline-flex; align-items:center; justify-content:center; min-width:160px; min-height:46px; padding:8px 12px; border:2px dashed #cbd5e1; border-radius:10px; background:#fff; cursor:pointer; font-weight:800; font-size:13px; color:#475569; }
 #rcpRoot .fotoDrop.has{ border-style:solid; border-color:var(--ok); color:var(--ok); background:#eef7ee; }
 #rcpRoot .fotoDrop.drag{ border-color:#1e6bd6; background:#eff6ff; }
-#rcpRoot .pcFoot{ margin-top:14px; display:flex; align-items:center; justify-content:flex-end; gap:12px; }
+#rcpRoot .pcFoot{ margin-top:10px; display:flex; align-items:center; justify-content:flex-end; gap:12px; }
 #rcpRoot .enviarBtn{ padding:11px 22px; font-size:16px; font-weight:900; border:0; border-radius:11px; background:#111; color:#fff; cursor:pointer; }
 #rcpRoot .enviarBtn:disabled{ opacity:.4; cursor:default; }
 #rcpRoot .codigoBox{ font-size:26px; font-weight:900; letter-spacing:4px; color:#0a7a2f; font-variant-numeric:tabular-nums; }
@@ -987,6 +988,7 @@ function renderMenu() {
 let _pendRows = {};   // id -> estado vivo (espejo de lo persistido en Supabase). NADA en localStorage.
 async function renderPendientes() {
   opState.step = "pend";
+  opPage.classList.add("pendWide");   // PC: ancho completo → grilla de tarjetas (menos scroll)
   opSetBack(true);
   opTitle.textContent = "Pendientes";
   opSubtitle.textContent = "Recepciones cargadas. Tildá, adjuntá la foto y tocá Enviar.";

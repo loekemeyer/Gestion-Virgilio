@@ -4,7 +4,13 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-22 · Versión app al documentar: **v3.61**
+> Última actualización: 2026-06-22 · Versión app al documentar: **v3.62**
+>
+> Nota: **v3.62** — Pendientes optimizado **para PC** (lo usa una operadora en monitor): las
+> tarjetas pasan de una columna a una **grilla multi-columna** (`grid-template-columns:
+> repeat(auto-fill, minmax(340px,1fr))`) usando **todo el ancho** (clase `pendWide` en `opPage`
+> → saca el cap de 780px) → se ven varias recepciones por fila y se **scrollea mucho menos**.
+> Tarjetas un poco más compactas. `recepcion.js?v=3.62`.
 >
 > Nota: **v3.61** — fix visual en Recepción: el header sticky del Modo OP (`.opHeader`) no
 > tenía `z-index`, así que al scrollear Pendientes las tarjetas (y su botón Enviar) se
