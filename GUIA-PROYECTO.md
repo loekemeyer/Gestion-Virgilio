@@ -4,7 +4,13 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-22 · Versión app al documentar: **v3.66**
+> Última actualización: 2026-06-22 · Versión app al documentar: **v3.67**
+>
+> Nota: **v3.67** — Editor de Planimetría, polish estético: todo el cuerpo se acota a una
+> **columna centrada de 560px** (`.planim-body{align-items:center}` + `.planim-body > *{max-width:560px}`)
+> → ya no se estira a todo el ancho ni queda el hueco. Filas con **hover** (sombra suave),
+> botones Guardar/Borrar de **igual alto** (42px) con hover, inputs con **anillo de foco**, la
+> columna Sector más justa (150px) y el N° de orden centrado. Solo CSS de `#planimEditorOverlay`.
 >
 > Nota: **v3.66** — Editor de Planimetría: (a) el buscador **vacío ahora muestra TODAS las
 > ubicaciones** (antes pedía buscar algo) **ordenadas por N° de orden** (orden de góndola, no
