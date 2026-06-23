@@ -96,7 +96,7 @@ const RCP_CSS = `
 #rcpRoot .opPage{ position:fixed; inset:0; background:var(--bg); overflow:auto; display:none; z-index:1300; }
 #rcpRoot .opPage.open{ display:block; }
 #rcpRoot .opPageInner{ max-width:780px; margin:0 auto; padding:16px; min-height:100%; box-sizing:border-box; display:flex; flex-direction:column; }
-#rcpRoot .opHeader{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 0 14px; margin-bottom:14px; border-bottom:1px solid var(--border); position:sticky; top:0; background:var(--bg); }
+#rcpRoot .opHeader{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 0 14px; margin-bottom:14px; border-bottom:1px solid var(--border); position:sticky; top:0; background:var(--bg); z-index:6; }
 #rcpRoot .opPageTitle{ flex:1; text-align:center; font-size:22px; font-weight:900; }
 #rcpRoot .opNav{ background:#fff; border:2px solid var(--border); border-radius:12px; padding:14px 20px; font-size:18px; font-weight:900; cursor:pointer; white-space:nowrap; }
 #rcpRoot .opPageBody{ flex:1; }

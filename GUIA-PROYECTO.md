@@ -4,7 +4,12 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-22 · Versión app al documentar: **v3.60**
+> Última actualización: 2026-06-22 · Versión app al documentar: **v3.61**
+>
+> Nota: **v3.61** — fix visual en Recepción: el header sticky del Modo OP (`.opHeader`) no
+> tenía `z-index`, así que al scrollear Pendientes las tarjetas (y su botón Enviar) se
+> pintaban **por encima** de la barra "Pendientes". Se le puso `z-index:6` → ahora el header
+> tapa lo que scrollea debajo. `recepcion.js?v=3.61`.
 >
 > Nota: **v3.60** — **Pendientes pasó de TABLA horizontal a TARJETAS verticales** (pedido del
 > usuario; evita scroll horizontal y deja los controles grandes/claros). Cada recepción = una
