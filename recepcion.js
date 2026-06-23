@@ -138,7 +138,7 @@ const RCP_CSS = `
 /* Pendientes (Marianela) = TARJETAS verticales (sin scroll horizontal): tilde + No
    corresponde + foto (adjuntar/arrastrar) + Enviar (código). */
 #rcpRoot .opPage.pendWide .opPageInner{ max-width:none; }   /* PC: usa todo el ancho */
-#rcpRoot .pendCards{ display:grid; grid-template-columns:repeat(auto-fill, minmax(340px, 1fr)); gap:12px; align-items:start; }
+#rcpRoot .pendCards{ display:grid; grid-template-columns:repeat(auto-fill, minmax(min(100%, 360px), 360px)); gap:12px; align-items:start; }
 #rcpRoot .pendCard{ border:2px solid var(--border); border-radius:14px; background:#fff; padding:12px 14px; }
 #rcpRoot .pendCard.sentRow{ border-color:var(--ok); background:#f6fff8; }
 #rcpRoot .pcHead{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }

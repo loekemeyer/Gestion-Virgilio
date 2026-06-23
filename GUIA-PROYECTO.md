@@ -4,7 +4,11 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-22 · Versión app al documentar: **v3.62**
+> Última actualización: 2026-06-22 · Versión app al documentar: **v3.63**
+>
+> Nota: **v3.63** — Pendientes: las tarjetas tienen **ancho fijo** (360px) en vez de estirarse
+> (`1fr`) → cada una mide siempre lo mismo haya 2 o 7, y entran las que quepan por fila
+> (`grid-template-columns: repeat(auto-fill, minmax(min(100%,360px), 360px))`). `recepcion.js?v=3.63`.
 >
 > Nota: **v3.62** — Pendientes optimizado **para PC** (lo usa una operadora en monitor): las
 > tarjetas pasan de una columna a una **grilla multi-columna** (`grid-template-columns:
