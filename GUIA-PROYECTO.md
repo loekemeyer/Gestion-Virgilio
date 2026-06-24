@@ -4,7 +4,21 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-24 · Versión app al documentar: **v3.78**
+> Última actualización: 2026-06-24 · Versión app al documentar: **v3.79**
+>
+> Nota: **v3.79** — **PPP N° base: ahora se VE de dónde sale (vinculado a Supabase visible)** (el usuario
+> reportó "no está vinculado a Supabase": el número salía bien pero sin ninguna señal de que viniera de la
+> tabla, y si la lectura fallaba caía a local **en silencio**). Cambios: (1) **nota de origen** bajo el
+> toolbar (`#pppBaseNote`, `_pppRenderBaseNote`) — **verde** "🟢 Supabase (Prog. Diaria): última tanda
+> C63 → N° base 64" cuando la lectura anduvo, **roja** "🔴 No pude leer Supabase (…) — N° base local: N"
+> cuando falla, "✍️ puesto a mano" si lo editás. (2) **Supabase es la fuente primaria**: `base = supaMax
+> + 1`; lo local/`baseLast` quedó sólo como **piso anti-colisión** (si aplica, la nota lo aclara
+> "ajustado"). (3) **Ya no se queda pegado a local**: sólo fija el día (`baseAutoDate`) si Supabase
+> **respondió**; si falla, reintenta al reabrir (cooldown 6s, guard `_pppBaseBusy`). Verificado que el
+> **RLS permite la lectura anónima**: `sql/ppp_supabase.sql` tiene `policy ppp_prog_select ... for select
+> to anon using (true)` → en el navegador del usuario la lectura de `PPP_Programacion_Diaria` está
+> habilitada (el sandbox NO puede probarla: el proxy bloquea `*.supabase.co`, igual que Google). `baseNote`
+> + `baseOk` se guardan en `vir_ppp_cfg`. Resto de la lógica de v3.78 igual.
 >
 > Nota: **v3.78** — **PPP: el "N° base" (con el que se nombran las tandas `C<NN><letra>`) se calcula
 > SOLO** (pedido del usuario; antes era fijo `60` a mano). Regla elegida = **un número nuevo por día de

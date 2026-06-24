@@ -5002,7 +5002,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.78";
+const APP_VERSION = "v3.79";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -9009,8 +9009,8 @@ function pppSetEdit(np, field, val, regroup) {
    mano, ni programa pedidos sin zona (primero hay que asignarles el barrio). El
    resultado se escribe como edits (igual que tipear la tanda) → editable/reversible. */
 const PPP_CFG_KEY = "vir_ppp_cfg";
-function pppGetCfg() { let c = {}; try { c = JSON.parse(localStorage.getItem(PPP_CFG_KEY) || "{}"); } catch (_e) {} return { tandaCap: (c && c.tandaCap != null ? +c.tandaCap : 0.8), dayCap: (c && c.dayCap != null ? +c.dayCap : 6), baseN: (c && c.baseN != null ? String(c.baseN) : "60"), baseAutoDate: (c && c.baseAutoDate != null ? String(c.baseAutoDate) : ""), baseLast: (c && c.baseLast != null ? (+c.baseLast || 0) : 0) }; }
-function pppSetCfg(k, v) { const c = pppGetCfg(); if (k === "tandaCap") c.tandaCap = parseFloat(String(v).replace(",", ".")) || 0.8; else if (k === "dayCap") c.dayCap = parseFloat(String(v).replace(",", ".")) || 6; else { c.baseN = String(v).trim() || "60"; c.baseAutoDate = getTodayKey(); const _bn = _pppBaseNumOf(c.baseN); if (_bn != null && _bn > (c.baseLast || 0)) c.baseLast = _bn; } try { localStorage.setItem(PPP_CFG_KEY, JSON.stringify(c)); } catch (_e) {} }
+function pppGetCfg() { let c = {}; try { c = JSON.parse(localStorage.getItem(PPP_CFG_KEY) || "{}"); } catch (_e) {} return { tandaCap: (c && c.tandaCap != null ? +c.tandaCap : 0.8), dayCap: (c && c.dayCap != null ? +c.dayCap : 6), baseN: (c && c.baseN != null ? String(c.baseN) : "60"), baseAutoDate: (c && c.baseAutoDate != null ? String(c.baseAutoDate) : ""), baseLast: (c && c.baseLast != null ? (+c.baseLast || 0) : 0), baseNote: (c && c.baseNote != null ? String(c.baseNote) : ""), baseOk: (c && c.baseOk != null ? !!c.baseOk : true) }; }
+function pppSetCfg(k, v) { const c = pppGetCfg(); if (k === "tandaCap") c.tandaCap = parseFloat(String(v).replace(",", ".")) || 0.8; else if (k === "dayCap") c.dayCap = parseFloat(String(v).replace(",", ".")) || 6; else { c.baseN = String(v).trim() || "60"; c.baseAutoDate = getTodayKey(); const _bn = _pppBaseNumOf(c.baseN); if (_bn != null && _bn > (c.baseLast || 0)) c.baseLast = _bn; c.baseNote = "✍️ N° base puesto a mano: " + c.baseN; c.baseOk = true; _pppBaseNote = c.baseNote; _pppBaseOk = true; } try { localStorage.setItem(PPP_CFG_KEY, JSON.stringify(c)); } catch (_e) {} if (k !== "tandaCap" && k !== "dayCap") _pppRenderBaseNote(); }
 function _pppLetter(i) { let s = ""; i = i | 0; do { s = String.fromCharCode(65 + (i % 26)) + s; i = Math.floor(i / 26) - 1; } while (i >= 0); return s; }
 /* "C64A" / "64" / "C19H" → 64 / 64 / 19. Formato operario (A15C) u otro → null. */
 function _pppBaseNumOf(t) { const m = /^C?(\d+)/i.exec(String(t == null ? "" : t).trim()); return m ? parseInt(m[1], 10) : null; }
@@ -9031,26 +9031,54 @@ function pppLocalMaxBase() {
   for (const p of (_pppParsed.prog || [])) see(p.tanda);
   return mx;
 }
-/* N° base AUTOMÁTICO = "un número nuevo por DÍA de programación": última tanda en
-   Supabase (Programación Diaria) + 1. Mismo día → reusa el ya fijado (no sube); día
-   nuevo → recalcula. Toma el máx entre Supabase, lo local y un high-water (baseLast)
-   por si Supabase todavía no espejó lo de hoy (la PPP escribe SOLO LOCAL). Si Supabase
-   no responde, cae a lo local. Persiste en vir_ppp_cfg y, si el campo está a la vista
-   y no lo está tipeando el usuario, lo actualiza. */
+let _pppBaseNote = "", _pppBaseOk = true, _pppBaseBusy = false, _pppBaseLastTry = 0;
+/* Pinta la nota de origen del N° base (de dónde salió: Supabase / local / a mano). */
+function _pppRenderBaseNote() {
+  const el = document.getElementById("pppBaseNote");
+  if (!el) return;
+  el.textContent = _pppBaseNote || "";
+  el.style.color = _pppBaseOk ? "#166534" : "#b42318";
+}
+/* N° base AUTOMÁTICO = "un número nuevo por DÍA de programación" leyendo la ÚLTIMA
+   tanda en Supabase (PPP_Programacion_Diaria) + 1. Muestra de DÓNDE salió (nota verde
+   "🟢 Supabase: última C63 → 64", o roja "🔴 no pude leer Supabase…") para que se VEA
+   que está vinculado. Mismo día → reusa lo ya fijado (no re-consulta); día nuevo, o si
+   la última vez falló → reintenta (con cooldown 6s para no spamear). SÓLO fija el día
+   cuando la lectura de Supabase salió bien (si falla, NO se queda pegado a local:
+   reintenta al reabrir). El máx con lo local/high-water es sólo un piso anti-colisión
+   (se avisa en la nota si llega a aplicar). */
 async function pppAutoBaseN() {
   const today = getTodayKey();
   const cfg = pppGetCfg();
-  if (cfg.baseAutoDate === today && cfg.baseN) return cfg.baseN;
-  let supaMax = 0;
-  try { supaMax = await pppFetchMaxTandaBase(); } catch (_e) { supaMax = 0; }
+  if (cfg.baseAutoDate === today && cfg.baseN) { _pppBaseNote = cfg.baseNote || ""; _pppBaseOk = (cfg.baseOk !== false); _pppRenderBaseNote(); return cfg.baseN; }
+  if (_pppBaseBusy) return cfg.baseN || "";
+  if (_pppBaseNote && (Date.now() - _pppBaseLastTry) < 6000) { _pppRenderBaseNote(); return cfg.baseN || ""; }   // cooldown tras un intento reciente
+  _pppBaseBusy = true; _pppBaseLastTry = Date.now();
+  let supaMax = null, err = "";
+  try { supaMax = await pppFetchMaxTandaBase(); }
+  catch (e) { err = (e && e.message) ? String(e.message) : "error"; }
+  _pppBaseBusy = false;
   const cur = pppGetCfg();
-  if (cur.baseAutoDate === today && cur.baseN) return cur.baseN;   // un edit manual lo fijó mientras buscaba
-  const base = Math.max(supaMax, pppLocalMaxBase(), cur.baseLast || 0) + 1;
+  if (cur.baseAutoDate === today && cur.baseN) { _pppBaseNote = cur.baseNote || ""; _pppBaseOk = (cur.baseOk !== false); _pppRenderBaseNote(); return cur.baseN; }   // un edit manual lo fijó mientras buscaba
+  const floor = Math.max(pppLocalMaxBase(), cur.baseLast || 0);
+  let base, note, ok;
+  if (supaMax != null) {
+    ok = true;
+    base = Math.max(supaMax, floor) + 1;
+    if (supaMax > 0) { note = "🟢 Supabase (Prog. Diaria): última tanda C" + supaMax + " → N° base " + base; if (base > supaMax + 1) note += " · ajustado (ya hay C" + floor + " local/hoy)"; }
+    else { note = "🟢 Supabase OK (sin tandas cargadas) → N° base " + base; }
+  } else {
+    ok = false; base = floor + 1;
+    note = "🔴 No pude leer Supabase (" + (err || "sin conexión") + ") — N° base local: " + base;
+  }
   let c = {}; try { c = JSON.parse(localStorage.getItem(PPP_CFG_KEY) || "{}"); } catch (_e) {}
-  c.baseN = String(base); c.baseAutoDate = today; c.baseLast = Math.max(c.baseLast || 0, base);
+  c.baseN = String(base); c.baseLast = Math.max(c.baseLast || 0, base); c.baseNote = note; c.baseOk = ok;
+  if (ok) c.baseAutoDate = today;            // sólo fijamos el día si Supabase respondió (si no, reintenta al reabrir)
   try { localStorage.setItem(PPP_CFG_KEY, JSON.stringify(c)); } catch (_e) {}
+  _pppBaseNote = note; _pppBaseOk = ok;
   const inp = document.getElementById("pppBaseNInp");
   if (inp && document.activeElement !== inp) inp.value = String(base);
+  _pppRenderBaseNote();
   return String(base);
 }
 function pppSugerirTandas() {
@@ -9519,6 +9547,7 @@ function pppRenderProg() {
     '<label class="ppp-tool-l">N° base <input id="pppBaseNInp" class="ppp-tool-inp ppp-tool-n" value="' + escapeHtml(cfg.baseN) + '" onchange="pppSetCfg(\'baseN\',this.value)" title="Se calcula solo: última tanda en Supabase (Programación Diaria) + 1, un número por día. Podés cambiarlo a mano."></label>' +
     '<button class="ppp-tool-clear" onclick="pppLimpiarTandas()">borrar tandas</button>' +
     '</div>';
+  html += '<div id="pppBaseNote" style="font-size:12px;font-weight:600;margin:2px 2px 8px;color:' + (cfg.baseOk === false ? '#b42318' : '#166534') + ';">' + escapeHtml(cfg.baseNote || "") + '</div>';
   // ===== Sugerencia: pedido en A Programar cuyo CLIENTE ya tiene tanda en Programación =====
   // → ofrecer meterlo en esa tanda ya hecha (aunque pase el m³/tanda objetivo).
   const _progByCli = {};
