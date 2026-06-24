@@ -4,7 +4,14 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-23 · Versión app al documentar: **v3.72**
+> Última actualización: 2026-06-23 · Versión app al documentar: **v3.73**
+>
+> Nota: **v3.73** — **Planimetría: el código 513 pasa de sector D36 → F13** (pedido del usuario).
+> En `planimetria.js`: `"513":["D36",100]` → `"513":["F13",100]`. Se cambió **sólo el sector**; el
+> orden de picking queda en **100** (no se tocó la secuencia). Cache-buster `planimetria.js?v=3.73`.
+> No hay override en Supabase para 513, así que manda la estática. ⚠ Con orden 100 el 513 se levanta
+> entre los códigos del sector D (orden 100–103); si se quiere que se levante junto con los otros de
+> F13 (~orden 104), hay que reordenar aparte.
 >
 > Nota: **v3.72** — **Planimetría: alias con cero adelante para TODOS los códigos de 2 dígitos**
 > (pedido del usuario, generaliza v3.70/v3.71). En vez de ir uno por uno, se agregó a `planimetria.js`
