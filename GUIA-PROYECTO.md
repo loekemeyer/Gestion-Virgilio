@@ -4,7 +4,17 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-24 · Versión app al documentar: **v3.74**
+> Última actualización: 2026-06-24 · Versión app al documentar: **v3.75**
+>
+> Nota: **v3.75** — **Admin: botón "🚚 Remitos a controlar"** (pedido del usuario). Da al supervisor
+> la MISMA lista de RR (`showControlRemitos`) — cargados al camión sin controlar, con cliente (PPP +
+> "Pedidos Entregados"), líos y **Demora** desde que se cargó — y puede **tildar Controlado**. Botón
+> nuevo en el panel de Administración (`openRemitosAdmin`). Se reusa todo el código de RR con un flag
+> `_cr.admin`: el título cambia, se agrega la columna **Demora** (`crFmtDemora`, sólo en admin), y al
+> «Terminé» emite **CRN** por NP igual que el operario **pero NO cierra ningún toggle RR** (el admin no
+> tiene botonera). Usa **legajo "0"** (sistema, excluido de reportes de operario, igual que CRA); el
+> CRN igual mueve el pedido a Pedidos Entregados y limpia la alarma "🚨 SIN CONTROLAR" del PPP. NO es
+> lo mismo que **🏭 "Carga Recepción Mercadería"** (esa es la mercadería que ENTRA de talleristas).
 >
 > Nota: **v3.74** — **Recepción Remitos (RR): el cliente de los NP arrastrados sale de "Pedidos
 > Entregados"** (pedido del usuario). Síntoma: RR mostraba **Cod Cliente / Razón Social en "—"** para
