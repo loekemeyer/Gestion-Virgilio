@@ -2851,7 +2851,7 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
       <button class="sup-action-btn" onclick="openRecepcionAdmin()"><span class="sup-ico">🏭</span><span>Carga Recepción Mercadería</span></button>
       <button class="sup-action-btn" onclick="openPlanimEditor()"><span class="sup-ico">🗺️</span><span>Editar Planimetría</span></button>
       <button class="sup-action-btn" onclick="openPPP()"><span class="sup-ico">🗓️</span><span>PPP</span></button>
-      <button class="sup-action-btn" onclick="openRemitosAdmin()"><span class="sup-ico">🚚</span><span>Remitos a controlar</span></button>
+      <button class="sup-action-btn" onclick="openRemitosAdmin()"><span class="sup-ico">🚚</span><span>Recepción Remitos (RR)</span></button>
       <button class="sup-action-btn" onclick="openMailsEditor()"><span class="sup-ico">✉️</span><span>Mails autorizados</span></button>
       <button class="sup-action-btn" onclick="openTallEditor()"><span class="sup-ico">👷</span><span>Talleristas de Recepción</span></button>
     </div>
@@ -3134,7 +3134,7 @@ const SUPABASE_PLANIMETRIA_ENDPOINT =
 
 const filas = {
   row1: ["EP","TP","AP","TAP","CR","CC"],
-  row2: ["RR","RT","MG","RI","EI","CT"],
+  row2: ["RT","MG","RI","EI","CT"],
   row3: ["AT","PB","Limp","Perm","PC"]
 };
 
@@ -5004,7 +5004,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.75";
+const APP_VERSION = "v3.76";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -6816,7 +6816,7 @@ async function fetchCRData() {
 async function showControlRemitos(legajo, isAdmin) {
   const m = document.getElementById("tandaModal"); if (!m) return;
   const leg = String(legajo || "").trim();
-  m.querySelector(".tanda-modal-title").textContent = isAdmin ? "🚚 Remitos a controlar — admin" : "📋 Recepción Remitos — descarga";
+  m.querySelector(".tanda-modal-title").textContent = isAdmin ? "🚚 Recepción Remitos (RR) — control" : "📋 Recepción Remitos — descarga";
   m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">Cargando pedidos cargados al camión…</div>`;
   m.classList.add("show");
   crWakeLock();
@@ -12972,6 +12972,9 @@ function showOperario(emp) {
   try {
     if (typeof saveLastLegajo === "function") saveLastLegajo(emp.legajo);
     if (typeof renderLegajoHistory === "function") renderLegajoHistory(emp.legajo);
+    // RR salió de la botonera del operario (ahora es solo del admin, v3.76). Si quedó
+    // un toggle RR abierto de antes, lo cerramos: un toggle colgado bloquea EP/TP/AP/TAP.
+    try { const st = getLegajoState(emp.legajo); if (st.toggles && st.toggles.RR) { delete st.toggles.RR; setLegajoState(emp.legajo, st); } } catch (_e2) {}
     if (typeof updateCoreButtonsState === "function") updateCoreButtonsState();
     if (typeof renderPendingSuggestion === "function") renderPendingSuggestion();
   } catch (_e) {}
