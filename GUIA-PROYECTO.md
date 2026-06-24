@@ -4,7 +4,21 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-24 · Versión app al documentar: **v3.77**
+> Última actualización: 2026-06-24 · Versión app al documentar: **v3.78**
+>
+> Nota: **v3.78** — **PPP: el "N° base" (con el que se nombran las tandas `C<NN><letra>`) se calcula
+> SOLO** (pedido del usuario; antes era fijo `60` a mano). Regla elegida = **un número nuevo por día de
+> programación = última tanda en Supabase + 1**: lee la tabla **`PPP_Programacion_Diaria`** (las hojas
+> de Programación Diaria espejadas; `pppFetchMaxTandaBase` vía `supaFetchAll`, **solo lectura** — no
+> cambia el "SOLO LOCAL" de la PPP), saca el **mayor `C<NN>`** (`_pppBaseNumOf`, formato `C` + número +
+> letra; ignora formatos de operario tipo `A15C`) y suma 1. **Mismo día → reusa** el número ya fijado
+> (no sube); **día nuevo → recalcula**. Persiste en `vir_ppp_cfg` (`baseN` + `baseAutoDate` + `baseLast`
+> high-water). Toma el **máx** entre Supabase, lo **local** (`pppLocalMaxBase`, edits+pedidos) y `baseLast`
+> → no se repite ni baja aunque Supabase todavía no haya espejado lo de hoy. Hoy (última = `C63`) da
+> **64** → tandas `C64A, C64B…`; mañana **65**. `pppSugerirTandas` ahora **continúa las letras**
+> (`_pppLetterIdx`) si re-armás el mismo día (no pisa `C64A`). El campo **N° base** (`#pppBaseNInp`) se
+> autocompleta al abrir/renderizar 📥 A Programar (`pppAutoBaseN` en `pppRenderProg`) y **se puede editar
+> a mano** igual (un edit manual queda fijado para ese día; al otro día vuelve a autocalcular).
 >
 > Nota: **v3.77** — **REVIERTE v3.76: RR queda en los operarios Y se suma el botón admin** (aclaración
 > del usuario). RR vuelve a la botonera del operario (`filas.row2` incluye `"RR"` de nuevo) y se sacó el

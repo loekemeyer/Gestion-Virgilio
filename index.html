@@ -5002,7 +5002,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.77";
+const APP_VERSION = "v3.78";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -9009,9 +9009,50 @@ function pppSetEdit(np, field, val, regroup) {
    mano, ni programa pedidos sin zona (primero hay que asignarles el barrio). El
    resultado se escribe como edits (igual que tipear la tanda) → editable/reversible. */
 const PPP_CFG_KEY = "vir_ppp_cfg";
-function pppGetCfg() { let c = {}; try { c = JSON.parse(localStorage.getItem(PPP_CFG_KEY) || "{}"); } catch (_e) {} return { tandaCap: (c && c.tandaCap != null ? +c.tandaCap : 0.8), dayCap: (c && c.dayCap != null ? +c.dayCap : 6), baseN: (c && c.baseN != null ? String(c.baseN) : "60") }; }
-function pppSetCfg(k, v) { const c = pppGetCfg(); if (k === "tandaCap") c.tandaCap = parseFloat(String(v).replace(",", ".")) || 0.8; else if (k === "dayCap") c.dayCap = parseFloat(String(v).replace(",", ".")) || 6; else c.baseN = String(v).trim() || "60"; try { localStorage.setItem(PPP_CFG_KEY, JSON.stringify(c)); } catch (_e) {} }
+function pppGetCfg() { let c = {}; try { c = JSON.parse(localStorage.getItem(PPP_CFG_KEY) || "{}"); } catch (_e) {} return { tandaCap: (c && c.tandaCap != null ? +c.tandaCap : 0.8), dayCap: (c && c.dayCap != null ? +c.dayCap : 6), baseN: (c && c.baseN != null ? String(c.baseN) : "60"), baseAutoDate: (c && c.baseAutoDate != null ? String(c.baseAutoDate) : ""), baseLast: (c && c.baseLast != null ? (+c.baseLast || 0) : 0) }; }
+function pppSetCfg(k, v) { const c = pppGetCfg(); if (k === "tandaCap") c.tandaCap = parseFloat(String(v).replace(",", ".")) || 0.8; else if (k === "dayCap") c.dayCap = parseFloat(String(v).replace(",", ".")) || 6; else { c.baseN = String(v).trim() || "60"; c.baseAutoDate = getTodayKey(); const _bn = _pppBaseNumOf(c.baseN); if (_bn != null && _bn > (c.baseLast || 0)) c.baseLast = _bn; } try { localStorage.setItem(PPP_CFG_KEY, JSON.stringify(c)); } catch (_e) {} }
 function _pppLetter(i) { let s = ""; i = i | 0; do { s = String.fromCharCode(65 + (i % 26)) + s; i = Math.floor(i / 26) - 1; } while (i >= 0); return s; }
+/* "C64A" / "64" / "C19H" → 64 / 64 / 19. Formato operario (A15C) u otro → null. */
+function _pppBaseNumOf(t) { const m = /^C?(\d+)/i.exec(String(t == null ? "" : t).trim()); return m ? parseInt(m[1], 10) : null; }
+/* Inverso de _pppLetter: "A"→0, "Z"→25, "AA"→26 … (para continuar las letras). */
+function _pppLetterIdx(s) { s = String(s == null ? "" : s).toUpperCase().replace(/[^A-Z]/g, ""); if (!s) return -1; let n = 0; for (let i = 0; i < s.length; i++) n = n * 26 + (s.charCodeAt(i) - 64); return n - 1; }
+/* Mayor N° de tanda (formato C<NN>) en las hojas de Programación Diaria de Supabase. */
+async function pppFetchMaxTandaBase() {
+  const rows = await supaFetchAll(SUPABASE_PPP_PROG_ENDPOINT, "select=tanda");
+  let mx = 0;
+  for (let i = 0; i < rows.length; i++) { const n = _pppBaseNumOf(rows[i] && rows[i].tanda); if (n != null && n > mx) mx = n; }
+  return mx;
+}
+/* Mayor N° de tanda C<NN> entre las tandas locales (edits + pedidos cargados). */
+function pppLocalMaxBase() {
+  const ed = pppLoadEdits(); let mx = 0;
+  const see = function (t) { const n = _pppBaseNumOf(t); if (n != null && n > mx) mx = n; };
+  for (const k in ed) { if (ed[k] && ed[k].tanda != null) see(ed[k].tanda); }
+  for (const p of (_pppParsed.prog || [])) see(p.tanda);
+  return mx;
+}
+/* N° base AUTOMÁTICO = "un número nuevo por DÍA de programación": última tanda en
+   Supabase (Programación Diaria) + 1. Mismo día → reusa el ya fijado (no sube); día
+   nuevo → recalcula. Toma el máx entre Supabase, lo local y un high-water (baseLast)
+   por si Supabase todavía no espejó lo de hoy (la PPP escribe SOLO LOCAL). Si Supabase
+   no responde, cae a lo local. Persiste en vir_ppp_cfg y, si el campo está a la vista
+   y no lo está tipeando el usuario, lo actualiza. */
+async function pppAutoBaseN() {
+  const today = getTodayKey();
+  const cfg = pppGetCfg();
+  if (cfg.baseAutoDate === today && cfg.baseN) return cfg.baseN;
+  let supaMax = 0;
+  try { supaMax = await pppFetchMaxTandaBase(); } catch (_e) { supaMax = 0; }
+  const cur = pppGetCfg();
+  if (cur.baseAutoDate === today && cur.baseN) return cur.baseN;   // un edit manual lo fijó mientras buscaba
+  const base = Math.max(supaMax, pppLocalMaxBase(), cur.baseLast || 0) + 1;
+  let c = {}; try { c = JSON.parse(localStorage.getItem(PPP_CFG_KEY) || "{}"); } catch (_e) {}
+  c.baseN = String(base); c.baseAutoDate = today; c.baseLast = Math.max(c.baseLast || 0, base);
+  try { localStorage.setItem(PPP_CFG_KEY, JSON.stringify(c)); } catch (_e) {}
+  const inp = document.getElementById("pppBaseNInp");
+  if (inp && document.activeElement !== inp) inp.value = String(base);
+  return String(base);
+}
 function pppSugerirTandas() {
   const cfg = pppGetCfg(), cap = cfg.tandaCap > 0 ? cfg.tandaCap : 0.8, baseN = cfg.baseN || "60";
   if (!_pppEntregados) _pppEntregados = new Set();
@@ -9019,7 +9060,10 @@ function pppSugerirTandas() {
   const tandaDe = function (p) { const e = ed[String(p.np)]; const t = (e && e.tanda != null) ? e.tanda : (p.tanda || ""); return (t && t !== "—") ? t : ""; };
   const pend = (_pppParsed.prog || []).filter(function (p) { return !_pppEntregados.has(String(p.np)) && !tandaDe(p); });
   if (!pend.length) { pppSetStatus("No hay pedidos sin tanda para sugerir.", false); return; }
-  let idx = 0; const next = function () { return "C" + baseN + _pppLetter(idx++); };
+  let idx = 0;
+  // Continuar las letras si ya hay tandas C<baseN> (mismo día → no pisar las ya armadas).
+  { const _re = new RegExp("^C" + baseN + "([A-Za-z]+)$"); let _mx = -1; for (const p of (_pppParsed.prog || [])) { const _t = tandaDe(p); const _m = _t && _re.exec(_t); if (_m) { const _li = _pppLetterIdx(_m[1]); if (_li > _mx) _mx = _li; } } idx = _mx + 1; }
+  const next = function () { return "C" + baseN + _pppLetter(idx++); };
   const assign = function (ps, code) { for (const p of ps) (ed[String(p.np)] = ed[String(p.np)] || {}).tanda = code; };
   let nT = 0;
   // Súper: una tanda por cliente.
@@ -9472,7 +9516,7 @@ function pppRenderProg() {
     '<button class="ppp-confirm-btn" onclick="pppConfirmarProgramar()">✅ Confirmar todas</button>' +
     '<label class="ppp-tool-l">m³/tanda <input class="ppp-tool-inp" type="number" step="0.1" min="0.1" value="' + cfg.tandaCap + '" onchange="pppSetCfg(\'tandaCap\',this.value)"></label>' +
     '<label class="ppp-tool-l">m³/día <input class="ppp-tool-inp" type="number" step="0.5" min="0.5" value="' + cfg.dayCap + '" onchange="pppSetCfg(\'dayCap\',this.value)"></label>' +
-    '<label class="ppp-tool-l">N° base <input class="ppp-tool-inp ppp-tool-n" value="' + escapeHtml(cfg.baseN) + '" onchange="pppSetCfg(\'baseN\',this.value)"></label>' +
+    '<label class="ppp-tool-l">N° base <input id="pppBaseNInp" class="ppp-tool-inp ppp-tool-n" value="' + escapeHtml(cfg.baseN) + '" onchange="pppSetCfg(\'baseN\',this.value)" title="Se calcula solo: última tanda en Supabase (Programación Diaria) + 1, un número por día. Podés cambiarlo a mano."></label>' +
     '<button class="ppp-tool-clear" onclick="pppLimpiarTandas()">borrar tandas</button>' +
     '</div>';
   // ===== Sugerencia: pedido en A Programar cuyo CLIENTE ya tiene tanda en Programación =====
@@ -9541,6 +9585,7 @@ function pppRenderProg() {
     }
   }
   box.innerHTML = html;
+  pppAutoBaseN();   // N° base automático: última tanda en Supabase (Prog. Diaria) + 1, un número por día
 }
 async function pppSubir(tipo) {
   const rows = _pppParsed[tipo];
