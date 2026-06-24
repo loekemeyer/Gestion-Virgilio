@@ -4,7 +4,19 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-23 · Versión app al documentar: **v3.73**
+> Última actualización: 2026-06-24 · Versión app al documentar: **v3.74**
+>
+> Nota: **v3.74** — **Recepción Remitos (RR): el cliente de los NP arrastrados sale de "Pedidos
+> Entregados"** (pedido del usuario). Síntoma: RR mostraba **Cod Cliente / Razón Social en "—"** para
+> casi todos los NP. Causa: esas dos columnas salían SÓLO del **PPP del día** (`fetchMonitorSheet`); los
+> NP cargados en días anteriores (backlog cargado-sin-controlar, ventana de 7 días) **ya no están** en
+> la PPP de hoy → "—". **Fix**: nuevo `fetchEntregadosMeta()` lee la hoja **"PPP Excel Pedidos Entregados
+> 2026"** (`MONITOR_HISTORIC_CSV_URL`, gid `2146771217`) y arma `NP → {cod, rs}`; `fetchCRData` lo usa
+> como **fallback** sólo para los NP que faltan (no lee la hoja si no hace falta). La hoja usa el **mismo
+> layout de columnas que la PPP** en las filas recientes (`NP=col2, COD=col4, RS=col5`; filas viejas tienen
+> la Razón en col6 → fallback; indexa col1 y col2 porque en filas viejas el N° está en col1). Cacheado 5
+> min. ⚠ Los **Líos** siguen saliendo de `TAL` (armado): si una tanda no cargó los líos, quedan en "—"
+> igual (eso NO lo arregla esto). No se tocó Carga Camión (CC ya saca la razón de `Facturacion_NP`).
 >
 > Nota: **v3.73** — **Planimetría: el código 513 pasa de sector D36 → F13** (pedido del usuario).
 > En `planimetria.js`: `"513":["D36",100]` → `"513":["F13",100]`. Se cambió **sólo el sector**; el

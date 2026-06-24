@@ -5001,7 +5001,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.73";
+const APP_VERSION = "v3.74";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -6724,8 +6724,42 @@ function crDeadline(loadMs) {
 }
 function crVencido(loadMs) { return loadMs > 0 && Date.now() > crDeadline(loadMs); }
 
-/* Junta lo necesario para CR: CCN (NP cargadas + cuándo + tanda), TAL (líos por
-   NP), CRN (NP ya controladas) y el PPP del día (cód + razón social por NP). */
+/* "Pedidos Entregados" (hoja histórica) → Map NP -> { cod, rs }. Para que Recepción
+   Remitos muestre el cliente de los NP que YA salieron de la PPP del día (arrastrados
+   de días anteriores). Mismas posiciones de columna que la PPP (fetchMonitorFromSheets):
+   NP=col2, COD=col4, RS=col5; las filas VIEJAS tienen la Razón en col6 → fallback si
+   col5 está vacía. Indexa col1 y col2 (en filas viejas el N° está en col1). Gana la
+   última fila con razón (las recientes están abajo). Cacheado 5 min (la hoja es grande). */
+let _entMetaCache = null, _entMetaTs = 0;
+const ENT_META_TTL_MS = 5 * 60 * 1000;
+async function fetchEntregadosMeta() {
+  const now = Date.now();
+  if (_entMetaCache && (now - _entMetaTs) < ENT_META_TTL_MS) return _entMetaCache;
+  const url = MONITOR_HISTORIC_CSV_URL + "&_=" + Date.now();
+  const r = await fetch(url, { cache: "no-store" });
+  if (!r.ok) throw new Error("Entregados CSV HTTP " + r.status);
+  const rows = parseCSV(await r.text());
+  const meta = {};
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i]; if (!row) continue;
+    const cod = String(row[4] == null ? "" : row[4]).trim();
+    let rs = String(row[5] == null ? "" : row[5]).trim();
+    if (!rs) { const c6 = String(row[6] == null ? "" : row[6]).trim(); if (/[A-Za-z]/.test(c6)) rs = c6; }
+    for (const idx of [1, 2]) {
+      for (const part of String(row[idx] == null ? "" : row[idx]).split(/[,/]/)) {
+        const np = part.trim().replace(/\.0+$/, "");
+        if (!/^\d{2,7}$/.test(np)) continue;
+        if (rs || !meta[np]) meta[np] = { cod: cod, rs: rs };
+      }
+    }
+  }
+  _entMetaCache = meta; _entMetaTs = now;
+  return meta;
+}
+
+/* Junta lo necesario para CR: CCN (NP cargadas + cuándo + tanda), TAL (líos por NP),
+   CRN (NP ya controladas), el PPP del día (cód + razón por NP) y, para los NP que ya
+   NO están en la PPP del día, "Pedidos Entregados" (fetchEntregadosMeta) como fallback. */
 async function fetchCRData() {
   const since = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
   const headers = { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY };
@@ -6755,6 +6789,16 @@ async function fetchCRData() {
   for (const ev of crnR) { const np = String(ev.texto || "").split("|")[0].trim().replace(/\.0+$/, ""); if (np) controlled.add(np); }
   const meta = {};             // NP -> { cod, rs } desde el PPP del día
   for (const [, entry] of sheetMap) { if (!entry || !entry.pedidos) continue; for (const p of entry.pedidos) { for (const part of String(p.np || "").split(/[,/]/)) { const np = part.trim().replace(/\.0+$/, ""); if (np && /\d/.test(np) && !meta[np]) meta[np] = { cod: p.cod || "", rs: p.razonSocial || "" }; } } }
+  // Arrastrados: NP cargados que ya NO están en la PPP del día → buscar el cliente en
+  // "Pedidos Entregados" (histórica). Solo si falta alguno (evita leer la hoja en vano).
+  const faltan = [];
+  for (const [np] of loaded) { const mm = meta[np]; if (!mm || (!mm.cod && !mm.rs)) faltan.push(np); }
+  if (faltan.length) {
+    try {
+      const ent = await fetchEntregadosMeta();
+      for (const np of faltan) { if (ent[np]) meta[np] = ent[np]; }
+    } catch (_e) { /* sin red / hoja caída: quedan en "—" */ }
+  }
   return { loaded, lios, controlled, meta };
 }
 
