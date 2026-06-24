@@ -4,9 +4,18 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-24 · Versión app al documentar: **v3.76**
+> Última actualización: 2026-06-24 · Versión app al documentar: **v3.77**
 >
-> Nota: **v3.76** — **RR (Recepción Remitos) pasa a ser SOLO del admin** (pedido del usuario). Se
+> Nota: **v3.77** — **REVIERTE v3.76: RR queda en los operarios Y se suma el botón admin** (aclaración
+> del usuario). RR vuelve a la botonera del operario (`filas.row2` incluye `"RR"` de nuevo) y se sacó el
+> cleanup de `showOperario` (ya no hace falta). El supervisor tiene **además** el botón **"Recepción
+> Remitos (RR)"** en Administración (`openRemitosAdmin` → `showControlRemitos("0", true)`) que abre **la
+> MISMA lista que el operario**: NP · Cod Cliente · Razón Social · Líos · Controlado (se quitó la columna
+> Demora y `crFmtDemora` que se habían agregado en v3.75, para que sea idéntica). El modo admin sólo
+> cambia el comportamiento de fondo (legajo `0`, no cierra ningún toggle). Resumen del modelo: RR lo
+> pueden controlar **los operarios (botonera) y el admin (botón)**, los dos sobre la misma lista.
+>
+> Nota: **v3.76** — *(revertida en v3.77)* RR (Recepción Remitos) pasa a ser SOLO del admin (pedido del usuario). Se
 > **sacó el botón RR de la botonera del operario** (`filas.row2`, ya no incluye `"RR"`). El control de
 > remitos lo hace ahora el supervisor desde Administración con el botón **"Recepción Remitos (RR)"**
 > (el de v3.75, `openRemitosAdmin` → `showControlRemitos("0", true)`; se renombró de "Remitos a
@@ -1458,7 +1467,7 @@ Definidos en `index.html` (objeto `desc`, ~línea 1531). Los botones se arman en
 | `AP` | Empecé Armado Pedido | CORE (inicio) | Sí — código de pedido |
 | `TAP` | Terminé Armado Pedido | CORE (cierre) | Sí — código de pedido |
 | `CR` | Control Remitos | TOGGLE | Sí — abre **popup de control de facturados** (`showControlRemitosCR`, v3.69): lista de facturados del reparto + Líos + tic **Controlado** → `CCR` por NP + cierra el toggle. (Fue toggle plano sin popup en v3.43–v3.68.) |
-| `RR` | Recepción Remitos | **ADMIN (v3.76)** | Ya **NO está en la botonera del operario** (se sacó en v3.76). El control de remitos lo hace el supervisor desde **Administración → "Recepción Remitos (RR)"** (`openRemitosAdmin` → `showControlRemitos("0", true)`): tabla de NP cargados sin controlar (cliente + líos + demora) → tildar Controlado → «Terminé» = `CRN` por NP (legajo `0`). Fue toggle de operario en v3.36–v3.75 (la lógica `_cr*`/popup sigue, ahora en modo admin). |
+| `RR` | Recepción Remitos | TOGGLE | Abre el popup de descarga (tabla NP cargados → tildar Controlado → «Terminé» = `CRN` por NP); desde v3.43 lleva la lógica que antes tenía `CR`. **v3.75+**: además hay un botón **"Recepción Remitos (RR)"** en Administración (`openRemitosAdmin` → `showControlRemitos("0", true)`) que abre la **MISMA lista** en modo admin (legajo `0`, sin cerrar toggle). Lo controlan operarios **y** admin. (v3.76 lo había sacado de los operarios; revertido en v3.77.) |
 | `CC` | Inicio/Fin Carga Camión | TOGGLE | Sí, al cerrar (Nro) |
 | `RT` | Recepción Mercadería | TOGGLE | Sí, al cerrar: `texto` = cantidad de cajas, **calculada sola** del Modo OP de Recepción (suma del día en `localStorage`, ver v2.61). Al abrir RT se lanza el Modo OP (`recepcion.js`). |
 | `MG` | Guardado a Góndola | TOGGLE | No |

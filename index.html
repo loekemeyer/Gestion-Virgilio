@@ -2082,8 +2082,6 @@ button {
 .cr-td-rs{ font-size: 13px; color: #334155; min-width: 90px; }
 .cr-td-lios{ text-align: center; font-size: 15px; font-weight: 800; color: #b45309; white-space: nowrap; }
 .cr-td-lios.cr-lios0{ color: #94a3b8; font-weight: 600; }
-.cr-td-dem{ text-align: center; font-weight: 700; color: #475569; white-space: nowrap; font-size: 13px; }
-.cr-venc .cr-td-dem{ color: #b91c1c; font-weight: 800; }
 .cr-td-ctrl{ text-align: center; }
 .cr-chk{ width: 26px; height: 26px; border-radius: 7px; border: 2px solid #cbd5e1; display: inline-flex; align-items: center; justify-content: center; color: #fff; font-weight: bold; font-size: 16px; }
 .cr-row.cc-on .cr-chk{ border-color: #16a34a; background: #16a34a; }
@@ -3134,7 +3132,7 @@ const SUPABASE_PLANIMETRIA_ENDPOINT =
 
 const filas = {
   row1: ["EP","TP","AP","TAP","CR","CC"],
-  row2: ["RT","MG","RI","EI","CT"],
+  row2: ["RR","RT","MG","RI","EI","CT"],
   row3: ["AT","PB","Limp","Perm","PC"]
 };
 
@@ -5004,7 +5002,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.76";
+const APP_VERSION = "v3.77";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -6726,14 +6724,6 @@ function crDeadline(loadMs) {
   return dl;
 }
 function crVencido(loadMs) { return loadMs > 0 && Date.now() > crDeadline(loadMs); }
-/* Demora desde que se cargó (CCN) → texto corto. Para el monitor admin de Remitos. */
-function crFmtDemora(loadMs) {
-  if (!loadMs) return "—";
-  const h = (Date.now() - loadMs) / 3600000;
-  if (h < 1) return Math.max(1, Math.round(h * 60)) + "min";
-  if (h < 48) return Math.round(h) + "h";
-  return Math.floor(h / 24) + "d " + Math.round(h % 24) + "h";
-}
 
 /* "Pedidos Entregados" (hoja histórica) → Map NP -> { cod, rs }. Para que Recepción
    Remitos muestre el cliente de los NP que YA salieron de la PPP del día (arrastrados
@@ -6816,7 +6806,7 @@ async function fetchCRData() {
 async function showControlRemitos(legajo, isAdmin) {
   const m = document.getElementById("tandaModal"); if (!m) return;
   const leg = String(legajo || "").trim();
-  m.querySelector(".tanda-modal-title").textContent = isAdmin ? "🚚 Recepción Remitos (RR) — control" : "📋 Recepción Remitos — descarga";
+  m.querySelector(".tanda-modal-title").textContent = isAdmin ? "📋 Recepción Remitos (RR)" : "📋 Recepción Remitos — descarga";
   m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">Cargando pedidos cargados al camión…</div>`;
   m.classList.add("show");
   crWakeLock();
@@ -6860,14 +6850,11 @@ function crRender() {
             `<td class="cr-td-cod">${it.cod ? escapeHtml(it.cod) : "—"}</td>` +
             `<td class="cr-td-rs">${escapeHtml(it.rs || "—")}${it.venc ? `<span class="cr-venc-tag">VENCIDO</span>` : ""}</td>` +
             `<td class="cr-td-lios${liosCls}">${liosTxt}</td>` +
-            (_cr.admin ? `<td class="cr-td-dem">${crFmtDemora(it.loadMs)}</td>` : "") +
             `<td class="cr-td-ctrl"><span class="cr-chk">${on ? "✓" : ""}</span></td></tr>`;
   }
   html += `<div class="cr-tablewrap"><table class="cr-table"><thead><tr>` +
           `<th>NP</th><th>Cod Cliente</th><th>Razón Social</th>` +
-          `<th class="cr-th-c">Líos</th>` +
-          (_cr.admin ? `<th class="cr-th-c">Demora</th>` : "") +
-          `<th class="cr-th-c">Controlado</th>` +
+          `<th class="cr-th-c">Líos</th><th class="cr-th-c">Controlado</th>` +
           `</tr></thead><tbody>${rows}</tbody></table></div>`;
   html += `<button class="pk-btn pk-ok" onclick="crFinish()">✓ Terminé (${_cr.checked.size} controladas)</button>` +
           `<button class="pk-btn pk-cancel" onclick="crClose()">Cerrar (sigo después)</button>`;
@@ -12972,9 +12959,6 @@ function showOperario(emp) {
   try {
     if (typeof saveLastLegajo === "function") saveLastLegajo(emp.legajo);
     if (typeof renderLegajoHistory === "function") renderLegajoHistory(emp.legajo);
-    // RR salió de la botonera del operario (ahora es solo del admin, v3.76). Si quedó
-    // un toggle RR abierto de antes, lo cerramos: un toggle colgado bloquea EP/TP/AP/TAP.
-    try { const st = getLegajoState(emp.legajo); if (st.toggles && st.toggles.RR) { delete st.toggles.RR; setLegajoState(emp.legajo, st); } } catch (_e2) {}
     if (typeof updateCoreButtonsState === "function") updateCoreButtonsState();
     if (typeof renderPendingSuggestion === "function") renderPendingSuggestion();
   } catch (_e) {}
