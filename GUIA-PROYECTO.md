@@ -4,7 +4,20 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-25 · Versión app al documentar: **v3.84**
+> Última actualización: 2026-06-25 · Versión app al documentar: **v3.85**
+>
+> Nota: **v3.85** — **PPP: control POR NP + fix del wrap "feo" + header "Localidad"** (pedido del usuario).
+> (1) **Wrap**: el v3.83 había puesto `.ppp-tbl{white-space:normal}` para evitar scroll, pero con el ancho
+> de 1240px (v3.84) **envolvía todo** (headers, badges) y quedaba feo. Se volvió a `white-space:nowrap` y
+> sólo envuelven las columnas largas: **Razón Social** (`.ppp-cli`, ya envolvía) y **Localidad**
+> (`.ppp-tbl td/th:nth-child(7){white-space:normal}`). (2) **Control POR NP, no por tanda**: en solo-lectura
+> se **sacó** el botón **"✓ Controlar"** de la franja (`entBtn` gateado a `!PPP_READONLY`) y el panel
+> **"✓ Controlar TODA la tanda"** (`pppControlarTanda`, ahora `if(!PPP_READONLY)`). En su lugar, cada fila
+> de la pestaña **Programación** tiene un botón **Controlar / ✓ Controlado** (toggle `pppControlarToggle`,
+> verde lleno = controlado, outline = sin controlar; sólo `_pppTab==="plan"`). Sigue siendo **local**
+> (`vir_ppp_entregados`, no emite CRN); controlado + aún en Supabase ⇒ alarma 🚮 SACAR. (3) Header de la
+> tabla **"Localidad / Barrio" → "Localidad"** (`PPP_THEAD`). Celda de acciones `.ppp-acc` (nowrap,
+> derecha) con los botones Controlar + 🖨.
 >
 > Nota: **v3.84** — **PPP: layout compacto (ancho máx 1240px centrado, no 100%) + "✓ Controlar" local
 > reactivado** (pedido del usuario: "nunca hace falta usar el 100%; optimizá los espacios"). (1) **Ancho**:
