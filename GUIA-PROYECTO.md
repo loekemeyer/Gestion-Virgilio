@@ -4,7 +4,18 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-25 · Versión app al documentar: **v3.92**
+> Última actualización: 2026-06-25 · Versión app al documentar: **v3.93**
+>
+> Nota: **v3.93** — **PPP / Imprimir: fix "no hace nada"** (pedido del usuario). Dos causas y dos fixes.
+> (1) **Lentitud**: desde v3.90 `pppFindNpPdf` **escaneaba TODA la carpeta** por pedido → con carpetas
+> grandes tardaba mucho y parecía colgado (y consumía el gesto del click). Ahora primero hace la ruta
+> **RÁPIDA** (`getFileHandle` con el nombre exacto ISIS `PDF_PREFIX`+NP-con-ceros+`_NN.pdf`, sin escanear),
+> y sólo si no matchea cae al **escaneo por número** (fallback para otro prefijo/relleno, ej. CHEF).
+> (2) **Impresión silenciosa**: `_pppPrintPdf` subió el delay 400→700ms (que el visor renderice antes de
+> `print()`) y se quitó el `window.open` interno (lo bloqueaba el popup-blocker). Ahora guarda el blob en
+> `_pppLastPdfUrl` y al imprimir el estado muestra un link **"Abrir el PDF"** (`pppAbrirUltimoPdf`) — lo toca
+> el usuario (gesto) → no se bloquea → imprime con Ctrl+P. Respaldo garantizado si la impresión automática
+> del iframe no sale.
 >
 > Nota: **v3.92** — **Talleristas de Recepción: editor de ARTÍCULOS por tallerista** (pedido del usuario).
 > En el editor "👷 Talleristas de Recepción", el badge **LK/CH** ahora es un botón (📦): al tocarlo abre un

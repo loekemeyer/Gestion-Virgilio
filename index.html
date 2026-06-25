@@ -5086,7 +5086,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.92";
+const APP_VERSION = "v3.93";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -9524,7 +9524,7 @@ function pppPedidoAProgramar(np) {
    (abre el diálogo de impresión directo, no lo abre solo para leer). Sólo lectura. */
 const PDF_DIR_KEY  = "pdf_isis_dir";    // (legacy) handle único — se migra a la lista
 const PDF_DIRS_KEY = "pdf_isis_dirs";   // LISTA de carpetas con PDF (ej. X:\PDF_ISIS y X:\PDF_ISISCHEF)
-const PDF_PREFIX  = "Pedido de Clte._Div_";   // formato real (ej. "Pedido de Clte._Div_000000097904_00.pdf") — solo de referencia: la búsqueda es por NÚMERO
+const PDF_PREFIX  = "Pedido de Clte._Div_";   // formato real ISIS (ej. "Pedido de Clte._Div_000000097904_00.pdf"). Se usa en la ruta RÁPIDA (getFileHandle); si no matchea, hay fallback por número
 const PDF_WIDTHS  = [12, 13, 11];            // ancho del NP con ceros (000000097899 = 12); fallback por si difiere
 const PDF_VERS    = 6;                        // probar _00.._05, usar la versión más alta
 let _pdfDirBusy = false;
@@ -9588,14 +9588,27 @@ async function pppRenderPdfDirStatus() {
   el.innerHTML = names.join(" · ") + (pend ? " — permiso pendiente (tocá Imprimir y aceptá)" : "") + ' · <a href="#" onclick="event.preventDefault();pppForgetPdfDir()" style="color:#b42318;font-weight:700">olvidar</a>';
   el.style.color = pend ? "#b45309" : "#166534";
 }
-/* Busca el PDF del pedido LISTANDO la carpeta y comparando el NÚMERO embebido en el
-   nombre (no arma el nombre exacto): así anda aunque el prefijo o el relleno de ceros
-   cambien entre carpetas (ej. PDF_ISIS vs PDF_ISISCHEF). El NP = la corrida de dígitos
-   más larga del nombre; el sufijo _NN es la versión (se queda con la más alta). */
+/* Busca el PDF del pedido. (1) RÁPIDO: arma el nombre exacto del formato ISIS conocido
+   (PDF_PREFIX + NP con ceros + _NN.pdf) y lo pide con getFileHandle — sin escanear, instantáneo.
+   (2) FALLBACK: si no aparece (otro prefijo/relleno, ej. CHEF), escanea la carpeta y compara el
+   NÚMERO embebido en cada nombre. Antes (v3.90-91) sólo escaneaba → con carpetas grandes tardaba
+   mucho y "parecía colgado". */
 async function pppFindNpPdf(dir, np) {
   const clean = String(np).replace(/\D/g, ""); if (!clean) return null;
+  // (1) Rápido: nombre exacto, sin escanear.
+  for (let wi = 0; wi < PDF_WIDTHS.length; wi++) {
+    const w = PDF_WIDTHS[wi];
+    const padded = clean.length >= w ? clean : ("0".repeat(w - clean.length) + clean);
+    let best = null;
+    for (let v = 0; v < PDF_VERS; v++) {
+      const name = PDF_PREFIX + padded + "_" + (v < 10 ? "0" + v : String(v)) + ".pdf";
+      try { const fh = await dir.getFileHandle(name); best = { fh: fh, name: name }; } catch (_e) { /* esa versión no existe */ }
+    }
+    if (best) return best;   // versión más alta encontrada para este ancho
+  }
+  // (2) Fallback: escanear y comparar el número embebido (otro prefijo/relleno).
   const npNum = parseInt(clean, 10);
-  let best = null, bestVer = -1;
+  let bestN = null, bestVer = -1;
   try {
     for await (const entry of dir.values()) {
       if (entry.kind !== "file") continue;
@@ -9604,10 +9617,10 @@ async function pppFindNpPdf(dir, np) {
       let npRun = ""; for (let k = 0; k < runs.length; k++) { if (runs[k].length > npRun.length) npRun = runs[k]; }
       if (parseInt(npRun, 10) !== npNum) continue;   // el archivo es de OTRO pedido
       const mv = /_(\d{1,3})\.pdf$/i.exec(nm); const ver = mv ? parseInt(mv[1], 10) : 0;
-      if (ver >= bestVer) { bestVer = ver; best = { fh: entry, name: nm }; }
+      if (ver >= bestVer) { bestVer = ver; bestN = { fh: entry, name: nm }; }
     }
   } catch (_e) { return null; }
-  return best;
+  return bestN;
 }
 /* Ruteo por N° de pedido: los que empiezan con 4 están en PDF_ISISCHEF, los que
    empiezan con 9 en PDF_ISIS. Ordena las carpetas para buscar primero en la correcta
@@ -9681,7 +9694,12 @@ async function pppPrintNp(np) {
     try { const file = await hit.fh.getFile(); buf = await file.arrayBuffer(); }
     catch (e) { pppSetStatus("No pude leer el PDF (" + (e.message || e) + ").", false); return; }
     _pppPrintPdf(buf, hit.name);
-    pppSetStatus("🖨️ Mandé a imprimir " + hit.name + ".", true);
+    const st = document.getElementById("pppStatus");
+    if (st) {
+      st.innerHTML = '🖨️ Enviado a imprimir: <b>' + escapeHtml(hit.name) + '</b>. Si no salió, tocá ' +
+        '<a href="#" onclick="event.preventDefault();pppAbrirUltimoPdf()" style="color:#2563eb;font-weight:800;text-decoration:underline">Abrir el PDF</a> e imprimí con Ctrl+P.';
+      st.style.color = "#166534";
+    } else { pppSetStatus("🖨️ Enviado a imprimir " + hit.name + ".", true); }
   } catch (e) { pppSetStatus("Error al imprimir el pedido " + np + ": " + (e && e.message ? e.message : e), false); }
   finally { _pdfDirBusy = false; }
 }
@@ -9690,19 +9708,28 @@ async function pppPrintNp(np) {
    navegador SIEMPRE muestra el diálogo de impresión (no se puede saltear por seguridad),
    pero queda a un clic. Último recurso: si el navegador bloquea el print del iframe, abre
    el PDF en otra pestaña para imprimir a mano. */
+let _pppLastPdfUrl = null, _pppLastPdfName = "";
 function _pppPrintPdf(buf, name) {
   const url = URL.createObjectURL(new Blob([buf], { type: "application/pdf" }));
+  _pppLastPdfUrl = url; _pppLastPdfName = name || "";   // para el respaldo "Abrir PDF"
   const ifr = document.createElement("iframe");
   ifr.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;";
   ifr.onload = function () {
     setTimeout(function () {
       try { ifr.contentWindow.focus(); ifr.contentWindow.print(); }
-      catch (_e) { try { window.open(url, "_blank"); } catch (_e2) {} }
-    }, 400);
+      catch (_e) { /* si el navegador bloquea el print del iframe, el usuario tiene el link "Abrir PDF" */ }
+    }, 700);   // 400→700ms: dar tiempo a que el visor de PDF renderice antes de print()
   };
   ifr.src = url;
   document.body.appendChild(ifr);
-  setTimeout(function () { try { URL.revokeObjectURL(url); } catch (_e) {} try { if (ifr.parentNode) ifr.parentNode.removeChild(ifr); } catch (_e) {} }, 120000);
+  setTimeout(function () { try { if (ifr.parentNode) ifr.parentNode.removeChild(ifr); } catch (_e) {} }, 180000);
+  return url;
+}
+/* Respaldo: abre el último PDF en una pestaña. Lo TOCA el usuario (gesto) → no lo bloquea el popup-blocker. */
+function pppAbrirUltimoPdf() {
+  if (!_pppLastPdfUrl) return;
+  try { const w = window.open(_pppLastPdfUrl, "_blank"); if (!w) location.href = _pppLastPdfUrl; }
+  catch (_e) { try { location.href = _pppLastPdfUrl; } catch (_e2) {} }
 }
 /* Imprime TODOS los PDF de los pedidos de una tanda, uno tras otro. Con Chrome
    --kiosk-printing salen solos; si no, aparece un diálogo por PDF. */
