@@ -4,7 +4,17 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-25 · Versión app al documentar: **v3.89**
+> Última actualización: 2026-06-25 · Versión app al documentar: **v3.90**
+>
+> Nota: **v3.90** — **PPP / Imprimir: búsqueda de PDF por NÚMERO (robusta) + diagnóstico**. Antes
+> `pppFindNpPdf` **armaba el nombre exacto** (`PDF_PREFIX` + NP con ceros + `_NN.pdf`) y fallaba si el
+> prefijo o el relleno difería (típico entre `PDF_ISIS` y `PDF_ISISCHEF`). Ahora **lista la carpeta** y
+> compara el **número embebido** en cada `.pdf`: el NP = la corrida de dígitos más larga del nombre
+> (`nm.match(/\d+/g)`), el sufijo `_NN` = versión (se queda con la más alta). Anda con cualquier prefijo y
+> cualquier cantidad de ceros, y no confunde 97904 con 979040/97905 (probado). `pppPrintTanda` usa
+> `_pppIndexDirs(dirs)` (1 pasada por carpeta → `Map(NP→archivo)`). Si NO encuentra, el cartel ahora muestra
+> **nombres reales** de la carpeta (`_pppDirSamples`) para ver el formato. `PDF_PREFIX`/`PDF_WIDTHS`/
+> `PDF_VERS` quedan solo de referencia (ya no se usan para construir el nombre).
 >
 > Nota: **v3.89** — **PPP / Carpeta PDF: soporte de VARIAS carpetas** (pedido del usuario: los PDF están en
 > `X:\PDF_ISIS` **y** `X:\PDF_ISISCHEF`). Antes la app conectaba **una sola** carpeta. Ahora guarda una

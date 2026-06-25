@@ -5054,7 +5054,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.89";
+const APP_VERSION = "v3.90";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -9556,24 +9556,58 @@ async function pppRenderPdfDirStatus() {
   el.innerHTML = names.join(" · ") + (pend ? " — permiso pendiente (tocá Imprimir y aceptá)" : "") + ' · <a href="#" onclick="event.preventDefault();pppForgetPdfDir()" style="color:#b42318;font-weight:700">olvidar</a>';
   el.style.color = pend ? "#b45309" : "#166534";
 }
+/* Busca el PDF del pedido LISTANDO la carpeta y comparando el NÚMERO embebido en el
+   nombre (no arma el nombre exacto): así anda aunque el prefijo o el relleno de ceros
+   cambien entre carpetas (ej. PDF_ISIS vs PDF_ISISCHEF). El NP = la corrida de dígitos
+   más larga del nombre; el sufijo _NN es la versión (se queda con la más alta). */
 async function pppFindNpPdf(dir, np) {
   const clean = String(np).replace(/\D/g, ""); if (!clean) return null;
-  for (let wi = 0; wi < PDF_WIDTHS.length; wi++) {
-    const w = PDF_WIDTHS[wi];
-    const padded = clean.length >= w ? clean : ("0".repeat(w - clean.length) + clean);
-    let best = null;
-    for (let v = 0; v < PDF_VERS; v++) {
-      const name = PDF_PREFIX + padded + "_" + (v < 10 ? "0" + v : String(v)) + ".pdf";
-      try { const fh = await dir.getFileHandle(name); best = { fh: fh, name: name }; } catch (_e) { /* esa versión no existe */ }
+  const npNum = parseInt(clean, 10);
+  let best = null, bestVer = -1;
+  try {
+    for await (const entry of dir.values()) {
+      if (entry.kind !== "file") continue;
+      const nm = entry.name; if (!/\.pdf$/i.test(nm)) continue;
+      const runs = nm.match(/\d+/g); if (!runs) continue;
+      let npRun = ""; for (let k = 0; k < runs.length; k++) { if (runs[k].length > npRun.length) npRun = runs[k]; }
+      if (parseInt(npRun, 10) !== npNum) continue;   // el archivo es de OTRO pedido
+      const mv = /_(\d{1,3})\.pdf$/i.exec(nm); const ver = mv ? parseInt(mv[1], 10) : 0;
+      if (ver >= bestVer) { bestVer = ver; best = { fh: entry, name: nm }; }
     }
-    if (best) return best;   // se queda con la versión más alta encontrada para este ancho
-  }
-  return null;
+  } catch (_e) { return null; }
+  return best;
 }
 // Busca el PDF del NP en TODAS las carpetas conectadas (devuelve el primer match).
 async function pppFindNpPdfAny(dirs, np) {
   for (let i = 0; i < dirs.length; i++) { const hit = await pppFindNpPdf(dirs[i], np); if (hit) return hit; }
   return null;
+}
+// Indexa TODAS las carpetas en una sola pasada: Map(NP -> {fh, name, ver}) con la versión más alta.
+async function _pppIndexDirs(dirs) {
+  const map = new Map();
+  for (let i = 0; i < dirs.length; i++) {
+    try {
+      for await (const entry of dirs[i].values()) {
+        if (entry.kind !== "file") continue;
+        const nm = entry.name; if (!/\.pdf$/i.test(nm)) continue;
+        const runs = nm.match(/\d+/g); if (!runs) continue;
+        let npRun = ""; for (let k = 0; k < runs.length; k++) { if (runs[k].length > npRun.length) npRun = runs[k]; }
+        const npNum = parseInt(npRun, 10); if (!npNum) continue;
+        const mv = /_(\d{1,3})\.pdf$/i.exec(nm); const ver = mv ? parseInt(mv[1], 10) : 0;
+        const prev = map.get(npNum);
+        if (!prev || ver >= prev.ver) map.set(npNum, { fh: entry, name: nm, ver: ver });
+      }
+    } catch (_e) {}
+  }
+  return map;
+}
+// Junta nombres de ejemplo (.pdf) de las carpetas, para diagnosticar cuando no encuentra.
+async function _pppDirSamples(dirs, max) {
+  const out = [];
+  for (let i = 0; i < dirs.length; i++) {
+    try { for await (const e of dirs[i].values()) { if (e.kind === "file" && /\.pdf$/i.test(e.name)) { out.push(e.name); if (out.length >= max) return out; } } } catch (_e) {}
+  }
+  return out;
 }
 async function pppPrintNp(np) {
   if (_pdfDirBusy) return; _pdfDirBusy = true;
@@ -9583,9 +9617,12 @@ async function pppPrintNp(np) {
     pppSetStatus("Buscando el PDF del pedido " + np + "…");
     const hit = await pppFindNpPdfAny(dirs, np);
     if (!hit) {
-      const probe = PDF_PREFIX + String(np).replace(/\D/g, "").padStart(PDF_WIDTHS[0], "0") + "_00.pdf";
+      const samples = await _pppDirSamples(dirs, 3);
+      const ej = samples.length
+        ? "\n\nArchivos que SÍ veo en la(s) carpeta(s):\n• " + samples.join("\n• ")
+        : "\n\nNo veo NINGÚN .pdf en la(s) carpeta(s) conectada(s). ¿Es la carpeta correcta? (botón 🖨️ Carpeta(s) PDF)";
       pppSetStatus("No encontré el PDF del pedido " + np + " en la(s) carpeta(s).", false);
-      alert("No encontré el PDF del pedido " + np + ".\n\nBusqué (entre otros): " + probe + "\n\nRevisá que la(s) carpeta(s) conectada(s) sea(n) la(s) correcta(s) (botón 🖨️ Carpeta PDF) y que el nombre arranque con \"" + PDF_PREFIX + "\".");
+      alert("No encontré el PDF del pedido " + np + " (busqué un archivo cuyo número sea " + np + ", en cualquier carpeta conectada)." + ej);
       return;
     }
     let buf;
@@ -9625,10 +9662,11 @@ async function pppPrintTanda(npsCsv) {
     const dirs = await pppGetPdfDirs(true);
     if (!dirs.length) return;
     pppSetStatus("Buscando " + nps.length + " PDF de la tanda…");
+    const idx = await _pppIndexDirs(dirs);   // una sola pasada por carpeta
     const found = [];
     for (let i = 0; i < nps.length; i++) {
-      const hit = await pppFindNpPdfAny(dirs, nps[i]);
-      if (hit) { try { const f = await hit.fh.getFile(); found.push({ buf: await f.arrayBuffer(), name: hit.name }); } catch (_e) {} }
+      const e = idx.get(parseInt(String(nps[i]).replace(/\D/g, ""), 10));
+      if (e) { try { const f = await e.fh.getFile(); found.push({ buf: await f.arrayBuffer(), name: e.name }); } catch (_e2) {} }
     }
     if (!found.length) { pppSetStatus("No encontré PDF para los pedidos de la tanda.", false); alert("No encontré ningún PDF de los pedidos de esta tanda."); return; }
     let i = 0;
