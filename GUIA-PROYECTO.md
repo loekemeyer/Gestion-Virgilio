@@ -4,7 +4,17 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-25 · Versión app al documentar: **v3.88**
+> Última actualización: 2026-06-25 · Versión app al documentar: **v3.89**
+>
+> Nota: **v3.89** — **PPP / Carpeta PDF: soporte de VARIAS carpetas** (pedido del usuario: los PDF están en
+> `X:\PDF_ISIS` **y** `X:\PDF_ISISCHEF`). Antes la app conectaba **una sola** carpeta. Ahora guarda una
+> **lista** (`PDF_DIRS_KEY = "pdf_isis_dirs"`, array de handles en IndexedDB vía `fshGet/fshSet`) y al
+> imprimir busca el PDF en **todas** (`pppFindNpPdfAny(dirs, np)` → primer match). El botón **🖨️ Carpeta(s)
+> PDF** ahora **agrega** una carpeta por click (`pppConnectPdfDir` → `_pppPickPdfDir`, dedupe por
+> `isSameEntry`); el estado lista todas con ✓/🔒 y un link **olvidar** (`pppForgetPdfDir`, borra la lista).
+> `pppGetPdfDirs(interactive)` devuelve las carpetas con permiso concedido. **Migración**: `_pppLoadPdfDirs`
+> incorpora el handle único viejo (`pdf_isis_dir`) a la lista y borra la clave vieja. Recordatorio del
+> **bloqueo de Chrome** (v3.88): hay que elegir la **subcarpeta** (`X:\PDF_ISIS`), no el disco `X:\`.
 >
 > Nota: **v3.88** — **PPP / Carpeta PDF: guía ante el bloqueo de Chrome** ("Esta carpeta no se puede abrir…
 > contiene archivos del sistema"). NO es un bug: el File System Access API (`showDirectoryPicker`) **bloquea

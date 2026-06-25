@@ -2992,7 +2992,7 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
         </div>
       </div>
       <button class="ppp-imp-toggle ppp-sup-toggle" onclick="openPppSupers()" title="Agregar/quitar clientes súper">🛒 Clientes súper</button>
-      <button class="ppp-imp-toggle ppp-pdf-toggle" onclick="pppConnectPdfDir()" title="Conectar UNA vez la carpeta con los PDF de ISIS (ej. la carpeta PDF_ISIS, NO el disco Z:\ entero). Chrome bloquea las raíces de disco y las carpetas del sistema. Necesita Chrome/Edge en PC.">🖨️ Carpeta PDF</button>
+      <button class="ppp-imp-toggle ppp-pdf-toggle" onclick="pppConnectPdfDir()" title="Conectar las carpetas con los PDF de ISIS (ej. X:\PDF_ISIS y X:\PDF_ISISCHEF). Podés agregar VARIAS: tocá una vez por carpeta. Elegí la subcarpeta, NO el disco entero (Chrome bloquea raíces de disco y carpetas del sistema). Necesita Chrome/Edge en PC.">🖨️ Carpeta(s) PDF</button>
       <span id="pppPdfDirStatus" class="ppp-pdfdir-status"></span>
       <div id="pppPreview" class="ppp-preview"></div>
       <div id="pppStatus" class="planim-status"></div>
@@ -5054,7 +5054,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.88";
+const APP_VERSION = "v3.89";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -9490,48 +9490,71 @@ function pppPedidoAProgramar(np) {
    archivos → NO se puede escanear): "Pedido de Clte_Div_" + NP con ceros + "_NN.pdf",
    probando versiones _00.._05 y quedándose con la MÁS ALTA, y lo MANDA A IMPRIMIR
    (abre el diálogo de impresión directo, no lo abre solo para leer). Sólo lectura. */
-const PDF_DIR_KEY = "pdf_isis_dir";
+const PDF_DIR_KEY  = "pdf_isis_dir";    // (legacy) handle único — se migra a la lista
+const PDF_DIRS_KEY = "pdf_isis_dirs";   // LISTA de carpetas con PDF (ej. X:\PDF_ISIS y X:\PDF_ISISCHEF)
 const PDF_PREFIX  = "Pedido de Clte_Div_";   // prefijo del archivo (ISIS)
 const PDF_WIDTHS  = [12, 13, 11];            // ancho del NP con ceros (000000097899 = 12); fallback por si difiere
 const PDF_VERS    = 6;                        // probar _00.._05, usar la versión más alta
 let _pdfDirBusy = false;
-async function pppGetPdfDir(interactive) {
-  if (!window.showDirectoryPicker) { if (interactive) alert("Para imprimir los PDF necesitás Chrome o Edge en PC (el monitor)."); return null; }
-  let h = null;
-  try { h = await fshGet(PDF_DIR_KEY); } catch (_e) { h = null; }
-  if (!h) {
-    if (!interactive) return null;
-    if (!confirm("Para imprimir los PDF, elegí UNA vez la carpeta donde están (ej. la carpeta PDF_ISIS).\n\n⚠ Elegí la CARPETA de los PDF, no el disco entero: Chrome NO deja elegir la raíz de un disco (C:\\, D:\\, Z:\\), el Escritorio ni carpetas del sistema.\n\n¿Elegir la carpeta ahora?")) return null;
-    try { h = await window.showDirectoryPicker({ id: "pdfisis", mode: "read", startIn: "documents" }); }
-    catch (e) {
-      if (e && e.name === "AbortError") return null;
-      alert("No se pudo abrir esa carpeta.\n\nSi Chrome dice «contiene archivos del sistema», es porque elegiste un disco entero (C:\\, D:\\, Z:\\) o una carpeta del sistema. Entrá a la SUBCARPETA donde están los PDF y elegí esa — o copiá los PDF a una carpeta común (ej. Documentos) y elegí esa.\n\nDetalle: " + (e.message || e));
-      return null;
-    }
-    if (!h) return null;
-    try { await fshSet(PDF_DIR_KEY, h); } catch (_e) {}
-    pppRenderPdfDirStatus();
+// Lista de carpetas conectadas (migra el handle único viejo si existe).
+async function _pppLoadPdfDirs() {
+  let arr = null;
+  try { arr = await fshGet(PDF_DIRS_KEY); } catch (_e) {}
+  if (!Array.isArray(arr)) arr = [];
+  if (!arr.length) {
+    try { const old = await fshGet(PDF_DIR_KEY); if (old && old.kind === "directory") { arr = [old]; await fshSet(PDF_DIRS_KEY, arr); await fshDel(PDF_DIR_KEY); } } catch (_e) {}
   }
-  const perm = await _fshPerm(h, interactive);
-  if (perm !== "granted") { if (interactive) alert("Necesito permiso de lectura sobre la carpeta de PDF. Volvé a tocar Imprimir y aceptá."); return null; }
-  return h;
+  return arr;
 }
+async function _pppSavePdfDirs(arr) { try { await fshSet(PDF_DIRS_KEY, arr); } catch (_e) {} }
+// Abre el selector de carpeta (con la guía anti-bloqueo de Chrome). Devuelve el handle o null.
+async function _pppPickPdfDir() {
+  if (!confirm("Elegí la carpeta donde están los PDF (ej. X:\\PDF_ISIS).\n\n⚠ Elegí la CARPETA de los PDF, no el disco entero: Chrome NO deja elegir la raíz de un disco (X:\\, C:\\, Z:\\), el Escritorio ni carpetas del sistema.\n\nPodés agregar VARIAS carpetas (ej. PDF_ISIS y PDF_ISISCHEF): tocá el botón una vez por cada una.\n\n¿Elegir la carpeta ahora?")) return null;
+  try { return await window.showDirectoryPicker({ id: "pdfisis", mode: "read", startIn: "documents" }); }
+  catch (e) {
+    if (e && e.name === "AbortError") return null;
+    alert("No se pudo abrir esa carpeta.\n\nSi Chrome dice «contiene archivos del sistema», es porque elegiste un disco entero (X:\\, C:\\, Z:\\) o una carpeta del sistema. Entrá a la SUBCARPETA donde están los PDF y elegí esa — o copiá los PDF a una carpeta común (ej. Documentos).\n\nDetalle: " + (e.message || e));
+    return null;
+  }
+}
+// Devuelve la lista de carpetas con permiso de lectura concedido (pide permiso si interactive).
+async function pppGetPdfDirs(interactive) {
+  if (!window.showDirectoryPicker) { if (interactive) alert("Para imprimir los PDF necesitás Chrome o Edge en PC (el monitor)."); return []; }
+  let dirs = await _pppLoadPdfDirs();
+  if (!dirs.length) {
+    if (!interactive) return [];
+    const h = await _pppPickPdfDir();
+    if (!h) return [];
+    dirs = [h]; await _pppSavePdfDirs(dirs); pppRenderPdfDirStatus();
+  }
+  const ok = [];
+  for (const h of dirs) { let perm = "prompt"; try { perm = await _fshPerm(h, interactive); } catch (_e) {} if (perm === "granted") ok.push(h); }
+  if (!ok.length && interactive) alert("Necesito permiso de lectura sobre la(s) carpeta(s) de PDF. Volvé a tocar Imprimir y aceptá.");
+  return ok;
+}
+// Conectar / AGREGAR una carpeta más a la lista.
 async function pppConnectPdfDir() {
   if (!window.showDirectoryPicker) { alert("Conectar carpeta PDF: usá Chrome o Edge en PC (el monitor)."); return; }
-  try { await fshDel(PDF_DIR_KEY); } catch (_e) {}
-  const h = await pppGetPdfDir(true);
+  const h = await _pppPickPdfDir();
+  if (!h) return;
+  const dirs = await _pppLoadPdfDirs();
+  let dup = false;
+  for (const d of dirs) { try { if (await d.isSameEntry(h)) { dup = true; break; } } catch (_e) { if (d.name === h.name) { dup = true; break; } } }
+  if (!dup) { dirs.push(h); await _pppSavePdfDirs(dirs); }
+  try { await _fshPerm(h, true); } catch (_e) {}
   pppRenderPdfDirStatus();
-  if (h) pppSetStatus("🖨️ Carpeta de PDF conectada (" + (h.name || "ok") + "). Ya podés imprimir un pedido.", true);
+  pppSetStatus("🖨️ Carpeta " + (h.name || "") + (dup ? " ya estaba conectada" : " conectada") + ". Carpetas activas: " + dirs.length + ".", true);
 }
-function pppForgetPdfDir() { fshDel(PDF_DIR_KEY).catch(function () {}); pppRenderPdfDirStatus(); pppSetStatus("Carpeta de PDF desconectada.", true); }
+function pppForgetPdfDir() { fshDel(PDF_DIRS_KEY).catch(function () {}); fshDel(PDF_DIR_KEY).catch(function () {}); pppRenderPdfDirStatus(); pppSetStatus("Carpetas de PDF desconectadas.", true); }
 async function pppRenderPdfDirStatus() {
   const el = document.getElementById("pppPdfDirStatus"); if (!el) return;
   if (!window.showDirectoryPicker) { el.textContent = "(impresión: solo Chrome/Edge en PC)"; el.style.color = "#94a3b8"; return; }
-  let h = null; try { h = await fshGet(PDF_DIR_KEY); } catch (_e) {}
-  if (!h) { el.textContent = "carpeta sin conectar"; el.style.color = "#b45309"; return; }
-  let perm = "prompt"; try { perm = await _fshPerm(h, false); } catch (_e) {}
-  if (perm === "granted") { el.textContent = "✓ " + (h.name || "carpeta") + " conectada"; el.style.color = "#166534"; }
-  else { el.textContent = "🔒 " + (h.name || "carpeta") + " — permiso pendiente (tocá Imprimir y aceptá)"; el.style.color = "#b45309"; }
+  const dirs = await _pppLoadPdfDirs();
+  if (!dirs.length) { el.textContent = "carpeta sin conectar"; el.style.color = "#b45309"; return; }
+  const names = []; let pend = 0;
+  for (const h of dirs) { let perm = "prompt"; try { perm = await _fshPerm(h, false); } catch (_e) {} names.push((perm === "granted" ? "✓ " : "🔒 ") + escapeHtml(h.name || "carpeta")); if (perm !== "granted") pend++; }
+  el.innerHTML = names.join(" · ") + (pend ? " — permiso pendiente (tocá Imprimir y aceptá)" : "") + ' · <a href="#" onclick="event.preventDefault();pppForgetPdfDir()" style="color:#b42318;font-weight:700">olvidar</a>';
+  el.style.color = pend ? "#b45309" : "#166534";
 }
 async function pppFindNpPdf(dir, np) {
   const clean = String(np).replace(/\D/g, ""); if (!clean) return null;
@@ -9547,17 +9570,22 @@ async function pppFindNpPdf(dir, np) {
   }
   return null;
 }
+// Busca el PDF del NP en TODAS las carpetas conectadas (devuelve el primer match).
+async function pppFindNpPdfAny(dirs, np) {
+  for (let i = 0; i < dirs.length; i++) { const hit = await pppFindNpPdf(dirs[i], np); if (hit) return hit; }
+  return null;
+}
 async function pppPrintNp(np) {
   if (_pdfDirBusy) return; _pdfDirBusy = true;
   try {
-    const dir = await pppGetPdfDir(true);
-    if (!dir) return;
+    const dirs = await pppGetPdfDirs(true);
+    if (!dirs.length) return;
     pppSetStatus("Buscando el PDF del pedido " + np + "…");
-    const hit = await pppFindNpPdf(dir, np);
+    const hit = await pppFindNpPdfAny(dirs, np);
     if (!hit) {
       const probe = PDF_PREFIX + String(np).replace(/\D/g, "").padStart(PDF_WIDTHS[0], "0") + "_00.pdf";
-      pppSetStatus("No encontré el PDF del pedido " + np + " en la carpeta.", false);
-      alert("No encontré el PDF del pedido " + np + ".\n\nBusqué (entre otros): " + probe + "\n\nRevisá que la carpeta conectada sea la correcta (botón 🖨️ Carpeta PDF) y que el nombre arranque con \"" + PDF_PREFIX + "\".");
+      pppSetStatus("No encontré el PDF del pedido " + np + " en la(s) carpeta(s).", false);
+      alert("No encontré el PDF del pedido " + np + ".\n\nBusqué (entre otros): " + probe + "\n\nRevisá que la(s) carpeta(s) conectada(s) sea(n) la(s) correcta(s) (botón 🖨️ Carpeta PDF) y que el nombre arranque con \"" + PDF_PREFIX + "\".");
       return;
     }
     let buf;
@@ -9594,12 +9622,12 @@ async function pppPrintTanda(npsCsv) {
   if (!nps.length) return;
   if (_pdfDirBusy) return; _pdfDirBusy = true;
   try {
-    const dir = await pppGetPdfDir(true);
-    if (!dir) return;
+    const dirs = await pppGetPdfDirs(true);
+    if (!dirs.length) return;
     pppSetStatus("Buscando " + nps.length + " PDF de la tanda…");
     const found = [];
     for (let i = 0; i < nps.length; i++) {
-      const hit = await pppFindNpPdf(dir, nps[i]);
+      const hit = await pppFindNpPdfAny(dirs, nps[i]);
       if (hit) { try { const f = await hit.fh.getFile(); found.push({ buf: await f.arrayBuffer(), name: hit.name }); } catch (_e) {} }
     }
     if (!found.length) { pppSetStatus("No encontré PDF para los pedidos de la tanda.", false); alert("No encontré ningún PDF de los pedidos de esta tanda."); return; }
