@@ -4,7 +4,15 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-25 · Versión app al documentar: **v3.86**
+> Última actualización: 2026-06-25 · Versión app al documentar: **v3.87**
+>
+> Nota: **v3.87** — **PPP: tabla sin scroll horizontal (garantizado)** (pedido del usuario: "no quiero
+> scrollear"). Las columnas largas **Razón Social** (`.ppp-cli`), **Localidad** (col 7) y **Zona** (col 9)
+> ahora envuelven con `overflow-wrap:anywhere` → su ancho **mínimo** deja de depender del texto. Resultado
+> medido (Playwright, peor caso): el **mínimo** de la tabla es **~917px fijo**, y como la PPP está topeada
+> en **1240px** (`#pppOverlay .planim-body > *{max-width:1240px}`), **nunca hay scroll** en monitor/laptop
+> (sólo aparecería por debajo de ~920px de ancho de contenedor). El `.ppp-tablewrap{overflow-x:auto}` queda
+> como red de seguridad pero no se dispara.
 >
 > Nota: **v3.86** — **PPP: buscador + tandas con error en rojo + imprimir por tanda + tabla más compacta**
 > (pedido del usuario). (1) **Buscador** (`#pppSearchInp`, `_pppSearch`/`pppSetSearch`/`_pppSearchStr`):

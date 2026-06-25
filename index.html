@@ -1925,11 +1925,11 @@ button {
 .ppp-tanda.ppp-open .ppp-tablewrap{ display:block; }
 .ppp-tablewrap{ overflow-x:auto; }
 .ppp-tbl{ width:100%; border-collapse:collapse; font-size:13px; white-space:nowrap; table-layout:auto; }
-.ppp-tbl td:nth-child(7), .ppp-tbl th:nth-child(7){ white-space:normal; min-width:72px; }   /* Localidad: envuelve si es largo */
+.ppp-tbl td:nth-child(7), .ppp-tbl th:nth-child(7), .ppp-tbl td:nth-child(9), .ppp-tbl th:nth-child(9){ white-space:normal; overflow-wrap:anywhere; }   /* Localidad y Zona: envuelven → nunca fuerzan scroll */
 .ppp-tbl td.ppp-acc{ white-space:nowrap; text-align:right; }
 .ppp-tbl th{ text-align:left; padding:5px 7px; background:#f8fafc; color:#475569; border-bottom:1px solid #e2e8f0; font-size:11px; text-transform:uppercase; letter-spacing:.2px; }
 .ppp-tbl th.num{ text-align:right; } .ppp-tbl td{ padding:5px 7px; border-bottom:1px solid #f1f5f9; color:#0f172a; } .ppp-tbl td.num{ text-align:right; }
-.ppp-tbl .ppp-cli{ font-weight:600; white-space:normal; min-width:130px; }
+.ppp-tbl .ppp-cli{ font-weight:600; white-space:normal; overflow-wrap:anywhere; min-width:90px; }
 .ppp-tbl tbody tr:hover td{ background:#f8fafc; }
 .ppp-row-btn{ width:auto; margin:0; padding:4px 8px; font-size:12px; font-weight:bold; border:none; border-radius:7px; cursor:pointer; white-space:nowrap; }
 .ppp-row-btn.ppp-ent{ background:#16a34a; color:#fff; } .ppp-row-btn.ppp-ent:hover{ background:#15803d; }
@@ -5054,7 +5054,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.86";
+const APP_VERSION = "v3.87";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
