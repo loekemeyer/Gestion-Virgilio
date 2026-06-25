@@ -4,7 +4,19 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-25 · Versión app al documentar: **v3.85**
+> Última actualización: 2026-06-25 · Versión app al documentar: **v3.86**
+>
+> Nota: **v3.86** — **PPP: buscador + tandas con error en rojo + imprimir por tanda + tabla más compacta**
+> (pedido del usuario). (1) **Buscador** (`#pppSearchInp`, `_pppSearch`/`pppSetSearch`/`_pppSearchStr`):
+> filtra por **cualquier dato** de la fila (NP, cliente, cód, tanda, localidad, zona, fecha, tipo) y sólo
+> muestra coincidencias (filtra `programados`/`aProgramar`/`entreg` → los contadores de las pestañas
+> reflejan los matches); al buscar, las tandas con coincidencias se **abren solas** (`_pppBlock`:
+> `open = _pppOpen.has(id) || _pppSearch`). (2) **Tandas con error en ROJO + ⚠️**: en `_pppBlock`,
+> `hasErr = pedidos.some(p._err.length)` → clase `ppp-tanda-err` (franja roja) + `⚠️` antes del nombre.
+> (3) **Imprimir por tanda**: botón 🖨 en la **franja** (`pppPrintTanda(npsCsv)`) que busca e imprime **todos
+> los PDF** de los pedidos de la tanda en secuencia (con Chrome `--kiosk-printing` salen solos; si no, un
+> diálogo por PDF). (4) **Tabla más compacta** (sacar scroll + espacios muertos): padding de celda 8/12→5/7,
+> botones de fila 5/12→4/8 y font 13→12, `.ppp-cli` min-width 160→130, Localidad min 84→72.
 >
 > Nota: **v3.85** — **PPP: control POR NP + fix del wrap "feo" + header "Localidad"** (pedido del usuario).
 > (1) **Wrap**: el v3.83 había puesto `.ppp-tbl{white-space:normal}` para evitar scroll, pero con el ancho

@@ -1881,6 +1881,11 @@ button {
 @media (max-width:560px){ .ppp-map-row{ flex-direction:column; align-items:stretch; gap:3px; } .ppp-map-row label{ flex:none; } }
 /* Vista PPP (Programación / Entregados) */
 .ppp-tabs{ display:flex; gap:8px; margin:6px 0 8px; }
+.ppp-search{ display:flex; align-items:center; gap:8px; margin:0 0 8px; }
+.ppp-search input{ flex:1; min-width:0; padding:7px 12px; font-size:14px; border:1.5px solid #cbd5e1; border-radius:9px; background:#fff; box-sizing:border-box; }
+.ppp-search input:focus{ outline:none; border-color:#2563eb; box-shadow:0 0 0 3px rgba(37,99,235,.12); }
+.ppp-search-clr{ width:auto; padding:6px 11px; border:1px solid #e2e8f0; border-radius:8px; background:#fff; color:#64748b; cursor:pointer; font-weight:700; }
+.ppp-search-n{ font-size:12px; color:#475569; white-space:nowrap; }
 .ppp-tab{ width:auto; margin:0; flex:1 1 0; padding:10px; font-size:14px; font-weight:bold; background:#eef2ff; color:#3730a3; border:1px solid #c7d2fe; border-radius:10px; cursor:pointer; }
 .ppp-tab.on{ background:#1e6bd6; color:#fff; border-color:#1e6bd6; }
 .ppp-tanda{ background:#fff; border:1px solid #e2e8f0; border-radius:10px; margin-bottom:5px; overflow:hidden; }
@@ -1901,6 +1906,7 @@ button {
 /* CARGA VENCIDA (cargado al camión, sin controlar, pasado el plazo) — rojo grande y molesto. */
 .ppp-tanda.ppp-cargvenc{ border:3px solid #dc2626; box-shadow:0 0 0 2px #fecaca, 0 6px 18px rgba(220,38,38,.35); }
 .ppp-tanda.ppp-cargvenc .ppp-tanda-h{ background:linear-gradient(90deg,#dc2626,#991b1b); animation:pppShake 1.3s ease-in-out infinite; }
+.ppp-tanda.ppp-tanda-err .ppp-tanda-h{ background:linear-gradient(90deg,#dc2626,#991b1b); box-shadow:inset 5px 0 0 #fca5a5; }   /* tanda con errores → roja + ⚠️ en el nombre */
 .ppp-cargvenc-badge{ display:inline-block; background:#fff; color:#b91c1c; font-weight:900; font-size:11px; letter-spacing:.4px; padding:2px 8px; border-radius:6px; animation:pppBlink 1s steps(1) infinite; }
 .ppp-cargvenc-row > td{ background:#fef2f2 !important; }
 .ppp-cargvenc-row .ppp-cli{ color:#b91c1c; font-weight:800; }
@@ -1919,13 +1925,13 @@ button {
 .ppp-tanda.ppp-open .ppp-tablewrap{ display:block; }
 .ppp-tablewrap{ overflow-x:auto; }
 .ppp-tbl{ width:100%; border-collapse:collapse; font-size:13px; white-space:nowrap; table-layout:auto; }
-.ppp-tbl td:nth-child(7), .ppp-tbl th:nth-child(7){ white-space:normal; min-width:84px; }   /* Localidad: envuelve si es largo */
+.ppp-tbl td:nth-child(7), .ppp-tbl th:nth-child(7){ white-space:normal; min-width:72px; }   /* Localidad: envuelve si es largo */
 .ppp-tbl td.ppp-acc{ white-space:nowrap; text-align:right; }
-.ppp-tbl th{ text-align:left; padding:7px 12px; background:#f8fafc; color:#475569; border-bottom:1px solid #e2e8f0; font-size:11px; text-transform:uppercase; letter-spacing:.3px; }
-.ppp-tbl th.num{ text-align:right; } .ppp-tbl td{ padding:8px 12px; border-bottom:1px solid #f1f5f9; color:#0f172a; } .ppp-tbl td.num{ text-align:right; }
-.ppp-tbl .ppp-cli{ font-weight:600; white-space:normal; min-width:160px; }
+.ppp-tbl th{ text-align:left; padding:5px 7px; background:#f8fafc; color:#475569; border-bottom:1px solid #e2e8f0; font-size:11px; text-transform:uppercase; letter-spacing:.2px; }
+.ppp-tbl th.num{ text-align:right; } .ppp-tbl td{ padding:5px 7px; border-bottom:1px solid #f1f5f9; color:#0f172a; } .ppp-tbl td.num{ text-align:right; }
+.ppp-tbl .ppp-cli{ font-weight:600; white-space:normal; min-width:130px; }
 .ppp-tbl tbody tr:hover td{ background:#f8fafc; }
-.ppp-row-btn{ width:auto; margin:0; padding:5px 12px; font-size:13px; font-weight:bold; border:none; border-radius:7px; cursor:pointer; white-space:nowrap; }
+.ppp-row-btn{ width:auto; margin:0; padding:4px 8px; font-size:12px; font-weight:bold; border:none; border-radius:7px; cursor:pointer; white-space:nowrap; }
 .ppp-row-btn.ppp-ent{ background:#16a34a; color:#fff; } .ppp-row-btn.ppp-ent:hover{ background:#15803d; }
 .ppp-row-btn.ppp-ctrl-no{ background:#fff; color:#16a34a; border:1px solid #86efac; margin-right:6px; } .ppp-row-btn.ppp-ctrl-no:hover{ background:#f0fdf4; }
 .ppp-row-btn.ppp-ctrl-yes{ background:#16a34a; color:#fff; margin-right:6px; } .ppp-row-btn.ppp-ctrl-yes:hover{ background:#15803d; }
@@ -2005,6 +2011,8 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .ppp-fc{ font-size:12px; color:#cbd5e1; font-weight:700; }
 .ppp-fc.ok{ color:#fff; background:#16a34a; border-radius:999px; padding:2px 8px; font-weight:800; }
 .ppp-fc.ok2{ color:#fff; background:#1e6bd6; border-radius:999px; padding:2px 8px; font-weight:800; }
+.ppp-tanda-print{ margin-left:6px; padding:3px 9px; font-size:13px; border:none; border-radius:7px; background:rgba(255,255,255,.22); color:#fff; cursor:pointer; }
+.ppp-tanda-print:hover{ background:rgba(255,255,255,.38); }
 .ppp-tanda-ent{ margin-left:8px; padding:3px 10px; font-size:11px; font-weight:800; border:none; border-radius:7px; background:rgba(255,255,255,.22); color:#fff; cursor:pointer; }
 .ppp-tanda-ent:hover{ background:rgba(255,255,255,.35); }
 .ppp-ok-btn{ margin-left:8px; padding:3px 12px; font-size:12px; font-weight:800; border:none; border-radius:7px; background:#fff; color:#166534; cursor:pointer; }
@@ -5046,7 +5054,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.85";
+const APP_VERSION = "v3.86";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -8973,6 +8981,9 @@ const PPP_ENT_KEY = "vir_ppp_entregados";
 let _pppEntregados = null;
 let _pppArmadoDone = null;            // Set de tandas (UPPER) con TAP (armado terminado → Listo para FC)
 let _pppTab = "prog";
+let _pppSearch = "";
+function _pppSearchStr(p) { return [p.np, p.cod, p.razon_social, p.tanda, p.localidad, p.zona, p.fecha, p.fecha_entrega, p.tipo].join(" ").toLowerCase(); }
+function pppSetSearch(v) { _pppSearch = String(v == null ? "" : v).trim(); pppRenderProg(); const el = document.getElementById("pppSearchInp"); if (el) { el.focus(); const n = el.value.length; try { el.setSelectionRange(n, n); } catch (_e) {} } }
 function pppLoadEntregados() { if (_pppEntregados) return _pppEntregados; let a = []; try { a = JSON.parse(localStorage.getItem(PPP_ENT_KEY) || "[]"); } catch (_e) {} _pppEntregados = new Set(Array.isArray(a) ? a.map(String) : []); return _pppEntregados; }
 function pppSaveEntregados() { try { localStorage.setItem(PPP_ENT_KEY, JSON.stringify(Array.from(pppLoadEntregados()))); } catch (_e) {} }
 function pppTab(t) { _pppTab = t; pppRenderProg(); if (t === "plan" || t === "ent" || t === "resumen") { pppRefreshArmado(); pppRefreshEntregado(); pppRefreshControlado(); } }
@@ -9572,6 +9583,30 @@ function _pppPrintPdf(buf, name) {
   document.body.appendChild(ifr);
   setTimeout(function () { try { URL.revokeObjectURL(url); } catch (_e) {} try { if (ifr.parentNode) ifr.parentNode.removeChild(ifr); } catch (_e) {} }, 120000);
 }
+/* Imprime TODOS los PDF de los pedidos de una tanda, uno tras otro. Con Chrome
+   --kiosk-printing salen solos; si no, aparece un diálogo por PDF. */
+async function pppPrintTanda(npsCsv) {
+  const nps = String(npsCsv || "").split(",").map(function (s) { return s.trim(); }).filter(Boolean);
+  if (!nps.length) return;
+  if (_pdfDirBusy) return; _pdfDirBusy = true;
+  try {
+    const dir = await pppGetPdfDir(true);
+    if (!dir) return;
+    pppSetStatus("Buscando " + nps.length + " PDF de la tanda…");
+    const found = [];
+    for (let i = 0; i < nps.length; i++) {
+      const hit = await pppFindNpPdf(dir, nps[i]);
+      if (hit) { try { const f = await hit.fh.getFile(); found.push({ buf: await f.arrayBuffer(), name: hit.name }); } catch (_e) {} }
+    }
+    if (!found.length) { pppSetStatus("No encontré PDF para los pedidos de la tanda.", false); alert("No encontré ningún PDF de los pedidos de esta tanda."); return; }
+    let i = 0;
+    const next = function () { if (i >= found.length) return; _pppPrintPdf(found[i].buf, found[i].name); i++; if (i < found.length) setTimeout(next, 1500); };
+    next();
+    const faltan = nps.length - found.length;
+    pppSetStatus("🖨️ Mandé a imprimir " + found.length + " PDF de la tanda" + (faltan > 0 ? " (⚠ " + faltan + " sin PDF)" : "") + ".", faltan === 0);
+  } catch (e) { pppSetStatus("Error al imprimir la tanda: " + (e && e.message ? e.message : e), false); }
+  finally { _pdfDirBusy = false; }
+}
 /* Clave de cliente para cruzar pedidos (cód si hay; si no, razón social). */
 function _pppCliKey(p) { return String((p && (p.cod || p.razon_social)) || "").trim().toUpperCase(); }
 /* Agrega pedidos (de A Programar) a una tanda YA programada del mismo cliente: les pone
@@ -9636,7 +9671,7 @@ function _pppNpFmt(nps) {
 }
 function _pppBlock(key, name, cls, meta, pedidos, headerExtra, editTanda) {
   const id = _pppKid(key);
-  const open = _pppOpen.has(id) ? " ppp-open" : "";
+  const open = (_pppOpen.has(id) || _pppSearch) ? " ppp-open" : "";   // al buscar, abre las tandas con coincidencias
   const modeCls = _pppMode[id] === "edit" ? " ppp-edit-mode" : (_pppMode[id] === "ctrl" ? " ppp-ctrl-mode" : "");
   const ruta = _pppRuta(pedidos);
   const rcls = (ruta && cls.indexOf("ppp-tanda-super") < 0) ? (" rt-" + ruta) : "";
@@ -9652,16 +9687,19 @@ function _pppBlock(key, name, cls, meta, pedidos, headerExtra, editTanda) {
   let cargVenc = false;
   if (_pppTab !== "ent") { for (const p of pedidos) { if (_pppCargaVencida(p)) { cargVenc = true; break; } } }
   const cargBadge = cargVenc ? '<span class="ppp-cargvenc-badge">🚨 SIN CONTROLAR</span> ' : '';
+  const hasErr = pedidos.some(function (p) { return (p._err || []).length; });   // alguna fila con error → tanda en rojo + ⚠️
+  const npsCsv = pedidos.map(function (p) { return String(p.np); }).join(",");
+  const tandaPrintBtn = '<button class="ppp-tanda-print" onclick="event.stopPropagation();pppPrintTanda(\'' + npsCsv + '\')" title="Imprimir todos los PDF de esta tanda">🖨️</button>';
   const sum = cargBadge + (razStr ? '<span class="ppp-sum-raz">' + escapeHtml(razStr) + '</span> ' : '') + '<span class="ppp-sum-np">' + escapeHtml(npStr) + '</span>';
   const feHtml = fes.length ? '<span class="ppp-sum-fe' + (venc ? ' ppp-fe-venc' : '') + '">' + (venc ? '⏰ ' : '📅 ') + escapeHtml(fes.join(" / ")) + (venc ? ' ¡VENCIDA!' : '') + '</span>' : '';
   const hx = (headerExtra || "").replace(/__BLOCKID__/g, id);
-  let h = '<div class="ppp-tanda ' + cls + open + modeCls + (venc ? ' ppp-vencida' : '') + (cargVenc ? ' ppp-cargvenc' : '') + '" id="' + id + '">' +
+  let h = '<div class="ppp-tanda ' + cls + open + modeCls + (venc ? ' ppp-vencida' : '') + (cargVenc ? ' ppp-cargvenc' : '') + (hasErr ? ' ppp-tanda-err' : '') + '" id="' + id + '">' +
     '<div class="ppp-tanda-h' + rcls + '" onclick="pppToggleBlock(\'' + id + '\')">' +
       '<span class="ppp-caret">▸</span>' +
-      '<span class="ppp-tanda-name">' + name + '</span>' +
+      '<span class="ppp-tanda-name">' + (hasErr ? '⚠️ ' : '') + name + '</span>' +
       '<span class="ppp-tanda-sum">' + sum + '</span>' +
       '<span class="ppp-tanda-fe">' + feHtml + '</span>' +
-      '<span class="ppp-tanda-meta">' + meta + hx + '</span>' +
+      '<span class="ppp-tanda-meta">' + meta + hx + tandaPrintBtn + '</span>' +
     '</div>';
   if (editTanda) {
     const te = escapeHtml(String(editTanda));
@@ -9822,6 +9860,12 @@ function pppRenderProg() {
     programados = notEnt.filter(function (p) { return p.programmed; });
     aProgramar  = notEnt.filter(function (p) { return !p.programmed; });
   }
+  // Buscador: filtra por cualquier dato de la fila; sólo se muestran coincidencias.
+  if (_pppSearch) {
+    const q = _pppSearch.toLowerCase();
+    const mt = function (p) { return _pppSearchStr(p).indexOf(q) >= 0; };
+    programados = programados.filter(mt); aProgramar = aProgramar.filter(mt); entreg = entreg.filter(mt);
+  }
   let html =
     '<div class="ppp-tabs">' +
       '<button class="ppp-tab ' + (_pppTab === "prog" ? "on" : "") + '" onclick="pppTab(\'prog\')">📥 A Programar (' + aProgramar.length + ')</button>' +
@@ -9829,6 +9873,7 @@ function pppRenderProg() {
       '<button class="ppp-tab ' + (_pppTab === "resumen" ? "on" : "") + '" onclick="pppTab(\'resumen\')">🚚 Resumen</button>' +
       '<button class="ppp-tab ' + (_pppTab === "ent" ? "on" : "") + '" onclick="pppTab(\'ent\')">✅ Pedidos Entregados (' + entreg.length + ')</button>' +
     '</div>';
+  html += '<div class="ppp-search"><input id="pppSearchInp" type="search" autocomplete="off" placeholder="🔎 Buscar: NP, cliente, cód, tanda, localidad, zona, fecha…" value="' + escapeHtml(_pppSearch) + '" oninput="pppSetSearch(this.value)">' + (_pppSearch ? '<button class="ppp-search-clr" onclick="pppSetSearch(\'\')" title="Limpiar búsqueda">✕</button><span class="ppp-search-n">' + (programados.length + aProgramar.length + entreg.length) + ' coincidencia(s)</span>' : '') + '</div>';
   if (PPP_READONLY && _errInfo) html += pppErroresHtml(_errInfo);   // panel de errores (SACAR / sin zona / zona / tanda)
   // Diagnóstico del mapeo (tocá para ver las columnas del Excel).
   if (_pppLastDetect) {
