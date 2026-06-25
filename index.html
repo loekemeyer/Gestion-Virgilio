@@ -1948,6 +1948,16 @@ button {
 .ppp-confirm-btn{ padding:9px 16px; font-size:14px; font-weight:800; border:none; border-radius:10px; background:#16a34a; color:#fff; cursor:pointer; }
 .ppp-confirm-btn:hover{ background:#15803d; }
 /* Sugerencia: agregar un pedido de A Programar a una tanda YA en Programación (mismo cliente). */
+.ppp-errpanel{ background:#fff7ed; border:1.5px solid #fdba74; border-radius:10px; padding:10px 12px; margin:8px 0 6px; }
+.ppp-errpanel.ok{ background:#f0fdf4; border-color:#bbf7d0; color:#166534; font-weight:600; }
+.ppp-errpanel-h{ font-weight:800; color:#9a3412; margin-bottom:6px; }
+.ppp-ei{ font-size:13px; line-height:1.5; padding:3px 0; border-top:1px dashed #fed7aa; word-break:break-word; }
+.ppp-ei.bad{ color:#b42318; } .ppp-ei.warn{ color:#92400e; }
+.ppp-eb{ display:inline-block; font-size:11px; font-weight:800; padding:1px 6px; border-radius:6px; margin-left:4px; vertical-align:middle; }
+.ppp-eb.bad{ background:#fee2e2; color:#b42318; border:1px solid #fecaca; }
+.ppp-eb.warn{ background:#fef3c7; color:#92400e; border:1px solid #fde68a; }
+tr.ppp-err-sacar > td{ background:#fef2f2 !important; }
+tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .ppp-match-box{ background:#eef2ff; border:1px solid #c7d2fe; border-radius:10px; padding:10px 12px; margin:8px 0 4px; }
 .ppp-match-h{ font-size:13px; font-weight:800; color:#3730a3; margin-bottom:6px; }
 .ppp-match-row{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:7px 0; border-top:1px solid #ddd6fe; }
@@ -5007,7 +5017,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.81";
+const APP_VERSION = "v3.82";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -8750,7 +8760,7 @@ async function pppLoadProgFromSupabase() {
   const supa = [], nps = {};
   for (const r of rows) { const np = _pppS(r.np); if (!np || (np in nps)) continue; nps[np] = 1; supa.push(_pppRowFromSupa(r)); }
   _pppSupaNps = nps;
-  const extra = pppLoadPedidosStore().filter(function (p) { return !(String(p.np) in nps); });   // importados que aún no están en Supabase
+  const extra = PPP_READONLY ? [] : pppLoadPedidosStore().filter(function (p) { return !(String(p.np) in nps); });   // importados que aún no están en Supabase (solo modo editable)
   _pppParsed.prog = supa.concat(extra);
   const prog = supa.filter(function (p) { return p.programmed; }).length;
   pppRenderProg();
@@ -9284,8 +9294,27 @@ function _pppTieneTanda(p) { const t = (p.tanda || "").trim(); return !!t && t !
 function _pppFechaKey(s) { const m = /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/.exec(String(s || "")); if (!m) return "99999999"; let y = m[3]; if (y.length === 2) y = "20" + y; return y + String(m[2]).padStart(2, "0") + String(m[1]).padStart(2, "0"); }
 function _pppFechaDate(s) { const m = /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/.exec(String(s || "")); if (!m) return null; let y = +m[3]; if (y < 100) y += 2000; const d = new Date(y, +m[2] - 1, +m[1]); return isNaN(d.getTime()) ? null : d; }
 function _pppM3Sum(arr) { return arr.reduce(function (s, p) { return s + (Number(p.m3) || 0); }, 0); }
+/* Fila de pedido en modo SOLO-LECTURA: todo texto (sin inputs ni botones de edición),
+   con badges de error (🚮 SACAR / ⚠ ZONA / ⚠ TANDA) y el botón 🖨 Imprimir. */
+function _pppRowTrRO(p, npE) {
+  const err = p._err || [];
+  const cls = (err.indexOf("sacar") >= 0) ? "ppp-err-sacar" : (err.length ? "ppp-err-zona" : "");
+  const badges = err.map(function (e) { return _PPP_ERR_BADGE[e] || ""; }).join(" ");
+  return '<tr' + (cls ? ' class="' + cls + '"' : '') + '>' +
+    '<td>' + escapeHtml(p.tanda && p.tanda !== "—" ? p.tanda : "—") + '</td>' +
+    '<td>' + escapeHtml(p.cod || "") + '</td><td><b>' + npE + '</b></td><td>' + escapeHtml(p.fecha || "") + '</td>' +
+    '<td class="ppp-cli">' + escapeHtml(p.razon_social || "") + (badges ? ' ' + badges : "") + '</td>' +
+    '<td class="num">' + (p.m3 != null && p.m3 !== "" ? Number(p.m3).toFixed(2) : "") + '</td>' +
+    '<td>' + escapeHtml(p.localidad || "") + '</td>' +
+    '<td>' + escapeHtml(p.fecha_entrega || "") + '</td>' +
+    '<td>' + escapeHtml(p.zona || pppZonaDeBarrio(p.localidad) || "—") + '</td>' +
+    '<td>' + (_pppListoFC(p) ? '<span class="ppp-fc ok" title="Armado terminado (TAP)">✓ Listo</span>' : '<span class="ppp-fc">·</span>') + '</td>' +
+    '<td>' + (_pppEntregado(p) ? '<span class="ppp-fc ok2" title="Cargado al camión (CCN)">✓ Entregado</span>' : '<span class="ppp-fc">·</span>') + '</td>' +
+    '<td><button class="ppp-row-btn ppp-print" onclick="pppPrintNp(\'' + npE + '\')" title="Imprimir el PDF del pedido (ISIS)">🖨️</button></td></tr>';
+}
 function _pppRowTr(p) {
   const npE = escapeHtml(String(p.np));
+  if (PPP_READONLY) return _pppRowTrRO(p, npE);
   const tEd = escapeHtml(p.tanda && p.tanda !== "—" ? p.tanda : "");
   const feEd = escapeHtml(p.fecha_entrega || "");
   const btn = (_pppTab === "ent")
@@ -9611,10 +9640,61 @@ function pppResumenHtml(prog) {
       '<th>Fecha</th><th>Día</th><th>Z1<br>Sur</th><th>Z2<br>Centro</th><th>Z3<br>Oeste</th><th>Z4<br>GBA&nbsp;S</th><th>Z5<br>GBA&nbsp;O</th><th>Z6<br>GBA&nbsp;N</th><th>Z7<br>Lejos</th><th>Retira</th><th>Súper</th><th>Total<br>m³</th><th>Cam.</th><th>Demora<br>(d)</th>' +
     '</tr></thead><tbody>' + rows + totRow + '</tbody></table></div>';
 }
+/* ===== PPP en modo SOLO-LECTURA de Supabase (pedido del usuario): la PPP NO corrige
+   nada acá (eso se hace en el Excel); sólo VISUALIZA la Programación de Supabase y MARCA
+   errores para corregir. Poné PPP_READONLY=false para volver a la PPP editable. ===== */
+const PPP_READONLY = true;
+const _PPP_ZONA_EXENTA = { "super": 1, "retira": 1, "expo": 1 };
+function _pppZonaNorm(z) { return String(z == null ? "" : z).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]/g, ""); }
+const _PPP_ERR_BADGE = {
+  sacar:    '<span class="ppp-eb bad">🚮 SACAR</span>',
+  sinzona:  '<span class="ppp-eb warn">⚠ SIN ZONA</span>',
+  zonadif:  '<span class="ppp-eb warn">⚠ ZONA?</span>',
+  tandamal: '<span class="ppp-eb warn">⚠ TANDA</span>'
+};
+/* Calcula los 4 errores sobre los pedidos de Supabase y los anota en p._err. Devuelve
+   las listas para el panel. entSet = NP ya entregados/controlados (CRN/CCR). */
+function _pppComputeErrors(peds, entSet) {
+  const sacar = [], sinZona = [], zonaDif = [];
+  for (const p of peds) {
+    p._err = [];
+    if (p.programmed && entSet && entSet.has(String(p.np))) { p._err.push("sacar"); sacar.push(p); }
+    const zCol = _pppS(p.zona);
+    if (!pppEsSuper(p) && !_PPP_ZONA_EXENTA[zCol.toLowerCase()]) {
+      const zb = pppZonaDeBarrio(p.localidad);
+      if (!zb) { p._err.push("sinzona"); sinZona.push(p); }
+      else if (zCol && _pppZonaNorm(zCol) !== _pppZonaNorm(zb)) { p._err.push("zonadif"); zonaDif.push(p); }
+    }
+  }
+  // Tandas inconsistentes: ruta (camión) mezclada o varias fechas de entrega.
+  const byT = {}, tandasMal = [];
+  for (const p of peds) { if (!p.programmed || !_pppTieneTanda(p)) continue; const t = p.tanda.toUpperCase(); (byT[t] = byT[t] || []).push(p); }
+  for (const t in byT) {
+    const ps = byT[t], rutas = {}, fechas = {};
+    for (const p of ps) { if (!pppEsSuper(p)) { const r = _pppRuta([p]); if (r) rutas[r] = 1; } const fe = _pppS(p.fecha_entrega); if (fe) fechas[fe] = 1; }
+    const nR = Object.keys(rutas).length, nF = Object.keys(fechas).length;
+    if (nR > 1 || nF > 1) { tandasMal.push({ tanda: t, rutas: nR, fechas: nF }); for (const p of ps) if (p._err.indexOf("tandamal") < 0) p._err.push("tandamal"); }
+  }
+  return { sacar: sacar, sinZona: sinZona, zonaDif: zonaDif, tandasMal: tandasMal };
+}
+function pppErroresHtml(e) {
+  const n = e.sacar.length + e.sinZona.length + e.zonaDif.length + e.tandasMal.length;
+  if (!n) return '<div class="ppp-errpanel ok">✓ Sin errores detectados en la Programación de Supabase.</div>';
+  const np = function (p) { return escapeHtml(String(p.np)); };
+  const cli = function (p) { const r = (p.razon_social || "").trim(); return r ? " " + escapeHtml(r.slice(0, 20)) : ""; };
+  let h = '<div class="ppp-errpanel"><div class="ppp-errpanel-h">🚨 ' + n + ' cosa(s) para revisar/corregir en el Excel</div>';
+  if (e.sacar.length)     h += '<div class="ppp-ei bad">🚮 <b>Ya entregados — SACAR (' + e.sacar.length + '):</b> ' + e.sacar.map(function (p) { return np(p) + cli(p); }).join(" · ") + '</div>';
+  if (e.sinZona.length)   h += '<div class="ppp-ei warn">⚠ <b>Sin zona (' + e.sinZona.length + '):</b> ' + e.sinZona.map(function (p) { return np(p) + " — " + escapeHtml(p.localidad || "?"); }).join(" · ") + '</div>';
+  if (e.zonaDif.length)   h += '<div class="ppp-ei warn">⚠ <b>Zona no coincide (' + e.zonaDif.length + '):</b> ' + e.zonaDif.map(function (p) { return np(p) + " [" + escapeHtml(p.localidad || "?") + ": Excel=" + escapeHtml(p.zona || "—") + " / barrio=" + escapeHtml(pppZonaDeBarrio(p.localidad) || "—") + "]"; }).join(" · ") + '</div>';
+  if (e.tandasMal.length) h += '<div class="ppp-ei warn">⚠ <b>Tandas inconsistentes (' + e.tandasMal.length + '):</b> ' + e.tandasMal.map(function (t) { return escapeHtml(t.tanda) + (t.rutas > 1 ? " (rutas mezcladas)" : "") + (t.fechas > 1 ? " (varias fechas)" : ""); }).join(" · ") + '</div>';
+  h += '</div>';
+  return h;
+}
 function pppRenderProg() {
   const box = document.getElementById("pppPreview"); if (!box) return;
   const ed = pppLoadEdits();
   const merge = function (p) {
+    if (PPP_READONLY) return p;   // solo Supabase: sin ediciones locales
     const e = ed[String(p.np)]; if (!e) return p;
     const o = Object.assign({}, p);
     if (e.tanda != null) o.tanda = e.tanda;
@@ -9629,10 +9709,18 @@ function pppRenderProg() {
   for (const p of (_pppParsed.prog || [])) { const k = String(p.np).trim(); if (!k || _vistos[k]) continue; _vistos[k] = 1; all.push(merge(p)); }
   if (!all.length) { box.innerHTML = '<div class="planim-empty">Importá el <b>Formato PPP</b> — los pedidos del día se suman a los que ya estaban y caen en <b>A Programar</b>.</div>'; return; }
   const ent = pppLoadEntregados();
-  const notEnt = all.filter(function (p) { return !ent.has(String(p.np)); });
-  const entreg = all.filter(function (p) { return ent.has(String(p.np)); });
-  const programados = notEnt.filter(function (p) { return p.programmed; });
-  const aProgramar = notEnt.filter(function (p) { return !p.programmed; });
+  let programados, aProgramar, entreg, _errInfo = null;
+  if (PPP_READONLY) {
+    _errInfo    = _pppComputeErrors(all, ent);                           // anota p._err + arma el panel
+    entreg      = all.filter(function (p) { return ent.has(String(p.np)); });
+    programados = all.filter(function (p) { return p.programmed; });     // incluye los entregados (se marcan 🚮 SACAR in situ)
+    aProgramar  = all.filter(function (p) { return !p.programmed; });
+  } else {
+    const notEnt = all.filter(function (p) { return !ent.has(String(p.np)); });
+    entreg      = all.filter(function (p) { return ent.has(String(p.np)); });
+    programados = notEnt.filter(function (p) { return p.programmed; });
+    aProgramar  = notEnt.filter(function (p) { return !p.programmed; });
+  }
   let html =
     '<div class="ppp-tabs">' +
       '<button class="ppp-tab ' + (_pppTab === "prog" ? "on" : "") + '" onclick="pppTab(\'prog\')">📥 A Programar (' + aProgramar.length + ')</button>' +
@@ -9640,6 +9728,7 @@ function pppRenderProg() {
       '<button class="ppp-tab ' + (_pppTab === "resumen" ? "on" : "") + '" onclick="pppTab(\'resumen\')">🚚 Resumen</button>' +
       '<button class="ppp-tab ' + (_pppTab === "ent" ? "on" : "") + '" onclick="pppTab(\'ent\')">✅ Pedidos Entregados (' + entreg.length + ')</button>' +
     '</div>';
+  if (PPP_READONLY && _errInfo) html += pppErroresHtml(_errInfo);   // panel de errores (SACAR / sin zona / zona / tanda)
   // Diagnóstico del mapeo (tocá para ver las columnas del Excel).
   if (_pppLastDetect) {
     const dg = _pppLastDetect;
@@ -9683,19 +9772,22 @@ function pppRenderProg() {
     }
     box.innerHTML = html; return;
   }
-  // ===== Tab "A Programar" → armar tandas (≤ m³/tanda) y confirmar para programar =====
+  // ===== Tab "A Programar" → (en modo editable) armar tandas y confirmar; en SOLO-LECTURA sólo lista =====
   const cfg = pppGetCfg();
-  html += '<div class="ppp-toolbar">' +
-    '<button class="ppp-sug-btn" onclick="pppSugerirTandas()">🪄 Sugerir tandas</button>' +
-    '<button class="ppp-confirm-btn" onclick="pppConfirmarProgramar()">✅ Confirmar todas</button>' +
-    '<label class="ppp-tool-l">m³/tanda <input class="ppp-tool-inp" type="number" step="0.1" min="0.1" value="' + cfg.tandaCap + '" onchange="pppSetCfg(\'tandaCap\',this.value)"></label>' +
-    '<label class="ppp-tool-l">m³/día <input class="ppp-tool-inp" type="number" step="0.5" min="0.5" value="' + cfg.dayCap + '" onchange="pppSetCfg(\'dayCap\',this.value)"></label>' +
-    '<label class="ppp-tool-l">N° base <input id="pppBaseNInp" class="ppp-tool-inp ppp-tool-n" value="' + escapeHtml(cfg.baseN) + '" onchange="pppSetCfg(\'baseN\',this.value)" title="Se calcula solo: última tanda en Supabase (Programación Diaria) + 1, un número por día. Podés cambiarlo a mano."></label>' +
-    '<button class="ppp-tool-clear" onclick="pppLimpiarTandas()">borrar tandas</button>' +
-    '</div>';
-  html += '<div id="pppBaseNote" style="font-size:12px;font-weight:600;margin:2px 2px 8px;color:' + (cfg.baseOk === false ? '#b42318' : '#166534') + ';">' + escapeHtml(cfg.baseNote || "") + '</div>';
+  if (!PPP_READONLY) {
+    html += '<div class="ppp-toolbar">' +
+      '<button class="ppp-sug-btn" onclick="pppSugerirTandas()">🪄 Sugerir tandas</button>' +
+      '<button class="ppp-confirm-btn" onclick="pppConfirmarProgramar()">✅ Confirmar todas</button>' +
+      '<label class="ppp-tool-l">m³/tanda <input class="ppp-tool-inp" type="number" step="0.1" min="0.1" value="' + cfg.tandaCap + '" onchange="pppSetCfg(\'tandaCap\',this.value)"></label>' +
+      '<label class="ppp-tool-l">m³/día <input class="ppp-tool-inp" type="number" step="0.5" min="0.5" value="' + cfg.dayCap + '" onchange="pppSetCfg(\'dayCap\',this.value)"></label>' +
+      '<label class="ppp-tool-l">N° base <input id="pppBaseNInp" class="ppp-tool-inp ppp-tool-n" value="' + escapeHtml(cfg.baseN) + '" onchange="pppSetCfg(\'baseN\',this.value)" title="Se calcula solo: última tanda en Supabase (Programación Diaria) + 1, un número por día. Podés cambiarlo a mano."></label>' +
+      '<button class="ppp-tool-clear" onclick="pppLimpiarTandas()">borrar tandas</button>' +
+      '</div>';
+    html += '<div id="pppBaseNote" style="font-size:12px;font-weight:600;margin:2px 2px 8px;color:' + (cfg.baseOk === false ? '#b42318' : '#166534') + ';">' + escapeHtml(cfg.baseNote || "") + '</div>';
+  }
   // ===== Sugerencia: pedido en A Programar cuyo CLIENTE ya tiene tanda en Programación =====
-  // → ofrecer meterlo en esa tanda ya hecha (aunque pase el m³/tanda objetivo).
+  // → ofrecer meterlo en esa tanda ya hecha (aunque pase el m³/tanda objetivo). (Sólo modo editable.)
+  if (!PPP_READONLY) {
   const _progByCli = {};
   for (const p of programados) {
     const ck = _pppCliKey(p), t = (p.tanda || "").trim().toUpperCase();
@@ -9725,6 +9817,7 @@ function pppRenderProg() {
     }
     html += '</div>';
   }
+  }
   const sup = aProgramar.filter(pppEsSuper);
   const resto = aProgramar.filter(function (p) { return !pppEsSuper(p); });
   const armadas = resto.filter(_pppTieneTanda);
@@ -9735,15 +9828,17 @@ function pppRenderProg() {
   else {
     const byC = {}, ord = [];
     for (const p of sup) { const k = String(p.cod || p.razon_social || "?"); if (!(k in byC)) ord.push(k); (byC[k] = byC[k] || []).push(p); }
-    for (const k of ord) { const ps = byC[k]; const ok = ' <button class="ppp-ok-btn" onclick="event.stopPropagation();pppOkSuper(\'' + escapeHtml(String(ps[0].np)) + '\')">✓ OK → Programar</button>'; html += _pppBlock("sup_" + k, "🛒 " + escapeHtml(ps[0].razon_social || ("Cliente " + k)), "ppp-tanda-super", ps.length + " ped · " + _pppM3Sum(ps).toFixed(2) + " m³", ps, ok); }
+    for (const k of ord) { const ps = byC[k]; const ok = PPP_READONLY ? "" : ' <button class="ppp-ok-btn" onclick="event.stopPropagation();pppOkSuper(\'' + escapeHtml(String(ps[0].np)) + '\')">✓ OK → Programar</button>'; html += _pppBlock("sup_" + k, "🛒 " + escapeHtml(ps[0].razon_social || ("Cliente " + k)), "ppp-tanda-super", ps.length + " ped · " + _pppM3Sum(ps).toFixed(2) + " m³", ps, ok); }
   }
-  // TANDAS ARMADAS — con tanda, sin confirmar (listas para programar).
-  html += '<div class="ppp-sec-t ppp-sec-done">🧩 Tandas armadas — sin confirmar · ' + armadas.length + '</div>';
-  if (!armadas.length) html += '<div class="planim-empty">Armá tandas con 🪄 Sugerir o escribiendo la Tanda abajo. Después tocá ✅ Confirmar y programar.</div>';
-  else {
-    const byT = {}, ord = []; for (const p of armadas) { const t = p.tanda.toUpperCase(); if (!(t in byT)) ord.push(t); (byT[t] = byT[t] || []).push(p); }
-    ord.sort();
-    for (const t of ord) { const ok = ' <button class="ppp-ok-btn" onclick="event.stopPropagation();pppOkTanda(\'' + escapeHtml(t) + '\')">✓ OK → Programar</button>'; html += _pppBlock("arm_" + t, "Tanda " + escapeHtml(t), "", byT[t].length + " ped · " + _pppM3Sum(byT[t]).toFixed(2) + " m³", byT[t], ok); }
+  // TANDAS ARMADAS — con tanda, sin confirmar (sólo modo editable; en solo-lectura no existe ese estado).
+  if (!PPP_READONLY) {
+    html += '<div class="ppp-sec-t ppp-sec-done">🧩 Tandas armadas — sin confirmar · ' + armadas.length + '</div>';
+    if (!armadas.length) html += '<div class="planim-empty">Armá tandas con 🪄 Sugerir o escribiendo la Tanda abajo. Después tocá ✅ Confirmar y programar.</div>';
+    else {
+      const byT = {}, ord = []; for (const p of armadas) { const t = p.tanda.toUpperCase(); if (!(t in byT)) ord.push(t); (byT[t] = byT[t] || []).push(p); }
+      ord.sort();
+      for (const t of ord) { const ok = ' <button class="ppp-ok-btn" onclick="event.stopPropagation();pppOkTanda(\'' + escapeHtml(t) + '\')">✓ OK → Programar</button>'; html += _pppBlock("arm_" + t, "Tanda " + escapeHtml(t), "", byT[t].length + " ped · " + _pppM3Sum(byT[t]).toFixed(2) + " m³", byT[t], ok); }
+    }
   }
   // SIN TANDA — por zona, ordenado por fecha de recepción.
   html += '<div class="ppp-sec-t ppp-sec-prog">📋 Sin tanda — por zona, ordenado por fecha de recepción · ' + sinTanda.length + '</div>';

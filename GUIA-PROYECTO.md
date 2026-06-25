@@ -4,7 +4,24 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-25 · Versión app al documentar: **v3.81**
+> Última actualización: 2026-06-25 · Versión app al documentar: **v3.82**
+>
+> Nota: **v3.82** — **PPP = visor SOLO-LECTURA de Supabase + panel de errores** (pedido del usuario: "por
+> ahora que solo funcione en función de Supabase, que no corrija nada, solo visualizar; se sigue
+> corrigiendo en Excel"). Flag **`PPP_READONLY = true`** (poner `false` vuelve a la PPP editable). En
+> modo lectura: (a) `merge` ignora `vir_ppp_edits` y `pppLoadProgFromSupabase` no suma extras locales →
+> la vista es **Supabase puro**; (b) se ocultan los controles de edición (Sugerir/Confirmar/N° base/borrar,
+> el cuadro 🔗 "agregar a tanda", "Tandas armadas", botones OK/↩/✏️/✓); las filas (`_pppRowTrRO`) van como
+> **texto** + botón 🖨 Imprimir. (c) **Panel de errores** arriba (`pppErroresHtml`/`_pppComputeErrors`,
+> los 4 que pidió el usuario, anota `p._err` y resalta la fila): **🚮 SACAR** = pedido `programmed` cuyo NP
+> está en entregados/controlados (CRN/CCR — sigue en la Programación de Supabase pero ya se entregó);
+> **⚠ SIN ZONA** = el barrio no cae en ninguna zona (`pppZonaDeBarrio` vacío; no para Súper/Retira/Expo);
+> **⚠ ZONA?** = la columna `zona` del Excel ≠ la que da el barrio (compara con `_pppZonaNorm`, formato/acentos);
+> **⚠ TANDA** = tanda con rutas/camión mezclados (`_pppRuta`) o varias fechas de entrega. En lectura, los
+> entregados **NO** se sacan de Programación (se muestran con el 🚮 para verlos). Verificado contra los
+> datos: `zona` en Supabase viene igual que la que calcula la app (`Zona 1 - CABA Sur`…), y hay casos
+> reales con `zona=''` (Micro Centro, Villa Sarmiento). ⚠ La PPP **no escribe nada** (ni local ni
+> Supabase); las correcciones siguen en el Excel.
 >
 > Nota: **v3.81** — **PPP: la Programación pasa a salir de Supabase + el import dedupea contra Supabase**
 > (pedido del usuario; antes era SOLO LOCAL y mostraba 0 programados aunque Supabase tuviera ~63). (1)
