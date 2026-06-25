@@ -1804,8 +1804,8 @@ button {
 .planim-body{ flex: 1; overflow: auto; padding: 14px; background: #f8fafc; display: flex; flex-direction: column; align-items: center; gap: 12px; }
 .planim-body > *{ width: 100%; max-width: 560px; box-sizing: border-box; }   /* columna prolija centrada */
 /* La PPP usa TODO el ancho de la página (no el cap de 560px del editor de planimetría) → sin scroll horizontal. */
-#pppOverlay .planim-body{ align-items: stretch; }
-#pppOverlay .planim-body > *{ max-width: none; }
+#pppOverlay .planim-body{ align-items: center; gap: 8px; }
+#pppOverlay .planim-body > *{ max-width: 1240px; }
 .planim-add-row .planim-inp{ flex: 1 1 100px; min-width: 0; }
 .planim-add-row .planim-inp-num{ flex: 0 0 84px; }
 .planim-add{ background: #fff; border: 2px solid #1e6bd6; border-radius: 10px; padding: 12px; }
@@ -1866,7 +1866,7 @@ button {
 .ppp-diag-tbl td{ padding:3px 8px; border-bottom:1px solid #ffedd5; color:#0f172a; vertical-align:top; }
 .ppp-diag-tbl td:first-child{ font-family:Consolas,Menlo,monospace; font-weight:bold; color:#9a3412; }
 .ppp-baseinfo .ppp-base-none{ color:#94a3b8; } .ppp-baseinfo .ppp-base-local{ color:#94a3b8; font-size:12px; }
-.ppp-preview{ margin-top:14px; }
+.ppp-preview{ margin-top:6px; }
 .ppp-prev-h{ font-size:13px; color:#334155; margin-bottom:8px; } .ppp-prev-h code{ background:#eef2ff; color:#3730a3; padding:1px 5px; border-radius:4px; }
 .ppp-prev-tablewrap{ overflow-x:auto; border:1px solid #e2e8f0; border-radius:8px; }
 .ppp-prev-table{ width:100%; border-collapse:collapse; font-size:12px; background:#fff; white-space:nowrap; }
@@ -1880,13 +1880,13 @@ button {
 .ppp-map-row select{ flex:1 1 auto; min-width:0; height:38px; font-size:14px; border:2px solid #cbd5e1; border-radius:8px; padding:0 8px; background:#fff; }
 @media (max-width:560px){ .ppp-map-row{ flex-direction:column; align-items:stretch; gap:3px; } .ppp-map-row label{ flex:none; } }
 /* Vista PPP (Programación / Entregados) */
-.ppp-tabs{ display:flex; gap:8px; margin:14px 0 12px; }
+.ppp-tabs{ display:flex; gap:8px; margin:6px 0 8px; }
 .ppp-tab{ width:auto; margin:0; flex:1 1 0; padding:10px; font-size:14px; font-weight:bold; background:#eef2ff; color:#3730a3; border:1px solid #c7d2fe; border-radius:10px; cursor:pointer; }
 .ppp-tab.on{ background:#1e6bd6; color:#fff; border-color:#1e6bd6; }
-.ppp-tanda{ background:#fff; border:1px solid #e2e8f0; border-radius:12px; margin-bottom:12px; overflow:hidden; }
+.ppp-tanda{ background:#fff; border:1px solid #e2e8f0; border-radius:10px; margin-bottom:5px; overflow:hidden; }
 .ppp-tanda.ppp-tanda-none{ border:1px solid #fcd34d; }
 .ppp-tanda.ppp-tanda-none .ppp-tanda-h{ background:linear-gradient(90deg,#d97706,#b45309); }
-.ppp-tanda-h{ display:grid; grid-template-columns:18px 210px 460px 124px minmax(0,1fr); align-items:center; gap:0 14px; padding:10px 14px; background:linear-gradient(90deg,#1e6bd6,#1e3a8a); color:#fff; cursor:pointer; }
+.ppp-tanda-h{ display:grid; grid-template-columns:18px 200px 1fr 120px auto; align-items:center; gap:0 14px; padding:6px 14px; background:linear-gradient(90deg,#1e6bd6,#1e3a8a); color:#fff; cursor:pointer; }
 .ppp-tanda-h:hover{ filter:brightness(1.06); }
 .ppp-tanda-h.rt-so{ background:linear-gradient(90deg,#1e6bd6,#1e3a8a); }
 .ppp-tanda-h.rt-n{ background:linear-gradient(90deg,#0d9488,#115e59); }
@@ -1939,7 +1939,7 @@ button {
 .ppp-zchip.z4{ background:#ec4899; } .ppp-zchip.z5{ background:#f59e0b; } .ppp-zchip.z6{ background:#10b981; }
 .ppp-zchip.z7{ background:#14b8a6; } .ppp-zchip.zsuper{ background:#b45309; } .ppp-zchip.zretira{ background:#64748b; } .ppp-zchip.zexpo{ background:#0f172a; }
 .ppp-zsel{ max-width:128px; border-color:#fca5a5; background:#fff1f2; }
-.ppp-sec-t{ font-size:14px; font-weight:800; margin:18px 0 8px; padding:7px 12px; border-radius:8px; }
+.ppp-sec-t{ font-size:13px; font-weight:800; margin:11px 0 5px; padding:5px 12px; border-radius:8px; }
 .ppp-sec-t.ppp-sec-super{ background:#fef3c7; color:#92400e; border:1px solid #fcd34d; }
 .ppp-sec-t.ppp-sec-prog{ background:#dbeafe; color:#1e40af; border:1px solid #bfdbfe; }
 .ppp-sec-t.ppp-sec-done{ background:#dcfce7; color:#166534; border:1px solid #bbf7d0; }
@@ -5042,7 +5042,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.83";
+const APP_VERSION = "v3.84";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -9396,7 +9396,8 @@ function _pppRowTrRO(p, npE) {
     '<td>' + escapeHtml(p.zona || pppZonaDeBarrio(p.localidad) || "—") + '</td>' +
     '<td>' + (_pppListoFC(p) ? '<span class="ppp-fc ok" title="Armado terminado (TAP)">✓ Listo</span>' : '<span class="ppp-fc">·</span>') + '</td>' +
     '<td>' + (_pppEntregado(p) ? '<span class="ppp-fc ok2" title="Cargado al camión (CCN)">✓ Entregado</span>' : '<span class="ppp-fc">·</span>') + '</td>' +
-    '<td><button class="ppp-row-btn ppp-print" onclick="pppPrintNp(\'' + npE + '\')" title="Imprimir el PDF del pedido (ISIS)">🖨️</button></td></tr>';
+    '<td><button class="ppp-row-btn ppp-print" onclick="pppPrintNp(\'' + npE + '\')" title="Imprimir el PDF del pedido (ISIS)">🖨️</button>' +
+    '<button class="ppp-row-btn ppp-ent ppp-ctrl-only" onclick="pppControlar(\'' + npE + '\')">✓ Controlado</button></td></tr>';
 }
 function _pppRowTr(p) {
   const npE = escapeHtml(String(p.np));
@@ -9657,12 +9658,14 @@ function _pppBlock(key, name, cls, meta, pedidos, headerExtra, editTanda) {
     // Panel de CONTROL (modo ✓ Controlar): tildar toda la tanda o pedido por pedido.
     h += '<div class="ppp-ctrl-panel"><button class="ppp-ep-btn ppp-ep-ctrl" onclick="pppControlarTanda(\'' + te + '\')">✓ Controlar TODA la tanda</button>' +
       '<span class="ppp-ep-hint">o tildá <b>pedido por pedido</b> con ✓ Controlado en cada fila.</span></div>';
-    // Panel de EDICIÓN (modo ✏️): cambiar fecha / devolver.
-    h += '<div class="ppp-edit-panel">' +
-      '<span class="ppp-ep-l">📅 Fecha de toda la tanda <input type="date" class="ppp-ep-date" id="' + id + '_d"> <button class="ppp-ep-btn" onclick="pppTandaFecha(\'' + id + '\',\'' + te + '\')">Aplicar</button></span>' +
-      '<button class="ppp-ep-btn ppp-ep-back" onclick="pppTandaAProgramar(\'' + te + '\')">↩ Toda la tanda a A Programar</button>' +
-      '<span class="ppp-ep-hint">Para <b>mover</b> un pedido a otra tanda: cambiá su <b>Tanda</b> en la fila. Para <b>sacarlo</b>: ↩ en su fila.</span>' +
-      '</div>';
+    // Panel de EDICIÓN (modo ✏️): cambiar fecha / devolver. Sólo modo editable (en solo-lectura se corrige en Excel).
+    if (!PPP_READONLY) {
+      h += '<div class="ppp-edit-panel">' +
+        '<span class="ppp-ep-l">📅 Fecha de toda la tanda <input type="date" class="ppp-ep-date" id="' + id + '_d"> <button class="ppp-ep-btn" onclick="pppTandaFecha(\'' + id + '\',\'' + te + '\')">Aplicar</button></span>' +
+        '<button class="ppp-ep-btn ppp-ep-back" onclick="pppTandaAProgramar(\'' + te + '\')">↩ Toda la tanda a A Programar</button>' +
+        '<span class="ppp-ep-hint">Para <b>mover</b> un pedido a otra tanda: cambiá su <b>Tanda</b> en la fila. Para <b>sacarlo</b>: ↩ en su fila.</span>' +
+        '</div>';
+    }
   }
   h += '<div class="ppp-tablewrap"><table class="ppp-tbl">' + PPP_THEAD + '<tbody>';
   for (const p of pedidos) h += _pppRowTr(p);
@@ -9851,8 +9854,8 @@ function pppRenderProg() {
       ordt.sort(function (a, b) { return _pppCamKey(byT[a]) - _pppCamKey(byT[b]) || (a < b ? -1 : a > b ? 1 : 0); });   // agrupa por camión (color), luego por tanda
       for (const t of ordt) {
         const es = pppEsSuper(byT[t][0]);
-        const pencil = (t !== "—") ? ' <button class="ppp-pencil-btn" onclick="event.stopPropagation();pppSetMode(\'__BLOCKID__\',\'edit\')" title="Editar: fecha / mover / devolver">✏️ Editar</button>' : '';
-        const entBtn = (t !== "—") ? ' <button class="ppp-tanda-ent" onclick="event.stopPropagation();pppSetMode(\'__BLOCKID__\',\'ctrl\')" title="Marcar entregas">✓ Controlar</button>' : '';
+        const pencil = (t !== "—" && !PPP_READONLY) ? ' <button class="ppp-pencil-btn" onclick="event.stopPropagation();pppSetMode(\'__BLOCKID__\',\'edit\')" title="Editar: fecha / mover / devolver">✏️ Editar</button>' : '';   // editar corrige (Excel) → oculto en solo-lectura
+        const entBtn = (t !== "—") ? ' <button class="ppp-tanda-ent" onclick="event.stopPropagation();pppSetMode(\'__BLOCKID__\',\'ctrl\')" title="Marcar entregas (local)">✓ Controlar</button>' : '';
         html += _pppBlock("plan_" + dk + "_" + t, (es ? "🛒 " : "") + (t === "—" ? "Sin tanda" : "Tanda " + escapeHtml(t)), es ? "ppp-tanda-super" : "", byT[t].length + " ped · " + _pppM3Sum(byT[t]).toFixed(2) + " m³", byT[t], pencil + entBtn, (t !== "—" ? t : null));
       }
     }

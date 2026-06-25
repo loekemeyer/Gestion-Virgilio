@@ -4,7 +4,23 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-25 · Versión app al documentar: **v3.83**
+> Última actualización: 2026-06-25 · Versión app al documentar: **v3.84**
+>
+> Nota: **v3.84** — **PPP: layout compacto (ancho máx 1240px centrado, no 100%) + "✓ Controlar" local
+> reactivado** (pedido del usuario: "nunca hace falta usar el 100%; optimizá los espacios"). (1) **Ancho**:
+> el v3.83 había puesto la PPP a `max-width:none` (100%) → quedaba enorme. Ahora `#pppOverlay .planim-body
+> > *{max-width:1240px}` + `align-items:center` → **columna centrada de 1240px**. (2) **Espaciado más
+> compacto**: `.ppp-tanda` margin-bottom 12→5px y radio 12→10px; `.ppp-tanda-h` padding 10→6px y grid
+> flexible (`18px 200px 1fr 120px auto`, antes anchos fijos 460/124); `.ppp-sec-t` margin 18→11 / padding
+> 7→5 / fuente 14→13; `.ppp-tabs` margin 14/12→6/8; `.ppp-preview` margin-top 14→6; gap del `.planim-body`
+> del PPP 12→8. (3) **"✓ Controlar" anda de nuevo desde la PPP** (segunda vía, **local**, lo eligió el
+> usuario): en `_pppRowTrRO` volvió el tilde **✓ Controlado** por fila (clase `ppp-ctrl-only`, se ve sólo
+> en modo Controlar) y el botón **✓ Controlar** de la franja sigue (abre `pppSetMode('ctrl')` →
+> `pppControlar`/`pppControlarTanda`, escribe `vir_ppp_entregados` **local**). El **✏️ Editar** y su panel
+> (fecha/devolver) quedan **ocultos en solo-lectura** (eso se corrige en Excel). ⚠ El tilde de la PPP es
+> LOCAL (no emite CRN ni va a Supabase): se ve sólo en ese navegador. El control "real" sigue siendo el
+> **RR** del operario (CRN → Supabase). Un pedido marcado como controlado y aún en la Programación de
+> Supabase dispara la alarma **🚮 SACAR** (sacarlo del Excel).
 >
 > Nota: **v3.83** — **PPP: ancho completo (sin scroll) + "Sugerir tandas" solo-lectura e imprimible**
 > (pedido del usuario). (1) **Ancho**: la PPP estaba limitada a **560px** por `.planim-body > *{max-width:560px}`
