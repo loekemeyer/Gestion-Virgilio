@@ -4,7 +4,22 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-25 · Versión app al documentar: **v3.82**
+> Última actualización: 2026-06-25 · Versión app al documentar: **v3.83**
+>
+> Nota: **v3.83** — **PPP: ancho completo (sin scroll) + "Sugerir tandas" solo-lectura e imprimible**
+> (pedido del usuario). (1) **Ancho**: la PPP estaba limitada a **560px** por `.planim-body > *{max-width:560px}`
+> (cap del editor de planimetría, v3.67) → la tabla de 12 columnas se salía con scroll horizontal. Override
+> `#pppOverlay .planim-body{align-items:stretch}` + `> *{max-width:none}` → usa **todo el ancho de la
+> página**; y `.ppp-tbl{white-space:normal;table-layout:auto}` (antes `nowrap`) → el texto largo (razón
+> social, localidad) **envuelve** en vez de forzar scroll. (2) **Sugerir tandas (solo-lectura)**: en modo
+> `PPP_READONLY` volvió el botón **🪄 Sugerir tandas**, pero NO edita: `pppSugerirView` calcula la
+> sugerencia con el MISMO algoritmo que `pppSugerirTandas` (`_pppComputeSugerencia`: súper 1×cliente; resto
+> por zona→cliente empacando ≤ m³/tanda; códigos `C<N°base><letra>`) **sin escribir edits**, y la muestra
+> en un overlay `#pppSugOverlay` (`_pppSugHtml`: una tabla por tanda con NP·Cód·Cliente·Localidad·m³ +
+> totales + aviso de los SIN ZONA que quedan afuera). Sirve para que la operadora la **cargue a mano en el
+> Excel**. (3) **Imprimible**: botón 🖨 Imprimir (`pppPrintSug`) abre la sugerencia en una ventana nueva con
+> CSS propio (`_PPP_SUG_PRINT_CSS`) y dispara `window.print()`. El N° base de la sugerencia sale del auto
+> (v3.78, última tanda Supabase +1). No toca la PPP ni Supabase.
 >
 > Nota: **v3.82** — **PPP = visor SOLO-LECTURA de Supabase + panel de errores** (pedido del usuario: "por
 > ahora que solo funcione en función de Supabase, que no corrija nada, solo visualizar; se sigue

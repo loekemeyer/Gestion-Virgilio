@@ -1803,6 +1803,9 @@ button {
 /* Editor de Planimetría (v2.78) */
 .planim-body{ flex: 1; overflow: auto; padding: 14px; background: #f8fafc; display: flex; flex-direction: column; align-items: center; gap: 12px; }
 .planim-body > *{ width: 100%; max-width: 560px; box-sizing: border-box; }   /* columna prolija centrada */
+/* La PPP usa TODO el ancho de la página (no el cap de 560px del editor de planimetría) → sin scroll horizontal. */
+#pppOverlay .planim-body{ align-items: stretch; }
+#pppOverlay .planim-body > *{ max-width: none; }
 .planim-add-row .planim-inp{ flex: 1 1 100px; min-width: 0; }
 .planim-add-row .planim-inp-num{ flex: 0 0 84px; }
 .planim-add{ background: #fff; border: 2px solid #1e6bd6; border-radius: 10px; padding: 12px; }
@@ -1915,7 +1918,7 @@ button {
 .ppp-tanda .ppp-tablewrap{ display:none; }
 .ppp-tanda.ppp-open .ppp-tablewrap{ display:block; }
 .ppp-tablewrap{ overflow-x:auto; }
-.ppp-tbl{ width:100%; border-collapse:collapse; font-size:13px; white-space:nowrap; }
+.ppp-tbl{ width:100%; border-collapse:collapse; font-size:13px; white-space:normal; table-layout:auto; }
 .ppp-tbl th{ text-align:left; padding:7px 12px; background:#f8fafc; color:#475569; border-bottom:1px solid #e2e8f0; font-size:11px; text-transform:uppercase; letter-spacing:.3px; }
 .ppp-tbl th.num{ text-align:right; } .ppp-tbl td{ padding:8px 12px; border-bottom:1px solid #f1f5f9; color:#0f172a; } .ppp-tbl td.num{ text-align:right; }
 .ppp-tbl .ppp-cli{ font-weight:600; white-space:normal; min-width:160px; }
@@ -1958,6 +1961,18 @@ button {
 .ppp-eb.warn{ background:#fef3c7; color:#92400e; border:1px solid #fde68a; }
 tr.ppp-err-sacar > td{ background:#fef2f2 !important; }
 tr.ppp-err-zona > td{ background:#fffbeb !important; }
+.ppp-sug-hint{ font-size:12px; color:#64748b; margin-left:10px; }
+.ppp-sug-print{ width:auto; margin-left:auto; margin-right:8px; padding:6px 14px; background:#2563eb; color:#fff; border:none; border-radius:8px; font-weight:bold; cursor:pointer; }
+.ppp-sug-print:hover{ background:#1d4ed8; }
+#pppSugContent h2{ font-size:18px; margin:0 0 4px; color:#0f172a; }
+.ppp-sug-sub{ font-size:12px; color:#475569; margin-bottom:12px; }
+.ppp-sug-tbl{ width:100%; border-collapse:collapse; margin:0 0 14px; font-size:13px; background:#fff; }
+.ppp-sug-tbl th, .ppp-sug-tbl td{ border:1px solid #e2e8f0; padding:6px 9px; text-align:left; }
+.ppp-sug-tbl .ppp-sug-th{ background:#1e293b; color:#fff; font-size:14px; }
+.ppp-sug-tbl thead tr:nth-child(2) th{ background:#f1f5f9; color:#475569; font-size:11px; text-transform:uppercase; }
+.ppp-sug-tbl td.num, .ppp-sug-tbl th.num{ text-align:right; }
+.ppp-sug-sinzona{ font-size:13px; color:#b45309; background:#fffbeb; border:1px solid #fde68a; border-radius:8px; padding:8px 10px; margin:8px 0; }
+.ppp-sug-tot{ font-weight:800; font-size:14px; margin-top:8px; }
 .ppp-match-box{ background:#eef2ff; border:1px solid #c7d2fe; border-radius:10px; padding:10px 12px; margin:8px 0 4px; }
 .ppp-match-h{ font-size:13px; font-weight:800; color:#3730a3; margin-bottom:6px; }
 .ppp-match-row{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:7px 0; border-top:1px solid #ddd6fe; }
@@ -2970,6 +2985,16 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
       <div id="pppPreview" class="ppp-preview"></div>
       <div id="pppStatus" class="planim-status"></div>
     </div>
+  </div>
+
+  <!-- Sugerencia de tandas (solo lectura, imprimible) para cargar a mano en el Excel. -->
+  <div id="pppSugOverlay" class="recp-admin-overlay">
+    <div class="recp-admin-bar">
+      <span class="recp-admin-title">🪄 Sugerencia de tandas</span>
+      <button class="ppp-sug-print" onclick="pppPrintSug()">🖨️ Imprimir</button>
+      <button class="recp-admin-close" onclick="pppCloseSug()">Cerrar</button>
+    </div>
+    <div class="planim-body"><div id="pppSugContent" class="ppp-sug-doc"></div></div>
   </div>
 
   <!-- Editor de clientes súper (lista que detecta los pedidos que van solos por súper). -->
@@ -5017,7 +5042,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.82";
+const APP_VERSION = "v3.83";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -9179,6 +9204,67 @@ function pppLimpiarTandas() {
   if (!confirm("¿Borrar TODAS las tandas y la programación? Los pedidos vuelven a 'Pedidos a Programar'.")) return;
   const ed = pppLoadEdits(); for (const k in ed) { if (ed[k]) { delete ed[k].tanda; delete ed[k].programmed; } } pppSaveEdits(); pppRenderProg();
 }
+/* ===== Sugerir tandas SOLO-LECTURA (para que la operadora la cargue a mano en el Excel) =====
+   Mismo algoritmo que pppSugerirTandas (súper 1×cliente; resto por zona → cliente, empacando
+   ≤ m³/tanda; códigos C<N°base><letra>) PERO no escribe nada: devuelve la sugerencia para
+   verla e imprimirla. Agrupa los pedidos SIN tanda (no programados). ===== */
+let _pppSugCache = null;
+function _pppComputeSugerencia() {
+  const cfg = pppGetCfg(), cap = cfg.tandaCap > 0 ? cfg.tandaCap : 0.8, baseN = cfg.baseN || "60";
+  const ent = pppLoadEntregados();
+  const pend = (_pppParsed.prog || []).filter(function (p) { return !ent.has(String(p.np)) && !_pppTieneTanda(p) && !p.programmed; });
+  const out = []; let idx = 0;
+  const next = function () { return "C" + baseN + _pppLetter(idx++); };
+  const sup = pend.filter(pppEsSuper), bySupC = {}, supOrd = [];
+  for (const p of sup) { const k = String(p.cod || p.razon_social); if (!(k in bySupC)) supOrd.push(k); (bySupC[k] = bySupC[k] || []).push(p); }
+  for (const k of supOrd) out.push({ code: next(), sup: true, pedidos: bySupC[k] });
+  const resto = pend.filter(function (p) { return !pppEsSuper(p) && pppZonaDeBarrio(p.localidad); });
+  const byZ = {}; for (const p of resto) { const z = pppZonaDeBarrio(p.localidad); (byZ[z] = byZ[z] || []).push(p); }
+  const zorder = Object.keys(byZ).sort(function (a, b) { const ia = PPP_ZONAS.indexOf(a), ib = PPP_ZONAS.indexOf(b); return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib); });
+  for (const z of zorder) {
+    const byC = {}, cord = [];
+    for (const p of byZ[z]) { const k = String(p.cod || p.razon_social); if (!(k in byC)) cord.push(k); (byC[k] = byC[k] || []).push(p); }
+    cord.sort(function (a, b) { const fa = Math.min.apply(null, byC[a].map(function (p) { return +_pppFechaKey(p.fecha); })); const fb = Math.min.apply(null, byC[b].map(function (p) { return +_pppFechaKey(p.fecha); })); return fa - fb; });
+    let bucket = [], bm3 = 0;
+    const flush = function () { if (bucket.length) { out.push({ code: next(), zona: z, pedidos: bucket }); bucket = []; bm3 = 0; } };
+    for (const k of cord) { const ps = byC[k], m3 = _pppM3Sum(ps); if (bucket.length && (bm3 + m3) > cap) flush(); bucket = bucket.concat(ps); bm3 += m3; if (bm3 >= cap) flush(); }
+    flush();
+  }
+  const sinZona = pend.filter(function (p) { return !pppEsSuper(p) && !pppZonaDeBarrio(p.localidad); });
+  return { tandas: out, sinZona: sinZona, cap: cap };
+}
+function _pppSugHtml(s) {
+  let tot = 0, np = 0;
+  let h = '<div class="ppp-sug-doc"><h2>🪄 Sugerencia de tandas — cargar a mano en el Excel</h2>' +
+    '<div class="ppp-sug-sub">' + s.tandas.length + ' tandas sugeridas · objetivo ' + s.cap + ' m³/tanda. Es una <b>sugerencia</b>: la PPP no cambia, programá en el Excel.</div>';
+  for (const t of s.tandas) {
+    const m3 = _pppM3Sum(t.pedidos); tot += m3; np += t.pedidos.length;
+    h += '<table class="ppp-sug-tbl"><thead>' +
+      '<tr><th colspan="5" class="ppp-sug-th">Tanda ' + escapeHtml(t.code) + (t.sup ? ' · 🛒 SÚPER' : (t.zona ? ' · ' + escapeHtml(t.zona) : '')) + ' — ' + t.pedidos.length + ' ped · ' + m3.toFixed(2) + ' m³</th></tr>' +
+      '<tr><th>N° Pedido</th><th>Cód</th><th>Cliente</th><th>Localidad</th><th class="num">m³</th></tr></thead><tbody>';
+    for (const p of t.pedidos) h += '<tr><td>' + escapeHtml(String(p.np)) + '</td><td>' + escapeHtml(p.cod || "") + '</td><td>' + escapeHtml(p.razon_social || "") + '</td><td>' + escapeHtml(p.localidad || "") + '</td><td class="num">' + (p.m3 != null ? Number(p.m3).toFixed(2) : "") + '</td></tr>';
+    h += '</tbody></table>';
+  }
+  if (s.sinZona && s.sinZona.length) h += '<div class="ppp-sug-sinzona">⚠ ' + s.sinZona.length + ' pedido(s) SIN ZONA quedaron fuera (asigná el barrio en el Excel): ' + s.sinZona.map(function (p) { return escapeHtml(String(p.np)) + " (" + escapeHtml(p.localidad || "?") + ")"; }).join(" · ") + '</div>';
+  h += '<div class="ppp-sug-tot">TOTAL: ' + np + ' pedidos · ' + s.tandas.length + ' tandas · ' + tot.toFixed(2) + ' m³</div></div>';
+  return h;
+}
+function pppSugerirView() {
+  const s = _pppComputeSugerencia();
+  if (!s.tandas.length && !(s.sinZona && s.sinZona.length)) { alert("No hay pedidos sin tanda para sugerir (todo lo de Supabase ya está programado)."); return; }
+  _pppSugCache = s;
+  const el = document.getElementById("pppSugContent"); if (el) el.innerHTML = _pppSugHtml(s);
+  const ov = document.getElementById("pppSugOverlay"); if (ov) ov.classList.add("show");
+}
+function pppCloseSug() { const ov = document.getElementById("pppSugOverlay"); if (ov) ov.classList.remove("show"); }
+const _PPP_SUG_PRINT_CSS = "body{font-family:Arial,Helvetica,sans-serif;color:#0f172a;margin:18px;} h2{font-size:18px;margin:0 0 4px;} .ppp-sug-sub{font-size:12px;color:#475569;margin-bottom:12px;} table{width:100%;border-collapse:collapse;margin:0 0 14px;font-size:12px;page-break-inside:avoid;} th,td{border:1px solid #cbd5e1;padding:5px 8px;text-align:left;} .ppp-sug-th{background:#1e293b;color:#fff;font-size:13px;} thead tr:nth-child(2) th{background:#f1f5f9;} td.num,th.num{text-align:right;} .ppp-sug-sinzona{font-size:12px;color:#b45309;margin:8px 0;} .ppp-sug-tot{font-weight:bold;margin-top:8px;}";
+function pppPrintSug() {
+  if (!_pppSugCache) return;
+  const w = window.open("", "_blank");
+  if (!w) { alert("El navegador bloqueó la ventana de impresión. Permití los pop-ups y reintentá."); return; }
+  w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>Sugerencia de tandas</title><style>' + _PPP_SUG_PRINT_CSS + '</style></head><body>' + _pppSugHtml(_pppSugCache) + '<scr' + 'ipt>window.onload=function(){setTimeout(function(){window.print();},150);};</scr' + 'ipt></body></html>');
+  w.document.close();
+}
 /* ===== Confirmar separación de tandas → Programación =====
    Pasa las tandas armadas (en "A Programar") a "Programación" asignándoles una Fecha de
    Entrega: empaqueta las tandas en días de entrega a dayCap m³/día (6), priorizando la
@@ -9784,6 +9870,8 @@ function pppRenderProg() {
       '<button class="ppp-tool-clear" onclick="pppLimpiarTandas()">borrar tandas</button>' +
       '</div>';
     html += '<div id="pppBaseNote" style="font-size:12px;font-weight:600;margin:2px 2px 8px;color:' + (cfg.baseOk === false ? '#b42318' : '#166534') + ';">' + escapeHtml(cfg.baseNote || "") + '</div>';
+  } else {
+    html += '<div class="ppp-toolbar"><button class="ppp-sug-btn" onclick="pppSugerirView()">🪄 Sugerir tandas</button><span class="ppp-sug-hint">Es una sugerencia para cargar a mano en el Excel (no cambia nada acá) — se puede imprimir.</span></div>';
   }
   // ===== Sugerencia: pedido en A Programar cuyo CLIENTE ya tiene tanda en Programación =====
   // → ofrecer meterlo en esa tanda ya hecha (aunque pase el m³/tanda objetivo). (Sólo modo editable.)
