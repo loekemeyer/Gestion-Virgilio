@@ -4,7 +4,23 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-25 · Versión app al documentar: **v3.96**
+> Última actualización: 2026-06-25 · Versión app al documentar: **v3.97**
+>
+> Nota: **v3.97** — **TAP: wizard "Completar" (líos + reparto de faltantes) + vista `Entregas_Virgilio`**
+> (pedido del usuario). Al dar **TAP** se abre `showCompletarWizard` (reemplaza al `showLiosModal` suelto):
+> **Paso 1** = líos por NP (guarda como antes, opcion **TAL**); **Paso 2** = repartir las **cajas
+> faltantes** del picking (de `faltantesDeTanda`/PKC) entre las NP que pidieron cada artículo (1 NP →
+> automático; 2+ → el operario reparte hasta completar). Navegación con flechas ← →, botón **Terminar**
+> (se habilita con líos completos + faltantes repartidos). Si la tanda no tiene faltantes, sólo Paso 1.
+> **Guardado de faltantes**: opcion **FAL**, `texto = tanda|np|cod_cliente|cod_art|cajas_faltantes` (por la
+> cola → offline-safe). **Vista Supabase `Entregas_Virgilio`** (security_invoker, grant anon/auth): cruza
+> `PPP_Programacion_Diaria` (np→cliente+`fecha_entrega`) × `PPP_Base_Pedidos` (pedido entero) − faltantes
+> (FAL) → columnas `fecha · cod_cliente · razon_social · tanda · np · cod_art · cajas_pedidas ·
+> cajas_faltantes · cajas_entregadas`. **Sin duplicar la base**: la vista la lee al vuelo; el faltante se
+> guarda 1 vez (FAL); `entregadas = pedidas − faltó`. **fecha = fecha_entrega** (no la de armado: el pedido
+> se arma el día anterior). ⚠ La base es del día en curso (se reemplaza al sync) → el programa externo lee
+> la vista el mismo día y guarda su histórico. Funciones: `showCompletarWizard`/`_compRenderLios`/
+> `_compRenderFalt`/`_compRecalc`/`_compGo`/`compTerminar`/`_compSendFalt`.
 >
 > Nota: **v3.96** — **Armado (AP): el aviso muestra TODOS los faltantes de la tanda** (pedido del usuario).
 > Antes `showMarianelaAviso` (se dispara al tocar **AP**, línea ~5295) sólo mostraba los faltantes que había
