@@ -1923,6 +1923,9 @@ button {
 .ppp-row-btn{ width:auto; margin:0; padding:5px 12px; font-size:13px; font-weight:bold; border:none; border-radius:7px; cursor:pointer; white-space:nowrap; }
 .ppp-row-btn.ppp-ent{ background:#16a34a; color:#fff; } .ppp-row-btn.ppp-ent:hover{ background:#15803d; }
 .ppp-row-btn.ppp-undo{ background:#fff; color:#b42318; border:1px solid #fecaca; }
+.ppp-row-btn.ppp-print{ background:#2563eb; color:#fff; margin-right:6px; } .ppp-row-btn.ppp-print:hover{ background:#1d4ed8; }
+.ppp-pdf-toggle{ margin-left:8px; border-color:#2563eb; color:#1d4ed8; } .ppp-pdf-toggle:hover{ background:#eff6ff; }
+.ppp-pdfdir-status{ font-size:12px; color:#475569; margin-left:8px; }
 .ppp-edit{ width:100%; min-width:62px; box-sizing:border-box; padding:5px 7px; font-size:13px; border:1px solid #cbd5e1; border-radius:6px; background:#fffbeb; color:#0f172a; }
 .ppp-edit:focus{ outline:none; border-color:#1e6bd6; background:#fff; box-shadow:0 0 0 2px rgba(30,107,214,.15); }
 .ppp-edit::placeholder{ color:#cbd5e1; }
@@ -2952,6 +2955,8 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
         </div>
       </div>
       <button class="ppp-imp-toggle ppp-sup-toggle" onclick="openPppSupers()" title="Agregar/quitar clientes súper">🛒 Clientes súper</button>
+      <button class="ppp-imp-toggle ppp-pdf-toggle" onclick="pppConnectPdfDir()" title="Conectar UNA vez la carpeta del servidor con los PDF de ISIS (ej. Z:\PDF_ISIS) para poder imprimir un pedido. Necesita Chrome/Edge en PC.">🖨️ Carpeta PDF</button>
+      <span id="pppPdfDirStatus" class="ppp-pdfdir-status"></span>
       <div id="pppPreview" class="ppp-preview"></div>
       <div id="pppStatus" class="planim-status"></div>
     </div>
@@ -5002,7 +5007,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.79";
+const APP_VERSION = "v3.80";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -8290,6 +8295,7 @@ function openPPP() {
   pppRefreshControlado();   // controlados (CRN) + chequeo de carga sin controlar vencida (alarma + Telegram)
   pppAutoRenderStatus();    // auto-carga (File System Access): estado + arranque del chequeo
   pppAutoStart();
+  pppRenderPdfDirStatus();  // estado de la carpeta de PDF (ISIS) para imprimir pedidos
 }
 function pppToggleImport() { const m = document.getElementById("pppImportMenu"); if (!m) return; m.classList.toggle("hidden"); if (!m.classList.contains("hidden")) { pppShowBaseInfo(); pppAutoRenderStatus(); } }
 function pppCloseImport() { const m = document.getElementById("pppImportMenu"); if (m) m.classList.add("hidden"); }
@@ -9260,7 +9266,8 @@ function _pppRowTr(p) {
     '<td>' + (cargVenc
         ? '<span class="ppp-fc cargvenc" title="Cargado al camión y SIN controlar pasado el plazo (30 hs; viernes→lunes 12 hs)">🚨 SIN CONTROLAR</span>'
         : (_pppEntregado(p) ? '<span class="ppp-fc ok2" title="Cargado al camión (CC)">✓ Entregado</span>' : '<span class="ppp-fc">·</span>')) + '</td>' +
-    '<td><button class="ppp-row-back ppp-edit-only" onclick="pppPedidoAProgramar(\'' + npE + '\')" title="Sacar de la tanda → A Programar">↩</button>' + btn + '</td></tr>';
+    '<td><button class="ppp-row-btn ppp-print" onclick="pppPrintNp(\'' + npE + '\')" title="Imprimir el PDF del pedido (Pedido de Cliente, ISIS)">🖨️ Imprimir</button>' +
+    '<button class="ppp-row-back ppp-edit-only" onclick="pppPedidoAProgramar(\'' + npE + '\')" title="Sacar de la tanda → A Programar">↩</button>' + btn + '</td></tr>';
 }
 let _pppOpen = new Set();   // ids de bloques abiertos (por clave estable → persiste entre renders)
 let _pppMode = {};          // id -> "ctrl" | "edit" (modos separados; persisten entre renders)
@@ -9299,6 +9306,106 @@ function pppPedidoAProgramar(np) {
   const ed = pppLoadEdits(), k = String(np);
   ed[k] = ed[k] || {}; ed[k].tanda = "—"; delete ed[k].programmed; delete ed[k].fecha_entrega;
   pppSaveEdits(); pppRenderProg(); pppSetStatus("↩ Pedido " + k + " devuelto a A Programar.", true);
+}
+/* ===== Imprimir el PDF del pedido (NP) desde la carpeta del servidor (ISIS) =====
+   El admin conecta UNA vez la carpeta (ej. Z:\PDF_ISIS) con el File System Access API
+   (Chrome/Edge en PC; el handle queda en IndexedDB, igual que la auto-carga del Excel).
+   Al tocar 🖨 en un pedido, busca el archivo por NOMBRE EXACTO (la carpeta tiene ~130k
+   archivos → NO se puede escanear): "Pedido de Clte_Div_" + NP con ceros + "_NN.pdf",
+   probando versiones _00.._05 y quedándose con la MÁS ALTA, y lo MANDA A IMPRIMIR
+   (abre el diálogo de impresión directo, no lo abre solo para leer). Sólo lectura. */
+const PDF_DIR_KEY = "pdf_isis_dir";
+const PDF_PREFIX  = "Pedido de Clte_Div_";   // prefijo del archivo (ISIS)
+const PDF_WIDTHS  = [12, 13, 11];            // ancho del NP con ceros (000000097899 = 12); fallback por si difiere
+const PDF_VERS    = 6;                        // probar _00.._05, usar la versión más alta
+let _pdfDirBusy = false;
+async function pppGetPdfDir(interactive) {
+  if (!window.showDirectoryPicker) { if (interactive) alert("Para imprimir los PDF necesitás Chrome o Edge en PC (el monitor)."); return null; }
+  let h = null;
+  try { h = await fshGet(PDF_DIR_KEY); } catch (_e) { h = null; }
+  if (!h) {
+    if (!interactive) return null;
+    if (!confirm("Para imprimir los PDF del servidor, elegí UNA vez la carpeta donde están (ej. Z:\\PDF_ISIS).\n\n¿Elegir la carpeta ahora?")) return null;
+    try { h = await window.showDirectoryPicker({ id: "pdfisis", mode: "read" }); }
+    catch (e) { if (e && e.name === "AbortError") return null; alert("No se pudo elegir la carpeta: " + (e.message || e)); return null; }
+    if (!h) return null;
+    try { await fshSet(PDF_DIR_KEY, h); } catch (_e) {}
+    pppRenderPdfDirStatus();
+  }
+  const perm = await _fshPerm(h, interactive);
+  if (perm !== "granted") { if (interactive) alert("Necesito permiso de lectura sobre la carpeta de PDF. Volvé a tocar Imprimir y aceptá."); return null; }
+  return h;
+}
+async function pppConnectPdfDir() {
+  if (!window.showDirectoryPicker) { alert("Conectar carpeta PDF: usá Chrome o Edge en PC (el monitor)."); return; }
+  try { await fshDel(PDF_DIR_KEY); } catch (_e) {}
+  const h = await pppGetPdfDir(true);
+  pppRenderPdfDirStatus();
+  if (h) pppSetStatus("🖨️ Carpeta de PDF conectada (" + (h.name || "ok") + "). Ya podés imprimir un pedido.", true);
+}
+function pppForgetPdfDir() { fshDel(PDF_DIR_KEY).catch(function () {}); pppRenderPdfDirStatus(); pppSetStatus("Carpeta de PDF desconectada.", true); }
+async function pppRenderPdfDirStatus() {
+  const el = document.getElementById("pppPdfDirStatus"); if (!el) return;
+  if (!window.showDirectoryPicker) { el.textContent = "(impresión: solo Chrome/Edge en PC)"; el.style.color = "#94a3b8"; return; }
+  let h = null; try { h = await fshGet(PDF_DIR_KEY); } catch (_e) {}
+  if (!h) { el.textContent = "carpeta sin conectar"; el.style.color = "#b45309"; return; }
+  let perm = "prompt"; try { perm = await _fshPerm(h, false); } catch (_e) {}
+  if (perm === "granted") { el.textContent = "✓ " + (h.name || "carpeta") + " conectada"; el.style.color = "#166534"; }
+  else { el.textContent = "🔒 " + (h.name || "carpeta") + " — permiso pendiente (tocá Imprimir y aceptá)"; el.style.color = "#b45309"; }
+}
+async function pppFindNpPdf(dir, np) {
+  const clean = String(np).replace(/\D/g, ""); if (!clean) return null;
+  for (let wi = 0; wi < PDF_WIDTHS.length; wi++) {
+    const w = PDF_WIDTHS[wi];
+    const padded = clean.length >= w ? clean : ("0".repeat(w - clean.length) + clean);
+    let best = null;
+    for (let v = 0; v < PDF_VERS; v++) {
+      const name = PDF_PREFIX + padded + "_" + (v < 10 ? "0" + v : String(v)) + ".pdf";
+      try { const fh = await dir.getFileHandle(name); best = { fh: fh, name: name }; } catch (_e) { /* esa versión no existe */ }
+    }
+    if (best) return best;   // se queda con la versión más alta encontrada para este ancho
+  }
+  return null;
+}
+async function pppPrintNp(np) {
+  if (_pdfDirBusy) return; _pdfDirBusy = true;
+  try {
+    const dir = await pppGetPdfDir(true);
+    if (!dir) return;
+    pppSetStatus("Buscando el PDF del pedido " + np + "…");
+    const hit = await pppFindNpPdf(dir, np);
+    if (!hit) {
+      const probe = PDF_PREFIX + String(np).replace(/\D/g, "").padStart(PDF_WIDTHS[0], "0") + "_00.pdf";
+      pppSetStatus("No encontré el PDF del pedido " + np + " en la carpeta.", false);
+      alert("No encontré el PDF del pedido " + np + ".\n\nBusqué (entre otros): " + probe + "\n\nRevisá que la carpeta conectada sea la correcta (botón 🖨️ Carpeta PDF) y que el nombre arranque con \"" + PDF_PREFIX + "\".");
+      return;
+    }
+    let buf;
+    try { const file = await hit.fh.getFile(); buf = await file.arrayBuffer(); }
+    catch (e) { pppSetStatus("No pude leer el PDF (" + (e.message || e) + ").", false); return; }
+    _pppPrintPdf(buf, hit.name);
+    pppSetStatus("🖨️ Mandé a imprimir " + hit.name + ".", true);
+  } catch (e) { pppSetStatus("Error al imprimir el pedido " + np + ": " + (e && e.message ? e.message : e), false); }
+  finally { _pdfDirBusy = false; }
+}
+/* Manda a IMPRIMIR un PDF (ArrayBuffer ya leído a memoria): lo carga en un iframe oculto
+   y dispara el diálogo de impresión apenas renderiza (NO lo abre sólo para mirar). El
+   navegador SIEMPRE muestra el diálogo de impresión (no se puede saltear por seguridad),
+   pero queda a un clic. Último recurso: si el navegador bloquea el print del iframe, abre
+   el PDF en otra pestaña para imprimir a mano. */
+function _pppPrintPdf(buf, name) {
+  const url = URL.createObjectURL(new Blob([buf], { type: "application/pdf" }));
+  const ifr = document.createElement("iframe");
+  ifr.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;";
+  ifr.onload = function () {
+    setTimeout(function () {
+      try { ifr.contentWindow.focus(); ifr.contentWindow.print(); }
+      catch (_e) { try { window.open(url, "_blank"); } catch (_e2) {} }
+    }, 400);
+  };
+  ifr.src = url;
+  document.body.appendChild(ifr);
+  setTimeout(function () { try { URL.revokeObjectURL(url); } catch (_e) {} try { if (ifr.parentNode) ifr.parentNode.removeChild(ifr); } catch (_e) {} }, 120000);
 }
 /* Clave de cliente para cruzar pedidos (cód si hay; si no, razón social). */
 function _pppCliKey(p) { return String((p && (p.cod || p.razon_social)) || "").trim().toUpperCase(); }

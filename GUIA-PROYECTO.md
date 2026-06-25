@@ -4,7 +4,26 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-24 · Versión app al documentar: **v3.79**
+> Última actualización: 2026-06-24 · Versión app al documentar: **v3.80**
+>
+> Nota: **v3.80** — **PPP: botón "🖨️ Imprimir" por pedido → manda a imprimir el PDF del NP desde la
+> carpeta del servidor (ISIS)** (pedido del usuario). Cada fila de pedido (`_pppRowTr`) tiene un botón
+> **🖨️ Imprimir** que llama `pppPrintNp(np)`. El admin conecta **UNA vez** la carpeta donde están los PDF
+> (ej. `Z:\PDF_ISIS` en `\\LOEKE-SVR`) con el botón **"🖨️ Carpeta PDF"** (`pppConnectPdfDir` →
+> `showDirectoryPicker({mode:"read"})`); el handle se guarda en IndexedDB (`vir-fs-handles`, key
+> `pdf_isis_dir`) reusando los helpers `fshGet/Set/Del` + `_fshPerm` de la auto-carga del Excel (v3.41).
+> **Por qué File System Access y no un link**: una página `https://…github.io` **no puede abrir un
+> archivo `Z:\…` directo** (el navegador bloquea `file://`); esta API es la forma web-nativa de leer la
+> carpeta local/mapeada. La carpeta tiene **~130k archivos** → NO se escanea: se abre por **nombre exacto**
+> con `getFileHandle` (O(1)). Patrón del archivo: `Pedido de Clte_Div_` + **NP con ceros a 12 dígitos**
+> (`000000097899`) + `_NN.pdf`; `pppFindNpPdf` prueba versiones `_00.._05` y se queda con la **más alta**
+> (ancho 12 primario, fallback 13/11 por si difiere — constantes `PDF_PREFIX`/`PDF_WIDTHS`/`PDF_VERS`).
+> **Imprime, NO sólo abre**: `_pppPrintPdf` lee el PDF a memoria (ArrayBuffer), lo carga en un **iframe
+> oculto** y dispara `contentWindow.print()` (diálogo de impresión directo); si el navegador bloquea el
+> print, último recurso abre el PDF en otra pestaña. ⚠ El diálogo de impresión **siempre aparece** (no se
+> puede imprimir 100% silencioso desde el navegador, es por seguridad) — queda a un clic. Sólo **Chrome/
+> Edge en PC** (el monitor; en celular no corre, igual que la auto-carga). Estado de la carpeta en
+> `#pppPdfDirStatus` (`pppRenderPdfDirStatus`, al abrir la PPP). Sólo lectura → no toca el "SOLO LOCAL".
 >
 > Nota: **v3.79** — **PPP N° base: ahora se VE de dónde sale (vinculado a Supabase visible)** (el usuario
 > reportó "no está vinculado a Supabase": el número salía bien pero sin ninguna señal de que viniera de la
