@@ -4,7 +4,18 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-25 · Versión app al documentar: **v3.94**
+> Última actualización: 2026-06-25 · Versión app al documentar: **v3.95**
+>
+> Nota: **v3.95** — **Talleristas / Artículos: fix "no aparece nada" (ej. Pintos) + estética + ← Volver**.
+> (1) **Bug del vínculo**: el panel de artículos buscaba por `Cod_Tallerista` (código), pero **varios
+> talleristas no tienen código** (en `Codigos X Tallerista` el `Codigo` es NULL, ej. **Pintos**) y sus
+> artículos en `Articulos Virgilio X Tallerista` están ligados por **`Tallerista` (NOMBRE)** con
+> `Cod_Tallerista` NULL → no aparecía nada. Ahora `tallArtsLoad` consulta por **`Tallerista=eq.<nombre>` +
+> `Linea`** (el nombre es NOT NULL, siempre está) y `tallOpenArts` ya **no exige código**; `tallArtAdd` setea
+> `Cod_Tallerista: cod || null`. (Pintos LK tiene 224/225/220-223/208/229…; CH 229/901/902/910/911/920/922.)
+> (2) **Estética**: `.tall-row` pasó a tarjeta de **2 líneas** (`.tall-row-top` Nombre + Borrar arriba;
+> `.tall-controls` LK/CH abajo) — antes el 📦 ensanchaba los chips y "Borrar" se iba a otro renglón apretado.
+> (3) **← Volver**: botón en la barra del panel de artículos (`.recp-admin-back` → `closeTallArts`).
 >
 > Nota: **v3.94** — **PPP / Imprimir: diagnóstico del "Buscando" trabado**. Si la ruta rápida no matchea,
 > el escaneo de una carpeta de red grande tardaba sin feedback (parecía colgado en "Buscando el PDF…").

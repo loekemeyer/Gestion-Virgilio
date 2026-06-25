@@ -1833,9 +1833,12 @@ button {
 .mails-row{ display:flex; align-items:center; gap:10px; background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:10px 12px; }
 .mails-mail{ flex:1 1 auto; font-size:15px; color:#0f172a; word-break:break-all; }
 .mails-fijo{ flex:0 0 auto; font-size:11px; font-weight:800; color:#475569; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:999px; padding:2px 10px; text-transform:uppercase; letter-spacing:.4px; }
-.tall-row{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:8px 12px; }
-.tall-name{ flex:1 1 160px; font-size:15px; font-weight:700; color:#0f172a; min-width:120px; }
-.tall-cod-wrap{ display:flex; align-items:center; gap:5px; }
+.tall-row{ display:flex; flex-direction:column; gap:9px; background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:11px 14px; }
+.tall-row-top{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.tall-name{ font-size:15px; font-weight:700; color:#0f172a; flex:1; min-width:0; word-break:break-word; }
+.tall-controls{ display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
+.tall-del{ padding:6px 14px; height:auto; }
+.tall-cod-wrap{ display:flex; align-items:center; gap:6px; }
 .tall-lin{ font-size:11px; font-weight:800; color:#475569; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:6px; padding:3px 7px; }
 .tall-cod{ width:80px; height:38px; font-size:15px; border:2px solid #cbd5e1; border-radius:8px; padding:0 8px; box-sizing:border-box; }
 .tall-lin-btn{ cursor:pointer; transition:background .12s; }
@@ -3088,6 +3091,7 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
        Se abre al tocar el badge LK/CH. Vínculo: Cod_Tallerista (= código LK/CH) + Linea. -->
   <div id="tallArtsOverlay" class="recp-admin-overlay">
     <div class="recp-admin-bar">
+      <button class="recp-admin-back" onclick="closeTallArts()">← Volver</button>
       <span class="recp-admin-title" id="tallArtsTitle">📦 Artículos</span>
       <button class="recp-admin-close" onclick="closeTallArts()">Cerrar</button>
     </div>
@@ -5086,7 +5090,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.94";
+const APP_VERSION = "v3.95";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -10296,9 +10300,11 @@ function tallRender(filter) {
   };
   list.innerHTML = nombres.map(function (n) {
     const t = byN[n], nE = escapeHtml(n);
-    return '<div class="tall-row"><span class="tall-name">' + nE + '</span>' +
-      codInput(nE, "LK", t.LK) + codInput(nE, "CH", t.CH) +
-      '<button class="planim-btn-del" data-nombre="' + nE + '" onclick="tallDelete(this.getAttribute(\'data-nombre\'))">Borrar</button></div>';
+    return '<div class="tall-row">' +
+      '<div class="tall-row-top"><span class="tall-name">' + nE + '</span>' +
+        '<button class="planim-btn-del tall-del" data-nombre="' + nE + '" onclick="tallDelete(this.getAttribute(\'data-nombre\'))">Borrar</button></div>' +
+      '<div class="tall-controls">' + codInput(nE, "LK", t.LK) + codInput(nE, "CH", t.CH) + '</div>' +
+      '</div>';
   }).join("");
 }
 async function tallSaveCod(el) {
@@ -10353,8 +10359,9 @@ async function tallDelete(nombre) {
 }
 
 /* ===== Sub-editor: ARTÍCULOS que entrega un tallerista — tabla Supabase
-   "Articulos Virgilio X Tallerista". Se abre tocando el badge LK/CH. Vínculo:
-   Cod_Tallerista (= código LK/CH) + Linea (la MISMA query que usa Recepción).
+   "Articulos Virgilio X Tallerista". Se abre tocando el badge LK/CH. Vínculo por
+   NOMBRE (Tallerista) + Linea: el campo Cod_Tallerista (código) está vacío/NULL para
+   varios talleristas (ej. Pintos), así que se usa el NOMBRE, que siempre está (NOT NULL).
    Lectura anon; escritura con JWT supervisor (RLS insert/update/delete = authenticated).
    NOT NULL: Linea, Cod_Art, Desc, Tallerista, Uni_x_Caja. ===== */
 let _tallArts = { nombre: "", linea: "", cod: "", rows: null };
@@ -10371,9 +10378,9 @@ function tallOpenArts(el) {
   const wrap = el.closest ? el.closest(".tall-cod-wrap") : null;   // tomar el valor ACTUAL del input hermano
   const inp = wrap ? wrap.querySelector(".tall-cod") : null;
   if (inp && inp.value.trim()) cod = inp.value.trim();
-  if (!cod) { alert("Primero asigná y guardá el código " + linea + " de " + nombre + ".\n\nLos artículos se vinculan por ese código."); return; }
+  if (!nombre) return;   // se vincula por NOMBRE (el código puede estar vacío, ej. Pintos)
   _tallArts = { nombre: nombre, linea: linea, cod: cod, rows: null };
-  const t = document.getElementById("tallArtsTitle"); if (t) t.textContent = "📦 " + nombre + " — " + linea + " (cód " + cod + ")";
+  const t = document.getElementById("tallArtsTitle"); if (t) t.textContent = "📦 " + nombre + " — " + linea + (cod ? " (cód " + cod + ")" : "");
   const sec = document.getElementById("tallArtsSecT"); if (sec) sec.textContent = "Artículos de la línea " + linea;
   const s = document.getElementById("tallArtsSearch"); if (s) s.value = "";
   const list = document.getElementById("tallArtsList"); if (list) list.innerHTML = '<div class="planim-empty">Cargando…</div>';
@@ -10384,7 +10391,7 @@ function tallOpenArts(el) {
 async function tallArtsLoad() {
   try {
     const url = SUPABASE_ART_ENDPOINT + "?select=id,Cod_Art,Desc,Uni_x_Caja,Cod_Tallerista,Linea,Tallerista"
-      + "&Cod_Tallerista=eq." + encodeURIComponent(_tallArts.cod)
+      + "&Tallerista=eq." + encodeURIComponent(_tallArts.nombre)   // por NOMBRE (campo confiable; el código puede estar vacío)
       + "&Linea=eq." + encodeURIComponent(_tallArts.linea) + "&order=Cod_Art";
     const r = await fetch(url, { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
     if (!r.ok) { tallArtsSetStatus("Error cargando: HTTP " + r.status, false); return; }
@@ -10437,7 +10444,7 @@ async function tallArtAdd() {
       if (mr.ok) { const md = await mr.json(); if (md && md.length) { if (!desc) desc = md[0].Desc || ""; if (!uxb) uxb = String(md[0].Uni_x_Caja == null ? "" : md[0].Uni_x_Caja); } }
     } catch (_e) {}
   }
-  const row = { Tallerista: _tallArts.nombre, Cod_Tallerista: _tallArts.cod, Linea: _tallArts.linea, Cod_Art: cod, Desc: desc || "", Uni_x_Caja: uxb === "" ? 1 : (parseInt(uxb, 10) || 1) };
+  const row = { Tallerista: _tallArts.nombre, Cod_Tallerista: _tallArts.cod || null, Linea: _tallArts.linea, Cod_Art: cod, Desc: desc || "", Uni_x_Caja: uxb === "" ? 1 : (parseInt(uxb, 10) || 1) };
   const headers = await facAuthWriteHeaders({ "Prefer": "return=minimal" });
   if (!headers) { tallArtsSetStatus("Iniciá sesión con Google (supervisor).", false); return; }
   try {
