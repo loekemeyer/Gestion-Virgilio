@@ -4,7 +4,16 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-25 · Versión app al documentar: **v3.90**
+> Última actualización: 2026-06-25 · Versión app al documentar: **v3.91**
+>
+> Nota: **v3.91** — **PPP / Imprimir: ruteo de carpeta por N° de pedido + prefijo real**. Regla del usuario:
+> NP que empieza con **4** → PDF en `X:\PDF_ISISCHEF`; empieza con **9** → `X:\PDF_ISIS`. `_pppOrderDirsForNp`
+> ordena las carpetas para buscar **primero en la correcta** (identifica la CHEF por el nombre, `/chef/i`),
+> con fallback al resto. Si no encuentra y la carpeta que correspondía NO está conectada, el cartel lo
+> **avisa** ("empieza con 4 → va en PDF_ISISCHEF, conectala"). El **formato real** del archivo es
+> `Pedido de Clte._Div_000000097904_00.pdf` — con **punto** después de "Clte" (el `PDF_PREFIX` viejo decía
+> `Clte_` sin punto: por eso la búsqueda por nombre exacto de ≤v3.89 fallaba). Desde v3.90 la búsqueda es
+> por NÚMERO, así que el prefijo/punto ya no importan; `PDF_PREFIX` quedó solo de referencia (corregido).
 >
 > Nota: **v3.90** — **PPP / Imprimir: búsqueda de PDF por NÚMERO (robusta) + diagnóstico**. Antes
 > `pppFindNpPdf` **armaba el nombre exacto** (`PDF_PREFIX` + NP con ceros + `_NN.pdf`) y fallaba si el

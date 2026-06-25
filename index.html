@@ -5054,7 +5054,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.90";
+const APP_VERSION = "v3.91";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -9492,7 +9492,7 @@ function pppPedidoAProgramar(np) {
    (abre el diálogo de impresión directo, no lo abre solo para leer). Sólo lectura. */
 const PDF_DIR_KEY  = "pdf_isis_dir";    // (legacy) handle único — se migra a la lista
 const PDF_DIRS_KEY = "pdf_isis_dirs";   // LISTA de carpetas con PDF (ej. X:\PDF_ISIS y X:\PDF_ISISCHEF)
-const PDF_PREFIX  = "Pedido de Clte_Div_";   // prefijo del archivo (ISIS)
+const PDF_PREFIX  = "Pedido de Clte._Div_";   // formato real (ej. "Pedido de Clte._Div_000000097904_00.pdf") — solo de referencia: la búsqueda es por NÚMERO
 const PDF_WIDTHS  = [12, 13, 11];            // ancho del NP con ceros (000000097899 = 12); fallback por si difiere
 const PDF_VERS    = 6;                        // probar _00.._05, usar la versión más alta
 let _pdfDirBusy = false;
@@ -9577,9 +9577,23 @@ async function pppFindNpPdf(dir, np) {
   } catch (_e) { return null; }
   return best;
 }
-// Busca el PDF del NP en TODAS las carpetas conectadas (devuelve el primer match).
+/* Ruteo por N° de pedido: los que empiezan con 4 están en PDF_ISISCHEF, los que
+   empiezan con 9 en PDF_ISIS. Ordena las carpetas para buscar primero en la correcta
+   (igual hace fallback al resto). Identifica la carpeta CHEF por el nombre. */
+function _pppOrderDirsForNp(dirs, np) {
+  const first = String(np).replace(/\D/g, "").charAt(0);
+  if (first !== "4" && first !== "9") return dirs.slice();
+  const wantsChef = (first === "4");
+  return dirs.slice().sort(function (a, b) {
+    const aOk = (/chef/i.test(a.name || "") === wantsChef) ? 0 : 1;
+    const bOk = (/chef/i.test(b.name || "") === wantsChef) ? 0 : 1;
+    return aOk - bOk;
+  });
+}
+// Busca el PDF del NP en TODAS las carpetas conectadas, empezando por la que corresponde al ruteo.
 async function pppFindNpPdfAny(dirs, np) {
-  for (let i = 0; i < dirs.length; i++) { const hit = await pppFindNpPdf(dirs[i], np); if (hit) return hit; }
+  const ordered = _pppOrderDirsForNp(dirs, np);
+  for (let i = 0; i < ordered.length; i++) { const hit = await pppFindNpPdf(ordered[i], np); if (hit) return hit; }
   return null;
 }
 // Indexa TODAS las carpetas en una sola pasada: Map(NP -> {fh, name, ver}) con la versión más alta.
@@ -9617,12 +9631,18 @@ async function pppPrintNp(np) {
     pppSetStatus("Buscando el PDF del pedido " + np + "…");
     const hit = await pppFindNpPdfAny(dirs, np);
     if (!hit) {
+      const f1 = String(np).replace(/\D/g, "").charAt(0);
+      const hasChef = dirs.some(function (d) { return /chef/i.test(d.name || ""); });
+      const hasIsis = dirs.some(function (d) { return !/chef/i.test(d.name || ""); });
+      let route = "";
+      if (f1 === "4" && !hasChef) route = "\n\n⚠ El pedido " + np + " empieza con 4 → su PDF va en X:\\PDF_ISISCHEF, que NO está conectada. Conectala con 🖨️ Carpeta(s) PDF.";
+      else if (f1 === "9" && !hasIsis) route = "\n\n⚠ El pedido " + np + " empieza con 9 → su PDF va en X:\\PDF_ISIS, que NO está conectada. Conectala con 🖨️ Carpeta(s) PDF.";
       const samples = await _pppDirSamples(dirs, 3);
       const ej = samples.length
         ? "\n\nArchivos que SÍ veo en la(s) carpeta(s):\n• " + samples.join("\n• ")
         : "\n\nNo veo NINGÚN .pdf en la(s) carpeta(s) conectada(s). ¿Es la carpeta correcta? (botón 🖨️ Carpeta(s) PDF)";
       pppSetStatus("No encontré el PDF del pedido " + np + " en la(s) carpeta(s).", false);
-      alert("No encontré el PDF del pedido " + np + " (busqué un archivo cuyo número sea " + np + ", en cualquier carpeta conectada)." + ej);
+      alert("No encontré el PDF del pedido " + np + " (busqué un archivo cuyo número sea " + np + ")." + route + ej);
       return;
     }
     let buf;
