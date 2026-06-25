@@ -2215,6 +2215,8 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .mar-art{ font-size:13.5px; color:#fed7aa; background:rgba(245,158,11,.12); border:1px solid rgba(245,158,11,.4); border-radius:8px; padding:4px 10px; }
 .mar-art b{ color:#fca5a5; }
 .mar-art .mar-np{ font-size:11px; font-weight:700; color:#fde68a; background:rgba(0,0,0,.25); border-radius:6px; padding:1px 6px; margin-left:3px; }
+.mar-art-rep{ background:rgba(220,38,38,.20); border-color:rgba(248,113,113,.65); color:#fecaca; }
+.mar-art-rep .mar-np{ color:#fee2e2; background:rgba(127,29,29,.55); }
 .mar-msg{ font-size:17px; color:#fff; margin:16px 0 20px; line-height:1.45; }
 .mar-msg b{ color:#fbbf24; font-size:20px; letter-spacing:.3px; }
 .mar-btn{ width:100%; margin:0; padding:14px; font-size:17px; font-weight:800; background:#f59e0b; color:#241803; border:none; border-radius:10px; cursor:pointer; }
@@ -2751,7 +2753,7 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
     <div class="mar-ico">⚠️</div>
     <div class="mar-title">Esta tanda se pickeó con faltantes</div>
     <div id="marianelaBody"></div>
-    <div class="mar-msg">Antes de separar los pedidos, preguntale a <b>MARIANELA</b> cómo repartir lo que hay.</div>
+    <div class="mar-msg">Revisá los faltantes antes de separar. Lo marcado en <b>rojo</b> hay que repartir entre pedidos — preguntale a <b>MARIANELA</b>.</div>
     <button class="mar-btn" onclick="closeMarianela()">Entendido</button>
   </div>
 </div>
@@ -5090,7 +5092,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.95";
+const APP_VERSION = "v3.96";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -6500,23 +6502,23 @@ async function showMarianelaAviso(codigo, legajo) {
       }
       return n;
     };
-    const relevantes = [];
-    for (const f of falt) {
-      if (!(f.real > 1) || !(f.falta > 1)) continue;          // pickearon >1 y falta >1
+    // TODOS los faltantes de la tanda; marcamos en rojo los que además hay que REPARTIR
+    // entre varios pedidos (pickearon >1, falta >1 y lo pidió más de un pedido).
+    const items = falt.map(function (f) {
       const n = contarPedidos(f.art);
-      if (n !== null && n <= 1) continue;                     // un solo pedido → no hay reparto
-      relevantes.push({ art: f.art, falta: f.falta, nped: n });
-    }
-    if (!relevantes.length) return;                           // nada para distribuir → no se muestra
-    relevantes.sort((a, b) => b.falta - a.falta);
-    const chips = relevantes.map(f =>
-      `<span class="mar-art">Art ${escapeHtml(f.art)} <b>−${f.falta}</b>` +
-      (f.nped ? ` <span class="mar-np">${f.nped} pedidos</span>` : "") + `</span>`
-    ).join("");
+      const reparto = (f.real > 1) && (f.falta > 1) && !(n !== null && n <= 1);
+      return { art: f.art, falta: f.falta, nped: n, reparto: reparto };
+    });
+    if (!items.length) return;
+    items.sort(function (a, b) { return (Number(b.reparto) - Number(a.reparto)) || (b.falta - a.falta); });   // reparto primero, luego por cantidad
+    const chips = items.map(function (f) {
+      return '<span class="mar-art' + (f.reparto ? ' mar-art-rep' : '') + '">Art ' + escapeHtml(f.art) + ' <b>−' + f.falta + '</b>' +
+        (f.reparto ? ' <span class="mar-np">repartir' + (f.nped ? ' · ' + f.nped + ' ped.' : '') + '</span>' : '') + '</span>';
+    }).join("");
     const body = document.getElementById("marianelaBody");
     if (body) body.innerHTML =
-      `<div class="mar-tanda">Tanda ${escapeHtml(tanda)} · hay que repartir entre pedidos</div>` +
-      `<div class="mar-arts">${chips}</div>`;
+      '<div class="mar-tanda">Tanda ' + escapeHtml(tanda) + ' · faltantes del picking</div>' +
+      '<div class="mar-arts">' + chips + '</div>';
     const ov = document.getElementById("marianelaModal");
     if (ov) ov.classList.add("show");
   } catch (_e) { /* sin red: no se muestra el aviso */ }

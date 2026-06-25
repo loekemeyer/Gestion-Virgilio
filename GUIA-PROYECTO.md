@@ -4,7 +4,16 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-25 · Versión app al documentar: **v3.95**
+> Última actualización: 2026-06-25 · Versión app al documentar: **v3.96**
+>
+> Nota: **v3.96** — **Armado (AP): el aviso muestra TODOS los faltantes de la tanda** (pedido del usuario).
+> Antes `showMarianelaAviso` (se dispara al tocar **AP**, línea ~5295) sólo mostraba los faltantes que había
+> que **REPARTIR** (faltante >1 y pedido por 2+ NP); si no había reparto, no mostraba nada. Ahora muestra
+> **todos** los faltantes del picking de la tanda (de los eventos **PKC**, `real < esperado`, últimos 5
+> días, vía `faltantesDeTanda`), ordenados con los de reparto primero. Los de **reparto** van marcados en
+> **rojo** (`.mar-art-rep`) con "repartir · N ped."; el resto en ámbar. Texto del modal actualizado
+> ("Revisá los faltantes antes de separar…"). El supervisor sigue teniendo la vista completa en **📦
+> Faltantes**.
 >
 > Nota: **v3.95** — **Talleristas / Artículos: fix "no aparece nada" (ej. Pintos) + estética + ← Volver**.
 > (1) **Bug del vínculo**: el panel de artículos buscaba por `Cod_Tallerista` (código), pero **varios
