@@ -2219,6 +2219,32 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .mar-art-rep .mar-np{ color:#fee2e2; background:rgba(127,29,29,.55); }
 .mar-msg{ font-size:17px; color:#fff; margin:16px 0 20px; line-height:1.45; }
 .mar-msg b{ color:#fbbf24; font-size:20px; letter-spacing:.3px; }
+/* Pop-up de reparto de faltantes (al dar TAP) */
+#faltDistModal{ display:none; position:fixed; inset:0; z-index:1300; background:rgba(2,6,23,.72); align-items:flex-start; justify-content:center; padding:14px; overflow:auto; }
+#faltDistModal.show{ display:flex; }
+.fdist-card{ background:#fff; border-radius:16px; width:100%; max-width:560px; margin:auto; box-shadow:0 20px 60px rgba(0,0,0,.45); display:flex; flex-direction:column; max-height:94vh; }
+.fdist-head{ padding:16px 18px 11px; border-bottom:1px solid #e2e8f0; }
+.fdist-title{ font-size:20px; font-weight:800; color:#0f172a; }
+.fdist-sub{ font-size:13px; color:#64748b; margin-top:3px; }
+.fdist-body{ padding:12px 16px; overflow:auto; flex:1; }
+.fdist-art{ border:1px solid #e2e8f0; border-radius:12px; padding:10px 12px; margin-bottom:12px; transition:border-color .12s, background .12s; }
+.fdist-art.ok{ border-color:#86efac; background:#f0fdf4; }
+.fdist-art-h{ display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
+.fdist-art-h > span:first-child{ font-size:16px; font-weight:800; color:#0f172a; font-family:Consolas,Menlo,monospace; }
+.fdist-art-falta{ font-size:13px; color:#b42318; font-weight:800; }
+.fdist-np{ display:flex; align-items:center; gap:10px; padding:7px 0; border-top:1px dashed #eef2f7; }
+.fdist-np:first-of-type{ border-top:none; }
+.fdist-np-info{ flex:1; min-width:0; }
+.fdist-np-np{ font-weight:800; color:#0f172a; }
+.fdist-np-cli{ font-size:12px; color:#64748b; }
+.fdist-np-inp{ width:66px; height:42px; text-align:center; font-size:18px; font-weight:800; border:2px solid #cbd5e1; border-radius:9px; box-sizing:border-box; }
+.fdist-np-inp[readonly]{ background:#f1f5f9; color:#475569; }
+.fdist-art-sum{ text-align:right; font-size:12px; font-weight:800; margin-top:7px; color:#64748b; }
+.fdist-art-sum.bad{ color:#b42318; } .fdist-art-sum.ok{ color:#166534; }
+.fdist-foot{ padding:12px 16px; border-top:1px solid #e2e8f0; display:flex; gap:10px; }
+.fdist-cancel{ flex:0 0 auto; padding:12px 16px; border:1px solid #e2e8f0; border-radius:10px; background:#fff; color:#64748b; font-weight:700; cursor:pointer; }
+.fdist-save{ flex:1; padding:12px; border:none; border-radius:10px; background:#16a34a; color:#fff; font-size:16px; font-weight:800; cursor:pointer; }
+.fdist-save:disabled{ background:#cbd5e1; cursor:not-allowed; }
 .mar-btn{ width:100%; margin:0; padding:14px; font-size:17px; font-weight:800; background:#f59e0b; color:#241803; border:none; border-radius:10px; cursor:pointer; }
 .mar-btn:hover{ background:#fbbf24; }
 
@@ -2755,6 +2781,22 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
     <div id="marianelaBody"></div>
     <div class="mar-msg">Revisá los faltantes antes de separar. Lo marcado en <b>rojo</b> hay que repartir entre pedidos — preguntale a <b>MARIANELA</b>.</div>
     <button class="mar-btn" onclick="closeMarianela()">Entendido</button>
+  </div>
+</div>
+
+<!-- Pop-up al dar TAP: repartir las cajas faltantes del picking entre las NP que pidieron
+     cada artículo. 1 NP → automático; 2+ NP → el operario reparte. Guarda en Supabase (opcion FAL). -->
+<div id="faltDistModal">
+  <div class="fdist-card">
+    <div class="fdist-head">
+      <div class="fdist-title">📦 Repartir faltantes</div>
+      <div class="fdist-sub" id="faltDistSub"></div>
+    </div>
+    <div class="fdist-body" id="faltDistBody"></div>
+    <div class="fdist-foot">
+      <button class="fdist-cancel" onclick="closeFaltDist(true)">Cancelar</button>
+      <button class="fdist-save" id="faltDistSave" onclick="faltDistGuardar()">Guardar reparto</button>
+    </div>
   </div>
 </div>
 
@@ -5296,6 +5338,10 @@ async function send() {
     // Marianela cómo repartir antes de separar (v2.87).
     showMarianelaAviso(texto, legajoStr);
   }
+  // Al TERMINAR ARMADO (TAP): repartir las cajas faltantes entre las NP. WIP — todavía
+  // NO se engancha acá porque se va a FUSIONAR con showLiosModal en el wizard "Completar"
+  // (Paso 1 líos · Paso 2 reparto). El código de showDistribuirFaltantes queda listo abajo.
+  // if (opcion === "TAP" && (texto || "").trim()) showDistribuirFaltantes(texto, legajoStr);
   // Al INICIAR carga camión (1er toque de CC): checklist de NPs listas (TAP).
   if (opcion === "CC") {
     const stCC = getLegajoState(legajoStr);
@@ -6526,6 +6572,122 @@ async function showMarianelaAviso(codigo, legajo) {
 function closeMarianela() {
   const ov = document.getElementById("marianelaModal");
   if (ov) ov.classList.remove("show");
+}
+
+/* ===== Pop-up al dar TAP: repartir las CAJAS FALTANTES del picking entre las NP que
+   pidieron cada artículo (v3.97). 1 NP → automático; 2+ → el operario reparte hasta
+   completar el faltante. Guarda en Supabase como opcion "FAL"
+   (texto = tanda|np|cod_cliente|cod_art|cajas), por la cola → offline-safe. ===== */
+let _faltDist = null;
+function _faltDistMatchArt(a, want) {
+  const aU = String(a).toUpperCase(), w = String(want).toUpperCase();
+  return aU === w || aU.replace(/E$/, "") === w.replace(/E$/, "");
+}
+async function showDistribuirFaltantes(codigo, legajo) {
+  const code = String(codigo || "").trim().toUpperCase();
+  if (!code) return;
+  try {
+    let enr = null; try { enr = await faltGetEnrich(); } catch (_e) {}
+    if (!enr || !enr.sheetMap) return;
+    // Resolver la tanda (el código puede ser tanda o pedido → su tanda).
+    let tanda = code, falt = await faltantesDeTanda(code);
+    if (!falt.length) {
+      const np = pickNormNp(code);
+      for (const [k, v] of enr.sheetMap) {
+        if (v && v.pedidos && v.pedidos.some(p => String(p.np || "").split(/[,/]/).map(s => pickNormNp(s)).indexOf(np) >= 0)) { tanda = String(v.tanda || k).trim().toUpperCase(); break; }
+      }
+      if (tanda !== code) falt = await faltantesDeTanda(tanda);
+    }
+    if (!falt.length) return;                         // sin faltantes → no se muestra
+    try { await faltEnsureBase(enr, [tanda]); } catch (_e) {}
+    const entry = enr.sheetMap.get(String(tanda).trim().toUpperCase());
+    const pedidos = (entry && entry.pedidos) || [];
+    const arts = [];
+    for (const f of falt) {
+      const nps = [], seen = new Set();
+      for (const p of pedidos) {
+        for (const part of String(p.np || "").split(/[,/]/)) {
+          const np = pickNormNp(part);
+          if (!np || !/\d/.test(np) || seen.has(np)) continue; seen.add(np);
+          let cajas = 0;
+          for (const it of (enr.pickBase.get(np) || [])) { if (_faltDistMatchArt(it.art, f.art)) cajas += (Number(it.cajas) || 0); }
+          if (cajas > 0) nps.push({ np: np, cod: String(p.cod || ""), rs: String(p.razonSocial || ""), pidio: cajas, asig: 0 });
+        }
+      }
+      if (nps.length === 1) nps[0].asig = f.falta;    // 1 NP → todo el faltante por defecto
+      arts.push({ art: f.art, falta: f.falta, nps: nps });
+    }
+    if (!arts.some(a => a.nps.length)) return;         // ningún faltante repartible → no se muestra
+    _faltDist = { tanda: String(tanda).trim().toUpperCase(), legajo: String(legajo || ""), arts: arts };
+    const sub = document.getElementById("faltDistSub");
+    if (sub) sub.textContent = "Tanda " + _faltDist.tanda + " · marcá a qué pedido fue cada caja que faltó";
+    _faltDistRender();
+    const ov = document.getElementById("faltDistModal"); if (ov) ov.classList.add("show");
+  } catch (_e) { /* sin red / sin datos: no se muestra */ }
+}
+function _faltDistRender() {
+  const body = document.getElementById("faltDistBody"); if (!body || !_faltDist) return;
+  body.innerHTML = _faltDist.arts.map(function (a, ai) {
+    if (!a.nps.length) {
+      return '<div class="fdist-art"><div class="fdist-art-h"><span>Art ' + escapeHtml(a.art) + '</span><span class="fdist-art-falta">faltan ' + a.falta + '</span></div>' +
+        '<div class="fdist-np-cli">⚠ Ningún pedido de la tanda pidió este artículo — no se reparte.</div></div>';
+    }
+    const auto = a.nps.length === 1;
+    const rows = a.nps.map(function (n, ni) {
+      return '<div class="fdist-np"><div class="fdist-np-info"><span class="fdist-np-np">NP ' + escapeHtml(n.np) + '</span> ' +
+        '<span class="fdist-np-cli">cli ' + escapeHtml(n.cod || "—") + (n.rs ? ' · ' + escapeHtml(n.rs) : "") + ' · pidió ' + n.pidio + '</span></div>' +
+        '<input class="fdist-np-inp" type="number" min="0" inputmode="numeric" data-ai="' + ai + '" data-ni="' + ni + '" value="' + (n.asig || (auto ? a.falta : "")) + '"' + (auto ? " readonly" : "") + ' oninput="_faltDistInput(this)"></div>';
+    }).join("");
+    return '<div class="fdist-art" id="fdist-art-' + ai + '"><div class="fdist-art-h"><span>Art ' + escapeHtml(a.art) + '</span>' +
+      '<span class="fdist-art-falta">faltan ' + a.falta + ' caja' + (a.falta === 1 ? "" : "s") + '</span></div>' + rows +
+      '<div class="fdist-art-sum" id="fdist-sum-' + ai + '"></div></div>';
+  }).join("");
+  _faltDistRecalc();
+}
+function _faltDistInput(el) {
+  if (!_faltDist) return;
+  const ai = +el.getAttribute("data-ai"), ni = +el.getAttribute("data-ni");
+  _faltDist.arts[ai].nps[ni].asig = Math.max(0, parseInt(el.value, 10) || 0);
+  _faltDistRecalc();
+}
+function _faltDistRecalc() {
+  if (!_faltDist) return;
+  let allOk = true;
+  _faltDist.arts.forEach(function (a, ai) {
+    if (!a.nps.length) return;                         // sin NP → se ignora (no bloquea)
+    const sum = a.nps.reduce(function (s, n) { return s + (n.asig || 0); }, 0);
+    const ok = (sum === a.falta);
+    const sumEl = document.getElementById("fdist-sum-" + ai);
+    if (sumEl) { sumEl.textContent = "Asignado " + sum + " / " + a.falta; sumEl.className = "fdist-art-sum " + (ok ? "ok" : "bad"); }
+    const artEl = document.getElementById("fdist-art-" + ai); if (artEl) artEl.classList.toggle("ok", ok);
+    if (!ok) allOk = false;
+  });
+  const saveBtn = document.getElementById("faltDistSave"); if (saveBtn) saveBtn.disabled = !allOk;
+}
+async function faltDistGuardar() {
+  if (!_faltDist) return;
+  const recs = [];
+  _faltDist.arts.forEach(function (a) {
+    a.nps.forEach(function (n) { if (n.asig > 0) recs.push({ np: n.np, cod: n.cod, art: a.art, cajas: n.asig }); });
+  });
+  if (!recs.length) { closeFaltDist(false); return; }
+  for (let i = 0; i < recs.length; i++) {
+    const r = recs[i], nowMs = Date.now();
+    const payload = {
+      legajo: _faltDist.legajo, opcion: "FAL", descripcion: "Faltante repartido",
+      texto: (_faltDist.tanda + "|" + r.np + "|" + r.cod + "|" + r.art + "|" + r.cajas).toUpperCase(),
+      ts: nowMs, id: nowMs.toString(36) + "_" + i + "_" + Math.random().toString(36).slice(2, 7), ts_inicio_iso: null
+    };
+    enqueueReport(payload);
+    trySendOneReport(payload).then(function (res) { if (res && res.ok) removeFromQueue(payload.id); }).catch(function () {});
+  }
+  closeFaltDist(false);
+  alert("✓ Reparto guardado: " + recs.length + " registro" + (recs.length === 1 ? "" : "s") + ".");
+}
+function closeFaltDist(askConfirm) {
+  if (askConfirm && !confirm("¿Cerrar sin guardar el reparto de faltantes?")) return;
+  const ov = document.getElementById("faltDistModal"); if (ov) ov.classList.remove("show");
+  _faltDist = null;
 }
 
 /* =========================================================
