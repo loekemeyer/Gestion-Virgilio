@@ -4,7 +4,20 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-25 · Versión app al documentar: **v3.91**
+> Última actualización: 2026-06-25 · Versión app al documentar: **v3.92**
+>
+> Nota: **v3.92** — **Talleristas de Recepción: editor de ARTÍCULOS por tallerista** (pedido del usuario).
+> En el editor "👷 Talleristas de Recepción", el badge **LK/CH** ahora es un botón (📦): al tocarlo abre un
+> sub-overlay (`tallArtsOverlay`, z-index 1260) para **ver/agregar/editar/borrar** los artículos que ese
+> tallerista entrega en esa línea. Tabla `Articulos Virgilio X Tallerista`; vínculo **`Cod_Tallerista`
+> (= código LK/CH) + `Linea`** (la MISMA query que usa Recepción `renderArticulos`). Cada fila: `Cod_Art` ·
+> `Desc` · `Uni_x_Caja` editables inline + Borrar. Al **agregar**, si dejás Desc/U×Caja vacíos y el
+> `Cod_Art` ya existe en otro tallerista, los **completa de ahí** (maestro). NOT NULL de la tabla: `Linea,
+> Cod_Art, Desc, Tallerista, Uni_x_Caja` (se setean todos). **RLS**: lectura anon (`select_all`), escritura
+> con JWT supervisor (`insert_all`/`update_all`/`delete_all` = authenticated) vía `facAuthWriteHeaders` →
+> **sin SQL**. Funciones: `tallOpenArts`/`tallArtsLoad`/`tallArtsRender`/`tallArtSave`/`tallArtAdd`/
+> `tallArtDelete`. ⚠ Los artículos se ligan por **código**: si cambiás el código LK/CH de un tallerista,
+> sus artículos viejos (con el código anterior) quedan con ese código.
 >
 > Nota: **v3.91** — **PPP / Imprimir: ruteo de carpeta por N° de pedido + prefijo real**. Regla del usuario:
 > NP que empieza con **4** → PDF en `X:\PDF_ISISCHEF`; empieza con **9** → `X:\PDF_ISIS`. `_pppOrderDirsForNp`

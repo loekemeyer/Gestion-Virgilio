@@ -1838,6 +1838,13 @@ button {
 .tall-cod-wrap{ display:flex; align-items:center; gap:5px; }
 .tall-lin{ font-size:11px; font-weight:800; color:#475569; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:6px; padding:3px 7px; }
 .tall-cod{ width:80px; height:38px; font-size:15px; border:2px solid #cbd5e1; border-radius:8px; padding:0 8px; box-sizing:border-box; }
+.tall-lin-btn{ cursor:pointer; transition:background .12s; }
+.tall-lin-btn:hover{ background:#dbeafe; border-color:#93c5fd; color:#1e40af; }
+#tallArtsOverlay{ z-index:1260; }   /* arriba del editor de talleristas */
+.tall-art-row{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:7px 12px; }
+.tall-art-cod{ width:92px; flex:0 0 auto; font-family:Consolas,Menlo,monospace; font-weight:700; }
+.tall-art-desc{ flex:1 1 220px; min-width:150px; height:38px; }
+.tall-art-uxb{ width:74px; flex:0 0 auto; text-align:center; }
 .planim-status{ font-size: 13px; color: #475569; min-height: 18px; text-align: center; }
 .planim-empty{ color: #94a3b8; padding: 10px; text-align: center; }
 /* Módulo PPP (placeholder/scaffolding) */
@@ -3074,6 +3081,31 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
       <input id="tallSearch" class="planim-inp planim-search" type="text" placeholder="🔍 Buscar tallerista…" oninput="tallRender(this.value)">
       <div id="tallList" class="planim-list"></div>
       <div id="tallStatus" class="planim-status"></div>
+    </div>
+  </div>
+
+  <!-- Sub-editor: ARTÍCULOS que entrega un tallerista (tabla "Articulos Virgilio X Tallerista").
+       Se abre al tocar el badge LK/CH. Vínculo: Cod_Tallerista (= código LK/CH) + Linea. -->
+  <div id="tallArtsOverlay" class="recp-admin-overlay">
+    <div class="recp-admin-bar">
+      <span class="recp-admin-title" id="tallArtsTitle">📦 Artículos</span>
+      <button class="recp-admin-close" onclick="closeTallArts()">Cerrar</button>
+    </div>
+    <div class="planim-body">
+      <div class="planim-add">
+        <div class="planim-add-t">Agregar artículo</div>
+        <div class="planim-add-row">
+          <input id="tallArtNewCod" class="planim-inp planim-inp-num" type="text" placeholder="Cód art.">
+          <input id="tallArtNewDesc" class="planim-inp" type="text" placeholder="Descripción (opcional)">
+          <input id="tallArtNewUxb" class="planim-inp planim-inp-num" type="number" placeholder="U×Caja">
+          <button class="planim-btn-save" onclick="tallArtAdd()">Agregar</button>
+        </div>
+        <div class="planim-hint">Si dejás <b>Descripción</b> / <b>U×Caja</b> vacíos y el código ya existe en otro tallerista, los completo de ahí.</div>
+      </div>
+      <div class="planim-sec-t" id="tallArtsSecT">Artículos</div>
+      <input id="tallArtsSearch" class="planim-inp planim-search" type="text" placeholder="🔍 Buscar artículo (código o descripción)…" oninput="tallArtsRender(this.value)">
+      <div id="tallArtsList" class="planim-list"></div>
+      <div id="tallArtsStatus" class="planim-status"></div>
     </div>
   </div>
 
@@ -5054,7 +5086,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.91";
+const APP_VERSION = "v3.92";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -10222,7 +10254,8 @@ function tallRender(filter) {
   if (!nombres.length) { list.innerHTML = '<div class="planim-empty">' + (f ? "Nada coincide." : "Sin talleristas.") + "</div>"; return; }
   const codInput = function (nE, lin, row) {
     const val = row ? escapeHtml(String(row.Codigo == null ? "" : row.Codigo)) : "";
-    return '<span class="tall-cod-wrap"><span class="tall-lin">' + lin + '</span>' +
+    return '<span class="tall-cod-wrap">' +
+      '<button type="button" class="tall-lin tall-lin-btn" data-nombre="' + nE + '" data-linea="' + lin + '" data-cod="' + val + '" title="Ver/editar los artículos que entrega" onclick="tallOpenArts(this)">' + lin + ' 📦</button>' +
       '<input class="tall-cod" data-id="' + (row ? row.id : "") + '" data-nombre="' + nE + '" data-linea="' + lin + '" value="' + val + '" onchange="tallSaveCod(this)"></span>';
   };
   list.innerHTML = nombres.map(function (n) {
@@ -10281,6 +10314,117 @@ async function tallDelete(nombre) {
     await tallLoad();
     tallSetStatus("✓ " + n + " borrado.", true);
   } catch (_e) { tallSetStatus("Sin conexión.", false); }
+}
+
+/* ===== Sub-editor: ARTÍCULOS que entrega un tallerista — tabla Supabase
+   "Articulos Virgilio X Tallerista". Se abre tocando el badge LK/CH. Vínculo:
+   Cod_Tallerista (= código LK/CH) + Linea (la MISMA query que usa Recepción).
+   Lectura anon; escritura con JWT supervisor (RLS insert/update/delete = authenticated).
+   NOT NULL: Linea, Cod_Art, Desc, Tallerista, Uni_x_Caja. ===== */
+let _tallArts = { nombre: "", linea: "", cod: "", rows: null };
+const SUPABASE_ART_ENDPOINT = SUPABASE_URL + "/rest/v1/" + encodeURIComponent("Articulos Virgilio X Tallerista");
+function tallArtsSetStatus(msg, ok) {
+  const el = document.getElementById("tallArtsStatus");
+  if (el) { el.textContent = msg || ""; el.style.color = (ok === false) ? "#b42318" : "#166534"; }
+}
+function closeTallArts() { const ov = document.getElementById("tallArtsOverlay"); if (ov) ov.classList.remove("show"); }
+function tallOpenArts(el) {
+  const nombre = el.getAttribute("data-nombre") || "";
+  const linea = el.getAttribute("data-linea") || "";
+  let cod = (el.getAttribute("data-cod") || "").trim();
+  const wrap = el.closest ? el.closest(".tall-cod-wrap") : null;   // tomar el valor ACTUAL del input hermano
+  const inp = wrap ? wrap.querySelector(".tall-cod") : null;
+  if (inp && inp.value.trim()) cod = inp.value.trim();
+  if (!cod) { alert("Primero asigná y guardá el código " + linea + " de " + nombre + ".\n\nLos artículos se vinculan por ese código."); return; }
+  _tallArts = { nombre: nombre, linea: linea, cod: cod, rows: null };
+  const t = document.getElementById("tallArtsTitle"); if (t) t.textContent = "📦 " + nombre + " — " + linea + " (cód " + cod + ")";
+  const sec = document.getElementById("tallArtsSecT"); if (sec) sec.textContent = "Artículos de la línea " + linea;
+  const s = document.getElementById("tallArtsSearch"); if (s) s.value = "";
+  const list = document.getElementById("tallArtsList"); if (list) list.innerHTML = '<div class="planim-empty">Cargando…</div>';
+  const ov = document.getElementById("tallArtsOverlay"); if (ov) ov.classList.add("show");
+  tallArtsSetStatus("Cargando…");
+  tallArtsLoad();
+}
+async function tallArtsLoad() {
+  try {
+    const url = SUPABASE_ART_ENDPOINT + "?select=id,Cod_Art,Desc,Uni_x_Caja,Cod_Tallerista,Linea,Tallerista"
+      + "&Cod_Tallerista=eq." + encodeURIComponent(_tallArts.cod)
+      + "&Linea=eq." + encodeURIComponent(_tallArts.linea) + "&order=Cod_Art";
+    const r = await fetch(url, { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+    if (!r.ok) { tallArtsSetStatus("Error cargando: HTTP " + r.status, false); return; }
+    _tallArts.rows = await r.json();
+    const s = document.getElementById("tallArtsSearch");
+    tallArtsRender(s ? s.value : ""); tallArtsSetStatus((_tallArts.rows.length || 0) + " artículo(s).");
+  } catch (_e) { tallArtsSetStatus("Sin conexión.", false); }
+}
+function tallArtsRender(filter) {
+  const list = document.getElementById("tallArtsList"); if (!list) return;
+  let rows = _tallArts.rows || [];
+  const f = String(filter || "").trim().toLowerCase();
+  if (f) rows = rows.filter(function (a) { return (String(a.Cod_Art) + " " + String(a.Desc || "")).toLowerCase().indexOf(f) >= 0; });
+  if (!rows.length) { list.innerHTML = '<div class="planim-empty">' + (f ? "Nada coincide." : "Sin artículos en esta línea. Agregá uno arriba.") + "</div>"; return; }
+  const numKey = function (c) { const m = String(c).match(/^(\d+)/); return m ? parseInt(m[1], 10) : Number.MAX_SAFE_INTEGER; };
+  rows = rows.slice().sort(function (a, b) { return numKey(a.Cod_Art) - numKey(b.Cod_Art) || (String(a.Cod_Art) < String(b.Cod_Art) ? -1 : 1); });
+  list.innerHTML = rows.map(function (a) {
+    const id = a.id;
+    return '<div class="tall-art-row">' +
+      '<input class="tall-cod tall-art-cod" data-id="' + id + '" data-f="Cod_Art" value="' + escapeHtml(String(a.Cod_Art == null ? "" : a.Cod_Art)) + '" onchange="tallArtSave(this)" title="Código del artículo">' +
+      '<input class="planim-inp tall-art-desc" data-id="' + id + '" data-f="Desc" value="' + escapeHtml(String(a.Desc == null ? "" : a.Desc)) + '" onchange="tallArtSave(this)" placeholder="Descripción">' +
+      '<input class="tall-cod tall-art-uxb" type="number" data-id="' + id + '" data-f="Uni_x_Caja" value="' + escapeHtml(String(a.Uni_x_Caja == null ? "" : a.Uni_x_Caja)) + '" onchange="tallArtSave(this)" title="Unidades por caja">' +
+      '<button class="planim-btn-del" data-id="' + id + '" data-cod="' + escapeHtml(String(a.Cod_Art || "")) + '" onclick="tallArtDelete(this)">Borrar</button>' +
+      '</div>';
+  }).join("");
+}
+async function tallArtSave(el) {
+  const id = el.getAttribute("data-id"); const field = el.getAttribute("data-f"); const val = el.value.trim();
+  if (field === "Cod_Art" && !val) { tallArtsSetStatus("El código no puede quedar vacío.", false); tallArtsLoad(); return; }
+  const body = {}; body[field] = (field === "Uni_x_Caja") ? (val === "" ? 0 : (parseInt(val, 10) || 0)) : val;
+  const headers = await facAuthWriteHeaders({ "Prefer": "return=minimal" });
+  if (!headers) { tallArtsSetStatus("Iniciá sesión con Google (supervisor).", false); return; }
+  try {
+    const r = await fetch(SUPABASE_ART_ENDPOINT + "?id=eq." + encodeURIComponent(id), { method: "PATCH", headers: headers, body: JSON.stringify(body) });
+    if (!r.ok) { tallArtsSetStatus("Error guardando: HTTP " + r.status, false); return; }
+    const row = (_tallArts.rows || []).find(function (x) { return String(x.id) === String(id); }); if (row) row[field] = body[field];
+    tallArtsSetStatus("✓ Guardado.", true);
+  } catch (_e) { tallArtsSetStatus("Sin conexión.", false); }
+}
+async function tallArtAdd() {
+  const codEl = document.getElementById("tallArtNewCod");
+  const cod = codEl ? codEl.value.trim().toUpperCase() : "";
+  if (!cod) { tallArtsSetStatus("Falta el código del artículo.", false); return; }
+  if ((_tallArts.rows || []).some(function (a) { return String(a.Cod_Art).toUpperCase() === cod; })) { tallArtsSetStatus("Ese código ya está en la lista.", false); return; }
+  let desc = ((document.getElementById("tallArtNewDesc") || {}).value || "").trim();
+  let uxb = String((document.getElementById("tallArtNewUxb") || {}).value || "").trim();
+  if (!desc || !uxb) {   // completar del MISMO Cod_Art si existe en otro tallerista (maestro)
+    try {
+      const mr = await fetch(SUPABASE_ART_ENDPOINT + "?select=Desc,Uni_x_Caja&Cod_Art=eq." + encodeURIComponent(cod) + "&limit=1", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+      if (mr.ok) { const md = await mr.json(); if (md && md.length) { if (!desc) desc = md[0].Desc || ""; if (!uxb) uxb = String(md[0].Uni_x_Caja == null ? "" : md[0].Uni_x_Caja); } }
+    } catch (_e) {}
+  }
+  const row = { Tallerista: _tallArts.nombre, Cod_Tallerista: _tallArts.cod, Linea: _tallArts.linea, Cod_Art: cod, Desc: desc || "", Uni_x_Caja: uxb === "" ? 1 : (parseInt(uxb, 10) || 1) };
+  const headers = await facAuthWriteHeaders({ "Prefer": "return=minimal" });
+  if (!headers) { tallArtsSetStatus("Iniciá sesión con Google (supervisor).", false); return; }
+  try {
+    const r = await fetch(SUPABASE_ART_ENDPOINT, { method: "POST", headers: headers, body: JSON.stringify(row) });
+    if (!r.ok) { tallArtsSetStatus("Error agregando: HTTP " + r.status, false); return; }
+    if (codEl) codEl.value = "";
+    const dEl = document.getElementById("tallArtNewDesc"); if (dEl) dEl.value = "";
+    const uEl = document.getElementById("tallArtNewUxb"); if (uEl) uEl.value = "";
+    await tallArtsLoad();
+    tallArtsSetStatus("✓ " + cod + " agregado.", true);
+  } catch (_e) { tallArtsSetStatus("Sin conexión.", false); }
+}
+async function tallArtDelete(el) {
+  const id = el.getAttribute("data-id"); const cod = el.getAttribute("data-cod") || "";
+  if (!confirm("¿Borrar el artículo " + cod + " de " + _tallArts.nombre + " (" + _tallArts.linea + ")?")) return;
+  const headers = await facAuthWriteHeaders({ "Prefer": "return=minimal" });
+  if (!headers) { tallArtsSetStatus("Iniciá sesión con Google (supervisor).", false); return; }
+  try {
+    const r = await fetch(SUPABASE_ART_ENDPOINT + "?id=eq." + encodeURIComponent(id), { method: "DELETE", headers: headers });
+    if (!r.ok) { tallArtsSetStatus("Error borrando: HTTP " + r.status, false); return; }
+    await tallArtsLoad();
+    tallArtsSetStatus("✓ " + cod + " borrado.", true);
+  } catch (_e) { tallArtsSetStatus("Sin conexión.", false); }
 }
 
 function openPlanimEditor() {
