@@ -4,7 +4,14 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-25 · Versión app al documentar: **v3.93**
+> Última actualización: 2026-06-25 · Versión app al documentar: **v3.94**
+>
+> Nota: **v3.94** — **PPP / Imprimir: diagnóstico del "Buscando" trabado**. Si la ruta rápida no matchea,
+> el escaneo de una carpeta de red grande tardaba sin feedback (parecía colgado en "Buscando el PDF…").
+> Ahora: (a) la ruta rápida `getFileHandle` prueba el prefijo **con y sin punto** (`Pedido de Clte._Div_` /
+> `Pedido de Clte_Div_`) y extensión `.pdf`/`.PDF`; (b) el escaneo muestra **progreso** ("Revisando la
+> carpeta… N archivos") vía `onProgress` y tiene **tope de 25 s** (`Date.now()`), así nunca parece colgado;
+> si corta, el cartel "no encontré" muestra nombres reales (`_pppDirSamples`) para ver el formato.
 >
 > Nota: **v3.93** — **PPP / Imprimir: fix "no hace nada"** (pedido del usuario). Dos causas y dos fixes.
 > (1) **Lentitud**: desde v3.90 `pppFindNpPdf` **escaneaba TODA la carpeta** por pedido → con carpetas

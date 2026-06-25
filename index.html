@@ -5086,7 +5086,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.93";
+const APP_VERSION = "v3.94";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -9593,24 +9593,32 @@ async function pppRenderPdfDirStatus() {
    (2) FALLBACK: si no aparece (otro prefijo/relleno, ej. CHEF), escanea la carpeta y compara el
    NÚMERO embebido en cada nombre. Antes (v3.90-91) sólo escaneaba → con carpetas grandes tardaba
    mucho y "parecía colgado". */
-async function pppFindNpPdf(dir, np) {
+async function pppFindNpPdf(dir, np, onProgress) {
   const clean = String(np).replace(/\D/g, ""); if (!clean) return null;
-  // (1) Rápido: nombre exacto, sin escanear.
-  for (let wi = 0; wi < PDF_WIDTHS.length; wi++) {
-    const w = PDF_WIDTHS[wi];
-    const padded = clean.length >= w ? clean : ("0".repeat(w - clean.length) + clean);
-    let best = null;
-    for (let v = 0; v < PDF_VERS; v++) {
-      const name = PDF_PREFIX + padded + "_" + (v < 10 ? "0" + v : String(v)) + ".pdf";
-      try { const fh = await dir.getFileHandle(name); best = { fh: fh, name: name }; } catch (_e) { /* esa versión no existe */ }
+  // (1) RÁPIDO: nombre exacto, sin escanear. Probamos prefijo con/sin punto y .pdf/.PDF.
+  const prefixes = [PDF_PREFIX, "Pedido de Clte_Div_"];
+  for (let pi = 0; pi < prefixes.length; pi++) {
+    for (let wi = 0; wi < PDF_WIDTHS.length; wi++) {
+      const w = PDF_WIDTHS[wi];
+      const padded = clean.length >= w ? clean : ("0".repeat(w - clean.length) + clean);
+      let best = null;
+      for (let v = 0; v < PDF_VERS; v++) {
+        const base = prefixes[pi] + padded + "_" + (v < 10 ? "0" + v : String(v));
+        try { const fh = await dir.getFileHandle(base + ".pdf"); best = { fh: fh, name: base + ".pdf" }; }
+        catch (_e) { try { const fh2 = await dir.getFileHandle(base + ".PDF"); best = { fh: fh2, name: base + ".PDF" }; } catch (_e2) {} }
+      }
+      if (best) return best;   // versión más alta encontrada para este ancho
     }
-    if (best) return best;   // versión más alta encontrada para este ancho
   }
-  // (2) Fallback: escanear y comparar el número embebido (otro prefijo/relleno).
+  // (2) FALLBACK: escanear y comparar el número embebido (otro prefijo/relleno, ej. CHEF).
+  // Con progreso visible y tope de tiempo, para que NUNCA parezca colgado.
   const npNum = parseInt(clean, 10);
-  let bestN = null, bestVer = -1;
+  let bestN = null, bestVer = -1, n = 0; const t0 = Date.now();
   try {
     for await (const entry of dir.values()) {
+      n++;
+      if (onProgress && (n % 800 === 0)) onProgress(n, false);
+      if (Date.now() - t0 > 25000) { if (onProgress) onProgress(n, true); break; }   // tope 25s
       if (entry.kind !== "file") continue;
       const nm = entry.name; if (!/\.pdf$/i.test(nm)) continue;
       const runs = nm.match(/\d+/g); if (!runs) continue;
@@ -9638,7 +9646,8 @@ function _pppOrderDirsForNp(dirs, np) {
 // Busca el PDF del NP en TODAS las carpetas conectadas, empezando por la que corresponde al ruteo.
 async function pppFindNpPdfAny(dirs, np) {
   const ordered = _pppOrderDirsForNp(dirs, np);
-  for (let i = 0; i < ordered.length; i++) { const hit = await pppFindNpPdf(ordered[i], np); if (hit) return hit; }
+  const onProg = function (n, corte) { pppSetStatus("Revisando la carpeta… " + n.toLocaleString("es-AR") + " archivos" + (corte ? " — muy lenta, corté la búsqueda" : "…")); };
+  for (let i = 0; i < ordered.length; i++) { const hit = await pppFindNpPdf(ordered[i], np, onProg); if (hit) return hit; }
   return null;
 }
 // Indexa TODAS las carpetas en una sola pasada: Map(NP -> {fh, name, ver}) con la versión más alta.
