@@ -5171,7 +5171,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.98";
+const APP_VERSION = "v3.99";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -6613,6 +6613,7 @@ function closeMarianela() {
    faltantes (opcion FAL: texto = tanda|np|cod_cliente|cod_art|cajas_faltantes). La vista
    Entregas_Virgilio cruza la base − FAL → cajas_entregadas. v3.97. ===== */
 let _comp = null;
+const SUPABASE_ENTREGAS_ENDPOINT = SUPABASE_URL + "/rest/v1/Entregas_Virgilio";
 /* Modo de carga del Paso 2: "cargo" = el operario anota lo que CARGÓ (DEFAULT, elegido por
    el usuario; el faltante sale por diferencia pidió−cargó) · "falto" = anota lo que faltó.
    El switch es SOLO de UI: internamente siempre se guarda el FALTANTE (asig), así FAL / la
@@ -6626,36 +6627,44 @@ async function showCompletarWizard(legajo, codigo) {
   try {
     let enr = null; try { enr = await faltGetEnrich(); } catch (_e) {}
     const sheetMap = (enr && enr.sheetMap) || await fetchMonitorSheet();
+    let pickBase = (enr && enr.pickBase) || null;
+    if (!pickBase) { try { pickBase = await fetchPickingBase(); } catch (_e) { pickBase = new Map(); } }
     let tanda = code, entry = sheetMap.get(tanda);
     if (!entry) {   // el código puede ser un pedido → buscar su tanda
       const np = pickNormNp(code);
       for (const [k, v] of sheetMap) { if (v && v.pedidos && v.pedidos.some(p => String(p.np || "").split(/[,/]/).map(s => pickNormNp(s)).indexOf(np) >= 0)) { tanda = String(v.tanda || k).trim().toUpperCase(); entry = v; break; } }
     }
     const pedidos = (entry && entry.pedidos) || [];
-    const nps = [], seenN = new Set();
-    for (const p of pedidos) for (const part of String(p.np || "").split(/[,/]/)) { const np = part.trim(); if (np && /\d/.test(np) && !seenN.has(np)) { seenN.add(np); nps.push({ np: np, rs: String(p.razonSocial || ""), cod: String(p.cod || ""), lios: null }); } }
+    const fecha = (entry && (entry.fechaEntregaRaw || entry.fechaEntrega)) || "";
+    const nps = [], seenN = new Set(), pedidoFull = [];
+    for (const p of pedidos) for (const part of String(p.np || "").split(/[,/]/)) {
+      const npT = part.trim(); if (!npT || !/\d/.test(npT) || seenN.has(npT)) continue; seenN.add(npT);
+      nps.push({ np: npT, rs: String(p.razonSocial || ""), cod: String(p.cod || ""), lios: null });
+      // pedido ENTERO de esa NP (todos sus artículos) → para la tabla Entregas_Virgilio
+      const items = (pickBase.get(pickNormNp(npT)) || []).map(function (it) { return { art: String(it.art), cajas: Number(it.cajas) || 0 }; }).filter(function (it) { return it.art && it.cajas > 0; });
+      if (items.length) pedidoFull.push({ np: pickNormNp(npT), cod: String(p.cod || ""), items: items });
+    }
     if (!nps.length) return;   // sin pedidos en el PPP → no abre (no rompe el TAP)
     let falt = []; try { falt = await faltantesDeTanda(tanda); } catch (_e) {}
     if (falt.length && enr) { try { await faltEnsureBase(enr, [tanda]); } catch (_e) {} }
     const arts = [];
-    if (falt.length && enr && enr.pickBase) {
+    if (falt.length && pickBase) {
       for (const f of falt) {
         const anps = [], seenA = new Set();
         for (const p of pedidos) for (const part of String(p.np || "").split(/[,/]/)) {
           const np = pickNormNp(part); if (!np || !/\d/.test(np) || seenA.has(np)) continue; seenA.add(np);
-          let cajas = 0; for (const it of (enr.pickBase.get(np) || [])) if (_compMatchArt(it.art, f.art)) cajas += (Number(it.cajas) || 0);
+          let cajas = 0; for (const it of (pickBase.get(np) || [])) if (_compMatchArt(it.art, f.art)) cajas += (Number(it.cajas) || 0);
           if (cajas > 0) anps.push({ np: np, cod: String(p.cod || ""), rs: String(p.razonSocial || ""), pidio: cajas, asig: 0 });
         }
         const real = Number(f.real) || 0;
-        // Automático: 1 solo cliente → todo el faltante a esa NP; agarraron 0 (real=0) →
-        // cada NP faltó lo que pidió (no hace falta repartir).
+        // Automático: 1 solo cliente → todo el faltante a esa NP; agarraron 0 (real=0) → cada NP faltó lo que pidió.
         if (anps.length === 1) anps[0].asig = f.falta;
         else if (real === 0) anps.forEach(function (n) { n.asig = n.pidio; });
         arts.push({ art: f.art, falta: f.falta, real: real, nps: anps, auto: (anps.length === 1 || real === 0) });
       }
     }
     const hayFalt = arts.some(a => a.nps.length);
-    _comp = { legajo: String(legajo || "").trim(), tanda: tanda, nps: nps, arts: arts, hayFalt: hayFalt, step: 1 };
+    _comp = { legajo: String(legajo || "").trim(), tanda: tanda, fecha: fecha, nps: nps, arts: arts, pedidoFull: pedidoFull, hayFalt: hayFalt, step: 1 };
     const t = document.getElementById("compTanda"); if (t) t.textContent = "Tanda " + tanda + (nps[0] && nps[0].rs ? " · " + nps[0].rs : "");
     const d2 = document.getElementById("compD2"), ln = document.getElementById("compLine");
     if (d2) d2.style.display = hayFalt ? "" : "none";
@@ -6757,24 +6766,42 @@ async function compTerminar() {
   _comp.nps.forEach(function (n, i) { if (n.lios == null) { faltanLios.push(n.np); const inp = document.querySelector('.comp-lios-inp[data-i="' + i + '"]'); if (inp) inp.style.borderColor = "#dc2626"; } });
   if (faltanLios.length) { _compGo(1); try { alert("Faltan los líos de " + faltanLios.length + " pedido(s). Completá todos (si no lleva, poné 0)."); } catch (_e) {} return; }
   if (_comp.hayFalt) { for (const a of _comp.arts) { if (a.nps.length >= 2 && !a.auto) { const sum = a.nps.reduce(function (s, n) { return s + (n.asig || 0); }, 0); if (sum !== a.falta) { _compGo(2); try { alert("Te falta repartir el Art " + a.art + " (faltaron " + sum + "/" + a.falta + ")."); } catch (_e) {} return; } } } }
-  const legajo = _comp.legajo, tanda = _comp.tanda;
-  _comp.nps.forEach(function (n) { liosSend(legajo, n.np, n.lios, tanda); });   // líos (opcion TAL)
-  let nFalt = 0;
-  if (_comp.hayFalt) _comp.arts.forEach(function (a) { a.nps.forEach(function (n) { if (n.asig > 0) { _compSendFalt(legajo, tanda, n.np, n.cod, a.art, n.asig); nFalt++; } }); });
+  const legajo = _comp.legajo, tanda = _comp.tanda, fecha = _comp.fecha || "";
+  _comp.nps.forEach(function (n) { liosSend(legajo, n.np, n.lios, tanda); });   // líos (opcion TAL, como siempre)
+  // Faltante por (NP, artículo) del reparto del Paso 2. Clave normalizada (sin la E final).
+  const faltMap = {};
+  if (_comp.hayFalt) _comp.arts.forEach(function (a) { const ka = String(a.art).toUpperCase().replace(/E$/, ""); a.nps.forEach(function (n) { if (n.asig > 0) faltMap[n.np + "|" + ka] = (faltMap[n.np + "|" + ka] || 0) + n.asig; }); });
+  // Pedido ENTERO de la tanda → filas de la tabla Entregas_Virgilio (pedidas · entregadas · faltó).
+  const rows = [];
+  (_comp.pedidoFull || []).forEach(function (p) {
+    p.items.forEach(function (it) {
+      const falto = faltMap[p.np + "|" + String(it.art).toUpperCase().replace(/E$/, "")] || 0;
+      rows.push({ fecha_salida: fecha, cod_cliente: p.cod, np: p.np, cod_art: it.art, cajas_pedidas: it.cajas, cajas_falto: falto, cajas_entregadas: Math.max(it.cajas - falto, 0), tanda: tanda });
+    });
+  });
+  const nFalt = Object.keys(faltMap).length;
   _comp = null;
   const ov = document.getElementById("completarModal"); if (ov) ov.classList.remove("show");
-  try { alert("✓ Completado: líos guardados" + (nFalt ? " · " + nFalt + " faltante(s) repartido(s)" : "") + "."); } catch (_e) {}
+  if (rows.length) _compSaveEntregas(rows);
+  try { alert("✓ Completado: líos guardados" + (nFalt ? " · " + nFalt + " artículo(s) con faltante" : "") + ". Entregas registradas: " + rows.length + "."); } catch (_e) {}
   try { updatePendingIndicator(); } catch (_e) {}
 }
-function _compSendFalt(legajo, tanda, np, cod, art, cajas) {
-  const nowMs = Date.now();
-  const payload = {
-    legajo: legajo, opcion: "FAL", descripcion: "Faltante repartido",
-    texto: (String(tanda) + "|" + String(np) + "|" + String(cod) + "|" + String(art) + "|" + String(cajas)).toUpperCase(),
-    ts: nowMs, id: nowMs.toString(36) + "_" + Math.random().toString(36).slice(2, 8), ts_inicio_iso: null
-  };
-  try { enqueueReport(payload); if (typeof trySendOneReport === "function") trySendOneReport(payload).then(function (r) { if (r && r.ok) removeFromQueue(payload.id); }).catch(function () {}); } catch (_e) {}
+/* Guarda el pedido entero en la tabla Entregas_Virgilio (POST en bloque, 1 sola llamada).
+   Si no hay red, lo deja en localStorage para reintentar al volver online (_compFlushEntregas). */
+function _compSaveEntregas(rows) {
+  const headers = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" };
+  fetch(SUPABASE_ENTREGAS_ENDPOINT, { method: "POST", headers: headers, body: JSON.stringify(rows) })
+    .then(function (r) { if (r.ok || (r.status >= 400 && r.status < 500)) return; throw new Error("HTTP " + r.status); })   // 4xx = error de datos → no reintentar (evita loop)
+    .catch(function () { try { const pend = JSON.parse(localStorage.getItem("vir_entregas_pend") || "[]"); pend.push.apply(pend, rows); localStorage.setItem("vir_entregas_pend", JSON.stringify(pend.slice(-5000))); } catch (_e) {} });
 }
+function _compFlushEntregas() {
+  let pend = []; try { pend = JSON.parse(localStorage.getItem("vir_entregas_pend") || "[]"); } catch (_e) {}
+  if (!pend.length) return;
+  fetch(SUPABASE_ENTREGAS_ENDPOINT, { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" }, body: JSON.stringify(pend) })
+    .then(function (r) { if (r.ok) { try { localStorage.removeItem("vir_entregas_pend"); } catch (_e) {} } })
+    .catch(function () {});
+}
+try { window.addEventListener("online", function () { try { _compFlushEntregas(); } catch (_e) {} }); _compFlushEntregas(); } catch (_e) {}
 function closeCompletar() { _comp = null; const ov = document.getElementById("completarModal"); if (ov) ov.classList.remove("show"); }
 
 /* =========================================================

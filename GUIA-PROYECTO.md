@@ -4,7 +4,23 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-25 · Versión app al documentar: **v3.98**
+> Última actualización: 2026-06-25 · Versión app al documentar: **v3.99**
+>
+> Nota: **v3.99** — **Entregas en Supabase: UNA tabla persistente `Entregas_Virgilio` (no más vistas)**
+> (pedido del usuario: "una sola tabla, sin duplicar"). Se **borraron las vistas** `Entregas_Virgilio` y
+> `Faltantes_Virgilio` (v3.97/v3.98) y se creó una **TABLA** `Entregas_Virgilio` con columnas exactas:
+> `fecha_salida · cod_cliente · np · cod_art · cajas_pedidas · cajas_entregadas · cajas_falto · tanda`
+> (+ `id`, `creado`). **La app la llena al dar TAP**: en `compTerminar` arma el **pedido entero** de la tanda
+> (una fila por **NP × artículo**, sacado de `pedidoFull` = picking base por NP), calcula el `cajas_falto` del
+> reparto del Paso 2 (`faltMap`, clave `np|art` sin la E final) y `cajas_entregadas = pedidas − faltó`, y hace
+> **un POST en bloque** (`_compSaveEntregas`, 1 sola llamada). **Sin duplicar la base**: la fila guarda el
+> pedido tal cual estaba al entregar (no se re-lee la base efímera `PPP_Base_Pedidos`). **Offline-safe**: si
+> el POST falla por red, las filas quedan en `localStorage` (`vir_entregas_pend`, cap 5000) y se reintentan al
+> volver online y al cargar (`_compFlushEntregas`); un 4xx (error de datos) NO se reintenta (evita loop).
+> **`fecha_salida` = `fecha_entrega`** de `PPP_Programacion_Diaria` (no la de armado: el pedido se arma el día
+> anterior). **Se quitaron los eventos FAL** (el faltante ya queda en la tabla; los líos siguen yendo como
+> **TAL** por la cola). RLS: `ent_insert`/`ent_select` para `anon`+`authenticated`. Funciones nuevas:
+> `_compSaveEntregas` / `_compFlushEntregas`; `showCompletarWizard` ahora arma `pedidoFull` + captura `fecha`.
 >
 > Nota: **v3.98** — **Wizard "Completar" Paso 2: modo CARGÓ + tope + auto-fill + switch** (pedido del
 > usuario). (1) **Modo `_compMode`** (default **"cargo"**, elegido por el usuario): el operario anota lo que
@@ -1718,6 +1734,31 @@ que ya tiene ese script apuntan a OTRO proyecto (`kwkclwhmoygunqmlegrg`, la web)
 eso el hook usa props nuevas `SUPABASE_VIRGILIO_*`. La app sólo las **lee** (RLS
 `select` para `anon`/`authenticated`). DDL en `sql/ppp_supabase.sql`; hook en
 `apps-script/sync-ppp-supabase.gs`; diseño en `MIGRACION-SUPABASE-PPP.md`.
+
+**`Entregas_Virgilio`** (v3.99) — **registro de lo entregado por pedido** (NO es una
+vista; es una **tabla** persistente que **la app llena al dar TAP**, vía
+`_compSaveEntregas`). Una fila por **NP × artículo** del pedido entero de la tanda:
+
+| Columna | Tipo | Notas |
+|---|---|---|
+| `id` | bigint | autonumérico |
+| `fecha_salida` | text | **fecha de ENTREGA** (`fecha_entrega` de `PPP_Programacion_Diaria`, no la de armado) |
+| `cod_cliente` | text | código de cliente del NP |
+| `np` | text | número de NP |
+| `cod_art` | text | código de artículo |
+| `cajas_pedidas` | numeric | lo que pedía el picking para esa NP/artículo |
+| `cajas_entregadas` | numeric | `cajas_pedidas − cajas_falto` |
+| `cajas_falto` | numeric | faltante asignado a esa NP en el reparto del Paso 2 del wizard (0 si no faltó) |
+| `tanda` | text | código de tanda |
+| `creado` | timestamptz | insert en servidor (default `now()`) |
+
+RLS: `ent_insert`/`ent_select` para `anon`+`authenticated` (la app escribe con la
+publishable key). **No duplica la base**: la fila guarda el pedido tal como estaba al
+entregar (no se re-lee la efímera `PPP_Base_Pedidos`). **Offline-safe**: si el POST
+falla por red, las filas quedan en `localStorage` `vir_entregas_pend` y se reintentan
+al volver online / al cargar (`_compFlushEntregas`). La consume el **programa externo**
+de seguimiento de entregas. (Reemplaza a las vistas `Entregas_Virgilio`/`Faltantes_Virgilio`
+y a los eventos `FAL` de v3.97/v3.98, ya eliminados.)
 
 ---
 
