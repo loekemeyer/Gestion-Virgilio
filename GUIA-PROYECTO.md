@@ -4,7 +4,20 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-25 · Versión app al documentar: **v3.97**
+> Última actualización: 2026-06-25 · Versión app al documentar: **v3.98**
+>
+> Nota: **v3.98** — **Wizard "Completar" Paso 2: modo CARGÓ + tope + auto-fill + switch** (pedido del
+> usuario). (1) **Modo `_compMode`** (default **"cargo"**, elegido por el usuario): el operario anota lo que
+> **CARGÓ** a cada NP y el **faltó** sale por diferencia (`pidió − cargó`); modo `"falto"` = anota el
+> faltante. El switch es **solo de UI** — internamente siempre se guarda el FALTANTE (`asig`), así **FAL /
+> la vista `Entregas_Virgilio` / los cálculos NO cambian**. Hay un **toggle en vivo** en el Paso 2 (para
+> que prueben los dos). (2) **Tope**: cada input no puede superar lo que **pidió** esa NP (`max=pidio`,
+> clamp en `_compFaltInput`). (3) **Auto-fill "agarró 0"**: si el picking levantó **0** (`real===0`), cada
+> NP queda con faltó = lo que pidió, **automático** (readonly), sin que lo marquen (igual que el caso de 1
+> solo cliente). `arts[].auto`/`real`. (4) **Claridad**: label **CARGÓ** (verde) + secundario **faltó X**
+> (rojo, chico) por NP, para no confundir lo cargado con lo faltante. CSS `.comp-mode-toggle`/`.comp-fnp-box`/
+> `.comp-fnp-lbl`/`.comp-fnp-sec`. La vista `Entregas_Virgilio` ya trae `cajas_pedidas · cajas_faltantes ·
+> cajas_entregadas` (entregó + faltó en Supabase).
 >
 > Nota: **v3.97** — **TAP: wizard "Completar" (líos + reparto de faltantes) + vista `Entregas_Virgilio`**
 > (pedido del usuario). Al dar **TAP** se abre `showCompletarWizard` (reemplaza al `showLiosModal` suelto):
