@@ -5007,7 +5007,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.80";
+const APP_VERSION = "v3.81";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -8290,6 +8290,7 @@ function openPPP() {
   if (!_pppParsed.prog || !_pppParsed.prog.length) { const st = pppLoadPedidosStore(); if (st.length) _pppParsed.prog = st; }
   pppShowBaseInfo();
   pppRenderProg();
+  pppLoadProgFromSupabase();   // BASE = Supabase (Programación Diaria): reemplaza la lista local + deja _pppSupaNps para el dedupe de imports
   pppRefreshArmado();
   pppRefreshEntregado();
   pppRefreshControlado();   // controlados (CRN) + chequeo de carga sin controlar vencida (alarma + Telegram)
@@ -8433,9 +8434,9 @@ async function pppHandleFile(tipo, f, buf, quiet) {     // de click, drag-drop o
       if (pppEsPPPCompleta(rows)) { pppImportarCompleta(rows, f.name); return; }   // Excel de la PPP completo → migración del estado actual
       const r = pppBuildProg(rows);
       if (!r.pedidos.length) { pppSetStatus("No reconocí las columnas. Encabezados que leí: " + (r.headerStr || "—"), false); return; }
-      const res = pppMergePedidos(r.pedidos);            // SE SUMAN a lo que ya estaba (dedupe por NP)
+      const res = pppMergePedidos(r.pedidos);            // SE SUMAN a lo que ya estaba (dedupe por NP + contra Supabase)
       if (!quiet) _pppTab = "prog"; pppRenderProg();
-      pppSetStatus("✓ " + f.name + ": " + res.add + " nuevos · " + res.upd + " actualizados · " + res.total + " pedidos en total (SOLO LOCAL).", true);
+      pppSetStatus("✓ " + f.name + ": " + res.add + " nuevos · " + res.upd + " actualizados" + (res.skip ? " · " + res.skip + " ya en Supabase (omitidos)" : "") + " · " + res.total + " pedidos en total.", true);
     } else {
       const mapped = pppMapBase(rows); _pppParsed.base = mapped;   // se guarda para subir después
       try { localStorage.setItem(PPP_BASE_TS_KEY, String(Date.now())); } catch (_e) {}
@@ -8710,15 +8711,53 @@ function pppMergePedidos(nuevos) {
   const cur = (_pppParsed.prog && _pppParsed.prog.length) ? _pppParsed.prog : pppLoadPedidosStore();
   const byNp = {}, ordenNp = [];
   for (const p of cur) { const k = String(p.np); if (!(k in byNp)) ordenNp.push(k); byNp[k] = p; }
-  let add = 0, upd = 0;
+  let add = 0, upd = 0, skip = 0;
   for (const n of (nuevos || [])) {
     const k = String(n.np);
+    if (_pppSupaNps && _pppSupaNps[k]) { skip++; continue; }   // ya está en Supabase (Prog. Diaria) → no duplicar, no considerar
     if (k in byNp) { byNp[k] = Object.assign({}, byNp[k], n); upd++; }   // actualiza datos del Excel; los edits (tanda/fe) viven aparte
     else { byNp[k] = n; ordenNp.push(k); add++; }
   }
   const merged = ordenNp.map(function (k) { return byNp[k]; });
   _pppParsed.prog = merged; pppSavePedidos(merged);
-  return { add: add, upd: upd, total: merged.length };
+  return { add: add, upd: upd, skip: skip, total: merged.length };
+}
+/* ===== PPP basado en Supabase (Programación Diaria) — pedido del usuario =====
+   La BASE de la programación sale de Supabase (PPP_Programacion_Diaria, lo que el Apps
+   Script sincroniza desde el Excel). Cada fila se mapea a la forma que usa el render
+   (ojo: p.fecha = fecha_recep, p.localidad = barrio; las fechas vienen "YYYY-MM-DD" y se
+   pasan a "dd/mm/aaaa"). Queda "programado" si tiene tanda O fecha de entrega (los súper
+   van por fecha). Las ediciones locales (vir_ppp_edits) mandan ENCIMA. Los pedidos
+   locales cuyo NP NO está en Supabase (importados sin sincronizar) se mantienen. Si
+   Supabase falla, queda lo local (no rompe). También deja _pppSupaNps para el dedupe
+   de imports. */
+let _pppSupaNps = null;
+function _pppSupaFecha(s) { s = _pppS(s); if (!s) return ""; const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s); return m ? (m[3] + "/" + m[2] + "/" + m[1]) : s; }
+function _pppRowFromSupa(r) {
+  const tanda = _pppS(r.tanda), fe = _pppSupaFecha(r.fecha_entrega);
+  return {
+    np: _pppS(r.np), tanda: (tanda || "—"), tipo: _pppS(r.tipo),
+    fecha: _pppSupaFecha(r.fecha_recep), cod: _pppS(r.cod), razon_social: _pppS(r.razon_social),
+    m3: (r.m3 == null || r.m3 === "" ? null : Number(r.m3)),
+    localidad: (_pppS(r.barrio) || _pppS(r.direccion)), fecha_entrega: fe, zona: _pppS(r.zona),
+    programmed: ((!!tanda && tanda !== "—") || !!fe), _supa: true
+  };
+}
+async function pppLoadProgFromSupabase() {
+  let rows;
+  try { rows = await supaFetchAll(SUPABASE_PPP_PROG_ENDPOINT, "select=np,tanda,tipo,fecha_recep,cod,razon_social,m3,direccion,barrio,fecha_entrega,zona"); }
+  catch (e) { pppSetStatus("⚠ No pude leer la Programación de Supabase (" + (e.message || e) + "). Muestro lo local.", false); return; }
+  const supa = [], nps = {};
+  for (const r of rows) { const np = _pppS(r.np); if (!np || (np in nps)) continue; nps[np] = 1; supa.push(_pppRowFromSupa(r)); }
+  _pppSupaNps = nps;
+  const extra = pppLoadPedidosStore().filter(function (p) { return !(String(p.np) in nps); });   // importados que aún no están en Supabase
+  _pppParsed.prog = supa.concat(extra);
+  const prog = supa.filter(function (p) { return p.programmed; }).length;
+  pppRenderProg();
+  if (typeof pppRefreshArmado === "function") pppRefreshArmado();
+  if (typeof pppRefreshEntregado === "function") pppRefreshEntregado();
+  if (typeof pppRefreshControlado === "function") pppRefreshControlado();
+  pppSetStatus("🟢 Programación de Supabase: " + supa.length + " pedidos (" + prog + " programados)" + (extra.length ? " + " + extra.length + " locales sin sincronizar" : "") + ".", true);
 }
 /* ===== Detección de SÚPER (van solos: un camión por súper). Tres señales (lo pedido):
    (1) lista de clientes súper (editable, sembrada con los 4 actuales),
@@ -9299,12 +9338,12 @@ function pppTandaFecha(id, tanda) {
 function pppTandaAProgramar(tanda) {
   const t = String(tanda).toUpperCase(); if (!confirm("¿Devolver toda la tanda " + t + " a 'A Programar'? (le saca la tanda, la fecha y la programación)")) return;
   const ed = pppLoadEdits();
-  for (const np of _pppTandaNps(t)) { ed[np] = ed[np] || {}; ed[np].tanda = "—"; delete ed[np].programmed; delete ed[np].fecha_entrega; }
+  for (const np of _pppTandaNps(t)) { ed[np] = ed[np] || {}; ed[np].tanda = "—"; ed[np].programmed = false; ed[np].fecha_entrega = ""; }   // override explícito sobre la base de Supabase
   pppSaveEdits(); pppRenderProg(); pppSetStatus("↩ Tanda " + t + " devuelta a A Programar.", true);
 }
 function pppPedidoAProgramar(np) {
   const ed = pppLoadEdits(), k = String(np);
-  ed[k] = ed[k] || {}; ed[k].tanda = "—"; delete ed[k].programmed; delete ed[k].fecha_entrega;
+  ed[k] = ed[k] || {}; ed[k].tanda = "—"; ed[k].programmed = false; ed[k].fecha_entrega = "";   // false/"" (no delete): override explícito sobre la base de Supabase
   pppSaveEdits(); pppRenderProg(); pppSetStatus("↩ Pedido " + k + " devuelto a A Programar.", true);
 }
 /* ===== Imprimir el PDF del pedido (NP) desde la carpeta del servidor (ISIS) =====

@@ -4,7 +4,27 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-24 · Versión app al documentar: **v3.80**
+> Última actualización: 2026-06-25 · Versión app al documentar: **v3.81**
+>
+> Nota: **v3.81** — **PPP: la Programación pasa a salir de Supabase + el import dedupea contra Supabase**
+> (pedido del usuario; antes era SOLO LOCAL y mostraba 0 programados aunque Supabase tuviera ~63). (1)
+> Al abrir la PPP, `pppLoadProgFromSupabase()` lee **`PPP_Programacion_Diaria`** (`supaFetchAll`) y la usa
+> como **BASE** de `_pppParsed.prog` (mapeo en `_pppRowFromSupa`: ⚠ `p.fecha`=`fecha_recep`,
+> `p.localidad`=`barrio`; fechas `YYYY-MM-DD`→`dd/mm/aaaa` con `_pppSupaFecha`). Un pedido queda
+> **`programmed`** si tiene **tanda O fecha de entrega** (los súper van por fecha; no se deriva por
+> `tanda&&fecha` porque la semilla tenía casos con tanda-sin-fecha y fecha-sin-tanda). Las **ediciones
+> locales** (`vir_ppp_edits`) siguen mandando **encima** (merge), y los pedidos locales cuyo NP **no**
+> está en Supabase (importados sin sincronizar) se **mantienen** (`extra`). Si Supabase falla, queda lo
+> local (no rompe). Primero renderiza local (instantáneo) y después reemplaza con Supabase. (2)
+> **Dedupe de import**: `pppMergePedidos` ahora **omite** los NP que ya están en Supabase
+> (`_pppSupaNps`, set que deja `pppLoadProgFromSupabase`) → al importar Formato PPP no se duplica lo que
+> ya está; el status muestra "N ya en Supabase (omitidos)". (3) **Fix**: "↩ devolver a A Programar"
+> (`pppPedidoAProgramar`/`pppTandaAProgramar`) ahora setea `programmed=false` + `fecha_entrega=""` (antes
+> `delete`) para **override explícito** sobre la base de Supabase (si no, el pedido seguía "programado").
+> ⚠ La **semilla** (`PPP_SEED`, 123 ped · ~83 programados en sus `edits`) sigue de fallback local; los
+> `edits` viejos pueden pisar Supabase para esos NP (no se limpian para no perder trabajo del usuario).
+> **Base Pedidos (Picking)**: el import local sigue inerte (solo timestamp; el picking ya lee
+> `PPP_Base_Pedidos` de Supabase directo → sin riesgo de duplicado). El N° base (v3.78-79) no cambió.
 >
 > Nota: **v3.80** — **PPP: botón "🖨️ Imprimir" por pedido → manda a imprimir el PDF del NP desde la
 > carpeta del servidor (ISIS)** (pedido del usuario). Cada fila de pedido (`_pppRowTr`) tiene un botón
