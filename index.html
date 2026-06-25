@@ -2992,7 +2992,7 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
         </div>
       </div>
       <button class="ppp-imp-toggle ppp-sup-toggle" onclick="openPppSupers()" title="Agregar/quitar clientes súper">🛒 Clientes súper</button>
-      <button class="ppp-imp-toggle ppp-pdf-toggle" onclick="pppConnectPdfDir()" title="Conectar UNA vez la carpeta del servidor con los PDF de ISIS (ej. Z:\PDF_ISIS) para poder imprimir un pedido. Necesita Chrome/Edge en PC.">🖨️ Carpeta PDF</button>
+      <button class="ppp-imp-toggle ppp-pdf-toggle" onclick="pppConnectPdfDir()" title="Conectar UNA vez la carpeta con los PDF de ISIS (ej. la carpeta PDF_ISIS, NO el disco Z:\ entero). Chrome bloquea las raíces de disco y las carpetas del sistema. Necesita Chrome/Edge en PC.">🖨️ Carpeta PDF</button>
       <span id="pppPdfDirStatus" class="ppp-pdfdir-status"></span>
       <div id="pppPreview" class="ppp-preview"></div>
       <div id="pppStatus" class="planim-status"></div>
@@ -5054,7 +5054,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.87";
+const APP_VERSION = "v3.88";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -9501,9 +9501,13 @@ async function pppGetPdfDir(interactive) {
   try { h = await fshGet(PDF_DIR_KEY); } catch (_e) { h = null; }
   if (!h) {
     if (!interactive) return null;
-    if (!confirm("Para imprimir los PDF del servidor, elegí UNA vez la carpeta donde están (ej. Z:\\PDF_ISIS).\n\n¿Elegir la carpeta ahora?")) return null;
-    try { h = await window.showDirectoryPicker({ id: "pdfisis", mode: "read" }); }
-    catch (e) { if (e && e.name === "AbortError") return null; alert("No se pudo elegir la carpeta: " + (e.message || e)); return null; }
+    if (!confirm("Para imprimir los PDF, elegí UNA vez la carpeta donde están (ej. la carpeta PDF_ISIS).\n\n⚠ Elegí la CARPETA de los PDF, no el disco entero: Chrome NO deja elegir la raíz de un disco (C:\\, D:\\, Z:\\), el Escritorio ni carpetas del sistema.\n\n¿Elegir la carpeta ahora?")) return null;
+    try { h = await window.showDirectoryPicker({ id: "pdfisis", mode: "read", startIn: "documents" }); }
+    catch (e) {
+      if (e && e.name === "AbortError") return null;
+      alert("No se pudo abrir esa carpeta.\n\nSi Chrome dice «contiene archivos del sistema», es porque elegiste un disco entero (C:\\, D:\\, Z:\\) o una carpeta del sistema. Entrá a la SUBCARPETA donde están los PDF y elegí esa — o copiá los PDF a una carpeta común (ej. Documentos) y elegí esa.\n\nDetalle: " + (e.message || e));
+      return null;
+    }
     if (!h) return null;
     try { await fshSet(PDF_DIR_KEY, h); } catch (_e) {}
     pppRenderPdfDirStatus();

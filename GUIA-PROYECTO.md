@@ -4,7 +4,16 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-25 · Versión app al documentar: **v3.87**
+> Última actualización: 2026-06-25 · Versión app al documentar: **v3.88**
+>
+> Nota: **v3.88** — **PPP / Carpeta PDF: guía ante el bloqueo de Chrome** ("Esta carpeta no se puede abrir…
+> contiene archivos del sistema"). NO es un bug: el File System Access API (`showDirectoryPicker`) **bloquea
+> carpetas sensibles** — la **raíz de un disco** (`C:\`, `D:\`, `Z:\`), la carpeta de usuario, Escritorio,
+> Windows, Archivos de programa, etc. **Solución (lado usuario)**: elegir la **subcarpeta** donde están los
+> PDF (ej. `Z:\PDF_ISIS`, no `Z:\`), o copiar los PDF a una carpeta común (Documentos) y elegir esa.
+> **Cambios de código**: el picker ahora abre con `startIn: "documents"`, el `confirm` avisa que no se puede
+> elegir el disco entero, y el `catch` (no-Abort) explica el caso «contiene archivos del sistema». Tooltip
+> del botón **🖨️ Carpeta PDF** actualizado.
 >
 > Nota: **v3.87** — **PPP: tabla sin scroll horizontal (garantizado)** (pedido del usuario: "no quiero
 > scrollear"). Las columnas largas **Razón Social** (`.ppp-cli`), **Localidad** (col 7) y **Zona** (col 9)
