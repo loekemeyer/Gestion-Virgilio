@@ -4,7 +4,26 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-26 · Versión app al documentar: **v4.17**
+> Última actualización: 2026-06-26 · Versión app al documentar: **v4.21**
+>
+> Nota: **v4.21** — **Fix m³/hora del monitor pegado en 0** (panel "Mts3 x Hora" / "Parcial").
+> `fetchMonitorDayStats` leía el m³ por tanda del cache global `_monitorSheetCache`, pero `renderMonitor`
+> lo setea **después** de llamar a esa función. En la 1ª carga el cache estaba `null` → todas las tandas
+> caían a la histórica del Sheet; las tandas **nuevas del día** (que no están en la histórica) daban m³ 0 y
+> el panel quedaba en 0,0 (los primeros ~15 s, o para siempre si la histórica no las tenía). Fix: el render
+> le pasa el `sheetMap` recién fetcheado como **2º parámetro** y el cache de 15 s sólo se reutiliza si se
+> calculó **con** sheet (flag `hadSheet`). El m³ NO está en Supabase para producción real, pero la PPP del
+> día sí (`PPP_Programacion_Diaria`, `PPP_SOURCE="auto"`) → el m³ por tanda sale de ahí o de la histórica.
+>
+> Nota: **v4.20** — **PPP: tilde de AP/TAP a la derecha de la impresora**. Cada fila de la PPP muestra dos
+> pastillas **AP** (armado empezado) y **TAP** (armado terminado) por tanda, verdes con ✓ cuando están
+> hechas. Se nutren de `getActivityStatus()` (`armadoStarted` / `armadoDone`) — lectura de Supabase, no
+> escribe la PPP. Helper `_pppApTapBadge(p)`; se inserta tras el botón 🖨️ en `_pppRowTr`/`_pppRowTrRO`.
+>
+> Nota: **v4.18–v4.19** — **PPP, dos ajustes**. v4.18: la **razón social larga** ya no desfasa ni ensancha
+> la columna (`.ppp-cli-in`: `max-width:180px` + ellipsis + tooltip con el nombre completo). v4.19:
+> **clickear un pedido en el panel de errores** lleva a su fila (`pppGoToRow(np)` → `scrollIntoView` +
+> flash `.ppp-row-flash`; cada `<tr>` tiene `id="ppprow_<np>"`; los NP del panel son `<a class="ppp-go">`).
 >
 > Nota: **v4.17** — **Máximo de OC = Proyección por tendencia (PaginaLK) × índice (configurable)**.
 > El máximo del generador ya no sale del Excel estático; sale de la **estadística madre por tendencia**
