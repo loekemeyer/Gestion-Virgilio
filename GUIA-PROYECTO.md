@@ -4,7 +4,22 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-26 · Versión app al documentar: **v4.05**
+> Última actualización: 2026-06-26 · Versión app al documentar: **v4.07**
+>
+> Nota: **v4.06–v4.07** — **STOCK ONLINE** (pedido del usuario; objetivo: stock dentro de la página).
+> Modelo **event-sourced**: tabla **`Movimientos_Stock`** (`ts, cod_art, descripcion, deposito
+> ('a_guardar'|'terminado'), delta (+/- cajas), tipo, ref, legajo`); el **stock = suma de `delta`** por
+> `cod_art`/`deposito` considerando sólo `ts >= corte`. Tabla **`Stock_Config`** guarda el corte
+> (`clave='cutoff_ts'`). **Flujos**: (1) **RT/recepción** (`recepcion.js opEnviar`) → cada artículo recibido
+> suma a **'a_guardar'** (tipo `recepcion`). (2) **MG** (Guardado a Góndola) → al tocar MG, `showMGModal`
+> muestra lo que hay en 'a_guardar', el operario elige cuántas cajas guarda y al confirmar genera 2
+> movimientos por artículo (`-a_guardar`, `+terminado`, tipo `guardado`). (3) **Picking** → al **TP**,
+> `stockBajaPicking` suma las cajas **reales** de los PKC de la tanda y resta de **'terminado'** (tipo
+> `picking`, dedup por `ref=tanda`). **Admin** "📦 Stock / Movimientos" (`openStockAdmin`): saldos por
+> artículo (terminado negativo en rojo), detalle de movimientos, **cargar stock inicial** (movimientos
+> `inicial`) y botón **"marcar inicio"** (setea `cutoff_ts` → desconsidera lo anterior sin borrarlo).
+> Cliente: `stockMove`/`stockFlushPend` (POST + reintento `vir_stock_pend`), `stockFetchMovs`/`GetCutoff`/
+> `ComputeSaldos`. Helpers offline-safe. (Arranca en 0; el corte permite resetear cuando se carga el inicial.)
 >
 > Nota: **v4.05** — **Dos alertas nuevas a Telegram** (grupo **"Faltantes Virgilio"**, chat `-1004379879565`, el
 > mismo bot/grupo de faltantes y sin planimetría). (1) **FALTA DE FACTURACIÓN** — *server-side* (`pg_cron` +
