@@ -2043,6 +2043,9 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .ppp-fc{ font-size:12px; color:#cbd5e1; font-weight:700; }
 .ppp-fc.ok{ color:#fff; background:#16a34a; border-radius:999px; padding:2px 8px; font-weight:800; }
 .ppp-fc.ok2{ color:#fff; background:#1e6bd6; border-radius:999px; padding:2px 8px; font-weight:800; }
+.ppp-aptap{ display:inline-flex; gap:4px; margin-left:8px; vertical-align:middle; }
+.ppp-apt{ font-size:10px; font-weight:800; padding:2px 6px; border-radius:999px; background:#e2e8f0; color:#94a3b8; white-space:nowrap; letter-spacing:.02em; }
+.ppp-apt.on{ background:#dcfce7; color:#166534; }
 .ppp-tanda-print{ margin-left:6px; padding:3px 9px; font-size:13px; border:none; border-radius:7px; background:rgba(255,255,255,.22); color:#fff; cursor:pointer; }
 .ppp-tanda-print:hover{ background:rgba(255,255,255,.38); }
 .ppp-tanda-ent{ margin-left:8px; padding:3px 10px; font-size:11px; font-weight:800; border:none; border-radius:7px; background:rgba(255,255,255,.22); color:#fff; cursor:pointer; }
@@ -5278,7 +5281,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v4.19";
+const APP_VERSION = "v4.20";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -10352,6 +10355,7 @@ function pppRenderBase(fname, totalRows, mapped) {
 const PPP_ENT_KEY = "vir_ppp_entregados";
 let _pppEntregados = null;
 let _pppArmadoDone = null;            // Set de tandas (UPPER) con TAP (armado terminado → Listo para FC)
+let _pppArmadoStarted = null;        // Set de tandas (UPPER) con AP (armado empezado; incluye los que ya tienen TAP)
 let _pppTab = "prog";
 let _pppSearch = "";
 function _pppSearchStr(p) { return [p.np, p.cod, p.razon_social, p.tanda, p.localidad, p.zona, p.fecha, p.fecha_entrega, p.tipo].join(" ").toLowerCase(); }
@@ -10374,8 +10378,13 @@ function pppControlarTanda(tanda) {
    evento CCN (carga de camión por NP que marcan los operarios). Ambos son LECTURA de
    Supabase (no rompen el "solo local"). */
 async function pppRefreshArmado() {
-  try { const s = await getActivityStatus(); _pppArmadoDone = (s && s.armadoDone) || new Set(); pppRenderProg(); }
-  catch (_e) { if (!_pppArmadoDone) _pppArmadoDone = new Set(); }
+  try {
+    const s = await getActivityStatus();
+    _pppArmadoDone = (s && s.armadoDone) || new Set();
+    _pppArmadoStarted = (s && s.armadoStarted) || new Set();
+    pppRenderProg();
+  }
+  catch (_e) { if (!_pppArmadoDone) _pppArmadoDone = new Set(); if (!_pppArmadoStarted) _pppArmadoStarted = new Set(); }
 }
 let _pppEntregadoCC = null;
 let _pppLoadMs = null;   // NP -> ms de la PRIMERA carga (CCN), para el plazo de control
@@ -10420,6 +10429,19 @@ async function pppRefreshControlado() {
   } catch (_e) { if (!_pppControladoCR) _pppControladoCR = new Set(); }
 }
 function _pppListoFC(p) { const t = (p.tanda || "").trim().toUpperCase(); return !!(_pppArmadoDone && t && t !== "—" && _pppArmadoDone.has(t)); }
+/* Tilde de AP/TAP por tanda, a la derecha de la impresora. AP = armado empezado
+   (cualquier AP o TAP del operario), TAP = armado terminado (último evento es TAP).
+   Verde con ✓ cuando está hecho; gris con · cuando no. */
+function _pppApTapBadge(p) {
+  const t = (p.tanda || "").trim().toUpperCase();
+  if (!t || t === "—") return '';
+  const ap  = !!(_pppArmadoStarted && _pppArmadoStarted.has(t));
+  const tap = !!(_pppArmadoDone && _pppArmadoDone.has(t));
+  return '<span class="ppp-aptap">' +
+    '<span class="ppp-apt' + (ap ? ' on' : '') + '" title="' + (ap ? 'Armado empezado (AP)' : 'Armado sin empezar') + '">AP ' + (ap ? '✓' : '·') + '</span>' +
+    '<span class="ppp-apt' + (tap ? ' on' : '') + '" title="' + (tap ? 'Armado terminado (TAP)' : 'Armado sin terminar') + '">TAP ' + (tap ? '✓' : '·') + '</span>' +
+    '</span>';
+}
 function _pppEntregado(p) { return !!(_pppEntregadoCC && _pppEntregadoCC.has(String(p.np))); }
 /* CARGADO (CCN) pero NO controlado (CRN ni manual) y con el plazo de control VENCIDO
    (crVencido = 30 hs; viernes→lunes 12 hs). Es la alarma "rojo grande y molesto". */
@@ -10790,7 +10812,7 @@ function _pppRowTrRO(p, npE) {
     '<td>' + escapeHtml(p.zona || pppZonaDeBarrio(p.localidad) || "—") + '</td>' +
     '<td>' + (_pppListoFC(p) ? '<span class="ppp-fc ok" title="Armado terminado (TAP)">✓ Listo</span>' : '<span class="ppp-fc">·</span>') + '</td>' +
     '<td>' + (_pppEntregado(p) ? '<span class="ppp-fc ok2" title="Cargado al camión (CCN)">✓ Entregado</span>' : '<span class="ppp-fc">·</span>') + '</td>' +
-    '<td class="ppp-acc">' + ctrlBtn + '<button class="ppp-row-btn ppp-print" onclick="pppPrintNp(\'' + npE + '\')" title="Imprimir el PDF del pedido (ISIS)">🖨️</button></td></tr>';
+    '<td class="ppp-acc">' + ctrlBtn + '<button class="ppp-row-btn ppp-print" onclick="pppPrintNp(\'' + npE + '\')" title="Imprimir el PDF del pedido (ISIS)">🖨️</button>' + _pppApTapBadge(p) + '</td></tr>';
 }
 function _pppRowTr(p) {
   const npE = escapeHtml(String(p.np));
@@ -10815,7 +10837,7 @@ function _pppRowTr(p) {
         ? '<span class="ppp-fc cargvenc" title="Cargado al camión y SIN controlar pasado el plazo (30 hs; viernes→lunes 12 hs)">🚨 SIN CONTROLAR</span>'
         : (_pppEntregado(p) ? '<span class="ppp-fc ok2" title="Cargado al camión (CC)">✓ Entregado</span>' : '<span class="ppp-fc">·</span>')) + '</td>' +
     '<td><button class="ppp-row-btn ppp-print" onclick="pppPrintNp(\'' + npE + '\')" title="Imprimir el PDF del pedido (Pedido de Cliente, ISIS)">🖨️ Imprimir</button>' +
-    '<button class="ppp-row-back ppp-edit-only" onclick="pppPedidoAProgramar(\'' + npE + '\')" title="Sacar de la tanda → A Programar">↩</button>' + btn + '</td></tr>';
+    '<button class="ppp-row-back ppp-edit-only" onclick="pppPedidoAProgramar(\'' + npE + '\')" title="Sacar de la tanda → A Programar">↩</button>' + btn + _pppApTapBadge(p) + '</td></tr>';
 }
 let _pppOpen = new Set();   // ids de bloques abiertos (por clave estable → persiste entre renders)
 let _pppMode = {};          // id -> "ctrl" | "edit" (modos separados; persisten entre renders)
