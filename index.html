@@ -66,7 +66,7 @@ button {
 /* Panel de Administración (supervisor): título + botones grandes centrados. */
 .sup-title { text-align: center; font-size: 32px; margin: 5vh 0 0; }
 .sup-actions {
-  max-width: min(1040px, 94vw); margin: 24px auto 0;
+  max-width: min(1280px, 97vw); margin: 24px auto 0;
   display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px;   /* tipo teclado 3 col */
 }
 .sup-action-btn {
@@ -79,21 +79,24 @@ button {
 .sup-action-btn:hover { background: #1d4ed8; }
 .sup-action-btn:active { transform: scale(.97); }
 .sup-action-btn .sup-ico { font-size: 34px; flex: 0 0 auto; line-height: 1; }
-/* Dos niveles (v4.15): GRANDES (uso diario, mismo tamaño) arriba · CHICOS (ocasionales) abajo. */
+/* Dos niveles (v4.16): GRANDES (uso diario) en UNA fila de 5 · CHICOS (ocasionales) en UNA tira de 7. */
 .sup-actions.sup-primary { grid-template-columns: repeat(5, 1fr); }
 .sup-primary .sup-action-btn { min-height: 150px; font-size: 19px; }
 .sup-primary .sup-action-btn .sup-ico { font-size: 42px; }
-.sup-sec-label { max-width: min(1040px, 94vw); margin: 26px auto 6px; font-size: 12.5px; font-weight: 800;
+.sup-sec-label { max-width: min(1280px, 97vw); margin: 26px auto 6px; font-size: 12.5px; font-weight: 800;
   letter-spacing: .05em; text-transform: uppercase; color: #94a3b8; }
-.sup-actions.sup-secondary { grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 0; }
-.sup-secondary .sup-action-btn { min-height: 80px; padding: 11px 9px; font-size: 14px; gap: 6px;
+.sup-actions.sup-secondary { grid-template-columns: repeat(7, 1fr); gap: 8px; margin-top: 0; }
+.sup-secondary .sup-action-btn { min-height: 78px; padding: 9px 6px; font-size: 12.5px; gap: 5px;
   background: #51688f; border-radius: 11px; }
 .sup-secondary .sup-action-btn:hover { background: #44597a; }
-.sup-secondary .sup-action-btn .sup-ico { font-size: 23px; }
-@media (max-width: 900px) { .sup-actions.sup-primary { grid-template-columns: repeat(3, 1fr); } .sup-actions.sup-secondary { grid-template-columns: repeat(3, 1fr); } }
-@media (max-width: 560px) { .sup-actions { grid-template-columns: repeat(2, 1fr); gap: 12px; }
-  .sup-actions.sup-primary { grid-template-columns: repeat(2, 1fr); } .sup-actions.sup-secondary { grid-template-columns: repeat(2, 1fr); }
-  .sup-primary .sup-action-btn { min-height: 120px; } }
+.sup-secondary .sup-action-btn .sup-ico { font-size: 21px; }
+/* Sólo en pantallas chicas (celular) se permite que se plieguen. En monitor van en una sola fila. */
+@media (max-width: 680px) {
+  .sup-actions { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .sup-actions.sup-primary { grid-template-columns: repeat(2, 1fr); }
+  .sup-actions.sup-secondary { grid-template-columns: repeat(3, 1fr); }
+  .sup-primary .sup-action-btn { min-height: 120px; }
+}
 /* Nombre del usuario logueado, fijo arriba a la izquierda. */
 #userTag {
   position: fixed; top: 8px; left: 8px; z-index: 60;
@@ -5270,7 +5273,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v4.15";
+const APP_VERSION = "v4.16";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
