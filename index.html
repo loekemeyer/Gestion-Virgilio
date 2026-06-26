@@ -1956,7 +1956,8 @@ button {
 .ppp-tbl td.ppp-acc{ white-space:nowrap; text-align:right; }
 .ppp-tbl th{ text-align:left; padding:5px 7px; background:#f8fafc; color:#475569; border-bottom:1px solid #e2e8f0; font-size:11px; text-transform:uppercase; letter-spacing:.2px; }
 .ppp-tbl th.num{ text-align:right; } .ppp-tbl td{ padding:5px 7px; border-bottom:1px solid #f1f5f9; color:#0f172a; } .ppp-tbl td.num{ text-align:right; }
-.ppp-tbl .ppp-cli{ font-weight:600; white-space:normal; overflow-wrap:anywhere; min-width:90px; }
+.ppp-tbl .ppp-cli{ font-weight:600; white-space:nowrap; }
+.ppp-tbl .ppp-cli-in{ display:inline-block; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; vertical-align:bottom; }
 .ppp-tbl tbody tr:hover td{ background:#f8fafc; }
 .ppp-row-btn{ width:auto; margin:0; padding:4px 8px; font-size:12px; font-weight:bold; border:none; border-radius:7px; cursor:pointer; white-space:nowrap; }
 .ppp-row-btn.ppp-ent{ background:#16a34a; color:#fff; } .ppp-row-btn.ppp-ent:hover{ background:#15803d; }
@@ -5273,7 +5274,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v4.17";
+const APP_VERSION = "v4.18";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -10778,7 +10779,7 @@ function _pppRowTrRO(p, npE) {
   return '<tr' + (cls ? ' class="' + cls + '"' : '') + '>' +
     '<td>' + escapeHtml(p.tanda && p.tanda !== "—" ? p.tanda : "—") + '</td>' +
     '<td>' + escapeHtml(p.cod || "") + '</td><td><b>' + npE + '</b></td><td>' + escapeHtml(p.fecha || "") + '</td>' +
-    '<td class="ppp-cli">' + escapeHtml(p.razon_social || "") + (badges ? ' ' + badges : "") + '</td>' +
+    '<td class="ppp-cli"><span class="ppp-cli-in" title="' + escapeHtml(p.razon_social || "") + '">' + escapeHtml(p.razon_social || "") + '</span>' + (badges ? ' ' + badges : "") + '</td>' +
     '<td class="num">' + (p.m3 != null && p.m3 !== "" ? Number(p.m3).toFixed(2) : "") + '</td>' +
     '<td>' + escapeHtml(p.localidad || "") + '</td>' +
     '<td>' + escapeHtml(p.fecha_entrega || "") + '</td>' +
@@ -10801,7 +10802,7 @@ function _pppRowTr(p) {
   return '<tr' + (cargVenc ? ' class="ppp-cargvenc-row"' : '') + '>' +
     '<td><input class="ppp-edit ppp-edit-tanda" value="' + tEd + '" placeholder="—" onchange="pppSetEdit(\'' + npE + '\',\'tanda\',this.value.trim().toUpperCase(),true)"></td>' +
     '<td>' + escapeHtml(p.cod || "") + '</td><td><b>' + npE + '</b></td><td>' + escapeHtml(p.fecha || "") +
-    '</td><td class="ppp-cli">' + escapeHtml(p.razon_social || "") + '</td><td class="num">' + (p.m3 != null && p.m3 !== "" ? Number(p.m3).toFixed(2) : "") +
+    '</td><td class="ppp-cli"><span class="ppp-cli-in" title="' + escapeHtml(p.razon_social || "") + '">' + escapeHtml(p.razon_social || "") + '</span></td><td class="num">' + (p.m3 != null && p.m3 !== "" ? Number(p.m3).toFixed(2) : "") +
     '</td><td>' + escapeHtml(p.localidad || "") + '</td>' +
     '<td><input class="ppp-edit ppp-edit-fe" value="' + feEd + '" placeholder="dd/mm/aaaa" onchange="pppSetEdit(\'' + npE + '\',\'fecha_entrega\',this.value.trim(),false)"></td>' +
     '<td>' + pppZonaCell(p) + '</td>' +
