@@ -1959,6 +1959,10 @@ button {
 .ppp-tbl .ppp-cli{ font-weight:600; white-space:nowrap; }
 .ppp-tbl .ppp-cli-in{ display:inline-block; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; vertical-align:bottom; }
 .ppp-tbl tbody tr:hover td{ background:#f8fafc; }
+.ppp-go{ color:#b45309; text-decoration:underline; cursor:pointer; font-weight:700; }
+.ppp-go:hover{ color:#92400e; }
+.ppp-row-flash td{ animation: pppRowFlash 1.6s ease; }
+@keyframes pppRowFlash{ 0%,100%{ background:transparent; } 18%,62%{ background:#fde68a; } }
 .ppp-row-btn{ width:auto; margin:0; padding:4px 8px; font-size:12px; font-weight:bold; border:none; border-radius:7px; cursor:pointer; white-space:nowrap; }
 .ppp-row-btn.ppp-ent{ background:#16a34a; color:#fff; } .ppp-row-btn.ppp-ent:hover{ background:#15803d; }
 .ppp-row-btn.ppp-ctrl-no{ background:#fff; color:#16a34a; border:1px solid #86efac; margin-right:6px; } .ppp-row-btn.ppp-ctrl-no:hover{ background:#f0fdf4; }
@@ -5274,7 +5278,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v4.18";
+const APP_VERSION = "v4.19";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -10776,7 +10780,7 @@ function _pppRowTrRO(p, npE) {
   const ctrlBtn = enPlan
     ? '<button class="ppp-row-btn ' + (ctrld ? "ppp-ctrl-yes" : "ppp-ctrl-no") + '" onclick="pppControlarToggle(\'' + npE + '\')" title="' + (ctrld ? "Controlado — tocá para desmarcar" : "Marcar este pedido como controlado (local)") + '">' + (ctrld ? "✓ Controlado" : "Controlar") + '</button>'
     : '';
-  return '<tr' + (cls ? ' class="' + cls + '"' : '') + '>' +
+  return '<tr id="ppprow_' + npE + '"' + (cls ? ' class="' + cls + '"' : '') + '>' +
     '<td>' + escapeHtml(p.tanda && p.tanda !== "—" ? p.tanda : "—") + '</td>' +
     '<td>' + escapeHtml(p.cod || "") + '</td><td><b>' + npE + '</b></td><td>' + escapeHtml(p.fecha || "") + '</td>' +
     '<td class="ppp-cli"><span class="ppp-cli-in" title="' + escapeHtml(p.razon_social || "") + '">' + escapeHtml(p.razon_social || "") + '</span>' + (badges ? ' ' + badges : "") + '</td>' +
@@ -10799,7 +10803,7 @@ function _pppRowTr(p) {
       ? '<button class="ppp-row-btn ppp-ent ppp-ctrl-only" onclick="pppControlar(\'' + npE + '\')">✓ Controlado</button>'
       : '';   // en "A Programar" no va botón (el pedido aún no está programado)
   const cargVenc = _pppCargaVencida(p);
-  return '<tr' + (cargVenc ? ' class="ppp-cargvenc-row"' : '') + '>' +
+  return '<tr id="ppprow_' + npE + '"' + (cargVenc ? ' class="ppp-cargvenc-row"' : '') + '>' +
     '<td><input class="ppp-edit ppp-edit-tanda" value="' + tEd + '" placeholder="—" onchange="pppSetEdit(\'' + npE + '\',\'tanda\',this.value.trim().toUpperCase(),true)"></td>' +
     '<td>' + escapeHtml(p.cod || "") + '</td><td><b>' + npE + '</b></td><td>' + escapeHtml(p.fecha || "") +
     '</td><td class="ppp-cli"><span class="ppp-cli-in" title="' + escapeHtml(p.razon_social || "") + '">' + escapeHtml(p.razon_social || "") + '</span></td><td class="num">' + (p.m3 != null && p.m3 !== "" ? Number(p.m3).toFixed(2) : "") +
@@ -11327,7 +11331,7 @@ function _pppComputeErrors(peds, entSet) {
 function pppErroresHtml(e) {
   const n = e.sacar.length + e.sinZona.length + e.zonaDif.length + e.tandasMal.length;
   if (!n) return '<div class="ppp-errpanel ok">✓ Sin errores detectados en la Programación de Supabase.</div>';
-  const np = function (p) { return escapeHtml(String(p.np)); };
+  const np = function (p) { const s = escapeHtml(String(p.np)); return '<a class="ppp-go" onclick="pppGoToRow(\'' + s + '\')" title="Ir a la fila del pedido">' + s + '</a>'; };
   const cli = function (p) { const r = (p.razon_social || "").trim(); return r ? " " + escapeHtml(r.slice(0, 20)) : ""; };
   let h = '<div class="ppp-errpanel"><div class="ppp-errpanel-h">🚨 ' + n + ' cosa(s) para revisar/corregir en el Excel</div>';
   if (e.sacar.length)     h += '<div class="ppp-ei bad">🚮 <b>Ya entregados — SACAR (' + e.sacar.length + '):</b> ' + e.sacar.map(function (p) { return np(p) + cli(p); }).join(" · ") + '</div>';
@@ -11336,6 +11340,14 @@ function pppErroresHtml(e) {
   if (e.tandasMal.length) h += '<div class="ppp-ei warn">⚠ <b>Tandas inconsistentes (' + e.tandasMal.length + '):</b> ' + e.tandasMal.map(function (t) { return escapeHtml(t.tanda) + (t.rutas > 1 ? " (rutas mezcladas)" : "") + (t.fechas > 1 ? " (varias fechas)" : ""); }).join(" · ") + '</div>';
   h += '</div>';
   return h;
+}
+/* Click en un NP del panel de errores → scrollea a su fila y la resalta. */
+function pppGoToRow(np) {
+  const el = document.getElementById("ppprow_" + np);
+  if (!el) { return; }
+  try { el.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (_e) { try { el.scrollIntoView(); } catch (_e2) {} }
+  el.classList.add("ppp-row-flash");
+  setTimeout(function () { try { el.classList.remove("ppp-row-flash"); } catch (_e) {} }, 1800);
 }
 function pppRenderProg() {
   const box = document.getElementById("pppPreview"); if (!box) return;
