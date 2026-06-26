@@ -5281,7 +5281,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v4.20";
+const APP_VERSION = "v4.21";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -9116,9 +9116,14 @@ let _monitorDayStatsCache = new Map();
 // Setteado en renderMonitor; leído por showOperarioActivityDetail.
 let _monitorLiveStats = { todayKey: null, today: null, yesterdayKey: null, yesterday: null };
 const MONITOR_DAY_STATS_TTL_MS = 15000;
-async function fetchMonitorDayStats(dayKey) {
+async function fetchMonitorDayStats(dayKey, sheetMapArg) {
+  // Cache hit: solo si la entrada cacheada se calculó CON el sheet (m³ real).
+  // Si se cacheó con sheet vacío (carrera de la 1ra carga: _monitorSheetCache
+  // todavía null), la descartamos y recomputamos con el sheetMapArg fresco —
+  // si no, el panel "Mts3 x Hora" quedaba pegado en 0 los primeros ~15s (o para
+  // siempre si las tandas del día son nuevas y no están en la histórica).
   const cached = _monitorDayStatsCache.get(dayKey);
-  if (cached && (Date.now() - cached.ts) < MONITOR_DAY_STATS_TTL_MS) return cached.data;
+  if (cached && (Date.now() - cached.ts) < MONITOR_DAY_STATS_TTL_MS && cached.hadSheet) return cached.data;
 
   const dayStartIso = new Date(`${dayKey}T00:00:00-03:00`).toISOString();
   const dayEndIso   = new Date(`${dayKey}T23:59:59-03:00`).toISOString();
@@ -9185,7 +9190,12 @@ async function fetchMonitorDayStats(dayKey) {
   // Lookup m3 por tanda: sheetMap actual primero (más fresco), después la
   // histórica del Sheet. ANTES del loop de eventos porque el detail necesita
   // m3 al momento de procesar cada cierre (era TDZ con const declarado abajo).
-  const sheetMap = _monitorSheetCache || new Map();
+  // Preferimos el sheetMap RECIÉN fetcheado que nos pasa el render (sheetMapArg):
+  // _monitorSheetCache lo settea renderMonitor DESPUÉS de llamar a esta función,
+  // así que en la 1ra carga venía vacío → m³ daban 0. Si el arg no vino o está
+  // vacío, caemos al cache global como antes.
+  const sheetMap = (sheetMapArg && sheetMapArg.size) ? sheetMapArg : (_monitorSheetCache || new Map());
+  const hadSheet = sheetMap.size > 0;
   const tandaM3 = (t) => {
     const e = sheetMap.get(t);
     if (e && e.m3 != null) return e.m3;
@@ -9376,7 +9386,7 @@ async function fetchMonitorDayStats(dayKey) {
   };
   perOperario.sort((a, b) => (b.m3Pick + b.m3Arm + b.m3CC) - (a.m3Pick + a.m3Arm + a.m3CC));
   const data = { perOperario, totals };
-  _monitorDayStatsCache.set(dayKey, { ts: Date.now(), data });
+  _monitorDayStatsCache.set(dayKey, { ts: Date.now(), data, hadSheet });
   return data;
 }
 
@@ -13541,8 +13551,8 @@ async function refreshMonitor() {
     const todayKeyAr  = isoToDayKey(Date.now());
     const yesterdayKeyAr = isoToDayKey(Date.now() - 24 * 3600 * 1000);
     const [todayStats, yesterdayStats] = await Promise.all([
-      fetchMonitorDayStats(todayKeyAr).catch(e => { console.warn("[monitor] dayStats hoy:", e.message); return null; }),
-      fetchMonitorDayStats(yesterdayKeyAr).catch(e => { console.warn("[monitor] dayStats ayer:", e.message); return null; })
+      fetchMonitorDayStats(todayKeyAr, sheetMap).catch(e => { console.warn("[monitor] dayStats hoy:", e.message); return null; }),
+      fetchMonitorDayStats(yesterdayKeyAr, sheetMap).catch(e => { console.warn("[monitor] dayStats ayer:", e.message); return null; })
     ]);
     renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, empleadosHoy, pastDays, null, fichadasResumen, todayStats, yesterdayStats, todayKeyAr, yesterdayKeyAr);
     if (refrEl) { refrEl.textContent = "● al día"; refrEl.classList.remove("stale"); }
