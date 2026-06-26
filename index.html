@@ -3466,6 +3466,31 @@ function escapeHtml(s) {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
 }
+/* Re-render conservando el foco y el cursor del input que estaba activo. Sin esto,
+   reemplazar innerHTML en cada tecla (buscadores, steppers) "saca" del campo y obliga
+   a re-clickear por cada dígito. Reidentifica el input por (tag.clase) y su posición. */
+function _renderKeepFocus(container, html) {
+  if (!container) return;
+  const a = document.activeElement;
+  let mark = null;
+  if (a && container.contains(a) && (a.tagName === "INPUT" || a.tagName === "TEXTAREA")) {
+    const cls = (a.className || "").trim().split(/\s+/).filter(Boolean);
+    const sel = a.tagName + (cls.length ? "." + cls.join(".") : "");
+    let idx = 0;
+    try { idx = Array.prototype.indexOf.call(container.querySelectorAll(sel), a); } catch (_e) {}
+    let ss = null, se = null;
+    try { ss = a.selectionStart; se = a.selectionEnd; } catch (_e) {}
+    mark = { sel: sel, idx: idx < 0 ? 0 : idx, ss: ss, se: se };
+  }
+  container.innerHTML = html;
+  if (mark) {
+    try {
+      const list = container.querySelectorAll(mark.sel);
+      const el = list[mark.idx] || list[0];
+      if (el) { el.focus(); if (mark.ss != null && el.setSelectionRange) { try { el.setSelectionRange(mark.ss, mark.se); } catch (_e) {} } }
+    } catch (_e) {}
+  }
+}
 
 /* =========================================================
    ÚLTIMO LEGAJO (persistente entre cierres de app)
@@ -5227,7 +5252,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v4.13";
+const APP_VERSION = "v4.14";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -7049,7 +7074,7 @@ async function openOCAdmin() {
   } catch (e) { const b = document.getElementById("ocBody"); if (b) b.innerHTML = '<div class="oc-loading">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
 }
 function closeOCAdmin() { const ov = document.getElementById("ocAdminOverlay"); if (ov) ov.classList.remove("show"); _oc = null; }
-function ocRender() { if (!_oc) return; const body = document.getElementById("ocBody"); if (!body) return; body.innerHTML = _oc.view === "detail" ? ocBodyDetail() : _oc.view === "nueva" ? ocBodyNueva() : _oc.view === "gen" ? ocBodyGen() : ocBodyList(); }
+function ocRender() { if (!_oc) return; const body = document.getElementById("ocBody"); if (!body) return; _renderKeepFocus(body, _oc.view === "detail" ? ocBodyDetail() : _oc.view === "nueva" ? ocBodyNueva() : _oc.view === "gen" ? ocBodyGen() : ocBodyList()); }
 function ocGroups() {
   const g = {};
   (_oc.rows || []).forEach(function (r) { const k = _ocGroupKey(r); if (!g[k]) g[k] = { key: k, proveedor: r.proveedor || "", fecha: r.fecha || "", rubro: r.rubro || "", rows: [] }; g[k].rows.push(r); });
@@ -7253,7 +7278,7 @@ function stkRender() {
   const tb = document.getElementById("stkTabs");
   if (tb) tb.innerHTML = tabs.map(function (t) { return '<button class="stk-tab' + (_stk.tab === t[0] ? " on" : "") + '" onclick="stkTab(\'' + t[0] + '\')">' + t[1] + '</button>'; }).join("");
   const body = document.getElementById("stkBody"); if (!body) return;
-  body.innerHTML = _stk.tab === "racks" ? stkBodyRacks() : _stk.tab === "ingresos" ? stkBodyIngresos() : _stk.tab === "salidas" ? stkBodySalidas() : _stk.tab === "ajustes" ? stkBodyAjustes() : stkBodyStocks();
+  _renderKeepFocus(body, _stk.tab === "racks" ? stkBodyRacks() : _stk.tab === "ingresos" ? stkBodyIngresos() : _stk.tab === "salidas" ? stkBodySalidas() : _stk.tab === "ajustes" ? stkBodyAjustes() : stkBodyStocks());
 }
 function stkMvRow(mv) {
   const old = _stk.cutoff && new Date(mv.ts).getTime() < new Date(_stk.cutoff).getTime();
@@ -7501,7 +7526,7 @@ function brRender() {
   }).join("");
   const tot = _br.items.reduce(function (s, it) { return s + it.bajar; }, 0);
   h += '<button class="br-fin"' + (tot <= 0 ? " disabled" : "") + ' onclick="brConfirmar()">✓ Registrar bajada de ' + tot + " caja(s)</button>";
-  body.innerHTML = h;
+  _renderKeepFocus(body, h);
 }
 function brChg(i, d) { if (!_br) return; const it = _br.items[i]; if (!it) return; it.bajar = Math.max(0, Math.min(it.disponible, it.bajar + d)); brRender(); }
 function brSet(i, v) { if (!_br) return; const it = _br.items[i]; if (!it) return; let n = Math.max(0, parseInt(v, 10) || 0); if (n > it.disponible) n = it.disponible; it.bajar = n; brRender(); }
@@ -7570,7 +7595,7 @@ function insRender() {
   }).join("");
   const tot = _ins.items.reduce(function (s, it) { return s + it.qty; }, 0);
   h += '<button class="ins-fin ' + (isIn ? "in" : "out") + '"' + (tot <= 0 ? " disabled" : "") + ' onclick="insConfirmar()">' + (isIn ? "✓ Registrar entrada de " : "✓ Registrar salida de ") + tot + " unidad(es)</button>";
-  body.innerHTML = h;
+  _renderKeepFocus(body, h);
 }
 function insChg(i, d) { if (!_ins) return; const it = _ins.items[i]; if (!it) return; it.qty = Math.max(0, it.qty + d); insRender(); }
 function insSet(i, v) { if (!_ins) return; const it = _ins.items[i]; if (!it) return; it.qty = Math.max(0, parseInt(v, 10) || 0); insRender(); }
@@ -7637,7 +7662,7 @@ function scRender() {
   }).join("");
   const tot = _sc.items.reduce(function (s, it) { return s + it.sacar; }, 0);
   h += '<button class="sc-fin"' + (tot <= 0 ? " disabled" : "") + ' onclick="scConfirmar()">✓ Mandar ' + tot + ' caja(s) a Cervantes</button>';
-  body.innerHTML = h;
+  _renderKeepFocus(body, h);
 }
 function scChg(i, d) { if (!_sc) return; const it = _sc.items[i]; if (!it) return; it.sacar = Math.max(0, Math.min(it.disponible, it.sacar + d)); scRender(); }
 function scSet(i, v) { if (!_sc) return; const it = _sc.items[i]; if (!it) return; let n = Math.max(0, parseInt(v, 10) || 0); if (n > it.disponible) n = it.disponible; it.sacar = n; scRender(); }
@@ -7685,7 +7710,7 @@ function mgRender() {
   }).join("");
   const tot = _mg.items.reduce(function (s, it) { return s + it.cargar; }, 0);
   h += '<button class="mg-fin"' + (tot <= 0 ? " disabled" : "") + ' onclick="mgConfirmar()">✓ Guardar ' + tot + ' caja(s) a Terminado</button>';
-  body.innerHTML = h;
+  _renderKeepFocus(body, h);
 }
 function mgChg(i, d) { if (!_mg) return; const it = _mg.items[i]; if (!it) return; it.cargar = Math.max(0, Math.min(it.disponible, it.cargar + d)); mgRender(); }
 function mgSet(i, v) { if (!_mg) return; const it = _mg.items[i]; if (!it) return; let n = Math.max(0, parseInt(v, 10) || 0); if (n > it.disponible) n = it.disponible; it.cargar = n; mgRender(); }
