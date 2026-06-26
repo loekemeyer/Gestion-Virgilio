@@ -5214,7 +5214,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v4.03";
+const APP_VERSION = "v4.04";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -5414,9 +5414,9 @@ async function send() {
   // defecto; showArmadoGuide corta solo si la flag está en false). No bloquea AP.
   if (opcion === "AP" && (texto || "").trim()) {
     showArmadoGuide(texto, legajoStr);
-    // Si la tanda de este pedido se pickeó con faltantes, avisar que pregunte a
-    // Marianela cómo repartir antes de separar (v2.87).
-    showMarianelaAviso(texto, legajoStr);
+    // v4.04: al EMPEZAR armado se abre el wizard "Completar" (Paso 1 Faltantes → Paso 2 Líos).
+    // Antes era el aviso read-only showMarianelaAviso y el wizard salía recién en TAP.
+    showCompletarWizard(legajoStr, texto);
   }
   // Al INICIAR carga camión (1er toque de CC): checklist de NPs listas (TAP).
   if (opcion === "CC") {
@@ -5433,9 +5433,8 @@ async function send() {
     const stCR = getLegajoState(legajoStr);
     if (stCR && stCR.toggles && stCR.toggles.CR) showControlRemitosCR(legajoStr);
   }
-  // Al TERMINAR ARMADO (TAP): wizard "Completar" — Paso 1 líos por NP · Paso 2 reparto de
-  // faltantes (si los hay). Guarda líos (TAL) + faltantes (FAL). v3.97.
-  if (opcion === "TAP" && (texto || "").trim()) showCompletarWizard(legajoStr, texto);
+  // v4.04: TAP ya NO abre ningún pop-up (el wizard se movió a AP). TAP es solo el cierre del
+  // armado; el wizard Faltantes→Líos se completa durante el armado y se guarda con su "Terminar".
   // Al INICIAR recepción (1er toque de RT): Modo OP de Recepción (recepcion.js).
   // Anota cajas por código; el total del día se usa para cerrar RT sin pedir
   // la cantidad a mano (ver recepcionCajasDelDia + Terminar Día).
@@ -6677,6 +6676,17 @@ async function showCompletarWizard(legajo, codigo) {
       const np = pickNormNp(code);
       for (const [k, v] of sheetMap) { if (v && v.pedidos && v.pedidos.some(p => String(p.np || "").split(/[,/]/).map(s => pickNormNp(s)).indexOf(np) >= 0)) { tanda = String(v.tanda || k).trim().toUpperCase(); entry = v; break; } }
     }
+    // v4.04: si hay avance guardado de esta tanda (el wizard que se abrió en AP), retomarlo.
+    const _savedC = _compRestore(tanda);
+    if (_savedC && _savedC.nps && _savedC.nps.length) {
+      _comp = _savedC;
+      const t0 = document.getElementById("compTanda"); if (t0) t0.textContent = "Tanda " + tanda + (_comp.nps[0] && _comp.nps[0].rs ? " · " + _comp.nps[0].rs : "");
+      const d20 = document.getElementById("compD2"), ln0 = document.getElementById("compLine");
+      if (d20) d20.style.display = ""; if (ln0) ln0.style.display = "";
+      _compRenderFalt(); _compGo(_comp.step || 1);
+      modal.classList.add("show");
+      return;
+    }
     const pedidos = (entry && entry.pedidos) || [];
     const fecha = (entry && (entry.fechaEntregaRaw || entry.fechaEntrega)) || "";
     const nps = [], seenN = new Set(), pedidoFull = [];
@@ -6747,7 +6757,7 @@ function _compLioStep(ci, d) { const n = _compLioNow(); if (!n) return; const c 
 function _compLioSuelta(ci) { const n = _compLioNow(); if (!n) return; const c = n.codes[ci]; if (!c || c.rest <= 0) return; c.rest--; n.liosArr.push({ items: [{ cod: c.cod, qty: 1 }], cajas: 1, suelta: true }); _compLioMark(n); _compRenderLios(); _compRecalc(); }
 function _compLioSiguiente() { const n = _compLioNow(); if (!n) return; const items = n.codes.filter(function (c) { return c.cur > 0; }).map(function (c) { return { cod: c.cod, qty: c.cur }; }); const cajas = items.reduce(function (s, it) { return s + it.qty; }, 0); if (!cajas) return; n.liosArr.push({ items: items, cajas: cajas, suelta: false }); n.codes.forEach(function (c) { c.cur = 0; }); _compLioMark(n); _compRenderLios(); _compRecalc(); }
 function _compLioDel(k) { const n = _compLioNow(); if (!n) return; const l = n.liosArr[k]; if (!l) return; l.items.forEach(function (it) { const c = n.codes.find(function (x) { return x.cod === it.cod; }); if (c) c.rest += it.qty; }); n.liosArr.splice(k, 1); _compLioMark(n); _compRenderLios(); _compRecalc(); }
-function _compLioNp(d) { if (!_comp) return; const ni = _comp.liosNpIdx + d; if (ni < 0 || ni >= _comp.nps.length) return; _comp.liosNpIdx = ni; _compRenderLios(); }
+function _compLioNp(d) { if (!_comp) return; const ni = _comp.liosNpIdx + d; if (ni < 0 || ni >= _comp.nps.length) return; _comp.liosNpIdx = ni; _compRenderLios(); _compPersist(); }
 function _compLiosResumen(n) { const L = function (i) { return i < 26 ? String.fromCharCode(65 + i) : "L" + (i + 1); }; return (n.liosArr || []).map(function (l, k) { return L(k) + "=" + l.items.map(function (it) { return it.cod + "x" + it.qty; }).join(",") + (l.suelta ? "(s)" : ""); }).join(";"); }
 function _compRenderLios() {
   const el = document.getElementById("compStep2"); if (!el || !_comp) return;
@@ -6843,6 +6853,7 @@ function _compRecalc() {
   });
   const liosOk = _comp.nps.every(function (n) { return n.liosDone; });
   const fin = document.getElementById("compFin"); if (fin) fin.disabled = !(liosOk && faltOk);
+  _compPersist();   // v4.04: persistir avance (faltantes + líos) por si se cierra la app durante el armado
 }
 function _compGo(s) {
   if (!_comp) return;
@@ -6879,6 +6890,7 @@ async function compTerminar() {
     });
   });
   const nFalt = Object.keys(faltMap).length;
+  _compClearPersist(tanda);   // v4.04: completado → borrar el avance persistido
   _comp = null;
   const ov = document.getElementById("completarModal"); if (ov) ov.classList.remove("show");
   if (rows.length) _compSaveEntregas(rows);
@@ -6901,6 +6913,14 @@ function _compFlushEntregas() {
     .catch(function () {});
 }
 try { window.addEventListener("online", function () { try { _compFlushEntregas(); } catch (_e) {} }); _compFlushEntregas(); } catch (_e) {}
+/* v4.04: persistencia del avance del wizard (queda abierto durante el armado).
+   Se guarda en cada cambio (_compRecalc/_compLioNp), se retoma al reabrir AP, y se
+   borra al Terminar. Ventana de 36h (cubre un armado de un día para el otro). */
+function _compPersistKey(tanda) { return "vir_comp_" + String(tanda || "").toUpperCase(); }
+function _compPersist() { try { if (_comp && _comp.tanda) localStorage.setItem(_compPersistKey(_comp.tanda), JSON.stringify(Object.assign({ _ts: Date.now() }, _comp))); } catch (_e) {} }
+function _compRestore(tanda) { try { const s = localStorage.getItem(_compPersistKey(tanda)); if (!s) return null; const o = JSON.parse(s); if (!o || !o._ts || (Date.now() - o._ts) > 36 * 3600 * 1000) { localStorage.removeItem(_compPersistKey(tanda)); return null; } return o; } catch (_e) { return null; } }
+function _compClearPersist(tanda) { try { localStorage.removeItem(_compPersistKey(tanda)); } catch (_e) {} }
+/* Cerrar (X / "sigo después"): NO borra el avance — al reabrir AP se retoma. Solo Terminar limpia. */
 function closeCompletar() { _comp = null; const ov = document.getElementById("completarModal"); if (ov) ov.classList.remove("show"); }
 
 /* =========================================================

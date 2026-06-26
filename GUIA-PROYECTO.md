@@ -4,7 +4,17 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-26 · Versión app al documentar: **v4.03**
+> Última actualización: 2026-06-26 · Versión app al documentar: **v4.04**
+>
+> Nota: **v4.04** — **El wizard "Completar" se movió a AP + TAP sin pop-up + persistencia** (cierra el pedido
+> del usuario sobre el flujo). Al tocar **AP** ahora se abre el wizard (Paso 1 Faltantes → Paso 2 Líos) en
+> lugar del aviso read-only `showMarianelaAviso`; **TAP ya NO abre ningún pop-up** (es solo el cierre del
+> armado). Como el wizard queda **abierto durante el armado**, se **persiste el avance** en `localStorage`
+> (clave `vir_comp_<TANDA>`, ventana 36 h): se guarda en cada cambio (`_compPersist`, llamado desde
+> `_compRecalc` y `_compLioNp`), se **retoma al reabrir AP** (`_compRestore` al inicio de
+> `showCompletarWizard`, antes de reconstruir) y se **borra al Terminar** (`_compClearPersist`). Cerrar con la
+> **X NO borra** (se retoma al reabrir). Validado con Playwright (guardar → cerrar → restaurar → terminar →
+> limpiar, sin errores). El flujo completo del usuario: **AP → faltantes → líos → TAP (sin popup)**.
 >
 > Nota: **v4.03** — **Wizard "Completar" reordenado + botonera de líos** (pedido del usuario). (1) **Orden
 > nuevo**: Paso 1 = **Faltantes** (antes Paso 2), Paso 2 = **LÍOS en botonera de cuadrados** (reemplaza el
