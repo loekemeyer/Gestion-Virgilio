@@ -5171,7 +5171,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v3.99";
+const APP_VERSION = "v4.00";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -6739,8 +6739,8 @@ function _compRecalc() {
   let faltOk = true;
   if (_comp.hayFalt) _comp.arts.forEach(function (a, ai) {
     if (!a.nps.length || a.auto) return;   // sin NP o automático (1 cliente / agarró 0) → completo
-    const sum = a.nps.reduce(function (s, n) { return s + (n.asig || 0); }, 0); const ok = (sum === a.falta);
-    const se = document.getElementById("comp-sum-" + ai); if (se) { se.textContent = "Faltaron " + sum + " / " + a.falta; se.className = "comp-sum " + (ok ? "ok" : ""); }
+    const sum = a.nps.reduce(function (s, n) { return s + (n.asig || 0); }, 0); const ok = (sum <= a.falta);   // llegó stock → puede faltar MENOS (o nada) de lo que marcó el picking
+    const se = document.getElementById("comp-sum-" + ai); if (se) { se.textContent = (sum < a.falta ? "Faltaron " + sum + " · picking marcó " + a.falta + " (se completaron " + (a.falta - sum) + ")" : "Faltaron " + sum + " / " + a.falta); se.className = "comp-sum " + (ok ? "ok" : ""); }
     const ae = document.getElementById("comp-art-" + ai); if (ae) ae.classList.toggle("ok", ok);
     if (!ok) faltOk = false;
   });
@@ -6765,7 +6765,7 @@ async function compTerminar() {
   const faltanLios = [];
   _comp.nps.forEach(function (n, i) { if (n.lios == null) { faltanLios.push(n.np); const inp = document.querySelector('.comp-lios-inp[data-i="' + i + '"]'); if (inp) inp.style.borderColor = "#dc2626"; } });
   if (faltanLios.length) { _compGo(1); try { alert("Faltan los líos de " + faltanLios.length + " pedido(s). Completá todos (si no lleva, poné 0)."); } catch (_e) {} return; }
-  if (_comp.hayFalt) { for (const a of _comp.arts) { if (a.nps.length >= 2 && !a.auto) { const sum = a.nps.reduce(function (s, n) { return s + (n.asig || 0); }, 0); if (sum !== a.falta) { _compGo(2); try { alert("Te falta repartir el Art " + a.art + " (faltaron " + sum + "/" + a.falta + ")."); } catch (_e) {} return; } } } }
+  if (_comp.hayFalt) { for (const a of _comp.arts) { if (a.nps.length >= 2 && !a.auto) { const sum = a.nps.reduce(function (s, n) { return s + (n.asig || 0); }, 0); if (sum > a.falta) { _compGo(2); try { alert("El Art " + a.art + ": marcaste " + sum + " faltantes pero el picking solo dio " + a.falta + " cortas. No puede faltar más de eso."); } catch (_e) {} return; } } } }
   const legajo = _comp.legajo, tanda = _comp.tanda, fecha = _comp.fecha || "";
   _comp.nps.forEach(function (n) { liosSend(legajo, n.np, n.lios, tanda); });   // líos (opcion TAL, como siempre)
   // Faltante por (NP, artículo) del reparto del Paso 2. Clave normalizada (sin la E final).
