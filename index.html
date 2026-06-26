@@ -79,7 +79,21 @@ button {
 .sup-action-btn:hover { background: #1d4ed8; }
 .sup-action-btn:active { transform: scale(.97); }
 .sup-action-btn .sup-ico { font-size: 34px; flex: 0 0 auto; line-height: 1; }
-@media (max-width: 560px) { .sup-actions { grid-template-columns: repeat(2, 1fr); gap: 12px; } }
+/* Dos niveles (v4.15): GRANDES (uso diario, mismo tamaño) arriba · CHICOS (ocasionales) abajo. */
+.sup-actions.sup-primary { grid-template-columns: repeat(5, 1fr); }
+.sup-primary .sup-action-btn { min-height: 150px; font-size: 19px; }
+.sup-primary .sup-action-btn .sup-ico { font-size: 42px; }
+.sup-sec-label { max-width: min(1040px, 94vw); margin: 26px auto 6px; font-size: 12.5px; font-weight: 800;
+  letter-spacing: .05em; text-transform: uppercase; color: #94a3b8; }
+.sup-actions.sup-secondary { grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 0; }
+.sup-secondary .sup-action-btn { min-height: 80px; padding: 11px 9px; font-size: 14px; gap: 6px;
+  background: #51688f; border-radius: 11px; }
+.sup-secondary .sup-action-btn:hover { background: #44597a; }
+.sup-secondary .sup-action-btn .sup-ico { font-size: 23px; }
+@media (max-width: 900px) { .sup-actions.sup-primary { grid-template-columns: repeat(3, 1fr); } .sup-actions.sup-secondary { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 560px) { .sup-actions { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .sup-actions.sup-primary { grid-template-columns: repeat(2, 1fr); } .sup-actions.sup-secondary { grid-template-columns: repeat(2, 1fr); }
+  .sup-primary .sup-action-btn { min-height: 120px; } }
 /* Nombre del usuario logueado, fijo arriba a la izquierda. */
 #userTag {
   position: fixed; top: 8px; left: 8px; z-index: 60;
@@ -3014,20 +3028,24 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
   <!-- SUPERVISOR (solo n8n / logistica): botones grandes centrados. -->
   <div id="supervisorPanel" class="hidden">
     <h1 class="sup-title">Administración</h1>
-    <div class="sup-actions">
-      <button class="sup-action-btn" onclick="openMonitor()"><span class="sup-ico">📊</span><span>Monitor de operarios</span></button>
+    <!-- GRANDES: uso diario (orden definido por el usuario). "Stock y Compras" = Stocks + OC en un solo botón. -->
+    <div class="sup-actions sup-primary">
       <button class="sup-action-btn" onclick="openFacturacion()"><span class="sup-ico">📋</span><span>Facturación</span></button>
-      <button class="sup-action-btn" onclick="openInconsistencias()"><span class="sup-ico">⚠</span><span>Inconsistencias</span></button>
-      <button class="sup-action-btn" onclick="openAnalisis()"><span class="sup-ico">📈</span><span>Análisis de productividad</span></button>
-      <button class="sup-action-btn" onclick="openFaltantes()"><span class="sup-ico">📦</span><span>Faltantes</span></button>
-      <button class="sup-action-btn" onclick="openRecepcionAdmin()"><span class="sup-ico">🏭</span><span>Carga Recepción Mercadería</span></button>
-      <button class="sup-action-btn" onclick="openPlanimEditor()"><span class="sup-ico">🗺️</span><span>Editar Planimetría</span></button>
       <button class="sup-action-btn" onclick="openPPP()"><span class="sup-ico">🗓️</span><span>PPP</span></button>
+      <button class="sup-action-btn" onclick="openRecepcionAdmin()"><span class="sup-ico">🏭</span><span>Carga Recepción Mercadería</span></button>
+      <button class="sup-action-btn" onclick="openStockAdmin()"><span class="sup-ico">📦</span><span>Stock y Compras</span></button>
       <button class="sup-action-btn" onclick="openRemitosAdmin()"><span class="sup-ico">🚚</span><span>Recepción Remitos (RR)</span></button>
-      <button class="sup-action-btn" onclick="openMailsEditor()"><span class="sup-ico">✉️</span><span>Mails autorizados</span></button>
+    </div>
+    <div class="sup-sec-label">Reportes y configuración</div>
+    <!-- CHICOS: uso ocasional. -->
+    <div class="sup-actions sup-secondary">
+      <button class="sup-action-btn" onclick="openMonitor()"><span class="sup-ico">📊</span><span>Monitor de operarios</span></button>
+      <button class="sup-action-btn" onclick="openAnalisis()"><span class="sup-ico">📈</span><span>Análisis de productividad</span></button>
+      <button class="sup-action-btn" onclick="openInconsistencias()"><span class="sup-ico">⚠</span><span>Inconsistencias</span></button>
+      <button class="sup-action-btn" onclick="openFaltantes()"><span class="sup-ico">📦</span><span>Faltantes</span></button>
+      <button class="sup-action-btn" onclick="openPlanimEditor()"><span class="sup-ico">🗺️</span><span>Editar Planimetría</span></button>
       <button class="sup-action-btn" onclick="openTallEditor()"><span class="sup-ico">👷</span><span>Talleristas de Recepción</span></button>
-      <button class="sup-action-btn" onclick="openStockAdmin()"><span class="sup-ico">📦</span><span>Stocks</span></button>
-      <button class="sup-action-btn" onclick="openOCAdmin()"><span class="sup-ico">📑</span><span>Órdenes de Compra</span></button>
+      <button class="sup-action-btn" onclick="openMailsEditor()"><span class="sup-ico">✉️</span><span>Mails autorizados</span></button>
     </div>
     <div class="auth-logout-row">
       <button class="auth-logout-btn" onclick="signOutGoogle()">Salir</button>
@@ -5252,7 +5270,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v4.14";
+const APP_VERSION = "v4.15";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -7033,7 +7051,7 @@ async function openStockAdmin() {
   let ov = document.getElementById("stockAdminOverlay");
   if (!ov) { ov = document.createElement("div"); ov.id = "stockAdminOverlay"; document.body.appendChild(ov); }
   ov.classList.add("show");
-  ov.innerHTML = '<div class="stk-card"><div class="stk-head"><span class="stk-title">📦 Stocks</span><button class="stk-close" onclick="closeStockAdmin()">Cerrar</button></div><div class="stk-tabs" id="stkTabs"></div><div class="stk-body" id="stkBody"><div class="stk-loading">Cargando…</div></div></div>';
+  ov.innerHTML = '<div class="stk-card"><div class="stk-head"><span class="stk-title">📦 Stock y Compras</span><button class="stk-close" onclick="closeStockAdmin()">Cerrar</button></div><div class="stk-tabs" id="stkTabs"></div><div class="stk-body" id="stkBody"><div class="stk-loading">Cargando…</div></div></div>';
   try {
     const res = await Promise.all([stockFetchMovs(), stockGetCutoff(), stockFetchArtFactors(), racksFetchOrdenes(), racksFetchBajadas()]);
     _stk = { movs: res[0] || [], cutoff: res[1], factors: res[2] || {}, ordenes: res[3] || [], bajadas: res[4] || [], tab: "stocks", filtro: "", openArt: null, ingMode: "remito" };
@@ -7271,10 +7289,10 @@ async function ocgGenerar() {
     alert("✓ Generadas " + rows.length + " línea(s) de OC. Las ves en la lista, agrupadas por proveedor.");
   } catch (e) { alert("Error generando OCs: " + (e.message || e)); }
 }
-function stkTab(t) { if (!_stk) return; _stk.tab = t; _stk.filtro = ""; _stk.openArt = null; stkRender(); }
+function stkTab(t) { if (!_stk) return; if (t === "compras") { openOCAdmin(); return; } _stk.tab = t; _stk.filtro = ""; _stk.openArt = null; stkRender(); }
 function stkRender() {
   if (!_stk) return;
-  const tabs = [["stocks", "📊 Stocks"], ["racks", "🏗 Racks"], ["ingresos", "📥 Ingresos"], ["salidas", "📤 Salidas"], ["ajustes", "⚙ Ajustes"]];
+  const tabs = [["stocks", "📊 Stocks"], ["racks", "🏗 Racks"], ["ingresos", "📥 Ingresos"], ["salidas", "📤 Salidas"], ["ajustes", "⚙ Ajustes"], ["compras", "📑 Compras (OCs)"]];
   const tb = document.getElementById("stkTabs");
   if (tb) tb.innerHTML = tabs.map(function (t) { return '<button class="stk-tab' + (_stk.tab === t[0] ? " on" : "") + '" onclick="stkTab(\'' + t[0] + '\')">' + t[1] + '</button>'; }).join("");
   const body = document.getElementById("stkBody"); if (!body) return;

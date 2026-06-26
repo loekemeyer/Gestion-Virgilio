@@ -4,7 +4,21 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-26 · Versión app al documentar: **v4.13**
+> Última actualización: 2026-06-26 · Versión app al documentar: **v4.15**
+>
+> Nota: **v4.15** — **Vista Administración en 2 niveles** (pedido del usuario). **GRANDES** (uso diario,
+> mismo tamaño, fila de 5, `.sup-primary`): **Facturación · PPP · Carga Recepción Mercadería · Stock y
+> Compras · Recepción Remitos (RR)** (ese orden lo definió el usuario). **CHICOS** (ocasionales,
+> `.sup-secondary`, más chicos y atenuados, bajo el rótulo "Reportes y configuración"): Monitor de
+> operarios · Análisis de productividad · Inconsistencias · Faltantes · Editar Planimetría · Talleristas
+> de Recepción · Mails autorizados. **"Stocks" + "Órdenes de Compra" se unificaron en UN botón**: "📦
+> Stock y Compras" abre `openStockAdmin`, que ahora tiene una solapa **"📑 Compras (OCs)"** (`stkTab`
+> intercepta `compras` → `openOCAdmin`). Responsive: 5→3→2 columnas.
+>
+> Nota: **v4.14** — **Fix de foco en buscadores/steppers**. Reemplazar `innerHTML` en cada tecla
+> "sacaba" del campo (había que re-clickear por dígito). Helper **`_renderKeepFocus(container, html)`**:
+> guarda el input activo (tag+clase+índice) y el cursor, y los restaura tras el re-render. Aplicado a
+> `stkRender, ocRender, insRender, scRender, brRender, mgRender`.
 >
 > Nota: **v4.13** — **GENERADOR DE OCs en la página (replica el Excel "Pedidos Talleristas/Prov")**.
 > **BETA, coded pero no para usar** hasta que esté el stock inicial cargado. Vive en el admin **Órdenes
