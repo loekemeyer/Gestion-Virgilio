@@ -4,7 +4,22 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-26 · Versión app al documentar: **v4.08**
+> Última actualización: 2026-06-26 · Versión app al documentar: **v4.09**
+>
+> Nota: **v4.09** — **INSUMOS** (stock de insumos en la página). Los botones **RI** (Recepción
+> Insumos) y **EI** (Entrega Insumos) —que ya existían como toggles de actividad— ahora, **al
+> tocarse (inicio)**, abren un modal que registra **stock de insumos** en `Movimientos_Stock`
+> (`deposito='insumos'`, tipo `recepcion_insumo` `+` / `entrega_insumo` `−`). El modal
+> (`showInsumoModal('RI'|'EI', legajo)`) tiene **buscador** sobre el catálogo **`Insumos`** (tabla
+> nueva: `id, cod (unique), nombre, creado_por, creado`; RLS abierta anon+auth) y **alta de código
+> al vuelo** (`insCrear` → POST a `Insumos`) para cuando el insumo no está. Cada fila muestra el
+> **stock actual** y un stepper; en EI avisa si va a quedar negativo (no lo bloquea — "como entra,
+> puede salir"). Confirmar usa **`stockMove`** (offline-safe `vir_stock_pend`). En el **admin Stocks**
+> (solapa Stocks) se agregó una sección **"📦 Insumos"** con el saldo por código. El selector de
+> depósito de **Ajustes** ya permite cargar/ajustar `insumos`. Validado con Playwright (RI/EI render,
+> buscador, warning, clamps, filas de movimiento correctas) y shape de insert en Supabase.
+> ⏳ Falta que el usuario pase el **listado de insumos** para precargar el catálogo (igual se crea solo
+> al usarse).
 >
 > Nota: **v4.08** — **RACKS → GÓNDOLA** (page-based, sin Telegram). Los **racks** son góndolas de
 > pallets donde se guarda stock en **master cajas**; una vez por semana (al generar las OCs, miércoles)
