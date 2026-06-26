@@ -5227,7 +5227,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v4.11";
+const APP_VERSION = "v4.12";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -6984,7 +6984,12 @@ async function stockGetCutoff() {
 function stockComputeSaldos(movs, cutoff) {
   const m = {}, cut = cutoff ? new Date(cutoff).getTime() : 0;
   movs.forEach(function (mv) {
-    if (cut && new Date(mv.ts).getTime() < cut) return;
+    // El stock inicial (tipo 'inicial') SIEMPRE cuenta como base, aunque sea
+    // anterior al corte. "Marcar inicio" (corte) sólo desconsidera los
+    // movimientos REALES previos (recepción/guardado/picking/ajuste/etc.), sin
+    // borrarlos. Así se puede cargar el inicial de varios depósitos en cualquier
+    // orden y marcar inicio una sola vez, sin que un depósito pise a otro.
+    if (cut && mv.tipo !== "inicial" && new Date(mv.ts).getTime() < cut) return;
     const k = String(mv.cod_art);
     if (!m[k]) m[k] = { cod: k, desc: mv.descripcion || "", a_guardar: 0, terminado: 0 };
     if (mv.descripcion && !m[k].desc) m[k].desc = mv.descripcion;
@@ -7230,7 +7235,7 @@ function stkBodyAjustes() {
   h += '<div class="stk-aj-sec"><div class="stk-aj-h">⚙ Ajustar stock</div>';
   h += '<div class="stk-aj-hint">Sumá o restá con signo: <code>+10</code> / <code>-3</code>.</div><div class="stk-aj-form"><input id="stkAjCod" class="stk-aj-inp" placeholder="Código"><input id="stkAjCant" class="stk-aj-inp" type="number" placeholder="+/- cajas"><button class="stk-btn ok" onclick="stockAjustar()">Aplicar</button></div>';
   h += '<div class="stk-aj-hint" style="margin-top:10px">O dejá el stock exacto:</div><div class="stk-aj-form"><input id="stkAjCod2" class="stk-aj-inp" placeholder="Código"><input id="stkAjFijar" class="stk-aj-inp" type="number" placeholder="Fijar en…"><button class="stk-btn" onclick="stockFijar()">Fijar</button></div></div>';
-  h += '<div class="stk-aj-sec"><div class="stk-aj-h">➕ Stock inicial</div><div class="stk-aj-hint">Una línea por artículo: <b>CÓDIGO CANTIDAD</b>.</div><textarea id="stkIniTxt" class="stk-ini-txt" rows="6" placeholder="544 30&#10;546 12"></textarea><div class="stk-ini-btns"><button class="stk-btn ok" onclick="stockGuardarInicial(false)">Guardar inicial</button><button class="stk-btn danger" onclick="stockGuardarInicial(true)">Guardar + marcar inicio</button></div><div class="stk-ini-warn">⚠ "Marcar inicio": el stock se cuenta SOLO desde ahora (lo anterior queda guardado pero no se suma).</div></div>';
+  h += '<div class="stk-aj-sec"><div class="stk-aj-h">➕ Stock inicial</div><div class="stk-aj-hint">Una línea por artículo: <b>CÓDIGO CANTIDAD</b> (en el depósito de arriba). El stock inicial <b>siempre cuenta</b> como base.</div><textarea id="stkIniTxt" class="stk-ini-txt" rows="6" placeholder="544 30&#10;546 12"></textarea><div class="stk-ini-btns"><button class="stk-btn ok" onclick="stockGuardarInicial()">Guardar inicial</button><button class="stk-btn danger" onclick="stockMarcarInicio()">🔄 Marcar inicio (resetear)</button></div><div class="stk-ini-warn">⚠ Pasos: 1) cargá el inicial de cada depósito (cambiás el depósito de arriba y repetís); 2) tocás <b>Marcar inicio</b> una sola vez. Desde ahí los movimientos REALES anteriores (de prueba) dejan de sumar — quedan guardados, no se borran.</div></div>';
   return h;
 }
 function stockToggleArt(codEnc) { if (!_stk) return; const cod = decodeURIComponent(codEnc); _stk.openArt = (_stk.openArt === cod ? null : cod); stkRender(); }
@@ -7257,23 +7262,28 @@ async function stockFijar() {
   if (delta === 0) { alert("El stock de " + cod + " (" + dep + ") ya es " + fijar + "."); return; }
   await stkInsertMov([{ cod_art: cod, descripcion: (sd && sd.desc) || null, deposito: dep, delta: delta, tipo: "ajuste", ref: "fijar en " + fijar, legajo: "0" }], "Stock de " + cod + " (" + dep + ") fijado en " + fijar + " (ajuste " + (delta > 0 ? "+" : "") + delta + ")");
 }
-async function stockGuardarInicial(conCorte) {
+async function stockGuardarInicial() {
   const ta = document.getElementById("stkIniTxt"); const txt = (ta && ta.value) || "";
   const rows = [], dep = _stkDep();
   txt.split(/\n/).forEach(function (ln) { const m = ln.trim().match(/^(\S+)\s+(-?\d+(?:\.\d+)?)/); if (m) rows.push({ cod_art: m[1].toUpperCase(), deposito: dep, delta: Number(m[2]), tipo: "inicial", ref: "carga inicial", legajo: "0" }); });
   if (!rows.length) { alert("No encontré líneas válidas. Formato: CÓDIGO CANTIDAD (una por línea)."); return; }
-  if (conCorte && !confirm("Vas a MARCAR INICIO ahora: los movimientos anteriores se desconsideran (no se borran). Se cargan " + rows.length + " artículos como stock inicial. ¿Seguro?")) return;
   try {
-    if (conCorte) {
-      const nowIso = new Date(Date.now() - 2000).toISOString();   // corte 2s atrás: los 'inicial' que inserto quedan del lado contado
-      const rc = await fetch(SUPABASE_URL + "/rest/v1/Stock_Config?on_conflict=clave", { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ clave: "cutoff_ts", valor: nowIso, actualizado: new Date().toISOString() }) });
-      if (!rc.ok && rc.status >= 500) throw new Error("config HTTP " + rc.status);
-    }
     const r = await fetch(SUPABASE_STOCK_ENDPOINT, { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" }, body: JSON.stringify(rows) });
     if (!r.ok) throw new Error("HTTP " + r.status);
-    alert("✓ Stock inicial cargado: " + rows.length + " artículo(s)" + (conCorte ? ". Marcado como inicio (lo anterior se desconsidera)." : "."));
+    if (ta) ta.value = "";
+    alert("✓ Stock inicial cargado: " + rows.length + " artículo(s) en " + dep + ". (El stock inicial siempre cuenta como base.)");
     openStockAdmin();
   } catch (e) { alert("Error al guardar: " + (e.message || e)); }
+}
+async function stockMarcarInicio() {
+  if (!confirm("MARCAR INICIO ahora: desde este momento, los movimientos REALES anteriores (recepción/guardado/picking/ajustes/etc.) dejan de contar para el stock. NO se borran. El stock inicial que cargues sigue contando. ¿Seguro?")) return;
+  try {
+    const nowIso = new Date().toISOString();
+    const rc = await fetch(SUPABASE_URL + "/rest/v1/Stock_Config?on_conflict=clave", { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ clave: "cutoff_ts", valor: nowIso, actualizado: nowIso }) });
+    if (!rc.ok && rc.status >= 500) throw new Error("config HTTP " + rc.status);
+    alert("✓ Inicio marcado. Desde ahora lo anterior (movimientos reales) no se suma; queda guardado igual.");
+    openStockAdmin();
+  } catch (e) { alert("Error: " + (e.message || e)); }
 }
 function _stkDep() { const e = document.getElementById("stkAjDep"); return (e && e.value) || "terminado"; }
 

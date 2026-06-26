@@ -4,7 +4,19 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-26 · Versión app al documentar: **v4.11**
+> Última actualización: 2026-06-26 · Versión app al documentar: **v4.12**
+>
+> Nota: **v4.12** — **Stock inicial / "marcar inicio" robusto**. (1) `stockComputeSaldos` ahora cuenta
+> **SIEMPRE** los movimientos `tipo='inicial'` (stock inicial = base), aunque sean anteriores al corte;
+> el `cutoff` sólo desconsidera los movimientos **reales** previos (recepción/guardado/picking/ajuste/
+> salida_cervantes/baja_racks/etc.), sin borrarlos. Así se puede cargar el inicial de **varios depósitos**
+> (góndola/racks/insumos) en cualquier orden y **marcar inicio una sola vez**, sin que un depósito pise a
+> otro. (2) En el admin Stocks → ⚙ Ajustes, la carga inicial pasó a **dos pasos separados**:
+> **`stockGuardarInicial()`** (carga el inicial del depósito elegido, sin tocar el corte) y
+> **`stockMarcarInicio()`** (botón aparte que fija `cutoff_ts = ahora`, una sola vez). Se quitó el botón
+> combinado "Guardar + marcar inicio" (era un footgun multi-depósito: movía el corte y dejaba afuera lo
+> cargado antes). Validado con Playwright. Decisión del usuario: **el stock inicial se carga más adelante**
+> (primero verifica que el resto del flujo sume/reste bien).
 >
 > Nota: **v4.11** — **ÓRDENES DE COMPRA** (módulo admin, base del match recibido↔pedido). Botón
 > supervisor **"📑 Órdenes de Compra"** (`openOCAdmin`). **Descubrimiento importante**: la tabla
