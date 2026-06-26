@@ -3026,6 +3026,7 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
       <button class="sup-action-btn" onclick="openRemitosAdmin()"><span class="sup-ico">🚚</span><span>Recepción Remitos (RR)</span></button>
       <button class="sup-action-btn" onclick="openMailsEditor()"><span class="sup-ico">✉️</span><span>Mails autorizados</span></button>
       <button class="sup-action-btn" onclick="openTallEditor()"><span class="sup-ico">👷</span><span>Talleristas de Recepción</span></button>
+      <button class="sup-action-btn" onclick="openStockAdmin()"><span class="sup-ico">📦</span><span>Stocks</span></button>
     </div>
     <div class="auth-logout-row">
       <button class="auth-logout-btn" onclick="signOutGoogle()">Salir</button>
@@ -5214,7 +5215,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v4.06";
+const APP_VERSION = "v4.07";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -6937,6 +6938,158 @@ function stockFlushPend() {
     .catch(function () {});
 }
 try { window.addEventListener("online", function () { try { stockFlushPend(); } catch (_e) {} }); stockFlushPend(); } catch (_e) {}
+
+/* ===== STOCK — módulo admin (v4.06): saldos + movimientos por artículo,
+   cargar stock inicial y marcar el "corte" (desconsiderar lo anterior). ===== */
+async function stockFetchMovs() {
+  const r = await fetch(SUPABASE_STOCK_ENDPOINT + "?select=*&order=ts.desc&limit=20000", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+  return r.ok ? r.json() : [];
+}
+async function stockGetCutoff() {
+  try {
+    const r = await fetch(SUPABASE_URL + "/rest/v1/Stock_Config?clave=eq.cutoff_ts&select=valor", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+    const rows = r.ok ? await r.json() : [];
+    return (rows[0] && rows[0].valor) || null;
+  } catch (_e) { return null; }
+}
+function stockComputeSaldos(movs, cutoff) {
+  const m = {}, cut = cutoff ? new Date(cutoff).getTime() : 0;
+  movs.forEach(function (mv) {
+    if (cut && new Date(mv.ts).getTime() < cut) return;
+    const k = String(mv.cod_art);
+    if (!m[k]) m[k] = { cod: k, desc: mv.descripcion || "", a_guardar: 0, terminado: 0 };
+    if (mv.descripcion && !m[k].desc) m[k].desc = mv.descripcion;
+    m[k][mv.deposito] = (m[k][mv.deposito] || 0) + Number(mv.delta || 0);
+  });
+  return m;
+}
+function stockFmtTs(ts) { try { return new Date(ts).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }); } catch (_e) { return String(ts); } }
+let _stk = null;
+async function openStockAdmin() {
+  if (!document.getElementById("stkCss")) {
+    const s = document.createElement("style"); s.id = "stkCss";
+    s.textContent = "#stockAdminOverlay{display:none;position:fixed;inset:0;z-index:1280;background:rgba(2,6,23,.74);overflow:auto;padding:14px;}#stockAdminOverlay.show{display:block;}.stk-card{background:#f8fafc;max-width:880px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.stk-head{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:linear-gradient(90deg,#1e6bd6,#1e3a8a);color:#fff;}.stk-title{font-size:19px;font-weight:800;}.stk-close{background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;width:auto;}.stk-body{padding:14px 16px;}.stk-loading,.stk-empty{padding:24px;text-align:center;color:#64748b;}.stk-cut{background:#fffbeb;border:1px solid #fcd34d;color:#92400e;border-radius:9px;padding:8px 11px;font-size:12.5px;font-weight:700;margin-bottom:10px;}.stk-tools{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;}.stk-filtro{flex:1;min-width:180px;height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 11px;font-size:14px;}.stk-btn{background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:8px 12px;font-size:13px;font-weight:800;cursor:pointer;width:auto;}.stk-btn.ok{background:#16a34a;color:#fff;border-color:#16a34a;}.stk-btn.danger{background:#fff;color:#b91c1c;border-color:#fca5a5;}.stk-tbl{width:100%;border-collapse:collapse;font-size:13.5px;}.stk-tbl th{background:#f1f5f9;color:#475569;text-align:left;padding:7px 9px;font-size:11px;text-transform:uppercase;border-bottom:1px solid #cbd5e1;}.stk-tbl th.num,.stk-tbl td.num{text-align:right;font-variant-numeric:tabular-nums;}.stk-row{cursor:pointer;border-bottom:1px solid #eef2f7;}.stk-row:hover{background:#eff6ff;}.stk-row td{padding:7px 9px;}.stk-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#1e6bd6;}.stk-desc{color:#475569;}.stk-neg{color:#b91c1c;font-weight:800;}.stk-caret{color:#94a3b8;}.stk-detrow td{padding:0 9px 9px;background:#f8fafc;}.stk-det{border-left:3px solid #cbd5e1;padding:6px 0 6px 10px;}.stk-mv{display:flex;gap:9px;font-size:12px;padding:3px 0;align-items:center;}.stk-mv-old{opacity:.45;}.stk-mv-ts{color:#64748b;min-width:96px;}.stk-mv-tipo{font-weight:800;min-width:78px;}.stk-mv-dep{color:#64748b;min-width:74px;}.stk-mv-d{font-weight:800;min-width:44px;text-align:right;}.stk-mv-d.pos{color:#15803d;}.stk-mv-d.neg{color:#b91c1c;}.stk-mv-ref{color:#94a3b8;}.stk-mv-more{font-size:11px;color:#94a3b8;padding-top:4px;}.stk-inicial{max-width:560px;}.stk-ini-h{font-size:16px;font-weight:800;margin-bottom:6px;}.stk-ini-hint{font-size:12.5px;color:#64748b;margin-bottom:8px;}.stk-ini-txt{width:100%;border:1px solid #cbd5e1;border-radius:9px;padding:9px;font-family:Consolas,Menlo,monospace;font-size:14px;}.stk-ini-btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}.stk-ini-warn{font-size:12px;color:#92400e;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:8px;margin-top:10px;}.stk-tabs{display:flex;gap:4px;padding:8px 12px 0;background:#1e3a8a;}.stk-tab{flex:1;background:rgba(255,255,255,.12);color:#cbd5e1;border:none;border-radius:9px 9px 0 0;padding:9px 6px;font-size:12.5px;font-weight:800;cursor:pointer;}.stk-tab.on{background:#f8fafc;color:#1e3a8a;}.stk-seg{display:flex;gap:6px;margin-bottom:10px;}.stk-segb{flex:1;background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:7px;font-size:13px;font-weight:800;cursor:pointer;}.stk-segb.on{background:#1e6bd6;color:#fff;border-color:#1e6bd6;}.stk-grp{margin-bottom:10px;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;}.stk-grp-h{background:#f1f5f9;padding:7px 10px;font-weight:800;font-size:13px;}.stk-grp-tot{color:#15803d;font-weight:800;margin-left:6px;}.stk-ing{display:flex;gap:9px;align-items:center;padding:5px 10px;border-top:1px solid #f1f5f9;font-size:12.5px;}.stk-ing-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#1e6bd6;}.stk-ing-desc{flex:1;color:#475569;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.stk-ing-rto{color:#94a3b8;font-size:11px;}.stk-aj-sec{border:1px solid #e2e8f0;border-radius:12px;padding:12px;margin-bottom:12px;}.stk-aj-h{font-size:15px;font-weight:800;margin-bottom:6px;}.stk-aj-hint{font-size:12px;color:#64748b;margin-bottom:7px;}.stk-aj-form{display:flex;gap:7px;flex-wrap:wrap;}.stk-aj-inp{flex:1;min-width:90px;height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 10px;font-size:14px;}";
+    document.head.appendChild(s);
+  }
+  let ov = document.getElementById("stockAdminOverlay");
+  if (!ov) { ov = document.createElement("div"); ov.id = "stockAdminOverlay"; document.body.appendChild(ov); }
+  ov.classList.add("show");
+  ov.innerHTML = '<div class="stk-card"><div class="stk-head"><span class="stk-title">📦 Stocks</span><button class="stk-close" onclick="closeStockAdmin()">Cerrar</button></div><div class="stk-tabs" id="stkTabs"></div><div class="stk-body" id="stkBody"><div class="stk-loading">Cargando…</div></div></div>';
+  try {
+    const res = await Promise.all([stockFetchMovs(), stockGetCutoff()]);
+    _stk = { movs: res[0] || [], cutoff: res[1], tab: "stocks", filtro: "", openArt: null, ingMode: "remito" };
+    stkRender();
+  } catch (e) { const b = document.getElementById("stkBody"); if (b) b.innerHTML = '<div class="stk-loading">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
+}
+function closeStockAdmin() { const ov = document.getElementById("stockAdminOverlay"); if (ov) ov.classList.remove("show"); _stk = null; }
+function stkTab(t) { if (!_stk) return; _stk.tab = t; _stk.filtro = ""; _stk.openArt = null; stkRender(); }
+function stkRender() {
+  if (!_stk) return;
+  const tabs = [["stocks", "📊 Stocks"], ["ingresos", "📥 Ingresos"], ["salidas", "📤 Salidas"], ["ajustes", "⚙ Ajustes"]];
+  const tb = document.getElementById("stkTabs");
+  if (tb) tb.innerHTML = tabs.map(function (t) { return '<button class="stk-tab' + (_stk.tab === t[0] ? " on" : "") + '" onclick="stkTab(\'' + t[0] + '\')">' + t[1] + '</button>'; }).join("");
+  const body = document.getElementById("stkBody"); if (!body) return;
+  body.innerHTML = _stk.tab === "ingresos" ? stkBodyIngresos() : _stk.tab === "salidas" ? stkBodySalidas() : _stk.tab === "ajustes" ? stkBodyAjustes() : stkBodyStocks();
+}
+function stkMvRow(mv) {
+  const old = _stk.cutoff && new Date(mv.ts).getTime() < new Date(_stk.cutoff).getTime();
+  return '<div class="stk-mv' + (old ? " stk-mv-old" : "") + '"><span class="stk-mv-ts">' + escapeHtml(stockFmtTs(mv.ts)) + '</span><span class="stk-mv-tipo">' + escapeHtml(mv.tipo) + '</span><span class="stk-mv-dep">' + escapeHtml(mv.deposito) + '</span><span class="stk-mv-d ' + (Number(mv.delta) < 0 ? "neg" : "pos") + '">' + (Number(mv.delta) > 0 ? "+" : "") + mv.delta + '</span><span class="stk-mv-ref">' + escapeHtml(mv.ref || "") + '</span></div>';
+}
+function stkBodyStocks() {
+  const saldos = stockComputeSaldos(_stk.movs, _stk.cutoff);
+  const arts = Object.keys(saldos).map(function (k) { return saldos[k]; }).sort(function (a, b) { return (parseInt(a.cod, 10) || 0) - (parseInt(b.cod, 10) || 0); });
+  const f = (_stk.filtro || "").toLowerCase();
+  const shown = f ? arts.filter(function (a) { return (a.cod + " " + a.desc).toLowerCase().indexOf(f) >= 0; }) : arts;
+  let h = (_stk.cutoff ? '<div class="stk-cut">Stock contado desde <b>' + escapeHtml(stockFmtTs(_stk.cutoff)) + '</b> (lo anterior no se suma).</div>' : "");
+  h += '<input class="stk-filtro" type="search" placeholder="🔎 Buscar código / descripción" value="' + escapeHtml(_stk.filtro) + '" oninput="if(_stk){_stk.filtro=this.value;stkRender();}">';
+  h += '<table class="stk-tbl"><thead><tr><th>Código</th><th>Descripción</th><th class="num">Stock</th><th class="num">A guardar</th><th></th></tr></thead><tbody>';
+  if (!shown.length) h += '<tr><td colspan="5" class="stk-empty">Sin stock todavía.</td></tr>';
+  shown.forEach(function (a) {
+    h += '<tr class="stk-row" onclick="stockToggleArt(\'' + encodeURIComponent(a.cod) + '\')"><td class="stk-cod">' + escapeHtml(a.cod) + '</td><td class="stk-desc">' + escapeHtml(a.desc || "—") + '</td><td class="num ' + (a.terminado < 0 ? "stk-neg" : "") + '"><b>' + a.terminado + '</b></td><td class="num">' + a.a_guardar + '</td><td class="stk-caret">' + (_stk.openArt === a.cod ? "▾" : "✚") + '</td></tr>';
+    if (_stk.openArt === a.cod) {
+      const det = _stk.movs.filter(function (mv) { return String(mv.cod_art) === a.cod && !(_stk.cutoff && new Date(mv.ts).getTime() < new Date(_stk.cutoff).getTime()); });
+      h += '<tr class="stk-detrow"><td colspan="5"><div class="stk-det">' + (det.length ? det.map(stkMvRow).join("") : '<div class="stk-mv">sin movimientos contados</div>') + '</div></td></tr>';
+    }
+  });
+  return h + "</tbody></table>";
+}
+function stkBodyIngresos() {
+  const ing = _stk.movs.filter(function (mv) { return mv.tipo === "recepcion"; });
+  const f = (_stk.filtro || "").toLowerCase();
+  const shown = f ? ing.filter(function (mv) { return ((mv.cod_art || "") + " " + (mv.descripcion || "") + " " + (mv.ref || "")).toLowerCase().indexOf(f) >= 0; }) : ing;
+  let h = '<div class="stk-seg"><button class="stk-segb' + (_stk.ingMode === "remito" ? " on" : "") + '" onclick="if(_stk){_stk.ingMode=\'remito\';stkRender();}">Por remito</button><button class="stk-segb' + (_stk.ingMode === "codigo" ? " on" : "") + '" onclick="if(_stk){_stk.ingMode=\'codigo\';stkRender();}">Por código</button></div>';
+  h += '<input class="stk-filtro" type="search" placeholder="🔎 Buscar remito / código / descripción" value="' + escapeHtml(_stk.filtro) + '" oninput="if(_stk){_stk.filtro=this.value;stkRender();}">';
+  if (!shown.length) return h + '<div class="stk-empty">Sin ingresos.</div>';
+  const groups = {};
+  shown.forEach(function (mv) { const k = _stk.ingMode === "remito" ? (mv.ref || "(sin remito)") : String(mv.cod_art); (groups[k] = groups[k] || []).push(mv); });
+  Object.keys(groups).sort().forEach(function (k) {
+    const g = groups[k]; const tot = g.reduce(function (s, mv) { return s + Number(mv.delta || 0); }, 0);
+    h += '<div class="stk-grp"><div class="stk-grp-h">' + (_stk.ingMode === "remito" ? "Remito " : "Código ") + escapeHtml(k) + ' <span class="stk-grp-tot">' + tot + " caja(s)</span></div>";
+    h += g.sort(function (a, b) { return new Date(b.ts) - new Date(a.ts); }).map(function (mv) {
+      return '<div class="stk-ing"><span class="stk-mv-ts">' + escapeHtml(stockFmtTs(mv.ts)) + '</span><span class="stk-ing-cod">' + escapeHtml(mv.cod_art) + '</span><span class="stk-ing-desc">' + escapeHtml(mv.descripcion || "") + '</span>' + (_stk.ingMode === "codigo" ? '<span class="stk-ing-rto">rto ' + escapeHtml(mv.ref || "—") + "</span>" : "") + '<span class="stk-mv-d pos">+' + mv.delta + "</span></div>";
+    }).join("") + "</div>";
+  });
+  return h;
+}
+function stkBodySalidas() {
+  const sal = _stk.movs.filter(function (mv) { return mv.tipo === "picking"; }).sort(function (a, b) { return new Date(b.ts) - new Date(a.ts); });
+  const f = (_stk.filtro || "").toLowerCase();
+  const shown = f ? sal.filter(function (mv) { return ((mv.cod_art || "") + " " + (mv.ref || "")).toLowerCase().indexOf(f) >= 0; }) : sal;
+  let h = '<input class="stk-filtro" type="search" placeholder="🔎 Buscar código / tanda" value="' + escapeHtml(_stk.filtro) + '" oninput="if(_stk){_stk.filtro=this.value;stkRender();}">';
+  h += '<table class="stk-tbl"><thead><tr><th>Día/hora</th><th>Código</th><th>Descripción</th><th class="num">Salió</th><th>Tanda</th></tr></thead><tbody>';
+  if (!shown.length) h += '<tr><td colspan="5" class="stk-empty">Sin salidas.</td></tr>';
+  shown.forEach(function (mv) { h += '<tr><td>' + escapeHtml(stockFmtTs(mv.ts)) + '</td><td class="stk-cod">' + escapeHtml(mv.cod_art) + '</td><td class="stk-desc">' + escapeHtml(mv.descripcion || "—") + '</td><td class="num stk-neg">' + mv.delta + '</td><td>' + escapeHtml(mv.ref || "") + "</td></tr>"; });
+  return h + "</tbody></table>";
+}
+function stkBodyAjustes() {
+  let h = '<div class="stk-aj-sec"><div class="stk-aj-h">⚙ Ajustar stock (Artículo Terminado)</div>';
+  h += '<div class="stk-aj-hint">Sumá o restá con signo: <code>+10</code> / <code>-3</code>.</div><div class="stk-aj-form"><input id="stkAjCod" class="stk-aj-inp" placeholder="Código"><input id="stkAjCant" class="stk-aj-inp" type="number" placeholder="+/- cajas"><button class="stk-btn ok" onclick="stockAjustar()">Aplicar</button></div>';
+  h += '<div class="stk-aj-hint" style="margin-top:10px">O dejá el stock exacto:</div><div class="stk-aj-form"><input id="stkAjCod2" class="stk-aj-inp" placeholder="Código"><input id="stkAjFijar" class="stk-aj-inp" type="number" placeholder="Fijar en…"><button class="stk-btn" onclick="stockFijar()">Fijar</button></div></div>';
+  h += '<div class="stk-aj-sec"><div class="stk-aj-h">➕ Stock inicial</div><div class="stk-aj-hint">Una línea por artículo: <b>CÓDIGO CANTIDAD</b>.</div><textarea id="stkIniTxt" class="stk-ini-txt" rows="6" placeholder="544 30&#10;546 12"></textarea><div class="stk-ini-btns"><button class="stk-btn ok" onclick="stockGuardarInicial(false)">Guardar inicial</button><button class="stk-btn danger" onclick="stockGuardarInicial(true)">Guardar + marcar inicio</button></div><div class="stk-ini-warn">⚠ "Marcar inicio": el stock se cuenta SOLO desde ahora (lo anterior queda guardado pero no se suma).</div></div>';
+  return h;
+}
+function stockToggleArt(codEnc) { if (!_stk) return; const cod = decodeURIComponent(codEnc); _stk.openArt = (_stk.openArt === cod ? null : cod); stkRender(); }
+async function stkInsertMov(rows, okMsg) {
+  try {
+    const r = await fetch(SUPABASE_STOCK_ENDPOINT, { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" }, body: JSON.stringify(rows) });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    alert("✓ " + okMsg); openStockAdmin();
+  } catch (e) { alert("Error: " + (e.message || e)); }
+}
+async function stockAjustar() {
+  const cod = ((document.getElementById("stkAjCod") || {}).value || "").trim().toUpperCase();
+  const cant = parseInt(((document.getElementById("stkAjCant") || {}).value || ""), 10);
+  if (!cod || isNaN(cant) || cant === 0) { alert("Poné un código y una cantidad (+/-)."); return; }
+  const sd = stockComputeSaldos(_stk.movs, _stk.cutoff)[cod];
+  await stkInsertMov([{ cod_art: cod, descripcion: (sd && sd.desc) || null, deposito: "terminado", delta: cant, tipo: "ajuste", ref: "ajuste manual", legajo: "0" }], "Ajuste " + cod + ": " + (cant > 0 ? "+" : "") + cant);
+}
+async function stockFijar() {
+  const cod = ((document.getElementById("stkAjCod2") || {}).value || "").trim().toUpperCase();
+  const fijar = parseInt(((document.getElementById("stkAjFijar") || {}).value || ""), 10);
+  if (!cod || isNaN(fijar)) { alert("Poné un código y el stock a fijar."); return; }
+  const sd = stockComputeSaldos(_stk.movs, _stk.cutoff)[cod];
+  const actual = (sd && sd.terminado) || 0; const delta = fijar - actual;
+  if (delta === 0) { alert("El stock de " + cod + " ya es " + fijar + "."); return; }
+  await stkInsertMov([{ cod_art: cod, descripcion: (sd && sd.desc) || null, deposito: "terminado", delta: delta, tipo: "ajuste", ref: "fijar en " + fijar, legajo: "0" }], "Stock de " + cod + " fijado en " + fijar + " (ajuste " + (delta > 0 ? "+" : "") + delta + ")");
+}
+async function stockGuardarInicial(conCorte) {
+  const ta = document.getElementById("stkIniTxt"); const txt = (ta && ta.value) || "";
+  const rows = [];
+  txt.split(/\n/).forEach(function (ln) { const m = ln.trim().match(/^(\S+)\s+(-?\d+(?:\.\d+)?)/); if (m) rows.push({ cod_art: m[1].toUpperCase(), deposito: "terminado", delta: Number(m[2]), tipo: "inicial", ref: "carga inicial", legajo: "0" }); });
+  if (!rows.length) { alert("No encontré líneas válidas. Formato: CÓDIGO CANTIDAD (una por línea)."); return; }
+  if (conCorte && !confirm("Vas a MARCAR INICIO ahora: los movimientos anteriores se desconsideran (no se borran). Se cargan " + rows.length + " artículos como stock inicial. ¿Seguro?")) return;
+  try {
+    if (conCorte) {
+      const nowIso = new Date(Date.now() - 2000).toISOString();   // corte 2s atrás: los 'inicial' que inserto quedan del lado contado
+      const rc = await fetch(SUPABASE_URL + "/rest/v1/Stock_Config?on_conflict=clave", { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ clave: "cutoff_ts", valor: nowIso, actualizado: new Date().toISOString() }) });
+      if (!rc.ok && rc.status >= 500) throw new Error("config HTTP " + rc.status);
+    }
+    const r = await fetch(SUPABASE_STOCK_ENDPOINT, { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" }, body: JSON.stringify(rows) });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    alert("✓ Stock inicial cargado: " + rows.length + " artículo(s)" + (conCorte ? ". Marcado como inicio (lo anterior se desconsidera)." : "."));
+    openStockAdmin();
+  } catch (e) { alert("Error al guardar: " + (e.message || e)); }
+}
 /* v4.04: persistencia del avance del wizard (queda abierto durante el armado).
    Se guarda en cada cambio (_compRecalc/_compLioNp), se retoma al reabrir AP, y se
    borra al Terminar. Ventana de 36h (cubre un armado de un día para el otro). */
