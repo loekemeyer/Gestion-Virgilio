@@ -5411,6 +5411,8 @@ async function send() {
 
   // Al EMPEZAR PICKING: flujo interactivo de artículos a levantar (Ok / F).
   if (opcion === "EP" && (texto || "").trim()) showPickingList(texto, legajoStr);
+  // v4.07: al TERMINAR PICKING (TP) → baja de "Artículo Terminado" lo que se pickeó (cajas reales).
+  if (opcion === "TP" && (texto || "").trim()) stockBajaPicking(texto, legajoStr);
   // Al EMPEZAR ARMADO (AP): armado guiado por caja/m³ (OPCIONAL, apagado por
   // defecto; showArmadoGuide corta solo si la flag está en false). No bloquea AP.
   if (opcion === "AP" && (texto || "").trim()) {
@@ -5433,6 +5435,11 @@ async function send() {
   if (opcion === "CR") {
     const stCR = getLegajoState(legajoStr);
     if (stCR && stCR.toggles && stCR.toggles.CR) showControlRemitosCR(legajoStr);
+  }
+  // v4.07: al INICIAR Guardado a Góndola (MG): pantalla para pasar de "Mercadería a guardar" a "Terminado".
+  if (opcion === "MG") {
+    const stMG = getLegajoState(legajoStr);
+    if (stMG && stMG.toggles && stMG.toggles.MG) showMGModal(legajoStr);
   }
   // v4.04: TAP ya NO abre ningún pop-up (el wizard se movió a AP). TAP es solo el cierre del
   // armado; el wizard Faltantes→Líos se completa durante el armado y se guarda con su "Terminar".
@@ -7089,6 +7096,76 @@ async function stockGuardarInicial(conCorte) {
     alert("✓ Stock inicial cargado: " + rows.length + " artículo(s)" + (conCorte ? ". Marcado como inicio (lo anterior se desconsidera)." : "."));
     openStockAdmin();
   } catch (e) { alert("Error al guardar: " + (e.message || e)); }
+}
+
+/* ===== STOCK — MG (Guardado a Góndola, v4.07): muestra lo que hay en "Mercadería
+   a guardar", el operario elige cuántas cajas guarda y al confirmar pasan a
+   "Artículo Terminado" (resta de a_guardar, suma a terminado). ===== */
+let _mg = null;
+async function showMGModal(legajo) {
+  if (!document.getElementById("mgCss")) {
+    const s = document.createElement("style"); s.id = "mgCss";
+    s.textContent = "#mgModal{display:none;position:fixed;inset:0;z-index:1290;background:rgba(2,6,23,.74);overflow:auto;padding:12px;}#mgModal.show{display:block;}.mg-card{background:#f8fafc;max-width:460px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.mg-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;background:linear-gradient(90deg,#16a34a,#15803d);color:#fff;}.mg-title{font-size:18px;font-weight:800;}.mg-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}.mg-body{padding:13px 14px;}.mg-loading,.mg-empty{padding:26px;text-align:center;color:#64748b;font-size:15px;}.mg-hint{font-size:12.5px;color:#64748b;margin-bottom:10px;}.mg-row{display:flex;align-items:center;gap:10px;border:1px solid #e2e8f0;border-radius:12px;padding:9px 11px;margin-bottom:8px;background:#fff;}.mg-info{flex:1;min-width:0;}.mg-cod{font-size:16px;font-weight:800;font-family:Consolas,Menlo,monospace;}.mg-desc{font-size:12px;color:#475569;}.mg-disp{font-size:11.5px;color:#1e6bd6;font-weight:700;margin-top:2px;}.mg-stp{display:flex;align-items:center;gap:5px;}.mg-sb{width:38px;height:40px;border:none;border-radius:9px;font-size:22px;font-weight:800;cursor:pointer;background:#e2e8f0;color:#475569;}.mg-inp{width:54px;height:40px;text-align:center;font-size:18px;font-weight:800;border:2px solid #cbd5e1;border-radius:9px;}.mg-all{height:40px;border:1px solid #cbd5e1;background:#fff;border-radius:9px;font-size:11px;font-weight:800;cursor:pointer;padding:0 8px;}.mg-fin{width:100%;margin-top:10px;padding:14px;border:none;border-radius:12px;background:#16a34a;color:#fff;font-size:17px;font-weight:800;cursor:pointer;}.mg-fin:disabled{background:#cbd5e1;cursor:not-allowed;}";
+    document.head.appendChild(s);
+  }
+  let ov = document.getElementById("mgModal");
+  if (!ov) { ov = document.createElement("div"); ov.id = "mgModal"; document.body.appendChild(ov); }
+  ov.classList.add("show");
+  ov.innerHTML = '<div class="mg-card"><div class="mg-head"><span class="mg-title">📥 Guardar a góndola</span><button class="mg-close" onclick="closeMG()">Cerrar</button></div><div class="mg-body" id="mgBody"><div class="mg-loading">Cargando lo que hay para guardar…</div></div></div>';
+  try {
+    const res = await Promise.all([stockFetchMovs(), stockGetCutoff()]);
+    const saldos = stockComputeSaldos(res[0] || [], res[1]);
+    const items = Object.keys(saldos).map(function (k) { return saldos[k]; }).filter(function (a) { return a.a_guardar > 0; }).sort(function (a, b) { return (parseInt(a.cod, 10) || 0) - (parseInt(b.cod, 10) || 0); }).map(function (a) { return { cod: a.cod, desc: a.desc, disponible: a.a_guardar, cargar: 0 }; });
+    _mg = { legajo: String(legajo || ""), items: items };
+    mgRender();
+  } catch (e) { const b = document.getElementById("mgBody"); if (b) b.innerHTML = '<div class="mg-loading">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
+}
+function mgRender() {
+  if (!_mg) return; const body = document.getElementById("mgBody"); if (!body) return;
+  if (!_mg.items.length) { body.innerHTML = '<div class="mg-empty">No hay mercadería para guardar 👍</div>'; return; }
+  let h = '<div class="mg-hint">Marcá cuántas cajas guardás de cada artículo → pasan a <b>Artículo Terminado</b>.</div>';
+  h += _mg.items.map(function (it, i) {
+    return '<div class="mg-row"><div class="mg-info"><span class="mg-cod">' + escapeHtml(it.cod) + '</span> <span class="mg-desc">' + escapeHtml(it.desc || "") + '</span><div class="mg-disp">disponible: ' + it.disponible + '</div></div><div class="mg-stp"><button class="mg-sb" onclick="mgChg(' + i + ',-1)">–</button><input class="mg-inp" type="number" min="0" max="' + it.disponible + '" inputmode="numeric" value="' + it.cargar + '" oninput="mgSet(' + i + ',this.value)"><button class="mg-sb" onclick="mgChg(' + i + ',1)">+</button><button class="mg-all" onclick="mgSet(' + i + ',' + it.disponible + ')">todo</button></div></div>';
+  }).join("");
+  const tot = _mg.items.reduce(function (s, it) { return s + it.cargar; }, 0);
+  h += '<button class="mg-fin"' + (tot <= 0 ? " disabled" : "") + ' onclick="mgConfirmar()">✓ Guardar ' + tot + ' caja(s) a Terminado</button>';
+  body.innerHTML = h;
+}
+function mgChg(i, d) { if (!_mg) return; const it = _mg.items[i]; if (!it) return; it.cargar = Math.max(0, Math.min(it.disponible, it.cargar + d)); mgRender(); }
+function mgSet(i, v) { if (!_mg) return; const it = _mg.items[i]; if (!it) return; let n = Math.max(0, parseInt(v, 10) || 0); if (n > it.disponible) n = it.disponible; it.cargar = n; mgRender(); }
+function mgConfirmar() {
+  if (!_mg) return;
+  const sel = _mg.items.filter(function (it) { return it.cargar > 0; });
+  if (!sel.length) return;
+  const rows = [];
+  sel.forEach(function (it) {
+    rows.push({ cod_art: it.cod, descripcion: it.desc || null, deposito: "a_guardar", delta: -it.cargar, tipo: "guardado", ref: null, legajo: _mg.legajo || null });
+    rows.push({ cod_art: it.cod, descripcion: it.desc || null, deposito: "terminado", delta: it.cargar, tipo: "guardado", ref: null, legajo: _mg.legajo || null });
+  });
+  const n = sel.reduce(function (s, it) { return s + it.cargar; }, 0);
+  closeMG();
+  stockMove(rows);
+  try { alert("✓ Guardado: " + n + " caja(s) pasaron a Artículo Terminado."); } catch (_e) {}
+}
+function closeMG() { const ov = document.getElementById("mgModal"); if (ov) ov.classList.remove("show"); _mg = null; }
+
+/* ===== STOCK — baja por PICKING (v4.07): al TP, suma las cajas REALES pickeadas de
+   la tanda (eventos PKC: texto=tanda|art|esp|real) y las resta de "Artículo Terminado".
+   Dedup por (tipo='picking', ref=tanda) para no descontar dos veces si se reentra a TP. ===== */
+async function stockBajaPicking(tanda, legajo) {
+  try {
+    const t = String(tanda || "").trim().toUpperCase(); if (!t) return;
+    const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+    const chk = await fetch(SUPABASE_STOCK_ENDPOINT + "?tipo=eq.picking&ref=eq." + encodeURIComponent(t) + "&select=id&limit=1", { headers: H, cache: "no-store" });
+    if (chk.ok) { const ex = await chk.json(); if (ex && ex.length) return; }   // ya descontado esta tanda
+    const since = new Date(Date.now() - 3 * 24 * 3600 * 1000).toISOString();
+    const r = await fetch(SUPABASE_URL + "/rest/v1/Registros_Produccion_Virgilio?opcion=eq.PKC&ts_cliente=gte." + encodeURIComponent(since) + "&select=texto&limit=20000", { headers: H, cache: "no-store" });
+    const evs = r.ok ? await r.json() : [];
+    const byArt = {};
+    evs.forEach(function (ev) { const p = String(ev.texto || "").split("|"); if (String(p[0] || "").trim().toUpperCase() !== t) return; const art = String(p[1] || "").trim(); const real = parseInt(p[3], 10); if (art && !isNaN(real) && real > 0) byArt[art] = (byArt[art] || 0) + real; });
+    const rows = Object.keys(byArt).map(function (art) { return { cod_art: art, deposito: "terminado", delta: -byArt[art], tipo: "picking", ref: t, legajo: String(legajo || "") }; });
+    if (rows.length) stockMove(rows);
+  } catch (_e) {}
 }
 /* v4.04: persistencia del avance del wizard (queda abierto durante el armado).
    Se guarda en cada cambio (_compRecalc/_compLioNp), se retoma al reabrir AP, y se
