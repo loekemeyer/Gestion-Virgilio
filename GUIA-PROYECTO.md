@@ -4,7 +4,20 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-26 · Versión app al documentar: **v4.09**
+> Última actualización: 2026-06-26 · Versión app al documentar: **v4.10**
+>
+> Nota: **v4.10** — **SALIDA A CERVANTES** (botón nuevo de operario). Se agregó el botón **`SC`**
+> ("Salida a Cervantes") a la botonera (en la fila de logística; **`CT` Conteo** se corrió a la
+> 3ª fila, ahora ambas filas de 6). Manda **artículo terminado** a la otra planta (muestra /
+> devolución): es una **baja de góndola** → `Movimientos_Stock` `deposito='terminado'`, `delta`
+> negativo, `tipo='salida_cervantes'`, `ref` = remito/motivo opcional. **No** es un toggle ni genera
+> evento en `Registros`: el botón intercepta en `selectOption` y abre **directo** el modal
+> `showCervantesModal` (sin "Enviar"); la salida queda registrada sólo en `Movimientos_Stock` (con
+> legajo + ts como traza). El modal (tipo MG) muestra lo que hay en góndola (stock terminado > 0),
+> buscador, stepper por artículo (tope = stock) y un campo remito/motivo; confirmar usa **`stockMove`**
+> (offline-safe). En el **admin Stocks** la solapa **Salidas** ahora muestra picking **+** salida a
+> Cervantes (columna "Destino": tanda vs 🚚 Cervantes · motivo). Validado con Playwright (layout de
+> botonera, intercept del botón, render, clamp, fila de movimiento).
 >
 > Nota: **v4.09** — **INSUMOS** (stock de insumos en la página). Los botones **RI** (Recepción
 > Insumos) y **EI** (Entrega Insumos) —que ya existían como toggles de actividad— ahora, **al

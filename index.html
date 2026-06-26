@@ -3267,7 +3267,7 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
 
   <div class="row row-6" id="row1"></div>
   <div class="row row-6" id="row2"></div>
-  <div class="row row-5" id="row3"></div>
+  <div class="row row-6" id="row3"></div>
   <div id="racksAlarma"></div>
   <div id="pendingSuggestion"></div>
 
@@ -3346,8 +3346,8 @@ const SUPABASE_PLANIMETRIA_ENDPOINT =
 
 const filas = {
   row1: ["EP","TP","AP","TAP","CR","CC"],
-  row2: ["RR","RT","MG","RI","EI","CT"],
-  row3: ["AT","PB","Limp","Perm","PC"]
+  row2: ["RR","RT","MG","RI","EI","SC"],
+  row3: ["AT","PB","Limp","Perm","PC","CT"]
 };
 
 const desc = {
@@ -3355,7 +3355,7 @@ const desc = {
   TAP:"Terminé Armado Pedido", CR:"Control Remitos", CC:"Inicio/Fin Carga Camión",
   RR:"Recepción Remitos",
   RT:"Recepción Mercadería", MG:"Guardado a Góndola",
-  RI:"Recepción Insumos", EI:"Entrega Insumos",
+  RI:"Recepción Insumos", EI:"Entrega Insumos", SC:"Salida a Cervantes",
   AT:"Atendí Timbre", PB:"Paré Baño", Limp:"Limpieza",
   Perm:"Permiso de Salida", PC:"Paré Comida",CT:"Conteo",
   LT:"Llegada Tarde", PKC:"Picking artículo", CCN:"Carga Camión NP",
@@ -4654,6 +4654,10 @@ function selectOption(code) {
     }
   }
 
+  // v4.10: Salida a Cervantes — abre el modal directo (sin Enviar ni evento en
+  // Registros); la salida se registra como baja de góndola en Movimientos_Stock.
+  if (code === "SC") { showCervantesModal(legajoStr); return; }
+
   // CC ya abierto: el botón CC RE-ABRE el popup de Carga Camión (no lo cierra).
   // El cierre se hace SOLO con "Terminé Carga Camión" dentro del popup.
   if (code === "CC") {
@@ -5222,7 +5226,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v4.09";
+const APP_VERSION = "v4.10";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -7068,13 +7072,17 @@ function stkBodyIngresos() {
   return h;
 }
 function stkBodySalidas() {
-  const sal = _stk.movs.filter(function (mv) { return mv.tipo === "picking"; }).sort(function (a, b) { return new Date(b.ts) - new Date(a.ts); });
+  // v4.10: salidas = picking (a pedido) + salida a Cervantes (otra planta).
+  const sal = _stk.movs.filter(function (mv) { return mv.tipo === "picking" || mv.tipo === "salida_cervantes"; }).sort(function (a, b) { return new Date(b.ts) - new Date(a.ts); });
   const f = (_stk.filtro || "").toLowerCase();
-  const shown = f ? sal.filter(function (mv) { return ((mv.cod_art || "") + " " + (mv.ref || "")).toLowerCase().indexOf(f) >= 0; }) : sal;
-  let h = '<input class="stk-filtro" type="search" placeholder="🔎 Buscar código / tanda" value="' + escapeHtml(_stk.filtro) + '" oninput="if(_stk){_stk.filtro=this.value;stkRender();}">';
-  h += '<table class="stk-tbl"><thead><tr><th>Día/hora</th><th>Código</th><th>Descripción</th><th class="num">Salió</th><th>Tanda</th></tr></thead><tbody>';
+  const shown = f ? sal.filter(function (mv) { return ((mv.cod_art || "") + " " + (mv.ref || "") + " " + (mv.tipo || "")).toLowerCase().indexOf(f) >= 0; }) : sal;
+  let h = '<input class="stk-filtro" type="search" placeholder="🔎 Buscar código / tanda / destino" value="' + escapeHtml(_stk.filtro) + '" oninput="if(_stk){_stk.filtro=this.value;stkRender();}">';
+  h += '<table class="stk-tbl"><thead><tr><th>Día/hora</th><th>Código</th><th>Descripción</th><th class="num">Salió</th><th>Destino</th></tr></thead><tbody>';
   if (!shown.length) h += '<tr><td colspan="5" class="stk-empty">Sin salidas.</td></tr>';
-  shown.forEach(function (mv) { h += '<tr><td>' + escapeHtml(stockFmtTs(mv.ts)) + '</td><td class="stk-cod">' + escapeHtml(mv.cod_art) + '</td><td class="stk-desc">' + escapeHtml(mv.descripcion || "—") + '</td><td class="num stk-neg">' + mv.delta + '</td><td>' + escapeHtml(mv.ref || "") + "</td></tr>"; });
+  shown.forEach(function (mv) {
+    const dest = mv.tipo === "salida_cervantes" ? ("🚚 Cervantes" + (mv.ref ? " · " + escapeHtml(mv.ref) : "")) : ("tanda " + escapeHtml(mv.ref || "—"));
+    h += '<tr><td>' + escapeHtml(stockFmtTs(mv.ts)) + '</td><td class="stk-cod">' + escapeHtml(mv.cod_art) + '</td><td class="stk-desc">' + escapeHtml(mv.descripcion || "—") + '</td><td class="num stk-neg">' + mv.delta + '</td><td>' + dest + "</td></tr>";
+  });
   return h + "</tbody></table>";
 }
 function stkBodyAjustes() {
@@ -7349,6 +7357,61 @@ function insConfirmar() {
   try { alert("✓ " + (isIn ? "Entrada" : "Salida") + " registrada: " + tot + " unidad(es) de insumos."); } catch (_e) {}
 }
 function closeIns() { const ov = document.getElementById("insModal"); if (ov) ov.classList.remove("show"); _ins = null; }
+
+/* ===== STOCK — SALIDA A CERVANTES (v4.10): el operario manda artículo terminado a la otra
+   planta (muestra/devolución). Es una baja de góndola: Movimientos_Stock deposito='terminado'
+   delta − tipo='salida_cervantes' (ref = remito/motivo opcional). Operario-facing; offline-safe
+   con stockMove. Se abre directo desde el botón SC (sin Enviar ni evento en Registros). ===== */
+let _sc = null;
+async function showCervantesModal(legajo) {
+  if (!document.getElementById("scCss")) {
+    const s = document.createElement("style"); s.id = "scCss";
+    s.textContent = "#scModal{display:none;position:fixed;inset:0;z-index:1297;background:rgba(2,6,23,.74);overflow:auto;padding:12px;}#scModal.show{display:block;}.sc-card{background:#f8fafc;max-width:480px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.sc-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;background:linear-gradient(90deg,#7c3aed,#6d28d9);color:#fff;}.sc-title{font-size:18px;font-weight:800;}.sc-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}.sc-body{padding:13px 14px;}.sc-loading,.sc-empty{padding:26px;text-align:center;color:#64748b;font-size:15px;}.sc-hint{font-size:12.5px;color:#64748b;margin-bottom:9px;}.sc-mot{width:100%;box-sizing:border-box;height:40px;border:2px solid #cbd5e1;border-radius:10px;padding:0 11px;font-size:14px;margin-bottom:9px;}.sc-search{width:100%;box-sizing:border-box;height:42px;border:2px solid #cbd5e1;border-radius:10px;padding:0 12px;font-size:15px;margin-bottom:9px;}.sc-row{border:1px solid #e2e8f0;border-radius:12px;padding:9px 11px;margin-bottom:8px;background:#fff;display:flex;align-items:center;gap:10px;}.sc-info{flex:1;min-width:0;}.sc-cod{font-size:16px;font-weight:800;font-family:Consolas,Menlo,monospace;}.sc-desc{font-size:12px;color:#475569;}.sc-disp{font-size:11.5px;color:#6d28d9;font-weight:700;margin-top:2px;}.sc-stp{display:flex;align-items:center;gap:5px;}.sc-sb{width:38px;height:40px;border:none;border-radius:9px;font-size:22px;font-weight:800;cursor:pointer;background:#e2e8f0;color:#475569;}.sc-inp{width:58px;height:40px;text-align:center;font-size:18px;font-weight:800;border:2px solid #cbd5e1;border-radius:9px;}.sc-fin{width:100%;margin-top:10px;padding:14px;border:none;border-radius:12px;background:#7c3aed;color:#fff;font-size:17px;font-weight:800;cursor:pointer;}.sc-fin:disabled{background:#cbd5e1;cursor:not-allowed;}";
+    document.head.appendChild(s);
+  }
+  let ov = document.getElementById("scModal");
+  if (!ov) { ov = document.createElement("div"); ov.id = "scModal"; document.body.appendChild(ov); }
+  ov.classList.add("show");
+  ov.innerHTML = '<div class="sc-card"><div class="sc-head"><span class="sc-title">🚚 Salida a Cervantes</span><button class="sc-close" onclick="closeSc()">Cerrar</button></div><div class="sc-body" id="scBody"><div class="sc-loading">Cargando góndola…</div></div></div>';
+  try {
+    const res = await Promise.all([stockFetchMovs(), stockGetCutoff()]);
+    const saldos = stockComputeSaldos(res[0] || [], res[1]);
+    const items = Object.keys(saldos).map(function (k) { return saldos[k]; }).filter(function (a) { return (a.terminado || 0) > 0; }).sort(function (a, b) { return (parseInt(a.cod, 10) || 0) - (parseInt(b.cod, 10) || 0); }).map(function (a) { return { cod: a.cod, desc: a.desc, disponible: a.terminado, sacar: 0 }; });
+    _sc = { legajo: String(legajo || "").trim(), items: items, filtro: "", motivo: "" };
+    scRender();
+  } catch (e) { const b = document.getElementById("scBody"); if (b) b.innerHTML = '<div class="sc-loading">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
+}
+function scRender() {
+  if (!_sc) return; const body = document.getElementById("scBody"); if (!body) return;
+  if (!_sc.items.length) { body.innerHTML = '<div class="sc-empty">No hay artículo terminado en góndola para mandar.</div>'; return; }
+  const f = (_sc.filtro || "").toLowerCase().trim();
+  const shown = f ? _sc.items.filter(function (it) { return (it.cod + " " + (it.desc || "")).toLowerCase().indexOf(f) >= 0; }) : _sc.items;
+  let h = '<div class="sc-hint">Marcá cuántas <b>cajas</b> mandás a Cervantes. Sale de la góndola (Artículo Terminado).</div>';
+  h += '<input class="sc-mot" type="text" placeholder="Remito / motivo (opcional)" value="' + escapeHtml(_sc.motivo || "") + '" oninput="if(_sc)_sc.motivo=this.value;">';
+  h += '<input class="sc-search" type="search" placeholder="🔎 Buscar código / descripción" value="' + escapeHtml(_sc.filtro) + '" oninput="if(_sc){_sc.filtro=this.value;scRender();}">';
+  if (!shown.length) h += '<div class="sc-empty">No hay artículos que coincidan.</div>';
+  else h += shown.map(function (it) {
+    const i = _sc.items.indexOf(it);
+    return '<div class="sc-row"><div class="sc-info"><span class="sc-cod">' + escapeHtml(it.cod) + '</span> <span class="sc-desc">' + escapeHtml(it.desc || "") + '</span><div class="sc-disp">en góndola: ' + it.disponible + ' cajas</div></div><div class="sc-stp"><button class="sc-sb" onclick="scChg(' + i + ',-1)">–</button><input class="sc-inp" type="number" min="0" max="' + it.disponible + '" inputmode="numeric" value="' + it.sacar + '" oninput="scSet(' + i + ',this.value)"><button class="sc-sb" onclick="scChg(' + i + ',1)">+</button></div></div>';
+  }).join("");
+  const tot = _sc.items.reduce(function (s, it) { return s + it.sacar; }, 0);
+  h += '<button class="sc-fin"' + (tot <= 0 ? " disabled" : "") + ' onclick="scConfirmar()">✓ Mandar ' + tot + ' caja(s) a Cervantes</button>';
+  body.innerHTML = h;
+}
+function scChg(i, d) { if (!_sc) return; const it = _sc.items[i]; if (!it) return; it.sacar = Math.max(0, Math.min(it.disponible, it.sacar + d)); scRender(); }
+function scSet(i, v) { if (!_sc) return; const it = _sc.items[i]; if (!it) return; let n = Math.max(0, parseInt(v, 10) || 0); if (n > it.disponible) n = it.disponible; it.sacar = n; scRender(); }
+function scConfirmar() {
+  if (!_sc) return;
+  const sel = _sc.items.filter(function (it) { return it.sacar > 0; });
+  if (!sel.length) return;
+  const ref = (_sc.motivo || "").trim() || null;
+  const rows = sel.map(function (it) { return { cod_art: it.cod, descripcion: it.desc || null, deposito: "terminado", delta: -it.sacar, tipo: "salida_cervantes", ref: ref, legajo: _sc.legajo || null }; });
+  const n = sel.reduce(function (s, it) { return s + it.sacar; }, 0);
+  closeSc();
+  stockMove(rows);   // offline-safe (vir_stock_pend)
+  try { alert("✓ Salida a Cervantes registrada: " + n + " caja(s). Bajó de la góndola."); } catch (_e) {}
+}
+function closeSc() { const ov = document.getElementById("scModal"); if (ov) ov.classList.remove("show"); _sc = null; }
 
 /* ===== STOCK — MG (Guardado a Góndola, v4.07): muestra lo que hay en "Mercadería
    a guardar", el operario elige cuántas cajas guarda y al confirmar pasan a
