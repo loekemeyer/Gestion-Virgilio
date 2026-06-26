@@ -2248,6 +2248,47 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .comp-lbl{ font-size:11px; font-weight:800; color:#b45309; text-transform:uppercase; letter-spacing:.3px; text-align:center; }
 .comp-lios-inp{ width:88px; height:46px; text-align:center; font-size:20px; font-weight:800; border:2px solid #cbd5e1; border-radius:10px; box-sizing:border-box; }
 .comp-lios-inp:focus{ outline:none; border-color:#1e6bd6; }
+/* Paso 2 — botonera de líos (cuadrados por código) */
+.cmpl-nphead{ display:flex; align-items:baseline; justify-content:space-between; gap:8px; margin:2px 0 8px; }
+.cmpl-np{ font-size:16px; font-weight:800; color:#0f172a; }
+.cmpl-cli{ font-size:12px; color:#64748b; }
+.cmpl-npidx{ font-size:12px; font-weight:800; background:#e2e8f0; color:#475569; border-radius:999px; padding:2px 9px; white-space:nowrap; }
+.cmpl-prog{ font-size:12.5px; font-weight:800; color:#1e3a8a; margin-bottom:9px; }
+.cmpl-empty{ font-size:13px; color:#64748b; background:#f1f5f9; border-radius:10px; padding:12px; text-align:center; }
+.cmpl-banner{ background:#fffbeb; border:1.5px solid #fcd34d; border-radius:12px; padding:8px 11px; margin-bottom:10px; }
+.cmpl-blab{ font-size:15px; font-weight:800; color:#92400e; }
+.cmpl-bcomp{ margin-top:5px; display:flex; flex-wrap:wrap; gap:5px; min-height:4px; }
+.cmpl-ch{ font-size:12.5px; font-weight:800; background:#fde68a; color:#92400e; border-radius:7px; padding:2px 8px; }
+.cmpl-bempty{ font-size:12px; color:#a16207; font-style:italic; }
+.cmpl-grid{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.cmpl-sq{ background:#fff; border:1.5px solid #e2e8f0; border-radius:12px; padding:8px 8px 9px; text-align:center; }
+.cmpl-sq.has{ border-color:#93c5fd; background:#eff6ff; }
+.cmpl-cod{ font-size:16px; font-weight:800; font-family:Consolas,Menlo,monospace; }
+.cmpl-row{ display:flex; align-items:center; justify-content:center; gap:6px; margin-top:5px; }
+.cmpl-sb{ width:38px; height:38px; border:none; border-radius:9px; font-size:22px; font-weight:800; cursor:pointer; display:flex; align-items:center; justify-content:center; flex:0 0 auto; }
+.cmpl-sb.minus{ background:#e2e8f0; color:#475569; }
+.cmpl-sb.plus{ background:#1e6bd6; color:#fff; }
+.cmpl-sb:disabled{ opacity:.3; }
+.cmpl-frac{ min-width:46px; }
+.cmpl-cur{ font-size:19px; font-weight:800; color:#1e3a8a; }
+.cmpl-cur.z{ color:#cbd5e1; }
+.cmpl-rem{ font-size:12px; font-weight:700; color:#94a3b8; }
+.cmpl-suelta{ margin-top:6px; font-size:11px; font-weight:800; color:#7c3aed; background:#f5f3ff; border:1px solid #ddd6fe; border-radius:999px; padding:2px 9px; cursor:pointer; }
+.cmpl-suelta:disabled{ opacity:.3; }
+.cmpl-done{ margin-top:8px; font-size:11.5px; font-weight:700; color:#15803d; }
+.cmpl-lnext{ width:100%; margin-top:9px; padding:11px; border:none; border-radius:11px; background:#1e6bd6; color:#fff; font-size:15px; font-weight:800; cursor:pointer; }
+.cmpl-lnext:disabled{ background:#cbd5e1; cursor:not-allowed; }
+.cmpl-liostit{ font-size:11.5px; font-weight:800; color:#475569; text-transform:uppercase; letter-spacing:.3px; margin:11px 2px 7px; }
+.cmpl-lio{ display:flex; align-items:center; gap:9px; background:#fff; border:1px solid #e2e8f0; border-left:4px solid #16a34a; border-radius:10px; padding:6px 10px; margin-bottom:6px; }
+.cmpl-lio.s{ border-left-color:#7c3aed; }
+.cmpl-lab{ width:28px; height:28px; border-radius:8px; background:#dcfce7; color:#15803d; font-size:14px; font-weight:800; display:flex; align-items:center; justify-content:center; flex:0 0 auto; }
+.cmpl-lio.s .cmpl-lab{ background:#f5f3ff; color:#7c3aed; }
+.cmpl-lc{ flex:1; min-width:0; font-size:13px; font-weight:700; color:#0f172a; }
+.cmpl-del{ border:none; background:none; color:#cbd5e1; font-size:20px; cursor:pointer; padding:0 4px; }
+.cmpl-npbtns{ display:flex; gap:8px; margin-top:12px; }
+.cmpl-npbtn{ flex:1; padding:11px; border:1px solid #cbd5e1; border-radius:11px; background:#fff; color:#334155; font-size:13.5px; font-weight:800; cursor:pointer; }
+.cmpl-npbtn.pri{ background:#0f172a; color:#fff; border-color:#0f172a; }
+.cmpl-npbtn:disabled{ opacity:.35; cursor:default; }
 .comp-art{ border:1px solid #e2e8f0; border-radius:12px; padding:11px 12px; margin-bottom:12px; transition:.12s; }
 .comp-art.ok{ border-color:#86efac; background:#f0fdf4; }
 .comp-art.defined{ border-color:#e2e8f0; background:#f1f5f9; }
@@ -2822,9 +2863,9 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
       <div class="comp-steps">
         <button class="comp-arrow" id="compBack" onclick="_compGo(1)" title="Volver">←</button>
         <div class="comp-dots">
-          <span class="comp-dot on" id="compD1"><span class="comp-num">1</span> Líos</span>
+          <span class="comp-dot on" id="compD1"><span class="comp-num">1</span> Faltantes</span>
           <span class="comp-line" id="compLine"></span>
-          <span class="comp-dot" id="compD2"><span class="comp-num">2</span> Faltantes</span>
+          <span class="comp-dot" id="compD2"><span class="comp-num">2</span> Líos</span>
         </div>
         <button class="comp-arrow" id="compNext" onclick="_compGo(2)" title="Siguiente">→</button>
       </div>
@@ -5173,7 +5214,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v4.02";
+const APP_VERSION = "v4.03";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -6669,29 +6710,83 @@ async function showCompletarWizard(legajo, codigo) {
     _comp = { legajo: String(legajo || "").trim(), tanda: tanda, fecha: fecha, nps: nps, arts: arts, pedidoFull: pedidoFull, hayFalt: hayFalt, step: 1 };
     const t = document.getElementById("compTanda"); if (t) t.textContent = "Tanda " + tanda + (nps[0] && nps[0].rs ? " · " + nps[0].rs : "");
     const d2 = document.getElementById("compD2"), ln = document.getElementById("compLine");
-    if (d2) d2.style.display = hayFalt ? "" : "none";
-    if (ln) ln.style.display = hayFalt ? "" : "none";
-    _compRenderLios(); _compRenderFalt(); _compGo(1);
+    if (d2) d2.style.display = "";   // Paso 2 = Líos: siempre presente
+    if (ln) ln.style.display = "";
+    _comp.liosNpIdx = 0;
+    _compRenderFalt(); _compGo(1);   // Paso 1 = Faltantes; los líos se arman al entrar al Paso 2
     modal.classList.add("show");
   } catch (_e) { /* sin datos: no se muestra */ }
 }
-function _compRenderLios() {
-  const el = document.getElementById("compStep1"); if (!el || !_comp) return;
-  el.innerHTML = '<div class="comp-step-t">¿Cuántos líos lleva cada pedido?</div>' +
-    _comp.nps.map(function (n, i) {
-      return '<div class="comp-lrow"><div class="comp-info"><div class="comp-np">NP ' + escapeHtml(n.np) + '</div>' +
-        '<div class="comp-cli">' + (n.cod ? 'Cliente ' + escapeHtml(n.cod) + ' · ' : '') + escapeHtml(n.rs) + '</div></div>' +
-        '<div><div class="comp-lbl">Líos</div><input class="comp-lios-inp" type="number" min="0" inputmode="numeric" data-i="' + i + '" placeholder="—" value="' + (n.lios == null ? "" : n.lios) + '" oninput="_compLiosInput(this)"></div></div>';
-    }).join("");
-}
-function _compLiosInput(el) {
+/* Paso 2 — armar líos (botonera de cuadrados, una NP a la vez). Trabaja sobre lo
+   que SALE (pedido − faltó del Paso 1); los líos salen solos (= cuántos se cierran). */
+function _compBuildLiosData() {
   if (!_comp) return;
-  const i = +el.getAttribute("data-i"); const raw = String(el.value).trim();
-  _comp.nps[i].lios = (raw === "" ? null : Math.max(0, parseInt(raw, 10) || 0));
-  el.style.borderColor = ""; _compRecalc();
+  const faltMap = {};
+  (_comp.arts || []).forEach(function (a) {
+    const ka = String(a.art).toUpperCase().replace(/E$/, "");
+    a.nps.forEach(function (nn) { if (nn.asig > 0) faltMap[nn.np + "|" + ka] = (faltMap[nn.np + "|" + ka] || 0) + nn.asig; });
+  });
+  _comp.nps.forEach(function (n) {
+    const npKey = pickNormNp(n.np);
+    const p = (_comp.pedidoFull || []).find(function (x) { return x.np === npKey; });
+    const items = (p && p.items) || [];
+    const codes = [];
+    items.forEach(function (it) {
+      const ka = String(it.art).toUpperCase().replace(/E$/, "");
+      const sale = Math.max(0, (Number(it.cajas) || 0) - (faltMap[npKey + "|" + ka] || 0));
+      if (sale > 0) codes.push({ cod: String(it.art), sale: sale, rest: sale, cur: 0 });
+    });
+    codes.sort(function (a, b) { return parseInt(a.cod, 10) - parseInt(b.cod, 10); });
+    n.codes = codes; n.liosArr = []; n.lios = 0; n.liosDone = (codes.length === 0);
+  });
+  _comp.liosNpIdx = 0;
+}
+function _compLioNow() { return _comp ? _comp.nps[_comp.liosNpIdx] : null; }
+function _compLioMark(n) { n.liosDone = n.codes.every(function (c) { return c.rest === 0 && c.cur === 0; }); n.lios = n.liosArr.length; }
+function _compLioStep(ci, d) { const n = _compLioNow(); if (!n) return; const c = n.codes[ci]; if (!c) return; if (d > 0 && c.rest > 0) { c.rest--; c.cur++; } else if (d < 0 && c.cur > 0) { c.cur--; c.rest++; } else return; _compRenderLios(); _compRecalc(); }
+function _compLioSuelta(ci) { const n = _compLioNow(); if (!n) return; const c = n.codes[ci]; if (!c || c.rest <= 0) return; c.rest--; n.liosArr.push({ items: [{ cod: c.cod, qty: 1 }], cajas: 1, suelta: true }); _compLioMark(n); _compRenderLios(); _compRecalc(); }
+function _compLioSiguiente() { const n = _compLioNow(); if (!n) return; const items = n.codes.filter(function (c) { return c.cur > 0; }).map(function (c) { return { cod: c.cod, qty: c.cur }; }); const cajas = items.reduce(function (s, it) { return s + it.qty; }, 0); if (!cajas) return; n.liosArr.push({ items: items, cajas: cajas, suelta: false }); n.codes.forEach(function (c) { c.cur = 0; }); _compLioMark(n); _compRenderLios(); _compRecalc(); }
+function _compLioDel(k) { const n = _compLioNow(); if (!n) return; const l = n.liosArr[k]; if (!l) return; l.items.forEach(function (it) { const c = n.codes.find(function (x) { return x.cod === it.cod; }); if (c) c.rest += it.qty; }); n.liosArr.splice(k, 1); _compLioMark(n); _compRenderLios(); _compRecalc(); }
+function _compLioNp(d) { if (!_comp) return; const ni = _comp.liosNpIdx + d; if (ni < 0 || ni >= _comp.nps.length) return; _comp.liosNpIdx = ni; _compRenderLios(); }
+function _compLiosResumen(n) { const L = function (i) { return i < 26 ? String.fromCharCode(65 + i) : "L" + (i + 1); }; return (n.liosArr || []).map(function (l, k) { return L(k) + "=" + l.items.map(function (it) { return it.cod + "x" + it.qty; }).join(",") + (l.suelta ? "(s)" : ""); }).join(";"); }
+function _compRenderLios() {
+  const el = document.getElementById("compStep2"); if (!el || !_comp) return;
+  if (!_comp.nps.length) { el.innerHTML = '<div class="comp-step-t">Sin pedidos en esta tanda.</div>'; return; }
+  if (_comp.liosNpIdx == null) _comp.liosNpIdx = 0;
+  if (!_comp.nps[0].codes) _compBuildLiosData();
+  const idx = _comp.liosNpIdx, n = _comp.nps[idx];
+  const L = function (i) { return i < 26 ? String.fromCharCode(65 + i) : "L" + (i + 1); };
+  const TOTAL = n.codes.reduce(function (s, c) { return s + c.sale; }, 0);
+  const curCajas = n.codes.reduce(function (s, c) { return s + c.cur; }, 0);
+  const enLios = n.liosArr.reduce(function (s, l) { return s + l.cajas; }, 0);
+  const asign = enLios + curCajas;
+  let h = '<div class="cmpl-nphead"><div class="cmpl-npinfo"><span class="cmpl-np">NP ' + escapeHtml(n.np) + '</span> <span class="cmpl-cli">' + (n.cod ? "cli " + escapeHtml(n.cod) + " · " : "") + escapeHtml(n.rs) + '</span></div><span class="cmpl-npidx">' + (idx + 1) + " / " + _comp.nps.length + '</span></div>';
+  h += '<div class="cmpl-prog">' + asign + " / " + TOTAL + " cajas · " + n.liosArr.length + " líos</div>";
+  if (TOTAL === 0) {
+    h += '<div class="cmpl-empty">Esta NP no lleva nada a armar (todo faltó). Pasá a la siguiente.</div>';
+  } else {
+    const inCur = n.codes.filter(function (c) { return c.cur > 0; });
+    h += '<div class="cmpl-banner"><div class="cmpl-blab">Armando Lío ' + L(n.liosArr.length) + '</div><div class="cmpl-bcomp">' + (inCur.length ? inCur.map(function (c) { return '<span class="cmpl-ch">' + escapeHtml(c.cod) + " ×" + c.cur + "</span>"; }).join("") : '<span class="cmpl-bempty">Tocá + en los códigos que entran en este lío…</span>') + "</div></div>";
+    h += '<div class="cmpl-grid">' + n.codes.map(function (c, ci) {
+      if (c.rest === 0 && c.cur === 0) return "";
+      const rem = c.cur + c.rest;
+      return '<div class="cmpl-sq' + (c.cur > 0 ? " has" : "") + '"><div class="cmpl-cod">' + escapeHtml(c.cod) + '</div><div class="cmpl-row"><button class="cmpl-sb minus" onclick="_compLioStep(' + ci + ',-1)"' + (c.cur <= 0 ? " disabled" : "") + '>–</button><div class="cmpl-frac"><span class="cmpl-cur' + (c.cur ? "" : " z") + '">' + c.cur + '</span><span class="cmpl-rem"> / ' + rem + '</span></div><button class="cmpl-sb plus" onclick="_compLioStep(' + ci + ',1)"' + (c.rest <= 0 ? " disabled" : "") + '>+</button></div><button class="cmpl-suelta" onclick="_compLioSuelta(' + ci + ')"' + (c.rest <= 0 ? " disabled" : "") + '>+ suelta</button></div>';
+    }).join("") + "</div>";
+    const doneCods = n.codes.filter(function (c) { return c.rest === 0 && c.cur === 0; }).map(function (c) { return c.cod; });
+    if (doneCods.length) h += '<div class="cmpl-done">✓ en líos: ' + doneCods.map(escapeHtml).join(" · ") + "</div>";
+    const allRest0 = n.codes.every(function (c) { return c.rest === 0; });
+    h += '<button class="cmpl-lnext" onclick="_compLioSiguiente()"' + (curCajas === 0 ? " disabled" : "") + ">" + (allRest0 && curCajas > 0 ? "Cerrar último lío ✓" : "Siguiente lío →") + "</button>";
+  }
+  if (n.liosArr.length) {
+    h += '<div class="cmpl-liostit">Líos de esta NP (' + n.liosArr.length + ")</div>" + n.liosArr.map(function (l, k) {
+      return '<div class="cmpl-lio' + (l.suelta ? " s" : "") + '"><span class="cmpl-lab">' + L(k) + '</span><span class="cmpl-lc">' + l.items.map(function (it) { return escapeHtml(it.cod) + "×" + it.qty; }).join("  ") + (l.suelta ? " · suelta" : "") + '</span><button class="cmpl-del" onclick="_compLioDel(' + k + ')">×</button></div>';
+    }).join("");
+  }
+  h += '<div class="cmpl-npbtns"><button class="cmpl-npbtn" onclick="_compLioNp(-1)"' + (idx <= 0 ? " disabled" : "") + '>← NP anterior</button><button class="cmpl-npbtn pri" onclick="_compLioNp(1)"' + (idx >= _comp.nps.length - 1 ? " disabled" : "") + '>NP siguiente →</button></div>';
+  el.innerHTML = h;
 }
 function _compRenderFalt() {
-  const el = document.getElementById("compStep2"); if (!el || !_comp) return;
+  const el = document.getElementById("compStep1"); if (!el || !_comp) return;
   if (!_comp.hayFalt) { el.innerHTML = '<div class="comp-step-t">Sin faltantes en esta tanda 👍</div>'; return; }
   const cargo = (_compMode === "cargo");
   const toggle = '<button type="button" class="comp-mode-toggle" onclick="_compToggleMode()">Anotás lo que <b>' + (cargo ? "CARGÓ" : "FALTÓ") + '</b> · tocá para cambiar a lo que ' + (cargo ? "faltó" : "cargó") + '</button>';
@@ -6746,12 +6841,11 @@ function _compRecalc() {
     const ae = document.getElementById("comp-art-" + ai); if (ae) ae.classList.toggle("ok", ok);
     if (!ok) faltOk = false;
   });
-  const liosOk = _comp.nps.every(function (n) { return n.lios != null; });
+  const liosOk = _comp.nps.every(function (n) { return n.liosDone; });
   const fin = document.getElementById("compFin"); if (fin) fin.disabled = !(liosOk && faltOk);
 }
 function _compGo(s) {
   if (!_comp) return;
-  if (s === 2 && !_comp.hayFalt) s = 1;
   _comp.step = s;
   document.getElementById("compStep1").classList.toggle("on", s === 1);
   document.getElementById("compStep2").classList.toggle("on", s === 2);
@@ -6759,17 +6853,20 @@ function _compGo(s) {
   document.getElementById("compD2").classList.toggle("on", s === 2);
   const bk = document.getElementById("compBack"), nx = document.getElementById("compNext");
   if (bk) bk.disabled = (s === 1);
-  if (nx) nx.disabled = (s === 2 || !_comp.hayFalt);
+  if (nx) nx.disabled = (s === 2);
+  if (s === 2) { if (!_comp.nps[0] || !_comp.nps[0].codes) _compBuildLiosData(); _compRenderLios(); }
   _compRecalc();
 }
 async function compTerminar() {
   if (!_comp) return;
-  const faltanLios = [];
-  _comp.nps.forEach(function (n, i) { if (n.lios == null) { faltanLios.push(n.np); const inp = document.querySelector('.comp-lios-inp[data-i="' + i + '"]'); if (inp) inp.style.borderColor = "#dc2626"; } });
-  if (faltanLios.length) { _compGo(1); try { alert("Faltan los líos de " + faltanLios.length + " pedido(s). Completá todos (si no lleva, poné 0)."); } catch (_e) {} return; }
-  if (_comp.hayFalt) { for (const a of _comp.arts) { if (a.nps.length >= 2 && !a.auto) { const sum = a.nps.reduce(function (s, n) { return s + (n.asig || 0); }, 0); if (sum > a.falta) { _compGo(2); try { alert("El Art " + a.art + ": marcaste " + sum + " faltantes pero el picking solo dio " + a.falta + " cortas. No puede faltar más de eso."); } catch (_e) {} return; } } } }
+  // Paso 1 — faltantes: no se puede faltar MÁS de lo que dio el picking
+  if (_comp.hayFalt) { for (const a of _comp.arts) { if (a.nps.length >= 2 && !a.auto) { const sum = a.nps.reduce(function (s, n) { return s + (n.asig || 0); }, 0); if (sum > a.falta) { _compGo(1); try { alert("El Art " + a.art + ": marcaste " + sum + " faltantes pero el picking solo dio " + a.falta + " cortas. No puede faltar más de eso."); } catch (_e) {} return; } } } }
+  // Paso 2 — líos: cada NP tiene que tener TODAS sus cajas repartidas en líos
+  if (!_comp.nps[0] || !_comp.nps[0].codes) _compBuildLiosData();
+  const pendLios = _comp.nps.filter(function (n) { return !n.liosDone; });
+  if (pendLios.length) { _comp.liosNpIdx = _comp.nps.indexOf(pendLios[0]); _compGo(2); try { alert("Faltan armar los líos de " + pendLios.length + " pedido(s): NP " + pendLios.map(function (n) { return n.np; }).join(", ") + "."); } catch (_e) {} return; }
   const legajo = _comp.legajo, tanda = _comp.tanda, fecha = _comp.fecha || "";
-  _comp.nps.forEach(function (n) { liosSend(legajo, n.np, n.lios, tanda); });   // líos (opcion TAL, como siempre)
+  _comp.nps.forEach(function (n) { liosSend(legajo, n.np, n.liosArr.length, tanda, _compLiosResumen(n)); });   // líos (opcion TAL) + resumen de composición
   // Faltante por (NP, artículo) del reparto del Paso 2. Clave normalizada (sin la E final).
   const faltMap = {};
   if (_comp.hayFalt) _comp.arts.forEach(function (a) { const ka = String(a.art).toUpperCase().replace(/E$/, ""); a.nps.forEach(function (n) { if (n.asig > 0) faltMap[n.np + "|" + ka] = (faltMap[n.np + "|" + ka] || 0) + n.asig; }); });
@@ -7045,11 +7142,11 @@ function liosSave() {
   _lios = null; closeTandaModal();
   try { alert("✓ Líos guardados (" + nps.length + " pedidos)."); } catch (_e) {}
 }
-function liosSend(legajo, np, lios, tanda) {
+function liosSend(legajo, np, lios, tanda, resumen) {
   const nowMs = Date.now();
   const payload = {
     legajo: legajo, opcion: "TAL", descripcion: "Líos por NP (TAP)",
-    texto: (String(np) + "|" + String(lios) + "|" + String(tanda)).toUpperCase(),
+    texto: (String(np) + "|" + String(lios) + "|" + String(tanda) + (resumen ? "|" + String(resumen) : "")).toUpperCase(),
     ts: nowMs, id: nowMs.toString(36) + "_" + Math.random().toString(36).slice(2, 8), ts_inicio_iso: null
   };
   try {

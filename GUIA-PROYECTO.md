@@ -4,7 +4,23 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-25 · Versión app al documentar: **v3.99**
+> Última actualización: 2026-06-26 · Versión app al documentar: **v4.03**
+>
+> Nota: **v4.03** — **Wizard "Completar" reordenado + botonera de líos** (pedido del usuario). (1) **Orden
+> nuevo**: Paso 1 = **Faltantes** (antes Paso 2), Paso 2 = **LÍOS en botonera de cuadrados** (reemplaza el
+> tipeo del número). (2) **Los líos se arman sobre lo ENTREGADO** (`pedido − faltó` del Paso 1):
+> `_compBuildLiosData` calcula por NP las cajas que salen por código (descuenta el faltante repartido en el
+> Paso 1, clave `np|cod` sin la E final). (3) **Botonera por NP** (una a la vez, nav ← / →): cada código un
+> cuadrado **código / (en este lío / quedan) / − +** con **+ suelta**, ordenada por nº de código; los códigos
+> ya repartidos salen de la grilla. **La cantidad de líos sale sola** (= cuántos se cierran). (4) **Guardado**:
+> evento **TAL** con texto extendido `NP|LÍOS|TANDA|RESUMEN` (resumen = composición `A=544x1;B=546x5;…`;
+> retrocompatible: lo viejo sigue leyendo `NP|LÍOS|TANDA`). `compTerminar` valida que cada NP tenga TODAS sus
+> cajas repartidas antes de cerrar. Funciones `_compBuildLiosData`/`_compLioStep`/`_compLioSuelta`/
+> `_compLioSiguiente`/`_compLioDel`/`_compLioNp`/`_compLiosResumen`/`_compRenderLios`. ⚠ **Sigue disparándose
+> en TAP** (todavía no se movió a AP ni se sacó el popup de TAP — pendiente: disparo en AP, TAP sin popup,
+> persistencia del avance en localStorage). **v4.00–v4.02** (interim): v4.00 faltantes permiten completar
+> (`sum ≤ a.falta`, llegó stock); v4.01 columna **Líos** en monitor de Facturación (lee TAL); v4.02 ensanchar
+> esa vista a 1240px para que entre Acción.
 >
 > Nota: **v3.99** — **Entregas en Supabase: UNA tabla persistente `Entregas_Virgilio` (no más vistas)**
 > (pedido del usuario: "una sola tabla, sin duplicar"). Se **borraron las vistas** `Entregas_Virgilio` y
