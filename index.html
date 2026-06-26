@@ -5214,7 +5214,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v4.05";
+const APP_VERSION = "v4.06";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -6913,6 +6913,30 @@ function _compFlushEntregas() {
     .catch(function () {});
 }
 try { window.addEventListener("online", function () { try { _compFlushEntregas(); } catch (_e) {} }); _compFlushEntregas(); } catch (_e) {}
+
+/* =========================================================
+   STOCK — movimientos a la tabla Movimientos_Stock (v4.06).
+   stockMove(rows): POST en bloque, best-effort + reintento localStorage si falla.
+   Lo usan MG (guardado) y el TP del picking; recepción (recepcion.js) escribe
+   directo con su cliente y, si falla, deja las filas en vir_stock_pend (las
+   reintenta stockFlushPend acá). Cada fila: {cod_art, descripcion, deposito
+   ('a_guardar'|'terminado'), delta (+/- cajas), tipo, ref, legajo}. */
+const SUPABASE_STOCK_ENDPOINT = SUPABASE_URL + "/rest/v1/Movimientos_Stock";
+function stockMove(rows) {
+  if (!rows || !rows.length) return Promise.resolve();
+  const headers = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" };
+  return fetch(SUPABASE_STOCK_ENDPOINT, { method: "POST", headers: headers, body: JSON.stringify(rows) })
+    .then(function (r) { if (r.ok || (r.status >= 400 && r.status < 500)) return; throw new Error("HTTP " + r.status); })
+    .catch(function () { try { const p = JSON.parse(localStorage.getItem("vir_stock_pend") || "[]"); p.push.apply(p, rows); localStorage.setItem("vir_stock_pend", JSON.stringify(p.slice(-5000))); } catch (_e) {} });
+}
+function stockFlushPend() {
+  let p = []; try { p = JSON.parse(localStorage.getItem("vir_stock_pend") || "[]"); } catch (_e) {}
+  if (!p.length) return;
+  fetch(SUPABASE_STOCK_ENDPOINT, { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" }, body: JSON.stringify(p) })
+    .then(function (r) { if (r.ok) { try { localStorage.removeItem("vir_stock_pend"); } catch (_e) {} } })
+    .catch(function () {});
+}
+try { window.addEventListener("online", function () { try { stockFlushPend(); } catch (_e) {} }); stockFlushPend(); } catch (_e) {}
 /* v4.04: persistencia del avance del wizard (queda abierto durante el armado).
    Se guarda en cada cambio (_compRecalc/_compLioNp), se retoma al reabrir AP, y se
    borra al Terminar. Ventana de 36h (cubre un armado de un día para el otro). */

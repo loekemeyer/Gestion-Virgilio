@@ -860,6 +860,24 @@ async function opEnviar() {
   // Suma al acumulador del día para que Producción cierre RT con esta cantidad.
   recpAddCajas(totalCajas);
 
+  // v4.06: STOCK — lo recibido ENTRA a "Mercadería a guardar" (Movimientos_Stock).
+  // Best-effort; si falla, queda en vir_stock_pend y lo reintenta index.html (stockFlushPend).
+  try {
+    const stockRows = items.map(i => ({
+      cod_art: String(i.cod), descripcion: i.desc || null,
+      deposito: 'a_guardar', delta: i.cajas, tipo: 'recepcion', ref: opState.remito || null
+    }));
+    const { error: stErr } = await supabase.from("Movimientos_Stock").insert(stockRows);
+    if (stErr) throw stErr;
+  } catch (e) {
+    console.warn("Movimientos_Stock recepcion (queda pendiente):", e);
+    try {
+      const p = JSON.parse(localStorage.getItem("vir_stock_pend") || "[]");
+      items.forEach(i => p.push({ cod_art: String(i.cod), descripcion: i.desc || null, deposito: 'a_guardar', delta: i.cajas, tipo: 'recepcion', ref: opState.remito || null }));
+      localStorage.setItem("vir_stock_pend", JSON.stringify(p.slice(-5000)));
+    } catch (_e) {}
+  }
+
   // Registro para el checklist de Marianela (un renglón por envío). No bloquea.
   let pendId = null;
   try {
