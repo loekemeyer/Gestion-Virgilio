@@ -4,7 +4,19 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-26 · Versión app al documentar: **v4.04**
+> Última actualización: 2026-06-26 · Versión app al documentar: **v4.05**
+>
+> Nota: **v4.05** — **Dos alertas nuevas a Telegram** (grupo **"Faltantes Virgilio"**, chat `-1004379879565`, el
+> mismo bot/grupo de faltantes y sin planimetría). (1) **FALTA DE FACTURACIÓN** — *server-side* (`pg_cron` +
+> `pg_net`): función `notificar_falta_facturacion_telegram(modo)`. **`'manana'`** (cron `falta-fact-manana`,
+> `0 21 * * *` = 18:00 AR): pedidos con **entrega mañana**, **armado terminado** (hay TAP en ≤5 días) y **sin
+> facturar** (no están en `Facturacion_NP`) → avisa. **`'hoy'`** (cron `falta-fact-hoy`, `0 11 * * *` = 08:00
+> AR): **entrega HOY y sin facturar** (urgente/vencido). (2) **ERROR EN PPP** — *client-emit*: el monitor PPP
+> (modo readonly) al detectar errores (`_pppComputeErrors`) emite un evento **`PPE`** (`texto =
+> sinzona:N|zonadif:N|tandamal:N|sacar:N`, id determinístico `ppe_<día>` + upsert → **1 aviso por día**); el
+> trigger **`trg_ppp_error_telegram`** (`notificar_ppp_error_telegram`, AFTER INSERT) lo reenvía con el detalle
+> (sin zona · zona≠barrio · tandas mezcladas fecha/ruta · a sacar). Cliente: función nueva `_pppEmitError`;
+> `PPE` agregado a `isUpsert` (index.html + sw.js). Verificado end-to-end (POST 200, `ok:true`).
 >
 > Nota: **v4.04** — **El wizard "Completar" se movió a AP + TAP sin pop-up + persistencia** (cierra el pedido
 > del usuario sobre el flujo). Al tocar **AP** ahora se abre el wizard (Paso 1 Faltantes → Paso 2 Líos) en

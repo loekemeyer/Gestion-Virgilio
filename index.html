@@ -5074,7 +5074,7 @@ async function trySendOneReport(payload) {
     // y el merge-duplicates no se aplica → 409).
     // FJ y PKC usan client_id determinístico + merge-duplicates (upsert): reenviar
     // o corregir actualiza la fila en vez de fallar con 409 / duplicar.
-    const isUpsert = (payload.opcion === "FJ" || payload.opcion === "PKC" || payload.opcion === "CCN" || payload.opcion === "PSP" || payload.opcion === "CRN" || payload.opcion === "CRA" || payload.opcion === "CCR");
+    const isUpsert = (payload.opcion === "FJ" || payload.opcion === "PKC" || payload.opcion === "CCN" || payload.opcion === "PSP" || payload.opcion === "CRN" || payload.opcion === "CRA" || payload.opcion === "CCR" || payload.opcion === "PPE");
     const url    = isUpsert
       ? SUPABASE_TABLE_ENDPOINT + "?on_conflict=client_id"
       : SUPABASE_TABLE_ENDPOINT;
@@ -5214,7 +5214,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v4.04";
+const APP_VERSION = "v4.05";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -10350,6 +10350,20 @@ const _PPP_ERR_BADGE = {
   zonadif:  '<span class="ppp-eb warn">⚠ ZONA?</span>',
   tandamal: '<span class="ppp-eb warn">⚠ TANDA</span>'
 };
+/* v4.05: emite un evento PPE (1 por día, dedup por client_id determinístico) cuando el
+   monitor PPP detecta errores → el trigger trg_ppp_error_telegram lo reenvía al grupo. */
+function _pppEmitError(info) {
+  if (!info) return;
+  const sz = (info.sinZona || []).length, zd = (info.zonaDif || []).length, tm = (info.tandasMal || []).length, sc = (info.sacar || []).length;
+  if (sz + zd + tm + sc <= 0) return;
+  try {
+    const payload = { legajo: "0", opcion: "PPE", descripcion: "Errores en PPP",
+      texto: "sinzona:" + sz + "|zonadif:" + zd + "|tandamal:" + tm + "|sacar:" + sc,
+      ts: Date.now(), id: "ppe_" + getTodayKey(), ts_inicio_iso: null };
+    enqueueReport(payload);
+    if (typeof trySendOneReport === "function") trySendOneReport(payload).then(function (r) { if (r && r.ok) removeFromQueue(payload.id); }).catch(function () {});
+  } catch (_e) {}
+}
 /* Calcula los 4 errores sobre los pedidos de Supabase y los anota en p._err. Devuelve
    las listas para el panel. entSet = NP ya entregados/controlados (CRN/CCR). */
 function _pppComputeErrors(peds, entSet) {
@@ -10410,6 +10424,7 @@ function pppRenderProg() {
   let programados, aProgramar, entreg, _errInfo = null;
   if (PPP_READONLY) {
     _errInfo    = _pppComputeErrors(all, ent);                           // anota p._err + arma el panel
+    try { _pppEmitError(_errInfo); } catch (_e) {}                       // v4.05: aviso Telegram si hay errores PPP
     entreg      = all.filter(function (p) { return ent.has(String(p.np)); });
     programados = all.filter(function (p) { return p.programmed; });     // incluye los entregados (se marcan 🚮 SACAR in situ)
     aProgramar  = all.filter(function (p) { return !p.programmed; });
