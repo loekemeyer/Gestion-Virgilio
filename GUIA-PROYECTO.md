@@ -4,7 +4,27 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-26 · Versión app al documentar: **v4.15**
+> Última actualización: 2026-06-26 · Versión app al documentar: **v4.17**
+>
+> Nota: **v4.17** — **Máximo de OC = Proyección por tendencia (PaginaLK) × índice (configurable)**.
+> El máximo del generador ya no sale del Excel estático; sale de la **estadística madre por tendencia**
+> que calcula PaginaLK (repo `loekemeyer/PaginaLK`, Supabase `kwkclwhmoygunqmlegrg`). Esa proyección
+> **no está guardada** allá: se computa al vuelo en su admin (`_computeEstMadreProjections`: por
+> cliente×artículo, ventana 24m, promedio desde 1ª compra **descartando picos disruptivos**; suma sobre
+> clientes; excluye clientes test 1/3878 y `sales_excluded_items`). **Fluctúa mes a mes**. Se expuso como
+> **RPC `fn_proyeccion_madre()`** (PaginaLK, anon) y se **sincroniza** a Virgilio: tabla
+> **`proyeccion_madre`** (`cod, proy_cajas_mes, uxb, proy_uni_mes, actualizado`) + función
+> **`refresh_proyeccion_madre()`** (extensión `http`, GET al RPC, filtra `proy>0` para descartar códigos
+> de descuento) + **`pg_cron` mensual** (`'0 6 5 * *'` = día 5, después del import). En el generador:
+> `ocgFetchProyeccion` (mapa cod→proy_cajas, cod normalizado sin ceros a la izquierda); **máximo (cajas)
+> = ceil(proyección × índice)**; si un artículo no tiene proyección, cae al objetivo del Excel
+> (`OC_Maximos.max_cajas`, marcado *xls*). **Índice configurable**: columna **`OC_Maximos.indice`**
+> (default 1,5) + **módulo "⚙ Índices"** en el generador (`ocgEnterIndices`/`ocBodyIndices`/`ociSetAll`/
+> `ociSave`): editar global ("a todos en X") o por artículo, guardar con sesión de supervisor. Validado
+> con Playwright (proy×índice, fallback, editor). ⚠ Regla en PaginaLK: tabla `sales_excluded_items` +
+> trigger `trg_sl_excluir_no_venta` en `sales_lines` que descarta al importar códigos no-venta (ej. 1101).
+>
+> Nota: **v4.16** — Admin: 5 grandes en una fila + 7 chicos en una tira (fix de breakpoints).
 >
 > Nota: **v4.15** — **Vista Administración en 2 niveles** (pedido del usuario). **GRANDES** (uso diario,
 > mismo tamaño, fila de 5, `.sup-primary`): **Facturación · PPP · Carga Recepción Mercadería · Stock y
