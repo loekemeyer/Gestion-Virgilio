@@ -79,7 +79,21 @@ button {
 .sup-action-btn:hover { background: #1d4ed8; }
 .sup-action-btn:active { transform: scale(.97); }
 .sup-action-btn .sup-ico { font-size: 34px; flex: 0 0 auto; line-height: 1; }
-@media (max-width: 560px) { .sup-actions { grid-template-columns: repeat(2, 1fr); gap: 12px; } }
+/* Dos niveles (v4.15): GRANDES (uso diario, mismo tamaño) arriba · CHICOS (ocasionales) abajo. */
+.sup-actions.sup-primary { grid-template-columns: repeat(5, 1fr); }
+.sup-primary .sup-action-btn { min-height: 150px; font-size: 19px; }
+.sup-primary .sup-action-btn .sup-ico { font-size: 42px; }
+.sup-sec-label { max-width: min(1040px, 94vw); margin: 26px auto 6px; font-size: 12.5px; font-weight: 800;
+  letter-spacing: .05em; text-transform: uppercase; color: #94a3b8; }
+.sup-actions.sup-secondary { grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 0; }
+.sup-secondary .sup-action-btn { min-height: 80px; padding: 11px 9px; font-size: 14px; gap: 6px;
+  background: #51688f; border-radius: 11px; }
+.sup-secondary .sup-action-btn:hover { background: #44597a; }
+.sup-secondary .sup-action-btn .sup-ico { font-size: 23px; }
+@media (max-width: 900px) { .sup-actions.sup-primary { grid-template-columns: repeat(3, 1fr); } .sup-actions.sup-secondary { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 560px) { .sup-actions { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .sup-actions.sup-primary { grid-template-columns: repeat(2, 1fr); } .sup-actions.sup-secondary { grid-template-columns: repeat(2, 1fr); }
+  .sup-primary .sup-action-btn { min-height: 120px; } }
 /* Nombre del usuario logueado, fijo arriba a la izquierda. */
 #userTag {
   position: fixed; top: 8px; left: 8px; z-index: 60;
@@ -3014,19 +3028,24 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
   <!-- SUPERVISOR (solo n8n / logistica): botones grandes centrados. -->
   <div id="supervisorPanel" class="hidden">
     <h1 class="sup-title">Administración</h1>
-    <div class="sup-actions">
-      <button class="sup-action-btn" onclick="openMonitor()"><span class="sup-ico">📊</span><span>Monitor de operarios</span></button>
+    <!-- GRANDES: uso diario (orden definido por el usuario). "Stock y Compras" = Stocks + OC en un solo botón. -->
+    <div class="sup-actions sup-primary">
       <button class="sup-action-btn" onclick="openFacturacion()"><span class="sup-ico">📋</span><span>Facturación</span></button>
-      <button class="sup-action-btn" onclick="openInconsistencias()"><span class="sup-ico">⚠</span><span>Inconsistencias</span></button>
-      <button class="sup-action-btn" onclick="openAnalisis()"><span class="sup-ico">📈</span><span>Análisis de productividad</span></button>
-      <button class="sup-action-btn" onclick="openFaltantes()"><span class="sup-ico">📦</span><span>Faltantes</span></button>
-      <button class="sup-action-btn" onclick="openRecepcionAdmin()"><span class="sup-ico">🏭</span><span>Carga Recepción Mercadería</span></button>
-      <button class="sup-action-btn" onclick="openPlanimEditor()"><span class="sup-ico">🗺️</span><span>Editar Planimetría</span></button>
       <button class="sup-action-btn" onclick="openPPP()"><span class="sup-ico">🗓️</span><span>PPP</span></button>
+      <button class="sup-action-btn" onclick="openRecepcionAdmin()"><span class="sup-ico">🏭</span><span>Carga Recepción Mercadería</span></button>
+      <button class="sup-action-btn" onclick="openStockAdmin()"><span class="sup-ico">📦</span><span>Stock y Compras</span></button>
       <button class="sup-action-btn" onclick="openRemitosAdmin()"><span class="sup-ico">🚚</span><span>Recepción Remitos (RR)</span></button>
-      <button class="sup-action-btn" onclick="openMailsEditor()"><span class="sup-ico">✉️</span><span>Mails autorizados</span></button>
+    </div>
+    <div class="sup-sec-label">Reportes y configuración</div>
+    <!-- CHICOS: uso ocasional. -->
+    <div class="sup-actions sup-secondary">
+      <button class="sup-action-btn" onclick="openMonitor()"><span class="sup-ico">📊</span><span>Monitor de operarios</span></button>
+      <button class="sup-action-btn" onclick="openAnalisis()"><span class="sup-ico">📈</span><span>Análisis de productividad</span></button>
+      <button class="sup-action-btn" onclick="openInconsistencias()"><span class="sup-ico">⚠</span><span>Inconsistencias</span></button>
+      <button class="sup-action-btn" onclick="openFaltantes()"><span class="sup-ico">📦</span><span>Faltantes</span></button>
+      <button class="sup-action-btn" onclick="openPlanimEditor()"><span class="sup-ico">🗺️</span><span>Editar Planimetría</span></button>
       <button class="sup-action-btn" onclick="openTallEditor()"><span class="sup-ico">👷</span><span>Talleristas de Recepción</span></button>
-      <button class="sup-action-btn" onclick="openStockAdmin()"><span class="sup-ico">📦</span><span>Stocks</span></button>
+      <button class="sup-action-btn" onclick="openMailsEditor()"><span class="sup-ico">✉️</span><span>Mails autorizados</span></button>
     </div>
     <div class="auth-logout-row">
       <button class="auth-logout-btn" onclick="signOutGoogle()">Salir</button>
@@ -3267,7 +3286,8 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
 
   <div class="row row-6" id="row1"></div>
   <div class="row row-6" id="row2"></div>
-  <div class="row row-5" id="row3"></div>
+  <div class="row row-6" id="row3"></div>
+  <div id="racksAlarma"></div>
   <div id="pendingSuggestion"></div>
 
   <div id="selectedArea" class="hidden">
@@ -3345,8 +3365,8 @@ const SUPABASE_PLANIMETRIA_ENDPOINT =
 
 const filas = {
   row1: ["EP","TP","AP","TAP","CR","CC"],
-  row2: ["RR","RT","MG","RI","EI","CT"],
-  row3: ["AT","PB","Limp","Perm","PC"]
+  row2: ["RR","RT","MG","RI","EI","SC"],
+  row3: ["AT","PB","Limp","Perm","PC","CT"]
 };
 
 const desc = {
@@ -3354,7 +3374,7 @@ const desc = {
   TAP:"Terminé Armado Pedido", CR:"Control Remitos", CC:"Inicio/Fin Carga Camión",
   RR:"Recepción Remitos",
   RT:"Recepción Mercadería", MG:"Guardado a Góndola",
-  RI:"Recepción Insumos", EI:"Entrega Insumos",
+  RI:"Recepción Insumos", EI:"Entrega Insumos", SC:"Salida a Cervantes",
   AT:"Atendí Timbre", PB:"Paré Baño", Limp:"Limpieza",
   Perm:"Permiso de Salida", PC:"Paré Comida",CT:"Conteo",
   LT:"Llegada Tarde", PKC:"Picking artículo", CCN:"Carga Camión NP",
@@ -3463,6 +3483,31 @@ function escapeHtml(s) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
+}
+/* Re-render conservando el foco y el cursor del input que estaba activo. Sin esto,
+   reemplazar innerHTML en cada tecla (buscadores, steppers) "saca" del campo y obliga
+   a re-clickear por cada dígito. Reidentifica el input por (tag.clase) y su posición. */
+function _renderKeepFocus(container, html) {
+  if (!container) return;
+  const a = document.activeElement;
+  let mark = null;
+  if (a && container.contains(a) && (a.tagName === "INPUT" || a.tagName === "TEXTAREA")) {
+    const cls = (a.className || "").trim().split(/\s+/).filter(Boolean);
+    const sel = a.tagName + (cls.length ? "." + cls.join(".") : "");
+    let idx = 0;
+    try { idx = Array.prototype.indexOf.call(container.querySelectorAll(sel), a); } catch (_e) {}
+    let ss = null, se = null;
+    try { ss = a.selectionStart; se = a.selectionEnd; } catch (_e) {}
+    mark = { sel: sel, idx: idx < 0 ? 0 : idx, ss: ss, se: se };
+  }
+  container.innerHTML = html;
+  if (mark) {
+    try {
+      const list = container.querySelectorAll(mark.sel);
+      const el = list[mark.idx] || list[0];
+      if (el) { el.focus(); if (mark.ss != null && el.setSelectionRange) { try { el.setSelectionRange(mark.ss, mark.se); } catch (_e) {} } }
+    } catch (_e) {}
+  }
 }
 
 /* =========================================================
@@ -4385,6 +4430,12 @@ function goToOptions() {
   document.getElementById("btnHistDias").classList.add("hidden");
   renderPendingSuggestion();
   updateCoreButtonsState();
+  // Racks → góndola: si hay una orden de bajada pendiente, mostrar la alarma
+  // (y reintentar bajadas que quedaron sin enviar). Refresco cada 5'.
+  try {
+    racksCheckAlarma(); racksFlushPend();
+    if (!window._racksAlTimer) window._racksAlTimer = setInterval(function () { try { racksCheckAlarma(); } catch (_e) {} }, 5 * 60 * 1000);
+  } catch (_e) {}
 }
 
 function backToLegajo() {
@@ -4646,6 +4697,10 @@ function selectOption(code) {
       }
     }
   }
+
+  // v4.10: Salida a Cervantes — abre el modal directo (sin Enviar ni evento en
+  // Registros); la salida se registra como baja de góndola en Movimientos_Stock.
+  if (code === "SC") { showCervantesModal(legajoStr); return; }
 
   // CC ya abierto: el botón CC RE-ABRE el popup de Carga Camión (no lo cierra).
   // El cierre se hace SOLO con "Terminé Carga Camión" dentro del popup.
@@ -5215,7 +5270,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v4.07";
+const APP_VERSION = "v4.15";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -5411,6 +5466,8 @@ async function send() {
 
   // Al EMPEZAR PICKING: flujo interactivo de artículos a levantar (Ok / F).
   if (opcion === "EP" && (texto || "").trim()) showPickingList(texto, legajoStr);
+  // v4.07: al TERMINAR PICKING (TP) → baja de "Artículo Terminado" lo que se pickeó (cajas reales).
+  if (opcion === "TP" && (texto || "").trim()) stockBajaPicking(texto, legajoStr);
   // Al EMPEZAR ARMADO (AP): armado guiado por caja/m³ (OPCIONAL, apagado por
   // defecto; showArmadoGuide corta solo si la flag está en false). No bloquea AP.
   if (opcion === "AP" && (texto || "").trim()) {
@@ -5433,6 +5490,21 @@ async function send() {
   if (opcion === "CR") {
     const stCR = getLegajoState(legajoStr);
     if (stCR && stCR.toggles && stCR.toggles.CR) showControlRemitosCR(legajoStr);
+  }
+  // v4.07: al INICIAR Guardado a Góndola (MG): pantalla para pasar de "Mercadería a guardar" a "Terminado".
+  if (opcion === "MG") {
+    const stMG = getLegajoState(legajoStr);
+    if (stMG && stMG.toggles && stMG.toggles.MG) showMGModal(legajoStr);
+  }
+  // v4.09: al INICIAR Recepción/Entrega de Insumos (RI/EI): buscador de insumos para registrar
+  // el stock que entra (+) o sale (−) en el depósito 'insumos' (con alta de código al vuelo).
+  if (opcion === "RI") {
+    const stRI = getLegajoState(legajoStr);
+    if (stRI && stRI.toggles && stRI.toggles.RI) showInsumoModal("RI", legajoStr);
+  }
+  if (opcion === "EI") {
+    const stEI = getLegajoState(legajoStr);
+    if (stEI && stEI.toggles && stEI.toggles.EI) showInsumoModal("EI", legajoStr);
   }
   // v4.04: TAP ya NO abre ningún pop-up (el wizard se movió a AP). TAP es solo el cierre del
   // armado; el wizard Faltantes→Líos se completa durante el armado y se guarda con su "Terminar".
@@ -6955,7 +7027,12 @@ async function stockGetCutoff() {
 function stockComputeSaldos(movs, cutoff) {
   const m = {}, cut = cutoff ? new Date(cutoff).getTime() : 0;
   movs.forEach(function (mv) {
-    if (cut && new Date(mv.ts).getTime() < cut) return;
+    // El stock inicial (tipo 'inicial') SIEMPRE cuenta como base, aunque sea
+    // anterior al corte. "Marcar inicio" (corte) sólo desconsidera los
+    // movimientos REALES previos (recepción/guardado/picking/ajuste/etc.), sin
+    // borrarlos. Así se puede cargar el inicial de varios depósitos en cualquier
+    // orden y marcar inicio una sola vez, sin que un depósito pise a otro.
+    if (cut && mv.tipo !== "inicial" && new Date(mv.ts).getTime() < cut) return;
     const k = String(mv.cod_art);
     if (!m[k]) m[k] = { cod: k, desc: mv.descripcion || "", a_guardar: 0, terminado: 0 };
     if (mv.descripcion && !m[k].desc) m[k].desc = mv.descripcion;
@@ -6968,28 +7045,258 @@ let _stk = null;
 async function openStockAdmin() {
   if (!document.getElementById("stkCss")) {
     const s = document.createElement("style"); s.id = "stkCss";
-    s.textContent = "#stockAdminOverlay{display:none;position:fixed;inset:0;z-index:1280;background:rgba(2,6,23,.74);overflow:auto;padding:14px;}#stockAdminOverlay.show{display:block;}.stk-card{background:#f8fafc;max-width:880px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.stk-head{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:linear-gradient(90deg,#1e6bd6,#1e3a8a);color:#fff;}.stk-title{font-size:19px;font-weight:800;}.stk-close{background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;width:auto;}.stk-body{padding:14px 16px;}.stk-loading,.stk-empty{padding:24px;text-align:center;color:#64748b;}.stk-cut{background:#fffbeb;border:1px solid #fcd34d;color:#92400e;border-radius:9px;padding:8px 11px;font-size:12.5px;font-weight:700;margin-bottom:10px;}.stk-tools{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;}.stk-filtro{flex:1;min-width:180px;height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 11px;font-size:14px;}.stk-btn{background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:8px 12px;font-size:13px;font-weight:800;cursor:pointer;width:auto;}.stk-btn.ok{background:#16a34a;color:#fff;border-color:#16a34a;}.stk-btn.danger{background:#fff;color:#b91c1c;border-color:#fca5a5;}.stk-tbl{width:100%;border-collapse:collapse;font-size:13.5px;}.stk-tbl th{background:#f1f5f9;color:#475569;text-align:left;padding:7px 9px;font-size:11px;text-transform:uppercase;border-bottom:1px solid #cbd5e1;}.stk-tbl th.num,.stk-tbl td.num{text-align:right;font-variant-numeric:tabular-nums;}.stk-row{cursor:pointer;border-bottom:1px solid #eef2f7;}.stk-row:hover{background:#eff6ff;}.stk-row td{padding:7px 9px;}.stk-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#1e6bd6;}.stk-desc{color:#475569;}.stk-neg{color:#b91c1c;font-weight:800;}.stk-caret{color:#94a3b8;}.stk-detrow td{padding:0 9px 9px;background:#f8fafc;}.stk-det{border-left:3px solid #cbd5e1;padding:6px 0 6px 10px;}.stk-mv{display:flex;gap:9px;font-size:12px;padding:3px 0;align-items:center;}.stk-mv-old{opacity:.45;}.stk-mv-ts{color:#64748b;min-width:96px;}.stk-mv-tipo{font-weight:800;min-width:78px;}.stk-mv-dep{color:#64748b;min-width:74px;}.stk-mv-d{font-weight:800;min-width:44px;text-align:right;}.stk-mv-d.pos{color:#15803d;}.stk-mv-d.neg{color:#b91c1c;}.stk-mv-ref{color:#94a3b8;}.stk-mv-more{font-size:11px;color:#94a3b8;padding-top:4px;}.stk-inicial{max-width:560px;}.stk-ini-h{font-size:16px;font-weight:800;margin-bottom:6px;}.stk-ini-hint{font-size:12.5px;color:#64748b;margin-bottom:8px;}.stk-ini-txt{width:100%;border:1px solid #cbd5e1;border-radius:9px;padding:9px;font-family:Consolas,Menlo,monospace;font-size:14px;}.stk-ini-btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}.stk-ini-warn{font-size:12px;color:#92400e;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:8px;margin-top:10px;}.stk-tabs{display:flex;gap:4px;padding:8px 12px 0;background:#1e3a8a;}.stk-tab{flex:1;background:rgba(255,255,255,.12);color:#cbd5e1;border:none;border-radius:9px 9px 0 0;padding:9px 6px;font-size:12.5px;font-weight:800;cursor:pointer;}.stk-tab.on{background:#f8fafc;color:#1e3a8a;}.stk-seg{display:flex;gap:6px;margin-bottom:10px;}.stk-segb{flex:1;background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:7px;font-size:13px;font-weight:800;cursor:pointer;}.stk-segb.on{background:#1e6bd6;color:#fff;border-color:#1e6bd6;}.stk-grp{margin-bottom:10px;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;}.stk-grp-h{background:#f1f5f9;padding:7px 10px;font-weight:800;font-size:13px;}.stk-grp-tot{color:#15803d;font-weight:800;margin-left:6px;}.stk-ing{display:flex;gap:9px;align-items:center;padding:5px 10px;border-top:1px solid #f1f5f9;font-size:12.5px;}.stk-ing-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#1e6bd6;}.stk-ing-desc{flex:1;color:#475569;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.stk-ing-rto{color:#94a3b8;font-size:11px;}.stk-aj-sec{border:1px solid #e2e8f0;border-radius:12px;padding:12px;margin-bottom:12px;}.stk-aj-h{font-size:15px;font-weight:800;margin-bottom:6px;}.stk-aj-hint{font-size:12px;color:#64748b;margin-bottom:7px;}.stk-aj-form{display:flex;gap:7px;flex-wrap:wrap;}.stk-aj-inp{flex:1;min-width:90px;height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 10px;font-size:14px;}";
+    s.textContent = "#stockAdminOverlay{display:none;position:fixed;inset:0;z-index:1280;background:rgba(2,6,23,.74);overflow:auto;padding:14px;}#stockAdminOverlay.show{display:block;}.stk-card{background:#f8fafc;max-width:880px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.stk-head{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:linear-gradient(90deg,#1e6bd6,#1e3a8a);color:#fff;}.stk-title{font-size:19px;font-weight:800;}.stk-close{background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;width:auto;}.stk-body{padding:14px 16px;}.stk-loading,.stk-empty{padding:24px;text-align:center;color:#64748b;}.stk-cut{background:#fffbeb;border:1px solid #fcd34d;color:#92400e;border-radius:9px;padding:8px 11px;font-size:12.5px;font-weight:700;margin-bottom:10px;}.stk-tools{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;}.stk-filtro{flex:1;min-width:180px;height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 11px;font-size:14px;}.stk-btn{background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:8px 12px;font-size:13px;font-weight:800;cursor:pointer;width:auto;}.stk-btn.ok{background:#16a34a;color:#fff;border-color:#16a34a;}.stk-btn.danger{background:#fff;color:#b91c1c;border-color:#fca5a5;}.stk-tbl{width:100%;border-collapse:collapse;font-size:13.5px;}.stk-tbl th{background:#f1f5f9;color:#475569;text-align:left;padding:7px 9px;font-size:11px;text-transform:uppercase;border-bottom:1px solid #cbd5e1;}.stk-tbl th.num,.stk-tbl td.num{text-align:right;font-variant-numeric:tabular-nums;}.stk-row{cursor:pointer;border-bottom:1px solid #eef2f7;}.stk-row:hover{background:#eff6ff;}.stk-row td{padding:7px 9px;}.stk-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#1e6bd6;}.stk-desc{color:#475569;}.stk-neg{color:#b91c1c;font-weight:800;}.stk-caret{color:#94a3b8;}.stk-detrow td{padding:0 9px 9px;background:#f8fafc;}.stk-det{border-left:3px solid #cbd5e1;padding:6px 0 6px 10px;}.stk-mv{display:flex;gap:9px;font-size:12px;padding:3px 0;align-items:center;}.stk-mv-old{opacity:.45;}.stk-mv-ts{color:#64748b;min-width:96px;}.stk-mv-tipo{font-weight:800;min-width:78px;}.stk-mv-dep{color:#64748b;min-width:74px;}.stk-mv-d{font-weight:800;min-width:44px;text-align:right;}.stk-mv-d.pos{color:#15803d;}.stk-mv-d.neg{color:#b91c1c;}.stk-mv-ref{color:#94a3b8;}.stk-mv-more{font-size:11px;color:#94a3b8;padding-top:4px;}.stk-inicial{max-width:560px;}.stk-ini-h{font-size:16px;font-weight:800;margin-bottom:6px;}.stk-ini-hint{font-size:12.5px;color:#64748b;margin-bottom:8px;}.stk-ini-txt{width:100%;border:1px solid #cbd5e1;border-radius:9px;padding:9px;font-family:Consolas,Menlo,monospace;font-size:14px;}.stk-ini-btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}.stk-ini-warn{font-size:12px;color:#92400e;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:8px;margin-top:10px;}.stk-tabs{display:flex;gap:4px;padding:8px 12px 0;background:#1e3a8a;}.stk-tab{flex:1;background:rgba(255,255,255,.12);color:#cbd5e1;border:none;border-radius:9px 9px 0 0;padding:9px 6px;font-size:12.5px;font-weight:800;cursor:pointer;}.stk-tab.on{background:#f8fafc;color:#1e3a8a;}.stk-seg{display:flex;gap:6px;margin-bottom:10px;}.stk-segb{flex:1;background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:7px;font-size:13px;font-weight:800;cursor:pointer;}.stk-segb.on{background:#1e6bd6;color:#fff;border-color:#1e6bd6;}.stk-grp{margin-bottom:10px;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;}.stk-grp-h{background:#f1f5f9;padding:7px 10px;font-weight:800;font-size:13px;}.stk-grp-tot{color:#15803d;font-weight:800;margin-left:6px;}.stk-ing{display:flex;gap:9px;align-items:center;padding:5px 10px;border-top:1px solid #f1f5f9;font-size:12.5px;}.stk-ing-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#1e6bd6;}.stk-ing-desc{flex:1;color:#475569;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.stk-ing-rto{color:#94a3b8;font-size:11px;}.stk-aj-sec{border:1px solid #e2e8f0;border-radius:12px;padding:12px;margin-bottom:12px;}.stk-aj-h{font-size:15px;font-weight:800;margin-bottom:6px;}.stk-aj-hint{font-size:12px;color:#64748b;margin-bottom:7px;}.stk-aj-form{display:flex;gap:7px;flex-wrap:wrap;}.stk-aj-inp{flex:1;min-width:90px;height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 10px;font-size:14px;}.stk-aj-dep{margin-bottom:12px;font-size:13px;font-weight:800;}.stk-aj-dep select{height:36px;border:1px solid #cbd5e1;border-radius:8px;padding:0 8px;font-size:14px;font-weight:700;}.stk-rk-orden{background:#f1f5f9;border-radius:10px;padding:10px 12px;font-size:13px;margin-bottom:10px;}.stk-rk-orden.pend{background:#fffbeb;border:1.5px solid #fcd34d;color:#92400e;}.stk-rk-baj{display:flex;align-items:center;gap:10px;border:1px solid #e2e8f0;border-radius:11px;padding:9px 11px;margin-bottom:8px;background:#fff;}.stk-rk-baji{flex:1;min-width:0;}.stk-rk-q{font-size:12px;color:#1e6bd6;font-weight:700;margin-top:2px;}";
     document.head.appendChild(s);
   }
   let ov = document.getElementById("stockAdminOverlay");
   if (!ov) { ov = document.createElement("div"); ov.id = "stockAdminOverlay"; document.body.appendChild(ov); }
   ov.classList.add("show");
-  ov.innerHTML = '<div class="stk-card"><div class="stk-head"><span class="stk-title">📦 Stocks</span><button class="stk-close" onclick="closeStockAdmin()">Cerrar</button></div><div class="stk-tabs" id="stkTabs"></div><div class="stk-body" id="stkBody"><div class="stk-loading">Cargando…</div></div></div>';
+  ov.innerHTML = '<div class="stk-card"><div class="stk-head"><span class="stk-title">📦 Stock y Compras</span><button class="stk-close" onclick="closeStockAdmin()">Cerrar</button></div><div class="stk-tabs" id="stkTabs"></div><div class="stk-body" id="stkBody"><div class="stk-loading">Cargando…</div></div></div>';
   try {
-    const res = await Promise.all([stockFetchMovs(), stockGetCutoff()]);
-    _stk = { movs: res[0] || [], cutoff: res[1], tab: "stocks", filtro: "", openArt: null, ingMode: "remito" };
+    const res = await Promise.all([stockFetchMovs(), stockGetCutoff(), stockFetchArtFactors(), racksFetchOrdenes(), racksFetchBajadas()]);
+    _stk = { movs: res[0] || [], cutoff: res[1], factors: res[2] || {}, ordenes: res[3] || [], bajadas: res[4] || [], tab: "stocks", filtro: "", openArt: null, ingMode: "remito" };
     stkRender();
   } catch (e) { const b = document.getElementById("stkBody"); if (b) b.innerHTML = '<div class="stk-loading">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
 }
 function closeStockAdmin() { const ov = document.getElementById("stockAdminOverlay"); if (ov) ov.classList.remove("show"); _stk = null; }
-function stkTab(t) { if (!_stk) return; _stk.tab = t; _stk.filtro = ""; _stk.openArt = null; stkRender(); }
+
+/* ===== ÓRDENES DE COMPRA (v4.11): visualización/carga de OCs y match recibido vs pedido.
+   Usa la tabla EXISTENTE Ordenes_Compra (plana: una fila por artículo pedido — codigo,
+   descripcion, cantidad, cantidad_recibida, proveedor, rubro, fecha, unidad, estado). Una "OC"
+   se agrupa por (proveedor · fecha · rubro). Lectura con anon (RLS select_all); ESCRITURA con
+   sesión de supervisor (facAuthWriteHeaders → rol authenticated, como Planimetría/Talleristas),
+   respetando que insert/update/delete están restringidos a authenticated. Los PDFs de OC viven en
+   un share de Windows (no accesible del sandbox); cuando definamos el formato, la importación va a
+   poblar ESTA misma tabla. Admin. ===== */
+const SUPABASE_OC_ENDPOINT = SUPABASE_URL + "/rest/v1/Ordenes_Compra";
+let _oc = null;
+function _ocGroupKey(r) { return [r.proveedor || "", r.fecha || "", r.rubro || ""].join("~|~"); }
+async function ocFetchRows() {
+  const r = await fetch(SUPABASE_OC_ENDPOINT + "?select=id,fecha,rubro,proveedor,codigo,descripcion,cantidad,cantidad_recibida,unidad,estado&order=fecha.desc,proveedor.asc,codigo.asc&limit=20000", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+  return r.ok ? r.json() : [];
+}
+async function openOCAdmin() {
+  if (!document.getElementById("ocCss")) {
+    const s = document.createElement("style"); s.id = "ocCss";
+    s.textContent = "#ocAdminOverlay{display:none;position:fixed;inset:0;z-index:1281;background:rgba(2,6,23,.74);overflow:auto;padding:14px;}#ocAdminOverlay.show{display:block;}.oc-card{background:#f8fafc;max-width:860px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.oc-head{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:linear-gradient(90deg,#0f766e,#134e4a);color:#fff;}.oc-title{font-size:19px;font-weight:800;}.oc-close{background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;width:auto;}.oc-body{padding:14px 16px;}.oc-loading,.oc-empty{padding:24px;text-align:center;color:#64748b;}.oc-tools{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center;}.oc-btn{background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:8px 13px;font-size:13px;font-weight:800;cursor:pointer;width:auto;}.oc-btn.ok{background:#0f766e;color:#fff;border-color:#0f766e;}.oc-btn.danger{background:#fff;color:#b91c1c;border-color:#fca5a5;}.oc-filtro{flex:1;min-width:160px;height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 11px;font-size:14px;}.oc-tbl{width:100%;border-collapse:collapse;font-size:13.5px;}.oc-tbl th{background:#f1f5f9;color:#475569;text-align:left;padding:7px 9px;font-size:11px;text-transform:uppercase;border-bottom:1px solid #cbd5e1;}.oc-tbl th.num,.oc-tbl td.num{text-align:right;font-variant-numeric:tabular-nums;}.oc-tbl td{padding:7px 9px;border-bottom:1px solid #eef2f7;}.oc-rowc{cursor:pointer;}.oc-rowc:hover{background:#ecfdf5;}.oc-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#0f766e;}.oc-pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11px;font-weight:800;}.oc-pill.pendiente{background:#fef3c7;color:#92400e;}.oc-pill.recibida{background:#dcfce7;color:#166534;}.oc-pill.parcial{background:#dbeafe;color:#1e40af;}.oc-falt{color:#b91c1c;font-weight:800;}.oc-ok{color:#166534;font-weight:800;}.oc-rinp{width:78px;height:34px;text-align:right;border:1px solid #cbd5e1;border-radius:8px;padding:0 7px;font-size:14px;font-weight:700;}.oc-form{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;}.oc-inp{height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 10px;font-size:14px;}.oc-meta{font-size:13px;color:#475569;margin-bottom:10px;}.oc-meta b{color:#0f172a;}.oc-additm{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-top:8px;}.oc-note{font-size:12px;color:#64748b;margin-top:10px;}";
+    document.head.appendChild(s);
+  }
+  let ov = document.getElementById("ocAdminOverlay");
+  if (!ov) { ov = document.createElement("div"); ov.id = "ocAdminOverlay"; document.body.appendChild(ov); }
+  ov.classList.add("show");
+  ov.innerHTML = '<div class="oc-card"><div class="oc-head"><span class="oc-title">📑 Órdenes de Compra</span><button class="oc-close" onclick="closeOCAdmin()">Cerrar</button></div><div class="oc-body" id="ocBody"><div class="oc-loading">Cargando…</div></div></div>';
+  try {
+    const rows = await ocFetchRows();
+    _oc = { rows: rows, view: "list", openKey: null, filtro: "", nueva: { proveedor: "", fecha: "", rubro: "", unidad: "Cajas", items: [{ cod: "", desc: "", cant: "" }] } };
+    ocRender();
+  } catch (e) { const b = document.getElementById("ocBody"); if (b) b.innerHTML = '<div class="oc-loading">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
+}
+function closeOCAdmin() { const ov = document.getElementById("ocAdminOverlay"); if (ov) ov.classList.remove("show"); _oc = null; }
+function ocRender() { if (!_oc) return; const body = document.getElementById("ocBody"); if (!body) return; _renderKeepFocus(body, _oc.view === "detail" ? ocBodyDetail() : _oc.view === "nueva" ? ocBodyNueva() : _oc.view === "gen" ? ocBodyGen() : ocBodyList()); }
+function ocGroups() {
+  const g = {};
+  (_oc.rows || []).forEach(function (r) { const k = _ocGroupKey(r); if (!g[k]) g[k] = { key: k, proveedor: r.proveedor || "", fecha: r.fecha || "", rubro: r.rubro || "", rows: [] }; g[k].rows.push(r); });
+  return g;
+}
+function ocGroupStats(grp) {
+  let ped = 0, rec = 0, allRecibida = true;
+  grp.rows.forEach(function (r) { ped += Number(r.cantidad) || 0; rec += Number(r.cantidad_recibida) || 0; if (String(r.estado || "") !== "recibida") allRecibida = false; });
+  const estado = allRecibida ? "recibida" : (rec > 0 ? "parcial" : "pendiente");
+  return { ped: ped, rec: rec, falta: ped - rec, estado: estado };
+}
+function ocBodyList() {
+  let h = '<div class="oc-tools"><button class="oc-btn ok" onclick="ocNueva()">+ Nueva OC (carga manual)</button><button class="oc-btn" onclick="ocgEnter()">⚙ Generar OCs (beta)</button><input class="oc-filtro" type="search" placeholder="🔎 Buscar proveedor / rubro / fecha" value="' + escapeHtml(_oc.filtro) + '" oninput="if(_oc){_oc.filtro=this.value;ocRender();}"></div>';
+  const g = ocGroups();
+  let keys = Object.keys(g);
+  const f = (_oc.filtro || "").toLowerCase().trim();
+  if (f) keys = keys.filter(function (k) { const x = g[k]; return ((x.proveedor || "") + " " + (x.rubro || "") + " " + (x.fecha || "")).toLowerCase().indexOf(f) >= 0; });
+  keys.sort(function (a, b) { return (g[b].fecha || "").localeCompare(g[a].fecha || "") || (g[a].proveedor || "").localeCompare(g[b].proveedor || ""); });
+  if (!keys.length) return h + '<div class="oc-empty">No hay órdenes de compra que coincidan.<br><small>La importación desde los PDF de OC se agrega cuando definamos el formato.</small></div>';
+  h += '<table class="oc-tbl"><thead><tr><th>Proveedor</th><th>Fecha</th><th>Rubro</th><th class="num">Ítems</th><th class="num">Pedido</th><th class="num">Falta</th><th>Estado</th></tr></thead><tbody>';
+  keys.forEach(function (k) {
+    const x = g[k], st = ocGroupStats(x);
+    h += '<tr class="oc-rowc" onclick="ocOpen(\'' + encodeURIComponent(k) + '\')"><td><b>' + escapeHtml(x.proveedor || "—") + '</b></td><td>' + escapeHtml(x.fecha || "—") + '</td><td>' + escapeHtml(x.rubro || "—") + '</td><td class="num">' + x.rows.length + '</td><td class="num">' + st.ped + '</td><td class="num ' + (st.falta > 0 ? "oc-falt" : "oc-ok") + '">' + (st.falta > 0 ? st.falta : "0") + '</td><td><span class="oc-pill ' + st.estado + '">' + st.estado + '</span></td></tr>';
+  });
+  h += '</tbody></table><div class="oc-note">La columna <b>Falta</b> = pedido − recibido. Entrá a una OC para cargar lo recibido y marcar el faltante (escritura: requiere sesión de supervisor).</div>';
+  return h;
+}
+function ocOpen(kEnc) { if (!_oc) return; _oc.openKey = decodeURIComponent(kEnc); _oc.view = "detail"; ocRender(); }
+function ocBack() { if (!_oc) return; _oc.view = "list"; _oc.openKey = null; ocRender(); }
+function ocBodyDetail() {
+  const g = ocGroups(), x = g[_oc.openKey];
+  if (!x) { _oc.view = "list"; return ocBodyList(); }
+  const st = ocGroupStats(x);
+  let h = '<div class="oc-tools"><button class="oc-btn" onclick="ocBack()">← Volver</button>';
+  h += '<button class="oc-btn ok" onclick="ocGuardarRecibido()">💾 Guardar recibido</button>';
+  if (st.estado !== "recibida") h += '<button class="oc-btn" onclick="ocMarcar(\'recibida\')">✓ Marcar recibida</button>';
+  else h += '<button class="oc-btn" onclick="ocMarcar(\'pendiente\')">↩ Reabrir</button>';
+  h += '</div>';
+  h += '<div class="oc-meta">Proveedor <b>' + escapeHtml(x.proveedor || "—") + '</b> · Fecha <b>' + escapeHtml(x.fecha || "—") + '</b> · Rubro <b>' + escapeHtml(x.rubro || "—") + '</b> · Pedido <b>' + st.ped + '</b> · Falta <b>' + (st.falta > 0 ? st.falta : 0) + '</b></div>';
+  h += '<table class="oc-tbl"><thead><tr><th>Código</th><th>Descripción</th><th>Unidad</th><th class="num">Pedido</th><th class="num">Recibido</th><th class="num">Falta</th></tr></thead><tbody>';
+  x.rows.forEach(function (r) {
+    const ped = Number(r.cantidad) || 0, rec = Number(r.cantidad_recibida) || 0, falt = ped - rec;
+    h += '<tr><td class="oc-cod">' + escapeHtml(r.codigo || "—") + '</td><td>' + escapeHtml(r.descripcion || "") + '</td><td>' + escapeHtml(r.unidad || "") + '</td><td class="num">' + ped + '</td><td class="num"><input class="oc-rinp" type="number" min="0" inputmode="numeric" data-id="' + r.id + '" value="' + rec + '" oninput="ocLiveFalt(' + r.id + ',' + ped + ',this.value)"></td><td class="num ' + (falt > 0 ? "oc-falt" : "oc-ok") + '" id="ocfalt_' + r.id + '">' + (falt !== 0 ? falt : "0") + '</td></tr>';
+  });
+  return h + "</tbody></table>";
+}
+function ocLiveFalt(id, ped, v) { const c = document.getElementById("ocfalt_" + id); if (!c) return; const falt = ped - (parseInt(v, 10) || 0); c.textContent = falt !== 0 ? falt : "0"; c.className = "num " + (falt > 0 ? "oc-falt" : "oc-ok"); }
+function _ocCollectRecibido() {
+  const out = [];
+  document.querySelectorAll('#ocBody .oc-rinp').forEach(function (el) { out.push({ id: el.getAttribute("data-id"), val: Math.max(0, parseInt(el.value, 10) || 0) }); });
+  return out;
+}
+async function ocGuardarRecibido() {
+  if (!_oc) return;
+  const headers = await facAuthWriteHeaders({ "Prefer": "return=minimal" });
+  if (!headers) { alert("Para guardar necesitás iniciar sesión con Google (supervisor)."); return; }
+  try {
+    await Promise.all(_ocCollectRecibido().map(function (r) { return fetch(SUPABASE_OC_ENDPOINT + "?id=eq." + r.id, { method: "PATCH", headers: headers, body: JSON.stringify({ cantidad_recibida: r.val }) }); }));
+    _oc.rows = await ocFetchRows(); ocRender();
+    alert("✓ Recibido guardado.");
+  } catch (e) { alert("Error guardando: " + (e.message || e)); }
+}
+async function ocMarcar(estado) {
+  if (!_oc || !_oc.openKey) return;
+  const g = ocGroups(), x = g[_oc.openKey]; if (!x) return;
+  const headers = await facAuthWriteHeaders({ "Prefer": "return=minimal" });
+  if (!headers) { alert("Para esto necesitás iniciar sesión con Google (supervisor)."); return; }
+  try {
+    if (estado === "recibida") { await Promise.all(_ocCollectRecibido().map(function (r) { return fetch(SUPABASE_OC_ENDPOINT + "?id=eq." + r.id, { method: "PATCH", headers: headers, body: JSON.stringify({ cantidad_recibida: r.val }) }); })); }
+    await Promise.all(x.rows.map(function (r) { return fetch(SUPABASE_OC_ENDPOINT + "?id=eq." + r.id, { method: "PATCH", headers: headers, body: JSON.stringify({ estado: estado }) }); }));
+    _oc.rows = await ocFetchRows(); ocRender();
+  } catch (e) { alert("Error: " + (e.message || e)); }
+}
+function ocNueva() { if (!_oc) return; _oc.view = "nueva"; if (!_oc.nueva || !_oc.nueva.items) _oc.nueva = { proveedor: "", fecha: "", rubro: "", unidad: "Cajas", items: [{ cod: "", desc: "", cant: "" }] }; ocRender(); }
+function ocBodyNueva() {
+  const n = _oc.nueva;
+  let h = '<div class="oc-tools"><button class="oc-btn" onclick="ocBack()">← Volver</button></div>';
+  h += '<div class="oc-form"><input class="oc-inp" placeholder="Proveedor" value="' + escapeHtml(n.proveedor) + '" oninput="if(_oc)_oc.nueva.proveedor=this.value"><input class="oc-inp" type="date" value="' + escapeHtml(n.fecha) + '" oninput="if(_oc)_oc.nueva.fecha=this.value"><input class="oc-inp" placeholder="Rubro (ej: Cajas)" value="' + escapeHtml(n.rubro) + '" oninput="if(_oc)_oc.nueva.rubro=this.value"><input class="oc-inp" placeholder="Unidad" style="width:90px" value="' + escapeHtml(n.unidad) + '" oninput="if(_oc)_oc.nueva.unidad=this.value"></div>';
+  h += '<table class="oc-tbl"><thead><tr><th>Código</th><th>Descripción</th><th class="num">Cantidad</th><th></th></tr></thead><tbody>';
+  n.items.forEach(function (it, i) {
+    h += '<tr><td><input class="oc-inp" style="width:100px" placeholder="cod" value="' + escapeHtml(it.cod) + '" oninput="if(_oc)_oc.nueva.items[' + i + '].cod=this.value"></td><td><input class="oc-inp" style="width:100%;box-sizing:border-box" placeholder="descripción" value="' + escapeHtml(it.desc) + '" oninput="if(_oc)_oc.nueva.items[' + i + '].desc=this.value"></td><td class="num"><input class="oc-rinp" type="number" min="0" inputmode="numeric" value="' + escapeHtml(String(it.cant)) + '" oninput="if(_oc)_oc.nueva.items[' + i + '].cant=this.value"></td><td><button class="oc-btn danger" onclick="ocNuevaDelItem(' + i + ')">✕</button></td></tr>';
+  });
+  h += '</tbody></table><div class="oc-additm"><button class="oc-btn" onclick="ocNuevaAddItem()">+ Agregar ítem</button><button class="oc-btn ok" onclick="ocNuevaCrear()">✓ Crear OC</button></div>';
+  return h;
+}
+function ocNuevaAddItem() { if (!_oc) return; _oc.nueva.items.push({ cod: "", desc: "", cant: "" }); ocRender(); }
+function ocNuevaDelItem(i) { if (!_oc) return; _oc.nueva.items.splice(i, 1); if (!_oc.nueva.items.length) _oc.nueva.items.push({ cod: "", desc: "", cant: "" }); ocRender(); }
+async function ocNuevaCrear() {
+  if (!_oc) return;
+  const n = _oc.nueva;
+  const items = n.items.filter(function (it) { return String(it.cod).trim() || (parseInt(it.cant, 10) || 0) > 0; });
+  if (!items.length) { alert("Cargá al menos un ítem con código y cantidad."); return; }
+  const headers = await facAuthWriteHeaders({ "Prefer": "return=minimal" });
+  if (!headers) { alert("Para crear una OC necesitás iniciar sesión con Google (supervisor)."); return; }
+  const rows = items.map(function (it) { return { proveedor: n.proveedor.trim() || null, fecha: n.fecha || null, rubro: n.rubro.trim() || null, codigo: String(it.cod).trim() || null, descripcion: String(it.desc).trim() || null, cantidad: Math.max(0, parseInt(it.cant, 10) || 0), cantidad_recibida: 0, unidad: n.unidad.trim() || null, estado: "pendiente" }; });
+  try {
+    const r = await fetch(SUPABASE_OC_ENDPOINT, { method: "POST", headers: headers, body: JSON.stringify(rows) });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    _oc.rows = await ocFetchRows();
+    _oc.nueva = { proveedor: "", fecha: "", rubro: "", unidad: "Cajas", items: [{ cod: "", desc: "", cant: "" }] };
+    _oc.openKey = [rows[0].proveedor || "", rows[0].fecha || "", rows[0].rubro || ""].join("~|~");
+    _oc.view = "detail"; ocRender();
+    alert("✓ OC creada con " + rows.length + " ítem(s).");
+  } catch (e) { alert("Error creando OC: " + (e.message || e)); }
+}
+
+/* ===== GENERADOR DE OCs (v4.13): replica la lógica del Excel "Pedidos Talleristas/Prov".
+   Por artículo: A pedir = max(0, Máximo + Pedidos − (Góndola + Racks)). Máximo y Proveedor salen de
+   OC_Maximos (config importada del Excel); Stock de Movimientos_Stock (góndola+racks, NO "a guardar");
+   Pedidos (demanda) = Σ cajas por artículo en los pedidos del PPP (PPP_Programacion_Diaria) según la
+   base de picking (PPP_Base_Pedidos). Agrupa por proveedor y, al confirmar, escribe las OCs en
+   Ordenes_Compra (escritura: sesión de supervisor). Proveedores INTERNOS (Racks=importación,
+   Log/Fabr=fábrica) se muestran pero NO generan OC externa. BETA: no usar hasta cargar el stock. */
+const SUPABASE_OCMAX_ENDPOINT = SUPABASE_URL + "/rest/v1/OC_Maximos";
+const OCG_INTERNOS = ["RACKS", "LOG/ FABR", "LOG/FABR", "LOG/ FABRICA"];
+function _ocgInterno(prov) { return OCG_INTERNOS.indexOf(String(prov || "").toUpperCase().trim()) >= 0; }
+async function ocgFetchMaximos() {
+  const r = await fetch(SUPABASE_OCMAX_ENDPOINT + "?select=cod,descripcion,linea,max_cajas,proveedor,uni_x_caja&activo=eq.true&limit=20000", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+  return r.ok ? r.json() : [];
+}
+async function ocgDemanda() {
+  let ppp = [];
+  try { ppp = await supaFetchAll(SUPABASE_PPP_PROG_ENDPOINT, "select=np"); } catch (_e) {}
+  const npSet = {};
+  ppp.forEach(function (r) { const n = pickNormNp(r.np); if (n) npSet[n] = true; });
+  let base = new Map();
+  try { base = await fetchPickingBase(); } catch (_e) {}
+  const dem = {};
+  Object.keys(npSet).forEach(function (np) {
+    (base.get(np) || []).forEach(function (it) { const a = String(it.art || "").toUpperCase().trim(); if (a) dem[a] = (dem[a] || 0) + (Number(it.cajas) || 0); });
+  });
+  return dem;
+}
+async function ocgEnter() {
+  if (!_oc) return;
+  _oc.view = "gen"; _oc.gen = null; ocRender();   // muestra "calculando…"
+  try {
+    const res = await Promise.all([ocgFetchMaximos(), stockFetchMovs(), stockGetCutoff(), ocgDemanda()]);
+    const maxs = res[0] || [], saldos = stockComputeSaldos(res[1] || [], res[2]), dem = res[3] || {};
+    const items = [];
+    maxs.forEach(function (m) {
+      const cod = String(m.cod).toUpperCase().trim();
+      const sd = saldos[cod] || {};
+      const stock = (Number(sd.terminado) || 0) + (Number(sd.racks) || 0);
+      const demanda = dem[cod] || 0;
+      const faltaRaw = (Number(m.max_cajas) || 0) + demanda - stock;
+      if (faltaRaw <= 0) return;
+      items.push({ cod: cod, desc: m.descripcion || "", prov: (m.proveedor || "(sin proveedor)").trim(), max: Number(m.max_cajas) || 0, demanda: demanda, stock: stock, falta: Math.ceil(faltaRaw) });
+    });
+    _oc.gen = { items: items, fecha: new Date().toISOString().slice(0, 10) };
+    ocRender();
+  } catch (e) { _oc.gen = { error: String(e.message || e), items: [] }; ocRender(); }
+}
+function ocgGroups() {
+  const g = {};
+  ((_oc.gen && _oc.gen.items) || []).forEach(function (it) { const k = it.prov; if (!g[k]) g[k] = { prov: k, interno: _ocgInterno(k), items: [], total: 0 }; g[k].items.push(it); g[k].total += it.falta; });
+  return g;
+}
+function ocBodyGen() {
+  let h = '<div class="oc-tools"><button class="oc-btn" onclick="ocBack()">← Volver</button></div>';
+  h += '<div style="background:#fffbeb;border:1px solid #fcd34d;color:#92400e;border-radius:9px;padding:9px 11px;margin-bottom:10px;font-size:12.5px"><b>BETA — no usar todavía.</b> Calcula como el Excel: <b>A pedir = máx(0, Máximo + Pedidos − (Góndola+Racks))</b>. Da números reales recién con el stock inicial cargado. Revisá antes de generar.</div>';
+  if (!_oc.gen) return h + '<div class="oc-loading">Calculando (stock + demanda PPP + máximos)…</div>';
+  if (_oc.gen.error) return h + '<div class="oc-empty" style="color:#b91c1c">Error: ' + escapeHtml(_oc.gen.error) + '</div>';
+  const g = ocgGroups(), keys = Object.keys(g).sort(function (a, b) { return (g[a].interno - g[b].interno) || a.localeCompare(b); });
+  if (!keys.length) return h + '<div class="oc-empty">No hay nada para pedir (todo está en o sobre el máximo).<br><small>Con el stock en 0, va a dar todo para pedir cuando lo cargues.</small></div>';
+  const externos = keys.filter(function (k) { return !g[k].interno; });
+  const totExt = externos.reduce(function (s, k) { return s + g[k].items.length; }, 0);
+  h += '<div class="oc-meta">Fecha <b>' + escapeHtml(_oc.gen.fecha) + '</b> · <b>' + externos.length + '</b> proveedor(es) externos · <b>' + totExt + '</b> ítem(s) a pedir. <button class="oc-btn ok" style="margin-left:8px" onclick="ocgGenerar()">✓ Generar las OCs</button></div>';
+  keys.forEach(function (k) {
+    const x = g[k];
+    h += '<div class="oc-meta" style="margin-top:12px;margin-bottom:4px"><b>' + escapeHtml(k) + '</b>' + (x.interno ? ' <span style="color:#64748b">(interno — no se genera OC)</span>' : '') + ' · ' + x.items.length + ' ítem(s) · ' + x.total + ' cajas</div>';
+    h += '<table class="oc-tbl"><thead><tr><th>Código</th><th>Descripción</th><th class="num">Máx</th><th class="num">Pedidos</th><th class="num">Stock</th><th class="num">A pedir</th></tr></thead><tbody>';
+    x.items.sort(function (a, b) { return b.falta - a.falta; }).forEach(function (it) {
+      h += '<tr><td class="oc-cod">' + escapeHtml(it.cod) + '</td><td>' + escapeHtml(it.desc) + '</td><td class="num">' + it.max + '</td><td class="num">' + it.demanda + '</td><td class="num">' + it.stock + '</td><td class="num oc-falt">' + it.falta + '</td></tr>';
+    });
+    h += '</tbody></table>';
+  });
+  return h;
+}
+async function ocgGenerar() {
+  if (!_oc || !_oc.gen) return;
+  const g = ocgGroups();
+  const rows = [];
+  Object.keys(g).forEach(function (k) { if (g[k].interno) return; g[k].items.forEach(function (it) { rows.push({ proveedor: it.prov, fecha: _oc.gen.fecha, rubro: "Art Term", codigo: it.cod, descripcion: it.desc || null, cantidad: it.falta, cantidad_recibida: 0, unidad: "Cajas", estado: "pendiente" }); }); });
+  if (!rows.length) { alert("No hay OCs externas para generar."); return; }
+  if (!confirm("Vas a generar " + rows.length + " línea(s) de OC (proveedores externos) en Ordenes_Compra. ¿Seguro?")) return;
+  const headers = await facAuthWriteHeaders({ "Prefer": "return=minimal" });
+  if (!headers) { alert("Para generar las OCs necesitás iniciar sesión con Google (supervisor)."); return; }
+  try {
+    const r = await fetch(SUPABASE_OC_ENDPOINT, { method: "POST", headers: headers, body: JSON.stringify(rows) });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    _oc.rows = await ocFetchRows();
+    _oc.view = "list"; ocRender();
+    alert("✓ Generadas " + rows.length + " línea(s) de OC. Las ves en la lista, agrupadas por proveedor.");
+  } catch (e) { alert("Error generando OCs: " + (e.message || e)); }
+}
+function stkTab(t) { if (!_stk) return; if (t === "compras") { openOCAdmin(); return; } _stk.tab = t; _stk.filtro = ""; _stk.openArt = null; stkRender(); }
 function stkRender() {
   if (!_stk) return;
-  const tabs = [["stocks", "📊 Stocks"], ["ingresos", "📥 Ingresos"], ["salidas", "📤 Salidas"], ["ajustes", "⚙ Ajustes"]];
+  const tabs = [["stocks", "📊 Stocks"], ["racks", "🏗 Racks"], ["ingresos", "📥 Ingresos"], ["salidas", "📤 Salidas"], ["ajustes", "⚙ Ajustes"], ["compras", "📑 Compras (OCs)"]];
   const tb = document.getElementById("stkTabs");
   if (tb) tb.innerHTML = tabs.map(function (t) { return '<button class="stk-tab' + (_stk.tab === t[0] ? " on" : "") + '" onclick="stkTab(\'' + t[0] + '\')">' + t[1] + '</button>'; }).join("");
   const body = document.getElementById("stkBody"); if (!body) return;
-  body.innerHTML = _stk.tab === "ingresos" ? stkBodyIngresos() : _stk.tab === "salidas" ? stkBodySalidas() : _stk.tab === "ajustes" ? stkBodyAjustes() : stkBodyStocks();
+  _renderKeepFocus(body, _stk.tab === "racks" ? stkBodyRacks() : _stk.tab === "ingresos" ? stkBodyIngresos() : _stk.tab === "salidas" ? stkBodySalidas() : _stk.tab === "ajustes" ? stkBodyAjustes() : stkBodyStocks());
 }
 function stkMvRow(mv) {
   const old = _stk.cutoff && new Date(mv.ts).getTime() < new Date(_stk.cutoff).getTime();
@@ -7011,7 +7318,19 @@ function stkBodyStocks() {
       h += '<tr class="stk-detrow"><td colspan="5"><div class="stk-det">' + (det.length ? det.map(stkMvRow).join("") : '<div class="stk-mv">sin movimientos contados</div>') + '</div></td></tr>';
     }
   });
-  return h + "</tbody></table>";
+  h += "</tbody></table>";
+  // v4.09: insumos (depósito 'insumos') — sección aparte, mismo filtro.
+  const ins = arts.filter(function (a) { return (a.insumos || 0) !== 0; });
+  const insShown = f ? ins.filter(function (a) { return (a.cod + " " + a.desc).toLowerCase().indexOf(f) >= 0; }) : ins;
+  if (insShown.length) {
+    h += '<div class="stk-aj-h" style="margin-top:18px">📦 Insumos</div>';
+    h += '<table class="stk-tbl"><thead><tr><th>Código</th><th>Descripción</th><th class="num">Stock</th></tr></thead><tbody>';
+    insShown.sort(function (a, b) { return String(a.cod).localeCompare(String(b.cod), undefined, { numeric: true }); }).forEach(function (a) {
+      h += '<tr><td class="stk-cod">' + escapeHtml(a.cod) + '</td><td class="stk-desc">' + escapeHtml(a.desc || "—") + '</td><td class="num ' + (a.insumos < 0 ? "stk-neg" : "") + '"><b>' + a.insumos + '</b></td></tr>';
+    });
+    h += "</tbody></table>";
+  }
+  return h;
 }
 function stkBodyIngresos() {
   const ing = _stk.movs.filter(function (mv) { return mv.tipo === "recepcion"; });
@@ -7032,20 +7351,25 @@ function stkBodyIngresos() {
   return h;
 }
 function stkBodySalidas() {
-  const sal = _stk.movs.filter(function (mv) { return mv.tipo === "picking"; }).sort(function (a, b) { return new Date(b.ts) - new Date(a.ts); });
+  // v4.10: salidas = picking (a pedido) + salida a Cervantes (otra planta).
+  const sal = _stk.movs.filter(function (mv) { return mv.tipo === "picking" || mv.tipo === "salida_cervantes"; }).sort(function (a, b) { return new Date(b.ts) - new Date(a.ts); });
   const f = (_stk.filtro || "").toLowerCase();
-  const shown = f ? sal.filter(function (mv) { return ((mv.cod_art || "") + " " + (mv.ref || "")).toLowerCase().indexOf(f) >= 0; }) : sal;
-  let h = '<input class="stk-filtro" type="search" placeholder="🔎 Buscar código / tanda" value="' + escapeHtml(_stk.filtro) + '" oninput="if(_stk){_stk.filtro=this.value;stkRender();}">';
-  h += '<table class="stk-tbl"><thead><tr><th>Día/hora</th><th>Código</th><th>Descripción</th><th class="num">Salió</th><th>Tanda</th></tr></thead><tbody>';
+  const shown = f ? sal.filter(function (mv) { return ((mv.cod_art || "") + " " + (mv.ref || "") + " " + (mv.tipo || "")).toLowerCase().indexOf(f) >= 0; }) : sal;
+  let h = '<input class="stk-filtro" type="search" placeholder="🔎 Buscar código / tanda / destino" value="' + escapeHtml(_stk.filtro) + '" oninput="if(_stk){_stk.filtro=this.value;stkRender();}">';
+  h += '<table class="stk-tbl"><thead><tr><th>Día/hora</th><th>Código</th><th>Descripción</th><th class="num">Salió</th><th>Destino</th></tr></thead><tbody>';
   if (!shown.length) h += '<tr><td colspan="5" class="stk-empty">Sin salidas.</td></tr>';
-  shown.forEach(function (mv) { h += '<tr><td>' + escapeHtml(stockFmtTs(mv.ts)) + '</td><td class="stk-cod">' + escapeHtml(mv.cod_art) + '</td><td class="stk-desc">' + escapeHtml(mv.descripcion || "—") + '</td><td class="num stk-neg">' + mv.delta + '</td><td>' + escapeHtml(mv.ref || "") + "</td></tr>"; });
+  shown.forEach(function (mv) {
+    const dest = mv.tipo === "salida_cervantes" ? ("🚚 Cervantes" + (mv.ref ? " · " + escapeHtml(mv.ref) : "")) : ("tanda " + escapeHtml(mv.ref || "—"));
+    h += '<tr><td>' + escapeHtml(stockFmtTs(mv.ts)) + '</td><td class="stk-cod">' + escapeHtml(mv.cod_art) + '</td><td class="stk-desc">' + escapeHtml(mv.descripcion || "—") + '</td><td class="num stk-neg">' + mv.delta + '</td><td>' + dest + "</td></tr>";
+  });
   return h + "</tbody></table>";
 }
 function stkBodyAjustes() {
-  let h = '<div class="stk-aj-sec"><div class="stk-aj-h">⚙ Ajustar stock (Artículo Terminado)</div>';
+  let h = '<div class="stk-aj-dep">Depósito: <select id="stkAjDep"><option value="terminado">Artículo Terminado (góndola)</option><option value="racks">Racks</option><option value="insumos">Insumos</option><option value="a_guardar">Mercadería a guardar</option></select></div>';
+  h += '<div class="stk-aj-sec"><div class="stk-aj-h">⚙ Ajustar stock</div>';
   h += '<div class="stk-aj-hint">Sumá o restá con signo: <code>+10</code> / <code>-3</code>.</div><div class="stk-aj-form"><input id="stkAjCod" class="stk-aj-inp" placeholder="Código"><input id="stkAjCant" class="stk-aj-inp" type="number" placeholder="+/- cajas"><button class="stk-btn ok" onclick="stockAjustar()">Aplicar</button></div>';
   h += '<div class="stk-aj-hint" style="margin-top:10px">O dejá el stock exacto:</div><div class="stk-aj-form"><input id="stkAjCod2" class="stk-aj-inp" placeholder="Código"><input id="stkAjFijar" class="stk-aj-inp" type="number" placeholder="Fijar en…"><button class="stk-btn" onclick="stockFijar()">Fijar</button></div></div>';
-  h += '<div class="stk-aj-sec"><div class="stk-aj-h">➕ Stock inicial</div><div class="stk-aj-hint">Una línea por artículo: <b>CÓDIGO CANTIDAD</b>.</div><textarea id="stkIniTxt" class="stk-ini-txt" rows="6" placeholder="544 30&#10;546 12"></textarea><div class="stk-ini-btns"><button class="stk-btn ok" onclick="stockGuardarInicial(false)">Guardar inicial</button><button class="stk-btn danger" onclick="stockGuardarInicial(true)">Guardar + marcar inicio</button></div><div class="stk-ini-warn">⚠ "Marcar inicio": el stock se cuenta SOLO desde ahora (lo anterior queda guardado pero no se suma).</div></div>';
+  h += '<div class="stk-aj-sec"><div class="stk-aj-h">➕ Stock inicial</div><div class="stk-aj-hint">Una línea por artículo: <b>CÓDIGO CANTIDAD</b> (en el depósito de arriba). El stock inicial <b>siempre cuenta</b> como base.</div><textarea id="stkIniTxt" class="stk-ini-txt" rows="6" placeholder="544 30&#10;546 12"></textarea><div class="stk-ini-btns"><button class="stk-btn ok" onclick="stockGuardarInicial()">Guardar inicial</button><button class="stk-btn danger" onclick="stockMarcarInicio()">🔄 Marcar inicio (resetear)</button></div><div class="stk-ini-warn">⚠ Pasos: 1) cargá el inicial de cada depósito (cambiás el depósito de arriba y repetís); 2) tocás <b>Marcar inicio</b> una sola vez. Desde ahí los movimientos REALES anteriores (de prueba) dejan de sumar — quedan guardados, no se borran.</div></div>';
   return h;
 }
 function stockToggleArt(codEnc) { if (!_stk) return; const cod = decodeURIComponent(codEnc); _stk.openArt = (_stk.openArt === cod ? null : cod); stkRender(); }
@@ -7060,35 +7384,387 @@ async function stockAjustar() {
   const cod = ((document.getElementById("stkAjCod") || {}).value || "").trim().toUpperCase();
   const cant = parseInt(((document.getElementById("stkAjCant") || {}).value || ""), 10);
   if (!cod || isNaN(cant) || cant === 0) { alert("Poné un código y una cantidad (+/-)."); return; }
-  const sd = stockComputeSaldos(_stk.movs, _stk.cutoff)[cod];
-  await stkInsertMov([{ cod_art: cod, descripcion: (sd && sd.desc) || null, deposito: "terminado", delta: cant, tipo: "ajuste", ref: "ajuste manual", legajo: "0" }], "Ajuste " + cod + ": " + (cant > 0 ? "+" : "") + cant);
+  const sd = stockComputeSaldos(_stk.movs, _stk.cutoff)[cod], dep = _stkDep();
+  await stkInsertMov([{ cod_art: cod, descripcion: (sd && sd.desc) || null, deposito: dep, delta: cant, tipo: "ajuste", ref: "ajuste manual", legajo: "0" }], "Ajuste " + cod + " (" + dep + "): " + (cant > 0 ? "+" : "") + cant);
 }
 async function stockFijar() {
   const cod = ((document.getElementById("stkAjCod2") || {}).value || "").trim().toUpperCase();
   const fijar = parseInt(((document.getElementById("stkAjFijar") || {}).value || ""), 10);
   if (!cod || isNaN(fijar)) { alert("Poné un código y el stock a fijar."); return; }
-  const sd = stockComputeSaldos(_stk.movs, _stk.cutoff)[cod];
-  const actual = (sd && sd.terminado) || 0; const delta = fijar - actual;
-  if (delta === 0) { alert("El stock de " + cod + " ya es " + fijar + "."); return; }
-  await stkInsertMov([{ cod_art: cod, descripcion: (sd && sd.desc) || null, deposito: "terminado", delta: delta, tipo: "ajuste", ref: "fijar en " + fijar, legajo: "0" }], "Stock de " + cod + " fijado en " + fijar + " (ajuste " + (delta > 0 ? "+" : "") + delta + ")");
+  const sd = stockComputeSaldos(_stk.movs, _stk.cutoff)[cod], dep = _stkDep();
+  const actual = (sd && sd[dep]) || 0; const delta = fijar - actual;
+  if (delta === 0) { alert("El stock de " + cod + " (" + dep + ") ya es " + fijar + "."); return; }
+  await stkInsertMov([{ cod_art: cod, descripcion: (sd && sd.desc) || null, deposito: dep, delta: delta, tipo: "ajuste", ref: "fijar en " + fijar, legajo: "0" }], "Stock de " + cod + " (" + dep + ") fijado en " + fijar + " (ajuste " + (delta > 0 ? "+" : "") + delta + ")");
 }
-async function stockGuardarInicial(conCorte) {
+async function stockGuardarInicial() {
   const ta = document.getElementById("stkIniTxt"); const txt = (ta && ta.value) || "";
-  const rows = [];
-  txt.split(/\n/).forEach(function (ln) { const m = ln.trim().match(/^(\S+)\s+(-?\d+(?:\.\d+)?)/); if (m) rows.push({ cod_art: m[1].toUpperCase(), deposito: "terminado", delta: Number(m[2]), tipo: "inicial", ref: "carga inicial", legajo: "0" }); });
+  const rows = [], dep = _stkDep();
+  txt.split(/\n/).forEach(function (ln) { const m = ln.trim().match(/^(\S+)\s+(-?\d+(?:\.\d+)?)/); if (m) rows.push({ cod_art: m[1].toUpperCase(), deposito: dep, delta: Number(m[2]), tipo: "inicial", ref: "carga inicial", legajo: "0" }); });
   if (!rows.length) { alert("No encontré líneas válidas. Formato: CÓDIGO CANTIDAD (una por línea)."); return; }
-  if (conCorte && !confirm("Vas a MARCAR INICIO ahora: los movimientos anteriores se desconsideran (no se borran). Se cargan " + rows.length + " artículos como stock inicial. ¿Seguro?")) return;
   try {
-    if (conCorte) {
-      const nowIso = new Date(Date.now() - 2000).toISOString();   // corte 2s atrás: los 'inicial' que inserto quedan del lado contado
-      const rc = await fetch(SUPABASE_URL + "/rest/v1/Stock_Config?on_conflict=clave", { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ clave: "cutoff_ts", valor: nowIso, actualizado: new Date().toISOString() }) });
-      if (!rc.ok && rc.status >= 500) throw new Error("config HTTP " + rc.status);
-    }
     const r = await fetch(SUPABASE_STOCK_ENDPOINT, { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" }, body: JSON.stringify(rows) });
     if (!r.ok) throw new Error("HTTP " + r.status);
-    alert("✓ Stock inicial cargado: " + rows.length + " artículo(s)" + (conCorte ? ". Marcado como inicio (lo anterior se desconsidera)." : "."));
+    if (ta) ta.value = "";
+    alert("✓ Stock inicial cargado: " + rows.length + " artículo(s) en " + dep + ". (El stock inicial siempre cuenta como base.)");
     openStockAdmin();
   } catch (e) { alert("Error al guardar: " + (e.message || e)); }
+}
+async function stockMarcarInicio() {
+  if (!confirm("MARCAR INICIO ahora: desde este momento, los movimientos REALES anteriores (recepción/guardado/picking/ajustes/etc.) dejan de contar para el stock. NO se borran. El stock inicial que cargues sigue contando. ¿Seguro?")) return;
+  try {
+    const nowIso = new Date().toISOString();
+    const rc = await fetch(SUPABASE_URL + "/rest/v1/Stock_Config?on_conflict=clave", { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ clave: "cutoff_ts", valor: nowIso, actualizado: nowIso }) });
+    if (!rc.ok && rc.status >= 500) throw new Error("config HTTP " + rc.status);
+    alert("✓ Inicio marcado. Desde ahora lo anterior (movimientos reales) no se suma; queda guardado igual.");
+    openStockAdmin();
+  } catch (e) { alert("Error: " + (e.message || e)); }
+}
+function _stkDep() { const e = document.getElementById("stkAjDep"); return (e && e.value) || "terminado"; }
+
+/* ===== STOCK — RACKS (v4.08): factores por artículo (master↔caja↔unidad), órdenes de bajar
+   racks→góndola y aprobación de Marianela. Las bajadas las propone el operario (Racks_Bajadas);
+   al aprobar se hace el movimiento entre depósitos (racks − / terminado +) y se cierra la orden. */
+const SUPABASE_ART_FACT_ENDPOINT = SUPABASE_URL + "/rest/v1/" + encodeURIComponent("Articulos Virgilio X Tallerista");
+const SUPABASE_RACKS_ORD_ENDPOINT = SUPABASE_URL + "/rest/v1/Racks_Ordenes";
+const SUPABASE_RACKS_BAJ_ENDPOINT = SUPABASE_URL + "/rest/v1/Racks_Bajadas";
+async function stockFetchArtFactors() {
+  try {
+    const r = await fetch(SUPABASE_ART_FACT_ENDPOINT + "?select=Cod_Art,Cajas_x_Master,Uni_x_Caja&limit=20000", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+    const rows = r.ok ? await r.json() : [];
+    const m = {};
+    rows.forEach(function (x) { const k = String(x.Cod_Art || "").toUpperCase(); if (!k) return; if (!m[k]) m[k] = { cajasXMaster: Number(x.Cajas_x_Master) || 0, uniXCaja: Number(x.Uni_x_Caja) || 0 }; else { if (!m[k].cajasXMaster && x.Cajas_x_Master) m[k].cajasXMaster = Number(x.Cajas_x_Master); if (!m[k].uniXCaja && x.Uni_x_Caja) m[k].uniXCaja = Number(x.Uni_x_Caja); } });
+    return m;
+  } catch (_e) { return {}; }
+}
+async function racksFetchOrdenes() { try { const r = await fetch(SUPABASE_RACKS_ORD_ENDPOINT + "?select=*&order=fecha.desc&limit=200", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" }); return r.ok ? r.json() : []; } catch (_e) { return []; } }
+async function racksFetchBajadas() { try { const r = await fetch(SUPABASE_RACKS_BAJ_ENDPOINT + "?select=*&order=ts.desc&limit=2000", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" }); return r.ok ? r.json() : []; } catch (_e) { return []; } }
+function stkUnits(cajas, cod, factors) {
+  const f = (factors || {})[String(cod).toUpperCase()] || {};
+  const M = f.cajasXMaster > 0 ? f.cajasXMaster : 0, U = f.uniXCaja > 0 ? f.uniXCaja : 0, p = [];
+  if (M) p.push((Math.round((cajas / M) * 100) / 100) + " master");
+  if (U) p.push((cajas * U) + " u");
+  return p.length ? p.join(" · ") : "";
+}
+function stkBodyRacks() {
+  const pend = (_stk.ordenes || []).filter(function (o) { return o.estado === "pendiente"; });
+  let h = pend.length
+    ? '<div class="stk-rk-orden pend">📦 Hay una orden de bajar racks→góndola <b>PENDIENTE</b> (' + escapeHtml(String(pend[0].fecha || "")) + '). A los operarios les aparece la alarma; ellos registran lo que bajan y vos lo aprobás acá abajo.</div>'
+    : '<div class="stk-rk-orden">No hay orden de bajada pendiente.</div>';
+  h += '<button class="stk-btn ok" onclick="racksCrearOrden()">📋 OCs generadas — emitir orden de bajar racks</button>';
+  const props = (_stk.bajadas || []).filter(function (b) { return b.estado === "propuesta"; });
+  h += '<div class="stk-aj-h" style="margin-top:16px">Bajadas propuestas por operarios (' + props.length + ")</div>";
+  if (!props.length) h += '<div class="stk-empty">Nada para aprobar.</div>';
+  else h += props.map(function (b) {
+    const u = stkUnits(Number(b.cajas), b.cod_art, _stk.factors);
+    return '<div class="stk-rk-baj"><div class="stk-rk-baji"><span class="stk-cod">' + escapeHtml(b.cod_art) + '</span> <span class="stk-desc">' + escapeHtml(b.descripcion || "") + '</span><div class="stk-rk-q">' + b.cajas + " cajas" + (u ? " · " + u : "") + '</div></div><button class="stk-btn ok" onclick="racksAprobar(' + b.id + ')">✓ Aprobar</button></div>';
+  }).join("");
+  const saldos = stockComputeSaldos(_stk.movs, _stk.cutoff);
+  const arts = Object.keys(saldos).map(function (k) { return saldos[k]; }).filter(function (a) { return (a.racks || 0) !== 0; }).sort(function (a, b) { return (parseInt(a.cod, 10) || 0) - (parseInt(b.cod, 10) || 0); });
+  h += '<div class="stk-aj-h" style="margin-top:16px">Stock en racks</div>';
+  h += '<table class="stk-tbl"><thead><tr><th>Código</th><th>Descripción</th><th class="num">Master</th><th class="num">Cajas</th><th class="num">Unidades</th></tr></thead><tbody>';
+  if (!arts.length) h += '<tr><td colspan="5" class="stk-empty">Sin stock en racks. Cargalo en ⚙ Ajustes (depósito = racks).</td></tr>';
+  arts.forEach(function (a) {
+    const f = _stk.factors[String(a.cod).toUpperCase()] || {}, M = f.cajasXMaster > 0 ? f.cajasXMaster : 0, U = f.uniXCaja > 0 ? f.uniXCaja : 0;
+    h += '<tr><td class="stk-cod">' + escapeHtml(a.cod) + '</td><td class="stk-desc">' + escapeHtml(a.desc || "—") + '</td><td class="num">' + (M ? (Math.round((a.racks / M) * 100) / 100) : "—") + '</td><td class="num"><b>' + a.racks + '</b></td><td class="num">' + (U ? (a.racks * U) : "—") + "</td></tr>";
+  });
+  return h + "</tbody></table>";
+}
+async function racksCrearOrden() {
+  const pend = (_stk.ordenes || []).filter(function (o) { return o.estado === "pendiente"; });
+  if (pend.length && !confirm("Ya hay una orden de bajada PENDIENTE. ¿Emitir otra igual?")) return;
+  try {
+    const r = await fetch(SUPABASE_RACKS_ORD_ENDPOINT, { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" }, body: JSON.stringify({ estado: "pendiente", creada_por: "admin" }) });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    alert("✓ Orden de bajar racks→góndola emitida. A los operarios les va a aparecer la alarma."); openStockAdmin();
+  } catch (e) { alert("Error: " + (e.message || e)); }
+}
+async function racksAprobar(bajadaId) {
+  const b = (_stk.bajadas || []).find(function (x) { return x.id === bajadaId; });
+  if (!b) return;
+  try {
+    await stockMove([
+      { cod_art: b.cod_art, descripcion: b.descripcion || null, deposito: "racks", delta: -Number(b.cajas), tipo: "baja_racks", ref: "orden " + (b.orden_id || ""), legajo: "0" },
+      { cod_art: b.cod_art, descripcion: b.descripcion || null, deposito: "terminado", delta: Number(b.cajas), tipo: "baja_racks", ref: "orden " + (b.orden_id || ""), legajo: "0" }
+    ]);
+    await fetch(SUPABASE_RACKS_BAJ_ENDPOINT + "?id=eq." + bajadaId, { method: "PATCH", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" }, body: JSON.stringify({ estado: "aprobada", aprobada_at: new Date().toISOString() }) });
+    const restantes = (_stk.bajadas || []).filter(function (x) { return x.orden_id === b.orden_id && x.estado === "propuesta" && x.id !== bajadaId; });
+    if (b.orden_id && !restantes.length) {
+      await fetch(SUPABASE_RACKS_ORD_ENDPOINT + "?id=eq." + b.orden_id, { method: "PATCH", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" }, body: JSON.stringify({ estado: "bajado", cerrada_at: new Date().toISOString() }) });
+    }
+    alert("✓ Aprobado: " + b.cajas + " caja(s) de " + b.cod_art + " pasaron de racks a góndola."); openStockAdmin();
+  } catch (e) { alert("Error: " + (e.message || e)); }
+}
+
+/* ===== STOCK — RACKS, lado operario (v4.08): alarma de orden pendiente en la botonera +
+   módulo para registrar la bajada (tipo MG). La bajada queda 'propuesta'; Marianela la aprueba
+   en el admin Stocks → recién ahí mueve el stock (racks − / terminado +). ===== */
+async function racksCheckAlarma() {
+  const box = document.getElementById("racksAlarma"); if (!box) return;
+  if (!document.getElementById("rkAlCss")) { const s = document.createElement("style"); s.id = "rkAlCss"; s.textContent = ".rk-alarma{background:#fffbeb;border:2px solid #f59e0b;color:#92400e;border-radius:11px;padding:10px 12px;margin:8px 0;font-size:14px;font-weight:700;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}.rk-alarma-btn{margin-left:auto;background:#b45309;color:#fff;border:none;border-radius:9px;padding:8px 14px;font-weight:800;cursor:pointer;width:auto;}"; document.head.appendChild(s); }
+  try {
+    const r = await fetch(SUPABASE_RACKS_ORD_ENDPOINT + "?estado=eq.pendiente&select=id,fecha&order=fecha.desc&limit=1", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+    const rows = r.ok ? await r.json() : [];
+    box.innerHTML = rows.length
+      ? '<div class="rk-alarma">📦 <b>Bajar racks → góndola</b> — orden del ' + escapeHtml(String(rows[0].fecha || "")) + '. <button class="rk-alarma-btn" onclick="showBajarRacks(' + rows[0].id + ')">Registrar bajada</button></div>'
+      : "";
+  } catch (_e) { /* sin red: no muestro nada */ }
+}
+function racksFlushPend() {
+  let p = []; try { p = JSON.parse(localStorage.getItem("vir_racks_pend") || "[]"); } catch (_e) {}
+  if (!p.length) return;
+  fetch(SUPABASE_RACKS_BAJ_ENDPOINT, { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" }, body: JSON.stringify(p) })
+    .then(function (r) { if (r.ok) { try { localStorage.removeItem("vir_racks_pend"); } catch (_e) {} } }).catch(function () {});
+}
+let _br = null;
+async function showBajarRacks(ordenId) {
+  if (!document.getElementById("brCss")) {
+    const s = document.createElement("style"); s.id = "brCss";
+    s.textContent = "#brModal{display:none;position:fixed;inset:0;z-index:1295;background:rgba(2,6,23,.74);overflow:auto;padding:12px;}#brModal.show{display:block;}.br-card{background:#f8fafc;max-width:470px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.br-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;background:linear-gradient(90deg,#b45309,#92400e);color:#fff;}.br-title{font-size:18px;font-weight:800;}.br-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}.br-body{padding:13px 14px;}.br-loading,.br-empty{padding:26px;text-align:center;color:#64748b;font-size:15px;}.br-hint{font-size:12.5px;color:#64748b;margin-bottom:10px;}.br-row{border:1px solid #e2e8f0;border-radius:12px;padding:9px 11px;margin-bottom:8px;background:#fff;}.br-r1{display:flex;align-items:center;gap:10px;}.br-info{flex:1;min-width:0;}.br-cod{font-size:16px;font-weight:800;font-family:Consolas,Menlo,monospace;}.br-desc{font-size:12px;color:#475569;}.br-disp{font-size:11.5px;color:#b45309;font-weight:700;margin-top:2px;}.br-stp{display:flex;align-items:center;gap:5px;}.br-sb{width:38px;height:40px;border:none;border-radius:9px;font-size:22px;font-weight:800;cursor:pointer;background:#e2e8f0;color:#475569;}.br-inp{width:58px;height:40px;text-align:center;font-size:18px;font-weight:800;border:2px solid #cbd5e1;border-radius:9px;}.br-conv{font-size:11px;color:#94a3b8;margin-top:4px;}.br-fin{width:100%;margin-top:10px;padding:14px;border:none;border-radius:12px;background:#b45309;color:#fff;font-size:17px;font-weight:800;cursor:pointer;}.br-fin:disabled{background:#cbd5e1;cursor:not-allowed;}";
+    document.head.appendChild(s);
+  }
+  let ov = document.getElementById("brModal");
+  if (!ov) { ov = document.createElement("div"); ov.id = "brModal"; document.body.appendChild(ov); }
+  ov.classList.add("show");
+  ov.innerHTML = '<div class="br-card"><div class="br-head"><span class="br-title">📦 Bajar racks → góndola</span><button class="br-close" onclick="closeBajarRacks()">Cerrar</button></div><div class="br-body" id="brBody"><div class="br-loading">Cargando stock de racks…</div></div></div>';
+  try {
+    const res = await Promise.all([stockFetchMovs(), stockGetCutoff(), stockFetchArtFactors()]);
+    const saldos = stockComputeSaldos(res[0] || [], res[1]);
+    const items = Object.keys(saldos).map(function (k) { return saldos[k]; }).filter(function (a) { return (a.racks || 0) > 0; }).sort(function (a, b) { return (parseInt(a.cod, 10) || 0) - (parseInt(b.cod, 10) || 0); }).map(function (a) { return { cod: a.cod, desc: a.desc, disponible: a.racks, bajar: 0 }; });
+    _br = { ordenId: ordenId, legajo: String((typeof legajoInput !== "undefined" && legajoInput && legajoInput.value) || "").trim(), factors: res[2] || {}, items: items };
+    brRender();
+  } catch (e) { const b = document.getElementById("brBody"); if (b) b.innerHTML = '<div class="br-loading">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
+}
+function brRender() {
+  if (!_br) return; const body = document.getElementById("brBody"); if (!body) return;
+  if (!_br.items.length) { body.innerHTML = '<div class="br-empty">No hay stock en racks para bajar.</div>'; return; }
+  let h = '<div class="br-hint">Marcá cuántas <b>cajas</b> bajás de cada artículo. Lo confirma Marianela y recién ahí pasa a góndola.</div>';
+  h += _br.items.map(function (it, i) {
+    const u = stkUnits(it.bajar, it.cod, _br.factors), ud = stkUnits(it.disponible, it.cod, _br.factors);
+    return '<div class="br-row"><div class="br-r1"><div class="br-info"><span class="br-cod">' + escapeHtml(it.cod) + '</span> <span class="br-desc">' + escapeHtml(it.desc || "") + '</span><div class="br-disp">en racks: ' + it.disponible + " cajas" + (ud ? " · " + ud : "") + '</div></div><div class="br-stp"><button class="br-sb" onclick="brChg(' + i + ',-1)">–</button><input class="br-inp" type="number" min="0" max="' + it.disponible + '" inputmode="numeric" value="' + it.bajar + '" oninput="brSet(' + i + ',this.value)"><button class="br-sb" onclick="brChg(' + i + ',1)">+</button></div></div>' + (it.bajar > 0 && u ? '<div class="br-conv">bajás: ' + it.bajar + " cajas · " + u + "</div>" : "") + "</div>";
+  }).join("");
+  const tot = _br.items.reduce(function (s, it) { return s + it.bajar; }, 0);
+  h += '<button class="br-fin"' + (tot <= 0 ? " disabled" : "") + ' onclick="brConfirmar()">✓ Registrar bajada de ' + tot + " caja(s)</button>";
+  _renderKeepFocus(body, h);
+}
+function brChg(i, d) { if (!_br) return; const it = _br.items[i]; if (!it) return; it.bajar = Math.max(0, Math.min(it.disponible, it.bajar + d)); brRender(); }
+function brSet(i, v) { if (!_br) return; const it = _br.items[i]; if (!it) return; let n = Math.max(0, parseInt(v, 10) || 0); if (n > it.disponible) n = it.disponible; it.bajar = n; brRender(); }
+function brConfirmar() {
+  if (!_br) return;
+  const sel = _br.items.filter(function (it) { return it.bajar > 0; });
+  if (!sel.length) return;
+  const rows = sel.map(function (it) { return { orden_id: _br.ordenId || null, cod_art: it.cod, descripcion: it.desc || null, cajas: it.bajar, estado: "propuesta", creada_por: _br.legajo || null }; });
+  const n = sel.reduce(function (s, it) { return s + it.bajar; }, 0);
+  closeBajarRacks();
+  fetch(SUPABASE_RACKS_BAJ_ENDPOINT, { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" }, body: JSON.stringify(rows) })
+    .then(function (r) { if (r.ok || (r.status >= 400 && r.status < 500)) return; throw new Error("HTTP " + r.status); })
+    .catch(function () { try { const p = JSON.parse(localStorage.getItem("vir_racks_pend") || "[]"); p.push.apply(p, rows); localStorage.setItem("vir_racks_pend", JSON.stringify(p.slice(-2000))); } catch (_e) {} });
+  try { alert("✓ Registraste " + n + " caja(s) para bajar. Marianela lo aprueba y pasa a góndola."); } catch (_e) {}
+}
+function closeBajarRacks() { const ov = document.getElementById("brModal"); if (ov) ov.classList.remove("show"); _br = null; }
+
+/* ===== STOCK — INSUMOS (v4.09): RI (entrada) / EI (salida) registran stock de insumos
+   (Movimientos_Stock deposito='insumos', tipo recepcion_insumo / entrega_insumo). Buscador
+   sobre el catálogo Insumos; si no está, se crea el código en el momento. La entrada/salida
+   se hace con stockMove (offline-safe, vir_stock_pend). Operario-facing. ===== */
+const SUPABASE_INSUMOS_ENDPOINT = SUPABASE_URL + "/rest/v1/Insumos";
+let _ins = null;
+function _insSortCod(a, b) { return String(a.cod).localeCompare(String(b.cod), undefined, { numeric: true, sensitivity: "base" }); }
+async function insFetchCatalogo() {
+  try {
+    const r = await fetch(SUPABASE_INSUMOS_ENDPOINT + "?select=cod,nombre&order=cod.asc&limit=20000", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+    return r.ok ? await r.json() : [];
+  } catch (_e) { return []; }
+}
+async function showInsumoModal(mode, legajo) {
+  if (!document.getElementById("insCss")) {
+    const s = document.createElement("style"); s.id = "insCss";
+    s.textContent = "#insModal{display:none;position:fixed;inset:0;z-index:1296;background:rgba(2,6,23,.74);overflow:auto;padding:12px;}#insModal.show{display:block;}.ins-card{background:#f8fafc;max-width:480px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.ins-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;color:#fff;}.ins-head.in{background:linear-gradient(90deg,#4f46e5,#4338ca);}.ins-head.out{background:linear-gradient(90deg,#0d9488,#0f766e);}.ins-title{font-size:18px;font-weight:800;}.ins-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}.ins-body{padding:13px 14px;}.ins-loading,.ins-empty{padding:24px;text-align:center;color:#64748b;font-size:15px;}.ins-hint{font-size:12.5px;color:#64748b;margin-bottom:9px;}.ins-search{width:100%;box-sizing:border-box;height:42px;border:2px solid #cbd5e1;border-radius:10px;padding:0 12px;font-size:15px;margin-bottom:9px;}.ins-crear{background:#eef2ff;border:1px dashed #a5b4fc;border-radius:11px;padding:9px 10px;margin-bottom:10px;font-size:12.5px;color:#3730a3;display:flex;align-items:center;gap:6px;flex-wrap:wrap;}.ins-nc{width:90px;}.ins-nn{flex:1;min-width:110px;}.ins-crear input{height:34px;border:1px solid #c7d2fe;border-radius:8px;padding:0 9px;font-size:13px;}.ins-cbtn{background:#4f46e5;color:#fff;border:none;border-radius:8px;padding:7px 12px;font-weight:800;cursor:pointer;width:auto;}.ins-row{border:1px solid #e2e8f0;border-radius:12px;padding:9px 11px;margin-bottom:8px;background:#fff;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}.ins-info{flex:1;min-width:0;}.ins-cod{font-size:16px;font-weight:800;font-family:Consolas,Menlo,monospace;}.ins-nom{font-size:12.5px;color:#475569;}.ins-stk{font-size:11.5px;color:#64748b;font-weight:700;margin-top:2px;}.ins-stp{display:flex;align-items:center;gap:5px;}.ins-sb{width:38px;height:40px;border:none;border-radius:9px;font-size:22px;font-weight:800;cursor:pointer;background:#e2e8f0;color:#475569;}.ins-inp{width:58px;height:40px;text-align:center;font-size:18px;font-weight:800;border:2px solid #cbd5e1;border-radius:9px;}.ins-warn{width:100%;font-size:11.5px;color:#b45309;font-weight:700;}.ins-fin{width:100%;margin-top:10px;padding:14px;border:none;border-radius:12px;color:#fff;font-size:17px;font-weight:800;cursor:pointer;}.ins-fin.in{background:#4f46e5;}.ins-fin.out{background:#0d9488;}.ins-fin:disabled{background:#cbd5e1;cursor:not-allowed;}";
+    document.head.appendChild(s);
+  }
+  let ov = document.getElementById("insModal");
+  if (!ov) { ov = document.createElement("div"); ov.id = "insModal"; document.body.appendChild(ov); }
+  ov.classList.add("show");
+  const isIn = mode === "RI";
+  ov.innerHTML = '<div class="ins-card"><div class="ins-head ' + (isIn ? "in" : "out") + '"><span class="ins-title">' + (isIn ? "📥 Recepción de insumos" : "📤 Entrega de insumos") + '</span><button class="ins-close" onclick="closeIns()">Cerrar</button></div><div class="ins-body" id="insBody"><div class="ins-loading">Cargando insumos…</div></div></div>';
+  try {
+    const res = await Promise.all([insFetchCatalogo(), stockFetchMovs(), stockGetCutoff()]);
+    const saldos = stockComputeSaldos(res[1] || [], res[2]);
+    const items = (res[0] || []).map(function (c) { const sd = saldos[String(c.cod)] || {}; return { cod: String(c.cod), nombre: c.nombre || (sd.desc || ""), stock: Number(sd.insumos || 0), qty: 0 }; });
+    // insumos con movimientos pero fuera del catálogo (defensivo)
+    Object.keys(saldos).forEach(function (k) { const sd = saldos[k]; if ((sd.insumos || 0) !== 0 && !items.some(function (it) { return it.cod === k; })) items.push({ cod: k, nombre: sd.desc || "", stock: Number(sd.insumos || 0), qty: 0 }); });
+    items.sort(_insSortCod);
+    _ins = { mode: mode, legajo: String(legajo || "").trim(), items: items, filtro: "" };
+    insRender();
+  } catch (e) { const b = document.getElementById("insBody"); if (b) b.innerHTML = '<div class="ins-loading">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
+}
+function insRender() {
+  if (!_ins) return; const body = document.getElementById("insBody"); if (!body) return;
+  const isIn = _ins.mode === "RI";
+  const f = (_ins.filtro || "").toLowerCase().trim();
+  const shown = f ? _ins.items.filter(function (it) { return (it.cod + " " + (it.nombre || "")).toLowerCase().indexOf(f) >= 0; }) : _ins.items;
+  let h = '<div class="ins-hint">' + (isIn ? "Marcá cuántas unidades <b>entraron</b> de cada insumo." : "Marcá cuántas unidades <b>salieron</b> de cada insumo.") + '</div>';
+  h += '<input class="ins-search" type="search" placeholder="🔎 Buscar insumo (código o nombre)" value="' + escapeHtml(_ins.filtro) + '" oninput="if(_ins){_ins.filtro=this.value;insRender();}">';
+  h += '<div class="ins-crear"><b>¿No está?</b> Creá el código: <input id="insNewCod" class="ins-nc" placeholder="código" value="' + (f && !shown.length ? escapeHtml(_ins.filtro.toUpperCase()) : "") + '"><input id="insNewNom" class="ins-nn" placeholder="nombre"><button class="ins-cbtn" onclick="insCrear()">+ Crear</button></div>';
+  if (!shown.length) h += '<div class="ins-empty">' + (f ? "No hay insumos que coincidan. Crealo arriba." : "No hay insumos cargados todavía. Creá el primero arriba.") + '</div>';
+  else h += shown.map(function (it) {
+    const i = _ins.items.indexOf(it);
+    const neg = !isIn && it.qty > it.stock;
+    return '<div class="ins-row"><div class="ins-info"><span class="ins-cod">' + escapeHtml(it.cod) + '</span> <span class="ins-nom">' + escapeHtml(it.nombre || "") + '</span><div class="ins-stk">stock actual: ' + it.stock + '</div></div><div class="ins-stp"><button class="ins-sb" onclick="insChg(' + i + ',-1)">–</button><input class="ins-inp" type="number" min="0" inputmode="numeric" value="' + it.qty + '" oninput="insSet(' + i + ',this.value)"><button class="ins-sb" onclick="insChg(' + i + ',1)">+</button></div>' + (neg ? '<div class="ins-warn">⚠ el stock quedaría en ' + (it.stock - it.qty) + '</div>' : "") + "</div>";
+  }).join("");
+  const tot = _ins.items.reduce(function (s, it) { return s + it.qty; }, 0);
+  h += '<button class="ins-fin ' + (isIn ? "in" : "out") + '"' + (tot <= 0 ? " disabled" : "") + ' onclick="insConfirmar()">' + (isIn ? "✓ Registrar entrada de " : "✓ Registrar salida de ") + tot + " unidad(es)</button>";
+  _renderKeepFocus(body, h);
+}
+function insChg(i, d) { if (!_ins) return; const it = _ins.items[i]; if (!it) return; it.qty = Math.max(0, it.qty + d); insRender(); }
+function insSet(i, v) { if (!_ins) return; const it = _ins.items[i]; if (!it) return; it.qty = Math.max(0, parseInt(v, 10) || 0); insRender(); }
+async function insCrear() {
+  if (!_ins) return;
+  const c = String(((document.getElementById("insNewCod") || {}).value) || "").trim().toUpperCase();
+  const n = String(((document.getElementById("insNewNom") || {}).value) || "").trim();
+  if (!c) { alert("Poné un código para el insumo."); return; }
+  if (_ins.items.some(function (it) { return it.cod.toUpperCase() === c; })) { alert("Ese código ya está en la lista."); _ins.filtro = c; insRender(); return; }
+  try {
+    const r = await fetch(SUPABASE_INSUMOS_ENDPOINT, { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" }, body: JSON.stringify({ cod: c, nombre: n || null, creado_por: _ins.legajo || null }) });
+    if (!r.ok && r.status !== 409 && !(r.status >= 400 && r.status < 500)) throw new Error("HTTP " + r.status);
+  } catch (_e) { /* sin red: igual lo agrego a la lista para poder registrar el movimiento (queda en el catálogo cuando vuelva la conexión via insumo nuevo más tarde) */ }
+  _ins.items.push({ cod: c, nombre: n, stock: 0, qty: 0 }); _ins.items.sort(_insSortCod); _ins.filtro = c; insRender();
+}
+function insConfirmar() {
+  if (!_ins) return;
+  const isIn = _ins.mode === "RI";
+  const sel = _ins.items.filter(function (it) { return it.qty > 0; });
+  if (!sel.length) return;
+  const rows = sel.map(function (it) { return { cod_art: it.cod, descripcion: it.nombre || null, deposito: "insumos", delta: isIn ? it.qty : -it.qty, tipo: isIn ? "recepcion_insumo" : "entrega_insumo", ref: null, legajo: _ins.legajo || null }; });
+  const tot = sel.reduce(function (s, it) { return s + it.qty; }, 0);
+  closeIns();
+  stockMove(rows);   // offline-safe (vir_stock_pend)
+  try { alert("✓ " + (isIn ? "Entrada" : "Salida") + " registrada: " + tot + " unidad(es) de insumos."); } catch (_e) {}
+}
+function closeIns() { const ov = document.getElementById("insModal"); if (ov) ov.classList.remove("show"); _ins = null; }
+
+/* ===== STOCK — SALIDA A CERVANTES (v4.10): el operario manda artículo terminado a la otra
+   planta (muestra/devolución). Es una baja de góndola: Movimientos_Stock deposito='terminado'
+   delta − tipo='salida_cervantes' (ref = remito/motivo opcional). Operario-facing; offline-safe
+   con stockMove. Se abre directo desde el botón SC (sin Enviar ni evento en Registros). ===== */
+let _sc = null;
+async function showCervantesModal(legajo) {
+  if (!document.getElementById("scCss")) {
+    const s = document.createElement("style"); s.id = "scCss";
+    s.textContent = "#scModal{display:none;position:fixed;inset:0;z-index:1297;background:rgba(2,6,23,.74);overflow:auto;padding:12px;}#scModal.show{display:block;}.sc-card{background:#f8fafc;max-width:480px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.sc-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;background:linear-gradient(90deg,#7c3aed,#6d28d9);color:#fff;}.sc-title{font-size:18px;font-weight:800;}.sc-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}.sc-body{padding:13px 14px;}.sc-loading,.sc-empty{padding:26px;text-align:center;color:#64748b;font-size:15px;}.sc-hint{font-size:12.5px;color:#64748b;margin-bottom:9px;}.sc-mot{width:100%;box-sizing:border-box;height:40px;border:2px solid #cbd5e1;border-radius:10px;padding:0 11px;font-size:14px;margin-bottom:9px;}.sc-search{width:100%;box-sizing:border-box;height:42px;border:2px solid #cbd5e1;border-radius:10px;padding:0 12px;font-size:15px;margin-bottom:9px;}.sc-row{border:1px solid #e2e8f0;border-radius:12px;padding:9px 11px;margin-bottom:8px;background:#fff;display:flex;align-items:center;gap:10px;}.sc-info{flex:1;min-width:0;}.sc-cod{font-size:16px;font-weight:800;font-family:Consolas,Menlo,monospace;}.sc-desc{font-size:12px;color:#475569;}.sc-disp{font-size:11.5px;color:#6d28d9;font-weight:700;margin-top:2px;}.sc-stp{display:flex;align-items:center;gap:5px;}.sc-sb{width:38px;height:40px;border:none;border-radius:9px;font-size:22px;font-weight:800;cursor:pointer;background:#e2e8f0;color:#475569;}.sc-inp{width:58px;height:40px;text-align:center;font-size:18px;font-weight:800;border:2px solid #cbd5e1;border-radius:9px;}.sc-fin{width:100%;margin-top:10px;padding:14px;border:none;border-radius:12px;background:#7c3aed;color:#fff;font-size:17px;font-weight:800;cursor:pointer;}.sc-fin:disabled{background:#cbd5e1;cursor:not-allowed;}";
+    document.head.appendChild(s);
+  }
+  let ov = document.getElementById("scModal");
+  if (!ov) { ov = document.createElement("div"); ov.id = "scModal"; document.body.appendChild(ov); }
+  ov.classList.add("show");
+  ov.innerHTML = '<div class="sc-card"><div class="sc-head"><span class="sc-title">🚚 Salida a Cervantes</span><button class="sc-close" onclick="closeSc()">Cerrar</button></div><div class="sc-body" id="scBody"><div class="sc-loading">Cargando góndola…</div></div></div>';
+  try {
+    const res = await Promise.all([stockFetchMovs(), stockGetCutoff()]);
+    const saldos = stockComputeSaldos(res[0] || [], res[1]);
+    const items = Object.keys(saldos).map(function (k) { return saldos[k]; }).filter(function (a) { return (a.terminado || 0) > 0; }).sort(function (a, b) { return (parseInt(a.cod, 10) || 0) - (parseInt(b.cod, 10) || 0); }).map(function (a) { return { cod: a.cod, desc: a.desc, disponible: a.terminado, sacar: 0 }; });
+    _sc = { legajo: String(legajo || "").trim(), items: items, filtro: "", motivo: "" };
+    scRender();
+  } catch (e) { const b = document.getElementById("scBody"); if (b) b.innerHTML = '<div class="sc-loading">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
+}
+function scRender() {
+  if (!_sc) return; const body = document.getElementById("scBody"); if (!body) return;
+  if (!_sc.items.length) { body.innerHTML = '<div class="sc-empty">No hay artículo terminado en góndola para mandar.</div>'; return; }
+  const f = (_sc.filtro || "").toLowerCase().trim();
+  const shown = f ? _sc.items.filter(function (it) { return (it.cod + " " + (it.desc || "")).toLowerCase().indexOf(f) >= 0; }) : _sc.items;
+  let h = '<div class="sc-hint">Marcá cuántas <b>cajas</b> mandás a Cervantes. Sale de la góndola (Artículo Terminado).</div>';
+  h += '<input class="sc-mot" type="text" placeholder="Remito / motivo (opcional)" value="' + escapeHtml(_sc.motivo || "") + '" oninput="if(_sc)_sc.motivo=this.value;">';
+  h += '<input class="sc-search" type="search" placeholder="🔎 Buscar código / descripción" value="' + escapeHtml(_sc.filtro) + '" oninput="if(_sc){_sc.filtro=this.value;scRender();}">';
+  if (!shown.length) h += '<div class="sc-empty">No hay artículos que coincidan.</div>';
+  else h += shown.map(function (it) {
+    const i = _sc.items.indexOf(it);
+    return '<div class="sc-row"><div class="sc-info"><span class="sc-cod">' + escapeHtml(it.cod) + '</span> <span class="sc-desc">' + escapeHtml(it.desc || "") + '</span><div class="sc-disp">en góndola: ' + it.disponible + ' cajas</div></div><div class="sc-stp"><button class="sc-sb" onclick="scChg(' + i + ',-1)">–</button><input class="sc-inp" type="number" min="0" max="' + it.disponible + '" inputmode="numeric" value="' + it.sacar + '" oninput="scSet(' + i + ',this.value)"><button class="sc-sb" onclick="scChg(' + i + ',1)">+</button></div></div>';
+  }).join("");
+  const tot = _sc.items.reduce(function (s, it) { return s + it.sacar; }, 0);
+  h += '<button class="sc-fin"' + (tot <= 0 ? " disabled" : "") + ' onclick="scConfirmar()">✓ Mandar ' + tot + ' caja(s) a Cervantes</button>';
+  _renderKeepFocus(body, h);
+}
+function scChg(i, d) { if (!_sc) return; const it = _sc.items[i]; if (!it) return; it.sacar = Math.max(0, Math.min(it.disponible, it.sacar + d)); scRender(); }
+function scSet(i, v) { if (!_sc) return; const it = _sc.items[i]; if (!it) return; let n = Math.max(0, parseInt(v, 10) || 0); if (n > it.disponible) n = it.disponible; it.sacar = n; scRender(); }
+function scConfirmar() {
+  if (!_sc) return;
+  const sel = _sc.items.filter(function (it) { return it.sacar > 0; });
+  if (!sel.length) return;
+  const ref = (_sc.motivo || "").trim() || null;
+  const rows = sel.map(function (it) { return { cod_art: it.cod, descripcion: it.desc || null, deposito: "terminado", delta: -it.sacar, tipo: "salida_cervantes", ref: ref, legajo: _sc.legajo || null }; });
+  const n = sel.reduce(function (s, it) { return s + it.sacar; }, 0);
+  closeSc();
+  stockMove(rows);   // offline-safe (vir_stock_pend)
+  try { alert("✓ Salida a Cervantes registrada: " + n + " caja(s). Bajó de la góndola."); } catch (_e) {}
+}
+function closeSc() { const ov = document.getElementById("scModal"); if (ov) ov.classList.remove("show"); _sc = null; }
+
+/* ===== STOCK — MG (Guardado a Góndola, v4.07): muestra lo que hay en "Mercadería
+   a guardar", el operario elige cuántas cajas guarda y al confirmar pasan a
+   "Artículo Terminado" (resta de a_guardar, suma a terminado). ===== */
+let _mg = null;
+async function showMGModal(legajo) {
+  if (!document.getElementById("mgCss")) {
+    const s = document.createElement("style"); s.id = "mgCss";
+    s.textContent = "#mgModal{display:none;position:fixed;inset:0;z-index:1290;background:rgba(2,6,23,.74);overflow:auto;padding:12px;}#mgModal.show{display:block;}.mg-card{background:#f8fafc;max-width:460px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.mg-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;background:linear-gradient(90deg,#16a34a,#15803d);color:#fff;}.mg-title{font-size:18px;font-weight:800;}.mg-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}.mg-body{padding:13px 14px;}.mg-loading,.mg-empty{padding:26px;text-align:center;color:#64748b;font-size:15px;}.mg-hint{font-size:12.5px;color:#64748b;margin-bottom:10px;}.mg-row{display:flex;align-items:center;gap:10px;border:1px solid #e2e8f0;border-radius:12px;padding:9px 11px;margin-bottom:8px;background:#fff;}.mg-info{flex:1;min-width:0;}.mg-cod{font-size:16px;font-weight:800;font-family:Consolas,Menlo,monospace;}.mg-desc{font-size:12px;color:#475569;}.mg-disp{font-size:11.5px;color:#1e6bd6;font-weight:700;margin-top:2px;}.mg-stp{display:flex;align-items:center;gap:5px;}.mg-sb{width:38px;height:40px;border:none;border-radius:9px;font-size:22px;font-weight:800;cursor:pointer;background:#e2e8f0;color:#475569;}.mg-inp{width:54px;height:40px;text-align:center;font-size:18px;font-weight:800;border:2px solid #cbd5e1;border-radius:9px;}.mg-all{height:40px;border:1px solid #cbd5e1;background:#fff;border-radius:9px;font-size:11px;font-weight:800;cursor:pointer;padding:0 8px;}.mg-fin{width:100%;margin-top:10px;padding:14px;border:none;border-radius:12px;background:#16a34a;color:#fff;font-size:17px;font-weight:800;cursor:pointer;}.mg-fin:disabled{background:#cbd5e1;cursor:not-allowed;}";
+    document.head.appendChild(s);
+  }
+  let ov = document.getElementById("mgModal");
+  if (!ov) { ov = document.createElement("div"); ov.id = "mgModal"; document.body.appendChild(ov); }
+  ov.classList.add("show");
+  ov.innerHTML = '<div class="mg-card"><div class="mg-head"><span class="mg-title">📥 Guardar a góndola</span><button class="mg-close" onclick="closeMG()">Cerrar</button></div><div class="mg-body" id="mgBody"><div class="mg-loading">Cargando lo que hay para guardar…</div></div></div>';
+  try {
+    const res = await Promise.all([stockFetchMovs(), stockGetCutoff()]);
+    const saldos = stockComputeSaldos(res[0] || [], res[1]);
+    const items = Object.keys(saldos).map(function (k) { return saldos[k]; }).filter(function (a) { return a.a_guardar > 0; }).sort(function (a, b) { return (parseInt(a.cod, 10) || 0) - (parseInt(b.cod, 10) || 0); }).map(function (a) { return { cod: a.cod, desc: a.desc, disponible: a.a_guardar, cargar: 0 }; });
+    _mg = { legajo: String(legajo || ""), items: items };
+    mgRender();
+  } catch (e) { const b = document.getElementById("mgBody"); if (b) b.innerHTML = '<div class="mg-loading">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
+}
+function mgRender() {
+  if (!_mg) return; const body = document.getElementById("mgBody"); if (!body) return;
+  if (!_mg.items.length) { body.innerHTML = '<div class="mg-empty">No hay mercadería para guardar 👍</div>'; return; }
+  let h = '<div class="mg-hint">Marcá cuántas cajas guardás de cada artículo → pasan a <b>Artículo Terminado</b>.</div>';
+  h += _mg.items.map(function (it, i) {
+    return '<div class="mg-row"><div class="mg-info"><span class="mg-cod">' + escapeHtml(it.cod) + '</span> <span class="mg-desc">' + escapeHtml(it.desc || "") + '</span><div class="mg-disp">disponible: ' + it.disponible + '</div></div><div class="mg-stp"><button class="mg-sb" onclick="mgChg(' + i + ',-1)">–</button><input class="mg-inp" type="number" min="0" max="' + it.disponible + '" inputmode="numeric" value="' + it.cargar + '" oninput="mgSet(' + i + ',this.value)"><button class="mg-sb" onclick="mgChg(' + i + ',1)">+</button><button class="mg-all" onclick="mgSet(' + i + ',' + it.disponible + ')">todo</button></div></div>';
+  }).join("");
+  const tot = _mg.items.reduce(function (s, it) { return s + it.cargar; }, 0);
+  h += '<button class="mg-fin"' + (tot <= 0 ? " disabled" : "") + ' onclick="mgConfirmar()">✓ Guardar ' + tot + ' caja(s) a Terminado</button>';
+  _renderKeepFocus(body, h);
+}
+function mgChg(i, d) { if (!_mg) return; const it = _mg.items[i]; if (!it) return; it.cargar = Math.max(0, Math.min(it.disponible, it.cargar + d)); mgRender(); }
+function mgSet(i, v) { if (!_mg) return; const it = _mg.items[i]; if (!it) return; let n = Math.max(0, parseInt(v, 10) || 0); if (n > it.disponible) n = it.disponible; it.cargar = n; mgRender(); }
+function mgConfirmar() {
+  if (!_mg) return;
+  const sel = _mg.items.filter(function (it) { return it.cargar > 0; });
+  if (!sel.length) return;
+  const rows = [];
+  sel.forEach(function (it) {
+    rows.push({ cod_art: it.cod, descripcion: it.desc || null, deposito: "a_guardar", delta: -it.cargar, tipo: "guardado", ref: null, legajo: _mg.legajo || null });
+    rows.push({ cod_art: it.cod, descripcion: it.desc || null, deposito: "terminado", delta: it.cargar, tipo: "guardado", ref: null, legajo: _mg.legajo || null });
+  });
+  const n = sel.reduce(function (s, it) { return s + it.cargar; }, 0);
+  closeMG();
+  stockMove(rows);
+  try { alert("✓ Guardado: " + n + " caja(s) pasaron a Artículo Terminado."); } catch (_e) {}
+}
+function closeMG() { const ov = document.getElementById("mgModal"); if (ov) ov.classList.remove("show"); _mg = null; }
+
+/* ===== STOCK — baja por PICKING (v4.07): al TP, suma las cajas REALES pickeadas de
+   la tanda (eventos PKC: texto=tanda|art|esp|real) y las resta de "Artículo Terminado".
+   Dedup por (tipo='picking', ref=tanda) para no descontar dos veces si se reentra a TP. ===== */
+async function stockBajaPicking(tanda, legajo) {
+  try {
+    const t = String(tanda || "").trim().toUpperCase(); if (!t) return;
+    const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+    const chk = await fetch(SUPABASE_STOCK_ENDPOINT + "?tipo=eq.picking&ref=eq." + encodeURIComponent(t) + "&select=id&limit=1", { headers: H, cache: "no-store" });
+    if (chk.ok) { const ex = await chk.json(); if (ex && ex.length) return; }   // ya descontado esta tanda
+    const since = new Date(Date.now() - 3 * 24 * 3600 * 1000).toISOString();
+    const r = await fetch(SUPABASE_URL + "/rest/v1/Registros_Produccion_Virgilio?opcion=eq.PKC&ts_cliente=gte." + encodeURIComponent(since) + "&select=texto&limit=20000", { headers: H, cache: "no-store" });
+    const evs = r.ok ? await r.json() : [];
+    const byArt = {};
+    evs.forEach(function (ev) { const p = String(ev.texto || "").split("|"); if (String(p[0] || "").trim().toUpperCase() !== t) return; const art = String(p[1] || "").trim(); const real = parseInt(p[3], 10); if (art && !isNaN(real) && real > 0) byArt[art] = (byArt[art] || 0) + real; });
+    const rows = Object.keys(byArt).map(function (art) { return { cod_art: art, deposito: "terminado", delta: -byArt[art], tipo: "picking", ref: t, legajo: String(legajo || "") }; });
+    if (rows.length) stockMove(rows);
+  } catch (_e) {}
 }
 /* v4.04: persistencia del avance del wizard (queda abierto durante el armado).
    Se guarda en cada cambio (_compRecalc/_compLioNp), se retoma al reabrir AP, y se

@@ -4,7 +4,137 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-26 · Versión app al documentar: **v4.05**
+> Última actualización: 2026-06-26 · Versión app al documentar: **v4.15**
+>
+> Nota: **v4.15** — **Vista Administración en 2 niveles** (pedido del usuario). **GRANDES** (uso diario,
+> mismo tamaño, fila de 5, `.sup-primary`): **Facturación · PPP · Carga Recepción Mercadería · Stock y
+> Compras · Recepción Remitos (RR)** (ese orden lo definió el usuario). **CHICOS** (ocasionales,
+> `.sup-secondary`, más chicos y atenuados, bajo el rótulo "Reportes y configuración"): Monitor de
+> operarios · Análisis de productividad · Inconsistencias · Faltantes · Editar Planimetría · Talleristas
+> de Recepción · Mails autorizados. **"Stocks" + "Órdenes de Compra" se unificaron en UN botón**: "📦
+> Stock y Compras" abre `openStockAdmin`, que ahora tiene una solapa **"📑 Compras (OCs)"** (`stkTab`
+> intercepta `compras` → `openOCAdmin`). Responsive: 5→3→2 columnas.
+>
+> Nota: **v4.14** — **Fix de foco en buscadores/steppers**. Reemplazar `innerHTML` en cada tecla
+> "sacaba" del campo (había que re-clickear por dígito). Helper **`_renderKeepFocus(container, html)`**:
+> guarda el input activo (tag+clase+índice) y el cursor, y los restaura tras el re-render. Aplicado a
+> `stkRender, ocRender, insRender, scRender, brRender, mgRender`.
+>
+> Nota: **v4.13** — **GENERADOR DE OCs en la página (replica el Excel "Pedidos Talleristas/Prov")**.
+> **BETA, coded pero no para usar** hasta que esté el stock inicial cargado. Vive en el admin **Órdenes
+> de Compra** (`openOCAdmin` → botón "⚙ Generar OCs (beta)" → vista `ocBodyGen`). **Fórmula (= la del
+> Excel, hoja OCUPACION VIRGILIO col H)**: por artículo **`A pedir = max(0, Máximo + Pedidos − Stock)`**,
+> redondeado para arriba a cajas enteras. **Fuentes**: (a) **Stock** = `Movimientos_Stock` **Góndola
+> (terminado) + Racks** (NO cuenta "a guardar"), vía `stockComputeSaldos`; (b) **Pedidos/demanda** =
+> Σ cajas por artículo en los pedidos del **PPP** (`PPP_Programacion_Diaria`, set de NP) según la **base
+> de picking** (`PPP_Base_Pedidos`, vía `fetchPickingBase`) — función `ocgDemanda`; (c) **Máximo +
+> Proveedor** = tabla nueva **`OC_Maximos`** (`cod, descripcion, linea, max_cajas, proveedor, uni_x_caja,
+> activo`; RLS lectura anon / escritura authenticated), **importada del Excel** (OCUPACION VIRGILIO:
+> Stock Max Cajas + Proveedor) — 339 códigos (315 activos, 22 proveedores). El **Máximo** del Excel =
+> Est.Madre_Uni × Índice ÷ Uni-x-Caja (Est.Madre se actualiza ~cada 3 meses → re-importar). **Agrupa por
+> proveedor**; los **proveedores internos** (`Racks` = importación, `Log/ Fabr` = fábrica) se muestran
+> pero **NO** generan OC externa. Al **"Generar las OCs"** escribe las líneas de los externos en
+> `Ordenes_Compra` (proveedor, fecha, codigo, descripcion, cantidad=falta, estado=pendiente, rubro='Art
+> Term'; escritura con sesión de supervisor). Validado con Playwright (fórmula, internos, generación).
+> **Decisiones/pendientes**: códigos con proveedor combinado ("Garcia / Lucho") quedan como ese string
+> (a futuro, partir); **futuro**: que se genere automático + guardar PDFs en una carpeta / enviar por
+> WhatsApp con plantilla (a trabajar después). El usuario carga el stock inicial más adelante (recién ahí
+> da números reales).
+>
+> Nota: **v4.12** — **Stock inicial / "marcar inicio" robusto**. (1) `stockComputeSaldos` ahora cuenta
+> **SIEMPRE** los movimientos `tipo='inicial'` (stock inicial = base), aunque sean anteriores al corte;
+> el `cutoff` sólo desconsidera los movimientos **reales** previos (recepción/guardado/picking/ajuste/
+> salida_cervantes/baja_racks/etc.), sin borrarlos. Así se puede cargar el inicial de **varios depósitos**
+> (góndola/racks/insumos) en cualquier orden y **marcar inicio una sola vez**, sin que un depósito pise a
+> otro. (2) En el admin Stocks → ⚙ Ajustes, la carga inicial pasó a **dos pasos separados**:
+> **`stockGuardarInicial()`** (carga el inicial del depósito elegido, sin tocar el corte) y
+> **`stockMarcarInicio()`** (botón aparte que fija `cutoff_ts = ahora`, una sola vez). Se quitó el botón
+> combinado "Guardar + marcar inicio" (era un footgun multi-depósito: movía el corte y dejaba afuera lo
+> cargado antes). Validado con Playwright. Decisión del usuario: **el stock inicial se carga más adelante**
+> (primero verifica que el resto del flujo sume/reste bien).
+>
+> Nota: **v4.11** — **ÓRDENES DE COMPRA** (módulo admin, base del match recibido↔pedido). Botón
+> supervisor **"📑 Órdenes de Compra"** (`openOCAdmin`). **Descubrimiento importante**: la tabla
+> **`Ordenes_Compra` YA EXISTÍA** con datos reales (18 líneas de cajas de "Corrugadora"). Es **plana**:
+> una fila por artículo pedido (`codigo, descripcion, cantidad, cantidad_recibida, unidad, proveedor,
+> rubro, fecha, estado` + campos de mensajería al proveedor `mensaje_enviado/fecha_mensaje/
+> proveedor_telefono` que mantiene otra herramienta). Una **"OC" = grupo (proveedor · fecha · rubro)**.
+> El módulo lista las OCs agrupadas con **Pedido / Falta** (= Σcantidad − Σrecibida) y estado
+> (pendiente|parcial|recibida); al abrir una OC muestra sus líneas con **recibido editable** y
+> **faltante en vivo**; permite **guardar recibido** y **marcar recibida/reabrir**; y **crear OC manual**
+> (carga líneas planas). **RLS de la tabla** (pre-existente, respetada): `select_all` anon+auth (lectura),
+> pero `insert/update/delete` **sólo `authenticated`** → las **escrituras usan `facAuthWriteHeaders`**
+> (sesión Google de supervisor, igual que Planimetría/Talleristas); la lectura va con anon. ⚠ Se creó por
+> error una tabla `OC_Items` (modelo header+items) y una policy `oc_all` anon-write: **ambas
+> revertidas/eliminadas** (se usa la tabla plana existente y su RLS original). **Pendiente** (necesita
+> input del usuario): (a) **importar los PDF de OC** (share Windows `D:\Shares\...\A2 OC Art Term VIGENTE`,
+> no accesible del sandbox) — poblaría esta misma tabla; (b) **auto-actualizar `cantidad_recibida` desde
+> la recepción** (definir el vínculo recepción→OC: por `codigo`, por remito, desde qué fecha).
+>
+> Nota: **v4.10** — **SALIDA A CERVANTES** (botón nuevo de operario). Se agregó el botón **`SC`**
+> ("Salida a Cervantes") a la botonera (en la fila de logística; **`CT` Conteo** se corrió a la
+> 3ª fila, ahora ambas filas de 6). Manda **artículo terminado** a la otra planta (muestra /
+> devolución): es una **baja de góndola** → `Movimientos_Stock` `deposito='terminado'`, `delta`
+> negativo, `tipo='salida_cervantes'`, `ref` = remito/motivo opcional. **No** es un toggle ni genera
+> evento en `Registros`: el botón intercepta en `selectOption` y abre **directo** el modal
+> `showCervantesModal` (sin "Enviar"); la salida queda registrada sólo en `Movimientos_Stock` (con
+> legajo + ts como traza). El modal (tipo MG) muestra lo que hay en góndola (stock terminado > 0),
+> buscador, stepper por artículo (tope = stock) y un campo remito/motivo; confirmar usa **`stockMove`**
+> (offline-safe). En el **admin Stocks** la solapa **Salidas** ahora muestra picking **+** salida a
+> Cervantes (columna "Destino": tanda vs 🚚 Cervantes · motivo). Validado con Playwright (layout de
+> botonera, intercept del botón, render, clamp, fila de movimiento).
+>
+> Nota: **v4.09** — **INSUMOS** (stock de insumos en la página). Los botones **RI** (Recepción
+> Insumos) y **EI** (Entrega Insumos) —que ya existían como toggles de actividad— ahora, **al
+> tocarse (inicio)**, abren un modal que registra **stock de insumos** en `Movimientos_Stock`
+> (`deposito='insumos'`, tipo `recepcion_insumo` `+` / `entrega_insumo` `−`). El modal
+> (`showInsumoModal('RI'|'EI', legajo)`) tiene **buscador** sobre el catálogo **`Insumos`** (tabla
+> nueva: `id, cod (unique), nombre, creado_por, creado`; RLS abierta anon+auth) y **alta de código
+> al vuelo** (`insCrear` → POST a `Insumos`) para cuando el insumo no está. Cada fila muestra el
+> **stock actual** y un stepper; en EI avisa si va a quedar negativo (no lo bloquea — "como entra,
+> puede salir"). Confirmar usa **`stockMove`** (offline-safe `vir_stock_pend`). En el **admin Stocks**
+> (solapa Stocks) se agregó una sección **"📦 Insumos"** con el saldo por código. El selector de
+> depósito de **Ajustes** ya permite cargar/ajustar `insumos`. Validado con Playwright (RI/EI render,
+> buscador, warning, clamps, filas de movimiento correctas) y shape de insert en Supabase.
+> ⏳ Falta que el usuario pase el **listado de insumos** para precargar el catálogo (igual se crea solo
+> al usarse).
+>
+> Nota: **v4.08** — **RACKS → GÓNDOLA** (page-based, sin Telegram). Los **racks** son góndolas de
+> pallets donde se guarda stock en **master cajas**; una vez por semana (al generar las OCs, miércoles)
+> se baja de racks a la góndola. **Modelo**: depósito nuevo **`racks`** en `Movimientos_Stock` (en cajas;
+> se muestran 3 unidades por artículo: **master ↔ caja ↔ unidad** vía `Cajas_x_Master` —columna nueva en
+> `Articulos Virgilio X Tallerista`, junto a `Uni_x_Caja`). Tablas nuevas: **`Racks_Ordenes`**
+> (`id, fecha, estado pendiente|bajado, creada_por, creada, cerrada_at`) y **`Racks_Bajadas`**
+> (`id, orden_id, cod_art, descripcion, cajas, estado propuesta|aprobada, creada_por, ts, aprobada_at`);
+> RLS abierta anon+authenticated. **Flujo**: (1) la operadora toca **"OCs generadas"** en el admin Stocks
+> (solapa 🏗 **Racks**) → crea una `Racks_Ordenes` **pendiente** (`racksCrearOrden`). (2) **Alarma en la
+> página**: mientras haya orden pendiente, a los operarios les aparece un banner en la botonera
+> (`#racksAlarma`, `racksCheckAlarma`, refresco 5′, llamado desde `goToOptions`). (3) **Operario baja**:
+> botón "Registrar bajada" → `showBajarRacks` (módulo tipo MG: muestra stock de racks en las 3 unidades,
+> el operario marca cuántas cajas baja) → guarda en `Racks_Bajadas` **estado `propuesta`** (NO mueve stock
+> todavía; reintento offline `vir_racks_pend`). (4) **Marianela aprueba** en **Carga Recepción Mercadería**
+> (`recepcion.js`, botón "📦 Bajadas Racks → góndola" con contador de pendientes) → `racksAprobarBaja`:
+> inserta 2 `Movimientos_Stock` (`-racks` / `+terminado`, tipo `baja_racks`), marca la bajada `aprobada` y,
+> si era la última de la orden, cierra la orden (`bajado` → apaga la alarma). **Si no se baja, NO se mueve
+> stock.** Mismo patrón reusable a futuro para reclamar artículos con poco stock (botón → orden/alarma en la
+> página). Admin Stocks ahora tiene **5 solapas** (Stocks · 🏗 Racks · Ingresos · Salidas · Ajustes) y el
+> selector de **depósito** en Ajustes incluye racks/insumos/a_guardar (`_stkDep`). Validado con Playwright
+> (admin render, operario `brRender`, clamps, alarma).
+>
+> Nota: **v4.06–v4.07** — **STOCK ONLINE** (pedido del usuario; objetivo: stock dentro de la página).
+> Modelo **event-sourced**: tabla **`Movimientos_Stock`** (`ts, cod_art, descripcion, deposito
+> ('a_guardar'|'terminado'), delta (+/- cajas), tipo, ref, legajo`); el **stock = suma de `delta`** por
+> `cod_art`/`deposito` considerando sólo `ts >= corte`. Tabla **`Stock_Config`** guarda el corte
+> (`clave='cutoff_ts'`). **Flujos**: (1) **RT/recepción** (`recepcion.js opEnviar`) → cada artículo recibido
+> suma a **'a_guardar'** (tipo `recepcion`). (2) **MG** (Guardado a Góndola) → al tocar MG, `showMGModal`
+> muestra lo que hay en 'a_guardar', el operario elige cuántas cajas guarda y al confirmar genera 2
+> movimientos por artículo (`-a_guardar`, `+terminado`, tipo `guardado`). (3) **Picking** → al **TP**,
+> `stockBajaPicking` suma las cajas **reales** de los PKC de la tanda y resta de **'terminado'** (tipo
+> `picking`, dedup por `ref=tanda`). **Admin** "📦 Stock / Movimientos" (`openStockAdmin`): saldos por
+> artículo (terminado negativo en rojo), detalle de movimientos, **cargar stock inicial** (movimientos
+> `inicial`) y botón **"marcar inicio"** (setea `cutoff_ts` → desconsidera lo anterior sin borrarlo).
+> Cliente: `stockMove`/`stockFlushPend` (POST + reintento `vir_stock_pend`), `stockFetchMovs`/`GetCutoff`/
+> `ComputeSaldos`. Helpers offline-safe. (Arranca en 0; el corte permite resetear cuando se carga el inicial.)
 >
 > Nota: **v4.05** — **Dos alertas nuevas a Telegram** (grupo **"Faltantes Virgilio"**, chat `-1004379879565`, el
 > mismo bot/grupo de faltantes y sin planimetría). (1) **FALTA DE FACTURACIÓN** — *server-side* (`pg_cron` +
