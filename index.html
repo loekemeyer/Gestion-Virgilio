@@ -3027,6 +3027,7 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
       <button class="sup-action-btn" onclick="openMailsEditor()"><span class="sup-ico">✉️</span><span>Mails autorizados</span></button>
       <button class="sup-action-btn" onclick="openTallEditor()"><span class="sup-ico">👷</span><span>Talleristas de Recepción</span></button>
       <button class="sup-action-btn" onclick="openStockAdmin()"><span class="sup-ico">📦</span><span>Stocks</span></button>
+      <button class="sup-action-btn" onclick="openOCAdmin()"><span class="sup-ico">📑</span><span>Órdenes de Compra</span></button>
     </div>
     <div class="auth-logout-row">
       <button class="auth-logout-btn" onclick="signOutGoogle()">Salir</button>
@@ -5226,7 +5227,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v4.10";
+const APP_VERSION = "v4.11";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -7010,6 +7011,145 @@ async function openStockAdmin() {
   } catch (e) { const b = document.getElementById("stkBody"); if (b) b.innerHTML = '<div class="stk-loading">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
 }
 function closeStockAdmin() { const ov = document.getElementById("stockAdminOverlay"); if (ov) ov.classList.remove("show"); _stk = null; }
+
+/* ===== ÓRDENES DE COMPRA (v4.11): visualización/carga de OCs y match recibido vs pedido.
+   Usa la tabla EXISTENTE Ordenes_Compra (plana: una fila por artículo pedido — codigo,
+   descripcion, cantidad, cantidad_recibida, proveedor, rubro, fecha, unidad, estado). Una "OC"
+   se agrupa por (proveedor · fecha · rubro). Lectura con anon (RLS select_all); ESCRITURA con
+   sesión de supervisor (facAuthWriteHeaders → rol authenticated, como Planimetría/Talleristas),
+   respetando que insert/update/delete están restringidos a authenticated. Los PDFs de OC viven en
+   un share de Windows (no accesible del sandbox); cuando definamos el formato, la importación va a
+   poblar ESTA misma tabla. Admin. ===== */
+const SUPABASE_OC_ENDPOINT = SUPABASE_URL + "/rest/v1/Ordenes_Compra";
+let _oc = null;
+function _ocGroupKey(r) { return [r.proveedor || "", r.fecha || "", r.rubro || ""].join("~|~"); }
+async function ocFetchRows() {
+  const r = await fetch(SUPABASE_OC_ENDPOINT + "?select=id,fecha,rubro,proveedor,codigo,descripcion,cantidad,cantidad_recibida,unidad,estado&order=fecha.desc,proveedor.asc,codigo.asc&limit=20000", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+  return r.ok ? r.json() : [];
+}
+async function openOCAdmin() {
+  if (!document.getElementById("ocCss")) {
+    const s = document.createElement("style"); s.id = "ocCss";
+    s.textContent = "#ocAdminOverlay{display:none;position:fixed;inset:0;z-index:1281;background:rgba(2,6,23,.74);overflow:auto;padding:14px;}#ocAdminOverlay.show{display:block;}.oc-card{background:#f8fafc;max-width:860px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.oc-head{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:linear-gradient(90deg,#0f766e,#134e4a);color:#fff;}.oc-title{font-size:19px;font-weight:800;}.oc-close{background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;width:auto;}.oc-body{padding:14px 16px;}.oc-loading,.oc-empty{padding:24px;text-align:center;color:#64748b;}.oc-tools{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center;}.oc-btn{background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:8px 13px;font-size:13px;font-weight:800;cursor:pointer;width:auto;}.oc-btn.ok{background:#0f766e;color:#fff;border-color:#0f766e;}.oc-btn.danger{background:#fff;color:#b91c1c;border-color:#fca5a5;}.oc-filtro{flex:1;min-width:160px;height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 11px;font-size:14px;}.oc-tbl{width:100%;border-collapse:collapse;font-size:13.5px;}.oc-tbl th{background:#f1f5f9;color:#475569;text-align:left;padding:7px 9px;font-size:11px;text-transform:uppercase;border-bottom:1px solid #cbd5e1;}.oc-tbl th.num,.oc-tbl td.num{text-align:right;font-variant-numeric:tabular-nums;}.oc-tbl td{padding:7px 9px;border-bottom:1px solid #eef2f7;}.oc-rowc{cursor:pointer;}.oc-rowc:hover{background:#ecfdf5;}.oc-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#0f766e;}.oc-pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11px;font-weight:800;}.oc-pill.pendiente{background:#fef3c7;color:#92400e;}.oc-pill.recibida{background:#dcfce7;color:#166534;}.oc-pill.parcial{background:#dbeafe;color:#1e40af;}.oc-falt{color:#b91c1c;font-weight:800;}.oc-ok{color:#166534;font-weight:800;}.oc-rinp{width:78px;height:34px;text-align:right;border:1px solid #cbd5e1;border-radius:8px;padding:0 7px;font-size:14px;font-weight:700;}.oc-form{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;}.oc-inp{height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 10px;font-size:14px;}.oc-meta{font-size:13px;color:#475569;margin-bottom:10px;}.oc-meta b{color:#0f172a;}.oc-additm{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-top:8px;}.oc-note{font-size:12px;color:#64748b;margin-top:10px;}";
+    document.head.appendChild(s);
+  }
+  let ov = document.getElementById("ocAdminOverlay");
+  if (!ov) { ov = document.createElement("div"); ov.id = "ocAdminOverlay"; document.body.appendChild(ov); }
+  ov.classList.add("show");
+  ov.innerHTML = '<div class="oc-card"><div class="oc-head"><span class="oc-title">📑 Órdenes de Compra</span><button class="oc-close" onclick="closeOCAdmin()">Cerrar</button></div><div class="oc-body" id="ocBody"><div class="oc-loading">Cargando…</div></div></div>';
+  try {
+    const rows = await ocFetchRows();
+    _oc = { rows: rows, view: "list", openKey: null, filtro: "", nueva: { proveedor: "", fecha: "", rubro: "", unidad: "Cajas", items: [{ cod: "", desc: "", cant: "" }] } };
+    ocRender();
+  } catch (e) { const b = document.getElementById("ocBody"); if (b) b.innerHTML = '<div class="oc-loading">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
+}
+function closeOCAdmin() { const ov = document.getElementById("ocAdminOverlay"); if (ov) ov.classList.remove("show"); _oc = null; }
+function ocRender() { if (!_oc) return; const body = document.getElementById("ocBody"); if (!body) return; body.innerHTML = _oc.view === "detail" ? ocBodyDetail() : _oc.view === "nueva" ? ocBodyNueva() : ocBodyList(); }
+function ocGroups() {
+  const g = {};
+  (_oc.rows || []).forEach(function (r) { const k = _ocGroupKey(r); if (!g[k]) g[k] = { key: k, proveedor: r.proveedor || "", fecha: r.fecha || "", rubro: r.rubro || "", rows: [] }; g[k].rows.push(r); });
+  return g;
+}
+function ocGroupStats(grp) {
+  let ped = 0, rec = 0, allRecibida = true;
+  grp.rows.forEach(function (r) { ped += Number(r.cantidad) || 0; rec += Number(r.cantidad_recibida) || 0; if (String(r.estado || "") !== "recibida") allRecibida = false; });
+  const estado = allRecibida ? "recibida" : (rec > 0 ? "parcial" : "pendiente");
+  return { ped: ped, rec: rec, falta: ped - rec, estado: estado };
+}
+function ocBodyList() {
+  let h = '<div class="oc-tools"><button class="oc-btn ok" onclick="ocNueva()">+ Nueva OC (carga manual)</button><input class="oc-filtro" type="search" placeholder="🔎 Buscar proveedor / rubro / fecha" value="' + escapeHtml(_oc.filtro) + '" oninput="if(_oc){_oc.filtro=this.value;ocRender();}"></div>';
+  const g = ocGroups();
+  let keys = Object.keys(g);
+  const f = (_oc.filtro || "").toLowerCase().trim();
+  if (f) keys = keys.filter(function (k) { const x = g[k]; return ((x.proveedor || "") + " " + (x.rubro || "") + " " + (x.fecha || "")).toLowerCase().indexOf(f) >= 0; });
+  keys.sort(function (a, b) { return (g[b].fecha || "").localeCompare(g[a].fecha || "") || (g[a].proveedor || "").localeCompare(g[b].proveedor || ""); });
+  if (!keys.length) return h + '<div class="oc-empty">No hay órdenes de compra que coincidan.<br><small>La importación desde los PDF de OC se agrega cuando definamos el formato.</small></div>';
+  h += '<table class="oc-tbl"><thead><tr><th>Proveedor</th><th>Fecha</th><th>Rubro</th><th class="num">Ítems</th><th class="num">Pedido</th><th class="num">Falta</th><th>Estado</th></tr></thead><tbody>';
+  keys.forEach(function (k) {
+    const x = g[k], st = ocGroupStats(x);
+    h += '<tr class="oc-rowc" onclick="ocOpen(\'' + encodeURIComponent(k) + '\')"><td><b>' + escapeHtml(x.proveedor || "—") + '</b></td><td>' + escapeHtml(x.fecha || "—") + '</td><td>' + escapeHtml(x.rubro || "—") + '</td><td class="num">' + x.rows.length + '</td><td class="num">' + st.ped + '</td><td class="num ' + (st.falta > 0 ? "oc-falt" : "oc-ok") + '">' + (st.falta > 0 ? st.falta : "0") + '</td><td><span class="oc-pill ' + st.estado + '">' + st.estado + '</span></td></tr>';
+  });
+  h += '</tbody></table><div class="oc-note">La columna <b>Falta</b> = pedido − recibido. Entrá a una OC para cargar lo recibido y marcar el faltante (escritura: requiere sesión de supervisor).</div>';
+  return h;
+}
+function ocOpen(kEnc) { if (!_oc) return; _oc.openKey = decodeURIComponent(kEnc); _oc.view = "detail"; ocRender(); }
+function ocBack() { if (!_oc) return; _oc.view = "list"; _oc.openKey = null; ocRender(); }
+function ocBodyDetail() {
+  const g = ocGroups(), x = g[_oc.openKey];
+  if (!x) { _oc.view = "list"; return ocBodyList(); }
+  const st = ocGroupStats(x);
+  let h = '<div class="oc-tools"><button class="oc-btn" onclick="ocBack()">← Volver</button>';
+  h += '<button class="oc-btn ok" onclick="ocGuardarRecibido()">💾 Guardar recibido</button>';
+  if (st.estado !== "recibida") h += '<button class="oc-btn" onclick="ocMarcar(\'recibida\')">✓ Marcar recibida</button>';
+  else h += '<button class="oc-btn" onclick="ocMarcar(\'pendiente\')">↩ Reabrir</button>';
+  h += '</div>';
+  h += '<div class="oc-meta">Proveedor <b>' + escapeHtml(x.proveedor || "—") + '</b> · Fecha <b>' + escapeHtml(x.fecha || "—") + '</b> · Rubro <b>' + escapeHtml(x.rubro || "—") + '</b> · Pedido <b>' + st.ped + '</b> · Falta <b>' + (st.falta > 0 ? st.falta : 0) + '</b></div>';
+  h += '<table class="oc-tbl"><thead><tr><th>Código</th><th>Descripción</th><th>Unidad</th><th class="num">Pedido</th><th class="num">Recibido</th><th class="num">Falta</th></tr></thead><tbody>';
+  x.rows.forEach(function (r) {
+    const ped = Number(r.cantidad) || 0, rec = Number(r.cantidad_recibida) || 0, falt = ped - rec;
+    h += '<tr><td class="oc-cod">' + escapeHtml(r.codigo || "—") + '</td><td>' + escapeHtml(r.descripcion || "") + '</td><td>' + escapeHtml(r.unidad || "") + '</td><td class="num">' + ped + '</td><td class="num"><input class="oc-rinp" type="number" min="0" inputmode="numeric" data-id="' + r.id + '" value="' + rec + '" oninput="ocLiveFalt(' + r.id + ',' + ped + ',this.value)"></td><td class="num ' + (falt > 0 ? "oc-falt" : "oc-ok") + '" id="ocfalt_' + r.id + '">' + (falt !== 0 ? falt : "0") + '</td></tr>';
+  });
+  return h + "</tbody></table>";
+}
+function ocLiveFalt(id, ped, v) { const c = document.getElementById("ocfalt_" + id); if (!c) return; const falt = ped - (parseInt(v, 10) || 0); c.textContent = falt !== 0 ? falt : "0"; c.className = "num " + (falt > 0 ? "oc-falt" : "oc-ok"); }
+function _ocCollectRecibido() {
+  const out = [];
+  document.querySelectorAll('#ocBody .oc-rinp').forEach(function (el) { out.push({ id: el.getAttribute("data-id"), val: Math.max(0, parseInt(el.value, 10) || 0) }); });
+  return out;
+}
+async function ocGuardarRecibido() {
+  if (!_oc) return;
+  const headers = await facAuthWriteHeaders({ "Prefer": "return=minimal" });
+  if (!headers) { alert("Para guardar necesitás iniciar sesión con Google (supervisor)."); return; }
+  try {
+    await Promise.all(_ocCollectRecibido().map(function (r) { return fetch(SUPABASE_OC_ENDPOINT + "?id=eq." + r.id, { method: "PATCH", headers: headers, body: JSON.stringify({ cantidad_recibida: r.val }) }); }));
+    _oc.rows = await ocFetchRows(); ocRender();
+    alert("✓ Recibido guardado.");
+  } catch (e) { alert("Error guardando: " + (e.message || e)); }
+}
+async function ocMarcar(estado) {
+  if (!_oc || !_oc.openKey) return;
+  const g = ocGroups(), x = g[_oc.openKey]; if (!x) return;
+  const headers = await facAuthWriteHeaders({ "Prefer": "return=minimal" });
+  if (!headers) { alert("Para esto necesitás iniciar sesión con Google (supervisor)."); return; }
+  try {
+    if (estado === "recibida") { await Promise.all(_ocCollectRecibido().map(function (r) { return fetch(SUPABASE_OC_ENDPOINT + "?id=eq." + r.id, { method: "PATCH", headers: headers, body: JSON.stringify({ cantidad_recibida: r.val }) }); })); }
+    await Promise.all(x.rows.map(function (r) { return fetch(SUPABASE_OC_ENDPOINT + "?id=eq." + r.id, { method: "PATCH", headers: headers, body: JSON.stringify({ estado: estado }) }); }));
+    _oc.rows = await ocFetchRows(); ocRender();
+  } catch (e) { alert("Error: " + (e.message || e)); }
+}
+function ocNueva() { if (!_oc) return; _oc.view = "nueva"; if (!_oc.nueva || !_oc.nueva.items) _oc.nueva = { proveedor: "", fecha: "", rubro: "", unidad: "Cajas", items: [{ cod: "", desc: "", cant: "" }] }; ocRender(); }
+function ocBodyNueva() {
+  const n = _oc.nueva;
+  let h = '<div class="oc-tools"><button class="oc-btn" onclick="ocBack()">← Volver</button></div>';
+  h += '<div class="oc-form"><input class="oc-inp" placeholder="Proveedor" value="' + escapeHtml(n.proveedor) + '" oninput="if(_oc)_oc.nueva.proveedor=this.value"><input class="oc-inp" type="date" value="' + escapeHtml(n.fecha) + '" oninput="if(_oc)_oc.nueva.fecha=this.value"><input class="oc-inp" placeholder="Rubro (ej: Cajas)" value="' + escapeHtml(n.rubro) + '" oninput="if(_oc)_oc.nueva.rubro=this.value"><input class="oc-inp" placeholder="Unidad" style="width:90px" value="' + escapeHtml(n.unidad) + '" oninput="if(_oc)_oc.nueva.unidad=this.value"></div>';
+  h += '<table class="oc-tbl"><thead><tr><th>Código</th><th>Descripción</th><th class="num">Cantidad</th><th></th></tr></thead><tbody>';
+  n.items.forEach(function (it, i) {
+    h += '<tr><td><input class="oc-inp" style="width:100px" placeholder="cod" value="' + escapeHtml(it.cod) + '" oninput="if(_oc)_oc.nueva.items[' + i + '].cod=this.value"></td><td><input class="oc-inp" style="width:100%;box-sizing:border-box" placeholder="descripción" value="' + escapeHtml(it.desc) + '" oninput="if(_oc)_oc.nueva.items[' + i + '].desc=this.value"></td><td class="num"><input class="oc-rinp" type="number" min="0" inputmode="numeric" value="' + escapeHtml(String(it.cant)) + '" oninput="if(_oc)_oc.nueva.items[' + i + '].cant=this.value"></td><td><button class="oc-btn danger" onclick="ocNuevaDelItem(' + i + ')">✕</button></td></tr>';
+  });
+  h += '</tbody></table><div class="oc-additm"><button class="oc-btn" onclick="ocNuevaAddItem()">+ Agregar ítem</button><button class="oc-btn ok" onclick="ocNuevaCrear()">✓ Crear OC</button></div>';
+  return h;
+}
+function ocNuevaAddItem() { if (!_oc) return; _oc.nueva.items.push({ cod: "", desc: "", cant: "" }); ocRender(); }
+function ocNuevaDelItem(i) { if (!_oc) return; _oc.nueva.items.splice(i, 1); if (!_oc.nueva.items.length) _oc.nueva.items.push({ cod: "", desc: "", cant: "" }); ocRender(); }
+async function ocNuevaCrear() {
+  if (!_oc) return;
+  const n = _oc.nueva;
+  const items = n.items.filter(function (it) { return String(it.cod).trim() || (parseInt(it.cant, 10) || 0) > 0; });
+  if (!items.length) { alert("Cargá al menos un ítem con código y cantidad."); return; }
+  const headers = await facAuthWriteHeaders({ "Prefer": "return=minimal" });
+  if (!headers) { alert("Para crear una OC necesitás iniciar sesión con Google (supervisor)."); return; }
+  const rows = items.map(function (it) { return { proveedor: n.proveedor.trim() || null, fecha: n.fecha || null, rubro: n.rubro.trim() || null, codigo: String(it.cod).trim() || null, descripcion: String(it.desc).trim() || null, cantidad: Math.max(0, parseInt(it.cant, 10) || 0), cantidad_recibida: 0, unidad: n.unidad.trim() || null, estado: "pendiente" }; });
+  try {
+    const r = await fetch(SUPABASE_OC_ENDPOINT, { method: "POST", headers: headers, body: JSON.stringify(rows) });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    _oc.rows = await ocFetchRows();
+    _oc.nueva = { proveedor: "", fecha: "", rubro: "", unidad: "Cajas", items: [{ cod: "", desc: "", cant: "" }] };
+    _oc.openKey = [rows[0].proveedor || "", rows[0].fecha || "", rows[0].rubro || ""].join("~|~");
+    _oc.view = "detail"; ocRender();
+    alert("✓ OC creada con " + rows.length + " ítem(s).");
+  } catch (e) { alert("Error creando OC: " + (e.message || e)); }
+}
 function stkTab(t) { if (!_stk) return; _stk.tab = t; _stk.filtro = ""; _stk.openArt = null; stkRender(); }
 function stkRender() {
   if (!_stk) return;

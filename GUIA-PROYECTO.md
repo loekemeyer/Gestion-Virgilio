@@ -4,7 +4,25 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-26 · Versión app al documentar: **v4.10**
+> Última actualización: 2026-06-26 · Versión app al documentar: **v4.11**
+>
+> Nota: **v4.11** — **ÓRDENES DE COMPRA** (módulo admin, base del match recibido↔pedido). Botón
+> supervisor **"📑 Órdenes de Compra"** (`openOCAdmin`). **Descubrimiento importante**: la tabla
+> **`Ordenes_Compra` YA EXISTÍA** con datos reales (18 líneas de cajas de "Corrugadora"). Es **plana**:
+> una fila por artículo pedido (`codigo, descripcion, cantidad, cantidad_recibida, unidad, proveedor,
+> rubro, fecha, estado` + campos de mensajería al proveedor `mensaje_enviado/fecha_mensaje/
+> proveedor_telefono` que mantiene otra herramienta). Una **"OC" = grupo (proveedor · fecha · rubro)**.
+> El módulo lista las OCs agrupadas con **Pedido / Falta** (= Σcantidad − Σrecibida) y estado
+> (pendiente|parcial|recibida); al abrir una OC muestra sus líneas con **recibido editable** y
+> **faltante en vivo**; permite **guardar recibido** y **marcar recibida/reabrir**; y **crear OC manual**
+> (carga líneas planas). **RLS de la tabla** (pre-existente, respetada): `select_all` anon+auth (lectura),
+> pero `insert/update/delete` **sólo `authenticated`** → las **escrituras usan `facAuthWriteHeaders`**
+> (sesión Google de supervisor, igual que Planimetría/Talleristas); la lectura va con anon. ⚠ Se creó por
+> error una tabla `OC_Items` (modelo header+items) y una policy `oc_all` anon-write: **ambas
+> revertidas/eliminadas** (se usa la tabla plana existente y su RLS original). **Pendiente** (necesita
+> input del usuario): (a) **importar los PDF de OC** (share Windows `D:\Shares\...\A2 OC Art Term VIGENTE`,
+> no accesible del sandbox) — poblaría esta misma tabla; (b) **auto-actualizar `cantidad_recibida` desde
+> la recepción** (definir el vínculo recepción→OC: por `codigo`, por remito, desde qué fecha).
 >
 > Nota: **v4.10** — **SALIDA A CERVANTES** (botón nuevo de operario). Se agregó el botón **`SC`**
 > ("Salida a Cervantes") a la botonera (en la fila de logística; **`CT` Conteo** se corrió a la
