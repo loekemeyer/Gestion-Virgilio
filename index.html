@@ -5227,7 +5227,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v4.12";
+const APP_VERSION = "v4.13";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -7049,7 +7049,7 @@ async function openOCAdmin() {
   } catch (e) { const b = document.getElementById("ocBody"); if (b) b.innerHTML = '<div class="oc-loading">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
 }
 function closeOCAdmin() { const ov = document.getElementById("ocAdminOverlay"); if (ov) ov.classList.remove("show"); _oc = null; }
-function ocRender() { if (!_oc) return; const body = document.getElementById("ocBody"); if (!body) return; body.innerHTML = _oc.view === "detail" ? ocBodyDetail() : _oc.view === "nueva" ? ocBodyNueva() : ocBodyList(); }
+function ocRender() { if (!_oc) return; const body = document.getElementById("ocBody"); if (!body) return; body.innerHTML = _oc.view === "detail" ? ocBodyDetail() : _oc.view === "nueva" ? ocBodyNueva() : _oc.view === "gen" ? ocBodyGen() : ocBodyList(); }
 function ocGroups() {
   const g = {};
   (_oc.rows || []).forEach(function (r) { const k = _ocGroupKey(r); if (!g[k]) g[k] = { key: k, proveedor: r.proveedor || "", fecha: r.fecha || "", rubro: r.rubro || "", rows: [] }; g[k].rows.push(r); });
@@ -7062,7 +7062,7 @@ function ocGroupStats(grp) {
   return { ped: ped, rec: rec, falta: ped - rec, estado: estado };
 }
 function ocBodyList() {
-  let h = '<div class="oc-tools"><button class="oc-btn ok" onclick="ocNueva()">+ Nueva OC (carga manual)</button><input class="oc-filtro" type="search" placeholder="🔎 Buscar proveedor / rubro / fecha" value="' + escapeHtml(_oc.filtro) + '" oninput="if(_oc){_oc.filtro=this.value;ocRender();}"></div>';
+  let h = '<div class="oc-tools"><button class="oc-btn ok" onclick="ocNueva()">+ Nueva OC (carga manual)</button><button class="oc-btn" onclick="ocgEnter()">⚙ Generar OCs (beta)</button><input class="oc-filtro" type="search" placeholder="🔎 Buscar proveedor / rubro / fecha" value="' + escapeHtml(_oc.filtro) + '" oninput="if(_oc){_oc.filtro=this.value;ocRender();}"></div>';
   const g = ocGroups();
   let keys = Object.keys(g);
   const f = (_oc.filtro || "").toLowerCase().trim();
@@ -7154,6 +7154,97 @@ async function ocNuevaCrear() {
     _oc.view = "detail"; ocRender();
     alert("✓ OC creada con " + rows.length + " ítem(s).");
   } catch (e) { alert("Error creando OC: " + (e.message || e)); }
+}
+
+/* ===== GENERADOR DE OCs (v4.13): replica la lógica del Excel "Pedidos Talleristas/Prov".
+   Por artículo: A pedir = max(0, Máximo + Pedidos − (Góndola + Racks)). Máximo y Proveedor salen de
+   OC_Maximos (config importada del Excel); Stock de Movimientos_Stock (góndola+racks, NO "a guardar");
+   Pedidos (demanda) = Σ cajas por artículo en los pedidos del PPP (PPP_Programacion_Diaria) según la
+   base de picking (PPP_Base_Pedidos). Agrupa por proveedor y, al confirmar, escribe las OCs en
+   Ordenes_Compra (escritura: sesión de supervisor). Proveedores INTERNOS (Racks=importación,
+   Log/Fabr=fábrica) se muestran pero NO generan OC externa. BETA: no usar hasta cargar el stock. */
+const SUPABASE_OCMAX_ENDPOINT = SUPABASE_URL + "/rest/v1/OC_Maximos";
+const OCG_INTERNOS = ["RACKS", "LOG/ FABR", "LOG/FABR", "LOG/ FABRICA"];
+function _ocgInterno(prov) { return OCG_INTERNOS.indexOf(String(prov || "").toUpperCase().trim()) >= 0; }
+async function ocgFetchMaximos() {
+  const r = await fetch(SUPABASE_OCMAX_ENDPOINT + "?select=cod,descripcion,linea,max_cajas,proveedor,uni_x_caja&activo=eq.true&limit=20000", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+  return r.ok ? r.json() : [];
+}
+async function ocgDemanda() {
+  let ppp = [];
+  try { ppp = await supaFetchAll(SUPABASE_PPP_PROG_ENDPOINT, "select=np"); } catch (_e) {}
+  const npSet = {};
+  ppp.forEach(function (r) { const n = pickNormNp(r.np); if (n) npSet[n] = true; });
+  let base = new Map();
+  try { base = await fetchPickingBase(); } catch (_e) {}
+  const dem = {};
+  Object.keys(npSet).forEach(function (np) {
+    (base.get(np) || []).forEach(function (it) { const a = String(it.art || "").toUpperCase().trim(); if (a) dem[a] = (dem[a] || 0) + (Number(it.cajas) || 0); });
+  });
+  return dem;
+}
+async function ocgEnter() {
+  if (!_oc) return;
+  _oc.view = "gen"; _oc.gen = null; ocRender();   // muestra "calculando…"
+  try {
+    const res = await Promise.all([ocgFetchMaximos(), stockFetchMovs(), stockGetCutoff(), ocgDemanda()]);
+    const maxs = res[0] || [], saldos = stockComputeSaldos(res[1] || [], res[2]), dem = res[3] || {};
+    const items = [];
+    maxs.forEach(function (m) {
+      const cod = String(m.cod).toUpperCase().trim();
+      const sd = saldos[cod] || {};
+      const stock = (Number(sd.terminado) || 0) + (Number(sd.racks) || 0);
+      const demanda = dem[cod] || 0;
+      const faltaRaw = (Number(m.max_cajas) || 0) + demanda - stock;
+      if (faltaRaw <= 0) return;
+      items.push({ cod: cod, desc: m.descripcion || "", prov: (m.proveedor || "(sin proveedor)").trim(), max: Number(m.max_cajas) || 0, demanda: demanda, stock: stock, falta: Math.ceil(faltaRaw) });
+    });
+    _oc.gen = { items: items, fecha: new Date().toISOString().slice(0, 10) };
+    ocRender();
+  } catch (e) { _oc.gen = { error: String(e.message || e), items: [] }; ocRender(); }
+}
+function ocgGroups() {
+  const g = {};
+  ((_oc.gen && _oc.gen.items) || []).forEach(function (it) { const k = it.prov; if (!g[k]) g[k] = { prov: k, interno: _ocgInterno(k), items: [], total: 0 }; g[k].items.push(it); g[k].total += it.falta; });
+  return g;
+}
+function ocBodyGen() {
+  let h = '<div class="oc-tools"><button class="oc-btn" onclick="ocBack()">← Volver</button></div>';
+  h += '<div style="background:#fffbeb;border:1px solid #fcd34d;color:#92400e;border-radius:9px;padding:9px 11px;margin-bottom:10px;font-size:12.5px"><b>BETA — no usar todavía.</b> Calcula como el Excel: <b>A pedir = máx(0, Máximo + Pedidos − (Góndola+Racks))</b>. Da números reales recién con el stock inicial cargado. Revisá antes de generar.</div>';
+  if (!_oc.gen) return h + '<div class="oc-loading">Calculando (stock + demanda PPP + máximos)…</div>';
+  if (_oc.gen.error) return h + '<div class="oc-empty" style="color:#b91c1c">Error: ' + escapeHtml(_oc.gen.error) + '</div>';
+  const g = ocgGroups(), keys = Object.keys(g).sort(function (a, b) { return (g[a].interno - g[b].interno) || a.localeCompare(b); });
+  if (!keys.length) return h + '<div class="oc-empty">No hay nada para pedir (todo está en o sobre el máximo).<br><small>Con el stock en 0, va a dar todo para pedir cuando lo cargues.</small></div>';
+  const externos = keys.filter(function (k) { return !g[k].interno; });
+  const totExt = externos.reduce(function (s, k) { return s + g[k].items.length; }, 0);
+  h += '<div class="oc-meta">Fecha <b>' + escapeHtml(_oc.gen.fecha) + '</b> · <b>' + externos.length + '</b> proveedor(es) externos · <b>' + totExt + '</b> ítem(s) a pedir. <button class="oc-btn ok" style="margin-left:8px" onclick="ocgGenerar()">✓ Generar las OCs</button></div>';
+  keys.forEach(function (k) {
+    const x = g[k];
+    h += '<div class="oc-meta" style="margin-top:12px;margin-bottom:4px"><b>' + escapeHtml(k) + '</b>' + (x.interno ? ' <span style="color:#64748b">(interno — no se genera OC)</span>' : '') + ' · ' + x.items.length + ' ítem(s) · ' + x.total + ' cajas</div>';
+    h += '<table class="oc-tbl"><thead><tr><th>Código</th><th>Descripción</th><th class="num">Máx</th><th class="num">Pedidos</th><th class="num">Stock</th><th class="num">A pedir</th></tr></thead><tbody>';
+    x.items.sort(function (a, b) { return b.falta - a.falta; }).forEach(function (it) {
+      h += '<tr><td class="oc-cod">' + escapeHtml(it.cod) + '</td><td>' + escapeHtml(it.desc) + '</td><td class="num">' + it.max + '</td><td class="num">' + it.demanda + '</td><td class="num">' + it.stock + '</td><td class="num oc-falt">' + it.falta + '</td></tr>';
+    });
+    h += '</tbody></table>';
+  });
+  return h;
+}
+async function ocgGenerar() {
+  if (!_oc || !_oc.gen) return;
+  const g = ocgGroups();
+  const rows = [];
+  Object.keys(g).forEach(function (k) { if (g[k].interno) return; g[k].items.forEach(function (it) { rows.push({ proveedor: it.prov, fecha: _oc.gen.fecha, rubro: "Art Term", codigo: it.cod, descripcion: it.desc || null, cantidad: it.falta, cantidad_recibida: 0, unidad: "Cajas", estado: "pendiente" }); }); });
+  if (!rows.length) { alert("No hay OCs externas para generar."); return; }
+  if (!confirm("Vas a generar " + rows.length + " línea(s) de OC (proveedores externos) en Ordenes_Compra. ¿Seguro?")) return;
+  const headers = await facAuthWriteHeaders({ "Prefer": "return=minimal" });
+  if (!headers) { alert("Para generar las OCs necesitás iniciar sesión con Google (supervisor)."); return; }
+  try {
+    const r = await fetch(SUPABASE_OC_ENDPOINT, { method: "POST", headers: headers, body: JSON.stringify(rows) });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    _oc.rows = await ocFetchRows();
+    _oc.view = "list"; ocRender();
+    alert("✓ Generadas " + rows.length + " línea(s) de OC. Las ves en la lista, agrupadas por proveedor.");
+  } catch (e) { alert("Error generando OCs: " + (e.message || e)); }
 }
 function stkTab(t) { if (!_stk) return; _stk.tab = t; _stk.filtro = ""; _stk.openArt = null; stkRender(); }
 function stkRender() {

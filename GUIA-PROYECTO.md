@@ -4,7 +4,28 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-26 · Versión app al documentar: **v4.12**
+> Última actualización: 2026-06-26 · Versión app al documentar: **v4.13**
+>
+> Nota: **v4.13** — **GENERADOR DE OCs en la página (replica el Excel "Pedidos Talleristas/Prov")**.
+> **BETA, coded pero no para usar** hasta que esté el stock inicial cargado. Vive en el admin **Órdenes
+> de Compra** (`openOCAdmin` → botón "⚙ Generar OCs (beta)" → vista `ocBodyGen`). **Fórmula (= la del
+> Excel, hoja OCUPACION VIRGILIO col H)**: por artículo **`A pedir = max(0, Máximo + Pedidos − Stock)`**,
+> redondeado para arriba a cajas enteras. **Fuentes**: (a) **Stock** = `Movimientos_Stock` **Góndola
+> (terminado) + Racks** (NO cuenta "a guardar"), vía `stockComputeSaldos`; (b) **Pedidos/demanda** =
+> Σ cajas por artículo en los pedidos del **PPP** (`PPP_Programacion_Diaria`, set de NP) según la **base
+> de picking** (`PPP_Base_Pedidos`, vía `fetchPickingBase`) — función `ocgDemanda`; (c) **Máximo +
+> Proveedor** = tabla nueva **`OC_Maximos`** (`cod, descripcion, linea, max_cajas, proveedor, uni_x_caja,
+> activo`; RLS lectura anon / escritura authenticated), **importada del Excel** (OCUPACION VIRGILIO:
+> Stock Max Cajas + Proveedor) — 339 códigos (315 activos, 22 proveedores). El **Máximo** del Excel =
+> Est.Madre_Uni × Índice ÷ Uni-x-Caja (Est.Madre se actualiza ~cada 3 meses → re-importar). **Agrupa por
+> proveedor**; los **proveedores internos** (`Racks` = importación, `Log/ Fabr` = fábrica) se muestran
+> pero **NO** generan OC externa. Al **"Generar las OCs"** escribe las líneas de los externos en
+> `Ordenes_Compra` (proveedor, fecha, codigo, descripcion, cantidad=falta, estado=pendiente, rubro='Art
+> Term'; escritura con sesión de supervisor). Validado con Playwright (fórmula, internos, generación).
+> **Decisiones/pendientes**: códigos con proveedor combinado ("Garcia / Lucho") quedan como ese string
+> (a futuro, partir); **futuro**: que se genere automático + guardar PDFs en una carpeta / enviar por
+> WhatsApp con plantilla (a trabajar después). El usuario carga el stock inicial más adelante (recién ahí
+> da números reales).
 >
 > Nota: **v4.12** — **Stock inicial / "marcar inicio" robusto**. (1) `stockComputeSaldos` ahora cuenta
 > **SIEMPRE** los movimientos `tipo='inicial'` (stock inicial = base), aunque sean anteriores al corte;
