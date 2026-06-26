@@ -3268,6 +3268,7 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
   <div class="row row-6" id="row1"></div>
   <div class="row row-6" id="row2"></div>
   <div class="row row-5" id="row3"></div>
+  <div id="racksAlarma"></div>
   <div id="pendingSuggestion"></div>
 
   <div id="selectedArea" class="hidden">
@@ -4385,6 +4386,12 @@ function goToOptions() {
   document.getElementById("btnHistDias").classList.add("hidden");
   renderPendingSuggestion();
   updateCoreButtonsState();
+  // Racks → góndola: si hay una orden de bajada pendiente, mostrar la alarma
+  // (y reintentar bajadas que quedaron sin enviar). Refresco cada 5'.
+  try {
+    racksCheckAlarma(); racksFlushPend();
+    if (!window._racksAlTimer) window._racksAlTimer = setInterval(function () { try { racksCheckAlarma(); } catch (_e) {} }, 5 * 60 * 1000);
+  } catch (_e) {}
 }
 
 function backToLegajo() {
@@ -5215,7 +5222,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v4.07";
+const APP_VERSION = "v4.08";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -6975,7 +6982,7 @@ let _stk = null;
 async function openStockAdmin() {
   if (!document.getElementById("stkCss")) {
     const s = document.createElement("style"); s.id = "stkCss";
-    s.textContent = "#stockAdminOverlay{display:none;position:fixed;inset:0;z-index:1280;background:rgba(2,6,23,.74);overflow:auto;padding:14px;}#stockAdminOverlay.show{display:block;}.stk-card{background:#f8fafc;max-width:880px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.stk-head{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:linear-gradient(90deg,#1e6bd6,#1e3a8a);color:#fff;}.stk-title{font-size:19px;font-weight:800;}.stk-close{background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;width:auto;}.stk-body{padding:14px 16px;}.stk-loading,.stk-empty{padding:24px;text-align:center;color:#64748b;}.stk-cut{background:#fffbeb;border:1px solid #fcd34d;color:#92400e;border-radius:9px;padding:8px 11px;font-size:12.5px;font-weight:700;margin-bottom:10px;}.stk-tools{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;}.stk-filtro{flex:1;min-width:180px;height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 11px;font-size:14px;}.stk-btn{background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:8px 12px;font-size:13px;font-weight:800;cursor:pointer;width:auto;}.stk-btn.ok{background:#16a34a;color:#fff;border-color:#16a34a;}.stk-btn.danger{background:#fff;color:#b91c1c;border-color:#fca5a5;}.stk-tbl{width:100%;border-collapse:collapse;font-size:13.5px;}.stk-tbl th{background:#f1f5f9;color:#475569;text-align:left;padding:7px 9px;font-size:11px;text-transform:uppercase;border-bottom:1px solid #cbd5e1;}.stk-tbl th.num,.stk-tbl td.num{text-align:right;font-variant-numeric:tabular-nums;}.stk-row{cursor:pointer;border-bottom:1px solid #eef2f7;}.stk-row:hover{background:#eff6ff;}.stk-row td{padding:7px 9px;}.stk-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#1e6bd6;}.stk-desc{color:#475569;}.stk-neg{color:#b91c1c;font-weight:800;}.stk-caret{color:#94a3b8;}.stk-detrow td{padding:0 9px 9px;background:#f8fafc;}.stk-det{border-left:3px solid #cbd5e1;padding:6px 0 6px 10px;}.stk-mv{display:flex;gap:9px;font-size:12px;padding:3px 0;align-items:center;}.stk-mv-old{opacity:.45;}.stk-mv-ts{color:#64748b;min-width:96px;}.stk-mv-tipo{font-weight:800;min-width:78px;}.stk-mv-dep{color:#64748b;min-width:74px;}.stk-mv-d{font-weight:800;min-width:44px;text-align:right;}.stk-mv-d.pos{color:#15803d;}.stk-mv-d.neg{color:#b91c1c;}.stk-mv-ref{color:#94a3b8;}.stk-mv-more{font-size:11px;color:#94a3b8;padding-top:4px;}.stk-inicial{max-width:560px;}.stk-ini-h{font-size:16px;font-weight:800;margin-bottom:6px;}.stk-ini-hint{font-size:12.5px;color:#64748b;margin-bottom:8px;}.stk-ini-txt{width:100%;border:1px solid #cbd5e1;border-radius:9px;padding:9px;font-family:Consolas,Menlo,monospace;font-size:14px;}.stk-ini-btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}.stk-ini-warn{font-size:12px;color:#92400e;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:8px;margin-top:10px;}.stk-tabs{display:flex;gap:4px;padding:8px 12px 0;background:#1e3a8a;}.stk-tab{flex:1;background:rgba(255,255,255,.12);color:#cbd5e1;border:none;border-radius:9px 9px 0 0;padding:9px 6px;font-size:12.5px;font-weight:800;cursor:pointer;}.stk-tab.on{background:#f8fafc;color:#1e3a8a;}.stk-seg{display:flex;gap:6px;margin-bottom:10px;}.stk-segb{flex:1;background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:7px;font-size:13px;font-weight:800;cursor:pointer;}.stk-segb.on{background:#1e6bd6;color:#fff;border-color:#1e6bd6;}.stk-grp{margin-bottom:10px;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;}.stk-grp-h{background:#f1f5f9;padding:7px 10px;font-weight:800;font-size:13px;}.stk-grp-tot{color:#15803d;font-weight:800;margin-left:6px;}.stk-ing{display:flex;gap:9px;align-items:center;padding:5px 10px;border-top:1px solid #f1f5f9;font-size:12.5px;}.stk-ing-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#1e6bd6;}.stk-ing-desc{flex:1;color:#475569;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.stk-ing-rto{color:#94a3b8;font-size:11px;}.stk-aj-sec{border:1px solid #e2e8f0;border-radius:12px;padding:12px;margin-bottom:12px;}.stk-aj-h{font-size:15px;font-weight:800;margin-bottom:6px;}.stk-aj-hint{font-size:12px;color:#64748b;margin-bottom:7px;}.stk-aj-form{display:flex;gap:7px;flex-wrap:wrap;}.stk-aj-inp{flex:1;min-width:90px;height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 10px;font-size:14px;}";
+    s.textContent = "#stockAdminOverlay{display:none;position:fixed;inset:0;z-index:1280;background:rgba(2,6,23,.74);overflow:auto;padding:14px;}#stockAdminOverlay.show{display:block;}.stk-card{background:#f8fafc;max-width:880px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.stk-head{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:linear-gradient(90deg,#1e6bd6,#1e3a8a);color:#fff;}.stk-title{font-size:19px;font-weight:800;}.stk-close{background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;width:auto;}.stk-body{padding:14px 16px;}.stk-loading,.stk-empty{padding:24px;text-align:center;color:#64748b;}.stk-cut{background:#fffbeb;border:1px solid #fcd34d;color:#92400e;border-radius:9px;padding:8px 11px;font-size:12.5px;font-weight:700;margin-bottom:10px;}.stk-tools{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;}.stk-filtro{flex:1;min-width:180px;height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 11px;font-size:14px;}.stk-btn{background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:8px 12px;font-size:13px;font-weight:800;cursor:pointer;width:auto;}.stk-btn.ok{background:#16a34a;color:#fff;border-color:#16a34a;}.stk-btn.danger{background:#fff;color:#b91c1c;border-color:#fca5a5;}.stk-tbl{width:100%;border-collapse:collapse;font-size:13.5px;}.stk-tbl th{background:#f1f5f9;color:#475569;text-align:left;padding:7px 9px;font-size:11px;text-transform:uppercase;border-bottom:1px solid #cbd5e1;}.stk-tbl th.num,.stk-tbl td.num{text-align:right;font-variant-numeric:tabular-nums;}.stk-row{cursor:pointer;border-bottom:1px solid #eef2f7;}.stk-row:hover{background:#eff6ff;}.stk-row td{padding:7px 9px;}.stk-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#1e6bd6;}.stk-desc{color:#475569;}.stk-neg{color:#b91c1c;font-weight:800;}.stk-caret{color:#94a3b8;}.stk-detrow td{padding:0 9px 9px;background:#f8fafc;}.stk-det{border-left:3px solid #cbd5e1;padding:6px 0 6px 10px;}.stk-mv{display:flex;gap:9px;font-size:12px;padding:3px 0;align-items:center;}.stk-mv-old{opacity:.45;}.stk-mv-ts{color:#64748b;min-width:96px;}.stk-mv-tipo{font-weight:800;min-width:78px;}.stk-mv-dep{color:#64748b;min-width:74px;}.stk-mv-d{font-weight:800;min-width:44px;text-align:right;}.stk-mv-d.pos{color:#15803d;}.stk-mv-d.neg{color:#b91c1c;}.stk-mv-ref{color:#94a3b8;}.stk-mv-more{font-size:11px;color:#94a3b8;padding-top:4px;}.stk-inicial{max-width:560px;}.stk-ini-h{font-size:16px;font-weight:800;margin-bottom:6px;}.stk-ini-hint{font-size:12.5px;color:#64748b;margin-bottom:8px;}.stk-ini-txt{width:100%;border:1px solid #cbd5e1;border-radius:9px;padding:9px;font-family:Consolas,Menlo,monospace;font-size:14px;}.stk-ini-btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}.stk-ini-warn{font-size:12px;color:#92400e;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:8px;margin-top:10px;}.stk-tabs{display:flex;gap:4px;padding:8px 12px 0;background:#1e3a8a;}.stk-tab{flex:1;background:rgba(255,255,255,.12);color:#cbd5e1;border:none;border-radius:9px 9px 0 0;padding:9px 6px;font-size:12.5px;font-weight:800;cursor:pointer;}.stk-tab.on{background:#f8fafc;color:#1e3a8a;}.stk-seg{display:flex;gap:6px;margin-bottom:10px;}.stk-segb{flex:1;background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:7px;font-size:13px;font-weight:800;cursor:pointer;}.stk-segb.on{background:#1e6bd6;color:#fff;border-color:#1e6bd6;}.stk-grp{margin-bottom:10px;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;}.stk-grp-h{background:#f1f5f9;padding:7px 10px;font-weight:800;font-size:13px;}.stk-grp-tot{color:#15803d;font-weight:800;margin-left:6px;}.stk-ing{display:flex;gap:9px;align-items:center;padding:5px 10px;border-top:1px solid #f1f5f9;font-size:12.5px;}.stk-ing-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#1e6bd6;}.stk-ing-desc{flex:1;color:#475569;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.stk-ing-rto{color:#94a3b8;font-size:11px;}.stk-aj-sec{border:1px solid #e2e8f0;border-radius:12px;padding:12px;margin-bottom:12px;}.stk-aj-h{font-size:15px;font-weight:800;margin-bottom:6px;}.stk-aj-hint{font-size:12px;color:#64748b;margin-bottom:7px;}.stk-aj-form{display:flex;gap:7px;flex-wrap:wrap;}.stk-aj-inp{flex:1;min-width:90px;height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 10px;font-size:14px;}.stk-aj-dep{margin-bottom:12px;font-size:13px;font-weight:800;}.stk-aj-dep select{height:36px;border:1px solid #cbd5e1;border-radius:8px;padding:0 8px;font-size:14px;font-weight:700;}.stk-rk-orden{background:#f1f5f9;border-radius:10px;padding:10px 12px;font-size:13px;margin-bottom:10px;}.stk-rk-orden.pend{background:#fffbeb;border:1.5px solid #fcd34d;color:#92400e;}.stk-rk-baj{display:flex;align-items:center;gap:10px;border:1px solid #e2e8f0;border-radius:11px;padding:9px 11px;margin-bottom:8px;background:#fff;}.stk-rk-baji{flex:1;min-width:0;}.stk-rk-q{font-size:12px;color:#1e6bd6;font-weight:700;margin-top:2px;}";
     document.head.appendChild(s);
   }
   let ov = document.getElementById("stockAdminOverlay");
@@ -6983,8 +6990,8 @@ async function openStockAdmin() {
   ov.classList.add("show");
   ov.innerHTML = '<div class="stk-card"><div class="stk-head"><span class="stk-title">📦 Stocks</span><button class="stk-close" onclick="closeStockAdmin()">Cerrar</button></div><div class="stk-tabs" id="stkTabs"></div><div class="stk-body" id="stkBody"><div class="stk-loading">Cargando…</div></div></div>';
   try {
-    const res = await Promise.all([stockFetchMovs(), stockGetCutoff()]);
-    _stk = { movs: res[0] || [], cutoff: res[1], tab: "stocks", filtro: "", openArt: null, ingMode: "remito" };
+    const res = await Promise.all([stockFetchMovs(), stockGetCutoff(), stockFetchArtFactors(), racksFetchOrdenes(), racksFetchBajadas()]);
+    _stk = { movs: res[0] || [], cutoff: res[1], factors: res[2] || {}, ordenes: res[3] || [], bajadas: res[4] || [], tab: "stocks", filtro: "", openArt: null, ingMode: "remito" };
     stkRender();
   } catch (e) { const b = document.getElementById("stkBody"); if (b) b.innerHTML = '<div class="stk-loading">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
 }
@@ -6992,11 +6999,11 @@ function closeStockAdmin() { const ov = document.getElementById("stockAdminOverl
 function stkTab(t) { if (!_stk) return; _stk.tab = t; _stk.filtro = ""; _stk.openArt = null; stkRender(); }
 function stkRender() {
   if (!_stk) return;
-  const tabs = [["stocks", "📊 Stocks"], ["ingresos", "📥 Ingresos"], ["salidas", "📤 Salidas"], ["ajustes", "⚙ Ajustes"]];
+  const tabs = [["stocks", "📊 Stocks"], ["racks", "🏗 Racks"], ["ingresos", "📥 Ingresos"], ["salidas", "📤 Salidas"], ["ajustes", "⚙ Ajustes"]];
   const tb = document.getElementById("stkTabs");
   if (tb) tb.innerHTML = tabs.map(function (t) { return '<button class="stk-tab' + (_stk.tab === t[0] ? " on" : "") + '" onclick="stkTab(\'' + t[0] + '\')">' + t[1] + '</button>'; }).join("");
   const body = document.getElementById("stkBody"); if (!body) return;
-  body.innerHTML = _stk.tab === "ingresos" ? stkBodyIngresos() : _stk.tab === "salidas" ? stkBodySalidas() : _stk.tab === "ajustes" ? stkBodyAjustes() : stkBodyStocks();
+  body.innerHTML = _stk.tab === "racks" ? stkBodyRacks() : _stk.tab === "ingresos" ? stkBodyIngresos() : _stk.tab === "salidas" ? stkBodySalidas() : _stk.tab === "ajustes" ? stkBodyAjustes() : stkBodyStocks();
 }
 function stkMvRow(mv) {
   const old = _stk.cutoff && new Date(mv.ts).getTime() < new Date(_stk.cutoff).getTime();
@@ -7049,7 +7056,8 @@ function stkBodySalidas() {
   return h + "</tbody></table>";
 }
 function stkBodyAjustes() {
-  let h = '<div class="stk-aj-sec"><div class="stk-aj-h">⚙ Ajustar stock (Artículo Terminado)</div>';
+  let h = '<div class="stk-aj-dep">Depósito: <select id="stkAjDep"><option value="terminado">Artículo Terminado (góndola)</option><option value="racks">Racks</option><option value="insumos">Insumos</option><option value="a_guardar">Mercadería a guardar</option></select></div>';
+  h += '<div class="stk-aj-sec"><div class="stk-aj-h">⚙ Ajustar stock</div>';
   h += '<div class="stk-aj-hint">Sumá o restá con signo: <code>+10</code> / <code>-3</code>.</div><div class="stk-aj-form"><input id="stkAjCod" class="stk-aj-inp" placeholder="Código"><input id="stkAjCant" class="stk-aj-inp" type="number" placeholder="+/- cajas"><button class="stk-btn ok" onclick="stockAjustar()">Aplicar</button></div>';
   h += '<div class="stk-aj-hint" style="margin-top:10px">O dejá el stock exacto:</div><div class="stk-aj-form"><input id="stkAjCod2" class="stk-aj-inp" placeholder="Código"><input id="stkAjFijar" class="stk-aj-inp" type="number" placeholder="Fijar en…"><button class="stk-btn" onclick="stockFijar()">Fijar</button></div></div>';
   h += '<div class="stk-aj-sec"><div class="stk-aj-h">➕ Stock inicial</div><div class="stk-aj-hint">Una línea por artículo: <b>CÓDIGO CANTIDAD</b>.</div><textarea id="stkIniTxt" class="stk-ini-txt" rows="6" placeholder="544 30&#10;546 12"></textarea><div class="stk-ini-btns"><button class="stk-btn ok" onclick="stockGuardarInicial(false)">Guardar inicial</button><button class="stk-btn danger" onclick="stockGuardarInicial(true)">Guardar + marcar inicio</button></div><div class="stk-ini-warn">⚠ "Marcar inicio": el stock se cuenta SOLO desde ahora (lo anterior queda guardado pero no se suma).</div></div>';
@@ -7067,22 +7075,22 @@ async function stockAjustar() {
   const cod = ((document.getElementById("stkAjCod") || {}).value || "").trim().toUpperCase();
   const cant = parseInt(((document.getElementById("stkAjCant") || {}).value || ""), 10);
   if (!cod || isNaN(cant) || cant === 0) { alert("Poné un código y una cantidad (+/-)."); return; }
-  const sd = stockComputeSaldos(_stk.movs, _stk.cutoff)[cod];
-  await stkInsertMov([{ cod_art: cod, descripcion: (sd && sd.desc) || null, deposito: "terminado", delta: cant, tipo: "ajuste", ref: "ajuste manual", legajo: "0" }], "Ajuste " + cod + ": " + (cant > 0 ? "+" : "") + cant);
+  const sd = stockComputeSaldos(_stk.movs, _stk.cutoff)[cod], dep = _stkDep();
+  await stkInsertMov([{ cod_art: cod, descripcion: (sd && sd.desc) || null, deposito: dep, delta: cant, tipo: "ajuste", ref: "ajuste manual", legajo: "0" }], "Ajuste " + cod + " (" + dep + "): " + (cant > 0 ? "+" : "") + cant);
 }
 async function stockFijar() {
   const cod = ((document.getElementById("stkAjCod2") || {}).value || "").trim().toUpperCase();
   const fijar = parseInt(((document.getElementById("stkAjFijar") || {}).value || ""), 10);
   if (!cod || isNaN(fijar)) { alert("Poné un código y el stock a fijar."); return; }
-  const sd = stockComputeSaldos(_stk.movs, _stk.cutoff)[cod];
-  const actual = (sd && sd.terminado) || 0; const delta = fijar - actual;
-  if (delta === 0) { alert("El stock de " + cod + " ya es " + fijar + "."); return; }
-  await stkInsertMov([{ cod_art: cod, descripcion: (sd && sd.desc) || null, deposito: "terminado", delta: delta, tipo: "ajuste", ref: "fijar en " + fijar, legajo: "0" }], "Stock de " + cod + " fijado en " + fijar + " (ajuste " + (delta > 0 ? "+" : "") + delta + ")");
+  const sd = stockComputeSaldos(_stk.movs, _stk.cutoff)[cod], dep = _stkDep();
+  const actual = (sd && sd[dep]) || 0; const delta = fijar - actual;
+  if (delta === 0) { alert("El stock de " + cod + " (" + dep + ") ya es " + fijar + "."); return; }
+  await stkInsertMov([{ cod_art: cod, descripcion: (sd && sd.desc) || null, deposito: dep, delta: delta, tipo: "ajuste", ref: "fijar en " + fijar, legajo: "0" }], "Stock de " + cod + " (" + dep + ") fijado en " + fijar + " (ajuste " + (delta > 0 ? "+" : "") + delta + ")");
 }
 async function stockGuardarInicial(conCorte) {
   const ta = document.getElementById("stkIniTxt"); const txt = (ta && ta.value) || "";
-  const rows = [];
-  txt.split(/\n/).forEach(function (ln) { const m = ln.trim().match(/^(\S+)\s+(-?\d+(?:\.\d+)?)/); if (m) rows.push({ cod_art: m[1].toUpperCase(), deposito: "terminado", delta: Number(m[2]), tipo: "inicial", ref: "carga inicial", legajo: "0" }); });
+  const rows = [], dep = _stkDep();
+  txt.split(/\n/).forEach(function (ln) { const m = ln.trim().match(/^(\S+)\s+(-?\d+(?:\.\d+)?)/); if (m) rows.push({ cod_art: m[1].toUpperCase(), deposito: dep, delta: Number(m[2]), tipo: "inicial", ref: "carga inicial", legajo: "0" }); });
   if (!rows.length) { alert("No encontré líneas válidas. Formato: CÓDIGO CANTIDAD (una por línea)."); return; }
   if (conCorte && !confirm("Vas a MARCAR INICIO ahora: los movimientos anteriores se desconsideran (no se borran). Se cargan " + rows.length + " artículos como stock inicial. ¿Seguro?")) return;
   try {
@@ -7097,6 +7105,148 @@ async function stockGuardarInicial(conCorte) {
     openStockAdmin();
   } catch (e) { alert("Error al guardar: " + (e.message || e)); }
 }
+function _stkDep() { const e = document.getElementById("stkAjDep"); return (e && e.value) || "terminado"; }
+
+/* ===== STOCK — RACKS (v4.08): factores por artículo (master↔caja↔unidad), órdenes de bajar
+   racks→góndola y aprobación de Marianela. Las bajadas las propone el operario (Racks_Bajadas);
+   al aprobar se hace el movimiento entre depósitos (racks − / terminado +) y se cierra la orden. */
+const SUPABASE_ART_FACT_ENDPOINT = SUPABASE_URL + "/rest/v1/" + encodeURIComponent("Articulos Virgilio X Tallerista");
+const SUPABASE_RACKS_ORD_ENDPOINT = SUPABASE_URL + "/rest/v1/Racks_Ordenes";
+const SUPABASE_RACKS_BAJ_ENDPOINT = SUPABASE_URL + "/rest/v1/Racks_Bajadas";
+async function stockFetchArtFactors() {
+  try {
+    const r = await fetch(SUPABASE_ART_FACT_ENDPOINT + "?select=Cod_Art,Cajas_x_Master,Uni_x_Caja&limit=20000", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+    const rows = r.ok ? await r.json() : [];
+    const m = {};
+    rows.forEach(function (x) { const k = String(x.Cod_Art || "").toUpperCase(); if (!k) return; if (!m[k]) m[k] = { cajasXMaster: Number(x.Cajas_x_Master) || 0, uniXCaja: Number(x.Uni_x_Caja) || 0 }; else { if (!m[k].cajasXMaster && x.Cajas_x_Master) m[k].cajasXMaster = Number(x.Cajas_x_Master); if (!m[k].uniXCaja && x.Uni_x_Caja) m[k].uniXCaja = Number(x.Uni_x_Caja); } });
+    return m;
+  } catch (_e) { return {}; }
+}
+async function racksFetchOrdenes() { try { const r = await fetch(SUPABASE_RACKS_ORD_ENDPOINT + "?select=*&order=fecha.desc&limit=200", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" }); return r.ok ? r.json() : []; } catch (_e) { return []; } }
+async function racksFetchBajadas() { try { const r = await fetch(SUPABASE_RACKS_BAJ_ENDPOINT + "?select=*&order=ts.desc&limit=2000", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" }); return r.ok ? r.json() : []; } catch (_e) { return []; } }
+function stkUnits(cajas, cod, factors) {
+  const f = (factors || {})[String(cod).toUpperCase()] || {};
+  const M = f.cajasXMaster > 0 ? f.cajasXMaster : 0, U = f.uniXCaja > 0 ? f.uniXCaja : 0, p = [];
+  if (M) p.push((Math.round((cajas / M) * 100) / 100) + " master");
+  if (U) p.push((cajas * U) + " u");
+  return p.length ? p.join(" · ") : "";
+}
+function stkBodyRacks() {
+  const pend = (_stk.ordenes || []).filter(function (o) { return o.estado === "pendiente"; });
+  let h = pend.length
+    ? '<div class="stk-rk-orden pend">📦 Hay una orden de bajar racks→góndola <b>PENDIENTE</b> (' + escapeHtml(String(pend[0].fecha || "")) + '). A los operarios les aparece la alarma; ellos registran lo que bajan y vos lo aprobás acá abajo.</div>'
+    : '<div class="stk-rk-orden">No hay orden de bajada pendiente.</div>';
+  h += '<button class="stk-btn ok" onclick="racksCrearOrden()">📋 OCs generadas — emitir orden de bajar racks</button>';
+  const props = (_stk.bajadas || []).filter(function (b) { return b.estado === "propuesta"; });
+  h += '<div class="stk-aj-h" style="margin-top:16px">Bajadas propuestas por operarios (' + props.length + ")</div>";
+  if (!props.length) h += '<div class="stk-empty">Nada para aprobar.</div>';
+  else h += props.map(function (b) {
+    const u = stkUnits(Number(b.cajas), b.cod_art, _stk.factors);
+    return '<div class="stk-rk-baj"><div class="stk-rk-baji"><span class="stk-cod">' + escapeHtml(b.cod_art) + '</span> <span class="stk-desc">' + escapeHtml(b.descripcion || "") + '</span><div class="stk-rk-q">' + b.cajas + " cajas" + (u ? " · " + u : "") + '</div></div><button class="stk-btn ok" onclick="racksAprobar(' + b.id + ')">✓ Aprobar</button></div>';
+  }).join("");
+  const saldos = stockComputeSaldos(_stk.movs, _stk.cutoff);
+  const arts = Object.keys(saldos).map(function (k) { return saldos[k]; }).filter(function (a) { return (a.racks || 0) !== 0; }).sort(function (a, b) { return (parseInt(a.cod, 10) || 0) - (parseInt(b.cod, 10) || 0); });
+  h += '<div class="stk-aj-h" style="margin-top:16px">Stock en racks</div>';
+  h += '<table class="stk-tbl"><thead><tr><th>Código</th><th>Descripción</th><th class="num">Master</th><th class="num">Cajas</th><th class="num">Unidades</th></tr></thead><tbody>';
+  if (!arts.length) h += '<tr><td colspan="5" class="stk-empty">Sin stock en racks. Cargalo en ⚙ Ajustes (depósito = racks).</td></tr>';
+  arts.forEach(function (a) {
+    const f = _stk.factors[String(a.cod).toUpperCase()] || {}, M = f.cajasXMaster > 0 ? f.cajasXMaster : 0, U = f.uniXCaja > 0 ? f.uniXCaja : 0;
+    h += '<tr><td class="stk-cod">' + escapeHtml(a.cod) + '</td><td class="stk-desc">' + escapeHtml(a.desc || "—") + '</td><td class="num">' + (M ? (Math.round((a.racks / M) * 100) / 100) : "—") + '</td><td class="num"><b>' + a.racks + '</b></td><td class="num">' + (U ? (a.racks * U) : "—") + "</td></tr>";
+  });
+  return h + "</tbody></table>";
+}
+async function racksCrearOrden() {
+  const pend = (_stk.ordenes || []).filter(function (o) { return o.estado === "pendiente"; });
+  if (pend.length && !confirm("Ya hay una orden de bajada PENDIENTE. ¿Emitir otra igual?")) return;
+  try {
+    const r = await fetch(SUPABASE_RACKS_ORD_ENDPOINT, { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" }, body: JSON.stringify({ estado: "pendiente", creada_por: "admin" }) });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    alert("✓ Orden de bajar racks→góndola emitida. A los operarios les va a aparecer la alarma."); openStockAdmin();
+  } catch (e) { alert("Error: " + (e.message || e)); }
+}
+async function racksAprobar(bajadaId) {
+  const b = (_stk.bajadas || []).find(function (x) { return x.id === bajadaId; });
+  if (!b) return;
+  try {
+    await stockMove([
+      { cod_art: b.cod_art, descripcion: b.descripcion || null, deposito: "racks", delta: -Number(b.cajas), tipo: "baja_racks", ref: "orden " + (b.orden_id || ""), legajo: "0" },
+      { cod_art: b.cod_art, descripcion: b.descripcion || null, deposito: "terminado", delta: Number(b.cajas), tipo: "baja_racks", ref: "orden " + (b.orden_id || ""), legajo: "0" }
+    ]);
+    await fetch(SUPABASE_RACKS_BAJ_ENDPOINT + "?id=eq." + bajadaId, { method: "PATCH", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" }, body: JSON.stringify({ estado: "aprobada", aprobada_at: new Date().toISOString() }) });
+    const restantes = (_stk.bajadas || []).filter(function (x) { return x.orden_id === b.orden_id && x.estado === "propuesta" && x.id !== bajadaId; });
+    if (b.orden_id && !restantes.length) {
+      await fetch(SUPABASE_RACKS_ORD_ENDPOINT + "?id=eq." + b.orden_id, { method: "PATCH", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" }, body: JSON.stringify({ estado: "bajado", cerrada_at: new Date().toISOString() }) });
+    }
+    alert("✓ Aprobado: " + b.cajas + " caja(s) de " + b.cod_art + " pasaron de racks a góndola."); openStockAdmin();
+  } catch (e) { alert("Error: " + (e.message || e)); }
+}
+
+/* ===== STOCK — RACKS, lado operario (v4.08): alarma de orden pendiente en la botonera +
+   módulo para registrar la bajada (tipo MG). La bajada queda 'propuesta'; Marianela la aprueba
+   en el admin Stocks → recién ahí mueve el stock (racks − / terminado +). ===== */
+async function racksCheckAlarma() {
+  const box = document.getElementById("racksAlarma"); if (!box) return;
+  if (!document.getElementById("rkAlCss")) { const s = document.createElement("style"); s.id = "rkAlCss"; s.textContent = ".rk-alarma{background:#fffbeb;border:2px solid #f59e0b;color:#92400e;border-radius:11px;padding:10px 12px;margin:8px 0;font-size:14px;font-weight:700;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}.rk-alarma-btn{margin-left:auto;background:#b45309;color:#fff;border:none;border-radius:9px;padding:8px 14px;font-weight:800;cursor:pointer;width:auto;}"; document.head.appendChild(s); }
+  try {
+    const r = await fetch(SUPABASE_RACKS_ORD_ENDPOINT + "?estado=eq.pendiente&select=id,fecha&order=fecha.desc&limit=1", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+    const rows = r.ok ? await r.json() : [];
+    box.innerHTML = rows.length
+      ? '<div class="rk-alarma">📦 <b>Bajar racks → góndola</b> — orden del ' + escapeHtml(String(rows[0].fecha || "")) + '. <button class="rk-alarma-btn" onclick="showBajarRacks(' + rows[0].id + ')">Registrar bajada</button></div>'
+      : "";
+  } catch (_e) { /* sin red: no muestro nada */ }
+}
+function racksFlushPend() {
+  let p = []; try { p = JSON.parse(localStorage.getItem("vir_racks_pend") || "[]"); } catch (_e) {}
+  if (!p.length) return;
+  fetch(SUPABASE_RACKS_BAJ_ENDPOINT, { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" }, body: JSON.stringify(p) })
+    .then(function (r) { if (r.ok) { try { localStorage.removeItem("vir_racks_pend"); } catch (_e) {} } }).catch(function () {});
+}
+let _br = null;
+async function showBajarRacks(ordenId) {
+  if (!document.getElementById("brCss")) {
+    const s = document.createElement("style"); s.id = "brCss";
+    s.textContent = "#brModal{display:none;position:fixed;inset:0;z-index:1295;background:rgba(2,6,23,.74);overflow:auto;padding:12px;}#brModal.show{display:block;}.br-card{background:#f8fafc;max-width:470px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.br-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;background:linear-gradient(90deg,#b45309,#92400e);color:#fff;}.br-title{font-size:18px;font-weight:800;}.br-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}.br-body{padding:13px 14px;}.br-loading,.br-empty{padding:26px;text-align:center;color:#64748b;font-size:15px;}.br-hint{font-size:12.5px;color:#64748b;margin-bottom:10px;}.br-row{border:1px solid #e2e8f0;border-radius:12px;padding:9px 11px;margin-bottom:8px;background:#fff;}.br-r1{display:flex;align-items:center;gap:10px;}.br-info{flex:1;min-width:0;}.br-cod{font-size:16px;font-weight:800;font-family:Consolas,Menlo,monospace;}.br-desc{font-size:12px;color:#475569;}.br-disp{font-size:11.5px;color:#b45309;font-weight:700;margin-top:2px;}.br-stp{display:flex;align-items:center;gap:5px;}.br-sb{width:38px;height:40px;border:none;border-radius:9px;font-size:22px;font-weight:800;cursor:pointer;background:#e2e8f0;color:#475569;}.br-inp{width:58px;height:40px;text-align:center;font-size:18px;font-weight:800;border:2px solid #cbd5e1;border-radius:9px;}.br-conv{font-size:11px;color:#94a3b8;margin-top:4px;}.br-fin{width:100%;margin-top:10px;padding:14px;border:none;border-radius:12px;background:#b45309;color:#fff;font-size:17px;font-weight:800;cursor:pointer;}.br-fin:disabled{background:#cbd5e1;cursor:not-allowed;}";
+    document.head.appendChild(s);
+  }
+  let ov = document.getElementById("brModal");
+  if (!ov) { ov = document.createElement("div"); ov.id = "brModal"; document.body.appendChild(ov); }
+  ov.classList.add("show");
+  ov.innerHTML = '<div class="br-card"><div class="br-head"><span class="br-title">📦 Bajar racks → góndola</span><button class="br-close" onclick="closeBajarRacks()">Cerrar</button></div><div class="br-body" id="brBody"><div class="br-loading">Cargando stock de racks…</div></div></div>';
+  try {
+    const res = await Promise.all([stockFetchMovs(), stockGetCutoff(), stockFetchArtFactors()]);
+    const saldos = stockComputeSaldos(res[0] || [], res[1]);
+    const items = Object.keys(saldos).map(function (k) { return saldos[k]; }).filter(function (a) { return (a.racks || 0) > 0; }).sort(function (a, b) { return (parseInt(a.cod, 10) || 0) - (parseInt(b.cod, 10) || 0); }).map(function (a) { return { cod: a.cod, desc: a.desc, disponible: a.racks, bajar: 0 }; });
+    _br = { ordenId: ordenId, legajo: String((typeof legajoInput !== "undefined" && legajoInput && legajoInput.value) || "").trim(), factors: res[2] || {}, items: items };
+    brRender();
+  } catch (e) { const b = document.getElementById("brBody"); if (b) b.innerHTML = '<div class="br-loading">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
+}
+function brRender() {
+  if (!_br) return; const body = document.getElementById("brBody"); if (!body) return;
+  if (!_br.items.length) { body.innerHTML = '<div class="br-empty">No hay stock en racks para bajar.</div>'; return; }
+  let h = '<div class="br-hint">Marcá cuántas <b>cajas</b> bajás de cada artículo. Lo confirma Marianela y recién ahí pasa a góndola.</div>';
+  h += _br.items.map(function (it, i) {
+    const u = stkUnits(it.bajar, it.cod, _br.factors), ud = stkUnits(it.disponible, it.cod, _br.factors);
+    return '<div class="br-row"><div class="br-r1"><div class="br-info"><span class="br-cod">' + escapeHtml(it.cod) + '</span> <span class="br-desc">' + escapeHtml(it.desc || "") + '</span><div class="br-disp">en racks: ' + it.disponible + " cajas" + (ud ? " · " + ud : "") + '</div></div><div class="br-stp"><button class="br-sb" onclick="brChg(' + i + ',-1)">–</button><input class="br-inp" type="number" min="0" max="' + it.disponible + '" inputmode="numeric" value="' + it.bajar + '" oninput="brSet(' + i + ',this.value)"><button class="br-sb" onclick="brChg(' + i + ',1)">+</button></div></div>' + (it.bajar > 0 && u ? '<div class="br-conv">bajás: ' + it.bajar + " cajas · " + u + "</div>" : "") + "</div>";
+  }).join("");
+  const tot = _br.items.reduce(function (s, it) { return s + it.bajar; }, 0);
+  h += '<button class="br-fin"' + (tot <= 0 ? " disabled" : "") + ' onclick="brConfirmar()">✓ Registrar bajada de ' + tot + " caja(s)</button>";
+  body.innerHTML = h;
+}
+function brChg(i, d) { if (!_br) return; const it = _br.items[i]; if (!it) return; it.bajar = Math.max(0, Math.min(it.disponible, it.bajar + d)); brRender(); }
+function brSet(i, v) { if (!_br) return; const it = _br.items[i]; if (!it) return; let n = Math.max(0, parseInt(v, 10) || 0); if (n > it.disponible) n = it.disponible; it.bajar = n; brRender(); }
+function brConfirmar() {
+  if (!_br) return;
+  const sel = _br.items.filter(function (it) { return it.bajar > 0; });
+  if (!sel.length) return;
+  const rows = sel.map(function (it) { return { orden_id: _br.ordenId || null, cod_art: it.cod, descripcion: it.desc || null, cajas: it.bajar, estado: "propuesta", creada_por: _br.legajo || null }; });
+  const n = sel.reduce(function (s, it) { return s + it.bajar; }, 0);
+  closeBajarRacks();
+  fetch(SUPABASE_RACKS_BAJ_ENDPOINT, { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" }, body: JSON.stringify(rows) })
+    .then(function (r) { if (r.ok || (r.status >= 400 && r.status < 500)) return; throw new Error("HTTP " + r.status); })
+    .catch(function () { try { const p = JSON.parse(localStorage.getItem("vir_racks_pend") || "[]"); p.push.apply(p, rows); localStorage.setItem("vir_racks_pend", JSON.stringify(p.slice(-2000))); } catch (_e) {} });
+  try { alert("✓ Registraste " + n + " caja(s) para bajar. Marianela lo aprueba y pasa a góndola."); } catch (_e) {}
+}
+function closeBajarRacks() { const ov = document.getElementById("brModal"); if (ov) ov.classList.remove("show"); _br = null; }
 
 /* ===== STOCK — MG (Guardado a Góndola, v4.07): muestra lo que hay en "Mercadería
    a guardar", el operario elige cuántas cajas guarda y al confirmar pasan a

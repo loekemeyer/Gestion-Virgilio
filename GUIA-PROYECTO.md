@@ -4,7 +4,29 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-26 · Versión app al documentar: **v4.07**
+> Última actualización: 2026-06-26 · Versión app al documentar: **v4.08**
+>
+> Nota: **v4.08** — **RACKS → GÓNDOLA** (page-based, sin Telegram). Los **racks** son góndolas de
+> pallets donde se guarda stock en **master cajas**; una vez por semana (al generar las OCs, miércoles)
+> se baja de racks a la góndola. **Modelo**: depósito nuevo **`racks`** en `Movimientos_Stock` (en cajas;
+> se muestran 3 unidades por artículo: **master ↔ caja ↔ unidad** vía `Cajas_x_Master` —columna nueva en
+> `Articulos Virgilio X Tallerista`, junto a `Uni_x_Caja`). Tablas nuevas: **`Racks_Ordenes`**
+> (`id, fecha, estado pendiente|bajado, creada_por, creada, cerrada_at`) y **`Racks_Bajadas`**
+> (`id, orden_id, cod_art, descripcion, cajas, estado propuesta|aprobada, creada_por, ts, aprobada_at`);
+> RLS abierta anon+authenticated. **Flujo**: (1) la operadora toca **"OCs generadas"** en el admin Stocks
+> (solapa 🏗 **Racks**) → crea una `Racks_Ordenes` **pendiente** (`racksCrearOrden`). (2) **Alarma en la
+> página**: mientras haya orden pendiente, a los operarios les aparece un banner en la botonera
+> (`#racksAlarma`, `racksCheckAlarma`, refresco 5′, llamado desde `goToOptions`). (3) **Operario baja**:
+> botón "Registrar bajada" → `showBajarRacks` (módulo tipo MG: muestra stock de racks en las 3 unidades,
+> el operario marca cuántas cajas baja) → guarda en `Racks_Bajadas` **estado `propuesta`** (NO mueve stock
+> todavía; reintento offline `vir_racks_pend`). (4) **Marianela aprueba** en **Carga Recepción Mercadería**
+> (`recepcion.js`, botón "📦 Bajadas Racks → góndola" con contador de pendientes) → `racksAprobarBaja`:
+> inserta 2 `Movimientos_Stock` (`-racks` / `+terminado`, tipo `baja_racks`), marca la bajada `aprobada` y,
+> si era la última de la orden, cierra la orden (`bajado` → apaga la alarma). **Si no se baja, NO se mueve
+> stock.** Mismo patrón reusable a futuro para reclamar artículos con poco stock (botón → orden/alarma en la
+> página). Admin Stocks ahora tiene **5 solapas** (Stocks · 🏗 Racks · Ingresos · Salidas · Ajustes) y el
+> selector de **depósito** en Ajustes incluye racks/insumos/a_guardar (`_stkDep`). Validado con Playwright
+> (admin render, operario `brRender`, clamps, alarma).
 >
 > Nota: **v4.06–v4.07** — **STOCK ONLINE** (pedido del usuario; objetivo: stock dentro de la página).
 > Modelo **event-sourced**: tabla **`Movimientos_Stock`** (`ts, cod_art, descripcion, deposito

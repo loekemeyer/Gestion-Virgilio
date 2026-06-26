@@ -243,7 +243,7 @@ function closeOp() { opPage.classList.remove("open"); if (_pendTimer) { clearInt
 opClose.onclick = closeOp;
 
 opBack.onclick = () => {
-  if (opState.step === "tipo" || opState.step === "pend") renderMenu();
+  if (opState.step === "tipo" || opState.step === "pend" || opState.step === "racks") renderMenu();
   else if (opState.step === "lista") renderTipoElegir();
   else if (opState.step === "linea") renderLista(opState.tipo);
   else if (opState.step === "remito") renderLinea();
@@ -975,8 +975,103 @@ function renderMenu() {
   bp.type = "button"; bp.className = "opTipoBtn";
   bp.textContent = "📋 Pendientes";
   bp.onclick = () => renderPendientes();
-  cont.appendChild(bc); cont.appendChild(bp);
+  const br = document.createElement("button");
+  br.type = "button"; br.className = "opTipoBtn";
+  br.textContent = "📦 Bajadas Racks → góndola";
+  br.onclick = () => renderBajadasRacks();
+  cont.appendChild(bc); cont.appendChild(bp); cont.appendChild(br);
   opBody.appendChild(cont);
+  // Si hay bajadas de racks esperando aprobación, lo marco en el botón.
+  racksBadgePend(br);
+}
+/* ===== RACKS → góndola (v4.08): Marianela aprueba acá lo que los operarios
+   marcaron para bajar. Al aprobar se hace el movimiento entre depósitos
+   (racks − / terminado +) en Movimientos_Stock y la bajada queda 'aprobada'
+   (si era la última de la orden, la orden pasa a 'bajado' y se apaga la alarma). */
+async function racksBadgePend(btn) {
+  try {
+    await sessionReady;
+    const r = await supabase.from("Racks_Bajadas").select("id", { count: "exact", head: true }).eq("estado", "propuesta");
+    const n = r.count || 0;
+    if (n > 0 && btn) btn.textContent = "📦 Bajadas Racks → góndola (" + n + ")";
+  } catch (_e) {}
+}
+async function renderBajadasRacks() {
+  opState.step = "racks";
+  opPage.classList.add("pendWide");
+  opSetBack(true);
+  opTitle.textContent = "Bajadas Racks → góndola";
+  opSubtitle.textContent = "Lo que los operarios marcaron para bajar. Revisá y aprobá: recién ahí pasa de racks a góndola.";
+  opActions.innerHTML = "";
+  opBody.innerHTML = '<div class="opEmpty">Cargando…</div>';
+  await sessionReady;
+  let res, fres;
+  try {
+    res = await supabase.from("Racks_Bajadas").select("id,orden_id,cod_art,descripcion,cajas,estado,creada_por,ts").eq("estado", "propuesta").order("ts", { ascending: true }).limit(500);
+    fres = await supabase.from("Articulos Virgilio X Tallerista").select("Cod_Art,Cajas_x_Master,Uni_x_Caja").limit(20000);
+  } catch (e) { res = { error: e }; }
+  if (opState.step !== "racks") return;
+  if (res.error) { opBody.innerHTML = '<div class="opEmpty" style="color:var(--danger)">No se pudo leer Racks_Bajadas.<br><small>' + (res.error.message || "") + '</small></div>'; return; }
+  const rows = res.data || [];
+  _racksFactors = {};
+  ((fres && fres.data) || []).forEach(function (x) { const k = String(x.Cod_Art || "").toUpperCase(); if (k && !_racksFactors[k]) _racksFactors[k] = { cajasXMaster: Number(x.Cajas_x_Master) || 0, uniXCaja: Number(x.Uni_x_Caja) || 0 }; });
+  if (!rows.length) { opBody.innerHTML = '<div class="opOk">✓ No hay bajadas pendientes de aprobar.</div>'; return; }
+  opBody.innerHTML = "";
+  const list = document.createElement("div"); list.className = "pendCards";
+  rows.forEach(function (b) { list.appendChild(racksBajaCard(b)); });
+  opBody.appendChild(list);
+}
+let _racksFactors = {};
+function racksFmtUnits(cajas, cod) {
+  const f = _racksFactors[String(cod).toUpperCase()] || {}, M = f.cajasXMaster > 0 ? f.cajasXMaster : 0, U = f.uniXCaja > 0 ? f.uniXCaja : 0, p = [];
+  if (M) p.push((Math.round((cajas / M) * 100) / 100) + " master");
+  if (U) p.push((cajas * U) + " u");
+  return p.length ? p.join(" · ") : "";
+}
+function racksBajaCard(b) {
+  const card = document.createElement("div"); card.className = "pendCard"; card.setAttribute("data-id", String(b.id));
+  const head = document.createElement("div"); head.className = "pcHead";
+  const name = document.createElement("span"); name.className = "pcName"; name.textContent = b.cod_art || "—";
+  const tag = document.createElement("span"); tag.className = "pcTag"; tag.textContent = b.creada_por ? ("Leg " + b.creada_por) : "operario";
+  head.appendChild(name); head.appendChild(tag);
+  card.appendChild(head);
+  const ent = document.createElement("div"); ent.className = "pcEntrega";
+  const u = racksFmtUnits(Number(b.cajas), b.cod_art);
+  ent.textContent = (b.descripcion || "") + "   ·   " + b.cajas + " cajas" + (u ? "  (" + u + ")" : "");
+  card.appendChild(ent);
+  const foot = document.createElement("div"); foot.className = "pcFoot";
+  const ok = document.createElement("button"); ok.type = "button"; ok.className = "enviarBtn"; ok.textContent = "✓ Aprobar";
+  ok.onclick = function () { racksAprobarBaja(b, foot); };
+  foot.appendChild(ok);
+  card.appendChild(foot);
+  return card;
+}
+async function racksAprobarBaja(b, foot) {
+  const btn = foot.querySelector("button");
+  if (btn) { btn.disabled = true; btn.textContent = "Aprobando…"; }
+  try {
+    await sessionReady;
+    const ref = "orden " + (b.orden_id || "");
+    const mov = await supabase.from("Movimientos_Stock").insert([
+      { cod_art: b.cod_art, descripcion: b.descripcion || null, deposito: "racks", delta: -Number(b.cajas), tipo: "baja_racks", ref: ref, legajo: "0" },
+      { cod_art: b.cod_art, descripcion: b.descripcion || null, deposito: "terminado", delta: Number(b.cajas), tipo: "baja_racks", ref: ref, legajo: "0" }
+    ]);
+    if (mov.error) throw mov.error;
+    const upd = await supabase.from("Racks_Bajadas").update({ estado: "aprobada", aprobada_at: new Date().toISOString() }).eq("id", b.id);
+    if (upd.error) throw upd.error;
+    // ¿Era la última propuesta de la orden? Entonces cerramos la orden (apaga la alarma).
+    if (b.orden_id) {
+      const rest = await supabase.from("Racks_Bajadas").select("id", { count: "exact", head: true }).eq("orden_id", b.orden_id).eq("estado", "propuesta");
+      if ((rest.count || 0) === 0) {
+        await supabase.from("Racks_Ordenes").update({ estado: "bajado", cerrada_at: new Date().toISOString() }).eq("id", b.orden_id);
+      }
+    }
+    const card = foot.closest(".pendCard");
+    if (card) { card.classList.add("sentRow"); foot.innerHTML = '<span class="pcLbl" style="color:var(--ok);font-weight:900">✓ Aprobado — pasó a góndola</span>'; }
+  } catch (e) {
+    if (btn) { btn.disabled = false; btn.textContent = "✓ Aprobar"; }
+    alert("No se pudo aprobar: " + (e.message || e));
+  }
 }
 let _pendRows = {};   // id -> estado vivo (espejo de lo persistido en Supabase). NADA en localStorage.
 async function renderPendientes() {
