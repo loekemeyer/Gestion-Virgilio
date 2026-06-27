@@ -3089,6 +3089,7 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
     <div class="sup-sec-label">Reportes y configuración</div>
     <!-- CHICOS: uso ocasional. -->
     <div class="sup-actions sup-secondary">
+      <button class="sup-action-btn" onclick="openAgentesAdmin()"><span class="sup-ico">🤖</span><span>Agentes</span></button>
       <button class="sup-action-btn" onclick="openMonitor()"><span class="sup-ico">📊</span><span>Monitor de operarios</span></button>
       <button class="sup-action-btn" onclick="openAnalisis()"><span class="sup-ico">📈</span><span>Análisis de productividad</span></button>
       <button class="sup-action-btn" onclick="openInconsistencias()"><span class="sup-ico">⚠</span><span>Inconsistencias</span></button>
@@ -5320,7 +5321,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v4.51";
+const APP_VERSION = "v4.52";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -7669,54 +7670,63 @@ async function ociSave() {
 function stkTab(t) { if (!_stk) return; if (t === "compras") { openOCAdmin(); return; } _stk.tab = t; _stk.filtro = ""; _stk.openArt = null; if (t === "capacidad" && !_stk.capLoaded) { stkCapLoad(); return; } stkRender(); }
 function stkRender() {
   if (!_stk) return;
-  const tabs = [["stocks", "📊 Stocks"], ["agentes", "🤖 Agentes"], ["proceso", "📦 A Separar"], ["racks", "🏗 Racks"], ["conteo", "📋 Conteo"], ["capacidad", "📐 Capacidad"], ["ajustes", "⚙ Ajustes"], ["compras", "📑 Compras (OCs)"]];
+  const tabs = [["stocks", "📊 Stocks"], ["proceso", "📦 A Separar"], ["racks", "🏗 Racks"], ["conteo", "📋 Conteo"], ["capacidad", "📐 Capacidad"], ["ajustes", "⚙ Ajustes"], ["compras", "📑 Compras (OCs)"]];
   const tb = document.getElementById("stkTabs");
   if (tb) tb.innerHTML = tabs.map(function (t) { return '<button class="stk-tab' + (_stk.tab === t[0] ? " on" : "") + '" onclick="stkTab(\'' + t[0] + '\')">' + t[1] + '</button>'; }).join("");
   const body = document.getElementById("stkBody"); if (!body) return;
-  _renderKeepFocus(body, _stk.tab === "agentes" ? stkBodyAgentes() : _stk.tab === "proceso" ? stkBodyProceso() : _stk.tab === "conteo" ? stkBodyConteo() : _stk.tab === "capacidad" ? stkBodyCapacidad() : _stk.tab === "racks" ? stkBodyRacks() : _stk.tab === "ajustes" ? stkBodyAjustes() : stkBodyStocksTab());
+  _renderKeepFocus(body, _stk.tab === "proceso" ? stkBodyProceso() : _stk.tab === "conteo" ? stkBodyConteo() : _stk.tab === "capacidad" ? stkBodyCapacidad() : _stk.tab === "racks" ? stkBodyRacks() : _stk.tab === "ajustes" ? stkBodyAjustes() : stkBodyStocksTab());
 }
-/* v4.51 — Solapa "🤖 Agentes": reporte de cosas para mirar (stock negativo, errores
-   de la app, Telegram trabado). Lee el snapshot curado `reporte_agentes` (lo genera
-   un cron cada 2 h en el server). */
-async function stkLoadReporte() {
-  try {
-    const r = await fetch(SUPABASE_URL + "/rest/v1/reporte_agentes?select=*&order=severidad.asc,categoria.asc,titulo.asc&limit=500", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
-    const rows = r.ok ? await r.json() : [];
-    let gen = "";
-    if (rows.length && rows[0].generado_at) { try { gen = new Date(rows[0].generado_at).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }); } catch (_e) {} }
-    _stk.reporte = { rows: rows, gen: gen };
-  } catch (e) { _stk.reporte = { error: e.message || String(e) }; }
-  if (_stk && _stk.tab === "agentes") stkRender();
-}
-function stkBodyAgentes() {
-  if (!document.getElementById("stkRepCss")) {
-    const s = document.createElement("style"); s.id = "stkRepCss";
-    s.textContent = ".stk-rep-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:12px;flex-wrap:wrap;}.stk-rep-head b{font-size:16px;}.stk-rep-gen{font-size:12px;color:#64748b;}.stk-rep-ok{padding:30px;text-align:center;color:#15803d;font-weight:800;font-size:18px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;}.stk-rep-ok small{display:block;color:#64748b;font-weight:600;font-size:13px;margin-top:6px;}.stk-rep-cat{border:1px solid #e2e8f0;border-radius:12px;padding:11px 13px;margin-bottom:11px;}.stk-rep-cat.stock_negativo{background:#fef2f2;border-color:#fecaca;}.stk-rep-cat.error_app{background:#fff7ed;border-color:#fed7aa;}.stk-rep-cat.outbox{background:#fffbeb;border-color:#fde68a;}.stk-rep-cat-h{font-weight:800;font-size:14.5px;color:#0f172a;display:flex;align-items:center;gap:8px;}.stk-rep-n{background:#0f172a;color:#fff;border-radius:999px;font-size:12px;padding:1px 9px;font-weight:800;}.stk-rep-hint{font-size:12px;color:#64748b;margin:3px 0 8px;}.stk-rep-row{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-top:1px solid rgba(0,0,0,.06);font-size:13.5px;flex-wrap:wrap;}.stk-rep-t{font-weight:700;color:#0f172a;}.stk-rep-d{color:#475569;font-size:12.5px;text-align:right;}";
+/* v4.52 — "🤖 Agentes": botón propio de admin (overlay aparte, ya NO solapa de
+   Stocks). Reporte de cosas para mirar (stock negativo, errores de la app, Telegram
+   trabado). Lee el snapshot curado `reporte_agentes` (lo genera un cron cada 2 h). */
+let _agt = null;
+async function openAgentesAdmin() {
+  if (!document.getElementById("agtCss")) {
+    const s = document.createElement("style"); s.id = "agtCss";
+    s.textContent = "#agentesAdminOverlay{display:none;position:fixed;inset:0;z-index:1280;background:rgba(2,6,23,.74);overflow:auto;padding:14px;}#agentesAdminOverlay.show{display:block;}.agt-card{background:#f8fafc;max-width:860px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.agt-head{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:linear-gradient(90deg,#0f766e,#0b3b36);color:#fff;}.agt-title{font-size:19px;font-weight:800;}.agt-close{background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;width:auto;}.agt-body{padding:14px 16px;}.agt-loading,.agt-empty{padding:24px;text-align:center;color:#64748b;}.agt-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#1e6bd6;}.stk-rep-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:12px;flex-wrap:wrap;}.stk-rep-head b{font-size:16px;}.stk-rep-gen{font-size:12px;color:#64748b;}.stk-rep-ok{padding:30px;text-align:center;color:#15803d;font-weight:800;font-size:18px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;}.stk-rep-ok small{display:block;color:#64748b;font-weight:600;font-size:13px;margin-top:6px;}.stk-rep-cat{border:1px solid #e2e8f0;border-radius:12px;padding:11px 13px;margin-bottom:11px;}.stk-rep-cat.stock_negativo{background:#fef2f2;border-color:#fecaca;}.stk-rep-cat.error_app{background:#fff7ed;border-color:#fed7aa;}.stk-rep-cat.outbox{background:#fffbeb;border-color:#fde68a;}.stk-rep-cat-h{font-weight:800;font-size:14.5px;color:#0f172a;display:flex;align-items:center;gap:8px;}.stk-rep-n{background:#0f172a;color:#fff;border-radius:999px;font-size:12px;padding:1px 9px;font-weight:800;}.stk-rep-hint{font-size:12px;color:#64748b;margin:3px 0 8px;}.stk-rep-row{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-top:1px solid rgba(0,0,0,.06);font-size:13.5px;flex-wrap:wrap;}.stk-rep-t{font-weight:700;color:#0f172a;}.stk-rep-d{color:#475569;font-size:12.5px;text-align:right;}";
     document.head.appendChild(s);
   }
-  if (!_stk.reporte) { stkLoadReporte(); return '<div class="stk-loading">Cargando reporte…</div>'; }
-  if (_stk.reporte.error) return '<div class="stk-empty" style="color:#b91c1c">Error: ' + escapeHtml(_stk.reporte.error) + '</div>';
-  const rows = _stk.reporte.rows || [], gen = _stk.reporte.gen || "";
+  let ov = document.getElementById("agentesAdminOverlay");
+  if (!ov) { ov = document.createElement("div"); ov.id = "agentesAdminOverlay"; document.body.appendChild(ov); }
+  ov.classList.add("show");
+  ov.innerHTML = '<div class="agt-card"><div class="agt-head"><span class="agt-title">🤖 Agentes — cosas para mirar</span><button class="agt-close" onclick="closeAgentesAdmin()">Cerrar</button></div><div class="agt-body" id="agtBody"><div class="agt-loading">Cargando reporte…</div></div></div>';
+  try {
+    const res = await Promise.all([agtFetchReporte(), loadArtNombres()]);
+    _agt = res[0];
+    agtRender();
+  } catch (e) { const b = document.getElementById("agtBody"); if (b) b.innerHTML = '<div class="agt-empty" style="color:#b91c1c">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
+}
+function closeAgentesAdmin() { const ov = document.getElementById("agentesAdminOverlay"); if (ov) ov.classList.remove("show"); _agt = null; }
+async function agtFetchReporte() {
+  const r = await fetch(SUPABASE_URL + "/rest/v1/reporte_agentes?select=*&order=severidad.asc,categoria.asc,titulo.asc&limit=500", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+  const rows = r.ok ? await r.json() : [];
+  let gen = "";
+  if (rows.length && rows[0].generado_at) { try { gen = new Date(rows[0].generado_at).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }); } catch (_e) {} }
+  return { rows: rows, gen: gen };
+}
+function agtRender() {
+  const body = document.getElementById("agtBody"); if (!body || !_agt) return;
+  const rows = _agt.rows || [], gen = _agt.gen || "";
   const CATS = [
     { key: "stock_negativo", icon: "⚠", titulo: "Stock negativo (saldo imposible)", hint: "El picking descontó más de lo que había cargado. Cargá/ajustá el inicial." },
     { key: "error_app", icon: "🐛", titulo: "Errores de la app (últimos 7 días)", hint: "Crashes que vieron los usuarios. Si se repite, hay que arreglarlo." },
     { key: "outbox", icon: "📨", titulo: "Telegram sin enviar", hint: "Avisos que quedaron trabados en la cola (>15 min)." }
   ];
-  let h = '<div class="stk-rep-head"><div><b>🤖 Reporte de agentes</b> — cosas para mirar</div><div class="stk-rep-gen">' + (gen ? "Generado " + escapeHtml(gen) : "") + '</div></div>';
-  if (!rows.length) return h + '<div class="stk-rep-ok">✓ Nada para mirar 👍<small>Sin stock negativo, sin errores ni avisos trabados.</small></div>';
+  let h = '<div class="stk-rep-head"><div><b>Reporte de agentes</b> — cosas para mirar</div><div class="stk-rep-gen">' + (gen ? "Generado " + escapeHtml(gen) : "") + '</div></div>';
+  if (!rows.length) { body.innerHTML = h + '<div class="stk-rep-ok">✓ Nada para mirar 👍<small>Sin stock negativo, sin errores ni avisos trabados.</small></div>'; return; }
   CATS.forEach(function (c) {
     const items = rows.filter(function (r) { return r.categoria === c.key; });
     if (!items.length) return;
     h += '<div class="stk-rep-cat ' + c.key + '"><div class="stk-rep-cat-h">' + c.icon + ' ' + escapeHtml(c.titulo) + ' <span class="stk-rep-n">' + items.length + '</span></div><div class="stk-rep-hint">' + escapeHtml(c.hint) + '</div>';
     items.forEach(function (r) {
       const t = (c.key === "stock_negativo")
-        ? '<span class="stk-cod">' + escapeHtml(r.titulo) + '</span> ' + escapeHtml(artNombre(r.titulo, ""))
+        ? '<span class="agt-cod">' + escapeHtml(r.titulo) + '</span> ' + escapeHtml(artNombre(r.titulo, ""))
         : escapeHtml(r.titulo);
       h += '<div class="stk-rep-row"><div class="stk-rep-t">' + t + '</div><div class="stk-rep-d">' + escapeHtml(r.detalle || "") + '</div></div>';
     });
     h += '</div>';
   });
-  return h;
+  body.innerHTML = h;
 }
 function stkMvRow(mv) {
   const old = _stk.cutoff && new Date(mv.ts).getTime() < new Date(_stk.cutoff).getTime();

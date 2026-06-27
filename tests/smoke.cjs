@@ -15,7 +15,7 @@ catch (_e) {
   p.on("pageerror", (e) => errs.push(e.message));
   await p.goto("file://" + path.join(root, "index.html"), { waitUntil: "domcontentloaded" });
   const r = await p.evaluate(() => {
-    const need = ["stockComputeSaldos", "stkBodyStocks", "stkBodyStocksTab", "stkBodyConteo", "stkBodyCapacidad", "stkBodyAgentes", "stkLoadReporte",
+    const need = ["stockComputeSaldos", "stkBodyStocks", "stkBodyStocksTab", "stkBodyConteo", "stkBodyCapacidad", "openAgentesAdmin", "agtRender",
       "stkBodyProceso", "ocBodyEntregas", "ocgEnter", "insRender", "mgRender", "pkRender", "stockBajaPicking",
       "stockSepararAFacturar", "stockSalidaFacturado"];
     const missing = need.filter((n) => typeof window[n] !== "function");

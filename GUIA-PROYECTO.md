@@ -4,9 +4,15 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-27 · Versión app al documentar: **v4.51**
+> Última actualización: 2026-06-27 · Versión app al documentar: **v4.52**
 >
-> Nota: **v4.51** — **Solapa “🤖 Agentes”** en *Stock y Compras* (2da, después de Stocks): **reporte de
+> Nota: **v4.52** — **“🤖 Agentes” pasó a botón propio** (no más solapa de Stocks). Botón en el panel de
+> supervisor (sección *Reportes y configuración*) → `openAgentesAdmin()` abre un overlay propio
+> (`agentesAdminOverlay`, header teal) con el mismo reporte. Funciones: `openAgentesAdmin` /
+> `closeAgentesAdmin` / `agtFetchReporte` / `agtRender`. El backend (tabla `reporte_agentes` + cron)
+> no cambió.
+>
+> Nota: **v4.51** — *(movido a botón en v4.52)* **Solapa “🤖 Agentes”** en *Stock y Compras* (2da, después de Stocks): **reporte de
 > cosas para mirar**. Lee el snapshot `reporte_agentes` (tabla curada, SELECT anon — NO expone las
 > tablas crudas) que genera la función `generar_reporte_agentes()` (SECURITY DEFINER, lee
 > `vista_saldos_stock` / `errores_cliente` / `telegram_outbox` como owner y escribe un resumen) por
