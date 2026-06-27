@@ -4,7 +4,12 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-27 · Versión app al documentar: **v4.32**
+> Última actualización: 2026-06-27 · Versión app al documentar: **v4.33**
+>
+> Nota: **v4.33** — Vista **Stocks**: el sector `separar_pedidos` se muestra como **"Pickeados"** (antes "A
+> separar"; solo el label de la vista de Stocks — la solapa y el pipeline siguen "A Separar"). Las columnas de la
+> tabla pasan a ser **TODAS fijas** (Góndola · A guardar · Excedente · Racks · Pickeados · A facturar), no solo
+> las que tienen stock.
 >
 > Nota: **v4.32** — Tabla de **Stocks** mide según el contenido (`.stk-tbl-fit` = `width:auto`), no estira a
 > 100% (sin huecos al pedo). Columnas: Código · Descripción · una por sector con stock (Góndola y A guardar

@@ -5285,7 +5285,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v4.32";
+const APP_VERSION = "v4.33";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -7501,7 +7501,7 @@ function stkBodyStocks() {
   const SECT = [
     { key: "terminado", label: "Góndola" }, { key: "a_guardar", label: "A guardar" },
     { key: "excedente", label: "Excedente" }, { key: "racks", label: "Racks" },
-    { key: "separar_pedidos", label: "A separar" }, { key: "a_facturar", label: "A facturar" },
+    { key: "separar_pedidos", label: "Pickeados" }, { key: "a_facturar", label: "A facturar" },
     { key: "insumos", label: "Insumos" }
   ];
   const totals = {};
@@ -7516,8 +7516,8 @@ function stkBodyStocks() {
   });
   h += '</div>';
   h += '<input class="stk-filtro" type="search" placeholder="🔎 Buscar código / descripción" value="' + escapeHtml(_stk.filtro) + '" oninput="if(_stk){_stk.filtro=this.value;stkRender();}">';
-  // Columnas de la tabla: góndola y a guardar siempre; racks/separar/facturar si hay stock.
-  const cols = SECT.filter(function (s) { return s.key !== "insumos" && (s.key === "terminado" || s.key === "a_guardar" || Math.abs(totals[s.key] || 0) > 0.0001); });
+  // Columnas FIJAS: todos los sectores (menos insumos, que va en su sección).
+  const cols = SECT.filter(function (s) { return s.key !== "insumos"; });
   const ncol = 2 + cols.length + 1;
   let th = '<th>Código</th><th>Descripción</th>';
   cols.forEach(function (c) { th += '<th class="num">' + c.label + '</th>'; });
