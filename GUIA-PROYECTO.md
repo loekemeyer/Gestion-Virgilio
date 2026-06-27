@@ -4,7 +4,20 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-27 · Versión app al documentar: **v4.56**
+> Última actualización: 2026-06-27 · Versión app al documentar: **v4.57**
+>
+> Nota: **v4.57** — **Agentes = tablero de estabilidad** (hacia "soltar lo manual"). El objetivo del
+> usuario es dejar de controlar a mano, pero para eso necesita ~2 semanas sin que los operarios marquen
+> errores que hoy **no se ven**. Por eso el reporte de Agentes (`generar_reporte_agentes`, cron c/2 h)
+> ahora suma 3 categorías y un termómetro: **`error_envio`** (📡 envíos de operarios que fallaron y
+> quedaron en `Auditoria_Produccion_Virgilio`, últimos 7 días, excluye legajos 0/1 — "lo que hoy no
+> ves"); **`faltante`** (🚚 faltantes de picking `PKC`, 7 días); **`oc_baja`** (📉 OCs con <50% recibido).
+> El overlay (`agtRender`) muestra arriba un **termómetro de estabilidad**: cuenta tipos de error de
+> operarios (`error_app` + `error_envio`) en 7 días → verde "✓ 0 errores … buena señal para ir soltando
+> lo manual" / ámbar "⚠ N tipo(s) … revisalos antes de soltar lo manual". Se le aplica `artNombre` a
+> `stock_negativo` y `oc_baja` (muestran descripción del artículo). **Además** se corrigieron los 3
+> saldos negativos que había (222, 503E, 702E) con movimientos de ajuste en `Movimientos_Stock`
+> (`tipo='ajuste'`, ref `fix-neg`) → 0 negativos. (`SW_VERSION` v4.57-vir.)
 >
 > Nota: **v4.56** — **Control de la PPP contra el espejo**. En el menú de importación de la PPP,
 > `pppShowBaseInfo` ahora además **cuenta en vivo** lo que hay en las 3 tablas de Supabase
