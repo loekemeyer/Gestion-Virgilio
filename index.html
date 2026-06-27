@@ -5281,7 +5281,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v4.23";
+const APP_VERSION = "v4.24";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -7047,7 +7047,7 @@ function stockComputeSaldos(movs, cutoff) {
     // orden y marcar inicio una sola vez, sin que un depósito pise a otro.
     if (cut && mv.tipo !== "inicial" && new Date(mv.ts).getTime() < cut) return;
     const k = String(mv.cod_art);
-    if (!m[k]) m[k] = { cod: k, desc: mv.descripcion || "", a_guardar: 0, terminado: 0, separar_pedidos: 0, a_facturar: 0 };
+    if (!m[k]) m[k] = { cod: k, desc: mv.descripcion || "", a_guardar: 0, terminado: 0, excedente: 0, separar_pedidos: 0, a_facturar: 0 };
     if (mv.descripcion && !m[k].desc) m[k].desc = mv.descripcion;
     m[k][mv.deposito] = (m[k][mv.deposito] || 0) + Number(mv.delta || 0);
   });
@@ -7263,7 +7263,7 @@ async function ocgEnter() {
     maxs.forEach(function (m) {
       const cod = String(m.cod).toUpperCase().trim();
       const sd = saldos[cod] || {};
-      const stock = (Number(sd.terminado) || 0) + (Number(sd.racks) || 0);
+      const stock = (Number(sd.terminado) || 0) + (Number(sd.racks) || 0) + (Number(sd.excedente) || 0);
       const demanda = dem[cod] || 0;
       const indice = (Number(m.indice) > 0) ? Number(m.indice) : OCG_FACTOR_MAXIMO;
       const pc = proy[_ocgNorm(cod)];   // proyección por tendencia en cajas/mes (o undefined)
@@ -7404,8 +7404,9 @@ function stkBodyStocks() {
   const fmtCajas = function (n) { n = Number(n) || 0; return String(Math.round(n * 10) / 10); };
   const SECT = [
     { key: "terminado", label: "Góndola" }, { key: "a_guardar", label: "A guardar" },
-    { key: "racks", label: "Racks" }, { key: "separar_pedidos", label: "A separar" },
-    { key: "a_facturar", label: "A facturar" }, { key: "insumos", label: "Insumos" }
+    { key: "excedente", label: "Excedente" }, { key: "racks", label: "Racks" },
+    { key: "separar_pedidos", label: "A separar" }, { key: "a_facturar", label: "A facturar" },
+    { key: "insumos", label: "Insumos" }
   ];
   const totals = {};
   arts.forEach(function (a) { SECT.forEach(function (s) { totals[s.key] = (totals[s.key] || 0) + (Number(a[s.key]) || 0); }); });
@@ -7531,7 +7532,7 @@ function stkBodySalidas() {
   return h + "</tbody></table>";
 }
 function stkBodyAjustes() {
-  let h = '<div class="stk-aj-dep">Depósito: <select id="stkAjDep"><option value="terminado">Artículo Terminado (góndola)</option><option value="racks">Racks</option><option value="insumos">Insumos</option><option value="separar_pedidos">A Separar (pedidos)</option><option value="a_facturar">A Facturar</option><option value="a_guardar">Mercadería a guardar</option></select></div>';
+  let h = '<div class="stk-aj-dep">Depósito: <select id="stkAjDep"><option value="terminado">Artículo Terminado (góndola)</option><option value="excedente">Excedente</option><option value="racks">Racks</option><option value="insumos">Insumos</option><option value="separar_pedidos">A Separar (pedidos)</option><option value="a_facturar">A Facturar</option><option value="a_guardar">Mercadería a guardar</option></select></div>';
   h += '<div class="stk-aj-sec"><div class="stk-aj-h">⚙ Ajustar stock</div>';
   h += '<div class="stk-aj-hint">Sumá o restá con signo: <code>+10</code> / <code>-3</code>.</div><div class="stk-aj-form"><input id="stkAjCod" class="stk-aj-inp" placeholder="Código"><input id="stkAjCant" class="stk-aj-inp" type="number" placeholder="+/- cajas"><button class="stk-btn ok" onclick="stockAjustar()">Aplicar</button></div>';
   h += '<div class="stk-aj-hint" style="margin-top:10px">O dejá el stock exacto:</div><div class="stk-aj-form"><input id="stkAjCod2" class="stk-aj-inp" placeholder="Código"><input id="stkAjFijar" class="stk-aj-inp" type="number" placeholder="Fijar en…"><button class="stk-btn" onclick="stockFijar()">Fijar</button></div></div>';
@@ -7870,7 +7871,7 @@ let _mg = null;
 async function showMGModal(legajo) {
   if (!document.getElementById("mgCss")) {
     const s = document.createElement("style"); s.id = "mgCss";
-    s.textContent = "#mgModal{display:none;position:fixed;inset:0;z-index:1290;background:rgba(2,6,23,.74);overflow:auto;padding:12px;}#mgModal.show{display:block;}.mg-card{background:#f8fafc;max-width:460px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.mg-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;background:linear-gradient(90deg,#16a34a,#15803d);color:#fff;}.mg-title{font-size:18px;font-weight:800;}.mg-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}.mg-body{padding:13px 14px;}.mg-loading,.mg-empty{padding:26px;text-align:center;color:#64748b;font-size:15px;}.mg-hint{font-size:12.5px;color:#64748b;margin-bottom:10px;}.mg-row{display:flex;align-items:center;gap:10px;border:1px solid #e2e8f0;border-radius:12px;padding:9px 11px;margin-bottom:8px;background:#fff;}.mg-info{flex:1;min-width:0;}.mg-cod{font-size:16px;font-weight:800;font-family:Consolas,Menlo,monospace;}.mg-desc{font-size:12px;color:#475569;}.mg-disp{font-size:11.5px;color:#1e6bd6;font-weight:700;margin-top:2px;}.mg-stp{display:flex;align-items:center;gap:5px;}.mg-sb{width:38px;height:40px;border:none;border-radius:9px;font-size:22px;font-weight:800;cursor:pointer;background:#e2e8f0;color:#475569;}.mg-inp{width:54px;height:40px;text-align:center;font-size:18px;font-weight:800;border:2px solid #cbd5e1;border-radius:9px;}.mg-all{height:40px;border:1px solid #cbd5e1;background:#fff;border-radius:9px;font-size:11px;font-weight:800;cursor:pointer;padding:0 8px;}.mg-fin{width:100%;margin-top:10px;padding:14px;border:none;border-radius:12px;background:#16a34a;color:#fff;font-size:17px;font-weight:800;cursor:pointer;}.mg-fin:disabled{background:#cbd5e1;cursor:not-allowed;}";
+    s.textContent = "#mgModal{display:none;position:fixed;inset:0;z-index:1290;background:rgba(2,6,23,.74);overflow:auto;padding:12px;}#mgModal.show{display:block;}.mg-card{background:#f8fafc;max-width:460px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.mg-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;background:linear-gradient(90deg,#16a34a,#15803d);color:#fff;}.mg-title{font-size:18px;font-weight:800;}.mg-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}.mg-body{padding:13px 14px;}.mg-loading,.mg-empty{padding:26px;text-align:center;color:#64748b;font-size:15px;}.mg-hint{font-size:12.5px;color:#64748b;margin-bottom:10px;}.mg-row{display:flex;align-items:center;flex-wrap:wrap;gap:10px;border:1px solid #e2e8f0;border-radius:12px;padding:9px 11px;margin-bottom:8px;background:#fff;}.mg-info{flex:1 1 110px;min-width:0;}.mg-cod{font-size:16px;font-weight:800;font-family:Consolas,Menlo,monospace;}.mg-desc{font-size:12px;color:#475569;}.mg-disp{font-size:11.5px;color:#1e6bd6;font-weight:700;margin-top:2px;}.mg-stp{display:flex;align-items:center;gap:5px;}.mg-sb{display:flex;align-items:center;justify-content:center;line-height:1;padding:0;width:36px;height:40px;border:none;border-radius:9px;font-size:22px;font-weight:800;cursor:pointer;background:#e2e8f0;color:#475569;}.mg-inp{width:48px;height:40px;text-align:center;font-size:18px;font-weight:800;border:2px solid #cbd5e1;border-radius:9px;padding:0;-moz-appearance:textfield;}.mg-inp::-webkit-outer-spin-button,.mg-inp::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}.mg-all{height:40px;display:flex;align-items:center;justify-content:center;border:1px solid #cbd5e1;background:#fff;border-radius:9px;font-size:11px;font-weight:800;cursor:pointer;padding:0 10px;}.mg-fin{width:100%;margin-top:10px;padding:14px;border:none;border-radius:12px;background:#16a34a;color:#fff;font-size:17px;font-weight:800;cursor:pointer;}.mg-fin:disabled{background:#cbd5e1;cursor:not-allowed;}.mg-grp{display:flex;flex-direction:column;align-items:center;gap:4px;}.mg-lbl{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:#64748b;}.mg-lbl.gond{color:#15803d;}.mg-lbl.exc{color:#b45309;}.mg-search{width:100%;height:44px;border:2px solid #cbd5e1;border-radius:11px;padding:0 13px;font-size:16px;font-weight:700;margin-bottom:10px;box-sizing:border-box;}.mg-addrow{background:#fffbeb;border:1px solid #fcd34d;border-radius:11px;padding:11px 12px;margin-bottom:10px;font-size:13px;color:#92400e;}.mg-add-btn{margin-left:6px;background:#16a34a;color:#fff;border:none;border-radius:9px;padding:8px 13px;font-weight:800;cursor:pointer;width:auto;}.mg-add-note{font-size:11.5px;color:#b45309;margin-top:7px;}.mg-disp-x{color:#b45309;font-weight:800;}";
     document.head.appendChild(s);
   }
   let ov = document.getElementById("mgModal");
@@ -7880,37 +7881,95 @@ async function showMGModal(legajo) {
   try {
     const res = await Promise.all([stockFetchMovs(), stockGetCutoff()]);
     const saldos = stockComputeSaldos(res[0] || [], res[1]);
-    const items = Object.keys(saldos).map(function (k) { return saldos[k]; }).filter(function (a) { return a.a_guardar > 0; }).sort(function (a, b) { return (parseInt(a.cod, 10) || 0) - (parseInt(b.cod, 10) || 0); }).map(function (a) { return { cod: a.cod, desc: a.desc, disponible: a.a_guardar, cargar: 0 }; });
-    _mg = { legajo: String(legajo || ""), items: items };
+    const items = Object.keys(saldos).map(function (k) { return saldos[k]; }).filter(function (a) { return a.a_guardar > 0; }).sort(function (a, b) { return (parseInt(a.cod, 10) || 0) - (parseInt(b.cod, 10) || 0); }).map(function (a) { return { cod: a.cod, desc: a.desc, disponible: a.a_guardar, cargar: 0, exc: 0, excOn: false }; });
+    _mg = { legajo: String(legajo || ""), items: items, filtro: "" };
     mgRender();
   } catch (e) { const b = document.getElementById("mgBody"); if (b) b.innerHTML = '<div class="mg-loading">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
 }
 function mgRender() {
   if (!_mg) return; const body = document.getElementById("mgBody"); if (!body) return;
-  if (!_mg.items.length) { body.innerHTML = '<div class="mg-empty">No hay mercadería para guardar 👍</div>'; return; }
-  let h = '<div class="mg-hint">Marcá cuántas cajas guardás de cada artículo → pasan a <b>Artículo Terminado</b>.</div>';
-  h += _mg.items.map(function (it, i) {
-    return '<div class="mg-row"><div class="mg-info"><span class="mg-cod">' + escapeHtml(it.cod) + '</span> <span class="mg-desc">' + escapeHtml(it.desc || "") + '</span><div class="mg-disp">disponible: ' + it.disponible + '</div></div><div class="mg-stp"><button class="mg-sb" onclick="mgChg(' + i + ',-1)">–</button><input class="mg-inp" type="number" min="0" max="' + it.disponible + '" inputmode="numeric" value="' + it.cargar + '" oninput="mgSet(' + i + ',this.value)"><button class="mg-sb" onclick="mgChg(' + i + ',1)">+</button><button class="mg-all" onclick="mgSet(' + i + ',' + it.disponible + ')">todo</button></div></div>';
+  // NO cortamos cuando la lista está vacía: el buscador tiene que estar igual para
+  // poder guardar un código fuera de lista (avisa Telegram).
+  let h = '<div class="mg-hint">Buscá el código y marcá, por cada uno, cuántas cajas van a <b>Góndola</b> y cuántas a <b>Excedente</b>.</div>';
+  h += '<input id="mgSearch" class="mg-search" type="search" inputmode="numeric" autocomplete="off" placeholder="🔎 Buscar código…" value="' + escapeHtml(_mg.filtro || "") + '" oninput="mgSearchInput(this.value)">';
+  const fq = String(_mg.filtro || "").trim(), fLo = fq.toLowerCase(), fUp = fq.toUpperCase();
+  const shown = fq ? _mg.items.filter(function (it) { return String(it.cod).toLowerCase().indexOf(fLo) >= 0; }) : _mg.items;
+  const exact = _mg.items.some(function (it) { return String(it.cod).toUpperCase() === fUp; });
+  // Código buscado que NO está en "a guardar" → se puede guardar igual (avisa Telegram).
+  if (fq && !exact) {
+    h += '<div class="mg-addrow">El código <b>' + escapeHtml(fUp) + '</b> no está en “a guardar”. <button class="mg-add-btn" onclick="mgAddManual()">➕ Guardarlo igual</button><div class="mg-add-note">⚠ Avisa por Telegram (puede ser un error de tipeo en un paso anterior).</div></div>';
+  }
+  if (!shown.length && !(fq && !exact)) h += '<div class="mg-empty" style="padding:16px">' + (fq ? "Sin resultados." : "No hay mercadería para guardar 👍") + '</div>';
+  h += shown.map(function (it) {
+    const i = _mg.items.indexOf(it);
+    const maxG = it.disponible - it.exc, maxE = it.disponible - it.cargar;
+    const disp = it.manual ? '<span class="mg-disp-x">⚠ fuera de lista</span>' : ('disponible: ' + it.disponible);
+    return '<div class="mg-row">' +
+      '<div class="mg-info"><span class="mg-cod">' + escapeHtml(it.cod) + '</span> <span class="mg-desc">' + escapeHtml(it.desc || "") + '</span><div class="mg-disp">' + disp + '</div></div>' +
+      '<div class="mg-grp"><div class="mg-stp"><button class="mg-sb" onclick="mgChg(' + i + ',-1)">–</button><input class="mg-inp" type="number" min="0" max="' + maxG + '" inputmode="numeric" value="' + it.cargar + '" oninput="mgSet(' + i + ',this.value)"><button class="mg-sb" onclick="mgChg(' + i + ',1)">+</button></div><div class="mg-lbl gond">Góndola</div></div>' +
+      '<div class="mg-grp"><div class="mg-stp"><button class="mg-sb" onclick="mgChgExc(' + i + ',-1)">–</button><input class="mg-inp" type="number" min="0" max="' + maxE + '" inputmode="numeric" value="' + it.exc + '" oninput="mgSetExc(' + i + ',this.value)"><button class="mg-sb" onclick="mgChgExc(' + i + ',1)">+</button></div><div class="mg-lbl exc">Excedente</div></div>' +
+      '</div>';
   }).join("");
-  const tot = _mg.items.reduce(function (s, it) { return s + it.cargar; }, 0);
-  h += '<button class="mg-fin"' + (tot <= 0 ? " disabled" : "") + ' onclick="mgConfirmar()">✓ Guardar ' + tot + ' caja(s) a Terminado</button>';
+  const totG = _mg.items.reduce(function (s, it) { return s + it.cargar; }, 0);
+  const totE = _mg.items.reduce(function (s, it) { return s + (it.exc || 0); }, 0);
+  const lbl = totE > 0 ? ('✓ Guardar ' + totG + ' góndola + ' + totE + ' excedente') : ('✓ Guardar ' + totG + ' caja(s) a Terminado');
+  h += '<button class="mg-fin"' + ((totG + totE) <= 0 ? " disabled" : "") + ' onclick="mgConfirmar()">' + lbl + '</button>';
   _renderKeepFocus(body, h);
 }
-function mgChg(i, d) { if (!_mg) return; const it = _mg.items[i]; if (!it) return; it.cargar = Math.max(0, Math.min(it.disponible, it.cargar + d)); mgRender(); }
-function mgSet(i, v) { if (!_mg) return; const it = _mg.items[i]; if (!it) return; let n = Math.max(0, parseInt(v, 10) || 0); if (n > it.disponible) n = it.disponible; it.cargar = n; mgRender(); }
+function mgSearchInput(v) { if (!_mg) return; _mg.filtro = String(v == null ? "" : v); mgRender(); }
+/* Guardar un código que NO estaba en "a guardar" (error de tipeo en un paso
+   anterior). Se agrega como item "manual": NO descuenta a_guardar y avisa por
+   Telegram al confirmar. */
+function mgAddManual() {
+  if (!_mg) return;
+  const cod = String(_mg.filtro || "").trim().toUpperCase(); if (!cod) return;
+  if (!_mg.items.some(function (it) { return String(it.cod).toUpperCase() === cod; })) {
+    _mg.items.push({ cod: cod, desc: "", disponible: 99999, cargar: 0, exc: 0, manual: true });
+  }
+  mgRender();
+}
+function mgChg(i, d) { if (!_mg) return; const it = _mg.items[i]; if (!it) return; it.cargar = Math.max(0, Math.min(it.disponible - it.exc, it.cargar + d)); mgRender(); }
+function mgSet(i, v) { if (!_mg) return; const it = _mg.items[i]; if (!it) return; let n = Math.max(0, parseInt(v, 10) || 0); const mx = it.disponible - it.exc; if (n > mx) n = mx; it.cargar = n; mgRender(); }
+function mgChgExc(i, d) { if (!_mg) return; const it = _mg.items[i]; if (!it) return; it.exc = Math.max(0, Math.min(it.disponible - it.cargar, it.exc + d)); mgRender(); }
+function mgSetExc(i, v) { if (!_mg) return; const it = _mg.items[i]; if (!it) return; let n = Math.max(0, parseInt(v, 10) || 0); const mx = it.disponible - it.cargar; if (n > mx) n = mx; it.exc = n; mgRender(); }
 function mgConfirmar() {
   if (!_mg) return;
-  const sel = _mg.items.filter(function (it) { return it.cargar > 0; });
+  const sel = _mg.items.filter(function (it) { return (it.cargar > 0) || (it.exc > 0); });
   if (!sel.length) return;
   const rows = [];
   sel.forEach(function (it) {
-    rows.push({ cod_art: it.cod, descripcion: it.desc || null, deposito: "a_guardar", delta: -it.cargar, tipo: "guardado", ref: null, legajo: _mg.legajo || null });
-    rows.push({ cod_art: it.cod, descripcion: it.desc || null, deposito: "terminado", delta: it.cargar, tipo: "guardado", ref: null, legajo: _mg.legajo || null });
+    const tot = it.cargar + (it.exc || 0);
+    if (tot <= 0) return;
+    // Item normal: sale de "a guardar". Item manual (fuera de lista): NO toca
+    // a_guardar (no estaba) → solo entra a góndola/excedente + alerta Telegram.
+    if (!it.manual) rows.push({ cod_art: it.cod, descripcion: it.desc || null, deposito: "a_guardar", delta: -tot, tipo: "guardado", ref: null, legajo: _mg.legajo || null });
+    const tp = it.manual ? "guardado_fuera_lista" : "guardado";
+    if (it.cargar > 0) rows.push({ cod_art: it.cod, descripcion: it.desc || null, deposito: "terminado", delta: it.cargar, tipo: tp, ref: null, legajo: _mg.legajo || null });
+    if (it.exc > 0)    rows.push({ cod_art: it.cod, descripcion: it.desc || null, deposito: "excedente", delta: it.exc, tipo: tp, ref: null, legajo: _mg.legajo || null });
   });
-  const n = sel.reduce(function (s, it) { return s + it.cargar; }, 0);
+  // Alerta Telegram por cada código guardado fuera de lista (evento MGX).
+  sel.filter(function (it) { return it.manual && (it.cargar + (it.exc || 0)) > 0; }).forEach(function (it) {
+    try { mgEmitFueraLista(it.cod, it.cargar, it.exc || 0, _mg.legajo); } catch (_e) {}
+  });
+  const nG = sel.reduce(function (s, it) { return s + it.cargar; }, 0);
+  const nE = sel.reduce(function (s, it) { return s + (it.exc || 0); }, 0);
   closeMG();
   stockMove(rows);
-  try { alert("✓ Guardado: " + n + " caja(s) pasaron a Artículo Terminado."); } catch (_e) {}
+  try { alert("✓ Guardado: " + nG + " caja(s) a góndola" + (nE > 0 ? " y " + nE + " a excedente" : "") + "."); } catch (_e) {}
+}
+/* Evento MGX: se guardó un código que NO estaba en "Mercadería a guardar". Un
+   trigger de Supabase lo reenvía por Telegram. texto = "COD|G<góndola>|E<exc>". */
+function mgEmitFueraLista(cod, g, e, legajo) {
+  const payload = {
+    legajo: String(legajo || "").trim(), opcion: "MGX", descripcion: "Guardado fuera de lista",
+    texto: (String(cod).toUpperCase() + "|G" + (g || 0) + "|E" + (e || 0)),
+    ts: Date.now(),
+    id: ("mgx_" + String(cod).toUpperCase() + "_" + String(legajo || "").trim() + "_" + Date.now()).replace(/[^a-zA-Z0-9_\-]/g, ""),
+    ts_inicio_iso: null
+  };
+  enqueueReport(payload);
+  if (typeof trySendOneReport === "function") trySendOneReport(payload).then(function (r) { if (r && r.ok) removeFromQueue(payload.id); }).catch(function () {});
+  try { updatePendingIndicator(); } catch (_e) {}
 }
 function closeMG() { const ov = document.getElementById("mgModal"); if (ov) ov.classList.remove("show"); _mg = null; }
 
@@ -7928,6 +7987,16 @@ async function stockBajaPicking(tanda, legajo) {
     const evs = r.ok ? await r.json() : [];
     const byArt = {};
     evs.forEach(function (ev) { const p = String(ev.texto || "").split("|"); if (String(p[0] || "").trim().toUpperCase() !== t) return; const art = String(p[1] || "").trim(); const real = parseInt(p[3], 10); if (art && !isNaN(real) && real > 0) byArt[art] = (byArt[art] || 0) + real; });
+    // v4.24: detectar si se sacó de góndola MÁS de lo que el sistema cree que hay
+    // (stock que quedaría negativo) → alerta Telegram (evento SSG). Best-effort.
+    const negativos = [];
+    try {
+      const sal = stockComputeSaldos(await stockFetchMovs(), await stockGetCutoff());
+      Object.keys(byArt).forEach(function (art) {
+        const have = (sal[art] && Number(sal[art].terminado)) || 0;
+        if (have < byArt[art]) negativos.push(art + ":" + byArt[art] + ">" + (Math.round(have * 10) / 10));
+      });
+    } catch (_e) {}
     // v4.22: el picking saca las cajas de góndola (terminado −) y las mete al
     // depósito intermedio "a separar" (separar_pedidos +). Quedan ahí hasta que
     // el armado (TAP) las pasa a "a facturar".
@@ -7937,7 +8006,23 @@ async function stockBajaPicking(tanda, legajo) {
       rows.push({ cod_art: art, deposito: "separar_pedidos", delta:  byArt[art], tipo: "picking", ref: t, legajo: String(legajo || "") });
     });
     if (rows.length) stockMove(rows);
+    if (negativos.length) { try { stockEmitSinStock(t, legajo, negativos); } catch (_e) {} }
   } catch (_e) {}
+}
+/* Evento SSG: se sacaron cajas de góndola que el sistema NO tenía (stock negativo
+   al pickear). Un trigger de Supabase lo reenvía por Telegram. texto =
+   "TANDA|COD:pedido>habia,COD2:…". 1 aviso por tanda/legajo/día (id determinístico). */
+function stockEmitSinStock(tanda, legajo, negArr) {
+  const payload = {
+    legajo: String(legajo || "").trim(), opcion: "SSG", descripcion: "Picking sin stock en góndola",
+    texto: (String(tanda).toUpperCase() + "|" + negArr.join(",")),
+    ts: Date.now(),
+    id: ("ssg_" + String(legajo || "").trim() + "_" + String(tanda).toUpperCase() + "_" + getTodayKey()).replace(/[^a-zA-Z0-9_\-]/g, ""),
+    ts_inicio_iso: null
+  };
+  enqueueReport(payload);
+  if (typeof trySendOneReport === "function") trySendOneReport(payload).then(function (r) { if (r && r.ok) removeFromQueue(payload.id); }).catch(function () {});
+  try { updatePendingIndicator(); } catch (_e) {}
 }
 
 /* v4.22 — PIPELINE DE STOCK separar → facturar. Las cajas pickeadas pasan por dos

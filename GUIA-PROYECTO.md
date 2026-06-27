@@ -4,7 +4,21 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-27 · Versión app al documentar: **v4.23**
+> Última actualización: 2026-06-27 · Versión app al documentar: **v4.24**
+>
+> Nota: **v4.24** — **MG (Guardar a góndola): Excedente + buscador + guardar fuera de lista + 2 alertas Telegram.**
+> (1) **Excedente**: nuevo depósito **`excedente`** (góndola que no entra). Cada artículo tiene **dos steppers**
+> lado a lado — **Góndola** y **Excedente** — independientes, topados a `góndola + exc ≤ disponible`. Al
+> confirmar: `a_guardar −(g+e)` · `terminado +g` · `excedente +e`. El excedente es un sector más en Stocks
+> (tira + columna + Ajustes) y **cuenta como stock disponible para las OCs** (`terminado + racks + excedente`).
+> (2) **Buscador** arriba (teclado numérico) que filtra por código. (3) **Guardar fuera de lista**: si el código
+> buscado **no está** en "a guardar" (típico error de tipeo en recepción), botón "➕ Guardarlo igual" → item
+> `manual` que **NO descuenta `a_guardar`** (solo entra a góndola/excedente) y **emite evento `MGX`** →
+> **alerta Telegram** (trigger `trg_mg_fuera_lista_telegram`). (4) **Alerta picking sin stock**: en el TP, si se
+> sacó de góndola **más de lo que el sistema tenía** (saldo `terminado` quedaría negativo), `stockBajaPicking`
+> emite **evento `SSG`** → **alerta Telegram** (trigger `trg_picking_sin_stock_telegram`). Símbolos `– / +` y
+> números **centrados** (prolijo). Validado con Playwright. ⚠ Los dos triggers Telegram usan el bot/grupo
+> "Faltantes Virgilio" (`-1004379879565`), patrón `net.http_post` como el resto.
 >
 > Nota: **v4.23** — **Solapa Stocks: "cuánto hay en cada sector"** (`stkBodyStocks`). (1) **Tira de totales
 > por depósito** arriba (Góndola · A guardar · Racks · A separar · A facturar · Insumos), totales GLOBALES en
@@ -2024,6 +2038,8 @@ Definidos en `index.html` (objeto `desc`, ~línea 1531). Los botones se arman en
 | `CRN` | Control Remito NP | (detalle de control, v3.36) | `texto` = `NP\|TANDA` (ej. `97754\|C47B`). Un evento por NP marcada como **recibida/controlada** en Recepción Remitos (`RR`, antes `CR`). id determinístico `crn_<legajo>_<np>_<día>` + upsert. La PPP lo lee (`pppRefreshControlado`) y pasa el pedido a **Pedidos Entregados**. El monitor lo ignora. |
 | `CRA` | Carga sin control (vencido) | (automático, v3.37) | `texto` = `NP\|TANDA\|RAZÓN`. Lo emite la PPP (`pppCheckCargaVencida`) cuando un pedido **cargado (CCN) sigue sin controlar (CRN/manual)** pasado el plazo (`crVencido`). id determinístico `cra_<np>_<día>` + upsert; legajo `0`. Dispara aviso Telegram vía trigger `trg_carga_sin_control_telegram` (**AFTER INSERT** → 1 vez por NP/día). El monitor lo ignora. |
 | `CCR` | Control Remito CR NP | (detalle de control CR, v3.69) | `texto` = `NP\|TANDA` (ej. `97754\|C47B`). Un evento por NP marcada como **controlada** en **Control Remitos (CR)** — paso **independiente** de la Carga Camión. id determinístico `ccr_<legajo>_<np>_<día>` + upsert. El NP sale **sólo de CR** (`fetchCCRData` lo resta de los facturados). ⚠ **NO alimenta RR** (RR lee `CCN`, no `CCR`). El monitor y las inconsistencias lo ignoran. Con el tiempo del toggle CR + los m³ sirve para medir productividad de CR (m³/h). |
+| `MGX` | Guardado fuera de lista | (automático, v4.24) | `texto` = `COD\|G<góndola>\|E<excedente>`. Lo emite el MG (`mgEmitFueraLista`) cuando se guarda un código que **NO estaba en "Mercadería a guardar"** (botón "Guardarlo igual"; típico error de tipeo en recepción). id `mgx_<cod>_<legajo>_<ts>`. Dispara aviso Telegram vía trigger `trg_mg_fuera_lista_telegram` (**AFTER INSERT** WHEN `opcion='MGX'`). El monitor lo ignora. |
+| `SSG` | Picking sin stock en góndola | (automático, v4.24) | `texto` = `TANDA\|COD:pedido>habia,…`. Lo emite `stockBajaPicking` al **TP** cuando se sacó de góndola **más de lo que el sistema tenía** (saldo `terminado` quedaría negativo). id determinístico `ssg_<legajo>_<tanda>_<día>` + upsert (1 aviso/tanda/día). Dispara aviso Telegram vía trigger `trg_picking_sin_stock_telegram` (**AFTER INSERT** WHEN `opcion='SSG'`). El monitor lo ignora. |
 
 **Grupos (constantes en `index.html`):**
 - `CORE_CODES = [EP, TP, AP, TAP]` — el trabajo medible (picking / armado).
