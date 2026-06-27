@@ -12,6 +12,11 @@
 > capacidad; si no hay proy, objetivo del Excel), respetando el corte de `Stock_Config`. Va por el **outbox**
 > confiable. Helper `_cod_norm(text)` (saca ceros a la izquierda) para matchear códigos entre tablas. ⚠ Con datos
 > de prueba da ~165 (stock bajo + índice 1.5 sin capacidad); con datos reales será representativo.
+> **Monitor del outbox**: `notificar_outbox_salud()` + cron **`outbox-salud`** (`'0 13 * * *'` = diario 10:00 AR)
+> avisa si quedaron avisos `failed`/`pending` viejos. **Índice de OC recuperado del Excel**: `OC_Maximos.indice`
+> se seteó por artículo = `max_cajas ÷ e_madre_cajas` (estadística madre del Excel, de PaginaLK
+> `estadistica_madre.e_madre_cajas`). **No era todo 1.5**: 22 de 339 distintos (0,67–4,50; mayoría 1,0/2,0/2,5/3,0).
+> Reproduce el máximo del Excel; afinable en ⚙ Índices.
 >
 > Nota: **v4.38** — **Números bien centrados en toda la app** (#8). Regla **global**: `input[type=number]` sin
 > flechitas (`-moz-appearance:textfield` + `::-webkit-*-spin-button{appearance:none}`) → el número centra de
