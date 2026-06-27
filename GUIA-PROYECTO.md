@@ -4,7 +4,19 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-27 · Versión app al documentar: **v4.57**
+> Última actualización: 2026-06-27 · Versión app al documentar: **v4.58**
+>
+> Nota: **v4.58** — **Limpieza de código muerto** (auditoría de consistencia, sin cambio de comportamiento).
+> Se removieron ~135 líneas sin uso de `index.html`: `readLastLegajo`, `closeCompletar` (duplicado exacto
+> del cierre inline del wizard Completar), `toggleMonitorTV` (+ su botón `btnMonitorTV` que ya no existía;
+> el modo TV se entra por otro lado), `pppMapProg`, y todo el **island de scaffolding de mapeo de la PPP**
+> (`pppShowMapping`/`pppApplyMapping`/`pppRenderBase` + helpers `_pppGuessMap`/`_pppColSamples`/
+> `_pppColLetter` + `PPP_FIELDS`/`PPP_MAP_KEY`/`_pppRawProg`) — restos del módulo PPP v2.95 "NO activado",
+> reemplazado por `pppMapBase`+`pppBuildProg`. ⚠ El cluster `showLiosModal` (que la auditoría marcó muerto)
+> **NO se tocó**: `liosSend` lo llama el wizard Completar y `_lios` se lee en un guard de salida — borrarlo
+> rompía código vivo. **Pendiente detectado (no es limpieza)**: `pppSubir` (subir la PPP a Supabase con
+> verificación, v4.55) **no tiene botón que lo llame** — la importación in-app hoy queda "solo local". Hay
+> que cablearlo o decidir descartarlo. (`SW_VERSION` v4.58-vir.)
 >
 > Nota: **v4.57** — **Agentes = tablero de estabilidad** (hacia "soltar lo manual"). El objetivo del
 > usuario es dejar de controlar a mano, pero para eso necesita ~2 semanas sin que los operarios marquen
