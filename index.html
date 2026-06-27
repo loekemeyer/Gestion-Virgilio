@@ -5291,7 +5291,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v4.40";
+const APP_VERSION = "v4.41";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -7129,6 +7129,18 @@ function stockComputeSaldos(movs, cutoff) {
 }
 function stockFmtTs(ts) { try { return new Date(ts).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }); } catch (_e) { return String(ts); } }
 let _stk = null;
+/* v4.41 — NOMBRES por artículo desde Supabase (fuente única): Articulos_Cajas.Descripcion
+   (la más completa) y, para los que falten, el objetivo del Excel (OC_Maximos.descripcion).
+   Lookup vivo (no copia datos). artNombre(cod, fallback) lo usan todos los módulos. */
+let _artNombres = null;
+async function loadArtNombres() {
+  if (_artNombres) return _artNombres;
+  const m = {}, H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+  try { const r = await fetch(SUPABASE_OCMAX_ENDPOINT + "?select=cod,descripcion&limit=20000", { headers: H, cache: "no-store" }); if (r.ok) (await r.json()).forEach(function (x) { const k = _ocgNorm(x.cod), d = String(x.descripcion || "").trim(); if (k && d && !m[k]) m[k] = d; }); } catch (_e) {}
+  try { const r = await fetch(SUPABASE_URL + "/rest/v1/Articulos_Cajas?select=Cod_Art,Descripcion&limit=20000", { headers: H, cache: "no-store" }); if (r.ok) (await r.json()).forEach(function (x) { const k = _ocgNorm(x.Cod_Art), d = String(x.Descripcion || "").trim(); if (k && d) m[k] = d; }); } catch (_e) {}
+  _artNombres = m; return m;
+}
+function artNombre(cod, fb) { const n = _artNombres && _artNombres[_ocgNorm(cod)]; return n || fb || ""; }
 async function openStockAdmin() {
   if (!document.getElementById("stkCss")) {
     const s = document.createElement("style"); s.id = "stkCss";
@@ -7140,7 +7152,7 @@ async function openStockAdmin() {
   ov.classList.add("show");
   ov.innerHTML = '<div class="stk-card"><div class="stk-head"><span class="stk-title">📦 Stock y Compras</span><button class="stk-close" onclick="closeStockAdmin()">Cerrar</button></div><div class="stk-tabs" id="stkTabs"></div><div class="stk-body" id="stkBody"><div class="stk-loading">Cargando…</div></div></div>';
   try {
-    const res = await Promise.all([stockFetchMovs(), stockGetCutoff(), stockFetchArtFactors(), racksFetchOrdenes(), racksFetchBajadas()]);
+    const res = await Promise.all([stockFetchMovs(), stockGetCutoff(), stockFetchArtFactors(), racksFetchOrdenes(), racksFetchBajadas(), loadArtNombres()]);
     _stk = { movs: res[0] || [], cutoff: res[1], factors: res[2] || {}, ordenes: res[3] || [], bajadas: res[4] || [], tab: "stocks", filtro: "", openArt: null, ingMode: "remito" };
     stkRender();
   } catch (e) { const b = document.getElementById("stkBody"); if (b) b.innerHTML = '<div class="stk-loading">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
@@ -7173,8 +7185,8 @@ async function openOCAdmin() {
   ov.classList.add("show");
   ov.innerHTML = '<div class="oc-card"><div class="oc-head"><span class="oc-title">📑 Órdenes de Compra</span><button class="oc-close" onclick="closeOCAdmin()">Cerrar</button></div><div class="oc-body" id="ocBody"><div class="oc-loading">Cargando…</div></div></div>';
   try {
-    const rows = await ocFetchRows();
-    _oc = { rows: rows, view: "list", openKey: null, filtro: "", nueva: { proveedor: "", fecha: "", rubro: "", unidad: "Cajas", items: [{ cod: "", desc: "", cant: "" }] } };
+    const r2 = await Promise.all([ocFetchRows(), loadArtNombres()]);
+    _oc = { rows: r2[0], view: "list", openKey: null, filtro: "", nueva: { proveedor: "", fecha: "", rubro: "", unidad: "Cajas", items: [{ cod: "", desc: "", cant: "" }] } };
     ocRender();
   } catch (e) { const b = document.getElementById("ocBody"); if (b) b.innerHTML = '<div class="oc-loading">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
 }
@@ -7205,7 +7217,7 @@ function ocBodyEntregas() {
   if (!arr.length) h += '<tr><td colspan="7" class="oc-empty">Sin resultados.</td></tr>';
   arr.forEach(function (a) {
     const p = pct(a.ent, a.ped); const col = p >= 100 ? "#166534" : (p >= 80 ? "#b45309" : "#b91c1c");
-    h += '<tr><td class="oc-cod">' + escapeHtml(a.cod) + '</td><td>' + escapeHtml(a.desc) + '</td><td style="font-size:12px;color:#475569">' + escapeHtml(a.prov) + '</td><td class="num">' + Math.round(a.ped) + '</td><td class="num">' + Math.round(a.ent) + '</td><td class="num" style="color:' + col + ';font-weight:800">' + p + '%</td><td class="num oc-falt">' + (Math.max(0, Math.round(a.ped - a.ent)) || "—") + '</td></tr>';
+    h += '<tr><td class="oc-cod">' + escapeHtml(a.cod) + '</td><td>' + escapeHtml(artNombre(a.cod, a.desc)) + '</td><td style="font-size:12px;color:#475569">' + escapeHtml(a.prov) + '</td><td class="num">' + Math.round(a.ped) + '</td><td class="num">' + Math.round(a.ent) + '</td><td class="num" style="color:' + col + ';font-weight:800">' + p + '%</td><td class="num oc-falt">' + (Math.max(0, Math.round(a.ped - a.ent)) || "—") + '</td></tr>';
   });
   h += '</tbody></table>';
   return h;
@@ -7421,7 +7433,7 @@ function ocBodyGen() {
     x.items.sort(function (a, b) { return b.falta - a.falta; }).forEach(function (it) {
       const proyTxt = (it.fuente === "proy") ? (Math.round(it.proy) + "") : '<span style="color:#b45309" title="sin proyección: usa objetivo Excel">xls</span>';
       const maxTxt = it.max + (it.capped ? ' <span style="color:#b45309;font-weight:800" title="Topado a la capacidad de góndola (' + it.cap + ' cajas) — proy×índice daba más">⤓</span>' : '');
-      h += '<tr><td class="oc-cod">' + escapeHtml(it.cod) + '</td><td>' + escapeHtml(it.desc) + '</td><td class="num">' + proyTxt + '</td><td class="num">' + it.indice + '</td><td class="num">' + maxTxt + '</td><td class="num">' + it.demanda + '</td><td class="num">' + it.stock + '</td><td class="num oc-falt">' + it.falta + '</td></tr>';
+      h += '<tr><td class="oc-cod">' + escapeHtml(it.cod) + '</td><td>' + escapeHtml(artNombre(it.cod, it.desc)) + '</td><td class="num">' + proyTxt + '</td><td class="num">' + it.indice + '</td><td class="num">' + maxTxt + '</td><td class="num">' + it.demanda + '</td><td class="num">' + it.stock + '</td><td class="num oc-falt">' + it.falta + '</td></tr>';
     });
     h += '</tbody></table>';
   });
@@ -7474,7 +7486,7 @@ function ocBodyIndices() {
   shown.forEach(function (a) {
     const i = _oc.indices.indexOf(a);
     const ch = (_ociChanged[a.cod] != null) ? ' style="background:#fef3c7"' : '';
-    h += '<tr' + ch + '><td class="oc-cod">' + escapeHtml(a.cod) + '</td><td>' + escapeHtml(a.desc) + '</td><td>' + escapeHtml(a.prov || "—") + '</td><td class="num"><input class="oc-rinp" type="number" step="0.1" min="0" value="' + a.indice + '" oninput="ociEdit(' + i + ',this.value)"></td></tr>';
+    h += '<tr' + ch + '><td class="oc-cod">' + escapeHtml(a.cod) + '</td><td>' + escapeHtml(artNombre(a.cod, a.desc)) + '</td><td>' + escapeHtml(a.prov || "—") + '</td><td class="num"><input class="oc-rinp" type="number" step="0.1" min="0" value="' + a.indice + '" oninput="ociEdit(' + i + ',this.value)"></td></tr>';
   });
   return h + '</tbody></table>';
 }
@@ -7565,7 +7577,7 @@ function stkBodySectDetail() {
   if (!rows.length) return h + '<div class="stk-empty">No hay stock en ' + (LBL[d.key] || d.key) + '.</div>';
   h += '<table class="stk-tbl stk-tbl-fit"><thead><tr><th>Sector</th><th>Código</th><th>Descripción</th><th class="num">Cajas</th></tr></thead><tbody>';
   rows.forEach(function (r) {
-    h += '<tr><td><b>' + escapeHtml(r.sector) + '</b></td><td class="stk-cod">' + escapeHtml(r.cod) + '</td><td class="stk-desc">' + escapeHtml(r.desc || "—") + '</td><td class="num"><b>' + (Math.round(r.cant * 10) / 10) + '</b></td></tr>';
+    h += '<tr><td><b>' + escapeHtml(r.sector) + '</b></td><td class="stk-cod">' + escapeHtml(r.cod) + '</td><td class="stk-desc">' + escapeHtml(artNombre(r.cod, r.desc) || "—") + '</td><td class="num"><b>' + (Math.round(r.cant * 10) / 10) + '</b></td></tr>';
   });
   h += '</tbody></table>';
   return h;
@@ -7613,7 +7625,7 @@ function stkBodyStocks() {
   h += '<table class="stk-tbl stk-tbl-fit"><thead><tr>' + th + '<th></th></tr></thead><tbody>';
   if (!shown.length) h += '<tr><td colspan="' + ncol + '" class="stk-empty">Sin stock todavía.</td></tr>';
   shown.forEach(function (a) {
-    let tds = '<td class="stk-cod">' + escapeHtml(a.cod) + '</td><td class="stk-desc">' + escapeHtml(a.desc || "—") + '</td>';
+    let tds = '<td class="stk-cod">' + escapeHtml(a.cod) + '</td><td class="stk-desc">' + escapeHtml(artNombre(a.cod, a.desc) || "—") + '</td>';
     cols.forEach(function (c) {
       const v = Number(a[c.key]) || 0;
       tds += '<td class="num ' + (v < 0 ? "stk-neg" : "") + '">' + (c.key === "terminado" ? '<b>' + fmtCajas(v) + '</b>' : fmtCajas(v)) + '</td>';
@@ -7633,7 +7645,7 @@ function stkBodyStocks() {
     h += '<div class="stk-aj-h" style="margin-top:18px">📦 Insumos</div>';
     h += '<table class="stk-tbl"><thead><tr><th>Código</th><th>Descripción</th><th class="num">Stock</th></tr></thead><tbody>';
     insShown.sort(function (a, b) { return String(a.cod).localeCompare(String(b.cod), undefined, { numeric: true }); }).forEach(function (a) {
-      h += '<tr><td class="stk-cod">' + escapeHtml(a.cod) + '</td><td class="stk-desc">' + escapeHtml(a.desc || "—") + '</td><td class="num ' + (a.insumos < 0 ? "stk-neg" : "") + '"><b>' + a.insumos + '</b></td></tr>';
+      h += '<tr><td class="stk-cod">' + escapeHtml(a.cod) + '</td><td class="stk-desc">' + escapeHtml(artNombre(a.cod, a.desc) || "—") + '</td><td class="num ' + (a.insumos < 0 ? "stk-neg" : "") + '"><b>' + a.insumos + '</b></td></tr>';
     });
     h += "</tbody></table>";
   }
@@ -7985,7 +7997,7 @@ function stkBodyRacks() {
   if (!arts.length) h += '<tr><td colspan="5" class="stk-empty">Sin stock en racks. Cargalo en ⚙ Ajustes (depósito = racks).</td></tr>';
   arts.forEach(function (a) {
     const f = _stk.factors[String(a.cod).toUpperCase()] || {}, M = f.cajasXMaster > 0 ? f.cajasXMaster : 0, U = f.uniXCaja > 0 ? f.uniXCaja : 0;
-    h += '<tr><td class="stk-cod">' + escapeHtml(a.cod) + '</td><td class="stk-desc">' + escapeHtml(a.desc || "—") + '</td><td class="num">' + (M ? (Math.round((a.racks / M) * 100) / 100) : "—") + '</td><td class="num"><b>' + a.racks + '</b></td><td class="num">' + (U ? (a.racks * U) : "—") + "</td></tr>";
+    h += '<tr><td class="stk-cod">' + escapeHtml(a.cod) + '</td><td class="stk-desc">' + escapeHtml(artNombre(a.cod, a.desc) || "—") + '</td><td class="num">' + (M ? (Math.round((a.racks / M) * 100) / 100) : "—") + '</td><td class="num"><b>' + a.racks + '</b></td><td class="num">' + (U ? (a.racks * U) : "—") + "</td></tr>";
   });
   return h + "</tbody></table>";
 }

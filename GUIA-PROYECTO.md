@@ -4,7 +4,16 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-27 · Versión app al documentar: **v4.40**
+> Última actualización: 2026-06-27 · Versión app al documentar: **v4.41**
+>
+> Nota: **v4.41** — **Nombres de artículo desde Supabase** (fuente única de descripciones). Lookup vivo
+> `loadArtNombres()` / `artNombre(cod, fallback)`: arma un mapa `cod normalizado → descripción` desde
+> **`Articulos_Cajas`** (`Cod_Art`/`Descripcion`, 361 artículos, la lista más completa) y, para los que falten,
+> el **objetivo del Excel** (`OC_Maximos.descripcion`). Se carga junto al admin (`openStockAdmin` / `openOCAdmin`,
+> dentro del `Promise.all`) y reemplaza al `desc` que venía en cada fila en **todos** los módulos: Stocks
+> (góndola/insumos/racks), detalle por sector, generador de OCs, índices y % entregas. Si un código no está en
+> ninguna tabla, cae al `desc` propio de la fila (movimiento/OC). No copia datos: es solo lectura. Normaliza el
+> código con `_ocgNorm` (saca ceros a la izquierda) para que matchee igual que el resto del stock.
 >
 > Nota (repo, 2026-06-27) — **Suite de smoke-tests** en `tests/` (`bash tests/run.sh`): `node --check sw.js` +
 > `checkhtml.cjs` (sintaxis de los `<script>` inline del index.html — lo que más rompe) + `smoke.cjs` (Playwright:
