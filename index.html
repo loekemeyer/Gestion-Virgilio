@@ -5291,7 +5291,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v4.39";
+const APP_VERSION = "v4.40";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -7179,7 +7179,37 @@ async function openOCAdmin() {
   } catch (e) { const b = document.getElementById("ocBody"); if (b) b.innerHTML = '<div class="oc-loading">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
 }
 function closeOCAdmin() { const ov = document.getElementById("ocAdminOverlay"); if (ov) ov.classList.remove("show"); _oc = null; }
-function ocRender() { if (!_oc) return; const body = document.getElementById("ocBody"); if (!body) return; _renderKeepFocus(body, _oc.view === "detail" ? ocBodyDetail() : _oc.view === "nueva" ? ocBodyNueva() : _oc.view === "gen" ? ocBodyGen() : _oc.view === "indices" ? ocBodyIndices() : ocBodyList()); }
+function ocRender() { if (!_oc) return; const body = document.getElementById("ocBody"); if (!body) return; _renderKeepFocus(body, _oc.view === "detail" ? ocBodyDetail() : _oc.view === "nueva" ? ocBodyNueva() : _oc.view === "gen" ? ocBodyGen() : _oc.view === "indices" ? ocBodyIndices() : _oc.view === "entregas" ? ocBodyEntregas() : ocBodyList()); }
+/* v4.40 — % DE ENTREGAS: cruza lo PEDIDO (Ordenes_Compra.cantidad) contra lo
+   ENTREGADO (cantidad_recibida) por artículo y global. Detalle del cumplimiento
+   de los proveedores. (Ordenes_Compra retiene el histórico de OCs.) */
+function ocEntregas() { if (!_oc) return; _oc.view = "entregas"; _oc.filtro = ""; ocRender(); }
+function ocBodyEntregas() {
+  const rows = _oc.rows || [];
+  let h = '<div class="oc-tools"><button class="oc-btn" onclick="ocBack()">← Volver</button><input class="oc-filtro" type="search" placeholder="🔎 Buscar código / descripción / proveedor" value="' + escapeHtml(_oc.filtro || "") + '" oninput="if(_oc){_oc.filtro=this.value;ocRender();}"></div>';
+  if (!rows.length) return h + '<div class="oc-empty">No hay OCs cargadas todavía. El % de entregas aparece cuando se cargan/generan OCs y se marca lo recibido.</div>';
+  const byArt = {}; let totP = 0, totE = 0;
+  rows.forEach(function (r) {
+    const k = String(r.codigo || "").toUpperCase().trim(); if (!k) return;
+    const ped = Number(r.cantidad) || 0, ent = Number(r.cantidad_recibida) || 0;
+    if (!byArt[k]) byArt[k] = { cod: r.codigo, desc: r.descripcion || "", prov: r.proveedor || "", ped: 0, ent: 0 };
+    byArt[k].ped += ped; byArt[k].ent += ent; totP += ped; totE += ent;
+  });
+  const pct = function (e, p) { return p > 0 ? Math.round(e / p * 1000) / 10 : 0; };
+  const f = (_oc.filtro || "").toLowerCase();
+  const arr = Object.keys(byArt).map(function (k) { return byArt[k]; })
+    .filter(function (a) { return f ? ((a.cod + " " + a.desc + " " + a.prov).toLowerCase().indexOf(f) >= 0) : true; })
+    .sort(function (a, b) { return pct(a.ent, a.ped) - pct(b.ent, b.ped); });
+  h += '<div class="oc-meta">% de entregas global: <b>' + pct(totE, totP) + '%</b> — ' + Math.round(totE) + ' entregadas de ' + Math.round(totP) + ' pedidas · ' + arr.length + ' artículo(s).</div>';
+  h += '<table class="oc-tbl"><thead><tr><th>Código</th><th>Descripción</th><th>Proveedor</th><th class="num">Pedidas</th><th class="num">Entregadas</th><th class="num">%</th><th class="num">Falta</th></tr></thead><tbody>';
+  if (!arr.length) h += '<tr><td colspan="7" class="oc-empty">Sin resultados.</td></tr>';
+  arr.forEach(function (a) {
+    const p = pct(a.ent, a.ped); const col = p >= 100 ? "#166534" : (p >= 80 ? "#b45309" : "#b91c1c");
+    h += '<tr><td class="oc-cod">' + escapeHtml(a.cod) + '</td><td>' + escapeHtml(a.desc) + '</td><td style="font-size:12px;color:#475569">' + escapeHtml(a.prov) + '</td><td class="num">' + Math.round(a.ped) + '</td><td class="num">' + Math.round(a.ent) + '</td><td class="num" style="color:' + col + ';font-weight:800">' + p + '%</td><td class="num oc-falt">' + (Math.max(0, Math.round(a.ped - a.ent)) || "—") + '</td></tr>';
+  });
+  h += '</tbody></table>';
+  return h;
+}
 function ocGroups() {
   const g = {};
   (_oc.rows || []).forEach(function (r) { const k = _ocGroupKey(r); if (!g[k]) g[k] = { key: k, proveedor: r.proveedor || "", fecha: r.fecha || "", rubro: r.rubro || "", rows: [] }; g[k].rows.push(r); });
@@ -7192,7 +7222,7 @@ function ocGroupStats(grp) {
   return { ped: ped, rec: rec, falta: ped - rec, estado: estado };
 }
 function ocBodyList() {
-  let h = '<div class="oc-tools"><button class="oc-btn ok" onclick="ocNueva()">+ Nueva OC (carga manual)</button><button class="oc-btn" onclick="ocgEnter()">⚙ Generar OCs</button><input class="oc-filtro" type="search" placeholder="🔎 Buscar proveedor / rubro / fecha" value="' + escapeHtml(_oc.filtro) + '" oninput="if(_oc){_oc.filtro=this.value;ocRender();}"></div>';
+  let h = '<div class="oc-tools"><button class="oc-btn ok" onclick="ocNueva()">+ Nueva OC (carga manual)</button><button class="oc-btn" onclick="ocgEnter()">⚙ Generar OCs</button><button class="oc-btn" onclick="ocEntregas()">📊 % Entregas</button><input class="oc-filtro" type="search" placeholder="🔎 Buscar proveedor / rubro / fecha" value="' + escapeHtml(_oc.filtro) + '" oninput="if(_oc){_oc.filtro=this.value;ocRender();}"></div>';
   const g = ocGroups();
   let keys = Object.keys(g);
   const f = (_oc.filtro || "").toLowerCase().trim();

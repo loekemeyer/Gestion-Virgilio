@@ -4,7 +4,13 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-27 · Versión app al documentar: **v4.39**
+> Última actualización: 2026-06-27 · Versión app al documentar: **v4.40**
+>
+> Nota: **v4.40** — **% de entregas de OCs** (vista **📊 % Entregas** en el módulo de OCs). Cruza lo **pedido**
+> (`Ordenes_Compra.cantidad`) contra lo **entregado** (`cantidad_recibida`) por artículo y global → % de
+> cumplimiento del proveedor. Ordenado por peor %. `ocEntregas`/`ocBodyEntregas` (`_oc.view==='entregas'`).
+> `Ordenes_Compra` retiene el histórico de OCs (es el archivo). ⚠ Si en el futuro se borran OCs viejas, habría
+> que agregar una tabla snapshot para no perder el histórico del %.
 >
 > Nota: **v4.39** — **Módulo de Conteo de stock** (solapa **📋 Conteo** en *Stock y Compras*; la empleada cuenta
 > martes/jueves). Formato planilla (como el repo `Planilla-Conteo-Cajas`): filas **Sector · Código · Pilas ·
