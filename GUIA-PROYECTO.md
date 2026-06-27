@@ -4,7 +4,11 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-27 · Versión app al documentar: **v4.29**
+> Última actualización: 2026-06-27 · Versión app al documentar: **v4.30**
+>
+> Nota: **v4.30** — **Stocks / Ingresos / Salidas unificados** en una sola solapa con un **segmento** arriba
+> (default "📊 Stock"; `stkBodyStocksTab`/`stkSetView`, estado `_stk.stkView`). Las solapas del admin de Stock
+> quedan: Stocks · A Separar · Racks · Capacidad · Ajustes · Compras (OCs).
 >
 > Nota: **v4.29** — **Módulo Capacidad por sector** (solapa **📐 Capacidad** en *Stock y Compras*). Tabla
 > **`Capacidad_Sector`** (`sector, cod, cajas_max`, único `(sector,cod)`; RLS read anon + write authenticated).
