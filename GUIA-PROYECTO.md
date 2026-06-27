@@ -4,7 +4,18 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-27 · Versión app al documentar: **v4.45**
+> Última actualización: 2026-06-27 · Versión app al documentar: **v4.46**
+>
+> Nota: **v4.46** — **MG rediseñado + alerta de excedente por Telegram**. (1) **Excedente opt-in**: la
+> tarjeta de *Guardar a góndola* ahora muestra **solo el stepper de Góndola** por defecto; el de
+> Excedente y la ubicación están ocultos detrás de un **tilde** "¿Va algo a EXCEDENTE? (góndola
+> llena)". Tildarlo los revela; destildarlo resetea (`mgToggleExc`, campo `excOn`). Layout apilado
+> (etiqueta izq + stepper der) → se fue el "zigzag" Góndola/Excedente que era horrible. (2) **Alerta
+> Telegram de excedente**: trigger `trg_excedente_telegram` en `Movimientos_Stock` (AFTER INSERT WHEN
+> `deposito='excedente' AND delta>0 AND tipo='guardado'`) → arma el mensaje con el nombre canónico
+> (vista) + cajas + ubicación + legajo y lo encola en el outbox (`tg_enqueue`, dedup por `id`). Salta
+> **al guardar** con excedente (góndola llena) — no en el tilde, así lleva la cantidad y la ubicación
+> y nunca es falso positivo. El *fuera de lista* sigue con su propia alerta MGX (no se duplica).
 >
 > Nota: **v4.45** — **Barrido de estética (resto de pantallas)**, vía auditoría con sub-agentes en
 > paralelo. Arreglos concretos: (1) **`fichadas-monitor.html`**: `colspan` de las filas de sección/
