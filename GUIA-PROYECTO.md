@@ -4,7 +4,17 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-27 · Versión app al documentar: **v4.52**
+> Última actualización: 2026-06-27 · Versión app al documentar: **v4.53**
+>
+> Nota: **v4.53** — **Barrio/Localidad prolijo en la PPP**. Aunque en el Excel venga en MAYÚSCULAS, con
+> acentos raros, paréntesis o variantes, ahora se muestra lindo: `pppLocDisp(s)` → si el barrio es
+> **conocido** (está en `PPP_BARRIO_ZONA`, ~85) devuelve el **nombre canónico Title Case** (con acento
+> donde corresponde, ej. `MORÓN`/`moron` → *Morón*, `JOSE C PAZ` → *José C. Paz*, `NUÑEZ` → *Núñez*);
+> si **no** lo conoce, lo pasa a **Title Case** respetando conectores (`de`/`del`/`la`…) y preservando
+> acrónimos cortos en mayúscula (`(CABA)`, `GBA`). Se aplica solo al **display** de las filas
+> (`escapeHtml(pppLocDisp(p.localidad))`); el **matcheo de zona NO cambia** (sigue con `pppNormBarrio`
+> sobre el crudo). Typos que no normalizan a un barrio conocido se ven en Title Case pero no se
+> autocorrigen (para eso sirve el override de zona ya existente).
 >
 > Nota: **v4.52** — **“🤖 Agentes” pasó a botón propio** (no más solapa de Stocks). Botón en el panel de
 > supervisor (sección *Reportes y configuración*) → `openAgentesAdmin()` abre un overlay propio

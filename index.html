@@ -5321,7 +5321,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v4.52";
+const APP_VERSION = "v4.53";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -11517,7 +11517,7 @@ function _pppSugHtml(s) {
     h += '<table class="ppp-sug-tbl"><thead>' +
       '<tr><th colspan="5" class="ppp-sug-th">Tanda ' + escapeHtml(t.code) + (t.sup ? ' · 🛒 SÚPER' : (t.zona ? ' · ' + escapeHtml(t.zona) : '')) + ' — ' + t.pedidos.length + ' ped · ' + m3.toFixed(2) + ' m³</th></tr>' +
       '<tr><th>N° Pedido</th><th>Cód</th><th>Cliente</th><th>Localidad</th><th class="num">m³</th></tr></thead><tbody>';
-    for (const p of t.pedidos) h += '<tr><td>' + escapeHtml(String(p.np)) + '</td><td>' + escapeHtml(p.cod || "") + '</td><td>' + escapeHtml(p.razon_social || "") + '</td><td>' + escapeHtml(p.localidad || "") + '</td><td class="num">' + (p.m3 != null ? Number(p.m3).toFixed(2) : "") + '</td></tr>';
+    for (const p of t.pedidos) h += '<tr><td>' + escapeHtml(String(p.np)) + '</td><td>' + escapeHtml(p.cod || "") + '</td><td>' + escapeHtml(p.razon_social || "") + '</td><td>' + escapeHtml(pppLocDisp(p.localidad)) + '</td><td class="num">' + (p.m3 != null ? Number(p.m3).toFixed(2) : "") + '</td></tr>';
     h += '</tbody></table>';
   }
   if (s.sinZona && s.sinZona.length) h += '<div class="ppp-sug-sinzona">⚠ ' + s.sinZona.length + ' pedido(s) SIN ZONA quedaron fuera (asigná el barrio en el Excel): ' + s.sinZona.map(function (p) { return escapeHtml(String(p.np)) + " (" + escapeHtml(p.localidad || "?") + ")"; }).join(" · ") + '</div>';
@@ -11633,6 +11633,39 @@ const PPP_BARRIO_ZONA = {"almagro":"Zona 2 - CABA Centro", "avellaneda":"Zona 4 
 const PPP_ZONAS = ["Zona 1 - CABA Sur", "Zona 2 - CABA Centro", "Zona 3 - CABA Oeste", "Zona 4 - GBA Sur", "Zona 5 - GBA Oeste", "Zona 6 - GBA Norte", "Zona 7 - GBA Norte Lejos", "Super", "Retira", "Expo"];
 const PPP_ZONA_SHORT = { "Zona 1 - CABA Sur": "Z1 Sur", "Zona 2 - CABA Centro": "Z2 Centro", "Zona 3 - CABA Oeste": "Z3 Oeste", "Zona 4 - GBA Sur": "Z4 GBA Sur", "Zona 5 - GBA Oeste": "Z5 GBA O", "Zona 6 - GBA Norte": "Z6 GBA N", "Zona 7 - GBA Norte Lejos": "Z7 Lejos", "Super": "Super", "Retira": "Retira", "Expo": "Expo" };
 function pppNormBarrio(s) { s = String(s == null ? "" : s).normalize("NFKD").replace(/[̀-ͯ]/g, ""); s = s.replace(/\([^)]*\)/g, ""); return s.replace(/\s+/g, " ").trim().toLowerCase(); }
+/* v4.53 — DISPLAY prolijo del barrio/localidad: aunque en el Excel venga en
+   MAYÚSCULAS, con acentos raros, paréntesis o variantes, lo mostramos lindo. Si el
+   barrio es CONOCIDO (está en PPP_BARRIO_ZONA) → nombre canónico Title Case (con
+   acento donde corresponde); si no → Title Case del crudo. NO toca el matcheo de
+   zona (eso sigue con pppNormBarrio sobre el crudo). */
+const PPP_LOC_CONN = { de: 1, del: 1, la: 1, las: 1, los: 1, y: 1, e: 1, el: 1 };
+function pppTitleCase(s) {
+  return String(s == null ? "" : s).split(" ").map(function (w, i) {
+    if (!w) return w;
+    const letters = w.replace(/[^A-Za-zÀ-ÿ]/g, "");
+    // Acrónimo corto TODO en mayúscula (CABA, GBA, BS, AS, incluso entre paréntesis) → dejar como vino.
+    if (letters.length >= 2 && letters.length <= 4 && letters === letters.toUpperCase() && /[A-ZÀ-Ý]/.test(letters)) return w;
+    const lw = w.toLowerCase();
+    if (i > 0 && PPP_LOC_CONN[lw]) return lw;
+    return lw.charAt(0).toUpperCase() + lw.slice(1);
+  }).join(" ");
+}
+let _pppLocDisp = null;
+function pppLocDispMap() {
+  if (_pppLocDisp) return _pppLocDisp;
+  _pppLocDisp = {};
+  Object.keys(PPP_BARRIO_ZONA).forEach(function (k) { _pppLocDisp[k] = pppTitleCase(k); });
+  // Acentos / forma linda para los conocidos que el Title Case no recupera (la key viene sin acento).
+  const OV = { moron: "Morón", nunez: "Núñez", constitucion: "Constitución", ituzaingo: "Ituzaingó", lanus: "Lanús", lujan: "Luján", "jose c paz": "José C. Paz", "f.varela": "F. Varela", "p.patricios": "P. Patricios", "v.alsina": "V. Alsina", "v. maipu - san martin": "V. Maipú - San Martín", "santa cruz de la sierra": "Santa Cruz de la Sierra" };
+  Object.keys(OV).forEach(function (k) { _pppLocDisp[k] = OV[k]; });
+  return _pppLocDisp;
+}
+function pppLocDisp(s) {
+  const raw = String(s == null ? "" : s).replace(/\s+/g, " ").trim();
+  if (!raw) return "";
+  const m = pppLocDispMap()[pppNormBarrio(raw)];
+  return m || pppTitleCase(raw);
+}
 const PPP_ZONA_OVR_KEY = "vir_ppp_zona_ovr"; let _pppZonaOvr = null;
 function pppLoadZonaOvr() { if (_pppZonaOvr) return _pppZonaOvr; try { _pppZonaOvr = JSON.parse(localStorage.getItem(PPP_ZONA_OVR_KEY) || "{}"); } catch (_e) { _pppZonaOvr = {}; } if (!_pppZonaOvr || typeof _pppZonaOvr !== "object") _pppZonaOvr = {}; return _pppZonaOvr; }
 function pppSaveZonaOvr() { try { localStorage.setItem(PPP_ZONA_OVR_KEY, JSON.stringify(_pppZonaOvr || {})); } catch (_e) {} }
@@ -11672,7 +11705,7 @@ function _pppRowTrRO(p, npE) {
     '<td>' + escapeHtml(p.cod || "") + '</td><td><b>' + npE + '</b></td><td>' + escapeHtml(p.fecha || "") + '</td>' +
     '<td class="ppp-cli"><span class="ppp-cli-in" title="' + escapeHtml(p.razon_social || "") + '">' + escapeHtml(p.razon_social || "") + '</span>' + (badges ? ' ' + badges : "") + '</td>' +
     '<td class="num">' + (p.m3 != null && p.m3 !== "" ? Number(p.m3).toFixed(2) : "") + '</td>' +
-    '<td>' + escapeHtml(p.localidad || "") + '</td>' +
+    '<td>' + escapeHtml(pppLocDisp(p.localidad)) + '</td>' +
     '<td>' + escapeHtml(p.fecha_entrega || "") + '</td>' +
     '<td>' + escapeHtml(p.zona || pppZonaDeBarrio(p.localidad) || "—") + '</td>' +
     '<td>' + (_pppListoFC(p) ? '<span class="ppp-fc ok" title="Armado terminado (TAP)">✓ Listo</span>' : '<span class="ppp-fc">·</span>') + '</td>' +
@@ -11694,7 +11727,7 @@ function _pppRowTr(p) {
     '<td><input class="ppp-edit ppp-edit-tanda" value="' + tEd + '" placeholder="—" onchange="pppSetEdit(\'' + npE + '\',\'tanda\',this.value.trim().toUpperCase(),true)"></td>' +
     '<td>' + escapeHtml(p.cod || "") + '</td><td><b>' + npE + '</b></td><td>' + escapeHtml(p.fecha || "") +
     '</td><td class="ppp-cli"><span class="ppp-cli-in" title="' + escapeHtml(p.razon_social || "") + '">' + escapeHtml(p.razon_social || "") + '</span></td><td class="num">' + (p.m3 != null && p.m3 !== "" ? Number(p.m3).toFixed(2) : "") +
-    '</td><td>' + escapeHtml(p.localidad || "") + '</td>' +
+    '</td><td>' + escapeHtml(pppLocDisp(p.localidad)) + '</td>' +
     '<td><input class="ppp-edit ppp-edit-fe" value="' + feEd + '" placeholder="dd/mm/aaaa" onchange="pppSetEdit(\'' + npE + '\',\'fecha_entrega\',this.value.trim(),false)"></td>' +
     '<td>' + pppZonaCell(p) + '</td>' +
     '<td>' + (_pppListoFC(p) ? '<span class="ppp-fc ok" title="Armado terminado (TAP)">✓ Listo</span>' : '<span class="ppp-fc">·</span>') + '</td>' +
