@@ -4,7 +4,14 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-27 · Versión app al documentar: **v4.46**
+> Última actualización: 2026-06-27 · Versión app al documentar: **v4.47**
+>
+> Nota: **v4.47** — **MG botonera en 2 estados** (pedido del usuario sobre la v4.46). Por defecto cada
+> código muestra el stepper de **Góndola grande y centrado** (caja verde) y a la derecha un recuadro
+> **“¿Hay Excedente?”** con un tilde. Al tildarlo (`mgToggleExc`/`excOn`) la fila pasa a **2 columnas**
+> Góndola | ☑ Excedente + la **ubicación** abajo (el layout que el usuario eligió). Destildar (tocar
+> “☑ Excedente”) vuelve al estado por defecto y resetea. La alerta Telegram de excedente (v4.46) no
+> cambia: salta al guardar con excedente > 0.
 >
 > Nota: **v4.46** — **MG rediseñado + alerta de excedente por Telegram**. (1) **Excedente opt-in**: la
 > tarjeta de *Guardar a góndola* ahora muestra **solo el stepper de Góndola** por defecto; el de
