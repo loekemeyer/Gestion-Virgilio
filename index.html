@@ -5281,7 +5281,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v4.21";
+const APP_VERSION = "v4.22";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -5479,6 +5479,8 @@ async function send() {
   if (opcion === "EP" && (texto || "").trim()) showPickingList(texto, legajoStr);
   // v4.07: al TERMINAR PICKING (TP) → baja de "Artículo Terminado" lo que se pickeó (cajas reales).
   if (opcion === "TP" && (texto || "").trim()) stockBajaPicking(texto, legajoStr);
+  // v4.22: al TERMINAR ARMADO (TAP) → las cajas pasan de "a separar" a "a facturar".
+  if (opcion === "TAP" && (texto || "").trim()) stockSepararAFacturar(texto, legajoStr);
   // Al EMPEZAR ARMADO (AP): armado guiado por caja/m³ (OPCIONAL, apagado por
   // defecto; showArmadoGuide corta solo si la flag está en false). No bloquea AP.
   if (opcion === "AP" && (texto || "").trim()) {
@@ -7045,7 +7047,7 @@ function stockComputeSaldos(movs, cutoff) {
     // orden y marcar inicio una sola vez, sin que un depósito pise a otro.
     if (cut && mv.tipo !== "inicial" && new Date(mv.ts).getTime() < cut) return;
     const k = String(mv.cod_art);
-    if (!m[k]) m[k] = { cod: k, desc: mv.descripcion || "", a_guardar: 0, terminado: 0 };
+    if (!m[k]) m[k] = { cod: k, desc: mv.descripcion || "", a_guardar: 0, terminado: 0, separar_pedidos: 0, a_facturar: 0 };
     if (mv.descripcion && !m[k].desc) m[k].desc = mv.descripcion;
     m[k][mv.deposito] = (m[k][mv.deposito] || 0) + Number(mv.delta || 0);
   });
@@ -7381,11 +7383,11 @@ async function ociSave() {
 function stkTab(t) { if (!_stk) return; if (t === "compras") { openOCAdmin(); return; } _stk.tab = t; _stk.filtro = ""; _stk.openArt = null; stkRender(); }
 function stkRender() {
   if (!_stk) return;
-  const tabs = [["stocks", "📊 Stocks"], ["racks", "🏗 Racks"], ["ingresos", "📥 Ingresos"], ["salidas", "📤 Salidas"], ["ajustes", "⚙ Ajustes"], ["compras", "📑 Compras (OCs)"]];
+  const tabs = [["stocks", "📊 Stocks"], ["proceso", "📦 A Separar"], ["racks", "🏗 Racks"], ["ingresos", "📥 Ingresos"], ["salidas", "📤 Salidas"], ["ajustes", "⚙ Ajustes"], ["compras", "📑 Compras (OCs)"]];
   const tb = document.getElementById("stkTabs");
   if (tb) tb.innerHTML = tabs.map(function (t) { return '<button class="stk-tab' + (_stk.tab === t[0] ? " on" : "") + '" onclick="stkTab(\'' + t[0] + '\')">' + t[1] + '</button>'; }).join("");
   const body = document.getElementById("stkBody"); if (!body) return;
-  _renderKeepFocus(body, _stk.tab === "racks" ? stkBodyRacks() : _stk.tab === "ingresos" ? stkBodyIngresos() : _stk.tab === "salidas" ? stkBodySalidas() : _stk.tab === "ajustes" ? stkBodyAjustes() : stkBodyStocks());
+  _renderKeepFocus(body, _stk.tab === "proceso" ? stkBodyProceso() : _stk.tab === "racks" ? stkBodyRacks() : _stk.tab === "ingresos" ? stkBodyIngresos() : _stk.tab === "salidas" ? stkBodySalidas() : _stk.tab === "ajustes" ? stkBodyAjustes() : stkBodyStocks());
 }
 function stkMvRow(mv) {
   const old = _stk.cutoff && new Date(mv.ts).getTime() < new Date(_stk.cutoff).getTime();
@@ -7421,6 +7423,48 @@ function stkBodyStocks() {
   }
   return h;
 }
+/* v4.22 — Solapa "A Separar": pipeline de stock entre el picking y la facturación.
+   Dos depósitos intermedios, por tanda: "a separar" (TP→TAP) y "a facturar"
+   (TAP→facturado). Muestra las tandas con saldo positivo en cada uno y el total
+   de cajas. Las cajas entran al terminar el picking, pasan a "a facturar" al
+   terminar el armado, y salen cuando Marianela factura toda la tanda. */
+function stkBodyProceso() {
+  const cut = _stk.cutoff ? new Date(_stk.cutoff).getTime() : 0;
+  const aggTanda = function (dep) {
+    const byTanda = {};
+    _stk.movs.forEach(function (mv) {
+      if (mv.deposito !== dep) return;
+      if (cut && mv.tipo !== "inicial" && new Date(mv.ts).getTime() < cut) return;
+      const t = String(mv.ref || "—").toUpperCase();
+      byTanda[t] = (byTanda[t] || 0) + Number(mv.delta || 0);
+    });
+    return Object.keys(byTanda)
+      .map(function (t) { return { tanda: t, cajas: Math.round(byTanda[t] * 1000) / 1000 }; })
+      .filter(function (x) { return x.cajas > 0; })
+      .sort(function (a, b) { return String(a.tanda).localeCompare(String(b.tanda), undefined, { numeric: true }); });
+  };
+  const sep = aggTanda("separar_pedidos"), fac = aggTanda("a_facturar");
+  const round1 = function (n) { return Math.round(n * 10) / 10; };
+  const sumOf = function (a) { return round1(a.reduce(function (s, x) { return s + x.cajas; }, 0)); };
+  const f = (_stk.filtro || "").toLowerCase();
+  const flt = function (a) { return f ? a.filter(function (x) { return x.tanda.toLowerCase().indexOf(f) >= 0; }) : a; };
+  const sec = function (titulo, hint, arr) {
+    const shown = flt(arr);
+    let h = '<div class="stk-grp"><div class="stk-grp-h">' + titulo + '<span class="stk-grp-tot">' + sumOf(arr) + ' cajas</span></div>';
+    h += '<div style="font-size:12px;color:#64748b;padding:6px 10px 2px;">' + hint + '</div>';
+    if (!shown.length) h += '<div class="stk-ing" style="color:#94a3b8">— Sin tandas —</div>';
+    shown.forEach(function (x) {
+      h += '<div class="stk-ing"><span class="stk-ing-cod">' + escapeHtml(x.tanda) + '</span><span class="stk-ing-desc"></span><span style="font-weight:800;color:#1e6bd6;font-variant-numeric:tabular-nums;">' + round1(x.cajas) + ' cajas</span></div>';
+    });
+    h += '</div>';
+    return h;
+  };
+  let h = '<div class="stk-cut" style="background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af;">Cajas que salieron de góndola por picking y todavía no se facturaron. Entran al terminar el <b>picking (TP)</b>, pasan a “a facturar” al terminar el <b>armado (TAP)</b> y salen del stock cuando Marianela factura <b>toda</b> la tanda.</div>';
+  h += '<input class="stk-filtro" type="search" placeholder="🔎 Buscar tanda" value="' + escapeHtml(_stk.filtro) + '" oninput="if(_stk){_stk.filtro=this.value;stkRender();}">';
+  h += sec("📦 A Separar (pickeado, falta armar)", "Tandas con picking terminado, esperando el armado/separado (TAP).", sep);
+  h += sec("🧾 A Facturar (armado, falta facturar)", "Tandas armadas, esperando que Marianela las facture. Al facturarse toda la tanda, salen del stock.", fac);
+  return h;
+}
 function stkBodyIngresos() {
   const ing = _stk.movs.filter(function (mv) { return mv.tipo === "recepcion"; });
   const f = (_stk.filtro || "").toLowerCase();
@@ -7441,7 +7485,10 @@ function stkBodyIngresos() {
 }
 function stkBodySalidas() {
   // v4.10: salidas = picking (a pedido) + salida a Cervantes (otra planta).
-  const sal = _stk.movs.filter(function (mv) { return mv.tipo === "picking" || mv.tipo === "salida_cervantes"; }).sort(function (a, b) { return new Date(b.ts) - new Date(a.ts); });
+  // v4.22: el picking ahora mueve góndola → "a separar" (2 filas tipo='picking');
+  // acá solo mostramos la BAJA de góndola (deposito='terminado'), no la entrada
+  // a separar (esa se ve en la solapa "A Separar").
+  const sal = _stk.movs.filter(function (mv) { return (mv.tipo === "picking" && mv.deposito === "terminado") || mv.tipo === "salida_cervantes"; }).sort(function (a, b) { return new Date(b.ts) - new Date(a.ts); });
   const f = (_stk.filtro || "").toLowerCase();
   const shown = f ? sal.filter(function (mv) { return ((mv.cod_art || "") + " " + (mv.ref || "") + " " + (mv.tipo || "")).toLowerCase().indexOf(f) >= 0; }) : sal;
   let h = '<input class="stk-filtro" type="search" placeholder="🔎 Buscar código / tanda / destino" value="' + escapeHtml(_stk.filtro) + '" oninput="if(_stk){_stk.filtro=this.value;stkRender();}">';
@@ -7454,7 +7501,7 @@ function stkBodySalidas() {
   return h + "</tbody></table>";
 }
 function stkBodyAjustes() {
-  let h = '<div class="stk-aj-dep">Depósito: <select id="stkAjDep"><option value="terminado">Artículo Terminado (góndola)</option><option value="racks">Racks</option><option value="insumos">Insumos</option><option value="a_guardar">Mercadería a guardar</option></select></div>';
+  let h = '<div class="stk-aj-dep">Depósito: <select id="stkAjDep"><option value="terminado">Artículo Terminado (góndola)</option><option value="racks">Racks</option><option value="insumos">Insumos</option><option value="separar_pedidos">A Separar (pedidos)</option><option value="a_facturar">A Facturar</option><option value="a_guardar">Mercadería a guardar</option></select></div>';
   h += '<div class="stk-aj-sec"><div class="stk-aj-h">⚙ Ajustar stock</div>';
   h += '<div class="stk-aj-hint">Sumá o restá con signo: <code>+10</code> / <code>-3</code>.</div><div class="stk-aj-form"><input id="stkAjCod" class="stk-aj-inp" placeholder="Código"><input id="stkAjCant" class="stk-aj-inp" type="number" placeholder="+/- cajas"><button class="stk-btn ok" onclick="stockAjustar()">Aplicar</button></div>';
   h += '<div class="stk-aj-hint" style="margin-top:10px">O dejá el stock exacto:</div><div class="stk-aj-form"><input id="stkAjCod2" class="stk-aj-inp" placeholder="Código"><input id="stkAjFijar" class="stk-aj-inp" type="number" placeholder="Fijar en…"><button class="stk-btn" onclick="stockFijar()">Fijar</button></div></div>';
@@ -7851,7 +7898,61 @@ async function stockBajaPicking(tanda, legajo) {
     const evs = r.ok ? await r.json() : [];
     const byArt = {};
     evs.forEach(function (ev) { const p = String(ev.texto || "").split("|"); if (String(p[0] || "").trim().toUpperCase() !== t) return; const art = String(p[1] || "").trim(); const real = parseInt(p[3], 10); if (art && !isNaN(real) && real > 0) byArt[art] = (byArt[art] || 0) + real; });
-    const rows = Object.keys(byArt).map(function (art) { return { cod_art: art, deposito: "terminado", delta: -byArt[art], tipo: "picking", ref: t, legajo: String(legajo || "") }; });
+    // v4.22: el picking saca las cajas de góndola (terminado −) y las mete al
+    // depósito intermedio "a separar" (separar_pedidos +). Quedan ahí hasta que
+    // el armado (TAP) las pasa a "a facturar".
+    const rows = [];
+    Object.keys(byArt).forEach(function (art) {
+      rows.push({ cod_art: art, deposito: "terminado",       delta: -byArt[art], tipo: "picking", ref: t, legajo: String(legajo || "") });
+      rows.push({ cod_art: art, deposito: "separar_pedidos", delta:  byArt[art], tipo: "picking", ref: t, legajo: String(legajo || "") });
+    });
+    if (rows.length) stockMove(rows);
+  } catch (_e) {}
+}
+
+/* v4.22 — PIPELINE DE STOCK separar → facturar. Las cajas pickeadas pasan por dos
+   depósitos intermedios antes de salir del stock:
+     góndola --(TP picking)--> separar_pedidos --(TAP armado)--> a_facturar --(facturado)--> fuera
+   Cada paso mueve el NETO real que hay en el depósito de origen para esa tanda
+   (nunca deja negativos) y es idempotente (dedup por tipo+ref). */
+async function _stockNetoDepTanda(deposito, tanda) {
+  const t = String(tanda || "").trim().toUpperCase(); if (!t) return {};
+  const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+  const r = await fetch(SUPABASE_STOCK_ENDPOINT + "?deposito=eq." + encodeURIComponent(deposito) + "&ref=eq." + encodeURIComponent(t) + "&select=cod_art,descripcion,delta&limit=20000", { headers: H, cache: "no-store" });
+  const rows = r.ok ? await r.json() : [];
+  const net = {};
+  rows.forEach(function (mv) { const k = String(mv.cod_art); if (!net[k]) net[k] = { sum: 0, desc: mv.descripcion || null }; net[k].sum += Number(mv.delta || 0); if (mv.descripcion && !net[k].desc) net[k].desc = mv.descripcion; });
+  return net;
+}
+/* Al TERMINAR ARMADO (TAP): las cajas pasan de "a separar" a "a facturar" (NO
+   salen del stock todavía). Dedup por (tipo='separado', ref=tanda). */
+async function stockSepararAFacturar(tanda, legajo) {
+  try {
+    const t = String(tanda || "").trim().toUpperCase(); if (!t) return;
+    const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+    const chk = await fetch(SUPABASE_STOCK_ENDPOINT + "?tipo=eq.separado&ref=eq." + encodeURIComponent(t) + "&select=id&limit=1", { headers: H, cache: "no-store" });
+    if (chk.ok) { const ex = await chk.json(); if (ex && ex.length) return; }   // ya movido a facturar
+    const net = await _stockNetoDepTanda("separar_pedidos", t);
+    const rows = [];
+    Object.keys(net).forEach(function (k) { const n = Math.round(net[k].sum * 1000) / 1000; if (n > 0) {
+      rows.push({ cod_art: k, descripcion: net[k].desc, deposito: "separar_pedidos", delta: -n, tipo: "separado", ref: t, legajo: String(legajo || "") });
+      rows.push({ cod_art: k, descripcion: net[k].desc, deposito: "a_facturar",       delta:  n, tipo: "separado", ref: t, legajo: String(legajo || "") });
+    } });
+    if (rows.length) stockMove(rows);
+  } catch (_e) {}
+}
+/* Cuando Marianela factura el ÚLTIMO NP de una tanda (queda 100% facturada) → las
+   cajas SALEN de "a facturar" (desaparecen del stock). Dedup por (tipo='facturado',
+   ref=tanda). Lo dispara facTickNP cuando detecta la tanda completa. */
+async function stockSalidaFacturado(tanda, legajo) {
+  try {
+    const t = String(tanda || "").trim().toUpperCase(); if (!t) return;
+    const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+    const chk = await fetch(SUPABASE_STOCK_ENDPOINT + "?tipo=eq.facturado&ref=eq." + encodeURIComponent(t) + "&select=id&limit=1", { headers: H, cache: "no-store" });
+    if (chk.ok) { const ex = await chk.json(); if (ex && ex.length) return; }   // ya salió del stock
+    const net = await _stockNetoDepTanda("a_facturar", t);
+    const rows = [];
+    Object.keys(net).forEach(function (k) { const n = Math.round(net[k].sum * 1000) / 1000; if (n > 0) rows.push({ cod_art: k, descripcion: net[k].desc, deposito: "a_facturar", delta: -n, tipo: "facturado", ref: t, legajo: String(legajo || "") }); });
     if (rows.length) stockMove(rows);
   } catch (_e) {}
 }
@@ -14262,6 +14363,8 @@ window.facTickNP = async function(btn){
   const tandaObj = _facLastTandas.find(t => (t.tanda || "") === tanda);
   if (tandaObj && tandaObj.pedidos.every(p => _facNpsHoy.has(p.np))){
     facShowToast(`Tanda ${tanda} completa ✓`);
+    // v4.22: tanda 100% facturada → las cajas salen de "a facturar" (fuera del stock).
+    try { stockSalidaFacturado(tanda); } catch(_e){}
   } else {
     facShowToast(`NP ${np} facturado`);
   }

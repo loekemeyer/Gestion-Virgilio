@@ -4,7 +4,22 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-26 · Versión app al documentar: **v4.21**
+> Última actualización: 2026-06-27 · Versión app al documentar: **v4.22**
+>
+> Nota: **v4.22** — **Pipeline de stock "Separar Pedidos" → "A Facturar"** (dos depósitos intermedios entre
+> el picking y la facturación). Recorrido de las cajas pickeadas: **góndola** `--TP-->` **separar_pedidos**
+> `--TAP-->` **a_facturar** `--facturado-->` fuera del stock. (1) **TP** (`stockBajaPicking`): saca de góndola
+> (`terminado −`) y mete en **`separar_pedidos +`** las cajas reales pickeadas (eventos PKC, por tanda),
+> `tipo='picking'`. (2) **TAP** (`stockSepararAFacturar`, hook en `send()`): mueve el neto de la tanda
+> `separar_pedidos −` / **`a_facturar +`**, `tipo='separado'`. (3) **Marianela factura el último NP de la
+> tanda** (la tanda queda 100% facturada en `facTickNP`) → `stockSalidaFacturado`: **`a_facturar −`**,
+> `tipo='facturado'` → sale del stock. Cada paso mueve el **neto real** del depósito de origen para esa tanda
+> (`_stockNetoDepTanda`, nunca deja negativos) y es **idempotente** (dedup por `tipo`+`ref=tanda`). Nueva
+> **solapa "📦 A Separar"** en *Stock y Compras* (`stkBodyProceso`): muestra por tanda las cajas en *a separar*
+> (pickeado, falta armar) y en *a facturar* (armado, falta facturar), con totales y filtro. `stockComputeSaldos`
+> ahora inicializa `separar_pedidos` y `a_facturar`; el dropdown de *⚙ Ajustes* y la solapa *Salidas* (solo la
+> baja de góndola del picking) contemplan los nuevos depósitos. Validado con Playwright. ⚠ El stock disponible
+> para OCs sigue siendo `terminado + racks` (NO cuenta estos intermedios: son cajas comprometidas a pedidos).
 >
 > Nota: **v4.21** — **Fix m³/hora del monitor pegado en 0** (panel "Mts3 x Hora" / "Parcial").
 > `fetchMonitorDayStats` leía el m³ por tanda del cache global `_monitorSheetCache`, pero `renderMonitor`
