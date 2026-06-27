@@ -5285,7 +5285,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v4.30";
+const APP_VERSION = "v4.31";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -7309,6 +7309,17 @@ async function ocgFetchProyeccion() {
     return m;
   } catch (_e) { return {}; }
 }
+/* Capacidad de góndola por código (suma de cajas_max de todos sus sectores).
+   Sirve de TOPE del máximo de OC: no pedir más de lo que entra en góndola. */
+async function ocgFetchCapacidad() {
+  try {
+    const r = await fetch(SUPABASE_CAPACIDAD_ENDPOINT + "?select=cod,cajas_max&limit=50000", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+    const rows = r.ok ? await r.json() : [];
+    const m = {};
+    rows.forEach(function (x) { const k = _ocgNorm(x.cod); if (k) m[k] = (m[k] || 0) + (Number(x.cajas_max) || 0); });
+    return m;
+  } catch (_e) { return {}; }
+}
 async function ocgDemanda() {
   let ppp = [];
   try { ppp = await supaFetchAll(SUPABASE_PPP_PROG_ENDPOINT, "select=np"); } catch (_e) {}
@@ -7326,8 +7337,8 @@ async function ocgEnter() {
   if (!_oc) return;
   _oc.view = "gen"; _oc.gen = null; ocRender();   // muestra "calculando…"
   try {
-    const res = await Promise.all([ocgFetchMaximos(), stockFetchMovs(), stockGetCutoff(), ocgDemanda(), ocgFetchProyeccion()]);
-    const maxs = res[0] || [], saldos = stockComputeSaldos(res[1] || [], res[2]), dem = res[3] || {}, proy = res[4] || {};
+    const res = await Promise.all([ocgFetchMaximos(), stockFetchMovs(), stockGetCutoff(), ocgDemanda(), ocgFetchProyeccion(), ocgFetchCapacidad()]);
+    const maxs = res[0] || [], saldos = stockComputeSaldos(res[1] || [], res[2]), dem = res[3] || {}, proy = res[4] || {}, capac = res[5] || {};
     const items = [];
     maxs.forEach(function (m) {
       const cod = String(m.cod).toUpperCase().trim();
@@ -7338,10 +7349,15 @@ async function ocgEnter() {
       const pc = proy[_ocgNorm(cod)];   // proyección por tendencia en cajas/mes (o undefined)
       // Máximo = proyección × índice. Si el artículo no tiene proyección, cae al objetivo del Excel.
       const fuente = (pc != null) ? "proy" : "excel";
-      const maxCajas = Math.ceil((pc != null) ? (pc * indice) : (Number(m.max_cajas) || 0));
+      let maxCajas = Math.ceil((pc != null) ? (pc * indice) : (Number(m.max_cajas) || 0));
+      // CONTROL (v4.31): el máximo de OC no puede ser mayor a la capacidad de góndola
+      // (suma de cajas_max de los sectores). Si la supera, se topa a la capacidad.
+      const cap = capac[_ocgNorm(cod)];
+      const capped = (cap != null && cap > 0 && maxCajas > cap);
+      if (capped) maxCajas = Math.floor(cap);
       const faltaRaw = maxCajas + demanda - stock;
       if (faltaRaw <= 0) return;
-      items.push({ cod: cod, desc: m.descripcion || "", prov: (m.proveedor || "(sin proveedor)").trim(), max: maxCajas, fuente: fuente, indice: indice, proy: (pc != null ? pc : null), demanda: demanda, stock: stock, falta: Math.ceil(faltaRaw) });
+      items.push({ cod: cod, desc: m.descripcion || "", prov: (m.proveedor || "(sin proveedor)").trim(), max: maxCajas, fuente: fuente, indice: indice, proy: (pc != null ? pc : null), demanda: demanda, stock: stock, falta: Math.ceil(faltaRaw), cap: (cap != null ? cap : null), capped: capped });
     });
     _oc.gen = { items: items, fecha: new Date().toISOString().slice(0, 10) };
     ocRender();
@@ -7368,7 +7384,8 @@ function ocBodyGen() {
     h += '<table class="oc-tbl"><thead><tr><th>Código</th><th>Descripción</th><th class="num">Proy</th><th class="num">Índice</th><th class="num">Máx</th><th class="num">Pedidos</th><th class="num">Stock</th><th class="num">A pedir</th></tr></thead><tbody>';
     x.items.sort(function (a, b) { return b.falta - a.falta; }).forEach(function (it) {
       const proyTxt = (it.fuente === "proy") ? (Math.round(it.proy) + "") : '<span style="color:#b45309" title="sin proyección: usa objetivo Excel">xls</span>';
-      h += '<tr><td class="oc-cod">' + escapeHtml(it.cod) + '</td><td>' + escapeHtml(it.desc) + '</td><td class="num">' + proyTxt + '</td><td class="num">' + it.indice + '</td><td class="num">' + it.max + '</td><td class="num">' + it.demanda + '</td><td class="num">' + it.stock + '</td><td class="num oc-falt">' + it.falta + '</td></tr>';
+      const maxTxt = it.max + (it.capped ? ' <span style="color:#b45309;font-weight:800" title="Topado a la capacidad de góndola (' + it.cap + ' cajas) — proy×índice daba más">⤓</span>' : '');
+      h += '<tr><td class="oc-cod">' + escapeHtml(it.cod) + '</td><td>' + escapeHtml(it.desc) + '</td><td class="num">' + proyTxt + '</td><td class="num">' + it.indice + '</td><td class="num">' + maxTxt + '</td><td class="num">' + it.demanda + '</td><td class="num">' + it.stock + '</td><td class="num oc-falt">' + it.falta + '</td></tr>';
     });
     h += '</tbody></table>';
   });
@@ -7586,12 +7603,14 @@ async function stkCapLoad() {
     const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
     const res = await Promise.all([
       fetch(SUPABASE_CAPACIDAD_ENDPOINT + "?select=sector,cod,cajas_max&limit=50000", { headers: H, cache: "no-store" }),
-      fetch(SUPABASE_OCMAX_ENDPOINT + "?select=cod,descripcion,max_cajas&limit=20000", { headers: H, cache: "no-store" })
+      fetch(SUPABASE_OCMAX_ENDPOINT + "?select=cod,descripcion,max_cajas,indice&limit=20000", { headers: H, cache: "no-store" }),
+      ocgFetchProyeccion()
     ]);
     _stk.cap  = res[0].ok ? await res[0].json() : [];
     _stk.cmax = res[1].ok ? await res[1].json() : [];
+    _stk.cproy = res[2] || {};
     _stk.capLoaded = true;
-  } catch (_e) { _stk.cap = _stk.cap || []; _stk.cmax = _stk.cmax || []; _stk.capLoaded = true; }
+  } catch (_e) { _stk.cap = _stk.cap || []; _stk.cmax = _stk.cmax || []; _stk.cproy = _stk.cproy || {}; _stk.capLoaded = true; }
   if (_stk) stkRender();
 }
 function stkBodyCapacidad() {
@@ -7605,8 +7624,16 @@ function stkBodyCapacidad() {
     const s = String(r.sector || "").trim();
     if (s && byCod[k].sectores.indexOf(s) < 0) byCod[k].sectores.push(s);
   });
+  // Máx OC = proyección × índice (mismo cálculo que el generador); si no hay
+  // proyección, cae al objetivo del Excel (max_cajas).
+  const proy = _stk.cproy || {};
   const maxByCod = {};
-  cmax.forEach(function (m) { maxByCod[_ocgNorm(m.cod)] = { max: Number(m.max_cajas) || 0, desc: m.descripcion || "" }; });
+  cmax.forEach(function (m) {
+    const k = _ocgNorm(m.cod);
+    const indice = (Number(m.indice) > 0) ? Number(m.indice) : OCG_FACTOR_MAXIMO;
+    const pc = proy[k];
+    maxByCod[k] = { max: Math.ceil((pc != null) ? (pc * indice) : (Number(m.max_cajas) || 0)), desc: m.descripcion || "" };
+  });
   const arts = Object.keys(byCod).map(function (k) {
     const c = byCod[k], m = maxByCod[k] || {};
     const capacidad = Math.round(c.cajas * 10) / 10;
