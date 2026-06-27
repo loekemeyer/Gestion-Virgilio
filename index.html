@@ -5291,7 +5291,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v4.42";
+const APP_VERSION = "v4.43";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -7129,15 +7129,17 @@ function stockComputeSaldos(movs, cutoff) {
 }
 function stockFmtTs(ts) { try { return new Date(ts).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }); } catch (_e) { return String(ts); } }
 let _stk = null;
-/* v4.41 — NOMBRES por artículo desde Supabase (fuente única): Articulos_Cajas.Descripcion
-   (la más completa) y, para los que falten, el objetivo del Excel (OC_Maximos.descripcion).
+/* v4.43 — NOMBRES por artículo desde Supabase. Fuente única: la vista
+   `vista_nombres_articulos`, que resuelve la descripción por prioridad en el
+   server: E. Madre LK > Articulos Virgilio X Tallerista > OC_Maximos (Excel),
+   ya deduplicada y 1 fila por código normalizado. (Antes se usaba
+   Articulos_Cajas, que tenía códigos duplicados y devolvía nombres equivocados.)
    Lookup vivo (no copia datos). artNombre(cod, fallback) lo usan todos los módulos. */
 let _artNombres = null;
 async function loadArtNombres() {
   if (_artNombres) return _artNombres;
   const m = {}, H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
-  try { const r = await fetch(SUPABASE_OCMAX_ENDPOINT + "?select=cod,descripcion&limit=20000", { headers: H, cache: "no-store" }); if (r.ok) (await r.json()).forEach(function (x) { const k = _ocgNorm(x.cod), d = String(x.descripcion || "").trim(); if (k && d && !m[k]) m[k] = d; }); } catch (_e) {}
-  try { const r = await fetch(SUPABASE_URL + "/rest/v1/Articulos_Cajas?select=Cod_Art,Descripcion&limit=20000", { headers: H, cache: "no-store" }); if (r.ok) (await r.json()).forEach(function (x) { const k = _ocgNorm(x.Cod_Art), d = String(x.Descripcion || "").trim(); if (k && d) m[k] = d; }); } catch (_e) {}
+  try { const r = await fetch(SUPABASE_URL + "/rest/v1/vista_nombres_articulos?select=cod,descripcion&limit=20000", { headers: H, cache: "no-store" }); if (r.ok) (await r.json()).forEach(function (x) { const k = _ocgNorm(x.cod), d = String(x.descripcion || "").trim(); if (k && d) m[k] = d; }); } catch (_e) {}
   _artNombres = m; return m;
 }
 function artNombre(cod, fb) { const n = _artNombres && _artNombres[_ocgNorm(cod)]; return n || fb || ""; }

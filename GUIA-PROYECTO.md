@@ -4,7 +4,18 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-27 · Versión app al documentar: **v4.42**
+> Última actualización: 2026-06-27 · Versión app al documentar: **v4.43**
+>
+> Nota: **v4.43** — **Nombres de artículo: fuente corregida**. La v4.41 sacaba la descripción de
+> `Articulos_Cajas`, que **tiene códigos duplicados** (ej. `026` aparece como *Colador N°8* y también
+> como *Pinza de Fideos*) → el lookup agarraba el equivocado y mostraba **nombres mal**. Se reemplazó
+> por una **vista en Supabase**, `vista_nombres_articulos` (`security_invoker=true`, SELECT para
+> `anon`), que resuelve el nombre por **prioridad en el server**: **`E. Madre LK` > `Articulos
+> Virgilio X Tallerista` > `OC_Maximos` (Excel)**, ya deduplicada y 1 fila por código normalizado
+> (mismo normalizado que `_ocgNorm`: upper+trim+saca ceros a la izquierda). Cobertura: 279 nombres de
+> E. Madre LK, 123 de Virgilio x Tallerista, 23 del Excel (425 códigos). `loadArtNombres()` ahora hace
+> **un solo fetch** a la vista. Si se quiere cambiar la prioridad o sumar tablas, editar la vista (no
+> el front). `artNombre(cod, fallback)` sigue igual.
 >
 > Nota: **v4.42** — **Pasada de estética en la solapa Stocks**. (1) La tabla de stock se salía del
 > card y **clipeaba la columna Racks**: se bajó el padding de las columnas numéricas (16→9px), se
@@ -15,7 +26,7 @@
 > `.stk-tbl td` (antes solo lo tenían las filas `.stk-row`), arreglando el choque "−20tanda" en
 > *Salidas* y la falta de aire en *Racks*/*Insumos*. Sin cambios de datos ni de lógica.
 >
-> Nota: **v4.41** — **Nombres de artículo desde Supabase** (fuente única de descripciones). Lookup vivo
+> Nota: **v4.41** — *(⚠ fuente superada por v4.43 — `Articulos_Cajas` tenía duplicados)* **Nombres de artículo desde Supabase** (fuente única de descripciones). Lookup vivo
 > `loadArtNombres()` / `artNombre(cod, fallback)`: arma un mapa `cod normalizado → descripción` desde
 > **`Articulos_Cajas`** (`Cod_Art`/`Descripcion`, 361 artículos, la lista más completa) y, para los que falten,
 > el **objetivo del Excel** (`OC_Maximos.descripcion`). Se carga junto al admin (`openStockAdmin` / `openOCAdmin`,
