@@ -4,7 +4,13 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-27 · Versión app al documentar: **v4.37**
+> Última actualización: 2026-06-27 · Versión app al documentar: **v4.38**
+>
+> Nota: **v4.38** — **Números bien centrados en toda la app** (#8). Regla **global**: `input[type=number]` sin
+> flechitas (`-moz-appearance:textfield` + `::-webkit-*-spin-button{appearance:none}`) → el número centra de
+> verdad en todos los steppers (MG, Insumos, Cervantes, Racks, ajustes, etc.). Además se centraron `.oc-rinp`
+> (recibido OC), `.stk-aj-inp` (cantidad de ajuste) y los números de la tabla de OC (`.oc-tbl .num`). (v4.24/v4.28
+> ya habían centrado los símbolos `–/+` de los steppers.) Se sacó el cartel **BETA** del generador de OCs.
 >
 > Nota: **v4.36/v4.37** — **Insumos (RI/EI) rediseñado.** Alta con **un solo campo identificador**: **código de
 > 7 dígitos** (`/^\d{7}$/`) **o sector** (el sector va *en el lugar del código*) + un campo **descripción**. Si el
