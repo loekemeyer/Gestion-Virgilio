@@ -5321,7 +5321,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v4.55";
+const APP_VERSION = "v4.56";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -10737,11 +10737,33 @@ async function pppHandleFile(tipo, f, buf, quiet) {     // de click, drag-drop o
 function pppShowBaseInfo() {
   const el = document.getElementById("pppBaseInfo"); if (!el) return;
   let ts = NaN; try { ts = parseInt(localStorage.getItem(PPP_BASE_TS_KEY) || "", 10); } catch (_e) {}
-  if (!ts || isNaN(ts)) { el.innerHTML = '<span class="ppp-base-none">📦 Base Pedidos (Picking): nunca importada.</span>'; return; }
-  const d = new Date(ts), p = function (n) { return String(n).padStart(2, "0"); };
-  el.innerHTML = '📦 <b>Base Pedidos (Picking)</b> — última importación: <b>' +
-    p(d.getDate()) + "/" + p(d.getMonth() + 1) + "/" + d.getFullYear() + " " + p(d.getHours()) + ":" + p(d.getMinutes()) +
-    '</b> <span class="ppp-base-local">(solo local)</span>';
+  let info;
+  if (!ts || isNaN(ts)) { info = '<span class="ppp-base-none">📦 Base Pedidos (Picking): nunca importada desde la app.</span>'; }
+  else {
+    const d = new Date(ts), p = function (n) { return String(n).padStart(2, "0"); };
+    info = '📦 <b>Base Pedidos (Picking)</b> — último import desde la app: <b>' +
+      p(d.getDate()) + "/" + p(d.getMonth() + 1) + "/" + d.getFullYear() + " " + p(d.getHours()) + ":" + p(d.getMinutes()) +
+      '</b> <span class="ppp-base-local">(solo local)</span>';
+  }
+  el.innerHTML = info + '<div id="pppSupaCounts" style="margin-top:6px;font-size:12.5px;color:#475569">🛰 Contando lo que hay en la PPP (Supabase)…</div>';
+  pppRenderSupaCounts();
+}
+/* v4.56 — CONTROL: cuenta en vivo lo que hay AHORA en las 3 tablas PPP de Supabase
+   (lo que cargó el espejo o el último import). Así el supervisor ve, al abrir el menú
+   de importación, si la PPP tiene datos y cuántos — y lo coteja contra el Excel. */
+async function pppRenderSupaCounts() {
+  if (!document.getElementById("pppSupaCounts")) return;
+  const res = await Promise.all([
+    pppCountTable(SUPABASE_PPP_BASE_ENDPOINT),
+    pppCountTable(SUPABASE_PPP_PROG_ENDPOINT),
+    pppCountTable(SUPABASE_PPP_ENTREGADOS_ENDPOINT)
+  ]);
+  const el = document.getElementById("pppSupaCounts"); if (!el) return;
+  const f = function (n) { return n == null ? "?" : n; };
+  const any = res.some(function (n) { return n != null && n > 0; });
+  el.innerHTML = '🛰 <b>En la PPP (Supabase) ahora</b> — lo que cargó el espejo / último import: ' +
+    'Base Pedidos <b>' + f(res[0]) + '</b> · Programación <b>' + f(res[1]) + '</b> · Entregados <b>' + f(res[2]) + '</b> filas.' +
+    (any ? '' : ' <span style="color:#b45309">⚠ Está vacía — todavía no se cargó nada.</span>');
 }
 /* ===== Auto-carga de PPP / Base desde una carpeta local (File System Access API) =====
    Pedido del usuario: en vez de importar el Excel a mano, elegir el archivo UNA vez y

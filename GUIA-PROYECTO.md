@@ -4,7 +4,15 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-27 · Versión app al documentar: **v4.55**
+> Última actualización: 2026-06-27 · Versión app al documentar: **v4.56**
+>
+> Nota: **v4.56** — **Control de la PPP contra el espejo**. En el menú de importación de la PPP,
+> `pppShowBaseInfo` ahora además **cuenta en vivo** lo que hay en las 3 tablas de Supabase
+> (`pppRenderSupaCounts` → "🛰 En la PPP ahora: Base X · Programación Y · Entregados Z filas"), o sea **lo
+> que cargó el espejo** (sync automático del Excel) o el último import. Así el supervisor ve si la PPP
+> tiene datos y los puede cotejar contra el Excel antes/después de importar (complementa la verificación
+> post-import de v4.55). Decisión del usuario: por ahora **sigue cargando en el Excel** (el espejo
+> sincroniza); la carga manual sin Excel queda para más adelante.
 >
 > Nota: **v4.55** — **Validación de carga a la PPP** (hacia "eliminar el Excel"). La **doble vía** ya
 > existía: picking y programación leen de Supabase (`PPP_Base_Pedidos`, `PPP_Programacion_Diaria`,
