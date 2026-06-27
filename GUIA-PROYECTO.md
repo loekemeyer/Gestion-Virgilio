@@ -4,7 +4,19 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-27 · Versión app al documentar: **v4.44**
+> Última actualización: 2026-06-27 · Versión app al documentar: **v4.45**
+>
+> Nota: **v4.45** — **Barrido de estética (resto de pantallas)**, vía auditoría con sub-agentes en
+> paralelo. Arreglos concretos: (1) **`fichadas-monitor.html`**: `colspan` de las filas de sección/
+> espaciador/empty estaba en **17** cuando la tabla tiene **18 columnas** → cada banda de sección
+> quedaba corta una celda a la derecha. Corregido a 18. (2) **Recepción (`recepcion.js`)**: el `⏱ X hs`
+> de demora salía en **18px** dentro de una línea meta de 13px (desalineado) → bajado a 14px; los
+> botones de código (`.opCodeBtn`) podían desbordar con códigos Log/Fabr largos → `overflow-wrap`; el
+> footer de "Listo" (Cerrar/Anular/Cargar otra) no envolvía y tenía alturas distintas → `flex-wrap` +
+> altura pareja (52px). **Quedó FLAG (no tocado)**: densidad de la botonera (row-6 Virgilio / row-5
+> Cervantes — diseño establecido), recorte de "Mts3 x Hora" en el monitor con muchos operarios (layout
+> afinado para la TV — verificar en la TV real), y los issues de **Cervantes** (es una copia: se
+> arreglan upstream en `Registro-Produccion-2.0` y se re-sincroniza).
 >
 > Nota: **v4.44** — **Nombres consistentes también en operario**. El lookup `artNombre` (vista
 > `vista_nombres_articulos`, ver v4.43) ahora también se usa en los módulos **operario** que muestran

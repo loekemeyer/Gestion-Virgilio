@@ -80,7 +80,7 @@ const RCP_CSS = `
 #rcpRoot .opNameBtn:hover{ border-color:#111; }
 #rcpRoot .opNameBtn .tag{ display:block; font-size:11px; font-weight:800; color:#a06000; margin-top:4px; }
 #rcpRoot input[type="text"].opSearch{ width:100%; height:50px; font-size:18px; letter-spacing:normal; text-align:left; border-radius:10px; border:2px solid var(--border); padding:0 14px; box-sizing:border-box; margin-bottom:14px; }
-#rcpRoot .opCodeBtn{ aspect-ratio:1/1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; font-weight:900; font-size:18px; border:2px solid var(--border); border-radius:12px; background:#fff; cursor:pointer; padding:6px; text-align:center; }
+#rcpRoot .opCodeBtn{ aspect-ratio:1/1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; font-weight:900; font-size:18px; border:2px solid var(--border); border-radius:12px; background:#fff; cursor:pointer; padding:6px; text-align:center; min-width:0; overflow-wrap:anywhere; }
 #rcpRoot .opCodeBtn .cnt{ font-size:12px; font-weight:800; color:var(--ok); }
 #rcpRoot .opCodeBtn.loaded{ background:#eef7ee; border-color:var(--ok); color:#333; }
 #rcpRoot .opCodeBtn.opCodeAdd{ border:2px dashed var(--ok); color:var(--ok); background:#f6fff8; }
@@ -100,8 +100,9 @@ const RCP_CSS = `
 #rcpRoot .opPageTitle{ flex:1; text-align:center; font-size:22px; font-weight:900; }
 #rcpRoot .opNav{ background:#fff; border:2px solid var(--border); border-radius:12px; padding:14px 20px; font-size:18px; font-weight:900; cursor:pointer; white-space:nowrap; }
 #rcpRoot .opPageBody{ flex:1; }
-#rcpRoot .opPageActions{ margin-top:18px; display:flex; justify-content:flex-end; gap:10px; position:sticky; bottom:0; background:var(--bg); padding:12px 0; }
+#rcpRoot .opPageActions{ margin-top:18px; display:flex; flex-wrap:wrap; align-items:center; justify-content:flex-end; gap:10px; position:sticky; bottom:0; background:var(--bg); padding:12px 0; }
 #rcpRoot .opPageActions .btnSend{ height:52px; font-size:18px; padding:0 24px; }
+#rcpRoot .opPageActions .btnCancel, #rcpRoot .opPageActions .btnAnular{ height:52px; padding:0 16px; }
 #rcpRoot .modal{ position:fixed; inset:0; background:rgba(0,0,0,.45); display:none; align-items:flex-start; justify-content:center; padding:24px; overflow:auto; z-index:1400; }
 #rcpRoot .modal.open{ display:flex; }
 #rcpRoot .modalCard{ background:#fff; border-radius:14px; padding:20px; width:100%; max-width:360px; max-height:90vh; display:flex; flex-direction:column; }
@@ -121,7 +122,7 @@ const RCP_CSS = `
 #rcpRoot .pcTag{ font-size:11px; font-weight:800; color:#a06000; background:#fff7e6; border:1px solid #ffd98a; border-radius:999px; padding:2px 8px; }
 #rcpRoot .pcRto{ margin-left:auto; font-size:13px; font-weight:800; color:#475569; white-space:nowrap; }
 #rcpRoot .pcMeta{ font-size:13px; color:#666; margin-top:3px; }
-#rcpRoot .pcDemora{ font-weight:900; color:#b45309; font-size:18px; vertical-align:middle; }
+#rcpRoot .pcDemora{ font-weight:900; color:#b45309; font-size:14px; }
 #rcpRoot .pcEntrega{ font-size:14px; color:#333; margin-top:6px; font-variant-numeric:tabular-nums; word-break:break-word; }
 #rcpRoot .pcActs{ margin-top:10px; border-top:1px solid #eee; padding-top:10px; display:flex; flex-direction:column; gap:10px; }
 #rcpRoot .pcRow{ display:flex; align-items:center; gap:12px; }

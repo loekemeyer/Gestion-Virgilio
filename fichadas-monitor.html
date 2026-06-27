@@ -224,7 +224,7 @@
       </colgroup>
       <thead id="grid-head"></thead>
       <tbody id="grid-body">
-        <tr><td colspan="17" class="empty-state">Cargando datos…</td></tr>
+        <tr><td colspan="18" class="empty-state">Cargando datos…</td></tr>
       </tbody>
     </table>
   </div>
@@ -600,12 +600,12 @@
       let html = "";
       for (const it of parsed.items) {
         if (it.type === "spacer") {
-          html += `<tr class="spacer-row"><td colspan="17"></td></tr>`;
+          html += `<tr class="spacer-row"><td colspan="18"></td></tr>`;
           continue;
         }
         if (it.type === "section") {
           const cls = it.isVirgilio ? "section-row virgilio" : "section-row";
-          html += `<tr class="${cls}"><td colspan="17">${escapeHtml(it.text)}</td></tr>`;
+          html += `<tr class="${cls}"><td colspan="18">${escapeHtml(it.text)}</td></tr>`;
           continue;
         }
         // emp row — TODOS los tiempos vienen de Fichadas_Historico
@@ -634,7 +634,7 @@
             ${cellsForDate("manual")}
           </tr>`;
       }
-      body.innerHTML = html || `<tr><td colspan="17" class="empty-state">Sin datos.</td></tr>`;
+      body.innerHTML = html || `<tr><td colspan="18" class="empty-state">Sin datos.</td></tr>`;
     }
     function sbRowToTimes(row) {
       if (!row) return { entrada: "", ci: "", ct: "", salida: "" };
