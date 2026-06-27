@@ -4,11 +4,12 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-27 · Versión app al documentar: **v4.36**
+> Última actualización: 2026-06-27 · Versión app al documentar: **v4.37**
 >
-> Nota: **v4.36** — **Insumos (RI/EI) rediseñado.** Alta por **código de 7 dígitos** (`/^\d{7}$/`, obligatorio si
-> se usa código) **o por sector + descripción** (sin código → `cod_art = SECTOR·DESCRIPCIÓN` en mayúsculas,
-> badge "S/C"). Cada ítem lleva **unidad de medida** (chips **Uni / Paquetes / Kg** + un **"+"** que agrega una
+> Nota: **v4.36/v4.37** — **Insumos (RI/EI) rediseñado.** Alta con **un solo campo identificador**: **código de
+> 7 dígitos** (`/^\d{7}$/`) **o sector** (el sector va *en el lugar del código*) + un campo **descripción**. Si el
+> id son 7 dígitos → código (`cod_art = código`); si no → sector (`cod_art = SECTOR·DESCRIPCIÓN`, se muestra
+> "📍 sector" en la posición del código). Descripción obligatoria para sectores. Cada ítem lleva **unidad de medida** (chips **Uni / Paquetes / Kg** + un **"+"** que agrega una
 > unidad custom, guardada en `localStorage` `vir_ins_units`). Los movimientos (`deposito='insumos'`) ahora
 > guardan **`unidad`** y **`ubicacion`** (= sector, para los sin código). Columnas nuevas en Supabase:
 > `Movimientos_Stock.unidad`, `Insumos.sector`. Funciones `insLoadUnits`/`insSetUnidad`/`insAddUnidad`,

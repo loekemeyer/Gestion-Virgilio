@@ -5285,7 +5285,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v4.36";
+const APP_VERSION = "v4.37";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -7996,7 +7996,7 @@ async function insFetchCatalogo() {
 async function showInsumoModal(mode, legajo) {
   if (!document.getElementById("insCss")) {
     const s = document.createElement("style"); s.id = "insCss";
-    s.textContent = "#insModal{display:none;position:fixed;inset:0;z-index:1296;background:rgba(2,6,23,.74);overflow:auto;padding:12px;}#insModal.show{display:block;}.ins-card{background:#f8fafc;max-width:480px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.ins-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;color:#fff;}.ins-head.in{background:linear-gradient(90deg,#4f46e5,#4338ca);}.ins-head.out{background:linear-gradient(90deg,#0d9488,#0f766e);}.ins-title{font-size:18px;font-weight:800;}.ins-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}.ins-body{padding:13px 14px;}.ins-loading,.ins-empty{padding:24px;text-align:center;color:#64748b;font-size:15px;}.ins-hint{font-size:12.5px;color:#64748b;margin-bottom:9px;}.ins-search{width:100%;box-sizing:border-box;height:42px;border:2px solid #cbd5e1;border-radius:10px;padding:0 12px;font-size:15px;margin-bottom:9px;}.ins-crear{background:#eef2ff;border:1px dashed #a5b4fc;border-radius:11px;padding:10px;margin-bottom:10px;font-size:12.5px;color:#3730a3;display:flex;flex-direction:column;gap:7px;}.ins-crear-r{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}.ins-crear-l{font-weight:800;min-width:72px;}.ins-crear-or{text-align:center;font-size:11px;color:#6366f1;font-weight:700;}.ins-nc{width:120px;letter-spacing:2px;}.ins-nsec{width:96px;}.ins-nn{flex:1;min-width:120px;}.ins-crear input{height:34px;border:1px solid #c7d2fe;border-radius:8px;padding:0 9px;font-size:13px;}.ins-cbtn{background:#4f46e5;color:#fff;border:none;border-radius:8px;padding:7px 12px;font-weight:800;cursor:pointer;width:auto;}.ins-row{border:1px solid #e2e8f0;border-radius:12px;padding:9px 11px;margin-bottom:8px;background:#fff;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}.ins-info{flex:1;min-width:0;}.ins-cod{font-size:16px;font-weight:800;font-family:Consolas,Menlo,monospace;}.ins-nom{font-size:12.5px;color:#475569;}.ins-stk{font-size:11.5px;color:#64748b;font-weight:700;margin-top:2px;}.ins-stp{display:flex;align-items:center;gap:5px;}.ins-sb{display:flex;align-items:center;justify-content:center;line-height:1;padding:0;width:38px;height:40px;border:none;border-radius:9px;font-size:22px;font-weight:800;cursor:pointer;background:#e2e8f0;color:#475569;}.ins-inp{width:58px;height:40px;text-align:center;font-size:18px;font-weight:800;border:2px solid #cbd5e1;border-radius:9px;}.ins-warn{width:100%;font-size:11.5px;color:#b45309;font-weight:700;}.ins-fin{width:100%;margin-top:10px;padding:14px;border:none;border-radius:12px;color:#fff;font-size:17px;font-weight:800;cursor:pointer;}.ins-fin.in{background:#4f46e5;}.ins-fin.out{background:#0d9488;}.ins-fin:disabled{background:#cbd5e1;cursor:not-allowed;}.ins-uni{flex-basis:100%;display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px dashed #e2e8f0;}.ins-uni-l{font-size:11.5px;color:#64748b;font-weight:700;}.ins-uchip{width:auto;margin:0;border:1px solid #cbd5e1;background:#fff;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:800;cursor:pointer;color:#475569;}.ins-uchip.on{background:#4f46e5;color:#fff;border-color:#4f46e5;}.ins-uadd{color:#4f46e5;font-size:15px;}.ins-cod-sc{font-size:10px;background:#e0e7ff;color:#3730a3;padding:2px 6px;border-radius:6px;font-weight:800;}";
+    s.textContent = "#insModal{display:none;position:fixed;inset:0;z-index:1296;background:rgba(2,6,23,.74);overflow:auto;padding:12px;}#insModal.show{display:block;}.ins-card{background:#f8fafc;max-width:480px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.ins-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;color:#fff;}.ins-head.in{background:linear-gradient(90deg,#4f46e5,#4338ca);}.ins-head.out{background:linear-gradient(90deg,#0d9488,#0f766e);}.ins-title{font-size:18px;font-weight:800;}.ins-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}.ins-body{padding:13px 14px;}.ins-loading,.ins-empty{padding:24px;text-align:center;color:#64748b;font-size:15px;}.ins-hint{font-size:12.5px;color:#64748b;margin-bottom:9px;}.ins-search{width:100%;box-sizing:border-box;height:42px;border:2px solid #cbd5e1;border-radius:10px;padding:0 12px;font-size:15px;margin-bottom:9px;}.ins-crear{background:#eef2ff;border:1px dashed #a5b4fc;border-radius:11px;padding:10px;margin-bottom:10px;font-size:12.5px;color:#3730a3;display:flex;flex-direction:column;gap:7px;}.ins-crear-r{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}.ins-crear-l{font-weight:800;min-width:72px;}.ins-crear-or{text-align:center;font-size:11px;color:#6366f1;font-weight:700;}.ins-nc{width:120px;letter-spacing:2px;}.ins-nsec{width:96px;}.ins-nn{flex:1;min-width:130px;}.ins-nid{flex:1;min-width:150px;}.ins-crear input{height:34px;border:1px solid #c7d2fe;border-radius:8px;padding:0 9px;font-size:13px;}.ins-cbtn{background:#4f46e5;color:#fff;border:none;border-radius:8px;padding:7px 12px;font-weight:800;cursor:pointer;width:auto;}.ins-row{border:1px solid #e2e8f0;border-radius:12px;padding:9px 11px;margin-bottom:8px;background:#fff;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}.ins-info{flex:1;min-width:0;}.ins-cod{font-size:16px;font-weight:800;font-family:Consolas,Menlo,monospace;}.ins-cod-sec{font-family:inherit;color:#4338ca;}.ins-nom{font-size:12.5px;color:#475569;}.ins-stk{font-size:11.5px;color:#64748b;font-weight:700;margin-top:2px;}.ins-stp{display:flex;align-items:center;gap:5px;}.ins-sb{display:flex;align-items:center;justify-content:center;line-height:1;padding:0;width:38px;height:40px;border:none;border-radius:9px;font-size:22px;font-weight:800;cursor:pointer;background:#e2e8f0;color:#475569;}.ins-inp{width:58px;height:40px;text-align:center;font-size:18px;font-weight:800;border:2px solid #cbd5e1;border-radius:9px;}.ins-warn{width:100%;font-size:11.5px;color:#b45309;font-weight:700;}.ins-fin{width:100%;margin-top:10px;padding:14px;border:none;border-radius:12px;color:#fff;font-size:17px;font-weight:800;cursor:pointer;}.ins-fin.in{background:#4f46e5;}.ins-fin.out{background:#0d9488;}.ins-fin:disabled{background:#cbd5e1;cursor:not-allowed;}.ins-uni{flex-basis:100%;display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px dashed #e2e8f0;}.ins-uni-l{font-size:11.5px;color:#64748b;font-weight:700;}.ins-uchip{width:auto;margin:0;border:1px solid #cbd5e1;background:#fff;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:800;cursor:pointer;color:#475569;}.ins-uchip.on{background:#4f46e5;color:#fff;border-color:#4f46e5;}.ins-uadd{color:#4f46e5;font-size:15px;}.ins-cod-sc{font-size:10px;background:#e0e7ff;color:#3730a3;padding:2px 6px;border-radius:6px;font-weight:800;}";
     document.head.appendChild(s);
   }
   let ov = document.getElementById("insModal");
@@ -8040,9 +8040,7 @@ function insRender() {
   let h = '<div class="ins-hint">' + (isIn ? "Cuánto <b>entró</b> de cada insumo." : "Cuánto <b>salió</b> de cada insumo.") + ' Código de <b>7 dígitos</b>, o <b>sector + descripción</b> si no tiene.</div>';
   h += '<input class="ins-search" type="search" placeholder="🔎 Buscar (código / descripción / sector)" value="' + escapeHtml(_ins.filtro) + '" oninput="if(_ins){_ins.filtro=this.value;insRender();}">';
   h += '<div class="ins-crear">' +
-    '<div class="ins-crear-r"><span class="ins-crear-l">Con código</span><input id="insNewCod" class="ins-nc" inputmode="numeric" maxlength="7" placeholder="7 dígitos" value="' + (f && !shown.length && /^\d{1,7}$/.test(_ins.filtro) ? escapeHtml(_ins.filtro) : "") + '"></div>' +
-    '<div class="ins-crear-or">— o sin código —</div>' +
-    '<div class="ins-crear-r"><span class="ins-crear-l">Sin código</span><input id="insNewSec" class="ins-nsec" placeholder="sector"><input id="insNewNom" class="ins-nn" placeholder="descripción"></div>' +
+    '<div class="ins-crear-r"><input id="insNewId" class="ins-nid" placeholder="Código (7 díg) o sector" value="' + (f && !shown.length ? escapeHtml(_ins.filtro) : "") + '"><input id="insNewNom" class="ins-nn" placeholder="descripción"></div>' +
     '<button class="ins-cbtn" onclick="insCrear()">+ Agregar a la lista</button>' +
     '</div>';
   if (!shown.length) h += '<div class="ins-empty">' + (f ? "No está. Cargalo arriba (código de 7 díg o sector + descripción)." : "Cargá el primer insumo arriba.") + '</div>';
@@ -8050,7 +8048,7 @@ function insRender() {
     const i = _ins.items.indexOf(it);
     const neg = !isIn && it.qty > it.stock;
     const idLbl = it.noCode
-      ? '<span class="ins-cod-sc">S/C</span> <span class="ins-nom"><b>' + escapeHtml(it.sector || "") + '</b> · ' + escapeHtml(it.nombre || "") + '</span>'
+      ? '<span class="ins-cod ins-cod-sec">📍 ' + escapeHtml(it.sector || "") + '</span> <span class="ins-nom">' + escapeHtml(it.nombre || "") + '</span>'
       : '<span class="ins-cod">' + escapeHtml(it.cod) + '</span> <span class="ins-nom">' + escapeHtml(it.nombre || "") + '</span>';
     const chips = units.map(function (u) { return '<button class="ins-uchip' + (it.unidad === u ? " on" : "") + '" onclick="insSetUnidad(' + i + ',\'' + u.replace(/'/g, "") + '\')">' + escapeHtml(u) + '</button>'; }).join("") + '<button class="ins-uchip ins-uadd" onclick="insAddUnidad(' + i + ')" title="Agregar unidad">+</button>';
     return '<div class="ins-row">' +
@@ -8068,19 +8066,21 @@ function insChg(i, d) { if (!_ins) return; const it = _ins.items[i]; if (!it) re
 function insSet(i, v) { if (!_ins) return; const it = _ins.items[i]; if (!it) return; it.qty = Math.max(0, parseInt(v, 10) || 0); insRender(); }
 async function insCrear() {
   if (!_ins) return;
-  const cod = String(((document.getElementById("insNewCod") || {}).value) || "").trim();
-  const sec = String(((document.getElementById("insNewSec") || {}).value) || "").trim();
+  const id = String(((document.getElementById("insNewId") || {}).value) || "").trim();
   const nom = String(((document.getElementById("insNewNom") || {}).value) || "").trim();
+  if (!id) { alert("Poné el código (7 dígitos) o el sector."); return; }
   let item;
-  if (cod) {
-    if (!/^\d{7}$/.test(cod)) { alert("El código del insumo tiene que ser de 7 dígitos.\n(Si no tiene código, cargá sector + descripción.)"); return; }
-    if (_ins.items.some(function (it) { return it.cod === cod; })) { alert("Ese código ya está en la lista."); _ins.filtro = cod; insRender(); return; }
-    item = { cod: cod, nombre: nom, sector: "", noCode: false, stock: 0, qty: 0, unidad: "Uni" };
+  if (/^\d{7}$/.test(id)) {
+    // CÓDIGO de 7 dígitos
+    if (_ins.items.some(function (it) { return it.cod === id; })) { alert("Ese código ya está en la lista."); _ins.filtro = id; insRender(); return; }
+    item = { cod: id, nombre: nom, sector: "", noCode: false, stock: 0, qty: 0, unidad: "Uni" };
   } else {
-    if (!sec || !nom) { alert("Sin código: poné SECTOR y DESCRIPCIÓN (o un código de 7 dígitos)."); return; }
-    const key = (sec + "·" + nom).toUpperCase();
+    // SECTOR (no es un código de 7 dígitos). Si es sólo números y no son 7, avisar.
+    if (/^\d+$/.test(id) && !confirm("\"" + id + "\" no es un código de 7 dígitos. ¿Cargarlo como SECTOR igual?")) return;
+    if (!nom) { alert("Con sector poné también la descripción."); return; }
+    const key = (id + "·" + nom).toUpperCase();
     if (_ins.items.some(function (it) { return it.cod === key; })) { alert("Ese insumo (sector + descripción) ya está en la lista."); _ins.filtro = nom; insRender(); return; }
-    item = { cod: key, nombre: nom, sector: sec, noCode: true, stock: 0, qty: 0, unidad: "Uni" };
+    item = { cod: key, nombre: nom, sector: id, noCode: true, stock: 0, qty: 0, unidad: "Uni" };
   }
   try {
     await fetch(SUPABASE_INSUMOS_ENDPOINT, { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" }, body: JSON.stringify({ cod: item.cod, nombre: item.nombre || null, sector: item.sector || null, creado_por: _ins.legajo || null }) });
