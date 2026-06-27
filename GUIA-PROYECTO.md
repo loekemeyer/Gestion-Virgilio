@@ -4,7 +4,16 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-27 · Versión app al documentar: **v4.50**
+> Última actualización: 2026-06-27 · Versión app al documentar: **v4.51**
+>
+> Nota: **v4.51** — **Solapa “🤖 Agentes”** en *Stock y Compras* (2da, después de Stocks): **reporte de
+> cosas para mirar**. Lee el snapshot `reporte_agentes` (tabla curada, SELECT anon — NO expone las
+> tablas crudas) que genera la función `generar_reporte_agentes()` (SECURITY DEFINER, lee
+> `vista_saldos_stock` / `errores_cliente` / `telegram_outbox` como owner y escribe un resumen) por
+> **cron cada 2 h** (`generar-reporte-agentes`). 3 secciones color-codeadas: **⚠ Stock negativo**
+> (saldo imposible), **🐛 Errores de la app** (últimos 7 días, agrupados por mensaje), **📨 Telegram sin
+> enviar** (outbox trabado >15 min). Front: `stkBodyAgentes()` + `stkLoadReporte()`. Si no hay nada,
+> muestra "Nada para mirar 👍". `generar_reporte_agentes` no es ejecutable por RPC (revocado de PUBLIC).
 >
 > Nota: **v4.50** — **Robustez/infra (4 cosas).** (1) **Vista de saldos** `vista_saldos_stock`
 > (`security_invoker`, SELECT anon): suma `delta` por depósito en el SERVER respetando el cutoff de
