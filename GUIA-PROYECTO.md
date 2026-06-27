@@ -4,7 +4,15 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-27 · Versión app al documentar: **v4.35**
+> Última actualización: 2026-06-27 · Versión app al documentar: **v4.36**
+>
+> Nota: **v4.36** — **Insumos (RI/EI) rediseñado.** Alta por **código de 7 dígitos** (`/^\d{7}$/`, obligatorio si
+> se usa código) **o por sector + descripción** (sin código → `cod_art = SECTOR·DESCRIPCIÓN` en mayúsculas,
+> badge "S/C"). Cada ítem lleva **unidad de medida** (chips **Uni / Paquetes / Kg** + un **"+"** que agrega una
+> unidad custom, guardada en `localStorage` `vir_ins_units`). Los movimientos (`deposito='insumos'`) ahora
+> guardan **`unidad`** y **`ubicacion`** (= sector, para los sin código). Columnas nuevas en Supabase:
+> `Movimientos_Stock.unidad`, `Insumos.sector`. Funciones `insLoadUnits`/`insSetUnidad`/`insAddUnidad`,
+> `insCrear` (valida 7 díg o sector+desc), `insConfirmar` (manda unidad + ubicación).
 >
 > Nota: **v4.35** — Vista **Stocks**: (1) sectores **reordenados** → Góndola · Excedente · Pickeados · A facturar ·
 > A guardar · Racks (· Insumos aparte). (2) Columnas numéricas **centradas** y títulos multi-palabra en **doble

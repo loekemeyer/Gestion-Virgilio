@@ -5285,7 +5285,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v4.35";
+const APP_VERSION = "v4.36";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -7996,7 +7996,7 @@ async function insFetchCatalogo() {
 async function showInsumoModal(mode, legajo) {
   if (!document.getElementById("insCss")) {
     const s = document.createElement("style"); s.id = "insCss";
-    s.textContent = "#insModal{display:none;position:fixed;inset:0;z-index:1296;background:rgba(2,6,23,.74);overflow:auto;padding:12px;}#insModal.show{display:block;}.ins-card{background:#f8fafc;max-width:480px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.ins-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;color:#fff;}.ins-head.in{background:linear-gradient(90deg,#4f46e5,#4338ca);}.ins-head.out{background:linear-gradient(90deg,#0d9488,#0f766e);}.ins-title{font-size:18px;font-weight:800;}.ins-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}.ins-body{padding:13px 14px;}.ins-loading,.ins-empty{padding:24px;text-align:center;color:#64748b;font-size:15px;}.ins-hint{font-size:12.5px;color:#64748b;margin-bottom:9px;}.ins-search{width:100%;box-sizing:border-box;height:42px;border:2px solid #cbd5e1;border-radius:10px;padding:0 12px;font-size:15px;margin-bottom:9px;}.ins-crear{background:#eef2ff;border:1px dashed #a5b4fc;border-radius:11px;padding:9px 10px;margin-bottom:10px;font-size:12.5px;color:#3730a3;display:flex;align-items:center;gap:6px;flex-wrap:wrap;}.ins-nc{width:90px;}.ins-nn{flex:1;min-width:110px;}.ins-crear input{height:34px;border:1px solid #c7d2fe;border-radius:8px;padding:0 9px;font-size:13px;}.ins-cbtn{background:#4f46e5;color:#fff;border:none;border-radius:8px;padding:7px 12px;font-weight:800;cursor:pointer;width:auto;}.ins-row{border:1px solid #e2e8f0;border-radius:12px;padding:9px 11px;margin-bottom:8px;background:#fff;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}.ins-info{flex:1;min-width:0;}.ins-cod{font-size:16px;font-weight:800;font-family:Consolas,Menlo,monospace;}.ins-nom{font-size:12.5px;color:#475569;}.ins-stk{font-size:11.5px;color:#64748b;font-weight:700;margin-top:2px;}.ins-stp{display:flex;align-items:center;gap:5px;}.ins-sb{display:flex;align-items:center;justify-content:center;line-height:1;padding:0;width:38px;height:40px;border:none;border-radius:9px;font-size:22px;font-weight:800;cursor:pointer;background:#e2e8f0;color:#475569;}.ins-inp{width:58px;height:40px;text-align:center;font-size:18px;font-weight:800;border:2px solid #cbd5e1;border-radius:9px;}.ins-warn{width:100%;font-size:11.5px;color:#b45309;font-weight:700;}.ins-fin{width:100%;margin-top:10px;padding:14px;border:none;border-radius:12px;color:#fff;font-size:17px;font-weight:800;cursor:pointer;}.ins-fin.in{background:#4f46e5;}.ins-fin.out{background:#0d9488;}.ins-fin:disabled{background:#cbd5e1;cursor:not-allowed;}";
+    s.textContent = "#insModal{display:none;position:fixed;inset:0;z-index:1296;background:rgba(2,6,23,.74);overflow:auto;padding:12px;}#insModal.show{display:block;}.ins-card{background:#f8fafc;max-width:480px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.ins-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;color:#fff;}.ins-head.in{background:linear-gradient(90deg,#4f46e5,#4338ca);}.ins-head.out{background:linear-gradient(90deg,#0d9488,#0f766e);}.ins-title{font-size:18px;font-weight:800;}.ins-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}.ins-body{padding:13px 14px;}.ins-loading,.ins-empty{padding:24px;text-align:center;color:#64748b;font-size:15px;}.ins-hint{font-size:12.5px;color:#64748b;margin-bottom:9px;}.ins-search{width:100%;box-sizing:border-box;height:42px;border:2px solid #cbd5e1;border-radius:10px;padding:0 12px;font-size:15px;margin-bottom:9px;}.ins-crear{background:#eef2ff;border:1px dashed #a5b4fc;border-radius:11px;padding:10px;margin-bottom:10px;font-size:12.5px;color:#3730a3;display:flex;flex-direction:column;gap:7px;}.ins-crear-r{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}.ins-crear-l{font-weight:800;min-width:72px;}.ins-crear-or{text-align:center;font-size:11px;color:#6366f1;font-weight:700;}.ins-nc{width:120px;letter-spacing:2px;}.ins-nsec{width:96px;}.ins-nn{flex:1;min-width:120px;}.ins-crear input{height:34px;border:1px solid #c7d2fe;border-radius:8px;padding:0 9px;font-size:13px;}.ins-cbtn{background:#4f46e5;color:#fff;border:none;border-radius:8px;padding:7px 12px;font-weight:800;cursor:pointer;width:auto;}.ins-row{border:1px solid #e2e8f0;border-radius:12px;padding:9px 11px;margin-bottom:8px;background:#fff;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}.ins-info{flex:1;min-width:0;}.ins-cod{font-size:16px;font-weight:800;font-family:Consolas,Menlo,monospace;}.ins-nom{font-size:12.5px;color:#475569;}.ins-stk{font-size:11.5px;color:#64748b;font-weight:700;margin-top:2px;}.ins-stp{display:flex;align-items:center;gap:5px;}.ins-sb{display:flex;align-items:center;justify-content:center;line-height:1;padding:0;width:38px;height:40px;border:none;border-radius:9px;font-size:22px;font-weight:800;cursor:pointer;background:#e2e8f0;color:#475569;}.ins-inp{width:58px;height:40px;text-align:center;font-size:18px;font-weight:800;border:2px solid #cbd5e1;border-radius:9px;}.ins-warn{width:100%;font-size:11.5px;color:#b45309;font-weight:700;}.ins-fin{width:100%;margin-top:10px;padding:14px;border:none;border-radius:12px;color:#fff;font-size:17px;font-weight:800;cursor:pointer;}.ins-fin.in{background:#4f46e5;}.ins-fin.out{background:#0d9488;}.ins-fin:disabled{background:#cbd5e1;cursor:not-allowed;}.ins-uni{flex-basis:100%;display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px dashed #e2e8f0;}.ins-uni-l{font-size:11.5px;color:#64748b;font-weight:700;}.ins-uchip{width:auto;margin:0;border:1px solid #cbd5e1;background:#fff;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:800;cursor:pointer;color:#475569;}.ins-uchip.on{background:#4f46e5;color:#fff;border-color:#4f46e5;}.ins-uadd{color:#4f46e5;font-size:15px;}.ins-cod-sc{font-size:10px;background:#e0e7ff;color:#3730a3;padding:2px 6px;border-radius:6px;font-weight:800;}";
     document.head.appendChild(s);
   }
   let ov = document.getElementById("insModal");
@@ -8007,56 +8007,96 @@ async function showInsumoModal(mode, legajo) {
   try {
     const res = await Promise.all([insFetchCatalogo(), stockFetchMovs(), stockGetCutoff()]);
     const saldos = stockComputeSaldos(res[1] || [], res[2]);
-    const items = (res[0] || []).map(function (c) { const sd = saldos[String(c.cod)] || {}; return { cod: String(c.cod), nombre: c.nombre || (sd.desc || ""), stock: Number(sd.insumos || 0), qty: 0 }; });
+    const items = (res[0] || []).map(function (c) { const sd = saldos[String(c.cod)] || {}; return { cod: String(c.cod), nombre: c.nombre || (sd.desc || ""), sector: c.sector || "", noCode: !!c.sector, stock: Number(sd.insumos || 0), qty: 0, unidad: "Uni" }; });
     // insumos con movimientos pero fuera del catálogo (defensivo)
-    Object.keys(saldos).forEach(function (k) { const sd = saldos[k]; if ((sd.insumos || 0) !== 0 && !items.some(function (it) { return it.cod === k; })) items.push({ cod: k, nombre: sd.desc || "", stock: Number(sd.insumos || 0), qty: 0 }); });
+    Object.keys(saldos).forEach(function (k) { const sd = saldos[k]; if ((sd.insumos || 0) !== 0 && !items.some(function (it) { return it.cod === k; })) items.push({ cod: k, nombre: sd.desc || "", sector: "", noCode: String(k).indexOf("·") >= 0, stock: Number(sd.insumos || 0), qty: 0, unidad: "Uni" }); });
     items.sort(_insSortCod);
     _ins = { mode: mode, legajo: String(legajo || "").trim(), items: items, filtro: "" };
     insRender();
   } catch (e) { const b = document.getElementById("insBody"); if (b) b.innerHTML = '<div class="ins-loading">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
 }
+/* v4.36 — INSUMOS rediseñado: alta por CÓDIGO (7 dígitos sí o sí) o por SECTOR +
+   DESCRIPCIÓN; cantidad + UNIDAD de medida por ítem (Uni / Paquetes / Kg + "+"
+   para agregar otra; las custom se guardan en localStorage). */
+function insLoadUnits() {
+  let u = ["Uni", "Paquetes", "Kg"];
+  try { const s = JSON.parse(localStorage.getItem("vir_ins_units") || "[]"); if (Array.isArray(s)) s.forEach(function (x) { x = String(x || "").trim(); if (x && u.indexOf(x) < 0) u.push(x); }); } catch (_e) {}
+  return u;
+}
+function insSetUnidad(i, u) { if (!_ins) return; const it = _ins.items[i]; if (!it) return; it.unidad = u; insRender(); }
+function insAddUnidad(i) {
+  let u = String((typeof prompt === "function" ? prompt("Nueva unidad de medida (ej. litros, rollos, metros):") : "") || "").trim().replace(/['"<>]/g, "");
+  if (!u) return;
+  try { let s = JSON.parse(localStorage.getItem("vir_ins_units") || "[]"); if (!Array.isArray(s)) s = []; if (s.indexOf(u) < 0) s.push(u); localStorage.setItem("vir_ins_units", JSON.stringify(s)); } catch (_e) {}
+  if (_ins && _ins.items[i]) _ins.items[i].unidad = u;
+  insRender();
+}
 function insRender() {
   if (!_ins) return; const body = document.getElementById("insBody"); if (!body) return;
   const isIn = _ins.mode === "RI";
+  const units = insLoadUnits();
   const f = (_ins.filtro || "").toLowerCase().trim();
-  const shown = f ? _ins.items.filter(function (it) { return (it.cod + " " + (it.nombre || "")).toLowerCase().indexOf(f) >= 0; }) : _ins.items;
-  let h = '<div class="ins-hint">' + (isIn ? "Marcá cuántas unidades <b>entraron</b> de cada insumo." : "Marcá cuántas unidades <b>salieron</b> de cada insumo.") + '</div>';
-  h += '<input class="ins-search" type="search" placeholder="🔎 Buscar insumo (código o nombre)" value="' + escapeHtml(_ins.filtro) + '" oninput="if(_ins){_ins.filtro=this.value;insRender();}">';
-  h += '<div class="ins-crear"><b>¿No está?</b> Creá el código: <input id="insNewCod" class="ins-nc" placeholder="código" value="' + (f && !shown.length ? escapeHtml(_ins.filtro.toUpperCase()) : "") + '"><input id="insNewNom" class="ins-nn" placeholder="nombre"><button class="ins-cbtn" onclick="insCrear()">+ Crear</button></div>';
-  if (!shown.length) h += '<div class="ins-empty">' + (f ? "No hay insumos que coincidan. Crealo arriba." : "No hay insumos cargados todavía. Creá el primero arriba.") + '</div>';
+  const shown = f ? _ins.items.filter(function (it) { return (it.cod + " " + (it.nombre || "") + " " + (it.sector || "")).toLowerCase().indexOf(f) >= 0; }) : _ins.items;
+  let h = '<div class="ins-hint">' + (isIn ? "Cuánto <b>entró</b> de cada insumo." : "Cuánto <b>salió</b> de cada insumo.") + ' Código de <b>7 dígitos</b>, o <b>sector + descripción</b> si no tiene.</div>';
+  h += '<input class="ins-search" type="search" placeholder="🔎 Buscar (código / descripción / sector)" value="' + escapeHtml(_ins.filtro) + '" oninput="if(_ins){_ins.filtro=this.value;insRender();}">';
+  h += '<div class="ins-crear">' +
+    '<div class="ins-crear-r"><span class="ins-crear-l">Con código</span><input id="insNewCod" class="ins-nc" inputmode="numeric" maxlength="7" placeholder="7 dígitos" value="' + (f && !shown.length && /^\d{1,7}$/.test(_ins.filtro) ? escapeHtml(_ins.filtro) : "") + '"></div>' +
+    '<div class="ins-crear-or">— o sin código —</div>' +
+    '<div class="ins-crear-r"><span class="ins-crear-l">Sin código</span><input id="insNewSec" class="ins-nsec" placeholder="sector"><input id="insNewNom" class="ins-nn" placeholder="descripción"></div>' +
+    '<button class="ins-cbtn" onclick="insCrear()">+ Agregar a la lista</button>' +
+    '</div>';
+  if (!shown.length) h += '<div class="ins-empty">' + (f ? "No está. Cargalo arriba (código de 7 díg o sector + descripción)." : "Cargá el primer insumo arriba.") + '</div>';
   else h += shown.map(function (it) {
     const i = _ins.items.indexOf(it);
     const neg = !isIn && it.qty > it.stock;
-    return '<div class="ins-row"><div class="ins-info"><span class="ins-cod">' + escapeHtml(it.cod) + '</span> <span class="ins-nom">' + escapeHtml(it.nombre || "") + '</span><div class="ins-stk">stock actual: ' + it.stock + '</div></div><div class="ins-stp"><button class="ins-sb" onclick="insChg(' + i + ',-1)">–</button><input class="ins-inp" type="number" min="0" inputmode="numeric" value="' + it.qty + '" oninput="insSet(' + i + ',this.value)"><button class="ins-sb" onclick="insChg(' + i + ',1)">+</button></div>' + (neg ? '<div class="ins-warn">⚠ el stock quedaría en ' + (it.stock - it.qty) + '</div>' : "") + "</div>";
+    const idLbl = it.noCode
+      ? '<span class="ins-cod-sc">S/C</span> <span class="ins-nom"><b>' + escapeHtml(it.sector || "") + '</b> · ' + escapeHtml(it.nombre || "") + '</span>'
+      : '<span class="ins-cod">' + escapeHtml(it.cod) + '</span> <span class="ins-nom">' + escapeHtml(it.nombre || "") + '</span>';
+    const chips = units.map(function (u) { return '<button class="ins-uchip' + (it.unidad === u ? " on" : "") + '" onclick="insSetUnidad(' + i + ',\'' + u.replace(/'/g, "") + '\')">' + escapeHtml(u) + '</button>'; }).join("") + '<button class="ins-uchip ins-uadd" onclick="insAddUnidad(' + i + ')" title="Agregar unidad">+</button>';
+    return '<div class="ins-row">' +
+      '<div class="ins-info">' + idLbl + '<div class="ins-stk">stock: ' + it.stock + ' ' + escapeHtml(it.unidad || "Uni") + '</div></div>' +
+      '<div class="ins-stp"><button class="ins-sb" onclick="insChg(' + i + ',-1)">–</button><input class="ins-inp" type="number" min="0" inputmode="numeric" value="' + it.qty + '" oninput="insSet(' + i + ',this.value)"><button class="ins-sb" onclick="insChg(' + i + ',1)">+</button></div>' +
+      '<div class="ins-uni"><span class="ins-uni-l">Unidad:</span> ' + chips + '</div>' +
+      (neg ? '<div class="ins-warn">⚠ el stock quedaría en ' + (it.stock - it.qty) + '</div>' : "") +
+      "</div>";
   }).join("");
   const tot = _ins.items.reduce(function (s, it) { return s + it.qty; }, 0);
-  h += '<button class="ins-fin ' + (isIn ? "in" : "out") + '"' + (tot <= 0 ? " disabled" : "") + ' onclick="insConfirmar()">' + (isIn ? "✓ Registrar entrada de " : "✓ Registrar salida de ") + tot + " unidad(es)</button>";
+  h += '<button class="ins-fin ' + (isIn ? "in" : "out") + '"' + (tot <= 0 ? " disabled" : "") + ' onclick="insConfirmar()">' + (isIn ? "✓ Registrar entrada" : "✓ Registrar salida") + "</button>";
   _renderKeepFocus(body, h);
 }
 function insChg(i, d) { if (!_ins) return; const it = _ins.items[i]; if (!it) return; it.qty = Math.max(0, it.qty + d); insRender(); }
 function insSet(i, v) { if (!_ins) return; const it = _ins.items[i]; if (!it) return; it.qty = Math.max(0, parseInt(v, 10) || 0); insRender(); }
 async function insCrear() {
   if (!_ins) return;
-  const c = String(((document.getElementById("insNewCod") || {}).value) || "").trim().toUpperCase();
-  const n = String(((document.getElementById("insNewNom") || {}).value) || "").trim();
-  if (!c) { alert("Poné un código para el insumo."); return; }
-  if (_ins.items.some(function (it) { return it.cod.toUpperCase() === c; })) { alert("Ese código ya está en la lista."); _ins.filtro = c; insRender(); return; }
+  const cod = String(((document.getElementById("insNewCod") || {}).value) || "").trim();
+  const sec = String(((document.getElementById("insNewSec") || {}).value) || "").trim();
+  const nom = String(((document.getElementById("insNewNom") || {}).value) || "").trim();
+  let item;
+  if (cod) {
+    if (!/^\d{7}$/.test(cod)) { alert("El código del insumo tiene que ser de 7 dígitos.\n(Si no tiene código, cargá sector + descripción.)"); return; }
+    if (_ins.items.some(function (it) { return it.cod === cod; })) { alert("Ese código ya está en la lista."); _ins.filtro = cod; insRender(); return; }
+    item = { cod: cod, nombre: nom, sector: "", noCode: false, stock: 0, qty: 0, unidad: "Uni" };
+  } else {
+    if (!sec || !nom) { alert("Sin código: poné SECTOR y DESCRIPCIÓN (o un código de 7 dígitos)."); return; }
+    const key = (sec + "·" + nom).toUpperCase();
+    if (_ins.items.some(function (it) { return it.cod === key; })) { alert("Ese insumo (sector + descripción) ya está en la lista."); _ins.filtro = nom; insRender(); return; }
+    item = { cod: key, nombre: nom, sector: sec, noCode: true, stock: 0, qty: 0, unidad: "Uni" };
+  }
   try {
-    const r = await fetch(SUPABASE_INSUMOS_ENDPOINT, { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" }, body: JSON.stringify({ cod: c, nombre: n || null, creado_por: _ins.legajo || null }) });
-    if (!r.ok && r.status !== 409 && !(r.status >= 400 && r.status < 500)) throw new Error("HTTP " + r.status);
-  } catch (_e) { /* sin red: igual lo agrego a la lista para poder registrar el movimiento (queda en el catálogo cuando vuelva la conexión via insumo nuevo más tarde) */ }
-  _ins.items.push({ cod: c, nombre: n, stock: 0, qty: 0 }); _ins.items.sort(_insSortCod); _ins.filtro = c; insRender();
+    await fetch(SUPABASE_INSUMOS_ENDPOINT, { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" }, body: JSON.stringify({ cod: item.cod, nombre: item.nombre || null, sector: item.sector || null, creado_por: _ins.legajo || null }) });
+  } catch (_e) { /* sin red: igual va a la lista */ }
+  _ins.items.push(item); _ins.items.sort(_insSortCod); _ins.filtro = ""; insRender();
 }
 function insConfirmar() {
   if (!_ins) return;
   const isIn = _ins.mode === "RI";
   const sel = _ins.items.filter(function (it) { return it.qty > 0; });
   if (!sel.length) return;
-  const rows = sel.map(function (it) { return { cod_art: it.cod, descripcion: it.nombre || null, deposito: "insumos", delta: isIn ? it.qty : -it.qty, tipo: isIn ? "recepcion_insumo" : "entrega_insumo", ref: null, legajo: _ins.legajo || null }; });
+  const rows = sel.map(function (it) { return { cod_art: it.cod, descripcion: it.nombre || null, deposito: "insumos", delta: isIn ? it.qty : -it.qty, tipo: isIn ? "recepcion_insumo" : "entrega_insumo", ref: null, legajo: _ins.legajo || null, unidad: it.unidad || "Uni", ubicacion: it.sector || null }; });
   const tot = sel.reduce(function (s, it) { return s + it.qty; }, 0);
   closeIns();
   stockMove(rows);   // offline-safe (vir_stock_pend)
-  try { alert("✓ " + (isIn ? "Entrada" : "Salida") + " registrada: " + tot + " unidad(es) de insumos."); } catch (_e) {}
+  try { alert("✓ " + (isIn ? "Entrada" : "Salida") + " registrada: " + sel.length + " insumo(s)."); } catch (_e) {}
 }
 function closeIns() { const ov = document.getElementById("insModal"); if (ov) ov.classList.remove("show"); _ins = null; }
 
