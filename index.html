@@ -5291,7 +5291,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v4.43";
+const APP_VERSION = "v4.44";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -7996,7 +7996,7 @@ function stkBodyRacks() {
   if (!props.length) h += '<div class="stk-empty">Nada para aprobar.</div>';
   else h += props.map(function (b) {
     const u = stkUnits(Number(b.cajas), b.cod_art, _stk.factors);
-    return '<div class="stk-rk-baj"><div class="stk-rk-baji"><span class="stk-cod">' + escapeHtml(b.cod_art) + '</span> <span class="stk-desc">' + escapeHtml(b.descripcion || "") + '</span><div class="stk-rk-q">' + b.cajas + " cajas" + (u ? " · " + u : "") + '</div></div><button class="stk-btn ok" onclick="racksAprobar(' + b.id + ')">✓ Aprobar</button></div>';
+    return '<div class="stk-rk-baj"><div class="stk-rk-baji"><span class="stk-cod">' + escapeHtml(b.cod_art) + '</span> <span class="stk-desc">' + escapeHtml(artNombre(b.cod_art, b.descripcion) || "") + '</span><div class="stk-rk-q">' + b.cajas + " cajas" + (u ? " · " + u : "") + '</div></div><button class="stk-btn ok" onclick="racksAprobar(' + b.id + ')">✓ Aprobar</button></div>';
   }).join("");
   const saldos = stockComputeSaldos(_stk.movs, _stk.cutoff);
   const arts = Object.keys(saldos).map(function (k) { return saldos[k]; }).filter(function (a) { return (a.racks || 0) !== 0; }).sort(function (a, b) { return (parseInt(a.cod, 10) || 0) - (parseInt(b.cod, 10) || 0); });
@@ -8067,9 +8067,9 @@ async function showBajarRacks(ordenId) {
   ov.classList.add("show");
   ov.innerHTML = '<div class="br-card"><div class="br-head"><span class="br-title">📦 Bajar racks → góndola</span><button class="br-close" onclick="closeBajarRacks()">Cerrar</button></div><div class="br-body" id="brBody"><div class="br-loading">Cargando stock de racks…</div></div></div>';
   try {
-    const res = await Promise.all([stockFetchMovs(), stockGetCutoff(), stockFetchArtFactors()]);
+    const res = await Promise.all([stockFetchMovs(), stockGetCutoff(), stockFetchArtFactors(), loadArtNombres()]);
     const saldos = stockComputeSaldos(res[0] || [], res[1]);
-    const items = Object.keys(saldos).map(function (k) { return saldos[k]; }).filter(function (a) { return (a.racks || 0) > 0; }).sort(function (a, b) { return (parseInt(a.cod, 10) || 0) - (parseInt(b.cod, 10) || 0); }).map(function (a) { return { cod: a.cod, desc: a.desc, disponible: a.racks, bajar: 0 }; });
+    const items = Object.keys(saldos).map(function (k) { return saldos[k]; }).filter(function (a) { return (a.racks || 0) > 0; }).sort(function (a, b) { return (parseInt(a.cod, 10) || 0) - (parseInt(b.cod, 10) || 0); }).map(function (a) { return { cod: a.cod, desc: artNombre(a.cod, a.desc), disponible: a.racks, bajar: 0 }; });
     _br = { ordenId: ordenId, legajo: String((typeof legajoInput !== "undefined" && legajoInput && legajoInput.value) || "").trim(), factors: res[2] || {}, items: items };
     brRender();
   } catch (e) { const b = document.getElementById("brBody"); if (b) b.innerHTML = '<div class="br-loading">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
@@ -8292,9 +8292,9 @@ async function showMGModal(legajo) {
   ov.classList.add("show");
   ov.innerHTML = '<div class="mg-card"><div class="mg-head"><span class="mg-title">📥 Guardar a góndola</span><button class="mg-close" onclick="closeMG()">Cerrar</button></div><div class="mg-body" id="mgBody"><div class="mg-loading">Cargando lo que hay para guardar…</div></div></div>';
   try {
-    const res = await Promise.all([stockFetchMovs(), stockGetCutoff()]);
+    const res = await Promise.all([stockFetchMovs(), stockGetCutoff(), loadArtNombres()]);
     const saldos = stockComputeSaldos(res[0] || [], res[1]);
-    const items = Object.keys(saldos).map(function (k) { return saldos[k]; }).filter(function (a) { return a.a_guardar > 0; }).sort(function (a, b) { return (parseInt(a.cod, 10) || 0) - (parseInt(b.cod, 10) || 0); }).map(function (a) { return { cod: a.cod, desc: a.desc, disponible: a.a_guardar, cargar: 0, exc: 0, ubic: "" }; });
+    const items = Object.keys(saldos).map(function (k) { return saldos[k]; }).filter(function (a) { return a.a_guardar > 0; }).sort(function (a, b) { return (parseInt(a.cod, 10) || 0) - (parseInt(b.cod, 10) || 0); }).map(function (a) { return { cod: a.cod, desc: artNombre(a.cod, a.desc), disponible: a.a_guardar, cargar: 0, exc: 0, ubic: "" }; });
     _mg = { legajo: String(legajo || ""), items: items, filtro: "" };
     mgRender();
   } catch (e) { const b = document.getElementById("mgBody"); if (b) b.innerHTML = '<div class="mg-loading">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }

@@ -4,7 +4,14 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-27 · Versión app al documentar: **v4.43**
+> Última actualización: 2026-06-27 · Versión app al documentar: **v4.44**
+>
+> Nota: **v4.44** — **Nombres consistentes también en operario**. El lookup `artNombre` (vista
+> `vista_nombres_articulos`, ver v4.43) ahora también se usa en los módulos **operario** que muestran
+> artículo terminado: **MG (Guardar a góndola)** y **Bajar racks → góndola**, más la fila de
+> aprobación de bajadas en el admin de Racks. Antes mostraban la descripción del movimiento (Excel) y
+> quedaban inconsistentes con el admin. *Picking* sigue sin nombre (es por **código + sector**, a
+> propósito) e *Insumos* mantiene su propio nombre (no son artículo terminado, no van por la vista).
 >
 > Nota: **v4.43** — **Nombres de artículo: fuente corregida**. La v4.41 sacaba la descripción de
 > `Articulos_Cajas`, que **tiene códigos duplicados** (ej. `026` aparece como *Colador N°8* y también
