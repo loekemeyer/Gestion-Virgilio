@@ -4,7 +4,14 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-27 · Versión app al documentar: **v4.30**
+> Última actualización: 2026-06-27 · Versión app al documentar: **v4.32**
+>
+> Nota: **v4.32** — Tabla de **Stocks** mide según el contenido (`.stk-tbl-fit` = `width:auto`), no estira a
+> 100% (sin huecos al pedo). Columnas: Código · Descripción · una por sector con stock (Góndola y A guardar
+> siempre; Excedente/Racks/A separar/A facturar si hay) · "✚". Arriba, la tira de totales por sector.
+>
+> Nota: **v4.31** — **OC máximo topado a la capacidad de góndola** (proy×índice ≤ capacidad; marca ⤓ en el
+> generador cuando topa) + la vista **Capacidad** compara contra el máximo generado (proy×índice), no `max_cajas`.
 >
 > Nota: **v4.30** — **Stocks / Ingresos / Salidas unificados** en una sola solapa con un **segmento** arriba
 > (default "📊 Stock"; `stkBodyStocksTab`/`stkSetView`, estado `_stk.stkView`). Las solapas del admin de Stock
