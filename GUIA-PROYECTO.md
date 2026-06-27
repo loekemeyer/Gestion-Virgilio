@@ -17,7 +17,13 @@
 > **Anomalías de stock**: función `check_stock_anomalias()` + cron `check-stock-anomalias` (diario
 > 11:00 UTC / 08:00 AR) → si hay **saldos negativos** (imposibles) avisa por Telegram (outbox, dedup
 > por día). (4) **6 sub-agentes** de revisión en `.claude/agents/`: `revisor-render`, `guardian-stock`,
-> `auditor-supabase`, `guardian-tests`, `auditor-consistencia`, `keeper-guia`.
+> `auditor-supabase`, `guardian-tests`, `auditor-consistencia`, `keeper-guia`. **Hardening de seguridad**
+> (de la auditoría del `auditor-supabase`): las funciones internas de Telegram/anomalías (`tg_enqueue`,
+> `tg_outbox_flush`, `check_stock_anomalias`, `notificar_excedente_telegram`) ya **NO son ejecutables
+> vía RPC** (se revocó `EXECUTE` de `PUBLIC`; corren solo desde sus triggers/cron como owner) y tienen
+> `search_path` fijado; y `telegram_outbox` pasó a tener **RLS prendida** (la app no la toca directo;
+> solo la usan esas funciones `SECURITY DEFINER` y el cron). La vista `vista_saldos_stock` fue
+> **validada por el `guardian-stock`**: coincide 100% con `stockComputeSaldos` (288 art, 0 diferencias).
 >
 > Nota: **v4.49** — **Rediseño del paso de picking** (`pkRender`). (1) Cabecera: **SECTOR (sin guion) a la
 > izquierda + CÓDIGO a la derecha**, ambos grandes (`bigRow`, reusado en el paso normal y en la pantalla
