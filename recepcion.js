@@ -879,6 +879,27 @@ async function opEnviar() {
     } catch (_e) {}
   }
 
+  // v4.61 — AVISO recepción sin planimetría: si llegan códigos que NO tienen lugar en
+  // la góndola (window.GONDOLA, planimetría), se emite un evento RSP → trigger Telegram
+  // + categoría "sin_planimetria" en el tablero Agentes. Best-effort, no bloquea.
+  try {
+    const G = (typeof window !== "undefined" && window.GONDOLA) ? window.GONDOLA : null;
+    if (G) {
+      const norm = c => String(c == null ? "" : c).toUpperCase().trim().replace(/^0+(?=.)/, "");
+      const seen = {}, sinLugar = [];
+      items.forEach(i => { const k = norm(i.cod); if (k && !G[k] && !seen[k]) { seen[k] = 1; sinLugar.push(String(i.cod)); } });
+      if (sinLugar.length) {
+        const cid = "rsp_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+        supabase.from("Registros_Produccion_Virgilio").insert({
+          client_id: cid, legajo: String(RECP.legajo || ""), opcion: "RSP",
+          descripcion: "Recepción sin planimetría",
+          texto: (opState.remito || "s/remito") + "|" + sinLugar.join(","),
+          ts_cliente: new Date().toISOString()
+        }).then(() => {}, () => {});
+      }
+    }
+  } catch (_e) {}
+
   // Registro para el checklist de Marianela (un renglón por envío). No bloquea.
   let pendId = null;
   try {

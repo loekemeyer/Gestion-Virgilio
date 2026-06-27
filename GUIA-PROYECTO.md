@@ -4,7 +4,16 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-27 · Versión app al documentar: **v4.60**
+> Última actualización: 2026-06-27 · Versión app al documentar: **v4.61**
+>
+> Nota: **v4.61** — **Alerta "recibido sin planimetría" (RSP)**. Completa lo que en v4.60 quedó pendiente:
+> ahora la **recepción** (`recepcion.js opEnviar`, tras grabar a `a_guardar`) chequea cada código recibido
+> contra `window.GONDOLA` (la planimetría = planimetria.js + merge Supabase) y, si alguno NO tiene lugar,
+> emite un evento `RSP` (`texto = remito|cod1,cod2`). Nuevo trigger `trg_recepcion_sin_planim_telegram`
+> (función `notificar_recepcion_sin_planim_telegram`, opcion='RSP') → Telegram "📦🗺 RECIBIDO SIN
+> PLANIMETRÍA". Ya aparece también en el tablero **Agentes** (categoría `sin_planimetria`, que une PSP de
+> picking + RSP de recepción). Diferencia con PSP: PSP detecta en el **picking** (la tanda trae códigos sin
+> sector); RSP detecta en la **recepción** (llegan códigos sin sector) — más temprano. (`recepcion.js?v=3.66`.)
 >
 > Nota: **v4.60** — **Agentes = espejo de TODO Telegram** (regla del usuario: "todo lo que va por Telegram
 > también lo toman los agentes"). El reporte `generar_reporte_agentes` (cron c/2h) pasó de 6 a **13
