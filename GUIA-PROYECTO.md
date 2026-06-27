@@ -6,6 +6,11 @@
 >
 > Última actualización: 2026-06-27 · Versión app al documentar: **v4.40**
 >
+> Nota (repo, 2026-06-27) — **Suite de smoke-tests** en `tests/` (`bash tests/run.sh`): `node --check sw.js` +
+> `checkhtml.cjs` (sintaxis de los `<script>` inline del index.html — lo que más rompe) + `smoke.cjs` (Playwright:
+> funciones clave existen, sin errores de página, `stockComputeSaldos` ok). Correr antes de pushear. Ver
+> `tests/README.md`.
+>
 > Nota: **v4.40** — **% de entregas de OCs** (vista **📊 % Entregas** en el módulo de OCs). Cruza lo **pedido**
 > (`Ordenes_Compra.cantidad`) contra lo **entregado** (`cantidad_recibida`) por artículo y global → % de
 > cumplimiento del proveedor. Ordenado por peor %. `ocEntregas`/`ocBodyEntregas` (`_oc.view==='entregas'`).
