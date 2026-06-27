@@ -5321,7 +5321,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v4.54";
+const APP_VERSION = "v4.55";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -12484,8 +12484,29 @@ async function pppSubir(tipo) {
       const r = await fetch(endpoint, { method: "POST", headers: headers, body: JSON.stringify(rows.slice(i, i + 1000)) });
       if (!r.ok) { pppSetStatus("Error subiendo (desde fila " + i + "): HTTP " + r.status, false); return; }
     }
-    pppSetStatus("✓ Listo: " + table + " quedó con " + rows.length + " filas.", true);
+    // VALIDACIÓN (v4.55): re-contar en Supabase para CORROBORAR que se subió de verdad.
+    // Si el conteo real no coincide con lo que mandamos, avisamos fuerte (no decimos
+    // "✓ Listo" en falso). Así, si se equivocan o algo falla, se ve.
+    pppSetStatus("Verificando que haya quedado en la PPP…");
+    const real = await pppCountTable(endpoint);
+    if (real == null) {
+      pppSetStatus("⚠ Subí " + rows.length + " filas a " + table + ", pero NO pude verificar el conteo en la PPP (¿sin conexión?). Volvé a abrir la PPP para confirmar.", false);
+    } else if (real === rows.length) {
+      pppSetStatus("✓ VERIFICADO: " + table + " quedó con " + real + " filas en la PPP (subiste " + rows.length + "). Todo OK.", true);
+    } else {
+      pppSetStatus("⚠ ATENCIÓN: subiste " + rows.length + " filas pero en la PPP quedaron " + real + ". Algo falló — reintentá o revisá los permisos.", false);
+    }
   } catch (e) { pppSetStatus("Sin conexión / error: " + (e.message || e), false); }
+}
+/* Cuenta exacta de filas de una tabla en Supabase (Content-Range con Prefer:
+   count=exact). Sirve para CORROBORAR que un import realmente entró a la PPP. */
+async function pppCountTable(endpoint) {
+  try {
+    const r = await fetch(endpoint + "?select=id&limit=1", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, Prefer: "count=exact" }, cache: "no-store" });
+    if (!r.ok) return null;
+    const m = /\/(\d+)\s*$/.exec(r.headers.get("content-range") || "");
+    return m ? parseInt(m[1], 10) : null;
+  } catch (_e) { return null; }
 }
 
 /* ===== Editor de Mails autorizados (supervisores) — tabla Supabase

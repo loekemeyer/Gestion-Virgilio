@@ -4,7 +4,17 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-27 · Versión app al documentar: **v4.54**
+> Última actualización: 2026-06-27 · Versión app al documentar: **v4.55**
+>
+> Nota: **v4.55** — **Validación de carga a la PPP** (hacia "eliminar el Excel"). La **doble vía** ya
+> existía: picking y programación leen de Supabase (`PPP_Base_Pedidos`, `PPP_Programacion_Diaria`,
+> `PPP_Pedidos_Entregados`) con fallback a Sheets, y el importador in-app (`pppSubir`) sube el Excel a
+> esas tablas (DELETE+INSERT con el JWT del supervisor). **Lo nuevo**: `pppSubir` ahora **verifica** que
+> la carga realmente entró — después del INSERT re-cuenta en Supabase (`pppCountTable`, Content-Range
+> con `Prefer: count=exact`) y compara contra lo que mandó: si coincide dice **"✓ VERIFICADO: N filas"**,
+> si no, avisa **fuerte** ("⚠ subiste N pero quedaron M — algo falló"). Antes decía "✓ Listo" usando el
+> conteo local (podía mentir si el INSERT fallaba en silencio). Pendiente (más grande, a confirmar):
+> **carga manual** de picking/programación sin Excel (data-entry directo en el programa).
 >
 > Nota: **v4.54** — **Override de barrios mal escritos + tidy en errores** (sigue de v4.53). (1) Si un
 > barrio viene con **typo** que no matchea ninguno conocido, ahora se puede **corregir**: en la celda de
