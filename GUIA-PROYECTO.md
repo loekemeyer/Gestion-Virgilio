@@ -4,7 +4,17 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-27 · Versión app al documentar: **v4.53**
+> Última actualización: 2026-06-27 · Versión app al documentar: **v4.54**
+>
+> Nota: **v4.54** — **Override de barrios mal escritos + tidy en errores** (sigue de v4.53). (1) Si un
+> barrio viene con **typo** que no matchea ninguno conocido, ahora se puede **corregir**: en la celda de
+> Zona de los pedidos sin reconocer hay un botón **✎** → `pppCorregirBarrioNp(np)` pide el barrio
+> correcto (de la lista conocida) y guarda un **alias** (localStorage `vir_ppp_barrio_alias`, typo →
+> barrio canónico). De ahí en más ese barrio toma **nombre canónico + zona** solo (`pppAliasResolve`
+> lo consulta desde `pppZonaDeBarrio` y `pppLocDisp`). (2) El **display prolijo** (`pppLocDisp`) se
+> aplicó también en los **mensajes de error** de la PPP (antes mostraban el barrio crudo). Nota: "barrios
+> sin mapear en Agentes" NO se hizo: el reporte de Agentes corre en el server (cron) y el diccionario de
+> barrios vive en el front — se surfacean y corrigen en la PPP misma (el ✎ + el desplegable de zona).
 >
 > Nota: **v4.53** — **Barrio/Localidad prolijo en la PPP**. Aunque en el Excel venga en MAYÚSCULAS, con
 > acentos raros, paréntesis o variantes, ahora se muestra lindo: `pppLocDisp(s)` → si el barrio es

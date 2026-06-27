@@ -5321,7 +5321,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v4.53";
+const APP_VERSION = "v4.54";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -11520,7 +11520,7 @@ function _pppSugHtml(s) {
     for (const p of t.pedidos) h += '<tr><td>' + escapeHtml(String(p.np)) + '</td><td>' + escapeHtml(p.cod || "") + '</td><td>' + escapeHtml(p.razon_social || "") + '</td><td>' + escapeHtml(pppLocDisp(p.localidad)) + '</td><td class="num">' + (p.m3 != null ? Number(p.m3).toFixed(2) : "") + '</td></tr>';
     h += '</tbody></table>';
   }
-  if (s.sinZona && s.sinZona.length) h += '<div class="ppp-sug-sinzona">⚠ ' + s.sinZona.length + ' pedido(s) SIN ZONA quedaron fuera (asigná el barrio en el Excel): ' + s.sinZona.map(function (p) { return escapeHtml(String(p.np)) + " (" + escapeHtml(p.localidad || "?") + ")"; }).join(" · ") + '</div>';
+  if (s.sinZona && s.sinZona.length) h += '<div class="ppp-sug-sinzona">⚠ ' + s.sinZona.length + ' pedido(s) SIN ZONA quedaron fuera (asigná el barrio en el Excel): ' + s.sinZona.map(function (p) { return escapeHtml(String(p.np)) + " (" + escapeHtml(pppLocDisp(p.localidad) || "?") + ")"; }).join(" · ") + '</div>';
   h += '<div class="ppp-sug-tot">TOTAL: ' + np + ' pedidos · ' + s.tandas.length + ' tandas · ' + tot.toFixed(2) + ' m³</div></div>';
   return h;
 }
@@ -11663,13 +11663,35 @@ function pppLocDispMap() {
 function pppLocDisp(s) {
   const raw = String(s == null ? "" : s).replace(/\s+/g, " ").trim();
   if (!raw) return "";
-  const m = pppLocDispMap()[pppNormBarrio(raw)];
+  const m = pppLocDispMap()[pppAliasResolve(raw)];
   return m || pppTitleCase(raw);
+}
+/* v4.53 — Override de barrios MAL ESCRITOS (alias): mapea un barrio con typo a uno
+   CONOCIDO. Una vez corregido, queda guardado (localStorage) y de ahí en más ese
+   barrio toma la zona + el nombre lindo del barrio canónico. pppAliasResolve()
+   devuelve la key normalizada EFECTIVA (después del alias). */
+const PPP_BARRIO_ALIAS_KEY = "vir_ppp_barrio_alias"; let _pppBarrioAlias = null;
+function pppLoadBarrioAlias() { if (_pppBarrioAlias) return _pppBarrioAlias; try { _pppBarrioAlias = JSON.parse(localStorage.getItem(PPP_BARRIO_ALIAS_KEY) || "{}"); } catch (_e) { _pppBarrioAlias = {}; } if (!_pppBarrioAlias || typeof _pppBarrioAlias !== "object") _pppBarrioAlias = {}; return _pppBarrioAlias; }
+function pppSaveBarrioAlias() { try { localStorage.setItem(PPP_BARRIO_ALIAS_KEY, JSON.stringify(_pppBarrioAlias || {})); } catch (_e) {} }
+function pppAliasResolve(barrio) { const k = pppNormBarrio(barrio); if (!k) return ""; const a = pppLoadBarrioAlias()[k]; return a ? pppNormBarrio(a) : k; }
+/* Corregir un barrio mal escrito a uno conocido (lo pide por NP, busca la localidad,
+   y pide el barrio correcto). Guarda el alias y re-renderiza. */
+function pppCorregirBarrioNp(np) {
+  np = String(np); const arr = _pppParsed.prog || []; let b = "";
+  for (const p of arr) { if (String(p.np) === np) { b = p.localidad || ""; break; } }
+  if (!b) return;
+  const lista = Object.keys(PPP_BARRIO_ZONA).map(function (k) { return pppLocDispMap()[k]; }).sort();
+  let ans = ""; try { ans = String((typeof prompt === "function" ? prompt("Barrio mal escrito: \"" + b + "\"\n¿Cuál es el correcto? (escribí un barrio conocido)\nEj: " + lista.slice(0, 10).join(", ") + "…") : "") || ""); } catch (_e) { return; }
+  ans = ans.trim(); if (!ans) return;
+  const k = pppNormBarrio(ans);
+  if (!PPP_BARRIO_ZONA[k]) { try { alert("\"" + ans + "\" no es un barrio conocido.\nEscribí uno de la lista, o asignale la zona con el desplegable."); } catch (_e) {} return; }
+  const o = pppLoadBarrioAlias(); o[pppNormBarrio(b)] = ans; pppSaveBarrioAlias();
+  try { pppRenderProg(); } catch (_e) {}
 }
 const PPP_ZONA_OVR_KEY = "vir_ppp_zona_ovr"; let _pppZonaOvr = null;
 function pppLoadZonaOvr() { if (_pppZonaOvr) return _pppZonaOvr; try { _pppZonaOvr = JSON.parse(localStorage.getItem(PPP_ZONA_OVR_KEY) || "{}"); } catch (_e) { _pppZonaOvr = {}; } if (!_pppZonaOvr || typeof _pppZonaOvr !== "object") _pppZonaOvr = {}; return _pppZonaOvr; }
 function pppSaveZonaOvr() { try { localStorage.setItem(PPP_ZONA_OVR_KEY, JSON.stringify(_pppZonaOvr || {})); } catch (_e) {} }
-function pppZonaDeBarrio(barrio) { const k = pppNormBarrio(barrio); if (!k) return ""; return pppLoadZonaOvr()[k] || PPP_BARRIO_ZONA[k] || ""; }
+function pppZonaDeBarrio(barrio) { const k = pppAliasResolve(barrio); if (!k) return ""; return pppLoadZonaOvr()[k] || PPP_BARRIO_ZONA[k] || ""; }
 function pppAsignarZona(np, zona) { np = String(np); const arr = _pppParsed.prog || []; let b = ""; for (const p of arr) { if (String(p.np) === np) { b = p.localidad || ""; break; } } if (!b || !zona) return; const o = pppLoadZonaOvr(); o[pppNormBarrio(b)] = zona; pppSaveZonaOvr(); pppRenderProg(); }
 function pppZonaClass(z) { if (z === "Super") return "zsuper"; if (z === "Retira") return "zretira"; if (z === "Expo") return "zexpo"; const m = /Zona\s*(\d)/.exec(z); return m ? ("z" + m[1]) : ""; }
 function pppZonaCell(p) {
@@ -11678,7 +11700,7 @@ function pppZonaCell(p) {
   if (b) {
     const npE = escapeHtml(String(p.np));
     const opt = '<option value="">⚠ asignar…</option>' + PPP_ZONAS.map(function (zz) { return '<option value="' + escapeHtml(zz) + '">' + escapeHtml(PPP_ZONA_SHORT[zz] || zz) + '</option>'; }).join("");
-    return '<select class="ppp-edit ppp-zsel" onchange="pppAsignarZona(\'' + npE + '\',this.value)">' + opt + '</select>';
+    return '<select class="ppp-edit ppp-zsel" onchange="pppAsignarZona(\'' + npE + '\',this.value)">' + opt + '</select> <button class="ppp-edit" title="El barrio está mal escrito — corregirlo a uno conocido" onclick="pppCorregirBarrioNp(\'' + npE + '\')">✎</button>';
   }
   return '';
 }
@@ -12255,8 +12277,8 @@ function pppErroresHtml(e) {
   const cli = function (p) { const r = (p.razon_social || "").trim(); return r ? " " + escapeHtml(r.slice(0, 20)) : ""; };
   let h = '<div class="ppp-errpanel"><div class="ppp-errpanel-h">🚨 ' + n + ' cosa(s) para revisar/corregir en el Excel</div>';
   if (e.sacar.length)     h += '<div class="ppp-ei bad">🚮 <b>Ya entregados — SACAR (' + e.sacar.length + '):</b> ' + e.sacar.map(function (p) { return np(p) + cli(p); }).join(" · ") + '</div>';
-  if (e.sinZona.length)   h += '<div class="ppp-ei warn">⚠ <b>Sin zona (' + e.sinZona.length + '):</b> ' + e.sinZona.map(function (p) { return np(p) + " — " + escapeHtml(p.localidad || "?"); }).join(" · ") + '</div>';
-  if (e.zonaDif.length)   h += '<div class="ppp-ei warn">⚠ <b>Zona no coincide (' + e.zonaDif.length + '):</b> ' + e.zonaDif.map(function (p) { return np(p) + " [" + escapeHtml(p.localidad || "?") + ": Excel=" + escapeHtml(p.zona || "—") + " / barrio=" + escapeHtml(pppZonaDeBarrio(p.localidad) || "—") + "]"; }).join(" · ") + '</div>';
+  if (e.sinZona.length)   h += '<div class="ppp-ei warn">⚠ <b>Sin zona (' + e.sinZona.length + '):</b> ' + e.sinZona.map(function (p) { return np(p) + " — " + escapeHtml(pppLocDisp(p.localidad) || "?"); }).join(" · ") + '</div>';
+  if (e.zonaDif.length)   h += '<div class="ppp-ei warn">⚠ <b>Zona no coincide (' + e.zonaDif.length + '):</b> ' + e.zonaDif.map(function (p) { return np(p) + " [" + escapeHtml(pppLocDisp(p.localidad) || "?") + ": Excel=" + escapeHtml(p.zona || "—") + " / barrio=" + escapeHtml(pppZonaDeBarrio(p.localidad) || "—") + "]"; }).join(" · ") + '</div>';
   if (e.tandasMal.length) h += '<div class="ppp-ei warn">⚠ <b>Tandas inconsistentes (' + e.tandasMal.length + '):</b> ' + e.tandasMal.map(function (t) { return escapeHtml(t.tanda) + (t.rutas > 1 ? " (rutas mezcladas)" : "") + (t.fechas > 1 ? " (varias fechas)" : ""); }).join(" · ") + '</div>';
   h += '</div>';
   return h;
