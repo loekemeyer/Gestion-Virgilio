@@ -5285,7 +5285,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v4.33";
+const APP_VERSION = "v4.34";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -7520,7 +7520,7 @@ function stkBodyStocks() {
   const cols = SECT.filter(function (s) { return s.key !== "insumos"; });
   const ncol = 2 + cols.length + 1;
   let th = '<th>Código</th><th>Descripción</th>';
-  cols.forEach(function (c) { th += '<th class="num">' + c.label + '</th>'; });
+  cols.forEach(function (c) { th += '<th class="num">' + c.label.replace(" ", "<br>") + '</th>'; });
   h += '<table class="stk-tbl stk-tbl-fit"><thead><tr>' + th + '<th></th></tr></thead><tbody>';
   if (!shown.length) h += '<tr><td colspan="' + ncol + '" class="stk-empty">Sin stock todavía.</td></tr>';
   shown.forEach(function (a) {
