@@ -4,7 +4,17 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-27 · Versión app al documentar: **v4.47**
+> Última actualización: 2026-06-27 · Versión app al documentar: **v4.48**
+>
+> Nota: **v4.48** — **Picking: botón “Tiene Excedente” + ajuste de alineación del MG**. (1) En cada
+> paso del picking (no en los de excedente) hay un botón **“📦 Tiene Excedente — anotar ubicación”**:
+> como todavía no está cargado qué artículos tienen excedente, el operario lo marca a mano → **pop-up**
+> (`prompt`) que pide la ubicación (1 letra + 2 letras) → agrega un **paso de excedente al final** del
+> picking para ir a buscarlo ahí (`pkMarkExcedente`, reusa el render `isExc`; `manualExc=true`,
+> `key=art·EXC`, `esp` = el pedido como referencia). ⚠ Pendiente a confirmar: la cantidad objetivo del
+> paso manual usa el pedido (no resta lo de góndola). (2) MG: el recuadro **“¿Hay Excedente?”** estaba
+> levemente más abajo que el de Góndola → se alineó (label arriba como “GÓNDOLA”, tilde en una caja de
+> 50px igual que el stepper) y se centraron los textos.
 >
 > Nota: **v4.47** — **MG botonera en 2 estados** (pedido del usuario sobre la v4.46). Por defecto cada
 > código muestra el stepper de **Góndola grande y centrado** (caja verde) y a la derecha un recuadro
