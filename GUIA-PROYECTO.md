@@ -4,7 +4,22 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-27 · Versión app al documentar: **v4.59**
+> Última actualización: 2026-06-27 · Versión app al documentar: **v4.60**
+>
+> Nota: **v4.60** — **Agentes = espejo de TODO Telegram** (regla del usuario: "todo lo que va por Telegram
+> también lo toman los agentes"). El reporte `generar_reporte_agentes` (cron c/2h) pasó de 6 a **13
+> categorías**: se sumaron las que solo iban a Telegram → `excedente` (Movimientos_Stock, góndola llena),
+> `carga_sin_control` (★ medido por **estado**: CCN cargado al camión sin su CRN de control >30 h, no por
+> el evento CRA que casi no se emite), `mg_fuera_lista` (MGX), `picking_sin_stock` (SSG), `ppp_error`
+> (PPE, último chequeo), `sin_planimetria` (PSP picking **+ RSP recepción**), `falta_facturacion`
+> (entrega hoy/mañana con armado TAP sin `Facturacion_NP`). Además se **corrigió `faltante`**: ahora
+> filtra `rea<esp` (antes mostraba PKC que NO eran faltante, ej. "puso 1 de 1"). El overlay `agtRender`
+> lista las 13 con su color/ícono/hint, y el **termómetro de estabilidad** ahora cuenta los errores de
+> operario reales (`error_envio` + `picking_sin_stock` + `carga_sin_control` + `mg_fuera_lista` +
+> `error_app`), no solo crashes/envíos. Mapa completo de alertas Telegram ↔ categoría Agentes en
+> `generar_reporte_agentes`. Pendiente: detección de "recibido sin planimetría" en `recepcion.js` (emite
+> `RSP`, la categoría ya lo contempla). ⚠ Hallazgo de seguridad (de paso): el **token del bot de
+> Telegram está hardcodeado** en `tg_outbox_flush()` — conviene moverlo a Vault.
 >
 > Nota: **v4.59** — **Optimización: más código y CSS muerto** (sin cambio de comportamiento; sigue de
 > v4.58). (1) Funciones: se removió `idbGetAll` (helper de IndexedDB sin caller en la página — el flush

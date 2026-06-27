@@ -5173,7 +5173,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v4.59";
+const APP_VERSION = "v4.60";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -7535,7 +7535,7 @@ let _agt = null;
 async function openAgentesAdmin() {
   if (!document.getElementById("agtCss")) {
     const s = document.createElement("style"); s.id = "agtCss";
-    s.textContent = "#agentesAdminOverlay{display:none;position:fixed;inset:0;z-index:1280;background:rgba(2,6,23,.74);overflow:auto;padding:14px;}#agentesAdminOverlay.show{display:block;}.agt-card{background:#f8fafc;max-width:860px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.agt-head{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:linear-gradient(90deg,#0f766e,#0b3b36);color:#fff;}.agt-title{font-size:19px;font-weight:800;}.agt-close{background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;width:auto;}.agt-body{padding:14px 16px;}.agt-loading,.agt-empty{padding:24px;text-align:center;color:#64748b;}.agt-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#1e6bd6;}.stk-rep-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:12px;flex-wrap:wrap;}.stk-rep-head b{font-size:16px;}.stk-rep-gen{font-size:12px;color:#64748b;}.stk-rep-ok{padding:30px;text-align:center;color:#15803d;font-weight:800;font-size:18px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;}.stk-rep-ok small{display:block;color:#64748b;font-weight:600;font-size:13px;margin-top:6px;}.stk-rep-cat{border:1px solid #e2e8f0;border-radius:12px;padding:11px 13px;margin-bottom:11px;}.stk-rep-cat.stock_negativo{background:#fef2f2;border-color:#fecaca;}.stk-rep-cat.error_app{background:#fff7ed;border-color:#fed7aa;}.stk-rep-cat.outbox{background:#fffbeb;border-color:#fde68a;}.stk-rep-cat-h{font-weight:800;font-size:14.5px;color:#0f172a;display:flex;align-items:center;gap:8px;}.stk-rep-n{background:#0f172a;color:#fff;border-radius:999px;font-size:12px;padding:1px 9px;font-weight:800;}.stk-rep-hint{font-size:12px;color:#64748b;margin:3px 0 8px;}.stk-rep-row{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-top:1px solid rgba(0,0,0,.06);font-size:13.5px;flex-wrap:wrap;}.stk-rep-t{font-weight:700;color:#0f172a;}.stk-rep-d{color:#475569;font-size:12.5px;text-align:right;}.agt-estab{padding:10px 13px;border-radius:10px;font-weight:800;font-size:13.5px;margin-bottom:12px;}.agt-estab.ok{background:#f0fdf4;border:1px solid #bbf7d0;color:#15803d;}.agt-estab.no{background:#fffbeb;border:1px solid #fde68a;color:#b45309;}.stk-rep-cat.error_envio{background:#fef2f2;border-color:#fecaca;}.stk-rep-cat.faltante{background:#eff6ff;border-color:#bfdbfe;}.stk-rep-cat.oc_baja{background:#fffbeb;border-color:#fde68a;}";
+    s.textContent = "#agentesAdminOverlay{display:none;position:fixed;inset:0;z-index:1280;background:rgba(2,6,23,.74);overflow:auto;padding:14px;}#agentesAdminOverlay.show{display:block;}.agt-card{background:#f8fafc;max-width:860px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.agt-head{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:linear-gradient(90deg,#0f766e,#0b3b36);color:#fff;}.agt-title{font-size:19px;font-weight:800;}.agt-close{background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;width:auto;}.agt-body{padding:14px 16px;}.agt-loading,.agt-empty{padding:24px;text-align:center;color:#64748b;}.agt-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#1e6bd6;}.stk-rep-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:12px;flex-wrap:wrap;}.stk-rep-head b{font-size:16px;}.stk-rep-gen{font-size:12px;color:#64748b;}.stk-rep-ok{padding:30px;text-align:center;color:#15803d;font-weight:800;font-size:18px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;}.stk-rep-ok small{display:block;color:#64748b;font-weight:600;font-size:13px;margin-top:6px;}.stk-rep-cat{border:1px solid #e2e8f0;border-radius:12px;padding:11px 13px;margin-bottom:11px;}.stk-rep-cat.stock_negativo{background:#fef2f2;border-color:#fecaca;}.stk-rep-cat.error_app{background:#fff7ed;border-color:#fed7aa;}.stk-rep-cat.outbox{background:#fffbeb;border-color:#fde68a;}.stk-rep-cat-h{font-weight:800;font-size:14.5px;color:#0f172a;display:flex;align-items:center;gap:8px;}.stk-rep-n{background:#0f172a;color:#fff;border-radius:999px;font-size:12px;padding:1px 9px;font-weight:800;}.stk-rep-hint{font-size:12px;color:#64748b;margin:3px 0 8px;}.stk-rep-row{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-top:1px solid rgba(0,0,0,.06);font-size:13.5px;flex-wrap:wrap;}.stk-rep-t{font-weight:700;color:#0f172a;}.stk-rep-d{color:#475569;font-size:12.5px;text-align:right;}.agt-estab{padding:10px 13px;border-radius:10px;font-weight:800;font-size:13.5px;margin-bottom:12px;}.agt-estab.ok{background:#f0fdf4;border:1px solid #bbf7d0;color:#15803d;}.agt-estab.no{background:#fffbeb;border:1px solid #fde68a;color:#b45309;}.stk-rep-cat.error_envio{background:#fef2f2;border-color:#fecaca;}.stk-rep-cat.faltante{background:#eff6ff;border-color:#bfdbfe;}.stk-rep-cat.oc_baja{background:#fffbeb;border-color:#fde68a;}.stk-rep-cat.falta_facturacion{background:#fef2f2;border-color:#fecaca;}.stk-rep-cat.carga_sin_control{background:#fef2f2;border-color:#fecaca;}.stk-rep-cat.picking_sin_stock{background:#fef2f2;border-color:#fecaca;}.stk-rep-cat.mg_fuera_lista{background:#fff7ed;border-color:#fed7aa;}.stk-rep-cat.sin_planimetria{background:#eff6ff;border-color:#bfdbfe;}.stk-rep-cat.excedente{background:#fffbeb;border-color:#fde68a;}.stk-rep-cat.ppp_error{background:#fffbeb;border-color:#fde68a;}";
     document.head.appendChild(s);
   }
   let ov = document.getElementById("agentesAdminOverlay");
@@ -7559,17 +7559,27 @@ async function agtFetchReporte() {
 function agtRender() {
   const body = document.getElementById("agtBody"); if (!body || !_agt) return;
   const rows = _agt.rows || [], gen = _agt.gen || "";
+  // Todas las categorías reflejan también lo que sale por Telegram (regla: todo aviso de
+  // Telegram aparece acá). Orden = qué mirar/accionar primero.
   const CATS = [
     { key: "stock_negativo", icon: "⚠", titulo: "Stock negativo (saldo imposible)", hint: "El picking descontó más de lo que había cargado. Cargá/ajustá el inicial." },
-    { key: "error_app", icon: "🐛", titulo: "Errores de la app (últimos 7 días)", hint: "Crashes de JS que vieron los operarios. Si se repite, hay que arreglarlo." },
+    { key: "falta_facturacion", icon: "🧾", titulo: "Falta facturar (entrega hoy/mañana)", hint: "Tandas con armado terminado y SIN facturar para una entrega inminente." },
+    { key: "carga_sin_control", icon: "🚨", titulo: "Cargado al camión sin controlar", hint: "NPs cargados hace +30 h y nadie controló los remitos — riesgo de error de reparto." },
+    { key: "picking_sin_stock", icon: "🛒", titulo: "Picking sin stock en góndola", hint: "Se sacaron cajas que el sistema NO tenía. Revisá stock / recepción." },
     { key: "error_envio", icon: "📡", titulo: "Envíos que fallaron (operarios)", hint: "Acciones de operarios que NO se subieron a Supabase — lo que hoy no ves." },
+    { key: "mg_fuera_lista", icon: "📥", titulo: "Guardado fuera de lista", hint: "Se guardó un código que no estaba en 'Mercadería a guardar' (¿tipeo en recepción?)." },
     { key: "faltante", icon: "🚚", titulo: "Faltantes en picking (7 días)", hint: "Códigos que faltaron al pickear. Si se repite, revisá stock / inicial." },
+    { key: "sin_planimetria", icon: "🗺", titulo: "Códigos sin lugar en planimetría", hint: "Llegaron / se pickearon códigos sin sector. Agregalos a la hoja Picking del Excel." },
+    { key: "excedente", icon: "📦", titulo: "Guardado a excedente (góndola llena)", hint: "Cajas que no entraron en góndola. Fijate si hay que bajarlas o reubicar." },
     { key: "oc_baja", icon: "📉", titulo: "OCs con entrega baja (<50%)", hint: "Proveedores que entregaron menos de la mitad de lo pedido." },
+    { key: "ppp_error", icon: "🗂", titulo: "Errores en la PPP", hint: "Pedidos sin zona, zona distinta al barrio, tandas mezcladas o ya entregados sin sacar." },
+    { key: "error_app", icon: "🐛", titulo: "Errores de la app (7 días)", hint: "Crashes de JS que vieron los operarios. Si se repite, hay que arreglarlo." },
     { key: "outbox", icon: "📨", titulo: "Telegram sin enviar", hint: "Avisos que quedaron trabados en la cola (>15 min)." }
   ];
   let h = '<div class="stk-rep-head"><div><b>Reporte de agentes</b> — cosas para mirar</div><div class="stk-rep-gen">' + (gen ? "Generado " + escapeHtml(gen) : "") + '</div></div>';
   // Termómetro de estabilidad (para ir soltando lo manual): errores de operarios en 7 días.
-  const errN = rows.filter(function (r) { return r.categoria === "error_app" || r.categoria === "error_envio"; }).length;
+  const ERR = ["error_envio", "picking_sin_stock", "carga_sin_control", "mg_fuera_lista", "error_app"];
+  const errN = rows.filter(function (r) { return ERR.indexOf(r.categoria) >= 0; }).length;
   h += '<div class="agt-estab ' + (errN ? "no" : "ok") + '">' + (errN
     ? "⚠ " + errN + " tipo(s) de error de operarios en los últimos 7 días — revisalos antes de soltar lo manual."
     : "✓ 0 errores de operarios en los últimos 7 días — buena señal para ir soltando lo manual.") + '</div>';
@@ -7579,7 +7589,7 @@ function agtRender() {
     if (!items.length) return;
     h += '<div class="stk-rep-cat ' + c.key + '"><div class="stk-rep-cat-h">' + c.icon + ' ' + escapeHtml(c.titulo) + ' <span class="stk-rep-n">' + items.length + '</span></div><div class="stk-rep-hint">' + escapeHtml(c.hint) + '</div>';
     items.forEach(function (r) {
-      const t = (c.key === "stock_negativo" || c.key === "oc_baja")
+      const t = (c.key === "stock_negativo" || c.key === "oc_baja" || c.key === "excedente")
         ? '<span class="agt-cod">' + escapeHtml(r.titulo) + '</span> ' + escapeHtml(artNombre(r.titulo, ""))
         : escapeHtml(r.titulo);
       h += '<div class="stk-rep-row"><div class="stk-rep-t">' + t + '</div><div class="stk-rep-d">' + escapeHtml(r.detalle || "") + '</div></div>';
