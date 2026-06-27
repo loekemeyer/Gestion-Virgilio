@@ -5285,7 +5285,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v4.28";
+const APP_VERSION = "v4.29";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -7288,6 +7288,7 @@ async function ocNuevaCrear() {
    Ordenes_Compra (escritura: sesión de supervisor). Proveedores INTERNOS (Racks=importación,
    Log/Fabr=fábrica) se muestran pero NO generan OC externa. BETA: no usar hasta cargar el stock. */
 const SUPABASE_OCMAX_ENDPOINT = SUPABASE_URL + "/rest/v1/OC_Maximos";
+const SUPABASE_CAPACIDAD_ENDPOINT = SUPABASE_URL + "/rest/v1/Capacidad_Sector";
 const OCG_INTERNOS = ["RACKS", "LOG/ FABR", "LOG/FABR", "LOG/ FABRICA"];
 function _ocgInterno(prov) { return OCG_INTERNOS.indexOf(String(prov || "").toUpperCase().trim()) >= 0; }
 async function ocgFetchMaximos() {
@@ -7448,14 +7449,14 @@ async function ociSave() {
     _ociChanged = {}; ocRender();
   } catch (e) { alert("Error guardando índices: " + (e.message || e)); }
 }
-function stkTab(t) { if (!_stk) return; if (t === "compras") { openOCAdmin(); return; } _stk.tab = t; _stk.filtro = ""; _stk.openArt = null; stkRender(); }
+function stkTab(t) { if (!_stk) return; if (t === "compras") { openOCAdmin(); return; } _stk.tab = t; _stk.filtro = ""; _stk.openArt = null; if (t === "capacidad" && !_stk.capLoaded) { stkCapLoad(); return; } stkRender(); }
 function stkRender() {
   if (!_stk) return;
-  const tabs = [["stocks", "📊 Stocks"], ["proceso", "📦 A Separar"], ["racks", "🏗 Racks"], ["ingresos", "📥 Ingresos"], ["salidas", "📤 Salidas"], ["ajustes", "⚙ Ajustes"], ["compras", "📑 Compras (OCs)"]];
+  const tabs = [["stocks", "📊 Stocks"], ["proceso", "📦 A Separar"], ["racks", "🏗 Racks"], ["ingresos", "📥 Ingresos"], ["salidas", "📤 Salidas"], ["capacidad", "📐 Capacidad"], ["ajustes", "⚙ Ajustes"], ["compras", "📑 Compras (OCs)"]];
   const tb = document.getElementById("stkTabs");
   if (tb) tb.innerHTML = tabs.map(function (t) { return '<button class="stk-tab' + (_stk.tab === t[0] ? " on" : "") + '" onclick="stkTab(\'' + t[0] + '\')">' + t[1] + '</button>'; }).join("");
   const body = document.getElementById("stkBody"); if (!body) return;
-  _renderKeepFocus(body, _stk.tab === "proceso" ? stkBodyProceso() : _stk.tab === "racks" ? stkBodyRacks() : _stk.tab === "ingresos" ? stkBodyIngresos() : _stk.tab === "salidas" ? stkBodySalidas() : _stk.tab === "ajustes" ? stkBodyAjustes() : stkBodyStocks());
+  _renderKeepFocus(body, _stk.tab === "proceso" ? stkBodyProceso() : _stk.tab === "capacidad" ? stkBodyCapacidad() : _stk.tab === "racks" ? stkBodyRacks() : _stk.tab === "ingresos" ? stkBodyIngresos() : _stk.tab === "salidas" ? stkBodySalidas() : _stk.tab === "ajustes" ? stkBodyAjustes() : stkBodyStocks());
 }
 function stkMvRow(mv) {
   const old = _stk.cutoff && new Date(mv.ts).getTime() < new Date(_stk.cutoff).getTime();
@@ -7563,6 +7564,98 @@ function stkBodyProceso() {
   h += sec("📦 A Separar (pickeado, falta armar)", "Tandas con picking terminado, esperando el armado/separado (TAP).", sep);
   h += sec("🧾 A Facturar (armado, falta facturar)", "Tandas armadas, esperando que Marianela las facture. Al facturarse toda la tanda, salen del stock.", fac);
   return h;
+}
+/* v4.29 — CAPACIDAD POR SECTOR: cuántas cajas de cada artículo entran en góndola
+   (por sector), para comparar con el máximo de OC ("¿el máximo está bien o bajo?").
+   Se pega una tabla "Sector ; código ; cajas max". Un artículo puede tener varios
+   sectores → la capacidad total es la suma. */
+async function stkCapLoad() {
+  if (!_stk) return;
+  _stk.capLoaded = "loading"; stkRender();
+  try {
+    const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+    const res = await Promise.all([
+      fetch(SUPABASE_CAPACIDAD_ENDPOINT + "?select=sector,cod,cajas_max&limit=50000", { headers: H, cache: "no-store" }),
+      fetch(SUPABASE_OCMAX_ENDPOINT + "?select=cod,descripcion,max_cajas&limit=20000", { headers: H, cache: "no-store" })
+    ]);
+    _stk.cap  = res[0].ok ? await res[0].json() : [];
+    _stk.cmax = res[1].ok ? await res[1].json() : [];
+    _stk.capLoaded = true;
+  } catch (_e) { _stk.cap = _stk.cap || []; _stk.cmax = _stk.cmax || []; _stk.capLoaded = true; }
+  if (_stk) stkRender();
+}
+function stkBodyCapacidad() {
+  if (_stk.capLoaded === "loading") return '<div class="stk-loading">Cargando capacidad…</div>';
+  const cap = _stk.cap || [], cmax = _stk.cmax || [];
+  const byCod = {};
+  cap.forEach(function (r) {
+    const k = _ocgNorm(r.cod); if (!k) return;
+    if (!byCod[k]) byCod[k] = { cod: String(r.cod), cajas: 0, sectores: [] };
+    byCod[k].cajas += Number(r.cajas_max) || 0;
+    const s = String(r.sector || "").trim();
+    if (s && byCod[k].sectores.indexOf(s) < 0) byCod[k].sectores.push(s);
+  });
+  const maxByCod = {};
+  cmax.forEach(function (m) { maxByCod[_ocgNorm(m.cod)] = { max: Number(m.max_cajas) || 0, desc: m.descripcion || "" }; });
+  const arts = Object.keys(byCod).map(function (k) {
+    const c = byCod[k], m = maxByCod[k] || {};
+    const capacidad = Math.round(c.cajas * 10) / 10;
+    const max = (m.max != null) ? m.max : null;
+    return { cod: c.cod, desc: m.desc || "", sectores: c.sectores, capacidad: capacidad, max: max, dif: (max != null ? Math.round((capacidad - max) * 10) / 10 : null) };
+  }).sort(function (a, b) { return (parseInt(a.cod, 10) || 0) - (parseInt(b.cod, 10) || 0); });
+  let h = '<div class="stk-cut" style="background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af;">Cuántas cajas de cada artículo <b>entran</b> en góndola (por sector) — para ver si el <b>máximo de OC</b> está bien o bajo. Un artículo puede tener varios sectores; la capacidad es la suma. Pegá la tabla <b>Sector ; código ; cajas max</b> (una por línea).</div>';
+  h += '<textarea id="stkCapTxt" class="stk-ini-txt" rows="5" placeholder="A-12 ; 505 ; 120&#10;B-03 ; 505 ; 80&#10;A-07 ; 506 ; 60"></textarea>';
+  h += '<div class="stk-ini-btns"><button class="stk-btn ok" onclick="stkCapImport()">📥 Importar</button>' + (cap.length ? ' <button class="stk-btn danger" onclick="stkCapBorrar()">Borrar todo</button>' : '') + '</div>';
+  if (!arts.length) return h + '<div class="stk-empty" style="margin-top:12px">Todavía no hay capacidad cargada. Pegá la tabla arriba.</div>';
+  const f = (_stk.filtro || "").toLowerCase();
+  const shown = f ? arts.filter(function (r) { return (r.cod + " " + r.desc + " " + r.sectores.join(" ")).toLowerCase().indexOf(f) >= 0; }) : arts;
+  const totCap = arts.reduce(function (s, r) { return s + r.capacidad; }, 0);
+  const conMax = arts.filter(function (r) { return r.max != null; });
+  const bajos = conMax.filter(function (r) { return r.dif > 0; }).length;     // capacidad > máximo → máximo podría estar bajo
+  const noEntra = conMax.filter(function (r) { return r.dif < 0; }).length;    // máximo > capacidad → no entra
+  h += '<div style="display:flex;flex-wrap:wrap;gap:8px;margin:12px 0;">' +
+    '<span style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:6px 10px;font-size:12px;"><b>' + arts.length + '</b> códigos · <b>' + (Math.round(totCap * 10) / 10) + '</b> cajas de capacidad</span>' +
+    '<span style="background:#dcfce7;border:1px solid #86efac;border-radius:10px;padding:6px 10px;font-size:12px;color:#166534;"><b>' + bajos + '</b> con lugar de sobra (máx bajo)</span>' +
+    '<span style="background:#fee2e2;border:1px solid #fca5a5;border-radius:10px;padding:6px 10px;font-size:12px;color:#991b1b;"><b>' + noEntra + '</b> que no entran (máx alto)</span></div>';
+  h += '<input class="stk-filtro" type="search" placeholder="🔎 Buscar código / sector" value="' + escapeHtml(_stk.filtro) + '" oninput="if(_stk){_stk.filtro=this.value;stkRender();}">';
+  h += '<table class="stk-tbl"><thead><tr><th>Código</th><th>Sectores</th><th class="num">Capacidad</th><th class="num">Máx OC</th><th class="num">Dif</th></tr></thead><tbody>';
+  shown.forEach(function (r) {
+    const flag = (r.max == null) ? '<span style="color:#94a3b8">sin máx</span>'
+      : (r.dif > 0 ? '<span style="color:#15803d;font-weight:800">+' + r.dif + '</span>'
+        : (r.dif < 0 ? '<span style="color:#b91c1c;font-weight:800">' + r.dif + '</span>'
+          : '<span style="color:#1e40af;font-weight:800">0</span>'));
+    h += '<tr><td class="stk-cod">' + escapeHtml(r.cod) + '</td><td style="font-size:12px;color:#475569">' + escapeHtml(r.sectores.join(", ")) + '</td><td class="num"><b>' + r.capacidad + '</b></td><td class="num">' + (r.max != null ? r.max : "—") + '</td><td class="num">' + flag + '</td></tr>';
+  });
+  h += '</tbody></table>';
+  return h;
+}
+async function stkCapImport() {
+  const txt = ((document.getElementById("stkCapTxt") || {}).value) || "";
+  const rows = [];
+  txt.split(/\n/).forEach(function (ln) {
+    const parts = ln.split(/[;\t,|]/).map(function (s) { return s.trim(); });
+    if (parts.length < 3) return;
+    if (/sector/i.test(parts[0]) && /c[oó]d/i.test(parts[1])) return;   // encabezado
+    const sector = parts[0], cod = parts[1].toUpperCase(), cajas = parseFloat(String(parts[2]).replace(",", "."));
+    if (!sector || !cod || isNaN(cajas)) return;
+    rows.push({ sector: sector, cod: cod, cajas_max: cajas });
+  });
+  if (!rows.length) { alert("No saqué filas válidas.\nFormato por línea: Sector ; código ; cajas max"); return; }
+  const headers = await facAuthWriteHeaders({ Prefer: "resolution=merge-duplicates,return=minimal" });
+  if (!headers) { alert("Iniciá sesión de supervisor (Google) para importar la capacidad."); return; }
+  try {
+    const r = await fetch(SUPABASE_CAPACIDAD_ENDPOINT + "?on_conflict=sector,cod", { method: "POST", headers: headers, body: JSON.stringify(rows) });
+    if (!r.ok && r.status !== 409) throw new Error("HTTP " + r.status);
+  } catch (e) { alert("Error importando: " + (e.message || e)); return; }
+  if (_stk) { _stk.capLoaded = false; stkCapLoad(); }
+  try { alert("✓ Importadas " + rows.length + " filas de capacidad."); } catch (_e) {}
+}
+async function stkCapBorrar() {
+  if (!confirm("¿Borrar TODA la capacidad cargada?")) return;
+  const headers = await facAuthWriteHeaders({ Prefer: "return=minimal" });
+  if (!headers) { alert("Iniciá sesión de supervisor para borrar."); return; }
+  try { await fetch(SUPABASE_CAPACIDAD_ENDPOINT + "?id=gt.0", { method: "DELETE", headers: headers }); } catch (_e) {}
+  if (_stk) { _stk.capLoaded = false; stkCapLoad(); }
 }
 function stkBodyIngresos() {
   const ing = _stk.movs.filter(function (mv) { return mv.tipo === "recepcion"; });

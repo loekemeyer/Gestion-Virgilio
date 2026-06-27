@@ -4,7 +4,17 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-27 · Versión app al documentar: **v4.27**
+> Última actualización: 2026-06-27 · Versión app al documentar: **v4.29**
+>
+> Nota: **v4.29** — **Módulo Capacidad por sector** (solapa **📐 Capacidad** en *Stock y Compras*). Tabla
+> **`Capacidad_Sector`** (`sector, cod, cajas_max`, único `(sector,cod)`; RLS read anon + write authenticated).
+> Se **pega** una tabla `Sector ; código ; cajas max` (una por línea; separadores `; , | tab`) → upsert. La vista
+> compara, por código, la **capacidad** (suma de `cajas_max` de todos sus sectores) con el **máximo de OC**
+> (`OC_Maximos.max_cajas`): **dif +** = sobra lugar (máximo podría estar bajo), **dif −** = no entra (máximo alto
+> → iría a excedente). Resumen arriba (códigos, capacidad total, cuántos con máx bajo / no entran). Funciones
+> `stkCapLoad`/`stkBodyCapacidad`/`stkCapImport`/`stkCapBorrar`. Sirve para tunear el índice/máximo de las OCs.
+> ⚠ Muchos sectores son nuevos (la planimetría tiene 1 sector "representativo" por artículo; acá hay varios).
+> (v4.28: centrado de los steppers `–/+` de Racks/Insumos/Cervantes, igual que el MG.)
 >
 > Nota: **v4.27** — **Picking con excedente PARCIAL** (refina v4.26). Si el excedente **no alcanza** lo pedido,
 > la góndola pide **el resto** y el excedente lo que hay. Ej: piden 15, hay 10 en excedente → góndola pide **5**
