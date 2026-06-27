@@ -4,7 +4,23 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-27 · Versión app al documentar: **v4.58**
+> Última actualización: 2026-06-27 · Versión app al documentar: **v4.59**
+>
+> Nota: **v4.59** — **Optimización: más código y CSS muerto** (sin cambio de comportamiento; sigue de
+> v4.58). (1) Funciones: se removió `idbGetAll` (helper de IndexedDB sin caller en la página — el flush
+> por `getAll` lo hace el SW) y el **modal standalone `showLiosModal`** (+ `_liosId`/`liosRender`/
+> `liosClose`/`liosSave`), inalcanzable desde v4.03 cuando los líos se metieron en el wizard Completar.
+> ⚠ Se **conservaron** `liosSend` (lo llama el wizard Completar) y `let _lios` (lo lee un guard de
+> salida). (2) **CSS**: se borraron **73 reglas muertas** (~7,5 KB) de los 2 bloques `<style>` reales —
+> restos de layouts viejos ya reemplazados: `fac-group*`/`fac-tanda-*`/`fac-progress` (Facturación),
+> `monitor-totales`/`monitor-tot-*`/`totales-*`/`monitor-charts-col`/`day-box-clickable` (totales),
+> `monitor-legend`/`legend-*`/`status-pend`, `monitor-tab*`/`incons-badge` (inconsistencias),
+> `pk-fq`/`pk-fq-input`/`pk-prog`/`pk-sector-exc` (picking viejo), `ppp-res*`/`ppp-map*`/`ppp-prev*`/
+> `ppp-subir-btn`/`ppp-over`/`ppp-diag-h`/`ppp-imp-row`, `recp-admin-frame`/`recp-choice*`/`recp-chooser`,
+> `auth-user-*`, `comp-l*`, `lios-inp`/`lios-row`. Método: detector whole-word + guard anti
+> concatenación-dinámica (ej. `inc-row-${sev}` se preservó) + chequeo de llaves balanceadas + smoke +
+> render. Pendiente menor: ~15 clases muertas que viven en CSS inyectado por JS (`mg-*`, `ins-*`,
+> `stk-ini*`). (`SW_VERSION` v4.59-vir.)
 >
 > Nota: **v4.58** — **Limpieza de código muerto** (auditoría de consistencia, sin cambio de comportamiento).
 > Se removieron ~135 líneas sin uso de `index.html`: `readLastLegajo`, `closeCompletar` (duplicado exacto

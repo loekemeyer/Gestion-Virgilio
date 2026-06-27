@@ -113,11 +113,6 @@ button {
 #userTag.hidden { display: none; }
 /* En la pantalla de opciones, bajamos la top-bar para no tapar el #userTag. */
 #optionsScreen .top-bar { margin-top: 30px; }
-.auth-user-row {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 10px; margin-bottom: 12px; font-size: 15px; color: #444;
-}
-.auth-user-email { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .auth-logout-btn {
   width: auto; margin: 0; padding: 6px 14px; font-size: 14px;
   background: #eee; color: #333; border: 1px solid #ccc; flex: 0 0 auto;
@@ -598,14 +593,10 @@ button {
   margin-top: 10px; padding: 8px 10px; border-top: 1px solid #e2e8f0;
   font-size: 13px; color: #334155; line-height: 1.55;
 }
-.monitor-legend .legend-title{ font-weight: bold; color: #475569; margin-bottom: 3px; }
-.monitor-legend .legend-item{ display: block; white-space: nowrap; }
-.monitor-legend .legend-item b{ color: #1e6bd6; }
 #monitorModal.tv .monitor-legend{ border-top-color: #334155; color: #cbd5e1; font-size: 0.9em; }
 #monitorModal.tv .monitor-legend .legend-title{ color: #94a3b8; }
 #monitorModal.tv .monitor-legend .legend-item b{ color: #60a5fa; }
 .status-icon{ font-size: 20px; line-height: 1; }
-.status-pend{ color: #94a3b8; }
 .status-curso{ color: #d97706; }
 .status-done{ color: #16a34a; }
 
@@ -683,31 +674,6 @@ button {
   gap: 8px;
   align-items: flex-start;
 }
-/* Stack vertical de filas de día (hoy + días anteriores). En modo TV puede
-   reflowear a varias columnas para que entre en la altura del viewport. */
-.totales-day-rows{
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  align-items: flex-start;
-}
-.totales-col-fc{
-  /* FC + Total + Charts uno al lado del otro (no apilados) */
-  display: flex;
-  flex-direction: row;
-  gap: 8px;
-  align-items: flex-start;
-  flex-wrap: wrap;
-}
-/* Cards de gráficos productividad (Picking + Pedido) — a la derecha de
-   Total por día. Apilados verticalmente entre sí. */
-.monitor-charts-col{
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  flex: 1 1 320px;
-  min-width: 280px;
-}
 .monitor-chart-card{
   border: 2px solid #cbd5e1;
   border-radius: 8px;
@@ -739,12 +705,6 @@ button {
 #monitorModal.tv .monitor-chart-title{ color: #60a5fa; font-size: clamp(13px, 1.6vh, 18px); }
 #monitorModal.tv .monitor-chart-canvas-wrap{ height: clamp(180px, 22vh, 280px); }
 #monitorModal.tv .monitor-chart-empty{ color: #94a3b8; }
-.totales-row{
-  display: flex;
-  gap: 8px;
-  align-items: flex-start;
-  flex-wrap: wrap;
-}
 
 /* Cuadro "Total por día" — a la derecha del card "Tandas a FC" */
 .monitor-total-card{
@@ -899,13 +859,6 @@ button {
 #monitorModal.tv .beyond-day{ font-size: clamp(12px, 1.5vh, 20px); }
 #monitorModal.tv .beyond-day-header{ color: #60a5fa; }
 #monitorModal.tv .beyond-day-tandas{ color: #94a3b8; }
-
-.monitor-totales{
-  margin-top: 12px;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
 /* POPUP MODE (PC normal): tabla arriba, totales en grid 2 cols abajo.
    En TV mode esto se sobreescribe a grid 50/50 lado a lado. */
 .monitor-flex{ display: block; }
@@ -927,27 +880,6 @@ button {
 }
 .monitor-totales-side .monitor-alert-title{ font-size: 11px; }
 .monitor-totales-side .monitor-alert-chip{ font-size: 11px; padding: 2px 6px; }
-.monitor-tot-box{
-  border: 2px solid #cbd5e1;
-  border-radius: 8px;
-  padding: 10px;
-  text-align: center;
-}
-.monitor-tot-label{ font-size: 12px; color: #555; }
-.monitor-tot-value{ font-size: 22px; font-weight: bold; color: #1e6bd6; margin-top: 2px; }
-
-/* Boxes de día (M3 Picking/Pedido/Empleados) clickeables → modal de
-   rendimiento por operario. */
-.day-box-clickable{
-  cursor: pointer;
-  transition: transform 0.1s, box-shadow 0.1s;
-}
-.day-box-clickable:hover{
-  box-shadow: 0 0 0 2px #60a5fa;
-}
-.day-box-clickable:active{
-  transform: scale(0.97);
-}
 .monitor-loading{ text-align: center; padding: 40px 12px; color: #666; }
 
 /* Banner de alertas — tandas trabajadas pero no en PPP */
@@ -1046,14 +978,6 @@ button {
   /* Cuadros del monitor: una sola columna, no dos */
   .monitor-totales-side{
     grid-template-columns: 1fr;
-  }
-  /* FC + Total → apilados (no en fila como en desktop) */
-  .totales-col-fc{
-    flex-direction: column;
-  }
-  /* Las filas de boxes del día se acomodan con wrap */
-  .totales-row{
-    gap: 6px;
   }
   /* Cards más chicas */
   .monitor-fc-card,
@@ -1782,7 +1706,6 @@ button {
 
 /* Picking interactivo (pop-up al "Empecé Picking"): un artículo por vez. */
 .pk-flow{ display: flex; flex-direction: column; gap: 12px; padding: 4px 2px 2px; }
-.pk-prog{ font-size: 14px; color: #64748b; }
 .pk-nav{ display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .pk-navbtn{ background: #f1f5f9; color: #1e6bd6; border: 1px solid #cbd5e1; border-radius: 10px; padding: 8px 14px; font-size: 15px; font-weight: bold; cursor: pointer; }
 .pk-navbtn:disabled{ color: #cbd5e1; cursor: default; }
@@ -1799,7 +1722,6 @@ button {
 .pk-cajas b{ font-size: 30px; color: #1e6bd6; }
 .pk-skip{ font-size: 18px; color: #92400e; background: #fffbeb; border: 2px solid #f59e0b; border-radius: 12px; padding: 14px 16px; text-align: center; font-weight: 700; line-height: 1.35; }
 .pk-skip b{ color: #b45309; }
-.pk-sector-exc{ background: #fef3c7 !important; color: #92400e !important; }
 .pk-cajas-exc{ font-size: 14px; color: #b45309; font-weight: 700; }
 /* Armado guiado por caja (v2.63) */
 .ar-tot-banner{ font-size: 16px; font-weight: bold; color: #5b21b6; background: #f5f3ff; border: 2px solid #7c3aed; border-radius: 10px; padding: 10px 12px; text-align: center; }
@@ -1821,12 +1743,7 @@ button {
 .recp-admin-bar{ display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 14px; background: #0b1220; color: #f8fafc; border-bottom: 1px solid #334155; }
 .recp-admin-title{ font-size: 18px; font-weight: bold; }
 .recp-admin-close{ width: auto; margin: 0; padding: 10px 18px; background: #1e293b; color: #f8fafc; border: 1px solid #334155; border-radius: 8px; font-size: 15px; font-weight: bold; cursor: pointer; }
-.recp-admin-frame{ flex: 1; width: 100%; border: 0; background: #fff; }
 .recp-admin-back{ width: auto; margin: 0; padding: 10px 16px; background: #1e293b; color: #f8fafc; border: 1px solid #334155; border-radius: 8px; font-size: 15px; font-weight: bold; cursor: pointer; }
-.recp-chooser{ flex: 1; display: flex; align-items: center; justify-content: center; gap: 20px; flex-wrap: wrap; padding: 24px; background: #0b1220; }
-.recp-choice{ width: auto; margin: 0; flex: 0 1 280px; min-height: 200px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 28px; font-size: 24px; font-weight: bold; background: #1e6bd6; color: #fff; border: none; border-radius: 18px; cursor: pointer; transition: background .12s, transform .06s; }
-.recp-choice:hover{ background: #1d4ed8; } .recp-choice:active{ transform: scale(.97); }
-.recp-choice-ico{ font-size: 52px; line-height: 1; }
 /* Editor de Planimetría (v2.78) */
 .planim-body{ flex: 1; overflow: auto; padding: 14px; background: #f8fafc; display: flex; flex-direction: column; align-items: center; gap: 12px; }
 .planim-body > *{ width: 100%; max-width: 560px; box-sizing: border-box; }   /* columna prolija centrada */
@@ -1879,7 +1796,6 @@ button {
 .planim-empty{ color: #94a3b8; padding: 10px; text-align: center; }
 /* Módulo PPP (placeholder/scaffolding) */
 .ppp-warn{ background:#fffbeb; border:1px solid #f59e0b; color:#92400e; border-radius:8px; padding:10px 12px; font-size:13px; margin-bottom:14px; }
-.ppp-imp-row{ display:flex; gap:12px; flex-wrap:wrap; }
 .ppp-imp-btn{ flex:1 1 220px; width:auto; margin:0; min-height:84px; display:flex; align-items:center; justify-content:center; gap:10px; padding:16px; font-size:17px; font-weight:bold; background:#1e6bd6; color:#fff; border:none; border-radius:12px; cursor:pointer; }
 .ppp-imp-btn:hover{ background:#1d4ed8; } .ppp-imp-btn span{ font-size:22px; }
 .ppp-imp-btn.ppp-drag{ background:#15803d; outline:3px dashed #86efac; outline-offset:-6px; }
@@ -1897,25 +1813,14 @@ button {
 .ppp-diag{ background:#fff7ed; border:1px solid #fed7aa; border-radius:8px; padding:8px 12px; margin-bottom:12px; font-size:12px; color:#9a3412; }
 .ppp-diag summary{ cursor:pointer; font-weight:bold; }
 .ppp-diag-grid{ display:flex; flex-wrap:wrap; gap:6px 14px; margin:8px 0; }
-.ppp-diag-grid b{ color:#0f172a; } .ppp-diag-h{ word-break:break-word; } .ppp-falta{ color:#b42318; }
+.ppp-diag-grid b{ color:#0f172a; } .ppp-falta{ color:#b42318; }
 .ppp-diag-tbl{ width:100%; border-collapse:collapse; margin-top:8px; font-size:11px; }
 .ppp-diag-tbl th{ text-align:left; padding:3px 8px; color:#9a3412; border-bottom:1px solid #fed7aa; }
 .ppp-diag-tbl td{ padding:3px 8px; border-bottom:1px solid #ffedd5; color:#0f172a; vertical-align:top; }
 .ppp-diag-tbl td:first-child{ font-family:Consolas,Menlo,monospace; font-weight:bold; color:#9a3412; }
 .ppp-baseinfo .ppp-base-none{ color:#94a3b8; } .ppp-baseinfo .ppp-base-local{ color:#94a3b8; font-size:12px; }
 .ppp-preview{ margin-top:6px; }
-.ppp-prev-h{ font-size:13px; color:#334155; margin-bottom:8px; } .ppp-prev-h code{ background:#eef2ff; color:#3730a3; padding:1px 5px; border-radius:4px; }
-.ppp-prev-tablewrap{ overflow-x:auto; border:1px solid #e2e8f0; border-radius:8px; }
-.ppp-prev-table{ width:100%; border-collapse:collapse; font-size:12px; background:#fff; white-space:nowrap; }
-.ppp-prev-table th{ text-align:left; padding:6px 9px; background:#f8fafc; color:#475569; border-bottom:1px solid #e2e8f0; font-weight:bold; }
-.ppp-prev-table td{ padding:5px 9px; border-bottom:1px solid #f1f5f9; color:#0f172a; }
-.ppp-subir-btn{ width:100%; margin:14px 0 0; padding:14px; font-size:16px; font-weight:bold; background:#16a34a; color:#fff; border:none; border-radius:10px; cursor:pointer; }
-.ppp-map{ background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:14px; }
-.ppp-map-t{ font-size:13px; color:#334155; margin-bottom:10px; }
-.ppp-map-row{ display:flex; align-items:center; gap:10px; margin-bottom:8px; }
-.ppp-map-row label{ flex:0 0 200px; font-size:14px; font-weight:600; color:#0f172a; }
-.ppp-map-row select{ flex:1 1 auto; min-width:0; height:38px; font-size:14px; border:2px solid #cbd5e1; border-radius:8px; padding:0 8px; background:#fff; }
-@media (max-width:560px){ .ppp-map-row{ flex-direction:column; align-items:stretch; gap:3px; } .ppp-map-row label{ flex:none; } }
+@media (max-width:560px){ }
 /* Vista PPP (Programación / Entregados) */
 .ppp-tabs{ display:flex; gap:8px; margin:6px 0 8px; }
 .ppp-search{ display:flex; align-items:center; gap:8px; margin:0 0 8px; }
@@ -2049,7 +1954,6 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .ppp-auto-btn-go:hover{ background:#4338ca; }
 .ppp-auto-btn-x{ color:#b42318; }
 .ppp-auto-hint{ font-size:11px; color:#78716c; margin-top:6px; }
-.ppp-over{ font-size:11px; font-weight:800; color:#fde68a; }
 .ppp-fc{ font-size:12px; color:#cbd5e1; font-weight:700; }
 .ppp-fc.ok{ color:#fff; background:#16a34a; border-radius:999px; padding:2px 8px; font-weight:800; }
 .ppp-fc.ok2{ color:#fff; background:#1e6bd6; border-radius:999px; padding:2px 8px; font-weight:800; }
@@ -2084,17 +1988,7 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .ppp-tool-inp{ width:84px; height:34px; font-size:14px; border:1px solid #cbd5e1; border-radius:8px; padding:0 8px; }
 .ppp-tool-n{ width:64px; font-family:Consolas,Menlo,monospace; }
 .ppp-tool-clear{ margin-left:auto; padding:7px 12px; font-size:12px; font-weight:700; border:1px solid #fecaca; border-radius:8px; background:#fff; color:#b42318; cursor:pointer; }
-.ppp-res{ display:flex; flex-direction:column; gap:10px; }
 .ppp-res-note{ font-size:13px; color:#92400e; background:#fffbeb; border:1px solid #fde68a; border-radius:8px; padding:8px 12px; margin-bottom:8px; }
-.ppp-res-day{ background:#fff; border:1px solid #e2e8f0; border-radius:12px; overflow:hidden; }
-.ppp-res-h{ display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; padding:10px 14px; background:linear-gradient(90deg,#0f172a,#334155); color:#fff; }
-.ppp-res-fecha{ font-size:15px; font-weight:800; }
-.ppp-res-kpi{ font-size:13px; font-weight:700; opacity:.95; }
-.ppp-res-zonas{ display:flex; flex-wrap:wrap; gap:6px; padding:10px 14px; border-bottom:1px solid #f1f5f9; }
-.ppp-res-muted{ color:#94a3b8; }
-.ppp-res-cams{ display:flex; flex-direction:column; gap:4px; padding:10px 14px; }
-.ppp-res-cam{ font-size:13px; color:#0f172a; }
-.ppp-res-tot{ margin-top:4px; padding:12px 14px; background:#0b1220; color:#fff; border-radius:12px; font-size:14px; text-align:right; }
 .ppp-res-leg{ font-size:12px; color:#475569; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:7px 10px; margin-bottom:8px; }
 .ppp-restbl-wrap{ overflow-x:auto; border:1px solid #e2e8f0; border-radius:10px; }
 .ppp-restbl{ width:100%; border-collapse:collapse; font-size:12px; }
@@ -2111,7 +2005,6 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .ppp-restbl td.z7{ background:rgba(20,184,166,.13); } .ppp-restbl td.zsup{ background:rgba(180,83,9,.13); } .ppp-restbl td.zret{ background:rgba(100,116,139,.10); }
 .ppp-restbl tbody tr:hover td{ filter:brightness(.97); }
 .ppp-restbl tr.totrow td{ border-top:2px solid #0f172a; background:#0b1220; color:#fff; font-weight:800; }
-.ppp-subir-btn:hover{ background:#15803d; }
 .planim-near{ display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
 .planim-near-t{ font-size: 12px; font-weight: bold; color: #475569; }
 .planim-near-row{ display: flex; align-items: center; gap: 8px; font-size: 15px; color: #0f172a; }
@@ -2144,10 +2037,8 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pk-dual-warn{ font-size: 17px; font-weight: bold; color: #92400e; background: #fef3c7; border: 2px solid #f59e0b; border-radius: 12px; padding: 14px 16px; text-align: center; line-height: 1.35; }
 .pk-dual-tag{ font-size: 15px; font-weight: bold; color: #1e3a8a; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 6px 10px; display: flex; align-items: center; justify-content: center; gap: 10px; }
 .pk-dual-change{ width: auto; margin: 0; padding: 4px 10px; font-size: 13px; font-weight: bold; background: #e2e8f0; color: #334155; border: 0; border-radius: 6px; cursor: pointer; }
-.pk-fq{ background: #fff7ed; border: 2px solid #f59e0b; border-radius: 12px; padding: 14px; }
 .pk-fq-q{ font-size: 16px; color: #334155; margin-bottom: 8px; }
 .pk-fq-esp{ color: #94a3b8; font-size: 14px; }
-.pk-fq-input{ width: 100%; font-size: 34px; font-weight: bold; text-align: center; padding: 10px; border: 2px solid #cbd5e1; border-radius: 10px; box-sizing: border-box; }
 .pk-fq2{ display:flex; gap:12px; }
 .pk-fq-col{ flex:1; display:flex; flex-direction:column; align-items:center; gap:7px; border-radius:12px; padding:11px 8px; box-sizing:border-box; }
 .pk-fq-col.puse{ background:#eff6ff; border:2px solid #1e6bd6; }
@@ -2174,10 +2065,7 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .cc-rs{ font-size: 13px; color: #64748b; margin-left: auto; text-align: right; }
 .cc-lios{ flex: 0 0 auto; font-size: 14px; font-weight: 800; color: #b45309; white-space: nowrap; }
 .cc-lios.cc-lios0{ color: #94a3b8; font-weight: 600; }
-.lios-row{ cursor: default; }
 .lios-row .cc-rs{ margin-left: 0; flex: 1 1 auto; }
-.lios-inp{ width: 84px; height: 40px; font-size: 17px; text-align: center; border: 2px solid #cbd5e1; border-radius: 10px; flex: 0 0 auto; }
-.lios-inp:focus{ outline: none; border-color: #1e6bd6; }
 
 /* Control Remitos (CR): TABLA de los NP cargados al camión (CCN) pendientes de
    control. Columnas: NP · Cod Cliente · Razón Social · Líos · Controlado (tic).
@@ -2305,13 +2193,9 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .comp-step{ display:none; } .comp-step.on{ display:block; }
 .comp-step-t{ font-size:15px; font-weight:800; color:#1e3a8a; margin:2px 0 12px; }
 .comp-hint{ font-size:12.5px; color:#64748b; margin:-2px 0 12px; }
-.comp-lrow{ display:flex; align-items:center; gap:12px; padding:11px 12px; border:1px solid #e2e8f0; border-radius:12px; margin-bottom:10px; }
 .comp-info{ flex:1; min-width:0; }
 .comp-np{ font-weight:800; font-size:16px; color:#0f172a; }
 .comp-cli{ font-size:12.5px; color:#64748b; }
-.comp-lbl{ font-size:11px; font-weight:800; color:#b45309; text-transform:uppercase; letter-spacing:.3px; text-align:center; }
-.comp-lios-inp{ width:88px; height:46px; text-align:center; font-size:20px; font-weight:800; border:2px solid #cbd5e1; border-radius:10px; box-sizing:border-box; }
-.comp-lios-inp:focus{ outline:none; border-color:#1e6bd6; }
 /* Paso 2 — botonera de líos (cuadrados por código) */
 .cmpl-nphead{ display:flex; align-items:baseline; justify-content:space-between; gap:8px; margin:2px 0 8px; }
 .cmpl-np{ font-size:16px; font-weight:800; color:#0f172a; }
@@ -2489,12 +2373,7 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
   color: #991b1b;
   border-color: #fecaca;
 }
-
-/* ===== Pestañas del monitor + Hoja de inconsistencias ===== */
-.monitor-tabs{ display:flex; gap:6px; padding:6px 0 0; }
-.monitor-tab{ border:none; background:#e2e8f0; color:#334155; padding:7px 14px; border-radius:8px 8px 0 0; font-size:13px; font-weight:600; cursor:pointer; }
 .monitor-tab.active{ background:#fff; color:#0f172a; box-shadow:0 -2px 0 #2563eb inset; }
-.incons-badge{ display:inline-block; min-width:18px; padding:0 5px; margin-left:5px; border-radius:9px; background:#94a3b8; color:#fff; font-size:11px; line-height:18px; text-align:center; }
 .incons-badge.inc-badge-alta{ background:#dc2626; }
 .inc-days{ display:flex; flex-wrap:wrap; gap:5px; margin:8px 0; }
 .inc-day{ border:1px solid #cbd5e1; background:#f8fafc; color:#334155; padding:4px 9px; border-radius:6px; font-size:12px; cursor:pointer; }
@@ -2701,22 +2580,8 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 }
 .fac-btn-revertir:hover:not(:disabled){ background: #fef3c7; }
 .fac-btn-revertir:disabled{ opacity: 0.45; cursor: not-allowed; }
-.fac-group{
-  background: #fff; border: 1px solid #cbd5e1; border-radius: 8px;
-  margin-bottom: 8px; overflow: hidden;
-  transition: opacity .5s, transform .5s;
-}
 .fac-group.fading{ opacity: 0; transform: scale(.95); }
-.fac-group-head{
-  background: linear-gradient(90deg, #1e6bd6, #1e3a8a); color: #fff;
-  padding: 6px 12px; display: flex; justify-content: space-between;
-  align-items: center; flex-wrap: wrap; gap: 8px;
-}
-.fac-tanda-code{ font-size: 17px; font-weight: bold; font-family: Consolas, Menlo, monospace; letter-spacing: 1px; }
-.fac-tanda-meta{ font-size: 12px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .fac-tanda-meta .lbl{ opacity: .75; }
-.fac-tanda-meta b{ font-weight: bold; }
-.fac-progress{ background: rgba(255,255,255,.18); border-radius: 4px; padding: 2px 8px; font-weight: bold; font-size: 11px; }
 .fac-progress.complete{ background: #16a34a; }
 /* table-layout fixed: las cols mantienen el ancho que les asignamos —
    evita que Razón Social y Dirección se estiren al infinito. */
@@ -4927,14 +4792,6 @@ function idbDelete(id) {
     r.onerror   = () => rej(r.error);
   }));
 }
-function idbGetAll() {
-  return idbOpen().then(db => new Promise((res, rej) => {
-    const tx = db.transaction(IDB_STORE, "readonly");
-    const r = tx.objectStore(IDB_STORE).getAll();
-    r.onsuccess = () => res(r.result || []);
-    r.onerror   = () => rej(r.error);
-  }));
-}
 
 /* Pide al SW que reintente la cola apenas pueda (Background Sync API).
    En navegadores sin soporte (Safari iOS), falla silencioso y dependemos
@@ -5316,7 +5173,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v4.58";
+const APP_VERSION = "v4.59";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -8901,64 +8758,7 @@ function ccSendDetail(legajo, np, tanda) {
    Reusa #tandaModal y fetchMonitorSheet() (igual que Carga Camión).
    ========================================================= */
 let _lios = null;   // { legajo, tanda, nps:[{np, rs}] }
-async function showLiosModal(legajo, tanda) {
-  const m = document.getElementById("tandaModal"); if (!m) return;
-  const tn = String(tanda || "").trim().toUpperCase();
-  m.querySelector(".tanda-modal-title").textContent = "📦 Líos por pedido — Tanda " + tn;
-  m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">Cargando pedidos…</div>`;
-  m.classList.add("show");
-  try {
-    const sheetMap = await fetchMonitorSheet();
-    const entry = sheetMap.get(tn);
-    const nps = []; const seen = new Set();
-    if (entry && entry.pedidos) {
-      for (const p of entry.pedidos) {
-        for (const part of String(p.np || "").split(/[,/]/)) {
-          const np = part.trim();
-          if (np && /\d/.test(np) && !seen.has(np)) { seen.add(np); nps.push({ np: np, rs: p.razonSocial || "" }); }
-        }
-      }
-    }
-    if (!nps.length) { _lios = null; m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">No encontré pedidos de la tanda ${escapeHtml(tn)} en el PPP de hoy.</div><button class="pk-btn pk-cancel" onclick="liosClose()">Cerrar</button>`; return; }
-    _lios = { legajo: String(legajo || "").trim(), tanda: tn, nps: nps };
-    liosRender();
-  } catch (e) {
-    _lios = null;
-    m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">No se pudo cargar (¿sin conexión?). Podés anotar los líos más tarde.</div><button class="pk-btn pk-cancel" onclick="liosClose()">Cerrar</button>`;
-  }
-}
-function _liosId(np) { return "lios_" + String(np).replace(/[^0-9A-Za-z]/g, ""); }
-function liosRender() {
-  const m = document.getElementById("tandaModal"); if (!m || !_lios) return;
-  let html = `<div class="cc-sub">Anotá cuántos <b>líos</b> lleva cada pedido:</div>`;
-  for (const it of _lios.nps) {
-    html += `<div class="cc-np lios-row">` +
-            `<span class="cc-npnum">${escapeHtml(it.np)}</span>` +
-            `<span class="cc-rs">${escapeHtml(it.rs)}</span>` +
-            `<input class="lios-inp" type="number" min="0" inputmode="numeric" id="${_liosId(it.np)}" placeholder="líos"></div>`;
-  }
-  html += `<div class="cc-sub" style="margin-top:8px">Tenés que completar <b>todos</b>. Si un pedido no lleva líos, poné <b>0</b>.</div>` +
-          `<button class="pk-btn pk-ok" onclick="liosSave()">Guardar líos</button>`;
-  m.querySelector(".tanda-modal-body").innerHTML = html;
-}
-function liosClose() { _lios = null; closeTandaModal(); }
-function liosSave() {
-  if (!_lios) return;
-  // Obligatorio: TODOS los pedidos deben tener un número (0 vale). No se puede dejar vacío.
-  const faltan = [];
-  for (const it of _lios.nps) {
-    const inp = document.getElementById(_liosId(it.np));
-    const raw = inp ? String(inp.value).trim() : "";
-    const v = parseInt(raw, 10);
-    if (raw === "" || isNaN(v) || v < 0) { faltan.push(it.np); if (inp) inp.style.borderColor = "#dc2626"; }
-    else if (inp) inp.style.borderColor = "";
-  }
-  if (faltan.length) { try { alert("Faltan los líos de " + faltan.length + " pedido(s). Completá todos (si no lleva, poné 0)."); } catch (_e) {} return; }
-  const legajo = _lios.legajo, tanda = _lios.tanda, nps = _lios.nps.slice();
-  for (const it of nps) { const inp = document.getElementById(_liosId(it.np)); liosSend(legajo, it.np, parseInt(inp.value, 10), tanda); }
-  _lios = null; closeTandaModal();
-  try { alert("✓ Líos guardados (" + nps.length + " pedidos)."); } catch (_e) {}
-}
+
 function liosSend(legajo, np, lios, tanda, resumen) {
   const nowMs = Date.now();
   const payload = {
