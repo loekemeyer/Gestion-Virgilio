@@ -4,7 +4,20 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-27 · Versión app al documentar: **v4.48**
+> Última actualización: 2026-06-27 · Versión app al documentar: **v4.49**
+>
+> Nota: **v4.49** — **Rediseño del paso de picking** (`pkRender`). (1) Cabecera: **SECTOR (sin guion) a la
+> izquierda + CÓDIGO a la derecha**, ambos grandes (`bigRow`, reusado en el paso normal y en la pantalla
+> de Faltan). (2) **3 botones** en fila: **Sin Stock** (rojo, `pkSinStock` → registra 0 y avanza =
+> faltante completo) · **Faltan** (ámbar) · **✓ Puse N** (verde, `pkOk`). Tanto Puse como Confirmar de
+> Faltan llaman a `pkAdvance()` → **saltan solos** al siguiente. (3) **Faltan** (`fInput`): dos cuadros —
+> **PUSE** (input) + **FALTAN** (automático = pedido − puse, `pkFaltanCalc` en vivo). (4) **Próximas
+> ubicaciones** abajo (`pkNextHtml`, hasta 4: sector + código + cajas). (5) **Excedente**: si está
+> **registrado** (de stock), el paso de góndola dice "(hay N en excedente <ubic>)" y, si cubre todo, el
+> paso pasa a **"Salteá la góndola — hay excedente en <ubic>"**; el botón manual **"Tiene Excedente"**
+> (`pkMarkExcedente`, pop-up de ubicación → paso al final) aparece **solo si NO hay excedente
+> registrado**. (6) De los 4 botones se puede **volver** (← Atrás / Volver / Cancelar el pop-up /
+> destildar el excedente con `pkUnmarkExcedente`). Sin cambios de datos.
 >
 > Nota: **v4.48** — **Picking: botón “Tiene Excedente” + ajuste de alineación del MG**. (1) En cada
 > paso del picking (no en los de excedente) hay un botón **“📦 Tiene Excedente — anotar ubicación”**:

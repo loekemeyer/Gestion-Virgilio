@@ -2122,7 +2122,24 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pk-imp{ background: #2563eb; }
 .pk-cancel{ background: #e2e8f0; color: #334155; font-weight: 600; font-size: 16px; padding: 12px; }
 .pk-exc{ background:#fff7ed; color:#b45309; border:2px solid #f59e0b; font-size:16px; padding:13px; }
-.pk-exc-mark{ background:#fff7ed; border:1px solid #fcd34d; color:#92400e; border-radius:12px; padding:11px; font-weight:800; font-size:14px; text-align:center; box-sizing:border-box; }
+.pk-exc-mark{ width:100%; background:#fff7ed; border:1.5px solid #fcd34d; color:#92400e; border-radius:12px; padding:12px; font-weight:800; font-size:14px; text-align:center; box-sizing:border-box; cursor:pointer; }
+.pk-big-row{ display:flex; align-items:flex-end; justify-content:space-between; gap:12px; }
+.pk-big-col{ display:flex; flex-direction:column; gap:2px; min-width:0; }
+.pk-big-right{ align-items:flex-end; text-align:right; }
+.pk-sector-big{ font-weight:800; color:#1e6bd6; line-height:1; }
+.pk-sector-big.exc{ color:#b45309; }
+.pk-big-row .pk-cod-big, .pk-big-row .pk-sector-big{ font-size:clamp(40px,13vw,54px); }
+.pk2{ display:flex; gap:10px; }
+.pk2 .pk-btn{ width:auto; flex:1; padding:18px 4px; font-size:17px; line-height:1.1; }
+.pk-nostk{ background:#dc2626; }
+.pk-next{ margin-top:8px; border-top:1px dashed #e2e8f0; padding-top:10px; }
+.pk-next-h{ font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:.04em; color:#94a3b8; margin-bottom:6px; }
+.pk-next-row{ display:flex; align-items:center; gap:12px; padding:7px 4px; border-bottom:1px solid #f1f5f9; }
+.pk-next-sec{ font-size:22px; font-weight:800; color:#1e6bd6; min-width:70px; }
+.pk-next-sec.exc{ color:#b45309; }
+.pk-next-cod{ flex:1; font-size:16px; font-weight:700; color:#0f172a; font-family:Consolas,Menlo,monospace; }
+.pk-next-tag{ font-size:11px; font-weight:800; color:#b45309; background:#fff7ed; border-radius:6px; padding:1px 6px; font-family:inherit; }
+.pk-next-q{ font-size:14px; color:#64748b; white-space:nowrap; }
 /* Par Nacional/Importado (v2.76) */
 .pk-dual-warn{ font-size: 17px; font-weight: bold; color: #92400e; background: #fef3c7; border: 2px solid #f59e0b; border-radius: 12px; padding: 14px 16px; text-align: center; line-height: 1.35; }
 .pk-dual-tag{ font-size: 15px; font-weight: bold; color: #1e3a8a; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 6px 10px; display: flex; align-items: center; justify-content: center; gap: 10px; }
@@ -2131,6 +2148,16 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pk-fq-q{ font-size: 16px; color: #334155; margin-bottom: 8px; }
 .pk-fq-esp{ color: #94a3b8; font-size: 14px; }
 .pk-fq-input{ width: 100%; font-size: 34px; font-weight: bold; text-align: center; padding: 10px; border: 2px solid #cbd5e1; border-radius: 10px; box-sizing: border-box; }
+.pk-fq2{ display:flex; gap:12px; }
+.pk-fq-col{ flex:1; display:flex; flex-direction:column; align-items:center; gap:7px; border-radius:12px; padding:11px 8px; box-sizing:border-box; }
+.pk-fq-col.puse{ background:#eff6ff; border:2px solid #1e6bd6; }
+.pk-fq-col.falt{ background:#fff7ed; border:2px solid #f59e0b; }
+.pk-fq-lbl{ font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:.04em; color:#1e6bd6; }
+.pk-fq-lbl.faltan{ color:#b45309; }
+.pk-fq-input2{ width:100%; height:62px; border:2px solid #1e6bd6; border-radius:10px; text-align:center; font-size:38px; font-weight:800; color:#0f172a; box-sizing:border-box; -moz-appearance:textfield; }
+.pk-fq-input2::-webkit-outer-spin-button,.pk-fq-input2::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
+.pk-fq-faltan{ height:62px; display:flex; align-items:center; justify-content:center; font-size:42px; font-weight:800; color:#b45309; }
+.pk-fq-faltan.ok{ color:#16a34a; }
 .pk-doneflow{ align-items: center; text-align: center; gap: 10px; padding: 18px 6px; }
 .pk-done-ico{ width: 64px; height: 64px; border-radius: 50%; background: #16a34a; color: #fff; font-size: 38px; line-height: 64px; }
 .pk-done-t{ font-size: 22px; font-weight: bold; color: #0f172a; }
@@ -5293,7 +5320,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v4.48";
+const APP_VERSION = "v4.49";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -6304,10 +6331,13 @@ function pkRender() {
   // v4.26: artículo cuyo excedente cubre TODO lo pedido → en góndola se SALTEA
   // ("se busca al final"); el pick real va en el paso de excedente del final.
   if (it.skip) {
+    const exu = String(it.excUbic || it.sector || "—").replace(/-/g, "");
     body.innerHTML = `<div class="pk-flow">${nav}
-      <div class="pk-cod-row"><span class="pk-cod-lbl">CÓDIGO</span><span class="pk-sector">Sector: ${escapeHtml(it.sector || "—")}</span></div>
-      <div class="pk-cod-big">${escapeHtml(it.art)}</div>
-      <div class="pk-skip">⏭ <b>Salteá</b> — está en <b>EXCEDENTE</b>.<br>Se busca al <b>final</b> del picking.</div>
+      <div class="pk-big-row">
+        <div class="pk-big-col"><span class="pk-cod-lbl">📦 EXCEDENTE</span><span class="pk-sector-big exc">${escapeHtml(exu)}</span></div>
+        <div class="pk-big-col pk-big-right"><span class="pk-cod-lbl">CÓDIGO</span><span class="pk-cod-big">${escapeHtml(it.art)}</span></div>
+      </div>
+      <div class="pk-skip">⏭ <b>Salteá la góndola</b> — hay <b>excedente en ${escapeHtml(exu)}</b>.<br>Lo levantás al <b>final</b> del picking.</div>
       <button class="pk-btn pk-ok" onclick="pkNext()">Siguiente →</button>
     </div>`;
     return;
@@ -6326,17 +6356,23 @@ function pkRender() {
   const dualTag = (it.dual && it.pick)
     ? `<div class="pk-dual-tag">${it.pick === it.dual.imp ? "IMPORTADO" : "NACIONAL"} <b>${escapeHtml(it.pick)}</b> <button class="pk-dual-change" onclick="pkReclarify()">cambiar</button></div>`
     : ``;
-  // En el paso de excedente, el "sector" es la ubicación del excedente (no la góndola).
-  const sectorHtml = it.isExc
-    ? `<span class="pk-sector pk-sector-exc">📦 EXCEDENTE — ${escapeHtml(it.excUbic || it.sector || "—")}</span>`
-    : `<span class="pk-sector">Sector: ${escapeHtml(it.sector || "—")}</span>`;
+  // SECTOR (sin guion) a la IZQUIERDA y CÓDIGO a la DERECHA, ambos grandes. Mismo
+  // bloque para el paso normal y para la pantalla de "Faltan". En el paso de excedente
+  // el "sector" es la ubicación del excedente (no la góndola).
+  const sectorTxt = String(it.isExc ? (it.excUbic || it.sector || "—") : (it.sector || "—")).replace(/-/g, "");
+  const sectorBig = `<span class="pk-sector-big${it.isExc ? " exc" : ""}">${escapeHtml(sectorTxt)}</span>`;
+  const bigRow = `<div class="pk-big-row">
+      <div class="pk-big-col"><span class="pk-cod-lbl">${it.isExc ? "📦 UBICACIÓN" : "SECTOR"}</span>${sectorBig}</div>
+      <div class="pk-big-col pk-big-right"><span class="pk-cod-lbl">${it.isExc ? "EXCEDENTE" : "CÓDIGO"}</span><span class="pk-cod-big">${escapeHtml(rec)}</span></div>
+    </div>`;
   if (_pk.mode === "fInput") {
     body.innerHTML = `<div class="pk-flow">${nav}
-      <div class="pk-cod-row"><span class="pk-cod-big">${escapeHtml(rec)}</span>${sectorHtml}</div>
+      ${bigRow}
       ${dualTag}
-      <div class="pk-fq">
-        <div class="pk-fq-q">¿Cuántas cajas pusiste? <span class="pk-fq-esp">(pedidas: ${pkFmt(it.esp)})</span></div>
-        <input id="pkFqty" class="pk-fq-input" type="number" inputmode="numeric" min="0" value="${pkFmt(confirmed != null ? confirmed : it.esp)}">
+      <div class="pk-fq-q" style="text-align:center">¿Cuántas pusiste? <span class="pk-fq-esp">(pedidas: ${pkFmt(it.esp)})</span></div>
+      <div class="pk-fq2">
+        <div class="pk-fq-col puse"><div class="pk-fq-lbl">PUSE</div><input id="pkFqty" class="pk-fq-input2" type="number" inputmode="numeric" min="0" value="${pkFmt(confirmed != null ? confirmed : it.esp)}" oninput="pkFaltanCalc(${it.esp})"></div>
+        <div class="pk-fq-col falt"><div class="pk-fq-lbl faltan">FALTAN</div><div id="pkFaltan" class="pk-fq-faltan${(it.esp - (confirmed != null ? confirmed : it.esp)) > 0 ? "" : " ok"}">${Math.max(0, Math.round((it.esp - (confirmed != null ? confirmed : it.esp)) * 10) / 10)}</div></div>
       </div>
       <button class="pk-btn pk-ok" onclick="pkConfirmF()">Confirmar</button>
       <button class="pk-btn pk-cancel" onclick="pkCancelF()">Volver</button>
@@ -6348,14 +6384,17 @@ function pkRender() {
     ? `<div class="pk-confirmed">✓ Ya confirmaste <b>${pkFmt(confirmed)}</b>${confirmed < it.esp ? ` <span class="pk-falta">(faltaron ${pkFmt(it.esp - confirmed)})</span>` : ""} — podés cambiarlo</div>`
     : ``;
   body.innerHTML = `<div class="pk-flow">${nav}
-    <div class="pk-cod-row"><span class="pk-cod-lbl">${it.isExc ? "EXCEDENTE" : "CÓDIGO"}</span>${sectorHtml}</div>
-    <div class="pk-cod-big">${escapeHtml(rec)}</div>
+    ${bigRow}
     ${dualTag}
-    <div class="pk-cajas">Levantá <b>${pkFmt(it.esp)}</b> cajas${it.isExc ? " <span class='pk-cajas-exc'>(en el excedente)</span>" : (it.excHint ? ` <span class='pk-cajas-exc'>(+ ${pkFmt(it.excHint)} en EXCEDENTE, al final)</span>` : (it.hasManualExc ? ` <span class='pk-cajas-exc'>(+ excedente @ ${escapeHtml(it.manualExcUbic || "")}, al final)</span>` : ""))}</div>
+    <div class="pk-cajas">Levantá <b>${pkFmt(it.esp)}</b> cajas${it.isExc ? " <span class='pk-cajas-exc'>(en el excedente)</span>" : (it.excHint ? ` <span class='pk-cajas-exc'>(hay ${pkFmt(it.excHint)} en excedente ${escapeHtml(String(it.excUbic || "").replace(/-/g, ""))} — al final)</span>` : (it.hasManualExc ? ` <span class='pk-cajas-exc'>(+ excedente @ ${escapeHtml(it.manualExcUbic || "")}, al final)</span>` : ""))}</div>
     ${confLine}
-    <button class="pk-btn pk-ok" onclick="pkOk()">✓ Ok — puse ${pkFmt(it.esp)}</button>
-    <button class="pk-btn pk-f" onclick="pkF()">F — no está todo</button>
-    ${(!it.isExc) ? (it.hasManualExc ? `<div class="pk-exc-mark">📦 Excedente marcado @ ${escapeHtml(it.manualExcUbic || "")} — lo buscás al final</div>` : `<button class="pk-btn pk-exc" onclick="pkMarkExcedente(${_pk.idx})">📦 Tiene Excedente — anotar ubicación</button>`) : ""}
+    <div class="pk2">
+      <button class="pk-btn pk-nostk" onclick="pkSinStock()">Sin<br>Stock</button>
+      <button class="pk-btn pk-f" onclick="pkF()">Faltan</button>
+      <button class="pk-btn pk-ok" onclick="pkOk()">✓ Puse ${pkFmt(it.esp)}</button>
+    </div>
+    ${(it.isExc || it.excHint) ? "" : (it.hasManualExc ? `<button class="pk-exc-mark" onclick="pkUnmarkExcedente(${_pk.idx})">📦 Excedente @ ${escapeHtml(it.manualExcUbic || "")} — lo buscás al final <span style="opacity:.75">· tocá para quitar ✕</span></button>` : `<button class="pk-btn pk-exc" onclick="pkMarkExcedente(${_pk.idx})">📦 Tiene Excedente — anotar ubicación</button>`)}
+    ${pkNextHtml()}
   </div>`;
 }
 
@@ -6420,7 +6459,40 @@ function pkOk() {
   pkSendDetail(rec, it.esp, it.esp);
   pkAdvance();
 }
+/* Sin stock: no había NADA de este código → registra 0 y avanza (faltante completo,
+   dispara el aviso de faltante al supervisor, igual que marcar Faltan con 0). */
+function pkSinStock() {
+  if (!_pk || _pk.idx >= _pk.items.length) return;
+  const it = _pk.items[_pk.idx];
+  const rec = (it.dual && it.pick) ? it.pick : it.art;
+  _pk.results[it.key] = 0;
+  pkSendDetail(rec, it.esp, 0);
+  pkAdvance();
+}
 function pkF() { if (_pk) { _pk.mode = "fInput"; pkRender(); } }
+/* Recalcula "Faltan" (pedido − puestas) en vivo mientras el operario tipea, sin
+   re-render para no perder el foco del input. */
+function pkFaltanCalc(esp) {
+  const inp = document.getElementById("pkFqty"), out = document.getElementById("pkFaltan");
+  if (!inp || !out) return;
+  let v = parseFloat(String(inp.value).replace(",", ".")); if (isNaN(v) || v < 0) v = 0;
+  const f = Math.max(0, (Number(esp) || 0) - v);
+  out.textContent = Math.round(f * 10) / 10;
+  out.className = "pk-fq-faltan" + (f > 0 ? "" : " ok");
+}
+/* Próximas ubicaciones a retirar (los siguientes pasos del picking) — para que el
+   operario arme el recorrido. Muestra hasta 4, salteando los pasos "salteá". */
+function pkNextHtml() {
+  if (!_pk) return "";
+  const up = _pk.items.slice(_pk.idx + 1).filter(function (x) { return !x.skip; }).slice(0, 4);
+  if (!up.length) return "";
+  let h = '<div class="pk-next"><div class="pk-next-h">📍 Próximas ubicaciones</div>';
+  up.forEach(function (x) {
+    const sec = String(x.isExc ? (x.excUbic || x.sector || "—") : (x.sector || "—")).replace(/-/g, "");
+    h += '<div class="pk-next-row"><span class="pk-next-sec' + (x.isExc ? " exc" : "") + '">' + escapeHtml(sec) + '</span><span class="pk-next-cod">' + escapeHtml(x.art) + (x.isExc ? ' <span class="pk-next-tag">excedente</span>' : "") + '</span><span class="pk-next-q">' + pkFmt(x.esp) + ' caj</span></div>';
+  });
+  return h + "</div>";
+}
 /* v4.48 — Marcar manualmente que un artículo TIENE excedente (cuando la carga
    automática de excedentes no está). Pide la ubicación (1 letra + 2 letras) en un
    pop-up y agrega un paso al FINAL del picking para ir a buscarlo a esa ubicación. */
@@ -6435,6 +6507,18 @@ function pkMarkExcedente(idx) {
   if (_pk.items.some(function (x) { return x.key === key; })) { try { alert("Ya marcaste excedente para " + it.art + "."); } catch (_e) {} return; }
   _pk.items.push({ art: it.art, key: key, esp: it.esp, sector: ubic, excUbic: ubic, isExc: true, manualExc: true, dual: null });
   it.hasManualExc = true; it.manualExcUbic = ubic;
+  try { pkSave(); } catch (_e) {}
+  pkRender();
+}
+/* Quitar el excedente marcado a mano (volver atrás de "Tiene Excedente"): saca el
+   paso del final y limpia la marca. */
+function pkUnmarkExcedente(idx) {
+  if (!_pk) return;
+  const it = _pk.items[idx]; if (!it) return;
+  const key = it.art + "·EXC";
+  _pk.items = _pk.items.filter(function (x) { return !(x.key === key && x.manualExc); });
+  if (_pk.results) delete _pk.results[key];
+  it.hasManualExc = false; it.manualExcUbic = "";
   try { pkSave(); } catch (_e) {}
   pkRender();
 }
