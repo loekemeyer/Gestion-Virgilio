@@ -4,7 +4,14 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-27 · Versión app al documentar: **v4.22**
+> Última actualización: 2026-06-27 · Versión app al documentar: **v4.23**
+>
+> Nota: **v4.23** — **Solapa Stocks: "cuánto hay en cada sector"** (`stkBodyStocks`). (1) **Tira de totales
+> por depósito** arriba (Góndola · A guardar · Racks · A separar · A facturar · Insumos), totales GLOBALES en
+> cajas (no filtrados). (2) **Columnas por sector** en la tabla por artículo: Góndola y A guardar siempre;
+> Racks / A separar / A facturar **solo si tienen stock** (no ensanchan de gusto). `fmtCajas` redondea a 1
+> decimal (racks fraccionados). El `colspan` de las filas de detalle/empty es dinámico. Insumos sigue como
+> sección aparte abajo (artículos distintos). Validado con Playwright.
 >
 > Nota: **v4.22** — **Pipeline de stock "Separar Pedidos" → "A Facturar"** (dos depósitos intermedios entre
 > el picking y la facturación). Recorrido de las cajas pickeadas: **góndola** `--TP-->` **separar_pedidos**

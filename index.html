@@ -5281,7 +5281,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v4.22";
+const APP_VERSION = "v4.23";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -7398,15 +7398,45 @@ function stkBodyStocks() {
   const arts = Object.keys(saldos).map(function (k) { return saldos[k]; }).sort(function (a, b) { return (parseInt(a.cod, 10) || 0) - (parseInt(b.cod, 10) || 0); });
   const f = (_stk.filtro || "").toLowerCase();
   const shown = f ? arts.filter(function (a) { return (a.cod + " " + a.desc).toLowerCase().indexOf(f) >= 0; }) : arts;
+  // v4.23: "cuánto hay en cada sector". Totales por depósito (GLOBAL, no filtrado)
+  // para la tira de arriba; columnas por sector en la tabla (góndola y a guardar
+  // siempre; racks / a separar / a facturar solo si tienen algo).
+  const fmtCajas = function (n) { n = Number(n) || 0; return String(Math.round(n * 10) / 10); };
+  const SECT = [
+    { key: "terminado", label: "Góndola" }, { key: "a_guardar", label: "A guardar" },
+    { key: "racks", label: "Racks" }, { key: "separar_pedidos", label: "A separar" },
+    { key: "a_facturar", label: "A facturar" }, { key: "insumos", label: "Insumos" }
+  ];
+  const totals = {};
+  arts.forEach(function (a) { SECT.forEach(function (s) { totals[s.key] = (totals[s.key] || 0) + (Number(a[s.key]) || 0); }); });
   let h = (_stk.cutoff ? '<div class="stk-cut">Stock contado desde <b>' + escapeHtml(stockFmtTs(_stk.cutoff)) + '</b> (lo anterior no se suma).</div>' : "");
+  // Tira de totales por sector (todos, aunque estén en 0).
+  h += '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;">';
+  SECT.forEach(function (s) {
+    h += '<span style="display:inline-flex;flex-direction:column;align-items:center;min-width:78px;background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:6px 10px;">' +
+      '<span style="font-size:10px;text-transform:uppercase;color:#64748b;font-weight:700;letter-spacing:.02em;">' + s.label + '</span>' +
+      '<span style="font-size:17px;font-weight:800;color:' + ((totals[s.key] || 0) < 0 ? "#b91c1c" : "#1e3a8a") + ';font-variant-numeric:tabular-nums;">' + fmtCajas(totals[s.key]) + '</span></span>';
+  });
+  h += '</div>';
   h += '<input class="stk-filtro" type="search" placeholder="🔎 Buscar código / descripción" value="' + escapeHtml(_stk.filtro) + '" oninput="if(_stk){_stk.filtro=this.value;stkRender();}">';
-  h += '<table class="stk-tbl"><thead><tr><th>Código</th><th>Descripción</th><th class="num">Stock</th><th class="num">A guardar</th><th></th></tr></thead><tbody>';
-  if (!shown.length) h += '<tr><td colspan="5" class="stk-empty">Sin stock todavía.</td></tr>';
+  // Columnas de la tabla: góndola y a guardar siempre; racks/separar/facturar si hay stock.
+  const cols = SECT.filter(function (s) { return s.key !== "insumos" && (s.key === "terminado" || s.key === "a_guardar" || Math.abs(totals[s.key] || 0) > 0.0001); });
+  const ncol = 2 + cols.length + 1;
+  let th = '<th>Código</th><th>Descripción</th>';
+  cols.forEach(function (c) { th += '<th class="num">' + c.label + '</th>'; });
+  h += '<table class="stk-tbl"><thead><tr>' + th + '<th></th></tr></thead><tbody>';
+  if (!shown.length) h += '<tr><td colspan="' + ncol + '" class="stk-empty">Sin stock todavía.</td></tr>';
   shown.forEach(function (a) {
-    h += '<tr class="stk-row" onclick="stockToggleArt(\'' + encodeURIComponent(a.cod) + '\')"><td class="stk-cod">' + escapeHtml(a.cod) + '</td><td class="stk-desc">' + escapeHtml(a.desc || "—") + '</td><td class="num ' + (a.terminado < 0 ? "stk-neg" : "") + '"><b>' + a.terminado + '</b></td><td class="num">' + a.a_guardar + '</td><td class="stk-caret">' + (_stk.openArt === a.cod ? "▾" : "✚") + '</td></tr>';
+    let tds = '<td class="stk-cod">' + escapeHtml(a.cod) + '</td><td class="stk-desc">' + escapeHtml(a.desc || "—") + '</td>';
+    cols.forEach(function (c) {
+      const v = Number(a[c.key]) || 0;
+      tds += '<td class="num ' + (v < 0 ? "stk-neg" : "") + '">' + (c.key === "terminado" ? '<b>' + fmtCajas(v) + '</b>' : fmtCajas(v)) + '</td>';
+    });
+    tds += '<td class="stk-caret">' + (_stk.openArt === a.cod ? "▾" : "✚") + '</td>';
+    h += '<tr class="stk-row" onclick="stockToggleArt(\'' + encodeURIComponent(a.cod) + '\')">' + tds + '</tr>';
     if (_stk.openArt === a.cod) {
       const det = _stk.movs.filter(function (mv) { return String(mv.cod_art) === a.cod && !(_stk.cutoff && new Date(mv.ts).getTime() < new Date(_stk.cutoff).getTime()); });
-      h += '<tr class="stk-detrow"><td colspan="5"><div class="stk-det">' + (det.length ? det.map(stkMvRow).join("") : '<div class="stk-mv">sin movimientos contados</div>') + '</div></td></tr>';
+      h += '<tr class="stk-detrow"><td colspan="' + ncol + '"><div class="stk-det">' + (det.length ? det.map(stkMvRow).join("") : '<div class="stk-mv">sin movimientos contados</div>') + '</div></td></tr>';
     }
   });
   h += "</tbody></table>";
