@@ -6,6 +6,18 @@
 >
 > Última actualización: 2026-06-27 · Versión app al documentar: **v4.25**
 >
+> Nota (Supabase, 2026-06-27) — **Telegram confiable (outbox + reintento) y fix de avisos duplicados.**
+> (1) **Duplicado de faltantes**: el trigger `trg_faltante_telegram` estaba como `AFTER INSERT **OR UPDATE**`
+> (único así). Como `PKC` es **upsert** (la app reenvía el mismo evento), cada UPDATE re-disparaba el aviso →
+> 2-3 Telegram por faltante. Se dejó **solo `AFTER INSERT`** (como el resto) → 1 aviso. (2) **Confiabilidad**:
+> las notificaciones eran `net.http_post` "fire-and-forget" — si fallaba (timeout/red/Telegram caído) el aviso
+> se **perdía sin reintento** (se vio: handshake TLS > 5 s default → timeout). Ahora **todas** pasan por
+> **`telegram_outbox`** (tabla): el trigger **encola** (`tg_enqueue`, escritura local, nunca falla por red) +
+> **flush inmediato**; un **pg_cron cada 1 min** (`telegram-outbox-flush` → `tg_outbox_flush()`) **reintenta
+> hasta status 200** (timeout 20 s, hasta 60 intentos ≈ 1 h) y reconcilia la respuesta async de pg_net. La
+> **`dedup_key`** (= `client_id`) evita doble-envío aunque un trigger dispare de más. Migrados: faltante (PKC),
+> carga-sin-control (CRA), ppp-error (PPE), sin-planimetría (PSP), falta-facturación (cron), + los nuevos MGX/SSG.
+>
 > Nota: **v4.25** — MG: cada fila muestra **"a guardar: N"** (antes "disponible") y abajo **"Faltan: N"** =
 > `disponible − góndola − excedente` (lo que queda por asignar; verde en 0, ámbar si falta). Vivo a medida que
 > se cargan los steppers.
