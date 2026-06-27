@@ -4,7 +4,16 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-27 · Versión app al documentar: **v4.38**
+> Última actualización: 2026-06-27 · Versión app al documentar: **v4.39**
+>
+> Nota: **v4.39** — **Módulo de Conteo de stock** (solapa **📋 Conteo** en *Stock y Compras*; la empleada cuenta
+> martes/jueves). Formato planilla (como el repo `Planilla-Conteo-Cajas`): filas **Sector · Código · Pilas ·
+> Cjas×Pila · Sueltas** → **cajas = pilas×cjas/pila + sueltas**. Botón **"Comparar con el sistema"** → tabla
+> **Contado vs Sistema (góndola+excedente)** con la **diferencia** y lo **"en proceso"** (Pickeados + A facturar,
+> que no está en la góndola). **Guardar** → tabla `Conteo_Stock` (`sesion, legajo, cod, sector, pilas, cjas_x_pila,
+> sueltas, cajas`; RLS read+insert anon). `stkBodyConteo`/`cntSet`/`cntAddRow`/`cntCompara`/`cntGuardar`.
+> ⚠ A revisar el lunes con la empleada: el repo original tenía "Cargar" con 2 códigos y un resumen con
+> "Pickings Armados / Pedidos FC / Mercadería en Tránsito" — acá se simplificó (legajo + comparación directa).
 >
 > Nota (Supabase, 2026-06-27) — **Aviso semanal "generá las OCs" por Telegram.** Función
 > `notificar_oc_pendientes_telegram()` + `pg_cron` **`alerta-oc-pendientes`** (`'0 11 * * 3'` = miércoles 08:00 AR).
