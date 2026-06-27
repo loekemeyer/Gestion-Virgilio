@@ -6,6 +6,13 @@
 >
 > Última actualización: 2026-06-27 · Versión app al documentar: **v4.38**
 >
+> Nota (Supabase, 2026-06-27) — **Aviso semanal "generá las OCs" por Telegram.** Función
+> `notificar_oc_pendientes_telegram()` + `pg_cron` **`alerta-oc-pendientes`** (`'0 11 * * 3'` = miércoles 08:00 AR).
+> Lista los artículos con **stock (góndola+racks+excedente) por debajo del máximo** (= proy×índice topado a
+> capacidad; si no hay proy, objetivo del Excel), respetando el corte de `Stock_Config`. Va por el **outbox**
+> confiable. Helper `_cod_norm(text)` (saca ceros a la izquierda) para matchear códigos entre tablas. ⚠ Con datos
+> de prueba da ~165 (stock bajo + índice 1.5 sin capacidad); con datos reales será representativo.
+>
 > Nota: **v4.38** — **Números bien centrados en toda la app** (#8). Regla **global**: `input[type=number]` sin
 > flechitas (`-moz-appearance:textfield` + `::-webkit-*-spin-button{appearance:none}`) → el número centra de
 > verdad en todos los steppers (MG, Insumos, Cervantes, Racks, ajustes, etc.). Además se centraron `.oc-rinp`
