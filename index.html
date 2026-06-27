@@ -1791,6 +1791,10 @@ button {
 .pk-cod-big{ font-size: 54px; font-weight: 800; color: #0f172a; line-height: 1; }
 .pk-cajas{ font-size: 22px; color: #334155; background: #eff6ff; border: 2px solid #1e6bd6; border-radius: 12px; padding: 12px 16px; text-align: center; }
 .pk-cajas b{ font-size: 30px; color: #1e6bd6; }
+.pk-skip{ font-size: 18px; color: #92400e; background: #fffbeb; border: 2px solid #f59e0b; border-radius: 12px; padding: 14px 16px; text-align: center; font-weight: 700; line-height: 1.35; }
+.pk-skip b{ color: #b45309; }
+.pk-sector-exc{ background: #fef3c7 !important; color: #92400e !important; }
+.pk-cajas-exc{ font-size: 14px; color: #b45309; font-weight: 700; }
 /* Armado guiado por caja (v2.63) */
 .ar-tot-banner{ font-size: 16px; font-weight: bold; color: #5b21b6; background: #f5f3ff; border: 2px solid #7c3aed; border-radius: 10px; padding: 10px 12px; text-align: center; }
 .ar-tot-banner b{ font-size: 20px; }
@@ -5281,7 +5285,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v4.25";
+const APP_VERSION = "v4.26";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -6202,7 +6206,22 @@ async function showPickingList(tanda, legajo) {
         (nps.length ? `Pedidos ${nps.map(escapeHtml).join(", ")} — sin filas en la base de picking.` : `La tanda no figura en la programación de hoy.`) + `</div>`;
       return;
     }
-    _pk = { tanda: tNorm, legajo: String(legajo || (typeof legajoInput !== "undefined" && legajoInput.value) || "").trim(), items: items, idx: 0, results: {}, mode: "item" };
+    // v4.26: adjuntar el excedente (cajas + ubicación) a cada artículo.
+    try {
+      const excMap = await pkFetchExcedente(Object.keys(agg));
+      items.forEach(function (it) { const e = excMap[String(it.art).toUpperCase()]; if (e) { it.exc = e.cajas; it.excUbic = e.ubics.join(" · "); } });
+    } catch (_e) {}
+    // Los artículos con excedente se SALTEAN en el orden de góndola (se avisa) y se
+    // agregan AL FINAL como pasos de pick en su ubicación de excedente.
+    const excSteps = [];
+    items.forEach(function (it) {
+      if (it.exc > 0) {
+        it.skip = true;
+        excSteps.push({ art: it.art, esp: it.esp, sector: it.excUbic || "—", excUbic: it.excUbic, exc: it.exc, isExc: true, dual: null });
+      }
+    });
+    const allItems = items.concat(excSteps);
+    _pk = { tanda: tNorm, legajo: String(legajo || (typeof legajoInput !== "undefined" && legajoInput.value) || "").trim(), items: allItems, idx: 0, results: {}, mode: "item" };
     // Si ya había un picking guardado de ESTA tanda hoy (se bloqueó el cel, etc.),
     // restaurar lo ya marcado y la posición sobre los ítems frescos del sheet.
     try {
@@ -6225,6 +6244,30 @@ async function showPickingList(tanda, legajo) {
 }
 
 function pkFmt(n) { const r = Math.round(n * 100) / 100; return (r === Math.round(r) ? String(Math.round(r)) : String(r)).replace(".", ","); }
+/* v4.26: saldo de EXCEDENTE por artículo + ubicaciones (el excedente no tiene lugar
+   fijo: la ubicación se cargó en el MG). Devuelve { ART: {cajas, ubics:[]} } solo
+   para los que tienen saldo > 0. Best-effort. */
+async function pkFetchExcedente(arts) {
+  try {
+    if (!arts || !arts.length) return {};
+    const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+    const inList = arts.map(function (a) { return encodeURIComponent(String(a).toUpperCase()); }).join(",");
+    const r = await fetch(SUPABASE_STOCK_ENDPOINT + "?deposito=eq.excedente&cod_art=in.(" + inList + ")&select=cod_art,delta,ubicacion,ts&order=ts.desc&limit=5000", { headers: H, cache: "no-store" });
+    if (!r.ok) return {};
+    const rows = await r.json();
+    const m = {};
+    rows.forEach(function (mv) {
+      const k = String(mv.cod_art).toUpperCase();
+      if (!m[k]) m[k] = { cajas: 0, ubics: [] };
+      m[k].cajas += Number(mv.delta || 0);
+      const u = String(mv.ubicacion || "").trim();
+      if (Number(mv.delta) > 0 && u && m[k].ubics.indexOf(u) < 0) m[k].ubics.push(u);   // ubicaciones de las entradas, recientes primero
+    });
+    const out = {};
+    Object.keys(m).forEach(function (k) { if (Math.round(m[k].cajas * 1000) / 1000 > 0) out[k] = m[k]; });
+    return out;
+  } catch (_e) { return {}; }
+}
 
 function pkCount() { return _pk ? Object.keys(_pk.results).length : 0; }
 
@@ -6234,15 +6277,27 @@ function pkRender() {
   pkSave();   // persistir el estado en CADA cambio (anti pérdida por bloqueo de pantalla)
   const body = m.querySelector(".tanda-modal-body");
   const N = _pk.items.length;
+  const pickTotal = _pk.items.filter(function (x) { return !x.skip; }).length || N;   // pasos reales (sin los "Salteá")
   const nav = `<div class="pk-nav">
       <button class="pk-navbtn" ${_pk.idx <= 0 ? "disabled" : ""} onclick="pkPrev()">← Atrás</button>
       <span class="pk-nav-mid">${_pk.idx >= N ? "Resumen" : "Artículo " + (_pk.idx + 1) + " de " + N}</span>
       <button class="pk-navbtn" ${_pk.idx >= N ? "disabled" : ""} onclick="pkNext()">Adelante →</button>
     </div>
-    <div class="pk-bar"><i style="width:${Math.round((pkCount() / N) * 100)}%"></i></div>`;
+    <div class="pk-bar"><i style="width:${Math.round((pkCount() / pickTotal) * 100)}%"></i></div>`;
   if (_pk.idx >= N) { pkRenderDone(body, N, nav); return; }
   const it = _pk.items[_pk.idx];
   const confirmed = _pk.results[it.art];
+  // v4.26: artículo con excedente en el orden de góndola → "Salteá, se busca al
+  // final". No se confirma acá; el pick real va en el paso de excedente del final.
+  if (it.skip) {
+    body.innerHTML = `<div class="pk-flow">${nav}
+      <div class="pk-cod-row"><span class="pk-cod-lbl">CÓDIGO</span><span class="pk-sector">Sector: ${escapeHtml(it.sector || "—")}</span></div>
+      <div class="pk-cod-big">${escapeHtml(it.art)}</div>
+      <div class="pk-skip">⏭ <b>Salteá</b> — hay <b>${pkFmt(it.exc)}</b> en <b>EXCEDENTE</b>.<br>Se busca al <b>final</b> del picking.</div>
+      <button class="pk-btn pk-ok" onclick="pkNext()">Siguiente →</button>
+    </div>`;
+    return;
+  }
   // Par Nacional/Importado (planimetría): aclarar cuál se levanta ANTES de confirmar.
   if (it.dual && !it.pick) {
     body.innerHTML = `<div class="pk-flow">${nav}
@@ -6257,9 +6312,13 @@ function pkRender() {
   const dualTag = (it.dual && it.pick)
     ? `<div class="pk-dual-tag">${it.pick === it.dual.imp ? "IMPORTADO" : "NACIONAL"} <b>${escapeHtml(it.pick)}</b> <button class="pk-dual-change" onclick="pkReclarify()">cambiar</button></div>`
     : ``;
+  // En el paso de excedente, el "sector" es la ubicación del excedente (no la góndola).
+  const sectorHtml = it.isExc
+    ? `<span class="pk-sector pk-sector-exc">📦 EXCEDENTE — ${escapeHtml(it.excUbic || it.sector || "—")}</span>`
+    : `<span class="pk-sector">Sector: ${escapeHtml(it.sector || "—")}</span>`;
   if (_pk.mode === "fInput") {
     body.innerHTML = `<div class="pk-flow">${nav}
-      <div class="pk-cod-row"><span class="pk-cod-big">${escapeHtml(rec)}</span><span class="pk-sector">Sector: ${escapeHtml(it.sector || "—")}</span></div>
+      <div class="pk-cod-row"><span class="pk-cod-big">${escapeHtml(rec)}</span>${sectorHtml}</div>
       ${dualTag}
       <div class="pk-fq">
         <div class="pk-fq-q">¿Cuántas cajas pusiste? <span class="pk-fq-esp">(pedidas: ${pkFmt(it.esp)})</span></div>
@@ -6275,10 +6334,10 @@ function pkRender() {
     ? `<div class="pk-confirmed">✓ Ya confirmaste <b>${pkFmt(confirmed)}</b>${confirmed < it.esp ? ` <span class="pk-falta">(faltaron ${pkFmt(it.esp - confirmed)})</span>` : ""} — podés cambiarlo</div>`
     : ``;
   body.innerHTML = `<div class="pk-flow">${nav}
-    <div class="pk-cod-row"><span class="pk-cod-lbl">CÓDIGO</span><span class="pk-sector">Sector: ${escapeHtml(it.sector || "—")}</span></div>
+    <div class="pk-cod-row"><span class="pk-cod-lbl">${it.isExc ? "EXCEDENTE" : "CÓDIGO"}</span>${sectorHtml}</div>
     <div class="pk-cod-big">${escapeHtml(rec)}</div>
     ${dualTag}
-    <div class="pk-cajas">Levantá <b>${pkFmt(it.esp)}</b> cajas</div>
+    <div class="pk-cajas">Levantá <b>${pkFmt(it.esp)}</b> cajas${it.isExc ? " <span class='pk-cajas-exc'>(en el excedente)</span>" : ""}</div>
     ${confLine}
     <button class="pk-btn pk-ok" onclick="pkOk()">✓ Ok — puse ${pkFmt(it.esp)}</button>
     <button class="pk-btn pk-f" onclick="pkF()">F — no está todo</button>
@@ -6298,12 +6357,15 @@ function pkReclarify() {
 }
 
 function pkRenderDone(body, N, nav) {
-  let falt = 0; const conf = pkCount(); const pend = N - conf;
-  for (const it of _pk.items) { const r = _pk.results[it.art]; if (r != null && r < it.esp) falt++; }
+  // v4.26: los "Salteá" (skip) NO son pasos de pick → no cuentan para terminar.
+  const pickItems = _pk.items.filter(it => !it.skip);
+  let falt = 0; const conf = pkCount(); const pend = pickItems.filter(it => _pk.results[it.art] == null).length;
+  for (const it of pickItems) { const r = _pk.results[it.art]; if (r != null && r < it.esp) falt++; }
+  N = pickItems.length;   // mostrar "X de <pasos reales>"
   // Si saltearon artículos con "Adelante" sin marcar Ok/F, NO se puede terminar:
   // hay que marcar cada uno (Ok o F) sí o sí. Listamos los que faltan.
   if (pend > 0) {
-    const faltanList = _pk.items.filter(it => _pk.results[it.art] == null).map(it => escapeHtml(it.art));
+    const faltanList = pickItems.filter(it => _pk.results[it.art] == null).map(it => escapeHtml(it.art));
     body.innerHTML = `<div class="pk-flow">${nav || ""}<div class="pk-doneflow">
       <div class="pk-done-ico" style="color:#dc2626">!</div>
       <div class="pk-done-t">Te faltan ${pend} sin marcar</div>
@@ -6325,7 +6387,7 @@ function pkRenderDone(body, N, nav) {
    que faltan" cuando quedó alguno salteado con "Adelante". */
 function pkGoFirstPending() {
   if (!_pk) return;
-  const i = _pk.items.findIndex(it => _pk.results[it.art] == null);
+  const i = _pk.items.findIndex(it => !it.skip && _pk.results[it.art] == null);
   _pk.idx = i >= 0 ? i : 0;
   _pk.mode = "item";
   pkRender();
@@ -6365,7 +6427,7 @@ function pkFinishPicking() {
   // Guard: no terminar si quedó algún artículo sin marcar (Ok/F). Salta al
   // primero pendiente en vez de cerrar — refuerzo del bloqueo de pkRenderDone.
   if (_pk) {
-    const pendIdx = _pk.items.findIndex(it => _pk.results[it.art] == null);
+    const pendIdx = _pk.items.findIndex(it => !it.skip && _pk.results[it.art] == null);
     if (pendIdx >= 0) { _pk.idx = pendIdx; _pk.mode = "item"; pkRender(); return; }
   }
   const tanda = _pk ? _pk.tanda : "";
@@ -7871,7 +7933,7 @@ let _mg = null;
 async function showMGModal(legajo) {
   if (!document.getElementById("mgCss")) {
     const s = document.createElement("style"); s.id = "mgCss";
-    s.textContent = "#mgModal{display:none;position:fixed;inset:0;z-index:1290;background:rgba(2,6,23,.74);overflow:auto;padding:12px;}#mgModal.show{display:block;}.mg-card{background:#f8fafc;max-width:460px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.mg-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;background:linear-gradient(90deg,#16a34a,#15803d);color:#fff;}.mg-title{font-size:18px;font-weight:800;}.mg-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}.mg-body{padding:13px 14px;}.mg-loading,.mg-empty{padding:26px;text-align:center;color:#64748b;font-size:15px;}.mg-hint{font-size:12.5px;color:#64748b;margin-bottom:10px;}.mg-row{display:flex;align-items:center;flex-wrap:wrap;gap:10px;border:1px solid #e2e8f0;border-radius:12px;padding:9px 11px;margin-bottom:8px;background:#fff;}.mg-info{flex:1 1 110px;min-width:0;}.mg-cod{font-size:16px;font-weight:800;font-family:Consolas,Menlo,monospace;}.mg-desc{font-size:12px;color:#475569;}.mg-disp{font-size:11.5px;color:#1e6bd6;font-weight:700;margin-top:2px;}.mg-faltan{font-size:11.5px;font-weight:800;color:#b45309;margin-top:1px;}.mg-faltan.ok{color:#15803d;}.mg-stp{display:flex;align-items:center;gap:5px;}.mg-sb{display:flex;align-items:center;justify-content:center;line-height:1;padding:0;width:36px;height:40px;border:none;border-radius:9px;font-size:22px;font-weight:800;cursor:pointer;background:#e2e8f0;color:#475569;}.mg-inp{width:48px;height:40px;text-align:center;font-size:18px;font-weight:800;border:2px solid #cbd5e1;border-radius:9px;padding:0;-moz-appearance:textfield;}.mg-inp::-webkit-outer-spin-button,.mg-inp::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}.mg-all{height:40px;display:flex;align-items:center;justify-content:center;border:1px solid #cbd5e1;background:#fff;border-radius:9px;font-size:11px;font-weight:800;cursor:pointer;padding:0 10px;}.mg-fin{width:100%;margin-top:10px;padding:14px;border:none;border-radius:12px;background:#16a34a;color:#fff;font-size:17px;font-weight:800;cursor:pointer;}.mg-fin:disabled{background:#cbd5e1;cursor:not-allowed;}.mg-grp{display:flex;flex-direction:column;align-items:center;gap:4px;}.mg-lbl{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:#64748b;}.mg-lbl.gond{color:#15803d;}.mg-lbl.exc{color:#b45309;}.mg-search{width:100%;height:44px;border:2px solid #cbd5e1;border-radius:11px;padding:0 13px;font-size:16px;font-weight:700;margin-bottom:10px;box-sizing:border-box;}.mg-addrow{background:#fffbeb;border:1px solid #fcd34d;border-radius:11px;padding:11px 12px;margin-bottom:10px;font-size:13px;color:#92400e;}.mg-add-btn{margin-left:6px;background:#16a34a;color:#fff;border:none;border-radius:9px;padding:8px 13px;font-weight:800;cursor:pointer;width:auto;}.mg-add-note{font-size:11.5px;color:#b45309;margin-top:7px;}.mg-disp-x{color:#b45309;font-weight:800;}";
+    s.textContent = "#mgModal{display:none;position:fixed;inset:0;z-index:1290;background:rgba(2,6,23,.74);overflow:auto;padding:12px;}#mgModal.show{display:block;}.mg-card{background:#f8fafc;max-width:460px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.mg-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;background:linear-gradient(90deg,#16a34a,#15803d);color:#fff;}.mg-title{font-size:18px;font-weight:800;}.mg-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}.mg-body{padding:13px 14px;}.mg-loading,.mg-empty{padding:26px;text-align:center;color:#64748b;font-size:15px;}.mg-hint{font-size:12.5px;color:#64748b;margin-bottom:10px;}.mg-row{display:flex;align-items:center;flex-wrap:wrap;gap:10px;border:1px solid #e2e8f0;border-radius:12px;padding:9px 11px;margin-bottom:8px;background:#fff;}.mg-info{flex:1 1 110px;min-width:0;}.mg-cod{font-size:16px;font-weight:800;font-family:Consolas,Menlo,monospace;}.mg-desc{font-size:12px;color:#475569;}.mg-disp{font-size:11.5px;color:#1e6bd6;font-weight:700;margin-top:2px;}.mg-faltan{font-size:11.5px;font-weight:800;color:#b45309;margin-top:1px;}.mg-faltan.ok{color:#15803d;}.mg-stp{display:flex;align-items:center;gap:5px;}.mg-sb{display:flex;align-items:center;justify-content:center;line-height:1;padding:0;width:36px;height:40px;border:none;border-radius:9px;font-size:22px;font-weight:800;cursor:pointer;background:#e2e8f0;color:#475569;}.mg-inp{width:48px;height:40px;text-align:center;font-size:18px;font-weight:800;border:2px solid #cbd5e1;border-radius:9px;padding:0;-moz-appearance:textfield;}.mg-inp::-webkit-outer-spin-button,.mg-inp::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}.mg-all{height:40px;display:flex;align-items:center;justify-content:center;border:1px solid #cbd5e1;background:#fff;border-radius:9px;font-size:11px;font-weight:800;cursor:pointer;padding:0 10px;}.mg-fin{width:100%;margin-top:10px;padding:14px;border:none;border-radius:12px;background:#16a34a;color:#fff;font-size:17px;font-weight:800;cursor:pointer;}.mg-fin:disabled{background:#cbd5e1;cursor:not-allowed;}.mg-grp{display:flex;flex-direction:column;align-items:center;gap:4px;}.mg-lbl{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:#64748b;}.mg-lbl.gond{color:#15803d;}.mg-lbl.exc{color:#b45309;}.mg-search{width:100%;height:44px;border:2px solid #cbd5e1;border-radius:11px;padding:0 13px;font-size:16px;font-weight:700;margin-bottom:10px;box-sizing:border-box;}.mg-addrow{background:#fffbeb;border:1px solid #fcd34d;border-radius:11px;padding:11px 12px;margin-bottom:10px;font-size:13px;color:#92400e;}.mg-add-btn{margin-left:6px;background:#16a34a;color:#fff;border:none;border-radius:9px;padding:8px 13px;font-weight:800;cursor:pointer;width:auto;}.mg-add-note{font-size:11.5px;color:#b45309;margin-top:7px;}.mg-disp-x{color:#b45309;font-weight:800;}.mg-ubic{flex-basis:100%;display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:9px;padding-top:9px;border-top:1px dashed #fcd34d;font-size:12.5px;color:#92400e;}.mg-ubic-lbl{font-weight:800;}.mg-ubic-lbl small{font-weight:700;opacity:.8;}.mg-ubic-inp{width:84px;height:40px;border:2px solid #f59e0b;border-radius:9px;padding:0;font-size:20px;font-weight:800;text-align:center;letter-spacing:4px;text-transform:uppercase;box-sizing:border-box;}";
     document.head.appendChild(s);
   }
   let ov = document.getElementById("mgModal");
@@ -7881,7 +7943,7 @@ async function showMGModal(legajo) {
   try {
     const res = await Promise.all([stockFetchMovs(), stockGetCutoff()]);
     const saldos = stockComputeSaldos(res[0] || [], res[1]);
-    const items = Object.keys(saldos).map(function (k) { return saldos[k]; }).filter(function (a) { return a.a_guardar > 0; }).sort(function (a, b) { return (parseInt(a.cod, 10) || 0) - (parseInt(b.cod, 10) || 0); }).map(function (a) { return { cod: a.cod, desc: a.desc, disponible: a.a_guardar, cargar: 0, exc: 0, excOn: false }; });
+    const items = Object.keys(saldos).map(function (k) { return saldos[k]; }).filter(function (a) { return a.a_guardar > 0; }).sort(function (a, b) { return (parseInt(a.cod, 10) || 0) - (parseInt(b.cod, 10) || 0); }).map(function (a) { return { cod: a.cod, desc: a.desc, disponible: a.a_guardar, cargar: 0, exc: 0, ubic: "" }; });
     _mg = { legajo: String(legajo || ""), items: items, filtro: "" };
     mgRender();
   } catch (e) { const b = document.getElementById("mgBody"); if (b) b.innerHTML = '<div class="mg-loading">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
@@ -7911,6 +7973,7 @@ function mgRender() {
       '<div class="mg-info"><span class="mg-cod">' + escapeHtml(it.cod) + '</span> <span class="mg-desc">' + escapeHtml(it.desc || "") + '</span>' + infoBot + '</div>' +
       '<div class="mg-grp"><div class="mg-stp"><button class="mg-sb" onclick="mgChg(' + i + ',-1)">–</button><input class="mg-inp" type="number" min="0" max="' + maxG + '" inputmode="numeric" value="' + it.cargar + '" oninput="mgSet(' + i + ',this.value)"><button class="mg-sb" onclick="mgChg(' + i + ',1)">+</button></div><div class="mg-lbl gond">Góndola</div></div>' +
       '<div class="mg-grp"><div class="mg-stp"><button class="mg-sb" onclick="mgChgExc(' + i + ',-1)">–</button><input class="mg-inp" type="number" min="0" max="' + maxE + '" inputmode="numeric" value="' + it.exc + '" oninput="mgSetExc(' + i + ',this.value)"><button class="mg-sb" onclick="mgChgExc(' + i + ',1)">+</button></div><div class="mg-lbl exc">Excedente</div></div>' +
+      ((it.exc || 0) > 0 ? '<div class="mg-ubic">📍 <span class="mg-ubic-lbl">Ubicación <small>(1 letra + 2 letras)</small></span> <input class="mg-ubic-inp" type="text" maxlength="3" autocomplete="off" placeholder="ABC" value="' + escapeHtml(it.ubic || "") + '" oninput="this.value=this.value.toUpperCase().replace(/[^A-Za-z]/g,\'\').slice(0,3);mgSetUbic(' + i + ',this.value)"></div>' : "") +
       '</div>';
   }).join("");
   const totG = _mg.items.reduce(function (s, it) { return s + it.cargar; }, 0);
@@ -7927,7 +7990,7 @@ function mgAddManual() {
   if (!_mg) return;
   const cod = String(_mg.filtro || "").trim().toUpperCase(); if (!cod) return;
   if (!_mg.items.some(function (it) { return String(it.cod).toUpperCase() === cod; })) {
-    _mg.items.push({ cod: cod, desc: "", disponible: 99999, cargar: 0, exc: 0, manual: true });
+    _mg.items.push({ cod: cod, desc: "", disponible: 99999, cargar: 0, exc: 0, ubic: "", manual: true });
   }
   mgRender();
 }
@@ -7935,10 +7998,17 @@ function mgChg(i, d) { if (!_mg) return; const it = _mg.items[i]; if (!it) retur
 function mgSet(i, v) { if (!_mg) return; const it = _mg.items[i]; if (!it) return; let n = Math.max(0, parseInt(v, 10) || 0); const mx = it.disponible - it.exc; if (n > mx) n = mx; it.cargar = n; mgRender(); }
 function mgChgExc(i, d) { if (!_mg) return; const it = _mg.items[i]; if (!it) return; it.exc = Math.max(0, Math.min(it.disponible - it.cargar, it.exc + d)); mgRender(); }
 function mgSetExc(i, v) { if (!_mg) return; const it = _mg.items[i]; if (!it) return; let n = Math.max(0, parseInt(v, 10) || 0); const mx = it.disponible - it.cargar; if (n > mx) n = mx; it.exc = n; mgRender(); }
+// Ubicación del excedente: 1 letra + 2 letras (3 letras, mayúsculas). Solo guarda
+// (no re-render → no pierde foco mientras tipean).
+function mgSetUbic(i, v) { if (!_mg) return; const it = _mg.items[i]; if (!it) return; it.ubic = String(v == null ? "" : v).toUpperCase().replace(/[^A-Z]/g, "").slice(0, 3); }
 function mgConfirmar() {
   if (!_mg) return;
   const sel = _mg.items.filter(function (it) { return (it.cargar > 0) || (it.exc > 0); });
   if (!sel.length) return;
+  // El excedente no tiene lugar fijo → la ubicación es obligatoria para tenerla
+  // de dato (la usa el picking).
+  const sinUbic = sel.find(function (it) { return (it.exc || 0) > 0 && String(it.ubic || "").trim().length < 3; });
+  if (sinUbic) { try { alert("📍 Falta la ubicación del excedente de " + sinUbic.cod + ".\nEs 1 letra + 2 letras (ej. ABC) — el excedente no tiene lugar fijo, hay que anotarla para el picking."); } catch (_e) {} return; }
   const rows = [];
   sel.forEach(function (it) {
     const tot = it.cargar + (it.exc || 0);
@@ -7948,7 +8018,7 @@ function mgConfirmar() {
     if (!it.manual) rows.push({ cod_art: it.cod, descripcion: it.desc || null, deposito: "a_guardar", delta: -tot, tipo: "guardado", ref: null, legajo: _mg.legajo || null });
     const tp = it.manual ? "guardado_fuera_lista" : "guardado";
     if (it.cargar > 0) rows.push({ cod_art: it.cod, descripcion: it.desc || null, deposito: "terminado", delta: it.cargar, tipo: tp, ref: null, legajo: _mg.legajo || null });
-    if (it.exc > 0)    rows.push({ cod_art: it.cod, descripcion: it.desc || null, deposito: "excedente", delta: it.exc, tipo: tp, ref: null, legajo: _mg.legajo || null });
+    if (it.exc > 0)    rows.push({ cod_art: it.cod, descripcion: it.desc || null, deposito: "excedente", delta: it.exc, tipo: tp, ref: null, legajo: _mg.legajo || null, ubicacion: String(it.ubic || "").trim() || null });
   });
   // Alerta Telegram por cada código guardado fuera de lista (evento MGX).
   sel.filter(function (it) { return it.manual && (it.cargar + (it.exc || 0)) > 0; }).forEach(function (it) {
@@ -7990,23 +8060,23 @@ async function stockBajaPicking(tanda, legajo) {
     const evs = r.ok ? await r.json() : [];
     const byArt = {};
     evs.forEach(function (ev) { const p = String(ev.texto || "").split("|"); if (String(p[0] || "").trim().toUpperCase() !== t) return; const art = String(p[1] || "").trim(); const real = parseInt(p[3], 10); if (art && !isNaN(real) && real > 0) byArt[art] = (byArt[art] || 0) + real; });
-    // v4.24: detectar si se sacó de góndola MÁS de lo que el sistema cree que hay
-    // (stock que quedaría negativo) → alerta Telegram (evento SSG). Best-effort.
-    const negativos = [];
-    try {
-      const sal = stockComputeSaldos(await stockFetchMovs(), await stockGetCutoff());
-      Object.keys(byArt).forEach(function (art) {
-        const have = (sal[art] && Number(sal[art].terminado)) || 0;
-        if (have < byArt[art]) negativos.push(art + ":" + byArt[art] + ">" + (Math.round(have * 10) / 10));
-      });
-    } catch (_e) {}
-    // v4.22: el picking saca las cajas de góndola (terminado −) y las mete al
-    // depósito intermedio "a separar" (separar_pedidos +). Quedan ahí hasta que
-    // el armado (TAP) las pasa a "a facturar".
-    const rows = [];
+    // Saldos actuales (para repartir la baja entre excedente/góndola y detectar falta).
+    let sal = {};
+    try { sal = stockComputeSaldos(await stockFetchMovs(), await stockGetCutoff()); } catch (_e) {}
+    // v4.22/v4.26: el picking mete las cajas a "a separar" (separar_pedidos +) y las
+    // saca PRIMERO del EXCEDENTE (ahí lo mandamos a buscar) y después de la góndola
+    // (terminado). v4.24: si entre los dos no alcanza → alerta Telegram (SSG).
+    const rows = []; const negativos = [];
     Object.keys(byArt).forEach(function (art) {
-      rows.push({ cod_art: art, deposito: "terminado",       delta: -byArt[art], tipo: "picking", ref: t, legajo: String(legajo || "") });
-      rows.push({ cod_art: art, deposito: "separar_pedidos", delta:  byArt[art], tipo: "picking", ref: t, legajo: String(legajo || "") });
+      const need = byArt[art];
+      const haveExc  = Math.max(0, (sal[art] && Number(sal[art].excedente)) || 0);
+      const haveGond = Math.max(0, (sal[art] && Number(sal[art].terminado)) || 0);
+      const fromExc  = Math.min(need, haveExc);          // primero el excedente
+      const fromGond = need - fromExc;                   // el resto, de góndola (puede quedar negativo si falta)
+      if (fromExc  > 0) rows.push({ cod_art: art, deposito: "excedente", delta: -fromExc,  tipo: "picking", ref: t, legajo: String(legajo || "") });
+      if (fromGond > 0) rows.push({ cod_art: art, deposito: "terminado", delta: -fromGond, tipo: "picking", ref: t, legajo: String(legajo || "") });
+      rows.push({ cod_art: art, deposito: "separar_pedidos", delta: need, tipo: "picking", ref: t, legajo: String(legajo || "") });
+      if ((haveExc + haveGond) < need) negativos.push(art + ":" + need + ">" + (Math.round((haveExc + haveGond) * 10) / 10));
     });
     if (rows.length) stockMove(rows);
     if (negativos.length) { try { stockEmitSinStock(t, legajo, negativos); } catch (_e) {} }

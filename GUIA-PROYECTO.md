@@ -4,7 +4,18 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-27 · Versión app al documentar: **v4.25**
+> Última actualización: 2026-06-27 · Versión app al documentar: **v4.26**
+>
+> Nota: **v4.26** — **Excedente con ubicación (no tiene lugar fijo) → el picking lo busca al final.**
+> (1) Nueva columna **`Movimientos_Stock.ubicacion`** (text). (2) **MG**: al guardar al excedente (stepper exc > 0)
+> aparece un campo **"📍 Ubicación"** — **formato 1 letra + 2 letras** (ej. `ABC`, mayúsculas), **obligatorio**
+> (sin ubicación no deja confirmar). Se guarda en `ubicacion` de la fila `deposito='excedente'`. (3) **Picking**:
+> `showPickingList` adjunta el excedente a cada artículo (`pkFetchExcedente`: saldo + ubicaciones). Los artículos
+> con excedente se **SALTEAN** en el orden de góndola (`it.skip`, banner **"⏭ Salteá — hay N en EXCEDENTE, se
+> busca al final"**) y se **agregan al final** como pasos de pick en su ubicación (`isExc`, "📦 EXCEDENTE — &lt;ubic&gt;").
+> Los `skip` no cuentan para terminar (mismo `it.art` que el paso de excedente → un solo resultado). (4) **Contabilidad**
+> (`stockBajaPicking`): la baja del picking sale **primero del `excedente`** (ahí se lo mandó a buscar) y el resto
+> de `terminado`; si entre los dos no alcanza → alerta **SSG**.
 >
 > Nota (Supabase, 2026-06-27) — **Telegram confiable (outbox + reintento) y fix de avisos duplicados.**
 > (1) **Duplicado de faltantes**: el trigger `trg_faltante_telegram` estaba como `AFTER INSERT **OR UPDATE**`
