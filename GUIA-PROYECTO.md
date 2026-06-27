@@ -4,7 +4,16 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-27 · Versión app al documentar: **v4.41**
+> Última actualización: 2026-06-27 · Versión app al documentar: **v4.42**
+>
+> Nota: **v4.42** — **Pasada de estética en la solapa Stocks**. (1) La tabla de stock se salía del
+> card y **clipeaba la columna Racks**: se bajó el padding de las columnas numéricas (16→9px), se
+> acotó el ancho de Descripción (300→210px) y se envolvió en un contenedor con scroll horizontal
+> (`.stk-tblwrap`) para que nunca se corte. (2) Los artículos **solo-insumos** (y cualquiera en 0 en
+> todos los sectores) **ya no aparecen como filas todo-cero** en la tabla principal — solo se ven en
+> su sección *Insumos*; siguen siendo encontrables con el buscador. (3) Se agregó padding base a
+> `.stk-tbl td` (antes solo lo tenían las filas `.stk-row`), arreglando el choque "−20tanda" en
+> *Salidas* y la falta de aire en *Racks*/*Insumos*. Sin cambios de datos ni de lógica.
 >
 > Nota: **v4.41** — **Nombres de artículo desde Supabase** (fuente única de descripciones). Lookup vivo
 > `loadArtNombres()` / `artNombre(cod, fallback)`: arma un mapa `cod normalizado → descripción` desde
