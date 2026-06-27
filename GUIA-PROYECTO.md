@@ -4,7 +4,15 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-27 · Versión app al documentar: **v4.26**
+> Última actualización: 2026-06-27 · Versión app al documentar: **v4.27**
+>
+> Nota: **v4.27** — **Picking con excedente PARCIAL** (refina v4.26). Si el excedente **no alcanza** lo pedido,
+> la góndola pide **el resto** y el excedente lo que hay. Ej: piden 15, hay 10 en excedente → góndola pide **5**
+> ("Levantá 5 (+ 10 en EXCEDENTE, al final)") y el paso de excedente pide **10**. Si el excedente cubre todo →
+> góndola se saltea. Cada paso lleva **`key` propia** (`art` para góndola, `art·EXC` para excedente) así los dos
+> picks del mismo código **cuentan por separado** (confirmar uno no marca el otro). `pkSendDetail` sigue
+> emitiendo PKC con el código real; `stockBajaPicking` saca primero del excedente y el resto de góndola (coincide
+> con el split). Validado con Playwright.
 >
 > Nota: **v4.26** — **Excedente con ubicación (no tiene lugar fijo) → el picking lo busca al final.**
 > (1) Nueva columna **`Movimientos_Stock.ubicacion`** (text). (2) **MG**: al guardar al excedente (stepper exc > 0)

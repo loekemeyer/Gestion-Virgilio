@@ -5285,7 +5285,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v4.26";
+const APP_VERSION = "v4.27";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -6198,7 +6198,7 @@ async function showPickingList(tanda, legajo) {
     };
     const items = Object.keys(agg)
       .sort((a, b) => (gOrden(a) - gOrden(b)) || (numKey(a) - numKey(b)) || (a < b ? -1 : a > b ? 1 : 0))
-      .map(art => { const e = gOf(art); return { art: art, esp: agg[art], sector: (e && e[0]) ? e[0] : "—", dual: dualOf(art) }; });
+      .map(art => { const e = gOf(art); return { art: art, key: art, esp: agg[art], sector: (e && e[0]) ? e[0] : "—", dual: dualOf(art) }; });
     if (!items.length) {
       _pk = null;
       m.querySelector(".tanda-modal-body").innerHTML =
@@ -6211,13 +6211,19 @@ async function showPickingList(tanda, legajo) {
       const excMap = await pkFetchExcedente(Object.keys(agg));
       items.forEach(function (it) { const e = excMap[String(it.art).toUpperCase()]; if (e) { it.exc = e.cajas; it.excUbic = e.ubics.join(" · "); } });
     } catch (_e) {}
-    // Los artículos con excedente se SALTEAN en el orden de góndola (se avisa) y se
-    // agregan AL FINAL como pasos de pick en su ubicación de excedente.
+    // Excedente: se agarra PRIMERO del excedente (al final) y, si no alcanza, el
+    // RESTO de góndola. Ej: piden 15, hay 10 en excedente → góndola pide 5 (en su
+    // orden normal) + 10 en el excedente (paso al final). Si el excedente cubre
+    // todo, la góndola se SALTEA. El paso de excedente lleva key propia (art·EXC)
+    // para que cuente aparte del de góndola.
     const excSteps = [];
     items.forEach(function (it) {
       if (it.exc > 0) {
-        it.skip = true;
-        excSteps.push({ art: it.art, esp: it.esp, sector: it.excUbic || "—", excUbic: it.excUbic, exc: it.exc, isExc: true, dual: null });
+        const excUsed = Math.min(it.esp, it.exc);     // lo que se levanta del excedente
+        const gondNeeded = it.esp - excUsed;           // el resto, de góndola
+        if (gondNeeded > 0) { it.esp = gondNeeded; it.excHint = excUsed; }   // góndola pide solo el resto
+        else { it.skip = true; }                                              // excedente cubre todo → saltear góndola
+        excSteps.push({ art: it.art, key: it.art + "·EXC", esp: excUsed, sector: it.excUbic || "—", excUbic: it.excUbic, exc: it.exc, isExc: true, dual: null });
       }
     });
     const allItems = items.concat(excSteps);
@@ -6227,8 +6233,8 @@ async function showPickingList(tanda, legajo) {
     try {
       const saved = pkLoadSaved(_pk.legajo);
       if (saved && saved.tanda === tNorm) {
-        for (const art of Object.keys(saved.results || {})) {
-          if (items.some(it => it.art === art)) _pk.results[art] = saved.results[art];
+        for (const k of Object.keys(saved.results || {})) {
+          if (_pk.items.some(it => it.key === k)) _pk.results[k] = saved.results[k];
         }
         _pk.idx = Math.min(saved.idx || 0, items.length);
         _pk.mode = "item";
@@ -6286,14 +6292,14 @@ function pkRender() {
     <div class="pk-bar"><i style="width:${Math.round((pkCount() / pickTotal) * 100)}%"></i></div>`;
   if (_pk.idx >= N) { pkRenderDone(body, N, nav); return; }
   const it = _pk.items[_pk.idx];
-  const confirmed = _pk.results[it.art];
-  // v4.26: artículo con excedente en el orden de góndola → "Salteá, se busca al
-  // final". No se confirma acá; el pick real va en el paso de excedente del final.
+  const confirmed = _pk.results[it.key];
+  // v4.26: artículo cuyo excedente cubre TODO lo pedido → en góndola se SALTEA
+  // ("se busca al final"); el pick real va en el paso de excedente del final.
   if (it.skip) {
     body.innerHTML = `<div class="pk-flow">${nav}
       <div class="pk-cod-row"><span class="pk-cod-lbl">CÓDIGO</span><span class="pk-sector">Sector: ${escapeHtml(it.sector || "—")}</span></div>
       <div class="pk-cod-big">${escapeHtml(it.art)}</div>
-      <div class="pk-skip">⏭ <b>Salteá</b> — hay <b>${pkFmt(it.exc)}</b> en <b>EXCEDENTE</b>.<br>Se busca al <b>final</b> del picking.</div>
+      <div class="pk-skip">⏭ <b>Salteá</b> — está en <b>EXCEDENTE</b>.<br>Se busca al <b>final</b> del picking.</div>
       <button class="pk-btn pk-ok" onclick="pkNext()">Siguiente →</button>
     </div>`;
     return;
@@ -6337,7 +6343,7 @@ function pkRender() {
     <div class="pk-cod-row"><span class="pk-cod-lbl">${it.isExc ? "EXCEDENTE" : "CÓDIGO"}</span>${sectorHtml}</div>
     <div class="pk-cod-big">${escapeHtml(rec)}</div>
     ${dualTag}
-    <div class="pk-cajas">Levantá <b>${pkFmt(it.esp)}</b> cajas${it.isExc ? " <span class='pk-cajas-exc'>(en el excedente)</span>" : ""}</div>
+    <div class="pk-cajas">Levantá <b>${pkFmt(it.esp)}</b> cajas${it.isExc ? " <span class='pk-cajas-exc'>(en el excedente)</span>" : (it.excHint ? ` <span class='pk-cajas-exc'>(+ ${pkFmt(it.excHint)} en EXCEDENTE, al final)</span>` : "")}</div>
     ${confLine}
     <button class="pk-btn pk-ok" onclick="pkOk()">✓ Ok — puse ${pkFmt(it.esp)}</button>
     <button class="pk-btn pk-f" onclick="pkF()">F — no está todo</button>
@@ -6359,13 +6365,13 @@ function pkReclarify() {
 function pkRenderDone(body, N, nav) {
   // v4.26: los "Salteá" (skip) NO son pasos de pick → no cuentan para terminar.
   const pickItems = _pk.items.filter(it => !it.skip);
-  let falt = 0; const conf = pkCount(); const pend = pickItems.filter(it => _pk.results[it.art] == null).length;
-  for (const it of pickItems) { const r = _pk.results[it.art]; if (r != null && r < it.esp) falt++; }
+  let falt = 0; const conf = pkCount(); const pend = pickItems.filter(it => _pk.results[it.key] == null).length;
+  for (const it of pickItems) { const r = _pk.results[it.key]; if (r != null && r < it.esp) falt++; }
   N = pickItems.length;   // mostrar "X de <pasos reales>"
   // Si saltearon artículos con "Adelante" sin marcar Ok/F, NO se puede terminar:
   // hay que marcar cada uno (Ok o F) sí o sí. Listamos los que faltan.
   if (pend > 0) {
-    const faltanList = pickItems.filter(it => _pk.results[it.art] == null).map(it => escapeHtml(it.art));
+    const faltanList = pickItems.filter(it => _pk.results[it.key] == null).map(it => escapeHtml(it.art));
     body.innerHTML = `<div class="pk-flow">${nav || ""}<div class="pk-doneflow">
       <div class="pk-done-ico" style="color:#dc2626">!</div>
       <div class="pk-done-t">Te faltan ${pend} sin marcar</div>
@@ -6387,7 +6393,7 @@ function pkRenderDone(body, N, nav) {
    que faltan" cuando quedó alguno salteado con "Adelante". */
 function pkGoFirstPending() {
   if (!_pk) return;
-  const i = _pk.items.findIndex(it => !it.skip && _pk.results[it.art] == null);
+  const i = _pk.items.findIndex(it => !it.skip && _pk.results[it.key] == null);
   _pk.idx = i >= 0 ? i : 0;
   _pk.mode = "item";
   pkRender();
@@ -6401,7 +6407,7 @@ function pkOk() {
   if (!_pk || _pk.idx >= _pk.items.length) return;
   const it = _pk.items[_pk.idx];
   const rec = (it.dual && it.pick) ? it.pick : it.art;   // par Nacional/Importado: registra el elegido
-  _pk.results[it.art] = it.esp;
+  _pk.results[it.key] = it.esp;
   pkSendDetail(rec, it.esp, it.esp);
   pkAdvance();
 }
@@ -6414,7 +6420,7 @@ function pkConfirmF() {
   let real = inp ? parseFloat(String(inp.value).replace(",", ".")) : 0;
   if (isNaN(real) || real < 0) real = 0;
   const rec = (it.dual && it.pick) ? it.pick : it.art;   // par Nacional/Importado: registra el elegido
-  _pk.results[it.art] = real;
+  _pk.results[it.key] = real;
   pkSendDetail(rec, it.esp, real);
   pkAdvance();
 }
@@ -6427,7 +6433,7 @@ function pkFinishPicking() {
   // Guard: no terminar si quedó algún artículo sin marcar (Ok/F). Salta al
   // primero pendiente en vez de cerrar — refuerzo del bloqueo de pkRenderDone.
   if (_pk) {
-    const pendIdx = _pk.items.findIndex(it => !it.skip && _pk.results[it.art] == null);
+    const pendIdx = _pk.items.findIndex(it => !it.skip && _pk.results[it.key] == null);
     if (pendIdx >= 0) { _pk.idx = pendIdx; _pk.mode = "item"; pkRender(); return; }
   }
   const tanda = _pk ? _pk.tanda : "";
