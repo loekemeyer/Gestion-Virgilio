@@ -4,7 +4,20 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-27 · Versión app al documentar: **v4.49**
+> Última actualización: 2026-06-27 · Versión app al documentar: **v4.50**
+>
+> Nota: **v4.50** — **Robustez/infra (4 cosas).** (1) **Vista de saldos** `vista_saldos_stock`
+> (`security_invoker`, SELECT anon): suma `delta` por depósito en el SERVER respetando el cutoff de
+> `Stock_Config` (misma lógica que `stockComputeSaldos`). El front tiene `stockFetchSaldos()` y los
+> módulos que solo necesitan saldos (MG, bajar racks, insumos, salida Cervantes) ahora bajan **~1 fila
+> por artículo** en vez de las ~20k de `Movimientos_Stock`. El admin de Stocks sigue con los
+> movimientos (muestra el detalle). (2) **Baliza de errores**: tabla `errores_cliente` (INSERT anon) +
+> `logClientError` enganchado a `window.onerror`/`unhandledrejection` → manda los crashes de JS
+> (pantallas en blanco) a Supabase, best-effort, tope 25/sesión. Se leen del dashboard/MCP. (3)
+> **Anomalías de stock**: función `check_stock_anomalias()` + cron `check-stock-anomalias` (diario
+> 11:00 UTC / 08:00 AR) → si hay **saldos negativos** (imposibles) avisa por Telegram (outbox, dedup
+> por día). (4) **6 sub-agentes** de revisión en `.claude/agents/`: `revisor-render`, `guardian-stock`,
+> `auditor-supabase`, `guardian-tests`, `auditor-consistencia`, `keeper-guia`.
 >
 > Nota: **v4.49** — **Rediseño del paso de picking** (`pkRender`). (1) Cabecera: **SECTOR (sin guion) a la
 > izquierda + CÓDIGO a la derecha**, ambos grandes (`bigRow`, reusado en el paso normal y en la pantalla
