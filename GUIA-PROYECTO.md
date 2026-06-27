@@ -4,7 +4,11 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-27 · Versión app al documentar: **v4.24**
+> Última actualización: 2026-06-27 · Versión app al documentar: **v4.25**
+>
+> Nota: **v4.25** — MG: cada fila muestra **"a guardar: N"** (antes "disponible") y abajo **"Faltan: N"** =
+> `disponible − góndola − excedente` (lo que queda por asignar; verde en 0, ámbar si falta). Vivo a medida que
+> se cargan los steppers.
 >
 > Nota: **v4.24** — **MG (Guardar a góndola): Excedente + buscador + guardar fuera de lista + 2 alertas Telegram.**
 > (1) **Excedente**: nuevo depósito **`excedente`** (góndola que no entra). Cada artículo tiene **dos steppers**
