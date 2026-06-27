@@ -5285,7 +5285,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v4.34";
+const APP_VERSION = "v4.35";
 
 function updatePendingIndicator() {
   const el = document.getElementById("pendingIndicator");
@@ -7126,7 +7126,7 @@ let _stk = null;
 async function openStockAdmin() {
   if (!document.getElementById("stkCss")) {
     const s = document.createElement("style"); s.id = "stkCss";
-    s.textContent = "#stockAdminOverlay{display:none;position:fixed;inset:0;z-index:1280;background:rgba(2,6,23,.74);overflow:auto;padding:14px;}#stockAdminOverlay.show{display:block;}.stk-card{background:#f8fafc;max-width:880px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.stk-head{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:linear-gradient(90deg,#1e6bd6,#1e3a8a);color:#fff;}.stk-title{font-size:19px;font-weight:800;}.stk-close{background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;width:auto;}.stk-body{padding:14px 16px;}.stk-loading,.stk-empty{padding:24px;text-align:center;color:#64748b;}.stk-cut{background:#fffbeb;border:1px solid #fcd34d;color:#92400e;border-radius:9px;padding:8px 11px;font-size:12.5px;font-weight:700;margin-bottom:10px;}.stk-tools{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;}.stk-filtro{flex:1;min-width:180px;height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 11px;font-size:14px;}.stk-btn{background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:8px 12px;font-size:13px;font-weight:800;cursor:pointer;width:auto;}.stk-btn.ok{background:#16a34a;color:#fff;border-color:#16a34a;}.stk-btn.danger{background:#fff;color:#b91c1c;border-color:#fca5a5;}.stk-tbl{width:100%;border-collapse:collapse;font-size:13.5px;}.stk-tbl.stk-tbl-fit{width:auto;max-width:100%;}.stk-tbl.stk-tbl-fit td.stk-desc{max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.stk-tbl.stk-tbl-fit th.num,.stk-tbl.stk-tbl-fit td.num{padding-left:22px;}.stk-tbl th{background:#f1f5f9;color:#475569;text-align:left;padding:7px 9px;font-size:11px;text-transform:uppercase;border-bottom:1px solid #cbd5e1;}.stk-tbl th.num,.stk-tbl td.num{text-align:right;font-variant-numeric:tabular-nums;}.stk-row{cursor:pointer;border-bottom:1px solid #eef2f7;}.stk-row:hover{background:#eff6ff;}.stk-row td{padding:7px 9px;}.stk-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#1e6bd6;}.stk-desc{color:#475569;}.stk-neg{color:#b91c1c;font-weight:800;}.stk-caret{color:#94a3b8;}.stk-detrow td{padding:0 9px 9px;background:#f8fafc;}.stk-det{border-left:3px solid #cbd5e1;padding:6px 0 6px 10px;}.stk-mv{display:flex;gap:9px;font-size:12px;padding:3px 0;align-items:center;}.stk-mv-old{opacity:.45;}.stk-mv-ts{color:#64748b;min-width:96px;}.stk-mv-tipo{font-weight:800;min-width:78px;}.stk-mv-dep{color:#64748b;min-width:74px;}.stk-mv-d{font-weight:800;min-width:44px;text-align:right;}.stk-mv-d.pos{color:#15803d;}.stk-mv-d.neg{color:#b91c1c;}.stk-mv-ref{color:#94a3b8;}.stk-mv-more{font-size:11px;color:#94a3b8;padding-top:4px;}.stk-inicial{max-width:560px;}.stk-ini-h{font-size:16px;font-weight:800;margin-bottom:6px;}.stk-ini-hint{font-size:12.5px;color:#64748b;margin-bottom:8px;}.stk-ini-txt{width:100%;border:1px solid #cbd5e1;border-radius:9px;padding:9px;font-family:Consolas,Menlo,monospace;font-size:14px;}.stk-ini-btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}.stk-ini-warn{font-size:12px;color:#92400e;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:8px;margin-top:10px;}.stk-tabs{display:flex;gap:4px;padding:8px 12px 0;background:#1e3a8a;}.stk-tab{flex:1;background:rgba(255,255,255,.12);color:#cbd5e1;border:none;border-radius:9px 9px 0 0;padding:9px 6px;font-size:12.5px;font-weight:800;cursor:pointer;}.stk-tab.on{background:#f8fafc;color:#1e3a8a;}.stk-seg{display:flex;gap:6px;margin-bottom:10px;}.stk-segb{flex:1;background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:7px;font-size:13px;font-weight:800;cursor:pointer;}.stk-segb.on{background:#1e6bd6;color:#fff;border-color:#1e6bd6;}.stk-grp{margin-bottom:10px;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;}.stk-grp-h{background:#f1f5f9;padding:7px 10px;font-weight:800;font-size:13px;}.stk-grp-tot{color:#15803d;font-weight:800;margin-left:6px;}.stk-ing{display:flex;gap:9px;align-items:center;padding:5px 10px;border-top:1px solid #f1f5f9;font-size:12.5px;}.stk-ing-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#1e6bd6;}.stk-ing-desc{flex:1;color:#475569;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.stk-ing-rto{color:#94a3b8;font-size:11px;}.stk-aj-sec{border:1px solid #e2e8f0;border-radius:12px;padding:12px;margin-bottom:12px;}.stk-aj-h{font-size:15px;font-weight:800;margin-bottom:6px;}.stk-aj-hint{font-size:12px;color:#64748b;margin-bottom:7px;}.stk-aj-form{display:flex;gap:7px;flex-wrap:wrap;}.stk-aj-inp{flex:1;min-width:90px;height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 10px;font-size:14px;}.stk-aj-dep{margin-bottom:12px;font-size:13px;font-weight:800;}.stk-aj-dep select{height:36px;border:1px solid #cbd5e1;border-radius:8px;padding:0 8px;font-size:14px;font-weight:700;}.stk-rk-orden{background:#f1f5f9;border-radius:10px;padding:10px 12px;font-size:13px;margin-bottom:10px;}.stk-rk-orden.pend{background:#fffbeb;border:1.5px solid #fcd34d;color:#92400e;}.stk-rk-baj{display:flex;align-items:center;gap:10px;border:1px solid #e2e8f0;border-radius:11px;padding:9px 11px;margin-bottom:8px;background:#fff;}.stk-rk-baji{flex:1;min-width:0;}.stk-rk-q{font-size:12px;color:#1e6bd6;font-weight:700;margin-top:2px;}";
+    s.textContent = "#stockAdminOverlay{display:none;position:fixed;inset:0;z-index:1280;background:rgba(2,6,23,.74);overflow:auto;padding:14px;}#stockAdminOverlay.show{display:block;}.stk-card{background:#f8fafc;max-width:880px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.stk-head{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:linear-gradient(90deg,#1e6bd6,#1e3a8a);color:#fff;}.stk-title{font-size:19px;font-weight:800;}.stk-close{background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;width:auto;}.stk-body{padding:14px 16px;}.stk-loading,.stk-empty{padding:24px;text-align:center;color:#64748b;}.stk-cut{background:#fffbeb;border:1px solid #fcd34d;color:#92400e;border-radius:9px;padding:8px 11px;font-size:12.5px;font-weight:700;margin-bottom:10px;}.stk-tools{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;}.stk-filtro{flex:1;min-width:180px;height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 11px;font-size:14px;}.stk-btn{background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:8px 12px;font-size:13px;font-weight:800;cursor:pointer;width:auto;}.stk-btn.ok{background:#16a34a;color:#fff;border-color:#16a34a;}.stk-btn.danger{background:#fff;color:#b91c1c;border-color:#fca5a5;}.stk-tbl{width:100%;border-collapse:collapse;font-size:13.5px;}.stk-tbl.stk-tbl-fit{width:auto;max-width:100%;}.stk-tbl.stk-tbl-fit td.stk-desc{max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.stk-tbl.stk-tbl-fit th.num,.stk-tbl.stk-tbl-fit td.num{text-align:center;padding-left:16px;padding-right:16px;}.stk-tbl.stk-tbl-fit th.num{vertical-align:bottom;line-height:1.15;}.stk-tbl th{background:#f1f5f9;color:#475569;text-align:left;padding:7px 9px;font-size:11px;text-transform:uppercase;border-bottom:1px solid #cbd5e1;}.stk-tbl th.num,.stk-tbl td.num{text-align:right;font-variant-numeric:tabular-nums;}.stk-row{cursor:pointer;border-bottom:1px solid #eef2f7;}.stk-row:hover{background:#eff6ff;}.stk-row td{padding:7px 9px;}.stk-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#1e6bd6;}.stk-desc{color:#475569;}.stk-neg{color:#b91c1c;font-weight:800;}.stk-caret{color:#94a3b8;}.stk-detrow td{padding:0 9px 9px;background:#f8fafc;}.stk-det{border-left:3px solid #cbd5e1;padding:6px 0 6px 10px;}.stk-mv{display:flex;gap:9px;font-size:12px;padding:3px 0;align-items:center;}.stk-mv-old{opacity:.45;}.stk-mv-ts{color:#64748b;min-width:96px;}.stk-mv-tipo{font-weight:800;min-width:78px;}.stk-mv-dep{color:#64748b;min-width:74px;}.stk-mv-d{font-weight:800;min-width:44px;text-align:right;}.stk-mv-d.pos{color:#15803d;}.stk-mv-d.neg{color:#b91c1c;}.stk-mv-ref{color:#94a3b8;}.stk-mv-more{font-size:11px;color:#94a3b8;padding-top:4px;}.stk-inicial{max-width:560px;}.stk-ini-h{font-size:16px;font-weight:800;margin-bottom:6px;}.stk-ini-hint{font-size:12.5px;color:#64748b;margin-bottom:8px;}.stk-ini-txt{width:100%;border:1px solid #cbd5e1;border-radius:9px;padding:9px;font-family:Consolas,Menlo,monospace;font-size:14px;}.stk-ini-btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}.stk-ini-warn{font-size:12px;color:#92400e;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:8px;margin-top:10px;}.stk-tabs{display:flex;gap:4px;padding:8px 12px 0;background:#1e3a8a;}.stk-tab{flex:1;background:rgba(255,255,255,.12);color:#cbd5e1;border:none;border-radius:9px 9px 0 0;padding:9px 6px;font-size:12.5px;font-weight:800;cursor:pointer;}.stk-tab.on{background:#f8fafc;color:#1e3a8a;}.stk-seg{display:flex;gap:6px;margin-bottom:10px;}.stk-segb{flex:1;background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:7px;font-size:13px;font-weight:800;cursor:pointer;}.stk-segb.on{background:#1e6bd6;color:#fff;border-color:#1e6bd6;}.stk-grp{margin-bottom:10px;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;}.stk-grp-h{background:#f1f5f9;padding:7px 10px;font-weight:800;font-size:13px;}.stk-grp-tot{color:#15803d;font-weight:800;margin-left:6px;}.stk-ing{display:flex;gap:9px;align-items:center;padding:5px 10px;border-top:1px solid #f1f5f9;font-size:12.5px;}.stk-ing-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#1e6bd6;}.stk-ing-desc{flex:1;color:#475569;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.stk-ing-rto{color:#94a3b8;font-size:11px;}.stk-aj-sec{border:1px solid #e2e8f0;border-radius:12px;padding:12px;margin-bottom:12px;}.stk-aj-h{font-size:15px;font-weight:800;margin-bottom:6px;}.stk-aj-hint{font-size:12px;color:#64748b;margin-bottom:7px;}.stk-aj-form{display:flex;gap:7px;flex-wrap:wrap;}.stk-aj-inp{flex:1;min-width:90px;height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 10px;font-size:14px;}.stk-aj-dep{margin-bottom:12px;font-size:13px;font-weight:800;}.stk-aj-dep select{height:36px;border:1px solid #cbd5e1;border-radius:8px;padding:0 8px;font-size:14px;font-weight:700;}.stk-rk-orden{background:#f1f5f9;border-radius:10px;padding:10px 12px;font-size:13px;margin-bottom:10px;}.stk-rk-orden.pend{background:#fffbeb;border:1.5px solid #fcd34d;color:#92400e;}.stk-rk-baj{display:flex;align-items:center;gap:10px;border:1px solid #e2e8f0;border-radius:11px;padding:9px 11px;margin-bottom:8px;background:#fff;}.stk-rk-baji{flex:1;min-width:0;}.stk-rk-q{font-size:12px;color:#1e6bd6;font-weight:700;margin-top:2px;}";
     document.head.appendChild(s);
   }
   let ov = document.getElementById("stockAdminOverlay");
@@ -7481,7 +7481,59 @@ function stkMvRow(mv) {
 }
 /* v4.30 — Stocks / Ingresos / Salidas unificados en una sola solapa con un
    segmento arriba (default "Stock"). */
-function stkSetView(v) { if (!_stk) return; _stk.stkView = v; _stk.filtro = ""; _stk.openArt = null; stkRender(); }
+function stkSetView(v) { if (!_stk) return; _stk.stkView = v; _stk.filtro = ""; _stk.openArt = null; _stk.sectDetail = null; stkRender(); }
+/* v4.35 — detalle de un sector al tocar su total: lista código + cantidad + sector,
+   ordenable por código o por sector. Para EXCEDENTE el "sector" es la ubicación
+   cargada en el MG (por movimiento); para el resto, el sector de planimetría. */
+function stkSectDetail(key) { if (!_stk) return; _stk.sectDetail = { key: key, sort: "cod" }; _stk.filtro = ""; stkRender(); }
+function stkSectSort(s) { if (!_stk || !_stk.sectDetail) return; _stk.sectDetail.sort = s; stkRender(); }
+function stkSectClose() { if (!_stk) return; _stk.sectDetail = null; stkRender(); }
+function stkSectRows(key) {
+  const cut = _stk.cutoff ? new Date(_stk.cutoff).getTime() : 0;
+  const G = (typeof window !== "undefined" && window.GONDOLA) ? window.GONDOLA : {};
+  const rows = [];
+  if (key === "excedente") {
+    const byKey = {};
+    _stk.movs.forEach(function (mv) {
+      if (mv.deposito !== "excedente") return;
+      if (cut && mv.tipo !== "inicial" && new Date(mv.ts).getTime() < cut) return;
+      const cod = String(mv.cod_art), ubic = String(mv.ubicacion || "").trim() || "—";
+      const k = cod + "|" + ubic;
+      if (!byKey[k]) byKey[k] = { cod: cod, desc: mv.descripcion || "", sector: ubic, cant: 0 };
+      byKey[k].cant += Number(mv.delta || 0);
+      if (mv.descripcion && !byKey[k].desc) byKey[k].desc = mv.descripcion;
+    });
+    Object.keys(byKey).forEach(function (k) { if (Math.round(byKey[k].cant * 100) / 100 > 0) rows.push(byKey[k]); });
+  } else {
+    const saldos = stockComputeSaldos(_stk.movs, _stk.cutoff);
+    Object.keys(saldos).forEach(function (c) {
+      const v = Number(saldos[c][key]) || 0;
+      if (v > 0) { const e = G[String(c).toUpperCase()]; rows.push({ cod: saldos[c].cod, desc: saldos[c].desc || "", sector: (e && e[0]) ? String(e[0]) : "—", cant: Math.round(v * 100) / 100 }); }
+    });
+  }
+  return rows;
+}
+function stkBodySectDetail() {
+  const d = _stk.sectDetail, sort = d.sort || "cod";
+  const LBL = { terminado: "Góndola", a_guardar: "A guardar", excedente: "Excedente", racks: "Racks", separar_pedidos: "Pickeados", a_facturar: "A facturar", insumos: "Insumos" };
+  const rows = stkSectRows(d.key);
+  const numCod = function (c) { const m = String(c).match(/^(\d+)/); return m ? parseInt(m[1], 10) : Number.MAX_SAFE_INTEGER; };
+  rows.sort(function (a, b) {
+    if (sort === "sector") { const s = String(a.sector).localeCompare(String(b.sector), undefined, { numeric: true }); if (s) return s; }
+    return (numCod(a.cod) - numCod(b.cod)) || String(a.cod).localeCompare(String(b.cod));
+  });
+  const tot = rows.reduce(function (s, r) { return s + r.cant; }, 0);
+  let h = '<div class="stk-ini-btns" style="margin-bottom:10px"><button class="stk-btn" onclick="stkSectClose()">← Volver</button></div>';
+  h += '<div class="stk-aj-h">' + (LBL[d.key] || d.key) + ' — <b>' + (Math.round(tot * 10) / 10) + '</b> cajas · ' + rows.length + ' fila(s)</div>';
+  h += '<div class="stk-seg" style="margin:8px 0 10px"><button class="stk-segb' + (sort === "cod" ? " on" : "") + '" onclick="stkSectSort(\'cod\')">Por código</button><button class="stk-segb' + (sort === "sector" ? " on" : "") + '" onclick="stkSectSort(\'sector\')">Por sector</button></div>';
+  if (!rows.length) return h + '<div class="stk-empty">No hay stock en ' + (LBL[d.key] || d.key) + '.</div>';
+  h += '<table class="stk-tbl stk-tbl-fit"><thead><tr><th>Sector</th><th>Código</th><th>Descripción</th><th class="num">Cajas</th></tr></thead><tbody>';
+  rows.forEach(function (r) {
+    h += '<tr><td><b>' + escapeHtml(r.sector) + '</b></td><td class="stk-cod">' + escapeHtml(r.cod) + '</td><td class="stk-desc">' + escapeHtml(r.desc || "—") + '</td><td class="num"><b>' + (Math.round(r.cant * 10) / 10) + '</b></td></tr>';
+  });
+  h += '</tbody></table>';
+  return h;
+}
 function stkBodyStocksTab() {
   const view = _stk.stkView || "stocks";
   const seg = function (v, label) { return '<button class="stk-segb' + (view === v ? " on" : "") + '" onclick="stkSetView(\'' + v + '\')">' + label + '</button>'; };
@@ -7490,6 +7542,7 @@ function stkBodyStocksTab() {
   return h;
 }
 function stkBodyStocks() {
+  if (_stk.sectDetail) return stkBodySectDetail();   // v4.35: detalle de un sector (click en un total)
   const saldos = stockComputeSaldos(_stk.movs, _stk.cutoff);
   const arts = Object.keys(saldos).map(function (k) { return saldos[k]; }).sort(function (a, b) { return (parseInt(a.cod, 10) || 0) - (parseInt(b.cod, 10) || 0); });
   const f = (_stk.filtro || "").toLowerCase();
@@ -7499,9 +7552,9 @@ function stkBodyStocks() {
   // siempre; racks / a separar / a facturar solo si tienen algo).
   const fmtCajas = function (n) { n = Number(n) || 0; return String(Math.round(n * 10) / 10); };
   const SECT = [
-    { key: "terminado", label: "Góndola" }, { key: "a_guardar", label: "A guardar" },
-    { key: "excedente", label: "Excedente" }, { key: "racks", label: "Racks" },
+    { key: "terminado", label: "Góndola" }, { key: "excedente", label: "Excedente" },
     { key: "separar_pedidos", label: "Pickeados" }, { key: "a_facturar", label: "A facturar" },
+    { key: "a_guardar", label: "A guardar" }, { key: "racks", label: "Racks" },
     { key: "insumos", label: "Insumos" }
   ];
   const totals = {};
@@ -7510,7 +7563,7 @@ function stkBodyStocks() {
   // Tira de totales por sector (todos, aunque estén en 0).
   h += '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;">';
   SECT.forEach(function (s) {
-    h += '<span style="display:inline-flex;flex-direction:column;align-items:center;min-width:78px;background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:6px 10px;">' +
+    h += '<span onclick="stkSectDetail(\'' + s.key + '\')" title="Ver el detalle por código y sector" style="cursor:pointer;display:inline-flex;flex-direction:column;align-items:center;min-width:78px;background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:6px 10px;">' +
       '<span style="font-size:10px;text-transform:uppercase;color:#64748b;font-weight:700;letter-spacing:.02em;">' + s.label + '</span>' +
       '<span style="font-size:17px;font-weight:800;color:' + ((totals[s.key] || 0) < 0 ? "#b91c1c" : "#1e3a8a") + ';font-variant-numeric:tabular-nums;">' + fmtCajas(totals[s.key]) + '</span></span>';
   });

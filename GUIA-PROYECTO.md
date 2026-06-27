@@ -4,7 +4,14 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-27 · Versión app al documentar: **v4.33**
+> Última actualización: 2026-06-27 · Versión app al documentar: **v4.35**
+>
+> Nota: **v4.35** — Vista **Stocks**: (1) sectores **reordenados** → Góndola · Excedente · Pickeados · A facturar ·
+> A guardar · Racks (· Insumos aparte). (2) Columnas numéricas **centradas** y títulos multi-palabra en **doble
+> fila** ("A guardar"→"A / guardar"). (3) **Tocar el total de un sector** (chip de la tira) abre el **detalle**
+> (`stkSectDetail`/`stkBodySectDetail`): lista **sector · código · descripción · cajas**, ordenable **por código
+> o por sector**. Para **Excedente** el "sector" es la **ubicación** cargada en el MG (por movimiento); para el
+> resto, el sector de planimetría (`window.GONDOLA`).
 >
 > Nota: **v4.33** — Vista **Stocks**: el sector `separar_pedidos` se muestra como **"Pickeados"** (antes "A
 > separar"; solo el label de la vista de Stocks — la solapa y el pipeline siguen "A Separar"). Las columnas de la
