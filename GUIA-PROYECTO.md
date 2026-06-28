@@ -4,7 +4,15 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-28 · Versión app al documentar: **v4.69**
+> Última actualización: 2026-06-28 · Versión app al documentar: **v4.70**
+>
+> Nota: **v4.70** — **Productividad: desglose tocable + nombres más grandes**. (1) Los títulos **🔧 Armado**
+> y **🛒 Picking** ahora son un header grande (15px, en color) arriba del número. (2) Cada color del
+> desglose "en qué se va la jornada" (Productivo, Carga, Recepción, Comida, Ocio, etc.) es **tocable**:
+> abre un panel con **de qué se compone** ese tiempo. Productivo → lista de tandas (m³ + tiempo asignado);
+> tareas → cada evento con hora, código/NP y duración; Ocio → los huecos (hora + duración). El motor ahora
+> devuelve `detail` por bucket (`prodDetail`/`detailPanel`, estado `_prodOpen`). Sirve para auditar (ej.
+> ver que una tanda "armada" estuvo 4h abierta, o en qué se fue la recepción).
 >
 > Nota: **v4.69** — **Productividad: los DOS ritmos por separado**. Cada operario muestra **🔧 armado** y
 > **🛒 picking** como **valores distintos** (m³/h cada uno, con su propia flecha de tendencia) — antes
