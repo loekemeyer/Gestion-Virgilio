@@ -1585,6 +1585,11 @@ button {
   padding: clamp(2px, 0.5vh, 5px) clamp(3px, 0.4vw, 7px);
 }
 #monitorModal.tv.vp-narrow .monitor-stats-table th.stats-title{ font-size: clamp(11px, 1.5vw, 18px); }
+/* Toggle m³/hora ↔ min/m³ en la cabecera de "Mts3 x Hora" (estilo switch verde). */
+.mts-sw{ display:inline-block; width:32px; height:17px; border-radius:999px; background:#94a3b8; position:relative; vertical-align:middle; margin-left:8px; cursor:pointer; transition:background .15s; }
+.mts-sw.on{ background:#22c55e; }
+.mts-sw-k{ position:absolute; top:2px; left:2px; width:13px; height:13px; border-radius:50%; background:#fff; transition:left .15s; box-shadow:0 1px 2px rgba(0,0,0,.3); }
+.mts-sw.on .mts-sw-k{ left:17px; }
 #monitorModal.tv.vp-narrow .monitor-stats-table th.op-name{
   font-size: clamp(9px, 1.2vw, 14px);
   max-width: clamp(48px, 7vw, 90px);
@@ -5174,7 +5179,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v4.65";
+const APP_VERSION = "v4.66";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -13731,6 +13736,12 @@ function statusCell(state, legajo, tanda, kind) {
   return `<span class="status-wrap tanda-clickable" data-tanda="${escapeHtml(t)}" data-kind="${escapeHtml(kind)}" onclick="showTandaMessages(this.dataset.tanda, this.dataset.kind)">${icon}${monitorLegajoTag(legajo, state)}</span>`;
 }
 
+/* Toggle de la vista de productividad: "m3h" (m³ por hora) ↔ "minm3" (minutos por m³).
+   Reusa los m³/h ya calculados con horas REALES de cada actividad (computeClosureDur,
+   descuenta los tiempos muertos): min/m³ = 60 / (m³/h). Afecta la tabla "Mts3 x Hora"
+   (por operario) y las "Parcial" (totales del equipo). */
+let _mtsHoraFmt = "m3h";
+function toggleMtsHora() { _mtsHoraFmt = _mtsHoraFmt === "m3h" ? "minm3" : "m3h"; try { refreshMonitor(); } catch (_e) {} }
 function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, empleadosHoy, pastDays, errMsg, fichadasResumen, todayStats, yesterdayStats, todayKey, yesterdayKey) {
   // Cacheamos sheetMap para que showTandaDetail() pueda leer los NPs/m3
   // de la tanda clickeada en el modal.
@@ -14085,8 +14096,10 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
   // atributo onclick lo bindeamos solo cuando el operario tocó esa actividad
   // (no tiene sentido abrirlo en celdas "—").
   const _clk = (leg, act) => `onclick="showOperarioActivityDetail('${leg}','${act}')" style="cursor:pointer" title="Click para ver el desglose"`;
+  // Valor de productividad según el toggle: m³/h (default) o min/m³ (= 60 / m³h).
+  const prodVal = (v) => (_mtsHoraFmt === "minm3" ? (v > 0 ? Math.round(60 / v) : 0) : fmt1(v));
   const cellM3h = (val, did, msg, leg, act) => {
-    if (val > 0) return `<td class="num" ${_clk(leg, act)}>${fmt1(val)}</td>`;
+    if (val > 0) return `<td class="num" ${_clk(leg, act)}>${prodVal(val)}</td>`;
     if (did)     return `<td class="num stats-nodata" title="${msg}" ${_clk(leg, act)}>·</td>`;
     return `<td class="num">—</td>`;
   };
@@ -14100,7 +14113,7 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
     <div class="monitor-stats-card">
       <table class="monitor-stats-table monitor-stats-mtshora">
         <thead>
-          <tr><th colspan="${operariosHoy.length + 1}" class="stats-title">Mts3 x Hora (${dayKeyLabel(todayKey)})</th></tr>
+          <tr><th colspan="${operariosHoy.length + 1}" class="stats-title">${_mtsHoraFmt === "minm3" ? "Min por m³" : "Mts3 x Hora"} (${dayKeyLabel(todayKey)})<span class="mts-sw ${_mtsHoraFmt === "minm3" ? "on" : ""}" onclick="toggleMtsHora()" title="Cambiar vista: m³/hora ↔ minutos por m³"><span class="mts-sw-k"></span></span></th></tr>
           <tr>
             <th></th>
             ${operariosHoy.map(o => `<th class="op-name" title="${escapeHtml(o.nombre)}">${renderOperarioName(o.nombre)}</th>`).join("")}
@@ -14129,7 +14142,7 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
     <div class="monitor-stats-card">
       <table class="monitor-stats-table monitor-stats-mtshora">
         <thead>
-          <tr><th class="stats-title">Mts3 x Hora (${dayKeyLabel(todayKey)})</th></tr>
+          <tr><th class="stats-title">${_mtsHoraFmt === "minm3" ? "Min por m³" : "Mts3 x Hora"} (${dayKeyLabel(todayKey)})<span class="mts-sw ${_mtsHoraFmt === "minm3" ? "on" : ""}" onclick="toggleMtsHora()" title="Cambiar vista: m³/hora ↔ minutos por m³"><span class="mts-sw-k"></span></span></th></tr>
         </thead>
         <tbody>
           <tr><td class="stats-empty">Sin actividad hoy todavía</td></tr>
@@ -14146,13 +14159,13 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
           <tr><th colspan="2" class="stats-title">${title}</th></tr>
           <tr>
             <th class="num">Total<br>m3</th>
-            <th class="num">m3 x<br>Hora</th>
+            <th class="num">${_mtsHoraFmt === "minm3" ? "Min<br>x m³" : "m3 x<br>Hora"}</th>
           </tr>
         </thead>
         <tbody>
-          <tr><td class="num">${fmt1(t.pickM3)}</td><td class="num">${fmt1(t.pickM3h)}</td></tr>
-          <tr><td class="num">${fmt1(t.sepM3)}</td><td class="num">${fmt1(t.sepM3h)}</td></tr>
-          <tr><td class="num">${fmt1(t.ccM3)}</td><td class="num">${fmt1(t.ccM3h)}</td></tr>
+          <tr><td class="num">${fmt1(t.pickM3)}</td><td class="num">${prodVal(t.pickM3h)}</td></tr>
+          <tr><td class="num">${fmt1(t.sepM3)}</td><td class="num">${prodVal(t.sepM3h)}</td></tr>
+          <tr><td class="num">${fmt1(t.ccM3)}</td><td class="num">${prodVal(t.ccM3h)}</td></tr>
           <tr><td class="num" colspan="2">${fmt1((t.movMin || 0) / 60)} h</td></tr>
         </tbody>
       </table>

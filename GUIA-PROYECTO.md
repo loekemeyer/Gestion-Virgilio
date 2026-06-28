@@ -4,7 +4,22 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-28 · Versión app al documentar: **v4.65**
+> Última actualización: 2026-06-28 · Versión app al documentar: **v4.66**
+>
+> Nota: **v4.66** — **Toggle m³/hora ↔ min/m³ en "Mts3 x Hora"** (monitor). En el panel de productividad
+> del monitor (tabla "Mts3 x Hora" por operario + las "Parcial" del equipo, en `renderMonitor`) hay un
+> **switch verde** en la cabecera que cambia la vista entre **m³ por hora** (default) y **minutos por m³**
+> (= 60 / m³h). Reusa los m³/h que ya se calculan con **horas REALES de cada actividad**
+> (`computeClosureDur` descuenta los tiempos muertos / interrupciones) — NO recalcula nada, solo invierte
+> el número. Estado global `_mtsHoraFmt`, `toggleMtsHora()` (refresca el monitor), helper `prodVal()`.
+> ⚠ Nota de arquitectura: la lógica buena de productividad (descontar interrupciones + m³ por tanda vía
+> `tandaM3` del sheet) vive en el **módulo que ya existía** (`openAnalisis` / monitor), NO en el servicio
+> `openProductividad` que se agregó antes (ese usa `vista_productividad_semanal`, con duración cruda
+> `ts_inicio→ts_cliente` — sirve para tendencia semanal de tandas, pero NO para min/m³ fino). Por pedido
+> del usuario se dejan **los dos** módulos por ahora.
+>
+> Nota: **Token de Telegram** (2026-06-28) — el usuario **rotó** el bot token (BotFather `/revoke`). El
+> nuevo quedó en **Vault** (`telegram_bot_token`). Se validó con `getMe` (200). Alertas online.
 >
 > Nota: **v4.65** — **Agentes: `faltante_articulo`** (señal de reposición). Categoría nueva (la 19):
 > agrupa los faltantes de picking (PKC) **por artículo** en 30 días → "art X faltó N cajas en M pickings".
