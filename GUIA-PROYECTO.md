@@ -4,7 +4,21 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-27 · Versión app al documentar: **v4.61**
+> Última actualización: 2026-06-28 · Versión app al documentar: **v4.62**
+>
+> Nota: **v4.62** — **Agentes: pendientes que se traban + recepción rara** (de la investigación con agentes).
+> `generar_reporte_agentes` sumó 5 categorías (ahora 18): **`mg_pendiente`** (mercadería en `a_guardar` sin
+> subir a góndola >8 h — bloquea stock disponible), **`armado_sin_terminar`** (AP sin su TAP >24 h),
+> **`pipeline_atascado`** (separar_pedidos/a_facturar sin avanzar >2 días — *future-ready*: esos depósitos
+> todavía no se usan), **`excedente_estancado`** (excedente sin moverse >5 días — *future-ready*), y
+> **`recepcion_absurda`** (recepción con cantidad ≤0 o muchísimo mayor a lo normal). Esta última además
+> tiene **alerta Telegram inmediata**: trigger `trg_recepcion_absurda_telegram` en `Movimientos_Stock`
+> (AFTER INSERT, tipo='recepcion'), umbral = `max(10× mediana del artículo, 1000)` o `delta≤0`. ⚠ El trigger
+> está **blindado** (`exception when others then return new`) para NO bloquear jamás una recepción. La
+> categoría `recepcion_absurda` se encadena en el cron (jobid 14) vía función auxiliar
+> `reporte_agentes_recepcion_absurda()` (para no re-tipear la función gigante). El termómetro NO cuenta
+> estas categorías (son "pendientes/rarezas", no errores de operario). `mg_pendiente`/`armado_sin_terminar`
+> dan 0 en el sandbox (datos de prueba con legajo 0, excluidos) pero disparan con datos reales.
 >
 > Nota: **v4.61** — **Alerta "recibido sin planimetría" (RSP)**. Completa lo que en v4.60 quedó pendiente:
 > ahora la **recepción** (`recepcion.js opEnviar`, tras grabar a `a_guardar`) chequea cada código recibido
