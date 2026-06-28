@@ -4,7 +4,13 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-28 · Versión app al documentar: **v4.64**
+> Última actualización: 2026-06-28 · Versión app al documentar: **v4.65**
+>
+> Nota: **v4.65** — **Agentes: `faltante_articulo`** (señal de reposición). Categoría nueva (la 19):
+> agrupa los faltantes de picking (PKC) **por artículo** en 30 días → "art X faltó N cajas en M pickings".
+> Distinto de `faltante` (que es por tanda, 7 días): este dice **qué códigos reforzar / revisar en la
+> compra**. Función auxiliar `reporte_agentes_faltante_articulo()` encadenada en el cron 14 (junto a
+> `reporte_agentes_recepcion_absurda`). Datos reales: 15 artículos (945E, etc.).
 >
 > Nota: **v4.64** — **Briefing "qué hacer hoy"** arriba del tablero Agentes (servicio: asistente diario).
 > En `agtRender`, antes del termómetro, un bloque **📅 Hoy** con: (1) **nudge del día** — miércoles
