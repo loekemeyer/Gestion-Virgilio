@@ -4,7 +4,19 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-28 · Versión app al documentar: **v4.62**
+> Última actualización: 2026-06-28 · Versión app al documentar: **v4.63**
+>
+> Nota: **v4.63** — **Servicio nuevo: Productividad por operario** (primer "servicio" más allá de alertas;
+> de la idea del agente predictivo). Botón **📊 Productividad** en la botonera del supervisor →
+> `openProductividad` (overlay azul, mismo patrón que Agentes). Lee la vista nueva
+> **`vista_productividad_semanal`** (`security_invoker`): por legajo y semana ISO (últimas 8, excluye
+> legajos 0/1) cuenta **TAP=armadas** y **TP=pickeadas**, y la **mediana de min/armado** (de `ts_inicio`→
+> `ts_cliente` de los TAP, filtrando duraciones 1 min–12 h para sacar los "se olvidaron de cerrar").
+> `prodRender` muestra una tarjeta por operario con rol (Armador/Picking según qué hace más), la última
+> semana y un mini-gráfico de barras por semana (violeta=armadas, azul=pickeadas, escala por-operario).
+> Sirve para "ver quién rinde sin pararse al lado". Datos REALES: 5 meses de log; se ve la especialización
+> (237 armador, 104/270 picking) y la velocidad (104 ≈14 min/armado, 8 ≈104). ⚠ Los m³ NO entran acá
+> (están en el Google Sheet, no en Supabase): productividad se mide en tandas, no en m³.
 >
 > Nota: **v4.62** — **Agentes: pendientes que se traban + recepción rara** (de la investigación con agentes).
 > `generar_reporte_agentes` sumó 5 categorías (ahora 18): **`mg_pendiente`** (mercadería en `a_guardar` sin
