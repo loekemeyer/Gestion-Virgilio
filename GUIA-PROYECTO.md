@@ -4,7 +4,14 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-28 · Versión app al documentar: **v4.68**
+> Última actualización: 2026-06-28 · Versión app al documentar: **v4.69**
+>
+> Nota: **v4.69** — **Productividad: los DOS ritmos por separado**. Cada operario muestra **🔧 armado** y
+> **🛒 picking** como **valores distintos** (m³/h cada uno, con su propia flecha de tendencia) — antes
+> mostraba solo el del rol primario. Si un operario no hace una de las dos, esa línea no aparece. El resumen
+> del equipo suma un **"Ritmo del equipo · 🔧 Armado X · 🛒 Picking Y"** (suma/suma), y "mejor armando /
+> mejor pickeando" se eligen por el ritmo real de cada actividad (no por el rol). El motor ya calculaba
+> ambos por separado (`armM3/armTimeM3` vs `pickM3/pickTimeM3`); fue solo cambio de `prodRender`.
 >
 > Nota: **v4.68** — **Productividad: MOTOR evento-por-evento + selector de período** (reescritura del
 > cálculo). El módulo 📊 deja de leer la vista semanal y ahora trae los **eventos crudos** del período que
