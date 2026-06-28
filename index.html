@@ -5179,7 +5179,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v4.66";
+const APP_VERSION = "v4.67";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -7623,23 +7623,32 @@ function agtRender() {
   });
   body.innerHTML = h;
 }
-/* ===== Productividad por operario (servicio: ver quién rinde sin pararse al lado) =====
-   Lee vista_productividad_semanal: TAP=armadas, TP=pickeadas, mediana min/armado por
-   semana ISO (últimas semanas, excluye legajos 0/1). Supervisor-only (botón admin). */
+/* ===== Rendimiento de operarios — dashboard de productividad (ingeniería industrial), 100% Supabase.
+   Lee vista_productividad_semanal (legajo×semana ISO): m³/h por ROL (armado/picking) con TIEMPO
+   EFECTIVO (unión de intervalos = descuenta solapes; topes por actividad para botones dejados abiertos),
+   volumen, tendencia semana a semana, y desglose de "en qué se va el tiempo" (motivos de la ociosidad,
+   estimado). Nombres de Empleados (getEmpleadosNombres). Toggle m³/h ↔ min/m³. Supervisor-only. */
 let _prod = null;
+let _prodNombres = new Map();
+let _prodToggle = "m3h";   // "m3h" | "minm3"
+function prodToggleVista() { _prodToggle = _prodToggle === "m3h" ? "minm3" : "m3h"; prodRender(); }
 async function openProductividad() {
   if (!document.getElementById("prodCss")) {
     const s = document.createElement("style"); s.id = "prodCss";
-    s.textContent = "#prodOverlay{display:none;position:fixed;inset:0;z-index:1280;background:rgba(2,6,23,.74);overflow:auto;padding:14px;}#prodOverlay.show{display:block;}.prod-card{background:#f8fafc;max-width:860px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.prod-head{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:linear-gradient(90deg,#1d4ed8,#0b2a6b);color:#fff;}.prod-title{font-size:19px;font-weight:800;}.prod-close{background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;width:auto;}.prod-body{padding:14px 16px;}.prod-sub{font-size:12.5px;color:#64748b;margin-bottom:12px;}.prod-op{border:1px solid #e2e8f0;border-radius:12px;padding:12px 14px;margin-bottom:11px;background:#fff;}.prod-op-h{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:6px;}.prod-op-leg{font-weight:800;font-size:15px;color:#0f172a;}.prod-op-rol{font-size:11.5px;font-weight:800;padding:2px 9px;border-radius:999px;}.prod-rol-arm{background:#ede9fe;color:#6d28d9;}.prod-rol-pick{background:#dbeafe;color:#1d4ed8;}.prod-now{font-size:13px;color:#334155;}.prod-now b{color:#0f172a;}.prod-weeks{display:flex;gap:8px;align-items:flex-end;margin-top:10px;}.prod-wk{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;}.prod-wk-bars{display:flex;gap:2px;align-items:flex-end;height:44px;}.prod-bar{width:11px;border-radius:3px 3px 0 0;background:#c4b5fd;}.prod-bar.pick{background:#93c5fd;}.prod-wk-lbl{font-size:9.5px;color:#94a3b8;}.prod-leg-row{display:flex;gap:14px;font-size:11px;color:#64748b;margin-bottom:10px;}.prod-leg-row span{display:inline-flex;align-items:center;gap:4px;}.prod-dot{width:10px;height:10px;border-radius:3px;display:inline-block;}.prod-empty{padding:24px;text-align:center;color:#64748b;}";
+    s.textContent = "#prodOverlay{display:none;position:fixed;inset:0;z-index:1280;background:rgba(2,6,23,.74);overflow:auto;padding:14px;}#prodOverlay.show{display:block;}.prod-card{background:#f8fafc;max-width:880px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.prod-head{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:linear-gradient(90deg,#1d4ed8,#0b2a6b);color:#fff;}.prod-title{font-size:19px;font-weight:800;}.prod-close{background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;width:auto;}.prod-body{padding:14px 16px;}.prod-empty{padding:24px;text-align:center;color:#64748b;}.prod-bar2{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px;}.prod-period{font-size:12px;color:#64748b;}.prod-tg{display:inline-flex;align-items:center;gap:6px;cursor:pointer;user-select:none;}.prod-tg-l{font-size:12px;font-weight:700;color:#94a3b8;}.prod-tg-l.on{color:#1d4ed8;}.prod-sw{display:inline-block;width:34px;height:18px;border-radius:999px;background:#94a3b8;position:relative;transition:background .15s;}.prod-sw.on{background:#1d4ed8;}.prod-sw-k{position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;transition:left .15s;box-shadow:0 1px 2px rgba(0,0,0,.3);}.prod-sw.on .prod-sw-k{left:18px;}.prod-summary{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:11px 14px;margin-bottom:10px;}.prod-sum-row{display:flex;gap:18px;flex-wrap:wrap;}.prod-sum-row>div{display:flex;flex-direction:column;}.prod-sum-row b{font-size:18px;color:#0f172a;font-variant-numeric:tabular-nums;}.prod-sum-row span{font-size:11px;color:#64748b;}.prod-best{font-size:12.5px;color:#334155;margin-top:8px;border-top:1px solid #f1f5f9;padding-top:7px;}.prod-note{font-size:11.5px;color:#64748b;background:#f1f5f9;border-radius:8px;padding:8px 11px;margin-bottom:12px;}.prod-group-h{font-size:14px;font-weight:800;color:#0f172a;margin:14px 0 8px;}.prod-op{border:1px solid #e2e8f0;border-radius:12px;padding:12px 14px;margin-bottom:10px;background:#fff;}.prod-op-h{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:8px;}.prod-op-leg{font-weight:800;font-size:15px;color:#0f172a;}.prod-rank{display:inline-block;background:#0f172a;color:#fff;border-radius:6px;font-size:11px;padding:1px 6px;font-weight:800;margin-right:4px;}.prod-leg-id{font-size:11px;color:#94a3b8;font-weight:600;}.prod-op-rol{font-size:11.5px;font-weight:800;padding:2px 9px;border-radius:999px;}.prod-rol-arm{background:#ede9fe;color:#6d28d9;}.prod-rol-pick{background:#dbeafe;color:#1d4ed8;}.prod-kpi-row{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;}.prod-kpi-big{font-size:30px;font-weight:900;color:#1d4ed8;font-variant-numeric:tabular-nums;line-height:1;}.prod-kpi-u{font-size:13px;font-weight:700;color:#64748b;}.prod-kpi-side{font-size:12.5px;color:#475569;text-align:right;}.prod-up{color:#16a34a;font-size:14px;}.prod-down{color:#dc2626;font-size:14px;}.prod-flat{color:#94a3b8;font-size:13px;}.prod-approx{background:#fef9c3;color:#854d0e;font-size:10px;font-weight:700;padding:1px 6px;border-radius:6px;}.prod-other{font-size:12px;color:#64748b;margin-top:3px;}.prod-spark{display:flex;gap:6px;align-items:flex-end;margin-top:10px;}.prod-sp{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;}.prod-sp-bar{width:100%;max-width:24px;border-radius:3px 3px 0 0;background:#93c5fd;}.prod-sp-l{font-size:9px;color:#94a3b8;}.prod-brk-h{font-size:12px;color:#334155;margin:11px 0 5px;}.prod-est{color:#94a3b8;font-size:10.5px;}.prod-brk{display:flex;height:14px;border-radius:7px;overflow:hidden;background:#e2e8f0;}.prod-brk-seg{height:100%;}.prod-brk-leg{display:flex;flex-wrap:wrap;gap:8px;margin-top:5px;font-size:10.5px;color:#475569;}.prod-brk-leg span{display:inline-flex;align-items:center;gap:3px;}.prod-brk-leg i{width:9px;height:9px;border-radius:2px;display:inline-block;}";
     document.head.appendChild(s);
   }
   let ov = document.getElementById("prodOverlay");
   if (!ov) { ov = document.createElement("div"); ov.id = "prodOverlay"; document.body.appendChild(ov); }
   ov.classList.add("show");
-  ov.innerHTML = '<div class="prod-card"><div class="prod-head"><span class="prod-title">📊 Productividad por operario</span><button class="prod-close" onclick="closeProductividad()">Cerrar</button></div><div class="prod-body" id="prodBody"><div class="prod-empty">Cargando…</div></div></div>';
+  ov.innerHTML = '<div class="prod-card"><div class="prod-head"><span class="prod-title">📊 Rendimiento de operarios</span><button class="prod-close" onclick="closeProductividad()">Cerrar</button></div><div class="prod-body" id="prodBody"><div class="prod-empty">Cargando…</div></div></div>';
   try {
-    const r = await fetch(SUPABASE_URL + "/rest/v1/vista_productividad_semanal?select=*&order=semana_ts.asc", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+    const [r, nombres] = await Promise.all([
+      fetch(SUPABASE_URL + "/rest/v1/vista_productividad_semanal?select=*&order=semana_ts.asc", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" }),
+      getEmpleadosNombres().catch(function () { return new Map(); })
+    ]);
     _prod = r.ok ? await r.json() : [];
+    _prodNombres = nombres || new Map();
     prodRender();
   } catch (e) { const b = document.getElementById("prodBody"); if (b) b.innerHTML = '<div class="prod-empty" style="color:#b91c1c">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
 }
@@ -7648,32 +7657,163 @@ function prodRender() {
   const body = document.getElementById("prodBody"); if (!body) return;
   const rows = _prod || [];
   if (!rows.length) { body.innerHTML = '<div class="prod-empty">Sin datos de producción todavía.</div>'; return; }
+  const nombres = _prodNombres || new Map();
+  const nameOf = function (leg) { return nombres.get(String(leg)) || ("Legajo " + leg); };
+  const num = function (v) { return +v || 0; };
+  const POCO = 5;                       // piso de tandas-con-m³ para rankear (debajo = "pocos datos")
+  const minm3 = _prodToggle === "minm3";
+  const unit = minm3 ? "min/m³" : "m³/h";
+  const showVal = function (m3h) { return m3h > 0 ? (minm3 ? String(Math.round(60 / m3h)) : (Math.round(m3h * 100) / 100).toFixed(2)) : "—"; };
+
+  // 1) agregar por legajo (suma de todas las semanas — suma/suma, no promedio de ratios)
   const byLeg = {};
   rows.forEach(function (r) { (byLeg[r.legajo] = byLeg[r.legajo] || []).push(r); });
   let semanas = []; rows.forEach(function (r) { if (semanas.indexOf(r.semana) < 0) semanas.push(r.semana); });
-  semanas.sort(); semanas = semanas.slice(-6);
+  semanas.sort();
+  const periodo = semanas.length ? (semanas[0].replace("-S", " S") + " → " + semanas[semanas.length - 1].replace("-S", " S")) : "";
+
   const ops = Object.keys(byLeg).map(function (leg) {
-    let tArm = 0, tPick = 0; byLeg[leg].forEach(function (w) { tArm += +w.armadas || 0; tPick += +w.pickeadas || 0; });
-    return { leg: leg, ws: byLeg[leg], tArm: tArm, tPick: tPick, total: tArm + tPick };
-  }).sort(function (a, b) { return b.total - a.total; });
-  let h = '<div class="prod-sub">Cuántas tandas hizo cada uno por semana, y cuánto tarda en armar. Sirve para ver quién rinde sin pararse al lado. Legajos de prueba (0/1) excluidos.</div>';
-  h += '<div class="prod-leg-row"><span><i class="prod-dot" style="background:#c4b5fd"></i>armadas (TAP)</span><span><i class="prod-dot" style="background:#93c5fd"></i>pickeadas (TP)</span></div>';
-  ops.forEach(function (o) {
-    const rol = o.tArm >= o.tPick ? "arm" : "pick";
-    const last = o.ws[o.ws.length - 1];
-    const myMaxA = Math.max(1, ...o.ws.map(function (w) { return +w.armadas || 0; }));
-    const myMaxP = Math.max(1, ...o.ws.map(function (w) { return +w.pickeadas || 0; }));
-    const wmap = {}; o.ws.forEach(function (w) { wmap[w.semana] = w; });
-    h += '<div class="prod-op"><div class="prod-op-h"><span class="prod-op-leg">Legajo ' + escapeHtml(o.leg) + '</span><span class="prod-op-rol prod-rol-' + rol + '">' + (rol === "arm" ? "Armador" : "Picking") + '</span></div>';
-    h += '<div class="prod-now">Última semana (' + escapeHtml(last.semana) + '): <b>' + (+last.armadas || 0) + '</b> armadas · <b>' + (+last.pickeadas || 0) + '</b> pickeadas' + (last.min_x_armado != null ? ' · <b>' + last.min_x_armado + '</b> min/armado' : '') + '</div>';
-    h += '<div class="prod-weeks">';
-    semanas.forEach(function (sem) {
-      const w = wmap[sem]; const arm = w ? (+w.armadas || 0) : 0, pick = w ? (+w.pickeadas || 0) : 0;
-      const hA = arm ? Math.max(3, Math.round(40 * arm / myMaxA)) : 0, hP = pick ? Math.max(3, Math.round(40 * pick / myMaxP)) : 0;
-      h += '<div class="prod-wk" title="' + escapeHtml(sem) + ': ' + arm + ' arm · ' + pick + ' pick"><div class="prod-wk-bars"><div class="prod-bar" style="height:' + hA + 'px"></div><div class="prod-bar pick" style="height:' + hP + 'px"></div></div><div class="prod-wk-lbl">' + escapeHtml(sem.slice(-3)) + '</div></div>';
+    const ws = byLeg[leg].slice().sort(function (a, b) { return a.semana < b.semana ? -1 : a.semana > b.semana ? 1 : 0; });
+    const S = { armadas: 0, pickeadas: 0, arm_m3: 0, pick_m3: 0, arm_eff: 0, pick_eff: 0, prod_eff: 0, all_eff: 0, arm_td: 0, pick_td: 0, jor: 0, jor_min: 0, t_carga: 0, t_control: 0, t_movim: 0, t_comida: 0, t_recep: 0, t_limp: 0, t_otros: 0 };
+    ws.forEach(function (w) {
+      S.armadas += num(w.armadas); S.pickeadas += num(w.pickeadas);
+      S.arm_m3 += num(w.arm_m3); S.pick_m3 += num(w.pick_m3);
+      S.arm_eff += num(w.arm_eff_min); S.pick_eff += num(w.pick_eff_min);
+      S.prod_eff += num(w.prod_eff_min); S.all_eff += num(w.all_eff_min);
+      S.arm_td += num(w.arm_tandas_dur); S.pick_td += num(w.pick_tandas_dur);
+      S.jor += num(w.jornadas); S.jor_min += num(w.jornada_min);
+      S.t_carga += num(w.t_carga); S.t_control += num(w.t_control); S.t_movim += num(w.t_movim);
+      S.t_comida += num(w.t_comida); S.t_recep += num(w.t_recep); S.t_limp += num(w.t_limp); S.t_otros += num(w.t_otros);
     });
-    h += '</div></div>';
+    const rol = S.armadas >= S.pickeadas ? "arm" : "pick";
+    const m3 = rol === "arm" ? S.arm_m3 : S.pick_m3;
+    const eff = rol === "arm" ? S.arm_eff : S.pick_eff;
+    const td = rol === "arm" ? S.arm_td : S.pick_td;
+    const cnt = rol === "arm" ? S.armadas : S.pickeadas;
+    return {
+      leg: leg, S: S, rol: rol,
+      m3h: eff > 0 ? 60 * m3 / eff : 0,
+      minTanda: td > 0 ? eff / td : 0,
+      td: td, cnt: cnt, m3role: m3, m3total: S.arm_m3 + S.pick_m3,
+      pctProd: S.jor_min > 0 ? 100 * S.prod_eff / S.jor_min : 0,
+      poco: td < POCO,
+      serie: ws.map(function (w) {
+        const wm = rol === "arm" ? num(w.arm_m3) : num(w.pick_m3);
+        const we = rol === "arm" ? num(w.arm_eff_min) : num(w.pick_eff_min);
+        return { sem: w.semana, v: we > 0 ? 60 * wm / we : null };
+      })
+    };
   });
+
+  const bySort = function (a, b) { if (a.poco !== b.poco) return a.poco ? 1 : -1; return b.m3h - a.m3h; };
+  const arms = ops.filter(function (o) { return o.rol === "arm"; }).sort(bySort);
+  const picks = ops.filter(function (o) { return o.rol === "pick"; }).sort(bySort);
+
+  // tendencia: última semana con dato de m³/h vs el promedio de las previas ("¿bajó el ritmo?")
+  const trend = function (serie) {
+    const v = serie.filter(function (s) { return s.v != null; });
+    if (v.length < 2) return { d: "flat", t: "" };
+    const last = v[v.length - 1].v, prev = v.slice(0, -1);
+    const avg = prev.reduce(function (s, x) { return s + x.v; }, 0) / prev.length;
+    if (avg <= 0) return { d: "flat", t: "" };
+    const p = Math.round(100 * (last - avg) / avg);
+    if (p >= 8) return { d: "up", t: "+" + p + "%" };
+    if (p <= -8) return { d: "down", t: p + "%" };
+    return { d: "flat", t: "≈ estable" };
+  };
+
+  // desglose de la jornada (motivos de la ociosidad): productivo (unión real) + tareas
+  // secundarias (repartidas por peso, estimado) + esperas (jornada − activo). Suma = jornada.
+  const breakdown = function (S) {
+    const jor = S.jor_min; if (jor <= 0) return null;
+    const prod = Math.min(S.prod_eff, jor);
+    const otras = Math.max(0, Math.min(S.all_eff, jor) - prod);
+    const espera = Math.max(0, jor - Math.min(S.all_eff, jor));
+    const tsum = S.t_carga + S.t_control + S.t_movim + S.t_comida + S.t_recep + S.t_limp + S.t_otros;
+    const ap = function (t) { return tsum > 0 ? otras * (t / tsum) : 0; };
+    return {
+      jor: jor, segs: [
+        { lbl: "Productivo", min: prod, col: "#16a34a" },
+        { lbl: "Carga camión", min: ap(S.t_carga), col: "#0891b2" },
+        { lbl: "Control", min: ap(S.t_control), col: "#7c3aed" },
+        { lbl: "Movimiento", min: ap(S.t_movim), col: "#f59e0b" },
+        { lbl: "Comida", min: ap(S.t_comida), col: "#64748b" },
+        { lbl: "Recepción", min: ap(S.t_recep), col: "#0ea5e9" },
+        { lbl: "Limpieza", min: ap(S.t_limp), col: "#84cc16" },
+        { lbl: "Otros", min: ap(S.t_otros), col: "#a3a3a3" },
+        { lbl: "Esperas / sin registrar", min: espera, col: "#cbd5e1" }
+      ].filter(function (s) { return s.min > 0.5; })
+    };
+  };
+  const fmtH = function (min) { const hh = min / 60; return (hh >= 10 ? Math.round(hh) : Math.round(hh * 10) / 10) + " h"; };
+
+  // 2) resumen del equipo
+  const teamM3 = ops.reduce(function (s, o) { return s + o.m3total; }, 0);
+  const teamArm = ops.reduce(function (s, o) { return s + o.S.armadas; }, 0);
+  const teamPick = ops.reduce(function (s, o) { return s + o.S.pickeadas; }, 0);
+  const bestArm = arms.filter(function (o) { return !o.poco; })[0];
+  const bestPick = picks.filter(function (o) { return !o.poco; })[0];
+
+  // ---- header: período + toggle de unidad ----
+  let h = '<div class="prod-bar2"><span class="prod-period">' + escapeHtml(periodo) + ' · ' + ops.length + ' operario(s)</span>' +
+    '<span class="prod-tg" onclick="prodToggleVista()" title="Cambiar la unidad"><span class="prod-tg-l' + (!minm3 ? " on" : "") + '">m³/h</span>' +
+    '<span class="prod-sw' + (minm3 ? " on" : "") + '"><span class="prod-sw-k"></span></span>' +
+    '<span class="prod-tg-l' + (minm3 ? " on" : "") + '">min/m³</span></span></div>';
+
+  // ---- resumen del equipo ----
+  h += '<div class="prod-summary"><div class="prod-sum-row">' +
+    '<div><b>' + (Math.round(teamM3 * 10) / 10) + '</b><span>m³ movidos</span></div>' +
+    '<div><b>' + teamArm + '</b><span>tandas armadas</span></div>' +
+    '<div><b>' + teamPick + '</b><span>tandas pickeadas</span></div></div>';
+  if (bestArm || bestPick) {
+    const bits = [];
+    if (bestArm) bits.push('Mejor armador: <b>' + escapeHtml(nameOf(bestArm.leg)) + '</b> (' + showVal(bestArm.m3h) + ' ' + unit + ')');
+    if (bestPick) bits.push('Mejor picker: <b>' + escapeHtml(nameOf(bestPick.leg)) + '</b> (' + showVal(bestPick.m3h) + ' ' + unit + ')');
+    h += '<div class="prod-best">🏆 ' + bits.join(' · ') + '</div>';
+  }
+  h += '</div>';
+
+  // ---- nota de honestidad (requisito de IE) ----
+  h += '<div class="prod-note">El <b>m³/h</b> va sobre el <b>tiempo efectivo</b> (unión de intervalos: descuenta solapes y botones dejados abiertos), separado por rol — armador y picker no se comparan entre sí. El <b>% productivo</b> es sobre la jornada (primer→último evento del día). El reparto de las tareas secundarias es <i>estimado</i>; “Esperas / sin registrar” = jornada sin acción cargada. m³ disponible en ~94% de las tandas; menos de ' + POCO + ' tandas con m³ → “pocos datos”.</div>';
+
+  // ---- tarjeta por operario ----
+  const card = function (o, rank) {
+    const tr = trend(o.serie);
+    const arrow = o.poco ? '' : (tr.d === "up" ? '<span class="prod-up">▲ ' + tr.t + '</span>' : tr.d === "down" ? '<span class="prod-down">▼ ' + tr.t + '</span>' : '<span class="prod-flat">' + tr.t + '</span>');
+    let c = '<div class="prod-op"><div class="prod-op-h"><span class="prod-op-leg">' +
+      (o.poco ? '' : '<span class="prod-rank">#' + rank + '</span>') +
+      escapeHtml(nameOf(o.leg)) + ' <span class="prod-leg-id">leg ' + escapeHtml(o.leg) + '</span></span>' +
+      '<span class="prod-op-rol prod-rol-' + o.rol + '">' + (o.rol === "arm" ? "🔧 Armador" : "🛒 Picker") + '</span></div>';
+    c += '<div class="prod-kpi-row"><div><span class="prod-kpi-big">' + showVal(o.m3h) + '</span> <span class="prod-kpi-u">' + unit + '</span> ' + arrow +
+      (o.poco ? ' <span class="prod-approx">pocos datos</span>' : '') + '</div>' +
+      '<div class="prod-kpi-side"><b>' + o.cnt + '</b> tandas · <b>' + (Math.round(o.m3role * 10) / 10) + '</b> m³<br>' +
+      (o.minTanda > 0 ? '<b>' + Math.round(o.minTanda) + '</b> min/tanda · ' : '') + '<b>' + o.S.jor + '</b> jornada(s)</div></div>';
+    // sparkline semanal de m³/h (escala propia)
+    const sv = o.serie.slice(-8);
+    const smax = Math.max(0.01, Math.max.apply(null, sv.map(function (s) { return s.v || 0; })));
+    if (sv.length > 1) {
+      c += '<div class="prod-spark">';
+      sv.forEach(function (s) {
+        const hh = s.v != null ? Math.max(3, Math.round(34 * s.v / smax)) : 2;
+        c += '<div class="prod-sp" title="' + escapeHtml(s.sem) + ': ' + (s.v != null ? showVal(s.v) + ' ' + unit : 's/d') + '"><div class="prod-sp-bar" style="height:' + hh + 'px;' + (s.v == null ? 'background:#e2e8f0;' : '') + '"></div><div class="prod-sp-l">' + escapeHtml(s.sem.slice(-3)) + '</div></div>';
+      });
+      c += '</div>';
+    }
+    // desglose de la jornada
+    const bd = breakdown(o.S);
+    if (bd) {
+      c += '<div class="prod-brk-h">En qué se va la jornada · <b>' + Math.round(o.pctProd) + '%</b> productivo <span class="prod-est">(estimado)</span></div>';
+      c += '<div class="prod-brk">';
+      bd.segs.forEach(function (s) { c += '<div class="prod-brk-seg" style="width:' + (100 * s.min / bd.jor) + '%;background:' + s.col + '" title="' + escapeHtml(s.lbl) + ': ' + fmtH(s.min) + '"></div>'; });
+      c += '</div><div class="prod-brk-leg">';
+      bd.segs.forEach(function (s) { c += '<span><i style="background:' + s.col + '"></i>' + escapeHtml(s.lbl) + ' ' + Math.round(100 * s.min / bd.jor) + '%</span>'; });
+      c += '</div>';
+    }
+    return c + '</div>';
+  };
+
+  if (arms.length) { h += '<div class="prod-group-h">🔧 Armadores</div>'; arms.forEach(function (o, i) { h += card(o, i + 1); }); }
+  if (picks.length) { h += '<div class="prod-group-h">🛒 Pickers</div>'; picks.forEach(function (o, i) { h += card(o, i + 1); }); }
   body.innerHTML = h;
 }
 function stkMvRow(mv) {

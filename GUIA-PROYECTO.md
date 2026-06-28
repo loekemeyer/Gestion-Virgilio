@@ -4,7 +4,25 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-28 · Versión app al documentar: **v4.66**
+> Última actualización: 2026-06-28 · Versión app al documentar: **v4.67**
+>
+> Nota: **v4.67** — **📊 "Rendimiento de operarios" reescrito (dashboard de ingeniería industrial, 100%
+> Supabase)**. El servicio `openProductividad` (botón 📊) deja de mostrar conteo de tandas y pasa a un
+> tablero serio para evaluar el rinde. **KPI rector = m³/h por ROL** (armador vs picker, nunca cruzados;
+> toggle a **min/m³**, estado propio `_prodToggle`, no el `_mtsHoraFmt` del monitor). Por operario:
+> headline m³/h + **flecha de tendencia** (última semana vs promedio previo = "¿bajó el ritmo?"),
+> throughput (tandas, m³, min/tanda, jornadas), **sparkline semanal**, y **desglose "en qué se va la
+> jornada"** (productivo + carga/control/movimiento/comida/recepción/limpieza/otros repartidos + **esperas /
+> sin registrar**) = los **motivos de la ociosidad** que pidió el usuario. Resumen de equipo (m³, tandas,
+> mejor armador/picker). Nombres de `Empleados` (`getEmpleadosNombres`). La vista
+> **`vista_productividad_semanal`** se reescribió (ver `sql/productividad_operario.sql`): m³ desde
+> `PPP_Pedidos_Entregados` (NO el Sheet); **tiempo EFECTIVO por unión de intervalos** (descuenta solapes +
+> topes por actividad para botones abiertos); **bucket por `ts_cliente`** (no `created_at` — el backfill
+> metía 415 eventos de 14 semanas en una sola); **m³ solo sobre tandas con duración válida** (consistencia
+> numerador/denominador). Invariante garantizado: `prod_eff ≤ all_eff ≤ jornada`. Datos reales:
+> armado 0.46–0.49 m³/h, picking 0.61–1.24; % productivo 18–57% (los bajos = mucha carga/control, lo
+> explica el desglose). Verificado headless a 430 y 900 px, ambos toggles, sin overflow. El **otro** módulo
+> (📈 Análisis, que usa el Sheet) NO se tocó: conviven los dos.
 >
 > Nota: **v4.66** — **Toggle m³/hora ↔ min/m³ en "Mts3 x Hora"** (monitor). En el panel de productividad
 > del monitor (tabla "Mts3 x Hora" por operario + las "Parcial" del equipo, en `renderMonitor`) hay un
@@ -43,8 +61,9 @@
 > `prodRender` muestra una tarjeta por operario con rol (Armador/Picking según qué hace más), la última
 > semana y un mini-gráfico de barras por semana (violeta=armadas, azul=pickeadas, escala por-operario).
 > Sirve para "ver quién rinde sin pararse al lado". Datos REALES: 5 meses de log; se ve la especialización
-> (237 armador, 104/270 picking) y la velocidad (104 ≈14 min/armado, 8 ≈104). ⚠ Los m³ NO entran acá
-> (están en el Google Sheet, no en Supabase): productividad se mide en tandas, no en m³.
+> (237 armador, 104/270 picking) y la velocidad (104 ≈14 min/armado, 8 ≈104). ⚠ **SUPERADO por v4.67**:
+> ahora los m³ SÍ entran (desde `PPP_Pedidos_Entregados`, no el Sheet) y el KPI es m³/h por rol; el
+> `prodRender` de tandas/barras se reemplazó por el dashboard.
 >
 > Nota: **v4.62** — **Agentes: pendientes que se traban + recepción rara** (de la investigación con agentes).
 > `generar_reporte_agentes` sumó 5 categorías (ahora 18): **`mg_pendiente`** (mercadería en `a_guardar` sin
@@ -2731,8 +2750,12 @@ INCONSISTENCIAS"):
 `generar_reporte_agentes` (o a una función auxiliar encadenada en el cron 14 para no re-tipear la grande);
 (3) agregar el `key` al array `CATS` de `agtRender` + su CSS `.stk-rep-cat.<key>`. **Siempre las dos vías**.
 
-**Servicio Productividad** (botón 📊, `openProductividad`): lee `vista_productividad_semanal` (TAP/TP y
-mediana min/armado por legajo/semana). No es alerta; es analítica de equipo.
+**Servicio Productividad / "Rendimiento de operarios"** (botón 📊, `openProductividad`/`prodRender`,
+v4.67): dashboard de ingeniería industrial 100% Supabase. Lee `vista_productividad_semanal` (ver
+`sql/productividad_operario.sql`) + `getEmpleadosNombres`. **KPI = m³/h por rol** (armador/picker, toggle
+min/m³ con `_prodToggle`/`prodToggleVista`) sobre **tiempo efectivo** (unión de intervalos), tendencia,
+sparkline, y **desglose de la jornada** (motivos de la ociosidad: productivo + secundarias + esperas). No
+es alerta; es analítica de equipo. El módulo 📈 Análisis (que usa el Sheet) es OTRA cosa y sigue vivo.
 
 ---
 
