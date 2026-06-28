@@ -1,7 +1,18 @@
 -- =====================================================================
---  productividad_operario.sql  —  vista_productividad_semanal (v4.67)
+--  productividad_operario.sql  —  fuentes SQL del módulo 📊 "Rendimiento de operarios"
 --
---  Alimenta el módulo 📊 "Rendimiento de operarios" (openProductividad /
+--  ⚠ v4.68: el cálculo de productividad ya NO usa la vista semanal de abajo. Se
+--    reescribió como un MOTOR evento-por-evento en el CLIENTE (index.html:
+--    prodCompute / _pvOperator / prodLoad). El motor trae los eventos crudos del
+--    período elegido y aplica las reglas del dueño: el "envase" AP→TAP / EP→TP es
+--    la actividad (los huecos adentro = armado/picking, no ocio); ocio = jornada sin
+--    nada abierto; descarta los bordes (tandas que cruzan el inicio/fin del período);
+--    topes solo a tareas secundarias. Permite elegir desde/hasta. La ÚNICA pieza SQL
+--    que usa hoy es la vista de m³ `vista_tanda_m3` (abajo del todo).
+--  La vista `vista_productividad_semanal` queda como REFERENCIA / SQL ad-hoc (semanal,
+--    unión de intervalos). No la consume la app, pero el cuadre suma/suma sigue sirviendo.
+--
+--  Alimenta(ba) el módulo 📊 "Rendimiento de operarios" (openProductividad /
 --  prodRender en index.html). 100% Supabase: NO usa el Google Sheet. Los m³
 --  salen de PPP_Pedidos_Entregados (col mt3).
 --
@@ -146,3 +157,29 @@ HAVING count(*) FILTER (WHERE e.opcion = ANY (ARRAY['TAP','TP'])) > 0;
 --   SELECT count(*) FILTER (WHERE prod_eff_min > all_eff_min + 1)            AS prod_gt_all,
 --          count(*) FILTER (WHERE all_eff_min  > jornada_min + 1 AND jornada_min > 0) AS all_gt_jor
 --   FROM vista_productividad_semanal;
+
+
+-- =====================================================================
+--  vista_tanda_m3 (v4.68)  —  m³ por tanda, la ÚNICA pieza SQL que usa hoy el módulo.
+--
+--  Dos fuentes de m³ en Supabase: PPP_Pedidos_Entregados (lo realmente ENTREGADO,
+--  espejo del Sheet "Pedidos Entregados", solo tanda+mt3) y PPP_Programacion_Diaria
+--  (la programación, m³ por pedido/np). Una tanda recién armada puede no estar todavía
+--  en Entregados (no se entregó/sincronizó) pero sí en Programación. Se toma Entregados
+--  primero (real) y Programación de respaldo → cobertura de ~93% a ~96% de las tandas
+--  armadas. El cliente la baja entera (tanda→m3) y arma un mapa.
+-- =====================================================================
+CREATE OR REPLACE VIEW public.vista_tanda_m3
+WITH (security_invoker = true) AS
+WITH ent AS (
+  SELECT upper(btrim(tanda)) AS tanda, sum(mt3) AS m3
+  FROM "PPP_Pedidos_Entregados" WHERE mt3 > 0 GROUP BY upper(btrim(tanda))
+), prog AS (
+  SELECT upper(btrim(tanda)) AS tanda, sum(m3) AS m3
+  FROM "PPP_Programacion_Diaria" WHERE m3 > 0 GROUP BY upper(btrim(tanda))
+)
+SELECT COALESCE(e.tanda, p.tanda) AS tanda,
+       round(COALESCE(e.m3, p.m3), 3) AS m3,
+       (e.m3 IS NOT NULL) AS entregado
+FROM ent e FULL JOIN prog p ON e.tanda = p.tanda
+WHERE COALESCE(e.m3, p.m3) > 0;

@@ -5179,7 +5179,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v4.67";
+const APP_VERSION = "v4.68";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -7624,92 +7624,208 @@ function agtRender() {
   body.innerHTML = h;
 }
 /* ===== Rendimiento de operarios — dashboard de productividad (ingeniería industrial), 100% Supabase.
-   Lee vista_productividad_semanal (legajo×semana ISO): m³/h por ROL (armado/picking) con TIEMPO
-   EFECTIVO (unión de intervalos = descuenta solapes; topes por actividad para botones dejados abiertos),
-   volumen, tendencia semana a semana, y desglose de "en qué se va el tiempo" (motivos de la ociosidad,
-   estimado). Nombres de Empleados (getEmpleadosNombres). Toggle m³/h ↔ min/m³. Supervisor-only. */
-let _prod = null;
+   MOTOR evento-por-evento (no usa vista): por cada operario y PERÍODO elegido reconstruye los días.
+   Reglas (pedidas por el dueño): (1) el "envase" AP→TAP / EP→TP ES la actividad: los HUECOS dentro del
+   envase (en horario de jornada, menos otras tareas/descansos) cuentan como armado/picking, NO ocio.
+   (2) ocio real = tiempo de jornada sin ningún envase abierto ni tarea registrada. (3) borde IZQ: tanda
+   que cierra adentro pero empezó ANTES del período → se descarta de inicio-de-jornada hasta el cierre.
+   (4) borde DER: tanda que abrió adentro y no cerró → se descartan sus huecos. Tareas secundarias con
+   tope (un botón olvidado no es trabajo); TAP/TP sin tope (cruzan noches). m³ por tanda = vista_tanda_m3
+   (Entregados + Programación de respaldo). Nombres de Empleados. Toggle m³/h ↔ min/m³. Supervisor-only. */
+let _prod = null;                 // { total, weekly, weeks, d1, d2 }
 let _prodNombres = new Map();
-let _prodToggle = "m3h";   // "m3h" | "minm3"
+let _prodToggle = "m3h";          // "m3h" | "minm3"
+let _prodPeriod = null;           // { d1:"YYYY-MM-DD", d2:"YYYY-MM-DD" }
+let _prodM3Cache = null;
 function prodToggleVista() { _prodToggle = _prodToggle === "m3h" ? "minm3" : "m3h"; prodRender(); }
+
+/* --- motor: matemática de intervalos + reglas. Prefijo _pv para no pisar nombres del archivo gigante. --- */
+var _PV_AR = 3 * 3600 * 1000, _PV_DAY = 86400000;
+function _pvDi(ms) { return Math.floor((ms - _PV_AR) / _PV_DAY); }
+function _pvDayStart(d) { return d * _PV_DAY + _PV_AR; }
+function _pv2(n) { return n < 10 ? "0" + n : "" + n; }
+function _pvYmd(ms) { var d = new Date(ms - _PV_AR); return d.getUTCFullYear() + "-" + _pv2(d.getUTCMonth() + 1) + "-" + _pv2(d.getUTCDate()); }
+function _pvParse(ymd) { return Date.parse(ymd + "T00:00:00-03:00"); }
+function _pvNorm(iv) {
+  iv = iv.filter(function (x) { return x[1] > x[0]; }).map(function (x) { return [x[0], x[1]]; }).sort(function (a, b) { return a[0] - b[0]; });
+  var out = [];
+  for (var i = 0; i < iv.length; i++) { var x = iv[i], last = out[out.length - 1]; if (last && x[0] <= last[1]) last[1] = Math.max(last[1], x[1]); else out.push(x); }
+  return out;
+}
+function _pvTot(iv) { var s = 0; for (var i = 0; i < iv.length; i++) s += iv[i][1] - iv[i][0]; return s; }
+function _pvInter(a, b) {
+  a = _pvNorm(a); b = _pvNorm(b); var out = [], i = 0, j = 0;
+  while (i < a.length && j < b.length) { var s = Math.max(a[i][0], b[j][0]), e = Math.min(a[i][1], b[j][1]); if (e > s) out.push([s, e]); if (a[i][1] < b[j][1]) i++; else j++; }
+  return out;
+}
+function _pvSub(a, b) {
+  a = _pvNorm(a); b = _pvNorm(b); var out = [];
+  for (var i = 0; i < a.length; i++) {
+    var cs = a[i][0], e = a[i][1];
+    for (var j = 0; j < b.length; j++) { var bs = b[j][0], be = b[j][1]; if (be <= cs || bs >= e) continue; if (bs > cs) out.push([cs, bs]); cs = Math.max(cs, be); if (cs >= e) break; }
+    if (cs < e) out.push([cs, e]);
+  }
+  return _pvNorm(out);
+}
+var _PV_BUCKET = { CC: "carga", CCN: "carga", CCR: "carga", CR: "control", CRN: "control", MG: "movim", EI: "insumos", RI: "insumos", RT: "recep", RR: "recep", PC: "comida", PB: "pausa", Limp: "limpieza" };
+var _PV_ORDER = ["comida", "pausa", "carga", "control", "movim", "insumos", "recep", "limpieza", "otros"];   // descansos primero (recortan tareas dejadas abiertas)
+var _PV_CAP = { comida: 90, pausa: 60, carga: 180, control: 45, movim: 30, insumos: 240, recep: 240, limpieza: 45, otros: 90 };   // topes (min) SOLO de tareas secundarias
+function _pvOperator(evs, m3of, D1, D2) {
+  evs = evs.filter(function (e) { return e.cli >= D1 && e.cli < D2; }).sort(function (a, b) { return a.cli - b.cli; });
+  var byDay = {}, e, d, o, i;
+  for (i = 0; i < evs.length; i++) {
+    e = evs[i]; d = _pvDi(e.cli);
+    if (!byDay[d]) byDay[d] = { starts: [], ends: [], fj: null };
+    o = byDay[d]; o.starts.push(e.cli); o.ends.push(e.cli);
+    if (e.ini != null && _pvDi(e.ini) === d) o.starts.push(e.ini);
+    if (e.opcion === "FJ") o.fj = e.cli;
+  }
+  var dayWin = {}, wwArr = [];
+  for (d in byDay) { o = byDay[d]; var ws = Math.min.apply(null, o.starts), we = (o.fj != null) ? o.fj : Math.max.apply(null, o.ends); if (we > ws) { dayWin[d] = [ws, we]; wwArr.push([ws, we]); } }
+  var wwClip = _pvInter(wwArr, [[D1, D2]]), jornada = _pvTot(wwClip);
+  var armEnv = [], pickEnv = [], taskIv = {}, starts = [], b;
+  for (i = 0; i < _PV_ORDER.length; i++) taskIv[_PV_ORDER[i]] = [];
+  for (i = 0; i < evs.length; i++) {
+    e = evs[i];
+    if (e.ini != null && e.cli > e.ini) {
+      if (e.opcion === "TAP") armEnv.push({ tanda: e.texto, ini: e.ini, cli: e.cli });
+      else if (e.opcion === "TP") pickEnv.push({ tanda: e.texto, ini: e.ini, cli: e.cli });
+      else { b = _PV_BUCKET[e.opcion] || "otros"; taskIv[b].push([e.ini, Math.min(e.cli, e.ini + _PV_CAP[b] * 60000)]); }
+    } else if (e.ini == null) {
+      if (e.opcion === "AP") starts.push({ role: "arm", tanda: e.texto, t: e.cli });
+      else if (e.opcion === "EP") starts.push({ role: "pick", tanda: e.texto, t: e.cli });
+    }
+  }
+  var exclL = [], exclR = [], all = armEnv.concat(pickEnv), env;
+  for (i = 0; i < all.length; i++) { env = all[i]; if (env.ini < D1) { var w = dayWin[_pvDi(env.cli)]; exclL.push([w ? w[0] : _pvDayStart(_pvDi(env.cli)), env.cli]); env.cross = true; } }
+  var closedArm = {}, closedPick = {};
+  for (i = 0; i < armEnv.length; i++) if (!armEnv[i].cross) closedArm[armEnv[i].tanda] = 1;
+  for (i = 0; i < pickEnv.length; i++) if (!pickEnv[i].cross) closedPick[pickEnv[i].tanda] = 1;
+  for (i = 0; i < starts.length; i++) { var sm = starts[i], cl = sm.role === "arm" ? closedArm : closedPick; if (sm.t >= D1 && sm.t < D2 && !cl[sm.tanda]) exclR.push([sm.t, D2]); }
+  var avail = _pvSub(wwClip, exclL), excluded = jornada - _pvTot(avail), buckets = {};
+  for (i = 0; i < _PV_ORDER.length; i++) { var bn = _PV_ORDER[i]; buckets[bn] = _pvTot(_pvInter(taskIv[bn], avail)); avail = _pvSub(avail, taskIv[bn]); }
+  function alloc(envs) {
+    var time = 0, timeM3 = 0, m3 = 0, tset = {}, m3set = {}, list = envs.filter(function (x) { return !x.cross; }).sort(function (a, b) { return a.ini - b.ini; });
+    for (var k = 0; k < list.length; k++) { var en = list[k], got = _pvTot(_pvInter([[en.ini, en.cli]], avail)); if (got > 0) avail = _pvSub(avail, [[en.ini, en.cli]]); time += got; tset[en.tanda] = 1; var m = m3of(en.tanda) || 0; if (m > 0) { timeM3 += got; if (!m3set[en.tanda]) { m3set[en.tanda] = 1; m3 += m; } } }
+    return { time: time, timeM3: timeM3, m3: m3, tandas: Object.keys(tset).length, tandasM3: Object.keys(m3set).length };
+  }
+  var arm = alloc(armEnv), pick = alloc(pickEnv);
+  excluded += _pvTot(_pvInter(exclR, avail)); avail = _pvSub(avail, exclR);
+  return { jornada: jornada, excluded: excluded, idle: _pvTot(avail), buckets: buckets,
+    armTime: arm.time, armTimeM3: arm.timeM3, armM3: arm.m3, armTandas: arm.tandas, armTandasM3: arm.tandasM3,
+    pickTime: pick.time, pickTimeM3: pick.timeM3, pickM3: pick.m3, pickTandas: pick.tandas, pickTandasM3: pick.tandasM3 };
+}
+function prodCompute(events, m3map, D1, D2) {
+  var m3of = function (t) { return m3map[t] || 0; }, byLeg = {}, i, e;
+  for (i = 0; i < events.length; i++) { e = events[i]; if (e.legajo === "0" || e.legajo === "1" || !e.legajo) continue; if (!byLeg[e.legajo]) byLeg[e.legajo] = []; byLeg[e.legajo].push(e); }
+  var out = {}; for (var leg in byLeg) out[leg] = _pvOperator(byLeg[leg], m3of, D1, D2);
+  return out;
+}
+function _pvWeeks(D1, D2) {
+  var out = [], wd = new Date(D1 - _PV_AR).getUTCDay(), monday = _pvDayStart(_pvDi(D1) - ((wd + 6) % 7));
+  for (var s = monday; s < D2; s += 7 * _PV_DAY) { var a = Math.max(s, D1), bb = Math.min(s + 7 * _PV_DAY, D2); if (bb > a) out.push([a, bb]); }
+  return out;
+}
+async function _pvFetchM3() {
+  if (_prodM3Cache) return _prodM3Cache;
+  var map = {};
+  try {
+    var r = await fetch(SUPABASE_URL + "/rest/v1/vista_tanda_m3?select=tanda,m3&limit=20000", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY } });
+    if (r.ok) { var d = await r.json(); for (var i = 0; i < d.length; i++) map[d[i].tanda] = +d[i].m3 || 0; }
+  } catch (e) { }
+  _prodM3Cache = map; return map;
+}
+function prodSetPeriod(d1, d2) { if (d1 && d2 && d1 <= d2) { _prodPeriod = { d1: d1, d2: d2 }; prodLoad(); } }
+function prodPreset(days) { var hoy = Date.now(); prodSetPeriod(_pvYmd(hoy - (days - 1) * _PV_DAY), _pvYmd(hoy)); }
+async function prodLoad() {
+  var body = document.getElementById("prodBody"); if (body) body.innerHTML = '<div class="prod-empty">Calculando…</div>';
+  var D1 = _pvParse(_prodPeriod.d1), D2 = _pvParse(_prodPeriod.d2) + _PV_DAY;
+  try {
+    var evUrl = SUPABASE_TABLE_ENDPOINT + "?ts_cliente=gte." + encodeURIComponent(new Date(D1).toISOString()) + "&ts_cliente=lt." + encodeURIComponent(new Date(D2).toISOString()) + "&select=legajo,opcion,texto,ts_inicio,ts_cliente&order=ts_cliente.asc&limit=100000";
+    var res = await Promise.all([
+      fetch(evUrl, { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" }),
+      getEmpleadosNombres().catch(function () { return new Map(); }),
+      _pvFetchM3()
+    ]);
+    var rows = res[0].ok ? await res[0].json() : [], events = [];
+    for (var i = 0; i < rows.length; i++) { var x = rows[i], cli = Date.parse(x.ts_cliente); if (!cli) continue; events.push({ legajo: x.legajo, opcion: x.opcion, texto: (x.texto || "").trim().toUpperCase(), ini: x.ts_inicio ? Date.parse(x.ts_inicio) : null, cli: cli }); }
+    var weeks = _pvWeeks(D1, D2).slice(-8);
+    var weekly = weeks.map(function (w) { return prodCompute(events, res[2], w[0], w[1]); });
+    _prod = { total: prodCompute(events, res[2], D1, D2), weekly: weekly, weeks: weeks, d1: _prodPeriod.d1, d2: _prodPeriod.d2 };
+    _prodNombres = res[1] || new Map();
+    prodRender();
+  } catch (e) { if (body) body.innerHTML = '<div class="prod-empty" style="color:#b91c1c">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
+}
 async function openProductividad() {
   if (!document.getElementById("prodCss")) {
     const s = document.createElement("style"); s.id = "prodCss";
-    s.textContent = "#prodOverlay{display:none;position:fixed;inset:0;z-index:1280;background:rgba(2,6,23,.74);overflow:auto;padding:14px;}#prodOverlay.show{display:block;}.prod-card{background:#f8fafc;max-width:880px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.prod-head{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:linear-gradient(90deg,#1d4ed8,#0b2a6b);color:#fff;}.prod-title{font-size:19px;font-weight:800;}.prod-close{background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;width:auto;}.prod-body{padding:14px 16px;}.prod-empty{padding:24px;text-align:center;color:#64748b;}.prod-bar2{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px;}.prod-period{font-size:12px;color:#64748b;}.prod-tg{display:inline-flex;align-items:center;gap:6px;cursor:pointer;user-select:none;}.prod-tg-l{font-size:12px;font-weight:700;color:#94a3b8;}.prod-tg-l.on{color:#1d4ed8;}.prod-sw{display:inline-block;width:34px;height:18px;border-radius:999px;background:#94a3b8;position:relative;transition:background .15s;}.prod-sw.on{background:#1d4ed8;}.prod-sw-k{position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;transition:left .15s;box-shadow:0 1px 2px rgba(0,0,0,.3);}.prod-sw.on .prod-sw-k{left:18px;}.prod-summary{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:11px 14px;margin-bottom:10px;}.prod-sum-row{display:flex;gap:18px;flex-wrap:wrap;}.prod-sum-row>div{display:flex;flex-direction:column;}.prod-sum-row b{font-size:18px;color:#0f172a;font-variant-numeric:tabular-nums;}.prod-sum-row span{font-size:11px;color:#64748b;}.prod-best{font-size:12.5px;color:#334155;margin-top:8px;border-top:1px solid #f1f5f9;padding-top:7px;}.prod-note{font-size:11.5px;color:#64748b;background:#f1f5f9;border-radius:8px;padding:8px 11px;margin-bottom:12px;}.prod-group-h{font-size:14px;font-weight:800;color:#0f172a;margin:14px 0 8px;}.prod-op{border:1px solid #e2e8f0;border-radius:12px;padding:12px 14px;margin-bottom:10px;background:#fff;}.prod-op-h{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:8px;}.prod-op-leg{font-weight:800;font-size:15px;color:#0f172a;}.prod-rank{display:inline-block;background:#0f172a;color:#fff;border-radius:6px;font-size:11px;padding:1px 6px;font-weight:800;margin-right:4px;}.prod-leg-id{font-size:11px;color:#94a3b8;font-weight:600;}.prod-op-rol{font-size:11.5px;font-weight:800;padding:2px 9px;border-radius:999px;}.prod-rol-arm{background:#ede9fe;color:#6d28d9;}.prod-rol-pick{background:#dbeafe;color:#1d4ed8;}.prod-kpi-row{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;}.prod-kpi-big{font-size:30px;font-weight:900;color:#1d4ed8;font-variant-numeric:tabular-nums;line-height:1;}.prod-kpi-u{font-size:13px;font-weight:700;color:#64748b;}.prod-kpi-side{font-size:12.5px;color:#475569;text-align:right;}.prod-up{color:#16a34a;font-size:14px;}.prod-down{color:#dc2626;font-size:14px;}.prod-flat{color:#94a3b8;font-size:13px;}.prod-approx{background:#fef9c3;color:#854d0e;font-size:10px;font-weight:700;padding:1px 6px;border-radius:6px;}.prod-other{font-size:12px;color:#64748b;margin-top:3px;}.prod-spark{display:flex;gap:6px;align-items:flex-end;margin-top:10px;}.prod-sp{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;}.prod-sp-bar{width:100%;max-width:24px;border-radius:3px 3px 0 0;background:#93c5fd;}.prod-sp-l{font-size:9px;color:#94a3b8;}.prod-brk-h{font-size:12px;color:#334155;margin:11px 0 5px;}.prod-est{color:#94a3b8;font-size:10.5px;}.prod-brk{display:flex;height:14px;border-radius:7px;overflow:hidden;background:#e2e8f0;}.prod-brk-seg{height:100%;}.prod-brk-leg{display:flex;flex-wrap:wrap;gap:8px;margin-top:5px;font-size:10.5px;color:#475569;}.prod-brk-leg span{display:inline-flex;align-items:center;gap:3px;}.prod-brk-leg i{width:9px;height:9px;border-radius:2px;display:inline-block;}";
+    s.textContent = "#prodOverlay{display:none;position:fixed;inset:0;z-index:1280;background:rgba(2,6,23,.74);overflow:auto;padding:14px;}#prodOverlay.show{display:block;}.prod-card{background:#f8fafc;max-width:880px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.prod-head{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:linear-gradient(90deg,#1d4ed8,#0b2a6b);color:#fff;}.prod-title{font-size:19px;font-weight:800;}.prod-close{background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;width:auto;}.prod-body{padding:14px 16px;}.prod-empty{padding:24px;text-align:center;color:#64748b;}.prod-bar2{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px;}.prod-period{font-size:12px;color:#64748b;}.prod-tg{display:inline-flex;align-items:center;gap:6px;cursor:pointer;user-select:none;}.prod-tg-l{font-size:12px;font-weight:700;color:#94a3b8;}.prod-tg-l.on{color:#1d4ed8;}.prod-sw{display:inline-block;width:34px;height:18px;border-radius:999px;background:#94a3b8;position:relative;transition:background .15s;}.prod-sw.on{background:#1d4ed8;}.prod-sw-k{position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;transition:left .15s;box-shadow:0 1px 2px rgba(0,0,0,.3);}.prod-sw.on .prod-sw-k{left:18px;}.prod-summary{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:11px 14px;margin-bottom:10px;}.prod-sum-row{display:flex;gap:18px;flex-wrap:wrap;}.prod-sum-row>div{display:flex;flex-direction:column;}.prod-sum-row b{font-size:18px;color:#0f172a;font-variant-numeric:tabular-nums;}.prod-sum-row span{font-size:11px;color:#64748b;}.prod-best{font-size:12.5px;color:#334155;margin-top:8px;border-top:1px solid #f1f5f9;padding-top:7px;}.prod-note{font-size:11.5px;color:#64748b;background:#f1f5f9;border-radius:8px;padding:8px 11px;margin-bottom:12px;}.prod-group-h{font-size:14px;font-weight:800;color:#0f172a;margin:14px 0 8px;}.prod-op{border:1px solid #e2e8f0;border-radius:12px;padding:12px 14px;margin-bottom:10px;background:#fff;}.prod-op-h{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:8px;}.prod-op-leg{font-weight:800;font-size:15px;color:#0f172a;}.prod-rank{display:inline-block;background:#0f172a;color:#fff;border-radius:6px;font-size:11px;padding:1px 6px;font-weight:800;margin-right:4px;}.prod-leg-id{font-size:11px;color:#94a3b8;font-weight:600;}.prod-op-rol{font-size:11.5px;font-weight:800;padding:2px 9px;border-radius:999px;}.prod-rol-arm{background:#ede9fe;color:#6d28d9;}.prod-rol-pick{background:#dbeafe;color:#1d4ed8;}.prod-kpi-row{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;}.prod-kpi-big{font-size:30px;font-weight:900;color:#1d4ed8;font-variant-numeric:tabular-nums;line-height:1;}.prod-kpi-u{font-size:13px;font-weight:700;color:#64748b;}.prod-kpi-side{font-size:12.5px;color:#475569;text-align:right;}.prod-up{color:#16a34a;font-size:14px;}.prod-down{color:#dc2626;font-size:14px;}.prod-flat{color:#94a3b8;font-size:13px;}.prod-approx{background:#fef9c3;color:#854d0e;font-size:10px;font-weight:700;padding:1px 6px;border-radius:6px;}.prod-other{font-size:12px;color:#64748b;margin-top:3px;}.prod-spark{display:flex;gap:6px;align-items:flex-end;margin-top:10px;}.prod-sp{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;}.prod-sp-bar{width:100%;max-width:24px;border-radius:3px 3px 0 0;background:#93c5fd;}.prod-sp-l{font-size:9px;color:#94a3b8;}.prod-brk-h{font-size:12px;color:#334155;margin:11px 0 5px;}.prod-est{color:#94a3b8;font-size:10.5px;}.prod-brk{display:flex;height:14px;border-radius:7px;overflow:hidden;background:#e2e8f0;}.prod-brk-seg{height:100%;}.prod-brk-leg{display:flex;flex-wrap:wrap;gap:8px;margin-top:5px;font-size:10.5px;color:#475569;}.prod-brk-leg span{display:inline-flex;align-items:center;gap:3px;}.prod-brk-leg i{width:9px;height:9px;border-radius:2px;display:inline-block;}.prod-dates{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:10px;background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:8px 11px;}.prod-dates label{font-size:11px;color:#64748b;font-weight:700;}.prod-dates input[type=date]{padding:4px 6px;border:1px solid #cbd5e1;border-radius:7px;font-size:12px;width:auto;color:#0f172a;}.prod-preset{background:#e2e8f0;border:none;border-radius:7px;padding:4px 10px;font-size:11px;font-weight:700;color:#334155;cursor:pointer;width:auto;}.prod-exc{font-size:10.5px;color:#b45309;margin-top:4px;}";
     document.head.appendChild(s);
   }
   let ov = document.getElementById("prodOverlay");
   if (!ov) { ov = document.createElement("div"); ov.id = "prodOverlay"; document.body.appendChild(ov); }
   ov.classList.add("show");
   ov.innerHTML = '<div class="prod-card"><div class="prod-head"><span class="prod-title">📊 Rendimiento de operarios</span><button class="prod-close" onclick="closeProductividad()">Cerrar</button></div><div class="prod-body" id="prodBody"><div class="prod-empty">Cargando…</div></div></div>';
-  try {
-    const [r, nombres] = await Promise.all([
-      fetch(SUPABASE_URL + "/rest/v1/vista_productividad_semanal?select=*&order=semana_ts.asc", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" }),
-      getEmpleadosNombres().catch(function () { return new Map(); })
-    ]);
-    _prod = r.ok ? await r.json() : [];
-    _prodNombres = nombres || new Map();
-    prodRender();
-  } catch (e) { const b = document.getElementById("prodBody"); if (b) b.innerHTML = '<div class="prod-empty" style="color:#b91c1c">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
+  if (!_prodPeriod) { var hoy = Date.now(); _prodPeriod = { d1: _pvYmd(hoy - 27 * _PV_DAY), d2: _pvYmd(hoy) }; }   // default: últimas 4 semanas
+  prodLoad();
 }
 function closeProductividad() { const ov = document.getElementById("prodOverlay"); if (ov) ov.classList.remove("show"); _prod = null; }
 function prodRender() {
   const body = document.getElementById("prodBody"); if (!body) return;
-  const rows = _prod || [];
-  if (!rows.length) { body.innerHTML = '<div class="prod-empty">Sin datos de producción todavía.</div>'; return; }
   const nombres = _prodNombres || new Map();
   const nameOf = function (leg) { return nombres.get(String(leg)) || ("Legajo " + leg); };
-  const num = function (v) { return +v || 0; };
-  const POCO = 5;                       // piso de tandas-con-m³ para rankear (debajo = "pocos datos")
   const minm3 = _prodToggle === "minm3";
   const unit = minm3 ? "min/m³" : "m³/h";
-  const showVal = function (m3h) { return m3h > 0 ? (minm3 ? String(Math.round(60 / m3h)) : (Math.round(m3h * 100) / 100).toFixed(2)) : "—"; };
+  const showVal = function (v) { return v > 0 ? (minm3 ? String(Math.round(60 / v)) : (Math.round(v * 100) / 100).toFixed(2)) : "—"; };
+  const hrs = function (ms) { return ms / 3600000; };
+  const minOf = function (ms) { return ms / 60000; };
+  const fmtH = function (m) { const hh = m / 60; return (hh >= 10 ? Math.round(hh) : Math.round(hh * 10) / 10) + " h"; };
+  const wkLbl = function (i) { const w = _prod && _prod.weeks[i]; if (!w) return ""; const d = new Date(w[0] - _PV_AR); return _pv2(d.getUTCDate()) + "/" + _pv2(d.getUTCMonth() + 1); };
 
-  // 1) agregar por legajo (suma de todas las semanas — suma/suma, no promedio de ratios)
-  const byLeg = {};
-  rows.forEach(function (r) { (byLeg[r.legajo] = byLeg[r.legajo] || []).push(r); });
-  let semanas = []; rows.forEach(function (r) { if (semanas.indexOf(r.semana) < 0) semanas.push(r.semana); });
-  semanas.sort();
-  const periodo = semanas.length ? (semanas[0].replace("-S", " S") + " → " + semanas[semanas.length - 1].replace("-S", " S")) : "";
+  // selector de fechas (siempre arriba)
+  const d1v = _prod ? _prod.d1 : (_prodPeriod ? _prodPeriod.d1 : "");
+  const d2v = _prod ? _prod.d2 : (_prodPeriod ? _prodPeriod.d2 : "");
+  const sel = '<div class="prod-dates"><label>Desde</label><input id="prodD1" type="date" value="' + d1v + '" onchange="prodSetPeriod(this.value, document.getElementById(\'prodD2\').value)">' +
+    '<label>Hasta</label><input id="prodD2" type="date" value="' + d2v + '" onchange="prodSetPeriod(document.getElementById(\'prodD1\').value, this.value)">' +
+    '<button class="prod-preset" onclick="prodPreset(7)">7 días</button><button class="prod-preset" onclick="prodPreset(28)">4 sem</button><button class="prod-preset" onclick="prodPreset(56)">8 sem</button></div>';
 
-  const ops = Object.keys(byLeg).map(function (leg) {
-    const ws = byLeg[leg].slice().sort(function (a, b) { return a.semana < b.semana ? -1 : a.semana > b.semana ? 1 : 0; });
-    const S = { armadas: 0, pickeadas: 0, arm_m3: 0, pick_m3: 0, arm_eff: 0, pick_eff: 0, prod_eff: 0, all_eff: 0, arm_td: 0, pick_td: 0, jor: 0, jor_min: 0, t_carga: 0, t_control: 0, t_movim: 0, t_comida: 0, t_recep: 0, t_limp: 0, t_otros: 0 };
-    ws.forEach(function (w) {
-      S.armadas += num(w.armadas); S.pickeadas += num(w.pickeadas);
-      S.arm_m3 += num(w.arm_m3); S.pick_m3 += num(w.pick_m3);
-      S.arm_eff += num(w.arm_eff_min); S.pick_eff += num(w.pick_eff_min);
-      S.prod_eff += num(w.prod_eff_min); S.all_eff += num(w.all_eff_min);
-      S.arm_td += num(w.arm_tandas_dur); S.pick_td += num(w.pick_tandas_dur);
-      S.jor += num(w.jornadas); S.jor_min += num(w.jornada_min);
-      S.t_carga += num(w.t_carga); S.t_control += num(w.t_control); S.t_movim += num(w.t_movim);
-      S.t_comida += num(w.t_comida); S.t_recep += num(w.t_recep); S.t_limp += num(w.t_limp); S.t_otros += num(w.t_otros);
-    });
-    const rol = S.armadas >= S.pickeadas ? "arm" : "pick";
-    const m3 = rol === "arm" ? S.arm_m3 : S.pick_m3;
-    const eff = rol === "arm" ? S.arm_eff : S.pick_eff;
-    const td = rol === "arm" ? S.arm_td : S.pick_td;
-    const cnt = rol === "arm" ? S.armadas : S.pickeadas;
-    return {
-      leg: leg, S: S, rol: rol,
-      m3h: eff > 0 ? 60 * m3 / eff : 0,
-      minTanda: td > 0 ? eff / td : 0,
-      td: td, cnt: cnt, m3role: m3, m3total: S.arm_m3 + S.pick_m3,
-      pctProd: S.jor_min > 0 ? 100 * S.prod_eff / S.jor_min : 0,
-      poco: td < POCO,
-      serie: ws.map(function (w) {
-        const wm = rol === "arm" ? num(w.arm_m3) : num(w.pick_m3);
-        const we = rol === "arm" ? num(w.arm_eff_min) : num(w.pick_eff_min);
-        return { sem: w.semana, v: we > 0 ? 60 * wm / we : null };
+  if (!_prod) { body.innerHTML = sel + '<div class="prod-empty">Sin datos.</div>'; return; }
+  const POCO = 5;
+
+  // agregados por operario (a partir del motor)
+  const ops = [];
+  Object.keys(_prod.total).forEach(function (leg) {
+    const t = _prod.total[leg];
+    if ((t.armTandas + t.pickTandas) === 0) return;
+    const role = t.armTime >= t.pickTime ? "arm" : "pick";
+    const rM3 = role === "arm" ? t.armM3 : t.pickM3;
+    const rTimeM3 = role === "arm" ? t.armTimeM3 : t.pickTimeM3;
+    const rTime = role === "arm" ? t.armTime : t.pickTime;
+    const rTandas = role === "arm" ? t.armTandas : t.pickTandas;
+    const rTandasM3 = role === "arm" ? t.armTandasM3 : t.pickTandasM3;
+    const measurable = Math.max(0, t.jornada - t.excluded);
+    ops.push({
+      leg: leg, role: role, t: t,
+      m3h: rTimeM3 > 0 ? rM3 / hrs(rTimeM3) : 0,
+      m3role: rM3, rTime: rTime, rTandas: rTandas,
+      minTanda: rTandas > 0 ? minOf(rTime) / rTandas : 0,
+      m3total: t.armM3 + t.pickM3,
+      measurable: measurable,
+      pctProd: measurable > 0 ? 100 * (t.armTime + t.pickTime) / measurable : 0,
+      poco: rTandasM3 < POCO,
+      serie: _prod.weekly.map(function (wk, i) {
+        const a = wk[leg];
+        if (!a) return { v: null, lbl: wkLbl(i) };
+        const m3 = role === "arm" ? a.armM3 : a.pickM3, tm = role === "arm" ? a.armTimeM3 : a.pickTimeM3;
+        return { v: tm > 0 ? m3 / hrs(tm) : null, lbl: wkLbl(i) };
       })
-    };
+    });
   });
 
   const bySort = function (a, b) { if (a.poco !== b.poco) return a.poco ? 1 : -1; return b.m3h - a.m3h; };
-  const arms = ops.filter(function (o) { return o.rol === "arm"; }).sort(bySort);
-  const picks = ops.filter(function (o) { return o.rol === "pick"; }).sort(bySort);
+  const arms = ops.filter(function (o) { return o.role === "arm"; }).sort(bySort);
+  const picks = ops.filter(function (o) { return o.role === "pick"; }).sort(bySort);
 
-  // tendencia: última semana con dato de m³/h vs el promedio de las previas ("¿bajó el ritmo?")
   const trend = function (serie) {
     const v = serie.filter(function (s) { return s.v != null; });
     if (v.length < 2) return { d: "flat", t: "" };
@@ -7722,45 +7838,38 @@ function prodRender() {
     return { d: "flat", t: "≈ estable" };
   };
 
-  // desglose de la jornada (motivos de la ociosidad): productivo (unión real) + tareas
-  // secundarias (repartidas por peso, estimado) + esperas (jornada − activo). Suma = jornada.
-  const breakdown = function (S) {
-    const jor = S.jor_min; if (jor <= 0) return null;
-    const prod = Math.min(S.prod_eff, jor);
-    const otras = Math.max(0, Math.min(S.all_eff, jor) - prod);
-    const espera = Math.max(0, jor - Math.min(S.all_eff, jor));
-    const tsum = S.t_carga + S.t_control + S.t_movim + S.t_comida + S.t_recep + S.t_limp + S.t_otros;
-    const ap = function (t) { return tsum > 0 ? otras * (t / tsum) : 0; };
-    return {
-      jor: jor, segs: [
-        { lbl: "Productivo", min: prod, col: "#16a34a" },
-        { lbl: "Carga camión", min: ap(S.t_carga), col: "#0891b2" },
-        { lbl: "Control", min: ap(S.t_control), col: "#7c3aed" },
-        { lbl: "Movimiento", min: ap(S.t_movim), col: "#f59e0b" },
-        { lbl: "Comida", min: ap(S.t_comida), col: "#64748b" },
-        { lbl: "Recepción", min: ap(S.t_recep), col: "#0ea5e9" },
-        { lbl: "Limpieza", min: ap(S.t_limp), col: "#84cc16" },
-        { lbl: "Otros", min: ap(S.t_otros), col: "#a3a3a3" },
-        { lbl: "Esperas / sin registrar", min: espera, col: "#cbd5e1" }
-      ].filter(function (s) { return s.min > 0.5; })
-    };
+  // desglose: productivo (armado+picking) + tareas reales + ocio (turno sin nada abierto). Suma = medible.
+  const breakdown = function (t, measurable) {
+    if (measurable <= 0) return null;
+    const bk = t.buckets;
+    const segs = [
+      { lbl: "Productivo", min: minOf(t.armTime + t.pickTime), col: "#16a34a" },
+      { lbl: "Carga camión", min: minOf(bk.carga), col: "#0891b2" },
+      { lbl: "Control", min: minOf(bk.control), col: "#7c3aed" },
+      { lbl: "Movimiento", min: minOf(bk.movim), col: "#f59e0b" },
+      { lbl: "Recepción", min: minOf(bk.recep), col: "#0284c7" },
+      { lbl: "Insumos", min: minOf(bk.insumos), col: "#0ea5e9" },
+      { lbl: "Comida", min: minOf(bk.comida), col: "#64748b" },
+      { lbl: "Pausa", min: minOf(bk.pausa), col: "#94a3b8" },
+      { lbl: "Limpieza", min: minOf(bk.limpieza), col: "#84cc16" },
+      { lbl: "Otros", min: minOf(bk.otros), col: "#a3a3a3" },
+      { lbl: "Ocio", min: minOf(t.idle), col: "#fb7185" }
+    ].filter(function (s) { return s.min > 0.5; });
+    return { jor: minOf(measurable), segs: segs };
   };
-  const fmtH = function (min) { const hh = min / 60; return (hh >= 10 ? Math.round(hh) : Math.round(hh * 10) / 10) + " h"; };
 
-  // 2) resumen del equipo
-  const teamM3 = ops.reduce(function (s, o) { return s + o.m3total; }, 0);
-  const teamArm = ops.reduce(function (s, o) { return s + o.S.armadas; }, 0);
-  const teamPick = ops.reduce(function (s, o) { return s + o.S.pickeadas; }, 0);
+  // resumen del equipo
+  let teamM3 = 0, teamArm = 0, teamPick = 0;
+  ops.forEach(function (o) { teamM3 += o.m3total; teamArm += o.t.armTandas; teamPick += o.t.pickTandas; });
   const bestArm = arms.filter(function (o) { return !o.poco; })[0];
   const bestPick = picks.filter(function (o) { return !o.poco; })[0];
 
-  // ---- header: período + toggle de unidad ----
-  let h = '<div class="prod-bar2"><span class="prod-period">' + escapeHtml(periodo) + ' · ' + ops.length + ' operario(s)</span>' +
+  let h = sel;
+  h += '<div class="prod-bar2"><span class="prod-period">' + escapeHtml(_prod.d1) + ' → ' + escapeHtml(_prod.d2) + ' · ' + ops.length + ' operario(s)</span>' +
     '<span class="prod-tg" onclick="prodToggleVista()" title="Cambiar la unidad"><span class="prod-tg-l' + (!minm3 ? " on" : "") + '">m³/h</span>' +
     '<span class="prod-sw' + (minm3 ? " on" : "") + '"><span class="prod-sw-k"></span></span>' +
     '<span class="prod-tg-l' + (minm3 ? " on" : "") + '">min/m³</span></span></div>';
 
-  // ---- resumen del equipo ----
   h += '<div class="prod-summary"><div class="prod-sum-row">' +
     '<div><b>' + (Math.round(teamM3 * 10) / 10) + '</b><span>m³ movidos</span></div>' +
     '<div><b>' + teamArm + '</b><span>tandas armadas</span></div>' +
@@ -7773,47 +7882,45 @@ function prodRender() {
   }
   h += '</div>';
 
-  // ---- nota de honestidad (requisito de IE) ----
-  h += '<div class="prod-note">El <b>m³/h</b> va sobre el <b>tiempo efectivo</b> (unión de intervalos: descuenta solapes y botones dejados abiertos), separado por rol — armador y picker no se comparan entre sí. El <b>% productivo</b> es sobre la jornada (primer→último evento del día). El reparto de las tareas secundarias es <i>estimado</i>; “Esperas / sin registrar” = jornada sin acción cargada. m³ disponible en ~94% de las tandas; menos de ' + POCO + ' tandas con m³ → “pocos datos”.</div>';
+  h += '<div class="prod-note">El <b>m³/h</b> va por ROL (armado/picking, no se comparan). El "envase" de cada tanda (de que abre hasta que cierra) cuenta como esa tarea: los <b>huecos adentro son trabajo</b>, no ocio. <b>Ocio</b> = jornada con nada abierto. Las tandas que <b>cruzan el borde</b> del período no se miden (se muestran aparte). m³ de Entregados + Programación (~96%); menos de ' + POCO + ' tandas → “pocos datos”.</div>';
 
-  // ---- tarjeta por operario ----
   const card = function (o, rank) {
     const tr = trend(o.serie);
     const arrow = o.poco ? '' : (tr.d === "up" ? '<span class="prod-up">▲ ' + tr.t + '</span>' : tr.d === "down" ? '<span class="prod-down">▼ ' + tr.t + '</span>' : '<span class="prod-flat">' + tr.t + '</span>');
     let c = '<div class="prod-op"><div class="prod-op-h"><span class="prod-op-leg">' +
       (o.poco ? '' : '<span class="prod-rank">#' + rank + '</span>') +
       escapeHtml(nameOf(o.leg)) + ' <span class="prod-leg-id">leg ' + escapeHtml(o.leg) + '</span></span>' +
-      '<span class="prod-op-rol prod-rol-' + o.rol + '">' + (o.rol === "arm" ? "🔧 Armador" : "🛒 Picker") + '</span></div>';
+      '<span class="prod-op-rol prod-rol-' + o.role + '">' + (o.role === "arm" ? "🔧 Armador" : "🛒 Picker") + '</span></div>';
     c += '<div class="prod-kpi-row"><div><span class="prod-kpi-big">' + showVal(o.m3h) + '</span> <span class="prod-kpi-u">' + unit + '</span> ' + arrow +
       (o.poco ? ' <span class="prod-approx">pocos datos</span>' : '') + '</div>' +
-      '<div class="prod-kpi-side"><b>' + o.cnt + '</b> tandas · <b>' + (Math.round(o.m3role * 10) / 10) + '</b> m³<br>' +
-      (o.minTanda > 0 ? '<b>' + Math.round(o.minTanda) + '</b> min/tanda · ' : '') + '<b>' + o.S.jor + '</b> jornada(s)</div></div>';
-    // sparkline semanal de m³/h (escala propia)
-    const sv = o.serie.slice(-8);
+      '<div class="prod-kpi-side"><b>' + o.rTandas + '</b> tandas · <b>' + (Math.round(o.m3role * 10) / 10) + '</b> m³<br>' +
+      (o.minTanda > 0 ? '<b>' + Math.round(o.minTanda) + '</b> min/tanda · ' : '') + '<b>' + fmtH(minOf(o.rTime)) + '</b> ' + (o.role === "arm" ? "armando" : "pickeando") + '</div></div>';
+    const sv = o.serie;
     const smax = Math.max(0.01, Math.max.apply(null, sv.map(function (s) { return s.v || 0; })));
     if (sv.length > 1) {
       c += '<div class="prod-spark">';
       sv.forEach(function (s) {
         const hh = s.v != null ? Math.max(3, Math.round(34 * s.v / smax)) : 2;
-        c += '<div class="prod-sp" title="' + escapeHtml(s.sem) + ': ' + (s.v != null ? showVal(s.v) + ' ' + unit : 's/d') + '"><div class="prod-sp-bar" style="height:' + hh + 'px;' + (s.v == null ? 'background:#e2e8f0;' : '') + '"></div><div class="prod-sp-l">' + escapeHtml(s.sem.slice(-3)) + '</div></div>';
+        c += '<div class="prod-sp" title="' + escapeHtml(s.lbl) + ': ' + (s.v != null ? showVal(s.v) + ' ' + unit : 's/d') + '"><div class="prod-sp-bar" style="height:' + hh + 'px;' + (s.v == null ? 'background:#e2e8f0;' : '') + '"></div><div class="prod-sp-l">' + escapeHtml(s.lbl) + '</div></div>';
       });
       c += '</div>';
     }
-    // desglose de la jornada
-    const bd = breakdown(o.S);
+    const bd = breakdown(o.t, o.measurable);
     if (bd) {
-      c += '<div class="prod-brk-h">En qué se va la jornada · <b>' + Math.round(o.pctProd) + '%</b> productivo <span class="prod-est">(estimado)</span></div>';
+      c += '<div class="prod-brk-h">En qué se va la jornada · <b>' + Math.round(o.pctProd) + '%</b> productivo</div>';
       c += '<div class="prod-brk">';
       bd.segs.forEach(function (s) { c += '<div class="prod-brk-seg" style="width:' + (100 * s.min / bd.jor) + '%;background:' + s.col + '" title="' + escapeHtml(s.lbl) + ': ' + fmtH(s.min) + '"></div>'; });
       c += '</div><div class="prod-brk-leg">';
       bd.segs.forEach(function (s) { c += '<span><i style="background:' + s.col + '"></i>' + escapeHtml(s.lbl) + ' ' + Math.round(100 * s.min / bd.jor) + '%</span>'; });
       c += '</div>';
+      if (o.t.excluded > 60000) c += '<div class="prod-exc">+ ' + fmtH(minOf(o.t.excluded)) + ' sin medir (tandas que cruzan el borde del período)</div>';
     }
     return c + '</div>';
   };
 
   if (arms.length) { h += '<div class="prod-group-h">🔧 Armadores</div>'; arms.forEach(function (o, i) { h += card(o, i + 1); }); }
   if (picks.length) { h += '<div class="prod-group-h">🛒 Pickers</div>'; picks.forEach(function (o, i) { h += card(o, i + 1); }); }
+  if (!arms.length && !picks.length) h += '<div class="prod-empty">Sin armado/picking en el período.</div>';
   body.innerHTML = h;
 }
 function stkMvRow(mv) {

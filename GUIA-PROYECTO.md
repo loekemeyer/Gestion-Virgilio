@@ -4,7 +4,24 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-28 · Versión app al documentar: **v4.67**
+> Última actualización: 2026-06-28 · Versión app al documentar: **v4.68**
+>
+> Nota: **v4.68** — **Productividad: MOTOR evento-por-evento + selector de período** (reescritura del
+> cálculo). El módulo 📊 deja de leer la vista semanal y ahora trae los **eventos crudos** del período que
+> elijas (desde/hasta, o presets 7d/4sem/8sem) y los procesa en el navegador con las reglas que definió el
+> dueño: (1) el **"envase" AP→TAP / EP→TP ES la actividad** — los **huecos dentro del envase** (en horario
+> de jornada, menos otras tareas) cuentan como **armado/picking, NO ocio** (un armador, si no hace otra
+> cosa, está armando; por eso es habitual dejar un armado abierto al otro día); (2) **ocio** real = jornada
+> con nada abierto; (3) **borde IZQ**: tanda que cierra adentro pero empezó antes del período → se descarta
+> de inicio-de-jornada hasta el cierre (no se mide); (4) **borde DER**: tanda que abrió y no cerró → se
+> descartan sus huecos. Tareas secundarias con **tope** (un MG de 5h = botón olvidado); TAP/TP **sin tope**
+> (cruzan noches; las noches se sacan al intersectar con la jornada real, primer evento→FJ por día). m³ por
+> tanda desde **`vista_tanda_m3`** = `PPP_Pedidos_Entregados` (entregado) **+ `PPP_Programacion_Diaria`** de
+> respaldo (sube cobertura 93%→96%; arregla tandas armadas-no-entregadas tipo C57A=10,3 m³). Motor en
+> `prodCompute`/`_pvOperator`/`prodLoad` (matemática de intervalos, prefijo `_pv`). Validado contra el día
+> real de Farias Juan (leg 8): armado 0,66 m³/h con los huecos contados; borde izq excluye la mañana hasta
+> cerrar la tanda. ⚠ Los nombres salen SIEMPRE de `Empleados` (`getEmpleadosNombres`); no hay nombres
+> hardcodeados. La vista `vista_productividad_semanal` (v4.67) queda de referencia, ya no la usa la app.
 >
 > Nota: **v4.67** — **📊 "Rendimiento de operarios" reescrito (dashboard de ingeniería industrial, 100%
 > Supabase)**. El servicio `openProductividad` (botón 📊) deja de mostrar conteo de tandas y pasa a un
