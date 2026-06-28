@@ -42,7 +42,12 @@
 > `error_app`), no solo crashes/envíos. Mapa completo de alertas Telegram ↔ categoría Agentes en
 > `generar_reporte_agentes`. Pendiente: detección de "recibido sin planimetría" en `recepcion.js` (emite
 > `RSP`, la categoría ya lo contempla). ⚠ Hallazgo de seguridad (de paso): el **token del bot de
-> Telegram está hardcodeado** en `tg_outbox_flush()` — conviene moverlo a Vault.
+> Telegram estaba hardcodeado** en `tg_outbox_flush()` — **✓ RESUELTO el 2026-06-28**: se movió a
+> **Supabase Vault** (secreto `telegram_bot_token`); `tg_outbox_flush` lo lee con
+> `select decrypted_secret from vault.decrypted_secrets where name='telegram_bot_token'` y, si no lo
+> puede leer, **no envía** (los mensajes quedan `pending` y los levanta la categoría `outbox` de Agentes).
+> Verificado end-to-end: envío de prueba a Telegram OK (HTTP 200). El `chat_id` default sigue en
+> `tg_enqueue` (menos sensible). **Token de seguridad de Telegram = NO está más en el código.**
 >
 > Nota: **v4.59** — **Optimización: más código y CSS muerto** (sin cambio de comportamiento; sigue de
 > v4.58). (1) Funciones: se removió `idbGetAll` (helper de IndexedDB sin caller en la página — el flush
