@@ -4,7 +4,14 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-28 · Versión app al documentar: **v4.63**
+> Última actualización: 2026-06-28 · Versión app al documentar: **v4.64**
+>
+> Nota: **v4.64** — **Briefing "qué hacer hoy"** arriba del tablero Agentes (servicio: asistente diario).
+> En `agtRender`, antes del termómetro, un bloque **📅 Hoy** con: (1) **nudge del día** — miércoles
+> "generá las OCs", martes/jueves "día de conteo" (`new Date().getDay()`); (2) **to-do accionable** armado
+> del mismo reporte: facturar (falta_facturacion), controlar remitos (carga_sin_control), guardar a góndola
+> (mg_pendiente), cerrar armados (armado_sin_terminar). Convierte el tablero pasivo en "esto es lo que
+> tenés que hacer hoy". Sin datos nuevos (reusa el reporte). Verificado con render.
 >
 > Nota: **v4.63** — **Servicio nuevo: Productividad por operario** (primer "servicio" más allá de alertas;
 > de la idea del agente predictivo). Botón **📊 Productividad** en la botonera del supervisor →
