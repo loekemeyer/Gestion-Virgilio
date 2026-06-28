@@ -5,9 +5,14 @@
 -- mismo bot @Faltantes_Virgilio_bot que faltantes / sin planimetría / carga
 -- sin control). Mecanismo: pg_net (net.http_post) + pg_cron.
 --
--- ⚠ Estas funciones viven en Supabase. Este archivo es la copia versionada
---   para poder rearmarlas si hace falta. Si cambiás el bot_token / chat_id,
---   actualizá acá Y en Supabase.
+-- ⚠⚠ ARCHIVO HISTÓRICO / DESACTUALIZADO (no correr tal cual). Las funciones VIVAS
+--   en Supabase EVOLUCIONARON: hoy mandan vía `tg_enqueue` → `telegram_outbox` →
+--   `tg_outbox_flush()` (con dedup y reintentos), no con `net.http_post` directo como
+--   acá. Si corrés este archivo, PISÁS las funciones buenas. Está sólo como referencia.
+-- ⚠ SEGURIDAD: el bot_token YA NO se hardcodea — se lee de **Supabase Vault**
+--   (secreto `telegram_bot_token`). Si rotás el token (BotFather), actualizá SOLO el Vault:
+--   select vault.update_secret((select id from vault.secrets where name='telegram_bot_token'), '<NUEVO>');
+--   El `chat_id` no es secreto.
 --
 -- (1) FALTA DE FACTURACIÓN — server-side (pg_cron). Pedidos con armado
 --     terminado (TAP) y entrega mañana/hoy que NO están en Facturacion_NP.
@@ -21,7 +26,7 @@
 create or replace function public.notificar_falta_facturacion_telegram(modo text)
 returns void language plpgsql security definer as $fn$
 declare
-  bot_token text := '8900754924:AAE44JeCYhI2nSmtxWJxw14TwX0ztAvXPNU';
+  bot_token text := (select decrypted_secret from vault.decrypted_secrets where name = 'telegram_bot_token');
   chat_id   text := '-1004379879565';
   hoy date := (now() at time zone 'America/Argentina/Buenos_Aires')::date;
   objetivo date := case when modo = 'hoy' then hoy else hoy + 1 end;
@@ -65,7 +70,7 @@ select cron.schedule('falta-fact-hoy',   '0 11 * * *', $$select public.notificar
 create or replace function public.notificar_ppp_error_telegram()
 returns trigger language plpgsql security definer as $fn$
 declare
-  bot_token text := '8900754924:AAE44JeCYhI2nSmtxWJxw14TwX0ztAvXPNU';
+  bot_token text := (select decrypted_secret from vault.decrypted_secrets where name = 'telegram_bot_token');
   chat_id   text := '-1004379879565';
   kv text; arr text[];
   sz int := 0; zd int := 0; tm int := 0; sc int := 0;
