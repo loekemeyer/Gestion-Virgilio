@@ -2671,6 +2671,56 @@ INCONSISTENCIAS"):
 
 ---
 
+## 12b. Sistema de alertas (tablero **Agentes** + **Telegram**)
+
+> Construido principalmente 2026-06-27/28 (v4.57→v4.65). **Regla del usuario: todo lo que va por
+> Telegram también aparece en Agentes** (Agentes = vista única de "qué mirar").
+
+**Cómo funciona**
+- **Telegram (inmediato)**: triggers/cron llaman `tg_enqueue(text, dedup, chat)` → tabla `telegram_outbox`
+  → `tg_outbox_flush()` (lee el token de **Vault**, secreto `telegram_bot_token`; envía con pg_net). Chat
+  default `-1004379879565`.
+- **Agentes (panel, cada 2 h)**: cron jobid 14 corre `generar_reporte_agentes()` +
+  `reporte_agentes_recepcion_absurda()` + `reporte_agentes_faltante_articulo()` → llena la tabla
+  `reporte_agentes` (DELETE+INSERT). El front (`openAgentesAdmin`/`agtRender`, botón 🤖) la lee; arriba
+  muestra el **briefing "📅 Hoy"** (nudge del día + to-do) y el **termómetro de estabilidad** (cuenta
+  errores de operario en 7 días: error_envio/picking_sin_stock/carga_sin_control/mg_fuera_lista/error_app).
+  Solo se muestran las categorías **con datos** (las vacías no aparecen).
+
+**Las 19 categorías de `reporte_agentes`** (cada una = `categoria`; las con ⚡ también van a Telegram):
+
+| categoría | qué | fuente | Telegram |
+|---|---|---|---|
+| `stock_negativo` | saldo imposible | `vista_saldos_stock` | ⚡ `check_stock_anomalias` (cron) |
+| `excedente` | guardado a excedente (góndola llena) | `Movimientos_Stock` exc | ⚡ `trg_excedente_telegram` |
+| `carga_sin_control` | CCN cargado al camión sin CRN >30 h | `Registros` CCN/CRN | ⚡ `trg_carga_sin_control` (evento CRA) |
+| `mg_fuera_lista` | guardó código fuera de "a guardar" | `Registros` MGX | ⚡ `trg_mg_fuera_lista` |
+| `picking_sin_stock` | sacó cajas sin stock | `Registros` SSG | ⚡ `trg_picking_sin_stock` |
+| `sin_planimetria` | códigos sin sector (picking PSP + recepción RSP) | `Registros` PSP/RSP | ⚡ `trg_sin_planim` / `trg_recepcion_sin_planim` |
+| `ppp_error` | errores de la PPP | `Registros` PPE | ⚡ `trg_ppp_error` |
+| `falta_facturacion` | TAP sin facturar, entrega hoy/mañana | PPP+TAP+Facturacion_NP | ⚡ `notificar_falta_facturacion` (cron) |
+| `recepcion_absurda` | recepción ≤0 o ≫ normal | `Movimientos_Stock` recep | ⚡ `trg_recepcion_absurda` |
+| `faltante` | faltantes picking por tanda (7 d, rea<esp) | `Registros` PKC | ⚡ `trg_faltante` |
+| `faltante_articulo` | qué artículos faltan más (30 d) — reposición | `Registros` PKC | — |
+| `mg_pendiente` | mercadería en a_guardar sin subir a góndola >8 h | `Movimientos_Stock` | — |
+| `armado_sin_terminar` | AP sin TAP >24 h | `Registros` AP/TAP | — |
+| `pipeline_atascado` | separar_pedidos/a_facturar >2 d (*future*) | `Movimientos_Stock` | — |
+| `excedente_estancado` | excedente sin mover >5 d (*future*) | `Movimientos_Stock` | — |
+| `oc_baja` | OC <50% recibido | `Ordenes_Compra` | — |
+| `error_app` | crashes JS de operarios (7 d) | `errores_cliente` | — |
+| `error_envio` | envíos de operarios que fallaron (7 d) | `Auditoria_*` | — |
+| `outbox` | Telegram trabado >15 min | `telegram_outbox` | ⚡ `notificar_outbox_salud` (cron) |
+
+**Para agregar una alerta nueva**: (1) si la detecta el cliente → emitir un evento `Registros` con un
+`opcion` nuevo + trigger `notificar_*` que llame `tg_enqueue`; (2) sumar la categoría a
+`generar_reporte_agentes` (o a una función auxiliar encadenada en el cron 14 para no re-tipear la grande);
+(3) agregar el `key` al array `CATS` de `agtRender` + su CSS `.stk-rep-cat.<key>`. **Siempre las dos vías**.
+
+**Servicio Productividad** (botón 📊, `openProductividad`): lee `vista_productividad_semanal` (TAP/TP y
+mediana min/armado por legajo/semana). No es alerta; es analítica de equipo.
+
+---
+
 ## 13. Mantenimiento de esta guía
 
 - **Actualizar este archivo cuando cambie el proyecto**: nuevos códigos de
