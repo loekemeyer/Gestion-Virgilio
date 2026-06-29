@@ -4,7 +4,9 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-28 · Versión app al documentar: **v4.74**
+> Última actualización: 2026-06-29 · Versión app al documentar: **v4.82**
+>
+> Nota: **v4.82** — **Premios por área (solo pantalla admin 📊) + lockdown de seguridad Telegram + estética móvil**. (1) **Premios**: cada área tiene una **meta m³/h** donde el premio es 0%; el premio % de cada operario = **(su ritmo ÷ meta − 1) × 100**, con signo (negativo si está por debajo). Ej. meta Picking 1.6: 1.6→0%, 1.76→+10%, 1.44→−10%. Metas **editables** arriba del tablero (default Picking **1.6** · Armado **0.7**), persisten en `localStorage 'prod_metas'`. Badges verde/rojo en tarjeta resumida, expandida y tabla. **NO se manda por Telegram** (solo la ve el supervisor). Helpers `_pvMetas`/`_pvPremio`/`prodSetMeta`/`premioBadge`. (2) **Seguridad** (migración `lock_down_telegram_report_functions`): se revocó `execute` de **public/anon/authenticated** en las 5 funciones `SECURITY DEFINER` que mandan Telegram o fuerzan reportes (`tg_enqueue`, `reporte_diario_telegram`, `reporte_semanal_telegram`, `reporte_agentes_rendimiento_anomalo`, `reporte_agentes_zona_lista`) — quedan solo `postgres` + `service_role`; los crons siguen andando. La anon key (pública en index.html/sw.js) ya **no** puede inyectar mensajes al grupo. `_es`/`_h` con `search_path` pinneado. (3) **Motor confirmado**: las interrupciones en el medio de un envase (carga/movimiento/comida/recepción/etc.) **se restan** del tiempo de la tanda. El app las guarda como **par** (fila "open" sin `ts_inicio` + fila "close" con `ts_inicio→ts_cliente` = la duración real); el motor usa el `close` y lo descuenta del envase. Ej. `8:10 EP, carga 8:40→8:50, 9:10 TP` → **picking = 50 min** (no 60). Generaliza a N interrupciones (resta la unión). Único caso que quedaría en 60: una tarea tapeada sin "close" (sin duración registrada) — raro.
 >
 > Nota: **v4.74** — **Productividad: textos en vez de logos**. Se cambiaron los íconos 🔧/🛒 por las palabras **Armado** / **Picking** (en color: armado violeta, picking azul) en toda la vista — la gente no entendía los logos. Y la tabla aclara que **% prod** = parte de la jornada que estuvo armando/pickeando.\n>\n> Nota: **v4.73** — **Productividad: vista TABLA (ranking)**. Toggle 📇 Tarjetas ↔ 📊 Tabla. La tabla lista a todos en filas, ordenable por columna (nombre, 🔧 armado m³/h, 🛒 picking m³/h, tandas, % prod color-coded). Tocás un encabezado = ordena; tocás una fila = abre la tarjeta del operario. `_prodTab`/`_prodSort`, `prodSetTab`/`prodTabSort`. Sirve para comparar a todos de un vistazo.\n>\n> Nota: **v4.72** — **Productividad: resumen ultra-compacto**. La tarjeta colapsada es ahora UNA línea: nombre + solo el/los **m³/h** (armado y/o picking), sin tandas/m³/horas. Se abre al tocar. Pocos-datos van atenuados.\n>\n> Nota: **v4.71** — **Productividad: tarjetas resumidas al entrar**. Cada operario entra **colapsado**: solo el nombre + los dos ritmos (🔧 armado / 🛒 picking). Al **tocar** la tarjeta (o "Ver detalle ▾") se expande con el sparkline + el desglose tocable. Estado `_prodExpand` (vacío = todas resumidas; se resetea al recargar período); `prodToggleOp(leg)`. Hace el módulo mucho más rápido de escanear.
 >
@@ -2790,6 +2792,11 @@ v4.67): dashboard de ingeniería industrial 100% Supabase. Lee `vista_productivi
 min/m³ con `_prodToggle`/`prodToggleVista`) sobre **tiempo efectivo** (unión de intervalos), tendencia,
 sparkline, y **desglose de la jornada** (motivos de la ociosidad: productivo + secundarias + esperas). No
 es alerta; es analítica de equipo. El módulo 📈 Análisis (que usa el Sheet) es OTRA cosa y sigue vivo.
+**Premios (v4.82, solo esta pantalla admin)**: cada área tiene una **meta m³/h** editable (default Picking
+1.6 · Armado 0.7, en `localStorage 'prod_metas'`); el premio % de cada operario = `(ritmo ÷ meta − 1) × 100`
+con signo (badges verde/rojo en tarjetas + tabla). No se manda por Telegram. Nota técnica del motor: las
+**interrupciones en el medio del envase** (carga, movimiento, comida, etc.) se **restan** del tiempo de la
+tanda — se guardan como par open/close y el motor descuenta el `close` (la duración real).
 
 ---
 
