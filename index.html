@@ -2238,6 +2238,13 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .cmpl-done{ margin-top:8px; font-size:11.5px; font-weight:700; color:#15803d; }
 .cmpl-lnext{ width:100%; margin-top:9px; padding:11px; border:none; border-radius:11px; background:#1e6bd6; color:#fff; font-size:15px; font-weight:800; cursor:pointer; }
 .cmpl-lnext:disabled{ background:#cbd5e1; cursor:not-allowed; }
+.cmpl-bhead{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.cmpl-undo{ flex:0 0 auto; background:#fff; color:#b42318; border:1.5px solid #fecaca; border-radius:8px; padding:4px 10px; font-size:13px; font-weight:800; cursor:pointer; width:auto; white-space:nowrap; }
+.cmpl-undo:active{ transform:scale(.96); }
+.cmpl-fab{ position:fixed; right:16px; bottom:76px; z-index:5; background:#16a34a; color:#fff; border:none; border-radius:999px; padding:11px 18px; font-size:14px; font-weight:800; box-shadow:0 6px 18px rgba(0,0,0,.35); cursor:pointer; width:auto; }
+.cmpl-fab:disabled{ background:#94a3b8; box-shadow:none; cursor:not-allowed; }
+.cmpl-fab:active{ transform:scale(.97); }
+.cmpl-fab.hidden{ display:none; }
 .cmpl-liostit{ font-size:11.5px; font-weight:800; color:#475569; text-transform:uppercase; letter-spacing:.3px; margin:11px 2px 7px; }
 .cmpl-lio{ display:flex; align-items:center; gap:9px; background:#fff; border:1px solid #e2e8f0; border-left:4px solid #16a34a; border-radius:10px; padding:6px 10px; margin-bottom:6px; }
 .cmpl-lio.s{ border-left-color:#7c3aed; }
@@ -2819,6 +2826,7 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
       <button class="comp-fin" id="compFin" onclick="compTerminar()">Terminar</button>
     </div>
   </div>
+  <button id="compFab" class="cmpl-fab hidden" onclick="_compLioSiguiente()">✓ Cerrar lío</button>
 </div>
 
 <!-- Modal: detalle de una tanda (NPs + m3) — se abre al clickear el código
@@ -5188,7 +5196,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v4.84";
+const APP_VERSION = "v4.85";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -6919,6 +6927,7 @@ function _compLioMark(n) { n.liosDone = n.codes.every(function (c) { return c.re
 function _compLioStep(ci, d) { const n = _compLioNow(); if (!n) return; const c = n.codes[ci]; if (!c) return; if (d > 0 && c.rest > 0) { c.rest--; c.cur++; } else if (d < 0 && c.cur > 0) { c.cur--; c.rest++; } else return; _compRenderLios(); _compRecalc(); }
 function _compLioSuelta(ci) { const n = _compLioNow(); if (!n) return; const c = n.codes[ci]; if (!c || c.rest <= 0) return; c.rest--; n.liosArr.push({ items: [{ cod: c.cod, qty: 1 }], cajas: 1, suelta: true }); _compLioMark(n); _compRenderLios(); _compRecalc(); }
 function _compLioSiguiente() { const n = _compLioNow(); if (!n) return; const items = n.codes.filter(function (c) { return c.cur > 0; }).map(function (c) { return { cod: c.cod, qty: c.cur }; }); const cajas = items.reduce(function (s, it) { return s + it.qty; }, 0); if (!cajas) return; n.liosArr.push({ items: items, cajas: cajas, suelta: false }); n.codes.forEach(function (c) { c.cur = 0; }); _compLioMark(n); _compRenderLios(); _compRecalc(); }
+function _compLioReset() { const n = _compLioNow(); if (!n) return; let any = false; n.codes.forEach(function (c) { if (c.cur > 0) { c.rest += c.cur; c.cur = 0; any = true; } }); if (any) { _compRenderLios(); _compRecalc(); } }
 function _compLioDel(k) { const n = _compLioNow(); if (!n) return; const l = n.liosArr[k]; if (!l) return; l.items.forEach(function (it) { const c = n.codes.find(function (x) { return x.cod === it.cod; }); if (c) c.rest += it.qty; }); n.liosArr.splice(k, 1); _compLioMark(n); _compRenderLios(); _compRecalc(); }
 function _compLioNp(d) { if (!_comp) return; const ni = _comp.liosNpIdx + d; if (ni < 0 || ni >= _comp.nps.length) return; _comp.liosNpIdx = ni; _compRenderLios(); _compPersist(); }
 function _compLiosResumen(n) { const L = function (i) { return i < 26 ? String.fromCharCode(65 + i) : "L" + (i + 1); }; return (n.liosArr || []).map(function (l, k) { return L(k) + "=" + l.items.map(function (it) { return it.cod + "x" + it.qty; }).join(",") + (l.suelta ? "(s)" : ""); }).join(";"); }
@@ -6939,7 +6948,7 @@ function _compRenderLios() {
     h += '<div class="cmpl-empty">Esta NP no lleva nada a armar (todo faltó). Pasá a la siguiente.</div>';
   } else {
     const inCur = n.codes.filter(function (c) { return c.cur > 0; });
-    h += '<div class="cmpl-banner"><div class="cmpl-blab">Armando Lío ' + L(n.liosArr.length) + '</div><div class="cmpl-bcomp">' + (inCur.length ? inCur.map(function (c) { return '<span class="cmpl-ch">' + escapeHtml(c.cod) + " ×" + c.cur + "</span>"; }).join("") : '<span class="cmpl-bempty">Tocá + en los códigos que entran en este lío…</span>') + "</div></div>";
+    h += '<div class="cmpl-banner"><div class="cmpl-bhead"><div class="cmpl-blab">Armando Lío ' + L(n.liosArr.length) + '</div>' + (inCur.length ? '<button class="cmpl-undo" onclick="_compLioReset()" title="Vaciar este lío y empezar de nuevo">↶ Deshacer</button>' : '') + '</div><div class="cmpl-bcomp">' + (inCur.length ? inCur.map(function (c) { return '<span class="cmpl-ch">' + escapeHtml(c.cod) + " ×" + c.cur + "</span>"; }).join("") : '<span class="cmpl-bempty">Tocá + en los códigos que entran en este lío…</span>') + "</div></div>";
     h += '<div class="cmpl-grid">' + n.codes.map(function (c, ci) {
       if (c.rest === 0 && c.cur === 0) return "";
       const rem = c.cur + c.rest;
@@ -6956,7 +6965,13 @@ function _compRenderLios() {
     }).join("");
   }
   h += '<div class="cmpl-npbtns"><button class="cmpl-npbtn" onclick="_compLioNp(-1)"' + (idx <= 0 ? " disabled" : "") + '>← NP anterior</button><button class="cmpl-npbtn pri" onclick="_compLioNp(1)"' + (idx >= _comp.nps.length - 1 ? " disabled" : "") + '>NP siguiente →</button></div>';
+  h += '<div style="height:80px"></div>';
   el.innerHTML = h;
+  const fab = document.getElementById("compFab");
+  if (fab) {
+    if (TOTAL === 0) { fab.classList.add("hidden"); }
+    else { fab.classList.remove("hidden"); const allR0 = n.codes.every(function (c) { return c.rest === 0; }); fab.disabled = (curCajas === 0); fab.textContent = curCajas > 0 ? ((allR0 ? "✓ Cerrar último (" : "✓ Cerrar lío (") + curCajas + ")") : "✓ Cerrar lío"; }
+  }
 }
 function _compRenderFalt() {
   const el = document.getElementById("compStep1"); if (!el || !_comp) return;
@@ -7028,6 +7043,8 @@ function _compGo(s) {
   const bk = document.getElementById("compBack"), nx = document.getElementById("compNext");
   if (bk) bk.disabled = (s === 1);
   if (nx) nx.disabled = (s === 2);
+  const fab = document.getElementById("compFab");
+  if (fab) fab.classList.toggle("hidden", s !== 2);
   if (s === 2) { if (!_comp.nps[0] || !_comp.nps[0].codes) _compBuildLiosData(); _compRenderLios(); }
   _compRecalc();
 }
