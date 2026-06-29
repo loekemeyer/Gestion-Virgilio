@@ -5208,7 +5208,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v4.87";
+const APP_VERSION = "v4.88";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -6965,7 +6965,7 @@ function _compRenderLios() {
   } else {
     const restCods = n.codes.filter(function (c) { return c.rest > 0; });
     const nRest = restCods.reduce(function (s, c) { return s + c.rest; }, 0);
-    h += '<div class="cmpl-subtabs"><button class="cmpl-subtab' + (view === "armar" ? " on" : "") + '" onclick="_compViewArmar()">🔗 Armar líos</button><button class="cmpl-subtab' + (view === "sueltas" ? " on" : "") + '" onclick="_compViewSueltas()">📦 Sueltas' + (nRest ? " (" + nRest + ")" : "") + '</button></div>';
+    h += '<div class="cmpl-subtabs">' + (view === "sueltas" ? '<button class="cmpl-subtab" onclick="_compViewArmar()">← Volver a líos</button>' : '<button class="cmpl-subtab" onclick="_compViewSueltas()">📦 Sueltas' + (nRest ? " (" + nRest + ")" : "") + '</button>') + '</div>';
     if (view === "sueltas") {
       h += '<div class="cmpl-shint">Las que van <b>solas</b>: tocá cada código y cada toque queda como <b>un lío de 1 caja</b>. Acá ves sólo lo que falta asignar.</div>';
       if (n.liosArr.some(function (l) { return l.suelta; })) h += '<button class="cmpl-sundo" onclick="_compSueltaUndo()">↶ Deshacer última suelta</button>';
