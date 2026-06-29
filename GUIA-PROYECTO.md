@@ -529,6 +529,23 @@
 > baja de góndola del picking) contemplan los nuevos depósitos. Validado con Playwright. ⚠ El stock disponible
 > para OCs sigue siendo `terminado + racks` (NO cuenta estos intermedios: son cajas comprometidas a pedidos).
 >
+> Nota: **v4.99 (server-side)** — **Pipeline de stock también del lado del SERVER**
+> (`reconciliar_pipeline_stock()` + cron jobid 22 `*/10 * * * *`; ver
+> `sql/reconciliar_pipeline_stock.sql`). **Root cause** de por qué *Pickeados*/*A facturar*
+> mostraban 0 **y la góndola nunca bajaba por el picking**: era UN solo bug — el CHECK
+> `Movimientos_Stock_deposito_check` no incluía `separar_pedidos`/`a_facturar`/`excedente`,
+> y como `stockBajaPicking` manda `[terminado−, separar_pedidos+]` en **un batch** y
+> `stockMove` **se traga los 4xx**, el rechazo del CHECK volteaba TODO el movimiento en
+> silencio (ni góndola − ni separar +). Encima los equipos de picking corren app vieja (TWA)
+> que ni intenta el pipeline. **Fix**: (1) migración `movimientos_stock_deposito_check_pipeline`
+> amplía el CHECK a `terminado/excedente/separar_pedidos/a_facturar/a_guardar/racks/insumos`;
+> (2) `reconciliar_pipeline_stock()` replica las 3 etapas (PKC/TP→separar+góndola−,
+> TAP→a_facturar, 100% facturado→fuera), **idempotente** (dedup por movimiento), **respeta
+> descuentos de góndola previos** (no re-descuenta el seed de C58B/C/D), sólo post-cutoff,
+> comparte los `tipo` con el cliente (guards evitan doble conteo si una app nueva sí corre el
+> pipeline). Backlog 29/06 reconciliado: **Pickeados 627** (C58C/C58E/C59C), **A facturar 442**
+> (C58A/C58B/C58D), góndola −634 (sólo las 3 sin descuento previo; quedó con 2 arts en −5).
+>
 > Nota: **v4.21** — **Fix m³/hora del monitor pegado en 0** (panel "Mts3 x Hora" / "Parcial").
 > `fetchMonitorDayStats` leía el m³ por tanda del cache global `_monitorSheetCache`, pero `renderMonitor`
 > lo setea **después** de llamar a esa función. En la 1ª carga el cache estaba `null` → todas las tandas
