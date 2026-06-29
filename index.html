@@ -5298,7 +5298,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v4.93";
+const APP_VERSION = "v4.94";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -7155,7 +7155,7 @@ function _compSepPedido() {
     return '<button class="csep-chip' + (j === idx ? " on" : "") + '" onclick="_compSepNp(' + j + ')">' + escapeHtml(nn.np) + '<small>' + pend + ' cj</small></button>';
   }).join("") + '</div>';
   const rows = Math.max(3, Math.ceil(codes.length / 3));
-  const grid = '<div class="csep-grid" style="grid-template-rows:repeat(' + rows + ',minmax(74px,1fr))">' + codes.map(function (c) {
+  const grid = '<div class="csep-grid" style="grid-template-rows:repeat(' + rows + ',minmax(88px,1fr))">' + codes.map(function (c) {
     const ci = n.codes.indexOf(c);
     return '<button class="csep-card' + (c.sep ? " done" : "") + '" onclick="_compSepTap(' + idx + ',' + ci + ')">' +
       '<div class="csep-c">' + escapeHtml(c.cod) + '</div><div class="csep-q">' + c.sale + ' cajas</div>' +
@@ -7219,7 +7219,7 @@ function _compDifHtml() {
   if (d.mode === "pick") {
     const codes = (n.codes || []).filter(function (c) { return c.sale > 0; });
     const rows = Math.max(3, Math.ceil(codes.length / 3));
-    const grid = '<div class="csep-grid" style="grid-template-rows:repeat(' + rows + ',minmax(74px,1fr))">' + codes.map(function (c) {
+    const grid = '<div class="csep-grid" style="grid-template-rows:repeat(' + rows + ',minmax(88px,1fr))">' + codes.map(function (c) {
       const ci = n.codes.indexOf(c);
       return '<button class="csep-card csep-pickc' + (c.sep ? " done" : "") + '" onclick="_compDifPick(' + ci + ')"><div class="csep-c">' + escapeHtml(c.cod) + '</div><div class="csep-q">' + c.sale + ' cajas</div></button>';
     }).join("") + '</div>';
