@@ -2289,6 +2289,45 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .cmpl-npbtn{ flex:1; padding:11px; border:1px solid #cbd5e1; border-radius:11px; background:#fff; color:#334155; font-size:13.5px; font-weight:800; cursor:pointer; }
 .cmpl-npbtn.pri{ background:#0f172a; color:#fff; border-color:#0f172a; }
 .cmpl-npbtn:disabled{ opacity:.35; cursor:default; }
+/* Paso Separar por NP (v4.91) */
+.csep-hd{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin:0 0 11px; }
+.csep-mesa{ display:inline-flex; align-items:center; gap:6px; background:#eff6ff; border:1.5px solid #bfdbfe; border-radius:999px; padding:6px 12px; font-size:12.5px; font-weight:700; color:#1e3a8a; white-space:nowrap; }
+.csep-mesa b{ font-size:18px; }
+.csep-sw{ display:flex; align-items:center; gap:6px; flex:0 0 auto; }
+.csep-swl{ font-size:10px; font-weight:800; color:#94a3b8; line-height:1.1; text-align:center; }
+.csep-swl.on{ color:#0f172a; }
+.csep-tog{ width:48px; height:27px; border-radius:999px; background:#cbd5e1; position:relative; flex:0 0 auto; border:none; padding:0; cursor:pointer; }
+.csep-tog.on{ background:#34c759; }
+.csep-knob{ position:absolute; top:3px; left:3px; width:21px; height:21px; border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.3); transition:.15s; }
+.csep-tog.on .csep-knob{ left:24px; }
+.csep-chips{ display:flex; gap:6px; overflow-x:auto; margin-bottom:9px; padding-bottom:2px; }
+.csep-chip{ flex:0 0 auto; border:1.5px solid #cbd5e1; border-radius:999px; padding:5px 11px; font-size:12.5px; font-weight:800; color:#475569; background:#fff; cursor:pointer; width:auto; line-height:1.1; }
+.csep-chip.on{ background:#1e6bd6; border-color:#1e6bd6; color:#fff; }
+.csep-chip small{ display:block; font-size:9.5px; font-weight:700; opacity:.85; margin-top:1px; }
+.csep-np{ font-size:14px; font-weight:800; color:#0f172a; margin-bottom:9px; }
+.csep-np small{ color:#64748b; font-weight:600; }
+.csep-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+.csep-card{ position:relative; border:2px solid #e8edf2; border-radius:13px; background:#fff; padding:10px 4px; display:flex; flex-direction:column; align-items:center; justify-content:center; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+.csep-card:active{ transform:scale(.97); }
+.csep-card.done{ background:#f0fdf4; border-color:#86efac; }
+.csep-c{ font-family:Consolas,Menlo,monospace; font-weight:800; font-size:18px; color:#0f172a; line-height:1; }
+.csep-card.done .csep-c{ color:#15803d; }
+.csep-q{ font-size:11.5px; color:#64748b; font-weight:700; margin-top:4px; }
+.csep-k{ position:absolute; top:6px; right:6px; width:20px; height:20px; border-radius:6px; border:2px solid #cbd5e1; display:flex; align-items:center; justify-content:center; color:#fff; font-weight:800; font-size:12px; }
+.csep-card.done .csep-k{ background:#16a34a; border-color:#16a34a; }
+.csep-armar{ display:block; width:100%; margin-top:11px; padding:13px; border:none; border-radius:12px; background:#16a34a; color:#fff; font-size:15px; font-weight:800; cursor:pointer; }
+.csep-armar:active{ transform:scale(.99); }
+.csep-n{ background:rgba(255,255,255,.25); border-radius:999px; padding:1px 9px; margin-left:4px; font-size:13px; }
+.csep-tosep{ display:block; width:100%; margin-top:9px; padding:10px; border:1.5px dashed #fcd34d; border-radius:11px; background:#fffbeb; color:#b45309; font-size:13px; font-weight:800; cursor:pointer; }
+.csep-mxwrap{ overflow-x:auto; -webkit-overflow-scrolling:touch; border:1px solid #e2e8f0; border-radius:10px; max-height:60vh; }
+.csep-mx{ border-collapse:collapse; width:100%; }
+.csep-mx th,.csep-mx td{ text-align:center; font-size:13px; padding:8px 6px; border-bottom:1px solid #eef2f6; white-space:nowrap; }
+.csep-mx thead th{ font-size:11px; color:#64748b; font-weight:800; border-bottom:2px solid #e2e8f0; position:sticky; top:0; background:#fff; z-index:1; }
+.csep-mxc{ text-align:left !important; font-family:Consolas,Menlo,monospace; font-weight:800; font-size:13px; position:sticky; left:0; background:#fff; }
+.csep-mxt{ background:#f8fafc; color:#475569; font-weight:800; font-size:12px; }
+.csep-cell{ font-weight:800; color:#1e6bd6; cursor:pointer; }
+.csep-cell.done{ background:#16a34a; color:#fff; }
+.csep-z{ color:#cbd5e1; font-weight:700; }
 .comp-art{ border:1px solid #e2e8f0; border-radius:12px; padding:11px 12px; margin-bottom:12px; transition:.12s; }
 .comp-art.ok{ border-color:#86efac; background:#f0fdf4; }
 .comp-art.defined{ border-color:#e2e8f0; background:#f1f5f9; }
@@ -2842,17 +2881,20 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
       <div class="comp-title">Completar</div>
       <div class="comp-tanda" id="compTanda"></div>
       <div class="comp-steps">
-        <button class="comp-arrow" id="compBack" onclick="_compGo(1)" title="Volver">←</button>
+        <button class="comp-arrow" id="compBack" onclick="_compNav(-1)" title="Volver">←</button>
         <div class="comp-dots">
-          <span class="comp-dot on" id="compD1"><span class="comp-num">1</span> Faltantes</span>
+          <span class="comp-dot on" id="compD1"><span class="comp-num">1</span> Falt.</span>
+          <span class="comp-line"></span>
+          <span class="comp-dot" id="compDSep"><span class="comp-num">2</span> Separar</span>
           <span class="comp-line" id="compLine"></span>
-          <span class="comp-dot" id="compD2"><span class="comp-num">2</span> Líos</span>
+          <span class="comp-dot" id="compD2"><span class="comp-num">3</span> Líos</span>
         </div>
-        <button class="comp-arrow" id="compNext" onclick="_compGo(2)" title="Siguiente">→</button>
+        <button class="comp-arrow" id="compNext" onclick="_compNav(1)" title="Siguiente">→</button>
       </div>
     </div>
     <div class="comp-body">
       <div class="comp-step on" id="compStep1"></div>
+      <div class="comp-step" id="compStepSep"></div>
       <div class="comp-step" id="compStep2"></div>
     </div>
     <div class="comp-foot">
@@ -5229,7 +5271,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v4.90";
+const APP_VERSION = "v4.91";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -6950,7 +6992,7 @@ function _compBuildLiosData() {
     items.forEach(function (it) {
       const ka = String(it.art).toUpperCase().replace(/E$/, "");
       const sale = Math.max(0, (Number(it.cajas) || 0) - (faltMap[npKey + "|" + ka] || 0));
-      if (sale > 0) codes.push({ cod: String(it.art), sale: sale, rest: sale, cur: 0 });
+      if (sale > 0) codes.push({ cod: String(it.art), sale: sale, rest: sale, cur: 0, sep: false });
     });
     codes.sort(function (a, b) { return parseInt(a.cod, 10) - parseInt(b.cod, 10); });
     n.codes = codes; n.liosArr = []; n.lios = 0; n.liosDone = (codes.length === 0);
@@ -6979,7 +7021,7 @@ function _compRenderLios() {
   const TOTAL = n.codes.reduce(function (s, c) { return s + c.sale; }, 0);
   const curCajas = n.codes.reduce(function (s, c) { return s + c.cur; }, 0);
   const enLios = n.liosArr.reduce(function (s, l) { return s + l.cajas; }, 0);
-  const nRest = n.codes.reduce(function (s, c) { return s + c.rest; }, 0);
+  const nRest = n.codes.reduce(function (s, c) { return s + (c.sep ? c.rest : 0); }, 0);
   const groups = _compLioGroups(n);
   const curLetter = _compLetter(groups.length);
   let h = '<div class="cmpl-nphead"><div class="cmpl-npinfo"><span class="cmpl-np">NP ' + escapeHtml(n.np) + '</span> <span class="cmpl-cli">' + (n.cod ? "cli " + escapeHtml(n.cod) + " · " : "") + escapeHtml(n.rs) + '</span></div><span class="cmpl-npidx">' + (idx + 1) + " / " + _comp.nps.length + '</span></div>';
@@ -6998,7 +7040,7 @@ function _compRenderLios() {
         '<button class="cmpl-egdel" onclick="_compGroupDel(' + gi + ')" title="Borrar">×</button></div>';
     }).join("");
   } else if (view === "sueltas") {
-    const restCods = n.codes.filter(function (c) { return c.rest > 0; });
+    const restCods = n.codes.filter(function (c) { return c.rest > 0 && c.sep; });
     h += '<button class="cmpl-back" onclick="_compViewArmar()">← Volver</button>';
     h += '<div class="cmpl-shint">Las que van <b>solas</b>: tocá cada código, cada toque = <b>un lío de 1 caja</b>.</div>';
     if (n.liosArr.some(function (l) { return l.suelta; })) h += '<button class="cmpl-sundo" onclick="_compSueltaUndo()">↶ Deshacer última suelta</button>';
@@ -7010,12 +7052,14 @@ function _compRenderLios() {
       '<button class="cmpl-ctrl cmpl-ctrl-edit" onclick="_compViewEditar()"' + (n.liosArr.length ? '' : ' disabled') + '>✏️ Editar<br>líos (' + n.liosArr.length + ')</button>' +
       '<button class="cmpl-ctrl cmpl-ctrl-su" onclick="_compViewSueltas()">📦 Sueltas<br>(' + nRest + ')</button></div>';
     h += '<div class="cmpl-grid">' + n.codes.map(function (c, ci) {
-      if (c.rest === 0 && c.cur === 0) return "";
+      if (!c.sep || (c.rest === 0 && c.cur === 0)) return "";
       const rem = c.cur + c.rest;
       return '<div class="cmpl-sq' + (c.cur > 0 ? " has" : "") + '" onclick="_compLioStep(' + ci + ',1)">' +
         (c.cur > 0 ? '<button class="cmpl-min" onclick="event.stopPropagation();_compLioStep(' + ci + ',-1)">−</button>' : '') +
         '<div class="cmpl-cod">' + escapeHtml(c.cod) + '</div><div class="cmpl-cur2">' + c.cur + '<span class="cmpl-tot2"> / ' + rem + '</span></div></div>';
     }).join("") + "</div>";
+    const _noSep = n.codes.filter(function (c) { return !c.sep && c.rest > 0; });
+    if (_noSep.length) h += '<button class="csep-tosep" onclick="_compGo(2)">↩ Volver a separar · faltan ' + _noSep.reduce(function (s, c) { return s + c.rest; }, 0) + ' cajas</button>';
     h += '<button class="cmpl-cerrar" onclick="_compLioSiguiente()"' + (curCajas === 0 ? " disabled" : "") + '>✓ Cerrar Lío ' + curLetter + (curCajas ? ' (' + curCajas + ')' : '') + '</button>';
   }
   h += '<div class="cmpl-npbtns"><button class="cmpl-npbtn" onclick="_compLioNp(-1)"' + (idx <= 0 ? " disabled" : "") + '>← NP anterior</button><button class="cmpl-npbtn pri" onclick="_compLioNp(1)"' + (idx >= _comp.nps.length - 1 ? " disabled" : "") + '>NP siguiente →</button></div>';
@@ -7040,6 +7084,78 @@ function _compGroupMore(gi) { const n = _compLioNow(); if (!n) return; const g =
 function _compGroupLess(gi) { const n = _compLioNow(); if (!n) return; const g = _compLioGroups(n)[gi]; if (!g) return; _compLioDel(g.idxs[g.idxs.length - 1]); }
 function _compGroupDel(gi) { const n = _compLioNow(); if (!n) return; const g = _compLioGroups(n)[gi]; if (!g) return; g.idxs.slice().sort(function (a, b) { return b - a; }).forEach(function (k) { const l = n.liosArr[k]; if (l) { l.items.forEach(function (it) { const c = n.codes.find(function (x) { return x.cod === it.cod; }); if (c) c.rest += it.qty; }); n.liosArr.splice(k, 1); } }); _compLioMark(n); _compRenderLios(); _compRecalc(); }
 function _compGroupReopen(gi) { const n = _compLioNow(); if (!n) return; const g = _compLioGroups(n)[gi]; if (!g) return; const k = g.idxs[g.idxs.length - 1]; const l = n.liosArr[k]; if (!l) return; l.items.forEach(function (it) { const c = n.codes.find(function (x) { return x.cod === it.cod; }); if (c) c.cur += it.qty; }); n.liosArr.splice(k, 1); _comp.liosView = "armar"; _compLioMark(n); _compRenderLios(); _compRecalc(); }
+/* =========================================================
+   Paso 2 — SEPARAR POR NP (v4.91). Antes de armar líos, el AP/TAP separa la
+   mesa (mezcla de varias NPs) por pedido. Dos vistas que comparten estado
+   (c.sep por código×NP): "Por pedido" (grilla de una NP, 3 por fila) y "Modo
+   picking" (matriz códigos × NPs). Sólo lo separado pasa a Líos. */
+function _compSepMesa() {
+  let mesa = 0, grand = 0;
+  (_comp.nps || []).forEach(function (n) { (n.codes || []).forEach(function (c) { grand += c.sale; if (!c.sep) mesa += c.sale; }); });
+  return { mesa: mesa, grand: grand };
+}
+function _compSepLiveNps() { return (_comp.nps || []).filter(function (n) { return (n.codes || []).some(function (c) { return c.sale > 0; }); }); }
+function _compSepView(v) { if (_comp) { _comp.sepView = v; _compRenderSep(); } }
+function _compSepNp(j) { if (_comp) { _comp.sepNpIdx = j; _comp.liosNpIdx = j; _compRenderSep(); } }
+function _compSepTap(npIdx, ci) {
+  if (!_comp) return; const n = _comp.nps[npIdx]; if (!n || !n.codes || !n.codes[ci]) return;
+  n.codes[ci].sep = !n.codes[ci].sep; _compRenderSep(); _compRecalc();
+}
+function _compSepArmar() { if (!_comp) return; if (_comp.sepNpIdx != null) _comp.liosNpIdx = _comp.sepNpIdx; _compGo(3); }
+function _compRenderSep() {
+  const el = document.getElementById("compStepSep"); if (!el || !_comp) return;
+  if (!_comp.nps[0] || !_comp.nps[0].codes || _comp._liosDirty) { _compBuildLiosData(); _comp._liosDirty = false; }
+  const live = _compSepLiveNps();
+  if (!live.length) { el.innerHTML = '<div class="comp-step-t">Separar por NP</div><div class="cmpl-empty">No hay nada para separar (todo faltó) 👍 Pasá a Líos con la flecha →.</div>'; return; }
+  const mm = _compSepMesa(), view = (_comp.sepView === "picking") ? "picking" : "pedido";
+  let h = '<div class="csep-hd"><div class="csep-mesa">📦 <b>' + mm.mesa + '</b> en mesa</div>' +
+    '<div class="csep-sw"><span class="csep-swl' + (view === "picking" ? " on" : "") + '">Modo<br>picking</span>' +
+    '<button class="csep-tog' + (view === "pedido" ? " on" : "") + '" onclick="_compSepView(\'' + (view === "pedido" ? "picking" : "pedido") + '\')" title="Cambiar vista"><span class="csep-knob"></span></button>' +
+    '<span class="csep-swl' + (view === "pedido" ? " on" : "") + '">Por<br>pedido</span></div></div>';
+  h += (view === "picking") ? _compSepMatrix() : _compSepPedido();
+  el.innerHTML = h;
+}
+function _compSepPedido() {
+  const nps = _comp.nps;
+  if (_comp.sepNpIdx == null) _comp.sepNpIdx = 0;
+  let idx = _comp.sepNpIdx;
+  if (idx < 0 || idx >= nps.length || !(nps[idx].codes || []).some(function (c) { return c.sale > 0; })) { idx = nps.indexOf(_compSepLiveNps()[0]); _comp.sepNpIdx = idx; }
+  const n = nps[idx], codes = (n.codes || []).filter(function (c) { return c.sale > 0; });
+  const chips = '<div class="csep-chips">' + nps.map(function (nn, j) {
+    if (!(nn.codes || []).some(function (c) { return c.sale > 0; })) return '';
+    const pend = (nn.codes || []).reduce(function (s, c) { return s + (c.sep ? 0 : c.sale); }, 0);
+    return '<button class="csep-chip' + (j === idx ? " on" : "") + '" onclick="_compSepNp(' + j + ')">' + escapeHtml(nn.np) + '<small>' + pend + ' cj</small></button>';
+  }).join("") + '</div>';
+  const rows = Math.max(3, Math.ceil(codes.length / 3));
+  const grid = '<div class="csep-grid" style="grid-template-rows:repeat(' + rows + ',minmax(74px,1fr))">' + codes.map(function (c) {
+    const ci = n.codes.indexOf(c);
+    return '<button class="csep-card' + (c.sep ? " done" : "") + '" onclick="_compSepTap(' + idx + ',' + ci + ')">' +
+      '<div class="csep-c">' + escapeHtml(c.cod) + '</div><div class="csep-q">' + c.sale + ' cajas</div>' +
+      '<span class="csep-k">' + (c.sep ? "✓" : "") + '</span></button>';
+  }).join("") + '</div>';
+  const sepN = codes.filter(function (c) { return c.sep; }).length;
+  const np = '<div class="csep-np">NP ' + escapeHtml(n.np) + ' <small>· ' + escapeHtml(n.rs || "") + '</small></div>';
+  const armar = '<button class="csep-armar" onclick="_compSepArmar()">🔨 Armar líos con lo separado <span class="csep-n">' + sepN + '</span></button>';
+  return chips + np + grid + armar;
+}
+function _compSepMatrix() {
+  const nps = _compSepLiveNps(), codSet = {}, codOrder = [];
+  nps.forEach(function (n) { (n.codes || []).forEach(function (c) { if (c.sale > 0 && !codSet[c.cod]) { codSet[c.cod] = true; codOrder.push(c.cod); } }); });
+  codOrder.sort(function (a, b) { return (parseInt(a, 10) || 0) - (parseInt(b, 10) || 0); });
+  const head = '<tr><th class="csep-mxc">Cod</th><th class="csep-mxt">Tot</th>' + nps.map(function (n) { return '<th>' + escapeHtml(n.np) + '</th>'; }).join("") + '</tr>';
+  const body = codOrder.map(function (cod) {
+    let tot = 0;
+    const cells = nps.map(function (n) {
+      const c = (n.codes || []).find(function (x) { return x.cod === cod && x.sale > 0; });
+      if (!c) return '<td class="csep-z">·</td>';
+      tot += c.sale; const ci = n.codes.indexOf(c), npIdx = _comp.nps.indexOf(n);
+      return '<td class="csep-cell' + (c.sep ? " done" : "") + '" onclick="_compSepTap(' + npIdx + ',' + ci + ')">' + c.sale + '</td>';
+    }).join("");
+    return '<tr><td class="csep-mxc">' + escapeHtml(cod) + '</td><td class="csep-mxt">' + tot + '</td>' + cells + '</tr>';
+  }).join("");
+  return '<div class="csep-mxwrap"><table class="csep-mx"><thead>' + head + '</thead><tbody>' + body + '</tbody></table></div>' +
+    '<button class="csep-armar" onclick="_compSepArmar()">🔨 Armar líos con lo separado →</button>';
+}
 function _compRenderFalt() {
   const el = document.getElementById("compStep1"); if (!el || !_comp) return;
   if (!_comp.hayFalt) { el.innerHTML = '<div class="comp-step-t">Sin faltantes en esta tanda 👍</div>'; return; }
@@ -7105,17 +7221,22 @@ function _compGo(s) {
   if (!_comp) return;
   _comp.step = s;
   document.getElementById("compStep1").classList.toggle("on", s === 1);
-  document.getElementById("compStep2").classList.toggle("on", s === 2);
+  document.getElementById("compStepSep").classList.toggle("on", s === 2);
+  document.getElementById("compStep2").classList.toggle("on", s === 3);
   document.getElementById("compD1").classList.toggle("on", s === 1);
-  document.getElementById("compD2").classList.toggle("on", s === 2);
+  const _dsep = document.getElementById("compDSep"); if (_dsep) _dsep.classList.toggle("on", s === 2);
+  document.getElementById("compD2").classList.toggle("on", s === 3);
   const bk = document.getElementById("compBack"), nx = document.getElementById("compNext");
   if (bk) bk.disabled = (s === 1);
-  if (nx) nx.disabled = (s === 2);
+  if (nx) nx.disabled = (s === 3);
   const fab = document.getElementById("compFab");
-  if (fab) fab.classList.toggle("hidden", s !== 2);
-  if (s === 2) { if (!_comp.nps[0] || !_comp.nps[0].codes || _comp._liosDirty) { _compBuildLiosData(); _comp._liosDirty = false; } _compRenderLios(); }
+  if (fab) fab.classList.toggle("hidden", s !== 3);
+  if (s === 2 || s === 3) { if (!_comp.nps[0] || !_comp.nps[0].codes || _comp._liosDirty) { _compBuildLiosData(); _comp._liosDirty = false; } }
+  if (s === 2) _compRenderSep();
+  if (s === 3) _compRenderLios();
   _compRecalc();
 }
+function _compNav(d) { if (!_comp) return; const s = Math.min(3, Math.max(1, (_comp.step || 1) + d)); _compGo(s); }
 async function compTerminar() {
   if (!_comp) return;
   // Paso 1 — faltantes: no se puede faltar MÁS de lo que dio el picking
