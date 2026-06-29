@@ -5229,7 +5229,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v4.89";
+const APP_VERSION = "v4.90";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -6887,6 +6887,7 @@ async function showCompletarWizard(legajo, codigo) {
       const t0 = document.getElementById("compTanda"); if (t0) t0.textContent = "Tanda " + tanda + (_comp.nps[0] && _comp.nps[0].rs ? " · " + _comp.nps[0].rs : "");
       const d20 = document.getElementById("compD2"), ln0 = document.getElementById("compLine");
       if (d20) d20.style.display = ""; if (ln0) ln0.style.display = "";
+      if (!_comp.nps[0] || !_comp.nps[0].codes) _compBuildLiosData();   // v4.90: si el avance se guardó en Paso 1 (sin codes), armar la data de líos para habilitar Terminar
       _compRenderFalt(); _compGo(_comp.step || 1);
       modal.classList.add("show");
       return;
@@ -6927,7 +6928,8 @@ async function showCompletarWizard(legajo, codigo) {
     if (d2) d2.style.display = "";   // Paso 2 = Líos: siempre presente
     if (ln) ln.style.display = "";
     _comp.liosNpIdx = 0;
-    _compRenderFalt(); _compGo(1);   // Paso 1 = Faltantes; los líos se arman al entrar al Paso 2
+    _compBuildLiosData();   // v4.90: armar la data de líos YA al abrir → liosDone correcto desde el arranque (si todo faltó, no obliga a entrar a Líos para habilitar Terminar)
+    _compRenderFalt(); _compGo(1);   // Paso 1 = Faltantes
     modal.classList.add("show");
   } catch (_e) { /* sin datos: no se muestra */ }
 }
@@ -7070,6 +7072,7 @@ function _compFaltInput(el) {
   let v = Math.max(0, parseInt(el.value, 10) || 0);
   if (v > n.pidio) { v = n.pidio; el.value = v; }            // TOPE: no más de lo que pidió esa NP
   n.asig = (_compMode === "cargo") ? (n.pidio - v) : v;      // canónico = FALTANTE (cargo: pidió − cargó)
+  _comp._liosDirty = true;   // v4.90: cambió un faltante → rearmar la data de líos al entrar al Paso 2
   _compUpdateSec(ai, ni); _compRecalc();
 }
 function _compUpdateSec(ai, ni) {
@@ -7094,7 +7097,7 @@ function _compRecalc() {
     const ae = document.getElementById("comp-art-" + ai); if (ae) ae.classList.toggle("ok", ok);
     if (!ok) faltOk = false;
   });
-  const liosOk = _comp.nps.every(function (n) { return n.liosDone; });
+  const liosOk = !_comp._liosDirty && _comp.nps.every(function (n) { return n.liosDone; });   // v4.90: si cambió un faltante, primero rearmar líos (entrar al Paso 2)
   const fin = document.getElementById("compFin"); if (fin) fin.disabled = !(liosOk && faltOk);
   _compPersist();   // v4.04: persistir avance (faltantes + líos) por si se cierra la app durante el armado
 }
@@ -7110,7 +7113,7 @@ function _compGo(s) {
   if (nx) nx.disabled = (s === 2);
   const fab = document.getElementById("compFab");
   if (fab) fab.classList.toggle("hidden", s !== 2);
-  if (s === 2) { if (!_comp.nps[0] || !_comp.nps[0].codes) _compBuildLiosData(); _compRenderLios(); }
+  if (s === 2) { if (!_comp.nps[0] || !_comp.nps[0].codes || _comp._liosDirty) { _compBuildLiosData(); _comp._liosDirty = false; } _compRenderLios(); }
   _compRecalc();
 }
 async function compTerminar() {
@@ -7118,7 +7121,7 @@ async function compTerminar() {
   // Paso 1 — faltantes: no se puede faltar MÁS de lo que dio el picking
   if (_comp.hayFalt) { for (const a of _comp.arts) { if (a.nps.length >= 2 && !a.auto) { const sum = a.nps.reduce(function (s, n) { return s + (n.asig || 0); }, 0); if (sum > a.falta) { _compGo(1); try { alert("El Art " + a.art + ": marcaste " + sum + " faltantes pero el picking solo dio " + a.falta + " cortas. No puede faltar más de eso."); } catch (_e) {} return; } } } }
   // Paso 2 — líos: cada NP tiene que tener TODAS sus cajas repartidas en líos
-  if (!_comp.nps[0] || !_comp.nps[0].codes) _compBuildLiosData();
+  if (!_comp.nps[0] || !_comp.nps[0].codes || _comp._liosDirty) { _compBuildLiosData(); _comp._liosDirty = false; }
   const pendLios = _comp.nps.filter(function (n) { return !n.liosDone; });
   if (pendLios.length) { _comp.liosNpIdx = _comp.nps.indexOf(pendLios[0]); _compGo(2); try { alert("Faltan armar los líos de " + pendLios.length + " pedido(s): NP " + pendLios.map(function (n) { return n.np; }).join(", ") + "."); } catch (_e) {} return; }
   const legajo = _comp.legajo, tanda = _comp.tanda, fecha = _comp.fecha || "";
