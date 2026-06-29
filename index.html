@@ -2220,9 +2220,10 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .cmpl-bcomp{ margin-top:5px; display:flex; flex-wrap:wrap; gap:5px; min-height:4px; }
 .cmpl-ch{ font-size:12.5px; font-weight:800; background:#fde68a; color:#92400e; border-radius:7px; padding:2px 8px; }
 .cmpl-bempty{ font-size:12px; color:#a16207; font-style:italic; }
-.cmpl-grid{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
-.cmpl-sq{ background:#fff; border:1.5px solid #e2e8f0; border-radius:12px; padding:8px 8px 9px; text-align:center; }
-.cmpl-sq.has{ border-color:#93c5fd; background:#eff6ff; }
+.cmpl-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:7px; }
+.cmpl-sq{ position:relative; background:#fff; border:1.5px solid #e2e8f0; border-radius:13px; padding:15px 6px 17px; text-align:center; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+.cmpl-sq.has{ border-color:#1e6bd6; background:#eff6ff; border-width:2px; }
+.cmpl-sq:active{ transform:scale(.97); }
 .cmpl-cod{ font-size:16px; font-weight:800; font-family:Consolas,Menlo,monospace; }
 .cmpl-row{ display:flex; align-items:center; justify-content:center; gap:6px; margin-top:5px; }
 .cmpl-sb{ width:38px; height:38px; border:none; border-radius:9px; font-size:22px; font-weight:800; cursor:pointer; display:flex; align-items:center; justify-content:center; flex:0 0 auto; }
@@ -2257,6 +2258,26 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .cmpl-siadd{ font-size:11px; font-weight:800; color:#7c3aed; }
 .cmpl-sundo{ display:block; width:100%; margin-bottom:10px; background:#fff; color:#b42318; border:1.5px solid #fecaca; border-radius:10px; padding:9px; font-size:13px; font-weight:800; cursor:pointer; }
 .cmpl-sundo:active{ transform:scale(.98); }
+.cmpl-ctrlrow{ display:flex; gap:6px; margin-bottom:10px; }
+.cmpl-ctrl{ flex:1; border-radius:10px; padding:8px 4px; font-size:11.5px; font-weight:800; text-align:center; border:1.5px solid; line-height:1.15; box-sizing:border-box; cursor:pointer; }
+.cmpl-ctrl:disabled{ opacity:.45; }
+.cmpl-ctrl-lio{ background:#fffbeb; border-color:#fcd34d; color:#92400e; cursor:default; }
+.cmpl-ctrl-edit{ background:#fff; border-color:#bfdbfe; color:#1e6bd6; }
+.cmpl-ctrl-su{ background:#eef2ff; border-color:#c7d2fe; color:#3730a3; }
+.cmpl-cur2{ font-size:30px; font-weight:800; color:#cbd5e1; margin-top:5px; line-height:1; }
+.cmpl-sq.has .cmpl-cur2{ color:#1e3a8a; }
+.cmpl-tot2{ font-size:14px; color:#94a3b8; font-weight:700; }
+.cmpl-min{ position:absolute; top:6px; right:6px; width:28px; height:28px; border-radius:8px; border:1.5px solid #fecaca; background:#fff; color:#b42318; font-size:18px; font-weight:800; line-height:1; padding:0; cursor:pointer; }
+.cmpl-cerrar{ display:block; width:100%; margin-top:11px; padding:13px; border:none; border-radius:12px; background:#16a34a; color:#fff; font-size:16px; font-weight:800; cursor:pointer; }
+.cmpl-cerrar:disabled{ background:#cbd5e1; color:#64748b; cursor:not-allowed; }
+.cmpl-back{ width:auto; background:#f1f5f9; color:#334155; border:1px solid #cbd5e1; border-radius:9px; padding:7px 14px; font-size:13px; font-weight:800; cursor:pointer; margin-bottom:10px; }
+.cmpl-eh{ font-size:14px; font-weight:800; color:#0f172a; margin-bottom:8px; }
+.cmpl-eg{ display:flex; align-items:center; gap:7px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:7px 9px; margin-bottom:6px; }
+.cmpl-egc{ flex:1; font-size:13px; font-weight:700; color:#0f172a; min-width:0; }
+.cmpl-egb{ width:30px; height:30px; border-radius:8px; border:1.5px solid #cbd5e1; background:#fff; font-size:16px; font-weight:800; color:#334155; flex:0 0 auto; cursor:pointer; }
+.cmpl-egb:disabled{ opacity:.35; }
+.cmpl-egedit,.cmpl-egdel{ width:32px; height:32px; border-radius:8px; border:1.5px solid #cbd5e1; background:#fff; font-size:15px; flex:0 0 auto; cursor:pointer; }
+.cmpl-egdel{ color:#b42318; border-color:#fecaca; }
 .cmpl-liostit{ font-size:11.5px; font-weight:800; color:#475569; text-transform:uppercase; letter-spacing:.3px; margin:11px 2px 7px; }
 .cmpl-lio{ display:flex; align-items:center; gap:9px; background:#fff; border:1px solid #e2e8f0; border-left:4px solid #16a34a; border-radius:10px; padding:6px 10px; margin-bottom:6px; }
 .cmpl-lio.s{ border-left-color:#7c3aed; }
@@ -5208,7 +5229,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v4.88";
+const APP_VERSION = "v4.89";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -6952,53 +6973,71 @@ function _compRenderLios() {
   if (_comp.liosNpIdx == null) _comp.liosNpIdx = 0;
   if (!_comp.nps[0].codes) _compBuildLiosData();
   const idx = _comp.liosNpIdx, n = _comp.nps[idx];
-  const L = function (i) { return i < 26 ? String.fromCharCode(65 + i) : "L" + (i + 1); };
-  const view = (_comp.liosView === "sueltas") ? "sueltas" : "armar";
+  const view = (_comp.liosView === "sueltas" || _comp.liosView === "editar") ? _comp.liosView : "armar";
   const TOTAL = n.codes.reduce(function (s, c) { return s + c.sale; }, 0);
   const curCajas = n.codes.reduce(function (s, c) { return s + c.cur; }, 0);
   const enLios = n.liosArr.reduce(function (s, l) { return s + l.cajas; }, 0);
-  const asign = enLios + curCajas;
+  const nRest = n.codes.reduce(function (s, c) { return s + c.rest; }, 0);
+  const groups = _compLioGroups(n);
+  const curLetter = _compLetter(groups.length);
   let h = '<div class="cmpl-nphead"><div class="cmpl-npinfo"><span class="cmpl-np">NP ' + escapeHtml(n.np) + '</span> <span class="cmpl-cli">' + (n.cod ? "cli " + escapeHtml(n.cod) + " · " : "") + escapeHtml(n.rs) + '</span></div><span class="cmpl-npidx">' + (idx + 1) + " / " + _comp.nps.length + '</span></div>';
-  h += '<div class="cmpl-prog">' + asign + " / " + TOTAL + " cajas · " + n.liosArr.length + " líos</div>";
+  h += '<div class="cmpl-prog">' + (enLios + curCajas) + " / " + TOTAL + " cajas · " + n.liosArr.length + " líos</div>";
   if (TOTAL === 0) {
     h += '<div class="cmpl-empty">Esta NP no lleva nada a armar (todo faltó). Pasá a la siguiente.</div>';
-  } else {
+  } else if (view === "editar") {
+    h += '<button class="cmpl-back" onclick="_compViewArmar()">← Volver</button>';
+    h += '<div class="cmpl-eh">✏️ Líos generados (' + n.liosArr.length + ')</div>';
+    if (!groups.length) h += '<div class="cmpl-empty">Todavía no armaste ningún lío.</div>';
+    else h += groups.map(function (g, gi) {
+      const comp = g.items.map(function (it) { return escapeHtml(it.cod) + "×" + it.qty; }).join("  ") + (g.suelta ? " · suelta" : "");
+      return '<div class="cmpl-eg"><span class="cmpl-lab">' + g.label + '</span><span class="cmpl-egc">' + comp + (g.count > 1 ? ' · <b>×' + g.count + '</b>' : '') + '</span>' +
+        (g.count > 1 ? '<button class="cmpl-egb" onclick="_compGroupLess(' + gi + ')" title="Sacar uno">−</button><button class="cmpl-egb" onclick="_compGroupMore(' + gi + ')"' + (g.canMore ? '' : ' disabled') + ' title="Agregar otro igual">+</button>' : '') +
+        '<button class="cmpl-egedit" onclick="_compGroupReopen(' + gi + ')" title="Reabrir para editar">✏️</button>' +
+        '<button class="cmpl-egdel" onclick="_compGroupDel(' + gi + ')" title="Borrar">×</button></div>';
+    }).join("");
+  } else if (view === "sueltas") {
     const restCods = n.codes.filter(function (c) { return c.rest > 0; });
-    const nRest = restCods.reduce(function (s, c) { return s + c.rest; }, 0);
-    h += '<div class="cmpl-subtabs">' + (view === "sueltas" ? '<button class="cmpl-subtab" onclick="_compViewArmar()">← Volver a líos</button>' : '<button class="cmpl-subtab" onclick="_compViewSueltas()">📦 Sueltas' + (nRest ? " (" + nRest + ")" : "") + '</button>') + '</div>';
-    if (view === "sueltas") {
-      h += '<div class="cmpl-shint">Las que van <b>solas</b>: tocá cada código y cada toque queda como <b>un lío de 1 caja</b>. Acá ves sólo lo que falta asignar.</div>';
-      if (n.liosArr.some(function (l) { return l.suelta; })) h += '<button class="cmpl-sundo" onclick="_compSueltaUndo()">↶ Deshacer última suelta</button>';
-      if (!restCods.length) h += '<div class="cmpl-empty">No quedan cajas sin asignar 👍</div>';
-      else h += '<div class="cmpl-sgrid">' + restCods.map(function (c) { const sci = n.codes.indexOf(c); return '<button class="cmpl-sitem" onclick="_compLioSuelta(' + sci + ')"><span class="cmpl-sicod">' + escapeHtml(c.cod) + '</span><span class="cmpl-sirest">quedan ' + c.rest + '</span><span class="cmpl-siadd">📦 marcar</span></button>'; }).join("") + '</div>';
-    } else {
-    const inCur = n.codes.filter(function (c) { return c.cur > 0; });
-    h += '<div class="cmpl-banner"><div class="cmpl-bhead"><div class="cmpl-blab">Armando Lío ' + L(n.liosArr.length) + '</div>' + (inCur.length ? '<button class="cmpl-undo" onclick="_compLioReset()" title="Vaciar este lío y empezar de nuevo">↶ Deshacer</button>' : '') + '</div><div class="cmpl-bcomp">' + (inCur.length ? inCur.map(function (c) { return '<span class="cmpl-ch">' + escapeHtml(c.cod) + " ×" + c.cur + "</span>"; }).join("") : '<span class="cmpl-bempty">Tocá + en los códigos que entran en este lío…</span>') + "</div></div>";
+    h += '<button class="cmpl-back" onclick="_compViewArmar()">← Volver</button>';
+    h += '<div class="cmpl-shint">Las que van <b>solas</b>: tocá cada código, cada toque = <b>un lío de 1 caja</b>.</div>';
+    if (n.liosArr.some(function (l) { return l.suelta; })) h += '<button class="cmpl-sundo" onclick="_compSueltaUndo()">↶ Deshacer última suelta</button>';
+    if (!restCods.length) h += '<div class="cmpl-empty">No quedan cajas sin asignar 👍</div>';
+    else h += '<div class="cmpl-sgrid">' + restCods.map(function (c) { const sci = n.codes.indexOf(c); return '<button class="cmpl-sitem" onclick="_compLioSuelta(' + sci + ')"><span class="cmpl-sicod">' + escapeHtml(c.cod) + '</span><span class="cmpl-sirest">quedan ' + c.rest + '</span><span class="cmpl-siadd">📦 marcar</span></button>'; }).join("") + '</div>';
+  } else {
+    h += '<div class="cmpl-ctrlrow">' +
+      '<div class="cmpl-ctrl cmpl-ctrl-lio">🔨 Armando<br>Lío ' + curLetter + (curCajas ? ' (' + curCajas + ')' : '') + '</div>' +
+      '<button class="cmpl-ctrl cmpl-ctrl-edit" onclick="_compViewEditar()"' + (n.liosArr.length ? '' : ' disabled') + '>✏️ Editar<br>líos (' + n.liosArr.length + ')</button>' +
+      '<button class="cmpl-ctrl cmpl-ctrl-su" onclick="_compViewSueltas()">📦 Sueltas<br>(' + nRest + ')</button></div>';
     h += '<div class="cmpl-grid">' + n.codes.map(function (c, ci) {
       if (c.rest === 0 && c.cur === 0) return "";
       const rem = c.cur + c.rest;
-      return '<div class="cmpl-sq' + (c.cur > 0 ? " has" : "") + '"><div class="cmpl-cod">' + escapeHtml(c.cod) + '</div><div class="cmpl-row"><button class="cmpl-sb minus" onclick="_compLioStep(' + ci + ',-1)"' + (c.cur <= 0 ? " disabled" : "") + '>–</button><div class="cmpl-frac"><span class="cmpl-cur' + (c.cur ? "" : " z") + '">' + c.cur + '</span><span class="cmpl-rem"> / ' + rem + '</span></div><button class="cmpl-sb plus" onclick="_compLioStep(' + ci + ',1)"' + (c.rest <= 0 ? " disabled" : "") + '>+</button></div></div>';
+      return '<div class="cmpl-sq' + (c.cur > 0 ? " has" : "") + '" onclick="_compLioStep(' + ci + ',1)">' +
+        (c.cur > 0 ? '<button class="cmpl-min" onclick="event.stopPropagation();_compLioStep(' + ci + ',-1)">−</button>' : '') +
+        '<div class="cmpl-cod">' + escapeHtml(c.cod) + '</div><div class="cmpl-cur2">' + c.cur + '<span class="cmpl-tot2"> / ' + rem + '</span></div></div>';
     }).join("") + "</div>";
-    const doneCods = n.codes.filter(function (c) { return c.rest === 0 && c.cur === 0; }).map(function (c) { return c.cod; });
-    if (doneCods.length) h += '<div class="cmpl-done">✓ en líos: ' + doneCods.map(escapeHtml).join(" · ") + "</div>";
-    const allRest0 = n.codes.every(function (c) { return c.rest === 0; });
-    h += '<button class="cmpl-lnext" onclick="_compLioSiguiente()"' + (curCajas === 0 ? " disabled" : "") + ">" + (allRest0 && curCajas > 0 ? "Cerrar último lío ✓" : "Siguiente lío →") + "</button>";
-    }
-  }
-  if (n.liosArr.length) {
-    h += '<div class="cmpl-liostit">Líos de esta NP (' + n.liosArr.length + ")</div>" + n.liosArr.map(function (l, k) {
-      return '<div class="cmpl-lio' + (l.suelta ? " s" : "") + '"><span class="cmpl-lab">' + L(k) + '</span><span class="cmpl-lc">' + l.items.map(function (it) { return escapeHtml(it.cod) + "×" + it.qty; }).join("  ") + (l.suelta ? " · suelta" : "") + '</span><button class="cmpl-del" onclick="_compLioDel(' + k + ')">×</button></div>';
-    }).join("");
+    h += '<button class="cmpl-cerrar" onclick="_compLioSiguiente()"' + (curCajas === 0 ? " disabled" : "") + '>✓ Cerrar Lío ' + curLetter + (curCajas ? ' (' + curCajas + ')' : '') + '</button>';
   }
   h += '<div class="cmpl-npbtns"><button class="cmpl-npbtn" onclick="_compLioNp(-1)"' + (idx <= 0 ? " disabled" : "") + '>← NP anterior</button><button class="cmpl-npbtn pri" onclick="_compLioNp(1)"' + (idx >= _comp.nps.length - 1 ? " disabled" : "") + '>NP siguiente →</button></div>';
-  h += '<div style="height:80px"></div>';
+  h += '<div style="height:24px"></div>';
   el.innerHTML = h;
-  const fab = document.getElementById("compFab");
-  if (fab) {
-    if (TOTAL === 0 || view === "sueltas") { fab.classList.add("hidden"); }
-    else { fab.classList.remove("hidden"); const allR0 = n.codes.every(function (c) { return c.rest === 0; }); fab.disabled = (curCajas === 0); fab.textContent = curCajas > 0 ? ((allR0 ? "✓ Cerrar último (" : "✓ Cerrar lío (") + curCajas + ")") : "✓ Cerrar lío"; }
-  }
+  const fab = document.getElementById("compFab"); if (fab) fab.classList.add("hidden");
 }
+/* Agrupa líos por composición (líos iguales comparten letra + ×N), preservando el conteo real. */
+function _compLetter(i) { return i < 26 ? String.fromCharCode(65 + i) : "L" + (i + 1); }
+function _compLioSig(l) { return l.items.slice().sort(function (a, b) { return String(a.cod).localeCompare(String(b.cod)); }).map(function (it) { return it.cod + "x" + it.qty; }).join(",") + (l.suelta ? "|s" : ""); }
+function _compLioGroups(n) {
+  const map = {}, order = [];
+  (n.liosArr || []).forEach(function (l, k) {
+    const sig = _compLioSig(l);
+    if (!map[sig]) { map[sig] = { sig: sig, items: l.items, suelta: !!l.suelta, count: 0, idxs: [] }; order.push(sig); }
+    map[sig].count++; map[sig].idxs.push(k);
+  });
+  return order.map(function (sig, i) { const g = map[sig]; g.label = _compLetter(i); g.canMore = g.items.every(function (it) { const c = n.codes.find(function (x) { return x.cod === it.cod; }); return c && c.rest >= it.qty; }); return g; });
+}
+function _compViewEditar() { if (_comp) { _comp.liosView = "editar"; _compRenderLios(); } }
+function _compGroupMore(gi) { const n = _compLioNow(); if (!n) return; const g = _compLioGroups(n)[gi]; if (!g || !g.canMore) return; g.items.forEach(function (it) { const c = n.codes.find(function (x) { return x.cod === it.cod; }); if (c) c.rest -= it.qty; }); n.liosArr.push({ items: g.items.map(function (it) { return { cod: it.cod, qty: it.qty }; }), cajas: g.items.reduce(function (s, it) { return s + it.qty; }, 0), suelta: g.suelta }); _compLioMark(n); _compRenderLios(); _compRecalc(); }
+function _compGroupLess(gi) { const n = _compLioNow(); if (!n) return; const g = _compLioGroups(n)[gi]; if (!g) return; _compLioDel(g.idxs[g.idxs.length - 1]); }
+function _compGroupDel(gi) { const n = _compLioNow(); if (!n) return; const g = _compLioGroups(n)[gi]; if (!g) return; g.idxs.slice().sort(function (a, b) { return b - a; }).forEach(function (k) { const l = n.liosArr[k]; if (l) { l.items.forEach(function (it) { const c = n.codes.find(function (x) { return x.cod === it.cod; }); if (c) c.rest += it.qty; }); n.liosArr.splice(k, 1); } }); _compLioMark(n); _compRenderLios(); _compRecalc(); }
+function _compGroupReopen(gi) { const n = _compLioNow(); if (!n) return; const g = _compLioGroups(n)[gi]; if (!g) return; const k = g.idxs[g.idxs.length - 1]; const l = n.liosArr[k]; if (!l) return; l.items.forEach(function (it) { const c = n.codes.find(function (x) { return x.cod === it.cod; }); if (c) c.cur += it.qty; }); n.liosArr.splice(k, 1); _comp.liosView = "armar"; _compLioMark(n); _compRenderLios(); _compRecalc(); }
 function _compRenderFalt() {
   const el = document.getElementById("compStep1"); if (!el || !_comp) return;
   if (!_comp.hayFalt) { el.innerHTML = '<div class="comp-step-t">Sin faltantes en esta tanda 👍</div>'; return; }
