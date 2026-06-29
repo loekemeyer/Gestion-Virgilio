@@ -5314,7 +5314,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.01";
+const APP_VERSION = "v5.02";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -9091,7 +9091,17 @@ function insConfirmar() {
   stockMove(rows);   // offline-safe (vir_stock_pend)
   try { alert("✓ " + (isIn ? "Entrada" : "Salida") + " registrada: " + sel.length + " insumo(s)."); } catch (_e) {}
 }
-function closeIns() { const ov = document.getElementById("insModal"); if (ov) ov.classList.remove("show"); _ins = null; }
+function closeIns() {
+  const ov = document.getElementById("insModal"); if (ov) ov.classList.remove("show");
+  // v5.02: al cerrar el modal, CERRAR el toggle RI/EI. Así cada recepción/entrega de
+  // insumos vuelve a abrir el buscador desde cero. Antes el toggle quedaba activo tras
+  // el 1er envío: la 2da vez caía al "cierre" del toggle (toggleStartOrEnd lo borraba)
+  // y el dispatch de send() ya no abría el modal → "deja subir una sola vez" (reportado
+  // por Marianela). Mismo patrón de cierre que CC/RR/CR. Bonus: no queda RI "activo"
+  // bloqueando EP/TP, ni aparece el input "Indicar Cantidad" suelto.
+  try { if (_ins && _ins.legajo && _ins.mode) { const st = getLegajoState(_ins.legajo); if (st && st.toggles && st.toggles[_ins.mode]) toggleStartOrEnd(_ins.legajo, _ins.mode); } } catch (_e) {}
+  _ins = null;
+}
 
 /* ===== STOCK — SALIDA A CERVANTES (v4.10): el operario manda artículo terminado a la otra
    planta (muestra/devolución). Es una baja de góndola: Movimientos_Stock deposito='terminado'
