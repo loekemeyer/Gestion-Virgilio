@@ -5179,7 +5179,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v4.76";
+const APP_VERSION = "v4.77";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -7641,7 +7641,7 @@ let _prodM3Cache = null;
 let _prodOpen = null;             // { leg, key } — desglose abierto (tocar un chip)
 let _prodExpand = {};             // legajos con la tarjeta expandida (por defecto: todas resumidas)
 let _prodTab = "cards";           // "cards" | "table"
-let _prodSort = { col: "pct", dir: -1 };   // orden de la tabla
+let _prodSort = { col: "tandas", dir: -1 };   // orden de la tabla
 function prodToggleVista() { _prodToggle = _prodToggle === "m3h" ? "minm3" : "m3h"; prodRender(); }
 function prodDetail(leg, key) { if (_prodOpen && _prodOpen.leg === leg && _prodOpen.key === key) _prodOpen = null; else _prodOpen = { leg: leg, key: key }; prodRender(); }
 function prodToggleOp(leg) { if (_prodExpand[leg]) { delete _prodExpand[leg]; if (_prodOpen && _prodOpen.leg === leg) _prodOpen = null; } else _prodExpand[leg] = 1; prodRender(); }
@@ -7996,16 +7996,14 @@ function prodRender() {
     const so = ops.slice().sort(function (a, b) { const va = colVal(a), vb = colVal(b); if (va < vb) return -_prodSort.dir; if (va > vb) return _prodSort.dir; return 0; });
     const ar = function (col) { return _prodSort.col === col ? (_prodSort.dir < 0 ? " ▾" : " ▴") : ""; };
     const thh = function (col, lbl) { return '<th onclick="prodTabSort(\'' + col + '\')" class="' + (_prodSort.col === col ? "on" : "") + '">' + lbl + ar(col) + '</th>'; };
-    h += '<table class="prod-tbl"><thead><tr>' + thh("name", "Operario") + thh("pick", "Picking") + thh("arm", "Armado") + thh("tandas", "Tandas") + thh("pct", "% prod") + '</tr></thead><tbody>';
+    h += '<table class="prod-tbl"><thead><tr>' + thh("name", "Operario") + thh("pick", "Picking") + thh("arm", "Armado") + thh("tandas", "Tandas") + '</tr></thead><tbody>';
     so.forEach(function (o) {
-      const pc = o.pctProd >= 70 ? "#16a34a" : (o.pctProd >= 45 ? "#d97706" : "#dc2626");
       h += '<tr onclick="prodOpenFromTable(\'' + o.leg + '\')"><td class="prod-tdn">' + escapeHtml(nameOf(o.leg)) + '</td>' +
         '<td class="prod-tdv prod-rb-pick' + (o.pickPoco ? " prod-mini-poco" : "") + '">' + (o.t.pickTandas > 0 ? showVal(o.pickM3h) : "—") + '</td>' +
         '<td class="prod-tdv prod-rb-arm' + (o.armPoco ? " prod-mini-poco" : "") + '">' + (o.t.armTandas > 0 ? showVal(o.armM3h) : "—") + '</td>' +
-        '<td class="prod-tdn2">' + (o.t.armTandas + o.t.pickTandas) + '</td>' +
-        '<td style="color:' + pc + ';font-weight:800">' + Math.round(o.pctProd) + '%</td></tr>';
+        '<td class="prod-tdn2">' + (o.t.armTandas + o.t.pickTandas) + '</td></tr>';
     });
-    h += '</tbody></table><div class="prod-tbl-hint">Tocá un encabezado para ordenar · una fila para ver el detalle. Armado y Picking en ' + unit + '. <b>% prod</b> = parte de la jornada que estuvo armando/pickeando.</div>';
+    h += '</tbody></table><div class="prod-tbl-hint">Tocá un encabezado para ordenar · una fila para ver el detalle. Armado y Picking en ' + unit + '.</div>';
     if (!ops.length) h += '<div class="prod-empty">Sin armado/picking en el período.</div>';
     body.innerHTML = h; return;
   }
