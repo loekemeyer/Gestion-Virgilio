@@ -7231,13 +7231,13 @@ function ocBodyEntregas() {
     .filter(function (a) { return f ? ((a.cod + " " + a.desc + " " + a.prov).toLowerCase().indexOf(f) >= 0) : true; })
     .sort(function (a, b) { return pct(a.ent, a.ped) - pct(b.ent, b.ped); });
   h += '<div class="oc-meta">% de entregas global: <b>' + pct(totE, totP) + '%</b> — ' + Math.round(totE) + ' entregadas de ' + Math.round(totP) + ' pedidas · ' + arr.length + ' artículo(s).</div>';
-  h += '<table class="oc-tbl"><thead><tr><th>Código</th><th>Descripción</th><th>Proveedor</th><th class="num">Pedidas</th><th class="num">Entregadas</th><th class="num">%</th><th class="num">Falta</th></tr></thead><tbody>';
+  h += '<div class="oc-tblwrap"><table class="oc-tbl"><thead><tr><th>Código</th><th>Descripción</th><th>Proveedor</th><th class="num">Pedidas</th><th class="num">Entregadas</th><th class="num">%</th><th class="num">Falta</th></tr></thead><tbody>';
   if (!arr.length) h += '<tr><td colspan="7" class="oc-empty">Sin resultados.</td></tr>';
   arr.forEach(function (a) {
     const p = pct(a.ent, a.ped); const col = p >= 100 ? "#166534" : (p >= 80 ? "#b45309" : "#b91c1c");
     h += '<tr><td class="oc-cod">' + escapeHtml(a.cod) + '</td><td>' + escapeHtml(artNombre(a.cod, a.desc)) + '</td><td style="font-size:12px;color:#475569">' + escapeHtml(a.prov) + '</td><td class="num">' + Math.round(a.ped) + '</td><td class="num">' + Math.round(a.ent) + '</td><td class="num" style="color:' + col + ';font-weight:800">' + p + '%</td><td class="num oc-falt">' + (Math.max(0, Math.round(a.ped - a.ent)) || "—") + '</td></tr>';
   });
-  h += '</tbody></table>';
+  h += '</tbody></table></div>';
   return h;
 }
 function ocGroups() {
@@ -7259,12 +7259,12 @@ function ocBodyList() {
   if (f) keys = keys.filter(function (k) { const x = g[k]; return ((x.proveedor || "") + " " + (x.rubro || "") + " " + (x.fecha || "")).toLowerCase().indexOf(f) >= 0; });
   keys.sort(function (a, b) { return (g[b].fecha || "").localeCompare(g[a].fecha || "") || (g[a].proveedor || "").localeCompare(g[b].proveedor || ""); });
   if (!keys.length) return h + '<div class="oc-empty">No hay órdenes de compra que coincidan.<br><small>La importación desde los PDF de OC se agrega cuando definamos el formato.</small></div>';
-  h += '<table class="oc-tbl"><thead><tr><th>Proveedor</th><th>Fecha</th><th>Rubro</th><th class="num">Ítems</th><th class="num">Pedido</th><th class="num">Falta</th><th>Estado</th></tr></thead><tbody>';
+  h += '<div class="oc-tblwrap"><table class="oc-tbl"><thead><tr><th>Proveedor</th><th>Fecha</th><th>Rubro</th><th class="num">Ítems</th><th class="num">Pedido</th><th class="num">Falta</th><th>Estado</th></tr></thead><tbody>';
   keys.forEach(function (k) {
     const x = g[k], st = ocGroupStats(x);
     h += '<tr class="oc-rowc" onclick="ocOpen(\'' + encodeURIComponent(k) + '\')"><td><b>' + escapeHtml(x.proveedor || "—") + '</b></td><td>' + escapeHtml(x.fecha || "—") + '</td><td>' + escapeHtml(x.rubro || "—") + '</td><td class="num">' + x.rows.length + '</td><td class="num">' + st.ped + '</td><td class="num ' + (st.falta > 0 ? "oc-falt" : "oc-ok") + '">' + (st.falta > 0 ? st.falta : "0") + '</td><td><span class="oc-pill ' + st.estado + '">' + st.estado + '</span></td></tr>';
   });
-  h += '</tbody></table><div class="oc-note">La columna <b>Falta</b> = pedido − recibido. Entrá a una OC para cargar lo recibido y marcar el faltante (escritura: requiere sesión de supervisor).</div>';
+  h += '</tbody></table></div><div class="oc-note">La columna <b>Falta</b> = pedido − recibido. Entrá a una OC para cargar lo recibido y marcar el faltante (escritura: requiere sesión de supervisor).</div>';
   return h;
 }
 function ocOpen(kEnc) { if (!_oc) return; _oc.openKey = decodeURIComponent(kEnc); _oc.view = "detail"; ocRender(); }
@@ -7279,12 +7279,12 @@ function ocBodyDetail() {
   else h += '<button class="oc-btn" onclick="ocMarcar(\'pendiente\')">↩ Reabrir</button>';
   h += '</div>';
   h += '<div class="oc-meta">Proveedor <b>' + escapeHtml(x.proveedor || "—") + '</b> · Fecha <b>' + escapeHtml(x.fecha || "—") + '</b> · Rubro <b>' + escapeHtml(x.rubro || "—") + '</b> · Pedido <b>' + st.ped + '</b> · Falta <b>' + (st.falta > 0 ? st.falta : 0) + '</b></div>';
-  h += '<table class="oc-tbl"><thead><tr><th>Código</th><th>Descripción</th><th>Unidad</th><th class="num">Pedido</th><th class="num">Recibido</th><th class="num">Falta</th></tr></thead><tbody>';
+  h += '<div class="oc-tblwrap"><table class="oc-tbl"><thead><tr><th>Código</th><th>Descripción</th><th>Unidad</th><th class="num">Pedido</th><th class="num">Recibido</th><th class="num">Falta</th></tr></thead><tbody>';
   x.rows.forEach(function (r) {
     const ped = Number(r.cantidad) || 0, rec = Number(r.cantidad_recibida) || 0, falt = ped - rec;
     h += '<tr><td class="oc-cod">' + escapeHtml(r.codigo || "—") + '</td><td>' + escapeHtml(r.descripcion || "") + '</td><td>' + escapeHtml(r.unidad || "") + '</td><td class="num">' + ped + '</td><td class="num"><input class="oc-rinp" type="number" min="0" inputmode="numeric" data-id="' + r.id + '" value="' + rec + '" oninput="ocLiveFalt(' + r.id + ',' + ped + ',this.value)"></td><td class="num ' + (falt > 0 ? "oc-falt" : "oc-ok") + '" id="ocfalt_' + r.id + '">' + (falt !== 0 ? falt : "0") + '</td></tr>';
   });
-  return h + "</tbody></table>";
+  return h + "</tbody></table></div>";
 }
 function ocLiveFalt(id, ped, v) { const c = document.getElementById("ocfalt_" + id); if (!c) return; const falt = ped - (parseInt(v, 10) || 0); c.textContent = falt !== 0 ? falt : "0"; c.className = "num " + (falt > 0 ? "oc-falt" : "oc-ok"); }
 function _ocCollectRecibido() {
@@ -7318,11 +7318,11 @@ function ocBodyNueva() {
   const n = _oc.nueva;
   let h = '<div class="oc-tools"><button class="oc-btn" onclick="ocBack()">← Volver</button></div>';
   h += '<div class="oc-form"><input class="oc-inp" placeholder="Proveedor" value="' + escapeHtml(n.proveedor) + '" oninput="if(_oc)_oc.nueva.proveedor=this.value"><input class="oc-inp" type="date" value="' + escapeHtml(n.fecha) + '" oninput="if(_oc)_oc.nueva.fecha=this.value"><input class="oc-inp" placeholder="Rubro (ej: Cajas)" value="' + escapeHtml(n.rubro) + '" oninput="if(_oc)_oc.nueva.rubro=this.value"><input class="oc-inp" placeholder="Unidad" style="width:90px" value="' + escapeHtml(n.unidad) + '" oninput="if(_oc)_oc.nueva.unidad=this.value"></div>';
-  h += '<table class="oc-tbl"><thead><tr><th>Código</th><th>Descripción</th><th class="num">Cantidad</th><th></th></tr></thead><tbody>';
+  h += '<div class="oc-tblwrap"><table class="oc-tbl"><thead><tr><th>Código</th><th>Descripción</th><th class="num">Cantidad</th><th></th></tr></thead><tbody>';
   n.items.forEach(function (it, i) {
     h += '<tr><td><input class="oc-inp" style="width:100px" placeholder="cod" value="' + escapeHtml(it.cod) + '" oninput="if(_oc)_oc.nueva.items[' + i + '].cod=this.value"></td><td><input class="oc-inp" style="width:100%;box-sizing:border-box" placeholder="descripción" value="' + escapeHtml(it.desc) + '" oninput="if(_oc)_oc.nueva.items[' + i + '].desc=this.value"></td><td class="num"><input class="oc-rinp" type="number" min="0" inputmode="numeric" value="' + escapeHtml(String(it.cant)) + '" oninput="if(_oc)_oc.nueva.items[' + i + '].cant=this.value"></td><td><button class="oc-btn danger" onclick="ocNuevaDelItem(' + i + ')">✕</button></td></tr>';
   });
-  h += '</tbody></table><div class="oc-additm"><button class="oc-btn" onclick="ocNuevaAddItem()">+ Agregar ítem</button><button class="oc-btn ok" onclick="ocNuevaCrear()">✓ Crear OC</button></div>';
+  h += '</tbody></table></div><div class="oc-additm"><button class="oc-btn" onclick="ocNuevaAddItem()">+ Agregar ítem</button><button class="oc-btn ok" onclick="ocNuevaCrear()">✓ Crear OC</button></div>';
   return h;
 }
 function ocNuevaAddItem() { if (!_oc) return; _oc.nueva.items.push({ cod: "", desc: "", cant: "" }); ocRender(); }
@@ -7447,13 +7447,13 @@ function ocBodyGen() {
   keys.forEach(function (k) {
     const x = g[k];
     h += '<div class="oc-meta" style="margin-top:12px;margin-bottom:4px"><b>' + escapeHtml(k) + '</b>' + (x.interno ? ' <span style="color:#64748b">(interno — no se genera OC)</span>' : '') + ' · ' + x.items.length + ' ítem(s) · ' + x.total + ' cajas</div>';
-    h += '<table class="oc-tbl"><thead><tr><th>Código</th><th>Descripción</th><th class="num">Proy</th><th class="num">Índice</th><th class="num">Máx</th><th class="num">Pedidos</th><th class="num">Stock</th><th class="num">A pedir</th></tr></thead><tbody>';
+    h += '<div class="oc-tblwrap"><table class="oc-tbl"><thead><tr><th>Código</th><th>Descripción</th><th class="num">Proy</th><th class="num">Índice</th><th class="num">Máx</th><th class="num">Pedidos</th><th class="num">Stock</th><th class="num">A pedir</th></tr></thead><tbody>';
     x.items.sort(function (a, b) { return b.falta - a.falta; }).forEach(function (it) {
       const proyTxt = (it.fuente === "proy") ? (Math.round(it.proy) + "") : '<span style="color:#b45309" title="sin proyección: usa objetivo Excel">xls</span>';
       const maxTxt = it.max + (it.capped ? ' <span style="color:#b45309;font-weight:800" title="Topado a la capacidad de góndola (' + it.cap + ' cajas) — proy×índice daba más">⤓</span>' : '');
       h += '<tr><td class="oc-cod">' + escapeHtml(it.cod) + '</td><td>' + escapeHtml(artNombre(it.cod, it.desc)) + '</td><td class="num">' + proyTxt + '</td><td class="num">' + it.indice + '</td><td class="num">' + maxTxt + '</td><td class="num">' + it.demanda + '</td><td class="num">' + it.stock + '</td><td class="num oc-falt">' + it.falta + '</td></tr>';
     });
-    h += '</tbody></table>';
+    h += '</tbody></table></div>';
   });
   return h;
 }
@@ -7499,14 +7499,14 @@ function ocBodyIndices() {
   h += '<input class="oc-filtro" type="search" placeholder="🔎 código / descripción / proveedor" value="' + escapeHtml(_oc.idxFiltro || "") + '" oninput="if(_oc){_oc.idxFiltro=this.value;ocRender();}"></div>';
   const f = (_oc.idxFiltro || "").toLowerCase().trim();
   const shown = f ? _oc.indices.filter(function (a) { return (a.cod + " " + a.desc + " " + a.prov).toLowerCase().indexOf(f) >= 0; }) : _oc.indices;
-  h += '<table class="oc-tbl"><thead><tr><th>Código</th><th>Descripción</th><th>Proveedor</th><th class="num">Índice</th></tr></thead><tbody>';
+  h += '<div class="oc-tblwrap"><table class="oc-tbl"><thead><tr><th>Código</th><th>Descripción</th><th>Proveedor</th><th class="num">Índice</th></tr></thead><tbody>';
   if (!shown.length) h += '<tr><td colspan="4" class="oc-empty">Sin resultados.</td></tr>';
   shown.forEach(function (a) {
     const i = _oc.indices.indexOf(a);
     const ch = (_ociChanged[a.cod] != null) ? ' style="background:#fef3c7"' : '';
     h += '<tr' + ch + '><td class="oc-cod">' + escapeHtml(a.cod) + '</td><td>' + escapeHtml(artNombre(a.cod, a.desc)) + '</td><td>' + escapeHtml(a.prov || "—") + '</td><td class="num"><input class="oc-rinp" type="number" step="0.1" min="0" value="' + a.indice + '" oninput="ociEdit(' + i + ',this.value)"></td></tr>';
   });
-  return h + '</tbody></table>';
+  return h + '</tbody></table></div>';
 }
 function ociEdit(i, v) {
   if (!_oc || !_oc.indices) return; const a = _oc.indices[i]; if (!a) return;
@@ -8381,7 +8381,7 @@ function stkBodyConteo() {
   const c = _stk.conteo;
   let h = '<div class="stk-cut" style="background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af;">Conteo físico de góndola. Por fila: <b>Sector · Código · Pilas · Cajas×Pila · Sueltas</b> → Cajas = <b>pilas×cajas/pila + sueltas</b>. Después “Comparar con el sistema” y “Guardar”.</div>';
   h += '<div style="margin-bottom:8px"><input class="stk-aj-inp" id="cntLegajo" style="max-width:130px;text-align:center" placeholder="Legajo" value="' + escapeHtml(c.legajo || "") + '" oninput="if(_stk&&_stk.conteo)_stk.conteo.legajo=this.value"></div>';
-  h += '<table class="stk-tbl stk-tbl-fit"><thead><tr><th>Sector</th><th>Código</th><th class="num">Pilas</th><th class="num">Cjas×Pila</th><th class="num">Sueltas</th><th class="num">Cajas</th><th></th></tr></thead><tbody>';
+  h += '<div class="stk-tblwrap"><table class="stk-tbl stk-tbl-fit"><thead><tr><th>Sector</th><th>Código</th><th class="num">Pilas</th><th class="num">Cjas×Pila</th><th class="num">Sueltas</th><th class="num">Cajas</th><th></th></tr></thead><tbody>';
   c.rows.forEach(function (r, i) {
     h += '<tr>' +
       '<td><input class="cnt-in" style="width:84px" value="' + escapeHtml(r.sector || "") + '" oninput="cntSet(' + i + ',\'sector\',this.value)"></td>' +
@@ -8393,7 +8393,7 @@ function stkBodyConteo() {
       '<td><button class="stk-btn" style="padding:4px 9px" onclick="cntDelRow(' + i + ')">✕</button></td>' +
       '</tr>';
   });
-  h += '</tbody></table>';
+  h += '</tbody></table></div>';
   h += '<div class="stk-ini-btns"><button class="stk-btn" onclick="cntAddRow()">+ Fila</button> <button class="stk-btn" onclick="cntCompara()">📊 Comparar con el sistema</button> <button class="stk-btn ok" onclick="cntGuardar()">💾 Guardar conteo</button></div>';
   if (c.showComp) {
     const cont = {};
@@ -8402,14 +8402,14 @@ function stkBodyConteo() {
     const sys = {};
     Object.keys(saldos).forEach(function (cc) { const k = _ocgNorm(cc); if (!sys[k]) sys[k] = { cod: saldos[cc].cod, desc: saldos[cc].desc, gond: 0, exc: 0, proc: 0 }; sys[k].gond += Number(saldos[cc].terminado) || 0; sys[k].exc += Number(saldos[cc].excedente) || 0; sys[k].proc += (Number(saldos[cc].separar_pedidos) || 0) + (Number(saldos[cc].a_facturar) || 0); });
     h += '<div class="stk-aj-h" style="margin-top:14px">📊 Contado vs Sistema (góndola + excedente)</div>';
-    h += '<table class="stk-tbl stk-tbl-fit"><thead><tr><th>Código</th><th class="num">Contado</th><th class="num">Sistema</th><th class="num">Dif</th><th class="num">En proceso</th></tr></thead><tbody>';
+    h += '<div class="stk-tblwrap"><table class="stk-tbl stk-tbl-fit"><thead><tr><th>Código</th><th class="num">Contado</th><th class="num">Sistema</th><th class="num">Dif</th><th class="num">En proceso</th></tr></thead><tbody>';
     Object.keys(cont).sort(function (a, b) { return String(a).localeCompare(String(b), undefined, { numeric: true }); }).forEach(function (k) {
       const s = sys[k] || { cod: k, gond: 0, exc: 0, proc: 0 };
       const sysv = (s.gond || 0) + (s.exc || 0); const dif = Math.round((cont[k] - sysv) * 100) / 100;
       const col = dif === 0 ? "#15803d" : (dif < 0 ? "#b91c1c" : "#b45309");
       h += '<tr><td class="stk-cod">' + escapeHtml(s.cod || k) + '</td><td class="num"><b>' + (Math.round(cont[k] * 10) / 10) + '</b></td><td class="num">' + (Math.round(sysv * 10) / 10) + '</td><td class="num" style="color:' + col + ';font-weight:800">' + (dif > 0 ? "+" : "") + dif + '</td><td class="num" style="color:#94a3b8">' + (s.proc > 0 ? Math.round(s.proc * 10) / 10 : "—") + '</td></tr>';
     });
-    h += '</tbody></table>';
+    h += '</tbody></table></div>';
   }
   return h;
 }
