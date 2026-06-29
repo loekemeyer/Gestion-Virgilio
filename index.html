@@ -3726,14 +3726,14 @@ function terminarDia() {
         return `
         <div style="margin:8px 0; padding:8px; border:1px solid #bae6fd; border-radius:6px; background:#fff;">
           <div><b>${escapeHtml(tipo)}</b>${p.valor ? ` <i>${valEsc}</i>` : ""}${p.desc ? ` — ${escapeHtml(p.desc)}` : ""}</div>
-          <div style="margin-top:6px; font-size:14px;">
-            <label style="margin-right:14px;">
-              <input type="radio" name="td_cont_${escapeHtml(tipo)}" value="si" checked
+          <div style="margin-top:6px; font-size:14px; display:flex; flex-wrap:wrap; gap:6px;">
+            <label style="display:inline-flex; align-items:center; gap:8px; min-height:42px; padding:4px 14px 4px 8px; border-radius:8px; cursor:pointer;">
+              <input type="radio" name="td_cont_${escapeHtml(tipo)}" value="si" checked style="width:20px; height:20px; margin:0; flex:0 0 auto;"
                      onchange="var w=document.getElementById('td_closewrap_${escapeHtml(tipo)}'); if(w) w.style.display='none';">
               Continúa mañana
             </label>
-            <label>
-              <input type="radio" name="td_cont_${escapeHtml(tipo)}" value="no"
+            <label style="display:inline-flex; align-items:center; gap:8px; min-height:42px; padding:4px 14px 4px 8px; border-radius:8px; cursor:pointer;">
+              <input type="radio" name="td_cont_${escapeHtml(tipo)}" value="no" style="width:20px; height:20px; margin:0; flex:0 0 auto;"
                      onchange="var w=document.getElementById('td_closewrap_${escapeHtml(tipo)}'); if(w) w.style.display='block';">
               Finalizar ahora
             </label>
