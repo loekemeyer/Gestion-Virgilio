@@ -4,7 +4,7 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-29 · Versión app al documentar: **v4.92**
+> Última actualización: 2026-06-29 · Versión app al documentar: **v4.93** (v4.93: el diálogo "diferente a la mesa" pide **"Levantadas según picking" (fijo) vs "Levantadas real" (input)** y la app calcula la diferencia, en vez de "¿cuántas de diferencia?")
 >
 > Nota: **v4.92** — **"Diferente a la mesa" en el paso Separar (completa el módulo Separar por NP, en main)**. En la vista "Por pedido" hay un cartel naranja **"⚠ Hay un artículo diferente a la mesa"**: el AP/TAP reporta (de a 1 artículo) que algo NO coincide con lo que marcó el picking (EP/TP) — NO es su error, sólo avisa y sigue (no lo frena). Flujo: cartel → elegir el artículo (grilla de la NP) → diálogo **de más / de menos** + **¿cuántas cajas?** + si es de menos **¿hay en góndola?** (sí/no) + **← Volver**. Persiste evento **opcode NPD** (`texto="NP|cod|tipo|gond|qty|sale|tanda"`). **Stock**: sólo "de menos + sin góndola" devuelve `qty` a góndola (`terminado`, `tipo='ajuste'`, ref `picking_difiere`) para no quedar negativo; "de menos + sí" NO descuenta (ya lo hizo el picking); "de más" no toca stock (se vuelve a guardar a mano). **Alerta** server-side `reporte_agentes_picking_difiere()` (`sql/picking_difiere.sql`): Telegram (digest del día, dedup por set de eventos) + tablero Agentes (categoría `picking_difiere`), encadenada al cron jobid 14 (cada 2 h); SECURITY DEFINER con revoke de anon. Funciones cliente `_compDif*`. Verificado headless (pick → diálogo → góndola → resolve sin errores) + parseo del digest en SQL.
 >
