@@ -2145,6 +2145,7 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .falt-table th{ font-size:11px; color:#7f8ea3; text-align:left; font-weight:700; text-transform:uppercase; letter-spacing:.5px; padding:9px 16px; background:#0d1424; }
 .falt-table th.num{ text-align:right; }
 .falt-table td{ font-size:15px; padding:10px 16px; border-top:1px solid #16202f; }
+@media (max-width:460px){ .falt-table th, .falt-table td{ padding-left:9px; padding-right:9px; } }
 .falt-table td.num{ text-align:right; font-variant-numeric:tabular-nums; }
 .falt-table .c-art{ font-weight:700; color:#f1f5f9; }
 .falt-table .c-muted{ color:#8aa0b8; }
@@ -14942,7 +14943,7 @@ function inconsDaySelectorHtml(dayKey) {
 function inconsSevChip(sev) {
   return sev === "alta"
     ? `<span class="inc-chip inc-alta">ALTA</span>`
-    : `<span class="inc-chip inc-media">media</span>`;
+    : `<span class="inc-chip inc-media">MEDIA</span>`;
 }
 
 function renderInconsistencias(rows, dayKey, totalEv) {
