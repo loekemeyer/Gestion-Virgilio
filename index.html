@@ -5303,7 +5303,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v4.98";
+const APP_VERSION = "v4.99";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -8480,13 +8480,14 @@ function stkBodyStocks() {
   h += '<input class="stk-filtro" type="search" placeholder="🔎 Buscar código / descripción" value="' + escapeHtml(_stk.filtro) + '" oninput="if(_stk){_stk.filtro=this.value;stkRender();}">';
   // Columnas FIJAS: todos los sectores (menos insumos, que va en su sección).
   const cols = SECT.filter(function (s) { return s.key !== "insumos"; });
-  const ncol = 2 + cols.length + 1;
-  let th = '<th>Código</th><th>Descripción</th>';
+  const ncol = 3 + cols.length + 1;
+  let th = '<th>Código</th><th>Descripción</th><th class="num" style="background:#eef2ff;color:#1e3a8a;">Total<br>Stock</th>';
   cols.forEach(function (c) { th += '<th class="num">' + c.label.replace(" ", "<br>") + '</th>'; });
   h += '<div class="stk-tblwrap"><table class="stk-tbl stk-tbl-fit"><thead><tr>' + th + '<th></th></tr></thead><tbody>';
   if (!shown.length) h += '<tr><td colspan="' + ncol + '" class="stk-empty">Sin stock todavía.</td></tr>';
   shown.forEach(function (a) {
-    let tds = '<td class="stk-cod">' + escapeHtml(a.cod) + '</td><td class="stk-desc">' + escapeHtml(artNombre(a.cod, a.desc) || "—") + '</td>';
+    const _tot = SECTKEYS.reduce(function (s, k) { return s + (Number(a[k]) || 0); }, 0);
+    let tds = '<td class="stk-cod">' + escapeHtml(a.cod) + '</td><td class="stk-desc">' + escapeHtml(artNombre(a.cod, a.desc) || "—") + '</td><td class="num ' + (_tot < 0 ? "stk-neg" : "") + '" style="background:#f8fafc"><b>' + fmtCajas(_tot) + '</b></td>';
     cols.forEach(function (c) {
       const v = Number(a[c.key]) || 0;
       tds += '<td class="num ' + (v < 0 ? "stk-neg" : "") + '">' + (c.key === "terminado" ? '<b>' + fmtCajas(v) + '</b>' : fmtCajas(v)) + '</td>';
