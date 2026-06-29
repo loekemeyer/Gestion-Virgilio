@@ -5314,7 +5314,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.02";
+const APP_VERSION = "v5.03";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -13220,6 +13220,9 @@ async function pppCountTable(endpoint) {
 /* ===== Editor de Mails autorizados (supervisores) — tabla Supabase
    Supervisores_Virgilio, se mergea sobre los 3 fijos. Escribe con el JWT del
    supervisor (igual que Planimetría). Requiere la tabla + RLS (SQL por chat). v3.01. */
+// v5.03: declarado ACÁ (antes de su 1er uso en openMailsEditor) para evitar un TDZ
+// "_supervisoresRemotos is not defined" si el login lo toca durante la carga (lo cazó el agente).
+let _supervisoresRemotos = null;
 function openMailsEditor() {
   if (!requireSupervisor()) return;
   const ov = document.getElementById("mailsEditorOverlay");
@@ -16593,8 +16596,9 @@ function setAuthStatus(msg, isError) {
 const SUPERVISOR_EMAILS = ["loekemeyer.n8n@gmail.com", "loekemeyer.logistica@gmail.com", "comexloekemeyer@gmail.com"];
 /* Supervisores extra, editables desde la app (tabla Supabase Supervisores_Virgilio).
    Se MERGEAN sobre los 3 fijos de arriba → los fijos siempre son supervisores (no
-   hay forma de quedarse afuera). null = todavía no se cargó. v3.01. */
-let _supervisoresRemotos = null;
+   hay forma de quedarse afuera). null = todavía no se cargó. v3.01.
+   ⚠ La declaración `let _supervisoresRemotos` se movió ARRIBA (antes de openMailsEditor)
+   para evitar un TDZ "not defined" en el login durante la carga. */
 const SUPABASE_SUPERVISORES_ENDPOINT = SUPABASE_URL + "/rest/v1/Supervisores_Virgilio";
 async function loadSupervisoresRemotos() {
   try {
