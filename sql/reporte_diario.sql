@@ -10,7 +10,8 @@
 --      producción del día lo cubrió / sobrepasó / quedó por debajo.
 --    • Días para terminar la PPP al ritmo REAL (m³ armado/día) y si alcanza vs PPP.
 --    • Pedidos con fecha muy lejana (outliers > hoy+21d) — los "viejos" a revisar.
---    • Rendimiento por operario (sólo los que trabajaron ese día): m³ pick/arm + m³/h.
+--    • Rendimiento por operario (sólo los que trabajaron ese día): m³ pick/arm + m³/h,
+--      como TABLA monoespaciada (HTML <pre>) para que las columnas queden alineadas.
 --
 --  Decisiones (confirmadas con el dueño):
 --    • "Cubrir lo proyectado" = contra el RITMO NECESARIO (no contra lo del día solo).
@@ -34,3 +35,8 @@ select cron.schedule('reporte-diario-telegram', '0 21 * * *',
   'select public.reporte_diario_telegram();');
 
 -- Para Lun–Sáb (saltear domingo), sería:  '0 21 * * 1-6'
+
+-- parse_mode: tg_enqueue gana un 4º arg p_parse_mode (default null) y telegram_outbox
+-- una columna parse_mode; tg_outbox_flush la agrega al body sólo si está seteada. Así el
+-- reporte usa HTML (<pre>) sin tocar las demás alertas (que siguen yendo en texto plano).
+-- Escapar SIEMPRE el texto dinámico con _h() cuando se manda con parse_mode=HTML.
