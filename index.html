@@ -3068,6 +3068,17 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
     </div>
   </div>
 
+  <!-- SOLO CONTEO (ej. Giuliana): un único botón para el conteo físico. -->
+  <div id="conteoPanel" class="hidden">
+    <h1 class="sup-title">Conteo de stock</h1>
+    <div class="sup-actions sup-primary" style="grid-template-columns:1fr;max-width:340px;margin-left:auto;margin-right:auto;">
+      <button class="sup-action-btn" onclick="openStockAdmin(true)"><span class="sup-ico">📋</span><span>Hacer conteo</span></button>
+    </div>
+    <div class="auth-logout-row">
+      <button class="auth-logout-btn" onclick="signOutGoogle()">Salir</button>
+    </div>
+  </div>
+
   <!-- SUPERVISOR (solo n8n / logistica): botones grandes centrados. -->
   <div id="supervisorPanel" class="hidden">
     <h1 class="sup-title">Administración</h1>
@@ -5303,7 +5314,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.00";
+const APP_VERSION = "v5.01";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -7465,7 +7476,8 @@ async function loadArtNombres() {
   _artNombres = m; return m;
 }
 function artNombre(cod, fb) { const n = _artNombres && _artNombres[_ocgNorm(cod)]; return n || fb || ""; }
-async function openStockAdmin() {
+async function openStockAdmin(soloConteo) {
+  const _solo = soloConteo === true;   // rol "solo conteo" (Giuliana): solo la solapa Conteo
   if (!document.getElementById("stkCss")) {
     const s = document.createElement("style"); s.id = "stkCss";
     s.textContent = "#stockAdminOverlay{display:none;position:fixed;inset:0;z-index:1280;background:rgba(2,6,23,.74);overflow:auto;padding:14px;}#stockAdminOverlay.show{display:block;}.stk-card{background:#f8fafc;max-width:880px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.stk-head{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:linear-gradient(90deg,#1e6bd6,#1e3a8a);color:#fff;}.stk-title{font-size:19px;font-weight:800;}.stk-close{background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;width:auto;}.stk-body{padding:14px 16px;}.stk-loading,.stk-empty{padding:24px;text-align:center;color:#64748b;}.stk-cut{background:#fffbeb;border:1px solid #fcd34d;color:#92400e;border-radius:9px;padding:8px 11px;font-size:12.5px;font-weight:700;margin-bottom:10px;}.stk-tools{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;}.stk-filtro{flex:1;min-width:180px;height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 11px;font-size:14px;}.stk-btn{background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:8px 12px;font-size:13px;font-weight:800;cursor:pointer;width:auto;}.stk-btn.ok{background:#16a34a;color:#fff;border-color:#16a34a;}.stk-btn.danger{background:#fff;color:#b91c1c;border-color:#fca5a5;}.stk-tbl{width:100%;border-collapse:collapse;font-size:13.5px;}.stk-tbl.stk-tbl-fit{width:auto;max-width:100%;}.stk-tbl.stk-tbl-fit td.stk-desc{max-width:210px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.stk-tbl.stk-tbl-sect td.stk-desc{max-width:140px;}.stk-tbl.stk-tbl-fit th.num,.stk-tbl.stk-tbl-fit td.num{text-align:right;padding-left:9px;padding-right:9px;}.stk-tblwrap{overflow-x:auto;max-width:100%;}.stk-tbl.stk-tbl-fit th.num{vertical-align:bottom;line-height:1.15;}.stk-tbl th{background:#f1f5f9;color:#475569;text-align:left;padding:7px 9px;font-size:11px;text-transform:uppercase;border-bottom:1px solid #cbd5e1;}.stk-tbl td{padding:7px 9px;}.stk-tbl th.num,.stk-tbl td.num{text-align:right;font-variant-numeric:tabular-nums;}.stk-row{cursor:pointer;border-bottom:1px solid #eef2f7;}.stk-row:hover{background:#eff6ff;}.stk-row td{padding:7px 9px;}.stk-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#1e6bd6;}.stk-desc{color:#475569;}.stk-neg{color:#b91c1c;font-weight:800;}.stk-caret{color:#94a3b8;}.stk-detrow td{padding:0 9px 9px;background:#f8fafc;}.stk-det{border-left:3px solid #cbd5e1;padding:6px 0 6px 10px;}.stk-mv{display:flex;gap:9px;font-size:12px;padding:3px 0;align-items:center;}.stk-mv-old{opacity:.45;}.stk-mv-ts{color:#64748b;min-width:96px;}.stk-mv-tipo{font-weight:800;min-width:78px;}.stk-mv-dep{color:#64748b;min-width:74px;}.stk-mv-d{font-weight:800;min-width:44px;text-align:right;}.stk-mv-d.pos{color:#15803d;}.stk-mv-d.neg{color:#b91c1c;}.stk-mv-ref{color:#94a3b8;}.stk-mv-more{font-size:11px;color:#94a3b8;padding-top:4px;}.stk-inicial{max-width:560px;}.stk-ini-h{font-size:16px;font-weight:800;margin-bottom:6px;}.stk-ini-hint{font-size:12.5px;color:#64748b;margin-bottom:8px;}.stk-ini-txt{width:100%;border:1px solid #cbd5e1;border-radius:9px;padding:9px;font-family:Consolas,Menlo,monospace;font-size:14px;}.stk-ini-btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}.stk-ini-warn{font-size:12px;color:#92400e;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:8px;margin-top:10px;}.stk-tabs{display:flex;gap:4px;padding:8px 12px 0;background:#1e3a8a;overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch;}.stk-tab{flex:1 0 auto;white-space:nowrap;background:rgba(255,255,255,.12);color:#cbd5e1;border:none;border-radius:9px 9px 0 0;padding:9px 13px;font-size:12.5px;font-weight:800;cursor:pointer;}.stk-tab.on{background:#f8fafc;color:#1e3a8a;}.stk-seg{display:flex;gap:6px;margin-bottom:10px;}.stk-segb{flex:1;background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:7px;font-size:13px;font-weight:800;cursor:pointer;}.stk-segb.on{background:#1e6bd6;color:#fff;border-color:#1e6bd6;}.stk-grp{margin-bottom:10px;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;}.stk-grp-h{background:#f1f5f9;padding:7px 10px;font-weight:800;font-size:13px;}.stk-grp-tot{color:#15803d;font-weight:800;margin-left:6px;}.stk-ing{display:flex;gap:9px;align-items:center;padding:5px 10px;border-top:1px solid #f1f5f9;font-size:12.5px;}.stk-ing-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#1e6bd6;}.stk-ing-desc{flex:1;color:#475569;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.stk-ing-rto{color:#94a3b8;font-size:11px;}.stk-aj-sec{border:1px solid #e2e8f0;border-radius:12px;padding:12px;margin-bottom:12px;}.stk-aj-h{font-size:15px;font-weight:800;margin-bottom:6px;}.stk-aj-hint{font-size:12px;color:#64748b;margin-bottom:7px;}.stk-aj-form{display:flex;gap:7px;flex-wrap:wrap;}.stk-aj-inp{flex:1;min-width:90px;height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 10px;font-size:14px;text-align:center;}.cnt-in{height:32px;border:1px solid #cbd5e1;border-radius:7px;padding:0 6px;font-size:13px;box-sizing:border-box;margin:0;width:auto;}.stk-aj-dep{margin-bottom:12px;font-size:13px;font-weight:800;}.stk-aj-dep select{height:36px;border:1px solid #cbd5e1;border-radius:8px;padding:0 8px;font-size:14px;font-weight:700;}.stk-rk-orden{background:#f1f5f9;border-radius:10px;padding:10px 12px;font-size:13px;margin-bottom:10px;}.stk-rk-orden.pend{background:#fffbeb;border:1.5px solid #fcd34d;color:#92400e;}.stk-rk-baj{display:flex;align-items:center;gap:10px;border:1px solid #e2e8f0;border-radius:11px;padding:9px 11px;margin-bottom:8px;background:#fff;}.stk-rk-baji{flex:1;min-width:0;}.stk-rk-q{font-size:12px;color:#1e6bd6;font-weight:700;margin-top:2px;}";
@@ -7474,10 +7486,10 @@ async function openStockAdmin() {
   let ov = document.getElementById("stockAdminOverlay");
   if (!ov) { ov = document.createElement("div"); ov.id = "stockAdminOverlay"; document.body.appendChild(ov); }
   ov.classList.add("show");
-  ov.innerHTML = '<div class="stk-card"><div class="stk-head"><span class="stk-title">📦 Stock y Compras</span><button class="stk-close" onclick="closeStockAdmin()">Cerrar</button></div><div class="stk-tabs" id="stkTabs"></div><div class="stk-body" id="stkBody"><div class="stk-loading">Cargando…</div></div></div>';
+  ov.innerHTML = '<div class="stk-card"><div class="stk-head"><span class="stk-title">' + (_solo ? "📋 Conteo de stock" : "📦 Stock y Compras") + '</span><button class="stk-close" onclick="closeStockAdmin()">Cerrar</button></div><div class="stk-tabs" id="stkTabs"></div><div class="stk-body" id="stkBody"><div class="stk-loading">Cargando…</div></div></div>';
   try {
     const res = await Promise.all([stockFetchMovs(), stockGetCutoff(), stockFetchArtFactors(), racksFetchOrdenes(), racksFetchBajadas(), loadArtNombres()]);
-    _stk = { movs: res[0] || [], cutoff: res[1], factors: res[2] || {}, ordenes: res[3] || [], bajadas: res[4] || [], tab: "stocks", filtro: "", openArt: null, ingMode: "remito" };
+    _stk = { movs: res[0] || [], cutoff: res[1], factors: res[2] || {}, ordenes: res[3] || [], bajadas: res[4] || [], tab: _solo ? "conteo" : "stocks", soloConteo: _solo, filtro: "", openArt: null, ingMode: "remito" };
     stkRender();
   } catch (e) { const b = document.getElementById("stkBody"); if (b) b.innerHTML = '<div class="stk-loading">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
 }
@@ -7841,6 +7853,11 @@ async function ociSave() {
 function stkTab(t) { if (!_stk) return; if (t === "compras") { openOCAdmin(); return; } _stk.tab = t; _stk.filtro = ""; _stk.openArt = null; if (t === "capacidad" && !_stk.capLoaded) { stkCapLoad(); return; } stkRender(); }
 function stkRender() {
   if (!_stk) return;
+  if (_stk.soloConteo) {   // rol "solo conteo": sin solapas, directo al conteo físico
+    const tb0 = document.getElementById("stkTabs"); if (tb0) tb0.innerHTML = "";
+    const body0 = document.getElementById("stkBody"); if (body0) _renderKeepFocus(body0, stkBodyConteo());
+    return;
+  }
   const tabs = [["stocks", "📊 Stocks"], ["proceso", "📦 A Separar"], ["racks", "🏗 Racks"], ["conteo", "📋 Conteo"], ["capacidad", "📐 Capacidad"], ["ajustes", "⚙ Ajustes"], ["compras", "📑 Compras (OCs)"]];
   const tb = document.getElementById("stkTabs");
   if (tb) tb.innerHTML = tabs.map(function (t) { return '<button class="stk-tab' + (_stk.tab === t[0] ? " on" : "") + '" onclick="stkTab(\'' + t[0] + '\')">' + t[1] + '</button>'; }).join("");
@@ -16582,6 +16599,12 @@ function isSupervisorEmail(email) {
   if (SUPERVISOR_EMAILS.indexOf(e) !== -1) return true;
   return !!(_supervisoresRemotos && _supervisoresRemotos.has(e));
 }
+/* Rol "solo conteo": cuentas que SOLO hacen el conteo físico (ej. Giuliana). No son
+   supervisores ni operarios — aterrizan en una pantalla con un único botón. */
+const CONTEO_EMAILS = ["delavegagiulianab@gmail.com"];
+function isConteoEmail(email) {
+  return CONTEO_EMAILS.indexOf((email || "").toLowerCase().trim()) !== -1;
+}
 
 /* email -> {legajo, nombre} vía tabla Empleados (anon SELECT permitido por RLS). */
 async function resolveEmpleadoByEmail(email) {
@@ -16658,6 +16681,7 @@ function showLoggedOut() {
   $("authBlock").classList.remove("hidden");
   $("legajoEntry").classList.add("hidden");
   $("supervisorPanel").classList.add("hidden");
+  $("conteoPanel").classList.add("hidden");
   $("plantSelector").classList.add("hidden");
   $("btnHistDias").classList.add("hidden");   // 📅 no aplica en el login (sin operario)
   _setCambiarPlanta(false);
@@ -16677,6 +16701,7 @@ function showSelector() {
   $("authBlock").classList.add("hidden");
   $("legajoEntry").classList.add("hidden");
   $("supervisorPanel").classList.add("hidden");
+  $("conteoPanel").classList.add("hidden");
   $("plantSelector").classList.remove("hidden");
   $("btnHistDias").classList.add("hidden");   // 📅 no aplica en el selector
   _setCambiarPlanta(false);
@@ -16724,10 +16749,27 @@ function showOperario(emp) {
   } catch (_e) {}
 }
 
+/* Pantalla "solo conteo" (ej. Giuliana): un único botón que abre el conteo físico
+   (Stock admin en modo solo-conteo, sin el resto del admin). */
+function showConteo(email) {
+  window.__isSupervisor = false;
+  $("authBlock").classList.add("hidden");
+  $("legajoEntry").classList.add("hidden");
+  $("supervisorPanel").classList.add("hidden");
+  $("plantSelector").classList.add("hidden");
+  $("conteoPanel").classList.remove("hidden");
+  _setCambiarPlanta(false);
+  setHistorySpace(false);
+  setUserTag(email);
+  setLegajoTitle(null);
+}
+
 /* Renderiza la pantalla de la planta Virgilio según la identidad resuelta. */
 function _renderIdentity() {
   if (!__identity) { showLoggedOut(); return; }
+  const _cp = $("conteoPanel"); if (_cp) _cp.classList.add("hidden");
   if (__identity.type === "supervisor") showSupervisor(__identity.email);
+  else if (__identity.type === "conteo") showConteo(__identity.email);
   else showOperario(__identity.emp);
 }
 /* Tras autenticar: si es modo monitor (TV/supervisor con ?monitor=) o ya se
@@ -16743,6 +16785,12 @@ async function showLoggedIn(user) {
   // 1) Supervisor por email (no requiere estar en Empleados).
   if (isSupervisorEmail(email)) {
     __identity = { type: "supervisor", email: email, nombre: email };
+    _routeAfterAuth();
+    return;
+  }
+  // 1b) Rol "solo conteo" por email (no requiere estar en Empleados).
+  if (isConteoEmail(email)) {
+    __identity = { type: "conteo", email: email, nombre: email };
     _routeAfterAuth();
     return;
   }

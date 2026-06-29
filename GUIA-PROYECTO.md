@@ -4,7 +4,7 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-29 · Versión app al documentar: **v4.99**
+> Última actualización: 2026-06-29 · Versión app al documentar: **v5.01**
 >
 > Nota: **v4.99 + server-side** — (1) **Columna "Total Stock"** en Stock y Compras → solapa Stocks: suma por código de todos los depósitos (Góndola+Excedente+Pickeados+A facturar+A guardar+Racks), destacada después de Descripción (`stkBodyStocks`). (2) **Zona automática en la PPP** (`sql/autozona.sql`, server-side, NO toca la app): el Excel ya **no carga la zona** — Supabase la deriva del **barrio** vía trigger `trg_ppp_autozona` en `PPP_Programacion_Diaria` (completa `zona` cuando llega vacía, no pisa una cargada). Mapeo en tabla **`Zonas_Barrios`** (barrio_norm→zona, 33 barrios del histórico, 0 ambiguos). Normalización `_norm_barrio()` = minúsculas + **sin tildes** (translate áéíóúü→aeiouu) + espacios. Barrio nuevo no mapeado → sin zona → salta la alerta `ppp_sin_zona` → se agrega 1 vez a `Zonas_Barrios`. (3) **Carga manual de stock**: se cargó "a guardar" (16 códigos, 2661 cajas, ref `carga manual a guardar 29/06`) y se descontó góndola por esas cantidades (ref `descuento gondola…`); los que sobraban de antes (121/550) se pusieron en 0 con ajuste (sin borrar historial).
 >
@@ -528,6 +528,17 @@
 > ahora inicializa `separar_pedidos` y `a_facturar`; el dropdown de *⚙ Ajustes* y la solapa *Salidas* (solo la
 > baja de góndola del picking) contemplan los nuevos depósitos. Validado con Playwright. ⚠ El stock disponible
 > para OCs sigue siendo `terminado + racks` (NO cuenta estos intermedios: son cajas comprometidas a pedidos).
+>
+> Nota: **v5.01** — **Rol "solo conteo"** (`CONTEO_EMAILS`, ej. Giuliana
+> `delavegagiulianab@gmail.com`): al loguear con Google aterriza en `#conteoPanel` (un único
+> botón "Hacer conteo") → `openStockAdmin(true)` abre el admin de Stock en modo **solo conteo**
+> (`_stk.soloConteo`: sin solapas, directo a `stkBodyConteo`). No es supervisor ni operario (no
+> necesita estar en Empleados); `cntGuardar` no requiere supervisor. **v5.00** — detalle por sector
+> de Stocks (`stkBodySectDetail`) reordenado a **Código · Cajas · Descripción · Sector** (entra en
+> el celu sin recortar). **Excedente cargado** (conteo 29/06: 48 líneas / 1664 cajas, posiciones
+> **P1–P30** en `ubicacion`, `ref='conteo excedente 29/06'`): el picking lo levanta primero solo
+> (v4.26 `pkFetchExcedente` lee `deposito=excedente` con su ubicación). ⚠ Códigos con doble
+> identidad (099↔99, 124↔124E): se cargó el de la **góndola** para que el Total sume bien.
 >
 > Nota: **v4.99 (server-side)** — **Pipeline de stock también del lado del SERVER**
 > (`reconciliar_pipeline_stock()` + cron jobid 22 `*/10 * * * *`; ver
