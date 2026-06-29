@@ -36,6 +36,16 @@ select cron.schedule('reporte-diario-telegram', '0 21 * * *',
 
 -- Para Lun–Sáb (saltear domingo), sería:  '0 21 * * 1-6'
 
+-- ⚠ SEGURIDAD: tanto reporte_diario_telegram como el helper central tg_enqueue son
+-- SECURITY DEFINER y mandan Telegram. NO deben ser ejecutables por la anon key
+-- (pública, hardcodeada en index.html/sw.js) — si no, cualquiera con esa key podría
+-- inyectar mensajes al grupo o forzar reportes. Los crons corren como postgres
+-- (conserva EXECUTE). Migración lock_down_telegram_report_functions (v4.82):
+revoke execute on function public.reporte_diario_telegram(date, boolean) from public, anon, authenticated;
+revoke execute on function public.tg_enqueue(text, text, text, text)     from public, anon, authenticated;
+grant  execute on function public.reporte_diario_telegram(date, boolean) to service_role;
+grant  execute on function public.tg_enqueue(text, text, text, text)     to service_role;
+
 -- parse_mode: tg_enqueue gana un 4º arg p_parse_mode (default null) y telegram_outbox
 -- una columna parse_mode; tg_outbox_flush la agrega al body sólo si está seteada. Así el
 -- reporte usa HTML (<pre>) sin tocar las demás alertas (que siguen yendo en texto plano).

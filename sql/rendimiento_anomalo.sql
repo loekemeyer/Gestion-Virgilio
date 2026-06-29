@@ -84,3 +84,10 @@ begin
   end loop;
 exception when others then null;   -- best-effort: nunca romper el resto del reporte
 end $fn$;
+
+-- ⚠ SEGURIDAD: esta función es SECURITY DEFINER y manda Telegram. NO debe ser
+-- ejecutable por la anon key (pública). El cron (jobid 14) corre como postgres, que
+-- conserva EXECUTE. Revocamos de public/anon/authenticated. (Migración
+-- lock_down_telegram_report_functions, v4.82.)
+revoke execute on function public.reporte_agentes_rendimiento_anomalo() from public, anon, authenticated;
+grant  execute on function public.reporte_agentes_rendimiento_anomalo() to service_role;

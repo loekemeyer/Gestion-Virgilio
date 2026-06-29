@@ -14,3 +14,9 @@
 
 select cron.schedule('reporte-semanal-telegram', '0 11 * * 1',
   'select public.reporte_semanal_telegram();');
+
+-- ⚠ SEGURIDAD: SECURITY DEFINER + manda Telegram → NO ejecutable por la anon key
+-- (pública, en index.html/sw.js). El cron corre como postgres (conserva EXECUTE).
+-- Migración lock_down_telegram_report_functions (v4.82):
+revoke execute on function public.reporte_semanal_telegram(date, boolean) from public, anon, authenticated;
+grant  execute on function public.reporte_semanal_telegram(date, boolean) to service_role;
