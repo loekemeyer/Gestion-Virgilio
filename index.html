@@ -2328,6 +2328,27 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .csep-cell{ font-weight:800; color:#1e6bd6; cursor:pointer; }
 .csep-cell.done{ background:#16a34a; color:#fff; }
 .csep-z{ color:#cbd5e1; font-weight:700; }
+.csep-dif{ display:block; width:100%; margin-top:9px; padding:11px; border:1.5px solid #f59e0b; border-radius:12px; background:#fff7ed; color:#b45309; font-size:13.5px; font-weight:800; cursor:pointer; }
+.csep-difbnr{ background:#fff7ed; border:1.5px solid #fdba74; border-radius:11px; padding:10px; text-align:center; font-size:14px; font-weight:800; color:#b45309; margin-bottom:10px; }
+.csep-difbnr small{ display:block; font-size:11px; font-weight:700; color:#ea9a52; margin-top:2px; }
+.csep-pickc{ border-color:#fde68a; }
+.csep-cancel{ display:block; width:100%; margin-top:11px; padding:12px; border:1.5px solid #cbd5e1; border-radius:12px; background:#fff; color:#475569; font-size:14px; font-weight:800; cursor:pointer; }
+.csep-back{ width:auto; background:#f1f5f9; color:#334155; border:none; border-radius:9px; padding:8px 13px; font-size:12.5px; font-weight:800; cursor:pointer; margin-bottom:10px; }
+.csep-difh{ font-size:17px; font-weight:800; color:#b45309; text-align:center; margin-bottom:3px; }
+.csep-difsub{ font-size:11.5px; font-weight:700; color:#94a3b8; text-align:center; margin-bottom:12px; }
+.csep-difcod{ background:#fff7ed; border:1.5px solid #fdba74; border-radius:12px; padding:11px; text-align:center; font-size:14px; color:#7c2d12; font-weight:700; margin-bottom:13px; }
+.csep-difq{ font-size:13.5px; font-weight:800; color:#0f172a; margin:0 0 8px; }
+.csep-difrow{ display:flex; gap:10px; margin-bottom:13px; }
+.csep-difopt{ flex:1; border:2px solid #e2e8f0; border-radius:12px; padding:12px 6px; text-align:center; font-size:13px; font-weight:800; color:#475569; background:#fff; line-height:1.3; cursor:pointer; }
+.csep-difopt.on{ border-color:#f59e0b; background:#fffbeb; color:#b45309; }
+.csep-difopt small{ font-size:10.5px; font-weight:700; opacity:.85; }
+.csep-difqty{ width:100%; height:46px; border:1.5px solid #cbd5e1; border-radius:11px; padding:0 13px; font-size:18px; font-weight:800; text-align:center; box-sizing:border-box; margin-bottom:13px; }
+.csep-difres{ display:block; width:100%; padding:14px; border:none; border-radius:12px; background:#16a34a; color:#fff; font-size:15px; font-weight:800; cursor:pointer; }
+.csep-difgond{ flex:1; border:none; border-radius:12px; padding:14px 6px; text-align:center; font-size:14px; font-weight:800; color:#fff; line-height:1.25; cursor:pointer; }
+.csep-difgond.yes{ background:#16a34a; }
+.csep-difgond.no{ background:#ef4444; }
+.csep-difnote{ font-size:11.5px; color:#64748b; text-align:center; margin-top:13px; line-height:1.5; }
+.csep-difnote2{ font-size:12px; color:#64748b; margin-bottom:10px; }
 .comp-art{ border:1px solid #e2e8f0; border-radius:12px; padding:11px 12px; margin-bottom:12px; transition:.12s; }
 .comp-art.ok{ border-color:#86efac; background:#f0fdf4; }
 .comp-art.defined{ border-color:#e2e8f0; background:#f1f5f9; }
@@ -5271,7 +5292,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v4.91";
+const APP_VERSION = "v4.92";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -7107,6 +7128,7 @@ function _compRenderSep() {
   if (!_comp.nps[0] || !_comp.nps[0].codes || _comp._liosDirty) { _compBuildLiosData(); _comp._liosDirty = false; }
   const live = _compSepLiveNps();
   if (!live.length) { el.innerHTML = '<div class="comp-step-t">Separar por NP</div><div class="cmpl-empty">No hay nada para separar (todo faltó) 👍 Pasá a Líos con la flecha →.</div>'; return; }
+  if (_comp.sepDif && _comp.sepDif.mode) { el.innerHTML = _compDifHtml(); return; }
   const mm = _compSepMesa(), view = (_comp.sepView === "picking") ? "picking" : "pedido";
   let h = '<div class="csep-hd"><div class="csep-mesa">📦 <b>' + mm.mesa + '</b> en mesa</div>' +
     '<div class="csep-sw"><span class="csep-swl' + (view === "picking" ? " on" : "") + '">Modo<br>picking</span>' +
@@ -7136,7 +7158,8 @@ function _compSepPedido() {
   const sepN = codes.filter(function (c) { return c.sep; }).length;
   const np = '<div class="csep-np">NP ' + escapeHtml(n.np) + ' <small>· ' + escapeHtml(n.rs || "") + '</small></div>';
   const armar = '<button class="csep-armar" onclick="_compSepArmar()">🔨 Armar líos con lo separado <span class="csep-n">' + sepN + '</span></button>';
-  return chips + np + grid + armar;
+  const dif = '<button class="csep-dif" onclick="_compDifStart()">⚠ Hay un artículo diferente a la mesa</button>';
+  return chips + np + grid + armar + dif;
 }
 function _compSepMatrix() {
   const nps = _compSepLiveNps(), codSet = {}, codOrder = [];
@@ -7155,6 +7178,67 @@ function _compSepMatrix() {
   }).join("");
   return '<div class="csep-mxwrap"><table class="csep-mx"><thead>' + head + '</thead><tbody>' + body + '</tbody></table></div>' +
     '<button class="csep-armar" onclick="_compSepArmar()">🔨 Armar líos con lo separado →</button>';
+}
+/* "Diferente a la mesa" (v4.92): el AP/TAP reporta que un artículo NO coincide
+   con lo que marcó el picking (EP/TP). No es su responsabilidad, sólo avisa y
+   sigue (no lo frena). De a 1 artículo. Persiste evento NPD + alerta server-side
+   (reporte_agentes_picking_difiere) + regla de stock (sólo "de menos + sin
+   góndola" devuelve a góndola para no quedar negativo). */
+function _compDifStart() { if (_comp) { _comp.sepDif = { mode: "pick", npIdx: (_comp.sepNpIdx == null ? 0 : _comp.sepNpIdx) }; _compRenderSep(); } }
+function _compDifPick(ci) { if (_comp && _comp.sepDif) { _comp.sepDif.ci = ci; _comp.sepDif.mode = "dialog"; _comp.sepDif.tipo = null; _compRenderSep(); } }
+function _compDifTipo(t) { if (_comp && _comp.sepDif) { _comp.sepDif.tipo = t; _compRenderSep(); } }
+function _compDifBack() { if (!_comp || !_comp.sepDif) return; if (_comp.sepDif.mode === "dialog") { _comp.sepDif.mode = "pick"; _comp.sepDif.tipo = null; } else { _comp.sepDif = null; } _compRenderSep(); }
+function _compDifResolve(tipo, gond) {
+  if (!_comp || !_comp.sepDif) return;
+  const d = _comp.sepDif, n = _comp.nps[d.npIdx], c = n.codes[d.ci];
+  if (!c) { _comp.sepDif = null; _compRenderSep(); return; }
+  let qty = 1; try { const qi = document.getElementById("csep-difqty"); qty = Math.max(1, parseInt(qi && qi.value, 10) || 1); } catch (_e) {}
+  if (qty > c.sale) qty = c.sale;
+  try {
+    const payload = { id: (Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 8)), legajo: _comp.legajo, opcion: "NPD", descripcion: "Picking difiere de mesa",
+      texto: n.np + "|" + c.cod + "|" + tipo + "|" + (gond || "-") + "|" + qty + "|" + c.sale + "|" + _comp.tanda, ts: Date.now(), ts_inicio_iso: null };
+    if (typeof enqueueReport === "function") enqueueReport(payload);
+    if (typeof trySendOneReport === "function") { try { trySendOneReport(payload); } catch (_e) {} }
+  } catch (_e) {}
+  // Stock: SÓLO "de menos + no hay en góndola" → devolver a góndola (ajuste +) para no quedar negativo
+  // (el EP/TP marcó como bajado algo que no estaba). "Sí, agarro de góndola" NO descuenta (ya lo descontó el picking).
+  // "De más" (sobra): en stock nada (se vuelve a guardar a mano).
+  try { if (tipo === "menos" && gond === "no" && typeof stockMove === "function") stockMove([{ cod_art: c.cod, descripcion: "", deposito: "terminado", delta: qty, tipo: "ajuste", ref: "picking_difiere", legajo: _comp.legajo }]); } catch (_e) {}
+  _comp.sepDif = null; _compRenderSep();
+  try { alert("✓ Avisado al picking · " + c.cod + " (" + (tipo === "mas" ? "de más" : "de menos") + " " + qty + "). Seguí armando."); } catch (_e) {}
+}
+function _compDifHtml() {
+  const d = _comp.sepDif, n = _comp.nps[d.npIdx];
+  if (d.mode === "pick") {
+    const codes = (n.codes || []).filter(function (c) { return c.sale > 0; });
+    const rows = Math.max(3, Math.ceil(codes.length / 3));
+    const grid = '<div class="csep-grid" style="grid-template-rows:repeat(' + rows + ',minmax(74px,1fr))">' + codes.map(function (c) {
+      const ci = n.codes.indexOf(c);
+      return '<button class="csep-card csep-pickc' + (c.sep ? " done" : "") + '" onclick="_compDifPick(' + ci + ')"><div class="csep-c">' + escapeHtml(c.cod) + '</div><div class="csep-q">' + c.sale + ' cajas</div></button>';
+    }).join("") + '</div>';
+    return '<div class="csep-difbnr">👆 Tocá el artículo diferente a la mesa<small>de a uno por vez · NP ' + escapeHtml(n.np) + '</small></div>' + grid + '<button class="csep-cancel" onclick="_compDifBack()">✕ Cancelar</button>';
+  }
+  const c = n.codes[d.ci]; if (!c) return '<button class="csep-cancel" onclick="_compDifBack()">✕ Cerrar</button>';
+  let h = '<button class="csep-back" onclick="_compDifBack()">← Volver</button>';
+  h += '<div class="csep-difh">⚠ Artículo diferente a la mesa</div>';
+  h += '<div class="csep-difsub">No es tu error — lo bajó el picking. Vos solo avisás.</div>';
+  h += '<div class="csep-difcod">Código <b>' + escapeHtml(c.cod) + '</b> · el picking marcó <b>' + c.sale + ' cajas</b></div>';
+  h += '<div class="csep-difq">¿Qué hay en la mesa?</div>';
+  h += '<div class="csep-difrow">' +
+    '<button class="csep-difopt' + (d.tipo === "mas" ? " on" : "") + '" onclick="_compDifTipo(\'mas\')">▲ Hay de más<br><small>bajó de más</small></button>' +
+    '<button class="csep-difopt' + (d.tipo === "menos" ? " on" : "") + '" onclick="_compDifTipo(\'menos\')">▼ Hay de menos<br><small>bajó de menos</small></button></div>';
+  if (d.tipo === "mas" || d.tipo === "menos") {
+    h += '<div class="csep-difq">¿Cuántas cajas de diferencia?</div><input id="csep-difqty" class="csep-difqty" type="number" min="1" max="' + c.sale + '" inputmode="numeric" value="1">';
+  }
+  if (d.tipo === "mas") {
+    h += '<div class="csep-difnote2">Las que sobran: volvé a guardarlas (en stock no cambia nada).</div>';
+    h += '<button class="csep-difres" onclick="_compDifResolve(\'mas\',null)">✅ Avisar al picking</button>';
+  } else if (d.tipo === "menos") {
+    h += '<div class="csep-difq">¿Hay en góndola para completar?</div>';
+    h += '<div class="csep-difrow"><button class="csep-difgond yes" onclick="_compDifResolve(\'menos\',\'si\')">✅ Sí, agarro<br>de góndola</button><button class="csep-difgond no" onclick="_compDifResolve(\'menos\',\'no\')">🚫 No hay<br>en góndola</button></div>';
+  }
+  h += '<div class="csep-difnote">Se avisa al picking por Telegram + Agentes. Seguí armando, no te frena.</div>';
+  return h;
 }
 function _compRenderFalt() {
   const el = document.getElementById("compStep1"); if (!el || !_comp) return;
@@ -7793,6 +7877,7 @@ function agtRender() {
     { key: "rendimiento_anomalo", icon: "📊", titulo: "Rendimiento anómalo (muy bajo/alto)", hint: "Operario con m³/h muy fuera de lo normal de su rol (últimas 4 sem). Muy bajo = revisar/ayudar; muy alto = ¿dato roto o súper jornada? También avisa por Telegram (1 vez/semana)." },
     { key: "zona_lista", icon: "🚚", titulo: "Zona lista para programar (≥1 m³)", hint: "Ya se juntó 1 m³ o más de pedidos SIN fecha para esa zona → conviene programar el reparto. Avisa también por Telegram (1 vez/semana)." },
     { key: "ppp_sin_zona", icon: "🗺️", titulo: "Pedidos sin zona en la PPP", hint: "Llegaron pedidos a la Programación Diaria SIN zona cargada — no se pueden rutear ni asignar camión hasta que tengan zona. Avisa también por Telegram. Cargá la zona en la PPP." },
+    { key: "picking_difiere", icon: "📦⚠", titulo: "Picking no coincide con la mesa", hint: "El AP/TAP encontró que un artículo NO coincide con lo que marcó el picking (de más / de menos). No es error del armador. Avisa también por Telegram. Revisá con quien hizo el picking." },
     { key: "faltante", icon: "🚚", titulo: "Faltantes en picking (7 días)", hint: "Códigos que faltaron al pickear. Si se repite, revisá stock / inicial." },
     { key: "faltante_articulo", icon: "🔁", titulo: "Artículos que más faltan (30 días)", hint: "Códigos que faltan seguido al pickear (cajas acumuladas). Reforzá su stock / revisá la compra." },
     { key: "sin_planimetria", icon: "🗺", titulo: "Códigos sin lugar en planimetría", hint: "Llegaron / se pickearon códigos sin sector. Agregalos a la hoja Picking del Excel." },
