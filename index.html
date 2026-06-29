@@ -5179,7 +5179,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v4.73";
+const APP_VERSION = "v4.74";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -7886,7 +7886,7 @@ function prodRender() {
     if (!rows.length) return p + '<div class="prod-det-empty">Sin detalle para mostrar.</div></div>';
     if (key === "productivo") {
       rows.slice().sort(function (a, b) { return b.ms - a.ms; }).forEach(function (r) {
-        p += '<div class="prod-det-r"><span>' + (r.role === "arm" ? "🔧" : "🛒") + ' ' + escapeHtml(r.tanda) + '</span><span>' + (r.m3 > 0 ? (Math.round(r.m3 * 100) / 100) + ' m³ · ' : '') + fmtMin(r.ms) + '</span></div>';
+        p += '<div class="prod-det-r"><span>' + (r.role === "arm" ? "Arm" : "Pick") + ' ' + escapeHtml(r.tanda) + '</span><span>' + (r.m3 > 0 ? (Math.round(r.m3 * 100) / 100) + ' m³ · ' : '') + fmtMin(r.ms) + '</span></div>';
       });
     } else if (key === "ocio") {
       rows.slice().sort(function (a, b) { return a.ts - b.ts; }).forEach(function (r) {
@@ -7917,7 +7917,7 @@ function prodRender() {
     '<div><b>' + (Math.round(teamM3 * 10) / 10) + '</b><span>m³ movidos</span></div>' +
     '<div><b>' + teamArm + '</b><span>tandas armadas</span></div>' +
     '<div><b>' + teamPick + '</b><span>tandas pickeadas</span></div></div>';
-  h += '<div class="prod-team2">Ritmo del equipo · 🔧 Armado <b>' + showVal(teamArmR) + '</b> · 🛒 Picking <b>' + showVal(teamPickR) + '</b> ' + unit + '</div>';
+  h += '<div class="prod-team2">Ritmo del equipo · Armado <b>' + showVal(teamArmR) + '</b> · Picking <b>' + showVal(teamPickR) + '</b> ' + unit + '</div>';
   if (bestArm || bestPick) {
     const bits = [];
     if (bestArm) bits.push('Mejor armando: <b>' + escapeHtml(nameOf(bestArm.leg)) + '</b> (' + showVal(bestArm.armM3h) + ')');
@@ -7926,7 +7926,7 @@ function prodRender() {
   }
   h += '</div>';
 
-  h += '<div class="prod-note">Cada operario muestra sus <b>dos ritmos por separado</b>: 🔧 armado y 🛒 picking (m³/h; no se comparan entre sí). El "envase" de cada tanda (de que abre hasta que cierra) cuenta como esa tarea: los <b>huecos adentro son trabajo</b>, no ocio. <b>Ocio</b> = jornada con nada abierto. Las tandas que <b>cruzan el borde</b> del período no se miden (se muestran aparte). m³ de Entregados + Programación (~96%); menos de ' + POCO + ' tandas → “pocos datos”.</div>';
+  h += '<div class="prod-note">Cada operario muestra sus <b>dos ritmos por separado</b>: armado y picking (m³/h; no se comparan entre sí). El "envase" de cada tanda (de que abre hasta que cierra) cuenta como esa tarea: los <b>huecos adentro son trabajo</b>, no ocio. <b>Ocio</b> = jornada con nada abierto. Las tandas que <b>cruzan el borde</b> del período no se miden (se muestran aparte). m³ de Entregados + Programación (~96%); menos de ' + POCO + ' tandas → “pocos datos”.</div>';
 
   // toggle de vista: tarjetas (detalle) ↔ tabla (ranking comparable)
   h += '<div class="prod-viewseg"><button class="prod-vbtn' + (_prodTab === "cards" ? " on" : "") + '" onclick="prodSetTab(\'cards\')">📇 Tarjetas</button><button class="prod-vbtn' + (_prodTab === "table" ? " on" : "") + '" onclick="prodSetTab(\'table\')">📊 Tabla</button></div>';
@@ -7935,7 +7935,7 @@ function prodRender() {
   const rateLine = function (cls, icon, label, m3h, tandas, m3, timeMs, poco, serie) {
     const tr = poco ? { d: "flat", t: "" } : trend(serie);
     const arrow = (tr.d === "up") ? '<span class="prod-up">▲ ' + tr.t + '</span>' : (tr.d === "down") ? '<span class="prod-down">▼ ' + tr.t + '</span>' : (tr.t ? '<span class="prod-flat">' + tr.t + '</span>' : '');
-    return '<div class="prod-rate"><div class="prod-rate-name ' + cls + '">' + icon + ' ' + label + '</div>' +
+    return '<div class="prod-rate"><div class="prod-rate-name ' + cls + '">' + label + '</div>' +
       '<div class="prod-rate-top"><span class="prod-rate-big ' + cls + '">' + showVal(m3h) + '</span> <span class="prod-kpi-u">' + unit + '</span> ' + arrow + (poco ? ' <span class="prod-approx">pocos</span>' : '') + '</div>' +
       '<div class="prod-rate-sub">' + tandas + ' tandas · ' + (Math.round(m3 * 10) / 10) + ' m³ · ' + fmtH(minOf(timeMs)) + '</div></div>';
   };
@@ -7947,14 +7947,14 @@ function prodRender() {
     if (!exp) {
       // RESUMIDA: una sola línea, SOLO el/los m³/h. Se abre al tocar.
       let mini = '';
-      if (o.t.armTandas > 0) mini += '<span class="prod-mini prod-rb-arm' + (o.armPoco ? ' prod-mini-poco' : '') + '">🔧 ' + showVal(o.armM3h) + '</span>';
-      if (o.t.pickTandas > 0) mini += '<span class="prod-mini prod-rb-pick' + (o.pickPoco ? ' prod-mini-poco' : '') + '">🛒 ' + showVal(o.pickM3h) + '</span>';
+      if (o.t.armTandas > 0) mini += '<span class="prod-mini prod-rb-arm' + (o.armPoco ? ' prod-mini-poco' : '') + '">Armado ' + showVal(o.armM3h) + '</span>';
+      if (o.t.pickTandas > 0) mini += '<span class="prod-mini prod-rb-pick' + (o.pickPoco ? ' prod-mini-poco' : '') + '">Picking ' + showVal(o.pickM3h) + '</span>';
       mini += '<span class="prod-mini-u">' + unit + '</span>';
       return '<div class="prod-op prod-op-c" onclick="prodToggleOp(\'' + o.leg + '\')"><div class="prod-row1"><span class="prod-op-leg">' + nameHtml + '</span><span class="prod-row1-r">' + mini + '</span></div></div>';
     }
     // EXPANDIDA: header + ritmos con detalle + sparkline + desglose
     let c = '<div class="prod-op"><div class="prod-op-h" onclick="prodToggleOp(\'' + o.leg + '\')" style="cursor:pointer"><span class="prod-op-leg">' + nameHtml +
-      '</span><span class="prod-op-rol prod-rol-' + o.role + '">' + (o.role === "arm" ? "🔧 Armador" : "🛒 Picker") + '</span></div>';
+      '</span><span class="prod-op-rol prod-rol-' + o.role + '">' + (o.role === "arm" ? "Armador" : "Picker") + '</span></div>';
     c += '<div class="prod-rates">';
     if (o.t.armTandas > 0) c += rateLine("prod-rb-arm", "🔧", "Armado", o.armM3h, o.t.armTandas, o.t.armM3, o.t.armTime, o.armPoco, o.serieArm);
     if (o.t.pickTandas > 0) c += rateLine("prod-rb-pick", "🛒", "Picking", o.pickM3h, o.t.pickTandas, o.t.pickM3, o.t.pickTime, o.pickPoco, o.seriePick);
@@ -7995,7 +7995,7 @@ function prodRender() {
     const so = ops.slice().sort(function (a, b) { const va = colVal(a), vb = colVal(b); if (va < vb) return -_prodSort.dir; if (va > vb) return _prodSort.dir; return 0; });
     const ar = function (col) { return _prodSort.col === col ? (_prodSort.dir < 0 ? " ▾" : " ▴") : ""; };
     const thh = function (col, lbl) { return '<th onclick="prodTabSort(\'' + col + '\')" class="' + (_prodSort.col === col ? "on" : "") + '">' + lbl + ar(col) + '</th>'; };
-    h += '<table class="prod-tbl"><thead><tr>' + thh("name", "Operario") + thh("arm", "🔧") + thh("pick", "🛒") + thh("tandas", "Tandas") + thh("pct", "% prod") + '</tr></thead><tbody>';
+    h += '<table class="prod-tbl"><thead><tr>' + thh("name", "Operario") + thh("arm", "Armado") + thh("pick", "Picking") + thh("tandas", "Tandas") + thh("pct", "% prod") + '</tr></thead><tbody>';
     so.forEach(function (o) {
       const pc = o.pctProd >= 70 ? "#16a34a" : (o.pctProd >= 45 ? "#d97706" : "#dc2626");
       h += '<tr onclick="prodOpenFromTable(\'' + o.leg + '\')"><td class="prod-tdn">' + escapeHtml(nameOf(o.leg)) + '</td>' +
@@ -8004,12 +8004,12 @@ function prodRender() {
         '<td class="prod-tdn2">' + (o.t.armTandas + o.t.pickTandas) + '</td>' +
         '<td style="color:' + pc + ';font-weight:800">' + Math.round(o.pctProd) + '%</td></tr>';
     });
-    h += '</tbody></table><div class="prod-tbl-hint">Tocá un encabezado para ordenar · una fila para ver el detalle. 🔧 armado · 🛒 picking en ' + unit + '.</div>';
+    h += '</tbody></table><div class="prod-tbl-hint">Tocá un encabezado para ordenar · una fila para ver el detalle. Armado y Picking en ' + unit + '. <b>% prod</b> = parte de la jornada que estuvo armando/pickeando.</div>';
     if (!ops.length) h += '<div class="prod-empty">Sin armado/picking en el período.</div>';
     body.innerHTML = h; return;
   }
-  if (arms.length) { h += '<div class="prod-group-h">🔧 Armadores</div>'; arms.forEach(function (o, i) { h += card(o, i + 1); }); }
-  if (picks.length) { h += '<div class="prod-group-h">🛒 Pickers</div>'; picks.forEach(function (o, i) { h += card(o, i + 1); }); }
+  if (arms.length) { h += '<div class="prod-group-h">Armadores</div>'; arms.forEach(function (o, i) { h += card(o, i + 1); }); }
+  if (picks.length) { h += '<div class="prod-group-h">Pickers</div>'; picks.forEach(function (o, i) { h += card(o, i + 1); }); }
   if (!arms.length && !picks.length) h += '<div class="prod-empty">Sin armado/picking en el período.</div>';
   body.innerHTML = h;
 }
