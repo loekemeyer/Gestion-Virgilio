@@ -2255,6 +2255,8 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .cmpl-sicod{ font-size:17px; font-weight:800; color:#0f172a; }
 .cmpl-sirest{ font-size:11px; color:#64748b; font-weight:700; }
 .cmpl-siadd{ font-size:11px; font-weight:800; color:#7c3aed; }
+.cmpl-sundo{ display:block; width:100%; margin-bottom:10px; background:#fff; color:#b42318; border:1.5px solid #fecaca; border-radius:10px; padding:9px; font-size:13px; font-weight:800; cursor:pointer; }
+.cmpl-sundo:active{ transform:scale(.98); }
 .cmpl-liostit{ font-size:11.5px; font-weight:800; color:#475569; text-transform:uppercase; letter-spacing:.3px; margin:11px 2px 7px; }
 .cmpl-lio{ display:flex; align-items:center; gap:9px; background:#fff; border:1px solid #e2e8f0; border-left:4px solid #16a34a; border-radius:10px; padding:6px 10px; margin-bottom:6px; }
 .cmpl-lio.s{ border-left-color:#7c3aed; }
@@ -5206,7 +5208,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v4.86";
+const APP_VERSION = "v4.87";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -6940,6 +6942,7 @@ function _compLioSiguiente() { const n = _compLioNow(); if (!n) return; const it
 function _compLioReset() { const n = _compLioNow(); if (!n) return; let any = false; n.codes.forEach(function (c) { if (c.cur > 0) { c.rest += c.cur; c.cur = 0; any = true; } }); if (any) { _compRenderLios(); _compRecalc(); } }
 function _compViewArmar() { if (_comp) { _comp.liosView = "armar"; _compRenderLios(); } }
 function _compViewSueltas() { if (_comp) { _comp.liosView = "sueltas"; _compRenderLios(); } }
+function _compSueltaUndo() { const n = _compLioNow(); if (!n) return; for (let k = n.liosArr.length - 1; k >= 0; k--) { if (n.liosArr[k].suelta) { _compLioDel(k); return; } } }
 function _compLioDel(k) { const n = _compLioNow(); if (!n) return; const l = n.liosArr[k]; if (!l) return; l.items.forEach(function (it) { const c = n.codes.find(function (x) { return x.cod === it.cod; }); if (c) c.rest += it.qty; }); n.liosArr.splice(k, 1); _compLioMark(n); _compRenderLios(); _compRecalc(); }
 function _compLioNp(d) { if (!_comp) return; const ni = _comp.liosNpIdx + d; if (ni < 0 || ni >= _comp.nps.length) return; _comp.liosNpIdx = ni; _compRenderLios(); _compPersist(); }
 function _compLiosResumen(n) { const L = function (i) { return i < 26 ? String.fromCharCode(65 + i) : "L" + (i + 1); }; return (n.liosArr || []).map(function (l, k) { return L(k) + "=" + l.items.map(function (it) { return it.cod + "x" + it.qty; }).join(",") + (l.suelta ? "(s)" : ""); }).join(";"); }
@@ -6965,6 +6968,7 @@ function _compRenderLios() {
     h += '<div class="cmpl-subtabs"><button class="cmpl-subtab' + (view === "armar" ? " on" : "") + '" onclick="_compViewArmar()">🔗 Armar líos</button><button class="cmpl-subtab' + (view === "sueltas" ? " on" : "") + '" onclick="_compViewSueltas()">📦 Sueltas' + (nRest ? " (" + nRest + ")" : "") + '</button></div>';
     if (view === "sueltas") {
       h += '<div class="cmpl-shint">Las que van <b>solas</b>: tocá cada código y cada toque queda como <b>un lío de 1 caja</b>. Acá ves sólo lo que falta asignar.</div>';
+      if (n.liosArr.some(function (l) { return l.suelta; })) h += '<button class="cmpl-sundo" onclick="_compSueltaUndo()">↶ Deshacer última suelta</button>';
       if (!restCods.length) h += '<div class="cmpl-empty">No quedan cajas sin asignar 👍</div>';
       else h += '<div class="cmpl-sgrid">' + restCods.map(function (c) { const sci = n.codes.indexOf(c); return '<button class="cmpl-sitem" onclick="_compLioSuelta(' + sci + ')"><span class="cmpl-sicod">' + escapeHtml(c.cod) + '</span><span class="cmpl-sirest">quedan ' + c.rest + '</span><span class="cmpl-siadd">📦 marcar</span></button>'; }).join("") + '</div>';
     } else {
