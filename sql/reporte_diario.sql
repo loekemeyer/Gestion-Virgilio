@@ -10,8 +10,11 @@
 --      producción del día lo cubrió / sobrepasó / quedó por debajo.
 --    • Días para terminar la PPP al ritmo REAL (m³ armado/día) y si alcanza vs PPP.
 --    • Pedidos con fecha muy lejana (outliers > hoy+21d) — los "viejos" a revisar.
---    • Rendimiento por operario (sólo los que trabajaron ese día): m³ pick/arm + m³/h,
---      como TABLA monoespaciada (HTML <pre>) para que las columnas queden alineadas.
+--    • Rendimiento por operario (sólo los que trabajaron ese día): DOS tablas
+--      monoespaciadas (HTML <pre>) — "📦 Producción (m³)" (pick/arm) arriba y
+--      "⏱️ Ritmo (m³/h)" (Pk/h, Ar/h) abajo. Antes era 1 sola tabla de 5 columnas
+--      que se cortaba en el celular (migración reporte_diario_rendimiento_dos_tablas,
+--      pedido del dueño: "primero lo que hicieron en m³ y abajo el ritmo").
 --
 --  Decisiones (confirmadas con el dueño):
 --    • "Cubrir lo proyectado" = contra el RITMO NECESARIO (no contra lo del día solo).
