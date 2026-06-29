@@ -4,7 +4,9 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-28 · Versión app al documentar: **v4.70**
+> Última actualización: 2026-06-28 · Versión app al documentar: **v4.71**
+>
+> Nota: **v4.71** — **Productividad: tarjetas resumidas al entrar**. Cada operario entra **colapsado**: solo el nombre + los dos ritmos (🔧 armado / 🛒 picking). Al **tocar** la tarjeta (o "Ver detalle ▾") se expande con el sparkline + el desglose tocable. Estado `_prodExpand` (vacío = todas resumidas; se resetea al recargar período); `prodToggleOp(leg)`. Hace el módulo mucho más rápido de escanear.
 >
 > Nota: **v4.70** — **Productividad: desglose tocable + nombres más grandes**. (1) Los títulos **🔧 Armado**
 > y **🛒 Picking** ahora son un header grande (15px, en color) arriba del número. (2) Cada color del
