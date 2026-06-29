@@ -4,7 +4,9 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-29 · Versión app al documentar: **v4.96**
+> Última actualización: 2026-06-29 · Versión app al documentar: **v4.98**
+>
+> Nota: **v4.97–v4.98** — v4.97: el cartel "diferente a la mesa" pasa a **acción secundaria** (más finito/clarito, no compite con el botón verde). v4.98: **alerta "llegó un faltante, completá antes de facturar"** (`sql/falta_llego.sql`, `reporte_agentes_falta_llego()`): cruza lo que llegó y quedó en **'a guardar'** (`Movimientos_Stock`, respeta el cutoff) con los **faltantes por pedido** (`Entregas_Virgilio.cajas_falto>0`) de NPs **armadas y SIN facturar** (no en `Facturacion_NP`), match por código normalizado (upper + sin ceros a la izquierda). Avisa por **Telegram + tablero Agentes** (categoría `falta_llego`, severidad alta), encadenada al cron jobid 14 (cada 2 h), dedup por el set de (np|cod) del día; SECURITY DEFINER con revoke de anon. ⚠ `Entregas_Virgilio.fecha_salida` es **TEXT** → comparar con `left(...,10) >= 'YYYY-MM-DD'`, NO castear a date (si no, el `exception when others` lo tapa y nunca alerta).
 >
 > Nota: **v4.93–v4.96** — **Pulidos de Separar por NP (estética + UX)**. v4.93: el diálogo "diferente a la mesa" pide **"Levantadas según picking" (fijo) vs "Levantadas real" (input)** y la app calcula la diferencia. v4.94–v4.95: tarjetas de código más altas (casillero limpio) y **sin tic** — tocar cualquier parte de la tarjeta la marca **toda en verde**. v4.96 (pasada a fondo): **fix del `button` global** (`margin-top:14px` + `padding:16px`) que se filtraba a los botones del módulo y descentraba el switch (7px abajo) y las flechas del header; ahora las **flechas del header** son redondas y centradas, el **toggle** Modo picking/Por pedido queda alineado, "Sin faltantes" es un **estado vacío centrado**, y las **celdas separadas de la matriz** son pastillas redondeadas. Solo CSS/HTML.
 >

@@ -5303,7 +5303,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v4.97";
+const APP_VERSION = "v4.98";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -7892,6 +7892,7 @@ function agtRender() {
     { key: "zona_lista", icon: "🚚", titulo: "Zona lista para programar (≥1 m³)", hint: "Ya se juntó 1 m³ o más de pedidos SIN fecha para esa zona → conviene programar el reparto. Avisa también por Telegram (1 vez/semana)." },
     { key: "ppp_sin_zona", icon: "🗺️", titulo: "Pedidos sin zona en la PPP", hint: "Llegaron pedidos a la Programación Diaria SIN zona cargada — no se pueden rutear ni asignar camión hasta que tengan zona. Avisa también por Telegram. Cargá la zona en la PPP." },
     { key: "picking_difiere", icon: "📦⚠", titulo: "Picking no coincide con la mesa", hint: "El AP/TAP encontró que un artículo NO coincide con lo que marcó el picking (de más / de menos). No es error del armador. Avisa también por Telegram. Revisá con quien hizo el picking." },
+    { key: "falta_llego", icon: "📦✅", titulo: "Llegó un faltante (completar antes de facturar)", hint: "Llegó (vía recepción, está en 'a guardar') un artículo que había FALTADO en un pedido armado y todavía SIN facturar. Agarralo de 'a guardar' y completá el pedido antes de que se facture. Avisa también por Telegram." },
     { key: "faltante", icon: "🚚", titulo: "Faltantes en picking (7 días)", hint: "Códigos que faltaron al pickear. Si se repite, revisá stock / inicial." },
     { key: "faltante_articulo", icon: "🔁", titulo: "Artículos que más faltan (30 días)", hint: "Códigos que faltan seguido al pickear (cajas acumuladas). Reforzá su stock / revisá la compra." },
     { key: "sin_planimetria", icon: "🗺", titulo: "Códigos sin lugar en planimetría", hint: "Llegaron / se pickearon códigos sin sector. Agregalos a la hoja Picking del Excel." },
