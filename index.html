@@ -3732,6 +3732,7 @@ function terminarDia() {
             </label>
           </div>
           ${needsInput ? `
+            <div style="margin-top:6px; font-size:12.5px; color:#b45309; background:#fffbeb; border:1px solid #fde68a; border-radius:6px; padding:6px 8px;">⚠ Si ya lo terminaste, marcá <b>"Finalizar ahora"</b> y cargá la tanda. Dejarlo abierto para mañana hace que no se pueda medir bien tu ritmo.</div>
             <div id="td_closewrap_${escapeHtml(tipo)}" style="display:none; margin-top:6px;">
               <input type="text" id="td_close_${escapeHtml(tipo)}" value="${valEsc}"
                      placeholder="Dato para cerrar (tanda/pedido)"
@@ -5179,7 +5180,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v4.78";
+const APP_VERSION = "v4.79";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -7648,6 +7649,28 @@ function prodToggleOp(leg) { if (_prodExpand[leg]) { delete _prodExpand[leg]; if
 function prodSetTab(t) { _prodTab = t; prodRender(); }
 function prodTabSort(col) { if (_prodSort.col === col) _prodSort.dir = -_prodSort.dir; else _prodSort = { col: col, dir: col === "name" ? 1 : -1 }; prodRender(); }
 function prodOpenFromTable(leg) { _prodTab = "cards"; _prodExpand[leg] = 1; prodRender(); }
+function prodExportCsv() {
+  if (!_prod || !_prod.total) { alert("Nada para exportar todavía."); return; }
+  var nombres = _prodNombres || new Map();
+  var nameOf = function (leg) { return nombres.get(String(leg)) || ("Legajo " + leg); };
+  var esn = function (v) { return v ? String(Math.round(v * 100) / 100).replace(".", ",") : "0"; };
+  var rows = [["Operario", "Legajo", "Picking m3", "Armado m3", "Picking m3/h", "Armado m3/h", "Tandas"]];
+  Object.keys(_prod.total).forEach(function (leg) {
+    var t = _prod.total[leg];
+    if ((t.armTandas + t.pickTandas) === 0) return;
+    var pickM3h = t.pickTimeM3 > 0 ? t.pickM3 / (t.pickTimeM3 / 3600000) : 0;
+    var armM3h = t.armTimeM3 > 0 ? t.armM3 / (t.armTimeM3 / 3600000) : 0;
+    rows.push([nameOf(leg), leg, esn(t.pickM3), esn(t.armM3), esn(pickM3h), esn(armM3h), String(t.armTandas + t.pickTandas)]);
+  });
+  // ; separador (Excel es-AR) + coma decimal + BOM utf-8 (acentos)
+  var csv = "﻿" + rows.map(function (r) { return r.map(function (c) { return '"' + String(c).replace(/"/g, '""') + '"'; }).join(";"); }).join("\r\n");
+  var blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  var a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "productividad_" + _prod.d1 + "_a_" + _prod.d2 + ".csv";
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+}
 
 /* --- motor: matemática de intervalos + reglas. Prefijo _pv para no pisar nombres del archivo gigante. --- */
 var _PV_AR = 3 * 3600 * 1000, _PV_DAY = 86400000;
@@ -7807,7 +7830,7 @@ function prodRender() {
   const d2v = _prod ? _prod.d2 : (_prodPeriod ? _prodPeriod.d2 : "");
   const sel = '<div class="prod-dates"><label>Desde</label><input id="prodD1" type="date" value="' + d1v + '" onchange="prodSetPeriod(this.value, document.getElementById(\'prodD2\').value)">' +
     '<label>Hasta</label><input id="prodD2" type="date" value="' + d2v + '" onchange="prodSetPeriod(document.getElementById(\'prodD1\').value, this.value)">' +
-    '<button class="prod-preset" onclick="prodPreset(7)">7 días</button><button class="prod-preset" onclick="prodPreset(28)">4 sem</button><button class="prod-preset" onclick="prodPreset(56)">8 sem</button></div>';
+    '<button class="prod-preset" onclick="prodPreset(7)">7 días</button><button class="prod-preset" onclick="prodPreset(28)">4 sem</button><button class="prod-preset" onclick="prodPreset(56)">8 sem</button><button class="prod-preset" onclick="prodExportCsv()" style="background:#16a34a;color:#fff" title="Bajar la tabla a Excel/CSV">⬇ Excel</button></div>';
 
   if (!_prod) { body.innerHTML = sel + '<div class="prod-empty">Sin datos.</div>'; return; }
   const POCO = 5;
