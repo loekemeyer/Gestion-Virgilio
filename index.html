@@ -1833,7 +1833,7 @@ button {
 .ppp-preview{ margin-top:6px; }
 @media (max-width:560px){ }
 /* Vista PPP (Programación / Entregados) */
-.ppp-tabs{ display:flex; gap:8px; margin:6px 0 8px; }
+.ppp-tabs{ display:flex; gap:8px; margin:6px 0 8px; flex-wrap:wrap; }
 .ppp-search{ display:flex; align-items:center; gap:8px; margin:0 0 8px; }
 .ppp-search input{ flex:1; min-width:0; padding:7px 12px; font-size:14px; border:1.5px solid #cbd5e1; border-radius:9px; background:#fff; box-sizing:border-box; }
 .ppp-search input:focus{ outline:none; border-color:#2563eb; box-shadow:0 0 0 3px rgba(37,99,235,.12); }
@@ -7444,7 +7444,7 @@ function ocBodyGen() {
   if (!keys.length) return h + '<div class="oc-empty">No hay nada para pedir (todo está en o sobre el máximo).<br><small>Con el stock en 0, va a dar todo para pedir cuando lo cargues.</small></div>';
   const externos = keys.filter(function (k) { return !g[k].interno; });
   const totExt = externos.reduce(function (s, k) { return s + g[k].items.length; }, 0);
-  h += '<div class="oc-meta">Fecha <b>' + escapeHtml(_oc.gen.fecha) + '</b> · <b>' + externos.length + '</b> proveedor(es) externos · <b>' + totExt + '</b> ítem(s) a pedir. <button class="oc-btn ok" style="margin-left:8px" onclick="ocgGenerar()">✓ Generar las OCs</button></div>';
+  h += '<div class="oc-meta">Fecha <b>' + escapeHtml(_oc.gen.fecha) + '</b> · <b>' + externos.length + '</b> proveedor(es) externos · <b>' + totExt + '</b> ítem(s) a pedir.</div><div class="oc-tools" style="margin-top:8px"><button class="oc-btn ok" onclick="ocgGenerar()">✓ Generar las OCs</button></div>';
   keys.forEach(function (k) {
     const x = g[k];
     h += '<div class="oc-meta" style="margin-top:12px;margin-bottom:4px"><b>' + escapeHtml(k) + '</b>' + (x.interno ? ' <span style="color:#64748b">(interno — no se genera OC)</span>' : '') + ' · ' + x.items.length + ' ítem(s) · ' + x.total + ' cajas</div>';
