@@ -4,7 +4,9 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-30 · Versión app al documentar: **v5.06**
+> Última actualización: 2026-06-30 · Versión app al documentar: **v5.07**
+>
+> Nota: **v5.07 — Fix CP: el faltante completado NO desaparecía (RLS) + refresh en vivo**. `Entregas_Virgilio` solo tiene RLS **INSERT/SELECT** para anon (no UPDATE) → el PATCH de `cpReduceFaltante` que bajaba `cajas_falto` se **rechazaba en silencio** y el faltante seguía en la lista de CP (reportado: "lo completaron pero no desapareció"). Fix: **RPC SECURITY DEFINER acotada** `cp_completar_faltante(p_id bigint, p_qty numeric)` (resta `cajas_falto` / suma `cajas_entregadas` por id, clamp 0; `grant anon`) en vez de abrir un UPDATE general a la anon key. `cpReduceFaltante` ahora la llama (`POST /rpc/...`). Además **`cpConfirm` pasa a async**: espera la baja y **REFRESCA la lista** (ya no cierra el modal) → el completado **desaparece a la vista** + banner verde "✓ N caja(s) …" (`.cp-done`) y se pueden completar **varios seguidos**. Verificado headless (RPC llamada, re-fetch, item fuera de la lista, banner). Las columnas `cajas_*` son `numeric` (el JSON las muestra como string). Apaga la alerta #28 al llegar `cajas_falto` a 0.
 >
 > Nota: **v5.06 — Botonera jerarquizada (primarios grandes / secundarios chicos)**. El dueño separó la botonera del operario: **primarios** (quedan grandes, como siempre, = ~90% del uso) y **secundarios** (más chicos, uso puntual). **Primarios**: `row1` EP·TP·AP·TAP·CR·CC + `row2` RT·RR·MG (picking/armado + carga/control + recepción/guardado). Debajo, separador **"acciones secundarias"** y **secundarios** (clase `.box-sm`): `row3` RI·EI·SC·**CP** + `row4` AT·PB·Limp·Perm·PC·CT. **CP** (Completar Pedido, v5.05) pasó a secundario con un **borde verde sutil** (`.box[data-code="CP"]`) para encontrarlo. Render: `BOTONERA_SECUNDARIAS={row3,row4}` marca qué filas van chicas; el loop agrega `.box-sm` + `data-code`. Verificado headless 430px. (Tarea #32.)
 >

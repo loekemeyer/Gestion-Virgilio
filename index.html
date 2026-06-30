@@ -5336,7 +5336,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.06";
+const APP_VERSION = "v5.07";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -9386,7 +9386,7 @@ async function cpLoadLios(np) {
 async function showCPModal(legajo) {
   if (!document.getElementById("cpCss")) {
     const st = document.createElement("style"); st.id = "cpCss";
-    st.textContent = "#cpModal{display:none;position:fixed;inset:0;z-index:1290;background:rgba(2,6,23,.74);overflow:auto;padding:12px;}#cpModal.show{display:block;}.cp-card{background:#f8fafc;max-width:460px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.cp-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;background:linear-gradient(90deg,#16a34a,#15803d);color:#fff;}.cp-title{font-size:18px;font-weight:800;}.cp-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}.cp-body{padding:13px 14px;}.cp-loading,.cp-empty{padding:24px;text-align:center;color:#64748b;font-size:15px;}.cp-hint{font-size:12.5px;color:#64748b;margin-bottom:10px;}.cp-frow{display:block;width:100%;text-align:left;border:1px solid #e2e8f0;border-radius:13px;padding:11px 12px;margin-bottom:9px;background:#fff;cursor:pointer;}.cp-frow-top{display:flex;align-items:baseline;gap:8px;margin-bottom:4px;}.cp-frow-bot{display:flex;align-items:center;justify-content:space-between;gap:8px;}.cp-cod{font-size:16px;font-weight:800;font-family:Consolas,Menlo,monospace;}.cp-fdesc{font-size:12.5px;color:#475569;}.cp-np{font-size:12px;color:#64748b;}.cp-faltan{font-size:12.5px;font-weight:800;color:#b45309;white-space:nowrap;}.cp-back{background:none;border:none;color:#1e6bd6;font-weight:800;font-size:14px;cursor:pointer;padding:0 0 8px;width:auto;}.cp-sel{background:#fff;border:1px solid #e2e8f0;border-radius:13px;padding:11px 12px;margin-bottom:12px;}.cp-selnp{font-size:12px;color:#64748b;margin-top:3px;}.cp-fld{margin-bottom:13px;}.cp-lbl{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:#64748b;margin-bottom:7px;}.cp-stp{display:flex;align-items:center;gap:7px;}.cp-sb{display:flex;align-items:center;justify-content:center;line-height:1;padding:0;width:46px;height:50px;border:none;border-radius:10px;font-size:26px;font-weight:800;cursor:pointer;background:#e2e8f0;color:#475569;}.cp-inp{width:70px;height:50px;text-align:center;font-size:24px;font-weight:800;border:2px solid #cbd5e1;border-radius:10px;padding:0;-moz-appearance:textfield;}.cp-inp::-webkit-outer-spin-button,.cp-inp::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}.cp-seg,.cp-lios{display:flex;flex-wrap:wrap;gap:8px;}.cp-opt{flex:1 1 0;min-width:120px;display:flex;flex-direction:column;align-items:center;gap:2px;background:#fff;border:1.5px solid #cbd5e1;border-radius:11px;padding:10px 8px;font-size:14px;font-weight:800;color:#334155;cursor:pointer;}.cp-opt small{font-weight:700;color:#64748b;font-size:11.5px;}.cp-opt.on{border-color:#16a34a;background:#f0fdf4;color:#15803d;}.cp-lio{background:#fff;border:1.5px solid #cbd5e1;border-radius:11px;padding:8px 11px;font-size:14px;font-weight:800;color:#334155;cursor:pointer;}.cp-lio small{font-weight:700;color:#64748b;font-size:11px;}.cp-lio.on{border-color:#16a34a;background:#f0fdf4;color:#15803d;}.cp-lio-new{border-style:dashed;}.cp-liosload,.cp-note{font-size:12px;color:#64748b;}.cp-note{margin-top:6px;}.cp-fin{width:100%;margin-top:6px;padding:15px;border:none;border-radius:12px;background:#16a34a;color:#fff;font-size:17px;font-weight:800;cursor:pointer;}.cp-fin:disabled{background:#cbd5e1;color:#64748b;cursor:not-allowed;}";
+    st.textContent = "#cpModal{display:none;position:fixed;inset:0;z-index:1290;background:rgba(2,6,23,.74);overflow:auto;padding:12px;}#cpModal.show{display:block;}.cp-card{background:#f8fafc;max-width:460px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.cp-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;background:linear-gradient(90deg,#16a34a,#15803d);color:#fff;}.cp-title{font-size:18px;font-weight:800;}.cp-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}.cp-body{padding:13px 14px;}.cp-loading,.cp-empty{padding:24px;text-align:center;color:#64748b;font-size:15px;}.cp-hint{font-size:12.5px;color:#64748b;margin-bottom:10px;}.cp-frow{display:block;width:100%;text-align:left;border:1px solid #e2e8f0;border-radius:13px;padding:11px 12px;margin-bottom:9px;background:#fff;cursor:pointer;}.cp-frow-top{display:flex;align-items:baseline;gap:8px;margin-bottom:4px;}.cp-frow-bot{display:flex;align-items:center;justify-content:space-between;gap:8px;}.cp-cod{font-size:16px;font-weight:800;font-family:Consolas,Menlo,monospace;}.cp-fdesc{font-size:12.5px;color:#475569;}.cp-np{font-size:12px;color:#64748b;}.cp-faltan{font-size:12.5px;font-weight:800;color:#b45309;white-space:nowrap;}.cp-back{background:none;border:none;color:#1e6bd6;font-weight:800;font-size:14px;cursor:pointer;padding:0 0 8px;width:auto;}.cp-sel{background:#fff;border:1px solid #e2e8f0;border-radius:13px;padding:11px 12px;margin-bottom:12px;}.cp-selnp{font-size:12px;color:#64748b;margin-top:3px;}.cp-fld{margin-bottom:13px;}.cp-lbl{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:#64748b;margin-bottom:7px;}.cp-stp{display:flex;align-items:center;gap:7px;}.cp-sb{display:flex;align-items:center;justify-content:center;line-height:1;padding:0;width:46px;height:50px;border:none;border-radius:10px;font-size:26px;font-weight:800;cursor:pointer;background:#e2e8f0;color:#475569;}.cp-inp{width:70px;height:50px;text-align:center;font-size:24px;font-weight:800;border:2px solid #cbd5e1;border-radius:10px;padding:0;-moz-appearance:textfield;}.cp-inp::-webkit-outer-spin-button,.cp-inp::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}.cp-seg,.cp-lios{display:flex;flex-wrap:wrap;gap:8px;}.cp-opt{flex:1 1 0;min-width:120px;display:flex;flex-direction:column;align-items:center;gap:2px;background:#fff;border:1.5px solid #cbd5e1;border-radius:11px;padding:10px 8px;font-size:14px;font-weight:800;color:#334155;cursor:pointer;}.cp-opt small{font-weight:700;color:#64748b;font-size:11.5px;}.cp-opt.on{border-color:#16a34a;background:#f0fdf4;color:#15803d;}.cp-lio{background:#fff;border:1.5px solid #cbd5e1;border-radius:11px;padding:8px 11px;font-size:14px;font-weight:800;color:#334155;cursor:pointer;}.cp-lio small{font-weight:700;color:#64748b;font-size:11px;}.cp-lio.on{border-color:#16a34a;background:#f0fdf4;color:#15803d;}.cp-lio-new{border-style:dashed;}.cp-liosload,.cp-note{font-size:12px;color:#64748b;}.cp-note{margin-top:6px;}.cp-fin{width:100%;margin-top:6px;padding:15px;border:none;border-radius:12px;background:#16a34a;color:#fff;font-size:17px;font-weight:800;cursor:pointer;}.cp-fin:disabled{background:#cbd5e1;color:#64748b;cursor:not-allowed;}.cp-done{background:#dcfce7;border:1px solid #86efac;color:#15803d;font-weight:800;font-size:13px;border-radius:11px;padding:10px 12px;margin-bottom:11px;}";
     document.head.appendChild(st);
   }
   let ov = document.getElementById("cpModal");
@@ -9407,7 +9407,9 @@ async function showCPModal(legajo) {
 function cpRender() {
   if (!_cp) return; const body = document.getElementById("cpBody"); if (!body) return;
   if (_cp.step === 2) { cpRenderStep2(body); return; }
-  let h = '<div class="cp-hint">Tocá el faltante que <b>llegó</b>. Lo sumás al pedido y queda <b>a facturar</b>.</div>';
+  let h = '';
+  if (_cp.justDone) h += '<div class="cp-done">' + escapeHtml(_cp.justDone) + '</div>';
+  h += '<div class="cp-hint">Tocá el faltante que <b>llegó</b>. Lo sumás al pedido y queda <b>a facturar</b>.</div>';
   if (!_cp.falt.length) h += '<div class="cp-empty">No hay faltantes pendientes 👍</div>';
   else h += _cp.falt.map(function (e, i) {
     const cli = String(e.cod_cliente || "").trim();
@@ -9420,6 +9422,7 @@ function cpRender() {
 }
 function cpPickFalt(i) {
   if (!_cp) return; const e = _cp.falt[i]; if (!e) return;
+  _cp.justDone = "";
   _cp.sel = e; _cp.step = 2; _cp.qty = Math.max(1, Math.round(Number(e.cajas_falto) || 1));
   const sal = e._saldo || {};
   _cp.origen = (Number(sal.a_guardar) || 0) > 0 ? "a_guardar" : ((Number(sal.terminado) || 0) > 0 ? "terminado" : "a_guardar");
@@ -9486,14 +9489,22 @@ function cpUpdateLio(leg, s, qty, lioSel, info) {
 /* Baja cajas_falto (y sube cajas_entregadas) del faltante en Entregas_Virgilio →
    cuando llega a 0 deja de disparar la alerta #28 (falta_llego). */
 async function cpReduceFaltante(s, qty) {
+  // Entregas_Virgilio NO tiene RLS de UPDATE para anon (solo INSERT/SELECT) → el PATCH
+  // se rechazaba y el faltante no bajaba. Vía RPC SECURITY DEFINER acotada.
   try {
-    const newFalt = Math.max(0, Number(s.cajas_falto || 0) - qty);
-    const newEnt = Number(s.cajas_entregadas || 0) + qty;
-    const url = SUPABASE_ENTREGAS_ENDPOINT + "?id=eq." + encodeURIComponent(s.id);
-    await fetch(url, { method: "PATCH", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" }, body: JSON.stringify({ cajas_falto: newFalt, cajas_entregadas: newEnt }) });
+    const url = SUPABASE_URL + "/rest/v1/rpc/cp_completar_faltante";
+    await fetch(url, { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" }, body: JSON.stringify({ p_id: Number(s.id), p_qty: Number(qty) }) });
   } catch (_e) {}
 }
-function cpConfirm() {
+/* Recarga la lista de faltantes (reusa saldos ya cargados) para refrescar después de completar. */
+async function cpReloadFaltantes() {
+  const falt = await cpLoadFaltantes();
+  const today = cpTodayAR(), cut = today ? cpDateMinus(today, 21) : "";
+  const fr = falt.filter(function (e) { const d = String(e.fecha_salida || "").slice(0, 10); return !d || !cut || d >= cut; });
+  fr.forEach(function (e) { e.desc = artNombre(e.cod_art, ""); e._saldo = (_cp.saldosN || {})[_cpNorm(e.cod_art)] || null; });
+  return fr;
+}
+async function cpConfirm() {
   if (!_cp || !_cp.sel) return;
   const s = _cp.sel, qty = _cp.qty, origen = _cp.origen, leg = _cp.legajo, lioSel = _cp.lioSel, info = _cp._liosInfo || { resumen: "", tanda: s.tanda || "" };
   if (qty <= 0) return;
@@ -9508,13 +9519,18 @@ function cpConfirm() {
     texto: (String(s.np) + "|" + String(s.cod_art) + "|" + qty + "|" + (origen === "terminado" ? "GONDOLA" : "AGUARDAR") + "|" + lioTag).toUpperCase(),
     ts: Date.now(), id: ("cp_" + s.np + "_" + s.cod_art + "_" + Date.now()).replace(/[^a-zA-Z0-9_\-]/g, ""), ts_inicio_iso: null
   };
-  closeCP();
   try { enqueueReport(payload); if (typeof trySendOneReport === "function") trySendOneReport(payload).then(function (r) { if (r && r.ok) removeFromQueue(payload.id); }).catch(function () {}); } catch (_e) {}
   try { stockMove(rows); } catch (_e) {}
   cpUpdateLio(leg, s, qty, lioSel, info);
-  cpReduceFaltante(s, qty);
   try { updatePendingIndicator(); } catch (_e) {}
-  try { alert("✓ Completado: " + qty + " caja(s) del cód " + s.cod_art + " sumadas a la NP " + s.np + " (a facturar)."); } catch (_e) {}
+  // Bajar el faltante (RPC) y REFRESCAR la lista para que el completado DESAPAREZCA a la
+  // vista (y se puedan completar varios seguidos sin cerrar el modal).
+  await cpReduceFaltante(s, qty);
+  if (!_cp) return;
+  _cp.justDone = "✓ " + qty + " caja(s) de " + s.cod_art + " → NP " + s.np + " (a facturar)";
+  _cp.sel = null; _cp.step = 1; _cp.liosLoading = false; _cp._liosInfo = null;
+  try { _cp.falt = await cpReloadFaltantes(); } catch (_e) {}
+  if (_cp) cpRender();
 }
 
 /* ===== STOCK — baja por PICKING (v4.07): al TP, suma las cajas REALES pickeadas de
