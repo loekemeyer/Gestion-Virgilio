@@ -166,6 +166,8 @@ button {
 .row-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 
 .box { border: 2px solid #334155; border-radius: 10px; padding: 9px 5px; text-align: center; cursor: pointer; min-width: 0; transition: border-color .12s, transform .06s; }
+#row4 .box { border-color: #16a34a; background: #f0fdf4; }
+#row4 .box .box-title { color: #15803d; }
 .box:active { transform: scale(.96); }
 .box-title { font-size: 18px; font-weight: bold; }
 .box-desc { font-size: 11px; margin-top: 3px; line-height: 1.2; overflow-wrap: break-word; word-break: break-word; hyphens: auto; }
@@ -3087,6 +3089,7 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
       <button class="sup-action-btn" onclick="openFacturacion()"><span class="sup-ico">📋</span><span>Facturación</span></button>
       <button class="sup-action-btn" onclick="openPPP()"><span class="sup-ico">🗓️</span><span>PPP</span></button>
       <button class="sup-action-btn" onclick="openRecepcionAdmin()"><span class="sup-ico">🏭</span><span>Carga Recepción Mercadería</span></button>
+      <button class="sup-action-btn" onclick="showCPModal('0')"><span class="sup-ico">📦➕</span><span>Completar Pedido</span></button>
       <button class="sup-action-btn" onclick="openStockAdmin()"><span class="sup-ico">📦</span><span>Stock y Compras</span></button>
       <button class="sup-action-btn" onclick="openRemitosAdmin()"><span class="sup-ico">🚚</span><span>Recepción Remitos (RR)</span></button>
     </div>
@@ -3343,6 +3346,7 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
   <div class="row row-6" id="row1"></div>
   <div class="row row-6" id="row2"></div>
   <div class="row row-6" id="row3"></div>
+  <div class="row" id="row4"></div>
   <div id="racksAlarma"></div>
   <div id="pendingSuggestion"></div>
 
@@ -3422,7 +3426,8 @@ const SUPABASE_PLANIMETRIA_ENDPOINT =
 const filas = {
   row1: ["EP","TP","AP","TAP","CR","CC"],
   row2: ["RR","RT","MG","RI","EI","SC"],
-  row3: ["AT","PB","Limp","Perm","PC","CT"]
+  row3: ["AT","PB","Limp","Perm","PC","CT"],
+  row4: ["CP"]
 };
 
 const desc = {
@@ -3431,6 +3436,7 @@ const desc = {
   RR:"Recepción Remitos",
   RT:"Recepción Mercadería", MG:"Guardado a Góndola",
   RI:"Recepción Insumos", EI:"Entrega Insumos", SC:"Salida a Cervantes",
+  CP:"Completar Pedido",
   AT:"Atendí Timbre", PB:"Paré Baño", Limp:"Limpieza",
   Perm:"Permiso de Salida", PC:"Paré Comida",CT:"Conteo",
   LT:"Llegada Tarde", PKC:"Picking artículo", CCN:"Carga Camión NP",
@@ -4754,6 +4760,11 @@ function selectOption(code) {
   // Registros); la salida se registra como baja de góndola en Movimientos_Stock.
   if (code === "SC") { showCervantesModal(legajoStr); return; }
 
+  // v5.05: Completar Pedido — agrega cajas que llegaron tarde a una NP armada SIN
+  // facturar. Abre el modal directo (sin Enviar ni evento; el evento CP lo emite el
+  // modal al confirmar). Operario (botonera, 4ª fila) y Marianela (panel admin).
+  if (code === "CP") { showCPModal(legajoStr); return; }
+
   // CC ya abierto: el botón CC RE-ABRE el popup de Carga Camión (no lo cierra).
   // El cierre se hace SOLO con "Terminé Carga Camión" dentro del popup.
   if (code === "CC") {
@@ -5314,7 +5325,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.04";
+const APP_VERSION = "v5.05";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -9289,6 +9300,211 @@ function mgEmitFueraLista(cod, g, e, legajo) {
   try { updatePendingIndicator(); } catch (_e) {}
 }
 function closeMG() { const ov = document.getElementById("mgModal"); if (ov) ov.classList.remove("show"); _mg = null; }
+
+/* ===== STOCK — CP · Completar Pedido (v5.05): el operario (botonera 4ª fila) o
+   Marianela agrega cajas que llegaron TARDE a una NP ya armada y SIN facturar.
+   Flujo: elegir el faltante (Entregas_Virgilio.cajas_falto>0, NP no facturada) →
+   cuántas cajas llegaron → de dónde salen (Tránsito/a guardar o Góndola) → a qué LÍO
+   van (uno existente o uno nuevo). Al confirmar: stock origen− / a_facturar+ (evento
+   CP), re-emite el TAL del pedido con el lío actualizado, y baja cajas_falto en
+   Entregas_Virgilio → apaga la alerta #28 (falta_llego). Abre directo, sin Enviar. ===== */
+let _cp = null;
+function _cpNorm(c) { try { return _ocgNorm(String(c == null ? "" : c)); } catch (_e) { return String(c == null ? "" : c).toUpperCase().trim(); } }
+function _cpAuthH() { return { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }; }
+function cpLioLetter(i) { return i < 26 ? String.fromCharCode(65 + i) : "L" + (i + 1); }
+function cpTodayAR() { try { return new Date().toLocaleDateString("en-CA", { timeZone: "America/Argentina/Buenos_Aires" }); } catch (_e) { return ""; } }
+function cpDateMinus(ymd, days) {
+  const p = String(ymd || "").split("-"); if (p.length < 3) return "";
+  const d = new Date(Date.UTC(parseInt(p[0], 10), parseInt(p[1], 10) - 1, parseInt(p[2], 10)));
+  d.setUTCDate(d.getUTCDate() - days);
+  const mm = ("0" + (d.getUTCMonth() + 1)).slice(-2), dd = ("0" + d.getUTCDate()).slice(-2);
+  return d.getUTCFullYear() + "-" + mm + "-" + dd;
+}
+/* "A=535X3,546X5;B=510X1(s)" -> [{items:[{cod,qty}],suelta}] (orden = letras A,B,C…) */
+function cpParseResumen(resumen) {
+  const out = [];
+  String(resumen == null ? "" : resumen).split(";").forEach(function (seg) {
+    seg = String(seg).trim(); if (!seg) return;
+    const eq = seg.indexOf("="); let body = eq >= 0 ? seg.slice(eq + 1) : seg;
+    let suelta = false;
+    if (/\(s\)\s*$/i.test(body)) { suelta = true; body = body.replace(/\(s\)\s*$/i, ""); }
+    const items = [];
+    body.split(",").forEach(function (tok) {
+      tok = String(tok).trim(); if (!tok) return;
+      const m = tok.match(/^(.*)X(\d+)$/i);
+      if (m) items.push({ cod: m[1], qty: parseInt(m[2], 10) || 0 });
+    });
+    if (items.length) out.push({ items: items, suelta: suelta });
+  });
+  return out;
+}
+function cpBuildResumen(lios) {
+  return lios.map(function (l, k) {
+    return cpLioLetter(k) + "=" + l.items.map(function (it) { return String(it.cod).toUpperCase() + "X" + it.qty; }).join(",") + (l.suelta ? "(s)" : "");
+  }).join(";");
+}
+async function cpLoadFaltantes() {
+  const H = _cpAuthH();
+  const url = SUPABASE_ENTREGAS_ENDPOINT + "?select=id,np,cod_cliente,cod_art,cajas_pedidas,cajas_entregadas,cajas_falto,tanda,fecha_salida&cajas_falto=gt.0&order=np";
+  const r = await fetch(url, { headers: H, cache: "no-store" });
+  const rows = r.ok ? await r.json() : [];
+  let facSet = {};
+  try {
+    const rf = await fetch(SUPABASE_FACTURACION_NP_ENDPOINT + "?select=np", { headers: H, cache: "no-store" });
+    const fac = rf.ok ? await rf.json() : [];
+    fac.forEach(function (x) { facSet[String(x.np).trim()] = 1; });
+  } catch (_e) {}
+  return rows.filter(function (e) { return Number(e.cajas_falto) > 0 && !facSet[String(e.np).trim()]; });
+}
+/* Lee el TAL más reciente de una NP → {count, tanda, resumen} (para mostrar/actualizar líos). */
+async function cpLoadLios(np) {
+  const npU = String(np == null ? "" : np).toUpperCase().trim().replace(/\.0+$/, "");
+  try {
+    const url = SUPABASE_TABLE_ENDPOINT + "?select=texto,ts_cliente&opcion=eq.TAL&texto=like." + encodeURIComponent(npU) + "%7C*&order=ts_cliente.desc&limit=8";
+    const r = await fetch(url, { headers: _cpAuthH(), cache: "no-store" });
+    const rows = r.ok ? await r.json() : [];
+    for (let i = 0; i < rows.length; i++) {
+      const p = String(rows[i].texto || "").split("|");
+      if (String(p[0]).trim().replace(/\.0+$/, "") === npU) {
+        return { count: parseInt(p[1], 10) || 0, tanda: p[2] || "", resumen: p[3] || "" };
+      }
+    }
+  } catch (_e) {}
+  return { count: 0, tanda: "", resumen: "" };
+}
+async function showCPModal(legajo) {
+  if (!document.getElementById("cpCss")) {
+    const st = document.createElement("style"); st.id = "cpCss";
+    st.textContent = "#cpModal{display:none;position:fixed;inset:0;z-index:1290;background:rgba(2,6,23,.74);overflow:auto;padding:12px;}#cpModal.show{display:block;}.cp-card{background:#f8fafc;max-width:460px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.cp-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;background:linear-gradient(90deg,#16a34a,#15803d);color:#fff;}.cp-title{font-size:18px;font-weight:800;}.cp-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}.cp-body{padding:13px 14px;}.cp-loading,.cp-empty{padding:24px;text-align:center;color:#64748b;font-size:15px;}.cp-hint{font-size:12.5px;color:#64748b;margin-bottom:10px;}.cp-frow{display:block;width:100%;text-align:left;border:1px solid #e2e8f0;border-radius:13px;padding:11px 12px;margin-bottom:9px;background:#fff;cursor:pointer;}.cp-frow-top{display:flex;align-items:baseline;gap:8px;margin-bottom:4px;}.cp-frow-bot{display:flex;align-items:center;justify-content:space-between;gap:8px;}.cp-cod{font-size:16px;font-weight:800;font-family:Consolas,Menlo,monospace;}.cp-fdesc{font-size:12.5px;color:#475569;}.cp-np{font-size:12px;color:#64748b;}.cp-faltan{font-size:12.5px;font-weight:800;color:#b45309;white-space:nowrap;}.cp-back{background:none;border:none;color:#1e6bd6;font-weight:800;font-size:14px;cursor:pointer;padding:0 0 8px;width:auto;}.cp-sel{background:#fff;border:1px solid #e2e8f0;border-radius:13px;padding:11px 12px;margin-bottom:12px;}.cp-selnp{font-size:12px;color:#64748b;margin-top:3px;}.cp-fld{margin-bottom:13px;}.cp-lbl{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:#64748b;margin-bottom:7px;}.cp-stp{display:flex;align-items:center;gap:7px;}.cp-sb{display:flex;align-items:center;justify-content:center;line-height:1;padding:0;width:46px;height:50px;border:none;border-radius:10px;font-size:26px;font-weight:800;cursor:pointer;background:#e2e8f0;color:#475569;}.cp-inp{width:70px;height:50px;text-align:center;font-size:24px;font-weight:800;border:2px solid #cbd5e1;border-radius:10px;padding:0;-moz-appearance:textfield;}.cp-inp::-webkit-outer-spin-button,.cp-inp::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}.cp-seg,.cp-lios{display:flex;flex-wrap:wrap;gap:8px;}.cp-opt{flex:1 1 0;min-width:120px;display:flex;flex-direction:column;align-items:center;gap:2px;background:#fff;border:1.5px solid #cbd5e1;border-radius:11px;padding:10px 8px;font-size:14px;font-weight:800;color:#334155;cursor:pointer;}.cp-opt small{font-weight:700;color:#64748b;font-size:11.5px;}.cp-opt.on{border-color:#16a34a;background:#f0fdf4;color:#15803d;}.cp-lio{background:#fff;border:1.5px solid #cbd5e1;border-radius:11px;padding:8px 11px;font-size:14px;font-weight:800;color:#334155;cursor:pointer;}.cp-lio small{font-weight:700;color:#64748b;font-size:11px;}.cp-lio.on{border-color:#16a34a;background:#f0fdf4;color:#15803d;}.cp-lio-new{border-style:dashed;}.cp-liosload,.cp-note{font-size:12px;color:#64748b;}.cp-note{margin-top:6px;}.cp-fin{width:100%;margin-top:6px;padding:15px;border:none;border-radius:12px;background:#16a34a;color:#fff;font-size:17px;font-weight:800;cursor:pointer;}.cp-fin:disabled{background:#cbd5e1;color:#64748b;cursor:not-allowed;}";
+    document.head.appendChild(st);
+  }
+  let ov = document.getElementById("cpModal");
+  if (!ov) { ov = document.createElement("div"); ov.id = "cpModal"; document.body.appendChild(ov); }
+  ov.classList.add("show");
+  ov.innerHTML = '<div class="cp-card"><div class="cp-head"><span class="cp-title">📦➕ Completar Pedido</span><button class="cp-close" onclick="closeCP()">Cerrar</button></div><div class="cp-body" id="cpBody"><div class="cp-loading">Cargando faltantes…</div></div></div>';
+  try {
+    const res = await Promise.all([cpLoadFaltantes(), stockFetchSaldos(), loadArtNombres()]);
+    const falt = res[0] || [], saldos = res[1] || {};
+    const sN = {}; Object.keys(saldos).forEach(function (k) { sN[_cpNorm(k)] = saldos[k]; });
+    const today = cpTodayAR(), cut = today ? cpDateMinus(today, 21) : "";
+    const fr = falt.filter(function (e) { const d = String(e.fecha_salida || "").slice(0, 10); return !d || !cut || d >= cut; });
+    fr.forEach(function (e) { e.desc = artNombre(e.cod_art, ""); e._saldo = sN[_cpNorm(e.cod_art)] || null; });
+    _cp = { legajo: String(legajo || ""), step: 1, falt: fr, saldosN: sN, sel: null, qty: 1, origen: "a_guardar", lioSel: "__new__", _liosInfo: null, liosLoading: false };
+    cpRender();
+  } catch (e) { const b = document.getElementById("cpBody"); if (b) b.innerHTML = '<div class="cp-loading">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
+}
+function cpRender() {
+  if (!_cp) return; const body = document.getElementById("cpBody"); if (!body) return;
+  if (_cp.step === 2) { cpRenderStep2(body); return; }
+  let h = '<div class="cp-hint">Tocá el faltante que <b>llegó</b>. Lo sumás al pedido y queda <b>a facturar</b>.</div>';
+  if (!_cp.falt.length) h += '<div class="cp-empty">No hay faltantes pendientes 👍</div>';
+  else h += _cp.falt.map(function (e, i) {
+    const cli = String(e.cod_cliente || "").trim();
+    return '<button class="cp-frow" onclick="cpPickFalt(' + i + ')">' +
+      '<div class="cp-frow-top"><span class="cp-cod">' + escapeHtml(String(e.cod_art)) + '</span> <span class="cp-fdesc">' + escapeHtml(e.desc || "") + '</span></div>' +
+      '<div class="cp-frow-bot"><span class="cp-np">NP ' + escapeHtml(String(e.np)) + (cli ? ' · ' + escapeHtml(cli) : '') + (e.tanda ? ' · ' + escapeHtml(String(e.tanda)) : '') + '</span><span class="cp-faltan">faltan ' + Math.round(Number(e.cajas_falto) || 0) + '</span></div>' +
+      '</button>';
+  }).join("");
+  _renderKeepFocus(body, h);
+}
+function cpPickFalt(i) {
+  if (!_cp) return; const e = _cp.falt[i]; if (!e) return;
+  _cp.sel = e; _cp.step = 2; _cp.qty = Math.max(1, Math.round(Number(e.cajas_falto) || 1));
+  const sal = e._saldo || {};
+  _cp.origen = (Number(sal.a_guardar) || 0) > 0 ? "a_guardar" : ((Number(sal.terminado) || 0) > 0 ? "terminado" : "a_guardar");
+  _cp._liosInfo = null; _cp.liosLoading = true; _cp.lioSel = "__new__";
+  cpRender();
+  cpLoadLios(e.np).then(function (info) { if (!_cp) return; _cp._liosInfo = info; _cp.liosLoading = false; cpRender(); }).catch(function () { if (!_cp) return; _cp._liosInfo = { resumen: "", tanda: e.tanda || "" }; _cp.liosLoading = false; cpRender(); });
+}
+function cpRenderStep2(body) {
+  const e = _cp.sel; if (!e) { _cp.step = 1; cpRender(); return; }
+  const sal = e._saldo || {}; const agu = Math.round(Number(sal.a_guardar) || 0), gon = Math.round(Number(sal.terminado) || 0);
+  const maxQ = Math.max(1, Math.round(Number(e.cajas_falto) || 1));
+  let h = '<button class="cp-back" onclick="cpBack()">← Volver</button>';
+  h += '<div class="cp-sel"><span class="cp-cod">' + escapeHtml(String(e.cod_art)) + '</span> <span class="cp-fdesc">' + escapeHtml(e.desc || "") + '</span><div class="cp-selnp">NP ' + escapeHtml(String(e.np)) + (e.tanda ? ' · ' + escapeHtml(String(e.tanda)) : '') + ' · faltan ' + maxQ + '</div></div>';
+  h += '<div class="cp-fld"><div class="cp-lbl">¿Cuántas cajas llegaron?</div><div class="cp-stp"><button class="cp-sb" onclick="cpQty(-1)">–</button><input class="cp-inp" type="number" min="1" max="' + maxQ + '" inputmode="numeric" value="' + _cp.qty + '" oninput="cpQtySet(this.value)"><button class="cp-sb" onclick="cpQty(1)">+</button></div></div>';
+  h += '<div class="cp-fld"><div class="cp-lbl">¿De dónde salen?</div><div class="cp-seg">' +
+    '<button class="cp-opt' + (_cp.origen === "a_guardar" ? " on" : "") + '" onclick="cpOrigen(\'a_guardar\')">Tránsito<small>a guardar · ' + agu + '</small></button>' +
+    '<button class="cp-opt' + (_cp.origen === "terminado" ? " on" : "") + '" onclick="cpOrigen(\'terminado\')">Góndola<small>hay ' + gon + '</small></button>' +
+    '</div></div>';
+  h += '<div class="cp-fld"><div class="cp-lbl">¿A qué lío va?</div>';
+  if (_cp.liosLoading) h += '<div class="cp-liosload">cargando líos…</div>';
+  else {
+    const info = _cp._liosInfo || { resumen: "" };
+    const lios = cpParseResumen(info.resumen);
+    let chips = lios.map(function (l, k) {
+      const letter = cpLioLetter(k);
+      const comp = l.items.map(function (it) { return it.cod + "×" + it.qty; }).join(",");
+      return '<button class="cp-lio' + (_cp.lioSel === letter ? " on" : "") + '" onclick="cpLio(\'' + letter + '\')">' + letter + ' <small>' + escapeHtml(comp) + (l.suelta ? " (s)" : "") + '</small></button>';
+    }).join("");
+    chips += '<button class="cp-lio cp-lio-new' + (_cp.lioSel === "__new__" ? " on" : "") + '" onclick="cpLio(\'__new__\')">🆕 Lío nuevo</button>';
+    h += '<div class="cp-lios">' + chips + '</div>';
+    if (!lios.length) h += '<div class="cp-note">Sin líos con detalle en este pedido — se crea uno nuevo.</div>';
+  }
+  h += '</div>';
+  const ok = _cp.qty > 0 && !_cp.liosLoading;
+  h += '<button class="cp-fin"' + (ok ? "" : " disabled") + ' onclick="cpConfirm()">✓ Completar ' + _cp.qty + ' caja(s) → a facturar</button>';
+  _renderKeepFocus(body, h);
+}
+function cpBack() { if (!_cp) return; _cp.step = 1; _cp.sel = null; cpRender(); }
+function cpQty(d) { if (!_cp || !_cp.sel) return; const mx = Math.max(1, Math.round(Number(_cp.sel.cajas_falto) || 1)); _cp.qty = Math.max(1, Math.min(mx, _cp.qty + d)); cpRender(); }
+function cpQtySet(v) { if (!_cp || !_cp.sel) return; const mx = Math.max(1, Math.round(Number(_cp.sel.cajas_falto) || 1)); let n = Math.max(1, parseInt(v, 10) || 1); if (n > mx) n = mx; _cp.qty = n; cpRender(); }
+function cpOrigen(o) { if (!_cp) return; _cp.origen = o; cpRender(); }
+function cpLio(l) { if (!_cp) return; _cp.lioSel = l; cpRender(); }
+function closeCP() { const ov = document.getElementById("cpModal"); if (ov) ov.classList.remove("show"); _cp = null; }
+/* Recalcula el resumen de líos del pedido sumando la caja completada (a un lío
+   existente por letra, o a uno nuevo) y re-emite el TAL (gana el más reciente). */
+function cpUpdateLio(leg, s, qty, lioSel, info) {
+  let lios = cpParseResumen((info && info.resumen) || "");
+  const codU = String(s.cod_art).toUpperCase();
+  if (lioSel !== "__new__" && lios.length) {
+    let done = false;
+    for (let i = 0; i < lios.length; i++) {
+      if (cpLioLetter(i) === lioSel) {
+        const ex = lios[i].items.filter(function (it) { return String(it.cod).toUpperCase() === codU; })[0];
+        if (ex) ex.qty += qty; else lios[i].items.push({ cod: codU, qty: qty });
+        done = true; break;
+      }
+    }
+    if (!done) lios.push({ items: [{ cod: codU, qty: qty }], suelta: false });
+  } else {
+    lios.push({ items: [{ cod: codU, qty: qty }], suelta: false });
+  }
+  try { liosSend(String(leg || ""), s.np, lios.length, (info && info.tanda) || s.tanda || "", cpBuildResumen(lios)); } catch (_e) {}
+}
+/* Baja cajas_falto (y sube cajas_entregadas) del faltante en Entregas_Virgilio →
+   cuando llega a 0 deja de disparar la alerta #28 (falta_llego). */
+async function cpReduceFaltante(s, qty) {
+  try {
+    const newFalt = Math.max(0, Number(s.cajas_falto || 0) - qty);
+    const newEnt = Number(s.cajas_entregadas || 0) + qty;
+    const url = SUPABASE_ENTREGAS_ENDPOINT + "?id=eq." + encodeURIComponent(s.id);
+    await fetch(url, { method: "PATCH", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" }, body: JSON.stringify({ cajas_falto: newFalt, cajas_entregadas: newEnt }) });
+  } catch (_e) {}
+}
+function cpConfirm() {
+  if (!_cp || !_cp.sel) return;
+  const s = _cp.sel, qty = _cp.qty, origen = _cp.origen, leg = _cp.legajo, lioSel = _cp.lioSel, info = _cp._liosInfo || { resumen: "", tanda: s.tanda || "" };
+  if (qty <= 0) return;
+  const dep = origen === "terminado" ? "terminado" : "a_guardar";
+  const rows = [
+    { cod_art: s.cod_art, descripcion: s.desc || null, deposito: dep, delta: -qty, tipo: "cp", ref: String(s.np), legajo: leg || null },
+    { cod_art: s.cod_art, descripcion: s.desc || null, deposito: "a_facturar", delta: qty, tipo: "cp", ref: String(s.np), legajo: leg || null }
+  ];
+  const lioTag = lioSel === "__new__" ? "NUEVA" : lioSel;
+  const payload = {
+    legajo: String(leg || ""), opcion: "CP", descripcion: "Completar Pedido",
+    texto: (String(s.np) + "|" + String(s.cod_art) + "|" + qty + "|" + (origen === "terminado" ? "GONDOLA" : "AGUARDAR") + "|" + lioTag).toUpperCase(),
+    ts: Date.now(), id: ("cp_" + s.np + "_" + s.cod_art + "_" + Date.now()).replace(/[^a-zA-Z0-9_\-]/g, ""), ts_inicio_iso: null
+  };
+  closeCP();
+  try { enqueueReport(payload); if (typeof trySendOneReport === "function") trySendOneReport(payload).then(function (r) { if (r && r.ok) removeFromQueue(payload.id); }).catch(function () {}); } catch (_e) {}
+  try { stockMove(rows); } catch (_e) {}
+  cpUpdateLio(leg, s, qty, lioSel, info);
+  cpReduceFaltante(s, qty);
+  try { updatePendingIndicator(); } catch (_e) {}
+  try { alert("✓ Completado: " + qty + " caja(s) del cód " + s.cod_art + " sumadas a la NP " + s.np + " (a facturar)."); } catch (_e) {}
+}
 
 /* ===== STOCK — baja por PICKING (v4.07): al TP, suma las cajas REALES pickeadas de
    la tanda (eventos PKC: texto=tanda|art|esp|real) y las resta de "Artículo Terminado".
