@@ -5314,7 +5314,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.03";
+const APP_VERSION = "v5.04";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -12963,8 +12963,12 @@ function _pppComputeErrors(peds, entSet) {
     const zCol = _pppS(p.zona);
     if (!pppEsSuper(p) && !_PPP_ZONA_EXENTA[zCol.toLowerCase()]) {
       const zb = pppZonaDeBarrio(p.localidad);
-      if (!zb) { p._err.push("sinzona"); sinZona.push(p); }
-      else if (zCol && _pppZonaNorm(zCol) !== _pppZonaNorm(zb)) { p._err.push("zonadif"); zonaDif.push(p); }
+      // "Sin zona" SOLO si NI el barrio (mapa del cliente) NI la columna `zona` de
+      // Supabase (autozona) la resuelven. Antes marcaba sin-zona con solo el barrio
+      // desconocido para el cliente, ignorando que Supabase ya tenía la zona derivada
+      // del barrio (tabla Zonas_Barrios) → falsos "N sin zona" (ej. José León Suárez).
+      if (!zb && !zCol) { p._err.push("sinzona"); sinZona.push(p); }
+      else if (zb && zCol && _pppZonaNorm(zCol) !== _pppZonaNorm(zb)) { p._err.push("zonadif"); zonaDif.push(p); }
     }
   }
   // Tandas inconsistentes: ruta (camión) mezclada o varias fechas de entrega.
