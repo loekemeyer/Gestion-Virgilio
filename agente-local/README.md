@@ -25,7 +25,9 @@ set SUPABASE_SERVICE_KEY=<pegá acá la service_role key NUEVA>
 :: set NC_BASE_DIR=C:\Users\Public\Documents
 python nc_ingest.py
 ```
-Por defecto mira `Documentos\PDF_ISIS` (Loeke) y `Documentos\PDF_ISISCHEF` (Chef).
+Por defecto mira la carpeta **Documentos del usuario que lo corre** (automático y por
+usuario — resuelve la carpeta real del sistema vía el registro de Windows, maneja
+OneDrive/redirección): `Documentos\PDF_ISIS` (Loeke) y `Documentos\PDF_ISISCHEF` (Chef).
 Revisá cada 30 s; `Ctrl+C` para parar. Para que arranque solo, programalo con el
 **Programador de tareas** de Windows (al iniciar sesión).
 

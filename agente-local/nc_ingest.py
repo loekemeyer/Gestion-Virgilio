@@ -29,10 +29,26 @@ SERVICE_KEY  = os.environ.get("SUPABASE_SERVICE_KEY", "")
 if not SERVICE_KEY:
     sys.exit("Falta SUPABASE_SERVICE_KEY (variable de entorno con la service_role key).")
 
-# Carpetas a vigilar → (ruta, division). Por defecto: Documentos\PDF_ISIS (Loeke) y
-# Documentos\PDF_ISISCHEF (Chef). Si están en los Documentos PÚBLICOS/compartidos,
-# antes de correr poné:  set NC_BASE_DIR=C:\Users\Public\Documents
-BASE_DIR = os.environ.get("NC_BASE_DIR") or os.path.join(os.path.expanduser("~"), "Documents")
+# Carpeta "Documentos" del usuario que corre el agente — automático y POR USUARIO.
+# Resuelve la carpeta REAL del sistema (maneja redirección / OneDrive) vía el registro
+# de Windows (HKCU, así cada usuario usa la suya). Para forzar otra ruta, antes de
+# correr poné:  set NC_BASE_DIR=D:\loQueSea
+def documentos_dir():
+    d = os.environ.get("NC_BASE_DIR")
+    if d:
+        return d
+    if os.name == "nt":
+        try:
+            import winreg
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER,
+                    r"Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders") as k:
+                val, _ = winreg.QueryValueEx(k, "Personal")   # "Personal" = Documentos
+                return os.path.expandvars(val)                # expande %USERPROFILE% etc.
+        except Exception:
+            pass
+    return os.path.join(os.path.expanduser("~"), "Documents")
+
+BASE_DIR = documentos_dir()
 CARPETAS = [
     (os.path.join(BASE_DIR, "PDF_ISIS"),     "loeke"),
     (os.path.join(BASE_DIR, "PDF_ISISCHEF"), "chef"),
