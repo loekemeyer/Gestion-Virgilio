@@ -1,0 +1,5 @@
+# Estado local del agente (qué PDF ya procesó) — no va al repo
+nc_procesados.json
+# Nunca subir secretos / config local con la service key
+.env
+*.local
