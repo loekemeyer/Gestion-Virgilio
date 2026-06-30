@@ -5336,7 +5336,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.08";
+const APP_VERSION = "v5.09";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -9572,7 +9572,11 @@ async function stockBajaPicking(tanda, legajo) {
     const r = await fetch(SUPABASE_URL + "/rest/v1/Registros_Produccion_Virgilio?opcion=eq.PKC&ts_cliente=gte." + encodeURIComponent(since) + "&select=texto&limit=20000", { headers: H, cache: "no-store" });
     const evs = r.ok ? await r.json() : [];
     const byArt = {};
-    evs.forEach(function (ev) { const p = String(ev.texto || "").split("|"); if (String(p[0] || "").trim().toUpperCase() !== t) return; const art = String(p[1] || "").trim(); const real = parseInt(p[3], 10); if (art && !isNaN(real) && real > 0) byArt[art] = (byArt[art] || 0) + real; });
+    // Equivalencia (v5.09): si se pickeó un código de pedido (029), el stock que baja
+    // es el REAL (437E) — físicamente eso sale de góndola. equivResolve es idempotente
+    // para códigos que ya son reales. El resto del pipeline (a separar→a facturar) sigue
+    // por tanda, así que el 437E fluye solo. Faltantes/facturación siguen con el 029.
+    evs.forEach(function (ev) { const p = String(ev.texto || "").split("|"); if (String(p[0] || "").trim().toUpperCase() !== t) return; const art = equivResolve(String(p[1] || "").trim()); const real = parseInt(p[3], 10); if (art && !isNaN(real) && real > 0) byArt[art] = (byArt[art] || 0) + real; });
     // Saldos actuales (para repartir la baja entre excedente/góndola y detectar falta).
     let sal = {};
     try { sal = stockComputeSaldos(await stockFetchMovs(), await stockGetCutoff()); } catch (_e) {}
