@@ -5336,7 +5336,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.07";
+const APP_VERSION = "v5.08";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -5717,6 +5717,27 @@ async function loadPlanimetriaRemote() {
   } catch (_e) { /* offline / sin tabla: queda la planimetría estática */ }
 }
 loadPlanimetriaRemote();   // al arrancar (para que el picking tenga la planimetría fresca)
+
+/* ===== Equivalencias de código cliente→interno (v5.08): el cliente pide un código
+   (ej. 029) pero físicamente se levanta otro (ej. 437E = colador 16cm importado).
+   El picking resuelve cod_pedido → cod_real para la PLANIMETRÍA (ubicación) y para la
+   alerta "sin planimetría" (029 no es código de depósito, 437E sí). El código que se
+   trackea sigue siendo el del pedido (029) para faltantes/facturación; solo se RESUELVE
+   para ubicar y para no dar falsa alerta. Fuente: tabla Supabase Equivalencias_Codigos
+   (anon select). Claves normalizadas sin ceros a la izquierda. ===== */
+let _codeEquiv = { "29": { real: "437E", nota: "Colador 16cm importado" }, "30": { real: "438E", nota: "Colador importado" } };
+function _equivNorm(c) { return String(c == null ? "" : c).toUpperCase().trim().replace(/^0+(?=.)/, ""); }
+function equivLookup(cod) { return _codeEquiv[_equivNorm(cod)] || null; }
+function equivResolve(cod) { const e = equivLookup(cod); return e ? e.real : String(cod == null ? "" : cod); }
+async function loadEquivalencias() {
+  try {
+    const r = await fetch(SUPABASE_URL + "/rest/v1/Equivalencias_Codigos?select=cod_pedido,cod_real,nota", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+    if (!r.ok) return;
+    const rows = await r.json();
+    rows.forEach(function (x) { const k = _equivNorm(x.cod_pedido); if (k && x.cod_real) _codeEquiv[k] = { real: String(x.cod_real).toUpperCase(), nota: x.nota || "" }; });
+  } catch (_e) {}
+}
+loadEquivalencias();
 
 /* SW + IDB: registrar el SW, replicar la cola completa de LS a IDB para
    que el SW la vea, y volver a pedir un background sync si la cola tiene
@@ -6263,7 +6284,8 @@ async function showPickingList(tanda, legajo) {
     // cada código y le adjunta su sector. Los códigos sin planimetría caen al
     // final, ordenados numéricamente entre sí.
     const G = (typeof window !== "undefined" && window.GONDOLA) ? window.GONDOLA : {};
-    const gOf = (c) => G[String(c).toUpperCase()] || null;
+    // Resuelve por equivalencia (029→437E) si el código no está directo en la planimetría.
+    const gOf = (c) => G[String(c).toUpperCase()] || G[String(equivResolve(c)).toUpperCase()] || null;
     const gOrden = (c) => { const e = gOf(c); return (e && typeof e[1] === "number") ? e[1] : Number.MAX_SAFE_INTEGER; };
     const numKey = (c) => { const mm = String(c).match(/^(\d+)/); return mm ? parseInt(mm[1], 10) : Number.MAX_SAFE_INTEGER; };
     // Par Nacional/Importado: base (574) y base+E (574E) cargados en la planimetría
@@ -6280,7 +6302,7 @@ async function showPickingList(tanda, legajo) {
     };
     const items = Object.keys(agg)
       .sort((a, b) => (gOrden(a) - gOrden(b)) || (numKey(a) - numKey(b)) || (a < b ? -1 : a > b ? 1 : 0))
-      .map(art => { const e = gOf(art); return { art: art, key: art, esp: agg[art], sector: (e && e[0]) ? e[0] : "—", dual: dualOf(art) }; });
+      .map(art => { const e = gOf(art); const eq = equivLookup(art); return { art: art, key: art, esp: agg[art], sector: (e && e[0]) ? e[0] : "—", dual: dualOf(art), real: eq ? eq.real : null, realNota: eq ? eq.nota : null }; });
     if (!items.length) {
       _pk = null;
       m.querySelector(".tanda-modal-body").innerHTML =
@@ -6408,10 +6430,13 @@ function pkRender() {
   // el "sector" es la ubicación del excedente (no la góndola).
   const sectorTxt = String(it.isExc ? (it.excUbic || it.sector || "—") : (it.sector || "—")).replace(/-/g, "");
   const sectorBig = `<span class="pk-sector-big${it.isExc ? " exc" : ""}">${escapeHtml(sectorTxt)}</span>`;
+  const equivHint = it.real
+    ? `<div style="background:#fff7ed;border:1px solid #fdba74;color:#9a3412;border-radius:10px;padding:9px 11px;margin-top:8px;font-size:14px;font-weight:800;text-align:center;line-height:1.25;">👉 Levantá el <b>${escapeHtml(it.real)}</b>${it.realNota ? " — " + escapeHtml(it.realNota) : ""}<br><small style="font-weight:700;opacity:.85;">(el cliente lo pidió como ${escapeHtml(it.art)})</small></div>`
+    : ``;
   const bigRow = `<div class="pk-big-row">
       <div class="pk-big-col"><span class="pk-cod-lbl">${it.isExc ? "📦 UBICACIÓN" : "SECTOR"}</span>${sectorBig}</div>
       <div class="pk-big-col pk-big-right"><span class="pk-cod-lbl">${it.isExc ? "EXCEDENTE" : "CÓDIGO"}</span><span class="pk-cod-big">${escapeHtml(rec)}</span></div>
-    </div>`;
+    </div>${equivHint}`;
   if (_pk.mode === "fInput") {
     body.innerHTML = `<div class="pk-flow">${nav}
       ${bigRow}
@@ -6643,7 +6668,8 @@ function pkNotifySinPlanim(tanda, legajo, items, G) {
     const sin = [];
     for (const it of items) {
       const c = String(it.art).toUpperCase();
-      if (!G[c] && sin.indexOf(c) < 0) sin.push(c);
+      // No marcar "sin planimetría" si resuelve por equivalencia (029→437E).
+      if (!G[c] && !G[String(equivResolve(it.art)).toUpperCase()] && sin.indexOf(c) < 0) sin.push(c);
     }
     if (!sin.length) return;
     const payload = {
