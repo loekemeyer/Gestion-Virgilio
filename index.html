@@ -5365,7 +5365,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.14";
+const APP_VERSION = "v5.15";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -5622,7 +5622,7 @@ async function send() {
   // v4.07: al INICIAR Guardado a Góndola (MG): pantalla para pasar de "Mercadería a guardar" a "Terminado".
   if (opcion === "MG") {
     const stMG = getLegajoState(legajoStr);
-    if (stMG && stMG.toggles && stMG.toggles.MG) showMGModal(legajoStr);
+    if (stMG && stMG.toggles && stMG.toggles.MG) showMGChooser(legajoStr);   // v5.15: pregunta qué baja (a guardar / racks)
   }
   // v4.09: al INICIAR Recepción/Entrega de Insumos (RI/EI): buscador de insumos para registrar
   // el stock que entra (+) o sale (−) en el depósito 'insumos' (con alta de código al vuelo).
@@ -9415,6 +9415,119 @@ function mgEmitFueraLista(cod, g, e, legajo) {
   try { updatePendingIndicator(); } catch (_e) {}
 }
 function closeMG() { const ov = document.getElementById("mgModal"); if (ov) ov.classList.remove("show"); _mg = null; }
+
+/* MG ahora pregunta QUÉ se baja a góndola (v5.15): lo que llegó (a guardar) o de los
+   racks. "De los racks" abre showRacksBajarModal. */
+let _mgChooserLegajo = "";
+function showMGChooser(legajo) {
+  _mgChooserLegajo = String(legajo || "");
+  let ov = document.getElementById("mgChooserModal");
+  if (!ov) { ov = document.createElement("div"); ov.id = "mgChooserModal"; ov.style.cssText = "position:fixed;inset:0;z-index:1296;background:rgba(2,6,23,.74);display:flex;align-items:center;justify-content:center;padding:16px;"; document.body.appendChild(ov); }
+  ov.innerHTML = '<div style="background:#f8fafc;max-width:380px;width:100%;border-radius:16px;padding:18px;box-shadow:0 24px 70px rgba(0,0,0,.5);box-sizing:border-box;">' +
+    '<div style="font-size:18px;font-weight:800;margin-bottom:3px;">📥 Bajar a góndola</div>' +
+    '<div style="font-size:13px;color:#64748b;margin-bottom:16px;">¿Qué vas a bajar?</div>' +
+    '<button onclick="mgChooserGo(\'guardar\')" style="width:100%;margin-bottom:10px;padding:16px;border:none;border-radius:12px;background:#16a34a;color:#fff;font-size:16px;font-weight:800;cursor:pointer;">📦 Lo que llegó <span style="font-weight:600;opacity:.85;">(a guardar)</span></button>' +
+    '<button onclick="mgChooserGo(\'racks\')" style="width:100%;margin-bottom:10px;padding:16px;border:none;border-radius:12px;background:#1e6bd6;color:#fff;font-size:16px;font-weight:800;cursor:pointer;">🏗 De los racks</button>' +
+    '<button onclick="closeMGChooser()" style="width:100%;padding:11px;border:none;border-radius:10px;background:#e2e8f0;color:#475569;font-weight:700;cursor:pointer;">Cancelar</button>' +
+    '</div>';
+  ov.style.display = "flex";
+}
+function closeMGChooser() { const ov = document.getElementById("mgChooserModal"); if (ov) ov.style.display = "none"; }
+function mgChooserGo(which) { closeMGChooser(); if (which === "racks") showRacksBajarModal(_mgChooserLegajo); else showMGModal(_mgChooserLegajo); }
+
+/* Bajar de racks a góndola (operario, v5.15). Lista lo que hay en racks ORDENADO por
+   código; si algo físico no figura, "+" para agregarlo → alerta Telegram (evento RKX).
+   Si tipean un código que NO existe pero sí su versión con E (583 vs 583E), lo sugiere.
+   Al confirmar: racks − / terminado +. NO toca racks de fondo (se reconcilia con #5). */
+let _rkb = null;
+async function showRacksBajarModal(legajo) {
+  if (!document.getElementById("rkbCss")) {
+    const s = document.createElement("style"); s.id = "rkbCss";
+    s.textContent = "#rkbModal{display:none;position:fixed;inset:0;z-index:1290;background:rgba(2,6,23,.74);overflow:auto;padding:12px;}#rkbModal.show{display:block;}.rkb-card{background:#f8fafc;max-width:460px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.rkb-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;background:linear-gradient(90deg,#1e6bd6,#1d4ed8);color:#fff;}.rkb-title{font-size:17px;font-weight:800;}.rkb-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}.rkb-body{padding:13px 14px;}.rkb-hint{font-size:12.5px;color:#64748b;margin-bottom:10px;line-height:1.35;}.rkb-search{width:100%;height:44px;border:2px solid #cbd5e1;border-radius:11px;padding:0 13px;font-size:16px;font-weight:700;margin-bottom:10px;box-sizing:border-box;}.rkb-row{display:flex;align-items:center;gap:10px;border:1px solid #e2e8f0;border-radius:13px;padding:10px 12px;margin-bottom:8px;background:#fff;}.rkb-info{flex:1;min-width:0;}.rkb-cod{font-size:16px;font-weight:800;font-family:Consolas,Menlo,monospace;}.rkb-desc{font-size:12px;color:#475569;}.rkb-av{font-size:11.5px;color:#64748b;}.rkb-mano{font-weight:800;color:#b45309;}.rkb-stp{display:flex;align-items:center;gap:6px;}.rkb-sb{width:42px;height:46px;border:none;border-radius:9px;font-size:24px;font-weight:800;cursor:pointer;background:#e2e8f0;color:#475569;}.rkb-inp{width:54px;height:46px;text-align:center;font-size:20px;font-weight:800;border:2px solid #cbd5e1;border-radius:9px;padding:0;-moz-appearance:textfield;}.rkb-inp::-webkit-outer-spin-button,.rkb-inp::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}.rkb-add{background:#fffbeb;border:1px solid #fcd34d;border-radius:11px;padding:11px 12px;margin-bottom:10px;font-size:13px;color:#92400e;line-height:1.4;}.rkb-addbtn{margin-top:6px;background:#1e6bd6;color:#fff;border:none;border-radius:9px;padding:8px 13px;font-weight:800;cursor:pointer;display:inline-block;}.rkb-sug{margin-top:5px;font-size:12px;font-weight:700;}.rkb-fin{width:100%;margin-top:10px;padding:14px;border:none;border-radius:12px;background:#1e6bd6;color:#fff;font-size:17px;font-weight:800;cursor:pointer;}.rkb-fin:disabled{background:#cbd5e1;color:#64748b;cursor:not-allowed;}.rkb-empty{padding:18px;text-align:center;color:#64748b;font-size:14px;}";
+    document.head.appendChild(s);
+  }
+  let ov = document.getElementById("rkbModal");
+  if (!ov) { ov = document.createElement("div"); ov.id = "rkbModal"; document.body.appendChild(ov); }
+  ov.classList.add("show");
+  ov.innerHTML = '<div class="rkb-card"><div class="rkb-head"><span class="rkb-title">🏗 Bajar de racks a góndola</span><button class="rkb-close" onclick="closeRkb()">Cerrar</button></div><div class="rkb-body" id="rkbBody"><div class="rkb-empty">Cargando racks…</div></div></div>';
+  try {
+    const res = await Promise.all([stockFetchSaldos(), loadArtNombres()]);
+    const saldos = res[0] || {};
+    const sN = {}; Object.keys(saldos).forEach(function (k) { sN[_cpNorm(k)] = saldos[k]; });
+    const items = Object.keys(saldos).map(function (k) { return saldos[k]; }).filter(function (a) { return (a.racks || 0) > 0; })
+      .sort(function (a, b) { return (parseInt(a.cod, 10) || 0) - (parseInt(b.cod, 10) || 0); })
+      .map(function (a) { return { cod: a.cod, desc: artNombre(a.cod, a.desc), racks: Math.round(a.racks), baja: 0, manual: false }; });
+    _rkb = { legajo: String(legajo || ""), items: items, saldosN: sN, filtro: "" };
+    rkbRender();
+  } catch (e) { const b = document.getElementById("rkbBody"); if (b) b.innerHTML = '<div class="rkb-empty">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
+}
+function rkbRender() {
+  if (!_rkb) return; const body = document.getElementById("rkbBody"); if (!body) return;
+  let h = '<div class="rkb-hint">Aparece <b>ordenado por código</b> lo que hay en racks. Si algo que tenés físicamente <b>no figura</b>, buscalo y tocá <b>➕</b> (avisa por Telegram para revisar).</div>';
+  h += '<input id="rkbSearch" class="rkb-search" type="search" autocomplete="off" placeholder="🔎 Buscar código…" value="' + escapeHtml(_rkb.filtro || "") + '" oninput="rkbSearchInput(this.value)">';
+  const fq = String(_rkb.filtro || "").trim(), fLo = fq.toLowerCase(), fUp = fq.toUpperCase();
+  const shown = fq ? _rkb.items.filter(function (it) { return String(it.cod).toLowerCase().indexOf(fLo) >= 0; }) : _rkb.items;
+  const exact = _rkb.items.some(function (it) { return String(it.cod).toUpperCase() === fUp; });
+  if (fq && !exact) {
+    const enCat = !!_rkb.saldosN[_cpNorm(fq)];
+    const eVer = (!fUp.endsWith("E") && _rkb.saldosN[_cpNorm(fq + "E")]) ? (fUp + "E") : "";
+    let add = '<div class="rkb-add">El código <b>' + escapeHtml(fUp) + '</b> no está en racks. ';
+    if (eVer) add += '¿No será <b>' + escapeHtml(eVer) + '</b>? <button class="rkb-addbtn" onclick="rkbAddManual(\'' + eVer + '\')">Usar ' + escapeHtml(eVer) + '</button>';
+    else if (enCat) add += '<div class="rkb-sug" style="color:#b45309">⚠ No figura en racks → al bajarlo avisa por Telegram.</div><button class="rkb-addbtn" onclick="rkbAddManual(\'' + fUp.replace(/[^A-Z0-9]/g, "") + '\')">➕ Bajarlo igual</button>';
+    else add += '<div class="rkb-sug" style="color:#dc2626">⚠ Ese código <b>no existe</b> en el catálogo (¿le falta la E?). Revisalo.</div><button class="rkb-addbtn" onclick="rkbAddManual(\'' + fUp.replace(/[^A-Z0-9]/g, "") + '\')">➕ Bajarlo igual de todos modos</button>';
+    add += '</div>';
+    h += add;
+  }
+  if (!shown.length && !(fq && !exact)) h += '<div class="rkb-empty">' + (fq ? "Sin resultados." : "No hay stock cargado en racks. Buscá el código y tocá ➕ para bajar igual.") + '</div>';
+  h += shown.map(function (it) {
+    const i = _rkb.items.indexOf(it);
+    const head = it.manual ? '<span class="rkb-av rkb-mano">⚠ fuera de lista</span>' : '<span class="rkb-av">en racks: <b>' + it.racks + '</b></span>';
+    const mx = it.manual ? 99999 : it.racks;
+    return '<div class="rkb-row"><div class="rkb-info"><span class="rkb-cod">' + escapeHtml(it.cod) + '</span> <span class="rkb-desc">' + escapeHtml(it.desc || "") + '</span><div>' + head + '</div></div>' +
+      '<div class="rkb-stp"><button class="rkb-sb" onclick="rkbChg(' + i + ',-1)">–</button><input class="rkb-inp" type="number" min="0" max="' + mx + '" inputmode="numeric" value="' + it.baja + '" oninput="rkbSet(' + i + ',this.value)"><button class="rkb-sb" onclick="rkbChg(' + i + ',1)">+</button></div></div>';
+  }).join("");
+  const tot = _rkb.items.reduce(function (s, it) { return s + (it.baja || 0); }, 0);
+  h += '<button class="rkb-fin"' + (tot <= 0 ? " disabled" : "") + ' onclick="rkbConfirmar()">✓ Bajar ' + tot + ' caja(s) a góndola</button>';
+  _renderKeepFocus(body, h);
+}
+function rkbSearchInput(v) { if (!_rkb) return; _rkb.filtro = String(v == null ? "" : v); rkbRender(); }
+function rkbAddManual(cod) {
+  if (!_rkb) return; cod = String(cod || "").toUpperCase().trim(); if (!cod) return;
+  if (!_rkb.items.some(function (it) { return String(it.cod).toUpperCase() === cod; })) {
+    const inCat = _rkb.saldosN[_cpNorm(cod)];
+    _rkb.items.push({ cod: cod, desc: artNombre(cod, ""), racks: 0, baja: 1, manual: !inCat });
+  }
+  _rkb.filtro = ""; rkbRender();
+}
+function rkbChg(i, d) { if (!_rkb) return; const it = _rkb.items[i]; if (!it) return; const mx = it.manual ? 99999 : it.racks; it.baja = Math.max(0, Math.min(mx, it.baja + d)); rkbRender(); }
+function rkbSet(i, v) { if (!_rkb) return; const it = _rkb.items[i]; if (!it) return; let n = Math.max(0, parseInt(v, 10) || 0); const mx = it.manual ? 99999 : it.racks; if (n > mx) n = mx; it.baja = n; rkbRender(); }
+function closeRkb() { const ov = document.getElementById("rkbModal"); if (ov) ov.classList.remove("show"); _rkb = null; }
+function rkbConfirmar() {
+  if (!_rkb) return;
+  const sel = _rkb.items.filter(function (it) { return it.baja > 0; });
+  if (!sel.length) return;
+  const rows = [];
+  sel.forEach(function (it) {
+    rows.push({ cod_art: it.cod, descripcion: it.desc || null, deposito: "racks", delta: -it.baja, tipo: "baja_racks", ref: "operario", legajo: _rkb.legajo || null });
+    rows.push({ cod_art: it.cod, descripcion: it.desc || null, deposito: "terminado", delta: it.baja, tipo: "baja_racks", ref: "operario", legajo: _rkb.legajo || null });
+  });
+  // alerta Telegram por cada bajada fuera de lista (no estaba en racks) — evento RKX
+  sel.filter(function (it) { return it.manual; }).forEach(function (it) { try { rkbEmitFueraLista(it.cod, it.baja, _rkb.legajo); } catch (_e) {} });
+  const tot = sel.reduce(function (s, it) { return s + it.baja; }, 0);
+  closeRkb();
+  try { stockMove(rows); } catch (_e) {}
+  try { alert("✓ Bajaste " + tot + " caja(s) de racks a góndola."); } catch (_e) {}
+}
+function rkbEmitFueraLista(cod, cajas, legajo) {
+  const payload = {
+    legajo: String(legajo || "").trim(), opcion: "RKX", descripcion: "Bajada de racks fuera de lista",
+    texto: (String(cod).toUpperCase() + "|R" + (cajas || 0)),
+    ts: Date.now(), id: ("rkx_" + String(cod).toUpperCase() + "_" + String(legajo || "").trim() + "_" + Date.now()).replace(/[^a-zA-Z0-9_\-]/g, ""), ts_inicio_iso: null
+  };
+  enqueueReport(payload);
+  if (typeof trySendOneReport === "function") trySendOneReport(payload).then(function (r) { if (r && r.ok) removeFromQueue(payload.id); }).catch(function () {});
+  try { updatePendingIndicator(); } catch (_e) {}
+}
 
 /* ===== STOCK — CP · Completar Pedido (v5.05): el operario (botonera 4ª fila) o
    Marianela agrega cajas que llegaron TARDE a una NP ya armada y SIN facturar.
