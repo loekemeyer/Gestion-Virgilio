@@ -4,7 +4,9 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-06-30 · Versión app al documentar: **v5.13**
+> Última actualización: 2026-06-30 · Versión app al documentar: **v5.14**
+>
+> Nota: **v5.14 — Instructivo de onboarding (#29)**. Botón **"❓ ¿Cómo se usa?"** en la pantalla inicial (`legajoScreen`, visible logueado o no) → modal con ayuda **breve por rubro**: 🛒 Picking (EP/TP), 🔨 Armado (AP/TAP + los 4 pasos del asistente: faltantes/clasificar/separar/líos), 📦➕ Completar Pedido (CP), 🏭 Recepción (RT/RR), 🚚 Carga y control (CC/CR), 📥 Guardar a góndola (MG), 🧰 Insumos y Cervantes (RI/EI/SC), ⏱ Pausas (AT/PB/Limp/Perm/PC/CT). Solo lectura, contenido **estático** (`showInstructivo`/`closeInstructivo`). Verificado headless. Cierra #29.
 >
 > Nota: **v5.13 — `Zonas_Barrios` (Supabase) → cliente (#37)**. `pppZonaDeBarrio` ahora **mergea la tabla `Zonas_Barrios`** (la misma que llena autozona) en su lookup: prioridad **override local > Supabase (`_pppZonaSupa`) > `PPP_BARRIO_ZONA` hardcodeado**. Así el **RUTEO** y el **SUGERIDOR** conocen los barrios nuevos (Suárez, Chilavert…) sin re-hardcodear — **completa el fix v5.04** (que solo arreglaba la detección de "sin zona" en el monitor, no el ruteo). `loadZonasBarriosRemote()` se llama al cargar (fetch `Zonas_Barrios?select=barrio_norm,zona`); la clave `barrio_norm` == `pppNormBarrio(barrio)` (NFKD + sin tildes + minúsculas, verificado). `_pppZonaSupa` declarado **antes** de `pppZonaDeBarrio` (evita TDZ, el patrón que cazó el agente SE). Verificado headless (Suárez/Chilavert resuelven, barrio desconocido → ""). Cierra la tarea #37.
 >

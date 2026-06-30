@@ -3063,6 +3063,8 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
     </div>
   </div>
 
+  <button id="btnInstructivo" onclick="showInstructivo()" style="margin:14px auto 0;display:block;background:none;border:none;color:#1e6bd6;font-weight:700;font-size:13.5px;cursor:pointer;text-decoration:underline;">❓ ¿Cómo se usa? — instructivo rápido</button>
+
   <!-- OPERARIO: tras loguear se muestra el nombre (no se tipea legajo).
        #legajoInput queda oculto pero conserva el valor para el resto del código. -->
   <div id="legajoEntry" class="hidden">
@@ -4491,6 +4493,33 @@ Object.keys(filas).forEach(rowId => {
 /* =========================================================
    NAVEGACIÓN
    ========================================================= */
+/* Instructivo de onboarding (#29): ayuda breve por rubro, accesible desde la pantalla
+   inicial (botón "¿Cómo se usa?"). Solo lectura, contenido estático. */
+function showInstructivo() {
+  if (!document.getElementById("instrCss")) {
+    const s = document.createElement("style"); s.id = "instrCss";
+    s.textContent = "#instrModal{display:none;position:fixed;inset:0;z-index:1300;background:rgba(2,6,23,.78);overflow:auto;padding:12px;}#instrModal.show{display:block;}.instr-card{background:#f8fafc;max-width:460px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.instr-head{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:linear-gradient(90deg,#1e6bd6,#1d4ed8);color:#fff;position:sticky;top:0;}.instr-title{font-size:18px;font-weight:800;}.instr-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}.instr-body{padding:13px 14px 22px;}.instr-intro{font-size:13px;color:#475569;line-height:1.4;margin-bottom:12px;}.instr-sec{background:#fff;border:1px solid #e2e8f0;border-radius:13px;padding:11px 13px;margin-bottom:9px;}.instr-st{font-size:14.5px;font-weight:800;color:#0f172a;margin-bottom:3px;}.instr-codes{font-size:11.5px;font-weight:800;color:#1e6bd6;font-family:Consolas,Menlo,monospace;margin-bottom:5px;}.instr-tx{font-size:12.5px;color:#475569;line-height:1.4;}";
+    document.head.appendChild(s);
+  }
+  let ov = document.getElementById("instrModal");
+  if (!ov) { ov = document.createElement("div"); ov.id = "instrModal"; document.body.appendChild(ov); }
+  const SEC = [
+    { t: "🛒 Picking", c: "EP · TP", x: "EP = empecé a pickear (elegí la tanda). La app te guía artículo por artículo: <b>sector + código + cuántas</b>. Si no hay, tocás <b>Faltan</b>. TP = terminé." },
+    { t: "🔨 Armado de pedidos", c: "AP · TAP", x: "AP = empecé a armar. Se abre el asistente en pasos: <b>1)</b> faltantes, <b>2)</b> clasificar cada pedido <b>Lío/Etiqueta/Nada</b>, <b>3)</b> separar la mesa por pedido, <b>4)</b> armar los líos. TAP = terminé." },
+    { t: "📦➕ Completar Pedido", c: "CP", x: "Si llegó una caja que <b>faltaba</b> en un pedido sin facturar: tocá CP → elegí el faltante → cuántas → de dónde sale → a qué lío va." },
+    { t: "🏭 Recepción", c: "RT · RR", x: "RT = recibí mercadería (entra a <b>“a guardar”</b>). RR = controlar los remitos cargados al camión." },
+    { t: "🚚 Carga y control", c: "CC · CR", x: "CC = inicio/fin de la carga del camión. CR = control de remitos." },
+    { t: "📥 Guardar a góndola", c: "MG", x: "Lo que está en <b>“a guardar”</b> lo pasás a góndola. Si la góndola está llena, marcás <b>Excedente</b> y su ubicación." },
+    { t: "🧰 Insumos y Cervantes", c: "RI · EI · SC", x: "RI/EI = recepción/entrega de insumos. SC = salida de mercadería a Cervantes." },
+    { t: "⏱ Pausas y otros", c: "AT · PB · Limp · Perm · PC · CT", x: "Marcá cuándo: atendés el timbre (AT), vas al baño (PB), limpiás (Limp), pedís permiso (Perm), parás a comer (PC) o hacés conteo (CT). Tocás al <b>empezar</b> y otra vez al <b>terminar</b>." }
+  ];
+  ov.innerHTML = '<div class="instr-card"><div class="instr-head"><span class="instr-title">❓ ¿Cómo se usa?</span><button class="instr-close" onclick="closeInstructivo()">Cerrar</button></div><div class="instr-body">' +
+    '<div class="instr-intro">Entrá con tu <b>legajo</b> y tocá el botón de lo que vas a hacer. Los <b>importantes</b> (picking/armado) son los <b>grandes de arriba</b>; los de uso puntual, más chicos abajo. Acá va, por rubro:</div>' +
+    SEC.map(function (s) { return '<div class="instr-sec"><div class="instr-st">' + s.t + '</div><div class="instr-codes">' + s.c + '</div><div class="instr-tx">' + s.x + '</div></div>'; }).join("") +
+    '</div></div>';
+  ov.classList.add("show");
+}
+function closeInstructivo() { const ov = document.getElementById("instrModal"); if (ov) ov.classList.remove("show"); }
 function goToOptions() {
   if (!legajoInput.value) return alert("Ingresá el número de legajo");
   saveLastLegajo(legajoInput.value);    // persistir para próximas aperturas
@@ -5336,7 +5365,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.13";
+const APP_VERSION = "v5.14";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
