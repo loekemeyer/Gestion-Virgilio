@@ -5336,7 +5336,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.11";
+const APP_VERSION = "v5.12";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -7108,6 +7108,15 @@ function _compRenderLios() {
   if (_comp.liosNpIdx == null) _comp.liosNpIdx = 0;
   if (!_comp.nps[0].codes) _compBuildLiosData();
   const idx = _comp.liosNpIdx, n = _comp.nps[idx];
+  if (n.clase === "etiqueta" || n.clase === "nada") {   // v5.12: súper/retira no arman líos
+    const _lbl = n.clase === "etiqueta" ? "🏷 Etiqueta (súper)" : "🚶 Retira";
+    let hh = '<div class="cmpl-nphead"><div class="cmpl-npinfo"><span class="cmpl-np">NP ' + escapeHtml(n.np) + '</span> <span class="cmpl-cli">' + escapeHtml(n.rs || "") + '</span></div><span class="cmpl-npidx">' + (idx + 1) + " / " + _comp.nps.length + '</span></div>';
+    hh += '<div class="cmpl-empty">' + _lbl + ' — sin líos. Ya está marcado 👍 Pasá a la siguiente.</div>';
+    hh += '<div class="cmpl-npbtns"><button class="cmpl-npbtn" onclick="_compLioNp(-1)"' + (idx <= 0 ? " disabled" : "") + '>← NP anterior</button><button class="cmpl-npbtn pri" onclick="_compLioNp(1)"' + (idx >= _comp.nps.length - 1 ? " disabled" : "") + '>NP siguiente →</button></div>';
+    el.innerHTML = hh;
+    const _fab = document.getElementById("compFab"); if (_fab) _fab.classList.add("hidden");
+    return;
+  }
   const view = (_comp.liosView === "sueltas" || _comp.liosView === "editar") ? _comp.liosView : "armar";
   const TOTAL = n.codes.reduce(function (s, c) { return s + c.sale; }, 0);
   const curCajas = n.codes.reduce(function (s, c) { return s + c.cur; }, 0);
@@ -7193,14 +7202,51 @@ function _compSepTap(npIdx, ci) {
   n.codes[ci].sep = !n.codes[ci].sep; _compRenderSep(); _compRecalc();
 }
 function _compSepArmar() { if (!_comp) return; if (_comp.sepNpIdx != null) _comp.liosNpIdx = _comp.sepNpIdx; _compGo(3); }
+/* Clasificación por NP (v5.12): antes de separar, marcar cada pedido Lío/Etiqueta/Nada
+   (lío=clientes · etiqueta=súper · nada=retira). Solo se marca (sin cantidades). Es un
+   GATE: no se separa/arma hasta clasificar todos. Etiqueta/Nada NO arman líos
+   (liosDone=true). La clase se guarda en el TAL (campo 5) para confirmar el patrón. */
+function _compRenderClasif(el) {
+  if (!_comp || !el) return;
+  const nps = _comp.nps, allDone = nps.every(function (n) { return !!n.clase; });
+  let h = '<div class="comp-step-t">Clasificá cada pedido</div>';
+  h += '<div style="font-size:12.5px;color:#64748b;margin:-4px 0 11px;line-height:1.35;">Por cada NP: <b>🎁 Lío</b> (clientes) · <b>🏷 Etiqueta</b> (súper) · <b>🚶 Nada</b> (retira). Solo marcar.</div>';
+  h += nps.map(function (n, i) {
+    const c = n.clase || "";
+    function b(val, ico, txt, col) { const on = c === val; return '<button onclick="_compSetClase(' + i + ',\'' + val + '\')" style="flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:1px;padding:9px 3px;border-radius:10px;border:2px solid ' + (on ? col : '#cbd5e1') + ';background:' + (on ? col + '14' : '#fff') + ';color:' + (on ? col : '#475569') + ';font-weight:800;font-size:16px;cursor:pointer;line-height:1;">' + ico + '<span style="font-size:11px;">' + txt + '</span></button>'; }
+    return '<div style="border:1px solid #e2e8f0;border-radius:12px;padding:9px 10px;margin-bottom:8px;background:#fff;">' +
+      '<div style="font-size:13.5px;font-weight:800;margin-bottom:7px;">NP ' + escapeHtml(n.np) + (n.rs ? ' <span style="font-weight:600;color:#64748b;font-size:11.5px;">' + escapeHtml(n.rs) + '</span>' : '') + '</div>' +
+      '<div style="display:flex;gap:6px;">' + b("lio", "🎁", "Lío", "#1e6bd6") + b("etiqueta", "🏷", "Etiqueta", "#b45309") + b("nada", "🚶", "Nada", "#475569") + '</div>' +
+      '</div>';
+  }).join("");
+  h += '<button onclick="_compClasifDone()"' + (allDone ? '' : ' disabled') + ' style="width:100%;margin-top:4px;padding:14px;border:none;border-radius:12px;background:' + (allDone ? '#16a34a' : '#cbd5e1') + ';color:' + (allDone ? '#fff' : '#64748b') + ';font-size:16px;font-weight:800;cursor:' + (allDone ? 'pointer' : 'not-allowed') + ';">✓ Listo — separar →</button>';
+  el.innerHTML = h;
+  const fab = document.getElementById("compFab"); if (fab) fab.classList.add("hidden");
+}
+function _compSetClase(i, clase) {
+  if (!_comp) return; const n = _comp.nps[i]; if (!n) return;
+  n.clase = clase;
+  if (clase === "etiqueta" || clase === "nada") { n.liosArr = []; n.lios = 0; n.liosDone = true; (n.codes || []).forEach(function (c) { c.cur = 0; }); }
+  else { try { _compLioMark(n); } catch (_e) {} }   // lío → liosDone refleja el estado real
+  _compRenderSep(); _compRecalc(); _compPersist();
+}
+function _compClasifDone() {
+  if (!_comp) return;
+  if (_comp.nps.some(function (n) { return !n.clase; })) return;
+  _comp.clasifDone = true;
+  if (_comp.sepNpIdx == null) _comp.sepNpIdx = 0;
+  _compRenderSep(); _compRecalc(); _compPersist();
+}
+function _compReclasif() { if (!_comp) return; _comp.clasifDone = false; _compRenderSep(); }
 function _compRenderSep() {
   const el = document.getElementById("compStepSep"); if (!el || !_comp) return;
+  if (!_comp.clasifDone) { _compRenderClasif(el); return; }   // ← gate de clasificación (v5.12)
   if (!_comp.nps[0] || !_comp.nps[0].codes || _comp._liosDirty) { _compBuildLiosData(); _comp._liosDirty = false; }
   const live = _compSepLiveNps();
   if (!live.length) { el.innerHTML = '<div class="comp-step-t">Separar por NP</div><div class="cmpl-empty">No hay nada para separar (todo faltó) 👍 Pasá a Líos con la flecha →.</div>'; return; }
   if (_comp.sepDif && _comp.sepDif.mode) { el.innerHTML = _compDifHtml(); return; }
   const mm = _compSepMesa(), view = (_comp.sepView === "picking") ? "picking" : "pedido";
-  let h = '<div class="csep-hd"><div class="csep-mesa">📦 <b>' + mm.mesa + '</b> en mesa</div>' +
+  let h = '<button onclick="_compReclasif()" style="background:none;border:none;color:#1e6bd6;font-weight:700;font-size:12px;cursor:pointer;padding:0 0 7px;">✎ reclasificar</button><div class="csep-hd"><div class="csep-mesa">📦 <b>' + mm.mesa + '</b> en mesa</div>' +
     '<div class="csep-sw"><span class="csep-swl' + (view === "picking" ? " on" : "") + '">Modo<br>picking</span>' +
     '<button class="csep-tog' + (view === "pedido" ? " on" : "") + '" onclick="_compSepView(\'' + (view === "pedido" ? "picking" : "pedido") + '\')" title="Cambiar vista"><span class="csep-knob"></span></button>' +
     '<span class="csep-swl' + (view === "pedido" ? " on" : "") + '">Por<br>pedido</span></div></div>';
@@ -7398,12 +7444,14 @@ async function compTerminar() {
   if (!_comp) return;
   // Paso 1 — faltantes: no se puede faltar MÁS de lo que dio el picking
   if (_comp.hayFalt) { for (const a of _comp.arts) { if (a.nps.length >= 2 && !a.auto) { const sum = a.nps.reduce(function (s, n) { return s + (n.asig || 0); }, 0); if (sum > a.falta) { _compGo(1); try { alert("El Art " + a.art + ": marcaste " + sum + " faltantes pero el picking solo dio " + a.falta + " cortas. No puede faltar más de eso."); } catch (_e) {} return; } } } }
+  // Clasificación (v5.12): todos los NP deben estar clasificados (lío/etiqueta/nada).
+  if (!_comp.clasifDone || _comp.nps.some(function (n) { return !n.clase; })) { _comp.clasifDone = false; _compGo(2); try { alert("Clasificá cada pedido (Lío / Etiqueta / Nada) antes de terminar."); } catch (_e) {} return; }
   // Paso 2 — líos: cada NP tiene que tener TODAS sus cajas repartidas en líos
   if (!_comp.nps[0] || !_comp.nps[0].codes || _comp._liosDirty) { _compBuildLiosData(); _comp._liosDirty = false; }
   const pendLios = _comp.nps.filter(function (n) { return !n.liosDone; });
   if (pendLios.length) { _comp.liosNpIdx = _comp.nps.indexOf(pendLios[0]); _compGo(2); try { alert("Faltan armar los líos de " + pendLios.length + " pedido(s): NP " + pendLios.map(function (n) { return n.np; }).join(", ") + "."); } catch (_e) {} return; }
   const legajo = _comp.legajo, tanda = _comp.tanda, fecha = _comp.fecha || "";
-  _comp.nps.forEach(function (n) { liosSend(legajo, n.np, n.liosArr.length, tanda, _compLiosResumen(n)); });   // líos (opcion TAL) + resumen de composición
+  _comp.nps.forEach(function (n) { liosSend(legajo, n.np, n.liosArr.length, tanda, _compLiosResumen(n), n.clase || ""); });   // líos (TAL) + resumen + clase (lio/etiqueta/nada)
   // Faltante por (NP, artículo) del reparto del Paso 2. Clave normalizada (sin la E final).
   const faltMap = {};
   if (_comp.hayFalt) _comp.arts.forEach(function (a) { const ka = String(a.art).toUpperCase().replace(/E$/, ""); a.nps.forEach(function (n) { if (n.asig > 0) faltMap[n.np + "|" + ka] = (faltMap[n.np + "|" + ka] || 0) + n.asig; }); });
@@ -9851,11 +9899,17 @@ function ccSendDetail(legajo, np, tanda) {
    ========================================================= */
 let _lios = null;   // { legajo, tanda, nps:[{np, rs}] }
 
-function liosSend(legajo, np, lios, tanda, resumen) {
+function liosSend(legajo, np, lios, tanda, resumen, clase) {
   const nowMs = Date.now();
+  // texto = NP|líos|tanda[|resumen[|clase]]. clase (v5.12) = lio|etiqueta|nada por NP
+  // (lío=clientes · etiqueta=súper · nada=retira). Backward-compatible: los lectores de
+  // TAL toman [0..3]; la clase queda en el campo [4].
+  let _txt = String(np) + "|" + String(lios) + "|" + String(tanda);
+  if (resumen || clase) _txt += "|" + String(resumen || "");
+  if (clase) _txt += "|" + String(clase);
   const payload = {
     legajo: legajo, opcion: "TAL", descripcion: "Líos por NP (TAP)",
-    texto: (String(np) + "|" + String(lios) + "|" + String(tanda) + (resumen ? "|" + String(resumen) : "")).toUpperCase(),
+    texto: _txt.toUpperCase(),
     ts: nowMs, id: nowMs.toString(36) + "_" + Math.random().toString(36).slice(2, 8), ts_inicio_iso: null
   };
   try {
