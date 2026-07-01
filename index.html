@@ -3495,7 +3495,7 @@ function getTodayKey() {
   return `${y}-${m}-${dd}`;
 }
 function formatDateTime(ts) {
-  try { return new Date(ts).toLocaleString("es-AR"); }
+  try { return new Date(ts).toLocaleString("es-AR", { timeZone: TZ_AR }); }
   catch (_e) { return ""; }
 }
 /* Total de cajas que el operario cargó hoy por el Modo OP de Recepción
@@ -5365,7 +5365,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.16";
+const APP_VERSION = "v5.17";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -7124,7 +7124,6 @@ function _compLioMark(n) { n.liosDone = n.codes.every(function (c) { return c.re
 function _compLioStep(ci, d) { const n = _compLioNow(); if (!n) return; const c = n.codes[ci]; if (!c) return; if (d > 0 && c.rest > 0) { c.rest--; c.cur++; } else if (d < 0 && c.cur > 0) { c.cur--; c.rest++; } else return; _compRenderLios(); _compRecalc(); }
 function _compLioSuelta(ci) { const n = _compLioNow(); if (!n) return; const c = n.codes[ci]; if (!c || c.rest <= 0) return; c.rest--; n.liosArr.push({ items: [{ cod: c.cod, qty: 1 }], cajas: 1, suelta: true }); _compLioMark(n); _compRenderLios(); _compRecalc(); }
 function _compLioSiguiente() { const n = _compLioNow(); if (!n) return; const items = n.codes.filter(function (c) { return c.cur > 0; }).map(function (c) { return { cod: c.cod, qty: c.cur }; }); const cajas = items.reduce(function (s, it) { return s + it.qty; }, 0); if (!cajas) return; n.liosArr.push({ items: items, cajas: cajas, suelta: false }); n.codes.forEach(function (c) { c.cur = 0; }); _compLioMark(n); _compRenderLios(); _compRecalc(); }
-function _compLioReset() { const n = _compLioNow(); if (!n) return; let any = false; n.codes.forEach(function (c) { if (c.cur > 0) { c.rest += c.cur; c.cur = 0; any = true; } }); if (any) { _compRenderLios(); _compRecalc(); } }
 function _compViewArmar() { if (_comp) { _comp.liosView = "armar"; _compRenderLios(); } }
 function _compViewSueltas() { if (_comp) { _comp.liosView = "sueltas"; _compRenderLios(); } }
 function _compSueltaUndo() { const n = _compLioNow(); if (!n) return; for (let k = n.liosArr.length - 1; k >= 0; k--) { if (n.liosArr[k].suelta) { _compLioDel(k); return; } } }
@@ -7838,7 +7837,7 @@ async function ocgDemanda() {
   try { base = await fetchPickingBase(); } catch (_e) {}
   const dem = {};
   Object.keys(npSet).forEach(function (np) {
-    (base.get(np) || []).forEach(function (it) { const a = String(it.art || "").toUpperCase().trim(); if (a) dem[a] = (dem[a] || 0) + (Number(it.cajas) || 0); });
+    (base.get(np) || []).forEach(function (it) { const a = _ocgNorm(it.art); if (a) dem[a] = (dem[a] || 0) + (Number(it.cajas) || 0); });
   });
   return dem;
 }
@@ -7848,20 +7847,30 @@ async function ocgEnter() {
   try {
     const res = await Promise.all([ocgFetchMaximos(), stockFetchMovs(), stockGetCutoff(), ocgDemanda(), ocgFetchProyeccion(), ocgFetchCapacidad()]);
     const maxs = res[0] || [], saldos = stockComputeSaldos(res[1] || [], res[2]), dem = res[3] || {}, proy = res[4] || {}, capac = res[5] || {};
+    // Cruce por código: TODO usa LA MISMA normalización (_ocgNorm = upper + sin ceros a la
+    // izquierda). Las claves de stockComputeSaldos son el cod_art CRUDO del movimiento →
+    // se re-indexa acá para que "007" y "7" caigan en el mismo bucket (si no, el stock da 0
+    // y se sobre-pide). Hallazgo ALTA de la auditoría SE (v5.17).
+    const stockN = {};
+    Object.keys(saldos).forEach(function (k) {
+      const n = _ocgNorm(k); if (!n) return;
+      const sd = saldos[k];
+      stockN[n] = (stockN[n] || 0) + (Number(sd.terminado) || 0) + (Number(sd.racks) || 0) + (Number(sd.excedente) || 0);
+    });
     const items = [];
     maxs.forEach(function (m) {
       const cod = String(m.cod).toUpperCase().trim();
-      const sd = saldos[cod] || {};
-      const stock = (Number(sd.terminado) || 0) + (Number(sd.racks) || 0) + (Number(sd.excedente) || 0);
-      const demanda = dem[cod] || 0;
+      const codN = _ocgNorm(cod);
+      const stock = stockN[codN] || 0;
+      const demanda = dem[codN] || 0;
       const indice = (Number(m.indice) > 0) ? Number(m.indice) : OCG_FACTOR_MAXIMO;
-      const pc = proy[_ocgNorm(cod)];   // proyección por tendencia en cajas/mes (o undefined)
+      const pc = proy[codN];   // proyección por tendencia en cajas/mes (o undefined)
       // Máximo = proyección × índice. Si el artículo no tiene proyección, cae al objetivo del Excel.
       const fuente = (pc != null) ? "proy" : "excel";
       let maxCajas = Math.ceil((pc != null) ? (pc * indice) : (Number(m.max_cajas) || 0));
       // CONTROL (v4.31): el máximo de OC no puede ser mayor a la capacidad de góndola
       // (suma de cajas_max de los sectores). Si la supera, se topa a la capacidad.
-      const cap = capac[_ocgNorm(cod)];
+      const cap = capac[codN];
       const capped = (cap != null && cap > 0 && maxCajas > cap);
       if (capped) maxCajas = Math.floor(cap);
       const faltaRaw = maxCajas + demanda - stock;
@@ -15323,7 +15332,7 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
         <td class="center">${statusCell(ev.separado, ev.sepLegajo, t.tanda, "separado")}</td>
       </tr>`;
   }
-  const todayStr = new Date().toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit" });
+  const todayStr = new Date().toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", timeZone: "America/Argentina/Buenos_Aires" });
   // todayKey/yesterdayKey ahora vienen como parámetros desde refreshMonitor —
   // los usaba acá showDayBreakdown indirectamente, pero ya está cubierto.
   if (!todayKey) todayKey = isoToDayKey(Date.now());
@@ -17115,8 +17124,10 @@ if (typeof supabase === "undefined") {
 }
 const { createClient } = supabase;   // global del bundle UMD self-hosted
 
-const SB_URL = "https://hrxfctzncixxqmpfhskv.supabase.co";
-const SB_KEY = "sb_publishable_BqpAgZH6ty-9wft10_YMhw_0rcIPuWT";
+// Única fuente de verdad: las constantes globales de arriba (≈3390). Si se rota la
+// key, queda UN solo lugar en esta página (sw.js y recepcion.js siguen aparte).
+const SB_URL = SUPABASE_URL;
+const SB_KEY = SUPABASE_KEY;
 
 const sb = createClient(SB_URL, SB_KEY, {
   auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: "pkce" }
