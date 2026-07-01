@@ -12,4 +12,7 @@ node tests/checkhtml.cjs
 echo "== smoke (Playwright headless) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/smoke.cjs
 
+echo "== ocg-norm (regresión: cruce de códigos del generador de OCs) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ocg-norm.cjs
+
 echo "== TODO OK =="
