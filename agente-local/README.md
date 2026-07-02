@@ -5,10 +5,16 @@ PDF, parsea los comprobantes (NC) y los sube a Supabase como **pendientes**; Mar
 después los confirma en la app.
 
 ## ⚠ Seguridad (importante)
-- Usa la **service_role key** de Supabase (acceso total → saltea RLS). Va **SOLO acá**,
-  en una **variable de entorno**. **Nunca** en el repo, en `index.html`, ni pegada en
-  ningún chat. Si alguna vez se expone, **rotala** en Supabase
-  (*Project Settings → API → service_role → Reset*).
+- Usa una **secret key** de Supabase (`sb_secret_…`, acceso total → saltea RLS). Va
+  **SOLO acá**, en una **variable de entorno**. **Nunca** en el repo, en `index.html`,
+  ni pegada en ningún chat.
+- **Crearla / rotarla** (dashboard nuevo): *Project Settings → API Keys → pestaña
+  "Publishable and secret API keys" → Create new secret key* (se muestra UNA sola vez).
+  Si se expone: crear una nueva, actualizar la variable de entorno y borrar la
+  comprometida desde esa misma pestaña.
+- La vieja `service_role` **legacy** (JWT `eyJ…`) quedó **deshabilitada** (pestaña
+  *"Legacy anon, service_role API keys" → Disable JWT-based API keys*) — no usarla.
+  ⚠ NO tocar "generate a new JWT secret": desloguea a todos los usuarios del proyecto.
 - El archivo de estado (`nc_procesados.json`) y cualquier config local **no se commitean**
   (ver `.gitignore`).
 
@@ -20,7 +26,7 @@ pip install pypdf requests
 ## Configurar y correr
 ```bat
 set SUPABASE_URL=https://hrxfctzncixxqmpfhskv.supabase.co
-set SUPABASE_SERVICE_KEY=<pegá acá la service_role key NUEVA>
+set SUPABASE_SERVICE_KEY=<pegá acá la secret key sb_secret_...>
 :: opcional, si los PDF están en Documentos compartidos/públicos:
 :: set NC_BASE_DIR=C:\Users\Public\Documents
 python nc_ingest.py
