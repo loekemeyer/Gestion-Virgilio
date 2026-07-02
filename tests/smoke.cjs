@@ -19,7 +19,7 @@ catch (_e) {
       "prodCompute", "prodLoad", "prodExportCsv", "prodSetMeta", "_pvPremio", "_pvMetas",
       "stkBodyProceso", "ocBodyEntregas", "ocgEnter", "insRender", "mgRender", "pkRender", "stockBajaPicking",
       "stockSepararAFacturar", "stockSalidaFacturado",
-      "showMGChooser", "showRacksBajarModal", "rkbRender", "rkbConfirmar", "rkbFetchCxM",
+      "showMGChooser", "showRacksBajarModal", "rkbRender", "rkbConfirmar", "rkbFetchCxM", "rkbSetSec",
       "showCPModal", "cpRender", "cpConfirm", "showInstructivo", "equivResolve", "pppZonaDeBarrio"];
     const missing = need.filter((n) => typeof window[n] !== "function");
     const ts = new Date().toISOString();

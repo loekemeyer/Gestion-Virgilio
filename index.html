@@ -5249,7 +5249,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.21";
+const APP_VERSION = "v5.22";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -7945,6 +7945,7 @@ function agtRender() {
     { key: "carga_sin_control", icon: "🚨", titulo: "Cargado al camión sin controlar", hint: "NPs cargados hace +30 h y nadie controló los remitos — riesgo de error de reparto." },
     { key: "picking_sin_stock", icon: "🛒", titulo: "Picking sin stock en góndola", hint: "Se sacaron cajas que el sistema NO tenía. Revisá stock / recepción." },
     { key: "error_envio", icon: "📡", titulo: "Envíos que fallaron (operarios)", hint: "Acciones de operarios que NO se subieron a Supabase — lo que hoy no ves." },
+    { key: "envio_recuperado", icon: "📶", titulo: "Envíos con reintento (llegaron igual)", hint: "Fallaron por señal pero entraron solos al reintentar — informativo, no se perdió nada. Si se repite en el mismo horario/zona, ahí hay un agujero de wifi." },
     { key: "mg_fuera_lista", icon: "📥", titulo: "Guardado fuera de lista", hint: "Se guardó un código que no estaba en 'Mercadería a guardar' (¿tipeo en recepción?)." },
     { key: "recepcion_absurda", icon: "📦❓", titulo: "Recepción con cantidad rara", hint: "Se recibió 0/negativo o muchísimo más de lo normal. Típico error de tipeo al recibir." },
     { key: "rendimiento_anomalo", icon: "📊", titulo: "Rendimiento anómalo (muy bajo/alto)", hint: "Operario con m³/h muy fuera de lo normal de su rol (últimas 4 sem). Muy bajo = revisar/ayudar; muy alto = ¿dato roto o súper jornada? También avisa por Telegram (1 vez/semana)." },
@@ -9362,29 +9363,34 @@ let _rkb = null;
 // (1:1, exacto) hasta que se defina su master real. El saldo de racks vive en INNER cajas.
 async function rkbFetchCxM() {
   try {
-    const r = await fetch(SUPABASE_URL + "/rest/v1/Racks_Planimetria?select=cod_art,master_cajas,innercajas&estado=eq.ocupado", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
-    if (!r.ok) return {};
+    const r = await fetch(SUPABASE_URL + "/rest/v1/Racks_Planimetria?select=sector,cod_art,master_cajas,innercajas&estado=eq.ocupado", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+    if (!r.ok) return { cxm: {}, locs: {} };
     const rows = await r.json();
-    const agg = {};
+    const agg = {}, locs = {};
     rows.forEach(function (x) {
-      if (!x.cod_art || !(Number(x.master_cajas) > 0) || !(Number(x.innercajas) > 0)) return;
+      if (!x.cod_art) return;
       const k = _cpNorm(String(x.cod_art).replace(/\s+/g, ""));
+      const inn = Number(x.innercajas) || 0, mas = Number(x.master_cajas) || 0;
+      // Ubicaciones con stock (planimetría viva, v5.22): dónde está el código.
+      if (inn > 0) { if (!locs[k]) locs[k] = []; locs[k].push({ sector: String(x.sector || "").trim(), master: mas, inner: inn }); }
+      if (!(mas > 0) || !(inn > 0)) return;
       if (!agg[k]) agg[k] = { inner: 0, master: 0, ratios: {} };
-      agg[k].inner += Number(x.innercajas); agg[k].master += Number(x.master_cajas);
-      agg[k].ratios[Math.round((Number(x.innercajas) / Number(x.master_cajas)) * 1000)] = 1;
+      agg[k].inner += inn; agg[k].master += mas;
+      agg[k].ratios[Math.round((inn / mas) * 1000)] = 1;
     });
+    Object.keys(locs).forEach(function (k) { locs[k].sort(function (a, b) { return b.inner - a.inner; }); });
     const map = {};
     Object.keys(agg).forEach(function (k) {
       const a = agg[k];
       if (Object.keys(a.ratios).length === 1 && a.inner % a.master === 0) map[k] = a.inner / a.master;
     });
-    return map;
-  } catch (_e) { return {}; }
+    return { cxm: map, locs: locs };
+  } catch (_e) { return { cxm: {}, locs: {} }; }
 }
 async function showRacksBajarModal(legajo) {
   if (!document.getElementById("rkbCss")) {
     const s = document.createElement("style"); s.id = "rkbCss";
-    s.textContent = "#rkbModal{display:none;position:fixed;inset:0;z-index:1290;background:rgba(2,6,23,.74);overflow:auto;padding:12px;}#rkbModal.show{display:block;}.rkb-card{background:#f8fafc;max-width:460px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.rkb-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;background:linear-gradient(90deg,#1e6bd6,#1d4ed8);color:#fff;}.rkb-title{font-size:17px;font-weight:800;}.rkb-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}.rkb-body{padding:13px 14px;}.rkb-hint{font-size:12.5px;color:#64748b;margin-bottom:10px;line-height:1.35;}.rkb-search{width:100%;height:44px;border:2px solid #cbd5e1;border-radius:11px;padding:0 13px;font-size:16px;font-weight:700;margin-bottom:10px;box-sizing:border-box;}.rkb-row{display:flex;align-items:center;gap:10px;border:1px solid #e2e8f0;border-radius:13px;padding:10px 12px;margin-bottom:8px;background:#fff;}.rkb-info{flex:1;min-width:0;}.rkb-cod{font-size:16px;font-weight:800;font-family:Consolas,Menlo,monospace;}.rkb-desc{font-size:12px;color:#475569;}.rkb-av{font-size:11.5px;color:#64748b;}.rkb-mano{font-weight:800;color:#b45309;}.rkb-stp{display:flex;align-items:center;gap:6px;}.rkb-u{font-size:10.5px;color:#64748b;font-weight:800;min-width:34px;text-align:left;text-transform:uppercase;letter-spacing:.3px;}.rkb-sb{width:42px;height:46px;border:none;border-radius:9px;font-size:24px;font-weight:800;cursor:pointer;background:#e2e8f0;color:#475569;}.rkb-inp{width:54px;height:46px;text-align:center;font-size:20px;font-weight:800;border:2px solid #cbd5e1;border-radius:9px;padding:0;-moz-appearance:textfield;}.rkb-inp::-webkit-outer-spin-button,.rkb-inp::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}.rkb-add{background:#fffbeb;border:1px solid #fcd34d;border-radius:11px;padding:11px 12px;margin-bottom:10px;font-size:13px;color:#92400e;line-height:1.4;}.rkb-addbtn{margin-top:6px;background:#1e6bd6;color:#fff;border:none;border-radius:9px;padding:8px 13px;font-weight:800;cursor:pointer;display:inline-block;}.rkb-sug{margin-top:5px;font-size:12px;font-weight:700;}.rkb-fin{width:100%;margin-top:10px;padding:14px;border:none;border-radius:12px;background:#1e6bd6;color:#fff;font-size:17px;font-weight:800;cursor:pointer;}.rkb-fin:disabled{background:#cbd5e1;color:#64748b;cursor:not-allowed;}.rkb-empty{padding:18px;text-align:center;color:#64748b;font-size:14px;}";
+    s.textContent = "#rkbModal{display:none;position:fixed;inset:0;z-index:1290;background:rgba(2,6,23,.74);overflow:auto;padding:12px;}#rkbModal.show{display:block;}.rkb-card{background:#f8fafc;max-width:460px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.rkb-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;background:linear-gradient(90deg,#1e6bd6,#1d4ed8);color:#fff;}.rkb-title{font-size:17px;font-weight:800;}.rkb-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}.rkb-body{padding:13px 14px;}.rkb-hint{font-size:12.5px;color:#64748b;margin-bottom:10px;line-height:1.35;}.rkb-search{width:100%;height:44px;border:2px solid #cbd5e1;border-radius:11px;padding:0 13px;font-size:16px;font-weight:700;margin-bottom:10px;box-sizing:border-box;}.rkb-row{display:flex;align-items:center;gap:10px;border:1px solid #e2e8f0;border-radius:13px;padding:10px 12px;margin-bottom:8px;background:#fff;}.rkb-info{flex:1;min-width:0;}.rkb-cod{font-size:16px;font-weight:800;font-family:Consolas,Menlo,monospace;}.rkb-desc{font-size:12px;color:#475569;}.rkb-av{font-size:11.5px;color:#64748b;}.rkb-mano{font-weight:800;color:#b45309;}.rkb-stp{display:flex;align-items:center;gap:6px;}.rkb-u{font-size:10.5px;color:#64748b;font-weight:800;min-width:34px;text-align:left;text-transform:uppercase;letter-spacing:.3px;}.rkb-locs{margin-top:6px;display:flex;flex-wrap:wrap;gap:5px;}.rkb-loc{border:1.5px solid #cbd5e1;border-radius:8px;padding:3px 8px;font-size:11.5px;font-weight:800;color:#475569;background:#f8fafc;cursor:pointer;}.rkb-loc.on{border-color:#1e6bd6;background:#eff6ff;color:#1d4ed8;}.rkb-sb{width:42px;height:46px;border:none;border-radius:9px;font-size:24px;font-weight:800;cursor:pointer;background:#e2e8f0;color:#475569;}.rkb-inp{width:54px;height:46px;text-align:center;font-size:20px;font-weight:800;border:2px solid #cbd5e1;border-radius:9px;padding:0;-moz-appearance:textfield;}.rkb-inp::-webkit-outer-spin-button,.rkb-inp::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}.rkb-add{background:#fffbeb;border:1px solid #fcd34d;border-radius:11px;padding:11px 12px;margin-bottom:10px;font-size:13px;color:#92400e;line-height:1.4;}.rkb-addbtn{margin-top:6px;background:#1e6bd6;color:#fff;border:none;border-radius:9px;padding:8px 13px;font-weight:800;cursor:pointer;display:inline-block;}.rkb-sug{margin-top:5px;font-size:12px;font-weight:700;}.rkb-fin{width:100%;margin-top:10px;padding:14px;border:none;border-radius:12px;background:#1e6bd6;color:#fff;font-size:17px;font-weight:800;cursor:pointer;}.rkb-fin:disabled{background:#cbd5e1;color:#64748b;cursor:not-allowed;}.rkb-empty{padding:18px;text-align:center;color:#64748b;font-size:14px;}";
     document.head.appendChild(s);
   }
   let ov = document.getElementById("rkbModal");
@@ -9394,12 +9400,17 @@ async function showRacksBajarModal(legajo) {
   try {
     const res = await Promise.all([stockFetchSaldos(), loadArtNombres(), rkbFetchCxM()]);
     const saldos = res[0] || {};
-    const cxmMap = res[2] || {};
+    const plani = res[2] || {};
+    const cxmMap = plani.cxm || {}, locsMap = plani.locs || {};
     const sN = {}; Object.keys(saldos).forEach(function (k) { sN[_cpNorm(k)] = saldos[k]; });
     const items = Object.keys(saldos).map(function (k) { return saldos[k]; }).filter(function (a) { return (a.racks || 0) > 0; })
       .sort(function (a, b) { return (parseInt(a.cod, 10) || 0) - (parseInt(b.cod, 10) || 0); })
-      .map(function (a) { return { cod: a.cod, desc: artNombre(a.cod, a.desc), racks: Math.round(a.racks), cxm: cxmMap[_cpNorm(a.cod)] || 0, baja: 0, manual: false }; });
-    _rkb = { legajo: String(legajo || ""), items: items, saldosN: sN, cxmMap: cxmMap, filtro: "" };
+      .map(function (a) {
+        const kN = _cpNorm(a.cod), locs = locsMap[kN] || [];
+        // sec preseleccionada = la ubicación con más stock (planimetría viva, v5.22)
+        return { cod: a.cod, desc: artNombre(a.cod, a.desc), racks: Math.round(a.racks), cxm: cxmMap[kN] || 0, locs: locs, sec: (locs[0] ? locs[0].sector : ""), baja: 0, manual: false };
+      });
+    _rkb = { legajo: String(legajo || ""), items: items, saldosN: sN, cxmMap: cxmMap, locsMap: locsMap, filtro: "" };
     rkbRender();
   } catch (e) { const b = document.getElementById("rkbBody"); if (b) b.innerHTML = '<div class="rkb-empty">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
 }
@@ -9429,7 +9440,18 @@ function rkbRender() {
       : (usaMaster ? '<span class="rkb-av">en racks: <b>' + availM + '</b> master <span style="color:#94a3b8">(' + it.racks + ' cj · ×' + it.cxm + ')</span></span>'
                    : '<span class="rkb-av">en racks: <b>' + it.racks + '</b> cajas <span class="rkb-mano" style="font-weight:700">· master pendiente</span></span>');
     const mx = it.manual ? 99999 : (usaMaster ? availM : it.racks);
-    return '<div class="rkb-row"><div class="rkb-info"><span class="rkb-cod">' + escapeHtml(it.cod) + '</span> <span class="rkb-desc">' + escapeHtml(it.desc || "") + '</span><div>' + head + '</div></div>' +
+    // Planimetría viva (v5.22): chips con las UBICACIONES del código en racks.
+    // Sirven para ENCONTRARLO y marcan de qué celda se baja (preselecciona la
+    // de más stock; el operario puede tocar otra).
+    let locsHtml = "";
+    if (it.locs && it.locs.length) {
+      locsHtml = '<div class="rkb-locs">' + it.locs.map(function (L) {
+        const on = it.sec === L.sector ? " on" : "";
+        const q = usaMaster ? (Math.floor(L.inner / it.cxm) + " m") : (L.inner + " cj");
+        return '<span class="rkb-loc' + on + '" onclick="rkbSetSec(' + i + ',\'' + escapeHtml(L.sector) + '\')">' + escapeHtml(L.sector) + " · " + q + "</span>";
+      }).join("") + "</div>";
+    }
+    return '<div class="rkb-row"><div class="rkb-info"><span class="rkb-cod">' + escapeHtml(it.cod) + '</span> <span class="rkb-desc">' + escapeHtml(it.desc || "") + '</span><div>' + head + '</div>' + locsHtml + '</div>' +
       '<div class="rkb-stp"><button class="rkb-sb" onclick="rkbChg(' + i + ',-1)">–</button><input class="rkb-inp" type="number" min="0" max="' + mx + '" inputmode="numeric" value="' + it.baja + '" oninput="rkbSet(' + i + ',this.value)"><button class="rkb-sb" onclick="rkbChg(' + i + ',1)">+</button><span class="rkb-u">' + (usaMaster ? "master" : "cajas") + '</span></div></div>';
   }).join("");
   const tot = _rkb.items.reduce(function (s, it) { return s + (it.baja || 0); }, 0);
@@ -9438,11 +9460,13 @@ function rkbRender() {
   _renderKeepFocus(body, h);
 }
 function rkbSearchInput(v) { if (!_rkb) return; _rkb.filtro = String(v == null ? "" : v); rkbRender(); }
+function rkbSetSec(i, sec) { if (!_rkb) return; const it = _rkb.items[i]; if (!it) return; it.sec = String(sec || ""); rkbRender(); }
 function rkbAddManual(cod) {
   if (!_rkb) return; cod = String(cod || "").toUpperCase().trim(); if (!cod) return;
   if (!_rkb.items.some(function (it) { return String(it.cod).toUpperCase() === cod; })) {
     const inCat = _rkb.saldosN[_cpNorm(cod)];
-    _rkb.items.push({ cod: cod, desc: artNombre(cod, ""), racks: 0, cxm: (_rkb.cxmMap && _rkb.cxmMap[_cpNorm(cod)]) || 0, baja: 1, manual: !inCat });
+    const kN = _cpNorm(cod), mlocs = (_rkb.locsMap && _rkb.locsMap[kN]) || [];
+    _rkb.items.push({ cod: cod, desc: artNombre(cod, ""), racks: 0, cxm: (_rkb.cxmMap && _rkb.cxmMap[kN]) || 0, locs: mlocs, sec: (mlocs[0] ? mlocs[0].sector : ""), baja: 1, manual: !inCat });
   }
   _rkb.filtro = ""; rkbRender();
 }
@@ -9459,6 +9483,19 @@ function rkbConfirmar() {
     const inner = (it.cxm > 0 && !it.manual) ? (it.baja * it.cxm) : it.baja;
     rows.push({ cod_art: it.cod, descripcion: it.desc || null, deposito: "racks", delta: -inner, tipo: "baja_racks", ref: "operario", legajo: _rkb.legajo || null });
     rows.push({ cod_art: it.cod, descripcion: it.desc || null, deposito: "terminado", delta: inner, tipo: "baja_racks", ref: "operario", legajo: _rkb.legajo || null });
+  });
+  // Planimetría viva (v5.22): descontar de la UBICACIÓN elegida. Best-effort:
+  // si la RPC todavía no existe en Supabase, falla silencioso (queda el ledger).
+  sel.forEach(function (it) {
+    if (!it.sec) return;
+    const innerLoc = (it.cxm > 0 && !it.manual) ? (it.baja * it.cxm) : it.baja;
+    try {
+      fetch(SUPABASE_URL + "/rest/v1/rpc/racks_plani_descontar", {
+        method: "POST",
+        headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+        body: JSON.stringify({ p_sector: it.sec, p_cod: it.cod, p_inner: innerLoc })
+      }).catch(function () {});
+    } catch (_e) {}
   });
   // alerta Telegram por cada bajada fuera de lista (no estaba en racks) — evento RKX
   sel.filter(function (it) { return it.manual; }).forEach(function (it) { try { rkbEmitFueraLista(it.cod, it.baja, _rkb.legajo); } catch (_e) {} });
