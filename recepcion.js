@@ -22,7 +22,18 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const SUPABASE_URL = "https://hrxfctzncixxqmpfhskv.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_BqpAgZH6ty-9wft10_YMhw_0rcIPuWT";
-const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+// ⚠ storageKey PROPIA (v5.21): sin esto, este cliente comparte la key default
+// "sb-<ref>-auth-token" con el login Google de index.html y el signInAnonymously
+// de abajo PISABA la sesión del supervisor (deslogueos "de la nada"). Además:
+// detectSessionInUrl:false para no canjear el ?code= del callback OAuth ajeno.
+const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+  auth: {
+    storageKey: "sb-hrxfctzncixxqmpfhskv-recepcion",
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: false
+  }
+});
 
 // Sesion anonima silenciosa: las policies RLS de INSERT permiten rol authenticated.
 const sessionReady = (async () => {

@@ -2889,11 +2889,13 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
 
   <!-- Login con Google (obligatorio). Visible mientras no haya sesión. -->
   <div id="authBlock">
-    <button id="googleSignInBtn" class="google-btn" onclick="signInWithGoogle()">
+    <!-- v5.21: arranca deshabilitado ("Conectando…") hasta saber si hay sesión guardada —
+         antes se veía un login clickeable durante la restauración y un tap ahí pisaba la sesión. -->
+    <button id="googleSignInBtn" class="google-btn" onclick="signInWithGoogle()" disabled>
       <svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
       Iniciar sesión con Google
     </button>
-    <div id="authStatus" class="small">Iniciá sesión para continuar</div>
+    <div id="authStatus" class="small">Conectando…</div>
 
     <!-- Alternativa: entrar con el número de legajo (sin Google). Resuelve
          contra Empleados y guarda una sesión local que dura el día. -->
@@ -5247,7 +5249,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.20";
+const APP_VERSION = "v5.21";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -7643,7 +7645,7 @@ function _ocCollectRecibido() {
 async function ocGuardarRecibido() {
   if (!_oc) return;
   const headers = await facAuthWriteHeaders({ "Prefer": "return=minimal" });
-  if (!headers) { alert("Para guardar necesitás iniciar sesión con Google (supervisor)."); return; }
+  if (!headers) { alert(authNoSesionMsg("Para guardar necesitás iniciar sesión con Google (supervisor).")); return; }
   try {
     await Promise.all(_ocCollectRecibido().map(function (r) { return fetch(SUPABASE_OC_ENDPOINT + "?id=eq." + r.id, { method: "PATCH", headers: headers, body: JSON.stringify({ cantidad_recibida: r.val }) }); }));
     _oc.rows = await ocFetchRows(); ocRender();
@@ -7654,7 +7656,7 @@ async function ocMarcar(estado) {
   if (!_oc || !_oc.openKey) return;
   const g = ocGroups(), x = g[_oc.openKey]; if (!x) return;
   const headers = await facAuthWriteHeaders({ "Prefer": "return=minimal" });
-  if (!headers) { alert("Para esto necesitás iniciar sesión con Google (supervisor)."); return; }
+  if (!headers) { alert(authNoSesionMsg("Para esto necesitás iniciar sesión con Google (supervisor).")); return; }
   try {
     if (estado === "recibida") { await Promise.all(_ocCollectRecibido().map(function (r) { return fetch(SUPABASE_OC_ENDPOINT + "?id=eq." + r.id, { method: "PATCH", headers: headers, body: JSON.stringify({ cantidad_recibida: r.val }) }); })); }
     await Promise.all(x.rows.map(function (r) { return fetch(SUPABASE_OC_ENDPOINT + "?id=eq." + r.id, { method: "PATCH", headers: headers, body: JSON.stringify({ estado: estado }) }); }));
@@ -7681,7 +7683,7 @@ async function ocNuevaCrear() {
   const items = n.items.filter(function (it) { return String(it.cod).trim() || (parseInt(it.cant, 10) || 0) > 0; });
   if (!items.length) { alert("Cargá al menos un ítem con código y cantidad."); return; }
   const headers = await facAuthWriteHeaders({ "Prefer": "return=minimal" });
-  if (!headers) { alert("Para crear una OC necesitás iniciar sesión con Google (supervisor)."); return; }
+  if (!headers) { alert(authNoSesionMsg("Para crear una OC necesitás iniciar sesión con Google (supervisor).")); return; }
   const rows = items.map(function (it) { return { proveedor: n.proveedor.trim() || null, fecha: n.fecha || null, rubro: n.rubro.trim() || null, codigo: String(it.cod).trim() || null, descripcion: String(it.desc).trim() || null, cantidad: Math.max(0, parseInt(it.cant, 10) || 0), cantidad_recibida: 0, unidad: n.unidad.trim() || null, estado: "pendiente" }; });
   try {
     const r = await fetch(SUPABASE_OC_ENDPOINT, { method: "POST", headers: headers, body: JSON.stringify(rows) });
@@ -7823,7 +7825,7 @@ async function ocgGenerar() {
   if (!rows.length) { alert("No hay OCs externas para generar."); return; }
   if (!confirm("Vas a generar " + rows.length + " línea(s) de OC (proveedores externos) en Ordenes_Compra. ¿Seguro?")) return;
   const headers = await facAuthWriteHeaders({ "Prefer": "return=minimal" });
-  if (!headers) { alert("Para generar las OCs necesitás iniciar sesión con Google (supervisor)."); return; }
+  if (!headers) { alert(authNoSesionMsg("Para generar las OCs necesitás iniciar sesión con Google (supervisor).")); return; }
   try {
     const r = await fetch(SUPABASE_OC_ENDPOINT, { method: "POST", headers: headers, body: JSON.stringify(rows) });
     if (!r.ok) throw new Error("HTTP " + r.status);
@@ -7883,7 +7885,7 @@ async function ociSave() {
   const cods = Object.keys(_ociChanged);
   if (!cods.length) { alert("No hay cambios para guardar."); return; }
   const headers = await facAuthWriteHeaders({ "Prefer": "return=minimal" });
-  if (!headers) { alert("Para guardar los índices necesitás iniciar sesión con Google (supervisor)."); return; }
+  if (!headers) { alert(authNoSesionMsg("Para guardar los índices necesitás iniciar sesión con Google (supervisor).")); return; }
   try {
     await Promise.all(cods.map(function (c) { return fetch(SUPABASE_OCMAX_ENDPOINT + "?cod=eq." + encodeURIComponent(c), { method: "PATCH", headers: headers, body: JSON.stringify({ indice: _ociChanged[c] }) }); }));
     alert("✓ Guardados " + cods.length + " índice(s). Volvé a generar para ver el efecto.");
@@ -13620,7 +13622,7 @@ async function pppSubir(tipo) {
   const table = PPP_TABLE[tipo];
   const endpoint = SUPABASE_URL + "/rest/v1/" + encodeURIComponent(table);
   const headers = await facAuthWriteHeaders({ "Prefer": "return=minimal" });
-  if (!headers) { pppSetStatus("Iniciá sesión con Google (supervisor) para subir.", false); return; }
+  if (!headers) { pppSetStatus(authNoSesionMsg("Iniciá sesión con Google (supervisor) para subir."), false); return; }
   if (!confirm("¿Reemplazar TODO " + table + " con " + rows.length + " filas?\n(Borra lo que haya y carga esto.)")) return;
   pppSetStatus("Subiendo " + rows.length + " filas a " + table + "…");
   try {
@@ -13696,7 +13698,7 @@ async function mailsAdd() {
   if (!email || email.indexOf("@") < 1) { mailsSetStatus("Poné un mail válido.", false); return; }
   if (SUPERVISOR_EMAILS.indexOf(email) !== -1) { mailsSetStatus("Ese mail ya es supervisor fijo.", false); return; }
   const headers = await facAuthWriteHeaders({ "Prefer": "resolution=merge-duplicates,return=minimal" });
-  if (!headers) { mailsSetStatus("Iniciá sesión con Google para editar.", false); return; }
+  if (!headers) { mailsSetStatus(authNoSesionMsg("Iniciá sesión con Google para editar."), false); return; }
   try {
     const r = await fetch(SUPABASE_SUPERVISORES_ENDPOINT + "?on_conflict=email", { method: "POST", headers: headers, body: JSON.stringify({ email: email }) });
     if (!r.ok) { mailsSetStatus("Error guardando: HTTP " + r.status + " (¿creaste la tabla + RLS?)", false); return; }
@@ -13710,7 +13712,7 @@ async function mailsDelete(email) {
   const e = String(email).toLowerCase().trim();
   if (!confirm("¿Sacar a " + e + " de supervisores?")) return;
   const headers = await facAuthWriteHeaders({ "Prefer": "return=minimal" });
-  if (!headers) { mailsSetStatus("Iniciá sesión con Google para editar.", false); return; }
+  if (!headers) { mailsSetStatus(authNoSesionMsg("Iniciá sesión con Google para editar."), false); return; }
   try {
     const r = await fetch(SUPABASE_SUPERVISORES_ENDPOINT + "?email=eq." + encodeURIComponent(e), { method: "DELETE", headers: headers });
     if (!r.ok) { mailsSetStatus("Error borrando: HTTP " + r.status, false); return; }
@@ -13784,7 +13786,7 @@ async function tallSaveCod(el) {
   const linea = el.getAttribute("data-linea");
   const cod = el.value.trim();
   const headers = await facAuthWriteHeaders({ "Prefer": "return=minimal" });
-  if (!headers) { tallSetStatus("Iniciá sesión con Google.", false); return; }
+  if (!headers) { tallSetStatus(authNoSesionMsg("Iniciá sesión con Google."), false); return; }
   try {
     let r;
     if (id) r = await fetch(SUPABASE_TALL_ENDPOINT + "?id=eq." + encodeURIComponent(id), { method: "PATCH", headers: headers, body: JSON.stringify({ Codigo: cod || null }) });
@@ -13805,7 +13807,7 @@ async function tallAdd() {
     { Nombre: nombre, Linea: "CH", Codigo: (ch || "").trim() || null }
   ];
   const headers = await facAuthWriteHeaders({ "Prefer": "return=minimal" });
-  if (!headers) { tallSetStatus("Iniciá sesión con Google.", false); return; }
+  if (!headers) { tallSetStatus(authNoSesionMsg("Iniciá sesión con Google."), false); return; }
   try {
     const r = await fetch(SUPABASE_TALL_ENDPOINT, { method: "POST", headers: headers, body: JSON.stringify(rows) });
     if (!r.ok) { tallSetStatus("Error agregando: HTTP " + r.status, false); return; }
@@ -13820,7 +13822,7 @@ async function tallDelete(nombre) {
   const n = String(nombre || "");
   if (!n || !confirm("¿Borrar al tallerista " + n + " (todas sus líneas LK/CH)?")) return;
   const headers = await facAuthWriteHeaders({ "Prefer": "return=minimal" });
-  if (!headers) { tallSetStatus("Iniciá sesión con Google.", false); return; }
+  if (!headers) { tallSetStatus(authNoSesionMsg("Iniciá sesión con Google."), false); return; }
   try {
     const r = await fetch(SUPABASE_TALL_ENDPOINT + "?Nombre=eq." + encodeURIComponent(n), { method: "DELETE", headers: headers });
     if (!r.ok) { tallSetStatus("Error borrando: HTTP " + r.status, false); return; }
@@ -13894,7 +13896,7 @@ async function tallArtSave(el) {
   if (field === "Cod_Art" && !val) { tallArtsSetStatus("El código no puede quedar vacío.", false); tallArtsLoad(); return; }
   const body = {}; body[field] = (field === "Uni_x_Caja") ? (val === "" ? 0 : (parseInt(val, 10) || 0)) : val;
   const headers = await facAuthWriteHeaders({ "Prefer": "return=minimal" });
-  if (!headers) { tallArtsSetStatus("Iniciá sesión con Google (supervisor).", false); return; }
+  if (!headers) { tallArtsSetStatus(authNoSesionMsg("Iniciá sesión con Google (supervisor)."), false); return; }
   try {
     const r = await fetch(SUPABASE_ART_ENDPOINT + "?id=eq." + encodeURIComponent(id), { method: "PATCH", headers: headers, body: JSON.stringify(body) });
     if (!r.ok) { tallArtsSetStatus("Error guardando: HTTP " + r.status, false); return; }
@@ -13917,7 +13919,7 @@ async function tallArtAdd() {
   }
   const row = { Tallerista: _tallArts.nombre, Cod_Tallerista: _tallArts.cod || null, Linea: _tallArts.linea, Cod_Art: cod, Desc: desc || "", Uni_x_Caja: uxb === "" ? 1 : (parseInt(uxb, 10) || 1) };
   const headers = await facAuthWriteHeaders({ "Prefer": "return=minimal" });
-  if (!headers) { tallArtsSetStatus("Iniciá sesión con Google (supervisor).", false); return; }
+  if (!headers) { tallArtsSetStatus(authNoSesionMsg("Iniciá sesión con Google (supervisor)."), false); return; }
   try {
     const r = await fetch(SUPABASE_ART_ENDPOINT, { method: "POST", headers: headers, body: JSON.stringify(row) });
     if (!r.ok) { tallArtsSetStatus("Error agregando: HTTP " + r.status, false); return; }
@@ -13932,7 +13934,7 @@ async function tallArtDelete(el) {
   const id = el.getAttribute("data-id"); const cod = el.getAttribute("data-cod") || "";
   if (!confirm("¿Borrar el artículo " + cod + " de " + _tallArts.nombre + " (" + _tallArts.linea + ")?")) return;
   const headers = await facAuthWriteHeaders({ "Prefer": "return=minimal" });
-  if (!headers) { tallArtsSetStatus("Iniciá sesión con Google (supervisor).", false); return; }
+  if (!headers) { tallArtsSetStatus(authNoSesionMsg("Iniciá sesión con Google (supervisor)."), false); return; }
   try {
     const r = await fetch(SUPABASE_ART_ENDPOINT + "?id=eq." + encodeURIComponent(id), { method: "DELETE", headers: headers });
     if (!r.ok) { tallArtsSetStatus("Error borrando: HTTP " + r.status, false); return; }
@@ -13986,7 +13988,7 @@ function planimRender(filter) {
 }
 async function planimUpsert(cod, sector, orden) {
   const headers = await facAuthWriteHeaders({ "Prefer": "resolution=merge-duplicates,return=minimal" });
-  if (!headers) { planimSetStatus("Iniciá sesión con Google para editar.", false); return false; }
+  if (!headers) { planimSetStatus(authNoSesionMsg("Iniciá sesión con Google para editar."), false); return false; }
   try {
     const r = await fetch(SUPABASE_PLANIMETRIA_ENDPOINT + "?on_conflict=cod", {
       method: "POST", headers: headers, body: JSON.stringify({ cod: cod, sector: sector, orden: orden })
@@ -14028,7 +14030,7 @@ async function planimDeleteRow(cod) {
   const c = String(cod).toUpperCase();
   if (!confirm("¿Borrar " + c + " de la planimetría (Supabase)?\n\n(Si el código venía del archivo base, puede reaparecer; los agregados acá se borran del todo.)")) return;
   const headers = await facAuthWriteHeaders({ "Prefer": "return=minimal" });
-  if (!headers) { planimSetStatus("Iniciá sesión con Google para editar.", false); return; }
+  if (!headers) { planimSetStatus(authNoSesionMsg("Iniciá sesión con Google para editar."), false); return; }
   try {
     const r = await fetch(SUPABASE_PLANIMETRIA_ENDPOINT + "?cod=eq." + encodeURIComponent(c), { method: "DELETE", headers: headers });
     if (!r.ok) { planimSetStatus("Error borrando: HTTP " + r.status, false); return; }
@@ -16285,6 +16287,15 @@ function facRender(tandas){
    _Cierres exige rol `authenticated`, así que mandamos el JWT del usuario
    logueado (Supabase Auth). Si no hay sesión (kiosko TV, deslogueado) devuelve
    null y el caller cancela mostrando aviso para loguearse. */
+/* Mensaje para acciones que requieren token (v5.21): distinguir "no estás
+   logueado" de "se cayó la red". Antes CUALQUIER fallo decía "Iniciá sesión
+   con Google" y el supervisor creía que lo había deslogueado, cuando en
+   realidad era un refresh de token fallando por wifi. */
+function authNoSesionMsg(base) {
+  return (window.sbAuth && window.sbAuth.lastFailNetwork)
+    ? "Sin conexión — seguís logueado; reintentá en unos segundos."
+    : base;
+}
 async function facAuthWriteHeaders(extra) {
   let token = null;
   try {
@@ -16310,7 +16321,7 @@ window.facTickNP = async function(btn){
   const headers = await facAuthWriteHeaders({ Prefer: "resolution=merge-duplicates" });
   if (!headers) {
     btn.disabled = false;
-    facShowToast("Iniciá sesión con Google para tickear");
+    facShowToast(authNoSesionMsg("Iniciá sesión con Google para tickear"));
     return;
   }
 
@@ -16376,7 +16387,7 @@ window.facRevertir = async function(){
   const headers = await facAuthWriteHeaders({ Prefer: "return=minimal" });
   if (!headers) {
     if (btn) btn.disabled = false;
-    facShowToast("Iniciá sesión con Google para revertir");
+    facShowToast(authNoSesionMsg("Iniciá sesión con Google para revertir"));
     return;
   }
 
@@ -16513,7 +16524,7 @@ async function generateFacturacionPDF(){
   // 2) INSERT cierre → recupera id (con JWT del usuario logueado)
   const hCierre = await facAuthWriteHeaders({ Prefer: "return=representation" });
   if (!hCierre) {
-    facShowToast("Iniciá sesión con Google para cerrar facturación");
+    facShowToast(authNoSesionMsg("Iniciá sesión con Google para cerrar facturación"));
     btn.disabled = false; btn.textContent = "Terminé — Generar PDF";
     return;
   }
@@ -17017,6 +17028,26 @@ async function refreshProductivityCharts(){
 <script src="supabase.js"></script>
 <script>
 (function initAuth() {
+// Failsafe (v5.21): el botón de login arranca deshabilitado ("Conectando…").
+// Si en 8s nadie resolvió el estado (bundle que no cargó, error inesperado),
+// habilitarlo igual para no dejar la app muerta. Registrado ANTES de los
+// guards de abajo para que corra aunque initAuth retorne temprano.
+window.__authResolved = false;
+setTimeout(function () {
+  if (window.__authResolved) return;
+  if (window.__authClientReady) {
+    // El cliente de auth ESTÁ andando pero getSession sigue colgado (refresh
+    // con red mala). NO habilitar el login — un OAuth acá pisaría la sesión
+    // guardada. Solo actualizar el texto para que no parezca trabado.
+    var st0 = document.getElementById("authStatus");
+    if (st0 && /Conectando/.test(st0.textContent || "")) st0.textContent = "Reconectando… (tu sesión sigue guardada, esperando la red)";
+    return;
+  }
+  var b = document.getElementById("googleSignInBtn");
+  if (b) b.disabled = false;
+  var st = document.getElementById("authStatus");
+  if (st && /Conectando/.test(st.textContent || "")) st.textContent = "Iniciá sesión para continuar";
+}, 8000);
 // Pantalla de pared (modo kiosko, ?monitor=...&key=): sin login, no inicializamos auth.
 if (window.__tvKioskMode) return;
 // Si supabase.js no cargó (navegador muy viejo), no rompemos la página: el
@@ -17054,13 +17085,17 @@ const SUPERVISOR_EMAILS = ["loekemeyer.n8n@gmail.com", "loekemeyer.logistica@gma
    ⚠ La declaración `let _supervisoresRemotos` se movió ARRIBA (antes de openMailsEditor)
    para evitar un TDZ "not defined" en el login durante la carga. */
 const SUPABASE_SUPERVISORES_ENDPOINT = SUPABASE_URL + "/rest/v1/Supervisores_Virgilio";
+/* v5.21: si la consulta FALLA (red), NO cachear un set vacío — eso hacía que un
+   blip de wifi convirtiera a un supervisor válido en "no autorizado" → signOut
+   REAL (borraba el refresh token). El flag _rolCheckFailed lo lee showLoggedIn. */
+let _rolCheckFailed = false;
 async function loadSupervisoresRemotos() {
   try {
     const r = await fetch(SUPABASE_SUPERVISORES_ENDPOINT + "?select=email", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
-    if (!r.ok) { if (_supervisoresRemotos === null) _supervisoresRemotos = new Set(); return; }
+    if (!r.ok) { _rolCheckFailed = true; return; }
     const data = await r.json();
     _supervisoresRemotos = new Set((data || []).map(function (x) { return String(x.email || "").toLowerCase().trim(); }).filter(Boolean));
-  } catch (_e) { if (_supervisoresRemotos === null) _supervisoresRemotos = new Set(); }
+  } catch (_e) { _rolCheckFailed = true; }
 }
 function isSupervisorEmail(email) {
   const e = (email || "").toLowerCase().trim();
@@ -17081,13 +17116,13 @@ async function resolveEmpleadoByEmail(email) {
     encodeURIComponent(email.toLowerCase().trim()) + "&select=Legajo,Empleado&limit=1";
   try {
     const r = await fetch(url, { headers: { apikey: SB_KEY, Authorization: "Bearer " + SB_KEY } });
-    if (!r.ok) return null;
+    if (!r.ok) { _rolCheckFailed = true; return null; }   // error ≠ "no está" (v5.21)
     const data = await r.json();
     if (Array.isArray(data) && data.length && data[0].Legajo != null) {
       return { legajo: String(data[0].Legajo).trim(), nombre: String(data[0].Empleado || "").trim() };
     }
     return null;
-  } catch (_e) { return null; }
+  } catch (_e) { _rolCheckFailed = true; return null; }
 }
 
 /* Inverso: legajo -> {legajo, nombre} para el login alternativo sin Google. */
@@ -17144,6 +17179,7 @@ function _setCambiarPlanta(show) {
 }
 
 function showLoggedOut() {
+  window.__authResolved = true;
   window.__isSupervisor = false;
   __identity = null; __plantChosen = false;
   $("authBlock").classList.remove("hidden");
@@ -17247,8 +17283,11 @@ function _routeAfterAuth() {
   showSelector();
 }
 
+let _rolRetryTimer = null;
 async function showLoggedIn(user) {
+  window.__authResolved = true;
   const email = user.email || "";
+  _rolCheckFailed = false;
   if (_supervisoresRemotos === null) { await loadSupervisoresRemotos(); }  // mails editables
   // 1) Supervisor por email (no requiere estar en Empleados).
   if (isSupervisorEmail(email)) {
@@ -17269,8 +17308,18 @@ async function showLoggedIn(user) {
     _routeAfterAuth();
     return;
   }
-  // 3) No autorizado -> signOut inmediato (no le damos acceso usable) y dejamos
-  //    la leyenda fija en la pantalla de login.
+  // 3a) v5.21: si el chequeo de rol FALLÓ por red, NO es "no autorizado" — no
+  //     destruir la sesión. Aviso + reintento automático (la sesión sigue viva).
+  if (_rolCheckFailed) {
+    rejectedMsg = "Sin conexión para verificar tu cuenta — reintentando…";
+    showLoggedOut();   // solo UI; NO signOut: los tokens quedan guardados
+    const btn = $("googleSignInBtn"); if (btn) btn.disabled = true;   // no pisar la sesión con otro OAuth
+    clearTimeout(_rolRetryTimer);
+    _rolRetryTimer = setTimeout(function () { applyAuthState(); }, 4000);
+    return;
+  }
+  // 3b) No autorizado DE VERDAD (las consultas respondieron) -> signOut inmediato
+  //     y leyenda fija en la pantalla de login.
   rejectedMsg = "La cuenta " + email + " no está autorizada. " +
     "Pedile al supervisor que te dé acceso.";
   try { await sb.auth.signOut(); } catch (_e) {}
@@ -17291,10 +17340,13 @@ window.cambiarPlanta = function () {
   showSelector();
 };
 
-/* Día (BsAs) en que se aceptó la sesión. La sesión persiste todo el día
-   (cerrar el navegador no desloguea), pero al cambiar de día se cierra y se
-   vuelve a pedir login. También se cierra al confirmar "Terminar Día". */
-const AUTH_DAY_KEY = "vir_auth_day";
+/* v5.21: la sesión de Google dura una VENTANA de 20 horas corridas desde el
+   login (pedido del dueño), en vez del corte por día calendario BsAs que había
+   antes (vir_auth_day) — ese corte deslogueaba a medianoche aunque hubieras
+   entrado a las 23:50. También se cierra al confirmar "Terminar Día". La
+   sesión de OPERARIO por legajo sigue durando el día calendario (a propósito). */
+const AUTH_SINCE_KEY = "vir_auth_since";
+const AUTH_MAX_MS = 20 * 60 * 60 * 1000;   // 20 horas
 /* Sesión de operario iniciada con el número de legajo (sin Google). Guarda
    {legajo, nombre, day} y se valida por día igual que la de Google. */
 const LEGAJO_AUTH_KEY = "vir_legajo_auth";
@@ -17322,21 +17374,40 @@ function clearLegajoSession() {
   try { localStorage.removeItem(LEGAJO_AUTH_KEY); } catch (_e) {}
 }
 
+/* Clave donde supabase-js guarda la sesión (default del bundle para este proyecto).
+   Se usa para distinguir "no hay sesión" de "hay tokens pero el refresh falló por red". */
+const AUTH_TOKEN_LS_KEY = "sb-hrxfctzncixxqmpfhskv-auth-token";
+function authTokensStored() {
+  try { return !!localStorage.getItem(AUTH_TOKEN_LS_KEY); } catch (_e) { return false; }
+}
+/* Estado "Reconectando…": hay sesión GUARDADA pero el refresh no salió (red).
+   NO mostrar el login clickeable — un OAuth nuevo acá pisaba la sesión buena. */
+function showReconnecting() {
+  window.__authResolved = true;
+  const ab = $("authBlock"); if (ab) ab.classList.remove("hidden");
+  const btn = $("googleSignInBtn"); if (btn) btn.disabled = true;
+  setAuthStatus("Reconectando… (tu sesión sigue guardada, esperando la red)", false);
+}
+let _authRetryTimer = null, _authRetryN = 0;
 async function applyAuthState() {
   let session = null;
-  try { session = (await sb.auth.getSession()).data.session; } catch (_e) {}
+  try {
+    const res = await sb.auth.getSession();
+    session = res && res.data ? res.data.session : null;
+  } catch (_e) {}
   const today = todayKeyBsAs();
   if (session && session.user && session.user.email) {
-    const storedDay = localStorage.getItem(AUTH_DAY_KEY);
-    if (today && storedDay && storedDay !== today) {
-      // Sesión iniciada un día anterior: la cerramos para pedir login de nuevo.
-      localStorage.removeItem(AUTH_DAY_KEY);
+    _authRetryN = 0;
+    // Ventana de 20h corridas desde el primer login (v5.21).
+    const since = Number(localStorage.getItem(AUTH_SINCE_KEY));
+    if (since && isFinite(since) && (Date.now() - since) > AUTH_MAX_MS) {
+      localStorage.removeItem(AUTH_SINCE_KEY);
       rejectedMsg = null;
       try { await sb.auth.signOut(); } catch (_e) {}
       showLoggedOut();
       return;
     }
-    if (today) localStorage.setItem(AUTH_DAY_KEY, today);
+    if (!since || !isFinite(since)) { try { localStorage.setItem(AUTH_SINCE_KEY, String(Date.now())); } catch (_e) {} }
     await showLoggedIn(session.user);
     return;
   }
@@ -17348,6 +17419,22 @@ async function applyAuthState() {
     return;
   }
   if (legSess) clearLegajoSession();   // era de otro día — limpiar
+  // v5.21: ¿hay TOKENS guardados pero getSession dio null/error? Casi seguro es
+  // el refresh fallando por RED (el bundle no borra el storage en errores
+  // retryables) → "Reconectando…" con reintento, NO pantalla de login.
+  if (!session && authTokensStored()) {
+    const offline = (typeof navigator !== "undefined" && navigator.onLine === false);
+    // Offline: esperar la red sin límite (mostrar login acá invita a pisar la
+    // sesión guardada). Con red: hasta 3 reintentos con backoff y recién ahí login.
+    if (offline || _authRetryN < 3) {
+      if (!offline) _authRetryN++;
+      showReconnecting();
+      clearTimeout(_authRetryTimer);
+      _authRetryTimer = setTimeout(function () { applyAuthState(); }, offline ? 5000 : Math.min(3000 * _authRetryN, 15000));
+      return;
+    }
+  }
+  _authRetryN = 0;
   showLoggedOut();
 }
 
@@ -17368,6 +17455,7 @@ window.signInWithGoogle = async function () {
 
 window.signOutGoogle = async function () {
   clearLegajoSession();
+  try { localStorage.removeItem(AUTH_SINCE_KEY); localStorage.removeItem("vir_auth_day"); } catch (_e) {}
   try { await sb.auth.signOut(); } catch (_e) {}
   window.location.reload();
 };
@@ -17377,6 +17465,7 @@ window.signOutGoogle = async function () {
    de envíos vive en IndexedDB / Background Sync y no depende de esta sesión. */
 window.endDaySignOut = async function () {
   clearLegajoSession();
+  try { localStorage.removeItem(AUTH_SINCE_KEY); localStorage.removeItem("vir_auth_day"); } catch (_e) {}
   try { await sb.auth.signOut(); } catch (_e) {}
   // Si no había sesión de Google, el evento de signOut no se dispara —
   // forzamos el cambio de UI a la pantalla de login.
@@ -17410,15 +17499,40 @@ window.loginWithLegajo = async function () {
    requests autenticados a Supabase (p. ej. tickear en Facturación con RLS
    `authenticated`). Devuelve null si no hay sesión (kiosko / deslogueado). */
 window.sbAuth = {
+  lastFailNetwork: false,   // true = había tokens guardados pero el refresh no salió (red)
   getAccessToken: async function () {
     try {
-      const { data } = await sb.auth.getSession();
-      return data && data.session ? data.session.access_token : null;
-    } catch (_e) { return null; }
+      const r1 = await sb.auth.getSession();
+      if (r1.data && r1.data.session) { window.sbAuth.lastFailNetwork = false; return r1.data.session.access_token; }
+      // v5.21: hay tokens guardados pero getSession dio null → probable refresh
+      // en curso / caído por red. Esperar 1,5s y reintentar UNA vez antes de
+      // rendirse (el auto-refresh o el lock multi-pestaña suelen resolverlo).
+      if (authTokensStored()) {
+        await new Promise(function (r) { setTimeout(r, 1500); });
+        const r2 = await sb.auth.getSession();
+        if (r2.data && r2.data.session) { window.sbAuth.lastFailNetwork = false; return r2.data.session.access_token; }
+        window.sbAuth.lastFailNetwork = true;
+        return null;
+      }
+      window.sbAuth.lastFailNetwork = false;
+      return null;
+    } catch (_e) { window.sbAuth.lastFailNetwork = authTokensStored(); return null; }
   }
 };
 
-sb.auth.onAuthStateChange(() => { applyAuthState(); });
+/* v5.21: por EVENTO. TOKEN_REFRESHED llega cada ~1h y antes re-corría TODO el
+   applyAuthState (re-ruteo incluido); ahora solo chequea la ventana de 20h.
+   SIGNED_OUT va directo a la pantalla de login. */
+sb.auth.onAuthStateChange((event) => {
+  if (event === "TOKEN_REFRESHED") {
+    const since = Number(localStorage.getItem(AUTH_SINCE_KEY));
+    if (since && isFinite(since) && (Date.now() - since) > AUTH_MAX_MS) applyAuthState();
+    return;
+  }
+  if (event === "SIGNED_OUT") { showLoggedOut(); return; }
+  applyAuthState();
+});
+window.__authClientReady = true;   // el failsafe de arriba distingue "cliente vivo" de "no cargó"
 applyAuthState();
 })();
 </script>
