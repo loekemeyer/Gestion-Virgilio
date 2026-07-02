@@ -6,7 +6,7 @@
    ⚠ IMPORTANTE: SUPABASE_URL y SUPABASE_KEY están duplicados acá y en
    index.html. Si rotás la publishable key, hay que actualizar AMBOS.
    ========================================================= */
-const SW_VERSION = "v5.19-vir";
+const SW_VERSION = "v5.20-vir";
 
 const SUPABASE_URL = "https://hrxfctzncixxqmpfhskv.supabase.co";
 const SUPABASE_KEY = "sb_publishable_BqpAgZH6ty-9wft10_YMhw_0rcIPuWT";
@@ -19,7 +19,7 @@ const IDB_NAME    = "registro-prod-virgilio";
 const IDB_VERSION = 1;
 const IDB_STORE   = "queue";
 
-const SEND_TIMEOUT_MS = 12000;
+const SEND_TIMEOUT_MS = 30000;   // v5.20: 12s clasificaba wifi LENTO como caído
 
 /* ============== IndexedDB ============== */
 let _dbPromise = null;

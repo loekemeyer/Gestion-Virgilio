@@ -394,18 +394,28 @@ button {
 }
 .undo-btn:active{ background: #991b1b; }
 
-/* ✅ aviso de reportes pendientes (se reintenta solo en background) */
+/* ✅ aviso de reportes pendientes (se reintenta solo en background).
+   v5.20: banner FIJO abajo, visible en TODAS las pantallas — antes vivía dentro
+   de la pantalla de legajo y el operario no lo veía durante el turno. Tap = reintentar. */
 #pendingIndicator{
   display: none;
-  margin-top: 12px;
-  padding: 12px;
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 40px;              /* apilado arriba del #versionBadge (bottom:8px) */
+  z-index: 1400;
+  max-width: 92vw;
+  margin: 0;
+  padding: 10px 16px;
   background: #ffe0e0;
   border: 2px solid #d33;
-  border-radius: 8px;
-  font-size: 18px;
+  border-radius: 10px;
+  font-size: 15px;
   text-align: center;
   color: #900;
   font-weight: bold;
+  box-shadow: 0 6px 20px rgba(0,0,0,.25);
+  cursor: pointer;
 }
 
 /* Resumen de hoy: lista scrolleable con todos los reportes del día */
@@ -3154,9 +3164,6 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
     </div>
   </div>
 
-  <!-- Aviso: hay reportes que aún no se enviaron -->
-  <div id="pendingIndicator"></div>
-
   <!-- Deshacer último mensaje — visible 60s después de enviar -->
   <div id="undoBanner" class="hidden">
     <div id="undoBannerText"></div>
@@ -3172,6 +3179,9 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
   <div class="small" id="status"></div>
   <div id="legajoError" class="error"></div>
 </div>
+
+<!-- Aviso global: hay reportes sin enviar (banner fijo, visible en toda pantalla; tap = reintentar) -->
+<div id="pendingIndicator" onclick="flushQueue()"></div>
 
 <!-- ================= OPCIONES ================= -->
 <div id="optionsScreen" class="hidden">
@@ -3862,6 +3872,30 @@ async function bulkSendDayReplay(legajoStr, historySnapshot) {
                    no se hayan enviado siguen reintentándose por su cuenta */ }
 }
 
+/* Drenado de cola al Terminar Día (v5.20). Antes se hacía UN solo flushQueue()
+   sin esperar: si justo no había señal, el operario se iba con la cola llena y
+   sin aviso (el único escenario real de "hoy no se ven" los reportes). Ahora:
+   drena con espera ~9s y, si igual quedan pendientes, avisa con opción de
+   esperar de nuevo o salir igual (no se bloquea al que se va sin señal). */
+async function terminarDiaDrenarCola() {
+  const drenar = async function () {
+    if (typeof navigator !== "undefined" && navigator.onLine === false) return;   // sin red: no quemar CPU
+    const end = Date.now() + 9000;
+    while (Date.now() < end && readQueue().length) {
+      await flushQueue();
+      if (!readQueue().length) break;
+      await new Promise(function (r) { setTimeout(r, 400); });
+    }
+  };
+  await drenar();
+  while (readQueue().length) {
+    const n = readQueue().length;
+    const salir = confirm("⚠️ Te quedan " + n + " reporte(s) SIN ENVIAR (sin señal).\n\nSi cerrás la app ahora, hoy no se van a ver en el monitor.\nDejá la app ABIERTA cerca del wifi y se envían solos.\n\nAceptar = salir igual · Cancelar = esperar y reintentar");
+    if (salir) break;
+    await drenar();
+  }
+}
+
 async function confirmarTerminarDia() {
   const legajoStr = String(legajoInput.value || "");
   if (!legajoStr) { closeTerminarDia(); return; }
@@ -4034,8 +4068,9 @@ async function confirmarTerminarDia() {
   });
   enqueueReport(fjPayload);
 
-  // 3) Forzar flush ahora — antes de que el operario cierre el celular.
-  flushQueue();
+  // 3) Drenar la cola AHORA, con espera y aviso si quedan pendientes (v5.20)
+  //    — antes de que el operario cierre el celular.
+  await terminarDiaDrenarCola();
 
   // 4) Cerrar modal + volver a pantalla de legajo. NO se borra el legajo
   //    guardado: si mañana vuelve el mismo operario, ya lo tiene precargado.
@@ -4816,6 +4851,14 @@ function idbDelete(id) {
     r.onerror   = () => rej(r.error);
   }));
 }
+function idbGetAll() {
+  return idbOpen().then(db => new Promise((res, rej) => {
+    const tx = db.transaction(IDB_STORE, "readonly");
+    const r = tx.objectStore(IDB_STORE).getAll();
+    r.onsuccess = () => res(r.result || []);
+    r.onerror   = () => rej(r.error);
+  }));
+}
 
 /* Pide al SW que reintente la cola apenas pueda (Background Sync API).
    En navegadores sin soporte (Safari iOS), falla silencioso y dependemos
@@ -5044,11 +5087,13 @@ function removeFromQueue(id) {
      - ok=true            -> aceptado (201 ó 409 dedup)
      - ok=false, networkFail=true  -> sin respuesta (timeout, sin red, CORS)
      - ok=false, networkFail=false -> el server respondió con error (4xx/5xx) */
-async function trySendOneReport(payload) {
+async function trySendOneReport(payload, timeoutMs) {
   try {
-    // Corte duro a los 12s para no quedarnos esperando si la red se cuelga.
+    // Corte duro (12s default) para no quedarnos esperando si la red se cuelga.
+    // Los flush de FONDO pasan 30s: con wifi lento-pero-vivo, 12s clasificaba
+    // "network" (y auditaba) envíos que con más paciencia entraban (v5.20).
     const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), 12000);
+    const t = setTimeout(() => ctrl.abort(), timeoutMs || 12000);
     // FJ usa client_id determinístico (fj_<legajo>_<YYYY-MM-DD>) y merge-duplicates
     // para que un segundo Terminar Día del mismo día actualice (UPDATE) el FJ
     // anterior en vez de fallar con 409. Para todo lo demás, return=minimal normal.
@@ -5153,7 +5198,7 @@ async function flushQueue() {
     const batch = arr.slice(0, BATCH_SIZE);
     let historyChanged = false;
     for (const item of batch) {
-      const r = await trySendOneReport(item.payload);
+      const r = await trySendOneReport(item.payload, 30000);
       if (r.ok) {
         removeFromQueue(item.id);
         if (setHistoryItemStatus(item.legajo, item.fecha, item.id, "sent", new Date().toISOString(), r.created_at)) {
@@ -5170,6 +5215,9 @@ async function flushQueue() {
           cur[i].lastErr  = r.networkFail ? "network" : `server_${r.status||"?"}`;
           writeQueue(cur);
           newAttempts = cur[i].attempts;
+          // Espejar a IndexedDB: si no, el SW lleva SU contador desde 0 y vuelve
+          // a auditar "intento 1" del mismo ítem → filas duplicadas en Auditoría (v5.20).
+          try { idbPut(cur[i]).catch(function () {}); } catch (_e) {}
         }
         // Auditoría remota: 1er intento y cada 5 (para no spamear)
         if (newAttempts === 1 || newAttempts % 5 === 0) {
@@ -5182,8 +5230,10 @@ async function flushQueue() {
             historyChanged = true;
           }
         }
-        // Red caída: no insistir con el resto del batch.
-        if (r.networkFail) break;
+        // Red caída: no insistir con el resto del batch. Re-registrar el
+        // Background Sync: Chrome lo descarta tras ~3 reintentos con backoff y
+        // sin esto el reintento en background moría hasta el próximo encolado (v5.20).
+        if (r.networkFail) { try { registerBackgroundSync(); } catch (_e) {} break; }
         // Server rejection: seguir con el próximo item de la cola.
       }
     }
@@ -5197,7 +5247,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.19";
+const APP_VERSION = "v5.20";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -5522,6 +5572,24 @@ async function migrateQueueToIDB() {
     try { await idbPut(it); } catch (_e) {}
   }
 }
+/* Camino INVERSO (v5.20): rescatar ítems que quedaron SOLO en IDB (writeQueue
+   con QuotaExceeded silencioso, o LS limpiado). Sin esto la página no los ve:
+   no cuentan en el indicador ni en el reintento cada 3s — solo un eventual
+   Background Sync los salvaría. Correr DESPUÉS de migrateQueueToIDB (el orden
+   importa: un duplicado transitorio termina en 409 = éxito idempotente). */
+async function reconcileQueueFromIDB() {
+  let idbItems = [];
+  try { idbItems = await idbGetAll(); } catch (_e) { return; }
+  if (!idbItems.length) return;
+  const ls = readQueue();
+  const seen = {};
+  ls.forEach(function (it) { seen[it.id] = true; });
+  let added = false;
+  idbItems.forEach(function (it) {
+    if (it && it.id && !seen[it.id]) { ls.push(it); added = true; }
+  });
+  if (added) { writeQueue(ls); updatePendingIndicator(); }
+}
 
 /* El SW nos avisa cuando manda un item con éxito (ver postMessage en sw.js).
    Lo borramos de LS y actualizamos el historial en tiempo real, sin depender
@@ -5605,6 +5673,7 @@ loadEquivalencias();
    items pendientes de versiones anteriores. */
 registerServiceWorker();
 migrateQueueToIDB()
+  .then(() => reconcileQueueFromIDB())
   .then(() => {
     if (readQueue().length > 0) registerBackgroundSync();
   })
@@ -5623,8 +5692,13 @@ renderLegajoHistory("");
 updatePendingIndicator();
 
 /* Cuando vuelve la red, drená la cola de manera agresiva durante 3s
-   (en lugar de un solo intento aislado). */
+   (en lugar de un solo intento aislado). Además le pido al SW que drene su
+   copia (FLUSH_NOW, v5.20): segundo camino que sobrevive si la pestaña se
+   congela a mitad del loop. Duplicados → 409 = éxito, idempotente. */
 window.addEventListener("online", async () => {
+  if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
+    try { navigator.serviceWorker.controller.postMessage({ type: "FLUSH_NOW" }); } catch (_e) {}
+  }
   const end = Date.now() + 3000;
   while (Date.now() < end && readQueue().length) await flushQueue();
 });
