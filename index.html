@@ -5249,7 +5249,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.22";
+const APP_VERSION = "v5.23";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -9570,6 +9570,39 @@ async function cpLoadFaltantes() {
   } catch (_e) {}
   return rows.filter(function (e) { return Number(e.cajas_falto) > 0 && !facSet[String(e.np).trim()]; });
 }
+/* Tandas PICKEADAS con faltantes pero SIN armar todavía (no tienen filas en
+   Entregas_Virgilio) → sus faltantes aún NO llegaron al CP. Se listan como aviso
+   para que se entienda por qué una NP no aparece todavía (v5.23). Liviano: PKC de
+   los últimos 3 días (~cientos de filas), y un solo fetch de Entregas acotado a
+   esas tandas candidatas. */
+async function cpLoadPickSinArmar() {
+  try {
+    const today = cpTodayAR(), desde = today ? cpDateMinus(today, 3) : "";
+    let url = SUPABASE_TABLE_ENDPOINT + "?select=texto&opcion=eq.PKC&order=ts_cliente.desc&limit=3000";
+    if (desde) url += "&ts_cliente=gte." + desde;
+    const r = await fetch(url, { headers: _cpAuthH(), cache: "no-store" });
+    const rows = r.ok ? await r.json() : [];
+    const tandaFalt = {};
+    rows.forEach(function (x) {
+      const p = String(x.texto || "").split("|");
+      if (p.length < 4) return;
+      const esp = Number(p[2]), rea = Number(p[3]);
+      if (!isFinite(esp) || !isFinite(rea) || rea >= esp) return;   // solo faltantes reales
+      const t = String(p[0]).trim(); if (!t) return;
+      tandaFalt[t] = (tandaFalt[t] || 0) + 1;
+    });
+    const cands = Object.keys(tandaFalt);
+    if (!cands.length) return [];
+    // ¿cuáles YA están armadas? = tienen filas en Entregas
+    const inList = cands.map(function (t) { return encodeURIComponent(t); }).join(",");
+    const re = await fetch(SUPABASE_ENTREGAS_ENDPOINT + "?select=tanda&tanda=in.(" + inList + ")", { headers: _cpAuthH(), cache: "no-store" });
+    const erows = re.ok ? await re.json() : [];
+    const armed = {}; erows.forEach(function (x) { armed[String(x.tanda).trim()] = 1; });
+    return cands.filter(function (t) { return !armed[t]; })
+      .map(function (t) { return { tanda: t, arts: tandaFalt[t] }; })
+      .sort(function (a, b) { return a.tanda < b.tanda ? -1 : (a.tanda > b.tanda ? 1 : 0); });
+  } catch (_e) { return []; }
+}
 /* Lee el TAL más reciente de una NP → {count, tanda, resumen} (para mostrar/actualizar líos). */
 async function cpLoadLios(np) {
   const npU = String(np == null ? "" : np).toUpperCase().trim().replace(/\.0+$/, "");
@@ -9589,7 +9622,7 @@ async function cpLoadLios(np) {
 async function showCPModal(legajo) {
   if (!document.getElementById("cpCss")) {
     const st = document.createElement("style"); st.id = "cpCss";
-    st.textContent = "#cpModal{display:none;position:fixed;inset:0;z-index:1290;background:rgba(2,6,23,.74);overflow:auto;padding:12px;}#cpModal.show{display:block;}.cp-card{background:#f8fafc;max-width:460px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.cp-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;background:linear-gradient(90deg,#16a34a,#15803d);color:#fff;}.cp-title{font-size:18px;font-weight:800;}.cp-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}.cp-body{padding:13px 14px;}.cp-loading,.cp-empty{padding:24px;text-align:center;color:#64748b;font-size:15px;}.cp-hint{font-size:12.5px;color:#64748b;margin-bottom:10px;}.cp-frow{display:block;width:100%;text-align:left;border:1px solid #e2e8f0;border-radius:13px;padding:11px 12px;margin-bottom:9px;background:#fff;cursor:pointer;}.cp-frow-top{display:flex;align-items:baseline;gap:8px;margin-bottom:4px;}.cp-frow-bot{display:flex;align-items:center;justify-content:space-between;gap:8px;}.cp-cod{font-size:16px;font-weight:800;font-family:Consolas,Menlo,monospace;}.cp-fdesc{font-size:12.5px;color:#475569;}.cp-np{font-size:12px;color:#64748b;}.cp-faltan{font-size:12.5px;font-weight:800;color:#b45309;white-space:nowrap;}.cp-back{background:none;border:none;color:#1e6bd6;font-weight:800;font-size:14px;cursor:pointer;padding:0 0 8px;width:auto;}.cp-sel{background:#fff;border:1px solid #e2e8f0;border-radius:13px;padding:11px 12px;margin-bottom:12px;}.cp-selnp{font-size:12px;color:#64748b;margin-top:3px;}.cp-fld{margin-bottom:13px;}.cp-lbl{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:#64748b;margin-bottom:7px;}.cp-stp{display:flex;align-items:center;gap:7px;}.cp-sb{display:flex;align-items:center;justify-content:center;line-height:1;padding:0;width:46px;height:50px;border:none;border-radius:10px;font-size:26px;font-weight:800;cursor:pointer;background:#e2e8f0;color:#475569;}.cp-inp{width:70px;height:50px;text-align:center;font-size:24px;font-weight:800;border:2px solid #cbd5e1;border-radius:10px;padding:0;-moz-appearance:textfield;}.cp-inp::-webkit-outer-spin-button,.cp-inp::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}.cp-seg,.cp-lios{display:flex;flex-wrap:wrap;gap:8px;}.cp-opt{flex:1 1 0;min-width:120px;display:flex;flex-direction:column;align-items:center;gap:2px;background:#fff;border:1.5px solid #cbd5e1;border-radius:11px;padding:10px 8px;font-size:14px;font-weight:800;color:#334155;cursor:pointer;}.cp-opt small{font-weight:700;color:#64748b;font-size:11.5px;}.cp-opt.on{border-color:#16a34a;background:#f0fdf4;color:#15803d;}.cp-lio{background:#fff;border:1.5px solid #cbd5e1;border-radius:11px;padding:8px 11px;font-size:14px;font-weight:800;color:#334155;cursor:pointer;}.cp-lio small{font-weight:700;color:#64748b;font-size:11px;}.cp-lio.on{border-color:#16a34a;background:#f0fdf4;color:#15803d;}.cp-lio-new{border-style:dashed;}.cp-liosload,.cp-note{font-size:12px;color:#64748b;}.cp-note{margin-top:6px;}.cp-fin{width:100%;margin-top:6px;padding:15px;border:none;border-radius:12px;background:#16a34a;color:#fff;font-size:17px;font-weight:800;cursor:pointer;}.cp-fin:disabled{background:#cbd5e1;color:#64748b;cursor:not-allowed;}.cp-done{background:#dcfce7;border:1px solid #86efac;color:#15803d;font-weight:800;font-size:13px;border-radius:11px;padding:10px 12px;margin-bottom:11px;}";
+    st.textContent = "#cpModal{display:none;position:fixed;inset:0;z-index:1290;background:rgba(2,6,23,.74);overflow:auto;padding:12px;}#cpModal.show{display:block;}.cp-card{background:#f8fafc;max-width:460px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.cp-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;background:linear-gradient(90deg,#16a34a,#15803d);color:#fff;}.cp-title{font-size:18px;font-weight:800;}.cp-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}.cp-body{padding:13px 14px;}.cp-loading,.cp-empty{padding:24px;text-align:center;color:#64748b;font-size:15px;}.cp-hint{font-size:12.5px;color:#64748b;margin-bottom:10px;}.cp-pend{background:#fffbeb;border:1px solid #fcd34d;border-radius:11px;padding:9px 11px;margin-bottom:10px;font-size:12.5px;color:#92400e;line-height:1.4;}.cp-frow{display:block;width:100%;text-align:left;border:1px solid #e2e8f0;border-radius:13px;padding:11px 12px;margin-bottom:9px;background:#fff;cursor:pointer;}.cp-frow-top{display:flex;align-items:baseline;gap:8px;margin-bottom:4px;}.cp-frow-bot{display:flex;align-items:center;justify-content:space-between;gap:8px;}.cp-cod{font-size:16px;font-weight:800;font-family:Consolas,Menlo,monospace;}.cp-fdesc{font-size:12.5px;color:#475569;}.cp-np{font-size:12px;color:#64748b;}.cp-faltan{font-size:12.5px;font-weight:800;color:#b45309;white-space:nowrap;}.cp-back{background:none;border:none;color:#1e6bd6;font-weight:800;font-size:14px;cursor:pointer;padding:0 0 8px;width:auto;}.cp-sel{background:#fff;border:1px solid #e2e8f0;border-radius:13px;padding:11px 12px;margin-bottom:12px;}.cp-selnp{font-size:12px;color:#64748b;margin-top:3px;}.cp-fld{margin-bottom:13px;}.cp-lbl{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:#64748b;margin-bottom:7px;}.cp-stp{display:flex;align-items:center;gap:7px;}.cp-sb{display:flex;align-items:center;justify-content:center;line-height:1;padding:0;width:46px;height:50px;border:none;border-radius:10px;font-size:26px;font-weight:800;cursor:pointer;background:#e2e8f0;color:#475569;}.cp-inp{width:70px;height:50px;text-align:center;font-size:24px;font-weight:800;border:2px solid #cbd5e1;border-radius:10px;padding:0;-moz-appearance:textfield;}.cp-inp::-webkit-outer-spin-button,.cp-inp::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}.cp-seg,.cp-lios{display:flex;flex-wrap:wrap;gap:8px;}.cp-opt{flex:1 1 0;min-width:120px;display:flex;flex-direction:column;align-items:center;gap:2px;background:#fff;border:1.5px solid #cbd5e1;border-radius:11px;padding:10px 8px;font-size:14px;font-weight:800;color:#334155;cursor:pointer;}.cp-opt small{font-weight:700;color:#64748b;font-size:11.5px;}.cp-opt.on{border-color:#16a34a;background:#f0fdf4;color:#15803d;}.cp-lio{background:#fff;border:1.5px solid #cbd5e1;border-radius:11px;padding:8px 11px;font-size:14px;font-weight:800;color:#334155;cursor:pointer;}.cp-lio small{font-weight:700;color:#64748b;font-size:11px;}.cp-lio.on{border-color:#16a34a;background:#f0fdf4;color:#15803d;}.cp-lio-new{border-style:dashed;}.cp-liosload,.cp-note{font-size:12px;color:#64748b;}.cp-note{margin-top:6px;}.cp-fin{width:100%;margin-top:6px;padding:15px;border:none;border-radius:12px;background:#16a34a;color:#fff;font-size:17px;font-weight:800;cursor:pointer;}.cp-fin:disabled{background:#cbd5e1;color:#64748b;cursor:not-allowed;}.cp-done{background:#dcfce7;border:1px solid #86efac;color:#15803d;font-weight:800;font-size:13px;border-radius:11px;padding:10px 12px;margin-bottom:11px;}";
     document.head.appendChild(st);
   }
   let ov = document.getElementById("cpModal");
@@ -9597,13 +9630,13 @@ async function showCPModal(legajo) {
   ov.classList.add("show");
   ov.innerHTML = '<div class="cp-card"><div class="cp-head"><span class="cp-title">📦➕ Completar Pedido</span><button class="cp-close" onclick="closeCP()">Cerrar</button></div><div class="cp-body" id="cpBody"><div class="cp-loading">Cargando faltantes…</div></div></div>';
   try {
-    const res = await Promise.all([cpLoadFaltantes(), stockFetchSaldos(), loadArtNombres()]);
+    const res = await Promise.all([cpLoadFaltantes(), stockFetchSaldos(), loadArtNombres(), cpLoadPickSinArmar()]);
     const falt = res[0] || [], saldos = res[1] || {};
     const sN = {}; Object.keys(saldos).forEach(function (k) { sN[_cpNorm(k)] = saldos[k]; });
     const today = cpTodayAR(), cut = today ? cpDateMinus(today, 21) : "";
     const fr = falt.filter(function (e) { const d = String(e.fecha_salida || "").slice(0, 10); return !d || !cut || d >= cut; });
     fr.forEach(function (e) { e.desc = artNombre(e.cod_art, ""); e._saldo = sN[_cpNorm(e.cod_art)] || null; });
-    _cp = { legajo: String(legajo || ""), step: 1, falt: fr, saldosN: sN, sel: null, qty: 1, origen: "a_guardar", lioSel: "__new__", _liosInfo: null, liosLoading: false };
+    _cp = { legajo: String(legajo || ""), step: 1, falt: fr, saldosN: sN, sel: null, qty: 1, origen: "a_guardar", lioSel: "__new__", _liosInfo: null, liosLoading: false, pickPend: res[3] || [] };
     cpRender();
   } catch (e) { const b = document.getElementById("cpBody"); if (b) b.innerHTML = '<div class="cp-loading">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
 }
@@ -9613,6 +9646,10 @@ function cpRender() {
   let h = '';
   if (_cp.justDone) h += '<div class="cp-done">' + escapeHtml(_cp.justDone) + '</div>';
   h += '<div class="cp-hint">Tocá el faltante que <b>llegó</b>. Lo sumás al pedido y queda <b>a facturar</b>.</div>';
+  if (_cp.pickPend && _cp.pickPend.length) {
+    h += '<div class="cp-pend">⏳ <b>' + _cp.pickPend.length + '</b> tanda(s) pickeadas SIN armar todavía — sus faltantes van a aparecer acá cuando se <b>termine el armado</b>: ' +
+      _cp.pickPend.map(function (p) { return '<b>' + escapeHtml(p.tanda) + '</b>'; }).join(", ") + '</div>';
+  }
   if (!_cp.falt.length) h += '<div class="cp-empty">No hay faltantes pendientes 👍</div>';
   else h += _cp.falt.map(function (e, i) {
     const cli = String(e.cod_cliente || "").trim();
