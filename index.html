@@ -5249,7 +5249,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.23";
+const APP_VERSION = "v5.24";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -6503,15 +6503,15 @@ function pkNextHtml() {
   return h + "</div>";
 }
 /* v4.48 — Marcar manualmente que un artículo TIENE excedente (cuando la carga
-   automática de excedentes no está). Pide la ubicación (1 letra + 2 letras) en un
-   pop-up y agrega un paso al FINAL del picking para ir a buscarlo a esa ubicación. */
+   automática de excedentes no está). Pide la ubicación (letras y números, ej. A12)
+   en un pop-up y agrega un paso al FINAL del picking para ir a buscarlo ahí. */
 function pkMarkExcedente(idx) {
   if (!_pk) return;
   const it = _pk.items[idx]; if (!it || it.isExc || it.skip) return;
   let ubic = "";
-  try { ubic = String((typeof prompt === "function" ? prompt("📦 Excedente de " + it.art + "\n¿En qué ubicación está? (1 letra + 2 letras, ej. ABC)") : "") || ""); } catch (_e) { return; }
-  ubic = ubic.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 3);
-  if (ubic.length < 3) { if (ubic.length) { try { alert("La ubicación es 1 letra + 2 letras (ej. ABC)."); } catch (_e) {} } return; }
+  try { ubic = String((typeof prompt === "function" ? prompt("📦 Excedente de " + it.art + "\n¿En qué ubicación está? (letras y números, ej. A12)") : "") || ""); } catch (_e) { return; }
+  ubic = ubic.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
+  if (ubic.length < 1) { return; }
   const key = it.art + "·EXC";
   if (_pk.items.some(function (x) { return x.key === key; })) { try { alert("Ya marcaste excedente para " + it.art + "."); } catch (_e) {} return; }
   _pk.items.push({ art: it.art, key: key, esp: it.esp, sector: ubic, excUbic: ubic, isExc: true, manualExc: true, dual: null });
@@ -9247,7 +9247,7 @@ function mgRender() {
       : '<span class="mg-agu">a guardar <b>' + it.disponible + '</b></span>';
     const gondStp = function (big) { return '<div class="mg-stp' + (big ? ' big' : '') + '"><button class="mg-sb" onclick="mgChg(' + i + ',-1)">–</button><input class="mg-inp" type="number" min="0" max="' + maxG + '" inputmode="numeric" value="' + it.cargar + '" oninput="mgSet(' + i + ',this.value)"><button class="mg-sb" onclick="mgChg(' + i + ',1)">+</button></div>'; };
     const excStp = '<div class="mg-stp"><button class="mg-sb" onclick="mgChgExc(' + i + ',-1)">–</button><input class="mg-inp" type="number" min="0" max="' + maxE + '" inputmode="numeric" value="' + it.exc + '" oninput="mgSetExc(' + i + ',this.value)"><button class="mg-sb" onclick="mgChgExc(' + i + ',1)">+</button></div>';
-    const ubicInp = '<input class="mg-ubic-inp" type="text" maxlength="3" autocomplete="off" placeholder="ABC" value="' + escapeHtml(it.ubic || "") + '" oninput="this.value=this.value.toUpperCase().replace(/[^A-Za-z]/g,\'\').slice(0,3);mgSetUbic(' + i + ',this.value)">';
+    const ubicInp = '<input class="mg-ubic-inp" type="text" maxlength="6" autocomplete="off" placeholder="A12" value="' + escapeHtml(it.ubic || "") + '" oninput="this.value=this.value.toUpperCase().replace(/[^A-Za-z0-9]/g,\'\').slice(0,6);mgSetUbic(' + i + ',this.value)">';
     const faltTxt = it.manual ? '' : '<span class="mg-faltan' + (faltan <= 0 ? ' ok' : '') + '">' + (faltan <= 0 ? '✓ Listo' : 'Faltan ' + faltan) + '</span>';
     return '<div class="mg-row">' +
       '<div class="mg-headline"><div class="mg-info"><span class="mg-cod">' + escapeHtml(it.cod) + '</span> <span class="mg-desc">' + escapeHtml(it.desc || "") + '</span></div>' + head + '</div>' +
@@ -9288,15 +9288,15 @@ function mgToggleExc(i) { if (!_mg) return; const it = _mg.items[i]; if (!it) re
 function mgSetExc(i, v) { if (!_mg) return; const it = _mg.items[i]; if (!it) return; let n = Math.max(0, parseInt(v, 10) || 0); const mx = it.disponible - it.cargar; if (n > mx) n = mx; it.exc = n; mgRender(); }
 // Ubicación del excedente: 1 letra + 2 letras (3 letras, mayúsculas). Solo guarda
 // (no re-render → no pierde foco mientras tipean).
-function mgSetUbic(i, v) { if (!_mg) return; const it = _mg.items[i]; if (!it) return; it.ubic = String(v == null ? "" : v).toUpperCase().replace(/[^A-Z]/g, "").slice(0, 3); }
+function mgSetUbic(i, v) { if (!_mg) return; const it = _mg.items[i]; if (!it) return; it.ubic = String(v == null ? "" : v).toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6); }
 function mgConfirmar() {
   if (!_mg) return;
   const sel = _mg.items.filter(function (it) { return (it.cargar > 0) || (it.exc > 0); });
   if (!sel.length) return;
   // El excedente no tiene lugar fijo → la ubicación es obligatoria para tenerla
   // de dato (la usa el picking).
-  const sinUbic = sel.find(function (it) { return (it.exc || 0) > 0 && String(it.ubic || "").trim().length < 3; });
-  if (sinUbic) { try { alert("📍 Falta la ubicación del excedente de " + sinUbic.cod + ".\nEs 1 letra + 2 letras (ej. ABC) — el excedente no tiene lugar fijo, hay que anotarla para el picking."); } catch (_e) {} return; }
+  const sinUbic = sel.find(function (it) { return (it.exc || 0) > 0 && String(it.ubic || "").trim().length < 1; });
+  if (sinUbic) { try { alert("📍 Falta la ubicación del excedente de " + sinUbic.cod + ".\nEscribí dónde lo pusiste (letras y números, ej. A12) — el excedente no tiene lugar fijo, hay que anotarla para el picking."); } catch (_e) {} return; }
   const rows = [];
   sel.forEach(function (it) {
     const tot = it.cargar + (it.exc || 0);
