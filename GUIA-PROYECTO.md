@@ -284,7 +284,9 @@
 > Nota: **v4.55** — **Validación de carga a la PPP** (hacia "eliminar el Excel"). La **doble vía** ya
 > existía: picking y programación leen de Supabase (`PPP_Base_Pedidos`, `PPP_Programacion_Diaria`,
 > `PPP_Pedidos_Entregados`) con fallback a Sheets, y el importador in-app (`pppSubir`) sube el Excel a
-> esas tablas (DELETE+INSERT con el JWT del supervisor). **Lo nuevo**: `pppSubir` ahora **verifica** que
+> esas tablas (DELETE+INSERT con el JWT del supervisor) — ⚠ pero `pppSubir` **hoy quedó sin botón que lo
+> dispare** (ver la nota v4.58 más arriba); la carga real a la PPP la hace el espejo del Excel, no este
+> importador in-app. **Lo nuevo** en v4.55: `pppSubir` ahora **verifica** que
 > la carga realmente entró — después del INSERT re-cuenta en Supabase (`pppCountTable`, Content-Range
 > con `Prefer: count=exact`) y compara contra lo que mandó: si coincide dice **"✓ VERIFICADO: N filas"**,
 > si no, avisa **fuerte** ("⚠ subiste N pero quedaron M — algo falló"). Antes decía "✓ Listo" usando el

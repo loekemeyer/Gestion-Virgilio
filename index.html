@@ -5657,7 +5657,7 @@ loadPlanimetriaRemote();   // al arrancar (para que el picking tenga la planimet
    para ubicar y para no dar falsa alerta. Fuente: tabla Supabase Equivalencias_Codigos
    (anon select). Claves normalizadas sin ceros a la izquierda. ===== */
 let _codeEquiv = { "29": { real: "437E", nota: "Colador 16cm importado" }, "30": { real: "438E", nota: "Colador importado" } };
-function _equivNorm(c) { return String(c == null ? "" : c).toUpperCase().trim().replace(/^0+(?=.)/, ""); }
+function _equivNorm(c) { return _ocgNorm(c); }  // misma normalización que el resto (upper+trim+sin ceros a la izq); ver _ocgNorm / _cpNorm
 function equivLookup(cod) { return _codeEquiv[_equivNorm(cod)] || null; }
 function equivResolve(cod) { const e = equivLookup(cod); return e ? e.real : String(cod == null ? "" : cod); }
 async function loadEquivalencias() {
@@ -8879,12 +8879,14 @@ function _stkDep() { const e = document.getElementById("stkAjDep"); return (e &&
 /* ===== STOCK — RACKS (v4.08): factores por artículo (master↔caja↔unidad), órdenes de bajar
    racks→góndola y aprobación de Marianela. Las bajadas las propone el operario (Racks_Bajadas);
    al aprobar se hace el movimiento entre depósitos (racks − / terminado +) y se cierra la orden. */
-const SUPABASE_ART_FACT_ENDPOINT = SUPABASE_URL + "/rest/v1/" + encodeURIComponent("Articulos Virgilio X Tallerista");
+/* La tabla de artículos se lee con SUPABASE_ART_ENDPOINT (definido más abajo, en el
+   editor de artículos). Antes había acá un SUPABASE_ART_FACT_ENDPOINT duplicado a la
+   MISMA tabla — se unificó para no tener que cambiar dos constantes si migra la tabla. */
 const SUPABASE_RACKS_ORD_ENDPOINT = SUPABASE_URL + "/rest/v1/Racks_Ordenes";
 const SUPABASE_RACKS_BAJ_ENDPOINT = SUPABASE_URL + "/rest/v1/Racks_Bajadas";
 async function stockFetchArtFactors() {
   try {
-    const r = await fetch(SUPABASE_ART_FACT_ENDPOINT + "?select=Cod_Art,Cajas_x_Master,Uni_x_Caja&limit=20000", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+    const r = await fetch(SUPABASE_ART_ENDPOINT + "?select=Cod_Art,Cajas_x_Master,Uni_x_Caja&limit=20000", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
     const rows = r.ok ? await r.json() : [];
     const m = {};
     rows.forEach(function (x) { const k = String(x.Cod_Art || "").toUpperCase(); if (!k) return; if (!m[k]) m[k] = { cajasXMaster: Number(x.Cajas_x_Master) || 0, uniXCaja: Number(x.Uni_x_Caja) || 0 }; else { if (!m[k].cajasXMaster && x.Cajas_x_Master) m[k].cajasXMaster = Number(x.Cajas_x_Master); if (!m[k].uniXCaja && x.Uni_x_Caja) m[k].uniXCaja = Number(x.Uni_x_Caja); } });
@@ -11710,7 +11712,6 @@ function closePPP() {
    ⚠ Requiere policy RLS de escritura para supervisores (SQL aparte). v2.97. ===== */
 let _pppParsed = { base: null, prog: null };
 const PPP_TABLE = { base: "PPP_Base_Pedidos", prog: "PPP_Programacion_Diaria" };
-const PPP_HOJA  = { base: "Base Pedidos", prog: "Formato PPP (Programación)" };
 let _pppXlsxP = null;
 function pppLoadXlsx() {
   if (window.XLSX) return Promise.resolve(window.XLSX);
@@ -13198,7 +13199,6 @@ function _pppBlock(key, name, cls, meta, pedidos, headerExtra, editTanda) {
    Ruta Sur/Oeste = Z1+Z3+Z4 · Ruta Norte = Z5+Z6+Z7 · Ruta Centro = Z2 · Súper (uno
    por cliente) · Retira (sin camión). Cada camión hasta la capacidad (6 m³/día →
    ceil(m³/cap) camiones por ruta). Demora prom = promedio (Fecha Entrega − Fecha Recep). */
-const PPP_ZKEYS = ["Zona 1 - CABA Sur", "Zona 2 - CABA Centro", "Zona 3 - CABA Oeste", "Zona 4 - GBA Sur", "Zona 5 - GBA Oeste", "Zona 6 - GBA Norte", "Zona 7 - GBA Norte Lejos", "Retira", "Super", "Expo"];
 function pppResumenHtml(prog) {
   const conF = prog.filter(function (p) { return (p.fecha_entrega || "").trim(); });
   const sinF = prog.length - conF.length;
