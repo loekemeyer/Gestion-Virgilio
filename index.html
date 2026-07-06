@@ -5268,7 +5268,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.25";
+const APP_VERSION = "v5.26";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -5403,6 +5403,20 @@ async function send() {
 
   if (!legajoStr) { alert("Falta el número de legajo"); return; }
   if (!opcion)    { alert("Falta seleccionar una opción"); return; }
+
+  // v5.26: AP sobre una tanda que YA tiene armado abierto (mismo código) → NO generamos
+  // un 2º evento AP (doble arranque, ensucia los tiempos): reabrimos el asistente donde
+  // quedó. Cubre al operario que, tras una pausa (comida), aprieta AP de nuevo por
+  // costumbre para volver. (Si es OTRA tanda, sigue el flujo normal = armado nuevo.)
+  if (opcion === "AP" && texto) {
+    const stAP = getLegajoState(legajoStr);
+    if (stAP && stAP.armado && stAP.armado.active &&
+        String(stAP.armado.value || "").trim().toUpperCase() === texto) {
+      try { alert("Ese armado (tanda " + texto + ") ya estaba abierto — te lo reabro donde lo dejaste.\nNo hace falta marcar AP de nuevo."); } catch (_e) {}
+      try { showCompletarWizard(legajoStr, texto); } catch (_e) {}
+      return;
+    }
+  }
 
   // ID único por reporte: permite dedup en el server (UNIQUE en client_id).
   const nowMs  = Date.now();
