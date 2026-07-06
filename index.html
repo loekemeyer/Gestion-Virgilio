@@ -4268,6 +4268,25 @@ function renderPendingSuggestion(){
     }
   } catch (_e) { /* no-op */ }
 
+  // (−1b) Armado en curso: botón para RETOMAR el asistente (Completar) EXACTO donde
+  // quedó, SIN re-mandar AP. Cubre la pausa en medio del armado (el operario hace AP,
+  // luego PC comida u otra tarea): antes tenía que apretar AP de nuevo — doble evento
+  // AP y, durante la pausa, el AP quedaba deshabilitado y no se veía nada. Va arriba de
+  // todo, incluso con un toggle activo (mismo patrón que el de picking).
+  try {
+    const stA = getLegajoState(legajo);
+    if (stA && stA.armado && stA.armado.active && stA.armado.value) {
+      const savA  = _compRestore(stA.armado.value);
+      const pasoA = (savA && savA.step) ? " · Paso " + savA.step : "";
+      const btnA  = document.createElement("button");
+      btnA.className = "primary-btn";
+      btnA.style.background = "#b45309";
+      btnA.innerText = "▶ Seguir armado tanda " + stA.armado.value + pasoA;
+      btnA.onclick = () => showCompletarWizard(legajo, stA.armado.value);
+      box.appendChild(btnA);
+    }
+  } catch (_e) { /* no-op */ }
+
   const st    = getLegajoState(legajo);
   const today = getTodayKey();
   const cont  = st.continuar || {};
@@ -5249,7 +5268,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.24";
+const APP_VERSION = "v5.25";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
