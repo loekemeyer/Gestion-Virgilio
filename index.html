@@ -5268,7 +5268,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.26";
+const APP_VERSION = "v5.27";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -5415,6 +5415,22 @@ async function send() {
       try { alert("Ese armado (tanda " + texto + ") ya estaba abierto — te lo reabro donde lo dejaste.\nNo hace falta marcar AP de nuevo."); } catch (_e) {}
       try { showCompletarWizard(legajoStr, texto); } catch (_e) {}
       return;
+    }
+  }
+
+  // v5.27: EP sobre una tanda que NO está en la programación (PPP) de hoy → aviso ANTES
+  // de arrancar el picking, para frenar el error de pickear la tanda equivocada en el
+  // segundo 0 (antes se detectaba recién en el monitor, tras perder el tiempo). No bloquea
+  // si no se puede verificar (sin red / PPP vacío): falla ABIERTO. Solo EP — el armado
+  // puede ir un día después, fuera del PPP del día (ahí NO avisamos). Ver caso C69C
+  // re-pickeado (Jhonny agarró una tanda ya terminada en vez de C72F).
+  if (opcion === "EP" && texto) {
+    let sm = null;
+    try { sm = await fetchMonitorSheet(); } catch (_e) { sm = null; }
+    if (sm && typeof sm.get === "function" && sm.size > 0 && !sm.get(texto)) {
+      let ok = false;
+      try { ok = confirm("⚠ La tanda " + texto + " NO está en la programación (PPP) de hoy.\n\n¿Seguro que la vas a pickear? Puede que te hayas equivocado de tanda."); } catch (_e) { ok = true; }
+      if (!ok) return;   // se equivocó de tanda → aborta el EP (no registra nada)
     }
   }
 
