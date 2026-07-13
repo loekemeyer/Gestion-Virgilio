@@ -5268,7 +5268,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.27";
+const APP_VERSION = "v5.28";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -11280,11 +11280,18 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
     }
     closeStartMs = Math.max(closeStartMs, tsInicioMs);
     const closePortion = Math.max(0, tsClienteMs - closeStartMs);
-    // Días intermedios (raro): cada uno cuenta como una jornada completa.
+    // Días intermedios (raro): cada día HÁBIL entre apertura y cierre cuenta como una
+    // jornada completa. ⚠ Sábado y domingo NO se trabaja en el depósito → se saltean
+    // (antes contaban como jornada: una tanda armada de viernes a lunes sumaba +1080 min
+    // de fin de semana). Se recorre día por día en hora AR (00:00 AR = 03:00 UTC, así que
+    // getUTCDay() del ms da el día de la semana correcto). 0=domingo, 6=sábado.
     const dStart = new Date(dayOpen  + "T00:00:00-03:00").getTime();
     const dEnd   = new Date(dayClose + "T00:00:00-03:00").getTime();
-    const nCrossings = Math.round((dEnd - dStart) / (24 * 3600 * 1000));
-    const intermediateDays = Math.max(0, nCrossings - 1);
+    let intermediateDays = 0;
+    for (let dm = dStart + 24 * 3600 * 1000; dm < dEnd - 1000; dm += 24 * 3600 * 1000) {
+      const wd = new Date(dm).getUTCDay();
+      if (wd !== 0 && wd !== 6) intermediateDays++;
+    }
     const intermediatePortion = intermediateDays * workH * 3600 * 1000;
     if (outBreakdown) {
       outBreakdown.sameDay = false;
