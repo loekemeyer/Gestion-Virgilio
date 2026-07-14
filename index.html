@@ -5292,7 +5292,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.33";
+const APP_VERSION = "v5.34";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -5999,18 +5999,9 @@ setInterval(updateMonitorClock, 30000);   // refresca cada 30s
      determinar status Picking y Separado de cada tanda.
    - Auto-refresh cada 3 s mientras el modal esté abierto.
    ========================================================= */
-/* Endpoint gviz: NO usa el cache CDN de "publicar en la web" (1-5 min),
-   refleja los cambios en segundos. Requiere que el Google Sheet esté
-   compartido como "Anyone with the link → Viewer". Si no está compartido,
-   el endpoint devuelve HTML de login y el monitor muestra error. */
-const MONITOR_CSV_URL =
-  "https://docs.google.com/spreadsheets/d/1-16YXe0xq6x9i-Yhk5cm5V3VqvQ0PWZtcDbm8OeeKW0/gviz/tq?tqx=out:csv&gid=1947169223";
-
-/* Hoja "PPP Excel Pedidos Entregados 2026" — fallback de M3 para tandas
-   que ya no están en la programación diaria. Mismo documento, otro gid.
-   Refrescada en cache cada 5 min. */
-const MONITOR_HISTORIC_CSV_URL =
-  "https://docs.google.com/spreadsheets/d/1-16YXe0xq6x9i-Yhk5cm5V3VqvQ0PWZtcDbm8OeeKW0/gviz/tq?tqx=out:csv&gid=2146771217";
+/* (v5.34) URLs gviz de la PPP (programación e histórico) eliminadas: la app ya no
+   lee Google Sheets — la programación sale de PPP_Programacion_Diaria y el m³
+   histórico de PPP_Pedidos_Entregados (Supabase). */
 const HISTORIC_REFRESH_MS = 5 * 60 * 1000;
 let historicMap        = null;   // Map<tandaUpper, m3 sumado>
 let historicLastFetch  = 0;
@@ -6022,17 +6013,8 @@ let historicLastFetch  = 0;
    ("PPP Excel Base Datos Pedidos"), suma las cajas por código y las muestra
    ordenadas numéricamente. (Después: orden de góndola en vez de numérico.)
    ========================================================= */
-// Base del picking. /export?format=csv devuelve los valores como TEXTO (respeta los
-// códigos importados "035E" y el cero adelante "026"). gviz queda de RESPALDO: coacciona
-// la columna a número y descarta los importados (ver v3.43). v3.44.
-const PICKING_BASE_DOC = "1-16YXe0xq6x9i-Yhk5cm5V3VqvQ0PWZtcDbm8OeeKW0";
-const PICKING_BASE_GID = "845301421";   // pestaña "PPP Excel Base Datos Pedidos"
-const PICKING_BASE_CSV_URL =
-  "https://docs.google.com/spreadsheets/d/" + PICKING_BASE_DOC + "/export?format=csv&gid=" + PICKING_BASE_GID;
-const PICKING_BASE_CSV_URL_GVIZ =
-  "https://docs.google.com/spreadsheets/d/" + PICKING_BASE_DOC + "/gviz/tq?tqx=out:csv&sheet=" +
-  encodeURIComponent("PPP Excel Base Datos Pedidos");
-const PICK_BASE_TTL_MS = 5 * 60 * 1000;   // hoja grande (~20k filas) → cache 5 min
+// (v5.34) URLs gviz de la base de pedidos eliminadas: se lee de Supabase (PPP_Base_Pedidos).
+const PICK_BASE_TTL_MS = 5 * 60 * 1000;   // cache 5 min
 let _pickBaseCache   = null;   // Map<pedido(NP), [{art, cajas}]>
 let _pickBaseCacheTs = 0;
 
@@ -6087,21 +6069,11 @@ async function supaFetchAll(endpoint, query) {
   return out;
 }
 
-/* Dispatcher de la base de pedidos (picking). Cache 5 min. Fuente según
-   PPP_SOURCE: Supabase (PPP_Base_Pedidos) o Google Sheets. */
+/* Base de pedidos (picking) desde Supabase (PPP_Base_Pedidos). Cache 5 min. v5.34. */
 async function fetchPickingBase() {
   const now = Date.now();
   if (_pickBaseCache && (now - _pickBaseCacheTs) < PICK_BASE_TTL_MS) return _pickBaseCache;
-  let map = null;
-  if (PPP_SOURCE !== "sheets") {
-    try { map = await fetchPickingBaseFromSupabase(); }
-    catch (e) {
-      if (PPP_SOURCE === "supabase") throw e;
-      console.warn("[picking] Supabase base falló, caigo a Sheets:", e.message); map = null;
-    }
-    if (map && !map.size && PPP_SOURCE === "auto") map = null;   // vacío → fallback
-  }
-  if (!map) map = await fetchPickingBaseFromSheets();
+  const map = await fetchPickingBaseFromSupabase();
   _pickBaseCache = map; _pickBaseCacheTs = Date.now();
   return map;
 }
@@ -6123,45 +6095,8 @@ async function fetchPickingBaseFromSupabase() {
   return map;
 }
 
-/* Baja "PPP Excel Base Datos Pedidos" (pedido → artículos + cajas) de Google
-   Sheets. Lee por posición: Pedido=A, Artículo=C, Cantidad Cajas=F (con detección
-   de header por las dudas, tolerando los labels que gviz a veces duplica). */
-async function fetchPickingBaseFromSheets() {
-  const now = Date.now();
-  let text = null;
-  // Preferimos /export?format=csv (TEXTO: respeta "035E" y el cero). Si falla o devuelve
-  // HTML (login/permiso), caemos a gviz (coacciona a número y pierde los importados, pero
-  // no deja el picking vacío). v3.44.
-  try {
-    const r = await fetch(PICKING_BASE_CSV_URL + "&_=" + now, { cache: "no-store" });
-    if (r.ok) { const t = await r.text(); if (t && t.slice(0, 64).trim().charAt(0) !== "<") text = t; }
-  } catch (_e) { /* probamos gviz */ }
-  if (text == null) {
-    const r2 = await fetch(PICKING_BASE_CSV_URL_GVIZ + "&_=" + now, { cache: "no-store" });
-    if (!r2.ok) throw new Error("Base Datos Pedidos HTTP " + r2.status);
-    text = await r2.text();
-  }
-  const rows = parseCSV(text);
-  let cPed = 0, cArt = 2, cCaj = 5;
-  for (let i = 0; i < Math.min(rows.length, 5); i++) {
-    const h = rows[i].map(dedupeHeaderCell);
-    const ip = h.indexOf("pedido");
-    const ia = h.findIndex(x => x === "artículo" || x === "articulo");
-    const ic = h.findIndex(x => x.indexOf("cajas") >= 0);
-    if (ip >= 0 && ia >= 0) { cPed = ip; cArt = ia; if (ic >= 0) cCaj = ic; break; }
-  }
-  const map = new Map();
-  for (let i = 0; i < rows.length; i++) {
-    const row = rows[i]; if (!row) continue;
-    const ped = pickNormNp(row[cPed]);
-    if (!ped || !/^\d/.test(ped)) continue;             // saltea header y basura
-    const art = (row[cArt] || "").trim();
-    if (!art) continue;
-    if (!map.has(ped)) map.set(ped, []);
-    map.get(ped).push({ art: art, cajas: pickParseCajas(row[cCaj]) });
-  }
-  return map;
-}
+/* (v5.34) fetchPickingBaseFromSheets eliminado: la base de pedidos se lee de
+   Supabase (fetchPickingBaseFromSupabase). */
 
 /* m³ por artículo desde Supabase (tabla "Volumen_Articulos", migrada de la hoja
    "VolumenArticulos" en v5.33 — incluye los DOS bloques de la hoja, que el parser
@@ -6264,21 +6199,9 @@ async function showPickingList(tanda, legajo) {
       return a;
     };
     let agg = aggFrom(pickBase);
-    // Mirror de Supabase desatrasado: si a ALGÚN NP de la tanda le faltan filas en la
-    // base de Supabase (todavía no sincronizó), BACKFILL solo esos NP desde Google
-    // Sheets — SIN pisar los que sí están en Supabase. ⚠ La hoja gviz devuelve los
-    // códigos SIN la "E" del importado (y sin el cero adelante); Supabase sí los trae
-    // bien. Antes se reemplazaba TODO el agg con la hoja y se perdían los importados
-    // (códigos E) de toda la tanda. v3.43.
-    const npsSinFilas = nps.filter(np => !(pickBase.get(np) || []).length);
-    if (npsSinFilas.length && typeof PPP_SOURCE !== "undefined" && PPP_SOURCE !== "sheets") {
-      try {
-        const sheetBase = await fetchPickingBaseFromSheets();
-        for (const np of npsSinFilas) {
-          for (const it of (sheetBase.get(np) || [])) agg[it.art] = (agg[it.art] || 0) + it.cajas;
-        }
-      } catch (_e) { /* sin Sheets: queda lo que trajo Supabase */ }
-    }
+    // v5.34: la base sale 100% de Supabase (PPP_Base_Pedidos). Ya no hay backfill
+    // desde Google Sheets; si un NP todavía no sincronizó en Supabase, queda sin filas
+    // hasta que la macro lo cargue.
     // Orden de góndola (planimetría, window.GONDOLA): ordena por el "orden" de
     // cada código y le adjunta su sector. Los códigos sin planimetría caen al
     // final, ordenados numéricamente entre sí.
@@ -10250,34 +10173,24 @@ function crDeadline(loadMs) {
 }
 function crVencido(loadMs) { return loadMs > 0 && Date.now() > crDeadline(loadMs); }
 
-/* "Pedidos Entregados" (hoja histórica) → Map NP -> { cod, rs }. Para que Recepción
-   Remitos muestre el cliente de los NP que YA salieron de la PPP del día (arrastrados
-   de días anteriores). Mismas posiciones de columna que la PPP (fetchMonitorFromSheets):
-   NP=col2, COD=col4, RS=col5; las filas VIEJAS tienen la Razón en col6 → fallback si
-   col5 está vacía. Indexa col1 y col2 (en filas viejas el N° está en col1). Gana la
-   última fila con razón (las recientes están abajo). Cacheado 5 min (la hoja es grande). */
+/* "Pedidos Entregados" → Map NP -> { cod, rs }. Para que Recepción Remitos muestre el
+   cliente de los NP que YA salieron de la PPP del día (arrastrados de días anteriores).
+   Desde v5.34 sale de la tabla Supabase PPP_Entregados_Meta (migrada del histórico; la
+   sincroniza server-side sync_ppp_entregados_meta() por cron). Cacheado 5 min. */
 let _entMetaCache = null, _entMetaTs = 0;
 const ENT_META_TTL_MS = 5 * 60 * 1000;
 async function fetchEntregadosMeta() {
   const now = Date.now();
   if (_entMetaCache && (now - _entMetaTs) < ENT_META_TTL_MS) return _entMetaCache;
-  const url = MONITOR_HISTORIC_CSV_URL + "&_=" + Date.now();
-  const r = await fetch(url, { cache: "no-store" });
-  if (!r.ok) throw new Error("Entregados CSV HTTP " + r.status);
-  const rows = parseCSV(await r.text());
+  const url = SUPABASE_URL + "/rest/v1/PPP_Entregados_Meta?select=np,cod,rs&limit=100000";
+  const r = await fetch(url, { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+  if (!r.ok) throw new Error("Entregados meta HTTP " + r.status);
+  const rows = await r.json();
   const meta = {};
-  for (let i = 1; i < rows.length; i++) {
-    const row = rows[i]; if (!row) continue;
-    const cod = String(row[4] == null ? "" : row[4]).trim();
-    let rs = String(row[5] == null ? "" : row[5]).trim();
-    if (!rs) { const c6 = String(row[6] == null ? "" : row[6]).trim(); if (/[A-Za-z]/.test(c6)) rs = c6; }
-    for (const idx of [1, 2]) {
-      for (const part of String(row[idx] == null ? "" : row[idx]).split(/[,/]/)) {
-        const np = part.trim().replace(/\.0+$/, "");
-        if (!/^\d{2,7}$/.test(np)) continue;
-        if (rs || !meta[np]) meta[np] = { cod: cod, rs: rs };
-      }
-    }
+  for (let i = 0; i < rows.length; i++) {
+    const np = String(rows[i].np == null ? "" : rows[i].np).trim();
+    if (!np) continue;
+    meta[np] = { cod: String(rows[i].cod == null ? "" : rows[i].cod).trim(), rs: String(rows[i].rs == null ? "" : rows[i].rs).trim() };
   }
   _entMetaCache = meta; _entMetaTs = now;
   return meta;
@@ -14329,34 +14242,11 @@ async function faltGetEnrich() {
   _faltEnrich = { sheetMap, pickBase }; _faltEnrichTs = now;
   return _faltEnrich;
 }
-/* Igual que el fallback del picking, pero para el monitor (faltantes / quién pidió /
-   aviso Marianela): si a los NP de las tandas dadas les faltan filas en la base
-   (mirror de Supabase atrasado), trae la base de Google Sheets y **mergea** los NP
-   faltantes en `enr.pickBase` (que es el MISMO objeto que cachea el picking → sana
-   ambos). No hace nada si la fuente ya es Sheets o si no falta ningún NP. v2.91. */
-async function faltEnsureBase(enr, tandas) {
-  if (!enr || !enr.sheetMap || !enr.pickBase) return;
-  if (typeof PPP_SOURCE === "undefined" || PPP_SOURCE === "sheets") return;
-  const need = new Set();
-  for (const t of (tandas || [])) {
-    const entry = enr.sheetMap.get(String(t).trim().toUpperCase());
-    if (!entry || !entry.pedidos) continue;
-    for (const p of entry.pedidos) for (const part of String(p.np || "").split(/[,/]/)) {
-      const np = pickNormNp(part); if (np && /\d/.test(np)) need.add(np);
-    }
-  }
-  let faltan = false;
-  for (const np of need) { if (!(enr.pickBase.get(np) || []).length) { faltan = true; break; } }
-  if (!faltan) return;
-  try {
-    const sheetBase = await fetchPickingBaseFromSheets();
-    for (const np of need) {
-      if (!(enr.pickBase.get(np) || []).length && (sheetBase.get(np) || []).length) {
-        enr.pickBase.set(np, sheetBase.get(np));
-      }
-    }
-  } catch (_e) { /* sin Sheets: queda lo que trajo Supabase */ }
-}
+/* v5.34: el picking/monitor leen 100% de Supabase (PPP_Base_Pedidos); ya no hay
+   backfill desde Google Sheets. Se deja la función como no-op para no tocar a sus
+   llamadores. Si un NP no está aún en Supabase, queda sin filas hasta que la macro
+   lo sincronice. (Antes: faltEnsureBase traía los NP faltantes del Sheet, v2.91.) */
+async function faltEnsureBase() { /* no-op: sin fuente Google Sheets */ }
 
 async function refreshFaltantes() {
   const body = document.getElementById("faltantesBody");
@@ -14555,35 +14445,8 @@ function showKioskAdminPanel() {
   document.querySelectorAll("#supervisorPanel .auth-logout-row").forEach((el) => el.classList.add("hidden"));
 }
 
-/* Parser CSV simple — soporta campos entre comillas con comas y comillas
-   escapadas dobles ("a""b" -> a"b). Suficiente para CSV publicado de Sheets. */
-function parseCSV(text) {
-  const rows = [];
-  let row = [], field = "", inQ = false;
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i];
-    if (inQ) {
-      if (c === '"' && text[i+1] === '"') { field += '"'; i++; }
-      else if (c === '"') { inQ = false; }
-      else { field += c; }
-    } else {
-      if (c === '"') inQ = true;
-      else if (c === ',') { row.push(field); field = ""; }
-      else if (c === '\n') { row.push(field); rows.push(row); row = []; field = ""; }
-      else if (c === '\r') { /* skip */ }
-      else { field += c; }
-    }
-  }
-  if (field.length || row.length) { row.push(field); rows.push(row); }
-  return rows;
-}
-
-/* Convierte "0,289" -> 0.289. "" o no-numérico -> 0. */
-function monitorParseM3(s) {
-  if (!s) return 0;
-  const n = parseFloat(String(s).replace(/\./g, "").replace(",", "."));
-  return isNaN(n) ? 0 : n;
-}
+/* (v5.34) parseCSV y monitorParseM3 eliminados: eran solo para el parseo de Google
+   Sheets, que ya no se usa (todo sale de Supabase). */
 
 /* PERSISTENCIA de m³ por tanda (localStorage). Necesario para Productividad:
    la PPP "Programacion Diaria" solo tiene las tandas a entregar HOY, así que
@@ -14682,60 +14545,12 @@ function targetDeliveryDates(sheetMap, futureCount) {
   return [...past, ...future];
 }
 
-/* gviz a veces DUPLICA cada label del header cuando el sheet tiene 2 filas de
-   encabezado apiladas (título + headers) → "Op Op", "M3 M3", "Fecha Entrega
-   Fecha Entrega". Esta función colapsa esos duplicados EXACTOS: "op op" → "op",
-   "fecha entrega fecha entrega" → "fecha entrega". Deja intactos los labels
-   normales (1 sola vez) y los que no son duplicado exacto (p.ej. el 1er cell
-   "Pedidos con Problemas o Nuevos … Tanda", que igual matchea por substring). */
-function dedupeHeaderCell(x) {
-  const t = (x || "").trim().toLowerCase().replace(/\s+/g, " ");
-  if (!t) return "";
-  const w = t.split(" ");
-  if (w.length >= 2 && w.length % 2 === 0) {
-    const half = w.length / 2;
-    let same = true;
-    for (let i = 0; i < half; i++) { if (w[i] !== w[half + i]) { same = false; break; } }
-    if (same) return w.slice(0, half).join(" ");
-  }
-  return t;
-}
+/* (v5.34) dedupeHeaderCell y findMonitorHeader eliminados: eran para parsear el
+   header del sheet gviz, que ya no se usa. */
 
-/* Encuentra el índice del header. El sheet "PPP Excel Programacion Diaria" tiene
-   varias sub-tablas apiladas ("Pedidos con Problemas o Nuevos", "…Super a
-   Programar", "…a Programar", "Programacion"), cada una con su propia fila de
-   encabezado — y algunas INCOMPLETAS (traen "Op" pero la col "Fecha Entrega"
-   vacía). El header bueno es el que rotula TODAS las columnas: tanda + op +
-   fecha entrega. Por eso la 1ra pasada exige los tres (sobre los labels ya
-   de-duplicados con dedupeHeaderCell); la 2da es fallback (tanda + op) para
-   sheets normales. Rango de 50 filas porque las sub-tablas previas empujan el
-   header bueno hacia abajo (caso real 2026-06-05: header en fila 11 del CSV). */
-function findMonitorHeader(rows) {
-  for (let i = 0; i < Math.min(rows.length, 50); i++) {
-    const r = rows[i].map(dedupeHeaderCell);
-    if (r.some(c => c.includes("tanda")) && r.includes("op") && r.includes("fecha entrega")) return i;
-  }
-  for (let i = 0; i < Math.min(rows.length, 50); i++) {
-    const r = rows[i].map(dedupeHeaderCell);
-    if (r.some(c => c.includes("tanda")) && r.includes("op")) return i;
-  }
-  return -1;
-}
-
-/* Dispatcher de la fuente PPP (ver PPP_SOURCE). Intenta Supabase si corresponde
-   y cae a Sheets en modo "auto". Aplica los side-effects de m³ persistido sobre
-   el Map resultante, venga de donde venga. v2.80. */
+/* PPP "Programacion Diaria" desde Supabase (aplica los side-effects de m³ persistido). v5.34. */
 async function fetchMonitorSheet() {
-  let acc = null;
-  if (PPP_SOURCE !== "sheets") {
-    try { acc = await fetchMonitorFromSupabase(); }
-    catch (e) {
-      if (PPP_SOURCE === "supabase") throw e;
-      console.warn("[monitor] Supabase PPP falló, caigo a Sheets:", e.message); acc = null;
-    }
-    if (acc && !acc.size && PPP_SOURCE === "auto") acc = null;   // vacío → fallback
-  }
-  if (!acc) acc = await fetchMonitorFromSheets();
+  const acc = await fetchMonitorFromSupabase();
   // Persistimos cada tanda con m³ > 0 para que sobreviva cuando salga de la PPP
   // "Programacion Diaria" (mañana ya no estará pero la recordamos).
   for (const [k, v] of acc) { if (v && v.m3 > 0) rememberTandaM3(k, v.m3); }
@@ -14784,139 +14599,16 @@ async function fetchMonitorFromSupabase() {
   return acc;
 }
 
-/* Lee el CSV (Google Sheets) y devuelve mapa Tanda -> { tanda, m3, fechaEntrega, … }. */
-async function fetchMonitorFromSheets() {
-  // cache-busting para evitar respuesta cacheada del CDN de Google
-  const url = MONITOR_CSV_URL + "&_=" + Date.now();
-  const r = await fetch(url, { cache: "no-store" });
-  if (!r.ok) throw new Error("CSV HTTP " + r.status);
-  const text = await r.text();
-  const rows = parseCSV(text);
-  // ── Lectura por POSICIÓN FIJA ──────────────────────────────────────────
-  // Las columnas de "PPP Excel Programacion Diaria" SIEMPRE vienen en este
-  // orden (las arma el Excel). Leemos por ÍNDICE, no por nombre de encabezado:
-  // así no nos afectan los títulos que gviz duplica ("Op Op"), las sub-tablas
-  // apiladas ("Problemas o Nuevos", "Super a Programar", …) ni cuánto crezcan.
-  // ⚠ Si cambiás el orden/las columnas en el Excel, actualizá estos índices
-  // (el monitor avisa por consola si detecta un desajuste — ver abajo).
-  const C = { TANDA: 0, NP: 2, COD: 4, RS: 5, M3: 6, DIR: 8, BARRIO: 9, OP: 10, FE: 11, ZONA: 13 };
-  // Sanity-guard: si la respuesta NO es el sheet (p.ej. una página HTML de
-  // login), no hay ningún encabezado reconocible → cortamos. Y si SÍ hay header
-  // pero las columnas no caen donde las esperamos, avisamos (no rompemos):
-  // señal de que cambió el Excel y hay que actualizar los índices de arriba.
-  const hdrIdx = findMonitorHeader(rows);
-  if (hdrIdx < 0) throw new Error("Header no encontrado en CSV (¿la respuesta no es el sheet?)");
-  const _h = rows[hdrIdx].map(dedupeHeaderCell);
-  if (!((_h[C.TANDA] || "").includes("tanda") && _h[C.OP] === "op" &&
-        _h[C.FE] === "fecha entrega" && (_h[C.M3] === "m3" || _h[C.M3] === "mt3"))) {
-    console.warn("[monitor] ⚠ El encabezado no coincide con las posiciones fijas " +
-      "(¿cambió el Excel?): Tanda@" + C.TANDA + "=" + _h[C.TANDA] + " · Op@" + C.OP +
-      "=" + _h[C.OP] + " · FechaEntrega@" + C.FE + "=" + _h[C.FE] + " · M3@" + C.M3 + "=" + _h[C.M3]);
-  }
-  const acc = new Map();
-  for (let i = 0; i < rows.length; i++) {
-    const r = rows[i];
-    if (!r) continue;
-    const np = (r[C.NP] || "").trim();
-    // Sólo filas con N° NP real = pedidos. Descarta títulos de sección
-    // ("Programacion", "Pedidos a Programar"…), los encabezados repetidos de
-    // cada sub-tabla y las filas "Total Cxx:" (ninguno trae número de pedido).
-    if (!/\d/.test(np)) continue;
-    const tanda = (r[C.TANDA] || "").trim();
-    const op    = (r[C.OP]    || "").trim().toUpperCase();
-    const m3    = monitorParseM3(r[C.M3]);
-    const fe    = (r[C.FE]    || "").trim();
-    const rs    = (r[C.RS]    || "").trim();
-    const feRaw = monitorRawFecha(fe);
-    // Con código de tanda → esa tanda. Sin código pero con fecha → "S/Tanda"
-    // (pedido cargado que todavía no tiene nro de tanda). Sin ninguno → skip.
-    let displayTanda, mapKey;
-    if (tanda) {
-      displayTanda = tanda;
-      mapKey = tanda.toUpperCase();
-    } else if (feRaw) {
-      displayTanda = "S/Tanda";
-      mapKey = "S/TANDA__" + feRaw;
-    } else {
-      continue;
-    }
-    if (!acc.has(mapKey)) acc.set(mapKey, {
-      tanda: displayTanda,
-      _key: mapKey,                 // identificador único para click handlers
-      m3: 0,
-      fechaEntrega: monitorFmtFecha(fe),
-      fechaEntregaRaw: feRaw,
-      // opIsSi se prende SOLO si alguna fila de la tanda trae Op=SI (abajo), así
-      // los pedidos "a Programar"/"con Problemas" (Op vacío) NO se cuentan como
-      // planificados ni sus fechas desplazan tandas reales de la ventana.
-      opIsSi: false,
-      pedidos: []                   // [{ np, m3, razonSocial, … }] — alimenta el modal
-    });
-    const entry = acc.get(mapKey);
-    entry.m3 += m3;
-    if (op === "SI") entry.opIsSi = true;   // si CUALQUIER fila de la tanda trae Op=SI
-    entry.pedidos.push({
-      np, m3, razonSocial: rs,
-      // Campos extra para la pantalla de facturación (PDF).
-      cod:       (r[C.COD]    || "").trim(),
-      direccion: (r[C.DIR]    || "").trim(),
-      barrio:    (r[C.BARRIO] || "").trim(),
-      zona:      (r[C.ZONA]   || "").trim()
-    });
-  }
-  return acc;
-}
+/* (v5.34) fetchMonitorFromSheets eliminado: la PPP se lee de Supabase
+   (fetchMonitorFromSupabase). */
 
-/* Lee la hoja "PPP Excel Pedidos Entregados 2026" y devuelve
-   Map<tandaUpper, m3 total>. Hay varias filas por tanda (una por pedido)
-   y sumamos los m3 de col G "Mt3".
-   ⚠ NO usar col H "Mt3 FC": pese al nombre, NO es m3 — son códigos chicos
-   (zonas/V) tipo 4, 7, 21, 16 que inflaban los totales hasta órdenes de
-   magnitud por encima de lo real. Solo col G. */
-async function fetchHistoricFromSheets() {
-  const url = MONITOR_HISTORIC_CSV_URL + "&_=" + Date.now();
-  const r = await fetch(url, { cache: "no-store" });
-  if (!r.ok) throw new Error("Histórico CSV HTTP " + r.status);
-  const text = await r.text();
-  const rows = parseCSV(text);
-  if (!rows.length) return new Map();
-  // Header en fila 0 (sin filas de título arriba como en el sheet principal).
-  const header = rows[0].map(x => (x||"").trim().toLowerCase());
-  const cTanda = header.indexOf("tanda");
-  // Busca la columna de m3 NORMAL: acepta "mt3" o "m3", pero EXCLUYE cualquier
-  // header que contenga "fc" (la hoja tiene "Mt3" y "Mt3 FC", y la FC está mal
-  // cargada — siempre usamos la normal).
-  const cMt3 = header.findIndex(h => (h === "mt3" || h === "m3") && !h.includes("fc"));
-  if (cTanda < 0 || cMt3 < 0) {
-    throw new Error("Histórico: faltan columnas Tanda/Mt3 (encabezados: " + header.join("|") + ")");
-  }
-  console.log("[historic] col Mt3 (normal) =", header[cMt3], "@col", cMt3, "| FC ignorada");
-  const acc = new Map();
-  for (let i = 1; i < rows.length; i++) {
-    const r = rows[i];
-    if (!r) continue;
-    const tanda = (r[cTanda]||"").trim();
-    if (!tanda) continue;
-    const m3 = monitorParseM3(r[cMt3]);
-    const key = tanda.toUpperCase();
-    acc.set(key, (acc.get(key) || 0) + m3);
-  }
-  return acc;
-}
+/* (v5.34) fetchHistoricFromSheets eliminado: el histórico se lee de Supabase
+   (fetchHistoricFromSupabase). */
 
 /* Dispatcher histórico (ver PPP_SOURCE): Supabase (PPP_Pedidos_Entregados) o
    Sheets. Suma m³ por tanda y persiste el m³ visto, venga de donde venga. v2.80. */
 async function fetchHistoricSheet() {
-  let acc = null;
-  if (PPP_SOURCE !== "sheets") {
-    try { acc = await fetchHistoricFromSupabase(); }
-    catch (e) {
-      if (PPP_SOURCE === "supabase") throw e;
-      console.warn("[historic] Supabase falló, caigo a Sheets:", e.message); acc = null;
-    }
-    if (acc && !acc.size && PPP_SOURCE === "auto") acc = null;   // vacío → fallback
-  }
-  if (!acc) acc = await fetchHistoricFromSheets();
+  const acc = await fetchHistoricFromSupabase();
   for (const [k, v] of acc) { if (v > 0) rememberTandaM3(k, v); }
   flushPersistedM3();
   return acc;

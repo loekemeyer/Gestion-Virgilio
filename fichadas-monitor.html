@@ -49,6 +49,14 @@
       background: #16a34a; margin-right: 4px; vertical-align: middle;
     }
     #meta.stale .dot { background: #ea580c; }
+    #manualWrap {
+      font-size: 12px; color: var(--text-muted);
+      display: inline-flex; align-items: center; gap: 6px;
+    }
+    #manualDate {
+      font: inherit; padding: 3px 6px; border: 1px solid var(--grid);
+      border-radius: 6px; color: var(--text);
+    }
     #legend {
       font-size: 11px;
       color: var(--text-muted);
@@ -59,11 +67,6 @@
       font-weight: 500; margin-left: 6px;
       background: rgba(62, 207, 142, 0.15); color: #047857;
       border: 1px solid rgba(62, 207, 142, 0.4);
-    }
-    #syncStatus {
-      font-size: 11px;
-      color: var(--text-muted);
-      margin-left: 8px;
     }
 
     .wrap {
@@ -203,9 +206,9 @@
   <header>
     <h1>Registro de Entradas-Salidas</h1>
     <span id="meta"><span class="dot"></span>Cargando…</span>
-    <span id="syncStatus"></span>
+    <span id="manualWrap">Búsqueda manual: <input type="date" id="manualDate" onchange="load()"></span>
     <span id="legend">
-      Datos <span class="pill">Fichadas_Historico</span>
+      Datos <span class="pill">Supabase</span>
     </span>
   </header>
 
@@ -230,113 +233,79 @@
   </div>
 
   <footer>
-    Tiempos desde <b>Fichadas_Historico</b> (Supabase) · estructura desde
-    <a href="https://docs.google.com/spreadsheets/d/19jF76wpbkVi7qBYNQ6BeZe1w5skJojljLJZttaOBD8g/edit?gid=1548577326" target="_blank" rel="noopener">sheet pivot</a>
-    · sync sheet→Supabase cada refresh · refresh cada 60s
+    Tiempos desde <b>Fichadas_Historico</b> y estructura desde <b>Fichadas_Estructura</b> (Supabase).
+    La sincronización del Google Form (respuestas) y del roster (pivot) corre <b>del lado servidor</b>
+    (pg_cron cada 2 / 10 min). El monitor no lee Google. Refresh cada 60s.
   </footer>
 
   <script>
     // ============================================================
-    // Monitor de Fichadas — 100% Fichadas_Historico (Supabase)
+    // Monitor de Fichadas — 100% Supabase (v5.34)
     // ------------------------------------------------------------
-    // Toda la data de tiempos viene de la tabla Fichadas_Historico.
-    // El sheet pivot (gid 1548577326) solo provee ESTRUCTURA:
-    //   - secciones (Pellegrini, Esnaola, Virgilio, Home Office, etc)
-    //   - emails / empresas / legajos / nombres
-    //   - fechas Hoy / Día Anterior / Búsqueda Manual
+    // Tiempos: tabla Fichadas_Historico (indexada por email).
+    // Estructura (secciones, roster, empresas, legajos, nombres):
+    //   tabla Fichadas_Estructura.
     //
-    // Como los no-Virgilio siguen usando el Google Form (que escribe
-    // al sheet de respuestas gid 1495479968), tenemos que sincar
-    // ese sheet → Fichadas_Historico cada refresh, para que la tabla
-    // tenga sus eventos nuevos. La idempotencia la da el UNIQUE de
-    // (ts_evento, email, evento) + Prefer:resolution=ignore-duplicates.
+    // Ya NO se lee ninguna hoja de Google desde el navegador. Las
+    // dos hojas (respuestas del Google Form y el pivot con el roster)
+    // se sincronizan a Supabase del lado SERVIDOR con pg_cron +
+    // la extensión http de Postgres:
+    //   - sync_fichadas_respuestas()  -> Fichadas_Historico (cada 2')
+    //   - sync_fichadas_estructura()  -> Fichadas_Estructura (cada 10')
     //
-    // Para los Virgilio no hay que sincar nada — la app principal y
-    // fichada.html ya escriben directo a Fichadas_Historico.
+    // Las fechas Hoy / Día Anterior se calculan acá (hora AR); la
+    // "Búsqueda Manual" es el <input type=date> del encabezado.
     // ============================================================
 
-    const SHEET_PIVOT_URL      = "https://docs.google.com/spreadsheets/d/19jF76wpbkVi7qBYNQ6BeZe1w5skJojljLJZttaOBD8g/gviz/tq?tqx=out:csv&gid=1548577326";
-    const SHEET_RESPUESTAS_URL = "https://docs.google.com/spreadsheets/d/19jF76wpbkVi7qBYNQ6BeZe1w5skJojljLJZttaOBD8g/gviz/tq?tqx=out:csv&gid=1495479968";
     const REFRESH_MS = 60000;
 
     const SUPABASE_URL = "https://hrxfctzncixxqmpfhskv.supabase.co";
     const SUPABASE_KEY = "sb_publishable_BqpAgZH6ty-9wft10_YMhw_0rcIPuWT";
-    const HISTORICO_ENDPOINT = SUPABASE_URL + "/rest/v1/Fichadas_Historico";
-    const EMPLEADOS_ENDPOINT = SUPABASE_URL + "/rest/v1/Empleados";
+    const HISTORICO_ENDPOINT   = SUPABASE_URL + "/rest/v1/Fichadas_Historico";
+    const ESTRUCTURA_ENDPOINT  = SUPABASE_URL + "/rest/v1/Fichadas_Estructura";
     const SUPABASE_HEADERS = {
       "apikey":        SUPABASE_KEY,
       "Authorization": "Bearer " + SUPABASE_KEY
     };
 
-    const VALID_EVENTOS = new Set(['Entrada', 'Comida Inicia', 'Comida Termina', 'Salida']);
-
     let lastOkTs = null;
 
-    // Indices de columnas en el CSV del sheet
-    const COL = {
-      email:   0,
-      empresa: 1,
-      leg:     2,
-      nombre:  3,
-      hoy:       { entrada: 4,  ci: 5,  ct: 6,  salida: 7 },
-      anterior:  { entrada: 9,  ci: 10, ct: 11, salida: 12 },
-      manual:    { entrada: 14, ci: 15, ct: 16, salida: 17 },
-    };
+    // ---- Fechas en hora Argentina (UTC-3 fijo) ----
+    function ymdAR(ms)   { return new Date(ms - 3 * 3600 * 1000).toISOString().slice(0, 10); }
+    function fmtDMY(ymd) { if (!ymd) return "—"; const p = ymd.split("-"); return p[2] + "/" + p[1] + "/" + p[0].slice(2); }
 
-    // Cache de Empleados (cambia poco, lo refrescamos cada 10 min).
-    // Lo uso para resolver email→legajo cuando posteo nuevas filas al
-    // sync (asi quedan con legajo cargado en Fichadas_Historico, no
-    // dependo de un UPDATE posterior).
-    let _empleadosCache = null;
-    let _empleadosCacheTs = 0;
-    const EMPLEADOS_TTL = 10 * 60 * 1000;
-    async function getEmpleadosMap() {
-      const now = Date.now();
-      if (_empleadosCache && now - _empleadosCacheTs < EMPLEADOS_TTL) {
-        return _empleadosCache;
-      }
-      const url = EMPLEADOS_ENDPOINT +
-        "?email=not.is.null" +
-        "&select=Legajo,email" +
-        "&limit=2000";
-      const r = await fetch(url, { headers: SUPABASE_HEADERS });
-      if (!r.ok) throw new Error("Empleados HTTP " + r.status);
-      const data = await r.json();
-      const m = new Map();
-      for (const e of data) {
-        if (e.email && e.Legajo != null) {
-          m.set(String(e.email).toLowerCase().trim(), String(e.Legajo));
-        }
-      }
-      _empleadosCache = m;
-      _empleadosCacheTs = now;
-      return m;
-    }
-
-    // Cache de la estructura del sheet pivot (secciones + lista emails +
-    // fechas Hoy/DA/BM). Cambia poco, refrescamos cada 10 min.
+    // ---- Estructura (roster) desde Supabase, cacheada 5 min ----
     let _structCache = null;
     let _structCacheTs = 0;
-    const STRUCT_TTL = 10 * 60 * 1000;
+    const STRUCT_TTL = 5 * 60 * 1000;
     async function getStructure() {
       const now = Date.now();
-      if (_structCache && now - _structCacheTs < STRUCT_TTL) {
-        return _structCache;
-      }
-      const r = await fetch(SHEET_PIVOT_URL + "&_=" + now, { cache: "no-store" });
-      if (!r.ok) throw new Error("Sheet pivot HTTP " + r.status);
-      const text = await r.text();
-      const rows = parseCSV(text);
-      if (!rows.length) throw new Error("Sheet pivot vacío");
-      _structCache = parseSheetStructure(rows);
+      if (_structCache && now - _structCacheTs < STRUCT_TTL) return _structCache;
+      const url = ESTRUCTURA_ENDPOINT +
+        "?select=orden,tipo,seccion,email,empresa,leg,nombre,es_virgilio" +
+        "&order=orden.asc&limit=5000";
+      const r = await fetch(url, { headers: SUPABASE_HEADERS, cache: "no-store" });
+      if (!r.ok) throw new Error("Fichadas_Estructura HTTP " + r.status);
+      const rows = await r.json();
+      const items = rows.map(row => {
+        if (row.tipo === "spacer") return { type: "spacer" };
+        if (row.tipo === "section") return { type: "section", text: row.seccion || "", isVirgilio: !!row.es_virgilio };
+        return {
+          type: "emp",
+          email: row.email || "",
+          empresa: row.empresa || "",
+          legSheet: row.leg || "",
+          nombre: row.nombre || "",
+          isVirgilio: !!row.es_virgilio
+        };
+      });
+      _structCache = { items };
       _structCacheTs = now;
       return _structCache;
     }
 
     // Trae para un dia (YYYY-MM-DD) un mapa email -> { entrada, ci, ct, salida }
-    // con objetos Date (o null para los que no hubo evento). Lee TODOS los
-    // empleados de Fichadas_Historico — indexado por email, que es la
-    // clave universal (algunos no tienen legajo todavia).
+    // con objetos Date (o null). Lee Fichadas_Historico indexado por email.
     async function fetchSupabaseTimesForDate(dateStr) {
       if (!dateStr) return new Map();
       const dayStart = new Date(dateStr + "T00:00:00-03:00").toISOString();
@@ -371,106 +340,38 @@
           case "Salida":        if (!r0.salida  || t > r0.salida)  r0.salida  = t; break;
         }
       }
-
       return byEmail;
-    }
-
-    // Sync periódico: baja el sheet de respuestas (gid 1495479968) y
-    // postea a Fichadas_Historico las filas cuyo ts cae dentro de las
-    // 3 fechas visibles del monitor. Idempotente: el UNIQUE +
-    // Prefer:resolution=ignore-duplicates hacen que las filas ya
-    // presentes no se dupliquen.
-    // Por qué solo las 3 fechas: el sheet tiene 14k+ filas, queremos
-    // minimizar transferencia. Las 3 fechas suficientes para mantener
-    // actualizada la vista del monitor.
-    async function syncSheetToHistorico(dates, empleadosMap) {
-      const dateSet = new Set(Object.values(dates).filter(Boolean));
-      if (!dateSet.size) return { fetched: 0, posted: 0 };
-
-      const r = await fetch(SHEET_RESPUESTAS_URL + "&_=" + Date.now(), { cache: "no-store" });
-      if (!r.ok) throw new Error("Sheet respuestas HTTP " + r.status);
-      const rows = parseCSV(await r.text());
-      rows.shift(); // header
-
-      const toPost = [];
-      for (const r of rows) {
-        if (!r || r.length < 3) continue;
-        const ts = parseRespuestasTs(r[0]);
-        if (!ts) continue;
-        const dayKey = ts.slice(0, 10);  // "YYYY-MM-DD"
-        if (!dateSet.has(dayKey)) continue;
-        const evento = (r[1] || "").trim();
-        if (!VALID_EVENTOS.has(evento)) continue;
-        const email = (r[2] || "").trim().toLowerCase();
-        if (!email || !email.includes("@")) continue;
-        const legajo = empleadosMap.get(email) || null;
-        toPost.push({ ts_evento: ts, evento, email, legajo });
-      }
-
-      if (!toPost.length) return { fetched: rows.length, posted: 0 };
-
-      // POST batch — PostgREST acepta JSON array como bulk insert
-      const r2 = await fetch(HISTORICO_ENDPOINT, {
-        method: "POST",
-        headers: {
-          ...SUPABASE_HEADERS,
-          "Content-Type": "application/json",
-          "Prefer": "return=minimal,resolution=ignore-duplicates"
-        },
-        body: JSON.stringify(toPost)
-      });
-      if (!r2.ok && r2.status !== 409) {
-        throw new Error("Sync POST HTTP " + r2.status);
-      }
-      return { fetched: rows.length, posted: toPost.length };
-    }
-
-    // "DD/MM/YYYY HH:MM:SS" del sheet de respuestas → ISO con offset AR
-    function parseRespuestasTs(s) {
-      const m = String(s).trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2}):(\d{2})$/);
-      if (!m) return null;
-      const [, d, mo, y, h, mi, se] = m;
-      return `${y}-${String(+mo).padStart(2,'0')}-${String(+d).padStart(2,'0')}T${String(+h).padStart(2,'0')}:${mi}:${se}-03:00`;
     }
 
     async function load() {
       const meta = document.getElementById("meta");
-      const sync = document.getElementById("syncStatus");
       try {
-        // 1) Estructura del sheet pivot (cacheada 10 min)
-        const parsed = await getStructure();
+        // 1) Estructura (roster) desde Supabase (cacheada 5 min)
+        const struct = await getStructure();
 
-        // 2) Empleados map (cacheado 10 min) — necesario para que el sync
-        //    resuelva email→legajo antes de postear a Supabase.
-        const empleadosMap = await getEmpleadosMap();
-
-        // 3) Sync sheet respuestas → Fichadas_Historico (best-effort).
-        //    Si falla, mostramos warning en el header pero seguimos rindiendo
-        //    con lo que haya en la tabla.
-        let syncInfo = null;
-        try {
-          syncInfo = await syncSheetToHistorico(parsed.dates, empleadosMap);
-        } catch (e) {
-          console.warn("[sync sheet→supabase] fallo:", e && e.message);
-          sync.textContent = " · sync sheet falló: " + (e.message || e);
-        }
-        if (syncInfo) {
-          sync.textContent = ` · sync sheet: ${syncInfo.posted}/${syncInfo.fetched} subidas`;
-        }
-
-        // 4) Leer Fichadas_Historico para las 3 fechas (paralelo)
-        const sbResults = await Promise.all([
-          parsed.dates.hoy      ? fetchSupabaseTimesForDate(parsed.dates.hoy)      : Promise.resolve(new Map()),
-          parsed.dates.anterior ? fetchSupabaseTimesForDate(parsed.dates.anterior) : Promise.resolve(new Map()),
-          parsed.dates.manual   ? fetchSupabaseTimesForDate(parsed.dates.manual)   : Promise.resolve(new Map()),
-        ]);
-        const sbByDate = {
-          hoy:      sbResults[0],
-          anterior: sbResults[1],
-          manual:   sbResults[2]
+        // 2) Fechas: Hoy y Día Anterior en hora AR; Manual = input
+        const manualVal = (document.getElementById("manualDate") || {}).value || "";
+        const dates = {
+          hoy:      ymdAR(Date.now()),
+          anterior: ymdAR(Date.now() - 86400000),
+          manual:   manualVal || null
+        };
+        const parsed = {
+          labels:   { hoy: "Hoy", anterior: "Día Anterior", manual: "Búsqueda Manual" },
+          dates:    dates,
+          rawDates: { hoy: fmtDMY(dates.hoy), anterior: fmtDMY(dates.anterior), manual: fmtDMY(dates.manual) },
+          items:    struct.items
         };
 
-        // 5) Render
+        // 3) Leer Fichadas_Historico para las fechas visibles (paralelo)
+        const sbResults = await Promise.all([
+          fetchSupabaseTimesForDate(dates.hoy),
+          fetchSupabaseTimesForDate(dates.anterior),
+          dates.manual ? fetchSupabaseTimesForDate(dates.manual) : Promise.resolve(new Map())
+        ]);
+        const sbByDate = { hoy: sbResults[0], anterior: sbResults[1], manual: sbResults[2] };
+
+        // 4) Render
         render(parsed, sbByDate);
 
         lastOkTs = Date.now();
@@ -482,90 +383,6 @@
         meta.innerHTML = `<span class="dot"></span>Error al actualizar (último OK hace ${age}): ${escapeHtml(e.message || e)}`;
         console.error("[fichadas-monitor]", e);
       }
-    }
-
-    // ============================================================
-    // Parseo del sheet
-    // ============================================================
-    function parseSheetStructure(rows) {
-      const labelRow = rows[0] || [];
-      const dateRow  = rows[1] || [];
-      const dayHoy   = labelRow[COL.hoy.entrada]      || "Hoy";
-      const dayAnt   = labelRow[COL.anterior.entrada] || "Día Anterior";
-      const dayMan   = labelRow[COL.manual.entrada]   || "Búsqueda Manual";
-      const dateHoy  = dateRow[COL.hoy.entrada]       || "";
-      const dateAnt  = dateRow[COL.anterior.entrada]  || "";
-      const dateMan  = dateRow[COL.manual.entrada]    || "";
-
-      const items = [];  // [{type: 'section'|'spacer'|'emp', ...}]
-      let currentSection = "";
-      for (let i = 3; i < rows.length; i++) {
-        const r = rows[i] || [];
-        const col0 = (r[COL.email]   || "").trim();
-        const col1 = (r[COL.empresa] || "").trim();
-        const col2 = (r[COL.leg]     || "").trim();
-        const col3 = (r[COL.nombre]  || "").trim();
-
-        if (!col0 && !col1 && !col2 && !col3) {
-          items.push({ type: "spacer" });
-          continue;
-        }
-        const isEmail = /@/.test(col0);
-        if (!isEmail && col0 && !col1 && !col2 && !col3) {
-          currentSection = col0;
-          items.push({ type: "section", text: col0, isVirgilio: /^Virgilio/i.test(col0) });
-          continue;
-        }
-        // Employee row
-        const isVirgilioSection = /^Virgilio/i.test(currentSection);
-        items.push({
-          type: "emp",
-          email: col0,
-          empresa: col1,
-          legSheet: col2,    // el legajo como lo escribe el sheet ("C8", "237", etc)
-          nombre: col3,
-          isVirgilio: isVirgilioSection,
-          // tiempos del sheet (solo se usan si NO es virgilio)
-          sheetTimes: {
-            hoy:      pickTimes(r, COL.hoy),
-            anterior: pickTimes(r, COL.anterior),
-            manual:   pickTimes(r, COL.manual)
-          }
-        });
-      }
-
-      return {
-        labels: { hoy: dayHoy, anterior: dayAnt, manual: dayMan },
-        dates: {
-          hoy:      parseSheetDate(dateHoy),
-          anterior: parseSheetDate(dateAnt),
-          manual:   parseSheetDate(dateMan)
-        },
-        rawDates: { hoy: dateHoy, anterior: dateAnt, manual: dateMan },
-        items
-      };
-    }
-
-    function pickTimes(row, colIdx) {
-      return {
-        entrada: (row[colIdx.entrada] || "").trim(),
-        ci:      (row[colIdx.ci]      || "").trim(),
-        ct:      (row[colIdx.ct]      || "").trim(),
-        salida:  (row[colIdx.salida]  || "").trim()
-      };
-    }
-
-    // "25/05/26", "22/5", "19/05/26", "5/1/2026" → "YYYY-MM-DD"
-    function parseSheetDate(s) {
-      if (!s) return null;
-      const m = String(s).trim().match(/^(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?$/);
-      if (!m) return null;
-      let day = parseInt(m[1], 10);
-      let month = parseInt(m[2], 10);
-      let year = m[3] ? parseInt(m[3], 10) : new Date().getFullYear();
-      if (year < 100) year += 2000;
-      if (!day || !month || month < 1 || month > 12) return null;
-      return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
     }
 
     // ============================================================
@@ -608,10 +425,7 @@
           html += `<tr class="${cls}"><td colspan="18">${escapeHtml(it.text)}</td></tr>`;
           continue;
         }
-        // emp row — TODOS los tiempos vienen de Fichadas_Historico
-        // indexado por email (no por legajo). Asi cubrimos Virgilio
-        // (que escriben directo desde la app) y los demas (que llegan
-        // via el sync sheet→tabla).
+        // emp row — tiempos por email desde Fichadas_Historico
         const emailKey = String(it.email).toLowerCase().trim();
         const timesForDate = (d) => sbRowToTimes(sbByDate[d].get(emailKey));
         const cellsForDate = (d) => {
@@ -660,29 +474,6 @@
     // ============================================================
     // Helpers
     // ============================================================
-    function parseCSV(text) {
-      const rows = [];
-      let row = [];
-      let cell = "";
-      let inQuote = false;
-      for (let i = 0; i < text.length; i++) {
-        const c = text[i];
-        if (inQuote) {
-          if (c === '"' && text[i + 1] === '"') { cell += '"'; i++; }
-          else if (c === '"') { inQuote = false; }
-          else cell += c;
-        } else {
-          if (c === '"') inQuote = true;
-          else if (c === ',') { row.push(cell); cell = ""; }
-          else if (c === '\n') { row.push(cell); rows.push(row); row = []; cell = ""; }
-          else if (c === '\r') { /* skip */ }
-          else cell += c;
-        }
-      }
-      if (cell !== "" || row.length) { row.push(cell); rows.push(row); }
-      return rows;
-    }
-
     function escapeHtml(s) {
       return String(s == null ? "" : s)
         .replace(/&/g, "&amp;")
