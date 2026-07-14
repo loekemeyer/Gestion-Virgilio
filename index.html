@@ -3262,7 +3262,7 @@ const SUPABASE_FACTURACION_NP_ENDPOINT =
      "auto"     = intenta Supabase y cae a Sheets si está vacío/falla (transición)
      "supabase" = solo Supabase (corta la dependencia de Google)
    ─────────────────────────────────────────────────────────────────────────── */
-const PPP_SOURCE = "auto";   // v2.80: lee Supabase, cae a Sheets si falta/falla
+const PPP_SOURCE = "supabase";   // v5.33: solo Supabase — se cortó la dependencia de Google Sheets
 const SUPABASE_PPP_PROG_ENDPOINT       = SUPABASE_URL + "/rest/v1/PPP_Programacion_Diaria";
 const SUPABASE_PPP_ENTREGADOS_ENDPOINT = SUPABASE_URL + "/rest/v1/PPP_Pedidos_Entregados";
 const SUPABASE_PPP_BASE_ENDPOINT       = SUPABASE_URL + "/rest/v1/PPP_Base_Pedidos";
@@ -5292,7 +5292,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.32";
+const APP_VERSION = "v5.33";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -6036,11 +6036,9 @@ const PICK_BASE_TTL_MS = 5 * 60 * 1000;   // hoja grande (~20k filas) → cache 
 let _pickBaseCache   = null;   // Map<pedido(NP), [{art, cajas}]>
 let _pickBaseCacheTs = 0;
 
-/* m³ por artículo: sale de la hoja "VolumenArticulos" (NO de la base de pedidos).
-   Se usa para el armado por caja (mismo m³ = misma caja). v2.65. */
-const VOLUMEN_ART_CSV_URL =
-  "https://docs.google.com/spreadsheets/d/1-16YXe0xq6x9i-Yhk5cm5V3VqvQ0PWZtcDbm8OeeKW0/gviz/tq?tqx=out:csv&sheet=" +
-  encodeURIComponent("VolumenArticulos");
+/* m³ por artículo: desde v5.33 sale de la tabla Supabase "Volumen_Articulos"
+   (migrada de la hoja Google "VolumenArticulos"). Se usa para el armado por caja
+   y para el descuento de faltantes. Ya NO se lee de Google. */
 let _pickM3Cache     = null;   // Map<códigoArt(UP), m3(number)>
 let _pickM3CacheTs   = 0;
 
@@ -6165,31 +6163,22 @@ async function fetchPickingBaseFromSheets() {
   return map;
 }
 
-/* Baja la hoja "VolumenArticulos" (artículo → m³) y la cachea. Detecta por
-   header la columna de código (artículo/código) y la de m³ (m3/volumen). Si no
-   están, devuelve un Map vacío → el armado guiado no se activa. v2.65. */
+/* m³ por artículo desde Supabase (tabla "Volumen_Articulos", migrada de la hoja
+   "VolumenArticulos" en v5.33 — incluye los DOS bloques de la hoja, que el parser
+   gviz perdía). Devuelve Map<códigoUP, m3>. v>0 entra al mapa; 0 = sin medir → el
+   armado guiado no se activa para ese código. Si falla, tira (mismo contrato que antes). */
 async function fetchVolumenArticulos() {
   const now = Date.now();
   if (_pickM3Cache && (now - _pickM3CacheTs) < PICK_BASE_TTL_MS) return _pickM3Cache;
-  const r = await fetch(VOLUMEN_ART_CSV_URL + "&_=" + now, { cache: "no-store" });
-  if (!r.ok) throw new Error("VolumenArticulos HTTP " + r.status);
-  const rows = parseCSV(await r.text());
-  let cArt = -1, cM3 = -1;
-  for (let i = 0; i < Math.min(rows.length, 5); i++) {
-    const h = rows[i].map(dedupeHeaderCell);
-    const ia = h.findIndex(x => x === "artículo" || x === "articulo" || x === "código" || x === "codigo" || x === "cod" || x.indexOf("artic") >= 0 || x.indexOf("codig") >= 0);
-    const im = h.findIndex(x => x.indexOf("m3") >= 0 || x.indexOf("mt3") >= 0 || x.indexOf("volum") >= 0);
-    if (ia >= 0 && im >= 0) { cArt = ia; cM3 = im; break; }
-  }
+  const r = await fetch(SUPABASE_URL + "/rest/v1/Volumen_Articulos?select=codigo,m3&limit=100000",
+    { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+  if (!r.ok) throw new Error("Volumen_Articulos HTTP " + r.status);
+  const rows = await r.json();
   const m3map = new Map();
-  if (cArt >= 0 && cM3 >= 0) {
-    for (let i = 0; i < rows.length; i++) {
-      const row = rows[i]; if (!row) continue;
-      const art = (row[cArt] || "").trim();
-      if (!art || !/^[0-9]/.test(art)) continue;        // saltea header y basura
-      const v = pickParseCajas(row[cM3]);               // parser con coma decimal
-      if (v > 0) m3map.set(art.toUpperCase(), v);
-    }
+  for (let i = 0; i < rows.length; i++) {
+    const art = String(rows[i].codigo || "").trim().toUpperCase();
+    const v = +rows[i].m3;
+    if (art && v > 0) m3map.set(art, v);
   }
   _pickM3Cache = m3map; _pickM3CacheTs = Date.now();
   return m3map;

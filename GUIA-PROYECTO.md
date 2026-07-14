@@ -4,7 +4,9 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-07-14 · Versión app al documentar: **v5.32**
+> Última actualización: 2026-07-14 · Versión app al documentar: **v5.33**
+>
+> Nota: **v5.33 — `VolumenArticulos` migrado a Supabase + se cortó la conexión con Google Sheets**. (1) Nueva tabla **`Volumen_Articulos`** (`codigo` PK, `m3` numeric, RLS SELECT para `anon`) cargada desde la hoja `VolumenArticulos` con la **extensión `http` de Postgres** (`http_get` server-side, que sí alcanza Google — el sandbox de Claude NO). Se levantaron **los DOS bloques** código/m³ de la hoja → **2.542 códigos** (el parser gviz viejo leía solo el bloque izquierdo → perdía ~190 códigos "L" y otros; además descartaba los que no empezaban con dígito). En **13 códigos los dos bloques discrepan**; se guardó el valor del **bloque izquierdo** (el que la app venía usando): `035E`, `437E`, `438E`, `439E`, `440E`, `724`, `823`, `809E`, `7026803`, `7055800`, `7439900`, `7658800`, `7659800` — **revisar en la hoja cuál es el correcto**. (2) `fetchVolumenArticulos()` ahora lee de `Volumen_Articulos` por REST; se borró la constante `VOLUMEN_ART_CSV_URL`. (3) **`PPP_SOURCE` pasó de `"auto"` a `"supabase"`**: la app **ya no lee ninguna hoja de Google** — programación, histórico, base de pedidos y volumen salen 100% de Supabase. El código `…FromSheets` y las URLs gviz de PPP quedan **dormidos** (no se invocan) por si hay que revertir; se pueden borrar más adelante. ⚠ Sin caída al Sheet, la app **depende de que la macro Apps Script (Sheet→Supabase) mantenga PPP al día**; y `Volumen_Articulos` ahora se actualiza en Supabase (re-corriendo la carga `http_get`, o editando la tabla). **Pendiente aparte:** `fichadas-monitor.html` usa OTRO Sheet (pivot de fichadas), no tocado.
 >
 > Nota: **v5.32 — descarga diaria: una fila por cada picking/armado** (formato largo). Reemplaza el formato ancho de v5.31 (una fila por operario/día con columnas picking+armado). Ver punto (2) de la nota siguiente. El resto de v5.31 (m³ neto de faltantes) sigue igual.
 >
