@@ -5292,7 +5292,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.29";
+const APP_VERSION = "v5.30";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -9491,7 +9491,7 @@ async function showRacksBajarModal(legajo) {
 }
 function rkbRender() {
   if (!_rkb) return; const body = document.getElementById("rkbBody"); if (!body) return;
-  let h = '<div class="rkb-hint">Bajás en <b>master cajas</b> (lo que físicamente movés del rack). Aparece <b>ordenado por código</b>. Los que dicen <b>“cajas”</b> todavía no tienen el master cargado. Si algo que tenés físicamente <b>no figura</b>, buscalo y tocá <b>➕</b> (avisa por Telegram).</div>';
+  let h = '<div class="rkb-hint">Bajás en <b>master cajas</b> (lo que físicamente movés del rack). Aparece <b>ordenado por código</b>. Los que dicen <b>“cajas”</b> todavía no tienen el master cargado. Si algo que tenés físicamente <b>no figura</b>, buscalo y tocá <b>➕</b> (avisa por Telegram). <b>Lo aprueba Marianela</b> en Recepción y recién ahí pasa a góndola.</div>';
   h += '<input id="rkbSearch" class="rkb-search" type="search" autocomplete="off" placeholder="🔎 Buscar código…" value="' + escapeHtml(_rkb.filtro || "") + '" oninput="rkbSearchInput(this.value)">';
   const fq = String(_rkb.filtro || "").trim(), fLo = fq.toLowerCase(), fUp = fq.toUpperCase();
   const shown = fq ? _rkb.items.filter(function (it) { return String(it.cod).toLowerCase().indexOf(fLo) >= 0; }) : _rkb.items;
@@ -9531,7 +9531,7 @@ function rkbRender() {
   }).join("");
   const tot = _rkb.items.reduce(function (s, it) { return s + (it.baja || 0); }, 0);
   const totInner = _rkb.items.reduce(function (s, it) { return s + (it.baja || 0) * ((it.cxm > 0 && !it.manual) ? it.cxm : 1); }, 0);
-  h += '<button class="rkb-fin"' + (tot <= 0 ? " disabled" : "") + ' onclick="rkbConfirmar()">✓ Bajar a góndola' + (totInner > 0 ? " (" + totInner + " cajas)" : "") + '</button>';
+  h += '<button class="rkb-fin"' + (tot <= 0 ? " disabled" : "") + ' onclick="rkbConfirmar()">✓ Registrar bajada' + (totInner > 0 ? " (" + totInner + " cajas)" : "") + '</button>';
   _renderKeepFocus(body, h);
 }
 function rkbSearchInput(v) { if (!_rkb) return; _rkb.filtro = String(v == null ? "" : v); rkbRender(); }
@@ -9552,12 +9552,13 @@ function rkbConfirmar() {
   if (!_rkb) return;
   const sel = _rkb.items.filter(function (it) { return it.baja > 0; });
   if (!sel.length) return;
-  const rows = [];
-  sel.forEach(function (it) {
-    // el ledger está en INNER cajas: si baja en master, convierto (master × CxM)
+  // v5.30: la bajada del operario queda PROPUESTA en Racks_Bajadas (cola de aprobación de
+  // Marianela en Recepción → "Bajadas Racks → góndola"). El stock recién se mueve al APROBAR
+  // (racksAprobarBaja), igual que la bajada de las OCs. Antes movía el stock directo y no
+  // entraba a la cola. cajas = INNER (si baja en master, convierto master × CxM).
+  const rows = sel.map(function (it) {
     const inner = (it.cxm > 0 && !it.manual) ? (it.baja * it.cxm) : it.baja;
-    rows.push({ cod_art: it.cod, descripcion: it.desc || null, deposito: "racks", delta: -inner, tipo: "baja_racks", ref: "operario", legajo: _rkb.legajo || null });
-    rows.push({ cod_art: it.cod, descripcion: it.desc || null, deposito: "terminado", delta: inner, tipo: "baja_racks", ref: "operario", legajo: _rkb.legajo || null });
+    return { orden_id: null, cod_art: it.cod, descripcion: it.desc || null, cajas: inner, estado: "propuesta", creada_por: _rkb.legajo || null };
   });
   // Planimetría viva (v5.22): descontar de la UBICACIÓN elegida. Best-effort:
   // si la RPC todavía no existe en Supabase, falla silencioso (queda el ledger).
@@ -9574,10 +9575,12 @@ function rkbConfirmar() {
   });
   // alerta Telegram por cada bajada fuera de lista (no estaba en racks) — evento RKX
   sel.filter(function (it) { return it.manual; }).forEach(function (it) { try { rkbEmitFueraLista(it.cod, it.baja, _rkb.legajo); } catch (_e) {} });
-  const totInner = sel.reduce(function (s, it) { return s + ((it.cxm > 0 && !it.manual) ? (it.baja * it.cxm) : it.baja); }, 0);
+  const totInner = rows.reduce(function (s, r) { return s + Number(r.cajas || 0); }, 0);
   closeRkb();
-  try { stockMove(rows); } catch (_e) {}
-  try { alert("✓ Bajaste " + totInner + " caja(s) de racks a góndola."); } catch (_e) {}
+  fetch(SUPABASE_RACKS_BAJ_ENDPOINT, { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" }, body: JSON.stringify(rows) })
+    .then(function (r) { if (r.ok || (r.status >= 400 && r.status < 500)) return; throw new Error("HTTP " + r.status); })
+    .catch(function () { try { const p = JSON.parse(localStorage.getItem("vir_racks_pend") || "[]"); p.push.apply(p, rows); localStorage.setItem("vir_racks_pend", JSON.stringify(p.slice(-2000))); } catch (_e) {} });
+  try { alert("✓ Registraste " + totInner + " caja(s) para bajar.\nMarianela lo aprueba en Recepción y ahí pasa a góndola."); } catch (_e) {}
 }
 function rkbEmitFueraLista(cod, cajas, legajo) {
   const payload = {
