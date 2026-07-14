@@ -5292,7 +5292,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.31";
+const APP_VERSION = "v5.32";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -8144,22 +8144,23 @@ function prodExportCsv() {
    m³/h = m³ ÷ horas sobre tandas con m³ (igual que la pantalla). */
 function prodExportCsvDiario() {
   if (!_prod || !_prod.events) { alert("Nada para exportar todavía."); return; }
-  var nombres = _prodNombres || new Map();
-  var nameOf = function (leg) { return nombres.get(String(leg)) || ("Legajo " + leg); };
   var esn = function (v) { return v ? String(Math.round(v * 100) / 100).replace(".", ",") : "0"; };
   var d1 = _pvDi(_pvParse(_prod.d1)), d2 = _pvDi(_pvParse(_prod.d2));
-  var rows = [["Fecha", "Operario", "Legajo", "Picking hs", "Picking m3", "Picking m3/h", "Armado hs", "Armado m3", "Armado m3/h", "Tandas"]];
+  // UNA FILA POR PICKING / ARMADO (por tanda), v5.31. Ej.: 5 pickings + 3 armados en un día = 8 filas.
+  var rows = [["Fecha", "legajo", "tarea", "hora inicio", "hora fin", "mins otra tarea", "minutos netos", "mt3 reales", "ritmo"]];
   for (var dd = d1; dd <= d2; dd++) {
     var A = _pvDayStart(dd), B = A + _PV_DAY, fecha = _pvYmd(A);
     var comp = prodCompute(_prod.events, _prod.m3map, A, B, _prod.factorMap);
-    var legs = Object.keys(comp).sort(function (a, b) { return nameOf(a).localeCompare(nameOf(b)); });
+    var legs = Object.keys(comp).sort(function (a, b) { return (+a) - (+b); });
     for (var li = 0; li < legs.length; li++) {
-      var leg = legs[li], t = comp[leg];
-      if ((t.armTandas + t.pickTandas) === 0) continue;
-      var pickH = t.pickTime / 3600000, armH = t.armTime / 3600000;
-      var pickM3h = t.pickTimeM3 > 0 ? t.pickM3 / (t.pickTimeM3 / 3600000) : 0;
-      var armM3h = t.armTimeM3 > 0 ? t.armM3 / (t.armTimeM3 / 3600000) : 0;
-      rows.push([fecha, nameOf(leg), leg, esn(pickH), esn(t.pickM3), esn(pickM3h), esn(armH), esn(t.armM3), esn(armM3h), String(t.armTandas + t.pickTandas)]);
+      var leg = legs[li], its = (comp[leg].rows || []).slice().sort(function (a, b) { return a.ini - b.ini; });
+      for (var ii = 0; ii < its.length; ii++) {
+        var it = its[ii];
+        var tarea = it.role === "arm" ? "Armado" : "Picking";
+        var netos = it.net / 60000, span = (it.cli - it.ini) / 60000, otra = span - netos; if (otra < 0) otra = 0;
+        var ritmo = netos > 0 ? it.m3 / (netos / 60) : 0;
+        rows.push([fecha, leg, tarea, _pvHm(it.ini), _pvHm(it.cli), String(Math.round(otra)), String(Math.round(netos)), esn(it.m3), esn(ritmo)]);
+      }
     }
   }
   if (rows.length === 1) { alert("No hay actividad de picking/armado en el período."); return; }
@@ -8240,14 +8241,17 @@ function _pvOperator(evs, m3of, D1, D2) {
   var avail = _pvSub(wwClip, exclL), excluded = jornada - _pvTot(avail), buckets = {};
   for (i = 0; i < _PV_ORDER.length; i++) { var bn = _PV_ORDER[i]; buckets[bn] = _pvTot(_pvInter(taskIv[bn], avail)); avail = _pvSub(avail, taskIv[bn]); }
   function alloc(envs, role) {
-    var time = 0, timeM3 = 0, m3 = 0, tset = {}, m3set = {}, det = {}, list = envs.filter(function (x) { return !x.cross; }).sort(function (a, b) { return a.ini - b.ini; });
+    var time = 0, timeM3 = 0, m3 = 0, tset = {}, m3set = {}, det = {}, items = [], list = envs.filter(function (x) { return !x.cross; }).sort(function (a, b) { return a.ini - b.ini; });
     for (var k = 0; k < list.length; k++) {
       var en = list[k], got = _pvTot(_pvInter([[en.ini, en.cli]], avail)); if (got > 0) avail = _pvSub(avail, [[en.ini, en.cli]]);
       time += got; tset[en.tanda] = 1;
       if (!det[en.tanda]) det[en.tanda] = { tanda: en.tanda, m3: m3of(en.tanda) || 0, ms: 0, role: role }; det[en.tanda].ms += got;
-      var m = m3of(en.tanda) || 0; if (m > 0) { timeM3 += got; if (!m3set[en.tanda]) { m3set[en.tanda] = 1; m3 += m; } }
+      var m = m3of(en.tanda) || 0, firstOfTanda = !m3set[en.tanda];
+      if (m > 0) { timeM3 += got; if (firstOfTanda) { m3set[en.tanda] = 1; m3 += m; } }
+      // una fila por envase (v5.31): el m³ se acredita 1 sola vez por tanda (en su 1er envase del día)
+      items.push({ tanda: en.tanda, role: role, ini: en.ini, cli: en.cli, net: got, m3: firstOfTanda ? m : 0 });
     }
-    return { time: time, timeM3: timeM3, m3: m3, tandas: Object.keys(tset).length, tandasM3: Object.keys(m3set).length, det: Object.keys(det).map(function (k2) { return det[k2]; }) };
+    return { time: time, timeM3: timeM3, m3: m3, tandas: Object.keys(tset).length, tandasM3: Object.keys(m3set).length, det: Object.keys(det).map(function (k2) { return det[k2]; }), items: items };
   }
   var arm = alloc(armEnv, "arm"), pick = alloc(pickEnv, "pick");
   excluded += _pvTot(_pvInter(exclR, avail)); avail = _pvSub(avail, exclR);
@@ -8255,7 +8259,8 @@ function _pvOperator(evs, m3of, D1, D2) {
   for (i = 0; i < _PV_ORDER.length; i++) detail[_PV_ORDER[i]] = taskDet[_PV_ORDER[i]];
   return { jornada: jornada, excluded: excluded, idle: _pvTot(avail), buckets: buckets, detail: detail,
     armTime: arm.time, armTimeM3: arm.timeM3, armM3: arm.m3, armTandas: arm.tandas, armTandasM3: arm.tandasM3,
-    pickTime: pick.time, pickTimeM3: pick.timeM3, pickM3: pick.m3, pickTandas: pick.tandas, pickTandasM3: pick.tandasM3 };
+    pickTime: pick.time, pickTimeM3: pick.timeM3, pickM3: pick.m3, pickTandas: pick.tandas, pickTandasM3: pick.tandasM3,
+    rows: pick.items.concat(arm.items) };
 }
 function prodCompute(events, m3map, D1, D2, factorMap) {
   var fm = factorMap || {};
