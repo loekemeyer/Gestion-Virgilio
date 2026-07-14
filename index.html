@@ -5292,7 +5292,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.30";
+const APP_VERSION = "v5.31";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -8138,6 +8138,39 @@ function prodExportCsv() {
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
 }
+/* Export DIARIO (v5.28): una fila por operario y por día del período, con las HORAS reales de
+   picking y de armado, sus m³ y el ritmo (m³/h) de cada tarea. Reusa el mismo motor prodCompute
+   (envase EP→TP / AP→TAP) recalculándolo por cada día. hs = tiempo real de la actividad;
+   m³/h = m³ ÷ horas sobre tandas con m³ (igual que la pantalla). */
+function prodExportCsvDiario() {
+  if (!_prod || !_prod.events) { alert("Nada para exportar todavía."); return; }
+  var nombres = _prodNombres || new Map();
+  var nameOf = function (leg) { return nombres.get(String(leg)) || ("Legajo " + leg); };
+  var esn = function (v) { return v ? String(Math.round(v * 100) / 100).replace(".", ",") : "0"; };
+  var d1 = _pvDi(_pvParse(_prod.d1)), d2 = _pvDi(_pvParse(_prod.d2));
+  var rows = [["Fecha", "Operario", "Legajo", "Picking hs", "Picking m3", "Picking m3/h", "Armado hs", "Armado m3", "Armado m3/h", "Tandas"]];
+  for (var dd = d1; dd <= d2; dd++) {
+    var A = _pvDayStart(dd), B = A + _PV_DAY, fecha = _pvYmd(A);
+    var comp = prodCompute(_prod.events, _prod.m3map, A, B, _prod.factorMap);
+    var legs = Object.keys(comp).sort(function (a, b) { return nameOf(a).localeCompare(nameOf(b)); });
+    for (var li = 0; li < legs.length; li++) {
+      var leg = legs[li], t = comp[leg];
+      if ((t.armTandas + t.pickTandas) === 0) continue;
+      var pickH = t.pickTime / 3600000, armH = t.armTime / 3600000;
+      var pickM3h = t.pickTimeM3 > 0 ? t.pickM3 / (t.pickTimeM3 / 3600000) : 0;
+      var armM3h = t.armTimeM3 > 0 ? t.armM3 / (t.armTimeM3 / 3600000) : 0;
+      rows.push([fecha, nameOf(leg), leg, esn(pickH), esn(t.pickM3), esn(pickM3h), esn(armH), esn(t.armM3), esn(armM3h), String(t.armTandas + t.pickTandas)]);
+    }
+  }
+  if (rows.length === 1) { alert("No hay actividad de picking/armado en el período."); return; }
+  var csv = "﻿" + rows.map(function (r) { return r.map(function (c) { return '"' + String(c).replace(/"/g, '""') + '"'; }).join(";"); }).join("\r\n");
+  var blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  var a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "productividad_diaria_" + _prod.d1 + "_a_" + _prod.d2 + ".csv";
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+}
 
 /* --- motor: matemática de intervalos + reglas. Prefijo _pv para no pisar nombres del archivo gigante. --- */
 var _PV_AR = 3 * 3600 * 1000, _PV_DAY = 86400000;
@@ -8224,11 +8257,35 @@ function _pvOperator(evs, m3of, D1, D2) {
     armTime: arm.time, armTimeM3: arm.timeM3, armM3: arm.m3, armTandas: arm.tandas, armTandasM3: arm.tandasM3,
     pickTime: pick.time, pickTimeM3: pick.timeM3, pickM3: pick.m3, pickTandas: pick.tandas, pickTandasM3: pick.tandasM3 };
 }
-function prodCompute(events, m3map, D1, D2) {
-  var m3of = function (t) { return m3map[t] || 0; }, byLeg = {}, i, e;
+function prodCompute(events, m3map, D1, D2, factorMap) {
+  var fm = factorMap || {};
+  var m3of = function (t) { var f = (fm[t] != null) ? fm[t] : 1; return (m3map[t] || 0) * f; }, byLeg = {}, i, e;
   for (i = 0; i < events.length; i++) { e = events[i]; if (e.legajo === "0" || e.legajo === "1" || !e.legajo) continue; if (!byLeg[e.legajo]) byLeg[e.legajo] = []; byLeg[e.legajo].push(e); }
   var out = {}; for (var leg in byLeg) out[leg] = _pvOperator(byLeg[leg], m3of, D1, D2);
   return out;
+}
+/* v5.28: factor de faltantes por tanda. Desde que se registran faltantes (evento PKC,
+   texto = TANDA|CÓDIGO|ESPERADAS|REALES), el m³ que realmente se pickeó/armó es menor:
+   factor = 1 − (volumen faltante ÷ volumen pedido), ponderando cada caja por su m³ de la
+   hoja VolumenArticulos (si un código no está, pesa 1 = proporción por cajas). Las tandas
+   SIN PKC (antes del 12-jun-2026, o pickeadas fuera del flujo guiado) quedan con factor 1
+   = m³ completo. m3of() lo aplica al m³ base de la tanda en todo el dashboard y las descargas. */
+function _pvFaltanteFactores(events, volMap) {
+  var acc = {}, i, e, p, tanda, cod, esp, rea, vol, falt;
+  var volOf = function (c) { var v = (volMap && volMap.get) ? volMap.get(c) : 0; return (v > 0) ? v : 1; };
+  for (i = 0; i < events.length; i++) {
+    e = events[i]; if (e.opcion !== "PKC") continue;
+    p = String(e.texto || "").split("|"); if (p.length < 4) continue;
+    tanda = String(p[0] || "").trim().toUpperCase(); cod = String(p[1] || "").trim().toUpperCase();
+    esp = parseInt(p[2], 10); rea = parseInt(p[3], 10);
+    if (!tanda || !isFinite(esp) || !isFinite(rea) || esp <= 0) continue;
+    vol = volOf(cod); falt = Math.max(0, esp - rea);
+    if (!acc[tanda]) acc[tanda] = { esp: 0, falt: 0 };
+    acc[tanda].esp += esp * vol; acc[tanda].falt += falt * vol;
+  }
+  var fm = {};
+  for (tanda in acc) { var a = acc[tanda]; if (a.esp > 0) { var f = 1 - (a.falt / a.esp); if (f < 0) f = 0; if (f > 1) f = 1; fm[tanda] = f; } }
+  return fm;
 }
 function _pvWeeks(D1, D2) {
   var out = [], wd = new Date(D1 - _PV_AR).getUTCDay(), monday = _pvDayStart(_pvDi(D1) - ((wd + 6) % 7));
@@ -8255,13 +8312,15 @@ async function prodLoad() {
     var res = await Promise.all([
       fetch(evUrl, { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" }),
       getEmpleadosNombres().catch(function () { return new Map(); }),
-      _pvFetchM3()
+      _pvFetchM3(),
+      fetchVolumenArticulos().catch(function () { return new Map(); })
     ]);
     var rows = res[0].ok ? await res[0].json() : [], events = [];
     for (var i = 0; i < rows.length; i++) { var x = rows[i], cli = Date.parse(x.ts_cliente); if (!cli) continue; events.push({ legajo: x.legajo, opcion: x.opcion, texto: (x.texto || "").trim().toUpperCase(), ini: x.ts_inicio ? Date.parse(x.ts_inicio) : null, cli: cli }); }
+    var factorMap = _pvFaltanteFactores(events, res[3]);   // v5.28: m³ real = m³ tanda × (1 − faltante)
     var weeks = _pvWeeks(D1, D2).slice(-8);
-    var weekly = weeks.map(function (w) { return prodCompute(events, res[2], w[0], w[1]); });
-    _prod = { total: prodCompute(events, res[2], D1, D2), weekly: weekly, weeks: weeks, d1: _prodPeriod.d1, d2: _prodPeriod.d2 };
+    var weekly = weeks.map(function (w) { return prodCompute(events, res[2], w[0], w[1], factorMap); });
+    _prod = { total: prodCompute(events, res[2], D1, D2, factorMap), weekly: weekly, weeks: weeks, d1: _prodPeriod.d1, d2: _prodPeriod.d2, events: events, m3map: res[2], factorMap: factorMap };
     _prodNombres = res[1] || new Map();
     prodRender();
   } catch (e) { if (body) body.innerHTML = '<div class="prod-empty" style="color:#b91c1c">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
@@ -8304,7 +8363,8 @@ function prodRender() {
   const d2v = _prod ? _prod.d2 : (_prodPeriod ? _prodPeriod.d2 : "");
   const sel = '<div class="prod-dates"><label>Desde</label><input id="prodD1" type="date" value="' + d1v + '" onchange="prodSetPeriod(this.value, document.getElementById(\'prodD2\').value)">' +
     '<label>Hasta</label><input id="prodD2" type="date" value="' + d2v + '" onchange="prodSetPeriod(document.getElementById(\'prodD1\').value, this.value)">' +
-    '<button class="prod-preset" onclick="prodPreset(7)">7 días</button><button class="prod-preset" onclick="prodPreset(28)">4 sem</button><button class="prod-preset" onclick="prodPreset(56)">8 sem</button><button class="prod-preset" onclick="prodExportCsv()" style="background:#16a34a;color:#fff" title="Bajar la tabla a Excel/CSV">⬇ Excel</button></div>';
+    '<button class="prod-preset" onclick="prodPreset(7)">7 días</button><button class="prod-preset" onclick="prodPreset(28)">4 sem</button><button class="prod-preset" onclick="prodPreset(56)">8 sem</button><button class="prod-preset" onclick="prodExportCsv()" style="background:#16a34a;color:#fff" title="Bajar la tabla a Excel/CSV (totales por operario)">⬇ Excel</button>' +
+    '<button class="prod-preset" onclick="prodExportCsvDiario()" style="background:#0891b2;color:#fff" title="Bajar el detalle por empleado y DÍA: horas, m³ y ritmo de picking y de armado">⬇ Excel × día</button></div>';
 
   if (!_prod) { body.innerHTML = sel + '<div class="prod-empty">Sin datos.</div>'; return; }
   const POCO = 5;
