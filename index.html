@@ -2956,6 +2956,23 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
       <button class="sup-action-btn" onclick="openTallEditor()"><span class="sup-ico">👷</span><span>Talleristas de Recepción</span></button>
       <button class="sup-action-btn" onclick="openMailsEditor()"><span class="sup-ico">✉️</span><span>Mails autorizados</span></button>
     </div>
+    <style id="ssgSwCss">
+      .sup-cfg{max-width:520px;margin:14px auto 0;background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:11px 14px;}
+      .sup-cfg-top{display:flex;align-items:center;justify-content:space-between;gap:12px;}
+      .sup-cfg-t{font-size:13.5px;font-weight:700;color:#0f172a;line-height:1.25;}
+      .sup-cfg-hint{font-size:11.5px;color:#64748b;margin-top:6px;}
+      .sup-sw{flex:0 0 auto;display:inline-block;width:44px;height:24px;border-radius:999px;background:#94a3b8;position:relative;cursor:pointer;transition:background .15s;}
+      .sup-sw.on{background:#16a34a;}
+      .sup-sw-k{position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .15s;box-shadow:0 1px 2px rgba(0,0,0,.3);}
+      .sup-sw.on .sup-sw-k{left:23px;}
+    </style>
+    <div class="sup-cfg" id="ssgSwitchRow">
+      <div class="sup-cfg-top">
+        <span class="sup-cfg-t">📦 Aviso Telegram “picking sin stock en góndola”</span>
+        <span class="sup-sw" id="ssgSw" onclick="toggleSsgAlert()" role="switch"><span class="sup-sw-k"></span></span>
+      </div>
+      <div class="sup-cfg-hint" id="ssgSwHint">Cargando…</div>
+    </div>
     <div class="auth-logout-row">
       <button class="auth-logout-btn" onclick="signOutGoogle()">Salir</button>
     </div>
@@ -5292,7 +5309,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.34";
+const APP_VERSION = "v5.35";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -7438,6 +7455,36 @@ try { window.addEventListener("online", function () { try { stockFlushPend(); } 
 async function stockFetchMovs() {
   const r = await fetch(SUPABASE_STOCK_ENDPOINT + "?select=*&order=ts.desc&limit=20000", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
   return r.ok ? r.json() : [];
+}
+/* Switch admin (v5.35): activa/desactiva el aviso Telegram "picking sin stock en góndola"
+   (SSG). El flag vive en Stock_Config.alerta_sin_stock_gondola ('1' on / '0' off); el trigger
+   server-side lo lee antes de notificar. Default OFF: mientras no se carga el stock inicial,
+   TODO da "había 0" y es solo ruido. Escritura con anon key igual que el cutoff. */
+function ssgSetSwitchUI(on) {
+  const sw = document.getElementById("ssgSw"), hint = document.getElementById("ssgSwHint");
+  if (sw) sw.classList.toggle("on", !!on);
+  if (hint) hint.textContent = on
+    ? "✅ ACTIVADO — llegan los avisos de picking sin stock en góndola."
+    : "🔕 DESACTIVADO — no llegan (útil mientras no cargás el stock inicial).";
+}
+async function loadSsgSwitch() {
+  const sw = document.getElementById("ssgSw"); if (!sw) return;
+  try {
+    const r = await fetch(SUPABASE_URL + "/rest/v1/Stock_Config?clave=eq.alerta_sin_stock_gondola&select=valor", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+    const d = r.ok ? await r.json() : [];
+    ssgSetSwitchUI(d.length && String(d[0].valor) === "1");
+  } catch (_e) { const h = document.getElementById("ssgSwHint"); if (h) h.textContent = "No se pudo leer el estado."; }
+}
+async function toggleSsgAlert() {
+  const sw = document.getElementById("ssgSw"), hint = document.getElementById("ssgSwHint");
+  if (!sw) return;
+  const nuevo = sw.classList.contains("on") ? "0" : "1";
+  if (hint) hint.textContent = "Guardando…";
+  try {
+    const r = await fetch(SUPABASE_URL + "/rest/v1/Stock_Config?on_conflict=clave", { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ clave: "alerta_sin_stock_gondola", valor: nuevo }) });
+    if (!r.ok) { if (hint) hint.textContent = "Error guardando (HTTP " + r.status + ")."; return; }
+    ssgSetSwitchUI(nuevo === "1");
+  } catch (_e) { if (hint) hint.textContent = "Sin conexión: no se guardó."; }
 }
 /* v4.50 — Saldos calculados en el SERVER (vista vista_saldos_stock): el celu baja
    ~1 fila por artículo en vez de las ~20k de movimientos. Devuelve el MISMO shape
@@ -14439,6 +14486,7 @@ function showKioskAdminPanel() {
   const hide = (id) => { const e = document.getElementById(id); if (e) e.classList.add("hidden"); };
   const show = (id) => { const e = document.getElementById(id); if (e) e.classList.remove("hidden"); };
   hide("authBlock"); hide("legajoEntry"); show("supervisorPanel");
+  try { loadSsgSwitch(); } catch (_e) {}
   const h = document.getElementById("legajoHistorySpace"); if (h) h.style.display = "none";
   hide("legajoTitle");
   // En kiosko no hay sesión que cerrar: ocultamos la fila de "Salir".

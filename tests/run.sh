@@ -24,4 +24,7 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== racks-propuesta (regresión: MG 'De los racks' propone para aprobar, no mueve stock) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/racks-propuesta.cjs
 
+echo "== ssg-switch (regresión: switch admin del aviso 'picking sin stock') =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ssg-switch.cjs
+
 echo "== TODO OK =="
