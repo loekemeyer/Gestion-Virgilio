@@ -89,12 +89,17 @@ catch (_e) {
     out.row57 = row57 ? { tanda: row57.tanda, cod: row57.cod, rs: row57.rs, fecha: row57.fecha, lios: row57.lios, falt: row57.falt ? row57.falt.cajas : 0 } : null;
     npcApply();
     out.contHtml = (document.getElementById("npcContainer") || {}).innerHTML || "";
-    document.getElementById("npcQNp").value = "97958"; npcApply();
-    out.filterNp = (document.getElementById("npcCount") || {}).textContent;
-    document.getElementById("npcQNp").value = ""; document.getElementById("npcQRs").value = "osa"; npcApply();
-    out.filterRs = (document.getElementById("npcCount") || {}).textContent;
-    document.getElementById("npcQRs").value = ""; document.getElementById("npcQFecha").value = "15/07"; npcApply();
-    out.filterFecha = (document.getElementById("npcCount") || {}).textContent;
+    // Buscador único: matchea contra todos los campos, multi-término = AND.
+    document.getElementById("npcQ").value = "97958"; npcApply();
+    out.filterNp = (document.getElementById("npcCount") || {}).textContent;      // 1 / 2 (NP)
+    document.getElementById("npcQ").value = "osa"; npcApply();
+    out.filterRs = (document.getElementById("npcCount") || {}).textContent;      // 2 / 2 (razón social)
+    document.getElementById("npcQ").value = "15/07"; npcApply();
+    out.filterFecha = (document.getElementById("npcCount") || {}).textContent;   // 2 / 2 (fecha dd/mm)
+    document.getElementById("npcQ").value = "osa 97958"; npcApply();
+    out.filterMulti = (document.getElementById("npcCount") || {}).textContent;   // 1 / 2 (AND multi-término)
+    document.getElementById("npcQ").value = "c75b"; npcApply();
+    out.filterTanda = (document.getElementById("npcCount") || {}).textContent;   // 2 / 2 (tanda)
     return out;
   });
 
@@ -104,7 +109,8 @@ catch (_e) {
   const okF2 = r.rowCount === 2 && r.row57 && r.row57.tanda === "C75B" && r.row57.cod === "2533" &&
     /Osa/.test(r.row57.rs) && r.row57.fecha === "2026-07-15" && r.row57.lios === 28 && r.row57.falt === 11 &&
     /315/.test(r.contHtml) && /npc-item f/.test(r.contHtml) &&
-    /^1 \//.test(String(r.filterNp)) && /^2 \//.test(String(r.filterRs)) && /^2 \//.test(String(r.filterFecha));
+    /^1 \//.test(String(r.filterNp)) && /^2 \//.test(String(r.filterRs)) && /^2 \//.test(String(r.filterFecha)) &&
+    /^1 \//.test(String(r.filterMulti)) && /^2 \//.test(String(r.filterTanda));
   const pass = okF1 && okF2 && errs.length === 0;
   console.log("fac-npc:", JSON.stringify(r).slice(0, 600));
   console.log("  pageerrors:", errs.length ? errs.join("|") : "none");

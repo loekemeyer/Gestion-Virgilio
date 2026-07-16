@@ -2848,6 +2848,7 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
   .npc-top h1{ font-size:19px; margin:0 0 10px; display:flex; align-items:center; gap:8px; color:#0f172a; }
   .npc-filters{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px; }
   .npc-inp{ flex:1 1 130px; min-width:0; padding:9px 11px; border:1px solid #cbd5e1; border-radius:9px; font-size:14px; background:#fff; }
+  .npc-filters .npc-inp-all{ flex:1 1 260px; }
   .npc-inp:focus{ outline:none; border-color:#0f766e; box-shadow:0 0 0 3px rgba(15,118,110,.15); }
   .npc-btn-clear{ flex:0 0 auto; padding:9px 14px; border:1px solid #cbd5e1; border-radius:9px; background:#fff; font-size:13px; font-weight:700; color:#334155; cursor:pointer; }
   .npc-stats{ display:flex; gap:8px; align-items:center; margin-bottom:10px; flex-wrap:wrap; }
@@ -2874,17 +2875,13 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
   .npc-lio > em{ font-style:normal; color:#b45309; font-size:11px; font-weight:700; }
   .npc-nolio{ color:#94a3b8; font-size:12.5px; font-style:italic; }
   .npc-falt-det{ margin-top:8px; font-size:12px; font-weight:700; color:#991b1b; background:#fef2f2; border:1px solid #fca5a5; border-radius:8px; padding:5px 9px; }
-  @media (max-width:640px){ .npc-inp{ flex-basis:calc(50% - 4px); } .npc-rs{ flex-basis:100%; } }
+  @media (max-width:640px){ .npc-inp{ flex-basis:calc(50% - 4px); } .npc-filters .npc-inp-all{ flex-basis:100%; } .npc-rs{ flex-basis:100%; } }
 </style>
 <div id="npConsultaModal">
   <div class="npc-top">
     <h1><img class="hdr-logo" src="icon.svg" alt="">Consulta de Notas de Pedido — Composición a líos</h1>
     <div class="npc-filters">
-      <input id="npcQNp" class="npc-inp" placeholder="NP" oninput="npcApply()" autocomplete="off">
-      <input id="npcQTanda" class="npc-inp" placeholder="Tanda" oninput="npcApply()" autocomplete="off">
-      <input id="npcQCod" class="npc-inp" placeholder="Cod Cliente" oninput="npcApply()" autocomplete="off">
-      <input id="npcQRs" class="npc-inp" placeholder="Razón Social" oninput="npcApply()" autocomplete="off">
-      <input id="npcQFecha" class="npc-inp" placeholder="Fecha (dd/mm o aaaa-mm-dd)" oninput="npcApply()" autocomplete="off">
+      <input id="npcQ" class="npc-inp npc-inp-all" placeholder="🔎 Buscar por NP, tanda, cod cliente, razón social o fecha… (podés combinar, ej. «osa 15/07»)" oninput="npcApply()" autocomplete="off">
       <button class="npc-btn-clear" onclick="npcClear()">Limpiar</button>
     </div>
     <div class="npc-stats">
@@ -5379,7 +5376,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.36";
+const APP_VERSION = "v5.37";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -16050,7 +16047,7 @@ function openNpConsulta(){
   npcLoad(false);
 }
 function closeNpConsulta(){ document.getElementById("npConsultaModal").classList.remove("show"); }
-function npcClear(){ ["npcQNp","npcQTanda","npcQCod","npcQRs","npcQFecha"].forEach(function(id){ const el = document.getElementById(id); if (el) el.value = ""; }); npcApply(); }
+function npcClear(){ const el = document.getElementById("npcQ"); if (el) el.value = ""; npcApply(); }
 
 async function npcLoad(force){
   const now = Date.now();
@@ -16116,14 +16113,19 @@ async function npcLoad(force){
   return _npcInflight;
 }
 
+/* Un solo buscador: matchea contra TODOS los campos a la vez (NP, tanda, cod, razón
+   social, fecha ISO y dd/mm/aaaa, y la clase). Multi-término separado por espacios =
+   AND (todos los términos tienen que aparecer en algún lado). */
+function npcHaystack(r){
+  return (String(r.np) + " " + String(r.tanda) + " " + String(r.cod) + " " + String(r.rs) + " " +
+    String(r.fecha) + " " + npcDmy(r.fecha) + " " + npcClaseLabel(r.clase)).toLowerCase();
+}
 function npcApply(){
-  const qNp = npcNorm(npcVal("npcQNp")), qT = npcNorm(npcVal("npcQTanda")), qC = npcNorm(npcVal("npcQCod")), qR = npcNorm(npcVal("npcQRs")), qF = npcNorm(npcVal("npcQFecha"));
-  const rows = _npcRows.filter(function(r){
-    if (qNp && String(r.np).toLowerCase().indexOf(qNp) < 0) return false;
-    if (qT && String(r.tanda).toLowerCase().indexOf(qT) < 0) return false;
-    if (qC && String(r.cod).toLowerCase().indexOf(qC) < 0) return false;
-    if (qR && String(r.rs).toLowerCase().indexOf(qR) < 0) return false;
-    if (qF){ const iso = String(r.fecha || "").toLowerCase(); if (iso.indexOf(qF) < 0 && npcDmy(r.fecha).indexOf(qF) < 0) return false; }
+  const q = npcNorm(npcVal("npcQ"));
+  const toks = q ? q.split(/\s+/).filter(Boolean) : [];
+  const rows = !toks.length ? _npcRows : _npcRows.filter(function(r){
+    const hay = npcHaystack(r);
+    for (let i = 0; i < toks.length; i++){ if (hay.indexOf(toks[i]) < 0) return false; }
     return true;
   });
   const cnt = document.getElementById("npcCount"); if (cnt) cnt.textContent = rows.length + " / " + _npcRows.length;
