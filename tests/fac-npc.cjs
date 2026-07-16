@@ -111,6 +111,20 @@ catch (_e) {
     out.filterTanda = (document.getElementById("npcCount") || {}).textContent;   // 2 / 2 (tanda)
     document.getElementById("npcQ").value = "pedro"; npcApply();                 // nombre del picker en el haystack
     out.filterPicker = (document.getElementById("npcCount") || {}).textContent;  // 2 / 2
+
+    // ===== F3: rótulos de líos agrupados (A1,A2… cuando repite cod+cant) =====
+    out.labels = liosLabels([
+      { items: [{ cod: "026", qty: 5 }] }, { items: [{ cod: "026", qty: 5 }] },
+      { items: [{ cod: "026", qty: 5 }] }, { items: [{ cod: "026", qty: 5 }] },
+      { items: [{ cod: "570", qty: 3 }] }
+    ]);   // esperado ["A1","A2","A3","A4","B"]
+    out.labels2 = liosLabels([
+      { items: [{ cod: "570", qty: 3 }] }, { items: [{ cod: "538E", qty: 5 }] }, { items: [{ cod: "570", qty: 3 }] }
+    ]);   // 570×3 repetido aunque no consecutivo → A1,B,A2
+    out.resumen = _compLiosResumen({ liosArr: [
+      { items: [{ cod: "026", qty: 5 }] }, { items: [{ cod: "026", qty: 5 }] },
+      { items: [{ cod: "026", qty: 5 }] }, { items: [{ cod: "026", qty: 5 }] }
+    ] });   // esperado "A1=026x5;A2=026x5;A3=026x5;A4=026x5"
     return out;
   });
 
@@ -124,10 +138,13 @@ catch (_e) {
     /Pickeó/.test(r.contHtml) && /Pedro Gómez/.test(r.contHtml) && /Juan Pérez/.test(r.contHtml) && /Sale/.test(r.contHtml) &&
     /^1 \//.test(String(r.filterNp)) && /^2 \//.test(String(r.filterRs)) && /^2 \//.test(String(r.filterFecha)) &&
     /^1 \//.test(String(r.filterMulti)) && /^2 \//.test(String(r.filterTanda)) && /^2 \//.test(String(r.filterPicker));
-  const pass = okF1 && okF2 && errs.length === 0;
-  console.log("fac-npc:", JSON.stringify(r).slice(0, 600));
+  const okF3 = JSON.stringify(r.labels) === '["A1","A2","A3","A4","B"]' &&
+    JSON.stringify(r.labels2) === '["A1","B","A2"]' &&
+    r.resumen === "A1=026x5;A2=026x5;A3=026x5;A4=026x5";
+  const pass = okF1 && okF2 && okF3 && errs.length === 0;
+  console.log("fac-npc:", JSON.stringify(r).slice(0, 640));
   console.log("  pageerrors:", errs.length ? errs.join("|") : "none");
-  console.log(" ", okF1 ? "F1 faltante ✓" : "F1 faltante ✗", "·", okF2 ? "F2 consulta ✓" : "F2 consulta ✗", "·", pass ? "OK" : "FAIL");
+  console.log(" ", okF1 ? "F1 faltante ✓" : "F1 faltante ✗", "·", okF2 ? "F2 consulta ✓" : "F2 consulta ✗", "·", okF3 ? "F3 rótulos ✓" : "F3 rótulos ✗", "·", pass ? "OK" : "FAIL");
   await b.close();
   process.exit(pass ? 0 : 1);
 })();

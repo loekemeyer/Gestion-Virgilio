@@ -5378,7 +5378,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.38";
+const APP_VERSION = "v5.39";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -7108,7 +7108,7 @@ function _compViewSueltas() { if (_comp) { _comp.liosView = "sueltas"; _compRend
 function _compSueltaUndo() { const n = _compLioNow(); if (!n) return; for (let k = n.liosArr.length - 1; k >= 0; k--) { if (n.liosArr[k].suelta) { _compLioDel(k); return; } } }
 function _compLioDel(k) { const n = _compLioNow(); if (!n) return; const l = n.liosArr[k]; if (!l) return; l.items.forEach(function (it) { const c = n.codes.find(function (x) { return x.cod === it.cod; }); if (c) c.rest += it.qty; }); n.liosArr.splice(k, 1); _compLioMark(n); _compRenderLios(); _compRecalc(); }
 function _compLioNp(d) { if (!_comp) return; const ni = _comp.liosNpIdx + d; if (ni < 0 || ni >= _comp.nps.length) return; _comp.liosNpIdx = ni; _compRenderLios(); _compPersist(); }
-function _compLiosResumen(n) { const L = function (i) { return i < 26 ? String.fromCharCode(65 + i) : "L" + (i + 1); }; return (n.liosArr || []).map(function (l, k) { return L(k) + "=" + l.items.map(function (it) { return it.cod + "x" + it.qty; }).join(",") + (l.suelta ? "(s)" : ""); }).join(";"); }
+function _compLiosResumen(n) { const lios = n.liosArr || []; const labels = liosLabels(lios); return lios.map(function (l, k) { return labels[k] + "=" + l.items.map(function (it) { return it.cod + "x" + it.qty; }).join(",") + (l.suelta ? "(s)" : ""); }).join(";"); }
 function _compRenderLios() {
   const el = document.getElementById("compStep2"); if (!el || !_comp) return;
   if (!_comp.nps.length) { el.innerHTML = '<div class="comp-step-t">Sin pedidos en esta tanda.</div>'; return; }
@@ -7141,7 +7141,8 @@ function _compRenderLios() {
     if (!groups.length) h += '<div class="cmpl-empty">Todavía no armaste ningún lío.</div>';
     else h += groups.map(function (g, gi) {
       const comp = g.items.map(function (it) { return escapeHtml(it.cod) + "×" + it.qty; }).join("  ") + (g.suelta ? " · suelta" : "");
-      return '<div class="cmpl-eg"><span class="cmpl-lab">' + g.label + '</span><span class="cmpl-egc">' + comp + (g.count > 1 ? ' · <b>×' + g.count + '</b>' : '') + '</span>' +
+      const labTxt = g.count > 1 ? (g.label + '1–' + g.label + g.count) : g.label;
+      return '<div class="cmpl-eg"><span class="cmpl-lab">' + labTxt + '</span><span class="cmpl-egc">' + comp + (g.count > 1 ? ' · <b>×' + g.count + '</b>' : '') + '</span>' +
         (g.count > 1 ? '<button class="cmpl-egb" onclick="_compGroupLess(' + gi + ')" title="Sacar uno">−</button><button class="cmpl-egb" onclick="_compGroupMore(' + gi + ')"' + (g.canMore ? '' : ' disabled') + ' title="Agregar otro igual">+</button>' : '') +
         '<button class="cmpl-egedit" onclick="_compGroupReopen(' + gi + ')" title="Reabrir para editar">✏️</button>' +
         '<button class="cmpl-egdel" onclick="_compGroupDel(' + gi + ')" title="Borrar">×</button></div>';
@@ -9697,6 +9698,23 @@ let _cp = null;
 function _cpNorm(c) { try { return _ocgNorm(String(c == null ? "" : c)); } catch (_e) { return String(c == null ? "" : c).toUpperCase().trim(); } }
 function _cpAuthH() { return { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }; }
 function cpLioLetter(i) { return i < 26 ? String.fromCharCode(65 + i) : "L" + (i + 1); }
+/* Rótulos de líos (v5.39): los líos con misma firma (mismo cod Y misma cantidad, ver
+   _compLioSig) comparten letra base por orden de aparición y se sub-indexan A1, A2, A3…
+   Los que no se repiten quedan con la letra sola. Así no se gastan letras cuando un
+   artículo llena varios líos iguales. Mismo criterio de agrupación que _compLioGroups. */
+function liosLabels(lios) {
+  const arr = lios || [];
+  const count = {};
+  arr.forEach(function (l) { const s = _compLioSig(l); count[s] = (count[s] || 0) + 1; });
+  const baseBySig = {}; const occ = {}; let li = 0;
+  return arr.map(function (l) {
+    const s = _compLioSig(l);
+    if (!(s in baseBySig)) { baseBySig[s] = cpLioLetter(li); li++; }
+    const base = baseBySig[s];
+    if (count[s] > 1) { occ[s] = (occ[s] || 0) + 1; return base + occ[s]; }
+    return base;
+  });
+}
 function cpTodayAR() { try { return new Date().toLocaleDateString("en-CA", { timeZone: "America/Argentina/Buenos_Aires" }); } catch (_e) { return ""; } }
 function cpDateMinus(ymd, days) {
   const p = String(ymd || "").split("-"); if (p.length < 3) return "";
@@ -9724,8 +9742,9 @@ function cpParseResumen(resumen) {
   return out;
 }
 function cpBuildResumen(lios) {
+  const labels = liosLabels(lios);
   return lios.map(function (l, k) {
-    return cpLioLetter(k) + "=" + l.items.map(function (it) { return String(it.cod).toUpperCase() + "X" + it.qty; }).join(",") + (l.suelta ? "(s)" : "");
+    return labels[k] + "=" + l.items.map(function (it) { return String(it.cod).toUpperCase() + "X" + it.qty; }).join(",") + (l.suelta ? "(s)" : "");
   }).join(";");
 }
 async function cpLoadFaltantes() {
@@ -9857,10 +9876,10 @@ function cpRenderStep2(body) {
   else {
     const info = _cp._liosInfo || { resumen: "" };
     const lios = cpParseResumen(info.resumen);
+    const labels = liosLabels(lios);
     let chips = lios.map(function (l, k) {
-      const letter = cpLioLetter(k);
       const comp = l.items.map(function (it) { return it.cod + "×" + it.qty; }).join(",");
-      return '<button class="cp-lio' + (_cp.lioSel === letter ? " on" : "") + '" onclick="cpLio(\'' + letter + '\')">' + letter + ' <small>' + escapeHtml(comp) + (l.suelta ? " (s)" : "") + '</small></button>';
+      return '<button class="cp-lio' + (_cp.lioSel === k ? " on" : "") + '" onclick="cpLio(' + k + ')">' + labels[k] + ' <small>' + escapeHtml(comp) + (l.suelta ? " (s)" : "") + '</small></button>';
     }).join("");
     chips += '<button class="cp-lio cp-lio-new' + (_cp.lioSel === "__new__" ? " on" : "") + '" onclick="cpLio(\'__new__\')">🆕 Lío nuevo</button>';
     h += '<div class="cp-lios">' + chips + '</div>';
@@ -9882,16 +9901,10 @@ function closeCP() { const ov = document.getElementById("cpModal"); if (ov) ov.c
 function cpUpdateLio(leg, s, qty, lioSel, info) {
   let lios = cpParseResumen((info && info.resumen) || "");
   const codU = String(s.cod_art).toUpperCase();
-  if (lioSel !== "__new__" && lios.length) {
-    let done = false;
-    for (let i = 0; i < lios.length; i++) {
-      if (cpLioLetter(i) === lioSel) {
-        const ex = lios[i].items.filter(function (it) { return String(it.cod).toUpperCase() === codU; })[0];
-        if (ex) ex.qty += qty; else lios[i].items.push({ cod: codU, qty: qty });
-        done = true; break;
-      }
-    }
-    if (!done) lios.push({ items: [{ cod: codU, qty: qty }], suelta: false });
+  const idx = (typeof lioSel === "number") ? lioSel : -1;   // v5.39: selección por índice (los rótulos ya no son 1 letra por lío)
+  if (lioSel !== "__new__" && idx >= 0 && lios[idx]) {
+    const ex = lios[idx].items.filter(function (it) { return String(it.cod).toUpperCase() === codU; })[0];
+    if (ex) ex.qty += qty; else lios[idx].items.push({ cod: codU, qty: qty });
   } else {
     lios.push({ items: [{ cod: codU, qty: qty }], suelta: false });
   }
@@ -16161,10 +16174,11 @@ function npcRenderList(rows){
   const shown = rows.slice(0, MAX);
   const html = shown.map(function(r){
     const lios = cpParseResumen(r.resumen);
+    const npcLabels = liosLabels(lios);
     const faltCods = {}; if (r.falt) r.falt.items.forEach(function(it){ const k = String(it.cod).toUpperCase(); faltCods[k] = (faltCods[k] || 0) + it.falto; });
     const liosHtml = lios.length ? lios.map(function(l, k){
       const items = l.items.map(function(it){ const isF = faltCods[String(it.cod).toUpperCase()]; return '<span class="npc-item' + (isF ? ' f' : '') + '">' + escapeHtml(String(it.cod)) + '<i>×' + it.qty + '</i></span>'; }).join("");
-      return '<span class="npc-lio"><b>' + escapeHtml(cpLioLetter(k)) + '</b>' + items + (l.suelta ? '<em>suelta</em>' : '') + '</span>';
+      return '<span class="npc-lio"><b>' + escapeHtml(npcLabels[k]) + '</b>' + items + (l.suelta ? '<em>suelta</em>' : '') + '</span>';
     }).join("") : '<span class="npc-nolio">— sin detalle de líos (TAL viejo sin resumen) —</span>';
     const faltDet = r.falt ? '<div class="npc-falt-det">⚠ Faltaron ' + r.falt.cajas + ' cajas: ' + r.falt.items.map(function(it){ return escapeHtml(it.cod) + '×' + it.falto; }).join(", ") + '</div>' : '';
     return '<div class="npc-card' + (r.falt ? ' falt' : '') + '">' +
