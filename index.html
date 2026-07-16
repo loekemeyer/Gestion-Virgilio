@@ -2874,6 +2874,8 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
   .npc-item.f > i{ color:#dc2626; }
   .npc-lio > em{ font-style:normal; color:#b45309; font-size:11px; font-weight:700; }
   .npc-nolio{ color:#94a3b8; font-size:12.5px; font-style:italic; }
+  .npc-meta{ display:flex; flex-wrap:wrap; gap:5px 16px; margin:-2px 0 9px; font-size:11.5px; color:#64748b; }
+  .npc-meta b{ color:#334155; font-weight:700; }
   .npc-falt-det{ margin-top:8px; font-size:12px; font-weight:700; color:#991b1b; background:#fef2f2; border:1px solid #fca5a5; border-radius:8px; padding:5px 9px; }
   @media (max-width:640px){ .npc-inp{ flex-basis:calc(50% - 4px); } .npc-filters .npc-inp-all{ flex-basis:100%; } .npc-rs{ flex-basis:100%; } }
 </style>
@@ -5376,7 +5378,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.37";
+const APP_VERSION = "v5.38";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -16075,12 +16077,25 @@ async function npcLoad(force){
       const entUrl  = SUPABASE_ENTREGAS_ENDPOINT + "?select=np,cod_cliente,tanda,fecha_salida,cod_art,cajas_pedidas,cajas_falto&np=in.(" + inList + ")&limit=20000";
       const metaUrl = SUPABASE_URL + "/rest/v1/PPP_Entregados_Meta?select=np,cod,rs&np=in.(" + inList + ")&limit=20000";
       const ppUrl   = SUPABASE_PPP_PROG_ENDPOINT + "?select=np,cod,razon_social,fecha_entrega,tanda&np=in.(" + inList + ")&limit=20000";
+      // Tandas del corpus → para saber quién pickeó (eventos EP/TP de la tanda).
+      const tandaSet = {}; tal.forEach(function(v){ if (v.tanda) tandaSet[v.tanda] = 1; });
+      const tandaIn = Object.keys(tandaSet).slice(0, 1500).map(function(x){ return encodeURIComponent(x); }).join(",");
+      const pkUrl = SUPABASE_TABLE_ENDPOINT + "?opcion=in.(EP,TP)&texto=in.(" + tandaIn + ")&select=opcion,texto,legajo,ts_cliente&order=ts_cliente.asc&limit=20000";
       const par = await Promise.all([
         fetch(entUrl,  { headers: H, cache: "no-store" }).then(function(r){ return r.ok ? r.json() : []; }).catch(function(){ return []; }),
         fetch(metaUrl, { headers: H, cache: "no-store" }).then(function(r){ return r.ok ? r.json() : []; }).catch(function(){ return []; }),
-        fetch(ppUrl,   { headers: H, cache: "no-store" }).then(function(r){ return r.ok ? r.json() : []; }).catch(function(){ return []; })
+        fetch(ppUrl,   { headers: H, cache: "no-store" }).then(function(r){ return r.ok ? r.json() : []; }).catch(function(){ return []; }),
+        (tandaIn ? fetch(pkUrl, { headers: H, cache: "no-store" }).then(function(r){ return r.ok ? r.json() : []; }).catch(function(){ return []; }) : Promise.resolve([])),
+        getEmpleadosNombres().catch(function(){ return null; })   // legajo→nombre (cacheado 1h)
       ]);
-      const ent = par[0], meta = par[1], pp = par[2];
+      const ent = par[0], meta = par[1], pp = par[2], pk = par[3] || [];
+      // Quién pickeó por tanda: TP (terminó) pisa a EP (empezó); con order asc queda el más reciente.
+      const pickerByTanda = {};
+      pk.forEach(function(x){
+        const t = String(x.texto || "").trim().toUpperCase(); if (!t) return;
+        if (x.opcion === "TP") pickerByTanda[t] = String(x.legajo || "");
+        else if (!pickerByTanda[t]) pickerByTanda[t] = String(x.legajo || "");
+      });
       const entMeta = new Map(); const falt = new Map();
       ent.forEach(function(x){
         const np = String(x.np || "").trim().replace(/\.0+$/, ""); if (!np) return;
@@ -16093,12 +16108,16 @@ async function npcLoad(force){
       // 3) Merge por NP (prioridad de fuentes según cuál es más confiable por campo).
       const rows = nps.map(function(np){
         const t = tal.get(np) || {}; const e = entMeta.get(np) || {}; const m = metaMap.get(np) || {}; const pd = ppMap.get(np) || {};
+        const tanda = t.tanda || e.tanda || pd.tanda || "";
         return {
-          np: np,
-          tanda: t.tanda || e.tanda || pd.tanda || "",
+          np: np, tanda: tanda,
           cod: e.cod || pd.cod || m.cod || "",
           rs: pd.rs || m.rs || "",
           fecha: e.fecha || pd.fecha || "",
+          salePpp: pd.fecha || "",                        // día que sale según PPP (fecha_entrega)
+          armadoTs: t.ts || "",                           // día/hora en que se armó (evento TAL)
+          armadorLeg: String(t.legajo || ""),             // quién armó el pedido
+          pickerLeg: String(pickerByTanda[tanda] || ""),  // quién pickeó la tanda
           lios: t.lios || 0, resumen: t.resumen || "", clase: t.clase || "",
           ts: t.ts || "", legajo: t.legajo || "", falt: falt.get(np) || null
         };
@@ -16116,9 +16135,11 @@ async function npcLoad(force){
 /* Un solo buscador: matchea contra TODOS los campos a la vez (NP, tanda, cod, razón
    social, fecha ISO y dd/mm/aaaa, y la clase). Multi-término separado por espacios =
    AND (todos los términos tienen que aparecer en algún lado). */
+function npcNombre(leg){ if (!leg) return ""; const n = (typeof _empleadosNombres !== "undefined" && _empleadosNombres) ? _empleadosNombres.get(String(leg)) : ""; return n || ("Leg " + leg); }
 function npcHaystack(r){
   return (String(r.np) + " " + String(r.tanda) + " " + String(r.cod) + " " + String(r.rs) + " " +
-    String(r.fecha) + " " + npcDmy(r.fecha) + " " + npcClaseLabel(r.clase)).toLowerCase();
+    String(r.salePpp) + " " + npcDmy(r.salePpp) + " " + String(r.fecha) + " " + npcDmy(r.fecha) + " " +
+    npcClaseLabel(r.clase) + " " + npcNombre(r.pickerLeg) + " " + npcNombre(r.armadorLeg)).toLowerCase();
 }
 function npcApply(){
   const q = npcNorm(npcVal("npcQ"));
@@ -16152,10 +16173,15 @@ function npcRenderList(rows){
         '<span class="npc-tag t-tanda">' + escapeHtml(r.tanda || '—') + '</span>' +
         '<span class="npc-tag">Cod ' + escapeHtml(r.cod || '—') + '</span>' +
         '<span class="npc-rs">' + escapeHtml(r.rs || '—') + '</span>' +
-        '<span class="npc-tag">' + escapeHtml(npcDmy(r.fecha) || '—') + '</span>' +
         '<span class="npc-tag t-lios">' + r.lios + ' líos</span>' +
         (r.clase ? '<span class="npc-clase">' + escapeHtml(npcClaseLabel(r.clase)) + '</span>' : '') +
         (r.falt ? '<span class="npc-tag t-falt">⚠ ' + r.falt.cajas + ' cj</span>' : '') +
+      '</div>' +
+      '<div class="npc-meta">' +
+        '<span>📅 Sale <b>' + escapeHtml(npcDmy(r.salePpp) || '—') + '</b></span>' +
+        '<span>🛠 Armado <b>' + escapeHtml(npcDmy(String(r.armadoTs).slice(0, 10)) || '—') + '</b></span>' +
+        '<span>📦 Pickeó <b>' + escapeHtml(npcNombre(r.pickerLeg) || '—') + '</b></span>' +
+        '<span>🧰 Armó <b>' + escapeHtml(npcNombre(r.armadorLeg) || '—') + '</b></span>' +
       '</div>' +
       '<div class="npc-lios-grid">' + liosHtml + '</div>' +
       faltDet +

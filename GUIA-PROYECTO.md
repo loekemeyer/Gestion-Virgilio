@@ -4,7 +4,9 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-07-16 · Versión app al documentar: **v5.37**
+> Última actualización: 2026-07-16 · Versión app al documentar: **v5.38**
+>
+> Nota: **v5.38 — Consulta NP/Líos: día de salida (PPP), día de armado, quién pickeó y quién armó**. Cada tarjeta suma una línea meta: **📅 Sale** (fecha_entrega de `PPP_Programacion_Diaria`), **🛠 Armado** (fecha del evento TAL), **📦 Pickeó** (legajo de los eventos **EP/TP** de la tanda — TP=terminó pisa a EP=empezó) y **🧰 Armó** (legajo del TAL). `npcLoad` ahora también trae los EP/TP de las tandas del corpus (`pickerByTanda`) y llama `getEmpleadosNombres()` (legajo→nombre, cacheado 1h); el buscador único también matchea por **nombre de operario**. Aclaración: los NP armados **antes** de v5.12 tienen TAL sin resumen (`NP|líos|tanda`) → se muestran "sin detalle de líos" (sólo se guardó la cantidad, no la composición; no es recuperable). Test `tests/fac-npc.cjs` extendido (salePpp/armadorLeg/pickerLeg + render de la línea meta + búsqueda por nombre).
 >
 > Nota: **v5.37 — Consulta NP/Líos: un solo buscador en vez de 5**. Los 5 inputs por-campo (NP · Tanda · Cod · Razón Social · Fecha) se reemplazaron por **un único buscador** que matchea contra **todos** los campos a la vez (incluye fecha ISO y dd/mm/aaaa, y la clase lío/etiqueta/retira). Multi-término separado por espacios = **AND** (ej. «osa 15/07» filtra por razón social Y fecha). `npcApply` ahora arma un `npcHaystack(r)` por fila y testea que cada término esté contenido; `npcClear` limpia el único input `#npcQ`. Regresión `tests/fac-npc.cjs` actualizada (busca por NP/RS/fecha/tanda y multi-término contra el mismo input).
 >

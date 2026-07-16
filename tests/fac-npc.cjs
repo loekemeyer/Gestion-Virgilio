@@ -57,6 +57,15 @@ catch (_e) {
           { np: "97958", cod: "2533", razon_social: "Osa Distribuidora", fecha_entrega: "2026-07-15 00:00:00", tanda: "C75B" }
         ]);
       }
+      if (url.indexOf("opcion=in.(EP,TP)") >= 0) {   // picking → quién pickeó la tanda
+        return J([
+          { opcion: "EP", texto: "C75B", legajo: "55", ts_cliente: "2026-07-15T08:00:00Z" },
+          { opcion: "TP", texto: "C75B", legajo: "55", ts_cliente: "2026-07-15T09:00:00Z" }
+        ]);
+      }
+      if (url.indexOf("Empleados") >= 0) {           // legajo → nombre
+        return J([{ Legajo: "122", Empleado: "Juan Pérez" }, { Legajo: "55", Empleado: "Pedro Gómez" }]);
+      }
       return J([]);
     };
 
@@ -86,7 +95,7 @@ catch (_e) {
     await npcLoad(true);
     out.rowCount = _npcRows.length;
     const row57 = _npcRows.find(function (x) { return x.np === "97957"; });
-    out.row57 = row57 ? { tanda: row57.tanda, cod: row57.cod, rs: row57.rs, fecha: row57.fecha, lios: row57.lios, falt: row57.falt ? row57.falt.cajas : 0 } : null;
+    out.row57 = row57 ? { tanda: row57.tanda, cod: row57.cod, rs: row57.rs, fecha: row57.fecha, lios: row57.lios, falt: row57.falt ? row57.falt.cajas : 0, salePpp: row57.salePpp, armadorLeg: row57.armadorLeg, pickerLeg: row57.pickerLeg } : null;
     npcApply();
     out.contHtml = (document.getElementById("npcContainer") || {}).innerHTML || "";
     // Buscador único: matchea contra todos los campos, multi-término = AND.
@@ -100,6 +109,8 @@ catch (_e) {
     out.filterMulti = (document.getElementById("npcCount") || {}).textContent;   // 1 / 2 (AND multi-término)
     document.getElementById("npcQ").value = "c75b"; npcApply();
     out.filterTanda = (document.getElementById("npcCount") || {}).textContent;   // 2 / 2 (tanda)
+    document.getElementById("npcQ").value = "pedro"; npcApply();                 // nombre del picker en el haystack
+    out.filterPicker = (document.getElementById("npcCount") || {}).textContent;  // 2 / 2
     return out;
   });
 
@@ -108,9 +119,11 @@ catch (_e) {
     r.btnNotDisabled === true && r.postAfterOk === 1;
   const okF2 = r.rowCount === 2 && r.row57 && r.row57.tanda === "C75B" && r.row57.cod === "2533" &&
     /Osa/.test(r.row57.rs) && r.row57.fecha === "2026-07-15" && r.row57.lios === 28 && r.row57.falt === 11 &&
+    r.row57.salePpp === "2026-07-15" && r.row57.armadorLeg === "122" && r.row57.pickerLeg === "55" &&
     /315/.test(r.contHtml) && /npc-item f/.test(r.contHtml) &&
+    /Pickeó/.test(r.contHtml) && /Pedro Gómez/.test(r.contHtml) && /Juan Pérez/.test(r.contHtml) && /Sale/.test(r.contHtml) &&
     /^1 \//.test(String(r.filterNp)) && /^2 \//.test(String(r.filterRs)) && /^2 \//.test(String(r.filterFecha)) &&
-    /^1 \//.test(String(r.filterMulti)) && /^2 \//.test(String(r.filterTanda));
+    /^1 \//.test(String(r.filterMulti)) && /^2 \//.test(String(r.filterTanda)) && /^2 \//.test(String(r.filterPicker));
   const pass = okF1 && okF2 && errs.length === 0;
   console.log("fac-npc:", JSON.stringify(r).slice(0, 600));
   console.log("  pageerrors:", errs.length ? errs.join("|") : "none");
