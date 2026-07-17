@@ -3033,6 +3033,7 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
       <button class="sup-action-btn" onclick="openInconsistencias()"><span class="sup-ico">⚠</span><span>Inconsistencias</span></button>
       <button class="sup-action-btn" onclick="openFaltantes()"><span class="sup-ico">📦</span><span>Faltantes</span></button>
       <button class="sup-action-btn" onclick="openNpConsulta()"><span class="sup-ico">🔎</span><span>Consultar NP / Líos</span></button>
+      <button class="sup-action-btn" onclick="openPrintStation()"><span class="sup-ico">🖨️</span><span>Cola de impresión</span></button>
       <button class="sup-action-btn" onclick="openPlanimEditor()"><span class="sup-ico">🗺️</span><span>Editar Planimetría</span></button>
       <button class="sup-action-btn" onclick="openTallEditor()"><span class="sup-ico">👷</span><span>Talleristas de Recepción</span></button>
       <button class="sup-action-btn" onclick="openMailsEditor()"><span class="sup-ico">✉️</span><span>Mails autorizados</span></button>
@@ -5395,7 +5396,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.50";
+const APP_VERSION = "v5.51";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -5868,6 +5869,12 @@ if ("serviceWorker" in navigator) {
 renderLegajoHistory("");
 
 updatePendingIndicator();
+
+/* v5.51: si esta PC es la estación de impresión (auto ON), retomar el loop al
+   abrir/recargar la página. Deferido para no chocar con la TDZ de los const de
+   arriba y dejar que la app termine de bootear primero. Es por-dispositivo:
+   solo la PC de la operadora tiene ps_auto=1 → los celulares nunca imprimen. */
+setTimeout(function () { try { if (localStorage.getItem("ps_auto_virgilio") === "1") psStart(); } catch (_e) {} }, 1500);
 
 /* Cuando vuelve la red, drená la cola de manera agresiva durante 3s
    (en lugar de un solo intento aislado). Además le pido al SW que drene su
@@ -16513,6 +16520,168 @@ function remitoPrintDoc(inner){
   const fire = function(){ if (fired) return; fired = true; setTimeout(function(){ try { w.focus(); w.print(); } catch (_e) {} setTimeout(function(){ try { document.body.removeChild(ifr); } catch (_e2) {} }, 1500); }, 120); };
   ifr.onload = fire;
   setTimeout(fire, 350);   // fallback: doc.write no siempre dispara onload
+}
+
+/* =========================================================
+   v5.51 — ESTACIÓN DE IMPRESIÓN (auto-print de remitos al TAP).
+   Corre en la PC fija de la operadora (al lado de la impresora). Con "auto" ON:
+   cada ~12 s busca NPs recién terminadas (eventos TAL nuevos) y las imprime solas
+   vía remitoPrintDoc. Con Chrome en modo --kiosk-printing + impresora
+   predeterminada de Windows → sale la hoja SIN diálogo ni clics.
+   - Dedup por NP/día (localStorage) para no repetir (aunque se recargue la página).
+   - Al prender por 1ª vez en el día "siembra" lo YA terminado (lo marca como
+     impreso SIN imprimir) para no volcar todo el día de golpe.
+   - El estado (auto ON) es por dispositivo (localStorage): SOLO la PC de la
+     operadora lo tiene → los celulares nunca imprimen.
+   ========================================================= */
+var PS_POLL_MS = 12000;
+var PS_AUTO_KEY = "ps_auto_virgilio";
+var PS_LASTSEEN_KEY = "ps_lastseen_virgilio";
+var _ps = null;
+function psPrintedKey(){ return "ps_printed_virgilio_" + cpTodayAR(); }
+function psGetPrinted(){ try { return new Set(JSON.parse(localStorage.getItem(psPrintedKey()) || "[]")); } catch (_e) { return new Set(); } }
+function psSavePrinted(set){ try { localStorage.setItem(psPrintedKey(), JSON.stringify(Array.from(set))); } catch (_e) {} }
+function psMarkPrinted(np){ const s = psGetPrinted(); s.add(String(np)); psSavePrinted(s); }
+function psIsAuto(){ try { return localStorage.getItem(PS_AUTO_KEY) === "1"; } catch (_e) { return false; } }
+function psH(){ return { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }; }
+function _psEnsure(){ if (!_ps){ let ls = ""; try { ls = localStorage.getItem(PS_LASTSEEN_KEY) || ""; } catch (_e) {} _ps = { timer: null, lastSeen: ls, queue: [], printing: false, log: [] }; } return _ps; }
+async function psSeedTodayIfNeeded(){
+  _psEnsure();
+  const day = cpTodayAR(); const seedKey = "ps_seeded_virgilio_" + day;
+  let seeded = false; try { seeded = localStorage.getItem(seedKey) === "1"; } catch (_e) {}
+  if (seeded){ if (!_ps.lastSeen) _ps.lastSeen = new Date().toISOString(); return; }
+  const startAr = day + "T00:00:00-03:00";
+  try {
+    const url = SUPABASE_TABLE_ENDPOINT + "?opcion=eq.TAL&ts_cliente=gte." + encodeURIComponent(startAr) + "&select=texto,ts_cliente&order=ts_cliente.desc&limit=5000";
+    const rows = await fetch(url, { headers: psH(), cache: "no-store" }).then(function (r){ return r.ok ? r.json() : []; });
+    const printed = psGetPrinted(); let maxTs = _ps.lastSeen || "";
+    rows.forEach(function (ev){ const np = String(String(ev.texto || "").split("|")[0] || "").trim().replace(/\.0+$/, ""); if (np) printed.add(np); if (String(ev.ts_cliente) > maxTs) maxTs = String(ev.ts_cliente); });
+    psSavePrinted(printed);
+    _ps.lastSeen = maxTs || new Date().toISOString();
+  } catch (_e){ if (!_ps.lastSeen) _ps.lastSeen = new Date().toISOString(); }
+  try { localStorage.setItem(PS_LASTSEEN_KEY, _ps.lastSeen); localStorage.setItem(seedKey, "1"); } catch (_e) {}
+}
+async function psStart(){
+  _psEnsure();
+  await psSeedTodayIfNeeded();
+  if (_ps.timer){ psRender(); return; }
+  _ps.timer = setInterval(function (){ psPoll(); }, PS_POLL_MS);
+  psRender();
+  psPoll();
+}
+function psStop(){ if (_ps && _ps.timer){ clearInterval(_ps.timer); _ps.timer = null; } psRender(); }
+function psSetAuto(on){ try { localStorage.setItem(PS_AUTO_KEY, on ? "1" : "0"); } catch (_e) {} if (on) psStart(); else psStop(); }
+function psToggle(){ psSetAuto(!psIsAuto()); }
+async function psPoll(){
+  if (!psIsAuto()) return;
+  _psEnsure();
+  const since = _ps.lastSeen || new Date(Date.now() - 3600000).toISOString();
+  try {
+    const url = SUPABASE_TABLE_ENDPOINT + "?opcion=eq.TAL&ts_cliente=gt." + encodeURIComponent(since) + "&select=texto,ts_cliente&order=ts_cliente.asc&limit=2000";
+    const rows = await fetch(url, { headers: psH(), cache: "no-store" }).then(function (r){ return r.ok ? r.json() : []; });
+    if (!rows.length) return;
+    const printed = psGetPrinted(); let maxTs = since; const fresh = [];
+    rows.forEach(function (ev){
+      if (String(ev.ts_cliente) > maxTs) maxTs = String(ev.ts_cliente);
+      const p = String(ev.texto || "").split("|"); const np = String(p[0] || "").trim().replace(/\.0+$/, "");
+      if (!np || printed.has(np)) return;
+      const resumen = p[3] || "";
+      if (!resumen){ psMarkPrinted(np); return; }   // TAL sin resumen (viejo) → nada que imprimir
+      fresh.push({ np: np, tanda: String(p[2] || "").trim().toUpperCase(), resumen: resumen });
+    });
+    _ps.lastSeen = maxTs; try { localStorage.setItem(PS_LASTSEEN_KEY, maxTs); } catch (_e) {}
+    if (fresh.length) await psPrintBatch(fresh);
+  } catch (_e){}
+}
+async function psPrintBatch(items){
+  const npIn = items.map(function (x){ return encodeURIComponent(x.np); }).join(",");
+  const ppMap = {};
+  try {
+    const pp = await fetch(SUPABASE_PPP_PROG_ENDPOINT + "?select=np,cod,razon_social,fecha_entrega,tanda&np=in.(" + npIn + ")&limit=5000", { headers: psH(), cache: "no-store" }).then(function (r){ return r.ok ? r.json() : []; });
+    pp.forEach(function (x){ const np = String(x.np || "").trim().replace(/\.0+$/, ""); if (np && !ppMap[np]) ppMap[np] = { cod: String(x.cod || "").trim(), rs: String(x.razon_social || "").trim(), fecha: String(x.fecha_entrega || "").slice(0, 10), tanda: String(x.tanda || "").trim().toUpperCase() }; });
+  } catch (_e){}
+  items.forEach(function (it){
+    const pd = ppMap[it.np] || {};
+    const row = { np: it.np, tanda: it.tanda || pd.tanda || "", cod: pd.cod || "", rs: pd.rs || "", salePpp: pd.fecha || "", fecha: pd.fecha || "", resumen: it.resumen };
+    const d = armadoRemitoData(row);
+    psMarkPrinted(it.np);   // marcar ANTES de encolar → si hay 2 pestañas abiertas, no imprimen doble
+    psEnqueuePrint(d);
+    psLog(d);
+  });
+}
+function psEnqueuePrint(d){ _psEnsure(); _ps.queue.push(d); psDrain(); }
+function psDrain(){
+  if (!_ps || _ps.printing || !_ps.queue.length) return;
+  _ps.printing = true; const d = _ps.queue.shift();
+  try { remitoPrintDoc(armadoRemitoInnerHtml(d)); } catch (_e){}
+  setTimeout(function (){ if (_ps){ _ps.printing = false; psDrain(); } }, 2600);   // serializado: 1 hoja cada ~2.6 s
+}
+function psLog(d){
+  _psEnsure();
+  let hora = ""; try { hora = new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", timeZone: TZ_AR }); } catch (_e) {}
+  _ps.log.unshift({ d: d, hora: hora });
+  if (_ps.log.length > 60) _ps.log.length = 60;
+  psRender();
+}
+function psReprint(i){ if (!_ps) return; const e = _ps.log[i]; if (e && e.d){ try { remitoPrintDoc(armadoRemitoInnerHtml(e.d)); } catch (_ex){} } }
+function psTestPrint(){
+  const row = { np: "PRUEBA", tanda: "TEST", cod: "0000", rs: "Hoja de prueba — estación de impresión", salePpp: cpTodayAR(), fecha: cpTodayAR(), resumen: "A=999X1;B=999X1" };
+  try { remitoPrintDoc(armadoRemitoInnerHtml(armadoRemitoData(row))); } catch (_e){}
+}
+var PS_CSS =
+  "#printStationModal{display:none;position:fixed;inset:0;background:#f1f5f9;z-index:210;overflow:auto;padding:14px;}" +
+  "#printStationModal.show{display:block;}" +
+  ".ps-wrap{max-width:640px;margin:0 auto;}" +
+  ".ps-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}" +
+  ".ps-title{font-size:18px;font-weight:800;color:#0f172a;}" +
+  ".ps-close{width:auto;margin:0;padding:9px 15px;border:1px solid #cbd5e1;border-radius:9px;background:#fff;font-size:14px;font-weight:700;color:#334155;cursor:pointer;}" +
+  ".ps-toggle-card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:14px 15px;margin-bottom:12px;}" +
+  ".ps-tc-top{display:flex;align-items:center;justify-content:space-between;gap:12px;}" +
+  ".ps-tc-t{font-size:15px;font-weight:800;color:#0f172a;line-height:1.3;}" +
+  ".ps-status{margin-top:9px;font-size:13px;font-weight:700;color:#64748b;}" +
+  ".ps-status.on{color:#15803d;}" +
+  ".ps-help{background:#eff6ff;border:1px solid #bfdbfe;border-radius:11px;padding:11px 13px;font-size:12.5px;line-height:1.5;color:#1e40af;margin-bottom:12px;}" +
+  ".ps-help code{background:#dbeafe;border-radius:4px;padding:1px 5px;font-family:Consolas,Menlo,monospace;font-size:11.5px;}" +
+  ".ps-actions{margin-bottom:14px;}" +
+  ".ps-test{width:100%;margin:0;padding:13px;border:none;border-radius:11px;background:#0f766e;color:#fff;font-size:15px;font-weight:800;cursor:pointer;}" +
+  ".ps-log-t{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#94a3b8;margin:4px 0 7px;}" +
+  ".ps-empty{color:#94a3b8;font-size:13.5px;padding:14px;text-align:center;background:#fff;border:1px dashed #e2e8f0;border-radius:11px;}" +
+  ".ps-log{display:flex;flex-direction:column;gap:7px;}" +
+  ".ps-row{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:9px 12px;}" +
+  ".ps-row-main{min-width:0;}" +
+  ".ps-np{font-size:14.5px;font-weight:800;color:#0f172a;}" +
+  ".ps-row-sub{font-size:12px;color:#64748b;}" +
+  ".ps-row-right{flex:0 0 auto;display:flex;align-items:center;gap:9px;}" +
+  ".ps-hora{font-size:12px;color:#94a3b8;font-weight:700;}" +
+  ".ps-reprint{width:auto;margin:0;padding:6px 11px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;font-size:12.5px;font-weight:700;color:#334155;cursor:pointer;}";
+function openPrintStation(){
+  if (!requireSupervisor()) return;
+  _psEnsure();
+  if (!document.getElementById("psCss")){ const st = document.createElement("style"); st.id = "psCss"; st.textContent = PS_CSS; document.head.appendChild(st); }
+  let ov = document.getElementById("printStationModal");
+  if (!ov){ ov = document.createElement("div"); ov.id = "printStationModal"; document.body.appendChild(ov); }
+  ov.innerHTML = '<div class="ps-wrap"><div class="ps-head"><span class="ps-title">🖨️ Cola de impresión de remitos</span><button class="ps-close" onclick="closePrintStation()">Cerrar</button></div><div class="ps-body" id="psBody"></div></div>';
+  ov.classList.add("show");
+  if (psIsAuto()) psStart(); else psRender();
+}
+function closePrintStation(){ const ov = document.getElementById("printStationModal"); if (ov) ov.classList.remove("show"); }
+function psRender(){
+  const body = document.getElementById("psBody"); if (!body) return;
+  const on = psIsAuto(); const running = !!(_ps && _ps.timer);
+  let h = "";
+  h += '<div class="ps-toggle-card"><div class="ps-tc-top"><span class="ps-tc-t">🖨️ Auto-imprimir remitos al terminar armado</span>' +
+    '<span class="sup-sw' + (on ? " on" : "") + '" onclick="psToggle()" role="switch"><span class="sup-sw-k"></span></span></div>' +
+    '<div class="ps-status ' + (on ? "on" : "") + '">' + (on ? (running ? "🟢 Activo — escuchando pedidos terminados (cada 12 s)" : "🟢 Activo") : "⚪ Apagado — los remitos no se imprimen solos") + '</div></div>';
+  h += '<div class="ps-help">Dejá <b>esta pantalla abierta</b> en la PC que está al lado de la impresora. Para que salga <b>sin diálogo</b>: abrí la app en <b>Chrome con <code>--kiosk-printing</code></b> y poné esa impresora como <b>predeterminada de Windows</b>. Probá con el botón de abajo antes de prender el automático.</div>';
+  h += '<div class="ps-actions"><button class="ps-test" onclick="psTestPrint()">🖨️ Imprimir hoja de prueba</button></div>';
+  const log = (_ps && _ps.log) || [];
+  h += '<div class="ps-log-t">Impresos en esta sesión (' + log.length + ')</div>';
+  if (!log.length) h += '<div class="ps-empty">Todavía no se imprimió nada.</div>';
+  else h += '<div class="ps-log">' + log.map(function (e, i){
+    const d = e.d;
+    return '<div class="ps-row"><div class="ps-row-main"><span class="ps-np">NP ' + escapeHtml(String(d.np)) + '</span> <span class="ps-row-sub">' + escapeHtml(d.rs || "—") + ' · ' + d.total + ' cajas · ' + d.nLios + ' líos</span></div><div class="ps-row-right"><span class="ps-hora">' + escapeHtml(e.hora) + '</span><button class="ps-reprint" onclick="psReprint(' + i + ')">Re-imprimir</button></div></div>';
+  }).join("") + '</div>';
+  body.innerHTML = h;
 }
 
 function facTodayKey(){
