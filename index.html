@@ -5378,7 +5378,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.39";
+const APP_VERSION = "v5.40";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -7578,9 +7578,11 @@ async function stockGetCutoff() {
     return (rows[0] && rows[0].valor) || null;
   } catch (_e) { return null; }
 }
-function stockComputeSaldos(movs, cutoff) {
+function stockComputeSaldos(movs, cutoff, asOf) {
   const m = {}, cut = cutoff ? new Date(cutoff).getTime() : 0;
+  const lim = asOf ? new Date(asOf).getTime() : 0;   // "a fecha/hora": ignorar lo POSTERIOR (el 'inicial' es baseline y siempre cuenta)
   movs.forEach(function (mv) {
+    if (lim && mv.tipo !== "inicial" && new Date(mv.ts).getTime() > lim) return;
     // El stock inicial (tipo 'inicial') SIEMPRE cuenta como base, aunque sea
     // anterior al corte. "Marcar inicio" (corte) sólo desconsidera los
     // movimientos REALES previos (recepción/guardado/picking/ajuste/etc.), sin
@@ -7623,7 +7625,7 @@ async function openStockAdmin(soloConteo) {
   ov.innerHTML = '<div class="stk-card"><div class="stk-head"><span class="stk-title">' + (_solo ? "📋 Conteo de stock" : "📦 Stock y Compras") + '</span><button class="stk-close" onclick="closeStockAdmin()">Cerrar</button></div><div class="stk-tabs" id="stkTabs"></div><div class="stk-body" id="stkBody"><div class="stk-loading">Cargando…</div></div></div>';
   try {
     const res = await Promise.all([stockFetchMovs(), stockGetCutoff(), stockFetchArtFactors(), racksFetchOrdenes(), racksFetchBajadas(), loadArtNombres()]);
-    _stk = { movs: res[0] || [], cutoff: res[1], factors: res[2] || {}, ordenes: res[3] || [], bajadas: res[4] || [], tab: _solo ? "conteo" : "stocks", soloConteo: _solo, filtro: "", openArt: null, ingMode: "remito" };
+    _stk = { movs: res[0] || [], cutoff: res[1], factors: res[2] || {}, ordenes: res[3] || [], bajadas: res[4] || [], tab: _solo ? "conteo" : "stocks", soloConteo: _solo, filtro: "", openArt: null, ingMode: "remito", asOf: null, asOfInput: "" };
     stkRender();
   } catch (e) { const b = document.getElementById("stkBody"); if (b) b.innerHTML = '<div class="stk-loading">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
 }
@@ -7994,6 +7996,33 @@ async function ociSave() {
     _ociChanged = {}; ocRender();
   } catch (e) { alert("Error guardando índices: " + (e.message || e)); }
 }
+/* v5.40 — "En vivo" (default) vs "a una fecha y hora determinada" (snapshot histórico).
+   Como el stock es event-sourced, el punto en el tiempo = recomputar saldos contando
+   sólo los movimientos con ts ≤ la fecha/hora elegida (hora Argentina, UTC-3 fijo).
+   Sólo aplica a la solapa Stocks. */
+function stkAsOfControl() {
+  if (!_stk) return "";
+  const on = !!_stk.asOf;
+  let h = '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin-bottom:10px;background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:8px 10px;">';
+  h += '<span style="font-size:12px;font-weight:800;color:#475569;">Ver stock:</span>';
+  h += '<button class="stk-btn' + (on ? '' : ' ok') + '" onclick="stkAsOfLive()">🔴 En vivo</button>';
+  h += '<input type="datetime-local" id="stkAsOfInp" value="' + escapeHtml(_stk.asOfInput || '') + '" onchange="if(_stk){_stk.asOfInput=this.value;}" style="height:36px;border:1px solid #cbd5e1;border-radius:8px;padding:0 8px;font-size:13px;">';
+  h += '<button class="stk-btn" onclick="stkAsOfApply()">📅 A esa fecha/hora</button>';
+  if (on) h += '<span style="font-size:12.5px;font-weight:800;color:#92400e;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:5px 9px;">📅 Stock al <b>' + escapeHtml(stockFmtTs(_stk.asOf)) + '</b> hs (histórico, no el actual)</span>';
+  h += '</div>';
+  return h;
+}
+function stkAsOfApply() {
+  if (!_stk) return;
+  const el = document.getElementById("stkAsOfInp");
+  const v = (el && el.value) || _stk.asOfInput || "";
+  if (!v) { alert("Elegí una fecha y hora."); return; }
+  _stk.asOfInput = v;
+  _stk.asOf = v + ":00-03:00";   // hora Argentina (UTC-3 fijo, como todo el depósito)
+  _stk.openArt = null;
+  stkRender();
+}
+function stkAsOfLive() { if (!_stk) return; _stk.asOf = null; _stk.openArt = null; stkRender(); }
 function stkTab(t) { if (!_stk) return; if (t === "compras") { openOCAdmin(); return; } _stk.tab = t; _stk.filtro = ""; _stk.openArt = null; if (t === "capacidad" && !_stk.capLoaded) { stkCapLoad(); return; } stkRender(); }
 function stkRender() {
   if (!_stk) return;
@@ -8674,7 +8703,7 @@ function stkBodyStocksTab() {
 }
 function stkBodyStocks() {
   if (_stk.sectDetail) return stkBodySectDetail();   // v4.35: detalle de un sector (click en un total)
-  const saldos = stockComputeSaldos(_stk.movs, _stk.cutoff);
+  const saldos = stockComputeSaldos(_stk.movs, _stk.cutoff, _stk.asOf);
   const arts = Object.keys(saldos).map(function (k) { return saldos[k]; }).sort(function (a, b) { return (parseInt(a.cod, 10) || 0) - (parseInt(b.cod, 10) || 0); });
   const f = (_stk.filtro || "").toLowerCase();
   // Sin búsqueda: ocultar artículos que están en 0 en TODOS los sectores (típicamente
@@ -8697,6 +8726,7 @@ function stkBodyStocks() {
   const totals = {};
   arts.forEach(function (a) { SECT.forEach(function (s) { totals[s.key] = (totals[s.key] || 0) + (Number(a[s.key]) || 0); }); });
   let h = (_stk.cutoff ? '<div class="stk-cut">Stock contado desde <b>' + escapeHtml(stockFmtTs(_stk.cutoff)) + '</b> (lo anterior no se suma).</div>' : "");
+  h += stkAsOfControl();   // En vivo / a una fecha y hora determinada
   // Tira de totales por sector (todos, aunque estén en 0).
   h += '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;">';
   SECT.forEach(function (s) {
@@ -8723,7 +8753,8 @@ function stkBodyStocks() {
     tds += '<td class="stk-caret">' + (_stk.openArt === a.cod ? "▾" : "✚") + '</td>';
     h += '<tr class="stk-row" onclick="stockToggleArt(\'' + encodeURIComponent(a.cod) + '\')">' + tds + '</tr>';
     if (_stk.openArt === a.cod) {
-      const det = _stk.movs.filter(function (mv) { return String(mv.cod_art) === a.cod && !(_stk.cutoff && new Date(mv.ts).getTime() < new Date(_stk.cutoff).getTime()); });
+      const _lim = _stk.asOf ? new Date(_stk.asOf).getTime() : 0;
+      const det = _stk.movs.filter(function (mv) { return String(mv.cod_art) === a.cod && !(_stk.cutoff && new Date(mv.ts).getTime() < new Date(_stk.cutoff).getTime()) && !(_lim && new Date(mv.ts).getTime() > _lim); });
       h += '<tr class="stk-detrow"><td colspan="' + ncol + '"><div class="stk-det">' + (det.length ? det.map(stkMvRow).join("") : '<div class="stk-mv">sin movimientos contados</div>') + '</div></td></tr>';
     }
   });

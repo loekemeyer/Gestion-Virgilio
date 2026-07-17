@@ -125,6 +125,18 @@ catch (_e) {
       { items: [{ cod: "026", qty: 5 }] }, { items: [{ cod: "026", qty: 5 }] },
       { items: [{ cod: "026", qty: 5 }] }, { items: [{ cod: "026", qty: 5 }] }
     ] });   // esperado "A1=026x5;A2=026x5;A3=026x5;A4=026x5"
+
+    // ===== F4: stock a fecha/hora (asOf) — caso 510/C74A =====
+    var _movs = [
+      { cod_art: "510", deposito: "terminado",       tipo: "inicial",  delta: 100,  ts: "2026-06-26T00:05:00-03:00" },
+      { cod_art: "510", deposito: "separar_pedidos", tipo: "picking",  delta: 200,  ts: "2026-07-14T12:04:00-03:00" },
+      { cod_art: "510", deposito: "separar_pedidos", tipo: "separado", delta: -200, ts: "2026-07-15T13:55:00-03:00" }
+    ];
+    var sLive = stockComputeSaldos(_movs, null, null)["510"];
+    var sPast = stockComputeSaldos(_movs, null, "2026-07-14T13:00:00-03:00")["510"];   // entre picking y separado
+    out.asofLive     = sLive ? sLive.separar_pedidos : null;   // 0 (pickeó y armó)
+    out.asofPast     = sPast ? sPast.separar_pedidos : null;   // 200 (solo el picking cuenta)
+    out.asofPastGond = sPast ? sPast.terminado : null;         // 100 (el inicial siempre es baseline)
     return out;
   });
 
@@ -141,10 +153,11 @@ catch (_e) {
   const okF3 = JSON.stringify(r.labels) === '["A1","A2","A3","A4","B"]' &&
     JSON.stringify(r.labels2) === '["A1","B","A2"]' &&
     r.resumen === "A1=026x5;A2=026x5;A3=026x5;A4=026x5";
-  const pass = okF1 && okF2 && okF3 && errs.length === 0;
-  console.log("fac-npc:", JSON.stringify(r).slice(0, 640));
+  const okF4 = r.asofLive === 0 && r.asofPast === 200 && r.asofPastGond === 100;
+  const pass = okF1 && okF2 && okF3 && okF4 && errs.length === 0;
+  console.log("fac-npc:", JSON.stringify(r).slice(0, 700));
   console.log("  pageerrors:", errs.length ? errs.join("|") : "none");
-  console.log(" ", okF1 ? "F1 faltante ✓" : "F1 faltante ✗", "·", okF2 ? "F2 consulta ✓" : "F2 consulta ✗", "·", okF3 ? "F3 rótulos ✓" : "F3 rótulos ✗", "·", pass ? "OK" : "FAIL");
+  console.log(" ", okF1 ? "F1 faltante ✓" : "F1 faltante ✗", "·", okF2 ? "F2 consulta ✓" : "F2 consulta ✗", "·", okF3 ? "F3 rótulos ✓" : "F3 rótulos ✗", "·", okF4 ? "F4 asOf ✓" : "F4 asOf ✗", "·", pass ? "OK" : "FAIL");
   await b.close();
   process.exit(pass ? 0 : 1);
 })();
