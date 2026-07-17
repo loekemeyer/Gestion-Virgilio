@@ -170,6 +170,8 @@ button {
 .botonera-sep { text-align: center; font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #94a3b8; margin: 13px 0 1px; }
 .box[data-code="CP"] { border-color: #86efac; background: #f0fdf4; }
 .box-sm[data-code="CP"] .box-title { color: #15803d; }
+.box[data-code="RC"] { border-color: #fdba74; background: #fff7ed; }
+.box-sm[data-code="RC"] .box-title { color: #c2410c; }
 .box:active { transform: scale(.96); }
 .box-title { font-size: 18px; font-weight: bold; }
 .box-desc { font-size: 11px; margin-top: 3px; line-height: 1.2; overflow-wrap: break-word; word-break: break-word; hyphens: auto; }
@@ -3363,7 +3365,7 @@ const SUPABASE_PLANIMETRIA_ENDPOINT =
 const filas = {
   row1: ["EP","TP","AP","TAP","CR","CC"],
   row2: ["RT","RR","MG"],
-  row3: ["RI","EI","SC","CP"],
+  row3: ["RI","EI","SC","CP","RC"],
   row4: ["AT","PB","Limp","Perm","PC","CT"]
 };
 // Filas secundarias (botones más chicos): uso puntual. Las primarias (row1/row2)
@@ -3377,7 +3379,7 @@ const desc = {
   RR:"Recepción Remitos",
   RT:"Recepción Mercadería", MG:"Guardado a Góndola",
   RI:"Recepción Insumos", EI:"Entrega Insumos", SC:"Salida a Cervantes",
-  CP:"Completar Pedido",
+  CP:"Completar Pedido", RC:"Pasar a urgente",
   AT:"Atendí Timbre", PB:"Paré Baño", Limp:"Limpieza",
   Perm:"Permiso de Salida", PC:"Paré Comida",CT:"Conteo",
   LT:"Llegada Tarde", PKC:"Picking artículo", CCN:"Carga Camión NP",
@@ -4803,6 +4805,11 @@ function selectOption(code) {
   // modal al confirmar). Operario (botonera, 4ª fila) y Marianela (panel admin).
   if (code === "CP") { showCPModal(legajoStr); return; }
 
+  // v5.49: Pasar cajas a un pedido urgente — sacale cajas a un pedido que sale
+  // después (armado o pickeado) y dáselas a uno urgente que sale antes. Abre el
+  // modal directo (sin Enviar; el evento RC lo emite el modal al confirmar).
+  if (code === "RC") { showRCModal(legajoStr); return; }
+
   // CC ya abierto: el botón CC RE-ABRE el popup de Carga Camión (no lo cierra).
   // El cierre se hace SOLO con "Terminé Carga Camión" dentro del popup.
   if (code === "CC") {
@@ -5378,7 +5385,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.48";
+const APP_VERSION = "v5.49";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -10009,6 +10016,144 @@ async function cpConfirm() {
   _cp.sel = null; _cp.step = 1; _cp.liosLoading = false; _cp._liosInfo = null;
   try { _cp.falt = await cpReloadFaltantes(); } catch (_e) {}
   if (_cp) cpRender();
+}
+
+/* ===== RC · Pasar cajas a un pedido URGENTE (v5.49). El operario le saca cajas a un pedido
+   que sale DESPUÉS para completar uno URGENTE que sale antes. Ajusta faltantes (RPC atómica
+   reasignar_cajas), stock (a facturar / a separar) y los líos de AMBOS pedidos. Evento RC.
+   La app SUGIERE (ordena por fecha de salida, el más tardío primero) pero el operario elige. ===== */
+let _rc = null;
+async function showRCModal(legajo) {
+  if (!document.getElementById("rcCss")) {
+    const st = document.createElement("style"); st.id = "rcCss";
+    st.textContent = "#rcModal{display:none;position:fixed;inset:0;z-index:1291;background:rgba(2,6,23,.74);overflow:auto;padding:12px;}#rcModal.show{display:block;}.rc-card{background:#f8fafc;max-width:460px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.rc-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;background:linear-gradient(90deg,#ea580c,#c2410c);color:#fff;}.rc-title{font-size:17px;font-weight:800;}.rc-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}.rc-body{padding:13px 14px;}.rc-hint{font-size:12.5px;color:#64748b;margin-bottom:10px;line-height:1.35;}.rc-empty{padding:24px;text-align:center;color:#64748b;font-size:15px;}.rc-frow{display:block;width:100%;text-align:left;border:1px solid #e2e8f0;border-radius:13px;padding:11px 12px;margin:0 0 9px;background:#fff;cursor:pointer;}.rc-ftop{display:flex;align-items:baseline;gap:8px;margin-bottom:4px;}.rc-fbot{display:flex;align-items:center;justify-content:space-between;gap:8px;}.rc-cod{font-size:16px;font-weight:800;font-family:Consolas,Menlo,monospace;}.rc-fdesc{font-size:12.5px;color:#475569;}.rc-np{font-size:12px;color:#64748b;}.rc-faltan{font-size:12.5px;font-weight:800;color:#c2410c;white-space:nowrap;}.rc-back{background:none;border:none;color:#1e6bd6;font-weight:800;font-size:14px;cursor:pointer;padding:0 0 8px;width:auto;margin:0;}.rc-sel{background:#fff7ed;border:1px solid #fed7aa;border-radius:13px;padding:11px 12px;margin-bottom:12px;}.rc-selnp{font-size:12px;color:#9a3412;margin-top:3px;font-weight:700;}.rc-fld{margin-bottom:13px;}.rc-lbl{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:#64748b;margin-bottom:7px;}.rc-donors{display:flex;flex-wrap:wrap;gap:8px;}.rc-donor{background:#fff;border:1.5px solid #cbd5e1;border-radius:11px;padding:8px 11px;font-size:14px;font-weight:800;color:#334155;cursor:pointer;width:auto;margin:0;text-align:left;}.rc-donor small{font-weight:700;color:#64748b;font-size:11px;display:block;}.rc-donor.on{border-color:#ea580c;background:#fff7ed;color:#c2410c;}.rc-donor.pick{border-style:dashed;}.rc-note{font-size:12px;color:#64748b;margin-top:6px;}.rc-stp{display:flex;align-items:center;gap:7px;}.rc-sb{display:flex;align-items:center;justify-content:center;line-height:1;padding:0;margin:0;width:46px;height:50px;border:none;border-radius:10px;font-size:26px;font-weight:800;cursor:pointer;background:#e2e8f0;color:#475569;}.rc-inp{width:70px;height:50px;box-sizing:border-box;margin:0;text-align:center;font-size:24px;font-weight:800;border:2px solid #cbd5e1;border-radius:10px;padding:0;-moz-appearance:textfield;}.rc-inp::-webkit-outer-spin-button,.rc-inp::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}.rc-fin{width:100%;margin-top:6px;padding:15px;border:none;border-radius:12px;background:#ea580c;color:#fff;font-size:16px;font-weight:800;cursor:pointer;}.rc-fin:disabled{background:#cbd5e1;color:#64748b;cursor:not-allowed;}.rc-done{background:#dcfce7;border:1px solid #86efac;color:#15803d;font-weight:800;font-size:13px;border-radius:11px;padding:10px 12px;margin-bottom:11px;}.rc-liosload{font-size:12px;color:#64748b;}";
+    document.head.appendChild(st);
+  }
+  let ov = document.getElementById("rcModal");
+  if (!ov) { ov = document.createElement("div"); ov.id = "rcModal"; document.body.appendChild(ov); }
+  ov.classList.add("show");
+  ov.innerHTML = '<div class="rc-card"><div class="rc-head"><span class="rc-title">🔁 Pasar cajas a un pedido urgente</span><button class="rc-close" onclick="closeRC()">Cerrar</button></div><div class="rc-body" id="rcBody"><div class="rc-empty">Cargando faltantes…</div></div></div>';
+  _rc = { legajo: String(legajo || ""), step: 1, sel: null, donorSel: null, qty: 1, faltantes: [], donors: null, donorsLoading: false, justDone: "" };
+  try { const fr = await cpLoadFaltantes(); fr.sort(function (a, b) { return String(a.fecha_salida || "9999").localeCompare(String(b.fecha_salida || "9999")) || String(a.np).localeCompare(String(b.np)); }); if (_rc) _rc.faltantes = fr; } catch (_e) {}
+  if (_rc) rcRender();
+}
+function closeRC() { const ov = document.getElementById("rcModal"); if (ov) ov.classList.remove("show"); _rc = null; }
+function rcRender() {
+  if (!_rc) return; const body = document.getElementById("rcBody"); if (!body) return;
+  if (_rc.step === 2 && _rc.sel) { rcRenderStep2(body); return; }
+  let h = "";
+  if (_rc.justDone) h += '<div class="rc-done">' + escapeHtml(_rc.justDone) + '</div>';
+  h += '<div class="rc-hint">Sacale cajas a un pedido que sale <b>después</b> para completar uno <b>urgente</b> que sale antes. Elegí el urgente (los que salen antes están primero):</div>';
+  const fs = _rc.faltantes || [];
+  if (!fs.length) { h += '<div class="rc-empty">No hay pedidos con faltantes sin facturar. 👍</div>'; _renderKeepFocus(body, h); return; }
+  h += fs.map(function (e) {
+    const dmy = npcDmy(String(e.fecha_salida || "").slice(0, 10));
+    return '<button class="rc-frow" onclick="rcPickUrgent(' + Number(e.id) + ')"><div class="rc-ftop"><span class="rc-cod">' + escapeHtml(String(e.cod_art)) + '</span> <span class="rc-fdesc">' + escapeHtml(artNombre(e.cod_art, e.desc) || "") + '</span></div><div class="rc-fbot"><span class="rc-np">NP ' + escapeHtml(String(e.np)) + (e.tanda ? ' · ' + escapeHtml(String(e.tanda)) : '') + ' · sale <b>' + escapeHtml(dmy || "—") + '</b></span><span class="rc-faltan">faltan ' + (Math.round(Number(e.cajas_falto) || 0)) + '</span></div></button>';
+  }).join("");
+  _renderKeepFocus(body, h);
+}
+function rcPickUrgent(id) {
+  if (!_rc) return; const e = (_rc.faltantes || []).find(function (x) { return Number(x.id) === Number(id); }); if (!e) return;
+  _rc.sel = e; _rc.step = 2; _rc.donorSel = null; _rc.qty = 1; _rc.donors = null; _rc.donorsLoading = true; rcRender();
+  rcLoadDonors(e).then(function (ds) { if (!_rc) return; _rc.donors = ds; _rc.donorsLoading = false; rcRender(); }).catch(function () { if (!_rc) return; _rc.donors = []; _rc.donorsLoading = false; rcRender(); });
+}
+function rcBack() { if (!_rc) return; _rc.step = 1; _rc.sel = null; _rc.donorSel = null; rcRender(); }
+async function rcLoadDonors(sel) {
+  const cod = String(sel.cod_art); const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }; const out = [];
+  try {
+    const rows = await fetch(SUPABASE_ENTREGAS_ENDPOINT + "?select=id,np,cod_cliente,cod_art,cajas_entregadas,tanda,fecha_salida&cod_art=eq." + encodeURIComponent(cod) + "&cajas_entregadas=gt.0&limit=20000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; });
+    rows.forEach(function (x) { if (String(x.np) !== String(sel.np)) out.push({ type: "armado", id: Number(x.id), np: String(x.np), cod: String(x.cod_cliente || ""), tanda: String(x.tanda || ""), fecha: String(x.fecha_salida || "").slice(0, 10), disp: Math.round(Number(x.cajas_entregadas) || 0) }); });
+  } catch (_e) {}
+  try {
+    const mv = await fetch(SUPABASE_STOCK_ENDPOINT + "?deposito=eq.separar_pedidos&cod_art=eq." + encodeURIComponent(cod) + "&select=ref,delta&limit=20000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; });
+    const byT = {}; mv.forEach(function (x) { const t = String(x.ref || "").trim().toUpperCase(); if (t) byT[t] = (byT[t] || 0) + (Number(x.delta) || 0); });
+    const tandas = Object.keys(byT).filter(function (t) { return byT[t] > 0.5 && t !== String(sel.tanda || "").toUpperCase(); });
+    if (tandas.length) {
+      const inList = tandas.map(function (t) { return encodeURIComponent(t); }).join(",");
+      const pp = await fetch(SUPABASE_PPP_PROG_ENDPOINT + "?select=tanda,fecha_entrega&tanda=in.(" + inList + ")&limit=20000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; });
+      const fbT = {}; pp.forEach(function (x) { const t = String(x.tanda || "").trim().toUpperCase(); if (t && !fbT[t]) fbT[t] = String(x.fecha_entrega || "").slice(0, 10); });
+      tandas.forEach(function (t) { out.push({ type: "pickeado", id: null, np: null, cod: null, tanda: t, fecha: fbT[t] || "", disp: Math.round(byT[t]) }); });
+    }
+  } catch (_e) {}
+  out.sort(function (a, b) { return String(b.fecha || "").localeCompare(String(a.fecha || "")) || (b.disp - a.disp); });
+  return out;
+}
+function rcRenderStep2(body) {
+  const s = _rc.sel; const dmy = npcDmy(String(s.fecha_salida || "").slice(0, 10));
+  const maxFalt = Math.max(1, Math.round(Number(s.cajas_falto) || 1));
+  let h = '<button class="rc-back" onclick="rcBack()">← Volver</button>';
+  h += '<div class="rc-sel"><span class="rc-cod">' + escapeHtml(String(s.cod_art)) + '</span> <span class="rc-fdesc">' + escapeHtml(artNombre(s.cod_art, s.desc) || "") + '</span><div class="rc-selnp">🔥 Urgente: NP ' + escapeHtml(String(s.np)) + ' · sale ' + escapeHtml(dmy || "—") + ' · faltan ' + maxFalt + '</div></div>';
+  h += '<div class="rc-fld"><div class="rc-lbl">¿De qué pedido lo saco? (sugeridos: los que salen después)</div>';
+  if (_rc.donorsLoading) h += '<div class="rc-liosload">buscando pedidos con ' + escapeHtml(String(s.cod_art)) + '…</div>';
+  else {
+    const ds = _rc.donors || [];
+    if (!ds.length) h += '<div class="rc-note">No hay otro pedido con <b>' + escapeHtml(String(s.cod_art)) + '</b> para sacar (ni armado ni pickeado). Si hay stock libre, usá "Completar Pedido".</div>';
+    else h += '<div class="rc-donors">' + ds.map(function (d, i) {
+      const ddmy = npcDmy(String(d.fecha || "").slice(0, 10));
+      const label = d.type === "armado" ? ("NP " + d.np) : ("Tanda " + d.tanda);
+      return '<button class="rc-donor' + (_rc.donorSel === i ? " on" : "") + (d.type === "pickeado" ? " pick" : "") + '" onclick="rcPickDonor(' + i + ')">' + escapeHtml(label) + (d.type === "pickeado" ? " (pickeado)" : "") + '<small>tiene ' + d.disp + (d.fecha ? ' · sale ' + escapeHtml(ddmy) : '') + '</small></button>';
+    }).join("") + '</div>';
+  }
+  h += '</div>';
+  const donor = (_rc.donorSel != null) ? (_rc.donors || [])[_rc.donorSel] : null;
+  const maxQ = donor ? Math.max(1, Math.min(maxFalt, donor.disp)) : maxFalt;
+  if (_rc.qty > maxQ) _rc.qty = maxQ;
+  h += '<div class="rc-fld"><div class="rc-lbl">¿Cuántas cajas paso?</div><div class="rc-stp"><button class="rc-sb" onclick="rcQty(-1)">–</button><input class="rc-inp" type="number" min="1" max="' + maxQ + '" inputmode="numeric" value="' + _rc.qty + '" oninput="rcQtySet(this.value)"><button class="rc-sb" onclick="rcQty(1)">+</button></div></div>';
+  const ok = donor && _rc.qty > 0;
+  h += '<button class="rc-fin"' + (ok ? "" : " disabled") + ' onclick="rcConfirm()">' + (donor ? ('✓ Pasar ' + _rc.qty + ' caja(s) a NP ' + s.np + (donor.type === "armado" ? ' (de NP ' + donor.np + ')' : ' (de ' + donor.tanda + ')')) : 'Elegí de dónde sacar') + '</button>';
+  _renderKeepFocus(body, h);
+}
+function rcPickDonor(i) { if (!_rc) return; _rc.donorSel = i; const d = (_rc.donors || [])[i]; const maxFalt = Math.max(1, Math.round(Number(_rc.sel.cajas_falto) || 1)); _rc.qty = Math.max(1, Math.min(maxFalt, d ? d.disp : 1, _rc.qty || 1)); rcRender(); }
+function _rcMaxQ() { const donor = (_rc.donorSel != null) ? (_rc.donors || [])[_rc.donorSel] : null; const maxFalt = Math.max(1, Math.round(Number(_rc.sel.cajas_falto) || 1)); return donor ? Math.max(1, Math.min(maxFalt, donor.disp)) : maxFalt; }
+function rcQty(dd) { if (!_rc) return; const mx = _rcMaxQ(); _rc.qty = Math.max(1, Math.min(mx, _rc.qty + dd)); rcRender(); }
+function rcQtySet(v) { if (!_rc) return; const mx = _rcMaxQ(); let n = Math.max(1, parseInt(v, 10) || 1); if (n > mx) n = mx; _rc.qty = n; rcRender(); }
+async function rcConfirm() {
+  if (!_rc || !_rc.sel || _rc.donorSel == null) return;
+  const t = _rc.sel, d = (_rc.donors || [])[_rc.donorSel], qty = _rc.qty, leg = _rc.legajo;
+  if (!d || qty <= 0) return;
+  const cod = String(t.cod_art);
+  const H2 = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" };
+  // 1) faltantes: RPC atómica (urgente completa; donante armado queda corto + aviso)
+  try { await fetch(SUPABASE_URL + "/rest/v1/rpc/reasignar_cajas", { method: "POST", headers: H2, body: JSON.stringify({ p_target_id: Number(t.id), p_qty: Number(qty), p_donor_id: (d.type === "armado" ? Number(d.id) : null) }) }); } catch (_e) {}
+  // 2) stock: la caja va al urgente (a facturar) y sale del donante (a facturar si armado, a separar si pickeado)
+  const rows = [{ cod_art: cod, descripcion: artNombre(cod, "") || null, deposito: "a_facturar", delta: qty, tipo: "rc", ref: String(t.np), legajo: leg || null }];
+  if (d.type === "armado") rows.push({ cod_art: cod, descripcion: null, deposito: "a_facturar", delta: -qty, tipo: "rc", ref: String(d.np), legajo: leg || null });
+  else rows.push({ cod_art: cod, descripcion: null, deposito: "separar_pedidos", delta: -qty, tipo: "rc", ref: String(d.tanda), legajo: leg || null });
+  try { stockMove(rows); } catch (_e) {}
+  // 3) líos: sumar al urgente; sacar del donante armado (el pickeado todavía no tiene líos)
+  try { await rcAddToLio(leg, t, qty); } catch (_e) {}
+  if (d.type === "armado") { try { await rcRemoveFromLio(leg, d, cod, qty); } catch (_e) {} }
+  // 4) evento RC (trazabilidad)
+  rcEmitEvent(leg, t, d, qty);
+  try { updatePendingIndicator(); } catch (_e) {}
+  // 5) refrescar la lista de faltantes
+  if (!_rc) return;
+  _rc.justDone = "✓ Pasaste " + qty + " caja(s) de " + cod + " a NP " + t.np + (d.type === "armado" ? " (de NP " + d.np + ")" : " (de " + d.tanda + ")");
+  _rc.sel = null; _rc.donorSel = null; _rc.step = 1; _rc.donors = null; _rc.qty = 1;
+  try { const fr = await cpLoadFaltantes(); fr.sort(function (a, b) { return String(a.fecha_salida || "9999").localeCompare(String(b.fecha_salida || "9999")) || String(a.np).localeCompare(String(b.np)); }); if (_rc) _rc.faltantes = fr; } catch (_e) {}
+  if (_rc) rcRender();
+}
+async function rcAddToLio(leg, t, qty) {
+  let info = { resumen: "", tanda: t.tanda || "" }; try { info = await cpLoadLios(t.np); } catch (_e) {}
+  cpUpdateLio(leg, { np: t.np, cod_art: t.cod_art, tanda: (info && info.tanda) || t.tanda || "" }, qty, "__new__", info);
+}
+async function rcRemoveFromLio(leg, d, cod, qty) {
+  let info = { resumen: "", tanda: d.tanda || "" }; try { info = await cpLoadLios(d.np); } catch (_e) {}
+  let lios = cpParseResumen((info && info.resumen) || "");
+  const codU = String(cod).toUpperCase(); let rem = qty;
+  for (let i = lios.length - 1; i >= 0 && rem > 0; i--) {
+    const items = lios[i].items;
+    for (let j = items.length - 1; j >= 0 && rem > 0; j--) {
+      if (String(items[j].cod).toUpperCase() === codU) { const take = Math.min(rem, items[j].qty); items[j].qty -= take; rem -= take; if (items[j].qty <= 0) items.splice(j, 1); }
+    }
+    if (!items.length) lios.splice(i, 1);
+  }
+  try { liosSend(String(leg || ""), d.np, lios.length, (info && info.tanda) || d.tanda || "", cpBuildResumen(lios)); } catch (_e) {}
+}
+function rcEmitEvent(leg, t, d, qty) {
+  const donorRef = d.type === "armado" ? ("NP" + d.np) : ("T" + d.tanda);
+  const payload = { legajo: String(leg || ""), opcion: "RC", descripcion: "Pasar cajas a urgente", texto: (String(t.np) + "|" + donorRef + "|" + String(t.cod_art) + "|" + qty).toUpperCase(), ts: Date.now(), id: ("rc_" + t.np + "_" + String(t.cod_art) + "_" + Date.now()).replace(/[^a-zA-Z0-9_\-]/g, ""), ts_inicio_iso: null };
+  try { enqueueReport(payload); if (typeof trySendOneReport === "function") trySendOneReport(payload).then(function (r) { if (r && r.ok) removeFromQueue(payload.id); }).catch(function () {}); } catch (_e) {}
 }
 
 /* ===== STOCK — baja por PICKING (v4.07): al TP, suma las cajas REALES pickeadas de
