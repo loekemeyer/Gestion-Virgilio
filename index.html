@@ -5378,7 +5378,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.47";
+const APP_VERSION = "v5.48";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -7635,8 +7635,8 @@ async function openStockAdmin(soloConteo) {
   ov.classList.add("show");
   ov.innerHTML = '<div class="stk-card"><div class="stk-head"><span class="stk-title">' + (_solo ? "📋 Conteo de stock" : "📦 Stock y Compras") + '</span><button class="stk-close" onclick="closeStockAdmin()">Cerrar</button></div><div class="stk-tabs" id="stkTabs"></div><div class="stk-body" id="stkBody"><div class="stk-loading">Cargando…</div></div></div>';
   try {
-    const res = await Promise.all([stockFetchMovs(), stockGetCutoff(), stockFetchArtFactors(), racksFetchOrdenes(), racksFetchBajadas(), loadArtNombres()]);
-    _stk = { movs: res[0] || [], cutoff: res[1], factors: res[2] || {}, ordenes: res[3] || [], bajadas: res[4] || [], tab: _solo ? "conteo" : "stocks", soloConteo: _solo, filtro: "", openArt: null, ingMode: "remito", asOf: null, asOfInput: "" };
+    const res = await Promise.all([stockFetchMovs(), stockGetCutoff(), stockFetchArtFactors(), racksFetchOrdenes(), racksFetchBajadas(), loadArtNombres(), ocgDemanda().catch(function(){ return {}; })]);
+    _stk = { movs: res[0] || [], cutoff: res[1], factors: res[2] || {}, ordenes: res[3] || [], bajadas: res[4] || [], tab: _solo ? "conteo" : "stocks", soloConteo: _solo, filtro: "", openArt: null, ingMode: "remito", asOf: null, asOfInput: "", dem: res[6] || {} };
     stkRender();
   } catch (e) { const b = document.getElementById("stkBody"); if (b) b.innerHTML = '<div class="stk-loading">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
 }
@@ -8717,7 +8717,12 @@ function stkBodyStocksTab() {
 function stkBodyStocks() {
   if (_stk.sectDetail) return stkBodySectDetail();   // v4.35: detalle de un sector (click en un total)
   const saldos = stockComputeSaldos(_stk.movs, _stk.cutoff, _stk.asOf);
-  const arts = Object.keys(saldos).map(function (k) { return saldos[k]; }).sort(function (a, b) { return (parseInt(a.cod, 10) || 0) - (parseInt(b.cod, 10) || 0); });
+  const dem = _stk.dem || {};
+  const arts = Object.keys(saldos).map(function (k) { return saldos[k]; });
+  // v5.48: sumar artículos que tienen CAJAS PEDIDAS (demanda del PPP) aunque no tengan stock cargado.
+  const _seenN = {}; arts.forEach(function (a) { _seenN[_ocgNorm(a.cod)] = true; });
+  Object.keys(dem).forEach(function (k) { if (!_seenN[k] && (Number(dem[k]) || 0) > 0) arts.push({ cod: k, desc: artNombre(k, ""), terminado: 0, excedente: 0, separar_pedidos: 0, a_facturar: 0, a_guardar: 0, racks: 0, insumos: 0 }); });
+  arts.sort(function (a, b) { return (parseInt(a.cod, 10) || 0) - (parseInt(b.cod, 10) || 0); });
   const f = (_stk.filtro || "").toLowerCase();
   // Sin búsqueda: ocultar artículos que están en 0 en TODOS los sectores (típicamente
   // los solo-insumos, que tienen su propia sección abajo) — si no, ensucian la tabla
@@ -8725,7 +8730,7 @@ function stkBodyStocks() {
   const SECTKEYS = ["terminado", "excedente", "separar_pedidos", "a_facturar", "a_guardar", "racks"];
   const shown = f
     ? arts.filter(function (a) { return (a.cod + " " + a.desc).toLowerCase().indexOf(f) >= 0; })
-    : arts.filter(function (a) { return SECTKEYS.some(function (k) { return (Number(a[k]) || 0) !== 0; }); });
+    : arts.filter(function (a) { return SECTKEYS.some(function (k) { return (Number(a[k]) || 0) !== 0; }) || (Number(dem[_ocgNorm(a.cod)]) || 0) > 0; });
   // v4.23: "cuánto hay en cada sector". Totales por depósito (GLOBAL, no filtrado)
   // para la tira de arriba; columnas por sector en la tabla (góndola y a guardar
   // siempre; racks / a separar / a facturar solo si tienen algo).
@@ -8747,18 +8752,23 @@ function stkBodyStocks() {
       '<span style="font-size:10px;text-transform:uppercase;color:#64748b;font-weight:700;letter-spacing:.02em;">' + s.label + '</span>' +
       '<span style="font-size:17px;font-weight:800;color:' + ((totals[s.key] || 0) < 0 ? "#b91c1c" : "#1e3a8a") + ';font-variant-numeric:tabular-nums;">' + fmtCajas(totals[s.key]) + '</span></span>';
   });
+  var totDem = Object.keys(dem).reduce(function (s, k) { return s + (Number(dem[k]) || 0); }, 0);
+  h += '<span title="Suma de cajas pedidas (demanda del PPP), artículo por artículo" style="display:inline-flex;flex-direction:column;align-items:center;min-width:78px;background:#fffbeb;border:1px solid #fcd34d;border-radius:10px;padding:6px 10px;">' +
+    '<span style="font-size:10px;text-transform:uppercase;color:#92400e;font-weight:700;letter-spacing:.02em;">Pedidas</span>' +
+    '<span style="font-size:17px;font-weight:800;color:#92400e;font-variant-numeric:tabular-nums;">' + fmtCajas(totDem) + '</span></span>';
   h += '</div>';
   h += '<input class="stk-filtro" type="search" placeholder="🔎 Buscar código / descripción" value="' + escapeHtml(_stk.filtro) + '" oninput="if(_stk){_stk.filtro=this.value;stkRender();}">';
   // Columnas FIJAS: todos los sectores (menos insumos, que va en su sección).
   const cols = SECT.filter(function (s) { return s.key !== "insumos"; });
-  const ncol = 3 + cols.length + 1;
-  let th = '<th>Código</th><th>Descripción</th><th class="num" style="background:#eef2ff;color:#1e3a8a;">Total<br>Stock</th>';
+  const ncol = 4 + cols.length + 1;
+  let th = '<th>Código</th><th>Descripción</th><th class="num" style="background:#eef2ff;color:#1e3a8a;">Total<br>Stock</th><th class="num" style="background:#fef3c7;color:#92400e;">Cajas<br>Pedidas</th>';
   cols.forEach(function (c) { th += '<th class="num">' + c.label.replace(" ", "<br>") + '</th>'; });
   h += '<div class="stk-tblwrap"><table class="stk-tbl stk-tbl-fit"><thead><tr>' + th + '<th></th></tr></thead><tbody>';
   if (!shown.length) h += '<tr><td colspan="' + ncol + '" class="stk-empty">Sin stock todavía.</td></tr>';
   shown.forEach(function (a) {
     const _tot = SECTKEYS.reduce(function (s, k) { return s + (Number(a[k]) || 0); }, 0);
-    let tds = '<td class="stk-cod">' + escapeHtml(a.cod) + '</td><td class="stk-desc">' + escapeHtml(artNombre(a.cod, a.desc) || "—") + '</td><td class="num ' + (_tot < 0 ? "stk-neg" : "") + '" style="background:#f8fafc"><b>' + fmtCajas(_tot) + '</b></td>';
+    const _ped = Number(dem[_ocgNorm(a.cod)]) || 0;
+    let tds = '<td class="stk-cod">' + escapeHtml(a.cod) + '</td><td class="stk-desc">' + escapeHtml(artNombre(a.cod, a.desc) || "—") + '</td><td class="num ' + (_tot < 0 ? "stk-neg" : "") + '" style="background:#f8fafc"><b>' + fmtCajas(_tot) + '</b></td><td class="num" style="background:#fffbeb;color:#92400e"><b>' + (_ped ? fmtCajas(_ped) : "") + '</b></td>';
     cols.forEach(function (c) {
       const v = Number(a[c.key]) || 0;
       tds += '<td class="num ' + (v < 0 ? "stk-neg" : "") + '">' + (c.key === "terminado" ? '<b>' + fmtCajas(v) + '</b>' : fmtCajas(v)) + '</td>';
