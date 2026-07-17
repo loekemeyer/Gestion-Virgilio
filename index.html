@@ -2880,6 +2880,16 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
   .npc-meta b{ color:#334155; font-weight:700; }
   .npc-falt-det{ margin-top:8px; font-size:12px; font-weight:700; color:#991b1b; background:#fef2f2; border:1px solid #fca5a5; border-radius:8px; padding:5px 9px; }
   @media (max-width:640px){ .npc-inp{ flex-basis:calc(50% - 4px); } .npc-filters .npc-inp-all{ flex-basis:100%; } .npc-rs{ flex-basis:100%; } }
+  /* v5.50 — botón imprimir remito de armado (por NP) */
+  .npc-print{ flex:0 0 auto; width:auto; margin:0; padding:3px 9px; border:1px solid #cbd5e1; border-radius:7px; background:#fff; font-size:12.5px; font-weight:700; color:#334155; cursor:pointer; line-height:1.4; }
+  .npc-print:hover{ background:#f1f5f9; border-color:#94a3b8; }
+  /* Preview del remito (operadora) — overlay en pantalla; el print real va por iframe aislado */
+  #remitoPrint{ display:none; position:fixed; inset:0; z-index:1295; background:rgba(2,6,23,.7); overflow:auto; padding:16px; }
+  #remitoPrint.show{ display:block; }
+  .rmt-toolbar{ max-width:420px; margin:0 auto 10px; display:flex; gap:9px; }
+  .rmt-tb-btn{ flex:1 1 auto; width:auto; margin:0; padding:12px; border:none; border-radius:10px; font-size:15px; font-weight:800; cursor:pointer; }
+  .rmt-print{ background:#0f766e; color:#fff; }
+  .rmt-close{ background:#e2e8f0; color:#334155; flex:0 0 auto; padding:12px 18px; }
 </style>
 <div id="npConsultaModal">
   <div class="npc-top">
@@ -5385,7 +5395,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.49";
+const APP_VERSION = "v5.50";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -16377,6 +16387,7 @@ function npcRenderList(rows){
         '<span class="npc-tag t-lios">' + r.lios + ' líos</span>' +
         (r.clase ? '<span class="npc-clase">' + escapeHtml(npcClaseLabel(r.clase)) + '</span>' : '') +
         (r.falt ? '<span class="npc-tag t-falt">⚠ ' + r.falt.cajas + ' cj</span>' : '') +
+        (r.resumen ? '<button class="npc-print" onclick="showRemitoArmado(\'' + escapeHtml(String(r.np)) + '\')">🖨️ Imprimir</button>' : '') +
       '</div>' +
       '<div class="npc-meta">' +
         '<span>📅 Sale <b>' + escapeHtml(npcDmy(r.salePpp) || '—') + '</b></span>' +
@@ -16390,6 +16401,118 @@ function npcRenderList(rows){
   }).join("");
   const nota = rows.length > MAX ? '<div class="fac-empty" style="padding:8px">Mostrando ' + MAX + ' de ' + rows.length + ' — afiná la búsqueda para ver el resto.</div>' : '';
   cont.innerHTML = html + nota;
+}
+
+/* =========================================================
+   v5.50 — REMITO DE ARMADO (imprimible por NP). Lo pidió el dueño: al terminar
+   el armado (TAP) se querrá imprimir una hoja con la composición del pedido.
+   Por ahora es MANUAL desde el módulo de la operadora (Consultar NP/Líos →
+   botón 🖨️ por fila); más adelante se dispara solo al TAP reusando estas mismas
+   funciones (armadoRemitoData → armadoRemitoInnerHtml → remitoPrintDoc).
+   Layout confirmado (opción a): cabecera NP + tabla Cod/Cajas/en qué lío + tabla
+   Lío/Composición (sin nombre de artículo, orden por código).
+   ========================================================= */
+var REMITO_SHEET_CSS =
+  ".rmt-sheet{background:#fff;color:#0f172a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;max-width:420px;margin:0 auto;padding:18px 20px;box-sizing:border-box;border-radius:10px;}" +
+  ".rmt-h1{font-size:11px;font-weight:800;letter-spacing:.14em;color:#64748b;text-transform:uppercase;margin:0 0 1px;}" +
+  ".rmt-np{font-size:27px;font-weight:800;color:#0f172a;margin:0 0 11px;line-height:1;}" +
+  ".rmt-hdr{font-size:13.5px;line-height:1.5;}" +
+  ".rmt-hdr b{display:inline-block;min-width:104px;color:#64748b;font-weight:700;font-size:12px;}" +
+  ".rmt-sub{font-size:12px;color:#64748b;margin-top:5px;font-weight:600;}" +
+  ".rmt-sec{font-size:10.5px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:#94a3b8;margin:15px 0 0;border-bottom:1.5px solid #0f172a;padding-bottom:3px;}" +
+  ".rmt-table{width:100%;border-collapse:collapse;font-size:13.5px;margin-top:2px;}" +
+  ".rmt-table th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;font-weight:700;padding:5px 6px 3px;border-bottom:1px solid #cbd5e1;}" +
+  ".rmt-table td{padding:5px 6px;border-bottom:1px solid #eef2f6;vertical-align:top;line-height:1.35;}" +
+  ".rmt-cod{font-weight:800;font-family:Consolas,Menlo,monospace;}" +
+  ".rmt-num{text-align:center;width:54px;font-weight:800;}" +
+  ".rmt-lab{font-weight:800;text-align:center;width:44px;}" +
+  ".rmt-total td{font-weight:800;border-top:2px solid #0f172a;border-bottom:none;padding-top:6px;}";
+var REMITO_PRINT_CSS = REMITO_SHEET_CSS +
+  "@page{margin:11mm;}html,body{margin:0;padding:0;}" +
+  "body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}" +
+  ".rmt-sheet{max-width:none;margin:0;padding:0;border-radius:0;}" +
+  ".rmt-table{page-break-inside:auto;}tr{page-break-inside:avoid;}.rmt-sec{page-break-after:avoid;}";
+var _remitoInner = "";
+function _remitoCodKey(cod){ const m = String(cod).match(/^0*(\d+)/); return m ? parseInt(m[1], 10) : 999999; }
+/* row = fila de _npcRows (tiene np, cod=cod cliente, rs, salePpp/fecha, tanda, resumen) */
+function armadoRemitoData(row){
+  const lios = cpParseResumen(row.resumen || "");
+  const labels = liosLabels(lios);
+  const artMap = {}; let total = 0;
+  lios.forEach(function(l, k){
+    const lab = labels[k];
+    (l.items || []).forEach(function(it){
+      const cod = String(it.cod); const q = Number(it.qty) || 0; total += q;
+      if (!artMap[cod]) artMap[cod] = { cod: cod, cajas: 0, lios: [] };
+      artMap[cod].cajas += q;
+      if (artMap[cod].lios.indexOf(lab) === -1) artMap[cod].lios.push(lab);
+    });
+  });
+  const arts = Object.keys(artMap).map(function(k){ return artMap[k]; });
+  arts.sort(function(a, b){ return _remitoCodKey(a.cod) - _remitoCodKey(b.cod) || String(a.cod).localeCompare(String(b.cod)); });
+  const liosOut = lios.map(function(l, k){
+    return { label: labels[k], comp: (l.items || []).map(function(it){ return String(it.cod) + " ×" + it.qty; }).join(", ") + (l.suelta ? "  (suelta)" : "") };
+  });
+  return { np: row.np, cod: row.cod || "", rs: row.rs || "", fecha: row.salePpp || row.fecha || "", tanda: row.tanda || "", total: total, nLios: lios.length, arts: arts, lios: liosOut };
+}
+function armadoRemitoInnerHtml(d){
+  const artRows = d.arts.length ? d.arts.map(function(a){
+    return '<tr><td class="rmt-cod">' + escapeHtml(a.cod) + '</td><td class="rmt-num">' + a.cajas + '</td><td>' + escapeHtml(a.lios.join(", ")) + '</td></tr>';
+  }).join("") : '<tr><td colspan="3" style="color:#94a3b8">— sin detalle de líos —</td></tr>';
+  const lioRows = d.lios.length ? d.lios.map(function(l){
+    return '<tr><td class="rmt-lab">' + escapeHtml(l.label) + '</td><td>' + escapeHtml(l.comp) + '</td></tr>';
+  }).join("") : '<tr><td colspan="2" style="color:#94a3b8">— sin líos —</td></tr>';
+  return '' +
+    '<div class="rmt-h1">Remito de armado</div>' +
+    '<div class="rmt-np">NP ' + escapeHtml(String(d.np)) + '</div>' +
+    '<div class="rmt-hdr">' +
+      '<div><b>Cod Cliente</b>' + escapeHtml(d.cod || '—') + '</div>' +
+      '<div><b>Razón Social</b>' + escapeHtml(d.rs || '—') + '</div>' +
+      '<div><b>Fecha Entrega</b>' + escapeHtml(npcDmy(d.fecha) || '—') + '</div>' +
+      '<div class="rmt-sub">Tanda ' + escapeHtml(d.tanda || '—') + ' · ' + d.total + ' cajas · ' + d.nLios + ' líos</div>' +
+    '</div>' +
+    '<div class="rmt-sec">Artículos</div>' +
+    '<table class="rmt-table"><thead><tr><th>Cod</th><th class="rmt-num">Cajas</th><th>Va en lío(s)</th></tr></thead><tbody>' +
+      artRows +
+      '<tr class="rmt-total"><td>TOTAL</td><td class="rmt-num">' + d.total + '</td><td></td></tr>' +
+    '</tbody></table>' +
+    '<div class="rmt-sec">Líos</div>' +
+    '<table class="rmt-table"><thead><tr><th>Lío</th><th>Composición</th></tr></thead><tbody>' + lioRows + '</tbody></table>';
+}
+function showRemitoArmado(np){
+  const row = (_npcRows || []).find(function(r){ return String(r.np) === String(np); });
+  if (!row){ alert("No encontré el pedido NP " + np + " en la lista."); return; }
+  const d = armadoRemitoData(row);
+  _remitoInner = armadoRemitoInnerHtml(d);
+  if (!document.getElementById("rmtSheetCss")){ const st = document.createElement("style"); st.id = "rmtSheetCss"; st.textContent = REMITO_SHEET_CSS; document.head.appendChild(st); }
+  let ov = document.getElementById("remitoPrint");
+  if (!ov){ ov = document.createElement("div"); ov.id = "remitoPrint"; document.body.appendChild(ov); }
+  ov.innerHTML =
+    '<div class="rmt-toolbar">' +
+      '<button class="rmt-tb-btn rmt-print" onclick="remitoDoPrint()">🖨️ Imprimir</button>' +
+      '<button class="rmt-tb-btn rmt-close" onclick="closeRemito()">Cerrar</button>' +
+    '</div>' +
+    '<div class="rmt-sheet" id="rmtSheet">' + _remitoInner + '</div>';
+  ov.classList.add("show");
+}
+function closeRemito(){ const ov = document.getElementById("remitoPrint"); if (ov) ov.classList.remove("show"); }
+function remitoDoPrint(){ remitoPrintDoc(_remitoInner); }
+/* Imprime SOLO el remito en un iframe aislado (sin popup, sin páginas en blanco del
+   resto de la página). Reusable para el auto-print del TAP más adelante. */
+function remitoPrintDoc(inner){
+  if (!inner) return;
+  const ifr = document.createElement("iframe");
+  ifr.setAttribute("aria-hidden", "true");
+  ifr.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;";
+  document.body.appendChild(ifr);
+  const w = ifr.contentWindow, doc = w.document;
+  doc.open();
+  doc.write('<!doctype html><html><head><meta charset="utf-8"><title>Remito de armado</title><style>' + REMITO_PRINT_CSS + '</style></head><body><div class="rmt-sheet">' + inner + '</div></body></html>');
+  doc.close();
+  let fired = false;
+  const fire = function(){ if (fired) return; fired = true; setTimeout(function(){ try { w.focus(); w.print(); } catch (_e) {} setTimeout(function(){ try { document.body.removeChild(ifr); } catch (_e2) {} }, 1500); }, 120); };
+  ifr.onload = fire;
+  setTimeout(fire, 350);   // fallback: doc.write no siempre dispara onload
 }
 
 function facTodayKey(){
