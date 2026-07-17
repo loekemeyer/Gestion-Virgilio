@@ -137,6 +137,26 @@ catch (_e) {
     out.asofLive     = sLive ? sLive.separar_pedidos : null;   // 0 (pickeó y armó)
     out.asofPast     = sPast ? sPast.separar_pedidos : null;   // 200 (solo el picking cuenta)
     out.asofPastGond = sPast ? sPast.terminado : null;         // 100 (el inicial siempre es baseline)
+
+    // ===== F5: stockFetchMovs pagina (PostgREST corta en 1000) → tiene que traer TODO =====
+    var _ranges = [];
+    var TOTAL = 1500;   // > 1000 a propósito
+    window.fetch = function (url, opts) {
+      var range = (opts && opts.headers && opts.headers.Range) || "";
+      _ranges.push(range);
+      var mm = range.match(/^(\d+)-(\d+)$/);
+      var from = mm ? parseInt(mm[1], 10) : 0;
+      var rows = [];
+      for (var i = from; i < Math.min(from + 1000, TOTAL); i++) rows.push({ cod_art: "X", deposito: "terminado", tipo: "inicial", delta: 1, ts: "2026-07-01T00:00:00-03:00" });
+      return Promise.resolve({
+        ok: true, status: 206,
+        headers: { get: function (h) { return String(h).toLowerCase() === "content-range" ? (from + "-" + (from + rows.length - 1) + "/" + TOTAL) : null; } },
+        json: function () { return Promise.resolve(rows); }
+      });
+    };
+    var allMovs = await stockFetchMovs();
+    out.movsLen = allMovs.length;    // esperado 1500 (NO 1000)
+    out.movsPages = _ranges.length;  // ≥ 2 (paginó)
     return out;
   });
 
@@ -154,10 +174,11 @@ catch (_e) {
     JSON.stringify(r.labels2) === '["A1","B","A2"]' &&
     r.resumen === "A1=026x5;A2=026x5;A3=026x5;A4=026x5";
   const okF4 = r.asofLive === 0 && r.asofPast === 200 && r.asofPastGond === 100;
-  const pass = okF1 && okF2 && okF3 && okF4 && errs.length === 0;
-  console.log("fac-npc:", JSON.stringify(r).slice(0, 700));
+  const okF5 = r.movsLen === 1500 && r.movsPages >= 2;
+  const pass = okF1 && okF2 && okF3 && okF4 && okF5 && errs.length === 0;
+  console.log("fac-npc:", JSON.stringify(r).slice(0, 760));
   console.log("  pageerrors:", errs.length ? errs.join("|") : "none");
-  console.log(" ", okF1 ? "F1 faltante ✓" : "F1 faltante ✗", "·", okF2 ? "F2 consulta ✓" : "F2 consulta ✗", "·", okF3 ? "F3 rótulos ✓" : "F3 rótulos ✗", "·", okF4 ? "F4 asOf ✓" : "F4 asOf ✗", "·", pass ? "OK" : "FAIL");
+  console.log(" ", okF1 ? "F1 faltante ✓" : "F1 faltante ✗", "·", okF2 ? "F2 consulta ✓" : "F2 consulta ✗", "·", okF3 ? "F3 rótulos ✓" : "F3 rótulos ✗", "·", okF4 ? "F4 asOf ✓" : "F4 asOf ✗", "·", okF5 ? "F5 paginado ✓" : "F5 paginado ✗", "·", pass ? "OK" : "FAIL");
   await b.close();
   process.exit(pass ? 0 : 1);
 })();
