@@ -5378,7 +5378,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.42";
+const APP_VERSION = "v5.43";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -7565,8 +7565,9 @@ async function toggleSsgAlert() {
    módulos que solo necesitan saldos (MG, bajar racks, insumos, salida Cervantes);
    el admin de Stocks sigue con los movimientos porque muestra el detalle. */
 async function stockFetchSaldos() {
-  const r = await fetch(SUPABASE_URL + "/rest/v1/vista_saldos_stock?select=*&limit=20000", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
-  const rows = r.ok ? await r.json() : [];
+  // supaFetchAll: vista_saldos_stock (1 fila por artículo); blindado contra el corte de 1000. v5.43.
+  let rows = [];
+  try { rows = await supaFetchAll(SUPABASE_URL + "/rest/v1/vista_saldos_stock", "select=*"); } catch (_e) { rows = []; }
   const m = {};
   rows.forEach(function (x) {
     const k = String(x.cod_art);
@@ -7574,11 +7575,18 @@ async function stockFetchSaldos() {
   });
   return m;
 }
+/* Normaliza un timestamp a ISO parseable en TODOS los browsers. Stock_Config.cutoff_ts a veces
+   quedó cargado a mano como "2026-06-26 00:01:00-03" (espacio en vez de T, offset sin ":00") →
+   iOS Safari lo parseaba como Invalid Date y el corte se ignoraba (front ≠ vista). v5.43. */
+function _stkNormTs(s) {
+  s = String(s == null ? "" : s).trim(); if (!s) return s;
+  return s.replace(" ", "T").replace(/([+-]\d{2})$/, "$1:00");
+}
 async function stockGetCutoff() {
   try {
     const r = await fetch(SUPABASE_URL + "/rest/v1/Stock_Config?clave=eq.cutoff_ts&select=valor", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
     const rows = r.ok ? await r.json() : [];
-    return (rows[0] && rows[0].valor) || null;
+    return (rows[0] && rows[0].valor) ? _stkNormTs(rows[0].valor) : null;
   } catch (_e) { return null; }
 }
 function stockComputeSaldos(movs, cutoff, asOf) {
@@ -14911,26 +14919,15 @@ async function fetchMonitorEvents(targetTandaKeys, sheetMap) {
 
   // Query B: eventos EP/TP/AP/TAP de los últimos 6 días — totales/alertas de
   // hoy + acumulados por día anterior para las filas históricas del monitor.
-  const urlB = SUPABASE_TABLE_ENDPOINT +
-    "?opcion=in.(EP,TP,AP,TAP)" +
-    "&ts_cliente=gte." + encodeURIComponent(start6DaysIso) +
-    "&order=ts_cliente.asc" +
-    "&limit=10000" +
-    "&select=opcion,texto,ts_cliente";
-  const rB = await fetch(urlB, { headers });
-  if (!rB.ok) throw new Error("Supabase HTTP " + rB.status + " (today query)");
-  const dataB = await rB.json();
+  // supaFetchAll: EP/TP/AP/TAP de 10 días; blindado contra el corte de 1000 filas. v5.43.
+  const dataB = await supaFetchAll(SUPABASE_TABLE_ENDPOINT, "opcion=in.(EP,TP,AP,TAP)&ts_cliente=gte." + encodeURIComponent(start6DaysIso) + "&order=ts_cliente.asc&select=opcion,texto,ts_cliente");
 
   // Query C: legajos + ts + opcion de los últimos 6 días (cualquier opción,
   // incluye FJ/Perm/Limp/etc.). Dedup por día en cliente. opcion se usa para
   // marcar quién ya cerró jornada hoy (tiene FJ).
-  const urlC = SUPABASE_TABLE_ENDPOINT +
-    "?ts_cliente=gte." + encodeURIComponent(start6DaysIso) +
-    "&limit=20000" +
-    "&select=legajo,ts_cliente,opcion";
-  const rC = await fetch(urlC, { headers });
-  if (!rC.ok) throw new Error("Supabase HTTP " + rC.status + " (legajos query)");
-  const dataC = await rC.json();
+  // ⚠ supaFetchAll: trae TODAS las opciones de 10 días (>1800 filas hoy). Con fetch simple
+  // PostgREST cortaba en 1000 y se caía HOY → "empleados hoy", jornada y "últimos días" mal. v5.43.
+  const dataC = await supaFetchAll(SUPABASE_TABLE_ENDPOINT, "ts_cliente=gte." + encodeURIComponent(start6DaysIso) + "&select=legajo,ts_cliente,opcion");
 
   // Query D: fichadas de ingreso de HOY (Supabase Fichadas_Virgilio).
   // Si la query falla (red flaky, RLS mal), no rompemos el monitor — el
@@ -16122,7 +16119,7 @@ async function npcLoad(force){
       const npsMeta = nps.slice(0, 1500);
       const inList = npsMeta.map(function(x){ return encodeURIComponent(x); }).join(",");
       // 2) Metadata + faltantes en paralelo.
-      const entUrl  = SUPABASE_ENTREGAS_ENDPOINT + "?select=np,cod_cliente,tanda,fecha_salida,cod_art,cajas_pedidas,cajas_falto&np=in.(" + inList + ")&limit=20000";
+      const entQuery = "select=np,cod_cliente,tanda,fecha_salida,cod_art,cajas_pedidas,cajas_falto&np=in.(" + inList + ")";   // supaFetchAll abajo (Entregas puede pasar 1000 filas)
       const metaUrl = SUPABASE_URL + "/rest/v1/PPP_Entregados_Meta?select=np,cod,rs&np=in.(" + inList + ")&limit=20000";
       const ppUrl   = SUPABASE_PPP_PROG_ENDPOINT + "?select=np,cod,razon_social,fecha_entrega,tanda&np=in.(" + inList + ")&limit=20000";
       // Tandas del corpus → para saber quién pickeó (eventos EP/TP de la tanda).
@@ -16130,7 +16127,7 @@ async function npcLoad(force){
       const tandaIn = Object.keys(tandaSet).slice(0, 1500).map(function(x){ return encodeURIComponent(x); }).join(",");
       const pkUrl = SUPABASE_TABLE_ENDPOINT + "?opcion=in.(EP,TP)&texto=in.(" + tandaIn + ")&select=opcion,texto,legajo,ts_cliente&order=ts_cliente.asc&limit=20000";
       const par = await Promise.all([
-        fetch(entUrl,  { headers: H, cache: "no-store" }).then(function(r){ return r.ok ? r.json() : []; }).catch(function(){ return []; }),
+        supaFetchAll(SUPABASE_ENTREGAS_ENDPOINT, entQuery).catch(function(){ return []; }),
         fetch(metaUrl, { headers: H, cache: "no-store" }).then(function(r){ return r.ok ? r.json() : []; }).catch(function(){ return []; }),
         fetch(ppUrl,   { headers: H, cache: "no-store" }).then(function(r){ return r.ok ? r.json() : []; }).catch(function(){ return []; }),
         (tandaIn ? fetch(pkUrl, { headers: H, cache: "no-store" }).then(function(r){ return r.ok ? r.json() : []; }).catch(function(){ return []; }) : Promise.resolve([])),
@@ -16963,17 +16960,8 @@ async function fetchProductivityData(daysBack){
       const sinceIso = sinceDate.toISOString();
 
       // Eventos
-      const url = SUPABASE_TABLE_ENDPOINT
-        + "?opcion=in.(EP,TP,AP,TAP)"
-        + "&ts_cliente=gte." + encodeURIComponent(sinceIso)
-        + "&order=ts_cliente.asc"
-        + "&select=opcion,texto,legajo,ts_cliente"
-        + "&limit=5000";
-      const r = await fetch(url, {
-        headers: { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY }
-      });
-      if (!r.ok) throw new Error("Supabase HTTP " + r.status);
-      const events = await r.json();
+      // supaFetchAll: EP/TP/AP/TAP de la ventana; blindado contra el corte de 1000 filas. v5.43.
+      const events = await supaFetchAll(SUPABASE_TABLE_ENDPOINT, "opcion=in.(EP,TP,AP,TAP)&ts_cliente=gte." + encodeURIComponent(sinceIso) + "&order=ts_cliente.asc&select=opcion,texto,legajo,ts_cliente");
 
       // m3 por tanda: union PPP cache + Historico.
       // Si _pppCache no está cargado (p. ej. el monitor nunca se abrió),

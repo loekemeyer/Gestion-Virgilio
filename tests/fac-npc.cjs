@@ -24,7 +24,14 @@ catch (_e) {
     const out = {};
     const posts = [];
     window.alert = function () {};
-    function J(data) { return Promise.resolve({ ok: true, status: 200, json: function () { return Promise.resolve(data); } }); }
+    function J(data) {
+      var n = Array.isArray(data) ? data.length : 0;   // content-range para que supaFetchAll pagine y termine
+      return Promise.resolve({
+        ok: true, status: 200,
+        headers: { get: function (h) { return String(h).toLowerCase() === "content-range" ? ("0-" + Math.max(0, n - 1) + "/" + n) : null; } },
+        json: function () { return Promise.resolve(data); }
+      });
+    }
     window.fetch = function (url, opts) {
       url = String(url);
       const method = (opts && opts.method) || "GET";
