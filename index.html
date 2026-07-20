@@ -162,6 +162,7 @@ button {
 
 .row { display: grid; gap: 8px; margin-top: 13px; }
 .row-6 { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+#row2 { grid-template-columns: repeat(3, minmax(0, 1fr)); }   /* RT·RR·MG: 3 anchos (usan la fila entera, entra "Recepción" sin cortar) */
 
 .box { border: 2px solid #334155; border-radius: 10px; padding: 9px 5px; text-align: center; cursor: pointer; min-width: 0; transition: border-color .12s, transform .06s; }
 .box-sm { padding: 5px 4px; border-radius: 8px; }
@@ -176,7 +177,7 @@ button {
 .box-sm[data-code="EA"] .box-title { color: #6d28d9; }
 .box:active { transform: scale(.96); }
 .box-title { font-size: 18px; font-weight: bold; }
-.box-desc { font-size: 11px; margin-top: 3px; line-height: 1.2; overflow-wrap: break-word; word-break: break-word; hyphens: auto; }
+.box-desc { font-size: 10.5px; margin-top: 3px; line-height: 1.2; overflow-wrap: break-word; word-break: normal; hyphens: none; }
 
 .top-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
 .back-top { font-size: 28px; cursor: pointer; }
@@ -4377,6 +4378,29 @@ function renderPendingSuggestion(){
   box.innerHTML = "";
   if(!legajo) return;
 
+  // (−2) "Che, ayer te quedó esto SIN CERRAR": tareas (picking/armado) que quedaron
+  // ABIERTAS de un día anterior. Así saben qué les quedó mal y lo terminan si fue sin
+  // querer (último minuto de ayer), o lo continúan si siguen. (v5.59)
+  try {
+    const stL = getLegajoState(legajo), hoy = getTodayKey(), viejas = [];
+    let ayer = ""; try { const dA = new Date(new Date().toLocaleString("en-US", { timeZone: TZ_AR })); dA.setDate(dA.getDate() - 1); ayer = isoToDayKey(dA.getTime()); } catch (_e) {}
+    const chkL = function (label, act, val, tsIni, cerrar) {
+      if (!act || !tsIni) return;
+      const dk = isoToDayKey(tsIni); if (!dk || dk >= hoy) return;   // de hoy → no es de un día anterior
+      let hora = ""; try { hora = new Date(tsIni).toLocaleTimeString("es-AR", { timeZone: TZ_AR, hour: "2-digit", minute: "2-digit" }); } catch (_e) {}
+      const cuando = (ayer && dk === ayer) ? "ayer" : ("el " + dk);
+      viejas.push(label + (val ? " <b>" + escapeHtml(val) + "</b>" : "") + " — abierto <b>" + cuando + (hora ? " " + hora : "") + "</b>, cerralo con <b>" + cerrar + "</b> si ya lo hiciste");
+    };
+    chkL("🛒 Picking", stL.picking && stL.picking.active, stL.picking && stL.picking.value, stL.picking && stL.picking.ts_inicio, "Fin Picking (TP)");
+    chkL("🔨 Armado", stL.armado && stL.armado.active, stL.armado && stL.armado.value, stL.armado && stL.armado.ts_inicio, "Fin Armado (TAP)");
+    if (viejas.length) {
+      const div = document.createElement("div");
+      div.style.cssText = "background:#fffbeb;border:2px solid #f59e0b;color:#92400e;border-radius:11px;padding:10px 12px;margin:8px 0;font-size:13.5px;font-weight:600;line-height:1.45;";
+      div.innerHTML = "⚠ <b>Te quedó SIN CERRAR de un día anterior:</b><br>• " + viejas.join("<br>• ") + "<br><span style=\"font-weight:500;\">Si ya lo terminaste, cerralo. Si seguís, continuá abajo.</span>";
+      box.appendChild(div);
+    }
+  } catch (_e) { /* no-op */ }
+
   // (−1) Picking interactivo en curso, guardado solo: botón para retomarlo
   // EXACTO donde quedó. Cubre el caso de que se bloquee el celular / se cierre la
   // app a mitad del picking — antes se perdía todo. Va arriba de todo.
@@ -5417,7 +5441,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.58";
+const APP_VERSION = "v5.59";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco

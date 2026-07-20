@@ -22,6 +22,7 @@ catch (_e) {
       "opDraftSave", "opDraftLoad", "opDraftClear", "opAskClose", "opDraftResume",
       "mgAskClose", "rkbAskClose", "insAskClose", "scAskClose", "eaAskClose", "cpAskClose", "rcAskClose",
       "showMoverModal", "mvRender", "mvPickOrigen", "mvConfirmar", "closeMv", "stkFiltroToggleE",
+      "pppSugerirInline", "pppSugInlineClose", "_pppEsCiudadela",
       "stkBodyProceso", "ocBodyEntregas", "ocgEnter", "insRender", "mgRender", "pkRender", "stockBajaPicking",
       "stockSepararAFacturar", "stockSalidaFacturado",
       "showMGChooser", "showRacksBajarModal", "rkbRender", "rkbConfirmar", "rkbFetchCxM", "rkbSetSec",
