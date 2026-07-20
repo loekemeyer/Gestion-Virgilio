@@ -5417,7 +5417,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.57";
+const APP_VERSION = "v5.58";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -9269,6 +9269,23 @@ async function stkToggleAutoBajada() {
     _stk.abrOn = (nuevo === "1"); stkRender();
   } catch (_e) { try { alert("Sin conexión: no se guardó."); } catch (_e2) {} }
 }
+/* EJECUCIÓN de la bajada automática: crea las bajadas como PROPUESTA en Racks_Bajadas
+   (mismo camino que el operario en "bajar de racks" → las aprueba Marianela en Recepción,
+   ahí recién se mueve el stock racks− / terminado+). NO decrementa la planimetría (no
+   elige celda; la planimetría se reconcilia aparte). Solo aparece con el switch ON. */
+async function stkAutoBajadaGenerar() {
+  if (!_stk) return;
+  const r = stkAutoBajadaCompute();
+  if (!r.bajar.length) { try { alert("No hay nada para bajar."); } catch (_e) {} return; }
+  const totC = r.bajar.reduce(function (s, x) { return s + x.cajas; }, 0);
+  if (!confirm("Vas a generar la bajada automática de " + r.bajar.length + " código(s) · " + totC + " cajas.\n\n⚠ Revisá que el stock de góndola esté bien (si hay negativos, baja de más).\n\nQueda como PROPUESTA para que Marianela apruebe en Recepción. ¿Generar?")) return;
+  const rows = r.bajar.map(function (x) { return { orden_id: null, cod_art: x.cod, descripcion: x.desc || null, cajas: x.cajas, estado: "propuesta", creada_por: "auto" }; });
+  try {
+    const resp = await fetch(SUPABASE_RACKS_BAJ_ENDPOINT, { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" }, body: JSON.stringify(rows) });
+    if (!resp.ok) throw new Error("HTTP " + resp.status);
+    try { alert("✓ Generada la bajada: " + r.bajar.length + " código(s) · " + totC + " cajas.\nMarianela la aprueba en Recepción → “Bajadas Racks → góndola”."); } catch (_e) {}
+  } catch (e) { try { alert("Error generando la bajada: " + (e.message || e)); } catch (_e) {} }
+}
 function stkAutoBajadaSection() {
   if (_stk.planiLoaded !== true) return "";
   const on = !!_stk.abrOn;
@@ -9278,7 +9295,7 @@ function stkAutoBajadaSection() {
     '<div style="font-size:12px;color:#4338ca;margin-top:2px;">' + (on ? 'Activada — calcula qué bajar por capacidad de góndola.' : 'Desactivada — prendé cuando confíes en el stock de góndola.') + '</div></div>' + sw + '</div>';
   if (!on) return h;
   const r = stkAutoBajadaCompute();
-  h += '<div class="stk-cut" style="background:#eef6ff;border:1px solid #bfdbfe;color:#1e40af;">Baja para <b>llenar la góndola</b> = capacidad − lo que ya hay, <b>solo en master completos</b> (nunca se abre un master) y hasta lo que haya en racks. <b>Preview</b>: todavía no crea la orden ni carga al operario.</div>';
+  h += '<div class="stk-cut" style="background:#eef6ff;border:1px solid #bfdbfe;color:#1e40af;">Baja para <b>llenar la góndola</b> = capacidad − lo que ya hay, <b>solo en master completos</b> (nunca se abre un master) y hasta lo que haya en racks. ⚠ Revisá que el <b>stock de góndola</b> esté cargado antes de generar (si hay negativos, baja de más).</div>';
   if (!r.bajar.length) h += '<div class="stk-empty">Nada para bajar automático ahora (góndola llena, sin capacidad cargada o sin CxM).</div>';
   else {
     let totC = 0, totM = 0;
@@ -9289,6 +9306,7 @@ function stkAutoBajadaSection() {
     });
     h += '</tbody></table></div>';
     h += '<div style="font-size:12.5px;color:#334155;margin-top:6px;"><b>Total a bajar:</b> ' + totM + ' master · ' + totC + ' cajas.</div>';
+    h += '<button class="stk-btn ok" style="width:100%;margin-top:10px;" onclick="stkAutoBajadaGenerar()">📋 Generar la bajada (queda para que Marianela apruebe)</button>';
   }
   if (r.sinMaster.length) h += '<div style="font-size:11.5px;color:#92400e;margin-top:6px;">⚠ ' + r.sinMaster.length + ' con hueco y stock en racks pero <b>sin master (CxM) cargado</b> → no entran al automático: ' + r.sinMaster.map(function (x) { return escapeHtml(x.cod); }).join(", ") + '.</div>';
   return h + '<div style="height:14px;border-bottom:1px solid #e2e8f0;margin:12px 0;"></div>';

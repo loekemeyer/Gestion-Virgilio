@@ -18,7 +18,7 @@ catch (_e) {
     const need = ["stockComputeSaldos", "stkBodyStocks", "stkBodyStocksTab", "stkBodyConteo", "stkBodyCapacidad", "openAgentesAdmin", "agtRender", "openProductividad", "prodRender",
       "prodCompute", "prodLoad", "prodExportCsv", "prodSetMeta", "_pvPremio", "_pvMetas",
       "stkBodyRacks", "stkRacksCapCompute", "stkRacksCapSummary", "stkPlnSet", "stkPlaniLoad",
-      "stkAutoBajadaCompute", "stkAutoBajadaSection", "stkToggleAutoBajada",
+      "stkAutoBajadaCompute", "stkAutoBajadaSection", "stkToggleAutoBajada", "stkAutoBajadaGenerar",
       "opDraftSave", "opDraftLoad", "opDraftClear", "opAskClose", "opDraftResume",
       "mgAskClose", "rkbAskClose", "insAskClose", "scAskClose", "eaAskClose", "cpAskClose", "rcAskClose",
       "showMoverModal", "mvRender", "mvPickOrigen", "mvConfirmar", "closeMv", "stkFiltroToggleE",
