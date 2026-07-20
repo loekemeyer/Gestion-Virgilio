@@ -5402,7 +5402,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.52";
+const APP_VERSION = "v5.53";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -8064,7 +8064,7 @@ function stkAsOfApply() {
   stkRender();
 }
 function stkAsOfLive() { if (!_stk) return; _stk.asOf = null; _stk.openArt = null; stkRender(); }
-function stkTab(t) { if (!_stk) return; if (t === "compras") { openOCAdmin(); return; } _stk.tab = t; _stk.filtro = ""; _stk.openArt = null; if (t === "capacidad" && !_stk.capLoaded) { stkCapLoad(); return; } stkRender(); }
+function stkTab(t) { if (!_stk) return; if (t === "compras") { openOCAdmin(); return; } _stk.tab = t; _stk.filtro = ""; _stk.openArt = null; if (t === "capacidad" && !_stk.capLoaded) { stkCapLoad(); return; } if (t === "racks" && !_stk.planiLoaded) { stkPlaniLoad(); return; } stkRender(); }
 function stkRender() {
   if (!_stk) return;
   if (_stk.soloConteo) {   // rol "solo conteo": sin solapas, directo al conteo físico
@@ -9153,9 +9153,107 @@ function stkUnits(cajas, cod, factors) {
   if (U) p.push((cajas * U) + " u");
   return p.length ? p.join(" · ") : "";
 }
+/* v5.53 — Capacidad de POSICIONES de racks (planimetría viva). Lee
+   Racks_Planimetria (1 fila por ubicación/artículo; una posición física = 1 palet)
+   y arma el resumen "¿cuántos palets vacíos entran hoy?" + simulador de importación
+   + lista de posiciones por liberarse (poca mercadería). Solo lectura (anon SELECT). */
+const SUPABASE_RACKS_PLANI_ENDPOINT = SUPABASE_URL + "/rest/v1/Racks_Planimetria";
+async function racksFetchPlani() { try { const r = await fetch(SUPABASE_RACKS_PLANI_ENDPOINT + "?select=sector,emp,cod_art,master_cajas,innercajas,estado&limit=5000", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" }); return r.ok ? r.json() : []; } catch (_e) { return []; } }
+async function stkPlaniLoad() {
+  if (!_stk) return;
+  _stk.planiLoaded = "loading"; stkRender();
+  _stk.plani = await racksFetchPlani();
+  _stk.planiLoaded = true;
+  if (_stk) stkRender();
+}
+/* Agrupa la planimetría por posición física (sector). Una posición puede tener
+   varios códigos (palet mezclado); "Pedidos"/"Cajas" son slots especiales. */
+function stkRacksCapCompute() {
+  const bySec = {};
+  (_stk.plani || []).forEach(function (r) {
+    const sec = String(r.sector || "").trim(); if (!sec) return;
+    if (!bySec[sec]) bySec[sec] = { sector: sec, ocupado: false, pedidos: false, cajas: false, inner: 0, master: 0, items: [] };
+    const g = bySec[sec];
+    if (String(r.estado) === "ocupado") g.ocupado = true;
+    const cod = (r.cod_art == null) ? "" : String(r.cod_art).trim(), codU = cod.toUpperCase();
+    if (codU === "PEDIDOS") g.pedidos = true;
+    else if (codU === "CAJAS") g.cajas = true;
+    else if (cod) {
+      const inner = Number(r.innercajas) || 0, master = Number(r.master_cajas) || 0;
+      g.inner += inner; g.master += master; g.items.push({ cod: cod, inner: inner, master: master });
+    }
+  });
+  const pos = Object.keys(bySec).map(function (k) { return bySec[k]; });
+  return {
+    pos: pos,
+    libres:   pos.filter(function (p) { return !p.ocupado; }),
+    pedidos:  pos.filter(function (p) { return p.ocupado && p.pedidos; }),
+    cajasSlot:pos.filter(function (p) { return p.ocupado && p.cajas && !p.pedidos; }),
+    conMerc:  pos.filter(function (p) { return p.ocupado && !p.pedidos && !p.cajas && (p.inner > 0 || p.master > 0); }),
+    agotadas: pos.filter(function (p) { return p.ocupado && !p.pedidos && !p.cajas && p.inner === 0 && p.master === 0 && p.items.length; })
+  };
+}
+function stkPlnSet(v) {
+  if (!_stk) return;
+  let n = parseInt(v, 10); if (isNaN(n) || n < 0) n = 0; if (n > 999) n = 999;
+  _stk.plnPalets = n;
+  try { localStorage.setItem("vir_racks_palets_in", String(n)); } catch (_e) {}
+  stkRender();
+}
+function stkRacksCapSummary() {
+  if (_stk.planiLoaded !== true) return '<div class="stk-loading" style="padding:14px">Cargando planimetría de racks…</div>';
+  const c = stkRacksCapCompute();
+  const libres = c.libres.length, agot = c.agotadas.length, ped = c.pedidos.length, ocup = c.conMerc.length, casi = libres + agot;
+  if (_stk.plnPalets == null) { let s = 26; try { const v = parseInt(localStorage.getItem("vir_racks_palets_in"), 10); if (!isNaN(v)) s = v; } catch (_e) {} _stk.plnPalets = s; }
+  const n = _stk.plnPalets;
+  const badge = function (num, lbl, bg, bd, col) { return '<span style="background:' + bg + ';border:1px solid ' + bd + ';border-radius:10px;padding:6px 11px;font-size:12px;color:' + col + ';"><b style="font-size:15px">' + num + '</b> ' + lbl + '</span>'; };
+  let simBg, simBd, simCol, simTxt;
+  if (n <= 0) { simBg = "#f1f5f9"; simBd = "#e2e8f0"; simCol = "#475569"; simTxt = "Poné cuántos palets llegan para ver si entran."; }
+  else if (libres >= n) { simBg = "#dcfce7"; simBd = "#86efac"; simCol = "#166534"; simTxt = "✓ <b>Entran los " + n + "</b> en posiciones libres. Quedan <b>" + (libres - n) + "</b> libres después."; }
+  else if (casi >= n) { simBg = "#fef3c7"; simBd = "#fcd34d"; simCol = "#92400e"; simTxt = "⚠ Entran los " + n + " <b>pero hay que liberar " + (n - libres) + "</b> posición(es) agotada(s) (código con 0 cajas — ver abajo). Libres reales: <b>" + libres + "</b>."; }
+  else { simBg = "#fee2e2"; simBd = "#fca5a5"; simCol = "#991b1b"; simTxt = "✗ <b>No entran.</b> Faltan <b>" + (n - casi) + "</b> posición(es) aun liberando las " + agot + " agotadas. Hay que bajar mercadería a góndola o buscar otro lado."; }
+  let h = '<div class="stk-cut" style="background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af;">📦 <b>Palets vacíos que entran en racks</b> (planimetría viva · 1 posición = 1 palet). <b>Libres</b> = vacías listas · <b>Casi libres</b> = con código pero <b>0 cajas</b> (se barren) · <b>Reservadas</b> = "Pedidos".</div>';
+  h += '<div style="display:flex;flex-wrap:wrap;gap:8px;margin:12px 0;">' +
+    badge(libres, 'posiciones LIBRES', '#dcfce7', '#86efac', '#166534') +
+    badge(agot, 'casi libres (0 cajas)', '#fef9c3', '#fde047', '#854d0e') +
+    badge(ped, 'reservadas (Pedidos)', '#e0e7ff', '#a5b4fc', '#3730a3') +
+    badge(ocup, 'ocupadas c/ mercadería', '#f1f5f9', '#e2e8f0', '#475569') + '</div>';
+  h += '<div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:12px 13px;margin-bottom:12px;">' +
+    '<div style="font-size:13px;font-weight:700;color:#334155;margin-bottom:8px;">🚚 ¿Entra la importación que llega?</div>' +
+    '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">' +
+    '<span style="font-size:13px;color:#475569;">Palets que llegan:</span>' +
+    '<button class="stk-btn" style="width:auto;padding:6px 12px;" onclick="stkPlnSet(' + (n - 1) + ')">–</button>' +
+    '<input id="stkPlnInp" type="number" min="0" inputmode="numeric" value="' + n + '" oninput="stkPlnSet(this.value)" style="width:74px;height:40px;text-align:center;font-size:18px;font-weight:800;border:2px solid #cbd5e1;border-radius:9px;">' +
+    '<button class="stk-btn" style="width:auto;padding:6px 12px;" onclick="stkPlnSet(' + (n + 1) + ')">+</button>' +
+    '</div>' +
+    '<div style="margin-top:10px;background:' + simBg + ';border:1px solid ' + simBd + ';color:' + simCol + ';border-radius:10px;padding:10px 12px;font-size:13.5px;">' + simTxt + '</div>' +
+    '</div>';
+  if (libres) {
+    const libSec = c.libres.map(function (p) { return p.sector; }).sort();
+    h += '<div class="stk-aj-h">Posiciones libres (' + libres + ') — dónde meterlos</div>';
+    h += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;">' + libSec.map(function (s) { return '<span style="background:#f0fdf4;border:1px solid #bbf7d0;color:#166534;border-radius:8px;padding:4px 9px;font-size:12.5px;font-weight:700;font-family:Consolas,Menlo,monospace;">' + escapeHtml(s) + '</span>'; }).join("") + '</div>';
+  }
+  const liber = c.agotadas.slice().concat(c.conMerc.filter(function (p) { return p.inner > 0 && p.inner <= 36; }));
+  liber.sort(function (a, b) { return a.inner - b.inner; });
+  const liberTop = liber.slice(0, 15);
+  h += '<div class="stk-aj-h">Se están por liberar (poca mercadería) — ' + liber.length + '</div>';
+  if (!liber.length) h += '<div class="stk-empty">Nada con poca mercadería ahora mismo.</div>';
+  else {
+    h += '<table class="stk-tbl"><thead><tr><th>Posición</th><th>Contenido</th><th class="num">Master</th><th class="num">Cajas</th></tr></thead><tbody>';
+    liberTop.forEach(function (p) {
+      const cont = p.items.length ? p.items.map(function (it) { return it.cod; }).join(", ") : "—";
+      const vacia = (p.inner === 0 && p.master === 0);
+      h += '<tr><td class="stk-cod">' + escapeHtml(p.sector) + '</td><td class="stk-desc">' + escapeHtml(cont) + (vacia ? ' <span style="color:#854d0e;font-weight:700">(vacía — se barre)</span>' : '') + '</td><td class="num">' + p.master + '</td><td class="num"><b>' + p.inner + '</b></td></tr>';
+    });
+    h += '</tbody></table>';
+    if (liber.length > liberTop.length) h += '<div style="font-size:12px;color:#94a3b8;margin-top:6px;">…y ' + (liber.length - liberTop.length) + ' más con poca mercadería.</div>';
+  }
+  return h + '<div style="height:16px;border-bottom:1px solid #e2e8f0;margin-bottom:14px;"></div>';
+}
 function stkBodyRacks() {
+  let h = stkRacksCapSummary();
   const pend = (_stk.ordenes || []).filter(function (o) { return o.estado === "pendiente"; });
-  let h = pend.length
+  h += pend.length
     ? '<div class="stk-rk-orden pend">📦 Hay una orden de bajar racks→góndola <b>PENDIENTE</b> (' + escapeHtml(String(pend[0].fecha || "")) + '). A los operarios les aparece la alarma; ellos registran lo que bajan y vos lo aprobás acá abajo.</div>'
     : '<div class="stk-rk-orden">No hay orden de bajada pendiente.</div>';
   h += '<button class="stk-btn ok" onclick="racksCrearOrden()">📋 OCs generadas — emitir orden de bajar racks</button>';
