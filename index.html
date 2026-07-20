@@ -172,6 +172,8 @@ button {
 .box-sm[data-code="CP"] .box-title { color: #15803d; }
 .box[data-code="RC"] { border-color: #fdba74; background: #fff7ed; }
 .box-sm[data-code="RC"] .box-title { color: #c2410c; }
+.box[data-code="EA"] { border-color: #c4b5fd; background: #f5f3ff; }
+.box-sm[data-code="EA"] .box-title { color: #6d28d9; }
 .box:active { transform: scale(.96); }
 .box-title { font-size: 18px; font-weight: bold; }
 .box-desc { font-size: 11px; margin-top: 3px; line-height: 1.2; overflow-wrap: break-word; word-break: break-word; hyphens: auto; }
@@ -3376,7 +3378,7 @@ const SUPABASE_PLANIMETRIA_ENDPOINT =
 const filas = {
   row1: ["EP","TP","AP","TAP","CR","CC"],
   row2: ["RT","RR","MG"],
-  row3: ["RI","EI","SC","CP","RC"],
+  row3: ["RI","EI","EA","SC","CP","RC"],
   row4: ["AT","PB","Limp","Perm","PC","CT"]
 };
 // Filas secundarias (botones más chicos): uso puntual. Las primarias (row1/row2)
@@ -3389,7 +3391,7 @@ const desc = {
   TAP:"Terminé Armado Pedido", CR:"Control Remitos", CC:"Inicio/Fin Carga Camión",
   RR:"Recepción Remitos",
   RT:"Recepción Mercadería", MG:"Guardado a Góndola",
-  RI:"Recepción Insumos", EI:"Entrega Insumos", SC:"Salida a Cervantes",
+  RI:"Recepción Insumos", EI:"Entrega Insumos", EA:"Entrega p/ envasar", SC:"Salida a Cervantes",
   CP:"Completar Pedido", RC:"Pasar a urgente",
   AT:"Atendí Timbre", PB:"Paré Baño", Limp:"Limpieza",
   Perm:"Permiso de Salida", PC:"Paré Comida",CT:"Conteo",
@@ -4821,6 +4823,10 @@ function selectOption(code) {
   // modal directo (sin Enviar; el evento RC lo emite el modal al confirmar).
   if (code === "RC") { showRCModal(legajoStr); return; }
 
+  // v5.52: Entrega Artículos para envasar — muestra el stock del depósito
+  // "para_envasar" y lo da de baja al entregarlo (modal directo; evento EA).
+  if (code === "EA") { showEAModal(legajoStr); return; }
+
   // CC ya abierto: el botón CC RE-ABRE el popup de Carga Camión (no lo cierra).
   // El cierre se hace SOLO con "Terminé Carga Camión" dentro del popup.
   if (code === "CC") {
@@ -5396,7 +5402,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.51";
+const APP_VERSION = "v5.52";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -9759,6 +9765,98 @@ function rkbEmitFueraLista(cod, cajas, legajo) {
     legajo: String(legajo || "").trim(), opcion: "RKX", descripcion: "Bajada de racks fuera de lista",
     texto: (String(cod).toUpperCase() + "|R" + (cajas || 0)),
     ts: Date.now(), id: ("rkx_" + String(cod).toUpperCase() + "_" + String(legajo || "").trim() + "_" + Date.now()).replace(/[^a-zA-Z0-9_\-]/g, ""), ts_inicio_iso: null
+  };
+  enqueueReport(payload);
+  if (typeof trySendOneReport === "function") trySendOneReport(payload).then(function (r) { if (r && r.ok) removeFromQueue(payload.id); }).catch(function () {});
+  try { updatePendingIndicator(); } catch (_e) {}
+}
+
+/* ===== STOCK — EA · Entrega Artículos para envasar (v5.52): el operario ve lo que
+   hay en el depósito "para_envasar" (los códigos que el Conteo Definitivo movió ahí,
+   ej. 035E/439E/440E/584E) y lo da de baja al entregarlo para envasar. Igual patrón
+   que "bajar de racks" pero: (1) lee el saldo de para_envasar DIRECTO de
+   Movimientos_Stock (ese depósito está fuera de los 7 hardcodeados de
+   stockComputeSaldos para no contaminar totales/OC), (2) es baja DIRECTA (no cola de
+   aprobación): al confirmar descuenta para_envasar −qty (tipo 'entrega_envasar') y
+   emite el evento EA por código. Si en vez de salir tuviera que ir a góndola, se
+   agrega un +terminado (follow-up). ===== */
+let _ea = null;
+async function eaFetchStock() {
+  const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+  try {
+    const rows = await fetch(SUPABASE_STOCK_ENDPOINT + "?deposito=eq.para_envasar&select=cod_art,descripcion,delta&limit=20000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; });
+    const agg = {};
+    rows.forEach(function (x) {
+      const raw = String(x.cod_art || "").replace(/\s+/g, ""); if (!raw) return;
+      const k = _cpNorm(raw);
+      if (!agg[k]) agg[k] = { cod: raw, saldo: 0, desc: "" };
+      agg[k].saldo += Number(x.delta) || 0;
+      if (x.descripcion && !agg[k].desc) agg[k].desc = String(x.descripcion);
+    });
+    return agg;
+  } catch (_e) { return {}; }
+}
+async function showEAModal(legajo) {
+  if (!document.getElementById("eaCss")) {
+    const s = document.createElement("style"); s.id = "eaCss";
+    s.textContent = "#eaModal{display:none;position:fixed;inset:0;z-index:1290;background:rgba(2,6,23,.74);overflow:auto;padding:12px;}#eaModal.show{display:block;}.ea-card{background:#f8fafc;max-width:460px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.ea-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;background:linear-gradient(90deg,#7c3aed,#6d28d9);color:#fff;}.ea-title{font-size:17px;font-weight:800;}.ea-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}.ea-body{padding:13px 14px;}.ea-hint{font-size:12.5px;color:#64748b;margin-bottom:10px;line-height:1.35;}.ea-search{width:100%;height:44px;border:2px solid #cbd5e1;border-radius:11px;padding:0 13px;font-size:16px;font-weight:700;margin-bottom:10px;box-sizing:border-box;}.ea-row{display:flex;align-items:center;gap:10px;border:1px solid #e2e8f0;border-radius:13px;padding:10px 12px;margin-bottom:8px;background:#fff;}.ea-info{flex:1;min-width:0;}.ea-cod{font-size:16px;font-weight:800;font-family:Consolas,Menlo,monospace;}.ea-desc{font-size:12px;color:#475569;}.ea-av{font-size:11.5px;color:#64748b;}.ea-stpcol{display:flex;flex-direction:column;align-items:center;gap:3px;}.ea-u{font-size:10.5px;color:#64748b;font-weight:800;text-align:center;text-transform:uppercase;letter-spacing:.3px;}.ea-stp{display:flex;align-items:center;gap:6px;}.ea-sb{width:42px;height:46px;border:none;border-radius:9px;font-size:24px;font-weight:800;cursor:pointer;background:#e2e8f0;color:#475569;display:flex;align-items:center;justify-content:center;line-height:1;padding:0;margin:0;}.ea-inp{width:54px;height:46px;box-sizing:border-box;text-align:center;font-size:20px;font-weight:800;border:2px solid #cbd5e1;border-radius:9px;padding:0;-moz-appearance:textfield;}.ea-inp::-webkit-outer-spin-button,.ea-inp::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}.ea-fin{width:100%;margin-top:10px;padding:14px;border:none;border-radius:12px;background:#7c3aed;color:#fff;font-size:17px;font-weight:800;cursor:pointer;}.ea-fin:disabled{background:#cbd5e1;color:#64748b;cursor:not-allowed;}.ea-empty{padding:18px;text-align:center;color:#64748b;font-size:14px;}";
+    document.head.appendChild(s);
+  }
+  let ov = document.getElementById("eaModal");
+  if (!ov) { ov = document.createElement("div"); ov.id = "eaModal"; document.body.appendChild(ov); }
+  ov.classList.add("show");
+  ov.innerHTML = '<div class="ea-card"><div class="ea-head"><span class="ea-title">🫙 Entrega artículos para envasar</span><button class="ea-close" onclick="closeEA()">Cerrar</button></div><div class="ea-body" id="eaBody"><div class="ea-empty">Cargando…</div></div></div>';
+  try {
+    const res = await Promise.all([eaFetchStock(), loadArtNombres()]);
+    const agg = res[0] || {};
+    const items = Object.keys(agg).map(function (k) { return agg[k]; }).filter(function (a) { return (a.saldo || 0) > 0; })
+      .sort(function (a, b) { return (parseInt(a.cod, 10) || 0) - (parseInt(b.cod, 10) || 0); })
+      .map(function (a) { return { cod: a.cod, desc: artNombre(a.cod, a.desc), saldo: Math.round(a.saldo), baja: 0 }; });
+    _ea = { legajo: String(legajo || ""), items: items, filtro: "" };
+    eaRender();
+  } catch (e) { const b = document.getElementById("eaBody"); if (b) b.innerHTML = '<div class="ea-empty">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
+}
+function eaRender() {
+  if (!_ea) return; const body = document.getElementById("eaBody"); if (!body) return;
+  let h = '<div class="ea-hint">Estos son los artículos en <b>“para envasar”</b>. Poné cuántas cajas <b>entregás para envasar</b> y tocá registrar — se <b>descuentan</b> del stock de “para envasar”.</div>';
+  h += '<input id="eaSearch" class="ea-search" type="search" autocomplete="off" placeholder="🔎 Buscar código…" value="' + escapeHtml(_ea.filtro || "") + '" oninput="eaSearchInput(this.value)">';
+  const fq = String(_ea.filtro || "").trim().toLowerCase();
+  const shown = fq ? _ea.items.filter(function (it) { return String(it.cod).toLowerCase().indexOf(fq) >= 0; }) : _ea.items;
+  if (!shown.length) h += '<div class="ea-empty">' + (fq ? "Sin resultados." : "No hay artículos para envasar. 👍") + '</div>';
+  h += shown.map(function (it) {
+    const i = _ea.items.indexOf(it);
+    const mx = it.saldo;
+    return '<div class="ea-row"><div class="ea-info"><span class="ea-cod">' + escapeHtml(it.cod) + '</span> <span class="ea-desc">' + escapeHtml(it.desc || "") + '</span><div class="ea-av">para envasar: <b>' + it.saldo + '</b> cajas</div></div>' +
+      '<div class="ea-stpcol"><span class="ea-u">cajas</span><div class="ea-stp"><button class="ea-sb" onclick="eaChg(' + i + ',-1)">–</button><input class="ea-inp" type="number" min="0" max="' + mx + '" inputmode="numeric" value="' + it.baja + '" oninput="eaSet(' + i + ',this.value)"><button class="ea-sb" onclick="eaChg(' + i + ',1)">+</button></div></div></div>';
+  }).join("");
+  const tot = _ea.items.reduce(function (s, it) { return s + (it.baja || 0); }, 0);
+  h += '<button class="ea-fin"' + (tot <= 0 ? " disabled" : "") + ' onclick="eaConfirmar()">✓ Registrar entrega' + (tot > 0 ? " (" + tot + " cajas)" : "") + '</button>';
+  _renderKeepFocus(body, h);
+}
+function eaSearchInput(v) { if (!_ea) return; _ea.filtro = String(v == null ? "" : v); eaRender(); }
+function eaChg(i, d) { if (!_ea) return; const it = _ea.items[i]; if (!it) return; it.baja = Math.max(0, Math.min(it.saldo, it.baja + d)); eaRender(); }
+function eaSet(i, v) { if (!_ea) return; const it = _ea.items[i]; if (!it) return; let n = Math.max(0, parseInt(v, 10) || 0); if (n > it.saldo) n = it.saldo; it.baja = n; eaRender(); }
+function closeEA() { const ov = document.getElementById("eaModal"); if (ov) ov.classList.remove("show"); _ea = null; }
+function eaConfirmar() {
+  if (!_ea) return;
+  const sel = _ea.items.filter(function (it) { return it.baja > 0; });
+  if (!sel.length) return;
+  const leg = _ea.legajo || "";
+  const rows = sel.map(function (it) {
+    return { cod_art: it.cod, descripcion: it.desc || null, deposito: "para_envasar", delta: -Number(it.baja), tipo: "entrega_envasar", ref: "operario", legajo: leg || null };
+  });
+  try { stockMove(rows); } catch (_e) {}
+  sel.forEach(function (it) { try { eaEmitEvent(it.cod, it.baja, leg); } catch (_e) {} });
+  try { updatePendingIndicator(); } catch (_e) {}
+  const tot = sel.reduce(function (s, it) { return s + Number(it.baja || 0); }, 0);
+  closeEA();
+  try { alert("✓ Entregaste " + tot + " caja(s) para envasar.\nSe descontaron del stock de “para envasar”."); } catch (_e) {}
+}
+function eaEmitEvent(cod, cajas, legajo) {
+  const payload = {
+    legajo: String(legajo || "").trim(), opcion: "EA", descripcion: "Entrega artículos para envasar",
+    texto: (String(cod).toUpperCase() + "|" + (cajas || 0)),
+    ts: Date.now(), id: ("ea_" + String(cod).toUpperCase() + "_" + String(legajo || "").trim() + "_" + Date.now()).replace(/[^a-zA-Z0-9_\-]/g, ""), ts_inicio_iso: null
   };
   enqueueReport(payload);
   if (typeof trySendOneReport === "function") trySendOneReport(payload).then(function (r) { if (r && r.ok) removeFromQueue(payload.id); }).catch(function () {});

@@ -22,7 +22,8 @@ catch (_e) {
       "showMGChooser", "showRacksBajarModal", "rkbRender", "rkbConfirmar", "rkbFetchCxM", "rkbSetSec",
       "showCPModal", "cpRender", "cpConfirm", "cpLoadPickSinArmar", "showInstructivo", "equivResolve", "pppZonaDeBarrio",
       "showRCModal", "rcConfirm", "rcLoadDonors", "showRemitoArmado", "armadoRemitoData", "armadoRemitoInnerHtml", "remitoPrintDoc",
-      "openPrintStation", "psToggle", "psPoll", "psTestPrint", "psPrintBatch", "psSeedTodayIfNeeded", "psRender"];
+      "openPrintStation", "psToggle", "psPoll", "psTestPrint", "psPrintBatch", "psSeedTodayIfNeeded", "psRender",
+      "showEAModal", "eaFetchStock", "eaRender", "eaConfirmar", "eaEmitEvent"];
     const missing = need.filter((n) => typeof window[n] !== "function");
     const ts = new Date().toISOString();
     const sal = stockComputeSaldos([
