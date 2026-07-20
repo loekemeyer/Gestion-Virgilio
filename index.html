@@ -9239,6 +9239,18 @@ function stkAutoBajadaSection() {
   if (r.sinMaster.length) h += '<div style="font-size:11.5px;color:#92400e;margin-top:6px;">⚠ ' + r.sinMaster.length + ' con hueco y stock en racks pero <b>sin master (CxM) cargado</b> → no entran al automático: ' + r.sinMaster.map(function (x) { return escapeHtml(x.cod); }).join(", ") + '.</div>';
   return h + '<div style="height:14px;border-bottom:1px solid #e2e8f0;margin:12px 0;"></div>';
 }
+/* Zonas de racks reservadas para INSUMOS (regla del dueño): V01–V16 + V21/V22 y
+   R01–R18. NO son posiciones de artículo terminado → NO se cuentan como racks
+   libres/ocupadas para palets. (Las que hay hoy en la planimetría arrancan en V17
+   y R20, así que hoy no cambia el número; queda defensivo por si se cargan.) */
+function _racksZonaInsumo(sector) {
+  const m = String(sector || "").toUpperCase().trim().match(/^([A-Z]+)(\d+)$/);
+  if (!m) return false;
+  const pref = m[1], n = parseInt(m[2], 10);
+  if (pref === "V") return (n >= 1 && n <= 16) || n === 21 || n === 22;
+  if (pref === "R") return (n >= 1 && n <= 18);
+  return false;
+}
 /* Agrupa la planimetría por posición física (sector). Una posición puede tener
    varios códigos (palet mezclado); "Pedidos"/"Cajas" son slots especiales. */
 function stkRacksCapCompute() {
@@ -9256,7 +9268,7 @@ function stkRacksCapCompute() {
       g.inner += inner; g.master += master; g.items.push({ cod: cod, inner: inner, master: master });
     }
   });
-  const pos = Object.keys(bySec).map(function (k) { return bySec[k]; });
+  const pos = Object.keys(bySec).map(function (k) { return bySec[k]; }).filter(function (p) { return !_racksZonaInsumo(p.sector); });
   return {
     pos: pos,
     libres:   pos.filter(function (p) { return !p.ocupado; }),
@@ -9285,7 +9297,7 @@ function stkRacksCapSummary() {
   else if (libres >= n) { simBg = "#dcfce7"; simBd = "#86efac"; simCol = "#166534"; simTxt = "✓ <b>Entran los " + n + "</b> en posiciones libres. Quedan <b>" + (libres - n) + "</b> libres después."; }
   else if (casi >= n) { simBg = "#fef3c7"; simBd = "#fcd34d"; simCol = "#92400e"; simTxt = "⚠ Entran los " + n + " <b>pero hay que liberar " + (n - libres) + "</b> posición(es) agotada(s) (código con 0 cajas — ver abajo). Libres reales: <b>" + libres + "</b>."; }
   else { simBg = "#fee2e2"; simBd = "#fca5a5"; simCol = "#991b1b"; simTxt = "✗ <b>No entran.</b> Faltan <b>" + (n - casi) + "</b> posición(es) aun liberando las " + agot + " agotadas. Hay que bajar mercadería a góndola o buscar otro lado."; }
-  let h = '<div class="stk-cut" style="background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af;">📦 <b>Palets vacíos que entran en racks</b> (planimetría viva · 1 posición = 1 palet). <b>Libres</b> = vacías listas · <b>Casi libres</b> = con código pero <b>0 cajas</b> (se barren) · <b>Reservadas</b> = "Pedidos".</div>';
+  let h = '<div class="stk-cut" style="background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af;">📦 <b>Palets vacíos que entran en racks</b> (planimetría viva · 1 posición = 1 palet). <b>Libres</b> = vacías listas · <b>Casi libres</b> = con código pero <b>0 cajas</b> (se barren) · <b>Reservadas</b> = "Pedidos". <span style="opacity:.85;">Las zonas de insumos (V01–V16/V21/V22 y R01–R18) no se cuentan.</span></div>';
   h += '<div style="display:flex;flex-wrap:wrap;gap:8px;margin:12px 0;">' +
     badge(libres, 'posiciones LIBRES', '#dcfce7', '#86efac', '#166534') +
     badge(agot, 'casi libres (0 cajas)', '#fef9c3', '#fde047', '#854d0e') +

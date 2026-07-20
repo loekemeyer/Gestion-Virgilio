@@ -36,6 +36,7 @@ declare
   v_codn    text := upper(replace(trim(coalesce(p_cod, '')), ' ', ''));
   v_total   numeric;
   v_nombre  text;
+  v_otras   text;
   v_bucket  text := to_char(now() at time zone 'America/Argentina/Buenos_Aires', 'YYYYMMDD_HH24MI');
 begin
   if p_inner is null or p_inner <= 0 or p_inner > 100000 then
@@ -71,10 +72,18 @@ begin
 
   -- (1) La POSICIÓN del rack quedó vacía → se LIBERA (anula el art, pasa a 'libre')
   if coalesce(v_pos_new, 0) <= 0 then
+    -- ¿en qué OTRAS posiciones sigue estando este artículo? (con stock, distinta a la vaciada)
+    select string_agg(sector || ' (' || coalesce(innercajas, 0) || ' cj)', ', ' order by sector)
+      into v_otras
+      from "Racks_Planimetria"
+     where upper(replace(trim(cod_art), ' ', '')) = v_codn
+       and estado = 'ocupado' and coalesce(innercajas, 0) > 0 and sector <> p_sector;
     perform tg_enqueue(
       '📦 RACK LIBRE — La posición ' || coalesce(p_sector, '?') ||
       ' quedó VACÍA (se bajó lo último de ' || coalesce(p_cod, '?') ||
-      coalesce(' · ' || v_nombre, '') || '). Quedó LIBRE para otro palet.',
+      coalesce(' · ' || v_nombre, '') || '). Quedó LIBRE para otro palet.' ||
+      case when v_otras is not null then ' Ese artículo todavía está en: ' || v_otras || '.'
+           else ' (No queda en ninguna otra posición de rack.)' end,
       'rackpos0|' || coalesce(p_sector, '') || '|' || v_codn || '|' || v_bucket
     );
     -- Regla del dueño: si quedó en 0, se anula ese artículo para esa ubicación y pasa a libre.
