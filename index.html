@@ -3299,6 +3299,7 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
   <div class="botonera-sep">acciones secundarias</div>
   <div class="row row-6 row-sec" id="row3"></div>
   <div class="row row-6 row-sec" id="row4"></div>
+  <button id="moverOpBtn" onclick="showMoverModal(legajoInput.value)" style="background:#ecfeff;border:1.5px solid #a5f3fc;color:#0e7490;border-radius:12px;font-weight:800;font-size:14px;">🔀 Mover mercadería de lugar (racks)</button>
   <div id="racksAlarma"></div>
   <div id="pendingSuggestion"></div>
 
@@ -5416,7 +5417,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.54";
+const APP_VERSION = "v5.55";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -9352,6 +9353,7 @@ function stkRacksCapSummary() {
 function stkBodyRacks() {
   let h = stkRacksCapSummary();
   h += stkAutoBajadaSection();
+  h += '<button class="stk-btn" style="width:100%;margin-bottom:14px;background:#ecfeff;border-color:#a5f3fc;color:#0e7490;" onclick="showMoverModal(\'0\')">🔀 Mover mercadería de una ubicación a otra</button>';
   const pend = (_stk.ordenes || []).filter(function (o) { return o.estado === "pendiente"; });
   h += pend.length
     ? '<div class="stk-rk-orden pend">📦 Hay una orden de bajar racks→góndola <b>PENDIENTE</b> (' + escapeHtml(String(pend[0].fecha || "")) + '). A los operarios les aparece la alarma; ellos registran lo que bajan y vos lo aprobás acá abajo.</div>'
@@ -10020,6 +10022,115 @@ function rkbEmitFueraLista(cod, cajas, legajo) {
   enqueueReport(payload);
   if (typeof trySendOneReport === "function") trySendOneReport(payload).then(function (r) { if (r && r.ok) removeFromQueue(payload.id); }).catch(function () {});
   try { updatePendingIndicator(); } catch (_e) {}
+}
+
+/* ===== MOVER mercadería de una ubicación de rack a otra (v5.55, operario + admin).
+   Solo mueve la PLANIMETRÍA (Racks_Planimetria) vía RPC racks_plani_mover — el total
+   de racks en Movimientos_Stock NO cambia (mover entre celdas no crea ni destruye
+   stock). Origen −, destino +; si el origen queda en 0 se libera; el destino tiene que
+   estar LIBRE o con el MISMO código. ===== */
+let _mv = null;
+async function showMoverModal(legajo) {
+  if (!document.getElementById("mvCss")) {
+    const s = document.createElement("style"); s.id = "mvCss";
+    s.textContent = "#mvModal{display:none;position:fixed;inset:0;z-index:1292;background:rgba(2,6,23,.74);overflow:auto;padding:12px;}#mvModal.show{display:block;}.mv-card{background:#f8fafc;max-width:470px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.mv-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;background:linear-gradient(90deg,#0891b2,#0e7490);color:#fff;}.mv-title{font-size:17px;font-weight:800;}.mv-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}.mv-body{padding:13px 14px;}.mv-hint{font-size:12.5px;color:#64748b;margin-bottom:10px;line-height:1.35;}.mv-empty{padding:22px;text-align:center;color:#64748b;font-size:14px;}.mv-search{width:100%;height:42px;border:2px solid #cbd5e1;border-radius:11px;padding:0 12px;font-size:15px;font-weight:700;margin-bottom:10px;box-sizing:border-box;}.mv-row{display:block;width:100%;text-align:left;border:1px solid #e2e8f0;border-radius:12px;padding:10px 12px;margin-bottom:8px;background:#fff;cursor:pointer;}.mv-r1{display:flex;align-items:baseline;gap:8px;}.mv-sec{font-size:14px;font-weight:800;font-family:Consolas,Menlo,monospace;color:#0e7490;}.mv-cod{font-size:15px;font-weight:800;font-family:Consolas,Menlo,monospace;}.mv-desc{font-size:12px;color:#475569;}.mv-av{font-size:11.5px;color:#64748b;margin-top:2px;}.mv-back{background:none;border:none;color:#1e6bd6;font-weight:800;font-size:14px;cursor:pointer;padding:0 0 8px;width:auto;margin:0;}.mv-sel{background:#ecfeff;border:1px solid #a5f3fc;border-radius:12px;padding:11px 12px;margin-bottom:12px;}.mv-fld{margin-bottom:13px;}.mv-lbl{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:#64748b;margin-bottom:7px;}.mv-stp{display:flex;align-items:center;gap:7px;}.mv-sb{display:flex;align-items:center;justify-content:center;line-height:1;padding:0;margin:0;width:46px;height:50px;border:none;border-radius:10px;font-size:26px;font-weight:800;cursor:pointer;background:#e2e8f0;color:#475569;}.mv-inp{width:74px;height:50px;box-sizing:border-box;margin:0;text-align:center;font-size:22px;font-weight:800;border:2px solid #cbd5e1;border-radius:10px;padding:0;-moz-appearance:textfield;}.mv-inp::-webkit-outer-spin-button,.mv-inp::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}.mv-dests{display:flex;flex-wrap:wrap;gap:7px;}.mv-dest{background:#fff;border:1.5px solid #cbd5e1;border-radius:10px;padding:7px 11px;font-size:13.5px;font-weight:800;font-family:Consolas,Menlo,monospace;color:#334155;cursor:pointer;width:auto;margin:0;}.mv-dest.libre{border-style:dashed;}.mv-dest.on{border-color:#0891b2;background:#ecfeff;color:#0e7490;}.mv-dest small{font-family:system-ui;font-weight:700;color:#64748b;}.mv-fin{width:100%;margin-top:6px;padding:15px;border:none;border-radius:12px;background:#0891b2;color:#fff;font-size:16px;font-weight:800;cursor:pointer;}.mv-fin:disabled{background:#cbd5e1;color:#64748b;cursor:not-allowed;}";
+    document.head.appendChild(s);
+  }
+  let ov = document.getElementById("mvModal");
+  if (!ov) { ov = document.createElement("div"); ov.id = "mvModal"; document.body.appendChild(ov); }
+  ov.classList.add("show");
+  ov.innerHTML = '<div class="mv-card"><div class="mv-head"><span class="mv-title">🔀 Mover mercadería de lugar</span><button class="mv-close" onclick="closeMv()">Cerrar</button></div><div class="mv-body" id="mvBody"><div class="mv-empty">Cargando ubicaciones…</div></div></div>';
+  try {
+    const plani = await racksFetchPlani();
+    await loadArtNombres();
+    _mv = { legajo: String(legajo || ""), plani: plani || [], step: 1, filtroO: "", filtroD: "", origen: null, mover: 0, destino: null };
+    mvRender();
+  } catch (e) { const b = document.getElementById("mvBody"); if (b) b.innerHTML = '<div class="mv-empty">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
+}
+function closeMv() { const ov = document.getElementById("mvModal"); if (ov) ov.classList.remove("show"); _mv = null; }
+function _mvNorm(c) { return String(c == null ? "" : c).toUpperCase().replace(/\s+/g, ""); }
+function _mvEsReal(cod) { const c = _mvNorm(cod); return c && c !== "PEDIDOS" && c !== "CAJAS"; }
+function mvRender() {
+  if (!_mv) return; const body = document.getElementById("mvBody"); if (!body) return;
+  if (_mv.step === 2 && _mv.origen) { mvRenderStep2(body); return; }
+  // Paso 1: elegir el ORIGEN (una celda ocupada con mercadería real)
+  const orig = _mv.plani.filter(function (r) { return r.estado === "ocupado" && _mvEsReal(r.cod_art) && (Number(r.innercajas) || 0) > 0; })
+    .sort(function (a, b) { return String(a.sector).localeCompare(String(b.sector), undefined, { numeric: true }); });
+  const f = _mv.filtroO.trim().toLowerCase();
+  const shown = f ? orig.filter(function (r) { return (String(r.sector) + " " + String(r.cod_art)).toLowerCase().indexOf(f) >= 0; }) : orig;
+  let h = '<div class="mv-hint">Elegí <b>de dónde</b> movés (la ubicación que tiene la mercadería). Después elegís a dónde y cuántas cajas. Solo cambia el <b>mapa de racks</b>, no el stock total.</div>';
+  h += '<input class="mv-search" type="search" autocomplete="off" placeholder="🔎 Buscar código / ubicación…" value="' + escapeHtml(_mv.filtroO) + '" oninput="if(_mv){_mv.filtroO=this.value;mvRender();}">';
+  if (!shown.length) h += '<div class="mv-empty">' + (f ? "Sin resultados." : "No hay mercadería en racks para mover.") + '</div>';
+  h += shown.map(function (r) {
+    const inner = Number(r.innercajas) || 0, master = Number(r.master_cajas) || 0;
+    return '<button class="mv-row" onclick="mvPickOrigen(\'' + encodeURIComponent(r.sector) + '\',\'' + encodeURIComponent(String(r.cod_art)) + '\')">' +
+      '<div class="mv-r1"><span class="mv-sec">' + escapeHtml(r.sector) + '</span> · <span class="mv-cod">' + escapeHtml(String(r.cod_art)) + '</span> <span class="mv-desc">' + escapeHtml(artNombre(r.cod_art, "") || "") + '</span></div>' +
+      '<div class="mv-av">' + inner + ' cajas' + (master ? ' · ' + master + ' master' : '') + '</div></button>';
+  }).join("");
+  _renderKeepFocus(body, h);
+}
+function mvPickOrigen(secEnc, codEnc) {
+  if (!_mv) return;
+  const sector = decodeURIComponent(secEnc), cod = decodeURIComponent(codEnc);
+  const r = _mv.plani.find(function (x) { return x.sector === sector && String(x.cod_art) === cod && x.estado === "ocupado"; });
+  if (!r) return;
+  const inner = Number(r.innercajas) || 0, master = Number(r.master_cajas) || 0;
+  _mv.origen = { sector: sector, cod: cod, desc: artNombre(cod, "") || "", inner: inner, master: master };
+  _mv.mover = inner; _mv.destino = null; _mv.filtroD = ""; _mv.step = 2;
+  mvRender();
+}
+function mvRenderStep2(body) {
+  const o = _mv.origen;
+  // destinos válidos: celdas LIBRES o con el MISMO código (no la de origen, no reservadas)
+  const codN = _mvNorm(o.cod);
+  const dests = _mv.plani.filter(function (r) {
+    if (r.sector === o.sector) return false;
+    if (_racksZonaInsumo(r.sector)) return false;
+    if (r.estado !== "ocupado") return true;                 // libre
+    return _mvNorm(r.cod_art) === codN;                      // mismo código
+  }).sort(function (a, b) { return String(a.sector).localeCompare(String(b.sector), undefined, { numeric: true }); });
+  const fd = _mv.filtroD.trim().toLowerCase();
+  const dShown = fd ? dests.filter(function (r) { return String(r.sector).toLowerCase().indexOf(fd) >= 0; }) : dests;
+  let h = '<button class="mv-back" onclick="mvBack()">← Volver</button>';
+  h += '<div class="mv-sel"><div class="mv-r1"><span class="mv-sec">' + escapeHtml(o.sector) + '</span> · <span class="mv-cod">' + escapeHtml(o.cod) + '</span> <span class="mv-desc">' + escapeHtml(o.desc) + '</span></div><div class="mv-av">tiene ' + o.inner + ' cajas' + (o.master ? ' · ' + o.master + ' master' : '') + '</div></div>';
+  h += '<div class="mv-fld"><div class="mv-lbl">¿Cuántas cajas movés?</div><div class="mv-stp"><button class="mv-sb" onclick="mvChg(-1)">–</button><input class="mv-inp" type="number" min="1" max="' + o.inner + '" inputmode="numeric" value="' + _mv.mover + '" oninput="mvSet(this.value)"><button class="mv-sb" onclick="mvChg(1)">+</button></div></div>';
+  h += '<div class="mv-fld"><div class="mv-lbl">¿A qué ubicación?</div>';
+  h += '<input class="mv-search" type="search" autocomplete="off" placeholder="🔎 Buscar ubicación…" value="' + escapeHtml(_mv.filtroD) + '" oninput="if(_mv){_mv.filtroD=this.value;mvRender();}">';
+  if (!dShown.length) h += '<div class="mv-empty">No hay ubicaciones libres ni con ' + escapeHtml(o.cod) + '.</div>';
+  else h += '<div class="mv-dests">' + dShown.map(function (r) {
+    const libre = r.estado !== "ocupado";
+    const on = _mv.destino === r.sector;
+    return '<button class="mv-dest' + (libre ? ' libre' : '') + (on ? ' on' : '') + '" onclick="mvPickDest(\'' + encodeURIComponent(r.sector) + '\')">' + escapeHtml(r.sector) + ' <small>' + (libre ? "libre" : (Number(r.innercajas) || 0) + " cj") + '</small></button>';
+  }).join("") + '</div>';
+  h += '</div>';
+  const ok = _mv.destino && _mv.mover > 0 && _mv.mover <= o.inner;
+  h += '<button class="mv-fin"' + (ok ? "" : " disabled") + ' onclick="mvConfirmar()">🔀 Mover ' + _mv.mover + ' caja(s)' + (_mv.destino ? ' a ' + escapeHtml(_mv.destino) : '') + '</button>';
+  _renderKeepFocus(body, h);
+}
+function mvBack() { if (!_mv) return; _mv.step = 1; _mv.origen = null; _mv.destino = null; mvRender(); }
+function mvChg(d) { if (!_mv || !_mv.origen) return; _mv.mover = Math.max(1, Math.min(_mv.origen.inner, _mv.mover + d)); mvRender(); }
+function mvSet(v) { if (!_mv || !_mv.origen) return; let n = Math.max(1, parseInt(v, 10) || 1); if (n > _mv.origen.inner) n = _mv.origen.inner; _mv.mover = n; mvRender(); }
+function mvPickDest(secEnc) { if (!_mv) return; _mv.destino = decodeURIComponent(secEnc); mvRender(); }
+async function mvConfirmar() {
+  if (!_mv || !_mv.origen || !_mv.destino) return;
+  const o = _mv.origen, mover = _mv.mover;
+  if (mover <= 0 || mover > o.inner) return;
+  // master proporcional a las cajas movidas (así el master del origen/destino queda coherente)
+  const masterMove = (o.inner > 0 && o.master > 0) ? Math.round(o.master * mover / o.inner) : 0;
+  let res = "";
+  try {
+    const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/racks_plani_mover", {
+      method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ p_origen: o.sector, p_cod: o.cod, p_destino: _mv.destino, p_inner: mover, p_master: masterMove })
+    });
+    res = r.ok ? String(await r.json()) : ("error: HTTP " + r.status);
+  } catch (e) { res = "error: sin conexión"; }
+  if (res !== "ok") { try { alert("No se pudo mover.\n" + res.replace(/^error:\s*/, "")); } catch (_e) {} return; }
+  const dest = _mv.destino;
+  closeMv();
+  try { alert("✓ Moviste " + mover + " caja(s) de " + o.cod + ": " + o.sector + " → " + dest + "."); } catch (_e) {}
+  // si estoy en el admin de Stocks (solapa Racks), refresco la planimetría
+  try { if (_stk) { _stk.planiLoaded = false; stkPlaniLoad(); } } catch (_e) {}
 }
 
 /* ===== STOCK — EA · Entrega Artículos para envasar (v5.52): el operario ve lo que

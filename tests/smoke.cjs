@@ -21,6 +21,7 @@ catch (_e) {
       "stkAutoBajadaCompute", "stkAutoBajadaSection", "stkToggleAutoBajada",
       "opDraftSave", "opDraftLoad", "opDraftClear", "opAskClose", "opDraftResume",
       "mgAskClose", "rkbAskClose", "insAskClose", "scAskClose", "eaAskClose", "cpAskClose", "rcAskClose",
+      "showMoverModal", "mvRender", "mvPickOrigen", "mvConfirmar", "closeMv",
       "stkBodyProceso", "ocBodyEntregas", "ocgEnter", "insRender", "mgRender", "pkRender", "stockBajaPicking",
       "stockSepararAFacturar", "stockSalidaFacturado",
       "showMGChooser", "showRacksBajarModal", "rkbRender", "rkbConfirmar", "rkbFetchCxM", "rkbSetSec",
