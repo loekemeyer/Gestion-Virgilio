@@ -4412,6 +4412,20 @@ function renderPendingSuggestion(){
     }
   } catch (_e) { /* no-op */ }
 
+  // (−1c) Borrador de una operación cerrada sin terminar (MG / racks / insumos /
+  // Cervantes / Completar / RC / EA): botón para VOLVER al cuadro exacto (v5.55).
+  try {
+    const draft = opDraftLoad(legajo);
+    if (draft) {
+      const btnD = document.createElement("button");
+      btnD.className = "primary-btn";
+      btnD.style.background = "#0891b2";
+      btnD.innerText = "▶ Seguir " + (draft.label || "lo que estabas cargando");
+      btnD.onclick = () => opDraftResume(legajo);
+      box.appendChild(btnD);
+    }
+  } catch (_e) { /* no-op */ }
+
   const st    = getLegajoState(legajo);
   const today = getTodayKey();
   const cont  = st.continuar || {};
@@ -9467,7 +9481,7 @@ async function insFetchCatalogo() {
     return r.ok ? await r.json() : [];
   } catch (_e) { return []; }
 }
-async function showInsumoModal(mode, legajo) {
+async function showInsumoModal(mode, legajo, _resume) {
   if (!document.getElementById("insCss")) {
     const s = document.createElement("style"); s.id = "insCss";
     s.textContent = "#insModal{display:none;position:fixed;inset:0;z-index:1296;background:rgba(2,6,23,.74);overflow:auto;padding:12px;}#insModal.show{display:block;}.ins-card{background:#f8fafc;max-width:480px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.ins-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;color:#fff;}.ins-head.in{background:linear-gradient(90deg,#4f46e5,#4338ca);}.ins-head.out{background:linear-gradient(90deg,#0d9488,#0f766e);}.ins-title{font-size:18px;font-weight:800;}.ins-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}.ins-body{padding:13px 14px;}.ins-loading,.ins-empty{padding:24px;text-align:center;color:#64748b;font-size:15px;}.ins-hint{font-size:12.5px;color:#64748b;margin-bottom:9px;}.ins-search{width:100%;box-sizing:border-box;height:42px;border:2px solid #cbd5e1;border-radius:10px;padding:0 12px;font-size:15px;margin-bottom:9px;}.ins-crear{background:#eef2ff;border:1px dashed #a5b4fc;border-radius:11px;padding:10px;margin-bottom:10px;font-size:12.5px;color:#3730a3;display:flex;flex-direction:column;gap:7px;}.ins-crear-r{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}.ins-nn{flex:1;min-width:130px;}.ins-nid{flex:1;min-width:150px;}.ins-crear input{height:34px;border:1px solid #c7d2fe;border-radius:8px;padding:0 9px;font-size:13px;}.ins-cbtn{background:#4f46e5;color:#fff;border:none;border-radius:8px;padding:7px 12px;font-weight:800;cursor:pointer;width:auto;}.ins-row{border:1px solid #e2e8f0;border-radius:12px;padding:9px 11px;margin-bottom:8px;background:#fff;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}.ins-info{flex:1;min-width:0;}.ins-cod{font-size:16px;font-weight:800;font-family:Consolas,Menlo,monospace;}.ins-cod-sec{font-family:inherit;color:#4338ca;}.ins-nom{font-size:12.5px;color:#475569;}.ins-stk{font-size:11.5px;color:#64748b;font-weight:700;margin-top:2px;}.ins-stp{display:flex;align-items:center;gap:5px;}.ins-sb{display:flex;align-items:center;justify-content:center;line-height:1;padding:0;margin:0;width:38px;height:40px;border:none;border-radius:9px;font-size:22px;font-weight:800;cursor:pointer;background:#e2e8f0;color:#475569;}.ins-inp{width:58px;height:40px;box-sizing:border-box;margin:0;padding:0;text-align:center;font-size:18px;font-weight:800;border:2px solid #cbd5e1;border-radius:9px;}.ins-warn{width:100%;font-size:11.5px;color:#b45309;font-weight:700;}.ins-fin{width:100%;margin-top:10px;padding:14px;border:none;border-radius:12px;color:#fff;font-size:17px;font-weight:800;cursor:pointer;}.ins-fin.in{background:#4f46e5;}.ins-fin.out{background:#0d9488;}.ins-fin:disabled{background:#cbd5e1;color:#64748b;cursor:not-allowed;}.ins-uni{flex-basis:100%;display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px dashed #e2e8f0;}.ins-uni-l{font-size:11.5px;color:#64748b;font-weight:700;}.ins-uchip{width:auto;margin:0;border:1px solid #cbd5e1;background:#fff;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:800;cursor:pointer;color:#475569;}.ins-uchip.on{background:#4f46e5;color:#fff;border-color:#4f46e5;}.ins-uadd{color:#4f46e5;font-size:15px;}";
@@ -9477,7 +9491,8 @@ async function showInsumoModal(mode, legajo) {
   if (!ov) { ov = document.createElement("div"); ov.id = "insModal"; document.body.appendChild(ov); }
   ov.classList.add("show");
   const isIn = mode === "RI";
-  ov.innerHTML = '<div class="ins-card"><div class="ins-head ' + (isIn ? "in" : "out") + '"><span class="ins-title">' + (isIn ? "📥 Recepción de insumos" : "📤 Entrega de insumos") + '</span><button class="ins-close" onclick="closeIns()">Cerrar</button></div><div class="ins-body" id="insBody"><div class="ins-loading">Cargando insumos…</div></div></div>';
+  ov.innerHTML = '<div class="ins-card"><div class="ins-head ' + (isIn ? "in" : "out") + '"><span class="ins-title">' + (isIn ? "📥 Recepción de insumos" : "📤 Entrega de insumos") + '</span><button class="ins-close" onclick="insAskClose()">Cerrar</button></div><div class="ins-body" id="insBody"><div class="ins-loading">Cargando insumos…</div></div></div>';
+  if (_resume) { _ins = _resume; insRender(); return; }
   try {
     const res = await Promise.all([insFetchCatalogo(), stockFetchSaldos()]);
     const saldos = res[1] || {};
@@ -9568,10 +9583,13 @@ function insConfirmar() {
   if (!sel.length) return;
   const rows = sel.map(function (it) { return { cod_art: it.cod, descripcion: it.nombre || null, deposito: "insumos", delta: isIn ? it.qty : -it.qty, tipo: isIn ? "recepcion_insumo" : "entrega_insumo", ref: null, legajo: _ins.legajo || null, unidad: it.unidad || "Uni", ubicacion: it.sector || null }; });
   const tot = sel.reduce(function (s, it) { return s + it.qty; }, 0);
+  try { opDraftClear(_ins && _ins.legajo); } catch (_e) {}
   closeIns();
   stockMove(rows);   // offline-safe (vir_stock_pend)
   try { alert("✓ " + (isIn ? "Entrada" : "Salida") + " registrada: " + sel.length + " insumo(s)."); } catch (_e) {}
 }
+function insHasProgress() { return !!(_ins && _ins.items && _ins.items.some(function (it) { return (it.qty > 0); })); }
+function insAskClose() { opAskClose(insHasProgress(), "INS", _ins && _ins.legajo, (_ins && _ins.mode === "EI" ? "Entrega de insumos" : "Recepción de insumos"), _ins, closeIns); }
 function closeIns() {
   const ov = document.getElementById("insModal"); if (ov) ov.classList.remove("show");
   // v5.02: al cerrar el modal, CERRAR el toggle RI/EI. Así cada recepción/entrega de
@@ -9589,7 +9607,7 @@ function closeIns() {
    delta − tipo='salida_cervantes' (ref = remito/motivo opcional). Operario-facing; offline-safe
    con stockMove. Se abre directo desde el botón SC (sin Enviar ni evento en Registros). ===== */
 let _sc = null;
-async function showCervantesModal(legajo) {
+async function showCervantesModal(legajo, _resume) {
   if (!document.getElementById("scCss")) {
     const s = document.createElement("style"); s.id = "scCss";
     s.textContent = "#scModal{display:none;position:fixed;inset:0;z-index:1297;background:rgba(2,6,23,.74);overflow:auto;padding:12px;}#scModal.show{display:block;}.sc-card{background:#f8fafc;max-width:480px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.sc-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;background:linear-gradient(90deg,#7c3aed,#6d28d9);color:#fff;}.sc-title{font-size:18px;font-weight:800;}.sc-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}.sc-body{padding:13px 14px;}.sc-loading,.sc-empty{padding:26px;text-align:center;color:#64748b;font-size:15px;}.sc-hint{font-size:12.5px;color:#64748b;margin-bottom:9px;}.sc-mot{width:100%;box-sizing:border-box;height:40px;border:2px solid #cbd5e1;border-radius:10px;padding:0 11px;font-size:14px;margin-bottom:9px;}.sc-search{width:100%;box-sizing:border-box;height:42px;border:2px solid #cbd5e1;border-radius:10px;padding:0 12px;font-size:15px;margin-bottom:9px;}.sc-row{border:1px solid #e2e8f0;border-radius:12px;padding:9px 11px;margin-bottom:8px;background:#fff;display:flex;align-items:center;gap:10px;}.sc-info{flex:1;min-width:0;}.sc-cod{font-size:16px;font-weight:800;font-family:Consolas,Menlo,monospace;}.sc-desc{font-size:12px;color:#475569;}.sc-disp{font-size:11.5px;color:#6d28d9;font-weight:700;margin-top:2px;}.sc-stp{display:flex;align-items:center;gap:5px;}.sc-sb{display:flex;align-items:center;justify-content:center;line-height:1;padding:0;width:38px;height:40px;border:none;border-radius:9px;font-size:22px;font-weight:800;cursor:pointer;background:#e2e8f0;color:#475569;}.sc-inp{width:58px;height:40px;text-align:center;font-size:18px;font-weight:800;border:2px solid #cbd5e1;border-radius:9px;}.sc-fin{width:100%;margin-top:10px;padding:14px;border:none;border-radius:12px;background:#7c3aed;color:#fff;font-size:17px;font-weight:800;cursor:pointer;}.sc-fin:disabled{background:#cbd5e1;color:#64748b;cursor:not-allowed;}";
@@ -9598,7 +9616,8 @@ async function showCervantesModal(legajo) {
   let ov = document.getElementById("scModal");
   if (!ov) { ov = document.createElement("div"); ov.id = "scModal"; document.body.appendChild(ov); }
   ov.classList.add("show");
-  ov.innerHTML = '<div class="sc-card"><div class="sc-head"><span class="sc-title">🚚 Salida a Cervantes</span><button class="sc-close" onclick="closeSc()">Cerrar</button></div><div class="sc-body" id="scBody"><div class="sc-loading">Cargando góndola…</div></div></div>';
+  ov.innerHTML = '<div class="sc-card"><div class="sc-head"><span class="sc-title">🚚 Salida a Cervantes</span><button class="sc-close" onclick="scAskClose()">Cerrar</button></div><div class="sc-body" id="scBody"><div class="sc-loading">Cargando góndola…</div></div></div>';
+  if (_resume) { _sc = _resume; scRender(); return; }
   try {
     const res = await Promise.all([stockFetchSaldos()]);
     const saldos = res[0] || {};
@@ -9633,17 +9652,57 @@ function scConfirmar() {
   const ref = (_sc.motivo || "").trim() || null;
   const rows = sel.map(function (it) { return { cod_art: it.cod, descripcion: it.desc || null, deposito: "terminado", delta: -it.sacar, tipo: "salida_cervantes", ref: ref, legajo: _sc.legajo || null }; });
   const n = sel.reduce(function (s, it) { return s + it.sacar; }, 0);
+  try { opDraftClear(_sc && _sc.legajo); } catch (_e) {}
   closeSc();
   stockMove(rows);   // offline-safe (vir_stock_pend)
   try { alert("✓ Salida a Cervantes registrada: " + n + " caja(s). Bajó de la góndola."); } catch (_e) {}
 }
 function closeSc() { const ov = document.getElementById("scModal"); if (ov) ov.classList.remove("show"); _sc = null; }
+function scHasProgress() { return !!(_sc && _sc.items && _sc.items.some(function (it) { return (it.sacar > 0); })); }
+function scAskClose() { opAskClose(scHasProgress(), "SC", _sc && _sc.legajo, "Salida a Cervantes", _sc, closeSc); }
+
+/* ===== "Volver al cuadro" (v5.55): borrador de una operación cerrada sin terminar.
+   Cuando el operario cierra un modal (MG / Bajar racks / Insumos / Cervantes /
+   Completar / RC / EA) con cosas cargadas, se le pregunta y —si sale— se guarda un
+   SNAPSHOT del estado en localStorage (uno por legajo). En la pantalla de inicio
+   aparece "▶ Seguir…" que reabre el modal EXACTO donde quedó (sin recargar). ===== */
+var OP_EXIT_MSG = "¿Salir sin terminar?\n\nLo que cargaste queda guardado: vas a poder volver con el botón “▶ Seguir…” en la pantalla de inicio.";
+function _opDraftKey(legajo) { return "vir_op_draft_" + String(legajo || "").trim(); }
+function opDraftSave(op, legajo, label, snap) {
+  try { localStorage.setItem(_opDraftKey(legajo), JSON.stringify({ op: op, legajo: String(legajo || ""), label: label, ts: Date.now(), snap: snap })); } catch (_e) {}
+  try { renderPendingSuggestion(); } catch (_e) {}
+}
+function opDraftLoad(legajo) { try { const s = localStorage.getItem(_opDraftKey(legajo)); return s ? JSON.parse(s) : null; } catch (_e) { return null; } }
+function opDraftClear(legajo) { try { localStorage.removeItem(_opDraftKey(legajo)); } catch (_e) {} try { renderPendingSuggestion(); } catch (_e) {} }
+/* Guard genérico del botón Cerrar: si hay cosas cargadas, pregunta y guarda el borrador. */
+function opAskClose(hasProg, op, legajo, label, snap, closeFn) {
+  if (hasProg) {
+    if (typeof confirm === "function" && !confirm(OP_EXIT_MSG)) return;   // se queda en el cuadro
+    opDraftSave(op, legajo, label, snap);
+  } else {
+    opDraftClear(legajo);   // nada cargado: descartar cualquier borrador viejo del mismo legajo
+  }
+  closeFn();
+}
+function opDraftResume(legajo) {
+  const d = opDraftLoad(legajo); if (!d) return;
+  opDraftClear(legajo);   // se reabre; si vuelven a cerrar con progreso, se re-guarda
+  const s = d.snap || {}, leg = s.legajo || legajo;
+  if (s) { s.liosLoading = false; s.donorsLoading = false; }   // CP/RC: no re-cargar async
+  if (d.op === "MG") showMGModal(leg, s);
+  else if (d.op === "RKB") showRacksBajarModal(leg, s);
+  else if (d.op === "INS") showInsumoModal(s.mode || "RI", leg, s);
+  else if (d.op === "SC") showCervantesModal(leg, s);
+  else if (d.op === "EA") showEAModal(leg, s);
+  else if (d.op === "CP") showCPModal(leg, s);
+  else if (d.op === "RC") showRCModal(leg, s);
+}
 
 /* ===== STOCK — MG (Guardado a Góndola, v4.07): muestra lo que hay en "Mercadería
    a guardar", el operario elige cuántas cajas guarda y al confirmar pasan a
    "Artículo Terminado" (resta de a_guardar, suma a terminado). ===== */
 let _mg = null;
-async function showMGModal(legajo) {
+async function showMGModal(legajo, _resume) {
   if (!document.getElementById("mgCss")) {
     const s = document.createElement("style"); s.id = "mgCss";
     s.textContent = "#mgModal{display:none;position:fixed;inset:0;z-index:1290;background:rgba(2,6,23,.74);overflow:auto;padding:12px;}#mgModal.show{display:block;}.mg-card{background:#f8fafc;max-width:460px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.mg-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;background:linear-gradient(90deg,#16a34a,#15803d);color:#fff;}.mg-title{font-size:18px;font-weight:800;}.mg-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}.mg-body{padding:13px 14px;}.mg-loading,.mg-empty{padding:26px;text-align:center;color:#64748b;font-size:15px;}.mg-hint{font-size:12.5px;color:#64748b;margin-bottom:10px;}.mg-row{display:flex;flex-direction:column;gap:9px;border:1px solid #e2e8f0;border-radius:13px;padding:11px 12px;margin-bottom:9px;background:#fff;}.mg-headline{display:flex;align-items:baseline;justify-content:space-between;gap:8px;}.mg-agu{font-size:11.5px;color:#64748b;white-space:nowrap;}.mg-agu b{color:#0f172a;font-size:14px;}.mg-box{font-size:19px;line-height:1;}.mg-info{flex:1 1 110px;min-width:0;}.mg-def{display:flex;gap:10px;align-items:stretch;}.mg-gond-box{flex:1.7;display:flex;flex-direction:column;align-items:center;gap:8px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:11px 8px;}.mg-exc-q{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:8px;background:#fffbeb;border:1.5px dashed #f59e0b;border-radius:12px;padding:11px 8px;color:#92400e;font-weight:800;font-size:12.5px;text-align:center;cursor:pointer;line-height:1.15;}.mg-exc-q-b{height:50px;display:flex;align-items:center;justify-content:center;}.mg-exc-q .mg-box{font-size:30px;}.mg-exp{display:flex;gap:10px;align-items:stretch;}.mg-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:7px;border-radius:12px;padding:9px 6px;}.mg-col.g{background:#f0fdf4;border:1px solid #bbf7d0;}.mg-col.e{background:#fff;border:1px solid #e2e8f0;}.mg-exc-hdr{background:none;border:none;color:#b45309;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;cursor:pointer;padding:0;width:auto;}.mg-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:2px;min-height:22px;}.mg-foot .mg-faltan{font-size:13px;white-space:nowrap;}.mg-foot .mg-faltan.ok{color:#15803d;}.mg-stp.big .mg-inp{width:62px;height:50px;font-size:23px;}.mg-stp.big .mg-sb{width:44px;height:50px;font-size:25px;}.mg-cod{font-size:16px;font-weight:800;font-family:Consolas,Menlo,monospace;}.mg-desc{font-size:12px;color:#475569;}.mg-faltan{font-size:11.5px;font-weight:800;color:#b45309;margin-top:1px;}.mg-faltan.ok{color:#15803d;}.mg-stp{display:flex;align-items:center;gap:5px;}.mg-sb{display:flex;align-items:center;justify-content:center;line-height:1;padding:0;margin:0;width:36px;height:40px;border:none;border-radius:9px;font-size:22px;font-weight:800;cursor:pointer;background:#e2e8f0;color:#475569;}.mg-inp{width:48px;height:40px;box-sizing:border-box;margin:0;text-align:center;font-size:18px;font-weight:800;border:2px solid #cbd5e1;border-radius:9px;padding:0;-moz-appearance:textfield;}.mg-inp::-webkit-outer-spin-button,.mg-inp::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}.mg-fin{width:100%;margin-top:10px;padding:14px;border:none;border-radius:12px;background:#16a34a;color:#fff;font-size:17px;font-weight:800;cursor:pointer;}.mg-fin:disabled{background:#cbd5e1;color:#64748b;cursor:not-allowed;}.mg-lbl{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:#64748b;}.mg-lbl.gond{color:#15803d;}.mg-lbl.exc{color:#b45309;}.mg-search{width:100%;height:44px;border:2px solid #cbd5e1;border-radius:11px;padding:0 13px;font-size:16px;font-weight:700;margin-bottom:10px;box-sizing:border-box;}.mg-addrow{background:#fffbeb;border:1px solid #fcd34d;border-radius:11px;padding:11px 12px;margin-bottom:10px;font-size:13px;color:#92400e;}.mg-add-btn{margin-left:6px;background:#16a34a;color:#fff;border:none;border-radius:9px;padding:8px 13px;font-weight:800;cursor:pointer;width:auto;}.mg-add-note{font-size:11.5px;color:#b45309;margin-top:7px;}.mg-disp-x{color:#b45309;font-weight:800;}.mg-ubic{flex-basis:100%;display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:9px;padding-top:9px;border-top:1px dashed #fcd34d;font-size:12.5px;color:#92400e;}.mg-ubic-lbl{font-weight:800;}.mg-ubic-lbl small{font-weight:700;opacity:.8;}.mg-ubic-inp{width:84px;height:40px;border:2px solid #f59e0b;border-radius:9px;padding:0;font-size:20px;font-weight:800;text-align:center;letter-spacing:4px;text-transform:uppercase;box-sizing:border-box;}";
@@ -9652,7 +9711,8 @@ async function showMGModal(legajo) {
   let ov = document.getElementById("mgModal");
   if (!ov) { ov = document.createElement("div"); ov.id = "mgModal"; document.body.appendChild(ov); }
   ov.classList.add("show");
-  ov.innerHTML = '<div class="mg-card"><div class="mg-head"><span class="mg-title">📥 Guardar a góndola</span><button class="mg-close" onclick="closeMG()">Cerrar</button></div><div class="mg-body" id="mgBody"><div class="mg-loading">Cargando lo que hay para guardar…</div></div></div>';
+  ov.innerHTML = '<div class="mg-card"><div class="mg-head"><span class="mg-title">📥 Guardar a góndola</span><button class="mg-close" onclick="mgAskClose()">Cerrar</button></div><div class="mg-body" id="mgBody"><div class="mg-loading">Cargando lo que hay para guardar…</div></div></div>';
+  if (_resume) { _mg = _resume; mgRender(); return; }
   try {
     const res = await Promise.all([stockFetchSaldos(), loadArtNombres()]);
     const saldos = res[0] || {};
@@ -9751,6 +9811,7 @@ function mgConfirmar() {
   });
   const nG = sel.reduce(function (s, it) { return s + it.cargar; }, 0);
   const nE = sel.reduce(function (s, it) { return s + (it.exc || 0); }, 0);
+  try { opDraftClear(_mg && _mg.legajo); } catch (_e) {}
   closeMG();
   stockMove(rows);
   try { alert("✓ Guardado: " + nG + " caja(s) a góndola" + (nE > 0 ? " y " + nE + " a excedente" : "") + "."); } catch (_e) {}
@@ -9770,6 +9831,8 @@ function mgEmitFueraLista(cod, g, e, legajo) {
   try { updatePendingIndicator(); } catch (_e) {}
 }
 function closeMG() { const ov = document.getElementById("mgModal"); if (ov) ov.classList.remove("show"); _mg = null; }
+function mgHasProgress() { return !!(_mg && _mg.items && _mg.items.some(function (it) { return (it.cargar > 0) || (it.exc > 0); })); }
+function mgAskClose() { opAskClose(mgHasProgress(), "MG", _mg && _mg.legajo, "Guardar a góndola", _mg, closeMG); }
 
 /* MG ahora pregunta QUÉ se baja a góndola (v5.15): lo que llegó (a guardar) o de los
    racks. "De los racks" abre showRacksBajarModal. */
@@ -9824,7 +9887,7 @@ async function rkbFetchCxM() {
     return { cxm: map, locs: locs };
   } catch (_e) { return { cxm: {}, locs: {} }; }
 }
-async function showRacksBajarModal(legajo) {
+async function showRacksBajarModal(legajo, _resume) {
   if (!document.getElementById("rkbCss")) {
     const s = document.createElement("style"); s.id = "rkbCss";
     s.textContent = "#rkbModal{display:none;position:fixed;inset:0;z-index:1290;background:rgba(2,6,23,.74);overflow:auto;padding:12px;}#rkbModal.show{display:block;}.rkb-card{background:#f8fafc;max-width:460px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.rkb-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;background:linear-gradient(90deg,#1e6bd6,#1d4ed8);color:#fff;}.rkb-title{font-size:17px;font-weight:800;}.rkb-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}.rkb-body{padding:13px 14px;}.rkb-hint{font-size:12.5px;color:#64748b;margin-bottom:10px;line-height:1.35;}.rkb-search{width:100%;height:44px;border:2px solid #cbd5e1;border-radius:11px;padding:0 13px;font-size:16px;font-weight:700;margin-bottom:10px;box-sizing:border-box;}.rkb-row{display:flex;align-items:center;gap:10px;border:1px solid #e2e8f0;border-radius:13px;padding:10px 12px;margin-bottom:8px;background:#fff;}.rkb-info{flex:1;min-width:0;}.rkb-cod{font-size:16px;font-weight:800;font-family:Consolas,Menlo,monospace;}.rkb-desc{font-size:12px;color:#475569;}.rkb-av{font-size:11.5px;color:#64748b;}.rkb-mano{font-weight:800;color:#b45309;}.rkb-stp{display:flex;align-items:center;gap:6px;}.rkb-stpcol{display:flex;flex-direction:column;align-items:center;gap:3px;}.rkb-u{font-size:10.5px;color:#64748b;font-weight:800;text-align:center;text-transform:uppercase;letter-spacing:.3px;}.rkb-locs{margin-top:6px;display:flex;flex-wrap:wrap;gap:5px;}.rkb-loc{border:1.5px solid #cbd5e1;border-radius:8px;padding:3px 8px;font-size:11.5px;font-weight:800;color:#475569;background:#f8fafc;cursor:pointer;}.rkb-loc.on{border-color:#1e6bd6;background:#eff6ff;color:#1d4ed8;}.rkb-sb{width:42px;height:46px;border:none;border-radius:9px;font-size:24px;font-weight:800;cursor:pointer;background:#e2e8f0;color:#475569;display:flex;align-items:center;justify-content:center;line-height:1;padding:0;margin:0;}.rkb-inp{width:54px;height:46px;box-sizing:border-box;text-align:center;font-size:20px;font-weight:800;border:2px solid #cbd5e1;border-radius:9px;padding:0;-moz-appearance:textfield;}.rkb-inp::-webkit-outer-spin-button,.rkb-inp::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}.rkb-add{background:#fffbeb;border:1px solid #fcd34d;border-radius:11px;padding:11px 12px;margin-bottom:10px;font-size:13px;color:#92400e;line-height:1.4;}.rkb-addbtn{margin-top:6px;background:#1e6bd6;color:#fff;border:none;border-radius:9px;padding:8px 13px;font-weight:800;cursor:pointer;display:inline-block;}.rkb-sug{margin-top:5px;font-size:12px;font-weight:700;}.rkb-fin{width:100%;margin-top:10px;padding:14px;border:none;border-radius:12px;background:#1e6bd6;color:#fff;font-size:17px;font-weight:800;cursor:pointer;}.rkb-fin:disabled{background:#cbd5e1;color:#64748b;cursor:not-allowed;}.rkb-empty{padding:18px;text-align:center;color:#64748b;font-size:14px;}";
@@ -9833,7 +9896,8 @@ async function showRacksBajarModal(legajo) {
   let ov = document.getElementById("rkbModal");
   if (!ov) { ov = document.createElement("div"); ov.id = "rkbModal"; document.body.appendChild(ov); }
   ov.classList.add("show");
-  ov.innerHTML = '<div class="rkb-card"><div class="rkb-head"><span class="rkb-title">🏗 Bajar de racks a góndola</span><button class="rkb-close" onclick="closeRkb()">Cerrar</button></div><div class="rkb-body" id="rkbBody"><div class="rkb-empty">Cargando racks…</div></div></div>';
+  ov.innerHTML = '<div class="rkb-card"><div class="rkb-head"><span class="rkb-title">🏗 Bajar de racks a góndola</span><button class="rkb-close" onclick="rkbAskClose()">Cerrar</button></div><div class="rkb-body" id="rkbBody"><div class="rkb-empty">Cargando racks…</div></div></div>';
+  if (_resume) { _rkb = _resume; rkbRender(); return; }
   try {
     const res = await Promise.all([stockFetchSaldos(), loadArtNombres(), rkbFetchCxM()]);
     const saldos = res[0] || {};
@@ -9910,6 +9974,8 @@ function rkbAddManual(cod) {
 function rkbChg(i, d) { if (!_rkb) return; const it = _rkb.items[i]; if (!it) return; const mx = it.manual ? 99999 : (it.cxm > 0 ? Math.floor(it.racks / it.cxm) : it.racks); it.baja = Math.max(0, Math.min(mx, it.baja + d)); rkbRender(); }
 function rkbSet(i, v) { if (!_rkb) return; const it = _rkb.items[i]; if (!it) return; let n = Math.max(0, parseInt(v, 10) || 0); const mx = it.manual ? 99999 : (it.cxm > 0 ? Math.floor(it.racks / it.cxm) : it.racks); if (n > mx) n = mx; it.baja = n; rkbRender(); }
 function closeRkb() { const ov = document.getElementById("rkbModal"); if (ov) ov.classList.remove("show"); _rkb = null; }
+function rkbHasProgress() { return !!(_rkb && _rkb.items && _rkb.items.some(function (it) { return (it.baja > 0); })); }
+function rkbAskClose() { opAskClose(rkbHasProgress(), "RKB", _rkb && _rkb.legajo, "Bajar de racks", _rkb, closeRkb); }
 function rkbConfirmar() {
   if (!_rkb) return;
   const sel = _rkb.items.filter(function (it) { return it.baja > 0; });
@@ -9938,6 +10004,7 @@ function rkbConfirmar() {
   // alerta Telegram por cada bajada fuera de lista (no estaba en racks) — evento RKX
   sel.filter(function (it) { return it.manual; }).forEach(function (it) { try { rkbEmitFueraLista(it.cod, it.baja, _rkb.legajo); } catch (_e) {} });
   const totInner = rows.reduce(function (s, r) { return s + Number(r.cajas || 0); }, 0);
+  try { opDraftClear(_rkb && _rkb.legajo); } catch (_e) {}
   closeRkb();
   fetch(SUPABASE_RACKS_BAJ_ENDPOINT, { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" }, body: JSON.stringify(rows) })
     .then(function (r) { if (r.ok || (r.status >= 400 && r.status < 500)) return; throw new Error("HTTP " + r.status); })
@@ -9980,7 +10047,7 @@ async function eaFetchStock() {
     return agg;
   } catch (_e) { return {}; }
 }
-async function showEAModal(legajo) {
+async function showEAModal(legajo, _resume) {
   if (!document.getElementById("eaCss")) {
     const s = document.createElement("style"); s.id = "eaCss";
     s.textContent = "#eaModal{display:none;position:fixed;inset:0;z-index:1290;background:rgba(2,6,23,.74);overflow:auto;padding:12px;}#eaModal.show{display:block;}.ea-card{background:#f8fafc;max-width:460px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.ea-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;background:linear-gradient(90deg,#7c3aed,#6d28d9);color:#fff;}.ea-title{font-size:17px;font-weight:800;}.ea-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}.ea-body{padding:13px 14px;}.ea-hint{font-size:12.5px;color:#64748b;margin-bottom:10px;line-height:1.35;}.ea-search{width:100%;height:44px;border:2px solid #cbd5e1;border-radius:11px;padding:0 13px;font-size:16px;font-weight:700;margin-bottom:10px;box-sizing:border-box;}.ea-row{display:flex;align-items:center;gap:10px;border:1px solid #e2e8f0;border-radius:13px;padding:10px 12px;margin-bottom:8px;background:#fff;}.ea-info{flex:1;min-width:0;}.ea-cod{font-size:16px;font-weight:800;font-family:Consolas,Menlo,monospace;}.ea-desc{font-size:12px;color:#475569;}.ea-av{font-size:11.5px;color:#64748b;}.ea-stpcol{display:flex;flex-direction:column;align-items:center;gap:3px;}.ea-u{font-size:10.5px;color:#64748b;font-weight:800;text-align:center;text-transform:uppercase;letter-spacing:.3px;}.ea-stp{display:flex;align-items:center;gap:6px;}.ea-sb{width:42px;height:46px;border:none;border-radius:9px;font-size:24px;font-weight:800;cursor:pointer;background:#e2e8f0;color:#475569;display:flex;align-items:center;justify-content:center;line-height:1;padding:0;margin:0;}.ea-inp{width:54px;height:46px;box-sizing:border-box;text-align:center;font-size:20px;font-weight:800;border:2px solid #cbd5e1;border-radius:9px;padding:0;-moz-appearance:textfield;}.ea-inp::-webkit-outer-spin-button,.ea-inp::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}.ea-fin{width:100%;margin-top:10px;padding:14px;border:none;border-radius:12px;background:#7c3aed;color:#fff;font-size:17px;font-weight:800;cursor:pointer;}.ea-fin:disabled{background:#cbd5e1;color:#64748b;cursor:not-allowed;}.ea-empty{padding:18px;text-align:center;color:#64748b;font-size:14px;}";
@@ -9989,7 +10056,8 @@ async function showEAModal(legajo) {
   let ov = document.getElementById("eaModal");
   if (!ov) { ov = document.createElement("div"); ov.id = "eaModal"; document.body.appendChild(ov); }
   ov.classList.add("show");
-  ov.innerHTML = '<div class="ea-card"><div class="ea-head"><span class="ea-title">🫙 Entrega artículos para envasar</span><button class="ea-close" onclick="closeEA()">Cerrar</button></div><div class="ea-body" id="eaBody"><div class="ea-empty">Cargando…</div></div></div>';
+  ov.innerHTML = '<div class="ea-card"><div class="ea-head"><span class="ea-title">🫙 Entrega artículos para envasar</span><button class="ea-close" onclick="eaAskClose()">Cerrar</button></div><div class="ea-body" id="eaBody"><div class="ea-empty">Cargando…</div></div></div>';
+  if (_resume) { _ea = _resume; eaRender(); return; }
   try {
     const res = await Promise.all([eaFetchStock(), loadArtNombres()]);
     const agg = res[0] || {};
@@ -10021,6 +10089,8 @@ function eaSearchInput(v) { if (!_ea) return; _ea.filtro = String(v == null ? ""
 function eaChg(i, d) { if (!_ea) return; const it = _ea.items[i]; if (!it) return; it.baja = Math.max(0, Math.min(it.saldo, it.baja + d)); eaRender(); }
 function eaSet(i, v) { if (!_ea) return; const it = _ea.items[i]; if (!it) return; let n = Math.max(0, parseInt(v, 10) || 0); if (n > it.saldo) n = it.saldo; it.baja = n; eaRender(); }
 function closeEA() { const ov = document.getElementById("eaModal"); if (ov) ov.classList.remove("show"); _ea = null; }
+function eaHasProgress() { return !!(_ea && _ea.items && _ea.items.some(function (it) { return (it.baja > 0); })); }
+function eaAskClose() { opAskClose(eaHasProgress(), "EA", _ea && _ea.legajo, "Entrega para envasar", _ea, closeEA); }
 function eaConfirmar() {
   if (!_ea) return;
   const sel = _ea.items.filter(function (it) { return it.baja > 0; });
@@ -10033,6 +10103,7 @@ function eaConfirmar() {
   sel.forEach(function (it) { try { eaEmitEvent(it.cod, it.baja, leg); } catch (_e) {} });
   try { updatePendingIndicator(); } catch (_e) {}
   const tot = sel.reduce(function (s, it) { return s + Number(it.baja || 0); }, 0);
+  try { opDraftClear(leg); } catch (_e) {}
   closeEA();
   try { alert("✓ Entregaste " + tot + " caja(s) para envasar.\nSe descontaron del stock de “para envasar”."); } catch (_e) {}
 }
@@ -10169,7 +10240,7 @@ async function cpLoadLios(np) {
   } catch (_e) {}
   return { count: 0, tanda: "", resumen: "" };
 }
-async function showCPModal(legajo) {
+async function showCPModal(legajo, _resume) {
   if (!document.getElementById("cpCss")) {
     const st = document.createElement("style"); st.id = "cpCss";
     st.textContent = "#cpModal{display:none;position:fixed;inset:0;z-index:1290;background:rgba(2,6,23,.74);overflow:auto;padding:12px;}#cpModal.show{display:block;}.cp-card{background:#f8fafc;max-width:460px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.cp-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;background:linear-gradient(90deg,#16a34a,#15803d);color:#fff;}.cp-title{font-size:18px;font-weight:800;}.cp-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}.cp-body{padding:13px 14px;}.cp-loading,.cp-empty{padding:24px;text-align:center;color:#64748b;font-size:15px;}.cp-hint{font-size:12.5px;color:#64748b;margin-bottom:10px;}.cp-pend{background:#fffbeb;border:1px solid #fcd34d;border-radius:11px;padding:9px 11px;margin-bottom:10px;font-size:12.5px;color:#92400e;line-height:1.4;}.cp-frow{display:block;width:100%;text-align:left;border:1px solid #e2e8f0;border-radius:13px;padding:11px 12px;margin-bottom:9px;background:#fff;cursor:pointer;}.cp-frow-top{display:flex;align-items:baseline;gap:8px;margin-bottom:4px;}.cp-frow-bot{display:flex;align-items:center;justify-content:space-between;gap:8px;}.cp-cod{font-size:16px;font-weight:800;font-family:Consolas,Menlo,monospace;}.cp-fdesc{font-size:12.5px;color:#475569;}.cp-np{font-size:12px;color:#64748b;}.cp-faltan{font-size:12.5px;font-weight:800;color:#b45309;white-space:nowrap;}.cp-back{background:none;border:none;color:#1e6bd6;font-weight:800;font-size:14px;cursor:pointer;padding:0 0 8px;width:auto;}.cp-sel{background:#fff;border:1px solid #e2e8f0;border-radius:13px;padding:11px 12px;margin-bottom:12px;}.cp-selnp{font-size:12px;color:#64748b;margin-top:3px;}.cp-fld{margin-bottom:13px;}.cp-lbl{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:#64748b;margin-bottom:7px;}.cp-stp{display:flex;align-items:center;gap:7px;}.cp-sb{display:flex;align-items:center;justify-content:center;line-height:1;padding:0;margin:0;width:46px;height:50px;border:none;border-radius:10px;font-size:26px;font-weight:800;cursor:pointer;background:#e2e8f0;color:#475569;}.cp-inp{width:70px;height:50px;box-sizing:border-box;margin:0;text-align:center;font-size:24px;font-weight:800;border:2px solid #cbd5e1;border-radius:10px;padding:0;-moz-appearance:textfield;}.cp-inp::-webkit-outer-spin-button,.cp-inp::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}.cp-seg,.cp-lios{display:flex;flex-wrap:wrap;gap:8px;}.cp-opt{flex:1 1 0;min-width:120px;display:flex;flex-direction:column;align-items:center;gap:2px;background:#fff;border:1.5px solid #cbd5e1;border-radius:11px;padding:10px 8px;font-size:14px;font-weight:800;color:#334155;cursor:pointer;}.cp-opt small{font-weight:700;color:#64748b;font-size:11.5px;}.cp-opt.on{border-color:#16a34a;background:#f0fdf4;color:#15803d;}.cp-lio{background:#fff;border:1.5px solid #cbd5e1;border-radius:11px;padding:8px 11px;font-size:14px;font-weight:800;color:#334155;cursor:pointer;}.cp-lio small{font-weight:700;color:#64748b;font-size:11px;}.cp-lio.on{border-color:#16a34a;background:#f0fdf4;color:#15803d;}.cp-lio-new{border-style:dashed;}.cp-liosload,.cp-note{font-size:12px;color:#64748b;}.cp-note{margin-top:6px;}.cp-fin{width:100%;margin-top:6px;padding:15px;border:none;border-radius:12px;background:#16a34a;color:#fff;font-size:17px;font-weight:800;cursor:pointer;}.cp-fin:disabled{background:#cbd5e1;color:#64748b;cursor:not-allowed;}.cp-done{background:#dcfce7;border:1px solid #86efac;color:#15803d;font-weight:800;font-size:13px;border-radius:11px;padding:10px 12px;margin-bottom:11px;}";
@@ -10178,7 +10249,8 @@ async function showCPModal(legajo) {
   let ov = document.getElementById("cpModal");
   if (!ov) { ov = document.createElement("div"); ov.id = "cpModal"; document.body.appendChild(ov); }
   ov.classList.add("show");
-  ov.innerHTML = '<div class="cp-card"><div class="cp-head"><span class="cp-title">📦➕ Completar Pedido</span><button class="cp-close" onclick="closeCP()">Cerrar</button></div><div class="cp-body" id="cpBody"><div class="cp-loading">Cargando faltantes…</div></div></div>';
+  ov.innerHTML = '<div class="cp-card"><div class="cp-head"><span class="cp-title">📦➕ Completar Pedido</span><button class="cp-close" onclick="cpAskClose()">Cerrar</button></div><div class="cp-body" id="cpBody"><div class="cp-loading">Cargando faltantes…</div></div></div>';
+  if (_resume) { _cp = _resume; cpRender(); return; }
   try {
     const res = await Promise.all([cpLoadFaltantes(), stockFetchSaldos(), loadArtNombres(), cpLoadPickSinArmar()]);
     const falt = res[0] || [], saldos = res[1] || {};
@@ -10256,6 +10328,8 @@ function cpQtySet(v) { if (!_cp || !_cp.sel) return; const mx = Math.max(1, Math
 function cpOrigen(o) { if (!_cp) return; _cp.origen = o; cpRender(); }
 function cpLio(l) { if (!_cp) return; _cp.lioSel = l; cpRender(); }
 function closeCP() { const ov = document.getElementById("cpModal"); if (ov) ov.classList.remove("show"); _cp = null; }
+function cpHasProgress() { return !!(_cp && _cp.step === 2 && _cp.sel); }
+function cpAskClose() { opAskClose(cpHasProgress(), "CP", _cp && _cp.legajo, "Completar Pedido", _cp, closeCP); }
 /* Recalcula el resumen de líos del pedido sumando la caja completada (a un lío
    existente por letra, o a uno nuevo) y re-emite el TAL (gana el más reciente). */
 function cpUpdateLio(leg, s, qty, lioSel, info) {
@@ -10310,6 +10384,7 @@ async function cpConfirm() {
   // Bajar el faltante (RPC) y REFRESCAR la lista para que el completado DESAPAREZCA a la
   // vista (y se puedan completar varios seguidos sin cerrar el modal).
   await cpReduceFaltante(s, qty);
+  try { opDraftClear(leg); } catch (_e) {}
   if (!_cp) return;
   _cp.justDone = "✓ " + qty + " caja(s) de " + s.cod_art + " → NP " + s.np + " (a facturar)";
   _cp.sel = null; _cp.step = 1; _cp.liosLoading = false; _cp._liosInfo = null;
@@ -10322,7 +10397,7 @@ async function cpConfirm() {
    reasignar_cajas), stock (a facturar / a separar) y los líos de AMBOS pedidos. Evento RC.
    La app SUGIERE (ordena por fecha de salida, el más tardío primero) pero el operario elige. ===== */
 let _rc = null;
-async function showRCModal(legajo) {
+async function showRCModal(legajo, _resume) {
   if (!document.getElementById("rcCss")) {
     const st = document.createElement("style"); st.id = "rcCss";
     st.textContent = "#rcModal{display:none;position:fixed;inset:0;z-index:1291;background:rgba(2,6,23,.74);overflow:auto;padding:12px;}#rcModal.show{display:block;}.rc-card{background:#f8fafc;max-width:460px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.rc-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;background:linear-gradient(90deg,#ea580c,#c2410c);color:#fff;}.rc-title{font-size:17px;font-weight:800;}.rc-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}.rc-body{padding:13px 14px;}.rc-hint{font-size:12.5px;color:#64748b;margin-bottom:10px;line-height:1.35;}.rc-empty{padding:24px;text-align:center;color:#64748b;font-size:15px;}.rc-frow{display:block;width:100%;text-align:left;border:1px solid #e2e8f0;border-radius:13px;padding:11px 12px;margin:0 0 9px;background:#fff;cursor:pointer;}.rc-ftop{display:flex;align-items:baseline;gap:8px;margin-bottom:4px;}.rc-fbot{display:flex;align-items:center;justify-content:space-between;gap:8px;}.rc-cod{font-size:16px;font-weight:800;font-family:Consolas,Menlo,monospace;}.rc-fdesc{font-size:12.5px;color:#475569;}.rc-np{font-size:12px;color:#64748b;}.rc-faltan{font-size:12.5px;font-weight:800;color:#c2410c;white-space:nowrap;}.rc-back{background:none;border:none;color:#1e6bd6;font-weight:800;font-size:14px;cursor:pointer;padding:0 0 8px;width:auto;margin:0;}.rc-sel{background:#fff7ed;border:1px solid #fed7aa;border-radius:13px;padding:11px 12px;margin-bottom:12px;}.rc-selnp{font-size:12px;color:#9a3412;margin-top:3px;font-weight:700;}.rc-fld{margin-bottom:13px;}.rc-lbl{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:#64748b;margin-bottom:7px;}.rc-donors{display:flex;flex-wrap:wrap;gap:8px;}.rc-donor{background:#fff;border:1.5px solid #cbd5e1;border-radius:11px;padding:8px 11px;font-size:14px;font-weight:800;color:#334155;cursor:pointer;width:auto;margin:0;text-align:left;}.rc-donor small{font-weight:700;color:#64748b;font-size:11px;display:block;}.rc-donor.on{border-color:#ea580c;background:#fff7ed;color:#c2410c;}.rc-donor.pick{border-style:dashed;}.rc-note{font-size:12px;color:#64748b;margin-top:6px;}.rc-stp{display:flex;align-items:center;gap:7px;}.rc-sb{display:flex;align-items:center;justify-content:center;line-height:1;padding:0;margin:0;width:46px;height:50px;border:none;border-radius:10px;font-size:26px;font-weight:800;cursor:pointer;background:#e2e8f0;color:#475569;}.rc-inp{width:70px;height:50px;box-sizing:border-box;margin:0;text-align:center;font-size:24px;font-weight:800;border:2px solid #cbd5e1;border-radius:10px;padding:0;-moz-appearance:textfield;}.rc-inp::-webkit-outer-spin-button,.rc-inp::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}.rc-fin{width:100%;margin-top:6px;padding:15px;border:none;border-radius:12px;background:#ea580c;color:#fff;font-size:16px;font-weight:800;cursor:pointer;}.rc-fin:disabled{background:#cbd5e1;color:#64748b;cursor:not-allowed;}.rc-done{background:#dcfce7;border:1px solid #86efac;color:#15803d;font-weight:800;font-size:13px;border-radius:11px;padding:10px 12px;margin-bottom:11px;}.rc-liosload{font-size:12px;color:#64748b;}";
@@ -10331,12 +10406,15 @@ async function showRCModal(legajo) {
   let ov = document.getElementById("rcModal");
   if (!ov) { ov = document.createElement("div"); ov.id = "rcModal"; document.body.appendChild(ov); }
   ov.classList.add("show");
-  ov.innerHTML = '<div class="rc-card"><div class="rc-head"><span class="rc-title">🔁 Pasar cajas a un pedido urgente</span><button class="rc-close" onclick="closeRC()">Cerrar</button></div><div class="rc-body" id="rcBody"><div class="rc-empty">Cargando faltantes…</div></div></div>';
+  ov.innerHTML = '<div class="rc-card"><div class="rc-head"><span class="rc-title">🔁 Pasar cajas a un pedido urgente</span><button class="rc-close" onclick="rcAskClose()">Cerrar</button></div><div class="rc-body" id="rcBody"><div class="rc-empty">Cargando faltantes…</div></div></div>';
+  if (_resume) { _rc = _resume; rcRender(); return; }
   _rc = { legajo: String(legajo || ""), step: 1, sel: null, donorSel: null, qty: 1, faltantes: [], donors: null, donorsLoading: false, justDone: "" };
   try { const fr = await cpLoadFaltantes(); fr.sort(function (a, b) { return String(a.fecha_salida || "9999").localeCompare(String(b.fecha_salida || "9999")) || String(a.np).localeCompare(String(b.np)); }); if (_rc) _rc.faltantes = fr; } catch (_e) {}
   if (_rc) rcRender();
 }
 function closeRC() { const ov = document.getElementById("rcModal"); if (ov) ov.classList.remove("show"); _rc = null; }
+function rcHasProgress() { return !!(_rc && _rc.step === 2 && _rc.sel); }
+function rcAskClose() { opAskClose(rcHasProgress(), "RC", _rc && _rc.legajo, "Pasar cajas a urgente", _rc, closeRC); }
 function rcRender() {
   if (!_rc) return; const body = document.getElementById("rcBody"); if (!body) return;
   if (_rc.step === 2 && _rc.sel) { rcRenderStep2(body); return; }
@@ -10425,6 +10503,7 @@ async function rcConfirm() {
   // 4) evento RC (trazabilidad)
   rcEmitEvent(leg, t, d, qty);
   try { updatePendingIndicator(); } catch (_e) {}
+  try { opDraftClear(leg); } catch (_e) {}
   // 5) refrescar la lista de faltantes
   if (!_rc) return;
   _rc.justDone = "✓ Pasaste " + qty + " caja(s) de " + cod + " a NP " + t.np + (d.type === "armado" ? " (de NP " + d.np + ")" : " (de " + d.tanda + ")");

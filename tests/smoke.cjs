@@ -19,6 +19,8 @@ catch (_e) {
       "prodCompute", "prodLoad", "prodExportCsv", "prodSetMeta", "_pvPremio", "_pvMetas",
       "stkBodyRacks", "stkRacksCapCompute", "stkRacksCapSummary", "stkPlnSet", "stkPlaniLoad",
       "stkAutoBajadaCompute", "stkAutoBajadaSection", "stkToggleAutoBajada",
+      "opDraftSave", "opDraftLoad", "opDraftClear", "opAskClose", "opDraftResume",
+      "mgAskClose", "rkbAskClose", "insAskClose", "scAskClose", "eaAskClose", "cpAskClose", "rcAskClose",
       "stkBodyProceso", "ocBodyEntregas", "ocgEnter", "insRender", "mgRender", "pkRender", "stockBajaPicking",
       "stockSepararAFacturar", "stockSalidaFacturado",
       "showMGChooser", "showRacksBajarModal", "rkbRender", "rkbConfirmar", "rkbFetchCxM", "rkbSetSec",
