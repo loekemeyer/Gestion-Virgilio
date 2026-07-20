@@ -5441,7 +5441,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.59";
+const APP_VERSION = "v5.60";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -8990,6 +8990,19 @@ function stkBodyCapacidad() {
     '<span style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:6px 10px;font-size:12px;"><b>' + arts.length + '</b> códigos · <b>' + (Math.round(totCap * 10) / 10) + '</b> cajas de capacidad</span>' +
     '<span style="background:#dcfce7;border:1px solid #86efac;border-radius:10px;padding:6px 10px;font-size:12px;color:#166534;"><b>' + bajos + '</b> con lugar de sobra (máx bajo)</span>' +
     '<span style="background:#fee2e2;border:1px solid #fca5a5;border-radius:10px;padding:6px 10px;font-size:12px;color:#991b1b;"><b>' + noEntra + '</b> que no entran (máx alto)</span></div>';
+  // ⚠ Revisar: artículos con lugar en góndola pero SIN proyección/máximo. No debería
+  // pasar (regla del dueño): suele ser el código mal escrito (le falta la E, un cero…).
+  // Si el mismo código + "E" SÍ tiene máximo, lo sugerimos.
+  const revisar = arts.filter(function (r) { return r.max == null && r.capacidad > 0; });
+  if (revisar.length) {
+    const sugE = function (cod) { const k = _ocgNorm(cod); return maxByCod[k + "E"] ? (cod + "E") : null; };
+    h += '<div style="background:#fef2f2;border:1.5px solid #fca5a5;border-radius:11px;padding:10px 12px;margin:0 0 12px;color:#991b1b;font-size:12.5px;line-height:1.4;">' +
+      '<b>⚠ ' + revisar.length + ' con lugar en góndola pero SIN proyección/máximo — revisar.</b> Un artículo no debería tener lugar en góndola si no tiene proyección de ventas: suele ser el <b>código mal escrito</b> (le falta la E, un cero, etc.).' +
+      '<div style="margin-top:7px;">' + revisar.map(function (r) {
+        const s = sugE(r.cod);
+        return '<span style="display:inline-block;background:#fff;border:1px solid #fecaca;border-radius:8px;padding:3px 8px;margin:0 4px 4px 0;font-family:Consolas,Menlo,monospace;"><b>' + escapeHtml(r.cod) + '</b> <span style="color:#64748b;font-family:system-ui;">(' + r.capacidad + ' cj)</span>' + (s ? ' <b style="color:#166534;">→ ¿' + escapeHtml(s) + '?</b>' : '') + '</span>';
+      }).join("") + '</div></div>';
+  }
   h += '<input class="stk-filtro" type="search" placeholder="🔎 Buscar código / sector" value="' + escapeHtml(_stk.filtro) + '" oninput="if(_stk){_stk.filtro=this.value;stkRender();}">';
   h += '<table class="stk-tbl"><thead><tr><th>Código</th><th>Sectores</th><th class="num">Capacidad</th><th class="num">Máx OC</th><th class="num">Dif</th></tr></thead><tbody>';
   shown.forEach(function (r) {
