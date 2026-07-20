@@ -5417,7 +5417,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.56";
+const APP_VERSION = "v5.57";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -9226,13 +9226,30 @@ function stkAutoBajadaCompute() {
   const F = _stk.factors || {}, fN = {}; Object.keys(F).forEach(function (k) { fN[_ocgNorm(k)] = F[k]; });
   const capByCod = {};
   (_stk.cap || []).forEach(function (r) { const k = _ocgNorm(r.cod); if (!k) return; if (!capByCod[k]) capByCod[k] = { cod: String(r.cod), cajas: 0 }; capByCod[k].cajas += Number(r.cajas_max) || 0; });
+  // CxM (cajas por master) derivado de la PLANIMETRÍA: por código, si todas las celdas
+  // ocupadas con master>0 dan el MISMO ratio ENTERO inner/master, ese es el CxM. Así el
+  // automático no depende de que esté cargado el maestro (mismo criterio que rkbFetchCxM).
+  const _cxAgg = {};
+  (_stk.plani || []).forEach(function (r) {
+    if (String(r.estado) !== "ocupado") return;
+    const m = Number(r.master_cajas) || 0, inn = Number(r.innercajas) || 0;
+    if (m <= 0 || inn <= 0) return;
+    const k = _ocgNorm(r.cod_art); if (!k) return;
+    if (!_cxAgg[k]) _cxAgg[k] = { ratio: null, bad: false };
+    if (inn % m !== 0) { _cxAgg[k].bad = true; return; }
+    const ratio = inn / m;
+    if (_cxAgg[k].ratio == null) _cxAgg[k].ratio = ratio;
+    else if (_cxAgg[k].ratio !== ratio) _cxAgg[k].bad = true;
+  });
+  const cxmPlani = {};
+  Object.keys(_cxAgg).forEach(function (k) { if (!_cxAgg[k].bad && _cxAgg[k].ratio > 0) cxmPlani[k] = _cxAgg[k].ratio; });
   const bajar = [], sinMaster = [];
   Object.keys(capByCod).forEach(function (k) {
     const capg = capByCod[k].cajas, sd = sN[k] || {};
     const gond = Math.round(Number(sd.terminado) || 0), racks = Math.round(Number(sd.racks) || 0);
     const hueco = Math.max(0, capg - gond);
     if (hueco <= 0 || racks <= 0) return;
-    const master = (fN[k] && fN[k].cajasXMaster > 0) ? fN[k].cajasXMaster : 0;
+    const master = (fN[k] && fN[k].cajasXMaster > 0) ? fN[k].cajasXMaster : (cxmPlani[k] || 0);
     const cod = capByCod[k].cod;
     if (!master) { sinMaster.push({ cod: cod }); return; }
     const masters = Math.min(Math.floor(hueco / master), Math.floor(racks / master));
