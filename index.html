@@ -13472,6 +13472,21 @@ function pppSugerirView() {
   const el = document.getElementById("pppSugContent"); if (el) el.innerHTML = _pppSugHtml(s);
   const ov = document.getElementById("pppSugOverlay"); if (ov) ov.classList.add("show");
 }
+/* v5.59 — Sugerir tandas INLINE (sin popup): muestra la sugerencia en la MISMA vista
+   (qué tanda va a ser cada pedido según m³ + reglas de zona). El pop-up (ventana de
+   impresión) aparece SOLO al tocar "Exportar PDF". Pedido del dueño. */
+function pppSugerirInline() {
+  const s = _pppComputeSugerencia();
+  const el = document.getElementById("pppSugInline"); if (!el) return;
+  if (!s.tandas.length && !(s.sinZona && s.sinZona.length)) { el.innerHTML = '<div class="planim-empty" style="margin-top:8px;">No hay pedidos sin tanda para sugerir (todo lo de Supabase ya está programado).</div>'; return; }
+  _pppSugCache = s;
+  el.innerHTML = '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:10px 0 6px;">' +
+    '<button class="ppp-sug-btn" onclick="pppPrintSug()">📄 Exportar PDF</button>' +
+    '<button class="ppp-tool-clear" onclick="pppSugInlineClose()">✕ ocultar</button></div>' +
+    '<div style="border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;background:#fff;">' + _pppSugHtml(s) + '</div>';
+  try { el.scrollIntoView({ behavior: "smooth", block: "nearest" }); } catch (_e) {}
+}
+function pppSugInlineClose() { const el = document.getElementById("pppSugInline"); if (el) el.innerHTML = ""; }
 function pppCloseSug() { const ov = document.getElementById("pppSugOverlay"); if (ov) ov.classList.remove("show"); }
 const _PPP_SUG_PRINT_CSS = "body{font-family:Arial,Helvetica,sans-serif;color:#0f172a;margin:18px;} h2{font-size:18px;margin:0 0 4px;} .ppp-sug-sub{font-size:12px;color:#475569;margin-bottom:12px;} table{width:100%;border-collapse:collapse;margin:0 0 14px;font-size:12px;page-break-inside:avoid;} th,td{border:1px solid #cbd5e1;padding:5px 8px;text-align:left;} .ppp-sug-th{background:#1e293b;color:#fff;font-size:13px;} thead tr:nth-child(2) th{background:#f1f5f9;} td.num,th.num{text-align:right;} .ppp-sug-sinzona{font-size:12px;color:#b45309;margin:8px 0;} .ppp-sug-tot{font-weight:bold;margin-top:8px;}";
 function pppPrintSug() {
@@ -14391,6 +14406,11 @@ function _pppEmitError(info) {
 }
 /* Calcula los 4 errores sobre los pedidos de Supabase y los anota en p._err. Devuelve
    las listas para el panel. entSet = NP ya entregados/controlados (CRN/CCR). */
+/* Ciudadela: pegada a la fábrica (Villarreal) y camino a Zona 1 por la autopista →
+   se puede meter en cualquier tanda cercana sin que cuente como "ruta mezclada". */
+function _pppEsCiudadela(barrio) {
+  return String(barrio || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").indexOf("ciudadela") >= 0;
+}
 function _pppComputeErrors(peds, entSet) {
   const sacar = [], sinZona = [], zonaDif = [];
   for (const p of peds) {
@@ -14412,7 +14432,9 @@ function _pppComputeErrors(peds, entSet) {
   for (const p of peds) { if (!p.programmed || !_pppTieneTanda(p)) continue; const t = p.tanda.toUpperCase(); (byT[t] = byT[t] || []).push(p); }
   for (const t in byT) {
     const ps = byT[t], rutas = {}, fechas = {};
-    for (const p of ps) { if (!pppEsSuper(p)) { const r = _pppRuta([p]); if (r) rutas[r] = 1; } const fe = _pppS(p.fecha_entrega); if (fe) fechas[fe] = 1; }
+    // Ciudadela (GBA Oeste) queda pegada a la fábrica (Villarreal) camino a Zona 1 por la
+    // autopista → NO cuenta como ruta aparte (no marca "tanda mezclada"). Pedido del dueño.
+    for (const p of ps) { if (!pppEsSuper(p) && !_pppEsCiudadela(p.localidad)) { const r = _pppRuta([p]); if (r) rutas[r] = 1; } const fe = _pppS(p.fecha_entrega); if (fe) fechas[fe] = 1; }
     const nR = Object.keys(rutas).length, nF = Object.keys(fechas).length;
     if (nR > 1 || nF > 1) { tandasMal.push({ tanda: t, rutas: nR, fechas: nF }); for (const p of ps) if (p._err.indexOf("tandamal") < 0) p._err.push("tandamal"); }
   }
@@ -14542,7 +14564,8 @@ function pppRenderProg() {
       '</div>';
     html += '<div id="pppBaseNote" style="font-size:12px;font-weight:600;margin:2px 2px 8px;color:' + (cfg.baseOk === false ? '#b42318' : '#166534') + ';">' + escapeHtml(cfg.baseNote || "") + '</div>';
   } else {
-    html += '<div class="ppp-toolbar"><button class="ppp-sug-btn" onclick="pppSugerirView()">🪄 Sugerir tandas</button><span class="ppp-sug-hint">Es una sugerencia para cargar a mano en el Excel (no cambia nada acá) — se puede imprimir.</span></div>';
+    html += '<div class="ppp-toolbar"><button class="ppp-sug-btn" onclick="pppSugerirInline()">🪄 Sugerir tandas</button><span class="ppp-sug-hint">Es una sugerencia para cargar a mano en el Excel (no cambia nada acá). Se muestra acá abajo; con “Exportar PDF” la imprimís.</span></div>';
+    html += '<div id="pppSugInline"></div>';
   }
   // ===== Sugerencia: pedido en A Programar cuyo CLIENTE ya tiene tanda en Programación =====
   // → ofrecer meterlo en esa tanda ya hecha (aunque pase el m³/tanda objetivo). (Sólo modo editable.)
