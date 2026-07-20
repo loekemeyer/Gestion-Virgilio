@@ -5402,7 +5402,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.53";
+const APP_VERSION = "v5.54";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -9162,9 +9162,82 @@ async function racksFetchPlani() { try { const r = await fetch(SUPABASE_RACKS_PL
 async function stkPlaniLoad() {
   if (!_stk) return;
   _stk.planiLoaded = "loading"; stkRender();
-  _stk.plani = await racksFetchPlani();
+  const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+  try {
+    const res = await Promise.all([
+      racksFetchPlani(),
+      _stk.cap ? Promise.resolve(_stk.cap) : fetch(SUPABASE_CAPACIDAD_ENDPOINT + "?select=sector,cod,cajas_max&limit=50000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; }),
+      fetch(SUPABASE_URL + "/rest/v1/Stock_Config?clave=eq.bajada_auto_racks&select=valor", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; })
+    ]);
+    _stk.plani = res[0] || [];
+    _stk.cap = res[1] || [];
+    _stk.abrOn = !!(res[2] && res[2].length && String(res[2][0].valor) === "1");
+  } catch (_e) { _stk.plani = _stk.plani || []; }
   _stk.planiLoaded = true;
   if (_stk) stkRender();
+}
+/* Bajada automática de racks → góndola (v5.54, detrás de un switch en Stock_Config
+   'bajada_auto_racks', default OFF). Regla del dueño: por artículo, se baja para
+   LLENAR la góndola = capacidad (suma de sus celdas en Capacidad_Sector) − lo que ya
+   hay en góndola (terminado), SOLO en MASTER cajas completas (nunca se abre un master),
+   y hasta lo que haya en racks. Es lo que hay que bajar "a guardar"/góndola, automático.
+   PREVIEW por ahora (no crea la orden ni pre-carga al operario): eso se activa cuando el
+   dueño confíe en el stock de góndola. */
+function stkAutoBajadaCompute() {
+  const saldos = stockComputeSaldos(_stk.movs, _stk.cutoff);
+  const sN = {}; Object.keys(saldos).forEach(function (k) { sN[_ocgNorm(k)] = saldos[k]; });
+  const F = _stk.factors || {}, fN = {}; Object.keys(F).forEach(function (k) { fN[_ocgNorm(k)] = F[k]; });
+  const capByCod = {};
+  (_stk.cap || []).forEach(function (r) { const k = _ocgNorm(r.cod); if (!k) return; if (!capByCod[k]) capByCod[k] = { cod: String(r.cod), cajas: 0 }; capByCod[k].cajas += Number(r.cajas_max) || 0; });
+  const bajar = [], sinMaster = [];
+  Object.keys(capByCod).forEach(function (k) {
+    const capg = capByCod[k].cajas, sd = sN[k] || {};
+    const gond = Math.round(Number(sd.terminado) || 0), racks = Math.round(Number(sd.racks) || 0);
+    const hueco = Math.max(0, capg - gond);
+    if (hueco <= 0 || racks <= 0) return;
+    const master = (fN[k] && fN[k].cajasXMaster > 0) ? fN[k].cajasXMaster : 0;
+    const cod = capByCod[k].cod;
+    if (!master) { sinMaster.push({ cod: cod }); return; }
+    const masters = Math.min(Math.floor(hueco / master), Math.floor(racks / master));
+    if (masters < 1) return;
+    bajar.push({ cod: cod, desc: artNombre(cod, sd.desc) || "", capg: capg, gond: gond, hueco: hueco, master: master, masters: masters, cajas: masters * master, racks: racks });
+  });
+  const byCod = function (a, b) { return (parseInt(a.cod, 10) || 0) - (parseInt(b.cod, 10) || 0); };
+  bajar.sort(byCod); sinMaster.sort(byCod);
+  return { bajar: bajar, sinMaster: sinMaster };
+}
+async function stkToggleAutoBajada() {
+  if (!_stk) return;
+  const nuevo = _stk.abrOn ? "0" : "1";
+  try {
+    const r = await fetch(SUPABASE_URL + "/rest/v1/Stock_Config?on_conflict=clave", { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ clave: "bajada_auto_racks", valor: nuevo }) });
+    if (!r.ok) { try { alert("No se pudo guardar (HTTP " + r.status + ")."); } catch (_e) {} return; }
+    _stk.abrOn = (nuevo === "1"); stkRender();
+  } catch (_e) { try { alert("Sin conexión: no se guardó."); } catch (_e2) {} }
+}
+function stkAutoBajadaSection() {
+  if (_stk.planiLoaded !== true) return "";
+  const on = !!_stk.abrOn;
+  const sw = '<span class="sup-sw' + (on ? ' on' : '') + '" onclick="stkToggleAutoBajada()" role="switch" style="vertical-align:middle;flex:0 0 auto;"><span class="sup-sw-k"></span></span>';
+  let h = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;background:#eef2ff;border:1px solid #c7d2fe;border-radius:12px;padding:11px 13px;margin-bottom:12px;">' +
+    '<div style="min-width:0;"><div style="font-size:14px;font-weight:800;color:#3730a3;">🤖 Bajada automática de racks</div>' +
+    '<div style="font-size:12px;color:#4338ca;margin-top:2px;">' + (on ? 'Activada — calcula qué bajar por capacidad de góndola.' : 'Desactivada — prendé cuando confíes en el stock de góndola.') + '</div></div>' + sw + '</div>';
+  if (!on) return h;
+  const r = stkAutoBajadaCompute();
+  h += '<div class="stk-cut" style="background:#eef6ff;border:1px solid #bfdbfe;color:#1e40af;">Baja para <b>llenar la góndola</b> = capacidad − lo que ya hay, <b>solo en master completos</b> (nunca se abre un master) y hasta lo que haya en racks. <b>Preview</b>: todavía no crea la orden ni carga al operario.</div>';
+  if (!r.bajar.length) h += '<div class="stk-empty">Nada para bajar automático ahora (góndola llena, sin capacidad cargada o sin CxM).</div>';
+  else {
+    let totC = 0, totM = 0;
+    h += '<div class="stk-tblwrap"><table class="stk-tbl"><thead><tr><th>Código</th><th class="num">Cap.</th><th class="num">Góndola</th><th class="num">Hueco</th><th class="num">Bajar</th><th class="num">Racks</th></tr></thead><tbody>';
+    r.bajar.forEach(function (x) {
+      totC += x.cajas; totM += x.masters;
+      h += '<tr><td class="stk-cod">' + escapeHtml(x.cod) + '</td><td class="num">' + x.capg + '</td><td class="num">' + x.gond + '</td><td class="num">' + x.hueco + '</td><td class="num"><b>' + x.masters + ' mstr</b> · ' + x.cajas + ' cj</td><td class="num">' + x.racks + '</td></tr>';
+    });
+    h += '</tbody></table></div>';
+    h += '<div style="font-size:12.5px;color:#334155;margin-top:6px;"><b>Total a bajar:</b> ' + totM + ' master · ' + totC + ' cajas.</div>';
+  }
+  if (r.sinMaster.length) h += '<div style="font-size:11.5px;color:#92400e;margin-top:6px;">⚠ ' + r.sinMaster.length + ' con hueco y stock en racks pero <b>sin master (CxM) cargado</b> → no entran al automático: ' + r.sinMaster.map(function (x) { return escapeHtml(x.cod); }).join(", ") + '.</div>';
+  return h + '<div style="height:14px;border-bottom:1px solid #e2e8f0;margin:12px 0;"></div>';
 }
 /* Agrupa la planimetría por posición física (sector). Una posición puede tener
    varios códigos (palet mezclado); "Pedidos"/"Cajas" son slots especiales. */
@@ -9252,6 +9325,7 @@ function stkRacksCapSummary() {
 }
 function stkBodyRacks() {
   let h = stkRacksCapSummary();
+  h += stkAutoBajadaSection();
   const pend = (_stk.ordenes || []).filter(function (o) { return o.estado === "pendiente"; });
   h += pend.length
     ? '<div class="stk-rk-orden pend">📦 Hay una orden de bajar racks→góndola <b>PENDIENTE</b> (' + escapeHtml(String(pend[0].fecha || "")) + '). A los operarios les aparece la alarma; ellos registran lo que bajan y vos lo aprobás acá abajo.</div>'
