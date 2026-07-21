@@ -30,6 +30,7 @@ catch (_e) {
       "showRCModal", "rcConfirm", "rcLoadDonors", "showRemitoArmado", "armadoRemitoData", "armadoRemitoInnerHtml", "remitoPrintDoc",
       "openPrintStation", "psToggle", "psPoll", "psTestPrint", "psPrintBatch", "psSeedTodayIfNeeded", "psRender",
       "showEAModal", "eaFetchStock", "eaRender", "eaConfirmar", "eaEmitEvent",
+      "eaFetchUbics", "eaRenderEdit", "eaEditUbic", "eaEditSet", "eaUbicCancel", "eaUbicSave", "eaUbicDelete",
       "stkOpenPedidos", "stkOpenGondola", "stkGondRender", "_stkPopAgg", "_stkFetchNpsByTanda", "stkCapSort"];
     const missing = need.filter((n) => typeof window[n] !== "function");
     const ts = new Date().toISOString();

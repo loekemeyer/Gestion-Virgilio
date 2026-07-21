@@ -5441,7 +5441,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.62";
+const APP_VERSION = "v5.63";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -7572,6 +7572,11 @@ try { window.addEventListener("online", function () { try { _compFlushEntregas()
    reintenta stockFlushPend acá). Cada fila: {cod_art, descripcion, deposito
    ('a_guardar'|'terminado'), delta (+/- cajas), tipo, ref, legajo}. */
 const SUPABASE_STOCK_ENDPOINT = SUPABASE_URL + "/rest/v1/Movimientos_Stock";
+/* Ubicación física de lo "para envasar" (módulo EA). Tabla propia, SEPARADA de
+   Racks_Planimetria: racks = terminado→góndola; para_envasar = tiene que salir.
+   Comparten sector físico pero se listan aparte. Solo mapa; el saldo vive en
+   Movimientos_Stock (deposito='para_envasar'). */
+const SUPABASE_ENVASAR_UBIC_ENDPOINT = SUPABASE_URL + "/rest/v1/Envasar_Ubicaciones";
 function stockMove(rows) {
   if (!rows || !rows.length) return Promise.resolve();
   const headers = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" };
@@ -10448,27 +10453,28 @@ async function eaFetchStock() {
 async function showEAModal(legajo, _resume) {
   if (!document.getElementById("eaCss")) {
     const s = document.createElement("style"); s.id = "eaCss";
-    s.textContent = "#eaModal{display:none;position:fixed;inset:0;z-index:1290;background:rgba(2,6,23,.74);overflow:auto;padding:12px;}#eaModal.show{display:block;}.ea-card{background:#f8fafc;max-width:460px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.ea-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;background:linear-gradient(90deg,#7c3aed,#6d28d9);color:#fff;}.ea-title{font-size:17px;font-weight:800;}.ea-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}.ea-body{padding:13px 14px;}.ea-hint{font-size:12.5px;color:#64748b;margin-bottom:10px;line-height:1.35;}.ea-search{width:100%;height:44px;border:2px solid #cbd5e1;border-radius:11px;padding:0 13px;font-size:16px;font-weight:700;margin-bottom:10px;box-sizing:border-box;}.ea-row{display:flex;align-items:center;gap:10px;border:1px solid #e2e8f0;border-radius:13px;padding:10px 12px;margin-bottom:8px;background:#fff;}.ea-info{flex:1;min-width:0;}.ea-cod{font-size:16px;font-weight:800;font-family:Consolas,Menlo,monospace;}.ea-desc{font-size:12px;color:#475569;}.ea-av{font-size:11.5px;color:#64748b;}.ea-stpcol{display:flex;flex-direction:column;align-items:center;gap:3px;}.ea-u{font-size:10.5px;color:#64748b;font-weight:800;text-align:center;text-transform:uppercase;letter-spacing:.3px;}.ea-stp{display:flex;align-items:center;gap:6px;}.ea-sb{width:42px;height:46px;border:none;border-radius:9px;font-size:24px;font-weight:800;cursor:pointer;background:#e2e8f0;color:#475569;display:flex;align-items:center;justify-content:center;line-height:1;padding:0;margin:0;}.ea-inp{width:54px;height:46px;box-sizing:border-box;text-align:center;font-size:20px;font-weight:800;border:2px solid #cbd5e1;border-radius:9px;padding:0;-moz-appearance:textfield;}.ea-inp::-webkit-outer-spin-button,.ea-inp::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}.ea-fin{width:100%;margin-top:10px;padding:14px;border:none;border-radius:12px;background:#7c3aed;color:#fff;font-size:17px;font-weight:800;cursor:pointer;}.ea-fin:disabled{background:#cbd5e1;color:#64748b;cursor:not-allowed;}.ea-empty{padding:18px;text-align:center;color:#64748b;font-size:14px;}";
+    s.textContent = "#eaModal{display:none;position:fixed;inset:0;z-index:1290;background:rgba(2,6,23,.74);overflow:auto;padding:12px;}#eaModal.show{display:block;}.ea-card{background:#f8fafc;max-width:460px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.ea-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;background:linear-gradient(90deg,#7c3aed,#6d28d9);color:#fff;}.ea-title{font-size:17px;font-weight:800;}.ea-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}.ea-body{padding:13px 14px;}.ea-hint{font-size:12.5px;color:#64748b;margin-bottom:10px;line-height:1.35;}.ea-search{width:100%;height:44px;border:2px solid #cbd5e1;border-radius:11px;padding:0 13px;font-size:16px;font-weight:700;margin-bottom:10px;box-sizing:border-box;}.ea-row{display:flex;align-items:center;gap:10px;border:1px solid #e2e8f0;border-radius:13px;padding:10px 12px;margin-bottom:8px;background:#fff;}.ea-info{flex:1;min-width:0;}.ea-cod{font-size:16px;font-weight:800;font-family:Consolas,Menlo,monospace;}.ea-desc{font-size:12px;color:#475569;}.ea-av{font-size:11.5px;color:#64748b;}.ea-stpcol{display:flex;flex-direction:column;align-items:center;gap:3px;}.ea-u{font-size:10.5px;color:#64748b;font-weight:800;text-align:center;text-transform:uppercase;letter-spacing:.3px;}.ea-stp{display:flex;align-items:center;gap:6px;}.ea-sb{width:42px;height:46px;border:none;border-radius:9px;font-size:24px;font-weight:800;cursor:pointer;background:#e2e8f0;color:#475569;display:flex;align-items:center;justify-content:center;line-height:1;padding:0;margin:0;}.ea-inp{width:54px;height:46px;box-sizing:border-box;text-align:center;font-size:20px;font-weight:800;border:2px solid #cbd5e1;border-radius:9px;padding:0;-moz-appearance:textfield;}.ea-inp::-webkit-outer-spin-button,.ea-inp::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}.ea-fin{width:100%;margin-top:10px;padding:14px;border:none;border-radius:12px;background:#7c3aed;color:#fff;font-size:17px;font-weight:800;cursor:pointer;}.ea-fin:disabled{background:#cbd5e1;color:#64748b;cursor:not-allowed;}.ea-empty{padding:18px;text-align:center;color:#64748b;font-size:14px;}.ea-loc{display:flex;align-items:center;flex-wrap:wrap;gap:5px;margin-top:5px;}.ea-loc-chip{font-size:11.5px;font-weight:800;font-family:Consolas,Menlo,monospace;color:#0e7490;background:#ecfeff;border:1px solid #a5f3fc;border-radius:8px;padding:3px 8px;cursor:pointer;}.ea-loc-add{font-size:11.5px;font-weight:700;color:#7c3aed;background:#f5f3ff;border:1px dashed #c4b5fd;border-radius:8px;padding:3px 8px;cursor:pointer;width:auto;margin:0;}.ea-loc-none{font-size:11px;color:#94a3b8;}.ea-back{background:none;border:none;color:#7c3aed;font-weight:800;font-size:14px;cursor:pointer;padding:0 0 8px;width:auto;margin:0;}.ea-ed{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:12px 13px;}.ea-ed-fld{margin-bottom:11px;}.ea-ed-lbl{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:#64748b;margin-bottom:6px;}.ea-ed-inp{width:100%;height:44px;box-sizing:border-box;border:2px solid #cbd5e1;border-radius:10px;padding:0 12px;font-size:16px;font-weight:700;}.ea-ed-num{width:110px;text-align:center;}.ea-ed-row{display:flex;gap:14px;}.ea-ed-btns{display:flex;gap:8px;margin-top:4px;}.ea-ed-save{flex:1;padding:13px;border:none;border-radius:11px;background:#7c3aed;color:#fff;font-size:16px;font-weight:800;cursor:pointer;}.ea-ed-save:disabled{background:#cbd5e1;color:#64748b;cursor:not-allowed;}.ea-ed-del{padding:13px 14px;border:none;border-radius:11px;background:#fee2e2;color:#b91c1c;font-size:15px;font-weight:800;cursor:pointer;width:auto;margin:0;}.ea-ed-cancel{padding:13px 14px;border:1px solid #cbd5e1;border-radius:11px;background:#fff;color:#475569;font-size:14px;font-weight:700;cursor:pointer;width:auto;margin:0;}";
     document.head.appendChild(s);
   }
   let ov = document.getElementById("eaModal");
   if (!ov) { ov = document.createElement("div"); ov.id = "eaModal"; document.body.appendChild(ov); }
   ov.classList.add("show");
   ov.innerHTML = '<div class="ea-card"><div class="ea-head"><span class="ea-title">🫙 Entrega artículos para envasar</span><button class="ea-close" onclick="eaAskClose()">Cerrar</button></div><div class="ea-body" id="eaBody"><div class="ea-empty">Cargando…</div></div></div>';
-  if (_resume) { _ea = _resume; eaRender(); return; }
+  if (_resume) { _ea = _resume; if (!_ea.ubics) { eaFetchUbics().then(function (m) { if (_ea) { _ea.ubics = m; eaRender(); } }).catch(function () {}); } eaRender(); return; }
   try {
-    const res = await Promise.all([eaFetchStock(), loadArtNombres()]);
+    const res = await Promise.all([eaFetchStock(), loadArtNombres(), eaFetchUbics()]);
     const agg = res[0] || {};
     const items = Object.keys(agg).map(function (k) { return agg[k]; }).filter(function (a) { return (a.saldo || 0) > 0; })
       .sort(function (a, b) { return (parseInt(a.cod, 10) || 0) - (parseInt(b.cod, 10) || 0); })
       .map(function (a) { return { cod: a.cod, desc: artNombre(a.cod, a.desc), saldo: Math.round(a.saldo), baja: 0 }; });
-    _ea = { legajo: String(legajo || ""), items: items, filtro: "" };
+    _ea = { legajo: String(legajo || ""), items: items, filtro: "", ubics: (res[2] || {}), edit: null };
     eaRender();
   } catch (e) { const b = document.getElementById("eaBody"); if (b) b.innerHTML = '<div class="ea-empty">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
 }
 function eaRender() {
   if (!_ea) return; const body = document.getElementById("eaBody"); if (!body) return;
-  let h = '<div class="ea-hint">Estos son los artículos en <b>“para envasar”</b>. Poné cuántas cajas <b>entregás para envasar</b> y tocá registrar — se <b>descuentan</b> del stock de “para envasar”.</div>';
+  if (_ea.edit) { eaRenderEdit(body); return; }
+  let h = '<div class="ea-hint">Estos son los artículos en <b>“para envasar”</b>. Poné cuántas cajas <b>entregás para envasar</b> y tocá registrar — se <b>descuentan</b> del stock. El <b>📍 sector</b> es aparte del mapa de racks (pueden estar en el mismo estante, pero son cosas distintas): tocalo para cargar/mover dónde está.</div>';
   h += '<input id="eaSearch" class="ea-search" type="search" autocomplete="off" placeholder="🔎 Buscar código…" value="' + escapeHtml(_ea.filtro || "") + '" oninput="eaSearchInput(this.value)">';
   const fq = String(_ea.filtro || "").trim().toLowerCase();
   const shown = fq ? _ea.items.filter(function (it) { return String(it.cod).toLowerCase().indexOf(fq) >= 0; }) : _ea.items;
@@ -10476,11 +10482,36 @@ function eaRender() {
   h += shown.map(function (it) {
     const i = _ea.items.indexOf(it);
     const mx = it.saldo;
-    return '<div class="ea-row"><div class="ea-info"><span class="ea-cod">' + escapeHtml(it.cod) + '</span> <span class="ea-desc">' + escapeHtml(it.desc || "") + '</span><div class="ea-av">para envasar: <b>' + it.saldo + '</b> cajas</div></div>' +
+    const ubs = (_ea.ubics && _ea.ubics[_cpNorm(it.cod)]) || [];
+    let loc = '<div class="ea-loc">📍 ';
+    loc += ubs.length
+      ? ubs.map(function (u) { return '<span class="ea-loc-chip" onclick="eaEditUbic(\'' + escapeHtml(it.cod) + '\',' + u.id + ')">' + escapeHtml(u.sector) + (u.inner ? ' · ' + u.inner : '') + '</span>'; }).join("")
+      : '<span class="ea-loc-none">sin ubicación</span> ';
+    loc += '<button class="ea-loc-add" onclick="eaEditUbic(\'' + escapeHtml(it.cod) + '\',0)">+ ubicación</button></div>';
+    return '<div class="ea-row"><div class="ea-info"><span class="ea-cod">' + escapeHtml(it.cod) + '</span> <span class="ea-desc">' + escapeHtml(it.desc || "") + '</span><div class="ea-av">para envasar: <b>' + it.saldo + '</b> cajas</div>' + loc + '</div>' +
       '<div class="ea-stpcol"><span class="ea-u">cajas</span><div class="ea-stp"><button class="ea-sb" onclick="eaChg(' + i + ',-1)">–</button><input class="ea-inp" type="number" min="0" max="' + mx + '" inputmode="numeric" value="' + it.baja + '" oninput="eaSet(' + i + ',this.value)"><button class="ea-sb" onclick="eaChg(' + i + ',1)">+</button></div></div></div>';
   }).join("");
   const tot = _ea.items.reduce(function (s, it) { return s + (it.baja || 0); }, 0);
   h += '<button class="ea-fin"' + (tot <= 0 ? " disabled" : "") + ' onclick="eaConfirmar()">✓ Registrar entrega' + (tot > 0 ? " (" + tot + " cajas)" : "") + '</button>';
+  _renderKeepFocus(body, h);
+}
+/* Editor de UBICACIÓN de un código para-envasar (tabla Envasar_Ubicaciones, aparte
+   del mapa de racks). Sirve para cargar dónde está y para "moverlo" (cambiar el
+   sector). No toca ningún saldo. */
+function eaRenderEdit(body) {
+  const e = _ea.edit, desc = artNombre(e.cod, "") || "";
+  let h = '<button class="ea-back" onclick="eaUbicCancel()">← Volver</button>';
+  h += '<div class="ea-ed">';
+  h += '<div class="ea-ed-fld"><div class="ea-ed-lbl">' + (e.id ? "Mover / editar" : "Nueva ubicación") + ' — ' + escapeHtml(e.cod) + '</div>';
+  if (desc) h += '<div class="ea-desc" style="margin-bottom:9px">' + escapeHtml(desc) + '</div>';
+  h += '<div class="ea-ed-lbl">Sector</div><input class="ea-ed-inp" id="eaEdSector" type="text" autocomplete="off" placeholder="ej. Y29" value="' + escapeHtml(e.sector || "") + '" oninput="eaEditSet(\'sector\',this.value)"></div>';
+  h += '<div class="ea-ed-row"><div class="ea-ed-fld"><div class="ea-ed-lbl">Master</div><input class="ea-ed-inp ea-ed-num" type="number" min="0" inputmode="numeric" value="' + (Number(e.master) || 0) + '" oninput="eaEditSet(\'master\',this.value)"></div>';
+  h += '<div class="ea-ed-fld"><div class="ea-ed-lbl">Cajas</div><input class="ea-ed-inp ea-ed-num" type="number" min="0" inputmode="numeric" value="' + (Number(e.inner) || 0) + '" oninput="eaEditSet(\'inner\',this.value)"></div></div>';
+  const okSave = String(e.sector || "").trim().length > 0;
+  h += '<div class="ea-ed-btns"><button class="ea-ed-save"' + (okSave ? "" : " disabled") + ' onclick="eaUbicSave()">✓ Guardar</button>';
+  if (e.id) h += '<button class="ea-ed-del" onclick="eaUbicDelete()">🗑</button>';
+  h += '<button class="ea-ed-cancel" onclick="eaUbicCancel()">Cancelar</button></div>';
+  h += '</div>';
   _renderKeepFocus(body, h);
 }
 function eaSearchInput(v) { if (!_ea) return; _ea.filtro = String(v == null ? "" : v); eaRender(); }
@@ -10514,6 +10545,66 @@ function eaEmitEvent(cod, cajas, legajo) {
   enqueueReport(payload);
   if (typeof trySendOneReport === "function") trySendOneReport(payload).then(function (r) { if (r && r.ok) removeFromQueue(payload.id); }).catch(function () {});
   try { updatePendingIndicator(); } catch (_e) {}
+}
+/* Ubicaciones de "para envasar" (tabla Envasar_Ubicaciones). Devuelve un mapa
+   cod normalizado -> [{id,sector,master,inner,emp}] ordenado por sector. */
+async function eaFetchUbics() {
+  const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+  try {
+    const rows = await fetch(SUPABASE_ENVASAR_UBIC_ENDPOINT + "?select=id,cod_art,sector,master_cajas,innercajas,emp&limit=20000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; });
+    const m = {};
+    rows.forEach(function (x) {
+      const k = _cpNorm(String(x.cod_art || "")); if (!k) return;
+      if (!m[k]) m[k] = [];
+      m[k].push({ id: x.id, sector: String(x.sector || ""), master: Number(x.master_cajas) || 0, inner: Number(x.innercajas) || 0, emp: String(x.emp || "LK") });
+    });
+    Object.keys(m).forEach(function (k) { m[k].sort(function (a, b) { return String(a.sector).localeCompare(String(b.sector), undefined, { numeric: true }); }); });
+    return m;
+  } catch (_e) { return {}; }
+}
+function eaEditUbic(cod, id) {
+  if (!_ea) return;
+  const list = (_ea.ubics && _ea.ubics[_cpNorm(cod)]) || [];
+  const u = id ? list.filter(function (x) { return x.id === id; })[0] : null;
+  _ea.edit = u ? { cod: cod, id: u.id, sector: u.sector, master: u.master, inner: u.inner }
+               : { cod: cod, id: 0, sector: "", master: 0, inner: 0 };
+  eaRender();
+}
+function eaEditSet(field, val) {
+  if (!_ea || !_ea.edit) return;
+  if (field === "sector") _ea.edit.sector = String(val == null ? "" : val).toUpperCase().replace(/\s+/g, "");
+  else { let n = parseInt(val, 10); if (isNaN(n) || n < 0) n = 0; _ea.edit[field] = n; }
+  eaRender();
+}
+function eaUbicCancel() { if (!_ea) return; _ea.edit = null; eaRender(); }
+async function eaUbicSave() {
+  if (!_ea || !_ea.edit) return;
+  const e = _ea.edit, sector = String(e.sector || "").trim().toUpperCase().replace(/\s+/g, "");
+  if (!sector) return;
+  const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" };
+  const master = Number(e.master) || 0, inner = Number(e.inner) || 0;
+  try {
+    let r;
+    if (e.id) {
+      r = await fetch(SUPABASE_ENVASAR_UBIC_ENDPOINT + "?id=eq." + e.id, { method: "PATCH", headers: Object.assign({ Prefer: "return=minimal" }, H), body: JSON.stringify({ sector: sector, master_cajas: master, innercajas: inner, updated_at: new Date().toISOString() }) });
+    } else {
+      r = await fetch(SUPABASE_ENVASAR_UBIC_ENDPOINT + "?on_conflict=cod_art,sector", { method: "POST", headers: Object.assign({ Prefer: "resolution=merge-duplicates,return=minimal" }, H), body: JSON.stringify({ cod_art: String(e.cod).toUpperCase(), sector: sector, master_cajas: master, innercajas: inner, emp: "LK", updated_at: new Date().toISOString() }) });
+    }
+    if (!r.ok) { try { alert("No se pudo guardar la ubicación (HTTP " + r.status + (r.status === 409 ? " — ese sector ya está cargado para el código" : "") + ")."); } catch (_e) {} return; }
+  } catch (_e) { try { alert("Sin conexión: no se guardó la ubicación."); } catch (_e2) {} return; }
+  try { _ea.ubics = await eaFetchUbics(); } catch (_e) {}
+  _ea.edit = null; eaRender();
+}
+async function eaUbicDelete() {
+  if (!_ea || !_ea.edit || !_ea.edit.id) return;
+  try { if (!confirm("¿Sacar la ubicación " + (_ea.edit.sector || "") + " de " + _ea.edit.cod + "?")) return; } catch (_e) {}
+  const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+  try {
+    const r = await fetch(SUPABASE_ENVASAR_UBIC_ENDPOINT + "?id=eq." + _ea.edit.id, { method: "DELETE", headers: H });
+    if (!r.ok) { try { alert("No se pudo borrar (HTTP " + r.status + ")."); } catch (_e) {} return; }
+  } catch (_e) { try { alert("Sin conexión: no se borró."); } catch (_e2) {} return; }
+  try { _ea.ubics = await eaFetchUbics(); } catch (_e) {}
+  _ea.edit = null; eaRender();
 }
 
 /* ===== STOCK — CP · Completar Pedido (v5.05): el operario (botonera 4ª fila) o
