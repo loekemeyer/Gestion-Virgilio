@@ -5441,7 +5441,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.60";
+const APP_VERSION = "v5.61";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -8842,6 +8842,11 @@ function stkBodyStocks() {
     '<span style="font-size:10px;text-transform:uppercase;color:#166534;font-weight:700;letter-spacing:.02em;">Capacidad</span>' +
     '<span style="font-size:17px;font-weight:800;color:#166534;font-variant-numeric:tabular-nums;">' + fmtCajas(totCap) + '</span></span>';
   h += '</div>';
+  // v5.53 — dos pop-ups: NPs por estadio (pickeado→facturar) y movimientos de góndola.
+  h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">' +
+    '<button onclick="stkOpenPedidos()" style="width:auto;margin:0;padding:9px 13px;border:1px solid #c7d2fe;border-radius:10px;background:#eef2ff;color:#3730a3;font-size:13px;font-weight:800;cursor:pointer;">📋 Pedidos por estadio</button>' +
+    '<button onclick="stkOpenGondola()" style="width:auto;margin:0;padding:9px 13px;border:1px solid #bbf7d0;border-radius:10px;background:#f0fdf4;color:#15803d;font-size:13px;font-weight:800;cursor:pointer;">🔁 Movimientos de góndola</button>' +
+    '</div>';
   // Teclado NUMÉRICO por defecto (los códigos son números); botón "E" para los
   // importados (506 → 506E) sin tener que cambiar de teclado (pedido del dueño).
   h += '<div style="display:flex;gap:6px;margin-bottom:10px;align-items:center;">' +
@@ -8928,6 +8933,169 @@ function stkBodyProceso() {
   h += sec("🧾 A Facturar (armado, falta facturar)", "Tandas armadas, esperando que Marianela las facture. Al facturarse toda la tanda, salen del stock.", fac);
   return h;
 }
+
+/* =========================================================
+   v5.53 — Pop-ups del módulo Stocks (2 vistas que pidió el dueño):
+   (1) stkOpenPedidos: qué NOTAS DE PEDIDO hay en cada estadio desde el pickeado
+       en adelante (Pickeados=separar_pedidos, A Facturar=a_facturar). El stock de
+       esos depósitos está por TANDA (ref); acá se mapea tanda→NPs con el PPP.
+   (2) stkOpenGondola: los movimientos que tuvo específicamente la GÓNDOLA
+       (terminado) — aumento por 'guardado' (MG) y disminución por 'picking' (TP).
+   Ambas leen _stk.movs (ya cargado) y respetan el corte / "a esa fecha".
+   ========================================================= */
+var _stkPop = null;
+var STK_POP_CSS =
+  "#stkPopModal{display:none;position:fixed;inset:0;z-index:1292;background:rgba(2,6,23,.72);overflow:auto;padding:14px;}" +
+  "#stkPopModal.show{display:block;}" +
+  ".stkpop-card{background:#f8fafc;max-width:560px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}" +
+  ".stkpop-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;background:linear-gradient(90deg,#1e3a8a,#1e40af);color:#fff;}" +
+  ".stkpop-title{font-size:16px;font-weight:800;}" +
+  ".stkpop-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}" +
+  ".stkpop-body{padding:13px 14px;max-height:calc(100vh - 110px);overflow:auto;}" +
+  ".stkpop-hint{font-size:12px;color:#64748b;margin-bottom:10px;line-height:1.4;}" +
+  ".stkpop-grp{margin-bottom:15px;}" +
+  ".stkpop-grp-h{display:flex;align-items:center;justify-content:space-between;font-size:14px;font-weight:800;color:#0f172a;padding:6px 2px;border-bottom:2px solid #cbd5e1;margin-bottom:7px;}" +
+  ".stkpop-grp-tot{font-size:12px;font-weight:800;color:#1e6bd6;}" +
+  ".stkpop-tanda{background:#fff;border:1px solid #e2e8f0;border-radius:11px;padding:9px 11px;margin-bottom:7px;}" +
+  ".stkpop-tanda-h{display:flex;align-items:center;justify-content:space-between;gap:8px;}" +
+  ".stkpop-tn{font-size:14px;font-weight:800;color:#1e40af;font-family:Consolas,Menlo,monospace;}" +
+  ".stkpop-tcaj{font-size:12.5px;font-weight:800;color:#1e6bd6;white-space:nowrap;}" +
+  ".stkpop-nps{margin-top:6px;display:flex;flex-direction:column;gap:3px;}" +
+  ".stkpop-np{font-size:12.5px;color:#334155;}" +
+  ".stkpop-np b{color:#0f172a;font-weight:800;font-family:Consolas,Menlo,monospace;}" +
+  ".stkpop-empty{padding:16px;text-align:center;color:#94a3b8;font-size:13.5px;}" +
+  ".stkpop-sum{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:11px;}" +
+  ".stkpop-sumchip{display:inline-flex;flex-direction:column;align-items:center;min-width:92px;background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:6px 12px;}" +
+  ".stkpop-sumchip .l{font-size:10px;text-transform:uppercase;color:#64748b;font-weight:700;}" +
+  ".stkpop-sumchip .v{font-size:17px;font-weight:800;font-variant-numeric:tabular-nums;}" +
+  ".stkpop-filters{display:flex;gap:6px;margin-bottom:9px;flex-wrap:wrap;}" +
+  ".stkpop-fb{width:auto;margin:0;padding:6px 11px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;font-size:12px;font-weight:700;color:#334155;cursor:pointer;}" +
+  ".stkpop-fb.on{background:#1e40af;border-color:#1e40af;color:#fff;}" +
+  ".stkpop-search{width:100%;height:40px;border:2px solid #cbd5e1;border-radius:10px;padding:0 12px;font-size:14px;margin-bottom:9px;box-sizing:border-box;}" +
+  ".stkpop-mv{display:flex;align-items:center;gap:8px;padding:6px 4px;border-bottom:1px solid #eef2f6;font-size:12.5px;}" +
+  ".stkpop-mv-ts{color:#94a3b8;font-size:11px;white-space:nowrap;min-width:86px;}" +
+  ".stkpop-mv-tipo{font-weight:800;border-radius:6px;padding:1px 7px;font-size:10.5px;white-space:nowrap;}" +
+  ".stkpop-mv-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#0f172a;}" +
+  ".stkpop-mv-ref{color:#64748b;font-size:11px;font-family:Consolas,Menlo,monospace;}" +
+  ".stkpop-mv-d{font-weight:800;font-variant-numeric:tabular-nums;margin-left:auto;white-space:nowrap;}" +
+  ".stkpop-mv-d.pos{color:#15803d;}.stkpop-mv-d.neg{color:#b91c1c;}" +
+  ".tp-guardado{background:#dcfce7;color:#15803d;}.tp-picking{background:#fee2e2;color:#b91c1c;}.tp-otro{background:#f1f5f9;color:#475569;}";
+function _stkPopShell(title, bodyId) {
+  if (!document.getElementById("stkPopCss")) { const st = document.createElement("style"); st.id = "stkPopCss"; st.textContent = STK_POP_CSS; document.head.appendChild(st); }
+  let ov = document.getElementById("stkPopModal");
+  if (!ov) { ov = document.createElement("div"); ov.id = "stkPopModal"; document.body.appendChild(ov); }
+  ov.classList.add("show");
+  ov.innerHTML = '<div class="stkpop-card"><div class="stkpop-head"><span class="stkpop-title">' + title + '</span><button class="stkpop-close" onclick="stkPopClose()">Cerrar</button></div><div class="stkpop-body" id="' + bodyId + '"></div></div>';
+}
+function stkPopClose() { const ov = document.getElementById("stkPopModal"); if (ov) ov.classList.remove("show"); _stkPop = null; }
+function _stkWin(mv, exemptInicial) {
+  const cut = _stk.cutoff ? new Date(_stk.cutoff).getTime() : 0;
+  const lim = _stk.asOf ? new Date(_stk.asOf).getTime() : 0;
+  const t = new Date(mv.ts).getTime();
+  if (cut && !(exemptInicial && mv.tipo === "inicial") && t < cut) return false;
+  if (lim && t > lim) return false;
+  return true;
+}
+function _stkPopAgg(dep) {
+  const by = {};
+  _stk.movs.forEach(function (mv) {
+    if (mv.deposito !== dep) return;
+    if (!_stkWin(mv, true)) return;
+    const k = String(mv.ref || "—").toUpperCase();
+    by[k] = (by[k] || 0) + Number(mv.delta || 0);
+  });
+  return Object.keys(by).map(function (t) { return { tanda: t, cajas: Math.round(by[t] * 10) / 10 }; })
+    .filter(function (x) { return x.cajas > 0.05; })
+    .sort(function (a, b) { return String(a.tanda).localeCompare(String(b.tanda), undefined, { numeric: true }); });
+}
+async function _stkFetchNpsByTanda(tandas) {
+  const out = {};
+  if (!tandas.length) return out;
+  const inList = tandas.map(function (t) { return encodeURIComponent(t); }).join(",");
+  try {
+    const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+    const rows = await fetch(SUPABASE_PPP_PROG_ENDPOINT + "?select=np,razon_social,tanda&tanda=in.(" + inList + ")&limit=20000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; });
+    rows.forEach(function (x) {
+      const t = String(x.tanda || "").trim().toUpperCase(); if (!t) return;
+      const np = String(x.np || "").trim().replace(/\.0+$/, ""); if (!np) return;
+      if (!out[t]) out[t] = [];
+      if (!out[t].some(function (e) { return e.np === np; })) out[t].push({ np: np, rs: String(x.razon_social || "").trim() });
+    });
+  } catch (_e) {}
+  Object.keys(out).forEach(function (t) { out[t].sort(function (a, b) { return String(a.np).localeCompare(String(b.np), undefined, { numeric: true }); }); });
+  return out;
+}
+async function stkOpenPedidos() {
+  if (!_stk) return;
+  _stkPopShell("📋 Pedidos por estadio", "stkPopBody");
+  const body = document.getElementById("stkPopBody"); if (body) body.innerHTML = '<div class="stkpop-empty">Cargando pedidos…</div>';
+  const sep = _stkPopAgg("separar_pedidos"), fac = _stkPopAgg("a_facturar");
+  const tset = {}; sep.concat(fac).forEach(function (x) { tset[x.tanda] = 1; });
+  const npMap = await _stkFetchNpsByTanda(Object.keys(tset));
+  const round1 = function (n) { return Math.round(n * 10) / 10; };
+  const sumOf = function (a) { return round1(a.reduce(function (s, x) { return s + x.cajas; }, 0)); };
+  const sec = function (titulo, hint, arr) {
+    let h = '<div class="stkpop-grp"><div class="stkpop-grp-h">' + titulo + '<span class="stkpop-grp-tot">' + sumOf(arr) + ' cajas · ' + arr.length + ' tanda(s)</span></div>';
+    h += '<div class="stkpop-hint">' + hint + '</div>';
+    if (!arr.length) { h += '<div class="stkpop-empty">— Sin tandas en este estadio —</div></div>'; return h; }
+    arr.forEach(function (x) {
+      const nps = npMap[x.tanda] || [];
+      h += '<div class="stkpop-tanda"><div class="stkpop-tanda-h"><span class="stkpop-tn">' + escapeHtml(x.tanda) + '</span><span class="stkpop-tcaj">' + round1(x.cajas) + ' cajas</span></div>';
+      if (nps.length) h += '<div class="stkpop-nps">' + nps.map(function (n) { return '<span class="stkpop-np"><b>NP ' + escapeHtml(n.np) + '</b> · ' + escapeHtml(n.rs || "—") + '</span>'; }).join("") + '</div>';
+      else h += '<div class="stkpop-nps"><span class="stkpop-np" style="color:#94a3b8">— sin NPs en el PPP para esta tanda —</span></div>';
+      h += '</div>';
+    });
+    h += '</div>';
+    return h;
+  };
+  let h = '<div class="stkpop-hint">Pedidos que salieron de góndola por picking y todavía no se facturaron, agrupados por <b>tanda</b> con sus <b>notas de pedido</b> (del PPP). Al facturarse toda la tanda, sale del stock.</div>';
+  h += sec("📦 Pickeados (falta armar)", "Con el picking terminado (TP), esperando el armado (TAP).", sep);
+  h += sec("🧾 A Facturar (falta facturar)", "Armadas (TAP), esperando que Marianela las facture.", fac);
+  if (body) body.innerHTML = h;
+}
+function _stkEsGuardado(mv) { return mv.tipo === "guardado" || mv.tipo === "guardado_fuera_lista" || mv.tipo === "baja_racks"; }
+function stkOpenGondola() {
+  if (!_stk) return;
+  _stkPop = { filter: "gp", search: "" };
+  _stkPopShell("🔁 Movimientos de góndola", "stkPopBody");
+  stkGondRender();
+}
+function stkGondSetFilter(f) { if (!_stkPop) return; _stkPop.filter = f; stkGondRender(); }
+function stkGondSearch(v) { if (!_stkPop) return; _stkPop.search = String(v == null ? "" : v); stkGondRender(); }
+function stkGondRender() {
+  const body = document.getElementById("stkPopBody"); if (!body) return;
+  const all = _stk.movs.filter(function (mv) { return mv.deposito === "terminado" && _stkWin(mv, false); });
+  let totG = 0, totP = 0;
+  all.forEach(function (mv) { const d = Number(mv.delta) || 0; if (_stkEsGuardado(mv)) totG += d; else if (mv.tipo === "picking") totP += d; });
+  const f = _stkPop.filter, sq = String(_stkPop.search || "").trim().toLowerCase();
+  let list = all.filter(function (mv) {
+    if (f === "guardado") return _stkEsGuardado(mv);
+    if (f === "picking") return mv.tipo === "picking";
+    if (f === "gp") return _stkEsGuardado(mv) || mv.tipo === "picking";
+    return true;
+  });
+  if (sq) list = list.filter(function (mv) { return (String(mv.cod_art) + " " + String(mv.ref || "")).toLowerCase().indexOf(sq) >= 0; });
+  list.sort(function (a, b) { return new Date(b.ts) - new Date(a.ts); });
+  const MAX = 300, shown = list.slice(0, MAX);
+  const fmt1 = function (n) { return Math.round(n * 10) / 10; };
+  let h = '<div class="stkpop-hint">Todo lo que entró y salió de <b>góndola</b>: el <b>guardado</b> (MG) la sube y el <b>picking</b> (TP) la baja.</div>';
+  h += '<div class="stkpop-sum"><span class="stkpop-sumchip"><span class="l">⬆ Guardado</span><span class="v" style="color:#15803d">+' + fmt1(totG) + '</span></span><span class="stkpop-sumchip"><span class="l">⬇ Picking</span><span class="v" style="color:#b91c1c">' + fmt1(totP) + '</span></span><span class="stkpop-sumchip"><span class="l">Neto</span><span class="v" style="color:#1e3a8a">' + fmt1(totG + totP) + '</span></span></div>';
+  const fb = function (v, label) { return '<button class="stkpop-fb' + (f === v ? " on" : "") + '" onclick="stkGondSetFilter(\'' + v + '\')">' + label + '</button>'; };
+  h += '<div class="stkpop-filters">' + fb("gp", "Guardado + Picking") + fb("guardado", "Solo guardado") + fb("picking", "Solo picking") + fb("todos", "Todos") + '</div>';
+  h += '<input class="stkpop-search" type="search" placeholder="🔎 Buscar código o tanda" value="' + escapeHtml(_stkPop.search || "") + '" oninput="stkGondSearch(this.value)">';
+  if (!shown.length) h += '<div class="stkpop-empty">Sin movimientos para ese filtro.</div>';
+  else {
+    h += shown.map(function (mv) {
+      const d = Number(mv.delta) || 0;
+      const cls = _stkEsGuardado(mv) ? "tp-guardado" : (mv.tipo === "picking" ? "tp-picking" : "tp-otro");
+      const lbl = mv.tipo === "guardado_fuera_lista" ? "guard.f/lista" : (mv.tipo === "baja_racks" ? "de racks" : mv.tipo);
+      return '<div class="stkpop-mv"><span class="stkpop-mv-ts">' + escapeHtml(stockFmtTs(mv.ts)) + '</span><span class="stkpop-mv-tipo ' + cls + '">' + escapeHtml(lbl) + '</span><span class="stkpop-mv-cod">' + escapeHtml(String(mv.cod_art)) + '</span><span class="stkpop-mv-ref">' + escapeHtml(String(mv.ref || "")) + '</span><span class="stkpop-mv-d ' + (d < 0 ? "neg" : "pos") + '">' + (d > 0 ? "+" : "") + fmt1(d) + '</span></div>';
+    }).join("");
+    if (list.length > MAX) h += '<div class="stkpop-empty">Mostrando ' + MAX + ' de ' + list.length + ' — filtrá o buscá para acotar.</div>';
+  }
+  body.innerHTML = h;
+}
+/* v4.29 — CAPACIDAD POR SECTOR: cuántas cajas de cada artículo entran en góndola
 /* v4.29 — CAPACIDAD POR SECTOR: cuántas cajas de cada artículo entran en góndola
    (por sector), para comparar con el máximo de OC ("¿el máximo está bien o bajo?").
    Se pega una tabla "Sector ; código ; cajas max". Un artículo puede tener varios
