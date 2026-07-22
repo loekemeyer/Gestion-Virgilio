@@ -2823,6 +2823,11 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
   tr.fac-has-falta{ background:#fff5f5 !important; }
   tr.fac-has-falta > td:first-child{ box-shadow: inset 4px 0 0 #dc2626; }
   tr.fac-has-falta .fac-np-cell{ color:#991b1b; font-weight:800; }
+  /* v5.71: NP con faltante EN PROGRESO (le están agregando cajas ahora) — amarillo. */
+  .fac-progreso-badge{margin-top:3px;font-size:10.5px;font-weight:800;color:#854d0e;background:#fefce8;border:1px solid #fde047;border-radius:7px;padding:2px 6px;line-height:1.25;display:inline-block;}
+  tr.fac-en-progreso{ background:#fefce8 !important; }
+  tr.fac-en-progreso > td:first-child{ box-shadow: inset 4px 0 0 #eab308; }
+  tr.fac-en-progreso .fac-np-cell{ color:#854d0e; font-weight:800; }
 </style>
 <div id="facturacionModal">
   <div class="fac-banner" id="facBanner" style="display:none"></div>
@@ -3035,6 +3040,7 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
       <button class="sup-action-btn" onclick="openPPP()"><span class="sup-ico">🗓️</span><span>PPP</span></button>
       <button class="sup-action-btn" onclick="openRecepcionAdmin()"><span class="sup-ico">🏭</span><span>Carga Recepción Mercadería</span></button>
       <button class="sup-action-btn" onclick="showCPModal('0')"><span class="sup-ico">📦➕</span><span>Completar Pedido</span></button>
+      <button class="sup-action-btn" onclick="showFaltAvisar()"><span class="sup-ico">📢</span><span>Avisar faltante llegó</span></button>
       <button class="sup-action-btn" onclick="openStockAdmin()"><span class="sup-ico">📦</span><span>Stock y Compras</span></button>
       <button class="sup-action-btn" onclick="openRemitosAdmin()"><span class="sup-ico">🚚</span><span>Recepción Remitos (RR)</span></button>
     </div>
@@ -4598,6 +4604,8 @@ function goToOptions() {
     racksCheckAlarma(); racksFlushPend();
     if (!window._racksAlTimer) window._racksAlTimer = setInterval(function () { try { racksCheckAlarma(); } catch (_e) {} }, 5 * 60 * 1000);
   } catch (_e) {}
+  // v5.71: pop-up en vivo de "faltante que llegó → completar" para los que están en Virgilio.
+  try { faltPollStart(); } catch (_e) {}
 }
 
 function backToLegajo() {
@@ -5467,7 +5475,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.70";
+const APP_VERSION = "v5.71";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -11130,12 +11138,225 @@ async function cpConfirm() {
   // Bajar el faltante (RPC) y REFRESCAR la lista para que el completado DESAPAREZCA a la
   // vista (y se puedan completar varios seguidos sin cerrar el modal).
   await cpReduceFaltante(s, qty);
+  try { faltMaybeCompletar(String(s.np)); } catch (_e) {}   // v5.71: si era una tarea asignada y ya no falta nada, la cierra
   try { opDraftClear(leg); } catch (_e) {}
   if (!_cp) return;
   _cp.justDone = "✓ " + qty + " caja(s) de " + s.cod_art + " → NP " + s.np + " (a facturar)";
   _cp.sel = null; _cp.step = 1; _cp.liosLoading = false; _cp._liosInfo = null;
   try { _cp.falt = await cpReloadFaltantes(); } catch (_e) {}
   if (_cp) cpRender();
+}
+
+/* ============================================================
+   FALT · Faltante que LLEGÓ → completar (coordinación en vivo). v5.71.
+   El supervisor dispara una TAREA por NP (tabla Faltantes_Tareas vía RPC). En los
+   celulares que están trabajando en Virgilio salta un POP-UP grande: uno se la
+   ASIGNA (atómico: solo el primero gana), completa la caja por el módulo CP, y se
+   cierra. A los demás les dice "ya la toma Fulano, seguí". Marianela ve la NP
+   "en progreso" (amarillo) mientras dura, y cuando se completa la caja aparece en
+   el pedido como siempre y se apaga el faltante. Escrituras SOLO por RPC SECURITY
+   DEFINER (la anon key solo puede LEER Faltantes_Tareas). ============================ */
+const SUPABASE_FALTAREAS_ENDPOINT = SUPABASE_URL + "/rest/v1/Faltantes_Tareas";
+let _faltTareas = [];       // tareas activas (poll de la botonera)
+let _faltPollTimer = null;
+let _faltSnooze = {};       // id -> ts hasta cuando NO molestar ("Ahora no")
+let _faltTareaMia = null;   // {id, np} en curso → autocerrar la tarea al completar en cpConfirm
+let _faltTaken = null;      // {id, nombre, until} "ya la toma X" (temporal)
+let _faltEnCP = false;      // el asignado abrió CP → no re-tapar con el popup
+let _faltShownPendId = null;// id de la tarea pendiente que estoy mostrando (para detectar "la tomó otro")
+let _faltAvData = {};       // panel supervisor: NP -> {np,cliente,tanda,arts,cajas}
+function _faltH() { return { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" }; }
+function _faltRpc(fn, body) { return fetch(SUPABASE_URL + "/rest/v1/rpc/" + fn, { method: "POST", headers: _faltH(), body: JSON.stringify(body || {}) }); }
+function _faltMiLegajo() { try { return String((typeof legajoInput !== "undefined" && legajoInput && legajoInput.value) || "").trim(); } catch (_e) { return ""; } }
+function _faltNpNorm(np) { return String(np == null ? "" : np).trim().replace(/\.0+$/, ""); }
+/* ¿El operario está en la botonera de Virgilio (no en legajo, no supervisor, no prueba)? */
+function _faltActivo() {
+  try {
+    if (typeof esOperadorPrueba === "function" && esOperadorPrueba()) return false;
+    if (!_faltMiLegajo()) return false;
+    const os = document.getElementById("optionsScreen");
+    if (!os || os.classList.contains("hidden")) return false;
+    return true;
+  } catch (_e) { return false; }
+}
+async function faltPoll() {
+  if (!_faltActivo()) { faltHidePopup(); return; }
+  try {
+    const r = await fetch(SUPABASE_FALTAREAS_ENDPOINT + "?select=*&estado=in.(pendiente,asignado)&order=creado_ts.asc", { headers: _faltH(), cache: "no-store" });
+    if (r.ok) _faltTareas = await r.json();
+  } catch (_e) { /* sin red: dejamos lo último cacheado */ }
+  faltDecidePopup();
+}
+function faltPollStart() {
+  try { faltPoll(); } catch (_e) {}
+  if (!_faltPollTimer) _faltPollTimer = setInterval(function () { try { faltPoll(); } catch (_e) {} }, 6000);
+}
+function faltDecidePopup() {
+  if (!_faltActivo()) { faltHidePopup(); return; }
+  // Si CP no está abierto, resetear la bandera (el asignado volvió de CP).
+  const cpOpen = (function () { const m = document.getElementById("cpModal"); return !!(m && m.classList.contains("show")); })();
+  if (!cpOpen) _faltEnCP = false;
+  const mi = _faltMiLegajo();
+  // 1) "ya la toma X" (mensaje temporal tras perder la carrera o verla tomada)
+  if (_faltTaken && Date.now() < _faltTaken.until) { faltShowPopup(faltHtmlTaken(_faltTaken)); return; }
+  _faltTaken = null;
+  // 2) ¿tengo una asignada a mí?
+  let mine = null;
+  for (let i = 0; i < _faltTareas.length; i++) { const t = _faltTareas[i]; if (t.estado === "asignado" && String(t.asignado_legajo || "") === mi) { mine = t; break; } }
+  if (mine) { _faltShownPendId = null; if (_faltEnCP) { faltHidePopup(); return; } faltShowPopup(faltHtmlMine(mine)); return; }
+  // 3) La pendiente que YO estaba mirando, ¿la tomó otro recién? → "ya la toma X"
+  if (_faltShownPendId != null) {
+    let prev = null;
+    for (let k = 0; k < _faltTareas.length; k++) { if (Number(_faltTareas[k].id) === Number(_faltShownPendId)) { prev = _faltTareas[k]; break; } }
+    if (prev && prev.estado === "asignado" && String(prev.asignado_legajo || "") !== mi) {
+      _faltTaken = { id: prev.id, nombre: (prev.asignado_nombre || ("legajo " + (prev.asignado_legajo || "?"))), until: Date.now() + 5000 };
+      _faltShownPendId = null;
+      faltShowPopup(faltHtmlTaken(_faltTaken)); return;
+    }
+    if (!prev || prev.estado !== "pendiente") _faltShownPendId = null;   // se completó/canceló → limpiar
+  }
+  // 4) ¿hay pendiente sin snooze?
+  let pend = null;
+  for (let j = 0; j < _faltTareas.length; j++) { const t = _faltTareas[j]; if (t.estado !== "pendiente") continue; if (_faltSnooze[t.id] && Date.now() < _faltSnooze[t.id]) continue; pend = t; break; }
+  if (pend) { _faltShownPendId = pend.id; faltShowPopup(faltHtmlPend(pend)); return; }
+  _faltShownPendId = null;
+  faltHidePopup();
+}
+function faltArtsHtml(t) {
+  let arr = [];
+  try { arr = Array.isArray(t.articulos) ? t.articulos : JSON.parse(t.articulos || "[]"); } catch (_e) { arr = []; }
+  if (!arr.length) return "";
+  return '<div class="ftk-arts">' + arr.map(function (a) { return '<span class="ftk-art">' + escapeHtml(String(a.cod)) + ' ×' + (Number(a.falto) || 0) + '</span>'; }).join("") + '</div>';
+}
+function faltHtmlPend(t) {
+  return '<div class="ftk-hd"><div class="ftk-hd-emoji">📦⚠️</div><div class="ftk-hd-t">¡Llegó un faltante!</div><div class="ftk-hd-s">Hay que completar un pedido con lo que llegó. ¿Quién lo hace?</div></div>' +
+    '<div class="ftk-in"><div class="ftk-note">El que se lo asigna ve qué llegó y para qué pedido. <b>Solo uno</b> puede tomarlo.</div>' +
+    '<button class="ftk-btn ftk-take" onclick="faltAsignarme(' + Number(t.id) + ')">✋ Me lo asigno</button>' +
+    '<button class="ftk-btn ftk-later" onclick="faltSnoozeId(' + Number(t.id) + ')">Ahora no</button></div>';
+}
+function faltHtmlMine(t) {
+  const cli = t.razon_social || (t.cod_cliente ? ("Cliente " + t.cod_cliente) : "");
+  return '<div class="ftk-hd ftk-hd-mine"><div class="ftk-hd-emoji">📦➕</div><div class="ftk-hd-t">Te lo asignaste</div><div class="ftk-hd-s">Completá este pedido con lo que llegó</div></div>' +
+    '<div class="ftk-in"><div class="ftk-detail"><div class="ftk-np">NP ' + escapeHtml(String(t.np)) + (t.tanda ? ' <span class="ftk-tanda">' + escapeHtml(String(t.tanda)) + '</span>' : '') + '</div>' +
+    (cli ? '<div class="ftk-cli">' + escapeHtml(cli) + '</div>' : '') + faltArtsHtml(t) + '</div>' +
+    '<button class="ftk-btn ftk-complete" onclick="faltCompletar(' + Number(t.id) + ',\'' + escapeHtml(String(t.np)) + '\')">📦➕ Completar ahora</button>' +
+    '<div class="ftk-sec"><button class="ftk-btn ftk-soltar" onclick="faltSoltar(' + Number(t.id) + ')">Soltar</button>' +
+    '<button class="ftk-btn ftk-listo" onclick="faltYaListo(' + Number(t.id) + ')">✓ Ya lo completé</button></div></div>';
+}
+function faltHtmlTaken(x) {
+  return '<div class="ftk-hd ftk-hd-taken"><div class="ftk-hd-emoji">✅</div><div class="ftk-hd-t">Ya lo está haciendo ' + escapeHtml(String(x.nombre || "")) + '</div><div class="ftk-hd-s">Seguí trabajando, gracias 👍</div></div>' +
+    '<div class="ftk-in"><button class="ftk-btn ftk-later" onclick="faltTakenOk()">OK</button></div>';
+}
+function faltEnsurePopup() {
+  if (!document.getElementById("faltCss")) {
+    const s = document.createElement("style"); s.id = "faltCss";
+    s.textContent = "#faltPopup{display:none;position:fixed;inset:0;z-index:2000;background:rgba(2,6,23,.88);padding:16px;overflow:auto;}#faltPopup.show{display:flex;align-items:center;justify-content:center;}.ftk-card{background:#fff;max-width:500px;width:100%;border-radius:20px;overflow:hidden;box-shadow:0 30px 90px rgba(0,0,0,.6);animation:faltPop .18s ease-out;}@keyframes faltPop{from{transform:scale(.92);opacity:.4}to{transform:scale(1);opacity:1}}.ftk-hd{padding:22px 20px;background:linear-gradient(135deg,#dc2626,#b91c1c);color:#fff;text-align:center;}.ftk-hd-mine{background:linear-gradient(135deg,#16a34a,#15803d);}.ftk-hd-taken{background:linear-gradient(135deg,#0e7490,#155e75);}.ftk-hd-emoji{font-size:46px;line-height:1;}.ftk-hd-t{font-size:23px;font-weight:900;margin-top:8px;line-height:1.15;}.ftk-hd-s{font-size:14px;opacity:.95;margin-top:5px;line-height:1.3;}.ftk-in{padding:18px 20px 22px;}.ftk-note{font-size:13px;color:#64748b;text-align:center;margin-bottom:14px;line-height:1.4;}.ftk-detail{background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:14px;margin-bottom:16px;}.ftk-np{font-size:20px;font-weight:900;color:#0f172a;font-family:Consolas,Menlo,monospace;}.ftk-tanda{font-size:13px;font-weight:800;color:#0e7490;background:#ecfeff;border:1px solid #a5f3fc;border-radius:7px;padding:2px 7px;margin-left:4px;font-family:inherit;}.ftk-cli{font-size:14px;color:#475569;margin-top:3px;}.ftk-arts{margin-top:11px;display:flex;flex-wrap:wrap;gap:6px;}.ftk-art{background:#fee2e2;border:1px solid #fca5a5;color:#991b1b;border-radius:8px;padding:4px 9px;font-size:13.5px;font-weight:800;font-family:Consolas,Menlo,monospace;}.ftk-btn{width:100%;padding:17px;border:none;border-radius:14px;font-size:18px;font-weight:900;cursor:pointer;margin:0;}.ftk-take,.ftk-complete,.ftk-listo{background:#16a34a;color:#fff;}.ftk-later{background:#e2e8f0;color:#475569;font-size:15px;padding:13px;margin-top:10px;}.ftk-sec{display:flex;gap:10px;margin-top:12px;}.ftk-sec .ftk-btn{margin-top:0;}.ftk-soltar{background:#fff;border:1.5px solid #cbd5e1;color:#64748b;font-size:14px;padding:13px;flex:0 0 38%;}.ftk-listo{flex:1;font-size:15px;padding:13px;}";
+    document.head.appendChild(s);
+  }
+  if (!document.getElementById("faltPopup")) {
+    const ov = document.createElement("div"); ov.id = "faltPopup";
+    ov.innerHTML = '<div class="ftk-card"><div id="faltPopupBody"></div></div>';
+    document.body.appendChild(ov);
+  }
+}
+function faltShowPopup(html) { faltEnsurePopup(); const b = document.getElementById("faltPopupBody"); if (b) b.innerHTML = html; const ov = document.getElementById("faltPopup"); if (ov) ov.classList.add("show"); }
+function faltHidePopup() { const ov = document.getElementById("faltPopup"); if (ov) ov.classList.remove("show"); }
+async function faltAsignarme(id) {
+  if (typeof esOperadorPrueba === "function" && esOperadorPrueba()) { faltHidePopup(); return; }
+  const mi = _faltMiLegajo(); if (!mi) return;
+  let nombre = "";
+  try { const mp = await getEmpleadosNombres(); if (mp && mp.get) nombre = mp.get(mi) || ""; } catch (_e) {}
+  let row = null;
+  try { const r = await _faltRpc("faltante_tarea_asignar", { p_id: Number(id), p_legajo: mi, p_nombre: nombre }); if (r.ok) row = await r.json(); } catch (_e) {}
+  if (row && String(row.asignado_legajo || "") === mi) { _faltEnCP = false; await faltPoll(); return; }   // gané
+  if (row) { _faltTaken = { id: Number(id), nombre: (row.asignado_nombre || ("legajo " + (row.asignado_legajo || "?"))), until: Date.now() + 5000 }; faltDecidePopup(); return; }   // otro la tomó
+  await faltPoll();   // error de red → reintentar en el próximo ciclo
+}
+function faltSnoozeId(id) { _faltSnooze[id] = Date.now() + 90000; faltHidePopup(); }   // reaparece a los 90s
+function faltCompletar(id, np) { _faltTareaMia = { id: Number(id), np: String(np) }; _faltEnCP = true; faltHidePopup(); try { showCPModal(_faltMiLegajo()); } catch (_e) {} }
+async function faltYaListo(id) {
+  try { await _faltRpc("faltante_tarea_completar", { p_id: Number(id) }); } catch (_e) {}
+  if (_faltTareaMia && Number(_faltTareaMia.id) === Number(id)) _faltTareaMia = null;
+  _faltEnCP = false; await faltPoll();
+}
+async function faltSoltar(id) {
+  try { await _faltRpc("faltante_tarea_soltar", { p_id: Number(id), p_legajo: _faltMiLegajo() }); } catch (_e) {}
+  if (_faltTareaMia && Number(_faltTareaMia.id) === Number(id)) _faltTareaMia = null;
+  _faltEnCP = false; await faltPoll();
+}
+function faltTakenOk() { _faltTaken = null; faltHidePopup(); try { faltPoll(); } catch (_e) {} }
+/* Autocierre: al completar una caja en CP, si esa NP era mi tarea y ya no le falta
+   nada → marcar la tarea 'completado' (Marianela deja de ver "en progreso"). */
+async function faltMaybeCompletar(np) {
+  if (!_faltTareaMia || _faltNpNorm(_faltTareaMia.np) !== _faltNpNorm(np)) return;
+  let rest = 1;
+  try {
+    const r = await fetch(SUPABASE_ENTREGAS_ENDPOINT + "?select=cajas_falto&np=eq." + encodeURIComponent(_faltNpNorm(np)), { headers: _faltH(), cache: "no-store" });
+    if (r.ok) { const rows = await r.json(); rest = 0; rows.forEach(function (x) { rest += Number(x.cajas_falto) || 0; }); }
+  } catch (_e) { return; }   // ante error, NO autocerramos
+  if (rest <= 0) {
+    const id = _faltTareaMia.id;
+    try { await _faltRpc("faltante_tarea_completar", { p_id: Number(id) }); } catch (_e) {}
+    _faltTareaMia = null;
+    try { alert("✓ Pedido " + np + " completo. Marianela ya lo ve en el pedido."); } catch (_e) {}
+  }
+}
+/* ---- Panel del SUPERVISOR: "Avisar que llegó un faltante" ---- */
+async function faltFetchActivasNps() {
+  const s = {};
+  try {
+    const r = await fetch(SUPABASE_FALTAREAS_ENDPOINT + "?select=np&estado=in.(pendiente,asignado)", { headers: _faltH(), cache: "no-store" });
+    if (r.ok) (await r.json()).forEach(function (x) { s[_faltNpNorm(x.np)] = true; });
+  } catch (_e) {}
+  return s;
+}
+function faltEnsureAvisar() {
+  if (!document.getElementById("favCss")) {
+    const s = document.createElement("style"); s.id = "favCss";
+    s.textContent = "#faltAvModal{display:none;position:fixed;inset:0;z-index:1292;background:rgba(2,6,23,.74);overflow:auto;padding:12px;}#faltAvModal.show{display:block;}.fav-card{background:#f8fafc;max-width:560px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.fav-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;background:linear-gradient(90deg,#b91c1c,#7f1d1d);color:#fff;}.fav-title{font-size:17px;font-weight:800;}.fav-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}.fav-body{padding:13px 14px;}.fav-hint{font-size:12.5px;color:#64748b;margin-bottom:11px;line-height:1.4;}.fav-empty{padding:22px;text-align:center;color:#64748b;font-size:14px;}.fav-row{display:flex;align-items:center;gap:10px;background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:11px 12px;margin-bottom:9px;}.fav-info{flex:1;min-width:0;}.fav-np{font-size:15px;font-weight:800;color:#0f172a;font-family:Consolas,Menlo,monospace;}.fav-arts{font-size:12.5px;color:#475569;margin-top:3px;}.fav-btn{flex:0 0 auto;width:auto;margin:0;padding:11px 14px;border:none;border-radius:10px;background:#dc2626;color:#fff;font-size:13.5px;font-weight:800;cursor:pointer;white-space:nowrap;}.fav-ya{flex:0 0 auto;font-size:12.5px;font-weight:800;color:#15803d;background:#dcfce7;border:1px solid #86efac;border-radius:999px;padding:6px 12px;white-space:nowrap;}";
+    document.head.appendChild(s);
+  }
+  let ov = document.getElementById("faltAvModal");
+  if (!ov) { ov = document.createElement("div"); ov.id = "faltAvModal"; document.body.appendChild(ov); }
+  ov.innerHTML = '<div class="fav-card"><div class="fav-head"><span class="fav-title">📢 Avisar que llegó un faltante</span><button class="fav-close" onclick="closeFaltAvisar()">Cerrar</button></div><div class="fav-body" id="faltAvBody"><div class="fav-empty">Cargando faltantes…</div></div></div>';
+  return ov;
+}
+async function showFaltAvisar() {
+  const ov = faltEnsureAvisar(); ov.classList.add("show");
+  try {
+    const falt = await cpLoadFaltantes();
+    const activas = await faltFetchActivasNps();
+    faltAvRender(falt, activas);
+  } catch (e) { const b = document.getElementById("faltAvBody"); if (b) b.innerHTML = '<div class="fav-empty">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
+}
+function closeFaltAvisar() { const ov = document.getElementById("faltAvModal"); if (ov) ov.classList.remove("show"); }
+function faltAvRender(falt, activas) {
+  const body = document.getElementById("faltAvBody"); if (!body) return;
+  _faltAvData = {};
+  (falt || []).forEach(function (e) {
+    const np = _faltNpNorm(e.np);
+    if (!_faltAvData[np]) _faltAvData[np] = { np: np, cliente: e.cod_cliente || "", tanda: e.tanda || "", rs: e.razon_social || "", arts: [], cajas: 0 };
+    _faltAvData[np].arts.push({ cod: String(e.cod_art), falto: Number(e.cajas_falto) || 0 });
+    _faltAvData[np].cajas += Number(e.cajas_falto) || 0;
+  });
+  const list = Object.keys(_faltAvData).map(function (k) { return _faltAvData[k]; }).sort(function (a, b) { return String(a.np).localeCompare(String(b.np)); });
+  let h = '<div class="fav-hint">Cuando llega mercadería de un faltante que todavía <b>no salió ni se facturó</b>, tocá <b>Avisar</b>: a los celulares de los que están en Virgilio les salta un pop-up para que alguien lo complete. Solo uno lo toma.</div>';
+  if (!list.length) { h += '<div class="fav-empty">No hay pedidos con faltantes sin facturar. 👍</div>'; body.innerHTML = h; return; }
+  h += list.map(function (g) {
+    const det = g.arts.map(function (a) { return escapeHtml(a.cod) + '×' + a.falto; }).join(", ");
+    const ya = activas[g.np];
+    return '<div class="fav-row"><div class="fav-info"><div class="fav-np">NP ' + escapeHtml(g.np) + (g.tanda ? ' · ' + escapeHtml(g.tanda) : '') + (g.cliente ? ' · cli ' + escapeHtml(g.cliente) : '') + '</div><div class="fav-arts">' + det + ' <b>(' + g.cajas + ' cj)</b></div></div>' +
+      (ya ? '<span class="fav-ya">✓ Avisado</span>' : '<button class="fav-btn" onclick="faltCrear(\'' + escapeHtml(g.np) + '\')">📢 Avisar que llegó</button>') + '</div>';
+  }).join("");
+  body.innerHTML = h;
+}
+async function faltCrear(np) {
+  const g = _faltAvData[_faltNpNorm(np)]; if (!g) return;
+  try {
+    await _faltRpc("faltante_tarea_crear", { p_np: g.np, p_cod_cliente: g.cliente || "", p_razon_social: g.rs || "", p_tanda: g.tanda || "", p_articulos: g.arts, p_cajas: g.cajas, p_creado_por: _faltMiLegajo() || "0" });
+    try { alert("📢 Aviso enviado. En los celulares de Virgilio va a aparecer el pop-up para completar la NP " + g.np + "."); } catch (_e) {}
+  } catch (e) { try { alert("No se pudo avisar: " + (e.message || e)); } catch (_e2) {} }
+  showFaltAvisar();
 }
 
 /* ===== RC · Pasar cajas a un pedido URGENTE (v5.49). El operario le saca cajas a un pedido
@@ -18040,6 +18261,30 @@ function facFaltBadge(np){
   const mas = f.items.length > 8 ? " +" + (f.items.length - 8) : "";
   return '<div class="fac-falta-badge" title="Faltan ' + f.cajas + ' cajas en ' + f.items.length + ' artículo(s) — facturá por lo ENTREGADO">⚠ FALTA ' + f.cajas + ' cj: ' + det + mas + '</div>';
 }
+/* Tareas de faltante EN PROGRESO por NP (Faltantes_Tareas activas) → aviso AMARILLO
+   en Facturación: "están agregando cajas a esta NP ahora, esperá antes de facturar".
+   Distinto del rojo (rojo = salió corto). Muestra el estado (completo / faltan X). v5.71. */
+let _facTareas = new Map(); let _facTareasTs = 0;
+async function facFetchTareas(){
+  const now = Date.now();
+  if (_facTareasTs && (now - _facTareasTs) < 30000) return _facTareas;
+  try {
+    const url = SUPABASE_FALTAREAS_ENDPOINT + "?select=np,estado,asignado_legajo,asignado_nombre&estado=in.(pendiente,asignado)";
+    const rows = await fetch(url, { headers: { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY }, cache: "no-store" }).then(r => r.ok ? r.json() : []);
+    const m = new Map();
+    for (const x of rows){ const np = String(x.np || "").trim().replace(/\.0+$/, ""); if (np) m.set(np, x); }
+    _facTareas = m; _facTareasTs = now;
+  } catch (_e) { /* sin red: queda el último cache */ }
+  return _facTareas;
+}
+function facTareaActiva(np){ return _facTareas.get(String(np).trim().replace(/\.0+$/, "")) || null; }
+function facTareaBadge(np){
+  const t = facTareaActiva(np); if (!t) return "";
+  const f = facFaltInfo(np);
+  const est = (f && f.cajas) ? ('faltan ' + f.cajas + ' cj') : 'completo';
+  const quien = (t.estado === 'asignado') ? (' · lo hace ' + escapeHtml(t.asignado_nombre || ('leg ' + (t.asignado_legajo || '?')))) : ' · sin asignar aún';
+  return '<div class="fac-progreso-badge" title="Están agregando cajas a esta NP (faltante que llegó). Esperá a que terminen antes de facturar.">⏳ Completando · ' + escapeHtml(est) + quien + '</div>';
+}
 /* v5.70: alterna el filtro "ver solo NPs con faltante" y re-dibuja. */
 function facToggleSoloFalt(){ _facSoloFalt = !_facSoloFalt; if (typeof facRender === "function") facRender(_facLastTandas || []); }
 window.facToggleSoloFalt = facToggleSoloFalt;
@@ -18122,13 +18367,14 @@ function facRender(tandas){
       .replace(/'/g, "&apos;")
       .replace(/</g, "&lt;");
     const _ff = facFaltInfo(f.np);
+    const _ft = facTareaActiva(f.np);
     return `
-      <tr data-fac-np="${escapeHtml(f.np)}" class="${altFlag ? 'fac-tanda-alt' : ''}${_ff ? ' fac-has-falta' : ''}">
+      <tr data-fac-np="${escapeHtml(f.np)}" class="${altFlag ? 'fac-tanda-alt' : ''}${_ft ? ' fac-en-progreso' : (_ff ? ' fac-has-falta' : '')}">
         <td class="fac-tanda-col">${escapeHtml(f.tanda)}</td>
         <td class="center">${escapeHtml(f.fechaSalida)}</td>
         <td class="fac-np-cell">${escapeHtml(f.np)}</td>
         <td class="fac-cod-cell">${escapeHtml(f.cod)}</td>
-        <td class="fac-rs-cell"><span class="fac-rs-name">${escapeHtml(f.rs)}</span>${(() => { const ea = _facEquiv.get(String(f.np).trim().replace(/\.0+$/, "")); return (ea && ea.length) ? '<div style="margin-top:3px;font-size:10.5px;font-weight:800;color:#9a3412;background:#fff7ed;border:1px solid #fdba74;border-radius:7px;padding:2px 6px;line-height:1.25;">🧾 Facturá ' + ea.map(function(e){ return '<b>' + escapeHtml(e.real) + '</b> (no ' + escapeHtml(e.cod) + ')'; }).join(', ') + '</div>' : ''; })()}${facFaltBadge(f.np)}</td>
+        <td class="fac-rs-cell"><span class="fac-rs-name">${escapeHtml(f.rs)}</span>${(() => { const ea = _facEquiv.get(String(f.np).trim().replace(/\.0+$/, "")); return (ea && ea.length) ? '<div style="margin-top:3px;font-size:10.5px;font-weight:800;color:#9a3412;background:#fff7ed;border:1px solid #fdba74;border-radius:7px;padding:2px 6px;line-height:1.25;">🧾 Facturá ' + ea.map(function(e){ return '<b>' + escapeHtml(e.real) + '</b> (no ' + escapeHtml(e.cod) + ')'; }).join(', ') + '</div>' : ''; })()}${_ft ? facTareaBadge(f.np) : facFaltBadge(f.np)}</td>
         <td class="fac-dir-cell">${escapeHtml(f.dir)}</td>
         <td class="num">${f.m3 ? f.m3.toFixed(1).replace(".",",") : ""}</td>
         <td>${escapeHtml(f.barrio)}</td>
@@ -18202,6 +18448,21 @@ window.facTickNP = async function(btn){
   try { args = JSON.parse(btn.dataset.args); }
   catch(e){ facShowToast("Error leyendo NP"); return; }
   const { np, tanda, m3, rs, cod, feRaw } = args;
+
+  // v5.71: si esta NP está EN PROGRESO (un operario está agregando cajas que llegaron),
+  // avisar en AMARILLO ANTES de facturar — mejor esperar a que terminen.
+  const _tarea = facTareaActiva(np);
+  if (_tarea){
+    const _f0 = facFaltInfo(np);
+    const _est = (_f0 && _f0.cajas) ? ("todavía le faltan " + _f0.cajas + " caja(s)") : "ya estaría completo";
+    const _q = (_tarea.estado === "asignado") ? ("Lo está completando " + (_tarea.asignado_nombre || ("legajo " + _tarea.asignado_legajo)) + ".") : "Todavía nadie se lo asignó.";
+    const ok0 = confirm(
+      "⏳ NP " + np + " se está MODIFICANDO\n\n" +
+      "Le están agregando cajas que llegaron (" + _est + ").\n" + _q + "\n\n" +
+      "Lo ideal es esperar a que terminen para facturarla completa.\n¿Facturar igual ahora?"
+    );
+    if (!ok0) return;
+  }
 
   // v5.36: si la NP salió con FALTANTES, avisar y pedir confirmación ANTES de
   // facturarla. La factura debe hacerse por lo ENTREGADO, no lo pedido.
@@ -18340,7 +18601,8 @@ async function facTick(){
       facFetchLios().catch(function(){ return _facLios; }),           // líos por NP (TAL) → columna Líos
       facFetchEquiv().catch(function(){ return _facEquiv; }),         // equivalencias por NP → cartel "facturá el real"
       facFetchFaltantes().catch(function(){ return _facFalt; }),      // faltantes por NP → aviso ⚠ antes de facturar (v5.36)
-      facFetchCajas().catch(function(){ return _facCajas; })          // cajas por NP → la columna Líos muestra CAJAS para los súper (v5.68)
+      facFetchCajas().catch(function(){ return _facCajas; }),         // cajas por NP → la columna Líos muestra CAJAS para los súper (v5.68)
+      facFetchTareas().catch(function(){ return _facTareas; })        // tareas en progreso por NP → aviso ⏳ amarillo (v5.71)
     ]);
     const fcKeys = _facPar[0] || new Set();
 

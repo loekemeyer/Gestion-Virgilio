@@ -33,4 +33,7 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== fac-falta-filter (regresión: chip + filtro 'solo con faltante' en Facturación) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/fac-falta-filter.cjs
 
+echo "== falt-tareas (regresión: pop-up + asignación atómica de faltante que llegó) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/falt-tareas.cjs
+
 echo "== TODO OK =="
