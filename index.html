@@ -5457,7 +5457,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.68";
+const APP_VERSION = "v5.69";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -10726,7 +10726,7 @@ async function irFetchCxM(plani) {
 async function showIngresoRacksModal(legajo, _resume) {
   if (!document.getElementById("irCss")) {
     const s = document.createElement("style"); s.id = "irCss";
-    s.textContent = "#irModal{display:none;position:fixed;inset:0;z-index:1291;background:rgba(2,6,23,.74);overflow:auto;padding:12px;}#irModal.show{display:block;}.ir-card{background:#f8fafc;max-width:470px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.ir-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;background:linear-gradient(90deg,#0e7490,#155e75);color:#fff;}.ir-title{font-size:17px;font-weight:800;}.ir-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}.ir-body{padding:13px 14px;}.ir-empty{padding:22px;text-align:center;color:#64748b;font-size:14px;}.ir-hint{font-size:12.5px;color:#64748b;margin-bottom:11px;line-height:1.35;}.ir-fld{margin-bottom:11px;}.ir-lbl{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:#64748b;margin-bottom:6px;}.ir-inp{width:100%;height:44px;box-sizing:border-box;border:2px solid #cbd5e1;border-radius:10px;padding:0 12px;font-size:16px;font-weight:700;}.ir-desc{font-size:12.5px;color:#475569;margin:-4px 0 10px;}.ir-row2{display:flex;gap:12px;}.ir-row2 .ir-fld{flex:1;}.ir-num{text-align:center;}.ir-stp{display:flex;align-items:center;gap:6px;}.ir-sb{width:40px;height:44px;border:none;border-radius:9px;font-size:23px;font-weight:800;cursor:pointer;background:#e2e8f0;color:#475569;display:flex;align-items:center;justify-content:center;line-height:1;padding:0;}.ir-libres{display:flex;flex-wrap:wrap;gap:6px;margin:-2px 0 11px;}.ir-chip{background:#ecfeff;border:1px solid #a5f3fc;color:#0e7490;border-radius:9px;padding:6px 10px;font-size:13px;font-weight:800;font-family:Consolas,Menlo,monospace;cursor:pointer;width:auto;margin:0;}.ir-chip.on{background:#0e7490;color:#fff;border-color:#0e7490;}.ir-more{font-size:11.5px;color:#94a3b8;align-self:center;}.ir-warn{background:#fef2f2;border:1px solid #fca5a5;color:#991b1b;border-radius:9px;padding:8px 10px;font-size:12.5px;font-weight:700;margin:-2px 0 10px;}.ir-ok2{background:#ecfdf5;border:1px solid #a7f3d0;color:#065f46;border-radius:9px;padding:8px 10px;font-size:12.5px;font-weight:700;margin:-2px 0 10px;}.ir-seg{display:flex;gap:8px;}.ir-segb{flex:1;padding:9px;border:1.5px solid #cbd5e1;border-radius:10px;background:#fff;color:#475569;font-size:13.5px;font-weight:800;cursor:pointer;}.ir-segb.on{border-color:#0e7490;background:#ecfeff;color:#0e7490;}.ir-fin{width:100%;margin-top:6px;padding:14px;border:none;border-radius:12px;background:#0e7490;color:#fff;font-size:16px;font-weight:800;cursor:pointer;}.ir-fin:disabled{background:#cbd5e1;color:#64748b;cursor:not-allowed;}.ir-done-h{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:#64748b;margin:16px 0 8px;border-top:1px solid #e2e8f0;padding-top:12px;}.ir-done-row{display:flex;align-items:baseline;gap:8px;padding:6px 0;border-bottom:1px solid #f1f5f9;font-size:13px;}.ir-done-sec{font-weight:800;font-family:Consolas,Menlo,monospace;color:#0e7490;}.ir-done-cod{font-weight:800;font-family:Consolas,Menlo,monospace;}.ir-done-q{color:#64748b;margin-left:auto;font-size:12px;}";
+    s.textContent = "#irModal{display:none;position:fixed;inset:0;z-index:1291;background:rgba(2,6,23,.74);overflow:auto;padding:12px;}#irModal.show{display:block;}.ir-card{background:#f8fafc;max-width:470px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.ir-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;background:linear-gradient(90deg,#0e7490,#155e75);color:#fff;}.ir-title{font-size:17px;font-weight:800;}.ir-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}.ir-body{padding:13px 14px;}.ir-empty{padding:22px;text-align:center;color:#64748b;font-size:14px;}.ir-hint{font-size:12.5px;color:#64748b;margin-bottom:11px;line-height:1.35;}.ir-fld{margin-bottom:11px;}.ir-lbl{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:#64748b;margin-bottom:6px;}.ir-inp{width:100%;height:44px;box-sizing:border-box;border:2px solid #cbd5e1;border-radius:10px;padding:0 12px;font-size:16px;font-weight:700;}.ir-desc{font-size:12.5px;color:#475569;margin:-4px 0 10px;}.ir-row2{display:flex;gap:12px;}.ir-row2 .ir-fld{flex:1;}.ir-num{text-align:center;}.ir-stp{display:flex;align-items:center;gap:6px;}.ir-sb{width:40px;height:44px;border:none;border-radius:9px;font-size:23px;font-weight:800;cursor:pointer;background:#e2e8f0;color:#475569;display:flex;align-items:center;justify-content:center;line-height:1;padding:0;}.ir-libres{display:flex;flex-wrap:wrap;gap:6px;margin:-2px 0 11px;}.ir-chip{background:#ecfeff;border:1px solid #a5f3fc;color:#0e7490;border-radius:9px;padding:6px 10px;font-size:13px;font-weight:800;font-family:Consolas,Menlo,monospace;cursor:pointer;width:auto;margin:0;}.ir-chip.on{background:#0e7490;color:#fff;border-color:#0e7490;}.ir-more{font-size:11.5px;color:#94a3b8;align-self:center;}.ir-warn{background:#fef2f2;border:1px solid #fca5a5;color:#991b1b;border-radius:9px;padding:8px 10px;font-size:12.5px;font-weight:700;margin:-2px 0 10px;}.ir-ok2{background:#ecfdf5;border:1px solid #a7f3d0;color:#065f46;border-radius:9px;padding:8px 10px;font-size:12.5px;font-weight:700;margin:-2px 0 10px;}.ir-seg{display:flex;gap:8px;}.ir-segb{flex:1;padding:9px;border:1.5px solid #cbd5e1;border-radius:10px;background:#fff;color:#475569;font-size:13.5px;font-weight:800;cursor:pointer;}.ir-segb.on{border-color:#0e7490;background:#ecfeff;color:#0e7490;}.ir-fin{width:100%;margin-top:6px;padding:14px;border:none;border-radius:12px;background:#0e7490;color:#fff;font-size:16px;font-weight:800;cursor:pointer;}.ir-fin:disabled{background:#cbd5e1;color:#64748b;cursor:not-allowed;}.ir-done-h{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:#64748b;margin:16px 0 8px;border-top:1px solid #e2e8f0;padding-top:12px;}.ir-done-row{display:flex;align-items:baseline;gap:8px;padding:6px 0;border-bottom:1px solid #f1f5f9;font-size:13px;}.ir-done-sec{font-weight:800;font-family:Consolas,Menlo,monospace;color:#0e7490;}.ir-done-cod{font-weight:800;font-family:Consolas,Menlo,monospace;}.ir-done-q{color:#64748b;margin-left:auto;font-size:12px;}.ir-rev{background:#fff;border:1.5px solid #cbd5e1;border-radius:12px;padding:2px 14px;margin-bottom:12px;}.ir-rev-row{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid #f1f5f9;}.ir-rev-row:last-child{border-bottom:none;}.ir-rev-lbl{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:#64748b;flex:0 0 auto;}.ir-rev-val{font-size:16px;font-weight:800;font-family:Consolas,Menlo,monospace;color:#0f172a;text-align:right;}.ir-rev-txt{font-family:inherit;font-weight:700;}.ir-rev-big{font-size:20px;color:#0e7490;}.ir-rev-sm{font-weight:700;color:#0e7490;font-family:inherit;}.ir-conf-btns{display:flex;gap:10px;}.ir-back{flex:0 0 38%;padding:14px;border:1.5px solid #cbd5e1;border-radius:12px;background:#fff;color:#475569;font-size:15px;font-weight:800;cursor:pointer;}.ir-confirm{flex:1;padding:14px;border:none;border-radius:12px;background:#059669;color:#fff;font-size:16px;font-weight:800;cursor:pointer;}";
     document.head.appendChild(s);
   }
   let ov = document.getElementById("irModal");
@@ -10747,12 +10747,13 @@ async function showIngresoRacksModal(legajo, _resume) {
       if (!ocupados[secU]) libres.push(sec);
     });
     libres.sort(function (a, b) { return String(a).localeCompare(String(b), undefined, { numeric: true }); });
-    _ir = { legajo: String(legajo || ""), cxm: cxm, libres: libres, ocupados: ocupados, cod: "", masters: 0, inner: 0, sector: (libres[0] || ""), emp: "LK", done: [] };
+    _ir = { legajo: String(legajo || ""), cxm: cxm, libres: libres, ocupados: ocupados, cod: "", masters: 0, inner: 0, sector: (libres[0] || ""), emp: "LK", done: [], confirming: false };
     irRender();
   } catch (e) { const b = document.getElementById("irBody"); if (b) b.innerHTML = '<div class="ir-empty">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
 }
 function irRender() {
   if (!_ir) return; const body = document.getElementById("irBody"); if (!body) return;
+  if (_ir.confirming) { irRenderConfirm(body); return; }
   const codN = _irNorm(_ir.cod), cxm = _ir.cxm[codN] || 0;
   const secU = String(_ir.sector || "").trim().toUpperCase(), ocupadoPor = _ir.ocupados[secU] || "";
   const sectorOcupadoOtro = ocupadoPor && _irNorm(ocupadoPor) !== codN;
@@ -10768,7 +10769,7 @@ function irRender() {
   h += '<div class="ir-libres">' + _ir.libres.slice(0, 14).map(function (s) { return '<button class="ir-chip' + (secU === s.toUpperCase() ? ' on' : '') + '" onclick="irSetSec(\'' + escapeHtml(s) + '\')">' + escapeHtml(s) + '</button>'; }).join("") + (_ir.libres.length > 14 ? '<span class="ir-more">+' + (_ir.libres.length - 14) + ' libres</span>' : (_ir.libres.length ? '' : '<span class="ir-more">sin sectores libres</span>')) + '</div>';
   h += '<div class="ir-fld"><div class="ir-lbl">Empresa</div><div class="ir-seg"><button class="ir-segb' + (_ir.emp === "LK" ? " on" : "") + '" onclick="irSetEmp(\'LK\')">LK · Loeke</button><button class="ir-segb' + (_ir.emp === "CH" ? " on" : "") + '" onclick="irSetEmp(\'CH\')">CH · Chef</button></div></div>';
   const ok = codN && (Number(_ir.inner) > 0) && secU && !sectorOcupadoOtro;
-  h += '<button class="ir-fin"' + (ok ? "" : " disabled") + ' onclick="irCargar()">✓ Cargar palet' + (secU ? ' a ' + escapeHtml(secU) : '') + (Number(_ir.inner) > 0 ? ' (' + (Number(_ir.inner) || 0) + ' cajas)' : '') + '</button>';
+  h += '<button class="ir-fin"' + (ok ? "" : " disabled") + ' onclick="irRevisar()">Revisar carga →' + (secU && Number(_ir.inner) > 0 ? ' (' + (Number(_ir.inner) || 0) + ' cajas a ' + escapeHtml(secU) + ')' : '') + '</button>';
   if (_ir.done.length) {
     h += '<div class="ir-done-h">Cargados en esta sesión (' + _ir.done.length + ')</div>';
     h += _ir.done.map(function (d) { return '<div class="ir-done-row"><span class="ir-done-sec">' + escapeHtml(d.sector) + '</span> <span class="ir-done-cod">' + escapeHtml(d.cod) + '</span><span class="ir-done-q">' + d.inner + ' cajas' + (d.masters ? ' · ' + d.masters + ' master' : '') + '</span></div>'; }).join("");
@@ -10782,6 +10783,38 @@ function irSetI(v) { if (!_ir) return; let n = parseInt(v, 10); if (isNaN(n) || 
 function irChgI(d) { if (!_ir) return; irSetI(Math.max(0, (Number(_ir.inner) || 0) + d)); }
 function irSetSec(v) { if (!_ir) return; _ir.sector = String(v == null ? "" : v).toUpperCase().replace(/[^A-Z0-9]/g, ""); irRender(); }
 function irSetEmp(e) { if (!_ir) return; _ir.emp = (e === "CH") ? "CH" : "LK"; irRender(); }
+/* Paso de revisión (v5.69): "Revisar carga →" no escribe nada — muestra un resumen
+   y recién ahí "✓ Confirmar carga" ejecuta irCargar(). "← Volver" vuelve al formulario
+   con los datos intactos para corregir antes de confirmar. */
+function irRevisar() {
+  if (!_ir) return;
+  const codN = _irNorm(_ir.cod), secU = String(_ir.sector || "").trim().toUpperCase();
+  const ocupadoPor = _ir.ocupados[secU] || "";
+  const sectorOcupadoOtro = ocupadoPor && _irNorm(ocupadoPor) !== codN;
+  if (!codN || !(Number(_ir.inner) > 0) || !secU || sectorOcupadoOtro) return;
+  _ir.confirming = true; irRender();
+}
+function irVolver() { if (!_ir) return; _ir.confirming = false; irRender(); }
+function irRenderConfirm(body) {
+  if (!_ir || !body) return;
+  const cod = _irNorm(_ir.cod), sector = String(_ir.sector || "").trim().toUpperCase();
+  const inner = Number(_ir.inner) || 0, masters = Number(_ir.masters) || 0;
+  const nombre = artNombre(_ir.cod, "") || "";
+  const empTxt = _ir.emp === "CH" ? "CH · Chef" : "LK · Loeke";
+  const ocupadoPor = _ir.ocupados[sector] || "";
+  const suma = ocupadoPor && _irNorm(ocupadoPor) === cod;
+  let h = '<div class="ir-hint">Revisá que esté todo bien antes de confirmar. Si algo está mal, tocá <b>← Volver</b>.</div>';
+  h += '<div class="ir-rev">';
+  h += '<div class="ir-rev-row"><span class="ir-rev-lbl">Código</span><span class="ir-rev-val">' + escapeHtml(cod) + '</span></div>';
+  if (nombre) h += '<div class="ir-rev-row"><span class="ir-rev-lbl">Artículo</span><span class="ir-rev-val ir-rev-txt">' + escapeHtml(nombre) + '</span></div>';
+  h += '<div class="ir-rev-row"><span class="ir-rev-lbl">Sector</span><span class="ir-rev-val">' + escapeHtml(sector) + (suma ? ' <small class="ir-rev-sm">➕ suma a ' + escapeHtml(ocupadoPor) + '</small>' : '') + '</span></div>';
+  h += '<div class="ir-rev-row"><span class="ir-rev-lbl">Masters</span><span class="ir-rev-val">' + masters + '</span></div>';
+  h += '<div class="ir-rev-row"><span class="ir-rev-lbl">Cajas (inner)</span><span class="ir-rev-val ir-rev-big">' + inner + '</span></div>';
+  h += '<div class="ir-rev-row"><span class="ir-rev-lbl">Empresa</span><span class="ir-rev-val ir-rev-txt">' + escapeHtml(empTxt) + '</span></div>';
+  h += '</div>';
+  h += '<div class="ir-conf-btns"><button class="ir-back" onclick="irVolver()">← Volver</button><button class="ir-confirm" onclick="irCargar()">✓ Confirmar carga</button></div>';
+  body.innerHTML = h;
+}
 function closeIR() { const ov = document.getElementById("irModal"); if (ov) ov.classList.remove("show"); _ir = null; }
 async function irCargar() {
   if (!_ir) return;
@@ -10806,7 +10839,7 @@ async function irCargar() {
   _ir.ocupados[sector] = cod;
   _ir.libres = _ir.libres.filter(function (s) { return s.toUpperCase() !== sector; });
   _ir.done.push({ cod: cod, sector: sector, masters: masters, inner: inner });
-  _ir.cod = ""; _ir.masters = 0; _ir.inner = 0; _ir.sector = (_ir.libres[0] || "");
+  _ir.cod = ""; _ir.masters = 0; _ir.inner = 0; _ir.sector = (_ir.libres[0] || ""); _ir.confirming = false;
   irRender();
   try { alert("✓ Cargado: " + inner + " cajas de " + cod + " en " + sector + "."); } catch (_e) {}
 }
