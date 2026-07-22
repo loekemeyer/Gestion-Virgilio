@@ -5441,7 +5441,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.63";
+const APP_VERSION = "v5.64";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -7577,17 +7577,37 @@ const SUPABASE_STOCK_ENDPOINT = SUPABASE_URL + "/rest/v1/Movimientos_Stock";
    Comparten sector físico pero se listan aparte. Solo mapa; el saldo vive en
    Movimientos_Stock (deposito='para_envasar'). */
 const SUPABASE_ENVASAR_UBIC_ENDPOINT = SUPABASE_URL + "/rest/v1/Envasar_Ubicaciones";
+/* ⚠ PostgREST rechaza un bulk insert si los objetos del array NO tienen todos las
+   MISMAS claves (400 "All object keys must match"). El guardado a EXCEDENTE en MG
+   arma una fila del excedente CON 'ubicacion' y las otras (a_guardar/góndola) SIN
+   ella → claves mezcladas → 400 que el catch tragaba como OK (era 4xx) → se perdía
+   TODO el guardado con excedente (no descontaba a_guardar ni cargaba excedente; el
+   operario volvía a ver lo mismo). Fix: normalizar todas las filas al union de
+   claves (faltante = null) para que el array sea homogéneo. */
+function _stockNormRows(rows) {
+  const keys = {};
+  rows.forEach(function (r) { for (var k in r) { if (Object.prototype.hasOwnProperty.call(r, k)) keys[k] = true; } });
+  const all = Object.keys(keys);
+  return rows.map(function (r) { const o = {}; all.forEach(function (k) { o[k] = (k in r) ? r[k] : null; }); return o; });
+}
 function stockMove(rows) {
   if (!rows || !rows.length) return Promise.resolve();
+  const norm = _stockNormRows(rows);
   const headers = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" };
-  return fetch(SUPABASE_STOCK_ENDPOINT, { method: "POST", headers: headers, body: JSON.stringify(rows) })
-    .then(function (r) { if (r.ok || (r.status >= 400 && r.status < 500)) return; throw new Error("HTTP " + r.status); })
-    .catch(function () { try { const p = JSON.parse(localStorage.getItem("vir_stock_pend") || "[]"); p.push.apply(p, rows); localStorage.setItem("vir_stock_pend", JSON.stringify(p.slice(-5000))); } catch (_e) {} });
+  return fetch(SUPABASE_STOCK_ENDPOINT, { method: "POST", headers: headers, body: JSON.stringify(norm) })
+    .then(function (r) {
+      if (r.ok) return;
+      // 4xx = fila mal formada: NO reintentar (sería veneno en la cola), pero dejar
+      // rastro en consola en vez de tragarlo mudo (así no se vuelve a esconder un bug).
+      if (r.status >= 400 && r.status < 500) { try { console.error("stockMove HTTP " + r.status + " — fila rechazada", norm); } catch (_e) {} return; }
+      throw new Error("HTTP " + r.status);
+    })
+    .catch(function () { try { const p = JSON.parse(localStorage.getItem("vir_stock_pend") || "[]"); p.push.apply(p, norm); localStorage.setItem("vir_stock_pend", JSON.stringify(p.slice(-5000))); } catch (_e) {} });
 }
 function stockFlushPend() {
   let p = []; try { p = JSON.parse(localStorage.getItem("vir_stock_pend") || "[]"); } catch (_e) {}
   if (!p.length) return;
-  fetch(SUPABASE_STOCK_ENDPOINT, { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" }, body: JSON.stringify(p) })
+  fetch(SUPABASE_STOCK_ENDPOINT, { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" }, body: JSON.stringify(_stockNormRows(p)) })
     .then(function (r) { if (r.ok) { try { localStorage.removeItem("vir_stock_pend"); } catch (_e) {} } })
     .catch(function () {});
 }

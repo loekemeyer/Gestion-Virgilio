@@ -23,8 +23,8 @@ catch (_e) {
       "mgAskClose", "rkbAskClose", "insAskClose", "scAskClose", "eaAskClose", "cpAskClose", "rcAskClose",
       "showMoverModal", "mvRender", "mvPickOrigen", "mvConfirmar", "closeMv", "stkFiltroToggleE",
       "pppSugerirInline", "pppSugInlineClose", "_pppEsCiudadela",
-      "stkBodyProceso", "ocBodyEntregas", "ocgEnter", "insRender", "mgRender", "pkRender", "stockBajaPicking",
-      "stockSepararAFacturar", "stockSalidaFacturado",
+      "stkBodyProceso", "ocBodyEntregas", "ocgEnter", "insRender", "mgRender", "mgConfirmar", "pkRender", "stockBajaPicking",
+      "stockSepararAFacturar", "stockSalidaFacturado", "stockMove", "_stockNormRows",
       "showMGChooser", "showRacksBajarModal", "rkbRender", "rkbConfirmar", "rkbFetchCxM", "rkbSetSec",
       "showCPModal", "cpRender", "cpConfirm", "cpLoadPickSinArmar", "showInstructivo", "equivResolve", "pppZonaDeBarrio",
       "showRCModal", "rcConfirm", "rcLoadDonors", "showRemitoArmado", "armadoRemitoData", "armadoRemitoInnerHtml", "remitoPrintDoc",
@@ -40,9 +40,18 @@ catch (_e) {
       { cod_art: "X", deposito: "excedente", delta: 5, tipo: "guardado", ts }
     ], null);
     const saldoOk = !!(sal.X && sal.X.terminado === 80 && sal.X.excedente === 5);
-    return { missing, saldoOk };
+    // Guardado a excedente: filas con claves distintas (una con ubicacion, otra sin)
+    // se deben normalizar al mismo set de claves, si no PostgREST tira 400 y se pierde.
+    const nr = _stockNormRows([
+      { cod_art: "X", deposito: "a_guardar", delta: -5, tipo: "guardado" },
+      { cod_art: "X", deposito: "excedente", delta: 5, tipo: "guardado", ubicacion: "N11" }
+    ]);
+    const normOk = nr.length === 2 && ("ubicacion" in nr[0]) && ("ubicacion" in nr[1]) &&
+      nr[0].ubicacion === null && nr[1].ubicacion === "N11" &&
+      JSON.stringify(Object.keys(nr[0]).sort()) === JSON.stringify(Object.keys(nr[1]).sort());
+    return { missing, saldoOk, normOk };
   });
-  const pass = r.missing.length === 0 && r.saldoOk && errs.length === 0;
+  const pass = r.missing.length === 0 && r.saldoOk && r.normOk && errs.length === 0;
   console.log("smoke:", JSON.stringify(r), "· pageerrors:", errs.length ? errs.join("|") : "none", "·", pass ? "✓ OK" : "✗ FAIL");
   await b.close();
   process.exit(pass ? 0 : 1);
