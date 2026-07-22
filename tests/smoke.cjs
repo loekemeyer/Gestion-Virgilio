@@ -31,6 +31,7 @@ catch (_e) {
       "openPrintStation", "psToggle", "psPoll", "psTestPrint", "psPrintBatch", "psSeedTodayIfNeeded", "psRender",
       "showEAModal", "eaFetchStock", "eaRender", "eaConfirmar", "eaEmitEvent",
       "eaFetchUbics", "eaRenderEdit", "eaEditUbic", "eaEditSet", "eaUbicCancel", "eaUbicSave", "eaUbicDelete",
+      "showIngresoRacksModal", "irRender", "irCargar", "irEmitEvent", "irFetchCxM", "irSetCod", "irSetM", "irSetSec", "irSetEmp",
       "stkOpenPedidos", "stkOpenGondola", "stkGondRender", "_stkPopAgg", "_stkFetchNpsByTanda", "stkCapSort"];
     const missing = need.filter((n) => typeof window[n] !== "function");
     const ts = new Date().toISOString();

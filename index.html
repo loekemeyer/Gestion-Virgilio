@@ -175,6 +175,8 @@ button {
 .box-sm[data-code="RC"] .box-title { color: #c2410c; }
 .box[data-code="EA"] { border-color: #c4b5fd; background: #f5f3ff; }
 .box-sm[data-code="EA"] .box-title { color: #6d28d9; }
+.box[data-code="IR"] { border-color: #a5f3fc; background: #ecfeff; }
+.box-sm[data-code="IR"] .box-title { color: #0e7490; }
 .box:active { transform: scale(.96); }
 .box-title { font-size: 18px; font-weight: bold; }
 .box-desc { font-size: 10.5px; margin-top: 3px; line-height: 1.2; overflow-wrap: break-word; word-break: normal; hyphens: none; }
@@ -3380,7 +3382,7 @@ const SUPABASE_PLANIMETRIA_ENDPOINT =
 const filas = {
   row1: ["EP","TP","AP","TAP","CR","CC"],
   row2: ["RT","RR","MG"],
-  row3: ["RI","EI","EA","SC","CP","RC"],
+  row3: ["RI","EI","EA","SC","CP","RC","IR"],
   row4: ["AT","PB","Limp","Perm","PC","CT"]
 };
 // Filas secundarias (botones más chicos): uso puntual. Las primarias (row1/row2)
@@ -3394,7 +3396,7 @@ const desc = {
   RR:"Recepción Remitos",
   RT:"Recepción Mercadería", MG:"Guardado a Góndola",
   RI:"Recepción Insumos", EI:"Entrega Insumos", EA:"Entrega p/ envasar", SC:"Salida a Cervantes",
-  CP:"Completar Pedido", RC:"Pasar a urgente",
+  CP:"Completar Pedido", RC:"Pasar a urgente", IR:"Ingreso a Racks",
   AT:"Atendí Timbre", PB:"Paré Baño", Limp:"Limpieza",
   Perm:"Permiso de Salida", PC:"Paré Comida",CT:"Conteo",
   LT:"Llegada Tarde", PKC:"Picking artículo", CCN:"Carga Camión NP",
@@ -4866,6 +4868,10 @@ function selectOption(code) {
   // "para_envasar" y lo da de baja al entregarlo (modal directo; evento EA).
   if (code === "EA") { showEAModal(legajoStr); return; }
 
+  // v5.67: Ingreso a Racks — da de alta lo que llega (importaciones) a los racks, con
+  // su posición. Modal directo (sin Enviar; el evento IR lo emite al cargar cada palet).
+  if (code === "IR") { showIngresoRacksModal(legajoStr); return; }
+
   // CC ya abierto: el botón CC RE-ABRE el popup de Carga Camión (no lo cierra).
   // El cierre se hace SOLO con "Terminé Carga Camión" dentro del popup.
   if (code === "CC") {
@@ -5441,7 +5447,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.66";
+const APP_VERSION = "v5.67";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -10676,6 +10682,132 @@ async function eaUbicDelete() {
   } catch (_e) { try { alert("Sin conexión: no se borró."); } catch (_e2) {} return; }
   try { _ea.ubics = await eaFetchUbics(); } catch (_e) {}
   _ea.edit = null; eaRender();
+}
+
+/* ===== IR · Ingreso a Racks (v5.67, operario/botonera): da de ALTA lo que LLEGA a los
+   racks (importaciones). Por palet: código (muestra el CxM del maestro/planimetría si lo
+   conoce → calcula las cajas), masters, cajas (inner), y sector (sugiere uno LIBRE,
+   editable, valida que no esté ocupado por OTRO código). Escribe planimetría + saldo de
+   racks vía RPC racks_plani_ingreso (SECURITY DEFINER: la anon key no puede escribir
+   Racks_Planimetria). Un palet por vez: al cargar, guarda y limpia para el siguiente.
+   Evento IR por palet. Contraparte de Mover (mv) y Bajar de racks (rkb). ===== */
+let _ir = null;
+function _irNorm(c) { return String(c == null ? "" : c).toUpperCase().replace(/\s+/g, ""); }
+async function irFetchCxM(plani) {
+  const cx = {};
+  try {
+    const r = await fetch(SUPABASE_ART_ENDPOINT + "?select=Cod_Art,Cajas_x_Master&limit=20000", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+    if (r.ok) (await r.json()).forEach(function (x) { const k = _irNorm(x.Cod_Art), v = Number(x.Cajas_x_Master) || 0; if (k && v > 0 && !cx[k]) cx[k] = v; });
+  } catch (_e) {}
+  const agg = {};
+  (plani || []).forEach(function (rr) {
+    if (String(rr.estado) !== "ocupado") return;
+    const m = Number(rr.master_cajas) || 0, inn = Number(rr.innercajas) || 0, k = _irNorm(rr.cod_art);
+    if (!k || m <= 0 || inn <= 0) return;
+    if (!agg[k]) agg[k] = { ratio: null, bad: false };
+    if (inn % m !== 0) { agg[k].bad = true; return; }
+    const ratio = inn / m;
+    if (agg[k].ratio == null) agg[k].ratio = ratio; else if (agg[k].ratio !== ratio) agg[k].bad = true;
+  });
+  Object.keys(agg).forEach(function (k) { if (!cx[k] && !agg[k].bad && agg[k].ratio > 0) cx[k] = agg[k].ratio; });
+  return cx;
+}
+async function showIngresoRacksModal(legajo, _resume) {
+  if (!document.getElementById("irCss")) {
+    const s = document.createElement("style"); s.id = "irCss";
+    s.textContent = "#irModal{display:none;position:fixed;inset:0;z-index:1291;background:rgba(2,6,23,.74);overflow:auto;padding:12px;}#irModal.show{display:block;}.ir-card{background:#f8fafc;max-width:470px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.ir-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;background:linear-gradient(90deg,#0e7490,#155e75);color:#fff;}.ir-title{font-size:17px;font-weight:800;}.ir-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}.ir-body{padding:13px 14px;}.ir-empty{padding:22px;text-align:center;color:#64748b;font-size:14px;}.ir-hint{font-size:12.5px;color:#64748b;margin-bottom:11px;line-height:1.35;}.ir-fld{margin-bottom:11px;}.ir-lbl{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:#64748b;margin-bottom:6px;}.ir-inp{width:100%;height:44px;box-sizing:border-box;border:2px solid #cbd5e1;border-radius:10px;padding:0 12px;font-size:16px;font-weight:700;}.ir-desc{font-size:12.5px;color:#475569;margin:-4px 0 10px;}.ir-row2{display:flex;gap:12px;}.ir-row2 .ir-fld{flex:1;}.ir-num{text-align:center;}.ir-stp{display:flex;align-items:center;gap:6px;}.ir-sb{width:40px;height:44px;border:none;border-radius:9px;font-size:23px;font-weight:800;cursor:pointer;background:#e2e8f0;color:#475569;display:flex;align-items:center;justify-content:center;line-height:1;padding:0;}.ir-libres{display:flex;flex-wrap:wrap;gap:6px;margin:-2px 0 11px;}.ir-chip{background:#ecfeff;border:1px solid #a5f3fc;color:#0e7490;border-radius:9px;padding:6px 10px;font-size:13px;font-weight:800;font-family:Consolas,Menlo,monospace;cursor:pointer;width:auto;margin:0;}.ir-chip.on{background:#0e7490;color:#fff;border-color:#0e7490;}.ir-more{font-size:11.5px;color:#94a3b8;align-self:center;}.ir-warn{background:#fef2f2;border:1px solid #fca5a5;color:#991b1b;border-radius:9px;padding:8px 10px;font-size:12.5px;font-weight:700;margin:-2px 0 10px;}.ir-ok2{background:#ecfdf5;border:1px solid #a7f3d0;color:#065f46;border-radius:9px;padding:8px 10px;font-size:12.5px;font-weight:700;margin:-2px 0 10px;}.ir-seg{display:flex;gap:8px;}.ir-segb{flex:1;padding:9px;border:1.5px solid #cbd5e1;border-radius:10px;background:#fff;color:#475569;font-size:13.5px;font-weight:800;cursor:pointer;}.ir-segb.on{border-color:#0e7490;background:#ecfeff;color:#0e7490;}.ir-fin{width:100%;margin-top:6px;padding:14px;border:none;border-radius:12px;background:#0e7490;color:#fff;font-size:16px;font-weight:800;cursor:pointer;}.ir-fin:disabled{background:#cbd5e1;color:#64748b;cursor:not-allowed;}.ir-done-h{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:#64748b;margin:16px 0 8px;border-top:1px solid #e2e8f0;padding-top:12px;}.ir-done-row{display:flex;align-items:baseline;gap:8px;padding:6px 0;border-bottom:1px solid #f1f5f9;font-size:13px;}.ir-done-sec{font-weight:800;font-family:Consolas,Menlo,monospace;color:#0e7490;}.ir-done-cod{font-weight:800;font-family:Consolas,Menlo,monospace;}.ir-done-q{color:#64748b;margin-left:auto;font-size:12px;}";
+    document.head.appendChild(s);
+  }
+  let ov = document.getElementById("irModal");
+  if (!ov) { ov = document.createElement("div"); ov.id = "irModal"; document.body.appendChild(ov); }
+  ov.classList.add("show");
+  ov.innerHTML = '<div class="ir-card"><div class="ir-head"><span class="ir-title">📥 Ingreso a racks</span><button class="ir-close" onclick="closeIR()">Cerrar</button></div><div class="ir-body" id="irBody"><div class="ir-empty">Cargando racks…</div></div></div>';
+  if (_resume) { _ir = _resume; irRender(); return; }
+  try {
+    const plani = await racksFetchPlani();
+    await loadArtNombres();
+    const cxm = await irFetchCxM(plani);
+    const seen = {}, libres = [], ocupados = {};
+    (plani || []).forEach(function (r) { const sec = String(r.sector || "").trim(); if (sec && String(r.estado) === "ocupado" && r.cod_art) ocupados[sec.toUpperCase()] = String(r.cod_art); });
+    (plani || []).forEach(function (r) {
+      const sec = String(r.sector || "").trim(); if (!sec) return;
+      const secU = sec.toUpperCase(); if (seen[secU]) return; seen[secU] = true;
+      if (typeof _racksZonaInsumo === "function" && _racksZonaInsumo(sec)) return;
+      if (!ocupados[secU]) libres.push(sec);
+    });
+    libres.sort(function (a, b) { return String(a).localeCompare(String(b), undefined, { numeric: true }); });
+    _ir = { legajo: String(legajo || ""), cxm: cxm, libres: libres, ocupados: ocupados, cod: "", masters: 0, inner: 0, sector: (libres[0] || ""), emp: "LK", done: [] };
+    irRender();
+  } catch (e) { const b = document.getElementById("irBody"); if (b) b.innerHTML = '<div class="ir-empty">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
+}
+function irRender() {
+  if (!_ir) return; const body = document.getElementById("irBody"); if (!body) return;
+  const codN = _irNorm(_ir.cod), cxm = _ir.cxm[codN] || 0;
+  const secU = String(_ir.sector || "").trim().toUpperCase(), ocupadoPor = _ir.ocupados[secU] || "";
+  const sectorOcupadoOtro = ocupadoPor && _irNorm(ocupadoPor) !== codN;
+  const nombre = _ir.cod ? (artNombre(_ir.cod, "") || "") : "";
+  let h = '<div class="ir-hint">Cargá lo que llegó, <b>un palet por vez</b>: código, cuántos <b>masters</b> (te calcula las cajas si sé el CxM) y el <b>sector</b> (te sugiero uno libre). Se guarda en el mapa de racks y en el stock.</div>';
+  h += '<div class="ir-fld"><div class="ir-lbl">Código</div><input id="irCod" class="ir-inp" type="text" autocomplete="off" placeholder="ej. 582E" value="' + escapeHtml(_ir.cod) + '" oninput="irSetCod(this.value)"></div>';
+  if (_ir.cod) h += '<div class="ir-desc">' + escapeHtml(nombre || "(código nuevo, sin nombre)") + (cxm ? ' · <b>' + cxm + '</b> cajas por master' : ' · <span style="color:#b45309">no sé el CxM — poné las cajas a mano</span>') + '</div>';
+  h += '<div class="ir-row2"><div class="ir-fld"><div class="ir-lbl">Masters</div><div class="ir-stp"><button class="ir-sb" onclick="irChgM(-1)">–</button><input class="ir-inp ir-num" type="number" min="0" inputmode="numeric" value="' + (Number(_ir.masters) || 0) + '" oninput="irSetM(this.value)"><button class="ir-sb" onclick="irChgM(1)">+</button></div></div>';
+  h += '<div class="ir-fld"><div class="ir-lbl">Cajas (inner)</div><div class="ir-stp"><button class="ir-sb" onclick="irChgI(-1)">–</button><input class="ir-inp ir-num" type="number" min="0" inputmode="numeric" value="' + (Number(_ir.inner) || 0) + '" oninput="irSetI(this.value)"><button class="ir-sb" onclick="irChgI(1)">+</button></div></div></div>';
+  h += '<div class="ir-fld"><div class="ir-lbl">Sector</div><input id="irSec" class="ir-inp" type="text" autocomplete="off" placeholder="ej. Y30" value="' + escapeHtml(_ir.sector) + '" oninput="irSetSec(this.value)"></div>';
+  if (sectorOcupadoOtro) h += '<div class="ir-warn">⚠ ' + escapeHtml(secU) + ' ya está ocupado por <b>' + escapeHtml(ocupadoPor) + '</b>. Elegí otro (o poné ese mismo código para sumar).</div>';
+  else if (ocupadoPor) h += '<div class="ir-ok2">➕ ' + escapeHtml(secU) + ' ya tiene ' + escapeHtml(ocupadoPor) + ' — se suma.</div>';
+  h += '<div class="ir-libres">' + _ir.libres.slice(0, 14).map(function (s) { return '<button class="ir-chip' + (secU === s.toUpperCase() ? ' on' : '') + '" onclick="irSetSec(\'' + escapeHtml(s) + '\')">' + escapeHtml(s) + '</button>'; }).join("") + (_ir.libres.length > 14 ? '<span class="ir-more">+' + (_ir.libres.length - 14) + ' libres</span>' : (_ir.libres.length ? '' : '<span class="ir-more">sin sectores libres</span>')) + '</div>';
+  h += '<div class="ir-fld"><div class="ir-lbl">Empresa</div><div class="ir-seg"><button class="ir-segb' + (_ir.emp === "LK" ? " on" : "") + '" onclick="irSetEmp(\'LK\')">LK · Loeke</button><button class="ir-segb' + (_ir.emp === "CH" ? " on" : "") + '" onclick="irSetEmp(\'CH\')">CH · Chef</button></div></div>';
+  const ok = codN && (Number(_ir.inner) > 0) && secU && !sectorOcupadoOtro;
+  h += '<button class="ir-fin"' + (ok ? "" : " disabled") + ' onclick="irCargar()">✓ Cargar palet' + (secU ? ' a ' + escapeHtml(secU) : '') + (Number(_ir.inner) > 0 ? ' (' + (Number(_ir.inner) || 0) + ' cajas)' : '') + '</button>';
+  if (_ir.done.length) {
+    h += '<div class="ir-done-h">Cargados en esta sesión (' + _ir.done.length + ')</div>';
+    h += _ir.done.map(function (d) { return '<div class="ir-done-row"><span class="ir-done-sec">' + escapeHtml(d.sector) + '</span> <span class="ir-done-cod">' + escapeHtml(d.cod) + '</span><span class="ir-done-q">' + d.inner + ' cajas' + (d.masters ? ' · ' + d.masters + ' master' : '') + '</span></div>'; }).join("");
+  }
+  _renderKeepFocus(body, h);
+}
+function irSetCod(v) { if (!_ir) return; _ir.cod = String(v == null ? "" : v).toUpperCase().replace(/\s+/g, ""); const cxm = _ir.cxm[_irNorm(_ir.cod)] || 0; if (cxm > 0 && Number(_ir.masters) > 0) _ir.inner = Number(_ir.masters) * cxm; irRender(); }
+function irSetM(v) { if (!_ir) return; let n = parseInt(v, 10); if (isNaN(n) || n < 0) n = 0; _ir.masters = n; const cxm = _ir.cxm[_irNorm(_ir.cod)] || 0; if (cxm > 0) _ir.inner = n * cxm; irRender(); }
+function irChgM(d) { if (!_ir) return; irSetM(Math.max(0, (Number(_ir.masters) || 0) + d)); }
+function irSetI(v) { if (!_ir) return; let n = parseInt(v, 10); if (isNaN(n) || n < 0) n = 0; _ir.inner = n; irRender(); }
+function irChgI(d) { if (!_ir) return; irSetI(Math.max(0, (Number(_ir.inner) || 0) + d)); }
+function irSetSec(v) { if (!_ir) return; _ir.sector = String(v == null ? "" : v).toUpperCase().replace(/[^A-Z0-9]/g, ""); irRender(); }
+function irSetEmp(e) { if (!_ir) return; _ir.emp = (e === "CH") ? "CH" : "LK"; irRender(); }
+function closeIR() { const ov = document.getElementById("irModal"); if (ov) ov.classList.remove("show"); _ir = null; }
+async function irCargar() {
+  if (!_ir) return;
+  const cod = _irNorm(_ir.cod), sector = String(_ir.sector || "").trim().toUpperCase(), inner = Number(_ir.inner) || 0, masters = Number(_ir.masters) || 0, emp = (_ir.emp === "CH" ? "CH" : "LK"), leg = _ir.legajo || "";
+  if (!cod || !sector || inner <= 0) return;
+  let res = "";
+  try {
+    const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/racks_plani_ingreso", {
+      method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ p_sector: sector, p_cod: cod, p_master: masters, p_inner: inner, p_emp: emp, p_legajo: leg })
+    });
+    res = r.ok ? String(await r.json()) : ("error: HTTP " + r.status);
+  } catch (e) { res = "error: sin conexión"; }
+  if (res !== "ok") {
+    try {
+      if (res.indexOf("ocupado:") === 0) alert("El sector " + sector + " ya está ocupado por " + res.slice(8) + ".\nElegí otro sector (o cargá ese mismo código para sumar).");
+      else alert("No se pudo cargar: " + res.replace(/^error:\s*/, ""));
+    } catch (_e) {}
+    return;
+  }
+  try { irEmitEvent(cod, masters, inner, sector, leg); } catch (_e) {}
+  _ir.ocupados[sector] = cod;
+  _ir.libres = _ir.libres.filter(function (s) { return s.toUpperCase() !== sector; });
+  _ir.done.push({ cod: cod, sector: sector, masters: masters, inner: inner });
+  _ir.cod = ""; _ir.masters = 0; _ir.inner = 0; _ir.sector = (_ir.libres[0] || "");
+  irRender();
+  try { alert("✓ Cargado: " + inner + " cajas de " + cod + " en " + sector + "."); } catch (_e) {}
+}
+function irEmitEvent(cod, masters, inner, sector, legajo) {
+  const payload = {
+    legajo: String(legajo || "").trim(), opcion: "IR", descripcion: "Ingreso a racks",
+    texto: (String(cod).toUpperCase() + "|" + sector + "|" + masters + "M|" + inner + "C"),
+    ts: Date.now(), id: ("ir_" + String(cod).toUpperCase() + "_" + sector + "_" + Date.now()).replace(/[^a-zA-Z0-9_\-]/g, ""), ts_inicio_iso: null
+  };
+  enqueueReport(payload);
+  if (typeof trySendOneReport === "function") trySendOneReport(payload).then(function (r) { if (r && r.ok) removeFromQueue(payload.id); }).catch(function () {});
+  try { updatePendingIndicator(); } catch (_e) {}
 }
 
 /* ===== STOCK — CP · Completar Pedido (v5.05): el operario (botonera 4ª fila) o
