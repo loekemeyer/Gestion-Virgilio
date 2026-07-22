@@ -25,7 +25,7 @@ catch (_e) {
       "pppSugerirInline", "pppSugInlineClose", "_pppEsCiudadela",
       "stkBodyProceso", "ocBodyEntregas", "ocgEnter", "insRender", "mgRender", "mgConfirmar", "pkRender", "stockBajaPicking",
       "stockSepararAFacturar", "stockSalidaFacturado", "stockMove", "_stockNormRows",
-      "esLegajoPrueba", "esOperadorPrueba", "enqueueReport", "facFetchCajas",
+      "esLegajoPrueba", "esOperadorPrueba", "enqueueReport", "facFetchCajas", "facFaltBadge", "facToggleSoloFalt",
       "showMGChooser", "showRacksBajarModal", "rkbRender", "rkbConfirmar", "rkbFetchCxM", "rkbSetSec",
       "showCPModal", "cpRender", "cpConfirm", "cpLoadPickSinArmar", "showInstructivo", "equivResolve", "pppZonaDeBarrio",
       "showRCModal", "rcConfirm", "rcLoadDonors", "showRemitoArmado", "armadoRemitoData", "armadoRemitoInnerHtml", "remitoPrintDoc",

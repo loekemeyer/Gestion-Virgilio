@@ -2543,6 +2543,10 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .fac-chip.green{ border-color: #16a34a; color: #15803d; }
 .fac-chip.blue{ border-color: #1e6bd6; color: #1e3a8a; }
 .fac-chip.orange{ border-color: #f59e0b; color: #92400e; }
+.fac-chip.red{ border-color: #dc2626; color: #991b1b; background:#fef2f2; }
+.fac-chip.clickable{ cursor:pointer; user-select:none; }
+.fac-chip.clickable:hover{ filter:brightness(0.97); }
+.fac-chip.red.on{ background:#dc2626; color:#fff; border-color:#dc2626; box-shadow:0 1px 4px rgba(220,38,38,.4); }
 .fac-dot{ display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #94a3b8; margin-right: 5px; vertical-align: middle; }
 .fac-dot.ok{ background: #16a34a; }
 .fac-dot.err{ background: #dc2626; }
@@ -2581,6 +2585,11 @@ table.fac-np-tbl td.center{ text-align: center; }
 .fac-np-cell{ font-family: monospace; font-weight: bold; color: #1e6bd6; font-size: 13px; }
 .fac-cod-cell{ font-family: monospace; color: #475569; font-size: 12px; }
 .fac-dir-cell{ color: #475569; font-size: 12px; }
+/* Razón Social: el nombre trunca en su renglón, pero los avisos (⚠ FALTA / 🧾
+   equivalencia) tienen que poder BAJAR y verse — antes el td tenía overflow:hidden
+   + nowrap y CLIPEABA el badge de faltante (no se veía nunca). v5.70. */
+table.fac-np-tbl td.fac-rs-cell{ white-space: normal; overflow: visible; }
+.fac-rs-name{ display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 /* Cabecera grupo eliminada — la tanda ahora es una col más. Para no perder
    el agrupamiento visual, las filas de cada tanda comparten un fondo sutil
    alternado (zebra por tanda, no por fila). */
@@ -2823,6 +2832,7 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
       <span class="fac-chip blue">Tandas: <span id="facCntTandas">0</span></span>
       <span class="fac-chip orange">NPs pendientes: <span id="facCntPend">0</span></span>
       <span class="fac-chip green">NPs facturados hoy: <span id="facCntDone">0</span></span>
+      <span class="fac-chip red clickable" id="facChipFalt" onclick="facToggleSoloFalt()" style="display:none" title="Pedidos que salieron con faltante — clic para ver SOLO esos y revisarlos antes de facturar">⚠ Con faltante: <span id="facCntFalt">0</span></span>
       <button id="facBtnRevertir" class="fac-btn-revertir" disabled onclick="facRevertir()" title="Borra todos los ticks pendientes de cierre">↺ Revertir</button>
       <span class="fac-chip"><span class="fac-dot" id="facDot"></span><span id="facStatusTxt">Cargando…</span></span>
     </div>
@@ -5457,7 +5467,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.69";
+const APP_VERSION = "v5.70";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -17339,6 +17349,7 @@ const FAC_NPS_TTL_MS = 4000;          // cache local del set de NPs facturados
 let _facIntervalId = null;
 let _facLastTandas = [];
 let _facToastTimer = null;
+let _facSoloFalt   = false;   // v5.70: filtro "ver solo NPs con faltante" (toolbar)
 // Set de NPs facturados pendientes de cierre (lo que se ve como tickeado).
 // Lo lee también el monitor Virgilio para marcar ✅ en "Tandas a FC".
 let _facNpsHoy        = new Set();
@@ -18029,7 +18040,11 @@ function facFaltBadge(np){
   const mas = f.items.length > 8 ? " +" + (f.items.length - 8) : "";
   return '<div class="fac-falta-badge" title="Faltan ' + f.cajas + ' cajas en ' + f.items.length + ' artículo(s) — facturá por lo ENTREGADO">⚠ FALTA ' + f.cajas + ' cj: ' + det + mas + '</div>';
 }
+/* v5.70: alterna el filtro "ver solo NPs con faltante" y re-dibuja. */
+function facToggleSoloFalt(){ _facSoloFalt = !_facSoloFalt; if (typeof facRender === "function") facRender(_facLastTandas || []); }
+window.facToggleSoloFalt = facToggleSoloFalt;
 function facRender(tandas){
+  _facLastTandas = tandas || [];   // v5.70: el filtro "solo faltante" re-dibuja este mismo set
   // Aplanamos: una fila por NP pendiente, llevando tanda + fecha salida
   // como cols (antes vivían en el header de cada grupo, ahora se repiten
   // por fila). Permite ordenar/filtrar globalmente sin agrupación visual.
@@ -18072,6 +18087,21 @@ function facRender(tandas){
   const btnRev = document.getElementById("facBtnRevertir");
   if (btnRev) btnRev.disabled = _facNpsHoy.size === 0;
 
+  // v5.70: chip "⚠ Con faltante: N" + filtro "solo faltantes". Los pedidos que
+  // salieron cortos (Entregas_Virgilio.cajas_falto>0) ya vienen marcados en la
+  // fila; esto agrega un CONTADOR arriba y un clic para ver SOLO esos, así la
+  // operadora los revisa antes de facturar (facturar por lo ENTREGADO).
+  const filasFalt = filas.filter(function(f){ return !!facFaltInfo(f.np); });
+  if (_facSoloFalt && !filasFalt.length) _facSoloFalt = false;   // no quedar atrapada en un filtro vacío
+  const _chipF = document.getElementById("facChipFalt");
+  if (_chipF){
+    const _cf = document.getElementById("facCntFalt");
+    if (_cf) _cf.textContent = filasFalt.length;
+    _chipF.style.display = filasFalt.length ? "" : "none";
+    _chipF.classList.toggle("on", _facSoloFalt && filasFalt.length > 0);
+  }
+  const filasView = _facSoloFalt ? filasFalt : filas;
+
   const container = document.getElementById("facContainer");
   if (!filas.length){
     container.innerHTML = `<div class="fac-empty">${tandas.length ? "✅ Todos los NPs facturados" : "⏳ Sin tandas listas para facturar"}</div>`;
@@ -18082,7 +18112,7 @@ function facRender(tandas){
   // el header de grupo dando agrupamiento visual sin ocupar espacio.
   let prevTanda = null;
   let altFlag = false;
-  const rowsHtml = filas.map(f => {
+  const rowsHtml = filasView.map(f => {
     if (f.tanda !== prevTanda){ altFlag = !altFlag; prevTanda = f.tanda; }
     const args = JSON.stringify({
       np: f.np, tanda: f.tanda, m3: f.m3 || 0,
@@ -18098,7 +18128,7 @@ function facRender(tandas){
         <td class="center">${escapeHtml(f.fechaSalida)}</td>
         <td class="fac-np-cell">${escapeHtml(f.np)}</td>
         <td class="fac-cod-cell">${escapeHtml(f.cod)}</td>
-        <td>${escapeHtml(f.rs)}${(() => { const ea = _facEquiv.get(String(f.np).trim().replace(/\.0+$/, "")); return (ea && ea.length) ? '<div style="margin-top:3px;font-size:10.5px;font-weight:800;color:#9a3412;background:#fff7ed;border:1px solid #fdba74;border-radius:7px;padding:2px 6px;line-height:1.25;">🧾 Facturá ' + ea.map(function(e){ return '<b>' + escapeHtml(e.real) + '</b> (no ' + escapeHtml(e.cod) + ')'; }).join(', ') + '</div>' : ''; })()}${facFaltBadge(f.np)}</td>
+        <td class="fac-rs-cell"><span class="fac-rs-name">${escapeHtml(f.rs)}</span>${(() => { const ea = _facEquiv.get(String(f.np).trim().replace(/\.0+$/, "")); return (ea && ea.length) ? '<div style="margin-top:3px;font-size:10.5px;font-weight:800;color:#9a3412;background:#fff7ed;border:1px solid #fdba74;border-radius:7px;padding:2px 6px;line-height:1.25;">🧾 Facturá ' + ea.map(function(e){ return '<b>' + escapeHtml(e.real) + '</b> (no ' + escapeHtml(e.cod) + ')'; }).join(', ') + '</div>' : ''; })()}${facFaltBadge(f.np)}</td>
         <td class="fac-dir-cell">${escapeHtml(f.dir)}</td>
         <td class="num">${f.m3 ? f.m3.toFixed(1).replace(".",",") : ""}</td>
         <td>${escapeHtml(f.barrio)}</td>
