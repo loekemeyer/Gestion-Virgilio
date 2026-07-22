@@ -5441,7 +5441,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.65";
+const APP_VERSION = "v5.66";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -8806,43 +8806,56 @@ function stkBodyStocksTab() {
   const view = _stk.stkView || "stocks";
   const seg = function (v, label) { return '<button class="stk-segb' + (view === v ? " on" : "") + '" onclick="stkSetView(\'' + v + '\')">' + label + '</button>'; };
   let h = '<div class="stk-seg">' + seg("stocks", "📊 Stock") + seg("ingresos", "📥 Ingresos") + seg("salidas", "📤 Salidas") + '</div>';
-  h += '<button class="stk-btn" style="width:100%;margin:0 0 10px;background:#fffbeb;border-color:#fcd34d;color:#92400e;font-weight:800;" onclick="stkExportExcedentes()">⬇ Descargar excedentes (Excel)</button>';
+  h += '<button class="stk-btn" style="width:100%;margin:0 0 10px;background:#fffbeb;border-color:#fcd34d;color:#92400e;font-weight:800;" onclick="stkExportExcedentes()">⬇ Excedentes por ubicación (Excel)</button>';
   h += (view === "ingresos") ? stkBodyIngresos() : (view === "salidas") ? stkBodySalidas() : stkBodyStocks();
   return h;
 }
-/* Descarga un Excel (.xls, tabla HTML → lo abre Excel; sin librería) con el saldo
-   ACTUAL del depósito "excedente" por código: código, descripción, cajas y ubicación.
-   Saldo vía stockComputeSaldos (mismo corte/asOf que la vista); ubicaciones de las
-   entradas (delta>0). Cliente-side, no toca Supabase. */
+/* Descarga un Excel (.xls, tabla HTML → lo abre Excel; sin librería) del depósito
+   "excedente" ORDENADO POR UBICACIÓN: una fila por (ubicación, código) — si un código
+   está en varias ubicaciones, se repite. Columnas: Ubicación · Código · Cajas.
+   Neto por (código, ubicación real); las bajas de picking SIN ubicación se atribuyen
+   al código si tiene UNA sola ubicación (si tiene varias quedan sin atribuir → ese
+   código puede leer un poco alto). Respeta corte/asOf igual que stockComputeSaldos.
+   Cliente-side, no toca Supabase. */
 function stkExportExcedentes() {
   if (!_stk || !_stk.movs) { try { alert("Todavía no cargó el stock — abrí la solapa y esperá un segundo."); } catch (_e) {} return; }
-  const saldos = stockComputeSaldos(_stk.movs, _stk.cutoff, _stk.asOf);
-  const ubics = {};
+  const cut = _stk.cutoff ? new Date(_stk.cutoff).getTime() : 0, lim = _stk.asOf ? new Date(_stk.asOf).getTime() : 0;
+  const inWin = function (mv) { if (mv.tipo === "inicial") return true; const t = new Date(mv.ts).getTime(); if (lim && t > lim) return false; if (cut && t < cut) return false; return true; };
+  const tagged = {}, sin = {};
   _stk.movs.forEach(function (mv) {
-    if (String(mv.deposito) !== "excedente" || (Number(mv.delta) || 0) <= 0) return;
-    const k = String(mv.cod_art || "").trim().toUpperCase(), u = String(mv.ubicacion || "").trim();
-    if (!k || !u) return;
-    if (!ubics[k]) ubics[k] = [];
-    if (ubics[k].indexOf(u) < 0) ubics[k].push(u);
+    if (String(mv.deposito) !== "excedente" || !inWin(mv)) return;
+    const cod = String(mv.cod_art || "").trim(); if (!cod) return;
+    const k = cod.toUpperCase(), d = Number(mv.delta) || 0, u = String(mv.ubicacion || "").trim();
+    if (u) { if (!tagged[k]) tagged[k] = { cod: cod, ubics: {} }; tagged[k].ubics[u] = (tagged[k].ubics[u] || 0) + d; }
+    else { sin[k] = (sin[k] || 0) + d; }
   });
-  const rows = Object.keys(saldos).map(function (k) { return saldos[k]; })
-    .filter(function (a) { return (Number(a.excedente) || 0) > 0.001; })
-    .map(function (a) { return { cod: a.cod, desc: artNombre(a.cod, a.desc) || "", cajas: Math.round((Number(a.excedente) || 0) * 10) / 10, ubic: (ubics[String(a.cod).trim().toUpperCase()] || []).sort().join(", ") }; })
-    .sort(function (a, b) { return ((parseInt(a.cod, 10) || 999999) - (parseInt(b.cod, 10) || 999999)) || String(a.cod).localeCompare(String(b.cod)); });
+  const rows = [];
+  Object.keys(tagged).forEach(function (k) {
+    const t = tagged[k], s = sin[k] || 0;
+    const nz = Object.keys(t.ubics).filter(function (u) { return Math.round(t.ubics[u] * 10) / 10 !== 0; });
+    nz.forEach(function (u) {
+      let cajas = t.ubics[u];
+      if (nz.length === 1) cajas += s;   // única ubicación con saldo → absorbe las bajas sin-ubicación
+      cajas = Math.round(cajas * 10) / 10;
+      if (cajas > 0) rows.push({ ubic: u, cod: t.cod, cajas: cajas });
+    });
+  });
   if (!rows.length) { try { alert("No hay excedentes cargados ahora mismo."); } catch (_e) {} return; }
+  const uk = function (u) { const mm = String(u).match(/^([A-Za-z]+)(\d+)/); return mm ? [mm[1].toUpperCase(), parseInt(mm[2], 10)] : [String(u).toUpperCase(), 0]; };
+  rows.sort(function (a, b) { const ka = uk(a.ubic), kb = uk(b.ubic); if (ka[0] !== kb[0]) return ka[0] < kb[0] ? -1 : 1; if (ka[1] !== kb[1]) return ka[1] - kb[1]; return String(a.cod).localeCompare(String(b.cod)); });
   const fecha = (function () { try { return new Date().toLocaleDateString("en-CA", { timeZone: "America/Argentina/Buenos_Aires" }); } catch (_e) { return "hoy"; } })();
   const esc = function (s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); };
   let total = 0; rows.forEach(function (r) { total += Number(r.cajas) || 0; });
   let html = '<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"><style>td,th{border:1px solid #ccc;padding:3px 7px;font-family:Calibri,Arial,sans-serif;} th{background:#B45309;color:#fff;text-align:left;}</style></head><body>';
-  html += '<h3>Excedentes — Producción Virgilio (' + esc(fecha) + ')</h3>';
-  html += '<table><tr><th>Codigo</th><th>Descripcion</th><th>Cajas</th><th>Ubicacion</th></tr>';
-  rows.forEach(function (r) { html += '<tr><td>' + esc(r.cod) + '</td><td>' + esc(r.desc) + '</td><td>' + r.cajas + '</td><td>' + esc(r.ubic) + '</td></tr>'; });
-  html += '<tr><td colspan="2"><b>TOTAL (' + rows.length + ' códigos)</b></td><td><b>' + (Math.round(total * 10) / 10) + '</b></td><td></td></tr>';
+  html += '<h3>Excedentes por ubicación — Producción Virgilio (' + esc(fecha) + ')</h3>';
+  html += '<table><tr><th>Ubicacion</th><th>Codigo</th><th>Cajas</th></tr>';
+  rows.forEach(function (r) { html += '<tr><td>' + esc(r.ubic) + '</td><td>' + esc(r.cod) + '</td><td>' + r.cajas + '</td></tr>'; });
+  html += '<tr><td><b>TOTAL (' + rows.length + ' filas)</b></td><td></td><td><b>' + (Math.round(total * 10) / 10) + '</b></td></tr>';
   html += '</table></body></html>';
   try {
     const blob = new Blob(["﻿" + html], { type: "application/vnd.ms-excel" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = "Excedentes_" + fecha + ".xls";
+    const a = document.createElement("a"); a.href = url; a.download = "Excedentes_por_ubicacion_" + fecha + ".xls";
     document.body.appendChild(a); a.click();
     setTimeout(function () { try { document.body.removeChild(a); URL.revokeObjectURL(url); } catch (_e) {} }, 1500);
   } catch (e) { try { alert("No se pudo generar el Excel: " + (e.message || e)); } catch (_e) {} }
