@@ -17,7 +17,7 @@ catch (_e) {
   const r = await p.evaluate(() => {
     const need = ["stockComputeSaldos", "stkBodyStocks", "stkBodyStocksTab", "stkBodyConteo", "stkBodyCapacidad", "openAgentesAdmin", "agtRender", "openProductividad", "prodRender",
       "prodCompute", "prodLoad", "prodExportCsv", "prodSetMeta", "_pvPremio", "_pvMetas",
-      "stkBodyRacks", "stkRacksCapCompute", "stkRacksCapSummary", "stkPlnSet", "stkPlaniLoad",
+      "stkBodyRacks", "stkRacksCapCompute", "stkRacksCapSummary", "stkPlnSet", "stkPlaniLoad", "stkBodyStocksTab", "stkExportExcedentes",
       "stkAutoBajadaCompute", "stkAutoBajadaSection", "stkToggleAutoBajada", "stkAutoBajadaGenerar",
       "opDraftSave", "opDraftLoad", "opDraftClear", "opAskClose", "opDraftResume",
       "mgAskClose", "rkbAskClose", "insAskClose", "scAskClose", "eaAskClose", "cpAskClose", "rcAskClose",
