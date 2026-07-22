@@ -25,6 +25,7 @@ catch (_e) {
       "pppSugerirInline", "pppSugInlineClose", "_pppEsCiudadela",
       "stkBodyProceso", "ocBodyEntregas", "ocgEnter", "insRender", "mgRender", "mgConfirmar", "pkRender", "stockBajaPicking",
       "stockSepararAFacturar", "stockSalidaFacturado", "stockMove", "_stockNormRows",
+      "esLegajoPrueba", "esOperadorPrueba", "enqueueReport", "facFetchCajas",
       "showMGChooser", "showRacksBajarModal", "rkbRender", "rkbConfirmar", "rkbFetchCxM", "rkbSetSec",
       "showCPModal", "cpRender", "cpConfirm", "cpLoadPickSinArmar", "showInstructivo", "equivResolve", "pppZonaDeBarrio",
       "showRCModal", "rcConfirm", "rcLoadDonors", "showRemitoArmado", "armadoRemitoData", "armadoRemitoInnerHtml", "remitoPrintDoc",
@@ -50,9 +51,18 @@ catch (_e) {
     const normOk = nr.length === 2 && ("ubicacion" in nr[0]) && ("ubicacion" in nr[1]) &&
       nr[0].ubicacion === null && nr[1].ubicacion === "N11" &&
       JSON.stringify(Object.keys(nr[0]).sort()) === JSON.stringify(Object.keys(nr[1]).sort());
-    return { missing, saldoOk, normOk };
+    // Candado legajo de prueba: el operador logueado como 0/1 no persiste (v5.68).
+    let pruebaOk = esLegajoPrueba("0") && esLegajoPrueba("1") && !esLegajoPrueba("104") && !esLegajoPrueba("");
+    const li = document.getElementById("legajoInput");
+    if (li) {
+      const orig = li.value;
+      li.value = "0";   pruebaOk = pruebaOk && esOperadorPrueba() === true;
+      li.value = "104"; pruebaOk = pruebaOk && esOperadorPrueba() === false;
+      li.value = orig;
+    } else { pruebaOk = false; }
+    return { missing, saldoOk, normOk, pruebaOk };
   });
-  const pass = r.missing.length === 0 && r.saldoOk && r.normOk && errs.length === 0;
+  const pass = r.missing.length === 0 && r.saldoOk && r.normOk && r.pruebaOk && errs.length === 0;
   console.log("smoke:", JSON.stringify(r), "· pageerrors:", errs.length ? errs.join("|") : "none", "·", pass ? "✓ OK" : "✗ FAIL");
   await b.close();
   process.exit(pass ? 0 : 1);

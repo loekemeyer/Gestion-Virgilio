@@ -5073,7 +5073,16 @@ async function registerBackgroundSync() {
   } catch (_e) { /* no soportado, sin drama */ }
 }
 
+/* v5.68 — Legajo de PRUEBA (0 = Thomas Loke TESTING, 1 = Pruebas): NADA de lo que
+   opere el operador logueado como 0/1 se sube a Supabase (ni eventos ni stock). Se
+   mira el legajo del INPUT logueado (no el de la fila/payload), así las acciones de
+   sistema/admin que hardcodean legajo "0" (racksAprobar, ajustes, CRA/PPE) SÍ suben —
+   lo que se bloquea es el OPERADOR de prueba. Esto es lo que rompió el 542 (un CP con
+   legajo 0 movió stock real y desincronizó la alerta). */
+function esLegajoPrueba(leg) { const s = String(leg == null ? "" : leg).trim(); return s === "0" || s === "1"; }
+function esOperadorPrueba() { try { const el = document.getElementById("legajoInput"); return esLegajoPrueba(el ? el.value : ""); } catch (_e) { return false; } }
 function enqueueReport(payload) {
+  if (esOperadorPrueba()) { try { console.warn("[PRUEBA] evento NO persistido (legajo de prueba):", payload && payload.opcion); } catch (_e) {} return; }
   // fecha = día (hora Arg) del ts del payload. Para un reporte normal
   // payload.ts es Date.now() así que cae en hoy. Para un auto-cierre del
   // día anterior, payload.ts es las 17:00 de ayer y la fecha va a ser ayer
@@ -5288,6 +5297,7 @@ function removeFromQueue(id) {
      - ok=false, networkFail=true  -> sin respuesta (timeout, sin red, CORS)
      - ok=false, networkFail=false -> el server respondió con error (4xx/5xx) */
 async function trySendOneReport(payload, timeoutMs) {
+  if (esOperadorPrueba()) return { ok: false, skipped: true };   // legajo de prueba: no sube a Supabase
   try {
     // Corte duro (12s default) para no quedarnos esperando si la red se cuelga.
     // Los flush de FONDO pasan 30s: con wifi lento-pero-vivo, 12s clasificaba
@@ -5447,7 +5457,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.67";
+const APP_VERSION = "v5.68";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -7598,6 +7608,7 @@ function _stockNormRows(rows) {
 }
 function stockMove(rows) {
   if (!rows || !rows.length) return Promise.resolve();
+  if (esOperadorPrueba()) { try { console.warn("[PRUEBA] stockMove NO persistido (operador de prueba)"); } catch (_e) {} return Promise.resolve(); }
   const norm = _stockNormRows(rows);
   const headers = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" };
   return fetch(SUPABASE_STOCK_ENDPOINT, { method: "POST", headers: headers, body: JSON.stringify(norm) })
@@ -17922,6 +17933,21 @@ async function facFetchLios(){
   } catch (_e) { /* sin red: queda el último cache */ }
   return _facLios;
 }
+/* Cajas por NP (suma de cajas_pedidas en Entregas_Virgilio). Para los SÚPER, la
+   columna "Líos" muestra ESTO en vez de 0 (los súper van por etiqueta/cajas, no líos).
+   supaFetchAll pagina (Entregas > 1000 filas). Cache 30s. v5.68. */
+let _facCajas = new Map(); let _facCajasTs = 0;
+async function facFetchCajas(){
+  const now = Date.now();
+  if (_facCajasTs && (now - _facCajasTs) < 30000) return _facCajas;
+  try {
+    const rows = await supaFetchAll(SUPABASE_ENTREGAS_ENDPOINT, "select=np,cajas_pedidas");
+    const m = new Map();
+    for (const x of rows){ const np = String(x.np || "").trim().replace(/\.0+$/, ""); if (!np) continue; m.set(np, (m.get(np) || 0) + (Number(x.cajas_pedidas) || 0)); }
+    _facCajas = m; _facCajasTs = now;
+  } catch (_e) { /* sin red: queda el último cache */ }
+  return _facCajas;
+}
 /* Equivalencias por NP (vista_pedidos_equivalencia): NP → [{cod, real, nota}], para el
    cartel "facturá con el código REAL" en el módulo de Facturación (la factura se hace
    afuera de la app y debe ir con el código real, no el del pedido). Cache 60s. */
@@ -18044,7 +18070,12 @@ function facRender(tandas){
         <td class="num">${f.m3 ? f.m3.toFixed(1).replace(".",",") : ""}</td>
         <td>${escapeHtml(f.barrio)}</td>
         <td>${escapeHtml(f.zona)}</td>
-        <td class="fac-lios-cell">${(() => { const v = _facLios.get(String(f.np).trim().replace(/\.0+$/, "")); return (v == null) ? '<span class="fac-lios0">—</span>' : escapeHtml(String(v)); })()}</td>
+        <td class="fac-lios-cell">${(() => {
+          const np = String(f.np).trim().replace(/\.0+$/, "");
+          const esSuper = /super/i.test(String(f.zona || "")) || (typeof pppZonaDeBarrio === "function" && pppZonaDeBarrio(f.barrio) === "Super");
+          if (esSuper) { const c = _facCajas.get(np); return (!c) ? '<span class="fac-lios0">—</span>' : (escapeHtml(String(Math.round(c))) + ' <small style="font-weight:600;color:#64748b">cj</small>'); }
+          const v = _facLios.get(np); return (v == null) ? '<span class="fac-lios0">—</span>' : escapeHtml(String(v));
+        })()}</td>
         <td class="center"><button class="fac-btn-tick" data-args='${args}' onclick="facTickNP(this)">✓</button></td>
       </tr>`;
   }).join("");
@@ -18245,7 +18276,8 @@ async function facTick(){
       fetchFacturadosTodos(true).catch(function(){ return null; }),   // para excluir ya-facturados (incl. cerrados)
       facFetchLios().catch(function(){ return _facLios; }),           // líos por NP (TAL) → columna Líos
       facFetchEquiv().catch(function(){ return _facEquiv; }),         // equivalencias por NP → cartel "facturá el real"
-      facFetchFaltantes().catch(function(){ return _facFalt; })       // faltantes por NP → aviso ⚠ antes de facturar (v5.36)
+      facFetchFaltantes().catch(function(){ return _facFalt; }),      // faltantes por NP → aviso ⚠ antes de facturar (v5.36)
+      facFetchCajas().catch(function(){ return _facCajas; })          // cajas por NP → la columna Líos muestra CAJAS para los súper (v5.68)
     ]);
     const fcKeys = _facPar[0] || new Set();
 
