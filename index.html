@@ -4672,9 +4672,9 @@ async function getPppTandasForOperator() {
                         por AP para no excluir tandas con TAP mal tipeado
                         (ej: "C02D " con espacio no excluye al PPP "C02D").
    Cache 10s. */
-async function getActivityStatus() {
+async function getActivityStatus(force) {
   const now = Date.now();
-  if (_activityStatusCache && (now - _activityStatusTs) < ACTIVITY_STATUS_TTL_MS) {
+  if (!force && _activityStatusCache && (now - _activityStatusTs) < ACTIVITY_STATUS_TTL_MS) {
     return _activityStatusCache;
   }
   const empty = {
@@ -4683,7 +4683,9 @@ async function getActivityStatus() {
     pickingDoneStrict: new Set(),
     armadoStarted:     new Set(),
     armadoDone:        new Set(),
-    armadoDoneStrict:  new Set()
+    armadoDoneStrict:  new Set(),
+    pickingEnCursoBy:  new Map(),   // v5.74: tanda EN CURSO (EP sin TP) -> legajo que la arrancó
+    armadoEnCursoBy:   new Map()    // v5.74: tanda EN CURSO (AP sin TAP) -> legajo que la arrancó
   };
   try {
     const since = new Date(Date.now() - 7*24*60*60*1000).toISOString();
@@ -4692,7 +4694,7 @@ async function getActivityStatus() {
       "&ts_cliente=gte." + encodeURIComponent(since) +
       "&order=ts_cliente.asc" +
       "&limit=10000" +
-      "&select=opcion,texto,ts_cliente";
+      "&select=opcion,texto,ts_cliente,legajo";
     const r = await fetch(url, {
       headers: { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY }
     });
@@ -4708,7 +4710,9 @@ async function getActivityStatus() {
       pickingDoneStrict: new Set(),
       armadoStarted:     new Set(),
       armadoDone:        new Set(),
-      armadoDoneStrict:  new Set()
+      armadoDoneStrict:  new Set(),
+      pickingEnCursoBy:  new Map(),
+      armadoEnCursoBy:   new Map()
     };
     for (const ev of data) {
       const tRaw  = ev.texto || "";
@@ -4718,20 +4722,20 @@ async function getActivityStatus() {
       if (ev.opcion === "EP" || ev.opcion === "TP") {
         status.pickingStarted.add(tNorm);
         const cur = lastPick.get(tNorm);
-        if (!cur || ts > cur.ts) lastPick.set(tNorm, { opcion: ev.opcion, ts });
+        if (!cur || ts > cur.ts) lastPick.set(tNorm, { opcion: ev.opcion, ts, legajo: ev.legajo });
         const curS = lastPickStrict.get(tRaw);
         if (!curS || ts > curS.ts) lastPickStrict.set(tRaw, { opcion: ev.opcion, ts });
       } else if (ev.opcion === "AP" || ev.opcion === "TAP") {
         status.armadoStarted.add(tNorm);
         const cur = lastArm.get(tNorm);
-        if (!cur || ts > cur.ts) lastArm.set(tNorm, { opcion: ev.opcion, ts });
+        if (!cur || ts > cur.ts) lastArm.set(tNorm, { opcion: ev.opcion, ts, legajo: ev.legajo });
         const curS = lastArmStrict.get(tRaw);
         if (!curS || ts > curS.ts) lastArmStrict.set(tRaw, { opcion: ev.opcion, ts });
       }
     }
-    for (const [t, ev] of lastPick)       if (ev.opcion === "TP")  status.pickingDone.add(t);
+    for (const [t, ev] of lastPick)       { if (ev.opcion === "TP")  status.pickingDone.add(t); else if (ev.opcion === "EP") status.pickingEnCursoBy.set(t, String(ev.legajo == null ? "" : ev.legajo).trim()); }
     for (const [t, ev] of lastPickStrict) if (ev.opcion === "TP")  status.pickingDoneStrict.add(t);
-    for (const [t, ev] of lastArm)        if (ev.opcion === "TAP") status.armadoDone.add(t);
+    for (const [t, ev] of lastArm)        { if (ev.opcion === "TAP") status.armadoDone.add(t);  else if (ev.opcion === "AP") status.armadoEnCursoBy.set(t, String(ev.legajo == null ? "" : ev.legajo).trim()); }
     for (const [t, ev] of lastArmStrict)  if (ev.opcion === "TAP") status.armadoDoneStrict.add(t);
     _activityStatusCache = status;
     _activityStatusTs    = Date.now();
@@ -4774,9 +4778,11 @@ async function populateTandasList(filterMode) {
     // pickingDone: lenient (normalizado), así matchea aunque haya tipos.
     // armadoDoneStrict: exacto, para que un TAP con espacio extra ("C02D ")
     // no excluya la tanda PPP "C02D" del filtro de AP.
+    // v5.74: además, si OTRO ya arrancó el armado (AP sin TAP), no la mostramos →
+    // no pueden empezar dos el mismo armado.
     filtered = items.filter(it => {
       const k = it.tanda.toUpperCase();
-      return s.pickingDone.has(k) && !s.armadoDoneStrict.has(it.tanda);
+      return s.pickingDone.has(k) && !s.armadoDoneStrict.has(it.tanda) && !s.armadoEnCursoBy.has(k);
     });
   } else if (_tandasListMode === "armadoCurso") {
     const s = await getActivityStatus();
@@ -5475,7 +5481,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.73";
+const APP_VERSION = "v5.74";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -5625,6 +5631,27 @@ async function send() {
     }
   }
 
+  // v5.74: EXCLUSIVIDAD de tanda. Si OTRO operario ya arrancó el picking (EP sin TP)
+  // o el armado (AP sin TAP) de esta tanda, no dejamos que un segundo lo empiece:
+  // no pueden trabajar dos el mismo. Chequeo FRESCO (sin cache) para achicar la
+  // ventana de carrera. Falla ABIERTO (si no hay red, no bloquea).
+  if ((opcion === "EP" || opcion === "AP") && texto) {
+    let sAct = null;
+    try { sAct = await getActivityStatus(true); } catch (_e) { sAct = null; }
+    if (sAct) {
+      const dueno = (opcion === "EP") ? (sAct.pickingEnCursoBy && sAct.pickingEnCursoBy.get(texto))
+                                      : (sAct.armadoEnCursoBy && sAct.armadoEnCursoBy.get(texto));
+      if (dueno && String(dueno) !== legajoStr) {
+        let nom = "";
+        try { const mp = await getEmpleadosNombres(); if (mp && mp.get) nom = mp.get(String(dueno)) || ""; } catch (_e) {}
+        const quien = nom ? (nom + " (leg " + dueno + ")") : ("el legajo " + dueno);
+        const q = (opcion === "EP") ? "pickeando" : "armando";
+        try { alert("⛔ La tanda " + texto + " ya la está " + q + " " + quien + ".\n\nNo pueden hacer dos el mismo. Elegí otra."); } catch (_e) {}
+        return;
+      }
+    }
+  }
+
   // v5.27: EP sobre una tanda que NO está en la programación (PPP) de hoy → aviso ANTES
   // de arrancar el picking, para frenar el error de pickear la tanda equivocada en el
   // segundo 0 (antes se detectaba recién en el monitor, tras perder el tiempo). No bloquea
@@ -5707,6 +5734,10 @@ async function send() {
 
   /* ---- ENCOLAR SIEMPRE antes de tocar la red ---- */
   enqueueReport(payload);
+
+  // v5.74: si fue un evento de picking/armado, invalidar el cache de actividad para
+  // que la próxima lista salga fresca (la tanda recién arrancada/terminada se refleja).
+  if (opcion === "EP" || opcion === "TP" || opcion === "AP" || opcion === "TAP") { _activityStatusTs = 0; }
 
   // Hay 2 botones Enviar (uno inline al lado del label, otro abajo). Updateo
   // ambos así no importa cuál esté visible.
