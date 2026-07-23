@@ -5491,7 +5491,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.85";
+const APP_VERSION = "v5.86";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -5681,6 +5681,77 @@ function emitPickUbic(tanda, ubic, legajo) {
   if (typeof trySendOneReport === "function") trySendOneReport(payload).then(function (r) { if (r && r.ok) removeFromQueue(payload.id); }).catch(function () {});
   try { updatePendingIndicator(); } catch (_e) {}
 }
+/* v5.86 — Al TERMINAR ARMADO (TAP) el armador elige EN QUÉ UBICACIÓN queda cada
+   nota de pedido de la tanda (columnas AB/AA/AC/AD del sector de armado). Igual
+   idea que el PUB del picking, pero POR NP (los pedidos de una misma tanda pueden
+   ir a lugares distintos, o coincidir). Se guarda 1 evento 'AUB' por NP
+   (texto=NP, descripcion=ubicación). Lo puede leer facturación/carga de camión. */
+const ARM_UBIC_OPCIONES = ["AB10", "AB9", "AB4", "AB3", "AA10", "AA9", "AA4", "AA3", "AC3", "AC4", "AC9", "AC10", "AD3", "AD4", "AD9", "AD10"];
+/* Devuelve {np: ubic} con lo asignado, {} si eligió "omitir", o null si canceló
+   (en cuyo caso el TAP se aborta, igual que el PUB aborta el TP). */
+async function askArmadoUbicaciones(tanda) {
+  const t = String(tanda || "").trim().toUpperCase();
+  let nps = [];
+  try { const m = await _stkFetchNpsByTanda([t]); nps = (m && m[t]) || []; } catch (_e) { nps = []; }
+  // Fallback: si la PPP no tiene los NP de la tanda, preguntamos UNA ubicación para
+  // toda la tanda (no bloqueamos el TAP por falta de datos de la PPP).
+  const soloTanda = !nps.length;
+  const filas = soloTanda ? [{ np: t, rs: "(toda la tanda)" }] : nps;
+  return new Promise(function (resolve) {
+    if (!document.getElementById("aubCss")) {
+      const s = document.createElement("style"); s.id = "aubCss";
+      s.textContent = "#aubModal{display:none;position:fixed;inset:0;z-index:1300;background:rgba(2,6,23,.78);overflow:auto;padding:14px;}#aubModal.show{display:flex;align-items:flex-start;justify-content:center;}.aub-card{background:#f8fafc;max-width:460px;width:100%;margin:auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.aub-head{padding:14px 16px;background:linear-gradient(90deg,#7c3aed,#5b21b6);color:#fff;}.aub-title{font-size:17px;font-weight:800;}.aub-sub{font-size:12.5px;opacity:.92;margin-top:3px;}.aub-body{padding:14px;}.aub-all{display:flex;align-items:center;gap:8px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:11px;padding:9px 11px;margin-bottom:12px;}.aub-all label{font-size:12.5px;font-weight:800;color:#475569;flex:1;}.aub-row{display:flex;align-items:center;gap:9px;border:1px solid #e2e8f0;border-radius:11px;padding:9px 11px;margin-bottom:8px;background:#fff;}.aub-npi{flex:1;min-width:0;}.aub-np{font-size:14px;font-weight:800;color:#0f172a;}.aub-rs{font-size:12px;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.aub-sel{width:104px;height:44px;box-sizing:border-box;border:2px solid #cbd5e1;border-radius:10px;padding:0 8px;font-size:15px;font-weight:800;color:#0f172a;background:#fff;margin:0;}.aub-sel.set{border-color:#7c3aed;background:#faf5ff;}.aub-btns{display:flex;gap:8px;margin-top:12px;}.aub-ok{flex:2;padding:13px;border:none;border-radius:11px;background:#7c3aed;color:#fff;font-size:15px;font-weight:800;cursor:pointer;}.aub-ok:disabled{background:#cbd5e1;color:#64748b;cursor:not-allowed;}.aub-skip{flex:1;padding:13px 8px;border:1px solid #cbd5e1;border-radius:11px;background:#fff;color:#475569;font-size:13px;font-weight:800;cursor:pointer;}.aub-x{margin-top:9px;width:100%;padding:10px;border:none;border-radius:10px;background:#fee2e2;color:#b91c1c;font-weight:800;font-size:13px;cursor:pointer;}";
+      document.head.appendChild(s);
+    }
+    let ov = document.getElementById("aubModal");
+    if (!ov) { ov = document.createElement("div"); ov.id = "aubModal"; document.body.appendChild(ov); }
+    function done(v) { ov.classList.remove("show"); ov.innerHTML = ""; resolve(v); }
+    const optsHtml = '<option value="">— elegí —</option>' + ARM_UBIC_OPCIONES.map(function (o) { return '<option value="' + o + '">' + o + '</option>'; }).join("");
+    const rows = filas.map(function (n, i) {
+      return '<div class="aub-row"><div class="aub-npi"><div class="aub-np">' + (soloTanda ? "Tanda " : "NP ") + escapeHtml(String(n.np)) + '</div>' +
+        (n.rs ? '<div class="aub-rs">' + escapeHtml(n.rs) + '</div>' : '') + '</div>' +
+        '<select class="aub-sel" data-np="' + escapeHtml(String(n.np)) + '" data-i="' + i + '">' + optsHtml + '</select></div>';
+    }).join("");
+    const allRow = filas.length > 1
+      ? '<div class="aub-all"><label>Todas a la misma:</label><select class="aub-sel" id="aubAll">' + optsHtml + '</select></div>'
+      : '';
+    ov.innerHTML = '<div class="aub-card"><div class="aub-head"><div class="aub-title">📍 ¿Dónde queda cada pedido?</div><div class="aub-sub">Tanda ' + escapeHtml(t) + ' · elegí la ubicación de cada NP (pueden coincidir).</div></div><div class="aub-body">' +
+      allRow + rows +
+      '<div class="aub-btns"><button class="aub-ok" id="aubOk" disabled>Listo</button><button class="aub-skip" id="aubSkip">Omitir</button></div>' +
+      '<button class="aub-x" id="aubX">Cancelar (no terminar)</button></div></div>';
+    ov.classList.add("show");
+    const sels = Array.prototype.slice.call(ov.querySelectorAll(".aub-sel[data-np]"));
+    const okBtn = ov.querySelector("#aubOk");
+    function refresh() {
+      let allSet = true;
+      sels.forEach(function (s) { if (s.value) s.classList.add("set"); else { s.classList.remove("set"); allSet = false; } });
+      if (okBtn) okBtn.disabled = !allSet;
+    }
+    sels.forEach(function (s) { s.onchange = refresh; });
+    const allSel = ov.querySelector("#aubAll");
+    if (allSel) allSel.onchange = function () { const v = allSel.value; if (!v) return; sels.forEach(function (s) { s.value = v; }); refresh(); };
+    ov.querySelector("#aubOk").onclick = function () { const map = {}; sels.forEach(function (s) { if (s.value) map[s.getAttribute("data-np")] = s.value; }); done(map); };
+    ov.querySelector("#aubSkip").onclick = function () { done({}); };
+    ov.querySelector("#aubX").onclick = function () { done(null); };
+    refresh();
+  });
+}
+/* Emite 1 evento AUB por NP (ubicación donde quedó armado ese pedido). Mismo patrón
+   que emitPickUbic: encola + intenta enviar; id único → el lector toma el más reciente. */
+function emitArmadoUbic(np, ubic, legajo) {
+  if (!ubic) return;
+  const n = String(np || "").trim().toUpperCase(); if (!n) return;
+  const nowMs = Date.now();
+  const payload = {
+    legajo: String(legajo || "").trim(), opcion: "AUB", descripcion: String(ubic),
+    texto: n, ts: nowMs,
+    id: nowMs.toString(36) + "_" + Math.random().toString(36).slice(2, 8),
+    ts_inicio_iso: null
+  };
+  enqueueReport(payload);
+  if (typeof trySendOneReport === "function") trySendOneReport(payload).then(function (r) { if (r && r.ok) removeFromQueue(payload.id); }).catch(function () {});
+  try { updatePendingIndicator(); } catch (_e) {}
+}
 async function send() {
   const legajoStr   = String(legajoInput.value || "").trim();
   const opcion      = selected;
@@ -5766,6 +5837,14 @@ async function send() {
     _pubUbic = await askPickUbicacion(texto);
     if (_pubUbic == null) return;   // canceló → no registra el TP
   }
+  // v5.86: al TERMINAR ARMADO preguntar EN QUÉ UBICACIÓN queda cada NP de la tanda.
+  // Se emiten eventos AUB (más abajo). Cancelar (null) → aborta el TAP; "Omitir" ({})
+  // → sigue el TAP sin registrar ubicaciones.
+  let _armUbics = null;
+  if (opcion === "TAP" && texto) {
+    _armUbics = await askArmadoUbicaciones(texto);
+    if (_armUbics == null) return;   // canceló → no registra el TAP
+  }
 
   // ID único por reporte: permite dedup en el server (UNIQUE en client_id).
   const nowMs  = Date.now();
@@ -5842,6 +5921,8 @@ async function send() {
 
   // v5.78: registrar DÓNDE quedó el picking (evento PUB aparte, lo lee el wizard de armado).
   if (opcion === "TP" && texto && _pubUbic) emitPickUbic(texto, _pubUbic, legajoStr);
+  // v5.86: registrar la UBICACIÓN de cada NP al terminar armado (1 evento AUB por NP).
+  if (opcion === "TAP" && texto && _armUbics) { Object.keys(_armUbics).forEach(function (np) { emitArmadoUbic(np, _armUbics[np], legajoStr); }); }
 
   // Hay 2 botones Enviar (uno inline al lado del label, otro abajo). Updateo
   // ambos así no importa cuál esté visible.
