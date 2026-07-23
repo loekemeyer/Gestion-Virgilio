@@ -2824,6 +2824,7 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
   /* v5.36 — aviso de faltantes en Facturación: la operadora ve ANTES de facturar
      que una NP salió incompleta (Entregas_Virgilio.cajas_falto > 0). */
   .fac-falta-badge{margin-top:3px;font-size:10.5px;font-weight:800;color:#991b1b;background:#fef2f2;border:1px solid #fca5a5;border-radius:7px;padding:2px 6px;line-height:1.25;display:inline-block;}
+  table.fac-np-tbl td.fac-falta-col{white-space:normal;overflow:visible;font-size:11px;font-weight:800;color:#991b1b;line-height:1.3;}
   tr.fac-has-falta{ background:#fff5f5 !important; }
   tr.fac-has-falta > td:first-child{ box-shadow: inset 4px 0 0 #dc2626; }
   tr.fac-has-falta .fac-np-cell{ color:#991b1b; font-weight:800; }
@@ -5485,7 +5486,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.79";
+const APP_VERSION = "v5.80";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -18442,6 +18443,14 @@ function facFaltBadge(np){
   const mas = f.items.length > 8 ? " +" + (f.items.length - 8) : "";
   return '<div class="fac-falta-badge" title="Faltan ' + f.cajas + ' cajas en ' + f.items.length + ' artículo(s) — facturá por lo ENTREGADO">⚠ FALTA ' + f.cajas + ' cj: ' + det + mas + '</div>';
 }
+/* v5.80 — Faltantes en COLUMNA aparte (no dentro de la Razón Social): SOLO la
+   distribución por artículo (cod×faltó), sin el total "FALTA N cj". La operadora
+   la usa para facturar por lo ENTREGADO. */
+function facFaltDist(np){
+  const f = facFaltInfo(np);
+  if (!f || !f.cajas) return "";
+  return f.items.map(function(it){ return escapeHtml(it.cod) + "×" + it.falto; }).join(", ");
+}
 /* Tareas de faltante EN PROGRESO por NP (Faltantes_Tareas activas) → aviso AMARILLO
    en Facturación: "están agregando cajas a esta NP ahora, esperá antes de facturar".
    Distinto del rojo (rojo = salió corto). Muestra el estado (completo / faltan X). v5.71. */
@@ -18555,7 +18564,8 @@ function facRender(tandas){
         <td class="center">${escapeHtml(f.fechaSalida)}</td>
         <td class="fac-np-cell">${escapeHtml(f.np)}</td>
         <td class="fac-cod-cell">${escapeHtml(f.cod)}</td>
-        <td class="fac-rs-cell"><span class="fac-rs-name">${escapeHtml(f.rs)}</span>${(() => { const ea = _facEquiv.get(String(f.np).trim().replace(/\.0+$/, "")); return (ea && ea.length) ? '<div style="margin-top:3px;font-size:10.5px;font-weight:800;color:#9a3412;background:#fff7ed;border:1px solid #fdba74;border-radius:7px;padding:2px 6px;line-height:1.25;">🧾 Facturá ' + ea.map(function(e){ return '<b>' + escapeHtml(e.real) + '</b> (no ' + escapeHtml(e.cod) + ')'; }).join(', ') + '</div>' : ''; })()}${_ft ? facTareaBadge(f.np) : facFaltBadge(f.np)}</td>
+        <td class="fac-rs-cell"><span class="fac-rs-name">${escapeHtml(f.rs)}</span>${(() => { const ea = _facEquiv.get(String(f.np).trim().replace(/\.0+$/, "")); return (ea && ea.length) ? '<div style="margin-top:3px;font-size:10.5px;font-weight:800;color:#9a3412;background:#fff7ed;border:1px solid #fdba74;border-radius:7px;padding:2px 6px;line-height:1.25;">🧾 Facturá ' + ea.map(function(e){ return '<b>' + escapeHtml(e.real) + '</b> (no ' + escapeHtml(e.cod) + ')'; }).join(', ') + '</div>' : ''; })()}${_ft ? facTareaBadge(f.np) : ''}</td>
+        <td class="fac-falta-col">${facFaltDist(f.np)}</td>
         <td class="fac-dir-cell">${escapeHtml(f.dir)}</td>
         <td class="num">${f.m3 ? f.m3.toFixed(1).replace(".",",") : ""}</td>
         <td>${escapeHtml(f.barrio)}</td>
@@ -18580,6 +18590,7 @@ function facRender(tandas){
             <th style="width:60px">NP</th>
             <th style="width:45px">Cod</th>
             <th style="width:175px">Razón Social</th>
+            <th style="width:150px">Faltantes</th>
             <th style="width:195px">Dirección</th>
             <th class="num" style="width:40px">M3</th>
             <th style="width:115px">Localidad</th>

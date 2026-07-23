@@ -4,7 +4,9 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-07-23 · Versión app al documentar: **v5.79**
+> Última actualización: 2026-07-23 · Versión app al documentar: **v5.80**
+>
+> Nota: **v5.80 — Facturación (NPs a FC): faltantes en COLUMNA aparte, solo la distribución**. Antes el faltante salía como badge **dentro** de la Razón Social ("⚠ FALTA N cj: cod×n, …"). Pedido de la operadora: que sea una **columna separada** y que muestre **solo la distribución** por artículo (`cod×faltó`), **sin** el total "FALTA N cj" (lo usa para facturar por lo entregado). Cambios en `facRender`: nueva columna **Faltantes** (th, entre Razón Social y Dirección) con `facFaltDist(np)` (= `items.map(cod×faltó).join(", ")`, sin total ni truncado); se sacó `facFaltBadge` de la celda de Razón Social (queda solo el nombre + el aviso de equivalencia + el ⏳ "completando" si hay tarea en progreso). CSS `.fac-falta-col` (wrap, sin clip, rojo). `facFaltBadge` sigue existiendo (lo usa la consulta NP). Test `fac-falta-filter.cjs` actualizado (valida la distribución en la columna, sin el total, y que la Razón Social ya no lleva el badge). Verificado con la suite.
 >
 > Nota: **v5.79 — Fix: la dirección del cliente (v5.77) no aparecía en armados RETOMADOS**. La dirección se leía de `n.dir`, que se setea al **construir** las `nps` (v5.77). Pero cuando el wizard se abre **retomado** (`_compRestore`, armado en curso guardado ANTES de v5.77), las `nps` guardadas no tenían `dir` → no mostraba nada (aunque la PPP sí tiene la dirección, ej. C87H/98153 = "R DE ESCALADA 3630"). Fix: `showCompletarWizard` arma un mapa **`_comp.dirByNp`** (NP→dirección) desde la PPP **fresca** (`entry.pedidos`, que ya trae `direccion` vía `fetchMonitorFromSupabase`); `_compSepPedido` y `_compSepMatrix` usan `_comp.dirByNp[n.np]` con fallback a `n.dir`. Así la dirección aparece **también en armados retomados**, no solo en los nuevos. Solo UI. Verificado con la suite.
 >
