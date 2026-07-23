@@ -2955,7 +2955,7 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
      #rcpRoot, con su propio cliente Supabase (login anónimo). Portado de la app
      Control-Carga-Remitos-FC. Suma las cajas del día a localStorage para que RT
      se cierre con esa cantidad sin pedirla a mano. -->
-<script type="module" src="recepcion.js?v=3.66"></script>
+<script type="module" src="recepcion.js?v=3.67"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -5491,7 +5491,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.87";
+const APP_VERSION = "v5.88";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -10834,7 +10834,7 @@ function rkbConfirmar() {
   // entraba a la cola. cajas = INNER (si baja en master, convierto master × CxM).
   const rows = sel.map(function (it) {
     const inner = (it.cxm > 0 && !it.manual) ? (it.baja * it.cxm) : it.baja;
-    return { orden_id: null, cod_art: it.cod, descripcion: it.desc || null, cajas: inner, estado: "propuesta", creada_por: _rkb.legajo || null };
+    return { orden_id: null, cod_art: it.cod, descripcion: it.desc || null, cajas: inner, estado: "propuesta", creada_por: _rkb.legajo || null, sector: it.sec || null };
   });
   // Planimetría viva (v5.22): descontar de la UBICACIÓN elegida. Best-effort:
   // si la RPC todavía no existe en Supabase, falla silencioso (queda el ledger).

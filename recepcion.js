@@ -1040,7 +1040,7 @@ async function renderBajadasRacks() {
   await sessionReady;
   let res, fres;
   try {
-    res = await supabase.from("Racks_Bajadas").select("id,orden_id,cod_art,descripcion,cajas,estado,creada_por,ts").eq("estado", "propuesta").order("ts", { ascending: true }).limit(500);
+    res = await supabase.from("Racks_Bajadas").select("id,orden_id,cod_art,descripcion,cajas,estado,creada_por,ts,sector").eq("estado", "propuesta").order("ts", { ascending: true }).limit(500);
     fres = await supabase.from("Articulos Virgilio X Tallerista").select("Cod_Art,Cajas_x_Master,Uni_x_Caja").limit(20000);
   } catch (e) { res = { error: e }; }
   if (opState.step !== "racks") return;
@@ -1061,6 +1061,13 @@ function racksFmtUnits(cajas, cod) {
   if (U) p.push((cajas * U) + " u");
   return p.length ? p.join(" · ") : "";
 }
+/* Día y hora (Buenos Aires, 24h) de cuándo el operario marcó la bajada. */
+function racksBajaFecha(ts) {
+  if (!ts) return "";
+  try {
+    return new Date(ts).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false });
+  } catch (_e) { return ""; }
+}
 function racksBajaCard(b) {
   const card = document.createElement("div"); card.className = "pendCard"; card.setAttribute("data-id", String(b.id));
   const head = document.createElement("div"); head.className = "pcHead";
@@ -1072,6 +1079,17 @@ function racksBajaCard(b) {
   const u = racksFmtUnits(Number(b.cajas), b.cod_art);
   ent.textContent = (b.descripcion || "") + "   ·   " + b.cajas + " cajas" + (u ? "  (" + u + ")" : "");
   card.appendChild(ent);
+  // Sector del rack + día/hora en que el operario la marcó
+  const metaParts = [];
+  if (b.sector) metaParts.push("📍 Sector " + b.sector);
+  const fch = racksBajaFecha(b.ts);
+  if (fch) metaParts.push("🕒 " + fch);
+  if (metaParts.length) {
+    const meta = document.createElement("div");
+    meta.style.cssText = "font-size:12.5px;color:#64748b;font-weight:600;margin-top:5px;";
+    meta.textContent = metaParts.join("   ·   ");
+    card.appendChild(meta);
+  }
   const foot = document.createElement("div"); foot.className = "pcFoot";
   const ok = document.createElement("button"); ok.type = "button"; ok.className = "enviarBtn"; ok.textContent = "✓ Aprobar";
   ok.onclick = function () { racksAprobarBaja(b, foot); };
