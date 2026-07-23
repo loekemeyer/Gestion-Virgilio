@@ -5475,7 +5475,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.71";
+const APP_VERSION = "v5.72";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -7550,6 +7550,22 @@ function _compGo(s) {
   _compRecalc();
 }
 function _compNav(d) { if (!_comp) return; const s = Math.min(3, Math.max(1, (_comp.step || 1) + d)); _compGo(s); }
+/* v5.72: ¿la tanda YA fue armada? (ya tiene filas en Entregas_Virgilio). Sirve de
+   candado anti doble-armado: si alguien reabre y re-arma una tanda ya terminada,
+   duplicaría el pedido (fue lo que rompió la NP 98114: 2 armados → 2 filas por
+   artículo → se pudo completar el 546 dos veces = lío 546x120). Ante error de red
+   devuelve false (no trabar el laburo por una caída puntual). */
+async function _compTandaYaArmada(tanda) {
+  const t = String(tanda == null ? "" : tanda).trim().toUpperCase();
+  if (!t) return false;
+  try {
+    const url = SUPABASE_ENTREGAS_ENDPOINT + "?select=id&tanda=eq." + encodeURIComponent(t) + "&limit=1";
+    const r = await fetch(url, { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+    if (!r.ok) return false;
+    const rows = await r.json();
+    return Array.isArray(rows) && rows.length > 0;
+  } catch (_e) { return false; }
+}
 async function compTerminar() {
   if (!_comp) return;
   // Paso 1 — faltantes: no se puede faltar MÁS de lo que dio el picking
@@ -7561,6 +7577,19 @@ async function compTerminar() {
   const pendLios = _comp.nps.filter(function (n) { return !n.liosDone; });
   if (pendLios.length) { _comp.liosNpIdx = _comp.nps.indexOf(pendLios[0]); _compGo(2); try { alert("Faltan armar los líos de " + pendLios.length + " pedido(s): NP " + pendLios.map(function (n) { return n.np; }).join(", ") + "."); } catch (_e) {} return; }
   const legajo = _comp.legajo, tanda = _comp.tanda, fecha = _comp.fecha || "";
+  // v5.72: candado anti doble-armado. Si esta tanda ya fue armada antes (ya tiene
+  // Entregas), NO la volvemos a armar → evita duplicar el pedido. Guardo contra
+  // doble-click con _terminando y contra re-apertura con el chequeo en Supabase.
+  if (_comp._terminando) return;
+  _comp._terminando = true;
+  let _yaArmada = false;
+  try { _yaArmada = await _compTandaYaArmada(tanda); } catch (_e) { _yaArmada = false; }
+  if (!_comp) return;                       // cerraron el modal mientras chequeaba
+  if (_yaArmada) {
+    _comp._terminando = false;
+    try { alert("⚠ La tanda " + tanda + " YA fue armada.\n\nNo se puede armar de nuevo (duplicaría el pedido). Si hay que corregir algo, avisá para hacerlo a mano."); } catch (_e) {}
+    return;
+  }
   _comp.nps.forEach(function (n) { liosSend(legajo, n.np, n.liosArr.length, tanda, _compLiosResumen(n), n.clase || ""); });   // líos (TAL) + resumen + clase (lio/etiqueta/nada)
   // Faltante por (NP, artículo) del reparto del Paso 2. Clave normalizada (sin la E final).
   const faltMap = {};

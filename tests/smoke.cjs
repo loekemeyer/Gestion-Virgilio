@@ -28,7 +28,7 @@ catch (_e) {
       "esLegajoPrueba", "esOperadorPrueba", "enqueueReport", "facFetchCajas", "facFaltBadge", "facToggleSoloFalt",
       "faltPoll", "faltPollStart", "faltDecidePopup", "faltAsignarme", "faltCompletar", "faltYaListo", "faltSoltar",
       "faltSnoozeId", "faltMaybeCompletar", "faltHtmlPend", "faltHtmlMine", "faltHtmlTaken", "showFaltAvisar", "faltCrear",
-      "facFetchTareas", "facTareaActiva", "facTareaBadge",
+      "facFetchTareas", "facTareaActiva", "facTareaBadge", "_compTandaYaArmada",
       "showMGChooser", "showRacksBajarModal", "rkbRender", "rkbConfirmar", "rkbFetchCxM", "rkbSetSec",
       "showCPModal", "cpRender", "cpConfirm", "cpLoadPickSinArmar", "showInstructivo", "equivResolve", "pppZonaDeBarrio",
       "showRCModal", "rcConfirm", "rcLoadDonors", "showRemitoArmado", "armadoRemitoData", "armadoRemitoInnerHtml", "remitoPrintDoc",
