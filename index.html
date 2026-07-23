@@ -2165,6 +2165,7 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .csep-hd{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin:0 0 11px; }
 .csep-mesa{ display:inline-flex; align-items:center; gap:6px; background:#eff6ff; border:1.5px solid #bfdbfe; border-radius:999px; padding:6px 12px; font-size:12.5px; font-weight:700; color:#1e3a8a; white-space:nowrap; }
 .csep-mesa b{ font-size:18px; }
+.csep-mesawrap{ display:flex; flex-direction:column; align-items:flex-start; gap:3px; }
 .csep-sw{ display:flex; align-items:center; gap:6px; flex:0 0 auto; }
 .csep-swl{ font-size:10px; font-weight:800; color:#94a3b8; line-height:1.1; text-align:center; }
 .csep-swl.on{ color:#0f172a; }
@@ -2176,8 +2177,10 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .csep-chip{ flex:0 0 auto; border:1.5px solid #cbd5e1; border-radius:999px; padding:5px 11px; font-size:12.5px; font-weight:800; color:#475569; background:#fff; cursor:pointer; width:auto; line-height:1.1; }
 .csep-chip.on{ background:#1e6bd6; border-color:#1e6bd6; color:#fff; }
 .csep-chip small{ display:block; font-size:9.5px; font-weight:700; opacity:.85; margin-top:1px; }
-.csep-np{ font-size:14px; font-weight:800; color:#0f172a; margin-bottom:9px; }
+.csep-np{ display:flex; flex-wrap:wrap; align-items:baseline; gap:2px 8px; font-size:14px; font-weight:800; color:#0f172a; margin-bottom:9px; }
 .csep-np small{ color:#64748b; font-weight:600; }
+.csep-dir{ font-size:11.5px; font-weight:600; color:#475569; margin-left:auto; text-align:right; }
+.csep-mxdir{ display:block; font-size:8.5px; font-weight:600; color:#94a3b8; line-height:1.05; white-space:normal; max-width:64px; margin:0 auto 2px; }
 .csep-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
 .csep-card{ position:relative; border:2px solid #e8edf2; border-radius:13px; background:#fff; padding:10px 4px; display:flex; flex-direction:column; align-items:center; justify-content:center; cursor:pointer; -webkit-tap-highlight-color:transparent; }
 .csep-card:active{ transform:scale(.97); }
@@ -5481,7 +5484,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.76";
+const APP_VERSION = "v5.77";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -7225,7 +7228,7 @@ async function showCompletarWizard(legajo, codigo) {
     const nps = [], seenN = new Set(), pedidoFull = [];
     for (const p of pedidos) for (const part of String(p.np || "").split(/[,/]/)) {
       const npT = part.trim(); if (!npT || !/\d/.test(npT) || seenN.has(npT)) continue; seenN.add(npT);
-      nps.push({ np: npT, rs: String(p.razonSocial || ""), cod: String(p.cod || ""), lios: null });
+      nps.push({ np: npT, rs: String(p.razonSocial || ""), dir: String(p.direccion || ""), cod: String(p.cod || ""), lios: null });
       // pedido ENTERO de esa NP (todos sus artículos) → para la tabla Entregas_Virgilio
       const items = (pickBase.get(pickNormNp(npT)) || []).map(function (it) { return { art: String(it.art), cajas: Number(it.cajas) || 0 }; }).filter(function (it) { return it.art && it.cajas > 0; });
       if (items.length) pedidoFull.push({ np: pickNormNp(npT), cod: String(p.cod || ""), items: items });
@@ -7441,7 +7444,7 @@ function _compRenderSep() {
   if (!live.length) { el.innerHTML = '<div class="comp-step-t">Separar por NP</div><div class="cmpl-empty">No hay nada para separar (todo faltó) 👍 Pasá a Líos con la flecha →.</div>'; return; }
   if (_comp.sepDif && _comp.sepDif.mode) { el.innerHTML = _compDifHtml(); return; }
   const mm = _compSepMesa(), view = (_comp.sepView === "picking") ? "picking" : "pedido";
-  let h = '<button onclick="_compReclasif()" style="background:none;border:none;color:#1e6bd6;font-weight:700;font-size:12px;cursor:pointer;padding:0 0 7px;">✎ reclasificar</button><div class="csep-hd"><div class="csep-mesa">📦 <b>' + mm.mesa + '</b> en mesa</div>' +
+  let h = '<div class="csep-hd"><div class="csep-mesawrap"><button onclick="_compReclasif()" style="background:none;border:none;color:#1e6bd6;font-weight:700;font-size:12px;cursor:pointer;padding:0 0 4px;align-self:flex-start;">✎ reclasificar</button><div class="csep-mesa">📦 <b>' + mm.mesa + '</b> en mesa</div></div>' +
     '<div class="csep-sw"><span class="csep-swl' + (view === "picking" ? " on" : "") + '">Modo<br>picking</span>' +
     '<button class="csep-tog' + (view === "pedido" ? " on" : "") + '" onclick="_compSepView(\'' + (view === "pedido" ? "picking" : "pedido") + '\')" title="Cambiar vista"><span class="csep-knob"></span></button>' +
     '<span class="csep-swl' + (view === "pedido" ? " on" : "") + '">Por<br>pedido</span></div></div>';
@@ -7466,7 +7469,8 @@ function _compSepPedido() {
       '<div class="csep-c">' + escapeHtml(c.cod) + '</div><div class="csep-q">' + c.sale + ' cajas</div></button>';
   }).join("") + '</div>';
   const sepN = codes.filter(function (c) { return c.sep; }).length;
-  const np = '<div class="csep-np">NP ' + escapeHtml(n.np) + ' <small>· ' + escapeHtml(n.rs || "") + '</small></div>';
+  const dirHtml = n.dir ? '<span class="csep-dir">📍 ' + escapeHtml(n.dir) + '</span>' : '';
+  const np = '<div class="csep-np"><span>NP ' + escapeHtml(n.np) + ' <small>· ' + escapeHtml(n.rs || "") + '</small></span>' + dirHtml + '</div>';
   const armar = '<button class="csep-armar" onclick="_compSepArmar()">🔨 Armar líos con lo separado <span class="csep-n">' + sepN + '</span></button>';
   const dif = '<button class="csep-dif" onclick="_compDifStart()">⚠ Hay un artículo diferente a la mesa</button>';
   return chips + np + grid + armar + dif;
@@ -7475,7 +7479,7 @@ function _compSepMatrix() {
   const nps = _compSepLiveNps(), codSet = {}, codOrder = [];
   nps.forEach(function (n) { (n.codes || []).forEach(function (c) { if (c.sale > 0 && !codSet[c.cod]) { codSet[c.cod] = true; codOrder.push(c.cod); } }); });
   codOrder.sort(function (a, b) { return (parseInt(a, 10) || 0) - (parseInt(b, 10) || 0); });
-  const head = '<tr><th class="csep-mxc">Cod</th><th class="csep-mxt">Tot</th>' + nps.map(function (n) { return '<th>' + escapeHtml(n.np) + '</th>'; }).join("") + '</tr>';
+  const head = '<tr><th class="csep-mxc">Cod</th><th class="csep-mxt">Tot</th>' + nps.map(function (n) { return '<th>' + (n.dir ? '<span class="csep-mxdir">' + escapeHtml(n.dir) + '</span>' : '') + escapeHtml(n.np) + '</th>'; }).join("") + '</tr>';
   const body = codOrder.map(function (cod) {
     let tot = 0;
     const cells = nps.map(function (n) {
