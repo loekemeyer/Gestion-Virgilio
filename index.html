@@ -3045,7 +3045,6 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
       <button class="sup-action-btn" onclick="openPPP()"><span class="sup-ico">🗓️</span><span>PPP</span></button>
       <button class="sup-action-btn" onclick="openRecepcionAdmin()"><span class="sup-ico">🏭</span><span>Carga Recepción Mercadería</span></button>
       <button class="sup-action-btn" onclick="showCPModal('0')"><span class="sup-ico">📦➕</span><span>Completar Pedido</span></button>
-      <button class="sup-action-btn" onclick="showFaltAvisar()"><span class="sup-ico">📢</span><span>Avisar faltante llegó</span></button>
       <button class="sup-action-btn" onclick="openStockAdmin()"><span class="sup-ico">📦</span><span>Stock y Compras</span></button>
       <button class="sup-action-btn" onclick="openRemitosAdmin()"><span class="sup-ico">🚚</span><span>Recepción Remitos (RR)</span></button>
     </div>
@@ -5486,7 +5485,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.82";
+const APP_VERSION = "v5.83";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
