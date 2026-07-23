@@ -5481,7 +5481,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.75";
+const APP_VERSION = "v5.76";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -5807,7 +5807,9 @@ async function send() {
 
   // Al EMPEZAR PICKING: flujo interactivo de artículos a levantar (Ok / F).
   if (opcion === "EP" && (texto || "").trim()) showPickingList(texto, legajoStr);
-  // v4.07: al TERMINAR PICKING (TP) → baja de "Artículo Terminado" lo que se pickeó (cajas reales).
+  // v4.07/v5.76: al TERMINAR PICKING (TP). La baja de stock la hace ahora SOLO el cron
+  // server-side (single writer, evita el doble-conteo); acá el cliente solo chequea si
+  // el pick quedó sin stock en góndola → aviso SSG.
   if (opcion === "TP" && (texto || "").trim()) stockBajaPicking(texto, legajoStr);
   // v4.22: al TERMINAR ARMADO (TAP) → las cajas pasan de "a separar" a "a facturar".
   if (opcion === "TAP" && (texto || "").trim()) stockSepararAFacturar(texto, legajoStr);
@@ -11616,40 +11618,35 @@ function rcEmitEvent(leg, t, d, qty) {
 /* ===== STOCK — baja por PICKING (v4.07): al TP, suma las cajas REALES pickeadas de
    la tanda (eventos PKC: texto=tanda|art|esp|real) y las resta de "Artículo Terminado".
    Dedup por (tipo='picking', ref=tanda) para no descontar dos veces si se reentra a TP. ===== */
+/* v5.76 — SINGLE WRITER. El picking al stock lo escribe AHORA una sola fuente: el cron
+   server-side reconciliar_pipeline_stock() (jobid 22, cada 10 min). Antes también lo
+   escribía el cliente ("fast path"). Como el guard "chequear-y-después-insertar" NO es
+   atómico y el POST del cliente pasa por la cola offline (vir_stock_pend), el cron caía
+   en la ventana entre el chequeo y la escritura → se DUPLICABA (Pickeados +2×, góndola
+   −2×; se vio en C81B/C87A/C87F/C87H). Ahora el cliente NO toca el stock del picking;
+   solo detecta "picking sin stock en góndola" para el aviso SSG (Telegram). La baja de
+   excedente-first quedó del lado del cron (pendiente de portar allí, ver GUIA). */
 async function stockBajaPicking(tanda, legajo) {
   try {
     const t = String(tanda || "").trim().toUpperCase(); if (!t) return;
     const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
-    const chk = await fetch(SUPABASE_STOCK_ENDPOINT + "?tipo=eq.picking&ref=eq." + encodeURIComponent(t) + "&select=id&limit=1", { headers: H, cache: "no-store" });
-    if (chk.ok) { const ex = await chk.json(); if (ex && ex.length) return; }   // ya descontado esta tanda
     const since = new Date(Date.now() - 3 * 24 * 3600 * 1000).toISOString();
     const r = await fetch(SUPABASE_URL + "/rest/v1/Registros_Produccion_Virgilio?opcion=eq.PKC&ts_cliente=gte." + encodeURIComponent(since) + "&select=texto&limit=20000", { headers: H, cache: "no-store" });
     const evs = r.ok ? await r.json() : [];
     const byArt = {};
-    // Equivalencia (v5.09): si se pickeó un código de pedido (029), el stock que baja
-    // es el REAL (437E) — físicamente eso sale de góndola. equivResolve es idempotente
-    // para códigos que ya son reales. El resto del pipeline (a separar→a facturar) sigue
-    // por tanda, así que el 437E fluye solo. Faltantes/facturación siguen con el 029.
+    // Equivalencia (v5.09): el código de pedido (029) se resuelve al real (437E) para
+    // mirar el saldo físico correcto (lo que realmente sale de góndola).
     evs.forEach(function (ev) { const p = String(ev.texto || "").split("|"); if (String(p[0] || "").trim().toUpperCase() !== t) return; const art = equivResolve(String(p[1] || "").trim()); const real = parseInt(p[3], 10); if (art && !isNaN(real) && real > 0) byArt[art] = (byArt[art] || 0) + real; });
-    // Saldos actuales (para repartir la baja entre excedente/góndola y detectar falta).
+    // Saldos actuales SOLO para detectar si el pick supera lo disponible (excedente+góndola).
     let sal = {};
     try { sal = stockComputeSaldos(await stockFetchMovs(), await stockGetCutoff()); } catch (_e) {}
-    // v4.22/v4.26: el picking mete las cajas a "a separar" (separar_pedidos +) y las
-    // saca PRIMERO del EXCEDENTE (ahí lo mandamos a buscar) y después de la góndola
-    // (terminado). v4.24: si entre los dos no alcanza → alerta Telegram (SSG).
-    const rows = []; const negativos = [];
+    const negativos = [];
     Object.keys(byArt).forEach(function (art) {
       const need = byArt[art];
       const haveExc  = Math.max(0, (sal[art] && Number(sal[art].excedente)) || 0);
       const haveGond = Math.max(0, (sal[art] && Number(sal[art].terminado)) || 0);
-      const fromExc  = Math.min(need, haveExc);          // primero el excedente
-      const fromGond = need - fromExc;                   // el resto, de góndola (puede quedar negativo si falta)
-      if (fromExc  > 0) rows.push({ cod_art: art, deposito: "excedente", delta: -fromExc,  tipo: "picking", ref: t, legajo: String(legajo || "") });
-      if (fromGond > 0) rows.push({ cod_art: art, deposito: "terminado", delta: -fromGond, tipo: "picking", ref: t, legajo: String(legajo || "") });
-      rows.push({ cod_art: art, deposito: "separar_pedidos", delta: need, tipo: "picking", ref: t, legajo: String(legajo || "") });
       if ((haveExc + haveGond) < need) negativos.push(art + ":" + need + ">" + (Math.round((haveExc + haveGond) * 10) / 10));
     });
-    if (rows.length) stockMove(rows);
     if (negativos.length) { try { stockEmitSinStock(t, legajo, negativos); } catch (_e) {} }
   } catch (_e) {}
 }

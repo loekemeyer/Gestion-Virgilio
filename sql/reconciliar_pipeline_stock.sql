@@ -22,8 +22,8 @@
 --      (Desbloquea el pipeline tanto del cliente como del server.)
 --   2) `reconciliar_pipeline_stock()` (migración `reconciliar_pipeline_stock`):
 --      replica las 3 etapas del cliente, pero del lado del server, idempotente:
---        ETAPA 1 (PKC/TP): separar_pedidos(+picked) y góndola(−picked). Góndola
---          SÓLO si no fue descontada antes (no re-descuenta tandas ya seedeadas).
+--        ETAPA 1 (PKC/TP): separar_pedidos(+picked) y baja EXCEDENTE-FIRST
+--          (excedente− y el resto góndola−). Dedup por índice único (ver v5.76).
 --        ETAPA 2 (TAP):    mueve el neto de separar_pedidos → a_facturar.
 --        ETAPA 3 (factura): saca de a_facturar cuando la tanda está 100%
 --          facturada (todos los NP de la PPP en Facturacion_NP).
@@ -41,6 +41,28 @@
 --    Mantiene Pickeados/A facturar al día desde los eventos sin depender de la
 --    app vieja. El pipeline del cliente queda como "fast path" (instantáneo); el
 --    cron es la red de seguridad para equipos con app vieja.
+--
+--  v5.76 — EL CRON ES EL ÚNICO ESCRITOR DEL PICKING. El "fast path" del cliente
+--    (stockBajaPicking, TP) se DESACTIVÓ: el guard chequear-y-después-insertar no
+--    es atómico y la cola offline del cliente (vir_stock_pend) abría una ventana en
+--    la que el cron insertaba primero y el cliente duplicaba (separar +2×, góndola
+--    −2×; se vio en C81B/C87A/C87F/C87H, ~486 cajas). Ahora el cliente NO toca el
+--    stock del picking (solo emite el aviso SSG). Se limpiaron a mano las filas de
+--    picking del cliente en esas 4 tandas (C81B/C87A ya facturadas → además ajuste
+--    compensatorio en separar_pedidos, tipo='ajuste_doble_pipeline').
+--    v5.76 (2ª parte) — DEDUP ATÓMICO + EXCEDENTE-FIRST:
+--     (a) EXCEDENTE-FIRST portado a ETAPA 1: se baja primero de excedente y el resto
+--         de góndola (window por artículo para no sobre-descontar el excedente si
+--         dos tandas del mismo art entran en la misma corrida). No se pierde la
+--         lógica que tenía el cliente.
+--     (b) Índice único parcial `mov_stock_pipeline_dedup` UNIQUE
+--         (upper(trim(ref)), upper(trim(cod_art)), deposito, tipo)
+--         WHERE tipo IN ('picking','separado','facturado') → una sola fila por
+--         (tanda, art, depósito, etapa). Mata la race para las 3 etapas a nivel DB.
+--         Las 3 etapas del cron usan ON CONFLICT DO NOTHING; el cliente (que aún
+--         escribe separado/facturado hasta el merge) choca y su 4xx se traga solo.
+--         tipo va EN la clave porque en separar_pedidos conviven picking(+) y
+--         separado(−).
 --
 --  BACKLOG RECONCILIADO (29/06): 6 tandas en vuelo, post-cutoff:
 --    separar_pedidos (Pickeados) = 627  → C58C 108 + C58E 44 + C59C 475
