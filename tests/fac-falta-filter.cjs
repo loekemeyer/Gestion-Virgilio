@@ -51,22 +51,26 @@ catch (_e) {
     out.chipCount = (document.getElementById("facCntFalt") || {}).textContent;                 // "1"
     out.chipShown = (document.getElementById("facChipFalt") || {}).style.display !== "none";    // true
     out.rowsAll   = nRows();                                                                    // 2
-    out.badge500  = /FALTA 8 cj/.test((document.querySelector('#facContainer tr[data-fac-np="500"]') || {}).innerHTML || "");
     out.class500  = /fac-has-falta/.test((document.querySelector('#facContainer tr[data-fac-np="500"]') || {}).className || "");
-    // Regresión del clip (v5.70): el td de Razón Social NO puede quedar nowrap/overflow
-    // hidden, si no el badge de faltante se corta y no se ve (el bug real que reportaron).
-    const _td500 = document.querySelector('#facContainer tr[data-fac-np="500"] td.fac-rs-cell');
-    const _bg500 = _td500 ? _td500.querySelector(".fac-falta-badge") : null;
-    out.rsCellWraps = _td500 ? getComputedStyle(_td500).whiteSpace : "";       // "normal" (no "nowrap")
-    out.badgeExists = !!_bg500;
-    if (_td500 && _bg500) {
-      const _nm = _td500.querySelector(".fac-rs-name");
-      const br = _bg500.getBoundingClientRect(), nr = _nm ? _nm.getBoundingClientRect() : { bottom: 0, right: 0 };
-      const cr = _td500.getBoundingClientRect();
-      out.badgeVisible = br.width > 0 && br.height > 0;                        // tiene tamaño (se ve)
-      out.badgeBelowName = br.top >= nr.bottom - 2;                            // en su propio renglón, debajo del nombre
-      out.badgeNotClipped = br.right <= cr.right + 1;                          // no se corta por el borde del td
+    // v5.80: los faltantes van en COLUMNA aparte (.fac-falta-col), SOLO la distribución
+    // por artículo (cod×faltó), sin el total "FALTA N cj".
+    const _row500 = document.querySelector('#facContainer tr[data-fac-np="500"]');
+    const _fc500 = _row500 ? _row500.querySelector("td.fac-falta-col") : null;
+    out.faltDist500 = /315×8/.test((_fc500 || {}).innerHTML || "");            // muestra la distribución
+    out.noTotalInDist = !/FALTA|cj/.test((_fc500 || {}).innerHTML || "");      // NO el total "FALTA N cj"
+    out.faltColExists = !!_fc500;
+    if (_fc500) {
+      const br = _fc500.getBoundingClientRect();
+      out.faltColWraps = getComputedStyle(_fc500).whiteSpace;                  // "normal" (no se corta)
+      out.faltColNotClipped = br.width > 0 && br.height > 0;
     }
+    // la Razón Social YA NO lleva el badge de faltante
+    const _td500rs = _row500 ? _row500.querySelector("td.fac-rs-cell") : null;
+    out.rsNoFaltaBadge = _td500rs ? !_td500rs.querySelector(".fac-falta-badge") : false;
+    out.rsCellWraps = _td500rs ? getComputedStyle(_td500rs).whiteSpace : "";   // sigue "normal"
+    // la 501 (sin faltante) → columna vacía
+    const _row501 = document.querySelector('#facContainer tr[data-fac-np="501"]');
+    out.dist501empty = ((_row501 && _row501.querySelector("td.fac-falta-col") || {}).innerHTML || "") === "";
     out.chipOffBefore = !(document.getElementById("facChipFalt") || { classList: { contains: function () { return false; } } }).classList.contains("on");
 
     // 2) Filtro ON: solo la 500
@@ -96,9 +100,9 @@ catch (_e) {
 
   const pass =
     r.chipCount === "1" && r.chipShown === true && r.rowsAll === 2 &&
-    r.badge500 === true && r.class500 === true && r.chipOffBefore === true &&
-    r.rsCellWraps === "normal" && r.badgeExists === true && r.badgeVisible === true &&
-    r.badgeBelowName === true && r.badgeNotClipped === true &&
+    r.faltDist500 === true && r.noTotalInDist === true && r.class500 === true && r.chipOffBefore === true &&
+    r.faltColExists === true && r.faltColWraps === "normal" && r.faltColNotClipped === true &&
+    r.rsNoFaltaBadge === true && r.rsCellWraps === "normal" && r.dist501empty === true &&
     r.rowsFiltered === 1 && r.only500 === true && r.chipOnAfter === true &&
     r.rowsBack === 2 && r.chipOffAfter === true &&
     r.chipHiddenNoFalt === true && r.rows999 === 1 &&

@@ -2166,6 +2166,7 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .csep-mesa{ display:inline-flex; align-items:center; gap:6px; background:#eff6ff; border:1.5px solid #bfdbfe; border-radius:999px; padding:6px 12px; font-size:12.5px; font-weight:700; color:#1e3a8a; white-space:nowrap; }
 .csep-mesa b{ font-size:18px; }
 .csep-mesawrap{ display:flex; flex-direction:column; align-items:flex-start; gap:3px; }
+.csep-ubic{ font-size:12px; font-weight:700; color:#0369a1; background:#e0f2fe; border:1.5px solid #bae6fd; border-radius:999px; padding:4px 11px; white-space:nowrap; }
 .csep-sw{ display:flex; align-items:center; gap:6px; flex:0 0 auto; }
 .csep-swl{ font-size:10px; font-weight:800; color:#94a3b8; line-height:1.1; text-align:center; }
 .csep-swl.on{ color:#0f172a; }
@@ -2823,6 +2824,7 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
   /* v5.36 — aviso de faltantes en Facturación: la operadora ve ANTES de facturar
      que una NP salió incompleta (Entregas_Virgilio.cajas_falto > 0). */
   .fac-falta-badge{margin-top:3px;font-size:10.5px;font-weight:800;color:#991b1b;background:#fef2f2;border:1px solid #fca5a5;border-radius:7px;padding:2px 6px;line-height:1.25;display:inline-block;}
+  table.fac-np-tbl td.fac-falta-col{white-space:normal;overflow:visible;font-size:11px;font-weight:800;color:#991b1b;line-height:1.3;}
   tr.fac-has-falta{ background:#fff5f5 !important; }
   tr.fac-has-falta > td:first-child{ box-shadow: inset 4px 0 0 #dc2626; }
   tr.fac-has-falta .fac-np-cell{ color:#991b1b; font-weight:800; }
@@ -5484,7 +5486,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.77";
+const APP_VERSION = "v5.80";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -5635,6 +5637,45 @@ async function tandaLiberar(tanda, fase, legajo) {
     });
   } catch (_e) {}
 }
+/* v5.78 — Al TERMINAR PICKING (TP) el operario elige DÓNDE dejó lo pickeado (mesa/
+   carro/rack) para que lo encuentren al armar. Se guarda en un evento aparte 'PUB'
+   (texto=tanda, descripcion=ubicación) — NO se mete en el texto del TP porque ese
+   se usa como clave de tanda en getActivityStatus/lock. El wizard de armado lo lee. */
+const PICK_UBIC_OPCIONES = ["Mesa 1", "Mesa 2", "Carro", "AA3", "AA4", "AA9", "AA10", "AB3", "AB4", "AB9", "AB10"];
+function askPickUbicacion(tanda) {
+  return new Promise(function (resolve) {
+    if (!document.getElementById("pubCss")) {
+      const s = document.createElement("style"); s.id = "pubCss";
+      s.textContent = "#pubModal{display:none;position:fixed;inset:0;z-index:1300;background:rgba(2,6,23,.78);overflow:auto;padding:14px;}#pubModal.show{display:flex;align-items:center;justify-content:center;}.pub-card{background:#f8fafc;max-width:440px;width:100%;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.pub-head{padding:14px 16px;background:linear-gradient(90deg,#1e6bd6,#1749a3);color:#fff;}.pub-title{font-size:17px;font-weight:800;}.pub-sub{font-size:12.5px;opacity:.92;margin-top:3px;}.pub-body{padding:14px;}.pub-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;}.pub-opt{padding:17px 6px;border:2px solid #cbd5e1;border-radius:12px;background:#fff;font-size:15px;font-weight:800;color:#0f172a;cursor:pointer;width:auto;margin:0;}.pub-opt:active{background:#eff6ff;border-color:#1e6bd6;}.pub-x{margin-top:12px;width:100%;padding:11px;border:none;border-radius:10px;background:#e2e8f0;color:#475569;font-weight:800;font-size:14px;cursor:pointer;}";
+      document.head.appendChild(s);
+    }
+    let ov = document.getElementById("pubModal");
+    if (!ov) { ov = document.createElement("div"); ov.id = "pubModal"; document.body.appendChild(ov); }
+    function done(v) { ov.classList.remove("show"); ov.innerHTML = ""; resolve(v); }
+    const opts = PICK_UBIC_OPCIONES.map(function (o) { return '<button class="pub-opt" data-u="' + escapeHtml(o) + '">' + escapeHtml(o) + '</button>'; }).join("");
+    ov.innerHTML = '<div class="pub-card"><div class="pub-head"><div class="pub-title">📍 ¿Dónde dejás la tanda ' + escapeHtml(String(tanda || "")) + '?</div><div class="pub-sub">Elegí dónde queda lo pickeado, para que lo encuentren al armar.</div></div><div class="pub-body"><div class="pub-grid">' + opts + '</div><button class="pub-x">Cancelar</button></div></div>';
+    ov.classList.add("show");
+    ov.querySelectorAll(".pub-opt").forEach(function (b) { b.onclick = function () { done(b.getAttribute("data-u")); }; });
+    const x = ov.querySelector(".pub-x"); if (x) x.onclick = function () { done(null); };
+  });
+}
+/* Emite el evento PUB (ubicación donde quedó el picking). Igual patrón que stockEmitSinStock:
+   encola + intenta enviar. id único (permite actualizar si re-TP con otra ubicación; el
+   wizard lee la MÁS reciente). El legajo de PRUEBA no persiste (lo frena enqueueReport). */
+function emitPickUbic(tanda, ubic, legajo) {
+  if (!ubic) return;
+  const t = String(tanda || "").trim().toUpperCase(); if (!t) return;
+  const nowMs = Date.now();
+  const payload = {
+    legajo: String(legajo || "").trim(), opcion: "PUB", descripcion: String(ubic),
+    texto: t, ts: nowMs,
+    id: nowMs.toString(36) + "_" + Math.random().toString(36).slice(2, 8),
+    ts_inicio_iso: null
+  };
+  enqueueReport(payload);
+  if (typeof trySendOneReport === "function") trySendOneReport(payload).then(function (r) { if (r && r.ok) removeFromQueue(payload.id); }).catch(function () {});
+  try { updatePendingIndicator(); } catch (_e) {}
+}
 async function send() {
   const legajoStr   = String(legajoInput.value || "").trim();
   const opcion      = selected;
@@ -5713,6 +5754,14 @@ async function send() {
     }
   }
 
+  // v5.78: al TERMINAR PICKING preguntar DÓNDE dejó lo pickeado (mesa/carro/rack).
+  // Se emite como evento PUB (más abajo). Si cierra sin elegir → aborta el TP.
+  let _pubUbic = "";
+  if (opcion === "TP" && texto) {
+    _pubUbic = await askPickUbicacion(texto);
+    if (_pubUbic == null) return;   // canceló → no registra el TP
+  }
+
   // ID único por reporte: permite dedup en el server (UNIQUE en client_id).
   const nowMs  = Date.now();
   const nowIso = new Date(nowMs).toISOString();
@@ -5785,6 +5834,9 @@ async function send() {
   // v5.74: si fue un evento de picking/armado, invalidar el cache de actividad para
   // que la próxima lista salga fresca (la tanda recién arrancada/terminada se refleja).
   if (opcion === "EP" || opcion === "TP" || opcion === "AP" || opcion === "TAP") { _activityStatusTs = 0; }
+
+  // v5.78: registrar DÓNDE quedó el picking (evento PUB aparte, lo lee el wizard de armado).
+  if (opcion === "TP" && texto && _pubUbic) emitPickUbic(texto, _pubUbic, legajoStr);
 
   // Hay 2 botones Enviar (uno inline al lado del label, otro abajo). Updateo
   // ambos así no importa cuál esté visible.
@@ -7211,10 +7263,26 @@ async function showCompletarWizard(legajo, codigo) {
       try { alert("⚠ La tanda " + tanda + " ya fue armada.\n\nNo se abre el armado de nuevo para no duplicar el pedido. Si hay que corregir algo, avisá para hacerlo a mano."); } catch (_e) {}
       return;
     }
+    // v5.78: ubicación donde el picker dejó la tanda (evento PUB más reciente) → se muestra en Separar.
+    let _pickUbic = "";
+    try {
+      const _ru = await fetch(SUPABASE_URL + "/rest/v1/Registros_Produccion_Virgilio?opcion=eq.PUB&texto=eq." + encodeURIComponent(tanda) + "&select=descripcion&order=ts_cliente.desc&limit=1", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+      if (_ru.ok) { const _a = await _ru.json(); if (_a && _a[0]) _pickUbic = String(_a[0].descripcion || ""); }
+    } catch (_e) {}
+    // v5.79: dirección del cliente por NP, desde la PPP fresca (entry). Sirve también para
+    // wizards RETOMADOS (nps guardadas antes de v5.77 sin `dir`). El render usa este mapa.
+    const _dirByNp = {};
+    try {
+      ((entry && entry.pedidos) || []).forEach(function (p) {
+        const d = String(p.direccion || "").trim(); if (!d) return;
+        String(p.np || "").split(/[,/]/).forEach(function (part) { const k = part.trim(); if (k && !_dirByNp[k]) _dirByNp[k] = d; });
+      });
+    } catch (_e) {}
     // v4.04: si hay avance guardado de esta tanda (el wizard que se abrió en AP), retomarlo.
     const _savedC = _compRestore(tanda);
     if (_savedC && _savedC.nps && _savedC.nps.length) {
       _comp = _savedC;
+      _comp.pickUbic = _pickUbic; _comp.dirByNp = _dirByNp;
       const t0 = document.getElementById("compTanda"); if (t0) t0.textContent = "Tanda " + tanda + (_comp.nps[0] && _comp.nps[0].rs ? " · " + _comp.nps[0].rs : "");
       const d20 = document.getElementById("compD2"), ln0 = document.getElementById("compLine");
       if (d20) d20.style.display = ""; if (ln0) ln0.style.display = "";
@@ -7253,7 +7321,7 @@ async function showCompletarWizard(legajo, codigo) {
       }
     }
     const hayFalt = arts.some(a => a.nps.length);
-    _comp = { legajo: String(legajo || "").trim(), tanda: tanda, fecha: fecha, nps: nps, arts: arts, pedidoFull: pedidoFull, hayFalt: hayFalt, step: 1 };
+    _comp = { legajo: String(legajo || "").trim(), tanda: tanda, fecha: fecha, nps: nps, arts: arts, pedidoFull: pedidoFull, hayFalt: hayFalt, step: 1, pickUbic: _pickUbic, dirByNp: _dirByNp };
     const t = document.getElementById("compTanda"); if (t) t.textContent = "Tanda " + tanda + (nps[0] && nps[0].rs ? " · " + nps[0].rs : "");
     const d2 = document.getElementById("compD2"), ln = document.getElementById("compLine");
     if (d2) d2.style.display = "";   // Paso 2 = Líos: siempre presente
@@ -7444,7 +7512,7 @@ function _compRenderSep() {
   if (!live.length) { el.innerHTML = '<div class="comp-step-t">Separar por NP</div><div class="cmpl-empty">No hay nada para separar (todo faltó) 👍 Pasá a Líos con la flecha →.</div>'; return; }
   if (_comp.sepDif && _comp.sepDif.mode) { el.innerHTML = _compDifHtml(); return; }
   const mm = _compSepMesa(), view = (_comp.sepView === "picking") ? "picking" : "pedido";
-  let h = '<div class="csep-hd"><div class="csep-mesawrap"><button onclick="_compReclasif()" style="background:none;border:none;color:#1e6bd6;font-weight:700;font-size:12px;cursor:pointer;padding:0 0 4px;align-self:flex-start;">✎ reclasificar</button><div class="csep-mesa">📦 <b>' + mm.mesa + '</b> en mesa</div></div>' +
+  let h = '<div class="csep-hd"><div class="csep-mesawrap"><button onclick="_compReclasif()" style="background:none;border:none;color:#1e6bd6;font-weight:700;font-size:12px;cursor:pointer;padding:0 0 4px;align-self:flex-start;">✎ reclasificar</button><div class="csep-mesa">📦 <b>' + mm.mesa + '</b> en mesa</div>' + (_comp.pickUbic ? '<div class="csep-ubic">📍 Dejado en: <b>' + escapeHtml(_comp.pickUbic) + '</b></div>' : '') + '</div>' +
     '<div class="csep-sw"><span class="csep-swl' + (view === "picking" ? " on" : "") + '">Modo<br>picking</span>' +
     '<button class="csep-tog' + (view === "pedido" ? " on" : "") + '" onclick="_compSepView(\'' + (view === "pedido" ? "picking" : "pedido") + '\')" title="Cambiar vista"><span class="csep-knob"></span></button>' +
     '<span class="csep-swl' + (view === "pedido" ? " on" : "") + '">Por<br>pedido</span></div></div>';
@@ -7469,7 +7537,8 @@ function _compSepPedido() {
       '<div class="csep-c">' + escapeHtml(c.cod) + '</div><div class="csep-q">' + c.sale + ' cajas</div></button>';
   }).join("") + '</div>';
   const sepN = codes.filter(function (c) { return c.sep; }).length;
-  const dirHtml = n.dir ? '<span class="csep-dir">📍 ' + escapeHtml(n.dir) + '</span>' : '';
+  const _dir = (_comp.dirByNp && _comp.dirByNp[n.np]) || n.dir || "";
+  const dirHtml = _dir ? '<span class="csep-dir">📍 ' + escapeHtml(_dir) + '</span>' : '';
   const np = '<div class="csep-np"><span>NP ' + escapeHtml(n.np) + ' <small>· ' + escapeHtml(n.rs || "") + '</small></span>' + dirHtml + '</div>';
   const armar = '<button class="csep-armar" onclick="_compSepArmar()">🔨 Armar líos con lo separado <span class="csep-n">' + sepN + '</span></button>';
   const dif = '<button class="csep-dif" onclick="_compDifStart()">⚠ Hay un artículo diferente a la mesa</button>';
@@ -7479,7 +7548,7 @@ function _compSepMatrix() {
   const nps = _compSepLiveNps(), codSet = {}, codOrder = [];
   nps.forEach(function (n) { (n.codes || []).forEach(function (c) { if (c.sale > 0 && !codSet[c.cod]) { codSet[c.cod] = true; codOrder.push(c.cod); } }); });
   codOrder.sort(function (a, b) { return (parseInt(a, 10) || 0) - (parseInt(b, 10) || 0); });
-  const head = '<tr><th class="csep-mxc">Cod</th><th class="csep-mxt">Tot</th>' + nps.map(function (n) { return '<th>' + (n.dir ? '<span class="csep-mxdir">' + escapeHtml(n.dir) + '</span>' : '') + escapeHtml(n.np) + '</th>'; }).join("") + '</tr>';
+  const head = '<tr><th class="csep-mxc">Cod</th><th class="csep-mxt">Tot</th>' + nps.map(function (n) { const _d = (_comp.dirByNp && _comp.dirByNp[n.np]) || n.dir || ""; return '<th>' + (_d ? '<span class="csep-mxdir">' + escapeHtml(_d) + '</span>' : '') + escapeHtml(n.np) + '</th>'; }).join("") + '</tr>';
   const body = codOrder.map(function (cod) {
     let tot = 0;
     const cells = nps.map(function (n) {
@@ -18374,6 +18443,14 @@ function facFaltBadge(np){
   const mas = f.items.length > 8 ? " +" + (f.items.length - 8) : "";
   return '<div class="fac-falta-badge" title="Faltan ' + f.cajas + ' cajas en ' + f.items.length + ' artículo(s) — facturá por lo ENTREGADO">⚠ FALTA ' + f.cajas + ' cj: ' + det + mas + '</div>';
 }
+/* v5.80 — Faltantes en COLUMNA aparte (no dentro de la Razón Social): SOLO la
+   distribución por artículo (cod×faltó), sin el total "FALTA N cj". La operadora
+   la usa para facturar por lo ENTREGADO. */
+function facFaltDist(np){
+  const f = facFaltInfo(np);
+  if (!f || !f.cajas) return "";
+  return f.items.map(function(it){ return escapeHtml(it.cod) + "×" + it.falto; }).join(", ");
+}
 /* Tareas de faltante EN PROGRESO por NP (Faltantes_Tareas activas) → aviso AMARILLO
    en Facturación: "están agregando cajas a esta NP ahora, esperá antes de facturar".
    Distinto del rojo (rojo = salió corto). Muestra el estado (completo / faltan X). v5.71. */
@@ -18487,7 +18564,8 @@ function facRender(tandas){
         <td class="center">${escapeHtml(f.fechaSalida)}</td>
         <td class="fac-np-cell">${escapeHtml(f.np)}</td>
         <td class="fac-cod-cell">${escapeHtml(f.cod)}</td>
-        <td class="fac-rs-cell"><span class="fac-rs-name">${escapeHtml(f.rs)}</span>${(() => { const ea = _facEquiv.get(String(f.np).trim().replace(/\.0+$/, "")); return (ea && ea.length) ? '<div style="margin-top:3px;font-size:10.5px;font-weight:800;color:#9a3412;background:#fff7ed;border:1px solid #fdba74;border-radius:7px;padding:2px 6px;line-height:1.25;">🧾 Facturá ' + ea.map(function(e){ return '<b>' + escapeHtml(e.real) + '</b> (no ' + escapeHtml(e.cod) + ')'; }).join(', ') + '</div>' : ''; })()}${_ft ? facTareaBadge(f.np) : facFaltBadge(f.np)}</td>
+        <td class="fac-rs-cell"><span class="fac-rs-name">${escapeHtml(f.rs)}</span>${(() => { const ea = _facEquiv.get(String(f.np).trim().replace(/\.0+$/, "")); return (ea && ea.length) ? '<div style="margin-top:3px;font-size:10.5px;font-weight:800;color:#9a3412;background:#fff7ed;border:1px solid #fdba74;border-radius:7px;padding:2px 6px;line-height:1.25;">🧾 Facturá ' + ea.map(function(e){ return '<b>' + escapeHtml(e.real) + '</b> (no ' + escapeHtml(e.cod) + ')'; }).join(', ') + '</div>' : ''; })()}${_ft ? facTareaBadge(f.np) : ''}</td>
+        <td class="fac-falta-col">${facFaltDist(f.np)}</td>
         <td class="fac-dir-cell">${escapeHtml(f.dir)}</td>
         <td class="num">${f.m3 ? f.m3.toFixed(1).replace(".",",") : ""}</td>
         <td>${escapeHtml(f.barrio)}</td>
@@ -18512,6 +18590,7 @@ function facRender(tandas){
             <th style="width:60px">NP</th>
             <th style="width:45px">Cod</th>
             <th style="width:175px">Razón Social</th>
+            <th style="width:150px">Faltantes</th>
             <th style="width:195px">Dirección</th>
             <th class="num" style="width:40px">M3</th>
             <th style="width:115px">Localidad</th>
