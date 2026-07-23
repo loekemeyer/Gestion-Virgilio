@@ -5486,7 +5486,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.81";
+const APP_VERSION = "v5.82";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -7943,7 +7943,7 @@ async function openStockAdmin(soloConteo) {
   const _solo = soloConteo === true;   // rol "solo conteo" (Giuliana): solo la solapa Conteo
   if (!document.getElementById("stkCss")) {
     const s = document.createElement("style"); s.id = "stkCss";
-    s.textContent = "#stockAdminOverlay{display:none;position:fixed;inset:0;z-index:1280;background:rgba(2,6,23,.74);overflow:auto;padding:14px;}#stockAdminOverlay.show{display:block;}.stk-card{background:#f8fafc;max-width:880px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.stk-head{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:linear-gradient(90deg,#1e6bd6,#1e3a8a);color:#fff;}.stk-title{font-size:19px;font-weight:800;}.stk-close{background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;width:auto;}.stk-body{padding:14px 16px;}.stk-loading,.stk-empty{padding:24px;text-align:center;color:#64748b;}.stk-cut{background:#fffbeb;border:1px solid #fcd34d;color:#92400e;border-radius:9px;padding:8px 11px;font-size:12.5px;font-weight:700;margin-bottom:10px;}.stk-filtro{flex:1;min-width:180px;height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 11px;font-size:14px;}.stk-btn{background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:8px 12px;font-size:13px;font-weight:800;cursor:pointer;width:auto;}.stk-btn.ok{background:#16a34a;color:#fff;border-color:#16a34a;}.stk-btn.danger{background:#fff;color:#b91c1c;border-color:#fca5a5;}.stk-tbl{width:100%;border-collapse:collapse;font-size:13.5px;}.stk-tbl.stk-tbl-fit{width:auto;max-width:100%;}.stk-tbl.stk-tbl-fit td.stk-desc{max-width:210px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.stk-tbl.stk-tbl-sect td.stk-desc{max-width:140px;}.stk-tbl.stk-tbl-fit th.num,.stk-tbl.stk-tbl-fit td.num{text-align:right;padding-left:9px;padding-right:9px;}.stk-tblwrap{overflow-x:auto;max-width:100%;}.stk-tbl.stk-tbl-fit th.num{vertical-align:bottom;line-height:1.15;}.stk-tbl th{background:#f1f5f9;color:#475569;text-align:left;padding:7px 9px;font-size:11px;text-transform:uppercase;border-bottom:1px solid #cbd5e1;}.stk-tbl td{padding:7px 9px;}.stk-tbl th.num,.stk-tbl td.num{text-align:right;font-variant-numeric:tabular-nums;}.stk-row{cursor:pointer;border-bottom:1px solid #eef2f7;}.stk-row:hover{background:#eff6ff;}.stk-row td{padding:7px 9px;}.stk-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#1e6bd6;}.stk-desc{color:#475569;}.stk-neg{color:#b91c1c;font-weight:800;}.stk-pick-cell{cursor:pointer;color:#1e6bd6;font-weight:800;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px;}.stk-pick-cell:hover{background:#eff6ff;}.stk-caret{color:#94a3b8;}.stk-detrow td{padding:0 9px 9px;background:#f8fafc;}.stk-det{border-left:3px solid #cbd5e1;padding:6px 0 6px 10px;}.stk-mv{display:flex;gap:9px;font-size:12px;padding:3px 0;align-items:center;}.stk-mv-old{opacity:.45;}.stk-mv-ts{color:#64748b;min-width:96px;}.stk-mv-tipo{font-weight:800;min-width:78px;}.stk-mv-dep{color:#64748b;min-width:74px;}.stk-mv-d{font-weight:800;min-width:44px;text-align:right;}.stk-mv-d.pos{color:#15803d;}.stk-mv-d.neg{color:#b91c1c;}.stk-mv-ref{color:#94a3b8;}.stk-ini-txt{width:100%;border:1px solid #cbd5e1;border-radius:9px;padding:9px;font-family:Consolas,Menlo,monospace;font-size:14px;}.stk-ini-btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}.stk-ini-warn{font-size:12px;color:#92400e;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:8px;margin-top:10px;}.stk-tabs{display:flex;gap:4px;padding:8px 12px 0;background:#1e3a8a;flex-wrap:wrap;}.stk-tab{flex:0 1 auto;width:auto;white-space:nowrap;background:rgba(255,255,255,.12);color:#cbd5e1;border:none;border-radius:9px 9px 0 0;padding:9px 13px;font-size:12.5px;font-weight:800;cursor:pointer;}.stk-tab.on{background:#f8fafc;color:#1e3a8a;}.stk-seg{display:flex;gap:6px;margin-bottom:10px;}.stk-segb{flex:1;background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:7px;font-size:13px;font-weight:800;cursor:pointer;}.stk-segb.on{background:#1e6bd6;color:#fff;border-color:#1e6bd6;}.stk-grp{margin-bottom:10px;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;}.stk-grp-h{background:#f1f5f9;padding:7px 10px;font-weight:800;font-size:13px;}.stk-grp-tot{color:#15803d;font-weight:800;margin-left:6px;}.stk-ing{display:flex;gap:9px;align-items:center;padding:5px 10px;border-top:1px solid #f1f5f9;font-size:12.5px;}.stk-ing-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#1e6bd6;}.stk-ing-desc{flex:1;color:#475569;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.stk-ing-rto{color:#94a3b8;font-size:11px;}.stk-aj-sec{border:1px solid #e2e8f0;border-radius:12px;padding:12px;margin-bottom:12px;}.stk-aj-h{font-size:15px;font-weight:800;margin-bottom:6px;}.stk-aj-hint{font-size:12px;color:#64748b;margin-bottom:7px;}.stk-aj-form{display:flex;gap:7px;flex-wrap:wrap;}.stk-aj-inp{flex:1;min-width:90px;height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 10px;font-size:14px;text-align:center;}.cnt-in{height:32px;border:1px solid #cbd5e1;border-radius:7px;padding:0 6px;font-size:13px;box-sizing:border-box;margin:0;width:auto;}.stk-aj-dep{margin-bottom:12px;font-size:13px;font-weight:800;}.stk-aj-dep select{height:36px;border:1px solid #cbd5e1;border-radius:8px;padding:0 8px;font-size:14px;font-weight:700;}.stk-rk-orden{background:#f1f5f9;border-radius:10px;padding:10px 12px;font-size:13px;margin-bottom:10px;}.stk-rk-orden.pend{background:#fffbeb;border:1.5px solid #fcd34d;color:#92400e;}.stk-rk-baj{display:flex;align-items:center;gap:10px;border:1px solid #e2e8f0;border-radius:11px;padding:9px 11px;margin-bottom:8px;background:#fff;}.stk-rk-baji{flex:1;min-width:0;}.stk-rk-q{font-size:12px;color:#1e6bd6;font-weight:700;margin-top:2px;}";
+    s.textContent = "#stockAdminOverlay{display:none;position:fixed;inset:0;z-index:1280;background:rgba(2,6,23,.74);overflow:auto;padding:14px;}#stockAdminOverlay.show{display:block;}.stk-card{background:#f8fafc;max-width:min(1500px,97vw);margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.stk-head{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:linear-gradient(90deg,#1e6bd6,#1e3a8a);color:#fff;}.stk-title{font-size:19px;font-weight:800;}.stk-close{background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;width:auto;}.stk-body{padding:14px 16px;}.stk-loading,.stk-empty{padding:24px;text-align:center;color:#64748b;}.stk-cut{background:#fffbeb;border:1px solid #fcd34d;color:#92400e;border-radius:9px;padding:8px 11px;font-size:12.5px;font-weight:700;margin-bottom:10px;}.stk-filtro{flex:1;min-width:180px;height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 11px;font-size:14px;}.stk-btn{background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:8px 12px;font-size:13px;font-weight:800;cursor:pointer;width:auto;}.stk-btn.ok{background:#16a34a;color:#fff;border-color:#16a34a;}.stk-btn.danger{background:#fff;color:#b91c1c;border-color:#fca5a5;}.stk-tbl{width:100%;border-collapse:collapse;font-size:13.5px;}.stk-tbl.stk-tbl-fit{width:auto;max-width:100%;}.stk-tbl.stk-tbl-fit td.stk-desc{max-width:210px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.stk-tbl.stk-tbl-sect td.stk-desc{max-width:140px;}.stk-tbl.stk-tbl-fit th.num,.stk-tbl.stk-tbl-fit td.num{text-align:right;padding-left:9px;padding-right:9px;}.stk-tblwrap{overflow-x:auto;max-width:100%;}.stk-tbl.stk-tbl-fit th.num{vertical-align:bottom;line-height:1.15;}.stk-tbl th{background:#f1f5f9;color:#475569;text-align:left;padding:7px 9px;font-size:11px;text-transform:uppercase;border-bottom:1px solid #cbd5e1;}.stk-tbl td{padding:7px 9px;}.stk-tbl th.num,.stk-tbl td.num{text-align:right;font-variant-numeric:tabular-nums;}.stk-row{cursor:pointer;border-bottom:1px solid #eef2f7;}.stk-row:hover{background:#eff6ff;}.stk-row td{padding:7px 9px;}.stk-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#1e6bd6;}.stk-desc{color:#475569;}.stk-neg{color:#b91c1c;font-weight:800;}.stk-pick-cell{cursor:pointer;color:#1e6bd6;font-weight:800;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px;}.stk-pick-cell:hover{background:#eff6ff;}.stk-caret{color:#94a3b8;}.stk-detrow td{padding:0 9px 9px;background:#f8fafc;}.stk-det{border-left:3px solid #cbd5e1;padding:6px 0 6px 10px;}.stk-mv{display:flex;gap:9px;font-size:12px;padding:3px 0;align-items:center;}.stk-mv-old{opacity:.45;}.stk-mv-ts{color:#64748b;min-width:96px;}.stk-mv-tipo{font-weight:800;min-width:78px;}.stk-mv-dep{color:#64748b;min-width:74px;}.stk-mv-d{font-weight:800;min-width:44px;text-align:right;}.stk-mv-d.pos{color:#15803d;}.stk-mv-d.neg{color:#b91c1c;}.stk-mv-ref{color:#94a3b8;}.stk-ini-txt{width:100%;border:1px solid #cbd5e1;border-radius:9px;padding:9px;font-family:Consolas,Menlo,monospace;font-size:14px;}.stk-ini-btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}.stk-ini-warn{font-size:12px;color:#92400e;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:8px;margin-top:10px;}.stk-tabs{display:flex;gap:4px;padding:8px 12px 0;background:#1e3a8a;flex-wrap:wrap;}.stk-tab{flex:0 1 auto;width:auto;white-space:nowrap;background:rgba(255,255,255,.12);color:#cbd5e1;border:none;border-radius:9px 9px 0 0;padding:9px 13px;font-size:12.5px;font-weight:800;cursor:pointer;}.stk-tab.on{background:#f8fafc;color:#1e3a8a;}.stk-seg{display:flex;gap:6px;margin-bottom:10px;}.stk-segb{flex:1;background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:7px;font-size:13px;font-weight:800;cursor:pointer;}.stk-segb.on{background:#1e6bd6;color:#fff;border-color:#1e6bd6;}.stk-grp{margin-bottom:10px;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;}.stk-grp-h{background:#f1f5f9;padding:7px 10px;font-weight:800;font-size:13px;}.stk-grp-tot{color:#15803d;font-weight:800;margin-left:6px;}.stk-ing{display:flex;gap:9px;align-items:center;padding:5px 10px;border-top:1px solid #f1f5f9;font-size:12.5px;}.stk-ing-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#1e6bd6;}.stk-ing-desc{flex:1;color:#475569;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.stk-ing-rto{color:#94a3b8;font-size:11px;}.stk-aj-sec{border:1px solid #e2e8f0;border-radius:12px;padding:12px;margin-bottom:12px;}.stk-aj-h{font-size:15px;font-weight:800;margin-bottom:6px;}.stk-aj-hint{font-size:12px;color:#64748b;margin-bottom:7px;}.stk-aj-form{display:flex;gap:7px;flex-wrap:wrap;}.stk-aj-inp{flex:1;min-width:90px;height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 10px;font-size:14px;text-align:center;}.cnt-in{height:32px;border:1px solid #cbd5e1;border-radius:7px;padding:0 6px;font-size:13px;box-sizing:border-box;margin:0;width:auto;}.stk-aj-dep{margin-bottom:12px;font-size:13px;font-weight:800;}.stk-aj-dep select{height:36px;border:1px solid #cbd5e1;border-radius:8px;padding:0 8px;font-size:14px;font-weight:700;}.stk-rk-orden{background:#f1f5f9;border-radius:10px;padding:10px 12px;font-size:13px;margin-bottom:10px;}.stk-rk-orden.pend{background:#fffbeb;border:1.5px solid #fcd34d;color:#92400e;}.stk-rk-baj{display:flex;align-items:center;gap:10px;border:1px solid #e2e8f0;border-radius:11px;padding:9px 11px;margin-bottom:8px;background:#fff;}.stk-rk-baji{flex:1;min-width:0;}.stk-rk-q{font-size:12px;color:#1e6bd6;font-weight:700;margin-top:2px;}";
     document.head.appendChild(s);
   }
   let ov = document.getElementById("stockAdminOverlay");
@@ -9165,9 +9165,17 @@ function stkBodyStocks() {
     let tds = '<td class="stk-cod">' + escapeHtml(a.cod) + '</td><td class="stk-desc">' + escapeHtml(artNombre(a.cod, a.desc) || "—") + '</td><td class="num ' + (_tot < 0 ? "stk-neg" : "") + '" style="background:#f8fafc"><b>' + fmtCajas(_tot) + '</b></td><td class="num" style="background:#fffbeb;color:#92400e"><b>' + (_ped ? fmtCajas(_ped) : "") + '</b></td><td class="num" style="background:#f0fdf4;color:#166534"><b>' + (_cap ? fmtCajas(_cap) : "") + '</b></td>';
     cols.forEach(function (c) {
       const v = Number(a[c.key]) || 0;
-      if (c.key === "separar_pedidos" && v > 0.05) {
-        // v5.81: click en el PICKEADO de un artículo → qué NPs lo tienen pickeado.
-        tds += '<td class="num stk-pick-cell" onclick="event.stopPropagation();stkOpenPickeadoArt(\'' + encodeURIComponent(a.cod) + '\')" title="Ver qué NPs tienen este pickeado">' + fmtCajas(v) + '</td>';
+      // v5.82: columnas clickeables → detalle. Pickeados/A facturar → NPs; Excedente/Racks → ubicación.
+      let _clk = "";
+      if (v > 0.05) {
+        const _ce = encodeURIComponent(a.cod);
+        if (c.key === "separar_pedidos") _clk = "stkOpenEstadioArt('" + _ce + "','separar_pedidos')";
+        else if (c.key === "a_facturar") _clk = "stkOpenEstadioArt('" + _ce + "','a_facturar')";
+        else if (c.key === "excedente") _clk = "stkOpenExcedenteArt('" + _ce + "')";
+        else if (c.key === "racks") _clk = "stkOpenRacksArt('" + _ce + "')";
+      }
+      if (_clk) {
+        tds += '<td class="num stk-pick-cell" onclick="event.stopPropagation();' + _clk + '" title="Ver detalle (NPs / ubicación)">' + fmtCajas(v) + '</td>';
       } else {
         tds += '<td class="num ' + (v < 0 ? "stk-neg" : "") + '">' + (c.key === "terminado" ? '<b>' + fmtCajas(v) + '</b>' : fmtCajas(v)) + '</td>';
       }
@@ -9250,7 +9258,7 @@ var _stkPop = null;
 var STK_POP_CSS =
   "#stkPopModal{display:none;position:fixed;inset:0;z-index:1292;background:rgba(2,6,23,.72);overflow:auto;padding:14px;}" +
   "#stkPopModal.show{display:block;}" +
-  ".stkpop-card{background:#f8fafc;max-width:560px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}" +
+  ".stkpop-card{background:#f8fafc;max-width:min(760px,96vw);margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}" +
   ".stkpop-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;background:linear-gradient(90deg,#1e3a8a,#1e40af);color:#fff;}" +
   ".stkpop-title{font-size:16px;font-weight:800;}" +
   ".stkpop-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}" +
@@ -9356,45 +9364,51 @@ async function stkOpenPedidos() {
   h += sec("🧾 A Facturar (falta facturar)", "Armadas (TAP), esperando que Marianela las facture.", fac);
   if (body) body.innerHTML = h;
 }
-/* v5.81 — Click en la celda PICKEADOS de un artículo → qué NOTAS DE PEDIDO lo tienen
-   pickeado. Cruza los movimientos separar_pedidos del artículo (por tanda, misma
-   ventana que la tabla) con el PPP: tanda→NPs (_stkFetchNpsByTanda) y, dentro de cada
-   tanda, qué NP pidió ESE artículo (PPP_Base_Pedidos) con cuántas cajas. */
+/* v5.81/v5.82 — Click en una celda de STOCK de un artículo → detalle.
+   • Pickeados / A facturar (stkOpenEstadioArt): qué NOTAS DE PEDIDO lo tienen. Cruza los
+     movimientos del depósito por ref (tanda o NP directo del CP/RC) con el PPP: tanda→NPs
+     (_stkFetchNpsByTanda) y qué NP pidió ese artículo (PPP_Base_Pedidos).
+   • Excedente / Racks: en qué UBICACIÓN está (excedente = Movimientos_Stock.ubicacion;
+     racks = Racks_Planimetria). */
 function _stkNormCod(c) { return String(c == null ? "" : c).toUpperCase().replace(/\s+/g, "").replace(/^0+(?=\d)/, ""); }
-async function stkOpenPickeadoArt(codEnc) {
+const _STK_ESTADIO_LBL = { separar_pedidos: "📦 Pickeado", a_facturar: "🧾 A facturar" };
+async function stkOpenEstadioArt(codEnc, dep) {
   if (!_stk) return;
   const cod = decodeURIComponent(codEnc), codN = _stkNormCod(cod);
-  _stkPopShell("📦 Pickeado — " + escapeHtml(cod), "stkPopBody");
+  _stkPopShell((_STK_ESTADIO_LBL[dep] || dep) + " — " + escapeHtml(cod), "stkPopBody");
   const body = document.getElementById("stkPopBody"); if (body) body.innerHTML = '<div class="stkpop-empty">Cargando NPs…</div>';
   const by = {};
   _stk.movs.forEach(function (mv) {
-    if (mv.deposito !== "separar_pedidos" || _stkNormCod(mv.cod_art) !== codN) return;
-    if (!_stkWin(mv, true)) return;
+    if (mv.deposito !== dep || _stkNormCod(mv.cod_art) !== codN || !_stkWin(mv, true)) return;
     const k = String(mv.ref || "—").toUpperCase();
     by[k] = (by[k] || 0) + Number(mv.delta || 0);
   });
-  const tandas = Object.keys(by).filter(function (t) { return by[t] > 0.05; })
+  const refs = Object.keys(by).filter(function (t) { return by[t] > 0.05; })
     .sort(function (a, b) { return String(a).localeCompare(String(b), undefined, { numeric: true }); });
-  if (!tandas.length) { if (body) body.innerHTML = '<div class="stkpop-empty">No hay pickeado de ' + escapeHtml(cod) + ' en este momento.</div>'; return; }
+  if (!refs.length) { if (body) body.innerHTML = '<div class="stkpop-empty">No hay ' + (dep === "a_facturar" ? "a facturar" : "pickeado") + ' de ' + escapeHtml(cod) + ' en este momento.</div>'; return; }
+  const tandas = refs.filter(function (r) { return /[A-Z]/.test(r); });     // ref con letra = tanda
+  const npRefs = refs.filter(function (r) { return !/[A-Z]/.test(r); });    // ref numérica = NP directo (CP/RC)
   const npMap = await _stkFetchNpsByTanda(tandas);
   const allNps = [];
   Object.keys(npMap).forEach(function (t) { (npMap[t] || []).forEach(function (n) { if (allNps.indexOf(n.np) < 0) allNps.push(n.np); }); });
-  const pidio = {};
+  npRefs.forEach(function (r) { if (allNps.indexOf(r) < 0) allNps.push(r); });
+  const pidio = {}, rsByNp = {};
   if (allNps.length) {
+    const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
     try {
-      const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
-      const inList = allNps.map(function (n) { return encodeURIComponent(n); }).join(",");
-      const rows = await fetch(SUPABASE_URL + "/rest/v1/PPP_Base_Pedidos?pedido=in.(" + inList + ")&select=pedido,articulo,cajas&limit=20000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; });
-      rows.forEach(function (x) {
-        if (_stkNormCod(x.articulo) !== codN) return;
-        const np = String(x.pedido || "").trim().replace(/\.0+$/, ""); if (!np) return;
-        pidio[np] = (pidio[np] || 0) + (Number(x.cajas) || 0);
-      });
+      const rows = await fetch(SUPABASE_URL + "/rest/v1/PPP_Base_Pedidos?pedido=in.(" + allNps.map(encodeURIComponent).join(",") + ")&select=pedido,articulo,cajas&limit=20000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; });
+      rows.forEach(function (x) { if (_stkNormCod(x.articulo) !== codN) return; const np = String(x.pedido || "").trim().replace(/\.0+$/, ""); if (np) pidio[np] = (pidio[np] || 0) + (Number(x.cajas) || 0); });
     } catch (_e) {}
+    if (npRefs.length) {
+      try {
+        const rows2 = await fetch(SUPABASE_PPP_PROG_ENDPOINT + "?np=in.(" + npRefs.map(encodeURIComponent).join(",") + ")&select=np,razon_social&limit=5000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; });
+        rows2.forEach(function (x) { const np = String(x.np || "").trim().replace(/\.0+$/, ""); if (np && !rsByNp[np]) rsByNp[np] = String(x.razon_social || "").trim(); });
+      } catch (_e) {}
+    }
   }
   const round1 = function (n) { return Math.round(n * 10) / 10; };
-  const totCaj = round1(tandas.reduce(function (s, t) { return s + by[t]; }, 0));
-  let h = '<div class="stkpop-hint"><b>' + escapeHtml(cod) + '</b> · pickeado (esperando armado): <b>' + totCaj + ' cajas</b> en ' + tandas.length + ' tanda(s). Los NPs con <b style="color:#166534">· pidió N</b> son los que pidieron este artículo (del PPP).</div>';
+  const totCaj = round1(refs.reduce(function (s, t) { return s + by[t]; }, 0));
+  let h = '<div class="stkpop-hint"><b>' + escapeHtml(cod) + '</b> · ' + (dep === "a_facturar" ? "a facturar" : "pickeado") + ': <b>' + totCaj + ' cajas</b> en ' + refs.length + ' ' + (dep === "a_facturar" ? "grupo(s)" : "tanda(s)") + '. Los NPs con <b style="color:#166534">· pidió N</b> son los que pidieron este artículo.</div>';
   tandas.forEach(function (t) {
     const nps = npMap[t] || [];
     const conArt = nps.filter(function (n) { return pidio[n.np] != null; });
@@ -9404,6 +9418,53 @@ async function stkOpenPickeadoArt(codEnc) {
     else h += '<div class="stkpop-nps"><span class="stkpop-np" style="color:#94a3b8">— sin NPs en el PPP para esta tanda —</span></div>';
     h += '</div>';
   });
+  npRefs.forEach(function (r) {
+    const pc = pidio[r];
+    h += '<div class="stkpop-tanda"><div class="stkpop-tanda-h"><span class="stkpop-tn">NP ' + escapeHtml(r) + '</span><span class="stkpop-tcaj">' + round1(by[r]) + ' cajas</span></div>' +
+      '<div class="stkpop-nps"><span class="stkpop-np">' + escapeHtml(rsByNp[r] || "—") + (pc != null ? ' <b style="color:#166534">· pidió ' + round1(pc) + '</b>' : '') + ' <small style="color:#94a3b8">(directo · Completar/reasignar)</small></span></div></div>';
+  });
+  if (body) body.innerHTML = h;
+}
+async function stkOpenExcedenteArt(codEnc) {
+  if (!_stk) return;
+  const cod = decodeURIComponent(codEnc), codN = _stkNormCod(cod);
+  _stkPopShell("🧊 Excedente — " + escapeHtml(cod), "stkPopBody");
+  const body = document.getElementById("stkPopBody"); if (!body) return;
+  const byU = {}; let sinU = 0;
+  _stk.movs.forEach(function (mv) {
+    if (mv.deposito !== "excedente" || _stkNormCod(mv.cod_art) !== codN || !_stkWin(mv, true)) return;
+    const u = String(mv.ubicacion || "").trim(), d = Number(mv.delta) || 0;
+    if (u) byU[u] = (byU[u] || 0) + d; else sinU += d;
+  });
+  const round1 = function (n) { return Math.round(n * 10) / 10; };
+  let ubics = Object.keys(byU).filter(function (u) { return round1(byU[u]) > 0.05; });
+  if (ubics.length === 1) byU[ubics[0]] += sinU;   // única ubicación → absorbe las bajas sin ubicación (como el export)
+  ubics = ubics.filter(function (u) { return round1(byU[u]) > 0.05; })
+    .sort(function (a, b) { const ka = String(a).match(/^([A-Za-z]+)(\d+)/), kb = String(b).match(/^([A-Za-z]+)(\d+)/); if (ka && kb && ka[1].toUpperCase() !== kb[1].toUpperCase()) return ka[1] < kb[1] ? -1 : 1; if (ka && kb) return (+ka[2]) - (+kb[2]); return String(a).localeCompare(String(b)); });
+  if (!ubics.length) { body.innerHTML = '<div class="stkpop-empty">No hay excedente de ' + escapeHtml(cod) + ' con ubicación' + (round1(sinU) > 0 ? ' (' + round1(sinU) + ' cajas sin ubicación cargada)' : '') + '.</div>'; return; }
+  const tot = round1(ubics.reduce(function (s, u) { return s + byU[u]; }, 0));
+  let h = '<div class="stkpop-hint"><b>' + escapeHtml(cod) + '</b> · excedente: <b>' + tot + ' cajas</b> en ' + ubics.length + ' ubicación(es).</div>';
+  h += '<div class="stkpop-grp"><div class="stkpop-nps">' + ubics.map(function (u) { return '<span class="stkpop-np"><b>📍 ' + escapeHtml(u) + '</b> · ' + round1(byU[u]) + ' cajas</span>'; }).join("") + '</div></div>';
+  if (ubics.length !== 1 && round1(sinU) > 0.05) h += '<div class="stkpop-hint" style="color:#92400e">⚠ ' + round1(sinU) + ' cajas sin ubicación (picking de excedente sin ubicación anotada).</div>';
+  body.innerHTML = h;
+}
+async function stkOpenRacksArt(codEnc) {
+  if (!_stk) return;
+  const cod = decodeURIComponent(codEnc), codN = _stkNormCod(cod);
+  _stkPopShell("🏗 Racks — " + escapeHtml(cod), "stkPopBody");
+  const body = document.getElementById("stkPopBody"); if (body) body.innerHTML = '<div class="stkpop-empty">Cargando ubicaciones…</div>';
+  let rows = [];
+  try {
+    const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+    rows = await fetch(SUPABASE_URL + "/rest/v1/Racks_Planimetria?select=sector,cod_art,master_cajas,innercajas&estado=eq.ocupado&limit=5000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; });
+  } catch (_e) {}
+  const mine = (rows || []).filter(function (x) { return _stkNormCod(x.cod_art) === codN; })
+    .sort(function (a, b) { return String(a.sector).localeCompare(String(b.sector), undefined, { numeric: true }); });
+  if (!mine.length) { if (body) body.innerHTML = '<div class="stkpop-empty">No hay posiciones de rack para ' + escapeHtml(cod) + ' en la planimetría.</div>'; return; }
+  const totInner = mine.reduce(function (s, x) { return s + (Number(x.innercajas) || 0); }, 0);
+  const totMaster = mine.reduce(function (s, x) { return s + (Number(x.master_cajas) || 0); }, 0);
+  let h = '<div class="stkpop-hint"><b>' + escapeHtml(cod) + '</b> · racks (planimetría): <b>' + totInner + ' cajas</b>' + (totMaster ? ' · ' + totMaster + ' master' : '') + ' en ' + mine.length + ' posición(es). <small>(La planimetría es el conteo físico por posición.)</small></div>';
+  h += '<div class="stkpop-grp"><div class="stkpop-nps">' + mine.map(function (x) { return '<span class="stkpop-np"><b>🏗 ' + escapeHtml(String(x.sector)) + '</b> · ' + (Number(x.innercajas) || 0) + ' cajas' + (Number(x.master_cajas) ? ' · ' + (Number(x.master_cajas)) + ' master' : '') + '</span>'; }).join("") + '</div></div>';
   if (body) body.innerHTML = h;
 }
 function _stkEsGuardado(mv) { return mv.tipo === "guardado" || mv.tipo === "guardado_fuera_lista" || mv.tipo === "baja_racks"; }
