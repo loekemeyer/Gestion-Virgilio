@@ -42,6 +42,19 @@
 --    app vieja. El pipeline del cliente queda como "fast path" (instantáneo); el
 --    cron es la red de seguridad para equipos con app vieja.
 --
+--  v5.76 — EL CRON ES EL ÚNICO ESCRITOR DEL PICKING. El "fast path" del cliente
+--    (stockBajaPicking, TP) se DESACTIVÓ: el guard chequear-y-después-insertar no
+--    es atómico y la cola offline del cliente (vir_stock_pend) abría una ventana en
+--    la que el cron insertaba primero y el cliente duplicaba (separar +2×, góndola
+--    −2×; se vio en C81B/C87A/C87F/C87H, ~486 cajas). Ahora el cliente NO toca el
+--    stock del picking (solo emite el aviso SSG). Se limpiaron a mano las filas de
+--    picking del cliente en esas 4 tandas.
+--    PENDIENTES (follow-up): (a) portar la baja EXCEDENTE-FIRST acá (ETAPA 1 hoy
+--    baja solo góndola; el cliente bajaba primero de excedente); (b) 'separado'
+--    (TAP) y 'facturado' siguen con DOS escritores (cliente + cron) — mismo riesgo
+--    latente de doble-conteo; evaluar índice único parcial (ref,cod_art,deposito)
+--    WHERE tipo IN ('picking','separado','facturado') para dedup atómico en DB.
+--
 --  BACKLOG RECONCILIADO (29/06): 6 tandas en vuelo, post-cutoff:
 --    separar_pedidos (Pickeados) = 627  → C58C 108 + C58E 44 + C59C 475
 --    a_facturar      (A facturar) = 442 → C58A 115 + C58B 247 + C58D 80
