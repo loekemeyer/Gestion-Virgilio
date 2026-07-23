@@ -2166,6 +2166,7 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .csep-mesa{ display:inline-flex; align-items:center; gap:6px; background:#eff6ff; border:1.5px solid #bfdbfe; border-radius:999px; padding:6px 12px; font-size:12.5px; font-weight:700; color:#1e3a8a; white-space:nowrap; }
 .csep-mesa b{ font-size:18px; }
 .csep-mesawrap{ display:flex; flex-direction:column; align-items:flex-start; gap:3px; }
+.csep-ubic{ font-size:12px; font-weight:700; color:#0369a1; background:#e0f2fe; border:1.5px solid #bae6fd; border-radius:999px; padding:4px 11px; white-space:nowrap; }
 .csep-sw{ display:flex; align-items:center; gap:6px; flex:0 0 auto; }
 .csep-swl{ font-size:10px; font-weight:800; color:#94a3b8; line-height:1.1; text-align:center; }
 .csep-swl.on{ color:#0f172a; }
@@ -5484,7 +5485,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.77";
+const APP_VERSION = "v5.78";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -5635,6 +5636,45 @@ async function tandaLiberar(tanda, fase, legajo) {
     });
   } catch (_e) {}
 }
+/* v5.78 — Al TERMINAR PICKING (TP) el operario elige DÓNDE dejó lo pickeado (mesa/
+   carro/rack) para que lo encuentren al armar. Se guarda en un evento aparte 'PUB'
+   (texto=tanda, descripcion=ubicación) — NO se mete en el texto del TP porque ese
+   se usa como clave de tanda en getActivityStatus/lock. El wizard de armado lo lee. */
+const PICK_UBIC_OPCIONES = ["Mesa 1", "Mesa 2", "Carro", "AA3", "AA4", "AA9", "AA10", "AB3", "AB4", "AB9", "AB10"];
+function askPickUbicacion(tanda) {
+  return new Promise(function (resolve) {
+    if (!document.getElementById("pubCss")) {
+      const s = document.createElement("style"); s.id = "pubCss";
+      s.textContent = "#pubModal{display:none;position:fixed;inset:0;z-index:1300;background:rgba(2,6,23,.78);overflow:auto;padding:14px;}#pubModal.show{display:flex;align-items:center;justify-content:center;}.pub-card{background:#f8fafc;max-width:440px;width:100%;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.pub-head{padding:14px 16px;background:linear-gradient(90deg,#1e6bd6,#1749a3);color:#fff;}.pub-title{font-size:17px;font-weight:800;}.pub-sub{font-size:12.5px;opacity:.92;margin-top:3px;}.pub-body{padding:14px;}.pub-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;}.pub-opt{padding:17px 6px;border:2px solid #cbd5e1;border-radius:12px;background:#fff;font-size:15px;font-weight:800;color:#0f172a;cursor:pointer;width:auto;margin:0;}.pub-opt:active{background:#eff6ff;border-color:#1e6bd6;}.pub-x{margin-top:12px;width:100%;padding:11px;border:none;border-radius:10px;background:#e2e8f0;color:#475569;font-weight:800;font-size:14px;cursor:pointer;}";
+      document.head.appendChild(s);
+    }
+    let ov = document.getElementById("pubModal");
+    if (!ov) { ov = document.createElement("div"); ov.id = "pubModal"; document.body.appendChild(ov); }
+    function done(v) { ov.classList.remove("show"); ov.innerHTML = ""; resolve(v); }
+    const opts = PICK_UBIC_OPCIONES.map(function (o) { return '<button class="pub-opt" data-u="' + escapeHtml(o) + '">' + escapeHtml(o) + '</button>'; }).join("");
+    ov.innerHTML = '<div class="pub-card"><div class="pub-head"><div class="pub-title">📍 ¿Dónde dejás la tanda ' + escapeHtml(String(tanda || "")) + '?</div><div class="pub-sub">Elegí dónde queda lo pickeado, para que lo encuentren al armar.</div></div><div class="pub-body"><div class="pub-grid">' + opts + '</div><button class="pub-x">Cancelar</button></div></div>';
+    ov.classList.add("show");
+    ov.querySelectorAll(".pub-opt").forEach(function (b) { b.onclick = function () { done(b.getAttribute("data-u")); }; });
+    const x = ov.querySelector(".pub-x"); if (x) x.onclick = function () { done(null); };
+  });
+}
+/* Emite el evento PUB (ubicación donde quedó el picking). Igual patrón que stockEmitSinStock:
+   encola + intenta enviar. id único (permite actualizar si re-TP con otra ubicación; el
+   wizard lee la MÁS reciente). El legajo de PRUEBA no persiste (lo frena enqueueReport). */
+function emitPickUbic(tanda, ubic, legajo) {
+  if (!ubic) return;
+  const t = String(tanda || "").trim().toUpperCase(); if (!t) return;
+  const nowMs = Date.now();
+  const payload = {
+    legajo: String(legajo || "").trim(), opcion: "PUB", descripcion: String(ubic),
+    texto: t, ts: nowMs,
+    id: nowMs.toString(36) + "_" + Math.random().toString(36).slice(2, 8),
+    ts_inicio_iso: null
+  };
+  enqueueReport(payload);
+  if (typeof trySendOneReport === "function") trySendOneReport(payload).then(function (r) { if (r && r.ok) removeFromQueue(payload.id); }).catch(function () {});
+  try { updatePendingIndicator(); } catch (_e) {}
+}
 async function send() {
   const legajoStr   = String(legajoInput.value || "").trim();
   const opcion      = selected;
@@ -5713,6 +5753,14 @@ async function send() {
     }
   }
 
+  // v5.78: al TERMINAR PICKING preguntar DÓNDE dejó lo pickeado (mesa/carro/rack).
+  // Se emite como evento PUB (más abajo). Si cierra sin elegir → aborta el TP.
+  let _pubUbic = "";
+  if (opcion === "TP" && texto) {
+    _pubUbic = await askPickUbicacion(texto);
+    if (_pubUbic == null) return;   // canceló → no registra el TP
+  }
+
   // ID único por reporte: permite dedup en el server (UNIQUE en client_id).
   const nowMs  = Date.now();
   const nowIso = new Date(nowMs).toISOString();
@@ -5785,6 +5833,9 @@ async function send() {
   // v5.74: si fue un evento de picking/armado, invalidar el cache de actividad para
   // que la próxima lista salga fresca (la tanda recién arrancada/terminada se refleja).
   if (opcion === "EP" || opcion === "TP" || opcion === "AP" || opcion === "TAP") { _activityStatusTs = 0; }
+
+  // v5.78: registrar DÓNDE quedó el picking (evento PUB aparte, lo lee el wizard de armado).
+  if (opcion === "TP" && texto && _pubUbic) emitPickUbic(texto, _pubUbic, legajoStr);
 
   // Hay 2 botones Enviar (uno inline al lado del label, otro abajo). Updateo
   // ambos así no importa cuál esté visible.
@@ -7211,10 +7262,17 @@ async function showCompletarWizard(legajo, codigo) {
       try { alert("⚠ La tanda " + tanda + " ya fue armada.\n\nNo se abre el armado de nuevo para no duplicar el pedido. Si hay que corregir algo, avisá para hacerlo a mano."); } catch (_e) {}
       return;
     }
+    // v5.78: ubicación donde el picker dejó la tanda (evento PUB más reciente) → se muestra en Separar.
+    let _pickUbic = "";
+    try {
+      const _ru = await fetch(SUPABASE_URL + "/rest/v1/Registros_Produccion_Virgilio?opcion=eq.PUB&texto=eq." + encodeURIComponent(tanda) + "&select=descripcion&order=ts_cliente.desc&limit=1", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+      if (_ru.ok) { const _a = await _ru.json(); if (_a && _a[0]) _pickUbic = String(_a[0].descripcion || ""); }
+    } catch (_e) {}
     // v4.04: si hay avance guardado de esta tanda (el wizard que se abrió en AP), retomarlo.
     const _savedC = _compRestore(tanda);
     if (_savedC && _savedC.nps && _savedC.nps.length) {
       _comp = _savedC;
+      _comp.pickUbic = _pickUbic;
       const t0 = document.getElementById("compTanda"); if (t0) t0.textContent = "Tanda " + tanda + (_comp.nps[0] && _comp.nps[0].rs ? " · " + _comp.nps[0].rs : "");
       const d20 = document.getElementById("compD2"), ln0 = document.getElementById("compLine");
       if (d20) d20.style.display = ""; if (ln0) ln0.style.display = "";
@@ -7253,7 +7311,7 @@ async function showCompletarWizard(legajo, codigo) {
       }
     }
     const hayFalt = arts.some(a => a.nps.length);
-    _comp = { legajo: String(legajo || "").trim(), tanda: tanda, fecha: fecha, nps: nps, arts: arts, pedidoFull: pedidoFull, hayFalt: hayFalt, step: 1 };
+    _comp = { legajo: String(legajo || "").trim(), tanda: tanda, fecha: fecha, nps: nps, arts: arts, pedidoFull: pedidoFull, hayFalt: hayFalt, step: 1, pickUbic: _pickUbic };
     const t = document.getElementById("compTanda"); if (t) t.textContent = "Tanda " + tanda + (nps[0] && nps[0].rs ? " · " + nps[0].rs : "");
     const d2 = document.getElementById("compD2"), ln = document.getElementById("compLine");
     if (d2) d2.style.display = "";   // Paso 2 = Líos: siempre presente
@@ -7444,7 +7502,7 @@ function _compRenderSep() {
   if (!live.length) { el.innerHTML = '<div class="comp-step-t">Separar por NP</div><div class="cmpl-empty">No hay nada para separar (todo faltó) 👍 Pasá a Líos con la flecha →.</div>'; return; }
   if (_comp.sepDif && _comp.sepDif.mode) { el.innerHTML = _compDifHtml(); return; }
   const mm = _compSepMesa(), view = (_comp.sepView === "picking") ? "picking" : "pedido";
-  let h = '<div class="csep-hd"><div class="csep-mesawrap"><button onclick="_compReclasif()" style="background:none;border:none;color:#1e6bd6;font-weight:700;font-size:12px;cursor:pointer;padding:0 0 4px;align-self:flex-start;">✎ reclasificar</button><div class="csep-mesa">📦 <b>' + mm.mesa + '</b> en mesa</div></div>' +
+  let h = '<div class="csep-hd"><div class="csep-mesawrap"><button onclick="_compReclasif()" style="background:none;border:none;color:#1e6bd6;font-weight:700;font-size:12px;cursor:pointer;padding:0 0 4px;align-self:flex-start;">✎ reclasificar</button><div class="csep-mesa">📦 <b>' + mm.mesa + '</b> en mesa</div>' + (_comp.pickUbic ? '<div class="csep-ubic">📍 Dejado en: <b>' + escapeHtml(_comp.pickUbic) + '</b></div>' : '') + '</div>' +
     '<div class="csep-sw"><span class="csep-swl' + (view === "picking" ? " on" : "") + '">Modo<br>picking</span>' +
     '<button class="csep-tog' + (view === "pedido" ? " on" : "") + '" onclick="_compSepView(\'' + (view === "pedido" ? "picking" : "pedido") + '\')" title="Cambiar vista"><span class="csep-knob"></span></button>' +
     '<span class="csep-swl' + (view === "pedido" ? " on" : "") + '">Por<br>pedido</span></div></div>';
