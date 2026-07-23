@@ -2145,6 +2145,11 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .cmpl-sq.has .cmpl-cur2{ color:#1e3a8a; }
 .cmpl-tot2{ font-size:14px; color:#94a3b8; font-weight:700; }
 .cmpl-min{ position:absolute; top:6px; right:6px; width:28px; height:28px; border-radius:8px; border:1.5px solid #fecaca; background:#fff; color:#b42318; font-size:18px; font-weight:800; line-height:1; padding:0; cursor:pointer; }
+.cmpl-auto{ position:absolute; top:6px; left:6px; height:24px; padding:0 8px; border-radius:8px; border:1.5px solid #fcd34d; background:#fffbeb; color:#92400e; font-size:12px; font-weight:800; line-height:1; cursor:pointer; margin:0; width:auto; }
+.cmpl-auto:active{ background:#fde68a; }
+.cmpl-autobar{ font-size:12.5px; color:#92400e; background:#fffbeb; border:1px solid #fcd34d; border-radius:9px; padding:7px 10px; margin:0 0 9px; line-height:1.35; }
+.cmpl-szinp{ width:48px; height:28px; text-align:center; font-size:15px; font-weight:800; border:1.5px solid #fcd34d; border-radius:7px; margin:0 2px; padding:0; -moz-appearance:textfield; }
+.cmpl-szinp::-webkit-outer-spin-button,.cmpl-szinp::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
 .cmpl-cerrar{ display:block; width:100%; margin-top:11px; padding:13px; border:none; border-radius:12px; background:#16a34a; color:#fff; font-size:16px; font-weight:800; cursor:pointer; }
 .cmpl-cerrar:disabled{ background:#cbd5e1; color:#64748b; cursor:not-allowed; }
 .cmpl-back{ width:auto; background:#f1f5f9; color:#334155; border:1px solid #cbd5e1; border-radius:9px; padding:7px 14px; font-size:13px; font-weight:800; cursor:pointer; margin-bottom:10px; }
@@ -5486,7 +5491,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.84";
+const APP_VERSION = "v5.85";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -7361,6 +7366,18 @@ function _compLioMark(n) { n.liosDone = n.codes.every(function (c) { return c.re
 function _compLioStep(ci, d) { const n = _compLioNow(); if (!n) return; const c = n.codes[ci]; if (!c) return; if (d > 0 && c.rest > 0) { c.rest--; c.cur++; } else if (d < 0 && c.cur > 0) { c.cur--; c.rest++; } else return; _compRenderLios(); _compRecalc(); }
 function _compLioSuelta(ci) { const n = _compLioNow(); if (!n) return; const c = n.codes[ci]; if (!c || c.rest <= 0) return; c.rest--; n.liosArr.push({ items: [{ cod: c.cod, qty: 1 }], cajas: 1, suelta: true }); _compLioMark(n); _compRenderLios(); _compRecalc(); }
 function _compLioSiguiente() { const n = _compLioNow(); if (!n) return; const items = n.codes.filter(function (c) { return c.cur > 0; }).map(function (c) { return { cod: c.cod, qty: c.cur }; }); const cajas = items.reduce(function (s, it) { return s + it.qty; }, 0); if (!cajas) return; n.liosArr.push({ items: items, cajas: cajas, suelta: false }); n.codes.forEach(function (c) { c.cur = 0; }); _compLioMark(n); _compRenderLios(); _compRecalc(); }
+/* v5.85 — Atajo "líos de a N": arma de una todos los líos iguales de un código
+   (⌊rest/N⌋ líos de N cajas), en vez de repetir "poner N → Cerrar Lío". N editable
+   (default 5). El resto (< N) queda para cerrarlo a mano o como suelta. */
+function _compSetLioSize(v) { if (!_comp) return; _comp.lioSize = Math.max(1, Math.min(999, parseInt(v, 10) || 5)); _compRenderLios(); }
+function _compLioAuto(ci) {
+  const n = _compLioNow(); if (!n) return;
+  const c = n.codes[ci]; if (!c) return;
+  const size = Math.max(1, parseInt(_comp && _comp.lioSize, 10) || 5);
+  let made = 0;
+  while (c.rest >= size) { c.rest -= size; n.liosArr.push({ items: [{ cod: c.cod, qty: size }], cajas: size, suelta: false }); made++; }
+  if (made) { _compLioMark(n); _compRenderLios(); _compRecalc(); }
+}
 function _compViewArmar() { if (_comp) { _comp.liosView = "armar"; _compRenderLios(); } }
 function _compViewSueltas() { if (_comp) { _comp.liosView = "sueltas"; _compRenderLios(); } }
 function _compSueltaUndo() { const n = _compLioNow(); if (!n) return; for (let k = n.liosArr.length - 1; k >= 0; k--) { if (n.liosArr[k].suelta) { _compLioDel(k); return; } } }
@@ -7417,11 +7434,14 @@ function _compRenderLios() {
       '<div class="cmpl-ctrl cmpl-ctrl-lio">🔨 Armando<br>Lío ' + curLetter + (curCajas ? ' (' + curCajas + ')' : '') + '</div>' +
       '<button class="cmpl-ctrl cmpl-ctrl-edit" onclick="_compViewEditar()"' + (n.liosArr.length ? '' : ' disabled') + '>✏️ Editar<br>líos (' + n.liosArr.length + ')</button>' +
       '<button class="cmpl-ctrl cmpl-ctrl-su" onclick="_compViewSueltas()">📦 Sueltas<br>(' + nRest + ')</button></div>';
+    const _sz = Math.max(1, parseInt(_comp.lioSize, 10) || 5);
+    h += '<div class="cmpl-autobar">⚡ Líos de a <input class="cmpl-szinp" type="number" min="1" inputmode="numeric" value="' + _sz + '" onchange="_compSetLioSize(this.value)"> — tocá <b>⚡×' + _sz + '</b> en un código y arma todos sus líos de ' + _sz + ' de una.</div>';
     h += '<div class="cmpl-grid">' + n.codes.map(function (c, ci) {
       if (!c.sep || (c.rest === 0 && c.cur === 0)) return "";
       const rem = c.cur + c.rest;
       return '<div class="cmpl-sq' + (c.cur > 0 ? " has" : "") + '" onclick="_compLioStep(' + ci + ',1)">' +
         (c.cur > 0 ? '<button class="cmpl-min" onclick="event.stopPropagation();_compLioStep(' + ci + ',-1)">−</button>' : '') +
+        (c.rest >= _sz ? '<button class="cmpl-auto" onclick="event.stopPropagation();_compLioAuto(' + ci + ')" title="Armar ' + Math.floor(c.rest / _sz) + ' lío(s) de ' + _sz + '">⚡×' + _sz + '</button>' : '') +
         '<div class="cmpl-cod">' + escapeHtml(c.cod) + '</div><div class="cmpl-cur2">' + c.cur + '<span class="cmpl-tot2"> / ' + rem + '</span></div></div>';
     }).join("") + "</div>";
     const _noSep = n.codes.filter(function (c) { return !c.sep && c.rest > 0; });
