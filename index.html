@@ -5481,7 +5481,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.74";
+const APP_VERSION = "v5.75";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -5608,6 +5608,30 @@ async function undoLastSent() {
   alert("Mensaje deshecho.");
 }
 
+/* v5.74b: reserva ATÓMICA de tanda (RPC). tanda_reservar devuelve SIEMPRE el dueño
+   que quedó (gana el primero); si el dueño no soy yo → está tomada. Falla ABIERTO
+   (si no hay red, devuelve null y NO bloquea el laburo). tanda_liberar la suelta al
+   terminar (TP/TAP). */
+async function tandaReservar(tanda, fase, legajo, nombre) {
+  try {
+    const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/tanda_reservar", {
+      method: "POST",
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ p_tanda: String(tanda || ""), p_fase: fase, p_legajo: String(legajo || ""), p_nombre: String(nombre || "") })
+    });
+    if (!r.ok) return null;
+    return await r.json();
+  } catch (_e) { return null; }
+}
+async function tandaLiberar(tanda, fase, legajo) {
+  try {
+    await fetch(SUPABASE_URL + "/rest/v1/rpc/tanda_liberar", {
+      method: "POST",
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ p_tanda: String(tanda || ""), p_fase: fase, p_legajo: String(legajo || "") })
+    });
+  } catch (_e) {}
+}
 async function send() {
   const legajoStr   = String(legajoInput.value || "").trim();
   const opcion      = selected;
@@ -5668,6 +5692,24 @@ async function send() {
     }
   }
 
+  // v5.74b: RESERVA ATÓMICA (última compuerta antes de emitir EP/AP). Gana el primero:
+  // el RPC devuelve el dueño que quedó; si no soy yo → tomada, no arranco. Cierra la
+  // ventana de carrera del lock por eventos. Falla ABIERTO (sin red no bloquea). El
+  // legajo de PRUEBA no reserva (no persiste).
+  if ((opcion === "EP" || opcion === "AP") && texto &&
+      !(typeof esOperadorPrueba === "function" && esOperadorPrueba())) {
+    const fase = (opcion === "EP") ? "picking" : "armado";
+    let nombreMio = "";
+    try { const mp = await getEmpleadosNombres(); if (mp && mp.get) nombreMio = mp.get(legajoStr) || ""; } catch (_e) {}
+    const lock = await tandaReservar(texto, fase, legajoStr, nombreMio);
+    if (lock && lock.legajo && String(lock.legajo) !== legajoStr) {
+      const quien = lock.nombre ? (lock.nombre + " (leg " + lock.legajo + ")") : ("el legajo " + lock.legajo);
+      const q = (opcion === "EP") ? "pickeando" : "armando";
+      try { alert("⛔ La tanda " + texto + " ya la está " + q + " " + quien + ".\n\nNo pueden hacer dos el mismo. Elegí otra."); } catch (_e) {}
+      return;
+    }
+  }
+
   // ID único por reporte: permite dedup en el server (UNIQUE en client_id).
   const nowMs  = Date.now();
   const nowIso = new Date(nowMs).toISOString();
@@ -5719,6 +5761,7 @@ async function send() {
     const st = getLegajoState(legajoStr);
     st.picking = { active:false, value:"", ts_inicio: null };
     setLegajoState(legajoStr, st);
+    try { tandaLiberar(texto, "picking", legajoStr); } catch (_e) {}   // v5.74b: soltar la reserva al terminar
   } else if (opcion === "AP") {
     const st = getLegajoState(legajoStr);
     st.armado = { active:true, value:texto, ts_inicio: nowIso };
@@ -5727,6 +5770,7 @@ async function send() {
     const st = getLegajoState(legajoStr);
     st.armado = { active:false, value:"", ts_inicio: null };
     setLegajoState(legajoStr, st);
+    try { tandaLiberar(texto, "armado", legajoStr); } catch (_e) {}   // v5.74b: soltar la reserva al terminar
   } else if (TOGGLE_CODES.includes(opcion)) {
     // 1ra vez abre (guarda ts ISO); 2da vez cierra (borra)
     toggleStartOrEnd(legajoStr, opcion);

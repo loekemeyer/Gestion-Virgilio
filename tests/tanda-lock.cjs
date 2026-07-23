@@ -51,6 +51,17 @@ catch (_e) {
     out.sendUsaArm   = /armadoEnCursoBy/.test(srcSend);
     out.sendForce    = /getActivityStatus\(true\)/.test(srcSend);
     out.apEsconde    = /armadoEnCursoBy/.test(populateTandasList.toString());
+
+    // v5.74b — reserva ATÓMICA (RPC). tandaReservar devuelve el dueño que quedó.
+    window.fetch = function (url) {
+      url = String(url);
+      if (url.indexOf("rpc/tanda_reservar") >= 0) return J({ tanda: "TANDA_X", fase: "picking", legajo: "77", nombre: "Marta" });
+      return J([]);
+    };
+    const lk = await tandaReservar("TANDA_X", "picking", "104", "Yo");
+    out.reservaDueno   = lk && lk.legajo === "77";        // otro (77) es el dueño → yo pierdo
+    out.sendReserva    = /tandaReservar/.test(srcSend);   // send() usa la reserva atómica
+    out.sendLibera     = /tandaLiberar/.test(srcSend);    // send() libera al terminar (TP/TAP)
     return out;
   });
 
@@ -58,6 +69,7 @@ catch (_e) {
     r.pickA === "104" && r.pickC_done === false && r.armB === "55" && r.armD_done === false &&
     r.mapsExist === true &&
     r.sendUsaPick === true && r.sendUsaArm === true && r.sendForce === true && r.apEsconde === true &&
+    r.reservaDueno === true && r.sendReserva === true && r.sendLibera === true &&
     errs.length === 0;
   console.log("tanda-lock:", JSON.stringify(r));
   console.log("  pageerrors:", errs.length ? errs.join("|") : "none", "·", pass ? "✓ OK" : "✗ FAIL");
