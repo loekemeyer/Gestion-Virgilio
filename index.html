@@ -5475,7 +5475,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.72";
+const APP_VERSION = "v5.73";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -7122,6 +7122,14 @@ async function showCompletarWizard(legajo, codigo) {
     if (!entry) {   // el código puede ser un pedido → buscar su tanda
       const np = pickNormNp(code);
       for (const [k, v] of sheetMap) { if (v && v.pedidos && v.pedidos.some(p => String(p.np || "").split(/[,/]/).map(s => pickNormNp(s)).indexOf(np) >= 0)) { tanda = String(v.tanda || k).trim().toUpperCase(); entry = v; break; } }
+    }
+    // v5.73: candado también al ABRIR. Si la tanda YA fue armada (ya tiene filas en
+    // Entregas), ni se abre el armado → evita re-armar y duplicar el pedido. Un armado
+    // EN CURSO todavía no tiene Entregas (solo avance en localStorage), así que
+    // "Seguir armado" sigue funcionando; solo bloquea las YA terminadas.
+    if (await _compTandaYaArmada(tanda)) {
+      try { alert("⚠ La tanda " + tanda + " ya fue armada.\n\nNo se abre el armado de nuevo para no duplicar el pedido. Si hay que corregir algo, avisá para hacerlo a mano."); } catch (_e) {}
+      return;
     }
     // v4.04: si hay avance guardado de esta tanda (el wizard que se abrió en AP), retomarlo.
     const _savedC = _compRestore(tanda);

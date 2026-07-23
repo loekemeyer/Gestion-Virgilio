@@ -45,6 +45,11 @@ catch (_e) {
     out.usaCandado = /_compTandaYaArmada/.test(src);
     out.usaTerminando = /_terminando/.test(src);
     out.candadoAntesDeLios = src.indexOf("_compTandaYaArmada") < src.indexOf("liosSend") && src.indexOf("_compTandaYaArmada") > 0;
+
+    // 6) Cableado: showCompletarWizard bloquea al ABRIR, ANTES de restaurar/armar (v5.73)
+    const src2 = showCompletarWizard.toString();
+    out.openUsaCandado = /_compTandaYaArmada/.test(src2);
+    out.openAntesDeRestore = src2.indexOf("_compTandaYaArmada") > 0 && src2.indexOf("_compTandaYaArmada") < src2.indexOf("_compRestore");
     return out;
   });
 
@@ -52,6 +57,7 @@ catch (_e) {
     r.armada === true && r.armadaLower === true && r.nueva === false &&
     r.errorNoBloquea === false && r.vacio === false &&
     r.usaCandado === true && r.usaTerminando === true && r.candadoAntesDeLios === true &&
+    r.openUsaCandado === true && r.openAntesDeRestore === true &&
     errs.length === 0;
   console.log("comp-doblearmado:", JSON.stringify(r));
   console.log("  pageerrors:", errs.length ? errs.join("|") : "none", "·", pass ? "✓ OK" : "✗ FAIL");
