@@ -5491,7 +5491,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.86";
+const APP_VERSION = "v5.87";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -9382,6 +9382,11 @@ var STK_POP_CSS =
   ".stkpop-np{font-size:12.5px;color:#334155;}" +
   ".stkpop-np b{color:#0f172a;font-weight:800;font-family:Consolas,Menlo,monospace;}" +
   ".stkpop-empty{padding:16px;text-align:center;color:#94a3b8;font-size:13.5px;}" +
+  ".stkpop-live{background:#f0fdf4;border:1.5px solid #86efac;border-radius:11px;padding:9px 11px;margin-bottom:11px;}" +
+  ".stkpop-live-h{font-size:12.5px;font-weight:800;color:#15803d;margin-bottom:6px;}" +
+  ".stkpop-live-row{display:flex;align-items:center;gap:8px;padding:2px 0;font-size:12.5px;}" +
+  ".stkpop-live-who{color:#166534;font-weight:700;}" +
+  ".stkpop-live-ped{margin-left:auto;font-weight:800;color:#15803d;white-space:nowrap;}" +
   ".stkpop-sum{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:11px;}" +
   ".stkpop-sumchip{display:inline-flex;flex-direction:column;align-items:center;min-width:92px;background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:6px 12px;}" +
   ".stkpop-sumchip .l{font-size:10px;text-transform:uppercase;color:#64748b;font-weight:700;}" +
@@ -9492,10 +9497,22 @@ async function stkOpenEstadioArt(codEnc, dep) {
   });
   const refs = Object.keys(by).filter(function (t) { return by[t] > 0.05; })
     .sort(function (a, b) { return String(a).localeCompare(String(b), undefined, { numeric: true }); });
-  if (!refs.length) { if (body) body.innerHTML = '<div class="stkpop-empty">No hay ' + (dep === "a_facturar" ? "a facturar" : "pickeado") + ' de ' + escapeHtml(cod) + ' en este momento.</div>'; return; }
+  // v5.87: en el popup de PICKEADOS marcar también las tandas que se están pickeando
+  // AHORA (EP sin TP) que incluyen este artículo. Todavía NO están en separar_pedidos
+  // (el stock baja al TP), por eso van aparte, arriba y en verde.
+  let liveTandas = [];
+  if (dep === "separar_pedidos") {
+    try {
+      const act = await getActivityStatus();
+      liveTandas = Array.from(act.pickingEnCursoBy.keys())
+        .map(function (t) { return String(t).trim().toUpperCase(); })
+        .filter(function (t) { return t && refs.indexOf(t) < 0; });
+    } catch (_e) { liveTandas = []; }
+  }
+  if (!refs.length && !liveTandas.length) { if (body) body.innerHTML = '<div class="stkpop-empty">No hay ' + (dep === "a_facturar" ? "a facturar" : "pickeado") + ' de ' + escapeHtml(cod) + ' en este momento.</div>'; return; }
   const tandas = refs.filter(function (r) { return /[A-Z]/.test(r); });     // ref con letra = tanda
   const npRefs = refs.filter(function (r) { return !/[A-Z]/.test(r); });    // ref numérica = NP directo (CP/RC)
-  const npMap = await _stkFetchNpsByTanda(tandas);
+  const npMap = await _stkFetchNpsByTanda(tandas.concat(liveTandas));
   const allNps = [];
   Object.keys(npMap).forEach(function (t) { (npMap[t] || []).forEach(function (n) { if (allNps.indexOf(n.np) < 0) allNps.push(n.np); }); });
   npRefs.forEach(function (r) { if (allNps.indexOf(r) < 0) allNps.push(r); });
@@ -9514,8 +9531,29 @@ async function stkOpenEstadioArt(codEnc, dep) {
     }
   }
   const round1 = function (n) { return Math.round(n * 10) / 10; };
+  // Tandas en vivo que realmente incluyen este artículo (alguna de sus NPs lo pidió).
+  const liveWithArt = liveTandas.filter(function (t) { return (npMap[t] || []).some(function (n) { return pidio[n.np] != null; }); });
+  let liveHtml = "";
+  if (liveWithArt.length) {
+    let names = new Map(); try { names = await getEmpleadosNombres(); } catch (_e) {}
+    let actL = null; try { actL = await getActivityStatus(); } catch (_e) {}
+    liveHtml = '<div class="stkpop-live"><div class="stkpop-live-h">🟢 Pickeando AHORA (todavía sin terminar)</div>' +
+      liveWithArt.map(function (t) {
+        const nps = (npMap[t] || []).filter(function (n) { return pidio[n.np] != null; });
+        const ped = round1(nps.reduce(function (s, n) { return s + (pidio[n.np] || 0); }, 0));
+        const leg = actL && actL.pickingEnCursoBy ? (actL.pickingEnCursoBy.get(t) || "") : "";
+        const who = leg ? (names.get(String(leg)) || ("leg " + leg)) : "";
+        return '<div class="stkpop-live-row"><span class="stkpop-tn">' + escapeHtml(t) + '</span>' +
+          (who ? '<span class="stkpop-live-who">' + escapeHtml(who) + '</span>' : '') +
+          '<span class="stkpop-live-ped">pidió ' + ped + '</span></div>';
+      }).join("") + '</div>';
+  }
+  if (!refs.length) {
+    if (body) body.innerHTML = liveHtml + '<div class="stkpop-hint" style="color:#64748b">No hay <b>' + escapeHtml(cod) + '</b> pickeado (terminado) ahora — solo lo que se está pickeando en este momento (arriba).</div>';
+    return;
+  }
   const totCaj = round1(refs.reduce(function (s, t) { return s + by[t]; }, 0));
-  let h = '<div class="stkpop-hint"><b>' + escapeHtml(cod) + '</b> · ' + (dep === "a_facturar" ? "a facturar" : "pickeado") + ': <b>' + totCaj + ' cajas</b> en ' + refs.length + ' ' + (dep === "a_facturar" ? "grupo(s)" : "tanda(s)") + '. Los NPs con <b style="color:#166534">· pidió N</b> son los que pidieron este artículo.</div>';
+  let h = liveHtml + '<div class="stkpop-hint"><b>' + escapeHtml(cod) + '</b> · ' + (dep === "a_facturar" ? "a facturar" : "pickeado") + ': <b>' + totCaj + ' cajas</b> en ' + refs.length + ' ' + (dep === "a_facturar" ? "grupo(s)" : "tanda(s)") + '. Los NPs con <b style="color:#166534">· pidió N</b> son los que pidieron este artículo.</div>';
   tandas.forEach(function (t) {
     const nps = npMap[t] || [];
     const conArt = nps.filter(function (n) { return pidio[n.np] != null; });
