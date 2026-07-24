@@ -41,7 +41,8 @@ catch (_e) {
       "irRevisar", "irRenderConfirm", "irVolver",
       "stkOpenPedidos", "stkOpenGondola", "stkGondRender", "_stkPopAgg", "_stkFetchNpsByTanda", "stkCapSort",
       "askPickUbicacion", "emitPickUbic", "askArmadoUbicaciones", "emitArmadoUbic",
-      "pkForzarGondola", "pkEmitRetiroGondola"];
+      "pkForzarGondola", "pkEmitRetiroGondola",
+      "pkNpEsLoeke", "pkDualBreakdown", "opDraftSaveQuiet"];
     const missing = need.filter((n) => typeof window[n] !== "function");
     const ts = new Date().toISOString();
     const sal = stockComputeSaldos([
