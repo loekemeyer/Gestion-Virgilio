@@ -5491,7 +5491,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.91";
+const APP_VERSION = "v5.92";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -10205,14 +10205,16 @@ function stkBodyRacks() {
     ? '<div class="stk-rk-orden pend">📦 Hay una orden de bajar racks→góndola <b>PENDIENTE</b> (' + escapeHtml(String(pend[0].fecha || "")) + '). A los operarios les aparece la alarma; ellos registran lo que bajan y vos lo aprobás acá abajo.</div>'
     : '<div class="stk-rk-orden">No hay orden de bajada pendiente.</div>';
   h += '<button class="stk-btn ok" onclick="racksCrearOrden()">📋 OCs generadas — emitir orden de bajar racks</button>';
+  const saldos = stockComputeSaldos(_stk.movs, _stk.cutoff);
   const props = (_stk.bajadas || []).filter(function (b) { return b.estado === "propuesta"; });
   h += '<div class="stk-aj-h" style="margin-top:16px">Bajadas propuestas por operarios (' + props.length + ")</div>";
   if (!props.length) h += '<div class="stk-empty">Nada para aprobar.</div>';
   else h += props.map(function (b) {
     const u = stkUnits(Number(b.cajas), b.cod_art, _stk.factors);
-    return '<div class="stk-rk-baj"><div class="stk-rk-baji"><span class="stk-cod">' + escapeHtml(b.cod_art) + '</span> <span class="stk-desc">' + escapeHtml(artNombre(b.cod_art, b.descripcion) || "") + '</span><div class="stk-rk-q">' + b.cajas + " cajas" + (u ? " · " + u : "") + '</div></div><button class="stk-btn ok" onclick="racksAprobar(' + b.id + ')">✓ Aprobar</button></div>';
+    const al = racksBajadaAlerta(b, saldos);
+    const alHtml = al ? '<div style="font-size:11.5px;font-weight:800;color:#b91c1c;background:#fef2f2;border:1px solid #fca5a5;border-radius:7px;padding:2px 7px;margin-top:3px;display:inline-block;">⚠ ' + (al.neg ? 'dejaría racks en <b>' + (Math.round((al.saldoRacks - al.pedir) * 100) / 100) + '</b>' : '') + (al.neg && al.otras.length ? ' · ' : '') + (al.otras.length ? 'ya hay otra bajada de este código hoy' : '') + '</div>' : '';
+    return '<div class="stk-rk-baj"><div class="stk-rk-baji"><span class="stk-cod">' + escapeHtml(b.cod_art) + '</span> <span class="stk-desc">' + escapeHtml(artNombre(b.cod_art, b.descripcion) || "") + '</span><div class="stk-rk-q">' + b.cajas + " cajas" + (u ? " · " + u : "") + '</div>' + alHtml + '</div><button class="stk-btn ok" onclick="racksAprobar(' + b.id + ')">✓ Aprobar</button></div>';
   }).join("");
-  const saldos = stockComputeSaldos(_stk.movs, _stk.cutoff);
   const arts = Object.keys(saldos).map(function (k) { return saldos[k]; }).filter(function (a) { return (a.racks || 0) !== 0; }).sort(function (a, b) { return (parseInt(a.cod, 10) || 0) - (parseInt(b.cod, 10) || 0); });
   h += '<div class="stk-aj-h" style="margin-top:16px">Stock en racks</div>';
   h += '<table class="stk-tbl"><thead><tr><th>Código</th><th>Descripción</th><th class="num">Master</th><th class="num">Cajas</th><th class="num">Unidades</th></tr></thead><tbody>';
@@ -10232,9 +10234,36 @@ async function racksCrearOrden() {
     alert("✓ Orden de bajar racks→góndola emitida. A los operarios les va a aparecer la alarma."); openStockAdmin();
   } catch (e) { alert("Error: " + (e.message || e)); }
 }
+/* v5.92 — Guardarraíles al aprobar una bajada de racks, para que NO se repita el
+   descuadre 931E/984E (racks negativo por bajada duplicada / "1 MC" contado como
+   1 caja). Antes de mover stock, racksAprobar avisa cuando: (1) TOPE — la bajada
+   dejaría el saldo de racks NEGATIVO; (2) DUPLICADO — ya hay otra bajada del mismo
+   código el mismo día (AR), típico de contar la misma mercadería dos veces. No es
+   un bloqueo duro: Marianela puede aprobar igual (confirm), pero ve el problema. */
+function _rkArDay(ts) { try { return new Date(ts).toLocaleDateString("es-AR", { timeZone: "America/Argentina/Buenos_Aires" }); } catch (_e) { return String(ts || "").slice(0, 10); } }
+function racksBajadaAlerta(b, saldos) {
+  if (!b || !_stk) return null;
+  saldos = saldos || stockComputeSaldos(_stk.movs, _stk.cutoff);
+  const pedir = Number(b.cajas) || 0;
+  const saldoRacks = Number(((saldos[String(b.cod_art)] || {}).racks) || 0);
+  const otras = (_stk.bajadas || []).filter(function (x) {
+    return x.id !== b.id && String(x.cod_art) === String(b.cod_art) && x.estado !== "rechazada" && _rkArDay(x.ts) === _rkArDay(b.ts);
+  });
+  const neg = pedir > saldoRacks + 1e-9;
+  if (!neg && !otras.length) return null;
+  const f = (_stk.factors || {})[String(b.cod_art).toUpperCase()] || {};
+  return { neg: neg, saldoRacks: Math.round(saldoRacks * 100) / 100, pedir: pedir, otras: otras, M: (f.cajasXMaster > 0 ? f.cajasXMaster : 0) };
+}
 async function racksAprobar(bajadaId) {
   const b = (_stk.bajadas || []).find(function (x) { return x.id === bajadaId; });
   if (!b) return;
+  const al = racksBajadaAlerta(b);
+  if (al) {
+    let msg = "";
+    if (al.neg) msg += "⚠ En racks hay " + al.saldoRacks + " caja(s) de " + b.cod_art + " y estás por bajar " + al.pedir + ". Quedaría en " + (Math.round((al.saldoRacks - al.pedir) * 100) / 100) + " (NEGATIVO — imposible).\n\n";
+    if (al.otras.length) msg += "⚠ Ya hay otra bajada de " + b.cod_art + " hoy: " + al.otras.map(function (x) { return x.cajas + " cj (" + (x.estado || "") + ")"; }).join(", ") + ".\n¿No es la misma mercadería contada dos veces" + (al.M ? " (1 MC = " + al.M + " cajas)" : "") + "?\n\n";
+    if (!confirm(msg + "¿Aprobar igual la bajada de " + b.cajas + " caja(s)?")) return;
+  }
   try {
     await stockMove([
       { cod_art: b.cod_art, descripcion: b.descripcion || null, deposito: "racks", delta: -Number(b.cajas), tipo: "baja_racks", ref: "orden " + (b.orden_id || ""), legajo: "0" },
