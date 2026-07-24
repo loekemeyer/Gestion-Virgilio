@@ -5549,7 +5549,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v6.20";
+const APP_VERSION = "v6.21";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -19775,6 +19775,38 @@ async function facAuthWriteHeaders(extra) {
   return h;
 }
 
+/* Parte B (v6.21): solo la OPERADORA (su mail) puede forzar la facturación de una NP
+   con faltante recuperable. El resto queda bloqueado. El mail entra por SUPERVISOR_EMAILS,
+   así que la operadora loguea como supervisor y su __identity.email es su mail. */
+const FAC_OPERADORA_EMAIL = "loekemeyer.n8n@gmail.com";
+function _facEsOperadora(){
+  try { return !!(typeof __identity !== "undefined" && __identity && String(__identity.email || "").toLowerCase().trim() === FAC_OPERADORA_EMAIL); }
+  catch (_e){ return false; }
+}
+/* ¿Algún artículo faltante de la NP se puede COMPLETAR? = hay stock en "a guardar",
+   en góndola (terminado) o se guardó hoy. Devuelve la lista de items recuperables. */
+function _facFaltRecuperables(falt){
+  if (!falt || !falt.items) return [];
+  return falt.items.filter(function(it){
+    const kn = _cpNorm(it.cod); const s = _facSaldosN[kn] || {};
+    return (Number(s.a_guardar) || 0) > 0 || (Number(s.terminado) || 0) > 0 || _facGuardadoHoy.has(kn);
+  });
+}
+/* Emite el evento FCO (operadora facturó corto pese a stock recuperable) → Telegram
+   vía trigger notificar_facturacion_override_telegram. texto = NP|TANDA|detalle|RS. */
+function facEmitOverride(np, tanda, rs, items){
+  const det = (items || []).slice(0, 20).map(function(it){ return String(it.cod) + "×" + it.falto; }).join(",");
+  const payload = {
+    legajo: "", opcion: "FCO", descripcion: "Facturó NP con faltante recuperable (override operadora)",
+    texto: [String(np || "").trim(), String(tanda || "").toUpperCase(), det, String(rs || "").slice(0, 60)].join("|"),
+    ts: Date.now(),
+    id: ("fco_" + String(np || "").trim() + "_" + Date.now()).replace(/[^a-zA-Z0-9_\-]/g, ""),
+    ts_inicio_iso: null
+  };
+  try { enqueueReport(payload); } catch (_e) {}
+  if (typeof trySendOneReport === "function") trySendOneReport(payload).then(function(r){ if (r && r.ok && typeof removeFromQueue === "function") removeFromQueue(payload.id); }).catch(function(){});
+}
+
 window.facTickNP = async function(btn){
   let args;
   try { args = JSON.parse(btn.dataset.args); }
@@ -19796,19 +19828,50 @@ window.facTickNP = async function(btn){
     if (!ok0) return;
   }
 
-  // v5.36: si la NP salió con FALTANTES, avisar y pedir confirmación ANTES de
-  // facturarla. La factura debe hacerse por lo ENTREGADO, no lo pedido.
+  // v5.36 / v6.21 (Parte B): si la NP salió con FALTANTES hay dos casos:
+  //  · RECUPERABLE (hay stock en "a guardar" o en góndola para completarlo) →
+  //    NO se factura corto. Se completa desde CP. Solo la operadora puede forzar
+  //    (con aviso Telegram). El resto queda BLOQUEADO.
+  //  · NO recuperable (no hay stock en ningún lado) → se factura por lo ENTREGADO
+  //    con la confirmación de siempre.
   const _falt = facFaltInfo(np);
   if (_falt && _falt.cajas){
-    const det = _falt.items.slice(0, 12).map(function(it){ return it.cod + "×" + it.falto; }).join(", ");
-    const mas = _falt.items.length > 12 ? " (+" + (_falt.items.length - 12) + " más)" : "";
-    const ok = confirm(
-      "⚠ NP " + np + " tiene FALTANTES\n\n" +
-      "Faltaron " + _falt.cajas + " cajas en " + _falt.items.length + " artículo(s):\n" +
-      det + mas + "\n\n" +
-      "Facturá por lo ENTREGADO, no lo pedido.\n¿Marcar esta NP como facturada igual?"
-    );
-    if (!ok) return;
+    const _rec = _facFaltRecuperables(_falt);
+    if (_rec.length){
+      const _detR = _rec.slice(0, 12).map(function(it){
+        const s = _facSaldosN[_cpNorm(it.cod)] || {}; const d = [];
+        if ((Number(s.a_guardar) || 0) > 0) d.push("a guardar " + Math.round(s.a_guardar));
+        if ((Number(s.terminado) || 0) > 0) d.push("góndola " + Math.round(s.terminado));
+        return "• " + it.cod + "×" + it.falto + " (" + (d.join(" · ") || "guardado hoy") + ")";
+      }).join("\n");
+      if (!_facEsOperadora()){
+        alert(
+          "🚫 NP " + np + " todavía NO se factura\n\n" +
+          "Este faltante se puede COMPLETAR — hay stock en “a guardar” o en góndola:\n" + _detR + "\n\n" +
+          "Completá el pedido desde “Completar pedido” (CP) antes de facturar.\n" +
+          "Si igual hay que facturar corto, lo tiene que autorizar la operadora."
+        );
+        return;
+      }
+      const okOv = confirm(
+        "⚠ NP " + np + " — faltante RECUPERABLE\n\n" +
+        "Hay stock para completarlo (a guardar / góndola):\n" + _detR + "\n\n" +
+        "Lo ideal es completarlo desde “Completar pedido” (CP).\n" +
+        "¿Facturar CORTO igual? Queda registrado y se avisa por Telegram."
+      );
+      if (!okOv) return;
+      facEmitOverride(np, tanda, rs, _rec);
+    } else {
+      const det = _falt.items.slice(0, 12).map(function(it){ return it.cod + "×" + it.falto; }).join(", ");
+      const mas = _falt.items.length > 12 ? " (+" + (_falt.items.length - 12) + " más)" : "";
+      const ok = confirm(
+        "⚠ NP " + np + " tiene FALTANTES\n\n" +
+        "Faltaron " + _falt.cajas + " cajas en " + _falt.items.length + " artículo(s):\n" +
+        det + mas + "\n\n" +
+        "Facturá por lo ENTREGADO, no lo pedido.\n¿Marcar esta NP como facturada igual?"
+      );
+      if (!ok) return;
+    }
   }
   btn.disabled = true;
 
