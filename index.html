@@ -5533,7 +5533,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.98";
+const APP_VERSION = "v5.99";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -17449,6 +17449,27 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
         <td class="center">${statusCell(ev.separado, ev.sepLegajo, t.tanda, "separado")}</td>
       </tr>`;
   }
+  // v5.99 — "Tandas a FC" = TODAS las terminadas (picking+separado), aunque estén
+  // FUERA de la ventana de 3 días. El loop de arriba solo sumó las de la ventana;
+  // acá agregamos el resto (con status; refreshMonitor cubre 7 días). Pedido del
+  // dueño: "las tandas a facturar tienen que aparecer todas".
+  {
+    const _fcKeys = new Set(tandasFC.map(function (t) { return t._key || t.tanda; }));
+    for (const [k, v] of sheetMap) {
+      if (!v || !v.opIsSi) continue;
+      const key = v._key || v.tanda;
+      if (_fcKeys.has(key)) continue;
+      const ev2 = statusMap.get(k);
+      if (ev2 && ev2.picking === "done" && ev2.separado === "done") {
+        tandasFC.push(Object.assign({}, v, { ev: ev2 }));
+        _fcKeys.add(key);
+      }
+    }
+    tandasFC.sort(function (a, b) {
+      return String(a.fechaEntregaRaw || "").localeCompare(String(b.fechaEntregaRaw || "")) ||
+             String(a.tanda || "").localeCompare(String(b.tanda || ""));
+    });
+  }
   const todayStr = new Date().toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", timeZone: "America/Argentina/Buenos_Aires" });
   // todayKey/yesterdayKey ahora vienen como parámetros desde refreshMonitor —
   // los usaba acá showDayBreakdown indirectamente, pero ya está cubierto.
@@ -17549,9 +17570,13 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
   const beyondByDate = new Map();
   let beyondTotalTandas = 0;
   let beyondTotalM3 = 0;
-  for (const [, v] of sheetMap) {
+  for (const [k, v] of sheetMap) {
     if (!v.opIsSi || !v.fechaEntregaRaw) continue;
     if (!maxTarget || v.fechaEntregaRaw <= maxTarget) continue;
+    // v5.99: las terminadas ya aparecen en "Tandas a FC" (todas) → NO contarlas acá.
+    // "Fuera de ventana" = trabajo PENDIENTE más lejano de los 3 días.
+    const evB = statusMap.get(k);
+    if (evB && evB.picking === "done" && evB.separado === "done") continue;
     if (!beyondByDate.has(v.fechaEntregaRaw)) {
       beyondByDate.set(v.fechaEntregaRaw, { fechaDisplay: v.fechaEntrega, tandas: [], sumM3: 0 });
     }
@@ -17817,16 +17842,12 @@ async function refreshMonitor() {
     //    la ventana corta ya quedan POCOS pickings por hacer (≤3), expandimos
     //    a 7 días — así, cuando están terminando los pickings, el monitor
     //    adelanta y muestra las tandas de los próximos días automáticamente.
+    // v5.99: la TABLA principal muestra SIEMPRE los próximos 3 días hábiles (pedido
+    // del dueño). Antes se auto-expandía a 7 días cuando quedaban pocos pickings;
+    // ahora lo que está más lejos de 3 días va a la card "Fuera de ventana" (m³), y
+    // el panel "Tandas a FC" muestra TODAS las terminadas igual (ver renderMonitor).
     const narrowDates = targetDeliveryDates(sheetMap, 3);
-    const narrowSet   = new Set(narrowDates);
-    let pickingsPendientes = 0;
-    for (const [k, v] of sheetMap) {
-      if (!narrowSet.has(v.fechaEntregaRaw)) continue;
-      if (!v.opIsSi) continue;
-      const ev = statusMap.get(k) || {};
-      if (ev.picking !== "done") pickingsPendientes++;
-    }
-    const targetDates = pickingsPendientes <= 3 ? wideTargetDates : narrowDates;
+    const targetDates = narrowDates;
     await getEmpleadosNombres();   // legajo -> nombre para la leyenda (cacheado 1h)
     // Stats por operario para el panel de la derecha (Mts3 x Hora) — hoy + ayer.
     // Cacheado 15s para no martillar Supabase en cada tick. Best-effort: si falla,
