@@ -2211,10 +2211,13 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .csep-tosep{ display:block; width:100%; margin-top:9px; padding:10px; border:1.5px dashed #fcd34d; border-radius:11px; background:#fffbeb; color:#b45309; font-size:13px; font-weight:800; cursor:pointer; }
 .csep-mxwrap{ overflow-x:auto; -webkit-overflow-scrolling:touch; border:1px solid #e2e8f0; border-radius:10px; max-height:60vh; }
 .csep-mx{ border-collapse:collapse; width:100%; }
-.csep-mx th,.csep-mx td{ text-align:center; font-size:13px; padding:8px 6px; border-bottom:1px solid #eef2f6; white-space:nowrap; }
-.csep-mx thead th{ font-size:11px; color:#64748b; font-weight:800; border-bottom:2px solid #e2e8f0; position:sticky; top:0; background:#fff; z-index:1; }
-.csep-mxc{ text-align:left !important; font-family:Consolas,Menlo,monospace; font-weight:800; font-size:13px; position:sticky; left:0; background:#fff; }
-.csep-mxt{ background:#f8fafc; color:#475569; font-weight:800; font-size:12px; }
+/* v5.96: líneas (grid) para ver claro qué cantidad va a qué NP — vertical entre
+   columnas + horizontal entre códigos. */
+.csep-mx th,.csep-mx td{ text-align:center; font-size:13px; padding:8px 6px; border-bottom:1px solid #d7dee7; border-right:1px solid #e8ecf1; white-space:nowrap; }
+.csep-mx th:last-child,.csep-mx td:last-child{ border-right:none; }
+.csep-mx thead th{ font-size:11px; color:#64748b; font-weight:800; border-bottom:2px solid #cbd5e1; position:sticky; top:0; background:#fff; z-index:1; }
+.csep-mxc{ text-align:left !important; font-family:Consolas,Menlo,monospace; font-weight:800; font-size:13px; position:sticky; left:0; background:#fff; border-right:2px solid #cbd5e1; box-shadow:2px 0 0 #cbd5e1; }
+.csep-mxt{ background:#f8fafc; color:#475569; font-weight:800; font-size:12px; border-right:2px solid #cbd5e1 !important; }
 .csep-cell{ font-weight:800; color:#1e6bd6; cursor:pointer; }
 .csep-cdone{ display:inline-block; min-width:30px; padding:5px 9px; background:#16a34a; color:#fff; border-radius:8px; font-weight:800; }
 .csep-z{ color:#cbd5e1; font-weight:700; }
@@ -5530,7 +5533,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.95";
+const APP_VERSION = "v5.96";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -7729,7 +7732,13 @@ function _compRenderSep() {
     '<button class="csep-tog' + (view === "pedido" ? " on" : "") + '" onclick="_compSepView(\'' + (view === "pedido" ? "picking" : "pedido") + '\')" title="Cambiar vista"><span class="csep-knob"></span></button>' +
     '<span class="csep-swl' + (view === "pedido" ? " on" : "") + '">Por<br>pedido</span></div></div>';
   h += (view === "picking") ? _compSepMatrix() : _compSepPedido();
+  // v5.96: guardar el scroll ANTES de reemplazar (la matriz .csep-mxwrap y el cuerpo
+  // del modal .comp-body se recrean) → tocar una celda ya NO manda la vista arriba.
+  const _oldMx = el.querySelector(".csep-mxwrap"); const _mxTop = _oldMx ? _oldMx.scrollTop : 0;
+  const _body = el.closest(".comp-body"); const _bodyTop = _body ? _body.scrollTop : 0;
   el.innerHTML = h;
+  const _newMx = el.querySelector(".csep-mxwrap"); if (_newMx && _mxTop) _newMx.scrollTop = _mxTop;
+  if (_body && _bodyTop) _body.scrollTop = _bodyTop;
 }
 function _compSepPedido() {
   const nps = _comp.nps;
