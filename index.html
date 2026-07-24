@@ -4434,6 +4434,9 @@ function renderPendingSuggestion(){
   // app a mitad del picking — antes se perdía todo. Va arriba de todo.
   try {
     const savedPk = pkLoadSaved(legajo);
+    const stPk = getLegajoState(legajo);
+    const openTanda = (stPk && stPk.picking && stPk.picking.active && stPk.picking.value)
+      ? String(stPk.picking.value).trim().toUpperCase() : "";
     if (savedPk) {
       const hechos = Object.keys(savedPk.results || {}).length;
       const total  = (savedPk.items || []).length;
@@ -4442,6 +4445,17 @@ function renderPendingSuggestion(){
       btn.style.background = "#7c3aed";
       btn.innerText = `▶ Seguir picking tanda ${savedPk.tanda} (${hechos}/${total})`;
       btn.onclick = () => pkResume(legajo);
+      box.appendChild(btn);
+    } else if (openTanda) {
+      // v5.91: hay un picking ABIERTO pero sin guardado local (cruzó de día, se hizo
+      // en otro celular, o se limpió). Botón para CONTINUAR reconstruyendo el avance
+      // desde el servidor — antes solo aparecía "terminar", que cerraba el picking a
+      // medio hacer y no dejaba seguir lo de ayer.
+      const btn = document.createElement("button");
+      btn.className = "primary-btn";
+      btn.style.background = "#7c3aed";
+      btn.innerText = `▶ Seguir picking tanda ${openTanda}`;
+      btn.onclick = () => pkResumeServer(openTanda, legajo);
       box.appendChild(btn);
     }
   } catch (_e) { /* no-op */ }
@@ -5491,7 +5505,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.90";
+const APP_VERSION = "v5.91";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -6556,7 +6570,20 @@ function pkLoadSaved(legajo) {
     const raw = localStorage.getItem(PK_SAVE_PREFIX + String(legajo || ""));
     if (!raw) return null;
     const s = JSON.parse(raw);
-    if (!s || s.day !== getTodayKey() || !s.items || !s.items.length) { pkClearSaved(legajo); return null; }
+    if (!s || !s.items || !s.items.length) { pkClearSaved(legajo); return null; }
+    // v5.91: si el guardado es de OTRO día, conservarlo SOLO si el picking sigue
+    // ABIERTO (cruzó de día: se empezó a la tarde y se sigue al otro día). Antes se
+    // borraba siempre → se perdía el avance y no se podía continuar lo de ayer. Si el
+    // picking ya no está abierto para esa tanda, es basura vieja → limpiar.
+    if (s.day !== getTodayKey()) {
+      let stillOpen = false;
+      try {
+        const stp = getLegajoState(String(legajo || ""));
+        stillOpen = !!(stp && stp.picking && stp.picking.active &&
+          String(stp.picking.value || "").trim().toUpperCase() === String(s.tanda || "").trim().toUpperCase());
+      } catch (_e2) { /* no-op */ }
+      if (!stillOpen) { pkClearSaved(legajo); return null; }
+    }
     return s;
   } catch (_e) { return null; }
 }
@@ -6578,7 +6605,49 @@ function pkResume(legajo) {
   pkRender();
 }
 
-async function showPickingList(tanda, legajo) {
+/* v5.91 — Marcas de picking YA enviadas al servidor (eventos PKC) de una tanda/
+   legajo → Map<CÓDIGO, reales> (la ÚLTIMA marca por código gana). Sirve para
+   RECONSTRUIR el avance cuando el guardado local no está: el picking cruzó de día,
+   se hizo en otro celular, o se limpió. `sinceIso` acota al arranque del picking
+   (ts_inicio del EP) para no traer marcas de una vez anterior con el mismo código. */
+async function pkFetchServerMarks(tanda, legajo, sinceIso) {
+  const out = new Map();
+  try {
+    const lg = String(legajo || "").trim();
+    const tU = String(tanda || "").trim().toUpperCase();
+    if (!lg || !tU) return out;
+    let since = sinceIso;
+    if (!since) { try { since = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(); } catch (_e) { since = null; } }
+    let q = "opcion=eq.PKC&legajo=eq." + encodeURIComponent(lg) + "&select=texto,ts_cliente&order=ts_cliente.asc";
+    if (since) q += "&ts_cliente=gte." + encodeURIComponent(since);
+    const rows = await supaFetchAll(SUPABASE_TABLE_ENDPOINT, q);
+    for (const r of rows) {
+      const parts = String((r && r.texto) || "").split("|");
+      if (parts.length < 4) continue;                                   // texto = TANDA|COD|ESP|REAL
+      if (String(parts[0]).trim().toUpperCase() !== tU) continue;
+      const code = String(parts[1]).trim().toUpperCase();
+      if (!code) continue;
+      const real = Number(parts[3]);
+      out.set(code, isNaN(real) ? 0 : real);                            // order asc → queda la última del código
+    }
+  } catch (_e) { /* best-effort: si no hay red, devuelve vacío y arranca sin sembrar */ }
+  return out;
+}
+
+/* v5.91 — Retomar un picking ABIERTO cuyo snapshot local NO está (típico: se empezó
+   ayer a la tarde y hoy se sigue; el guardado local se borró por el cambio de día).
+   Reusa showPickingList (baja la lista fresca de la tanda) sembrando el avance desde
+   el servidor. Necesita señal (es un "retomar", no el picking 100% offline). */
+function pkResumeServer(tanda, legajo) {
+  let sinceIso = null;
+  try {
+    const st = getLegajoState(String(legajo || ""));
+    if (st && st.picking && st.picking.ts_inicio) sinceIso = st.picking.ts_inicio;
+  } catch (_e) { /* no-op */ }
+  showPickingList(tanda, legajo, { seedFromServer: true, sinceIso: sinceIso });
+}
+
+async function showPickingList(tanda, legajo, opts) {
   const tNorm = (tanda || "").trim().toUpperCase();
   if (!tNorm) return;
   const m = document.getElementById("tandaModal");
@@ -6672,6 +6741,23 @@ async function showPickingList(tanda, legajo) {
         _pk.mode = "item";
       }
     } catch (_e) { /* si algo falla, arranca limpio */ }
+    // v5.91: RECONSTRUIR el avance desde el SERVIDOR (los PKC ya enviados) al retomar
+    // un picking cuyo snapshot local no está (cruzó de día / otro celular / se limpió).
+    // Marca lo ya pickeado y ubica en el PRIMER artículo sin marcar → se continúa sin
+    // volver a pickear lo de ayer.
+    if (opts && opts.seedFromServer) {
+      try {
+        const srv = await pkFetchServerMarks(tNorm, _pk.legajo, opts.sinceIso);
+        for (const it of _pk.items) {
+          if (it.skip || it.isExc) continue;
+          const code = String(it.art).toUpperCase();
+          if (srv.has(code) && _pk.results[it.key] == null) _pk.results[it.key] = srv.get(code);
+        }
+        const fp = _pk.items.findIndex(it => !it.skip && _pk.results[it.key] == null);
+        _pk.idx = fp >= 0 ? fp : _pk.items.length;
+        _pk.mode = "item";
+      } catch (_e) { /* si falla, arranca donde esté (no rompe el retomar) */ }
+    }
     pkRender();
     pkNotifySinPlanim(tNorm, _pk.legajo, items, G);   // aviso Telegram si hay códigos sin planimetría
   } catch (e) {
