@@ -68,6 +68,8 @@ const RCP_CSS = `
 #rcpRoot .opTipoBtns{ display:flex; flex-direction:column; gap:16px; max-width:420px; margin:10px auto 0; }
 #rcpRoot .opTipoBtn{ height:90px; font-size:22px; font-weight:900; border-radius:14px; border:2px solid var(--border); background:#fff; color:#111; cursor:pointer; }
 #rcpRoot .opTipoBtn:hover{ border-color:#111; }
+/* Botón secundario (Carga Manual): más chico y apagado (v5.93). */
+#rcpRoot .opTipoBtn.opBtnSm{ height:52px; font-size:15px; font-weight:700; color:#64748b; }
 #rcpRoot .opLista{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
 #rcpRoot .btnBig{ height:52px; font-size:18px; padding:0 24px; }
 #rcpRoot .btnAnular{ border:2px solid var(--danger); background:#fff; color:var(--danger); border-radius:10px; padding:10px 16px; font-weight:900; cursor:pointer; }
@@ -1000,10 +1002,8 @@ function renderMenu() {
   opBody.innerHTML = "";
   const cont = document.createElement("div");
   cont.className = "opTipoBtns";
-  const bc = document.createElement("button");
-  bc.type = "button"; bc.className = "opTipoBtn";
-  bc.textContent = "✍️ Carga Manual";
-  bc.onclick = () => { opResetState(); renderTipoElegir(); };   // fromMenu sigue true → "Atrás" vuelve al menú
+  // Orden por importancia (pedido del dueño, v5.93): 1º Pendientes (con contador de
+  // remitos por cargar), 2º Bajadas Racks, 3º Carga Manual (chico = uso puntual).
   const bp = document.createElement("button");
   bp.type = "button"; bp.className = "opTipoBtn";
   bp.textContent = "📋 Pendientes";
@@ -1012,10 +1012,25 @@ function renderMenu() {
   br.type = "button"; br.className = "opTipoBtn";
   br.textContent = "📦 Bajadas Racks → góndola";
   br.onclick = () => renderBajadasRacks();
-  cont.appendChild(bc); cont.appendChild(bp); cont.appendChild(br);
+  const bc = document.createElement("button");
+  bc.type = "button"; bc.className = "opTipoBtn opBtnSm";
+  bc.textContent = "✍️ Carga Manual";
+  bc.onclick = () => { opResetState(); renderTipoElegir(); };   // fromMenu sigue true → "Atrás" vuelve al menú
+  cont.appendChild(bp); cont.appendChild(br); cont.appendChild(bc);
   opBody.appendChild(cont);
-  // Si hay bajadas de racks esperando aprobación, lo marco en el botón.
+  // Contadores en los botones: remitos pendientes de cargar + bajadas por aprobar.
+  pendBadgePend(bp);
   racksBadgePend(br);
+}
+/* v5.93 — Contador de remitos pendientes de cargar en el botón "Pendientes"
+   (mismas filas que renderPendientes: Control_Modo_OP con estado='pendiente'). */
+async function pendBadgePend(btn) {
+  try {
+    await sessionReady;
+    const r = await supabase.from("Control_Modo_OP").select("id", { count: "exact", head: true }).eq("estado", "pendiente");
+    const n = r.count || 0;
+    if (n > 0 && btn) btn.textContent = "📋 Pendientes (" + n + ")";
+  } catch (_e) {}
 }
 /* ===== RACKS → góndola (v4.08): Marianela aprueba acá lo que los operarios
    marcaron para bajar. Al aprobar se hace el movimiento entre depósitos
