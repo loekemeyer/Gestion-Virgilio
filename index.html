@@ -2160,6 +2160,11 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .cmpl-autobar{ font-size:12.5px; color:#92400e; background:#fffbeb; border:1px solid #fcd34d; border-radius:9px; padding:7px 10px; margin:0 0 9px; line-height:1.35; }
 .cmpl-szinp{ width:48px; height:28px; text-align:center; font-size:15px; font-weight:800; border:1.5px solid #fcd34d; border-radius:7px; margin:0 2px; padding:0; -moz-appearance:textfield; }
 .cmpl-szinp::-webkit-outer-spin-button,.cmpl-szinp::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
+.cmpl-repbar{ display:flex; gap:8px; align-items:stretch; margin:0 0 10px; }
+.cmpl-rep{ flex:1; margin:0; padding:11px 12px; border:2px solid #16a34a; border-radius:11px; background:#f0fdf4; color:#15803d; font-size:15px; font-weight:800; cursor:pointer; line-height:1.15; text-align:center; }
+.cmpl-rep small{ font-weight:700; color:#16a34a; }
+.cmpl-rep:active{ background:#dcfce7; }
+.cmpl-repminus{ flex:0 0 auto; width:56px; margin:0; padding:0; border:2px solid #cbd5e1; border-radius:11px; background:#fff; color:#475569; font-size:26px; font-weight:800; line-height:1; cursor:pointer; }
 .cmpl-cerrar{ display:block; width:100%; margin-top:11px; padding:13px; border:none; border-radius:12px; background:#16a34a; color:#fff; font-size:16px; font-weight:800; cursor:pointer; }
 .cmpl-cerrar:disabled{ background:#cbd5e1; color:#64748b; cursor:not-allowed; }
 .cmpl-back{ width:auto; background:#f1f5f9; color:#334155; border:1px solid #cbd5e1; border-radius:9px; padding:7px 14px; font-size:13px; font-weight:800; cursor:pointer; margin-bottom:10px; }
@@ -5533,7 +5538,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v6.05";
+const APP_VERSION = "v6.06";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -7647,6 +7652,20 @@ function _compRenderLios() {
       '<div class="cmpl-ctrl cmpl-ctrl-lio">🔨 Armando<br>Lío ' + curLetter + (curCajas ? ' (' + curCajas + ')' : '') + '</div>' +
       '<button class="cmpl-ctrl cmpl-ctrl-edit" onclick="_compViewEditar()"' + (n.liosArr.length ? '' : ' disabled') + '>✏️ Editar<br>líos (' + n.liosArr.length + ')</button>' +
       '<button class="cmpl-ctrl cmpl-ctrl-su" onclick="_compViewSueltas()">📦 Sueltas<br>(' + nRest + ')</button></div>';
+    // v6.06 — botón "🔁 Repetir" el ÚLTIMO lío cerrado (otro igual), sólo si quedan
+    // cajas para repetirlo (si no, no aparece). "−" saca el último de ese lío.
+    if (n.liosArr.length) {
+      const lastLio = n.liosArr[n.liosArr.length - 1];
+      const grp = _compLioGroups(n), sig = _compLioSig(lastLio);
+      let g = null; for (let gi = 0; gi < grp.length; gi++) { if (grp[gi].sig === sig) { g = grp[gi]; break; } }
+      if (g && (g.canMore || g.count > 1)) {
+        const compTxt = (lastLio.items || []).map(function (it) { return escapeHtml(it.cod) + '×' + it.qty; }).join(' + ');
+        h += '<div class="cmpl-repbar">';
+        if (g.canMore) h += '<button class="cmpl-rep" onclick="_compRepetirLast()">🔁 Repetir Lío ' + g.label + '<br><small>otro igual · ' + compTxt + '</small></button>';
+        if (g.count > 1) h += '<button class="cmpl-repminus" onclick="_compQuitarLast()" title="Quitar el último de ese lío">−</button>';
+        h += '</div>';
+      }
+    }
     // v5.105: atajo "⚡ Líos de a N" SACADO por ahora (pedido del dueño: funcionaba mal).
     // Las funciones _compLioAuto/_compSetLioSize quedan definidas por si se reactiva.
     h += '<div class="cmpl-grid">' + n.codes.map(function (c, ci) {
@@ -7682,6 +7701,21 @@ function _compGroupMore(gi) { const n = _compLioNow(); if (!n) return; const g =
 function _compGroupLess(gi) { const n = _compLioNow(); if (!n) return; const g = _compLioGroups(n)[gi]; if (!g) return; _compLioDel(g.idxs[g.idxs.length - 1]); }
 function _compGroupDel(gi) { const n = _compLioNow(); if (!n) return; const g = _compLioGroups(n)[gi]; if (!g) return; g.idxs.slice().sort(function (a, b) { return b - a; }).forEach(function (k) { const l = n.liosArr[k]; if (l) { l.items.forEach(function (it) { const c = n.codes.find(function (x) { return x.cod === it.cod; }); if (c) c.rest += it.qty; }); n.liosArr.splice(k, 1); } }); _compLioMark(n); _compRenderLios(); _compRecalc(); }
 function _compGroupReopen(gi) { const n = _compLioNow(); if (!n) return; const g = _compLioGroups(n)[gi]; if (!g) return; const k = g.idxs[g.idxs.length - 1]; const l = n.liosArr[k]; if (!l) return; l.items.forEach(function (it) { const c = n.codes.find(function (x) { return x.cod === it.cod; }); if (c) c.cur += it.qty; }); n.liosArr.splice(k, 1); _comp.liosView = "armar"; _compLioMark(n); _compRenderLios(); _compRecalc(); }
+/* v6.06 — "🔁 Repetir": arma OTRO lío igual al ÚLTIMO cerrado (solo si quedan cajas
+   para hacerlo — si no, el botón no aparece). "−" saca el último de ese lío. Reusa la
+   lógica de grupos (_compGroupMore/Less), sin abrir ninguna vista nueva. */
+function _compRepetirLast() {
+  const n = _compLioNow(); if (!n || !n.liosArr || !n.liosArr.length) return;
+  const sig = _compLioSig(n.liosArr[n.liosArr.length - 1]);
+  const grp = _compLioGroups(n);
+  for (let gi = 0; gi < grp.length; gi++) { if (grp[gi].sig === sig) { if (grp[gi].canMore) _compGroupMore(gi); return; } }
+}
+function _compQuitarLast() {
+  const n = _compLioNow(); if (!n || !n.liosArr || !n.liosArr.length) return;
+  const sig = _compLioSig(n.liosArr[n.liosArr.length - 1]);
+  const grp = _compLioGroups(n);
+  for (let gi = 0; gi < grp.length; gi++) { if (grp[gi].sig === sig) { if (grp[gi].count > 1) _compGroupLess(gi); return; } }
+}
 /* =========================================================
    Paso 2 — SEPARAR POR NP (v4.91). Antes de armar líos, el AP/TAP separa la
    mesa (mezcla de varias NPs) por pedido. Dos vistas que comparten estado

@@ -4,7 +4,9 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-07-24 · Versión app al documentar: **v6.05**
+> Última actualización: 2026-07-24 · Versión app al documentar: **v6.06**
+>
+> Nota: **v6.06 — Botón "🔁 Repetir" en el armado de líos** (reemplaza al atajo ⚡ que se sacó en v5.105, ahora claro y sin vista nueva). Pedido del dueño. En el paso Líos (`_compRenderLios`, vista *armar*), **después de cerrar un lío** aparece **🔁 Repetir Lío X** (otro igual) — **SOLO si quedan cajas para repetirlo** (`_compLioGroups().canMore`); si no, no se muestra. Cada toque arma otro lío idéntico al ÚLTIMO cerrado (`_compRepetirLast` → `_compGroupMore`); un **−** saca el último si se pasó (`_compQuitarLast` → `_compGroupLess`, aparece con ≥2 de ese lío). Reusa la lógica de grupos que ya existía en "Editar líos" (por eso es sólido). Dato que lo motiva: el historial de TAL muestra que los líos **puros** de un artículo son muy consistentes (ej. **505 → de a 5 cajas en 165 de ~200 veces**), así que "repetir el último" es lo natural. Verificado: `comp-doblearmado.cjs` + smoke OK.
 >
 > Nota: **v6.05 — Bump de versión (reset del esquema: v5.105 → v6.05)**. Pedido del dueño. Sin cambios funcionales, solo `APP_VERSION` (index.html) y `SW_VERSION` (sw.js). De acá en más se sigue con **v6.0x**.
 >
