@@ -2164,6 +2164,8 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .cmpl-rep{ flex:1; margin:0; padding:11px 12px; border:2px solid #16a34a; border-radius:11px; background:#f0fdf4; color:#15803d; font-size:15px; font-weight:800; cursor:pointer; line-height:1.15; text-align:center; }
 .cmpl-rep small{ font-weight:700; color:#16a34a; }
 .cmpl-rep:active{ background:#dcfce7; }
+.cmpl-rep.off{ border-color:#cbd5e1; background:#f1f5f9; color:#94a3b8; }
+.cmpl-rep.off small{ color:#94a3b8; }
 .cmpl-repminus{ flex:0 0 auto; width:56px; margin:0; padding:0; border:2px solid #cbd5e1; border-radius:11px; background:#fff; color:#475569; font-size:26px; font-weight:800; line-height:1; cursor:pointer; }
 .cmpl-cerrar{ display:block; width:100%; margin-top:11px; padding:13px; border:none; border-radius:12px; background:#16a34a; color:#fff; font-size:16px; font-weight:800; cursor:pointer; }
 .cmpl-cerrar:disabled{ background:#cbd5e1; color:#64748b; cursor:not-allowed; }
@@ -5538,7 +5540,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v6.06";
+const APP_VERSION = "v6.07";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -7658,10 +7660,10 @@ function _compRenderLios() {
       const lastLio = n.liosArr[n.liosArr.length - 1];
       const grp = _compLioGroups(n), sig = _compLioSig(lastLio);
       let g = null; for (let gi = 0; gi < grp.length; gi++) { if (grp[gi].sig === sig) { g = grp[gi]; break; } }
-      if (g && (g.canMore || g.count > 1)) {
+      if (g) {
         const compTxt = (lastLio.items || []).map(function (it) { return escapeHtml(it.cod) + '×' + it.qty; }).join(' + ');
         h += '<div class="cmpl-repbar">';
-        if (g.canMore) h += '<button class="cmpl-rep" onclick="_compRepetirLast()">🔁 Repetir Lío ' + g.label + '<br><small>otro igual · ' + compTxt + '</small></button>';
+        h += '<button class="cmpl-rep' + (g.canMore ? '' : ' off') + '" onclick="_compRepetirLast()">🔁 Repetir Lío ' + g.label + '<br><small>' + (g.canMore ? 'otro igual · ' + compTxt : 'ya no quedan cajas') + '</small></button>';
         if (g.count > 1) h += '<button class="cmpl-repminus" onclick="_compQuitarLast()" title="Quitar el último de ese lío">−</button>';
         h += '</div>';
       }
@@ -7706,9 +7708,22 @@ function _compGroupReopen(gi) { const n = _compLioNow(); if (!n) return; const g
    lógica de grupos (_compGroupMore/Less), sin abrir ninguna vista nueva. */
 function _compRepetirLast() {
   const n = _compLioNow(); if (!n || !n.liosArr || !n.liosArr.length) return;
-  const sig = _compLioSig(n.liosArr[n.liosArr.length - 1]);
+  const last = n.liosArr[n.liosArr.length - 1], sig = _compLioSig(last);
   const grp = _compLioGroups(n);
-  for (let gi = 0; gi < grp.length; gi++) { if (grp[gi].sig === sig) { if (grp[gi].canMore) _compGroupMore(gi); return; } }
+  for (let gi = 0; gi < grp.length; gi++) {
+    if (grp[gi].sig === sig) {
+      if (grp[gi].canMore) { _compGroupMore(gi); }   // repite (descuenta lo mismo que el lío anterior)
+      else {
+        // se pasó: no quedan cajas → avisa claro, NO rompe ni descuenta de más.
+        const cods = (last.items || []).map(function (it) { return it.cod; });
+        const msg = cods.length === 1
+          ? "Ya usaste todas las cajas del " + cods[0] + " — no se puede armar otro lío igual."
+          : "No quedan cajas suficientes para repetir ese lío.";
+        try { alert("🚫 " + msg); } catch (_e) {}
+      }
+      return;
+    }
+  }
 }
 function _compQuitarLast() {
   const n = _compLioNow(); if (!n || !n.liosArr || !n.liosArr.length) return;
