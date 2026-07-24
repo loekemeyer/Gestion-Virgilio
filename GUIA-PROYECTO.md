@@ -4,7 +4,9 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-07-24 · Versión app al documentar: **v6.13**
+> Última actualización: 2026-07-24 · Versión app al documentar: **v6.14**
+>
+> Nota: **v6.14 — CP: filtro por "completable" = a guardar O góndola** (ajuste del v6.09). El dueño marcó que el CP le pedía completar faltantes de artículos **sin stock en ningún lado** (ej. NP 97986: 361E/367E, que no tienen ni a_guardar ni góndola). Ahora el filtro de `showCPModal`/`cpReloadFaltantes` muestra un faltante **solo si su artículo tiene stock en `a_guardar` > 0 O en `terminado` (góndola) > 0** — que son justamente los dos orígenes desde los que el CP puede completar (paso 2). Si no hay en ninguno, no figura. Cada fila muestra dónde está el stock ("a guardar: N · góndola: M"). Sigue sin filtrarse el acceso directo `focusNp`.
 >
 > Nota: **v6.13 — Merge de la rama `stock-negativo` sobre main v6.12 (2º reintegro)**. Main volvió a avanzar (v6.08→v6.12: rediseño Editar líos, picking ubicación por origen/Otra, excedente→góndola, MG borrador, faltante-que-llegó automático). Se remergeó `origin/main` a la rama: **cero conflictos de código** otra vez (solo versiones). La rama trae, sobre v6.12: (a) Facturación NPs a FC con anchos **%** (sin scroll) + box-sizing; (b) **racks** — guardarraíles al aprobar (`racksBajadaAlerta`) + botón "✗ Rechazar"; (c) **a_facturar por NP** (`stockSalidaFacturadoNP`, `ref=tanda|NP`); (d) **PPP** Avellaneda→Zona 1 + Z2 en ruta Sur/Centro/Oeste; (e) **CP operario** filtrado a solo artículos "a guardar" con faltante (v6.09 de la rama). Datos ya live: 931E/984E, C86C, 982E #28, 97822, Avellaneda. **Pendiente**: parte B del CP (vista operadora en Facturación + bloqueo del tilde + Telegram).
 >
