@@ -59,7 +59,7 @@ catch (_e) {
     window.__ASSIGN = t; window.__TASKS = [t];
     await faltAsignarme(1);
     const h = document.getElementById("faltPopupBody").innerHTML;
-    return { isMine: /Te lo asignaste/.test(h), showsNp: /98114/.test(h), showsArt: /315/.test(h), hasCompletar: /faltCompletar\(1/.test(h), hasListo: /faltYaListo\(1\)/.test(h) };
+    return { isMine: /Te lo asignaste/.test(h), showsNp: /98114/.test(h), showsArt: /315/.test(h), hasCompletar: /faltCompletar\(1/.test(h), hasSoltar: /faltSoltar\(1\)/.test(h) };
   });
 
   // F) estoy MIRANDO una pendiente y la toma OTRO (sin que yo intente) → "ya la toma X"
@@ -104,7 +104,7 @@ catch (_e) {
   });
 
   const okA = A.shown && A.isPend && A.hasAssign && A.noDetailYet;
-  const okB = B.isMine && B.showsNp && B.showsArt && B.hasCompletar && B.hasListo;
+  const okB = B.isMine && B.showsNp && B.showsArt && B.hasCompletar && B.hasSoltar;
   const okF = F.wasPend && F.nowTaken;
   const okC = C.taken;
   const okD = D.active && D.hasCompletando && D.hasPedro && D.noneForOther;
