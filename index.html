@@ -5549,7 +5549,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v6.19";
+const APP_VERSION = "v6.20";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -12335,6 +12335,53 @@ function faltPollStart() {
   try { faltPoll(); } catch (_e) {}
   if (!_faltPollTimer) _faltPollTimer = setInterval(function () { try { faltPoll(); } catch (_e) {} }, 6000);
 }
+
+/* ============================================================
+   v6.20 — Recordatorio "Completar Pedido" para Moncayo (legajo 104).
+   Todos los días HÁBILES (lun-vie), a partir de las 15:30 AR, cuando
+   Moncayo esté en la botonera (es decir, NO en medio de una tarea),
+   le avisa "es hora de completar los faltantes" y le abre directamente
+   el módulo CP. Dispara UNA sola vez por día (dedup en localStorage por
+   fecha). Si a las 15:30 está en medio de una tarea, NO lo interrumpe:
+   espera a que vuelva a la botonera y recién ahí dispara. Corre en el
+   celular del operario (poll cada 25s); el chequeo se auto-limita al
+   legajo 104, así que es inofensivo para el resto.
+   Para cambiar destinatario/hora: editar CP_RECORD_LEGAJO / CP_RECORD_MIN.
+   ============================================================ */
+const CP_RECORD_LEGAJO = "104";              // Jhonny Moncayo
+const CP_RECORD_MIN    = 15 * 60 + 30;       // 15:30 (minutos desde 00:00, hora AR)
+let _cpRecordTimer = null;
+function _cpRecordNowAR() {
+  try {
+    const ymd = new Date().toLocaleDateString("en-CA", { timeZone: TZ_AR });                                  // YYYY-MM-DD
+    const wd  = new Date().toLocaleDateString("en-US", { timeZone: TZ_AR, weekday: "short" });                // "Mon".."Sun"
+    const hm  = new Date().toLocaleTimeString("en-GB", { timeZone: TZ_AR, hour12: false, hour: "2-digit", minute: "2-digit" }); // "HH:MM"
+    const p   = String(hm).split(":");
+    const min = (parseInt(p[0], 10) || 0) * 60 + (parseInt(p[1], 10) || 0);
+    return { ymd: ymd, min: min, habil: ["Mon", "Tue", "Wed", "Thu", "Fri"].indexOf(wd) >= 0 };
+  } catch (_e) { return null; }
+}
+function cpRecordCheck() {
+  try {
+    const t = _cpRecordNowAR(); if (!t || !t.ymd) return;
+    if (!t.habil || t.min < CP_RECORD_MIN) return;                 // solo días hábiles, de 15:30 en adelante
+    if (_faltMiLegajo() !== CP_RECORD_LEGAJO) return;              // solo Moncayo
+    if (!_faltActivo()) return;                                    // en la botonera (no en medio de una tarea)
+    const cpOpen = (function () { const m = document.getElementById("cpModal"); return !!(m && m.classList.contains("show")); })();
+    if (cpOpen) return;                                            // ya está abierto
+    const key = "vir_cp_record_" + CP_RECORD_LEGAJO + "_" + t.ymd; // dedup: 1 vez por día
+    if (localStorage.getItem(key)) return;
+    localStorage.setItem(key, "1");
+    try { alert("⏰ Es hora de completar los faltantes."); } catch (_e) {}
+    try { showCPModal(CP_RECORD_LEGAJO); } catch (_e) {}
+  } catch (_e) {}
+}
+function cpRecordStart() {
+  if (_cpRecordTimer) return;
+  try { cpRecordCheck(); } catch (_e) {}
+  _cpRecordTimer = setInterval(function () { try { cpRecordCheck(); } catch (_e) {} }, 25000);
+}
+cpRecordStart();
 function faltDecidePopup() {
   if (!FALT_POPUP_ENABLED) { try { faltHidePopup(); } catch (_e) {} return; }
   if (!_faltActivo()) { faltHidePopup(); return; }
