@@ -2533,7 +2533,7 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 }
 #facturacionModal.show{ display: block; }
 .fac-banner,.fac-top,.fac-cierre,.fac-empty{
-  max-width: 1240px;
+  max-width: 1400px;
   margin-left: auto;
   margin-right: auto;
 }
@@ -2580,7 +2580,7 @@ table.fac-np-tbl{ width: 100%; border-collapse: collapse; font-size: 13px; table
 table.fac-np-tbl th{
   background: #f1f5f9; color: #475569; font-weight: bold; font-size: 11px;
   text-align: left; padding: 6px 8px; border-bottom: 1px solid #cbd5e1;
-  text-transform: uppercase; letter-spacing: .3px;
+  text-transform: uppercase; letter-spacing: .3px; box-sizing: border-box;
 }
 table.fac-np-tbl th.num{ text-align: right; }
 table.fac-np-tbl th.center{ text-align: center; }
@@ -2588,7 +2588,7 @@ table.fac-np-tbl tbody tr{ border-bottom: 1px solid #f1f5f9; transition: opacity
 table.fac-np-tbl tbody tr:last-child{ border-bottom: none; }
 table.fac-np-tbl tbody tr:hover{ background: #f8fafc; }
 table.fac-np-tbl tbody tr.fading{ opacity: 0; transform: translateX(20px); }
-table.fac-np-tbl td{ padding: 3px 8px; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+table.fac-np-tbl td{ padding: 3px 8px; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; box-sizing: border-box; }
 table.fac-np-tbl td.num{ text-align: right; font-variant-numeric: tabular-nums; }
 table.fac-np-tbl td.center{ text-align: center; }
 .fac-np-cell{ font-family: monospace; font-weight: bold; color: #1e6bd6; font-size: 13px; }
@@ -2607,7 +2607,7 @@ table.fac-np-tbl tbody tr.fac-tanda-alt td{ background: #f8fafc; }
 table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
 .fac-table-wrap{
   background: #fff; border: 1px solid #cbd5e1; border-radius: 8px;
-  overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 1240px; margin: 0 auto;
+  overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 1400px; margin: 0 auto;
 }
 .fac-btn-tick{
   background: #16a34a; color: #fff; border: none; border-radius: 4px;
@@ -5491,7 +5491,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.90";
+const APP_VERSION = "v5.91";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco

@@ -4,7 +4,9 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-07-24 · Versión app al documentar: **v5.90**
+> Última actualización: 2026-07-24 · Versión app al documentar: **v5.91**
+>
+> Nota: **v5.91 — Facturación (NPs a FC): la tabla entra en pantalla sin scroll horizontal**. Pedido del dueño: en el monitor de ventas la tabla `fac-np-tbl` se cortaba y la última columna **Acción (✓)** quedaba fuera, con scroll horizontal. Causa: las celdas usaban `content-box` (no hay reset global de `box-sizing`), así que el `padding` (~16px × 12 columnas ≈ 192px) se **sumaba** a los ~1155px de anchos nominales → ~1347px, superando el tope de 1240px del `.fac-table-wrap` → overflow. Fix: (1) `box-sizing: border-box` en `table.fac-np-tbl th` y `td` (el padding ahora entra dentro del ancho de cada columna) y (2) `max-width` de `.fac-banner/.fac-top/.fac-cierre/.fac-empty` y `.fac-table-wrap` subido de **1240 → 1400px** para aprovechar el monitor ancho. La tabla sigue `width:100%` + `table-layout:fixed`, así que el espacio sobrante se reparte entre columnas (Razón Social / Dirección respiran) y las 12 columnas entran completas. Solo CSS, no cambia la lógica de facturación.
 >
 > Nota: **v5.90 — Pop-up de faltantes avisa cuántos hay (avisos consecutivos)**. Pedido del dueño: si llegaron faltantes de **más de una NP**, que se vea que son varios (no uno solo). La detección server-side (`detectar_faltantes_llegaron`, v5.83) ya crea **una tarea por NP** (loop por NP, idempotente); lo que faltaba era mostrarlo. Ahora `faltDecidePopup` cuenta las tareas **pendientes** y se lo pasa a `faltHtmlPend(t, n)`: si hay más de una, arriba del pop-up sale un cartel amarillo **"⚠ Hay N pedidos con faltante para completar — van saliendo de a uno"**. Siguen apareciendo de a uno (el que uno toma → el resto ve el siguiente), pero ahora se sabe que hay más. Con 1 solo no muestra contador. Test `falt-tareas.cjs` extendido (1 → sin contador, 3 → "Hay 3").
 >
