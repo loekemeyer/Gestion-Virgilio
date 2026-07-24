@@ -3059,8 +3059,7 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
       <button class="sup-action-btn" onclick="openFacturacion()"><span class="sup-ico">📋</span><span>Facturación</span></button>
       <button class="sup-action-btn" onclick="openPPP()"><span class="sup-ico">🗓️</span><span>PPP</span></button>
       <button class="sup-action-btn" onclick="openRecepcionAdmin()"><span class="sup-ico">🏭</span><span>Carga Recepción Mercadería</span></button>
-      <button class="sup-action-btn" onclick="showCPModal('0')"><span class="sup-ico">📦➕</span><span>Completar Pedido</span></button>
-      <button class="sup-action-btn" onclick="showFaltAvisar()"><span class="sup-ico">📢</span><span>Avisar faltante llegó</span></button>
+      <button class="sup-action-btn" onclick="showFaltAvisar()"><span class="sup-ico">📦➕</span><span>Completar Pedido</span></button>
       <button class="sup-action-btn" onclick="openStockAdmin()"><span class="sup-ico">📦</span><span>Stock y Compras</span></button>
       <button class="sup-action-btn" onclick="openRemitosAdmin()"><span class="sup-ico">🚚</span><span>Recepción Remitos (RR)</span></button>
     </div>
@@ -5531,7 +5530,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.94";
+const APP_VERSION = "v5.95";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -11886,12 +11885,12 @@ async function faltFetchActivasNps() {
 function faltEnsureAvisar() {
   if (!document.getElementById("favCss")) {
     const s = document.createElement("style"); s.id = "favCss";
-    s.textContent = "#faltAvModal{display:none;position:fixed;inset:0;z-index:1292;background:rgba(2,6,23,.74);overflow:auto;padding:12px;}#faltAvModal.show{display:block;}.fav-card{background:#f8fafc;max-width:560px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.fav-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;background:linear-gradient(90deg,#b91c1c,#7f1d1d);color:#fff;}.fav-title{font-size:17px;font-weight:800;}.fav-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}.fav-body{padding:13px 14px;}.fav-hint{font-size:12.5px;color:#64748b;margin-bottom:11px;line-height:1.4;}.fav-empty{padding:22px;text-align:center;color:#64748b;font-size:14px;}.fav-row{display:flex;align-items:center;gap:10px;background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:11px 12px;margin-bottom:9px;}.fav-info{flex:1;min-width:0;}.fav-np{font-size:15px;font-weight:800;color:#0f172a;font-family:Consolas,Menlo,monospace;}.fav-arts{font-size:12.5px;color:#475569;margin-top:3px;}.fav-btn{flex:0 0 auto;width:auto;margin:0;padding:11px 14px;border:none;border-radius:10px;background:#dc2626;color:#fff;font-size:13.5px;font-weight:800;cursor:pointer;white-space:nowrap;}.fav-ya{flex:0 0 auto;font-size:12.5px;font-weight:800;color:#15803d;background:#dcfce7;border:1px solid #86efac;border-radius:999px;padding:6px 12px;white-space:nowrap;}";
+    s.textContent = "#faltAvModal{display:none;position:fixed;inset:0;z-index:1292;background:rgba(2,6,23,.74);overflow:auto;padding:12px;}#faltAvModal.show{display:block;}.fav-card{background:#f8fafc;max-width:560px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.fav-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;background:linear-gradient(90deg,#b91c1c,#7f1d1d);color:#fff;}.fav-title{font-size:17px;font-weight:800;}.fav-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}.fav-body{padding:13px 14px;}.fav-hint{font-size:12.5px;color:#64748b;margin-bottom:11px;line-height:1.4;}.fav-empty{padding:22px;text-align:center;color:#64748b;font-size:14px;}.fav-row{display:flex;align-items:center;gap:10px;background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:11px 12px;margin-bottom:9px;}.fav-info{flex:1;min-width:0;}.fav-np{font-size:15px;font-weight:800;color:#0f172a;font-family:Consolas,Menlo,monospace;}.fav-arts{font-size:12.5px;color:#475569;margin-top:3px;}.fav-btn{flex:0 0 auto;width:auto;margin:0;padding:11px 14px;border:none;border-radius:10px;background:#dc2626;color:#fff;font-size:13.5px;font-weight:800;cursor:pointer;white-space:nowrap;}.fav-ya{flex:0 0 auto;font-size:12.5px;font-weight:800;color:#15803d;background:#dcfce7;border:1px solid #86efac;border-radius:999px;padding:6px 12px;white-space:nowrap;}.fav-actions{display:flex;flex-direction:column;gap:6px;flex:0 0 auto;}.fav-btn-cargar{background:#16a34a;}";
     document.head.appendChild(s);
   }
   let ov = document.getElementById("faltAvModal");
   if (!ov) { ov = document.createElement("div"); ov.id = "faltAvModal"; document.body.appendChild(ov); }
-  ov.innerHTML = '<div class="fav-card"><div class="fav-head"><span class="fav-title">📢 Avisar que llegó un faltante</span><button class="fav-close" onclick="closeFaltAvisar()">Cerrar</button></div><div class="fav-body" id="faltAvBody"><div class="fav-empty">Cargando faltantes…</div></div></div>';
+  ov.innerHTML = '<div class="fav-card"><div class="fav-head"><span class="fav-title">📦➕ Completar Pedido — faltante que llegó</span><button class="fav-close" onclick="closeFaltAvisar()">Cerrar</button></div><div class="fav-body" id="faltAvBody"><div class="fav-empty">Cargando faltantes…</div></div></div>';
   return ov;
 }
 async function showFaltAvisar() {
@@ -11913,13 +11912,15 @@ function faltAvRender(falt, activas) {
     _faltAvData[np].cajas += Number(e.cajas_falto) || 0;
   });
   const list = Object.keys(_faltAvData).map(function (k) { return _faltAvData[k]; }).sort(function (a, b) { return String(a.np).localeCompare(String(b.np)); });
-  let h = '<div class="fav-hint">Cuando llega mercadería de un faltante que todavía <b>no salió ni se facturó</b>, tocá <b>Avisar</b>: a los celulares de los que están en Virgilio les salta un pop-up para que alguien lo complete. Solo uno lo toma.</div>';
+  let h = '<div class="fav-hint">Pedidos con un <b>faltante</b> que todavía <b>no salió ni se facturó</b>. Por cada uno: <b>📦➕ Cargar yo</b> (lo completás vos ahora) o <b>📢 Avisar</b> (les salta el pop-up a los celulares de Virgilio y lo completa alguien; solo uno lo toma).</div>';
   if (!list.length) { h += '<div class="fav-empty">No hay pedidos con faltantes sin facturar. 👍</div>'; body.innerHTML = h; return; }
   h += list.map(function (g) {
     const det = g.arts.map(function (a) { return escapeHtml(a.cod) + '×' + a.falto; }).join(", ");
     const ya = activas[g.np];
+    const cargarBtn = '<button class="fav-btn fav-btn-cargar" onclick="faltCargarYo(\'' + escapeHtml(g.np) + '\')">📦➕ Cargar yo</button>';
+    const avisarBtn = ya ? '<span class="fav-ya">✓ Avisado</span>' : '<button class="fav-btn" onclick="faltCrear(\'' + escapeHtml(g.np) + '\')">📢 Avisar</button>';
     return '<div class="fav-row"><div class="fav-info"><div class="fav-np">NP ' + escapeHtml(g.np) + (g.tanda ? ' · ' + escapeHtml(g.tanda) : '') + (g.cliente ? ' · cli ' + escapeHtml(g.cliente) : '') + '</div><div class="fav-arts">' + det + ' <b>(' + g.cajas + ' cj)</b></div></div>' +
-      (ya ? '<span class="fav-ya">✓ Avisado</span>' : '<button class="fav-btn" onclick="faltCrear(\'' + escapeHtml(g.np) + '\')">📢 Avisar que llegó</button>') + '</div>';
+      '<div class="fav-actions">' + cargarBtn + avisarBtn + '</div></div>';
   }).join("");
   body.innerHTML = h;
 }
@@ -11930,6 +11931,13 @@ async function faltCrear(np) {
     try { alert("📢 Aviso enviado. En los celulares de Virgilio va a aparecer el pop-up para completar la NP " + g.np + "."); } catch (_e) {}
   } catch (e) { try { alert("No se pudo avisar: " + (e.message || e)); } catch (_e2) {} }
   showFaltAvisar();
+}
+/* v5.95 — "Cargar yo": el supervisor completa el faltante de esa NP él mismo AHORA
+   (en vez de avisar para que lo haga un operario). Cierra este modal y abre el CP
+   enfocado en esa NP (mismo showCPModal de la botonera; legajo '0' = admin). */
+function faltCargarYo(np) {
+  closeFaltAvisar();
+  try { showCPModal("0", null, _faltNpNorm(np)); } catch (_e) {}
 }
 
 /* ===== RC · Pasar cajas a un pedido URGENTE (v5.49). El operario le saca cajas a un pedido
