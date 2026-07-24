@@ -2171,13 +2171,16 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .cmpl-cerrar:disabled{ background:#cbd5e1; color:#64748b; cursor:not-allowed; }
 .cmpl-back{ width:auto; background:#f1f5f9; color:#334155; border:1px solid #cbd5e1; border-radius:9px; padding:7px 14px; font-size:13px; font-weight:800; cursor:pointer; margin-bottom:10px; }
 .cmpl-eh{ font-size:14px; font-weight:800; color:#0f172a; margin-bottom:8px; }
-.cmpl-eg{ display:flex; align-items:center; gap:7px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:7px 9px; margin-bottom:6px; }
-.cmpl-egc{ flex:1; font-size:13px; font-weight:700; color:#0f172a; min-width:0; }
-.cmpl-egb{ width:30px; height:30px; border-radius:8px; border:1.5px solid #cbd5e1; background:#fff; font-size:16px; font-weight:800; color:#334155; flex:0 0 auto; cursor:pointer; }
+.cmpl-eg{ background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:10px 11px 11px; margin-bottom:8px; box-shadow:0 1px 2px rgba(15,23,42,.04); }
+.cmpl-eg-top{ display:flex; align-items:center; gap:9px; margin-bottom:9px; }
+.cmpl-egc{ flex:1; font-size:15px; font-weight:800; color:#0f172a; min-width:0; font-family:Consolas,Menlo,monospace; overflow-wrap:anywhere; }
+.cmpl-egn{ flex:0 0 auto; background:#eff6ff; color:#1e40af; font-weight:800; font-size:13.5px; border-radius:999px; padding:3px 11px; }
+.cmpl-eg-acts{ display:flex; gap:7px; }
+.cmpl-egb{ width:46px; height:42px; border-radius:10px; border:1.5px solid #cbd5e1; background:#f8fafc; font-size:22px; font-weight:800; color:#334155; flex:0 0 auto; cursor:pointer; line-height:1; }
 .cmpl-egb:disabled{ opacity:.35; }
-.cmpl-egedit,.cmpl-egdel{ width:32px; height:32px; border-radius:8px; border:1.5px solid #cbd5e1; background:#fff; font-size:15px; flex:0 0 auto; cursor:pointer; }
-.cmpl-egdel{ color:#b42318; border-color:#fecaca; }
-.cmpl-lab{ width:28px; height:28px; border-radius:8px; background:#dcfce7; color:#15803d; font-size:14px; font-weight:800; display:flex; align-items:center; justify-content:center; flex:0 0 auto; }
+.cmpl-egedit{ flex:1; height:42px; border-radius:10px; border:1.5px solid #cbd5e1; background:#fff; font-size:14px; font-weight:800; color:#334155; cursor:pointer; }
+.cmpl-egdel{ flex:1; height:42px; border-radius:10px; border:1.5px solid #fecaca; background:#fff; font-size:14px; font-weight:800; color:#b42318; cursor:pointer; }
+.cmpl-lab{ min-width:38px; height:30px; padding:0 9px; border-radius:9px; background:#dcfce7; color:#15803d; font-size:14px; font-weight:800; display:flex; align-items:center; justify-content:center; flex:0 0 auto; }
 .cmpl-npbtns{ display:flex; gap:8px; margin-top:12px; }
 .cmpl-npbtn{ flex:1; padding:11px; border:1px solid #cbd5e1; border-radius:11px; background:#fff; color:#334155; font-size:13.5px; font-weight:800; cursor:pointer; }
 .cmpl-npbtn.pri{ background:#0f172a; color:#fff; border-color:#0f172a; }
@@ -5540,7 +5543,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v6.07";
+const APP_VERSION = "v6.08";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -7637,10 +7640,13 @@ function _compRenderLios() {
     else h += groups.map(function (g, gi) {
       const comp = g.items.map(function (it) { return escapeHtml(it.cod) + "×" + it.qty; }).join("  ") + (g.suelta ? " · suelta" : "");
       const labTxt = g.count > 1 ? (g.label + '1–' + g.label + g.count) : g.label;
-      return '<div class="cmpl-eg"><span class="cmpl-lab">' + labTxt + '</span><span class="cmpl-egc">' + comp + (g.count > 1 ? ' · <b>×' + g.count + '</b>' : '') + '</span>' +
-        (g.count > 1 ? '<button class="cmpl-egb" onclick="_compGroupLess(' + gi + ')" title="Sacar uno">−</button><button class="cmpl-egb" onclick="_compGroupMore(' + gi + ')"' + (g.canMore ? '' : ' disabled') + ' title="Agregar otro igual">+</button>' : '') +
-        '<button class="cmpl-egedit" onclick="_compGroupReopen(' + gi + ')" title="Reabrir para editar">✏️</button>' +
-        '<button class="cmpl-egdel" onclick="_compGroupDel(' + gi + ')" title="Borrar">×</button></div>';
+      return '<div class="cmpl-eg">' +
+        '<div class="cmpl-eg-top"><span class="cmpl-lab">' + labTxt + '</span><span class="cmpl-egc">' + comp + '</span>' + (g.count > 1 ? '<span class="cmpl-egn">×' + g.count + '</span>' : '') + '</div>' +
+        '<div class="cmpl-eg-acts">' +
+        (g.count > 1 ? '<button class="cmpl-egb" onclick="_compGroupLess(' + gi + ')" title="Sacar uno">−</button><button class="cmpl-egb" onclick="_compGroupMore(' + gi + ')"' + (g.canMore ? '' : ' disabled') + ' title="Otro igual">+</button>' : '') +
+        '<button class="cmpl-egedit" onclick="_compGroupReopen(' + gi + ')">✏️ Editar</button>' +
+        '<button class="cmpl-egdel" onclick="_compGroupDel(' + gi + ')">🗑 Borrar</button>' +
+        '</div></div>';
     }).join("");
   } else if (view === "sueltas") {
     const restCods = n.codes.filter(function (c) { return c.rest > 0 && c.sep; });

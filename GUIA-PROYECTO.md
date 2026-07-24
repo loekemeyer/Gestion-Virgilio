@@ -4,7 +4,9 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-07-24 · Versión app al documentar: **v6.07**
+> Última actualización: 2026-07-24 · Versión app al documentar: **v6.08**
+>
+> Nota: **v6.08 — "Editar líos": rediseño estético** (el dueño lo marcó feo). La lista de líos generados (`_compRenderLios`, vista *editar*) tenía cada lío como una **fila apretada** con 4 botoncitos chicos (−, +, ✏️, ×) al lado de la composición → amontonado y difícil de tocar. Ahora cada lío es una **tarjeta en 2 partes**: arriba badge de letra (A1–A2…) + composición (monoespaciada, negrita) + chip **×N** si es grupo; abajo botones **grandes** (42px) **[−] [+]** (solo si es grupo) + **✏️ Editar** + **🗑 Borrar**. CSS: `.cmpl-eg/.cmpl-eg-top/.cmpl-eg-acts/.cmpl-egb/.cmpl-egedit/.cmpl-egdel/.cmpl-lab/.cmpl-egn`. Solo estética + tap targets, misma lógica (`_compGroupMore/Less/Reopen/Del`). Verificado con render mock (sin overflow).
 >
 > Nota: **v6.07 — "🔁 Repetir" a prueba de errores + dato de tamaño de lío por artículo (top 30)**. **(1)** El botón Repetir ahora queda **siempre visible** tras cerrar un lío; si ya no quedan cajas para repetirlo se **grisa** (`.cmpl-rep.off`) y al tocarlo **avisa** ("Ya usaste todas las cajas del {cod} — no se puede armar otro lío igual") — nunca rompe ni descuenta de más (`_compRepetirLast` guarda con `canMore`). Antes se ocultaba; ahora se ve + avisa (pedido del dueño: que aunque toquen de más no rompa). **(2) Dato base para sugerencias futuras** (corre por fuera del botón): análisis de los 30 artículos más pickeados (suma de PKC) × **tamaño del lío PURO más común** (parseando el resumen de TAL, líos de un solo código). Resultado: el estándar es **de a 5** (505/504/513/506/501/031/586/546/510/544/026/027/… todos 5, con 75-98% de sus líos puros). **Excepciones:** `321 → de a 3` (83%), `315 → de a 4`, `583E → de a 4`, `706 → de a 6`. Sin dato: `103/522E/198E` (siempre mezclados, sin líos puros). Servirá para, más adelante, **sugerirle al operario la medida por artículo**.
 >
