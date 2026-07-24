@@ -4,7 +4,9 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-07-24 · Versión app al documentar: **v5.93**
+> Última actualización: 2026-07-24 · Versión app al documentar: **v5.94**
+>
+> Nota: **v5.94 — Monitor TV: auto-reload cada 10 min (evita el crash por memoria)**. Reporte del dueño: la TV de pared mostraba **"¡Vaya!" (Chrome Aw-Snap) cada ~15 min** y había que tocar "Volver a cargar". **No es el wifi** (un corte de red da otra pantalla). Es el **navegador quedándose sin memoria**: el aparato MXQ es barato (poca RAM) y el monitor corre 24/7 refrescando cada 30s (`MONITOR_REFRESH_MS`) **sin recargarse nunca** → la memoria se acumula hasta que Chrome mata la pestaña. Fix: en el bloque de **kiosko** (`if (__pendingMonitorParam && (_keyValid || _kioskEnrolled))`, index.html ~16693) se agrega `setInterval(location.reload, 10min)` (guard `window._kioskReloadTimer`) → la pantalla se recarga sola y arranca limpia antes de llenarse. **Solo aplica al kiosko de pared** (no al monitor que un supervisor abre en su PC). Si aun así crashea, el aparato es demasiado débil (cambiarlo).
 >
 > Nota: **v5.93 — Menú de Recepción de Mercadería: reordenado por importancia + contador de remitos**. Pedido del dueño. En `renderMenu` (`recepcion.js`) el orden pasó a: **1º 📋 Pendientes** (lo más usado) · **2º 📦 Bajadas Racks → góndola** · **3º ✍️ Carga Manual**. Carga Manual ahora es **chico y apagado** (clase nueva `.opTipoBtn.opBtnSm`: height 52px vs 90px, font 15px, gris #64748b) porque es de uso puntual. **Pendientes muestra el contador de remitos por cargar entre paréntesis** — "📋 Pendientes (N)" — vía `pendBadgePend(btn)` (nueva, espejo de `racksBadgePend`): `count exact head` sobre `Control_Modo_OP` con `estado='pendiente'` (las mismas filas que lista `renderPendientes`). Solo se muestra el número si N>0 (igual que el de Bajadas Racks). Cache-bust `recepcion.js?v=3.68`. Verificado: sintaxis OK + mock con el CSS real (Pendientes (8) grande arriba, Carga Manual chico gris abajo) + la DB tiene 8 pendientes ahora.
 >
