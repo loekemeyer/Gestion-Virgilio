@@ -5549,7 +5549,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v6.18";
+const APP_VERSION = "v6.19";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -12237,6 +12237,21 @@ async function cpReloadFaltantes() {
   if (_cp && _cp.focusNp) { const fn = String(_cp.focusNp).trim().replace(/\.0+$/, ""); fr = fr.filter(function (e) { return String(e.np).trim().replace(/\.0+$/, "") === fn; }); }
   return fr;
 }
+/* v6.19 — Cierra la(s) tarea(s) de faltante de una NP si ya no queda cajas_falto. Necesario
+   porque con el pop-up de faltantes desactivado (v6.15) faltMaybeCompletar no corre (no hay
+   _faltTareaMia) y las tareas quedaban abiertas → el badge "⏳ Completando · completo" no se iba. */
+async function cpCerrarTareaSiCompleta(np) {
+  try {
+    const n = String(np).trim().replace(/\.0+$/, "");
+    const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+    const r = await fetch(SUPABASE_ENTREGAS_ENDPOINT + "?select=cajas_falto&np=eq." + encodeURIComponent(n), { headers: H, cache: "no-store" });
+    let rest = 1; if (r.ok) { const rows = await r.json(); rest = 0; rows.forEach(function (x) { rest += Number(x.cajas_falto) || 0; }); }
+    if (rest > 0) return;   // todavía falta algo → no cerrar
+    const rt = await fetch(SUPABASE_FALTAREAS_ENDPOINT + "?select=id&np=eq." + encodeURIComponent(n) + "&estado=in.(pendiente,asignado)", { headers: H, cache: "no-store" });
+    const tareas = rt.ok ? await rt.json() : [];
+    for (let i = 0; i < tareas.length; i++) { try { await _faltRpc("faltante_tarea_completar", { p_id: Number(tareas[i].id) }); } catch (_e) {} }
+  } catch (_e) {}
+}
 async function cpConfirm() {
   if (!_cp || !_cp.sel) return;
   const s = _cp.sel, qty = _cp.qty, origen = _cp.origen, leg = _cp.legajo, lioSel = _cp.lioSel, info = _cp._liosInfo || { resumen: "", tanda: s.tanda || "" };
@@ -12260,6 +12275,7 @@ async function cpConfirm() {
   // vista (y se puedan completar varios seguidos sin cerrar el modal).
   await cpReduceFaltante(s, qty);
   try { faltMaybeCompletar(String(s.np)); } catch (_e) {}   // v5.71: si era una tarea asignada y ya no falta nada, la cierra
+  try { await cpCerrarTareaSiCompleta(String(s.np)); } catch (_e) {}   // v6.19: cierra la tarea aunque NO se haya tomado por pop-up
   try { opDraftClear(leg); } catch (_e) {}
   if (!_cp) return;
   _cp.justDone = "✓ " + qty + " caja(s) de " + s.cod_art + " → NP " + s.np + " (a facturar)";
@@ -19539,13 +19555,16 @@ function facTareaActiva(np){ return _facTareas.get(String(np).trim().replace(/\.
 function facTareaBadge(np){
   const t = facTareaActiva(np); if (!t) return "";
   const f = facFaltInfo(np);
+  // v6.19: si ya NO falta nada en la NP (faltante completado, aunque la tarea siga abierta), no
+  // mostramos el aviso — la NP está lista para facturar. Corrige el "⏳ Completando · completo".
+  if (!f || !(Number(f.cajas) > 0)) return "";
   // v6.18: el aviso solo si algún artículo faltante de la NP está EN "a guardar" (a_guardar>0) O
   // se guardó HOY — que es lo que aparece en el CP para completar. Si no, no se muestra (se factura corto).
-  if (f && f.items && f.items.length) {
+  if (f.items && f.items.length) {
     const hayStock = f.items.some(function (it) { const kn = _cpNorm(it.cod); const s = _facSaldosN[kn] || {}; return (Number(s.a_guardar) || 0) > 0 || _facGuardadoHoy.has(kn); });
     if (!hayStock) return "";
   }
-  const est = (f && f.cajas) ? ('faltan ' + f.cajas + ' cj') : 'completo';
+  const est = 'faltan ' + f.cajas + ' cj';
   const quien = (t.estado === 'asignado') ? (' · lo hace ' + escapeHtml(t.asignado_nombre || ('leg ' + (t.asignado_legajo || '?')))) : ' · sin asignar aún';
   return '<div class="fac-progreso-badge" title="Están agregando cajas a esta NP (faltante que llegó). Esperá a que terminen antes de facturar.">⏳ Completando · ' + escapeHtml(est) + quien + '</div>';
 }
