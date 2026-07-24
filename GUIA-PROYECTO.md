@@ -4,7 +4,9 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-07-24 · Versión app al documentar: **v5.104**
+> Última actualización: 2026-07-24 · Versión app al documentar: **v5.105**
+>
+> Nota: **v5.105 — Atajo "⚡ Líos de a N" SACADO (funcionaba mal)**. Pedido del dueño. En el paso **Líos** del armado (`_compRenderLios`) se quitó la UI del auto-armado (la barra "⚡ Líos de a N" con el input `.cmpl-szinp` + el botón "⚡×N" por código `.cmpl-auto`, v5.85) porque funcionaba mal. Las funciones **`_compLioAuto` y `_compSetLioSize` quedan definidas** (y el CSS `.cmpl-auto/.cmpl-autobar/.cmpl-szinp`) por si se reactiva más adelante ("por ahora"). El armado manual de líos (tocar el código +1, − para restar, **✓ Cerrar Lío**) queda igual. Verificado: `comp-doblearmado.cjs` + smoke OK.
 >
 > Nota: **v5.104 — Cajas pedidas exportable a Excel + fix de alineación de las tablas de movimientos**. **(1)** La vista "Cajas pedidas" (`stkOpenCajasPedidasArt`) tiene botón **⬇ Exportar a Excel** (`stkCajasPedidasExport`) → baja un `.xls` (tabla HTML con MIME `application/vnd.ms-excel` + BOM, mismo patrón que el export de excedentes) con columnas NP · Tanda · Razón Social · Pidió · Pickeado · Separado. Guarda las filas en `_stkPop.rows`. **(2) Fix (lo reportó el dueño: "corrido fuera de su columna"):** en `.mva-tbl` (movimientos de Góndola/A guardar/Racks) los números quedaban **alineados a la izquierda** mientras los headers iban a la derecha, porque `.mva-tbl td{text-align:left}` (especificidad 0,2,1) le ganaba a `.mva-in/.mva-out/.mva-sal{text-align:right}` (0,1,0). Se scopeó la alineación a `.mva-tbl td.mva-in/out/sal` (0,2,1) → los números caen bajo su columna (verificado headless: borde derecho del header == del valor).
 >

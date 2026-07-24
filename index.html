@@ -5533,7 +5533,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.104";
+const APP_VERSION = "v5.105";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -7647,14 +7647,13 @@ function _compRenderLios() {
       '<div class="cmpl-ctrl cmpl-ctrl-lio">🔨 Armando<br>Lío ' + curLetter + (curCajas ? ' (' + curCajas + ')' : '') + '</div>' +
       '<button class="cmpl-ctrl cmpl-ctrl-edit" onclick="_compViewEditar()"' + (n.liosArr.length ? '' : ' disabled') + '>✏️ Editar<br>líos (' + n.liosArr.length + ')</button>' +
       '<button class="cmpl-ctrl cmpl-ctrl-su" onclick="_compViewSueltas()">📦 Sueltas<br>(' + nRest + ')</button></div>';
-    const _sz = Math.max(1, parseInt(_comp.lioSize, 10) || 5);
-    h += '<div class="cmpl-autobar">⚡ Líos de a <input class="cmpl-szinp" type="number" min="1" inputmode="numeric" value="' + _sz + '" onchange="_compSetLioSize(this.value)"> — tocá <b>⚡×' + _sz + '</b> en un código y arma todos sus líos de ' + _sz + ' de una.</div>';
+    // v5.105: atajo "⚡ Líos de a N" SACADO por ahora (pedido del dueño: funcionaba mal).
+    // Las funciones _compLioAuto/_compSetLioSize quedan definidas por si se reactiva.
     h += '<div class="cmpl-grid">' + n.codes.map(function (c, ci) {
       if (!c.sep || (c.rest === 0 && c.cur === 0)) return "";
       const rem = c.cur + c.rest;
       return '<div class="cmpl-sq' + (c.cur > 0 ? " has" : "") + '" onclick="_compLioStep(' + ci + ',1)">' +
         (c.cur > 0 ? '<button class="cmpl-min" onclick="event.stopPropagation();_compLioStep(' + ci + ',-1)">−</button>' : '') +
-        (c.rest >= _sz ? '<button class="cmpl-auto" onclick="event.stopPropagation();_compLioAuto(' + ci + ')" title="Armar ' + Math.floor(c.rest / _sz) + ' lío(s) de ' + _sz + '">⚡×' + _sz + '</button>' : '') +
         '<div class="cmpl-cod">' + escapeHtml(c.cod) + '</div><div class="cmpl-cur2">' + c.cur + '<span class="cmpl-tot2"> / ' + rem + '</span></div></div>';
     }).join("") + "</div>";
     const _noSep = n.codes.filter(function (c) { return !c.sep && c.rest > 0; });
