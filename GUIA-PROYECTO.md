@@ -4,7 +4,9 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-07-24 · Versión app al documentar: **v6.14**
+> Última actualización: 2026-07-24 · Versión app al documentar: **v6.15**
+>
+> Nota: **v6.15 — Alerta automática de faltantes (pop-up) DESACTIVADA**. El pop-up que les aparecía a los operarios cada 6s para completar un faltante que llegó (`faltPollStart`/`faltDecidePopup`/`faltShowPopup`) queda apagado con el flag **`FALT_POPUP_ENABLED = false`**: no arranca el poll ni se muestra el pop-up (pedido del dueño — genera confusión; la carga de faltantes se hace desde el módulo **CP · Completar Pedido**, que desde v6.14 solo muestra los completables —con stock en a_guardar o góndola—). Reversible: poner el flag en `true`. Las **alertas Telegram** de faltantes son server-side (triggers/cron) y **no** dependen de esto. El botón/tile "Completar Pedido" (CP manual) sigue funcionando.
 >
 > Nota: **v6.14 — CP: filtro por "completable" = a guardar O góndola** (ajuste del v6.09). El dueño marcó que el CP le pedía completar faltantes de artículos **sin stock en ningún lado** (ej. NP 97986: 361E/367E, que no tienen ni a_guardar ni góndola). Ahora el filtro de `showCPModal`/`cpReloadFaltantes` muestra un faltante **solo si su artículo tiene stock en `a_guardar` > 0 O en `terminado` (góndola) > 0** — que son justamente los dos orígenes desde los que el CP puede completar (paso 2). Si no hay en ninguno, no figura. Cada fila muestra dónde está el stock ("a guardar: N · góndola: M"). Sigue sin filtrarse el acceso directo `focusNp`.
 >

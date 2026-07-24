@@ -5549,7 +5549,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v6.14";
+const APP_VERSION = "v6.15";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -12277,11 +12277,19 @@ async function faltPoll() {
   } catch (_e) { /* sin red: dejamos lo último cacheado */ }
   faltDecidePopup();
 }
+/* v6.15 — Alerta automática de faltantes DESACTIVADA (pedido del dueño): el pop-up que
+   les aparecía a los operarios para completar un faltante que llegó ya no se muestra ni
+   se hace polling. La carga de faltantes se hace desde el módulo CP (Completar Pedido).
+   Para reactivarla: poner FALT_POPUP_ENABLED = true. (Las alertas Telegram de faltantes
+   son server-side y no dependen de esto.) */
+const FALT_POPUP_ENABLED = false;
 function faltPollStart() {
+  if (!FALT_POPUP_ENABLED) return;
   try { faltPoll(); } catch (_e) {}
   if (!_faltPollTimer) _faltPollTimer = setInterval(function () { try { faltPoll(); } catch (_e) {} }, 6000);
 }
 function faltDecidePopup() {
+  if (!FALT_POPUP_ENABLED) { try { faltHidePopup(); } catch (_e) {} return; }
   if (!_faltActivo()) { faltHidePopup(); return; }
   // Si CP no está abierto, resetear la bandera (el asignado volvió de CP).
   const cpOpen = (function () { const m = document.getElementById("cpModal"); return !!(m && m.classList.contains("show")); })();
