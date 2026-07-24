@@ -5491,7 +5491,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.95";
+const APP_VERSION = "v5.96";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -12088,19 +12088,37 @@ async function stockSepararAFacturar(tanda, legajo) {
     if (rows.length) stockMove(rows);
   } catch (_e) {}
 }
-/* v5.95 — BARRIDO final por tanda: cuando la tanda queda 100% facturada, saca de
-   "a facturar" cualquier REMANENTE (por si la composición de las NP no cubrió todo
-   lo que había en a_facturar). El drenaje principal ahora es POR NP
-   (stockSalidaFacturadoNP, disparado en cada tick); esto es solo la red de
-   seguridad. Dedup propio con ubicacion='__barrido__' (independiente de los
-   drenajes por NP, que marcan ubicacion=NP). */
+/* v5.96 — Remanente REAL de a_facturar de una tanda: separado (ref=tanda) MENOS
+   todos los facturado (ref=tanda del barrido + ref=tanda|NP de los drenajes por NP).
+   Hace falta porque la restricción unique(ref,cod_art,deposito,tipo) obliga a que
+   cada NP drene con su propio ref (tanda|NP), y _stockNetoDepTanda (ref=eq.tanda) no
+   los vería → el tope quedaría mal y podría dejar a_facturar negativo. Trae ref
+   like tanda* y filtra en cliente a la tanda exacta y sus NP. */
+async function _stockAfacturarRestanteTanda(tanda) {
+  const t = String(tanda || "").trim().toUpperCase(); if (!t) return {};
+  const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+  const url = SUPABASE_STOCK_ENDPOINT + "?deposito=eq.a_facturar&ref=like." + encodeURIComponent(t) + "*&select=cod_art,descripcion,delta,ref&limit=20000";
+  const r = await fetch(url, { headers: H, cache: "no-store" });
+  const rows = r.ok ? await r.json() : [];
+  const net = {};
+  rows.forEach(function (mv) {
+    const rf = String(mv.ref || "").toUpperCase();
+    if (rf !== t && rf.indexOf(t + "|") !== 0) return;   // solo la tanda y sus NP (no otra tanda con mismo prefijo)
+    const k = String(mv.cod_art); if (!net[k]) net[k] = { sum: 0, desc: mv.descripcion || null };
+    net[k].sum += Number(mv.delta || 0); if (mv.descripcion && !net[k].desc) net[k].desc = mv.descripcion;
+  });
+  return net;
+}
+/* v5.95/96 — BARRIDO final por tanda: cuando la tanda queda 100% facturada, saca de
+   "a facturar" cualquier REMANENTE que los drenajes por NP no hayan cubierto (red de
+   seguridad). Filas con ref=tanda (una por cod → unique ok); dedup por ref=tanda. */
 async function stockSalidaFacturado(tanda, legajo) {
   try {
     const t = String(tanda || "").trim().toUpperCase(); if (!t) return;
     const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
-    const chk = await fetch(SUPABASE_STOCK_ENDPOINT + "?tipo=eq.facturado&ref=eq." + encodeURIComponent(t) + "&ubicacion=eq.__barrido__&select=id&limit=1", { headers: H, cache: "no-store" });
-    if (chk.ok) { const ex = await chk.json(); if (ex && ex.length) return; }   // ya barrido
-    const net = await _stockNetoDepTanda("a_facturar", t);   // remanente: ya descuenta los drenajes por NP (ref=tanda)
+    const chk = await fetch(SUPABASE_STOCK_ENDPOINT + "?tipo=eq.facturado&ref=eq." + encodeURIComponent(t) + "&select=id&limit=1", { headers: H, cache: "no-store" });
+    if (chk.ok) { const ex = await chk.json(); if (ex && ex.length) return; }   // barrido ya hecho (o tanda vieja ya drenada)
+    const net = await _stockAfacturarRestanteTanda(t);   // remanente real (descuenta drenajes por NP)
     const rows = [];
     Object.keys(net).forEach(function (k) { const n = Math.round(net[k].sum * 1000) / 1000; if (n > 0) rows.push({ cod_art: k, descripcion: net[k].desc, deposito: "a_facturar", delta: -n, tipo: "facturado", ref: t, ubicacion: "__barrido__", legajo: String(legajo || "") }); });
     if (rows.length) await stockMove(rows);
@@ -12133,24 +12151,26 @@ async function _talComposicionNP(np) {
   } catch (_e) {}
   return out;
 }
-/* v5.95 — Drenar a_facturar POR NP: al facturar una NP, saca de "a facturar" los
+/* v5.95/96 — Drenar a_facturar POR NP: al facturar una NP, saca de "a facturar" los
    artículos de ESA NP (según su composición TAL), sin esperar al 100% de la tanda.
    Así una NP vacía o que nunca se factura no traba el stock de las demás NP.
-   - Tope: nunca deja a_facturar negativo (min con el neto disponible de la tanda,
-     que ya descuenta drenajes previos por NP y el inicial separado).
-   - ref = tanda (para que _stockNetoDepTanda lo cuente en el neto); el NP se guarda
-     en `ubicacion` para deduplicar por NP. */
+   - ref = tanda|NP (cada NP su propio ref) → dos NP que comparten un código no chocan
+     con la restricción unique(ref,cod,deposito,tipo).
+   - Tope: nunca deja a_facturar negativo (min con el remanente REAL de la tanda, que
+     ya descuenta el separado inicial y los drenajes de las otras NP).
+   - Dedup por ref=tanda|NP (esta NP ya drenó). */
 async function stockSalidaFacturadoNP(np, tanda, legajo) {
   try {
     const t = String(tanda || "").trim().toUpperCase();
     const n = String(np == null ? "" : np).trim().replace(/\.0+$/, "");
     if (!t || !n) return;
+    const refNp = t + "|" + n;
     const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
-    const chk = await fetch(SUPABASE_STOCK_ENDPOINT + "?tipo=eq.facturado&ref=eq." + encodeURIComponent(t) + "&ubicacion=eq." + encodeURIComponent(n) + "&select=id&limit=1", { headers: H, cache: "no-store" });
+    const chk = await fetch(SUPABASE_STOCK_ENDPOINT + "?tipo=eq.facturado&ref=eq." + encodeURIComponent(refNp) + "&select=id&limit=1", { headers: H, cache: "no-store" });
     if (chk.ok) { const ex = await chk.json(); if (ex && ex.length) return; }   // esta NP ya drenó
     const comp = await _talComposicionNP(n);
     if (!comp || !Object.keys(comp).length) return;   // NP sin armado → nada que drenar
-    const net = await _stockNetoDepTanda("a_facturar", t);
+    const net = await _stockAfacturarRestanteTanda(t);
     const netN = {}; Object.keys(net).forEach(function (k) { netN[String(k).toUpperCase().trim().replace(/^0+(?=.)/, "")] = { key: k, sum: net[k].sum, desc: net[k].desc }; });
     const rows = [];
     Object.keys(comp).forEach(function (c) {
@@ -12158,7 +12178,7 @@ async function stockSalidaFacturadoNP(np, tanda, legajo) {
       if (!slot) return;
       const disp = Math.round(slot.sum * 1000) / 1000;
       const bajar = Math.min(comp[c], disp);
-      if (bajar > 0) { rows.push({ cod_art: slot.key, descripcion: slot.desc || null, deposito: "a_facturar", delta: -bajar, tipo: "facturado", ref: t, ubicacion: n, legajo: String(legajo || "") }); slot.sum -= bajar; }
+      if (bajar > 0) { rows.push({ cod_art: slot.key, descripcion: slot.desc || null, deposito: "a_facturar", delta: -bajar, tipo: "facturado", ref: refNp, ubicacion: n, legajo: String(legajo || "") }); slot.sum -= bajar; }
     });
     if (rows.length) await stockMove(rows);
   } catch (_e) {}
