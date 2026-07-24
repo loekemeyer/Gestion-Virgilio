@@ -34,9 +34,17 @@ catch (_e) {
       { id: 2, np: "98114", cod_cliente: "771", cod_art: "561", cajas_pedidas: 90, cajas_entregadas: 30, cajas_falto: 60, tanda: "D02A", fecha_salida: "2026-07-24" },
       { id: 3, np: "99999", cod_cliente: "800", cod_art: "700", cajas_pedidas: 10, cajas_entregadas: 5, cajas_falto: 5, tanda: "C97A", fecha_salida: "2026-07-24" }
     ];
+    // v6.18: el CP SIN foco filtra a "a_guardar>0 O guardado hoy". Para que la
+    // sección 3 (lista completa) muestre 315 y 700, les damos saldo a_guardar.
+    const SALDOS = [
+      { cod_art: "315", descripcion: "", a_guardar: 60, terminado: 0, excedente: 0, separar_pedidos: 0, a_facturar: 0, racks: 0, insumos: 0 },
+      { cod_art: "561", descripcion: "", a_guardar: 60, terminado: 0, excedente: 0, separar_pedidos: 0, a_facturar: 0, racks: 0, insumos: 0 },
+      { cod_art: "700", descripcion: "", a_guardar: 5,  terminado: 0, excedente: 0, separar_pedidos: 0, a_facturar: 0, racks: 0, insumos: 0 }
+    ];
     window.fetch = function (url) {
       url = String(url);
       if (url.indexOf("Entregas_Virgilio") >= 0 && url.indexOf("cajas_falto=gt.0") >= 0) return J(FALT);
+      if (url.indexOf("vista_saldos_stock") >= 0) return J(SALDOS);   // stockFetchSaldos (filtro v6.18)
       if (url.indexOf("opcion=eq.TAL") >= 0) return J([]);   // cpLoadLios
       return J([]);   // Facturacion_NP, PKC, Movimientos, Articulos, etc.
     };

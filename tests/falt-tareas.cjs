@@ -1,10 +1,15 @@
-/* Regresión v5.71 — FALT · faltante que llegó → completar (coordinación en vivo).
-   Con fetch stubbeado (sin red), maneja el pop-up y la asignación atómica:
-   A) tarea pendiente → pop-up "¡Llegó un faltante!" con botón asignarme
-   B) me asigno y GANO → pop-up "Te lo asignaste" con NP + artículos + completar
-   C) me asigno pero OTRO la tomó → "Ya lo está haciendo Ana"
-   D) Facturación: facTareaActiva/facTareaBadge (aviso amarillo "en progreso")
-   E) legajo de prueba (0) NO ve el pop-up
+/* Regresión — FALT (v6.15+): el pop-up de faltantes EN VIVO está DESACTIVADO
+   (FALT_POPUP_ENABLED=false, pedido del dueño). La carga de faltantes se hace
+   desde el módulo CP. Este test garantiza el contrato ACTUAL:
+   A) con tareas pendientes/asignadas, faltPoll() NO muestra el pop-up.
+   E) legajo de prueba (0) tampoco.
+   D) Facturación: facTareaActiva/facTareaBadge (aviso "⏳ Completando") sigue
+      andando con el gate v6.18/v6.19 — se muestra solo si la NP tiene faltante
+      con cajas>0 Y el código está a_guardar>0 (o guardado hoy); si el faltante
+      ya se completó (cajas 0) el badge desaparece aunque la tarea siga abierta.
+   La coordinación en vivo (asignación atómica: faltAsignarme/faltHtmlMine/…)
+   queda DORMIDA con el pop-up; si se reactiva, restaurar la cobertura A/B/C/F
+   desde el historial de git (commits ≤ v6.14).
    Sale 1 si falla. */
 const path = require("path");
 let chromium;
@@ -24,16 +29,12 @@ catch (_e) {
   // Setup: stub fetch + operador "activo" en la botonera (legajo 55).
   await p.evaluate(() => {
     window.__TASKS = [];
-    window.__ASSIGN = null;
     window.alert = function () {};
     function J(data) { return Promise.resolve({ ok: true, status: 200, headers: { get: function () { return null; } }, json: function () { return Promise.resolve(data); } }); }
-    window.fetch = function (url, opts) {
-      url = String(url); const m = (opts && opts.method) || "GET";
-      if (url.indexOf("rpc/faltante_tarea_asignar") >= 0) return J(window.__ASSIGN);
-      if (url.indexOf("rpc/faltante_tarea_") >= 0) return J(null);          // completar/soltar/crear
+    window.fetch = function (url) {
+      url = String(url);
       if (url.indexOf("Faltantes_Tareas") >= 0) return J(window.__TASKS);
       if (url.indexOf("Empleados") >= 0) return J([{ Legajo: "55", Empleado: "Pedro" }]);
-      if (url.indexOf("Entregas_Virgilio") >= 0) return J([]);              // faltNpRestante / cpLoadFaltantes
       return J([]);
     };
     document.getElementById("legajoInput").value = "55";
@@ -41,70 +42,23 @@ catch (_e) {
     const os = document.getElementById("optionsScreen"); if (os) os.classList.remove("hidden");
   });
 
-  const body = () => p.evaluate(() => { const b = document.getElementById("faltPopupBody"); return b ? b.innerHTML : ""; });
-  const shown = () => p.evaluate(() => { const o = document.getElementById("faltPopup"); return !!(o && o.classList.contains("show")); });
+  const popupShown = () => p.evaluate(() => { const o = document.getElementById("faltPopup"); return !!(o && o.classList.contains("show")); });
 
-  // A) pendiente → pop-up de call-to-action
+  // A) Pop-up DESACTIVADO: con pendiente y con asignada-a-mí, faltPoll() no lo muestra.
   const A = await p.evaluate(async () => {
-    window.__TASKS = [{ id: 1, np: "98114", estado: "pendiente", articulos: [{ cod: "315", falto: 10 }], cod_cliente: "771", tanda: "D02A", razon_social: "Distri Norte" }];
+    const flagOff = (typeof FALT_POPUP_ENABLED !== "undefined" && FALT_POPUP_ENABLED === false);
+    window.__TASKS = [{ id: 1, np: "98114", estado: "pendiente", articulos: [{ cod: "315", falto: 10 }] }];
     await faltPoll();
-    const h = document.getElementById("faltPopupBody").innerHTML;
-    const o = document.getElementById("faltPopup");
-    const one = { shown: !!(o && o.classList.contains("show")), isPend: /Llegó un faltante/.test(h), hasAssign: /faltAsignarme\(1\)/.test(h), noDetailYet: !/98114/.test(h) };
-    one.unoSinContador = !/pedidos con faltante/.test(h);   // con 1 solo, NO muestra "hay N"
-    // v5.90: con VARIAS NPs pendientes → avisa que hay varios (consecutivos)
-    window.__TASKS = [
-      { id: 1, np: "98114", estado: "pendiente", articulos: [{ cod: "315", falto: 10 }] },
-      { id: 2, np: "98091", estado: "pendiente", articulos: [{ cod: "440", falto: 5 }] },
-      { id: 3, np: "98200", estado: "pendiente", articulos: [{ cod: "700", falto: 2 }] }
-    ];
+    const o1 = document.getElementById("faltPopup");
+    const pendHidden = !(o1 && o1.classList.contains("show"));
+    window.__TASKS = [{ id: 1, np: "98114", estado: "asignado", asignado_legajo: "55", asignado_nombre: "Pedro", articulos: [{ cod: "315", falto: 10 }] }];
     await faltPoll();
-    const h2 = document.getElementById("faltPopupBody").innerHTML;
-    one.varios3 = /Hay <b>3<\/b> pedidos/.test(h2);
-    return one;
+    const o2 = document.getElementById("faltPopup");
+    const asigHidden = !(o2 && o2.classList.contains("show"));
+    return { flagOff, pendHidden, asigHidden };
   });
 
-  // B) me asigno y GANO → "Te lo asignaste" con detalle
-  const B = await p.evaluate(async () => {
-    const t = { id: 1, np: "98114", estado: "asignado", asignado_legajo: "55", asignado_nombre: "Pedro", articulos: [{ cod: "315", falto: 10 }], cod_cliente: "771", tanda: "D02A", razon_social: "Distri Norte" };
-    window.__ASSIGN = t; window.__TASKS = [t];
-    await faltAsignarme(1);
-    const h = document.getElementById("faltPopupBody").innerHTML;
-    return { isMine: /Te lo asignaste/.test(h), showsNp: /98114/.test(h), showsArt: /315/.test(h), hasCompletar: /faltCompletar\(1/.test(h), hasSoltar: /faltSoltar\(1\)/.test(h) };
-  });
-
-  // F) estoy MIRANDO una pendiente y la toma OTRO (sin que yo intente) → "ya la toma X"
-  const F = await p.evaluate(async () => {
-    window.__TASKS = [{ id: 3, np: "555", estado: "pendiente", articulos: [{ cod: "100", falto: 2 }] }];
-    await faltPoll();
-    const wasPend = /Llegó un faltante/.test(document.getElementById("faltPopupBody").innerHTML);
-    window.__TASKS = [{ id: 3, np: "555", estado: "asignado", asignado_legajo: "77", asignado_nombre: "Marta" }];
-    await faltPoll();
-    const nowTaken = /Ya lo está haciendo Marta/.test(document.getElementById("faltPopupBody").innerHTML);
-    return { wasPend, nowTaken };
-  });
-
-  // C) me asigno pero la tomó OTRO → "Ya lo está haciendo Ana"
-  const C = await p.evaluate(async () => {
-    window.__TASKS = [{ id: 2, np: "98091", estado: "pendiente", articulos: [{ cod: "440", falto: 5 }] }];
-    // reset estado interno de "taken"/mine: forzamos un poll con la 2 pendiente
-    await faltPoll();
-    window.__ASSIGN = { id: 2, np: "98091", estado: "asignado", asignado_legajo: "88", asignado_nombre: "Ana" };
-    await faltAsignarme(2);
-    const h = document.getElementById("faltPopupBody").innerHTML;
-    return { taken: /Ya lo está haciendo Ana/.test(h) };
-  });
-
-  // D) Facturación: badge amarillo "en progreso"
-  const D = await p.evaluate(async () => {
-    window.__TASKS = [{ np: "98114", estado: "asignado", asignado_legajo: "55", asignado_nombre: "Pedro" }];
-    await facFetchTareas();
-    const t = facTareaActiva("98114");
-    const badge = facTareaBadge("98114");
-    return { active: !!t, hasCompletando: /Completando/.test(badge), hasPedro: /Pedro/.test(badge), noneForOther: facTareaActiva("00000") === null };
-  });
-
-  // E) legajo de PRUEBA (0) no ve el pop-up
+  // E) legajo de PRUEBA (0) tampoco ve el pop-up
   const E = await p.evaluate(async () => {
     document.getElementById("legajoInput").value = "0";
     window.__TASKS = [{ id: 9, np: "777", estado: "pendiente", articulos: [] }];
@@ -114,16 +68,36 @@ catch (_e) {
     return { hiddenForPrueba: !(o && o.classList.contains("show")) };
   });
 
-  const okA = A.shown && A.isPend && A.hasAssign && A.noDetailYet && A.unoSinContador && A.varios3;
-  const okB = B.isMine && B.showsNp && B.showsArt && B.hasCompletar && B.hasSoltar;
-  const okF = F.wasPend && F.nowTaken;
-  const okC = C.taken;
-  const okD = D.active && D.hasCompletando && D.hasPedro && D.noneForOther;
+  // D) Facturación: badge "⏳ Completando" con el gate v6.18/v6.19.
+  const D = await p.evaluate(async () => {
+    document.getElementById("legajoInput").value = "55";
+    window.__TASKS = [{ np: "98114", estado: "asignado", asignado_legajo: "55", asignado_nombre: "Pedro" }];
+    await facFetchTareas();
+    // Preconds del gate: faltante con cajas>0 + código a_guardar>0.
+    _facFalt = new Map([["98114", { cajas: 10, items: [{ cod: "315", falto: 10, ped: 80 }] }]]);
+    _facSaldosN = { "315": { a_guardar: 10, terminado: 0 } };
+    _facGuardadoHoy = new Set();
+    const t = facTareaActiva("98114");
+    const badge = facTareaBadge("98114");
+    const noneForOther = facTareaActiva("00000") === null;
+    const badgeOtroVacio = facTareaBadge("00000") === "";               // sin tarea → sin badge
+    // v6.19: faltante YA completado (cajas 0), la tarea sigue abierta → badge vacío
+    _facFalt = new Map([["98114", { cajas: 0, items: [] }]]);
+    const badgeCompletoVacio = facTareaBadge("98114") === "";
+    // v6.18: tarea + faltante con cajas pero SIN stock (a_guardar 0, no guardado hoy) → badge vacío
+    _facFalt = new Map([["98114", { cajas: 10, items: [{ cod: "315", falto: 10, ped: 80 }] }]]);
+    _facSaldosN = { "315": { a_guardar: 0, terminado: 0 } };
+    const badgeSinStockVacio = facTareaBadge("98114") === "";
+    return { active: !!t, hasCompletando: /Completando/.test(badge), hasPedro: /Pedro/.test(badge), noneForOther, badgeOtroVacio, badgeCompletoVacio, badgeSinStockVacio };
+  });
+
+  const okA = A.flagOff && A.pendHidden && A.asigHidden;
   const okE = E.hiddenForPrueba;
-  const pass = okA && okB && okF && okC && okD && okE && errs.length === 0;
-  console.log("falt-tareas:", JSON.stringify({ A, B, F, C, D, E }));
+  const okD = D.active && D.hasCompletando && D.hasPedro && D.noneForOther && D.badgeOtroVacio && D.badgeCompletoVacio && D.badgeSinStockVacio;
+  const pass = okA && okE && okD && errs.length === 0;
+  console.log("falt-tareas:", JSON.stringify({ A, E, D }));
   console.log("  pageerrors:", errs.length ? errs.join("|") : "none");
-  console.log(" ", okA ? "A pend ✓" : "A pend ✗", "·", okB ? "B gano ✓" : "B gano ✗", "·", okF ? "F mira-otro ✓" : "F mira-otro ✗", "·", okC ? "C pierdo ✓" : "C pierdo ✗", "·", okD ? "D fac ✓" : "D fac ✗", "·", okE ? "E prueba ✓" : "E prueba ✗", "·", pass ? "OK" : "FAIL");
+  console.log(" ", okA ? "A popup-off ✓" : "A popup-off ✗", "·", okE ? "E prueba ✓" : "E prueba ✗", "·", okD ? "D fac-badge ✓" : "D fac-badge ✗", "·", pass ? "OK" : "FAIL");
   await b.close();
   process.exit(pass ? 0 : 1);
 })();
