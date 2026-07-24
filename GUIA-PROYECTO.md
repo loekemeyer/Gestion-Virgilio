@@ -4,7 +4,9 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-07-24 · Versión app al documentar: **v6.15**
+> Última actualización: 2026-07-24 · Versión app al documentar: **v6.16**
+>
+> Nota: **v6.16 — Facturación: el aviso ⏳ "Completando faltante" solo aparece si hay stock para completar**. El badge `facTareaBadge` (amarillo, "⏳ Completando · faltan N · sin asignar aún") se mostraba para cualquier NP con una `Faltantes_Tarea` activa, **sin mirar stock**. Ahora Facturación carga los **saldos** (`stockFetchSaldos` sumado al `Promise.all` de la carga; `_facSaldosN` normalizado) y el badge se **oculta si NINGÚN artículo faltante de la NP tiene stock** en `a_guardar` o `terminado` (góndola) — pedido del dueño: si no hay mercadería, nadie lo va a completar, se factura corto, y no tiene sentido avisar que "falta guardarlo". El badge rojo de faltantes (`facFaltDist`/`facFaltBadge`, "qué salió corto") no cambia. Nota: reversa de un ajuste manual erróneo (942P `terminado` −288 → +288 = 0) hecha por datos.
 >
 > Nota: **v6.15 — Alerta automática de faltantes (pop-up) DESACTIVADA**. El pop-up que les aparecía a los operarios cada 6s para completar un faltante que llegó (`faltPollStart`/`faltDecidePopup`/`faltShowPopup`) queda apagado con el flag **`FALT_POPUP_ENABLED = false`**: no arranca el poll ni se muestra el pop-up (pedido del dueño — genera confusión; la carga de faltantes se hace desde el módulo **CP · Completar Pedido**, que desde v6.14 solo muestra los completables —con stock en a_guardar o góndola—). Reversible: poner el flag en `true`. Las **alertas Telegram** de faltantes son server-side (triggers/cron) y **no** dependen de esto. El botón/tile "Completar Pedido" (CP manual) sigue funcionando.
 >

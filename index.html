@@ -5549,7 +5549,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v6.15";
+const APP_VERSION = "v6.16";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -19490,6 +19490,7 @@ function facFaltDist(np){
    en Facturación: "están agregando cajas a esta NP ahora, esperá antes de facturar".
    Distinto del rojo (rojo = salió corto). Muestra el estado (completo / faltan X). v5.71. */
 let _facTareas = new Map(); let _facTareasTs = 0;
+let _facSaldosN = {};   // v6.16: saldos por artículo (normalizado) para ocultar el ⏳ sin stock
 async function facFetchTareas(){
   const now = Date.now();
   if (_facTareasTs && (now - _facTareasTs) < 30000) return _facTareas;
@@ -19506,6 +19507,12 @@ function facTareaActiva(np){ return _facTareas.get(String(np).trim().replace(/\.
 function facTareaBadge(np){
   const t = facTareaActiva(np); if (!t) return "";
   const f = facFaltInfo(np);
+  // v6.16: si NINGÚN artículo faltante de la NP tiene stock para completar (a_guardar o
+  // góndola), no mostramos el aviso — nadie lo va a guardar/completar, se factura corto.
+  if (f && f.items && f.items.length) {
+    const hayStock = f.items.some(function (it) { const s = _facSaldosN[_cpNorm(it.cod)] || {}; return (Number(s.a_guardar) || 0) > 0 || (Number(s.terminado) || 0) > 0; });
+    if (!hayStock) return "";
+  }
   const est = (f && f.cajas) ? ('faltan ' + f.cajas + ' cj') : 'completo';
   const quien = (t.estado === 'asignado') ? (' · lo hace ' + escapeHtml(t.asignado_nombre || ('leg ' + (t.asignado_legajo || '?')))) : ' · sin asignar aún';
   return '<div class="fac-progreso-badge" title="Están agregando cajas a esta NP (faltante que llegó). Esperá a que terminen antes de facturar.">⏳ Completando · ' + escapeHtml(est) + quien + '</div>';
@@ -19833,9 +19840,11 @@ async function facTick(){
       facFetchEquiv().catch(function(){ return _facEquiv; }),         // equivalencias por NP → cartel "facturá el real"
       facFetchFaltantes().catch(function(){ return _facFalt; }),      // faltantes por NP → aviso ⚠ antes de facturar (v5.36)
       facFetchCajas().catch(function(){ return _facCajas; }),         // cajas por NP → la columna Líos muestra CAJAS para los súper (v5.68)
-      facFetchTareas().catch(function(){ return _facTareas; })        // tareas en progreso por NP → aviso ⏳ amarillo (v5.71)
+      facFetchTareas().catch(function(){ return _facTareas; }),       // tareas en progreso por NP → aviso ⏳ amarillo (v5.71)
+      stockFetchSaldos().catch(function(){ return {}; })              // v6.16: saldos → ocultar ⏳ si el faltante no tiene stock para completar
     ]);
     const fcKeys = _facPar[0] || new Set();
+    try { const _sal = _facPar[8] || {}; _facSaldosN = {}; Object.keys(_sal).forEach(function(k){ _facSaldosN[_cpNorm(k)] = _sal[k]; }); } catch(_e){ _facSaldosN = {}; }
 
     let tandasFC = tandasPlan.filter(t => fcKeys.has(t._key || t.tanda.toUpperCase()));
     let modoFallback = false;
