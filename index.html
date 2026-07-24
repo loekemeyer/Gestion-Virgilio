@@ -5543,7 +5543,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v6.09";
+const APP_VERSION = "v6.10";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -10915,6 +10915,7 @@ function opDraftResume(legajo) {
   const s = d.snap || {}, leg = s.legajo || legajo;
   if (s) { s.liosLoading = false; s.donorsLoading = false; }   // CP/RC: no re-cargar async
   if (d.op === "MG") showMGModal(leg, s);
+  else if (d.op === "EXC") showExcModal(leg, s);
   else if (d.op === "RKB") showRacksBajarModal(leg, s);
   else if (d.op === "INS") showInsumoModal(s.mode || "RI", leg, s);
   else if (d.op === "SC") showCervantesModal(leg, s);
@@ -11059,8 +11060,92 @@ function closeMG() { const ov = document.getElementById("mgModal"); if (ov) ov.c
 function mgHasProgress() { return !!(_mg && _mg.items && _mg.items.some(function (it) { return (it.cargar > 0) || (it.exc > 0); })); }
 function mgAskClose() { opAskClose(mgHasProgress(), "MG", _mg && _mg.legajo, "Guardar a góndola", _mg, closeMG); }
 
-/* MG ahora pregunta QUÉ se baja a góndola (v5.15): lo que llegó (a guardar) o de los
-   racks. "De los racks" abre showRacksBajarModal. */
+/* ===== Bajar EXCEDENTE a góndola (v6.10, operario). El excedente son cajas que NO
+   entraron cuando la góndola estaba llena (se guardaron "arriba" con su ubicación en el
+   MG, v4.26). Cuando hay lugar, este modal las baja: excedente − / terminado (góndola) +,
+   tipo 'traslado' (mismo par que antes se hacía a mano por SQL — ref "excedente_a_gondola").
+   Es la reversa exacta del excedente del MG. El saldo autoritativo sale de stockFetchSaldos
+   (.excedente, misma fuente que MG); las ubicaciones (dónde están físicamente, dato para el
+   operario) de pkFetchExcedente (best-effort, si falla igual se puede bajar). ===== */
+let _exc = null;
+async function showExcModal(legajo, _resume) {
+  if (!document.getElementById("excCss")) {
+    const s = document.createElement("style"); s.id = "excCss";
+    s.textContent = "#excModal{display:none;position:fixed;inset:0;z-index:1290;background:rgba(2,6,23,.74);overflow:auto;padding:12px;}#excModal.show{display:block;}.exc-card{background:#f8fafc;max-width:460px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.exc-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;background:linear-gradient(90deg,#d97706,#b45309);color:#fff;}.exc-title{font-size:18px;font-weight:800;}.exc-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}.exc-body{padding:13px 14px;}.exc-empty{padding:26px;text-align:center;color:#64748b;font-size:15px;}.exc-hint{font-size:12.5px;color:#64748b;margin-bottom:10px;line-height:1.35;}.exc-search{width:100%;height:44px;border:2px solid #cbd5e1;border-radius:11px;padding:0 13px;font-size:16px;font-weight:700;margin-bottom:10px;box-sizing:border-box;}.exc-row{display:flex;flex-direction:column;gap:9px;border:1px solid #e2e8f0;border-radius:13px;padding:11px 12px;margin-bottom:9px;background:#fff;}.exc-headline{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;}.exc-info{flex:1;min-width:0;}.exc-cod{font-size:16px;font-weight:800;font-family:Consolas,Menlo,monospace;}.exc-desc{font-size:12px;color:#475569;}.exc-av{font-size:11.5px;color:#64748b;white-space:nowrap;}.exc-av b{color:#b45309;font-size:14px;}.exc-ubics{margin-top:5px;display:flex;flex-wrap:wrap;gap:5px;}.exc-ubic{border:1.5px solid #fcd34d;background:#fffbeb;border-radius:8px;padding:2px 8px;font-size:11.5px;font-weight:800;color:#92400e;font-family:Consolas,Menlo,monospace;}.exc-noubic{font-size:11px;color:#94a3b8;font-weight:700;margin-top:5px;}.exc-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;}.exc-stp{display:flex;align-items:center;gap:6px;}.exc-sb{display:flex;align-items:center;justify-content:center;line-height:1;padding:0;margin:0;width:44px;height:50px;border:none;border-radius:10px;font-size:25px;font-weight:800;cursor:pointer;background:#e2e8f0;color:#475569;}.exc-inp{width:62px;height:50px;box-sizing:border-box;margin:0;text-align:center;font-size:23px;font-weight:800;border:2px solid #cbd5e1;border-radius:10px;padding:0;-moz-appearance:textfield;}.exc-inp::-webkit-outer-spin-button,.exc-inp::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}.exc-rest{font-size:13px;font-weight:800;color:#b45309;white-space:nowrap;}.exc-rest.ok{color:#15803d;}.exc-fin{width:100%;margin-top:10px;padding:14px;border:none;border-radius:12px;background:#d97706;color:#fff;font-size:17px;font-weight:800;cursor:pointer;}.exc-fin:disabled{background:#cbd5e1;color:#64748b;cursor:not-allowed;}";
+    document.head.appendChild(s);
+  }
+  let ov = document.getElementById("excModal");
+  if (!ov) { ov = document.createElement("div"); ov.id = "excModal"; document.body.appendChild(ov); }
+  ov.classList.add("show");
+  ov.innerHTML = '<div class="exc-card"><div class="exc-head"><span class="exc-title">📦 Bajar excedente a góndola</span><button class="exc-close" onclick="excAskClose()">Cerrar</button></div><div class="exc-body" id="excBody"><div class="exc-empty">Cargando excedente…</div></div></div>';
+  if (_resume) { _exc = _resume; excRender(); return; }
+  try {
+    const res = await Promise.all([stockFetchSaldos(), loadArtNombres()]);
+    const saldos = res[0] || {};
+    const withExc = Object.keys(saldos).map(function (k) { return saldos[k]; }).filter(function (a) { return (a.excedente || 0) > 0; }).sort(function (a, b) { return (parseInt(a.cod, 10) || 0) - (parseInt(b.cod, 10) || 0); });
+    let exc = {};
+    try { exc = await pkFetchExcedente(withExc.map(function (a) { return a.cod; })); } catch (_e) { exc = {}; }
+    const items = withExc.map(function (a) {
+      const e = exc[String(a.cod).toUpperCase()] || {};
+      return { cod: a.cod, desc: artNombre(a.cod, a.desc), disponible: Math.round(a.excedente), ubics: e.ubics || [], bajar: 0 };
+    });
+    _exc = { legajo: String(legajo || ""), items: items, filtro: "" };
+    excRender();
+  } catch (e) { const b = document.getElementById("excBody"); if (b) b.innerHTML = '<div class="exc-empty">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
+}
+function excRender() {
+  if (!_exc) return; const body = document.getElementById("excBody"); if (!body) return;
+  let h = '<div class="exc-hint">El <b>excedente</b> son cajas que no entraron cuando la góndola estaba llena (guardadas arriba). Ahora que hay lugar, bajalas: elegí cuántas por código y tocá <b>Bajar</b>. Van directo a <b>góndola</b>.</div>';
+  h += '<input id="excSearch" class="exc-search" type="search" inputmode="numeric" autocomplete="off" placeholder="🔎 Buscar código…" value="' + escapeHtml(_exc.filtro || "") + '" oninput="excSearchInput(this.value)">';
+  const fq = String(_exc.filtro || "").trim(), fLo = fq.toLowerCase();
+  const shown = fq ? _exc.items.filter(function (it) { return String(it.cod).toLowerCase().indexOf(fLo) >= 0; }) : _exc.items;
+  if (!_exc.items.length) h += '<div class="exc-empty">No hay nada en excedente 👍</div>';
+  else if (!shown.length) h += '<div class="exc-empty">Sin resultados.</div>';
+  h += shown.map(function (it) {
+    const i = _exc.items.indexOf(it);
+    const mx = it.disponible;
+    const ubicHtml = (it.ubics && it.ubics.length)
+      ? '<div class="exc-ubics">' + it.ubics.map(function (u) { return '<span class="exc-ubic">📍 ' + escapeHtml(String(u).replace(/-/g, "")) + '</span>'; }).join("") + '</div>'
+      : '<div class="exc-noubic">📍 sin ubicación anotada</div>';
+    const rest = it.disponible - it.bajar;
+    const restTxt = '<span class="exc-rest' + (rest <= 0 ? ' ok' : '') + '">' + (rest <= 0 ? '✓ Todo' : 'Quedan ' + rest) + '</span>';
+    return '<div class="exc-row">' +
+      '<div class="exc-headline"><div class="exc-info"><span class="exc-cod">' + escapeHtml(it.cod) + '</span> <span class="exc-desc">' + escapeHtml(it.desc || "") + '</span>' + ubicHtml + '</div><span class="exc-av">excedente <b>' + it.disponible + '</b></span></div>' +
+      '<div class="exc-foot"><div class="exc-stp"><button class="exc-sb" onclick="excChg(' + i + ',-1)">–</button><input class="exc-inp" type="number" min="0" max="' + mx + '" inputmode="numeric" value="' + it.bajar + '" oninput="excSet(' + i + ',this.value)"><button class="exc-sb" onclick="excChg(' + i + ',1)">+</button></div>' + restTxt + '</div>' +
+      '</div>';
+  }).join("");
+  const tot = _exc.items.reduce(function (s, it) { return s + (it.bajar || 0); }, 0);
+  h += '<button class="exc-fin"' + (tot <= 0 ? " disabled" : "") + ' onclick="excConfirmar()">✓ Bajar ' + tot + ' caja(s) a góndola</button>';
+  _renderKeepFocus(body, h);
+}
+function excSearchInput(v) { if (!_exc) return; _exc.filtro = String(v == null ? "" : v); excRender(); }
+function excChg(i, d) { if (!_exc) return; const it = _exc.items[i]; if (!it) return; it.bajar = Math.max(0, Math.min(it.disponible, it.bajar + d)); excRender(); }
+function excSet(i, v) { if (!_exc) return; const it = _exc.items[i]; if (!it) return; let n = Math.max(0, parseInt(v, 10) || 0); if (n > it.disponible) n = it.disponible; it.bajar = n; excRender(); }
+function excConfirmar() {
+  if (!_exc) return;
+  const sel = _exc.items.filter(function (it) { return it.bajar > 0; });
+  if (!sel.length) return;
+  const rows = [];
+  sel.forEach(function (it) {
+    if (it.bajar <= 0) return;
+    // ubic origen si es única → queda de dato en el movimiento (informativo; el saldo
+    // autoritativo es el NET por código, igual que lo consume el picking).
+    const u = (it.ubics && it.ubics.length === 1) ? (String(it.ubics[0]).trim() || null) : null;
+    rows.push({ cod_art: it.cod, descripcion: it.desc || null, deposito: "excedente", delta: -it.bajar, tipo: "traslado", ref: "excedente_a_gondola", legajo: _exc.legajo || null, ubicacion: u });
+    rows.push({ cod_art: it.cod, descripcion: it.desc || null, deposito: "terminado", delta: it.bajar, tipo: "traslado", ref: "excedente_a_gondola", legajo: _exc.legajo || null });
+  });
+  const n = sel.reduce(function (s, it) { return s + it.bajar; }, 0);
+  try { opDraftClear(_exc && _exc.legajo); } catch (_e) {}
+  closeExc();
+  stockMove(rows);
+  try { alert("✓ Bajaste " + n + " caja(s) del excedente a góndola."); } catch (_e) {}
+}
+function closeExc() { const ov = document.getElementById("excModal"); if (ov) ov.classList.remove("show"); _exc = null; }
+function excHasProgress() { return !!(_exc && _exc.items && _exc.items.some(function (it) { return (it.bajar > 0); })); }
+function excAskClose() { opAskClose(excHasProgress(), "EXC", _exc && _exc.legajo, "Bajar excedente a góndola", _exc, closeExc); }
+
+/* MG ahora pregunta QUÉ se baja a góndola (v5.15): lo que llegó (a guardar), del
+   excedente (v6.10) o de los racks. Cada uno abre su modal. */
 let _mgChooserLegajo = "";
 function showMGChooser(legajo) {
   _mgChooserLegajo = String(legajo || "");
@@ -11070,13 +11155,14 @@ function showMGChooser(legajo) {
     '<div style="font-size:18px;font-weight:800;margin-bottom:3px;">📥 Bajar a góndola</div>' +
     '<div style="font-size:13px;color:#64748b;margin-bottom:16px;">¿Qué vas a bajar?</div>' +
     '<button onclick="mgChooserGo(\'guardar\')" style="width:100%;margin-bottom:10px;padding:16px;border:none;border-radius:12px;background:#16a34a;color:#fff;font-size:16px;font-weight:800;cursor:pointer;">📦 Lo que llegó <span style="font-weight:600;opacity:.85;">(a guardar)</span></button>' +
+    '<button onclick="mgChooserGo(\'excedente\')" style="width:100%;margin-bottom:10px;padding:16px;border:none;border-radius:12px;background:#d97706;color:#fff;font-size:16px;font-weight:800;cursor:pointer;">📦 Del excedente <span style="font-weight:600;opacity:.85;">(lo que no entró)</span></button>' +
     '<button onclick="mgChooserGo(\'racks\')" style="width:100%;margin-bottom:10px;padding:16px;border:none;border-radius:12px;background:#1e6bd6;color:#fff;font-size:16px;font-weight:800;cursor:pointer;">🏗 De los racks</button>' +
     '<button onclick="closeMGChooser()" style="width:100%;padding:11px;border:none;border-radius:10px;background:#e2e8f0;color:#475569;font-weight:700;cursor:pointer;">Cancelar</button>' +
     '</div>';
   ov.style.display = "flex";
 }
 function closeMGChooser() { const ov = document.getElementById("mgChooserModal"); if (ov) ov.style.display = "none"; }
-function mgChooserGo(which) { closeMGChooser(); if (which === "racks") showRacksBajarModal(_mgChooserLegajo); else showMGModal(_mgChooserLegajo); }
+function mgChooserGo(which) { closeMGChooser(); if (which === "racks") showRacksBajarModal(_mgChooserLegajo); else if (which === "excedente") showExcModal(_mgChooserLegajo); else showMGModal(_mgChooserLegajo); }
 
 /* Bajar de racks a góndola (operario, v5.15). Lista lo que hay en racks ORDENADO por
    código; si algo físico no figura, "+" para agregarlo → alerta Telegram (evento RKX).

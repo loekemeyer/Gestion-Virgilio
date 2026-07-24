@@ -31,6 +31,7 @@ catch (_e) {
       "facFetchTareas", "facTareaActiva", "facTareaBadge", "_compTandaYaArmada",
       "getActivityStatus", "tandaReservar", "tandaLiberar",
       "showMGChooser", "showRacksBajarModal", "rkbRender", "rkbConfirmar", "rkbFetchCxM", "rkbSetSec",
+      "showExcModal", "excRender", "excConfirmar", "excSet", "excChg", "excAskClose", "closeExc",
       "showCPModal", "cpRender", "cpConfirm", "cpLoadPickSinArmar", "showInstructivo", "equivResolve", "pppZonaDeBarrio",
       "showRCModal", "rcConfirm", "rcLoadDonors", "showRemitoArmado", "armadoRemitoData", "armadoRemitoInnerHtml", "remitoPrintDoc",
       "openPrintStation", "psToggle", "psPoll", "psTestPrint", "psPrintBatch", "psSeedTodayIfNeeded", "psRender",
