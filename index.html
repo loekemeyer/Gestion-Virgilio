@@ -162,21 +162,27 @@ button {
 
 .row { display: grid; gap: 8px; margin-top: 13px; }
 .row-6 { grid-template-columns: repeat(6, minmax(0, 1fr)); }
-#row2 { grid-template-columns: repeat(3, minmax(0, 1fr)); }   /* RT·RR·MG: 3 anchos (usan la fila entera, entra "Recepción" sin cortar) */
+.row-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.row-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
 .box { border: 2px solid #334155; border-radius: 10px; padding: 9px 5px; text-align: center; cursor: pointer; min-width: 0; transition: border-color .12s, transform .06s; }
 .box-sm { padding: 5px 4px; border-radius: 8px; }
 .box-sm .box-title { font-size: 13px; }
 .box-sm .box-desc { font-size: 9px; margin-top: 2px; }
+/* CORE (picking / armado): botones GRANDES = los más importantes (v5.92). */
+.row-core .box { padding: 15px 6px; border-width: 2.5px; }
+.row-core .box-title { font-size: 22px; }
+.row-core .box-desc { font-size: 12px; margin-top: 4px; }
+/* ÚNICOS con color: Picking (azul) EP·TP y Armado (verde) AP·TAP. Todo el resto
+   queda blanco con borde oscuro — decisión del dueño (v5.92). */
+.box[data-code="EP"], .box[data-code="TP"] { border-color: #1e6bd6; background: #eff6ff; }
+.box[data-code="EP"] .box-title, .box[data-code="TP"] .box-title { color: #1e40af; }
+.box[data-code="AP"], .box[data-code="TAP"] { border-color: #16a34a; background: #f0fdf4; }
+.box[data-code="AP"] .box-title, .box[data-code="TAP"] .box-title { color: #15803d; }
+.botonera-grp { text-align: left; font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: #475569; margin: 12px 2px 0; }
+.botonera-grp + .row { margin-top: 4px; }
 .botonera-sep { text-align: center; font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #94a3b8; margin: 13px 0 1px; }
-.box[data-code="CP"] { border-color: #86efac; background: #f0fdf4; }
-.box-sm[data-code="CP"] .box-title { color: #15803d; }
-.box[data-code="RC"] { border-color: #fdba74; background: #fff7ed; }
-.box-sm[data-code="RC"] .box-title { color: #c2410c; }
-.box[data-code="EA"] { border-color: #c4b5fd; background: #f5f3ff; }
-.box-sm[data-code="EA"] .box-title { color: #6d28d9; }
-.box[data-code="IR"] { border-color: #a5f3fc; background: #ecfeff; }
-.box-sm[data-code="IR"] .box-title { color: #0e7490; }
+.botonera-sep + .row { margin-top: 3px; }
 .box:active { transform: scale(.96); }
 .box-title { font-size: 18px; font-weight: bold; }
 .box-desc { font-size: 10.5px; margin-top: 3px; line-height: 1.2; overflow-wrap: break-word; word-break: normal; hyphens: none; }
@@ -343,8 +349,10 @@ button {
  text-align:center;
 }
 
-/* ✅ deshabilitado visual */
-.box.disabled{
+/* ✅ deshabilitado visual. El variante [data-code] sube la especificidad por encima
+   del color de core (EP/TP/AP/TAP) para que el gris de bloqueo gane (v5.92). */
+.box.disabled,
+.box[data-code].disabled{
   background:#ddd;
   color:#888;
   border-color:#aaa;
@@ -352,15 +360,17 @@ button {
   opacity:0.6;
 }
 
-/* ⚠ tarea pendiente: hay un EP/AP o toggle abierto sin cerrar.
-   El botón correspondiente queda con borde rojo. Si está además
-   disabled (por bloqueo), gana el borde rojo igual. */
-.box.pending{
+/* ⚠ tarea pendiente: hay un EP/AP o toggle abierto sin cerrar. El botón queda con
+   borde rojo. El variante [data-code] gana sobre el color de core (azul/verde) y
+   sobre disabled, así el rojo se ve siempre (v5.92). */
+.box.pending,
+.box[data-code].pending{
   border-color: #d33;
   background: #fff5f5;
 }
 .box.disabled.pending,
-.box.pending.disabled{
+.box.pending.disabled,
+.box[data-code].disabled.pending{
   border-color: #d33;
   background: #ddd;
 }
@@ -2150,6 +2160,13 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .cmpl-autobar{ font-size:12.5px; color:#92400e; background:#fffbeb; border:1px solid #fcd34d; border-radius:9px; padding:7px 10px; margin:0 0 9px; line-height:1.35; }
 .cmpl-szinp{ width:48px; height:28px; text-align:center; font-size:15px; font-weight:800; border:1.5px solid #fcd34d; border-radius:7px; margin:0 2px; padding:0; -moz-appearance:textfield; }
 .cmpl-szinp::-webkit-outer-spin-button,.cmpl-szinp::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
+.cmpl-repbar{ display:flex; gap:8px; align-items:stretch; margin:0 0 10px; }
+.cmpl-rep{ flex:1; margin:0; padding:11px 12px; border:2px solid #16a34a; border-radius:11px; background:#f0fdf4; color:#15803d; font-size:15px; font-weight:800; cursor:pointer; line-height:1.15; text-align:center; }
+.cmpl-rep small{ font-weight:700; color:#16a34a; }
+.cmpl-rep:active{ background:#dcfce7; }
+.cmpl-rep.off{ border-color:#cbd5e1; background:#f1f5f9; color:#94a3b8; }
+.cmpl-rep.off small{ color:#94a3b8; }
+.cmpl-repminus{ flex:0 0 auto; width:56px; margin:0; padding:0; border:2px solid #cbd5e1; border-radius:11px; background:#fff; color:#475569; font-size:26px; font-weight:800; line-height:1; cursor:pointer; }
 .cmpl-cerrar{ display:block; width:100%; margin-top:11px; padding:13px; border:none; border-radius:12px; background:#16a34a; color:#fff; font-size:16px; font-weight:800; cursor:pointer; }
 .cmpl-cerrar:disabled{ background:#cbd5e1; color:#64748b; cursor:not-allowed; }
 .cmpl-back{ width:auto; background:#f1f5f9; color:#334155; border:1px solid #cbd5e1; border-radius:9px; padding:7px 14px; font-size:13px; font-weight:800; cursor:pointer; margin-bottom:10px; }
@@ -2201,10 +2218,13 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .csep-tosep{ display:block; width:100%; margin-top:9px; padding:10px; border:1.5px dashed #fcd34d; border-radius:11px; background:#fffbeb; color:#b45309; font-size:13px; font-weight:800; cursor:pointer; }
 .csep-mxwrap{ overflow-x:auto; -webkit-overflow-scrolling:touch; border:1px solid #e2e8f0; border-radius:10px; max-height:60vh; }
 .csep-mx{ border-collapse:collapse; width:100%; }
-.csep-mx th,.csep-mx td{ text-align:center; font-size:13px; padding:8px 6px; border-bottom:1px solid #eef2f6; white-space:nowrap; }
-.csep-mx thead th{ font-size:11px; color:#64748b; font-weight:800; border-bottom:2px solid #e2e8f0; position:sticky; top:0; background:#fff; z-index:1; }
-.csep-mxc{ text-align:left !important; font-family:Consolas,Menlo,monospace; font-weight:800; font-size:13px; position:sticky; left:0; background:#fff; }
-.csep-mxt{ background:#f8fafc; color:#475569; font-weight:800; font-size:12px; }
+/* v5.96: líneas (grid) para ver claro qué cantidad va a qué NP — vertical entre
+   columnas + horizontal entre códigos. */
+.csep-mx th,.csep-mx td{ text-align:center; font-size:13px; padding:8px 6px; border-bottom:1px solid #d7dee7; border-right:1px solid #e8ecf1; white-space:nowrap; }
+.csep-mx th:last-child,.csep-mx td:last-child{ border-right:none; }
+.csep-mx thead th{ font-size:11px; color:#64748b; font-weight:800; border-bottom:2px solid #cbd5e1; position:sticky; top:0; background:#fff; z-index:1; }
+.csep-mxc{ text-align:left !important; font-family:Consolas,Menlo,monospace; font-weight:800; font-size:13px; position:sticky; left:0; background:#fff; border-right:2px solid #cbd5e1; box-shadow:2px 0 0 #cbd5e1; }
+.csep-mxt{ background:#f8fafc; color:#475569; font-weight:800; font-size:12px; border-right:2px solid #cbd5e1 !important; }
 .csep-cell{ font-weight:800; color:#1e6bd6; cursor:pointer; }
 .csep-cdone{ display:inline-block; min-width:30px; padding:5px 9px; background:#16a34a; color:#fff; border-radius:8px; font-weight:800; }
 .csep-z{ color:#cbd5e1; font-weight:700; }
@@ -2955,7 +2975,7 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
      #rcpRoot, con su propio cliente Supabase (login anónimo). Portado de la app
      Control-Carga-Remitos-FC. Suma las cajas del día a localStorage para que RT
      se cierre con esa cantidad sin pedirla a mano. -->
-<script type="module" src="recepcion.js?v=3.67"></script>
+<script type="module" src="recepcion.js?v=3.68"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -3049,8 +3069,7 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
       <button class="sup-action-btn" onclick="openFacturacion()"><span class="sup-ico">📋</span><span>Facturación</span></button>
       <button class="sup-action-btn" onclick="openPPP()"><span class="sup-ico">🗓️</span><span>PPP</span></button>
       <button class="sup-action-btn" onclick="openRecepcionAdmin()"><span class="sup-ico">🏭</span><span>Carga Recepción Mercadería</span></button>
-      <button class="sup-action-btn" onclick="showCPModal('0')"><span class="sup-ico">📦➕</span><span>Completar Pedido</span></button>
-      <button class="sup-action-btn" onclick="showFaltAvisar()"><span class="sup-ico">📢</span><span>Avisar faltante llegó</span></button>
+      <button class="sup-action-btn" onclick="showFaltAvisar()"><span class="sup-ico">📦➕</span><span>Completar Pedido</span></button>
       <button class="sup-action-btn" onclick="openStockAdmin()"><span class="sup-ico">📦</span><span>Stock y Compras</span></button>
       <button class="sup-action-btn" onclick="openRemitosAdmin()"><span class="sup-ico">🚚</span><span>Recepción Remitos (RR)</span></button>
     </div>
@@ -3323,12 +3342,15 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
     <button id="btnTerminarDia" onclick="terminarDia()">Terminar Día</button>
   </div>
 
-  <div class="row row-6" id="row1"></div>
-  <div class="row row-6" id="row2"></div>
+  <div class="botonera-grp">🛒 Picking</div>
+  <div class="row row-2 row-core" id="row1"></div>
+  <div class="botonera-grp">🔨 Armado de pedido</div>
+  <div class="row row-2 row-core" id="row2"></div>
+  <div class="botonera-grp">📦 Depósito y carga</div>
+  <div class="row row-3" id="row3"></div>
   <div class="botonera-sep">acciones secundarias</div>
-  <div class="row row-6 row-sec" id="row3"></div>
   <div class="row row-6 row-sec" id="row4"></div>
-  <button id="moverOpBtn" onclick="showMoverModal(legajoInput.value)" style="background:#ecfeff;border:1.5px solid #a5f3fc;color:#0e7490;border-radius:12px;font-weight:800;font-size:14px;">🔀 Mover mercadería de lugar (racks)</button>
+  <div class="row row-6 row-sec" id="row5"></div>
   <div id="racksAlarma"></div>
   <div id="pendingSuggestion"></div>
 
@@ -3406,15 +3428,17 @@ const SUPABASE_PLANIMETRIA_ENDPOINT =
   SUPABASE_URL + "/rest/v1/Planimetria";
 
 const filas = {
-  row1: ["EP","TP","AP","TAP","CR","CC"],
-  row2: ["RT","RR","MG"],
-  row3: ["RI","EI","EA","SC","CP","RC","IR"],
-  row4: ["AT","PB","Limp","Perm","PC","CT"]
+  row1: ["EP","TP"],                                   // Picking (grande, azul)
+  row2: ["AP","TAP"],                                  // Armado (grande, verde)
+  row3: ["RT","MG","CC"],                              // Depósito y carga (mediano)
+  row4: ["CR","RR","RI","EI","CP","RC","IR","EA","SC"],// secundarias (chico) + 🔀 Mover al final
+  row5: ["AT","PB","Limp","Perm","PC","CT"]            // tiempos / pausas (chico)
 };
-// Filas secundarias (botones más chicos): uso puntual. Las primarias (row1/row2)
-// quedan grandes como siempre = el ~90% del uso (picking/armado + carga/control +
-// recepción/guardado). Elección del dueño (v5.06).
-const BOTONERA_SECUNDARIAS = { row3: true, row4: true };
+// Rediseño v5.92 (pedido del dueño): más peso a los botones más usados. Primarias
+// GRANDES y con color = Picking (row1, azul) y Armado (row2, verde); Depósito y
+// carga (row3) medianas sin color; el resto CHICO (row4 secundarias + row5 tiempos),
+// sin color. 🔀 Mover racks pasó a ser un box chico más (se agrega en el render).
+const BOTONERA_SECUNDARIAS = { row4: true, row5: true };
 
 const desc = {
   EP:"Empecé Picking", TP:"Fin Picking", AP:"Empecé Armado Pedido",
@@ -4434,6 +4458,9 @@ function renderPendingSuggestion(){
   // app a mitad del picking — antes se perdía todo. Va arriba de todo.
   try {
     const savedPk = pkLoadSaved(legajo);
+    const stPk = getLegajoState(legajo);
+    const openTanda = (stPk && stPk.picking && stPk.picking.active && stPk.picking.value)
+      ? String(stPk.picking.value).trim().toUpperCase() : "";
     if (savedPk) {
       const hechos = Object.keys(savedPk.results || {}).length;
       const total  = (savedPk.items || []).length;
@@ -4442,6 +4469,17 @@ function renderPendingSuggestion(){
       btn.style.background = "#7c3aed";
       btn.innerText = `▶ Seguir picking tanda ${savedPk.tanda} (${hechos}/${total})`;
       btn.onclick = () => pkResume(legajo);
+      box.appendChild(btn);
+    } else if (openTanda) {
+      // v5.91: hay un picking ABIERTO pero sin guardado local (cruzó de día, se hizo
+      // en otro celular, o se limpió). Botón para CONTINUAR reconstruyendo el avance
+      // desde el servidor — antes solo aparecía "terminar", que cerraba el picking a
+      // medio hacer y no dejaba seguir lo de ayer.
+      const btn = document.createElement("button");
+      btn.className = "primary-btn";
+      btn.style.background = "#7c3aed";
+      btn.innerText = `▶ Seguir picking tanda ${openTanda}`;
+      btn.onclick = () => pkResumeServer(openTanda, legajo);
       box.appendChild(btn);
     }
   } catch (_e) { /* no-op */ }
@@ -4569,6 +4607,17 @@ Object.keys(filas).forEach(rowId => {
     document.getElementById(rowId).appendChild(d);
   });
 });
+// v5.92: 🔀 Mover mercadería de racks — secundario (casi no se usa) → box CHICO al
+// final de las secundarias, en vez del botón ancho aparte de antes.
+try {
+  const mov = document.createElement("div");
+  mov.className = "box box-sm";
+  mov.setAttribute("data-code", "MOV");
+  mov.innerHTML = `<div class="box-title" style="font-size:15px">🔀</div><div class="box-desc">Mover racks</div>`;
+  mov.onclick = () => showMoverModal(legajoInput.value);
+  const r4 = document.getElementById("row4");
+  if (r4) r4.appendChild(mov);
+} catch (_e) { /* no-op */ }
 
 /* =========================================================
    NAVEGACIÓN
@@ -5491,7 +5540,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.98";
+const APP_VERSION = "v6.08";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -6556,7 +6605,20 @@ function pkLoadSaved(legajo) {
     const raw = localStorage.getItem(PK_SAVE_PREFIX + String(legajo || ""));
     if (!raw) return null;
     const s = JSON.parse(raw);
-    if (!s || s.day !== getTodayKey() || !s.items || !s.items.length) { pkClearSaved(legajo); return null; }
+    if (!s || !s.items || !s.items.length) { pkClearSaved(legajo); return null; }
+    // v5.91: si el guardado es de OTRO día, conservarlo SOLO si el picking sigue
+    // ABIERTO (cruzó de día: se empezó a la tarde y se sigue al otro día). Antes se
+    // borraba siempre → se perdía el avance y no se podía continuar lo de ayer. Si el
+    // picking ya no está abierto para esa tanda, es basura vieja → limpiar.
+    if (s.day !== getTodayKey()) {
+      let stillOpen = false;
+      try {
+        const stp = getLegajoState(String(legajo || ""));
+        stillOpen = !!(stp && stp.picking && stp.picking.active &&
+          String(stp.picking.value || "").trim().toUpperCase() === String(s.tanda || "").trim().toUpperCase());
+      } catch (_e2) { /* no-op */ }
+      if (!stillOpen) { pkClearSaved(legajo); return null; }
+    }
     return s;
   } catch (_e) { return null; }
 }
@@ -6578,11 +6640,64 @@ function pkResume(legajo) {
   pkRender();
 }
 
-async function showPickingList(tanda, legajo) {
+/* v5.91 — Marcas de picking YA enviadas al servidor (eventos PKC) de una tanda/
+   legajo → Map<CÓDIGO, reales> (la ÚLTIMA marca por código gana). Sirve para
+   RECONSTRUIR el avance cuando el guardado local no está: el picking cruzó de día,
+   se hizo en otro celular, o se limpió. `sinceIso` acota al arranque del picking
+   (ts_inicio del EP) para no traer marcas de una vez anterior con el mismo código. */
+async function pkFetchServerMarks(tanda, legajo, sinceIso) {
+  const out = new Map();
+  try {
+    const lg = String(legajo || "").trim();
+    const tU = String(tanda || "").trim().toUpperCase();
+    if (!lg || !tU) return out;
+    let since = sinceIso;
+    if (!since) { try { since = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(); } catch (_e) { since = null; } }
+    let q = "opcion=eq.PKC&legajo=eq." + encodeURIComponent(lg) + "&select=texto,ts_cliente&order=ts_cliente.asc";
+    if (since) q += "&ts_cliente=gte." + encodeURIComponent(since);
+    const rows = await supaFetchAll(SUPABASE_TABLE_ENDPOINT, q);
+    for (const r of rows) {
+      const parts = String((r && r.texto) || "").split("|");
+      if (parts.length < 4) continue;                                   // texto = TANDA|COD|ESP|REAL
+      if (String(parts[0]).trim().toUpperCase() !== tU) continue;
+      const code = String(parts[1]).trim().toUpperCase();
+      if (!code) continue;
+      const real = Number(parts[3]);
+      out.set(code, isNaN(real) ? 0 : real);                            // order asc → queda la última del código
+    }
+  } catch (_e) { /* best-effort: si no hay red, devuelve vacío y arranca sin sembrar */ }
+  return out;
+}
+
+/* v5.91 — Retomar un picking ABIERTO cuyo snapshot local NO está (típico: se empezó
+   ayer a la tarde y hoy se sigue; el guardado local se borró por el cambio de día).
+   Reusa showPickingList (baja la lista fresca de la tanda) sembrando el avance desde
+   el servidor. Necesita señal (es un "retomar", no el picking 100% offline). */
+function pkResumeServer(tanda, legajo) {
+  let sinceIso = null;
+  try {
+    const st = getLegajoState(String(legajo || ""));
+    if (st && st.picking && st.picking.ts_inicio) sinceIso = st.picking.ts_inicio;
+  } catch (_e) { /* no-op */ }
+  showPickingList(tanda, legajo, { seedFromServer: true, sinceIso: sinceIso });
+}
+
+async function showPickingList(tanda, legajo, opts) {
   const tNorm = (tanda || "").trim().toUpperCase();
   if (!tNorm) return;
   const m = document.getElementById("tandaModal");
   if (!m) return;
+  // v5.97 — OFFLINE-FIRST: si ESTA tanda ya se precargó hoy (el picking se bajó entero
+  // con señal y quedó en localStorage), reabrir al INSTANTE desde el guardado, SIN tocar
+  // la red. Así al fondo del depósito sin WiFi ven todos los códigos y siguen marcando.
+  // (Salvo reconstrucción desde el servidor: esa sí re-baja la lista fresca.)
+  if (!(opts && opts.seedFromServer)) {
+    try {
+      const _lg = String(legajo || (typeof legajoInput !== "undefined" && legajoInput.value) || "").trim();
+      const _snap = pkLoadSaved(_lg);
+      if (_snap && _snap.tanda === tNorm && _snap.items && _snap.items.length) { pkResume(_lg); return; }
+    } catch (_e) { /* si algo falla, sigue por la carga normal de red */ }
+  }
   m.querySelector(".tanda-modal-title").textContent = "Picking — Tanda " + tNorm;
   m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">Cargando artículos…</div>`;
   m.classList.add("show");
@@ -6672,6 +6787,23 @@ async function showPickingList(tanda, legajo) {
         _pk.mode = "item";
       }
     } catch (_e) { /* si algo falla, arranca limpio */ }
+    // v5.91: RECONSTRUIR el avance desde el SERVIDOR (los PKC ya enviados) al retomar
+    // un picking cuyo snapshot local no está (cruzó de día / otro celular / se limpió).
+    // Marca lo ya pickeado y ubica en el PRIMER artículo sin marcar → se continúa sin
+    // volver a pickear lo de ayer.
+    if (opts && opts.seedFromServer) {
+      try {
+        const srv = await pkFetchServerMarks(tNorm, _pk.legajo, opts.sinceIso);
+        for (const it of _pk.items) {
+          if (it.skip || it.isExc) continue;
+          const code = String(it.art).toUpperCase();
+          if (srv.has(code) && _pk.results[it.key] == null) _pk.results[it.key] = srv.get(code);
+        }
+        const fp = _pk.items.findIndex(it => !it.skip && _pk.results[it.key] == null);
+        _pk.idx = fp >= 0 ? fp : _pk.items.length;
+        _pk.mode = "item";
+      } catch (_e) { /* si falla, arranca donde esté (no rompe el retomar) */ }
+    }
     pkRender();
     pkNotifySinPlanim(tNorm, _pk.legajo, items, G);   // aviso Telegram si hay códigos sin planimetría
   } catch (e) {
@@ -6690,7 +6822,14 @@ async function pkFetchExcedente(arts) {
     if (!arts || !arts.length) return {};
     const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
     const inList = arts.map(function (a) { return encodeURIComponent(String(a).toUpperCase()); }).join(",");
-    const r = await fetch(SUPABASE_STOCK_ENDPOINT + "?deposito=eq.excedente&cod_art=in.(" + inList + ")&select=cod_art,delta,ubicacion,ts&order=ts.desc&limit=5000", { headers: H, cache: "no-store" });
+    // v5.97: timeout — un WiFi LENTO no debe colgar la carga del picking. Si tarda,
+    // se arma sin el excedente (se levanta todo de góndola) → degradación aceptable.
+    const _ctrl = (typeof AbortController !== "undefined") ? new AbortController() : null;
+    const _to = _ctrl ? setTimeout(function () { try { _ctrl.abort(); } catch (_e) {} }, 7000) : null;
+    let r;
+    try {
+      r = await fetch(SUPABASE_STOCK_ENDPOINT + "?deposito=eq.excedente&cod_art=in.(" + inList + ")&select=cod_art,delta,ubicacion,ts&order=ts.desc&limit=5000", { headers: H, cache: "no-store", signal: _ctrl ? _ctrl.signal : undefined });
+    } finally { if (_to) clearTimeout(_to); }
     if (!r.ok) return {};
     const rows = await r.json();
     const m = {};
@@ -7515,14 +7654,27 @@ function _compRenderLios() {
       '<div class="cmpl-ctrl cmpl-ctrl-lio">🔨 Armando<br>Lío ' + curLetter + (curCajas ? ' (' + curCajas + ')' : '') + '</div>' +
       '<button class="cmpl-ctrl cmpl-ctrl-edit" onclick="_compViewEditar()"' + (n.liosArr.length ? '' : ' disabled') + '>✏️ Editar<br>líos (' + n.liosArr.length + ')</button>' +
       '<button class="cmpl-ctrl cmpl-ctrl-su" onclick="_compViewSueltas()">📦 Sueltas<br>(' + nRest + ')</button></div>';
-    const _sz = Math.max(1, parseInt(_comp.lioSize, 10) || 5);
-    h += '<div class="cmpl-autobar">⚡ Líos de a <input class="cmpl-szinp" type="number" min="1" inputmode="numeric" value="' + _sz + '" onchange="_compSetLioSize(this.value)"> — tocá <b>⚡×' + _sz + '</b> en un código y arma todos sus líos de ' + _sz + ' de una.</div>';
+    // v6.06 — botón "🔁 Repetir" el ÚLTIMO lío cerrado (otro igual), sólo si quedan
+    // cajas para repetirlo (si no, no aparece). "−" saca el último de ese lío.
+    if (n.liosArr.length) {
+      const lastLio = n.liosArr[n.liosArr.length - 1];
+      const grp = _compLioGroups(n), sig = _compLioSig(lastLio);
+      let g = null; for (let gi = 0; gi < grp.length; gi++) { if (grp[gi].sig === sig) { g = grp[gi]; break; } }
+      if (g) {
+        const compTxt = (lastLio.items || []).map(function (it) { return escapeHtml(it.cod) + '×' + it.qty; }).join(' + ');
+        h += '<div class="cmpl-repbar">';
+        h += '<button class="cmpl-rep' + (g.canMore ? '' : ' off') + '" onclick="_compRepetirLast()">🔁 Repetir Lío ' + g.label + '<br><small>' + (g.canMore ? 'otro igual · ' + compTxt : 'ya no quedan cajas') + '</small></button>';
+        if (g.count > 1) h += '<button class="cmpl-repminus" onclick="_compQuitarLast()" title="Quitar el último de ese lío">−</button>';
+        h += '</div>';
+      }
+    }
+    // v5.105: atajo "⚡ Líos de a N" SACADO por ahora (pedido del dueño: funcionaba mal).
+    // Las funciones _compLioAuto/_compSetLioSize quedan definidas por si se reactiva.
     h += '<div class="cmpl-grid">' + n.codes.map(function (c, ci) {
       if (!c.sep || (c.rest === 0 && c.cur === 0)) return "";
       const rem = c.cur + c.rest;
       return '<div class="cmpl-sq' + (c.cur > 0 ? " has" : "") + '" onclick="_compLioStep(' + ci + ',1)">' +
         (c.cur > 0 ? '<button class="cmpl-min" onclick="event.stopPropagation();_compLioStep(' + ci + ',-1)">−</button>' : '') +
-        (c.rest >= _sz ? '<button class="cmpl-auto" onclick="event.stopPropagation();_compLioAuto(' + ci + ')" title="Armar ' + Math.floor(c.rest / _sz) + ' lío(s) de ' + _sz + '">⚡×' + _sz + '</button>' : '') +
         '<div class="cmpl-cod">' + escapeHtml(c.cod) + '</div><div class="cmpl-cur2">' + c.cur + '<span class="cmpl-tot2"> / ' + rem + '</span></div></div>';
     }).join("") + "</div>";
     const _noSep = n.codes.filter(function (c) { return !c.sep && c.rest > 0; });
@@ -7551,6 +7703,34 @@ function _compGroupMore(gi) { const n = _compLioNow(); if (!n) return; const g =
 function _compGroupLess(gi) { const n = _compLioNow(); if (!n) return; const g = _compLioGroups(n)[gi]; if (!g) return; _compLioDel(g.idxs[g.idxs.length - 1]); }
 function _compGroupDel(gi) { const n = _compLioNow(); if (!n) return; const g = _compLioGroups(n)[gi]; if (!g) return; g.idxs.slice().sort(function (a, b) { return b - a; }).forEach(function (k) { const l = n.liosArr[k]; if (l) { l.items.forEach(function (it) { const c = n.codes.find(function (x) { return x.cod === it.cod; }); if (c) c.rest += it.qty; }); n.liosArr.splice(k, 1); } }); _compLioMark(n); _compRenderLios(); _compRecalc(); }
 function _compGroupReopen(gi) { const n = _compLioNow(); if (!n) return; const g = _compLioGroups(n)[gi]; if (!g) return; const k = g.idxs[g.idxs.length - 1]; const l = n.liosArr[k]; if (!l) return; l.items.forEach(function (it) { const c = n.codes.find(function (x) { return x.cod === it.cod; }); if (c) c.cur += it.qty; }); n.liosArr.splice(k, 1); _comp.liosView = "armar"; _compLioMark(n); _compRenderLios(); _compRecalc(); }
+/* v6.06 — "🔁 Repetir": arma OTRO lío igual al ÚLTIMO cerrado (solo si quedan cajas
+   para hacerlo — si no, el botón no aparece). "−" saca el último de ese lío. Reusa la
+   lógica de grupos (_compGroupMore/Less), sin abrir ninguna vista nueva. */
+function _compRepetirLast() {
+  const n = _compLioNow(); if (!n || !n.liosArr || !n.liosArr.length) return;
+  const last = n.liosArr[n.liosArr.length - 1], sig = _compLioSig(last);
+  const grp = _compLioGroups(n);
+  for (let gi = 0; gi < grp.length; gi++) {
+    if (grp[gi].sig === sig) {
+      if (grp[gi].canMore) { _compGroupMore(gi); }   // repite (descuenta lo mismo que el lío anterior)
+      else {
+        // se pasó: no quedan cajas → avisa claro, NO rompe ni descuenta de más.
+        const cods = (last.items || []).map(function (it) { return it.cod; });
+        const msg = cods.length === 1
+          ? "Ya usaste todas las cajas del " + cods[0] + " — no se puede armar otro lío igual."
+          : "No quedan cajas suficientes para repetir ese lío.";
+        try { alert("🚫 " + msg); } catch (_e) {}
+      }
+      return;
+    }
+  }
+}
+function _compQuitarLast() {
+  const n = _compLioNow(); if (!n || !n.liosArr || !n.liosArr.length) return;
+  const sig = _compLioSig(n.liosArr[n.liosArr.length - 1]);
+  const grp = _compLioGroups(n);
+  for (let gi = 0; gi < grp.length; gi++) { if (grp[gi].sig === sig) { if (grp[gi].count > 1) _compGroupLess(gi); return; } }
+}
 /* =========================================================
    Paso 2 — SEPARAR POR NP (v4.91). Antes de armar líos, el AP/TAP separa la
    mesa (mezcla de varias NPs) por pedido. Dos vistas que comparten estado
@@ -7618,7 +7798,13 @@ function _compRenderSep() {
     '<button class="csep-tog' + (view === "pedido" ? " on" : "") + '" onclick="_compSepView(\'' + (view === "pedido" ? "picking" : "pedido") + '\')" title="Cambiar vista"><span class="csep-knob"></span></button>' +
     '<span class="csep-swl' + (view === "pedido" ? " on" : "") + '">Por<br>pedido</span></div></div>';
   h += (view === "picking") ? _compSepMatrix() : _compSepPedido();
+  // v5.96: guardar el scroll ANTES de reemplazar (la matriz .csep-mxwrap y el cuerpo
+  // del modal .comp-body se recrean) → tocar una celda ya NO manda la vista arriba.
+  const _oldMx = el.querySelector(".csep-mxwrap"); const _mxTop = _oldMx ? _oldMx.scrollTop : 0;
+  const _body = el.closest(".comp-body"); const _bodyTop = _body ? _body.scrollTop : 0;
   el.innerHTML = h;
+  const _newMx = el.querySelector(".csep-mxwrap"); if (_newMx && _mxTop) _newMx.scrollTop = _mxTop;
+  if (_body && _bodyTop) _body.scrollTop = _bodyTop;
 }
 function _compSepPedido() {
   const nps = _comp.nps;
@@ -9269,7 +9455,7 @@ function stkBodyStocks() {
     const _tot = SECTKEYS.reduce(function (s, k) { return s + (Number(a[k]) || 0); }, 0);
     const _ped = Number(dem[_ocgNorm(a.cod)]) || 0;
     const _cap = Number(capByCod[_ocgNorm(a.cod)]) || 0;
-    let tds = '<td class="stk-cod">' + escapeHtml(a.cod) + '</td><td class="stk-desc">' + escapeHtml(artNombre(a.cod, a.desc) || "—") + '</td><td class="num ' + (_tot < 0 ? "stk-neg" : "") + '" style="background:#f8fafc"><b>' + fmtCajas(_tot) + '</b></td><td class="num" style="background:#fffbeb;color:#92400e"><b>' + (_ped ? fmtCajas(_ped) : "") + '</b></td><td class="num" style="background:#f0fdf4;color:#166534"><b>' + (_cap ? fmtCajas(_cap) : "") + '</b></td>';
+    let tds = '<td class="stk-cod">' + escapeHtml(a.cod) + '</td><td class="stk-desc">' + escapeHtml(artNombre(a.cod, a.desc) || "—") + '</td><td class="num ' + (_tot < 0 ? "stk-neg" : "") + '" style="background:#f8fafc"><b>' + fmtCajas(_tot) + '</b></td>' + (_ped ? '<td class="num stk-pick-cell" style="background:#fffbeb;color:#92400e" onclick="event.stopPropagation();stkOpenCajasPedidasArt(\'' + encodeURIComponent(a.cod) + '\')" title="Qué NP pidió + pickeado/separado"><b>' + fmtCajas(_ped) + '</b></td>' : '<td class="num" style="background:#fffbeb;color:#92400e"></td>') + (_cap ? '<td class="num stk-pick-cell" style="background:#f0fdf4;color:#166534" onclick="event.stopPropagation();stkOpenCapArt(\'' + encodeURIComponent(a.cod) + '\')" title="Ubicaciones y capacidad de góndola"><b>' + fmtCajas(_cap) + '</b></td>' : '<td class="num" style="background:#f0fdf4;color:#166534"></td>');
     cols.forEach(function (c) {
       const v = Number(a[c.key]) || 0;
       // v5.82: columnas clickeables → detalle. Pickeados/A facturar → NPs; Excedente/Racks → ubicación.
@@ -9280,6 +9466,8 @@ function stkBodyStocks() {
         else if (c.key === "a_facturar") _clk = "stkOpenEstadioArt('" + _ce + "','a_facturar')";
         else if (c.key === "excedente") _clk = "stkOpenExcedenteArt('" + _ce + "')";
         else if (c.key === "racks") _clk = "stkOpenRacksArt('" + _ce + "')";
+        else if (c.key === "terminado") _clk = "stkOpenMovsArt('" + _ce + "','terminado','Góndola','📥')";   // v5.100: solo mov. de góndola + saldo + fechas
+        else if (c.key === "a_guardar") _clk = "stkOpenMovsArt('" + _ce + "','a_guardar','A guardar','📦')";  // v5.100
       }
       if (_clk) {
         tds += '<td class="num stk-pick-cell" onclick="event.stopPropagation();' + _clk + '" title="Ver detalle (NPs / ubicación)">' + fmtCajas(v) + '</td>';
@@ -9400,9 +9588,21 @@ var STK_POP_CSS =
   ".stkpop-mv-tipo{font-weight:800;border-radius:6px;padding:1px 7px;font-size:10.5px;white-space:nowrap;}" +
   ".stkpop-mv-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#0f172a;}" +
   ".stkpop-mv-ref{color:#64748b;font-size:11px;font-family:Consolas,Menlo,monospace;}" +
+  ".stkpop-mv-emp{color:#7c3aed;font-size:11px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px;}" +
   ".stkpop-mv-d{font-weight:800;font-variant-numeric:tabular-nums;margin-left:auto;white-space:nowrap;}" +
   ".stkpop-mv-d.pos{color:#15803d;}.stkpop-mv-d.neg{color:#b91c1c;}" +
-  ".tp-guardado{background:#dcfce7;color:#15803d;}.tp-picking{background:#fee2e2;color:#b91c1c;}.tp-otro{background:#f1f5f9;color:#475569;}";
+  ".tp-guardado{background:#dcfce7;color:#15803d;}.tp-picking{background:#fee2e2;color:#b91c1c;}.tp-otro{background:#f1f5f9;color:#475569;}" +
+  ".mva-daterow{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12.5px;color:#475569;margin-bottom:9px;}" +
+  ".mva-date{height:34px;border:1.5px solid #cbd5e1;border-radius:8px;padding:0 8px;font-size:13px;}" +
+  ".mva-clear{width:auto;margin:0;padding:6px 10px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;font-weight:800;cursor:pointer;color:#64748b;}" +
+  ".mva-tblwrap{overflow:auto;max-height:60vh;border:1px solid #e2e8f0;border-radius:10px;}" +
+  ".mva-tbl{border-collapse:collapse;width:100%;font-size:12.5px;}" +
+  ".mva-tbl th,.mva-tbl td{padding:6px 9px;border-bottom:1px solid #eef2f6;text-align:left;white-space:nowrap;}" +
+  ".mva-tbl thead th{position:sticky;top:0;background:#f8fafc;color:#64748b;font-size:10.5px;text-transform:uppercase;font-weight:800;}" +
+  ".mva-tbl th.num,.mva-tbl td.mva-in,.mva-tbl td.mva-out,.mva-tbl td.mva-sal{text-align:right;font-variant-numeric:tabular-nums;font-weight:800;}" +
+  ".mva-ts{color:#94a3b8;font-size:11px;}.mva-ref{color:#64748b;font-family:Consolas,Menlo,monospace;}" +
+  ".mva-in{color:#15803d;}.mva-out{color:#b91c1c;}.mva-sal{color:#1e3a8a;}" +
+  ".stkpop-ubic{color:#7c3aed;font-weight:800;white-space:nowrap;}";
 function _stkPopShell(title, bodyId) {
   if (!document.getElementById("stkPopCss")) { const st = document.createElement("style"); st.id = "stkPopCss"; st.textContent = STK_POP_CSS; document.head.appendChild(st); }
   let ov = document.getElementById("stkPopModal");
@@ -9554,18 +9754,33 @@ async function stkOpenEstadioArt(codEnc, dep) {
   }
   const totCaj = round1(refs.reduce(function (s, t) { return s + by[t]; }, 0));
   let h = liveHtml + '<div class="stkpop-hint"><b>' + escapeHtml(cod) + '</b> · ' + (dep === "a_facturar" ? "a facturar" : "pickeado") + ': <b>' + totCaj + ' cajas</b> en ' + refs.length + ' ' + (dep === "a_facturar" ? "grupo(s)" : "tanda(s)") + '. Los NPs con <b style="color:#166534">· pidió N</b> son los que pidieron este artículo.</div>';
+  // v5.102 — ubicación FÍSICA del pedido: pickeado = PUB (por TANDA: Mesa 1/2, Carro);
+  // a facturar = AUB (por NP: AB10/AA4…). Se cruza por tanda / NP. Última carga gana.
+  const ubicByTanda = {}, ubicByNp = {};
+  try {
+    const H2 = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+    if (dep === "separar_pedidos" && tandas.length) {
+      const rowsP = await fetch(SUPABASE_TABLE_ENDPOINT + "?opcion=eq.PUB&texto=in.(" + tandas.map(encodeURIComponent).join(",") + ")&select=texto,descripcion,ts_cliente&order=ts_cliente.asc&limit=5000", { headers: H2, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; });
+      rowsP.forEach(function (x) { const t = String(x.texto || "").trim().toUpperCase(); if (t) ubicByTanda[t] = String(x.descripcion || "").trim(); });
+    } else if (dep === "a_facturar" && allNps.length) {
+      const rowsA = await fetch(SUPABASE_TABLE_ENDPOINT + "?opcion=eq.AUB&texto=in.(" + allNps.map(encodeURIComponent).join(",") + ")&select=texto,descripcion,ts_cliente&order=ts_cliente.asc&limit=8000", { headers: H2, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; });
+      rowsA.forEach(function (x) { const n = String(x.texto || "").trim().replace(/\.0+$/, ""); if (n) ubicByNp[n] = String(x.descripcion || "").trim(); });
+    }
+  } catch (_e) {}
   tandas.forEach(function (t) {
     const nps = npMap[t] || [];
     const conArt = nps.filter(function (n) { return pidio[n.np] != null; });
     const list = conArt.length ? conArt : nps;
-    h += '<div class="stkpop-tanda"><div class="stkpop-tanda-h"><span class="stkpop-tn">' + escapeHtml(t) + '</span><span class="stkpop-tcaj">' + round1(by[t]) + ' cajas</span></div>';
-    if (list.length) h += '<div class="stkpop-nps">' + list.map(function (n) { const pc = pidio[n.np]; return '<span class="stkpop-np"><b>NP ' + escapeHtml(n.np) + '</b> · ' + escapeHtml(n.rs || "—") + (pc != null ? ' <b style="color:#166534">· pidió ' + round1(pc) + '</b>' : '') + '</span>'; }).join("") + '</div>';
+    const uT = (dep === "separar_pedidos" && ubicByTanda[String(t).toUpperCase()]) ? ' <span class="stkpop-ubic">📍 ' + escapeHtml(ubicByTanda[String(t).toUpperCase()]) + '</span>' : '';
+    h += '<div class="stkpop-tanda"><div class="stkpop-tanda-h"><span class="stkpop-tn">' + escapeHtml(t) + '</span>' + uT + '<span class="stkpop-tcaj">' + round1(by[t]) + ' cajas</span></div>';
+    if (list.length) h += '<div class="stkpop-nps">' + list.map(function (n) { const pc = pidio[n.np]; const uN = (dep === "a_facturar" && ubicByNp[n.np]) ? ' <b class="stkpop-ubic">📍 ' + escapeHtml(ubicByNp[n.np]) + '</b>' : ''; return '<span class="stkpop-np"><b>NP ' + escapeHtml(n.np) + '</b> · ' + escapeHtml(n.rs || "—") + (pc != null ? ' <b style="color:#166534">· pidió ' + round1(pc) + '</b>' : '') + uN + '</span>'; }).join("") + '</div>';
     else h += '<div class="stkpop-nps"><span class="stkpop-np" style="color:#94a3b8">— sin NPs en el PPP para esta tanda —</span></div>';
     h += '</div>';
   });
   npRefs.forEach(function (r) {
     const pc = pidio[r];
-    h += '<div class="stkpop-tanda"><div class="stkpop-tanda-h"><span class="stkpop-tn">NP ' + escapeHtml(r) + '</span><span class="stkpop-tcaj">' + round1(by[r]) + ' cajas</span></div>' +
+    const uN = (dep === "a_facturar" && ubicByNp[r]) ? ' <b class="stkpop-ubic">📍 ' + escapeHtml(ubicByNp[r]) + '</b>' : '';
+    h += '<div class="stkpop-tanda"><div class="stkpop-tanda-h"><span class="stkpop-tn">NP ' + escapeHtml(r) + '</span>' + uN + '<span class="stkpop-tcaj">' + round1(by[r]) + ' cajas</span></div>' +
       '<div class="stkpop-nps"><span class="stkpop-np">' + escapeHtml(rsByNp[r] || "—") + (pc != null ? ' <b style="color:#166534">· pidió ' + round1(pc) + '</b>' : '') + ' <small style="color:#94a3b8">(directo · Completar/reasignar)</small></span></div></div>';
   });
   if (body) body.innerHTML = h;
@@ -9596,28 +9811,173 @@ async function stkOpenExcedenteArt(codEnc) {
 async function stkOpenRacksArt(codEnc) {
   if (!_stk) return;
   const cod = decodeURIComponent(codEnc), codN = _stkNormCod(cod);
+  _stkPop = { kind: "racksArt", cod: cod, codN: codN, dep: "racks", titulo: "Racks", icono: "🏗", desde: "", hasta: "", pos: [] };
   _stkPopShell("🏗 Racks — " + escapeHtml(cod), "stkPopBody");
-  const body = document.getElementById("stkPopBody"); if (body) body.innerHTML = '<div class="stkpop-empty">Cargando ubicaciones…</div>';
+  const body = document.getElementById("stkPopBody"); if (body) body.innerHTML = '<div class="stkpop-empty">Cargando…</div>';
   let rows = [];
   try {
     const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
     rows = await fetch(SUPABASE_URL + "/rest/v1/Racks_Planimetria?select=sector,cod_art,master_cajas,innercajas&estado=eq.ocupado&limit=5000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; });
   } catch (_e) {}
-  const mine = (rows || []).filter(function (x) { return _stkNormCod(x.cod_art) === codN; })
+  if (!_stkPop || _stkPop.kind !== "racksArt" || _stkPop.codN !== codN) return;   // cambió de popup mientras cargaba
+  _stkPop.pos = (rows || []).filter(function (x) { return _stkNormCod(x.cod_art) === codN; })
     .sort(function (a, b) { return String(a.sector).localeCompare(String(b.sector), undefined, { numeric: true }); });
-  if (!mine.length) { if (body) body.innerHTML = '<div class="stkpop-empty">No hay posiciones de rack para ' + escapeHtml(cod) + ' en la planimetría.</div>'; return; }
-  const totInner = mine.reduce(function (s, x) { return s + (Number(x.innercajas) || 0); }, 0);
-  const totMaster = mine.reduce(function (s, x) { return s + (Number(x.master_cajas) || 0); }, 0);
-  let h = '<div class="stkpop-hint"><b>' + escapeHtml(cod) + '</b> · racks (planimetría): <b>' + totInner + ' cajas</b>' + (totMaster ? ' · ' + totMaster + ' master' : '') + ' en ' + mine.length + ' posición(es). <small>(La planimetría es el conteo físico por posición.)</small></div>';
-  h += '<div class="stkpop-grp"><div class="stkpop-nps">' + mine.map(function (x) { return '<span class="stkpop-np"><b>🏗 ' + escapeHtml(String(x.sector)) + '</b> · ' + (Number(x.innercajas) || 0) + ' cajas' + (Number(x.master_cajas) ? ' · ' + (Number(x.master_cajas)) + ' master' : '') + '</span>'; }).join("") + '</div></div>';
-  if (body) body.innerHTML = h;
+  stkRacksArtRender();
 }
 function _stkEsGuardado(mv) { return mv.tipo === "guardado" || mv.tipo === "guardado_fuera_lista" || mv.tipo === "baja_racks"; }
+/* v5.101 — CAPACIDAD de góndola por artículo: las ubicaciones (sectores) y cuántas
+   cajas entran en cada una (de Capacidad_Sector, ya cargado en _stk.cap). */
+function stkOpenCapArt(codEnc) {
+  if (!_stk) return;
+  const cod = decodeURIComponent(codEnc), codN = _ocgNorm(cod);
+  _stkPopShell("📥 Capacidad de góndola — " + escapeHtml(cod), "stkPopBody");
+  const body = document.getElementById("stkPopBody"); if (!body) return;
+  const mine = (_stk.cap || []).filter(function (r) { return _ocgNorm(r.cod) === codN; })
+    .map(function (r) { return { sector: String(r.sector || "—").trim(), cajas: Number(r.cajas_max) || 0 }; })
+    .filter(function (r) { return r.cajas > 0; })
+    .sort(function (a, b) { return String(a.sector).localeCompare(String(b.sector), undefined, { numeric: true }); });
+  if (!mine.length) { body.innerHTML = '<div class="stkpop-empty">No hay capacidad de góndola cargada para ' + escapeHtml(cod) + '.</div>'; return; }
+  const tot = mine.reduce(function (s, r) { return s + r.cajas; }, 0);
+  let h = '<div class="stkpop-hint"><b>' + escapeHtml(cod) + '</b> · capacidad de góndola: <b>' + tot + ' cajas</b> en ' + mine.length + ' ubicación(es).</div>';
+  h += '<div class="stkpop-grp"><div class="stkpop-nps">' + mine.map(function (r) { return '<span class="stkpop-np"><b>📍 ' + escapeHtml(r.sector) + '</b> · ' + r.cajas + ' cajas</span>'; }).join("") + '</div></div>';
+  body.innerHTML = h;
+}
+/* v5.103 — CAJAS PEDIDAS por artículo: qué NP pidió cuántas de ese código y si su
+   TANDA ya se pickeó (hay picking en separar_pedidos) y/o separó (separado en
+   a_facturar). NP→tanda de PPP_Programacion_Diaria; estado de _stk.movs. */
+async function stkOpenCajasPedidasArt(codEnc) {
+  if (!_stk) return;
+  const cod = decodeURIComponent(codEnc), codN = _stkNormCod(cod);
+  _stkPopShell("🟡 Cajas pedidas — " + escapeHtml(cod), "stkPopBody");
+  const body = document.getElementById("stkPopBody"); if (body) body.innerHTML = '<div class="stkpop-empty">Cargando pedidos…</div>';
+  const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+  let base = [];
+  try { base = await fetch(SUPABASE_URL + "/rest/v1/PPP_Base_Pedidos?articulo=eq." + encodeURIComponent(cod) + "&select=pedido,cajas&limit=20000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }); } catch (_e) {}
+  const pedByNp = {};
+  base.forEach(function (x) { const np = String(x.pedido || "").trim().replace(/\.0+$/, ""); if (np) pedByNp[np] = (pedByNp[np] || 0) + (Number(x.cajas) || 0); });
+  const nps = Object.keys(pedByNp).filter(function (np) { return pedByNp[np] > 0.05; });
+  if (!nps.length) { if (body) body.innerHTML = '<div class="stkpop-empty">Ningún pedido pidió ' + escapeHtml(cod) + ' en la base de picking.</div>'; return; }
+  const npInfo = {};
+  try {
+    const prog = await fetch(SUPABASE_PPP_PROG_ENDPOINT + "?np=in.(" + nps.map(encodeURIComponent).join(",") + ")&select=np,tanda,razon_social&limit=8000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; });
+    prog.forEach(function (x) { const np = String(x.np || "").trim().replace(/\.0+$/, ""); if (np && !npInfo[np]) npInfo[np] = { tanda: String(x.tanda || "").trim().toUpperCase(), rs: String(x.razon_social || "").trim() }; });
+  } catch (_e) {}
+  const pickTandas = {}, sepTandas = {};
+  _stk.movs.forEach(function (mv) {
+    if (_stkNormCod(mv.cod_art) !== codN || !_stkWin(mv, true)) return;
+    const ref = String(mv.ref || "").toUpperCase();
+    if (mv.deposito === "separar_pedidos" && mv.tipo === "picking" && Number(mv.delta) > 0) pickTandas[ref] = true;
+    if (mv.deposito === "a_facturar" && mv.tipo === "separado" && Number(mv.delta) > 0) sepTandas[ref] = true;
+  });
+  const round1 = function (n) { return Math.round(n * 10) / 10; };
+  nps.sort(function (a, b) { return String(a).localeCompare(String(b), undefined, { numeric: true }); });
+  const totP = round1(nps.reduce(function (s, np) { return s + pedByNp[np]; }, 0));
+  const rowsArr = nps.map(function (np) { const info = npInfo[np] || {}, t = info.tanda || ""; return { np: np, tanda: t, rs: info.rs || "", pidio: round1(pedByNp[np]), pickeado: !!(t && pickTandas[t]), separado: !!(t && sepTandas[t]) }; });
+  _stkPop = { kind: "cajasPed", cod: cod, rows: rowsArr };   // v5.104: guardar para el export a Excel
+  let h = '<div class="stkpop-hint"><b>' + escapeHtml(cod) + '</b> · pedido total: <b>' + totP + ' cajas</b> en ' + nps.length + ' NP(s). Por cada NP: cuántas pidió y si su tanda ya se <b style="color:#166534">pickeó</b> / <b style="color:#1e40af">separó</b>.</div>';
+  h += '<div style="margin-bottom:10px"><button class="mva-clear" style="background:#166534;color:#fff;border-color:#166534" onclick="stkCajasPedidasExport()">⬇ Exportar a Excel</button></div>';
+  h += '<div class="stkpop-grp"><div class="stkpop-nps">' + rowsArr.map(function (r) {
+    const bPk = r.pickeado ? '<b style="color:#166534">📦 pickeado ✓</b>' : '<span style="color:#b45309">📦 sin pickear</span>';
+    const bSp = r.separado ? '<b style="color:#1e40af">🧾 separado ✓</b>' : '<span style="color:#94a3b8">🧾 sin separar</span>';
+    return '<span class="stkpop-np" style="display:block"><b>NP ' + escapeHtml(r.np) + '</b>' + (r.tanda ? ' <small style="color:#94a3b8">· ' + escapeHtml(r.tanda) + '</small>' : '') + ' · ' + escapeHtml(r.rs || "—") + ' <b>· pidió ' + r.pidio + '</b><br>' + bPk + ' · ' + bSp + '</span>';
+  }).join("") + '</div></div>';
+  if (body) body.innerHTML = h;
+}
+/* v5.104 — Exportar "Cajas pedidas" a Excel (.xls vía tabla HTML, mismo patrón que
+   el export de excedentes). Lee _stkPop.rows (guardado por stkOpenCajasPedidasArt). */
+function stkCajasPedidasExport() {
+  if (!_stkPop || _stkPop.kind !== "cajasPed" || !_stkPop.rows || !_stkPop.rows.length) { try { alert("Abrí primero 'Cajas pedidas' de un artículo."); } catch (_e) {} return; }
+  const cod = _stkPop.cod, rows = _stkPop.rows;
+  const esc = function (s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); };
+  const fecha = (function () { try { return new Date().toLocaleDateString("en-CA", { timeZone: "America/Argentina/Buenos_Aires" }); } catch (_e) { return "hoy"; } })();
+  let total = 0; rows.forEach(function (r) { total += Number(r.pidio) || 0; });
+  let html = '<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"><style>td,th{border:1px solid #ccc;padding:3px 7px;font-family:Calibri,Arial,sans-serif;} th{background:#92400E;color:#fff;text-align:left;}</style></head><body>';
+  html += '<h3>Cajas pedidas — ' + esc(cod) + ' — Producción Virgilio (' + esc(fecha) + ')</h3>';
+  html += '<table><tr><th>NP</th><th>Tanda</th><th>Razon Social</th><th>Pidio (cajas)</th><th>Pickeado</th><th>Separado</th></tr>';
+  rows.forEach(function (r) { html += '<tr><td>' + esc(r.np) + '</td><td>' + esc(r.tanda) + '</td><td>' + esc(r.rs) + '</td><td>' + (Number(r.pidio) || 0) + '</td><td>' + (r.pickeado ? "SI" : "no") + '</td><td>' + (r.separado ? "SI" : "no") + '</td></tr>'; });
+  html += '<tr><td><b>TOTAL (' + rows.length + ' NP)</b></td><td></td><td></td><td><b>' + (Math.round(total * 10) / 10) + '</b></td><td></td><td></td></tr>';
+  html += '</table></body></html>';
+  try {
+    const blob = new Blob(["﻿" + html], { type: "application/vnd.ms-excel" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = "Cajas_pedidas_" + cod + "_" + fecha + ".xls";
+    document.body.appendChild(a); a.click();
+    setTimeout(function () { try { document.body.removeChild(a); URL.revokeObjectURL(url); } catch (_e) {} }, 1500);
+  } catch (e) { try { alert("No se pudo generar el Excel: " + (e.message || e)); } catch (_e) {} }
+}
+/* v5.100 — Movimientos POR ARTÍCULO de UN depósito (góndola=terminado, a_guardar…):
+   solo ese rubro, ordenados por fecha, con lo que ENTRÓ / SALIÓ y el SALDO corrido,
+   + filtro por rango de fechas. Pedido del dueño (ver solo el rubro elegido). */
+function stkOpenMovsArt(codEnc, dep, titulo, icono) {
+  if (!_stk) return;
+  const cod = decodeURIComponent(codEnc);
+  _stkPop = { kind: "movsArt", cod: cod, codN: _stkNormCod(cod), dep: dep, titulo: titulo || dep, icono: icono || "🔁", desde: "", hasta: "" };
+  _stkPopShell((icono || "🔁") + " " + (titulo || dep) + " — " + escapeHtml(cod), "stkPopBody");
+  stkMovsArtRender();
+}
+function stkMovsArtDate(which, val) {
+  if (!_stkPop) return;
+  if (which === "clear") { _stkPop.desde = ""; _stkPop.hasta = ""; }
+  else if (which === "desde") _stkPop.desde = String(val || "");
+  else _stkPop.hasta = String(val || "");
+  if (_stkPop.kind === "racksArt") stkRacksArtRender(); else stkMovsArtRender();
+}
+/* Bloque HTML de "movimientos por artículo de un depósito" (hint + rango de fechas +
+   tabla Entró/Salió/Saldo corrido). Lo comparten Góndola/A guardar (stkMovsArtRender)
+   y Racks (stkRacksArtRender, que además muestra las posiciones arriba). v5.101. */
+function _stkMovsBlock() {
+  const dep = _stkPop.dep, codN = _stkPop.codN, round1 = function (n) { return Math.round(n * 10) / 10; };
+  const desdeT = _stkPop.desde ? new Date(_stkPop.desde + "T00:00:00").getTime() : 0;
+  const hastaT = _stkPop.hasta ? new Date(_stkPop.hasta + "T23:59:59").getTime() : 0;
+  const list = _stk.movs.filter(function (mv) {
+    if (mv.deposito !== dep || _stkNormCod(mv.cod_art) !== codN || !_stkWin(mv, true)) return false;
+    const t = new Date(mv.ts).getTime();
+    if (desdeT && t < desdeT) return false;
+    if (hastaT && t > hastaT) return false;
+    return true;
+  }).sort(function (a, b) { return new Date(a.ts) - new Date(b.ts); });   // por fecha ASC (ingresó → salió)
+  let saldo = 0, totIn = 0, totOut = 0;
+  const rows = list.map(function (mv) {
+    const d = Number(mv.delta) || 0; saldo += d; if (d > 0) totIn += d; else totOut += d;
+    return '<tr><td class="mva-ts">' + escapeHtml(stockFmtTs(mv.ts)) + '</td><td>' + escapeHtml(String(mv.tipo || "")) + (mv.ref ? ' <span class="mva-ref">' + escapeHtml(String(mv.ref)) + '</span>' : '') + '</td><td class="mva-in">' + (d > 0 ? "+" + round1(d) : "") + '</td><td class="mva-out">' + (d < 0 ? round1(d) : "") + '</td><td class="mva-sal">' + round1(saldo) + '</td></tr>';
+  }).join("");
+  let h = '<div class="stkpop-hint">Movimientos de <b>' + escapeHtml(_stkPop.cod) + '</b> en <b>' + escapeHtml(_stkPop.titulo) + '</b>, por fecha. Entró <b style="color:#15803d">+' + round1(totIn) + '</b> · salió <b style="color:#b91c1c">' + round1(totOut) + '</b> · <b>saldo ' + round1(saldo) + '</b>.</div>';
+  h += '<div class="mva-daterow">Desde <input type="date" class="mva-date" value="' + escapeHtml(_stkPop.desde) + '" onchange="stkMovsArtDate(\'desde\',this.value)"> hasta <input type="date" class="mva-date" value="' + escapeHtml(_stkPop.hasta) + '" onchange="stkMovsArtDate(\'hasta\',this.value)">' + ((_stkPop.desde || _stkPop.hasta) ? ' <button class="mva-clear" onclick="stkMovsArtDate(\'clear\')">✕</button>' : '') + '</div>';
+  h += list.length
+    ? '<div class="mva-tblwrap"><table class="mva-tbl"><thead><tr><th>Fecha</th><th>Movimiento</th><th class="num">Entró</th><th class="num">Salió</th><th class="num">Saldo</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
+    : '<div class="stkpop-empty">Sin movimientos' + ((_stkPop.desde || _stkPop.hasta) ? ' en ese rango' : '') + '.</div>';
+  return h;
+}
+function stkMovsArtRender() {
+  const body = document.getElementById("stkPopBody"); if (!body || !_stkPop) return;
+  body.innerHTML = _stkMovsBlock();
+}
+/* v5.101 — Racks por artículo: posiciones de la planimetría (como antes) + los
+   MOVIMIENTOS del depósito racks con filtro de rango de fechas y saldo. */
+function stkRacksArtRender() {
+  const body = document.getElementById("stkPopBody"); if (!body || !_stkPop) return;
+  const mine = _stkPop.pos || [];
+  let h = "";
+  if (mine.length) {
+    const totInner = mine.reduce(function (s, x) { return s + (Number(x.innercajas) || 0); }, 0);
+    const totMaster = mine.reduce(function (s, x) { return s + (Number(x.master_cajas) || 0); }, 0);
+    h += '<div class="stkpop-hint"><b>' + escapeHtml(_stkPop.cod) + '</b> · racks (planimetría): <b>' + totInner + ' cajas</b>' + (totMaster ? ' · ' + totMaster + ' master' : '') + ' en ' + mine.length + ' posición(es).</div>';
+    h += '<div class="stkpop-grp"><div class="stkpop-nps">' + mine.map(function (x) { return '<span class="stkpop-np"><b>🏗 ' + escapeHtml(String(x.sector)) + '</b> · ' + (Number(x.innercajas) || 0) + ' cajas' + (Number(x.master_cajas) ? ' · ' + (Number(x.master_cajas)) + ' master' : '') + '</span>'; }).join("") + '</div></div>';
+  } else {
+    h += '<div class="stkpop-hint">Sin posiciones de rack en la planimetría para ' + escapeHtml(_stkPop.cod) + '.</div>';
+  }
+  h += '<div class="stkpop-hint" style="margin-top:8px;font-weight:800;color:#0f172a;">Movimientos de racks</div>';
+  h += _stkMovsBlock();
+  body.innerHTML = h;
+}
 function stkOpenGondola() {
   if (!_stk) return;
   _stkPop = { filter: "gp", search: "" };
   _stkPopShell("🔁 Movimientos de góndola", "stkPopBody");
   stkGondRender();
+  // v5.98: cargar nombres (legajo→nombre) para mostrar quién hizo cada movimiento;
+  // al resolver, re-render. Cacheado 1h → normalmente ya está y no re-dibuja de más.
+  try { getEmpleadosNombres().then(function () { if (_stkPop) stkGondRender(); }).catch(function () {}); } catch (_e) {}
 }
 function stkGondSetFilter(f) { if (!_stkPop) return; _stkPop.filter = f; stkGondRender(); }
 function stkGondSearch(v) { if (!_stkPop) return; _stkPop.search = String(v == null ? "" : v); stkGondRender(); }
@@ -9637,7 +9997,7 @@ function stkGondRender() {
   list.sort(function (a, b) { return new Date(b.ts) - new Date(a.ts); });
   const MAX = 300, shown = list.slice(0, MAX);
   const fmt1 = function (n) { return Math.round(n * 10) / 10; };
-  let h = '<div class="stkpop-hint">Todo lo que entró y salió de <b>góndola</b>: el <b>guardado</b> (MG) la sube y el <b>picking</b> (TP) la baja.</div>';
+  let h = '<div class="stkpop-hint">Todo lo que entró y salió de <b>góndola</b>: el <b>guardado</b> (MG) la sube, el <b>picking</b> (TP) la baja. <b>👤 = quién lo hizo</b>.</div>';
   h += '<div class="stkpop-sum"><span class="stkpop-sumchip"><span class="l">⬆ Guardado</span><span class="v" style="color:#15803d">+' + fmt1(totG) + '</span></span><span class="stkpop-sumchip"><span class="l">⬇ Picking</span><span class="v" style="color:#b91c1c">' + fmt1(totP) + '</span></span><span class="stkpop-sumchip"><span class="l">Neto</span><span class="v" style="color:#1e3a8a">' + fmt1(totG + totP) + '</span></span></div>';
   const fb = function (v, label) { return '<button class="stkpop-fb' + (f === v ? " on" : "") + '" onclick="stkGondSetFilter(\'' + v + '\')">' + label + '</button>'; };
   h += '<div class="stkpop-filters">' + fb("gp", "Guardado + Picking") + fb("guardado", "Solo guardado") + fb("picking", "Solo picking") + fb("todos", "Todos") + '</div>';
@@ -9648,7 +10008,9 @@ function stkGondRender() {
       const d = Number(mv.delta) || 0;
       const cls = _stkEsGuardado(mv) ? "tp-guardado" : (mv.tipo === "picking" ? "tp-picking" : "tp-otro");
       const lbl = mv.tipo === "guardado_fuera_lista" ? "guard.f/lista" : (mv.tipo === "baja_racks" ? "de racks" : mv.tipo);
-      return '<div class="stkpop-mv"><span class="stkpop-mv-ts">' + escapeHtml(stockFmtTs(mv.ts)) + '</span><span class="stkpop-mv-tipo ' + cls + '">' + escapeHtml(lbl) + '</span><span class="stkpop-mv-cod">' + escapeHtml(String(mv.cod_art)) + '</span><span class="stkpop-mv-ref">' + escapeHtml(String(mv.ref || "")) + '</span><span class="stkpop-mv-d ' + (d < 0 ? "neg" : "pos") + '">' + (d > 0 ? "+" : "") + fmt1(d) + '</span></div>';
+      // v5.98: quién hizo el movimiento (legajo→nombre; cacheado en _empleadosNombres).
+      const emp = mv.legajo ? ((typeof _empleadosNombres !== "undefined" && _empleadosNombres.get(String(mv.legajo))) || ("Leg " + mv.legajo)) : "s/dato";
+      return '<div class="stkpop-mv"><span class="stkpop-mv-ts">' + escapeHtml(stockFmtTs(mv.ts)) + '</span><span class="stkpop-mv-tipo ' + cls + '">' + escapeHtml(lbl) + '</span><span class="stkpop-mv-cod">' + escapeHtml(String(mv.cod_art)) + '</span><span class="stkpop-mv-ref">' + escapeHtml(String(mv.ref || "")) + '</span><span class="stkpop-mv-emp" title="' + escapeHtml(emp) + '">👤 ' + escapeHtml(emp) + '</span><span class="stkpop-mv-d ' + (d < 0 ? "neg" : "pos") + '">' + (d > 0 ? "+" : "") + fmt1(d) + '</span></div>';
     }).join("");
     if (list.length > MAX) h += '<div class="stkpop-empty">Mostrando ' + MAX + ' de ' + list.length + ' — filtrá o buscá para acotar.</div>';
   }
@@ -11818,12 +12180,12 @@ async function faltFetchActivasNps() {
 function faltEnsureAvisar() {
   if (!document.getElementById("favCss")) {
     const s = document.createElement("style"); s.id = "favCss";
-    s.textContent = "#faltAvModal{display:none;position:fixed;inset:0;z-index:1292;background:rgba(2,6,23,.74);overflow:auto;padding:12px;}#faltAvModal.show{display:block;}.fav-card{background:#f8fafc;max-width:560px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.fav-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;background:linear-gradient(90deg,#b91c1c,#7f1d1d);color:#fff;}.fav-title{font-size:17px;font-weight:800;}.fav-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}.fav-body{padding:13px 14px;}.fav-hint{font-size:12.5px;color:#64748b;margin-bottom:11px;line-height:1.4;}.fav-empty{padding:22px;text-align:center;color:#64748b;font-size:14px;}.fav-row{display:flex;align-items:center;gap:10px;background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:11px 12px;margin-bottom:9px;}.fav-info{flex:1;min-width:0;}.fav-np{font-size:15px;font-weight:800;color:#0f172a;font-family:Consolas,Menlo,monospace;}.fav-arts{font-size:12.5px;color:#475569;margin-top:3px;}.fav-btn{flex:0 0 auto;width:auto;margin:0;padding:11px 14px;border:none;border-radius:10px;background:#dc2626;color:#fff;font-size:13.5px;font-weight:800;cursor:pointer;white-space:nowrap;}.fav-ya{flex:0 0 auto;font-size:12.5px;font-weight:800;color:#15803d;background:#dcfce7;border:1px solid #86efac;border-radius:999px;padding:6px 12px;white-space:nowrap;}";
+    s.textContent = "#faltAvModal{display:none;position:fixed;inset:0;z-index:1292;background:rgba(2,6,23,.74);overflow:auto;padding:12px;}#faltAvModal.show{display:block;}.fav-card{background:#f8fafc;max-width:560px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.fav-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;background:linear-gradient(90deg,#b91c1c,#7f1d1d);color:#fff;}.fav-title{font-size:17px;font-weight:800;}.fav-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}.fav-body{padding:13px 14px;}.fav-hint{font-size:12.5px;color:#64748b;margin-bottom:11px;line-height:1.4;}.fav-empty{padding:22px;text-align:center;color:#64748b;font-size:14px;}.fav-row{display:flex;align-items:center;gap:10px;background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:11px 12px;margin-bottom:9px;}.fav-info{flex:1;min-width:0;}.fav-np{font-size:15px;font-weight:800;color:#0f172a;font-family:Consolas,Menlo,monospace;}.fav-arts{font-size:12.5px;color:#475569;margin-top:3px;}.fav-btn{flex:0 0 auto;width:auto;margin:0;padding:11px 14px;border:none;border-radius:10px;background:#dc2626;color:#fff;font-size:13.5px;font-weight:800;cursor:pointer;white-space:nowrap;}.fav-ya{flex:0 0 auto;font-size:12.5px;font-weight:800;color:#15803d;background:#dcfce7;border:1px solid #86efac;border-radius:999px;padding:6px 12px;white-space:nowrap;}.fav-actions{display:flex;flex-direction:column;gap:6px;flex:0 0 auto;}.fav-btn-cargar{background:#16a34a;}";
     document.head.appendChild(s);
   }
   let ov = document.getElementById("faltAvModal");
   if (!ov) { ov = document.createElement("div"); ov.id = "faltAvModal"; document.body.appendChild(ov); }
-  ov.innerHTML = '<div class="fav-card"><div class="fav-head"><span class="fav-title">📢 Avisar que llegó un faltante</span><button class="fav-close" onclick="closeFaltAvisar()">Cerrar</button></div><div class="fav-body" id="faltAvBody"><div class="fav-empty">Cargando faltantes…</div></div></div>';
+  ov.innerHTML = '<div class="fav-card"><div class="fav-head"><span class="fav-title">📦➕ Completar Pedido — faltante que llegó</span><button class="fav-close" onclick="closeFaltAvisar()">Cerrar</button></div><div class="fav-body" id="faltAvBody"><div class="fav-empty">Cargando faltantes…</div></div></div>';
   return ov;
 }
 async function showFaltAvisar() {
@@ -11845,13 +12207,15 @@ function faltAvRender(falt, activas) {
     _faltAvData[np].cajas += Number(e.cajas_falto) || 0;
   });
   const list = Object.keys(_faltAvData).map(function (k) { return _faltAvData[k]; }).sort(function (a, b) { return String(a.np).localeCompare(String(b.np)); });
-  let h = '<div class="fav-hint">Cuando llega mercadería de un faltante que todavía <b>no salió ni se facturó</b>, tocá <b>Avisar</b>: a los celulares de los que están en Virgilio les salta un pop-up para que alguien lo complete. Solo uno lo toma.</div>';
+  let h = '<div class="fav-hint">Pedidos con un <b>faltante</b> que todavía <b>no salió ni se facturó</b>. Por cada uno: <b>📦➕ Cargar yo</b> (lo completás vos ahora) o <b>📢 Avisar</b> (les salta el pop-up a los celulares de Virgilio y lo completa alguien; solo uno lo toma).</div>';
   if (!list.length) { h += '<div class="fav-empty">No hay pedidos con faltantes sin facturar. 👍</div>'; body.innerHTML = h; return; }
   h += list.map(function (g) {
     const det = g.arts.map(function (a) { return escapeHtml(a.cod) + '×' + a.falto; }).join(", ");
     const ya = activas[g.np];
+    const cargarBtn = '<button class="fav-btn fav-btn-cargar" onclick="faltCargarYo(\'' + escapeHtml(g.np) + '\')">📦➕ Cargar yo</button>';
+    const avisarBtn = ya ? '<span class="fav-ya">✓ Avisado</span>' : '<button class="fav-btn" onclick="faltCrear(\'' + escapeHtml(g.np) + '\')">📢 Avisar</button>';
     return '<div class="fav-row"><div class="fav-info"><div class="fav-np">NP ' + escapeHtml(g.np) + (g.tanda ? ' · ' + escapeHtml(g.tanda) : '') + (g.cliente ? ' · cli ' + escapeHtml(g.cliente) : '') + '</div><div class="fav-arts">' + det + ' <b>(' + g.cajas + ' cj)</b></div></div>' +
-      (ya ? '<span class="fav-ya">✓ Avisado</span>' : '<button class="fav-btn" onclick="faltCrear(\'' + escapeHtml(g.np) + '\')">📢 Avisar que llegó</button>') + '</div>';
+      '<div class="fav-actions">' + cargarBtn + avisarBtn + '</div></div>';
   }).join("");
   body.innerHTML = h;
 }
@@ -11862,6 +12226,13 @@ async function faltCrear(np) {
     try { alert("📢 Aviso enviado. En los celulares de Virgilio va a aparecer el pop-up para completar la NP " + g.np + "."); } catch (_e) {}
   } catch (e) { try { alert("No se pudo avisar: " + (e.message || e)); } catch (_e2) {} }
   showFaltAvisar();
+}
+/* v5.95 — "Cargar yo": el supervisor completa el faltante de esa NP él mismo AHORA
+   (en vez de avisar para que lo haga un operario). Cierra este modal y abre el CP
+   enfocado en esa NP (mismo showCPModal de la botonera; legajo '0' = admin). */
+function faltCargarYo(np) {
+  closeFaltAvisar();
+  try { showCPModal("0", null, _faltNpNorm(np)); } catch (_e) {}
 }
 
 /* ===== RC · Pasar cajas a un pedido URGENTE (v5.49). El operario le saca cajas a un pedido
@@ -16702,6 +17073,15 @@ if (window.__pendingMonitorParam && (_keyValid || _kioskEnrolled)) {
   window.addEventListener("load", () => {
     try { showKioskAdminPanel(); } catch (_e) {}
     try { if (typeof window.maybeAutoOpenMonitor === "function") window.maybeAutoOpenMonitor(); } catch (_e) {}
+    // v5.94: la TV de pared es un aparato barato (poca RAM). Corriendo 24/7 la
+    // memoria se llena y Chrome mata la pestaña ("¡Vaya!"/Aw-Snap) cada ~15 min.
+    // Se recarga sola cada 10 min → arranca limpia antes de llenarse (reload de
+    // 1-2s). NO es el wifi (un corte de red mostraría otra pantalla). Solo kiosko.
+    if (!window._kioskReloadTimer) {
+      window._kioskReloadTimer = setInterval(function () {
+        try { location.reload(); } catch (_e) {}
+      }, 10 * 60 * 1000);
+    }
   });
 }
 
@@ -17408,6 +17788,27 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
         <td class="center">${statusCell(ev.separado, ev.sepLegajo, t.tanda, "separado")}</td>
       </tr>`;
   }
+  // v5.99 — "Tandas a FC" = TODAS las terminadas (picking+separado), aunque estén
+  // FUERA de la ventana de 3 días. El loop de arriba solo sumó las de la ventana;
+  // acá agregamos el resto (con status; refreshMonitor cubre 7 días). Pedido del
+  // dueño: "las tandas a facturar tienen que aparecer todas".
+  {
+    const _fcKeys = new Set(tandasFC.map(function (t) { return t._key || t.tanda; }));
+    for (const [k, v] of sheetMap) {
+      if (!v || !v.opIsSi) continue;
+      const key = v._key || v.tanda;
+      if (_fcKeys.has(key)) continue;
+      const ev2 = statusMap.get(k);
+      if (ev2 && ev2.picking === "done" && ev2.separado === "done") {
+        tandasFC.push(Object.assign({}, v, { ev: ev2 }));
+        _fcKeys.add(key);
+      }
+    }
+    tandasFC.sort(function (a, b) {
+      return String(a.fechaEntregaRaw || "").localeCompare(String(b.fechaEntregaRaw || "")) ||
+             String(a.tanda || "").localeCompare(String(b.tanda || ""));
+    });
+  }
   const todayStr = new Date().toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", timeZone: "America/Argentina/Buenos_Aires" });
   // todayKey/yesterdayKey ahora vienen como parámetros desde refreshMonitor —
   // los usaba acá showDayBreakdown indirectamente, pero ya está cubierto.
@@ -17508,9 +17909,13 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
   const beyondByDate = new Map();
   let beyondTotalTandas = 0;
   let beyondTotalM3 = 0;
-  for (const [, v] of sheetMap) {
+  for (const [k, v] of sheetMap) {
     if (!v.opIsSi || !v.fechaEntregaRaw) continue;
     if (!maxTarget || v.fechaEntregaRaw <= maxTarget) continue;
+    // v5.99: las terminadas ya aparecen en "Tandas a FC" (todas) → NO contarlas acá.
+    // "Fuera de ventana" = trabajo PENDIENTE más lejano de los 3 días.
+    const evB = statusMap.get(k);
+    if (evB && evB.picking === "done" && evB.separado === "done") continue;
     if (!beyondByDate.has(v.fechaEntregaRaw)) {
       beyondByDate.set(v.fechaEntregaRaw, { fechaDisplay: v.fechaEntrega, tandas: [], sumM3: 0 });
     }
@@ -17776,16 +18181,12 @@ async function refreshMonitor() {
     //    la ventana corta ya quedan POCOS pickings por hacer (≤3), expandimos
     //    a 7 días — así, cuando están terminando los pickings, el monitor
     //    adelanta y muestra las tandas de los próximos días automáticamente.
+    // v5.99: la TABLA principal muestra SIEMPRE los próximos 3 días hábiles (pedido
+    // del dueño). Antes se auto-expandía a 7 días cuando quedaban pocos pickings;
+    // ahora lo que está más lejos de 3 días va a la card "Fuera de ventana" (m³), y
+    // el panel "Tandas a FC" muestra TODAS las terminadas igual (ver renderMonitor).
     const narrowDates = targetDeliveryDates(sheetMap, 3);
-    const narrowSet   = new Set(narrowDates);
-    let pickingsPendientes = 0;
-    for (const [k, v] of sheetMap) {
-      if (!narrowSet.has(v.fechaEntregaRaw)) continue;
-      if (!v.opIsSi) continue;
-      const ev = statusMap.get(k) || {};
-      if (ev.picking !== "done") pickingsPendientes++;
-    }
-    const targetDates = pickingsPendientes <= 3 ? wideTargetDates : narrowDates;
+    const targetDates = narrowDates;
     await getEmpleadosNombres();   // legajo -> nombre para la leyenda (cacheado 1h)
     // Stats por operario para el panel de la derecha (Mts3 x Hora) — hoy + ayer.
     // Cacheado 15s para no martillar Supabase en cada tick. Best-effort: si falla,
