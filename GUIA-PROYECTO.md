@@ -4,7 +4,9 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-07-24 · Versión app al documentar: **v5.101**
+> Última actualización: 2026-07-24 · Versión app al documentar: **v5.102**
+>
+> Nota: **v5.102 — Stock rediseño parte 3: ubicación FÍSICA en Pickeados (#5) + A facturar (#6)**. En `stkOpenEstadioArt`, además de las NPs/tandas, ahora muestra **DÓNDE** está el pedido (badge violeta `.stkpop-ubic`): **Pickeados** (`separar_pedidos`) → ubicación del picking **por tanda** (Mesa 1/2, Carro) desde eventos **PUB** (`texto=tanda`, `descripcion=ubicación`, v5.78); **A facturar** (`a_facturar`) → ubicación del armado **por NP** (AB10/AA4…) desde eventos **AUB** (`texto=NP`, `descripcion=ubicación`, v5.86). Se cruza por tanda/NP con un fetch a `Registros_Produccion_Virgilio` (última carga gana). **Falta del rediseño (última parte):** #1 **Cajas pedidas** (qué NP pidió cuántas + si ya se pickeó / separó). El resto (#2 Capacidad, #3 Góndola, #4 Excedente, #5 Pickeados, #6 A facturar, #7 A guardar, #8 Racks) ya está.
 >
 > Nota: **v5.101 — Stock rediseño parte 2: Capacidad (#2) + Racks con fechas (#8)**. Sigue de v5.100. **#2 Capacidad de góndola:** la columna ahora es clickeable → `stkOpenCapArt` muestra las **ubicaciones (sectores) y la capacidad (cajas_max) de cada una** (de `_stk.cap` = `Capacidad_Sector`, ya cargado). **#8 Racks:** `stkOpenRacksArt` ahora muestra las posiciones de la planimetría (como antes) **+ los movimientos** del depósito `racks` con **filtro de rango de fechas** y saldo. Se extrajo **`_stkMovsBlock()`** (la tabla de movimientos por fecha con Entró/Salió/Saldo corrido) para compartirla entre Góndola/A guardar (`stkMovsArtRender`) y Racks (`stkRacksArtRender`); `stkMovsArtDate` despacha según `_stkPop.kind` (`racksArt` → posiciones + movs; si no → solo movs). **Faltan del rediseño:** #1 **Cajas pedidas** (qué NP pidió + pickeado/separado), #5 **Pickeados** + ubicación (mesa/carro, eventos **PUB**), #6 **A facturar** + ubicación (AA4/AA5, eventos **AUB**).
 >
