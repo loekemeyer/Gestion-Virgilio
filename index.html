@@ -162,21 +162,27 @@ button {
 
 .row { display: grid; gap: 8px; margin-top: 13px; }
 .row-6 { grid-template-columns: repeat(6, minmax(0, 1fr)); }
-#row2 { grid-template-columns: repeat(3, minmax(0, 1fr)); }   /* RT·RR·MG: 3 anchos (usan la fila entera, entra "Recepción" sin cortar) */
+.row-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.row-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
 .box { border: 2px solid #334155; border-radius: 10px; padding: 9px 5px; text-align: center; cursor: pointer; min-width: 0; transition: border-color .12s, transform .06s; }
 .box-sm { padding: 5px 4px; border-radius: 8px; }
 .box-sm .box-title { font-size: 13px; }
 .box-sm .box-desc { font-size: 9px; margin-top: 2px; }
+/* CORE (picking / armado): botones GRANDES = los más importantes (v5.92). */
+.row-core .box { padding: 15px 6px; border-width: 2.5px; }
+.row-core .box-title { font-size: 22px; }
+.row-core .box-desc { font-size: 12px; margin-top: 4px; }
+/* ÚNICOS con color: Picking (azul) EP·TP y Armado (verde) AP·TAP. Todo el resto
+   queda blanco con borde oscuro — decisión del dueño (v5.92). */
+.box[data-code="EP"], .box[data-code="TP"] { border-color: #1e6bd6; background: #eff6ff; }
+.box[data-code="EP"] .box-title, .box[data-code="TP"] .box-title { color: #1e40af; }
+.box[data-code="AP"], .box[data-code="TAP"] { border-color: #16a34a; background: #f0fdf4; }
+.box[data-code="AP"] .box-title, .box[data-code="TAP"] .box-title { color: #15803d; }
+.botonera-grp { text-align: left; font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: #475569; margin: 12px 2px 0; }
+.botonera-grp + .row { margin-top: 4px; }
 .botonera-sep { text-align: center; font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #94a3b8; margin: 13px 0 1px; }
-.box[data-code="CP"] { border-color: #86efac; background: #f0fdf4; }
-.box-sm[data-code="CP"] .box-title { color: #15803d; }
-.box[data-code="RC"] { border-color: #fdba74; background: #fff7ed; }
-.box-sm[data-code="RC"] .box-title { color: #c2410c; }
-.box[data-code="EA"] { border-color: #c4b5fd; background: #f5f3ff; }
-.box-sm[data-code="EA"] .box-title { color: #6d28d9; }
-.box[data-code="IR"] { border-color: #a5f3fc; background: #ecfeff; }
-.box-sm[data-code="IR"] .box-title { color: #0e7490; }
+.botonera-sep + .row { margin-top: 3px; }
 .box:active { transform: scale(.96); }
 .box-title { font-size: 18px; font-weight: bold; }
 .box-desc { font-size: 10.5px; margin-top: 3px; line-height: 1.2; overflow-wrap: break-word; word-break: normal; hyphens: none; }
@@ -343,8 +349,10 @@ button {
  text-align:center;
 }
 
-/* ✅ deshabilitado visual */
-.box.disabled{
+/* ✅ deshabilitado visual. El variante [data-code] sube la especificidad por encima
+   del color de core (EP/TP/AP/TAP) para que el gris de bloqueo gane (v5.92). */
+.box.disabled,
+.box[data-code].disabled{
   background:#ddd;
   color:#888;
   border-color:#aaa;
@@ -352,15 +360,17 @@ button {
   opacity:0.6;
 }
 
-/* ⚠ tarea pendiente: hay un EP/AP o toggle abierto sin cerrar.
-   El botón correspondiente queda con borde rojo. Si está además
-   disabled (por bloqueo), gana el borde rojo igual. */
-.box.pending{
+/* ⚠ tarea pendiente: hay un EP/AP o toggle abierto sin cerrar. El botón queda con
+   borde rojo. El variante [data-code] gana sobre el color de core (azul/verde) y
+   sobre disabled, así el rojo se ve siempre (v5.92). */
+.box.pending,
+.box[data-code].pending{
   border-color: #d33;
   background: #fff5f5;
 }
 .box.disabled.pending,
-.box.pending.disabled{
+.box.pending.disabled,
+.box[data-code].disabled.pending{
   border-color: #d33;
   background: #ddd;
 }
@@ -3323,12 +3333,15 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
     <button id="btnTerminarDia" onclick="terminarDia()">Terminar Día</button>
   </div>
 
-  <div class="row row-6" id="row1"></div>
-  <div class="row row-6" id="row2"></div>
+  <div class="botonera-grp">🛒 Picking</div>
+  <div class="row row-2 row-core" id="row1"></div>
+  <div class="botonera-grp">🔨 Armado de pedido</div>
+  <div class="row row-2 row-core" id="row2"></div>
+  <div class="botonera-grp">📦 Depósito y carga</div>
+  <div class="row row-3" id="row3"></div>
   <div class="botonera-sep">acciones secundarias</div>
-  <div class="row row-6 row-sec" id="row3"></div>
   <div class="row row-6 row-sec" id="row4"></div>
-  <button id="moverOpBtn" onclick="showMoverModal(legajoInput.value)" style="background:#ecfeff;border:1.5px solid #a5f3fc;color:#0e7490;border-radius:12px;font-weight:800;font-size:14px;">🔀 Mover mercadería de lugar (racks)</button>
+  <div class="row row-6 row-sec" id="row5"></div>
   <div id="racksAlarma"></div>
   <div id="pendingSuggestion"></div>
 
@@ -3406,15 +3419,17 @@ const SUPABASE_PLANIMETRIA_ENDPOINT =
   SUPABASE_URL + "/rest/v1/Planimetria";
 
 const filas = {
-  row1: ["EP","TP","AP","TAP","CR","CC"],
-  row2: ["RT","RR","MG"],
-  row3: ["RI","EI","EA","SC","CP","RC","IR"],
-  row4: ["AT","PB","Limp","Perm","PC","CT"]
+  row1: ["EP","TP"],                                   // Picking (grande, azul)
+  row2: ["AP","TAP"],                                  // Armado (grande, verde)
+  row3: ["RT","MG","CC"],                              // Depósito y carga (mediano)
+  row4: ["CR","RR","RI","EI","CP","RC","IR","EA","SC"],// secundarias (chico) + 🔀 Mover al final
+  row5: ["AT","PB","Limp","Perm","PC","CT"]            // tiempos / pausas (chico)
 };
-// Filas secundarias (botones más chicos): uso puntual. Las primarias (row1/row2)
-// quedan grandes como siempre = el ~90% del uso (picking/armado + carga/control +
-// recepción/guardado). Elección del dueño (v5.06).
-const BOTONERA_SECUNDARIAS = { row3: true, row4: true };
+// Rediseño v5.92 (pedido del dueño): más peso a los botones más usados. Primarias
+// GRANDES y con color = Picking (row1, azul) y Armado (row2, verde); Depósito y
+// carga (row3) medianas sin color; el resto CHICO (row4 secundarias + row5 tiempos),
+// sin color. 🔀 Mover racks pasó a ser un box chico más (se agrega en el render).
+const BOTONERA_SECUNDARIAS = { row4: true, row5: true };
 
 const desc = {
   EP:"Empecé Picking", TP:"Fin Picking", AP:"Empecé Armado Pedido",
@@ -4583,6 +4598,17 @@ Object.keys(filas).forEach(rowId => {
     document.getElementById(rowId).appendChild(d);
   });
 });
+// v5.92: 🔀 Mover mercadería de racks — secundario (casi no se usa) → box CHICO al
+// final de las secundarias, en vez del botón ancho aparte de antes.
+try {
+  const mov = document.createElement("div");
+  mov.className = "box box-sm";
+  mov.setAttribute("data-code", "MOV");
+  mov.innerHTML = `<div class="box-title" style="font-size:15px">🔀</div><div class="box-desc">Mover racks</div>`;
+  mov.onclick = () => showMoverModal(legajoInput.value);
+  const r4 = document.getElementById("row4");
+  if (r4) r4.appendChild(mov);
+} catch (_e) { /* no-op */ }
 
 /* =========================================================
    NAVEGACIÓN
@@ -5505,7 +5531,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.91";
+const APP_VERSION = "v5.92";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
