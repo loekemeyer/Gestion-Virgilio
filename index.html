@@ -5533,7 +5533,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.102";
+const APP_VERSION = "v5.103";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -9407,7 +9407,7 @@ function stkBodyStocks() {
     const _tot = SECTKEYS.reduce(function (s, k) { return s + (Number(a[k]) || 0); }, 0);
     const _ped = Number(dem[_ocgNorm(a.cod)]) || 0;
     const _cap = Number(capByCod[_ocgNorm(a.cod)]) || 0;
-    let tds = '<td class="stk-cod">' + escapeHtml(a.cod) + '</td><td class="stk-desc">' + escapeHtml(artNombre(a.cod, a.desc) || "—") + '</td><td class="num ' + (_tot < 0 ? "stk-neg" : "") + '" style="background:#f8fafc"><b>' + fmtCajas(_tot) + '</b></td><td class="num" style="background:#fffbeb;color:#92400e"><b>' + (_ped ? fmtCajas(_ped) : "") + '</b></td>' + (_cap ? '<td class="num stk-pick-cell" style="background:#f0fdf4;color:#166534" onclick="event.stopPropagation();stkOpenCapArt(\'' + encodeURIComponent(a.cod) + '\')" title="Ubicaciones y capacidad de góndola"><b>' + fmtCajas(_cap) + '</b></td>' : '<td class="num" style="background:#f0fdf4;color:#166534"></td>');
+    let tds = '<td class="stk-cod">' + escapeHtml(a.cod) + '</td><td class="stk-desc">' + escapeHtml(artNombre(a.cod, a.desc) || "—") + '</td><td class="num ' + (_tot < 0 ? "stk-neg" : "") + '" style="background:#f8fafc"><b>' + fmtCajas(_tot) + '</b></td>' + (_ped ? '<td class="num stk-pick-cell" style="background:#fffbeb;color:#92400e" onclick="event.stopPropagation();stkOpenCajasPedidasArt(\'' + encodeURIComponent(a.cod) + '\')" title="Qué NP pidió + pickeado/separado"><b>' + fmtCajas(_ped) + '</b></td>' : '<td class="num" style="background:#fffbeb;color:#92400e"></td>') + (_cap ? '<td class="num stk-pick-cell" style="background:#f0fdf4;color:#166534" onclick="event.stopPropagation();stkOpenCapArt(\'' + encodeURIComponent(a.cod) + '\')" title="Ubicaciones y capacidad de góndola"><b>' + fmtCajas(_cap) + '</b></td>' : '<td class="num" style="background:#f0fdf4;color:#166534"></td>');
     cols.forEach(function (c) {
       const v = Number(a[c.key]) || 0;
       // v5.82: columnas clickeables → detalle. Pickeados/A facturar → NPs; Excedente/Racks → ubicación.
@@ -9793,6 +9793,46 @@ function stkOpenCapArt(codEnc) {
   let h = '<div class="stkpop-hint"><b>' + escapeHtml(cod) + '</b> · capacidad de góndola: <b>' + tot + ' cajas</b> en ' + mine.length + ' ubicación(es).</div>';
   h += '<div class="stkpop-grp"><div class="stkpop-nps">' + mine.map(function (r) { return '<span class="stkpop-np"><b>📍 ' + escapeHtml(r.sector) + '</b> · ' + r.cajas + ' cajas</span>'; }).join("") + '</div></div>';
   body.innerHTML = h;
+}
+/* v5.103 — CAJAS PEDIDAS por artículo: qué NP pidió cuántas de ese código y si su
+   TANDA ya se pickeó (hay picking en separar_pedidos) y/o separó (separado en
+   a_facturar). NP→tanda de PPP_Programacion_Diaria; estado de _stk.movs. */
+async function stkOpenCajasPedidasArt(codEnc) {
+  if (!_stk) return;
+  const cod = decodeURIComponent(codEnc), codN = _stkNormCod(cod);
+  _stkPopShell("🟡 Cajas pedidas — " + escapeHtml(cod), "stkPopBody");
+  const body = document.getElementById("stkPopBody"); if (body) body.innerHTML = '<div class="stkpop-empty">Cargando pedidos…</div>';
+  const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+  let base = [];
+  try { base = await fetch(SUPABASE_URL + "/rest/v1/PPP_Base_Pedidos?articulo=eq." + encodeURIComponent(cod) + "&select=pedido,cajas&limit=20000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }); } catch (_e) {}
+  const pedByNp = {};
+  base.forEach(function (x) { const np = String(x.pedido || "").trim().replace(/\.0+$/, ""); if (np) pedByNp[np] = (pedByNp[np] || 0) + (Number(x.cajas) || 0); });
+  const nps = Object.keys(pedByNp).filter(function (np) { return pedByNp[np] > 0.05; });
+  if (!nps.length) { if (body) body.innerHTML = '<div class="stkpop-empty">Ningún pedido pidió ' + escapeHtml(cod) + ' en la base de picking.</div>'; return; }
+  const npInfo = {};
+  try {
+    const prog = await fetch(SUPABASE_PPP_PROG_ENDPOINT + "?np=in.(" + nps.map(encodeURIComponent).join(",") + ")&select=np,tanda,razon_social&limit=8000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; });
+    prog.forEach(function (x) { const np = String(x.np || "").trim().replace(/\.0+$/, ""); if (np && !npInfo[np]) npInfo[np] = { tanda: String(x.tanda || "").trim().toUpperCase(), rs: String(x.razon_social || "").trim() }; });
+  } catch (_e) {}
+  const pickTandas = {}, sepTandas = {};
+  _stk.movs.forEach(function (mv) {
+    if (_stkNormCod(mv.cod_art) !== codN || !_stkWin(mv, true)) return;
+    const ref = String(mv.ref || "").toUpperCase();
+    if (mv.deposito === "separar_pedidos" && mv.tipo === "picking" && Number(mv.delta) > 0) pickTandas[ref] = true;
+    if (mv.deposito === "a_facturar" && mv.tipo === "separado" && Number(mv.delta) > 0) sepTandas[ref] = true;
+  });
+  const round1 = function (n) { return Math.round(n * 10) / 10; };
+  nps.sort(function (a, b) { return String(a).localeCompare(String(b), undefined, { numeric: true }); });
+  const totP = round1(nps.reduce(function (s, np) { return s + pedByNp[np]; }, 0));
+  let h = '<div class="stkpop-hint"><b>' + escapeHtml(cod) + '</b> · pedido total: <b>' + totP + ' cajas</b> en ' + nps.length + ' NP(s). Por cada NP: cuántas pidió y si su tanda ya se <b style="color:#166534">pickeó</b> / <b style="color:#1e40af">separó</b>.</div>';
+  h += '<div class="stkpop-grp"><div class="stkpop-nps">' + nps.map(function (np) {
+    const info = npInfo[np] || {}, t = info.tanda || "";
+    const pk = !!(t && pickTandas[t]), sp = !!(t && sepTandas[t]);
+    const bPk = pk ? '<b style="color:#166534">📦 pickeado ✓</b>' : '<span style="color:#b45309">📦 sin pickear</span>';
+    const bSp = sp ? '<b style="color:#1e40af">🧾 separado ✓</b>' : '<span style="color:#94a3b8">🧾 sin separar</span>';
+    return '<span class="stkpop-np" style="display:block"><b>NP ' + escapeHtml(np) + '</b>' + (t ? ' <small style="color:#94a3b8">· ' + escapeHtml(t) + '</small>' : '') + ' · ' + escapeHtml(info.rs || "—") + ' <b>· pidió ' + round1(pedByNp[np]) + '</b><br>' + bPk + ' · ' + bSp + '</span>';
+  }).join("") + '</div></div>';
+  if (body) body.innerHTML = h;
 }
 /* v5.100 — Movimientos POR ARTÍCULO de UN depósito (góndola=terminado, a_guardar…):
    solo ese rubro, ordenados por fecha, con lo que ENTRÓ / SALIÓ y el SALDO corrido,
