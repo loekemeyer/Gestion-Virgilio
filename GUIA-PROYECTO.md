@@ -4,7 +4,9 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-07-24 · Versión app al documentar: **v6.08**
+> Última actualización: 2026-07-24 · Versión app al documentar: **v6.09**
+>
+> Nota: **v6.09 — Picking · ubicación "✏️ Otra…" (escribir a mano)**. Pedido del dueño: en el modal de "¿Dónde dejás la tanda?" (`askPickUbicacion`, evento **PUB** v5.78) los operarios estaban atados a las opciones fijas (`PICK_UBIC_OPCIONES`: Mesa 1/2, Carro, AA3…AB10). Ahora al final de la grilla hay un botón **"✏️ Otra…"** (`.pub-otra`, ámbar) → abre un `prompt()` donde escriben la ubicación a mano (ej. "Pasillo 3 / Rack B12"); si escriben algo, ese texto libre va como `descripcion` del evento PUB igual que una opción fija; si cancelan o dejan vacío, el modal **no se cierra** (pueden elegir otra opción o Cancelar). No cambia el modelo (mismo evento PUB, `texto=tanda`, `descripcion=ubicación`); el wizard de armado lo muestra igual ("📍 Dejado en: X"). Solo UI. Verificado headless (grilla con 12 opciones, "Otra…" última y estilada, sin errores de página) + `checkhtml`.
 >
 > Nota: **v6.08 — "Editar líos": rediseño estético** (el dueño lo marcó feo). La lista de líos generados (`_compRenderLios`, vista *editar*) tenía cada lío como una **fila apretada** con 4 botoncitos chicos (−, +, ✏️, ×) al lado de la composición → amontonado y difícil de tocar. Ahora cada lío es una **tarjeta en 2 partes**: arriba badge de letra (A1–A2…) + composición (monoespaciada, negrita) + chip **×N** si es grupo; abajo botones **grandes** (42px) **[−] [+]** (solo si es grupo) + **✏️ Editar** + **🗑 Borrar**. CSS: `.cmpl-eg/.cmpl-eg-top/.cmpl-eg-acts/.cmpl-egb/.cmpl-egedit/.cmpl-egdel/.cmpl-lab/.cmpl-egn`. Solo estética + tap targets, misma lógica (`_compGroupMore/Less/Reopen/Del`). Verificado con render mock (sin overflow).
 >
