@@ -4,7 +4,9 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-07-24 · Versión app al documentar: **v6.16**
+> Última actualización: 2026-07-24 · Versión app al documentar: **v6.17**
+>
+> Nota: **v6.17 — CP/badge: filtro corregido a SOLO "a guardar" (no góndola)**. Corrige v6.14, que había ampliado el filtro a "a_guardar O góndola" — mal: el CP mostraba faltantes de artículos que solo estaban en **góndola** (ej. 836/839/911/280) cuando el dueño solo quiere ver los que están **a guardar** (llegó mercadería nueva para completar el pedido). Un faltante contra algo que está en góndola es un tema de picking, no "llegó algo para completar". Ahora `showCPModal`, `cpReloadFaltantes` y el badge `facTareaBadge` filtran por **`a_guardar > 0` únicamente**. La fila muestra "a guardar: N" (se quitó el "· góndola: M"). Ejemplo real: quedan 323E (a_guardar 72) y 534 (a_guardar 6); desaparecen 836/839/911/280 (solo góndola). Nota: la lógica de **bloqueo del tilde** (parte B, pendiente) sí contempla góndola además de a_guardar — es otra cosa (no dejar facturar si el faltante es recuperable de cualquier lado).
 >
 > Nota: **v6.16 — Facturación: el aviso ⏳ "Completando faltante" solo aparece si hay stock para completar**. El badge `facTareaBadge` (amarillo, "⏳ Completando · faltan N · sin asignar aún") se mostraba para cualquier NP con una `Faltantes_Tarea` activa, **sin mirar stock**. Ahora Facturación carga los **saldos** (`stockFetchSaldos` sumado al `Promise.all` de la carga; `_facSaldosN` normalizado) y el badge se **oculta si NINGÚN artículo faltante de la NP tiene stock** en `a_guardar` o `terminado` (góndola) — pedido del dueño: si no hay mercadería, nadie lo va a completar, se factura corto, y no tiene sentido avisar que "falta guardarlo". El badge rojo de faltantes (`facFaltDist`/`facFaltBadge`, "qué salió corto") no cambia. Nota: reversa de un ajuste manual erróneo (942P `terminado` −288 → +288 = 0) hecha por datos.
 >
