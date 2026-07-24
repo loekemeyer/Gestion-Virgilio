@@ -5533,7 +5533,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.97";
+const APP_VERSION = "v5.98";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -9538,6 +9538,7 @@ var STK_POP_CSS =
   ".stkpop-mv-tipo{font-weight:800;border-radius:6px;padding:1px 7px;font-size:10.5px;white-space:nowrap;}" +
   ".stkpop-mv-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#0f172a;}" +
   ".stkpop-mv-ref{color:#64748b;font-size:11px;font-family:Consolas,Menlo,monospace;}" +
+  ".stkpop-mv-emp{color:#7c3aed;font-size:11px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px;}" +
   ".stkpop-mv-d{font-weight:800;font-variant-numeric:tabular-nums;margin-left:auto;white-space:nowrap;}" +
   ".stkpop-mv-d.pos{color:#15803d;}.stkpop-mv-d.neg{color:#b91c1c;}" +
   ".tp-guardado{background:#dcfce7;color:#15803d;}.tp-picking{background:#fee2e2;color:#b91c1c;}.tp-otro{background:#f1f5f9;color:#475569;}";
@@ -9756,6 +9757,9 @@ function stkOpenGondola() {
   _stkPop = { filter: "gp", search: "" };
   _stkPopShell("🔁 Movimientos de góndola", "stkPopBody");
   stkGondRender();
+  // v5.98: cargar nombres (legajo→nombre) para mostrar quién hizo cada movimiento;
+  // al resolver, re-render. Cacheado 1h → normalmente ya está y no re-dibuja de más.
+  try { getEmpleadosNombres().then(function () { if (_stkPop) stkGondRender(); }).catch(function () {}); } catch (_e) {}
 }
 function stkGondSetFilter(f) { if (!_stkPop) return; _stkPop.filter = f; stkGondRender(); }
 function stkGondSearch(v) { if (!_stkPop) return; _stkPop.search = String(v == null ? "" : v); stkGondRender(); }
@@ -9775,7 +9779,7 @@ function stkGondRender() {
   list.sort(function (a, b) { return new Date(b.ts) - new Date(a.ts); });
   const MAX = 300, shown = list.slice(0, MAX);
   const fmt1 = function (n) { return Math.round(n * 10) / 10; };
-  let h = '<div class="stkpop-hint">Todo lo que entró y salió de <b>góndola</b>: el <b>guardado</b> (MG) la sube y el <b>picking</b> (TP) la baja.</div>';
+  let h = '<div class="stkpop-hint">Todo lo que entró y salió de <b>góndola</b>: el <b>guardado</b> (MG) la sube, el <b>picking</b> (TP) la baja. <b>👤 = quién lo hizo</b>.</div>';
   h += '<div class="stkpop-sum"><span class="stkpop-sumchip"><span class="l">⬆ Guardado</span><span class="v" style="color:#15803d">+' + fmt1(totG) + '</span></span><span class="stkpop-sumchip"><span class="l">⬇ Picking</span><span class="v" style="color:#b91c1c">' + fmt1(totP) + '</span></span><span class="stkpop-sumchip"><span class="l">Neto</span><span class="v" style="color:#1e3a8a">' + fmt1(totG + totP) + '</span></span></div>';
   const fb = function (v, label) { return '<button class="stkpop-fb' + (f === v ? " on" : "") + '" onclick="stkGondSetFilter(\'' + v + '\')">' + label + '</button>'; };
   h += '<div class="stkpop-filters">' + fb("gp", "Guardado + Picking") + fb("guardado", "Solo guardado") + fb("picking", "Solo picking") + fb("todos", "Todos") + '</div>';
@@ -9786,7 +9790,9 @@ function stkGondRender() {
       const d = Number(mv.delta) || 0;
       const cls = _stkEsGuardado(mv) ? "tp-guardado" : (mv.tipo === "picking" ? "tp-picking" : "tp-otro");
       const lbl = mv.tipo === "guardado_fuera_lista" ? "guard.f/lista" : (mv.tipo === "baja_racks" ? "de racks" : mv.tipo);
-      return '<div class="stkpop-mv"><span class="stkpop-mv-ts">' + escapeHtml(stockFmtTs(mv.ts)) + '</span><span class="stkpop-mv-tipo ' + cls + '">' + escapeHtml(lbl) + '</span><span class="stkpop-mv-cod">' + escapeHtml(String(mv.cod_art)) + '</span><span class="stkpop-mv-ref">' + escapeHtml(String(mv.ref || "")) + '</span><span class="stkpop-mv-d ' + (d < 0 ? "neg" : "pos") + '">' + (d > 0 ? "+" : "") + fmt1(d) + '</span></div>';
+      // v5.98: quién hizo el movimiento (legajo→nombre; cacheado en _empleadosNombres).
+      const emp = mv.legajo ? ((typeof _empleadosNombres !== "undefined" && _empleadosNombres.get(String(mv.legajo))) || ("Leg " + mv.legajo)) : "s/dato";
+      return '<div class="stkpop-mv"><span class="stkpop-mv-ts">' + escapeHtml(stockFmtTs(mv.ts)) + '</span><span class="stkpop-mv-tipo ' + cls + '">' + escapeHtml(lbl) + '</span><span class="stkpop-mv-cod">' + escapeHtml(String(mv.cod_art)) + '</span><span class="stkpop-mv-ref">' + escapeHtml(String(mv.ref || "")) + '</span><span class="stkpop-mv-emp" title="' + escapeHtml(emp) + '">👤 ' + escapeHtml(emp) + '</span><span class="stkpop-mv-d ' + (d < 0 ? "neg" : "pos") + '">' + (d > 0 ? "+" : "") + fmt1(d) + '</span></div>';
     }).join("");
     if (list.length > MAX) h += '<div class="stkpop-empty">Mostrando ' + MAX + ' de ' + list.length + ' — filtrá o buscá para acotar.</div>';
   }
