@@ -50,7 +50,18 @@ catch (_e) {
     await faltPoll();
     const h = document.getElementById("faltPopupBody").innerHTML;
     const o = document.getElementById("faltPopup");
-    return { shown: !!(o && o.classList.contains("show")), isPend: /Llegó un faltante/.test(h), hasAssign: /faltAsignarme\(1\)/.test(h), noDetailYet: !/98114/.test(h) };
+    const one = { shown: !!(o && o.classList.contains("show")), isPend: /Llegó un faltante/.test(h), hasAssign: /faltAsignarme\(1\)/.test(h), noDetailYet: !/98114/.test(h) };
+    one.unoSinContador = !/pedidos con faltante/.test(h);   // con 1 solo, NO muestra "hay N"
+    // v5.90: con VARIAS NPs pendientes → avisa que hay varios (consecutivos)
+    window.__TASKS = [
+      { id: 1, np: "98114", estado: "pendiente", articulos: [{ cod: "315", falto: 10 }] },
+      { id: 2, np: "98091", estado: "pendiente", articulos: [{ cod: "440", falto: 5 }] },
+      { id: 3, np: "98200", estado: "pendiente", articulos: [{ cod: "700", falto: 2 }] }
+    ];
+    await faltPoll();
+    const h2 = document.getElementById("faltPopupBody").innerHTML;
+    one.varios3 = /Hay <b>3<\/b> pedidos/.test(h2);
+    return one;
   });
 
   // B) me asigno y GANO → "Te lo asignaste" con detalle
@@ -103,7 +114,7 @@ catch (_e) {
     return { hiddenForPrueba: !(o && o.classList.contains("show")) };
   });
 
-  const okA = A.shown && A.isPend && A.hasAssign && A.noDetailYet;
+  const okA = A.shown && A.isPend && A.hasAssign && A.noDetailYet && A.unoSinContador && A.varios3;
   const okB = B.isMine && B.showsNp && B.showsArt && B.hasCompletar && B.hasSoltar;
   const okF = F.wasPend && F.nowTaken;
   const okC = C.taken;
