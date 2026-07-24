@@ -4,7 +4,9 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-07-24 · Versión app al documentar: **v5.105**
+> Última actualización: 2026-07-24 · Versión app al documentar: **v6.05**
+>
+> Nota: **v6.05 — Bump de versión (reset del esquema: v5.105 → v6.05)**. Pedido del dueño. Sin cambios funcionales, solo `APP_VERSION` (index.html) y `SW_VERSION` (sw.js). De acá en más se sigue con **v6.0x**.
 >
 > Nota: **v5.105 — Atajo "⚡ Líos de a N" SACADO (funcionaba mal)**. Pedido del dueño. En el paso **Líos** del armado (`_compRenderLios`) se quitó la UI del auto-armado (la barra "⚡ Líos de a N" con el input `.cmpl-szinp` + el botón "⚡×N" por código `.cmpl-auto`, v5.85) porque funcionaba mal. Las funciones **`_compLioAuto` y `_compSetLioSize` quedan definidas** (y el CSS `.cmpl-auto/.cmpl-autobar/.cmpl-szinp`) por si se reactiva más adelante ("por ahora"). El armado manual de líos (tocar el código +1, − para restar, **✓ Cerrar Lío**) queda igual. Verificado: `comp-doblearmado.cjs` + smoke OK.
 >
