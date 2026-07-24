@@ -4,7 +4,9 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-07-24 · Versión app al documentar: **v5.90**
+> Última actualización: 2026-07-24 · Versión app al documentar: **v5.91**
+>
+> Nota: **v5.91 — Continuar un PICKING que cruzó de día (reconstrucción desde el servidor)**. **Bug urgente (24/07):** un operario (legajo 122) empezó el picking de una tanda a la tarde (EP 16:04), marcó 25 artículos y **no lo cerró**; al otro día la app solo le ofrecía **"Presioná para terminar" (TP)** — no continuarlo — y EP estaba deshabilitado por el picking abierto → **trancado**. Causa: el avance interactivo (`_pk`) se guarda en `localStorage` (`vir_pk_<legajo>`) **protegido por día** (`pkLoadSaved` borraba el snapshot si `day !== hoy`), así que al abrir hoy se limpiaba y el botón "▶ Seguir picking" no aparecía. Pero **los eventos PKC de ayer sí quedaron en Supabase** (`Registros_Produccion_Virgilio`, `texto = TANDA|COD|ESP|REAL`) → el avance es **recuperable**. Fix (index.html): **(1)** `pkLoadSaved` conserva el guardado de otro día **si el picking sigue abierto** para esa tanda (cruce de día); si no, limpia como antes. **(2)** `pkFetchServerMarks(tanda, legajo, sinceIso)` reconstruye `Map<código, reales>` desde los PKC (acotado por `ts_inicio` del EP para no traer marcas de una vez anterior). **(3)** `showPickingList(tanda, legajo, opts)` con `opts.seedFromServer` siembra el avance del servidor sobre la lista fresca y ubica en el **primer artículo sin marcar**. **(4)** `pkResumeServer` + botón morado **"▶ Seguir picking tanda X"** en `renderPendingSuggestion` cuando hay un picking abierto **sin snapshot local** (cruzó de día / otro celular / se limpió): reconstruye desde el servidor en vez de dejar solo "terminar". El operario ve marcado lo de ayer y sigue con lo que falta; termina normal con "Terminé el picking" (TP). Reconstruye por **código** (no marca los pasos de excedente, raros). Necesita señal (es un "retomar", no el picking 100% offline — eso es el pendiente aparte del WiFi). Test `pk-resume-server.cjs` (reconstrucción + guard cross-day). ⚠ **Pendiente aún abierto:** precargar el picking para que ande al fondo del depósito sin señal (lo de "los primeros dos botones + mal WiFi").
 >
 > Nota: **v5.90 — Pop-up de faltantes avisa cuántos hay (avisos consecutivos)**. Pedido del dueño: si llegaron faltantes de **más de una NP**, que se vea que son varios (no uno solo). La detección server-side (`detectar_faltantes_llegaron`, v5.83) ya crea **una tarea por NP** (loop por NP, idempotente); lo que faltaba era mostrarlo. Ahora `faltDecidePopup` cuenta las tareas **pendientes** y se lo pasa a `faltHtmlPend(t, n)`: si hay más de una, arriba del pop-up sale un cartel amarillo **"⚠ Hay N pedidos con faltante para completar — van saliendo de a uno"**. Siguen apareciendo de a uno (el que uno toma → el resto ve el siguiente), pero ahora se sabe que hay más. Con 1 solo no muestra contador. Test `falt-tareas.cjs` extendido (1 → sin contador, 3 → "Hay 3").
 >
@@ -2253,6 +2255,8 @@
 > (`showPickingList` mergea los `results` guardados). Se borra al terminar
 > (`pkClearSaved` en `pkFinishPicking`); los guardados de días anteriores se
 > ignoran y limpian. Antes, si el navegador mataba la pestaña, se perdía todo.
+> *(**v5.91** cambió esto: si el picking sigue ABIERTO, el guardado de otro día se
+> conserva —cruce de día— y se puede reconstruir desde el servidor. Ver nota v5.91.)*
 >
 > Nota: **v2.65** — armado guiado (sigue apagado): **(a) m³ desde la hoja
 > `VolumenArticulos`** (`fetchVolumenArticulos`, gid por `&sheet=VolumenArticulos`;
