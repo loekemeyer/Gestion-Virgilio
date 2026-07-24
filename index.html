@@ -5533,7 +5533,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v5.99";
+const APP_VERSION = "v5.100";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -9418,6 +9418,8 @@ function stkBodyStocks() {
         else if (c.key === "a_facturar") _clk = "stkOpenEstadioArt('" + _ce + "','a_facturar')";
         else if (c.key === "excedente") _clk = "stkOpenExcedenteArt('" + _ce + "')";
         else if (c.key === "racks") _clk = "stkOpenRacksArt('" + _ce + "')";
+        else if (c.key === "terminado") _clk = "stkOpenMovsArt('" + _ce + "','terminado','Góndola','📥')";   // v5.100: solo mov. de góndola + saldo + fechas
+        else if (c.key === "a_guardar") _clk = "stkOpenMovsArt('" + _ce + "','a_guardar','A guardar','📦')";  // v5.100
       }
       if (_clk) {
         tds += '<td class="num stk-pick-cell" onclick="event.stopPropagation();' + _clk + '" title="Ver detalle (NPs / ubicación)">' + fmtCajas(v) + '</td>';
@@ -9541,7 +9543,17 @@ var STK_POP_CSS =
   ".stkpop-mv-emp{color:#7c3aed;font-size:11px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px;}" +
   ".stkpop-mv-d{font-weight:800;font-variant-numeric:tabular-nums;margin-left:auto;white-space:nowrap;}" +
   ".stkpop-mv-d.pos{color:#15803d;}.stkpop-mv-d.neg{color:#b91c1c;}" +
-  ".tp-guardado{background:#dcfce7;color:#15803d;}.tp-picking{background:#fee2e2;color:#b91c1c;}.tp-otro{background:#f1f5f9;color:#475569;}";
+  ".tp-guardado{background:#dcfce7;color:#15803d;}.tp-picking{background:#fee2e2;color:#b91c1c;}.tp-otro{background:#f1f5f9;color:#475569;}" +
+  ".mva-daterow{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12.5px;color:#475569;margin-bottom:9px;}" +
+  ".mva-date{height:34px;border:1.5px solid #cbd5e1;border-radius:8px;padding:0 8px;font-size:13px;}" +
+  ".mva-clear{width:auto;margin:0;padding:6px 10px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;font-weight:800;cursor:pointer;color:#64748b;}" +
+  ".mva-tblwrap{overflow:auto;max-height:60vh;border:1px solid #e2e8f0;border-radius:10px;}" +
+  ".mva-tbl{border-collapse:collapse;width:100%;font-size:12.5px;}" +
+  ".mva-tbl th,.mva-tbl td{padding:6px 9px;border-bottom:1px solid #eef2f6;text-align:left;white-space:nowrap;}" +
+  ".mva-tbl thead th{position:sticky;top:0;background:#f8fafc;color:#64748b;font-size:10.5px;text-transform:uppercase;font-weight:800;}" +
+  ".mva-tbl th.num{text-align:right;}.mva-in,.mva-out,.mva-sal{text-align:right;font-variant-numeric:tabular-nums;font-weight:800;}" +
+  ".mva-ts{color:#94a3b8;font-size:11px;}.mva-ref{color:#64748b;font-family:Consolas,Menlo,monospace;}" +
+  ".mva-in{color:#15803d;}.mva-out{color:#b91c1c;}.mva-sal{color:#1e3a8a;}";
 function _stkPopShell(title, bodyId) {
   if (!document.getElementById("stkPopCss")) { const st = document.createElement("style"); st.id = "stkPopCss"; st.textContent = STK_POP_CSS; document.head.appendChild(st); }
   let ov = document.getElementById("stkPopModal");
@@ -9752,6 +9764,51 @@ async function stkOpenRacksArt(codEnc) {
   if (body) body.innerHTML = h;
 }
 function _stkEsGuardado(mv) { return mv.tipo === "guardado" || mv.tipo === "guardado_fuera_lista" || mv.tipo === "baja_racks"; }
+/* v5.100 — Movimientos POR ARTÍCULO de UN depósito (góndola=terminado, a_guardar…):
+   solo ese rubro, ordenados por fecha, con lo que ENTRÓ / SALIÓ y el SALDO corrido,
+   + filtro por rango de fechas. Pedido del dueño (ver solo el rubro elegido). */
+function stkOpenMovsArt(codEnc, dep, titulo, icono) {
+  if (!_stk) return;
+  const cod = decodeURIComponent(codEnc);
+  _stkPop = { kind: "movsArt", cod: cod, codN: _stkNormCod(cod), dep: dep, titulo: titulo || dep, icono: icono || "🔁", desde: "", hasta: "" };
+  _stkPopShell((icono || "🔁") + " " + (titulo || dep) + " — " + escapeHtml(cod), "stkPopBody");
+  stkMovsArtRender();
+}
+function stkMovsArtDate(which, val) {
+  if (!_stkPop) return;
+  if (which === "clear") { _stkPop.desde = ""; _stkPop.hasta = ""; }
+  else if (which === "desde") _stkPop.desde = String(val || "");
+  else _stkPop.hasta = String(val || "");
+  stkMovsArtRender();
+}
+function stkMovsArtRender() {
+  const body = document.getElementById("stkPopBody"); if (!body || !_stkPop) return;
+  const dep = _stkPop.dep, codN = _stkPop.codN, round1 = function (n) { return Math.round(n * 10) / 10; };
+  const desdeT = _stkPop.desde ? new Date(_stkPop.desde + "T00:00:00").getTime() : 0;
+  const hastaT = _stkPop.hasta ? new Date(_stkPop.hasta + "T23:59:59").getTime() : 0;
+  const list = _stk.movs.filter(function (mv) {
+    if (mv.deposito !== dep || _stkNormCod(mv.cod_art) !== codN || !_stkWin(mv, true)) return false;
+    const t = new Date(mv.ts).getTime();
+    if (desdeT && t < desdeT) return false;
+    if (hastaT && t > hastaT) return false;
+    return true;
+  }).sort(function (a, b) { return new Date(a.ts) - new Date(b.ts); });   // por fecha ASC (ingresó → salió)
+  let saldo = 0, totIn = 0, totOut = 0;
+  const rows = list.map(function (mv) {
+    const d = Number(mv.delta) || 0; saldo += d; if (d > 0) totIn += d; else totOut += d;
+    return '<tr><td class="mva-ts">' + escapeHtml(stockFmtTs(mv.ts)) + '</td>' +
+      '<td class="mva-tipo">' + escapeHtml(String(mv.tipo || "")) + (mv.ref ? ' <span class="mva-ref">' + escapeHtml(String(mv.ref)) + '</span>' : '') + '</td>' +
+      '<td class="mva-in">' + (d > 0 ? "+" + round1(d) : "") + '</td>' +
+      '<td class="mva-out">' + (d < 0 ? round1(d) : "") + '</td>' +
+      '<td class="mva-sal">' + round1(saldo) + '</td></tr>';
+  }).join("");
+  let h = '<div class="stkpop-hint">Movimientos de <b>' + escapeHtml(_stkPop.cod) + '</b> en <b>' + escapeHtml(_stkPop.titulo) + '</b>, por fecha. Entró <b style="color:#15803d">+' + round1(totIn) + '</b> · salió <b style="color:#b91c1c">' + round1(totOut) + '</b> · <b>saldo ' + round1(saldo) + '</b>.</div>';
+  h += '<div class="mva-daterow">Desde <input type="date" class="mva-date" value="' + escapeHtml(_stkPop.desde) + '" onchange="stkMovsArtDate(\'desde\',this.value)"> hasta <input type="date" class="mva-date" value="' + escapeHtml(_stkPop.hasta) + '" onchange="stkMovsArtDate(\'hasta\',this.value)">' + ((_stkPop.desde || _stkPop.hasta) ? ' <button class="mva-clear" onclick="stkMovsArtDate(\'clear\')">✕</button>' : '') + '</div>';
+  h += list.length
+    ? '<div class="mva-tblwrap"><table class="mva-tbl"><thead><tr><th>Fecha</th><th>Movimiento</th><th class="num">Entró</th><th class="num">Salió</th><th class="num">Saldo</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
+    : '<div class="stkpop-empty">Sin movimientos' + ((_stkPop.desde || _stkPop.hasta) ? ' en ese rango' : '') + '.</div>';
+  body.innerHTML = h;
+}
 function stkOpenGondola() {
   if (!_stk) return;
   _stkPop = { filter: "gp", search: "" };
