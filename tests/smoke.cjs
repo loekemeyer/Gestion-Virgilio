@@ -31,6 +31,7 @@ catch (_e) {
       "facFetchTareas", "facTareaActiva", "facTareaBadge", "_compTandaYaArmada",
       "getActivityStatus", "tandaReservar", "tandaLiberar",
       "showMGChooser", "showRacksBajarModal", "rkbRender", "rkbConfirmar", "rkbFetchCxM", "rkbSetSec",
+      "showExcModal", "excRender", "excConfirmar", "excSet", "excChg", "excAskClose", "closeExc",
       "showCPModal", "cpRender", "cpConfirm", "cpLoadPickSinArmar", "showInstructivo", "equivResolve", "pppZonaDeBarrio",
       "showRCModal", "rcConfirm", "rcLoadDonors", "showRemitoArmado", "armadoRemitoData", "armadoRemitoInnerHtml", "remitoPrintDoc",
       "openPrintStation", "psToggle", "psPoll", "psTestPrint", "psPrintBatch", "psSeedTodayIfNeeded", "psRender",
@@ -39,7 +40,9 @@ catch (_e) {
       "showIngresoRacksModal", "irRender", "irCargar", "irEmitEvent", "irFetchCxM", "irSetCod", "irSetM", "irSetSec", "irSetEmp",
       "irRevisar", "irRenderConfirm", "irVolver",
       "stkOpenPedidos", "stkOpenGondola", "stkGondRender", "_stkPopAgg", "_stkFetchNpsByTanda", "stkCapSort",
-      "askPickUbicacion", "emitPickUbic", "askArmadoUbicaciones", "emitArmadoUbic"];
+      "askPickUbicacion", "emitPickUbic", "askArmadoUbicaciones", "emitArmadoUbic",
+      "pkForzarGondola", "pkEmitRetiroGondola",
+      "pkNpEsLoeke", "pkDualBreakdown", "opDraftSaveQuiet"];
     const missing = need.filter((n) => typeof window[n] !== "function");
     const ts = new Date().toISOString();
     const sal = stockComputeSaldos([
