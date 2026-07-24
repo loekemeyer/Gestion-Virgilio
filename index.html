@@ -1935,6 +1935,8 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pk-cancel{ background: #e2e8f0; color: #334155; font-weight: 600; font-size: 16px; padding: 12px; }
 .pk-exc{ background:#fff7ed; color:#b45309; border:2px solid #f59e0b; font-size:16px; padding:13px; }
 .pk-exc-mark{ width:100%; background:#fff7ed; border:1.5px solid #fcd34d; color:#92400e; border-radius:12px; padding:12px; font-weight:800; font-size:14px; text-align:center; box-sizing:border-box; cursor:pointer; }
+.pk-forcegond{ width:100%; margin-top:10px; background:#f0fdf4; border:1.5px solid #86efac; color:#15803d; border-radius:12px; padding:12px; font-weight:800; font-size:15px; text-align:center; box-sizing:border-box; cursor:pointer; }
+.pk-forced-note{ margin-top:8px; background:#f0fdf4; border:1px solid #bbf7d0; color:#15803d; border-radius:10px; padding:8px 11px; font-size:13px; font-weight:800; text-align:center; line-height:1.3; }
 .pk-big-row{ display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
 .pk-big-col{ display:flex; flex-direction:column; gap:2px; min-width:0; }
 .pk-big-right{ align-items:flex-end; text-align:right; }
@@ -5543,7 +5545,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v6.10";
+const APP_VERSION = "v6.11";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -6608,7 +6610,8 @@ function pkSave() {
     if (!_pk || !_pk.legajo) return;
     localStorage.setItem(PK_SAVE_PREFIX + _pk.legajo, JSON.stringify({
       day: getTodayKey(), tanda: _pk.tanda, legajo: _pk.legajo,
-      items: _pk.items, idx: _pk.idx, results: _pk.results, mode: _pk.mode
+      items: _pk.items, idx: _pk.idx, results: _pk.results, mode: _pk.mode,
+      forced: _pk.forced || {}
     }));
   } catch (_e) { /* localStorage lleno / privado: no rompe el picking */ }
 }
@@ -6797,6 +6800,20 @@ async function showPickingList(tanda, legajo, opts) {
         }
         _pk.idx = Math.min(saved.idx || 0, items.length);
         _pk.mode = "item";
+        // v6.11: re-aplicar "retirar de góndola forzado" sobre los ítems frescos
+        // (deja de saltear + saca el paso de excedente de ese artículo).
+        if (saved.forced && typeof saved.forced === "object") {
+          _pk.forced = {};
+          Object.keys(saved.forced).forEach(function (art) {
+            if (!saved.forced[art]) return;
+            const a = String(art).toUpperCase();
+            _pk.forced[a] = true;
+            const gi = _pk.items.findIndex(function (x) { return !x.isExc && String(x.art).toUpperCase() === a; });
+            if (gi >= 0) { _pk.items[gi].skip = false; _pk.items[gi].forcedGond = true; }
+            const ei = _pk.items.findIndex(function (x) { return x.isExc && String(x.art).toUpperCase() === a; });
+            if (ei >= 0) { const k = _pk.items[ei].key; _pk.items.splice(ei, 1); if (_pk.results[k] != null) delete _pk.results[k]; }
+          });
+        }
       }
     } catch (_e) { /* si algo falla, arranca limpio */ }
     // v5.91: RECONSTRUIR el avance desde el SERVIDOR (los PKC ya enviados) al retomar
@@ -6887,6 +6904,7 @@ function pkRender() {
       </div>
       <div class="pk-skip">⏭ <b>Salteá la góndola</b> — hay <b>excedente en ${escapeHtml(exu)}</b>.<br>Lo levantás al <b>final</b> del picking.</div>
       <button class="pk-btn pk-ok" onclick="pkNext()">Siguiente →</button>
+      <button class="pk-forcegond" onclick="pkForzarGondola(${_pk.idx})">🟢 Retirar de góndola igual <small style="font-weight:700;opacity:.8">(avisa al supervisor)</small></button>
     </div>`;
     return;
   }
@@ -6938,6 +6956,7 @@ function pkRender() {
     ${bigRow}
     ${dualTag}
     <div class="pk-cajas">Levantá <b>${pkFmt(it.esp)}</b> cajas${it.isExc ? " <span class='pk-cajas-exc'>(en el excedente)</span>" : (it.excHint ? ` <span class='pk-cajas-exc'>(hay ${pkFmt(it.excHint)} en excedente ${escapeHtml(String(it.excUbic || "").replace(/-/g, ""))} — al final)</span>` : (it.hasManualExc ? ` <span class='pk-cajas-exc'>(+ excedente @ ${escapeHtml(it.manualExcUbic || "")}, al final)</span>` : ""))}</div>
+    ${it.forcedGond ? `<div class="pk-forced-note">🟢 Estás retirando de <b>góndola</b> (había excedente) — se avisó al supervisor</div>` : ``}
     ${confLine}
     <div class="pk2">
       <button class="pk-btn pk-nostk" onclick="pkSinStock()">Sin<br>Stock</button>
@@ -7072,6 +7091,44 @@ function pkUnmarkExcedente(idx) {
   it.hasManualExc = false; it.manualExcUbic = "";
   try { pkSave(); } catch (_e) {}
   pkRender();
+}
+/* v6.11 — El operario FUERZA retirar de GÓNDOLA aunque haya excedente que cubre todo
+   lo pedido (ese paso normalmente se saltea y se levanta del excedente al final). Deja
+   de saltear ese artículo (se levanta de góndola, monto completo), saca su paso de
+   excedente y AVISA por Telegram (evento PGE) con el NOMBRE del operario. Pide confirmar
+   (el aviso al supervisor tiene que ser a propósito). La decisión se persiste (_pk.forced)
+   para que sobreviva un retomar que rearma la lista (showPickingList). */
+function pkForzarGondola(idx) {
+  if (!_pk) return;
+  const it = _pk.items[idx];
+  if (!it || !it.skip) return;   // solo aplica al paso salteado por excedente (evita doble tap)
+  let ok = true;
+  try { ok = confirm("¿Retirar de GÓNDOLA en lugar del excedente?\n\nEl artículo " + it.art + " tenía excedente en " + String(it.excUbic || it.sector || "—").replace(/-/g, "") + ". Si lo sacás de góndola, se le AVISA al supervisor.\n\nTocá Cancelar para levantarlo del excedente (al final)."); } catch (_e) { ok = true; }
+  if (!ok) return;
+  it.skip = false; it.forcedGond = true;
+  if (!_pk.forced) _pk.forced = {};
+  _pk.forced[String(it.art).toUpperCase()] = true;
+  // sacar el paso de excedente de ESE artículo (ya no se levanta del excedente)
+  const exKey = it.art + "·EXC";
+  const exIdx = _pk.items.findIndex(function (x) { return x.key === exKey; });
+  if (exIdx >= 0) { _pk.items.splice(exIdx, 1); if (exIdx < _pk.idx) _pk.idx--; if (_pk.results[exKey] != null) delete _pk.results[exKey]; }
+  try { pkEmitRetiroGondola(it.art, _pk.tanda, _pk.legajo); } catch (_e) {}
+  try { pkSave(); } catch (_e) {}
+  pkRender();
+}
+/* Evento PGE (Picking · Góndola en vez de Excedente): un trigger de Supabase lo reenvía
+   por Telegram resolviendo legajo→nombre. texto = "COD|TANDA". No persiste para PRUEBA. */
+function pkEmitRetiroGondola(art, tanda, legajo) {
+  const payload = {
+    legajo: String(legajo || "").trim(), opcion: "PGE", descripcion: "Retiró de góndola en lugar de excedente",
+    texto: (String(art).toUpperCase() + "|" + String(tanda || "").toUpperCase()),
+    ts: Date.now(),
+    id: ("pge_" + String(art).toUpperCase() + "_" + String(legajo || "").trim() + "_" + Date.now()).replace(/[^a-zA-Z0-9_\-]/g, ""),
+    ts_inicio_iso: null
+  };
+  enqueueReport(payload);
+  if (typeof trySendOneReport === "function") trySendOneReport(payload).then(function (r) { if (r && r.ok) removeFromQueue(payload.id); }).catch(function () {});
+  try { updatePendingIndicator(); } catch (_e) {}
 }
 function pkCancelF() { if (_pk) { _pk.mode = "item"; pkRender(); } }
 function pkConfirmF() {
@@ -8032,17 +8089,20 @@ async function compTerminar() {
   if (_comp.hayFalt) { for (const a of _comp.arts) { if (a.nps.length >= 2 && !a.auto) { const sum = a.nps.reduce(function (s, n) { return s + (n.asig || 0); }, 0); if (sum > a.falta) { _compGo(1); try { alert("El Art " + a.art + ": marcaste " + sum + " faltantes pero el picking solo dio " + a.falta + " cortas. No puede faltar más de eso."); } catch (_e) {} return; } } } }
   // Clasificación (v5.12): todos los NP deben estar clasificados (lío/etiqueta/nada).
   if (!_comp.clasifDone || _comp.nps.some(function (n) { return !n.clase; })) { _comp.clasifDone = false; _compGo(2); try { alert("Clasificá cada pedido (Lío / Etiqueta / Nada) antes de terminar."); } catch (_e) {} return; }
-  // Paso 2 — líos: cada NP tiene que tener TODAS sus cajas repartidas en líos
+  // Paso 2 — líos. v6.11: el cartel de confirmación (v5.84, para evitar el toque
+  // accidental que trababa la tanda) MOLESTA cuando ya está TODO hecho (faltantes +
+  // separado + líos). El dueño lo quiere SOLO cuando todavía faltan líos por armar:
+  //   · todos los líos hechos → termina DIRECTO, sin cartel.
+  //   · faltan líos → avisa; si igual quieren terminar, los deja; si no, va al Paso 2.
+  // (El candado anti doble-armado de v5.72/73 sigue protegiendo contra duplicar.)
   if (!_comp.nps[0] || !_comp.nps[0].codes || _comp._liosDirty) { _compBuildLiosData(); _comp._liosDirty = false; }
   const pendLios = _comp.nps.filter(function (n) { return !n.liosDone; });
-  if (pendLios.length) { _comp.liosNpIdx = _comp.nps.indexOf(pendLios[0]); _compGo(2); try { alert("Faltan armar los líos de " + pendLios.length + " pedido(s): NP " + pendLios.map(function (n) { return n.np; }).join(", ") + "."); } catch (_e) {} return; }
+  if (pendLios.length) {
+    let _okPend = false;
+    try { _okPend = confirm("⚠ Todavía faltan armar líos en " + pendLios.length + " pedido(s): NP " + pendLios.map(function (n) { return n.np; }).join(", ") + ".\n\n¿Terminar igual? Se guarda así y NO vas a poder volver a entrar a separar/armar.\n\nTocá Cancelar para ir a completarlos."); } catch (_e) { _okPend = false; }
+    if (!_okPend) { _comp.liosNpIdx = _comp.nps.indexOf(pendLios[0]); _compGo(2); return; }
+  }
   const legajo = _comp.legajo, tanda = _comp.tanda, fecha = _comp.fecha || "";
-  // v5.84: "Terminar" tiene que ser A PROPÓSITO. Un toque accidental completaba el
-  // armado y dejaba la tanda TRABADA (no se podía re-entrar a separar). Confirmación
-  // explícita antes de guardar (salir ≠ terminar).
-  try {
-    if (!confirm("¿Terminaste de armar la tanda " + tanda + "?\n\nSe guarda el pedido y NO vas a poder volver a entrar a separar/armar.\n\nSi todavía estás armando, tocá Cancelar.")) return;
-  } catch (_e) {}
   // v5.72: candado anti doble-armado. Si esta tanda ya fue armada antes (ya tiene
   // Entregas), NO la volvemos a armar → evita duplicar el pedido. Guardo contra
   // doble-click con _terminando y contra re-apertura con el chequeo en Supabase.

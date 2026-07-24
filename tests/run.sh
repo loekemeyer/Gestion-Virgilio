@@ -45,4 +45,7 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== cp-focus (regresion: Cargar las cajas abre el CP enfocado en la NP) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/cp-focus.cjs
 
+echo "== pk-forzar-gondola (regresión: forzar góndola c/ excedente + confirm solo con líos pendientes) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pk-forzar-gondola.cjs
+
 echo "== TODO OK =="
