@@ -4,7 +4,9 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-07-24 · Versión app al documentar: **v5.93**
+> Última actualización: 2026-07-24 · Versión app al documentar: **v5.94**
+>
+> Nota: **v5.94 — Botón "✗ Rechazar" en bajadas de racks propuestas**. En *"Bajadas propuestas por operarios"* (`stkBodyRacks`) cada fila ahora tiene, además de "✓ Aprobar", un botón **"✗ Rechazar"** (`racksRechazar`) para descartar una bajada mal cargada (duplicado / error) sin mover stock: hace `PATCH estado='rechazada'` en `Racks_Bajadas` y sale de la lista de pendientes, dejando traza. Requirió habilitar `'rechazada'` en el **check constraint** `Racks_Bajadas_estado_check` (antes solo `propuesta`/`aprobada`; migración `racks_bajadas_allow_rechazada`) — que ya era un estado contemplado por el filtro de `racksBajadaAlerta` (v5.92). Caso real: se rechazó la bajada #28 (982E, 3 cajas), un duplicado tipo 931E/984E del operario 122 que, de aprobarse, dejaba racks en −3.
 >
 > Nota: **v5.93 — Bajadas de racks: cada fila propuesta muestra el saldo actual de racks**. Complemento de v5.92: en *"Bajadas propuestas por operarios"* (`stkBodyRacks`) cada fila ahora muestra siempre **"· en racks hoy: N"** (no solo cuando hay alerta), en **rojo** si `N < cajas a bajar` (quedaría negativo). Así Marianela ve el contexto de un vistazo antes de aprobar. Solo display.
 >
