@@ -80,10 +80,10 @@ begin
        and estado = 'ocupado' and coalesce(innercajas, 0) > 0 and sector <> p_sector;
     perform tg_enqueue(
       '📦 RACK LIBRE — La posición ' || coalesce(p_sector, '?') ||
-      ' quedó VACÍA (se bajó lo último de ' || coalesce(p_cod, '?') ||
-      coalesce(' · ' || v_nombre, '') || '). Quedó LIBRE para otro palet.' ||
-      case when v_otras is not null then ' Ese artículo todavía está en: ' || v_otras || '.'
-           else ' (No queda en ninguna otra posición de rack.)' end,
+      ' quedó VACÍA: se bajó TODO el ' || coalesce(p_cod, '?') ||
+      coalesce(' · ' || v_nombre, '') || ' que había EN ESA POSICIÓN. Quedó LIBRE para otro palet.' ||
+      case when v_otras is not null then E'\n✅ El ' || coalesce(p_cod, '?') || ' TODAVÍA tiene stock en rack: ' || v_otras || '.'
+           else E'\n⚠ El ' || coalesce(p_cod, '?') || ' ya NO queda en ninguna otra posición de rack.' end,
       'rackpos0|' || coalesce(p_sector, '') || '|' || v_codn || '|' || v_bucket
     );
     -- Regla del dueño: si quedó en 0, se anula ese artículo para esa ubicación y pasa a libre.
