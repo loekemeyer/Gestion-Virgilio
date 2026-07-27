@@ -4,7 +4,9 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-07-27 · Versión app al documentar: **v6.24**
+> Última actualización: 2026-07-27 · Versión app al documentar: **v6.25**
+>
+> Nota: **v6.25 — La solapa Insumos muestra Medida y Sector**. La tabla "📦 Insumos" (en Stock y Compras → Stocks) pasó de `Código · Descripción · Stock` a `Código · Descripción · Stock · **Medida** · **Sector**`. Los valores salen del movimiento **más reciente con dato** de cada insumo: `stockComputeSaldos` ahora captura `_uni` (de `unidad`) y `_ubi` (de `ubicacion`) — los movs vienen `ts.desc`, así que el primer valor no vacío es el más nuevo. Completa lo de v6.24 (que ya cargaba esos campos). Bump `v6.25`.
 >
 > Nota: **v6.24 — Stock inicial de INSUMOS con 5 campos (cod / descripción / cantidad / medida / sector)**. En Stock y Compras → **Ajustes** → "Stock inicial", cuando el **Depósito = Insumos** la caja acepta una línea por insumo con `CÓDIGO ; DESCRIPCIÓN ; CANTIDAD ; MEDIDA ; SECTOR` (separá con `;` **o** pegá 5 columnas de Excel = TAB). **Código** y **cantidad** obligatorios; descripción/medida/sector opcionales. Mapean a columnas ya existentes de `Movimientos_Stock`: `descripcion`, `unidad` (medida), `ubicacion` (sector). Cae al formato clásico `CÓDIGO CANTIDAD` si la línea no trae separador, y los demás depósitos siguen igual. El instructivo + placeholder cambian solos según el depósito (`stkIniHintUpdate`, `onchange` del selector). Pendiente/ofrecido: mostrar descripción/medida/sector en la solapa Insumos. Bump `v6.24`.
 >

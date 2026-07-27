@@ -5549,7 +5549,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v6.24";
+const APP_VERSION = "v6.25";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -8336,8 +8336,12 @@ function stockComputeSaldos(movs, cutoff, asOf) {
     // orden y marcar inicio una sola vez, sin que un depósito pise a otro.
     if (cut && mv.tipo !== "inicial" && new Date(mv.ts).getTime() < cut) return;
     const k = String(mv.cod_art);
-    if (!m[k]) m[k] = { cod: k, desc: mv.descripcion || "", a_guardar: 0, terminado: 0, excedente: 0, separar_pedidos: 0, a_facturar: 0 };
+    if (!m[k]) m[k] = { cod: k, desc: mv.descripcion || "", a_guardar: 0, terminado: 0, excedente: 0, separar_pedidos: 0, a_facturar: 0, _uni: "", _ubi: "" };
     if (mv.descripcion && !m[k].desc) m[k].desc = mv.descripcion;
+    // v6.25: medida (unidad) y sector (ubicacion) del movimiento MÁS RECIENTE con dato
+    // (movs vienen ts.desc → el primero no vacío es el más nuevo). Para mostrar en Insumos.
+    if (mv.unidad && !m[k]._uni) m[k]._uni = String(mv.unidad).trim();
+    if (mv.ubicacion && !m[k]._ubi) m[k]._ubi = String(mv.ubicacion).trim();
     m[k][mv.deposito] = (m[k][mv.deposito] || 0) + Number(mv.delta || 0);
   });
   return m;
@@ -9615,9 +9619,9 @@ function stkBodyStocks() {
   const insShown = f ? ins.filter(function (a) { return (a.cod + " " + a.desc).toLowerCase().indexOf(f) >= 0; }) : ins;
   if (insShown.length) {
     h += '<div class="stk-aj-h" style="margin-top:18px">📦 Insumos</div>';
-    h += '<table class="stk-tbl"><thead><tr><th>Código</th><th>Descripción</th><th class="num">Stock</th></tr></thead><tbody>';
+    h += '<table class="stk-tbl"><thead><tr><th>Código</th><th>Descripción</th><th class="num">Stock</th><th>Medida</th><th>Sector</th></tr></thead><tbody>';
     insShown.sort(function (a, b) { return String(a.cod).localeCompare(String(b.cod), undefined, { numeric: true }); }).forEach(function (a) {
-      h += '<tr><td class="stk-cod">' + escapeHtml(a.cod) + '</td><td class="stk-desc">' + escapeHtml(artNombre(a.cod, a.desc) || "—") + '</td><td class="num ' + (a.insumos < 0 ? "stk-neg" : "") + '"><b>' + a.insumos + '</b></td></tr>';
+      h += '<tr><td class="stk-cod">' + escapeHtml(a.cod) + '</td><td class="stk-desc">' + escapeHtml(artNombre(a.cod, a.desc) || "—") + '</td><td class="num ' + (a.insumos < 0 ? "stk-neg" : "") + '"><b>' + a.insumos + '</b></td><td>' + escapeHtml(a._uni || "—") + '</td><td>' + escapeHtml(a._ubi || "—") + '</td></tr>';
     });
     h += "</tbody></table>";
   }
