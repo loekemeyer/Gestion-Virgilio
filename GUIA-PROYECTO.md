@@ -4,7 +4,9 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-07-27 · Versión app al documentar: **v6.23**
+> Última actualización: 2026-07-27 · Versión app al documentar: **v6.24**
+>
+> Nota: **v6.24 — Stock inicial de INSUMOS con 5 campos (cod / descripción / cantidad / medida / sector)**. En Stock y Compras → **Ajustes** → "Stock inicial", cuando el **Depósito = Insumos** la caja acepta una línea por insumo con `CÓDIGO ; DESCRIPCIÓN ; CANTIDAD ; MEDIDA ; SECTOR` (separá con `;` **o** pegá 5 columnas de Excel = TAB). **Código** y **cantidad** obligatorios; descripción/medida/sector opcionales. Mapean a columnas ya existentes de `Movimientos_Stock`: `descripcion`, `unidad` (medida), `ubicacion` (sector). Cae al formato clásico `CÓDIGO CANTIDAD` si la línea no trae separador, y los demás depósitos siguen igual. El instructivo + placeholder cambian solos según el depósito (`stkIniHintUpdate`, `onchange` del selector). Pendiente/ofrecido: mostrar descripción/medida/sector en la solapa Insumos. Bump `v6.24`.
 >
 > Nota: **v6.23 — Fix: la OPERADORA quedaba bloqueada para "facturar corto" (override no aparecía)**. La operadora, logueada como supervisor con su mail (`loekemeyer.n8n@gmail.com`), veía el **bloqueo** duro (solo "Aceptar") en vez del **confirm** para forzar la facturación de una NP con faltante recuperable. Causa: `_facEsOperadora()` dependía **solo** de `__identity.email`, y si algo repisaba `__identity` después del render (dejándolo sin `email`) el chequeo daba `false`. Fix: (1) en `showLoggedIn` se guarda el mail autenticado en un global **estable** `window.__authEmail` (se limpia en `showLoggedOut`); (2) `_facEsOperadora()` ahora toma `__identity.email` **o** `__identity.nombre` (en supervisor ambos SON el mail) **o** `window.__authEmail` de respaldo. Se agregó un diagnóstico temporal en el cartel de bloqueo ("cuenta detectada: …") para confirmar el valor en runtime — **quitar** una vez validado. Smoke `fac-block-recuperable` sigue verde (bloqueo/override/normal). Bump `v6.23`.
 >

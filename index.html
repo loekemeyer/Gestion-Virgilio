@@ -5549,7 +5549,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v6.23";
+const APP_VERSION = "v6.24";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -10385,12 +10385,27 @@ function stkBodySalidas() {
   return h + "</tbody></table>";
 }
 function stkBodyAjustes() {
-  let h = '<div class="stk-aj-dep">Depósito: <select id="stkAjDep"><option value="terminado">Artículo Terminado (góndola)</option><option value="excedente">Excedente</option><option value="racks">Racks</option><option value="insumos">Insumos</option><option value="separar_pedidos">A Separar (pedidos)</option><option value="a_facturar">A Facturar</option><option value="a_guardar">Mercadería a guardar</option></select></div>';
+  let h = '<div class="stk-aj-dep">Depósito: <select id="stkAjDep" onchange="stkIniHintUpdate()"><option value="terminado">Artículo Terminado (góndola)</option><option value="excedente">Excedente</option><option value="racks">Racks</option><option value="insumos">Insumos</option><option value="separar_pedidos">A Separar (pedidos)</option><option value="a_facturar">A Facturar</option><option value="a_guardar">Mercadería a guardar</option></select></div>';
   h += '<div class="stk-aj-sec"><div class="stk-aj-h">⚙ Ajustar stock</div>';
   h += '<div class="stk-aj-hint">Sumá o restá con signo: <code>+10</code> / <code>-3</code>.</div><div class="stk-aj-form"><input id="stkAjCod" class="stk-aj-inp" placeholder="Código"><input id="stkAjCant" class="stk-aj-inp" type="number" placeholder="+/- cajas"><button class="stk-btn ok" onclick="stockAjustar()">Aplicar</button></div>';
   h += '<div class="stk-aj-hint" style="margin-top:10px">O dejá el stock exacto:</div><div class="stk-aj-form"><input id="stkAjCod2" class="stk-aj-inp" placeholder="Código"><input id="stkAjFijar" class="stk-aj-inp" type="number" placeholder="Fijar en…"><button class="stk-btn" onclick="stockFijar()">Fijar</button></div></div>';
-  h += '<div class="stk-aj-sec"><div class="stk-aj-h">➕ Stock inicial</div><div class="stk-aj-hint">Una línea por artículo: <b>CÓDIGO CANTIDAD</b> (en el depósito de arriba). El stock inicial <b>siempre cuenta</b> como base.</div><textarea id="stkIniTxt" class="stk-ini-txt" rows="6" placeholder="544 30&#10;546 12"></textarea><div class="stk-ini-btns"><button class="stk-btn ok" onclick="stockGuardarInicial()">Guardar inicial</button><button class="stk-btn danger" onclick="stockMarcarInicio()">🔄 Marcar inicio (resetear)</button></div><div class="stk-ini-warn">⚠ Pasos: 1) cargá el inicial de cada depósito (cambiás el depósito de arriba y repetís); 2) tocás <b>Marcar inicio</b> una sola vez. Desde ahí los movimientos REALES anteriores (de prueba) dejan de sumar — quedan guardados, no se borran.</div></div>';
+  h += '<div class="stk-aj-sec"><div class="stk-aj-h">➕ Stock inicial</div><div class="stk-aj-hint" id="stkIniHint">Una línea por artículo: <b>CÓDIGO CANTIDAD</b> (en el depósito de arriba). El stock inicial <b>siempre cuenta</b> como base.</div><textarea id="stkIniTxt" class="stk-ini-txt" rows="6" placeholder="544 30&#10;546 12"></textarea><div class="stk-ini-btns"><button class="stk-btn ok" onclick="stockGuardarInicial()">Guardar inicial</button><button class="stk-btn danger" onclick="stockMarcarInicio()">🔄 Marcar inicio (resetear)</button></div><div class="stk-ini-warn">⚠ Pasos: 1) cargá el inicial de cada depósito (cambiás el depósito de arriba y repetís); 2) tocás <b>Marcar inicio</b> una sola vez. Desde ahí los movimientos REALES anteriores (de prueba) dejan de sumar — quedan guardados, no se borran.</div></div>';
   return h;
+}
+/* v6.24: el instructivo + placeholder del "Stock inicial" cambian según el depósito.
+   Para INSUMOS se pueden cargar 5 campos por línea (cod / descripción / cantidad /
+   medida / sector), separados por ";" o pegando columnas de Excel (tab). */
+function stkIniHintUpdate() {
+  const dep = _stkDep();
+  const hint = document.getElementById("stkIniHint");
+  const ta = document.getElementById("stkIniTxt");
+  if (dep === "insumos") {
+    if (hint) hint.innerHTML = 'Una línea por insumo: <b>CÓDIGO ; DESCRIPCIÓN ; CANTIDAD ; MEDIDA ; SECTOR</b> — separá con <code>;</code> o pegá 5 columnas de Excel. <b>Código</b> y <b>cantidad</b> son obligatorios; descripción / medida / sector, opcionales. El stock inicial <b>siempre cuenta</b> como base.';
+    if (ta) ta.placeholder = "544 ; Bolsa 50x70 ; 30 ; unidades ; V05\n546 ; Etiqueta rollo ; 12 ; rollos ; V06";
+  } else {
+    if (hint) hint.innerHTML = 'Una línea por artículo: <b>CÓDIGO CANTIDAD</b> (en el depósito de arriba). El stock inicial <b>siempre cuenta</b> como base.';
+    if (ta) ta.placeholder = "544 30\n546 12";
+  }
 }
 function stockToggleArt(codEnc) { if (!_stk) return; const cod = decodeURIComponent(codEnc); _stk.openArt = (_stk.openArt === cod ? null : cod); stkRender(); }
 async function stkInsertMov(rows, okMsg) {
@@ -10419,8 +10434,22 @@ async function stockFijar() {
 async function stockGuardarInicial() {
   const ta = document.getElementById("stkIniTxt"); const txt = (ta && ta.value) || "";
   const rows = [], dep = _stkDep();
-  txt.split(/\n/).forEach(function (ln) { const m = ln.trim().match(/^(\S+)\s+(-?\d+(?:\.\d+)?)/); if (m) rows.push({ cod_art: m[1].toUpperCase(), deposito: dep, delta: Number(m[2]), tipo: "inicial", ref: "carga inicial", legajo: "0" }); });
-  if (!rows.length) { alert("No encontré líneas válidas. Formato: CÓDIGO CANTIDAD (una por línea)."); return; }
+  const esInsumo = dep === "insumos";
+  txt.split(/\n/).forEach(function (ln) {
+    const line = ln.trim(); if (!line) return;
+    // v6.24: insumos con campos (cod ; descr ; cant ; medida ; sector), separados
+    // por ";" o TAB (pegado de Excel). Cae al formato clásico si no hay separador.
+    if (esInsumo && /[;\t]/.test(line)) {
+      const p = line.split(/\t|;/).map(function (x) { return x.trim(); });
+      const cod = (p[0] || "").toUpperCase(); const cant = Number(p[2]);
+      if (!cod || !isFinite(cant)) return;
+      rows.push({ cod_art: cod, descripcion: p[1] || null, deposito: dep, delta: cant, tipo: "inicial", unidad: p[3] || null, ubicacion: p[4] || null, ref: "carga inicial", legajo: "0" });
+      return;
+    }
+    const m = line.match(/^(\S+)\s+(-?\d+(?:\.\d+)?)/);
+    if (m) rows.push({ cod_art: m[1].toUpperCase(), deposito: dep, delta: Number(m[2]), tipo: "inicial", ref: "carga inicial", legajo: "0" });
+  });
+  if (!rows.length) { alert("No encontré líneas válidas. " + (esInsumo ? "Insumos: CÓDIGO ; DESCRIPCIÓN ; CANTIDAD ; MEDIDA ; SECTOR (o CÓDIGO CANTIDAD)." : "Formato: CÓDIGO CANTIDAD (una por línea).")); return; }
   try {
     const r = await fetch(SUPABASE_STOCK_ENDPOINT, { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" }, body: JSON.stringify(rows) });
     if (!r.ok) throw new Error("HTTP " + r.status);
