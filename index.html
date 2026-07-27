@@ -5549,7 +5549,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v6.21";
+const APP_VERSION = "v6.22";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -8838,7 +8838,7 @@ function agtRender() {
     { key: "excedente", icon: "📦", titulo: "Guardado a excedente (góndola llena)", hint: "Cajas que no entraron en góndola. Fijate si hay que bajarlas o reubicar." },
     { key: "mg_pendiente", icon: "⏳", titulo: "Mercadería recibida sin guardar", hint: "Llegó a 'a guardar' y nadie la subió a góndola hace +8 h. Bloquea stock disponible." },
     { key: "armado_sin_terminar", icon: "🧩", titulo: "Armado empezado sin terminar", hint: "Tandas con armado abierto hace +24 h sin cerrar (TAP). ¿Se olvidaron de cerrar?" },
-    { key: "pipeline_atascado", icon: "🚧", titulo: "Pipeline atascado (+2 días)", hint: "Cajas pickeadas / a facturar que no avanzaron. Tanda que quedó a medio camino." },
+    { key: "pipeline_atascado", icon: "🚧", titulo: "Pipeline atascado (+2 días hábiles)", hint: "Cajas pickeadas / a facturar sin que NADIE las trabaje hace +2 días hábiles (sáb/dom no cuentan). Mide por última actividad, no por la caja más vieja." },
     { key: "excedente_estancado", icon: "🧊", titulo: "Excedente estancado (+5 días)", hint: "Excedente que nadie baja a góndola — stock 'escondido' arriba." },
     { key: "oc_baja", icon: "📉", titulo: "OCs con entrega baja (<50%)", hint: "Proveedores que entregaron menos de la mitad de lo pedido." },
     { key: "ppp_error", icon: "🗂", titulo: "Errores en la PPP", hint: "Pedidos sin zona, zona distinta al barrio, tandas mezcladas o ya entregados sin sacar." },
