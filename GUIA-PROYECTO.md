@@ -4,7 +4,9 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-07-27 · Versión app al documentar: **v6.25**
+> Última actualización: 2026-07-27 · Versión app al documentar: **v6.26**
+>
+> Nota: **v6.26 — El Monitor muestra el TOTAL de tandas programadas**. El encabezado del Monitor mostraba solo el conteo de la **ventana de fechas** visible (`N entrega <fechas> · X en curso · Y a FC`) — no el total global. Ahora antepone **`N programadas (total)`** = todas las tandas con **Op=SI** en `PPP_Programacion_Diaria` (cualquier fecha, contadas desde `sheetMap` en `renderMonitor`). El "46" de la ventana no era el total (dejaba afuera las programadas para fechas fuera de la ventana). Bump `v6.26`.
 >
 > Nota (backend, sin bump de app): **Aviso "📦 RACK LIBRE" reescrito (era confuso)**. Decía *"se bajó lo último de 566E … Ese artículo todavía está en X28"* → sonaba contradictorio (¿se terminó o queda?). Ahora aclara que se vació **esa posición**, no el artículo: *"La posición AA02 quedó VACÍA: se bajó TODO el 566E … que había EN ESA POSICIÓN. Quedó LIBRE para otro palet."* + línea aparte: *"✅ El 566E TODAVÍA tiene stock en rack: X28 (64 cj)."* (o *"⚠ El 566E ya NO queda en ninguna otra posición de rack."*). Función `racks_plani_descontar` (`sql/racks_plani_viva.sql`), migración `rack_libre_mensaje_mas_claro`.
 >

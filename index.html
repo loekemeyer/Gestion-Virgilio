@@ -5549,7 +5549,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v6.25";
+const APP_VERSION = "v6.26";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -18503,11 +18503,15 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
   `;
   content.innerHTML = tableHtml;
   const countCurso = tandas.filter(t => t.ev.picking === "curso" || t.ev.separado === "curso").length;
+  // v6.26: TOTAL de tandas PROGRAMADAS (Op=SI en el PPP, TODA fecha) — antes solo se
+  // veía el conteo de la ventana visible ("N entrega <fechas>"), no el total global.
+  let totalProgramadas = 0;
+  for (const [, v] of sheetMap) { if (v && v.opIsSi) totalProgramadas++; }
   const _mm = document.getElementById("monitorModal");
   // Resolución del viewport sale al lado del status "● al día" (no en la
   // barra meta). Acá solo dejamos los conteos.
   document.getElementById("monitorMeta").textContent =
-    `${tandas.length} tanda(s) entrega ${targetLabel} · ${countCurso} en curso · ${tandasFC.length} a FC`;
+    `${totalProgramadas} programadas (total) · ${tandas.length} entrega ${targetLabel} · ${countCurso} en curso · ${tandasFC.length} a FC`;
   const _vpEl = document.getElementById("monitorVpInfo");
   if (_vpEl && _mm && _mm.dataset.vpSize) {
     _vpEl.textContent = `${_mm.dataset.vpSize} (${_mm.dataset.vp || "?"})`;
