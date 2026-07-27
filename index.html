@@ -5549,7 +5549,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v6.22";
+const APP_VERSION = "v6.23";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -19780,8 +19780,18 @@ async function facAuthWriteHeaders(extra) {
    así que la operadora loguea como supervisor y su __identity.email es su mail. */
 const FAC_OPERADORA_EMAIL = "loekemeyer.n8n@gmail.com";
 function _facEsOperadora(){
-  try { return !!(typeof __identity !== "undefined" && __identity && String(__identity.email || "").toLowerCase().trim() === FAC_OPERADORA_EMAIL); }
-  catch (_e){ return false; }
+  try {
+    // v6.23: robusto. Toma el mail de la identidad viva (email o nombre, que en
+    // supervisor SON el mail) y, de respaldo, el mail autenticado estable. Antes
+    // dependía solo de __identity.email: si algo repisaba __identity tras el
+    // render, la operadora quedaba sin reconocer y el override no aparecía.
+    var em = "";
+    if (typeof __identity !== "undefined" && __identity) em = __identity.email || __identity.nombre || "";
+    if (!em && typeof window !== "undefined") em = window.__authEmail || "";
+    em = String(em).toLowerCase().trim();
+    try { window.__facLastEmailChk = em || "(vacío)"; } catch (_e) {}
+    return em === FAC_OPERADORA_EMAIL;
+  } catch (_e){ return false; }
 }
 /* ¿Algún artículo faltante de la NP se puede COMPLETAR? = hay stock en "a guardar",
    en góndola (terminado) o se guardó hoy. Devuelve la lista de items recuperables. */
@@ -19849,7 +19859,8 @@ window.facTickNP = async function(btn){
           "🚫 NP " + np + " todavía NO se factura\n\n" +
           "Este faltante se puede COMPLETAR — hay stock en “a guardar” o en góndola:\n" + _detR + "\n\n" +
           "Completá el pedido desde “Completar pedido” (CP) antes de facturar.\n" +
-          "Si igual hay que facturar corto, lo tiene que autorizar la operadora."
+          "Si igual hay que facturar corto, lo tiene que autorizar la operadora." +
+          "\n\n(cuenta detectada: " + ((typeof window !== "undefined" && window.__facLastEmailChk) || "—") + ")"
         );
         return;
       }
@@ -20741,6 +20752,7 @@ function showLoggedOut() {
   window.__authResolved = true;
   window.__isSupervisor = false;
   __identity = null; __plantChosen = false;
+  try { window.__authEmail = null; } catch (_e) {}   // v6.23: se limpia al cerrar sesión
   $("authBlock").classList.remove("hidden");
   $("legajoEntry").classList.add("hidden");
   $("supervisorPanel").classList.add("hidden");
@@ -20846,6 +20858,10 @@ let _rolRetryTimer = null;
 async function showLoggedIn(user) {
   window.__authResolved = true;
   const email = user.email || "";
+  // v6.23: guardamos el mail autenticado en un global ESTABLE. `__identity` se
+  // puede repisar después del render (p.ej. una restauración de sesión), pero
+  // este valor sigue el login de Google real → lo usa _facEsOperadora de respaldo.
+  try { window.__authEmail = email; } catch (_e) {}
   _rolCheckFailed = false;
   if (_supervisoresRemotos === null) { await loadSupervisoresRemotos(); }  // mails editables
   // 1) Supervisor por email (no requiere estar en Empleados).
