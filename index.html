@@ -5549,7 +5549,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v6.27";
+const APP_VERSION = "v6.28";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -10720,7 +10720,8 @@ function stkRacksCapSummary() {
 function stkBodyRacks() {
   let h = stkRacksCapSummary();
   h += stkAutoBajadaSection();
-  h += '<button class="stk-btn" style="width:100%;margin-bottom:14px;background:#ecfeff;border-color:#a5f3fc;color:#0e7490;" onclick="showMoverModal(\'0\')">🔀 Mover mercadería de una ubicación a otra</button>';
+  h += '<button class="stk-btn" style="width:100%;margin-bottom:8px;background:#ecfeff;border-color:#a5f3fc;color:#0e7490;" onclick="showMoverModal(\'0\')">🔀 Mover mercadería de una ubicación a otra</button>';
+  h += '<button class="stk-btn" style="width:100%;margin-bottom:14px;background:#ecfeff;border-color:#a5f3fc;color:#0e7490;" onclick="showIngresoRacksModal(\'0\', null, \'nacional\')">🏠 Ingresar nacional a racks (mover de a guardar / excedente)</button>';
   const pend = (_stk.ordenes || []).filter(function (o) { return o.estado === "pendiente"; });
   h += pend.length
     ? '<div class="stk-rk-orden pend">📦 Hay una orden de bajar racks→góndola <b>PENDIENTE</b> (' + escapeHtml(String(pend[0].fecha || "")) + '). A los operarios les aparece la alarma; ellos registran lo que bajan y vos lo aprobás acá abajo.</div>'
@@ -11852,7 +11853,7 @@ async function irFetchCxM(plani) {
   Object.keys(agg).forEach(function (k) { if (!cx[k] && !agg[k].bad && agg[k].ratio > 0) cx[k] = agg[k].ratio; });
   return cx;
 }
-async function showIngresoRacksModal(legajo, _resume) {
+async function showIngresoRacksModal(legajo, _resume, _modoInit) {
   if (!document.getElementById("irCss")) {
     const s = document.createElement("style"); s.id = "irCss";
     s.textContent = "#irModal{display:none;position:fixed;inset:0;z-index:1291;background:rgba(2,6,23,.74);overflow:auto;padding:12px;}#irModal.show{display:block;}.ir-card{background:#f8fafc;max-width:470px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.ir-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;background:linear-gradient(90deg,#0e7490,#155e75);color:#fff;}.ir-title{font-size:17px;font-weight:800;}.ir-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}.ir-body{padding:13px 14px;}.ir-empty{padding:22px;text-align:center;color:#64748b;font-size:14px;}.ir-hint{font-size:12.5px;color:#64748b;margin-bottom:11px;line-height:1.35;}.ir-fld{margin-bottom:11px;}.ir-lbl{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:#64748b;margin-bottom:6px;}.ir-inp{width:100%;height:44px;box-sizing:border-box;border:2px solid #cbd5e1;border-radius:10px;padding:0 12px;font-size:16px;font-weight:700;}.ir-desc{font-size:12.5px;color:#475569;margin:-4px 0 10px;}.ir-row2{display:flex;gap:12px;}.ir-row2 .ir-fld{flex:1;}.ir-num{text-align:center;}.ir-stp{display:flex;align-items:center;gap:6px;}.ir-sb{width:40px;height:44px;border:none;border-radius:9px;font-size:23px;font-weight:800;cursor:pointer;background:#e2e8f0;color:#475569;display:flex;align-items:center;justify-content:center;line-height:1;padding:0;}.ir-libres{display:flex;flex-wrap:wrap;gap:6px;margin:-2px 0 11px;}.ir-chip{background:#ecfeff;border:1px solid #a5f3fc;color:#0e7490;border-radius:9px;padding:6px 10px;font-size:13px;font-weight:800;font-family:Consolas,Menlo,monospace;cursor:pointer;width:auto;margin:0;}.ir-chip.on{background:#0e7490;color:#fff;border-color:#0e7490;}.ir-more{font-size:11.5px;color:#94a3b8;align-self:center;}.ir-warn{background:#fef2f2;border:1px solid #fca5a5;color:#991b1b;border-radius:9px;padding:8px 10px;font-size:12.5px;font-weight:700;margin:-2px 0 10px;}.ir-ok2{background:#ecfdf5;border:1px solid #a7f3d0;color:#065f46;border-radius:9px;padding:8px 10px;font-size:12.5px;font-weight:700;margin:-2px 0 10px;}.ir-seg{display:flex;gap:8px;}.ir-segb{flex:1;padding:9px;border:1.5px solid #cbd5e1;border-radius:10px;background:#fff;color:#475569;font-size:13.5px;font-weight:800;cursor:pointer;}.ir-segb.on{border-color:#0e7490;background:#ecfeff;color:#0e7490;}.ir-fin{width:100%;margin-top:6px;padding:14px;border:none;border-radius:12px;background:#0e7490;color:#fff;font-size:16px;font-weight:800;cursor:pointer;}.ir-fin:disabled{background:#cbd5e1;color:#64748b;cursor:not-allowed;}.ir-done-h{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:#64748b;margin:16px 0 8px;border-top:1px solid #e2e8f0;padding-top:12px;}.ir-done-row{display:flex;align-items:baseline;gap:8px;padding:6px 0;border-bottom:1px solid #f1f5f9;font-size:13px;}.ir-done-sec{font-weight:800;font-family:Consolas,Menlo,monospace;color:#0e7490;}.ir-done-cod{font-weight:800;font-family:Consolas,Menlo,monospace;}.ir-done-q{color:#64748b;margin-left:auto;font-size:12px;}.ir-rev{background:#fff;border:1.5px solid #cbd5e1;border-radius:12px;padding:2px 14px;margin-bottom:12px;}.ir-rev-row{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid #f1f5f9;}.ir-rev-row:last-child{border-bottom:none;}.ir-rev-lbl{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:#64748b;flex:0 0 auto;}.ir-rev-val{font-size:16px;font-weight:800;font-family:Consolas,Menlo,monospace;color:#0f172a;text-align:right;}.ir-rev-txt{font-family:inherit;font-weight:700;}.ir-rev-big{font-size:20px;color:#0e7490;}.ir-rev-sm{font-weight:700;color:#0e7490;font-family:inherit;}.ir-conf-btns{display:flex;gap:10px;}.ir-back{flex:0 0 38%;padding:14px;border:1.5px solid #cbd5e1;border-radius:12px;background:#fff;color:#475569;font-size:15px;font-weight:800;cursor:pointer;}.ir-confirm{flex:1;padding:14px;border:none;border-radius:12px;background:#059669;color:#fff;font-size:16px;font-weight:800;cursor:pointer;}";
@@ -11867,6 +11868,7 @@ async function showIngresoRacksModal(legajo, _resume) {
     const plani = await racksFetchPlani();
     await loadArtNombres();
     const cxm = await irFetchCxM(plani);
+    const saldos = await stockFetchSaldos().catch(function () { return {}; });   // v6.28: para el "nacional" (stock en a_guardar/excedente)
     const seen = {}, libres = [], ocupados = {};
     (plani || []).forEach(function (r) { const sec = String(r.sector || "").trim(); if (sec && String(r.estado) === "ocupado" && r.cod_art) ocupados[sec.toUpperCase()] = String(r.cod_art); });
     (plani || []).forEach(function (r) {
@@ -11876,32 +11878,54 @@ async function showIngresoRacksModal(legajo, _resume) {
       if (!ocupados[secU]) libres.push(sec);
     });
     libres.sort(function (a, b) { return String(a).localeCompare(String(b), undefined, { numeric: true }); });
-    _ir = { legajo: String(legajo || ""), cxm: cxm, libres: libres, ocupados: ocupados, cod: "", masters: 0, inner: 0, sector: (libres[0] || ""), emp: "LK", done: [], confirming: false };
+    _ir = { legajo: String(legajo || ""), cxm: cxm, saldos: saldos, libres: libres, ocupados: ocupados, modo: (_modoInit === "nacional" ? "nacional" : "import"), origen: "a_guardar", codPick: "", cod: "", masters: 0, inner: 0, sector: (libres[0] || ""), emp: "LK", done: [], confirming: false };
     irRender();
   } catch (e) { const b = document.getElementById("irBody"); if (b) b.innerHTML = '<div class="ir-empty">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
 }
 function irRender() {
   if (!_ir) return; const body = document.getElementById("irBody"); if (!body) return;
   if (_ir.confirming) { irRenderConfirm(body); return; }
+  const nac = _ir.modo === "nacional";
   const codN = _irNorm(_ir.cod), cxm = _ir.cxm[codN] || 0;
   const secU = String(_ir.sector || "").trim().toUpperCase(), ocupadoPor = _ir.ocupados[secU] || "";
   const sectorOcupadoOtro = ocupadoPor && _irNorm(ocupadoPor) !== codN;
   const nombre = _ir.cod ? (artNombre(_ir.cod, "") || "") : "";
-  let h = '<div class="ir-hint">Cargá lo que llegó, <b>un palet por vez</b>: código, cuántos <b>masters</b> (te calcula las cajas si sé el CxM) y el <b>sector</b> (te sugiero uno libre). Se guarda en el mapa de racks y en el stock.</div>';
-  h += '<div class="ir-fld"><div class="ir-lbl">Código</div><input id="irCod" class="ir-inp" type="text" autocomplete="off" placeholder="ej. 582E" value="' + escapeHtml(_ir.cod) + '" oninput="irSetCod(this.value)"></div>';
-  if (_ir.cod) h += '<div class="ir-desc">' + escapeHtml(nombre || "(código nuevo, sin nombre)") + (cxm ? ' · <b>' + cxm + '</b> cajas por master' : ' · <span style="color:#b45309">no sé el CxM — poné las cajas a mano</span>') + '</div>';
-  h += '<div class="ir-row2"><div class="ir-fld"><div class="ir-lbl">Masters</div><div class="ir-stp"><button class="ir-sb" onclick="irChgM(-1)">–</button><input class="ir-inp ir-num" type="number" min="0" inputmode="numeric" value="' + (Number(_ir.masters) || 0) + '" oninput="irSetM(this.value)"><button class="ir-sb" onclick="irChgM(1)">+</button></div></div>';
-  h += '<div class="ir-fld"><div class="ir-lbl">Cajas (inner)</div><div class="ir-stp"><button class="ir-sb" onclick="irChgI(-1)">–</button><input class="ir-inp ir-num" type="number" min="0" inputmode="numeric" value="' + (Number(_ir.inner) || 0) + '" oninput="irSetI(this.value)"><button class="ir-sb" onclick="irChgI(1)">+</button></div></div></div>';
+  const origTxt = _ir.origen === "excedente" ? "excedente" : "a guardar";
+  const disp = nac ? _irDisp(_ir.cod, _ir.origen) : 0;
+  // v6.28: toggle Importación (stock nuevo) / Nacional (mover stock existente a racks)
+  let h = '<div class="ir-fld"><div class="ir-seg">'
+    + '<button class="ir-segb' + (!nac ? " on" : "") + '" onclick="irSetModo(\'import\')">📦 Importación</button>'
+    + '<button class="ir-segb' + (nac ? " on" : "") + '" onclick="irSetModo(\'nacional\')">🏠 Nacional</button>'
+    + '</div></div>';
+  if (nac) {
+    h += '<div class="ir-hint">Mové a racks stock que <b>YA tenés</b> (no crea stock nuevo): elegí <b>origen</b>, <b>código</b> con stock, <b>cajas</b> y el <b>sector</b>. Descuenta del origen y ocupa la celda.</div>';
+    h += '<div class="ir-fld"><div class="ir-lbl">Origen del stock</div><div class="ir-seg">'
+      + '<button class="ir-segb' + (_ir.origen === "a_guardar" ? " on" : "") + '" onclick="irSetOrigen(\'a_guardar\')">A guardar</button>'
+      + '<button class="ir-segb' + (_ir.origen === "excedente" ? " on" : "") + '" onclick="irSetOrigen(\'excedente\')">Excedente</button>'
+      + '</div></div>';
+    h += '<div class="ir-fld"><div class="ir-lbl">Código con stock en ' + origTxt + '</div><input id="irPick" class="ir-inp" type="text" autocomplete="off" placeholder="🔎 buscar código o nombre" value="' + escapeHtml(_ir.codPick || "") + '" oninput="irSetPick(this.value)"></div>';
+    if (_ir.cod) h += '<div class="ir-desc">Elegido: <b>' + escapeHtml(_ir.cod) + '</b> ' + escapeHtml(nombre || "") + ' · <b>' + Math.round(disp) + '</b> cajas en ' + origTxt + '</div>';
+    h += _irListaNac();
+    h += '<div class="ir-fld"><div class="ir-lbl">Cajas a mover' + (_ir.cod ? ' (máx ' + Math.round(disp) + ')' : '') + '</div><div class="ir-stp"><button class="ir-sb" onclick="irChgI(-1)">–</button><input class="ir-inp ir-num" type="number" min="0" inputmode="numeric" value="' + (Number(_ir.inner) || 0) + '" oninput="irSetI(this.value)"><button class="ir-sb" onclick="irChgI(1)">+</button></div></div>';
+    if (_ir.cod && Number(_ir.inner) > disp) h += '<div class="ir-warn">⚠ No hay tantas: solo hay ' + Math.round(disp) + ' cajas de ' + escapeHtml(_ir.cod) + ' en ' + origTxt + '.</div>';
+  } else {
+    h += '<div class="ir-hint">Cargá lo que llegó, <b>un palet por vez</b>: código, cuántos <b>masters</b> (te calcula las cajas si sé el CxM) y el <b>sector</b> (te sugiero uno libre). Se guarda en el mapa de racks y en el stock.</div>';
+    h += '<div class="ir-fld"><div class="ir-lbl">Código</div><input id="irCod" class="ir-inp" type="text" autocomplete="off" placeholder="ej. 582E" value="' + escapeHtml(_ir.cod) + '" oninput="irSetCod(this.value)"></div>';
+    if (_ir.cod) h += '<div class="ir-desc">' + escapeHtml(nombre || "(código nuevo, sin nombre)") + (cxm ? ' · <b>' + cxm + '</b> cajas por master' : ' · <span style="color:#b45309">no sé el CxM — poné las cajas a mano</span>') + '</div>';
+    h += '<div class="ir-row2"><div class="ir-fld"><div class="ir-lbl">Masters</div><div class="ir-stp"><button class="ir-sb" onclick="irChgM(-1)">–</button><input class="ir-inp ir-num" type="number" min="0" inputmode="numeric" value="' + (Number(_ir.masters) || 0) + '" oninput="irSetM(this.value)"><button class="ir-sb" onclick="irChgM(1)">+</button></div></div>';
+    h += '<div class="ir-fld"><div class="ir-lbl">Cajas (inner)</div><div class="ir-stp"><button class="ir-sb" onclick="irChgI(-1)">–</button><input class="ir-inp ir-num" type="number" min="0" inputmode="numeric" value="' + (Number(_ir.inner) || 0) + '" oninput="irSetI(this.value)"><button class="ir-sb" onclick="irChgI(1)">+</button></div></div></div>';
+  }
   h += '<div class="ir-fld"><div class="ir-lbl">Sector</div><input id="irSec" class="ir-inp" type="text" autocomplete="off" placeholder="ej. Y30" value="' + escapeHtml(_ir.sector) + '" oninput="irSetSec(this.value)"></div>';
   if (sectorOcupadoOtro) h += '<div class="ir-warn">⚠ ' + escapeHtml(secU) + ' ya está ocupado por <b>' + escapeHtml(ocupadoPor) + '</b>. Elegí otro (o poné ese mismo código para sumar).</div>';
   else if (ocupadoPor) h += '<div class="ir-ok2">➕ ' + escapeHtml(secU) + ' ya tiene ' + escapeHtml(ocupadoPor) + ' — se suma.</div>';
   h += '<div class="ir-libres">' + _ir.libres.slice(0, 14).map(function (s) { return '<button class="ir-chip' + (secU === s.toUpperCase() ? ' on' : '') + '" onclick="irSetSec(\'' + escapeHtml(s) + '\')">' + escapeHtml(s) + '</button>'; }).join("") + (_ir.libres.length > 14 ? '<span class="ir-more">+' + (_ir.libres.length - 14) + ' libres</span>' : (_ir.libres.length ? '' : '<span class="ir-more">sin sectores libres</span>')) + '</div>';
   h += '<div class="ir-fld"><div class="ir-lbl">Empresa</div><div class="ir-seg"><button class="ir-segb' + (_ir.emp === "LK" ? " on" : "") + '" onclick="irSetEmp(\'LK\')">LK · Loeke</button><button class="ir-segb' + (_ir.emp === "CH" ? " on" : "") + '" onclick="irSetEmp(\'CH\')">CH · Chef</button></div></div>';
-  const ok = codN && (Number(_ir.inner) > 0) && secU && !sectorOcupadoOtro;
+  const dispOk = !nac || (disp > 0 && Number(_ir.inner) <= disp);
+  const ok = codN && (Number(_ir.inner) > 0) && secU && !sectorOcupadoOtro && dispOk;
   h += '<button class="ir-fin"' + (ok ? "" : " disabled") + ' onclick="irRevisar()">Revisar carga →' + (secU && Number(_ir.inner) > 0 ? ' (' + (Number(_ir.inner) || 0) + ' cajas a ' + escapeHtml(secU) + ')' : '') + '</button>';
   if (_ir.done.length) {
     h += '<div class="ir-done-h">Cargados en esta sesión (' + _ir.done.length + ')</div>';
-    h += _ir.done.map(function (d) { return '<div class="ir-done-row"><span class="ir-done-sec">' + escapeHtml(d.sector) + '</span> <span class="ir-done-cod">' + escapeHtml(d.cod) + '</span><span class="ir-done-q">' + d.inner + ' cajas' + (d.masters ? ' · ' + d.masters + ' master' : '') + '</span></div>'; }).join("");
+    h += _ir.done.map(function (d) { return '<div class="ir-done-row"><span class="ir-done-sec">' + escapeHtml(d.sector) + '</span> <span class="ir-done-cod">' + escapeHtml(d.cod) + '</span><span class="ir-done-q">' + d.inner + ' cajas' + (d.masters ? ' · ' + d.masters + ' master' : '') + (d.nac ? ' · 🏠 desde ' + escapeHtml(d.nac) : '') + '</span></div>'; }).join("");
   }
   _renderKeepFocus(body, h);
 }
@@ -11912,6 +11936,38 @@ function irSetI(v) { if (!_ir) return; let n = parseInt(v, 10); if (isNaN(n) || 
 function irChgI(d) { if (!_ir) return; irSetI(Math.max(0, (Number(_ir.inner) || 0) + d)); }
 function irSetSec(v) { if (!_ir) return; _ir.sector = String(v == null ? "" : v).toUpperCase().replace(/[^A-Z0-9]/g, ""); irRender(); }
 function irSetEmp(e) { if (!_ir) return; _ir.emp = (e === "CH") ? "CH" : "LK"; irRender(); }
+/* v6.28 — Ingreso a racks NACIONAL: mover stock existente (a_guardar/excedente) a racks. */
+function _irDisp(cod, origen) { if (!_ir || !_ir.saldos || !cod) return 0; const e = _ir.saldos[String(cod)]; if (!e) return 0; return Math.max(0, Number(e[origen === "excedente" ? "excedente" : "a_guardar"]) || 0); }
+function irSetModo(m) { if (!_ir) return; _ir.modo = (m === "nacional" ? "nacional" : "import"); _ir.cod = ""; _ir.codPick = ""; _ir.masters = 0; _ir.inner = 0; irRender(); }
+function irSetOrigen(o) { if (!_ir) return; _ir.origen = (o === "excedente" ? "excedente" : "a_guardar"); _ir.cod = ""; _ir.inner = 0; irRender(); }
+function irSetPick(v) { if (!_ir) return; _ir.codPick = String(v == null ? "" : v); irRender(); }
+function irPickCod(codEnc) { if (!_ir) return; const cod = decodeURIComponent(codEnc); _ir.cod = cod; const disp = _irDisp(cod, _ir.origen); if (Number(_ir.inner) > disp) _ir.inner = disp; irRender(); }
+function _irListaNac() {
+  if (!_ir) return "";
+  const orig = _ir.origen === "excedente" ? "excedente" : "a_guardar";
+  const origTxt = orig === "excedente" ? "excedente" : "a guardar";
+  const f = String(_ir.codPick || "").toLowerCase().trim();
+  const arr = [];
+  Object.keys(_ir.saldos || {}).forEach(function (k) {
+    const e = _ir.saldos[k]; const q = Number(e[orig]) || 0; if (q <= 0.5) return;
+    const nom = artNombre(k, e.desc || "");
+    if (f && (String(k) + " " + nom).toLowerCase().indexOf(f) < 0) return;
+    arr.push({ cod: k, nom: nom, q: q });
+  });
+  arr.sort(function (a, b) { return b.q - a.q || String(a.cod).localeCompare(String(b.cod), undefined, { numeric: true }); });
+  if (!arr.length) return '<div class="ir-desc" style="color:#b45309">No hay stock en ' + origTxt + (f ? ' que coincida con "' + escapeHtml(_ir.codPick) + '"' : '') + '.</div>';
+  let h = '<div style="max-height:190px;overflow:auto;border:1px solid #e2e8f0;border-radius:10px;margin:-2px 0 11px;">';
+  arr.slice(0, 40).forEach(function (x) {
+    const on = String(_ir.cod) === String(x.cod);
+    h += '<button onclick="irPickCod(\'' + encodeURIComponent(x.cod) + '\')" style="display:flex;width:100%;align-items:baseline;gap:8px;padding:8px 10px;border:none;border-bottom:1px solid #f1f5f9;background:' + (on ? "#0e7490" : "#fff") + ';color:' + (on ? "#fff" : "#0f172a") + ';cursor:pointer;text-align:left;font-size:13.5px;">'
+      + '<span style="font-family:Consolas,Menlo,monospace;font-weight:800;">' + escapeHtml(x.cod) + '</span>'
+      + '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:' + (on ? "#e0f2fe" : "#475569") + ';">' + escapeHtml(x.nom || "—") + '</span>'
+      + '<span style="font-weight:800;white-space:nowrap;">' + Math.round(x.q) + ' cj</span></button>';
+  });
+  if (arr.length > 40) h += '<div class="ir-more" style="padding:7px 10px;">+' + (arr.length - 40) + ' más — afiná la búsqueda</div>';
+  h += '</div>';
+  return h;
+}
 /* Paso de revisión (v5.69): "Revisar carga →" no escribe nada — muestra un resumen
    y recién ahí "✓ Confirmar carga" ejecuta irCargar(). "← Volver" vuelve al formulario
    con los datos intactos para corregir antes de confirmar. */
@@ -11921,6 +11977,7 @@ function irRevisar() {
   const ocupadoPor = _ir.ocupados[secU] || "";
   const sectorOcupadoOtro = ocupadoPor && _irNorm(ocupadoPor) !== codN;
   if (!codN || !(Number(_ir.inner) > 0) || !secU || sectorOcupadoOtro) return;
+  if (_ir.modo === "nacional") { const disp = _irDisp(_ir.cod, _ir.origen); if (!(disp > 0) || Number(_ir.inner) > disp) return; }
   _ir.confirming = true; irRender();
 }
 function irVolver() { if (!_ir) return; _ir.confirming = false; irRender(); }
@@ -11932,13 +11989,17 @@ function irRenderConfirm(body) {
   const empTxt = _ir.emp === "CH" ? "CH · Chef" : "LK · Loeke";
   const ocupadoPor = _ir.ocupados[sector] || "";
   const suma = ocupadoPor && _irNorm(ocupadoPor) === cod;
-  let h = '<div class="ir-hint">Revisá que esté todo bien antes de confirmar. Si algo está mal, tocá <b>← Volver</b>.</div>';
+  const nac = _ir.modo === "nacional";
+  const origTxt = _ir.origen === "excedente" ? "excedente" : "a guardar";
+  let h = '<div class="ir-hint">Revisá que esté todo bien antes de confirmar. Si algo está mal, tocá <b>← Volver</b>.' + (nac ? ' <b>Nacional</b>: descuenta de <b>' + origTxt + '</b> y ocupa el rack (NO crea stock nuevo).' : '') + '</div>';
   h += '<div class="ir-rev">';
+  h += '<div class="ir-rev-row"><span class="ir-rev-lbl">Tipo</span><span class="ir-rev-val ir-rev-txt">' + (nac ? '🏠 Nacional (traslado)' : '📦 Importación') + '</span></div>';
   h += '<div class="ir-rev-row"><span class="ir-rev-lbl">Código</span><span class="ir-rev-val">' + escapeHtml(cod) + '</span></div>';
   if (nombre) h += '<div class="ir-rev-row"><span class="ir-rev-lbl">Artículo</span><span class="ir-rev-val ir-rev-txt">' + escapeHtml(nombre) + '</span></div>';
+  if (nac) h += '<div class="ir-rev-row"><span class="ir-rev-lbl">Origen</span><span class="ir-rev-val ir-rev-txt">' + escapeHtml(origTxt) + '</span></div>';
   h += '<div class="ir-rev-row"><span class="ir-rev-lbl">Sector</span><span class="ir-rev-val">' + escapeHtml(sector) + (suma ? ' <small class="ir-rev-sm">➕ suma a ' + escapeHtml(ocupadoPor) + '</small>' : '') + '</span></div>';
-  h += '<div class="ir-rev-row"><span class="ir-rev-lbl">Masters</span><span class="ir-rev-val">' + masters + '</span></div>';
-  h += '<div class="ir-rev-row"><span class="ir-rev-lbl">Cajas (inner)</span><span class="ir-rev-val ir-rev-big">' + inner + '</span></div>';
+  if (!nac) h += '<div class="ir-rev-row"><span class="ir-rev-lbl">Masters</span><span class="ir-rev-val">' + masters + '</span></div>';
+  h += '<div class="ir-rev-row"><span class="ir-rev-lbl">Cajas' + (nac ? ' a mover' : ' (inner)') + '</span><span class="ir-rev-val ir-rev-big">' + inner + '</span></div>';
   h += '<div class="ir-rev-row"><span class="ir-rev-lbl">Empresa</span><span class="ir-rev-val ir-rev-txt">' + escapeHtml(empTxt) + '</span></div>';
   h += '</div>';
   h += '<div class="ir-conf-btns"><button class="ir-back" onclick="irVolver()">← Volver</button><button class="ir-confirm" onclick="irCargar()">✓ Confirmar carga</button></div>';
@@ -11947,35 +12008,49 @@ function irRenderConfirm(body) {
 function closeIR() { const ov = document.getElementById("irModal"); if (ov) ov.classList.remove("show"); _ir = null; }
 async function irCargar() {
   if (!_ir) return;
-  const cod = _irNorm(_ir.cod), sector = String(_ir.sector || "").trim().toUpperCase(), inner = Number(_ir.inner) || 0, masters = Number(_ir.masters) || 0, emp = (_ir.emp === "CH" ? "CH" : "LK"), leg = _ir.legajo || "";
+  const nac = _ir.modo === "nacional";
+  const cod = _irNorm(_ir.cod), sector = String(_ir.sector || "").trim().toUpperCase(), inner = Number(_ir.inner) || 0, emp = (_ir.emp === "CH" ? "CH" : "LK"), leg = _ir.legajo || "";
+  // nacional: masters se deriva del CxM (mueven cajas sueltas); importación: lo puso el usuario
+  const cxmv = _ir.cxm[cod] || 0;
+  const masters = nac ? (cxmv > 0 ? Math.floor(inner / cxmv) : 0) : (Number(_ir.masters) || 0);
   if (!cod || !sector || inner <= 0) return;
+  const origTxt = _ir.origen === "excedente" ? "excedente" : "a guardar";
+  if (nac) { const disp = _irDisp(_ir.cod, _ir.origen); if (inner > disp) { try { alert("No hay tantas: solo hay " + Math.round(disp) + " cajas de " + cod + " en " + origTxt + "."); } catch (_e) {} return; } }
   let res = "";
   try {
-    const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/racks_plani_ingreso", {
+    const rpc = nac ? "racks_plani_ingreso_nacional" : "racks_plani_ingreso";
+    const bodyObj = nac
+      ? { p_sector: sector, p_cod: cod, p_master: masters, p_inner: inner, p_origen: _ir.origen, p_emp: emp, p_legajo: leg }
+      : { p_sector: sector, p_cod: cod, p_master: masters, p_inner: inner, p_emp: emp, p_legajo: leg };
+    const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/" + rpc, {
       method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
-      body: JSON.stringify({ p_sector: sector, p_cod: cod, p_master: masters, p_inner: inner, p_emp: emp, p_legajo: leg })
+      body: JSON.stringify(bodyObj)
     });
     res = r.ok ? String(await r.json()) : ("error: HTTP " + r.status);
   } catch (e) { res = "error: sin conexión"; }
   if (res !== "ok") {
     try {
       if (res.indexOf("ocupado:") === 0) alert("El sector " + sector + " ya está ocupado por " + res.slice(8) + ".\nElegí otro sector (o cargá ese mismo código para sumar).");
+      else if (res.indexOf("sin_stock:") === 0) alert("No hay stock suficiente: solo hay " + res.slice(10) + " cajas de " + cod + " en " + origTxt + ".\nRefrescá o elegí menos cajas.");
       else alert("No se pudo cargar: " + res.replace(/^error:\s*/, ""));
     } catch (_e) {}
     return;
   }
-  try { irEmitEvent(cod, masters, inner, sector, leg); } catch (_e) {}
+  try { irEmitEvent(cod, masters, inner, sector, leg, nac ? _ir.origen : ""); } catch (_e) {}
   _ir.ocupados[sector] = cod;
   _ir.libres = _ir.libres.filter(function (s) { return s.toUpperCase() !== sector; });
-  _ir.done.push({ cod: cod, sector: sector, masters: masters, inner: inner });
-  _ir.cod = ""; _ir.masters = 0; _ir.inner = 0; _ir.sector = (_ir.libres[0] || ""); _ir.confirming = false;
+  // nacional: descontar del saldo local (origen −, racks +) para refrescar el buscador
+  if (nac && _ir.saldos && _ir.saldos[_ir.cod]) { const key = _ir.origen === "excedente" ? "excedente" : "a_guardar"; _ir.saldos[_ir.cod][key] = (Number(_ir.saldos[_ir.cod][key]) || 0) - inner; _ir.saldos[_ir.cod].racks = (Number(_ir.saldos[_ir.cod].racks) || 0) + inner; }
+  _ir.done.push({ cod: cod, sector: sector, masters: masters, inner: inner, nac: nac ? origTxt : "" });
+  _ir.cod = ""; _ir.codPick = ""; _ir.masters = 0; _ir.inner = 0; _ir.sector = (_ir.libres[0] || ""); _ir.confirming = false;
   irRender();
-  try { alert("✓ Cargado: " + inner + " cajas de " + cod + " en " + sector + "."); } catch (_e) {}
+  try { alert("✓ " + (nac ? "Trasladado" : "Cargado") + ": " + inner + " cajas de " + cod + " → " + sector + (nac ? " (desde " + origTxt + ")" : "") + "."); } catch (_e) {}
 }
-function irEmitEvent(cod, masters, inner, sector, legajo) {
+function irEmitEvent(cod, masters, inner, sector, legajo, origen) {
+  const nacTag = origen ? ("|NAC:" + origen) : "";
   const payload = {
     legajo: String(legajo || "").trim(), opcion: "IR", descripcion: "Ingreso a racks",
-    texto: (String(cod).toUpperCase() + "|" + sector + "|" + masters + "M|" + inner + "C"),
+    texto: (String(cod).toUpperCase() + "|" + sector + "|" + masters + "M|" + inner + "C" + nacTag),
     ts: Date.now(), id: ("ir_" + String(cod).toUpperCase() + "_" + sector + "_" + Date.now()).replace(/[^a-zA-Z0-9_\-]/g, ""), ts_inicio_iso: null
   };
   enqueueReport(payload);
