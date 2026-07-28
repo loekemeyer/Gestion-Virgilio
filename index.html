@@ -5551,7 +5551,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v6.33";
+const APP_VERSION = "v6.34";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -5755,7 +5755,7 @@ function emitPickUbic(tanda, ubic, legajo) {
    idea que el PUB del picking, pero POR NP (los pedidos de una misma tanda pueden
    ir a lugares distintos, o coincidir). Se guarda 1 evento 'AUB' por NP
    (texto=NP, descripcion=ubicación). Lo puede leer facturación/carga de camión. */
-const ARM_UBIC_OPCIONES = ["AB10", "AB9", "AB4", "AB3", "AA10", "AA9", "AA4", "AA3", "AC3", "AC4", "AC9", "AC10", "AD3", "AD4", "AD9", "AD10"];
+const ARM_UBIC_OPCIONES = ["AB8", "AB7", "AB2", "AB1", "AA8", "AA7", "AA2", "AA1", "AC1", "AC2", "AC7", "AC8", "AD1", "AD2", "AD7", "AD8"];
 /* Devuelve {np: ubic} con lo asignado, {} si eligió "omitir", o null si canceló
    (en cuyo caso el TAP se aborta, igual que el PUB aborta el TP). */
 async function askArmadoUbicaciones(tanda) {

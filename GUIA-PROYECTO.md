@@ -4,7 +4,9 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-07-28 · Versión app al documentar: **v6.33**
+> Última actualización: 2026-07-28 · Versión app al documentar: **v6.34**
+>
+> Nota: **v6.34 — Ubicaciones de armado (TAP): renumeradas 3/4/9/10 → 1/2/7/8**. Pedido del dueño. En el modal `askArmadoUbicaciones` (al mandar **TAP**, el armador elige en qué ubicación queda cada NP; evento **AUB**, v5.86), `ARM_UBIC_OPCIONES` pasó de **AB10/AB9/AB4/AB3 · AA10/AA9/AA4/AA3 · AC3/AC4/AC9/AC10 · AD3/AD4/AD9/AD10** a **AB8/AB7/AB2/AB1 · AA8/AA7/AA2/AA1 · AC1/AC2/AC7/AC8 · AD1/AD2/AD7/AD8** (para cada prefijo AA/AB/AC/AD: **3→1, 4→2, 9→7, 10→8**). Solo la lista de opciones; el flujo (AUB, wizard) no cambia. Smoke verde.
 >
 > Nota: **v6.33 — Consulta NP/Líos: marcar los artículos que salieron de "a guardar"**. Pedido del dueño: en la composición a líos (`npcRenderList`), saber de un vistazo si un artículo se completó desde **a_guardar** (un faltante que llegó y se cargó por **CP**). Se agregó a `npcLoad` un fetch de los eventos **`CP`** (texto = `NP|COD|QTY|GONDOLA\|AGUARDAR|LÍO`; **campo 3 = origen**) → mapa `aguardarByNp = {NP:{COD:cajas}}` con solo los de origen **AGUARDAR**; cada fila lleva `aguardar`. En el render, esos ítems se pintan con **📥 + estilo violeta** (`.npc-item.ag`, distinto del rojo de faltante `.f`) + tooltip "Salió de «a guardar»". Ej.: NP 98119 completó **546×1** desde a_guardar → sale marcado. Solo lectura (no cambia el CP). Verificado con render mock + checkhtml + smoke.
 >
