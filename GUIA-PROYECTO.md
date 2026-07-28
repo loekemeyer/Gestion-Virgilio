@@ -4,7 +4,9 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-07-28 · Versión app al documentar: **v6.34**
+> Última actualización: 2026-07-28 · Versión app al documentar: **v6.35**
+>
+> Nota: **v6.35 — Monitor TV: reload PREVENTIVO por memoria (crash "Aw Snap")**. El box de la TV (MX9, barato) se queda sin RAM y **Chrome mata la pestaña** ("¡Vaya!"/Aw-Snap); ahí el **JS de la página ya está muerto**, así que el reload interno no puede recuperarla (queda en la pantalla de error hasta que alguien recarga a mano). El reload fijo de 10' (v5.94) a veces **no se adelanta** al crash. Ahora (kiosko, `?monitor=`) el timer **chequea cada 1 minuto** y recarga **ANTES de llenarse**: si el heap JS supera **~65% del límite** (`performance.memory`, Chrome) o pasaron **7 min** desde la carga (piso, y fallback si el box no expone `performance.memory`). Reset limpio de 1-2s. ⚠ **Es una mitigación, no una cura**: una vez que el navegador crashea, desde la web no se puede auto-recuperar. La solución robusta es **del lado del aparato**: un **navegador kiosko** (ej. *Fully Kiosk Browser* para Android TV) que recargue solo al crashear + limpie memoria, o un box con más RAM.
 >
 > Nota: **v6.34 — Ubicaciones de armado (TAP): renumeradas 3/4/9/10 → 1/2/7/8**. Pedido del dueño. En el modal `askArmadoUbicaciones` (al mandar **TAP**, el armador elige en qué ubicación queda cada NP; evento **AUB**, v5.86), `ARM_UBIC_OPCIONES` pasó de **AB10/AB9/AB4/AB3 · AA10/AA9/AA4/AA3 · AC3/AC4/AC9/AC10 · AD3/AD4/AD9/AD10** a **AB8/AB7/AB2/AB1 · AA8/AA7/AA2/AA1 · AC1/AC2/AC7/AC8 · AD1/AD2/AD7/AD8** (para cada prefijo AA/AB/AC/AD: **3→1, 4→2, 9→7, 10→8**). Solo la lista de opciones; el flujo (AUB, wizard) no cambia. Smoke verde.
 >

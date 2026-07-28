@@ -5564,7 +5564,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v6.34";
+const APP_VERSION = "v6.35";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -17669,10 +17669,23 @@ if (window.__pendingMonitorParam && (_keyValid || _kioskEnrolled)) {
     // memoria se llena y Chrome mata la pestaña ("¡Vaya!"/Aw-Snap) cada ~15 min.
     // Se recarga sola cada 10 min → arranca limpia antes de llenarse (reload de
     // 1-2s). NO es el wifi (un corte de red mostraría otra pantalla). Solo kiosko.
+    // v6.35: reload PREVENTIVO por memoria. El reload fijo de 10' a veces no se
+    // adelanta al crash (Chrome mata la pestaña cuando se llena la RAM, y ahí el JS
+    // ya está MUERTO → no se puede auto-recargar). Ahora chequea cada 1' y recarga
+    // ANTES de llenarse: si el heap JS pasa ~65% del límite (Chrome: performance.memory)
+    // o a los 7' como piso. Reset limpio de 1-2s. Si no hay performance.memory (box viejo),
+    // cae al piso de 7'.
     if (!window._kioskReloadTimer) {
+      window._kioskLoadTs = Date.now();
       window._kioskReloadTimer = setInterval(function () {
-        try { location.reload(); } catch (_e) {}
-      }, 10 * 60 * 1000);
+        try {
+          var reload = false;
+          var pm = (window.performance && performance.memory) ? performance.memory : null;
+          if (pm && pm.jsHeapSizeLimit && pm.usedJSHeapSize > pm.jsHeapSizeLimit * 0.65) reload = true;
+          if (Date.now() - window._kioskLoadTs > 7 * 60 * 1000) reload = true;
+          if (reload) location.reload();
+        } catch (_e) { try { location.reload(); } catch (_e2) {} }
+      }, 60 * 1000);
     }
   });
 }
