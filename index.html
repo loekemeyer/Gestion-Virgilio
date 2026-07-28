@@ -5564,7 +5564,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v6.37";
+const APP_VERSION = "v6.38";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -19682,6 +19682,10 @@ function psRender(){
   h += '<div class="ps-toggle-card"><div class="ps-tc-top"><span class="ps-tc-t">🖨️ Auto-imprimir remitos al terminar armado</span>' +
     '<span class="sup-sw' + (on ? " on" : "") + '" onclick="psToggle()" role="switch"><span class="sup-sw-k"></span></span></div>' +
     '<div class="ps-status ' + (on ? "on" : "") + '">' + (on ? (running ? "🟢 Activo — escuchando pedidos terminados (cada 12 s)" : "🟢 Activo") : "⚪ Apagado — los remitos no se imprimen solos") + '</div></div>';
+  const fon = facPrintIsOn();
+  h += '<div class="ps-toggle-card"><div class="ps-tc-top"><span class="ps-tc-t">🧾 Auto-imprimir remito FACTURADO al tildar Facturación</span>' +
+    '<span class="sup-sw' + (fon ? " on" : "") + '" onclick="facPrintToggle()" role="switch"><span class="sup-sw-k"></span></span></div>' +
+    '<div class="ps-status ' + (fon ? "on" : "") + '">' + (fon ? "🟢 Activo — imprime el FACTURADO en esta PC al tildar" : "⚪ Apagado — no imprime el facturado (se auto-pregunta en el 1er tic)") + '</div></div>';
   h += '<div class="ps-help">Dejá <b>esta pantalla abierta</b> en la PC que está al lado de la impresora. Para que salga <b>sin diálogo</b>: abrí la app en <b>Chrome con <code>--kiosk-printing</code></b> y poné esa impresora como <b>predeterminada de Windows</b>. Probá con el botón de abajo antes de prender el automático.</div>';
   h += '<div class="ps-actions"><button class="ps-test" onclick="psTestPrint()">🖨️ Imprimir hoja de prueba</button></div>';
   const log = (_ps && _ps.log) || [];
@@ -19692,6 +19696,71 @@ function psRender(){
     return '<div class="ps-row"><div class="ps-row-main"><span class="ps-np">NP ' + escapeHtml(String(d.np)) + '</span> <span class="ps-row-sub">' + escapeHtml(d.rs || "—") + ' · ' + d.total + ' cajas · ' + d.nLios + ' líos</span></div><div class="ps-row-right"><span class="ps-hora">' + escapeHtml(e.hora) + '</span><button class="ps-reprint" onclick="psReprint(' + i + ')">Re-imprimir</button></div></div>';
   }).join("") + '</div>';
   body.innerHTML = h;
+}
+
+/* =========================================================
+   v6.38 — Auto-imprimir el remito FACTURADO al tildar Facturación.
+   Por DISPOSITIVO (localStorage), igual que la estación de armado: SOLO la PC de la
+   operadora imprime; los celulares nunca. Se auto-configura en el 1er tic (pregunta
+   una vez; también se puede prender/apagar desde el toggle de la Cola de impresión).
+   La 1ª impresión abre el diálogo del navegador para ELEGIR la impresora (Chrome la
+   recuerda); con Chrome en --kiosk-printing + impresora predeterminada sale sin diálogo.
+   Reusa el mismo molde que el ARMADO: armadoRemitoData + armadoRemitoInnerHtml(d,"FACTURADO")
+   (agrega el recuadro "Controlado / Legajo") + remitoPrintDoc (iframe aislado). ===== */
+var FAC_PRINT_KEY = "fac_print_facturado_virgilio";
+function facPrintPref(){ try { return localStorage.getItem(FAC_PRINT_KEY); } catch(_e){ return null; } }
+function facPrintSetPref(v){ try { localStorage.setItem(FAC_PRINT_KEY, v); } catch(_e){} }
+function facPrintIsOn(){ return facPrintPref() === "1"; }
+function facPrintToggle(){ facPrintSetPref(facPrintIsOn() ? "0" : "1"); psRender(); }
+async function facPrintFacturado(np, tanda){
+  try {
+    const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+    const npE = encodeURIComponent(String(np));
+    try { if (typeof getEmpleadosNombres === "function") await getEmpleadosNombres(); } catch(_e){}   // calentar nombres picking/armado
+    // El resumen (composición a líos) sale del TAL de esta NP (texto = NP|orden|TANDA|resumen|LIO).
+    const talUrl = SUPABASE_TABLE_ENDPOINT + "?opcion=eq.TAL&texto=like." + encodeURIComponent(String(np) + "|") + "*&select=texto,legajo&order=ts_cliente.desc&limit=1";
+    const parts = await Promise.all([
+      fetch(talUrl, { headers: H, cache: "no-store" }).then(function(r){ return r.ok ? r.json() : []; }).catch(function(){ return []; }),
+      fetch(SUPABASE_PPP_PROG_ENDPOINT + "?select=np,cod,razon_social,fecha_entrega,tanda&np=eq." + npE + "&limit=1", { headers: H, cache: "no-store" }).then(function(r){ return r.ok ? r.json() : []; }).catch(function(){ return []; }),
+      fetch(SUPABASE_ENTREGAS_ENDPOINT + "?select=cod_art,cajas_falto&np=eq." + npE + "&cajas_falto=gt.0&limit=2000", { headers: H, cache: "no-store" }).then(function(r){ return r.ok ? r.json() : []; }).catch(function(){ return []; })
+    ]);
+    const tal = (parts[0] || [])[0] || {};
+    const seg = String(tal.texto || "").split("|");
+    const resumen = seg[3] || "";
+    if (!resumen){ facShowToast("NP " + np + ": sin armado (TAL) → no hay remito para imprimir"); return; }
+    const tandaU = String(tanda || seg[2] || "").trim().toUpperCase();
+    let pickerLeg = "";
+    if (tandaU){
+      const tp = await fetch(SUPABASE_TABLE_ENDPOINT + "?opcion=eq.TP&texto=eq." + encodeURIComponent(tandaU) + "&select=legajo&order=ts_cliente.desc&limit=1", { headers: H, cache: "no-store" }).then(function(r){ return r.ok ? r.json() : []; }).catch(function(){ return []; });
+      pickerLeg = (tp[0] && tp[0].legajo) || "";
+    }
+    const pp = (parts[1] || [])[0] || {};
+    const row = {
+      np: np, tanda: tandaU,
+      cod: String(pp.cod || "").trim(), rs: String(pp.razon_social || "").trim(),
+      salePpp: String(pp.fecha_entrega || "").slice(0, 10), fecha: String(pp.fecha_entrega || "").slice(0, 10),
+      resumen: resumen, armadorLeg: String(tal.legajo || ""), pickerLeg: pickerLeg,
+      faltantes: (parts[2] || []).map(function(x){ return { cod: String(x.cod_art || "").trim(), cajas: Number(x.cajas_falto) || 0 }; })
+    };
+    const d = armadoRemitoData(row);
+    remitoPrintDoc(armadoRemitoInnerHtml(d, "FACTURADO"));
+  } catch(_e){}
+}
+/* Se llama en facTickNP tras marcar la NP facturada. En el 1er tic de una PC pregunta
+   UNA vez si querés que imprima ahí (y guarda la respuesta); después imprime solo. */
+async function facMaybePrintFacturado(np, tanda){
+  const pref = facPrintPref();
+  if (pref === "0") return;                       // apagado en esta PC
+  if (pref !== "1"){                               // 1er tic en esta PC → configurar una vez
+    const ok = confirm(
+      "🖨️ ¿Imprimir el remito FACTURADO en ESTA computadora cada vez que tildás facturación?\n\n" +
+      "La 1ª vez se abre el diálogo para ELEGIR la impresora; después queda configurado.\n" +
+      "Prendelo SOLO en la PC que está al lado de la impresora (no en el celular)."
+    );
+    facPrintSetPref(ok ? "1" : "0");
+    if (!ok) return;
+  }
+  await facPrintFacturado(np, tanda);
 }
 
 function facTodayKey(){
@@ -20289,6 +20358,8 @@ window.facTickNP = async function(btn){
     facShowToast(`NP ${np} facturado`);
   }
   setTimeout(() => facRender(_facLastTandas), 350);
+  // v6.38: imprimir el remito FACTURADO en la PC de la operadora (se auto-configura el 1er tic).
+  facMaybePrintFacturado(np, tanda);
 };
 
 /* Revertir: borra todos los ticks pendientes de cierre (cierre_id IS NULL).
