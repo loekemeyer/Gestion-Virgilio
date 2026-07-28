@@ -5549,7 +5549,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v6.30";
+const APP_VERSION = "v6.31";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -19289,26 +19289,37 @@ function npcRenderList(rows){
    Layout confirmado (opción a): cabecera NP + tabla Cod/Cajas/en qué lío + tabla
    Lío/Composición (sin nombre de artículo, orden por código).
    ========================================================= */
+/* v6.31 — Formato nuevo (aprobado por el dueño): NP + Fecha, Cliente, Tanda, palabra
+   grande (ARMADO/FACTURADO), Picking/Armado (nombres), dos columnas (Artículos + Total +
+   Faltantes · Líos), y para FACTURADO el recuadro "Controlado". Tamaños en EM para que
+   remitoPrintDoc auto-ajuste la fuente y llene la hoja. */
 var REMITO_SHEET_CSS =
-  ".rmt-sheet{background:#fff;color:#0f172a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;max-width:420px;margin:0 auto;padding:18px 20px;box-sizing:border-box;border-radius:10px;}" +
-  ".rmt-h1{font-size:11px;font-weight:800;letter-spacing:.14em;color:#64748b;text-transform:uppercase;margin:0 0 1px;}" +
-  ".rmt-np{font-size:27px;font-weight:800;color:#0f172a;margin:0 0 11px;line-height:1;}" +
-  ".rmt-hdr{font-size:13.5px;line-height:1.5;}" +
-  ".rmt-hdr b{display:inline-block;min-width:104px;color:#64748b;font-weight:700;font-size:12px;}" +
-  ".rmt-sub{font-size:12px;color:#64748b;margin-top:5px;font-weight:600;}" +
-  ".rmt-sec{font-size:10.5px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:#94a3b8;margin:15px 0 0;border-bottom:1.5px solid #0f172a;padding-bottom:3px;}" +
-  ".rmt-table{width:100%;border-collapse:collapse;font-size:13.5px;margin-top:2px;}" +
-  ".rmt-table th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;font-weight:700;padding:5px 6px 3px;border-bottom:1px solid #cbd5e1;}" +
-  ".rmt-table td{padding:5px 6px;border-bottom:1px solid #eef2f6;vertical-align:top;line-height:1.35;}" +
-  ".rmt-cod{font-weight:800;font-family:Consolas,Menlo,monospace;}" +
-  ".rmt-num{text-align:center;width:54px;font-weight:800;}" +
-  ".rmt-lab{font-weight:800;text-align:center;width:44px;}" +
-  ".rmt-total td{font-weight:800;border-top:2px solid #0f172a;border-bottom:none;padding-top:6px;}";
+  ".rmt-sheet{background:#fff;color:#111;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;max-width:470px;margin:0 auto;padding:16px 18px;box-sizing:border-box;border-radius:10px;font-size:15px;}" +
+  ".rmt-top{position:relative;border-bottom:.14em solid #111;padding-bottom:.5em;}" +
+  ".rmt-r1{display:flex;justify-content:space-between;align-items:baseline;gap:8px;}" +
+  ".rmt-np{font-size:2.1em;font-weight:800;line-height:1;}" +
+  ".rmt-fe{font-size:1.1em;white-space:nowrap;}.rmt-fe b{font-weight:800;}" +
+  ".rmt-kv{font-size:1.1em;margin-top:.26em;}.rmt-kv b{display:inline-block;min-width:4.6em;font-weight:800;}" +
+  ".rmt-r4{display:flex;align-items:center;gap:1.4em;margin-top:.5em;flex-wrap:wrap;}" +
+  ".rmt-tipo{font-size:2.0em;font-weight:800;letter-spacing:.5px;line-height:1;}" +
+  ".rmt-who{font-size:1.06em;line-height:1.45;}.rmt-who b{font-weight:800;display:inline-block;min-width:4.6em;}" +
+  ".rmt-ctrl{position:absolute;right:0;top:2.0em;border:.13em solid #111;border-radius:3px;padding:.45em .9em;min-width:11.5em;text-align:right;}" +
+  ".rmt-ctrl-lg{font-size:1.45em;font-weight:800;}.rmt-ctrl-co{font-size:1.28em;font-weight:800;margin-top:.35em;}" +
+  ".rmt-cols{display:flex;margin-top:.4em;}" +
+  ".rmt-col-l{flex:0 0 46%;padding-right:.9em;border-right:.14em solid #111;}" +
+  ".rmt-col-r{flex:1;padding-left:1em;min-width:0;}" +
+  ".rmt-sec{font-size:1.35em;font-weight:800;border-bottom:1px solid #999;padding:.4em 0 .16em;margin-bottom:.1em;}" +
+  ".rmt-table{width:100%;border-collapse:collapse;font-size:1.2em;}" +
+  ".rmt-table th{text-align:left;font-weight:800;padding:.2em .25em;}" +
+  ".rmt-table td{padding:.22em .25em;vertical-align:top;line-height:1.3;}" +
+  ".rmt-cod{font-family:Consolas,Menlo,monospace;font-weight:800;}" +
+  ".rmt-cc{width:4em;}.rmt-cq{width:3.4em;}" +
+  ".rmt-tot{font-size:1.28em;font-weight:800;margin-top:.5em;border-top:1px solid #999;padding-top:.4em;}" +
+  ".rmt-empty{color:#94a3b8;font-size:.9em;padding:.35em .25em;}";
 var REMITO_PRINT_CSS = REMITO_SHEET_CSS +
-  "@page{margin:11mm;}html,body{margin:0;padding:0;}" +
+  "@page{size:A4;margin:12mm;}html,body{margin:0;padding:0;}" +
   "body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}" +
-  ".rmt-sheet{max-width:none;margin:0;padding:0;border-radius:0;}" +
-  ".rmt-table{page-break-inside:auto;}tr{page-break-inside:avoid;}.rmt-sec{page-break-after:avoid;}";
+  ".rmt-sheet{max-width:none;margin:0;padding:0;border-radius:0;}";
 var _remitoInner = "";
 function _remitoCodKey(cod){ const m = String(cod).match(/^0*(\d+)/); return m ? parseInt(m[1], 10) : 999999; }
 /* row = fila de _npcRows (tiene np, cod=cod cliente, rs, salePpp/fecha, tanda, resumen) */
@@ -19330,31 +19341,51 @@ function armadoRemitoData(row){
   const liosOut = lios.map(function(l, k){
     return { label: labels[k], comp: (l.items || []).map(function(it){ return String(it.cod) + " ×" + it.qty; }).join(", ") + (l.suelta ? "  (suelta)" : "") };
   });
-  return { np: row.np, cod: row.cod || "", rs: row.rs || "", fecha: row.salePpp || row.fecha || "", tanda: row.tanda || "", total: total, nLios: lios.length, arts: arts, lios: liosOut };
+  // v6.31 — nombres (picking/armado) + faltantes para el remito nuevo. El caller puede
+  // pasar row.pickName/armName ya resueltos, o row.pickerLeg/armadorLeg (legajos) que
+  // resolvemos con npcNombre. Faltantes: row.faltantes [{cod,cajas}] o row.falt.items.
+  var pickName = row.pickName || (typeof npcNombre === "function" ? npcNombre(row.pickerLeg) : "") || "";
+  var armName  = row.armName  || (typeof npcNombre === "function" ? npcNombre(row.armadorLeg) : "") || "";
+  var faltantes = row.faltantes ||
+    ((row.falt && row.falt.items) ? row.falt.items.map(function(it){ return { cod: it.cod, cajas: Number(it.falto) || 0 }; }) : []);
+  faltantes = (faltantes || []).slice().sort(function(a,b){ return _remitoCodKey(a.cod) - _remitoCodKey(b.cod); });
+  return { np: row.np, cod: row.cod || "", rs: row.rs || "", fecha: row.salePpp || row.fecha || "", tanda: row.tanda || "", total: total, nLios: lios.length, arts: arts, lios: liosOut, pickName: pickName, armName: armName, faltantes: faltantes };
 }
-function armadoRemitoInnerHtml(d){
+function armadoRemitoInnerHtml(d, tipo){
+  tipo = (tipo === "FACTURADO") ? "FACTURADO" : "ARMADO";
   const artRows = d.arts.length ? d.arts.map(function(a){
-    return '<tr><td class="rmt-cod">' + escapeHtml(a.cod) + '</td><td class="rmt-num">' + a.cajas + '</td><td>' + escapeHtml(a.lios.join(", ")) + '</td></tr>';
-  }).join("") : '<tr><td colspan="3" style="color:#94a3b8">— sin detalle de líos —</td></tr>';
+    return '<tr><td class="rmt-cc rmt-cod">' + escapeHtml(a.cod) + '</td><td class="rmt-cq">' + a.cajas + '</td><td>' + escapeHtml(a.lios.join(", ")) + '</td></tr>';
+  }).join("") : '<tr><td colspan="3" class="rmt-empty">— sin artículos —</td></tr>';
   const lioRows = d.lios.length ? d.lios.map(function(l){
-    return '<tr><td class="rmt-lab">' + escapeHtml(l.label) + '</td><td>' + escapeHtml(l.comp) + '</td></tr>';
-  }).join("") : '<tr><td colspan="2" style="color:#94a3b8">— sin líos —</td></tr>';
+    return '<tr><td class="rmt-cc rmt-cod">' + escapeHtml(l.label) + '</td><td>' + escapeHtml(l.comp) + '</td></tr>';
+  }).join("") : '<tr><td colspan="2" class="rmt-empty">— sin líos —</td></tr>';
+  const falt = d.faltantes || [];
+  const faltRows = falt.length ? falt.map(function(f){
+    return '<tr><td class="rmt-cc rmt-cod">' + escapeHtml(String(f.cod)) + '</td><td>' + (Number(f.cajas) || 0) + '</td></tr>';
+  }).join("") : '<tr><td colspan="2" class="rmt-empty">— sin faltantes —</td></tr>';
+  const ctrl = (tipo === "FACTURADO")
+    ? '<div class="rmt-ctrl"><div class="rmt-ctrl-lg">Legajo</div><div class="rmt-ctrl-co">Controlado: ______</div></div>' : '';
   return '' +
-    '<div class="rmt-h1">Remito de armado</div>' +
-    '<div class="rmt-np">NP ' + escapeHtml(String(d.np)) + '</div>' +
-    '<div class="rmt-hdr">' +
-      '<div><b>Cod Cliente</b>' + escapeHtml(d.cod || '—') + '</div>' +
-      '<div><b>Razón Social</b>' + escapeHtml(d.rs || '—') + '</div>' +
-      '<div><b>Fecha Entrega</b>' + escapeHtml(npcDmy(d.fecha) || '—') + '</div>' +
-      '<div class="rmt-sub">Tanda ' + escapeHtml(d.tanda || '—') + ' · ' + d.total + ' cajas · ' + d.nLios + ' líos</div>' +
+    '<div class="rmt-top">' +
+      '<div class="rmt-r1"><span class="rmt-np">NP ' + escapeHtml(String(d.np)) + '</span><span class="rmt-fe"><b>Fecha Entrega</b> ' + escapeHtml(npcDmy(d.fecha) || '—') + '</span></div>' +
+      '<div class="rmt-kv"><b>Cliente</b> ' + escapeHtml((d.cod ? d.cod + ' - ' : '') + (d.rs || '—')) + '</div>' +
+      '<div class="rmt-kv"><b>Tanda</b> ' + escapeHtml((d.tanda || '—') + ' - ' + d.total + ' cajas - ' + d.nLios + ' líos') + '</div>' +
+      '<div class="rmt-r4"><span class="rmt-tipo">' + tipo + '</span><span class="rmt-who"><div><b>Picking</b> ' + escapeHtml(d.pickName || '—') + '</div><div><b>Armado</b> ' + escapeHtml(d.armName || '—') + '</div></span></div>' +
+      ctrl +
     '</div>' +
-    '<div class="rmt-sec">Artículos</div>' +
-    '<table class="rmt-table"><thead><tr><th>Cod</th><th class="rmt-num">Cajas</th><th>Va en lío(s)</th></tr></thead><tbody>' +
-      artRows +
-      '<tr class="rmt-total"><td>TOTAL</td><td class="rmt-num">' + d.total + '</td><td></td></tr>' +
-    '</tbody></table>' +
-    '<div class="rmt-sec">Líos</div>' +
-    '<table class="rmt-table"><thead><tr><th>Lío</th><th>Composición</th></tr></thead><tbody>' + lioRows + '</tbody></table>';
+    '<div class="rmt-cols">' +
+      '<div class="rmt-col-l">' +
+        '<div class="rmt-sec">Artículos</div>' +
+        '<table class="rmt-table"><thead><tr><th class="rmt-cc">Cod</th><th class="rmt-cq">Cajas</th><th>Lío</th></tr></thead><tbody>' + artRows + '</tbody></table>' +
+        '<div class="rmt-tot">Total &nbsp; ' + d.total + '</div>' +
+        '<div class="rmt-sec">Faltantes</div>' +
+        '<table class="rmt-table"><thead><tr><th class="rmt-cc">Cod</th><th>Cajas</th></tr></thead><tbody>' + faltRows + '</tbody></table>' +
+      '</div>' +
+      '<div class="rmt-col-r">' +
+        '<div class="rmt-sec">Líos</div>' +
+        '<table class="rmt-table"><thead><tr><th class="rmt-cc">Lío</th><th>Composición</th></tr></thead><tbody>' + lioRows + '</tbody></table>' +
+      '</div>' +
+    '</div>';
 }
 function showRemitoArmado(np){
   const row = (_npcRows || []).find(function(r){ return String(r.np) === String(np); });
@@ -19380,16 +19411,26 @@ function remitoPrintDoc(inner){
   if (!inner) return;
   const ifr = document.createElement("iframe");
   ifr.setAttribute("aria-hidden", "true");
-  ifr.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;";
+  // v6.31 — ancho real = área imprimible A4 (210mm − 2·12mm ≈ 703px @96dpi) para medir
+  // bien el alto y auto-ajustar la fuente (así la hoja se llena hasta abajo).
+  ifr.style.cssText = "position:fixed;left:-10000px;top:0;width:703px;height:1123px;border:0;";
   document.body.appendChild(ifr);
   const w = ifr.contentWindow, doc = w.document;
   doc.open();
-  doc.write('<!doctype html><html><head><meta charset="utf-8"><title>Remito de armado</title><style>' + REMITO_PRINT_CSS + '</style></head><body><div class="rmt-sheet">' + inner + '</div></body></html>');
+  doc.write('<!doctype html><html><head><meta charset="utf-8"><title>Remito</title><style>' + REMITO_PRINT_CSS + '</style></head><body><div class="rmt-sheet" id="rmtFit">' + inner + '</div></body></html>');
   doc.close();
+  function autofit(){
+    try {
+      const el = doc.getElementById("rmtFit"); if (!el) return;
+      const TARGET = 1010; let lo = 11, hi = 34, best = 15;   // alto útil A4 ≈ 1010px
+      for (let i = 0; i < 18; i++){ const mid = (lo + hi) / 2; el.style.fontSize = mid + "px"; if (el.scrollHeight <= TARGET){ best = mid; lo = mid; } else { hi = mid; } }
+      el.style.fontSize = best + "px";
+    } catch (_e) {}
+  }
   let fired = false;
-  const fire = function(){ if (fired) return; fired = true; setTimeout(function(){ try { w.focus(); w.print(); } catch (_e) {} setTimeout(function(){ try { document.body.removeChild(ifr); } catch (_e2) {} }, 1500); }, 120); };
+  const fire = function(){ if (fired) return; fired = true; setTimeout(function(){ try { autofit(); w.focus(); w.print(); } catch (_e) {} setTimeout(function(){ try { document.body.removeChild(ifr); } catch (_e2) {} }, 1500); }, 150); };
   ifr.onload = fire;
-  setTimeout(fire, 350);   // fallback: doc.write no siempre dispara onload
+  setTimeout(fire, 400);   // fallback: doc.write no siempre dispara onload
 }
 
 /* =========================================================
@@ -19447,7 +19488,7 @@ async function psPoll(){
   _psEnsure();
   const since = _ps.lastSeen || new Date(Date.now() - 3600000).toISOString();
   try {
-    const url = SUPABASE_TABLE_ENDPOINT + "?opcion=eq.TAL&ts_cliente=gt." + encodeURIComponent(since) + "&select=texto,ts_cliente&order=ts_cliente.asc&limit=2000";
+    const url = SUPABASE_TABLE_ENDPOINT + "?opcion=eq.TAL&ts_cliente=gt." + encodeURIComponent(since) + "&select=texto,ts_cliente,legajo&order=ts_cliente.asc&limit=2000";
     const rows = await fetch(url, { headers: psH(), cache: "no-store" }).then(function (r){ return r.ok ? r.json() : []; });
     if (!rows.length) return;
     const printed = psGetPrinted(); let maxTs = since; const fresh = [];
@@ -19457,7 +19498,7 @@ async function psPoll(){
       if (!np || printed.has(np)) return;
       const resumen = p[3] || "";
       if (!resumen){ psMarkPrinted(np); return; }   // TAL sin resumen (viejo) → nada que imprimir
-      fresh.push({ np: np, tanda: String(p[2] || "").trim().toUpperCase(), resumen: resumen });
+      fresh.push({ np: np, tanda: String(p[2] || "").trim().toUpperCase(), resumen: resumen, armadorLeg: String(ev.legajo || "") });
     });
     _ps.lastSeen = maxTs; try { localStorage.setItem(PS_LASTSEEN_KEY, maxTs); } catch (_e) {}
     if (fresh.length) await psPrintBatch(fresh);
@@ -19465,14 +19506,27 @@ async function psPoll(){
 }
 async function psPrintBatch(items){
   const npIn = items.map(function (x){ return encodeURIComponent(x.np); }).join(",");
-  const ppMap = {};
+  const tandas = items.map(function (x){ return String(x.tanda || "").toUpperCase(); }).filter(function (t, i, a){ return t && a.indexOf(t) === i; });
+  const tIn = tandas.map(function (t){ return encodeURIComponent(t); }).join(",");
+  const ppMap = {}, faltMap = {}, pickByTanda = {};
   try {
-    const pp = await fetch(SUPABASE_PPP_PROG_ENDPOINT + "?select=np,cod,razon_social,fecha_entrega,tanda&np=in.(" + npIn + ")&limit=5000", { headers: psH(), cache: "no-store" }).then(function (r){ return r.ok ? r.json() : []; });
-    pp.forEach(function (x){ const np = String(x.np || "").trim().replace(/\.0+$/, ""); if (np && !ppMap[np]) ppMap[np] = { cod: String(x.cod || "").trim(), rs: String(x.razon_social || "").trim(), fecha: String(x.fecha_entrega || "").slice(0, 10), tanda: String(x.tanda || "").trim().toUpperCase() }; });
+    // v6.31 — además de la PPP (cliente/fecha), traemos faltantes (Entregas), el picker
+    // por tanda (evento TP) y los nombres, para el remito ARMADO nuevo.
+    const res = await Promise.all([
+      fetch(SUPABASE_PPP_PROG_ENDPOINT + "?select=np,cod,razon_social,fecha_entrega,tanda&np=in.(" + npIn + ")&limit=5000", { headers: psH(), cache: "no-store" }).then(function (r){ return r.ok ? r.json() : []; }).catch(function(){ return []; }),
+      fetch(SUPABASE_ENTREGAS_ENDPOINT + "?select=np,cod_art,cajas_falto&np=in.(" + npIn + ")&cajas_falto=gt.0&limit=5000", { headers: psH(), cache: "no-store" }).then(function (r){ return r.ok ? r.json() : []; }).catch(function(){ return []; }),
+      (tIn ? fetch(SUPABASE_TABLE_ENDPOINT + "?select=texto,legajo&opcion=eq.TP&texto=in.(" + tIn + ")&order=ts_cliente.desc&limit=2000", { headers: psH(), cache: "no-store" }).then(function (r){ return r.ok ? r.json() : []; }).catch(function(){ return []; }) : Promise.resolve([])),
+      (typeof getEmpleadosNombres === "function" ? getEmpleadosNombres().catch(function(){ return null; }) : Promise.resolve(null))
+    ]);
+    (res[0] || []).forEach(function (x){ const np = String(x.np || "").trim().replace(/\.0+$/, ""); if (np && !ppMap[np]) ppMap[np] = { cod: String(x.cod || "").trim(), rs: String(x.razon_social || "").trim(), fecha: String(x.fecha_entrega || "").slice(0, 10), tanda: String(x.tanda || "").trim().toUpperCase() }; });
+    (res[1] || []).forEach(function (x){ const np = String(x.np || "").trim().replace(/\.0+$/, ""); const fl = Number(x.cajas_falto) || 0; if (np && fl > 0){ (faltMap[np] = faltMap[np] || []).push({ cod: String(x.cod_art || "").trim(), cajas: fl }); } });
+    (res[2] || []).forEach(function (x){ const t = String(x.texto || "").trim().toUpperCase(); if (t && !pickByTanda[t]) pickByTanda[t] = String(x.legajo || ""); });   // order desc → el último TP gana
   } catch (_e){}
   items.forEach(function (it){
     const pd = ppMap[it.np] || {};
-    const row = { np: it.np, tanda: it.tanda || pd.tanda || "", cod: pd.cod || "", rs: pd.rs || "", salePpp: pd.fecha || "", fecha: pd.fecha || "", resumen: it.resumen };
+    const tanda = it.tanda || pd.tanda || "";
+    const row = { np: it.np, tanda: tanda, cod: pd.cod || "", rs: pd.rs || "", salePpp: pd.fecha || "", fecha: pd.fecha || "", resumen: it.resumen,
+      armadorLeg: it.armadorLeg || "", pickerLeg: pickByTanda[String(tanda).toUpperCase()] || "", faltantes: faltMap[it.np] || [] };
     const d = armadoRemitoData(row);
     psMarkPrinted(it.np);   // marcar ANTES de encolar → si hay 2 pestañas abiertas, no imprimen doble
     psEnqueuePrint(d);
