@@ -5549,7 +5549,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v6.28";
+const APP_VERSION = "v6.29";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -9822,7 +9822,10 @@ async function stkOpenEstadioArt(codEnc, dep) {
   const by = {};
   _stk.movs.forEach(function (mv) {
     if (mv.deposito !== dep || _stkNormCod(mv.cod_art) !== codN || !_stkWin(mv, true)) return;
-    const k = String(mv.ref || "—").toUpperCase();
+    // v6.29: agrupar por la TANDA/NP BASE (lo de antes del "|"). El facturado del
+    // cliente usa ref=tanda|NP y los ajustes ref=NP; sin esto el detalle no descuenta
+    // lo ya facturado y mostraba de más (ej. 530 decía 4 cuando el saldo era 1).
+    const k = String(mv.ref || "—").toUpperCase().split("|")[0];
     by[k] = (by[k] || 0) + Number(mv.delta || 0);
   });
   const refs = Object.keys(by).filter(function (t) { return by[t] > 0.05; })
