@@ -4,7 +4,9 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-07-27 · Versión app al documentar: **v6.26**
+> Última actualización: 2026-07-27 · Versión app al documentar: **v6.27**
+>
+> Nota: **v6.27 — Fix de raíz: el `facturado` ahora descuenta las cajas de COMPLETAR PEDIDO (CP)**. Bug recurrente (546/280/221/323E): al facturar una NP, sus cajas agregadas por **CP quedaban colgadas en `a_facturar`** y había que limpiarlas a mano. Causa: el CP marca sus filas con **`ref = NP`** (solo el número), pero el drenaje del facturado (`stockSalidaFacturadoNP` + barrido) busca por **`ref = tanda` / `tanda|NP`** → nunca las veía. Fix: helper nuevo **`stockDrenarCPFacturado(np)`** que saca de `a_facturar` las cajas `tipo='cp' ref=NP` de la NP, con un `facturado -neto` por código y **`ref = NP|CP`**. Idempotente e incremental (drena `pendiente = CP − ya_drenado`; **NO hay unique** en `Movimientos_Stock`, el dedup es en cliente). Se llama en DOS lados: (1) al **tildar Facturación** (`facTickNP`, tras `stockSalidaFacturadoNP`) → CP hecho ANTES de facturar; (2) en **`cpConfirm`**, si la NP **ya estaba facturada** (chequea `Facturacion_NP`) → CP hecho DESPUÉS de facturar (caso real visto: NP 97976 facturada 17:05, CP 17:10). `stockMove` en `cpConfirm` pasó a `await`. Smoke verde (cp-focus, fac-block-recuperable). Bump `v6.27`. ⚠ Las que ya estaban colgadas se limpiaron a mano (ajustes `reconcilia`); de acá en más se drenan solas.
 >
 > Nota: **v6.26 — El Monitor muestra el TOTAL de tandas programadas**. El encabezado del Monitor mostraba solo el conteo de la **ventana de fechas** visible (`N entrega <fechas> · X en curso · Y a FC`) — no el total global. Ahora antepone **`N programadas (total)`** = todas las tandas con **Op=SI** en `PPP_Programacion_Diaria` (cualquier fecha, contadas desde `sheetMap` en `renderMonitor`). El "46" de la ventana no era el total (dejaba afuera las programadas para fechas fuera de la ventana). Bump `v6.26`.
 >

@@ -5549,7 +5549,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v6.26";
+const APP_VERSION = "v6.27";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -12301,7 +12301,15 @@ async function cpConfirm() {
     ts: Date.now(), id: ("cp_" + s.np + "_" + s.cod_art + "_" + Date.now()).replace(/[^a-zA-Z0-9_\-]/g, ""), ts_inicio_iso: null
   };
   try { enqueueReport(payload); if (typeof trySendOneReport === "function") trySendOneReport(payload).then(function (r) { if (r && r.ok) removeFromQueue(payload.id); }).catch(function () {}); } catch (_e) {}
-  try { stockMove(rows); } catch (_e) {}
+  try { await stockMove(rows); } catch (_e) {}
+  // v6.27: si la NP YA estaba facturada, las cajas de CP recién entradas a "a facturar"
+  // no las descontaría ningún facturado futuro (ya se facturó) → sacarlas ahora. Si NO
+  // está facturada, no se toca: se drenan cuando se facture (drenaje en el tilde de Facturación).
+  try {
+    const _n = String(s.np).trim().replace(/\.0+$/, "");
+    const _fr = await fetch(SUPABASE_URL + "/rest/v1/Facturacion_NP?select=np&np=eq." + encodeURIComponent(_n) + "&limit=1", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+    if (_fr.ok && ((await _fr.json()) || []).length) { await stockDrenarCPFacturado(_n, leg); }
+  } catch (_e) {}
   cpUpdateLio(leg, s, qty, lioSel, info);
   try { updatePendingIndicator(); } catch (_e) {}
   // Bajar el faltante (RPC) y REFRESCAR la lista para que el completado DESAPAREZCA a la
@@ -12918,6 +12926,39 @@ async function stockSalidaFacturadoNP(np, tanda, legajo) {
       if (bajar > 0) { rows.push({ cod_art: slot.key, descripcion: slot.desc || null, deposito: "a_facturar", delta: -bajar, tipo: "facturado", ref: refNp, ubicacion: n, legajo: String(legajo || "") }); slot.sum -= bajar; }
     });
     if (rows.length) await stockMove(rows);
+  } catch (_e) {}
+}
+/* v6.27 — Drenar de "a facturar" las cajas que entraron por COMPLETAR PEDIDO (CP)
+   de una NP YA facturada. El CP marca sus filas con ref = NP (solo el número), pero
+   el drenaje normal del facturado (stockSalidaFacturadoNP / barrido) busca por
+   ref = tanda / tanda|NP → nunca veía esas cajas y quedaban colgadas en a_facturar
+   (había que limpiarlas a mano). Acá se sacan explícitamente: por cada código, un
+   'facturado' -neto con ref = NP|CP. Idempotente: dedup por (ref=NP|CP, cod) ya
+   existente (NO hay unique en la tabla → se chequea en el cliente). */
+async function stockDrenarCPFacturado(np, legajo) {
+  try {
+    const n = String(np == null ? "" : np).trim().replace(/\.0+$/, "");
+    if (!n) return;
+    const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+    const refCp = n + "|CP";
+    // cuánto de cada código YA se drenó (suma de facturado ref=NP|CP, en negativo)
+    const drained = {};
+    const chk = await fetch(SUPABASE_STOCK_ENDPOINT + "?deposito=eq.a_facturar&tipo=eq.facturado&ref=eq." + encodeURIComponent(refCp) + "&select=cod_art,delta&limit=5000", { headers: H, cache: "no-store" });
+    if (chk.ok) { (await chk.json()).forEach(function (x) { const k = String(x.cod_art); drained[k] = (drained[k] || 0) + Number(x.delta || 0); }); }
+    // cajas que el CP metió en a_facturar para esta NP (ref = NP, tipo cp, delta > 0)
+    const r = await fetch(SUPABASE_STOCK_ENDPOINT + "?deposito=eq.a_facturar&tipo=eq.cp&ref=eq." + encodeURIComponent(n) + "&select=cod_art,descripcion,delta&limit=5000", { headers: H, cache: "no-store" });
+    const rows = r.ok ? await r.json() : [];
+    if (!rows.length) return;
+    const net = {};
+    rows.forEach(function (mv) { const k = String(mv.cod_art); if (!net[k]) net[k] = { sum: 0, desc: mv.descripcion || null }; net[k].sum += Number(mv.delta || 0); if (mv.descripcion && !net[k].desc) net[k].desc = mv.descripcion; });
+    const out = [];
+    Object.keys(net).forEach(function (k) {
+      const cpQ = Math.round(net[k].sum * 1000) / 1000;                 // metido por CP
+      const ya  = Math.round((-(drained[k] || 0)) * 1000) / 1000;       // ya drenado (positivo)
+      const pend = Math.round((cpQ - ya) * 1000) / 1000;               // pendiente de sacar
+      if (pend > 0) out.push({ cod_art: k, descripcion: net[k].desc, deposito: "a_facturar", delta: -pend, tipo: "facturado", ref: refCp, ubicacion: "__cp__", legajo: String(legajo || "") });
+    });
+    if (out.length) await stockMove(out);
   } catch (_e) {}
 }
 /* v4.04: persistencia del avance del wizard (queda abierto durante el armado).
@@ -19965,6 +20006,9 @@ window.facTickNP = async function(btn){
   // v5.95: drenar de "a facturar" los artículos de ESTA NP ya (no esperar al 100%).
   // Así una NP vacía o sin facturar no deja trabado el stock de las demás.
   try { await stockSalidaFacturadoNP(np, tanda); } catch(_e){}
+  // v6.27: además drenar las cajas que entraron por Completar Pedido (CP) — el CP las
+  // marca con ref = NP y el drenaje por tanda no las ve → antes quedaban colgadas.
+  try { await stockDrenarCPFacturado(np, ""); } catch(_e){}
 
   // Si la tanda quedó 100% tickeada, avisar con toast distinto
   const tandaObj = _facLastTandas.find(t => (t.tanda || "") === tanda);
