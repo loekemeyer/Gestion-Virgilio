@@ -2933,6 +2933,8 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
   .npc-item > i{ font-style:normal; color:#64748b; font-weight:600; }
   .npc-item.f{ color:#991b1b; }
   .npc-item.f > i{ color:#dc2626; }
+  .npc-item.ag{ background:#f5f3ff; border:1px solid #ddd6fe; border-radius:6px; padding:0 5px; color:#6d28d9; }
+  .npc-item.ag > i{ color:#7c3aed; }
   .npc-lio > em{ font-style:normal; color:#b45309; font-size:11px; font-weight:700; }
   .npc-nolio{ color:#94a3b8; font-size:12.5px; font-style:italic; }
   .npc-meta{ display:flex; flex-wrap:wrap; gap:5px 16px; margin:-2px 0 9px; font-size:11.5px; color:#64748b; }
@@ -5549,7 +5551,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v6.32";
+const APP_VERSION = "v6.33";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -19214,9 +19216,20 @@ async function npcLoad(force){
         fetch(metaUrl, { headers: H, cache: "no-store" }).then(function(r){ return r.ok ? r.json() : []; }).catch(function(){ return []; }),
         fetch(ppUrl,   { headers: H, cache: "no-store" }).then(function(r){ return r.ok ? r.json() : []; }).catch(function(){ return []; }),
         (tandaIn ? fetch(pkUrl, { headers: H, cache: "no-store" }).then(function(r){ return r.ok ? r.json() : []; }).catch(function(){ return []; }) : Promise.resolve([])),
-        getEmpleadosNombres().catch(function(){ return null; })   // legajo→nombre (cacheado 1h)
+        getEmpleadosNombres().catch(function(){ return null; }),   // legajo→nombre (cacheado 1h)
+        fetch(SUPABASE_TABLE_ENDPOINT + "?opcion=eq.CP&select=texto&limit=20000", { headers: H, cache: "no-store" }).then(function(r){ return r.ok ? r.json() : []; }).catch(function(){ return []; })   // v6.33: CP → qué salió de "a guardar"
       ]);
       const ent = par[0], meta = par[1], pp = par[2], pk = par[3] || [];
+      // v6.33 — CP con origen "a guardar": qué código(s) de cada NP salieron de a_guardar
+      // (texto = NP|COD|QTY|GONDOLA|AGUARDAR|LÍO; campo 3 = origen). Para marcarlos en la composición.
+      const aguardarByNp = {};
+      (par[5] || []).forEach(function(x){
+        const p = String(x.texto || "").split("|");
+        if (String(p[3] || "").trim().toUpperCase() !== "AGUARDAR") return;
+        const np = String(p[0] || "").trim().replace(/\.0+$/, ""), cod = String(p[1] || "").trim().toUpperCase(), q = Number(p[2]) || 0;
+        if (!np || !cod || q <= 0) return;
+        aguardarByNp[np] = aguardarByNp[np] || {}; aguardarByNp[np][cod] = (aguardarByNp[np][cod] || 0) + q;
+      });
       // Quién pickeó por tanda: TP (terminó) pisa a EP (empezó); con order asc queda el más reciente.
       const pickerByTanda = {};
       pk.forEach(function(x){
@@ -19247,7 +19260,8 @@ async function npcLoad(force){
           armadorLeg: String(t.legajo || ""),             // quién armó el pedido
           pickerLeg: String(pickerByTanda[tanda] || ""),  // quién pickeó la tanda
           lios: t.lios || 0, resumen: t.resumen || "", clase: t.clase || "",
-          ts: t.ts || "", legajo: t.legajo || "", falt: falt.get(np) || null
+          ts: t.ts || "", legajo: t.legajo || "", falt: falt.get(np) || null,
+          aguardar: aguardarByNp[np] || null   // v6.33: {COD: cajas} que salieron de a_guardar (CP)
         };
       });
       rows.sort(function(a, b){ return (b.fecha || "").localeCompare(a.fecha || "") || (a.tanda || "").localeCompare(b.tanda || "") || (a.np || "").localeCompare(b.np || ""); });
@@ -19291,8 +19305,9 @@ function npcRenderList(rows){
     const lios = cpParseResumen(r.resumen);
     const npcLabels = liosLabels(lios);
     const faltCods = {}; if (r.falt) r.falt.items.forEach(function(it){ const k = String(it.cod).toUpperCase(); faltCods[k] = (faltCods[k] || 0) + it.falto; });
+    const agCods = r.aguardar || {};   // v6.33: códigos que salieron de "a guardar" (CP)
     const liosHtml = lios.length ? lios.map(function(l, k){
-      const items = l.items.map(function(it){ const isF = faltCods[String(it.cod).toUpperCase()]; return '<span class="npc-item' + (isF ? ' f' : '') + '">' + escapeHtml(String(it.cod)) + '<i>×' + it.qty + '</i></span>'; }).join("");
+      const items = l.items.map(function(it){ const codU = String(it.cod).toUpperCase(); const isF = faltCods[codU]; const isAg = agCods[codU]; return '<span class="npc-item' + (isF ? ' f' : '') + (isAg ? ' ag' : '') + '"' + (isAg ? ' title="📥 Salió de «a guardar» (faltante que llegó y se completó)"' : '') + '>' + (isAg ? '📥' : '') + escapeHtml(String(it.cod)) + '<i>×' + it.qty + '</i></span>'; }).join("");
       return '<span class="npc-lio"><b>' + escapeHtml(npcLabels[k]) + '</b>' + items + (l.suelta ? '<em>suelta</em>' : '') + '</span>';
     }).join("") : '<span class="npc-nolio">— sin detalle de líos (TAL viejo sin resumen) —</span>';
     const faltDet = r.falt ? '<div class="npc-falt-det">⚠ Faltaron ' + r.falt.cajas + ' cajas: ' + r.falt.items.map(function(it){ return escapeHtml(it.cod) + '×' + it.falto; }).join(", ") + '</div>' : '';
