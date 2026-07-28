@@ -5564,7 +5564,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v6.35";
+const APP_VERSION = "v6.36";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -16965,7 +16965,11 @@ function pppRenderProg() {
   html += '<div class="ppp-sec-t ppp-sec-prog">📋 Sin tanda — por zona, ordenado por fecha de recepción · ' + sinTanda.length + '</div>';
   if (!sinTanda.length) html += '<div class="planim-empty">Todo agrupado en tandas 👌</div>';
   else {
-    const byZ = {}; for (const p of sinTanda) { const z = pppZonaDeBarrio(p.localidad) || "— sin zona —"; (byZ[z] = byZ[z] || []).push(p); }
+    // v6.36: si el barrio no resuelve zona pero el Excel trae la columna ZONA cargada,
+    // agrupá por esa (mismo criterio que el panel de errores: sin-zona SOLO si NI barrio
+    // NI columna). Antes agrupaba solo por barrio → pedidos con zona en el Excel (barrio
+    // desconocido, ej. V.Devoto / Villa Bosch) caían en "sin zona" aunque la tabla la mostraba.
+    const byZ = {}; for (const p of sinTanda) { const z = pppZonaDeBarrio(p.localidad) || _pppS(p.zona) || "— sin zona —"; (byZ[z] = byZ[z] || []).push(p); }
     const ordZ = function (z) { const i = PPP_ZONAS.indexOf(z); return i < 0 ? 99 : i; };
     const zs = Object.keys(byZ).sort(function (a, b) { return ordZ(a) - ordZ(b) || (a < b ? -1 : 1); });
     for (const z of zs) {
