@@ -71,6 +71,19 @@
 --             C58B/C58C/C58D ya tenían el descuento del seed manual.
 --    Góndola quedó con sólo 2 artículos en −5 (despreciable).
 --
+--  v6.29 — FIX DOBLE-FACTURADO (a_facturar negativo). La ETAPA 3 agrupaba por
+--    `ref` crudo y solo deduplicaba contra `facturado ref=tanda`. Pero el CLIENTE
+--    factura por NP con `ref=tanda|NP` → el cron NO lo veía y volvía a facturar
+--    (`ref=tanda`) → DOBLE facturado → a_facturar quedaba NEGATIVO (restaba stock
+--    real del total). Se veía en 137 códigos / 364 tandas / 1.417 cajas, 100%
+--    explicado por este pipeline. Fix (migración `pipeline_etapa3_facturado_por_
+--    tanda_evita_doble`): la ETAPA 3 ahora calcula el neto y el dedup POR TANDA,
+--    contando también los facturados del cliente (`ref=tanda|NP` → normaliza con
+--    split_part(ref,'|',1)). Solo drena el remanente REAL: si el cliente ya lo
+--    sacó, net<=0 y no hace nada → nunca más duplica. Los 1.417 ya colgados se
+--    compensaron con ajustes trazables (tipo='ajuste', legajo='reconcilia', uno
+--    por tanda, llevando cada a_facturar-por-tanda a 0). ETAPA 1 y 2 sin cambios.
+--
 --  La definición viva de la función está en la migración homónima en Supabase.
 --  Este archivo es la documentación del diseño (convención de sql/).
 -- =====================================================================
