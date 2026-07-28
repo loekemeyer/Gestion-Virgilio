@@ -42,7 +42,8 @@ catch (_e) {
       "stkOpenPedidos", "stkOpenGondola", "stkGondRender", "_stkPopAgg", "_stkFetchNpsByTanda", "stkCapSort",
       "askPickUbicacion", "emitPickUbic", "askArmadoUbicaciones", "emitArmadoUbic",
       "pkForzarGondola", "pkEmitRetiroGondola",
-      "pkNpEsLoeke", "pkDualBreakdown", "opDraftSaveQuiet"];
+      "pkNpEsLoeke", "pkDualBreakdown", "opDraftSaveQuiet",
+      "emitGuardadoSesion", "stkGRate", "stkGRacksOn", "stkGuardadoToggleRacks", "stkGConfVal"];
     const missing = need.filter((n) => typeof window[n] !== "function");
     const ts = new Date().toISOString();
     const sal = stockComputeSaldos([

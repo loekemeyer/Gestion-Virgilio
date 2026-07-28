@@ -5549,7 +5549,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v6.29";
+const APP_VERSION = "v6.30";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -8375,8 +8375,9 @@ async function openStockAdmin(soloConteo) {
   ov.innerHTML = '<div class="stk-card"><div class="stk-head"><span class="stk-title">' + (_solo ? "📋 Conteo de stock" : "📦 Stock y Compras") + '</span><button class="stk-close" onclick="closeStockAdmin()">Cerrar</button></div><div class="stk-tabs" id="stkTabs"></div><div class="stk-body" id="stkBody"><div class="stk-loading">Cargando…</div></div></div>';
   try {
     const res = await Promise.all([stockFetchMovs(), stockGetCutoff(), stockFetchArtFactors(), racksFetchOrdenes(), racksFetchBajadas(), loadArtNombres(), ocgDemanda().catch(function(){ return {}; }),
-      fetch(SUPABASE_CAPACIDAD_ENDPOINT + "?select=sector,cod,cajas_max&limit=50000", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; })]);
-    _stk = { movs: res[0] || [], cutoff: res[1], factors: res[2] || {}, ordenes: res[3] || [], bajadas: res[4] || [], tab: _solo ? "conteo" : "stocks", soloConteo: _solo, filtro: "", openArt: null, ingMode: "remito", asOf: null, asOfInput: "", dem: res[6] || {}, cap: res[7] || [] };
+      fetch(SUPABASE_CAPACIDAD_ENDPOINT + "?select=sector,cod,cajas_max&limit=50000", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; }),
+      fetch(SUPABASE_URL + "/rest/v1/Stock_Config?clave=in.(guardado_cajas_por_hora,guardado_incluir_racks)&select=clave,valor", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; })]);
+    _stk = { movs: res[0] || [], cutoff: res[1], factors: res[2] || {}, ordenes: res[3] || [], bajadas: res[4] || [], tab: _solo ? "conteo" : "stocks", soloConteo: _solo, filtro: "", openArt: null, ingMode: "remito", asOf: null, asOfInput: "", dem: res[6] || {}, cap: res[7] || [], gConf: res[8] || [] };
     stkRender();
   } catch (e) { const b = document.getElementById("stkBody"); if (b) b.innerHTML = '<div class="stk-loading">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
 }
@@ -9512,6 +9513,21 @@ function stkFiltroToggleE() {
   _stk.filtro = /e$/i.test(f) ? f.replace(/e$/i, "") : (f + "E");
   stkRender();
 }
+/* v6.30 — Ratio de guardado: helpers para la tarjeta "horas de guardado pendientes".
+   Ratio y switch de racks viven en Stock_Config (los trae openStockAdmin en _stk.gConf).
+   El ratio lo autoajusta el server (guardado_recalc_ratio) con las sesiones medidas. */
+function stkGConfVal(clave, def) { var a = (_stk && _stk.gConf) || []; for (var i = 0; i < a.length; i++) { if (a[i].clave === clave) return a[i].valor; } return def; }
+function stkGRate() { var v = parseFloat(stkGConfVal("guardado_cajas_por_hora", "380")); return (v > 0) ? v : 380; }
+function stkGRacksOn() { return String(stkGConfVal("guardado_incluir_racks", "0")) === "1"; }
+function stkGuardadoToggleRacks() {
+  if (!_stk) return;
+  var nuevo = stkGRacksOn() ? "0" : "1", found = false;
+  _stk.gConf = _stk.gConf || [];
+  _stk.gConf.forEach(function (x) { if (x.clave === "guardado_incluir_racks") { x.valor = nuevo; found = true; } });
+  if (!found) _stk.gConf.push({ clave: "guardado_incluir_racks", valor: nuevo });
+  stkRender();
+  fetch(SUPABASE_URL + "/rest/v1/Stock_Config?on_conflict=clave", { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ clave: "guardado_incluir_racks", valor: nuevo }) }).catch(function () {});
+}
 function stkBodyStocks() {
   if (_stk.sectDetail) return stkBodySectDetail();   // v4.35: detalle de un sector (click en un total)
   const saldos = stockComputeSaldos(_stk.movs, _stk.cutoff, _stk.asOf);
@@ -9563,6 +9579,21 @@ function stkBodyStocks() {
     '<span style="font-size:10px;text-transform:uppercase;color:#166534;font-weight:700;letter-spacing:.02em;">Capacidad</span>' +
     '<span style="font-size:17px;font-weight:800;color:#166534;font-variant-numeric:tabular-nums;">' + fmtCajas(totCap) + '</span></span>';
   h += '</div>';
+  // v6.30 — Tarjeta "horas de guardado pendientes" (backlog a_guardar [+ racks si el switch] ÷ ratio).
+  var _gRate = stkGRate(), _gRacks = stkGRacksOn();
+  var _gBacklog = Math.max(0, (Number(totals.a_guardar) || 0) + (_gRacks ? (Number(totals.racks) || 0) : 0));
+  var _gHoras = _gRate > 0 ? Math.round((_gBacklog / _gRate) * 10) / 10 : 0;
+  var _gCol = _gHoras > 6 ? "#b91c1c" : (_gHoras >= 4 ? "#b45309" : "#166534");
+  var _gBg = _gHoras > 6 ? "#fef2f2" : (_gHoras >= 4 ? "#fffbeb" : "#f0fdf4");
+  var _gBd = _gHoras > 6 ? "#fca5a5" : (_gHoras >= 4 ? "#fcd34d" : "#86efac");
+  h += '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:' + _gBg + ';border:1.5px solid ' + _gBd + ';border-radius:12px;padding:10px 14px;margin-bottom:12px;">' +
+    '<div style="flex:1;min-width:190px;"><span style="font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:#64748b;font-weight:800;">⏱ Horas de guardado pendientes</span><br>' +
+    '<span style="font-size:26px;font-weight:800;color:' + _gCol + ';font-variant-numeric:tabular-nums;">' + _gHoras + ' h</span> ' +
+    '<span style="font-size:12.5px;color:#64748b;">' + Math.round(_gBacklog) + ' cajas ÷ ' + Math.round(_gRate) + ' cajas/h</span>' +
+    (_gHoras > 6 ? '<br><span style="font-size:12px;font-weight:800;color:#b91c1c;">🆘 Más de 6 h — pedir personal a Cervantes</span>' : '') +
+    '</div>' +
+    '<button onclick="stkGuardadoToggleRacks()" title="Sumar al cálculo lo que hay que bajar de racks (por ahora apagado)" style="width:auto;margin:0;background:' + (_gRacks ? "#1e6bd6" : "#fff") + ';color:' + (_gRacks ? "#fff" : "#334155") + ';border:1px solid ' + (_gRacks ? "#1e6bd6" : "#cbd5e1") + ';border-radius:9px;padding:9px 13px;font-size:12.5px;font-weight:800;cursor:pointer;white-space:nowrap;">' + (_gRacks ? "☑" : "☐") + ' Incluir racks</button>' +
+    '</div>';
   // v5.53 — dos pop-ups: NPs por estadio (pickeado→facturar) y movimientos de góndola.
   h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">' +
     '<button onclick="stkOpenPedidos()" style="width:auto;margin:0;padding:9px 13px;border:1px solid #c7d2fe;border-radius:10px;background:#eef2ff;color:#3730a3;font-size:13px;font-weight:800;cursor:pointer;">📋 Pedidos por estadio</button>' +
@@ -11142,7 +11173,7 @@ async function showMGModal(legajo, _resume) {
     const res = await Promise.all([stockFetchSaldos(), loadArtNombres()]);
     const saldos = res[0] || {};
     const items = Object.keys(saldos).map(function (k) { return saldos[k]; }).filter(function (a) { return a.a_guardar > 0; }).sort(function (a, b) { return (parseInt(a.cod, 10) || 0) - (parseInt(b.cod, 10) || 0); }).map(function (a) { return { cod: a.cod, desc: artNombre(a.cod, a.desc), disponible: a.a_guardar, cargar: 0, exc: 0, ubic: "", excOn: false }; });
-    _mg = { legajo: String(legajo || ""), items: items, filtro: "" };
+    _mg = { legajo: String(legajo || ""), items: items, filtro: "", tsInicio: Date.now() };
     mgRender();
   } catch (e) { const b = document.getElementById("mgBody"); if (b) b.innerHTML = '<div class="mg-loading">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
 }
@@ -11239,10 +11270,30 @@ function mgConfirmar() {
   });
   const nG = sel.reduce(function (s, it) { return s + it.cargar; }, 0);
   const nE = sel.reduce(function (s, it) { return s + (it.exc || 0); }, 0);
+  const _tsIni = _mg.tsInicio, _leg = _mg.legajo;   // capturar ANTES de cerrar (closeMG anula _mg)
   try { opDraftClear(_mg && _mg.legajo); } catch (_e) {}
   closeMG();
   stockMove(rows);
+  try { emitGuardadoSesion(nG + nE, _tsIni, _leg); } catch (_e) {}   // ratio de guardado (se autonutre)
   try { alert("✓ Guardado: " + nG + " caja(s) a góndola" + (nE > 0 ? " y " + nE + " a excedente" : "") + "."); } catch (_e) {}
+}
+/* v6.30 — Instrumentación del ratio de guardado (cajas/hora). Al confirmar un MG registra
+   (cajas, segundos) reales de la sesión (desde que se abrió el modal) en Guardado_Sesiones.
+   El recálculo diario del server (guardado_recalc_ratio) usa esto para AJUSTAR el ratio y
+   reemplazar la semilla cuando hay datos suficientes. Sesiones muy cortas/largas las filtra
+   el server (30s..2h). No persiste para PRUEBA. */
+function emitGuardadoSesion(cajas, tsInicio, legajo) {
+  try {
+    if (typeof esOperadorPrueba === "function" && esOperadorPrueba()) return;
+    const c = Math.round(Number(cajas) || 0); if (c <= 0) return;
+    if (!tsInicio) return;
+    const seg = Math.max(1, Math.round((Date.now() - tsInicio) / 1000));
+    fetch(SUPABASE_URL + "/rest/v1/Guardado_Sesiones", {
+      method: "POST",
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" },
+      body: JSON.stringify({ legajo: String(legajo || "").trim() || null, segundos: seg, cajas: c })
+    }).catch(function () {});
+  } catch (_e) {}
 }
 /* Evento MGX: se guardó un código que NO estaba en "Mercadería a guardar". Un
    trigger de Supabase lo reenvía por Telegram. texto = "COD|G<góndola>|E<exc>". */
