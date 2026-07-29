@@ -5564,7 +5564,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v6.42";
+const APP_VERSION = "v6.43";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -10649,6 +10649,33 @@ async function stockGuardarInicial() {
     if (m) rows.push({ cod_art: m[1].toUpperCase(), deposito: dep, delta: Number(m[2]), tipo: "inicial", ref: "carga inicial", legajo: "0" });
   });
   if (!rows.length) { alert("No encontré líneas válidas. " + (esInsumo ? "Insumos: CÓDIGO ; DESCRIPCIÓN ; CANTIDAD ; MEDIDA ; SECTOR (o CÓDIGO CANTIDAD)." : "Formato: CÓDIGO CANTIDAD (una por línea).")); return; }
+  // v6.43 — Capa 2/3: canonicalizar el código (mismo criterio que el trigger de la base) y
+  // AVISAR antes de guardar: qué códigos se corrigen (0027→027), cuáles se repiten (se suman),
+  // y si un ARTÍCULO TERMINADO se está cargando a «insumos» (el error del 27/7). El trigger de
+  // Movimientos_Stock igual corrige el código; esto lo hace visible y frena el pegado equivocado.
+  try { await loadCodCanon(); } catch (_e) {}
+  const _canonPrev = function (cod) {
+    const raw = String(cod == null ? "" : cod).toUpperCase().trim();
+    const k = _ocgNorm(raw); if (!k) return raw;
+    if (_codCanon && _codCanon[k]) return _codCanon[k];
+    if (/^[0-9]+$/.test(raw)) return k.length >= 3 ? k : k.padStart(3, "0");
+    return raw;
+  };
+  const _corr = [], _vistos = {}, _dups = {}, _art2ins = [];
+  rows.forEach(function (r) {
+    const orig = r.cod_art, canon = _canonPrev(orig);
+    if (canon !== orig) _corr.push(orig + " → " + canon);
+    r.cod_art = canon;                                   // guardar ya canónico (coincide con la base)
+    if (_vistos[canon]) _dups[canon] = true; else _vistos[canon] = true;
+    if (esInsumo && _codCanon && _codCanon[_ocgNorm(canon)]) _art2ins.push(canon + (r.descripcion ? " " + r.descripcion : ""));
+  });
+  let _aviso = "Vas a cargar " + rows.length + " línea(s) de stock inicial en «" + dep + "».";
+  if (_corr.length) _aviso += "\n\n⚠ " + _corr.length + " código(s) se corrigen al canónico:\n  " + _corr.slice(0, 12).join("\n  ") + (_corr.length > 12 ? "\n  …(+" + (_corr.length - 12) + " más)" : "");
+  const _dupList = Object.keys(_dups);
+  if (_dupList.length) _aviso += "\n\n⚠ " + _dupList.length + " código(s) repetidos (se SUMAN): " + _dupList.slice(0, 15).join(", ") + (_dupList.length > 15 ? " …" : "");
+  if (_art2ins.length) _aviso += "\n\n⛔ " + _art2ins.length + " código(s) parecen ARTÍCULO TERMINADO y van a «INSUMOS»:\n  " + _art2ins.slice(0, 10).join("\n  ") + (_art2ins.length > 10 ? "\n  …(+" + (_art2ins.length - 10) + " más)" : "") + "\n\n¿Seguro que van a insumos y no a góndola?";
+  _aviso += "\n\n¿Confirmás la carga?";
+  if (!confirm(_aviso)) return;
   try {
     const r = await fetch(SUPABASE_STOCK_ENDPOINT, { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" }, body: JSON.stringify(rows) });
     if (!r.ok) throw new Error("HTTP " + r.status);
