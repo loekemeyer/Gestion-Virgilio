@@ -5566,7 +5566,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v6.47";
+const APP_VERSION = "v6.48";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -10363,7 +10363,17 @@ function _stkMovsBlock() {
 }
 function stkMovsArtRender() {
   const body = document.getElementById("stkPopBody"); if (!body || !_stkPop) return;
-  body.innerHTML = _stkMovsBlock();
+  // v6.48: navegación de vuelta al detalle "clásico" del depósito (NPs/tandas para
+  // pickeados y a facturar, ubicaciones para excedente) — quedó inalcanzable en v6.47
+  // cuando el click de columna pasó a abrir movimientos directo.
+  let nav = "";
+  const _ce = encodeURIComponent(_stkPop.cod);
+  if (_stkPop.dep === "separar_pedidos" || _stkPop.dep === "a_facturar") {
+    nav = '<div style="margin-bottom:10px"><button class="mva-clear" onclick="stkOpenEstadioArt(\'' + _ce + '\',\'' + _stkPop.dep + '\')">📋 Ver NPs / tandas</button></div>';
+  } else if (_stkPop.dep === "excedente") {
+    nav = '<div style="margin-bottom:10px"><button class="mva-clear" onclick="stkOpenExcedenteArt(\'' + _ce + '\')">📍 Ver ubicaciones</button></div>';
+  }
+  body.innerHTML = nav + _stkMovsBlock();
 }
 /* v5.101 — Racks por artículo: posiciones de la planimetría (como antes) + los
    MOVIMIENTOS del depósito racks con filtro de rango de fechas y saldo. */
