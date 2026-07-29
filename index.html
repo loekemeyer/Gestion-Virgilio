@@ -5564,7 +5564,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v6.39";
+const APP_VERSION = "v6.40";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -19529,7 +19529,7 @@ function remitoPrintDoc(inner){
   function autofit(){
     try {
       const el = doc.getElementById("rmtFit"); if (!el) return;
-      const TARGET = 1010; let lo = 11, hi = 34, best = 15;   // alto útil A4 ≈ 1010px
+      const TARGET = 1010; let lo = 11, hi = 16, best = 15;   // alto útil A4 ≈ 1010px; TOPE 16px para que un remito con POCO contenido (ej. hoja de prueba) NO agrande la letra al absurdo (v6.40)
       for (let i = 0; i < 18; i++){ const mid = (lo + hi) / 2; el.style.fontSize = mid + "px"; if (el.scrollHeight <= TARGET){ best = mid; lo = mid; } else { hi = mid; } }
       el.style.fontSize = best + "px";
     } catch (_e) {}
