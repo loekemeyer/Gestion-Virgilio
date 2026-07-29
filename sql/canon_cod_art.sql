@@ -52,3 +52,9 @@ drop trigger if exists trg_canon_cod_art on public."Movimientos_Stock";
 create trigger trg_canon_cod_art
   before insert on public."Movimientos_Stock"
   for each row execute function public.fn_canon_cod_art();
+
+-- Endurecimiento (auditoría): la función es de tipo trigger y NO es invocable como RPC,
+-- pero el grant PUBLIC EXECUTE por defecto dispara los advisors 0028/0029. Se revoca para
+-- dejarlos en verde; el trigger sigue funcionando (corre con privilegios del owner).
+-- Aplicado como migración `canon_cod_art_revoke_execute`.
+revoke execute on function public.fn_canon_cod_art() from public, anon, authenticated;
