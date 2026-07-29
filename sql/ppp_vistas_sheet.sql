@@ -42,3 +42,7 @@ where f.cierre_id is not null;
 
 grant select on public.vista_ppp_programacion_pendiente to anon, authenticated;
 grant select on public.vista_ppp_pedidos_entregados     to anon, authenticated;
+
+-- Índice de apoyo para el lateral (ev.np = f.np) — recomendación del auditor.
+-- (Aplicado como migración `entregas_virgilio_np_idx`.)
+create index if not exists entregas_virgilio_np_idx on public."Entregas_Virgilio" (np);
