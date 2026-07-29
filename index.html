@@ -12337,7 +12337,13 @@ async function showCPModal(legajo, _resume, focusNp) {
     // GUARDÓ HOY (aunque ya esté en góndola) — lo que llegó/se guardó hoy es lo que se completa
     // en los pedidos ya armados. Si no está a guardar ni se guardó hoy, no figura (faltante de
     // picking viejo). Excepción: enfoque en una NP puntual (focusNp, "Cargar las cajas").
-    if (!focusNp) fr = fr.filter(function (e) { return (Number((e._saldo || {}).a_guardar) || 0) > 0 || e._guardadoHoy; });
+    // v6.19: si guardadoHoy, verificar que haya stock real (a_guardar + terminado > 0).
+    if (!focusNp) fr = fr.filter(function (e) {
+      const sal = e._saldo || {};
+      const ag = Number(sal.a_guardar) || 0;
+      const go = Number(sal.terminado) || 0;
+      return ag > 0 || (e._guardadoHoy && (ag + go) > 0);
+    });
     // v5.89: si vengo del "Completar ahora" de una tarea de faltante, foco SOLO en esa NP
     // → el operario no busca en la lista, va derecho a cargar sus cajas + lío.
     if (focusNp) { const fn = String(focusNp).trim().replace(/\.0+$/, ""); fr = fr.filter(function (e) { return String(e.np).trim().replace(/\.0+$/, "") === fn; }); }
