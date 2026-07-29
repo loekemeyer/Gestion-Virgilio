@@ -5564,7 +5564,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v6.43";
+const APP_VERSION = "v6.44";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -15320,7 +15320,44 @@ async function pppRenderSupaCounts() {
   const any = res.some(function (n) { return n != null && n > 0; });
   el.innerHTML = '🛰 <b>En la PPP (Supabase) ahora</b> — lo que cargó el espejo / último import: ' +
     'Base Pedidos <b>' + f(res[0]) + '</b> · Programación <b>' + f(res[1]) + '</b> · Entregados <b>' + f(res[2]) + '</b> filas.' +
-    (any ? '' : ' <span style="color:#b45309">⚠ Está vacía — todavía no se cargó nada.</span>');
+    (any ? '' : ' <span style="color:#b45309">⚠ Está vacía — todavía no se cargó nada.</span>') +
+    ' <button onclick="pppExportExcel()" style="margin-left:8px;padding:4px 10px;font-size:12px;font-weight:700;border:1px solid #0f766e;border-radius:8px;background:#0f766e;color:#fff;cursor:pointer">⬇ Exportar PPP a Excel</button>';
+}
+/* v6.44 — Exportar la PPP a un Excel de DOS hojas (Programación Diaria pendiente +
+   Pedidos Entregados), en vivo desde las vistas de Supabase. Genera un .xls multi-hoja
+   (formato SpreadsheetML/HTML que abre Excel con las 2 pestañas). Foto on-demand. */
+const PPP_XLS_HOJAS = [
+  { view: "vista_ppp_programacion_pendiente", hoja: "Programación Diaria", order: "tanda.asc,np.asc",
+    cols: [["tanda","Tanda"],["np","NP"],["tipo","Tipo"],["cod_cliente","Cód cliente"],["razon_social","Razón social"],["m3","m³"],["zona","Zona"],["barrio","Barrio"],["direccion","Dirección"],["op","Op"],["fecha_recep","Fecha recep"],["fecha_entrega","Fecha entrega"],["fecha_fc","Fecha FC"],["observaciones","Observaciones"]] },
+  { view: "vista_ppp_pedidos_entregados", hoja: "Pedidos Entregados", order: "facturado_at.desc",
+    cols: [["np","NP"],["tanda","Tanda"],["cod_cliente","Cód cliente"],["razon_social","Razón social"],["m3","m³"],["fecha_salida","Fecha salida"],["fecha_cierre","Fecha cierre"],["fecha_reparto","Fecha reparto"],["facturado_at","Facturado"],["cajas_pedidas","Cajas ped."],["cajas_entregadas","Cajas entr."],["cajas_falto","Faltó"]] }
+];
+async function pppExportExcel() {
+  try {
+    const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+    const datos = await Promise.all(PPP_XLS_HOJAS.map(function (h) {
+      const sel = h.cols.map(function (c) { return c[0]; }).join(",");
+      return fetch(SUPABASE_URL + "/rest/v1/" + h.view + "?select=" + sel + "&order=" + encodeURIComponent(h.order) + "&limit=50000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; });
+    }));
+    let wsXml = "", body = "";
+    PPP_XLS_HOJAS.forEach(function (h, i) {
+      wsXml += '<x:ExcelWorksheet><x:Name>' + h.hoja + '</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet>';
+      let t = '<table border="1"><thead><tr>' + h.cols.map(function (c) { return '<th>' + escapeHtml(c[1]) + '</th>'; }).join("") + '</tr></thead><tbody>';
+      (datos[i] || []).forEach(function (row) {
+        t += '<tr>' + h.cols.map(function (c) { const v = row[c[0]]; return '<td>' + escapeHtml(v == null ? "" : String(v)) + '</td>'; }).join("") + '</tr>';
+      });
+      body += t + '</tbody></table>';
+    });
+    const html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8">' +
+      '<!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets>' + wsXml + '</x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->' +
+      '<style>table{border-collapse:collapse;font-family:Arial,sans-serif;font-size:11px}th{background:#0f766e;color:#fff}th,td{border:1px solid #999;padding:3px 6px;mso-number-format:"\\@"}</style></head><body>' + body + '</body></html>';
+    const fecha = new Date().toISOString().slice(0, 10);
+    const blob = new Blob(["\ufeff" + html], { type: "application/vnd.ms-excel" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = "PPP_" + fecha + ".xls";
+    document.body.appendChild(a); a.click();
+    setTimeout(function () { try { document.body.removeChild(a); URL.revokeObjectURL(url); } catch (_e) {} }, 1500);
+  } catch (e) { try { alert("No se pudo generar el Excel: " + (e.message || e)); } catch (_e) {} }
 }
 /* ===== Auto-carga de PPP / Base desde una carpeta local (File System Access API) =====
    Pedido del usuario: en vez de importar el Excel a mano, elegir el archivo UNA vez y
