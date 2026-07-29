@@ -3214,6 +3214,7 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
           <div id="pppAutoBox" class="ppp-auto"></div>
         </div>
       </div>
+      <button class="ppp-imp-toggle" onclick="pppExportExcel()" title="Baja un Excel de 2 hojas (Programación Diaria pendiente + Pedidos Entregados), en vivo desde Supabase.">⬇ Exportar Excel</button>
       <button class="ppp-imp-toggle ppp-sup-toggle" onclick="openPppSupers()" title="Agregar/quitar clientes súper">🛒 Clientes súper</button>
       <button class="ppp-imp-toggle ppp-pdf-toggle" onclick="pppConnectPdfDir()" title="Conectar las carpetas con los PDF de ISIS (ej. X:\PDF_ISIS y X:\PDF_ISISCHEF). Podés agregar VARIAS: tocá una vez por carpeta. Elegí la subcarpeta, NO el disco entero (Chrome bloquea raíces de disco y carpetas del sistema). Necesita Chrome/Edge en PC.">🖨️ Carpeta(s) PDF</button>
       <span id="pppPdfDirStatus" class="ppp-pdfdir-status"></span>
@@ -5564,7 +5565,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v6.44";
+const APP_VERSION = "v6.45";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -15320,8 +15321,7 @@ async function pppRenderSupaCounts() {
   const any = res.some(function (n) { return n != null && n > 0; });
   el.innerHTML = '🛰 <b>En la PPP (Supabase) ahora</b> — lo que cargó el espejo / último import: ' +
     'Base Pedidos <b>' + f(res[0]) + '</b> · Programación <b>' + f(res[1]) + '</b> · Entregados <b>' + f(res[2]) + '</b> filas.' +
-    (any ? '' : ' <span style="color:#b45309">⚠ Está vacía — todavía no se cargó nada.</span>') +
-    ' <button onclick="pppExportExcel()" style="margin-left:8px;padding:4px 10px;font-size:12px;font-weight:700;border:1px solid #0f766e;border-radius:8px;background:#0f766e;color:#fff;cursor:pointer">⬇ Exportar PPP a Excel</button>';
+    (any ? '' : ' <span style="color:#b45309">⚠ Está vacía — todavía no se cargó nada.</span>');
 }
 /* v6.44 — Exportar la PPP a un Excel de DOS hojas (Programación Diaria pendiente +
    Pedidos Entregados), en vivo desde las vistas de Supabase. Genera un .xls multi-hoja
