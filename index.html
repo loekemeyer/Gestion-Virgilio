@@ -12303,6 +12303,48 @@ async function cpLoadGuardadoHoy() {
   } catch (_e) {}
   return set;
 }
+/* v6.19 — Artículos con stock en RACKS pero SIN góndola → mapa {cod_art: saldo_racks}.
+   Detecta cuando hay mercadería en racks que necesita trasladarse a góndola. */
+async function cpLoadRacksNoGondola(saldos) {
+  const map = {};
+  try {
+    Object.keys(saldos || {}).forEach(function (cod) {
+      const s = saldos[cod] || {};
+      const racks = Number(s.racks) || 0;
+      const gon = Number(s.terminado) || 0;
+      if (racks > 0 && gon === 0) {
+        map[_cpNorm(cod)] = racks;
+      }
+    });
+  } catch (_e) {}
+  return map;
+}
+/* v6.19 — Envía alerta a Telegram (grupo "Faltantes Virgilio") cuando hay artículos
+   con stock en racks que deben trasladarse a góndola. */
+async function cpSendTelegramAlert(artCod, saldoRacks, saldoGondola) {
+  try {
+    const msg = "⚠️ *MOVER RACKS → GONDOLA*\n" +
+      "Artículo: `" + String(artCod) + "`\n" +
+      "Stock en racks: " + Math.round(saldoRacks) + " cajas\n" +
+      "En góndola: " + (Math.round(saldoGondola) || 0) + " cajas\n" +
+      "_Acción: trasladar de racks a góndola_";
+    const CHAT_ID = "-1002231959863";
+    const url = SUPABASE_URL + "/rest/v1/telegram_outbox";
+    const body = {
+      chat_id: CHAT_ID,
+      text: msg,
+      parse_mode: "Markdown",
+      status: "pending",
+      dedup_key: "cp_racks_" + String(artCod).trim() + "_" + cpTodayAR()
+    };
+    await fetch(url, {
+      method: "POST",
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      cache: "no-store"
+    });
+  } catch (_e) {}
+}
 /* v6.18 — Razón social por NP (de PPP_Programacion_Diaria) → mostrar el NOMBRE del cliente en el CP. */
 async function cpLoadRazonSocial(nps) {
   const map = {};
@@ -12330,6 +12372,7 @@ async function showCPModal(legajo, _resume, focusNp) {
     const res = await Promise.all([cpLoadFaltantes(), stockFetchSaldos(), loadArtNombres(), cpLoadPickSinArmar(), cpLoadGuardadoHoy()]);
     const falt = res[0] || [], saldos = res[1] || {}, guardadoHoy = res[4] || new Set();
     const sN = {}; Object.keys(saldos).forEach(function (k) { sN[_cpNorm(k)] = saldos[k]; });
+    const racksNoGon = await cpLoadRacksNoGondola(saldos);
     const today = cpTodayAR(), cut = today ? cpDateMinus(today, 21) : "";
     let fr = falt.filter(function (e) { const d = String(e.fecha_salida || "").slice(0, 10); return !d || !cut || d >= cut; });
     fr.forEach(function (e) { e.desc = artNombre(e.cod_art, ""); e._saldo = sN[_cpNorm(e.cod_art)] || null; e._guardadoHoy = guardadoHoy.has(_cpNorm(e.cod_art)); });
@@ -12344,12 +12387,20 @@ async function showCPModal(legajo, _resume, focusNp) {
       const go = Number(sal.terminado) || 0;
       return ag > 0 || (e._guardadoHoy && (ag + go) > 0);
     });
+    // v6.19: detectar faltantes que tienen stock en racks (prioridad 1: faltantes + racks sin góndola)
+    fr.forEach(function (e) {
+      const codNorm = _cpNorm(e.cod_art);
+      if (racksNoGon[codNorm]) {
+        e._racksAlert = racksNoGon[codNorm];
+        cpSendTelegramAlert(e.cod_art, racksNoGon[codNorm], Number((e._saldo || {}).terminado) || 0);
+      }
+    });
     // v5.89: si vengo del "Completar ahora" de una tarea de faltante, foco SOLO en esa NP
     // → el operario no busca en la lista, va derecho a cargar sus cajas + lío.
     if (focusNp) { const fn = String(focusNp).trim().replace(/\.0+$/, ""); fr = fr.filter(function (e) { return String(e.np).trim().replace(/\.0+$/, "") === fn; }); }
     // v6.18: nombre del cliente (razón social) por NP
     try { const rsMap = await cpLoadRazonSocial(fr.map(function (e) { return e.np; })); fr.forEach(function (e) { e.rs = rsMap[String(e.np).trim().replace(/\.0+$/, "")] || ""; }); } catch (_e) {}
-    _cp = { legajo: String(legajo || ""), step: 1, falt: fr, saldosN: sN, guardadoHoy: guardadoHoy, sel: null, qty: 1, origen: "a_guardar", lioSel: "__new__", _liosInfo: null, liosLoading: false, pickPend: res[3] || [], focusNp: focusNp || null };
+    _cp = { legajo: String(legajo || ""), step: 1, falt: fr, saldosN: sN, guardadoHoy: guardadoHoy, racksNoGon: racksNoGon, sel: null, qty: 1, origen: "a_guardar", lioSel: "__new__", _liosInfo: null, liosLoading: false, pickPend: res[3] || [], focusNp: focusNp || null };
     if (focusNp && fr.length === 1) cpPickFalt(0); else cpRender();
   } catch (e) { const b = document.getElementById("cpBody"); if (b) b.innerHTML = '<div class="cp-loading">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
 }
@@ -12367,9 +12418,11 @@ function cpRender() {
   else h += _cp.falt.map(function (e, i) {
     const cli = (e.rs || "").trim() || String(e.cod_cliente || "").trim();
     const s = e._saldo || {}, ag = Math.round(Number(s.a_guardar) || 0), go = Math.round(Number(s.terminado) || 0);
-    const stockTxt = ag > 0 ? ("a guardar: " + ag) : (e._guardadoHoy ? ("guardado hoy" + (go > 0 ? " · góndola: " + go : "")) : "");
-    return '<button class="cp-frow" onclick="cpPickFalt(' + i + ')">' +
-      '<div class="cp-frow-top"><span class="cp-cod">' + escapeHtml(String(e.cod_art)) + '</span> <span class="cp-fdesc">' + escapeHtml(e.desc || "") + '</span><span style="margin-left:auto;font-size:11.5px;font-weight:800;color:#0e7490;white-space:nowrap;">' + escapeHtml(stockTxt) + '</span></div>' +
+    const racks = Math.round(Number(e._racksAlert) || 0);
+    let stockTxt = ag > 0 ? ("a guardar: " + ag) : (e._guardadoHoy ? ("guardado hoy" + (go > 0 ? " · góndola: " + go : "")) : "");
+    const racksWarning = racks > 0 ? " ⚠️ RACKS: " + racks : "";
+    return '<button class="cp-frow" onclick="cpPickFalt(' + i + ')" style="' + (racks > 0 ? "background:#fef3c7;border-color:#fca5a5;" : "") + '">' +
+      '<div class="cp-frow-top"><span class="cp-cod">' + escapeHtml(String(e.cod_art)) + '</span> <span class="cp-fdesc">' + escapeHtml(e.desc || "") + '</span><span style="margin-left:auto;font-size:11.5px;font-weight:800;color:' + (racks > 0 ? "#dc2626" : "#0e7490") + ';white-space:nowrap;">' + escapeHtml(stockTxt + racksWarning) + '</span></div>' +
       '<div class="cp-frow-bot"><span class="cp-np">NP ' + escapeHtml(String(e.np)) + (cli ? ' · ' + escapeHtml(cli) : '') + (e.tanda ? ' · ' + escapeHtml(String(e.tanda)) : '') + '</span><span class="cp-faltan">faltan ' + Math.round(Number(e.cajas_falto) || 0) + '</span></div>' +
       '</button>';
   }).join("");
