@@ -12303,6 +12303,48 @@ async function cpLoadGuardadoHoy() {
   } catch (_e) {}
   return set;
 }
+/* v6.19 — Artículos con stock en RACKS pero SIN góndola → mapa {cod_art: saldo_racks}.
+   Detecta cuando hay mercadería en racks que necesita trasladarse a góndola. */
+async function cpLoadRacksNoGondola(saldos) {
+  const map = {};
+  try {
+    Object.keys(saldos || {}).forEach(function (cod) {
+      const s = saldos[cod] || {};
+      const racks = Number(s.racks) || 0;
+      const gon = Number(s.terminado) || 0;
+      if (racks > 0 && gon === 0) {
+        map[_cpNorm(cod)] = racks;
+      }
+    });
+  } catch (_e) {}
+  return map;
+}
+/* v6.19 — Envía alerta a Telegram (grupo "Faltantes Virgilio") cuando hay artículos
+   con stock en racks que deben trasladarse a góndola. */
+async function cpSendTelegramAlert(artCod, saldoRacks, saldoGondola) {
+  try {
+    const msg = "⚠️ *MOVER RACKS → GONDOLA*\n" +
+      "Artículo: `" + String(artCod) + "`\n" +
+      "Stock en racks: " + Math.round(saldoRacks) + " cajas\n" +
+      "En góndola: " + (Math.round(saldoGondola) || 0) + " cajas\n" +
+      "_Acción: trasladar de racks a góndola_";
+    const CHAT_ID = "-1002231959863";
+    const url = SUPABASE_URL + "/rest/v1/telegram_outbox";
+    const body = {
+      chat_id: CHAT_ID,
+      text: msg,
+      parse_mode: "Markdown",
+      status: "pending",
+      dedup_key: "cp_racks_" + String(artCod).trim() + "_" + cpTodayAR()
+    };
+    await fetch(url, {
+      method: "POST",
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      cache: "no-store"
+    });
+  } catch (_e) {}
+}
 /* v6.18 — Razón social por NP (de PPP_Programacion_Diaria) → mostrar el NOMBRE del cliente en el CP. */
 async function cpLoadRazonSocial(nps) {
   const map = {};
@@ -12330,6 +12372,7 @@ async function showCPModal(legajo, _resume, focusNp) {
     const res = await Promise.all([cpLoadFaltantes(), stockFetchSaldos(), loadArtNombres(), cpLoadPickSinArmar(), cpLoadGuardadoHoy()]);
     const falt = res[0] || [], saldos = res[1] || {}, guardadoHoy = res[4] || new Set();
     const sN = {}; Object.keys(saldos).forEach(function (k) { sN[_cpNorm(k)] = saldos[k]; });
+    const racksNoGon = await cpLoadRacksNoGondola(saldos);
     const today = cpTodayAR(), cut = today ? cpDateMinus(today, 21) : "";
     let fr = falt.filter(function (e) { const d = String(e.fecha_salida || "").slice(0, 10); return !d || !cut || d >= cut; });
     fr.forEach(function (e) { e.desc = artNombre(e.cod_art, ""); e._saldo = sN[_cpNorm(e.cod_art)] || null; e._guardadoHoy = guardadoHoy.has(_cpNorm(e.cod_art)); });
@@ -12337,13 +12380,27 @@ async function showCPModal(legajo, _resume, focusNp) {
     // GUARDÓ HOY (aunque ya esté en góndola) — lo que llegó/se guardó hoy es lo que se completa
     // en los pedidos ya armados. Si no está a guardar ni se guardó hoy, no figura (faltante de
     // picking viejo). Excepción: enfoque en una NP puntual (focusNp, "Cargar las cajas").
-    if (!focusNp) fr = fr.filter(function (e) { return (Number((e._saldo || {}).a_guardar) || 0) > 0 || e._guardadoHoy; });
+    // v6.19: si guardadoHoy, verificar que haya stock real (a_guardar + terminado > 0).
+    if (!focusNp) fr = fr.filter(function (e) {
+      const sal = e._saldo || {};
+      const ag = Number(sal.a_guardar) || 0;
+      const go = Number(sal.terminado) || 0;
+      return ag > 0 || (e._guardadoHoy && (ag + go) > 0);
+    });
+    // v6.19: detectar faltantes que tienen stock en racks (prioridad 1: faltantes + racks sin góndola)
+    fr.forEach(function (e) {
+      const codNorm = _cpNorm(e.cod_art);
+      if (racksNoGon[codNorm]) {
+        e._racksAlert = racksNoGon[codNorm];
+        cpSendTelegramAlert(e.cod_art, racksNoGon[codNorm], Number((e._saldo || {}).terminado) || 0);
+      }
+    });
     // v5.89: si vengo del "Completar ahora" de una tarea de faltante, foco SOLO en esa NP
     // → el operario no busca en la lista, va derecho a cargar sus cajas + lío.
     if (focusNp) { const fn = String(focusNp).trim().replace(/\.0+$/, ""); fr = fr.filter(function (e) { return String(e.np).trim().replace(/\.0+$/, "") === fn; }); }
     // v6.18: nombre del cliente (razón social) por NP
     try { const rsMap = await cpLoadRazonSocial(fr.map(function (e) { return e.np; })); fr.forEach(function (e) { e.rs = rsMap[String(e.np).trim().replace(/\.0+$/, "")] || ""; }); } catch (_e) {}
-    _cp = { legajo: String(legajo || ""), step: 1, falt: fr, saldosN: sN, guardadoHoy: guardadoHoy, sel: null, qty: 1, origen: "a_guardar", lioSel: "__new__", _liosInfo: null, liosLoading: false, pickPend: res[3] || [], focusNp: focusNp || null };
+    _cp = { legajo: String(legajo || ""), step: 1, falt: fr, saldosN: sN, guardadoHoy: guardadoHoy, racksNoGon: racksNoGon, sel: null, qty: 1, origen: "a_guardar", lioSel: "__new__", _liosInfo: null, liosLoading: false, pickPend: res[3] || [], focusNp: focusNp || null };
     if (focusNp && fr.length === 1) cpPickFalt(0); else cpRender();
   } catch (e) { const b = document.getElementById("cpBody"); if (b) b.innerHTML = '<div class="cp-loading">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
 }
@@ -12361,9 +12418,11 @@ function cpRender() {
   else h += _cp.falt.map(function (e, i) {
     const cli = (e.rs || "").trim() || String(e.cod_cliente || "").trim();
     const s = e._saldo || {}, ag = Math.round(Number(s.a_guardar) || 0), go = Math.round(Number(s.terminado) || 0);
-    const stockTxt = ag > 0 ? ("a guardar: " + ag) : (e._guardadoHoy ? ("guardado hoy" + (go > 0 ? " · góndola: " + go : "")) : "");
-    return '<button class="cp-frow" onclick="cpPickFalt(' + i + ')">' +
-      '<div class="cp-frow-top"><span class="cp-cod">' + escapeHtml(String(e.cod_art)) + '</span> <span class="cp-fdesc">' + escapeHtml(e.desc || "") + '</span><span style="margin-left:auto;font-size:11.5px;font-weight:800;color:#0e7490;white-space:nowrap;">' + escapeHtml(stockTxt) + '</span></div>' +
+    const racks = Math.round(Number(e._racksAlert) || 0);
+    let stockTxt = ag > 0 ? ("a guardar: " + ag) : (e._guardadoHoy ? ("guardado hoy" + (go > 0 ? " · góndola: " + go : "")) : "");
+    const racksWarning = racks > 0 ? " ⚠️ RACKS: " + racks : "";
+    return '<button class="cp-frow" onclick="cpPickFalt(' + i + ')" style="' + (racks > 0 ? "background:#fef3c7;border-color:#fca5a5;" : "") + '">' +
+      '<div class="cp-frow-top"><span class="cp-cod">' + escapeHtml(String(e.cod_art)) + '</span> <span class="cp-fdesc">' + escapeHtml(e.desc || "") + '</span><span style="margin-left:auto;font-size:11.5px;font-weight:800;color:' + (racks > 0 ? "#dc2626" : "#0e7490") + ';white-space:nowrap;">' + escapeHtml(stockTxt + racksWarning) + '</span></div>' +
       '<div class="cp-frow-bot"><span class="cp-np">NP ' + escapeHtml(String(e.np)) + (cli ? ' · ' + escapeHtml(cli) : '') + (e.tanda ? ' · ' + escapeHtml(String(e.tanda)) : '') + '</span><span class="cp-faltan">faltan ' + Math.round(Number(e.cajas_falto) || 0) + '</span></div>' +
       '</button>';
   }).join("");
@@ -15641,6 +15700,10 @@ function pppSetEdit(np, field, val, regroup) {
   if (regroup) pppRenderProg();
 }
 /* ===== Fase 2: "Sugerir tandas" (armado automático asistido) =====
+   Formato: LETRA<NÚMERO><LETRA> (ej: A01A, A01B, ..., A01Z, A02A, ..., A99Z, B01A)
+   - LETRA INICIAL: Correlativo global (A→Z→AA→... hasta 99 cambios, luego sube letra)
+   - NÚMERO CENTRAL: Correlativo por día/zona (01-99; reinicia al cambiar día/zona)
+   - LETRA FINAL: Letra de tanda (A-Z; incrementa al completar tanda)
    Dentro de cada zona, ordena por fecha de recepción (más vieja primero) y junta
    pedidos manteniendo los de un mismo cliente JUNTOS, hasta llegar a X m³ por tanda
    (configurable). Los súper: una tanda por cliente. NO pisa tandas ya asignadas a
@@ -15650,8 +15713,8 @@ const PPP_CFG_KEY = "vir_ppp_cfg";
 function pppGetCfg() { let c = {}; try { c = JSON.parse(localStorage.getItem(PPP_CFG_KEY) || "{}"); } catch (_e) {} return { tandaCap: (c && c.tandaCap != null ? +c.tandaCap : 0.8), dayCap: (c && c.dayCap != null ? +c.dayCap : 6), baseN: (c && c.baseN != null ? String(c.baseN) : "60"), baseAutoDate: (c && c.baseAutoDate != null ? String(c.baseAutoDate) : ""), baseLast: (c && c.baseLast != null ? (+c.baseLast || 0) : 0), baseNote: (c && c.baseNote != null ? String(c.baseNote) : ""), baseOk: (c && c.baseOk != null ? !!c.baseOk : true) }; }
 function pppSetCfg(k, v) { const c = pppGetCfg(); if (k === "tandaCap") c.tandaCap = parseFloat(String(v).replace(",", ".")) || 0.8; else if (k === "dayCap") c.dayCap = parseFloat(String(v).replace(",", ".")) || 6; else { c.baseN = String(v).trim() || "60"; c.baseAutoDate = getTodayKey(); const _bn = _pppBaseNumOf(c.baseN); if (_bn != null && _bn > (c.baseLast || 0)) c.baseLast = _bn; c.baseNote = "✍️ N° base puesto a mano: " + c.baseN; c.baseOk = true; _pppBaseNote = c.baseNote; _pppBaseOk = true; } try { localStorage.setItem(PPP_CFG_KEY, JSON.stringify(c)); } catch (_e) {} if (k !== "tandaCap" && k !== "dayCap") _pppRenderBaseNote(); }
 function _pppLetter(i) { let s = ""; i = i | 0; do { s = String.fromCharCode(65 + (i % 26)) + s; i = Math.floor(i / 26) - 1; } while (i >= 0); return s; }
-/* "C64A" / "64" / "C19H" → 64 / 64 / 19. Formato operario (A15C) u otro → null. */
-function _pppBaseNumOf(t) { const m = /^C?(\d+)/i.exec(String(t == null ? "" : t).trim()); return m ? parseInt(m[1], 10) : null; }
+/* Extrae número central de formato nuevo "A01A" / "D10E" → 1, 10. Soporta formato viejo "C64A" → null. */
+function _pppBaseNumOf(t) { const s = String(t == null ? "" : t).trim(); const m = /^([A-Z]+)(\d+)([A-Z]+)$/i.exec(s); if (m) return parseInt(m[2], 10); const mo = /^C?(\d+)/i.exec(s); return mo ? parseInt(mo[1], 10) : null; }
 /* Inverso de _pppLetter: "A"→0, "Z"→25, "AA"→26 … (para continuar las letras). */
 function _pppLetterIdx(s) { s = String(s == null ? "" : s).toUpperCase().replace(/[^A-Z]/g, ""); if (!s) return -1; let n = 0; for (let i = 0; i < s.length; i++) n = n * 26 + (s.charCodeAt(i) - 64); return n - 1; }
 /* Mayor N° de tanda (formato C<NN>) en las hojas de Programación Diaria de Supabase. */
@@ -15720,27 +15783,42 @@ async function pppAutoBaseN() {
   return String(base);
 }
 function pppSugerirTandas() {
-  const cfg = pppGetCfg(), cap = cfg.tandaCap > 0 ? cfg.tandaCap : 0.8, baseN = cfg.baseN || "60";
+  const cfg = pppGetCfg(), cap = cfg.tandaCap > 0 ? cfg.tandaCap : 0.8;
   if (!_pppEntregados) _pppEntregados = new Set();
   const ed = pppLoadEdits();
   const tandaDe = function (p) { const e = ed[String(p.np)]; const t = (e && e.tanda != null) ? e.tanda : (p.tanda || ""); return (t && t !== "—") ? t : ""; };
   const pend = (_pppParsed.prog || []).filter(function (p) { return !_pppEntregados.has(String(p.np)) && !tandaDe(p); });
   if (!pend.length) { pppSetStatus("No hay pedidos sin tanda para sugerir.", false); return; }
-  let idx = 0;
-  // Continuar las letras si ya hay tandas C<baseN> (mismo día → no pisar las ya armadas).
-  { const _re = new RegExp("^C" + baseN + "([A-Za-z]+)$"); let _mx = -1; for (const p of (_pppParsed.prog || [])) { const _t = tandaDe(p); const _m = _t && _re.exec(_t); if (_m) { const _li = _pppLetterIdx(_m[1]); if (_li > _mx) _mx = _li; } } idx = _mx + 1; }
-  const next = function () { return "C" + baseN + _pppLetter(idx++); };
+
+  let globalLetterIdx = 0, zoneNum = 0, tandaLetterIdx = 0;
+  // Leer la última letra global usada de las tandas existentes
+  { let maxGlobalIdx = -1; const _re = /^([A-Z]+)(\d+)([A-Z]+)$/;
+    for (const p of (_pppParsed.prog || [])) { const _t = tandaDe(p); const _m = _t && _re.exec(_t);
+      if (_m) { const _gi = _pppLetterIdx(_m[1]); if (_gi > maxGlobalIdx) maxGlobalIdx = _gi; } }
+    globalLetterIdx = maxGlobalIdx + 1; }
+
+  const nextZone = function () { zoneNum++; tandaLetterIdx = 0; };
+  const next = function () {
+    const code = _pppLetter(globalLetterIdx) + String(zoneNum).padStart(2, '0') + _pppLetter(tandaLetterIdx);
+    tandaLetterIdx++;
+    if (tandaLetterIdx >= 26) { tandaLetterIdx = 0; zoneNum++; if (zoneNum > 99) { zoneNum = 1; globalLetterIdx++; } }
+    return code;
+  };
   const assign = function (ps, code) { for (const p of ps) (ed[String(p.np)] = ed[String(p.np)] || {}).tanda = code; };
   let nT = 0;
+
   // Súper: una tanda por cliente.
   const sup = pend.filter(pppEsSuper), bySupC = {}, supOrd = [];
   for (const p of sup) { const k = String(p.cod || p.razon_social); if (!(k in bySupC)) supOrd.push(k); (bySupC[k] = bySupC[k] || []).push(p); }
+  if (sup.length) nextZone();
   for (const k of supOrd) { assign(bySupC[k], next()); nT++; }
+
   // Resto CON zona: por zona, ordenar por fecha de recepción, empacar por cliente ≤ cap.
   const resto = pend.filter(function (p) { return !pppEsSuper(p) && pppZonaDeBarrio(p.localidad); });
   const byZ = {}; for (const p of resto) { const z = pppZonaDeBarrio(p.localidad); (byZ[z] = byZ[z] || []).push(p); }
   const zorder = Object.keys(byZ).sort(function (a, b) { const ia = PPP_ZONAS.indexOf(a), ib = PPP_ZONAS.indexOf(b); return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib); });
   for (const z of zorder) {
+    nextZone();
     const byC = {}, cord = [];
     for (const p of byZ[z]) { const k = String(p.cod || p.razon_social); if (!(k in byC)) cord.push(k); (byC[k] = byC[k] || []).push(p); }
     cord.sort(function (a, b) { const fa = Math.min.apply(null, byC[a].map(function (p) { return +_pppFechaKey(p.fecha); })); const fb = Math.min.apply(null, byC[b].map(function (p) { return +_pppFechaKey(p.fecha); })); return fa - fb; });
@@ -15763,28 +15841,46 @@ function pppLimpiarTandas() {
   const ed = pppLoadEdits(); for (const k in ed) { if (ed[k]) { delete ed[k].tanda; delete ed[k].programmed; } } pppSaveEdits(); pppRenderProg();
 }
 /* ===== Sugerir tandas SOLO-LECTURA (para que la operadora la cargue a mano en el Excel) =====
-   Mismo algoritmo que pppSugerirTandas (súper 1×cliente; resto por zona → cliente, empacando
-   ≤ m³/tanda; códigos C<N°base><letra>) PERO no escribe nada: devuelve la sugerencia para
-   verla e imprimirla. Agrupa los pedidos SIN tanda (no programados). ===== */
+   Formato LETRA<NN><LETRA> (A01A, A01B, ..., A99Z, B01A, ...). Mismo algoritmo que
+   pppSugerirTandas (súper 1×cliente; resto por zona → cliente, empacando ≤ m³/tanda)
+   PERO no escribe nada: devuelve la sugerencia para verla e imprimirla. ===== */
 let _pppSugCache = null;
 function _pppComputeSugerencia() {
-  const cfg = pppGetCfg(), cap = cfg.tandaCap > 0 ? cfg.tandaCap : 0.8, baseN = cfg.baseN || "60";
+  const cfg = pppGetCfg(), cap = cfg.tandaCap > 0 ? cfg.tandaCap : 0.8;
   const ent = pppLoadEntregados();
   const pend = (_pppParsed.prog || []).filter(function (p) { return !ent.has(String(p.np)) && !_pppTieneTanda(p) && !p.programmed; });
-  const out = []; let idx = 0;
-  const next = function () { return "C" + baseN + _pppLetter(idx++); };
+  const out = [];
+  let globalLetterIdx = 0, zoneNum = 0, tandaLetterIdx = 0;
+
+  // Leer la última letra global usada de las tandas existentes (formato LETRA<NN><LETRA>)
+  { let maxGlobalIdx = -1; const _re = /^([A-Z]+)(\d+)([A-Z]+)$/;
+    for (const p of (_pppParsed.prog || [])) { const _t = _pppTieneTanda(p) ? p.tanda : ""; const _m = _t && _re.exec(_t);
+      if (_m) { const _gi = _pppLetterIdx(_m[1]); if (_gi > maxGlobalIdx) maxGlobalIdx = _gi; } }
+    globalLetterIdx = maxGlobalIdx + 1; }
+
+  const nextZone = function () { zoneNum++; tandaLetterIdx = 0; };
+  const nextTanda = function () {
+    const code = _pppLetter(globalLetterIdx) + String(zoneNum).padStart(2, '0') + _pppLetter(tandaLetterIdx);
+    tandaLetterIdx++;
+    if (tandaLetterIdx >= 26) { tandaLetterIdx = 0; zoneNum++; if (zoneNum > 99) { zoneNum = 1; globalLetterIdx++; } }
+    return code;
+  };
+
   const sup = pend.filter(pppEsSuper), bySupC = {}, supOrd = [];
   for (const p of sup) { const k = String(p.cod || p.razon_social); if (!(k in bySupC)) supOrd.push(k); (bySupC[k] = bySupC[k] || []).push(p); }
-  for (const k of supOrd) out.push({ code: next(), sup: true, pedidos: bySupC[k] });
+  if (sup.length) nextZone();
+  for (const k of supOrd) out.push({ code: nextTanda(), sup: true, pedidos: bySupC[k] });
+
   const resto = pend.filter(function (p) { return !pppEsSuper(p) && pppZonaDeBarrio(p.localidad); });
   const byZ = {}; for (const p of resto) { const z = pppZonaDeBarrio(p.localidad); (byZ[z] = byZ[z] || []).push(p); }
   const zorder = Object.keys(byZ).sort(function (a, b) { const ia = PPP_ZONAS.indexOf(a), ib = PPP_ZONAS.indexOf(b); return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib); });
   for (const z of zorder) {
+    nextZone();
     const byC = {}, cord = [];
     for (const p of byZ[z]) { const k = String(p.cod || p.razon_social); if (!(k in byC)) cord.push(k); (byC[k] = byC[k] || []).push(p); }
     cord.sort(function (a, b) { const fa = Math.min.apply(null, byC[a].map(function (p) { return +_pppFechaKey(p.fecha); })); const fb = Math.min.apply(null, byC[b].map(function (p) { return +_pppFechaKey(p.fecha); })); return fa - fb; });
     let bucket = [], bm3 = 0;
-    const flush = function () { if (bucket.length) { out.push({ code: next(), zona: z, pedidos: bucket }); bucket = []; bm3 = 0; } };
+    const flush = function () { if (bucket.length) { out.push({ code: nextTanda(), zona: z, pedidos: bucket }); bucket = []; bm3 = 0; } };
     for (const k of cord) { const ps = byC[k], m3 = _pppM3Sum(ps); if (bucket.length && (bm3 + m3) > cap) flush(); bucket = bucket.concat(ps); bm3 += m3; if (bm3 >= cap) flush(); }
     flush();
   }
