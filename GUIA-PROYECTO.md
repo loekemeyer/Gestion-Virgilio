@@ -4,7 +4,9 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-07-30 · Versión app al documentar: **v6.55**
+> Última actualización: 2026-07-30 · Versión app al documentar: **v6.56**
+>
+> Nota: **v6.56 — Histórico de Recepción: el botón ＋ de filtros va al lado del buscador, en dos líneas**. Ajuste de UI sobre v6.55 pedido por el dueño (`renderHistorico`/`histBuscar`, `recepcion.js`, commit `0e18ed9`): el botón ＋ **sale de la fila Buscar/Limpiar** y se ubica a la **DERECHA del campo "Código o quién entregó"**, apilado en **dos líneas** — "＋" arriba (span `.plusIco`) y "filtros" abajo (span `.plusTxt`, id `histMasTxt`). El contador de filtros extra activos pasa a la línea de abajo: **"filtros (2)"** en vez de "＋ (2)" (⚠ supera el texto del botón descripto en v6.55; la lógica de filtros AND no cambia). CSS: `.histBtn.plus` con `flex-direction:column` + estilos de `.plusIco`/`.plusTxt`. Cache-bust **`recepcion.js?v=3.72`** en `index.html`. Bump `APP_VERSION` + `SW_VERSION` `v6.56`.
 >
 > Nota: **v6.55 — Histórico de Recepción: botón ＋ con filtros extra combinables**. En la barra de filtros del Histórico (`renderHistorico`, `recepcion.js`, commit `d41d93a`), botón nuevo **＋** junto a Buscar/Limpiar que despliega una segunda fila (`.histMore`, CSS nuevo scopeado en `#rcpRoot`) con tres buscadores: **Quién entregó** (`ilike` sobre `Nombre_Tall` en `Entregas Tallerista Virgilio` / `Proveedor` en `Entregas Prov AT`), **Remito** (`ilike Remito` en ambas) y **Cajas mínimas** (`gte` sobre `Cajas`/`Cantidad`). Se **combinan en AND** con el buscador principal (código o quién entregó, v6.54) y las fechas. Enter dispara la búsqueda desde cualquier campo; "Limpiar" vacía todos (`histBuscar` centraliza la lectura de los 6 campos con el helper `v()`); el botón ＋ muestra la cantidad de filtros extra activos ("＋ (2)") y se marca `.on` al desplegarse. Cache-bust **`recepcion.js?v=3.71`** en `index.html`. Bump `APP_VERSION` + `SW_VERSION` `v6.55`.
 >
