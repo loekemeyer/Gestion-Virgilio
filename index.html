@@ -2705,6 +2705,26 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
 .facfc-ok-meta{ font-size:12.5px; color:#64748b; }
 .fac-btn-tick:hover{ background: #15803d; }
 .fac-btn-tick:active{ transform: scale(.93); }
+/* idea 5178 — Facturación en celular: la tabla scrollea horizontal (min-width 980px)
+   y la columna Acción (✓/ARCA) quedaba al final, había que arrastrar ~530px por fila
+   para tocarla. En celular la fijamos sticky a la derecha (siempre visible) y agrandamos
+   el tap-target del ✓. La sticky necesita fondo opaco propio para no dejar ver el
+   contenido que pasa por debajo: replicamos los fondos por estado de fila (zebra/falta/
+   progreso). Solo aplica ≤560px: el monitor de oficina (pantalla ancha) no se toca. */
+@media (max-width: 560px){
+  table.fac-np-tbl th.fac-accion-th,
+  table.fac-np-tbl td.fac-accion-cell{
+    position: sticky; right: 0; z-index: 2;
+    box-shadow: inset 6px 0 6px -6px rgba(15,23,42,.28);
+  }
+  table.fac-np-tbl th.fac-accion-th{ background: #f1f5f9; z-index: 3; }
+  table.fac-np-tbl td.fac-accion-cell{ background: #fff; }
+  table.fac-np-tbl tbody tr.fac-tanda-alt td.fac-accion-cell{ background: #f8fafc; }
+  tr.fac-has-falta td.fac-accion-cell{ background: #fff5f5; }
+  tr.fac-en-progreso td.fac-accion-cell{ background: #fefce8; }
+  .fac-btn-tick{ padding: 8px 12px; min-height: 36px; }
+  .fac-btn-fc{ padding: 5px 8px; min-height: 36px; justify-content: center; }
+}
 .fac-empty{ padding: 32px 20px; text-align: center; color: #64748b; font-size: 15px; background: #fff; border-radius: 8px; border: 1px solid #cbd5e1; }
 .fac-cierre{
   background: #fff; border: 2px solid #1e6bd6; border-radius: 8px; padding: 12px; margin-top: 12px;
@@ -20872,18 +20892,18 @@ function facRender(tandas){
       <table class="fac-np-tbl">
         <thead>
           <tr>
-            <th style="width:5%">Tanda</th>
+            <th style="width:6%">Tanda</th>
             <th class="center" style="width:5%">Salida</th>
-            <th style="width:5%">NP</th>
-            <th style="width:4%">Cod</th>
+            <th style="width:7%">NP</th>
+            <th style="width:5%">Cod</th>
             <th style="width:15%">Razón Social</th>
             <th style="width:13%">Faltantes</th>
             <th style="width:13.5%">Dirección</th>
             <th class="num" style="width:3.5%">M3</th>
-            <th style="width:10%">Localidad</th>
-            <th style="width:11%">Zona</th>
+            <th style="width:8%">Localidad</th>
+            <th style="width:9%">Zona</th>
             <th class="center" style="width:4%">Líos</th>
-            <th class="center" style="width:11%">Acción</th>
+            <th class="center fac-accion-th" style="width:11%">Acción</th>
           </tr>
         </thead>
         <tbody>${rowsHtml}</tbody>
