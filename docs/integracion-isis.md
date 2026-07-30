@@ -160,6 +160,35 @@ Sobre `/api/ISISPedido`:
 red local? (4) ISIS Cloud: ¿API accesible + integración de fábrica?, ¿costo/tiempo de
 migrar? (5) Mapeo cliente/artículos por código ISIS.
 
+### Respuesta del proveedor (ronda 3) — patrón Balcony (Mercado Libre)
+
+Balcony es el **módulo adicional (pago)** que integra ML: un **sincronizador que corre
+constante** baja ventas de ML → tabla temporal en la base del ISIS → ISIS crea un
+**Pedido** → se factura con el proceso "Facturar pedidos de Balcony" (emite **CAE
+nuevo** contra AFIP; **no** registra comprobantes ya emitidos en otra plataforma). La
+facturación puede ser A/B/C pero **siempre como CONTADO con ingreso de valores**.
+
+**Confirma el patrón del Modelo A** (feeder externo → pedidos → ISIS factura). Nuestra
+app sería un "Balcony-like feeder" con las ventas propias.
+
+**Dos alertas que surgen:**
+- ⚠ **Contado vs Cuenta Corriente:** Balcony factura como CONTADO con ingreso de valores
+  (sirve para ML, que es prepago). Los clientes mayoristas de Virgilio son **cuenta
+  corriente** → si se registra como contado, carga cobros inexistentes. **Confirmar que
+  la facturación por API pueda ser cuenta corriente.**
+- 💰 **Costo:** `/api/ISISPedido` ¿viene solo o requiere el módulo **Balcony** (adicional
+  pago) o un desarrollo? A confirmar con comercial.
+
+### Estado: la base de conocimiento se agotó → hablar con un humano
+
+Lo técnico ya está claro (Modelo A). Lo que falta requiere **comercial + soporte técnico
+de Sistemas ISIS**, no la KB:
+1. **Doc real del endpoint `/api/ISISPedido`** (auth + payload). Sin esto no se codea.
+2. ¿Requiere el módulo Balcony? ¿Costo?
+3. ¿Soporta **cuenta corriente** (no solo contado)?
+4. Presupuesto y tiempo de migrar a **ISIS Cloud** (para que la API sea accesible desde
+   la app cloud).
+
 ### Qué construye la app (Modelo A)
 
 Al facturar una NP, la app arma el **pedido** (cliente, artículos, cantidades, precios —
