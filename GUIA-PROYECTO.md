@@ -2880,6 +2880,34 @@ al volver online / al cargar (`_compFlushEntregas`). La consume el **programa ex
 de seguimiento de entregas. (Reemplaza a las vistas `Entregas_Virgilio`/`Faltantes_Virgilio`
 y a los eventos `FAL` de v3.97/v3.98, ya eliminados.)
 
+### Subsistema de stock / OC (event-sourced)
+
+Además del log de eventos, el stock físico y las compras viven en tablas propias:
+
+- **`Movimientos_Stock`** — libro mayor event-sourced del stock. Una fila por
+  movimiento: `cod_art`, `deposito` (`terminado`/`excedente`/`separar_pedidos`/
+  `a_facturar`/`a_guardar`/`para_envasar`/`racks_ch`…), `delta`, `tipo`
+  (`inicial`/`recepcion`/`guardado`/`picking`/`separado`/`facturado`/`ajuste`/…),
+  `ts`, y opcional `ubicacion`/`unidad`/`ref`. El saldo se calcula con
+  `stockComputeSaldos(movs, cutoff, asOf)` (front) y la vista `vista_saldos_stock`
+  (server). `tipo='inicial'` es baseline y **siempre** cuenta; el **cutoff**
+  ("marcar inicio", `Stock_Config.cutoff_ts`) desconsidera los movimientos reales previos.
+- **`Stock_Config`** — flags/config del stock (cutoff, alertas, toggles), keyed por
+  `clave` (upsert `merge-duplicates`).
+- **`OC_Maximos`** — máximos por artículo para el generador de OC (`cod`, descripción,
+  `linea`, `max_cajas`, `proveedor`, `uni_x_caja`, `indice`, `activo`).
+- **`Ordenes_Compra`** — OC generadas/recibidas (proveedor, fecha, rubro, ítems,
+  `cantidad`/`cantidad_recibida`, estado). Las edita el módulo Compras/Recepción OC.
+- **`Racks_Bajadas`** / **`Racks_Ordenes`** — flujo de bajada de racks (propuesta →
+  aprobación → bajado); `Racks_Planimetria` guarda el layout.
+- **`Envasar_Ubicaciones`** — dónde está lo del depósito `para_envasar` (aparte de la
+  planimetría de góndola).
+- **`Zonas_Barrios`** — mapa barrio → zona para la PPP.
+
+RLS `anon` (hardening 2026-07): lectura + escritura **acotada por tabla** — insert
+siempre; update sólo donde la app lo usa; **sin delete** salvo `Envasar_Ubicaciones`.
+Ver `sql/agente_propuestas.sql` y las notas de seguridad.
+
 ---
 
 ## 4. Códigos de acción (`opcion`)
@@ -2922,6 +2950,12 @@ Definidos en `index.html` (objeto `desc`, ~línea 1531). Los botones se arman en
 | `CP` | Completar Pedido | (detalle, v5.05) | `texto` = `NP\|COD\|QTY\|GONDOLA\|AGUARDAR\|LÍO`. Lo emite el modal `showCPModal` al sumar cajas que llegaron tarde a una NP armada sin facturar (mueve stock origen→`a_facturar`, baja `cajas_falto` en `Entregas_Virgilio`, re-emite el TAL). El monitor lo ignora. |
 | `EA` | Entrega Artículos para envasar | (detalle, v5.52) | `texto` = `COD\|QTY` (ej. `440E\|30`). Lo emite el modal `showEAModal` (botonera operario) al dar de baja stock del depósito **`para_envasar`**: `stockMove` `para_envasar −qty` (`tipo='entrega_envasar'`), un evento por código. `para_envasar` está **fuera de los 7 depósitos** de `stockComputeSaldos` (no entra en totales/OC). El monitor lo ignora. **v5.63**: el modal ahora tiene además un **editor de ubicación 📍** (tabla `Envasar_Ubicaciones`, aparte de `Racks_Planimetria`) para cargar/mover dónde está lo para-envasar — no emite evento ni toca saldo. |
 | `RC` | Pasar cajas a un pedido urgente | (detalle, v5.49) | `texto` = `NP_URGENTE\|NP<donor> o T<tanda>\|COD\|QTY`. Lo emite el modal `showRCModal` al sacarle cajas a un pedido que sale después (armado o pickeado) y dárselas a uno urgente. Al confirmar: RPC `reasignar_cajas` (faltantes), `stockMove` tipo `rc` (donante `a_facturar`/`separar_pedidos −`, urgente `a_facturar +`), líos (suma al urgente, resta al donante armado). El monitor lo ignora. |
+| `PUB` | Picking · dónde lo dejó | (detalle, v5.78) | `descripcion` = ubicación (mesa/carro/rack), `texto` = código de tanda. Lo emite `emitPickUbic` al **TP**: registra dónde quedó lo pickeado (se muestra al Separar). El monitor lo ignora. |
+| `AUB` | Armado · dónde lo dejó | (detalle) | `descripcion` = ubicación, `texto` = NP. Lo emite `emitArmadoUbic`: dónde quedó el armado, por NP. El monitor lo ignora. |
+| `IR` | Ingreso a Racks | (detalle) | `texto` = `COD\|SECTOR\|<M>M\|<C>C[\|NAC:origen]`. Lo emite `irEmitEvent` (`showIngresoRacksModal`) al ingresar mercadería a racks (masters + inner por sector). El monitor lo ignora. |
+| `RKX` | Bajada de racks fuera de lista | (automático) | `texto` = `COD\|R<cajas>`. Lo emite `rkbEmitFueraLista` cuando se baja de racks un código que **no estaba** en la lista de bajada. Dispara aviso Telegram (`notificar_racks_fuera_lista_telegram`). El monitor lo ignora. |
+| `NPD` | Picking difiere de mesa | (detalle) | `texto` = `NP\|COD\|tipo(menos/mas)\|GÓNDOLA\|QTY\|SALE\|TANDA`. Lo emite el flujo de Completar cuando lo levantado real difiere de lo pickeado en la mesa. El monitor lo ignora. |
+| `PPE` | Errores en PPP | (automático, legajo 0) | `texto` = `sinzona:N\|zonadif:N\|tandamal:N\|sacar:N`. Lo emite el monitor PPP al detectar inconsistencias; id `ppe_<día>`. Dispara aviso Telegram (`notificar_ppp_error_telegram`, sólo si hay errores). El monitor lo ignora. |
 
 **Grupos (constantes en `index.html`):**
 - `CORE_CODES = [EP, TP, AP, TAP]` — el trabajo medible (picking / armado).
