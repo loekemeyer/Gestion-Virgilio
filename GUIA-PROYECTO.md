@@ -6,6 +6,18 @@
 >
 > Última actualización: 2026-07-30 · Versión app al documentar: **v6.65**
 >
+> Nota: **idea 7382 — Saldo de insumos SEPARADO por unidad**. El saldo de insumos
+> (`vista_saldos_stock.insumos`) sumaba `delta` mezclando unidades heterogéneas (kg, Uni,
+> Bolsas, MC, Paquetes, null…) como si fueran cajas → número sin sentido físico. Ahora
+> **(a)** vista aditiva nueva **`vista_saldos_insumos_x_unidad`** (`cod_art`, `unidad`,
+> `saldo`; una fila por unidad; variantes de case como kg/Kg se unifican; `security_invoker`,
+> `grant select` anon/authenticated; DDL en `sql/vista_saldos_insumos_x_unidad.sql`), y
+> **(b)** la solapa **Insumos** de Stock desglosa el saldo por unidad cuando un artículo
+> tiene movimientos en más de una (marca **⚠ varias**). `vista_saldos_stock` **no** se
+> tocó (retro-compatible). ⚠ **Pendiente (flag al usuario):** el módulo de **conteo/entrega
+> de insumos** todavía muestra un único número `it.insumos` — cambiarlo a por-unidad es un
+> flujo de INPUT del operario y necesita tu OK antes de tocarlo.
+>
 > Nota: **v6.65 — Pulidos de facturación (hallazgos revisor-render)** (commit `30ea5ad`).
 > Ajustes de UI del módulo de Facturación surgidos de la auditoría de render. Además, en
 > esta pasada se **documentó el subsistema de facturación en el catálogo de tablas (§3)**:
