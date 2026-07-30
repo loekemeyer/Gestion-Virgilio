@@ -21,9 +21,11 @@ inventes**.
   (`project_id = hrxfctzncixxqmpfhskv`).
 - **Tabla central**: `Registros_Produccion_Virgilio` (log de eventos; `opcion` =
   código de acción, `texto` = código de tanda/pedido, `ts_inicio` no nulo = cierre).
-- **m³ NO están en Supabase**: salen del Google Sheet "PPP Pedidos Entregados 2026"
-  (col `Mt3`, NO col H). No se pueden calcular desde el sandbox (Google bloqueado);
-  sí desde el navegador / monitor.
+- **m³ SÍ están en Supabase** (desde v5.33): `PPP_Programacion_Diaria.m3`,
+  `PPP_Pedidos_Entregados.mt3` y la vista `vista_tanda_m3` — se calculan por SQL
+  desde el sandbox. El **origen upstream** sigue siendo el Google Sheet
+  "PPP Pedidos Entregados 2026" (col `Mt3`, NO col H ni "Mt3 FC"), que se espeja
+  vía Apps Script (`sync-ppp-supabase.gs`).
 - **Zona horaria**: `America/Argentina/Buenos_Aires`, UTC-3 fijo.
 - **Versión**: `APP_VERSION` en `index.html` y `SW_VERSION` en `sw.js`.
 - Legajos `0` y `1` (Pruebas) son test/basura: excluir de reportes.
