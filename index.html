@@ -18798,7 +18798,9 @@ async function fetchMonitorEvents(targetTandaKeys, sheetMap) {
       doneTodayP: false,
       doneTodayA: false,
       pickLegajo: sp ? sp.legajo : null,
-      sepLegajo:  sa ? sa.legajo : null
+      sepLegajo:  sa ? sa.legajo : null,
+      pickStartTs: sp ? sp.ts : null,   // idea 4283: ts del EP/AP abierto para mostrar "en curso hace X"
+      sepStartTs:  sa ? sa.ts : null
     });
   }
 
@@ -18918,11 +18920,21 @@ function monitorLegajoTag(legajo, state) {
 /* Celda de Picking / Pedido Separado: icono centrado en la columna + iniciales
    del operario que la empezó. Clickeable: abre el popup con los eventos de
    esa tanda de ese lado (EP/TP para picking, AP/TAP para separado). */
-function statusCell(state, legajo, tanda, kind) {
+function statusCell(state, legajo, tanda, kind, startTs) {
   const icon = statusIconToday(state);
   if (!icon) return "";   // sin actividad → celda vacía no clickeable
   const t = String(tanda || "").trim();
-  return `<span class="status-wrap tanda-clickable" data-tanda="${escapeHtml(t)}" data-kind="${escapeHtml(kind)}" onclick="showTandaMessages(this.dataset.tanda, this.dataset.kind)">${icon}${monitorLegajoTag(legajo, state)}</span>`;
+  // idea 4283: si está EN CURSO (EP/AP abierto sin cerrar), mostrar hace cuánto — ámbar >1h, rojo >2h.
+  let dur = "";
+  if (state === "curso" && startTs) {
+    const min = Math.round((Date.now() - new Date(startTs).getTime()) / 60000);
+    if (min >= 0) {
+      const txt = min >= 60 ? (Math.floor(min / 60) + "h" + String(min % 60).padStart(2, "0")) : (min + "m");
+      const col = min >= 120 ? "#dc2626" : (min >= 60 ? "#d97706" : "#64748b");
+      dur = `<span class="mon-dur" style="font-size:11px;font-weight:800;color:${col};margin-left:3px;white-space:nowrap;">${txt}</span>`;
+    }
+  }
+  return `<span class="status-wrap tanda-clickable" data-tanda="${escapeHtml(t)}" data-kind="${escapeHtml(kind)}" onclick="showTandaMessages(this.dataset.tanda, this.dataset.kind)">${icon}${monitorLegajoTag(legajo, state)}${dur}</span>`;
 }
 
 /* Toggle de la vista de productividad: "m3h" (m³ por hora) ↔ "minm3" (minutos por m³).
@@ -19065,8 +19077,8 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
         <td class="monitor-tanda tanda-clickable" data-tanda="${escapeHtml(t._key || t.tanda)}" onclick="showTandaDetail(this.dataset.tanda)">${escapeHtml(t.tanda)}</td>
         <td class="num">${m3Txt}</td>
         <td class="center">${feTxt}</td>
-        <td class="center">${statusCell(ev.picking, ev.pickLegajo, t.tanda, "picking")}</td>
-        <td class="center">${statusCell(ev.separado, ev.sepLegajo, t.tanda, "separado")}</td>
+        <td class="center">${statusCell(ev.picking, ev.pickLegajo, t.tanda, "picking", ev.pickStartTs)}</td>
+        <td class="center">${statusCell(ev.separado, ev.sepLegajo, t.tanda, "separado", ev.sepStartTs)}</td>
       </tr>`;
   }
   // v5.99 — "Tandas a FC" = TODAS las terminadas (picking+separado), aunque estén
