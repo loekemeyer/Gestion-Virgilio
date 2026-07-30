@@ -26,6 +26,11 @@ tachan (`~~…~~`).
   puede repetirlo.
 - [ ] **4. Purga de los ~76 numéricos restantes** de la carga de insumos del 27/7 —
   solo se borraron los 13 confirmados; el CSV lo tenés para decidir.
+  Decisiones 2026-07-30: **`0037` y `0087` QUEDAN como están** (el usuario no los
+  reconoce; saldo 0, solo insumos, inofensivos — no volver a proponer borrarlos).
+  Auditoría de patrones (2 díg / 0XX / 00XX) hecha: el único split real del stock
+  era `66`↔`066` (tanda C94A, 5 filas, ids 7327/7328/7626/7627/8532; consolidación
+  verificada sin colisión de índice, esperando OK).
 - [ ] **5. Fase 2 del PPP** (programar desde la app / Supabase motor, sync con upsert)
   — diseño entregado, sin implementar. El Espejo quedó idéntico a PPP esperando esa
   divergencia.
