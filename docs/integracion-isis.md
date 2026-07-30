@@ -66,6 +66,40 @@ tipear**, para que la carga manual sea rápida y sin errores.
 - **Auto-facturar sin click:** emitir automáticamente al cerrar/entregar la NP. Se hace
   después de tener el circuito ISIS definido.
 
+## Decisión del usuario (2026-07-30)
+
+Quiere **migrar a este modelo**: facturar desde la app (rápido, a futuro automático
+sin click) **manteniendo en el ISIS el stock y el registro completo de ventas** como
+hoy. Requisito firme: **cero carga manual** (si el ahorro de facturar automático se
+pierde tipeando en el ISIS, no sirve). El stock lo quieren en **los dos** sistemas.
+
+→ Esto **descarta el "Comprobante Manual"** (es carga manual) y exige un **método
+automático de entrada al ISIS**. La pelota queda del lado del proveedor: que digan cuál
+es el camino soportado.
+
+### Preguntas enviadas al proveedor (Sistemas ISIS)
+
+1. ¿Import desde archivo (CSV/TXT/Excel/formato AFIP) de comprobantes de venta ya
+   emitidos (PV, número, CAE), sin re-emitir? ¿Estructura?
+2. ¿Import desde archivo de movimientos/salidas de stock? ¿Formato?
+3. ¿API / Web Service propio del ISIS para crear comprobantes y movimientos de stock
+   desde un sistema externo?
+4. ¿Soportan escribir directo en la base de datos del ISIS? ¿Motor?
+5. ¿Pueden DESARROLLAR la integración a medida (importador automático)? ¿Alcance,
+   costo, plazo?
+6. ¿Tienen versión CLOUD? Si se migra, ¿ya trae API/conectores/import automático que
+   resuelva esto sin desarrollo aparte?
+
+### Según la respuesta, del lado de la app
+
+- **Cloud con API / API on-premise (3, 6)** → la app se conecta a esa API y empuja
+  facturas + movimientos de stock. Cero manual. (Camino más limpio a futuro.)
+- **Import por archivo (1, 2)** → la app exporta en ese formato y una tarea lo deja
+  donde el ISIS lo importa. Cero manual.
+- **Desarrollo a medida (5)** → la app genera los datos en el formato que definan.
+- **Base de datos (4)** → puente en la red local que escribe al ISIS (más frágil).
+- **Solo carga manual** → no cumple el requisito; replantear con el proveedor.
+
 ## Otros efectos a considerar
 
 Al facturar por afuera del ISIS, ese sistema tampoco actualiza solo la **cuenta
