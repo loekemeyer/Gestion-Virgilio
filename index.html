@@ -5617,7 +5617,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v6.58";
+const APP_VERSION = "v6.59";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -17037,6 +17037,21 @@ function _pppBlock(key, name, cls, meta, pedidos, headerExtra, editTanda) {
    (zona/Retira/Súper/Total de un día) abre un POP-UP con la tabla de NPs que lo componen. */
 let _pppResDet = {};
 function pppResPopClose() { const ov = document.getElementById("pppResPopOv"); if (ov) ov.classList.remove("show"); }
+/* v6.59: NPs del mismo cliente en UNA fila, compactas: la 1ª completa y las siguientes
+   solo los dígitos que cambian (mínimo 2) — 44506+44507 → "44506/07"; 44598+44601
+   (salteadas, cambia la centena) → "44598/601". */
+function _pppNpsCompact(nps) {
+  const out = []; let prev = null;
+  for (const np of nps) {
+    if (prev && np.length === prev.length && /^\d+$/.test(np) && /^\d+$/.test(prev)) {
+      let i = 0; while (i < np.length && np[i] === prev[i]) i++;
+      i = Math.min(i, np.length - 2);            // mostrar al menos 2 dígitos
+      out.push(i > 0 ? np.slice(i) : np);
+    } else out.push(np);
+    prev = np;
+  }
+  return out.join("/");
+}
 function pppResTgl(dk, zkeyEnc) {
   const zkey = decodeURIComponent(zkeyEnc);
   const det = _pppResDet[dk] || {};
@@ -17050,14 +17065,26 @@ function pppResTgl(dk, zkeyEnc) {
     ov.addEventListener("click", function (e) { if (e.target === ov) pppResPopClose(); });
     document.body.appendChild(ov);
   }
-  let filas = "";
+  // v6.59: unificar por CLIENTE — una fila por cliente con sus NPs compactas y el m³ sumado.
+  const grp = {}, orden = [];
   items.forEach(function (i) {
-    filas += '<tr><td class="np">' + escapeHtml(i.np) + '</td><td>' + escapeHtml(i.tanda || "—") + '</td><td>' + escapeHtml(i.rs || "—") + '</td><td style="color:#64748b">' + escapeHtml(i.loc || "—") + '</td><td class="num"><b>' + f2(i.m3) + '</b></td></tr>';
+    const k = i.rs || ("np:" + i.np);
+    if (!grp[k]) { grp[k] = { nps: [], tandas: [], locs: [], rs: i.rs, m3: 0 }; orden.push(k); }
+    grp[k].nps.push(String(i.np));
+    if (i.tanda && grp[k].tandas.indexOf(i.tanda) < 0) grp[k].tandas.push(i.tanda);
+    if (i.loc && grp[k].locs.indexOf(i.loc) < 0) grp[k].locs.push(i.loc);
+    grp[k].m3 += i.m3;
+  });
+  const merged = orden.map(function (k) { return grp[k]; }).sort(function (a, b) { return b.m3 - a.m3; });
+  merged.forEach(function (r) { r.nps.sort(function (a, b) { return (parseInt(a, 10) || 0) - (parseInt(b, 10) || 0); }); });
+  let filas = "";
+  merged.forEach(function (r) {
+    filas += '<tr><td class="np">' + escapeHtml(_pppNpsCompact(r.nps)) + '</td><td>' + escapeHtml(r.tandas.join("/") || "—") + '</td><td>' + escapeHtml(r.rs || "—") + '</td><td style="color:#64748b">' + escapeHtml(r.locs.join(" / ") || "—") + '</td><td class="num"><b>' + f2(r.m3) + '</b></td></tr>';
   });
   if (!filas) filas = '<tr><td colspan="5" style="text-align:center;color:#94a3b8">— sin NPs —</td></tr>';
   ov.innerHTML = '<div class="pppres-card">' +
     '<div class="pppres-head"><span class="pppres-title">🧩 ' + escapeHtml(lbl) + ' · ' + escapeHtml(det.__fecha__ || "") + '</span><button class="pppres-x" onclick="pppResPopClose()">✕</button></div>' +
-    '<div class="pppres-sum"><b>' + items.length + '</b> NP(s) · <b>' + f2(tot) + ' m³</b></div>' +
+    '<div class="pppres-sum"><b>' + items.length + '</b> NP(s)' + (merged.length < items.length ? ' · <b>' + merged.length + '</b> cliente(s)' : '') + ' · <b>' + f2(tot) + ' m³</b></div>' +
     '<div class="pppres-wrap"><table class="pppres-tbl"><thead><tr><th>NP</th><th>Tanda</th><th>Cliente</th><th>Localidad</th><th class="num">m³</th></tr></thead><tbody>' + filas + '</tbody>' +
     '<tfoot><tr><td colspan="4">Total</td><td class="num">' + f2(tot) + '</td></tr></tfoot></table></div></div>';
   ov.classList.add("show");
