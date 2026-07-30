@@ -713,13 +713,19 @@ async function arSaveCodeRemote(cod) {
     }
   } catch (e) { /* no-op */ }
 }
+/* idea 3521: MISMA normalización de códigos que index.html (_ocgNorm = upper + trim +
+   sin ceros a la izquierda). recepcion.js es un módulo (scope propio) y no ve el
+   _ocgNorm de index.html, así que replicamos el canónico acá para que "027" cruce
+   con "27" y no se dupliquen artículos. */
+function _ocgNorm(c) { return String(c == null ? "" : c).toUpperCase().trim().replace(/^0+(?=.)/, ""); }
+
 function arAddCode() {
   let cod = prompt("Código del artículo nuevo para Log/Fabr:");
   if (cod == null) return;                       // canceló
-  cod = String(cod).trim().toUpperCase();
+  cod = _ocgNorm(cod);
   if (!cod) return;
   if (!opState.articulos) opState.articulos = [];
-  const existe = opState.articulos.some(a => String(a.Cod_Art).toUpperCase() === cod);
+  const existe = opState.articulos.some(a => _ocgNorm(a.Cod_Art) === cod);
   if (!existe) {
     opState.articulos.push({ Cod_Art: cod, Desc: "" });   // mostrar al instante
     arSaveCodeRemote(cod);                                  // guardar fijo (compartido)
@@ -898,9 +904,8 @@ async function opEnviar() {
   try {
     const G = (typeof window !== "undefined" && window.GONDOLA) ? window.GONDOLA : null;
     if (G) {
-      const norm = c => String(c == null ? "" : c).toUpperCase().trim().replace(/^0+(?=.)/, "");
       const seen = {}, sinLugar = [];
-      items.forEach(i => { const k = norm(i.cod); if (k && !G[k] && !seen[k]) { seen[k] = 1; sinLugar.push(String(i.cod)); } });
+      items.forEach(i => { const k = _ocgNorm(i.cod); if (k && !G[k] && !seen[k]) { seen[k] = 1; sinLugar.push(String(i.cod)); } });
       if (sinLugar.length) {
         const cid = "rsp_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
         supabase.from("Registros_Produccion_Virgilio").insert({
