@@ -13668,7 +13668,7 @@ async function fetchCCData() {
   // Líos por NP: eventos TAL (anotados al terminar armado). Mismo origen que usa Recepción Remitos.
   const talUrl = SUPABASE_TABLE_ENDPOINT
     + "?opcion=eq.TAL&ts_cliente=gte." + encodeURIComponent(sinceTal)
-    + "&select=texto&limit=20000";
+    + "&select=texto&order=ts_cliente.asc&limit=20000";  // idea 3016: orden cronologico -> el ultimo lios.set gana (TAL mas reciente)
   const _par = await Promise.all([
     fetch(repUrl, { headers, cache: "no-store" }).then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); }),
     fetch(ccnUrl, { headers, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }),
@@ -13892,7 +13892,7 @@ async function fetchCRData() {
   const since = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
   const headers = { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY };
   const ccnUrl = SUPABASE_TABLE_ENDPOINT + "?opcion=eq.CCN&ts_cliente=gte." + encodeURIComponent(since) + "&select=texto,ts_cliente&order=ts_cliente.asc&limit=20000";
-  const talUrl = SUPABASE_TABLE_ENDPOINT + "?opcion=eq.TAL&ts_cliente=gte." + encodeURIComponent(since) + "&select=texto&limit=20000";
+  const talUrl = SUPABASE_TABLE_ENDPOINT + "?opcion=eq.TAL&ts_cliente=gte." + encodeURIComponent(since) + "&select=texto&order=ts_cliente.asc&limit=20000";  // idea 3016: orden cronologico -> el ultimo lios.set gana (TAL mas reciente)
   const crnUrl = SUPABASE_TABLE_ENDPOINT + "?opcion=eq.CRN&ts_cliente=gte." + encodeURIComponent(since) + "&select=texto&limit=20000";
   const [ccnR, talR, crnR, sheetMap] = await Promise.all([
     fetch(ccnUrl, { headers, cache: "no-store" }).then(r => r.ok ? r.json() : []),
@@ -14071,7 +14071,7 @@ async function fetchCCRData() {
     + "&select=texto&limit=20000";
   const talUrl = SUPABASE_TABLE_ENDPOINT
     + "?opcion=eq.TAL&ts_cliente=gte." + encodeURIComponent(sinceTal)
-    + "&select=texto&limit=20000";
+    + "&select=texto&order=ts_cliente.asc&limit=20000";  // idea 3016: orden cronologico -> el ultimo lios.set gana (TAL mas reciente)
   const _par = await Promise.all([
     fetch(repUrl, { headers, cache: "no-store" }).then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); }),
     fetch(ccrUrl, { headers, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }),
