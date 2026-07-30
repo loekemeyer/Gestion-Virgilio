@@ -1,15 +1,28 @@
 # Facturación electrónica propia (ARCA / ex AFIP) — diseño y guía de puesta en marcha
 
-> Estado: **EN PREPARACIÓN** — nada emite todavía. Este documento es la guía viva del
-> camino "la app emite desde un punto de venta nuevo, e Isis levanta de ARCA".
-> Ver también la nota de investigación en `GUIA-PROYECTO.md` (Isis vs 2º emisor).
+> Estado: **HOMOLOGACIÓN PROBADA de punta a punta** (2026-07-30) — la app ya puede pedir y
+> obtener un **CAE** de ARCA en el entorno de PRUEBA. Para emitir con **validez fiscal** falta:
+> la fuente del **importe** (§5, bloqueo #1), el **OK del contador**, un **certificado de
+> producción** y `ARCA_ENV=prod`. Este documento es la guía viva del camino "la app emite desde
+> un punto de venta nuevo, e Isis levanta de ARCA". Ver también `GUIA-PROYECTO.md` (Isis vs 2º emisor).
 >
-> **Avance v6.41**: quedó armado el **esqueleto** (sin emitir): (1) la tabla
-> `Comprobantes_ARCA` **ya existe** en Supabase con RLS (anon solo lectura) — DDL versionado
-> en `sql/comprobantes_arca.sql`; (2) el **esqueleto de la Edge Function `arca-wsfe`** está en
-> el repo (`supabase/functions/arca-wsfe/index.ts`), responde `status` y **rechaza emitir**
-> hasta cargar los secrets y prender `ARCA_EMITIR=on`. Falta: certificado + PDV (§4), la
-> decisión del importe (§5) y el OK del contador.
+> **✅ Avance 2026-07-30 — HOMOLOGACIÓN OK end-to-end.** Se completó el §4 (shopping list) en el
+> entorno de PRUEBA y se probó la Edge Function `arca-wsfe` contra ARCA homologación, en orden:
+> **`ta`** (login WSAA firmando con el certificado) → OK (token ~12 h); **`ultimo`**
+> (`FECompUltimoAutorizado`, PDV 11) → OK (devolvió 0, PDV nuevo); **`emitir`** (`FECAESolicitar`,
+> Factura B de prueba $121) → **CAE AUTORIZADO** (`resultado='A'`) y logueado en `Comprobantes_ARCA`
+> (`entorno='homo'`, `estado='autorizado'`). **Config de la prueba:** **PDV nuevo = 11**
+> (`ARCA_PTO_VTA`), `ARCA_ENV=homo`. **Modelo de certificado:** por una limitación de la
+> homologación de AFIP (ata el certificado al CUIT de la **persona** que opera, no deja cambiarlo),
+> el **certificado es del representante (persona)** con una **autorización `wsfe` cuyo *representado*
+> es la EMPRESA** → así el **emisor de las facturas es la empresa** igual (delegación). En producción
+> se puede sacar el certificado **directo a nombre de la empresa** vía "Administración de Certificados
+> Digitales". Los **secrets** (`ARCA_CERT`, `ARCA_KEY`, `ARCA_CUIT`, `ARCA_PTO_VTA`, `ARCA_ENV=homo`,
+> `ARCA_EMITIR=on`) están cargados en **Supabase** (NO en el repo; el `.key` nunca se commitea).
+>
+> **Avance v6.41**: esqueleto — (1) tabla `Comprobantes_ARCA` en Supabase con RLS (anon solo
+> lectura, DDL en `sql/comprobantes_arca.sql`); (2) Edge Function `arca-wsfe`
+> (`supabase/functions/arca-wsfe/index.ts`), gateada por secrets + `ARCA_EMITIR`.
 
 ## 1. Objetivo
 
@@ -125,12 +138,11 @@ Navegador (app)                 Supabase                         ARCA (ex AFIP)
   Acciones: `status` (GET) · `ta` (login WSAA real — **la prueba del certificado**) ·
   `ultimo` (`{tipo_cbte}` → correlativo) · `emitir` (`{tipo_cbte, neto, iva,
   doc_tipo?, doc_nro?, cond_iva_receptor?, alic_id?, np?, tanda?}` → CAE).
-  ⚠ **NO probada contra ARCA** (falta el certificado): al llegar el cert de
-  homologación, cargar los secrets y probar en este orden: `ta` → `ultimo` → `emitir`
-  (con `ARCA_EMITIR=on`). URL:
-  `https://hrxfctzncixxqmpfhskv.supabase.co/functions/v1/arca-wsfe` (desde el
-  navegador; el sandbox de Claude no llega — proxy 403). Antes de producción:
-  `verify_jwt=on`.
+  ✅ **PROBADA en homologación (2026-07-30)**: cargados los secrets, se corrió `ta` → `ultimo`
+  → `emitir` (con `ARCA_EMITIR=on`) → **CAE autorizado** (ver el Avance del encabezado). URL:
+  `https://hrxfctzncixxqmpfhskv.supabase.co/functions/v1/arca-wsfe` (se invoca **desde el
+  navegador** — el sandbox de Claude no llega, proxy 403; `ta`/`ultimo`/`emitir` van por
+  POST `{"action":...}`, GET = status). Antes de producción: `verify_jwt=on`.
 - **Módulo frontend** dentro de **Facturación** (un botón "Facturar electrónicamente" /
   ticket aparte, NO el tilde actual): elige cliente + importe (o lo trae), llama a la
   función, muestra el CAE y permite imprimir. Se hace **al final**, después de que
@@ -146,8 +158,11 @@ Navegador (app)                 Supabase                         ARCA (ex AFIP)
   ⚠ No se pudo verificar desde el sandbox de Claude (su proxy bloquea salidas) — **probar
   abriendo esa URL desde el navegador del celu/monitor**. Se reemplaza por `arca-wsfe`
   real más adelante.
-- ⏳ **Bloqueado por**: (1) el certificado + PDV de ARCA (§4); (2) la decisión del importe
-  (§5); (3) confirmación fiscal del contador y la respuesta de Isis (¿importa de ARCA?).
+- ✅ **Homologación completa (2026-07-30)**: certificado + **PDV 11** + autorización `wsfe`
+  (representado = empresa) + secrets cargados + **CAE de prueba** obtenido. Ver el Avance del encabezado.
+- ⏳ **Falta para PRODUCCIÓN**: (1) la fuente del **importe** (§5, bloqueo #1); (2) **OK del
+  contador** (tipo A/B, alícuotas); (3) **certificado de producción** + `ARCA_ENV=prod`; (4) el
+  **módulo frontend** en Facturación; (5) confirmar que **Isis importa de ARCA**.
 
 ## 8. Resumen del camino
 
