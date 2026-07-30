@@ -44,7 +44,8 @@ catch (_e) {
       "pkForzarGondola", "pkEmitRetiroGondola",
       "pkNpEsLoeke", "pkDualBreakdown", "opDraftSaveQuiet",
       "emitGuardadoSesion", "stkGRate", "stkGRacksOn", "stkGuardadoToggleRacks", "stkGConfVal",
-      "facFacturarNP", "facFCOpen", "facFCEmitir", "facFCClose", "arcaCall", "facFmtMoney", "facFCEnsureModal"];
+      "facFacturarNP", "facFCOpen", "facFCEmitir", "facFCClose", "arcaCall", "facFmtMoney", "facFCEnsureModal",
+      "facNCOpen", "facNCEmitir", "facNCEnsure", "facNCClose"];
     const missing = need.filter((n) => typeof window[n] !== "function");
     const ts = new Date().toISOString();
     const sal = stockComputeSaldos([
@@ -71,9 +72,14 @@ catch (_e) {
       li.value = "104"; pruebaOk = pruebaOk && esOperadorPrueba() === false;
       li.value = orig;
     } else { pruebaOk = false; }
-    return { missing, saldoOk, normOk, pruebaOk };
+    // v6.64: botón "Anular factura (Nota de Crédito)" presente en el bloque de cierre.
+    const ncBtn = Array.from(document.querySelectorAll("button")).find((b) =>
+      (b.getAttribute("onclick") || "").indexOf("facNCOpen") >= 0 ||
+      /Anular factura/i.test(b.textContent || ""));
+    const ncBtnOk = !!ncBtn;
+    return { missing, saldoOk, normOk, pruebaOk, ncBtnOk };
   });
-  const pass = r.missing.length === 0 && r.saldoOk && r.normOk && r.pruebaOk && errs.length === 0;
+  const pass = r.missing.length === 0 && r.saldoOk && r.normOk && r.pruebaOk && r.ncBtnOk && errs.length === 0;
   console.log("smoke:", JSON.stringify(r), "· pageerrors:", errs.length ? errs.join("|") : "none", "·", pass ? "✓ OK" : "✗ FAIL");
   await b.close();
   process.exit(pass ? 0 : 1);
