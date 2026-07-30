@@ -18482,6 +18482,30 @@ function parseHHMMtoHours(s) {
   return Number(m[1]) + Number(m[2])/60 + (Number(m[3]||0))/3600;
 }
 
+/* idea 2093 — "operario en silencio" EN VIVO para el tablero principal. Antes el hueco
+   de inactividad (INC_GAP_MIN) sólo se veía post-hoc en Inconsistencias. Función PURA:
+   por legajo, último evento de HOY; si no cerró jornada (FJ) ni está en un descanso
+   permitido (PC/PB) y hace más de gapMin que no marca → entra a la lista. */
+function _monEnSilencio(eventos, todayKey, fjHoy, nowMs, gapMin) {
+  const last = new Map();
+  for (const ev of (eventos || [])) {
+    const leg = String(ev.legajo || "").trim();
+    if (!leg || leg === "0" || leg === "1") continue;                 // test/basura
+    if (isoToDayKey(ev.ts_cliente) !== todayKey) continue;            // sólo hoy
+    const ts = new Date(ev.ts_cliente).getTime();
+    const cur = last.get(leg);
+    if (!cur || ts > cur.ts) last.set(leg, { ts: ts, opcion: ev.opcion });
+  }
+  const out = [];
+  for (const [leg, info] of last) {
+    if (fjHoy && fjHoy.has(leg)) continue;                            // ya cerró jornada
+    if (info.opcion === "PC" || info.opcion === "PB") continue;       // en descanso permitido
+    const min = Math.round((nowMs - info.ts) / 60000);
+    if (min > gapMin) out.push({ legajo: leg, min: min });
+  }
+  out.sort(function (a, b) { return b.min - a.min; });                // el más silencioso primero
+  return out;
+}
 async function fetchMonitorEvents(targetTandaKeys, sheetMap) {
   const now = new Date();
   const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -18555,6 +18579,8 @@ async function fetchMonitorEvents(targetTandaKeys, sheetMap) {
   }
   const todayKey = isoToDayKey(startTodayMs);
   const empleadosHoy = perDayLegajos.has(todayKey) ? perDayLegajos.get(todayKey).size : 0;
+  // idea 2093: operarios "en silencio" ahora mismo (para el chip del tablero).
+  const enSilencio = _monEnSilencio(dataC, todayKey, perDayFJ.get(todayKey) || new Set(), Date.now(), INC_GAP_MIN);
 
   // Resumen de fichadas de HOY (para el panel del monitor).
   //   total       : cuántos ingresos únicos por legajo se registraron
@@ -18695,7 +18721,7 @@ async function fetchMonitorEvents(targetTandaKeys, sheetMap) {
     pastDays.push({ key: dayKey, label, totPick, totSep, empleados });
   }
 
-  return { statusMap, alertasOffSheet: [...alertasSet].sort(), empleadosHoy, pastDays, fichadasResumen };
+  return { statusMap, alertasOffSheet: [...alertasSet].sort(), empleadosHoy, pastDays, fichadasResumen, enSilencio };
 }
 
 function statusIconToday(s) {
@@ -19289,7 +19315,7 @@ async function refreshMonitor() {
       if (wideTargetSet.has(v.fechaEntregaRaw)) targetTandaKeys.push(k);
     }
     // 2) Eventos: status por tanda + alertas de hoy + empleados de hoy + 5 días anteriores
-    const { statusMap, alertasOffSheet, empleadosHoy, pastDays, fichadasResumen } = await fetchMonitorEvents(targetTandaKeys, sheetMap);
+    const { statusMap, alertasOffSheet, empleadosHoy, pastDays, fichadasResumen, enSilencio } = await fetchMonitorEvents(targetTandaKeys, sheetMap);
     monitorLastOkTs = Date.now();
     // 3) Decidir cuántos días mostrar: por default los próximos 3. Pero si en
     //    la ventana corta ya quedan POCOS pickings por hacer (≤3), expandimos
@@ -19312,6 +19338,28 @@ async function refreshMonitor() {
       fetchMonitorDayStats(yesterdayKeyAr, sheetMap).catch(e => { console.warn("[monitor] dayStats ayer:", e.message); return null; })
     ]);
     renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, empleadosHoy, pastDays, null, fichadasResumen, todayStats, yesterdayStats, todayKeyAr, yesterdayKeyAr);
+    // idea 2093: chip "operario en silencio" en vivo, debajo de la meta del monitor. Fail-safe.
+    try {
+      const _sil = enSilencio || [];
+      let _host = document.getElementById("monitorSilencio");
+      const _meta = document.getElementById("monitorMeta");
+      if (!_host && _meta && _meta.parentNode) {
+        _host = document.createElement("div");
+        _host.id = "monitorSilencio";
+        _host.style.cssText = "margin-top:6px;display:flex;flex-wrap:wrap;gap:6px;";
+        _meta.parentNode.insertBefore(_host, _meta.nextSibling);
+      }
+      if (_host) {
+        if (!_sil.length) { _host.innerHTML = ""; }
+        else {
+          const _nom = await getEmpleadosNombres();
+          _host.innerHTML = _sil.map(function (s) {
+            const n = (_nom && _nom.get && _nom.get(String(s.legajo))) || ("leg " + s.legajo);
+            return '<span style="background:#fef3c7;color:#92400e;border:1px solid #fcd34d;border-radius:999px;padding:2px 10px;font-size:12.5px;font-weight:800;white-space:nowrap;">⏰ ' + escapeHtml(n) + ' sin marcar hace ' + s.min + ' min</span>';
+          }).join("");
+        }
+      }
+    } catch (_e) {}
     if (refrEl) { refrEl.textContent = "● al día"; refrEl.classList.remove("stale"); }
     // Si el fetch anda, ocultar banner offline (puede que estuviera mostrándose).
     document.getElementById("monitorOfflineBanner").classList.add("hidden");

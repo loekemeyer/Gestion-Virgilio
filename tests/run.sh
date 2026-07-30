@@ -21,6 +21,9 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== stock-cutoff (regresión: stockComputeSaldos con cutoff/asOf, inicial siempre base) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stock-cutoff.cjs
 
+echo "== mon-silencio (regresión: operarios 'en silencio' en vivo — excluye FJ/PC/PB/prueba) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/mon-silencio.cjs
+
 echo "== ap-resume (regresión: 'Seguir armado' retoma sin re-mandar AP) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ap-resume.cjs
 
