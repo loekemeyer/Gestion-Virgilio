@@ -128,6 +128,45 @@ comprobante con PV/número/CAE existente que afecte stock + libro IVA sin CAE nu
 (5) ¿endpoint de movimientos/ajustes de stock? Desarrollo/cloud: (6) ¿lo desarrollan a
 medida (alcance/costo/plazo)? (7) ¿la versión cloud trae API más completa que lo cubra?
 
+### Respuesta del proveedor (ronda 2) — VEREDICTO
+
+Sobre `/api/ISISPedido`:
+1. Facturar el pedido **emite CAE nuevo** (patrón integración "Balcony", "CAE
+   Inmediato"). → doble emisión si la app también emite.
+2. La facturación **se puede automatizar** (parám. "Emite Factura de los Pedidos = Sí"
+   + proceso "Facturar pedidos"). ✅
+3. **El stock se mueve al facturar** (o remitir); el pedido solo compromete stock
+   futuro. ✅ (facturar el pedido descuenta stock físico).
+4. Registrar comprobante con CAE ya emitido por API → **NO existe** (solo manual).
+5. Endpoint de movimientos/ajustes de stock → **no documentado**.
+6. Desarrollo a medida → sin datos de política/costo/plazo.
+7. **Cloud tiene funciones exclusivas** (ej. integración Mercado Libre: "Administrador
+   de Publicaciones", "Consola de Ventas" son de ISIS Cloud). Confirma diferencias.
+
+**VEREDICTO:**
+- **Modelo B DESCARTADO** (no hay API para registrar CAE ya emitido; solo manual).
+- **Modelo A ELEGIDO y viable con la API existente:** la app **deja de emitir directo
+  a AFIP** y **empuja el pedido a `/api/ISISPedido`**; el ISIS **auto-factura** (CAE +
+  stock + contabilidad, nativo). Empleado solo usa la app. La emisión directa (PV 11)
+  queda de **respaldo**.
+- **Tema clave a resolver:** la app es cloud; el ISIS es on-premise → la API debe ser
+  **alcanzable desde internet**. Esto empuja a **evaluar migrar a ISIS Cloud** (API
+  accesible y mantenida). Recomendación: **Modelo A + evaluar ISIS Cloud**.
+
+### Preguntas ronda 3 (técnicas, para construir)
+
+(1) Doc del endpoint `/api/ISISPedido`: URL, auth, payload. (2) Facturación automática:
+¿inmediata o batch?, ¿devuelve CAE/número? (3) Accesibilidad: ¿API desde internet o solo
+red local? (4) ISIS Cloud: ¿API accesible + integración de fábrica?, ¿costo/tiempo de
+migrar? (5) Mapeo cliente/artículos por código ISIS.
+
+### Qué construye la app (Modelo A)
+
+Al facturar una NP, la app arma el **pedido** (cliente, artículos, cantidades, precios —
+datos que ya tiene) y lo **POSTea a `/api/ISISPedido`**; el ISIS auto-factura. Necesita:
+spec del endpoint (auth + payload) y URL alcanzable. El `arca-wsfe` (PV 11) queda como
+respaldo de emisión directa.
+
 ### Según la respuesta, del lado de la app
 
 - **Cloud con API / API on-premise (3, 6)** → la app se conecta a esa API y empuja
