@@ -164,8 +164,11 @@ const RCP_CSS = `
 #rcpRoot .histBtns{ display:flex; gap:8px; }
 #rcpRoot .histBtn{ height:44px; padding:0 18px; border-radius:10px; border:2px solid var(--border); background:#fff; font-weight:900; font-size:15px; cursor:pointer; }
 #rcpRoot .histBtn.pri{ background:#111; color:#fff; border-color:#111; }
-/* v6.55: "+" que despliega los filtros extra (Quién entregó / Remito / Cajas mín.) */
-#rcpRoot .histBtn.plus{ padding:0 14px; }
+/* v6.55: "+" que despliega los filtros extra (Quién entregó / Remito / Cajas mín.).
+   v6.56: va a la DERECHA del buscador principal, en dos líneas: "+" arriba, "filtros" abajo. */
+#rcpRoot .histBtn.plus{ padding:0 12px; display:flex; flex-direction:column; align-items:center; justify-content:center; line-height:1.05; }
+#rcpRoot .histBtn.plus .plusIco{ font-size:15px; font-weight:900; }
+#rcpRoot .histBtn.plus .plusTxt{ font-size:10px; font-weight:800; color:#475569; }
 #rcpRoot .histBtn.plus.on{ border-color:#111; background:#f1f5f9; }
 #rcpRoot .histMore{ display:none; }
 #rcpRoot .histMore.show{ display:flex; }
@@ -1119,7 +1122,8 @@ function renderHistorico() {
       '<div class="histField"><label for="histDesde">Desde</label><input type="date" id="histDesde" class="histDate"></div>' +
       '<div class="histField"><label for="histHasta">Hasta</label><input type="date" id="histHasta" class="histDate"></div>' +
       '<div class="histField"><label for="histCod">Código o quién entregó</label><input type="text" id="histCod" class="histCod" placeholder="ej. 590 o Rafael" inputmode="text" autocomplete="off"></div>' +
-      '<div class="histBtns"><button class="histBtn pri" id="histBuscar">Buscar</button><button class="histBtn" id="histLimpiar">Limpiar</button><button class="histBtn plus" id="histMas" title="Más filtros">＋</button></div>' +
+      '<button class="histBtn plus" id="histMas" title="Más filtros"><span class="plusIco">＋</span><span class="plusTxt" id="histMasTxt">filtros</span></button>' +
+      '<div class="histBtns"><button class="histBtn pri" id="histBuscar">Buscar</button><button class="histBtn" id="histLimpiar">Limpiar</button></div>' +
     '</div>' +
     '<div class="histBar histMore" id="histMore">' +
       '<div class="histField"><label for="histQuien">Quién entregó</label><input type="text" id="histQuien" class="histCod" placeholder="ej. Pintos" autocomplete="off"></div>' +
@@ -1171,10 +1175,10 @@ function histBuscar() {
   // v6.55: los filtros extra del "+" se COMBINAN (AND) con el buscador principal.
   const f = { desde: v("histDesde"), hasta: v("histHasta"), cod: v("histCod"),
               quien: v("histQuien"), remito: v("histRemito"), cajasMin: parseInt(v("histCajMin"), 10) || 0 };
-  const btn = document.getElementById("histMas");
-  if (btn) {
+  const txt = document.getElementById("histMasTxt");
+  if (txt) {
     const n = (f.quien ? 1 : 0) + (f.remito ? 1 : 0) + (f.cajasMin > 0 ? 1 : 0);
-    btn.textContent = n ? ("＋ (" + n + ")") : "＋";
+    txt.textContent = n ? ("filtros (" + n + ")") : "filtros";
   }
   histLoad(f);
 }
