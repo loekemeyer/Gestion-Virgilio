@@ -5617,7 +5617,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v6.59";
+const APP_VERSION = "v6.60";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -17037,18 +17037,31 @@ function _pppBlock(key, name, cls, meta, pedidos, headerExtra, editTanda) {
    (zona/Retira/Súper/Total de un día) abre un POP-UP con la tabla de NPs que lo componen. */
 let _pppResDet = {};
 function pppResPopClose() { const ov = document.getElementById("pppResPopOv"); if (ov) ov.classList.remove("show"); }
-/* v6.59: NPs del mismo cliente en UNA fila, compactas: la 1ª completa y las siguientes
-   solo los dígitos que cambian (mínimo 2) — 44506+44507 → "44506/07"; 44598+44601
-   (salteadas, cambia la centena) → "44598/601". */
+/* v6.59/v6.60: NPs del mismo cliente en UNA fila, compactas — la 1ª completa y las
+   siguientes solo los dígitos que cambian (mínimo 2): 44506+44507 → "44506/07";
+   salteadas 44598+44601 → "44598/601"; y 3+ CORRELATIVAS como rango → "44506 a 08". */
 function _pppNpsCompact(nps) {
-  const out = []; let prev = null;
+  const sufijo = function (np, prev) {
+    if (!prev || np.length !== prev.length || !/^\d+$/.test(np) || !/^\d+$/.test(prev)) return np;
+    let i = 0; while (i < np.length && np[i] === prev[i]) i++;
+    i = Math.min(i, np.length - 2);              // mostrar al menos 2 dígitos
+    return i > 0 ? np.slice(i) : np;
+  };
+  // agrupar en corridas de números CONSECUTIVOS (44506,44507,44508…)
+  const runs = []; let run = [];
   for (const np of nps) {
-    if (prev && np.length === prev.length && /^\d+$/.test(np) && /^\d+$/.test(prev)) {
-      let i = 0; while (i < np.length && np[i] === prev[i]) i++;
-      i = Math.min(i, np.length - 2);            // mostrar al menos 2 dígitos
-      out.push(i > 0 ? np.slice(i) : np);
-    } else out.push(np);
-    prev = np;
+    const n = /^\d+$/.test(np) ? parseInt(np, 10) : NaN;
+    const last = run.length ? run[run.length - 1] : null;
+    const lastN = last && /^\d+$/.test(last) ? parseInt(last, 10) : NaN;
+    if (run.length && !isNaN(n) && !isNaN(lastN) && n === lastN + 1 && np.length === last.length) run.push(np);
+    else { if (run.length) runs.push(run); run = [np]; }
+  }
+  if (run.length) runs.push(run);
+  const out = []; let prev = null;
+  for (const r of runs) {
+    if (r.length >= 3) out.push(sufijo(r[0], prev) + " a " + sufijo(r[r.length - 1], r[0]));
+    else r.forEach(function (np, i) { out.push(sufijo(np, i ? r[i - 1] : prev)); });
+    prev = r[r.length - 1];
   }
   return out.join("/");
 }
