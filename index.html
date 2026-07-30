@@ -1915,13 +1915,24 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .ppp-restbl td{ padding:5px 9px; border-bottom:1px solid #eef2f7; text-align:center; white-space:nowrap; }
 .ppp-restbl td.f{ font-weight:700; color:#0f172a; text-align:left; }
 .ppp-restbl td.d{ color:#64748b; }
-/* v6.57: celdas del Resumen clickeables → despliegan de qué NPs se compone el número */
+/* v6.57/v6.58: celdas del Resumen clickeables → pop-up con de qué NPs se compone el número */
 .ppp-restbl td.zc{ cursor:pointer; }
 .ppp-restbl td.zc:hover{ outline:2px solid #94a3b8; outline-offset:-2px; }
-.ppp-restbl tr.ppp-res-detrow td{ background:#f8fafc; text-align:left; white-space:normal; }
-.ppp-res-det{ display:flex; flex-wrap:wrap; gap:6px; padding:7px 6px; font-size:12px; }
-.ppp-res-det-h{ width:100%; font-size:12.5px; color:#334155; }
-.ppp-res-np{ background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:3px 8px; color:#334155; }
+.pppres-ov{ display:none; position:fixed; inset:0; z-index:1400; background:rgba(2,6,23,.72); overflow:auto; padding:16px; }
+.pppres-ov.show{ display:block; }
+.pppres-card{ background:#fff; max-width:680px; margin:40px auto 0; border-radius:14px; overflow:hidden; box-shadow:0 24px 70px rgba(0,0,0,.5); }
+.pppres-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:12px 16px; background:linear-gradient(90deg,#0f172a,#1e293b); color:#fff; }
+.pppres-title{ font-size:15.5px; font-weight:800; }
+.pppres-x{ background:#dc2626; color:#fff; border:none; border-radius:8px; padding:5px 13px; font-weight:800; cursor:pointer; width:auto; }
+.pppres-sum{ padding:9px 16px; font-size:13px; color:#475569; border-bottom:1px solid #e2e8f0; }
+.pppres-sum b{ color:#0f172a; }
+.pppres-wrap{ max-height:60vh; overflow:auto; }
+.pppres-tbl{ width:100%; border-collapse:collapse; font-size:13px; }
+.pppres-tbl th{ position:sticky; top:0; background:#f1f5f9; color:#475569; text-align:left; padding:7px 12px; font-size:11px; text-transform:uppercase; border-bottom:1px solid #cbd5e1; }
+.pppres-tbl td{ padding:7px 12px; border-bottom:1px solid #eef2f7; }
+.pppres-tbl td.num, .pppres-tbl th.num{ text-align:right; font-variant-numeric:tabular-nums; }
+.pppres-tbl td.np{ font-family:Consolas,Menlo,monospace; font-weight:800; color:#0f766e; white-space:nowrap; }
+.pppres-tbl tfoot td{ font-weight:800; background:#f8fafc; }
 .ppp-restbl td.num{ text-align:right; font-variant-numeric:tabular-nums; }
 .ppp-restbl td.z0{ color:#cbd5e1; }
 .ppp-restbl td.tot{ font-weight:800; background:#f1f5f9; }
@@ -5606,7 +5617,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v6.57";
+const APP_VERSION = "v6.58";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -17022,27 +17033,34 @@ function _pppBlock(key, name, cls, meta, pedidos, headerExtra, editTanda) {
    Ruta Sur/Centro/Oeste = Z1+Z2+Z3+Z4 · Ruta Norte = Z5+Z6+Z7 · Súper (uno
    por cliente) · Retira (sin camión). Cada camión hasta la capacidad (6 m³/día →
    ceil(m³/cap) camiones por ruta). Demora prom = promedio (Fecha Entrega − Fecha Recep). */
-/* v6.57 — detalle de composición de cada celda del Resumen: click en un número
-   (zona/Retira/Súper/Total de un día) despliega debajo qué NPs lo componen. */
+/* v6.57/v6.58 — composición de cada celda del Resumen: click en un número
+   (zona/Retira/Súper/Total de un día) abre un POP-UP con la tabla de NPs que lo componen. */
 let _pppResDet = {};
-let _pppResOpenKey = null;
+function pppResPopClose() { const ov = document.getElementById("pppResPopOv"); if (ov) ov.classList.remove("show"); }
 function pppResTgl(dk, zkeyEnc) {
   const zkey = decodeURIComponent(zkeyEnc);
-  const tr = document.getElementById("pppresd_" + dk), box = document.getElementById("pppresdc_" + dk);
-  if (!tr || !box) return;
-  const key = dk + "|" + zkey;
-  if (_pppResOpenKey === key && tr.style.display !== "none") { tr.style.display = "none"; _pppResOpenKey = null; return; }
   const det = _pppResDet[dk] || {};
   const items = ((zkey === "__tot__" ? det.__tot__ : det[zkey]) || []).slice().sort(function (a, b) { return b.m3 - a.m3; });
   const lbl = zkey === "__tot__" ? "Total del día" : zkey;
   const tot = items.reduce(function (s, i) { return s + i.m3; }, 0);
   const f2 = function (n) { return (Math.round(n * 100) / 100).toFixed(2); };
-  box.innerHTML = '<div class="ppp-res-det-h"><b>' + escapeHtml(lbl) + '</b> — ' + items.length + ' NP(s) · <b>' + f2(tot) + ' m³</b></div>' +
-    (items.length ? items.map(function (i) {
-      return '<span class="ppp-res-np"><b>NP ' + escapeHtml(i.np) + '</b>' + (i.tanda ? ' · ' + escapeHtml(i.tanda) : '') + ' · ' + escapeHtml(i.rs || "—") + (i.loc ? ' <small>(' + escapeHtml(i.loc) + ')</small>' : '') + ' · <b>' + f2(i.m3) + ' m³</b></span>';
-    }).join("") : '<span class="ppp-res-np">— sin NPs —</span>');
-  tr.style.display = "";
-  _pppResOpenKey = key;
+  let ov = document.getElementById("pppResPopOv");
+  if (!ov) {
+    ov = document.createElement("div"); ov.id = "pppResPopOv"; ov.className = "pppres-ov";
+    ov.addEventListener("click", function (e) { if (e.target === ov) pppResPopClose(); });
+    document.body.appendChild(ov);
+  }
+  let filas = "";
+  items.forEach(function (i) {
+    filas += '<tr><td class="np">' + escapeHtml(i.np) + '</td><td>' + escapeHtml(i.tanda || "—") + '</td><td>' + escapeHtml(i.rs || "—") + '</td><td style="color:#64748b">' + escapeHtml(i.loc || "—") + '</td><td class="num"><b>' + f2(i.m3) + '</b></td></tr>';
+  });
+  if (!filas) filas = '<tr><td colspan="5" style="text-align:center;color:#94a3b8">— sin NPs —</td></tr>';
+  ov.innerHTML = '<div class="pppres-card">' +
+    '<div class="pppres-head"><span class="pppres-title">🧩 ' + escapeHtml(lbl) + ' · ' + escapeHtml(det.__fecha__ || "") + '</span><button class="pppres-x" onclick="pppResPopClose()">✕</button></div>' +
+    '<div class="pppres-sum"><b>' + items.length + '</b> NP(s) · <b>' + f2(tot) + ' m³</b></div>' +
+    '<div class="pppres-wrap"><table class="pppres-tbl"><thead><tr><th>NP</th><th>Tanda</th><th>Cliente</th><th>Localidad</th><th class="num">m³</th></tr></thead><tbody>' + filas + '</tbody>' +
+    '<tfoot><tr><td colspan="4">Total</td><td class="num">' + f2(tot) + '</td></tr></tfoot></table></div></div>';
+  ov.classList.add("show");
 }
 function pppResumenHtml(prog) {
   const conF = prog.filter(function (p) { return (p.fecha_entrega || "").trim(); });
@@ -17075,6 +17093,7 @@ function pppResumenHtml(prog) {
       if (pppEsSuper(p)) { Z["Super"] += m3; det["Super"].push(item); const k = String(p.cod || p.razon_social || "?"); supCli[k] = (supCli[k] || 0) + m3; }
       else { const z = pppZonaDeBarrio(p.localidad); if (Z[z] != null) { Z[z] += m3; det[z].push(item); } }
     }
+    det.__fecha__ = d.fecha;
     _pppResDet[dk] = det;
     const total = ped.reduce(function (s, p) { return s + (Number(p.m3) || 0); }, 0);
     const surOeste = Z["Zona 1 - CABA Sur"] + Z["Zona 2 - CABA Centro"] + Z["Zona 3 - CABA Oeste"] + Z["Zona 4 - GBA Sur"];
@@ -17091,8 +17110,7 @@ function pppResumenHtml(prog) {
         if (m > 0.0001) return '<td class="num zc ' + z[1] + '" onclick="pppResTgl(\'' + dk + '\',\'' + encodeURIComponent(z[0]) + '\')" title="Ver de qué NPs se compone">' + f2(m) + '</td>';
         return '<td class="num z0 ' + z[1] + '">·</td>';
       }).join("") +
-      '<td class="num tot zc" onclick="pppResTgl(\'' + dk + '\',\'__tot__\')" title="Ver todas las NPs del día">' + f2(total) + '</td><td class="num cam">' + nCam + '</td><td class="num">' + (demP != null ? (Math.round(demP * 10) / 10) : "·") + '</td></tr>' +
-      '<tr class="ppp-res-detrow" id="pppresd_' + dk + '" style="display:none"><td colspan="14"><div class="ppp-res-det" id="pppresdc_' + dk + '"></div></td></tr>';
+      '<td class="num tot zc" onclick="pppResTgl(\'' + dk + '\',\'__tot__\')" title="Ver todas las NPs del día">' + f2(total) + '</td><td class="num cam">' + nCam + '</td><td class="num">' + (demP != null ? (Math.round(demP * 10) / 10) : "·") + '</td></tr>';
   }
   const demT = TdemN ? (Math.round(Tdem / TdemN * 10) / 10) : null;
   const totRow = '<tr class="totrow"><td class="f">TOTAL</td><td></td>' + Zc.map(function (z) { return tcell(T[z[0]]); }).join("") +
