@@ -2662,9 +2662,15 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
   transition: background .15s, transform .1s; line-height: 1.4;
   width: auto; display: inline-block; vertical-align: middle;   /* v6.52: override del global button{width:100%} para que ✓ y 🧾 vayan lado a lado */
 }
-/* v6.51 — 2ª tilde: facturar electrónicamente (ARCA) · v6.52: width:auto (mismo motivo) */
-.fac-btn-fc{ margin-left:5px; border:1px solid #c7d2fe; background:#eef2ff; color:#3730a3; border-radius:6px; padding:2px 9px; font-size:15px; cursor:pointer; line-height:1.4; width:auto; display:inline-block; vertical-align:middle; }
-.fac-btn-fc:hover{ background:#e0e7ff; border-color:#818cf8; }
+/* v6.51 — 2ª tilde: facturar electrónicamente (ARCA) · v6.52: width:auto
+   v6.61: tic azul apilado — ✓ arriba, "ARCA" abajo (en vez del icono de hoja) */
+.fac-btn-fc{ margin-left:6px; border:1px solid #93c5fd; background:#eff6ff; color:#1d4ed8; border-radius:6px; padding:3px 9px; cursor:pointer; line-height:1; width:auto; display:inline-flex; flex-direction:column; align-items:center; gap:1px; vertical-align:middle; transition:background .15s, transform .1s; }
+.fac-btn-fc-tic{ font-size:14px; font-weight:900; }
+.fac-btn-fc-lbl{ font-size:9px; font-weight:800; letter-spacing:.6px; }
+.fac-btn-fc:hover{ background:#dbeafe; border-color:#60a5fa; }
+.fac-btn-fc:active{ transform:scale(.93); }
+/* v6.61: los dos botones de acción, centrados verticalmente en la fila */
+.fac-accion-cell{ vertical-align:middle; }
 .facfc-ov{ position:fixed; inset:0; background:rgba(2,6,23,.6); z-index:1500; display:none; align-items:flex-start; justify-content:center; padding:24px 12px; overflow:auto; }
 .facfc-ov.show{ display:flex; }
 .facfc-card{ background:#fff; border-radius:16px; width:100%; max-width:440px; box-shadow:0 24px 70px rgba(0,0,0,.5); overflow:hidden; }
@@ -2681,6 +2687,8 @@ table.facfc-tbl th{ text-align:left; background:#f1f5f9; color:#64748b; font-siz
 table.facfc-tbl td{ padding:6px 10px; border-top:1px solid #eef2f6; }
 table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-numeric:tabular-nums; }
 .facfc-cod{ font-family:Consolas,Menlo,monospace; font-weight:800; }
+.facfc-des{ font-size:10.5px; color:#94a3b8; font-weight:700; font-variant-numeric:tabular-nums; margin-top:1px; white-space:nowrap; }
+.facfc-formula{ font-size:11px; color:#64748b; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:6px 10px; margin-bottom:10px; text-align:center; font-weight:700; }
 .facfc-warn{ background:#fff7ed; border:1px solid #fdba74; color:#9a3412; border-radius:9px; padding:8px 11px; font-size:12.5px; font-weight:700; margin-bottom:10px; }
 .facfc-tot{ display:flex; gap:14px; justify-content:flex-end; align-items:baseline; flex-wrap:wrap; font-size:13px; color:#334155; padding-top:6px; border-top:1px solid #e2e8f0; }
 .facfc-tot .facfc-total{ font-size:16px; font-weight:900; color:#0f172a; }
@@ -2709,6 +2717,15 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
 }
 .fac-btn-cierre:hover{ background: #1e3a8a; }
 .fac-btn-cierre:disabled{ background: #94a3b8; cursor: not-allowed; }
+/* v6.61: lista de NPs ya tildados hoy, en su propia fila debajo de "Armar ruta" */
+.fac-ticked-list{ flex:0 0 100%; width:100%; margin-top:4px; border-top:1px dashed #cbd5e1; padding-top:10px; }
+.fac-tk-head{ font-size:12px; font-weight:800; color:#15803d; margin-bottom:8px; text-transform:uppercase; letter-spacing:.4px; }
+.fac-tk-grid{ display:flex; flex-wrap:wrap; gap:6px; }
+.fac-tk-item{ display:inline-flex; align-items:center; gap:5px; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; padding:4px 9px; font-size:12.5px; color:#166534; }
+.fac-tk-item b{ font-weight:800; color:#14532d; }
+.fac-tk-ico{ color:#16a34a; font-weight:900; }
+.fac-tk-tanda{ font-family:Consolas,Menlo,monospace; font-weight:700; color:#0f766e; background:#ccfbf1; border-radius:5px; padding:0 5px; font-size:11px; }
+.fac-tk-rs{ color:#475569; font-weight:600; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .fac-toast{
   position: fixed; bottom: 20px; right: 20px; background: #0f172a; color: #fff;
   padding: 10px 18px; border-radius: 6px; font-size: 14px; font-weight: bold;
@@ -2943,6 +2960,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
     </div>
     <button class="fac-btn-cierre" id="facBtnCierre" disabled onclick="generateFacturacionPDF()">Terminé — Generar PDF</button>
     <button onclick="openRuteo()" style="width:100%;margin-top:8px;padding:13px;border:none;border-radius:10px;background:#0f766e;color:#fff;font-size:15px;font-weight:800;cursor:pointer">🗺️ Armar ruta de reparto de mañana</button>
+    <div id="facTickedList" class="fac-ticked-list" style="display:none"></div>
   </div>
   <div class="fac-toast" id="facToast"></div>
 </div>
@@ -5617,7 +5635,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v6.60";
+const APP_VERSION = "v6.61";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -20712,6 +20730,30 @@ function facTareaBadge(np){
 /* v5.70: alterna el filtro "ver solo NPs con faltante" y re-dibuja. */
 function facToggleSoloFalt(){ _facSoloFalt = !_facSoloFalt; if (typeof facRender === "function") facRender(_facLastTandas || []); }
 window.facToggleSoloFalt = facToggleSoloFalt;
+/* v6.61: lista de NPs ya tildadas hoy, debajo de "Armar ruta". _facNpsHoy son
+   los pendientes de cierre (tilde optimista + servidor). Los detalles (RS, tanda)
+   se buscan en _facLastTandas, donde el pedido sigue aunque se oculte de la tabla. */
+function facRenderTicked(){
+  const box = document.getElementById("facTickedList");
+  if (!box) return;
+  const nps = Array.from(_facNpsHoy || []);
+  if (!nps.length){ box.style.display = "none"; box.innerHTML = ""; return; }
+  const info = new Map();
+  (_facLastTandas || []).forEach(function(t){
+    (t.pedidos || []).forEach(function(p){
+      info.set(String(p.np), { rs: p.razonSocial || "", tanda: t.tanda || "" });
+    });
+  });
+  nps.sort(function(a,b){ return String(a).localeCompare(String(b), undefined, { numeric: true }); });
+  const items = nps.map(function(np){
+    const d = info.get(String(np)) || {};
+    const tn = d.tanda ? '<span class="fac-tk-tanda">' + escapeHtml(d.tanda) + '</span>' : '';
+    const rs = d.rs ? '<span class="fac-tk-rs">' + escapeHtml(d.rs) + '</span>' : '';
+    return '<div class="fac-tk-item"><span class="fac-tk-ico">✓</span><b>' + escapeHtml(String(np)) + '</b>' + tn + rs + '</div>';
+  }).join("");
+  box.innerHTML = '<div class="fac-tk-head">✓ Ya tildados hoy · ' + nps.length + '</div><div class="fac-tk-grid">' + items + '</div>';
+  box.style.display = "";
+}
 function facRender(tandas){
   _facLastTandas = tandas || [];   // v5.70: el filtro "solo faltante" re-dibuja este mismo set
   // Aplanamos: una fila por NP pendiente, llevando tanda + fecha salida
@@ -20755,6 +20797,7 @@ function facRender(tandas){
   document.getElementById("facBtnCierre").disabled = _facNpsHoy.size === 0;
   const btnRev = document.getElementById("facBtnRevertir");
   if (btnRev) btnRev.disabled = _facNpsHoy.size === 0;
+  facRenderTicked();   // v6.61: refrescar la lista de tildados debajo de "Armar ruta"
 
   // v5.70: chip "⚠ Con faltante: N" + filtro "solo faltantes". Los pedidos que
   // salieron cortos (Entregas_Virgilio.cajas_falto>0) ya vienen marcados en la
@@ -20810,7 +20853,7 @@ function facRender(tandas){
           if (esSuper) { const c = _facCajas.get(np); return (!c) ? '<span class="fac-lios0">—</span>' : (escapeHtml(String(Math.round(c))) + ' <small style="font-weight:600;color:#64748b">cj</small>'); }
           const v = _facLios.get(np); return (v == null) ? '<span class="fac-lios0">—</span>' : escapeHtml(String(v));
         })()}</td>
-        <td class="center"><button class="fac-btn-tick" data-args='${args}' onclick="facTickNP(this)">✓</button><button class="fac-btn-fc" data-args='${args}' onclick="facFacturarNP(this)" title="Facturar electrónicamente (ARCA)">🧾</button></td>
+        <td class="center fac-accion-cell"><button class="fac-btn-tick" data-args='${args}' onclick="facTickNP(this)">✓</button><button class="fac-btn-fc" data-args='${args}' onclick="facFacturarNP(this)" title="Facturar electrónicamente (ARCA)"><span class="fac-btn-fc-tic">✓</span><span class="fac-btn-fc-lbl">ARCA</span></button></td>
       </tr>`;
   }).join("");
 
@@ -20959,8 +21002,13 @@ async function facFCOpen(np, tanda, rs){
       '<div class="facfc-actions"><button class="facfc-cancel" onclick="facFCClose()">Cerrar</button></div></div>';
     return;
   }
+  // v6.61: desglose del P.unit — lista × (1 − dto vol del cliente) × (1 − 2% fijo).
+  var dtoPct = Math.round((Number(d.dto_vol) || 0) * 1000) / 10;
   var filas = (d.detalle || []).map(function(it){
-    return '<tr><td class="facfc-cod">' + escapeHtml(String(it.cod)) + '</td><td class="num">' + it.cajas + '×' + it.uxb + '</td><td class="num">' + facFmtMoney(it.precio_unit) + '</td><td class="num">' + facFmtMoney(it.neto_linea) + '</td></tr>';
+    var des = (it.list_price != null)
+      ? '<div class="facfc-des">lista ' + facFmtMoney(it.list_price) + (dtoPct > 0 ? ' −' + dtoPct + '%' : '') + ' −2%</div>'
+      : '';
+    return '<tr><td class="facfc-cod">' + escapeHtml(String(it.cod)) + '</td><td class="num">' + it.cajas + '×' + it.uxb + '</td><td class="num">' + facFmtMoney(it.precio_unit) + des + '</td><td class="num">' + facFmtMoney(it.neto_linea) + '</td></tr>';
   }).join("");
   var faltan = d.faltan || [];
   var puede = faltan.length === 0 && (Number(d.neto) > 0) && !!d.cuit;
@@ -20968,6 +21016,7 @@ async function facFCOpen(np, tanda, rs){
   h += '<div class="facfc-cli"><b>' + escapeHtml(d.cliente || rs || ("Cliente " + (d.cod_cliente || ""))) + '</b>' + (d.cuit ? ' · CUIT ' + escapeHtml(String(d.cuit)) : '') + '</div>';
   h += '<div class="facfc-sub">NP ' + escapeHtml(String(np)) + (tanda ? ' · Tanda ' + escapeHtml(String(tanda)) : '') + ' · Factura A</div>';
   h += '<div class="facfc-tblwrap"><table class="facfc-tbl"><thead><tr><th>Cód</th><th class="num">Cajas×u</th><th class="num">P.unit</th><th class="num">Neto</th></tr></thead><tbody>' + filas + '</tbody></table></div>';
+  h += '<div class="facfc-formula">P.unit = precio de lista' + (dtoPct > 0 ? ' − ' + dtoPct + '% dto volumen' : '') + ' − 2% dto fijo (sin IVA)</div>';
   if (faltan.length) h += '<div class="facfc-warn">⚠ Sin precio en el maestro web: <b>' + faltan.map(function(x){ return escapeHtml(String(x)); }).join(", ") + '</b>. No se puede facturar hasta cargarlos.</div>';
   h += '<div class="facfc-tot"><span>Neto ' + facFmtMoney(d.neto) + '</span><span>IVA 21% ' + facFmtMoney(d.iva) + '</span><span class="facfc-total">TOTAL ' + facFmtMoney(d.total) + '</span></div>';
   h += '<div class="facfc-actions"><button class="facfc-cancel" onclick="facFCClose()">Cancelar</button><button class="facfc-go" id="facFCGo"' + (puede ? '' : ' disabled') + '>Facturar (pedir CAE)</button></div>';
