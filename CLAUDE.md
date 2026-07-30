@@ -51,6 +51,37 @@ borró). Layout:
   `styles.css`, `sw.js`) y volver a poner el botón "Cambiar planta". Último sync desde
   commit `d2d6a59` (2026-06-04).
 
+## Agentes diarios + código de 4 dígitos (Telegram)
+
+Loop de dos etapas (tareas programadas, sesión nueva; **solo proponen**, no tocan código):
+
+- **Cada 2 h** — dos agentes generan ideas y las acumulan en `agente_propuestas`
+  (`estado='pendiente'`, `enviado_en=null`), sin molestar al usuario:
+  - **`mejoras-virgilio`** → mejoras/funcionalidades.
+  - **`revisor-logica`** → bugs, casos borde e inconsistencias de lógica.
+- **A las 8:00 AR** — el **`curador-telegram`**, parado sobre el repo y sobre todo
+  la `GUIA-PROYECTO.md` (lo que pidió el usuario), revisa TODO lo acumulado sin
+  enviar, **descarta ruido/duplicados/lo que contradice la guía**, arma **una
+  lista definitiva** y la manda por Telegram al privado del usuario (bot
+  `@Faltantes_Virgilio_bot`). Marca las enviadas con `enviado_en=now()` y las
+  descartadas con `estado='descartada'` + `curador_nota`.
+
+Cada propuesta tiene un **código de 4 dígitos** único.
+
+**⚠ Regla para CUALQUIER chat**: si el usuario manda un **código de 4 dígitos**
+(ej. `4837`, "hacé el 4837", "código 4837"), buscá esa fila:
+
+```sql
+select codigo, agente, titulo, detalle, ubicacion, impacto, esfuerzo, estado
+from public.agente_propuestas where codigo = '4837';
+```
+
+Trabajá sobre esa propuesta. Los cambios de código van **a `main` SOLO con
+aprobación explícita del usuario** (él decide qué código encarar). Al terminar y
+con su OK, marcá `update public.agente_propuestas set estado='hecha',
+actualizado_en=now() where codigo='4837';` (o `'descartada'` si el usuario la
+descarta). Detalle del sistema en `docs/AGENTES-DIARIOS.md`.
+
 ## Git
 
 - **Este es un repo de PRUEBA** (`tv-v`), espejo de Producción Virgilio. Trabajar
