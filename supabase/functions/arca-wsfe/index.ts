@@ -350,10 +350,13 @@ Deno.serve(async (req: Request): Promise<Response> => {
       const pr = await preciarNp(c, String(body.np || ""), body.tanda ? String(body.tanda) : "");
       if (pr.faltan.length) return json({ ok: false, error: "faltan_precios", faltan: pr.faltan, nota: "No emito: hay artículos sin precio en el maestro web." }, 422);
       if (pr.neto <= 0) return json({ ok: false, error: "neto_cero", nota: "El neto calculado dio 0." }, 422);
-      const tipo = Number(body.tipo_cbte) || 1; // 1 = Factura A (RG: receptor Responsable Inscripto)
+      // Condición IVA del receptor (RG 5616): 1=Resp.Inscripto, 4=Exento, 5=Cons.Final, 6=Monotributo.
+      // Tipo de comprobante: RI → Factura A (1); Monotributo/Exento/Cons.Final → Factura B (6).
+      const cond = Number(body.cond_iva_receptor) || 1;
+      const tipo = Number(body.tipo_cbte) || (cond === 1 ? 1 : 6);
       const ta = await wsaaLogin(c);
-      const r = await feEmitir(c, ta, { tipo_cbte: tipo, neto: pr.neto, iva: pr.iva, doc_tipo: 80, doc_nro: pr.cuit, cond_iva_receptor: 1, np: pr.np, tanda: pr.tanda });
-      return json({ ...r, cliente: pr.cliente, cuit: pr.cuit, cod_cliente: pr.cod_cliente, neto: pr.neto, iva: pr.iva, total: pr.total, detalle: pr.detalle }, r.ok ? 200 : 422);
+      const r = await feEmitir(c, ta, { tipo_cbte: tipo, neto: pr.neto, iva: pr.iva, doc_tipo: 80, doc_nro: pr.cuit, cond_iva_receptor: cond, np: pr.np, tanda: pr.tanda });
+      return json({ ...r, tipo_cbte: tipo, cond_iva_receptor: cond, letra: tipo === 1 ? "A" : "B", cliente: pr.cliente, cuit: pr.cuit, cod_cliente: pr.cod_cliente, neto: pr.neto, iva: pr.iva, total: pr.total, detalle: pr.detalle }, r.ok ? 200 : 422);
     }
   } catch (e) {
     return json({ ok: false, error: String((e as Error)?.message || e).slice(0, 500) }, 502);
