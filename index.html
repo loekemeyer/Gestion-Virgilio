@@ -1915,6 +1915,13 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .ppp-restbl td{ padding:5px 9px; border-bottom:1px solid #eef2f7; text-align:center; white-space:nowrap; }
 .ppp-restbl td.f{ font-weight:700; color:#0f172a; text-align:left; }
 .ppp-restbl td.d{ color:#64748b; }
+/* v6.57: celdas del Resumen clickeables → despliegan de qué NPs se compone el número */
+.ppp-restbl td.zc{ cursor:pointer; }
+.ppp-restbl td.zc:hover{ outline:2px solid #94a3b8; outline-offset:-2px; }
+.ppp-restbl tr.ppp-res-detrow td{ background:#f8fafc; text-align:left; white-space:normal; }
+.ppp-res-det{ display:flex; flex-wrap:wrap; gap:6px; padding:7px 6px; font-size:12px; }
+.ppp-res-det-h{ width:100%; font-size:12.5px; color:#334155; }
+.ppp-res-np{ background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:3px 8px; color:#334155; }
 .ppp-restbl td.num{ text-align:right; font-variant-numeric:tabular-nums; }
 .ppp-restbl td.z0{ color:#cbd5e1; }
 .ppp-restbl td.tot{ font-weight:800; background:#f1f5f9; }
@@ -5599,7 +5606,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v6.56";
+const APP_VERSION = "v6.57";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -17015,6 +17022,28 @@ function _pppBlock(key, name, cls, meta, pedidos, headerExtra, editTanda) {
    Ruta Sur/Centro/Oeste = Z1+Z2+Z3+Z4 · Ruta Norte = Z5+Z6+Z7 · Súper (uno
    por cliente) · Retira (sin camión). Cada camión hasta la capacidad (6 m³/día →
    ceil(m³/cap) camiones por ruta). Demora prom = promedio (Fecha Entrega − Fecha Recep). */
+/* v6.57 — detalle de composición de cada celda del Resumen: click en un número
+   (zona/Retira/Súper/Total de un día) despliega debajo qué NPs lo componen. */
+let _pppResDet = {};
+let _pppResOpenKey = null;
+function pppResTgl(dk, zkeyEnc) {
+  const zkey = decodeURIComponent(zkeyEnc);
+  const tr = document.getElementById("pppresd_" + dk), box = document.getElementById("pppresdc_" + dk);
+  if (!tr || !box) return;
+  const key = dk + "|" + zkey;
+  if (_pppResOpenKey === key && tr.style.display !== "none") { tr.style.display = "none"; _pppResOpenKey = null; return; }
+  const det = _pppResDet[dk] || {};
+  const items = ((zkey === "__tot__" ? det.__tot__ : det[zkey]) || []).slice().sort(function (a, b) { return b.m3 - a.m3; });
+  const lbl = zkey === "__tot__" ? "Total del día" : zkey;
+  const tot = items.reduce(function (s, i) { return s + i.m3; }, 0);
+  const f2 = function (n) { return (Math.round(n * 100) / 100).toFixed(2); };
+  box.innerHTML = '<div class="ppp-res-det-h"><b>' + escapeHtml(lbl) + '</b> — ' + items.length + ' NP(s) · <b>' + f2(tot) + ' m³</b></div>' +
+    (items.length ? items.map(function (i) {
+      return '<span class="ppp-res-np"><b>NP ' + escapeHtml(i.np) + '</b>' + (i.tanda ? ' · ' + escapeHtml(i.tanda) : '') + ' · ' + escapeHtml(i.rs || "—") + (i.loc ? ' <small>(' + escapeHtml(i.loc) + ')</small>' : '') + ' · <b>' + f2(i.m3) + ' m³</b></span>';
+    }).join("") : '<span class="ppp-res-np">— sin NPs —</span>');
+  tr.style.display = "";
+  _pppResOpenKey = key;
+}
 function pppResumenHtml(prog) {
   const conF = prog.filter(function (p) { return (p.fecha_entrega || "").trim(); });
   const sinF = prog.length - conF.length;
@@ -17030,19 +17059,23 @@ function pppResumenHtml(prog) {
   const f2 = function (n) { return (Math.round(n * 100) / 100).toFixed(2); };
   // columnas de zona (clave, clase de color)
   const Zc = [["Zona 1 - CABA Sur", "z1"], ["Zona 2 - CABA Centro", "z2"], ["Zona 3 - CABA Oeste", "z3"], ["Zona 4 - GBA Sur", "z4"], ["Zona 5 - GBA Oeste", "z5"], ["Zona 6 - GBA Norte", "z6"], ["Zona 7 - GBA Norte Lejos", "z7"], ["Retira", "zret"], ["Super", "zsup"]];
-  const cell = function (m, cls) { return m > 0.0001 ? '<td class="num ' + cls + '">' + f2(m) + '</td>' : '<td class="num z0 ' + cls + '">·</td>'; };
   const tcell = function (m) { return '<td class="num">' + (m > 0.0001 ? f2(m) : '·') + '</td>'; };
   const T = {}; Zc.forEach(function (z) { T[z[0]] = 0; }); let Ttot = 0, Tcam = 0, Tdem = 0, TdemN = 0;
+  _pppResDet = {};   // v6.57: composición por celda (fecha × zona) para el detalle clickeable
   let rows = "";
   for (const dk of dias) {
     const d = byD[dk], ped = d.ped;
     const Z = {}; Zc.forEach(function (z) { Z[z[0]] = 0; });
+    const det = { __tot__: [] }; Zc.forEach(function (z) { det[z[0]] = []; });
     const supCli = {};
     for (const p of ped) {
       const m3 = Number(p.m3) || 0;
-      if (pppEsSuper(p)) { Z["Super"] += m3; const k = String(p.cod || p.razon_social || "?"); supCli[k] = (supCli[k] || 0) + m3; }
-      else { const z = pppZonaDeBarrio(p.localidad); if (Z[z] != null) Z[z] += m3; }
+      const item = { np: String(p.np || "—"), tanda: String(p.tanda || "").trim(), rs: String(p.razon_social || "").trim(), loc: String(p.localidad || "").trim(), m3: m3 };
+      det.__tot__.push(item);
+      if (pppEsSuper(p)) { Z["Super"] += m3; det["Super"].push(item); const k = String(p.cod || p.razon_social || "?"); supCli[k] = (supCli[k] || 0) + m3; }
+      else { const z = pppZonaDeBarrio(p.localidad); if (Z[z] != null) { Z[z] += m3; det[z].push(item); } }
     }
+    _pppResDet[dk] = det;
     const total = ped.reduce(function (s, p) { return s + (Number(p.m3) || 0); }, 0);
     const surOeste = Z["Zona 1 - CABA Sur"] + Z["Zona 2 - CABA Centro"] + Z["Zona 3 - CABA Oeste"] + Z["Zona 4 - GBA Sur"];
     const norte = Z["Zona 5 - GBA Oeste"] + Z["Zona 6 - GBA Norte"] + Z["Zona 7 - GBA Norte Lejos"];
@@ -17053,8 +17086,13 @@ function pppResumenHtml(prog) {
     const dt = _pppFechaDate(d.fecha), dia = dt ? DOW[dt.getDay()] : "";
     Zc.forEach(function (z) { T[z[0]] += Z[z[0]]; }); Ttot += total; Tcam += nCam; Tdem += dem; TdemN += dn;
     rows += '<tr><td class="f">' + escapeHtml(d.fecha) + '</td><td class="d">' + dia + '</td>' +
-      Zc.map(function (z) { return cell(Z[z[0]], z[1]); }).join("") +
-      '<td class="num tot">' + f2(total) + '</td><td class="num cam">' + nCam + '</td><td class="num">' + (demP != null ? (Math.round(demP * 10) / 10) : "·") + '</td></tr>';
+      Zc.map(function (z) {
+        const m = Z[z[0]];
+        if (m > 0.0001) return '<td class="num zc ' + z[1] + '" onclick="pppResTgl(\'' + dk + '\',\'' + encodeURIComponent(z[0]) + '\')" title="Ver de qué NPs se compone">' + f2(m) + '</td>';
+        return '<td class="num z0 ' + z[1] + '">·</td>';
+      }).join("") +
+      '<td class="num tot zc" onclick="pppResTgl(\'' + dk + '\',\'__tot__\')" title="Ver todas las NPs del día">' + f2(total) + '</td><td class="num cam">' + nCam + '</td><td class="num">' + (demP != null ? (Math.round(demP * 10) / 10) : "·") + '</td></tr>' +
+      '<tr class="ppp-res-detrow" id="pppresd_' + dk + '" style="display:none"><td colspan="14"><div class="ppp-res-det" id="pppresdc_' + dk + '"></div></td></tr>';
   }
   const demT = TdemN ? (Math.round(Tdem / TdemN * 10) / 10) : null;
   const totRow = '<tr class="totrow"><td class="f">TOTAL</td><td></td>' + Zc.map(function (z) { return tcell(T[z[0]]); }).join("") +
