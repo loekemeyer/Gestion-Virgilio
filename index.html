@@ -12959,7 +12959,8 @@ function faltPollStart() {
    fecha). Si a las 15:30 está en medio de una tarea, NO lo interrumpe:
    espera a que vuelva a la botonera y recién ahí dispara. Corre en el
    celular del operario (poll cada 25s); el chequeo se auto-limita al
-   los legajos de CP_RECORD_LEGAJOS, así que es inofensivo para el resto.
+   los legajos de CP_RECORD_LEGAJOS (operarios) y a la OPERADORA (supervisor que
+   entra con su gmail = FAC_OPERADORA_EMAIL), así que es inofensivo para el resto.
    Para cambiar destinatarios/hora: editar CP_RECORD_LEGAJOS / CP_RECORD_MIN.
    ============================================================ */
 const CP_RECORD_LEGAJOS = ["104"];           // Jhonny Moncayo (sumar acá otros legajos, ej. la operadora)
@@ -12979,16 +12980,30 @@ function cpRecordCheck() {
   try {
     const t = _cpRecordNowAR(); if (!t || !t.ymd) return;
     if (!t.habil || t.min < CP_RECORD_MIN) return;                 // solo días hábiles, de 15:30 en adelante
-    const _miLeg = _faltMiLegajo();
-    if (CP_RECORD_LEGAJOS.indexOf(_miLeg) < 0) return;             // solo los legajos configurados
-    if (!_faltActivo()) return;                                    // en la botonera (no en medio de una tarea)
     const cpOpen = (function () { const m = document.getElementById("cpModal"); return !!(m && m.classList.contains("show")); })();
     if (cpOpen) return;                                            // ya está abierto
-    const key = "vir_cp_record_" + _miLeg + "_" + t.ymd;          // dedup: 1 vez por día POR legajo
-    if (localStorage.getItem(key)) return;
-    localStorage.setItem(key, "1");
-    try { alert("⏰ Es hora de completar los faltantes."); } catch (_e) {}
-    try { showCPModal(_miLeg); } catch (_e) {}
+    // Path 1 — operario por legajo (Moncayo 104, etc.), sólo cuando está en la botonera.
+    const _miLeg = _faltMiLegajo();
+    if (CP_RECORD_LEGAJOS.indexOf(_miLeg) >= 0 && _faltActivo()) {
+      const key = "vir_cp_record_" + _miLeg + "_" + t.ymd;         // dedup: 1 vez por día por legajo
+      if (localStorage.getItem(key)) return;
+      localStorage.setItem(key, "1");
+      try { alert("⏰ Es hora de completar los faltantes."); } catch (_e) {}
+      try { showCPModal(_miLeg); } catch (_e) {}
+      return;
+    }
+    // Path 2 — la OPERADORA entra al panel admin con su gmail (supervisor, sin legajo):
+    // le llega el mismo recordatorio. Abre el CP con legajo vacío (igual que su FCO).
+    const _em = (typeof window !== "undefined" && window.__authEmail) ? String(window.__authEmail).trim().toLowerCase() : "";
+    const _opEmail = (typeof FAC_OPERADORA_EMAIL !== "undefined") ? String(FAC_OPERADORA_EMAIL).trim().toLowerCase() : "";
+    if (window.__isSupervisor && _em && _opEmail && _em === _opEmail) {
+      const key = "vir_cp_record_" + _em + "_" + t.ymd;           // dedup: 1 vez por día por email
+      if (localStorage.getItem(key)) return;
+      localStorage.setItem(key, "1");
+      try { alert("⏰ Es hora de completar los faltantes."); } catch (_e) {}
+      try { showCPModal(""); } catch (_e) {}
+      return;
+    }
   } catch (_e) {}
 }
 function cpRecordStart() {
