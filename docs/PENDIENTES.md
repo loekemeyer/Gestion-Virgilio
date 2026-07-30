@@ -8,6 +8,17 @@ tachan (`~~…~~`).
 > ⚠ **#7 y #8 se están haciendo en OTRO chat** (el usuario dio el OK allá). No
 > tocarlos desde acá para no pisar el trabajo (el #7 es un revoke en Supabase en vivo).
 
+## ⚠ Revisar mañana (operativo) — anotado 2026-07-30
+
+- [ ] **2 pedidos armados + facturados pero SIN despachar (del 29/07).** Las NP **98185**
+  y **98186** (**Mundo Bazar S.R.L**, tanda **C98J**) se **armaron** el 29/07 16:51 (~216
+  cajas) y se **facturaron/tildaron** el 29/07 17:24, pero **NO se cargaron al camión**
+  (no hay evento `CCN`) ni entraron a ningún reparto (`Facturacion_NP.cierre_id` = null).
+  Son los 2 que aparecen en "YA TILDADOS HOY" del Cierre de jornada de Facturación.
+  **Acción:** verificar físicamente que esas cajas estén en el depósito y despacharlas en el
+  próximo reparto (van a estar en el "Generar PDF"); si ya salieron por otro medio, cerrarlas
+  / marcar la carga (CCN) para que salgan de la lista de pendientes.
+
 ## Grupo A — Requiere al usuario (Google/ARCA, fuera del alcance del agente)
 
 - ~~**1. Deploy del Apps Script `ppp-a-excel.gs`**~~ — **DESCARTADO 2026-07-30** por
