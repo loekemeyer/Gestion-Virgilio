@@ -5859,6 +5859,26 @@ async function send() {
     }
   }
 
+  // idea 5138: EP sobre un picking que YO ya tengo abierto → espejo de la guarda AP de arriba.
+  // Sin esto, un 2º EP sobreescribía st.picking en silencio: el EP original quedaba SIN TP
+  // (huérfano, inconsistencia tipo A) y la tanda seguía reservada en Tandas_Lock hasta +10h,
+  // bloqueando a otros. Misma tanda → reabrir; otra tanda abierta → avisar antes de dejarla trabada.
+  if (opcion === "EP" && texto) {
+    const stEP = getLegajoState(legajoStr);
+    if (stEP && stEP.picking && stEP.picking.active) {
+      const abierta = String(stEP.picking.value || "").trim().toUpperCase();
+      if (abierta === texto) {
+        try { alert("Ese picking (tanda " + texto + ") ya estaba abierto — te lo reabro donde lo dejaste.\nNo hace falta marcar EP de nuevo."); } catch (_e) {}
+        try { showPickingList(texto, legajoStr); } catch (_e) {}
+        return;
+      } else if (abierta) {
+        let ok = false;
+        try { ok = confirm("⚠ Tenés el picking de la tanda " + abierta + " SIN terminar (sin TP).\n\nSi arrancás " + texto + " ahora, " + abierta + " queda sin cerrar y trabada.\n\nAceptar = arrancar " + texto + " igual · Cancelar = terminar primero " + abierta + "."); } catch (_e) { ok = true; }
+        if (!ok) return;
+      }
+    }
+  }
+
   // v5.74: EXCLUSIVIDAD de tanda. Si OTRO operario ya arrancó el picking (EP sin TP)
   // o el armado (AP sin TAP) de esta tanda, no dejamos que un segundo lo empiece:
   // no pueden trabajar dos el mismo. Chequeo FRESCO (sin cache) para achicar la
