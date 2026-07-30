@@ -53,15 +53,20 @@ borró). Layout:
 
 ## Agentes diarios + código de 4 dígitos (Telegram)
 
-Dos agentes corren **todos los días ~8:00 AR** (tarea programada, sesión nueva) y
-**solo proponen** (no tocan código):
+Loop de dos etapas (tareas programadas, sesión nueva; **solo proponen**, no tocan código):
 
-- **`mejoras-virgilio`** → backlog de mejoras/funcionalidades.
-- **`revisor-logica`** → bugs, casos borde e inconsistencias de lógica.
+- **Cada 2 h** — dos agentes generan ideas y las acumulan en `agente_propuestas`
+  (`estado='pendiente'`, `enviado_en=null`), sin molestar al usuario:
+  - **`mejoras-virgilio`** → mejoras/funcionalidades.
+  - **`revisor-logica`** → bugs, casos borde e inconsistencias de lógica.
+- **A las 8:00 AR** — el **`curador-telegram`**, parado sobre el repo y sobre todo
+  la `GUIA-PROYECTO.md` (lo que pidió el usuario), revisa TODO lo acumulado sin
+  enviar, **descarta ruido/duplicados/lo que contradice la guía**, arma **una
+  lista definitiva** y la manda por Telegram al privado del usuario (bot
+  `@Faltantes_Virgilio_bot`). Marca las enviadas con `enviado_en=now()` y las
+  descartadas con `estado='descartada'` + `curador_nota`.
 
-Cada propuesta se guarda en la tabla `agente_propuestas` (Supabase
-`hrxfctzncixxqmpfhskv`) con un **código de 4 dígitos** único, y se manda un
-**resumen corto por Telegram** al privado del usuario (bot `@Faltantes_Virgilio_bot`).
+Cada propuesta tiene un **código de 4 dígitos** único.
 
 **⚠ Regla para CUALQUIER chat**: si el usuario manda un **código de 4 dígitos**
 (ej. `4837`, "hacé el 4837", "código 4837"), buscá esa fila:
