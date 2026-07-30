@@ -12,9 +12,16 @@
 //   ultimo  → FECompUltimoAutorizado {tipo_cbte} → último nro autorizado del PDV.
 //   emitir  → FECAESolicitar {tipo_cbte, neto, iva, doc_tipo?, doc_nro?, cond_iva_receptor?,
 //             alic_id?, total?, np?, tanda?} → CAE. Solo con ARCA_EMITIR=on.
+//   preciar → {np, tanda?} → calcula el importe de una NP (ítems de Entregas_Virgilio ×
+//             precios del proyecto web, neto = list_price×(1−dto_vol)×(1−2%), IVA 21%).
+//             NO emite (no requiere ARCA_EMITIR). Sirve de preview. Necesita WEB_SERVICE_KEY.
+//   emitir_np → {np, tanda?, tipo_cbte?=1} → precia la NP y pide el CAE (Factura A por defecto,
+//             receptor Responsable Inscripto por CUIT). Requiere ARCA_EMITIR=on + WEB_SERVICE_KEY.
 //
 // Secrets: ARCA_CERT (PEM), ARCA_KEY (PEM), ARCA_CUIT, ARCA_PTO_VTA, ARCA_ENV (homo|prod),
-//          ARCA_EMITIR (on|off). SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY los inyecta Supabase.
+//          ARCA_EMITIR (on|off), y para preciar/emitir_np: WEB_SERVICE_KEY (service_role del
+//          proyecto web de precios) + WEB_SUPABASE_URL (opcional, default hardcodeado).
+//          SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY los inyecta Supabase.
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import forge from "npm:node-forge@1.3.1";
@@ -46,6 +53,10 @@ function readConfig() {
     cuit: (Deno.env.get("ARCA_CUIT") || "").replace(/\D/g, ""),
     ptoVta: (Deno.env.get("ARCA_PTO_VTA") || "").replace(/\D/g, ""),
     emitir: (Deno.env.get("ARCA_EMITIR") || "off").toLowerCase() === "on",
+    // Proyecto web de PRECIOS (otro Supabase de la misma org): URL fija + service_role
+    // como secret (customers está protegida; hay que leerla server-side, nunca del front).
+    webUrl: Deno.env.get("WEB_SUPABASE_URL") || "https://kwkclwhmoygunqmlegrg.supabase.co",
+    webKey: Deno.env.get("WEB_SERVICE_KEY") || "",
     urls: WS_URLS[env as "homo" | "prod"],
   };
 }
@@ -220,6 +231,61 @@ async function feEmitir(c: Cfg, ta: { token: string; sign: string }, p: any) {
   return { ok: estado === "autorizado", estado, resultado, pto_vta: Number(c.ptoVta), nro_cbte: nro, cae, cae_vto: caeVto, obs: obs ? String(obs).slice(0, 800) : null, error: errTop };
 }
 
+// ───────── Precio de facturación: cruza Virgilio (Entregas_Virgilio) + proyecto web ─────────
+// Regla del dueño: neto_unit = list_price × (1 − dto_vol) × (1 − 2%). IVA 21%. Precios SIN IVA.
+const DTO_FIJO = 0.02;
+function canonCod(s: string): string { return String(s == null ? "" : s).toUpperCase().trim().replace(/^0+(?=.)/, ""); }
+async function webRest(c: Cfg, path: string): Promise<unknown[]> {
+  const r = await fetch(c.webUrl + "/rest/v1/" + path, { headers: { apikey: c.webKey, Authorization: "Bearer " + c.webKey } });
+  if (!r.ok) throw new Error("web REST " + r.status + ": " + (await r.text()).slice(0, 200));
+  return await r.json();
+}
+// deno-lint-ignore no-explicit-any
+async function preciarNp(c: Cfg, np: string, tanda: string): Promise<any> {
+  np = String(np || "").trim();
+  if (!np) throw new Error("Falta el número de NP.");
+  // 1) ítems ENTREGADOS de la NP (Virgilio, service role propio)
+  let q = sbUrl("Entregas_Virgilio") + "?select=cod_cliente,cod_art,cajas_entregadas&np=eq." + encodeURIComponent(np) + "&cajas_entregadas=gt.0";
+  if (tanda) q += "&tanda=eq." + encodeURIComponent(tanda);
+  // deno-lint-ignore no-explicit-any
+  const items: any[] = await (await fetch(q, { headers: sbHeaders() })).json();
+  if (!Array.isArray(items) || !items.length) throw new Error("La NP " + np + " no tiene ítems entregados en Entregas_Virgilio.");
+  const codCliente = String(items[0].cod_cliente || "").replace(/\D/g, "");
+  if (!codCliente) throw new Error("La NP " + np + " no tiene código de cliente.");
+  const cajasPorCod: Record<string, number> = {};
+  for (const it of items) { const k = canonCod(it.cod_art); if (k) cajasPorCod[k] = (cajasPorCod[k] || 0) + (Number(it.cajas_entregadas) || 0); }
+  // 2) cliente (web): CUIT + dto_vol
+  // deno-lint-ignore no-explicit-any
+  const custRows: any[] = await webRest(c, "customers?select=cod_cliente,cuit,business_name,dto_vol&cod_cliente=eq." + codCliente + "&limit=1");
+  const cust = custRows[0];
+  if (!cust) throw new Error("El cliente " + codCliente + " no figura en el maestro web (sin CUIT/precios).");
+  const cuit = String(cust.cuit || "").replace(/\D/g, "");
+  if (cuit.length !== 11) throw new Error("El cliente " + codCliente + " (" + (cust.business_name || "") + ") no tiene CUIT válido en el maestro web.");
+  const dto = Number(cust.dto_vol) || 0;
+  // 3) precios (web): productos activos, match por código canónico (066↔66)
+  // deno-lint-ignore no-explicit-any
+  const prods: any[] = await webRest(c, "products?select=cod,list_price,uxb,active&active=eq.true&limit=2000");
+  // deno-lint-ignore no-explicit-any
+  const pmap: Record<string, any> = {};
+  for (const p of prods) { const k = canonCod(p.cod); if (k && !(k in pmap)) pmap[k] = p; }
+  // 4) calcular neto
+  // deno-lint-ignore no-explicit-any
+  const detalle: any[] = []; const faltan: string[] = []; let neto = 0;
+  for (const cod of Object.keys(cajasPorCod)) {
+    const p = pmap[cod]; const cajas = cajasPorCod[cod];
+    if (!p || p.list_price == null || Number(p.list_price) <= 0) { faltan.push(cod); continue; }
+    const uxb = Number(p.uxb) || 1;
+    const punit = Number(p.list_price) * (1 - dto) * (1 - DTO_FIJO);
+    const nlin = cajas * uxb * punit;
+    neto += nlin;
+    detalle.push({ cod, cajas, uxb, list_price: Number(p.list_price), precio_unit: Math.round(punit * 100) / 100, neto_linea: Math.round(nlin * 100) / 100 });
+  }
+  neto = Math.round(neto * 100) / 100;
+  const iva = Math.round(neto * 0.21 * 100) / 100;
+  const total = Math.round((neto + iva) * 100) / 100;
+  return { np, tanda: tanda || null, cod_cliente: codCliente, cuit, cliente: cust.business_name || null, dto_vol: dto, neto, iva, total, detalle, faltan };
+}
+
 // ───────────────────────── handler ─────────────────────────
 Deno.serve(async (req: Request): Promise<Response> => {
   const c = readConfig();
@@ -235,7 +301,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
       ok: true, service: "arca-wsfe", version: 2, estado: "implementado (gateado)",
       configured: miss.length === 0, emitir_habilitado: c.emitir, entorno: c.env,
       faltan_secrets: miss,
-      acciones: ["status", "ta", "ultimo", "emitir"],
+      acciones: ["status", "ta", "ultimo", "emitir", "preciar", "emitir_np"],
+      web_precios: c.webKey ? "conectado" : "falta WEB_SERVICE_KEY",
       nota: miss.length ? "Cargá los secrets para poder probar (action=ta) — ver docs/facturacion-arca.md." : (c.emitir ? "Listo para emitir." : "Secrets OK. Probá action=ta / ultimo; para emitir prendé ARCA_EMITIR=on."),
     });
   }
@@ -261,6 +328,24 @@ Deno.serve(async (req: Request): Promise<Response> => {
       const ta = await wsaaLogin(c);
       const r = await feEmitir(c, ta, body);
       return json(r, r.ok ? 200 : 422);
+    }
+    if (action === "preciar") {
+      // Preview del importe de una NP (sin emitir; NO requiere ARCA_EMITIR). Necesita WEB_SERVICE_KEY.
+      if (!c.webKey) return json({ ok: false, error: "falta_web_key", nota: "Cargá el secret WEB_SERVICE_KEY (service_role del proyecto web de precios)." }, 501);
+      const pr = await preciarNp(c, String(body.np || ""), body.tanda ? String(body.tanda) : "");
+      return json({ ok: pr.faltan.length === 0, ...pr, nota: pr.faltan.length ? ("Faltan precios para: " + pr.faltan.join(", ")) : "Precio calculado (sin emitir)." });
+    }
+    if (action === "emitir_np") {
+      // Factura una NP completa: precia (Virgilio + web) y pide el CAE. Factura A (tipo 1) por defecto.
+      if (!c.emitir) return json({ ok: false, error: "emision_deshabilitada", nota: "Prendé el secret ARCA_EMITIR=on." }, 501);
+      if (!c.webKey) return json({ ok: false, error: "falta_web_key", nota: "Cargá el secret WEB_SERVICE_KEY." }, 501);
+      const pr = await preciarNp(c, String(body.np || ""), body.tanda ? String(body.tanda) : "");
+      if (pr.faltan.length) return json({ ok: false, error: "faltan_precios", faltan: pr.faltan, nota: "No emito: hay artículos sin precio en el maestro web." }, 422);
+      if (pr.neto <= 0) return json({ ok: false, error: "neto_cero", nota: "El neto calculado dio 0." }, 422);
+      const tipo = Number(body.tipo_cbte) || 1; // 1 = Factura A (RG: receptor Responsable Inscripto)
+      const ta = await wsaaLogin(c);
+      const r = await feEmitir(c, ta, { tipo_cbte: tipo, neto: pr.neto, iva: pr.iva, doc_tipo: 80, doc_nro: pr.cuit, cond_iva_receptor: 1, np: pr.np, tanda: pr.tanda });
+      return json({ ...r, cliente: pr.cliente, cuit: pr.cuit, cod_cliente: pr.cod_cliente, neto: pr.neto, iva: pr.iva, total: pr.total, detalle: pr.detalle }, r.ok ? 200 : 422);
     }
   } catch (e) {
     return json({ ok: false, error: String((e as Error)?.message || e).slice(0, 500) }, 502);
