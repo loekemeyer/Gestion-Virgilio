@@ -3651,6 +3651,21 @@ function recepcionResetCajas(legajo) {
   try { localStorage.setItem("vir_recepcion_cajas_" + String(legajo || "") + "_" + getTodayKey(), "0"); }
   catch (_e) { /* no-op */ }
 }
+/* idea 7725 — total REAL de cajas recibidas hoy por este legajo, sumado desde el
+   servidor (Movimientos_Stock tipo='recepcion', legajo taggeado desde v6.66).
+   El contador de recepcionCajasDelDia() es por-dispositivo: si el operario cargó
+   en dos equipos (batería, préstamo) la misma RT, el cierre reportaba solo lo del
+   equipo donde cerró. Esto suma TODOS los equipos. Devuelve null si no se puede
+   (offline / sin sesión) → el caller cae al contador local. */
+async function recepcionCajasServerTotal(legajo) {
+  const leg = String(legajo || ""); if (!leg) return null;
+  const desde = getTodayKey() + "T00:00:00-03:00";
+  try {
+    const rows = await supaFetchAll(SUPABASE_STOCK_ENDPOINT, "select=delta&tipo=eq.recepcion&legajo=eq." + encodeURIComponent(leg) + "&ts=gte." + encodeURIComponent(desde));
+    let t = 0; for (let i = 0; i < rows.length; i++) t += Number(rows[i].delta) || 0;
+    return Math.round(t);
+  } catch (_e) { return null; }
+}
 function formatDayLong(fecha) {
   const p = fecha.split("-");
   return `${p[2]}/${p[1]}/${p[0]}`;
@@ -4116,6 +4131,26 @@ function terminarDia() {
 
   document.getElementById("terminarDiaContent").innerHTML = html;
   document.getElementById("terminarDiaModal").classList.add("show");
+
+  // idea 7725: el input RT arranca con el contador local (por-dispositivo). Reconciliá
+  // con el total del servidor (todos los equipos) por si la RT se cargó en más de uno.
+  const _rtEl = document.getElementById("td_input_RT");
+  if (_rtEl) {
+    recepcionCajasServerTotal(legajoStr).then(function (srv) {
+      const local = parseInt(_rtEl.value, 10) || 0;
+      if (srv != null && srv > local) {
+        _rtEl.value = String(srv);
+        const wrap = _rtEl.parentElement;
+        if (wrap && !wrap.querySelector(".rt-multi-dev")) {
+          const n = document.createElement("div");
+          n.className = "rt-multi-dev";
+          n.style.cssText = "font-size:12px;color:#854d0e;background:#fffbeb;border:1px solid #fde047;border-radius:6px;padding:4px 7px;margin-top:4px;font-weight:700;";
+          n.textContent = "↗ Ajustado a " + srv + " cajas: se sumaron cargas de otro dispositivo (antes " + local + ").";
+          wrap.appendChild(n);
+        }
+      }
+    }).catch(function () {});
+  }
 }
 
 function closeTerminarDia() {
@@ -4198,7 +4233,14 @@ async function confirmarTerminarDia() {
   const pendNow = getPendingsForLegajo(legajoStr);
   for (const p of pendNow.seCierranConInput) {
     // RT: la cantidad sale sola del Modo OP de Recepción (no se pide ni se valida).
-    if (p.tipo === "RT") { closeInputs.RT = String(recepcionCajasDelDia(legajoStr)); continue; }
+    // idea 7725: el total local es por-dispositivo; tomamos el MÁXIMO con el total
+    // del servidor (suma de TODOS los equipos) para no subestimar si cargó en varios.
+    if (p.tipo === "RT") {
+      const _rtLocal = recepcionCajasDelDia(legajoStr);
+      let _rtSrv = null; try { _rtSrv = await recepcionCajasServerTotal(legajoStr); } catch (_e) {}
+      closeInputs.RT = String((_rtSrv != null) ? Math.max(_rtSrv, _rtLocal) : _rtLocal);
+      continue;
+    }
     const el = document.getElementById("td_input_" + p.tipo);
     const v  = (el && el.value || "").trim();
     if (!v) {
@@ -5125,6 +5167,11 @@ function selectOption(code) {
       if (code === "RT") {
         const autoRT = recepcionCajasDelDia(legajoStr);
         if (autoRT > 0) textInput.value = String(autoRT);
+        // idea 7725: reconciliá con el total del servidor (todos los equipos) por si
+        // cargó la RT en más de un dispositivo. Best-effort: solo sube el número.
+        recepcionCajasServerTotal(legajoStr).then(function (srv) {
+          if (srv != null && srv > (parseInt(textInput.value, 10) || 0)) textInput.value = String(srv);
+        }).catch(function () {});
       }
     }
   }

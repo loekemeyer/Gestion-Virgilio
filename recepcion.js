@@ -938,7 +938,8 @@ async function opEnviar() {
   try {
     const stockRows = items.map(i => ({
       cod_art: String(i.cod), descripcion: i.desc || null,
-      deposito: 'a_guardar', delta: i.cajas, tipo: 'recepcion', ref: opState.remito || null
+      deposito: 'a_guardar', delta: i.cajas, tipo: 'recepcion', ref: opState.remito || null,
+      legajo: RECP.legajo || null   // idea 7725: taggeamos el legajo para poder sumar el total del día CRUZANDO dispositivos al cerrar RT (el contador de localStorage es por-equipo)
     }));
     const { error: stErr } = await supabase.from("Movimientos_Stock").insert(stockRows);
     if (stErr) throw stErr;
@@ -946,7 +947,7 @@ async function opEnviar() {
     console.warn("Movimientos_Stock recepcion (queda pendiente):", e);
     try {
       const p = JSON.parse(localStorage.getItem("vir_stock_pend") || "[]");
-      items.forEach(i => p.push({ cod_art: String(i.cod), descripcion: i.desc || null, deposito: 'a_guardar', delta: i.cajas, tipo: 'recepcion', ref: opState.remito || null }));
+      items.forEach(i => p.push({ cod_art: String(i.cod), descripcion: i.desc || null, deposito: 'a_guardar', delta: i.cajas, tipo: 'recepcion', ref: opState.remito || null, legajo: RECP.legajo || null }));
       localStorage.setItem("vir_stock_pend", JSON.stringify(p.slice(-5000)));
     } catch (_e) {}
   }
