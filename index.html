@@ -2642,9 +2642,10 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
   background: #16a34a; color: #fff; border: none; border-radius: 4px;
   padding: 1px 10px; font-size: 13px; font-weight: bold; cursor: pointer;
   transition: background .15s, transform .1s; line-height: 1.4;
+  width: auto; display: inline-block; vertical-align: middle;   /* v6.52: override del global button{width:100%} para que ✓ y 🧾 vayan lado a lado */
 }
-/* v6.51 — 2ª tilde: facturar electrónicamente (ARCA) */
-.fac-btn-fc{ margin-left:5px; border:1px solid #c7d2fe; background:#eef2ff; color:#3730a3; border-radius:6px; padding:1px 8px; font-size:13px; cursor:pointer; line-height:1.4; }
+/* v6.51 — 2ª tilde: facturar electrónicamente (ARCA) · v6.52: width:auto (mismo motivo) */
+.fac-btn-fc{ margin-left:5px; border:1px solid #c7d2fe; background:#eef2ff; color:#3730a3; border-radius:6px; padding:2px 9px; font-size:15px; cursor:pointer; line-height:1.4; width:auto; display:inline-block; vertical-align:middle; }
 .fac-btn-fc:hover{ background:#e0e7ff; border-color:#818cf8; }
 .facfc-ov{ position:fixed; inset:0; background:rgba(2,6,23,.6); z-index:1500; display:none; align-items:flex-start; justify-content:center; padding:24px 12px; overflow:auto; }
 .facfc-ov.show{ display:flex; }
@@ -5598,7 +5599,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v6.51";
+const APP_VERSION = "v6.52";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
