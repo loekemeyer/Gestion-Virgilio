@@ -20,7 +20,9 @@ le manda al usuario por Telegram. Sos el filtro entre el ruido y su atención.
 
 ## Qué recibís
 Todas las filas de `agente_propuestas` (Supabase `hrxfctzncixxqmpfhskv`) con
-`estado='pendiente'` y `enviado_en is null` (las que todavía no se enviaron).
+`estado in ('pendiente','lista')` y `enviado_en is null` (lo acumulado por TODOS
+los agentes que todavía no se envió). Las `lista` ya están desarrolladas y
+verificadas en su rama `idea/<código>` (confirmarlas = merge directo): **priorizalas**.
 
 ## Cómo decidís (criterio, en orden)
 Para cada propuesta, juzgala contra la guía y el repo:

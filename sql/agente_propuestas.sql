@@ -11,18 +11,24 @@
 -- =====================================================================
 
 create table if not exists public.agente_propuestas (
-  codigo         text primary key,
-  agente         text not null check (agente in ('mejoras','logica')),
-  titulo         text not null,
-  detalle        text,
-  impacto        text,
-  esfuerzo       text,
-  ubicacion      text,
-  estado         text not null default 'pendiente'
-                 check (estado in ('pendiente','aprobada','hecha','descartada')),
-  creado_en      timestamptz not null default now(),
-  actualizado_en timestamptz
+  codigo          text primary key,
+  agente          text not null,                 -- nombre del agente (cualquiera del repo)
+  titulo          text not null,
+  detalle         text,
+  impacto         text,
+  esfuerzo        text,
+  ubicacion       text,
+  estado          text not null default 'pendiente'
+                  check (estado in ('pendiente','lista','aprobada','hecha','descartada')),
+  rama            text,                           -- idea/<codigo> ya desarrollada y verificada
+  creado_en       timestamptz not null default now(),
+  desarrollada_en timestamptz,
+  enviado_en      timestamptz,                    -- cuando el curador la mando por Telegram
+  curador_nota    text,
+  actualizado_en  timestamptz
 );
+-- estados: pendiente (propuesta) -> lista (desarrollada en rama) -> hecha (mergeada a main)
+--          | descartada (curador o usuario)
 
 alter table public.agente_propuestas enable row level security;
 
