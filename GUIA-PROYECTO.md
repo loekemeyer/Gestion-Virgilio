@@ -4,7 +4,15 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-07-30 · Versión app al documentar: **v6.64**
+> Última actualización: 2026-07-30 · Versión app al documentar: **v6.65**
+>
+> Nota: **v6.65 — Pulidos de facturación (hallazgos revisor-render)** (commit `30ea5ad`).
+> Ajustes de UI del módulo de Facturación surgidos de la auditoría de render. Además, en
+> esta pasada se **documentó el subsistema de facturación en el catálogo de tablas (§3)**:
+> `Facturacion_NP`, `Facturacion_Cierres`, `Comprobantes_ARCA` + la Edge Function
+> `arca-wsfe`, y el subsistema **NC** (`Comprobantes_NC` / `Comprobantes_NC_Items`,
+> `agente-local/nc_ingest.py`); y se corrigieron las versiones fósiles v3.51/v3.47 en §1/§10
+> (ahora `APP_VERSION`/`SW_VERSION` = **v6.65**).
 >
 > Nota: **🎉 HITO — Facturación electrónica ARCA en PRODUCCIÓN (facturas reales con validez fiscal)** (server-side, 2026-07-30). La Edge Function **`arca-wsfe`** pasó de homologación a **`ARCA_ENV=prod`**: usa el **certificado de producción `virgilioapp`** (creado en AFIP, con el servicio **`wsfe`** autorizado) y el **punto de venta 11** ("APP PRODUCCIÓN WS"). **Login WSAA confirmado** y **primera Factura A real emitida: NP 98277, CAE `86316114309666`**. La app emite **Factura A con validez fiscal** al tocar **"Facturar (pedir CAE)"** en el modal de Facturación. **Secrets en Supabase** (nunca en el repo): `ARCA_CERT` + `ARCA_KEY` (cert+key de `virgilioapp`), `ARCA_ENV=prod`, `ARCA_PTO_VTA=11`, `ARCA_CUIT=30515842450`, `ARCA_EMITIR=on`, `WEB_SERVICE_KEY` (service_role del proyecto web, para leer precios/CUIT sin exponerlos). Los comprobantes se loguean en **`Comprobantes_ARCA`** con `entorno='prod'`. Detalle en `docs/facturacion-arca.md`. ⚠ **Supera** las notas previas que decían "por ahora HOMOLOGACIÓN" (v6.51) y la prueba homo end-to-end (2026-07-30): el entorno vivo ahora es **producción, emitiendo facturas reales**.
 >
@@ -2710,7 +2718,7 @@ de pedidos de un Google Sheet.
 | Archivo | Rol |
 |---|---|
 | `index.html` | **La app completa** (~6.600 líneas): pantalla de operario + monitor + toda la lógica JS/CSS. Es el archivo central. |
-| `sw.js` | Service Worker. **NO cachea HTML/assets**: sólo hace Background Sync de la cola offline (IndexedDB). `SW_VERSION = "v3.47-vir"`. |
+| `sw.js` | Service Worker. **NO cachea HTML/assets**: sólo hace Background Sync de la cola offline (IndexedDB). `SW_VERSION = "v6.65-vir"`. |
 | `manifest.json` | Manifiesto PWA. |
 | `fichada.html` / `fichada.js` / `fichada-config.js` / `fichada-totp.js` / `fichada.css` | Sistema de **fichada por QR rotativo (TOTP)**. La página `fichada.html` se abre escaneando el QR y registra el **ingreso**. |
 | `fichadas-monitor.html` | Tablero **independiente** "Monitor Fichadas Esnaola" (lee de `Fichadas_Historico` y sincroniza otro Google Sheet distinto). No está enlazado desde `index.html`. |
@@ -2915,6 +2923,42 @@ falla por red, las filas quedan en `localStorage` `vir_entregas_pend` y se reint
 al volver online / al cargar (`_compFlushEntregas`). La consume el **programa externo**
 de seguimiento de entregas. (Reemplaza a las vistas `Entregas_Virgilio`/`Faltantes_Virgilio`
 y a los eventos `FAL` de v3.97/v3.98, ya eliminados.)
+
+**Facturación (tick de la operadora + cierre de reparto):** cuando ventas tilda una
+NP en la pantalla **Facturación — NPs a FC** (`facTickNP`, escritura con **sesión
+Google `authenticated`**, RLS exige ese rol), se graba una fila en:
+- **`Facturacion_NP`** — una fila por NP facturada. Cols: `np`, `tanda`, `fecha_salida`,
+  `m3` (numeric), `razon_social`, `cod_cliente`, `facturado_at` (timestamptz del tick),
+  `cierre_id` (null hasta el cierre → apunta a `Facturacion_Cierres.id`). PK `np`
+  (upsert merge-duplicates, por si hay doble click). Es la que consumen las vistas PPP
+  (pendiente/entregados), la solapa **FC s/Salida** de Stocks y el descuento de demanda.
+- **`Facturacion_Cierres`** — una fila por **cierre de jornada** ("Terminé" de la
+  operadora → PDF de reparto). Cols: `id`, `fecha_cierre`, `fecha_reparto`, `cant_nps`,
+  `cant_tandas`, `generado_at`. Al cerrar, las `Facturacion_NP` del día toman su
+  `cierre_id` → salen de "pendiente" y pasan a "entregados" (condición de las vistas).
+
+**Facturación electrónica ARCA (v6.51+, en PRODUCCIÓN desde v6.64):** la 2ª tilde
+**"✓ ARCA"** (`facFacturarNP` → `facFCOpen`/`facFCEmitir`) emite la factura real contra
+AFIP/ARCA vía la **Edge Function `arca-wsfe`** (Supabase Functions). Los comprobantes se
+loguean en:
+- **`Comprobantes_ARCA`** — Cols: `id`, `np`, `tanda`, `cuit_cliente`, `tipo_cbte`
+  (1=FA A, 6=B, 11=C, 3/8/13=NC), `pto_vta`, `nro_cbte`, `importe_neto`, `importe_iva`,
+  `importe_total`, `cae`, `cae_vto`, `estado` (`autorizado`/…), `entorno`
+  (`prod`/`homo`), `raw_resp` (jsonb de la respuesta WSFE), `creado`.
+- **Edge Function `arca-wsfe`** — acciones: `status`, `ta`, `ultimo`, `emitir`,
+  `preciar` (calcula importe server-side cruzando `Entregas_Virgilio` con precios del
+  proyecto web), `emitir_np`, `emitir_nc`. Secrets en Supabase (nunca en el repo):
+  `ARCA_CERT`/`ARCA_KEY` (cert `virgilioapp`), `ARCA_ENV=prod`, `ARCA_PTO_VTA=11`,
+  `ARCA_CUIT`, `WEB_SERVICE_KEY`. Detalle en `docs/facturacion-arca.md`.
+
+**Subsistema NC (devoluciones — comprobantes de proveedores, v6.64):** ingestión local
+por `agente-local/nc_ingest.py` (parsea PDFs de Notas de Crédito/Débito) a dos tablas:
+- **`Comprobantes_NC`** — cabecera. Cols: `id`, `division`, `tipo`, `numero`, `fecha`,
+  `contraparte`, `total`, `stock_dir` (dirección del ajuste de stock), `estado`
+  (`pendiente`/`confirmado`), `archivo`, `huella` (dedup del PDF), `creado_at`,
+  `confirmado_at`, `confirmado_por`.
+- **`Comprobantes_NC_Items`** — líneas. Cols: `id`, `nc_id` (→ `Comprobantes_NC.id`),
+  `cod_raw`, `cod_art`, `descripcion`, `cajas`, `unidades`, `importe`.
 
 ### Subsistema de stock / OC (event-sourced)
 
@@ -3125,11 +3169,11 @@ En `showDayBreakdown` (monitor, por operario por día):
 
 ## 10. Versionado y cache
 
-- `index.html`: `APP_VERSION = "v3.51"`. Badge en pantalla `#versionBadge`:
-  `"v3.51 ✓"` (sin cola), `"v3.51 ⏳ N"` (pendientes), `"v3.51 ⚠ N"` (error).
+- `index.html`: `APP_VERSION = "v6.65"`. Badge en pantalla `#versionBadge`:
+  `"v6.65 ✓"` (sin cola), `"v6.65 ⏳ N"` (pendientes), `"v6.65 ⚠ N"` (error).
   **Sirve para confirmar qué versión cargó cada pantalla** (mirá el badge en la TV
   para saber si está al día).
-- `sw.js`: `SW_VERSION = "v3.47-vir"`. **No precachea nada**; el handler de `fetch`
+- `sw.js`: `SW_VERSION = "v6.65-vir"`. **No precachea nada**; el handler de `fetch`
   está vacío. Usa `skipWaiting()` + `clients.claim()`. La página hace
   `reg.update()` cada 60 s con `updateViaCache:"none"` (esto **sólo actualiza el
   SW**; NO recarga la app ni cambia lo que se ve en pantalla).
