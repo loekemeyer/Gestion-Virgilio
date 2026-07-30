@@ -10,11 +10,14 @@ tachan (`~~…~~`).
 
 ## Grupo A — Requiere al usuario (Google/ARCA, fuera del alcance del agente)
 
-- [ ] **1. Deploy del Apps Script `ppp-a-excel.gs`** — el `.xlsx` auto-refrescado en
-  Drive: pegar el script, habilitar Drive API, `PPP_XLSX_ID`, disparador cada 10 min.
-  (El botón de la app ya funciona sin esto.)
+- ~~**1. Deploy del Apps Script `ppp-a-excel.gs`**~~ — **DESCARTADO 2026-07-30** por
+  decisión del usuario: se eliminó el script del repo. Queda solo el botón
+  "⬇ Exportar Excel" de la app (que ya funciona).
 - [ ] **2. Facturación ARCA** — conseguir certificado + PDV nuevo + definir de dónde
-  sale el importe + OK del contador. El esqueleto ya está deployado esperando eso.
+  sale el importe + OK del contador. **2026-07-30: la emisión ya está IMPLEMENTADA y
+  deployada** (WSAA con firma CMS + cache TA, FECompUltimoAutorizado, FECAESolicitar,
+  log en Comprobantes_ARCA), gateada por secrets + `ARCA_EMITIR=on`. Al llegar el
+  certificado de homologación: cargar secrets y probar `action=ta` → `ultimo` → `emitir`.
 
 ## Grupo B — Decisiones en pausa (no son deuda; esperan tu decisión)
 

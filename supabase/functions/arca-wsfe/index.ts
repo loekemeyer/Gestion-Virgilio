@@ -1,19 +1,23 @@
 // arca-wsfe — Edge Function (Deno) para facturación electrónica propia contra ARCA (ex AFIP).
 //
-// ⚠ ESQUELETO v6.41 — TODAVÍA NO EMITE. Reemplaza (más adelante) al healthcheck
-//   `arca-wsfe-healthcheck`. Ver diseño completo en docs/facturacion-arca.md.
+// v2 (2026-07-30): WSAA + WSFE **IMPLEMENTADOS** (firma CMS con node-forge, cache del TA en
+// la tabla ARCA_TA, FECompUltimoAutorizado y FECAESolicitar, log en Comprobantes_ARCA).
+// Sigue **GATEADA**: sin los secrets responde qué falta, y `emitir` exige ARCA_EMITIR=on.
+// Ver diseño en docs/facturacion-arca.md. NO probada contra ARCA todavía (falta certificado);
+// cuando llegue el cert de homologación, probar primero con {action:"ta"} y {action:"ultimo"}.
 //
-// Flujo objetivo: App → esta función → ARCA (Web Services) → CAE → tabla Comprobantes_ARCA.
-//   1) WSAA: firmar LoginTicketRequest en CMS/PKCS#7 con el certificado → token+sign (~12 h, cacheado).
-//   2) WSFE: FECompUltimoAutorizado (correlativo) + FECAESolicitar (pedir CAE).
-//   3) Guardar el comprobante en Comprobantes_ARCA (service_role).
+// Acciones (POST JSON {action:...}; GET = status):
+//   status  → deployada, qué secrets faltan, si la emisión está habilitada.
+//   ta      → hace el login WSAA real (o devuelve el TA cacheado). Prueba el certificado.
+//   ultimo  → FECompUltimoAutorizado {tipo_cbte} → último nro autorizado del PDV.
+//   emitir  → FECAESolicitar {tipo_cbte, neto, iva, doc_tipo?, doc_nro?, cond_iva_receptor?,
+//             alic_id?, total?, np?, tanda?} → CAE. Solo con ARCA_EMITIR=on.
 //
-// BLOQUEADO por (§4/§5 del doc): (1) certificado + PDV nuevo de ARCA; (2) de dónde sale el
-//   IMPORTE (la app tiene cajas/m³, no precios); (3) OK del contador. Hasta que se carguen los
-//   secrets (ARCA_CERT, ARCA_KEY, ARCA_CUIT, ARCA_PTO_VTA, ARCA_ENV) esta función responde
-//   "no configurado" y NO intenta emitir. El interruptor duro es ARCA_EMITIR !== "on".
+// Secrets: ARCA_CERT (PEM), ARCA_KEY (PEM), ARCA_CUIT, ARCA_PTO_VTA, ARCA_ENV (homo|prod),
+//          ARCA_EMITIR (on|off). SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY los inyecta Supabase.
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import forge from "npm:node-forge@1.3.1";
 
 const WS_URLS = {
   homo: {
@@ -33,21 +37,21 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
-// Config desde secrets de Supabase. Nunca viajan al navegador.
 function readConfig() {
   const env = (Deno.env.get("ARCA_ENV") || "homo").toLowerCase() === "prod" ? "prod" : "homo";
   return {
     env,
     cert: Deno.env.get("ARCA_CERT") || "",
     key: Deno.env.get("ARCA_KEY") || "",
-    cuit: Deno.env.get("ARCA_CUIT") || "",
-    ptoVta: Deno.env.get("ARCA_PTO_VTA") || "",
+    cuit: (Deno.env.get("ARCA_CUIT") || "").replace(/\D/g, ""),
+    ptoVta: (Deno.env.get("ARCA_PTO_VTA") || "").replace(/\D/g, ""),
     emitir: (Deno.env.get("ARCA_EMITIR") || "off").toLowerCase() === "on",
     urls: WS_URLS[env as "homo" | "prod"],
   };
 }
+type Cfg = ReturnType<typeof readConfig>;
 
-function missingSecrets(c: ReturnType<typeof readConfig>): string[] {
+function missingSecrets(c: Cfg): string[] {
   const miss: string[] = [];
   if (!c.cert) miss.push("ARCA_CERT");
   if (!c.key) miss.push("ARCA_KEY");
@@ -56,53 +60,210 @@ function missingSecrets(c: ReturnType<typeof readConfig>): string[] {
   return miss;
 }
 
-// ───────────────────────────────────────────────────────────────────────────
-// TODO (cuando lleguen certificado + PDV + decisión del importe):
-//   wsaaLogin(c): firmar LoginTicketRequest (CMS) con node-forge (npm:node-forge),
-//                 POST SOAP a c.urls.wsaa → parsear token+sign, cachear ~12 h.
-//   feCompUltimoAutorizado(c, ta, tipoCbte): correlativo del PDV+tipo.
-//   feCAESolicitar(c, ta, comprobante): pedir el CAE de un comprobante.
-//   guardarComprobante(row): insert en Comprobantes_ARCA con service_role.
-// Nada de esto se implementa todavía a propósito: el esqueleto no debe poder emitir.
-// ───────────────────────────────────────────────────────────────────────────
+// ───────────────────────── utilitarios XML/SOAP ─────────────────────────
+function tag(xml: string, name: string): string | null {
+  const m = xml.match(new RegExp("<(?:[A-Za-z0-9_]+:)?" + name + "[^>]*>([\\s\\S]*?)</(?:[A-Za-z0-9_]+:)?" + name + ">"));
+  return m ? m[1] : null;
+}
+function unesc(s: string): string {
+  return s.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, "&");
+}
+// ISO con offset fijo -03:00 (AR, sin DST)
+function isoAR(d: Date): string {
+  const t = new Date(d.getTime() - 3 * 3600 * 1000);
+  return t.toISOString().slice(0, 19) + "-03:00";
+}
+function hoyAR(): string {
+  const t = new Date(Date.now() - 3 * 3600 * 1000);
+  return t.toISOString().slice(0, 10).replace(/-/g, "");
+}
+async function soap(url: string, action: string, body: string): Promise<string> {
+  const r = await fetch(url, { method: "POST", headers: { "Content-Type": "text/xml; charset=utf-8", "SOAPAction": action }, body });
+  const t = await r.text();
+  const fault = tag(t, "faultstring");
+  if (fault) throw new Error("SOAP Fault: " + fault.slice(0, 300));
+  if (!r.ok) throw new Error("SOAP HTTP " + r.status + ": " + t.slice(0, 300));
+  return t;
+}
 
+// ───────────────── acceso a la base (service_role, inyectado) ─────────────────
+function sbHeaders(): Record<string, string> {
+  const k = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+  return { apikey: k, Authorization: "Bearer " + k, "Content-Type": "application/json" };
+}
+function sbUrl(path: string): string {
+  return (Deno.env.get("SUPABASE_URL") || "") + "/rest/v1/" + path;
+}
+
+// ───────────────────────── WSAA (login + cache del TA) ─────────────────────────
+async function taGet(envName: string) {
+  try {
+    const r = await fetch(sbUrl("ARCA_TA") + "?service=eq.wsfe-" + envName + "&select=token,sign,expira", { headers: sbHeaders() });
+    const rows = r.ok ? await r.json() : [];
+    const row = rows[0];
+    if (row && new Date(row.expira).getTime() > Date.now() + 5 * 60 * 1000) return row;
+  } catch (_e) { /* sin cache → login */ }
+  return null;
+}
+async function taSave(envName: string, token: string, sign: string, expira: string | null) {
+  try {
+    await fetch(sbUrl("ARCA_TA") + "?on_conflict=service", {
+      method: "POST", headers: { ...sbHeaders(), Prefer: "resolution=merge-duplicates" },
+      body: JSON.stringify({ service: "wsfe-" + envName, entorno: envName, token, sign, expira: expira || new Date(Date.now() + 11 * 3600 * 1000).toISOString() }),
+    });
+  } catch (_e) { /* best-effort */ }
+}
+async function wsaaLogin(c: Cfg): Promise<{ token: string; sign: string; expira: string | null; cacheado: boolean }> {
+  const cached = await taGet(c.env);
+  if (cached) return { token: cached.token, sign: cached.sign, expira: cached.expira, cacheado: true };
+  const now = Date.now();
+  const xml = '<?xml version="1.0" encoding="UTF-8"?>' +
+    '<loginTicketRequest version="1.0"><header>' +
+    "<uniqueId>" + Math.floor(now / 1000) + "</uniqueId>" +
+    "<generationTime>" + isoAR(new Date(now - 10 * 60 * 1000)) + "</generationTime>" +
+    "<expirationTime>" + isoAR(new Date(now + 10 * 60 * 1000)) + "</expirationTime>" +
+    "</header><service>wsfe</service></loginTicketRequest>";
+  // firma CMS/PKCS#7 (SignedData con contenido) con el certificado + clave privada
+  const p7 = forge.pkcs7.createSignedData();
+  p7.content = forge.util.createBuffer(xml, "utf8");
+  const cert = forge.pki.certificateFromPem(c.cert);
+  p7.addCertificate(cert);
+  p7.addSigner({
+    key: forge.pki.privateKeyFromPem(c.key),
+    certificate: cert,
+    digestAlgorithm: forge.pki.oids.sha256,
+    authenticatedAttributes: [
+      { type: forge.pki.oids.contentType, value: forge.pki.oids.data },
+      { type: forge.pki.oids.messageDigest },
+      { type: forge.pki.oids.signingTime, value: new Date() },
+    ],
+  });
+  p7.sign();
+  const cms = forge.util.encode64(forge.asn1.toDer(p7.toAsn1()).getBytes());
+  const envlp = '<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:wsaa="http://wsaa.view.sua.dvadac.desein.afip.gov"><soapenv:Header/><soapenv:Body><wsaa:loginCms><wsaa:in0>' + cms + "</wsaa:in0></wsaa:loginCms></soapenv:Body></soapenv:Envelope>";
+  const resp = await soap(c.urls.wsaa, "", envlp);
+  const inner = unesc(tag(resp, "loginCmsReturn") || "");
+  const token = tag(inner, "token"), sign = tag(inner, "sign"), expira = tag(inner, "expirationTime");
+  if (!token || !sign) throw new Error("WSAA sin token/sign: " + inner.slice(0, 300));
+  await taSave(c.env, token, sign, expira);
+  return { token, sign, expira, cacheado: false };
+}
+
+// ───────────────────────── WSFE ─────────────────────────
+const FE_NS = "http://ar.gov.afip.dif.FEV1/";
+function feAuth(c: Cfg, ta: { token: string; sign: string }): string {
+  return "<ar:Auth><ar:Token>" + ta.token + "</ar:Token><ar:Sign>" + ta.sign + "</ar:Sign><ar:Cuit>" + c.cuit + "</ar:Cuit></ar:Auth>";
+}
+function feEnvelope(inner: string): string {
+  return '<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ar="' + FE_NS + '"><soap:Body>' + inner + "</soap:Body></soap:Envelope>";
+}
+function feErrs(resp: string): string | null {
+  const e = tag(resp, "Errors");
+  if (!e) return null;
+  const code = tag(e, "Code"), msg = tag(e, "Msg");
+  return ((code ? code + ": " : "") + (msg || e)).slice(0, 300);
+}
+async function feUltimo(c: Cfg, ta: { token: string; sign: string }, tipoCbte: number): Promise<number> {
+  const resp = await soap(c.urls.wsfe, FE_NS + "FECompUltimoAutorizado",
+    feEnvelope("<ar:FECompUltimoAutorizado>" + feAuth(c, ta) + "<ar:PtoVta>" + c.ptoVta + "</ar:PtoVta><ar:CbteTipo>" + tipoCbte + "</ar:CbteTipo></ar:FECompUltimoAutorizado>"));
+  const err = feErrs(resp);
+  if (err) throw new Error("FECompUltimoAutorizado: " + err);
+  return parseInt(tag(resp, "CbteNro") || "0", 10);
+}
+// deno-lint-ignore no-explicit-any
+async function feEmitir(c: Cfg, ta: { token: string; sign: string }, p: any) {
+  const tipoCbte = Number(p.tipo_cbte);
+  const ultimo = await feUltimo(c, ta, tipoCbte);
+  const nro = ultimo + 1;
+  const neto = Math.round((Number(p.neto) || 0) * 100) / 100;
+  const iva = Math.round((Number(p.iva) || 0) * 100) / 100;
+  const total = p.total != null ? Math.round(Number(p.total) * 100) / 100 : Math.round((neto + iva) * 100) / 100;
+  const alic = Number(p.alic_id) || 5; // 5 = 21%
+  const det = "<ar:FECAEDetRequest>" +
+    "<ar:Concepto>1</ar:Concepto>" + // 1 = productos
+    "<ar:DocTipo>" + (p.doc_tipo != null ? Number(p.doc_tipo) : 99) + "</ar:DocTipo>" +
+    "<ar:DocNro>" + (p.doc_nro != null ? String(p.doc_nro).replace(/\D/g, "") : "0") + "</ar:DocNro>" +
+    "<ar:CbteDesde>" + nro + "</ar:CbteDesde><ar:CbteHasta>" + nro + "</ar:CbteHasta>" +
+    "<ar:CbteFch>" + hoyAR() + "</ar:CbteFch>" +
+    "<ar:ImpTotal>" + total.toFixed(2) + "</ar:ImpTotal><ar:ImpTotConc>0</ar:ImpTotConc>" +
+    "<ar:ImpNeto>" + neto.toFixed(2) + "</ar:ImpNeto><ar:ImpOpEx>0</ar:ImpOpEx>" +
+    "<ar:ImpTrib>0</ar:ImpTrib><ar:ImpIVA>" + iva.toFixed(2) + "</ar:ImpIVA>" +
+    "<ar:MonId>PES</ar:MonId><ar:MonCotiz>1</ar:MonCotiz>" +
+    (p.cond_iva_receptor != null ? "<ar:CondicionIVAReceptorId>" + Number(p.cond_iva_receptor) + "</ar:CondicionIVAReceptorId>" : "") +
+    (iva > 0 ? "<ar:Iva><ar:AlicIva><ar:Id>" + alic + "</ar:Id><ar:BaseImp>" + neto.toFixed(2) + "</ar:BaseImp><ar:Importe>" + iva.toFixed(2) + "</ar:Importe></ar:AlicIva></ar:Iva>" : "") +
+    "</ar:FECAEDetRequest>";
+  const req = "<ar:FECAESolicitar>" + feAuth(c, ta) +
+    "<ar:FeCAEReq><ar:FeCabReq><ar:CantReg>1</ar:CantReg><ar:PtoVta>" + c.ptoVta + "</ar:PtoVta><ar:CbteTipo>" + tipoCbte + "</ar:CbteTipo></ar:FeCabReq>" +
+    "<ar:FeDetReq>" + det + "</ar:FeDetReq></ar:FeCAEReq></ar:FECAESolicitar>";
+  const resp = await soap(c.urls.wsfe, FE_NS + "FECAESolicitar", feEnvelope(req));
+  const errTop = feErrs(resp);
+  const resultado = tag(resp, "Resultado") || "";
+  const cae = tag(resp, "CAE") || null;
+  const caeVto = tag(resp, "CAEFchVto") || null;
+  const obs = tag(resp, "Observaciones");
+  const estado = resultado === "A" && cae ? "autorizado" : "rechazado";
+  // log SIEMPRE en Comprobantes_ARCA (autorizado o rechazado), best-effort
+  try {
+    await fetch(sbUrl("Comprobantes_ARCA"), {
+      method: "POST", headers: { ...sbHeaders(), Prefer: "return=minimal" },
+      body: JSON.stringify({
+        np: p.np || null, tanda: p.tanda || null,
+        cuit_cliente: p.doc_nro != null ? String(p.doc_nro).replace(/\D/g, "") : null,
+        tipo_cbte: tipoCbte, pto_vta: Number(c.ptoVta), nro_cbte: nro,
+        importe_neto: neto, importe_iva: iva, importe_total: total,
+        cae, cae_vto: caeVto ? caeVto.slice(0, 4) + "-" + caeVto.slice(4, 6) + "-" + caeVto.slice(6, 8) : null,
+        estado, entorno: c.env,
+        raw_resp: { resultado, obs: obs ? String(obs).slice(0, 2000) : null, err: errTop },
+      }),
+    });
+  } catch (_e) { /* el CAE ya salió; el log no debe romper la respuesta */ }
+  return { ok: estado === "autorizado", estado, resultado, pto_vta: Number(c.ptoVta), nro_cbte: nro, cae, cae_vto: caeVto, obs: obs ? String(obs).slice(0, 800) : null, error: errTop };
+}
+
+// ───────────────────────── handler ─────────────────────────
 Deno.serve(async (req: Request): Promise<Response> => {
   const c = readConfig();
   const miss = missingSecrets(c);
-
-  // Ping de estado — no emite. Sirve para chequear que la función está deployada y
-  // ver qué falta configurar. (GET, o POST con { action: "status" }.)
+  let body: Record<string, unknown> = {};
   let action = "status";
   if (req.method === "POST") {
-    try {
-      const b = await req.json();
-      action = typeof b?.action === "string" ? b.action : "status";
-    } catch (_e) { /* body vacío → status */ }
+    try { body = await req.json(); action = typeof body?.action === "string" ? (body.action as string) : "status"; } catch (_e) { /* status */ }
   }
 
   if (action === "status") {
     return json({
-      ok: true,
-      service: "arca-wsfe",
-      estado: "esqueleto",
-      configured: miss.length === 0,
-      emitir_habilitado: c.emitir,
-      entorno: c.env,
+      ok: true, service: "arca-wsfe", version: 2, estado: "implementado (gateado)",
+      configured: miss.length === 0, emitir_habilitado: c.emitir, entorno: c.env,
       faltan_secrets: miss,
-      nota: "Esqueleto v6.41 — no emite. Cargá los secrets y ARCA_EMITIR=on cuando esté todo (ver docs/facturacion-arca.md).",
+      acciones: ["status", "ta", "ultimo", "emitir"],
+      nota: miss.length ? "Cargá los secrets para poder probar (action=ta) — ver docs/facturacion-arca.md." : (c.emitir ? "Listo para emitir." : "Secrets OK. Probá action=ta / ultimo; para emitir prendé ARCA_EMITIR=on."),
     });
   }
 
-  // Cualquier intento de emisión está deshabilitado hasta cargar config + prender el switch.
-  if (action === "emitir") {
-    if (miss.length > 0) {
-      return json({ ok: false, error: "faltan_secrets", faltan: miss }, 501);
+  if (miss.length > 0) return json({ ok: false, error: "faltan_secrets", faltan: miss }, 501);
+
+  try {
+    if (action === "ta") {
+      const ta = await wsaaLogin(c);
+      return json({ ok: true, entorno: c.env, expira: ta.expira, cacheado: ta.cacheado, nota: "WSAA OK — el certificado firma y ARCA lo acepta." });
     }
-    if (!c.emitir) {
-      return json({ ok: false, error: "emision_deshabilitada", nota: "Prendé ARCA_EMITIR=on para habilitar (todavía sin implementar la emisión)." }, 501);
+    if (action === "ultimo") {
+      const tipo = Number(body.tipo_cbte);
+      if (!tipo) return json({ ok: false, error: "tipo_cbte requerido (1=FA A, 6=FA B, 11=FA C…)" }, 400);
+      const ta = await wsaaLogin(c);
+      const nro = await feUltimo(c, ta, tipo);
+      return json({ ok: true, entorno: c.env, pto_vta: Number(c.ptoVta), tipo_cbte: tipo, ultimo_autorizado: nro });
     }
-    // TODO: wsaaLogin → feCompUltimoAutorizado → feCAESolicitar → guardarComprobante.
-    return json({ ok: false, error: "no_implementado", nota: "La emisión real se implementa cuando estén certificado + PDV + fuente del importe." }, 501);
+    if (action === "emitir") {
+      if (!c.emitir) return json({ ok: false, error: "emision_deshabilitada", nota: "Prendé el secret ARCA_EMITIR=on para habilitar la emisión." }, 501);
+      if (!body.tipo_cbte) return json({ ok: false, error: "tipo_cbte requerido" }, 400);
+      if (body.neto == null || body.iva == null) return json({ ok: false, error: "neto e iva requeridos (el importe NO sale de la app todavía — bloqueo #1 del doc)" }, 400);
+      const ta = await wsaaLogin(c);
+      const r = await feEmitir(c, ta, body);
+      return json(r, r.ok ? 200 : 422);
+    }
+  } catch (e) {
+    return json({ ok: false, error: String((e as Error)?.message || e).slice(0, 500) }, 502);
   }
 
   return json({ ok: false, error: "accion_desconocida", action }, 400);

@@ -7,8 +7,9 @@
 --
 -- security_invoker = true → respetan la RLS del que consulta; anon ya puede leer las tablas
 -- base (PPP_Programacion_Diaria, Facturacion_NP, Facturacion_Cierres, Entregas_Virgilio).
--- Las lee: el botón "Exportar PPP a Excel" de la app (index.html) y el Apps Script
--- ppp-a-excel.gs (Supabase → archivo .xlsx en Drive, auto-refrescado).
+-- Las lee el botón "⬇ Exportar Excel" de la app (index.html, pppExportExcel).
+-- (El Apps Script ppp-a-excel.gs que también las leía se eliminó el 2026-07-30
+--  por decisión del usuario, sin haberse deployado.)
 -- (Aplicado como migración `vistas_ppp_sheet`; este archivo es la copia versionada.)
 
 -- Hoja 1: Programación diaria — SOLO lo pendiente.

@@ -115,14 +115,22 @@ Navegador (app)                 Supabase                         ARCA (ex AFIP)
   `node-forge` vía `npm:`) + cache del TA + `FECAESolicitar` + `FECompUltimoAutorizado` +
   guarda en `Comprobantes_ARCA`. Certificado como **secret** (`ARCA_CERT`, `ARCA_KEY`,
   `ARCA_CUIT`, `ARCA_PTO_VTA`, `ARCA_ENV`).
-  ✅ **Esqueleto en el repo y DEPLOYADO**: `supabase/functions/arca-wsfe/index.ts`,
-  desplegada (`verify_jwt=off`, temporal como el healthcheck). Responde `status` con qué
-  secrets faltan y **rechaza `emitir`** (501) hasta cargar los secrets y prender
-  `ARCA_EMITIR=on`. La lógica WSAA/WSFE está marcada con `TODO` (a propósito el esqueleto
-  **no puede emitir**). Test:
-  `https://hrxfctzncixxqmpfhskv.supabase.co/functions/v1/arca-wsfe` (abrir desde el
-  navegador; el sandbox de Claude no llega — proxy 403). Al implementar la emisión real,
-  poner `verify_jwt=on`.
+  ✅ **v2 (2026-07-30): WSAA + WSFE IMPLEMENTADOS y DEPLOYADOS** en
+  `supabase/functions/arca-wsfe/index.ts` (`verify_jwt=off`, temporal): firma CMS del
+  LoginTicketRequest con `node-forge`, **cache del TA** en la tabla `ARCA_TA` (ARCA
+  rechaza pedir un TA nuevo con uno vigente), `FECompUltimoAutorizado`,
+  `FECAESolicitar` (incluye `CondicionIVAReceptorId`, RG 5616) y log de cada intento
+  (autorizado/rechazado) en `Comprobantes_ARCA` vía service_role. **Sigue GATEADA**:
+  sin secrets responde qué falta (501) y `emitir` exige además `ARCA_EMITIR=on`.
+  Acciones: `status` (GET) · `ta` (login WSAA real — **la prueba del certificado**) ·
+  `ultimo` (`{tipo_cbte}` → correlativo) · `emitir` (`{tipo_cbte, neto, iva,
+  doc_tipo?, doc_nro?, cond_iva_receptor?, alic_id?, np?, tanda?}` → CAE).
+  ⚠ **NO probada contra ARCA** (falta el certificado): al llegar el cert de
+  homologación, cargar los secrets y probar en este orden: `ta` → `ultimo` → `emitir`
+  (con `ARCA_EMITIR=on`). URL:
+  `https://hrxfctzncixxqmpfhskv.supabase.co/functions/v1/arca-wsfe` (desde el
+  navegador; el sandbox de Claude no llega — proxy 403). Antes de producción:
+  `verify_jwt=on`.
 - **Módulo frontend** dentro de **Facturación** (un botón "Facturar electrónicamente" /
   ticket aparte, NO el tilde actual): elige cliente + importe (o lo trae), llama a la
   función, muestra el CAE y permite imprimir. Se hace **al final**, después de que
