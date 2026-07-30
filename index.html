@@ -2697,6 +2697,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
 .facfc-go{ padding:10px 18px; border:none; background:#4f46e5; color:#fff; border-radius:10px; font-weight:900; cursor:pointer; }
 .facfc-go:disabled{ opacity:.45; cursor:default; }
 .facfc-note{ font-size:11px; color:#94a3b8; text-align:center; margin-top:10px; }
+.facfc-note-prod{ color:#15803d; font-weight:800; }
 .facfc-errbox{ text-align:center; padding:10px; } .facfc-err-ico{ font-size:30px; }
 .facfc-ok{ text-align:center; } .facfc-ok-ico{ font-size:40px; }
 .facfc-ok-t{ font-size:18px; font-weight:900; color:#15803d; margin:4px 0; }
@@ -21016,7 +21017,9 @@ async function facFCOpen(np, tanda, rs){
   if (faltan.length) h += '<div class="facfc-warn">⚠ Sin precio en el maestro web: <b>' + faltan.map(function(x){ return escapeHtml(String(x)); }).join(", ") + '</b>. No se puede facturar hasta cargarlos.</div>';
   h += '<div class="facfc-tot"><span>Neto ' + facFmtMoney(d.neto) + '</span><span>IVA 21% ' + facFmtMoney(d.iva) + '</span><span class="facfc-total">TOTAL ' + facFmtMoney(d.total) + '</span></div>';
   h += '<div class="facfc-actions"><button class="facfc-cancel" onclick="facFCClose()">Cancelar</button><button class="facfc-go" id="facFCGo"' + (puede ? '' : ' disabled') + '>Facturar (pedir CAE)</button></div>';
-  h += '<div class="facfc-note">Homologación — sin validez fiscal (prueba).</div>';
+  h += (d.entorno === 'prod')
+    ? '<div class="facfc-note facfc-note-prod">✔ Producción — factura con validez fiscal.</div>'
+    : '<div class="facfc-note">Homologación — sin validez fiscal (prueba).</div>';
   body.innerHTML = h;
   var go = document.getElementById("facFCGo");
   if (go && puede) go.onclick = function(){ facFCEmitir(go, np, tanda); };
@@ -21032,7 +21035,9 @@ async function facFCEmitir(go, np, tanda){
       '<div class="facfc-ok-cae">CAE <b>' + escapeHtml(String(d.cae)) + '</b></div>' +
       '<div class="facfc-ok-meta">Comp. N° ' + escapeHtml(String(d.nro_cbte)) + ' · PDV ' + escapeHtml(String(d.pto_vta)) + ' · Vto ' + escapeHtml(String(d.cae_vto || "")) + '</div>' +
       '<div class="facfc-ok-meta">' + escapeHtml(String(d.cliente || "")) + ' · Total ' + facFmtMoney(d.total) + '</div>' +
-      '<div class="facfc-note">Homologación — sin validez fiscal.</div>' +
+      ((d.entorno === 'prod')
+        ? '<div class="facfc-note facfc-note-prod">✔ Factura con validez fiscal · registrada en ARCA.</div>'
+        : '<div class="facfc-note">Homologación — sin validez fiscal.</div>') +
       '<div class="facfc-actions"><button class="facfc-cancel" onclick="facFCClose()">Cerrar</button></div></div>';
   } else {
     go.disabled = false; go.textContent = prev;

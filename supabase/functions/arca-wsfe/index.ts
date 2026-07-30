@@ -341,7 +341,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       // Preview del importe de una NP (sin emitir; NO requiere ARCA_EMITIR). Necesita WEB_SERVICE_KEY.
       if (!c.webKey) return json({ ok: false, error: "falta_web_key", nota: "Cargá el secret WEB_SERVICE_KEY (service_role del proyecto web de precios)." }, 501);
       const pr = await preciarNp(c, String(body.np || ""), body.tanda ? String(body.tanda) : "");
-      return json({ ok: pr.faltan.length === 0, ...pr, nota: pr.faltan.length ? ("Faltan precios para: " + pr.faltan.join(", ")) : "Precio calculado (sin emitir)." });
+      return json({ ok: pr.faltan.length === 0, ...pr, entorno: c.env, nota: pr.faltan.length ? ("Faltan precios para: " + pr.faltan.join(", ")) : "Precio calculado (sin emitir)." });
     }
     if (action === "emitir_np") {
       // Factura una NP completa: precia (Virgilio + web) y pide el CAE. Factura A (tipo 1) por defecto.
@@ -357,7 +357,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       const cond = Number(body.cond_iva_receptor) || 1;
       const ta = await wsaaLogin(c);
       const r = await feEmitir(c, ta, { tipo_cbte: tipo, neto: pr.neto, iva: pr.iva, doc_tipo: 80, doc_nro: pr.cuit, cond_iva_receptor: cond, np: pr.np, tanda: pr.tanda });
-      return json({ ...r, tipo_cbte: tipo, letra: "A", cliente: pr.cliente, cuit: pr.cuit, cod_cliente: pr.cod_cliente, neto: pr.neto, iva: pr.iva, total: pr.total, detalle: pr.detalle }, r.ok ? 200 : 422);
+      return json({ ...r, entorno: c.env, tipo_cbte: tipo, letra: "A", cliente: pr.cliente, cuit: pr.cuit, cod_cliente: pr.cod_cliente, neto: pr.neto, iva: pr.iva, total: pr.total, detalle: pr.detalle }, r.ok ? 200 : 422);
     }
   } catch (e) {
     return json({ ok: false, error: String((e as Error)?.message || e).slice(0, 500) }, 502);
