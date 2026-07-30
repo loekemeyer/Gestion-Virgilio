@@ -86,6 +86,20 @@ where estado in ('pendiente','lista') order by creado_en desc;
 Mostralas como `[ ] 4837 · [logica·alto] Título (rama idea/4837)`. El usuario
 tilda las que quiere → tratá cada tildada como "idea aceptada" (regla de abajo).
 
+**Idea escrita por el usuario** — cuando el usuario escriba una idea/mejora/pedido
+en el chat (aunque no dé ningún número), **registrala para que no se pierda**:
+
+1. `select public.nuevo_codigo_propuesta();` para el código.
+2. `insert into public.agente_propuestas (codigo, agente, titulo, detalle, estado)
+   values ('<cod>','usuario','<título corto>','<lo que pidió, textual>','pendiente');`
+3. Agregá una línea ARRIBA en `docs/IDEAS-USUARIO.md`:
+   `- [ ] **<cod>** (AAAA-MM-DD) — <idea> — _pendiente_`, y commiteá/pusheá a `main`.
+4. Confirmale al usuario: "Anotada como **<cod>**" (así puede activarla después por número).
+
+Las ideas del usuario tienen **prioridad**: el loop de cada 2 h las desarrolla primero
+y el curador de las 8 las **incluye todos los días hasta que el usuario las active o
+descarte** (no se marcan como enviadas de forma permanente).
+
 **Idea aceptada (por número o tildada en el checklist)** — cuando el usuario diga
 un **código de 4 dígitos** (`4837`, "hacé el 4837", "acepto 4837") o tilde ideas
 en el checklist, por cada código aceptado **mergealo a `main` directamente**:
@@ -98,6 +112,8 @@ en el checklist, por cada código aceptado **mergealo a `main` directamente**:
    verificá (`node --check` + smoke headless), y mergeala a main igual.
 4. Marcá `update public.agente_propuestas set estado='hecha', actualizado_en=now()
    where codigo='4837';`. Si el usuario la rechaza → `estado='descartada'`.
+   Si es idea del usuario (`agente='usuario'`), además actualizá su línea en
+   `docs/IDEAS-USUARIO.md` (`[x]` si hecha, `~~tachada~~` si descartada) y commiteá a `main`.
 
 El merge a `main` es **directo, sin mostrar diff** (así lo pidió el usuario), salvo
 que en el momento pida verlo.
