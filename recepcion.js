@@ -154,6 +154,34 @@ const RCP_CSS = `
 #rcpRoot .enviarBtn{ padding:11px 22px; font-size:16px; font-weight:900; border:0; border-radius:11px; background:#111; color:#fff; cursor:pointer; }
 #rcpRoot .enviarBtn:disabled{ opacity:.4; cursor:default; }
 #rcpRoot .codigoBox{ font-size:26px; font-weight:900; letter-spacing:4px; color:#0a7a2f; font-variant-numeric:tabular-nums; }
+/* Histórico de recepción (v6.41): barra de filtros + tabla. */
+#rcpRoot .histBar{ display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end; margin-bottom:10px; }
+#rcpRoot .histField{ display:flex; flex-direction:column; gap:4px; }
+#rcpRoot .histField label{ font-size:12px; font-weight:800; color:#475569; }
+#rcpRoot .histField input{ height:44px; border:2px solid var(--border); border-radius:10px; padding:0 12px; font-size:16px; font-weight:700; background:#fff; box-sizing:border-box; }
+#rcpRoot input[type="text"].histCod{ width:150px; letter-spacing:normal; text-align:left; }
+#rcpRoot .histField input.histDate{ width:158px; }
+#rcpRoot .histBtns{ display:flex; gap:8px; }
+#rcpRoot .histBtn{ height:44px; padding:0 18px; border-radius:10px; border:2px solid var(--border); background:#fff; font-weight:900; font-size:15px; cursor:pointer; }
+#rcpRoot .histBtn.pri{ background:#111; color:#fff; border-color:#111; }
+#rcpRoot .histPresets{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
+#rcpRoot .histChip{ padding:7px 14px; border-radius:999px; border:2px solid var(--border); background:#fff; font-weight:800; font-size:13px; cursor:pointer; color:#334155; }
+#rcpRoot .histChip:hover{ border-color:#111; }
+#rcpRoot .histSummary{ font-size:14px; font-weight:800; color:#0f172a; margin-bottom:8px; }
+#rcpRoot .histSummary b{ color:var(--ok); }
+#rcpRoot .histNote{ font-size:12.5px; color:#b45309; font-weight:700; margin-bottom:10px; }
+#rcpRoot .histTblWrap{ overflow-x:auto; -webkit-overflow-scrolling:touch; border:1px solid var(--border); border-radius:12px; }
+#rcpRoot table.histTbl{ width:100%; border-collapse:collapse; font-size:14px; min-width:520px; }
+#rcpRoot table.histTbl th{ text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:#64748b; font-weight:900; padding:10px 12px; background:#f1f5f9; position:sticky; top:0; }
+#rcpRoot table.histTbl td{ padding:9px 12px; border-top:1px solid #eef2f6; vertical-align:top; }
+#rcpRoot .histCodCell{ font-weight:900; color:#111; font-family:Consolas,Menlo,monospace; white-space:nowrap; }
+#rcpRoot .histCaj{ font-weight:900; color:var(--ok); text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+#rcpRoot .histFe{ white-space:nowrap; color:#334155; font-weight:700; }
+#rcpRoot .histWho{ color:#334155; }
+#rcpRoot .histWho .provTag{ font-size:10px; font-weight:800; color:#a06000; background:#fff7e6; border:1px solid #ffd98a; border-radius:999px; padding:1px 7px; margin-right:5px; }
+#rcpRoot .histWho .histDesc{ color:#94a3b8; }
+#rcpRoot .histRto{ color:#64748b; font-variant-numeric:tabular-nums; white-space:nowrap; }
+#rcpRoot .histLoading, #rcpRoot .histEmpty{ padding:26px; text-align:center; color:#64748b; font-weight:700; }
 `;
 
 /* ============== DOM (inyectado dentro de #rcpRoot) ============== */
@@ -257,7 +285,7 @@ function closeOp() { opPage.classList.remove("open"); if (_pendTimer) { clearInt
 opClose.onclick = closeOp;
 
 opBack.onclick = () => {
-  if (opState.step === "tipo" || opState.step === "pend" || opState.step === "racks") renderMenu();
+  if (opState.step === "tipo" || opState.step === "pend" || opState.step === "racks" || opState.step === "hist") renderMenu();
   else if (opState.step === "lista") renderTipoElegir();
   else if (opState.step === "linea") renderLista(opState.tipo);
   else if (opState.step === "remito") renderLinea();
@@ -1038,11 +1066,173 @@ function renderMenu() {
   bc.type = "button"; bc.className = "opTipoBtn opBtnSm";
   bc.textContent = "✍️ Carga Manual";
   bc.onclick = () => { opResetState(); renderTipoElegir(); };   // fromMenu sigue true → "Atrás" vuelve al menú
-  cont.appendChild(bp); cont.appendChild(br); cont.appendChild(bc);
+  const bh = document.createElement("button");
+  bh.type = "button"; bh.className = "opTipoBtn opBtnSm";
+  bh.textContent = "📜 Histórico de recepción";
+  bh.onclick = () => renderHistorico();
+  cont.appendChild(bp); cont.appendChild(br); cont.appendChild(bc); cont.appendChild(bh);
   opBody.appendChild(cont);
   // Contadores en los botones: remitos pendientes de cargar + bajadas por aprobar.
   pendBadgePend(bp);
   racksBadgePend(br);
+}
+
+/* ===== HISTÓRICO de recepción (v6.41) — registro de la mercadería recibida,
+   SOLO LECTURA, filtrable por fecha y/o código. Fuentes durables:
+   • "Entregas Tallerista Virgilio" (principal): Fecha texto YYYY-MM-DD + created_at,
+     Cod, Cajas, Nombre_Tall, Remito. Se filtra por la col Fecha (texto) para
+     evitar líos de zona horaria; se ordena Fecha↓ + created_at↓.
+   • "Entregas Prov AT" (secundaria): Dia_mes "DD-MM" SIN año → se asume el año en
+     curso para filtrar/ordenar (todos los datos son del año actual). Cod_Art,
+     Cantidad, Descripcion, Proveedor, Remito.
+   El registro lo genera y mantiene Virgilio solo: cada recepción (opEnviar) ya
+   graba estas tablas; acá únicamente se consultan. ===== */
+function escapeHtmlRcp(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, function (m) {
+    return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[m];
+  });
+}
+function histShiftYmd(days) {
+  const d = new Date(); d.setDate(d.getDate() + days);
+  const p = n => String(n).padStart(2, "0");
+  return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
+}
+function histMonthStartYmd() {
+  const d = new Date(), p = n => String(n).padStart(2, "0");
+  return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-01";
+}
+let _histReqSeq = 0;
+function renderHistorico() {
+  opState.step = "hist";
+  opPage.classList.remove("pendWide");
+  opSetBack(true);
+  opTitle.textContent = "Histórico de Recepción";
+  opSubtitle.textContent = "Mercadería recibida — filtrá por fecha y/o código";
+  opActions.innerHTML = "";
+  opBody.innerHTML =
+    '<div class="histBar">' +
+      '<div class="histField"><label for="histDesde">Desde</label><input type="date" id="histDesde" class="histDate"></div>' +
+      '<div class="histField"><label for="histHasta">Hasta</label><input type="date" id="histHasta" class="histDate"></div>' +
+      '<div class="histField"><label for="histCod">Código</label><input type="text" id="histCod" class="histCod" placeholder="ej. 590" inputmode="text" autocomplete="off"></div>' +
+      '<div class="histBtns"><button class="histBtn pri" id="histBuscar">Buscar</button><button class="histBtn" id="histLimpiar">Limpiar</button></div>' +
+    '</div>' +
+    '<div class="histPresets">' +
+      '<button class="histChip" data-preset="hoy">Hoy</button>' +
+      '<button class="histChip" data-preset="7">7 días</button>' +
+      '<button class="histChip" data-preset="mes">Este mes</button>' +
+      '<button class="histChip" data-preset="todo">Todo</button>' +
+    '</div>' +
+    '<div id="histResults"><div class="histLoading">Cargando…</div></div>';
+  document.getElementById("histBuscar").onclick = () => histBuscar();
+  document.getElementById("histLimpiar").onclick = () => {
+    document.getElementById("histDesde").value = "";
+    document.getElementById("histHasta").value = "";
+    document.getElementById("histCod").value = "";
+    histBuscar();
+  };
+  document.getElementById("histCod").onkeydown = (e) => { if (e.key === "Enter") histBuscar(); };
+  document.getElementById("histDesde").onchange = () => histBuscar();
+  document.getElementById("histHasta").onchange = () => histBuscar();
+  opBody.querySelectorAll(".histChip").forEach(function (ch) {
+    ch.onclick = function () {
+      const p = ch.getAttribute("data-preset");
+      const desde = document.getElementById("histDesde"), hasta = document.getElementById("histHasta");
+      if (p === "hoy") { desde.value = opTodayStr(); hasta.value = opTodayStr(); }
+      else if (p === "7") { desde.value = histShiftYmd(-6); hasta.value = opTodayStr(); }
+      else if (p === "mes") { desde.value = histMonthStartYmd(); hasta.value = opTodayStr(); }
+      else if (p === "todo") { desde.value = ""; hasta.value = ""; }
+      histBuscar();
+    };
+  });
+  histBuscar();   // primera carga: recepciones recientes
+}
+function histBuscar() {
+  const desde = (document.getElementById("histDesde") || {}).value || "";
+  const hasta = (document.getElementById("histHasta") || {}).value || "";
+  const cod = ((document.getElementById("histCod") || {}).value || "").trim();
+  histLoad({ desde: desde, hasta: hasta, cod: cod });
+}
+async function histLoad(f) {
+  const box = document.getElementById("histResults");
+  if (box) box.innerHTML = '<div class="histLoading">Cargando…</div>';
+  const myseq = ++_histReqSeq;
+  await sessionReady;
+  if (myseq !== _histReqSeq) return;   // ya hay una búsqueda más nueva en curso
+  const CAP = 500, HARD = 1000;
+  const codN = f.cod ? f.cod.toUpperCase() : "";
+  try {
+    let qt = supabase.from("Entregas Tallerista Virgilio").select("Fecha,created_at,Cod,Cajas,Nombre_Tall,Remito");
+    if (f.desde) qt = qt.gte("Fecha", f.desde);
+    if (f.hasta) qt = qt.lte("Fecha", f.hasta);
+    if (codN) qt = qt.ilike("Cod", "%" + codN + "%");
+    qt = qt.order("Fecha", { ascending: false }).order("created_at", { ascending: false }).limit(HARD);
+    let qp = supabase.from("Entregas Prov AT").select("Dia_mes,Proveedor,Cod_Art,Descripcion,Cantidad,Remito");
+    if (codN) qp = qp.ilike("Cod_Art", "%" + codN + "%");
+    qp = qp.limit(HARD);
+
+    const [rt, rp] = await Promise.all([qt, qp]);
+    if (myseq !== _histReqSeq) return;
+    if (rt && rt.error) throw rt.error;
+
+    const rows = [];
+    const curYear = new Date().getFullYear();
+    ((rt && rt.data) || []).forEach(function (r) {
+      rows.push({
+        ymd: r.Fecha || "", ms: r.created_at ? Date.parse(r.created_at) : 0,
+        fechaTxt: fechaCorta(r.Fecha), cod: r.Cod || "—", desc: "",
+        cajas: Number(r.Cajas) || 0, quien: displayName(r.Nombre_Tall || "—"),
+        remito: r.Remito || "", origen: "tall"
+      });
+    });
+    ((rp && rp.data) || []).forEach(function (r) {
+      const dm = /^(\d{2})-(\d{2})$/.exec(r.Dia_mes || "");
+      const ymd = dm ? (curYear + "-" + dm[2] + "-" + dm[1]) : "";
+      // filtro de fecha para prov (best-effort: sin año en Dia_mes)
+      if ((f.desde || f.hasta) && !ymd) return;
+      if (f.desde && ymd && ymd < f.desde) return;
+      if (f.hasta && ymd && ymd > f.hasta) return;
+      rows.push({
+        ymd: ymd, ms: 0,
+        fechaTxt: dm ? (dm[1] + "/" + MESES_CORTO[parseInt(dm[2], 10) - 1]) : (r.Dia_mes || "—"),
+        cod: r.Cod_Art || "—", desc: r.Descripcion || "",
+        cajas: Number(r.Cantidad) || 0, quien: r.Proveedor || "—",
+        remito: r.Remito || "", origen: "prov"
+      });
+    });
+    rows.sort(function (a, b) { if (a.ymd !== b.ymd) return a.ymd < b.ymd ? 1 : -1; return b.ms - a.ms; });
+    histRender(rows, CAP, !!(rt && rt.data && rt.data.length >= HARD));
+  } catch (e) {
+    if (myseq !== _histReqSeq) return;
+    console.warn("histLoad error:", e);
+    if (box) box.innerHTML = '<div class="histEmpty">No se pudo cargar el histórico. Probá de nuevo.</div>';
+  }
+}
+function histRender(rows, CAP, capped) {
+  const box = document.getElementById("histResults");
+  if (!box) return;
+  const n = rows.length;
+  if (!n) { box.innerHTML = '<div class="histEmpty">No hay recepciones para ese filtro.</div>'; return; }
+  const total = rows.reduce((s, r) => s + r.cajas, 0);
+  const shown = rows.slice(0, CAP);
+  let html = '<div class="histSummary">' + n + ' recepci' + (n === 1 ? 'ón' : 'ones') + ' · <b>' + total + ' cajas</b></div>';
+  if (capped) html += '<div class="histNote">⚠ Hay más de 1000 filas; se muestran las más recientes. Acotá por fecha para ver el resto.</div>';
+  else if (n > CAP) html += '<div class="histNote">Mostrando las primeras ' + CAP + ' de ' + n + '. Acotá el filtro para ver menos.</div>';
+  html += '<div class="histTblWrap"><table class="histTbl"><thead><tr>' +
+    '<th>Fecha</th><th>Código</th><th style="text-align:right">Cajas</th><th>Entregó</th><th>Remito</th>' +
+    '</tr></thead><tbody>';
+  shown.forEach(function (r) {
+    const who = (r.origen === "prov" ? '<span class="provTag">Prov</span>' : '') + escapeHtmlRcp(r.quien) +
+      (r.desc ? ' <span class="histDesc">· ' + escapeHtmlRcp(r.desc) + '</span>' : '');
+    html += '<tr>' +
+      '<td class="histFe">' + escapeHtmlRcp(r.fechaTxt) + '</td>' +
+      '<td class="histCodCell">' + escapeHtmlRcp(r.cod) + '</td>' +
+      '<td class="histCaj">' + r.cajas + '</td>' +
+      '<td class="histWho">' + who + '</td>' +
+      '<td class="histRto">' + escapeHtmlRcp(r.remito || "—") + '</td>' +
+    '</tr>';
+  });
+  html += '</tbody></table></div>';
+  box.innerHTML = html;
 }
 /* v5.93 — Contador de remitos pendientes de cargar en el botón "Pendientes"
    (mismas filas que renderPendientes: Control_Modo_OP con estado='pendiente'). */
