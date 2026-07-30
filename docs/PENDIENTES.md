@@ -29,8 +29,10 @@ tachan (`~~…~~`).
   Decisiones 2026-07-30: **`0037` y `0087` QUEDAN como están** (el usuario no los
   reconoce; saldo 0, solo insumos, inofensivos — no volver a proponer borrarlos).
   Auditoría de patrones (2 díg / 0XX / 00XX) hecha: el único split real del stock
-  era `66`↔`066` (tanda C94A, 5 filas, ids 7327/7328/7626/7627/8532; consolidación
-  verificada sin colisión de índice, esperando OK).
+  era `66`↔`066` (tanda C94A, 5 filas, ids 7327/7328/7626/7627/8532) —
+  **CONSOLIDADO 2026-07-30** con OK del usuario (UPDATE a `066`, verificado: sin
+  variante `66`, góndola de `066` quedó en 212). Con esto el stock no tiene ningún
+  código partido por padding.
 - [ ] **5. Fase 2 del PPP** (programar desde la app / Supabase motor, sync con upsert)
   — diseño entregado, sin implementar. El Espejo quedó idéntico a PPP esperando esa
   divergencia.
