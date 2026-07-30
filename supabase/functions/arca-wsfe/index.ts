@@ -208,6 +208,10 @@ async function feEmitir(c: Cfg, ta: { token: string; sign: string }, p: any) {
     "<ar:ImpTrib>0</ar:ImpTrib><ar:ImpIVA>" + iva.toFixed(2) + "</ar:ImpIVA>" +
     "<ar:MonId>PES</ar:MonId><ar:MonCotiz>1</ar:MonCotiz>" +
     (p.cond_iva_receptor != null ? "<ar:CondicionIVAReceptorId>" + Number(p.cond_iva_receptor) + "</ar:CondicionIVAReceptorId>" : "") +
+    // CbtesAsoc: comprobantes asociados. Obligatorio en Notas de Crédito/Débito — referencian la factura que anulan.
+    ((Array.isArray(p.cbtes_asoc) && p.cbtes_asoc.length)
+      ? "<ar:CbtesAsoc>" + p.cbtes_asoc.map(function (a: { tipo: number; pto_vta: number; nro: number }) { return "<ar:CbteAsoc><ar:Tipo>" + Number(a.tipo) + "</ar:Tipo><ar:PtoVta>" + Number(a.pto_vta) + "</ar:PtoVta><ar:Nro>" + Number(a.nro) + "</ar:Nro></ar:CbteAsoc>"; }).join("") + "</ar:CbtesAsoc>"
+      : "") +
     (iva > 0 ? "<ar:Iva><ar:AlicIva><ar:Id>" + alic + "</ar:Id><ar:BaseImp>" + neto.toFixed(2) + "</ar:BaseImp><ar:Importe>" + iva.toFixed(2) + "</ar:Importe></ar:AlicIva></ar:Iva>" : "") +
     "</ar:FECAEDetRequest>";
   const req = "<ar:FECAESolicitar>" + feAuth(c, ta) +
@@ -231,7 +235,7 @@ async function feEmitir(c: Cfg, ta: { token: string; sign: string }, p: any) {
         importe_neto: neto, importe_iva: iva, importe_total: total,
         cae, cae_vto: caeVto ? caeVto.slice(0, 4) + "-" + caeVto.slice(4, 6) + "-" + caeVto.slice(6, 8) : null,
         estado, entorno: c.env,
-        raw_resp: { resultado, obs: obs ? String(obs).slice(0, 2000) : null, err: errTop },
+        raw_resp: { resultado, obs: obs ? String(obs).slice(0, 2000) : null, err: errTop, cbtes_asoc: p.cbtes_asoc || null },
       }),
     });
   } catch (_e) { /* el CAE ya salió; el log no debe romper la respuesta */ }
@@ -309,7 +313,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       ok: true, service: "arca-wsfe", version: 2, estado: "implementado (gateado)",
       configured: miss.length === 0, emitir_habilitado: c.emitir, entorno: c.env,
       faltan_secrets: miss,
-      acciones: ["status", "ta", "ultimo", "emitir", "preciar", "emitir_np"],
+      acciones: ["status", "ta", "ultimo", "emitir", "preciar", "emitir_np", "emitir_nc"],
       web_precios: c.webKey ? "conectado" : "falta WEB_SERVICE_KEY",
       nota: miss.length ? "Cargá los secrets para poder probar (action=ta) — ver docs/facturacion-arca.md." : (c.emitir ? "Listo para emitir." : "Secrets OK. Probá action=ta / ultimo; para emitir prendé ARCA_EMITIR=on."),
     });
@@ -358,6 +362,35 @@ Deno.serve(async (req: Request): Promise<Response> => {
       const ta = await wsaaLogin(c);
       const r = await feEmitir(c, ta, { tipo_cbte: tipo, neto: pr.neto, iva: pr.iva, doc_tipo: 80, doc_nro: pr.cuit, cond_iva_receptor: cond, np: pr.np, tanda: pr.tanda });
       return json({ ...r, entorno: c.env, tipo_cbte: tipo, letra: "A", cliente: pr.cliente, cuit: pr.cuit, cod_cliente: pr.cod_cliente, neto: pr.neto, iva: pr.iva, total: pr.total, detalle: pr.detalle }, r.ok ? 200 : 422);
+    }
+    if (action === "emitir_nc") {
+      // Anula una factura ya emitida con una Nota de Crédito por el mismo importe,
+      // referenciándola en CbtesAsoc. Se busca el comprobante original por CAE (o np).
+      if (!c.emitir) return json({ ok: false, error: "emision_deshabilitada", nota: "Prendé el secret ARCA_EMITIR=on." }, 501);
+      const caeRef = body.cae ? String(body.cae).replace(/\D/g, "") : "";
+      const npRef = body.np ? String(body.np) : "";
+      let filtro = "";
+      if (caeRef) filtro = "cae=eq." + encodeURIComponent(caeRef);
+      else if (npRef) filtro = "np=eq." + encodeURIComponent(npRef) + "&tipo_cbte=in.(1,6,11)";
+      else return json({ ok: false, error: "falta_referencia", nota: "Indicá 'cae' o 'np' de la factura a anular." }, 400);
+      // deno-lint-ignore no-explicit-any
+      const rows: any[] = await (await fetch(sbUrl("Comprobantes_ARCA") + "?" + filtro + "&estado=eq.autorizado&order=creado.desc&limit=1", { headers: sbHeaders() })).json();
+      const orig = Array.isArray(rows) ? rows[0] : null;
+      if (!orig) return json({ ok: false, error: "original_no_encontrado", nota: "No encontré una factura autorizada con ese CAE/NP." }, 404);
+      if (orig.entorno !== c.env) return json({ ok: false, error: "entorno_distinto", nota: "La factura es de entorno '" + orig.entorno + "' y estás en '" + c.env + "'." }, 409);
+      if (Number(orig.pto_vta) !== Number(c.ptoVta)) return json({ ok: false, error: "pto_vta_distinto", nota: "La factura es del PV " + orig.pto_vta + " y el secret ARCA_PTO_VTA es " + c.ptoVta + "." }, 409);
+      // Factura A(1)→NC A(3), FA B(6)→NC B(8), FA C(11)→NC C(13)
+      const ncMap: Record<number, number> = { 1: 3, 6: 8, 11: 13 };
+      const tipoNc = ncMap[Number(orig.tipo_cbte)] || 3;
+      const ta = await wsaaLogin(c);
+      const r = await feEmitir(c, ta, {
+        tipo_cbte: tipoNc,
+        neto: Number(orig.importe_neto), iva: Number(orig.importe_iva), total: Number(orig.importe_total),
+        doc_tipo: 80, doc_nro: orig.cuit_cliente, cond_iva_receptor: 1,
+        np: orig.np, tanda: orig.tanda,
+        cbtes_asoc: [{ tipo: Number(orig.tipo_cbte), pto_vta: Number(orig.pto_vta), nro: Number(orig.nro_cbte) }],
+      });
+      return json({ ...r, entorno: c.env, tipo_cbte: tipoNc, letra: tipoNc === 3 ? "A" : (tipoNc === 8 ? "B" : "C"), anula: { cae: orig.cae, pto_vta: orig.pto_vta, nro_cbte: orig.nro_cbte, np: orig.np } }, r.ok ? 200 : 422);
     }
   } catch (e) {
     return json({ ok: false, error: String((e as Error)?.message || e).slice(0, 500) }, 502);
