@@ -1,9 +1,19 @@
 # Facturación electrónica propia (ARCA / ex AFIP) — diseño y guía de puesta en marcha
 
-> Estado: **HOMOLOGACIÓN PROBADA de punta a punta** (2026-07-30) — la app ya puede pedir y
-> obtener un **CAE** de ARCA en el entorno de PRUEBA. Para emitir con **validez fiscal** falta:
-> la fuente del **importe** (§5, bloqueo #1), el **OK del contador**, un **certificado de
-> producción** y `ARCA_ENV=prod`. Este documento es la guía viva del camino "la app emite desde
+> ## ✅ Estado: **PRODUCCIÓN ACTIVA** (2026-07-30)
+> La app **emite Facturas A reales con validez fiscal**. Ya se emitió la primera:
+> NP 98277, **CAE 86316114309666**, PV **11**, `entorno='prod'`. Config vigente:
+> certificado de producción **`virgilioapp`** (creado en "Administración de Certificados
+> Digitales" de AFIP y autorizado al servicio `wsfe`), **PV 11** ("APP PRODUCCIÓN WS"),
+> secrets en Supabase: `ARCA_CERT`, `ARCA_KEY` (de `virgilioapp`), `ARCA_ENV=prod`,
+> `ARCA_PTO_VTA=11`, `ARCA_CUIT=30515842450`, `ARCA_EMITIR=on`, `WEB_SERVICE_KEY`.
+> Notas de Crédito para anular: acción `emitir_nc` + botón "Anular factura (NC)" (v6.64).
+> **Todo lo de "HOMOLOGACIÓN / falta certificado" de abajo quedó SUPERADO** — se conserva
+> como historial del camino recorrido.
+
+> Estado histórico: **HOMOLOGACIÓN PROBADA de punta a punta** (2026-07-30) — la app ya podía pedir y
+> obtener un **CAE** de ARCA en el entorno de PRUEBA. (Superado: hoy está en producción, ver arriba.)
+> Este documento es la guía viva del camino "la app emite desde
 > un punto de venta nuevo, e Isis levanta de ARCA". Ver también `GUIA-PROYECTO.md` (Isis vs 2º emisor).
 >
 > **✅ Avance 2026-07-30 — HOMOLOGACIÓN OK end-to-end.** Se completó el §4 (shopping list) en el
