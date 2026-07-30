@@ -90,6 +90,44 @@ es el camino soportado.
 6. ¿Tienen versión CLOUD? Si se migra, ¿ya trae API/conectores/import automático que
    resuelva esto sin desarrollo aparte?
 
+### Respuesta del proveedor (ronda 1) — 2026-07-30
+
+1. Import por archivo de comprobantes de venta emitidos → **NO** existe. Solo carga
+   manual ("Comprobante Manual", Nro. Preimpreso).
+2. Import por archivo de movimientos de stock → **NO** hay info de esa funcionalidad.
+3. **API → SÍ.** Endpoint **`/api/ISISPedido`** inserta **Pedidos de Venta**. Un
+   sistema externo puede crear pedidos; después **deben facturarse dentro del ISIS**
+   para afectar contabilidad y stock. No especifican si por esta vía se puede registrar
+   un comprobante con **CAE ya emitido**.
+4. Escribir directo en la base → sin info.
+5. Traer masivo desde AFIP "Mis Comprobantes" → **NO**. Existe "Recuperar Facturas
+   (webservice)" pero es para **un** comprobante puntual aprobado por AFIP cuyo CAE no
+   quedó registrado, no import masivo.
+
+### Dos modelos posibles (a partir de la API)
+
+- **Modelo A — la app manda el pedido, el ISIS factura.** La app usa `/api/ISISPedido`
+  para insertar el pedido; el ISIS lo factura (emite CAE) y mueve stock + contabilidad
+  nativo. El empleado solo toca la app. **Pro:** usa la API que YA existe, sin doble
+  laburo, todo en el ISIS. **Contra:** el facturador a AFIP pasa a ser el ISIS (su PV);
+  la emisión directa del app (PV 11) queda como **respaldo**. Riesgo a resolver: que NO
+  haya doble emisión (si la app además emite, se duplica).
+- **Modelo B — la app factura, el ISIS registra.** La app emite (PV 11) y el ISIS
+  registra la factura ya emitida (stock + libro IVA) sin CAE nuevo. **Contra:** requiere
+  un endpoint que hoy NO existe → habría que pedir desarrollo a medida.
+
+**Lean actual: Modelo A** (usa API existente, evita doble emisión, todo nativo en ISIS).
+
+### Preguntas ronda 2 al proveedor (reformuladas con lo de la API)
+
+Sobre `/api/ISISPedido`: (1) ¿facturar el pedido emite CAE nuevo? (2) ¿se puede
+auto-facturar el pedido insertado por API, sin intervención manual? (3) ¿la API despacha
+el pedido para afectar stock, o el stock solo se mueve al facturar?
+Sobre registrar comprobantes ya emitidos: (4) ¿endpoint (o desarrollo) para registrar un
+comprobante con PV/número/CAE existente que afecte stock + libro IVA sin CAE nuevo?
+(5) ¿endpoint de movimientos/ajustes de stock? Desarrollo/cloud: (6) ¿lo desarrollan a
+medida (alcance/costo/plazo)? (7) ¿la versión cloud trae API más completa que lo cubra?
+
 ### Según la respuesta, del lado de la app
 
 - **Cloud con API / API on-premise (3, 6)** → la app se conecta a esa API y empuja
