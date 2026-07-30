@@ -935,19 +935,24 @@ async function opEnviar() {
 
   // v4.06: STOCK — lo recibido ENTRA a "Mercadería a guardar" (Movimientos_Stock).
   // Best-effort; si falla, queda en vir_stock_pend y lo reintenta index.html (stockFlushPend).
+  // idea 5490: un client_id ESTABLE por fila; el mismo id se usa en el insert y en la
+  // cola offline, así el reintento (POST que llegó pero cuya respuesta se perdió) NO
+  // duplica cajas (índice único parcial mov_stock_clientid_dedup + ignore-duplicates).
+  const _cid = () => { try { if (typeof crypto !== "undefined" && crypto.randomUUID) return "mst_" + crypto.randomUUID(); } catch (_e) {} return "mst_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 10); };
+  const stockRows = items.map(i => ({
+    cod_art: String(i.cod), descripcion: i.desc || null,
+    deposito: 'a_guardar', delta: i.cajas, tipo: 'recepcion', ref: opState.remito || null,
+    legajo: RECP.legajo || null,   // idea 7725: legajo para sumar el total del día cruzando dispositivos al cerrar RT
+    client_id: _cid()
+  }));
   try {
-    const stockRows = items.map(i => ({
-      cod_art: String(i.cod), descripcion: i.desc || null,
-      deposito: 'a_guardar', delta: i.cajas, tipo: 'recepcion', ref: opState.remito || null,
-      legajo: RECP.legajo || null   // idea 7725: taggeamos el legajo para poder sumar el total del día CRUZANDO dispositivos al cerrar RT (el contador de localStorage es por-equipo)
-    }));
     const { error: stErr } = await supabase.from("Movimientos_Stock").insert(stockRows);
     if (stErr) throw stErr;
   } catch (e) {
     console.warn("Movimientos_Stock recepcion (queda pendiente):", e);
     try {
       const p = JSON.parse(localStorage.getItem("vir_stock_pend") || "[]");
-      items.forEach(i => p.push({ cod_art: String(i.cod), descripcion: i.desc || null, deposito: 'a_guardar', delta: i.cajas, tipo: 'recepcion', ref: opState.remito || null, legajo: RECP.legajo || null }));
+      p.push.apply(p, stockRows);   // MISMO client_id → stockFlushPend reintenta idempotente
       localStorage.setItem("vir_stock_pend", JSON.stringify(p.slice(-5000)));
     } catch (_e) {}
   }
