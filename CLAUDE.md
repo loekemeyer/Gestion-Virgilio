@@ -53,34 +53,54 @@ borró). Layout:
 
 ## Agentes diarios + código de 4 dígitos (Telegram)
 
-Loop de dos etapas (tareas programadas, sesión nueva; **solo proponen**, no tocan código):
+Loop de tres etapas (tareas programadas, sesión nueva). Detalle en `docs/AGENTES-DIARIOS.md`.
 
-- **Cada 2 h** — dos agentes generan ideas y las acumulan en `agente_propuestas`
-  (`estado='pendiente'`, `enviado_en=null`), sin molestar al usuario:
-  - **`mejoras-virgilio`** → mejoras/funcionalidades.
-  - **`revisor-logica`** → bugs, casos borde e inconsistencias de lógica.
-- **A las 8:00 AR** — el **`curador-telegram`**, parado sobre el repo y sobre todo
-  la `GUIA-PROYECTO.md` (lo que pidió el usuario), revisa TODO lo acumulado sin
-  enviar, **descarta ruido/duplicados/lo que contradice la guía**, arma **una
-  lista definitiva** y la manda por Telegram al privado del usuario (bot
-  `@Faltantes_Virgilio_bot`). Marca las enviadas con `enviado_en=now()` y las
-  descartadas con `estado='descartada'` + `curador_nota`.
+- **Cada 2 h — TODOS los agentes proponen (cada uno en su especialidad) y las
+  ideas se desarrollan solas en su rama.** Participan `mejoras-virgilio`,
+  `revisor-logica`, `auditor-consistencia`, `auditor-supabase`, `guardian-stock`,
+  `guardian-tests`, `revisor-render` y `keeper-guia`. Cada idea nueva entra a
+  `agente_propuestas` (`estado='pendiente'`) y, hasta 5 por corrida, se implementa
+  y verifica en su rama **`idea/<código>`** (queda `estado='lista'`, `rama` seteada).
+  **Nunca** se toca `main`.
+- **A las 8:00 AR — el `curador-telegram` decide qué te llega.** Parado sobre el
+  repo y sobre todo la `GUIA-PROYECTO.md` (lo que pidió el usuario), revisa lo
+  acumulado sin enviar, **descarta ruido/duplicados/lo que contradice la guía**,
+  arma **una lista definitiva** y la manda por Telegram al privado del usuario
+  (bot `@Faltantes_Virgilio_bot`). Marca enviadas (`enviado_en=now()`) y
+  descartadas (`estado='descartada'` + `curador_nota`).
 
 Cada propuesta tiene un **código de 4 dígitos** único.
 
-**⚠ Regla para CUALQUIER chat**: si el usuario manda un **código de 4 dígitos**
-(ej. `4837`, "hacé el 4837", "código 4837"), buscá esa fila:
+### ⚠ Reglas para CUALQUIER chat sobre este repo
+
+**Comando `:`** — si el usuario escribe un mensaje que es (o empieza con) `:`,
+mostrale **todas las ideas creadas** como **checklist, de a 5** (paginá de 5 en 5),
+para que marque cuáles confirma. Traelas así:
 
 ```sql
-select codigo, agente, titulo, detalle, ubicacion, impacto, esfuerzo, estado
-from public.agente_propuestas where codigo = '4837';
+select codigo, estado, agente, impacto, titulo, rama
+from public.agente_propuestas
+where estado in ('pendiente','lista') order by creado_en desc;
 ```
 
-Trabajá sobre esa propuesta. Los cambios de código van **a `main` SOLO con
-aprobación explícita del usuario** (él decide qué código encarar). Al terminar y
-con su OK, marcá `update public.agente_propuestas set estado='hecha',
-actualizado_en=now() where codigo='4837';` (o `'descartada'` si el usuario la
-descarta). Detalle del sistema en `docs/AGENTES-DIARIOS.md`.
+Mostralas como `[ ] 4837 · [logica·alto] Título (rama idea/4837)`. El usuario
+tilda las que quiere → tratá cada tildada como "idea aceptada" (regla de abajo).
+
+**Idea aceptada (por número o tildada en el checklist)** — cuando el usuario diga
+un **código de 4 dígitos** (`4837`, "hacé el 4837", "acepto 4837") o tilde ideas
+en el checklist, por cada código aceptado **mergealo a `main` directamente**:
+
+1. `select codigo, titulo, estado, rama from public.agente_propuestas where codigo='4837';`
+2. Si `estado='lista'` y tiene `rama`: `git fetch origin && git checkout main &&
+   git pull origin main && git merge --no-ff origin/idea/4837 && git push origin main`.
+   Si hay conflicto por drift de main, resolvé o rebasá la rama sobre main y reintentá.
+3. Si `estado='pendiente'` (todavía sin rama): desarrollala vos ahora en `idea/4837`,
+   verificá (`node --check` + smoke headless), y mergeala a main igual.
+4. Marcá `update public.agente_propuestas set estado='hecha', actualizado_en=now()
+   where codigo='4837';`. Si el usuario la rechaza → `estado='descartada'`.
+
+El merge a `main` es **directo, sin mostrar diff** (así lo pidió el usuario), salvo
+que en el momento pida verlo.
 
 ## Git
 
