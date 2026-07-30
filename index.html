@@ -8415,11 +8415,22 @@ function _stockNormRows(rows) {
   const all = Object.keys(keys);
   return rows.map(function (r) { const o = {}; all.forEach(function (k) { o[k] = (k in r) ? r[k] : null; }); return o; });
 }
+/* idea 5490 — id único y estable por fila de movimiento de stock. Con el índice único
+   parcial `mov_stock_clientid_dedup` (client_id) + `resolution=ignore-duplicates`, el
+   insert es IDEMPOTENTE: si el POST llegó al server pero la respuesta se perdió (wifi
+   inestable), el reintento desde `vir_stock_pend` reusa el MISMO client_id → ON CONFLICT
+   DO NOTHING → no vuelve a sumar cajas. Cubre recepcion/ajuste/guardado/entrega_envasar
+   (picking/separado/facturado ya tenían dedup por clave natural ref,cod,deposito,tipo). */
+function _stockClientId() {
+  try { if (typeof crypto !== "undefined" && crypto.randomUUID) return "mst_" + crypto.randomUUID(); } catch (_e) {}
+  return "mst_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 10);
+}
 function stockMove(rows) {
   if (!rows || !rows.length) return Promise.resolve();
   if (esOperadorPrueba()) { try { console.warn("[PRUEBA] stockMove NO persistido (operador de prueba)"); } catch (_e) {} return Promise.resolve(); }
+  for (var _i = 0; _i < rows.length; _i++) { if (!rows[_i].client_id) rows[_i].client_id = _stockClientId(); }   // idea 5490: idempotencia
   const norm = _stockNormRows(rows);
-  const headers = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" };
+  const headers = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal,resolution=ignore-duplicates" };
   return fetch(SUPABASE_STOCK_ENDPOINT, { method: "POST", headers: headers, body: JSON.stringify(norm) })
     .then(function (r) {
       if (r.ok) return;
@@ -8433,7 +8444,7 @@ function stockMove(rows) {
 function stockFlushPend() {
   let p = []; try { p = JSON.parse(localStorage.getItem("vir_stock_pend") || "[]"); } catch (_e) {}
   if (!p.length) return;
-  fetch(SUPABASE_STOCK_ENDPOINT, { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" }, body: JSON.stringify(_stockNormRows(p)) })
+  fetch(SUPABASE_STOCK_ENDPOINT, { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal,resolution=ignore-duplicates" }, body: JSON.stringify(_stockNormRows(p)) })   // idea 5490: reintento idempotente por client_id
     .then(function (r) { if (r.ok) { try { localStorage.removeItem("vir_stock_pend"); } catch (_e) {} } })
     .catch(function () {});
 }
