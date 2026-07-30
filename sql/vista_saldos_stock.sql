@@ -20,7 +20,7 @@ with (security_invoker=true) as
    SELECT (SELECT "Stock_Config".valor FROM "Stock_Config" WHERE "Stock_Config".clave = 'cutoff_ts' LIMIT 1) AS cutoff
  )
  SELECT m.cod_art,
-   max(m.descripcion) FILTER (WHERE COALESCE(TRIM(BOTH FROM m.descripcion), '') <> '') AS descripcion,
+   (array_agg(m.descripcion ORDER BY length(m.descripcion), m.descripcion) FILTER (WHERE COALESCE(TRIM(BOTH FROM m.descripcion), '') <> ''))[1] AS descripcion,
    COALESCE(sum(m.delta) FILTER (WHERE m.deposito = 'terminado'), 0::numeric)       AS terminado,
    COALESCE(sum(m.delta) FILTER (WHERE m.deposito = 'excedente'), 0::numeric)        AS excedente,
    COALESCE(sum(m.delta) FILTER (WHERE m.deposito = 'separar_pedidos'), 0::numeric)  AS separar_pedidos,
