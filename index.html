@@ -2962,6 +2962,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
     <button class="fac-btn-cierre" id="facBtnCierre" disabled onclick="generateFacturacionPDF()">Terminé — Generar PDF</button>
     <button onclick="openRuteo()" style="width:100%;margin-top:8px;padding:13px;border:none;border-radius:10px;background:#0f766e;color:#fff;font-size:15px;font-weight:800;cursor:pointer">🗺️ Armar ruta de reparto de mañana</button>
     <div id="facTickedList" class="fac-ticked-list" style="display:none"></div>
+    <button onclick="facNCOpen()" title="Anular una factura ya emitida con una Nota de Crédito" style="flex:0 0 100%;width:100%;margin-top:4px;padding:9px;border:1px solid #fecaca;border-radius:10px;background:#fff;color:#b91c1c;font-size:13px;font-weight:800;cursor:pointer">🧾 Anular factura (Nota de Crédito)</button>
   </div>
   <div class="fac-toast" id="facToast"></div>
 </div>
@@ -5635,7 +5636,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v6.63";
+const APP_VERSION = "v6.64";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -20980,6 +20981,60 @@ function facFCEnsureModal(){
   return ov;
 }
 window.facFCClose = function(){ var ov = document.getElementById("facFCOverlay"); if (ov) ov.classList.remove("show"); };
+/* v6.64: Anular una factura ya emitida con Nota de Crédito. Usa la acción emitir_nc del
+   arca-wsfe (busca la factura por NP o CAE y emite la NC A por el mismo importe). */
+function facNCEnsure(){
+  var ov = document.getElementById("facNCOverlay");
+  if (ov) return ov;
+  ov = document.createElement("div");
+  ov.id = "facNCOverlay"; ov.className = "facfc-ov";
+  ov.innerHTML = '<div class="facfc-card"><div class="facfc-head" style="background:linear-gradient(90deg,#b91c1c,#dc2626)"><span class="facfc-title">🧾 Anular factura — Nota de Crédito</span><button class="facfc-x" onclick="facNCClose()">✕</button></div><div class="facfc-body" id="facNCBody"></div></div>';
+  ov.addEventListener("click", function(e){ if (e.target === ov) facNCClose(); });
+  document.body.appendChild(ov);
+  return ov;
+}
+window.facNCClose = function(){ var ov = document.getElementById("facNCOverlay"); if (ov) ov.classList.remove("show"); };
+window.facNCOpen = function(){
+  var ov = facNCEnsure();
+  var body = document.getElementById("facNCBody");
+  body.innerHTML =
+    '<div class="facfc-sub">Emite una <b>Nota de Crédito A</b> por el mismo importe, que anula la factura en AFIP. No se puede deshacer.</div>' +
+    '<label style="display:block;font-size:12.5px;font-weight:700;color:#334155;margin:6px 0 4px">NP o CAE de la factura a anular</label>' +
+    '<input id="facNCInput" type="text" inputmode="numeric" placeholder="Ej: 98277  ó  86316114309666" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:10px;font-size:15px;box-sizing:border-box" />' +
+    '<div class="facfc-actions"><button class="facfc-cancel" onclick="facNCClose()">Cancelar</button><button class="facfc-go" id="facNCGo" style="background:#dc2626">Anular (emitir NC)</button></div>' +
+    '<div class="facfc-note" id="facNCNote"></div>';
+  ov.classList.add("show");
+  var go = document.getElementById("facNCGo");
+  if (go) go.onclick = facNCEmitir;
+  var inp = document.getElementById("facNCInput"); if (inp) inp.focus();
+};
+async function facNCEmitir(){
+  var inp = document.getElementById("facNCInput");
+  var val = ((inp && inp.value) || "").trim();
+  if (!val){ if (typeof facShowToast === "function") facShowToast("Poné la NP o el CAE"); return; }
+  // CAE = 14 dígitos; si no, lo tratamos como NP.
+  var payload = /^\d{14}$/.test(val) ? { cae: val } : { np: val };
+  if (!confirm("¿Emitir una Nota de Crédito que ANULA la factura " + val + "?\n\nEs real y no se puede deshacer.")) return;
+  var go = document.getElementById("facNCGo");
+  if (go){ go.disabled = true; go.textContent = "Emitiendo NC…"; }
+  var r = await arcaCall("emitir_nc", payload);
+  var d = r.data || {};
+  var body = document.getElementById("facNCBody");
+  if (d.ok && d.cae){
+    var an = d.anula || {};
+    body.innerHTML = '<div class="facfc-ok"><div class="facfc-ok-ico">✅</div>' +
+      '<div class="facfc-ok-t">Nota de Crédito ' + escapeHtml(String(d.letra || "A")) + ' emitida</div>' +
+      '<div class="facfc-ok-cae">CAE <b>' + escapeHtml(String(d.cae)) + '</b></div>' +
+      '<div class="facfc-ok-meta">NC N° ' + escapeHtml(String(d.nro_cbte)) + ' · PDV ' + escapeHtml(String(d.pto_vta)) + '</div>' +
+      '<div class="facfc-ok-meta">Anula la factura N° ' + escapeHtml(String(an.nro_cbte || "")) + (an.np ? ' (NP ' + escapeHtml(String(an.np)) + ')' : '') + '</div>' +
+      '<div class="facfc-actions"><button class="facfc-cancel" onclick="facNCClose()">Cerrar</button></div></div>';
+  } else {
+    if (go){ go.disabled = false; go.textContent = "Anular (emitir NC)"; }
+    var msg = d.nota || d.error || d.obs || ("No se pudo emitir la NC (HTTP " + r.status + ").");
+    var note = document.getElementById("facNCNote");
+    if (note){ note.textContent = "⚠ " + String(msg); note.style.color = "#b91c1c"; note.style.fontWeight = "700"; }
+  }
+}
 window.facFacturarNP = async function(btn){
   var args;
   try { args = JSON.parse(btn.dataset.args); }
