@@ -37,10 +37,17 @@ const WS_URLS = {
   },
 };
 
+// CORS abierto: la app (github.io) llama a la función (supabase.co) = cross-origin.
+// ⚠ Producción: restringir Access-Control-Allow-Origin al origen de la app + verify_jwt=on.
+const CORS: Record<string, string> = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "content-type, authorization, apikey",
+  "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
+};
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { "Content-Type": "application/json", "Connection": "keep-alive" },
+    headers: { "Content-Type": "application/json", "Connection": "keep-alive", ...CORS },
   });
 }
 
@@ -288,6 +295,7 @@ async function preciarNp(c: Cfg, np: string, tanda: string): Promise<any> {
 
 // ───────────────────────── handler ─────────────────────────
 Deno.serve(async (req: Request): Promise<Response> => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   const c = readConfig();
   const miss = missingSecrets(c);
   let body: Record<string, unknown> = {};

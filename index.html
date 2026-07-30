@@ -2643,6 +2643,38 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
   padding: 1px 10px; font-size: 13px; font-weight: bold; cursor: pointer;
   transition: background .15s, transform .1s; line-height: 1.4;
 }
+/* v6.51 — 2ª tilde: facturar electrónicamente (ARCA) */
+.fac-btn-fc{ margin-left:5px; border:1px solid #c7d2fe; background:#eef2ff; color:#3730a3; border-radius:6px; padding:1px 8px; font-size:13px; cursor:pointer; line-height:1.4; }
+.fac-btn-fc:hover{ background:#e0e7ff; border-color:#818cf8; }
+.facfc-ov{ position:fixed; inset:0; background:rgba(2,6,23,.6); z-index:1500; display:none; align-items:flex-start; justify-content:center; padding:24px 12px; overflow:auto; }
+.facfc-ov.show{ display:flex; }
+.facfc-card{ background:#fff; border-radius:16px; width:100%; max-width:440px; box-shadow:0 24px 70px rgba(0,0,0,.5); overflow:hidden; }
+.facfc-head{ display:flex; align-items:center; justify-content:space-between; padding:13px 16px; background:linear-gradient(90deg,#3730a3,#4f46e5); color:#fff; }
+.facfc-title{ font-size:16px; font-weight:800; }
+.facfc-x{ background:rgba(255,255,255,.2); border:none; color:#fff; width:28px; height:28px; border-radius:8px; font-weight:800; cursor:pointer; }
+.facfc-body{ padding:15px 16px; }
+.facfc-loading{ padding:26px; text-align:center; color:#64748b; font-weight:700; }
+.facfc-cli{ font-size:15px; color:#0f172a; }
+.facfc-sub{ font-size:12px; color:#64748b; margin:2px 0 10px; font-weight:700; }
+.facfc-tblwrap{ border:1px solid #e2e8f0; border-radius:10px; overflow:hidden; margin-bottom:10px; }
+table.facfc-tbl{ width:100%; border-collapse:collapse; font-size:13px; }
+table.facfc-tbl th{ text-align:left; background:#f1f5f9; color:#64748b; font-size:11px; text-transform:uppercase; font-weight:800; padding:7px 10px; }
+table.facfc-tbl td{ padding:6px 10px; border-top:1px solid #eef2f6; }
+table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-numeric:tabular-nums; }
+.facfc-cod{ font-family:Consolas,Menlo,monospace; font-weight:800; }
+.facfc-warn{ background:#fff7ed; border:1px solid #fdba74; color:#9a3412; border-radius:9px; padding:8px 11px; font-size:12.5px; font-weight:700; margin-bottom:10px; }
+.facfc-tot{ display:flex; gap:14px; justify-content:flex-end; align-items:baseline; flex-wrap:wrap; font-size:13px; color:#334155; padding-top:6px; border-top:1px solid #e2e8f0; }
+.facfc-tot .facfc-total{ font-size:16px; font-weight:900; color:#0f172a; }
+.facfc-actions{ display:flex; gap:10px; justify-content:flex-end; margin-top:14px; }
+.facfc-cancel{ padding:10px 16px; border:1px solid #cbd5e1; background:#fff; border-radius:10px; font-weight:800; color:#334155; cursor:pointer; }
+.facfc-go{ padding:10px 18px; border:none; background:#4f46e5; color:#fff; border-radius:10px; font-weight:900; cursor:pointer; }
+.facfc-go:disabled{ opacity:.45; cursor:default; }
+.facfc-note{ font-size:11px; color:#94a3b8; text-align:center; margin-top:10px; }
+.facfc-errbox{ text-align:center; padding:10px; } .facfc-err-ico{ font-size:30px; }
+.facfc-ok{ text-align:center; } .facfc-ok-ico{ font-size:40px; }
+.facfc-ok-t{ font-size:18px; font-weight:900; color:#15803d; margin:4px 0; }
+.facfc-ok-cae{ font-size:16px; color:#0f172a; margin:6px 0; } .facfc-ok-cae b{ font-family:Consolas,Menlo,monospace; letter-spacing:1px; }
+.facfc-ok-meta{ font-size:12.5px; color:#64748b; }
 .fac-btn-tick:hover{ background: #15803d; }
 .fac-btn-tick:active{ transform: scale(.93); }
 .fac-empty{ padding: 32px 20px; text-align: center; color: #64748b; font-size: 15px; background: #fff; border-radius: 8px; border: 1px solid #cbd5e1; }
@@ -5566,7 +5598,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v6.50";
+const APP_VERSION = "v6.51";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -20681,7 +20713,7 @@ function facRender(tandas){
           if (esSuper) { const c = _facCajas.get(np); return (!c) ? '<span class="fac-lios0">—</span>' : (escapeHtml(String(Math.round(c))) + ' <small style="font-weight:600;color:#64748b">cj</small>'); }
           const v = _facLios.get(np); return (v == null) ? '<span class="fac-lios0">—</span>' : escapeHtml(String(v));
         })()}</td>
-        <td class="center"><button class="fac-btn-tick" data-args='${args}' onclick="facTickNP(this)">✓</button></td>
+        <td class="center"><button class="fac-btn-tick" data-args='${args}' onclick="facTickNP(this)">✓</button><button class="fac-btn-fc" data-args='${args}' onclick="facFacturarNP(this)" title="Facturar electrónicamente (ARCA)">🧾</button></td>
       </tr>`;
   }).join("");
 
@@ -20782,6 +20814,90 @@ function facEmitOverride(np, tanda, rs, items){
   if (typeof trySendOneReport === "function") trySendOneReport(payload).then(function(r){ if (r && r.ok && typeof removeFromQueue === "function") removeFromQueue(payload.id); }).catch(function(){});
 }
 
+/* ===== v6.51 — Facturación electrónica (ARCA): 2ª tilde 🧾 en Facturación =====
+   Preview (preciar) → confirmar → emitir_np → CAE. El importe se calcula SERVER-SIDE en la
+   Edge Function arca-wsfe (ítems de Entregas_Virgilio × precios del proyecto web). Por ahora
+   HOMOLOGACIÓN (sin validez fiscal). Factura A por defecto. */
+var ARCA_FN_URL = SUPABASE_URL + "/functions/v1/arca-wsfe";
+async function arcaCall(action, payload){
+  try {
+    var res = await fetch(ARCA_FN_URL, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(Object.assign({ action: action }, payload || {}))
+    });
+    var data = null; try { data = await res.json(); } catch(_e){}
+    return { status: res.status, data: data };
+  } catch(e){
+    return { status: 0, data: { error: "red", nota: "No se pudo conectar con la función (" + String((e && e.message) || e) + ")." } };
+  }
+}
+function facFmtMoney(n){ var v = Number(n) || 0; return "$" + v.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function facFCEnsureModal(){
+  var ov = document.getElementById("facFCOverlay");
+  if (ov) return ov;
+  ov = document.createElement("div");
+  ov.id = "facFCOverlay"; ov.className = "facfc-ov";
+  ov.innerHTML = '<div class="facfc-card"><div class="facfc-head"><span class="facfc-title">🧾 Facturar electrónicamente</span><button class="facfc-x" onclick="facFCClose()">✕</button></div><div class="facfc-body" id="facFCBody"></div></div>';
+  ov.addEventListener("click", function(e){ if (e.target === ov) facFCClose(); });
+  document.body.appendChild(ov);
+  return ov;
+}
+window.facFCClose = function(){ var ov = document.getElementById("facFCOverlay"); if (ov) ov.classList.remove("show"); };
+window.facFacturarNP = async function(btn){
+  var args;
+  try { args = JSON.parse(btn.dataset.args); }
+  catch(e){ if (typeof facShowToast === "function") facShowToast("Error leyendo NP"); return; }
+  facFCOpen(args.np, args.tanda, args.rs || "");
+};
+async function facFCOpen(np, tanda, rs){
+  var ov = facFCEnsureModal();
+  var body = document.getElementById("facFCBody");
+  body.innerHTML = '<div class="facfc-loading">Calculando importe de la NP ' + escapeHtml(String(np)) + '…</div>';
+  ov.classList.add("show");
+  var r = await arcaCall("preciar", { np: np, tanda: tanda });
+  var d = r.data || {};
+  if (!d.detalle || d.error){
+    var em = d.nota || d.error || ("No se pudo calcular (HTTP " + r.status + ").");
+    body.innerHTML = '<div class="facfc-errbox"><div class="facfc-err-ico">⚠</div><div>' + escapeHtml(String(em)) + '</div>' +
+      '<div class="facfc-actions"><button class="facfc-cancel" onclick="facFCClose()">Cerrar</button></div></div>';
+    return;
+  }
+  var filas = (d.detalle || []).map(function(it){
+    return '<tr><td class="facfc-cod">' + escapeHtml(String(it.cod)) + '</td><td class="num">' + it.cajas + '×' + it.uxb + '</td><td class="num">' + facFmtMoney(it.precio_unit) + '</td><td class="num">' + facFmtMoney(it.neto_linea) + '</td></tr>';
+  }).join("");
+  var faltan = d.faltan || [];
+  var puede = faltan.length === 0 && (Number(d.neto) > 0) && !!d.cuit;
+  var h = '';
+  h += '<div class="facfc-cli"><b>' + escapeHtml(d.cliente || rs || ("Cliente " + (d.cod_cliente || ""))) + '</b>' + (d.cuit ? ' · CUIT ' + escapeHtml(String(d.cuit)) : '') + '</div>';
+  h += '<div class="facfc-sub">NP ' + escapeHtml(String(np)) + (tanda ? ' · Tanda ' + escapeHtml(String(tanda)) : '') + ' · Factura A</div>';
+  h += '<div class="facfc-tblwrap"><table class="facfc-tbl"><thead><tr><th>Cód</th><th class="num">Cajas×u</th><th class="num">P.unit</th><th class="num">Neto</th></tr></thead><tbody>' + filas + '</tbody></table></div>';
+  if (faltan.length) h += '<div class="facfc-warn">⚠ Sin precio en el maestro web: <b>' + faltan.map(function(x){ return escapeHtml(String(x)); }).join(", ") + '</b>. No se puede facturar hasta cargarlos.</div>';
+  h += '<div class="facfc-tot"><span>Neto ' + facFmtMoney(d.neto) + '</span><span>IVA 21% ' + facFmtMoney(d.iva) + '</span><span class="facfc-total">TOTAL ' + facFmtMoney(d.total) + '</span></div>';
+  h += '<div class="facfc-actions"><button class="facfc-cancel" onclick="facFCClose()">Cancelar</button><button class="facfc-go" id="facFCGo"' + (puede ? '' : ' disabled') + '>Facturar (pedir CAE)</button></div>';
+  h += '<div class="facfc-note">Homologación — sin validez fiscal (prueba).</div>';
+  body.innerHTML = h;
+  var go = document.getElementById("facFCGo");
+  if (go && puede) go.onclick = function(){ facFCEmitir(go, np, tanda); };
+}
+async function facFCEmitir(go, np, tanda){
+  go.disabled = true; var prev = go.textContent; go.textContent = "Pidiendo CAE…";
+  var r = await arcaCall("emitir_np", { np: np, tanda: tanda });
+  var d = r.data || {};
+  if (d.ok && d.cae){
+    var body = document.getElementById("facFCBody");
+    body.innerHTML = '<div class="facfc-ok"><div class="facfc-ok-ico">✅</div>' +
+      '<div class="facfc-ok-t">Factura A autorizada</div>' +
+      '<div class="facfc-ok-cae">CAE <b>' + escapeHtml(String(d.cae)) + '</b></div>' +
+      '<div class="facfc-ok-meta">Comp. N° ' + escapeHtml(String(d.nro_cbte)) + ' · PDV ' + escapeHtml(String(d.pto_vta)) + ' · Vto ' + escapeHtml(String(d.cae_vto || "")) + '</div>' +
+      '<div class="facfc-ok-meta">' + escapeHtml(String(d.cliente || "")) + ' · Total ' + facFmtMoney(d.total) + '</div>' +
+      '<div class="facfc-note">Homologación — sin validez fiscal.</div>' +
+      '<div class="facfc-actions"><button class="facfc-cancel" onclick="facFCClose()">Cerrar</button></div></div>';
+  } else {
+    go.disabled = false; go.textContent = prev;
+    var msg = d.nota || d.error || d.obs || ("No se pudo emitir (HTTP " + r.status + ").");
+    if (typeof facShowToast === "function") facShowToast(String(msg)); else alert(String(msg));
+  }
+}
 window.facTickNP = async function(btn){
   let args;
   try { args = JSON.parse(btn.dataset.args); }

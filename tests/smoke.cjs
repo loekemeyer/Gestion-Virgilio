@@ -43,7 +43,8 @@ catch (_e) {
       "askPickUbicacion", "emitPickUbic", "askArmadoUbicaciones", "emitArmadoUbic",
       "pkForzarGondola", "pkEmitRetiroGondola",
       "pkNpEsLoeke", "pkDualBreakdown", "opDraftSaveQuiet",
-      "emitGuardadoSesion", "stkGRate", "stkGRacksOn", "stkGuardadoToggleRacks", "stkGConfVal"];
+      "emitGuardadoSesion", "stkGRate", "stkGRacksOn", "stkGuardadoToggleRacks", "stkGConfVal",
+      "facFacturarNP", "facFCOpen", "facFCEmitir", "facFCClose", "arcaCall", "facFmtMoney", "facFCEnsureModal"];
     const missing = need.filter((n) => typeof window[n] !== "function");
     const ts = new Date().toISOString();
     const sal = stockComputeSaldos([
