@@ -9,6 +9,9 @@ node --check sw.js
 echo "== checkhtml (sintaxis de los <script> inline) =="
 node tests/checkhtml.cjs
 
+echo "== version-sync (APP_VERSION == SW_VERSION base — evita PWA cacheando app vieja) =="
+node tests/version-sync.cjs
+
 echo "== smoke (Playwright headless) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/smoke.cjs
 
