@@ -862,6 +862,23 @@ async function opEnviar() {
       Remito: opState.remito
     }));
   }
+
+  // idea 9047: dedup de remito. Reenviar el mismo remito (timeout ambiguo / recarga con
+  // mala señal de depósito) duplicaba cajas en Movimientos_Stock y filas de Entregas. Antes
+  // de insertar chequeamos si ese remito ya está cargado para este proveedor/tallerista y
+  // pedimos confirmación. Falla ABIERTO: si el chequeo no se puede hacer (red), no bloquea.
+  if (String(opState.remito || "").trim()) {
+    try {
+      let q = supabase.from(tabla).select("Remito").eq("Remito", opState.remito).limit(1);
+      q = (opState.tipo === 'prov_at') ? q.eq("Proveedor", opState.tallNombre) : q.eq("Codigo_Tall", opState.tallCod);
+      const { data: yaHay } = await q;
+      if (yaHay && yaHay.length) {
+        const ok = confirm("⚠ El remito " + opState.remito + " ya figura cargado para " + opState.tallNombre + ".\n\nSi lo reenviás se DUPLICAN las cajas y el stock.\n\n¿Cargarlo igual?");
+        if (!ok) { btn.disabled = false; btn.textContent = prev; return; }
+      }
+    } catch (_e) { /* chequeo falla abierto: no bloquea la carga */ }
+  }
+
   const { error } = await supabase.from(tabla).insert(rows);
 
   if (error) {
