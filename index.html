@@ -12939,10 +12939,10 @@ function faltPollStart() {
    fecha). Si a las 15:30 está en medio de una tarea, NO lo interrumpe:
    espera a que vuelva a la botonera y recién ahí dispara. Corre en el
    celular del operario (poll cada 25s); el chequeo se auto-limita al
-   legajo 104, así que es inofensivo para el resto.
-   Para cambiar destinatario/hora: editar CP_RECORD_LEGAJO / CP_RECORD_MIN.
+   los legajos de CP_RECORD_LEGAJOS, así que es inofensivo para el resto.
+   Para cambiar destinatarios/hora: editar CP_RECORD_LEGAJOS / CP_RECORD_MIN.
    ============================================================ */
-const CP_RECORD_LEGAJO = "104";              // Jhonny Moncayo
+const CP_RECORD_LEGAJOS = ["104"];           // Jhonny Moncayo (sumar acá otros legajos, ej. la operadora)
 const CP_RECORD_MIN    = 15 * 60 + 30;       // 15:30 (minutos desde 00:00, hora AR)
 let _cpRecordTimer = null;
 function _cpRecordNowAR() {
@@ -12959,15 +12959,16 @@ function cpRecordCheck() {
   try {
     const t = _cpRecordNowAR(); if (!t || !t.ymd) return;
     if (!t.habil || t.min < CP_RECORD_MIN) return;                 // solo días hábiles, de 15:30 en adelante
-    if (_faltMiLegajo() !== CP_RECORD_LEGAJO) return;              // solo Moncayo
+    const _miLeg = _faltMiLegajo();
+    if (CP_RECORD_LEGAJOS.indexOf(_miLeg) < 0) return;             // solo los legajos configurados
     if (!_faltActivo()) return;                                    // en la botonera (no en medio de una tarea)
     const cpOpen = (function () { const m = document.getElementById("cpModal"); return !!(m && m.classList.contains("show")); })();
     if (cpOpen) return;                                            // ya está abierto
-    const key = "vir_cp_record_" + CP_RECORD_LEGAJO + "_" + t.ymd; // dedup: 1 vez por día
+    const key = "vir_cp_record_" + _miLeg + "_" + t.ymd;          // dedup: 1 vez por día POR legajo
     if (localStorage.getItem(key)) return;
     localStorage.setItem(key, "1");
     try { alert("⏰ Es hora de completar los faltantes."); } catch (_e) {}
-    try { showCPModal(CP_RECORD_LEGAJO); } catch (_e) {}
+    try { showCPModal(_miLeg); } catch (_e) {}
   } catch (_e) {}
 }
 function cpRecordStart() {
