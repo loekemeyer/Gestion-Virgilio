@@ -164,6 +164,11 @@ const RCP_CSS = `
 #rcpRoot .histBtns{ display:flex; gap:8px; }
 #rcpRoot .histBtn{ height:44px; padding:0 18px; border-radius:10px; border:2px solid var(--border); background:#fff; font-weight:900; font-size:15px; cursor:pointer; }
 #rcpRoot .histBtn.pri{ background:#111; color:#fff; border-color:#111; }
+/* v6.55: "+" que despliega los filtros extra (Quién entregó / Remito / Cajas mín.) */
+#rcpRoot .histBtn.plus{ padding:0 14px; }
+#rcpRoot .histBtn.plus.on{ border-color:#111; background:#f1f5f9; }
+#rcpRoot .histMore{ display:none; }
+#rcpRoot .histMore.show{ display:flex; }
 #rcpRoot .histPresets{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
 #rcpRoot .histChip{ padding:7px 14px; border-radius:999px; border:2px solid var(--border); background:#fff; font-weight:800; font-size:13px; cursor:pointer; color:#334155; }
 #rcpRoot .histChip:hover{ border-color:#111; }
@@ -1114,7 +1119,12 @@ function renderHistorico() {
       '<div class="histField"><label for="histDesde">Desde</label><input type="date" id="histDesde" class="histDate"></div>' +
       '<div class="histField"><label for="histHasta">Hasta</label><input type="date" id="histHasta" class="histDate"></div>' +
       '<div class="histField"><label for="histCod">Código o quién entregó</label><input type="text" id="histCod" class="histCod" placeholder="ej. 590 o Rafael" inputmode="text" autocomplete="off"></div>' +
-      '<div class="histBtns"><button class="histBtn pri" id="histBuscar">Buscar</button><button class="histBtn" id="histLimpiar">Limpiar</button></div>' +
+      '<div class="histBtns"><button class="histBtn pri" id="histBuscar">Buscar</button><button class="histBtn" id="histLimpiar">Limpiar</button><button class="histBtn plus" id="histMas" title="Más filtros">＋</button></div>' +
+    '</div>' +
+    '<div class="histBar histMore" id="histMore">' +
+      '<div class="histField"><label for="histQuien">Quién entregó</label><input type="text" id="histQuien" class="histCod" placeholder="ej. Pintos" autocomplete="off"></div>' +
+      '<div class="histField"><label for="histRemito">Remito</label><input type="text" id="histRemito" class="histCod" placeholder="ej. 37573" autocomplete="off"></div>' +
+      '<div class="histField"><label for="histCajMin">Cajas mínimas</label><input type="number" id="histCajMin" class="histCod" placeholder="ej. 50" min="0" inputmode="numeric"></div>' +
     '</div>' +
     '<div class="histPresets">' +
       '<button class="histChip" data-preset="hoy">Hoy</button>' +
@@ -1125,12 +1135,22 @@ function renderHistorico() {
     '<div id="histResults"><div class="histLoading">Cargando…</div></div>';
   document.getElementById("histBuscar").onclick = () => histBuscar();
   document.getElementById("histLimpiar").onclick = () => {
-    document.getElementById("histDesde").value = "";
-    document.getElementById("histHasta").value = "";
-    document.getElementById("histCod").value = "";
+    ["histDesde", "histHasta", "histCod", "histQuien", "histRemito", "histCajMin"].forEach(function (id) {
+      const el = document.getElementById(id); if (el) el.value = "";
+    });
     histBuscar();
   };
-  document.getElementById("histCod").onkeydown = (e) => { if (e.key === "Enter") histBuscar(); };
+  // v6.55: "+" despliega/oculta los filtros extra; muestra cuántos están activos.
+  document.getElementById("histMas").onclick = () => {
+    const more = document.getElementById("histMore"), btn = document.getElementById("histMas");
+    if (!more || !btn) return;
+    more.classList.toggle("show");
+    btn.classList.toggle("on", more.classList.contains("show"));
+  };
+  ["histCod", "histQuien", "histRemito", "histCajMin"].forEach(function (id) {
+    const el = document.getElementById(id);
+    if (el) el.onkeydown = (e) => { if (e.key === "Enter") histBuscar(); };
+  });
   document.getElementById("histDesde").onchange = () => histBuscar();
   document.getElementById("histHasta").onchange = () => histBuscar();
   opBody.querySelectorAll(".histChip").forEach(function (ch) {
@@ -1147,10 +1167,16 @@ function renderHistorico() {
   histBuscar();   // primera carga: recepciones recientes
 }
 function histBuscar() {
-  const desde = (document.getElementById("histDesde") || {}).value || "";
-  const hasta = (document.getElementById("histHasta") || {}).value || "";
-  const cod = ((document.getElementById("histCod") || {}).value || "").trim();
-  histLoad({ desde: desde, hasta: hasta, cod: cod });
+  const v = function (id) { return ((document.getElementById(id) || {}).value || "").trim(); };
+  // v6.55: los filtros extra del "+" se COMBINAN (AND) con el buscador principal.
+  const f = { desde: v("histDesde"), hasta: v("histHasta"), cod: v("histCod"),
+              quien: v("histQuien"), remito: v("histRemito"), cajasMin: parseInt(v("histCajMin"), 10) || 0 };
+  const btn = document.getElementById("histMas");
+  if (btn) {
+    const n = (f.quien ? 1 : 0) + (f.remito ? 1 : 0) + (f.cajasMin > 0 ? 1 : 0);
+    btn.textContent = n ? ("＋ (" + n + ")") : "＋";
+  }
+  histLoad(f);
 }
 async function histLoad(f) {
   const box = document.getElementById("histResults");
@@ -1167,9 +1193,15 @@ async function histLoad(f) {
     if (f.desde) qt = qt.gte("Fecha", f.desde);
     if (f.hasta) qt = qt.lte("Fecha", f.hasta);
     if (codN) qt = qt.or("Cod.ilike.%" + codN + "%,Nombre_Tall.ilike.%" + codN + "%");
+    if (f.quien) qt = qt.ilike("Nombre_Tall", "%" + f.quien + "%");
+    if (f.remito) qt = qt.ilike("Remito", "%" + f.remito + "%");
+    if (f.cajasMin > 0) qt = qt.gte("Cajas", f.cajasMin);
     qt = qt.order("Fecha", { ascending: false }).order("created_at", { ascending: false }).limit(HARD);
     let qp = supabase.from("Entregas Prov AT").select("Dia_mes,Proveedor,Cod_Art,Descripcion,Cantidad,Remito");
     if (codN) qp = qp.or("Cod_Art.ilike.%" + codN + "%,Proveedor.ilike.%" + codN + "%");
+    if (f.quien) qp = qp.ilike("Proveedor", "%" + f.quien + "%");
+    if (f.remito) qp = qp.ilike("Remito", "%" + f.remito + "%");
+    if (f.cajasMin > 0) qp = qp.gte("Cantidad", f.cajasMin);
     qp = qp.limit(HARD);
 
     const [rt, rp] = await Promise.all([qt, qp]);
