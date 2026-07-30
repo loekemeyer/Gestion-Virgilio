@@ -6670,6 +6670,17 @@ async function supaFetchAll(endpoint, query) {
   return out;
 }
 
+/* idea 2941 — variante de supaFetchAll que NUNCA tira: devuelve [] ante cualquier
+   error de red/HTTP. Sirve para reemplazar los fetch crudos con
+   `.then(r=>r.ok?r.json():[]).catch(()=>[])` en Promise.all SIN cambiar su semántica
+   (degradan a lista vacía), pero paginando con Range → trae TODO. Necesario en las
+   lecturas catálogo-completo (Capacidad_Sector, OC_Maximos) que crecen hacia el corte
+   de 1000 filas de PostgREST (limit=N no lo evita; ya mordió en v5.41/v5.42). */
+async function supaFetchAllSafe(endpoint, query) {
+  try { return await supaFetchAll(endpoint, query); }
+  catch (_e) { return []; }
+}
+
 /* Base de pedidos (picking) desde Supabase (PPP_Base_Pedidos). Cache 5 min. v5.34. */
 async function fetchPickingBase() {
   const now = Date.now();
@@ -8504,8 +8515,7 @@ async function loadCodCanon() {
   if (_codCanon) return _codCanon;
   const m = {};
   try {
-    const r = await fetch(SUPABASE_OCMAX_ENDPOINT + "?select=cod&activo=eq.true&limit=20000", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
-    if (r.ok) (await r.json()).forEach(function (x) {
+    (await supaFetchAllSafe(SUPABASE_OCMAX_ENDPOINT, "select=cod&activo=eq.true")).forEach(function (x) {
       const raw = String(x.cod == null ? "" : x.cod).toUpperCase().trim(); if (!raw) return;
       const k = _ocgNorm(raw); if (!k) return;
       // Si hay más de una variante para la clave, preferí la que trae ceros a la izq / la más larga.
@@ -8531,7 +8541,7 @@ async function openStockAdmin(soloConteo) {
   ov.innerHTML = '<div class="stk-card"><div class="stk-head"><span class="stk-title">' + (_solo ? "📋 Conteo de stock" : "📦 Stock y Compras") + '</span><button class="stk-close" onclick="closeStockAdmin()">Cerrar</button></div><div class="stk-tabs" id="stkTabs"></div><div class="stk-body" id="stkBody"><div class="stk-loading">Cargando…</div></div></div>';
   try {
     const res = await Promise.all([stockFetchMovs(), stockGetCutoff(), stockFetchArtFactors(), racksFetchOrdenes(), racksFetchBajadas(), loadArtNombres(), ocgDemanda().catch(function(){ return {}; }),
-      fetch(SUPABASE_CAPACIDAD_ENDPOINT + "?select=sector,cod,cajas_max&limit=50000", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; }),
+      supaFetchAllSafe(SUPABASE_CAPACIDAD_ENDPOINT, "select=sector,cod,cajas_max"),
       fetch(SUPABASE_URL + "/rest/v1/Stock_Config?clave=in.(guardado_cajas_por_hora,guardado_incluir_racks)&select=clave,valor", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; })]);
     _stk = { movs: res[0] || [], cutoff: res[1], factors: res[2] || {}, ordenes: res[3] || [], bajadas: res[4] || [], tab: _solo ? "conteo" : "stocks", soloConteo: _solo, filtro: "", openArt: null, ingMode: "remito", asOf: null, asOfInput: "", dem: res[6] || {}, cap: res[7] || [], gConf: res[8] || [] };
     stkRender();
@@ -8796,8 +8806,7 @@ const SUPABASE_CAPACIDAD_ENDPOINT = SUPABASE_URL + "/rest/v1/Capacidad_Sector";
 const OCG_INTERNOS = ["RACKS", "LOG/ FABR", "LOG/FABR", "LOG/ FABRICA"];
 function _ocgInterno(prov) { return OCG_INTERNOS.indexOf(String(prov || "").toUpperCase().trim()) >= 0; }
 async function ocgFetchMaximos() {
-  const r = await fetch(SUPABASE_OCMAX_ENDPOINT + "?select=cod,descripcion,linea,max_cajas,proveedor,uni_x_caja,indice&activo=eq.true&limit=20000", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
-  return r.ok ? r.json() : [];
+  return supaFetchAllSafe(SUPABASE_OCMAX_ENDPOINT, "select=cod,descripcion,linea,max_cajas,proveedor,uni_x_caja,indice&activo=eq.true");
 }
 /* v4.17: máximo del generador = proyección por tendencia (PaginaLK) × 1,5. La proyección se
    sincroniza mensual a la tabla proyeccion_madre (cod normalizado sin ceros a la izquierda). */
@@ -8817,8 +8826,7 @@ async function ocgFetchProyeccion() {
    Sirve de TOPE del máximo de OC: no pedir más de lo que entra en góndola. */
 async function ocgFetchCapacidad() {
   try {
-    const r = await fetch(SUPABASE_CAPACIDAD_ENDPOINT + "?select=cod,cajas_max&limit=50000", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
-    const rows = r.ok ? await r.json() : [];
+    const rows = await supaFetchAllSafe(SUPABASE_CAPACIDAD_ENDPOINT, "select=cod,cajas_max");
     const m = {};
     rows.forEach(function (x) { const k = _ocgNorm(x.cod); if (k) m[k] = (m[k] || 0) + (Number(x.cajas_max) || 0); });
     return m;
@@ -10637,14 +10645,13 @@ async function stkCapLoad() {
   if (!_stk) return;
   _stk.capLoaded = "loading"; stkRender();
   try {
-    const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
     const res = await Promise.all([
-      fetch(SUPABASE_CAPACIDAD_ENDPOINT + "?select=sector,cod,cajas_max&limit=50000", { headers: H, cache: "no-store" }),
-      fetch(SUPABASE_OCMAX_ENDPOINT + "?select=cod,descripcion,max_cajas,indice&limit=20000", { headers: H, cache: "no-store" }),
+      supaFetchAllSafe(SUPABASE_CAPACIDAD_ENDPOINT, "select=sector,cod,cajas_max"),
+      supaFetchAllSafe(SUPABASE_OCMAX_ENDPOINT, "select=cod,descripcion,max_cajas,indice"),
       ocgFetchProyeccion()
     ]);
-    _stk.cap  = res[0].ok ? await res[0].json() : [];
-    _stk.cmax = res[1].ok ? await res[1].json() : [];
+    _stk.cap  = res[0] || [];
+    _stk.cmax = res[1] || [];
     _stk.cproy = res[2] || {};
     _stk.capLoaded = true;
   } catch (_e) { _stk.cap = _stk.cap || []; _stk.cmax = _stk.cmax || []; _stk.cproy = _stk.cproy || {}; _stk.capLoaded = true; }
@@ -11014,7 +11021,7 @@ function stkUnits(cajas, cod, factors) {
    y arma el resumen "¿cuántos palets vacíos entran hoy?" + simulador de importación
    + lista de posiciones por liberarse (poca mercadería). Solo lectura (anon SELECT). */
 const SUPABASE_RACKS_PLANI_ENDPOINT = SUPABASE_URL + "/rest/v1/Racks_Planimetria";
-async function racksFetchPlani() { try { const r = await fetch(SUPABASE_RACKS_PLANI_ENDPOINT + "?select=sector,emp,cod_art,master_cajas,innercajas,estado&limit=5000", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" }); return r.ok ? r.json() : []; } catch (_e) { return []; } }
+async function racksFetchPlani() { return supaFetchAllSafe(SUPABASE_RACKS_PLANI_ENDPOINT, "select=sector,emp,cod_art,master_cajas,innercajas,estado"); }
 async function stkPlaniLoad() {
   if (!_stk) return;
   _stk.planiLoaded = "loading"; stkRender();
@@ -11022,7 +11029,7 @@ async function stkPlaniLoad() {
   try {
     const res = await Promise.all([
       racksFetchPlani(),
-      _stk.cap ? Promise.resolve(_stk.cap) : fetch(SUPABASE_CAPACIDAD_ENDPOINT + "?select=sector,cod,cajas_max&limit=50000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; }),
+      _stk.cap ? Promise.resolve(_stk.cap) : supaFetchAllSafe(SUPABASE_CAPACIDAD_ENDPOINT, "select=sector,cod,cajas_max"),
       fetch(SUPABASE_URL + "/rest/v1/Stock_Config?clave=eq.bajada_auto_racks&select=valor", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; })
     ]);
     _stk.plani = res[0] || [];
