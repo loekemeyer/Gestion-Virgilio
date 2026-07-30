@@ -1113,7 +1113,7 @@ function renderHistorico() {
     '<div class="histBar">' +
       '<div class="histField"><label for="histDesde">Desde</label><input type="date" id="histDesde" class="histDate"></div>' +
       '<div class="histField"><label for="histHasta">Hasta</label><input type="date" id="histHasta" class="histDate"></div>' +
-      '<div class="histField"><label for="histCod">Código</label><input type="text" id="histCod" class="histCod" placeholder="ej. 590" inputmode="text" autocomplete="off"></div>' +
+      '<div class="histField"><label for="histCod">Código o quién entregó</label><input type="text" id="histCod" class="histCod" placeholder="ej. 590 o Rafael" inputmode="text" autocomplete="off"></div>' +
       '<div class="histBtns"><button class="histBtn pri" id="histBuscar">Buscar</button><button class="histBtn" id="histLimpiar">Limpiar</button></div>' +
     '</div>' +
     '<div class="histPresets">' +
@@ -1159,15 +1159,17 @@ async function histLoad(f) {
   await sessionReady;
   if (myseq !== _histReqSeq) return;   // ya hay una búsqueda más nueva en curso
   const CAP = 500, HARD = 1000;
-  const codN = f.cod ? f.cod.toUpperCase() : "";
+  // v6.54: un solo buscador — matchea CÓDIGO o QUIÉN ENTREGÓ (tallerista/proveedor).
+  // Se sanea el término (sin comas/paréntesis) porque va dentro de un filtro .or() de PostgREST.
+  const codN = f.cod ? f.cod.toUpperCase().replace(/[,()]/g, " ").trim() : "";
   try {
     let qt = supabase.from("Entregas Tallerista Virgilio").select("Fecha,created_at,Cod,Cajas,Nombre_Tall,Remito");
     if (f.desde) qt = qt.gte("Fecha", f.desde);
     if (f.hasta) qt = qt.lte("Fecha", f.hasta);
-    if (codN) qt = qt.ilike("Cod", "%" + codN + "%");
+    if (codN) qt = qt.or("Cod.ilike.%" + codN + "%,Nombre_Tall.ilike.%" + codN + "%");
     qt = qt.order("Fecha", { ascending: false }).order("created_at", { ascending: false }).limit(HARD);
     let qp = supabase.from("Entregas Prov AT").select("Dia_mes,Proveedor,Cod_Art,Descripcion,Cantidad,Remito");
-    if (codN) qp = qp.ilike("Cod_Art", "%" + codN + "%");
+    if (codN) qp = qp.or("Cod_Art.ilike.%" + codN + "%,Proveedor.ilike.%" + codN + "%");
     qp = qp.limit(HARD);
 
     const [rt, rp] = await Promise.all([qt, qp]);
@@ -1176,10 +1178,12 @@ async function histLoad(f) {
 
     const rows = [];
     const curYear = new Date().getFullYear();
+    // v6.54: fecha SIEMPRE "dd/mm" (antes mezclaba "04/jun/26" y "04/jun").
+    const ddmm = function (ymd) { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd || ""); return m ? (m[3] + "/" + m[2]) : (ymd || "—"); };
     ((rt && rt.data) || []).forEach(function (r) {
       rows.push({
         ymd: r.Fecha || "", ms: r.created_at ? Date.parse(r.created_at) : 0,
-        fechaTxt: fechaCorta(r.Fecha), cod: r.Cod || "—", desc: "",
+        fechaTxt: ddmm(r.Fecha), cod: r.Cod || "—", desc: "",
         cajas: Number(r.Cajas) || 0, quien: displayName(r.Nombre_Tall || "—"),
         remito: r.Remito || "", origen: "tall"
       });
@@ -1193,7 +1197,7 @@ async function histLoad(f) {
       if (f.hasta && ymd && ymd > f.hasta) return;
       rows.push({
         ymd: ymd, ms: 0,
-        fechaTxt: dm ? (dm[1] + "/" + MESES_CORTO[parseInt(dm[2], 10) - 1]) : (r.Dia_mes || "—"),
+        fechaTxt: dm ? (dm[1] + "/" + dm[2]) : (r.Dia_mes || "—"),
         cod: r.Cod_Art || "—", desc: r.Descripcion || "",
         cajas: Number(r.Cantidad) || 0, quien: r.Proveedor || "—",
         remito: r.Remito || "", origen: "prov"
@@ -1221,8 +1225,8 @@ function histRender(rows, CAP, capped) {
     '<th>Fecha</th><th>Código</th><th style="text-align:right">Cajas</th><th>Entregó</th><th>Remito</th>' +
     '</tr></thead><tbody>';
   shown.forEach(function (r) {
-    const who = (r.origen === "prov" ? '<span class="provTag">Prov</span>' : '') + escapeHtmlRcp(r.quien) +
-      (r.desc ? ' <span class="histDesc">· ' + escapeHtmlRcp(r.desc) + '</span>' : '');
+    // v6.54: sin badge "Prov" ni la descripción del artículo — solo el nombre (pedido del dueño).
+    const who = escapeHtmlRcp(r.quien);
     html += '<tr>' +
       '<td class="histFe">' + escapeHtmlRcp(r.fechaTxt) + '</td>' +
       '<td class="histCodCell">' + escapeHtmlRcp(r.cod) + '</td>' +
