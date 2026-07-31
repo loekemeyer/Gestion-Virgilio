@@ -45,7 +45,7 @@ catch (_e) {
       "pkNpEsLoeke", "pkDualBreakdown", "opDraftSaveQuiet",
       "emitGuardadoSesion", "stkGRate", "stkGRacksOn", "stkGuardadoToggleRacks", "stkGConfVal",
       "facFacturarNP", "facFCOpen", "facFCEmitir", "facFCClose", "arcaCall", "facFmtMoney", "facFCEnsureModal",
-      "facNCOpen", "facNCEmitir", "facNCEnsure", "facNCClose", "openAbastecimiento", "abastCompute", "abastRender", "abastToggle", "abastSetFiltro", "_abastEsImportado",
+      "facNCOpen", "facNCEmitir", "facNCEnsure", "facNCClose", "openAbastecimiento", "abastCompute", "abastRender", "abastToggle", "abastSetFiltro", "_abastEsImportado", "_abastCodDisp", "abastToggleMeses",
       "fetchSinSalidaMap", "crMarkSinSalida", "crSendSinSalida", "stkFcsFetch", "stkOpenFcsArt"];
     const missing = need.filter((n) => typeof window[n] !== "function");
     const ts = new Date().toISOString();

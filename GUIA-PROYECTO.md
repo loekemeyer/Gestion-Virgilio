@@ -4,7 +4,15 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-07-31 · Versión app al documentar: **v6.78**
+> Última actualización: 2026-07-31 · Versión app al documentar: **v6.79**
+>
+> Nota: **v6.79 — Abastecimiento: códigos con 0 adelante, estética y meses anteriores**.
+> (1) Los códigos numéricos se muestran a 3 dígitos (`_abastCodDisp`: "31"→"031", "7"→"007";
+> los que tienen letras quedan igual) — display, no cambia joins; el buscador matchea ambas
+> formas. (2) Estética: código como pill, zebra en filas, fila abierta resaltada, tabla con
+> borde/redondeo. (3) El detalle mes a mes muestra los últimos 6 meses con un botón
+> **"▾ ver los N meses"** (`abastToggleMeses`) para ver todo el historial. Bump `APP_VERSION`/
+> `SW_VERSION` `v6.79`.
 >
 > Nota: **v6.78 — Abastecimiento: la "falta de capacidad" ya no suena si hay stock de sobra**.
 > Que un fabricante entregue menos de lo que se vende NO es problema si el stock alcanza para
