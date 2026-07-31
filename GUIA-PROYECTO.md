@@ -58,7 +58,9 @@
 > normaliza `0605`→`605`): **1062500 → 605** ("60 x 2.1", 664 Kg) · **1071500 → 695** ("11 x 0.9",
 > 337 Kg). ⚠ **1060500 → 0565 NO se hizo**: `0565` canoniza a **565** = **"Pinza De Hielo"**,
 > producto de VENTA activo en `OC_Maximos` — renombrar ahí fusionaría el alambre con el producto.
-> Falta código destino alternativo. **(c) Pendiente:** **4496** ("Mango Pelador Ergonómico Negro")
+> **Decisión del dueño:** al ver que en Virgilio el `0` no distingue (`0565`=`565`), **dejar
+> 1060500 con su código actual** (no se renombra). Mismatch conocido: la convención del dueño
+> usa el cero a la izquierda como significativo; Virgilio lo saca (fix histórico 66/066). **(c) Pendiente:** **4496** ("Mango Pelador Ergonómico Negro")
 > y **0666**/`666` ("Mango Pelador 505 Rojo") **no existen** en stock ni catálogo → no hay dónde
 > poner la descripción; falta decidir si se crean (y como qué).
 >
