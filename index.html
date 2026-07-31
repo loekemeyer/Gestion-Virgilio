@@ -5708,7 +5708,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v6.73";
+const APP_VERSION = "v6.74";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -9538,13 +9538,17 @@ function _abastMonthsInfo() {
   const ultimo = isLast ? cur : _mesAdd(cur, -1);
   return { cur: cur, ultimo: ultimo };
 }
-function abastCompute(recep, venta) {
+/* etiquetas de los depósitos que se suman en "stock actual" (todos los puntos de
+   producto terminado; insumos queda afuera: unidades heterogéneas, no son cajas). */
+var ABAST_DEPS = [["terminado", "Góndola"], ["excedente", "Excedente"], ["separar_pedidos", "Pickeados"], ["a_facturar", "A facturar"], ["a_guardar", "A guardar"], ["racks", "Racks"], ["racks_ch", "Racks CH"], ["para_envasar", "P/ envasar"]];
+function abastCompute(recep, venta, sp) {
   const info = _abastMonthsInfo(), ultimo = info.ultimo;
   const tres = [ultimo, _mesAdd(ultimo, -1), _mesAdd(ultimo, -2)];
   const arts = {};
-  const get = function (c) { if (!arts[c]) arts[c] = { cod: c, recepMes: {}, ventaMes: {}, provMes: {}, mesesSet: {} }; return arts[c]; };
+  const get = function (c) { if (!arts[c]) arts[c] = { cod: c, recepMes: {}, ventaMes: {}, provMes: {}, mesesSet: {}, stock: 0, pedidos: 0, npsPed: 0, dep: null, tieneSp: false }; return arts[c]; };
   (recep || []).forEach(function (r) { const c = String(r.cod || "").trim(); if (!c) return; const a = get(c), mes = r.mes, q = Number(r.cajas) || 0; a.recepMes[mes] = (a.recepMes[mes] || 0) + q; a.mesesSet[mes] = 1; if (!a.provMes[mes]) a.provMes[mes] = {}; const pv = (r.proveedor || "(s/nombre)"); a.provMes[mes][pv] = (a.provMes[mes][pv] || 0) + q; });
   (venta || []).forEach(function (r) { const c = String(r.cod || "").trim(); if (!c) return; const a = get(c); a.ventaMes[r.mes] = (a.ventaMes[r.mes] || 0) + (Number(r.cajas) || 0); a.mesesSet[r.mes] = 1; });
+  (sp || []).forEach(function (r) { const c = String(r.cod || "").trim(); if (!c) return; const a = get(c); a.tieneSp = true; a.stock = Number(r.stock_total) || 0; a.pedidos = Number(r.pedidos_ped) || 0; a.npsPed = Number(r.nps_ped) || 0; a.dep = {}; ABAST_DEPS.forEach(function (d) { a.dep[d[0]] = Number(r[d[0]]) || 0; }); });
   const avg3 = function (m) { let s = 0, n = 0; tres.forEach(function (mm) { if (m[mm] != null) { s += m[mm]; n++; } }); return n ? s / n : 0; };
   const rows = Object.keys(arts).map(function (c) {
     const a = arts[c];
@@ -9553,14 +9557,17 @@ function abastCompute(recep, venta) {
     const provs = a.provMes[ultimo] ? Object.keys(a.provMes[ultimo]).map(function (p) { return { nombre: p, cajas: a.provMes[ultimo][p] }; }).sort(function (x, y) { return y.cajas - x.cajas; }) : [];
     // proveedores "activos" (últimos 3 meses) para contar fabricantes reales
     const provSet = {}; tres.forEach(function (mm) { if (a.provMes[mm]) Object.keys(a.provMes[mm]).forEach(function (p) { provSet[p] = 1; }); });
-    return { cod: c, desc: artNombre(c, ""), recUlt: recUlt, venUlt: venUlt, recAvg: recAvg, venAvg: venAvg, provs: provs, nProv: Object.keys(provSet).length, balUlt: recUlt - venUlt, balAvg: recAvg - venAvg, _a: a };
+    // "cuánto necesito para normalizar" = cubrir los pedidos pendientes con el stock actual.
+    // Sólo cuenta si hay pedidos (>0); un saldo negativo sin demanda es una inconsistencia, no una necesidad.
+    const falta = a.pedidos > 0 ? Math.max(0, a.pedidos - a.stock) : 0;
+    return { cod: c, desc: artNombre(c, ""), recUlt: recUlt, venUlt: venUlt, recAvg: recAvg, venAvg: venAvg, provs: provs, nProv: Object.keys(provSet).length, balUlt: recUlt - venUlt, balAvg: recAvg - venAvg, stock: a.stock, pedidos: a.pedidos, npsPed: a.npsPed, dep: a.dep, tieneSp: a.tieneSp, falta: falta, _a: a };
   });
-  return { ultimo: ultimo, cur: info.cur, tres: tres, rows: rows, filtro: "" };
+  return { ultimo: ultimo, cur: info.cur, tres: tres, rows: rows, filtro: "", tab: "fab" };
 }
 async function openAbastecimiento() {
   if (!document.getElementById("abastCss")) {
     const s = document.createElement("style"); s.id = "abastCss";
-    s.textContent = "#abastOverlay{display:none;position:fixed;inset:0;z-index:1280;background:rgba(2,6,23,.74);overflow:auto;padding:14px;}#abastOverlay.show{display:block;}.abast-card{background:#f8fafc;max-width:min(1200px,98vw);margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.abast-head{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:linear-gradient(90deg,#7c3aed,#4c1d95);color:#fff;}.abast-title{font-size:19px;font-weight:800;}.abast-close{background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;width:auto;}.abast-body{padding:14px 16px;}.abast-loading{padding:24px;text-align:center;color:#64748b;}.abast-intro{background:#f5f3ff;border:1px solid #ddd6fe;color:#4c1d95;border-radius:10px;padding:9px 12px;font-size:12.5px;margin-bottom:10px;}.abast-headline{font-size:14px;font-weight:800;margin:6px 0 10px;}.abast-headline .bad{color:#b91c1c;}.abast-headline .ok{color:#15803d;}.abast-filtro{width:100%;height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 11px;font-size:14px;margin-bottom:10px;box-sizing:border-box;}.abast-tblwrap{overflow-x:auto;}.abast-tbl{width:100%;border-collapse:collapse;font-size:13px;}.abast-tbl th{background:#f1f5f9;color:#475569;text-align:right;padding:7px 8px;font-size:10.5px;text-transform:uppercase;border-bottom:1px solid #cbd5e1;white-space:nowrap;vertical-align:bottom;}.abast-tbl th.l{text-align:left;}.abast-tbl td{padding:7px 8px;text-align:right;border-bottom:1px solid #eef2f7;font-variant-numeric:tabular-nums;white-space:nowrap;}.abast-tbl td.l{text-align:left;white-space:normal;}.abast-row{cursor:pointer;}.abast-row:hover td{background:#faf5ff;}.abast-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#6d28d9;}.abast-desc{color:#475569;max-width:200px;overflow:hidden;text-overflow:ellipsis;}.abast-neg{color:#b91c1c;font-weight:800;}.abast-pos{color:#15803d;font-weight:700;}.abast-chip{display:inline-block;border-radius:999px;padding:1px 8px;font-size:11px;font-weight:800;}.abast-chip.bad{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;}.abast-chip.warn{background:#fffbeb;color:#b45309;border:1px solid #fde68a;}.abast-chip.ok{background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0;}.abast-prov{font-size:11px;color:#64748b;}.abast-det td{background:#faf5ff;}.abast-det table{width:auto;border-collapse:collapse;font-size:12px;margin:2px 0;}.abast-det th,.abast-det td{border:1px solid #e9d5ff;padding:3px 8px;text-align:right;}.abast-det th{background:#f5f3ff;color:#6d28d9;}";
+    s.textContent = "#abastOverlay{display:none;position:fixed;inset:0;z-index:1280;background:rgba(2,6,23,.74);overflow:auto;padding:14px;}#abastOverlay.show{display:block;}.abast-card{background:#f8fafc;max-width:min(1200px,98vw);margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.abast-head{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:linear-gradient(90deg,#7c3aed,#4c1d95);color:#fff;}.abast-title{font-size:19px;font-weight:800;}.abast-close{background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;width:auto;}.abast-body{padding:14px 16px;}.abast-loading{padding:24px;text-align:center;color:#64748b;}.abast-seg{display:flex;gap:6px;margin-bottom:10px;}.abast-sbtn{flex:1;background:#ede9fe;border:none;border-radius:9px;padding:8px 10px;font-size:13px;font-weight:800;color:#5b21b6;cursor:pointer;}.abast-sbtn.on{background:#7c3aed;color:#fff;}.abast-intro{background:#f5f3ff;border:1px solid #ddd6fe;color:#4c1d95;border-radius:10px;padding:9px 12px;font-size:12.5px;margin-bottom:10px;}.abast-headline{font-size:14px;font-weight:800;margin:6px 0 10px;}.abast-headline .bad{color:#b91c1c;}.abast-headline .ok{color:#15803d;}.abast-filtro{width:100%;height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 11px;font-size:14px;margin-bottom:10px;box-sizing:border-box;}.abast-tblwrap{overflow-x:auto;}.abast-tbl{width:100%;border-collapse:collapse;font-size:13px;}.abast-tbl th{background:#f1f5f9;color:#475569;text-align:right;padding:7px 8px;font-size:10.5px;text-transform:uppercase;border-bottom:1px solid #cbd5e1;white-space:nowrap;vertical-align:bottom;}.abast-tbl th.l{text-align:left;}.abast-tbl td{padding:7px 8px;text-align:right;border-bottom:1px solid #eef2f7;font-variant-numeric:tabular-nums;white-space:nowrap;}.abast-tbl td.l{text-align:left;white-space:normal;}.abast-row{cursor:pointer;}.abast-row:hover td{background:#faf5ff;}.abast-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#6d28d9;}.abast-desc{color:#475569;max-width:200px;overflow:hidden;text-overflow:ellipsis;}.abast-neg{color:#b91c1c;font-weight:800;}.abast-pos{color:#15803d;font-weight:700;}.abast-chip{display:inline-block;border-radius:999px;padding:1px 8px;font-size:11px;font-weight:800;}.abast-chip.bad{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;}.abast-chip.warn{background:#fffbeb;color:#b45309;border:1px solid #fde68a;}.abast-chip.ok{background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0;}.abast-prov{font-size:11px;color:#64748b;}.abast-det td{background:#faf5ff;}.abast-det table{width:auto;border-collapse:collapse;font-size:12px;margin:2px 0;}.abast-det th,.abast-det td{border:1px solid #e9d5ff;padding:3px 8px;text-align:right;}.abast-det th{background:#f5f3ff;color:#6d28d9;}";
     document.head.appendChild(s);
   }
   let ov = document.getElementById("abastOverlay");
@@ -9572,15 +9579,24 @@ async function openAbastecimiento() {
     const res = await Promise.all([
       fetch(SUPABASE_URL + "/rest/v1/vista_recepcion_mensual?select=cod,mes,proveedor,tipo,cajas,envios&limit=50000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }),
       fetch(SUPABASE_URL + "/rest/v1/vista_venta_mensual?select=cod,mes,cajas,nps&limit=50000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }),
+      fetch(SUPABASE_URL + "/rest/v1/vista_stock_vs_pedidos?select=cod,stock_total,terminado,excedente,separar_pedidos,a_facturar,a_guardar,racks,racks_ch,para_envasar,pedidos_ped,nps_ped&limit=50000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }),
       loadArtNombres()
     ]);
-    _abast = abastCompute(res[0] || [], res[1] || []);
+    _abast = abastCompute(res[0] || [], res[1] || [], res[2] || []);
     abastRender();
   } catch (e) { const b = document.getElementById("abastBody"); if (b) b.innerHTML = '<div class="abast-loading" style="color:#b91c1c">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
 }
 function closeAbastecimiento() { const ov = document.getElementById("abastOverlay"); if (ov) ov.classList.remove("show"); _abast = null; }
+function abastSetTab(t) { if (!_abast) return; _abast.tab = t; _abast.openCod = null; abastRender(); }
 function abastRender() {
   const body = document.getElementById("abastBody"); if (!body || !_abast) return;
+  const tab = _abast.tab || "fab";
+  const seg = '<div class="abast-seg">' +
+    '<button class="abast-sbtn' + (tab === "fab" ? " on" : "") + '" onclick="abastSetTab(\'fab\')">🏭 Fabricación vs Venta</button>' +
+    '<button class="abast-sbtn' + (tab === "stock" ? " on" : "") + '" onclick="abastSetTab(\'stock\')">📦 Stock vs Pedidos</button></div>';
+  body.innerHTML = seg + (tab === "stock" ? abastRenderStock() : abastRenderFab());
+}
+function abastRenderFab() {
   const f = (_abast.filtro || "").toLowerCase().trim();
   let rows = _abast.rows.slice().filter(function (r) { return (r.recUlt || r.venUlt || r.recAvg || r.venAvg); });
   if (f) rows = rows.filter(function (r) { return (r.cod + " " + r.desc).toLowerCase().indexOf(f) >= 0; });
@@ -9625,7 +9641,51 @@ function abastRender() {
     }
   });
   h += '</tbody></table></div>';
-  body.innerHTML = h;
+  return h;
+}
+/* Stock actual (sumado entre TODOS los puntos de stock) vs pedidos pendientes → cuánto falta para normalizar. */
+function abastRenderStock() {
+  const f = (_abast.filtro || "").toLowerCase().trim();
+  let rows = _abast.rows.slice().filter(function (r) { return r.tieneSp && (r.stock || r.pedidos); });
+  if (f) rows = rows.filter(function (r) { return (r.cod + " " + r.desc).toLowerCase().indexOf(f) >= 0; });
+  // Peores primero: los que MÁS falta necesitan; después mayor demanda.
+  rows.sort(function (a, b) { return (b.falta - a.falta) || (b.pedidos - a.pedidos) || String(a.cod).localeCompare(String(b.cod), undefined, { numeric: true }); });
+  const conFalta = rows.filter(function (r) { return r.falta > 0.05; });
+  const totFalta = conFalta.reduce(function (s, r) { return s + r.falta; }, 0);
+  let h = '<div class="abast-intro"><b>Stock actual que tenés</b> (sumado entre TODOS los puntos de stock: góndola, excedente, pickeados, a facturar, a guardar, racks y p/ envasar — <i>no</i> incluye insumos) <b>vs lo que tenés pedido</b> (NP programadas y todavía sin facturar). <b>Falta p/ normalizar</b> = lo que hay que fabricar/reponer para cubrir los pedidos con el stock actual. Tocá una fila para ver en qué depósitos está el stock.</div>';
+  h += '<div class="abast-headline">' + (conFalta.length ? '<span class="bad">⚠ ' + conFalta.length + ' artículo(s) sin stock suficiente para lo pedido</span> — faltan <b>' + _abastN(totFalta) + '</b> cajas en total.' : '<span class="ok">✓ Tenés stock para cubrir todos los pedidos pendientes.</span>') + '</div>';
+  h += '<input class="abast-filtro" type="search" placeholder="🔎 Buscar código / descripción" value="' + escapeHtml(_abast.filtro || "") + '" oninput="if(_abast){_abast.filtro=this.value;abastRender();}">';
+  h += '<div class="abast-tblwrap"><table class="abast-tbl"><thead><tr>' +
+    '<th class="l">Código</th><th class="l">Descripción</th>' +
+    '<th>Stock<br>actual</th><th>Pedido<br>pendiente</th><th>NPs</th>' +
+    '<th>Falta p/<br>normalizar</th><th class="l">Estado</th></tr></thead><tbody>';
+  if (!rows.length) h += '<tr><td colspan="7" class="l" style="color:#64748b;padding:16px">Sin datos de stock/pedidos.</td></tr>';
+  rows.forEach(function (r) {
+    const open = _abast.openCod === r.cod;
+    const estado = r.pedidos <= 0
+      ? '<span class="abast-chip ok">sin pedidos</span>'
+      : (r.falta > 0.05 ? '<span class="abast-chip bad">⚠ Faltan ' + _abastN(r.falta) + '</span>' : '<span class="abast-chip ok">✓ Alcanza</span>');
+    h += '<tr class="abast-row" onclick="abastToggle(\'' + encodeURIComponent(r.cod) + '\')">' +
+      '<td class="l abast-cod">' + escapeHtml(r.cod) + (open ? " ▾" : "") + '</td>' +
+      '<td class="l abast-desc">' + escapeHtml(r.desc || "—") + '</td>' +
+      '<td class="' + (r.stock < -0.05 ? "abast-neg" : "") + '">' + _abastN(r.stock) + '</td>' +
+      '<td>' + _abastN(r.pedidos) + '</td>' +
+      '<td>' + (r.npsPed || 0) + '</td>' +
+      '<td class="' + (r.falta > 0.05 ? "abast-neg" : "abast-pos") + '">' + (r.falta > 0.05 ? _abastN(r.falta) : "0") + '</td>' +
+      '<td class="l">' + estado + '</td></tr>';
+    if (open) {
+      const dep = r.dep || {};
+      const celdas = ABAST_DEPS.filter(function (d) { return Math.abs(Number(dep[d[0]]) || 0) > 0.001; })
+        .map(function (d) { return '<tr><td style="text-align:left">' + escapeHtml(d[1]) + '</td><td>' + _abastN(dep[d[0]]) + '</td></tr>'; }).join("");
+      let dt = '<table><thead><tr><th style="text-align:left">Depósito</th><th>Cajas</th></tr></thead><tbody>' +
+        (celdas || '<tr><td style="text-align:left" colspan="2">Sin stock en ningún depósito.</td></tr>') +
+        '<tr><td style="text-align:left;font-weight:800">TOTAL</td><td style="font-weight:800">' + _abastN(r.stock) + '</td></tr></tbody></table>';
+      dt += '<div class="abast-prov" style="margin-top:4px">Pedido pendiente: <b>' + _abastN(r.pedidos) + '</b> cajas en <b>' + (r.npsPed || 0) + '</b> NP(s)' + (r.falta > 0.05 ? ' · falta fabricar/reponer <b style="color:#b91c1c">' + _abastN(r.falta) + '</b>' : ' · stock suficiente ✓') + '</div>';
+      h += '<tr class="abast-det"><td colspan="7" class="l">' + dt + '</td></tr>';
+    }
+  });
+  h += '</tbody></table></div>';
+  return h;
 }
 function abastToggle(codEnc) { if (!_abast) return; const cod = decodeURIComponent(codEnc); _abast.openCod = (_abast.openCod === cod) ? null : cod; abastRender(); }
 

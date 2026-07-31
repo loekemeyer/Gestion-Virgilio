@@ -4,7 +4,21 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-07-31 · Versión app al documentar: **v6.73**
+> Última actualización: 2026-07-31 · Versión app al documentar: **v6.74**
+>
+> Nota: **v6.74 — El módulo "📈 Abastecimiento vs Venta" ahora tiene 2 sub-vistas**
+> (toggle arriba): **🏭 Fabricación vs Venta** (la de v6.73) y **📦 Stock vs Pedidos**
+> (nueva). La nueva cruza, por artículo, el **stock actual total** (suma de TODOS los
+> depósitos de producto terminado: terminado/góndola + excedente + separar_pedidos +
+> a_facturar + a_guardar + racks + racks_ch + para_envasar — **NO** insumos, que van en
+> unidades heterogéneas) contra los **pedidos pendientes** (NP programadas en el PPP y
+> **no** facturadas, cajas por artículo de `PPP_Base_Pedidos`), y muestra **"Falta p/
+> normalizar"** = `max(0, pedidos − stock)` **sólo si hay pedidos** (un saldo negativo sin
+> demanda es inconsistencia, no necesidad → no cuenta). Al tocar una fila se ve en qué
+> depósitos está el stock. Datos desde la vista nueva **`vista_stock_vs_pedidos`**
+> (`security_invoker=true`, select `anon`/`authenticated`; misma normalización de `cod`
+> que venta/recepción: upper+btrim+strip ceros). Front: `abastCompute(recep,venta,sp)`,
+> `abastSetTab`, `abastRenderFab`, `abastRenderStock`. Bump `APP_VERSION`/`SW_VERSION` `v6.74`.
 >
 > Nota: **v6.73 — Nuevo módulo "📈 Abastecimiento vs Venta"** (botón en el panel de
 > supervisor, al lado de "Rendimiento de operarios"). Muestra, **por artículo**, cuántas
