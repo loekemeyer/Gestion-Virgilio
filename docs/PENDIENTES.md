@@ -8,12 +8,19 @@ tachan (`~~…~~`).
 > ⚠ **#7 y #8 se están haciendo en OTRO chat** (el usuario dio el OK allá). No
 > tocarlos desde acá para no pisar el trabajo (el #7 es un revoke en Supabase en vivo).
 
-## ⚠ Insumos 505C/CB01/523C/H201Lever — falta 1 decisión para postear (31/07, prop. 2769)
+## ✅ Insumos 505C/CB01/523C/H201Lever — HECHO (31/07, prop. 2769)
 
-Pedido del usuario: *"505C / CB01 borrar stock y colocar en insumos"* + conteo físico. **No se
-posteó al ledger** porque hay 2 convenciones vivas y el estado está enredado con el
-recatalogueo `fix_recatalog_espiral` de HOY (un error MC-vs-unidades = factor 4000× sobre datos
-de compra reales). Reconciliación conteo ↔ `Movimientos_Stock`:
+Pedido del usuario: *"505C / CB01 borrar stock y colocar en insumos"* + conteo físico.
+**RESUELTO 31/07** (decisión del dueño en el chat: **saldo en unidades**, desglose "MC×UNI"
+como dato en la descripción, bajo **códigos numéricos**). Se puso en 0 lo viejo (505C insumos
+168000, CB01 insumos 2950, 523C racks 240) y se cargó en `insumos` (unidad `Uni`,
+ubicación=sector): **2955**=142000 (X20) · **4626**=2950 (N7) · **1685**=6000 (W1) ·
+**2815**=26400 (O1). Cabezal (H201Lever/2815) confirmado **distinto** del Espiral 2805.
+⚠ Quedan aparte los negativos compuestos `505C·CUCHILLA CHINA` (−16000/−6) y `523C·CREMALLERA`
+(−30 MC) — sub-ledger de entregas, cleanup separado. Debajo, la reconciliación original y el
+SQL de referencia (el ejecutado fue la variante **unidades**, no MC).
+
+Reconciliación conteo ↔ `Movimientos_Stock` (al momento del pedido):
 
 | Sector | cod | Modelo | Descripción | Conteo pedido | Estado hoy en el ledger |
 |---|---|---|---|---|---|

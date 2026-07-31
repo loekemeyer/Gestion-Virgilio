@@ -18,10 +18,22 @@
 > negativo imposible). **502** (Abrelatas Mariposa): **NO se tocó** — sus "remanentes en el
 > pipeline" (a_facturar C99H **+6** / C99J **+4**; separar_pedidos C99K **+4**) son **todos del
 > 31/07** = trabajo en curso normal (pickeado/armado sin facturar aún), no un cuelgue; la
-> porción de la 97822 ya neteó a 0. **Insumos 505C/CB01/523C/H201Lever** (mismo mensaje):
-> quedó **pendiente de decisión** (unidades crudas vs MC · código numérico vs modelo · no
-> pisar el recatalogueo `fix_recatalog_espiral` de hoy) — registrado como propuesta **2769**,
-> con la reconciliación y el SQL listo en `docs/PENDIENTES.md`.
+> porción de la 97822 ya neteó a 0. **Insumos 505C/CB01/523C/H201Lever → HECHO** (mismo
+> mensaje; decisión del dueño en el chat: **saldo en unidades** con el desglose "MC×UNI" como
+> dato en la descripción, bajo **códigos numéricos**). Se puso en 0 lo viejo (505C insumos
+> 168000, CB01 insumos 2950, 523C racks 240) y se cargó en `insumos` (unidad `Uni`,
+> ubicación=sector): **2955**=142000 (X20) · **4626**=2950 (N7) · **1685**=6000 (W1) ·
+> **2815**=26400 (O1; Cabezal Importado, confirmado **distinto** del Espiral 2805). Quedan
+> aparte los negativos compuestos `505C·CUCHILLA CHINA` (−16000/−6) y `523C·CREMALLERA`
+> (−30 MC) = sub-ledger de entregas, cleanup separado. Propuesta **2769** → hecha.
+>
+> Nota (dato — lock huérfano, 31/07): **tanda D01A "pickeando" fantasma**. D01A figuraba como
+> *pickeando por el legajo 122* (Adrian Villalba) pero **no se había pickeado nada**: había un
+> **lock en `Tandas_Lock`** (fase picking, 122, 12:00:34) **sin ningún evento** EP/PKC/TP ni
+> movimiento de stock (la agarró, no la pickeó, y a las 13:30 pasó a armar C99K). Los locks se
+> auto-expiran a las **+10h**, pero éste tenía ~2h → seguía bloqueando. Se **borró el lock** de
+> D01A (queda libre para pickear). ⚠ Quedan 2 locks de **legajo 999** (sistema/test) <10h —
+> C72F picking y D11X armado — que también podrían ser fantasma; no se tocaron.
 >
 > Nota: **v6.73 — Nuevo módulo "📈 Abastecimiento vs Venta"** (botón en el panel de
 > supervisor, al lado de "Rendimiento de operarios"). Muestra, **por artículo**, cuántas
