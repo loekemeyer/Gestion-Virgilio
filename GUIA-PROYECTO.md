@@ -4,7 +4,19 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-07-31 · Versión app al documentar: **v6.70**
+> Última actualización: 2026-07-31 · Versión app al documentar: **v6.71**
+>
+> Nota: **v6.71 — El monitor (TV) saca las tandas ya FACTURADAS Y DESPACHADAS**
+> (pedido del usuario: "las tandas que están FC y se despacharon en el camión no
+> tienen que estar acá"). Antes una tanda quedaba en el tablero hasta que la limpiaba
+> el sync del Sheet (o el CRN de entrega), así que las facturadas+cargadas seguían
+> figurando (ej. C98J). Ahora `renderMonitor` filtra: una tanda cuyas **todas** las NP
+> están **facturadas** (`_facNpsHoy`/`_facNpsTodos`) **y despachadas** (evento `CCN`,
+> salvo que un `FSS` más reciente la haya devuelto) se saca de la tabla principal **y**
+> del panel "Tandas a FC". El set de despachadas lo trae **`fetchDespachadosTodos()`**
+> (nuevo; `_ccnNpsTodos`, mismo TTL/patrón que las facturadas, disparado fire-and-forget
+> en cada refresh). Reusa `fetchSinSalidaMap` para respetar los retornos (FSS). Bump
+> `APP_VERSION` + `SW_VERSION` `v6.71`.
 >
 > Nota: **v6.70 — FC s/Salida pasó a ser una COLUMNA de la tabla de Stock (a la
 > derecha de Racks), ítem por ítem** (pedido del usuario; reemplaza al segmento que

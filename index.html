@@ -5707,7 +5707,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v6.70";
+const APP_VERSION = "v6.71";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -19352,9 +19352,25 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
   //   - Op vacío + sin eventos                 -> NO aparece
   // Status (picking/separado) usa TODOS los eventos históricos de la tanda
   // (no solo hoy) — si EP/TP/AP/TAP existieron antes, el tilde aparece igual.
+  // v6.71 — sacar del monitor las tandas ya FACTURADAS y DESPACHADAS (todas sus NP
+  // cargadas al camión = CCN, y no devueltas por FSS). Los sets se refrescan
+  // fire-and-forget más abajo (igual que las facturadas). Pedido del usuario.
+  const _facH2 = (typeof _facNpsHoy !== "undefined" && _facNpsHoy) ? _facNpsHoy : new Set();
+  const _facT2 = (typeof _facNpsTodos !== "undefined" && _facNpsTodos) ? _facNpsTodos : new Set();
+  const _ccn2  = (typeof _ccnNpsTodos !== "undefined" && _ccnNpsTodos) ? _ccnNpsTodos : new Set();
+  const _tandaDespachada = function (v) {
+    if (!v.pedidos || !v.pedidos.length) return false;
+    return v.pedidos.every(function (p) {
+      if (!p || !p.np) return false;
+      const npN = String(p.np).trim().replace(/\.0+$/, "");
+      const fact = _facH2.has(p.np) || _facT2.has(p.np) || _facH2.has(npN) || _facT2.has(npN);
+      return fact && _ccn2.has(npN);
+    });
+  };
   const tandas = [];
   for (const [k, v] of sheetMap) {
     if (!targetSet.has(v.fechaEntregaRaw)) continue;
+    if (_tandaDespachada(v)) continue;   // v6.71: facturada + despachada → fuera del monitor
     const ev = statusMap.get(k) || { picking: null, separado: null, doneTodayP: false, doneTodayA: false, pickLegajo: null, sepLegajo: null };
     const hasAny = (ev.picking !== null || ev.separado !== null);
     if (!v.opIsSi && !hasAny) continue;
@@ -19515,6 +19531,7 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
   // (cada 1s) ya tenga datos nuevos sin bloquear este render.
   if (typeof fetchFacturadosHoy === "function") fetchFacturadosHoy().catch(() => {});
   if (typeof fetchFacturadosTodos === "function") fetchFacturadosTodos().catch(() => {});
+  if (typeof fetchDespachadosTodos === "function") fetchDespachadosTodos().catch(() => {});   // v6.71: set de despachadas (CCN) para sacar las facturadas+despachadas del monitor
   const totalFcM3 = tandasFC.reduce((s, t) => s + (t.m3 || 0), 0);
   // ✅ "facturada" = todos sus NP facturados, con o SIN cierre. Usamos también
   // _facNpsTodos (todos los de Facturacion_NP) para que el ✅ PERSISTA después de
@@ -20258,6 +20275,11 @@ let _facTickedLocal   = new Set();
 let _facNpsTodos      = new Set();
 let _facNpsTodosTs    = 0;
 let _facNpsTodosInflight = null;
+// v6.71 — set de NP DESPACHADAS (cargadas al camión = CCN, salvo que un FSS más
+// reciente las haya devuelto). El monitor saca las tandas facturadas Y despachadas.
+let _ccnNpsTodos      = new Set();
+let _ccnNpsTodosTs    = 0;
+let _ccnNpsTodosInflight = null;
 // Cantidad de NP facturados HOY (facturado_at = hoy BsAs), con o sin cierre. Es
 // el contador "NPs facturados hoy": NO se resetea a 0 al "Generar PDF" (antes
 // mostraba _facNpsHoy = pendientes de cierre, que tras el PDF queda en 0). v3.53.
@@ -20919,6 +20941,35 @@ async function fetchFacturadosTodos(force){
     }
   })();
   return _facNpsTodosInflight;
+}
+
+/* v6.71 — Set de NP DESPACHADAS (cargadas al camión, evento CCN). Una NP está
+   despachada si su ÚLTIMO CCN es más reciente que su último FSS (si volvió al
+   depósito por «↩ s/salida», deja de estar despachada). Lo usa el monitor para
+   sacar del tablero las tandas ya facturadas Y despachadas. TTL como las facturadas. */
+async function fetchDespachadosTodos(force){
+  const now = Date.now();
+  if (!force && (now - _ccnNpsTodosTs) < FAC_NPS_TTL_MS) return _ccnNpsTodos;
+  if (_ccnNpsTodosInflight) return _ccnNpsTodosInflight;
+  _ccnNpsTodosInflight = (async () => {
+    try{
+      const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+      const par = await Promise.all([
+        fetch(SUPABASE_TABLE_ENDPOINT + "?opcion=eq.CCN&ts_cliente=gte." + encodeURIComponent(CC_REPARTO_DESDE_ISO) + "&select=texto,ts_cliente&limit=20000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }),
+        (typeof fetchSinSalidaMap === "function" ? fetchSinSalidaMap(CC_REPARTO_DESDE_ISO) : Promise.resolve(new Map()))
+      ]);
+      const ccnR = par[0] || [], fssMap = par[1] || new Map();
+      const maxCcn = {};
+      ccnR.forEach(function (ev) { const np = String(ev.texto || "").split("|")[0].trim().replace(/\.0+$/, ""); if (!np) return; const ms = ev.ts_cliente ? new Date(ev.ts_cliente).getTime() : 0; if (ms > (maxCcn[np] || 0)) maxCcn[np] = ms; });
+      const set = new Set();
+      Object.keys(maxCcn).forEach(function (np) { const fss = (fssMap.get && fssMap.get(np)) || 0; if (!(fss && fss > maxCcn[np])) set.add(np); });
+      _ccnNpsTodos = set; _ccnNpsTodosTs = Date.now();
+      return _ccnNpsTodos;
+    } finally {
+      _ccnNpsTodosInflight = null;
+    }
+  })();
+  return _ccnNpsTodosInflight;
 }
 
 function openFacturacion(){
