@@ -4,26 +4,9 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-07-31 · Versión app al documentar: **v6.66**
+> Última actualización: 2026-07-31 · Versión app al documentar: **v6.69**
 >
-> Nota: **v6.66 (server) — El cron de reconciliación ahora drena las cajas de
-> "Completar Pedido" (CP) de NPs ya facturadas** (pedido del usuario: "en a facturar
-> también debe salir porque ya salió"; el CP con legajo 0 es real, no prueba). Un CP
-> que completa una NP **ya facturada** mete cajas en `a_facturar` con `tipo='cp'` y
-> `ref=NP` (sin tanda); el fast-path del cliente (`stockDrenarCPFacturado`) debía
-> sacarlas pero falló en 13 casos reales (~202 cajas, ej. NP 98017 art 534), y el cron
-> **no las veía** (su ETAPA 3 agrupa por tanda y solo mira `separado`/`facturado`). Se
-> agregó la **ETAPA 4** a `reconciliar_pipeline_stock()` (migración
-> `pipeline_etapa4_drenar_cp_facturado`): netea el bucket "por NP"
-> (`split_part(ref,'|',1)` = número de NP; suma solo `cp`+`facturado`+`ajuste`, excluye
-> `rc`/`separado`) y, si queda >0 y la NP está en `Facturacion_NP`, la saca con un
-> `facturado` −neto `ref=NP|CP` (mismo formato que el cliente). **Idempotente**
-> (net>0→0 + índice único), **nunca negativo**, **no filtra por legajo** (leg 0 =
-> real). Las NPs aún **no** facturadas quedan intactas. Se corrió una vez a mano al
-> aplicar la migración → drenó los 13 casos colgados. **Sin cambio de cliente**
-> (`index.html`/`sw.js` sin tocar → sin bump). Detalle en `sql/reconciliar_pipeline_stock.sql`.
->
-> Nota: **v6.66 — Remito "Facturado sin salida" (volvió al depósito) + FC s/Salida
+> Nota: **v6.69 — Remito "Facturado sin salida" (volvió al depósito) + FC s/Salida
 > ahora es un segmento DENTRO de Stocks** (pedido del usuario). Caso: una NP se cargó
 > al camión (`CCN`) pero el cliente estaba cerrado y la mercadería **volvió**. En
 > **Recepción Remitos (RR)** cada fila tiene ahora un botón **«↩ s/salida»**
@@ -39,7 +22,118 @@
 > s/Salida es una **vista** (facturado − cargado), no un depósito. Además, **«🧾 FC
 > s/Salida» dejó de ser una solapa aparte** del módulo Stock: ahora es un **segmento
 > dentro de la solapa «📊 Stocks»** (junto a Stock / Ingresos / Salidas; `stkSetView`
-> con carga lazy). Bump `APP_VERSION` + `SW_VERSION` `v6.66`.
+> con carga lazy). Bump `APP_VERSION` + `SW_VERSION` `v6.69`.
+>
+> Nota: **v6.69 (server) — El cron de reconciliación ahora drena las cajas de
+> "Completar Pedido" (CP) de NPs ya facturadas** (pedido del usuario: "en a facturar
+> también debe salir porque ya salió"; el CP con legajo 0 es real, no prueba). Es la
+> contraparte en **`a_facturar`** del fix de estancado de v6.68 (que arregló el lado
+> `a_guardar`): mismo principio "los legajos de sistema/0 NO son basura para el stock".
+> Un CP que completa una NP **ya facturada** mete cajas en `a_facturar` con `tipo='cp'`
+> y `ref=NP` (sin tanda); el fast-path del cliente (`stockDrenarCPFacturado`) debía
+> sacarlas pero falló en 13 casos reales (~202 cajas, ej. NP 98017 art 534), y el cron
+> **no las veía** (su ETAPA 3 agrupa por tanda y solo mira `separado`/`facturado`). Se
+> agregó la **ETAPA 4** a `reconciliar_pipeline_stock()` (migración
+> `pipeline_etapa4_drenar_cp_facturado`): netea el bucket "por NP"
+> (`split_part(ref,'|',1)` = número de NP; suma solo `cp`+`facturado`+`ajuste`, excluye
+> `rc`/`separado`) y, si queda >0 y la NP está en `Facturacion_NP`, la saca con un
+> `facturado` −neto `ref=NP|CP` (mismo formato que el cliente). **Idempotente**
+> (net>0→0 + índice único), **nunca negativo**, **no filtra por legajo** (leg 0 =
+> real). Las NPs aún **no** facturadas quedan intactas. Se corrió una vez a mano al
+> aplicar la migración → drenó los 13 casos colgados. **Sin cambio de cliente**
+> (server-side). Detalle en `sql/reconciliar_pipeline_stock.sql`.
+>
+> Nota: **v6.68 — Prolijado del pop-up de movimientos + "Cerrar" del módulo Consulta NP
+> arriba a la derecha**. (a) En el pop-up 🔁/📦 de movimientos por artículo la celda
+> MOVIMIENTO pasó a un **flex**: un **slot fijo (20px)** para el "+" (vacío en los que no
+> son recepción) → los rótulos (`recepcion`/`guardado`/`cp`…) arrancan **alineados**;
+> chips 👤/NP en **pill**; el "+" alineado con la primera línea (le faltaba `margin:0`
+> contra el `button{margin-top:14px}` global). Padding y hover de fila más prolijos. (b)
+> El botón **Cerrar** del módulo *Consulta de Notas de Pedido — Composición a líos*
+> (`npConsultaModal`) estaba suelto en medio del panel → ahora **absoluto arriba a la
+> derecha** (`.fac-close-btn.npc`), con `padding-right` en el `h1` para no colisionar.
+> Bump `v6.68`. Smoke `mva-quien.cjs` sigue verde.
+>
+> Nota (backend Supabase): **Fix ESTANCADO — el saldo NO debe filtrar legajo (bug 534/323E)**
+> (pedido del dueño, cod 1636). La alerta `reporte_agentes_stock_estancado()` filtraba
+> `legajo not in ('0','1')` para saltear datos de prueba, pero varios movimientos REALES
+> registran **legajo 0** —típicamente `cp` (completar pedido)—; excluirlos rompía el saldo
+> event-sourced. Caso **534**: llegan 6, `cp -1` (legajo 0) saca 1 a `a_facturar`, guardan
+> 5 → `a_guardar` = 0; con el filtro parecía "6 − 5 = 1 sin guardar" (falso positivo). Idem
+> **323E**. Ahora la función computa el saldo sobre **TODOS** los movimientos (sin filtrar
+> legajo), igual que `stockComputeSaldos` en la app → la alerta coincide con lo que muestra
+> la app. Los legajos de sistema ('pipeline','reconcilia','0') NO son basura para el stock.
+> Deployado + `sql/stock_estancado.sql` actualizado.
+>
+> Nota (dato — corrección manual de stock, 31/07): **824 y 559 "mandados a góndola"**.
+> El dueño confirmó que **824** (14 cj, recepción 0245 sin marcar) y **559** (20 cj,
+> recepción 38770 sin marcar) se **guardaron físicamente** pero el operario no lo marcó en
+> la app (los ítems quedaron en `cargar:0` en el modal MG → `mgConfirmar` solo graba los
+> que tienen cantidad; **no es bug**, el guardado multi-código funciona: la tanda de las
+> 09:46 del 29/7 grabó 325+521+735 juntos). Se insertó el `guardado` correctivo
+> (`a_guardar → terminado`, legajo `ajuste`, `client_id` `fix_*`): 824 a_guardar 14→0 /
+> góndola 208→222; 559 a_guardar 20→0 / góndola 94→114. **534** ya estaba en 0 (lo resolvió
+> el fix de arriba). ⚠ *Ojo UX pendiente*: el modal MG no avisa si quedan códigos en 0 sin
+> guardar → fácil olvidarse uno.
+>
+> Nota: **v6.67 — Pop-up de movimientos por artículo: (a) "+" que despliega la ENTREGA
+> completa y (b) columnas en 0 clickeables si tuvieron movimientos**. Dos pedidos del
+> dueño sobre el pop-up 🔁/📦 de un artículo (Stock y Compras → tocar una columna de la
+> tabla). **(a)** Cada fila de `recepcion` trae ahora un **`+`** que abre un panel con la
+> **entrega completa**: 📅 **día**, **Proveedor/Tallerista** + nombre, **RTO/FC**, y los
+> **códigos con cuántas cajas de cada uno** (el código del artículo abierto queda
+> resaltado en verde). Fuente: **`Control_Modo_OP`** (recepcion.js graba una fila por
+> envío: `fecha`, `tipo` `tallerista`/`prov_at`, `nombre`, `remito`, `detalle`=`"cod →
+> cajas · …"`); se busca por `remito` y se elige la fila del **mismo día** (si el remito
+> se reusó). Si no hay fila (envíos viejos), **fallback**: arma los códigos/cajas desde
+> los propios movimientos de recepción del mismo remito+día (`_stk.movs`), sin el nombre
+> del proveedor. Funciones `stkRtoToggle` / `stkRtoFetch` / `_stkRtoDetail`. **(b)** En la
+> tabla de stock, las celdas de depósito (Góndola/Excedente/Pickeados/A facturar/A
+> guardar/Racks) ahora son **clickeables aunque el saldo sea 0**, si el artículo **tuvo
+> movimientos** ahí alguna vez (el pop-up muestra el historial que neteó a 0). Se marca en
+> **gris** (`stk-hist0`) con tooltip "Saldo 0 ahora, pero tuvo movimientos". Se cachea el
+> set `codN|deposito` en `_stk._histDeps` (O(movs) una vez, no por tecla). Smoke
+> `tests/mva-quien.cjs` extendido. Bump `v6.67`.
+>
+> Nota: **"ESTANCADO" — definición FINAL del dueño: se mide por CICLO, no por el
+> histórico del código** (backend Supabase, `sql/stock_estancado.sql`, función
+> `reporte_agentes_stock_estancado()`). **Estancado = de lo que LLEGÓ guardaron una
+> PARTE (entre góndola y excedente) pero NO la TOTALIDAD** → el resto quedó trabado.
+> Ej del dueño: llegan 14, guardan 10, quedan **4 a guardar** → **ESO** es estancado.
+> La versión anterior miraba "¿hubo algún `guardado` para este código alguna vez?"
+> sobre **todo el histórico** → daba **falsos positivos** con los códigos de rotación:
+> caso real **824** (llegan 10 → guardan 10 · llegan 22 → guardan 22 · llegan 14 y
+> nadie las tocó todavía) salía como estancado, cuando en realidad es una **recepción
+> nueva intacta = pendiente normal**. Ahora se calcula el **saldo corrido** de
+> `a_guardar` por código y se toma el **ciclo abierto** = lo que pasó **después** del
+> último movimiento que dejó el saldo en **0** (la última vez que se guardó todo).
+> Es estancado sólo si **dentro de ese ciclo** hubo un `guardado` y quedó resto. La
+> **cantidad** informada es el **resto que dejó el último `guardado` del ciclo** (no
+> el saldo total: si después llegó una recepción nueva, esas cajas son pendiente
+> normal), y la **antigüedad** se cuenta desde **ese `guardado`** — o sea, desde
+> cuándo se dejó el resto sin terminar. Se mantiene todo lo demás: días **hábiles**
+> (lun–vie), umbral `Stock_Config.dias_estancado` (default 2), caso (2) *pickeado sin
+> avanzar* (`separar_pedidos`/`a_facturar`) igual, sólo Telegram, respeta cutoff,
+> excluye legajos 0/1, dedup diario, encadenada al cron de agentes (jobid 14).
+> Verificado read-only hoy (31/07): pasa de **20** códigos "a guardar" con el criterio
+> viejo a **3 restos reales** (534, 323E, 731 — ej. 731: llegaron 83+64, guardaron 83,
+> quedan **64** sin guardar), y **824 ya no aparece**.
+>
+> Nota: **v6.66 — 👤 SIGLAS + LEGAJO de quién hizo cada movimiento (y de quién recibió)
+> en el detalle por artículo**. En el pop-up de movimientos de un depósito (📦 A guardar,
+> 🔁 Góndola, 🏗 Racks — `_stkMovsBlock`) cada fila muestra ahora un chip
+> `👤 SIGLAS · legajo` al lado del movimiento. De dónde sale: **(a)** si el movimiento
+> trae `Movimientos_Stock.legajo` (guardado, picking, ajustes… y las recepciones nuevas
+> desde la **idea 7725**, 30/07/2026) → chip **gris**, dato exacto; **(b)** si es una
+> `recepcion` **sin** legajo (todas las anteriores al 30/07 lo tienen **NULL**) → se
+> **deduce por la sesión de RT**: el evento `RT` de `Registros_Produccion_Virgilio`
+> (la fila de cierre trae `ts_inicio`=arranque y `ts_cliente`=cierre; la de apertura,
+> sólo `ts_cliente`=arranque) cuyo intervalo **contiene** el `ts` del movimiento → chip
+> **ámbar con `~`** (aproximado). Si dos sesiones se superponen gana la que **arrancó
+> más tarde**; hay 10 min de gracia al cierre (el movimiento se inserta un toque después
+> de cerrar el RT); si ninguna lo contiene, **no se inventa** nada (sin chip). Las siglas
+> salen de `Empleados` vía `getEmpleadosNombres()` + `initialsFromName()`; el nombre
+> completo va en el `title` (hover). Nuevo smoke `tests/mva-quien.cjs`. Bump `v6.66`.
 >
 > Nota: **idea 7382 — Saldo de insumos SEPARADO por unidad**. El saldo de insumos
 > (`vista_saldos_stock.insumos`) sumaba `delta` mezclando unidades heterogéneas (kg, Uni,
@@ -161,7 +255,7 @@
 >
 > Nota: **v6.22 — `pipeline_atascado` del tablero de Agentes: mismo criterio que la alerta (última actividad + días hábiles)**. El bloque 16 de `generar_reporte_agentes` (`sql/generar_reporte_agentes_v2.sql`) medía la antigüedad de lo pickeado (`separar_pedidos`/`a_facturar`) desde **la caja más vieja que entró** (`min(ts) filter delta>0`) en **días corridos** → marcaba "hace 27–28 días" a **códigos de alta rotación** que en realidad se pickean y separan **todos los días** (la "caja más vieja" es del arranque del sistema, pero el saldo churnea a diario). Eran falsos positivos (ej. 26/07 mostraba "20 · hace 28 días"). Ahora mide por **última actividad** (`max(ts)`) y en **días hábiles** (lun–vie, sáb/dom no cuentan), con umbral `Stock_Config.dias_estancado` (default 2) — **idéntico** a la alerta Telegram "STOCK ESTANCADO". Verificado: post-cambio da **0** hoy (lunes; lo del viernes va 1 día hábil, salta el martes si sigue quieto). Se actualizó el rótulo del tablero (`index.html` → "Pipeline atascado (+2 días hábiles)"). Bump `v6.22` (APP_VERSION + SW_VERSION) por tocar `index.html`.
 >
-> Nota (backend Supabase, sin bump de app): **"👀 STOCK ESTANCADO" — redefinido el concepto (errores reales, no "cantidad hace X días") + días HÁBILES**. Pedido del dueño: la alerta ya **no** avisa "cuánto hay a guardar hace tantos días" (una recepción entera sin tocar es pendiente normal, no un error), sino los **potenciales errores reales** — mercadería trabada porque alguien **empezó y no cerró**. Dos casos en `reporte_agentes_stock_estancado()` (`sql/stock_estancado.sql`): **(1) RESTO SIN GUARDAR** (`a_guardar`): guardaron **parte** de un artículo (a góndola y/o excedente) y dejaron un **resto** sin guardar. Ej: llegan 100, suben 50 a góndola + 40 a excedente → quedan **10 estancadas**. La señal es que **hubo `guardado`** para ese código (guardado parcial) **Y** todavía queda `saldo > 0` en `a_guardar`; si **nunca se guardó nada** (recepción intacta) **NO** avisa. **(2) PICKEADO SIN AVANZAR** (`separar_pedidos` + `a_facturar`): mercadería ya pickeada, sin que nadie la trabaje (pickeada sin separar/armar, o armada sin facturar), que no puede quedar así +N días. **DÍAS HÁBILES:** los operarios no trabajan sáb/dom → la antigüedad se cuenta en **días hábiles (lun–vie)**, no corridos (algo del **viernes** recién dispara el **martes**: vie+lun = 2). Umbral `Stock_Config.dias_estancado` (default **2**), ahora interpretado en días hábiles. Sigue **solo Telegram**, respeta cutoff, excluye legajos 0/1, dedup diario, encadenada al cron de agentes (jobid 14). Verificado read-only: hoy (lun 27/07) marcaría **3** restos sin guardar (cod 248/501/535, guardado parcial + resto), y **cero** falsos positivos por recepciones intactas (323E, 99, 335…) ni por el picking/armado del propio día. Deja atrás los ~40 avisos anteriores (recepciones enteras que inflaban la lista).
+> Nota (backend Supabase, sin bump de app) — ⚠ **SUPERADA por la nota "ESTANCADO — definición FINAL del dueño" (31/07, arriba): el criterio (1) ahora se mide por CICLO ABIERTO, no sobre el histórico del código**: **"👀 STOCK ESTANCADO" — redefinido el concepto (errores reales, no "cantidad hace X días") + días HÁBILES**. Pedido del dueño: la alerta ya **no** avisa "cuánto hay a guardar hace tantos días" (una recepción entera sin tocar es pendiente normal, no un error), sino los **potenciales errores reales** — mercadería trabada porque alguien **empezó y no cerró**. Dos casos en `reporte_agentes_stock_estancado()` (`sql/stock_estancado.sql`): **(1) RESTO SIN GUARDAR** (`a_guardar`): guardaron **parte** de un artículo (a góndola y/o excedente) y dejaron un **resto** sin guardar. Ej: llegan 100, suben 50 a góndola + 40 a excedente → quedan **10 estancadas**. La señal es que **hubo `guardado`** para ese código (guardado parcial) **Y** todavía queda `saldo > 0` en `a_guardar`; si **nunca se guardó nada** (recepción intacta) **NO** avisa. **(2) PICKEADO SIN AVANZAR** (`separar_pedidos` + `a_facturar`): mercadería ya pickeada, sin que nadie la trabaje (pickeada sin separar/armar, o armada sin facturar), que no puede quedar así +N días. **DÍAS HÁBILES:** los operarios no trabajan sáb/dom → la antigüedad se cuenta en **días hábiles (lun–vie)**, no corridos (algo del **viernes** recién dispara el **martes**: vie+lun = 2). Umbral `Stock_Config.dias_estancado` (default **2**), ahora interpretado en días hábiles. Sigue **solo Telegram**, respeta cutoff, excluye legajos 0/1, dedup diario, encadenada al cron de agentes (jobid 14). Verificado read-only: hoy (lun 27/07) marcaría **3** restos sin guardar (cod 248/501/535, guardado parcial + resto), y **cero** falsos positivos por recepciones intactas (323E, 99, 335…) ni por el picking/armado del propio día. Deja atrás los ~40 avisos anteriores (recepciones enteras que inflaban la lista).
 >
 > Nota (backend Supabase, sin bump de app): **Artículos DISCONTINUADOS — no disparan la alerta "CAPACIDAD SIN PROYECCIÓN"**. Esa alerta (`reporte_agentes_capacidad_sin_maximo`, Telegram) avisa cuando un artículo tiene **lugar en góndola** (`Capacidad_Sector`) pero **sin máximo/proyección** (`OC_Maximos`), asumiendo un typo de código. Pero los **discontinuados** (se venden hasta agotar stock, no se reponen) tienen lugar sin proyección **a propósito** → eran falsos positivos. Se creó la tabla **`Articulos_Discontinuados`** (`cod` PK, `motivo`, `creado_ts`; RLS anon **solo SELECT**) y la función ahora **excluye** esos códigos (CTE `disc`, normalizado). Cargados: **554, 573, 592**. Para marcar otro: `INSERT INTO "Articulos_Discontinuados"(cod,motivo) VALUES ('XXX','discontinuado')`. **Fix de dato:** el 3º venía mal escrito como **592E** en `Capacidad_Sector` (lo confirmó el dueño: es **592**) → corregido a `592` (H60, 18 cj). ⚠ El **`planimetria.js`** (mapa de picking, generado del Excel) todavía lista ese lugar como **592E@H60**; es inerte (el artículo tiene **0 pedidos y 0 movimientos de stock**), pero para dejarlo 100% consistente hay que corregirlo en la hoja **"Picking"** del Excel (592E→592) y regenerar.
 >
@@ -3076,7 +3170,7 @@ Definidos en `index.html` (objeto `desc`, ~línea 1531). Los botones se arman en
 | `SSG` | Picking sin stock en góndola | (automático, v4.24) | `texto` = `TANDA\|COD:pedido>habia,…`. Lo emite `stockBajaPicking` al **TP** cuando se sacó de góndola **más de lo que el sistema tenía** (saldo `terminado` quedaría negativo). id determinístico `ssg_<legajo>_<tanda>_<día>` + upsert (1 aviso/tanda/día). Dispara aviso Telegram vía trigger `trg_picking_sin_stock_telegram` (**AFTER INSERT** WHEN `opcion='SSG'`). El monitor lo ignora. |
 | `PGE` | Picking · retiró de góndola en vez de excedente | (aviso, v6.11) | `texto` = `COD\|TANDA`. Lo emite `pkEmitRetiroGondola` cuando el operario, en un artículo cuyo **excedente cubría todo** (paso salteado), toca **"🟢 Retirar de góndola igual"** (`pkForzarGondola`). id `pge_<cod>_<legajo>_<ts>`. Dispara aviso Telegram vía trigger `trg_picking_gondola_excedente_telegram` (**AFTER INSERT** WHEN `opcion='PGE'`), que **resuelve `legajo→Empleado`** → "🟢⚠ RETIRÓ DE GÓNDOLA (había excedente) — {Nombre} … Art X · tanda Y". No toca stock (el picking baja de góndola como cualquier otro). El monitor lo ignora. |
 | `FCO` | Facturación · override de la operadora (facturó corto un faltante recuperable) | (aviso, v6.21) | `texto` = `NP\|TANDA\|detalle\|RS` (detalle = `cod×falto,…`). Lo emite `facEmitOverride` (legajo vacío: la operadora es supervisor) cuando **la operadora** confirma facturar una NP cuyo faltante **se podía completar** (había stock en `a_guardar` o góndola). El resto de los usuarios queda **bloqueado** (no llega a emitir). Dispara Telegram vía trigger `trg_facturacion_override_telegram` (**AFTER INSERT** WHEN `opcion='FCO'`) → "🧾⚠ FACTURÓ CON FALTANTE RECUPERABLE — la operadora facturó CORTO la NP … Había stock para completarlo …". No toca stock (el drenaje de `a_facturar` lo hace `stockSalidaFacturadoNP` como siempre). El monitor lo ignora. |
-| `CP` | Completar Pedido | (detalle, v5.05) | `texto` = `NP\|COD\|QTY\|GONDOLA\|AGUARDAR\|LÍO`. Lo emite el modal `showCPModal` al sumar cajas que llegaron tarde a una NP armada sin facturar (mueve stock origen→`a_facturar` con `tipo='cp'`, `ref=NP`; baja `cajas_falto` en `Entregas_Virgilio`, re-emite el TAL). Si la NP **ya estaba facturada**, esas cajas de `a_facturar` se drenan: fast-path `stockDrenarCPFacturado` (en cpConfirm y en el tilde de Facturación) y, como red de seguridad, la **ETAPA 4** del cron `reconciliar_pipeline_stock()` (v6.66; `facturado` −neto `ref=NP\|CP`). El monitor lo ignora. |
+| `CP` | Completar Pedido | (detalle, v5.05) | `texto` = `NP\|COD\|QTY\|GONDOLA\|AGUARDAR\|LÍO`. Lo emite el modal `showCPModal` al sumar cajas que llegaron tarde a una NP armada sin facturar (mueve stock origen→`a_facturar` con `tipo='cp'`, `ref=NP`; baja `cajas_falto` en `Entregas_Virgilio`, re-emite el TAL). Si la NP **ya estaba facturada**, esas cajas de `a_facturar` se drenan: fast-path `stockDrenarCPFacturado` (en cpConfirm y en el tilde de Facturación) y, como red de seguridad, la **ETAPA 4** del cron `reconciliar_pipeline_stock()` (v6.69; `facturado` −neto `ref=NP\|CP`). El monitor lo ignora. |
 | `EA` | Entrega Artículos para envasar | (detalle, v5.52) | `texto` = `COD\|QTY` (ej. `440E\|30`). Lo emite el modal `showEAModal` (botonera operario) al dar de baja stock del depósito **`para_envasar`**: `stockMove` `para_envasar −qty` (`tipo='entrega_envasar'`), un evento por código. `para_envasar` está **fuera de los 7 depósitos** de `stockComputeSaldos` (no entra en totales/OC). El monitor lo ignora. **v5.63**: el modal ahora tiene además un **editor de ubicación 📍** (tabla `Envasar_Ubicaciones`, aparte de `Racks_Planimetria`) para cargar/mover dónde está lo para-envasar — no emite evento ni toca saldo. |
 | `RC` | Pasar cajas a un pedido urgente | (detalle, v5.49) | `texto` = `NP_URGENTE\|NP<donor> o T<tanda>\|COD\|QTY`. Lo emite el modal `showRCModal` al sacarle cajas a un pedido que sale después (armado o pickeado) y dárselas a uno urgente. Al confirmar: RPC `reasignar_cajas` (faltantes), `stockMove` tipo `rc` (donante `a_facturar`/`separar_pedidos −`, urgente `a_facturar +`), líos (suma al urgente, resta al donante armado). El monitor lo ignora. |
 | `PUB` | Picking · dónde lo dejó | (detalle, v5.78) | `descripcion` = ubicación (mesa/carro/rack), `texto` = código de tanda. Lo emite `emitPickUbic` al **TP**: registra dónde quedó lo pickeado (se muestra al Separar). El monitor lo ignora. |

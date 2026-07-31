@@ -29,7 +29,7 @@
 --          facturada (todos los NP de la PPP en Facturacion_NP).
 --        ETAPA 4 (CP):     saca de a_facturar las cajas 'cp' (Completar Pedido)
 --          de una NP YA facturada — la ETAPA 3 no las ve porque el CP marca ref=NP
---          (sin tanda). Ver nota v6.66. (migración `pipeline_etapa4_drenar_cp_facturado`)
+--          (sin tanda). Ver nota v6.69. (migración `pipeline_etapa4_drenar_cp_facturado`)
 --      Dedup por la existencia del movimiento (separar_pedidos / tipo='separado'
 --      / tipo='facturado' por ref=tanda). Comparte los `tipo` con el cliente, así
 --      si una app nueva sí corre el pipeline, los guards evitan doble conteo.
@@ -87,7 +87,7 @@
 --    compensaron con ajustes trazables (tipo='ajuste', legajo='reconcilia', uno
 --    por tanda, llevando cada a_facturar-por-tanda a 0). ETAPA 1 y 2 sin cambios.
 --
---  v6.66 — ETAPA 4: DRENAR CAJAS DE "COMPLETAR PEDIDO" (CP) DE NPs YA FACTURADAS.
+--  v6.69 — ETAPA 4: DRENAR CAJAS DE "COMPLETAR PEDIDO" (CP) DE NPs YA FACTURADAS.
 --    Root cause: un CP que completa una NP **ya facturada** mete cajas en a_facturar
 --    con `tipo='cp'` y `ref=NP` (solo el número, sin tanda). El fast-path del cliente
 --    (`stockDrenarCPFacturado`, llamado en cpConfirm y en el tilde de Facturación) debía

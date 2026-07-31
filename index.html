@@ -3000,7 +3000,9 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
   #npConsultaModal.show{ display:block; }
   .npc-top,.npc-empty{ max-width:1240px; margin:0 auto; }
   .npc-top{ position:relative; }
-  .npc-top h1{ font-size:19px; margin:0 0 10px; display:flex; align-items:center; gap:8px; color:#0f172a; }
+  .npc-top h1{ font-size:19px; margin:0 0 10px; padding-right:96px; display:flex; align-items:center; gap:8px; color:#0f172a; }
+  /* v6.68 — Cerrar arriba a la derecha (antes quedaba suelto en medio del panel) */
+  .fac-close-btn.npc{ position:absolute; top:0; right:0; z-index:3; padding:9px 18px; font-size:14px; border-radius:9px; box-shadow:0 2px 8px rgba(220,38,38,.28); }
   .npc-filters{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px; }
   .npc-inp{ flex:1 1 130px; min-width:0; padding:9px 11px; border:1px solid #cbd5e1; border-radius:9px; font-size:14px; background:#fff; }
   .npc-filters .npc-inp-all{ flex:1 1 260px; }
@@ -3008,7 +3010,6 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
   .npc-btn-clear{ flex:0 0 auto; padding:9px 14px; border:1px solid #cbd5e1; border-radius:9px; background:#fff; font-size:13px; font-weight:700; color:#334155; cursor:pointer; }
   .npc-stats{ display:flex; gap:8px; align-items:center; margin-bottom:10px; flex-wrap:wrap; }
   .npc-chip{ background:#e2e8f0; border-radius:999px; padding:3px 11px; font-size:12.5px; font-weight:700; color:#334155; display:inline-flex; align-items:center; gap:6px; }
-  .fac-close-btn.npc{ }
   #npcContainer{ max-width:1240px; margin:0 auto; display:flex; flex-direction:column; gap:9px; }
   .npc-card{ background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:11px 13px; }
   .npc-card.falt{ border-color:#fca5a5; background:#fffafa; }
@@ -3048,6 +3049,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
 </style>
 <div id="npConsultaModal">
   <div class="npc-top">
+    <button class="fac-close-btn npc" onclick="closeNpConsulta()">Cerrar</button>
     <h1><img class="hdr-logo" src="icon.svg" alt="">Consulta de Notas de Pedido — Composición a líos</h1>
     <div class="npc-filters">
       <input id="npcQ" class="npc-inp npc-inp-all" placeholder="🔎 Buscar por NP, tanda, cod cliente, razón social o fecha… (podés combinar, ej. «osa 15/07»)" oninput="npcApply()" autocomplete="off">
@@ -3057,7 +3059,6 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       <span class="npc-chip" id="npcCount">—</span>
       <span class="npc-chip"><span class="fac-dot" id="npcDot"></span><span id="npcStatus">Cargando…</span></span>
     </div>
-    <button class="fac-close-btn" onclick="closeNpConsulta()">Cerrar</button>
   </div>
   <div id="npcContainer"><div class="fac-empty">Cargando…</div></div>
 </div>
@@ -5706,7 +5707,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v6.66";
+const APP_VERSION = "v6.69";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -8593,7 +8594,7 @@ async function openStockAdmin(soloConteo) {
   const _solo = soloConteo === true;   // rol "solo conteo" (Giuliana): solo la solapa Conteo
   if (!document.getElementById("stkCss")) {
     const s = document.createElement("style"); s.id = "stkCss";
-    s.textContent = "#stockAdminOverlay{display:none;position:fixed;inset:0;z-index:1280;background:rgba(2,6,23,.74);overflow:auto;padding:14px;}#stockAdminOverlay.show{display:block;}.stk-card{background:#f8fafc;max-width:min(1500px,97vw);margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.stk-head{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:linear-gradient(90deg,#1e6bd6,#1e3a8a);color:#fff;}.stk-title{font-size:19px;font-weight:800;}.stk-close{background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;width:auto;}.stk-body{padding:14px 16px;}.stk-loading,.stk-empty{padding:24px;text-align:center;color:#64748b;}.stk-cut{background:#fffbeb;border:1px solid #fcd34d;color:#92400e;border-radius:9px;padding:8px 11px;font-size:12.5px;font-weight:700;margin-bottom:10px;}.stk-filtro{flex:1;min-width:180px;height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 11px;font-size:14px;}.stk-btn{background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:8px 12px;font-size:13px;font-weight:800;cursor:pointer;width:auto;}.stk-btn.ok{background:#16a34a;color:#fff;border-color:#16a34a;}.stk-btn.danger{background:#fff;color:#b91c1c;border-color:#fca5a5;}.stk-tbl{width:100%;border-collapse:collapse;font-size:13.5px;}.stk-tbl.stk-tbl-fit{width:auto;max-width:100%;}.stk-tbl.stk-tbl-fit td.stk-desc{max-width:210px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.stk-tbl.stk-tbl-sect td.stk-desc{max-width:140px;}.stk-tbl.stk-tbl-fit th.num,.stk-tbl.stk-tbl-fit td.num{text-align:right;padding-left:9px;padding-right:9px;}.stk-tblwrap{overflow-x:auto;max-width:100%;}.stk-tbl.stk-tbl-fit th.num{vertical-align:bottom;line-height:1.15;}.stk-tbl th{background:#f1f5f9;color:#475569;text-align:left;padding:7px 9px;font-size:11px;text-transform:uppercase;border-bottom:1px solid #cbd5e1;}.stk-tbl td{padding:7px 9px;}.stk-tbl th.num,.stk-tbl td.num{text-align:right;font-variant-numeric:tabular-nums;}.stk-row{cursor:pointer;border-bottom:1px solid #eef2f7;}.stk-row:hover{background:#eff6ff;}.stk-row td{padding:7px 9px;}.stk-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#1e6bd6;}.stk-desc{color:#475569;}.stk-neg{color:#b91c1c;font-weight:800;}.stk-pick-cell{cursor:pointer;color:#1e6bd6;font-weight:800;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px;}.stk-pick-cell:hover{background:#eff6ff;}.stk-caret{color:#94a3b8;}.stk-detrow td{padding:0 9px 9px;background:#f8fafc;}.stk-det{border-left:3px solid #cbd5e1;padding:6px 0 6px 10px;}.stk-mv{display:flex;gap:9px;font-size:12px;padding:3px 0;align-items:center;}.stk-mv-old{opacity:.45;}.stk-mv-ts{color:#64748b;min-width:96px;}.stk-mv-tipo{font-weight:800;min-width:78px;}.stk-mv-dep{color:#64748b;min-width:74px;}.stk-mv-d{font-weight:800;min-width:44px;text-align:right;}.stk-mv-d.pos{color:#15803d;}.stk-mv-d.neg{color:#b91c1c;}.stk-mv-ref{color:#94a3b8;}.stk-ini-txt{width:100%;border:1px solid #cbd5e1;border-radius:9px;padding:9px;font-family:Consolas,Menlo,monospace;font-size:14px;}.stk-ini-btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}.stk-ini-warn{font-size:12px;color:#92400e;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:8px;margin-top:10px;}.stk-tabs{display:flex;gap:4px;padding:8px 12px 0;background:#1e3a8a;flex-wrap:wrap;}.stk-tab{flex:0 1 auto;width:auto;white-space:nowrap;background:rgba(255,255,255,.12);color:#cbd5e1;border:none;border-radius:9px 9px 0 0;padding:9px 13px;font-size:12.5px;font-weight:800;cursor:pointer;}.stk-tab.on{background:#f8fafc;color:#1e3a8a;}.stk-seg{display:flex;gap:6px;margin-bottom:10px;}.stk-segb{flex:1;background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:7px;font-size:13px;font-weight:800;cursor:pointer;}.stk-segb.on{background:#1e6bd6;color:#fff;border-color:#1e6bd6;}.stk-grp{margin-bottom:10px;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;}.stk-grp-h{background:#f1f5f9;padding:7px 10px;font-weight:800;font-size:13px;}.stk-grp-tot{color:#15803d;font-weight:800;margin-left:6px;}.stk-ing{display:flex;gap:9px;align-items:center;padding:5px 10px;border-top:1px solid #f1f5f9;font-size:12.5px;}.stk-ing-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#1e6bd6;}.stk-ing-desc{flex:1;color:#475569;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.stk-ing-rto{color:#94a3b8;font-size:11px;}.stk-aj-sec{border:1px solid #e2e8f0;border-radius:12px;padding:12px;margin-bottom:12px;}.stk-aj-h{font-size:15px;font-weight:800;margin-bottom:6px;}.stk-aj-hint{font-size:12px;color:#64748b;margin-bottom:7px;}.stk-aj-form{display:flex;gap:7px;flex-wrap:wrap;}.stk-aj-inp{flex:1;min-width:90px;height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 10px;font-size:14px;text-align:center;}.cnt-in{height:32px;border:1px solid #cbd5e1;border-radius:7px;padding:0 6px;font-size:13px;box-sizing:border-box;margin:0;width:auto;}.stk-aj-dep{margin-bottom:12px;font-size:13px;font-weight:800;}.stk-aj-dep select{height:36px;border:1px solid #cbd5e1;border-radius:8px;padding:0 8px;font-size:14px;font-weight:700;}.stk-rk-orden{background:#f1f5f9;border-radius:10px;padding:10px 12px;font-size:13px;margin-bottom:10px;}.stk-rk-orden.pend{background:#fffbeb;border:1.5px solid #fcd34d;color:#92400e;}.stk-rk-baj{display:flex;align-items:center;gap:10px;border:1px solid #e2e8f0;border-radius:11px;padding:9px 11px;margin-bottom:8px;background:#fff;}.stk-rk-baji{flex:1;min-width:0;}.stk-rk-q{font-size:12px;color:#1e6bd6;font-weight:700;margin-top:2px;}";
+    s.textContent = "#stockAdminOverlay{display:none;position:fixed;inset:0;z-index:1280;background:rgba(2,6,23,.74);overflow:auto;padding:14px;}#stockAdminOverlay.show{display:block;}.stk-card{background:#f8fafc;max-width:min(1500px,97vw);margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.stk-head{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:linear-gradient(90deg,#1e6bd6,#1e3a8a);color:#fff;}.stk-title{font-size:19px;font-weight:800;}.stk-close{background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;width:auto;}.stk-body{padding:14px 16px;}.stk-loading,.stk-empty{padding:24px;text-align:center;color:#64748b;}.stk-cut{background:#fffbeb;border:1px solid #fcd34d;color:#92400e;border-radius:9px;padding:8px 11px;font-size:12.5px;font-weight:700;margin-bottom:10px;}.stk-filtro{flex:1;min-width:180px;height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 11px;font-size:14px;}.stk-btn{background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:8px 12px;font-size:13px;font-weight:800;cursor:pointer;width:auto;}.stk-btn.ok{background:#16a34a;color:#fff;border-color:#16a34a;}.stk-btn.danger{background:#fff;color:#b91c1c;border-color:#fca5a5;}.stk-tbl{width:100%;border-collapse:collapse;font-size:13.5px;}.stk-tbl.stk-tbl-fit{width:auto;max-width:100%;}.stk-tbl.stk-tbl-fit td.stk-desc{max-width:210px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.stk-tbl.stk-tbl-sect td.stk-desc{max-width:140px;}.stk-tbl.stk-tbl-fit th.num,.stk-tbl.stk-tbl-fit td.num{text-align:right;padding-left:9px;padding-right:9px;}.stk-tblwrap{overflow-x:auto;max-width:100%;}.stk-tbl.stk-tbl-fit th.num{vertical-align:bottom;line-height:1.15;}.stk-tbl th{background:#f1f5f9;color:#475569;text-align:left;padding:7px 9px;font-size:11px;text-transform:uppercase;border-bottom:1px solid #cbd5e1;}.stk-tbl td{padding:7px 9px;}.stk-tbl th.num,.stk-tbl td.num{text-align:right;font-variant-numeric:tabular-nums;}.stk-row{cursor:pointer;border-bottom:1px solid #eef2f7;}.stk-row:hover{background:#eff6ff;}.stk-row td{padding:7px 9px;}.stk-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#1e6bd6;}.stk-desc{color:#475569;}.stk-neg{color:#b91c1c;font-weight:800;}.stk-pick-cell{cursor:pointer;color:#1e6bd6;font-weight:800;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px;}.stk-pick-cell:hover{background:#eff6ff;}.stk-tbl td.stk-hist0{color:#94a3b8;font-weight:700;}.stk-tbl td.stk-hist0:hover{background:#f1f5f9;color:#475569;}.stk-caret{color:#94a3b8;}.stk-detrow td{padding:0 9px 9px;background:#f8fafc;}.stk-det{border-left:3px solid #cbd5e1;padding:6px 0 6px 10px;}.stk-mv{display:flex;gap:9px;font-size:12px;padding:3px 0;align-items:center;}.stk-mv-old{opacity:.45;}.stk-mv-ts{color:#64748b;min-width:96px;}.stk-mv-tipo{font-weight:800;min-width:78px;}.stk-mv-dep{color:#64748b;min-width:74px;}.stk-mv-d{font-weight:800;min-width:44px;text-align:right;}.stk-mv-d.pos{color:#15803d;}.stk-mv-d.neg{color:#b91c1c;}.stk-mv-ref{color:#94a3b8;}.stk-ini-txt{width:100%;border:1px solid #cbd5e1;border-radius:9px;padding:9px;font-family:Consolas,Menlo,monospace;font-size:14px;}.stk-ini-btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}.stk-ini-warn{font-size:12px;color:#92400e;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:8px;margin-top:10px;}.stk-tabs{display:flex;gap:4px;padding:8px 12px 0;background:#1e3a8a;flex-wrap:wrap;}.stk-tab{flex:0 1 auto;width:auto;white-space:nowrap;background:rgba(255,255,255,.12);color:#cbd5e1;border:none;border-radius:9px 9px 0 0;padding:9px 13px;font-size:12.5px;font-weight:800;cursor:pointer;}.stk-tab.on{background:#f8fafc;color:#1e3a8a;}.stk-seg{display:flex;gap:6px;margin-bottom:10px;}.stk-segb{flex:1;background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:7px;font-size:13px;font-weight:800;cursor:pointer;}.stk-segb.on{background:#1e6bd6;color:#fff;border-color:#1e6bd6;}.stk-grp{margin-bottom:10px;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;}.stk-grp-h{background:#f1f5f9;padding:7px 10px;font-weight:800;font-size:13px;}.stk-grp-tot{color:#15803d;font-weight:800;margin-left:6px;}.stk-ing{display:flex;gap:9px;align-items:center;padding:5px 10px;border-top:1px solid #f1f5f9;font-size:12.5px;}.stk-ing-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#1e6bd6;}.stk-ing-desc{flex:1;color:#475569;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.stk-ing-rto{color:#94a3b8;font-size:11px;}.stk-aj-sec{border:1px solid #e2e8f0;border-radius:12px;padding:12px;margin-bottom:12px;}.stk-aj-h{font-size:15px;font-weight:800;margin-bottom:6px;}.stk-aj-hint{font-size:12px;color:#64748b;margin-bottom:7px;}.stk-aj-form{display:flex;gap:7px;flex-wrap:wrap;}.stk-aj-inp{flex:1;min-width:90px;height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 10px;font-size:14px;text-align:center;}.cnt-in{height:32px;border:1px solid #cbd5e1;border-radius:7px;padding:0 6px;font-size:13px;box-sizing:border-box;margin:0;width:auto;}.stk-aj-dep{margin-bottom:12px;font-size:13px;font-weight:800;}.stk-aj-dep select{height:36px;border:1px solid #cbd5e1;border-radius:8px;padding:0 8px;font-size:14px;font-weight:700;}.stk-rk-orden{background:#f1f5f9;border-radius:10px;padding:10px 12px;font-size:13px;margin-bottom:10px;}.stk-rk-orden.pend{background:#fffbeb;border:1.5px solid #fcd34d;color:#92400e;}.stk-rk-baj{display:flex;align-items:center;gap:10px;border:1px solid #e2e8f0;border-radius:11px;padding:9px 11px;margin-bottom:8px;background:#fff;}.stk-rk-baji{flex:1;min-width:0;}.stk-rk-q{font-size:12px;color:#1e6bd6;font-weight:700;margin-top:2px;}";
     document.head.appendChild(s);
   }
   let ov = document.getElementById("stockAdminOverlay");
@@ -10003,6 +10004,15 @@ function stkBodyStocks() {
   cols.forEach(function (c) { th += '<th class="num">' + c.label.replace(" ", "<br>") + '</th>'; });
   h += '<div class="stk-tblwrap"><table class="stk-tbl stk-tbl-fit"><thead><tr>' + th + '<th></th></tr></thead><tbody>';
   if (!shown.length) h += '<tr><td colspan="' + ncol + '" class="stk-empty">Sin stock todavía.</td></tr>';
+  // v6.67 — celdas de depósito clickeables AUNQUE el saldo sea 0, si el artículo TUVO
+  // movimientos ahí alguna vez (el pop-up muestra el historial que neteó a 0). Se cachea
+  // en _stk._histDeps (Set "codN|deposito") — O(movs) una sola vez, no por tecla.
+  if (!_stk._histDeps) {
+    const hs = new Set();
+    (_stk.movs || []).forEach(function (mv) { const c = _stkNormCod(mv.cod_art), dep = String(mv.deposito || ""); if (c && dep) hs.add(c + "|" + dep); });
+    _stk._histDeps = hs;
+  }
+  const _histDeps = _stk._histDeps;
   shown.forEach(function (a) {
     const _tot = SECTKEYS.reduce(function (s, k) { return s + (Number(a[k]) || 0); }, 0);
     const _ped = Number(dem[_ocgNorm(a.cod)]) || 0;
@@ -10011,8 +10021,10 @@ function stkBodyStocks() {
     cols.forEach(function (c) {
       const v = Number(a[c.key]) || 0;
       // v5.82: columnas clickeables → detalle. Pickeados/A facturar → NPs; Excedente/Racks → ubicación.
+      // v6.67: también con saldo 0 si TUVO movimientos en ese depósito (ver el historial).
       let _clk = "";
-      if (v > 0.05) {
+      const _hasHist = _histDeps.has(_stkNormCod(a.cod) + "|" + c.key);
+      if (v > 0.05 || _hasHist) {
         const _ce = encodeURIComponent(a.cod);
         if (c.key === "separar_pedidos") _clk = "stkOpenMovsArt('" + _ce + "','separar_pedidos','Pickeados','🛒')";   // v6.47: ver movimientos (como góndola)
         else if (c.key === "a_facturar") _clk = "stkOpenMovsArt('" + _ce + "','a_facturar','A facturar','🧾')";       // v6.47
@@ -10022,7 +10034,8 @@ function stkBodyStocks() {
         else if (c.key === "a_guardar") _clk = "stkOpenMovsArt('" + _ce + "','a_guardar','A guardar','📦')";  // v5.100
       }
       if (_clk) {
-        tds += '<td class="num stk-pick-cell" onclick="event.stopPropagation();' + _clk + '" title="Ver detalle (NPs / ubicación)">' + fmtCajas(v) + '</td>';
+        const _zero = v <= 0.05;   // saldo 0 con historial → gris + tooltip distinto
+        tds += '<td class="num stk-pick-cell' + (_zero ? " stk-hist0" : "") + '" onclick="event.stopPropagation();' + _clk + '" title="' + (_zero ? "Saldo 0 ahora, pero tuvo movimientos — ver el historial" : "Ver detalle (NPs / ubicación)") + '">' + (c.key === "terminado" ? '<b>' + fmtCajas(v) + '</b>' : fmtCajas(v)) + '</td>';
       } else {
         tds += '<td class="num ' + (v < 0 ? "stk-neg" : "") + '">' + (c.key === "terminado" ? '<b>' + fmtCajas(v) + '</b>' : fmtCajas(v)) + '</td>';
       }
@@ -10186,13 +10199,30 @@ var STK_POP_CSS =
   ".mva-clear{width:auto;margin:0;padding:6px 10px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;font-weight:800;cursor:pointer;color:#64748b;}" +
   ".mva-tblwrap{overflow-x:hidden;overflow-y:auto;max-height:60vh;border:1px solid #e2e8f0;border-radius:10px;}" +
   ".mva-tbl{border-collapse:collapse;width:100%;font-size:12px;table-layout:fixed;}" +
-  ".mva-tbl th,.mva-tbl td{padding:5px 7px;border-bottom:1px solid #eef2f6;text-align:left;white-space:nowrap;vertical-align:top;}" +
+  ".mva-tbl th,.mva-tbl td{padding:7px 9px;border-bottom:1px solid #eef2f6;text-align:left;white-space:nowrap;vertical-align:top;}" +
+  ".mva-tbl tbody tr:not(.mva-detrow):hover{background:#f9fbff;}" +
   ".mva-tbl td.mva-ts,.mva-tbl td.mva-mov{white-space:normal;word-break:break-word;}" +
-  ".mva-tbl td.mva-ts{width:33%;color:#475569;font-size:11px;}.mva-tbl td.mva-mov{width:37%;}" +
-  ".mva-tbl thead th{position:sticky;top:0;background:#f8fafc;color:#64748b;font-size:10px;text-transform:uppercase;font-weight:800;}" +
-  ".mva-tbl th.num,.mva-tbl td.mva-cant,.mva-tbl td.mva-sal{text-align:right;font-variant-numeric:tabular-nums;font-weight:800;width:15%;}" +
+  ".mva-tbl td.mva-ts{width:31%;color:#475569;font-size:11px;line-height:1.35;padding-top:8px;}.mva-tbl td.mva-mov{width:39%;}" +
+  ".mva-tbl thead th{position:sticky;top:0;background:#f8fafc;color:#64748b;font-size:10px;text-transform:uppercase;letter-spacing:.03em;font-weight:800;}" +
+  ".mva-tbl th.num,.mva-tbl td.mva-cant,.mva-tbl td.mva-sal{text-align:right;font-variant-numeric:tabular-nums;font-weight:800;width:15%;padding-top:8px;}" +
   ".mva-tbl .mva-pos{color:#15803d;}.mva-tbl .mva-neg{color:#b91c1c;}" +
-  ".mva-np{display:inline-block;background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af;border-radius:6px;padding:0 5px;font-size:10.5px;font-weight:800;margin-left:2px;white-space:nowrap;}" +
+  // v6.68 — celda MOVIMIENTO como flex: slot fijo para el toggle (vacío en guardado) →
+  // 'recepcion' y 'guardado' arrancan alineados; cuerpo con chips que fluyen prolijo.
+  ".mva-movrow{display:flex;align-items:flex-start;gap:6px;}" +
+  ".mva-tgslot{flex:0 0 20px;}" +   // espaciador para guardado (sin '+') → alinea los rótulos
+  ".mva-movbody{flex:1;min-width:0;display:flex;flex-wrap:wrap;align-items:center;gap:4px 5px;line-height:1.5;}" +
+  ".mva-movtipo{font-weight:700;color:#334155;text-transform:capitalize;}" +
+  ".mva-np{display:inline-flex;align-items:center;background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af;border-radius:999px;padding:1px 7px;font-size:10.5px;font-weight:800;white-space:nowrap;}" +
+  ".mva-qui{display:inline-flex;align-items:center;gap:3px;background:#f1f5f9;border:1px solid #cbd5e1;color:#334155;border-radius:999px;padding:1px 7px;font-size:10.5px;font-weight:800;white-space:nowrap;}" +
+  ".mva-qui b{color:#0f172a;}.mva-qui.aprox{background:#fffbeb;border-color:#fde68a;color:#92400e;}.mva-qui .mva-aprox{opacity:.7;font-weight:900;}" +
+  ".mva-rto-tg{flex:0 0 20px;align-self:flex-start;margin:0;display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;padding:0;border:1px solid #bfdbfe;background:#eff6ff;color:#2563eb;border-radius:6px;font-size:15px;font-weight:800;line-height:1;cursor:pointer;transition:background .12s,border-color .12s;}" +
+  ".mva-rto-tg:hover{background:#dbeafe;border-color:#93c5fd;}" +
+  ".mva-tbl td.mva-detcell{white-space:normal;padding:0;background:#f8fafc;}" +
+  ".mva-rto{border-left:3px solid #60a5fa;margin:0 0 2px 6px;padding:7px 9px;}" +
+  ".mva-rto-h{font-size:11.5px;color:#334155;margin-bottom:6px;}.mva-rto-h .mva-ref{font-size:11px;}" +
+  ".mva-rto-its{display:flex;flex-wrap:wrap;gap:5px;}" +
+  ".mva-rto-it{display:inline-block;background:#eef2ff;border:1px solid #c7d2fe;color:#3730a3;border-radius:6px;padding:1px 7px;font-size:11.5px;font-weight:700;}" +
+  ".mva-rto-it b{color:#1e1b4b;}.mva-rto-it.on{background:#dcfce7;border-color:#86efac;color:#166534;}.mva-rto-it.on b{color:#14532d;}" +
   ".mva-ts{color:#94a3b8;font-size:11px;}.mva-ref{color:#64748b;font-family:Consolas,Menlo,monospace;}" +
   ".mva-in{color:#15803d;}.mva-out{color:#b91c1c;}.mva-sal{color:#1e3a8a;}" +
   ".stkpop-ubic{color:#7c3aed;font-weight:800;white-space:nowrap;}";
@@ -10423,6 +10453,7 @@ async function stkOpenRacksArt(codEnc) {
   _stkPop.pos = (rows || []).filter(function (x) { return _stkNormCod(x.cod_art) === codN; })
     .sort(function (a, b) { return String(a.sector).localeCompare(String(b.sector), undefined, { numeric: true }); });
   stkRacksArtRender();
+  _stkQuienLoad(stkRacksArtRender);   // v6.66 — 👤 siglas + legajo en los movimientos de racks
 }
 function _stkEsGuardado(mv) { return mv.tipo === "guardado" || mv.tipo === "guardado_fuera_lista" || mv.tipo === "baja_racks"; }
 /* v5.101 — CAPACIDAD de góndola por artículo: las ubicaciones (sectores) y cuántas
@@ -10542,6 +10573,7 @@ async function stkOpenMovsArt(codEnc, dep, titulo, icono) {
   _stkPop = { kind: "movsArt", cod: cod, codN: _stkNormCod(cod), dep: dep, titulo: titulo || dep, icono: icono || "🔁", desde: "", hasta: "", npByTanda: {} };
   _stkPopShell((icono || "🔁") + " " + (titulo || dep) + " — " + escapeHtml(cod), "stkPopBody");
   stkMovsArtRender();   // render inmediato (el NP de cada picking aparece cuando llega el fetch)
+  _stkQuienLoad(stkMovsArtRender);   // v6.66 — 👤 siglas + legajo (nombres + sesiones de RT)
   // v6.32 — NP(s) que pidieron ESTE artículo en cada tanda → para las filas de picking/separado.
   try {
     const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
@@ -10562,6 +10594,133 @@ function stkMovsArtDate(which, val) {
   else if (which === "desde") _stkPop.desde = String(val || "");
   else _stkPop.hasta = String(val || "");
   if (_stkPop.kind === "racksArt") stkRacksArtRender(); else stkMovsArtRender();
+}
+/* ===== v6.66 — QUIÉN hizo cada movimiento (siglas + legajo) en el detalle por artículo.
+   `Movimientos_Stock.legajo` viene cargado en guardado / picking / ajustes, pero en las
+   RECEPCIONES recién se graba desde la idea 7725 (30/07/2026): las viejas lo tienen NULL.
+   Para esas se deduce por la SESIÓN de RT — el movimiento cae dentro del [inicio, cierre]
+   del RT de ese operario en `Registros_Produccion_Virgilio` (opcion='RT': la fila de cierre
+   trae ts_inicio=arranque y ts_cliente=cierre; la de apertura, solo ts_cliente=arranque).
+   Lo deducido se marca en ámbar con "~"; lo que sale del propio movimiento, en gris. */
+let _stkRtSes = null;
+async function _stkLoadRtSes() {
+  if (_stkRtSes) return _stkRtSes;
+  const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+  let rows = [];
+  try {
+    rows = await fetch(SUPABASE_TABLE_ENDPOINT + "?opcion=eq.RT&select=legajo,ts_inicio,ts_cliente&order=ts_cliente.desc&limit=6000", { headers: H, cache: "no-store" })
+      .then(function (r) { return r.ok ? r.json() : []; });
+  } catch (_e) { rows = []; }
+  const ms = function (v) { const t = v ? new Date(v).getTime() : NaN; return isFinite(t) ? t : null; };
+  const ses = [], abiertas = [];
+  rows.forEach(function (r) {
+    const leg = String(r.legajo || "").trim(); if (!leg) return;
+    const ini = ms(r.ts_inicio), fin = ms(r.ts_cliente);
+    if (ini != null && fin != null) ses.push({ leg: leg, ini: ini, fin: fin });        // sesión cerrada
+    else if (fin != null) abiertas.push({ leg: leg, ini: fin });                        // toque de apertura
+  });
+  // Una apertura sin su cierre = sesión todavía abierta (las recepciones de hoy).
+  abiertas.forEach(function (a) {
+    const cerrada = ses.some(function (s) { return s.leg === a.leg && Math.abs(s.ini - a.ini) < 3000; });
+    if (!cerrada) ses.push({ leg: a.leg, ini: a.ini, fin: Infinity });
+  });
+  _stkRtSes = ses;
+  return ses;
+}
+/* Legajo del que estaba haciendo RT (recepción) en ese instante. Si se superponen
+   dos sesiones, gana la que arrancó más tarde. 10 min de gracia al cierre: el
+   movimiento se inserta un toque después de cerrar el RT. */
+function _stkRtQuien(ts) {
+  if (!_stkRtSes || !_stkRtSes.length) return "";
+  const t = new Date(ts).getTime(); if (!isFinite(t)) return "";
+  let best = null;
+  _stkRtSes.forEach(function (s) {
+    if (t < s.ini - 60000 || t > s.fin + 600000) return;
+    if (!best || s.ini > best.ini) best = s;
+  });
+  return best ? best.leg : "";
+}
+/* Chip "👤 SIGLAS · legajo" del movimiento (vacío si no se puede saber quién fue). */
+function _stkQuienChip(mv) {
+  let leg = mv.legajo != null ? String(mv.legajo).trim() : "", aprox = false;
+  if (!leg && String(mv.tipo || "") === "recepcion") { leg = _stkRtQuien(mv.ts); aprox = !!leg; }
+  if (!leg) return "";
+  const nom = (typeof _empleadosNombres !== "undefined" && _empleadosNombres) ? (_empleadosNombres.get(leg) || "") : "";
+  const sig = (typeof initialsFromName === "function" ? initialsFromName(nom, leg) : "") || nom || leg;
+  const tip = (nom || ("legajo " + leg)) + (aprox ? " — deducido por la sesión de RT (recepción vieja, sin legajo guardado)" : "");
+  return ' <span class="mva-qui' + (aprox ? " aprox" : "") + '" title="' + escapeHtml(tip) + '">👤 <b>' + escapeHtml(sig) + '</b> · ' + escapeHtml(leg) + (aprox ? ' <span class="mva-aprox">~</span>' : "") + '</span>';
+}
+/* Carga (una sola vez) nombres de empleados + sesiones de RT y re-dibuja el popup. */
+function _stkQuienLoad(rerender) {
+  try {
+    Promise.all([
+      (typeof getEmpleadosNombres === "function" ? getEmpleadosNombres().catch(function () { return null; }) : Promise.resolve(null)),
+      _stkLoadRtSes().catch(function () { return null; })
+    ]).then(function () { if (_stkPop && typeof rerender === "function") rerender(); });
+  } catch (_e) {}
+}
+/* ===== v6.67 — "+" por recepción: despliega la ENTREGA completa (día, proveedor/
+   tallerista, y los códigos con cuántas cajas de cada uno). Fuente: Control_Modo_OP —
+   recepcion.js graba una fila por envío con fecha, tipo ('tallerista'/'prov_at'),
+   nombre, remito y detalle="cod → cajas · cod → cajas". Fallback si no hay fila (envíos
+   viejos): se arma con los movimientos de recepción del mismo remito y día (_stk.movs),
+   sin el nombre del proveedor. */
+function stkRtoToggle(rid, refEnc) {
+  if (!_stkPop) return;
+  _stkPop.rtoOpen = _stkPop.rtoOpen || {};
+  _stkPop.rtoOpen[rid] = !_stkPop.rtoOpen[rid];
+  if (_stkPop.rtoOpen[rid]) stkRtoFetch(decodeURIComponent(refEnc || ""));
+  (_stkPop.kind === "racksArt" ? stkRacksArtRender : stkMovsArtRender)();
+}
+async function stkRtoFetch(ref) {
+  const key = String(ref || "");
+  _stkPop.rtoData = _stkPop.rtoData || {};
+  if (!key || _stkPop.rtoData[key]) return;   // sin remito, o ya en curso / cacheado
+  _stkPop.rtoData[key] = { loading: true, rows: [] };
+  try {
+    const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+    const rows = await fetch(SUPABASE_URL + "/rest/v1/Control_Modo_OP?remito=eq." + encodeURIComponent(key) + "&select=nombre,tipo,fecha,detalle,cantidad_total,created_at&order=created_at.desc&limit=20", { headers: H, cache: "no-store" })
+      .then(function (r) { return r.ok ? r.json() : []; });
+    _stkPop.rtoData[key] = { loading: false, rows: rows || [] };
+  } catch (_e) { _stkPop.rtoData[key] = { loading: false, rows: [] }; }
+  if (_stkPop) (_stkPop.kind === "racksArt" ? stkRacksArtRender : stkMovsArtRender)();
+}
+function _stkArDay(ts) { try { return new Date(ts).toLocaleDateString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", day: "2-digit", month: "2-digit", year: "numeric" }); } catch (_e) { return ""; } }
+/* HTML del detalle de la entrega para una fila de recepción (mv). */
+function _stkRtoDetail(mv) {
+  const ref = String(mv.ref || ""), dayMv = _stkArDay(mv.ts), codN = _stkNormCod(mv.cod_art);
+  const data = (_stkPop.rtoData || {})[ref];
+  // elegir la fila de Control_Modo_OP de ESTE envío (mismo remito + mismo día); si el
+  // remito se reusó, cae a la del día por created_at, o a la única que haya.
+  let row = null;
+  if (data && data.rows && data.rows.length) {
+    row = data.rows.filter(function (r) { return r.fecha && _stkArDay(r.fecha + "T12:00:00") === dayMv; })[0]
+       || data.rows.filter(function (r) { return r.created_at && _stkArDay(r.created_at) === dayMv; })[0]
+       || (data.rows.length === 1 ? data.rows[0] : null);
+  }
+  let items = [], nombre = "", tipoTxt = "", diaTxt = dayMv;
+  if (row) {
+    nombre = String(row.nombre || "");
+    tipoTxt = row.tipo === "prov_at" ? "Proveedor" : (row.tipo === "tallerista" ? "Tallerista" : "");
+    if (row.fecha) { const d = _stkArDay(row.fecha + "T12:00:00"); if (d) diaTxt = d; }
+    items = String(row.detalle || "").split("·").map(function (s) { const m = s.split("→"); return { cod: (m[0] || "").trim(), caj: (m[1] || "").trim() }; }).filter(function (x) { return x.cod; });
+  } else {
+    // fallback: recepciones del mismo remito y día en _stk.movs (sin nombre de proveedor).
+    const agg = {};
+    ((_stk && _stk.movs) || []).forEach(function (m) {
+      if (String(m.tipo || "") !== "recepcion" || String(m.ref || "") !== ref || _stkArDay(m.ts) !== dayMv) return;
+      const c = String(m.cod_art || ""); if (c) agg[c] = (agg[c] || 0) + (Number(m.delta) || 0);
+    });
+    items = Object.keys(agg).map(function (c) { return { cod: c, caj: String(Math.round(agg[c] * 10) / 10) }; });
+  }
+  const loading = !!(data && data.loading);
+  let head = '📅 <b>' + escapeHtml(diaTxt || "—") + '</b>';
+  if (nombre) head += ' · ' + (tipoTxt ? escapeHtml(tipoTxt) + ' ' : "") + '<b>' + escapeHtml(nombre) + '</b>';
+  else if (loading) head += ' · <span style="color:#94a3b8">cargando proveedor…</span>';
+  else head += ' · <span style="color:#94a3b8">proveedor/tallerista no registrado</span>';
+  if (ref) head += ' · <span class="mva-ref">RTO/FC ' + escapeHtml(ref) + '</span>';
+  const chips = items.map(function (it) { const on = _stkNormCod(it.cod) === codN; return '<span class="mva-rto-it' + (on ? " on" : "") + '">' + escapeHtml(it.cod) + ' <b>' + escapeHtml(it.caj) + '</b></span>'; }).join("");
+  return '<div class="mva-rto"><div class="mva-rto-h">' + head + '</div>' + (items.length ? '<div class="mva-rto-its">' + chips + '</div>' : '<div style="color:#94a3b8;font-size:11px">' + (loading ? "cargando…" : "Sin detalle de códigos.") + '</div>') + '</div>';
 }
 /* Bloque HTML de "movimientos por artículo de un depósito" (hint + rango de fechas +
    tabla Entró/Salió/Saldo corrido). Lo comparten Góndola/A guardar (stkMovsArtRender)
@@ -10587,9 +10746,19 @@ function _stkMovsBlock() {
     const refU = String(mv.ref || "").toUpperCase();
     const nps = npByTanda[refU];
     const npTxt = nps && nps.length ? ' <span class="mva-np">NP ' + escapeHtml(nps.join(", ")) + '</span>' : '';
-    return '<tr><td class="mva-ts">' + escapeHtml(stockFmtTs(mv.ts)) + '</td><td class="mva-mov">' + escapeHtml(String(mv.tipo || "")) + (mv.ref ? ' <span class="mva-ref">' + escapeHtml(String(mv.ref)) + '</span>' : '') + npTxt + '</td><td class="mva-cant">' + cant + '</td><td class="mva-sal">' + round1(saldo) + '</td></tr>';
+    // v6.67 — "+" en las recepciones: despliega la ENTREGA completa (día, prov/tall, códigos y cajas).
+    const isRcp = String(mv.tipo || "") === "recepcion";
+    const rid = mv.id != null ? String(mv.id) : (String(mv.ref || "") + "_" + new Date(mv.ts).getTime());
+    const open = isRcp && _stkPop.rtoOpen && _stkPop.rtoOpen[rid];
+    const plus = isRcp ? '<button class="mva-rto-tg" title="Ver la entrega completa (día, proveedor/tallerista, códigos y cajas)" onclick="stkRtoToggle(\'' + escapeHtml(rid) + '\',\'' + encodeURIComponent(String(mv.ref || "")) + '\')">' + (open ? "–" : "+") + '</button>' : '<span class="mva-tgslot"></span>';
+    // v6.66 — 👤 siglas + legajo del que lo hizo (en la recepción, del que recibió).
+    // v6.68 — celda MOVIMIENTO en flex: slot fijo para el "+" (vacío en no-recepciones)
+    // → los rótulos ('recepcion'/'guardado'/'cp'…) arrancan alineados; chips prolijos.
+    const detrow = open ? '<tr class="mva-detrow"><td colspan="4" class="mva-detcell">' + _stkRtoDetail(mv) + '</td></tr>' : '';
+    const movBody = '<span class="mva-movtipo">' + escapeHtml(String(mv.tipo || "")) + '</span>' + (mv.ref ? '<span class="mva-ref">' + escapeHtml(String(mv.ref)) + '</span>' : '') + npTxt + _stkQuienChip(mv);
+    return '<tr><td class="mva-ts">' + escapeHtml(stockFmtTs(mv.ts)) + '</td><td class="mva-mov"><div class="mva-movrow">' + plus + '<span class="mva-movbody">' + movBody + '</span></div></td><td class="mva-cant">' + cant + '</td><td class="mva-sal">' + round1(saldo) + '</td></tr>' + detrow;
   }).join("");
-  let h = '<div class="stkpop-hint">Movimientos de <b>' + escapeHtml(_stkPop.cod) + '</b> en <b>' + escapeHtml(_stkPop.titulo) + '</b>, por fecha. Entró <b style="color:#15803d">+' + round1(totIn) + '</b> · salió <b style="color:#b91c1c">' + round1(totOut) + '</b> · <b>saldo ' + round1(saldo) + '</b>.</div>';
+  let h = '<div class="stkpop-hint">Movimientos de <b>' + escapeHtml(_stkPop.cod) + '</b> en <b>' + escapeHtml(_stkPop.titulo) + '</b>, por fecha. Entró <b style="color:#15803d">+' + round1(totIn) + '</b> · salió <b style="color:#b91c1c">' + round1(totOut) + '</b> · <b>saldo ' + round1(saldo) + '</b>.<br><small style="color:#94a3b8">👤 = siglas y legajo del que lo hizo (en <b>recepcion</b>, del que recibió). En <span class="mva-qui aprox">ámbar ~</span> va el deducido por la sesión de RT (recepciones viejas, sin legajo guardado).</small></div>';
   h += '<div class="mva-daterow">Desde <input type="date" class="mva-date" value="' + escapeHtml(_stkPop.desde) + '" onchange="stkMovsArtDate(\'desde\',this.value)"> hasta <input type="date" class="mva-date" value="' + escapeHtml(_stkPop.hasta) + '" onchange="stkMovsArtDate(\'hasta\',this.value)">' + ((_stkPop.desde || _stkPop.hasta) ? ' <button class="mva-clear" onclick="stkMovsArtDate(\'clear\')">✕</button>' : '') + '</div>';
   h += list.length
     ? '<div class="mva-tblwrap"><table class="mva-tbl"><thead><tr><th>Fecha</th><th>Movimiento</th><th class="num">Cant.</th><th class="num">Saldo</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
