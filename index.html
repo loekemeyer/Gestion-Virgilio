@@ -2997,7 +2997,9 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
   #npConsultaModal.show{ display:block; }
   .npc-top,.npc-empty{ max-width:1240px; margin:0 auto; }
   .npc-top{ position:relative; }
-  .npc-top h1{ font-size:19px; margin:0 0 10px; display:flex; align-items:center; gap:8px; color:#0f172a; }
+  .npc-top h1{ font-size:19px; margin:0 0 10px; padding-right:96px; display:flex; align-items:center; gap:8px; color:#0f172a; }
+  /* v6.68 — Cerrar arriba a la derecha (antes quedaba suelto en medio del panel) */
+  .fac-close-btn.npc{ position:absolute; top:0; right:0; z-index:3; padding:9px 18px; font-size:14px; border-radius:9px; box-shadow:0 2px 8px rgba(220,38,38,.28); }
   .npc-filters{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px; }
   .npc-inp{ flex:1 1 130px; min-width:0; padding:9px 11px; border:1px solid #cbd5e1; border-radius:9px; font-size:14px; background:#fff; }
   .npc-filters .npc-inp-all{ flex:1 1 260px; }
@@ -3005,7 +3007,6 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
   .npc-btn-clear{ flex:0 0 auto; padding:9px 14px; border:1px solid #cbd5e1; border-radius:9px; background:#fff; font-size:13px; font-weight:700; color:#334155; cursor:pointer; }
   .npc-stats{ display:flex; gap:8px; align-items:center; margin-bottom:10px; flex-wrap:wrap; }
   .npc-chip{ background:#e2e8f0; border-radius:999px; padding:3px 11px; font-size:12.5px; font-weight:700; color:#334155; display:inline-flex; align-items:center; gap:6px; }
-  .fac-close-btn.npc{ }
   #npcContainer{ max-width:1240px; margin:0 auto; display:flex; flex-direction:column; gap:9px; }
   .npc-card{ background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:11px 13px; }
   .npc-card.falt{ border-color:#fca5a5; background:#fffafa; }
@@ -3045,6 +3046,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
 </style>
 <div id="npConsultaModal">
   <div class="npc-top">
+    <button class="fac-close-btn npc" onclick="closeNpConsulta()">Cerrar</button>
     <h1><img class="hdr-logo" src="icon.svg" alt="">Consulta de Notas de Pedido — Composición a líos</h1>
     <div class="npc-filters">
       <input id="npcQ" class="npc-inp npc-inp-all" placeholder="🔎 Buscar por NP, tanda, cod cliente, razón social o fecha… (podés combinar, ej. «osa 15/07»)" oninput="npcApply()" autocomplete="off">
@@ -3054,7 +3056,6 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       <span class="npc-chip" id="npcCount">—</span>
       <span class="npc-chip"><span class="fac-dot" id="npcDot"></span><span id="npcStatus">Cargando…</span></span>
     </div>
-    <button class="fac-close-btn" onclick="closeNpConsulta()">Cerrar</button>
   </div>
   <div id="npcContainer"><div class="fac-empty">Cargando…</div></div>
 </div>
@@ -5703,7 +5704,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v6.67";
+const APP_VERSION = "v6.68";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -10188,17 +10189,24 @@ var STK_POP_CSS =
   ".mva-clear{width:auto;margin:0;padding:6px 10px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;font-weight:800;cursor:pointer;color:#64748b;}" +
   ".mva-tblwrap{overflow-x:hidden;overflow-y:auto;max-height:60vh;border:1px solid #e2e8f0;border-radius:10px;}" +
   ".mva-tbl{border-collapse:collapse;width:100%;font-size:12px;table-layout:fixed;}" +
-  ".mva-tbl th,.mva-tbl td{padding:5px 7px;border-bottom:1px solid #eef2f6;text-align:left;white-space:nowrap;vertical-align:top;}" +
+  ".mva-tbl th,.mva-tbl td{padding:7px 9px;border-bottom:1px solid #eef2f6;text-align:left;white-space:nowrap;vertical-align:top;}" +
+  ".mva-tbl tbody tr:not(.mva-detrow):hover{background:#f9fbff;}" +
   ".mva-tbl td.mva-ts,.mva-tbl td.mva-mov{white-space:normal;word-break:break-word;}" +
-  ".mva-tbl td.mva-ts{width:33%;color:#475569;font-size:11px;}.mva-tbl td.mva-mov{width:37%;}" +
-  ".mva-tbl thead th{position:sticky;top:0;background:#f8fafc;color:#64748b;font-size:10px;text-transform:uppercase;font-weight:800;}" +
-  ".mva-tbl th.num,.mva-tbl td.mva-cant,.mva-tbl td.mva-sal{text-align:right;font-variant-numeric:tabular-nums;font-weight:800;width:15%;}" +
+  ".mva-tbl td.mva-ts{width:31%;color:#475569;font-size:11px;line-height:1.35;padding-top:8px;}.mva-tbl td.mva-mov{width:39%;}" +
+  ".mva-tbl thead th{position:sticky;top:0;background:#f8fafc;color:#64748b;font-size:10px;text-transform:uppercase;letter-spacing:.03em;font-weight:800;}" +
+  ".mva-tbl th.num,.mva-tbl td.mva-cant,.mva-tbl td.mva-sal{text-align:right;font-variant-numeric:tabular-nums;font-weight:800;width:15%;padding-top:8px;}" +
   ".mva-tbl .mva-pos{color:#15803d;}.mva-tbl .mva-neg{color:#b91c1c;}" +
-  ".mva-np{display:inline-block;background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af;border-radius:6px;padding:0 5px;font-size:10.5px;font-weight:800;margin-left:2px;white-space:nowrap;}" +
-  ".mva-qui{display:inline-block;background:#f1f5f9;border:1px solid #cbd5e1;color:#334155;border-radius:6px;padding:0 5px;font-size:10.5px;font-weight:800;margin-left:2px;white-space:nowrap;}" +
-  ".mva-qui b{color:#0f172a;}.mva-qui.aprox{background:#fffbeb;border-color:#fde68a;color:#92400e;}" +
-  ".mva-rto-tg{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;padding:0;margin-right:5px;border:1px solid #93c5fd;background:#eff6ff;color:#1e40af;border-radius:5px;font-size:13px;font-weight:800;line-height:1;cursor:pointer;vertical-align:middle;}" +
-  ".mva-rto-tg:hover{background:#dbeafe;}" +
+  // v6.68 — celda MOVIMIENTO como flex: slot fijo para el toggle (vacío en guardado) →
+  // 'recepcion' y 'guardado' arrancan alineados; cuerpo con chips que fluyen prolijo.
+  ".mva-movrow{display:flex;align-items:flex-start;gap:6px;}" +
+  ".mva-tgslot{flex:0 0 20px;}" +   // espaciador para guardado (sin '+') → alinea los rótulos
+  ".mva-movbody{flex:1;min-width:0;display:flex;flex-wrap:wrap;align-items:center;gap:4px 5px;line-height:1.5;}" +
+  ".mva-movtipo{font-weight:700;color:#334155;text-transform:capitalize;}" +
+  ".mva-np{display:inline-flex;align-items:center;background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af;border-radius:999px;padding:1px 7px;font-size:10.5px;font-weight:800;white-space:nowrap;}" +
+  ".mva-qui{display:inline-flex;align-items:center;gap:3px;background:#f1f5f9;border:1px solid #cbd5e1;color:#334155;border-radius:999px;padding:1px 7px;font-size:10.5px;font-weight:800;white-space:nowrap;}" +
+  ".mva-qui b{color:#0f172a;}.mva-qui.aprox{background:#fffbeb;border-color:#fde68a;color:#92400e;}.mva-qui .mva-aprox{opacity:.7;font-weight:900;}" +
+  ".mva-rto-tg{flex:0 0 20px;align-self:flex-start;margin:0;display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;padding:0;border:1px solid #bfdbfe;background:#eff6ff;color:#2563eb;border-radius:6px;font-size:15px;font-weight:800;line-height:1;cursor:pointer;transition:background .12s,border-color .12s;}" +
+  ".mva-rto-tg:hover{background:#dbeafe;border-color:#93c5fd;}" +
   ".mva-tbl td.mva-detcell{white-space:normal;padding:0;background:#f8fafc;}" +
   ".mva-rto{border-left:3px solid #60a5fa;margin:0 0 2px 6px;padding:7px 9px;}" +
   ".mva-rto-h{font-size:11.5px;color:#334155;margin-bottom:6px;}.mva-rto-h .mva-ref{font-size:11px;}" +
@@ -10630,7 +10638,7 @@ function _stkQuienChip(mv) {
   const nom = (typeof _empleadosNombres !== "undefined" && _empleadosNombres) ? (_empleadosNombres.get(leg) || "") : "";
   const sig = (typeof initialsFromName === "function" ? initialsFromName(nom, leg) : "") || nom || leg;
   const tip = (nom || ("legajo " + leg)) + (aprox ? " — deducido por la sesión de RT (recepción vieja, sin legajo guardado)" : "");
-  return ' <span class="mva-qui' + (aprox ? " aprox" : "") + '" title="' + escapeHtml(tip) + '">👤 <b>' + escapeHtml(sig) + '</b> · ' + escapeHtml(leg) + (aprox ? " ~" : "") + '</span>';
+  return ' <span class="mva-qui' + (aprox ? " aprox" : "") + '" title="' + escapeHtml(tip) + '">👤 <b>' + escapeHtml(sig) + '</b> · ' + escapeHtml(leg) + (aprox ? ' <span class="mva-aprox">~</span>' : "") + '</span>';
 }
 /* Carga (una sola vez) nombres de empleados + sesiones de RT y re-dibuja el popup. */
 function _stkQuienLoad(rerender) {
@@ -10732,10 +10740,13 @@ function _stkMovsBlock() {
     const isRcp = String(mv.tipo || "") === "recepcion";
     const rid = mv.id != null ? String(mv.id) : (String(mv.ref || "") + "_" + new Date(mv.ts).getTime());
     const open = isRcp && _stkPop.rtoOpen && _stkPop.rtoOpen[rid];
-    const plus = isRcp ? '<button class="mva-rto-tg" title="Ver la entrega completa (día, proveedor/tallerista, códigos y cajas)" onclick="stkRtoToggle(\'' + escapeHtml(rid) + '\',\'' + encodeURIComponent(String(mv.ref || "")) + '\')">' + (open ? "–" : "+") + '</button>' : '';
+    const plus = isRcp ? '<button class="mva-rto-tg" title="Ver la entrega completa (día, proveedor/tallerista, códigos y cajas)" onclick="stkRtoToggle(\'' + escapeHtml(rid) + '\',\'' + encodeURIComponent(String(mv.ref || "")) + '\')">' + (open ? "–" : "+") + '</button>' : '<span class="mva-tgslot"></span>';
     // v6.66 — 👤 siglas + legajo del que lo hizo (en la recepción, del que recibió).
+    // v6.68 — celda MOVIMIENTO en flex: slot fijo para el "+" (vacío en no-recepciones)
+    // → los rótulos ('recepcion'/'guardado'/'cp'…) arrancan alineados; chips prolijos.
     const detrow = open ? '<tr class="mva-detrow"><td colspan="4" class="mva-detcell">' + _stkRtoDetail(mv) + '</td></tr>' : '';
-    return '<tr><td class="mva-ts">' + escapeHtml(stockFmtTs(mv.ts)) + '</td><td class="mva-mov">' + plus + escapeHtml(String(mv.tipo || "")) + (mv.ref ? ' <span class="mva-ref">' + escapeHtml(String(mv.ref)) + '</span>' : '') + npTxt + _stkQuienChip(mv) + '</td><td class="mva-cant">' + cant + '</td><td class="mva-sal">' + round1(saldo) + '</td></tr>' + detrow;
+    const movBody = '<span class="mva-movtipo">' + escapeHtml(String(mv.tipo || "")) + '</span>' + (mv.ref ? '<span class="mva-ref">' + escapeHtml(String(mv.ref)) + '</span>' : '') + npTxt + _stkQuienChip(mv);
+    return '<tr><td class="mva-ts">' + escapeHtml(stockFmtTs(mv.ts)) + '</td><td class="mva-mov"><div class="mva-movrow">' + plus + '<span class="mva-movbody">' + movBody + '</span></div></td><td class="mva-cant">' + cant + '</td><td class="mva-sal">' + round1(saldo) + '</td></tr>' + detrow;
   }).join("");
   let h = '<div class="stkpop-hint">Movimientos de <b>' + escapeHtml(_stkPop.cod) + '</b> en <b>' + escapeHtml(_stkPop.titulo) + '</b>, por fecha. Entró <b style="color:#15803d">+' + round1(totIn) + '</b> · salió <b style="color:#b91c1c">' + round1(totOut) + '</b> · <b>saldo ' + round1(saldo) + '</b>.<br><small style="color:#94a3b8">👤 = siglas y legajo del que lo hizo (en <b>recepcion</b>, del que recibió). En <span class="mva-qui aprox">ámbar ~</span> va el deducido por la sesión de RT (recepciones viejas, sin legajo guardado).</small></div>';
   h += '<div class="mva-daterow">Desde <input type="date" class="mva-date" value="' + escapeHtml(_stkPop.desde) + '" onchange="stkMovsArtDate(\'desde\',this.value)"> hasta <input type="date" class="mva-date" value="' + escapeHtml(_stkPop.hasta) + '" onchange="stkMovsArtDate(\'hasta\',this.value)">' + ((_stkPop.desde || _stkPop.hasta) ? ' <button class="mva-clear" onclick="stkMovsArtDate(\'clear\')">✕</button>' : '') + '</div>';

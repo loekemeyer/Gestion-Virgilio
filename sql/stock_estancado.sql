@@ -38,7 +38,17 @@
 --  quedó el viernes recién dispara el martes (vie + lun = 2 días hábiles), no el
 --  lunes. Umbral configurable en `Stock_Config.dias_estancado` (default 2).
 --
---  Solo TELEGRAM. Respeta el cutoff, excluye legajos 0/1. Lista los 15 más viejos
+--  ⚠ SALDO EVENT-SOURCED, SIN FILTRAR LEGAJO: el saldo de stock se calcula sobre
+--  TODOS los movimientos (igual que stockComputeSaldos en la app), NO se excluyen
+--  legajos 0/1. Antes se filtraban (para saltear datos de prueba), pero algunos
+--  movimientos REALES registran legajo 0 —típicamente `cp` (completar pedido)—, y
+--  excluirlos rompía el saldo: marcaba estancado lo que la app muestra en 0. Caso
+--  cod 534: llegan 6, `cp -1` (legajo 0) saca 1 → a_facturar, guardan 5 → A guardar
+--  queda 0; con el filtro parecía "6 − 5 = 1 sin guardar" (falso). Sin filtro coincide
+--  con la app. (Idem 323E.) Los movimientos de sistema usan legajos especiales —
+--  'pipeline', 'reconcilia', '0'— que NO son basura de test para el stock.
+--
+--  Solo TELEGRAM. Respeta el cutoff. Lista los 15 más viejos
 --  + "… y N más". Dedup diario por el set (depósito|cod).
 --
 --  Encadenada al cron de agentes (jobid 14, 3×/día):
@@ -70,7 +80,6 @@ begin
     from public."Movimientos_Stock" m left join cfg on true
     where m.deposito in ('a_guardar', 'separar_pedidos', 'a_facturar')
       and (cfg.cutoff is null or m.tipo = 'inicial' or m.ts >= cfg.cutoff)
-      and coalesce(m.legajo, '') not in ('0', '1')
   ),
   -- (1) resto sin guardar — saldo corrido de a_guardar por código, en orden
   run as (

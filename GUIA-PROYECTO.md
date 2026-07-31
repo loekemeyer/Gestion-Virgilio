@@ -4,7 +4,40 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-07-31 · Versión app al documentar: **v6.67**
+> Última actualización: 2026-07-31 · Versión app al documentar: **v6.68**
+>
+> Nota: **v6.68 — Prolijado del pop-up de movimientos + "Cerrar" del módulo Consulta NP
+> arriba a la derecha**. (a) En el pop-up 🔁/📦 de movimientos por artículo la celda
+> MOVIMIENTO pasó a un **flex**: un **slot fijo (20px)** para el "+" (vacío en los que no
+> son recepción) → los rótulos (`recepcion`/`guardado`/`cp`…) arrancan **alineados**;
+> chips 👤/NP en **pill**; el "+" alineado con la primera línea (le faltaba `margin:0`
+> contra el `button{margin-top:14px}` global). Padding y hover de fila más prolijos. (b)
+> El botón **Cerrar** del módulo *Consulta de Notas de Pedido — Composición a líos*
+> (`npConsultaModal`) estaba suelto en medio del panel → ahora **absoluto arriba a la
+> derecha** (`.fac-close-btn.npc`), con `padding-right` en el `h1` para no colisionar.
+> Bump `v6.68`. Smoke `mva-quien.cjs` sigue verde.
+>
+> Nota (backend Supabase): **Fix ESTANCADO — el saldo NO debe filtrar legajo (bug 534/323E)**
+> (pedido del dueño, cod 1636). La alerta `reporte_agentes_stock_estancado()` filtraba
+> `legajo not in ('0','1')` para saltear datos de prueba, pero varios movimientos REALES
+> registran **legajo 0** —típicamente `cp` (completar pedido)—; excluirlos rompía el saldo
+> event-sourced. Caso **534**: llegan 6, `cp -1` (legajo 0) saca 1 a `a_facturar`, guardan
+> 5 → `a_guardar` = 0; con el filtro parecía "6 − 5 = 1 sin guardar" (falso positivo). Idem
+> **323E**. Ahora la función computa el saldo sobre **TODOS** los movimientos (sin filtrar
+> legajo), igual que `stockComputeSaldos` en la app → la alerta coincide con lo que muestra
+> la app. Los legajos de sistema ('pipeline','reconcilia','0') NO son basura para el stock.
+> Deployado + `sql/stock_estancado.sql` actualizado.
+>
+> Nota (dato — corrección manual de stock, 31/07): **824 y 559 "mandados a góndola"**.
+> El dueño confirmó que **824** (14 cj, recepción 0245 sin marcar) y **559** (20 cj,
+> recepción 38770 sin marcar) se **guardaron físicamente** pero el operario no lo marcó en
+> la app (los ítems quedaron en `cargar:0` en el modal MG → `mgConfirmar` solo graba los
+> que tienen cantidad; **no es bug**, el guardado multi-código funciona: la tanda de las
+> 09:46 del 29/7 grabó 325+521+735 juntos). Se insertó el `guardado` correctivo
+> (`a_guardar → terminado`, legajo `ajuste`, `client_id` `fix_*`): 824 a_guardar 14→0 /
+> góndola 208→222; 559 a_guardar 20→0 / góndola 94→114. **534** ya estaba en 0 (lo resolvió
+> el fix de arriba). ⚠ *Ojo UX pendiente*: el modal MG no avisa si quedan códigos en 0 sin
+> guardar → fácil olvidarse uno.
 >
 > Nota: **v6.67 — Pop-up de movimientos por artículo: (a) "+" que despliega la ENTREGA
 > completa y (b) columnas en 0 clickeables si tuvieron movimientos**. Dos pedidos del
