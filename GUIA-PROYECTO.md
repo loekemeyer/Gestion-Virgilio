@@ -4,7 +4,26 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-07-31 · Versión app al documentar: **v6.66**
+> Última actualización: 2026-07-31 · Versión app al documentar: **v6.67**
+>
+> Nota: **v6.67 — Pop-up de movimientos por artículo: (a) "+" que despliega la ENTREGA
+> completa y (b) columnas en 0 clickeables si tuvieron movimientos**. Dos pedidos del
+> dueño sobre el pop-up 🔁/📦 de un artículo (Stock y Compras → tocar una columna de la
+> tabla). **(a)** Cada fila de `recepcion` trae ahora un **`+`** que abre un panel con la
+> **entrega completa**: 📅 **día**, **Proveedor/Tallerista** + nombre, **RTO/FC**, y los
+> **códigos con cuántas cajas de cada uno** (el código del artículo abierto queda
+> resaltado en verde). Fuente: **`Control_Modo_OP`** (recepcion.js graba una fila por
+> envío: `fecha`, `tipo` `tallerista`/`prov_at`, `nombre`, `remito`, `detalle`=`"cod →
+> cajas · …"`); se busca por `remito` y se elige la fila del **mismo día** (si el remito
+> se reusó). Si no hay fila (envíos viejos), **fallback**: arma los códigos/cajas desde
+> los propios movimientos de recepción del mismo remito+día (`_stk.movs`), sin el nombre
+> del proveedor. Funciones `stkRtoToggle` / `stkRtoFetch` / `_stkRtoDetail`. **(b)** En la
+> tabla de stock, las celdas de depósito (Góndola/Excedente/Pickeados/A facturar/A
+> guardar/Racks) ahora son **clickeables aunque el saldo sea 0**, si el artículo **tuvo
+> movimientos** ahí alguna vez (el pop-up muestra el historial que neteó a 0). Se marca en
+> **gris** (`stk-hist0`) con tooltip "Saldo 0 ahora, pero tuvo movimientos". Se cachea el
+> set `codN|deposito` en `_stk._histDeps` (O(movs) una vez, no por tecla). Smoke
+> `tests/mva-quien.cjs` extendido. Bump `v6.67`.
 >
 > Nota: **"ESTANCADO" — definición FINAL del dueño: se mide por CICLO, no por el
 > histórico del código** (backend Supabase, `sql/stock_estancado.sql`, función
