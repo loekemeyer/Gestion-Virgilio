@@ -49,6 +49,19 @@
 > Grande*, **producto de VENTA** con góndola 26 + excedente 25) y el código **ABS** (18 Bolsas /
 > −6 Uni): el dueño confirmó **NO darlos de baja** → quedan **intactos**.
 >
+> Nota (dato — descripciones + recodificación de insumos, 31/07): **(a)** Descripciones a códigos
+> de partes que estaban sin nombre (UPDATE de `descripcion` en `Movimientos_Stock`, no afecta
+> saldos): **942P** Parte Cuchara Ac. Inox · **943P** Parte Cucharon Ac. Inox · **944P** Parte
+> Cuchara Fideos Ac. Inox · **945P** Parte Espátula Calada Ac. Inox · **948P** Parte Espumadera
+> Ac. Inox · **967H** Mango Bambu. **(b)** Recodificación de insumos de alambre (UPDATE `cod_art`,
+> se guarda la forma **canónica** sin ceros a la izq porque el trigger `fn_canon_cod_art`
+> normaliza `0605`→`605`): **1062500 → 605** ("60 x 2.1", 664 Kg) · **1071500 → 695** ("11 x 0.9",
+> 337 Kg). ⚠ **1060500 → 0565 NO se hizo**: `0565` canoniza a **565** = **"Pinza De Hielo"**,
+> producto de VENTA activo en `OC_Maximos` — renombrar ahí fusionaría el alambre con el producto.
+> Falta código destino alternativo. **(c) Pendiente:** **4496** ("Mango Pelador Ergonómico Negro")
+> y **0666**/`666` ("Mango Pelador 505 Rojo") **no existen** en stock ni catálogo → no hay dónde
+> poner la descripción; falta decidir si se crean (y como qué).
+>
 > Nota: **v6.73 — Nuevo módulo "📈 Abastecimiento vs Venta"** (botón en el panel de
 > supervisor, al lado de "Rendimiento de operarios"). Muestra, **por artículo**, cuántas
 > cajas te **ENTREGA cada fabricante/tallerista por mes** contra cuánto **VENDÉS**, para
