@@ -5708,7 +5708,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v6.80";
+const APP_VERSION = "v6.81";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -11859,11 +11859,15 @@ async function showInsumoModal(mode, legajo, _resume) {
   ov.innerHTML = '<div class="ins-card"><div class="ins-head ' + (isIn ? "in" : "out") + '"><span class="ins-title">' + (isIn ? "📥 Recepción de insumos" : "📤 Entrega de insumos") + '</span><button class="ins-close" onclick="insAskClose()">Cerrar</button></div><div class="ins-body" id="insBody"><div class="ins-loading">Cargando insumos…</div></div></div>';
   if (_resume) { _ins = _resume; insRender(); return; }
   try {
-    const res = await Promise.all([insFetchCatalogo(), stockFetchSaldos()]);
+    const res = await Promise.all([insFetchCatalogo(), stockFetchSaldos(), insFetchSaldosXUni()]);
     const saldos = res[1] || {};
-    const items = (res[0] || []).map(function (c) { const sd = saldos[String(c.cod)] || {}; return { cod: String(c.cod), nombre: c.nombre || (sd.desc || ""), sector: c.sector || "", noCode: !!c.sector, stock: Number(sd.insumos || 0), qty: 0, unidad: "Uni" }; });
+    const xUni = res[2] || {};
+    // idea 7382: default de unidad = la unidad real del saldo si el insumo tiene UNA sola
+    // (así el chip arranca en Kg/Bolsas/… en vez de "Uni" a ciegas); si mezcla, queda "Uni".
+    const _defUni = function (xu) { return (xu && xu.length === 1) ? xu[0].uni : "Uni"; };
+    const items = (res[0] || []).map(function (c) { const cod = String(c.cod), sd = saldos[cod] || {}, xu = xUni[cod] || null; return { cod: cod, nombre: c.nombre || (sd.desc || ""), sector: c.sector || "", noCode: !!c.sector, stock: Number(sd.insumos || 0), stockByUni: xu, qty: 0, unidad: _defUni(xu) }; });
     // insumos con movimientos pero fuera del catálogo (defensivo)
-    Object.keys(saldos).forEach(function (k) { const sd = saldos[k]; if ((sd.insumos || 0) !== 0 && !items.some(function (it) { return it.cod === k; })) items.push({ cod: k, nombre: sd.desc || "", sector: "", noCode: String(k).indexOf("·") >= 0, stock: Number(sd.insumos || 0), qty: 0, unidad: "Uni" }); });
+    Object.keys(saldos).forEach(function (k) { const sd = saldos[k], xu = xUni[k] || null; if ((sd.insumos || 0) !== 0 && !items.some(function (it) { return it.cod === k; })) items.push({ cod: k, nombre: sd.desc || "", sector: "", noCode: String(k).indexOf("·") >= 0, stock: Number(sd.insumos || 0), stockByUni: xu, qty: 0, unidad: _defUni(xu) }); });
     items.sort(_insSortCod);
     _ins = { mode: mode, legajo: String(legajo || "").trim(), items: items, filtro: "" };
     insRender();
@@ -11885,6 +11889,33 @@ function insAddUnidad(i) {
   if (_ins && _ins.items[i]) _ins.items[i].unidad = u;
   insRender();
 }
+/* idea 7382 (conteo) — saldo de insumos SEPARADO por unidad para el módulo de conteo/
+   entrega. Lee la vista aditiva vista_saldos_insumos_x_unidad → Map cod_art → [{uni,saldo}].
+   Así la referencia "stock:" ya no muestra un único número que mezcla kg/Uni/Bolsas. */
+async function insFetchSaldosXUni() {
+  const m = {};
+  try {
+    const rows = await supaFetchAll(SUPABASE_URL + "/rest/v1/vista_saldos_insumos_x_unidad", "select=cod_art,unidad,saldo");
+    rows.forEach(function (r) {
+      const k = String(r.cod_art), s = Number(r.saldo) || 0;
+      if (Math.round(s * 1000) === 0) return;   // unidad que neteó a 0: no la listo
+      if (!m[k]) m[k] = [];
+      m[k].push({ uni: String(r.unidad || "(s/u)"), saldo: s });
+    });
+  } catch (_e) {}
+  return m;
+}
+/* Saldo de la UNIDAD que el operario tiene seleccionada (para el aviso "quedaría en…").
+   Si el insumo tiene desglose por unidad, devuelve el saldo de ESA unidad (0 si no hay
+   movimientos en ella); si no, cae al saldo único histórico. */
+function _insStockForUnit(it) {
+  if (it && it.stockByUni && it.stockByUni.length) {
+    const u = String(it.unidad || "").trim().toLowerCase();
+    for (let k = 0; k < it.stockByUni.length; k++) { if (String(it.stockByUni[k].uni).trim().toLowerCase() === u) return it.stockByUni[k].saldo; }
+    return 0;
+  }
+  return it ? it.stock : 0;
+}
 function insRender() {
   if (!_ins) return; const body = document.getElementById("insBody"); if (!body) return;
   const isIn = _ins.mode === "RI";
@@ -11900,16 +11931,22 @@ function insRender() {
   if (!shown.length) h += '<div class="ins-empty">' + (f ? "No está. Cargalo arriba (código de 7 díg o sector + descripción)." : "Cargá el primer insumo arriba.") + '</div>';
   else h += shown.map(function (it) {
     const i = _ins.items.indexOf(it);
-    const neg = !isIn && it.qty > it.stock;
+    const _stkU = _insStockForUnit(it);   // idea 7382: saldo de la unidad seleccionada
+    const neg = !isIn && it.qty > _stkU;
+    const _mix = it.stockByUni && it.stockByUni.length > 1;
+    const _num = function (n) { return Math.round(n * 1000) / 1000; };
+    const stkLine = _mix
+      ? ('stock: ' + it.stockByUni.map(function (u) { return '<b>' + _num(u.saldo) + '</b> ' + escapeHtml(u.uni); }).join(' · '))
+      : ('stock: ' + _num(_stkU) + ' ' + escapeHtml(it.unidad || "Uni"));
     const idLbl = it.noCode
       ? '<span class="ins-cod ins-cod-sec">📍 ' + escapeHtml(it.sector || "") + '</span> <span class="ins-nom">' + escapeHtml(it.nombre || "") + '</span>'
       : '<span class="ins-cod">' + escapeHtml(it.cod) + '</span> <span class="ins-nom">' + escapeHtml(it.nombre || "") + '</span>';
     const chips = units.map(function (u) { return '<button class="ins-uchip' + (it.unidad === u ? " on" : "") + '" onclick="insSetUnidad(' + i + ',\'' + u.replace(/'/g, "") + '\')">' + escapeHtml(u) + '</button>'; }).join("") + '<button class="ins-uchip ins-uadd" onclick="insAddUnidad(' + i + ')" title="Agregar unidad">+</button>';
     return '<div class="ins-row">' +
-      '<div class="ins-info">' + idLbl + '<div class="ins-stk">stock: ' + it.stock + ' ' + escapeHtml(it.unidad || "Uni") + '</div></div>' +
+      '<div class="ins-info">' + idLbl + '<div class="ins-stk">' + stkLine + '</div></div>' +
       '<div class="ins-stp"><button class="ins-sb" onclick="insChg(' + i + ',-1)">–</button><input class="ins-inp" type="number" min="0" inputmode="numeric" value="' + it.qty + '" oninput="insSet(' + i + ',this.value)"><button class="ins-sb" onclick="insChg(' + i + ',1)">+</button></div>' +
       '<div class="ins-uni"><span class="ins-uni-l">Unidad:</span> ' + chips + '</div>' +
-      (neg ? '<div class="ins-warn">⚠ el stock quedaría en ' + (it.stock - it.qty) + '</div>' : "") +
+      (neg ? '<div class="ins-warn">⚠ el stock de ' + escapeHtml(it.unidad || "Uni") + ' quedaría en ' + _num(_stkU - it.qty) + '</div>' : "") +
       "</div>";
   }).join("");
   const tot = _ins.items.reduce(function (s, it) { return s + it.qty; }, 0);
