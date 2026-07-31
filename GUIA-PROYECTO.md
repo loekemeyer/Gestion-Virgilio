@@ -4,7 +4,44 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-07-31 · Versión app al documentar: **v6.68**
+> Última actualización: 2026-07-31 · Versión app al documentar: **v6.69**
+>
+> Nota: **v6.69 — Remito "Facturado sin salida" (volvió al depósito) + FC s/Salida
+> ahora es un segmento DENTRO de Stocks** (pedido del usuario). Caso: una NP se cargó
+> al camión (`CCN`) pero el cliente estaba cerrado y la mercadería **volvió**. En
+> **Recepción Remitos (RR)** cada fila tiene ahora un botón **«↩ s/salida»**
+> (`crMarkSinSalida`) que emite un evento nuevo **`FSS`** (`texto = NP|TANDA`,
+> `crSendSinSalida`). Regla en **todos los lectores de `CCN`** (helper
+> `fetchSinSalidaMap`): una NP está "sin salida" si su **último `FSS` es más reciente
+> que su último `CCN`**; si se vuelve a cargar (CCN nuevo) deja de estarlo. Efecto de
+> marcar una NP sin salida: **sale de RR** (`fetchCRData`/`showControlRemitos`), **deja
+> de contar como entregada** y no dispara la alarma "cargado sin controlar"
+> (`pppRefreshEntregado`), **reaparece en «FC s/Salida»** (`stkFcsLoad`) y en **Carga
+> Camión** (`fetchCCData`) para re-despacharla. **NO toca el libro de stock**
+> (`Movimientos_Stock`): esa mercadería ya salió del stock contable al facturar; FC
+> s/Salida es una **vista** (facturado − cargado), no un depósito. Además, **«🧾 FC
+> s/Salida» dejó de ser una solapa aparte** del módulo Stock: ahora es un **segmento
+> dentro de la solapa «📊 Stocks»** (junto a Stock / Ingresos / Salidas; `stkSetView`
+> con carga lazy). Bump `APP_VERSION` + `SW_VERSION` `v6.69`.
+>
+> Nota: **v6.69 (server) — El cron de reconciliación ahora drena las cajas de
+> "Completar Pedido" (CP) de NPs ya facturadas** (pedido del usuario: "en a facturar
+> también debe salir porque ya salió"; el CP con legajo 0 es real, no prueba). Es la
+> contraparte en **`a_facturar`** del fix de estancado de v6.68 (que arregló el lado
+> `a_guardar`): mismo principio "los legajos de sistema/0 NO son basura para el stock".
+> Un CP que completa una NP **ya facturada** mete cajas en `a_facturar` con `tipo='cp'`
+> y `ref=NP` (sin tanda); el fast-path del cliente (`stockDrenarCPFacturado`) debía
+> sacarlas pero falló en 13 casos reales (~202 cajas, ej. NP 98017 art 534), y el cron
+> **no las veía** (su ETAPA 3 agrupa por tanda y solo mira `separado`/`facturado`). Se
+> agregó la **ETAPA 4** a `reconciliar_pipeline_stock()` (migración
+> `pipeline_etapa4_drenar_cp_facturado`): netea el bucket "por NP"
+> (`split_part(ref,'|',1)` = número de NP; suma solo `cp`+`facturado`+`ajuste`, excluye
+> `rc`/`separado`) y, si queda >0 y la NP está en `Facturacion_NP`, la saca con un
+> `facturado` −neto `ref=NP|CP` (mismo formato que el cliente). **Idempotente**
+> (net>0→0 + índice único), **nunca negativo**, **no filtra por legajo** (leg 0 =
+> real). Las NPs aún **no** facturadas quedan intactas. Se corrió una vez a mano al
+> aplicar la migración → drenó los 13 casos colgados. **Sin cambio de cliente**
+> (server-side). Detalle en `sql/reconciliar_pipeline_stock.sql`.
 >
 > Nota: **v6.68 — Prolijado del pop-up de movimientos + "Cerrar" del módulo Consulta NP
 > arriba a la derecha**. (a) En el pop-up 🔁/📦 de movimientos por artículo la celda
@@ -3035,7 +3072,8 @@ Google `authenticated`**, RLS exige ese rol), se graba una fila en:
   `m3` (numeric), `razon_social`, `cod_cliente`, `facturado_at` (timestamptz del tick),
   `cierre_id` (null hasta el cierre → apunta a `Facturacion_Cierres.id`). PK `np`
   (upsert merge-duplicates, por si hay doble click). Es la que consumen las vistas PPP
-  (pendiente/entregados), la solapa **FC s/Salida** de Stocks y el descuento de demanda.
+  (pendiente/entregados), el segmento **FC s/Salida** de Stocks (v6.66: antes solapa
+  aparte, ahora dentro de «📊 Stocks») y el descuento de demanda.
 - **`Facturacion_Cierres`** — una fila por **cierre de jornada** ("Terminé" de la
   operadora → PDF de reparto). Cols: `id`, `fecha_cierre`, `fecha_reparto`, `cant_nps`,
   `cant_tandas`, `generado_at`. Al cerrar, las `Facturacion_NP` del día toman su
@@ -3127,11 +3165,12 @@ Definidos en `index.html` (objeto `desc`, ~línea 1531). Los botones se arman en
 | `CRN` | Control Remito NP | (detalle de control, v3.36) | `texto` = `NP\|TANDA` (ej. `97754\|C47B`). Un evento por NP marcada como **recibida/controlada** en Recepción Remitos (`RR`, antes `CR`). id determinístico `crn_<legajo>_<np>_<día>` + upsert. La PPP lo lee (`pppRefreshControlado`) y pasa el pedido a **Pedidos Entregados**. El monitor lo ignora. |
 | `CRA` | Carga sin control (vencido) | (automático, v3.37) | `texto` = `NP\|TANDA\|RAZÓN`. Lo emite la PPP (`pppCheckCargaVencida`) cuando un pedido **cargado (CCN) sigue sin controlar (CRN/manual)** pasado el plazo (`crVencido`). id determinístico `cra_<np>_<día>` + upsert; legajo `0`. Dispara aviso Telegram vía trigger `trg_carga_sin_control_telegram` (**AFTER INSERT** → 1 vez por NP/día). El monitor lo ignora. |
 | `CCR` | Control Remito CR NP | (detalle de control CR, v3.69) | `texto` = `NP\|TANDA` (ej. `97754\|C47B`). Un evento por NP marcada como **controlada** en **Control Remitos (CR)** — paso **independiente** de la Carga Camión. id determinístico `ccr_<legajo>_<np>_<día>` + upsert. El NP sale **sólo de CR** (`fetchCCRData` lo resta de los facturados). ⚠ **NO alimenta RR** (RR lee `CCN`, no `CCR`). El monitor y las inconsistencias lo ignoran. Con el tiempo del toggle CR + los m³ sirve para medir productividad de CR (m³/h). |
+| `FSS` | Facturado sin salida (volvió a depósito) | (detalle, v6.66) | `texto` = `NP\|TANDA` (ej. `98085\|C47B`). Lo emite el botón **«↩ s/salida»** de **Recepción Remitos** (`crMarkSinSalida`→`crSendSinSalida`) cuando una NP **cargada al camión (`CCN`) volvió** porque el cliente no recibió (cerrado, etc.). id aleatorio `fss_<legajo>_<np>_<ts>` (**no** upsert: cada retorno es un evento con su `ts`). Regla en **todos los lectores de `CCN`** (helper `fetchSinSalidaMap`): la NP está "sin salida" si su **último `FSS` > su último `CCN`**; si se re-carga (CCN nuevo) deja de estarlo. Efecto: sale de **RR** (`fetchCRData`), deja de contar como entregada / no dispara la alarma de carga sin control (`pppRefreshEntregado`), y **reaparece** en **«FC s/Salida»** (`stkFcsLoad`) y en **Carga Camión** (`fetchCCData`). **NO toca `Movimientos_Stock`** (esa mercadería ya salió del stock contable al facturar). El monitor lo ignora. |
 | `MGX` | Guardado fuera de lista | (automático, v4.24) | `texto` = `COD\|G<góndola>\|E<excedente>`. Lo emite el MG (`mgEmitFueraLista`) cuando se guarda un código que **NO estaba en "Mercadería a guardar"** (botón "Guardarlo igual"; típico error de tipeo en recepción). id `mgx_<cod>_<legajo>_<ts>`. Dispara aviso Telegram vía trigger `trg_mg_fuera_lista_telegram` (**AFTER INSERT** WHEN `opcion='MGX'`). El monitor lo ignora. |
 | `SSG` | Picking sin stock en góndola | (automático, v4.24) | `texto` = `TANDA\|COD:pedido>habia,…`. Lo emite `stockBajaPicking` al **TP** cuando se sacó de góndola **más de lo que el sistema tenía** (saldo `terminado` quedaría negativo). id determinístico `ssg_<legajo>_<tanda>_<día>` + upsert (1 aviso/tanda/día). Dispara aviso Telegram vía trigger `trg_picking_sin_stock_telegram` (**AFTER INSERT** WHEN `opcion='SSG'`). El monitor lo ignora. |
 | `PGE` | Picking · retiró de góndola en vez de excedente | (aviso, v6.11) | `texto` = `COD\|TANDA`. Lo emite `pkEmitRetiroGondola` cuando el operario, en un artículo cuyo **excedente cubría todo** (paso salteado), toca **"🟢 Retirar de góndola igual"** (`pkForzarGondola`). id `pge_<cod>_<legajo>_<ts>`. Dispara aviso Telegram vía trigger `trg_picking_gondola_excedente_telegram` (**AFTER INSERT** WHEN `opcion='PGE'`), que **resuelve `legajo→Empleado`** → "🟢⚠ RETIRÓ DE GÓNDOLA (había excedente) — {Nombre} … Art X · tanda Y". No toca stock (el picking baja de góndola como cualquier otro). El monitor lo ignora. |
 | `FCO` | Facturación · override de la operadora (facturó corto un faltante recuperable) | (aviso, v6.21) | `texto` = `NP\|TANDA\|detalle\|RS` (detalle = `cod×falto,…`). Lo emite `facEmitOverride` (legajo vacío: la operadora es supervisor) cuando **la operadora** confirma facturar una NP cuyo faltante **se podía completar** (había stock en `a_guardar` o góndola). El resto de los usuarios queda **bloqueado** (no llega a emitir). Dispara Telegram vía trigger `trg_facturacion_override_telegram` (**AFTER INSERT** WHEN `opcion='FCO'`) → "🧾⚠ FACTURÓ CON FALTANTE RECUPERABLE — la operadora facturó CORTO la NP … Había stock para completarlo …". No toca stock (el drenaje de `a_facturar` lo hace `stockSalidaFacturadoNP` como siempre). El monitor lo ignora. |
-| `CP` | Completar Pedido | (detalle, v5.05) | `texto` = `NP\|COD\|QTY\|GONDOLA\|AGUARDAR\|LÍO`. Lo emite el modal `showCPModal` al sumar cajas que llegaron tarde a una NP armada sin facturar (mueve stock origen→`a_facturar`, baja `cajas_falto` en `Entregas_Virgilio`, re-emite el TAL). El monitor lo ignora. |
+| `CP` | Completar Pedido | (detalle, v5.05) | `texto` = `NP\|COD\|QTY\|GONDOLA\|AGUARDAR\|LÍO`. Lo emite el modal `showCPModal` al sumar cajas que llegaron tarde a una NP armada sin facturar (mueve stock origen→`a_facturar` con `tipo='cp'`, `ref=NP`; baja `cajas_falto` en `Entregas_Virgilio`, re-emite el TAL). Si la NP **ya estaba facturada**, esas cajas de `a_facturar` se drenan: fast-path `stockDrenarCPFacturado` (en cpConfirm y en el tilde de Facturación) y, como red de seguridad, la **ETAPA 4** del cron `reconciliar_pipeline_stock()` (v6.69; `facturado` −neto `ref=NP\|CP`). El monitor lo ignora. |
 | `EA` | Entrega Artículos para envasar | (detalle, v5.52) | `texto` = `COD\|QTY` (ej. `440E\|30`). Lo emite el modal `showEAModal` (botonera operario) al dar de baja stock del depósito **`para_envasar`**: `stockMove` `para_envasar −qty` (`tipo='entrega_envasar'`), un evento por código. `para_envasar` está **fuera de los 7 depósitos** de `stockComputeSaldos` (no entra en totales/OC). El monitor lo ignora. **v5.63**: el modal ahora tiene además un **editor de ubicación 📍** (tabla `Envasar_Ubicaciones`, aparte de `Racks_Planimetria`) para cargar/mover dónde está lo para-envasar — no emite evento ni toca saldo. |
 | `RC` | Pasar cajas a un pedido urgente | (detalle, v5.49) | `texto` = `NP_URGENTE\|NP<donor> o T<tanda>\|COD\|QTY`. Lo emite el modal `showRCModal` al sacarle cajas a un pedido que sale después (armado o pickeado) y dárselas a uno urgente. Al confirmar: RPC `reasignar_cajas` (faltantes), `stockMove` tipo `rc` (donante `a_facturar`/`separar_pedidos −`, urgente `a_facturar +`), líos (suma al urgente, resta al donante armado). El monitor lo ignora. |
 | `PUB` | Picking · dónde lo dejó | (detalle, v5.78) | `descripcion` = ubicación (mesa/carro/rack), `texto` = código de tanda. Lo emite `emitPickUbic` al **TP**: registra dónde quedó lo pickeado (se muestra al Separar). El monitor lo ignora. |

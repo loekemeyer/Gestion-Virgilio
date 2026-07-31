@@ -21,12 +21,15 @@
 --      terminado, excedente, separar_pedidos, a_facturar, a_guardar, racks, insumos.
 --      (Desbloquea el pipeline tanto del cliente como del server.)
 --   2) `reconciliar_pipeline_stock()` (migración `reconciliar_pipeline_stock`):
---      replica las 3 etapas del cliente, pero del lado del server, idempotente:
+--      replica las etapas del cliente, pero del lado del server, idempotente:
 --        ETAPA 1 (PKC/TP): separar_pedidos(+picked) y baja EXCEDENTE-FIRST
 --          (excedente− y el resto góndola−). Dedup por índice único (ver v5.76).
 --        ETAPA 2 (TAP):    mueve el neto de separar_pedidos → a_facturar.
 --        ETAPA 3 (factura): saca de a_facturar cuando la tanda está 100%
 --          facturada (todos los NP de la PPP en Facturacion_NP).
+--        ETAPA 4 (CP):     saca de a_facturar las cajas 'cp' (Completar Pedido)
+--          de una NP YA facturada — la ETAPA 3 no las ve porque el CP marca ref=NP
+--          (sin tanda). Ver nota v6.69. (migración `pipeline_etapa4_drenar_cp_facturado`)
 --      Dedup por la existencia del movimiento (separar_pedidos / tipo='separado'
 --      / tipo='facturado' por ref=tanda). Comparte los `tipo` con el cliente, así
 --      si una app nueva sí corre el pipeline, los guards evitan doble conteo.
@@ -83,6 +86,27 @@
 --    sacó, net<=0 y no hace nada → nunca más duplica. Los 1.417 ya colgados se
 --    compensaron con ajustes trazables (tipo='ajuste', legajo='reconcilia', uno
 --    por tanda, llevando cada a_facturar-por-tanda a 0). ETAPA 1 y 2 sin cambios.
+--
+--  v6.69 — ETAPA 4: DRENAR CAJAS DE "COMPLETAR PEDIDO" (CP) DE NPs YA FACTURADAS.
+--    Root cause: un CP que completa una NP **ya facturada** mete cajas en a_facturar
+--    con `tipo='cp'` y `ref=NP` (solo el número, sin tanda). El fast-path del cliente
+--    (`stockDrenarCPFacturado`, llamado en cpConfirm y en el tilde de Facturación) debía
+--    sacarlas, pero es best-effort y falló en varios casos reales (p.ej. NP 98017 art
+--    534 +1, y 12 NPs más — ~202 cajas). El cron NO las veía: la ETAPA 3 agrupa por
+--    TANDA y solo mira `tipo in ('separado','facturado')`. Quedaban colgadas inflando
+--    a_facturar (había que limpiarlas a mano, como el 280 de la 98017).
+--    FIX (migración `pipeline_etapa4_drenar_cp_facturado`): la ETAPA 4 netea el bucket
+--    "por NP" = todas las filas de a_facturar cuyo `split_part(ref,'|',1)` es el número
+--    de NP, sumando SOLO `tipo in ('cp','facturado','ajuste')` (se EXCLUYEN `rc` y
+--    `separado` para no interferir con esos mecanismos). Si el neto es >0 y la NP está
+--    en `Facturacion_NP` (ya facturada), inserta un `facturado` −neto con `ref=NP|CP`,
+--    `ubicacion='__cp__'`, `legajo='pipeline'` — MISMO formato que el fast-path del
+--    cliente, así ambos deduplican entre sí. Idempotente: el net>0 lo lleva a 0 (segunda
+--    corrida drena 0) + el índice único `mov_stock_pipeline_dedup`. **Trata el legajo 0
+--    como REAL** (un CP de admin/sistema mueve stock real): no filtra por legajo. Las NPs
+--    aún NO facturadas (ej. 44500) quedan intactas: drenan cuando se facturen. El `return`
+--    ahora incluye `etapa4=N`. Backlog: al aplicar la migración se corrió una vez a mano
+--    → drenó los 13 casos colgados (incluido el 534).
 --
 --  La definición viva de la función está en la migración homónima en Supabase.
 --  Este archivo es la documentación del diseño (convención de sql/).

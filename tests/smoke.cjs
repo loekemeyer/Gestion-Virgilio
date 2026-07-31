@@ -45,7 +45,8 @@ catch (_e) {
       "pkNpEsLoeke", "pkDualBreakdown", "opDraftSaveQuiet",
       "emitGuardadoSesion", "stkGRate", "stkGRacksOn", "stkGuardadoToggleRacks", "stkGConfVal",
       "facFacturarNP", "facFCOpen", "facFCEmitir", "facFCClose", "arcaCall", "facFmtMoney", "facFCEnsureModal",
-      "facNCOpen", "facNCEmitir", "facNCEnsure", "facNCClose"];
+      "facNCOpen", "facNCEmitir", "facNCEnsure", "facNCClose",
+      "fetchSinSalidaMap", "crMarkSinSalida", "crSendSinSalida", "stkBodyFcs", "stkFcsLoad"];
     const missing = need.filter((n) => typeof window[n] !== "function");
     const ts = new Date().toISOString();
     const sal = stockComputeSaldos([
