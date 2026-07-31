@@ -4,7 +4,16 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-07-31 · Versión app al documentar: **v6.77**
+> Última actualización: 2026-07-31 · Versión app al documentar: **v6.78**
+>
+> Nota: **v6.78 — Abastecimiento: la "falta de capacidad" ya no suena si hay stock de sobra**.
+> Que un fabricante entregue menos de lo que se vende NO es problema si el stock alcanza para
+> los pedidos: se entrega menos a propósito cuando hay sobrestock (lo pide el usuario). Ahora
+> el problema de capacidad es `capReal = capFalla && stkFalla` (fabrican < venta **Y** falta
+> stock para lo pedido). Si `capFalla` pero el stock cubre los pedidos (`falta=0`), se muestra
+> una nota gris "🏭 −X/m (cubierto por stock)" en vez de warning, y no cuenta en el headline.
+> Ej. `587`: recibió 379 / vendió 285 (fabricó menos) pero stock 543 vs 98 pedidos → sin alarma.
+> Bump `APP_VERSION`/`SW_VERSION` `v6.78`.
 >
 > Nota: **v6.77 — Abastecimiento: una sola vista integrada** (se sacó el toggle de v6.74).
 > Ahora una única tabla muestra por artículo, con dos grupos de columnas: **🏭 Fabricación
