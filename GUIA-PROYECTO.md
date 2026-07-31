@@ -4,7 +4,21 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-07-31 · Versión app al documentar: **v6.71**
+> Última actualización: 2026-07-31 · Versión app al documentar: **v6.72**
+>
+> Nota: **v6.72 — Fix: subir foto en Recepción fallaba con "row-level security policy"**.
+> El cliente de `recepcion.js` se autentica con **`signInAnonymously()`** (rol
+> `authenticated`); el **31/07 el login anónimo dejó de crear usuarios** (0 usuarios
+> anónimos nuevos ese día, venían 3-12/día) → el cliente mandaba una sesión rota/vencida
+> y la subida al bucket `remitos` fallaba con RLS. La **policy RLS estaba bien** (anon y
+> authenticated pueden insertar en `remitos` **y** en `Control_Modo_OP` — verificado), o
+> sea recepción **no necesita** la sesión anónima. Fix en **`pendUploadFoto`**: si la
+> subida falla, renueva la sesión anónima y, si tampoco, hace `signOut` y reintenta con
+> la **publishable key** (rol `anon`, que la RLS permite) → la foto entra igual sin
+> depender del login. Bump `recepcion.js?v=3.73` + `APP_VERSION`/`SW_VERSION` `v6.72`.
+> ⚠ **Causa raíz pendiente (config, no código):** re-habilitar "Allow anonymous
+> sign-ins" en Supabase → Authentication (alguien lo desactivó o pegó un límite hoy);
+> si otras cosas usan la sesión anónima de recepción, conviene restaurarlo.
 >
 > Nota: **v6.71 — El monitor (TV) saca las tandas ya FACTURADAS Y DESPACHADAS**
 > (pedido del usuario: "las tandas que están FC y se despacharon en el camión no
