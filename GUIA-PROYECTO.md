@@ -30,8 +30,14 @@
 > una factura fiscal. Por eso NO aparecía en *Facturación — NPs a FC* (el módulo excluye las que
 > están en `Facturacion_NP`). Se **borró la fila** (equivale a destildar) → vuelve a "a FC".
 > **Restaurable**: np 98049 · tanda C98F · cod_cliente 118 · facturado_at `2026-07-28 16:52:04.378`
-> · cierre_id `8112d61e-3641-4fa8-998a-6e660641a8fb` · m3 0.083 · fecha_salida 2026-07-29. ⚠ Al
-> sacarla de `Facturacion_NP` también sale de ese cierre/reparto del 29/07.
+> · cierre_id `8112d61e-3641-4fa8-998a-6e660641a8fb` · m3 0.083 · fecha_salida 2026-07-29. **El
+> dueño confirmó que NO se facturó NI salió** (sin evento `CCN` → nunca despachada): además de la
+> fila de `Facturacion_NP` se **borraron las 7 filas `facturado` fantasma** (ref `C98F|98049`, ids
+> 17117-17123) que habían drenado el `a_facturar` → las **18 cajas vuelven a "A Facturar" en
+> stock** (501+3 · 502+4 · 513+4 · 535+1 · 546+3 · 555+1 · 816E+2). Se **borró** (no se reversó con
+> ajuste) para **liberar la clave de dedup** `(ref,cod,depósito,facturado)` — si no, al facturar
+> 98049 de verdad el drenaje de stock quedaría bloqueado. Con esto sale del cierre/reparto del
+> 29/07 (correcto: no salió).
 >
 > Nota (dato — corrección manual de stock + revisión, 31/07): **NP 97822 → 256 y 502**.
 > Revisión pedida por el dueño de los dos códigos que quedaron colgando de la reconstrucción
