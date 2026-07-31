@@ -35,6 +35,17 @@
 > D01A (queda libre para pickear). ⚠ Quedan 2 locks de **legajo 999** (sistema/test) <10h —
 > C72F picking y D11X armado — que también podrían ser fantasma; no se tocaron.
 >
+> Nota (dato — baja de stock, 31/07): **14 insumos FLEJE/ALAMBRE dados de baja** (pedido del
+> dueño: "los art con ese cod dar de baja el stock"). Códigos compuestos (`nombre·medida`) con
+> nombres fragmentados (FLEJES **CHEF** / **LOEKE** / **LOEKEMEYER** para la misma familia) y
+> separador decimal mezclado (`1.00` vs `1,00`) — todos puestos en **saldo 0** con un `ajuste`
+> −saldo por código (legajo `ajuste`, `client_id baja_*`, en la unidad original). Bajados:
+> ALAMBRE LARGO·11 (110 Kg) · FLEJE ESPIRAL·1 (46 Kg) · FLEJE PROLIPROPILENO·SUNCHOS 12 MM
+> (9 u) · FLEJE·11.00 X 0.90 (8750 u) · FLEJE·91 X 1,75 (258 Kg) · FLEJES CHEF·1.00 X 121 (112) ·
+> ·1.00 X 84 (154) · ·1.50 X 132 (165) · ·1.50 X 84 (155 Kg) · FLEJES LOEKE·1,00 X 121 (335) ·
+> ·1.00 X 84 (315) · ·1.50 X 132 (583 Kg) · FLEJES LOEKEMEYER·0.80 X 64 (161 Kg) · ·1.50 X 84
+> (922). Reversible (event-sourced): reponer = `ajuste` +saldo si fue error.
+>
 > Nota: **v6.73 — Nuevo módulo "📈 Abastecimiento vs Venta"** (botón en el panel de
 > supervisor, al lado de "Rendimiento de operarios"). Muestra, **por artículo**, cuántas
 > cajas te **ENTREGA cada fabricante/tallerista por mes** contra cuánto **VENDÉS**, para
