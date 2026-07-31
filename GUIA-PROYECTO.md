@@ -4,7 +4,24 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-07-31 · Versión app al documentar: **v6.74**
+> Última actualización: 2026-07-31 · Versión app al documentar: **v6.75**
+>
+> Nota: **v6.75 — Picking con LECTORA de código de barras (idea 8243), detrás de un SWITCH**.
+> Pedido del dueño (reemplazar la botonera del picking por una lectora Bluetooth). **TODO detrás
+> del switch `vir_picking_scanner`** (toggle en el **Print Station**): **apagado (default) = el
+> picking funciona EXACTO como hoy** (cada handler/listener corta en la 1ª línea, no se bindea
+> nada); prendido = cada disparo dispara la **misma** botonera (`pkOk` = todas / `pkF` = algunas)
+> sobre el artículo que matchea. Barcode **Code-128** `CÓDIGO|T` / `CÓDIGO|A`; `ninguna` sigue en
+> la tablet. Fns nuevas: `pkScanOn/SetOn/Toggle`, `_pkItemCodes`, `_pkFindByCode`, `pkOnScan`,
+> `pkScanToast` + listener keydown-wedge (Enter termina el scan; ignora inputs para no pisar el
+> tipeo de cantidad). El código sale del barcode (parseo, sin tabla) y se matchea contra
+> art/real/pick/dual (equivalencias 029→437E y pares nac/imp). Herramienta nueva
+> **`tools/etiquetas-gondola.html`** = genera el **ZPL** de las etiquetas de slot desde la
+> planimetría. Diseño completo (+ idea 5290 impresora/ensunchadora) en
+> **`docs/idea-picking-scanner-etiquetas.md`**. Smoke nuevo **`tests/pk-scan.cjs`**. Verificado:
+> pk-scan + mva-quien + checkhtml + version-sync **OK**. Bump `APP_VERSION`+`SW_VERSION` **v6.75**.
+> ⚠ Falta el **piloto con la lectora real** y la **idea 5290** (puente de impresión + etiqueta por
+> lío + ensunchadora).
 >
 > Nota: **v6.74 — MG: el input de góndola tipeaba al revés (fix) + confirmación de cierre al
 > enviar**. **(a)** En el modal *Guardar a góndola* (MG) los inputs de cantidad (góndola/excedente)
