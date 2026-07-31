@@ -4,7 +4,13 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-07-31 · Versión app al documentar: **v6.74**
+> Última actualización: 2026-07-31 · Versión app al documentar: **v6.75**
+>
+> Nota: **v6.75 — Fix: el buscador de Abastecimiento sólo dejaba tipear 1 dígito**.
+> El `oninput` re-dibujaba todo el body (`abastRender`) en cada tecla → el `<input>` se
+> recreaba y perdía el foco. Nuevo `abastSetFiltro(v)` con `id="abastFiltroInp"` que, tras
+> re-renderizar, vuelve a enfocar y deja el cursor al final (mismo patrón que `pppSetSearch`).
+> Bump `APP_VERSION`/`SW_VERSION` `v6.75`.
 >
 > Nota: **v6.74 — El módulo "📈 Abastecimiento vs Venta" ahora tiene 2 sub-vistas**
 > (toggle arriba): **🏭 Fabricación vs Venta** (la de v6.73) y **📦 Stock vs Pedidos**

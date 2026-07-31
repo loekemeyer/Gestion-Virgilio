@@ -5708,7 +5708,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v6.74";
+const APP_VERSION = "v6.75";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -9588,6 +9588,9 @@ async function openAbastecimiento() {
 }
 function closeAbastecimiento() { const ov = document.getElementById("abastOverlay"); if (ov) ov.classList.remove("show"); _abast = null; }
 function abastSetTab(t) { if (!_abast) return; _abast.tab = t; _abast.openCod = null; abastRender(); }
+/* Filtro: re-render + restaurar foco/cursor al final (si no, se re-dibuja el input
+   en cada tecla y se pierde el foco → "solo entra 1 dígito"). Patrón de pppSetSearch. */
+function abastSetFiltro(v) { if (!_abast) return; _abast.filtro = String(v == null ? "" : v); abastRender(); const el = document.getElementById("abastFiltroInp"); if (el) { el.focus(); const n = el.value.length; try { el.setSelectionRange(n, n); } catch (_e) {} } }
 function abastRender() {
   const body = document.getElementById("abastBody"); if (!body || !_abast) return;
   const tab = _abast.tab || "fab";
@@ -9606,7 +9609,7 @@ function abastRenderFab() {
   const nFalta = _abast.rows.filter(falta).length;
   let h = '<div class="abast-intro"><b>Cuánto te ENTREGAN por mes (por fabricante) vs cuánto VENDÉS</b>, por artículo. Si vendés más de lo que te fabrican, te falta capacidad → conviene sumar otro fabricante. Ventana: <b>' + escapeHtml(_abast.ultimo) + '</b> (último mes completo) y promedio de los últimos 3 meses. Datos: recepción (Control_Modo_OP) y venta entregada (Entregas_Virgilio). Tocá una fila para ver el mes a mes y los proveedores.</div>';
   h += '<div class="abast-headline">' + (nFalta ? '<span class="bad">⚠ ' + nFalta + ' artículo(s) donde la fabricación NO alcanza la venta</span> — priorizados arriba.' : '<span class="ok">✓ En todos los artículos la fabricación alcanza la venta.</span>') + '</div>';
-  h += '<input class="abast-filtro" type="search" placeholder="🔎 Buscar código / descripción" value="' + escapeHtml(_abast.filtro || "") + '" oninput="if(_abast){_abast.filtro=this.value;abastRender();}">';
+  h += '<input id="abastFiltroInp" class="abast-filtro" type="search" placeholder="🔎 Buscar código / descripción" value="' + escapeHtml(_abast.filtro || "") + '" oninput="abastSetFiltro(this.value)">';
   h += '<div class="abast-tblwrap"><table class="abast-tbl"><thead><tr>' +
     '<th class="l">Código</th><th class="l">Descripción</th><th>Fabri-<br>cantes</th>' +
     '<th>Recibido<br>' + escapeHtml(_abast.ultimo) + '</th><th>Vendido<br>' + escapeHtml(_abast.ultimo) + '</th><th>Balance<br>mes</th>' +
@@ -9654,7 +9657,7 @@ function abastRenderStock() {
   const totFalta = conFalta.reduce(function (s, r) { return s + r.falta; }, 0);
   let h = '<div class="abast-intro"><b>Stock actual que tenés</b> (sumado entre TODOS los puntos de stock: góndola, excedente, pickeados, a facturar, a guardar, racks y p/ envasar — <i>no</i> incluye insumos) <b>vs lo que tenés pedido</b> (NP programadas y todavía sin facturar). <b>Falta p/ normalizar</b> = lo que hay que fabricar/reponer para cubrir los pedidos con el stock actual. Tocá una fila para ver en qué depósitos está el stock.</div>';
   h += '<div class="abast-headline">' + (conFalta.length ? '<span class="bad">⚠ ' + conFalta.length + ' artículo(s) sin stock suficiente para lo pedido</span> — faltan <b>' + _abastN(totFalta) + '</b> cajas en total.' : '<span class="ok">✓ Tenés stock para cubrir todos los pedidos pendientes.</span>') + '</div>';
-  h += '<input class="abast-filtro" type="search" placeholder="🔎 Buscar código / descripción" value="' + escapeHtml(_abast.filtro || "") + '" oninput="if(_abast){_abast.filtro=this.value;abastRender();}">';
+  h += '<input id="abastFiltroInp" class="abast-filtro" type="search" placeholder="🔎 Buscar código / descripción" value="' + escapeHtml(_abast.filtro || "") + '" oninput="abastSetFiltro(this.value)">';
   h += '<div class="abast-tblwrap"><table class="abast-tbl"><thead><tr>' +
     '<th class="l">Código</th><th class="l">Descripción</th>' +
     '<th>Stock<br>actual</th><th>Pedido<br>pendiente</th><th>NPs</th>' +
