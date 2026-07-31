@@ -4,7 +4,47 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-07-30 · Versión app al documentar: **v6.65**
+> Última actualización: 2026-07-31 · Versión app al documentar: **v6.66**
+>
+> Nota: **"ESTANCADO" — definición FINAL del dueño: se mide por CICLO, no por el
+> histórico del código** (backend Supabase, `sql/stock_estancado.sql`, función
+> `reporte_agentes_stock_estancado()`). **Estancado = de lo que LLEGÓ guardaron una
+> PARTE (entre góndola y excedente) pero NO la TOTALIDAD** → el resto quedó trabado.
+> Ej del dueño: llegan 14, guardan 10, quedan **4 a guardar** → **ESO** es estancado.
+> La versión anterior miraba "¿hubo algún `guardado` para este código alguna vez?"
+> sobre **todo el histórico** → daba **falsos positivos** con los códigos de rotación:
+> caso real **824** (llegan 10 → guardan 10 · llegan 22 → guardan 22 · llegan 14 y
+> nadie las tocó todavía) salía como estancado, cuando en realidad es una **recepción
+> nueva intacta = pendiente normal**. Ahora se calcula el **saldo corrido** de
+> `a_guardar` por código y se toma el **ciclo abierto** = lo que pasó **después** del
+> último movimiento que dejó el saldo en **0** (la última vez que se guardó todo).
+> Es estancado sólo si **dentro de ese ciclo** hubo un `guardado` y quedó resto. La
+> **cantidad** informada es el **resto que dejó el último `guardado` del ciclo** (no
+> el saldo total: si después llegó una recepción nueva, esas cajas son pendiente
+> normal), y la **antigüedad** se cuenta desde **ese `guardado`** — o sea, desde
+> cuándo se dejó el resto sin terminar. Se mantiene todo lo demás: días **hábiles**
+> (lun–vie), umbral `Stock_Config.dias_estancado` (default 2), caso (2) *pickeado sin
+> avanzar* (`separar_pedidos`/`a_facturar`) igual, sólo Telegram, respeta cutoff,
+> excluye legajos 0/1, dedup diario, encadenada al cron de agentes (jobid 14).
+> Verificado read-only hoy (31/07): pasa de **20** códigos "a guardar" con el criterio
+> viejo a **3 restos reales** (534, 323E, 731 — ej. 731: llegaron 83+64, guardaron 83,
+> quedan **64** sin guardar), y **824 ya no aparece**.
+>
+> Nota: **v6.66 — 👤 SIGLAS + LEGAJO de quién hizo cada movimiento (y de quién recibió)
+> en el detalle por artículo**. En el pop-up de movimientos de un depósito (📦 A guardar,
+> 🔁 Góndola, 🏗 Racks — `_stkMovsBlock`) cada fila muestra ahora un chip
+> `👤 SIGLAS · legajo` al lado del movimiento. De dónde sale: **(a)** si el movimiento
+> trae `Movimientos_Stock.legajo` (guardado, picking, ajustes… y las recepciones nuevas
+> desde la **idea 7725**, 30/07/2026) → chip **gris**, dato exacto; **(b)** si es una
+> `recepcion` **sin** legajo (todas las anteriores al 30/07 lo tienen **NULL**) → se
+> **deduce por la sesión de RT**: el evento `RT` de `Registros_Produccion_Virgilio`
+> (la fila de cierre trae `ts_inicio`=arranque y `ts_cliente`=cierre; la de apertura,
+> sólo `ts_cliente`=arranque) cuyo intervalo **contiene** el `ts` del movimiento → chip
+> **ámbar con `~`** (aproximado). Si dos sesiones se superponen gana la que **arrancó
+> más tarde**; hay 10 min de gracia al cierre (el movimiento se inserta un toque después
+> de cerrar el RT); si ninguna lo contiene, **no se inventa** nada (sin chip). Las siglas
+> salen de `Empleados` vía `getEmpleadosNombres()` + `initialsFromName()`; el nombre
+> completo va en el `title` (hover). Nuevo smoke `tests/mva-quien.cjs`. Bump `v6.66`.
 >
 > Nota: **idea 7382 — Saldo de insumos SEPARADO por unidad**. El saldo de insumos
 > (`vista_saldos_stock.insumos`) sumaba `delta` mezclando unidades heterogéneas (kg, Uni,
@@ -126,7 +166,7 @@
 >
 > Nota: **v6.22 — `pipeline_atascado` del tablero de Agentes: mismo criterio que la alerta (última actividad + días hábiles)**. El bloque 16 de `generar_reporte_agentes` (`sql/generar_reporte_agentes_v2.sql`) medía la antigüedad de lo pickeado (`separar_pedidos`/`a_facturar`) desde **la caja más vieja que entró** (`min(ts) filter delta>0`) en **días corridos** → marcaba "hace 27–28 días" a **códigos de alta rotación** que en realidad se pickean y separan **todos los días** (la "caja más vieja" es del arranque del sistema, pero el saldo churnea a diario). Eran falsos positivos (ej. 26/07 mostraba "20 · hace 28 días"). Ahora mide por **última actividad** (`max(ts)`) y en **días hábiles** (lun–vie, sáb/dom no cuentan), con umbral `Stock_Config.dias_estancado` (default 2) — **idéntico** a la alerta Telegram "STOCK ESTANCADO". Verificado: post-cambio da **0** hoy (lunes; lo del viernes va 1 día hábil, salta el martes si sigue quieto). Se actualizó el rótulo del tablero (`index.html` → "Pipeline atascado (+2 días hábiles)"). Bump `v6.22` (APP_VERSION + SW_VERSION) por tocar `index.html`.
 >
-> Nota (backend Supabase, sin bump de app): **"👀 STOCK ESTANCADO" — redefinido el concepto (errores reales, no "cantidad hace X días") + días HÁBILES**. Pedido del dueño: la alerta ya **no** avisa "cuánto hay a guardar hace tantos días" (una recepción entera sin tocar es pendiente normal, no un error), sino los **potenciales errores reales** — mercadería trabada porque alguien **empezó y no cerró**. Dos casos en `reporte_agentes_stock_estancado()` (`sql/stock_estancado.sql`): **(1) RESTO SIN GUARDAR** (`a_guardar`): guardaron **parte** de un artículo (a góndola y/o excedente) y dejaron un **resto** sin guardar. Ej: llegan 100, suben 50 a góndola + 40 a excedente → quedan **10 estancadas**. La señal es que **hubo `guardado`** para ese código (guardado parcial) **Y** todavía queda `saldo > 0` en `a_guardar`; si **nunca se guardó nada** (recepción intacta) **NO** avisa. **(2) PICKEADO SIN AVANZAR** (`separar_pedidos` + `a_facturar`): mercadería ya pickeada, sin que nadie la trabaje (pickeada sin separar/armar, o armada sin facturar), que no puede quedar así +N días. **DÍAS HÁBILES:** los operarios no trabajan sáb/dom → la antigüedad se cuenta en **días hábiles (lun–vie)**, no corridos (algo del **viernes** recién dispara el **martes**: vie+lun = 2). Umbral `Stock_Config.dias_estancado` (default **2**), ahora interpretado en días hábiles. Sigue **solo Telegram**, respeta cutoff, excluye legajos 0/1, dedup diario, encadenada al cron de agentes (jobid 14). Verificado read-only: hoy (lun 27/07) marcaría **3** restos sin guardar (cod 248/501/535, guardado parcial + resto), y **cero** falsos positivos por recepciones intactas (323E, 99, 335…) ni por el picking/armado del propio día. Deja atrás los ~40 avisos anteriores (recepciones enteras que inflaban la lista).
+> Nota (backend Supabase, sin bump de app) — ⚠ **SUPERADA por la nota "ESTANCADO — definición FINAL del dueño" (31/07, arriba): el criterio (1) ahora se mide por CICLO ABIERTO, no sobre el histórico del código**: **"👀 STOCK ESTANCADO" — redefinido el concepto (errores reales, no "cantidad hace X días") + días HÁBILES**. Pedido del dueño: la alerta ya **no** avisa "cuánto hay a guardar hace tantos días" (una recepción entera sin tocar es pendiente normal, no un error), sino los **potenciales errores reales** — mercadería trabada porque alguien **empezó y no cerró**. Dos casos en `reporte_agentes_stock_estancado()` (`sql/stock_estancado.sql`): **(1) RESTO SIN GUARDAR** (`a_guardar`): guardaron **parte** de un artículo (a góndola y/o excedente) y dejaron un **resto** sin guardar. Ej: llegan 100, suben 50 a góndola + 40 a excedente → quedan **10 estancadas**. La señal es que **hubo `guardado`** para ese código (guardado parcial) **Y** todavía queda `saldo > 0` en `a_guardar`; si **nunca se guardó nada** (recepción intacta) **NO** avisa. **(2) PICKEADO SIN AVANZAR** (`separar_pedidos` + `a_facturar`): mercadería ya pickeada, sin que nadie la trabaje (pickeada sin separar/armar, o armada sin facturar), que no puede quedar así +N días. **DÍAS HÁBILES:** los operarios no trabajan sáb/dom → la antigüedad se cuenta en **días hábiles (lun–vie)**, no corridos (algo del **viernes** recién dispara el **martes**: vie+lun = 2). Umbral `Stock_Config.dias_estancado` (default **2**), ahora interpretado en días hábiles. Sigue **solo Telegram**, respeta cutoff, excluye legajos 0/1, dedup diario, encadenada al cron de agentes (jobid 14). Verificado read-only: hoy (lun 27/07) marcaría **3** restos sin guardar (cod 248/501/535, guardado parcial + resto), y **cero** falsos positivos por recepciones intactas (323E, 99, 335…) ni por el picking/armado del propio día. Deja atrás los ~40 avisos anteriores (recepciones enteras que inflaban la lista).
 >
 > Nota (backend Supabase, sin bump de app): **Artículos DISCONTINUADOS — no disparan la alerta "CAPACIDAD SIN PROYECCIÓN"**. Esa alerta (`reporte_agentes_capacidad_sin_maximo`, Telegram) avisa cuando un artículo tiene **lugar en góndola** (`Capacidad_Sector`) pero **sin máximo/proyección** (`OC_Maximos`), asumiendo un typo de código. Pero los **discontinuados** (se venden hasta agotar stock, no se reponen) tienen lugar sin proyección **a propósito** → eran falsos positivos. Se creó la tabla **`Articulos_Discontinuados`** (`cod` PK, `motivo`, `creado_ts`; RLS anon **solo SELECT**) y la función ahora **excluye** esos códigos (CTE `disc`, normalizado). Cargados: **554, 573, 592**. Para marcar otro: `INSERT INTO "Articulos_Discontinuados"(cod,motivo) VALUES ('XXX','discontinuado')`. **Fix de dato:** el 3º venía mal escrito como **592E** en `Capacidad_Sector` (lo confirmó el dueño: es **592**) → corregido a `592` (H60, 18 cj). ⚠ El **`planimetria.js`** (mapa de picking, generado del Excel) todavía lista ese lugar como **592E@H60**; es inerte (el artículo tiene **0 pedidos y 0 movimientos de stock**), pero para dejarlo 100% consistente hay que corregirlo en la hoja **"Picking"** del Excel (592E→592) y regenerar.
 >

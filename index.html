@@ -5703,7 +5703,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v6.65";
+const APP_VERSION = "v6.66";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -10183,6 +10183,8 @@ var STK_POP_CSS =
   ".mva-tbl th.num,.mva-tbl td.mva-cant,.mva-tbl td.mva-sal{text-align:right;font-variant-numeric:tabular-nums;font-weight:800;width:15%;}" +
   ".mva-tbl .mva-pos{color:#15803d;}.mva-tbl .mva-neg{color:#b91c1c;}" +
   ".mva-np{display:inline-block;background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af;border-radius:6px;padding:0 5px;font-size:10.5px;font-weight:800;margin-left:2px;white-space:nowrap;}" +
+  ".mva-qui{display:inline-block;background:#f1f5f9;border:1px solid #cbd5e1;color:#334155;border-radius:6px;padding:0 5px;font-size:10.5px;font-weight:800;margin-left:2px;white-space:nowrap;}" +
+  ".mva-qui b{color:#0f172a;}.mva-qui.aprox{background:#fffbeb;border-color:#fde68a;color:#92400e;}" +
   ".mva-ts{color:#94a3b8;font-size:11px;}.mva-ref{color:#64748b;font-family:Consolas,Menlo,monospace;}" +
   ".mva-in{color:#15803d;}.mva-out{color:#b91c1c;}.mva-sal{color:#1e3a8a;}" +
   ".stkpop-ubic{color:#7c3aed;font-weight:800;white-space:nowrap;}";
@@ -10413,6 +10415,7 @@ async function stkOpenRacksArt(codEnc) {
   _stkPop.pos = (rows || []).filter(function (x) { return _stkNormCod(x.cod_art) === codN; })
     .sort(function (a, b) { return String(a.sector).localeCompare(String(b.sector), undefined, { numeric: true }); });
   stkRacksArtRender();
+  _stkQuienLoad(stkRacksArtRender);   // v6.66 — 👤 siglas + legajo en los movimientos de racks
 }
 function _stkEsGuardado(mv) { return mv.tipo === "guardado" || mv.tipo === "guardado_fuera_lista" || mv.tipo === "baja_racks"; }
 /* v5.101 — CAPACIDAD de góndola por artículo: las ubicaciones (sectores) y cuántas
@@ -10532,6 +10535,7 @@ async function stkOpenMovsArt(codEnc, dep, titulo, icono) {
   _stkPop = { kind: "movsArt", cod: cod, codN: _stkNormCod(cod), dep: dep, titulo: titulo || dep, icono: icono || "🔁", desde: "", hasta: "", npByTanda: {} };
   _stkPopShell((icono || "🔁") + " " + (titulo || dep) + " — " + escapeHtml(cod), "stkPopBody");
   stkMovsArtRender();   // render inmediato (el NP de cada picking aparece cuando llega el fetch)
+  _stkQuienLoad(stkMovsArtRender);   // v6.66 — 👤 siglas + legajo (nombres + sesiones de RT)
   // v6.32 — NP(s) que pidieron ESTE artículo en cada tanda → para las filas de picking/separado.
   try {
     const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
@@ -10552,6 +10556,70 @@ function stkMovsArtDate(which, val) {
   else if (which === "desde") _stkPop.desde = String(val || "");
   else _stkPop.hasta = String(val || "");
   if (_stkPop.kind === "racksArt") stkRacksArtRender(); else stkMovsArtRender();
+}
+/* ===== v6.66 — QUIÉN hizo cada movimiento (siglas + legajo) en el detalle por artículo.
+   `Movimientos_Stock.legajo` viene cargado en guardado / picking / ajustes, pero en las
+   RECEPCIONES recién se graba desde la idea 7725 (30/07/2026): las viejas lo tienen NULL.
+   Para esas se deduce por la SESIÓN de RT — el movimiento cae dentro del [inicio, cierre]
+   del RT de ese operario en `Registros_Produccion_Virgilio` (opcion='RT': la fila de cierre
+   trae ts_inicio=arranque y ts_cliente=cierre; la de apertura, solo ts_cliente=arranque).
+   Lo deducido se marca en ámbar con "~"; lo que sale del propio movimiento, en gris. */
+let _stkRtSes = null;
+async function _stkLoadRtSes() {
+  if (_stkRtSes) return _stkRtSes;
+  const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+  let rows = [];
+  try {
+    rows = await fetch(SUPABASE_TABLE_ENDPOINT + "?opcion=eq.RT&select=legajo,ts_inicio,ts_cliente&order=ts_cliente.desc&limit=6000", { headers: H, cache: "no-store" })
+      .then(function (r) { return r.ok ? r.json() : []; });
+  } catch (_e) { rows = []; }
+  const ms = function (v) { const t = v ? new Date(v).getTime() : NaN; return isFinite(t) ? t : null; };
+  const ses = [], abiertas = [];
+  rows.forEach(function (r) {
+    const leg = String(r.legajo || "").trim(); if (!leg) return;
+    const ini = ms(r.ts_inicio), fin = ms(r.ts_cliente);
+    if (ini != null && fin != null) ses.push({ leg: leg, ini: ini, fin: fin });        // sesión cerrada
+    else if (fin != null) abiertas.push({ leg: leg, ini: fin });                        // toque de apertura
+  });
+  // Una apertura sin su cierre = sesión todavía abierta (las recepciones de hoy).
+  abiertas.forEach(function (a) {
+    const cerrada = ses.some(function (s) { return s.leg === a.leg && Math.abs(s.ini - a.ini) < 3000; });
+    if (!cerrada) ses.push({ leg: a.leg, ini: a.ini, fin: Infinity });
+  });
+  _stkRtSes = ses;
+  return ses;
+}
+/* Legajo del que estaba haciendo RT (recepción) en ese instante. Si se superponen
+   dos sesiones, gana la que arrancó más tarde. 10 min de gracia al cierre: el
+   movimiento se inserta un toque después de cerrar el RT. */
+function _stkRtQuien(ts) {
+  if (!_stkRtSes || !_stkRtSes.length) return "";
+  const t = new Date(ts).getTime(); if (!isFinite(t)) return "";
+  let best = null;
+  _stkRtSes.forEach(function (s) {
+    if (t < s.ini - 60000 || t > s.fin + 600000) return;
+    if (!best || s.ini > best.ini) best = s;
+  });
+  return best ? best.leg : "";
+}
+/* Chip "👤 SIGLAS · legajo" del movimiento (vacío si no se puede saber quién fue). */
+function _stkQuienChip(mv) {
+  let leg = mv.legajo != null ? String(mv.legajo).trim() : "", aprox = false;
+  if (!leg && String(mv.tipo || "") === "recepcion") { leg = _stkRtQuien(mv.ts); aprox = !!leg; }
+  if (!leg) return "";
+  const nom = (typeof _empleadosNombres !== "undefined" && _empleadosNombres) ? (_empleadosNombres.get(leg) || "") : "";
+  const sig = (typeof initialsFromName === "function" ? initialsFromName(nom, leg) : "") || nom || leg;
+  const tip = (nom || ("legajo " + leg)) + (aprox ? " — deducido por la sesión de RT (recepción vieja, sin legajo guardado)" : "");
+  return ' <span class="mva-qui' + (aprox ? " aprox" : "") + '" title="' + escapeHtml(tip) + '">👤 <b>' + escapeHtml(sig) + '</b> · ' + escapeHtml(leg) + (aprox ? " ~" : "") + '</span>';
+}
+/* Carga (una sola vez) nombres de empleados + sesiones de RT y re-dibuja el popup. */
+function _stkQuienLoad(rerender) {
+  try {
+    Promise.all([
+      (typeof getEmpleadosNombres === "function" ? getEmpleadosNombres().catch(function () { return null; }) : Promise.resolve(null)),
+      _stkLoadRtSes().catch(function () { return null; })
+    ]).then(function () { if (_stkPop && typeof rerender === "function") rerender(); });
+  } catch (_e) {}
 }
 /* Bloque HTML de "movimientos por artículo de un depósito" (hint + rango de fechas +
    tabla Entró/Salió/Saldo corrido). Lo comparten Góndola/A guardar (stkMovsArtRender)
@@ -10577,9 +10645,10 @@ function _stkMovsBlock() {
     const refU = String(mv.ref || "").toUpperCase();
     const nps = npByTanda[refU];
     const npTxt = nps && nps.length ? ' <span class="mva-np">NP ' + escapeHtml(nps.join(", ")) + '</span>' : '';
-    return '<tr><td class="mva-ts">' + escapeHtml(stockFmtTs(mv.ts)) + '</td><td class="mva-mov">' + escapeHtml(String(mv.tipo || "")) + (mv.ref ? ' <span class="mva-ref">' + escapeHtml(String(mv.ref)) + '</span>' : '') + npTxt + '</td><td class="mva-cant">' + cant + '</td><td class="mva-sal">' + round1(saldo) + '</td></tr>';
+    // v6.66 — 👤 siglas + legajo del que lo hizo (en la recepción, del que recibió).
+    return '<tr><td class="mva-ts">' + escapeHtml(stockFmtTs(mv.ts)) + '</td><td class="mva-mov">' + escapeHtml(String(mv.tipo || "")) + (mv.ref ? ' <span class="mva-ref">' + escapeHtml(String(mv.ref)) + '</span>' : '') + npTxt + _stkQuienChip(mv) + '</td><td class="mva-cant">' + cant + '</td><td class="mva-sal">' + round1(saldo) + '</td></tr>';
   }).join("");
-  let h = '<div class="stkpop-hint">Movimientos de <b>' + escapeHtml(_stkPop.cod) + '</b> en <b>' + escapeHtml(_stkPop.titulo) + '</b>, por fecha. Entró <b style="color:#15803d">+' + round1(totIn) + '</b> · salió <b style="color:#b91c1c">' + round1(totOut) + '</b> · <b>saldo ' + round1(saldo) + '</b>.</div>';
+  let h = '<div class="stkpop-hint">Movimientos de <b>' + escapeHtml(_stkPop.cod) + '</b> en <b>' + escapeHtml(_stkPop.titulo) + '</b>, por fecha. Entró <b style="color:#15803d">+' + round1(totIn) + '</b> · salió <b style="color:#b91c1c">' + round1(totOut) + '</b> · <b>saldo ' + round1(saldo) + '</b>.<br><small style="color:#94a3b8">👤 = siglas y legajo del que lo hizo (en <b>recepcion</b>, del que recibió). En <span class="mva-qui aprox">ámbar ~</span> va el deducido por la sesión de RT (recepciones viejas, sin legajo guardado).</small></div>';
   h += '<div class="mva-daterow">Desde <input type="date" class="mva-date" value="' + escapeHtml(_stkPop.desde) + '" onchange="stkMovsArtDate(\'desde\',this.value)"> hasta <input type="date" class="mva-date" value="' + escapeHtml(_stkPop.hasta) + '" onchange="stkMovsArtDate(\'hasta\',this.value)">' + ((_stkPop.desde || _stkPop.hasta) ? ' <button class="mva-clear" onclick="stkMovsArtDate(\'clear\')">✕</button>' : '') + '</div>';
   h += list.length
     ? '<div class="mva-tblwrap"><table class="mva-tbl"><thead><tr><th>Fecha</th><th>Movimiento</th><th class="num">Cant.</th><th class="num">Saldo</th></tr></thead><tbody>' + rows + '</tbody></table></div>'

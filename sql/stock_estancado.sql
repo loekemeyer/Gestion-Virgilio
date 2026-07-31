@@ -1,18 +1,32 @@
 -- =====================================================================
 --  stock_estancado.sql — Alerta Telegram "STOCK ESTANCADO" 👀
 --
---  CONCEPTO (redefinido): no interesa "cuánto hay a guardar hace X días"
---  (una recepción entera sin tocar es trabajo pendiente normal, no un error),
---  sino los POTENCIALES ERRORES reales — mercadería que quedó trabada porque
---  alguien empezó y no cerró:
+--  CONCEPTO (v6.66 — definición del dueño): no interesa "cuánto hay a guardar
+--  hace X días" (una recepción entera sin tocar es trabajo pendiente normal, no
+--  un error), sino los POTENCIALES ERRORES reales — mercadería que quedó trabada
+--  porque alguien EMPEZÓ a guardar y NO TERMINÓ:
 --
 --   1) RESTO SIN GUARDAR (deposito a_guardar):
---      Guardaron parte de un artículo (a góndola y/o excedente) pero dejaron un
---      resto sin guardar. Ej: llegan 100, suben 50 a góndola + 40 a excedente y
---      quedan 10 "a guardar" → esas 10 están estancadas (se olvidaron el resto).
---      Señal = hubo `guardado` para ese código (guardado parcial) Y todavía queda
---      saldo > 0 en a_guardar. Si NUNCA se guardó nada (recepción entera intacta),
---      NO se avisa: es pendiente normal, no un error.
+--      De lo que LLEGÓ, guardaron una PARTE (a góndola y/o excedente) pero NO la
+--      TOTALIDAD → el resto quedó estancado. Ej: llegan 14 cajas, guardan 10 →
+--      esas 4 que quedaron "a guardar" SON el estancado.
+--
+--      ⚠ Se mide por CICLO ABIERTO, no por el histórico del código. El ciclo
+--      abierto arranca justo después del último movimiento que dejó el saldo de
+--      `a_guardar` en 0 (o sea: la última vez que se guardó TODO lo que había).
+--      Es estancado si, DENTRO de ese ciclo, hubo un `guardado` y todavía queda
+--      resto. Si en el ciclo abierto NUNCA se guardó nada (llegó una recepción
+--      nueva y nadie la tocó todavía), NO se avisa: es pendiente normal.
+--
+--      Ejemplo real (cod 824): llegan 10 → guardan 10 (saldo 0) · llegan 22 →
+--      guardan 22 (saldo 0) · llegan 14 y nadie las tocó → saldo 14 pero NO es
+--      estancado (arranca ciclo nuevo, sin guardado). Antes SÍ avisaba, porque
+--      miraba "hubo guardado alguna vez" sobre todo el histórico → falso positivo.
+--
+--      Cantidad reportada = el RESTO que quedó al terminar el último `guardado`
+--      del ciclo (no el saldo total): si después de dejar el resto llegó una
+--      recepción nueva, esas cajas nuevas son pendiente normal, no estancado.
+--      La antigüedad se cuenta desde ESE `guardado` (cuándo se dejó el resto).
 --
 --   2) PICKEADO SIN AVANZAR (deposito separar_pedidos + a_facturar):
 --      Mercadería ya pickeada que quedó en un estado intermedio sin que nadie la
@@ -52,20 +66,33 @@ begin
   with cfg as (select valor::timestamptz as cutoff from public."Stock_Config" where clave = 'cutoff_ts' limit 1),
   mv as (
     select upper(regexp_replace(trim(m.cod_art), '^0+(.)', '\1')) as cod,
-           m.deposito, m.tipo, m.delta, m.ts
+           m.deposito, m.tipo, m.delta, m.ts, m.id
     from public."Movimientos_Stock" m left join cfg on true
     where m.deposito in ('a_guardar', 'separar_pedidos', 'a_facturar')
       and (cfg.cutoff is null or m.tipo = 'inicial' or m.ts >= cfg.cutoff)
       and coalesce(m.legajo, '') not in ('0', '1')
   ),
-  -- (1) resto sin guardar: quedó saldo en a_guardar Y hubo guardado parcial
-  ag as (
-    select cod, sum(delta) as saldo, max(ts) as ult
+  -- (1) resto sin guardar — saldo corrido de a_guardar por código, en orden
+  run as (
+    select cod, tipo, ts, id,
+           sum(delta) over (partition by cod order by ts, id rows between unbounded preceding and current row) as saldo_run
     from mv
     where deposito = 'a_guardar'
-    group by cod
-    having sum(delta) > 0.5
-       and coalesce(-sum(delta) filter (where tipo = 'guardado'), 0) > 0.5
+  ),
+  -- fin del último ciclo CERRADO = última vez que se guardó todo (saldo volvió a 0)
+  cero as (select cod, max(ts) as cero_ts from run where saldo_run <= 0.5 group by cod),
+  -- último `guardado` DENTRO del ciclo abierto + el resto que dejó sin guardar
+  ultg as (
+    select distinct on (r.cod) r.cod, r.ts as g_ts, r.saldo_run as resto
+    from run r left join cero c on c.cod = r.cod
+    where r.tipo = 'guardado' and (c.cero_ts is null or r.ts > c.cero_ts)
+    order by r.cod, r.ts desc, r.id desc
+  ),
+  fin as (select cod, sum(delta) as saldo from mv where deposito = 'a_guardar' group by cod),
+  ag as (
+    select u.cod, u.resto as saldo, u.g_ts as ult
+    from ultg u join fin f on f.cod = u.cod
+    where u.resto > 0.5 and f.saldo > 0.5
   ),
   -- (2) pickeado sin avanzar: separar_pedidos / a_facturar con saldo > 0
   pick as (
@@ -77,7 +104,7 @@ begin
   ),
   todo as (
     select 'a_guardar'::text as deposito, cod, saldo, ult,
-           'resto sin guardar (ya guardaron el resto)'::text as est from ag
+           'resto sin guardar (guardaron una parte de lo que llegó)'::text as est from ag
     union all
     select deposito, cod, saldo, ult,
            case deposito when 'a_facturar' then 'pickeado sin facturar'
