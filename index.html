@@ -5708,7 +5708,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v6.75";
+const APP_VERSION = "v6.76";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -9522,6 +9522,8 @@ async function prodLoad() {
    vista_venta_mensual. Admin (overlay aparte). ========================================= */
 let _abast = null;
 function _abastN(n) { n = Number(n) || 0; return String(Math.round(n * 10) / 10); }
+/* Los códigos con "E" son IMPORTADOS → se analizan por otro lado, no en este módulo. */
+function _abastEsImportado(cod) { return /E/i.test(String(cod || "")); }
 function _mesAdd(mes, delta) {
   const p = String(mes).split("-"); const d = new Date(parseInt(p[0], 10), parseInt(p[1], 10) - 1 + delta, 1);
   return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
@@ -9550,7 +9552,10 @@ function abastCompute(recep, venta, sp) {
   (venta || []).forEach(function (r) { const c = String(r.cod || "").trim(); if (!c) return; const a = get(c); a.ventaMes[r.mes] = (a.ventaMes[r.mes] || 0) + (Number(r.cajas) || 0); a.mesesSet[r.mes] = 1; });
   (sp || []).forEach(function (r) { const c = String(r.cod || "").trim(); if (!c) return; const a = get(c); a.tieneSp = true; a.stock = Number(r.stock_total) || 0; a.pedidos = Number(r.pedidos_ped) || 0; a.npsPed = Number(r.nps_ped) || 0; a.dep = {}; ABAST_DEPS.forEach(function (d) { a.dep[d[0]] = Number(r[d[0]]) || 0; }); });
   const avg3 = function (m) { let s = 0, n = 0; tres.forEach(function (mm) { if (m[mm] != null) { s += m[mm]; n++; } }); return n ? s / n : 0; };
-  const rows = Object.keys(arts).map(function (c) {
+  // Excluir importados (código con "E"): se analizan por otro lado.
+  const codigos = Object.keys(arts);
+  const nImport = codigos.filter(_abastEsImportado).length;
+  const rows = codigos.filter(function (c) { return !_abastEsImportado(c); }).map(function (c) {
     const a = arts[c];
     const recUlt = a.recepMes[ultimo] || 0, venUlt = a.ventaMes[ultimo] || 0;
     const recAvg = avg3(a.recepMes), venAvg = avg3(a.ventaMes);
@@ -9562,7 +9567,7 @@ function abastCompute(recep, venta, sp) {
     const falta = a.pedidos > 0 ? Math.max(0, a.pedidos - a.stock) : 0;
     return { cod: c, desc: artNombre(c, ""), recUlt: recUlt, venUlt: venUlt, recAvg: recAvg, venAvg: venAvg, provs: provs, nProv: Object.keys(provSet).length, balUlt: recUlt - venUlt, balAvg: recAvg - venAvg, stock: a.stock, pedidos: a.pedidos, npsPed: a.npsPed, dep: a.dep, tieneSp: a.tieneSp, falta: falta, _a: a };
   });
-  return { ultimo: ultimo, cur: info.cur, tres: tres, rows: rows, filtro: "", tab: "fab" };
+  return { ultimo: ultimo, cur: info.cur, tres: tres, rows: rows, filtro: "", tab: "fab", nImport: nImport };
 }
 async function openAbastecimiento() {
   if (!document.getElementById("abastCss")) {
@@ -9607,7 +9612,7 @@ function abastRenderFab() {
   const falta = function (r) { return r.venAvg > r.recAvg + 0.05; };
   rows.sort(function (a, b) { return (falta(b) ? 1 : 0) - (falta(a) ? 1 : 0) || (a.balAvg - b.balAvg) || String(a.cod).localeCompare(String(b.cod), undefined, { numeric: true }); });
   const nFalta = _abast.rows.filter(falta).length;
-  let h = '<div class="abast-intro"><b>Cuánto te ENTREGAN por mes (por fabricante) vs cuánto VENDÉS</b>, por artículo. Si vendés más de lo que te fabrican, te falta capacidad → conviene sumar otro fabricante. Ventana: <b>' + escapeHtml(_abast.ultimo) + '</b> (último mes completo) y promedio de los últimos 3 meses. Datos: recepción (Control_Modo_OP) y venta entregada (Entregas_Virgilio). Tocá una fila para ver el mes a mes y los proveedores.</div>';
+  let h = '<div class="abast-intro"><b>Cuánto te ENTREGAN por mes (por fabricante) vs cuánto VENDÉS</b>, por artículo. Si vendés más de lo que te fabrican, te falta capacidad → conviene sumar otro fabricante. Ventana: <b>' + escapeHtml(_abast.ultimo) + '</b> (último mes completo) y promedio de los últimos 3 meses. Datos: recepción (Control_Modo_OP) y venta entregada (Entregas_Virgilio). Tocá una fila para ver el mes a mes y los proveedores.' + (_abast.nImport ? ' <b>Importados (código con E) excluidos:</b> ' + _abast.nImport + ' (se analizan por otro lado).' : '') + '</div>';
   h += '<div class="abast-headline">' + (nFalta ? '<span class="bad">⚠ ' + nFalta + ' artículo(s) donde la fabricación NO alcanza la venta</span> — priorizados arriba.' : '<span class="ok">✓ En todos los artículos la fabricación alcanza la venta.</span>') + '</div>';
   h += '<input id="abastFiltroInp" class="abast-filtro" type="search" placeholder="🔎 Buscar código / descripción" value="' + escapeHtml(_abast.filtro || "") + '" oninput="abastSetFiltro(this.value)">';
   h += '<div class="abast-tblwrap"><table class="abast-tbl"><thead><tr>' +
@@ -9655,7 +9660,7 @@ function abastRenderStock() {
   rows.sort(function (a, b) { return (b.falta - a.falta) || (b.pedidos - a.pedidos) || String(a.cod).localeCompare(String(b.cod), undefined, { numeric: true }); });
   const conFalta = rows.filter(function (r) { return r.falta > 0.05; });
   const totFalta = conFalta.reduce(function (s, r) { return s + r.falta; }, 0);
-  let h = '<div class="abast-intro"><b>Stock actual que tenés</b> (sumado entre TODOS los puntos de stock: góndola, excedente, pickeados, a facturar, a guardar, racks y p/ envasar — <i>no</i> incluye insumos) <b>vs lo que tenés pedido</b> (NP programadas y todavía sin facturar). <b>Falta p/ normalizar</b> = lo que hay que fabricar/reponer para cubrir los pedidos con el stock actual. Tocá una fila para ver en qué depósitos está el stock.</div>';
+  let h = '<div class="abast-intro"><b>Stock actual que tenés</b> (sumado entre TODOS los puntos de stock: góndola, excedente, pickeados, a facturar, a guardar, racks y p/ envasar — <i>no</i> incluye insumos) <b>vs lo que tenés pedido</b> (NP programadas y todavía sin facturar). <b>Falta p/ normalizar</b> = lo que hay que fabricar/reponer para cubrir los pedidos con el stock actual. Tocá una fila para ver en qué depósitos está el stock.' + (_abast.nImport ? ' <b>Importados (código con E) excluidos:</b> ' + _abast.nImport + ' (se analizan por otro lado).' : '') + '</div>';
   h += '<div class="abast-headline">' + (conFalta.length ? '<span class="bad">⚠ ' + conFalta.length + ' artículo(s) sin stock suficiente para lo pedido</span> — faltan <b>' + _abastN(totFalta) + '</b> cajas en total.' : '<span class="ok">✓ Tenés stock para cubrir todos los pedidos pendientes.</span>') + '</div>';
   h += '<input id="abastFiltroInp" class="abast-filtro" type="search" placeholder="🔎 Buscar código / descripción" value="' + escapeHtml(_abast.filtro || "") + '" oninput="abastSetFiltro(this.value)">';
   h += '<div class="abast-tblwrap"><table class="abast-tbl"><thead><tr>' +

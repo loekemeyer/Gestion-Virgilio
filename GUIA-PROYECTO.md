@@ -4,7 +4,14 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-07-31 · Versión app al documentar: **v6.75**
+> Última actualización: 2026-07-31 · Versión app al documentar: **v6.76**
+>
+> Nota: **v6.76 — Abastecimiento excluye los artículos IMPORTADOS (código con "E")**.
+> Los códigos que contienen `E` (ej. `870E`, `812E`, `439EL`, `702EN`) son importados y
+> se analizan por otro lado (pedido del usuario), así que el módulo Abastecimiento (ambas
+> sub-vistas) los saca del análisis. Helper `_abastEsImportado(cod)` = `/E/i.test(cod)`;
+> `abastCompute` filtra esos códigos y expone `nImport` (se muestra en el intro: "Importados
+> excluidos: N"). Bump `APP_VERSION`/`SW_VERSION` `v6.76`.
 >
 > Nota: **v6.75 — Fix: el buscador de Abastecimiento sólo dejaba tipear 1 dígito**.
 > El `oninput` re-dibujaba todo el body (`abastRender`) en cada tecla → el `<input>` se
