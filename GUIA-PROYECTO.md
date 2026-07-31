@@ -23,6 +23,16 @@
 > 727E es de 727EN" — estaba mal atribuido). ⚠ Queda `727EN a_facturar −17` (negativo raro) sin
 > tocar, a revisar aparte.
 >
+> Nota (dato — facturación, 31/07): **NP 98049 devuelta a "a FC"**. El pedido (Numida S.A., tanda
+> **C98F**, FC-ready: TP 07-28 09:20 + TAP 07-28 13:19; con lío TAL + PPP + Base_Pedidos) figuraba
+> **marcado facturado** en `Facturacion_NP` (07-28 16:52, cierre `8112d61e…`, fecha_salida 29/07)
+> **pero SIN comprobante ARCA** → fue un tilde/mark de la app (posible artefacto del pipeline), no
+> una factura fiscal. Por eso NO aparecía en *Facturación — NPs a FC* (el módulo excluye las que
+> están en `Facturacion_NP`). Se **borró la fila** (equivale a destildar) → vuelve a "a FC".
+> **Restaurable**: np 98049 · tanda C98F · cod_cliente 118 · facturado_at `2026-07-28 16:52:04.378`
+> · cierre_id `8112d61e-3641-4fa8-998a-6e660641a8fb` · m3 0.083 · fecha_salida 2026-07-29. ⚠ Al
+> sacarla de `Facturacion_NP` también sale de ese cierre/reparto del 29/07.
+>
 > Nota (dato — corrección manual de stock + revisión, 31/07): **NP 97822 → 256 y 502**.
 > Revisión pedida por el dueño de los dos códigos que quedaron colgando de la reconstrucción
 > de la NP **97822** (tanda **C54B**, Superimperio S A; facturada 29/07, despachada 30/07,
