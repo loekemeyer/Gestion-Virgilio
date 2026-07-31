@@ -68,6 +68,17 @@
 > `ajuste terminado −7` → 0 (`client_id baja_727_noexiste_20260731`, reversible). ⏳ Si se quiere
 > **borrar las filas** del todo (no solo dejar en 0), avisar.
 >
+> Nota (dato — ubicación + consolidación + góndola, 31/07): **(a)** Ubicación **948E → I11**
+> (orden 186) escrita en la tabla `Planimetria` (antes solo estaba en la planimetría estática
+> `planimetria.js`; la familia 94xE/95xE es reciente y podía figurar "sin planimetría" en la app
+> desplegada). **(b)** Consolidados los duplicados de partes: **942P·942P → 942P** · **943P·943P →
+> 943P** · **944P·944P → 944P** · **945P·945P → 945P** · **948P·948P → 948P** (UPDATE `cod_art` +
+> descripción buena — el compuesto traía la desc corta "942P" que le ganaba a "Parte Cuchara…" en
+> la vista). Cada compuesto era `insumos MC −2`; ahora quedan bajo un solo código. **(c)**
+> Corrección de góndola (`terminado`) por conteo físico: **702** 60→**0** · **702E** 110→**97** ·
+> **702EN** **−36**→**20** (ajustes `terminado`; el 702EN sacaba un negativo imposible). ⚠ Fuera
+> del pedido, quedó sin tocar el **702EN `a_facturar` −52** — anomalía aparte a revisar.
+>
 > Nota: **v6.73 — Nuevo módulo "📈 Abastecimiento vs Venta"** (botón en el panel de
 > supervisor, al lado de "Rendimiento de operarios"). Muestra, **por artículo**, cuántas
 > cajas te **ENTREGA cada fabricante/tallerista por mes** contra cuánto **VENDÉS**, para
