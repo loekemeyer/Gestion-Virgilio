@@ -382,6 +382,16 @@ Deno.serve(async (req: Request): Promise<Response> => {
       // Factura A(1)→NC A(3), FA B(6)→NC B(8), FA C(11)→NC C(13)
       const ncMap: Record<number, number> = { 1: 3, 6: 8, 11: 13 };
       const tipoNc = ncMap[Number(orig.tipo_cbte)] || 3;
+      // Candado: no anular dos veces. ¿Ya hay una NC autorizada que referencia esta factura?
+      // deno-lint-ignore no-explicit-any
+      const prevNc: any[] = await (await fetch(sbUrl("Comprobantes_ARCA") + "?tipo_cbte=eq." + tipoNc + "&pto_vta=eq." + Number(orig.pto_vta) + "&entorno=eq." + c.env + "&estado=eq.autorizado&select=nro_cbte,raw_resp", { headers: sbHeaders() })).json();
+      // deno-lint-ignore no-explicit-any
+      const yaAnulada = Array.isArray(prevNc) && prevNc.some(function (x: any) {
+        const a = x && x.raw_resp && x.raw_resp.cbtes_asoc;
+        // deno-lint-ignore no-explicit-any
+        return Array.isArray(a) && a.some(function (rr: any) { return Number(rr.nro) === Number(orig.nro_cbte) && Number(rr.pto_vta) === Number(orig.pto_vta) && Number(rr.tipo) === Number(orig.tipo_cbte); });
+      });
+      if (yaAnulada && !body.forzar) return json({ ok: false, error: "ya_anulada", nota: "Esta factura ya tiene una Nota de Crédito que la anula. Si realmente querés emitir otra, mandá forzar:true.", factura: { pto_vta: orig.pto_vta, nro_cbte: orig.nro_cbte, cae: orig.cae } }, 409);
       const ta = await wsaaLogin(c);
       const r = await feEmitir(c, ta, {
         tipo_cbte: tipoNc,
@@ -391,6 +401,31 @@ Deno.serve(async (req: Request): Promise<Response> => {
         cbtes_asoc: [{ tipo: Number(orig.tipo_cbte), pto_vta: Number(orig.pto_vta), nro: Number(orig.nro_cbte) }],
       });
       return json({ ...r, entorno: c.env, tipo_cbte: tipoNc, letra: tipoNc === 3 ? "A" : (tipoNc === 8 ? "B" : "C"), anula: { cae: orig.cae, pto_vta: orig.pto_vta, nro_cbte: orig.nro_cbte, np: orig.np } }, r.ok ? 200 : 422);
+    }
+    if (action === "emitir_nd") {
+      // Nota de Débito que COMPENSA un comprobante ya emitido (por el mismo importe),
+      // referenciándolo en CbtesAsoc. Sirve p.ej. para neutralizar una NC de más.
+      if (!c.emitir) return json({ ok: false, error: "emision_deshabilitada", nota: "Prendé el secret ARCA_EMITIR=on." }, 501);
+      const caeRef = body.cae ? String(body.cae).replace(/\D/g, "") : "";
+      if (!caeRef) return json({ ok: false, error: "falta_referencia", nota: "Indicá 'cae' del comprobante a compensar con la Nota de Débito." }, 400);
+      // deno-lint-ignore no-explicit-any
+      const rows: any[] = await (await fetch(sbUrl("Comprobantes_ARCA") + "?cae=eq." + encodeURIComponent(caeRef) + "&estado=eq.autorizado&order=creado.desc&limit=1", { headers: sbHeaders() })).json();
+      const orig = Array.isArray(rows) ? rows[0] : null;
+      if (!orig) return json({ ok: false, error: "original_no_encontrado", nota: "No encontré un comprobante autorizado con ese CAE." }, 404);
+      if (orig.entorno !== c.env) return json({ ok: false, error: "entorno_distinto", nota: "El comprobante es de entorno '" + orig.entorno + "' y estás en '" + c.env + "'." }, 409);
+      if (Number(orig.pto_vta) !== Number(c.ptoVta)) return json({ ok: false, error: "pto_vta_distinto", nota: "El comprobante es del PV " + orig.pto_vta + " y el secret ARCA_PTO_VTA es " + c.ptoVta + "." }, 409);
+      // ND por letra: A(1,2,3)→ND A(2); B(6,7,8)→ND B(7); C(11,12,13)→ND C(12)
+      const ndMap: Record<number, number> = { 1: 2, 2: 2, 3: 2, 6: 7, 7: 7, 8: 7, 11: 12, 12: 12, 13: 12 };
+      const tipoNd = ndMap[Number(orig.tipo_cbte)] || 2;
+      const ta = await wsaaLogin(c);
+      const r = await feEmitir(c, ta, {
+        tipo_cbte: tipoNd,
+        neto: Number(orig.importe_neto), iva: Number(orig.importe_iva), total: Number(orig.importe_total),
+        doc_tipo: 80, doc_nro: orig.cuit_cliente, cond_iva_receptor: 1,
+        np: orig.np, tanda: orig.tanda,
+        cbtes_asoc: [{ tipo: Number(orig.tipo_cbte), pto_vta: Number(orig.pto_vta), nro: Number(orig.nro_cbte) }],
+      });
+      return json({ ...r, entorno: c.env, tipo_cbte: tipoNd, letra: tipoNd === 2 ? "A" : (tipoNd === 7 ? "B" : "C"), compensa: { cae: orig.cae, pto_vta: orig.pto_vta, nro_cbte: orig.nro_cbte, tipo_cbte: orig.tipo_cbte } }, r.ok ? 200 : 422);
     }
   } catch (e) {
     return json({ ok: false, error: String((e as Error)?.message || e).slice(0, 500) }, 502);
