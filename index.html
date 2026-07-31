@@ -886,6 +886,11 @@ button {
 .monitor-flex{ display: block; }
 .monitor-flex .monitor-table-wrap{ width: 100%; overflow: visible; }
 .monitor-flex .monitor-table{ width: 100%; }
+/* idea 1864 — buscador rápido del monitor: filtra client-side las filas de tanda
+   (por tanda, legajo o nombre del operario) y se re-aplica tras cada refresh. */
+.mon-filter-wrap{ display:flex; align-items:center; gap:8px; margin-top:6px; }
+.mon-filter{ width:auto; max-width:280px; height:30px; padding:0 10px; border:1px solid #cbd5e1; border-radius:8px; font-size:13px; box-sizing:border-box; margin:0; }
+.mon-filter-note{ font-size:12px; color:#64748b; font-weight:700; }
 /* Alert mini abajo de los totales — ocupa ambas columnas en popup */
 .monitor-loading{ text-align: center; padding: 40px 12px; color: #666; }
 
@@ -2832,6 +2837,10 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       <div>
         <div class="monitor-title"><img class="hdr-logo" src="icon.svg" alt=""><span id="monitorTitleText">Monitor Virgilio</span> <span id="monitorRefresh" class="monitor-refresh"></span><span id="monitorVpInfo" style="color:#888;font-size:12px;margin-left:8px"></span><span id="monitorCountdown" style="color:#888;font-size:12px;margin-left:8px"></span></div>
         <div class="monitor-meta" id="monitorMeta"></div>
+        <div class="mon-filter-wrap">
+          <input id="monFilter" class="mon-filter" type="search" placeholder="🔎 Buscar tanda / operario" oninput="_monApplyFilter()" autocomplete="off">
+          <span id="monFilterNote" class="mon-filter-note"></span>
+        </div>
       </div>
       <div id="monitorClock"></div>
       <div>
@@ -5708,7 +5717,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v6.81";
+const APP_VERSION = "v6.82";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -19484,6 +19493,25 @@ function initialsFromName(name, legajo) {
 /* Iniciales del operario que EMPEZÓ la tanda (EP picking / AP armado), al lado
    del icono de estado. Si no hay nombre cacheado, cae al número de legajo.
    El nombre completo va en el tooltip (hover). */
+/* idea 1864 — filtro rápido del monitor. Oculta/muestra las filas de tanda (las que
+   llevan data-search = tanda + legajos + nombres) según el texto del buscador. Se llama
+   en cada input y al final de cada render (refreshMonitor 30s) para que el filtro
+   sobreviva al refresco. Solo toca filas con data-search → no afecta las tablas de stats. */
+function _monApplyFilter() {
+  const inp = document.getElementById("monFilter");
+  const q = inp ? String(inp.value || "").trim().toLowerCase() : "";
+  const cont = document.getElementById("monitorContent");
+  if (!cont) return;
+  const rows = cont.querySelectorAll("tr[data-search]");
+  let shown = 0;
+  rows.forEach(function (tr) {
+    const vis = !q || (tr.getAttribute("data-search") || "").indexOf(q) >= 0;
+    tr.style.display = vis ? "" : "none";
+    if (vis) shown++;
+  });
+  const note = document.getElementById("monFilterNote");
+  if (note) note.textContent = q ? (shown + (shown === 1 ? " resultado" : " resultados")) : "";
+}
 function monitorLegajoTag(legajo, state) {
   if (!legajo || state == null) return "";
   const legStr = String(legajo).trim();
@@ -19666,8 +19694,12 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
     const feTxt = t.missingSi
       ? `${escapeHtml(t.fechaEntrega)}<br>(F Pk)`
       : escapeHtml(t.fechaEntrega);
+    const _monSearch = [t.tanda, ev.pickLegajo, ev.sepLegajo,
+      ev.pickLegajo ? (_empleadosNombres.get(String(ev.pickLegajo)) || "") : "",
+      ev.sepLegajo ? (_empleadosNombres.get(String(ev.sepLegajo)) || "") : ""
+    ].filter(Boolean).join(" ").toLowerCase();   // idea 1864: buscador del monitor
     rowsHtml += `
-      <tr class="${cls.join(" ")}">
+      <tr class="${cls.join(" ")}" data-search="${escapeHtml(_monSearch)}">
         <td class="monitor-tanda tanda-clickable" data-tanda="${escapeHtml(t._key || t.tanda)}" onclick="showTandaDetail(this.dataset.tanda)">${escapeHtml(t.tanda)}</td>
         <td class="num">${m3Txt}</td>
         <td class="center">${feTxt}</td>
@@ -20024,6 +20056,7 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
     </div>
   `;
   content.innerHTML = tableHtml;
+  if (typeof _monApplyFilter === "function") _monApplyFilter();   // idea 1864: re-aplicar el filtro tras el refresh
   const countCurso = tandas.filter(t => t.ev.picking === "curso" || t.ev.separado === "curso").length;
   // v6.26: TOTAL de tandas PROGRAMADAS (Op=SI en el PPP, TODA fecha) — antes solo se
   // veía el conteo de la ventana visible ("N entrega <fechas>"), no el total global.
