@@ -60,9 +60,13 @@
 > producto de VENTA activo en `OC_Maximos` — renombrar ahí fusionaría el alambre con el producto.
 > **Decisión del dueño:** al ver que en Virgilio el `0` no distingue (`0565`=`565`), **dejar
 > 1060500 con su código actual** (no se renombra). Mismatch conocido: la convención del dueño
-> usa el cero a la izquierda como significativo; Virgilio lo saca (fix histórico 66/066). **(c) Pendiente:** **4496** ("Mango Pelador Ergonómico Negro")
-> y **0666**/`666` ("Mango Pelador 505 Rojo") **no existen** en stock ni catálogo → no hay dónde
-> poner la descripción; falta decidir si se crean (y como qué).
+> usa el cero a la izquierda como significativo; Virgilio lo saca (fix histórico 66/066). **(c)**
+> Renombrados los mangos (eran códigos por nombre): **MANGO NEGRO PELADOR → 4496** ("Mango Pelador
+> Ergonómico Negro", 8750) y **MANGO ROJO PELADOR → 666** (pedido "0666"; queda `666` por la misma
+> normalización, "Mango Pelador 505 Rojo", 27000). **(d)** Art **727** dado de baja ("no existe"):
+> tenía góndola **7** de una recepción errónea (remito 38481, guardada por leg 104 el 10/07);
+> `ajuste terminado −7` → 0 (`client_id baja_727_noexiste_20260731`, reversible). ⏳ Si se quiere
+> **borrar las filas** del todo (no solo dejar en 0), avisar.
 >
 > Nota: **v6.73 — Nuevo módulo "📈 Abastecimiento vs Venta"** (botón en el panel de
 > supervisor, al lado de "Rendimiento de operarios"). Muestra, **por artículo**, cuántas
