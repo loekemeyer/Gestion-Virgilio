@@ -26,16 +26,20 @@ algunas / ninguna**. Se busca reemplazar el toque por un **disparo de lectora**.
   funda; cada disparo "tipea" el contenido en la app.
 - Se compra **UNA** para el piloto. Ver § Hardware recomendado abajo.
 
-### Barcode (decidido)
-- El EAN de Loeke/Loke es `779558700` + **3 dígitos del código** + verificador
-  (EAN-13, 779 = Argentina). **Pero le saca la letra**: `943E` → `...943`. Como en
-  góndola conviven pares base+variante (**323/323E, 502/502T, 505/505I, 510/510T,
-  587/587T**), el EAN puro **NO distingue** la variante → ambiguo.
-- **Decisión: las etiquetas de slot son Code-128** (las generamos nosotros), con el
-  **código interno completo** (`943E`, `323E`) → cero ambigüedad, y **puede llevar la
-  acción**. El EAN queda para retail; para el picking interno usamos Code-128.
-- Contenido: **`CÓDIGO|T`** (todas) y **`CÓDIGO|A`** (algunas). La app parte por el
-  último `|`: izquierda = código, derecha = acción.
+### Barcode (decidido — v6.76: EAN-13, dos códigos por artículo)
+- **Dos EAN-13 por artículo** (los genera la herramienta): **TODO** = `779558700`+NNN+verificador
+  (mercadería completa → "agarré todas") · **FALTA** = `779558701`+NNN+verificador (le falta algo
+  → abre la tablet para completar la cantidad). `779` = Argentina (GS1); el **verificador** (mod-10)
+  lo agrega la impresora (ZPL `^BE`) / el algoritmo público. La app distingue TODO/FALTA por el 9º
+  dígito del prefijo (0/1).
+- `NNN` = **parte numérica del código** (`943E`→`943`). ⚠ Pares base+variante **comparten NNN**
+  (**323/323E · 502/502T · 505/505I · 510/510T · 587/587T · 580/580E/580ES**) → el scan resuelve por
+  **contexto de la tanda** (el artículo que ese pedido pide); si una tanda pide los dos, hay que
+  mirar. La herramienta **marca** esas colisiones (rojo / columna `nnn_compartido` del CSV).
+- La app **también** lee un **Code-128** interno `CÓDIGO|T`/`CÓDIGO|A` como **fallback** (lleva el
+  código completo, sin la ambigüedad del NNN) — por si algún artículo colisionado lo necesita.
+- Decode en la app: `pkOnScan` → `_pkDecodeEAN` (prefijo+marcador+NNN) → `_pkFindByNum3` (matchea
+  la parte numérica contra los artículos pendientes de la tanda).
 
 ### Etiquetas: van en el SLOT de góndola (decidido)
 - Una etiqueta por artículo, **pegada en su lugar de góndola**, generada desde la

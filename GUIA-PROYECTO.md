@@ -4,7 +4,20 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-07-31 · Versión app al documentar: **v6.75**
+> Última actualización: 2026-07-31 · Versión app al documentar: **v6.76**
+>
+> Nota: **v6.76 — Picking scanner: decode de EAN-13 (dos códigos por artículo: TODO / FALTA)**.
+> Sobre v6.75, el dueño decidió usar **EAN-13** en las etiquetas de slot. Esquema (yo lo definí):
+> **TODO** = `779558700`+NNN+verificador (mercadería completa → "agarré todas"); **FALTA** =
+> `779558701`+NNN+verificador (le falta algo → abre la tablet para completar la cantidad, como
+> "algunas"). `NNN` = parte numérica del código (943E→943); el verificador (mod-10) lo calcula la
+> impresora (ZPL `^BE`) / el algoritmo público. `pkOnScan` ahora **decodifica el EAN** (fns nuevas
+> `_pkNum3`, `_pkDecodeEAN`, `_pkFindByNum3`) y resuelve el artículo por **contexto de la tanda**
+> (para NNN compartidos: 502/502T, 323/323E…); sigue leyendo también el Code-128 `código|T/A` como
+> fallback. `tools/etiquetas-gondola.html` genera ahora **EAN-13** (TODO/FALTA), exporta **CSV** de
+> los EAN y **marca las colisiones de NNN**. Smoke `pk-scan` extendido con los casos de EAN. Todo
+> sigue **detrás del switch** (off = picking igual que hoy). Verificado: pk-scan + mva-quien +
+> checkhtml + version-sync OK. Bump **v6.76**.
 >
 > Nota: **v6.75 — Picking con LECTORA de código de barras (idea 8243), detrás de un SWITCH**.
 > Pedido del dueño (reemplazar la botonera del picking por una lectora Bluetooth). **TODO detrás

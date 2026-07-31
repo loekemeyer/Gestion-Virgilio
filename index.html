@@ -5708,7 +5708,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v6.75";
+const APP_VERSION = "v6.76";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -7305,9 +7305,44 @@ function _pkFindByCode(code) {
   for (let i = 0; i < _pk.items.length; i++) { const it = _pk.items[i]; if (it.skip) continue; if (_pkItemCodes(it).indexOf(C) >= 0) return i; }
   return -1;
 }
+/* EAN interno (idea 8243): 13 dígitos = `77955870` + marcador + NNN(3) + verificador.
+   marcador 0 = TODO (mercadería completa) · 1 = FALTA (le falta algo → completar en tablet).
+   NNN = parte numérica del código (943E→943). El verificador (mod-10) no se usa para
+   decodificar (lo valida la lectora); se genera con el algoritmo público al imprimir. */
+function _pkNum3(code) { const d = String(code == null ? "" : code).replace(/\D/g, ""); return d ? d.slice(-3).padStart(3, "0") : ""; }
+function _pkDecodeEAN(s) {
+  const m = String(s == null ? "" : s).replace(/\D/g, "");
+  if (m.length !== 13 || m.slice(0, 8) !== "77955870") return null;
+  const marker = m[8];
+  if (marker !== "0" && marker !== "1") return null;
+  return { nnn: m.slice(9, 12), accion: (marker === "1" ? "A" : "T") };
+}
+function _pkFindByNum3(nnn) {
+  if (!_pk || !nnn) return -1;
+  const has = function (it) { return _pkItemCodes(it).some(function (c) { return _pkNum3(c) === nnn; }); };
+  const cur = _pk.items[_pk.idx];
+  if (cur && !cur.skip && _pk.results[cur.key] == null && has(cur)) return _pk.idx;
+  for (let i = 0; i < _pk.items.length; i++) { const it = _pk.items[i]; if (it.skip || _pk.results[it.key] != null) continue; if (has(it)) return i; }
+  for (let i = 0; i < _pk.items.length; i++) { const it = _pk.items[i]; if (it.skip) continue; if (has(it)) return i; }
+  return -1;
+}
 function pkOnScan(raw) {
   if (!_pk) return;
-  const s = String(raw || "").trim().toUpperCase(); if (!s) return;
+  const raw0 = String(raw || "").trim(); if (!raw0) return;
+  // 1) EAN interno (779558700 = todo / 779558701 = falta)
+  const ean = _pkDecodeEAN(raw0);
+  if (ean) {
+    const eidx = _pkFindByNum3(ean.nnn);
+    if (eidx < 0) { pkScanToast("✕ EAN …" + ean.nnn + " — no está en esta tanda", false); return; }
+    _pk.idx = eidx; _pk.mode = "item";
+    const eit = _pk.items[eidx];
+    const enom = eit.real || eit.pick || eit.art;
+    if (ean.accion === "A") { pkF(); pkScanToast("✎ " + enom + " — falta, completá en la tablet", true); }
+    else { pkOk(); pkScanToast("✓ " + enom + " · " + pkFmt(eit.esp), true); }
+    return;
+  }
+  // 2) Code-128 interno CÓDIGO|T / CÓDIGO|A (sigue funcionando)
+  const s = raw0.toUpperCase();
   let code = s, accion = "T";
   const p = s.lastIndexOf("|");
   if (p >= 0) { code = s.slice(0, p).trim(); accion = (s.slice(p + 1).trim() || "T"); }
