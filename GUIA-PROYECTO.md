@@ -4,7 +4,18 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-07-31 · Versión app al documentar: **v6.69**
+> Última actualización: 2026-07-31 · Versión app al documentar: **v6.70**
+>
+> Nota: **v6.70 — FC s/Salida pasó a ser una COLUMNA de la tabla de Stock (a la
+> derecha de Racks), ítem por ítem** (pedido del usuario; reemplaza al segmento que
+> había agregado v6.69). Se quitó el segmento «🧾 FC s/Salida» y la vista `stkBodyFcs`;
+> ahora cada artículo muestra sus **cajas facturadas sin salida** en una columna nueva
+> (celda azul, clickeable → popup `stkOpenFcsArt` con las NP y cajas de cada una), más
+> un chip de total en la tira de arriba. Los datos se cargan junto con el stock:
+> `stkFcsLoad` se convirtió en **`stkFcsFetch()`** (loader puro `{pend, porArt}`),
+> llamado en `openStockAdmin` (no en modo solo-conteo). Artículos que están **solo** en
+> FC s/Salida (facturados, ya sin stock contable) se agregan a la tabla igual. Bump
+> `APP_VERSION` + `SW_VERSION` `v6.70`.
 >
 > Nota: **v6.69 — Remito "Facturado sin salida" (volvió al depósito) + FC s/Salida
 > ahora es un segmento DENTRO de Stocks** (pedido del usuario). Caso: una NP se cargó
