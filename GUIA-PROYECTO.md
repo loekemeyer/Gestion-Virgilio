@@ -4,7 +4,25 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-07-30 · Versión app al documentar: **v6.65**
+> Última actualización: 2026-07-31 · Versión app al documentar: **v6.66**
+>
+> Nota: **v6.66 — Remito "Facturado sin salida" (volvió al depósito) + FC s/Salida
+> ahora es un segmento DENTRO de Stocks** (pedido del usuario). Caso: una NP se cargó
+> al camión (`CCN`) pero el cliente estaba cerrado y la mercadería **volvió**. En
+> **Recepción Remitos (RR)** cada fila tiene ahora un botón **«↩ s/salida»**
+> (`crMarkSinSalida`) que emite un evento nuevo **`FSS`** (`texto = NP|TANDA`,
+> `crSendSinSalida`). Regla en **todos los lectores de `CCN`** (helper
+> `fetchSinSalidaMap`): una NP está "sin salida" si su **último `FSS` es más reciente
+> que su último `CCN`**; si se vuelve a cargar (CCN nuevo) deja de estarlo. Efecto de
+> marcar una NP sin salida: **sale de RR** (`fetchCRData`/`showControlRemitos`), **deja
+> de contar como entregada** y no dispara la alarma "cargado sin controlar"
+> (`pppRefreshEntregado`), **reaparece en «FC s/Salida»** (`stkFcsLoad`) y en **Carga
+> Camión** (`fetchCCData`) para re-despacharla. **NO toca el libro de stock**
+> (`Movimientos_Stock`): esa mercadería ya salió del stock contable al facturar; FC
+> s/Salida es una **vista** (facturado − cargado), no un depósito. Además, **«🧾 FC
+> s/Salida» dejó de ser una solapa aparte** del módulo Stock: ahora es un **segmento
+> dentro de la solapa «📊 Stocks»** (junto a Stock / Ingresos / Salidas; `stkSetView`
+> con carga lazy). Bump `APP_VERSION` + `SW_VERSION` `v6.66`.
 >
 > Nota: **idea 7382 — Saldo de insumos SEPARADO por unidad**. El saldo de insumos
 > (`vista_saldos_stock.insumos`) sumaba `delta` mezclando unidades heterogéneas (kg, Uni,
@@ -2943,7 +2961,8 @@ Google `authenticated`**, RLS exige ese rol), se graba una fila en:
   `m3` (numeric), `razon_social`, `cod_cliente`, `facturado_at` (timestamptz del tick),
   `cierre_id` (null hasta el cierre → apunta a `Facturacion_Cierres.id`). PK `np`
   (upsert merge-duplicates, por si hay doble click). Es la que consumen las vistas PPP
-  (pendiente/entregados), la solapa **FC s/Salida** de Stocks y el descuento de demanda.
+  (pendiente/entregados), el segmento **FC s/Salida** de Stocks (v6.66: antes solapa
+  aparte, ahora dentro de «📊 Stocks») y el descuento de demanda.
 - **`Facturacion_Cierres`** — una fila por **cierre de jornada** ("Terminé" de la
   operadora → PDF de reparto). Cols: `id`, `fecha_cierre`, `fecha_reparto`, `cant_nps`,
   `cant_tandas`, `generado_at`. Al cerrar, las `Facturacion_NP` del día toman su
@@ -3035,6 +3054,7 @@ Definidos en `index.html` (objeto `desc`, ~línea 1531). Los botones se arman en
 | `CRN` | Control Remito NP | (detalle de control, v3.36) | `texto` = `NP\|TANDA` (ej. `97754\|C47B`). Un evento por NP marcada como **recibida/controlada** en Recepción Remitos (`RR`, antes `CR`). id determinístico `crn_<legajo>_<np>_<día>` + upsert. La PPP lo lee (`pppRefreshControlado`) y pasa el pedido a **Pedidos Entregados**. El monitor lo ignora. |
 | `CRA` | Carga sin control (vencido) | (automático, v3.37) | `texto` = `NP\|TANDA\|RAZÓN`. Lo emite la PPP (`pppCheckCargaVencida`) cuando un pedido **cargado (CCN) sigue sin controlar (CRN/manual)** pasado el plazo (`crVencido`). id determinístico `cra_<np>_<día>` + upsert; legajo `0`. Dispara aviso Telegram vía trigger `trg_carga_sin_control_telegram` (**AFTER INSERT** → 1 vez por NP/día). El monitor lo ignora. |
 | `CCR` | Control Remito CR NP | (detalle de control CR, v3.69) | `texto` = `NP\|TANDA` (ej. `97754\|C47B`). Un evento por NP marcada como **controlada** en **Control Remitos (CR)** — paso **independiente** de la Carga Camión. id determinístico `ccr_<legajo>_<np>_<día>` + upsert. El NP sale **sólo de CR** (`fetchCCRData` lo resta de los facturados). ⚠ **NO alimenta RR** (RR lee `CCN`, no `CCR`). El monitor y las inconsistencias lo ignoran. Con el tiempo del toggle CR + los m³ sirve para medir productividad de CR (m³/h). |
+| `FSS` | Facturado sin salida (volvió a depósito) | (detalle, v6.66) | `texto` = `NP\|TANDA` (ej. `98085\|C47B`). Lo emite el botón **«↩ s/salida»** de **Recepción Remitos** (`crMarkSinSalida`→`crSendSinSalida`) cuando una NP **cargada al camión (`CCN`) volvió** porque el cliente no recibió (cerrado, etc.). id aleatorio `fss_<legajo>_<np>_<ts>` (**no** upsert: cada retorno es un evento con su `ts`). Regla en **todos los lectores de `CCN`** (helper `fetchSinSalidaMap`): la NP está "sin salida" si su **último `FSS` > su último `CCN`**; si se re-carga (CCN nuevo) deja de estarlo. Efecto: sale de **RR** (`fetchCRData`), deja de contar como entregada / no dispara la alarma de carga sin control (`pppRefreshEntregado`), y **reaparece** en **«FC s/Salida»** (`stkFcsLoad`) y en **Carga Camión** (`fetchCCData`). **NO toca `Movimientos_Stock`** (esa mercadería ya salió del stock contable al facturar). El monitor lo ignora. |
 | `MGX` | Guardado fuera de lista | (automático, v4.24) | `texto` = `COD\|G<góndola>\|E<excedente>`. Lo emite el MG (`mgEmitFueraLista`) cuando se guarda un código que **NO estaba en "Mercadería a guardar"** (botón "Guardarlo igual"; típico error de tipeo en recepción). id `mgx_<cod>_<legajo>_<ts>`. Dispara aviso Telegram vía trigger `trg_mg_fuera_lista_telegram` (**AFTER INSERT** WHEN `opcion='MGX'`). El monitor lo ignora. |
 | `SSG` | Picking sin stock en góndola | (automático, v4.24) | `texto` = `TANDA\|COD:pedido>habia,…`. Lo emite `stockBajaPicking` al **TP** cuando se sacó de góndola **más de lo que el sistema tenía** (saldo `terminado` quedaría negativo). id determinístico `ssg_<legajo>_<tanda>_<día>` + upsert (1 aviso/tanda/día). Dispara aviso Telegram vía trigger `trg_picking_sin_stock_telegram` (**AFTER INSERT** WHEN `opcion='SSG'`). El monitor lo ignora. |
 | `PGE` | Picking · retiró de góndola en vez de excedente | (aviso, v6.11) | `texto` = `COD\|TANDA`. Lo emite `pkEmitRetiroGondola` cuando el operario, en un artículo cuyo **excedente cubría todo** (paso salteado), toca **"🟢 Retirar de góndola igual"** (`pkForzarGondola`). id `pge_<cod>_<legajo>_<ts>`. Dispara aviso Telegram vía trigger `trg_picking_gondola_excedente_telegram` (**AFTER INSERT** WHEN `opcion='PGE'`), que **resuelve `legajo→Empleado`** → "🟢⚠ RETIRÓ DE GÓNDOLA (había excedente) — {Nombre} … Art X · tanda Y". No toca stock (el picking baja de góndola como cualquier otro). El monitor lo ignora. |

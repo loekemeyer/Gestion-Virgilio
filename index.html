@@ -2029,6 +2029,9 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .fac-lios-cell{ text-align: center; font-weight: 800; color: #b45309; white-space: nowrap; }
 .fac-lios-cell .fac-lios0{ color: #94a3b8; font-weight: 600; }
 .cr-td-ctrl{ text-align: center; }
+.cr-td-act{ text-align: center; white-space: nowrap; }
+.cr-sinsal-btn{ font-size: 11px; font-weight: 800; color: #b91c1c; background: #fef2f2; border: 1px solid #fecaca; border-radius: 7px; padding: 6px 8px; cursor: pointer; white-space: nowrap; line-height: 1.1; }
+.cr-sinsal-btn:active{ background: #fee2e2; }
 .cr-chk{ width: 26px; height: 26px; border-radius: 7px; border: 2px solid #cbd5e1; display: inline-flex; align-items: center; justify-content: center; color: #fff; font-weight: bold; font-size: 16px; }
 .cr-row.cc-on .cr-chk{ border-color: #16a34a; background: #16a34a; }
 .cr-venc-tag{ display: inline-block; font-size: 10px; font-weight: 900; color: #fff; background: #dc2626; border-radius: 5px; padding: 1px 6px; margin-left: 6px; letter-spacing: .3px; vertical-align: middle; }
@@ -5703,7 +5706,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v6.65";
+const APP_VERSION = "v6.66";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -9081,7 +9084,7 @@ function stkAsOfApply() {
   stkRender();
 }
 function stkAsOfLive() { if (!_stk) return; _stk.asOf = null; _stk.openArt = null; stkRender(); }
-function stkTab(t) { if (!_stk) return; if (t === "compras") { openOCAdmin(); return; } _stk.tab = t; _stk.filtro = ""; _stk.openArt = null; if (t === "capacidad" && !_stk.capLoaded) { stkCapLoad(); return; } if (t === "racks" && !_stk.planiLoaded) { stkPlaniLoad(); return; } if (t === "fcs" && !_stk.fcsLoaded) { stkFcsLoad(); return; } stkRender(); }
+function stkTab(t) { if (!_stk) return; if (t === "compras") { openOCAdmin(); return; } _stk.tab = t; _stk.filtro = ""; _stk.openArt = null; if (t === "capacidad" && !_stk.capLoaded) { stkCapLoad(); return; } if (t === "racks" && !_stk.planiLoaded) { stkPlaniLoad(); return; } stkRender(); }
 function stkRender() {
   if (!_stk) return;
   if (_stk.soloConteo) {   // rol "solo conteo": sin solapas, directo al conteo físico
@@ -9089,11 +9092,11 @@ function stkRender() {
     const body0 = document.getElementById("stkBody"); if (body0) _renderKeepFocus(body0, stkBodyConteo());
     return;
   }
-  const tabs = [["stocks", "📊 Stocks"], ["proceso", "📦 A Separar"], ["fcs", "🧾 FC s/Salida"], ["racks", "🏗 Racks"], ["conteo", "📋 Conteo"], ["capacidad", "📐 Capacidad"], ["ajustes", "⚙ Ajustes"], ["compras", "📑 Compras (OCs)"]];
+  const tabs = [["stocks", "📊 Stocks"], ["proceso", "📦 A Separar"], ["racks", "🏗 Racks"], ["conteo", "📋 Conteo"], ["capacidad", "📐 Capacidad"], ["ajustes", "⚙ Ajustes"], ["compras", "📑 Compras (OCs)"]];
   const tb = document.getElementById("stkTabs");
   if (tb) tb.innerHTML = tabs.map(function (t) { return '<button class="stk-tab' + (_stk.tab === t[0] ? " on" : "") + '" onclick="stkTab(\'' + t[0] + '\')">' + t[1] + '</button>'; }).join("");
   const body = document.getElementById("stkBody"); if (!body) return;
-  _renderKeepFocus(body, _stk.tab === "proceso" ? stkBodyProceso() : _stk.tab === "conteo" ? stkBodyConteo() : _stk.tab === "capacidad" ? stkBodyCapacidad() : _stk.tab === "racks" ? stkBodyRacks() : _stk.tab === "ajustes" ? stkBodyAjustes() : _stk.tab === "fcs" ? stkBodyFcs() : stkBodyStocksTab());
+  _renderKeepFocus(body, _stk.tab === "proceso" ? stkBodyProceso() : _stk.tab === "conteo" ? stkBodyConteo() : _stk.tab === "capacidad" ? stkBodyCapacidad() : _stk.tab === "racks" ? stkBodyRacks() : _stk.tab === "ajustes" ? stkBodyAjustes() : stkBodyStocksTab());
 }
 /* ===== v6.47 — FC s/SALIDA: NPs FACTURADAS (tick de la operadora en Facturación =
    fila en Facturacion_NP) que TODAVÍA NO se cargaron al camión (sin evento CCN del
@@ -9103,17 +9106,23 @@ function stkRender() {
    sola cuando el operario marca la NP en Carga Camión (CCN). ===== */
 async function stkFcsLoad() {
   if (!_stk) return;
-  _stk.tab = "fcs"; _stk.filtro = ""; _stk.fcs = null; stkRender();   // muestra "cargando…"
+  _stk.tab = "stocks"; _stk.stkView = "fcs"; _stk.filtro = ""; _stk.fcs = null; stkRender();   // muestra "cargando…"
   try {
     const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
     const res = await Promise.all([
       fetch(SUPABASE_FACTURACION_NP_ENDPOINT + "?facturado_at=gte." + encodeURIComponent(CC_REPARTO_DESDE_ISO) + "&select=np,tanda,razon_social,facturado_at&limit=20000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }),
-      fetch(SUPABASE_TABLE_ENDPOINT + "?opcion=eq.CCN&ts_cliente=gte." + encodeURIComponent(CC_REPARTO_DESDE_ISO) + "&select=texto&limit=20000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }),
+      fetch(SUPABASE_TABLE_ENDPOINT + "?opcion=eq.CCN&ts_cliente=gte." + encodeURIComponent(CC_REPARTO_DESDE_ISO) + "&select=texto,ts_cliente&limit=20000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }),
       supaFetchAll(SUPABASE_ENTREGAS_ENDPOINT, "select=np,cod_art,cajas_entregadas"),
-      loadArtNombres(), loadCodCanon()
+      loadArtNombres(), loadCodCanon(),
+      fetchSinSalidaMap(CC_REPARTO_DESDE_ISO)
     ]);
+    // Cargada al camión = última CCN, salvo que un FSS más reciente la haya devuelto al
+    // depósito ("facturado sin salida") → vuelve a aparecer acá. v6.66.
+    const fssMap = res[5] || new Map();
+    const maxCcn = {};
+    (res[1] || []).forEach(function (ev) { const np = String(ev.texto || "").split("|")[0].trim().replace(/\.0+$/, ""); if (!np) return; const ms = ev.ts_cliente ? new Date(ev.ts_cliente).getTime() : 0; if (ms > (maxCcn[np] || 0)) maxCcn[np] = ms; });
     const cargados = {};
-    (res[1] || []).forEach(function (ev) { const np = String(ev.texto || "").split("|")[0].trim().replace(/\.0+$/, ""); if (np) cargados[np] = true; });
+    Object.keys(maxCcn).forEach(function (np) { const fss = (fssMap.get && fssMap.get(np)) || 0; if (!(fss && fss > maxCcn[np])) cargados[np] = true; });
     const pend = {};
     (res[0] || []).forEach(function (r) {
       const np = String(r.np || "").trim().replace(/\.0+$/, "");
@@ -9135,7 +9144,7 @@ async function stkFcsLoad() {
   stkRender();
 }
 function stkBodyFcs() {
-  let h = '<div style="background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af;border-radius:9px;padding:9px 11px;margin-bottom:10px;font-size:12.5px"><b>FC s/Salida = facturado pero todavía sin cargar al camión.</b> Entra cuando la operadora tilda la NP en <b>Facturación</b>; sale cuando el operario la marca en <b>Carga Camión</b> (CCN). Es mercadería que ya no está en el stock contable pero sigue física en el depósito.</div>';
+  let h = '<div style="background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af;border-radius:9px;padding:9px 11px;margin-bottom:10px;font-size:12.5px"><b>FC s/Salida = facturado pero todavía sin cargar al camión.</b> Entra cuando la operadora tilda la NP en <b>Facturación</b>; sale cuando el operario la marca en <b>Carga Camión</b> (CCN). También reingresa acá lo que <b>volvió al depósito</b> (botón «↩ s/salida» en Recepción Remitos: el cliente no recibió). Es mercadería que ya no está en el stock contable pero sigue física en el depósito.</div>';
   if (!_stk.fcs) return h + '<div class="stk-loading">Cargando facturados sin salida…</div>';
   if (_stk.fcs.error) return h + '<div class="stk-loading">Error: ' + escapeHtml(_stk.fcs.error) + '</div>';
   const pend = _stk.fcs.pend || {}, porArt = _stk.fcs.porArt || {};
@@ -9775,7 +9784,7 @@ function stkMvRow(mv) {
 }
 /* v4.30 — Stocks / Ingresos / Salidas unificados en una sola solapa con un
    segmento arriba (default "Stock"). */
-function stkSetView(v) { if (!_stk) return; _stk.stkView = v; _stk.filtro = ""; _stk.openArt = null; _stk.sectDetail = null; stkRender(); }
+function stkSetView(v) { if (!_stk) return; _stk.stkView = v; _stk.filtro = ""; _stk.openArt = null; _stk.sectDetail = null; if (v === "fcs" && !_stk.fcsLoaded) { stkFcsLoad(); return; } stkRender(); }
 /* v4.35 — detalle de un sector al tocar su total: lista código + cantidad + sector,
    ordenable por código o por sector. Para EXCEDENTE el "sector" es la ubicación
    cargada en el MG (por movimiento); para el resto, el sector de planimetría. */
@@ -9831,7 +9840,8 @@ function stkBodySectDetail() {
 function stkBodyStocksTab() {
   const view = _stk.stkView || "stocks";
   const seg = function (v, label) { return '<button class="stk-segb' + (view === v ? " on" : "") + '" onclick="stkSetView(\'' + v + '\')">' + label + '</button>'; };
-  let h = '<div class="stk-seg">' + seg("stocks", "📊 Stock") + seg("ingresos", "📥 Ingresos") + seg("salidas", "📤 Salidas") + '</div>';
+  let h = '<div class="stk-seg">' + seg("stocks", "📊 Stock") + seg("ingresos", "📥 Ingresos") + seg("salidas", "📤 Salidas") + seg("fcs", "🧾 FC s/Salida") + '</div>';
+  if (view === "fcs") return h + stkBodyFcs();   // v6.66: FC s/Salida ahora es un segmento de Stocks (no solapa aparte)
   h += '<button class="stk-btn" style="width:100%;margin:0 0 10px;background:#fffbeb;border-color:#fcd34d;color:#92400e;font-weight:800;" onclick="stkExportExcedentes()">⬇ Excedentes por ubicación (Excel)</button>';
   h += (view === "ingresos") ? stkBodyIngresos() : (view === "salidas") ? stkBodySalidas() : stkBodyStocks();
   return h;
@@ -13786,7 +13796,7 @@ async function fetchCCData() {
     + "&select=np,tanda,razon_social&limit=20000";
   const ccnUrl = SUPABASE_TABLE_ENDPOINT
     + "?opcion=eq.CCN&ts_cliente=gte." + encodeURIComponent(CC_REPARTO_DESDE_ISO)
-    + "&select=texto&limit=20000";
+    + "&select=texto,ts_cliente&limit=20000";
   // Líos por NP: eventos TAL (anotados al terminar armado). Mismo origen que usa Recepción Remitos.
   const talUrl = SUPABASE_TABLE_ENDPOINT
     + "?opcion=eq.TAL&ts_cliente=gte." + encodeURIComponent(sinceTal)
@@ -13794,14 +13804,20 @@ async function fetchCCData() {
   const _par = await Promise.all([
     fetch(repUrl, { headers, cache: "no-store" }).then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); }),
     fetch(ccnUrl, { headers, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }),
-    fetch(talUrl, { headers, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; })
+    fetch(talUrl, { headers, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }),
+    fetchSinSalidaMap(CC_REPARTO_DESDE_ISO)
   ]);
-  const repR = _par[0], ccnR = _par[1], talR = _par[2];
-  const cargados = new Set();
+  const repR = _par[0], ccnR = _par[1], talR = _par[2], fssMap = _par[3];
+  // Última carga (CCN) por NP; una NP está "cargada" salvo que haya un FSS más reciente
+  // (volvió al depósito) → reaparece en Carga Camión para re-despacharla. v6.66.
+  const maxCcn = new Map();
   for (const ev of ccnR) {
-    const np = String(ev.texto || "").split("|")[0].trim().replace(/\.0+$/, "");
-    if (np) cargados.add(np);
+    const np = String(ev.texto || "").split("|")[0].trim().replace(/\.0+$/, ""); if (!np) continue;
+    const ms = ev.ts_cliente ? new Date(ev.ts_cliente).getTime() : 0;
+    if (!maxCcn.has(np) || ms > maxCcn.get(np)) maxCcn.set(np, ms);
   }
+  const cargados = new Set();
+  for (const [np, ms] of maxCcn) { const fss = fssMap.get(np) || 0; if (!(fss && fss > ms)) cargados.add(np); }
   const lios = new Map();
   for (const ev of talR) {
     const p = String(ev.texto || "").split("|");
@@ -14007,6 +14023,27 @@ async function fetchEntregadosMeta() {
   return meta;
 }
 
+/* v6.66 — NP marcadas "Facturado sin salida" (evento FSS): se cargaron al camión pero
+   el cliente no recibió (cerrado, etc.) y la mercadería volvió al depósito. Devuelve un
+   Map np -> ms del ÚLTIMO FSS. Regla en todos los lectores de CCN: un NP está "sin salida"
+   si su último FSS es POSTERIOR a su última carga (CCN); si se vuelve a cargar (CCN nuevo
+   y más reciente) deja de estarlo. Así vuelve a FC s/Salida + Carga Camión y sale de RR. */
+async function fetchSinSalidaMap(sinceISO) {
+  try {
+    const url = SUPABASE_TABLE_ENDPOINT + "?opcion=eq.FSS&ts_cliente=gte." + encodeURIComponent(sinceISO) + "&select=texto,ts_cliente&limit=20000";
+    const r = await fetch(url, { headers: { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+    if (!r.ok) return new Map();
+    const data = await r.json();
+    const m = new Map();
+    for (const ev of data) {
+      const np = String(ev.texto || "").split("|")[0].trim().replace(/\.0+$/, ""); if (!np) continue;
+      const ms = ev.ts_cliente ? new Date(ev.ts_cliente).getTime() : 0;
+      if (!m.has(np) || ms > m.get(np)) m.set(np, ms);
+    }
+    return m;
+  } catch (_e) { return new Map(); }
+}
+
 /* Junta lo necesario para CR: CCN (NP cargadas + cuándo + tanda), TAL (líos por NP),
    CRN (NP ya controladas), el PPP del día (cód + razón por NP) y, para los NP que ya
    NO están en la PPP del día, "Pedidos Entregados" (fetchEntregadosMeta) como fallback. */
@@ -14016,13 +14053,14 @@ async function fetchCRData() {
   const ccnUrl = SUPABASE_TABLE_ENDPOINT + "?opcion=eq.CCN&ts_cliente=gte." + encodeURIComponent(since) + "&select=texto,ts_cliente&order=ts_cliente.asc&limit=20000";
   const talUrl = SUPABASE_TABLE_ENDPOINT + "?opcion=eq.TAL&ts_cliente=gte." + encodeURIComponent(since) + "&select=texto&order=ts_cliente.asc&limit=20000";  // idea 3016: orden cronologico -> el ultimo lios.set gana (TAL mas reciente)
   const crnUrl = SUPABASE_TABLE_ENDPOINT + "?opcion=eq.CRN&ts_cliente=gte." + encodeURIComponent(since) + "&select=texto&limit=20000";
-  const [ccnR, talR, crnR, sheetMap] = await Promise.all([
+  const [ccnR, talR, crnR, sheetMap, sinSalida] = await Promise.all([
     fetch(ccnUrl, { headers, cache: "no-store" }).then(r => r.ok ? r.json() : []),
     fetch(talUrl, { headers, cache: "no-store" }).then(r => r.ok ? r.json() : []),
     fetch(crnUrl, { headers, cache: "no-store" }).then(r => r.ok ? r.json() : []),
-    fetchMonitorSheet().catch(() => new Map())
+    fetchMonitorSheet().catch(() => new Map()),
+    fetchSinSalidaMap(since)
   ]);
-  const loaded = new Map();   // NP -> { tanda, loadMs } (primera carga)
+  const loaded = new Map();   // NP -> { tanda, loadMs (primera carga), lastCcnMs (última carga) }
   for (const ev of ccnR) {
     const parts = String(ev.texto || "").split("|");
     const np = parts[0].trim().replace(/\.0+$/, "");
@@ -14030,8 +14068,8 @@ async function fetchCRData() {
     if (!np) continue;
     const ms = ev.ts_cliente ? new Date(ev.ts_cliente).getTime() : 0;
     const prev = loaded.get(np);
-    if (!prev) loaded.set(np, { tanda: tanda || "—", loadMs: ms });
-    else { if (tanda && prev.tanda === "—") prev.tanda = tanda; if (ms && (!prev.loadMs || ms < prev.loadMs)) prev.loadMs = ms; }
+    if (!prev) loaded.set(np, { tanda: tanda || "—", loadMs: ms, lastCcnMs: ms });
+    else { if (tanda && prev.tanda === "—") prev.tanda = tanda; if (ms && (!prev.loadMs || ms < prev.loadMs)) prev.loadMs = ms; if (ms > (prev.lastCcnMs || 0)) prev.lastCcnMs = ms; }
   }
   const lios = new Map();      // NP -> cantidad de líos
   for (const ev of talR) { const p = String(ev.texto || "").split("|"); const np = p[0].trim().replace(/\.0+$/, ""); const v = parseInt(p[1], 10); if (np && !isNaN(v)) lios.set(np, v); }
@@ -14049,7 +14087,7 @@ async function fetchCRData() {
       for (const np of faltan) { if (ent[np]) meta[np] = ent[np]; }
     } catch (_e) { /* sin red / hoja caída: quedan en "—" */ }
   }
-  return { loaded, lios, controlled, meta };
+  return { loaded, lios, controlled, meta, sinSalida };
 }
 
 async function showControlRemitos(legajo, isAdmin) {
@@ -14064,6 +14102,8 @@ async function showControlRemitos(legajo, isAdmin) {
     const items = [];
     for (const [np, info] of data.loaded) {
       if (data.controlled.has(np)) continue;   // ya controlado → fuera (ya pasó a Entregados)
+      const fss = data.sinSalida ? (data.sinSalida.get(np) || 0) : 0;
+      if (fss && fss > (info.lastCcnMs || 0)) continue;   // volvió al depósito (FSS más reciente que la carga) → fuera de RR
       const meta = data.meta[np] || {};
       items.push({ np: np, tanda: info.tanda || "—", cod: meta.cod || "", rs: meta.rs || "", lios: data.lios.has(np) ? data.lios.get(np) : null, loadMs: info.loadMs || 0, venc: crVencido(info.loadMs || 0) });
     }
@@ -14091,19 +14131,21 @@ function crRender() {
   let rows = "";
   for (const it of _cr.items) {
     const on = _cr.checked.has(it.np);
+    const npc = String(it.np).replace(/[^0-9A-Za-z]/g, "");
     const liosNull = (it.lios == null);
     const liosTxt = liosNull ? "—" : String(it.lios);
     const liosCls = (liosNull || it.lios === 0) ? " cr-lios0" : "";
-    rows += `<tr class="cr-row${on ? " cc-on" : ""}${it.venc ? " cr-venc" : ""}" onclick="crToggle('${String(it.np).replace(/[^0-9A-Za-z]/g, "")}')">` +
+    rows += `<tr class="cr-row${on ? " cc-on" : ""}${it.venc ? " cr-venc" : ""}" onclick="crToggle('${npc}')">` +
             `<td class="cr-td-np">${escapeHtml(it.np)}</td>` +
             `<td class="cr-td-cod">${it.cod ? escapeHtml(it.cod) : "—"}</td>` +
             `<td class="cr-td-rs">${escapeHtml(it.rs || "—")}${it.venc ? `<span class="cr-venc-tag">VENCIDO</span>` : ""}</td>` +
             `<td class="cr-td-lios${liosCls}">${liosTxt}</td>` +
-            `<td class="cr-td-ctrl"><span class="cr-chk">${on ? "✓" : ""}</span></td></tr>`;
+            `<td class="cr-td-ctrl"><span class="cr-chk">${on ? "✓" : ""}</span></td>` +
+            `<td class="cr-td-act"><button class="cr-sinsal-btn" onclick="event.stopPropagation();crMarkSinSalida('${npc}')" title="El cliente no recibió — la mercadería volvió al depósito. Sale de acá y queda en «FC s/Salida» (Stocks).">↩ s/salida</button></td></tr>`;
   }
   html += `<div class="cr-tablewrap"><table class="cr-table"><thead><tr>` +
           `<th>NP</th><th>Cod Cliente</th><th>Razón Social</th>` +
-          `<th class="cr-th-c">Líos</th><th class="cr-th-c">Controlado</th>` +
+          `<th class="cr-th-c">Líos</th><th class="cr-th-c">Controlado</th><th class="cr-th-c">Volvió</th>` +
           `</tr></thead><tbody>${rows}</tbody></table></div>`;
   html += `<button class="pk-btn pk-ok" onclick="crFinish()">✓ Terminé (${_cr.checked.size} controladas)</button>` +
           `<button class="pk-btn pk-cancel" onclick="crClose()">Cerrar (sigo después)</button>`;
@@ -14157,6 +14199,44 @@ function crSendClose(legajo) {
   try { pushHistoryForLegajo(legajo, { ts: nowMs, opcion: "RR", descripcion: "Recepción Remitos", texto: "", id: payload.id, ts_inicio_iso: openIso, status: "queued" }); } catch (_e) {}
   try { enqueueReport(payload); if (typeof trySendOneReport === "function") trySendOneReport(payload).then(r => { if (r && r.ok) removeFromQueue(payload.id); }).catch(() => {}); } catch (_e) {}
   try { updatePendingIndicator(); updateCoreButtonsState(); } catch (_e) {}
+}
+
+/* v6.66 — "Facturado sin salida": el operario cargó la NP al camión (CCN) pero el
+   cliente no recibió (cerrado, etc.) y la mercadería volvió al depósito. Emite un FSS
+   (texto = "NP|TANDA") que — al ser MÁS RECIENTE que su CCN — la saca de Recepción
+   Remitos y de Pedidos Entregados, y la devuelve a «FC s/Salida» (Stocks) y a Carga
+   Camión para volver a despacharla. NO toca el libro de stock (esa mercadería ya salió
+   del stock contable al facturar; FC s/Salida es una vista, no un depósito). */
+function crMarkSinSalida(npClean) {
+  if (!_cr) return;
+  const it = _cr.items.find(x => String(x.np).replace(/[^0-9A-Za-z]/g, "") === String(npClean));
+  if (!it) return;
+  try { if (!confirm("¿Marcar la NP " + it.np + " como FACTURADO SIN SALIDA?\n\nEl cliente no recibió la mercadería (volvió al depósito).\nSale de esta lista y queda en «FC s/Salida» (Stocks). Podés volver a cargarla en Carga Camión cuando salga.")) return; } catch (_e) {}
+  crSendSinSalida(_cr.legajo, it.np, it.tanda);
+  _cr.checked.delete(it.np);
+  _cr.items = _cr.items.filter(x => x !== it);
+  try { crSaveChecked(_cr.legajo, _cr.checked); } catch (_e) {}
+  if (!_cr.items.length) {
+    try { alert("✓ NP " + it.np + " marcada FACTURADO SIN SALIDA.\nNo quedan remitos pendientes."); } catch (_e) {}
+    _cr = null; crReleaseWakeLock(); closeTandaModal(); return;
+  }
+  try { alert("✓ NP " + it.np + " marcada FACTURADO SIN SALIDA → «FC s/Salida»."); } catch (_e) {}
+  crRender();
+}
+function crSendSinSalida(legajo, np, tanda) {
+  const nowMs = Date.now();
+  const payload = {
+    legajo: legajo, opcion: "FSS", descripcion: "Facturado sin salida (volvió a depósito)",
+    texto: (String(np) + "|" + String(tanda || "")).toUpperCase(),
+    ts: nowMs,
+    id: ("fss_" + legajo + "_" + np + "_" + nowMs.toString(36) + Math.random().toString(36).slice(2, 6)).replace(/[^a-zA-Z0-9_\-]/g, ""),
+    ts_inicio_iso: null
+  };
+  try {
+    enqueueReport(payload);
+    if (typeof trySendOneReport === "function") trySendOneReport(payload).then(r => { if (r && r.ok) removeFromQueue(payload.id); }).catch(() => {});
+  } catch (_e) {}
+  try { updatePendingIndicator(); } catch (_e) {}
 }
 
 /* =========================================================
@@ -16172,12 +16252,21 @@ async function pppRefreshEntregado() {
   try {
     const since = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString();
     const url = SUPABASE_TABLE_ENDPOINT + "?opcion=eq.CCN&ts_cliente=gte." + encodeURIComponent(since) + "&select=texto,ts_cliente&limit=20000";
-    const r = await fetch(url, { headers: { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY } });
+    const [r, fssMap] = await Promise.all([
+      fetch(url, { headers: { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY } }),
+      fetchSinSalidaMap(since)
+    ]);
     if (!r.ok) throw new Error("HTTP " + r.status);
     const data = await r.json();
+    // Última carga por NP; si un FSS más reciente la devolvió al depósito (sin salida),
+    // NO cuenta como entregada ni dispara la alarma de "cargado sin controlar". v6.66.
+    const maxCcn = new Map();
+    for (const ev of data) { const t = String(ev.texto || "").split("|")[0].trim().replace(/\.0+$/, ""); if (!t) continue; const ms = ev.ts_cliente ? new Date(ev.ts_cliente).getTime() : 0; if (!maxCcn.has(t) || ms > maxCcn.get(t)) maxCcn.set(t, ms); }
     const set = new Set(); const loadMs = new Map();
     for (const ev of data) {
       const t = String(ev.texto || "").split("|")[0].trim().replace(/\.0+$/, ""); if (!t) continue;
+      const fss = fssMap.get(t) || 0;
+      if (fss && fss > (maxCcn.get(t) || 0)) continue;   // volvió al depósito → no entregada
       set.add(t);
       const ms = ev.ts_cliente ? new Date(ev.ts_cliente).getTime() : 0;
       if (ms && (!loadMs.has(t) || ms < loadMs.get(t))) loadMs.set(t, ms);
