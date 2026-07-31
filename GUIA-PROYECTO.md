@@ -45,9 +45,9 @@
 > ·1.00 X 84 (154) · ·1.50 X 132 (165) · ·1.50 X 84 (155 Kg) · FLEJES LOEKE·1,00 X 121 (335) ·
 > ·1.00 X 84 (315) · ·1.50 X 132 (583 Kg) · FLEJES LOEKEMEYER·0.80 X 64 (161 Kg) · ·1.50 X 84
 > (922). Reversible (event-sourced): reponer = `ajuste` +saldo si fue error. **Además** se dio
-> de baja **1266500** ("Abs", 850 Kg + 13 en unidad "325"/"Avc") → 0. ⏳ **Pendiente de OK del
-> dueño** (NO tocado): **863** = *Corta Pizza Grande* (es **producto de VENTA**, góndola 26 +
-> excedente 25 — no es insumo) y el código **ABS** (18 Bolsas / −6 Uni).
+> de baja **1266500** ("Abs", 850 Kg + 13 en unidad "325"/"Avc") → 0. **863** (*Corta Pizza
+> Grande*, **producto de VENTA** con góndola 26 + excedente 25) y el código **ABS** (18 Bolsas /
+> −6 Uni): el dueño confirmó **NO darlos de baja** → quedan **intactos**.
 >
 > Nota: **v6.73 — Nuevo módulo "📈 Abastecimiento vs Venta"** (botón en el panel de
 > supervisor, al lado de "Rendimiento de operarios"). Muestra, **por artículo**, cuántas
