@@ -251,10 +251,11 @@
 > `saldo`; una fila por unidad; variantes de case como kg/Kg se unifican; `security_invoker`,
 > `grant select` anon/authenticated; DDL en `sql/vista_saldos_insumos_x_unidad.sql`), y
 > **(b)** la solapa **Insumos** de Stock desglosa el saldo por unidad cuando un artículo
-> tiene movimientos en más de una (marca **⚠ varias**). `vista_saldos_stock` **no** se
-> tocó (retro-compatible). ⚠ **Pendiente (flag al usuario):** el módulo de **conteo/entrega
-> de insumos** todavía muestra un único número `it.insumos` — cambiarlo a por-unidad es un
-> flujo de INPUT del operario y necesita tu OK antes de tocarlo.
+> tiene movimientos en más de una (marca **⚠ varias**), y **(c)** el módulo de **conteo/
+> entrega de insumos** (`insLoad`/`insRender`) también: lee `vista_saldos_insumos_x_unidad`,
+> el chip de unidad arranca en la unidad real del saldo, la referencia "stock:" se muestra
+> por unidad y el aviso "quedaría en…" es por la unidad seleccionada. `vista_saldos_stock`
+> **no** se tocó (retro-compatible).
 >
 > Nota: **v6.65 — Pulidos de facturación (hallazgos revisor-render)** (commit `30ea5ad`).
 > Ajustes de UI del módulo de Facturación surgidos de la auditoría de render. Además, en
