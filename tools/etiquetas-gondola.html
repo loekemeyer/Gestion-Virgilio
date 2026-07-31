@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Etiquetas de góndola (ZPL) — Producción Virgilio</title>
+<style>
+  :root { --bg:#0f172a; --card:#1e293b; --ink:#e2e8f0; --mut:#94a3b8; --acc:#22c55e; --acc2:#eab308; --br:#334155; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:15px/1.5 system-ui,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--ink); padding:18px; }
+  h1 { font-size:20px; margin:0 0 4px; }
+  .sub { color:var(--mut); margin:0 0 16px; font-size:13px; }
+  .card { background:var(--card); border:1px solid var(--br); border-radius:12px; padding:14px; margin-bottom:14px; }
+  label { display:inline-flex; align-items:center; gap:6px; margin:4px 12px 4px 0; font-size:13px; }
+  input[type=text], input[type=number] { background:#0b1220; color:var(--ink); border:1px solid var(--br); border-radius:8px; padding:6px 8px; font:inherit; }
+  input[type=text] { width:180px; } input[type=number] { width:70px; }
+  button { background:var(--acc); color:#052e16; border:0; border-radius:8px; padding:9px 14px; font:600 14px/1 inherit; cursor:pointer; }
+  button.sec { background:#334155; color:var(--ink); }
+  .row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th,td { text-align:left; padding:5px 8px; border-bottom:1px solid var(--br); }
+  th { color:var(--mut); font-weight:600; position:sticky; top:0; background:var(--card); }
+  .wrap { max-height:340px; overflow:auto; border:1px solid var(--br); border-radius:8px; }
+  .mono { font-family:ui-monospace,Menlo,Consolas,monospace; }
+  .t { color:var(--acc); } .a { color:var(--acc2); }
+  textarea { width:100%; height:220px; background:#0b1220; color:var(--ink); border:1px solid var(--br); border-radius:8px; padding:10px; font:12px/1.4 ui-monospace,Menlo,Consolas,monospace; }
+  .cnt { color:var(--mut); font-size:13px; }
+  .warn { color:#fca5a5; }
+  code { background:#0b1220; padding:1px 5px; border-radius:5px; }
+</style>
+</head>
+<body>
+  <h1>🏷️ Etiquetas de góndola (ZPL)</h1>
+  <p class="sub">Genera las etiquetas de <b>slot</b> para el picking con lectora (idea 8243). Barcode <b>Code-128</b>
+     con <code>código|T</code> (TODAS) y <code>código|A</code> (ALGUNAS). Se arma desde la planimetría
+     (<code>planimetria.js</code>). Salida <b>ZPL</b> para mandar a la Zebra.</p>
+
+  <div class="card">
+    <div class="row">
+      <label>Filtrar código: <input id="fCod" type="text" placeholder="ej. 943 / 94"></label>
+      <label>Filtrar sector: <input id="fSec" type="text" placeholder="ej. I / A0"></label>
+      <label><input id="chkT" type="checkbox" checked> etiqueta TODAS</label>
+      <label><input id="chkA" type="checkbox" checked> etiqueta ALGUNAS</label>
+      <label>Alto barcode <input id="bh" type="number" value="70" min="30" max="200"></label>
+      <label>Ancho etiqueta (dots) <input id="pw" type="number" value="440" min="200" max="900"></label>
+      <label>Alto etiqueta (dots) <input id="ll" type="number" value="300" min="120" max="900"></label>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button id="gen">Generar ZPL</button>
+      <button id="dl" class="sec">⬇ Descargar .zpl</button>
+      <button id="cp" class="sec">Copiar</button>
+      <span id="cnt" class="cnt"></span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="wrap"><table id="tbl"><thead><tr><th>Código</th><th>Sector</th><th>TODAS</th><th>ALGUNAS</th></tr></thead><tbody></tbody></table></div>
+  </div>
+
+  <div class="card">
+    <div class="cnt" style="margin-bottom:6px">ZPL (mandar a la Zebra por USB/red, o abrir en ZebraDesigner):</div>
+    <textarea id="zpl" readonly placeholder="Tocá «Generar ZPL»…"></textarea>
+    <p class="sub" style="margin-top:8px">
+      Cómo imprimir: (a) en Windows con el driver Zebra podés mandar el .zpl crudo al puerto de la impresora
+      (<code>copy /b etiquetas.zpl \\localhost\Zebra</code>), o (b) pegar el ZPL en <b>Labelary.com</b> para previsualizar,
+      o (c) usarlo como plantilla en <b>ZebraDesigner</b>. La térmica es <b>blanco y negro</b>: TODAS/ALGUNAS se
+      distinguen por el <b>texto grande</b>, no por color. <span class="warn">Ojo:</span> se usa la planimetría
+      estática; si moviste un artículo por la tabla <code>Planimetria</code> (ej. 948E→I11), regenerá
+      <code>planimetria.js</code> o corregí ese slot a mano.
+    </p>
+  </div>
+
+<script src="../planimetria.js"></script>
+<script>
+(function(){
+  var G = window.GONDOLA || null;
+  var tbody = document.querySelector('#tbl tbody');
+  var zplEl = document.getElementById('zpl');
+  var cntEl = document.getElementById('cnt');
+
+  function items(){
+    if (!G) return [];
+    var fc = document.getElementById('fCod').value.trim().toUpperCase();
+    var fs = document.getElementById('fSec').value.trim().toUpperCase();
+    var out = [];
+    Object.keys(G).forEach(function(cod){
+      var v = G[cod]; if (!Array.isArray(v)) return;
+      var sector = String(v[0]||''), orden = Number(v[1]||0);
+      var C = String(cod).toUpperCase();
+      if (C === 'LIBRE') return;                 // slot vacío, no es artículo
+      if (fc && C.indexOf(fc) < 0) return;
+      if (fs && sector.toUpperCase().indexOf(fs) < 0) return;
+      out.push({ cod:C, sector:sector, orden:orden });
+    });
+    out.sort(function(a,b){ return a.orden - b.orden || a.cod.localeCompare(b.cod); });
+    return out;
+  }
+
+  // Un bloque ZPL por etiqueta. accion = 'T' (todas) | 'A' (algunas).
+  function label(cod, sector, accion){
+    var pw = +document.getElementById('pw').value || 440;
+    var ll = +document.getElementById('ll').value || 300;
+    var bh = +document.getElementById('bh').value || 70;
+    var titulo = accion === 'T' ? 'TODAS' : 'ALGUNAS';
+    var data = cod + '|' + accion;
+    var s = '';
+    s += '^XA\n^CI28\n^PW' + pw + '\n^LL' + ll + '\n';
+    s += '^FO24,18^A0N,44,44^FD' + titulo + '^FS\n';                 // acción, grande
+    s += '^FO24,74^A0N,60,60^FD' + cod + '^FS\n';                    // código, muy grande
+    s += '^FO24,144^A0N,26,26^FDSector ' + sector + '^FS\n';         // sector
+    s += '^FO24,182^BY2,2^BCN,' + bh + ',Y,N,N^FD' + data + '^FS\n'; // Code-128 con texto legible
+    s += '^XZ\n';
+    return s;
+  }
+
+  function render(){
+    var list = items();
+    // tabla preview
+    tbody.innerHTML = list.map(function(it){
+      return '<tr><td class="mono">'+it.cod+'</td><td class="mono">'+it.sector+'</td>'
+           + '<td class="mono t">'+it.cod+'|T</td><td class="mono a">'+it.cod+'|A</td></tr>';
+    }).join('');
+    // zpl
+    var wantT = document.getElementById('chkT').checked;
+    var wantA = document.getElementById('chkA').checked;
+    var zpl = '';
+    list.forEach(function(it){
+      if (wantT) zpl += label(it.cod, it.sector, 'T');
+      if (wantA) zpl += label(it.cod, it.sector, 'A');
+    });
+    zplEl.value = zpl;
+    var nlab = list.length * ((wantT?1:0)+(wantA?1:0));
+    cntEl.textContent = list.length + ' artículos · ' + nlab + ' etiquetas';
+  }
+
+  if (!G){
+    cntEl.innerHTML = '<span class="warn">No cargó planimetria.js (window.GONDOLA). Serví esta página desde el repo (GitHub Pages) o al lado de planimetria.js.</span>';
+  } else {
+    document.getElementById('gen').onclick = render;
+    ['fCod','fSec'].forEach(function(id){ document.getElementById(id).addEventListener('keydown', function(e){ if(e.key==='Enter') render(); }); });
+    document.getElementById('cp').onclick = function(){ zplEl.select(); try{ document.execCommand('copy'); }catch(_e){} };
+    document.getElementById('dl').onclick = function(){
+      var blob = new Blob([zplEl.value||''], {type:'text/plain'});
+      var a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+      a.download = 'etiquetas-gondola.zpl'; a.click();
+    };
+    render();
+  }
+})();
+</script>
+</body>
+</html>
