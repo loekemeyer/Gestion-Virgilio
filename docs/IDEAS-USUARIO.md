@@ -16,6 +16,8 @@ hasta que el usuario la active**, y se mergea a `main` cuando el usuario dice el
 
 ## Ideas
 
+- [ ] **8243** (2026-07-31) — **Lectora de código de barras inalámbrica** para el picking (reemplazar la botonera del celu: cada disparo carga en vivo). Enfoque: scanner Bluetooth/ring → la PWA captura el scan → mapea barcode→código → emite PKC de siempre. Trampa: mapeo barcode→código. WiFi ya mitigado por la cola offline — _pendiente (idea grande)_
+- [ ] **5290** (2026-07-31) — **Impresora automática de etiquetas por lío** (cod+cajas+cliente al cerrar cada lío; hoy lo escriben a mano). Enfoque: impresora térmica + puente de impresión (Pi/tablet) + cola de etiquetas en Supabase (los datos ya existen por TAL/líos) — _pendiente (idea secundaria)_
 - [x] **2769** (2026-07-31) — Insumos **505C/CB01/523C/H201Lever**: borrar stock y colocar en insumos con el conteo físico (sectores X20/N7/W1/O1) — _hecha: saldo en **unidades** bajo códigos numéricos 2955/4626/1685/2815 (142000/2950/6000/26400), viejos en 0, Cabezal ≠ Espiral 2805. En Supabase._
 - [x] **2091** (2026-07-31) — Mover el botón **Cerrar** del módulo Consulta de NP (composición a líos) **arriba a la derecha** — _hecha (v6.68, en main)_
 - [x] **1963** (2026-07-31) — **Prolijar** la estética del pop-up de movimientos por artículo (alinear rótulos, chips en pill, alinear el `+`) — _hecha (v6.68, en main)_
