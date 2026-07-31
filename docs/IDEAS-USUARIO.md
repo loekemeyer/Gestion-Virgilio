@@ -16,10 +16,10 @@ hasta que el usuario la active**, y se mergea a `main` cuando el usuario dice el
 
 ## Ideas
 
-- [ ] **1108** (2026-07-31) — Que las columnas de depósito (A facturar / A guardar / etc.) se puedan **abrir aunque digan 0**, si el artículo tuvo movimientos ahí alguna vez — _lista en `claude/mercaderia-estancada-definition-wxis06` (falta mergear a main)_
-- [ ] **3989** (2026-07-31) — Un **`+`** en cada recepción del pop-up que muestre la **entrega completa**: día que llegó, de qué prov/tall, qué códigos entregó y cuántas cajas de cada uno — _lista en `claude/mercaderia-estancada-definition-wxis06` (falta mergear a main)_
-- [ ] **2415** (2026-07-31) — En el pop-up de movimientos por artículo (📦 A guardar) mostrar las **siglas y el legajo de quien recibió** — _lista en `claude/mercaderia-estancada-definition-wxis06` (falta mergear a main)_
-- [ ] **1730** (2026-07-31) — Redefinir **ESTANCADO**: es cuando de lo que llegó se guardó una **parte** (entre góndola y excedente) pero **no la totalidad** (llegan 14, guardan 10, quedan 4 → eso es estancado). Una recepción nueva intacta **no** es estancado (caso cod 824) — _lista en `claude/mercaderia-estancada-definition-wxis06` (backend ya aplicado en Supabase)_
+- [x] **1108** (2026-07-31) — Que las columnas de depósito (A facturar / A guardar / etc.) se puedan **abrir aunque digan 0**, si el artículo tuvo movimientos ahí alguna vez — _hecha (v6.67, en main)_
+- [x] **3989** (2026-07-31) — Un **`+`** en cada recepción del pop-up que muestre la **entrega completa**: día que llegó, de qué prov/tall, qué códigos entregó y cuántas cajas de cada uno — _hecha (v6.67, en main)_
+- [x] **2415** (2026-07-31) — En el pop-up de movimientos por artículo (📦 A guardar) mostrar las **siglas y el legajo de quien recibió** — _hecha (v6.66, en main)_
+- [x] **1730** (2026-07-31) — Redefinir **ESTANCADO**: es cuando de lo que llegó se guardó una **parte** (entre góndola y excedente) pero **no la totalidad** (llegan 14, guardan 10, quedan 4 → eso es estancado). Una recepción nueva intacta **no** es estancado (caso cod 824) — _hecha (v6.66 + backend Supabase, en main)_
 
 <!-- Nuevas entradas se agregan ARRIBA de esta línea, formato:
 - [ ] **CÓDIGO** (AAAA-MM-DD) — texto de la idea — _estado_
