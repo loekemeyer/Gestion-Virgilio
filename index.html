@@ -5708,7 +5708,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v6.76";
+const APP_VERSION = "v6.77";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -9567,12 +9567,12 @@ function abastCompute(recep, venta, sp) {
     const falta = a.pedidos > 0 ? Math.max(0, a.pedidos - a.stock) : 0;
     return { cod: c, desc: artNombre(c, ""), recUlt: recUlt, venUlt: venUlt, recAvg: recAvg, venAvg: venAvg, provs: provs, nProv: Object.keys(provSet).length, balUlt: recUlt - venUlt, balAvg: recAvg - venAvg, stock: a.stock, pedidos: a.pedidos, npsPed: a.npsPed, dep: a.dep, tieneSp: a.tieneSp, falta: falta, _a: a };
   });
-  return { ultimo: ultimo, cur: info.cur, tres: tres, rows: rows, filtro: "", tab: "fab", nImport: nImport };
+  return { ultimo: ultimo, cur: info.cur, tres: tres, rows: rows, filtro: "", nImport: nImport };
 }
 async function openAbastecimiento() {
   if (!document.getElementById("abastCss")) {
     const s = document.createElement("style"); s.id = "abastCss";
-    s.textContent = "#abastOverlay{display:none;position:fixed;inset:0;z-index:1280;background:rgba(2,6,23,.74);overflow:auto;padding:14px;}#abastOverlay.show{display:block;}.abast-card{background:#f8fafc;max-width:min(1200px,98vw);margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.abast-head{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:linear-gradient(90deg,#7c3aed,#4c1d95);color:#fff;}.abast-title{font-size:19px;font-weight:800;}.abast-close{background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;width:auto;}.abast-body{padding:14px 16px;}.abast-loading{padding:24px;text-align:center;color:#64748b;}.abast-seg{display:flex;gap:6px;margin-bottom:10px;}.abast-sbtn{flex:1;background:#ede9fe;border:none;border-radius:9px;padding:8px 10px;font-size:13px;font-weight:800;color:#5b21b6;cursor:pointer;}.abast-sbtn.on{background:#7c3aed;color:#fff;}.abast-intro{background:#f5f3ff;border:1px solid #ddd6fe;color:#4c1d95;border-radius:10px;padding:9px 12px;font-size:12.5px;margin-bottom:10px;}.abast-headline{font-size:14px;font-weight:800;margin:6px 0 10px;}.abast-headline .bad{color:#b91c1c;}.abast-headline .ok{color:#15803d;}.abast-filtro{width:100%;height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 11px;font-size:14px;margin-bottom:10px;box-sizing:border-box;}.abast-tblwrap{overflow-x:auto;}.abast-tbl{width:100%;border-collapse:collapse;font-size:13px;}.abast-tbl th{background:#f1f5f9;color:#475569;text-align:right;padding:7px 8px;font-size:10.5px;text-transform:uppercase;border-bottom:1px solid #cbd5e1;white-space:nowrap;vertical-align:bottom;}.abast-tbl th.l{text-align:left;}.abast-tbl td{padding:7px 8px;text-align:right;border-bottom:1px solid #eef2f7;font-variant-numeric:tabular-nums;white-space:nowrap;}.abast-tbl td.l{text-align:left;white-space:normal;}.abast-row{cursor:pointer;}.abast-row:hover td{background:#faf5ff;}.abast-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#6d28d9;}.abast-desc{color:#475569;max-width:200px;overflow:hidden;text-overflow:ellipsis;}.abast-neg{color:#b91c1c;font-weight:800;}.abast-pos{color:#15803d;font-weight:700;}.abast-chip{display:inline-block;border-radius:999px;padding:1px 8px;font-size:11px;font-weight:800;}.abast-chip.bad{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;}.abast-chip.warn{background:#fffbeb;color:#b45309;border:1px solid #fde68a;}.abast-chip.ok{background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0;}.abast-prov{font-size:11px;color:#64748b;}.abast-det td{background:#faf5ff;}.abast-det table{width:auto;border-collapse:collapse;font-size:12px;margin:2px 0;}.abast-det th,.abast-det td{border:1px solid #e9d5ff;padding:3px 8px;text-align:right;}.abast-det th{background:#f5f3ff;color:#6d28d9;}";
+    s.textContent = "#abastOverlay{display:none;position:fixed;inset:0;z-index:1280;background:rgba(2,6,23,.74);overflow:auto;padding:14px;}#abastOverlay.show{display:block;}.abast-card{background:#f8fafc;max-width:min(1200px,98vw);margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.abast-head{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:linear-gradient(90deg,#7c3aed,#4c1d95);color:#fff;}.abast-title{font-size:19px;font-weight:800;}.abast-close{background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;width:auto;}.abast-body{padding:14px 16px;}.abast-loading{padding:24px;text-align:center;color:#64748b;}.abast-tbl th.grp{text-align:center;background:#ede9fe;color:#5b21b6;font-size:10.5px;letter-spacing:.2px;}.abast-tbl th.sep,.abast-tbl td.sep{border-left:2px solid #c4b5fd;}.abast-det-grid{display:flex;gap:14px;flex-wrap:wrap;}.abast-det-grid>div{flex:1;min-width:280px;}.abast-intro{background:#f5f3ff;border:1px solid #ddd6fe;color:#4c1d95;border-radius:10px;padding:9px 12px;font-size:12.5px;margin-bottom:10px;}.abast-headline{font-size:14px;font-weight:800;margin:6px 0 10px;}.abast-headline .bad{color:#b91c1c;}.abast-headline .ok{color:#15803d;}.abast-filtro{width:100%;height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 11px;font-size:14px;margin-bottom:10px;box-sizing:border-box;}.abast-tblwrap{overflow-x:auto;}.abast-tbl{width:100%;border-collapse:collapse;font-size:13px;}.abast-tbl th{background:#f1f5f9;color:#475569;text-align:right;padding:7px 8px;font-size:10.5px;text-transform:uppercase;border-bottom:1px solid #cbd5e1;white-space:nowrap;vertical-align:bottom;}.abast-tbl th.l{text-align:left;}.abast-tbl td{padding:7px 8px;text-align:right;border-bottom:1px solid #eef2f7;font-variant-numeric:tabular-nums;white-space:nowrap;}.abast-tbl td.l{text-align:left;white-space:normal;}.abast-row{cursor:pointer;}.abast-row:hover td{background:#faf5ff;}.abast-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#6d28d9;}.abast-desc{color:#475569;max-width:200px;overflow:hidden;text-overflow:ellipsis;}.abast-neg{color:#b91c1c;font-weight:800;}.abast-pos{color:#15803d;font-weight:700;}.abast-chip{display:inline-block;border-radius:999px;padding:1px 8px;font-size:11px;font-weight:800;}.abast-chip.bad{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;}.abast-chip.warn{background:#fffbeb;color:#b45309;border:1px solid #fde68a;}.abast-chip.ok{background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0;}.abast-prov{font-size:11px;color:#64748b;}.abast-det td{background:#faf5ff;}.abast-det table{width:auto;border-collapse:collapse;font-size:12px;margin:2px 0;}.abast-det th,.abast-det td{border:1px solid #e9d5ff;padding:3px 8px;text-align:right;}.abast-det th{background:#f5f3ff;color:#6d28d9;}";
     document.head.appendChild(s);
   }
   let ov = document.getElementById("abastOverlay");
@@ -9592,108 +9592,79 @@ async function openAbastecimiento() {
   } catch (e) { const b = document.getElementById("abastBody"); if (b) b.innerHTML = '<div class="abast-loading" style="color:#b91c1c">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
 }
 function closeAbastecimiento() { const ov = document.getElementById("abastOverlay"); if (ov) ov.classList.remove("show"); _abast = null; }
-function abastSetTab(t) { if (!_abast) return; _abast.tab = t; _abast.openCod = null; abastRender(); }
 /* Filtro: re-render + restaurar foco/cursor al final (si no, se re-dibuja el input
    en cada tecla y se pierde el foco → "solo entra 1 dígito"). Patrón de pppSetSearch. */
 function abastSetFiltro(v) { if (!_abast) return; _abast.filtro = String(v == null ? "" : v); abastRender(); const el = document.getElementById("abastFiltroInp"); if (el) { el.focus(); const n = el.value.length; try { el.setSelectionRange(n, n); } catch (_e) {} } }
+/* Vista ÚNICA integrada: fabricación vs venta (mensual) + stock vs pedidos (hoy), por artículo. */
 function abastRender() {
   const body = document.getElementById("abastBody"); if (!body || !_abast) return;
-  const tab = _abast.tab || "fab";
-  const seg = '<div class="abast-seg">' +
-    '<button class="abast-sbtn' + (tab === "fab" ? " on" : "") + '" onclick="abastSetTab(\'fab\')">🏭 Fabricación vs Venta</button>' +
-    '<button class="abast-sbtn' + (tab === "stock" ? " on" : "") + '" onclick="abastSetTab(\'stock\')">📦 Stock vs Pedidos</button></div>';
-  body.innerHTML = seg + (tab === "stock" ? abastRenderStock() : abastRenderFab());
-}
-function abastRenderFab() {
   const f = (_abast.filtro || "").toLowerCase().trim();
-  let rows = _abast.rows.slice().filter(function (r) { return (r.recUlt || r.venUlt || r.recAvg || r.venAvg); });
+  const capFalla = function (r) { return r.venAvg > r.recAvg + 0.05; };          // fabricación no alcanza la venta (prom 3m)
+  const stkFalla = function (r) { return r.falta > 0.05; };                       // no hay stock para lo pedido
+  let rows = _abast.rows.slice().filter(function (r) { return (r.recUlt || r.venUlt || r.recAvg || r.venAvg || r.stock || r.pedidos); });
   if (f) rows = rows.filter(function (r) { return (r.cod + " " + r.desc).toLowerCase().indexOf(f) >= 0; });
-  // Faltan capacidad = vendido > recibido (promedio 3m). Peores primero.
-  const falta = function (r) { return r.venAvg > r.recAvg + 0.05; };
-  rows.sort(function (a, b) { return (falta(b) ? 1 : 0) - (falta(a) ? 1 : 0) || (a.balAvg - b.balAvg) || String(a.cod).localeCompare(String(b.cod), undefined, { numeric: true }); });
-  const nFalta = _abast.rows.filter(falta).length;
-  let h = '<div class="abast-intro"><b>Cuánto te ENTREGAN por mes (por fabricante) vs cuánto VENDÉS</b>, por artículo. Si vendés más de lo que te fabrican, te falta capacidad → conviene sumar otro fabricante. Ventana: <b>' + escapeHtml(_abast.ultimo) + '</b> (último mes completo) y promedio de los últimos 3 meses. Datos: recepción (Control_Modo_OP) y venta entregada (Entregas_Virgilio). Tocá una fila para ver el mes a mes y los proveedores.' + (_abast.nImport ? ' <b>Importados (código con E) excluidos:</b> ' + _abast.nImport + ' (se analizan por otro lado).' : '') + '</div>';
-  h += '<div class="abast-headline">' + (nFalta ? '<span class="bad">⚠ ' + nFalta + ' artículo(s) donde la fabricación NO alcanza la venta</span> — priorizados arriba.' : '<span class="ok">✓ En todos los artículos la fabricación alcanza la venta.</span>') + '</div>';
+  // Peores primero: primero lo urgente (falta stock para pedidos), después lo estructural (fabricación no alcanza).
+  rows.sort(function (a, b) { return (b.falta - a.falta) || ((capFalla(b) ? 1 : 0) - (capFalla(a) ? 1 : 0)) || (a.balAvg - b.balAvg) || String(a.cod).localeCompare(String(b.cod), undefined, { numeric: true }); });
+  const conStk = _abast.rows.filter(stkFalla), totFalta = conStk.reduce(function (s, r) { return s + r.falta; }, 0);
+  const nCap = _abast.rows.filter(capFalla).length;
+  let h = '<div class="abast-intro"><b>Todo integrado por artículo.</b> A la izquierda, <b>fabricación vs venta</b> (cuánto te entregan por mes tus fabricantes vs cuánto vendés, promedio 3 meses — si vendés más de lo que te fabrican, falta capacidad → sumar otro fabricante). A la derecha, <b>stock vs pedidos hoy</b>: stock actual sumado entre TODOS los puntos (góndola, excedente, pickeados, a facturar, a guardar, racks, p/ envasar — sin insumos) vs lo pedido (NP programadas y sin facturar), y <b>cuánto falta para normalizar</b>. Tocá una fila para el detalle (mes a mes + depósitos).' + (_abast.nImport ? ' <b>Importados (código con E) excluidos:</b> ' + _abast.nImport + '.' : '') + '</div>';
+  h += '<div class="abast-headline">' +
+    (conStk.length ? '<span class="bad">⚠ ' + conStk.length + ' sin stock para lo pedido</span> (faltan <b>' + _abastN(totFalta) + '</b> cajas)' : '<span class="ok">✓ Stock cubre los pedidos</span>') +
+    ' &nbsp;·&nbsp; ' +
+    (nCap ? '<span class="bad">⚠ ' + nCap + ' donde la fabricación no alcanza la venta</span>' : '<span class="ok">✓ Fabricación alcanza la venta</span>') +
+    '</div>';
   h += '<input id="abastFiltroInp" class="abast-filtro" type="search" placeholder="🔎 Buscar código / descripción" value="' + escapeHtml(_abast.filtro || "") + '" oninput="abastSetFiltro(this.value)">';
-  h += '<div class="abast-tblwrap"><table class="abast-tbl"><thead><tr>' +
-    '<th class="l">Código</th><th class="l">Descripción</th><th>Fabri-<br>cantes</th>' +
-    '<th>Recibido<br>' + escapeHtml(_abast.ultimo) + '</th><th>Vendido<br>' + escapeHtml(_abast.ultimo) + '</th><th>Balance<br>mes</th>' +
-    '<th>Recibido<br>prom 3m</th><th>Vendido<br>prom 3m</th><th>Balance<br>prom</th><th class="l">Estado</th></tr></thead><tbody>';
-  if (!rows.length) h += '<tr><td colspan="10" class="l" style="color:#64748b;padding:16px">Sin datos todavía (se llena con la recepción y las ventas).</td></tr>';
+  h += '<div class="abast-tblwrap"><table class="abast-tbl"><thead>' +
+    '<tr><th class="l" rowspan="2">Código</th><th class="l" rowspan="2">Descripción</th>' +
+    '<th colspan="4" class="grp">🏭 Fabricación vs Venta (prom 3m)</th>' +
+    '<th colspan="3" class="grp sep">📦 Stock vs Pedidos (hoy)</th><th class="l" rowspan="2">Estado</th></tr>' +
+    '<tr><th>Fabri-<br>cantes</th><th>Recib.<br>/mes</th><th>Vend.<br>/mes</th><th>Bal.<br>/mes</th>' +
+    '<th class="sep">Stock<br>actual</th><th>Pedido<br>pend.</th><th>Falta p/<br>normaliz.</th></tr></thead><tbody>';
+  if (!rows.length) h += '<tr><td colspan="10" class="l" style="color:#64748b;padding:16px">Sin datos todavía.</td></tr>';
   rows.forEach(function (r) {
     const open = _abast.openCod === r.cod;
-    const provTxt = r.provs.length ? r.provs.map(function (p) { return escapeHtml(p.nombre) + ' ' + _abastN(p.cajas); }).join(" · ") : "—";
-    const estado = falta(r)
-      ? '<span class="abast-chip bad">⚠ Falta ' + _abastN(r.venAvg - r.recAvg) + '/mes</span>' + (r.nProv <= 1 ? ' <span class="abast-prov">1 solo fabri.</span>' : '')
-      : (r.recAvg > 0 ? '<span class="abast-chip ok">✓ Alcanza</span>' : '<span class="abast-chip warn">sin recepción</span>');
+    const chips = [];
+    if (r.pedidos > 0) chips.push(stkFalla(r) ? '<span class="abast-chip bad">⚠ Faltan ' + _abastN(r.falta) + '</span>' : '<span class="abast-chip ok">✓ Stock ok</span>');
+    if (capFalla(r)) chips.push('<span class="abast-chip warn">🏭 −' + _abastN(r.venAvg - r.recAvg) + '/m' + (r.nProv <= 1 ? ' · 1 fabri.' : '') + '</span>');
+    if (!chips.length) chips.push(r.recAvg > 0 ? '<span class="abast-chip ok">✓ OK</span>' : '<span class="abast-chip warn">sin recepción</span>');
     h += '<tr class="abast-row" onclick="abastToggle(\'' + encodeURIComponent(r.cod) + '\')">' +
       '<td class="l abast-cod">' + escapeHtml(r.cod) + (open ? " ▾" : "") + '</td>' +
       '<td class="l abast-desc">' + escapeHtml(r.desc || "—") + '</td>' +
       '<td>' + r.nProv + '</td>' +
-      '<td>' + _abastN(r.recUlt) + '</td><td>' + _abastN(r.venUlt) + '</td>' +
-      '<td class="' + (r.balUlt < -0.05 ? "abast-neg" : "abast-pos") + '">' + (r.balUlt >= 0 ? "+" : "") + _abastN(r.balUlt) + '</td>' +
       '<td>' + _abastN(r.recAvg) + '</td><td>' + _abastN(r.venAvg) + '</td>' +
       '<td class="' + (r.balAvg < -0.05 ? "abast-neg" : "abast-pos") + '">' + (r.balAvg >= 0 ? "+" : "") + _abastN(r.balAvg) + '</td>' +
-      '<td class="l">' + estado + '</td></tr>';
+      '<td class="sep ' + (r.stock < -0.05 ? "abast-neg" : "") + '">' + _abastN(r.stock) + '</td>' +
+      '<td>' + _abastN(r.pedidos) + (r.npsPed ? ' <span class="abast-prov">(' + r.npsPed + ')</span>' : '') + '</td>' +
+      '<td class="' + (stkFalla(r) ? "abast-neg" : "abast-pos") + '">' + (stkFalla(r) ? _abastN(r.falta) : "0") + '</td>' +
+      '<td class="l">' + chips.join(" ") + '</td></tr>';
     if (open) {
       const a = r._a; const meses = Object.keys(a.mesesSet).sort().reverse().slice(0, 8).reverse();
-      let dt = '<div class="abast-prov" style="margin-bottom:4px">Proveedores último mes: <b>' + provTxt + '</b></div>';
-      dt += '<table><thead><tr><th>Mes</th><th>Recibido</th><th>Vendido</th><th>Balance</th><th style="text-align:left">Fabricantes del mes</th></tr></thead><tbody>';
+      const provTxt = r.provs.length ? r.provs.map(function (p) { return escapeHtml(p.nombre) + ' ' + _abastN(p.cajas); }).join(" · ") : "—";
+      let dt = '<div class="abast-det-grid">';
+      // Izquierda: mes a mes fabricación vs venta
+      let dl = '<div><div class="abast-prov" style="margin-bottom:4px">🏭 Recepción vs venta — proveedores último mes: <b>' + provTxt + '</b></div>';
+      dl += '<table><thead><tr><th>Mes</th><th>Recib.</th><th>Vend.</th><th>Bal.</th><th style="text-align:left">Fabricantes del mes</th></tr></thead><tbody>';
       meses.forEach(function (mm) {
         const rec = a.recepMes[mm] || 0, ven = a.ventaMes[mm] || 0, bal = rec - ven;
         const pv = a.provMes[mm] ? Object.keys(a.provMes[mm]).map(function (p) { return escapeHtml(p) + " " + _abastN(a.provMes[mm][p]); }).join(" · ") : "—";
-        dt += '<tr><td>' + escapeHtml(mm) + (mm === _abast.cur && mm !== _abast.ultimo ? ' <span class="abast-prov">(en curso)</span>' : '') + '</td><td>' + _abastN(rec) + '</td><td>' + _abastN(ven) + '</td><td style="' + (bal < 0 ? "color:#b91c1c;font-weight:800" : "color:#15803d") + '">' + (bal >= 0 ? "+" : "") + _abastN(bal) + '</td><td style="text-align:left;color:#475569">' + pv + '</td></tr>';
+        dl += '<tr><td>' + escapeHtml(mm) + (mm === _abast.cur && mm !== _abast.ultimo ? ' <span class="abast-prov">(en curso)</span>' : '') + '</td><td>' + _abastN(rec) + '</td><td>' + _abastN(ven) + '</td><td style="' + (bal < 0 ? "color:#b91c1c;font-weight:800" : "color:#15803d") + '">' + (bal >= 0 ? "+" : "") + _abastN(bal) + '</td><td style="text-align:left;color:#475569">' + pv + '</td></tr>';
       });
-      dt += '</tbody></table>';
+      dl += '</tbody></table></div>';
+      // Derecha: stock por depósito + pedido
+      const dep = r.dep || {};
+      const celdas = ABAST_DEPS.filter(function (d) { return Math.abs(Number(dep[d[0]]) || 0) > 0.001; })
+        .map(function (d) { return '<tr><td style="text-align:left">' + escapeHtml(d[1]) + '</td><td>' + _abastN(dep[d[0]]) + '</td></tr>'; }).join("");
+      let dr = '<div><div class="abast-prov" style="margin-bottom:4px">📦 Stock por depósito</div>';
+      dr += '<table><thead><tr><th style="text-align:left">Depósito</th><th>Cajas</th></tr></thead><tbody>' +
+        (celdas || '<tr><td style="text-align:left" colspan="2">Sin stock en ningún depósito.</td></tr>') +
+        '<tr><td style="text-align:left;font-weight:800">TOTAL</td><td style="font-weight:800">' + _abastN(r.stock) + '</td></tr></tbody></table>';
+      dr += '<div class="abast-prov" style="margin-top:4px">Pedido pendiente: <b>' + _abastN(r.pedidos) + '</b> cajas en <b>' + (r.npsPed || 0) + '</b> NP(s)' + (stkFalla(r) ? ' · falta fabricar/reponer <b style="color:#b91c1c">' + _abastN(r.falta) + '</b>' : ' · stock suficiente ✓') + '</div></div>';
+      dt += dl + dr + '</div>';
       h += '<tr class="abast-det"><td colspan="10" class="l">' + dt + '</td></tr>';
     }
   });
   h += '</tbody></table></div>';
-  return h;
-}
-/* Stock actual (sumado entre TODOS los puntos de stock) vs pedidos pendientes → cuánto falta para normalizar. */
-function abastRenderStock() {
-  const f = (_abast.filtro || "").toLowerCase().trim();
-  let rows = _abast.rows.slice().filter(function (r) { return r.tieneSp && (r.stock || r.pedidos); });
-  if (f) rows = rows.filter(function (r) { return (r.cod + " " + r.desc).toLowerCase().indexOf(f) >= 0; });
-  // Peores primero: los que MÁS falta necesitan; después mayor demanda.
-  rows.sort(function (a, b) { return (b.falta - a.falta) || (b.pedidos - a.pedidos) || String(a.cod).localeCompare(String(b.cod), undefined, { numeric: true }); });
-  const conFalta = rows.filter(function (r) { return r.falta > 0.05; });
-  const totFalta = conFalta.reduce(function (s, r) { return s + r.falta; }, 0);
-  let h = '<div class="abast-intro"><b>Stock actual que tenés</b> (sumado entre TODOS los puntos de stock: góndola, excedente, pickeados, a facturar, a guardar, racks y p/ envasar — <i>no</i> incluye insumos) <b>vs lo que tenés pedido</b> (NP programadas y todavía sin facturar). <b>Falta p/ normalizar</b> = lo que hay que fabricar/reponer para cubrir los pedidos con el stock actual. Tocá una fila para ver en qué depósitos está el stock.' + (_abast.nImport ? ' <b>Importados (código con E) excluidos:</b> ' + _abast.nImport + ' (se analizan por otro lado).' : '') + '</div>';
-  h += '<div class="abast-headline">' + (conFalta.length ? '<span class="bad">⚠ ' + conFalta.length + ' artículo(s) sin stock suficiente para lo pedido</span> — faltan <b>' + _abastN(totFalta) + '</b> cajas en total.' : '<span class="ok">✓ Tenés stock para cubrir todos los pedidos pendientes.</span>') + '</div>';
-  h += '<input id="abastFiltroInp" class="abast-filtro" type="search" placeholder="🔎 Buscar código / descripción" value="' + escapeHtml(_abast.filtro || "") + '" oninput="abastSetFiltro(this.value)">';
-  h += '<div class="abast-tblwrap"><table class="abast-tbl"><thead><tr>' +
-    '<th class="l">Código</th><th class="l">Descripción</th>' +
-    '<th>Stock<br>actual</th><th>Pedido<br>pendiente</th><th>NPs</th>' +
-    '<th>Falta p/<br>normalizar</th><th class="l">Estado</th></tr></thead><tbody>';
-  if (!rows.length) h += '<tr><td colspan="7" class="l" style="color:#64748b;padding:16px">Sin datos de stock/pedidos.</td></tr>';
-  rows.forEach(function (r) {
-    const open = _abast.openCod === r.cod;
-    const estado = r.pedidos <= 0
-      ? '<span class="abast-chip ok">sin pedidos</span>'
-      : (r.falta > 0.05 ? '<span class="abast-chip bad">⚠ Faltan ' + _abastN(r.falta) + '</span>' : '<span class="abast-chip ok">✓ Alcanza</span>');
-    h += '<tr class="abast-row" onclick="abastToggle(\'' + encodeURIComponent(r.cod) + '\')">' +
-      '<td class="l abast-cod">' + escapeHtml(r.cod) + (open ? " ▾" : "") + '</td>' +
-      '<td class="l abast-desc">' + escapeHtml(r.desc || "—") + '</td>' +
-      '<td class="' + (r.stock < -0.05 ? "abast-neg" : "") + '">' + _abastN(r.stock) + '</td>' +
-      '<td>' + _abastN(r.pedidos) + '</td>' +
-      '<td>' + (r.npsPed || 0) + '</td>' +
-      '<td class="' + (r.falta > 0.05 ? "abast-neg" : "abast-pos") + '">' + (r.falta > 0.05 ? _abastN(r.falta) : "0") + '</td>' +
-      '<td class="l">' + estado + '</td></tr>';
-    if (open) {
-      const dep = r.dep || {};
-      const celdas = ABAST_DEPS.filter(function (d) { return Math.abs(Number(dep[d[0]]) || 0) > 0.001; })
-        .map(function (d) { return '<tr><td style="text-align:left">' + escapeHtml(d[1]) + '</td><td>' + _abastN(dep[d[0]]) + '</td></tr>'; }).join("");
-      let dt = '<table><thead><tr><th style="text-align:left">Depósito</th><th>Cajas</th></tr></thead><tbody>' +
-        (celdas || '<tr><td style="text-align:left" colspan="2">Sin stock en ningún depósito.</td></tr>') +
-        '<tr><td style="text-align:left;font-weight:800">TOTAL</td><td style="font-weight:800">' + _abastN(r.stock) + '</td></tr></tbody></table>';
-      dt += '<div class="abast-prov" style="margin-top:4px">Pedido pendiente: <b>' + _abastN(r.pedidos) + '</b> cajas en <b>' + (r.npsPed || 0) + '</b> NP(s)' + (r.falta > 0.05 ? ' · falta fabricar/reponer <b style="color:#b91c1c">' + _abastN(r.falta) + '</b>' : ' · stock suficiente ✓') + '</div>';
-      h += '<tr class="abast-det"><td colspan="7" class="l">' + dt + '</td></tr>';
-    }
-  });
-  h += '</tbody></table></div>';
-  return h;
+  body.innerHTML = h;
 }
 function abastToggle(codEnc) { if (!_abast) return; const cod = decodeURIComponent(codEnc); _abast.openCod = (_abast.openCod === cod) ? null : cod; abastRender(); }
 

@@ -4,7 +4,16 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-07-31 · Versión app al documentar: **v6.76**
+> Última actualización: 2026-07-31 · Versión app al documentar: **v6.77**
+>
+> Nota: **v6.77 — Abastecimiento: una sola vista integrada** (se sacó el toggle de v6.74).
+> Ahora una única tabla muestra por artículo, con dos grupos de columnas: **🏭 Fabricación
+> vs Venta** (fabricantes, recibido/mes, vendido/mes, balance/mes — prom 3 meses) y **📦
+> Stock vs Pedidos (hoy)** (stock actual total, pedido pendiente, falta p/ normalizar),
+> más una columna de Estado con chips combinados. Ordena peor primero (urgente=falta stock,
+> luego estructural=fabricación no alcanza). Al expandir una fila se ven las **dos** sub-tablas
+> lado a lado (mes a mes con fabricantes + stock por depósito). Se eliminaron `abastSetTab`/
+> `abastRenderFab`/`abastRenderStock`; todo vive en `abastRender`. Bump `APP_VERSION`/`SW_VERSION` `v6.77`.
 >
 > Nota: **v6.76 — Abastecimiento excluye los artículos IMPORTADOS (código con "E")**.
 > Los códigos que contienen `E` (ej. `870E`, `812E`, `439EL`, `702EN`) son importados y
