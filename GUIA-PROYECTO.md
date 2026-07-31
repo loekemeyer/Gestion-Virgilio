@@ -4,7 +4,13 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-07-31 · Versión app al documentar: **v6.79**
+> Última actualización: 2026-07-31 · Versión app al documentar: **v6.80**
+>
+> Nota: **v6.80 — Abastecimiento: se sacó el intro y los títulos quedan fijos**. Se eliminó
+> el párrafo de explicación (la nota de importados excluidos pasó al headline). La tabla ahora
+> scrollea internamente (`.abast-tblwrap` `max-height:64vh`) con el **thead sticky** (las dos
+> filas de encabezado: grupo `top:0`, columnas `top:27px`; `border-collapse:separate` para que
+> los bordes acompañen). Bump `APP_VERSION`/`SW_VERSION` `v6.80`.
 >
 > Nota: **v6.79 — Abastecimiento: códigos con 0 adelante, estética y meses anteriores**.
 > (1) Los códigos numéricos se muestran a 3 dígitos (`_abastCodDisp`: "31"→"031", "7"→"007";
