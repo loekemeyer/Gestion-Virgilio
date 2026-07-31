@@ -5708,7 +5708,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v6.73";
+const APP_VERSION = "v6.74";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -12065,8 +12065,8 @@ function mgRender() {
     const head = it.manual
       ? '<span class="mg-agu mg-disp-x">⚠ fuera de lista</span>'
       : '<span class="mg-agu">a guardar <b>' + it.disponible + '</b></span>';
-    const gondStp = function (big) { return '<div class="mg-stp' + (big ? ' big' : '') + '"><button class="mg-sb" onclick="mgChg(' + i + ',-1)">–</button><input class="mg-inp" type="number" min="0" max="' + maxG + '" inputmode="numeric" value="' + it.cargar + '" oninput="mgSet(' + i + ',this.value)"><button class="mg-sb" onclick="mgChg(' + i + ',1)">+</button></div>'; };
-    const excStp = '<div class="mg-stp"><button class="mg-sb" onclick="mgChgExc(' + i + ',-1)">–</button><input class="mg-inp" type="number" min="0" max="' + maxE + '" inputmode="numeric" value="' + it.exc + '" oninput="mgSetExc(' + i + ',this.value)"><button class="mg-sb" onclick="mgChgExc(' + i + ',1)">+</button></div>';
+    const gondStp = function (big) { return '<div class="mg-stp' + (big ? ' big' : '') + '"><button class="mg-sb" onclick="mgChg(' + i + ',-1)">–</button><input class="mg-inp" type="text" min="0" max="' + maxG + '" inputmode="numeric" value="' + it.cargar + '" oninput="mgSet(' + i + ',this.value)"><button class="mg-sb" onclick="mgChg(' + i + ',1)">+</button></div>'; };
+    const excStp = '<div class="mg-stp"><button class="mg-sb" onclick="mgChgExc(' + i + ',-1)">–</button><input class="mg-inp" type="text" min="0" max="' + maxE + '" inputmode="numeric" value="' + it.exc + '" oninput="mgSetExc(' + i + ',this.value)"><button class="mg-sb" onclick="mgChgExc(' + i + ',1)">+</button></div>';
     const ubicInp = '<input class="mg-ubic-inp" type="text" maxlength="6" autocomplete="off" placeholder="A12" value="' + escapeHtml(it.ubic || "") + '" oninput="this.value=this.value.toUpperCase().replace(/[^A-Za-z0-9]/g,\'\').slice(0,6);mgSetUbic(' + i + ',this.value)">';
     const faltTxt = it.manual ? '' : '<span class="mg-faltan' + (faltan <= 0 ? ' ok' : '') + '">' + (faltan <= 0 ? '✓ Listo' : 'Faltan ' + faltan) + '</span>';
     return '<div class="mg-row">' +

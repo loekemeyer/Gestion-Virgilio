@@ -4,7 +4,24 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-07-31 · Versión app al documentar: **v6.73**
+> Última actualización: 2026-07-31 · Versión app al documentar: **v6.74**
+>
+> Nota: **v6.74 — MG: el input de góndola tipeaba al revés (fix) + confirmación de cierre al
+> enviar**. **(a)** En el modal *Guardar a góndola* (MG) los inputs de cantidad (góndola/excedente)
+> eran `type="number"`; como `mgRender` re-renderiza en **cada tecla** vía `_renderKeepFocus` y los
+> inputs `number` **no exponen `selectionStart/End`**, el cursor volvía al inicio y los dígitos se
+> **antepondían** (para escribir "12" había que tipear "2" y luego "1"). Se cambiaron a
+> **`type="text" inputmode="numeric"`** (mismo teclado numérico) → `_renderKeepFocus` ahora
+> preserva el cursor y se tipea normal (izq→der). **(b)** `mgConfirmar` **ya cerraba** el modal al
+> enviar (`closeMG` + `opDraftClear`); el bump de versión propaga ese cierre a los dispositivos con
+> versión vieja. Verificado: smoke `mva-quien` + `checkhtml` + `version-sync` OK. Bump
+> `APP_VERSION` + `SW_VERSION` **v6.74**.
+>
+> Nota (dato — corrección de stock, 31/07 cont.): **727E / 727EN** (Sacacorcho Doble Imp.). **727E**
+> → **0 en TODOS los depósitos** (conteo del dueño: `racks −36`, `separar_pedidos −1`, `terminado
+> −18`). **727EN** → góndola (`terminado`) **17→10** y **`separar_pedidos +1`** ("lo pickeado del
+> 727E es de 727EN" — estaba mal atribuido). ⚠ Queda `727EN a_facturar −17` (negativo raro) sin
+> tocar, a revisar aparte.
 >
 > Nota (dato — corrección manual de stock + revisión, 31/07): **NP 97822 → 256 y 502**.
 > Revisión pedida por el dueño de los dos códigos que quedaron colgando de la reconstrucción
