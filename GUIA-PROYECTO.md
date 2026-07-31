@@ -4,7 +4,20 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-07-31 · Versión app al documentar: **v6.72**
+> Última actualización: 2026-07-31 · Versión app al documentar: **v6.73**
+>
+> Nota: **v6.73 — Nuevo módulo "📈 Abastecimiento vs Venta"** (botón en el panel de
+> supervisor, al lado de "Rendimiento de operarios"). Muestra, **por artículo**, cuántas
+> cajas te **ENTREGA cada fabricante/tallerista por mes** contra cuánto **VENDÉS**, para
+> ver si la fabricación alcanza el ritmo de venta y si conviene **sumar otro fabricante**
+> (ej. el `031`: jul recibido 701 / vendido 862 → balance **−161**, con **1 solo
+> fabricante** → falta capacidad). Ventana: **último mes completo** + **promedio de los
+> últimos 3 meses**; la fila se expande al mes-a-mes con los fabricantes de cada mes.
+> Datos desde dos vistas nuevas de Supabase (`security_invoker=true`, select para
+> `anon`/`authenticated`): **`vista_recepcion_mensual`** (parsea `Control_Modo_OP.detalle`
+> "cod → cajas" por mes y proveedor) y **`vista_venta_mensual`** (`Entregas_Virgilio`
+> agrupado por mes). Front: `openAbastecimiento`/`abastCompute`/`abastRender`/`abastToggle`
+> en `index.html`. Bump `APP_VERSION`/`SW_VERSION` `v6.73`.
 >
 > Nota: **v6.72 — Fix: subir foto en Recepción fallaba con "row-level security policy"**.
 > El cliente de `recepcion.js` se autentica con **`signInAnonymously()`** (rol
