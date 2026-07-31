@@ -16,6 +16,7 @@ hasta que el usuario la active**, y se mergea a `main` cuando el usuario dice el
 
 ## Ideas
 
+- [ ] **2769** (2026-07-31) — Insumos **505C/CB01/523C/H201Lever**: borrar stock y colocar en insumos con el conteo físico (sectores X20/N7/W1/O1). Falta 1 decisión (unidades crudas vs MC · código numérico vs modelo · no pisar el recatalogueo de hoy); reconciliación + SQL listo en `docs/PENDIENTES.md` — _pendiente_
 - [x] **2091** (2026-07-31) — Mover el botón **Cerrar** del módulo Consulta de NP (composición a líos) **arriba a la derecha** — _hecha (v6.68, en main)_
 - [x] **1963** (2026-07-31) — **Prolijar** la estética del pop-up de movimientos por artículo (alinear rótulos, chips en pill, alinear el `+`) — _hecha (v6.68, en main)_
 - [x] **1636** (2026-07-31) — **Fix estancado**: el `cp` (completar pedido) con legajo 0 se excluía y rompía el saldo → falso positivo del 534/323E en "a guardar". Ahora el saldo es event-sourced sobre todos los movimientos (sin filtrar legajo), como la app — _hecha (v6.68 + backend Supabase, en main)_

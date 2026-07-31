@@ -6,6 +6,23 @@
 >
 > Última actualización: 2026-07-31 · Versión app al documentar: **v6.73**
 >
+> Nota (dato — corrección manual de stock + revisión, 31/07): **NP 97822 → 256 y 502**.
+> Revisión pedida por el dueño de los dos códigos que quedaron colgando de la reconstrucción
+> de la NP **97822** (tanda **C54B**, Superimperio S A; facturada 29/07, despachada 30/07,
+> ya cerrada). **256:** góndola (`terminado`) estaba en **−3**, un negativo imposible — sus
+> **únicos** movimientos son 3 pickings (C75A/C87C/C98B) que descontaron góndola **sin ninguna
+> recepción/guardado/inicial** que la acreditara; el pipeline ya estaba en 0 (la porción de la
+> 97822 se facturó/barrió el 29/07). Se insertó un **ajuste +3 en `terminado`** (legajo
+> `ajuste`, `client_id fix_256_gondola_neg_20260731`, id 19870) → góndola **−3 → 0**. ⚠ Si hay
+> stock físico real de 256, sumar otro ajuste tras contar (el 0 es sólo el piso: saca el
+> negativo imposible). **502** (Abrelatas Mariposa): **NO se tocó** — sus "remanentes en el
+> pipeline" (a_facturar C99H **+6** / C99J **+4**; separar_pedidos C99K **+4**) son **todos del
+> 31/07** = trabajo en curso normal (pickeado/armado sin facturar aún), no un cuelgue; la
+> porción de la 97822 ya neteó a 0. **Insumos 505C/CB01/523C/H201Lever** (mismo mensaje):
+> quedó **pendiente de decisión** (unidades crudas vs MC · código numérico vs modelo · no
+> pisar el recatalogueo `fix_recatalog_espiral` de hoy) — registrado como propuesta **2769**,
+> con la reconciliación y el SQL listo en `docs/PENDIENTES.md`.
+>
 > Nota: **v6.73 — Nuevo módulo "📈 Abastecimiento vs Venta"** (botón en el panel de
 > supervisor, al lado de "Rendimiento de operarios"). Muestra, **por artículo**, cuántas
 > cajas te **ENTREGA cada fabricante/tallerista por mes** contra cuánto **VENDÉS**, para
