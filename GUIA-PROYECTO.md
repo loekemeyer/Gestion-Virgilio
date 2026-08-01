@@ -4,8 +4,179 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-01 · Versión app al documentar: **v6.83**
+> Última actualización: 2026-08-01 · Versión app al documentar: **v6.84**
 >
+> Nota: **v6.84 — idea 9020: la EMPRESA del pedido sale del número de NP y parte el
+> stock en el picking**. Cierra lo que quedó a medias en el split por empresa (idea 3197):
+> ahí el código pelado se resolvía con una equivalencia **fija** por artículo, que acierta
+> la mayoría pero **falla en la minoría** (hay 71 cajas de `809E` pedidas por NPs de
+> Loekemeyer que son *Corta Pizza Familiar*, no *Corta Queso*). Ahora la empresa se decide
+> **por NP**: `empresaDeNp(np)` → **NP > 90000 = Loekemeyer (`LK`), si no Chef (`CH`)**
+> — mismo umbral que el `pkNpEsLoeke` que ya existía desde v6.12, así que hay **una sola
+> regla** en el código. Verificado: las 947 NPs son 4xxxx (143, Chef) o 9xxxx (804, Loeke),
+> sin excepciones. **Dónde pega**: en `aggFrom` de `showPickingList`, que antes sumaba las
+> cajas por código entre todas las NPs de la tanda (perdiendo el origen) y ahora agrupa por
+> **`pkCodEmpresa(art, np)`** → el mismo `438E` pedido por una NP 98… y otra 44… da **dos
+> renglones** (`438E LK` y `438E CH`), cada uno con **su** sector desde la planimetría y su
+> cantidad. Como el `PKC` sale con el código ya sufijado, el **cron descuenta del saldo
+> correcto sin tocar nada más**. `pkCodEmpresa` **sólo** actúa si la planimetría tiene ese
+> código con sufijo → un artículo no partido se comporta igual que siempre. Nuevo
+> **`codBase(cod)`** saca el sufijo: el sufijo vive **sólo** en el picking (sector) y en el
+> stock (saldo), mientras que todo lo que se cruza contra el **pedido** —faltantes,
+> `Entregas_Virgilio`, facturación— usa el código pelado, que es el que pidió el cliente
+> (`faltantesDeTanda` devuelve pelado, `_compMatchArt` compara por base). El mapa
+> `PICK_UBIC_DUAL` de v6.12 queda de **fallback de display** (se le sumó `439E`) y no
+> matchea los códigos ya partidos. Tabla **`Planimetria`**: columna nueva **`empresa`**,
+> rellenada por sector desde los conteos del 01/08 (la calle Ñ es mixta: Ñ53/Ñ56/Ñ57/Ñ59
+> son de Chef). Las equivalencias fijas de la 3197 se **dejan como red de seguridad** para
+> cuando no se pueda resolver la empresa. Nuevo smoke `tests/emp-np.cjs` (17 asserts, incluye que la
+> **lectora** siga encontrando el ítem: `_pkItemCodes` acepta el código pelado además del
+> sufijado, porque la etiqueta del slot dice `438E` a secas) en `tests/run.sh` — de paso se
+> registró ahí `tests/pk-scan.cjs`, que había quedado sin correr en la suite. Bump `APP_VERSION`/`SW_VERSION` `v6.84` (la v6.83 se la llevó el merge del picking-scanner).
+>
+> Nota: **STOCK SEPARADO POR EMPRESA (01/08/2026)** — pedido del dueño. Hay códigos que
+> **significan productos distintos según la empresa**: el caso testigo es **`809E`**, que en el
+> maestro de **Chef** es *Corta Queso* y en el de **Loekemeyer** (`e_madre_lk`) es
+> ***Corta Pizza Familiar***. El stock los sumaba en un solo número (381 = 338 + 43), o sea
+> estaba **mal**, no sólo mal mostrado. Solución adoptada (la pidió el dueño así):
+> **la empresa va en el `cod_art`**, con sufijo ` LK` / ` CH`:
+>
+> | Código | Producto | Góndola | Sectores |
+> |---|---|---:|---|
+> | `437E LK` / `437E CH` | Colador 16cm | 63 / 27 | F09-F11 / L07-L08 |
+> | `438E LK` / `438E CH` | Colador 20cm | 50 / 24 | F13-F16 / L05-L06 |
+> | `439E LK` / `439E CH` | Colapasta | 29 / 18 | H33-H34 / Ñ53 |
+> | `809E CH` | **Corta Queso** X12 | 338 | M13-M15 |
+> | `809E LK` | **Corta Pizza Familiar** | 43 | J13-J14 |
+>
+> ⚠ **Lo que hay que entender para no romperlo**: el pedido (`PPP_Base_Pedidos`) trae el código
+> **pelado** (`438E`), y los movimientos de picking los escribe el **cron server-side**
+> (ETAPA 1 de `reconciliar_pipeline_stock`) con ese código tal cual. Si el stock vive en
+> `438E LK` y nadie traduce, el cron descuenta contra `438E` (saldo 0) y lo deja **negativo**.
+> Por eso el split vino con tres piezas más: **(1)** filas en **`Equivalencias_Codigos`**
+> (`437E`→`437E LK`, `438E`→`438E LK`, `439E`→`439E LK`, `809E`→`809E CH`; la empresa elegida
+> es a la que **ya apuntaba la planimetría**). Ojo: `equivResolve` resuelve **un solo salto**,
+> así que las viejas `029`→`437E` y `030`→`438E` se re-apuntaron directo a `437E LK`/`438E LK`.
+> **(2)** entradas de **`Planimetria`** para los 8 códigos nuevos (mismo sector y orden que el
+> original). **(3)** migración **`pipeline_etapa1_resuelve_equivalencias`**: el CTE `picks` de
+> la ETAPA 1 ahora hace `left join Equivalencias_Codigos` y usa `coalesce(e.cod_real, <código
+> del PKC>)` — el server resuelve igual que el cliente. **Nada más de la función cambió.**
+> ⚠ **Pendiente**: los saldos de **racks** siguen bajo el código pelado y sin empresa asignada
+> (`437E` 258, `438E` 156, `809E` 400) — hay que contarlos y repartirlos. Y si algún día un
+> cliente de Chef pide `438E`, el descuento va a salir del stock de Loekemeyer: la única forma
+> de resolverlo bien es saber la **empresa del cliente** en el pedido.
+>
+> Nota (dato — **505I resuelto + C15/C20, 01/08/2026**). **(a) La zona `AD` es RACKS**, no
+> góndola ni excedente — por eso `505I` no aparecía en ninguno de los dos conteos y venía
+> arrastrando saldos en los tres depósitos. Composición real dada por el dueño: **racks
+> AD07 420 · AD08 490 · AD09 400 = 1.310**, más **a_guardar 100** → **total 1.410** (el sistema
+> tenía 1.746 repartidas en góndola 659 / excedente 651 / racks 336 / a_guardar 100). Se
+> resetearon góndola, excedente y racks de `505I` y se cargó el conteo por sector
+> (`ref='conteo 505I 01-08'`). ⚠ Los `guardado` a **excedente** con `ubicacion` AD07/AD08/AD9
+> del 23 y 28/07 estaban mal de depósito: el operario guardó a racks y quedó como excedente.
+> **(b) Sectores `C15` y `C20`**: la planilla del conteo los trajo con el **código vacío** y 0
+> (fueron 4 de las filas salteadas); el dueño los pasó aparte → `587T` **81** (C20) y `581T`
+> **73** (C15), cargados. Queda pendiente `582T` 24 cj (C20): **ese código no existe** en el
+> maestro, ni en movimientos, ni en pedidos — el candidato es `502T` «Abrelata Mariposa Tira
+> Imp», que la planimetría ya ubica en C20 y es de la misma familia *Tira Imp* que 581T/587T.
+> **(c)** Quedan sin contar los sectores **`O1`/`O2`** (`441` 42 cj y `026` 86 cj en excedente).
+>
+> Nota (dato — **CONTEO DE EXCEDENTE, 01/08/2026**): mismo método que el de góndola
+> (`inicial` negativo de reset + `inicial` una fila por sector, sin tocar el cutoff).
+> Planilla `Conteo de Exedente.xlsx` (hoja "Excedente", encabezado en la **fila 2**), 52 filas,
+> **46 códigos / 1.593 cajas**, todos los totales cerrando. `ref='conteo excedente 01-08'` y
+> `ubicacion` = `"<sector> · <emp>"`. **31 de los 46 códigos coincidían exacto** con el sistema.
+> ⚠ **El excedente tiene TRES zonas y la planilla cubre sólo una**: **P1–P30** (contada),
+> **AD07/AD08/AD9** (sólo `505I`, 651 cj) y **O1/O2** (`441` 42 cj y `026` 86 cj). Los sectores
+> `O` y `AD` son los mismos que faltaron en el conteo de góndola, así que esos **tres códigos se
+> dejaron intactos** y el reset los excluye explícitamente. Sí fueron a 0 `229` (2, estaba en
+> P14) y `338` (1, estaba en P8): sus sectores se contaron y ya no figuran. Diferencias mayores:
+> `186` 15→92, `335` 6→47, `731` 238→202, `590E` 25→45, `613` 17→30, `723` 95→84.
+> Resultado: excedente **2.372** (1.593 del conteo + 651 `505I` + 86 `026` + 42 `441`), 49
+> artículos, 0 negativos, 0 descuadres contra la planilla.
+> ⚠ **Pendiente: nadie contó las zonas `O` y `AD`** (ni en góndola ni en excedente).
+>
+> Nota (**PLANIMETRÍA + saldos imposibles, 01/08/2026**). Tres cosas que salieron del conteo:
+> **(1) Planimetría — 10 códigos con stock no tenían ubicación** (el picking no los ubica y
+> dispara `PSP`): se cargaron en la **tabla Supabase `Planimetria`** (que `loadPlanimetriaRemote`
+> mergea sobre `planimetria.js` en cada arranque, `cache:"no-store"`) — **NO** se editó el `.js`,
+> que es **generado** desde el Excel "AAA_PPP_Vigente.xlsm" y perdería el cambio al regenerarse;
+> la tabla es la capa de correcciones (ya vivían ahí `335`, `948E`, `838E`). Cargados con el
+> sector del conteo y el orden interpolado del sector vecino: `120` Ñ50·291, `124E` Ñ30·286,
+> `554` A73·34, `563` A72·33, `702EN` M10·179, `727EN` L33·199, `809` M16·183, `828` L08·176,
+> `865ED` L57·266, `877E` M45·248. ⚠ Quedan **44 códigos pedidos sin ubicación**: 32 son la
+> familia **`…L`** (`031L`, `102EL`, `544L`, `951EL`…, 1.331 cajas) que nadie sabe qué es todavía,
+> más `55215`/`55289` (parecen typos), `574E`, `830`, `517` y `992E`–`999E`.
+> **(2) Pickeados fantasma**: `595` 1, `952E` 2, `957E` 2, `727EN` 1 figuraban en
+> `separar_pedidos` pero eran **faltantes** (el picking los descontó de góndola y no estaban;
+> `952E` y `957E` habían dejado la góndola en **negativo**). Se descontaron con `ajuste`
+> (+ `727E` +1, que cerraba el −1 de la reasignación). Lo demás en Pickeados son las tandas
+> **D14B** (30/07) y **D01E** (31/07), legítimas, esperando armado.
+> **(3) 7 saldos `a_facturar` NEGATIVOS (−189 cajas)** — `758` −55, `702EN` −52, `769` −49,
+> `727EN` −17, `439EL` −13, `877E` −2, `542` −1. **Causa única**: el **21/07** se hizo a mano
+> una *"limpieza residuo a_facturar"* de las NP **44482/44483** (Dorinka) con `tipo='ajuste'` y
+> `ref` = **texto descriptivo**; el **31/07** la **ETAPA 4** del cron drenó lo mismo otra vez,
+> porque agrupa por `split_part(ref,'|',1)` = número de NP y ese `ref` de texto **no matchea**
+> la NP → para el cron el bucket seguía positivo. Idem `542` con el cierre manual de la NP 97870.
+> **Es el mismo error que el de 546**: reparaciones a mano cuyo `ref` no encaja con la clave que
+> netea el cron. ⚠ **Regla para la próxima**: al corregir `a_facturar` de un CP, o usás
+> `ref = '<NP>|CP'` (que el cron reconoce y dedupea) o un `ref` de texto que **no empiece con el
+> número de NP** — nunca algo que el cron pueda contar a medias. Los 13 ajustes de esta nota
+> usan `ref` de texto a propósito, para no reactivar la ETAPA 4. Resultado: **0 saldos negativos
+> en toda la base** (verificado corriendo el cron después).
+>
+> Nota (dato — **CONTEO INICIAL DE GÓNDOLA, 01/08/2026**): se cargó el inventario físico
+> del depósito como nuevo baseline de `terminado`. Planilla del usuario `Conteo_2026.xlsx`
+> (hoja "Conteo 01-08"): `Emp · Sector · COD · Pilas · Cajas x Pila · Exced. Cajas · Total`,
+> 689 filas, **316 códigos / 28.652 cajas** (los totales cerraban: ninguna fila con
+> `Total ≠ Pilas×CxP + Exced`). **Cómo se cargó** (importante para la próxima vez): los
+> movimientos `tipo='inicial'` **siempre** cuentan, aun antes del cutoff, así que apilar un
+> conteo nuevo sobre el baseline viejo (26/06, 286 arts / 35.084 cajas) **duplicaría** todo;
+> y **"Marcar inicio"** (mover `cutoff_ts`) **no** servía porque es **global** y habría
+> reseteado también A guardar / A facturar / Pickeados / Excedente / Racks. Solución: (1) un
+> `inicial` **negativo por artículo** (`ref='reset previo conteo 01-08'`, 301 filas) que lleva
+> `terminado` a 0 leyendo el saldo de `vista_saldos_stock`, y (2) el conteo como `inicial`
+> **una fila por sector** (`ref='conteo 01-08'`, 529 filas) con **`ubicacion` = `"<sector> · <emp>"`**
+> (ej. `M13 · CH`). **Sin tocar el cutoff ni los otros depósitos.** **Mapeos de código**
+> confirmados por el dueño: `102→102E`, `106→106E`, `124→124E` (la línea LOKE se contó sin la
+> "E"; el resto — `101`,`103`,`104`,`108`… — no lleva E) y `865E→865ED`. `LIBRE` = sector
+> vacío (15), se excluye. `798E` es **sólo Chef**. **Decisiones**: todo lo no contado quedó en
+> **0** (typos `582`/`583`/`584` — ya había un fix igual "583→583E" el 30/06 —, fantasmas sin
+> movimientos desde junio `587T`/`502T`/`029`/`030`/`525`/`725`, y los negativos imposibles
+> `439EL` −15 / `830` −5 / `574E` −2), **excepto `505I`** (659 cj, con guardados reales de
+> +253 el 10/07 y +323 el 20/07): quedó **sin tocar** hasta verificar si es el mismo artículo
+> que `505`. Resultado: góndola **29.311** (28.652 del conteo + 659 de `505I`), 279 artículos
+> con stock, **0 saldos negativos**. ⚠ Pendientes de chequeo físico: **`106E`** (contado 173 vs
+> 1248 que decía el sistema) y **`505I`**. ⚠ Limitación conocida (idea **3197**): el stock es
+> **uno por código**, no por empresa — `437E`/`438E`/`439E`/`809E` existen en CH y LK a la vez
+> y se suman; la empresa sólo queda visible en `ubicacion`.
+>
+> Nota (dato — corrección manual de stock, 01/08): **"A facturar" inflado en 546 (14→3) y
+> 836 (5→0)**. Al preguntar de qué se componían esas cajas se encontraron dos causas
+> distintas. **(1) 546 — corrección aplicada DOS veces (11 cajas fantasma).** El
+> doble-facturado sintético del pipeline sobre C88A/C90A/C98A/C98B ya se había deshecho
+> (27/07 12:19 con un `ajuste +8` bajo el ref **combinado** `C88A/C90A`, y 28/07 12:18 con
+> `+2` C98A / `+1` C98B), pero el barrido global del 28/07 12:35 ("corrige facturado doble
+> … no puede quedar < 0", 364 filas / 137 artículos) lo volvió a sumar: **+1 C88A, +7 C90A,
+> +2 C98A, +1 C98B = 11**. Pasó porque ese barrido netea por tanda mirando sólo
+> `separado`+`facturado` (**ignora los `ajuste` previos**) y el +8 del 27/07 estaba bajo un
+> ref combinado que no matchea ninguna tanda. **546 fue el único artículo afectado** (el
+> único que ya tenía un "deshace" previo). ⚠ Ojo: **no es un bug del cron** —
+> `reconciliar_pipeline_stock()` (jobid 22) escribe con legajo `pipeline` y tiene su propio
+> dedup por tanda; estas filas son legajo `reconcilia`, de un script de reparación corrido a
+> mano. **La lección es para los scripts de reparación ad-hoc: netear incluyendo `ajuste`
+> antes de "corregir".** **(2) 836 — CP a una NP que nunca se facturó.** El 28/07 17:19
+> (legajo 104) un **CP** completó la NP **44500** (cliente 1768, tanda C86C, ya salida el
+> 22/07 con esas 5 cajas faltando) sacando 5 cajas de góndola → `a_facturar +5` `ref=44500`.
+> La NP nunca entró a `Facturacion_NP`, así que **ni el fast-path `stockDrenarCPFacturado`
+> ni la ETAPA 4 del cron la drenan** (ambos exigen NP facturada) y, al no estar más en el
+> PPP, quedaba colgada para siempre. El dueño confirmó que **las cajas volvieron a góndola**.
+> **Ajustes insertados** (legajo `ajuste`, `client_id` `fix_20260801_*`, imputados de modo
+> que cada bucket por tanda cierre en 0): 546 `a_facturar −11` (C88A/C90A/C98A/C98B), 836
+> `a_facturar −5` + `terminado +5` (ref 44500). Resultado: 546 a_facturar **3** (lo único
+> real: NP **98049** de C98F, armada el 28/07, lío B = 546×3, **sin facturar**), 836
+> a_facturar **0** / góndola **64**. Verificado corriendo el cron a mano después:
+> `etapa1=0 etapa2=0 etapa3=0 etapa4=0` (no re-inserta nada).
 > Nota: **v6.83 — Picking con LECTORA de código de barras (idea 8243) + fix del MG, TODO
 > detrás de un SWITCH**. Se mergeó a `main` (deploy) el trabajo del scanner y el arreglo del
 > MG. **⚠ Garantía pedida por el dueño: con el switch APAGADO (default) el picking funciona
