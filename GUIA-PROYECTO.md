@@ -6,6 +6,35 @@
 >
 > Última actualización: 2026-08-01 · Versión app al documentar: **v6.80**
 >
+> Nota (**PLANIMETRÍA + saldos imposibles, 01/08/2026**). Tres cosas que salieron del conteo:
+> **(1) Planimetría — 10 códigos con stock no tenían ubicación** (el picking no los ubica y
+> dispara `PSP`): se cargaron en la **tabla Supabase `Planimetria`** (que `loadPlanimetriaRemote`
+> mergea sobre `planimetria.js` en cada arranque, `cache:"no-store"`) — **NO** se editó el `.js`,
+> que es **generado** desde el Excel "AAA_PPP_Vigente.xlsm" y perdería el cambio al regenerarse;
+> la tabla es la capa de correcciones (ya vivían ahí `335`, `948E`, `838E`). Cargados con el
+> sector del conteo y el orden interpolado del sector vecino: `120` Ñ50·291, `124E` Ñ30·286,
+> `554` A73·34, `563` A72·33, `702EN` M10·179, `727EN` L33·199, `809` M16·183, `828` L08·176,
+> `865ED` L57·266, `877E` M45·248. ⚠ Quedan **44 códigos pedidos sin ubicación**: 32 son la
+> familia **`…L`** (`031L`, `102EL`, `544L`, `951EL`…, 1.331 cajas) que nadie sabe qué es todavía,
+> más `55215`/`55289` (parecen typos), `574E`, `830`, `517` y `992E`–`999E`.
+> **(2) Pickeados fantasma**: `595` 1, `952E` 2, `957E` 2, `727EN` 1 figuraban en
+> `separar_pedidos` pero eran **faltantes** (el picking los descontó de góndola y no estaban;
+> `952E` y `957E` habían dejado la góndola en **negativo**). Se descontaron con `ajuste`
+> (+ `727E` +1, que cerraba el −1 de la reasignación). Lo demás en Pickeados son las tandas
+> **D14B** (30/07) y **D01E** (31/07), legítimas, esperando armado.
+> **(3) 7 saldos `a_facturar` NEGATIVOS (−189 cajas)** — `758` −55, `702EN` −52, `769` −49,
+> `727EN` −17, `439EL` −13, `877E` −2, `542` −1. **Causa única**: el **21/07** se hizo a mano
+> una *"limpieza residuo a_facturar"* de las NP **44482/44483** (Dorinka) con `tipo='ajuste'` y
+> `ref` = **texto descriptivo**; el **31/07** la **ETAPA 4** del cron drenó lo mismo otra vez,
+> porque agrupa por `split_part(ref,'|',1)` = número de NP y ese `ref` de texto **no matchea**
+> la NP → para el cron el bucket seguía positivo. Idem `542` con el cierre manual de la NP 97870.
+> **Es el mismo error que el de 546**: reparaciones a mano cuyo `ref` no encaja con la clave que
+> netea el cron. ⚠ **Regla para la próxima**: al corregir `a_facturar` de un CP, o usás
+> `ref = '<NP>|CP'` (que el cron reconoce y dedupea) o un `ref` de texto que **no empiece con el
+> número de NP** — nunca algo que el cron pueda contar a medias. Los 13 ajustes de esta nota
+> usan `ref` de texto a propósito, para no reactivar la ETAPA 4. Resultado: **0 saldos negativos
+> en toda la base** (verificado corriendo el cron después).
+>
 > Nota (dato — **CONTEO INICIAL DE GÓNDOLA, 01/08/2026**): se cargó el inventario físico
 > del depósito como nuevo baseline de `terminado`. Planilla del usuario `Conteo_2026.xlsx`
 > (hoja "Conteo 01-08"): `Emp · Sector · COD · Pilas · Cajas x Pila · Exced. Cajas · Total`,
