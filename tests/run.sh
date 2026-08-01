@@ -78,7 +78,7 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== pk-scan (regresión v6.83 / idea 8243: lectora de código de barras detrás del switch) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pk-scan.cjs
 
-echo "== emp-np (regresión v6.84 / idea 9020: empresa por NP → sufijo LK/CH en el picking) =="
+echo "== emp-np (regresión v6.85 / idea 9020: empresa por NP → sufijo LK/CH en el picking) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/emp-np.cjs
 
 echo "== TODO OK =="

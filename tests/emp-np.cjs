@@ -13,6 +13,8 @@
       pedido. Si esto se rompe, el faltante no se le asigna a ninguna NP (silencioso).
    5. _pkItemCodes: la lectora de código de barras (idea 8243) escanea la etiqueta del
       slot, que dice "438E" pelado → el ítem partido acepta pelado Y con sufijo.
+   6. ocgDemanda(porEmpresa): CAJAS PEDIDAS de la tabla de Stock parte 809E por empresa;
+      el generador de OCs la sigue pidiendo PELADA (cruza contra OC_Maximos).
    Sale 1 si falla. */
 const path = require("path");
 let chromium;
@@ -28,11 +30,19 @@ catch (_e) {
   const errs = [];
   p.on("pageerror", (e) => errs.push(e.message));
   await p.goto("file://" + path.join(root, "index.html"), { waitUntil: "domcontentloaded" });
-  const r = await p.evaluate(() => {
+  const r = await p.evaluate(async () => {
+    // Stubs para la demanda (CAJAS PEDIDAS): una NP de Loeke (98049) y una de Chef (44519).
+    supaFetchAll = async (url) => (String(url).indexOf("PPP_Programacion") >= 0 ? [{ np: "98049" }, { np: "44519" }] : []);
+    fetchPickingBase = async () => new Map([
+      ["98049", [{ art: "809E", cajas: 5 }, { art: "546", cajas: 2 }]],
+      ["44519", [{ art: "809E", cajas: 3 }]]
+    ]);
     // Planimetría de prueba: 438E partido por empresa, 546 NO partido.
     window.GONDOLA = Object.assign({}, window.GONDOLA, {
-      "438E": ["F13", 104], "438E LK": ["F13", 104], "438E CH": ["L05", 174], "546": ["F45", 92]
+      "438E": ["F13", 104], "438E LK": ["F13", 104], "438E CH": ["L05", 174], "546": ["F45", 92],
+      "809E": ["M13", 182], "809E LK": ["J13", 127], "809E CH": ["M13", 182]
     });
+    const dem = { partida: await ocgDemanda(true), pelada: await ocgDemanda(false) };
     return {
       empLK:   empresaDeNp("98049"),
       empCH:   empresaDeNp("44519"),
@@ -54,7 +64,10 @@ catch (_e) {
       // 5. la lectora (idea 8243) escanea la etiqueta del slot, que dice "438E" pelado:
       //    el ítem partido tiene que aceptar los DOS códigos.
       scanCodes: _pkItemCodes({ art: "438E LK" }),
-      scanNum3: _pkNum3("438E LK")
+      scanNum3: _pkNum3("438E LK"),
+      // 6. CAJAS PEDIDAS de la tabla de Stock: la demanda se parte por empresa, pero
+      //    el generador de OCs la sigue viendo pelada (cruza contra OC_Maximos).
+      demanda: dem
     };
   });
   await b.close();
@@ -77,6 +90,12 @@ catch (_e) {
   if (!(r.scanCodes || []).includes("438E LK")) fail.push("_pkItemCodes: falta el código con sufijo");
   if (!(r.scanCodes || []).includes("438E")) fail.push("_pkItemCodes: falta el código PELADO (la lectora no encontraría el ítem)");
   eq("_pkNum3(438E LK)", r.scanNum3, "438");
+  const dP = (r.demanda && r.demanda.partida) || {}, dL = (r.demanda && r.demanda.pelada) || {};
+  eq("demanda partida: 809E LK (NP 98049)", dP["809E LK"], 5);
+  eq("demanda partida: 809E CH (NP 44519)", dP["809E CH"], 3);
+  if (dP["809E"] != null) fail.push("demanda partida: no debería quedar '809E' pelado, quedó " + dP["809E"]);
+  eq("demanda partida: código no partido (546)", dP["546"], 2);
+  eq("demanda PELADA (generador de OCs): 809E junta las dos", dL["809E"], 8);
   if (errs.length) fail.push("errores de página: " + errs.join(" | "));
   if (fail.length) { console.error("emp-np: FALLÓ\n  - " + fail.join("\n  - ")); process.exit(1); }
   console.log("emp-np: OK — empresa por NP, sufijo sólo si está partido, código pelado para el pedido.");

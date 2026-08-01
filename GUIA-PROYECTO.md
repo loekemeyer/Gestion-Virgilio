@@ -4,7 +4,18 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-01 · Versión app al documentar: **v6.84**
+> Última actualización: 2026-08-01 · Versión app al documentar: **v6.85**
+>
+> Nota: **v6.85 — la columna CAJAS PEDIDAS del Stock también parte por empresa**. Cola de
+> la idea 9020: el picking ya resolvía la empresa por NP, pero la demanda seguía saliendo del
+> pedido con el código **pelado**, así que `809E` sumaba en un solo número las cajas de *Corta
+> Queso* (Chef) y las de *Corta Pizza Familiar* (Loekemeyer) — dos productos distintos.
+> `ocgDemanda(porEmpresa)` toma ahora un flag: la **tabla de Stock** lo llama con `true` (la
+> demanda se agrupa por `pkCodEmpresa(art, np)`), y el **generador de OCs** lo sigue llamando
+> **sin** el flag a propósito, porque cruza la demanda contra `OC_Maximos`, donde el código
+> está pelado: partirla ahí haría que no encuentre el máximo y **pida de menos**. Los códigos
+> no partidos no cambian. `tests/emp-np.cjs` sube a 22 asserts (cubre las dos formas de la
+> demanda). Bump `APP_VERSION`/`SW_VERSION` `v6.85`.
 >
 > Nota: **v6.84 — idea 9020: la EMPRESA del pedido sale del número de NP y parte el
 > stock en el picking**. Cierra lo que quedó a medias en el split por empresa (idea 3197):

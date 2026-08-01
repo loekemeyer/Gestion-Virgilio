@@ -5718,7 +5718,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v6.84";
+const APP_VERSION = "v6.85";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -8776,7 +8776,7 @@ async function openStockAdmin(soloConteo) {
   ov.classList.add("show");
   ov.innerHTML = '<div class="stk-card"><div class="stk-head"><span class="stk-title">' + (_solo ? "📋 Conteo de stock" : "📦 Stock y Compras") + '</span><button class="stk-close" onclick="closeStockAdmin()">Cerrar</button></div><div class="stk-tabs" id="stkTabs"></div><div class="stk-body" id="stkBody"><div class="stk-loading">Cargando…</div></div></div>';
   try {
-    const res = await Promise.all([stockFetchMovs(), stockGetCutoff(), stockFetchArtFactors(), racksFetchOrdenes(), racksFetchBajadas(), loadArtNombres(), ocgDemanda().catch(function(){ return {}; }),
+    const res = await Promise.all([stockFetchMovs(), stockGetCutoff(), stockFetchArtFactors(), racksFetchOrdenes(), racksFetchBajadas(), loadArtNombres(), ocgDemanda(true).catch(function(){ return {}; }),   /* v6.85: demanda PARTIDA por empresa (809E CH ≠ 809E LK) */
       supaFetchAllSafe(SUPABASE_CAPACIDAD_ENDPOINT, "select=sector,cod,cajas_max"),
       fetch(SUPABASE_URL + "/rest/v1/Stock_Config?clave=in.(guardado_cajas_por_hora,guardado_incluir_racks)&select=clave,valor", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; }),
       (_solo ? Promise.resolve({ pend: {}, porArt: {} }) : stkFcsFetch().catch(function () { return { pend: {}, porArt: {} }; }))]);   // v6.70: FC s/Salida como columna
@@ -9069,7 +9069,14 @@ async function ocgFetchCapacidad() {
     return m;
   } catch (_e) { return {}; }
 }
-async function ocgDemanda() {
+/* v6.85 (idea 9020): `porEmpresa` parte la demanda por empresa usando la NP
+   (9=Loekemeyer, 4=Chef), igual que el picking. Lo usa la TABLA DE STOCK, para que
+   "CAJAS PEDIDAS" del `809E` no mezcle Corta Queso (Chef) con Corta Pizza Familiar
+   (Loekemeyer) — son productos distintos con el mismo código. El GENERADOR DE OCs
+   lo llama SIN el flag a propósito: cruza la demanda contra `OC_Maximos`, donde el
+   código está pelado, así que partirla ahí haría que no encuentre el máximo y pida
+   de menos. Los códigos no partidos no cambian (pkCodEmpresa los devuelve igual). */
+async function ocgDemanda(porEmpresa) {
   let ppp = [];
   try { ppp = await supaFetchAll(SUPABASE_PPP_PROG_ENDPOINT, "select=np"); } catch (_e) {}
   const npSet = {};
@@ -9086,7 +9093,7 @@ async function ocgDemanda() {
   try { base = await fetchPickingBase(); } catch (_e) {}
   const dem = {};
   Object.keys(npSet).forEach(function (np) {
-    (base.get(np) || []).forEach(function (it) { const a = _ocgNorm(it.art); if (a) dem[a] = (dem[a] || 0) + (Number(it.cajas) || 0); });
+    (base.get(np) || []).forEach(function (it) { const a = _ocgNorm(porEmpresa ? pkCodEmpresa(it.art, np) : it.art); if (a) dem[a] = (dem[a] || 0) + (Number(it.cajas) || 0); });
   });
   return dem;
 }
