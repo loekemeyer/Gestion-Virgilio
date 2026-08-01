@@ -4,9 +4,9 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-01 · Versión app al documentar: **v6.83**
+> Última actualización: 2026-08-01 · Versión app al documentar: **v6.84**
 >
-> Nota: **v6.83 — idea 9020: la EMPRESA del pedido sale del número de NP y parte el
+> Nota: **v6.84 — idea 9020: la EMPRESA del pedido sale del número de NP y parte el
 > stock en el picking**. Cierra lo que quedó a medias en el split por empresa (idea 3197):
 > ahí el código pelado se resolvía con una equivalencia **fija** por artículo, que acierta
 > la mayoría pero **falla en la minoría** (hay 71 cajas de `809E` pedidas por NPs de
@@ -29,8 +29,10 @@
 > matchea los códigos ya partidos. Tabla **`Planimetria`**: columna nueva **`empresa`**,
 > rellenada por sector desde los conteos del 01/08 (la calle Ñ es mixta: Ñ53/Ñ56/Ñ57/Ñ59
 > son de Chef). Las equivalencias fijas de la 3197 se **dejan como red de seguridad** para
-> cuando no se pueda resolver la empresa. Nuevo smoke `tests/emp-np.cjs` (14 asserts) en
-> `tests/run.sh`. Bump `APP_VERSION`/`SW_VERSION` `v6.83`.
+> cuando no se pueda resolver la empresa. Nuevo smoke `tests/emp-np.cjs` (17 asserts, incluye que la
+> **lectora** siga encontrando el ítem: `_pkItemCodes` acepta el código pelado además del
+> sufijado, porque la etiqueta del slot dice `438E` a secas) en `tests/run.sh` — de paso se
+> registró ahí `tests/pk-scan.cjs`, que había quedado sin correr en la suite. Bump `APP_VERSION`/`SW_VERSION` `v6.84` (la v6.83 se la llevó el merge del picking-scanner).
 >
 > Nota: **STOCK SEPARADO POR EMPRESA (01/08/2026)** — pedido del dueño. Hay códigos que
 > **significan productos distintos según la empresa**: el caso testigo es **`809E`**, que en el
@@ -175,6 +177,132 @@
 > real: NP **98049** de C98F, armada el 28/07, lío B = 546×3, **sin facturar**), 836
 > a_facturar **0** / góndola **64**. Verificado corriendo el cron a mano después:
 > `etapa1=0 etapa2=0 etapa3=0 etapa4=0` (no re-inserta nada).
+> Nota: **v6.83 — Picking con LECTORA de código de barras (idea 8243) + fix del MG, TODO
+> detrás de un SWITCH**. Se mergeó a `main` (deploy) el trabajo del scanner y el arreglo del
+> MG. **⚠ Garantía pedida por el dueño: con el switch APAGADO (default) el picking funciona
+> EXACTO como hoy** — las fns nuevas del scanner (`pkOnScan`, etc.) **sólo** se invocan desde
+> un listener keydown-wedge que corta en la 1ª línea si `!pkScanOn()`; ningún otro lado las
+> llama (verificado por grep). **El switch se prende desde DOS lugares**: el **módulo del
+> operador** (fila-toggle "🔫 Picking con lectora (piloto)" en la pantalla de inicio del
+> operario — `renderPendingSuggestion` → `_pkScanOperRow`, cuando hay legajo) y el **Print
+> Station** del supervisor; `pkScanToggle` refresca ambos. Flag `localStorage
+> vir_picking_scanner`. **Prendido**: cada lectura dispara la **misma** botonera del picking
+> (`pkOk` = todas / `pkF` = algunas) sobre el artículo que matchea; `ninguna` sigue en la
+> tablet. **Etiquetas EAN-13, dos por artículo** (esquema que definí): **TODO** =
+> `779558700`+NNN+verificador (mercadería completa → "agarré todas"); **FALTA** =
+> `779558701`+NNN+verificador (le falta algo → abre la tablet para completar, como "algunas").
+> `NNN` = parte numérica del código (943E→943); el verificador (mod-10) lo calcula la
+> impresora (ZPL `^BE`) / el algoritmo público. `pkOnScan` **decodifica el EAN** (`_pkNum3`,
+> `_pkDecodeEAN`, `_pkFindByNum3`) y resuelve el artículo por **contexto de la tanda** (para
+> NNN compartidos: 502/502T, 323/323E…); sigue leyendo el Code-128 `código|T/A` como fallback.
+> Fns nuevas: `pkScanOn/SetOn/Toggle`, `_pkItemCodes`, `_pkFindByCode`, `pkScanToast`.
+> Herramienta nueva **`tools/etiquetas-gondola.html`** = genera el **ZPL** EAN-13 (TODO/FALTA)
+> de las etiquetas de slot desde la planimetría, exporta **CSV** de los EAN y **marca las
+> colisiones de NNN**. Diseño completo (+ idea 5290 impresora/ensunchadora) en
+> **`docs/idea-picking-scanner-etiquetas.md`**. Smoke nuevo **`tests/pk-scan.cjs`**. **Fix del
+> MG** (mismo deploy): en el modal *Guardar a góndola* los inputs de cantidad eran
+> `type="number"`; como `mgRender` re-renderiza en **cada tecla** vía `_renderKeepFocus` y los
+> `number` **no exponen `selectionStart/End`**, el cursor volvía al inicio y los dígitos se
+> **antepondían** ("12" salía "21"). Se cambiaron a **`type="text" inputmode="numeric"`** →
+> se tipea normal (izq→der); `mgConfirmar` cierra el modal al enviar. Verificado: pk-scan +
+> mva-quien + checkhtml + version-sync + smoke **OK**. Bump `APP_VERSION`/`SW_VERSION`
+> **v6.83**. ⚠ Falta el **piloto con la lectora real** y la **idea 5290** (puente de impresión
+> + etiqueta por lío + ensunchadora).
+>
+> Nota (dato — corrección de stock, 31/07 cont.): **727E / 727EN** (Sacacorcho Doble Imp.). **727E**
+> → **0 en TODOS los depósitos** (conteo del dueño: `racks −36`, `separar_pedidos −1`, `terminado
+> −18`). **727EN** → góndola (`terminado`) **17→10** y **`separar_pedidos +1`** ("lo pickeado del
+> 727E es de 727EN" — estaba mal atribuido). ⚠ Queda `727EN a_facturar −17` (negativo raro) sin
+> tocar, a revisar aparte.
+>
+> Nota (dato — facturación, 31/07): **NP 98049 devuelta a "a FC"**. El pedido (Numida S.A., tanda
+> **C98F**, FC-ready: TP 07-28 09:20 + TAP 07-28 13:19; con lío TAL + PPP + Base_Pedidos) figuraba
+> **marcado facturado** en `Facturacion_NP` (07-28 16:52, cierre `8112d61e…`, fecha_salida 29/07)
+> **pero SIN comprobante ARCA** → fue un tilde/mark de la app (posible artefacto del pipeline), no
+> una factura fiscal. Por eso NO aparecía en *Facturación — NPs a FC* (el módulo excluye las que
+> están en `Facturacion_NP`). Se **borró la fila** (equivale a destildar) → vuelve a "a FC".
+> **Restaurable**: np 98049 · tanda C98F · cod_cliente 118 · facturado_at `2026-07-28 16:52:04.378`
+> · cierre_id `8112d61e-3641-4fa8-998a-6e660641a8fb` · m3 0.083 · fecha_salida 2026-07-29. **El
+> dueño confirmó que NO se facturó NI salió** (sin evento `CCN` → nunca despachada): además de la
+> fila de `Facturacion_NP` se **borraron las 7 filas `facturado` fantasma** (ref `C98F|98049`, ids
+> 17117-17123) que habían drenado el `a_facturar` → las **18 cajas vuelven a "A Facturar" en
+> stock** (501+3 · 502+4 · 513+4 · 535+1 · 546+3 · 555+1 · 816E+2). Se **borró** (no se reversó con
+> ajuste) para **liberar la clave de dedup** `(ref,cod,depósito,facturado)` — si no, al facturar
+> 98049 de verdad el drenaje de stock quedaría bloqueado. Con esto sale del cierre/reparto del
+> 29/07 (correcto: no salió).
+>
+> Nota (dato — corrección manual de stock + revisión, 31/07): **NP 97822 → 256 y 502**.
+> Revisión pedida por el dueño de los dos códigos que quedaron colgando de la reconstrucción
+> de la NP **97822** (tanda **C54B**, Superimperio S A; facturada 29/07, despachada 30/07,
+> ya cerrada). **256:** góndola (`terminado`) estaba en **−3**, un negativo imposible — sus
+> **únicos** movimientos son 3 pickings (C75A/C87C/C98B) que descontaron góndola **sin ninguna
+> recepción/guardado/inicial** que la acreditara; el pipeline ya estaba en 0 (la porción de la
+> 97822 se facturó/barrió el 29/07). Se insertó un **ajuste +3 en `terminado`** (legajo
+> `ajuste`, `client_id fix_256_gondola_neg_20260731`, id 19870) → góndola **−3 → 0**. ⚠ Si hay
+> stock físico real de 256, sumar otro ajuste tras contar (el 0 es sólo el piso: saca el
+> negativo imposible). **502** (Abrelatas Mariposa): **NO se tocó** — sus "remanentes en el
+> pipeline" (a_facturar C99H **+6** / C99J **+4**; separar_pedidos C99K **+4**) son **todos del
+> 31/07** = trabajo en curso normal (pickeado/armado sin facturar aún), no un cuelgue; la
+> porción de la 97822 ya neteó a 0. **Insumos 505C/CB01/523C/H201Lever → HECHO** (mismo
+> mensaje; decisión del dueño en el chat: **saldo en unidades** con el desglose "MC×UNI" como
+> dato en la descripción, bajo **códigos numéricos**). Se puso en 0 lo viejo (505C insumos
+> 168000, CB01 insumos 2950, 523C racks 240) y se cargó en `insumos` (unidad `Uni`,
+> ubicación=sector): **2955**=142000 (X20) · **4626**=2950 (N7) · **1685**=6000 (W1) ·
+> **2815**=26400 (O1; Cabezal Importado, confirmado **distinto** del Espiral 2805). Quedan
+> aparte los negativos compuestos `505C·CUCHILLA CHINA` (−16000/−6) y `523C·CREMALLERA`
+> (−30 MC) = sub-ledger de entregas, cleanup separado. Propuesta **2769** → hecha.
+>
+> Nota (dato — lock huérfano, 31/07): **tanda D01A "pickeando" fantasma**. D01A figuraba como
+> *pickeando por el legajo 122* (Adrian Villalba) pero **no se había pickeado nada**: había un
+> **lock en `Tandas_Lock`** (fase picking, 122, 12:00:34) **sin ningún evento** EP/PKC/TP ni
+> movimiento de stock (la agarró, no la pickeó, y a las 13:30 pasó a armar C99K). Los locks se
+> auto-expiran a las **+10h**, pero éste tenía ~2h → seguía bloqueando. Se **borró el lock** de
+> D01A (queda libre para pickear). ⚠ Quedan 2 locks de **legajo 999** (sistema/test) <10h —
+> C72F picking y D11X armado — que también podrían ser fantasma; no se tocaron.
+>
+> Nota (dato — baja de stock, 31/07): **14 insumos FLEJE/ALAMBRE dados de baja** (pedido del
+> dueño: "los art con ese cod dar de baja el stock"). Códigos compuestos (`nombre·medida`) con
+> nombres fragmentados (FLEJES **CHEF** / **LOEKE** / **LOEKEMEYER** para la misma familia) y
+> separador decimal mezclado (`1.00` vs `1,00`) — todos puestos en **saldo 0** con un `ajuste`
+> −saldo por código (legajo `ajuste`, `client_id baja_*`, en la unidad original). Bajados:
+> ALAMBRE LARGO·11 (110 Kg) · FLEJE ESPIRAL·1 (46 Kg) · FLEJE PROLIPROPILENO·SUNCHOS 12 MM
+> (9 u) · FLEJE·11.00 X 0.90 (8750 u) · FLEJE·91 X 1,75 (258 Kg) · FLEJES CHEF·1.00 X 121 (112) ·
+> ·1.00 X 84 (154) · ·1.50 X 132 (165) · ·1.50 X 84 (155 Kg) · FLEJES LOEKE·1,00 X 121 (335) ·
+> ·1.00 X 84 (315) · ·1.50 X 132 (583 Kg) · FLEJES LOEKEMEYER·0.80 X 64 (161 Kg) · ·1.50 X 84
+> (922). Reversible (event-sourced): reponer = `ajuste` +saldo si fue error. **Además** se dio
+> de baja **1266500** ("Abs", 850 Kg + 13 en unidad "325"/"Avc") → 0. **863** (*Corta Pizza
+> Grande*, **producto de VENTA** con góndola 26 + excedente 25) y el código **ABS** (18 Bolsas /
+> −6 Uni): el dueño confirmó **NO darlos de baja** → quedan **intactos**.
+>
+> Nota (dato — descripciones + recodificación de insumos, 31/07): **(a)** Descripciones a códigos
+> de partes que estaban sin nombre (UPDATE de `descripcion` en `Movimientos_Stock`, no afecta
+> saldos): **942P** Parte Cuchara Ac. Inox · **943P** Parte Cucharon Ac. Inox · **944P** Parte
+> Cuchara Fideos Ac. Inox · **945P** Parte Espátula Calada Ac. Inox · **948P** Parte Espumadera
+> Ac. Inox · **967H** Mango Bambu. **(b)** Recodificación de insumos de alambre (UPDATE `cod_art`,
+> se guarda la forma **canónica** sin ceros a la izq porque el trigger `fn_canon_cod_art`
+> normaliza `0605`→`605`): **1062500 → 605** ("60 x 2.1", 664 Kg) · **1071500 → 695** ("11 x 0.9",
+> 337 Kg). ⚠ **1060500 → 0565 NO se hizo**: `0565` canoniza a **565** = **"Pinza De Hielo"**,
+> producto de VENTA activo en `OC_Maximos` — renombrar ahí fusionaría el alambre con el producto.
+> **Decisión del dueño:** al ver que en Virgilio el `0` no distingue (`0565`=`565`), **dejar
+> 1060500 con su código actual** (no se renombra). Mismatch conocido: la convención del dueño
+> usa el cero a la izquierda como significativo; Virgilio lo saca (fix histórico 66/066). **(c)**
+> Renombrados los mangos (eran códigos por nombre): **MANGO NEGRO PELADOR → 4496** ("Mango Pelador
+> Ergonómico Negro", 8750) y **MANGO ROJO PELADOR → 666** (pedido "0666"; queda `666` por la misma
+> normalización, "Mango Pelador 505 Rojo", 27000). **(d)** Art **727** dado de baja ("no existe"):
+> tenía góndola **7** de una recepción errónea (remito 38481, guardada por leg 104 el 10/07);
+> `ajuste terminado −7` → 0 (`client_id baja_727_noexiste_20260731`, reversible). ⏳ Si se quiere
+> **borrar las filas** del todo (no solo dejar en 0), avisar.
+>
+> Nota (dato — ubicación + consolidación + góndola, 31/07): **(a)** Ubicación **948E → I11**
+> (orden 186) escrita en la tabla `Planimetria` (antes solo estaba en la planimetría estática
+> `planimetria.js`; la familia 94xE/95xE es reciente y podía figurar "sin planimetría" en la app
+> desplegada). **(b)** Consolidados los duplicados de partes: **942P·942P → 942P** · **943P·943P →
+> 943P** · **944P·944P → 944P** · **945P·945P → 945P** · **948P·948P → 948P** (UPDATE `cod_art` +
+> descripción buena — el compuesto traía la desc corta "942P" que le ganaba a "Parte Cuchara…" en
+> la vista). Cada compuesto era `insumos MC −2`; ahora quedan bajo un solo código. **(c)**
+> Corrección de góndola (`terminado`) por conteo físico: **702** 60→**0** · **702E** 110→**97** ·
+> **702EN** **−36**→**20** (ajustes `terminado`; el 702EN sacaba un negativo imposible). ⚠ Fuera
+> del pedido, quedó sin tocar el **702EN `a_facturar` −52** — anomalía aparte a revisar.
 >
 > Nota: **v6.80 — Abastecimiento: se sacó el intro y los títulos quedan fijos**. Se eliminó
 > el párrafo de explicación (la nota de importados excluidos pasó al headline). La tabla ahora

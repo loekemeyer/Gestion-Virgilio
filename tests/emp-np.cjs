@@ -1,4 +1,4 @@
-/* Test de regresión (v6.83, idea 9020): el picking tiene que partir por EMPRESA los
+/* Test de regresión (v6.84, idea 9020): el picking tiene que partir por EMPRESA los
    códigos cuyo stock está separado ("438E LK" / "438E CH"), usando el número de NP
    para decidir (>90000 = Loekemeyer, si no Chef). Es lo que hace que el descuento de
    stock caiga en el saldo correcto y que el operario vea el sector de SU empresa.
@@ -11,6 +11,8 @@
       (faltantes, Entregas_Virgilio), que siempre habla en código pelado.
    4. _compMatchArt: un faltante de "438E LK" tiene que matchear la línea "438E" del
       pedido. Si esto se rompe, el faltante no se le asigna a ninguna NP (silencioso).
+   5. _pkItemCodes: la lectora de código de barras (idea 8243) escanea la etiqueta del
+      slot, que dice "438E" pelado → el ítem partido acepta pelado Y con sufijo.
    Sale 1 si falla. */
 const path = require("path");
 let chromium;
@@ -48,7 +50,11 @@ catch (_e) {
       base3: codBase("438E"),
       base4: codBase("546"),
       matchFaltante: _compMatchArt("438E", "438E LK"),
-      matchDistinto: _compMatchArt("437E", "438E LK")
+      matchDistinto: _compMatchArt("437E", "438E LK"),
+      // 5. la lectora (idea 8243) escanea la etiqueta del slot, que dice "438E" pelado:
+      //    el ítem partido tiene que aceptar los DOS códigos.
+      scanCodes: _pkItemCodes({ art: "438E LK" }),
+      scanNum3: _pkNum3("438E LK")
     };
   });
   await b.close();
@@ -68,6 +74,9 @@ catch (_e) {
   eq("codBase(546)", r.base4, "546");
   eq("_compMatchArt(pedido 438E, faltante 438E LK)", r.matchFaltante, true);
   eq("_compMatchArt(437E vs 438E LK)", r.matchDistinto, false);
+  if (!(r.scanCodes || []).includes("438E LK")) fail.push("_pkItemCodes: falta el código con sufijo");
+  if (!(r.scanCodes || []).includes("438E")) fail.push("_pkItemCodes: falta el código PELADO (la lectora no encontraría el ítem)");
+  eq("_pkNum3(438E LK)", r.scanNum3, "438");
   if (errs.length) fail.push("errores de página: " + errs.join(" | "));
   if (fail.length) { console.error("emp-np: FALLÓ\n  - " + fail.join("\n  - ")); process.exit(1); }
   console.log("emp-np: OK — empresa por NP, sufijo sólo si está partido, código pelado para el pedido.");
