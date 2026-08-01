@@ -4,7 +4,17 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-07-31 · Versión app al documentar: **v6.76**
+> Última actualización: 2026-07-31 · Versión app al documentar: **v6.77**
+>
+> Nota: **v6.77 — El switch del scanner también se prende desde el MÓDULO DEL OPERADOR** (+ deploy
+> a main). Pedido del dueño: poder prender el piloto desde el **celu del operario**, no solo desde
+> el Print Station del supervisor. Se agregó una fila-toggle "🔫 Picking con lectora (piloto)" en
+> la **pantalla de inicio del operador** (`renderPendingSuggestion` → `_pkScanOperRow`, cuando hay
+> legajo). **Reconfirmado (pedido explícito): con el switch OFF no corre NADA nuevo** — las fns del
+> scanner (`pkOnScan`, etc.) **sólo** se invocan desde el listener, que corta en la 1ª línea si
+> `!pkScanOn()`; ningún otro lado las llama (verificado por grep). `pkScanToggle` refresca los dos
+> toggles. Verificado: pk-scan + mva-quien + checkhtml + version-sync OK. Bump v6.77. **Se mergeó
+> la rama a `main` (deploy)** con OK del dueño.
 >
 > Nota: **v6.76 — Picking scanner: decode de EAN-13 (dos códigos por artículo: TODO / FALTA)**.
 > Sobre v6.75, el dueño decidió usar **EAN-13** en las etiquetas de slot. Esquema (yo lo definí):

@@ -4581,6 +4581,7 @@ function renderPendingSuggestion(){
   const box = ensurePendingSuggestionContainer();
   box.innerHTML = "";
   if(!legajo) return;
+  _pkScanOperRow(box);   // switch del scanner (piloto), accesible desde el módulo del operador
 
   // (−2) "Che, ayer te quedó esto SIN CERRAR": tareas (picking/armado) que quedaron
   // ABIERTAS de un día anterior. Así saben qué les quedó mal y lo terminan si fue sin
@@ -5708,7 +5709,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v6.76";
+const APP_VERSION = "v6.77";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -7289,7 +7290,23 @@ function pkF() { if (_pk) { _pk.mode = "fInput"; pkRender(); } }
    Detalle: docs/idea-picking-scanner-etiquetas.md. ===== */
 function pkScanOn() { try { return localStorage.getItem("vir_picking_scanner") === "1"; } catch (_e) { return false; } }
 function pkScanSetOn(v) { try { localStorage.setItem("vir_picking_scanner", v ? "1" : "0"); } catch (_e) {} }
-function pkScanToggle() { pkScanSetOn(!pkScanOn()); try { if (typeof psRender === "function") psRender(); } catch (_e) {} }
+function pkScanToggle() { pkScanSetOn(!pkScanOn()); try { if (typeof psRender === "function") psRender(); } catch (_e) {} try { if (typeof renderPendingSuggestion === "function") renderPendingSuggestion(); } catch (_e) {} }
+/* Fila del switch del scanner para el MÓDULO DEL OPERADOR (se prende desde el celu
+   del operario, no solo desde el Print Station). Sólo dibuja el toggle; el modo
+   scanner en sí sigue 100% gateado por `pkScanOn()`. */
+function _pkScanOperRow(box) {
+  try {
+    const on = (typeof pkScanOn === "function") && pkScanOn();
+    const row = document.createElement("div");
+    row.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:10px;background:" + (on ? "#ecfdf5" : "#f8fafc") + ";border:1px solid " + (on ? "#16a34a" : "#cbd5e1") + ";border-radius:11px;padding:8px 12px;margin:8px 0;font-size:13px;color:#334155;line-height:1.3;";
+    row.innerHTML = '<span>🔫 <b>Picking con lectora</b> <small style="opacity:.7">(piloto)</small><br><small style="opacity:.7">' + (on ? "Activo — disparás en vez de tocar" : "Apagado — picking normal, igual que hoy") + '</small></span>';
+    const sw = document.createElement("span");
+    sw.className = "sup-sw" + (on ? " on" : ""); sw.setAttribute("role", "switch");
+    sw.innerHTML = '<span class="sup-sw-k"></span>';
+    sw.onclick = function () { try { pkScanToggle(); } catch (_e) {} };
+    row.appendChild(sw); box.appendChild(row);
+  } catch (_e) {}
+}
 function _pkItemCodes(it) {
   const out = [];
   [it.art, it.real, it.pick].forEach(function (c) { if (c) out.push(String(c).toUpperCase().trim()); });
