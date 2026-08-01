@@ -6,6 +6,32 @@
 >
 > Última actualización: 2026-08-01 · Versión app al documentar: **v6.80**
 >
+> Nota (dato — **CONTEO INICIAL DE GÓNDOLA, 01/08/2026**): se cargó el inventario físico
+> del depósito como nuevo baseline de `terminado`. Planilla del usuario `Conteo_2026.xlsx`
+> (hoja "Conteo 01-08"): `Emp · Sector · COD · Pilas · Cajas x Pila · Exced. Cajas · Total`,
+> 689 filas, **316 códigos / 28.652 cajas** (los totales cerraban: ninguna fila con
+> `Total ≠ Pilas×CxP + Exced`). **Cómo se cargó** (importante para la próxima vez): los
+> movimientos `tipo='inicial'` **siempre** cuentan, aun antes del cutoff, así que apilar un
+> conteo nuevo sobre el baseline viejo (26/06, 286 arts / 35.084 cajas) **duplicaría** todo;
+> y **"Marcar inicio"** (mover `cutoff_ts`) **no** servía porque es **global** y habría
+> reseteado también A guardar / A facturar / Pickeados / Excedente / Racks. Solución: (1) un
+> `inicial` **negativo por artículo** (`ref='reset previo conteo 01-08'`, 301 filas) que lleva
+> `terminado` a 0 leyendo el saldo de `vista_saldos_stock`, y (2) el conteo como `inicial`
+> **una fila por sector** (`ref='conteo 01-08'`, 529 filas) con **`ubicacion` = `"<sector> · <emp>"`**
+> (ej. `M13 · CH`). **Sin tocar el cutoff ni los otros depósitos.** **Mapeos de código**
+> confirmados por el dueño: `102→102E`, `106→106E`, `124→124E` (la línea LOKE se contó sin la
+> "E"; el resto — `101`,`103`,`104`,`108`… — no lleva E) y `865E→865ED`. `LIBRE` = sector
+> vacío (15), se excluye. `798E` es **sólo Chef**. **Decisiones**: todo lo no contado quedó en
+> **0** (typos `582`/`583`/`584` — ya había un fix igual "583→583E" el 30/06 —, fantasmas sin
+> movimientos desde junio `587T`/`502T`/`029`/`030`/`525`/`725`, y los negativos imposibles
+> `439EL` −15 / `830` −5 / `574E` −2), **excepto `505I`** (659 cj, con guardados reales de
+> +253 el 10/07 y +323 el 20/07): quedó **sin tocar** hasta verificar si es el mismo artículo
+> que `505`. Resultado: góndola **29.311** (28.652 del conteo + 659 de `505I`), 279 artículos
+> con stock, **0 saldos negativos**. ⚠ Pendientes de chequeo físico: **`106E`** (contado 173 vs
+> 1248 que decía el sistema) y **`505I`**. ⚠ Limitación conocida (idea **3197**): el stock es
+> **uno por código**, no por empresa — `437E`/`438E`/`439E`/`809E` existen en CH y LK a la vez
+> y se suman; la empresa sólo queda visible en `ubicacion`.
+>
 > Nota (dato — corrección manual de stock, 01/08): **"A facturar" inflado en 546 (14→3) y
 > 836 (5→0)**. Al preguntar de qué se componían esas cajas se encontraron dos causas
 > distintas. **(1) 546 — corrección aplicada DOS veces (11 cajas fantasma).** El
