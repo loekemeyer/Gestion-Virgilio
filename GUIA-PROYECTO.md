@@ -6,6 +6,21 @@
 >
 > Última actualización: 2026-08-01 · Versión app al documentar: **v6.80**
 >
+> Nota (dato — **505I resuelto + C15/C20, 01/08/2026**). **(a) La zona `AD` es RACKS**, no
+> góndola ni excedente — por eso `505I` no aparecía en ninguno de los dos conteos y venía
+> arrastrando saldos en los tres depósitos. Composición real dada por el dueño: **racks
+> AD07 420 · AD08 490 · AD09 400 = 1.310**, más **a_guardar 100** → **total 1.410** (el sistema
+> tenía 1.746 repartidas en góndola 659 / excedente 651 / racks 336 / a_guardar 100). Se
+> resetearon góndola, excedente y racks de `505I` y se cargó el conteo por sector
+> (`ref='conteo 505I 01-08'`). ⚠ Los `guardado` a **excedente** con `ubicacion` AD07/AD08/AD9
+> del 23 y 28/07 estaban mal de depósito: el operario guardó a racks y quedó como excedente.
+> **(b) Sectores `C15` y `C20`**: la planilla del conteo los trajo con el **código vacío** y 0
+> (fueron 4 de las filas salteadas); el dueño los pasó aparte → `587T` **81** (C20) y `581T`
+> **73** (C15), cargados. Queda pendiente `582T` 24 cj (C20): **ese código no existe** en el
+> maestro, ni en movimientos, ni en pedidos — el candidato es `502T` «Abrelata Mariposa Tira
+> Imp», que la planimetría ya ubica en C20 y es de la misma familia *Tira Imp* que 581T/587T.
+> **(c)** Quedan sin contar los sectores **`O1`/`O2`** (`441` 42 cj y `026` 86 cj en excedente).
+>
 > Nota (dato — **CONTEO DE EXCEDENTE, 01/08/2026**): mismo método que el de góndola
 > (`inicial` negativo de reset + `inicial` una fila por sector, sin tocar el cutoff).
 > Planilla `Conteo de Exedente.xlsx` (hoja "Excedente", encabezado en la **fila 2**), 52 filas,
