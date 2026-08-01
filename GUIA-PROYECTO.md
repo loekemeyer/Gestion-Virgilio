@@ -6,6 +6,21 @@
 >
 > Última actualización: 2026-08-01 · Versión app al documentar: **v6.80**
 >
+> Nota (dato — **CONTEO DE EXCEDENTE, 01/08/2026**): mismo método que el de góndola
+> (`inicial` negativo de reset + `inicial` una fila por sector, sin tocar el cutoff).
+> Planilla `Conteo de Exedente.xlsx` (hoja "Excedente", encabezado en la **fila 2**), 52 filas,
+> **46 códigos / 1.593 cajas**, todos los totales cerrando. `ref='conteo excedente 01-08'` y
+> `ubicacion` = `"<sector> · <emp>"`. **31 de los 46 códigos coincidían exacto** con el sistema.
+> ⚠ **El excedente tiene TRES zonas y la planilla cubre sólo una**: **P1–P30** (contada),
+> **AD07/AD08/AD9** (sólo `505I`, 651 cj) y **O1/O2** (`441` 42 cj y `026` 86 cj). Los sectores
+> `O` y `AD` son los mismos que faltaron en el conteo de góndola, así que esos **tres códigos se
+> dejaron intactos** y el reset los excluye explícitamente. Sí fueron a 0 `229` (2, estaba en
+> P14) y `338` (1, estaba en P8): sus sectores se contaron y ya no figuran. Diferencias mayores:
+> `186` 15→92, `335` 6→47, `731` 238→202, `590E` 25→45, `613` 17→30, `723` 95→84.
+> Resultado: excedente **2.372** (1.593 del conteo + 651 `505I` + 86 `026` + 42 `441`), 49
+> artículos, 0 negativos, 0 descuadres contra la planilla.
+> ⚠ **Pendiente: nadie contó las zonas `O` y `AD`** (ni en góndola ni en excedente).
+>
 > Nota (**PLANIMETRÍA + saldos imposibles, 01/08/2026**). Tres cosas que salieron del conteo:
 > **(1) Planimetría — 10 códigos con stock no tenían ubicación** (el picking no los ubica y
 > dispara `PSP`): se cargaron en la **tabla Supabase `Planimetria`** (que `loadPlanimetriaRemote`
