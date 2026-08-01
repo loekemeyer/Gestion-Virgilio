@@ -4,7 +4,34 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-07-31 · Versión app al documentar: **v6.80**
+> Última actualización: 2026-08-01 · Versión app al documentar: **v6.80**
+>
+> Nota (dato — corrección manual de stock, 01/08): **"A facturar" inflado en 546 (14→3) y
+> 836 (5→0)**. Al preguntar de qué se componían esas cajas se encontraron dos causas
+> distintas. **(1) 546 — corrección aplicada DOS veces (11 cajas fantasma).** El
+> doble-facturado sintético del pipeline sobre C88A/C90A/C98A/C98B ya se había deshecho
+> (27/07 12:19 con un `ajuste +8` bajo el ref **combinado** `C88A/C90A`, y 28/07 12:18 con
+> `+2` C98A / `+1` C98B), pero el barrido global del 28/07 12:35 ("corrige facturado doble
+> … no puede quedar < 0", 364 filas / 137 artículos) lo volvió a sumar: **+1 C88A, +7 C90A,
+> +2 C98A, +1 C98B = 11**. Pasó porque ese barrido netea por tanda mirando sólo
+> `separado`+`facturado` (**ignora los `ajuste` previos**) y el +8 del 27/07 estaba bajo un
+> ref combinado que no matchea ninguna tanda. **546 fue el único artículo afectado** (el
+> único que ya tenía un "deshace" previo). ⚠ Ojo: **no es un bug del cron** —
+> `reconciliar_pipeline_stock()` (jobid 22) escribe con legajo `pipeline` y tiene su propio
+> dedup por tanda; estas filas son legajo `reconcilia`, de un script de reparación corrido a
+> mano. **La lección es para los scripts de reparación ad-hoc: netear incluyendo `ajuste`
+> antes de "corregir".** **(2) 836 — CP a una NP que nunca se facturó.** El 28/07 17:19
+> (legajo 104) un **CP** completó la NP **44500** (cliente 1768, tanda C86C, ya salida el
+> 22/07 con esas 5 cajas faltando) sacando 5 cajas de góndola → `a_facturar +5` `ref=44500`.
+> La NP nunca entró a `Facturacion_NP`, así que **ni el fast-path `stockDrenarCPFacturado`
+> ni la ETAPA 4 del cron la drenan** (ambos exigen NP facturada) y, al no estar más en el
+> PPP, quedaba colgada para siempre. El dueño confirmó que **las cajas volvieron a góndola**.
+> **Ajustes insertados** (legajo `ajuste`, `client_id` `fix_20260801_*`, imputados de modo
+> que cada bucket por tanda cierre en 0): 546 `a_facturar −11` (C88A/C90A/C98A/C98B), 836
+> `a_facturar −5` + `terminado +5` (ref 44500). Resultado: 546 a_facturar **3** (lo único
+> real: NP **98049** de C98F, armada el 28/07, lío B = 546×3, **sin facturar**), 836
+> a_facturar **0** / góndola **64**. Verificado corriendo el cron a mano después:
+> `etapa1=0 etapa2=0 etapa3=0 etapa4=0` (no re-inserta nada).
 >
 > Nota: **v6.80 — Abastecimiento: se sacó el intro y los títulos quedan fijos**. Se eliminó
 > el párrafo de explicación (la nota de importados excluidos pasó al headline). La tabla ahora
