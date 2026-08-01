@@ -4590,6 +4590,7 @@ function renderPendingSuggestion(){
   const box = ensurePendingSuggestionContainer();
   box.innerHTML = "";
   if(!legajo) return;
+  _pkScanOperRow(box);   // switch del scanner (piloto), accesible desde el módulo del operador
 
   // (−2) "Che, ayer te quedó esto SIN CERRAR": tareas (picking/armado) que quedaron
   // ABIERTAS de un día anterior. Así saben qué les quedó mal y lo terminan si fue sin
@@ -5717,7 +5718,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v6.82";
+const APP_VERSION = "v6.83";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -7290,6 +7291,117 @@ function pkSinStock() {
   pkAdvance();
 }
 function pkF() { if (_pk) { _pk.mode = "fInput"; pkRender(); } }
+/* ===== Picking con LECTORA de código de barras (idea 8243) — TODO detrás del switch
+   `vir_picking_scanner`. Switch OFF (default) = el picking funciona EXACTO como hoy:
+   la 1ª línea de cada handler/listener corta, no se bindea ni corre nada. Switch ON =
+   cada disparo de la lectora dispara la MISMA botonera (pkOk/pkF) sobre el artículo que
+   matchea el código escaneado. Barcode Code-128 `CÓDIGO|T` (todas) / `CÓDIGO|A` (algunas).
+   Detalle: docs/idea-picking-scanner-etiquetas.md. ===== */
+function pkScanOn() { try { return localStorage.getItem("vir_picking_scanner") === "1"; } catch (_e) { return false; } }
+function pkScanSetOn(v) { try { localStorage.setItem("vir_picking_scanner", v ? "1" : "0"); } catch (_e) {} }
+function pkScanToggle() { pkScanSetOn(!pkScanOn()); try { if (typeof psRender === "function") psRender(); } catch (_e) {} try { if (typeof renderPendingSuggestion === "function") renderPendingSuggestion(); } catch (_e) {} }
+/* Fila del switch del scanner para el MÓDULO DEL OPERADOR (se prende desde el celu
+   del operario, no solo desde el Print Station). Sólo dibuja el toggle; el modo
+   scanner en sí sigue 100% gateado por `pkScanOn()`. */
+function _pkScanOperRow(box) {
+  try {
+    const on = (typeof pkScanOn === "function") && pkScanOn();
+    const row = document.createElement("div");
+    row.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:10px;background:" + (on ? "#ecfdf5" : "#f8fafc") + ";border:1px solid " + (on ? "#16a34a" : "#cbd5e1") + ";border-radius:11px;padding:8px 12px;margin:8px 0;font-size:13px;color:#334155;line-height:1.3;";
+    row.innerHTML = '<span>🔫 <b>Picking con lectora</b> <small style="opacity:.7">(piloto)</small><br><small style="opacity:.7">' + (on ? "Activo — disparás en vez de tocar" : "Apagado — picking normal, igual que hoy") + '</small></span>';
+    const sw = document.createElement("span");
+    sw.className = "sup-sw" + (on ? " on" : ""); sw.setAttribute("role", "switch");
+    sw.innerHTML = '<span class="sup-sw-k"></span>';
+    sw.onclick = function () { try { pkScanToggle(); } catch (_e) {} };
+    row.appendChild(sw); box.appendChild(row);
+  } catch (_e) {}
+}
+function _pkItemCodes(it) {
+  const out = [];
+  [it.art, it.real, it.pick].forEach(function (c) { if (c) out.push(String(c).toUpperCase().trim()); });
+  if (it.dual) { if (it.dual.nac) out.push(String(it.dual.nac).toUpperCase().trim()); if (it.dual.imp) out.push(String(it.dual.imp).toUpperCase().trim()); }
+  return out;
+}
+function _pkFindByCode(code) {
+  if (!_pk) return -1;
+  const C = String(code).toUpperCase().trim(); if (!C) return -1;
+  const cur = _pk.items[_pk.idx];
+  if (cur && !cur.skip && _pk.results[cur.key] == null && _pkItemCodes(cur).indexOf(C) >= 0) return _pk.idx;
+  for (let i = 0; i < _pk.items.length; i++) { const it = _pk.items[i]; if (it.skip || _pk.results[it.key] != null) continue; if (_pkItemCodes(it).indexOf(C) >= 0) return i; }
+  for (let i = 0; i < _pk.items.length; i++) { const it = _pk.items[i]; if (it.skip) continue; if (_pkItemCodes(it).indexOf(C) >= 0) return i; }
+  return -1;
+}
+/* EAN interno (idea 8243): 13 dígitos = `77955870` + marcador + NNN(3) + verificador.
+   marcador 0 = TODO (mercadería completa) · 1 = FALTA (le falta algo → completar en tablet).
+   NNN = parte numérica del código (943E→943). El verificador (mod-10) no se usa para
+   decodificar (lo valida la lectora); se genera con el algoritmo público al imprimir. */
+function _pkNum3(code) { const d = String(code == null ? "" : code).replace(/\D/g, ""); return d ? d.slice(-3).padStart(3, "0") : ""; }
+function _pkDecodeEAN(s) {
+  const m = String(s == null ? "" : s).replace(/\D/g, "");
+  if (m.length !== 13 || m.slice(0, 8) !== "77955870") return null;
+  const marker = m[8];
+  if (marker !== "0" && marker !== "1") return null;
+  return { nnn: m.slice(9, 12), accion: (marker === "1" ? "A" : "T") };
+}
+function _pkFindByNum3(nnn) {
+  if (!_pk || !nnn) return -1;
+  const has = function (it) { return _pkItemCodes(it).some(function (c) { return _pkNum3(c) === nnn; }); };
+  const cur = _pk.items[_pk.idx];
+  if (cur && !cur.skip && _pk.results[cur.key] == null && has(cur)) return _pk.idx;
+  for (let i = 0; i < _pk.items.length; i++) { const it = _pk.items[i]; if (it.skip || _pk.results[it.key] != null) continue; if (has(it)) return i; }
+  for (let i = 0; i < _pk.items.length; i++) { const it = _pk.items[i]; if (it.skip) continue; if (has(it)) return i; }
+  return -1;
+}
+function pkOnScan(raw) {
+  if (!_pk) return;
+  const raw0 = String(raw || "").trim(); if (!raw0) return;
+  // 1) EAN interno (779558700 = todo / 779558701 = falta)
+  const ean = _pkDecodeEAN(raw0);
+  if (ean) {
+    const eidx = _pkFindByNum3(ean.nnn);
+    if (eidx < 0) { pkScanToast("✕ EAN …" + ean.nnn + " — no está en esta tanda", false); return; }
+    _pk.idx = eidx; _pk.mode = "item";
+    const eit = _pk.items[eidx];
+    const enom = eit.real || eit.pick || eit.art;
+    if (ean.accion === "A") { pkF(); pkScanToast("✎ " + enom + " — falta, completá en la tablet", true); }
+    else { pkOk(); pkScanToast("✓ " + enom + " · " + pkFmt(eit.esp), true); }
+    return;
+  }
+  // 2) Code-128 interno CÓDIGO|T / CÓDIGO|A (sigue funcionando)
+  const s = raw0.toUpperCase();
+  let code = s, accion = "T";
+  const p = s.lastIndexOf("|");
+  if (p >= 0) { code = s.slice(0, p).trim(); accion = (s.slice(p + 1).trim() || "T"); }
+  const idx = _pkFindByCode(code);
+  if (idx < 0) { pkScanToast("✕ " + code + " — no está en esta tanda", false); return; }
+  const it = _pk.items[idx];
+  if (it.dual && !it.pick) {
+    if (it.dual.nac && String(it.dual.nac).toUpperCase() === code) it.pick = it.dual.nac;
+    else if (it.dual.imp && String(it.dual.imp).toUpperCase() === code) it.pick = it.dual.imp;
+  }
+  _pk.idx = idx; _pk.mode = "item";
+  if (accion === "A") { pkF(); pkScanToast("✎ " + code + " — poné cuántas", true); }
+  else { pkOk(); pkScanToast("✓ " + code + " · " + pkFmt(it.esp), true); }
+}
+function pkScanToast(msg, ok) {
+  let el = document.getElementById("pkScanToast");
+  if (!el) { el = document.createElement("div"); el.id = "pkScanToast"; document.body.appendChild(el); }
+  el.textContent = msg;
+  el.style.cssText = "position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:99999;padding:12px 20px;border-radius:12px;font:800 18px system-ui,sans-serif;color:#fff;box-shadow:0 8px 28px rgba(0,0,0,.35);opacity:1;transition:opacity .3s;background:" + (ok ? "#16a34a" : "#dc2626") + ";";
+  clearTimeout(el._t); el._t = setTimeout(function () { el.style.opacity = "0"; }, 1400);
+}
+(function pkScanBind() {
+  let buf = "", last = 0;
+  document.addEventListener("keydown", function (e) {
+    if (!pkScanOn()) return;                                  // switch OFF → no hace NADA
+    const m = document.getElementById("tandaModal");
+    if (!m || !m.classList.contains("show")) return;          // sólo con el picking abierto
+    const ae = document.activeElement;
+    if (ae && (ae.tagName === "INPUT" || ae.tagName === "TEXTAREA" || ae.tagName === "SELECT")) return; // no pisar el tipeo de cantidad
+    if (e.key === "Enter") { if (buf.length) { const sc = buf; buf = ""; e.preventDefault(); pkOnScan(sc); } return; }
+    if (e.key && e.key.length === 1) { const now = Date.now(); if (now - last > 120) buf = ""; last = now; buf += e.key; }
+  }, true);
+})();
 /* Recalcula "Faltan" (pedido − puestas) en vivo mientras el operario tipea, sin
    re-render para no perder el foco del input. */
 function pkFaltanCalc(esp) {
@@ -12161,8 +12273,8 @@ function mgRender() {
     const head = it.manual
       ? '<span class="mg-agu mg-disp-x">⚠ fuera de lista</span>'
       : '<span class="mg-agu">a guardar <b>' + it.disponible + '</b></span>';
-    const gondStp = function (big) { return '<div class="mg-stp' + (big ? ' big' : '') + '"><button class="mg-sb" onclick="mgChg(' + i + ',-1)">–</button><input class="mg-inp" type="number" min="0" max="' + maxG + '" inputmode="numeric" value="' + it.cargar + '" oninput="mgSet(' + i + ',this.value)"><button class="mg-sb" onclick="mgChg(' + i + ',1)">+</button></div>'; };
-    const excStp = '<div class="mg-stp"><button class="mg-sb" onclick="mgChgExc(' + i + ',-1)">–</button><input class="mg-inp" type="number" min="0" max="' + maxE + '" inputmode="numeric" value="' + it.exc + '" oninput="mgSetExc(' + i + ',this.value)"><button class="mg-sb" onclick="mgChgExc(' + i + ',1)">+</button></div>';
+    const gondStp = function (big) { return '<div class="mg-stp' + (big ? ' big' : '') + '"><button class="mg-sb" onclick="mgChg(' + i + ',-1)">–</button><input class="mg-inp" type="text" min="0" max="' + maxG + '" inputmode="numeric" value="' + it.cargar + '" oninput="mgSet(' + i + ',this.value)"><button class="mg-sb" onclick="mgChg(' + i + ',1)">+</button></div>'; };
+    const excStp = '<div class="mg-stp"><button class="mg-sb" onclick="mgChgExc(' + i + ',-1)">–</button><input class="mg-inp" type="text" min="0" max="' + maxE + '" inputmode="numeric" value="' + it.exc + '" oninput="mgSetExc(' + i + ',this.value)"><button class="mg-sb" onclick="mgChgExc(' + i + ',1)">+</button></div>';
     const ubicInp = '<input class="mg-ubic-inp" type="text" maxlength="6" autocomplete="off" placeholder="A12" value="' + escapeHtml(it.ubic || "") + '" oninput="this.value=this.value.toUpperCase().replace(/[^A-Za-z0-9]/g,\'\').slice(0,6);mgSetUbic(' + i + ',this.value)">';
     const faltTxt = it.manual ? '' : '<span class="mg-faltan' + (faltan <= 0 ? ' ok' : '') + '">' + (faltan <= 0 ? '✓ Listo' : 'Faltan ' + faltan) + '</span>';
     return '<div class="mg-row">' +
@@ -21025,6 +21137,11 @@ function psRender(){
   h += '<div class="ps-toggle-card"><div class="ps-tc-top"><span class="ps-tc-t">🧾 Auto-imprimir remito FACTURADO al tildar Facturación</span>' +
     '<span class="sup-sw' + (fon ? " on" : "") + '" onclick="facPrintToggle()" role="switch"><span class="sup-sw-k"></span></span></div>' +
     '<div class="ps-status ' + (fon ? "on" : "") + '">' + (fon ? "🟢 Activo — imprime el FACTURADO en esta PC al tildar" : "⚪ Apagado — no imprime el facturado (se auto-pregunta en el 1er tic)") + '</div></div>';
+  const scon = (typeof pkScanOn === "function") && pkScanOn();
+  h += '<div class="ps-toggle-card"><div class="ps-tc-top"><span class="ps-tc-t">🔫 Picking con lectora de código de barras (PILOTO)</span>' +
+    '<span class="sup-sw' + (scon ? " on" : "") + '" onclick="pkScanToggle()" role="switch"><span class="sup-sw-k"></span></span></div>' +
+    '<div class="ps-status ' + (scon ? "on" : "") + '">' + (scon ? "🟢 Activo — en el picking, cada disparo de la lectora marca el artículo (Code-128 <code>código|T</code> = todas / <code>código|A</code> = algunas)" : "⚪ Apagado — el picking funciona con la botonera de siempre (todas / algunas / sin stock)") + '</div>' +
+    '<div class="ps-help">Switch de prueba. <b>Apagado = el picking anda igual que hoy.</b> Imprimí las etiquetas de góndola con <code>tools/etiquetas-gondola.html</code> y emparejá la lectora Bluetooth al celu antes de prenderlo.</div></div>';
   h += '<div class="ps-help">Dejá <b>esta pantalla abierta</b> en la PC que está al lado de la impresora. Para que salga <b>sin diálogo</b>: abrí la app en <b>Chrome con <code>--kiosk-printing</code></b> y poné esa impresora como <b>predeterminada de Windows</b>. Probá con el botón de abajo antes de prender el automático.</div>';
   h += '<div class="ps-actions"><button class="ps-test" onclick="psTestPrint()">🖨️ Imprimir hoja de prueba</button></div>';
   const log = (_ps && _ps.log) || [];

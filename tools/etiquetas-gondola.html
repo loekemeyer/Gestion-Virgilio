@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Etiquetas de góndola (EAN-13) — Producción Virgilio</title>
+<style>
+  :root { --bg:#0f172a; --card:#1e293b; --ink:#e2e8f0; --mut:#94a3b8; --acc:#22c55e; --acc2:#eab308; --br:#334155; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:15px/1.5 system-ui,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--ink); padding:18px; }
+  h1 { font-size:20px; margin:0 0 4px; }
+  .sub { color:var(--mut); margin:0 0 16px; font-size:13px; }
+  .card { background:var(--card); border:1px solid var(--br); border-radius:12px; padding:14px; margin-bottom:14px; }
+  label { display:inline-flex; align-items:center; gap:6px; margin:4px 12px 4px 0; font-size:13px; }
+  input[type=text], input[type=number] { background:#0b1220; color:var(--ink); border:1px solid var(--br); border-radius:8px; padding:6px 8px; font:inherit; }
+  input[type=text] { width:170px; } input[type=number] { width:70px; }
+  button { background:var(--acc); color:#052e16; border:0; border-radius:8px; padding:9px 14px; font:600 14px/1 inherit; cursor:pointer; }
+  button.sec { background:#334155; color:var(--ink); }
+  .row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th,td { text-align:left; padding:5px 8px; border-bottom:1px solid var(--br); }
+  th { color:var(--mut); font-weight:600; position:sticky; top:0; background:var(--card); }
+  .wrap { max-height:340px; overflow:auto; border:1px solid var(--br); border-radius:8px; }
+  .mono { font-family:ui-monospace,Menlo,Consolas,monospace; }
+  .t { color:var(--acc); } .a { color:var(--acc2); }
+  .col { color:#fca5a5; font-weight:700; }
+  textarea { width:100%; height:200px; background:#0b1220; color:var(--ink); border:1px solid var(--br); border-radius:8px; padding:10px; font:12px/1.4 ui-monospace,Menlo,Consolas,monospace; }
+  .cnt { color:var(--mut); font-size:13px; }
+  .warn { color:#fca5a5; }
+  code { background:#0b1220; padding:1px 5px; border-radius:5px; }
+</style>
+</head>
+<body>
+  <h1>🏷️ Etiquetas de góndola (EAN-13)</h1>
+  <p class="sub">Genera las etiquetas de <b>slot</b> para el picking con lectora (idea 8243). <b>Dos EAN-13 por artículo</b>:
+     <span class="t">TODO</span> = <code>779558700</code>+NNN (mercadería completa) · <span class="a">FALTA</span> =
+     <code>779558701</code>+NNN (le falta algo → se completa en la tablet). <b>NNN</b> = parte numérica del código (943E→943).
+     El <b>verificador</b> (mod-10) se calcula solo. Salida <b>ZPL</b> (<code>^BE</code>) para la Zebra.</p>
+
+  <div class="card">
+    <div class="row">
+      <label>Filtrar código: <input id="fCod" type="text" placeholder="ej. 943 / 94"></label>
+      <label>Filtrar sector: <input id="fSec" type="text" placeholder="ej. I / A0"></label>
+      <label><input id="chkT" type="checkbox" checked> etiqueta TODO</label>
+      <label><input id="chkA" type="checkbox" checked> etiqueta FALTA</label>
+      <label>Alto barcode <input id="bh" type="number" value="70" min="30" max="200"></label>
+      <label>Ancho (dots) <input id="pw" type="number" value="440" min="200" max="900"></label>
+      <label>Alto (dots) <input id="ll" type="number" value="300" min="120" max="900"></label>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button id="gen">Generar ZPL</button>
+      <button id="dl" class="sec">⬇ Descargar .zpl</button>
+      <button id="cp" class="sec">Copiar</button>
+      <button id="csv" class="sec">⬇ Tabla EAN (CSV)</button>
+      <span id="cnt" class="cnt"></span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="wrap"><table id="tbl"><thead><tr><th>Código</th><th>Sector</th><th>NNN</th><th>EAN TODO</th><th>EAN FALTA</th></tr></thead><tbody></tbody></table></div>
+    <p class="sub" style="margin:8px 2px 0"><span class="col">Rojo</span> = varios artículos comparten el mismo NNN (ej. 502/502T, 323/323E). El scan los resuelve por
+      el contexto de la tanda (el que pide ese pedido); si una tanda pide los dos, hay que mirar. Ver
+      <code>docs/idea-picking-scanner-etiquetas.md</code>.</p>
+  </div>
+
+  <div class="card">
+    <div class="cnt" style="margin-bottom:6px">ZPL (a la Zebra por USB/red, o previsualizar en <b>Labelary.com</b>):</div>
+    <textarea id="zpl" readonly placeholder="Tocá «Generar ZPL»…"></textarea>
+    <p class="sub" style="margin-top:8px">
+      La térmica es <b>blanco y negro</b>: TODO/FALTA se distinguen por el <b>texto grande</b>, no por color.
+      <span class="warn">Ojo:</span> usa la planimetría estática; si moviste un artículo por la tabla
+      <code>Planimetria</code>, regenerá <code>planimetria.js</code>. El barcode lleva 12 dígitos y la Zebra
+      agrega el verificador (13º) sola con el algoritmo EAN-13.
+    </p>
+  </div>
+
+<script src="../planimetria.js"></script>
+<script>
+(function(){
+  var G = window.GONDOLA || null;
+  var tbody = document.querySelector('#tbl tbody');
+  var zplEl = document.getElementById('zpl');
+  var cntEl = document.getElementById('cnt');
+  var PREF_T = '779558700', PREF_A = '779558701';
+
+  function num3(cod){ var d = String(cod||'').replace(/\D/g,''); return d ? d.slice(-3).padStart(3,'0') : ''; }
+  function eanCheck(d12){ var s=0; for (var i=0;i<12;i++){ var n=+d12[i]||0; s += (i%2===0)? n : n*3; } return String((10-(s%10))%10); }
+  function ean13(pref, nnn){ var base = pref + nnn; return base + eanCheck(base); }   // 13 dígitos
+  function ean12(pref, nnn){ return pref + nnn; }                                     // 12 (la Zebra agrega el 13º)
+
+  function items(){
+    if (!G) return [];
+    var fc = document.getElementById('fCod').value.trim().toUpperCase();
+    var fs = document.getElementById('fSec').value.trim().toUpperCase();
+    var out = [], byNnn = {};
+    Object.keys(G).forEach(function(cod){
+      var v = G[cod]; if (!Array.isArray(v)) return;
+      var C = String(cod).toUpperCase(); if (C === 'LIBRE') return;
+      var nnn = num3(C); if (!nnn) return;
+      byNnn[nnn] = (byNnn[nnn]||0) + 1;
+      out.push({ cod:C, sector:String(v[0]||''), orden:Number(v[1]||0), nnn:nnn });
+    });
+    out.forEach(function(it){ it.colision = byNnn[it.nnn] > 1; });
+    var f = out.filter(function(it){
+      if (fc && it.cod.indexOf(fc) < 0) return false;
+      if (fs && it.sector.toUpperCase().indexOf(fs) < 0) return false;
+      return true;
+    });
+    f.sort(function(a,b){ return a.orden - b.orden || a.cod.localeCompare(b.cod); });
+    return f;
+  }
+
+  // Un bloque ZPL por etiqueta EAN-13. tipo = 'T' (todo) | 'A' (falta).
+  function label(it, tipo){
+    var pw=+document.getElementById('pw').value||440, ll=+document.getElementById('ll').value||300, bh=+document.getElementById('bh').value||70;
+    var titulo = tipo==='T' ? 'TODO' : 'FALTA';
+    var d12 = ean12(tipo==='T'?PREF_T:PREF_A, it.nnn);
+    var s = '';
+    s += '^XA\n^CI28\n^PW'+pw+'\n^LL'+ll+'\n';
+    s += '^FO24,18^A0N,44,44^FD'+titulo+'^FS\n';
+    s += '^FO24,74^A0N,58,58^FD'+it.cod+'^FS\n';
+    s += '^FO24,142^A0N,24,24^FDSector '+it.sector+'^FS\n';
+    s += '^FO24,178^BY2^BEN,'+bh+',Y,N^FD'+d12+'^FS\n';   // EAN-13 (agrega verificador)
+    s += '^XZ\n';
+    return s;
+  }
+
+  function render(){
+    var list = items();
+    tbody.innerHTML = list.map(function(it){
+      var cl = it.colision ? ' class="col"' : '';
+      return '<tr'+cl+'><td class="mono">'+it.cod+'</td><td class="mono">'+it.sector+'</td><td class="mono">'+it.nnn+'</td>'
+           + '<td class="mono t">'+ean13(PREF_T,it.nnn)+'</td><td class="mono a">'+ean13(PREF_A,it.nnn)+'</td></tr>';
+    }).join('');
+    var wantT=document.getElementById('chkT').checked, wantA=document.getElementById('chkA').checked, zpl='';
+    list.forEach(function(it){ if (wantT) zpl+=label(it,'T'); if (wantA) zpl+=label(it,'A'); });
+    zplEl.value = zpl;
+    var nlab = list.length*((wantT?1:0)+(wantA?1:0)), col = list.filter(function(x){return x.colision;}).length;
+    cntEl.textContent = list.length+' artículos · '+nlab+' etiquetas'+(col?(' · ⚠ '+col+' con NNN compartido'):'');
+    window._list = list;
+  }
+
+  if (!G){
+    cntEl.innerHTML = '<span class="warn">No cargó planimetria.js (window.GONDOLA). Serví esta página desde el repo (GitHub Pages) o al lado de planimetria.js.</span>';
+  } else {
+    document.getElementById('gen').onclick = render;
+    ['fCod','fSec'].forEach(function(id){ document.getElementById(id).addEventListener('keydown', function(e){ if(e.key==='Enter') render(); }); });
+    document.getElementById('cp').onclick = function(){ zplEl.select(); try{ document.execCommand('copy'); }catch(_e){} };
+    document.getElementById('dl').onclick = function(){ var b=new Blob([zplEl.value||''],{type:'text/plain'}); var a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='etiquetas-gondola.zpl'; a.click(); };
+    document.getElementById('csv').onclick = function(){
+      var rows = ['codigo,sector,nnn,ean_todo,ean_falta,nnn_compartido'];
+      (window._list||[]).forEach(function(it){ rows.push([it.cod,it.sector,it.nnn,ean13(PREF_T,it.nnn),ean13(PREF_A,it.nnn),it.colision?'SI':''].join(',')); });
+      var b=new Blob([rows.join('\n')],{type:'text/csv'}); var a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='ean-gondola.csv'; a.click();
+    };
+    render();
+  }
+})();
+</script>
+</body>
+</html>
