@@ -76,9 +76,12 @@
 > del 23 y 28/07 estaban mal de depósito: el operario guardó a racks y quedó como excedente.
 > **(b) Sectores `C15` y `C20`**: la planilla del conteo los trajo con el **código vacío** y 0
 > (fueron 4 de las filas salteadas); el dueño los pasó aparte → `587T` **81** (C20) y `581T`
-> **73** (C15), cargados. Queda pendiente `582T` 24 cj (C20): **ese código no existe** en el
-> maestro, ni en movimientos, ni en pedidos — el candidato es `502T` «Abrelata Mariposa Tira
-> Imp», que la planimetría ya ubica en C20 y es de la misma familia *Tira Imp* que 581T/587T.
+> **73** (C15), cargados. El dueño confirmó que el `582T` que había pasado era un
+> **error de tipeo**: son **`502T`** «Abrelata Mariposa Tira Imp» (24 cj, C20), el código que la
+> planimetría ya ubicaba ahí y de la misma familia *Tira Imp* que 581T/587T — cargado. Con eso
+> **C20** queda completo (587T 81 + 502T 24) y **C15** con 581T 73. A `581T` se le puso el
+> nombre del maestro con un movimiento `inicial` de delta **0** (la vista toma la descripción
+> más corta no vacía; sin eso salía en blanco en la tabla de Stock).
 > **(c)** Quedan sin contar los sectores **`O1`/`O2`** (`441` 42 cj y `026` 86 cj en excedente).
 >
 > Nota (dato — **CONTEO DE EXCEDENTE, 01/08/2026**): mismo método que el de góndola
