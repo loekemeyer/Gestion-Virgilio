@@ -16,7 +16,7 @@ hasta que el usuario la active**, y se mergea a `main` cuando el usuario dice el
 
 ## Ideas
 
-- [ ] **3197** (2026-08-01) — **Distinguir el stock por EMPRESA** (Loekemeyer / Chef / Loke). Hay códigos que viven en dos empresas a la vez (`437E`, `438E`, `439E`, `809E`; `798E` es sólo Chef) y hoy `Movimientos_Stock` tiene **un solo saldo por código** → se suman (ej. `809E` = 338 CH + 43 LK = 381). El conteo del 01-08 dejó la empresa en `ubicacion` (`M13 · CH`) como paliativo; separarlo de verdad pide columna `empresa` + desglose en Stock/Compras, cuidando que picking y PPP sigan usando el **total** — _pendiente_
+- [x] **3197** (2026-08-01) — **Distinguir el stock por EMPRESA** (Loekemeyer / Chef / Loke). Hay códigos que viven en dos empresas a la vez (`437E`, `438E`, `439E`, `809E`; `798E` es sólo Chef) y hoy `Movimientos_Stock` tiene **un solo saldo por código** → se suman (ej. `809E` = 338 CH + 43 LK = 381). El conteo del 01-08 dejó la empresa en `ubicacion` (`M13 · CH`) como paliativo; separarlo de verdad pide columna `empresa` + desglose en Stock/Compras, cuidando que picking y PPP sigan usando el **total** — _hecha (01/08): la empresa va en el `cod_art` (`438E LK` / `438E CH`), con equivalencias + planimetría + migración `pipeline_etapa1_resuelve_equivalencias` para que el cron descuente del código correcto_
 
 - [x] **2091** (2026-07-31) — Mover el botón **Cerrar** del módulo Consulta de NP (composición a líos) **arriba a la derecha** — _hecha (v6.68, en main)_
 - [x] **1963** (2026-07-31) — **Prolijar** la estética del pop-up de movimientos por artículo (alinear rótulos, chips en pill, alinear el `+`) — _hecha (v6.68, en main)_

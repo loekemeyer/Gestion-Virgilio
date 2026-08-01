@@ -6,6 +6,38 @@
 >
 > Última actualización: 2026-08-01 · Versión app al documentar: **v6.80**
 >
+> Nota: **STOCK SEPARADO POR EMPRESA (01/08/2026)** — pedido del dueño. Hay códigos que
+> **significan productos distintos según la empresa**: el caso testigo es **`809E`**, que en el
+> maestro de **Chef** es *Corta Queso* y en el de **Loekemeyer** (`e_madre_lk`) es
+> ***Corta Pizza Familiar***. El stock los sumaba en un solo número (381 = 338 + 43), o sea
+> estaba **mal**, no sólo mal mostrado. Solución adoptada (la pidió el dueño así):
+> **la empresa va en el `cod_art`**, con sufijo ` LK` / ` CH`:
+>
+> | Código | Producto | Góndola | Sectores |
+> |---|---|---:|---|
+> | `437E LK` / `437E CH` | Colador 16cm | 63 / 27 | F09-F11 / L07-L08 |
+> | `438E LK` / `438E CH` | Colador 20cm | 50 / 24 | F13-F16 / L05-L06 |
+> | `439E LK` / `439E CH` | Colapasta | 29 / 18 | H33-H34 / Ñ53 |
+> | `809E CH` | **Corta Queso** X12 | 338 | M13-M15 |
+> | `809E LK` | **Corta Pizza Familiar** | 43 | J13-J14 |
+>
+> ⚠ **Lo que hay que entender para no romperlo**: el pedido (`PPP_Base_Pedidos`) trae el código
+> **pelado** (`438E`), y los movimientos de picking los escribe el **cron server-side**
+> (ETAPA 1 de `reconciliar_pipeline_stock`) con ese código tal cual. Si el stock vive en
+> `438E LK` y nadie traduce, el cron descuenta contra `438E` (saldo 0) y lo deja **negativo**.
+> Por eso el split vino con tres piezas más: **(1)** filas en **`Equivalencias_Codigos`**
+> (`437E`→`437E LK`, `438E`→`438E LK`, `439E`→`439E LK`, `809E`→`809E CH`; la empresa elegida
+> es a la que **ya apuntaba la planimetría**). Ojo: `equivResolve` resuelve **un solo salto**,
+> así que las viejas `029`→`437E` y `030`→`438E` se re-apuntaron directo a `437E LK`/`438E LK`.
+> **(2)** entradas de **`Planimetria`** para los 8 códigos nuevos (mismo sector y orden que el
+> original). **(3)** migración **`pipeline_etapa1_resuelve_equivalencias`**: el CTE `picks` de
+> la ETAPA 1 ahora hace `left join Equivalencias_Codigos` y usa `coalesce(e.cod_real, <código
+> del PKC>)` — el server resuelve igual que el cliente. **Nada más de la función cambió.**
+> ⚠ **Pendiente**: los saldos de **racks** siguen bajo el código pelado y sin empresa asignada
+> (`437E` 258, `438E` 156, `809E` 400) — hay que contarlos y repartirlos. Y si algún día un
+> cliente de Chef pide `438E`, el descuento va a salir del stock de Loekemeyer: la única forma
+> de resolverlo bien es saber la **empresa del cliente** en el pedido.
+>
 > Nota (dato — **505I resuelto + C15/C20, 01/08/2026**). **(a) La zona `AD` es RACKS**, no
 > góndola ni excedente — por eso `505I` no aparecía en ninguno de los dos conteos y venía
 > arrastrando saldos en los tres depósitos. Composición real dada por el dueño: **racks
