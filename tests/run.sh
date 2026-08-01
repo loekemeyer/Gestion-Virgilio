@@ -75,4 +75,7 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== mva-quien (regresión v6.66: 👤 siglas + legajo del que hizo/recibió cada movimiento) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/mva-quien.cjs
 
+echo "== emp-np (regresión v6.83 / idea 9020: empresa por NP → sufijo LK/CH en el picking) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/emp-np.cjs
+
 echo "== TODO OK =="

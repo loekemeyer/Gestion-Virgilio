@@ -5717,7 +5717,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v6.82";
+const APP_VERSION = "v6.83";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -6389,6 +6389,40 @@ let _codeEquiv = { "29": { real: "437E", nota: "Colador 16cm importado" }, "30":
 function _equivNorm(c) { return _ocgNorm(c); }  // misma normalización que el resto (upper+trim+sin ceros a la izq); ver _ocgNorm / _cpNorm
 function equivLookup(cod) { return _codeEquiv[_equivNorm(cod)] || null; }
 function equivResolve(cod) { const e = equivLookup(cod); return e ? e.real : String(cod == null ? "" : cod); }
+
+/* ===== EMPRESA POR NÚMERO DE NP (idea 9020) — hay códigos que significan
+   PRODUCTOS DISTINTOS según la empresa (ej. 809E: en Chef es Corta Queso y en
+   Loekemeyer es Corta Pizza Familiar), y otros que son el mismo producto pero
+   con stock físico separado (437E/438E/439E). El stock los guarda con sufijo:
+   "438E LK" / "438E CH". La NP dice de qué empresa es el pedido:
+   empieza con 9 = Loekemeyer, con 4 = Chef (verificado sobre las 947 NPs).
+   `pkCodEmpresa` sólo actúa si la planimetría TIENE el código con sufijo; si no,
+   devuelve el código tal cual y todo sigue como antes (las equivalencias fijas de
+   Equivalencias_Codigos quedan de red de seguridad para ese caso).
+
+   Usa el MISMO umbral que `pkNpEsLoeke` (v6.12, que ya resolvía el SECTOR por
+   origen pero no el stock): NP > 90000 = Loekemeyer. En los datos reales las NPs
+   de Loekemeyer van 97428-98291 y las de Chef 44389-44547, así que "empieza con
+   9 / empieza con 4" y "> 90000" son la misma regla. Devuelve "" si no hay número
+   → sin empresa no se toca nada. ===== */
+function empresaDeNp(np) {
+  const n = parseInt(String(np == null ? "" : np).replace(/\D/g, ""), 10);
+  if (isNaN(n)) return "";
+  return n > 90000 ? "LK" : "CH";
+}
+function pkCodEmpresa(art, np) {
+  const a = String(art == null ? "" : art).trim().toUpperCase();
+  const emp = empresaDeNp(np);
+  if (!a || !emp) return a;
+  const G = (typeof window !== "undefined" && window.GONDOLA) ? window.GONDOLA : {};
+  const cand = a + " " + emp;
+  return G[cand] ? cand : a;
+}
+/* Saca el sufijo de empresa. El sufijo vive SÓLO en el picking (para el sector) y
+   en el stock (para el saldo); todo lo que se cruza contra el PEDIDO —faltantes,
+   Entregas_Virgilio, facturación— usa el código pelado, que es el que pidió el
+   cliente. Sin esto un faltante de "438E LK" no matchearía la línea "438E". */
+function codBase(cod) { return String(cod == null ? "" : cod).trim().toUpperCase().replace(/\s+(LK|CH|LOKE)$/, ""); }
 async function loadEquivalencias() {
   try {
     const r = await fetch(SUPABASE_URL + "/rest/v1/Equivalencias_Codigos?select=cod_pedido,cod_real,nota", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
@@ -6907,10 +6941,16 @@ function pkResumeServer(tanda, legajo) {
    mezclada, el paso muestra las DOS ubicaciones con el reparto. `sector` = celda para
    el display grande (corto); `rango` = texto de la nota. */
 const PICK_UBIC_DUAL = {
-  "809E": { loeke: { sector: "J13", rango: "J13 y J14" }, chef: { sector: "M13", rango: "M13 y M14" } },
+  "809E": { loeke: { sector: "J13", rango: "J13 y J14" }, chef: { sector: "M13", rango: "M13 a M15" } },
   "437E": { loeke: { sector: "F9",  rango: "F9 a F12" },  chef: { sector: "L7",  rango: "L7 y L8" } },
-  "438E": { loeke: { sector: "F13", rango: "F13 a F16" }, chef: { sector: "L5",  rango: "L5 y L6" } }
+  "438E": { loeke: { sector: "F13", rango: "F13 a F16" }, chef: { sector: "L5",  rango: "L5 y L6" } },
+  "439E": { loeke: { sector: "H33", rango: "H33 y H34" }, chef: { sector: "Ñ53", rango: "Ñ53" } }
 };
+/* v6.83 (idea 9020): este mapa es el FALLBACK de display. Desde que el stock está
+   partido por empresa ("438E LK" / "438E CH"), `pkCodEmpresa` ya parte el renglón
+   por NP y cada uno trae su propio sector de la planimetría, así que este bloque
+   queda inerte para esos códigos (no matchea el código con sufijo). Sigue vivo
+   para cualquier código dual que todavía no tenga el stock separado. */
 function pkNpEsLoeke(np) { const n = parseInt(String(np == null ? "" : np).replace(/\D/g, ""), 10); return !isNaN(n) && n > 90000; }
 /* Dado el código dual (ya resuelto por equivalencia) y las NPs de la tanda, suma cuántas
    cajas pidió cada origen. Devuelve {loeke, chef}. */
@@ -6956,9 +6996,14 @@ async function showPickingList(tanda, legajo, opts) {
       }
     }
     // Sumar cajas por código entre todos los pedidos de la tanda.
+    // v6.81 (idea 9020): si el código tiene stock separado por empresa, se parte
+    // por NP — la NP dice la empresa (9=Loekemeyer, 4=Chef), así que el mismo
+    // 438E pedido por una NP 98… y otra 44… da DOS renglones ("438E LK" y
+    // "438E CH"), cada uno con el sector de su empresa. Los códigos que no están
+    // partidos siguen sumando igual que siempre.
     const aggFrom = (base) => {
       const a = {};
-      for (const np of nps) for (const it of (base.get(np) || [])) a[it.art] = (a[it.art] || 0) + it.cajas;
+      for (const np of nps) for (const it of (base.get(np) || [])) { const k = pkCodEmpresa(it.art, np); a[k] = (a[k] || 0) + it.cajas; }
       return a;
     };
     let agg = aggFrom(pickBase);
@@ -7699,7 +7744,9 @@ async function faltantesDeTanda(tanda) {
       const art = (p[1] || "").trim();
       const esp = parseFloat(String(p[2]).replace(",", ".")), real = parseFloat(String(p[3]).replace(",", "."));
       if (!art || isNaN(esp) || isNaN(real) || real >= esp || seen.has(art)) continue;
-      seen.add(art); out.push({ art, esp, real, falta: esp - real });    // desc → 1er PKC = el más reciente
+      // v6.81: el dedup es por el código TAL CUAL vino (puede traer sufijo de empresa,
+      // "438E LK"), pero se devuelve PELADO porque el faltante se cruza contra el pedido.
+      seen.add(art); out.push({ art: codBase(art), esp, real, falta: esp - real });    // desc → 1er PKC = el más reciente
     }
     return out;
   } catch (_e) { return []; }
@@ -7785,7 +7832,7 @@ const SUPABASE_ENTREGAS_ENDPOINT = SUPABASE_URL + "/rest/v1/Entregas_Virgilio";
    vista Entregas_Virgilio / los cálculos NO cambian. Hay un toggle en vivo en el Paso 2;
    para fijar uno definitivo, cambiar este valor (y/o sacar el toggle). */
 let _compMode = "cargo";
-function _compMatchArt(a, want) { const aU = String(a).toUpperCase(), w = String(want).toUpperCase(); return aU === w || aU.replace(/E$/, "") === w.replace(/E$/, ""); }
+function _compMatchArt(a, want) { const aU = codBase(a), w = codBase(want); return aU === w || aU.replace(/E$/, "") === w.replace(/E$/, ""); }
 async function showCompletarWizard(legajo, codigo) {
   const code = String(codigo || "").trim().toUpperCase(); if (!code) return;
   const modal = document.getElementById("completarModal"); if (!modal) return;

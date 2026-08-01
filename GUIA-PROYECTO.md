@@ -4,7 +4,33 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-01 · Versión app al documentar: **v6.80**
+> Última actualización: 2026-08-01 · Versión app al documentar: **v6.83**
+>
+> Nota: **v6.83 — idea 9020: la EMPRESA del pedido sale del número de NP y parte el
+> stock en el picking**. Cierra lo que quedó a medias en el split por empresa (idea 3197):
+> ahí el código pelado se resolvía con una equivalencia **fija** por artículo, que acierta
+> la mayoría pero **falla en la minoría** (hay 71 cajas de `809E` pedidas por NPs de
+> Loekemeyer que son *Corta Pizza Familiar*, no *Corta Queso*). Ahora la empresa se decide
+> **por NP**: `empresaDeNp(np)` → **NP > 90000 = Loekemeyer (`LK`), si no Chef (`CH`)**
+> — mismo umbral que el `pkNpEsLoeke` que ya existía desde v6.12, así que hay **una sola
+> regla** en el código. Verificado: las 947 NPs son 4xxxx (143, Chef) o 9xxxx (804, Loeke),
+> sin excepciones. **Dónde pega**: en `aggFrom` de `showPickingList`, que antes sumaba las
+> cajas por código entre todas las NPs de la tanda (perdiendo el origen) y ahora agrupa por
+> **`pkCodEmpresa(art, np)`** → el mismo `438E` pedido por una NP 98… y otra 44… da **dos
+> renglones** (`438E LK` y `438E CH`), cada uno con **su** sector desde la planimetría y su
+> cantidad. Como el `PKC` sale con el código ya sufijado, el **cron descuenta del saldo
+> correcto sin tocar nada más**. `pkCodEmpresa` **sólo** actúa si la planimetría tiene ese
+> código con sufijo → un artículo no partido se comporta igual que siempre. Nuevo
+> **`codBase(cod)`** saca el sufijo: el sufijo vive **sólo** en el picking (sector) y en el
+> stock (saldo), mientras que todo lo que se cruza contra el **pedido** —faltantes,
+> `Entregas_Virgilio`, facturación— usa el código pelado, que es el que pidió el cliente
+> (`faltantesDeTanda` devuelve pelado, `_compMatchArt` compara por base). El mapa
+> `PICK_UBIC_DUAL` de v6.12 queda de **fallback de display** (se le sumó `439E`) y no
+> matchea los códigos ya partidos. Tabla **`Planimetria`**: columna nueva **`empresa`**,
+> rellenada por sector desde los conteos del 01/08 (la calle Ñ es mixta: Ñ53/Ñ56/Ñ57/Ñ59
+> son de Chef). Las equivalencias fijas de la 3197 se **dejan como red de seguridad** para
+> cuando no se pueda resolver la empresa. Nuevo smoke `tests/emp-np.cjs` (14 asserts) en
+> `tests/run.sh`. Bump `APP_VERSION`/`SW_VERSION` `v6.83`.
 >
 > Nota: **STOCK SEPARADO POR EMPRESA (01/08/2026)** — pedido del dueño. Hay códigos que
 > **significan productos distintos según la empresa**: el caso testigo es **`809E`**, que en el
