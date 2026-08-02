@@ -5719,7 +5719,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v6.88";
+const APP_VERSION = "v6.89";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -8144,8 +8144,8 @@ function _compBuildLiosData() {
 function _compLioNow() { return _comp ? _comp.nps[_comp.liosNpIdx] : null; }
 function _compLioMark(n) { n.liosDone = n.codes.every(function (c) { return c.rest === 0 && c.cur === 0; }); n.lios = n.liosArr.length; }
 function _compLioStep(ci, d) { const n = _compLioNow(); if (!n) return; const c = n.codes[ci]; if (!c) return; if (d > 0 && c.rest > 0) { c.rest--; c.cur++; } else if (d < 0 && c.cur > 0) { c.cur--; c.rest++; } else return; _compRenderLios(); _compRecalc(); }
-function _compLioSuelta(ci) { const n = _compLioNow(); if (!n) return; const c = n.codes[ci]; if (!c || c.rest <= 0) return; c.rest--; n.liosArr.push({ items: [{ cod: c.cod, qty: 1 }], cajas: 1, suelta: true }); _compLioMark(n); _compRenderLios(); _compRecalc(); }
-function _compLioSiguiente() { const n = _compLioNow(); if (!n) return; const items = n.codes.filter(function (c) { return c.cur > 0; }).map(function (c) { return { cod: c.cod, qty: c.cur }; }); const cajas = items.reduce(function (s, it) { return s + it.qty; }, 0); if (!cajas) return; n.liosArr.push({ items: items, cajas: cajas, suelta: false }); n.codes.forEach(function (c) { c.cur = 0; }); _compLioMark(n); _compRenderLios(); _compRecalc(); }
+function _compLioSuelta(ci) { const n = _compLioNow(); if (!n) return; const c = n.codes[ci]; if (!c || c.rest <= 0) return; c.rest--; _compAddLio(n,{ items: [{ cod: c.cod, qty: 1 }], cajas: 1, suelta: true }); _compLioMark(n); _compRenderLios(); _compRecalc(); }
+function _compLioSiguiente() { const n = _compLioNow(); if (!n) return; const items = n.codes.filter(function (c) { return c.cur > 0; }).map(function (c) { return { cod: c.cod, qty: c.cur }; }); const cajas = items.reduce(function (s, it) { return s + it.qty; }, 0); if (!cajas) return; _compAddLio(n,{ items: items, cajas: cajas, suelta: false }); n.codes.forEach(function (c) { c.cur = 0; }); _compLioMark(n); _compRenderLios(); _compRecalc(); }
 /* v5.85 — Atajo "líos de a N": arma de una todos los líos iguales de un código
    (⌊rest/N⌋ líos de N cajas), en vez de repetir "poner N → Cerrar Lío". N editable
    (default 5). El resto (< N) queda para cerrarlo a mano o como suelta. */
@@ -8155,7 +8155,7 @@ function _compLioAuto(ci) {
   const c = n.codes[ci]; if (!c) return;
   const size = Math.max(1, parseInt(_comp && _comp.lioSize, 10) || 5);
   let made = 0;
-  while (c.rest >= size) { c.rest -= size; n.liosArr.push({ items: [{ cod: c.cod, qty: size }], cajas: size, suelta: false }); made++; }
+  while (c.rest >= size) { c.rest -= size; _compAddLio(n,{ items: [{ cod: c.cod, qty: size }], cajas: size, suelta: false }); made++; }
   if (made) { _compLioMark(n); _compRenderLios(); _compRecalc(); }
 }
 function _compViewArmar() { if (_comp) { _comp.liosView = "armar"; _compRenderLios(); } }
@@ -8191,7 +8191,7 @@ function _etlZpl(L) {
   const W = 600, H = 132 + Math.max(1, items.length) * 42 + 60;   // ~75mm ancho; alto crece con los ítems
   let s = "^XA\n^CI28\n^PW" + W + "\n^LL" + H + "\n";
   s += "^FO20,18^A0N,42,42^FD" + _etlEsc(L.razon_social) + "^FS\n";
-  s += "^FO20,66^A0N,26,26^FDNP " + _etlEsc(L.np) + "  " + _etlEsc(L.tanda) + "   Lio " + L.lio_idx + "/" + L.lio_total + "^FS\n";
+  s += "^FO20,66^A0N,26,26^FDNP " + _etlEsc(L.np) + "  " + _etlEsc(L.tanda) + "   Lio " + L.lio_idx + (L.lio_total ? "/" + L.lio_total : "") + "^FS\n";
   s += "^FO20,100^GB" + (W - 40) + ",2,2^FS\n";
   let y = 116;
   items.forEach(function (it) { s += "^FO28," + y + "^A0N,36,36^FD" + _etlEsc(it.cod) + "   x " + it.qty + "^FS\n"; y += 42; });
@@ -8200,26 +8200,24 @@ function _etlZpl(L) {
   s += "^XZ\n";
   return s;
 }
-/* Construye las filas de etiqueta del armado (PURO, sin red) — [] si el switch está
-   apagado o el legajo no es de prueba (0/1). Una fila por lío de cada NP. */
-function etlBuildLabels(comp, legajo, tanda) {
-  if (!comp || !etlOn() || !pkScanAllowedLegajo(legajo)) return [];
-  const out = [], day = (typeof getTodayKey === "function" ? getTodayKey() : "");
-  (comp.nps || []).forEach(function (n) {
-    const lios = n.liosArr || [], total = lios.length;
-    lios.forEach(function (l, k) {
-      const row = {
-        client_id: ("etl_" + tanda + "_" + n.np + "_" + (k + 1) + "_" + day).replace(/[^a-zA-Z0-9_\-]/g, ""),
-        tanda: String(tanda || ""), np: String(n.np || ""), razon_social: _etlAbrev(n.rs || ""),
-        lio_idx: k + 1, lio_total: total, cajas: l.cajas || 0,
-        items: (l.items || []).map(function (it) { return { cod: it.cod, qty: it.qty }; }),
-        operario: String(legajo || ""), estado: "pendiente"
-      };
-      row.zpl = _etlZpl(row);
-      out.push(row);
-    });
-  });
-  return out;
+/* Construye la fila de etiqueta de UN lío (PURO, sin red). Devuelve null si el switch
+   está apagado o el legajo no es de prueba (0/1). Se llama al CERRAR cada lío, así que el
+   total de líos todavía no se conoce (lio_total = 0 → la etiqueta muestra sólo "Lío N").
+   client_id con secuencia monotónica (comp._etlSeq) → nunca choca aunque borren/editen. */
+function etlBuildLioRow(comp, n, lio) {
+  if (!comp || !etlOn() || !pkScanAllowedLegajo(comp.legajo) || !n || !lio) return null;
+  if (typeof comp._etlSeq !== "number") comp._etlSeq = 0;
+  comp._etlSeq++;
+  const day = (typeof getTodayKey === "function" ? getTodayKey() : "");
+  const row = {
+    client_id: ("etl_" + comp.tanda + "_s" + comp._etlSeq + "_" + day).replace(/[^a-zA-Z0-9_\-]/g, ""),
+    tanda: String(comp.tanda || ""), np: String(n.np || ""), razon_social: _etlAbrev(n.rs || ""),
+    lio_idx: (n.liosArr ? n.liosArr.length : 0), lio_total: 0, cajas: lio.cajas || 0,
+    items: (lio.items || []).map(function (it) { return { cod: it.cod, qty: it.qty }; }),
+    operario: String(comp.legajo || ""), estado: "pendiente"
+  };
+  row.zpl = _etlZpl(row);
+  return row;
 }
 function etlPost(row) {
   try {
@@ -8230,8 +8228,17 @@ function etlPost(row) {
     }).catch(function () {});
   } catch (_e) {}
 }
-/* Encola todas las etiquetas del armado (se llama en el finalizar, tras liosSend). */
-function etlEnqueueArmado(comp, legajo, tanda) { try { etlBuildLabels(comp, legajo, tanda).forEach(etlPost); } catch (_e) {} }
+/* Encola la etiqueta de UN lío recién cerrado (se llama desde _compAddLio). */
+function etlEnqueueLio(comp, n, lio) { try { const row = etlBuildLioRow(comp, n, lio); if (row) etlPost(row); } catch (_e) {} }
+/* Único punto de alta de líos: agrega el lío al armado y, si el piloto está activo,
+   encola su etiqueta EN EL ACTO (al cerrar el lío, no al TAP). Usa índice en vez de
+   .push para no chocar con búsquedas de texto. Persiste el _etlSeq. */
+function _compAddLio(n, lio) {
+  if (!n) return;
+  n.liosArr[n.liosArr.length] = lio;
+  try { etlEnqueueLio(_comp, n, lio); } catch (_e) {}
+  try { _compPersist(); } catch (_e) {}
+}
 /* Fila-toggle del piloto de etiquetas para el MÓDULO DEL OPERADOR (armador); sólo se
    dibuja para los legajos de prueba 0/1. */
 function _etlOperRow(box, legajo) {
@@ -8346,7 +8353,7 @@ function _compLioGroups(n) {
   return order.map(function (sig, i) { const g = map[sig]; g.label = _compLetter(i); g.canMore = g.items.every(function (it) { const c = n.codes.find(function (x) { return x.cod === it.cod; }); return c && c.rest >= it.qty; }); return g; });
 }
 function _compViewEditar() { if (_comp) { _comp.liosView = "editar"; _compRenderLios(); } }
-function _compGroupMore(gi) { const n = _compLioNow(); if (!n) return; const g = _compLioGroups(n)[gi]; if (!g || !g.canMore) return; g.items.forEach(function (it) { const c = n.codes.find(function (x) { return x.cod === it.cod; }); if (c) c.rest -= it.qty; }); n.liosArr.push({ items: g.items.map(function (it) { return { cod: it.cod, qty: it.qty }; }), cajas: g.items.reduce(function (s, it) { return s + it.qty; }, 0), suelta: g.suelta }); _compLioMark(n); _compRenderLios(); _compRecalc(); }
+function _compGroupMore(gi) { const n = _compLioNow(); if (!n) return; const g = _compLioGroups(n)[gi]; if (!g || !g.canMore) return; g.items.forEach(function (it) { const c = n.codes.find(function (x) { return x.cod === it.cod; }); if (c) c.rest -= it.qty; }); _compAddLio(n,{ items: g.items.map(function (it) { return { cod: it.cod, qty: it.qty }; }), cajas: g.items.reduce(function (s, it) { return s + it.qty; }, 0), suelta: g.suelta }); _compLioMark(n); _compRenderLios(); _compRecalc(); }
 function _compGroupLess(gi) { const n = _compLioNow(); if (!n) return; const g = _compLioGroups(n)[gi]; if (!g) return; _compLioDel(g.idxs[g.idxs.length - 1]); }
 function _compGroupDel(gi) { const n = _compLioNow(); if (!n) return; const g = _compLioGroups(n)[gi]; if (!g) return; g.idxs.slice().sort(function (a, b) { return b - a; }).forEach(function (k) { const l = n.liosArr[k]; if (l) { l.items.forEach(function (it) { const c = n.codes.find(function (x) { return x.cod === it.cod; }); if (c) c.rest += it.qty; }); n.liosArr.splice(k, 1); } }); _compLioMark(n); _compRenderLios(); _compRecalc(); }
 function _compGroupReopen(gi) { const n = _compLioNow(); if (!n) return; const g = _compLioGroups(n)[gi]; if (!g) return; const k = g.idxs[g.idxs.length - 1]; const l = n.liosArr[k]; if (!l) return; l.items.forEach(function (it) { const c = n.codes.find(function (x) { return x.cod === it.cod; }); if (c) c.cur += it.qty; }); n.liosArr.splice(k, 1); _comp.liosView = "armar"; _compLioMark(n); _compRenderLios(); _compRecalc(); }
@@ -8692,7 +8699,8 @@ async function compTerminar() {
     return;
   }
   _comp.nps.forEach(function (n) { liosSend(legajo, n.np, n.liosArr.length, tanda, _compLiosResumen(n), n.clase || ""); });   // líos (TAL) + resumen + clase (lio/etiqueta/nada)
-  try { etlEnqueueArmado(_comp, legajo, tanda); } catch (_e) {}   // idea 5290 (piloto): encola etiquetas de lío (detrás del switch + legajo 0/1)
+  // idea 5290: las etiquetas de lío ya NO se encolan acá (TAP) — se encolan al CERRAR cada
+  // lío, en _compAddLio (por pedido del dueño: imprime la pilita apenas la confirman).
   // Faltante por (NP, artículo) del reparto del Paso 2. Clave normalizada (sin la E final).
   const faltMap = {};
   if (_comp.hayFalt) _comp.arts.forEach(function (a) { const ka = String(a.art).toUpperCase().replace(/E$/, ""); a.nps.forEach(function (n) { if (n.asig > 0) faltMap[n.np + "|" + ka] = (faltMap[n.np + "|" + ka] || 0) + n.asig; }); });

@@ -4,7 +4,19 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-01 · Versión app al documentar: **v6.88**
+> Última actualización: 2026-08-01 · Versión app al documentar: **v6.89**
+>
+> Nota: **v6.89 — Etiquetas de lío: imprime AL CERRAR CADA LÍO (no al TAP)**. Pedido del dueño:
+> que la etiqueta salga apenas confirman la pilita (para ensuncharla en el acto), no todas juntas
+> al terminar. Se reemplazó el hook del TAP (v6.88) por un **único punto de alta de líos**:
+> `_compAddLio(n, lio)` — reemplaza los 4 `n.liosArr.push(...)` (Cerrar Lío, suelta, líos-de-a-N,
+> repetir/grupo) — que agrega el lío **y encola su etiqueta en el acto** (`etlEnqueueLio` →
+> `etlBuildLioRow`, PURO). `client_id` con **secuencia monotónica** `comp._etlSeq` (persistida en
+> `_compPersist`) → nunca choca aunque borren/editen líos; como el total aún no se conoce, la
+> etiqueta muestra sólo **"Lío N"**. Sigue detrás del switch `vir_etiqueta_lio` + legajo 0/1 (con el
+> switch apagado `_compAddLio` sólo agrega el lío, no encola nada). ⚠ Contra conocida: si borran un
+> lío ya impreso, la etiqueta ya salió (papel de más). Smoke `etl-lio` reescrito sobre `_compAddLio`.
+> Suite OK. Bump **v6.89**.
 >
 > Nota: **v6.88 — Etiquetas de lío automáticas (idea 5290), piloto detrás del switch + legajo 0/1**.
 > Al **terminar el armado** (finalizar, junto al `liosSend`/TAL), la app **encola una etiqueta por

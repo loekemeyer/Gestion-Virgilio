@@ -1,11 +1,11 @@
-/* Smoke de las etiquetas de lío (idea 5290, v6.88). TODO detrás del switch
-   `vir_etiqueta_lio` + SÓLO legajos de prueba 0/1. Verifica:
-   - las funciones existen,
-   - switch APAGADO → no construye ninguna etiqueta (app = igual que hoy),
-   - legajo real (104) → tampoco, aunque el switch esté prendido,
-   - legajo 0 con switch on → una fila por lío, con np/lio_idx/cajas/items/razón/ZPL,
-   - _etlAbrev abrevia la razón social (saca S.R.L./S.A. y recorta),
-   - el client_id es determinístico por tanda|np|lío. */
+/* Smoke de las etiquetas de lío (idea 5290, v6.89). Impresión AL CERRAR CADA LÍO
+   (no al TAP), TODO detrás del switch `vir_etiqueta_lio` + SÓLO legajos de prueba 0/1.
+   Verifica, sobre `_compAddLio` (el único punto de alta de líos) con `etlPost` stubeado:
+   - switch APAGADO → agrega el lío pero NO encola nada (app = igual que hoy),
+   - legajo real (104) → tampoco encola, aunque el switch esté prendido,
+   - legajo 0 + on → agrega Y encola una etiqueta con np/cajas/items/razón/ZPL correctos,
+   - secuencia monotónica: dos líos → client_id distintos (s1, s2) y lío 1/2,
+   - _etlAbrev abrevia la razón social. */
 const path = require("path");
 let chromium;
 try { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
@@ -19,30 +19,56 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   await p.goto("file://" + path.join(root, "index.html"), { waitUntil: "domcontentloaded" });
   const r = await p.evaluate(() => {
     const out = {};
-    out.fns = ["etlOn", "etlSetOn", "etlToggle", "etlBuildLabels", "etlEnqueueArmado", "_etlAbrev", "_etlZpl", "_etlOperRow"].every((n) => typeof window[n] === "function");
-    const comp = { nps: [
-      { np: "98001", rs: "DISTRIBUIDORA LA OSA S.R.L.", liosArr: [ { items: [{ cod: "502", qty: 3 }, { cod: "323E", qty: 2 }], cajas: 5 }, { items: [{ cod: "66", qty: 1 }], cajas: 1, suelta: true } ] },
-      { np: "98002", rs: "Mundo Bazar S.A.", liosArr: [ { items: [{ cod: "943E", qty: 4 }], cajas: 4 } ] }
-    ] };
+    out.fns = ["etlOn", "etlSetOn", "etlToggle", "etlBuildLioRow", "etlEnqueueLio", "_compAddLio", "_etlAbrev", "_etlZpl", "_etlOperRow"].every((n) => typeof window[n] === "function");
+    const mkLio = () => ({ items: [{ cod: "502", qty: 3 }, { cod: "323E", qty: 2 }], cajas: 5, suelta: false });
     try { localStorage.removeItem("vir_etiqueta_lio"); } catch (_e) {}
-    out.offEmpty  = (etlBuildLabels(comp, "0", "C99Z").length === 0);     // switch apagado → nada
+
+    // corre _compAddLio con etlPost STUBEADO para capturar lo que se encolaría (sin red)
+    function run(comp) {
+      _comp = comp;                          // asignación BARE (setea el `let _comp` del script, como _pk)
+      const n = comp.nps[0];
+      window.__cap = [];
+      const _p = window.etlPost; window.etlPost = function (row) { window.__cap.push(row); };
+      _compAddLio(n, mkLio());
+      window.etlPost = _p;
+      return { n: n, cap: window.__cap };
+    }
+
+    // switch APAGADO → agrega el lío pero NO encola
+    { const rr = run({ tanda: "C99Z", legajo: "0", nps: [{ np: "98001", rs: "X", liosArr: [] }] });
+      out.offNoEnq = (rr.n.liosArr.length === 1 && rr.cap.length === 0); }
+
     etlSetOn(true);
-    out.realEmpty = (etlBuildLabels(comp, "104", "C99Z").length === 0);   // legajo real → nada
-    const rows = etlBuildLabels(comp, "0", "C99Z");
-    out.count = (rows.length === 3);                                      // 2 líos NP1 + 1 líos NP2
-    const r0 = rows[0];
-    out.row0 = !!r0 && r0.np === "98001" && r0.lio_idx === 1 && r0.lio_total === 2 && r0.cajas === 5 &&
-      Array.isArray(r0.items) && r0.items.length === 2 && r0.razon_social === "DISTRIBUIDORA LA OSA" &&
-      /502/.test(r0.zpl) && /TOTAL 5 cajas/.test(r0.zpl) && /\^XA/.test(r0.zpl);
+    // legajo REAL (104) → agrega pero NO encola
+    { const rr = run({ tanda: "C99Z", legajo: "104", nps: [{ np: "98001", rs: "X", liosArr: [] }] });
+      out.realNoEnq = (rr.n.liosArr.length === 1 && rr.cap.length === 0); }
+
+    // legajo 0 + switch on → agrega Y encola UNA etiqueta correcta
+    { const rr = run({ tanda: "C99Z", legajo: "0", nps: [{ np: "98001", rs: "DISTRIBUIDORA LA OSA S.R.L.", liosArr: [] }] });
+      out.onEnq = (rr.n.liosArr.length === 1 && rr.cap.length === 1);
+      const c = rr.cap[0];
+      out.row = !!c && c.np === "98001" && c.cajas === 5 && Array.isArray(c.items) && c.items.length === 2 &&
+        c.razon_social === "DISTRIBUIDORA LA OSA" && c.lio_idx === 1 && c.lio_total === 0 &&
+        /502/.test(c.zpl) && /Lio 1\^FS/.test(c.zpl) && /TOTAL 5 cajas/.test(c.zpl) && /\^XA/.test(c.zpl);
+      out.cid = /^etl_C99Z_s1_/.test(c.client_id); }
+
+    // secuencia monotónica: dos líos seguidos → client_id distintos y lío 1/2
+    { _comp = { tanda: "C99Z", legajo: "0", nps: [{ np: "98002", rs: "Y", liosArr: [] }] };
+      const n = _comp.nps[0]; window.__cap = [];
+      const _p = window.etlPost; window.etlPost = function (row) { window.__cap.push(row); };
+      _compAddLio(n, mkLio()); _compAddLio(n, mkLio());
+      window.etlPost = _p;
+      out.seq = (window.__cap.length === 2 && window.__cap[0].client_id !== window.__cap[1].client_id && window.__cap[1].lio_idx === 2); }
+
     out.abrev = (_etlAbrev("Mundo Bazar S.A.") === "Mundo Bazar") &&
       (_etlAbrev("Comercial Del Plata S.R.L.") === "Comercial Del Plata") &&
       (_etlAbrev("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA").length <= 22);
-    out.cid = /^etl_C99Z_98001_1_/.test(r0.client_id) && /^etl_C99Z_98002_1_/.test(rows[2].client_id);
+
     etlSetOn(false);
     return out;
   });
   await b.close();
-  const ok = r.fns && r.offEmpty && r.realEmpty && r.count && r.row0 && r.abrev && r.cid && errs.length === 0;
+  const ok = r.fns && r.offNoEnq && r.realNoEnq && r.onEnq && r.row && r.cid && r.seq && r.abrev && errs.length === 0;
   console.log("etl-lio:", JSON.stringify(r), "· pageerrors:", errs.length ? errs.join(" | ") : "none", "·", ok ? "✓ OK" : "✗ FALLÓ");
   process.exit(ok ? 0 : 1);
 })();
