@@ -81,4 +81,7 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== emp-np (regresión v6.85 / idea 9020: empresa por NP → sufijo LK/CH en el picking) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/emp-np.cjs
 
+echo "== etl-lio (idea 5290 / v6.88: etiquetas de lío auto detrás del switch + legajo 0/1) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/etl-lio.cjs
+
 echo "== TODO OK =="

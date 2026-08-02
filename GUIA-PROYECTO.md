@@ -4,7 +4,22 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-01 · Versión app al documentar: **v6.87**
+> Última actualización: 2026-08-01 · Versión app al documentar: **v6.88**
+>
+> Nota: **v6.88 — Etiquetas de lío automáticas (idea 5290), piloto detrás del switch + legajo 0/1**.
+> Al **terminar el armado** (finalizar, junto al `liosSend`/TAL), la app **encola una etiqueta por
+> lío** de cada NP en la tabla nueva **`Etiquetas_Lio`** (Supabase): `client_id` determinístico
+> (`etl_<tanda>_<np>_<lío>_<día>`), **razón social abreviada** (`_etlAbrev`: saca S.R.L./S.A. y
+> recorta a 22), **composición cód+cajas** (`items` jsonb), tanda/NP, operario y el **ZPL** ya
+> armado (`_etlZpl`, ~75 mm de ancho, alto según ítems). Un **imprimidor** en la PC de la
+> **Zebra S4M** (`tools/imprimir-etiquetas-lio.ps1`, PowerShell, envío RAW por `winspool`) lee las
+> `estado='pendiente'`, imprime y marca `impreso`. **TODO detrás del switch `vir_etiqueta_lio` y
+> SÓLO para legajos de prueba 0/1** (mismo `pkScanAllowedLegajo`); con el switch apagado NO se
+> encola nada (`etlBuildLabels` devuelve `[]`). Toggle en el módulo del operador (`_etlOperRow`,
+> sólo 0/1). RLS: anon inserta sólo filas `pendiente` y sólo actualiza las `pendiente`. Falta el
+> **lugar de entrega** (el dueño lo tiene que parametrizar; hoy va cliente + composición). Fns:
+> `etlOn/SetOn/Toggle`, `_etlAbrev`, `_etlZpl`, `etlBuildLabels`, `etlPost`, `etlEnqueueArmado`,
+> `_etlOperRow`. Smoke `tests/etl-lio.cjs`. Suite completa OK. Bump **v6.88**.
 >
 > Nota: **v6.87 — El piloto de la lectora queda restringido a los legajos de PRUEBA (0 y 1)**.
 > Pedido del dueño: poder prender la lectora para probarla **él mismo** con los legajos 0/1
