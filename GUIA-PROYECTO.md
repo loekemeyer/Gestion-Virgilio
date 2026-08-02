@@ -4,7 +4,18 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-01 · Versión app al documentar: **v6.86**
+> Última actualización: 2026-08-01 · Versión app al documentar: **v6.87**
+>
+> Nota: **v6.87 — El piloto de la lectora queda restringido a los legajos de PRUEBA (0 y 1)**.
+> Pedido del dueño: poder prender la lectora para probarla **él mismo** con los legajos 0/1
+> (los de test/basura, ya excluidos de reportes) sin que ningún operario real la active. Helper
+> `pkScanAllowedLegajo(lg)` = `lg ∈ {"0","1"}`. **Efecto gateado en un solo choke-point**: el
+> listener de teclado (`pkScanBind`) corta si `!pkScanAllowedLegajo(_pk.legajo)` → aunque el flag
+> `vir_picking_scanner` esté prendido, un picking de otro legajo NO procesa scans y `_pk.faltaPend`
+> nunca se puebla (la pantalla de lote tampoco aparece). Además el **toggle del operador**
+> (`_pkScanOperRow(box, legajo)`) **sólo se dibuja para 0/1**; el del Print Station aclara que sólo
+> corre para esos legajos. Smoke `pk-scan` extendido (`legGate` + `operRowGate`). Verificado: suite
+> OK. Bump **v6.87**. (Cuando el dueño valide el flujo, se amplía a los legajos reales.)
 >
 > Nota: **v6.86 — Picking con lectora (idea 8243): FALTA DIFERIDO, cero toques de pantalla**.
 > Refinamiento pedido por el dueño: con el switch `vir_picking_scanner` prendido, durante el

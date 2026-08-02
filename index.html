@@ -4590,7 +4590,7 @@ function renderPendingSuggestion(){
   const box = ensurePendingSuggestionContainer();
   box.innerHTML = "";
   if(!legajo) return;
-  _pkScanOperRow(box);   // switch del scanner (piloto), accesible desde el módulo del operador
+  _pkScanOperRow(box, legajo);   // switch del scanner (piloto) — sólo aparece para los legajos de prueba 0 y 1
 
   // (−2) "Che, ayer te quedó esto SIN CERRAR": tareas (picking/armado) que quedaron
   // ABIERTAS de un día anterior. Así saben qué les quedó mal y lo terminan si fue sin
@@ -5718,7 +5718,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v6.86";
+const APP_VERSION = "v6.87";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -7413,11 +7413,17 @@ function pkFaltaPend() {
 function pkScanOn() { try { return localStorage.getItem("vir_picking_scanner") === "1"; } catch (_e) { return false; } }
 function pkScanSetOn(v) { try { localStorage.setItem("vir_picking_scanner", v ? "1" : "0"); } catch (_e) {} }
 function pkScanToggle() { pkScanSetOn(!pkScanOn()); try { if (typeof psRender === "function") psRender(); } catch (_e) {} try { if (typeof renderPendingSuggestion === "function") renderPendingSuggestion(); } catch (_e) {} }
+/* Piloto restringido a los legajos de PRUEBA (0 y 1): aunque el flag esté prendido, el
+   modo lectora sólo tiene efecto cuando el picking lo hace el legajo 0 o 1 (el dueño lo
+   prueba con esos). Para cualquier otro legajo el picking es SIEMPRE el de hoy — el
+   listener corta por acá y el toggle del operador ni se dibuja. */
+function pkScanAllowedLegajo(lg) { const s = String(lg == null ? "" : lg).trim(); return s === "0" || s === "1"; }
 /* Fila del switch del scanner para el MÓDULO DEL OPERADOR (se prende desde el celu
    del operario, no solo desde el Print Station). Sólo dibuja el toggle; el modo
    scanner en sí sigue 100% gateado por `pkScanOn()`. */
-function _pkScanOperRow(box) {
+function _pkScanOperRow(box, legajo) {
   try {
+    if (!pkScanAllowedLegajo(legajo)) return;   // piloto: el toggle sólo aparece para legajos de prueba 0 y 1
     const on = (typeof pkScanOn === "function") && pkScanOn();
     const row = document.createElement("div");
     row.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:10px;background:" + (on ? "#ecfdf5" : "#f8fafc") + ";border:1px solid " + (on ? "#16a34a" : "#cbd5e1") + ";border-radius:11px;padding:8px 12px;margin:8px 0;font-size:13px;color:#334155;line-height:1.3;";
@@ -7514,6 +7520,7 @@ function pkScanToast(msg, ok) {
     if (!pkScanOn()) return;                                  // switch OFF → no hace NADA
     const m = document.getElementById("tandaModal");
     if (!m || !m.classList.contains("show")) return;          // sólo con el picking abierto
+    if (!_pk || !pkScanAllowedLegajo(_pk.legajo)) return;     // piloto: SÓLO legajos de prueba 0 y 1
     const ae = document.activeElement;
     if (ae && (ae.tagName === "INPUT" || ae.tagName === "TEXTAREA" || ae.tagName === "SELECT")) return; // no pisar el tipeo de cantidad
     if (e.key === "Enter") { if (buf.length) { const sc = buf; buf = ""; e.preventDefault(); pkOnScan(sc); } return; }
@@ -21269,7 +21276,7 @@ function psRender(){
   h += '<div class="ps-toggle-card"><div class="ps-tc-top"><span class="ps-tc-t">🔫 Picking con lectora de código de barras (PILOTO)</span>' +
     '<span class="sup-sw' + (scon ? " on" : "") + '" onclick="pkScanToggle()" role="switch"><span class="sup-sw-k"></span></span></div>' +
     '<div class="ps-status ' + (scon ? "on" : "") + '">' + (scon ? "🟢 Activo — en el picking, cada disparo de la lectora marca el artículo (Code-128 <code>código|T</code> = todas / <code>código|A</code> = algunas)" : "⚪ Apagado — el picking funciona con la botonera de siempre (todas / algunas / sin stock)") + '</div>' +
-    '<div class="ps-help">Switch de prueba. <b>Apagado = el picking anda igual que hoy.</b> Imprimí las etiquetas de góndola con <code>tools/etiquetas-gondola.html</code> y emparejá la lectora Bluetooth al celu antes de prenderlo.</div></div>';
+    '<div class="ps-help">Switch de prueba — <b>sólo tiene efecto para los legajos 0 y 1</b> (los de prueba); el resto de los operarios pican igual que hoy. <b>Apagado = el picking anda igual que hoy.</b> Imprimí las etiquetas de góndola con <code>tools/etiquetas-gondola.html</code> y emparejá la lectora Bluetooth al celu antes de prenderlo.</div></div>';
   h += '<div class="ps-help">Dejá <b>esta pantalla abierta</b> en la PC que está al lado de la impresora. Para que salga <b>sin diálogo</b>: abrí la app en <b>Chrome con <code>--kiosk-printing</code></b> y poné esa impresora como <b>predeterminada de Windows</b>. Probá con el botón de abajo antes de prender el automático.</div>';
   h += '<div class="ps-actions"><button class="ps-test" onclick="psTestPrint()">🖨️ Imprimir hoja de prueba</button></div>';
   const log = (_ps && _ps.log) || [];

@@ -18,7 +18,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   await p.goto("file://" + path.join(root, "index.html"), { waitUntil: "domcontentloaded" });
   const r = await p.evaluate(() => {
     const out = {};
-    out.fns = ["pkScanOn", "pkScanSetOn", "pkScanToggle", "pkOnScan", "_pkFindByCode", "pkScanToast"].every((n) => typeof window[n] === "function");
+    out.fns = ["pkScanOn", "pkScanSetOn", "pkScanToggle", "pkScanAllowedLegajo", "pkOnScan", "pkFaltaPend", "pkConfirmFaltaBatch", "_pkFindByCode", "pkScanToast"].every((n) => typeof window[n] === "function");
     try { localStorage.removeItem("vir_picking_scanner"); } catch (_e) {}
     out.defOff = (pkScanOn() === false);                 // arranca apagado
     pkScanToggle(); out.togOn = (pkScanOn() === true);
@@ -67,11 +67,19 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
       out.batchConfirm = (_pk && _pk.results["323"] === 3 && !(_pk.faltaPend && _pk.faltaPend["323"]));
     } catch (e) { out.batchConfirmErr = String(e && e.message || e); out.batchConfirm = false; }
 
+    // PILOTO restringido a legajos de prueba 0 y 1 (helper + toggle del operador)
+    out.legGate = (pkScanAllowedLegajo("0") === true && pkScanAllowedLegajo("1") === true && pkScanAllowedLegajo("104") === false && pkScanAllowedLegajo("") === false);
+    try {
+      const bReal = document.createElement("div"); _pkScanOperRow(bReal, "104");   // legajo real → NO dibuja el toggle
+      const bTest = document.createElement("div"); _pkScanOperRow(bTest, "0");      // legajo de prueba → sí
+      out.operRowGate = (bReal.children.length === 0 && bTest.children.length === 1);
+    } catch (e) { out.operRowErr = String(e && e.message || e); out.operRowGate = false; }
+
     pkScanSetOn(false);
     return out;
   });
   await b.close();
-  const ok = r.fns && r.defOff && r.togOn && r.togOff && r.find && r.algunas && r.todas && r.unknown && r.num3 && r.eanDec && r.eanTodo && r.eanFalta && r.batch && r.batchConfirm && errs.length === 0;
+  const ok = r.fns && r.defOff && r.togOn && r.togOff && r.find && r.algunas && r.todas && r.unknown && r.num3 && r.eanDec && r.eanTodo && r.eanFalta && r.batch && r.batchConfirm && r.legGate && r.operRowGate && errs.length === 0;
   console.log("pk-scan:", JSON.stringify(r), "· pageerrors:", errs.length ? errs.join(" | ") : "none", "·", ok ? "✓ OK" : "✗ FALLÓ");
   process.exit(ok ? 0 : 1);
 })();
