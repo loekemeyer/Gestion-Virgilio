@@ -4,7 +4,23 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-01 · Versión app al documentar: **v6.85**
+> Última actualización: 2026-08-01 · Versión app al documentar: **v6.86**
+>
+> Nota: **v6.86 — Picking con lectora (idea 8243): FALTA DIFERIDO, cero toques de pantalla**.
+> Refinamiento pedido por el dueño: con el switch `vir_picking_scanner` prendido, durante el
+> picking el operario **no toca la pantalla** — sólo dispara la lectora. **TODO** (`779558700`+NNN)
+> = agarró todo → registra las cajas pedidas y avanza. **FALTA** (`779558701`+NNN) = agarró de
+> menos → **ya NO abre el input** en el momento: marca el artículo como *falta pendiente*
+> (`_pk.faltaPend`, se borra su result si tenía) y avanza. Recién **al terminar (TP)**,
+> `pkRenderDone` muestra **una pantalla que pide en LOTE** las cantidades de todos los FALTA
+> (inputs `type=text inputmode=numeric` para tipear al derecho; blanco/0 = no había);
+> `pkConfirmFaltaBatch` emite un PKC por artículo y dispara el TP. Los *falta pendiente* no
+> cuentan como "sin marcar" (el bloqueo de fin sigue exigiendo marcar los que NO se escanearon).
+> Objetivo: que el armador (cuello de botella) reciba las cajas prolijas sin esperar. Fns nuevas
+> `pkFaltaPend`/`pkConfirmFaltaBatch`; `faltaPend` persiste en `pkSave`/`pkResume`. **Con el switch
+> apagado (default) `_pk.faltaPend` no existe y el picking es EXACTO al de hoy.** Smoke `pk-scan`
+> extendido (batch + confirmación). Verificado: suite completa OK (0 handlers muertos). Bump
+> `APP_VERSION`/`SW_VERSION` **v6.86**. ⏳ Falta el piloto con la lectora real (llega mañana).
 >
 > Nota: **v6.85 — la columna CAJAS PEDIDAS del Stock también parte por empresa**. Cola de
 > la idea 9020: el picking ya resolvía la empresa por NP, pero la demanda seguía saliendo del

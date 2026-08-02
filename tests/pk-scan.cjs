@@ -35,8 +35,8 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     ] };
     out.find = (_pkFindByCode("943E") === 0) && (_pkFindByCode("323") === 1) && (_pkFindByCode("999X") === -1);
 
-    // ALGUNAS → input de cantidad sobre el artículo escaneado
-    try { pkOnScan("323|A"); out.algunas = (_pk.idx === 1 && _pk.mode === "fInput"); } catch (e) { out.algErr = String(e && e.message || e); out.algunas = false; }
+    // ALGUNAS → FALTA DIFERIDO (idea 8243): NO abre input; marca faltaPend y avanza (no toca pantalla)
+    try { pkOnScan("323|A"); out.algunas = (!!(_pk.faltaPend && _pk.faltaPend["323"] === true) && _pk.mode !== "fInput" && _pk.idx === 2); } catch (e) { out.algErr = String(e && e.message || e); out.algunas = false; }
 
     // TODAS → registra lo pedido (esp)
     try { _pk.idx = 0; _pk.mode = "item"; pkOnScan("943E|T"); out.todas = (_pk.results["943E"] === 12); } catch (e) { out.todErr = String(e && e.message || e); out.todas = false; }
@@ -51,15 +51,27 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     // TODO por EAN → registra sobre 943E (NNN 943)
     _pk = { tanda: "C99Z", legajo: "104", idx: 0, results: {}, mode: "item", items: [ { art: "943E", key: "943E", esp: 12, sector: "I08" }, { art: "323", key: "323", esp: 4, sector: "A50" } ] };
     try { pkOnScan("7795587009432"); out.eanTodo = (_pk.results["943E"] === 12); } catch (e) { out.eanTodoErr = String(e && e.message || e); out.eanTodo = false; }
-    // FALTA por EAN → abre input de cantidad sobre 943E
+    // FALTA por EAN → DIFERIDO: marca faltaPend sobre 943E, sin abrir input
     _pk = { tanda: "C99Z", legajo: "104", idx: 0, results: {}, mode: "item", items: [ { art: "943E", key: "943E", esp: 12, sector: "I08" }, { art: "323", key: "323", esp: 4, sector: "A50" } ] };
-    try { pkOnScan("7795587019431"); out.eanFalta = (_pk.mode === "fInput" && _pk.items[_pk.idx].art === "943E"); } catch (e) { out.eanFaltaErr = String(e && e.message || e); out.eanFalta = false; }
+    try { pkOnScan("7795587019431"); out.eanFalta = (!!(_pk.faltaPend && _pk.faltaPend["943E"] === true) && _pk.mode !== "fInput"); } catch (e) { out.eanFaltaErr = String(e && e.message || e); out.eanFalta = false; }
+
+    // BATCH al terminar (TP): con un FALTA diferido y el resto completo, pkRenderDone pide la cantidad en lote
+    _pk = { tanda: "C99Z", legajo: "104", idx: 2, mode: "item", results: { "943E": 12 }, faltaPend: { "323": true }, items: [ { art: "943E", key: "943E", esp: 12, sector: "I08" }, { art: "323", key: "323", esp: 4, sector: "A50" } ] };
+    try { pkRender(); const b = document.querySelector(".tanda-modal-body").innerHTML; out.batch = (/Cu.ntas cajas pusiste/i.test(b) && /id="pkBq_1"/.test(b)); } catch (e) { out.batchErr = String(e && e.message || e); out.batch = false; }
+    // Confirmar el lote setea el result correcto (stub de pkFinishPicking para no disparar el envío/cierre real)
+    try {
+      const inp = document.getElementById("pkBq_1"); if (inp) inp.value = "3";
+      const _fin = window.pkFinishPicking; window.pkFinishPicking = function () {};
+      pkConfirmFaltaBatch();
+      window.pkFinishPicking = _fin;
+      out.batchConfirm = (_pk && _pk.results["323"] === 3 && !(_pk.faltaPend && _pk.faltaPend["323"]));
+    } catch (e) { out.batchConfirmErr = String(e && e.message || e); out.batchConfirm = false; }
 
     pkScanSetOn(false);
     return out;
   });
   await b.close();
-  const ok = r.fns && r.defOff && r.togOn && r.togOff && r.find && r.algunas && r.todas && r.unknown && r.num3 && r.eanDec && r.eanTodo && r.eanFalta && errs.length === 0;
+  const ok = r.fns && r.defOff && r.togOn && r.togOff && r.find && r.algunas && r.todas && r.unknown && r.num3 && r.eanDec && r.eanTodo && r.eanFalta && r.batch && r.batchConfirm && errs.length === 0;
   console.log("pk-scan:", JSON.stringify(r), "· pageerrors:", errs.length ? errs.join(" | ") : "none", "·", ok ? "✓ OK" : "✗ FALLÓ");
   process.exit(ok ? 0 : 1);
 })();

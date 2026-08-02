@@ -5718,7 +5718,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v6.85";
+const APP_VERSION = "v6.86";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -6849,7 +6849,7 @@ function pkSave() {
     localStorage.setItem(PK_SAVE_PREFIX + _pk.legajo, JSON.stringify({
       day: getTodayKey(), tanda: _pk.tanda, legajo: _pk.legajo,
       items: _pk.items, idx: _pk.idx, results: _pk.results, mode: _pk.mode,
-      forced: _pk.forced || {}
+      forced: _pk.forced || {}, faltaPend: _pk.faltaPend || {}
     }));
   } catch (_e) { /* localStorage lleno / privado: no rompe el picking */ }
 }
@@ -6888,7 +6888,8 @@ function pkResume(legajo) {
   if (!m) return;
   m.querySelector(".tanda-modal-title").textContent = "Picking — Tanda " + saved.tanda;
   _pk = { tanda: saved.tanda, legajo: saved.legajo, items: saved.items,
-          idx: saved.idx || 0, results: saved.results || {}, mode: saved.mode || "item" };
+          idx: saved.idx || 0, results: saved.results || {}, mode: saved.mode || "item",
+          faltaPend: saved.faltaPend || {} };
   m.classList.add("show");
   pkRender();
 }
@@ -7279,13 +7280,17 @@ function pkReclarify() {
 function pkRenderDone(body, N, nav) {
   // v4.26: los "Salteá" (skip) NO son pasos de pick → no cuentan para terminar.
   const pickItems = _pk.items.filter(it => !it.skip);
-  let falt = 0; const conf = pkCount(); const pend = pickItems.filter(it => _pk.results[it.key] == null).length;
+  // Scanner (idea 8243): los "falta pendiente" (escaneados FALTA, cantidad diferida al
+  // TP) NO cuentan como "sin marcar" — se piden en lote más abajo. Sin scanner
+  // `_pk.faltaPend` no existe → isPend() siempre false y el cálculo queda idéntico.
+  const isPend = it => !!(_pk.faltaPend && _pk.faltaPend[it.key]);
+  let falt = 0; const conf = pkCount(); const pend = pickItems.filter(it => _pk.results[it.key] == null && !isPend(it)).length;
   for (const it of pickItems) { const r = _pk.results[it.key]; if (r != null && r < it.esp) falt++; }
   N = pickItems.length;   // mostrar "X de <pasos reales>"
   // Si saltearon artículos con "Adelante" sin marcar Ok/F, NO se puede terminar:
   // hay que marcar cada uno (Ok o F) sí o sí. Listamos los que faltan.
   if (pend > 0) {
-    const faltanList = pickItems.filter(it => _pk.results[it.key] == null).map(it => escapeHtml(it.art));
+    const faltanList = pickItems.filter(it => _pk.results[it.key] == null && !isPend(it)).map(it => escapeHtml(it.art));
     body.innerHTML = `<div class="pk-flow">${nav || ""}<div class="pk-doneflow">
       <div class="pk-done-ico" style="color:#dc2626">!</div>
       <div class="pk-done-t">Te faltan ${pend} sin marcar</div>
@@ -7295,6 +7300,35 @@ function pkRenderDone(body, N, nav) {
     </div></div>`;
     return;
   }
+  // Scanner (idea 8243): las cantidades de los FALTA se piden TODAS JUNTAS acá, al
+  // terminar (TP), para que durante el picking el operario no toque la pantalla. Inputs
+  // type=text inputmode=numeric (como el fix del MG) para que se tipeen al derecho.
+  if (_pk.faltaPend) {
+    const pendFalta = pickItems.filter(it => _pk.faltaPend[it.key] && _pk.results[it.key] == null);
+    if (pendFalta.length) {
+      const rows = pendFalta.map(it => {
+        const i = _pk.items.indexOf(it);
+        const sec = String(it.sector || "—").replace(/-/g, "");
+        const rec = (it.dual && it.pick) ? it.pick : (it.real || it.art);
+        return '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 6px;border-bottom:1px solid #e5e7eb;">'
+          + '<div style="display:flex;flex-direction:column;line-height:1.15;min-width:0;">'
+          + '<span style="font-weight:800;font-size:16px;color:#0f172a;">' + escapeHtml(rec) + '</span>'
+          + '<span style="font-size:12px;color:#64748b;">Sector ' + escapeHtml(sec) + '</span></div>'
+          + '<div style="display:flex;align-items:center;gap:6px;flex:none;">'
+          + '<input id="pkBq_' + i + '" type="text" inputmode="numeric" placeholder="0" value="" '
+          + 'style="width:64px;padding:9px;border:2px solid #cbd5e1;border-radius:9px;font:800 18px system-ui;text-align:center;">'
+          + '<span style="font-size:13px;color:#94a3b8;font-weight:700;">/ ' + pkFmt(it.esp) + '</span></div></div>';
+      }).join("");
+      body.innerHTML = `<div class="pk-flow">${nav || ""}<div class="pk-doneflow">
+        <div class="pk-done-t">¿Cuántas cajas pusiste?</div>
+        <div class="pk-done-s">De los que escaneaste como <b>FALTA</b>. El resto ya quedó completo. (0 = no había)</div>
+        <div style="width:100%;max-height:44vh;overflow:auto;border:1px solid #e5e7eb;border-radius:12px;margin:6px 0 10px;">${rows}</div>
+        <button class="pk-btn pk-ok" onclick="pkConfirmFaltaBatch()">✓ Confirmar y terminar</button>
+        <button class="pk-btn pk-cancel" onclick="pkClose()">Cerrar (sigo después)</button>
+      </div></div>`;
+      return;
+    }
+  }
   body.innerHTML = `<div class="pk-flow">${nav || ""}<div class="pk-doneflow">
     <div class="pk-done-ico">✓</div>
     <div class="pk-done-t">Picking completo</div>
@@ -7302,6 +7336,25 @@ function pkRenderDone(body, N, nav) {
     <button class="pk-btn pk-ok" onclick="pkFinishPicking()">✓ Terminé el picking</button>
     <button class="pk-btn pk-cancel" onclick="pkClose()">Cerrar (sigo después)</button>
   </div></div>`;
+}
+/* Scanner (idea 8243): confirma en LOTE las cantidades de los FALTA diferidos y termina
+   el picking. Un PKC por artículo (mismo pkSendDetail que el flujo normal); blanco o
+   negativo = 0 (no había). Después llama a pkFinishPicking (TP). */
+function pkConfirmFaltaBatch() {
+  if (!_pk) return;
+  for (let i = 0; i < _pk.items.length; i++) {
+    const it = _pk.items[i];
+    if (it.skip) continue;
+    if (!(_pk.faltaPend && _pk.faltaPend[it.key]) || _pk.results[it.key] != null) continue;
+    const inp = document.getElementById("pkBq_" + i);
+    let real = inp ? parseFloat(String(inp.value).replace(",", ".")) : 0;
+    if (isNaN(real) || real < 0) real = 0;
+    const rec = (it.dual && it.pick) ? it.pick : it.art;
+    _pk.results[it.key] = real;
+    pkSendDetail(rec, it.esp, real);
+    delete _pk.faltaPend[it.key];
+  }
+  pkFinishPicking();
 }
 /* Salta al primer artículo sin marcar (Ok/F). Lo usa el botón "Completar los
    que faltan" cuando quedó alguno salteado con "Adelante". */
@@ -7322,6 +7375,7 @@ function pkOk() {
   const it = _pk.items[_pk.idx];
   const rec = (it.dual && it.pick) ? it.pick : it.art;   // par Nacional/Importado: registra el elegido
   _pk.results[it.key] = it.esp;
+  if (_pk.faltaPend) delete _pk.faltaPend[it.key];   // idea 8243: si venía marcado FALTA pendiente, se resuelve
   pkSendDetail(rec, it.esp, it.esp);
   pkAdvance();
 }
@@ -7332,10 +7386,24 @@ function pkSinStock() {
   const it = _pk.items[_pk.idx];
   const rec = (it.dual && it.pick) ? it.pick : it.art;
   _pk.results[it.key] = 0;
+  if (_pk.faltaPend) delete _pk.faltaPend[it.key];   // idea 8243
   pkSendDetail(rec, it.esp, 0);
   pkAdvance();
 }
 function pkF() { if (_pk) { _pk.mode = "fInput"; pkRender(); } }
+/* Scanner (idea 8243) — FALTA DIFERIDO: al escanear la etiqueta FALTA NO se abre el
+   input de cantidad (no se toca la pantalla durante el picking). Se marca el artículo
+   como "falta pendiente" y se avanza; la cantidad se pide EN LOTE al terminar (TP), en
+   pkRenderDone → pkConfirmFaltaBatch. Sólo se llega acá desde pkOnScan (listener gateado
+   por el switch); sin scanner `_pk.faltaPend` no existe y NADA cambia. */
+function pkFaltaPend() {
+  if (!_pk || _pk.idx >= _pk.items.length) return;
+  const it = _pk.items[_pk.idx];
+  if (!_pk.faltaPend) _pk.faltaPend = {};
+  _pk.faltaPend[it.key] = true;
+  if (Object.prototype.hasOwnProperty.call(_pk.results, it.key)) delete _pk.results[it.key]; // si venía marcado, pasa a pendiente
+  pkAdvance();
+}
 /* ===== Picking con LECTORA de código de barras (idea 8243) — TODO detrás del switch
    `vir_picking_scanner`. Switch OFF (default) = el picking funciona EXACTO como hoy:
    la 1ª línea de cada handler/listener corta, no se bindea ni corre nada. Switch ON =
@@ -7413,7 +7481,7 @@ function pkOnScan(raw) {
     _pk.idx = eidx; _pk.mode = "item";
     const eit = _pk.items[eidx];
     const enom = eit.real || eit.pick || eit.art;
-    if (ean.accion === "A") { pkF(); pkScanToast("✎ " + enom + " — falta, completá en la tablet", true); }
+    if (ean.accion === "A") { pkFaltaPend(); pkScanToast("✎ " + enom + " — falta (cantidad al terminar)", true); }
     else { pkOk(); pkScanToast("✓ " + enom + " · " + pkFmt(eit.esp), true); }
     return;
   }
@@ -7430,7 +7498,7 @@ function pkOnScan(raw) {
     else if (it.dual.imp && String(it.dual.imp).toUpperCase() === code) it.pick = it.dual.imp;
   }
   _pk.idx = idx; _pk.mode = "item";
-  if (accion === "A") { pkF(); pkScanToast("✎ " + code + " — poné cuántas", true); }
+  if (accion === "A") { pkFaltaPend(); pkScanToast("✎ " + code + " — falta (cantidad al terminar)", true); }
   else { pkOk(); pkScanToast("✓ " + code + " · " + pkFmt(it.esp), true); }
 }
 function pkScanToast(msg, ok) {
@@ -7551,6 +7619,7 @@ function pkConfirmF() {
   if (isNaN(real) || real < 0) real = 0;
   const rec = (it.dual && it.pick) ? it.pick : it.art;   // par Nacional/Importado: registra el elegido
   _pk.results[it.key] = real;
+  if (_pk.faltaPend) delete _pk.faltaPend[it.key];   // idea 8243
   pkSendDetail(rec, it.esp, real);
   pkAdvance();
 }
