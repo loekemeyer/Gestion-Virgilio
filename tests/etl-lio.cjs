@@ -19,7 +19,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   await p.goto("file://" + path.join(root, "index.html"), { waitUntil: "domcontentloaded" });
   const r = await p.evaluate(() => {
     const out = {};
-    out.fns = ["etlOn", "etlSetOn", "etlToggle", "etlBuildLioRow", "etlEnqueueLio", "_compAddLio", "_etlAbrev", "_etlZpl", "_etlOperRow"].every((n) => typeof window[n] === "function");
+    out.fns = ["etlOn", "etlSetOn", "etlLoadGlobal", "etlToggleGlobal", "etlBuildLioRow", "etlEnqueueLio", "_compAddLio", "_etlAbrev", "_etlZpl"].every((n) => typeof window[n] === "function");
     const mkLio = () => ({ items: [{ cod: "502", qty: 3 }, { cod: "323E", qty: 2 }], cajas: 5, suelta: false });
     try { localStorage.removeItem("vir_etiqueta_lio"); } catch (_e) {}
 
@@ -39,9 +39,10 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
       out.offNoEnq = (rr.n.liosArr.length === 1 && rr.cap.length === 0); }
 
     etlSetOn(true);
-    // legajo REAL (104) → agrega pero NO encola
+    // SIN gate de legajo (v6.90 — switch global de la operadora): con el switch ON encola
+    // para CUALQUIER legajo (ej. 104), no sólo 0/1.
     { const rr = run({ tanda: "C99Z", legajo: "104", nps: [{ np: "98001", rs: "X", liosArr: [] }] });
-      out.realNoEnq = (rr.n.liosArr.length === 1 && rr.cap.length === 0); }
+      out.anyLeg = (rr.n.liosArr.length === 1 && rr.cap.length === 1); }
 
     // legajo 0 + switch on → agrega Y encola UNA etiqueta correcta
     { const rr = run({ tanda: "C99Z", legajo: "0", nps: [{ np: "98001", rs: "DISTRIBUIDORA LA OSA S.R.L.", liosArr: [] }] });
@@ -68,7 +69,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     return out;
   });
   await b.close();
-  const ok = r.fns && r.offNoEnq && r.realNoEnq && r.onEnq && r.row && r.cid && r.seq && r.abrev && errs.length === 0;
+  const ok = r.fns && r.offNoEnq && r.anyLeg && r.onEnq && r.row && r.cid && r.seq && r.abrev && errs.length === 0;
   console.log("etl-lio:", JSON.stringify(r), "· pageerrors:", errs.length ? errs.join(" | ") : "none", "·", ok ? "✓ OK" : "✗ FALLÓ");
   process.exit(ok ? 0 : 1);
 })();

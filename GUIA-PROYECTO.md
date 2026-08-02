@@ -4,7 +4,19 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-01 · Versión app al documentar: **v6.89**
+> Última actualización: 2026-08-01 · Versión app al documentar: **v6.90**
+>
+> Nota: **v6.90 — El switch de etiquetas de lío pasa a ser GLOBAL, en el módulo de la operadora**.
+> Pedido del dueño: el switch va en el **Print Station** (módulo de la operadora, la PC al lado de
+> la impresora) y **NO** gateado por legajo 0/1. Ahora es un **ajuste global** en
+> `Stock_Config.etiqueta_lio` ('1'/'0', default off) — mismo patrón que `alerta_sin_stock_gondola`.
+> La operadora lo prende/apaga con `etlToggleGlobal` (POST a `Stock_Config`); cada **armador** lo
+> toma con `etlLoadGlobal` (fetch → espejo a `localStorage` que lee `etlOn`) **al abrir el armado**
+> (tras construir `_comp`) y la operadora lo re-sincroniza al abrir el Print Station. Se **sacó** el
+> toggle del módulo del operador (`_etlOperRow`) y el **gate de legajo** de `etlBuildLioRow` (ahora
+> el único gate es el switch global). Con el switch apagado no se encola nada. Toggle nuevo en
+> `psRender` (card "🏷️ Etiqueta de lío automática"). Smoke `etl-lio` actualizado (sin gate de
+> legajo). Suite OK. Bump **v6.90**.
 >
 > Nota: **v6.89 — Etiquetas de lío: imprime AL CERRAR CADA LÍO (no al TAP)**. Pedido del dueño:
 > que la etiqueta salga apenas confirman la pilita (para ensuncharla en el acto), no todas juntas
