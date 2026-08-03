@@ -36,9 +36,19 @@ $JsonSer = New-Object System.Web.Script.Serialization.JavaScriptSerializer
 
 function Get-Pendientes($url) {
   $wc = New-Object System.Net.WebClient
+  # Esta PC vieja cacheaba la respuesta HTTP y repetia SIEMPRE el mismo resultado (por
+  # eso quedaba pegado en "1 pendiente" para siempre aunque la cola cambiara). Se
+  # desactiva el cache del WebClient Y se agrega un parametro que cambia en cada
+  # llamada para que la URL nunca sea "la misma" (doble resguardo).
+  $wc.CachePolicy = New-Object System.Net.Cache.RequestCachePolicy([System.Net.Cache.RequestCacheLevel]::NoCacheNoStore)
+  $wc.Headers.Add("Cache-Control", "no-cache, no-store")
+  $wc.Headers.Add("Pragma", "no-cache")
   $wc.Headers.Add("apikey", $ApiKey)
   $wc.Headers.Add("Authorization", "Bearer " + $ApiKey)
-  $txt = $wc.DownloadString($url)
+  $sep = "&"
+  if ($url.IndexOf("?") -lt 0) { $sep = "?" }
+  $urlSinCache = $url + $sep + "_=" + [DateTime]::UtcNow.Ticks
+  $txt = $wc.DownloadString($urlSinCache)
   return $JsonSer.DeserializeObject($txt)
 }
 function Marcar-Impreso($id) {
@@ -106,6 +116,7 @@ try {
 }
 Write-Host ""
 
+$tick = 0
 while ($true) {
   try {
     $raw = Get-Pendientes("$Base" + "?estado=eq.pendiente&order=creado_en.asc&select=id,zpl&limit=20")
@@ -113,6 +124,12 @@ while ($true) {
     # nunca se rompe el foreach de abajo, sea $null, un solo item, o varios).
     $items = @()
     if ($null -ne $raw) { $items = @($raw) }
+    # Senal de vida cada ~1 minuto: para VER que sigue mirando la cola de verdad (no
+    # una ventana congelada) y que el numero cambia (no quedo pegado por cache).
+    $tick++
+    if (($tick % 10) -eq 0) {
+      Write-Host ("  ... {0} - sigo mirando - pendientes ahora: {1}" -f (Get-Date -Format "HH:mm:ss"), $items.Count) -ForegroundColor DarkGray
+    }
     foreach ($row in $items) {
       if ($null -eq $row) { continue }
       try {
