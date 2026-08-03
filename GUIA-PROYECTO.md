@@ -4,7 +4,33 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-03 · Versión app al documentar: **v6.96**
+> Última actualización: 2026-08-03 · Versión app al documentar: **v6.97**
+>
+> Nota: **v6.97 — PPP: fix "Pedidos Entregados" (daba 0) + nueva solapa "📦 Ocupación"**. Dos
+> pedidos del usuario. **(1) Bug "Pedidos Entregados" siempre en 0 / "los pedidos entregados
+> desaparecen".** La solapa mostraba `entreg = prog ∩ controlados`: pedidos que están **todavía en
+> `PPP_Programacion_Diaria`** Y marcados controlados. Pero un pedido **SALE** de la Programación
+> Diaria en cuanto se entrega/controla (el sync upstream lo saca) → esa intersección es
+> estructuralmente ~0 (verificado: de 203 NP en prog, 0 tienen CRN; de 361 CRN, 0 siguen en prog).
+> **Fix:** la lista ahora es **durable** y sale de los eventos **CRN** (control hecho, últimos 45
+> días) enriquecidos con `PPP_Entregados_Meta` (NP→cod/razón) y `vista_tanda_m3` (tanda→m³), agrupada
+> por **día de control → tanda**. Funciones nuevas: `pppRefreshDelivered` (`_pppDelivered`),
+> `_pppEntBodyHtml`, `pppTandaM3Map` (cache 5 min de `vista_tanda_m3`). Se dispara en `openPPP` (para
+> el badge) y al entrar a la solapa. El viejo `entreg` (prog∩ent) sigue calculándose pero ya no se
+> usa para la solapa. **(2) Nueva solapa "📦 Ocupación"** (m³ por día): gráfico de barras
+> **últimos 30 días** = m³ **armado real** (evento **TAP** por tanda × `vista_tanda_m3`, verde) +
+> **próximos 30 días** = m³ **programado a entregar** (`PPP_Programacion_Diaria.fecha_entrega` × `m3`,
+> azul); **HOY** resaltado (violeta) y auto-scrolleado al centro; se actualiza solo al llegar
+> registros. **Comparativa de capacidad**: Virgilio **no guarda** una capacidad total del depósito en
+> m³ (`Capacidad_Sector` es capacidad de **góndola en cajas**, otra cosa) → se agregó un input para
+> cargarla a mano (localStorage `vir_ocup_cap_m3`); al setearla dibuja la línea de capacidad + el %
+> de ocupación de hoy. **Detalle por día** (tocar una barra): m³ **pendientes de entrega** ese día
+> (por tanda + NPs) y m³ armado ese día. KPIs: armado hoy, a entregar hoy, m³ próx. 30 días, día pico.
+> Funciones: `pppRefreshOcupacion` (`_ocupArmado`), `_ocupProgByDay`, `pppOcupHtml`, `_ocupSvg`,
+> `_ocupDetailHtml`, `pppOcupSetCap`, `pppOcupDay`. Todo **LECTURA** de Supabase (no rompe el "solo
+> local" de la PPP). Verificado: `checkhtml` + `smoke` OK, render headless a 400px de ambas solapas
+> (entregados agrupado por día; gráfico con barras verdes/azules, HOY, línea de capacidad al 81%).
+> Bump **v6.97**.
 >
 > Nota: **v6.96 — Fix UI: el botón "Cerrar" tapaba el título del modal**. Pedido del usuario (dos
 > capturas: "Picking — Tanda …" y "🚛 Carga Camión — reparto"): el título quedaba ATRÁS del botón
