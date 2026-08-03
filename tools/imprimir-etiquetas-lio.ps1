@@ -108,17 +108,27 @@ Write-Host ""
 
 while ($true) {
   try {
-    $pend = Get-Pendientes("$Base" + "?estado=eq.pendiente&order=creado_en.asc&select=id,zpl&limit=20")
-    foreach ($row in $pend) {
-      $zpl = [string]$row["zpl"]
-      $id  = $row["id"]
-      if (-not $zpl) { continue }
-      $ok = [RawPrinter]::Send($PrinterName, $zpl)
-      if ($ok) {
-        try { Marcar-Impreso $id } catch {}
-        Write-Host ("  [{0}] etiqueta #{1} impresa" -f (Get-Date -Format "HH:mm:ss"), $id) -ForegroundColor Cyan
-      } else {
-        Write-Host ("  ! no pude imprimir #{0} - revisa el NOMBRE de la impresora de arriba" -f $id) -ForegroundColor Yellow
+    $raw = Get-Pendientes("$Base" + "?estado=eq.pendiente&order=creado_en.asc&select=id,zpl&limit=20")
+    # @() fuerza SIEMPRE un arreglo (cola vacia = $null en algunos .NET viejos; con @()
+    # nunca se rompe el foreach de abajo, sea $null, un solo item, o varios).
+    $items = @()
+    if ($null -ne $raw) { $items = @($raw) }
+    foreach ($row in $items) {
+      if ($null -eq $row) { continue }
+      try {
+        $zpl = [string]$row["zpl"]
+        $id  = $row["id"]
+        if (-not $zpl) { continue }
+        $ok = [RawPrinter]::Send($PrinterName, $zpl)
+        if ($ok) {
+          try { Marcar-Impreso $id } catch {}
+          Write-Host ("  [{0}] etiqueta #{1} impresa" -f (Get-Date -Format "HH:mm:ss"), $id) -ForegroundColor Cyan
+        } else {
+          Write-Host ("  ! no pude imprimir #{0} - revisa el NOMBRE de la impresora de arriba" -f $id) -ForegroundColor Yellow
+        }
+      } catch {
+        # Una etiqueta con problema NO frena a las demas ni deja la cola trabada.
+        Write-Host ("  ! error con una etiqueta puntual: {0}" -f $_.Exception.Message) -ForegroundColor Yellow
       }
     }
   } catch {
