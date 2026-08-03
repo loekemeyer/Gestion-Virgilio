@@ -25,6 +25,10 @@ $PollSeconds = 4
 $Base    = "$SupabaseUrl/rest/v1/Etiquetas_Lio"
 $Headers = @{ apikey = $ApiKey; Authorization = "Bearer $ApiKey" }
 
+# Windows PowerShell 5.1 usa TLS viejo por default y Supabase exige TLS 1.2 → forzarlo,
+# si no, todas las consultas fallan con "error con la cola" y nunca imprime.
+try { [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12 } catch {}
+
 # --- Envío RAW: manda los bytes del ZPL a la impresora sin pasar por el driver GDI ---
 if (-not ("RawPrinter" -as [type])) {
 Add-Type @'
@@ -65,6 +69,15 @@ public class RawPrinter {
 Write-Host ""
 Write-Host "  Imprimidor de etiquetas de lio  ->  '$PrinterName'" -ForegroundColor Green
 Write-Host "  Mirando la cola cada $PollSeconds s. Ctrl+C para salir." -ForegroundColor Green
+Write-Host ""
+
+# Chequeo de conexion al arrancar (para ver enseguida si el problema es la red/TLS)
+try {
+  $chk = Invoke-RestMethod -Method Get -Headers $Headers -Uri "$Base?estado=eq.pendiente&select=id"
+  Write-Host ("  Conectado OK. Pendientes en cola ahora: {0}" -f @($chk).Count) -ForegroundColor Green
+} catch {
+  Write-Host ("  NO me pude conectar a la cola: {0}" -f $_.Exception.Message) -ForegroundColor Red
+}
 Write-Host ""
 
 while ($true) {
