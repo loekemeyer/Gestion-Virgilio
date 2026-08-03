@@ -4,7 +4,25 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-03 · Versión app al documentar: **v6.98**
+> Última actualización: 2026-08-03 · Versión app al documentar: **v6.99**
+>
+> Nota: **v6.99 — El histórico del Excel ahora trae FECHA + m³ (no solo NP+cliente)**. Seguimiento
+> del pedido del usuario: quería que los entregados **viejos** (anteriores al 26/05, que solo están
+> en el Sheet) también salgan con fecha y m³. Se descubrió que el Sheet **"PPP Pedidos Entregados
+> 2026"** SÍ tiene esas columnas (layout por campo entrecomillado: `1 Tanda · 3 NP · 5 Cod · 6 Razón ·
+> **7 Mt3** · 8 Mt3 FC · 13 Fecha de Entrega`), pero el sync server-side **`sync_ppp_entregados_meta()`**
+> (función Postgres que lee el CSV del Sheet vía extensión `http`, corre por cron pg_cron cada :07/:37)
+> solo capturaba np/cod/rs. **Fix (todo server-side, sin tocar el Apps Script):** (1) migración
+> `alter table PPP_Entregados_Meta add tanda text, m3 numeric, fecha_entrega text`; (2) se reescribió
+> la función para parsear también **tanda (ord 1)**, **Mt3 = m³ (ord 7, NO "Mt3 FC"/ord 8)** y
+> **Fecha de Entrega (ord 13)**, con el mismo parseo de coma-decimal que la app; (3) se corrió a mano
+> → **2043 filas, 2039 con m³, 1994 con fecha** (backfill inmediato; el cron la mantiene). En la app:
+> la solapa **"📄 Histórico completo del Excel"** ahora se renderiza **agrupada por fecha → tanda con
+> m³** (mismo formato que "Con detalle", vía `_pppEntGroupedHtml` compartido), no una grilla plana de
+> NP. `pppRefreshEntregadosFull` trae `np,cod,rs,tanda,m3,fecha_entrega`. Copia versionada de la
+> función en `sql/sync_ppp_entregados_meta.sql`. **Ojo**: `PPP_Entregados_Meta` ya NO es solo
+> NP→cliente — tiene tanda/m3/fecha_entrega (lo usa Recepción Remitos por np→cod/rs, sigue OK).
+> Verificado: `checkhtml` + `smoke` + render headless (Excel agrupado por fecha con m³). Bump **v6.99**.
 >
 > Nota: **v6.98 — "Pedidos Entregados": ahora muestra TODO (no 45 días de CRN)**. El usuario notó
 > que se veían pocos ("tendría que haber ~mil pedidos"). Diagnóstico sobre la data cruda: el espejo
