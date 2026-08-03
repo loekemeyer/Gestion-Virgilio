@@ -4,7 +4,19 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-03 · Versión app al documentar: **v6.95**
+> Última actualización: 2026-08-03 · Versión app al documentar: **v6.96**
+>
+> Nota: **v6.96 — Fix UI: el botón "Cerrar" tapaba el título del modal**. Pedido del usuario (dos
+> capturas: "Picking — Tanda …" y "🚛 Carga Camión — reparto"): el título quedaba ATRÁS del botón
+> "Cerrar", que se veía estirado a lo ancho de todo el modal. Causa: `.hist-modal-close` no
+> sobrescribía la regla global `button{ width:100%; margin-top:14px }` (index.html ~línea 25), así
+> que el botón se estiraba al 100%. En `.tanda-modal-header` (Picking / Carga Camión / Armado / RR)
+> el título es `flex:1; min-width:0` (puede colapsar a 0) y el botón `flex:0 0 auto` (no encoge) →
+> el botón se quedaba con todo el ancho y el texto del título quedaba desbordado por detrás. Fix: a
+> la clase base `.hist-modal-close` se le puso `width:auto; margin:0; flex:0 0 auto` — un botón de
+> cerrar va SIEMPRE compacto arriba a la derecha. Arregla los 5 modales que usan esa clase (tanda,
+> historial, terminar-día, monitor, análisis) sin regresiones. Verificado con render headless a
+> 400px y 900px (título y botón sin solaparse; los otros modales quedaron más prolijos). Bump **v6.96**.
 >
 > Nota: **v6.95 — Fix: "Seguir armado" (retomar) no refrescaba el switch/legajos de etiqueta de
 > lío**. Bug real encontrado en el piloto: `showCompletarWizard` llama a `etlLoadGlobal()` sólo en

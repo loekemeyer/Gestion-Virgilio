@@ -2365,6 +2365,13 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
   font-size: 16px;
   padding: 6px 14px;
   cursor: pointer;
+  /* Sin esto hereda width:100% + margin-top:14px de la regla global button{}
+     (línea ~25) y el botón "Cerrar" se estira a lo ancho tapando el título del
+     modal (el título tiene min-width:0 y su texto queda ATRÁS del botón).
+     Un botón de cerrar SIEMPRE va compacto arriba a la derecha. */
+  width: auto;
+  margin: 0;
+  flex: 0 0 auto;
 }
 .hist-day-block{
   border: 1px solid #ddd;
@@ -5718,7 +5725,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v6.95";
+const APP_VERSION = "v6.96";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
