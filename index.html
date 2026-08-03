@@ -5718,7 +5718,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v6.90";
+const APP_VERSION = "v6.91";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -8204,18 +8204,30 @@ function _etlAbrev(rs) {
   return s || String(rs || "").slice(0, 22);
 }
 function _etlEsc(x) { return String(x == null ? "" : x).replace(/[\^~\\]/g, " "); }
-/* ZPL de una etiqueta de lío para la S4M (203 dpi). Alto dinámico según cantidad de ítems. */
+/* ZPL de una etiqueta de lío para la S4M (203 dpi ≈ 8 dots/mm). Etiqueta FÍSICA fija
+   100×55mm → 800×440 dots (medida real confirmada por el dueño). El header y el footer
+   son de alto fijo; la zona de ítems reparte el espacio que queda entre TODOS los
+   ítems del lío, con una fuente que se achica sola si hay muchos códigos — así SIEMPRE
+   entra en la etiqueta física en vez de cortarse. */
 function _etlZpl(L) {
   const items = L.items || [];
-  const W = 600, H = 132 + Math.max(1, items.length) * 42 + 60;   // ~75mm ancho; alto crece con los ítems
+  const W = 800, H = 440;                              // 100×55mm @ 203dpi
+  const n = Math.max(1, items.length);
+  const headerH = 78, footerH = 40, pad = 12;
+  const itemsAreaH = H - headerH - footerH - pad * 2;
+  let rowH = Math.floor(itemsAreaH / n);
+  if (rowH > 46) rowH = 46;                            // no agrandar de más si hay pocos ítems
+  if (rowH < 20) rowH = 20;                            // piso de legibilidad si hay muchísimos
+  const fontH = Math.max(16, Math.min(36, rowH - 8));
   let s = "^XA\n^CI28\n^PW" + W + "\n^LL" + H + "\n";
-  s += "^FO20,18^A0N,42,42^FD" + _etlEsc(L.razon_social) + "^FS\n";
-  s += "^FO20,66^A0N,26,26^FDNP " + _etlEsc(L.np) + "  " + _etlEsc(L.tanda) + "   Lio " + L.lio_idx + (L.lio_total ? "/" + L.lio_total : "") + "^FS\n";
-  s += "^FO20,100^GB" + (W - 40) + ",2,2^FS\n";
-  let y = 116;
-  items.forEach(function (it) { s += "^FO28," + y + "^A0N,36,36^FD" + _etlEsc(it.cod) + "   x " + it.qty + "^FS\n"; y += 42; });
-  s += "^FO20," + (y + 10) + "^A0N,30,30^FDTOTAL " + (L.cajas || 0) + " cajas^FS\n";
-  s += "^FO" + (W - 200) + "," + (y + 14) + "^A0N,22,22^FDOp " + _etlEsc(L.operario) + "^FS\n";
+  s += "^FO16,10^A0N,40,40^FD" + _etlEsc(L.razon_social) + "^FS\n";
+  s += "^FO16,56^A0N,22,22^FDNP " + _etlEsc(L.np) + "  " + _etlEsc(L.tanda) + "   Lio " + L.lio_idx + (L.lio_total ? "/" + L.lio_total : "") + "^FS\n";
+  s += "^FO16," + headerH + "^GB" + (W - 32) + ",2,2^FS\n";
+  let y = headerH + pad;
+  items.forEach(function (it) { s += "^FO24," + y + "^A0N," + fontH + "," + fontH + "^FD" + _etlEsc(it.cod) + "   x " + it.qty + "^FS\n"; y += rowH; });
+  const footY = H - footerH + 4;
+  s += "^FO16," + footY + "^A0N,28,28^FDTOTAL " + (L.cajas || 0) + " cajas^FS\n";
+  s += "^FO" + (W - 220) + "," + (footY + 2) + "^A0N,20,20^FDOp " + _etlEsc(L.operario) + "^FS\n";
   s += "^XZ\n";
   return s;
 }

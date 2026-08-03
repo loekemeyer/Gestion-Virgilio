@@ -4,7 +4,22 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-01 · Versión app al documentar: **v6.90**
+> Última actualización: 2026-08-03 · Versión app al documentar: **v6.91**
+>
+> Nota: **v6.91 — Etiqueta de lío a la medida FÍSICA real: 100×55mm**. Piloto en vivo (03/08):
+> imprimió pero con el tamaño mal (el `_etlZpl` anterior usaba 600×dinámico "a ojo"). Fijado a
+> **800×440 dots** (100×55mm @ 203dpi ≈ 8 dots/mm — medida confirmada por el dueño en la impresora
+> real). Header (razón social + NP/tanda/lío) y footer (total + operario) son de alto fijo; la
+> **zona de ítems reparte el espacio libre entre todos los ítems del lío** con una fuente que se
+> achica sola si hay muchos códigos (`rowH`/`fontH` calculados, piso 20/16 dots) — así el lío
+> **siempre entra** en la etiqueta física en vez de cortarse. Smoke `etl-lio` verifica `^PW800`/
+> `^LL440` y un caso de 12 ítems (fuente achicada, mismo alto de etiqueta). Suite OK. Bump **v6.91**.
+> (De paso: la cola de etiquetas del piloto llegó a **0 pendientes** — el imprimidor de la PC de
+> la S4M, `tools/imprimir-etiquetas-lio.ps1`, quedó andando en esa PC con Windows 7 tras 2 fixes:
+> reescrito 100% ASCII — el guion largo/tildes rompían el parseo en PowerShell — y reescrito sin
+> `Invoke-RestMethod`/`ConvertFrom-Json` porque esa PC corre **PowerShell 2.0**, que no los tiene;
+> usa `WebClient` + `JavaScriptSerializer` (.NET) y fuerza TLS 1.2 vía `COMPLUS_Version=v4.0.30319`
+> en el `.bat` para que cargue CLR 4 en vez del 2.0 default.)
 >
 > Nota: **v6.90 — El switch de etiquetas de lío pasa a ser GLOBAL, en el módulo de la operadora**.
 > Pedido del dueño: el switch va en el **Print Station** (módulo de la operadora, la PC al lado de

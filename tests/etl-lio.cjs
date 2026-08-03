@@ -50,8 +50,15 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
       const c = rr.cap[0];
       out.row = !!c && c.np === "98001" && c.cajas === 5 && Array.isArray(c.items) && c.items.length === 2 &&
         c.razon_social === "DISTRIBUIDORA LA OSA" && c.lio_idx === 1 && c.lio_total === 0 &&
-        /502/.test(c.zpl) && /Lio 1\^FS/.test(c.zpl) && /TOTAL 5 cajas/.test(c.zpl) && /\^XA/.test(c.zpl);
+        /502/.test(c.zpl) && /Lio 1\^FS/.test(c.zpl) && /TOTAL 5 cajas/.test(c.zpl) && /\^XA/.test(c.zpl) &&
+        /\^PW800/.test(c.zpl) && /\^LL440/.test(c.zpl);   // etiqueta física 100×55mm @203dpi
       out.cid = /^etl_C99Z_s1_/.test(c.client_id); }
+
+    // muchos ítems en un mismo lío → la fuente se achica pero TODOS los ítems entran (mismo PW/LL)
+    { const manyItems = Array.from({ length: 12 }, (_, i) => ({ cod: "IT" + i, qty: i + 1 }));
+      const row = etlBuildLioRow({ tanda: "C99Z", legajo: "0", _etlSeq: 0 }, { np: "98003", rs: "Z" }, { items: manyItems, cajas: 99 });
+      const fsCount = (row.zpl.match(/\^FS/g) || []).length;
+      out.manyItems = !!row && /\^PW800/.test(row.zpl) && /\^LL440/.test(row.zpl) && fsCount === (manyItems.length + 5); }
 
     // secuencia monotónica: dos líos seguidos → client_id distintos y lío 1/2
     { _comp = { tanda: "C99Z", legajo: "0", nps: [{ np: "98002", rs: "Y", liosArr: [] }] };
@@ -69,7 +76,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     return out;
   });
   await b.close();
-  const ok = r.fns && r.offNoEnq && r.anyLeg && r.onEnq && r.row && r.cid && r.seq && r.abrev && errs.length === 0;
+  const ok = r.fns && r.offNoEnq && r.anyLeg && r.onEnq && r.row && r.cid && r.manyItems && r.seq && r.abrev && errs.length === 0;
   console.log("etl-lio:", JSON.stringify(r), "· pageerrors:", errs.length ? errs.join(" | ") : "none", "·", ok ? "✓ OK" : "✗ FALLÓ");
   process.exit(ok ? 0 : 1);
 })();
