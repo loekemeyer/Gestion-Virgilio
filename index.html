@@ -5718,7 +5718,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v6.91";
+const APP_VERSION = "v6.92";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -8213,21 +8213,21 @@ function _etlZpl(L) {
   const items = L.items || [];
   const W = 800, H = 440;                              // 100×55mm @ 203dpi
   const n = Math.max(1, items.length);
-  const headerH = 78, footerH = 40, pad = 12;
+  const headerH = 106, footerH = 56, pad = 10;
   const itemsAreaH = H - headerH - footerH - pad * 2;
   let rowH = Math.floor(itemsAreaH / n);
-  if (rowH > 46) rowH = 46;                            // no agrandar de más si hay pocos ítems
-  if (rowH < 20) rowH = 20;                            // piso de legibilidad si hay muchísimos
-  const fontH = Math.max(16, Math.min(36, rowH - 8));
+  if (rowH > 84) rowH = 84;                            // igual gigante con pocos ítems, sin desbordar
+  if (rowH < 18) rowH = 18;                            // piso de legibilidad si hay muchísimos
+  const fontH = Math.max(14, Math.min(66, rowH - 10));
   let s = "^XA\n^CI28\n^PW" + W + "\n^LL" + H + "\n";
-  s += "^FO16,10^A0N,40,40^FD" + _etlEsc(L.razon_social) + "^FS\n";
-  s += "^FO16,56^A0N,22,22^FDNP " + _etlEsc(L.np) + "  " + _etlEsc(L.tanda) + "   Lio " + L.lio_idx + (L.lio_total ? "/" + L.lio_total : "") + "^FS\n";
-  s += "^FO16," + headerH + "^GB" + (W - 32) + ",2,2^FS\n";
+  s += "^FO16,8^A0N,50,50^FD" + _etlEsc(L.razon_social) + "^FS\n";
+  s += "^FO16,64^A0N,28,28^FDNP " + _etlEsc(L.np) + "  " + _etlEsc(L.tanda) + "   Lio " + L.lio_idx + (L.lio_total ? "/" + L.lio_total : "") + "^FS\n";
+  s += "^FO16," + headerH + "^GB" + (W - 32) + ",4,4^FS\n";
   let y = headerH + pad;
   items.forEach(function (it) { s += "^FO24," + y + "^A0N," + fontH + "," + fontH + "^FD" + _etlEsc(it.cod) + "   x " + it.qty + "^FS\n"; y += rowH; });
-  const footY = H - footerH + 4;
-  s += "^FO16," + footY + "^A0N,28,28^FDTOTAL " + (L.cajas || 0) + " cajas^FS\n";
-  s += "^FO" + (W - 220) + "," + (footY + 2) + "^A0N,20,20^FDOp " + _etlEsc(L.operario) + "^FS\n";
+  const footY = H - footerH + 8;
+  s += "^FO16," + footY + "^A0N,40,40^FDTOTAL " + (L.cajas || 0) + " cajas^FS\n";
+  s += "^FO" + (W - 210) + "," + (footY + 14) + "^A0N,26,26^FDOp " + _etlEsc(L.operario) + "^FS\n";
   s += "^XZ\n";
   return s;
 }

@@ -4,7 +4,16 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-03 · Versión app al documentar: **v6.91**
+> Última actualización: 2026-08-03 · Versión app al documentar: **v6.92**
+>
+> Nota: **v6.92 — Etiqueta de lío: fuentes bien más grandes** (piloto en vivo, primera impresión
+> real a la medida 100×55mm: entró bien pero el dueño la vio "muy chica"). Se re-repartió el
+> mismo canvas 800×440: razón social 40→**50**, línea NP/tanda/lío 22→**28**, divisor más grueso
+> (2→4), TOTAL 28→**40**, operario 20→**26**; el techo de la fuente de ítems (pocos códigos) subió
+> 36→**66** (`rowH` techo 46→84) — con 1-2 ítems por lío (el caso típico) ahora ocupan casi toda la
+> etiqueta. El piso para líos con muchos códigos baja un poco (16→14) para seguir garantizando que
+> **siempre entra** sin cortarse. Mismos tests (no dependen de tamaños de fuente, sólo de contenido/
+> `^PW`/`^LL`). Suite OK. Bump **v6.92**.
 >
 > Nota: **v6.91 — Etiqueta de lío a la medida FÍSICA real: 100×55mm**. Piloto en vivo (03/08):
 > imprimió pero con el tamaño mal (el `_etlZpl` anterior usaba 600×dinámico "a ojo"). Fijado a
