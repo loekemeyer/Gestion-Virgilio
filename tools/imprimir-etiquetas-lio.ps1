@@ -36,17 +36,23 @@ $JsonSer = New-Object System.Web.Script.Serialization.JavaScriptSerializer
 
 function Get-Pendientes($url) {
   $wc = New-Object System.Net.WebClient
-  # Esta PC vieja cacheaba la respuesta HTTP y repetia SIEMPRE el mismo resultado (por
-  # eso quedaba pegado en "1 pendiente" para siempre aunque la cola cambiara). Se
-  # desactiva el cache del WebClient. OJO: NO se agrega un parametro extra a la URL
-  # (tipo "_=...") porque Supabase/PostgREST interpreta CUALQUIER parametro desconocido
-  # como un filtro por columna, y da 400 "Solicitud incorrecta" al no existir esa columna.
+  # Esta PC vieja cacheaba la respuesta HTTP y repetia SIEMPRE el mismo resultado (por eso
+  # quedaba pegado en "1 pendiente" para siempre aunque la cola cambiara). CachePolicy solo
+  # no alcanzo en esta maquina. OJO: no se puede agregar un parametro INVENTADO (tipo
+  # "_=...") porque Supabase/PostgREST lo interpreta como filtro por columna y tira 400 si
+  # esa columna no existe. Por eso se agrega un filtro sobre una columna REAL (creado_en)
+  # que siempre da verdadero (fecha bien en el pasado) pero cuyo texto cambia en CADA
+  # llamada -> la URL nunca se repite y ningun cache la puede servir "vieja".
   $wc.CachePolicy = New-Object System.Net.Cache.RequestCachePolicy([System.Net.Cache.RequestCacheLevel]::NoCacheNoStore)
   $wc.Headers.Add("Cache-Control", "no-cache, no-store")
   $wc.Headers.Add("Pragma", "no-cache")
   $wc.Headers.Add("apikey", $ApiKey)
   $wc.Headers.Add("Authorization", "Bearer " + $ApiKey)
-  $txt = $wc.DownloadString($url)
+  $sep = "&"
+  if ($url.IndexOf("?") -lt 0) { $sep = "?" }
+  $bust = [DateTime]::UtcNow.AddYears(-50).ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+  $urlFresca = $url + $sep + "creado_en=gte." + $bust
+  $txt = $wc.DownloadString($urlFresca)
   return $JsonSer.DeserializeObject($txt)
 }
 function Marcar-Impreso($id) {
