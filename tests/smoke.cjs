@@ -47,7 +47,8 @@ catch (_e) {
       "facFacturarNP", "facFCOpen", "facFCEmitir", "facFCClose", "arcaCall", "facFmtMoney", "facFCEnsureModal",
       "facNCOpen", "facNCEmitir", "facNCEnsure", "facNCClose", "openAbastecimiento", "abastCompute", "abastRender", "abastToggle", "abastSetFiltro", "_abastEsImportado", "_abastCodDisp", "abastToggleMeses",
       "fetchSinSalidaMap", "crMarkSinSalida", "crSendSinSalida", "stkFcsFetch", "stkOpenFcsArt",
-      "pppRefreshDelivered", "_pppEntBodyHtml", "pppTandaM3Map", "pppRefreshOcupacion", "pppOcupHtml", "_ocupSvg", "_ocupDetailHtml", "_ocupProgByDay", "pppOcupSetCap", "pppOcupDay"];
+      "pppRefreshDelivered", "_pppEntBodyHtml", "pppTandaM3Map", "pppRefreshOcupacion", "pppOcupHtml", "_ocupSvg", "_ocupDetailHtml", "_ocupProgByDay", "pppOcupSetCap", "pppOcupDay",
+      "pppRefreshEntregadosFull", "pppEntMode", "_pppEntAppHtml", "_pppEntExcelHtml", "_pppEntTabsHtml", "_pppYmdKey"];
     const missing = need.filter((n) => typeof window[n] !== "function");
     const ts = new Date().toISOString();
     const sal = stockComputeSaldos([

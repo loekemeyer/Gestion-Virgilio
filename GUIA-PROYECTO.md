@@ -4,7 +4,25 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-03 · Versión app al documentar: **v6.97**
+> Última actualización: 2026-08-03 · Versión app al documentar: **v6.98**
+>
+> Nota: **v6.98 — "Pedidos Entregados": ahora muestra TODO (no 45 días de CRN)**. El usuario notó
+> que se veían pocos ("tendría que haber ~mil pedidos"). Diagnóstico sobre la data cruda: el espejo
+> del Excel funciona bien (`PPP_Entregados_Meta` = **2337 NPs**, full-replace sincronizado hoy 17:37;
+> la macro anda) — el problema era **cómo lo exponía la página**: la v6.97 mostraba solo los eventos
+> **CRN de los últimos 45 días** (~250). Se rehízo la solapa con **dos fuentes** (el usuario eligió
+> "las dos"): **(a) DEFAULT "Con detalle"** = vista **`vista_ppp_pedidos_entregados`** (690 pedidos
+> facturados + cerrados en reparto, desde el 26/05, cuando arrancó el flujo de facturación/cierre):
+> NP, tanda, cliente, **m³**, **cajas entregadas/faltó** y **fecha de reparto** → agrupado por fecha
+> (desc) → por tanda, con total de m³. **(b) Toggle "Histórico completo del Excel"** = espejo
+> **`PPP_Entregados_Meta`** (2337 NP+cliente, todo el Sheet) en grilla de 2 columnas, cap 600 visibles
+> + buscador (lazy: solo se trae al tocar el toggle). Las dos comparten el 🔎 buscador del PPP.
+> Relación de las fuentes: la vista (690) es un subconjunto reciente y RICO; el Excel (2337) es el
+> histórico completo pero SIN fecha ni m³ por fila (esas columnas no se espejan). Funciones nuevas:
+> `pppRefreshDelivered` (ahora lee la vista, no CRN), `pppRefreshEntregadosFull`, `pppEntMode`,
+> `_pppEntAppHtml`, `_pppEntExcelHtml`, `_pppEntTabsHtml`, `_pppYmdKey` (`_pppDelivered` /
+> `_pppDeliveredFull` / `_pppEntMode`). Todo LECTURA. Verificado: `checkhtml` + `smoke` OK, render
+> headless de ambos modos (vista con m³/cajas; grilla del Excel). Bump **v6.98**.
 >
 > Nota: **v6.97 — PPP: fix "Pedidos Entregados" (daba 0) + nueva solapa "📦 Ocupación"**. Dos
 > pedidos del usuario. **(1) Bug "Pedidos Entregados" siempre en 0 / "los pedidos entregados

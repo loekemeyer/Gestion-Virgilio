@@ -1763,6 +1763,15 @@ button {
 .ppp-ent-t-h{ font-weight:bold; color:#1e40af; font-size:12px; margin-bottom:3px; }
 .ppp-ent-np{ display:inline-block; font-size:12px; color:#334155; margin:1px 10px 1px 0; }
 .ppp-ent-np b{ color:#0f172a; }
+.ppp-ent-modes{ display:flex; gap:8px; margin:0 0 10px; flex-wrap:wrap; }
+.ppp-ent-mode{ width:auto; margin:0; flex:1 1 0; padding:8px 10px; font-size:12.5px; font-weight:bold; background:#f1f5f9; color:#334155; border:1px solid #e2e8f0; border-radius:9px; cursor:pointer; }
+.ppp-ent-mode.on{ background:#0f766e; color:#fff; border-color:#0f766e; }
+.ppp-ent-row{ font-size:12.5px; color:#334155; padding:2px 0; }
+.ppp-ent-row b{ color:#0f172a; }
+.ppp-ent-m3{ color:#1e6bd6; font-weight:600; }
+.ppp-ent-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(155px,1fr)); gap:2px 12px; }
+.ppp-ent-cell{ font-size:12px; color:#334155; padding:2px 0; border-bottom:1px solid #f1f5f9; }
+.ppp-ent-cell b{ color:#0f172a; }
 /* v6.97 — Ocupación (m³ armado/programado por día) */
 .ppp-ocup-kpis{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin:2px 0 10px; }
 .ppp-ocup-kpi{ background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:8px 6px; text-align:center; }
@@ -5752,7 +5761,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v6.97";
+const APP_VERSION = "v6.98";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -17157,11 +17166,11 @@ async function pppRefreshControlado() {
     try { pppCheckCargaVencida(); } catch (_e) {}   // avisa a Telegram lo cargado sin controlar y vencido
   } catch (_e) { if (!_pppControladoCR) _pppControladoCR = new Set(); }
 }
-/* ===== v6.97 — Pedidos Entregados (lista DURABLE) + Ocupación (m³/día) =====
+/* ===== v6.97/6.98 — Pedidos Entregados (vista rica + histórico Excel) + Ocupación =====
    Bug viejo: "Pedidos Entregados" mostraba prog ∩ controlados, pero un pedido SALE de
-   PPP_Programacion_Diaria al entregarse → esa intersección daba 0 ("desaparecen"). Ahora
-   la lista sale de los eventos CRN (control hecho, últimos 45 días) enriquecidos con
-   PPP_Entregados_Meta (NP→cliente) y vista_tanda_m3 (tanda→m³). Todo LECTURA. */
+   PPP_Programacion_Diaria al entregarse → esa intersección daba 0. La fuente ahora está
+   más abajo (vista_ppp_pedidos_entregados + PPP_Entregados_Meta). pppTandaM3Map (tanda→m³,
+   vista_tanda_m3) la usa la solapa Ocupación. Todo LECTURA. */
 let _pppTandaM3 = null, _pppTandaM3Ts = 0;
 async function pppTandaM3Map() {
   const now = Date.now();
@@ -17175,69 +17184,109 @@ async function pppTandaM3Map() {
   _pppTandaM3 = map; _pppTandaM3Ts = now;
   return map;
 }
-let _pppDelivered = null;   // [{np,tanda,cod,rs,m3,ms}] entregados (CRN) últimos 45 días
+/* v6.98 — DOS fuentes para "Pedidos Entregados" (la v6.97 solo mostraba CRN de 45
+   días → se veían pocos). DEFAULT = vista_ppp_pedidos_entregados (facturados +
+   cerrados en reparto: NP, tanda, cliente, m³, cajas y FECHA de reparto). Toggle
+   "Histórico completo del Excel" = PPP_Entregados_Meta (espejo del Sheet, NP+cliente,
+   2000+ filas). Todo LECTURA. */
+let _pppDelivered = null;       // vista rica de la app
+let _pppDeliveredFull = null;   // espejo completo del Excel (NP+cliente)
+let _pppEntMode = "app";        // "app" | "excel"
+function pppEntMode(m) { _pppEntMode = m; if (m === "excel" && _pppDeliveredFull == null) pppRefreshEntregadosFull(); pppRenderProg(); }
+function _pppYmdKey(s) { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s || "")); return m ? (m[1] + m[2] + m[3]) : ""; }
 async function pppRefreshDelivered() {
   try {
-    const since = new Date(Date.now() - 45 * 24 * 60 * 60 * 1000).toISOString();
-    const url = SUPABASE_TABLE_ENDPOINT + "?opcion=eq.CRN&ts_cliente=gte." + encodeURIComponent(since) + "&select=texto,ts_cliente&limit=20000";
-    const res = await Promise.all([
-      fetch(url, { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY } }).then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); }),
-      fetchEntregadosMeta().catch(function () { return {}; }),
-      pppTandaM3Map().catch(function () { return {}; })
-    ]);
-    const data = res[0], meta = res[1] || {}, m3map = res[2] || {};
-    const byNp = new Map();
-    for (const ev of data) {
-      const parts = String(ev.texto || "").split("|");
-      const np = String(parts[0] || "").trim().replace(/\.0+$/, "");
-      if (!np) continue;
-      const tanda = String(parts[1] || "").trim().toUpperCase();
-      const ms = ev.ts_cliente ? new Date(ev.ts_cliente).getTime() : 0;
-      const prev = byNp.get(np);
-      if (!prev || ms > prev.ms) byNp.set(np, { np: np, tanda: tanda, ms: ms });
-    }
+    const sel = "np,tanda,cod_cliente,razon_social,m3,fecha_reparto,fecha_salida,facturado_at,cajas_pedidas,cajas_entregadas,cajas_falto";
+    const rows = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/vista_ppp_pedidos_entregados", "select=" + sel + "&order=facturado_at.desc");
     const list = [];
-    byNp.forEach(function (it) {
-      const mt = meta[it.np] || {};
-      list.push({ np: it.np, tanda: it.tanda || "—", cod: mt.cod || "", rs: mt.rs || "", ms: it.ms, m3: (it.tanda && m3map[it.tanda] != null) ? m3map[it.tanda] : null });
-    });
-    list.sort(function (a, b) { return b.ms - a.ms; });
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i];
+      const frep = (String(r.fecha_reparto || "").slice(0, 10) || String(r.fecha_salida || "").slice(0, 10) || String(r.facturado_at || "").slice(0, 10));
+      list.push({
+        np: String(r.np == null ? "" : r.np).trim(),
+        tanda: (String(r.tanda == null ? "" : r.tanda).trim().toUpperCase() || "—"),
+        cod: String(r.cod_cliente == null ? "" : r.cod_cliente).trim(),
+        rs: String(r.razon_social == null ? "" : r.razon_social).trim(),
+        m3: (r.m3 == null || r.m3 === "") ? null : Number(r.m3),
+        cajE: Number(r.cajas_entregadas) || 0, cajF: Number(r.cajas_falto) || 0,
+        frep: frep, fkey: _pppYmdKey(frep)
+      });
+    }
     _pppDelivered = list;
     if (_pppTab === "ent") pppRenderProg();
   } catch (_e) { if (!_pppDelivered) _pppDelivered = []; }
 }
-function _pppEntBodyHtml() {
+async function pppRefreshEntregadosFull() {
+  try {
+    const rows = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/PPP_Entregados_Meta", "select=np,cod,rs");
+    const list = [];
+    for (let i = 0; i < rows.length; i++) {
+      const np = String(rows[i].np == null ? "" : rows[i].np).trim(); if (!np) continue;
+      list.push({ np: np, cod: String(rows[i].cod == null ? "" : rows[i].cod).trim(), rs: String(rows[i].rs == null ? "" : rows[i].rs).trim() });
+    }
+    list.sort(function (a, b) { return (parseInt(b.np, 10) || 0) - (parseInt(a.np, 10) || 0); });   // NP desc ≈ más recientes primero
+    _pppDeliveredFull = list;
+    if (_pppTab === "ent" && _pppEntMode === "excel") pppRenderProg();
+  } catch (_e) { if (!_pppDeliveredFull) _pppDeliveredFull = []; }
+}
+function _pppEntTabsHtml() {
+  const nApp = _pppDelivered ? _pppDelivered.length : "…";
+  const nExc = _pppDeliveredFull ? _pppDeliveredFull.length : "2000+";
+  return '<div class="ppp-ent-modes">' +
+    '<button class="ppp-ent-mode' + (_pppEntMode === "app" ? " on" : "") + '" onclick="pppEntMode(\'app\')">🚚 Con detalle (' + nApp + ')</button>' +
+    '<button class="ppp-ent-mode' + (_pppEntMode === "excel" ? " on" : "") + '" onclick="pppEntMode(\'excel\')">📄 Histórico completo del Excel (' + nExc + ')</button>' +
+    '</div>';
+}
+function _pppEntBodyHtml() { return _pppEntTabsHtml() + (_pppEntMode === "excel" ? _pppEntExcelHtml() : _pppEntAppHtml()); }
+function _pppEntAppHtml() {
   if (_pppDelivered == null) return '<div class="planim-empty">Cargando pedidos entregados…</div>';
   let list = _pppDelivered;
   if (_pppSearch) {
     const q = _pppSearch.toLowerCase();
-    list = list.filter(function (p) { return [p.np, p.cod, p.rs, p.tanda].join(" ").toLowerCase().indexOf(q) >= 0; });
+    list = list.filter(function (p) { return [p.np, p.cod, p.rs, p.tanda, p.frep].join(" ").toLowerCase().indexOf(q) >= 0; });
   }
-  if (!list.length) return '<div class="planim-empty">' + (_pppSearch ? "Sin coincidencias entre los entregados." : "Nada entregado en los últimos 45 días.") + '</div>';
+  if (!list.length) return '<div class="ppp-ent-note">' + (_pppSearch ? "Sin coincidencias." : "Todavía no hay pedidos entregados (facturados y cerrados en reparto).") + '</div>';
   const DOW = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
-  const byDay = {}; const keys = [];
-  for (const p of list) {
-    const d = new Date(p.ms), key = _ocupKey(d);
-    if (!byDay[key]) { byDay[key] = { d: d, items: [] }; keys.push(key); }
-    byDay[key].items.push(p);
-  }
-  let html = '<div class="ppp-ent-note">✅ Pedidos <b>controlados</b> (entregados) — últimos 45 días, desde los eventos de Control de Remitos (CRN). ' + list.length + ' pedido(s).</div>';
+  const byDay = {}, keys = [];
+  for (const p of list) { const k = p.fkey || "00000000"; if (!byDay[k]) { byDay[k] = []; keys.push(k); } byDay[k].push(p); }
+  let totM3 = 0; for (const p of list) totM3 += (p.m3 || 0);
+  let html = '<div class="ppp-ent-note">🚚 Pedidos <b>entregados</b> (facturados y cerrados en reparto), con fecha, cliente y m³. <b>' + list.length + '</b> pedido(s) · <b>' + totM3.toFixed(2) + '</b> m³.</div>';
   keys.sort(); keys.reverse();
   for (const k of keys) {
-    const grp = byDay[k], d = grp.d, dia = DOW[d.getDay()];
+    const arr = byDay[k];
+    let m3d = 0; for (const p of arr) m3d += (p.m3 || 0);
+    let dh = "Sin fecha";
+    if (k !== "00000000") { const dt = new Date(+k.slice(0, 4), +k.slice(4, 6) - 1, +k.slice(6, 8)); dh = DOW[dt.getDay()] + " " + (+k.slice(6, 8)) + "/" + (+k.slice(4, 6)) + "/" + k.slice(0, 4); }
+    html += '<div class="ppp-ent-day"><div class="ppp-ent-day-h"><span>🗓️ ' + dh + '</span><span class="m3">' + arr.length + ' ped · ' + m3d.toFixed(2) + ' m³</span></div>';
     const byT = {}, tord = [];
-    for (const p of grp.items) { const t = p.tanda || "—"; if (!(t in byT)) { byT[t] = []; tord.push(t); } byT[t].push(p); }
-    let m3day = 0; for (const t of tord) { if (t !== "—" && byT[t][0].m3 != null) m3day += byT[t][0].m3; }
-    html += '<div class="ppp-ent-day"><div class="ppp-ent-day-h"><span>🗓️ ' + dia + ' ' + d.getDate() + '/' + (d.getMonth() + 1) + '</span><span class="m3">' + grp.items.length + ' ped · ' + m3day.toFixed(2) + ' m³</span></div>';
+    for (const p of arr) { const t = p.tanda || "—"; if (!(t in byT)) { byT[t] = []; tord.push(t); } byT[t].push(p); }
     tord.sort();
     for (const t of tord) {
-      const arr = byT[t];
-      html += '<div class="ppp-ent-t"><div class="ppp-ent-t-h">' + (t === "—" ? "Sin tanda" : ("Tanda " + escapeHtml(t))) + (t !== "—" && arr[0].m3 != null ? ' · ' + arr[0].m3.toFixed(2) + ' m³' : '') + '</div>';
-      for (const p of arr) html += '<span class="ppp-ent-np"><b>' + escapeHtml(p.np) + '</b>' + (p.rs ? ' — ' + escapeHtml(p.rs.slice(0, 30)) : (p.cod ? ' — ' + escapeHtml(p.cod) : '')) + '</span>';
+      html += '<div class="ppp-ent-t"><div class="ppp-ent-t-h">' + (t === "—" ? "Sin tanda" : ("Tanda " + escapeHtml(t))) + '</div>';
+      for (const p of byT[t]) {
+        const cajas = p.cajE ? (' · ' + p.cajE + ' cj' + (p.cajF ? ' <span style="color:#dc2626">(faltó ' + p.cajF + ')</span>' : '')) : '';
+        html += '<div class="ppp-ent-row"><b>' + escapeHtml(p.np) + '</b> ' + escapeHtml((p.rs || p.cod || "").slice(0, 32)) + (p.m3 != null ? ' <span class="ppp-ent-m3">' + p.m3.toFixed(3) + ' m³</span>' : '') + cajas + '</div>';
+      }
       html += '</div>';
     }
     html += '</div>';
   }
+  return html;
+}
+function _pppEntExcelHtml() {
+  if (_pppDeliveredFull == null) return '<div class="planim-empty">Cargando histórico completo del Excel…</div>';
+  let list = _pppDeliveredFull;
+  if (_pppSearch) {
+    const q = _pppSearch.toLowerCase();
+    list = list.filter(function (p) { return [p.np, p.cod, p.rs].join(" ").toLowerCase().indexOf(q) >= 0; });
+  }
+  const total = list.length;
+  if (!total) return '<div class="ppp-ent-note">' + (_pppSearch ? "Sin coincidencias en el histórico del Excel." : "El histórico del Excel está vacío.") + '</div>';
+  const CAP = 600, shown = list.slice(0, CAP);
+  let html = '<div class="ppp-ent-note">📄 Espejo completo del Excel "PPP Pedidos Entregados" (NP + cliente). <b>' + total + '</b> pedido(s)' + (total > CAP ? ' · mostrando ' + CAP + ' — usá el 🔎 buscador para encontrar uno' : '') + '.</div>';
+  html += '<div class="ppp-ent-grid">';
+  for (const p of shown) html += '<div class="ppp-ent-cell"><b>' + escapeHtml(p.np) + '</b>' + ((p.rs || p.cod) ? ' — ' + escapeHtml((p.rs || p.cod).slice(0, 30)) : '') + '</div>';
+  html += '</div>';
   return html;
 }
 /* ---- Ocupación: m³ armado (real, TAP×vista_tanda_m3) + programado a entregar
