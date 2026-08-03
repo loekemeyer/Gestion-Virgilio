@@ -1,17 +1,16 @@
 # =====================================================================
-#  imprimir-etiquetas-lio.ps1  ·  Producción Virgilio · idea 5290
+#  imprimir-etiquetas-lio.ps1  -  Produccion Virgilio - idea 5290
 # ---------------------------------------------------------------------
-#  Imprime SOLO las etiquetas de lío pendientes en la Zebra S4M.
-#  Dejá esta ventana ABIERTA en la PC que tiene la impresora.
+#  Imprime SOLO las etiquetas de lio pendientes en la Zebra S4M.
+#  Deja esta ventana ABIERTA en la PC que tiene la impresora.
 #
 #  PASOS (una sola vez):
-#   1) Poné abajo el NOMBRE EXACTO de tu impresora S4M
-#      (Panel de control → Dispositivos e impresoras → nombre tal cual).
-#   2) Doble clic derecho al archivo → "Ejecutar con PowerShell"
-#      (o en una consola:  powershell -ExecutionPolicy Bypass -File imprimir-etiquetas-lio.ps1 )
+#   1) Pone abajo el NOMBRE EXACTO de tu impresora S4M
+#      (Panel de control - Dispositivos e impresoras - nombre tal cual).
+#   2) Doble clic al .bat
+#      (o consola:  powershell -ExecutionPolicy Bypass -File imprimir-etiquetas-lio.ps1 )
 #
-#  Manda ZPL crudo directo a la S4M (no pasa por diálogos, no toca los remitos).
-#  Para arrancar solo con Windows: creá un acceso directo en la carpeta Inicio.
+#  Manda ZPL crudo directo a la S4M (no pasa por dialogos, no toca los remitos).
 # =====================================================================
 
 # >>>>>>>>>>>>>>  CAMBIAR ESTO  <<<<<<<<<<<<<<
@@ -25,11 +24,10 @@ $PollSeconds = 4
 $Base    = "$SupabaseUrl/rest/v1/Etiquetas_Lio"
 $Headers = @{ apikey = $ApiKey; Authorization = "Bearer $ApiKey" }
 
-# Windows PowerShell 5.1 usa TLS viejo por default y Supabase exige TLS 1.2 → forzarlo,
-# si no, todas las consultas fallan con "error con la cola" y nunca imprime.
+# Windows PowerShell 5.1 usa TLS viejo por default y Supabase exige TLS 1.2.
 try { [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12 } catch {}
 
-# --- Envío RAW: manda los bytes del ZPL a la impresora sin pasar por el driver GDI ---
+# --- Envio RAW: manda los bytes del ZPL a la impresora sin pasar por el driver GDI ---
 if (-not ("RawPrinter" -as [type])) {
 Add-Type @'
 using System;
@@ -82,18 +80,16 @@ Write-Host ""
 
 while ($true) {
   try {
-    $pend = Invoke-RestMethod -Method Get -Headers $Headers `
-      -Uri "$Base?estado=eq.pendiente&order=creado_en.asc&select=id,zpl&limit=20"
+    $pend = Invoke-RestMethod -Method Get -Headers $Headers -Uri "$Base?estado=eq.pendiente&order=creado_en.asc&select=id,zpl&limit=20"
     foreach ($row in $pend) {
       if (-not $row.zpl) { continue }
       $ok = [RawPrinter]::Send($PrinterName, [string]$row.zpl)
       if ($ok) {
         $body = '{"estado":"impreso","impreso_en":"' + (Get-Date).ToUniversalTime().ToString("o") + '"}'
-        Invoke-RestMethod -Method Patch -Uri "$Base?id=eq.$($row.id)" -Body $body `
-          -Headers ($Headers + @{ "Content-Type" = "application/json"; "Prefer" = "return=minimal" }) | Out-Null
+        Invoke-RestMethod -Method Patch -Uri "$Base?id=eq.$($row.id)" -Body $body -Headers ($Headers + @{ "Content-Type" = "application/json"; "Prefer" = "return=minimal" }) | Out-Null
         Write-Host ("  [{0}] etiqueta #{1} impresa" -f (Get-Date -Format "HH:mm:ss"), $row.id) -ForegroundColor Cyan
       } else {
-        Write-Host ("  ! no pude imprimir #{0} — revisa el NOMBRE de la impresora arriba" -f $row.id) -ForegroundColor Yellow
+        Write-Host ("  ! no pude imprimir #{0} - revisa el NOMBRE de la impresora de arriba" -f $row.id) -ForegroundColor Yellow
       }
     }
   } catch {
