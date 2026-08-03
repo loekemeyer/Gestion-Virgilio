@@ -3259,7 +3259,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
     </style>
     <div class="sup-cfg" id="ssgSwitchRow">
       <div class="sup-cfg-top">
-        <span class="sup-cfg-t">📦 Aviso Telegram “picking sin stock en góndola”</span>
+        <span class="sup-cfg-t">📦 Aviso Telegram “stock en negativo”</span>
         <span class="sup-sw" id="ssgSw" onclick="toggleSsgAlert()" role="switch"><span class="sup-sw-k"></span></span>
       </div>
       <div class="sup-cfg-hint" id="ssgSwHint">Cargando…</div>
@@ -5761,7 +5761,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v6.99";
+const APP_VERSION = "v7.00";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -8959,16 +8959,18 @@ async function stockFetchMovs() {
   // pagina con Range y trae TODOS. (Bug v5.41: con 8880 movs la ventana de 1000 cubría ~2 días.)
   return supaFetchAll(SUPABASE_STOCK_ENDPOINT, "select=*&order=ts.desc");
 }
-/* Switch admin (v5.35): activa/desactiva el aviso Telegram "picking sin stock en góndola"
-   (SSG). El flag vive en Stock_Config.alerta_sin_stock_gondola ('1' on / '0' off); el trigger
-   server-side lo lee antes de notificar. Default OFF: mientras no se carga el stock inicial,
-   TODO da "había 0" y es solo ruido. Escritura con anon key igual que el cutoff. */
+/* Switch admin (v5.35): activa/desactiva los avisos Telegram de "stock en negativo".
+   El flag vive en Stock_Config.alerta_sin_stock_gondola ('1' on / '0' off) y gatea DOS avisos
+   server-side: (1) SSG "picking sin stock en góndola" (evento SSG del cliente) y (2) v7.00 —
+   trigger trg_stock_negativo_telegram: CUALQUIER movimiento que deje un depósito en negativo
+   (separar_pedidos, a_facturar, racks, etc.; insumos excluido). Default histórico OFF: mientras
+   no se carga el stock inicial TODO da "había 0" y es ruido. Escritura con anon key igual que el cutoff. */
 function ssgSetSwitchUI(on) {
   const sw = document.getElementById("ssgSw"), hint = document.getElementById("ssgSwHint");
   if (sw) sw.classList.toggle("on", !!on);
   if (hint) hint.textContent = on
-    ? "✅ ACTIVADO — llegan los avisos de picking sin stock en góndola."
-    : "🔕 DESACTIVADO — no llegan (útil mientras no cargás el stock inicial).";
+    ? "✅ ACTIVADO — avisa al toque si algo queda en negativo (picking sin stock + cualquier depósito)."
+    : "🔕 DESACTIVADO — no llegan avisos de stock en negativo.";
 }
 async function loadSsgSwitch() {
   const sw = document.getElementById("ssgSw"); if (!sw) return;

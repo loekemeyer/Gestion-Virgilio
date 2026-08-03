@@ -4,7 +4,30 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-03 · Versión app al documentar: **v6.99**
+> Última actualización: 2026-08-03 · Versión app al documentar: **v7.00**
+>
+> Nota: **v7.00 — Stock: alerta Telegram "en el momento" cuando algo queda en negativo + fix de
+> 2 negativos imposibles**. El usuario pidió auditar el stock. Hallazgos (vía `vista_saldos_stock`):
+> **(1)** 2 negativos "imposibles" físicos, chicos y recientes, **corregidos con `ajuste`**:
+> **595** (Pinza de Fiambre) `separar_pedidos` −1 → 0 (residuo de un ajuste manual "faltante D01E");
+> **580E** (Batidor Mini) `terminado` −3 → 0. Causa del 580E (confirmada por el usuario): el
+> **conteo del 01-08 se cargó bajo `580` (sin E)** en vez de `580E` — `580` tenía `terminado`=+3 y
+> `580E` había quedado en −3 tras 3 picks; se **relocalizó** el conteo (`ajuste` +3 a 580E, −3 a 580,
+> ambos → 0). `fn_canon_cod_art` no reescribe el código en `ajuste` (mapea por clave normalizada vía
+> OC_Maximos; `580` y `580E` tienen claves distintas). **(2)** Negativos grandes en depósito
+> **`insumos`** (505C·Cuchilla China −16006, H201PART −14000, etc.): son movimientos `entrega_insumo`
+> (materia prima entregada a talleristas) **sin la recepción previa** → hueco de tracking del lado
+> de compra/recepción, NO bug de picking. Quedan pendientes (decisión del usuario). **(3) Feature —
+> "nunca algo puede quedar en negativo, avisá al toque":** nuevo trigger server-side
+> **`trg_stock_negativo_telegram`** (AFTER INSERT en `Movimientos_Stock`) que, cuando un movimiento
+> deja **cualquier** depósito físico/pipeline en negativo, manda alerta Telegram (vía `tg_enqueue`/
+> `tg_outbox_flush`, dedup por cod+depósito+día). Excluye `insumos`, `inicial` (reset/conteo) y
+> picking→góndola (ya lo cubre SSG). **NO bloquea** el insert (alerta, no corta el pipeline).
+> Comparte el switch con SSG: **`Stock_Config.alerta_sin_stock_gondola`**, que **estaba en `0`
+> (desactivado desde 07-16) y se REACTIVÓ a `1`** (el "switch que había quedado desactivado" que pidió
+> el usuario). El toggle admin se renombró a **"📦 Aviso Telegram 'stock en negativo'"** y ahora
+> gatea ambos avisos. SQL del trigger en `sql/guard_stock_negativo_telegram.sql`. Verificado: el
+> trigger NO rompe inserts (test con rollback), `checkhtml` + `smoke` OK. Bump **v7.00**.
 >
 > Nota: **v6.99 — El histórico del Excel ahora trae FECHA + m³ (no solo NP+cliente)**. Seguimiento
 > del pedido del usuario: quería que los entregados **viejos** (anteriores al 26/05, que solo están
