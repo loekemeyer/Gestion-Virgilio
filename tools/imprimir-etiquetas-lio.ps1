@@ -21,7 +21,7 @@ $PrinterName = "ZDesigner S4M-203dpi ZPL"
 
 $SupabaseUrl = "https://hrxfctzncixxqmpfhskv.supabase.co"
 $ApiKey      = "sb_publishable_BqpAgZH6ty-9wft10_YMhw_0rcIPuWT"
-$PollSeconds = 4
+$PollSeconds = 6   # cada cuanto mira la cola; una etiqueta un poco mas tarde no molesta a nadie
 
 $Base = "$SupabaseUrl/rest/v1/Etiquetas_Lio"
 

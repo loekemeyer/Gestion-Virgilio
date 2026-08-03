@@ -11,7 +11,7 @@ REM ============================================================
 title Imprimidor de etiquetas de lio
 set COMPLUS_OnlyUseLatestCLR=1
 set COMPLUS_Version=v4.0.30319
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0imprimir-etiquetas-lio.ps1"
+powershell -NoProfile -ExecutionPolicy Bypass -WindowStyle Minimized -File "%~dp0imprimir-etiquetas-lio.ps1"
 echo.
 echo El imprimidor se cerro. Mira el mensaje de arriba por si hubo un error.
 pause
