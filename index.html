@@ -5718,7 +5718,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v6.93";
+const APP_VERSION = "v6.94";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -8165,25 +8165,51 @@ function _compLioDel(k) { const n = _compLioNow(); if (!n) return; const l = n.l
 function _compLioNp(d) { if (!_comp) return; const ni = _comp.liosNpIdx + d; if (ni < 0 || ni >= _comp.nps.length) return; _comp.liosNpIdx = ni; _compRenderLios(); _compPersist(); }
 function _compLiosResumen(n) { const lios = n.liosArr || []; const labels = liosLabels(lios); return lios.map(function (l, k) { return labels[k] + "=" + l.items.map(function (it) { return it.cod + "x" + it.qty; }).join(",") + (l.suelta ? "(s)" : ""); }).join(";"); }
 /* ===== idea 5290 (piloto): ETIQUETAS DE LÍO automáticas =====
-   Al terminar el armado, la app encola UNA etiqueta por lío (composición cód+cajas +
-   razón social abreviada + tanda/NP + operario) en la tabla Supabase `Etiquetas_Lio`.
-   Un imprimidor liviano en la PC de la Zebra S4M lee las pendientes, imprime el ZPL y las
-   marca. TODO detrás del switch `vir_etiqueta_lio` y SÓLO para los legajos de prueba 0/1
-   (como la lectora). Con el switch apagado NO se encola NADA. ===== */
+   Al CERRAR cada lío (no al terminar el armado), la app encola su etiqueta (composición
+   cód+cajas + razón social abreviada + tanda/NP + letra del lío + operario) en la tabla
+   Supabase `Etiquetas_Lio`. Un imprimidor liviano en la PC de la Zebra S4M lee las
+   pendientes, imprime el ZPL y las marca. Doble gate: el switch GLOBAL `vir_etiqueta_lio`
+   (apagado maestro) Y la lista de legajos habilitados en `Etiqueta_Lio_Legajos` (control
+   fino de piloto — hoy sólo el legajo 8), ambos manejados por la operadora desde el Print
+   Station. Con cualquiera de los dos apagado, NO se encola NADA. ===== */
 const SUPABASE_ETIQUETAS_LIO_ENDPOINT = SUPABASE_URL + "/rest/v1/Etiquetas_Lio";
 function etlOn() { try { return localStorage.getItem("vir_etiqueta_lio") === "1"; } catch (_e) { return false; } }
 function etlSetOn(v) { try { localStorage.setItem("vir_etiqueta_lio", v ? "1" : "0"); } catch (_e) {} }
+const SUPABASE_ETIQUETA_LIO_LEGAJOS_ENDPOINT = SUPABASE_URL + "/rest/v1/Etiqueta_Lio_Legajos";
+/* Control fino de piloto (03/08, pedido del dueño): ADEMÁS del switch global, sólo los
+   legajos habilitados en `Etiqueta_Lio_Legajos` disparan la etiqueta (hoy: sólo el 8). Los
+   maneja la operadora desde el Print Station (agregar/activar/desactivar por empleado).
+   Mirror local (sin red) para el gate PURO de etlBuildLioRow — se puebla en etlLoadGlobal(). */
+function etlLegajoHabilitado(legajo) {
+  try {
+    const m = JSON.parse(localStorage.getItem("vir_etiqueta_lio_legajos") || "{}");
+    return m[String(legajo == null ? "" : legajo).trim()] === true;
+  } catch (_e) { return false; }
+}
+function _etlSetLegajosMirror(rows) {
+  try {
+    const m = {};
+    (rows || []).forEach(function (r) { m[String(r.legajo)] = !!r.habilitado; });
+    localStorage.setItem("vir_etiqueta_lio_legajos", JSON.stringify(m));
+  } catch (_e) {}
+}
 /* El switch de etiquetas de lío es un ajuste GLOBAL (Stock_Config.etiqueta_lio), NO por
    dispositivo: lo prende/apaga LA OPERADORA desde su módulo (Print Station) y cada armador
-   lo toma al abrir el armado. Espejamos el valor a localStorage para que etlOn() (que se
-   lee al cerrar cada lío) no dependa de la red en ese instante. */
+   lo toma al abrir el armado. Espejamos el valor (+ la lista de legajos habilitados) a
+   localStorage para que etlOn()/etlLegajoHabilitado() (que se leen al cerrar cada lío) no
+   dependan de la red en ese instante. */
 async function etlLoadGlobal() {
   try {
     const r = await fetch(SUPABASE_URL + "/rest/v1/Stock_Config?clave=eq.etiqueta_lio&select=valor", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
     const d = r.ok ? await r.json() : [];
     etlSetOn(d.length && String(d[0].valor) === "1");
-    try { if (typeof psRender === "function") psRender(); } catch (_e) {}
   } catch (_e) {}
+  try {
+    const r2 = await fetch(SUPABASE_ETIQUETA_LIO_LEGAJOS_ENDPOINT + "?select=legajo,habilitado", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+    const rows2 = r2.ok ? await r2.json() : [];
+    _etlSetLegajosMirror(rows2);
+  } catch (_e) {}
+  try { if (typeof psRender === "function") psRender(); } catch (_e) {}
 }
 async function etlToggleGlobal() {
   const nuevo = etlOn() ? "0" : "1";
@@ -8192,6 +8218,50 @@ async function etlToggleGlobal() {
     if (r.ok) etlSetOn(nuevo === "1");
   } catch (_e) {}
   try { if (typeof psRender === "function") psRender(); } catch (_e) {}
+}
+/* Administración de legajos habilitados (Print Station): fetch fresco cada vez que se
+   muestra (es un panel de admin, no el gate rápido de etlBuildLioRow) + agregar/activar/
+   desactivar. Refresca de paso el mirror local (misma fuente que usa el gate). */
+async function etlLegRenderList() {
+  const box = document.getElementById("etlLegList"); if (!box) return;
+  let rows = [];
+  try {
+    const r = await fetch(SUPABASE_ETIQUETA_LIO_LEGAJOS_ENDPOINT + "?select=legajo,habilitado&order=legajo.asc", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+    rows = r.ok ? await r.json() : [];
+  } catch (_e) {}
+  _etlSetLegajosMirror(rows);
+  if (!rows.length) { box.innerHTML = '<div class="ps-help">Ningún legajo cargado todavía.</div>'; return; }
+  box.innerHTML = rows.map(function (r) {
+    const on = !!r.habilitado;
+    return '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 2px;border-bottom:1px solid #e5e7eb;">' +
+      '<span style="font-weight:800;">Legajo ' + escapeHtml(String(r.legajo)) + '</span>' +
+      '<span class="sup-sw' + (on ? " on" : "") + '" onclick="etlLegToggle(\'' + escapeHtml(String(r.legajo)) + "', " + (!on) + ')" role="switch"><span class="sup-sw-k"></span></span>' +
+      '</div>';
+  }).join("");
+}
+async function etlLegAgregar() {
+  const inp = document.getElementById("etlLegInp"); if (!inp) return;
+  const legajo = String(inp.value || "").trim();
+  if (!legajo) return;
+  try {
+    await fetch(SUPABASE_ETIQUETA_LIO_LEGAJOS_ENDPOINT + "?on_conflict=legajo", {
+      method: "POST",
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" },
+      body: JSON.stringify({ legajo: legajo, habilitado: true, actualizado_en: new Date().toISOString() })
+    });
+  } catch (_e) {}
+  inp.value = "";
+  etlLegRenderList();
+}
+async function etlLegToggle(legajo, nuevo) {
+  try {
+    await fetch(SUPABASE_ETIQUETA_LIO_LEGAJOS_ENDPOINT + "?legajo=eq." + encodeURIComponent(legajo), {
+      method: "PATCH",
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" },
+      body: JSON.stringify({ habilitado: nuevo, actualizado_en: new Date().toISOString() })
+    });
+  } catch (_e) {}
+  etlLegRenderList();
 }
 /* Razón social abreviada (no hace falta entera): saca el sufijo societario y recorta. */
 function _etlAbrev(rs) {
@@ -8236,10 +8306,10 @@ function _etlZpl(L) {
   return s;
 }
 /* Construye la fila de etiqueta de UN lío (PURO, sin red). Devuelve null si el switch
-   global está apagado. Se llama al CERRAR cada lío, así que el total de líos todavía no
-   se conoce (lio_total = 0, no se muestra en la etiqueta).
+   global está apagado O si el legajo no está habilitado (`Etiqueta_Lio_Legajos`, control
+   fino de piloto — hoy sólo el 8). Se llama al CERRAR cada lío, así que el total de líos
+   todavía no se conoce (lio_total = 0, no se muestra en la etiqueta).
    client_id con secuencia monotónica (comp._etlSeq) → nunca choca aunque borren/editen.
-   El gate es SÓLO el switch global (etlOn) — NO se filtra por legajo (v6.90).
    ⚠ `lio_letra` se calcula CON LO QUE HAY HASTA ESE MOMENTO (best-effort al imprimir): si
    más adelante se cierra OTRO lío con la MISMA composición, `liosLabels` los re-numera a
    ambos como A1/A2 (ver comentario de `liosLabels`) pero la etiqueta YA impresa del primero
@@ -8255,7 +8325,7 @@ function _etlLioLetra(n) {
   } catch (_e) { return ""; }
 }
 function etlBuildLioRow(comp, n, lio) {
-  if (!comp || !etlOn() || !n || !lio) return null;
+  if (!comp || !etlOn() || !etlLegajoHabilitado(comp.legajo) || !n || !lio) return null;
   if (typeof comp._etlSeq !== "number") comp._etlSeq = 0;
   comp._etlSeq++;
   const day = (typeof getTodayKey === "function" ? getTodayKey() : "");
@@ -21414,6 +21484,11 @@ function psRender(){
     '<span class="sup-sw' + (elon ? " on" : "") + '" onclick="etlToggleGlobal()" role="switch"><span class="sup-sw-k"></span></span></div>' +
     '<div class="ps-status ' + (elon ? "on" : "") + '">' + (elon ? "🟢 Activo — al cerrar cada lío se imprime su etiqueta en esta impresora" : "⚪ Apagado — no se imprimen etiquetas de lío") + '</div>' +
     '<div class="ps-help">Ajuste <b>global</b>: lo prendés acá y <b>todos los armadores</b> lo toman al abrir el armado (no depende del legajo). Necesita el imprimidor <code>tools/imprimir-etiquetas-lio.ps1</code> corriendo en esta PC.</div></div>';
+  h += '<div class="ps-toggle-card"><div class="ps-tc-top"><span class="ps-tc-t">👥 Legajos habilitados para etiqueta de lío</span></div>' +
+    '<div class="ps-help">Además del switch de arriba, <b>sólo estos legajos</b> generan etiqueta al cerrar un lío — control fino mientras se pilotea. Agregalo una vez; después lo activás/desactivás sin borrarlo.</div>' +
+    '<div style="display:flex;gap:8px;margin:8px 0;"><input id="etlLegInp" type="text" inputmode="numeric" placeholder="legajo" onkeydown="if(event.key===\'Enter\')etlLegAgregar()" style="width:100px;padding:8px;border:1px solid #cbd5e1;border-radius:8px;font:inherit;">' +
+    '<button onclick="etlLegAgregar()" style="padding:8px 14px;border:0;border-radius:8px;background:#2563eb;color:#fff;font-weight:700;cursor:pointer;">+ Agregar</button></div>' +
+    '<div id="etlLegList"><div class="ps-help">Cargando…</div></div></div>';
   h += '<div class="ps-help">Dejá <b>esta pantalla abierta</b> en la PC que está al lado de la impresora. Para que salga <b>sin diálogo</b>: abrí la app en <b>Chrome con <code>--kiosk-printing</code></b> y poné esa impresora como <b>predeterminada de Windows</b>. Probá con el botón de abajo antes de prender el automático.</div>';
   h += '<div class="ps-actions"><button class="ps-test" onclick="psTestPrint()">🖨️ Imprimir hoja de prueba</button></div>';
   const log = (_ps && _ps.log) || [];
@@ -21424,6 +21499,7 @@ function psRender(){
     return '<div class="ps-row"><div class="ps-row-main"><span class="ps-np">NP ' + escapeHtml(String(d.np)) + '</span> <span class="ps-row-sub">' + escapeHtml(d.rs || "—") + ' · ' + d.total + ' cajas · ' + d.nLios + ' líos</span></div><div class="ps-row-right"><span class="ps-hora">' + escapeHtml(e.hora) + '</span><button class="ps-reprint" onclick="psReprint(' + i + ')">Re-imprimir</button></div></div>';
   }).join("") + '</div>';
   body.innerHTML = h;
+  try { etlLegRenderList(); } catch (_e) {}   // llena #etlLegList (fetch async, placeholder ya en el DOM)
 }
 
 /* =========================================================

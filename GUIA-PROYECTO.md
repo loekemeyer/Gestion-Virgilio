@@ -4,7 +4,22 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-03 · Versión app al documentar: **v6.93**
+> Última actualización: 2026-08-03 · Versión app al documentar: **v6.94**
+>
+> Nota: **v6.94 — Etiqueta de lío: control fino por LEGAJO (piloto restringido al 8)**. Pedido del
+> dueño: "por ahora que funcione solo contra legajo 8" + un switch para activar/desactivar
+> empleados. Nueva tabla **`Etiqueta_Lio_Legajos`** (`legajo` PK, `habilitado` bool default true) —
+> hoy sólo tiene el **8** cargado. **Doble gate** en `etlBuildLioRow`: el switch global
+> `Stock_Config.etiqueta_lio` (apagado maestro) **Y** `etlLegajoHabilitado(comp.legajo)` (lee un
+> mirror local `vir_etiqueta_lio_legajos`, poblado por `etlLoadGlobal` junto con el switch — mismo
+> patrón sin-red que `etlOn()`). En el **Print Station** hay una tarjeta nueva "👥 Legajos
+> habilitados": input + botón **"+ Agregar"** (upsert `habilitado=true`) y un switch por legajo ya
+> cargado (`etlLegToggle`) — `etlLegRenderList()` hace fetch fresco cada vez que se abre (es panel
+> de admin, no el gate rápido) y de paso refresca el mirror. Con el legajo NO habilitado (aunque el
+> switch global esté prendido) no se encola nada — igual que con el switch apagado. Tests
+> reescritos sobre el mirror (`_etlSetLegajosMirror`): legajo habilitado/deshabilitado/inexistente,
+> switch-off-con-legajo-habilitado, switch-on-con-legajo-no-habilitado. Suite OK (398 handlers, 0
+> muertos). Bump **v6.94**.
 >
 > Nota: **v6.93 — Etiqueta de lío: agrega la LETRA del lío (A, B, C1, C2, C3, D…)**. Pedido del
 > dueño: la misma letra que usa "Consultar NP/Líos" (`liosLabels`, agrupa por composición y
