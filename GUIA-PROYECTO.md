@@ -4,7 +4,20 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-03 · Versión app al documentar: **v6.94**
+> Última actualización: 2026-08-03 · Versión app al documentar: **v6.95**
+>
+> Nota: **v6.95 — Fix: "Seguir armado" (retomar) no refrescaba el switch/legajos de etiqueta de
+> lío**. Bug real encontrado en el piloto: `showCompletarWizard` llama a `etlLoadGlobal()` sólo en
+> el camino de armado **NUEVO** (`_comp = {...}`); el camino de **RETOMAR** un armado en curso
+> (`_compRestore(tanda)` → `_comp = _savedC` → `return` temprano) se saltea esa llamada por
+> completo. Resultado: un armado que quedó abierto desde ANTES de que existiera la tabla
+> `Etiqueta_Lio_Legajos` (o desde antes de un cambio de legajos habilitados) podía quedar **para
+> siempre** con el mirror local vacío o desactualizado — el switch aparecía prendido y el legajo
+> habilitado del lado del servidor, pero ESE armado en particular nunca se enteraba y no imprimía
+> nada, sin ningún error visible (síntoma: "andaba perfecto y de repente dejó de andar" justo
+   después de tocar la lista de legajos). Fix: se agregó el mismo `try { etlLoadGlobal(); } catch
+> {}` también en el camino de retomar, antes del `return`. Verificado: `ap-resume` (retomar armado)
+> y `comp-doblearmado` siguen OK, suite completa OK (398 handlers, 0 muertos). Bump **v6.95**.
 >
 > Nota: **v6.94 — Etiqueta de lío: control fino por LEGAJO (piloto restringido al 8)**. Pedido del
 > dueño: "por ahora que funcione solo contra legajo 8" + un switch para activar/desactivar

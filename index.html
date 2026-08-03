@@ -5718,7 +5718,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v6.94";
+const APP_VERSION = "v6.95";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -8067,6 +8067,7 @@ async function showCompletarWizard(legajo, codigo) {
     if (_savedC && _savedC.nps && _savedC.nps.length) {
       _comp = _savedC;
       _comp.pickUbic = _pickUbic; _comp.dirByNp = _dirByNp;
+      try { etlLoadGlobal(); } catch (_e) {}   // idea 5290 (fix): retomar un armado en curso NO se saltea el refresco del switch/legajos — si no, queda pegado con el mirror viejo (o vacío) para siempre
       const t0 = document.getElementById("compTanda"); if (t0) t0.textContent = "Tanda " + tanda + (_comp.nps[0] && _comp.nps[0].rs ? " · " + _comp.nps[0].rs : "");
       const d20 = document.getElementById("compD2"), ln0 = document.getElementById("compLine");
       if (d20) d20.style.display = ""; if (ln0) ln0.style.display = "";
