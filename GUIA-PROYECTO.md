@@ -4,7 +4,17 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-03 · Versión app al documentar: **v7.00**
+> Última actualización: 2026-08-03 · Versión app al documentar: **v7.01**
+>
+> Nota: **v7.01 — El guard de stock-negativo ahora TAMBIÉN avisa por `insumos`**. El usuario pidió
+> "que mande" también los negativos de insumos (antes se excluían para no spamear con los
+> `entrega_insumo` sin recepción). Se sacó la exclusión de `insumos` en
+> `notificar_stock_negativo_telegram()`; la dedup (cod+depósito+día) limita a **1 aviso por código
+> de insumo por día**. **Test end-to-end OK**: se disparó un aviso de prueba (movimiento negativo en
+> `insumos`, código `PRUEBA-NEG`, borrado después) → `telegram_outbox` status `sent`, HTTP **200**
+> desde Telegram. (Nota de la infra: `tg_outbox_flush` solo despacha **07:00–21:00 AR** y usa `pg_net`
+> async — el status pasa a `sent` en el flush siguiente aunque el mensaje ya salió.) `sql/guard_stock_negativo_telegram.sql`
+> actualizado. Bump **v7.01**.
 >
 > Nota: **v7.00 — Stock: alerta Telegram "en el momento" cuando algo queda en negativo + fix de
 > 2 negativos imposibles**. El usuario pidió auditar el stock. Hallazgos (vía `vista_saldos_stock`):

@@ -12,9 +12,10 @@
 --  admin "📦 Aviso Telegram 'stock en negativo'".
 --
 --  Excluye a propósito:
---   • deposito 'insumos'  → hueco conocido (entrega_insumo sin recepción cargada).
 --   • tipo 'inicial'      → reset/conteo controlado (el reset baja a 0 a propósito).
 --   • picking→'terminado' → ya lo avisa SSG (evita duplicar).
+--  v7.01: 'insumos' YA NO se excluye (pedido del usuario "que mande"). La dedup
+--  (cod+depósito+día) limita a 1 aviso por código de insumo por día.
 --  NO bloquea el insert (un fallo de aviso jamás rompe el pipeline de stock).
 --  Dedup: 1 aviso por (cod_art, depósito, día) vía tg_enqueue.
 -- =====================================================================
@@ -28,7 +29,6 @@ declare
   msg text;
 begin
   if new.delta is null or new.delta >= 0 then return new; end if;        -- sólo decrementos
-  if new.deposito = 'insumos' then return new; end if;                    -- hueco conocido
   if new.tipo = 'inicial' then return new; end if;                        -- reset/conteo
   if new.tipo = 'picking' and new.deposito = 'terminado' then return new; end if;  -- lo cubre SSG
   if coalesce((select valor from public."Stock_Config" where clave='alerta_sin_stock_gondola' limit 1),'0') <> '1' then
