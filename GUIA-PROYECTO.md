@@ -4,7 +4,21 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-03 · Versión app al documentar: **v6.92**
+> Última actualización: 2026-08-03 · Versión app al documentar: **v6.93**
+>
+> Nota: **v6.93 — Etiqueta de lío: agrega la LETRA del lío (A, B, C1, C2, C3, D…)**. Pedido del
+> dueño: la misma letra que usa "Consultar NP/Líos" (`liosLabels`, agrupa por composición y
+> sub-indexa los repetidos) ahora sale también en la etiqueta, en un **badge grande** (78pt)
+> arriba a la derecha. `_etlLioLetra(n)` la calcula en el momento de cerrar el lío — el lío ya
+> está en `n.liosArr` (lo agregó `_compAddLio` antes de llamar a `etlEnqueueLio`), así que la
+> **última** etiqueta de `liosLabels(n.liosArr)` es la de este lío. Nueva columna
+> `Etiquetas_Lio.lio_letra`. Para que el nombre/NP nunca choquen con el badge, esas dos líneas
+> usan **`^FB` (field block)** con ancho fijo a la izquierda del badge en vez de posición libre.
+> ⚠ **Límite conocido** (documentado en el código, mismo tipo que `lio_total`): la letra es
+> *best-effort al momento de imprimir* — si más adelante se cierra OTRO lío con la MISMA
+> composición, `liosLabels` re-numera TODO el array (A→A1, y el nuevo sale A2), pero la etiqueta
+> **ya impresa** del primero sigue diciendo sólo "A" (no se puede reimprimir sola). Tests
+> actualizados (`lio_letra`, badge en el ZPL, caso de re-letrado A/A2). Suite OK. Bump **v6.93**.
 >
 > Nota: **v6.92 — Etiqueta de lío: fuentes bien más grandes** (piloto en vivo, primera impresión
 > real a la medida 100×55mm: entró bien pero el dueño la vio "muy chica"). Se re-repartió el
