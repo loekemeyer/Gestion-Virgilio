@@ -38,17 +38,15 @@ function Get-Pendientes($url) {
   $wc = New-Object System.Net.WebClient
   # Esta PC vieja cacheaba la respuesta HTTP y repetia SIEMPRE el mismo resultado (por
   # eso quedaba pegado en "1 pendiente" para siempre aunque la cola cambiara). Se
-  # desactiva el cache del WebClient Y se agrega un parametro que cambia en cada
-  # llamada para que la URL nunca sea "la misma" (doble resguardo).
+  # desactiva el cache del WebClient. OJO: NO se agrega un parametro extra a la URL
+  # (tipo "_=...") porque Supabase/PostgREST interpreta CUALQUIER parametro desconocido
+  # como un filtro por columna, y da 400 "Solicitud incorrecta" al no existir esa columna.
   $wc.CachePolicy = New-Object System.Net.Cache.RequestCachePolicy([System.Net.Cache.RequestCacheLevel]::NoCacheNoStore)
   $wc.Headers.Add("Cache-Control", "no-cache, no-store")
   $wc.Headers.Add("Pragma", "no-cache")
   $wc.Headers.Add("apikey", $ApiKey)
   $wc.Headers.Add("Authorization", "Bearer " + $ApiKey)
-  $sep = "&"
-  if ($url.IndexOf("?") -lt 0) { $sep = "?" }
-  $urlSinCache = $url + $sep + "_=" + [DateTime]::UtcNow.Ticks
-  $txt = $wc.DownloadString($urlSinCache)
+  $txt = $wc.DownloadString($url)
   return $JsonSer.DeserializeObject($txt)
 }
 function Marcar-Impreso($id) {
