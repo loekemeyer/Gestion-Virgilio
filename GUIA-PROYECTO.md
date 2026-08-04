@@ -4,7 +4,24 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-04 · Versión app al documentar: **v7.07**
+> Última actualización: 2026-08-04 · Versión app al documentar: **v7.08**
+>
+> Nota: **v7.08 — Insumos (RI/EI): navegación por categorías con la MISMA FORMA que RT**
+> (pedido del usuario sobre la 7917). Los chips de la v7.05 mostraban todos los insumos de una,
+> en filas. Ahora es el mismo gesto que la **Recepción de Mercadería** (`recepcion.js`), que el
+> operario ya conoce: **pantalla 1** = grilla de **categorías** en botones cuadrados (emoji +
+> nombre + cuántos insumos tiene + cuántos lleva cargados) → tocás una y entrás a la **pantalla 2**
+> = grilla de los **insumos de esa categoría** (código grande + descripción + 📍 ubicación) →
+> tocás uno y se abre el **pop-up de cantidad** (–/+ grandes, chips de unidad, aviso de negativo),
+> igual que el pop-up de cajas de RT. **`‹ Atrás`** vuelve a las categorías **sin perder lo
+> cargado**: se puede cargar de varias categorías y mandar todo junto con **✓ Registrar (N)**.
+> El botón del insumo cargado queda pintado con su cantidad, y la tarjeta de la categoría muestra
+> "N cargados". El **buscador** de la pantalla 1 mira **todo** (incluso lo que está a depurar);
+> dentro de una categoría filtra ahí, y si no encuentra nada ofrece "buscar en todas". El alta
+> ("+ Agregar insumo", sólo dentro de una categoría) nace clasificada y abre el pop-up directo.
+> Funciones nuevas: `insOpenQty` / `insCloseQty` / `insBack` / `_insQtyHtml` / `_insCrearHtml` /
+> `_insBtnCod`. Test `tests/ins-categorias.cjs` reescrito para la navegación; suite completa OK;
+> render 390px sin overflow. Bump **v7.08**.
 >
 > Nota: **v7.07 — Recepción de Mercadería: la OC vigente en cada botón de código + aviso Telegram
 > si entra +20% de más**. Pedido del usuario, todo en `recepcion.js` (`?v=3.77`) + un trigger nuevo.

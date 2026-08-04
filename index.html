@@ -5786,7 +5786,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.07";
+const APP_VERSION = "v7.08";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -12415,7 +12415,7 @@ async function insFetchCatalogo() {
 async function showInsumoModal(mode, legajo, _resume) {
   if (!document.getElementById("insCss")) {
     const s = document.createElement("style"); s.id = "insCss";
-    s.textContent = "#insModal{display:none;position:fixed;inset:0;z-index:1296;background:rgba(2,6,23,.74);overflow:auto;padding:12px;}#insModal.show{display:block;}.ins-card{background:#f8fafc;max-width:480px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.ins-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;color:#fff;}.ins-head.in{background:linear-gradient(90deg,#4f46e5,#4338ca);}.ins-head.out{background:linear-gradient(90deg,#0d9488,#0f766e);}.ins-title{font-size:18px;font-weight:800;}.ins-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}.ins-body{padding:13px 14px;}.ins-loading,.ins-empty{padding:24px;text-align:center;color:#64748b;font-size:15px;}.ins-hint{font-size:12.5px;color:#64748b;margin-bottom:9px;}.ins-search{width:100%;box-sizing:border-box;height:42px;border:2px solid #cbd5e1;border-radius:10px;padding:0 12px;font-size:15px;margin-bottom:9px;}.ins-crear{background:#eef2ff;border:1px dashed #a5b4fc;border-radius:11px;padding:10px;margin-bottom:10px;font-size:12.5px;color:#3730a3;display:flex;flex-direction:column;gap:7px;}.ins-crear-r{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}.ins-nn{flex:1;min-width:130px;}.ins-nid{flex:1;min-width:150px;}.ins-crear input{height:34px;border:1px solid #c7d2fe;border-radius:8px;padding:0 9px;font-size:13px;}.ins-cbtn{background:#4f46e5;color:#fff;border:none;border-radius:8px;padding:7px 12px;font-weight:800;cursor:pointer;width:auto;}.ins-row{border:1px solid #e2e8f0;border-radius:12px;padding:9px 11px;margin-bottom:8px;background:#fff;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}.ins-info{flex:1;min-width:0;}.ins-cod{font-size:16px;font-weight:800;font-family:Consolas,Menlo,monospace;}.ins-cod-sec{font-family:inherit;color:#4338ca;}.ins-nom{font-size:12.5px;color:#475569;}.ins-stk{font-size:11.5px;color:#64748b;font-weight:700;margin-top:2px;}.ins-stp{display:flex;align-items:center;gap:5px;}.ins-sb{display:flex;align-items:center;justify-content:center;line-height:1;padding:0;margin:0;width:38px;height:40px;border:none;border-radius:9px;font-size:22px;font-weight:800;cursor:pointer;background:#e2e8f0;color:#475569;}.ins-inp{width:58px;height:40px;box-sizing:border-box;margin:0;padding:0;text-align:center;font-size:18px;font-weight:800;border:2px solid #cbd5e1;border-radius:9px;}.ins-warn{width:100%;font-size:11.5px;color:#b45309;font-weight:700;}.ins-fin{width:100%;margin-top:10px;padding:14px;border:none;border-radius:12px;color:#fff;font-size:17px;font-weight:800;cursor:pointer;}.ins-fin.in{background:#4f46e5;}.ins-fin.out{background:#0d9488;}.ins-fin:disabled{background:#cbd5e1;color:#64748b;cursor:not-allowed;}.ins-uni{flex-basis:100%;display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px dashed #e2e8f0;}.ins-uni-l{font-size:11.5px;color:#64748b;font-weight:700;}.ins-uchip{width:auto;margin:0;border:1px solid #cbd5e1;background:#fff;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:800;cursor:pointer;color:#475569;}.ins-uchip.on{background:#4f46e5;color:#fff;border-color:#4f46e5;}.ins-uadd{color:#4f46e5;font-size:15px;}.ins-cats{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;}.ins-cchip{width:auto;margin:0;border:1px solid #cbd5e1;background:#fff;border-radius:999px;padding:8px 13px;font-size:12.5px;font-weight:800;cursor:pointer;color:#475569;}.ins-cchip.on{background:#4f46e5;color:#fff;border-color:#4f46e5;}.ins-body.out .ins-cchip.on{background:#0d9488;border-color:#0d9488;}.ins-cchip.dep{border-style:dashed;color:#b45309;border-color:#fcd34d;}.ins-cchip.dep.on,.ins-body.out .ins-cchip.dep.on{background:#b45309;color:#fff;border-color:#b45309;}.ins-cn{opacity:.72;font-weight:700;}.ins-ubi{font-size:11.5px;color:#0f766e;font-weight:800;}.ins-cbadge{font-size:11px;font-weight:800;color:#64748b;}.ins-depw{background:#fffbeb;border:1px dashed #fcd34d;color:#92400e;border-radius:10px;padding:9px 11px;font-size:12px;margin-bottom:9px;}";
+    s.textContent = "#insModal{display:none;position:fixed;inset:0;z-index:1296;background:rgba(2,6,23,.74);overflow:auto;padding:12px;}#insModal.show{display:block;}.ins-card{background:#f8fafc;max-width:480px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.ins-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;color:#fff;}.ins-head.in{background:linear-gradient(90deg,#4f46e5,#4338ca);}.ins-head.out{background:linear-gradient(90deg,#0d9488,#0f766e);}.ins-title{font-size:18px;font-weight:800;}.ins-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}.ins-body{padding:13px 14px;}.ins-loading,.ins-empty{padding:24px;text-align:center;color:#64748b;font-size:15px;}.ins-hint{font-size:12.5px;color:#64748b;margin-bottom:9px;}.ins-search{width:100%;box-sizing:border-box;height:42px;border:2px solid #cbd5e1;border-radius:10px;padding:0 12px;font-size:15px;margin-bottom:9px;}.ins-crear{background:#eef2ff;border:1px dashed #a5b4fc;border-radius:11px;padding:10px;margin-bottom:10px;font-size:12.5px;color:#3730a3;display:flex;flex-direction:column;gap:7px;}.ins-crear-r{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}.ins-nn{flex:1;min-width:130px;}.ins-nid{flex:1;min-width:150px;}.ins-crear input{height:34px;border:1px solid #c7d2fe;border-radius:8px;padding:0 9px;font-size:13px;}.ins-cbtn{background:#4f46e5;color:#fff;border:none;border-radius:8px;padding:7px 12px;font-weight:800;cursor:pointer;width:auto;}.ins-row{border:1px solid #e2e8f0;border-radius:12px;padding:9px 11px;margin-bottom:8px;background:#fff;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}.ins-info{flex:1;min-width:0;}.ins-cod{font-size:16px;font-weight:800;font-family:Consolas,Menlo,monospace;}.ins-cod-sec{font-family:inherit;color:#4338ca;}.ins-nom{font-size:12.5px;color:#475569;}.ins-stk{font-size:11.5px;color:#64748b;font-weight:700;margin-top:2px;}.ins-stp{display:flex;align-items:center;gap:5px;}.ins-sb{display:flex;align-items:center;justify-content:center;line-height:1;padding:0;margin:0;width:38px;height:40px;border:none;border-radius:9px;font-size:22px;font-weight:800;cursor:pointer;background:#e2e8f0;color:#475569;}.ins-inp{width:58px;height:40px;box-sizing:border-box;margin:0;padding:0;text-align:center;font-size:18px;font-weight:800;border:2px solid #cbd5e1;border-radius:9px;}.ins-warn{width:100%;font-size:11.5px;color:#b45309;font-weight:700;}.ins-fin{width:100%;margin-top:10px;padding:14px;border:none;border-radius:12px;color:#fff;font-size:17px;font-weight:800;cursor:pointer;}.ins-fin.in{background:#4f46e5;}.ins-fin.out{background:#0d9488;}.ins-fin:disabled{background:#cbd5e1;color:#64748b;cursor:not-allowed;}.ins-uni{flex-basis:100%;display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px dashed #e2e8f0;}.ins-uni-l{font-size:11.5px;color:#64748b;font-weight:700;}.ins-uchip{width:auto;margin:0;border:1px solid #cbd5e1;background:#fff;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:800;cursor:pointer;color:#475569;}.ins-uchip.on{background:#4f46e5;color:#fff;border-color:#4f46e5;}.ins-uadd{color:#4f46e5;font-size:15px;}.ins-cats{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;}.ins-cchip{width:auto;margin:0;border:1px solid #cbd5e1;background:#fff;border-radius:999px;padding:8px 13px;font-size:12.5px;font-weight:800;cursor:pointer;color:#475569;}.ins-cchip.on{background:#4f46e5;color:#fff;border-color:#4f46e5;}.ins-body.out .ins-cchip.on{background:#0d9488;border-color:#0d9488;}.ins-cchip.dep{border-style:dashed;color:#b45309;border-color:#fcd34d;}.ins-cchip.dep.on,.ins-body.out .ins-cchip.dep.on{background:#b45309;color:#fff;border-color:#b45309;}.ins-cn{opacity:.72;font-weight:700;}.ins-ubi{font-size:11.5px;color:#0f766e;font-weight:800;}.ins-cbadge{font-size:11px;font-weight:800;color:#64748b;}.ins-depw{background:#fffbeb;border:1px dashed #fcd34d;color:#92400e;border-radius:10px;padding:9px 11px;font-size:12px;margin-bottom:9px;}.ins-bar{display:flex;align-items:center;gap:9px;margin-bottom:11px;}.ins-bar-t{flex:1;text-align:center;font-size:16px;font-weight:900;color:#0f172a;}.ins-back{width:auto;margin:0;background:#fff;border:2px solid #cbd5e1;border-radius:11px;padding:10px 15px;font-size:14px;font-weight:800;color:#334155;cursor:pointer;white-space:nowrap;}.ins-grid{display:grid;gap:9px;grid-template-columns:repeat(auto-fill,minmax(102px,1fr));}.ins-catbtn,.ins-itbtn{aspect-ratio:1/1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;width:auto;margin:0;padding:7px;text-align:center;background:#fff;border:2px solid #cbd5e1;border-radius:14px;cursor:pointer;min-width:0;overflow-wrap:anywhere;}.ins-catem{font-size:29px;line-height:1;}.ins-catnm{font-size:12.5px;font-weight:900;color:#0f172a;line-height:1.15;}.ins-catn{font-size:11px;font-weight:800;color:#64748b;}.ins-catbtn.dep,.ins-itbtn.add{border-style:dashed;border-color:#fcd34d;background:#fffbeb;}.ins-itbtn.add{border-color:#a5b4fc;background:#eef2ff;color:#3730a3;}.ins-itadd{font-size:32px;line-height:1;font-weight:900;}.ins-catbtn.hasq,.ins-itbtn.on{border-color:#4f46e5;background:#eef2ff;}.ins-body.out .ins-catbtn.hasq,.ins-body.out .ins-itbtn.on{border-color:#0d9488;background:#f0fdfa;}.ins-itcod{font-size:16px;font-weight:900;font-family:Consolas,Menlo,monospace;color:#0f172a;}.ins-itnom{font-size:10.5px;font-weight:700;color:#64748b;line-height:1.15;}.ins-itubi{font-size:10px;font-weight:800;color:#0f766e;}.ins-itq{font-size:12px;font-weight:900;color:#4f46e5;}.ins-body.out .ins-itq{color:#0d9488;}.ins-qov{position:fixed;inset:0;background:rgba(2,6,23,.62);z-index:1299;display:flex;align-items:flex-start;justify-content:center;padding:22px 13px;overflow:auto;}.ins-qc{background:#fff;border-radius:16px;padding:15px;width:100%;max-width:340px;box-shadow:0 24px 70px rgba(0,0,0,.5);}.ins-qh{display:flex;align-items:flex-start;justify-content:space-between;gap:9px;}.ins-qcod{font-size:21px;font-weight:900;font-family:Consolas,Menlo,monospace;color:#0f172a;}.ins-qnom{font-size:12.5px;color:#475569;font-weight:700;}.ins-qrow{display:flex;align-items:center;justify-content:center;gap:9px;margin:13px 0 4px;}.ins-qb{display:flex;align-items:center;justify-content:center;width:56px;height:64px;padding:0;margin:0;border:none;border-radius:12px;background:#e2e8f0;color:#475569;font-size:29px;font-weight:900;line-height:1;cursor:pointer;}.ins-qi{box-sizing:border-box;width:104px;height:64px;padding:0;margin:0;text-align:center;font-size:32px;font-weight:900;border:2px solid #cbd5e1;border-radius:12px;}.ins-qok{width:100%;margin-top:11px;padding:14px;border:none;border-radius:12px;color:#fff;font-size:17px;font-weight:900;cursor:pointer;}.ins-qok.in{background:#4f46e5;}.ins-qok.out{background:#0d9488;}";
     document.head.appendChild(s);
   }
   let ov = document.getElementById("insModal");
@@ -12441,7 +12441,7 @@ async function showInsumoModal(mode, legajo, _resume) {
     // en su propio chip — nunca se ocultan por un dato faltante.
     Object.keys(saldos).forEach(function (k) { const sd = saldos[k], xu = xUni[k] || null; if ((sd.insumos || 0) !== 0 && !items.some(function (it) { return it.cod === k; })) items.push({ cod: k, nombre: sd.desc || "", sector: "", ubic: "", cat: "", noCode: String(k).indexOf("·") >= 0, stock: Number(sd.insumos || 0), stockByUni: xu, qty: 0, unidad: _defUni(xu, "") }); });
     items.sort(_insSortCod);
-    _ins = { mode: mode, legajo: String(legajo || "").trim(), items: items, filtro: "", cat: "" };
+    _ins = { mode: mode, legajo: String(legajo || "").trim(), items: items, filtro: "", cat: "", qty: null, creando: false, newCat: "" };
     insRender();
   } catch (e) { const b = document.getElementById("insBody"); if (b) b.innerHTML = '<div class="ins-loading">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
 }
@@ -12527,73 +12527,123 @@ function _insStockForUnit(it) {
   }
   return it ? it.stock : 0;
 }
+function _insNum(n) { return Math.round(n * 1000) / 1000; }
+/* Etiqueta corta del insumo para el botón de la grilla: el código si tiene, o el
+   sector con 📍 si es de los viejos (sector + descripción). */
+function _insBtnCod(it) { return it.noCode ? ("📍 " + (it.sector || String(it.cod).split("·")[0] || "")) : it.cod; }
+/* idea 7917 (v7.08) — MISMA FORMA que la Recepción de Mercadería (recepcion.js):
+   pantalla 1 = grilla de CATEGORÍAS en botones cuadrados; tocás una y entrás a la
+   pantalla 2 = grilla de los INSUMOS de esa categoría; tocás uno y se abre el pop-up
+   de cantidad. "‹ Atrás" vuelve a las categorías. El operario ya conoce este gesto de
+   RT, así que no hay nada nuevo que aprender. */
 function insRender() {
   if (!_ins) return; const body = document.getElementById("insBody"); if (!body) return;
   const isIn = _ins.mode === "RI";
-  const units = insLoadUnits();
   const f = (_ins.filtro || "").toLowerCase().trim();
-  // idea 7917: el chip y el buscador son dos formas ALTERNATIVAS de achicar la lista,
-  // no se combinan — así el operario nunca cae en "0 resultados" por estar parado en
-  // la categoría equivocada. Buscar mira todo (incluso lo que está a depurar).
-  const cat = f ? "" : (_ins.cat || "");
-  const shown = (f
-    ? _ins.items.filter(function (it) { return (it.cod + " " + (it.nombre || "") + " " + (it.sector || "") + " " + (it.ubic || "")).toLowerCase().indexOf(f) >= 0; })
-    : _ins.items.filter(function (it) { const k = insCatOf(it); if (cat === "?") return k === ""; return cat ? k === cat : k !== INS_CAT_DEP; })
-  ).slice().sort(_insSortCat(cat));
-  let h = '<div class="ins-hint">' + (isIn ? "Cuánto <b>entró</b> de cada insumo." : "Cuánto <b>salió</b> de cada insumo.") + ' Elegí la <b>categoría</b> o buscá por código/descripción.</div>';
-  // botonera de categorías
-  const cnt = {}; let nOper = 0;
-  _ins.items.forEach(function (it) { const k = insCatOf(it); cnt[k] = (cnt[k] || 0) + 1; if (k !== INS_CAT_DEP) nOper++; });
-  let chips = '<button class="ins-cchip' + (!cat && !f ? " on" : "") + '" onclick="insSetCat(\'\')">Todos <span class="ins-cn">' + nOper + '</span></button>';
-  chips += INS_CATS.map(function (c) {
-    if (!cnt[c.k]) return "";
-    return '<button class="ins-cchip' + (c.k === INS_CAT_DEP ? " dep" : "") + (cat === c.k ? " on" : "") + '" onclick="insSetCat(\'' + c.k + '\')">' + c.lbl + ' <span class="ins-cn">' + cnt[c.k] + '</span></button>';
-  }).join("");
-  if (cnt[""]) chips += '<button class="ins-cchip' + (cat === "?" ? " on" : "") + '" onclick="insSetCat(\'?\')">❓ Sin categoría <span class="ins-cn">' + cnt[""] + '</span></button>';
-  h += '<div class="ins-cats">' + chips + '</div>';
-  // la categoría del alta vive en _ins (no en el <select>): el listado se re-renderiza
-  // en cada tecla del buscador y si no, la elección se perdía.
-  const newCat = _ins.newCat || (cat && cat !== "?" && cat !== INS_CAT_DEP ? cat : INS_CATS[0].k);
-  if (cat === INS_CAT_DEP) h += '<div class="ins-depw">⚠ Códigos <b>viejos o duplicados</b> (el conteo del 31/07 los dio de baja). No cargues acá: usá el código nuevo. Están a la vista sólo porque algunos todavía arrastran saldo.</div>';
-  h += '<input class="ins-search" type="search" placeholder="🔎 Buscar en TODOS (código / descripción / ubicación)" value="' + escapeHtml(_ins.filtro) + '" oninput="if(_ins){_ins.filtro=this.value;insRender();}">';
-  h += '<div class="ins-crear">' +
-    '<div class="ins-crear-r"><input id="insNewId" class="ins-nid" placeholder="Código (7 díg) o sector" value="' + (f && !shown.length ? escapeHtml(_ins.filtro) : "") + '"><input id="insNewNom" class="ins-nn" placeholder="descripción"></div>' +
-    '<div class="ins-crear-r"><span class="ins-cbadge">Categoría:</span> <select id="insNewCat" class="ins-nn" onchange="if(_ins)_ins.newCat=this.value;">' + INS_CATS.filter(function (c) { return c.k !== INS_CAT_DEP; }).map(function (c) { return '<option value="' + c.k + '"' + (newCat === c.k ? " selected" : "") + '>' + c.lbl + '</option>'; }).join("") + '</select></div>' +
-    '<button class="ins-cbtn" onclick="insCrear()">+ Agregar a la lista</button>' +
-    '</div>';
-  if (!shown.length) h += '<div class="ins-empty">' + (f ? "No está. Cargalo arriba (código de 7 díg o sector + descripción)." : "No hay insumos en esta categoría.") + '</div>';
-  else h += shown.map(function (it) {
-    const i = _ins.items.indexOf(it);
-    const _stkU = _insStockForUnit(it);   // idea 7382: saldo de la unidad seleccionada
-    const neg = !isIn && it.qty > _stkU;
-    const _mix = it.stockByUni && it.stockByUni.length > 1;
-    const _num = function (n) { return Math.round(n * 1000) / 1000; };
-    const stkLine = _mix
-      ? ('stock: ' + it.stockByUni.map(function (u) { return '<b>' + _num(u.saldo) + '</b> ' + escapeHtml(u.uni); }).join(' · '))
-      : ('stock: ' + _num(_stkU) + ' ' + escapeHtml(it.unidad || "Uni"));
-    const idLbl = it.noCode
-      ? '<span class="ins-cod ins-cod-sec">📍 ' + escapeHtml(it.sector || it.cod.split("·")[0] || "") + '</span> <span class="ins-nom">' + escapeHtml(it.nombre || "") + '</span>'
-      : '<span class="ins-cod">' + escapeHtml(it.cod) + '</span> <span class="ins-nom">' + escapeHtml(it.nombre || "") + '</span>';
-    // buscando se ve de qué categoría es cada resultado (si no, no se entiende por qué
-    // aparece un código viejo mezclado con los buenos)
-    const catLbl = (f || cat === "?") ? '<div class="ins-cbadge">' + escapeHtml(insCatLbl(insCatOf(it))) + '</div>' : "";
-    const ubiLbl = it.ubic ? ' <span class="ins-ubi">📍 ' + escapeHtml(it.ubic) + '</span>' : "";
-    const rowUnits = _insUnitsFor(it, units);
-    const chips = rowUnits.map(function (u) { return '<button class="ins-uchip' + (it.unidad === u ? " on" : "") + '" onclick="insSetUnidad(' + i + ',\'' + u.replace(/'/g, "") + '\')">' + escapeHtml(u) + '</button>'; }).join("") + '<button class="ins-uchip ins-uadd" onclick="insAddUnidad(' + i + ')" title="Agregar unidad">+</button>';
-    return '<div class="ins-row">' +
-      '<div class="ins-info">' + idLbl + ubiLbl + catLbl + '<div class="ins-stk">' + stkLine + '</div></div>' +
-      '<div class="ins-stp"><button class="ins-sb" onclick="insChg(' + i + ',-1)">–</button><input class="ins-inp" type="number" min="0" inputmode="numeric" value="' + it.qty + '" oninput="insSet(' + i + ',this.value)"><button class="ins-sb" onclick="insChg(' + i + ',1)">+</button></div>' +
-      '<div class="ins-uni"><span class="ins-uni-l">Unidad:</span> ' + chips + '</div>' +
-      (neg ? '<div class="ins-warn">⚠ el stock de ' + escapeHtml(it.unidad || "Uni") + ' quedaría en ' + _num(_stkU - it.qty) + '</div>' : "") +
-      "</div>";
-  }).join("");
-  const tot = _ins.items.reduce(function (s, it) { return s + it.qty; }, 0);
-  h += '<button class="ins-fin ' + (isIn ? "in" : "out") + '"' + (tot <= 0 ? " disabled" : "") + ' onclick="insConfirmar()">' + (isIn ? "✓ Registrar entrada" : "✓ Registrar salida") + "</button>";
+  const cat = _ins.cat || "";
+  const cnt = {}, cntQ = {}; let nOper = 0;
+  _ins.items.forEach(function (it) {
+    const k = insCatOf(it);
+    cnt[k] = (cnt[k] || 0) + 1;
+    if (it.qty > 0) cntQ[k] = (cntQ[k] || 0) + 1;
+    if (k !== INS_CAT_DEP) nOper++;
+  });
+  let h = "";
+
+  if (!cat && !f) {
+    // ---------- PANTALLA 1: categorías ----------
+    h += '<div class="ins-hint">' + (isIn ? "Cuánto <b>entró</b> de cada insumo." : "Cuánto <b>salió</b> de cada insumo.") + ' Entrá a la <b>categoría</b> o buscá por código.</div>';
+    h += '<input class="ins-search" type="search" placeholder="🔎 Buscar en TODOS (código / descripción / ubicación)" value="" oninput="if(_ins){_ins.filtro=this.value;insRender();}">';
+    h += '<div class="ins-grid">' + INS_CATS.map(function (c) {
+      if (!cnt[c.k]) return "";
+      const q = cntQ[c.k] || 0;
+      const p = c.lbl.split(" ");
+      return '<button class="ins-catbtn' + (c.k === INS_CAT_DEP ? " dep" : "") + (q ? " hasq" : "") + '" onclick="insSetCat(\'' + c.k + '\')">' +
+        '<span class="ins-catem">' + p[0] + '</span>' +
+        '<span class="ins-catnm">' + escapeHtml(p.slice(1).join(" ")) + '</span>' +
+        '<span class="ins-catn">' + cnt[c.k] + (q ? ' · <b>' + q + ' cargado' + (q === 1 ? "" : "s") + '</b>' : "") + '</span>' +
+        '</button>';
+    }).join("") + (cnt[""] ? '<button class="ins-catbtn' + (cntQ[""] ? " hasq" : "") + '" onclick="insSetCat(\'?\')"><span class="ins-catem">❓</span><span class="ins-catnm">Sin categoría</span><span class="ins-catn">' + cnt[""] + '</span></button>' : "") + '</div>';
+    h += '<div class="ins-cbadge" style="margin-top:10px;">' + nOper + ' insumos en uso' + (cnt[INS_CAT_DEP] ? ' · ' + cnt[INS_CAT_DEP] + ' viejos a depurar' : "") + '</div>';
+  } else {
+    // ---------- PANTALLA 2: insumos de la categoría (o resultados de la búsqueda) ----------
+    // Buscando se mira TODO (incluso lo que está a depurar): si el operario escribe el
+    // código, lo tiene que encontrar sí o sí. Dentro de una categoría, filtra ahí.
+    const base = f
+      ? (cat ? _ins.items.filter(function (it) { return insCatOf(it) === (cat === "?" ? "" : cat); }) : _ins.items)
+      : _ins.items.filter(function (it) { const k = insCatOf(it); return cat === "?" ? k === "" : k === cat; });
+    const shown = (f ? base.filter(function (it) { return (it.cod + " " + (it.nombre || "") + " " + (it.sector || "") + " " + (it.ubic || "")).toLowerCase().indexOf(f) >= 0; }) : base)
+      .slice().sort(_insSortCat(cat));
+    h += '<div class="ins-bar"><button class="ins-back" onclick="insBack()">‹ Atrás</button>' +
+      '<span class="ins-bar-t">' + escapeHtml(cat ? insCatLbl(cat === "?" ? "" : cat) : "🔎 Buscar") + '</span></div>';
+    if (cat === INS_CAT_DEP) h += '<div class="ins-depw">⚠ Códigos <b>viejos o duplicados</b> (el conteo del 31/07 los dio de baja). No cargues acá: usá el código nuevo. Están a la vista sólo porque algunos todavía arrastran saldo.</div>';
+    h += '<input class="ins-search" type="search" placeholder="🔎 Buscar ' + (cat ? "en esta categoría" : "en TODOS") + '" value="' + escapeHtml(_ins.filtro) + '" oninput="if(_ins){_ins.filtro=this.value;insRender();}">';
+    if (_ins.creando) h += _insCrearHtml(cat);
+    if (!shown.length) {
+      h += '<div class="ins-empty">' + (f ? "No hay ninguno que diga “" + escapeHtml(_ins.filtro) + "”." : "No hay insumos en esta categoría.") + '</div>';
+      if (f && cat) h += '<button class="ins-back" style="width:100%;" onclick="if(_ins){_ins.cat=\'\';insRender();}">🔎 Buscar en TODAS las categorías</button>';
+    } else {
+      h += '<div class="ins-grid">' + shown.map(function (it) {
+        const i = _ins.items.indexOf(it);
+        return '<button class="ins-itbtn' + (it.qty > 0 ? " on" : "") + '" onclick="insOpenQty(' + i + ')">' +
+          '<span class="ins-itcod">' + escapeHtml(_insBtnCod(it)) + '</span>' +
+          (it.nombre ? '<span class="ins-itnom">' + escapeHtml(it.nombre) + '</span>' : "") +
+          (it.ubic ? '<span class="ins-itubi">📍 ' + escapeHtml(it.ubic) + '</span>' : "") +
+          (it.qty > 0 ? '<span class="ins-itq">' + it.qty + " " + escapeHtml(it.unidad || "Uni") + '</span>' : "") +
+          '</button>';
+      }).join("") +
+        (cat && cat !== "?" && cat !== INS_CAT_DEP && !_ins.creando ? '<button class="ins-itbtn add" onclick="if(_ins){_ins.creando=true;insRender();}"><span class="ins-itadd">+</span><span class="ins-itnom">Agregar insumo</span></button>' : "") +
+        '</div>';
+    }
+  }
+
+  // "Enviar" siempre a la vista, con cuántos insumos van cargados (se puede cargar de
+  // varias categorías y mandar todo junto).
+  const nSel = _ins.items.filter(function (it) { return it.qty > 0; }).length;
+  h += '<button class="ins-fin ' + (isIn ? "in" : "out") + '"' + (nSel <= 0 ? " disabled" : "") + ' onclick="insConfirmar()">' + (isIn ? "✓ Registrar entrada" : "✓ Registrar salida") + (nSel ? " (" + nSel + ")" : "") + "</button>";
+  if (_ins.qty !== null && _ins.qty !== undefined) h += _insQtyHtml(_ins.items[_ins.qty], _ins.qty, isIn);
   _renderKeepFocus(body, h);
 }
-/* Tocar un chip limpia el buscador (y viceversa): son dos caminos alternativos a lo
-   mismo. Volver a tocar el chip activo deselecciona. */
-function insSetCat(k) { if (!_ins) return; _ins.cat = (_ins.cat === k) ? "" : k; _ins.filtro = ""; _ins.newCat = ""; insRender(); }
+/* Formulario de alta (sólo dentro de una categoría: nace ya clasificado). */
+function _insCrearHtml(cat) {
+  const newCat = _ins.newCat || (insCatDef(cat) && cat !== INS_CAT_DEP ? cat : INS_CATS[0].k);
+  return '<div class="ins-crear">' +
+    '<div class="ins-crear-r"><input id="insNewId" class="ins-nid" placeholder="Código (7 díg) o sector"><input id="insNewNom" class="ins-nn" placeholder="descripción"></div>' +
+    '<div class="ins-crear-r"><span class="ins-cbadge">Categoría:</span> <select id="insNewCat" class="ins-nn" onchange="if(_ins)_ins.newCat=this.value;">' + INS_CATS.filter(function (c) { return c.k !== INS_CAT_DEP; }).map(function (c) { return '<option value="' + c.k + '"' + (newCat === c.k ? " selected" : "") + '>' + c.lbl + '</option>'; }).join("") + '</select></div>' +
+    '<div class="ins-crear-r"><button class="ins-cbtn" onclick="insCrear()">+ Agregar</button>' +
+    '<button class="ins-back" onclick="if(_ins){_ins.creando=false;insRender();}">Cancelar</button></div>' +
+    '</div>';
+}
+/* Pop-up de cantidad (mismo gesto que el de cajas de la Recepción de Mercadería). */
+function _insQtyHtml(it, i, isIn) {
+  if (!it) return "";
+  const stk = _insStockForUnit(it);
+  const neg = !isIn && it.qty > stk;
+  const mix = it.stockByUni && it.stockByUni.length > 1;
+  const stkLine = mix
+    ? ('stock: ' + it.stockByUni.map(function (u) { return '<b>' + _insNum(u.saldo) + '</b> ' + escapeHtml(u.uni); }).join(' · '))
+    : ('stock: ' + _insNum(stk) + ' ' + escapeHtml(it.unidad || "Uni"));
+  const chips = _insUnitsFor(it, insLoadUnits()).map(function (u) {
+    return '<button class="ins-uchip' + (it.unidad === u ? " on" : "") + '" onclick="insSetUnidad(' + i + ',\'' + u.replace(/'/g, "") + '\')">' + escapeHtml(u) + '</button>';
+  }).join("") + '<button class="ins-uchip ins-uadd" onclick="insAddUnidad(' + i + ')" title="Agregar unidad">+</button>';
+  return '<div class="ins-qov" onclick="if(event.target===this)insCloseQty()"><div class="ins-qc">' +
+    '<div class="ins-qh"><div><div class="ins-qcod">' + escapeHtml(_insBtnCod(it)) + '</div>' +
+    (it.nombre ? '<div class="ins-qnom">' + escapeHtml(it.nombre) + '</div>' : "") +
+    '<div class="ins-stk">' + stkLine + '</div></div>' +
+    '<button class="ins-close" style="background:#e2e8f0;color:#475569;" onclick="insCloseQty()">✕</button></div>' +
+    '<div class="ins-qrow"><button class="ins-qb" onclick="insChg(' + i + ',-1)">–</button>' +
+    '<input class="ins-qi" type="number" min="0" inputmode="numeric" value="' + it.qty + '" oninput="insSet(' + i + ',this.value)">' +
+    '<button class="ins-qb" onclick="insChg(' + i + ',1)">+</button></div>' +
+    '<div class="ins-uni"><span class="ins-uni-l">Unidad:</span> ' + chips + '</div>' +
+    (neg ? '<div class="ins-warn">⚠ el stock de ' + escapeHtml(it.unidad || "Uni") + ' quedaría en ' + _insNum(stk - it.qty) + '</div>' : "") +
+    '<button class="ins-qok ' + (isIn ? "in" : "out") + '" onclick="insCloseQty()">Listo</button>' +
+    '</div></div>';
+}
+function insOpenQty(i) { if (!_ins || !_ins.items[i]) return; _ins.qty = i; insRender(); }
+function insCloseQty() { if (!_ins) return; _ins.qty = null; insRender(); }
+function insBack() { if (!_ins) return; _ins.cat = ""; _ins.filtro = ""; _ins.creando = false; _ins.newCat = ""; insRender(); }
+/* Entrar a una categoría (pantalla 2). Volver a tocarla desde adentro = volver. */
+function insSetCat(k) { if (!_ins) return; _ins.cat = (_ins.cat === k) ? "" : k; _ins.filtro = ""; _ins.newCat = ""; _ins.creando = false; _ins.qty = null; insRender(); }
 function insChg(i, d) { if (!_ins) return; const it = _ins.items[i]; if (!it) return; it.qty = Math.max(0, it.qty + d); insRender(); }
 function insSet(i, v) { if (!_ins) return; const it = _ins.items[i]; if (!it) return; it.qty = Math.max(0, parseInt(v, 10) || 0); insRender(); }
 async function insCrear() {
@@ -12622,7 +12672,12 @@ async function insCrear() {
   try {
     await fetch(SUPABASE_INSUMOS_ENDPOINT, { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" }, body: JSON.stringify({ cod: item.cod, nombre: item.nombre || null, sector: item.sector || null, categoria: item.cat || null, creado_por: _ins.legajo || null }) });
   } catch (_e) { /* sin red: igual va a la lista */ }
-  _ins.items.push(item); _ins.items.sort(_insSortCod); _ins.filtro = ""; _ins.cat = insCatDef(kcat) ? kcat : _ins.cat; insRender();
+  // queda en su categoría y se abre el pop-up de cantidad: lo creaste para cargarlo.
+  _ins.items.push(item); _ins.items.sort(_insSortCod);
+  _ins.filtro = ""; _ins.creando = false; _ins.newCat = "";
+  _ins.cat = insCatDef(kcat) ? kcat : _ins.cat;
+  _ins.qty = _ins.items.indexOf(item);
+  insRender();
 }
 function insConfirmar() {
   if (!_ins) return;

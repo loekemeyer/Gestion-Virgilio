@@ -217,11 +217,18 @@ que netean a 0 pero se muestran como dos líneas.
    arregla un bug de paso: el modal sólo agregaba los códigos fuera de catálogo si su
    saldo era **≠ 0**, así que un fleje que llegaba a 0 **desaparecía** y había que
    re-crearlo para poder recibirlo. `4`, `10` y `25` estaban exactamente así.
-3. **Chips de categoría** arriba del buscador (`insRender` + `insSetCat`), con el
-   conteo real de cada una. Chip y buscador son **alternativos**, no se combinan: tocar
-   un chip limpia el buscador y escribir limpia el chip. Así el operario nunca cae en
-   "0 resultados" por estar parado en la categoría equivocada, y buscando ve **todo**
-   (incluso lo que está a depurar, con su etiqueta de categoría en la fila).
+3. **Navegación por categorías** (v7.08), con la **misma forma que la Recepción de
+   Mercadería** (`recepcion.js`) — el operario ya conoce ese gesto de RT:
+   - **Pantalla 1**: grilla de **categorías** en botones cuadrados (emoji + nombre +
+     cuántos insumos tiene + cuántos lleva cargados).
+   - **Pantalla 2**: grilla de los **insumos de esa categoría** — código grande,
+     descripción y 📍 ubicación. `‹ Atrás` vuelve.
+   - **Pop-up de cantidad** al tocar un insumo: –/+ grandes, chips de unidad y el aviso
+     de negativo. Igual que el pop-up de cajas de RT.
+   Lo cargado **sobrevive al Atrás**: se puede cargar de varias categorías y mandar todo
+   junto con **✓ Registrar (N)**. El buscador de la pantalla 1 mira **todo** (incluso lo
+   a depurar); dentro de una categoría filtra ahí y, si no encuentra nada, ofrece
+   "buscar en todas" — nunca deja al operario en un "0 resultados" sin salida.
 4. **Unidad por defecto por categoría** (`INS_CATS[].uni`) — Fleje ⇒ Kg, Plástico ⇒
    Bolsas, Espirales ⇒ MC, Cajas ⇒ Paquetes, resto ⇒ Uni. La idea 7382 sigue mandando:
    si el insumo ya tiene saldo en **una sola** unidad, gana esa. Además los chips de

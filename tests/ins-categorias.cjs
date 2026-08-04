@@ -1,14 +1,15 @@
-/* Regresión v7.05 / idea 7917 — Insumos (RI/EI): botonera de categorías.
-   El modal listaba los 108 códigos planos por código y la única forma de llegar a uno
-   era el buscador de texto. Ahora `Insumos.categoria` alimenta chips arriba del
-   buscador. Este test fija el contrato:
-     · los chips se arman con los conteos reales y "Todos" NO cuenta los "a depurar"
-     · el listado por defecto esconde "a depurar" (pero el chip existe, con su aviso)
-     · chip y buscador son alternativos: buscar mira TODO (incluso lo a depurar)
-     · la unidad por defecto sale de la categoría (Fleje ⇒ Kg, Plástico ⇒ Bolsas)
-       salvo que el insumo ya tenga saldo en UNA sola unidad (idea 7382 manda)
-     · los flejes se ordenan por MEDIDA, no por código
-     · el alta nace con la categoría del chip activo
+/* Regresión v7.08 / idea 7917 — Insumos (RI/EI): navegación por categorías.
+   MISMA FORMA que la Recepción de Mercadería (recepcion.js): pantalla 1 = grilla de
+   CATEGORÍAS en botones cuadrados → pantalla 2 = grilla de los INSUMOS de esa categoría
+   → pop-up de cantidad. "‹ Atrás" vuelve. Este test fija el contrato:
+     · pantalla 1 muestra una tarjeta por categoría con su conteo, sin listar insumos
+     · 'a depurar' tiene su tarjeta (con aviso al entrar) pero no cuenta como "en uso"
+     · entrar a una categoría muestra SOLO sus insumos, y los flejes por MEDIDA
+     · tocar un insumo abre el pop-up; cargar cantidad marca la tarjeta y la categoría
+     · Atrás vuelve a las categorías conservando lo cargado (se manda todo junto)
+     · buscar desde la pantalla 1 mira TODO (incluso lo a depurar)
+     · la unidad por defecto sale de la categoría salvo que ya haya saldo en una sola
+     · el alta nace con categoría y abre el pop-up
    Sin red (fetch mockeado). */
 const path = require("path");
 let chromium;
@@ -20,7 +21,7 @@ catch (_e) {
 (async () => {
   const root = path.join(__dirname, "..");
   const b = await chromium.launch();
-  const p = await b.newPage();
+  const p = await b.newPage({ viewport: { width: 390, height: 844 } });
   const errs = [];
   p.on("pageerror", (e) => errs.push(e.message));
   await p.goto("file://" + path.join(root, "index.html"), { waitUntil: "domcontentloaded" });
@@ -31,7 +32,6 @@ catch (_e) {
     function J(data) {
       return Promise.resolve({ ok: true, status: 200, headers: { get: function () { return null; } }, json: function () { return Promise.resolve(data); } });
     }
-    // Catálogo chico pero con las 3 categorías que importan + un "a depurar".
     const CAT = [
       { cod: "22", nombre: "121 X 1,20", sector: null, categoria: "fleje", ubicacion: "V2 Ad" },
       { cod: "5", nombre: "38 X 0,55", sector: null, categoria: "fleje", ubicacion: "R4At" },
@@ -65,89 +65,111 @@ catch (_e) {
     };
 
     await showInsumoModal("EI", "104");
-    const rows = function () { return document.querySelectorAll("#insBody .ins-row").length; };
-    const cods = function () { return Array.prototype.map.call(document.querySelectorAll("#insBody .ins-row .ins-cod"), function (e) { return e.textContent.trim().replace(/^📍\s*/, ""); }); };
-    const chipByTxt = function (t) { return Array.prototype.filter.call(document.querySelectorAll("#insBody .ins-cchip"), function (e) { return e.textContent.indexOf(t) >= 0; })[0] || null; };
+    const nCats = function () { return document.querySelectorAll("#insBody .ins-catbtn").length; };
+    const nItems = function () { return document.querySelectorAll("#insBody .ins-itbtn:not(.add)").length; };
+    const cods = function () { return Array.prototype.map.call(document.querySelectorAll("#insBody .ins-itbtn:not(.add) .ins-itcod"), function (e) { return e.textContent.trim().replace(/^📍\s*/, ""); }); };
+    const catTxt = function () { return Array.prototype.map.call(document.querySelectorAll("#insBody .ins-catbtn"), function (e) { return e.textContent.replace(/\s+/g, " ").trim(); }); };
 
-    // 1) Botonera armada, "Todos" = 5 (los 6 menos el 'depurar'), 'depurar' con su chip
-    out.chips = Array.prototype.map.call(document.querySelectorAll("#insBody .ins-cchip"), function (e) { return e.textContent.replace(/\s+/g, " ").trim(); });
-    out.todosCount = (chipByTxt("Todos") || {}).textContent.replace(/\D/g, "");     // "5"
-    out.hayChipDep = !!chipByTxt("A depurar");
-    out.rowsDefault = rows();                                                       // 5 (sin el depurar)
-    out.depFueraDefault = cods().indexOf("505C·CUCHILLA CHINA") < 0 && cods().indexOf("505c") < 0;
+    // 1) PANTALLA 1: una tarjeta por categoría, ningún insumo listado
+    out.cats = catTxt();
+    out.nCats = nCats();                                                    // 4 (fleje, plástico, inox, depurar)
+    out.sinItemsEnP1 = nItems() === 0;
+    out.hayDep = out.cats.some(function (t) { return /A depurar/.test(t); });
+    out.enUso = /5 insumos en uso/.test(document.getElementById("insBody").textContent);   // no cuenta el depurar
+    out.finDisabled = document.querySelector("#insBody .ins-fin").disabled === true;
 
-    // 2) La modalidad EI pinta los chips en teal (clase del body), no en indigo
-    out.bodyOut = /(^|\s)out(\s|$)/.test((document.getElementById("insBody") || {}).className || "");
-
-    // 3) Unidad por defecto por CATEGORÍA: fleje sin saldo ⇒ Kg; plástico con saldo
-    //    en UNA unidad ⇒ esa (Bolsas, idea 7382 manda sobre el default de categoría)
+    // 2) Unidad por defecto POR CATEGORÍA; si ya hay saldo en UNA unidad, gana esa (7382)
     const byCod = {}; _ins.items.forEach(function (it) { byCod[it.cod] = it; });
     out.uni2745 = byCod["2745"].unidad;      // "Kg"  (fleje, sin saldo)
     out.uniPP = byCod["PP"].unidad;          // "Bolsas" (saldo en 1 sola unidad)
     out.uni2955 = byCod["2955"].unidad;      // "Uni" (inox)
-    // el chip de la unidad de la categoría existe aunque no esté en las guardadas
-    const rowPP = Array.prototype.filter.call(document.querySelectorAll("#insBody .ins-row"), function (e) { return /POLIPROPILENO/.test(e.textContent); })[0];
-    out.ppTieneChipBolsas = !!rowPP && Array.prototype.some.call(rowPP.querySelectorAll(".ins-uchip"), function (e) { return e.textContent.trim() === "Bolsas"; });
 
-    // 4) Chip 'Fleje': solo flejes y ordenados por MEDIDA (38 → 121 → 168), no por código
+    // 3) Entrar a "fleje": SOLO flejes, ordenados por MEDIDA (38 → 121 → 168) + Atrás
     insSetCat("fleje");
-    out.rowsFleje = rows();                                                          // 3
-    out.ordenFleje = cods().join(",");                                               // "5,22,2745"
-    out.ubicVisible = /V2 Ad/.test(document.getElementById("insBody").innerHTML);
+    out.nFleje = nItems();                                                  // 3
+    out.ordenFleje = cods().join(",");                                      // "5,22,2745"
+    out.hayAtras = !!document.querySelector("#insBody .ins-back");
+    out.tituloFleje = (document.querySelector("#insBody .ins-bar-t") || {}).textContent;
+    out.ubicEnBoton = /V2 Ad/.test(document.getElementById("insBody").innerHTML);
+    out.hayBotonAgregar = !!document.querySelector("#insBody .ins-itbtn.add");
 
-    // 5) Buscar mira TODO (incluso lo 'a depurar') y desactiva el chip
+    // 4) Tocar un insumo abre el POP-UP de cantidad; cargar marca el botón
+    insOpenQty(_ins.items.indexOf(byCod["22"]));
+    out.popupAbierto = !!document.querySelector("#insBody .ins-qov");
+    out.popupCod = (document.querySelector("#insBody .ins-qcod") || {}).textContent;   // "22"
+    out.popupStock = /1483\.95/.test((document.querySelector("#insBody .ins-qov") || {}).textContent || "");
+    insChg(_ins.items.indexOf(byCod["22"]), 3);
+    out.qtyTrasChg = byCod["22"].qty;                                       // 3
+    insCloseQty();
+    out.popupCerrado = !document.querySelector("#insBody .ins-qov");
+    out.botonMarcado = !!document.querySelector("#insBody .ins-itbtn.on");
+    out.finHabilitado = document.querySelector("#insBody .ins-fin").disabled === false;
+    out.finCuenta = /\(1\)/.test(document.querySelector("#insBody .ins-fin").textContent);
+
+    // 5) Atrás → vuelve a las categorías, la de fleje queda marcada y NO se pierde lo cargado
+    insBack();
+    out.volvioAP1 = nCats() > 0 && nItems() === 0;
+    out.flejeMarcada = !!document.querySelector("#insBody .ins-catbtn.hasq");
+    out.catCargados = /1 cargado/.test(document.getElementById("insBody").textContent);
+    out.qtySobrevive = byCod["22"].qty;                                     // 3
+
+    // 6) Buscar desde la pantalla 1 mira TODO (incluso lo 'a depurar')
     _ins.filtro = "cuchilla"; insRender();
-    out.rowsBusca = rows();                                                          // 2 (2955 + el depurar)
+    out.rowsBusca = nItems();                                               // 2 (2955 + el depurar)
     out.buscaTraeDep = document.getElementById("insBody").innerHTML.indexOf("CUCHILLA CHINA") >= 0;
-    out.chipApagadoAlBuscar = !(chipByTxt("Fleje") || { classList: { contains: function () { return true; } } }).classList.contains("on");
-    out.badgeCatAlBuscar = /A depurar/.test(document.getElementById("insBody").innerHTML);
+    insBack();
 
-    // 6) Chip 'A depurar': muestra el aviso y SOLO los viejos
+    // 7) Entrar a 'a depurar' muestra el aviso
     insSetCat("depurar");
-    out.filtroLimpioAlChip = _ins.filtro === "";
-    out.rowsDep = rows();                                                            // 1
     out.avisoDep = !!document.querySelector("#insBody .ins-depw");
+    out.nDep = nItems();                                                    // 1
+    out.sinAgregarEnDep = !document.querySelector("#insBody .ins-itbtn.add");
+    insBack();
 
-    // 7) Re-tocar el chip activo deselecciona → vuelve al default
-    insSetCat("depurar");
-    out.rowsVuelta = rows();                                                         // 5
-
-    // 8) El alta nace con la categoría del chip activo y su unidad
+    // 8) El alta nace con la categoría de la pantalla donde estás y abre el pop-up
     insSetCat("plastico");
+    _ins.creando = true; insRender();
     document.getElementById("insNewId").value = "1234567";
     document.getElementById("insNewNom").value = "Nylon nuevo";
     await insCrear();
     const nue = _ins.items.filter(function (it) { return it.cod === "1234567"; })[0];
-    out.altaCat = nue ? nue.cat : null;                                              // "plastico"
-    out.altaUni = nue ? nue.unidad : null;                                           // "Bolsas"
-    out.altaPosteoCat = (posted[0] || {}).categoria;                                 // "plastico"
-    out.altaVisible = cods().indexOf("1234567") >= 0;                                // queda a la vista
+    out.altaCat = nue ? nue.cat : null;                                     // "plastico"
+    out.altaUni = nue ? nue.unidad : null;                                  // "Bolsas"
+    out.altaPosteoCat = (posted[0] || {}).categoria;                        // "plastico"
+    out.altaAbrePopup = !!document.querySelector("#insBody .ins-qov");
+    insCloseQty();
 
-    // 9) El movimiento lleva la UBICACIÓN física, no el sector
-    byCod["22"].qty = 3;
+    // 9) El movimiento lleva la UBICACIÓN física y la unidad del ítem
     let mov = null;
     const _sm = window.stockMove; window.stockMove = function (rows) { mov = rows; };
     window.alert = function () {};
     insConfirmar();
     window.stockMove = _sm;
-    out.movUbic = mov && mov[0] ? mov[0].ubicacion : null;                           // "V2 Ad"
+    out.movN = mov ? mov.length : 0;                                        // 1 (sólo el 22)
+    out.movUbic = mov && mov[0] ? mov[0].ubicacion : null;                  // "V2 Ad"
     // "kg" en minúscula: el 22 ya tiene saldo en esa unidad y la idea 7382 manda sobre
     // el default de la categoría — no le cambiamos la unidad a un saldo que ya existe.
-    out.movUni = mov && mov[0] ? mov[0].unidad : null;                               // "kg"
-    out.movDelta = mov && mov[0] ? mov[0].delta : null;                              // -3 (EI)
+    out.movUni = mov && mov[0] ? mov[0].unidad : null;                      // "kg"
+    out.movDelta = mov && mov[0] ? mov[0].delta : null;                     // -3 (EI)
+
+    // 10) nada se sale del ancho del celular (390px)
+    out.overflow = document.documentElement.scrollWidth - document.documentElement.clientWidth;
     return out;
   });
 
   const pass =
-    r.todosCount === "5" && r.hayChipDep === true && r.rowsDefault === 5 && r.depFueraDefault === true &&
-    r.bodyOut === true &&
-    r.uni2745 === "Kg" && r.uniPP === "Bolsas" && r.uni2955 === "Uni" && r.ppTieneChipBolsas === true &&
-    r.rowsFleje === 3 && r.ordenFleje === "5,22,2745" && r.ubicVisible === true &&
-    r.rowsBusca === 2 && r.buscaTraeDep === true && r.chipApagadoAlBuscar === true && r.badgeCatAlBuscar === true &&
-    r.filtroLimpioAlChip === true && r.rowsDep === 1 && r.avisoDep === true &&
-    r.rowsVuelta === 5 &&
-    r.altaCat === "plastico" && r.altaUni === "Bolsas" && r.altaPosteoCat === "plastico" && r.altaVisible === true &&
-    r.movUbic === "V2 Ad" && r.movUni === "kg" && r.movDelta === -3 &&
+    r.nCats === 4 && r.sinItemsEnP1 === true && r.hayDep === true && r.enUso === true && r.finDisabled === true &&
+    r.uni2745 === "Kg" && r.uniPP === "Bolsas" && r.uni2955 === "Uni" &&
+    r.nFleje === 3 && r.ordenFleje === "5,22,2745" && r.hayAtras === true &&
+    /Fleje/.test(r.tituloFleje || "") && r.ubicEnBoton === true && r.hayBotonAgregar === true &&
+    r.popupAbierto === true && r.popupCod === "22" && r.popupStock === true && r.qtyTrasChg === 3 &&
+    r.popupCerrado === true && r.botonMarcado === true && r.finHabilitado === true && r.finCuenta === true &&
+    r.volvioAP1 === true && r.flejeMarcada === true && r.catCargados === true && r.qtySobrevive === 3 &&
+    r.rowsBusca === 2 && r.buscaTraeDep === true &&
+    r.avisoDep === true && r.nDep === 1 && r.sinAgregarEnDep === true &&
+    r.altaCat === "plastico" && r.altaUni === "Bolsas" && r.altaPosteoCat === "plastico" && r.altaAbrePopup === true &&
+    r.movN === 1 && r.movUbic === "V2 Ad" && r.movUni === "kg" && r.movDelta === -3 &&
+    r.overflow === 0 &&
     errs.length === 0;
   console.log("ins-categorias:", JSON.stringify(r));
   console.log("  pageerrors:", errs.length ? errs.join("|") : "none", "·", pass ? "✓ OK" : "✗ FAIL");
