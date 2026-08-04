@@ -99,4 +99,7 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== act-legajo0 (v7.06: getActivityStatus ignora legajo 0/1 → no tandas fantasma) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/act-legajo0.cjs
 
+echo "== rcp-oc (v7.07: OC vigente en los botones de recepción + evento ROC por exceso +20%) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/rcp-oc.cjs
+
 echo "== TODO OK =="
