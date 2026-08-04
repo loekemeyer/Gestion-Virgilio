@@ -4,7 +4,21 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-04 · Versión app al documentar: **v7.40**
+> Última actualización: 2026-08-04 · Versión app al documentar: **v7.41**
+>
+> Nota: **v7.41 — «picking difiere de la mesa» ya no infla góndola fantasma**. La regla v4.92
+> (`_compDifResolve`, evento **NPD**) devolvía a góndola (`terminado +qty`, `tipo=ajuste`,
+> `ref=picking_difiere`) **cada vez** que el armador marcaba *«de menos + no hay en góndola»*. Pero
+> cuando el picking ya había descontado bien (real correcto), ese *«de menos»* es un **faltante real
+> ya registrado por el PKC** (`esp>real`), y devolverlo creaba **stock fantasma**. Caso real **535 /
+> D05B**: PKC `6|3` bajó góndola a **0** y **tres NPD** *«de menos»* (uno **duplicado** por doble tap)
+> la subieron a **4**. Ahora la regla **lee el saldo VIVO** de góndola (`vista_saldos_stock`, helper
+> `_stkGondolaSaldoVivo`) y devuelve **a lo sumo lo justo para llevar góndola a 0** — sólo compensa si
+> el picking la dejó **negativa** (marcó como bajado algo que no estaba); si ya está en 0/+ o no hay
+> dato, **no toca el stock**. El aviso NPD (Telegram + tablero) se emite igual. Dato reconciliado: 535
+> góndola 4→0. Smoke `tests/comp-dif-nofantasma.cjs`. Bump **v7.41**. (Quedan otros códigos con
+> `picking_difiere` viejo — 546/702E/590E/224/031 — con saldo grande donde el fantasma es menor;
+> se pueden barrer aparte si se quiere.)
 >
 > Nota: **v7.40 — Impreso de OC: aclaración de las columnas + orden por % Lleno**. El usuario precisó
 > el significado de tres columnas (coinciden con lo de v7.39, se documenta fino) y pidió que las filas

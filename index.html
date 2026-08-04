@@ -5922,7 +5922,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.40";
+const APP_VERSION = "v7.41";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -8810,10 +8810,21 @@ function _compDifResolve(tipo, gond) {
     if (typeof enqueueReport === "function") enqueueReport(payload);
     if (typeof trySendOneReport === "function") { try { trySendOneReport(payload); } catch (_e) {} }
   } catch (_e) {}
-  // Stock: SÓLO "de menos + no hay en góndola" → devolver a góndola (ajuste +) para no quedar negativo
-  // (el EP/TP marcó como bajado algo que no estaba). "Sí, agarro de góndola" NO descuenta (ya lo descontó el picking).
-  // "De más" (sobra): en stock nada (se vuelve a guardar a mano).
-  try { if (tipo === "menos" && gond === "no" && typeof stockMove === "function") stockMove([{ cod_art: c.cod, descripcion: "", deposito: "terminado", delta: qty, tipo: "ajuste", ref: "picking_difiere", legajo: _comp.legajo }]); } catch (_e) {}
+  // Stock (v7.39): SÓLO "de menos + no hay en góndola", y SÓLO para COMPENSAR una góndola que
+  // el picking dejó NEGATIVA (marcó como bajado algo que no estaba). Antes devolvía `qty` SIEMPRE,
+  // y cuando el picking ya había descontado bien (real correcto) el "de menos" era un FALTANTE real
+  // ya registrado por el PKC (esp>real) → devolverlo a góndola creaba stock FANTASMA. Caso real:
+  // 535/D05B, PKC 6|3 dejó góndola en 0 y tres NPD "de menos" (uno duplicado) la subieron a 4.
+  // Ahora se lee el saldo VIVO y se devuelve, a lo sumo, lo justo para llevar góndola a 0 (nunca
+  // por encima). Si la góndola ya está en 0 o + → no se toca. Sin dato de saldo → no se toca.
+  // "Sí, agarro de góndola" NO descuenta (ya lo descontó el picking). "De más" (sobra): nada.
+  if (tipo === "menos" && gond === "no" && typeof stockMove === "function") {
+    (async function () {
+      let ret = 0;
+      try { const sal = await _stkGondolaSaldoVivo(c.cod); if (sal != null && sal < 0) ret = Math.min(qty, -sal); } catch (_e) { ret = 0; }
+      if (ret > 0) { try { stockMove([{ cod_art: c.cod, descripcion: "", deposito: "terminado", delta: ret, tipo: "ajuste", ref: "picking_difiere", legajo: _comp.legajo }]); } catch (_e) {} }
+    })();
+  }
   _comp.sepDif = null; _compRenderSep();
   try { alert("✓ Avisado al picking · " + c.cod + " (" + (tipo === "mas" ? "de más" : "de menos") + " " + qty + "). Seguí armando."); } catch (_e) {}
 }
@@ -9095,6 +9106,20 @@ function stockMove(rows) {
       throw new Error("HTTP " + r.status);
     })
     .catch(function () { try { const p = JSON.parse(localStorage.getItem("vir_stock_pend") || "[]"); p.push.apply(p, norm); localStorage.setItem("vir_stock_pend", JSON.stringify(p.slice(-5000))); } catch (_e) {} });
+}
+/* v7.39 — saldo VIVO de góndola (deposito 'terminado') de UN código, leído de la vista
+   viva `vista_saldos_stock`. Lo usa la regla de "picking difiere" para devolver a góndola
+   sólo lo justo si el picking la dejó NEGATIVA (no inflar stock fantasma). Devuelve null si
+   no se pudo leer (→ el llamador NO toca el stock). */
+async function _stkGondolaSaldoVivo(cod) {
+  try {
+    const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+    const r = await fetch(SUPABASE_URL + "/rest/v1/vista_saldos_stock?cod_art=eq." + encodeURIComponent(cod) + "&select=terminado", { headers: H, cache: "no-store" });
+    if (!r.ok) return null;
+    const a = await r.json();
+    if (!a || !a.length) return 0;   // sin fila = sin saldo = 0
+    return Number(a[0].terminado) || 0;
+  } catch (_e) { return null; }
 }
 function stockFlushPend() {
   let p = []; try { p = JSON.parse(localStorage.getItem("vir_stock_pend") || "[]"); } catch (_e) {}
