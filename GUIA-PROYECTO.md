@@ -4,7 +4,36 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-04 · Versión app al documentar: **v7.21**
+> Última actualización: 2026-08-04 · Versión app al documentar: **v7.22**
+>
+> Nota: **v7.22 — Insumos (admin): Cantidad/Unidad separadas, Aceptar o Borrar, y unidades arriba**
+> (idea 5572, pedido del usuario). Cinco cosas:
+>
+> **(1) «Unidades» se partió en dos columnas**: **Cantidad** (el número) y **Unidad** (la medida de ese
+> código). En los `TMP-` las dos se corrigen; en un código viejo se muestran —si arrastra saldo en
+> varias unidades va una línea por unidad, los negativos en rojo— porque ahí lo que corresponde no es
+> reescribir el número sino fusionarlo.
+>
+> **(2) Las acciones son sólo dos: ✓ Aceptar y 🗑 Borrar.** Desapareció "Identificar / fusionar":
+> **Aceptar** le pone el código real y le lleva el stock, y **si ese código ya existe avisa que los
+> saldos se SUMAN** (es la fusión, pero el admin no tiene que saber cómo se llama). **Borrar** lo saca
+> del catálogo: si tiene saldo, avisa y lo **deja en 0 con un asiento** antes de borrarlo —
+> necesario porque el modal del operario lista defensivamente cualquier código con saldo ≠ 0 aunque
+> no esté en el catálogo, y si no se cerorea el borrado reaparecería. También se fue "Descartar", que
+> mandaba a «a depurar»: como esa categoría ahora ES esta lista, no resolvía nada.
+>
+> **(3) No se puede crear un código que ya está en uso.** `insumo_alta` venía con
+> `on conflict do nothing`: la fila no se creaba pero la app decía "✓ creado". Ahora la función falla
+> con el motivo y el front además chequea antes de mandar, diciendo con qué insumo choca. Lo mismo al
+> aceptar una sugerencia del operario contra un código ocupado.
+>
+> **(4) «Unidades con las que trabajamos» pasó ARRIBA de Categorías** — primero el vocabulario,
+> después quién lo usa.
+>
+> **(5) Sacar una unidad EN USO avisa con detalle**: lista las **categorías que la permiten** y los
+> **insumos con saldo** en ella (hasta 8, y cuántos más), aclara que el stock no se toca y que lo que
+> cambia es que el operario deja de poder elegirla. Cada chip muestra un contador de uso. Si no la usa
+> nadie, la confirmación es la simple. Suite completa OK. Bump **v7.22**.
 >
 > Nota: **v7.21 — Botón "⏸ Pausar" en el asistente de armado (AP)** (pedido del usuario). Antes el
 > asistente "Completar" (que se abre al tildar AP) sólo tenía **"Terminar" (TAP)**: para ir a hacer

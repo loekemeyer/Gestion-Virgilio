@@ -5908,7 +5908,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.21";
+const APP_VERSION = "v7.22";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -11968,8 +11968,8 @@ function stkBodyInsumos() {
   let h = '<div class="stk-cut" style="background:#eef2ff;border:1px solid #a5b4fc;color:#3730a3;">🧰 <b>Administrar insumos</b> — lo que se define acá es <b>lo que ve el operario</b> cuando carga o sugiere un insumo desde el celular.</div>';
   if (_stkIns.msg) h += '<div class="stk-cut" style="background:#f0fdf4;border:1px solid #86efac;color:#166534;">' + escapeHtml(_stkIns.msg) + '</div>';
   h += _stkInsPend(pend);
+  h += _stkInsUnis(items);          // primero el vocabulario, después quién lo usa
   h += _stkInsCats(items, pend);
-  h += _stkInsUnis();
   return h;
 }
 /* ---------- (1) PENDIENTES ---------- */
@@ -11977,18 +11977,26 @@ function _stkInsPend(pend) {
   const tmps = pend.filter(_stkInsEsTmp), viejos = pend.filter(function (it) { return !_stkInsEsTmp(it); });
   let h = '<div class="stk-sec">🆕 Pendientes de identificar <span class="stk-secn">' + pend.length + '</span></div>';
   if (!pend.length) return h + '<div class="stk-empty">Nada pendiente.</div>';
-  h += '<div class="stk-cut" style="background:#fffbeb;border:1px solid #fcd34d;color:#92400e;">Acá está todo lo que <b>espera una decisión</b>: lo que sugirió un operario sin código (<b>' + tmps.length + '</b>) y los códigos <b>viejos o duplicados</b> del catálogo (<b>' + viejos.length + '</b>). Ponerle el código real <b>mueve el stock ya cargado</b> al código nuevo; si el código ya existe, <b>fusiona</b> los saldos (que es como se netean los negativos).</div>';
-  h += '<div class="stk-scroll"><table class="stk-tbl"><thead><tr><th>Código</th><th>Nombre</th><th>Categoría</th><th>Ubicación</th><th>Unidades</th><th></th></tr></thead><tbody>';
+  h += '<div class="stk-cut" style="background:#fffbeb;border:1px solid #fcd34d;color:#92400e;">Acá está todo lo que <b>espera una decisión</b>: lo que sugirió un operario sin código (<b>' + tmps.length + '</b>) y los códigos <b>viejos o duplicados</b> del catálogo (<b>' + viejos.length + '</b>). <b>Aceptar</b> le pone el código real y le lleva el stock; si ese código ya existe, los saldos se <b>suman</b> (así se netean los negativos). <b>Borrar</b> lo saca del catálogo.</div>';
+  h += '<div class="stk-scroll"><table class="stk-tbl"><thead><tr><th>Código</th><th>Nombre</th><th>Categoría</th><th>Ubicación</th><th class="num">Cantidad</th><th>Unidad</th><th></th></tr></thead><tbody>';
   h += pend.map(function (it) {
-    const u = _stkInsUni1(it), tmp = _stkInsEsTmp(it), conStock = _stkInsConStock(it);
+    const u = _stkInsUni1(it), tmp = _stkInsEsTmp(it);
     const origen = tmp
       ? 'sugerido' + (it.por ? " · leg " + escapeHtml(it.por) : "")
       : '<span style="color:#b45309;">código viejo</span>';
-    // La cantidad/unidad sólo se tocan en los TMP: en un código viejo con saldo lo que
-    // corresponde es FUSIONARLO contra el real, no reescribirle el número a mano.
-    const uniCell = tmp
-      ? '<input class="stk-inp" id="idQty_' + escapeHtml(it.cod) + '" type="number" step="any" value="' + escapeHtml(u.saldo) + '" style="width:74px;"> ' + _stkInsUniSel("idUni_" + it.cod, u.uni)
-      : '<span' + (conStock ? ' style="color:#b91c1c;font-weight:800;"' : "") + '>' + escapeHtml(_stkInsSaldo(it)) + '</span>';
+    // Cantidad y Unidad van en columnas separadas. En los TMP se corrigen (es lo que
+    // cargó el operario); en un código viejo se muestran, porque lo que corresponde ahí
+    // es fusionarlo contra el real, no reescribirle el número a mano. Si arrastra saldo
+    // en varias unidades, se lista una línea por unidad.
+    let cantCell, uniCell;
+    if (tmp) {
+      cantCell = '<input class="stk-inp" id="idQty_' + escapeHtml(it.cod) + '" type="number" step="any" value="' + escapeHtml(u.saldo) + '" style="width:82px;">';
+      uniCell = _stkInsUniSel("idUni_" + it.cod, u.uni);
+    } else if (it.xuni && it.xuni.length) {
+      const neg = function (x) { return x < 0 ? ' style="color:#b91c1c;font-weight:800;"' : ' style="font-weight:800;"'; };
+      cantCell = it.xuni.map(function (x) { return '<div' + neg(x.saldo) + '>' + (Math.round(x.saldo * 1000) / 1000) + '</div>'; }).join("");
+      uniCell = it.xuni.map(function (x) { return '<div>' + escapeHtml(x.uni) + '</div>'; }).join("");
+    } else { cantCell = '<span class="stk-sub">0</span>'; uniCell = '<span class="stk-sub">—</span>'; }
     return '<tr' + (tmp ? "" : ' class="stk-viejo"') + '><td><input class="stk-inp" id="idCod_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.cod) + '" style="width:150px;">' +
       '<div class="stk-sub">' + origen + '</div></td>' +
       '<td><input class="stk-inp" id="idNom_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.nombre) + '" style="width:180px;">' +
@@ -11996,14 +12004,9 @@ function _stkInsPend(pend) {
       '<td>' + _stkInsCatSel("idCat_" + it.cod, tmp ? it.cat : "") +
       (tmp ? '<div class="stk-sub">la sugirió quien lo recibió</div>' : "") + '</td>' +
       '<td><input class="stk-inp" id="idUbi_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.ubic) + '" placeholder="rack / sector" style="width:90px;"></td>' +
-      '<td>' + uniCell + '</td>' +
-      '<td><button class="stk-btn" onclick="stkInsIdentificar(\'' + escapeHtml(it.cod) + '\')">✓ ' + (tmp ? "Identificar" : "Identificar / fusionar") + '</button> ' +
-      (tmp
-        ? '<button class="stk-btn stk-btn-x" onclick="stkInsDescartar(\'' + escapeHtml(it.cod) + '\')">Descartar</button>'
-        : (conStock
-            ? '<span class="stk-sub">tiene saldo: fusionalo</span>'
-            : '<button class="stk-btn stk-btn-x" onclick="stkInsBorrar(\'' + escapeHtml(it.cod) + '\')">🗑 Borrar</button>')) +
-      '</td></tr>';
+      '<td class="num">' + cantCell + '</td><td>' + uniCell + '</td>' +
+      '<td><button class="stk-btn" onclick="stkInsAceptar(\'' + escapeHtml(it.cod) + '\')">✓ Aceptar</button> ' +
+      '<button class="stk-btn stk-btn-x" onclick="stkInsBorrar(\'' + escapeHtml(it.cod) + '\')">🗑 Borrar</button></td></tr>';
   }).join("");
   return h + '</tbody></table></div>';
 }
@@ -12096,13 +12099,27 @@ function _stkInsListado(k, items) {
   return h + '</div>';
 }
 /* ---------- (3) UNIDADES ---------- */
-function _stkInsUnis() {
+function _stkInsUnis(items) {
   let h = '<div class="stk-sec">📏 Unidades con las que trabajamos <span class="stk-secn">' + INS_UNIS.length + '</span></div>';
-  h += '<div class="stk-cut">El vocabulario de medidas: es lo que puede elegir el operario. Sacar una no toca el stock que ya se cargó con ella.</div>';
+  h += '<div class="stk-cut">El vocabulario de medidas: es lo que puede elegir el operario. Las que están <b>en uso</b> avisan antes de sacarse.</div>';
   h += '<div class="ins-cats">' + INS_UNIS.map(function (u) {
-    return '<span class="ins-uchip on">' + escapeHtml(u) + ' <b style="cursor:pointer;opacity:.75;" onclick="stkInsUniSacar(\'' + u.replace(/'/g, "") + '\')" title="Sacar de la lista">✕</b></span>';
+    const uso = _stkInsUniUso(u, items);
+    const t = uso.arts || uso.cats
+      ? (uso.arts ? uso.arts + " insumo(s) con saldo" : "") + (uso.arts && uso.cats ? " · " : "") + (uso.cats ? uso.cats + " categoría(s)" : "")
+      : "no la usa nadie";
+    return '<span class="ins-uchip on" title="' + escapeHtml(t) + '">' + escapeHtml(u) +
+      (uso.arts || uso.cats ? ' <span style="opacity:.7;font-weight:700;">·' + ((uso.arts || 0) + (uso.cats || 0)) + '</span>' : "") +
+      ' <b style="cursor:pointer;opacity:.75;" onclick="stkInsUniSacar(\'' + u.replace(/'/g, "") + '\')" title="Sacar de la lista">✕</b></span>';
   }).join("") + '<button class="ins-uchip ins-uadd" onclick="stkInsUniAgregar()" title="Agregar unidad">+</button></div>';
   return h;
+}
+/* Quién usa una unidad: insumos con saldo en ella y categorías que la permiten. */
+function _stkInsUniUso(u, items) {
+  const arts = (items || _stkIns.items || []).filter(function (it) {
+    return (it.xuni || []).some(function (x) { return x.uni === u && Math.abs(x.saldo) > 0.0005; });
+  });
+  const cats = INS_CATS.filter(function (c) { return (c.unis || []).indexOf(u) >= 0; });
+  return { arts: arts.length, cats: cats.length, artsList: arts, catsList: cats };
 }
 /* ---------- helpers de UI ---------- */
 function _stkInsCatSel(id, sel) {
@@ -12139,39 +12156,64 @@ async function _stkInsRpc(fn, args) {
   return r.json().catch(function () { return null; });
 }
 /* ---------- acciones ---------- */
-async function stkInsIdentificar(tmp) {
-  const it = (_stkIns.items || []).filter(function (x) { return x.cod === tmp; })[0];
+async function stkInsAceptar(orig) {
+  const it = (_stkIns.items || []).filter(function (x) { return x.cod === orig; })[0];
   if (!it) return;
   const esTmp = _stkInsEsTmp(it);
-  const cod = _stkInsVal("idCod_" + tmp), nom = _stkInsVal("idNom_" + tmp), cat = _stkInsVal("idCat_" + tmp);
-  const ubi = _stkInsVal("idUbi_" + tmp), uni = _stkInsVal("idUni_" + tmp), qty = _stkInsVal("idQty_" + tmp);
+  const cod = _stkInsVal("idCod_" + orig), nom = _stkInsVal("idNom_" + orig), cat = _stkInsVal("idCat_" + orig);
+  const ubi = _stkInsVal("idUbi_" + orig), uni = _stkInsVal("idUni_" + orig), qty = _stkInsVal("idQty_" + orig);
   if (!cod) { alert("Poné el código real."); return; }
   if (/^TMP-/.test(cod)) { alert("Cambiá el código: " + cod + " es el temporal que puso el sistema.\n\nPonele el código de verdad."); return; }
-  if (cod === tmp) { alert("Ese ya es su código. Cambiálo por el real."); return; }
-  const existe = (_stkIns.items || []).some(function (x) { return x.cod === cod; });
-  if (existe && esTmp) { alert("El código " + cod + " ya existe.\n\nUn temporal no se puede fusionar contra un insumo en uso."); return; }
-  const msg = existe
-    ? "FUSIONAR «" + tmp + "» dentro de " + cod + "?\n\n" +
-      "Todo el stock de «" + tmp + "» (" + _stkInsSaldo(it) + ") pasa a " + cod + " y los saldos se SUMAN.\n" +
-      "Es lo que netea un duplicado o un negativo. No se puede deshacer con un botón."
-    : 'Identificar "' + tmp + '" como código ' + cod + "?\n\nEl stock ya cargado pasa al código nuevo.";
+  if (cod === orig) { alert("Ese ya es su código. Cambiálo por el real."); return; }
+  const existente = (_stkIns.items || []).filter(function (x) { return x.cod === cod; })[0];
+  if (existente && esTmp) {
+    alert("El código " + cod + " ya está en uso" + (existente.nombre ? " (" + existente.nombre + ")" : "") + ".\n\nUna sugerencia del operario no se puede fusionar contra un insumo en uso: poné un código libre.");
+    return;
+  }
+  const msg = existente
+    ? "El código " + cod + " YA EXISTE" + (existente.nombre ? " (" + existente.nombre + ")" : "") + ".\n\n" +
+      "Aceptar acá SUMA el stock de «" + orig + "» (" + _stkInsSaldo(it) + ") al de " + cod + ".\n" +
+      "Es lo que netea un duplicado o un saldo negativo. No se deshace con un botón.\n\n¿Seguir?"
+    : 'Aceptar "' + orig + '" con el código ' + cod + "?\n\nEl stock ya cargado pasa al código nuevo.";
   if (!confirm(msg)) return;
   try {
     // La corrección de cantidad/unidad va primero, mientras el movimiento todavía está
     // en el código viejo (el log es append-only: se corrige con un asiento, no editando).
-    if (esTmp) await _stkInsAjustar(it, tmp, qty, uni);
-    const n = await _stkInsRpc("insumo_identificar", { p_tmp: tmp, p_cod: cod, p_nombre: nom || null, p_categoria: cat || null, p_ubicacion: ubi || null });
-    _stkIns.msg = "✓ " + tmp + (existe ? " fusionado dentro de " : " → ") + cod + " (" + (n || 0) + " movimiento(s) de stock).";
+    if (esTmp) await _stkInsAjustar(it, orig, qty, uni);
+    const n = await _stkInsRpc("insumo_identificar", { p_tmp: orig, p_cod: cod, p_nombre: nom || null, p_categoria: cat || null, p_ubicacion: ubi || null });
+    _stkIns.msg = "✓ " + orig + (existente ? " sumado a " : " → ") + cod + " (" + (n || 0) + " movimiento(s) de stock).";
     await stkInsRefresh(); stkRender();
   } catch (e) { alert("No se pudo: " + (e.message || e)); }
 }
 async function stkInsBorrar(cod) {
-  if (!confirm("Borrar «" + cod + "» del catálogo?\n\nNo tiene ningún movimiento de stock, así que no se pierde nada.")) return;
+  const it = (_stkIns.items || []).filter(function (x) { return x.cod === cod; })[0];
+  if (!it) return;
+  const conStock = _stkInsConStock(it);
+  const msg = conStock
+    ? "⚠ BORRAR «" + cod + "»\n\nTiene saldo: " + _stkInsSaldo(it) + ".\n\n" +
+      "Borrarlo lo deja en CERO con un asiento de ajuste y lo saca del catálogo. Si ese stock es real y sólo está mal el código, cancelá y usá Aceptar con el código correcto (se fusiona).\n\n¿Borrar igual?"
+    : "Borrar «" + cod + "» del catálogo?\n\nNo tiene saldo, así que no se pierde nada.";
+  if (!confirm(msg)) return;
   try {
+    if (conStock) await _stkInsCerorear(it);
     await _stkInsRpc("insumo_borrar", { p_cod: cod });
-    _stkIns.msg = "✓ " + cod + " borrado del catálogo.";
+    _stkIns.msg = "✓ " + cod + " borrado del catálogo" + (conStock ? " (saldo dejado en 0)" : "") + ".";
     await stkInsRefresh(); stkRender();
   } catch (e) { alert("No se pudo: " + (e.message || e)); }
+}
+/* Deja el saldo en 0 con un asiento por unidad. Hace falta antes de borrar: el modal
+   del operario lista, defensivamente, cualquier código con saldo ≠ 0 aunque no esté en
+   el catálogo — si no se cerorea, el código borrado reaparecería. */
+async function _stkInsCerorear(it) {
+  const rows = (it.xuni || []).filter(function (u) { return Math.abs(u.saldo) > 0.0005; }).map(function (u) {
+    return { cod_art: it.cod, descripcion: it.nombre || null, deposito: "insumos", delta: -u.saldo, tipo: "ajuste", unidad: u.uni === "(s/u)" ? null : u.uni, legajo: "admin" };
+  });
+  if (!rows.length) return;
+  const r = await fetch(SUPABASE_URL + "/rest/v1/Movimientos_Stock", {
+    method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" },
+    body: JSON.stringify(rows)
+  });
+  if (!r.ok) throw new Error("no se pudo dejar el saldo en 0 (HTTP " + r.status + ")");
 }
 /* La cantidad/unidad se corrigen con ASIENTOS, no editando el movimiento: el log de
    stock es append-only. Si cambia la unidad, se saca todo de la vieja y se pone en la
@@ -12197,14 +12239,6 @@ async function _stkInsAjustar(it, cod, qtyStr, uniNueva) {
   });
   if (!r.ok) throw new Error("no se pudo ajustar la cantidad (HTTP " + r.status + ")");
 }
-async function stkInsDescartar(tmp) {
-  if (!confirm('Descartar "' + tmp + '"?\n\nPasa a «a depurar»: deja de aparecerle al operario, pero el stock que tenga NO se toca.')) return;
-  try {
-    await _stkInsRpc("insumo_editar", { p_cod: tmp, p_categoria: INS_CAT_DEP });
-    _stkIns.msg = "✓ " + tmp + " mandado a «a depurar».";
-    await stkInsRefresh(); stkRender();
-  } catch (e) { alert("No se pudo: " + (e.message || e)); }
-}
 async function stkInsGuardar(cod) {
   try {
     await _stkInsRpc("insumo_editar", { p_cod: cod, p_categoria: _stkInsVal("edCat_" + cod) || null, p_nombre: _stkInsVal("edNom_" + cod) || null, p_ubicacion: _stkInsVal("edUbi_" + cod) || null });
@@ -12215,6 +12249,8 @@ async function stkInsGuardar(cod) {
 async function stkInsAlta(k) {
   const cod = _stkInsVal("nvCod");
   if (!cod) { alert("Poné el código."); return; }
+  const ya = (_stkIns.items || []).filter(function (x) { return x.cod === cod; })[0];
+  if (ya) { alert("El código " + cod + " ya está en uso" + (ya.nombre ? " (" + ya.nombre + ")" : "") + ".\n\nPoné otro."); return; }
   try {
     await _stkInsRpc("insumo_alta", { p_cod: cod, p_nombre: _stkInsVal("nvNom") || null, p_categoria: k === "?" ? null : k, p_ubicacion: _stkInsVal("nvUbi") || null, p_legajo: "admin" });
     _stkIns.nuevoEn = ""; _stkIns.msg = "✓ " + cod + " creado.";
@@ -12277,8 +12313,21 @@ async function stkInsUniAgregar() {
   } catch (e) { alert("No se pudo: " + (e.message || e)); }
 }
 async function stkInsUniSacar(u) {
-  const usada = (_stkIns.items || []).filter(function (it) { return (it.xuni || []).some(function (x) { return x.uni === u; }); }).length;
-  if (!confirm("Sacar «" + u + "» de la lista?" + (usada ? "\n\n⚠ Hay " + usada + " insumo(s) con saldo en esa unidad: el saldo NO se toca, sólo deja de ofrecerse para cargas nuevas." : ""))) return;
+  const uso = _stkInsUniUso(u);
+  if (uso.arts || uso.cats) {
+    // Sacar una unidad en uso no rompe nada (el saldo queda), pero le cambia las
+    // opciones al operario: que vea exactamente a quién afecta antes de decidir.
+    let m = "⚠ «" + u + "» ESTÁ EN USO\n\n";
+    if (uso.cats) m += "Categorías que la permiten (" + uso.cats + "):\n  " +
+      uso.catsList.map(function (c) { return c.lbl; }).join("\n  ") + "\n\n";
+    if (uso.arts) m += "Insumos con saldo en esa unidad (" + uso.arts + "):\n  " +
+      uso.artsList.slice(0, 8).map(function (it) { return it.cod + " (" + _stkInsSaldo(it) + ")"; }).join("\n  ") +
+      (uso.arts > 8 ? "\n  …(+" + (uso.arts - 8) + " más)" : "") + "\n\n";
+    m += "El stock NO se toca: sigue ahí y se sigue viendo. Lo que cambia es que el operario ya no la va a poder elegir para cargas nuevas";
+    if (uso.cats) m += ", y las categorías de arriba se quedan sin esa opción";
+    m += ".\n\n¿Sacarla igual?";
+    if (!confirm(m)) return;
+  } else if (!confirm("Sacar «" + u + "» de la lista?\n\nNo la usa ningún insumo ni categoría.")) return;
   try {
     await _stkInsRpc("insumo_unidad_guardar", { p_nombre: u, p_activa: false });
     _stkIns.msg = "✓ Unidad «" + u + "» sacada de la lista.";

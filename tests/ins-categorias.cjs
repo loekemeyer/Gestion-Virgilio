@@ -1,4 +1,4 @@
-/* Regresión v7.19 / ideas 7917 + 5572 — Insumos (RI/EI): navegación por categorías.
+/* Regresión v7.22 / ideas 7917 + 5572 — Insumos (RI/EI): navegación por categorías.
    MISMA FORMA que la Recepción de Mercadería (recepcion.js): pantalla 1 = grilla de
    CATEGORÍAS en botones cuadrados → pantalla 2 = grilla de los INSUMOS de esa categoría
    → pop-up de cantidad. "‹ Atrás" vuelve. Este test fija el contrato:

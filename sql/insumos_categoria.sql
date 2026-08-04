@@ -158,3 +158,11 @@ update public."Insumos" set categoria = 'partes_plasticas' where categoria = 'ma
 -- La fusión sólo sale desde 'depurar', nunca desde un TMP-. `insumo_borrar` elimina del
 -- catálogo un viejo SIN movimientos. Un insumo en uso no se toca por ninguna de las dos.
 -- ---------------------------------------------------------------------
+
+-- ---------------------------------------------------------------------
+-- v7.22 (idea 5572) — ver `insumos_alta_codigo_unico_y_borrar`:
+-- `insumo_alta` ya NO usa `on conflict do nothing` (creaba la sensación de haber dado
+-- de alta algo que no se creó): falla si el código ya está en uso. `insumo_borrar` saca
+-- del catálogo aunque haya movimientos —son historia— pero exige saldo 0; el front lo
+-- deja en 0 con un asiento antes de llamarla.
+-- ---------------------------------------------------------------------
