@@ -6,6 +6,32 @@
 >
 > Última actualización: 2026-08-04 · Versión app al documentar: **v7.33**
 >
+> Nota (backend, **sin bump de app**): **OCs automáticas — aviso de ERROR y "revisá las OCs de hoy"**.
+> Dos pedidos del usuario sobre `generar_ocs_automaticas()` (cron `ocs-auto-miercoles`, miércoles
+> 07:00 AR). **(1) Si falla, avisa.** Antes moría en silencio y nadie se enteraba hasta mirar la
+> pantalla de Compras. Ahora la generación va en su **propio bloque con `exception when others`**: si
+> algo revienta, el INSERT se deshace pero el aviso **sí sale** — "🚨 FALLÓ la generación automática
+> de OCs — <fecha> / <error SQL + SQLSTATE> / NO se generó ninguna OC. 👉 Generalas a mano…" (dedup
+> `ocauto_err_<día>`), y la función devuelve `error: <sqlerrm>` en vez de tirar (el cron no queda en
+> `failed` mudo). **(2) La guarda del día ahora mira TODAS las OCs de hoy**, no sólo las `notas like
+> 'auto%'`: si alguien generó a mano un miércoles antes de las 7, el cron **no** suma las suyas encima
+> (que era el caso nicho que quedaba abierto) y en vez de saltear en silencio manda "⚠ OCs AUTOMÁTICAS
+> NO GENERADAS — ya había N línea(s) de hoy (M a mano + K automáticas). No se generó nada para no
+> duplicar. 👉 REVISÁ las OCs de hoy…" (dedup `ocauto_skip_<día>`), devolviendo `ya_hay_del_dia:<n>`.
+> Los estados posibles quedaron: `ok:<n>` · `sin_items` · `ya_hay_del_dia:<n>` · `error: <sqlerrm>`.
+> **Probado sin generar ni mandar nada**, con transacción + `ROLLBACK`: con una OC de hoy →
+> `ya_hay_del_dia:1` + aviso encolado; con un check constraint que rompe el INSERT → `error: …` +
+> aviso de error encolado; después del rollback quedaron 0 OCs del día, 0 filas en el outbox y 0
+> requests colgados en `pg_net`. `sql/generar_ocs_automaticas.sql` actualizado.
+>
+> Chequeo del seteo (mismo día): cron **activo**, `0 10 * * 3`, base `postgres`; `cron.timezone=GMT`
+> → el schedule es **UTC**, verificado contra `job_run_details` (`falta-fact-hoy` `0 11 * * *` corre
+> 08:00 AR) ⇒ **07:00 AR los miércoles**. La cuenta del server coincide **exacta** con la del
+> generador manual: se compararon los 13 códigos de la pantalla (130, 57, 26, 23, 23, 9, 6, 6, 5, 4,
+> 3, 3, 3) y dan igual, incluidos proy/índice/máx/pedidos/stock. Nota: **`xls`** en la columna PROY =
+> el artículo **no tiene proyección** en `proyeccion_madre`, así que el Máximo cae al **objetivo del
+> Excel** (`OC_Maximos.max_cajas`) y el índice **no se aplica**.
+>
 > Nota: **v7.1 — idea 3798: CONTEO CÍCLICO de góndola dentro del picking**. Al **terminar un
 > picking** (done-screen), `pkPickConteo` elige **al azar UN artículo** de la tanda **de UNA sola
 > celda** en góndola (`Capacidad_Sector`; el usuario insistió: sólo 1 celda) y muestra un card ámbar
@@ -215,32 +241,6 @@
 > tanda X · Paso N"** para retomarlo donde quedó (sin re-mandar AP). La pausa **no cuenta** en el
 > tiempo de armado (prodCompute ya descuenta del tramo AP→TAP lo que se haga en el medio). Nueva
 > función `compPausar()`; smoke `tests/comp-pausar.cjs`. Bump **v7.21**.
->
-> Nota (backend, **sin bump de app**): **OCs automáticas — aviso de ERROR y "revisá las OCs de hoy"**.
-> Dos pedidos del usuario sobre `generar_ocs_automaticas()` (cron `ocs-auto-miercoles`, miércoles
-> 07:00 AR). **(1) Si falla, avisa.** Antes moría en silencio y nadie se enteraba hasta mirar la
-> pantalla de Compras. Ahora la generación va en su **propio bloque con `exception when others`**: si
-> algo revienta, el INSERT se deshace pero el aviso **sí sale** — "🚨 FALLÓ la generación automática
-> de OCs — <fecha> / <error SQL + SQLSTATE> / NO se generó ninguna OC. 👉 Generalas a mano…" (dedup
-> `ocauto_err_<día>`), y la función devuelve `error: <sqlerrm>` en vez de tirar (el cron no queda en
-> `failed` mudo). **(2) La guarda del día ahora mira TODAS las OCs de hoy**, no sólo las `notas like
-> 'auto%'`: si alguien generó a mano un miércoles antes de las 7, el cron **no** suma las suyas encima
-> (que era el caso nicho que quedaba abierto) y en vez de saltear en silencio manda "⚠ OCs AUTOMÁTICAS
-> NO GENERADAS — ya había N línea(s) de hoy (M a mano + K automáticas). No se generó nada para no
-> duplicar. 👉 REVISÁ las OCs de hoy…" (dedup `ocauto_skip_<día>`), devolviendo `ya_hay_del_dia:<n>`.
-> Los estados posibles quedaron: `ok:<n>` · `sin_items` · `ya_hay_del_dia:<n>` · `error: <sqlerrm>`.
-> **Probado sin generar ni mandar nada**, con transacción + `ROLLBACK`: con una OC de hoy →
-> `ya_hay_del_dia:1` + aviso encolado; con un check constraint que rompe el INSERT → `error: …` +
-> aviso de error encolado; después del rollback quedaron 0 OCs del día, 0 filas en el outbox y 0
-> requests colgados en `pg_net`. `sql/generar_ocs_automaticas.sql` actualizado.
->
-> Chequeo del seteo (mismo día): cron **activo**, `0 10 * * 3`, base `postgres`; `cron.timezone=GMT`
-> → el schedule es **UTC**, verificado contra `job_run_details` (`falta-fact-hoy` `0 11 * * *` corre
-> 08:00 AR) ⇒ **07:00 AR los miércoles**. La cuenta del server coincide **exacta** con la del
-> generador manual: se compararon los 13 códigos de la pantalla (130, 57, 26, 23, 23, 9, 6, 6, 5, 4,
-> 3, 3, 3) y dan igual, incluidos proy/índice/máx/pedidos/stock. Nota: **`xls`** en la columna PROY =
-> el artículo **no tiene proyección** en `proyeccion_madre`, así que el Máximo cae al **objetivo del
-> Excel** (`OC_Maximos.max_cajas`) y el índice **no se aplica**.
 >
 > Nota: **v7.20 — Fuera el piloto de "Picking con lectora"**. El usuario decidió que no lo van a
 > usar, así que se sacó de la app (no quedó apagado: se borró). Se fueron: el **switch del operario**
