@@ -206,20 +206,40 @@ que netean a 0 pero se muestran como dos líneas.
 
 ---
 
-## Cómo implementarlo
+## Qué se implementó (v7.05)
 
-1. **`Insumos.categoria`** (texto, nullable) + una función que la autoderive de
-   `ubicacion` con las reglas de la tabla de arriba, y backfill de los 65 operativos.
-   Los códigos del grupo 🗑 quedan en `categoria = 'depurar'` y **no se listan**
-   salvo que el operario apriete "ver todos".
-2. **Chips de categoría** arriba del buscador en `insRender` — mismo patrón visual
-   que los chips de unidad que ya existen (`.ins-uchip`). Cada chip con el conteo:
-   `🧵 Fleje (32)`. Al tocar uno, filtra; el buscador sigue funcionando **dentro**
-   de la categoría elegida.
-3. **Unidad por defecto por categoría** (Fleje ⇒ kg, Plástico ⇒ Bolsas,
-   Espirales ⇒ MC, Cajas ⇒ Paquetes, Partes/Mangos ⇒ Uni). Esto solo ya evita la
-   mitad de los saldos mezclados que hay hoy.
-4. **Orden dentro de la categoría**: los flejes por **medida**, el resto por saldo
-   descendente (lo que más se mueve, arriba).
-5. **Netear los 13 negativos** antes de soltar la botonera (asiento de ajuste contra
-   el código real, igual que el conteo del 31/07).
+1. **`Insumos.categoria`** + **`Insumos.ubicacion`** (migración
+   `insumos_categoria_y_ubicacion`). Los 108 códigos quedaron categorizados; los 43
+   del grupo 🗑 con `categoria = 'depurar'`.
+   ⚠ `sector` **no** se reusó para la ubicación: en la app `sector` no nulo significa
+   "insumo sin código, identificado por sector + descripción" (se dibuja con 📍).
+2. **Se cargaron al catálogo los 62 insumos que sólo existían como movimiento.** Esto
+   arregla un bug de paso: el modal sólo agregaba los códigos fuera de catálogo si su
+   saldo era **≠ 0**, así que un fleje que llegaba a 0 **desaparecía** y había que
+   re-crearlo para poder recibirlo. `4`, `10` y `25` estaban exactamente así.
+3. **Chips de categoría** arriba del buscador (`insRender` + `insSetCat`), con el
+   conteo real de cada una. Chip y buscador son **alternativos**, no se combinan: tocar
+   un chip limpia el buscador y escribir limpia el chip. Así el operario nunca cae en
+   "0 resultados" por estar parado en la categoría equivocada, y buscando ve **todo**
+   (incluso lo que está a depurar, con su etiqueta de categoría en la fila).
+4. **Unidad por defecto por categoría** (`INS_CATS[].uni`) — Fleje ⇒ Kg, Plástico ⇒
+   Bolsas, Espirales ⇒ MC, Cajas ⇒ Paquetes, resto ⇒ Uni. La idea 7382 sigue mandando:
+   si el insumo ya tiene saldo en **una sola** unidad, gana esa. Además los chips de
+   unidad de cada fila ahora **dedupean sin distinguir mayúsculas** (`Kg` y `kg` eran
+   dos chips distintos = dos saldos del mismo insumo) y ofrecen las unidades en las que
+   el insumo **ya tiene saldo**.
+5. **Orden dentro de la categoría**: los flejes por **medida** (`_insMedida`), el resto
+   por saldo descendente.
+6. El **alta nace con categoría** (selector en el formulario, arranca en la del chip
+   activo) y el movimiento guarda la **ubicación física** en vez del sector.
+
+Test: `tests/ins-categorias.cjs`.
+
+## ⏳ Lo que quedó pendiente
+
+**Netear los 13 saldos negativos** de la tabla de arriba. No se tocó porque **cambia
+saldos de stock** y eso es decisión del dueño, no del refactor de la pantalla: el
+asiento de ajuste tiene que ir contra el código real (igual que el conteo del 31/07) y
+alguien tiene que confirmar la equivalencia de cada par. Mientras tanto quedan detrás
+del chip 🗑 con el aviso, fuera del listado por defecto — **no** desaparecidos, porque
+esconder un saldo negativo no lo arregla.

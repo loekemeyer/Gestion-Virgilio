@@ -84,4 +84,7 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== etl-lio (idea 5290 / v6.89: etiquetas de lío al cerrar cada lío, switch + legajo 0/1) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/etl-lio.cjs
 
+echo "== ins-categorias (idea 7917 / v7.05: botonera de categorías en RI/EI) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ins-categorias.cjs
+
 echo "== TODO OK =="

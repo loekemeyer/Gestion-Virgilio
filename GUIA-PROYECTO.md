@@ -4,7 +4,29 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-03 · Versión app al documentar: **v7.04**
+> Última actualización: 2026-08-04 · Versión app al documentar: **v7.05**
+>
+> Nota: **v7.05 — Insumos (RI/EI): botonera de CATEGORÍAS** (idea 7917 del usuario). El modal de
+> Recepción/Entrega de Insumos listaba los **108 códigos planos ordenados por código** y la única
+> forma de llegar a uno era el buscador de texto (el operario tenía que saber que el fleje de
+> 121 × 1,20 es el código `22`). Ahora `Insumos` tiene **`categoria`** y **`ubicacion`**, y arriba
+> del buscador van los **chips**: `Todos` · 🧵 Fleje y alambre (32) · 🧪 Plástico (9) · 🍴 Partes
+> inox (11) · 🪵 Mangos (3) · 🌀 Espirales (2) · 📦 Cajas y embalaje (8) · 🗑 **A depurar (43)**.
+> **Cuatro cosas más, todas consecuencia de la agrupación**: **(1)** los **43 duplicados/negativos**
+> del formato viejo `sector·descripción` quedan **fuera del listado por defecto** (chip aparte, con
+> aviso ⚠ — no se esconden del todo porque algunos todavía arrastran saldo). **(2) Unidad por
+> defecto POR CATEGORÍA** (Fleje ⇒ Kg, Plástico ⇒ Bolsas, Espirales ⇒ MC, Cajas ⇒ Paquetes): es lo
+> que venía **partiendo los saldos** (`PP` tenía 151 Bolsas **+ 24 Uni** porque el chip arrancaba en
+> "Uni" y nadie lo cambiaba). La idea 7382 sigue mandando: si el insumo ya tiene saldo en **una
+> sola** unidad, gana esa. Los chips de unidad ahora **dedupean sin distinguir mayúsculas** (`Kg`
+> vs `kg` eran dos chips = dos saldos del mismo insumo). **(3)** Se **cargaron al catálogo los 62
+> insumos que sólo existían como movimiento** — antes un fleje que llegaba a 0 **desaparecía** del
+> modal y había que re-crearlo para poder recibirlo (`4`, `10` y `25` estaban así). **(4)** El
+> alta nace **con categoría** (selector en el formulario, arranca en la del chip activo) y el
+> movimiento guarda la **ubicación física** (`V9 Ad`, `AF7`) en vez del sector. Chip y buscador son
+> **alternativos** (buscar mira todo, incluso lo a depurar) para que nunca haya un "0 resultados"
+> por estar parado en la categoría equivocada. Relevamiento completo en `docs/INSUMOS-CATEGORIAS.md`.
+> Test nuevo `tests/ins-categorias.cjs`; suite completa OK; render 390px sin overflow. Bump **v7.05**.
 >
 > Nota: **v7.04 — Ocupación: drag&drop de "A programar" a días (planificación LOCAL)**. Completa el
 > #3 del usuario. Se pueden **arrastrar** los pedidos "a programar" (chips en el detalle de la barra
@@ -1914,7 +1936,8 @@
 > tocarse (inicio)**, abren un modal que registra **stock de insumos** en `Movimientos_Stock`
 > (`deposito='insumos'`, tipo `recepcion_insumo` `+` / `entrega_insumo` `−`). El modal
 > (`showInsumoModal('RI'|'EI', legajo)`) tiene **buscador** sobre el catálogo **`Insumos`** (tabla
-> nueva: `id, cod (unique), nombre, creado_por, creado`; RLS abierta anon+auth) y **alta de código
+> nueva: `id, cod (unique), nombre, creado_por, creado`, + `sector` desde v4.36 y
+> `categoria`/`ubicacion` desde **v7.05**; RLS: anon `select` + `insert`) y **alta de código
 > al vuelo** (`insCrear` → POST a `Insumos`) para cuando el insumo no está. Cada fila muestra el
 > **stock actual** y un stepper; en EI avisa si va a quedar negativo (no lo bloquea — "como entra,
 > puede salir"). Confirmar usa **`stockMove`** (offline-safe `vir_stock_pend`). En el **admin Stocks**

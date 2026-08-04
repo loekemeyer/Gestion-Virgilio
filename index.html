@@ -5780,7 +5780,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.04";
+const APP_VERSION = "v7.05";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -12362,36 +12362,64 @@ function closeBajarRacks() { const ov = document.getElementById("brModal"); if (
 const SUPABASE_INSUMOS_ENDPOINT = SUPABASE_URL + "/rest/v1/Insumos";
 let _ins = null;
 function _insSortCod(a, b) { return String(a.cod).localeCompare(String(b.cod), undefined, { numeric: true, sensitivity: "base" }); }
+/* idea 7917 — BOTONERA DE CATEGORÍAS. El modal listaba los 108 códigos planos por
+   código y la única forma de llegar a uno era el buscador de texto (el operario
+   tenía que saber que el fleje de 121 × 1,20 es el código "22"). Ahora `Insumos`
+   tiene `categoria` y arriba del buscador van los chips. `uni` = unidad por defecto
+   de la categoría: arregla de raíz los saldos partidos (PP tenía 151 Bolsas + 24
+   Uni porque el chip arrancaba en "Uni" y nadie lo cambiaba). */
+const INS_CATS = [
+  { k: "fleje", lbl: "🧵 Fleje y alambre", uni: "Kg" },
+  { k: "plastico", lbl: "🧪 Plástico", uni: "Bolsas" },
+  { k: "inox", lbl: "🍴 Partes inox", uni: "Uni" },
+  { k: "mangos", lbl: "🪵 Mangos", uni: "Uni" },
+  { k: "espirales", lbl: "🌀 Espirales", uni: "MC" },
+  { k: "cajas", lbl: "📦 Cajas y embalaje", uni: "Paquetes" },
+  { k: "depurar", lbl: "🗑 A depurar", uni: "Uni" }
+];
+const INS_CAT_DEP = "depurar";   // no entra en el listado por defecto
+function insCatDef(k) { for (let i = 0; i < INS_CATS.length; i++) { if (INS_CATS[i].k === k) return INS_CATS[i]; } return null; }
+function insCatLbl(k) { const c = insCatDef(k); return c ? c.lbl : "❓ Sin categoría"; }
+/* Un insumo que llegó por saldo (no está en el catálogo) o que se creó sin categoría
+   cae en "sin categoría": se muestra igual, en su propio chip, para que nunca
+   desaparezca del listado por un dato faltante. */
+function insCatOf(it) { const k = String((it && it.cat) || "").trim(); return insCatDef(k) ? k : ""; }
 async function insFetchCatalogo() {
   try {
-    const r = await fetch(SUPABASE_INSUMOS_ENDPOINT + "?select=cod,nombre&order=cod.asc&limit=20000", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+    const r = await fetch(SUPABASE_INSUMOS_ENDPOINT + "?select=cod,nombre,sector,categoria,ubicacion&order=cod.asc&limit=20000", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
     return r.ok ? await r.json() : [];
   } catch (_e) { return []; }
 }
 async function showInsumoModal(mode, legajo, _resume) {
   if (!document.getElementById("insCss")) {
     const s = document.createElement("style"); s.id = "insCss";
-    s.textContent = "#insModal{display:none;position:fixed;inset:0;z-index:1296;background:rgba(2,6,23,.74);overflow:auto;padding:12px;}#insModal.show{display:block;}.ins-card{background:#f8fafc;max-width:480px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.ins-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;color:#fff;}.ins-head.in{background:linear-gradient(90deg,#4f46e5,#4338ca);}.ins-head.out{background:linear-gradient(90deg,#0d9488,#0f766e);}.ins-title{font-size:18px;font-weight:800;}.ins-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}.ins-body{padding:13px 14px;}.ins-loading,.ins-empty{padding:24px;text-align:center;color:#64748b;font-size:15px;}.ins-hint{font-size:12.5px;color:#64748b;margin-bottom:9px;}.ins-search{width:100%;box-sizing:border-box;height:42px;border:2px solid #cbd5e1;border-radius:10px;padding:0 12px;font-size:15px;margin-bottom:9px;}.ins-crear{background:#eef2ff;border:1px dashed #a5b4fc;border-radius:11px;padding:10px;margin-bottom:10px;font-size:12.5px;color:#3730a3;display:flex;flex-direction:column;gap:7px;}.ins-crear-r{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}.ins-nn{flex:1;min-width:130px;}.ins-nid{flex:1;min-width:150px;}.ins-crear input{height:34px;border:1px solid #c7d2fe;border-radius:8px;padding:0 9px;font-size:13px;}.ins-cbtn{background:#4f46e5;color:#fff;border:none;border-radius:8px;padding:7px 12px;font-weight:800;cursor:pointer;width:auto;}.ins-row{border:1px solid #e2e8f0;border-radius:12px;padding:9px 11px;margin-bottom:8px;background:#fff;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}.ins-info{flex:1;min-width:0;}.ins-cod{font-size:16px;font-weight:800;font-family:Consolas,Menlo,monospace;}.ins-cod-sec{font-family:inherit;color:#4338ca;}.ins-nom{font-size:12.5px;color:#475569;}.ins-stk{font-size:11.5px;color:#64748b;font-weight:700;margin-top:2px;}.ins-stp{display:flex;align-items:center;gap:5px;}.ins-sb{display:flex;align-items:center;justify-content:center;line-height:1;padding:0;margin:0;width:38px;height:40px;border:none;border-radius:9px;font-size:22px;font-weight:800;cursor:pointer;background:#e2e8f0;color:#475569;}.ins-inp{width:58px;height:40px;box-sizing:border-box;margin:0;padding:0;text-align:center;font-size:18px;font-weight:800;border:2px solid #cbd5e1;border-radius:9px;}.ins-warn{width:100%;font-size:11.5px;color:#b45309;font-weight:700;}.ins-fin{width:100%;margin-top:10px;padding:14px;border:none;border-radius:12px;color:#fff;font-size:17px;font-weight:800;cursor:pointer;}.ins-fin.in{background:#4f46e5;}.ins-fin.out{background:#0d9488;}.ins-fin:disabled{background:#cbd5e1;color:#64748b;cursor:not-allowed;}.ins-uni{flex-basis:100%;display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px dashed #e2e8f0;}.ins-uni-l{font-size:11.5px;color:#64748b;font-weight:700;}.ins-uchip{width:auto;margin:0;border:1px solid #cbd5e1;background:#fff;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:800;cursor:pointer;color:#475569;}.ins-uchip.on{background:#4f46e5;color:#fff;border-color:#4f46e5;}.ins-uadd{color:#4f46e5;font-size:15px;}";
+    s.textContent = "#insModal{display:none;position:fixed;inset:0;z-index:1296;background:rgba(2,6,23,.74);overflow:auto;padding:12px;}#insModal.show{display:block;}.ins-card{background:#f8fafc;max-width:480px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.ins-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;color:#fff;}.ins-head.in{background:linear-gradient(90deg,#4f46e5,#4338ca);}.ins-head.out{background:linear-gradient(90deg,#0d9488,#0f766e);}.ins-title{font-size:18px;font-weight:800;}.ins-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}.ins-body{padding:13px 14px;}.ins-loading,.ins-empty{padding:24px;text-align:center;color:#64748b;font-size:15px;}.ins-hint{font-size:12.5px;color:#64748b;margin-bottom:9px;}.ins-search{width:100%;box-sizing:border-box;height:42px;border:2px solid #cbd5e1;border-radius:10px;padding:0 12px;font-size:15px;margin-bottom:9px;}.ins-crear{background:#eef2ff;border:1px dashed #a5b4fc;border-radius:11px;padding:10px;margin-bottom:10px;font-size:12.5px;color:#3730a3;display:flex;flex-direction:column;gap:7px;}.ins-crear-r{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}.ins-nn{flex:1;min-width:130px;}.ins-nid{flex:1;min-width:150px;}.ins-crear input{height:34px;border:1px solid #c7d2fe;border-radius:8px;padding:0 9px;font-size:13px;}.ins-cbtn{background:#4f46e5;color:#fff;border:none;border-radius:8px;padding:7px 12px;font-weight:800;cursor:pointer;width:auto;}.ins-row{border:1px solid #e2e8f0;border-radius:12px;padding:9px 11px;margin-bottom:8px;background:#fff;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}.ins-info{flex:1;min-width:0;}.ins-cod{font-size:16px;font-weight:800;font-family:Consolas,Menlo,monospace;}.ins-cod-sec{font-family:inherit;color:#4338ca;}.ins-nom{font-size:12.5px;color:#475569;}.ins-stk{font-size:11.5px;color:#64748b;font-weight:700;margin-top:2px;}.ins-stp{display:flex;align-items:center;gap:5px;}.ins-sb{display:flex;align-items:center;justify-content:center;line-height:1;padding:0;margin:0;width:38px;height:40px;border:none;border-radius:9px;font-size:22px;font-weight:800;cursor:pointer;background:#e2e8f0;color:#475569;}.ins-inp{width:58px;height:40px;box-sizing:border-box;margin:0;padding:0;text-align:center;font-size:18px;font-weight:800;border:2px solid #cbd5e1;border-radius:9px;}.ins-warn{width:100%;font-size:11.5px;color:#b45309;font-weight:700;}.ins-fin{width:100%;margin-top:10px;padding:14px;border:none;border-radius:12px;color:#fff;font-size:17px;font-weight:800;cursor:pointer;}.ins-fin.in{background:#4f46e5;}.ins-fin.out{background:#0d9488;}.ins-fin:disabled{background:#cbd5e1;color:#64748b;cursor:not-allowed;}.ins-uni{flex-basis:100%;display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px dashed #e2e8f0;}.ins-uni-l{font-size:11.5px;color:#64748b;font-weight:700;}.ins-uchip{width:auto;margin:0;border:1px solid #cbd5e1;background:#fff;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:800;cursor:pointer;color:#475569;}.ins-uchip.on{background:#4f46e5;color:#fff;border-color:#4f46e5;}.ins-uadd{color:#4f46e5;font-size:15px;}.ins-cats{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;}.ins-cchip{width:auto;margin:0;border:1px solid #cbd5e1;background:#fff;border-radius:999px;padding:8px 13px;font-size:12.5px;font-weight:800;cursor:pointer;color:#475569;}.ins-cchip.on{background:#4f46e5;color:#fff;border-color:#4f46e5;}.ins-body.out .ins-cchip.on{background:#0d9488;border-color:#0d9488;}.ins-cchip.dep{border-style:dashed;color:#b45309;border-color:#fcd34d;}.ins-cchip.dep.on,.ins-body.out .ins-cchip.dep.on{background:#b45309;color:#fff;border-color:#b45309;}.ins-cn{opacity:.72;font-weight:700;}.ins-ubi{font-size:11.5px;color:#0f766e;font-weight:800;}.ins-cbadge{font-size:11px;font-weight:800;color:#64748b;}.ins-depw{background:#fffbeb;border:1px dashed #fcd34d;color:#92400e;border-radius:10px;padding:9px 11px;font-size:12px;margin-bottom:9px;}";
     document.head.appendChild(s);
   }
   let ov = document.getElementById("insModal");
   if (!ov) { ov = document.createElement("div"); ov.id = "insModal"; document.body.appendChild(ov); }
   ov.classList.add("show");
   const isIn = mode === "RI";
-  ov.innerHTML = '<div class="ins-card"><div class="ins-head ' + (isIn ? "in" : "out") + '"><span class="ins-title">' + (isIn ? "📥 Recepción de insumos" : "📤 Entrega de insumos") + '</span><button class="ins-close" onclick="insAskClose()">Cerrar</button></div><div class="ins-body" id="insBody"><div class="ins-loading">Cargando insumos…</div></div></div>';
+  ov.innerHTML = '<div class="ins-card"><div class="ins-head ' + (isIn ? "in" : "out") + '"><span class="ins-title">' + (isIn ? "📥 Recepción de insumos" : "📤 Entrega de insumos") + '</span><button class="ins-close" onclick="insAskClose()">Cerrar</button></div><div class="ins-body ' + (isIn ? "in" : "out") + '" id="insBody"><div class="ins-loading">Cargando insumos…</div></div></div>';
   if (_resume) { _ins = _resume; insRender(); return; }
   try {
     const res = await Promise.all([insFetchCatalogo(), stockFetchSaldos(), insFetchSaldosXUni()]);
     const saldos = res[1] || {};
     const xUni = res[2] || {};
     // idea 7382: default de unidad = la unidad real del saldo si el insumo tiene UNA sola
-    // (así el chip arranca en Kg/Bolsas/… en vez de "Uni" a ciegas); si mezcla, queda "Uni".
-    const _defUni = function (xu) { return (xu && xu.length === 1) ? xu[0].uni : "Uni"; };
-    const items = (res[0] || []).map(function (c) { const cod = String(c.cod), sd = saldos[cod] || {}, xu = xUni[cod] || null; return { cod: cod, nombre: c.nombre || (sd.desc || ""), sector: c.sector || "", noCode: !!c.sector, stock: Number(sd.insumos || 0), stockByUni: xu, qty: 0, unidad: _defUni(xu) }; });
-    // insumos con movimientos pero fuera del catálogo (defensivo)
-    Object.keys(saldos).forEach(function (k) { const sd = saldos[k], xu = xUni[k] || null; if ((sd.insumos || 0) !== 0 && !items.some(function (it) { return it.cod === k; })) items.push({ cod: k, nombre: sd.desc || "", sector: "", noCode: String(k).indexOf("·") >= 0, stock: Number(sd.insumos || 0), stockByUni: xu, qty: 0, unidad: _defUni(xu) }); });
+    // (así el chip arranca en Kg/Bolsas/… en vez de "Uni" a ciegas). idea 7917: si mezcla
+    // o no tiene saldo, cae a la unidad de la CATEGORÍA (Fleje ⇒ Kg, Plástico ⇒ Bolsas…)
+    // en vez de "Uni" a ciegas — que es lo que venía partiendo los saldos.
+    const _defUni = function (xu, cat) { if (xu && xu.length === 1) return xu[0].uni; const c = insCatDef(cat); return c ? c.uni : "Uni"; };
+    const items = (res[0] || []).map(function (c) {
+      const cod = String(c.cod), sd = saldos[cod] || {}, xu = xUni[cod] || null, cat = String(c.categoria || "");
+      return { cod: cod, nombre: c.nombre || (sd.desc || ""), sector: c.sector || "", ubic: c.ubicacion || "", cat: cat, noCode: cod.indexOf("·") >= 0, stock: Number(sd.insumos || 0), stockByUni: xu, qty: 0, unidad: _defUni(xu, cat) };
+    });
+    // insumos con movimientos pero fuera del catálogo (defensivo): quedan sin categoría,
+    // en su propio chip — nunca se ocultan por un dato faltante.
+    Object.keys(saldos).forEach(function (k) { const sd = saldos[k], xu = xUni[k] || null; if ((sd.insumos || 0) !== 0 && !items.some(function (it) { return it.cod === k; })) items.push({ cod: k, nombre: sd.desc || "", sector: "", ubic: "", cat: "", noCode: String(k).indexOf("·") >= 0, stock: Number(sd.insumos || 0), stockByUni: xu, qty: 0, unidad: _defUni(xu, "") }); });
     items.sort(_insSortCod);
-    _ins = { mode: mode, legajo: String(legajo || "").trim(), items: items, filtro: "" };
+    _ins = { mode: mode, legajo: String(legajo || "").trim(), items: items, filtro: "", cat: "" };
     insRender();
   } catch (e) { const b = document.getElementById("insBody"); if (b) b.innerHTML = '<div class="ins-loading">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
 }
@@ -12410,6 +12438,45 @@ function insAddUnidad(i) {
   try { let s = JSON.parse(localStorage.getItem("vir_ins_units") || "[]"); if (!Array.isArray(s)) s = []; if (s.indexOf(u) < 0) s.push(u); localStorage.setItem("vir_ins_units", JSON.stringify(s)); } catch (_e) {}
   if (_ins && _ins.items[i]) _ins.items[i].unidad = u;
   insRender();
+}
+/* idea 7917 — unidades ofrecidas en la fila: las de siempre + la de la categoría +
+   las unidades en las que el insumo YA tiene saldo + la elegida. Antes el operario
+   tenía que apretar "+" y tipear "Bolsas" aunque el insumo tuviera 151 bolsas. */
+function _insUnitsFor(it, base) {
+  // Dedupe SIN distinguir mayúsculas: en los datos conviven "Kg" y "kg", y ofrecer los
+  // dos chips hace que el operario parta el saldo del mismo insumo en dos unidades.
+  // Gana la grafía del saldo que YA existe (así lo nuevo se suma a lo viejo).
+  const u = [], seen = {};
+  const add = function (x, wins) {
+    x = String(x || "").trim(); if (!x || x === "(s/u)") return;
+    const k = x.toLowerCase();
+    if (!(k in seen)) { seen[k] = u.length; u.push(x); }
+    else if (wins) u[seen[k]] = x;
+  };
+  base.forEach(function (x) { add(x, false); });
+  const c = insCatDef(insCatOf(it)); if (c) add(c.uni, false);
+  if (it && it.stockByUni) it.stockByUni.forEach(function (s) { add(s.uni, true); });
+  if (it) add(it.unidad, true);
+  return u;
+}
+/* Los flejes se llaman por su MEDIDA ("121 X 1,20"), no por un nombre: ordenarlos
+   por código deja "10, 13, 17, 19, 2, 20…" y el operario no encuentra nada. Se
+   ordenan por ancho y después por espesor. Lo que no tiene medida (los alambres)
+   va al final. */
+function _insMedida(nombre) {
+  const m = String(nombre || "").match(/^\s*(\d+(?:[.,]\d+)?)\s*[xX]\s*(\d+(?:[.,]\d+)?)/);
+  if (!m) return null;
+  return [parseFloat(m[1].replace(",", ".")), parseFloat(m[2].replace(",", "."))];
+}
+function _insSortCat(cat) {
+  if (cat === "fleje") return function (a, b) {
+    const ma = _insMedida(a.nombre), mb = _insMedida(b.nombre);
+    if (ma && !mb) return -1; if (!ma && mb) return 1;
+    if (ma && mb) { if (ma[0] !== mb[0]) return ma[0] - mb[0]; if (ma[1] !== mb[1]) return ma[1] - mb[1]; }
+    return _insSortCod(a, b);
+  };
+  // el resto: lo que más stock tiene arriba (es lo que más se mueve)
+  return function (a, b) { const d = Math.abs(b.stock) - Math.abs(a.stock); return d !== 0 ? d : _insSortCod(a, b); };
 }
 /* idea 7382 (conteo) — saldo de insumos SEPARADO por unidad para el módulo de conteo/
    entrega. Lee la vista aditiva vista_saldos_insumos_x_unidad → Map cod_art → [{uni,saldo}].
@@ -12443,14 +12510,36 @@ function insRender() {
   const isIn = _ins.mode === "RI";
   const units = insLoadUnits();
   const f = (_ins.filtro || "").toLowerCase().trim();
-  const shown = f ? _ins.items.filter(function (it) { return (it.cod + " " + (it.nombre || "") + " " + (it.sector || "")).toLowerCase().indexOf(f) >= 0; }) : _ins.items;
-  let h = '<div class="ins-hint">' + (isIn ? "Cuánto <b>entró</b> de cada insumo." : "Cuánto <b>salió</b> de cada insumo.") + ' Código de <b>7 dígitos</b>, o <b>sector + descripción</b> si no tiene.</div>';
-  h += '<input class="ins-search" type="search" placeholder="🔎 Buscar (código / descripción / sector)" value="' + escapeHtml(_ins.filtro) + '" oninput="if(_ins){_ins.filtro=this.value;insRender();}">';
+  // idea 7917: el chip y el buscador son dos formas ALTERNATIVAS de achicar la lista,
+  // no se combinan — así el operario nunca cae en "0 resultados" por estar parado en
+  // la categoría equivocada. Buscar mira todo (incluso lo que está a depurar).
+  const cat = f ? "" : (_ins.cat || "");
+  const shown = (f
+    ? _ins.items.filter(function (it) { return (it.cod + " " + (it.nombre || "") + " " + (it.sector || "") + " " + (it.ubic || "")).toLowerCase().indexOf(f) >= 0; })
+    : _ins.items.filter(function (it) { const k = insCatOf(it); if (cat === "?") return k === ""; return cat ? k === cat : k !== INS_CAT_DEP; })
+  ).slice().sort(_insSortCat(cat));
+  let h = '<div class="ins-hint">' + (isIn ? "Cuánto <b>entró</b> de cada insumo." : "Cuánto <b>salió</b> de cada insumo.") + ' Elegí la <b>categoría</b> o buscá por código/descripción.</div>';
+  // botonera de categorías
+  const cnt = {}; let nOper = 0;
+  _ins.items.forEach(function (it) { const k = insCatOf(it); cnt[k] = (cnt[k] || 0) + 1; if (k !== INS_CAT_DEP) nOper++; });
+  let chips = '<button class="ins-cchip' + (!cat && !f ? " on" : "") + '" onclick="insSetCat(\'\')">Todos <span class="ins-cn">' + nOper + '</span></button>';
+  chips += INS_CATS.map(function (c) {
+    if (!cnt[c.k]) return "";
+    return '<button class="ins-cchip' + (c.k === INS_CAT_DEP ? " dep" : "") + (cat === c.k ? " on" : "") + '" onclick="insSetCat(\'' + c.k + '\')">' + c.lbl + ' <span class="ins-cn">' + cnt[c.k] + '</span></button>';
+  }).join("");
+  if (cnt[""]) chips += '<button class="ins-cchip' + (cat === "?" ? " on" : "") + '" onclick="insSetCat(\'?\')">❓ Sin categoría <span class="ins-cn">' + cnt[""] + '</span></button>';
+  h += '<div class="ins-cats">' + chips + '</div>';
+  // la categoría del alta vive en _ins (no en el <select>): el listado se re-renderiza
+  // en cada tecla del buscador y si no, la elección se perdía.
+  const newCat = _ins.newCat || (cat && cat !== "?" && cat !== INS_CAT_DEP ? cat : INS_CATS[0].k);
+  if (cat === INS_CAT_DEP) h += '<div class="ins-depw">⚠ Códigos <b>viejos o duplicados</b> (el conteo del 31/07 los dio de baja). No cargues acá: usá el código nuevo. Están a la vista sólo porque algunos todavía arrastran saldo.</div>';
+  h += '<input class="ins-search" type="search" placeholder="🔎 Buscar en TODOS (código / descripción / ubicación)" value="' + escapeHtml(_ins.filtro) + '" oninput="if(_ins){_ins.filtro=this.value;insRender();}">';
   h += '<div class="ins-crear">' +
     '<div class="ins-crear-r"><input id="insNewId" class="ins-nid" placeholder="Código (7 díg) o sector" value="' + (f && !shown.length ? escapeHtml(_ins.filtro) : "") + '"><input id="insNewNom" class="ins-nn" placeholder="descripción"></div>' +
+    '<div class="ins-crear-r"><span class="ins-cbadge">Categoría:</span> <select id="insNewCat" class="ins-nn" onchange="if(_ins)_ins.newCat=this.value;">' + INS_CATS.filter(function (c) { return c.k !== INS_CAT_DEP; }).map(function (c) { return '<option value="' + c.k + '"' + (newCat === c.k ? " selected" : "") + '>' + c.lbl + '</option>'; }).join("") + '</select></div>' +
     '<button class="ins-cbtn" onclick="insCrear()">+ Agregar a la lista</button>' +
     '</div>';
-  if (!shown.length) h += '<div class="ins-empty">' + (f ? "No está. Cargalo arriba (código de 7 díg o sector + descripción)." : "Cargá el primer insumo arriba.") + '</div>';
+  if (!shown.length) h += '<div class="ins-empty">' + (f ? "No está. Cargalo arriba (código de 7 díg o sector + descripción)." : "No hay insumos en esta categoría.") + '</div>';
   else h += shown.map(function (it) {
     const i = _ins.items.indexOf(it);
     const _stkU = _insStockForUnit(it);   // idea 7382: saldo de la unidad seleccionada
@@ -12461,11 +12550,16 @@ function insRender() {
       ? ('stock: ' + it.stockByUni.map(function (u) { return '<b>' + _num(u.saldo) + '</b> ' + escapeHtml(u.uni); }).join(' · '))
       : ('stock: ' + _num(_stkU) + ' ' + escapeHtml(it.unidad || "Uni"));
     const idLbl = it.noCode
-      ? '<span class="ins-cod ins-cod-sec">📍 ' + escapeHtml(it.sector || "") + '</span> <span class="ins-nom">' + escapeHtml(it.nombre || "") + '</span>'
+      ? '<span class="ins-cod ins-cod-sec">📍 ' + escapeHtml(it.sector || it.cod.split("·")[0] || "") + '</span> <span class="ins-nom">' + escapeHtml(it.nombre || "") + '</span>'
       : '<span class="ins-cod">' + escapeHtml(it.cod) + '</span> <span class="ins-nom">' + escapeHtml(it.nombre || "") + '</span>';
-    const chips = units.map(function (u) { return '<button class="ins-uchip' + (it.unidad === u ? " on" : "") + '" onclick="insSetUnidad(' + i + ',\'' + u.replace(/'/g, "") + '\')">' + escapeHtml(u) + '</button>'; }).join("") + '<button class="ins-uchip ins-uadd" onclick="insAddUnidad(' + i + ')" title="Agregar unidad">+</button>';
+    // buscando se ve de qué categoría es cada resultado (si no, no se entiende por qué
+    // aparece un código viejo mezclado con los buenos)
+    const catLbl = (f || cat === "?") ? '<div class="ins-cbadge">' + escapeHtml(insCatLbl(insCatOf(it))) + '</div>' : "";
+    const ubiLbl = it.ubic ? ' <span class="ins-ubi">📍 ' + escapeHtml(it.ubic) + '</span>' : "";
+    const rowUnits = _insUnitsFor(it, units);
+    const chips = rowUnits.map(function (u) { return '<button class="ins-uchip' + (it.unidad === u ? " on" : "") + '" onclick="insSetUnidad(' + i + ',\'' + u.replace(/'/g, "") + '\')">' + escapeHtml(u) + '</button>'; }).join("") + '<button class="ins-uchip ins-uadd" onclick="insAddUnidad(' + i + ')" title="Agregar unidad">+</button>';
     return '<div class="ins-row">' +
-      '<div class="ins-info">' + idLbl + '<div class="ins-stk">' + stkLine + '</div></div>' +
+      '<div class="ins-info">' + idLbl + ubiLbl + catLbl + '<div class="ins-stk">' + stkLine + '</div></div>' +
       '<div class="ins-stp"><button class="ins-sb" onclick="insChg(' + i + ',-1)">–</button><input class="ins-inp" type="number" min="0" inputmode="numeric" value="' + it.qty + '" oninput="insSet(' + i + ',this.value)"><button class="ins-sb" onclick="insChg(' + i + ',1)">+</button></div>' +
       '<div class="ins-uni"><span class="ins-uni-l">Unidad:</span> ' + chips + '</div>' +
       (neg ? '<div class="ins-warn">⚠ el stock de ' + escapeHtml(it.unidad || "Uni") + ' quedaría en ' + _num(_stkU - it.qty) + '</div>' : "") +
@@ -12475,6 +12569,9 @@ function insRender() {
   h += '<button class="ins-fin ' + (isIn ? "in" : "out") + '"' + (tot <= 0 ? " disabled" : "") + ' onclick="insConfirmar()">' + (isIn ? "✓ Registrar entrada" : "✓ Registrar salida") + "</button>";
   _renderKeepFocus(body, h);
 }
+/* Tocar un chip limpia el buscador (y viceversa): son dos caminos alternativos a lo
+   mismo. Volver a tocar el chip activo deselecciona. */
+function insSetCat(k) { if (!_ins) return; _ins.cat = (_ins.cat === k) ? "" : k; _ins.filtro = ""; _ins.newCat = ""; insRender(); }
 function insChg(i, d) { if (!_ins) return; const it = _ins.items[i]; if (!it) return; it.qty = Math.max(0, it.qty + d); insRender(); }
 function insSet(i, v) { if (!_ins) return; const it = _ins.items[i]; if (!it) return; it.qty = Math.max(0, parseInt(v, 10) || 0); insRender(); }
 async function insCrear() {
@@ -12482,30 +12579,35 @@ async function insCrear() {
   const id = String(((document.getElementById("insNewId") || {}).value) || "").trim();
   const nom = String(((document.getElementById("insNewNom") || {}).value) || "").trim();
   if (!id) { alert("Poné el código (7 dígitos) o el sector."); return; }
+  // idea 7917: el alta nace CON categoría (la del <select>, que arranca en la del chip
+  // activo). Si no, el insumo nuevo caía en "sin categoría" y no lo encontraba nadie.
+  const kcat = String(((document.getElementById("insNewCat") || {}).value) || _ins.newCat || _ins.cat || "").trim();
+  const cdef = insCatDef(kcat);
+  const kuni = cdef ? cdef.uni : "Uni";
   let item;
   if (/^\d{7}$/.test(id)) {
     // CÓDIGO de 7 dígitos
     if (_ins.items.some(function (it) { return it.cod === id; })) { alert("Ese código ya está en la lista."); _ins.filtro = id; insRender(); return; }
-    item = { cod: id, nombre: nom, sector: "", noCode: false, stock: 0, qty: 0, unidad: "Uni" };
+    item = { cod: id, nombre: nom, sector: "", ubic: "", cat: kcat, noCode: false, stock: 0, qty: 0, unidad: kuni };
   } else {
     // SECTOR (no es un código de 7 dígitos). Si es sólo números y no son 7, avisar.
     if (/^\d+$/.test(id) && !confirm("\"" + id + "\" no es un código de 7 dígitos. ¿Cargarlo como SECTOR igual?")) return;
     if (!nom) { alert("Con sector poné también la descripción."); return; }
     const key = (id + "·" + nom).toUpperCase();
     if (_ins.items.some(function (it) { return it.cod === key; })) { alert("Ese insumo (sector + descripción) ya está en la lista."); _ins.filtro = nom; insRender(); return; }
-    item = { cod: key, nombre: nom, sector: id, noCode: true, stock: 0, qty: 0, unidad: "Uni" };
+    item = { cod: key, nombre: nom, sector: id, ubic: "", cat: kcat, noCode: true, stock: 0, qty: 0, unidad: kuni };
   }
   try {
-    await fetch(SUPABASE_INSUMOS_ENDPOINT, { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" }, body: JSON.stringify({ cod: item.cod, nombre: item.nombre || null, sector: item.sector || null, creado_por: _ins.legajo || null }) });
+    await fetch(SUPABASE_INSUMOS_ENDPOINT, { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" }, body: JSON.stringify({ cod: item.cod, nombre: item.nombre || null, sector: item.sector || null, categoria: item.cat || null, creado_por: _ins.legajo || null }) });
   } catch (_e) { /* sin red: igual va a la lista */ }
-  _ins.items.push(item); _ins.items.sort(_insSortCod); _ins.filtro = ""; insRender();
+  _ins.items.push(item); _ins.items.sort(_insSortCod); _ins.filtro = ""; _ins.cat = insCatDef(kcat) ? kcat : _ins.cat; insRender();
 }
 function insConfirmar() {
   if (!_ins) return;
   const isIn = _ins.mode === "RI";
   const sel = _ins.items.filter(function (it) { return it.qty > 0; });
   if (!sel.length) return;
-  const rows = sel.map(function (it) { return { cod_art: it.cod, descripcion: it.nombre || null, deposito: "insumos", delta: isIn ? it.qty : -it.qty, tipo: isIn ? "recepcion_insumo" : "entrega_insumo", ref: null, legajo: _ins.legajo || null, unidad: it.unidad || "Uni", ubicacion: it.sector || null }; });
+  const rows = sel.map(function (it) { return { cod_art: it.cod, descripcion: it.nombre || null, deposito: "insumos", delta: isIn ? it.qty : -it.qty, tipo: isIn ? "recepcion_insumo" : "entrega_insumo", ref: null, legajo: _ins.legajo || null, unidad: it.unidad || "Uni", ubicacion: it.ubic || it.sector || null }; });
   const tot = sel.reduce(function (s, it) { return s + it.qty; }, 0);
   try { opDraftClear(_ins && _ins.legajo); } catch (_e) {}
   closeIns();
