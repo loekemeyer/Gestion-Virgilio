@@ -4,7 +4,24 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-03 · Versión app al documentar: **v7.01**
+> Última actualización: 2026-08-03 · Versión app al documentar: **v7.02**
+>
+> Nota: **v7.02 — Ocupación: vista SEMANAL con barras apiladas por tamaño de pedido + "A programar"**.
+> El usuario pidió cambiar la visión: en vez del gráfico continuo de −30…+30 días, ahora es
+> **semanal** con **selector de 9 semanas** (`pppOcupWeek`, −4…+4; "Esta sem" resaltada). Cada día es
+> una **barra apilada por `fecha de entrega`**, segmentada por **tamaño de pedido** (4 buckets
+> `OCUP_BK`: Chico ≤0.10 / Mediano ≤0.30 / Grande ≤0.80 / Muy grande >0.80, escala de azules) — así se
+> "discriminan los pedidos que componen los m³". Fuente **por pedido**, unificada por `fecha_entrega`
+> (`_ocupUnified`): entregados = `PPP_Entregados_Meta` (reusa `_pppDeliveredFull`), programados =
+> `_pppParsed.prog`. **Pedidos "A programar"** (sin fecha) se incluyen como **barra de proyección**
+> (color ámbar, sólo en semana actual/futuras `_ocupWeek≥0`) + KPI "a programar (m³)". Click en una
+> barra → detalle de pedidos del día (NP, cliente, m³, punto de color por tamaño). Línea de capacidad
+> **diaria** opcional (mismo `vir_ocup_cap_m3`). Se **reemplazó** todo lo de armado/TAP anterior
+> (`_ocupArmado`, `_ocupSvg`, `_ocupProgByDay`, scroll horizontal) por `_ocupWeekData`/`_ocupWeekSvg`/
+> `_ocupWeekDetailHtml`. Nota: la métrica pasó de "armado por día" a **"a entregar por día"** (fecha de
+> entrega), consistente para pasado (entregados) + futuro (programados) + proyección (a programar).
+> Verificado: render headless de semana actual (con "A programar" ámbar + HOY), detalle por día, y
+> semana pasada. `checkhtml` + `smoke` OK. Bump **v7.02**.
 >
 > Nota: **v7.01 — El guard de stock-negativo ahora TAMBIÉN avisa por `insumos`**. El usuario pidió
 > "que mande" también los negativos de insumos (antes se excluían para no spamear con los
