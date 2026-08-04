@@ -82,21 +82,6 @@ const RCP_CSS = `
 #rcpRoot .cajasCodLine{ font-size:20px; margin-bottom:4px; }
 #rcpRoot .cajasCodLine strong{ font-size:34px; }
 #rcpRoot .cajasOc{ font-size:13px; font-weight:800; color:#a06000; background:#fff7e6; border:1px solid #ffd98a; border-radius:9px; padding:7px 10px; margin:6px 0 2px; }
-/* v7.04 — pop-up "Requiere aprobación" (recepción que excede la OC vigente +20%).
-   Va POR ENCIMA del pop-up de cajas (z-index 1500 > 1400) y lo deja abierto atrás,
-   así "Corregir" vuelve al número sin perder nada. */
-#rcpRoot .modal.aprob{ z-index:1500; align-items:center; }
-#rcpRoot .aprobCard{ max-width:340px; text-align:center; border:3px solid var(--danger); }
-#rcpRoot .aprobIco{ font-size:44px; line-height:1; }
-#rcpRoot .aprobTitle{ font-size:24px; font-weight:900; color:var(--danger); margin:6px 0 10px; }
-#rcpRoot .aprobTxt{ font-size:15px; color:#334155; font-weight:700; line-height:1.45; }
-#rcpRoot .aprobTxt b{ color:#111; }
-#rcpRoot .aprobActions{ margin-top:16px; display:flex; flex-direction:column; gap:9px; }
-#rcpRoot .aprobActions .btnSend{ height:52px; font-size:18px; }
-#rcpRoot .aprobActions .btnCancel{ height:44px; font-size:15px; }
-#rcpRoot .avisoExc{ border:2px solid var(--danger); background:#fff5f4; color:var(--danger); border-radius:10px; padding:10px 12px; font-size:13.5px; font-weight:800; line-height:1.4; margin-bottom:12px; }
-#rcpRoot .resItem.exceso{ border-color:var(--danger); background:#fff5f4; }
-#rcpRoot .resItem .resExc{ display:block; font-size:11.5px; font-weight:800; color:var(--danger); }
 #rcpRoot .cajasLabel{ display:block; font-weight:900; font-size:18px; margin:6px 0 10px; }
 #rcpRoot .cajasRow{ display:flex; align-items:stretch; gap:12px; }
 #rcpRoot .modalCard input[type="text"].cajasInput{ width:104px; height:104px; font-size:48px; font-weight:900; text-align:center; letter-spacing:normal; padding:0; border:2px solid var(--border); border-radius:12px; box-sizing:border-box; flex:0 0 auto; }
@@ -245,17 +230,6 @@ const RCP_HTML = `
     </div>
   </div>
 </div>
-<div id="opAprobModal" class="modal aprob" role="dialog" aria-modal="true">
-  <div class="modalCard aprobCard">
-    <div class="aprobIco">⚠</div>
-    <div class="aprobTitle">Requiere aprobación</div>
-    <div id="opAprobTxt" class="aprobTxt"></div>
-    <div class="aprobActions">
-      <button id="opAprobGo" class="btnSend">Continuar</button>
-      <button id="opAprobFix" class="btnCancel">Corregir la cantidad</button>
-    </div>
-  </div>
-</div>
 `;
 
 const rcpRoot = document.createElement("div");
@@ -281,10 +255,6 @@ const opCajasNext = document.getElementById("opCajasNext");
 const opCajasDelete = document.getElementById("opCajasDelete");
 const opCajasClose = document.getElementById("opCajasClose");
 const opCajasOc = document.getElementById("opCajasOc");
-const opAprobModal = document.getElementById("opAprobModal");
-const opAprobTxt = document.getElementById("opAprobTxt");
-const opAprobGo = document.getElementById("opAprobGo");
-const opAprobFix = document.getElementById("opAprobFix");
 
 const opState = {
   step: null,
@@ -299,8 +269,7 @@ const opState = {
   cargas: {},        // { Cod_Art: cajas }
   cajasCod: null,    // codigo abierto en el popup
   listaTipo: null,
-  ocPorCod: null,    // v7.04: OCs vigentes del proveedor { codNorm: {ped,rec,pend,fecha} } (null = sin cargar)
-  excesos: {}        // v7.04: { Cod_Art: {cajas, oc, pct} } — cargas que el operario aprobó pese a exceder la OC
+  ocPorCod: null     // v7.04: OCs vigentes del proveedor { codNorm: {ped,rec,pend,fecha} } (null = sin cargar)
 };
 
 function opTodayStr() {
@@ -320,7 +289,7 @@ function opResetState() {
   opState.articulosManual = null;
   opState.linea = null; opState.fecha = opTodayStr();
   opState.remito = ""; opState.articulos = null; opState.cargas = {};
-  opState.ocPorCod = null; opState.excesos = {};
+  opState.ocPorCod = null;
 }
 function openOp() {
   opResetState();
@@ -520,7 +489,6 @@ function seleccionarEntidad(e) {
   opState.articulos = null;
   opState.cargas = {};
   opState.ocPorCod = null;   // las OCs vigentes son POR proveedor → se recargan
-  opState.excesos = {};
   renderLinea();
 }
 
@@ -633,8 +601,10 @@ function renderRemito() {
 
 /* ============== Órdenes de Compra vigentes (v7.04) ==============
    El operario, al marcar la mercadería que recibe, ve en cada botón de código
-   CUÁNTO se le pidió a ese tallerista/proveedor en la OC vigente ("OC 100"), y si
-   carga más del +20% de esa cantidad salta el pop-up "Requiere aprobación".
+   CUÁNTO se le pidió a ese tallerista/proveedor en la OC vigente ("OC 100"). Si
+   carga más del +20% de esa cantidad NO se le interrumpe (nada de pop-up): el
+   botón queda marcado en rojo y, al enviar, sale el aviso por Telegram (evento
+   ROC → trigger `trg_recepcion_excede_oc_telegram`).
 
    FUENTE: tabla `Ordenes_Compra` — la MISMA que llena el generador de OCs desde el
    PPP (index.html → "📑 Órdenes de Compra" → "⚙ Generar OCs": A pedir = máx(0,
@@ -950,31 +920,13 @@ function renderResumen() {
   h.textContent = displayName(opState.tallNombre);
   opBody.appendChild(h);
 
-  // v7.04: aviso arriba de todo si alguna carga excede la OC vigente (+20%).
-  const codsExc = items.map(i => i.cod).filter(c => opState.excesos[c] && ocExcede(c, opState.cargas[c]));
-  if (codsExc.length) {
-    const av = document.createElement("div");
-    av.className = "avisoExc";
-    av.innerHTML = "⚠ <b>Requiere aprobación</b> — " + codsExc.length + " código(s) por encima de la orden de compra: " +
-      codsExc.map(c => escapeHtmlRcp(String(c)) + " (+" + ocPctExceso(c, opState.cargas[c]) + "%)").join(" · ");
-    opBody.appendChild(av);
-  }
-
   const list = document.createElement("div");
   list.className = "resList";
   items.forEach(i => {
-    const exc = opState.excesos[i.cod] && ocExcede(i.cod, i.cajas);
-    const oc = ocDeCod(i.cod);
     const r = document.createElement("div");
-    r.className = "resItem" + (exc ? " exceso" : "");
+    r.className = "resItem";
     const c = document.createElement("span"); c.className = "resCod"; c.textContent = i.cod;
-    const q = document.createElement("span"); q.className = "resCajas";
-    q.textContent = i.cajas + " caja" + (i.cajas === 1 ? "" : "s");
-    if (exc) {
-      const e = document.createElement("span"); e.className = "resExc";
-      e.textContent = "OC " + ocRef(oc) + " · +" + ocPctExceso(i.cod, i.cajas) + "%";
-      q.appendChild(e);
-    }
+    const q = document.createElement("span"); q.className = "resCajas"; q.textContent = i.cajas + " caja" + (i.cajas === 1 ? "" : "s");
     r.appendChild(c); r.appendChild(q);
     list.appendChild(r);
   });
@@ -1031,51 +983,19 @@ opCajasClose.onclick = closeCajas;
 // Antes: tocar el fondo oscuro cerraba el pop-up. Lo sacamos para que NO se cierre
 // solo si el empleado tarda en cargar / toca fuera sin querer — solo se cierra con
 // la ✕ o al cargar el número. (Pedido: "que se mantenga".)
-function opAplicarCajas(cod, n) {
-  if (n > 0) opState.cargas[cod] = n;
-  else delete opState.cargas[cod];
-  if (!(n > 0) || !ocExcede(cod, n)) delete opState.excesos[cod];   // corrigió → deja de estar en exceso
+opCajasNext.onclick = () => {
+  const n = parseInt(opCajasInput.value, 10) || 0;
+  if (n > 0) opState.cargas[opState.cajasCod] = n;
+  else delete opState.cargas[opState.cajasCod];
   closeCajas();
   drawArticulosGrid();
-}
-opCajasNext.onclick = () => {
-  const cod = opState.cajasCod;
-  const n = parseInt(opCajasInput.value, 10) || 0;
-  // v7.04: más del +20% de lo pedido en la OC vigente → pide aprobación antes de cargarlo.
-  if (n > 0 && ocExcede(cod, n)) { aprobPedir(cod, n); return; }
-  opAplicarCajas(cod, n);
 };
 opCajasDelete.onclick = () => {
-  const cod = opState.cajasCod;
-  delete opState.cargas[cod];
-  delete opState.excesos[cod];
+  delete opState.cargas[opState.cajasCod];
   closeCajas();
   drawArticulosGrid();
 };
 
-/* ===== Pop-up "Requiere aprobación" (v7.04) =====
-   Se recibe más del +20% de lo que pide la OC vigente. Por ahora es un cartel local:
-   "Continuar" acepta la carga (y la deja marcada como exceso, para el resumen y para
-   el evento ROC que queda registrado al enviar) y "Corregir la cantidad" vuelve al
-   número. El aviso por Telegram va enganchado al evento ROC. */
-function aprobPedir(cod, cajas) {
-  const oc = ocDeCod(cod), ref = ocRef(oc), pct = ocPctExceso(cod, cajas);
-  opAprobTxt.innerHTML =
-    'Estás recibiendo <b>' + cajas + ' caja' + (cajas === 1 ? '' : 's') + '</b> del código <b>' + escapeHtmlRcp(String(cod)) + '</b>,<br>' +
-    'y la orden de compra vigente pide <b>' + ref + '</b>.<br><br>' +
-    '<span style="color:#b42318">Excede en un <b>' + pct + '%</b></span> (el límite es +' + Math.round(OC_EXCESO_PCT * 100) + '%).<br><br>' +
-    'Esta recepción <b>requiere aprobación</b>.';
-  opAprobGo.onclick = function () {
-    opAprobModal.classList.remove("open");
-    opState.excesos[cod] = { cajas: cajas, oc: ref, pct: pct };
-    opAplicarCajas(cod, cajas);
-  };
-  opAprobFix.onclick = function () {
-    opAprobModal.classList.remove("open");
-    setTimeout(function () { opCajasInput.focus(); opCajasInput.select(); }, 50);
-  };
-  opAprobModal.classList.add("open");
-}
 
 /* ============== Enviar (graba todo) ============== */
 async function opEnviar() {
@@ -1202,14 +1122,14 @@ async function opEnviar() {
     }
   } catch (_e) {}
 
-  // v7.04 — AVISO recepción que EXCEDE la OC vigente (+20%): el operario ya lo aprobó
-  // en el pop-up "Requiere aprobación"; acá queda REGISTRADO el evento ROC (mismo
-  // patrón que RSP) con proveedor, remito y "cod:recibidas/pedidas". De ahí cuelga
-  // después el aviso por Telegram. Best-effort, no bloquea el envío.
+  // v7.04 — AVISO recepción que EXCEDE la OC vigente (+20%): SIN pop-up ni aprobación,
+  // al operario no se lo interrumpe. Se emite el evento ROC (mismo patrón que RSP) con
+  // proveedor, remito y "cod:recibidas/pedidas"; el trigger
+  // trg_recepcion_excede_oc_telegram manda el aviso por Telegram. Best-effort.
   try {
-    const exc = items.filter(i => opState.excesos[i.cod]);
+    const exc = items.filter(i => ocExcede(i.cod, i.cajas));
     if (exc.length) {
-      const det = exc.map(i => i.cod + ":" + i.cajas + "/" + opState.excesos[i.cod].oc).join(",");
+      const det = exc.map(i => i.cod + ":" + i.cajas + "/" + ocRef(ocDeCod(i.cod))).join(",");
       const cid = "roc_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
       supabase.from("Registros_Produccion_Virgilio").insert({
         client_id: cid, legajo: String(RECP.legajo || ""), opcion: "ROC",

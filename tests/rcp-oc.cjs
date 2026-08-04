@@ -1,11 +1,11 @@
 /* Test de regresión (v7.04) — RECEPCIÓN: detalle de la ORDEN DE COMPRA vigente en
-   los botones de código + pop-up "Requiere aprobación" cuando lo recibido excede la
+   los botones de código + aviso Telegram (evento ROC) cuando lo recibido excede la
    OC en más de 20%.
 
    `recepcion.js` es un MÓDULO ES que importa supabase-js de esm.sh, así que no se
    puede cargar tal cual desde file:// (sin red). El test lo parcha: reemplaza el
-   import por un cliente FALSO (devuelve filas fijas de "Ordenes_Compra") y expone
-   los internos en window.__rcp. Verifica:
+   import por un cliente FALSO (devuelve filas fijas de "Ordenes_Compra" y anota los
+   insert) y expone los internos en window.__rcp. Verifica:
    - matcheo de proveedor: exacto, compartido ("Garcia / Lucho"), con inicial pegada
      ("Martin C" = Martin), por alias (Pettofrezza = Rafael) y que NO matchee ajenos,
    - agrupado: se toma SOLO la generación más nueva (no acumula OCs viejas), se suman
@@ -14,8 +14,10 @@
    - el botón muestra "OC N" y el pop-up de cajas la OC vigente,
    - +20%: 120 sobre 100 NO dispara, 121 SÍ; con recibido parcial la referencia es lo
      que FALTA,
-   - "Continuar" aplica la carga y la deja marcada como exceso; corregir a un número
-     dentro de la OC la desmarca.
+   - exceder NO interrumpe al operario (v7.05: sin pop-up de aprobación): la carga
+     entra derecho, el botón queda en rojo con ⚠ y al enviar sale UN evento `ROC`
+     (proveedor|remito|cod:recibidas/pedidas) — el que dispara el Telegram — sólo con
+     los códigos que se pasaron.
    Sale 1 si falla. */
 const fs = require("fs");
 const path = require("path");
@@ -32,10 +34,12 @@ const src = fs.readFileSync(path.join(root, "recepcion.js"), "utf8");
 const FAKE_CLIENT = `
 const __fake = { rows: [] };
 window.__fakeRows = function (rows) { __fake.rows = rows; };
+window.__ins = [];
 function __q(table) {
   const o = {};
-  ["select","gte","lte","eq","neq","in","not","or","ilike","order","limit","single","insert","update","delete"]
+  ["select","gte","lte","eq","neq","in","not","or","ilike","order","limit","single","update","delete"]
     .forEach(function (m) { o[m] = function () { return o; }; });
+  o.insert = function (rows) { window.__ins.push({ table: table, rows: rows }); return o; };
   o.then = function (res, rej) {
     return Promise.resolve({ data: (table === "Ordenes_Compra" ? __fake.rows : []), error: null }).then(res, rej);
   };
@@ -57,9 +61,8 @@ const patched = src.replace(/^import\s+\{[^}]*\}\s+from\s+"[^"]*";\s*$/m, FAKE_C
 window.__rcp = { opState: opState, ocProvCoincide: ocProvCoincide, ocSplitProv: ocSplitProv,
   ocDeCod: ocDeCod, ocRef: ocRef, ocExcede: ocExcede, ocPctExceso: ocPctExceso,
   ocDiaLimite: ocDiaLimite, cargarOCVigentes: cargarOCVigentes, drawArticulosGrid: drawArticulosGrid,
-  openCajas: openCajas, renderResumen: renderResumen,
-  el: { body: opBody, cajasInput: opCajasInput, cajasNext: opCajasNext, cajasOc: opCajasOc,
-        aprobModal: opAprobModal, aprobTxt: opAprobTxt, aprobGo: opAprobGo, aprobFix: opAprobFix } };
+  openCajas: openCajas, renderResumen: renderResumen, opEnviar: opEnviar, RECP: RECP,
+  el: { body: opBody, cajasInput: opCajasInput, cajasNext: opCajasNext, cajasOc: opCajasOc } };
 `;
 
 if (patched.indexOf("esm.sh") >= 0) { console.error("rcp-oc: no pude parchear el import de supabase-js."); process.exit(1); }
@@ -110,7 +113,7 @@ if (patched.indexOf("esm.sh") >= 0) { console.error("rcp-oc: no pude parchear el
       { codigo: "999", cantidad: 500, cantidad_recibida: 0, proveedor: "Poly", fecha: "2026-07-29", estado: "pendiente" }
     ]);
     S.tipo = "tallerista"; S.tallNombre = "Lucho"; S.linea = "LK"; S.fecha = "2026-08-04";
-    S.remito = "12345"; S.cargas = {}; S.excesos = {}; S.ocPorCod = null;
+    S.remito = "12345"; S.cargas = {}; S.ocPorCod = null;
     await R.cargarOCVigentes();
     const oc518 = R.ocDeCod("518"), oc123 = R.ocDeCod("123"), oc586 = R.ocDeCod("586");
     out.soloNueva = !!oc518 && oc518.ped === 60 && oc518.fecha === "2026-07-29";
@@ -139,41 +142,46 @@ if (patched.indexOf("esm.sh") >= 0) { console.error("rcp-oc: no pude parchear el
       && btns["586"] === "OC 40/100"                 // faltan/pedidas cuando hay recibido parcial
       && btns["999"] === null;                       // sin OC vigente → sin detalle
 
-    // ---- 5) pop-up de cajas + "Requiere aprobación" ----
+    // ---- 5) pop-up de cajas: muestra la OC, y exceder NO interrumpe ----
     R.openCajas("518");
     out.popupOc = R.el.cajasOc.style.display !== "none" && R.el.cajasOc.textContent.indexOf("60") >= 0;
 
     R.el.cajasInput.value = "70";                     // dentro del +20% → entra derecho
     R.el.cajasNext.click();
-    out.okSinAviso = (S.cargas["518"] === 70) && !S.excesos["518"] && !R.el.aprobModal.classList.contains("open");
+    out.okSinAviso = (S.cargas["518"] === 70) && !document.querySelector("#rcpRoot .modal.open");
 
-    R.openCajas("518");
-    R.el.cajasInput.value = "90";                     // +50% → requiere aprobación
+    R.openCajas("586");
+    R.el.cajasInput.value = "90";                     // ref 40 → +125%, pero NO se frena
     R.el.cajasNext.click();
-    out.pideAprob = R.el.aprobModal.classList.contains("open")
-      && R.el.aprobTxt.textContent.indexOf("50%") >= 0
-      && S.cargas["518"] === 70;                      // todavía NO se aplicó
-    R.el.aprobFix.click();                            // "Corregir" → no aplica nada
-    out.corrigeNoAplica = !R.el.aprobModal.classList.contains("open") && S.cargas["518"] === 70 && !S.excesos["518"];
+    out.excesoNoFrena = (S.cargas["586"] === 90) && !document.querySelector("#rcpRoot .modal.open");
 
-    R.el.cajasInput.value = "90";
-    R.el.cajasNext.click();
-    R.el.aprobGo.click();                             // "Continuar" → aplica y queda marcado
-    out.continuaAplica = (S.cargas["518"] === 90) && !!S.excesos["518"] && S.excesos["518"].oc === 60
-      && !R.el.aprobModal.classList.contains("open");
-
-    // botón en rojo + resumen con el aviso
-    R.drawArticulosGrid();
-    out.btnRojo = !!R.el.body.querySelector(".opCodeBtn.exceso");
-    R.renderResumen();
-    out.resumenAviso = !!R.el.body.querySelector(".avisoExc") && R.el.body.textContent.indexOf("Requiere aprobación") >= 0;
-
-    // corrige a un número dentro de la OC → deja de estar en exceso
+    // el botón que se pasó queda marcado en rojo; el que está en regla, no
     S.step = "articulos"; R.drawArticulosGrid();
-    R.openCajas("518");
-    R.el.cajasInput.value = "50";
-    R.el.cajasNext.click();
-    out.desmarca = (S.cargas["518"] === 50) && !S.excesos["518"];
+    const rojos = {};
+    R.el.body.querySelectorAll(".opCodeBtn").forEach(function (x) {
+      rojos[x.querySelector("span").textContent.trim()] = x.classList.contains("exceso");
+    });
+    out.btnRojo = rojos["586"] === true && rojos["518"] === false;
+
+    // ---- 6) al enviar sale UN evento ROC con los códigos pasados ----
+    S.step = "resumen"; R.RECP.legajo = "104";
+    window.__ins = [];
+    R.renderResumen();
+    await R.opEnviar();
+    const roc = window.__ins.filter(function (x) {
+      return x.table === "Registros_Produccion_Virgilio" && x.rows && x.rows.opcion === "ROC";
+    });
+    out.rocUnico = roc.length === 1;
+    out.rocTexto = roc.length === 1 && roc[0].rows.texto === "Lucho|12345|586:90/40" && roc[0].rows.legajo === "104";
+
+    // sin excesos no se emite ROC
+    S.cargas = { "518": 50 };
+    window.__ins = [];
+    R.renderResumen();          // vuelve a crear el botón Confirmar que usa opEnviar
+    await R.opEnviar();
+    out.sinExcesoSinRoc = window.__ins.filter(function (x) {
+      return x.table === "Registros_Produccion_Virgilio" && x.rows && x.rows.opcion === "ROC";
+    }).length === 0;
 
     return out;
   });
@@ -183,6 +191,6 @@ if (patched.indexOf("esm.sh") >= 0) { console.error("rcp-oc: no pude parchear el
   Object.keys(r).forEach(function (k) { if (r[k] !== true) fail.push(k + "=" + JSON.stringify(r[k])); });
   if (errs.length) fail.push("pageerror: " + errs.join(" | "));
   if (fail.length) { console.error("rcp-oc: FALLÓ →", fail.join(", ")); process.exit(1); }
-  console.log("rcp-oc: OK — OC vigente en los botones + aprobación por exceso (+20%)");
+  console.log("rcp-oc: OK — OC vigente en los botones + evento ROC por exceso (+20%)");
   process.exit(0);
 })();

@@ -4,10 +4,26 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-04 · Versión app al documentar: **v7.04**
+> Última actualización: 2026-08-04 · Versión app al documentar: **v7.05**
+>
+> Nota: **v7.05 — Recepción que excede la OC: FUERA el pop-up, va por Telegram**. El usuario pidió
+> sacar el cartel "Requiere aprobación" (v7.04) y que el exceso se avise **sólo por Telegram**. En
+> `recepcion.js` (`?v=3.75`) se eliminó el modal `#opAprobModal` (HTML + CSS + `aprobPedir` + el
+> estado `opState.excesos`): cargar cajas vuelve a ser un paso directo, **nada interrumpe al
+> operario**. Lo único que queda visible es el botón del código **en rojo con ⚠** cuando se pasa del
+> +20%. El evento **`ROC`** ya no depende de ninguna aprobación: al enviar, `opEnviar` recalcula qué
+> códigos exceden (`ocExcede`) y emite UNA fila (`texto = proveedor|remito|cod:recibidas/pedidas`).
+> **Nuevo en Supabase**: función `notificar_recepcion_excede_oc_telegram()` + trigger
+> `trg_recepcion_excede_oc_telegram` (AFTER INSERT WHEN `opcion='ROC'`) — mismo mecanismo que el
+> resto (`tg_enqueue` → `telegram_outbox` → `tg_outbox_flush`, dedup por `client_id`, token del
+> Vault), con el legajo resuelto a nombre por `Empleados` y una línea por código con el %.
+> Archivo `sql/recepcion_excede_oc_telegram.sql`. **Test end-to-end OK**: evento ROC de prueba →
+> outbox → Telegram **HTTP 200** (message_id 678); el evento de prueba se borró después.
+> `tests/rcp-oc.cjs` actualizado (verifica que exceder NO frena, que el botón queda rojo y que sale
+> exactamente un `ROC` con los códigos pasados; suite completa OK). Bump **v7.05**.
 >
 > Nota: **v7.04 — Recepción: la OC vigente en cada botón de código + pop-up "Requiere aprobación"
-> por exceso (+20%)**. Pedido del usuario, todo en `recepcion.js` (`?v=3.74`). **(1) DETALLE DE LA OC
+> por exceso (+20%)** (el pop-up se sacó en v7.05 — ver arriba). Pedido del usuario, todo en `recepcion.js` (`?v=3.74`). **(1) DETALLE DE LA OC
 > EN EL BOTÓN**: al marcar la mercadería que recibe, cada código de la grilla muestra debajo, chiquito
 > y en ámbar, **`OC N`** = cajas pedidas a ese tallerista/proveedor en la **orden de compra vigente**
 > (si ya hay recibido parcial cargado en el módulo de OCs → **`OC falta/pedidas`**, ej. `OC 40/100`).
@@ -3843,8 +3859,8 @@ Además del log de eventos, el stock físico y las compras viven en tablas propi
   Las **genera** "📑 Órdenes de Compra → ⚙ Generar OCs" (`ocgEnter`/`ocgGenerar`) a
   partir del **PPP** (demanda) + stock + `OC_Maximos`. Desde **v7.04** también las
   **lee la Recepción de Mercadería** (`recepcion.js`): muestra en cada botón de código
-  la cantidad de la OC vigente del proveedor y pide aprobación si lo recibido la
-  excede en +20% (ver `ROC` en § 4).
+  la cantidad de la OC vigente del proveedor y, si lo recibido la excede en +20%, avisa
+  por Telegram (evento `ROC`, ver § 4) sin frenar al operario.
 - **`Racks_Bajadas`** / **`Racks_Ordenes`** — flujo de bajada de racks (propuesta →
   aprobación → bajado); `Racks_Planimetria` guarda el layout.
 - **`Envasar_Ubicaciones`** — dónde está lo del depósito `para_envasar` (aparte de la
@@ -3904,7 +3920,7 @@ Definidos en `index.html` (objeto `desc`, ~línea 1531). Los botones se arman en
 | `RKX` | Bajada de racks fuera de lista | (automático) | `texto` = `COD\|R<cajas>`. Lo emite `rkbEmitFueraLista` cuando se baja de racks un código que **no estaba** en la lista de bajada. Dispara aviso Telegram (`notificar_racks_fuera_lista_telegram`). El monitor lo ignora. |
 | `NPD` | Picking difiere de mesa | (detalle) | `texto` = `NP\|COD\|tipo(menos/mas)\|GÓNDOLA\|QTY\|SALE\|TANDA`. Lo emite el flujo de Completar cuando lo levantado real difiere de lo pickeado en la mesa. El monitor lo ignora. |
 | `PPE` | Errores en PPP | (automático, legajo 0) | `texto` = `sinzona:N\|zonadif:N\|tandamal:N\|sacar:N`. Lo emite el monitor PPP al detectar inconsistencias; id `ppe_<día>`. Dispara aviso Telegram (`notificar_ppp_error_telegram`, sólo si hay errores). El monitor lo ignora. |
-| `ROC` | Recepción que excede la OC (+20%) | (aviso, v7.04) | `texto` = `PROVEEDOR\|REMITO\|cod:recibidas/pedidas,…` (ej. `Lucho\|38770\|518:90/49`). Lo emite `opEnviar` (`recepcion.js`) cuando el operario **aprobó** en el pop-up "Requiere aprobación" una carga que supera en más de **20%** lo pedido en la **OC vigente** de ese proveedor (`Ordenes_Compra`). id `roc_<ts>`, best-effort (no bloquea la recepción). ⏳ **Falta** engancharle el trigger de Telegram (el pop-up es el paso intermedio pedido por el usuario). El monitor lo ignora. |
+| `ROC` | Recepción que excede la OC (+20%) | (automático, v7.04 · Telegram v7.05) | `texto` = `PROVEEDOR\|REMITO\|cod:recibidas/pedidas,…` (ej. `Lucho\|38770\|518:90/49`). Lo emite `opEnviar` (`recepcion.js`) cuando lo recibido de un código supera en más de **20%** lo que pide la **OC vigente** de ese proveedor (`Ordenes_Compra`; referencia = lo que **falta** recibir). **Sin pop-up ni aprobación** — al operario no se lo interrumpe (v7.05): sólo el botón queda en rojo con ⚠. id `roc_<ts>`, best-effort (no bloquea la recepción). Dispara Telegram vía trigger `trg_recepcion_excede_oc_telegram` (**AFTER INSERT** WHEN `opcion='ROC'`, función `notificar_recepcion_excede_oc_telegram`, `sql/recepcion_excede_oc_telegram.sql`) → "📦⚠ RECEPCIÓN POR ENCIMA DE LA ORDEN DE COMPRA — {Proveedor} / Remito N / • Art X: recibió A vs B pedidas (+P%) / Recibió: {Nombre}". El monitor lo ignora. |
 
 **Grupos (constantes en `index.html`):**
 - `CORE_CODES = [EP, TP, AP, TAP]` — el trabajo medible (picking / armado).
@@ -4180,6 +4196,7 @@ INCONSISTENCIAS"):
 | `ppp_error` | errores de la PPP | `Registros` PPE | ⚡ `trg_ppp_error` |
 | `falta_facturacion` | TAP sin facturar, entrega hoy/mañana | PPP+TAP+Facturacion_NP | ⚡ `notificar_falta_facturacion` (cron) |
 | `recepcion_absurda` | recepción ≤0 o ≫ normal | `Movimientos_Stock` recep | ⚡ `trg_recepcion_absurda` |
+| — (sólo Telegram) | recepción **+20% por encima de la OC** vigente | `Registros` ROC | ⚡ `trg_recepcion_excede_oc_telegram` (v7.05) |
 | `faltante` | faltantes picking por tanda (7 d, rea<esp) | `Registros` PKC | ⚡ `trg_faltante` |
 | `faltante_articulo` | qué artículos faltan más (30 d) — reposición | `Registros` PKC | — |
 | `mg_pendiente` | mercadería en a_guardar sin subir a góndola >8 h | `Movimientos_Stock` | — |

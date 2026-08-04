@@ -84,7 +84,7 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== etl-lio (idea 5290 / v6.89: etiquetas de lío al cerrar cada lío, switch + legajo 0/1) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/etl-lio.cjs
 
-echo "== rcp-oc (v7.04: OC vigente en los botones de recepción + aprobación por exceso +20%) =="
+echo "== rcp-oc (v7.05: OC vigente en los botones de recepción + evento ROC por exceso +20%) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/rcp-oc.cjs
 
 echo "== TODO OK =="
