@@ -268,3 +268,27 @@ update public."Insumos" set categoria = 'partes_plasticas' where categoria = 'ma
 --     toda caja a Paquetes (0127: 768 Uni → 768 Paquetes; el resto 0 → Paquetes).
 --   · "CAJAS·NUMERO 1" (Caja Nº 1) recodificada a su código real 0027, detalle "Caja Nº 1".
 -- ---------------------------------------------------------------------
+
+-- 2026-08-04 (cont.) — UNIFICACIÓN de Importados y Partes plásticas (pedido usuario:
+-- combinar duplicados en una sola unidad; prioridad Uni>Kg>Bolsas>Paquetes>MC>Cajas).
+-- Estado previo: recatalogación a medio hacer (ISIS nuevos con conteo físico 31/07 =
+-- verdad; viejos migrados a 0; familias · fantasma que el usuario venía cerrando hoy).
+--   · Borrados los viejos migrados (0): 505C→2955, CB01→4626, ESPIRAL CHINO→007,
+--     H201→2815, H201 PART→2805.
+--   · Anuladas y borradas las familias · fantasma (superadas por el conteo del canónico):
+--     505C·CUCHILLA CHINA (×3) → 2955; 523C·CREMALLERA (×2) → 1685;
+--     H201PART·ESPIRALES CHINO TIERRA NATIVA (×2) → 2805; SPIRAL CHEF·ESPIRALES CHINO (×2) → 007.
+--   · Partes inox 942P-948P → Uni (piezas): base (s/u)→Uni, absorbe su entrega −5 Uni
+--     (post-conteo), se anula la −2 MC (pre-conteo, superada por el fijar), se borran
+--     COPIAs y códigos ·. Resultado: 942P=1147, 943P=1963, 944P=427, 945P=3019, 948P=1435.
+--   · Partes plásticas 4496=8750, 666=27000, 967H=8256 y TENEDOR AC. INOX.=4464 → Uni.
+--   · 007 espiral chef: 18 MC → 9000 Uni (500 u/MC, confirmado por ESPIRAL CHINO=9000).
+-- PENDIENTE (sin resolver, falta info del usuario):
+--   · 2805 (63 MC): nombre dice 2000 u/MC (→126000 Uni) pero el viejo H201 PART=46000 no
+--     cuadra (46000/63≈730). Sin confirmar → se deja en MC.
+--   · 1546903 (222 MC, vastidor cortaqueso): sin factor u/MC → se deja en MC.
+--   · 967H(1)COPIA (−4 MC, mango bambú): sin factor MC→Uni → se deja.
+--   · Negativos sueltos (no son duplicados): 035·CERNIDOR (−1440), 102E·ABRELATAS (−720),
+--     439E·COLADOR (−480) Uni → necesitan conteo físico. Se dejan.
+--   · 7711600 (vacío, "Mango ergonómico negro"): posible duplicado ISIS de 4496 → se deja.
+-- ---------------------------------------------------------------------
