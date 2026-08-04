@@ -1,4 +1,4 @@
-/* Regresión v7.08 / idea 7917 — Insumos (RI/EI): navegación por categorías.
+/* Regresión v7.10 / idea 7917 — Insumos (RI/EI): navegación por categorías.
    MISMA FORMA que la Recepción de Mercadería (recepcion.js): pantalla 1 = grilla de
    CATEGORÍAS en botones cuadrados → pantalla 2 = grilla de los INSUMOS de esa categoría
    → pop-up de cantidad. "‹ Atrás" vuelve. Este test fija el contrato:
@@ -65,10 +65,10 @@ catch (_e) {
     };
 
     await showInsumoModal("EI", "104");
-    const nCats = function () { return document.querySelectorAll("#insBody .ins-catbtn").length; };
+    const nCats = function () { return document.querySelectorAll("#insBody .ins-catbtn:not(.add)").length; };
     const nItems = function () { return document.querySelectorAll("#insBody .ins-itbtn:not(.add)").length; };
     const cods = function () { return Array.prototype.map.call(document.querySelectorAll("#insBody .ins-itbtn:not(.add) .ins-itcod"), function (e) { return e.textContent.trim().replace(/^📍\s*/, ""); }); };
-    const catTxt = function () { return Array.prototype.map.call(document.querySelectorAll("#insBody .ins-catbtn"), function (e) { return e.textContent.replace(/\s+/g, " ").trim(); }); };
+    const catTxt = function () { return Array.prototype.map.call(document.querySelectorAll("#insBody .ins-catbtn:not(.add)"), function (e) { return e.textContent.replace(/\s+/g, " ").trim(); }); };
 
     // 1) PANTALLA 1: una tarjeta por categoría, ningún insumo listado
     out.cats = catTxt();
@@ -126,18 +126,54 @@ catch (_e) {
     out.sinAgregarEnDep = !document.querySelector("#insBody .ins-itbtn.add");
     insBack();
 
-    // 8) El alta nace con la categoría de la pantalla donde estás y abre el pop-up
-    insSetCat("plastico");
-    _ins.creando = true; insRender();
-    document.getElementById("insNewId").value = "1234567";
-    document.getElementById("insNewNom").value = "Nylon nuevo";
-    await insCrear();
-    const nue = _ins.items.filter(function (it) { return it.cod === "1234567"; })[0];
+    // 8) ALTA DE INSUMO NUEVO — el "+" está junto a las categorías (pantalla 1) y lleva
+    //    a una pantalla con categoría / cantidad / unidad / detalle. Sin código: el
+    //    operario no tiene por qué saberlo.
+    out.hayMasEnP1 = !!document.querySelector("#insBody .ins-catbtn.add");
+    document.querySelector("#insBody .ins-catbtn.add").click();
+    out.altaAbre = !!document.getElementById("insNvDet") && !!document.getElementById("insNvQty");
+    out.altaTitulo = (document.querySelector("#insBody .ins-bar-t") || {}).textContent;
+    // "Sin categoría clara" es una opción más
+    out.haySinCatClara = /Sin categoría clara/.test(document.getElementById("insBody").textContent);
+    // unidades que ya usamos en otros lados (Bolsas/MC/Cajas, no sólo Uni/Paquetes/Kg)
+    const uniTxt = Array.prototype.map.call(document.querySelectorAll("#insBody .ins-uchip"), function (e) { return e.textContent.trim(); });
+    out.uniOfrecidas = ["Uni", "Kg", "Bolsas", "Paquetes", "MC", "Cajas"].every(function (u) { return uniTxt.indexOf(u) >= 0; });
+    // elegir categoría propone su unidad sola
+    insNuevoPick("cat", "plastico");
+    out.altaUniAuto = _ins.nuevo.uni;                                       // "Bolsas"
+    document.getElementById("insNvQty").value = "7";
+    document.getElementById("insNvDet").value = "Bolsa gris sin etiqueta";
+    insNuevoOk();
+    const nue = _ins.items.filter(function (it) { return /BOLSA GRIS/.test(it.cod); })[0];
+    out.altaCod = nue ? nue.cod : null;                                     // "NUEVO·BOLSA GRIS SIN ETIQUETA"
     out.altaCat = nue ? nue.cat : null;                                     // "plastico"
     out.altaUni = nue ? nue.unidad : null;                                  // "Bolsas"
+    out.altaQty = nue ? nue.qty : null;                                     // 7 (ya cargado)
+    out.altaNombre = nue ? nue.nombre : null;                               // el detalle textual
     out.altaPosteoCat = (posted[0] || {}).categoria;                        // "plastico"
-    out.altaAbrePopup = !!document.querySelector("#insBody .ins-qov");
+    out.altaCierraPantalla = _ins.nuevo === null;
+    out.altaVaASuCat = _ins.cat === "plastico";
+
+    // 8b) Sin detalle y sin código no deja crear; "Sin categoría clara" cae en el ❓
+    let alerts = 0; const _al = window.alert; window.alert = function () { alerts++; };
+    insNuevoOpen("");
+    insNuevoOk();
+    out.altaExigeDetalle = alerts === 1 && _ins.nuevo !== null;
+    document.getElementById("insNvDet").value = "Cosa rara sin nombre";
+    insNuevoOk();
+    const nue2 = _ins.items.filter(function (it) { return /COSA RARA/.test(it.cod); })[0];
+    out.altaSinCat = nue2 ? nue2.cat : "(no se creó)";                      // "" → chip ❓
+    out.altaSinQtyAbrePopup = !!document.querySelector("#insBody .ins-qov");  // sin cantidad, pide
     insCloseQty();
+    // un código de 7 dígitos mal puesto se rechaza
+    insNuevoOpen("");
+    document.getElementById("insNvDet").value = "Con codigo malo";
+    document.getElementById("insNvCod").value = "123";
+    insNuevoOk();
+    out.altaRechazaCodCorto = _ins.nuevo !== null && alerts === 2;
+    insNuevoCancel();
+    window.alert = _al;
+    insBack();
 
     // 9) El movimiento lleva la UBICACIÓN física y la unidad del ítem
     let mov = null;
@@ -145,7 +181,8 @@ catch (_e) {
     window.alert = function () {};
     insConfirmar();
     window.stockMove = _sm;
-    out.movN = mov ? mov.length : 0;                                        // 1 (sólo el 22)
+    out.movN = mov ? mov.length : 0;                                        // 2 (el 22 y el alta con 7)
+    out.movNuevo = (mov || []).filter(function (m) { return /BOLSA GRIS/.test(m.cod_art); })[0] || null;
     out.movUbic = mov && mov[0] ? mov[0].ubicacion : null;                  // "V2 Ad"
     // "kg" en minúscula: el 22 ya tiene saldo en esa unidad y la idea 7382 manda sobre
     // el default de la categoría — no le cambiamos la unidad a un saldo que ya existe.
@@ -167,8 +204,15 @@ catch (_e) {
     r.volvioAP1 === true && r.flejeMarcada === true && r.catCargados === true && r.qtySobrevive === 3 &&
     r.rowsBusca === 2 && r.buscaTraeDep === true &&
     r.avisoDep === true && r.nDep === 1 && r.sinAgregarEnDep === true &&
-    r.altaCat === "plastico" && r.altaUni === "Bolsas" && r.altaPosteoCat === "plastico" && r.altaAbrePopup === true &&
-    r.movN === 1 && r.movUbic === "V2 Ad" && r.movUni === "kg" && r.movDelta === -3 &&
+    r.hayMasEnP1 === true && r.altaAbre === true && /Insumo nuevo/.test(r.altaTitulo || "") &&
+    r.haySinCatClara === true && r.uniOfrecidas === true && r.altaUniAuto === "Bolsas" &&
+    r.altaCod === "NUEVO·BOLSA GRIS SIN ETIQUETA" && r.altaCat === "plastico" && r.altaUni === "Bolsas" &&
+    r.altaQty === 7 && r.altaNombre === "Bolsa gris sin etiqueta" && r.altaPosteoCat === "plastico" &&
+    r.altaCierraPantalla === true && r.altaVaASuCat === true &&
+    r.altaExigeDetalle === true && r.altaSinCat === "" && r.altaSinQtyAbrePopup === true &&
+    r.altaRechazaCodCorto === true &&
+    r.movN === 2 && r.movUbic === "V2 Ad" && r.movUni === "kg" && r.movDelta === -3 &&
+    r.movNuevo && r.movNuevo.delta === -7 && r.movNuevo.unidad === "Bolsas" &&
     r.overflow === 0 &&
     errs.length === 0;
   console.log("ins-categorias:", JSON.stringify(r));

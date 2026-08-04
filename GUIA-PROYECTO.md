@@ -4,7 +4,27 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-04 · Versión app al documentar: **v7.09**
+> Última actualización: 2026-08-04 · Versión app al documentar: **v7.10**
+>
+> Nota: **v7.10 — Insumos: ALTA de un insumo nuevo desde la botonera** (pedido del usuario). En la
+> grilla de categorías de RI/EI hay ahora un tile **`+ Agregar insumo`** (y otro dentro de cada
+> categoría) que lleva a una **pantalla de alta** propia: **categoría** (las 6 + **"Sin categoría
+> clara"**) · **cantidad** · **unidad** · **detalle** en las palabras del operario. Lo importante:
+> **no pide código**, porque el operario no tiene por qué saberlo cuando llega algo que no está en
+> ninguna lista. La identidad la arma el sistema como **`NUEVO·<DETALLE>`** — el prefijo los deja
+> encontrables de un saque para asignarles el código real después — y hay un campo **opcional** de
+> código de 7 dígitos para cuando sí se sabe, así no se genera un huérfano al pedo. Elegir la
+> categoría **propone su unidad sola** (Plástico ⇒ Bolsas…) salvo que el operario ya haya tocado
+> otra; si el detalle ya existe **no se duplica**, se abre el que hay para que sume. Con cantidad
+> queda cargado directo; sin cantidad se abre el pop-up para que la ponga. Además las unidades
+> base pasaron de `Uni/Paquetes/Kg` a **`Uni/Kg/Bolsas/Paquetes/MC/Cajas`** (las que realmente se
+> usan: antes había que apretar "+" y tipear "Bolsas", que es lo más común del sector AF).
+> Reemplaza el alta vieja (`insCrear`, que pedía código de 7 dígitos **o** sector + descripción y
+> vivía embutida en el listado). Funciones nuevas: `insNuevoOpen` / `insNuevoOk` / `insNuevoPick` /
+> `insNuevoCancel` / `insNuevoAddUni` / `insCrearItem` / `_insNuevoHtml`. ⚠ **Los `NUEVO·` hay que
+> reconciliarlos**: mientras no tengan código real no cruzan con el maestro de artículos.
+> `tests/ins-categorias.cjs` extendido (alta completa, "sin categoría clara", validaciones, unidades
+> ofrecidas); suite completa OK; render 390px sin overflow. Bump **v7.10**.
 >
 > Nota: **v7.09 — Recepción a medio cargar: no se pierde y se REANUDA desde "Resumen de hoy"**.
 > Pedido del usuario: si el operario arranca una recepción y se va para atrás o cierra la pantalla,

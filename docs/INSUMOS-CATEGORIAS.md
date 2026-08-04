@@ -237,8 +237,18 @@ que netean a 0 pero se muestran como dos líneas.
    el insumo **ya tiene saldo**.
 5. **Orden dentro de la categoría**: los flejes por **medida** (`_insMedida`), el resto
    por saldo descendente.
-6. El **alta nace con categoría** (selector en el formulario, arranca en la del chip
-   activo) y el movimiento guarda la **ubicación física** en vez del sector.
+6. **Alta de un insumo nuevo** (v7.10) — tile **`+ Agregar insumo`** junto a las
+   categorías (y también dentro de cada una). Lleva a una pantalla propia con
+   **categoría** (las 6 + **"Sin categoría clara"**), **cantidad**, **unidad** y un
+   **detalle** en las palabras del operario. **No pide código**: el operario no tiene
+   por qué saberlo. El sistema arma la identidad como `NUEVO·<DETALLE>` — el prefijo los
+   deja encontrables de un saque para asignarles el código real más adelante — y hay un
+   campo **opcional** de código de 7 dígitos para cuando sí se sabe, así no se genera un
+   huérfano al pedo. Elegir la categoría propone su unidad sola. Si ya existe uno con
+   ese detalle no se duplica: se abre el que hay. El movimiento guarda la **ubicación
+   física** en vez del sector.
+   ⚠ Los `NUEVO·` **hay que reconciliarlos**: mientras no tengan código real no cruzan
+   con el maestro de artículos. Aparecen en la solapa Stock como cualquier insumo.
 
 Test: `tests/ins-categorias.cjs`.
 
