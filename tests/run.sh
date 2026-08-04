@@ -123,4 +123,7 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== mon-armado-legajo0 (v7.36: el monitor ignora AP/EP de legajo 0/1 — no 'armado por 0') =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/mon-armado-legajo0.cjs
 
+echo "== stk-ajuste-deps (v7.38: Ajustes ofrece Para envasar y Racks CH en el selector de depósito) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stk-ajuste-deps.cjs
+
 echo "== TODO OK =="

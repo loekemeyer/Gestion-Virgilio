@@ -4,7 +4,15 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-04 · Versión app al documentar: **v7.36**
+> Última actualización: 2026-08-04 · Versión app al documentar: **v7.38**
+>
+> Nota: **v7.38 — la solapa «⚙ Ajustes» ofrece TODOS los depósitos en el selector**. Faltaban
+> **«Para envasar»** (`para_envasar`) y **«Racks CH»** (`racks_ch`): esos depósitos ya se veían en la
+> tabla de *Stocks* (v7.03) pero no se podían **ajustar / fijar / cargar inicial** desde la UI — había
+> que hacerlo por SQL (caso real 035E p/envasar y 809E racks CH). Se agregaron los dos `<option>` a
+> `stkBodyAjustes` (`#stkAjDep`); el resto ya era genérico (`stockAjustar`/`stockFijar`/`stockGuardarInicial`
+> escriben `deposito = _stkDep()` y `stockComputeSaldos` separa el saldo por depósito, línea `m[k][mv.deposito]`).
+> Smoke `tests/stk-ajuste-deps.cjs`. Bump **v7.38**.
 >
 > Nota (backend, **sin bump de app**): **SIMULACIÓN semanal de las OCs automáticas antes del arranque
 > real**. El usuario pidió, antes de prender la generación de verdad (prevista **miércoles 12/08,
