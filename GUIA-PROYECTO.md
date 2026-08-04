@@ -6,6 +6,34 @@
 >
 > Última actualización: 2026-08-04 · Versión app al documentar: **v7.36**
 >
+> Nota (backend, **sin bump de app**): **FIX — "✕ Anular este envío" de Recepción no revertía el
+> STOCK (fantasma en `a_guardar`)**. Revisando que Recepción de Mercadería interactúe bien con el
+> stock. Una recepción escribe en tres lados: `Entregas …`, `Movimientos_Stock` (`a_guardar` +cajas,
+> `tipo='recepcion'`) y `Control_Modo_OP`. La RPC **`anular_modo_op(p_id)`** (botón "✕ Anular este
+> envío" que sale justo después de confirmar — **no** es el `anular_toggle_virgilio('RT')` de v7.15,
+> que cierra la sesión ANTES de mandar) borraba la entrega y marcaba `Control_Modo_OP='anulado'`, y el
+> cliente revertía el acumulador de cajas en localStorage… **pero nadie tocaba `Movimientos_Stock`** →
+> las cajas quedaban vivas para siempre en `a_guardar`. **Auditoría: sin daño histórico** — las 9
+> anulaciones existentes son todas **anteriores** a que recepción empezara a escribir stock (v4.06),
+> así que ninguna dejó cajas colgadas (verificado: 0 anulaciones post-arranque con stock vivo); pero
+> cualquier anulación de hoy lo corrompía. **Fix**: `anular_modo_op` ahora inserta además un
+> movimiento **compensatorio** (`a_guardar −cajas`, `tipo='ajuste'`, `legajo='anula_recep'`,
+> `ref='<remito>|ANULA'`, `client_id='anrec_<id>_<cod>'`) por cada código del envío, parseando
+> `Control_Modo_OP.detalle` ("cod → cajas · cod → cajas"). Idempotente (early-return `ya_anulado` +
+> `client_id` único), acotado a ESE envío (no toca otros que compartan remito), y `tipo='ajuste'` no
+> choca con el índice de dedup del pipeline. Verificado con transacción + `ROLLBACK`: envío de prueba
+> + su stock → `anular_modo_op()` ×2 → `ok`/`ya_anulado`, saldos `a_guardar` 0/0, 2 compensaciones
+> (no dobla), entrega borrada, estado `anulado`. SQL en `sql/anular_modo_op.sql`.
+>
+> **Resto de la integración Recepción↔Stock: sano.** Conciliación de los últimos ~40 días (153
+> remitos): **0 diferencias** entre lo que dice el registro de recepción (`Control_Modo_OP`) y lo que
+> entró a `Movimientos_Stock`; **0 pares (remito,código) duplicados** (la dedup por `client_id` de la
+> idea 5490 funciona); `delta` siempre > 0; `ref` (remito) siempre presente; y **0 saldos negativos en
+> `a_guardar`** (MG nunca sacó más de lo que recepción metió). Los 7 remitos "sin stock" y las filas
+> sin `client_id`/`legajo` son todas **previas** al arranque de cada feature (stock v4.06, `client_id`
+> ~v6.72, `legajo` idea 7725), no comportamiento actual. RSP ("recibido sin planimetría"), ROC
+> (excede OC) y MGX (guardado fuera de lista) emitiéndose OK.
+>
 > Nota: **v7.36 — el monitor del supervisor ignora legajo 0/1 (pruebas) al mostrar quién empezó
 > picking/armado**. Caso real: la tanda **D06C** la pickeó el legajo 122 (EP/TP) y después un **AP
 > fantasma de legajo 0** la hacía figurar *"armado por 0 / en curso"* en el tablero. `fetchMonitorEvents`
