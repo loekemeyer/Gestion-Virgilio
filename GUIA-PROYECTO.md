@@ -6,6 +6,19 @@
 >
 > Última actualización: 2026-08-04 · Versión app al documentar: **v7.27**
 >
+> Nota (backend · 2026-08-04): **FIX RLS — la administrativa no veía las bajadas de racks para
+> aprobar** ("✓ No hay bajadas pendientes" con 9 propuestas en la base, apiladas desde el 30-07).
+> Causa: RLS **por rol**. Recepción (`recepcion.js`) entra con **sesión anónima**
+> (`supabase.auth.signInAnonymously()`) → rol **`authenticated`**; el operario (index.html, fetch con
+> anon key sin sesión) es **`anon`**. Las policies de `Racks_Bajadas` y `Racks_Ordenes` eran **solo
+> `{anon}`** → el operario INSERTA la propuesta pero la admin lee **0 filas**. (`Movimientos_Stock` y
+> `Control_Modo_OP` ya eran `{anon,authenticated}`, por eso el resto de Recepción sí le funcionaba.)
+> Fix: se agregó `authenticated` a las 6 policies (SELECT/INSERT/UPDATE de las dos tablas) — sin
+> exposición nueva (anon y authenticated comparten la publishable key). Barrido: ninguna otra tabla
+> anon-only la lee una pantalla authenticated (recepción no toca Insumos/Stock_Config/etc.; fichada/
+> monitor/index son anon). `sql/racks_bajadas_rls_authenticated.sql` + migración
+> `racks_bajadas_ordenes_rls_authenticated`. **Sin bump de versión** (cambio 100% server-side).
+>
 > Nota: **v7.27 — Insumos (admin): Cantidad y Unidad editables en TODAS las filas de Pendientes**.
 > En v7.22 las dejé de sólo lectura para los códigos viejos, con el criterio de que ahí lo que
 > correspondía era fusionar y no reescribir el número — pero el usuario pidió que fueran editables y
