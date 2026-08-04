@@ -4,7 +4,13 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-04 · Versión app al documentar: **v7.27**
+> Última actualización: 2026-08-04 · Versión app al documentar: **v7.28**
+>
+> Nota: **v7.28 — Insumos (admin): la columna «Nombre» pasa a llamarse «Detalle»** en las tres
+> tablas de la solapa (Pendientes, el listado de cada categoría y «Todos los insumos») y en el
+> placeholder del alta. Es el mismo campo `Insumos.nombre`: lo que cambia es cómo se lo nombra, para
+> que coincida con lo que el operario ve al sugerir un insumo («Detalle — qué es, en tus palabras»).
+> Bump **v7.28**.
 >
 > Nota (backend · 2026-08-04): **FIX RLS — la administrativa no veía las bajadas de racks para
 > aprobar** ("✓ No hay bajadas pendientes" con 9 propuestas en la base, apiladas desde el 30-07).

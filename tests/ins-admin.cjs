@@ -1,12 +1,11 @@
-/* Regresión v7.27 / idea 5572 — Stock y Compras → solapa "🧰 Insumos" (Administrar
+/* Regresión v7.28 / idea 5572 — Stock y Compras → solapa "🧰 Insumos" (Administrar
    Insumos). Es el lado admin de la botonera del operario (idea 7917). Contrato:
      · la solapa existe, y arranca por "Pendientes de identificar"
      · pendientes = SOLO los TMP-*, con TODO editable: código (sugerido = el temporal),
-       nombre, categoría, ubicación y las UNIDADES (cantidad + unidad de medida)
-     · identificar manda insumo_identificar con código + nombre + categoría + ubicación
+       detalle, categoría, ubicación, cantidad y unidad
+     · aceptar manda insumo_identificar con código + detalle + categoría + ubicación
      · corregir cantidad/unidad postea ASIENTOS (el log es append-only), no edita
      · no deja identificar dejando el TMP como código
-     · descartar manda el insumo a 'depurar' (no borra: puede tener stock)
      · sección CATEGORÍAS: nombre/emoji, unidades permitidas, y los insumos adentro
        (con el alta de insumo ahí mismo)
      · los "a depurar" viven DENTRO de pendientes (son lo mismo: esperan decisión)
@@ -22,7 +21,7 @@
      · «a depurar» ya no existe: lo que no tiene categoría es «Sin categoría»
      · tabla final de SÓLO LECTURA con todos los insumos, filtrable, que se actualiza
      · una unidad no permitida por la categoría se rechaza con alerta
-     · en el listado de cada categoría se edita código, nombre, categoría, ubicación,
+     · en el listado de cada categoría se edita código, detalle, categoría, ubicación,
        CANTIDAD y UNIDAD (columnas separadas), y sólo se manda lo que cambió
      · Pendientes / Unidades / Categorías son colapsables; la tabla final no
      · VÍNCULO CON EL OPERARIO: lo que define el admin es lo que ve el operario en
@@ -122,7 +121,7 @@ catch (_e) {
     out.pendQty = (document.getElementById("idQty_TMP-0001") || {}).value;           // "7"
     out.pendUni = (document.getElementById("idUni_TMP-0001") || {}).value;           // "Bolsas"
     const th = Array.prototype.map.call(document.querySelectorAll("#stkBody table")[0].querySelectorAll("thead th"), function (e) { return e.textContent.trim(); });
-    out.colsPend = th.join("|");        // "Código|Nombre|Categoría|Ubicación|Cantidad|Unidad|"
+    out.colsPend = th.join("|");        // "Código|Detalle|Categoría|Ubicación|Cantidad|Unidad|"
     const acc = document.querySelectorAll("#stkBody table")[0].querySelectorAll("tbody tr")[0].querySelectorAll("button");
     out.acciones = Array.prototype.map.call(acc, function (e) { return e.textContent.trim(); }).join("|");   // "✓ Aceptar|🗑 Borrar"
         out.sinColumnaOrden = !/>Orden</.test(document.getElementById("stkBody").innerHTML);
@@ -309,7 +308,7 @@ catch (_e) {
 
   const pass =
     r.hayTabInsumos === true && /Pendientes de identificar/.test(r.primeraSec || "") &&
-    r.pendCount === 4 && /Cantidad\|Unidad/.test(r.colsPend || "") && r.acciones === "✓ Aceptar|🗑 Borrar" && r.pendTraeViejos === true && r.viejoQtyEditable === true && r.viejoAjusta === true &&
+    r.pendCount === 4 && /Código\|Detalle\|Categoría\|Ubicación\|Cantidad\|Unidad/.test(r.colsPend || "") && r.acciones === "✓ Aceptar|🗑 Borrar" && r.pendTraeViejos === true && r.viejoQtyEditable === true && r.viejoAjusta === true &&
     r.fusionAvisa === true && r.fusionRpc === true &&
     r.borraViejo === true && r.catBorrarExigeNombre === true && r.catBorrarConNombre === true && r.pendCodSugerido === "TMP-0001" && r.pendNombre === "Bolsa gris sin etiqueta" &&
     r.pendCat === "plastico" && r.pendUbicEditable === true && r.pendQty === "7" && r.pendUni === "Bolsas" &&
@@ -325,7 +324,7 @@ catch (_e) {
     r.haySecUnidades === true && r.uniSacar === true && r.uniUsadaAvisa === true && r.uniLibreNoAvisa === true &&
     /Pendientes.*\|.*Unidades.*\|.*Categorías/.test(r.ordenSecciones || "") && r.altaRechazaDuplicado === true &&
     r.hayBotonesSec === 3 && r.pendColapsa === true && r.pendVuelve === true &&
-    r.hayTablaTotal === true && /Código\|Nombre\|Categoría\|Rack \/ sector\|Cantidad\|Unidad/.test(r.totalCols || "") &&
+    r.hayTablaTotal === true && /Código\|Detalle\|Categoría\|Rack \/ sector\|Cantidad\|Unidad/.test(r.totalCols || "") &&
     r.totalSinEditar === true && r.totalHayFiltros === true && r.totalFiltraCod === 1 &&
     r.totalFiltraSinCat >= 1 && r.totalSeActualiza === true && r.uniProhibidaBloquea === true &&
     r.opVeCatNueva === true && r.opVeRenombrada === true && r.opVeInsumoDeLaCat === true &&

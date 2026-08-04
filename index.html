@@ -5908,7 +5908,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.27";
+const APP_VERSION = "v7.28";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -11990,7 +11990,7 @@ function _stkInsPend(pend) {
   if (!_stkAbierta("pend")) return h;
   if (!pend.length) return h + '<div class="stk-empty">Nada pendiente.</div>';
   h += '<div class="stk-cut" style="background:#fffbeb;border:1px solid #fcd34d;color:#92400e;">Acá está todo lo que <b>espera una decisión</b>: lo que sugirió un operario sin código (<b>' + tmps.length + '</b>) y los códigos <b>viejos o duplicados</b> del catálogo (<b>' + viejos.length + '</b>). <b>Aceptar</b> le pone el código real y le lleva el stock; si ese código ya existe, los saldos se <b>suman</b> (así se netean los negativos). <b>Borrar</b> lo saca del catálogo.</div>';
-  h += '<div class="stk-scroll"><table class="stk-tbl"><thead><tr><th>Código</th><th>Nombre</th><th>Categoría</th><th>Ubicación</th><th class="num">Cantidad</th><th>Unidad</th><th></th></tr></thead><tbody>';
+  h += '<div class="stk-scroll"><table class="stk-tbl"><thead><tr><th>Código</th><th>Detalle</th><th>Categoría</th><th>Ubicación</th><th class="num">Cantidad</th><th>Unidad</th><th></th></tr></thead><tbody>';
   h += pend.map(function (it) {
     const u = _stkInsUni1(it), tmp = _stkInsEsTmp(it);
     const origen = tmp
@@ -12083,11 +12083,11 @@ function _stkInsListado(k, items) {
   let h = '<div class="stk-catlist">';
   h += '<input class="stk-inp" style="width:100%;box-sizing:border-box;margin-bottom:7px;" placeholder="🔎 Buscar código / nombre / ubicación" value="' + escapeHtml(_stkIns.filtro) + '" oninput="if(_stkIns){_stkIns.filtro=this.value;stkRender();}">';
   h += '<div style="margin-bottom:7px;">' + (_stkIns.nuevoEn === k
-    ? '<span class="stk-nuevo"><input class="stk-inp" id="nvCod" placeholder="código" style="width:96px;"> <input class="stk-inp" id="nvNom" placeholder="nombre" style="width:170px;"> <input class="stk-inp" id="nvUbi" placeholder="ubicación" style="width:90px;"> <button class="stk-btn" onclick="stkInsAlta(\'' + k + '\')">✓ Crear</button> <button class="stk-btn stk-btn-x" onclick="if(_stkIns){_stkIns.nuevoEn=\'\';stkRender();}">Cancelar</button></span>'
+    ? '<span class="stk-nuevo"><input class="stk-inp" id="nvCod" placeholder="código" style="width:96px;"> <input class="stk-inp" id="nvNom" placeholder="detalle" style="width:170px;"> <input class="stk-inp" id="nvUbi" placeholder="ubicación" style="width:90px;"> <button class="stk-btn" onclick="stkInsAlta(\'' + k + '\')">✓ Crear</button> <button class="stk-btn stk-btn-x" onclick="if(_stkIns){_stkIns.nuevoEn=\'\';stkRender();}">Cancelar</button></span>'
     : (k === "?" ? "" : '<button class="stk-btn" onclick="if(_stkIns){_stkIns.nuevoEn=\'' + k + '\';stkRender();}">+ Agregar insumo a esta categoría</button>')) + '</div>';
   if (!lista.length) h += '<div class="stk-empty">Sin insumos' + (f ? " con ese filtro" : "") + '.</div>';
   else {
-    h += '<div class="stk-scroll"><table class="stk-tbl"><thead><tr><th>Código</th><th>Nombre</th><th>Categoría</th><th>Ubic.</th><th class="num">Cantidad</th><th>Unidad</th><th></th></tr></thead><tbody>';
+    h += '<div class="stk-scroll"><table class="stk-tbl"><thead><tr><th>Código</th><th>Detalle</th><th>Categoría</th><th>Ubic.</th><th class="num">Cantidad</th><th>Unidad</th><th></th></tr></thead><tbody>';
     h += lista.map(function (it) {
       const ed = _stkIns.edit === "art:" + it.cod;
       const u = _stkInsUni1(it);
@@ -12160,7 +12160,7 @@ function _stkInsTodos(items) {
   let h = '<div class="stk-sec">📋 Todos los insumos <span class="stk-secn">' + lista.length + (lista.length !== (items || []).length ? " / " + (items || []).length : "") + '</span></div>';
   h += '<div class="stk-cut">Sólo lectura: la foto completa del catálogo. Se actualiza sola cuando editás algo arriba.</div>';
   h += '<div class="stk-scroll"><table class="stk-tbl"><thead><tr>' +
-    '<th>Código</th><th>Nombre</th><th>Categoría</th><th>Rack / sector</th><th class="num">Cantidad</th><th>Unidad</th></tr>' +
+    '<th>Código</th><th>Detalle</th><th>Categoría</th><th>Rack / sector</th><th class="num">Cantidad</th><th>Unidad</th></tr>' +
     '<tr class="stk-filtros">' +
     '<th><input class="stk-inp" style="width:100px;" placeholder="filtrar" value="' + escapeHtml(f.cod || "") + '" oninput="stkInsFiltro(\'cod\',this.value)"></th>' +
     '<th><input class="stk-inp" style="width:140px;" placeholder="filtrar" value="' + escapeHtml(f.nom || "") + '" oninput="stkInsFiltro(\'nom\',this.value)"></th>' +
