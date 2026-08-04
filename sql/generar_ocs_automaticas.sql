@@ -22,9 +22,22 @@
 -- 'pendiente' y rubro 'Art Term' — o sea que la Recepción de Mercadería las ve
 -- como OC vigente al toque (ver `ROC` / v7.07).
 --
--- IDEMPOTENTE por día: si ya hay OCs automáticas de hoy no vuelve a generar
--- (devuelve 'ya_generada'). `select generar_ocs_automaticas(true)` fuerza.
--- Devuelve 'ok:<n>' | 'sin_items' | 'ya_generada'. Avisa por Telegram al terminar.
+-- IDEMPOTENTE por día: si ya hay OCs de hoy —de CUALQUIER origen, automáticas o
+-- cargadas a mano— no genera nada (para no duplicar) y AVISA por Telegram para que
+-- alguien las revise, en vez de saltear en silencio. `generar_ocs_automaticas(true)`
+-- fuerza igual. (Hasta v7.20 la guarda miraba sólo `notas like 'auto%'`: si alguien
+-- generaba a mano un miércoles antes de las 7, el cron sumaba las suyas encima.)
+--
+-- AVISOS por Telegram (dedup diario, tg_enqueue -> telegram_outbox):
+--   generó         -> '📑 OCs GENERADAS AUTOMÁTICAMENTE …'    (dedup ocauto_<día>)
+--   ya había OCs   -> '⚠ OCs AUTOMÁTICAS NO GENERADAS … REVISÁ las OCs de hoy …'
+--                                                            (dedup ocauto_skip_<día>)
+--   falló          -> '🚨 FALLÓ la generación automática de OCs …' + el error SQL
+--                                                            (dedup ocauto_err_<día>)
+-- El bloque de generación tiene su propio `exception when others`: si algo revienta,
+-- la inserción se deshace pero el aviso de error SÍ sale (antes moría en silencio).
+--
+-- Devuelve 'ok:<n>' | 'sin_items' | 'ya_hay_del_dia:<n>' | 'error: <sqlerrm>'.
 --
 -- El generador MANUAL de la app (index.html → ocgEnter) usa exactamente la misma
 -- fórmula desde v7.18, así que dan lo mismo.
@@ -32,6 +45,9 @@
 -- Cron: 'ocs-auto-miercoles' → '0 10 * * 3' (10:00 UTC = 7:00 AR, UTC-3 fijo).
 -- Prueba en seco 2026-08-04: 104 líneas · 19 proveedores · 9.198 cajas
 -- (165 NPs sin facturar → 138 cuentan como demanda; 27 ya pickeadas se netean).
+-- Los dos caminos nuevos se probaron en una transacción con ROLLBACK (sin generar ni
+-- mandar nada): con una OC de hoy → 'ya_hay_del_dia:1' + aviso encolado; con un check
+-- constraint que rompe el INSERT → 'error: …' + aviso de error encolado.
 --
 -- ⚠ La definición VIVA está en la migración `generar_ocs_automaticas` de Supabase;
 -- este archivo es la copia documentada para el repo.
@@ -43,12 +59,33 @@ returns text language plpgsql security definer set search_path to 'public', 'pg_
 declare
   v_hoy date := (now() at time zone 'America/Argentina/Buenos_Aires')::date;
   v_n int := 0; v_cajas numeric := 0; v_prov int := 0; v_msg text;
+  v_hay int := 0; v_hay_auto int := 0; v_hay_man int := 0;
 begin
-  if not p_forzar and exists (select 1 from public."Ordenes_Compra"
-                               where fecha = v_hoy and coalesce(notas, '') like 'auto%') then
-    return 'ya_generada';
+  -- ¿ya hay OCs de hoy? (automáticas O cargadas a mano) → no duplicar, y avisar.
+  if not p_forzar then
+    select count(*), count(*) filter (where coalesce(notas, '') like 'auto%')
+      into v_hay, v_hay_auto
+      from public."Ordenes_Compra" where fecha = v_hoy;
+    if v_hay > 0 then
+      v_hay_man := v_hay - v_hay_auto;
+      v_msg := '⚠ OCs AUTOMÁTICAS NO GENERADAS — ' || to_char(v_hoy, 'DD/MM') || E'\n' ||
+               'Ya había ' || v_hay || ' línea(s) de hoy' ||
+               case when v_hay_man > 0 and v_hay_auto > 0
+                      then ' (' || v_hay_man || ' a mano + ' || v_hay_auto || ' automáticas)'
+                    when v_hay_man > 0 then ' cargada(s) a mano'
+                    else ' automáticas' end || '.' || E'\n' ||
+               'No se generó nada para no duplicar. 👉 REVISÁ las OCs de hoy en Stock y Compras → ' ||
+               'Compras (OCs): si falta pedir algo, generalas a mano con ⚙ Generar OCs.';
+      begin
+        perform public.tg_enqueue(v_msg, 'ocauto_skip_' || to_char(v_hoy, 'YYYYMMDD'));
+        perform public.tg_outbox_flush();
+      exception when others then null; end;
+      return 'ya_hay_del_dia:' || v_hay;
+    end if;
   end if;
 
+  -- la generación va en su propio bloque: si algo revienta, el aviso sobrevive.
+  begin
   with norm as (   -- misma normalización que el front (_ocgNorm)
     select regexp_replace(upper(btrim(m.cod)), '^0+(?=.)', '') as codn,
            upper(btrim(m.cod)) as cod, m.descripcion, btrim(coalesce(m.proveedor, '')) as proveedor,
@@ -117,6 +154,16 @@ begin
     returning proveedor, cantidad
   )
   select count(*), coalesce(sum(cantidad), 0), count(distinct proveedor) into v_n, v_cajas, v_prov from ins;
+  exception when others then
+    v_msg := '🚨 FALLÓ la generación automática de OCs — ' || to_char(v_hoy, 'DD/MM') || E'\n' ||
+             coalesce(sqlerrm, 'error desconocido') || ' (' || coalesce(sqlstate, '?') || ')' || E'\n' ||
+             'NO se generó ninguna OC. 👉 Generalas a mano en Stock y Compras → Compras (OCs) → ⚙ Generar OCs.';
+    begin
+      perform public.tg_enqueue(v_msg, 'ocauto_err_' || to_char(v_hoy, 'YYYYMMDD'));
+      perform public.tg_outbox_flush();
+    exception when others then null; end;
+    return 'error: ' || coalesce(sqlerrm, '?');
+  end;
 
   if v_n = 0 then return 'sin_items'; end if;
 
