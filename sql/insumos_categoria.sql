@@ -262,3 +262,9 @@ update public."Insumos" set categoria = 'partes_plasticas' where categoria = 'ma
 --   fleje Kg, cajas Uni/Paquetes). Los ISIS vacíos sin movimientos (1262500/1071500…) quedan
 --   sin unidad (no tienen asientos). Registrado en Insumos_Historial (cat_guardar x3).
 -- ---------------------------------------------------------------------
+
+-- 2026-08-04 (cont.) — corrección Cajas (pedido usuario, viendo la pantalla):
+--   · Insumos_Categorias.unidades cajas = ['Paquetes'] (antes Uni/Paquetes). Se relabeló
+--     toda caja a Paquetes (0127: 768 Uni → 768 Paquetes; el resto 0 → Paquetes).
+--   · "CAJAS·NUMERO 1" (Caja Nº 1) recodificada a su código real 0027, detalle "Caja Nº 1".
+-- ---------------------------------------------------------------------
