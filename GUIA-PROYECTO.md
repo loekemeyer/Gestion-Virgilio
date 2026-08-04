@@ -4,7 +4,16 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-04 · Versión app al documentar: **v7.26**
+> Última actualización: 2026-08-04 · Versión app al documentar: **v7.27**
+>
+> Nota: **v7.27 — Insumos (admin): Cantidad y Unidad editables en TODAS las filas de Pendientes**.
+> En v7.22 las dejé de sólo lectura para los códigos viejos, con el criterio de que ahí lo que
+> correspondía era fusionar y no reescribir el número — pero el usuario pidió que fueran editables y
+> eso manda. Ahora toda fila de Pendientes tiene el input de cantidad y el selector de unidad, venga
+> de un operario (`TMP-`) o sea un código viejo, y la corrección se aplica igual para las dos: con un
+> **asiento** (`tipo='ajuste'`), no editando el movimiento, y **antes** de renombrar/fusionar, cuando
+> todavía está en el código original. El chequeo de unidad permitida por la categoría también corre
+> para todas. Sale simple porque desde v7.26 cada código tiene una sola unidad. Bump **v7.27**.
 >
 > Nota: **v7.26 — Insumos: UN código = UNA cantidad y UNA unidad, edición completa en categorías y
 > secciones plegables** (idea 5572, pedido del usuario).

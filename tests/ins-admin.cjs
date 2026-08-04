@@ -1,4 +1,4 @@
-/* Regresión v7.26 / idea 5572 — Stock y Compras → solapa "🧰 Insumos" (Administrar
+/* Regresión v7.27 / idea 5572 — Stock y Compras → solapa "🧰 Insumos" (Administrar
    Insumos). Es el lado admin de la botonera del operario (idea 7917). Contrato:
      · la solapa existe, y arranca por "Pendientes de identificar"
      · pendientes = SOLO los TMP-*, con TODO editable: código (sugerido = el temporal),
@@ -10,7 +10,8 @@
      · sección CATEGORÍAS: nombre/emoji, unidades permitidas, y los insumos adentro
        (con el alta de insumo ahí mismo)
      · los "a depurar" viven DENTRO de pendientes (son lo mismo: esperan decisión)
-     · Cantidad y Unidad van en COLUMNAS SEPARADAS
+     · Cantidad y Unidad van en COLUMNAS SEPARADAS y son EDITABLES en TODAS las filas
+       (venga de un operario o sea un código viejo)
      · sólo hay dos acciones: Aceptar y Borrar
      · Aceptar contra un código que ya existe SUMA los saldos (netea los negativos)
      · Borrar con saldo lo deja en 0 con un asiento antes de sacarlo del catálogo
@@ -113,7 +114,7 @@ catch (_e) {
     out.primeraSec = (document.querySelector("#stkBody .stk-sec") || {}).textContent || "";
     out.pendCount = document.querySelectorAll("#stkBody table")[0].querySelectorAll("tbody tr").length;   // 2 TMP + 2 viejos
     out.pendTraeViejos = /505C·CUCHILLA CHINA/.test(document.getElementById("stkBody").innerHTML);
-    out.viejoSinQtyEditable = !document.getElementById("idQty_505C·CUCHILLA CHINA");
+    out.viejoQtyEditable = !!document.getElementById("idQty_505C·CUCHILLA CHINA") && !!document.getElementById("idUni_505C·CUCHILLA CHINA");
     out.pendCodSugerido = (document.getElementById("idCod_TMP-0001") || {}).value;   // "TMP-0001"
     out.pendNombre = (document.getElementById("idNom_TMP-0001") || {}).value;        // lo que escribió
     out.pendCat = (document.getElementById("idCat_TMP-0001") || {}).value;           // la que sugirió
@@ -166,7 +167,11 @@ catch (_e) {
     // 4b) Un código viejo CON saldo se FUSIONA contra el real (netea el negativo)
     let confirmado = ""; window.confirm = function (m) { confirmado = String(m); confirmado0 = confirmado; return true; };
     document.getElementById("idCod_505C·CUCHILLA CHINA").value = "22";   // ya existe
+    // y de paso le corrijo la cantidad: −16000 → −15000, con la misma unidad
+    document.getElementById("idQty_505C·CUCHILLA CHINA").value = "-15000";
+    movs.length = 0;
     await stkInsAceptar("505C·CUCHILLA CHINA");
+    out.viejoAjusta = movs.length === 1 && movs[0].delta === 1000 && movs[0].cod_art === "505C·CUCHILLA CHINA";
     out.fusionAvisa = /YA EXISTE/.test(confirmado) && /SUMA/.test(confirmado);
     const fus = rpc.filter(function (x) { return x.fn === "insumo_identificar" && x.body.p_tmp === "505C·CUCHILLA CHINA"; })[0];
     out.fusionRpc = !!fus && fus.body.p_cod === "22";
@@ -304,7 +309,7 @@ catch (_e) {
 
   const pass =
     r.hayTabInsumos === true && /Pendientes de identificar/.test(r.primeraSec || "") &&
-    r.pendCount === 4 && /Cantidad\|Unidad/.test(r.colsPend || "") && r.acciones === "✓ Aceptar|🗑 Borrar" && r.pendTraeViejos === true && r.viejoSinQtyEditable === true &&
+    r.pendCount === 4 && /Cantidad\|Unidad/.test(r.colsPend || "") && r.acciones === "✓ Aceptar|🗑 Borrar" && r.pendTraeViejos === true && r.viejoQtyEditable === true && r.viejoAjusta === true &&
     r.fusionAvisa === true && r.fusionRpc === true &&
     r.borraViejo === true && r.catBorrarExigeNombre === true && r.catBorrarConNombre === true && r.pendCodSugerido === "TMP-0001" && r.pendNombre === "Bolsa gris sin etiqueta" &&
     r.pendCat === "plastico" && r.pendUbicEditable === true && r.pendQty === "7" && r.pendUni === "Bolsas" &&
