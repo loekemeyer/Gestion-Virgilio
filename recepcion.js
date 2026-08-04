@@ -49,7 +49,7 @@ const sessionReady = (async () => {
 /* ============== Estado del puente con Producción ============== */
 const RECP = { legajo: null, dayKey: null };
 
-/* ===== BORRADOR de la recepción en curso (v7.09) =====
+/* ===== BORRADOR de la recepción en curso (v7.12) =====
    Si el operario arranca una recepción y se va para atrás / cierra la pantalla,
    NO se pierde: el estado (tallerista, línea, fecha, remito y las cajas ya
    marcadas) queda en localStorage por legajo+día. Producción lo lee para mostrar
@@ -359,12 +359,12 @@ function opResetState() {
 function openOp() {
   opResetState();
   opState.fromMenu = false;     // operario (RT) entra directo a la carga, sin menú
-  rcpDraftClear(true);          // v7.09: recepción NUEVA → el borrador anterior ya no sirve
+  rcpDraftClear(true);          // v7.12: recepción NUEVA → el borrador anterior ya no sirve
   opPage.classList.remove("pendWide");
   opPage.classList.add("open");
   renderTipoElegir();
 }
-/* v7.09 — REANUDAR: vuelve a la recepción que el operario dejó por la mitad, en el
+/* v7.12 — REANUDAR: vuelve a la recepción que el operario dejó por la mitad, en el
    MISMO paso en el que estaba (lo llama el botón "▶ Reanudar" de "Resumen de hoy").
    Sin borrador cae al flujo normal, así el botón nunca deja al operario colgado. */
 window.reanudarRecepcionOp = function (legajo, dayKey) {
@@ -394,7 +394,7 @@ window.reanudarRecepcionOp = function (legajo, dayKey) {
 };
 let _pendTimer = null;   // timer del "hace X hs" en vivo de Pendientes
 function closeOp() {
-  rcpDraftSave();   // v7.09: salir NO pierde la recepción a medio cargar
+  rcpDraftSave();   // v7.12: salir NO pierde la recepción a medio cargar
   opPage.classList.remove("open");
   if (_pendTimer) { clearInterval(_pendTimer); _pendTimer = null; }
 }
@@ -1186,7 +1186,7 @@ async function opEnviar() {
 
   // Suma al acumulador del día para que Producción cierre RT con esta cantidad.
   recpAddCajas(totalCajas);
-  rcpDraftClear();   // v7.09: ya se envió, no hay nada que reanudar
+  rcpDraftClear();   // v7.12: ya se envió, no hay nada que reanudar
 
   // v4.06: STOCK — lo recibido ENTRA a "Mercadería a guardar" (Movimientos_Stock).
   // Best-effort; si falla, queda en vir_stock_pend y lo reintenta index.html (stockFlushPend).

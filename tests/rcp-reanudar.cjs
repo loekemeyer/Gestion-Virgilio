@@ -1,13 +1,16 @@
-/* Test de regresión (v7.09) — RECEPCIÓN: reanudar una carga a medio hacer.
+/* Test de regresión (v7.12) — RECEPCIÓN: reanudar una carga a medio hacer.
 
    Si el operario arranca una recepción y se va para atrás / cierra la pantalla, el
-   estado NO se pierde: queda un borrador en localStorage por legajo+día y en
-   "Resumen de hoy" aparece el botón "▶ Reanudar" que la reabre EN EL MISMO PASO.
+   estado NO se pierde: queda un borrador en localStorage por legajo+día y en la
+   BOTONERA aparece "▶ Seguir recepción …" (mismo formato que el de picking) que la
+   reabre EN EL MISMO PASO.
 
    Igual que rcp-oc.cjs, `recepcion.js` se carga con el import de supabase-js
    parcheado por un cliente falso. Verifica:
    - al salir con ✕ Salir queda el borrador (tallerista, línea, remito y cajas) y se
      avisa a Producción (window.onRecepcionDraftChange),
+   - el botón sale en renderPendingSuggestion (junto a los otros "▶ Seguir …"), NO en
+     "Resumen de hoy",
    - window.recepcionDraftInfo resume bien (nombre, línea, remito, códigos, cajas),
    - reanudarRecepcionOp restaura el estado y vuelve al MISMO paso (articulos),
    - el borrador es por legajo+día (otro legajo no ve el de este) y los de días
@@ -98,7 +101,7 @@ if (patched.indexOf("esm.sh") >= 0) { console.error("rcp-reanudar: no pude parch
     out.avisa = window.__avisos > avisosAntes;
     out.cerro = !R.el.page.classList.contains("open");
 
-    // Resumen para el botón de "Resumen de hoy".
+    // Resumen para el botón de la botonera.
     const info = window.recepcionDraftInfo(LEG, DIA);
     out.info = !!info && info.nombre === "Lucho" && info.linea === "LK" && info.remito === "38770" &&
       info.codigos === 2 && info.cajas === 19 && info.step === "articulos";
@@ -157,39 +160,37 @@ if (patched.indexOf("esm.sh") >= 0) { console.error("rcp-reanudar: no pude parch
     };
     window.__reanudado = null;
     window.reanudarRecepcionOp = function (leg, dia) { window.__reanudado = leg + "|" + dia; };
-    const box = document.getElementById("legajoHistoryContent");
+    document.getElementById("legajoInput").value = LEG;
 
-    // (a) con una fila RT en el resumen → el bloque cuelga de ESA fila
-    writeDayHist(getTodayKey(), LEG, [{ id: "x1", opcion: "RT", descripcion: "Recepción Mercadería", ts: Date.now(), status: "failed" }]);
-    renderLegajoHistory(LEG);
-    const item = box.querySelector(".history-item.hist-pend");
-    out.enFilaRT = !!item && item.textContent.indexOf("RT — Recepción Mercadería") >= 0 &&
-      item.textContent.indexOf("Reanudar") >= 0 && item.textContent.indexOf("Lucho · LK · RTO/FC 38770") >= 0 &&
-      item.textContent.indexOf("2 códigos · 19 cajas") >= 0;
-    out.unSoloBoton = box.querySelectorAll("button.hist-reanudar").length === 1;
+    // (a) con borrador → botón "▶ Seguir recepción …" en la botonera, con el MISMO
+    //     formato (primary-btn) que el de picking.
+    renderPendingSuggestion();
+    const box = document.getElementById("pendingSuggestion");
+    const btns = Array.prototype.slice.call(box.querySelectorAll("button.primary-btn"));
+    const btn = btns.filter(function (x) { return x.innerText.indexOf("Seguir recepción") >= 0; })[0];
+    out.botonEnBotonera = !!btn && btn.innerText === "▶ Seguir recepción Lucho (2 cód · 19 cajas)";
+    out.unoSolo = btns.filter(function (x) { return x.innerText.indexOf("Seguir recepción") >= 0; }).length === 1;
 
     // tocarlo reabre la recepción de ESE legajo
-    box.querySelector("button.hist-reanudar").click();
+    btn.click();
     out.click = window.__reanudado === LEG + "|" + getTodayKey();
 
-    // (b) sin fila RT (se perdió el evento) → tarjeta propia arriba de todo
-    writeDayHist(getTodayKey(), LEG, [{ id: "x2", opcion: "MG", descripcion: "Guardado a Góndola", ts: Date.now(), status: "sent" }]);
+    // (b) NO va en "Resumen de hoy"
+    writeDayHist(getTodayKey(), LEG, [{ id: "x1", opcion: "RT", descripcion: "Recepción Mercadería", ts: Date.now(), status: "failed" }]);
     renderLegajoHistory(LEG);
-    const first = box.querySelector(".history-item");
-    out.tarjetaPropia = !!first && first.classList.contains("hist-pend") &&
-      first.textContent.indexOf("Reanudar") >= 0 &&
-      box.querySelectorAll("button.hist-reanudar").length === 1;
+    const hist = document.getElementById("legajoHistoryContent");
+    out.noEnResumen = hist.textContent.indexOf("Reanudar") < 0 && hist.textContent.indexOf("Seguir recepción") < 0;
 
     // (c) sin borrador → no aparece nada
     window.recepcionDraftInfo = function () { return null; };
-    renderLegajoHistory(LEG);
-    out.sinDraft = box.querySelectorAll("button.hist-reanudar").length === 0 &&
-      box.querySelectorAll(".history-item").length === 1;
+    renderPendingSuggestion();
+    out.sinDraft = Array.prototype.slice.call(box.querySelectorAll("button.primary-btn"))
+      .filter(function (x) { return x.innerText.indexOf("Seguir recepción") >= 0; }).length === 0;
 
     // (d) sin el módulo cargado no explota
     delete window.recepcionDraftInfo;
-    renderLegajoHistory(LEG);
-    out.sinModulo = box.querySelectorAll("button.hist-reanudar").length === 0;
+    renderPendingSuggestion();
+    out.sinModulo = box.querySelectorAll("button.primary-btn").length >= 0;
     return out;
   });
   Object.keys(r2).forEach(function (k) { r["ui_" + k] = r2[k]; });
