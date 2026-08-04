@@ -3163,7 +3163,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      #rcpRoot, con su propio cliente Supabase (login anónimo). Portado de la app
      Control-Carga-Remitos-FC. Suma las cajas del día a localStorage para que RT
      se cierre con esa cantidad sin pedirla a mano. -->
-<script type="module" src="recepcion.js?v=3.79"></script>
+<script type="module" src="recepcion.js?v=3.80"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -3950,6 +3950,47 @@ function reanudarRecepcion(legajo) {
   if (typeof window.reanudarRecepcionOp === "function") window.reanudarRecepcionOp(leg, getTodayKey());
   else alert("El módulo de Recepción no cargó. Refrescá la página e intentá de nuevo.");
 }
+/* v7.15 — ANULAR la sesión de recepción (lo llama el botón rojo de recepcion.js).
+   Cierra el toggle RT del legajo, borra el evento RT de apertura en Supabase (RPC
+   `anular_toggle_virgilio`, misma que insumos) y pone en 0 el acumulador de cajas del
+   día. Devuelve false si el operario cancela la 2ª confirmación (ya había mandado
+   entregas en esta sesión: esas cajas YA están registradas y no se borran). */
+window.anularRecepcionSesion = async function (legajo) {
+  const leg = String(legajo || "").trim();
+  if (!leg) return false;
+  // Si ya mandó entregas en esta RT, avisar: se anula el RT, no lo ya recibido.
+  try {
+    const ya = recepcionCajasDelDia(leg);
+    if (ya > 0 && !confirm("⚠ En esta sesión ya mandaste " + ya + " caja(s) y esas quedan registradas.\n\n" +
+        "Anular sólo cierra el RT (la tarea), no borra la mercadería recibida.\n\n¿Anular igual?")) return false;
+  } catch (_e) { /* no-op */ }
+  // sacar de la cola el RT de apertura (si todavía no se sincronizó)
+  try {
+    readQueue().filter(function (it) {
+      return String(it.legajo || "") === leg && it.opcion === "RT" && !it.ts_inicio_iso;
+    }).forEach(function (it) { removeFromQueue(it.id); });
+  } catch (_e) { /* no-op */ }
+  try {
+    await fetch(SUPABASE_URL + "/rest/v1/rpc/anular_toggle_virgilio", {
+      method: "POST",
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ p_legajo: leg, p_opcion: "RT" })
+    });
+  } catch (_e) { /* sin red: se limpia local igual */ }
+  try { const st = getLegajoState(leg); if (st && st.toggles && st.toggles.RT) toggleStartOrEnd(leg, "RT"); } catch (_e) {}
+  try {
+    const f = getTodayKey();
+    writeDayHist(f, leg, readDayHist(f, leg).filter(function (h) { return !(h.opcion === "RT" && !h.texto); }));
+  } catch (_e) { /* no-op */ }
+  try { recepcionResetCajas(leg); } catch (_e) {}
+  try {
+    renderLegajoHistory(leg);
+    updateCoreButtonsState();
+    renderPendingSuggestion();
+    updatePendingIndicator();
+  } catch (_e) { /* no-op */ }
+  return true;
+};
 /* recepcion.js avisa cuando el borrador cambia (se guardó al salir, o se envió la
    recepción) → se repinta la sugerencia para que el botón aparezca/desaparezca solo. */
 window.onRecepcionDraftChange = function () {
@@ -5834,7 +5875,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.14";
+const APP_VERSION = "v7.15";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco

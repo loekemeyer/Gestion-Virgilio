@@ -187,6 +187,14 @@ const RCP_CSS = `
 #rcpRoot .opPageActions{ margin-top:18px; display:flex; flex-wrap:wrap; align-items:center; justify-content:flex-end; gap:10px; position:sticky; bottom:0; background:var(--bg); padding:12px 0; }
 #rcpRoot .opPageActions .btnSend{ height:52px; font-size:18px; padding:0 24px; }
 #rcpRoot .opPageActions .btnCancel, #rcpRoot .opPageActions .btnAnular{ height:52px; padding:0 16px; }
+/* v7.15 — "Anular recepción": salida clara de una sesión abierta por error (mismo
+   criterio que el "Anular picking"). Barra propia ABAJO DE TODO, fuera de #opBody y
+   de #opActions, así no la pisa ningún render de paso. */
+#rcpRoot .opAnularBar:empty{ display:none; }
+#rcpRoot .opAnularBar{ padding:4px 0 16px; }
+#rcpRoot button.opAnular{ width:100%; margin:0; padding:16px 14px; font-size:19px; font-weight:900; background:#dc2626; color:#fff; border:0; border-radius:12px; cursor:pointer; }
+#rcpRoot button.opAnular:hover{ background:#b91c1c; }
+#rcpRoot button.opAnular small{ display:block; font-size:12px; font-weight:700; opacity:.9; margin-top:2px; }
 #rcpRoot .modal{ position:fixed; inset:0; background:rgba(0,0,0,.45); display:none; align-items:flex-start; justify-content:center; padding:24px; overflow:auto; z-index:1400; }
 #rcpRoot .modal.open{ display:flex; }
 #rcpRoot .modalCard{ background:#fff; border-radius:14px; padding:20px; width:100%; max-width:360px; max-height:90vh; display:flex; flex-direction:column; }
@@ -275,6 +283,7 @@ const RCP_HTML = `
     <div id="opSubtitle" class="opSubtitle"></div>
     <div id="opBody" class="opPageBody"></div>
     <div id="opActions" class="opPageActions"></div>
+    <div id="opAnularBar" class="opAnularBar"></div>
   </div>
 </div>
 <div id="opCajasModal" class="modal" role="dialog" aria-modal="true">
@@ -320,6 +329,7 @@ const opCajasNext = document.getElementById("opCajasNext");
 const opCajasDelete = document.getElementById("opCajasDelete");
 const opCajasClose = document.getElementById("opCajasClose");
 const opCajasOc = document.getElementById("opCajasOc");
+const opAnularBar = document.getElementById("opAnularBar");
 
 const opState = {
   step: null,
@@ -345,6 +355,37 @@ function opTodayStr() {
   return yyyy + "-" + mm + "-" + dd;
 }
 
+/* ===== v7.15 — ANULAR la sesión de recepción =====
+   "✕ Salir" sólo cierra la pantalla: el toggle RT sigue ABIERTO en Supabase (y el
+   operario, al volver a tocar RT, cae en el cierre "Indicar Cantidad"). Esto la anula
+   de verdad: tira el borrador y le pide a Producción que cierre el RT y borre el
+   evento de apertura (window.anularRecepcionSesion → RPC anular_toggle_virgilio).
+   La barra vive fuera de #opBody/#opActions, así queda en TODOS los pasos del
+   operario; el supervisor (menú de Administración) no la ve. */
+function opAnularBarRender(mostrar) {
+  if (!opAnularBar) return;
+  opAnularBar.innerHTML = (mostrar && RECP.legajo)
+    ? '<button type="button" class="opAnular">✕ Anular recepción<small>descarta lo cargado y cierra la sesión</small></button>'
+    : "";
+  const b = opAnularBar.querySelector("button");
+  if (b) b.onclick = opAnularSesion;
+}
+async function opAnularSesion() {
+  const legajo = RECP.legajo;
+  const cargados = Object.keys(opState.cargas || {}).filter(function (c) { return opState.cargas[c] > 0; }).length;
+  if (!confirm("¿ANULAR esta recepción?\n\n" +
+      (cargados ? "Se descartan los " + cargados + " código(s) que marcaste y se " : "Se ") +
+      "cierra la sesión de Recepción (RT).\n\nNo se puede deshacer.")) return;
+  let hecho = true;
+  try {
+    if (typeof window.anularRecepcionSesion === "function") hecho = await window.anularRecepcionSesion(legajo);
+  } catch (e) { console.warn("anularRecepcionSesion:", e); }
+  if (hecho === false) return;   // Producción lo frenó (2ª confirmación cancelada)
+  opResetState();                // deja el estado vacío → closeOp borra el borrador
+  closeOp();
+  alert("✕ Recepción anulada.");
+}
+
 /* ============== Navegación ============== */
 function opResetState() {
   opState.step = null;
@@ -362,6 +403,7 @@ function openOp() {
   rcpDraftClear(true);          // v7.12: recepción NUEVA → el borrador anterior ya no sirve
   opPage.classList.remove("pendWide");
   opPage.classList.add("open");
+  opAnularBarRender(true);
   renderTipoElegir();
 }
 /* v7.12 — REANUDAR: vuelve a la recepción que el operario dejó por la mitad, en el
@@ -386,6 +428,7 @@ window.reanudarRecepcionOp = function (legajo, dayKey) {
   opState.cargas = d.cargas || {};
   opPage.classList.remove("pendWide");
   opPage.classList.add("open");
+  opAnularBarRender(true);
   if (d.step === "resumen" && Object.keys(opState.cargas).length) renderResumen();
   else if (d.step === "articulos" && opState.linea) renderArticulos();
   else if (d.step === "remito" && opState.linea) renderRemito();
@@ -395,6 +438,7 @@ window.reanudarRecepcionOp = function (legajo, dayKey) {
 let _pendTimer = null;   // timer del "hace X hs" en vivo de Pendientes
 function closeOp() {
   rcpDraftSave();   // v7.12: salir NO pierde la recepción a medio cargar
+  opAnularBarRender(false);
   opPage.classList.remove("open");
   if (_pendTimer) { clearInterval(_pendTimer); _pendTimer = null; }
 }
@@ -1331,6 +1375,7 @@ async function anularModoOP(pendId) {
 function renderMenu() {
   opState.step = "menu";
   opState.fromMenu = true;
+  opAnularBarRender(false);   // supervisor: no hay sesión RT que anular
   opPage.classList.remove("pendWide");
   opSetBack(false);
   opTitle.textContent = "Recepción de Mercadería";

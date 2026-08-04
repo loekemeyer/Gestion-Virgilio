@@ -1,5 +1,5 @@
 -- =====================================================================
--- anular_sesion_virgilio.sql — ANULAR una sesión empezada por error (v7.13)
+-- anular_sesion_virgilio.sql — ANULAR una sesión empezada por error (v7.13 · RT en v7.15)
 --
 -- Pedido del usuario: al empezar el picking de una tanda no había forma clara de
 -- darla de baja. "Cerrar" sólo sale del modal: el picking queda ABIERTO (EP sin
@@ -56,7 +56,7 @@ begin
   return 'ok';
 end $fn$;
 
--- (2) TOGGLE (hoy RI/EI): borra el evento de apertura que quedó abierto.
+-- (2) TOGGLE (RI/EI insumos y RT recepción): borra el evento de apertura que quedó abierto.
 --     Apertura = ts_inicio null; cierre = ts_inicio no nulo (convención de la app).
 create or replace function public.anular_toggle_virgilio(p_legajo text, p_opcion text)
 returns text language plpgsql security definer set search_path to 'public', 'pg_temp' as $fn$
@@ -64,7 +64,7 @@ declare v_id uuid; v_ts timestamptz; v_leg text; v_op text;
 begin
   v_leg := btrim(coalesce(p_legajo, ''));
   v_op  := btrim(coalesce(p_opcion, ''));
-  if v_leg = '' or v_op not in ('RI', 'EI') then return 'faltan_datos'; end if;
+  if v_leg = '' or v_op not in ('RI', 'EI', 'RT') then return 'faltan_datos'; end if;
 
   select id, created_at into v_id, v_ts
     from public."Registros_Produccion_Virgilio"
