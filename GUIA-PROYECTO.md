@@ -6,6 +6,16 @@
 >
 > Última actualización: 2026-08-04 · Versión app al documentar: **v7.31**
 >
+> Nota (datos, 2026-08-04): **Unificación de unidades por categoría** (pedido usuario). Operación de
+> DATOS sobre Supabase (no de código, sin bump), registrada entera en `Insumos_Historial` (grupo
+> 🧾 Historial) + asientos `tipo='ajuste'`. Regla: **Bolsas plásticas → Bolsas**, **Flejes → Kg**,
+> **Cajas → Uni/Paquetes**; los que quedan en 0 conservan la unidad correcta. Sólo se borraron
+> duplicados **confirmados por el historial de movimientos** (COPIAs, códigos `·` legacy y receptions
+> pre-inventario ya contadas en el inicial del 27/07). Resultados clave: `PP`=139 Bolsas (fusión de los
+> 3 códigos de POLIPROPILENO 2630), `AI`=44 Bolsas, `PE`=11 Bolsas, `7`=664 / `20`=635,2 / `74`=161 /
+> `1060500`=`5`=`25`=0 Kg, `0127`=768 Uni. **Quedó sin tocar `4600·ALTO IMPACTO` (−925 Kg)**: no hay
+> factor Kg↔Bolsa para unificarlo contra `AI`. Detalle en `sql/insumos_categoria.sql`.
+>
 > Nota: **v7.31 — Insumos (admin): grupo «🧾 Historial»** (pedido del usuario), debajo de *Categorías*
 > en la solapa Administrar Insumos, colapsable (arranca cerrado). Es una **bitácora de sólo lectura**
 > que junta **dos fuentes** en una línea de tiempo (lo más nuevo arriba): **(a)** los movimientos de

@@ -209,3 +209,37 @@ update public."Insumos" set categoria = 'partes_plasticas' where categoria = 'ma
 -- SELECT). Se le revocó insert/update/delete/… a anon y authenticated: sólo lectura.
 -- La superficie anon no se ensancha (mismo patrón que Insumos / Movimientos_Stock).
 -- ---------------------------------------------------------------------
+
+-- ---------------------------------------------------------------------
+-- 2026-08-04 (pedido usuario) — UNIFICACIÓN de unidades por categoría. Operación de
+-- DATOS (no de esquema), hecha por SQL directo (postgres) porque insumo_identificar/
+-- borrar rechazan códigos ya clasificados. Cada paso quedó en Insumos_Historial vía
+-- insumo_hist_log + asientos tipo='ajuste' legajo='admin'. Regla: Bolsas plásticas→Bolsas,
+-- Flejes→Kg, Cajas→Uni/Paquetes; los que quedan en 0 conservan la unidad correcta; sólo
+-- se borran duplicados CONFIRMADOS por el historial de movimientos.
+--
+-- FLEJES (→Kg):
+--   · 18.5 X 1.9·FLEJE MANGO PLANO (−738) fusionado a 1060500 (+738) → 1060500 = 0 Kg.
+--   · 5(1)COPIA (−256 Uni) reasignado a 5 en Kg → 5 = 0 Kg.
+--   · 605 y 695 (duplicados PRE-inventario de 7 y 20, ya contados en sus iniciales) → 0 y
+--     borrados; 7=664, 20=635,2.
+--   · 76,50 X 2.80·FLEJE SACATAPITA (−340, entrega pre-inventario) → 0 y borrado; 25=0.
+--   · FLEJES LOEKEMEYER·0.80 X 64 (dup del 74, −6 Uni suelto) limpiado y borrado; 74=161.
+--   · 12 códigos legacy vacíos (·/CHEF/LOEKE) normalizados a Kg (siguen en 0, no borrados).
+--
+-- BOLSAS PLÁSTICAS (→Bolsas):
+--   · POLIPROPILENO 2630: PP(1)COPIA + PP 2630·POLIPROPILENO + su (1)COPIA fusionados a
+--     PP → 151+24−32−4 = 139 Bolsas (respeta las conversiones a Bolsas que el usuario ya
+--     había cargado por el admin, ~25 Kg y ~25 Uni por bolsa).
+--   · ALTO IMPACTO: AI (34 Uni) + AI(1)COPIA (10 Bolsas) → AI = 44 Bolsas (Uni→Bolsas 1:1).
+--   · PE POLIETILENO: PE (7 B) + PE(1)COPIA (4 Uni) → PE = 11 Bolsas.
+--
+-- CAJAS (→Uni/Paquetes):
+--   · 0127: unidad "unidad" → "Uni" (768 Uni).
+--   · 5 cajas en 0 (Nº 2/10/13/27/29): (s/u) → Uni.
+--   · CAJAS·NUMERO 1 + su (1)COPIA (−80 que la cancelaba) → 0 en Uni.
+--
+-- PENDIENTE (sin factor de conversión, se dejó intacto):
+--   · 4600·ALTO IMPACTO = −925 Kg (−750 pre-inventario + −175 post). Falta Kg↔Bolsa para
+--     unificarlo contra AI. Idem empties ISIS 1262500/1266500/1062500/1071500 (0, se dejan).
+-- ---------------------------------------------------------------------
