@@ -187,3 +187,25 @@ update public."Insumos" set categoria = 'partes_plasticas' where categoria = 'ma
 -- y `insumo_editar_permite_vaciar_categoria`: el marcador '__sin__' vacía la categoría
 -- (null seguía significando "no tocar", así que no se podía desclasificar un insumo).
 -- ---------------------------------------------------------------------
+
+-- ---------------------------------------------------------------------
+-- v7.31 (pedido usuario) — HISTORIAL de insumos. Migraciones aplicadas:
+--   `insumos_historial_tabla` y `insumos_historial_log_en_funciones`.
+--
+-- Tabla nueva Insumos_Historial (id, ts, accion, cod, cod_nuevo, detalle, legajo,
+-- datos jsonb): bitácora de los cambios de CATÁLOGO que hace el admin y que NO mueven
+-- stock (aceptar/fusionar pendientes = las unificaciones, borrar, recodificar, editar,
+-- alta manual, categorías y unidades). Los ingresos/egresos/ajustes ya viven en
+-- Movimientos_Stock (deposito='insumos'); el front (_stkInsHist) muestra las dos cosas
+-- juntas, ordenadas por fecha.
+--
+-- Helper insumo_hist_log(accion, cod, cod_nuevo, detalle, legajo, datos) SECURITY
+-- DEFINER: lo llama CADA función de mutación (insumo_alta / _identificar / _borrar /
+-- _recodificar / _editar / _cat_guardar / _cat_borrar / _unidad_guardar). Se le REVOCÓ
+-- el execute a PUBLIC (postgres, dueño de todo, lo conserva) para que nadie forje
+-- historial desde la anon key.
+--
+-- Seguridad: Insumos_Historial con RLS + policy ins_hist_select (anon/authenticated
+-- SELECT). Se le revocó insert/update/delete/… a anon y authenticated: sólo lectura.
+-- La superficie anon no se ensancha (mismo patrón que Insumos / Movimientos_Stock).
+-- ---------------------------------------------------------------------

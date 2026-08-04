@@ -4,7 +4,28 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-04 · Versión app al documentar: **v7.29**
+> Última actualización: 2026-08-04 · Versión app al documentar: **v7.31**
+>
+> Nota: **v7.31 — Insumos (admin): grupo «🧾 Historial»** (pedido del usuario), debajo de *Categorías*
+> en la solapa Administrar Insumos, colapsable (arranca cerrado). Es una **bitácora de sólo lectura**
+> que junta **dos fuentes** en una línea de tiempo (lo más nuevo arriba): **(a)** los movimientos de
+> stock de insumos (`Movimientos_Stock` con `deposito='insumos'`) — **ingresos** (recepción),
+> **egresos** (entrega), **ajustes** y stock **inicial**, con **quién** (legajo), **cuándo** (ts) y
+> **cuánto** (delta + unidad); y **(b)** los **cambios de catálogo del admin** que NO mueven stock —
+> aceptar/**fusionar** pendientes (las unificaciones), borrar, recodificar, editar, alta manual, y
+> altas/bajas de categorías y unidades. (b) se registra en la tabla nueva **`Insumos_Historial`**
+> (`id, ts, accion, cod, cod_nuevo, detalle, legajo, datos jsonb`), escrita **sólo** por el helper
+> `insumo_hist_log(...)` (SECURITY DEFINER) que ahora invoca **cada** función de mutación de insumos
+> (`insumo_alta`, `insumo_identificar`, `insumo_borrar`, `insumo_recodificar`, `insumo_editar`,
+> `insumo_cat_guardar`, `insumo_cat_borrar`, `insumo_unidad_guardar`). La anon key **sólo lee**
+> `Insumos_Historial` (RLS con policy `ins_hist_select` + grant `SELECT`; se le revocó insert/update/
+> delete, y a `insumo_hist_log` se le revocó el execute a PUBLIC): la superficie anon no se ensancha.
+> Los **ajustes manuales** de cantidad/unidad y los ceroeos ya vivían en `Movimientos_Stock` como
+> `tipo='ajuste'` legajo `admin`, así que aparecen por la vía (a) sin cambios. Front: `_stkInsHist()`
+> + `_stkInsHistFetch()` (recarga en cada `stkInsRefresh`), con filtros por grupo (Todo / Ingresos-
+> egresos / Ajustes / Cambios de catálogo) y texto (código/detalle/quién). Bump **v7.31**. Test:
+> `tests/ins-admin.cjs` (mock de las dos fuentes + orden + filtro). (`origin/main` estaba en v7.30 —
+> fix de layout del botón Pausar — al hacer esto; se rebaseó encima.)
 >
 > Nota: **v7.29 — Insumos: «Agregar insumo» sólo en RECEPCIÓN** (pedido del usuario). En **Entrega de
 > insumos (EI)** desaparece el tile `+ Agregar insumo`, tanto el de la grilla de categorías como el de

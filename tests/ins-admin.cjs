@@ -1,4 +1,4 @@
-/* Regresión v7.29 / idea 5572 — Stock y Compras → solapa "🧰 Insumos" (Administrar
+/* Regresión v7.31 / idea 5572 — Stock y Compras → solapa "🧰 Insumos" (Administrar
    Insumos). Es el lado admin de la botonera del operario (idea 7917). Contrato:
      · la solapa existe, y arranca por "Pendientes de identificar"
      · pendientes = SOLO los TMP-*, con TODO editable: código (sugerido = el temporal),
@@ -24,6 +24,10 @@
      · en el listado de cada categoría se edita código, detalle, categoría, ubicación,
        CANTIDAD y UNIDAD (columnas separadas), y sólo se manda lo que cambió
      · Pendientes / Unidades / Categorías son colapsables; la tabla final no
+     · sección HISTORIAL (debajo de Categorías, colapsable): junta los movimientos
+       (ingresos/egresos/ajustes, con quién y cuándo) con los cambios de catálogo del
+       admin (aceptar/fusionar, borrar, editar, categorías…), ordenados por fecha,
+       filtrables por grupo
      · VÍNCULO CON EL OPERARIO: lo que define el admin es lo que ve el operario en
        RI/EI — categorías (nombre y unidades permitidas), insumos y unidades
    Sin red (fetch mockeado). */
@@ -69,6 +73,16 @@ catch (_e) {
       { cod: "505C·CUCHILLA CHINA", nombre: "CUCHILLA CHINA", categoria: null, ubicacion: null, orden: null, creado_por: "104" },
       { cod: "FLEJE ESPIRAL·1", nombre: "1", categoria: null, ubicacion: null, orden: null, creado_por: "104" }
     ];
+    // El Historial junta dos fuentes: los movimientos de stock (ingresos/egresos/ajustes)
+    // y los cambios de catálogo que registra el admin (Insumos_Historial).
+    const MOV_DB = [
+      { ts: "2026-08-04T13:00:00-03:00", cod_art: "22", descripcion: "121 X 1,20", delta: -50, tipo: "entrega_insumo", legajo: "231", unidad: "Kg" },
+      { ts: "2026-08-04T10:00:00-03:00", cod_art: "PP", descripcion: "POLIPROPILENO", delta: 100, tipo: "recepcion_insumo", legajo: "104", unidad: "Bolsas" }
+    ];
+    const HIST_DB = [
+      { ts: "2026-08-04T12:00:00-03:00", accion: "fusionar", cod: "TMP-0009", cod_nuevo: "9090", detalle: "Fusionado TMP-0009 → 9090 (3 mov)", legajo: "admin", datos: { movs: 3 } },
+      { ts: "2026-08-04T11:00:00-03:00", accion: "cat_guardar", cod: "cajas", cod_nuevo: null, detalle: "Categoría «Cajas» actualizada", legajo: "admin", datos: {} }
+    ];
     window.fetch = function (url, opt) {
       url = String(url);
       if (url.indexOf("/Movimientos_Stock") >= 0 && opt && String(opt.method || "").toUpperCase() === "POST") {
@@ -80,6 +94,9 @@ catch (_e) {
         rpc.push({ fn: url.split("/rpc/")[1].split("?")[0], body: body });
         return J(1);
       }
+      // Historial: OJO, va ANTES de "/Insumos" (Insumos_Historial contiene "/Insumos")
+      if (url.indexOf("Insumos_Historial") >= 0) return J(HIST_DB);
+      if (url.indexOf("/Movimientos_Stock") >= 0) return J(MOV_DB);   // GET (el POST ya se atrapó arriba)
       if (url.indexOf("Insumos_Categorias") >= 0) return J(CATS_DB);
       if (url.indexOf("Insumos_Unidades") >= 0) return J(UNIS_DB.map(function (n, i) { return { nombre: n, orden: i }; }));
       if (url.indexOf("/Insumos") >= 0) return J(CAT);
@@ -126,6 +143,25 @@ catch (_e) {
     out.acciones = Array.prototype.map.call(acc, function (e) { return e.textContent.trim(); }).join("|");   // "✓ Aceptar|🗑 Borrar"
         out.sinColumnaOrden = !/>Orden</.test(document.getElementById("stkBody").innerHTML);
     out.pendMuestraLegajo = /leg 231/.test(document.getElementById("stkBody").innerHTML);
+
+    // 1b) HISTORIAL: grupo nuevo debajo de Categorías. Arranca colapsado; al abrirlo
+    // muestra los movimientos (ingresos/egresos) y los cambios de catálogo, mezclados
+    // y ordenados por fecha (lo más nuevo arriba), con quién los hizo.
+    out.histColapsadoInicio = !/⬆ Egreso/.test(body());
+    stkInsSec("hist");                       // abrir
+    out.hayHist = /🧾 Historial/.test(body());
+    out.histTieneIngreso = /⬇ Ingreso/.test(body());
+    out.histTieneEgreso = /⬆ Egreso/.test(body());
+    out.histTieneFusion = /Fusionado/.test(body()) && /TMP-0009/.test(body()) && /9090/.test(body());
+    out.histTieneCatGuardar = /Categoría «Cajas» actualizada/.test(body());
+    out.histMuestraQuien = /leg 231/.test(body()) && /admin/.test(body());
+    // orden: el egreso (13:00) es más nuevo que el ingreso (10:00) → aparece antes
+    const histBody = body();
+    out.histOrdenado = histBody.indexOf("⬆ Egreso") < histBody.indexOf("⬇ Ingreso");
+    // filtro por grupo: "Cambios de catálogo" deja los del admin y oculta los movimientos
+    stkInsHistGrupo("cat");
+    out.histFiltraCat = /Fusionado/.test(body()) && !/⬆ Egreso/.test(body());
+    stkInsHistGrupo("");                     // vuelvo a Todo
 
     // 2) No deja identificar dejando el temporal como código
     const antesTmp = rpc.length;
@@ -236,7 +272,7 @@ catch (_e) {
     out.altaRechazaDuplicado = rpc.length === antesAlta && /ya está en uso/i.test(alerted);
 
     // 8b2) Secciones colapsables (la tabla final NO)
-    out.hayBotonesSec = document.querySelectorAll("#stkBody .stk-secbtn").length;   // 3
+    out.hayBotonesSec = document.querySelectorAll("#stkBody .stk-secbtn").length;   // 4 (Pendientes, Unidades, Categorías, Historial)
     stkInsSec("pend");
     out.pendColapsa = document.querySelectorAll("#stkBody table")[0] &&
       !document.getElementById("idCod_TMP-0001");
@@ -323,7 +359,10 @@ catch (_e) {
     r.catEditAbre === true && r.catGuardaNombre === "Cajas y embalaje" && r.catGuardaUnis === "Paquetes,Uni,MC" &&
     r.haySecUnidades === true && r.uniSacar === true && r.uniUsadaAvisa === true && r.uniLibreNoAvisa === true &&
     /Pendientes.*\|.*Unidades.*\|.*Categorías/.test(r.ordenSecciones || "") && r.altaRechazaDuplicado === true &&
-    r.hayBotonesSec === 3 && r.pendColapsa === true && r.pendVuelve === true &&
+    r.hayBotonesSec === 4 && r.pendColapsa === true && r.pendVuelve === true &&
+    r.histColapsadoInicio === true && r.hayHist === true && r.histTieneIngreso === true && r.histTieneEgreso === true &&
+    r.histTieneFusion === true && r.histTieneCatGuardar === true && r.histMuestraQuien === true &&
+    r.histOrdenado === true && r.histFiltraCat === true &&
     r.hayTablaTotal === true && /Código\|Detalle\|Categoría\|Rack \/ sector\|Cantidad\|Unidad/.test(r.totalCols || "") &&
     r.totalSinEditar === true && r.totalHayFiltros === true && r.totalFiltraCod === 1 &&
     r.totalFiltraSinCat >= 1 && r.totalSeActualiza === true && r.uniProhibidaBloquea === true &&

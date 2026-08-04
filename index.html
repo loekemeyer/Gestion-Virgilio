@@ -5910,7 +5910,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.30";
+const APP_VERSION = "v7.31";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -11931,7 +11931,7 @@ let _stkIns = null;
 async function stkInsLoad() {
   insEnsureCss();   // los chips de categoría usan .ins-cchip
   _stk.insLoaded = true;
-  _stkIns = { cat: "", abierta: "", filtro: "", edit: null, nuevoEn: "", msg: "", tf: {}, abre: {} };
+  _stkIns = { cat: "", abierta: "", filtro: "", edit: null, nuevoEn: "", msg: "", tf: {}, hf: { cod: "", grupo: "" }, abre: { hist: false } };
   const body = document.getElementById("stkBody");
   if (body) body.innerHTML = '<div class="stk-loading">Cargando insumos…</div>';
   await stkInsRefresh();
@@ -11942,13 +11942,15 @@ async function stkInsRefresh() {
     await insLoadMeta(true);
     const r = await Promise.all([
       supaFetchAll(SUPABASE_URL + "/rest/v1/Insumos", "select=cod,nombre,categoria,ubicacion,creado_por,creado"),
-      insFetchSaldosXUni()
+      insFetchSaldosXUni(),
+      _stkInsHistFetch()
     ]);
     _stkIns.items = (r[0] || []).map(function (c) {
       return { cod: String(c.cod), nombre: c.nombre || "", cat: c.categoria || "", ubic: c.ubicacion || "",
                por: c.creado_por || "", xuni: r[1][String(c.cod)] || null };
     });
     _stkIns.items.sort(_insSortCod);
+    _stkIns.hist = r[2] || [];
   } catch (e) { _stkIns.items = []; _stkIns.msg = "⚠ Error cargando: " + (e.message || e); }
 }
 function _stkInsSaldo(it) {
@@ -11982,6 +11984,7 @@ function stkBodyInsumos() {
   h += _stkInsPend(pend);
   h += _stkInsUnis(items);          // primero el vocabulario, después quién lo usa
   h += _stkInsCats(items, pend);
+  h += _stkInsHist();               // bitácora: movimientos + cambios del admin
   h += _stkInsTodos(items);         // foto completa, sólo lectura
   return h;
 }
@@ -12188,6 +12191,98 @@ function _stkInsTodos(items) {
   return h + '</tbody></table></div>';
 }
 function stkInsFiltro(k, v) { if (!_stkIns) return; _stkIns.tf = _stkIns.tf || {}; _stkIns.tf[k] = v; stkRender(); }
+
+/* ---------- (5) HISTORIAL — bitácora, sólo lectura ----------
+   Junta DOS fuentes en una línea de tiempo (lo más nuevo arriba):
+   · Movimientos_Stock (deposito='insumos'): ingresos (recepción), egresos (entrega),
+     ajustes y stock inicial — con quién (legajo), cuándo (ts) y cuánto (delta+unidad).
+   · Insumos_Historial: los cambios de CATÁLOGO que hace el admin y que NO mueven stock
+     (aceptar/fusionar pendientes = las unificaciones, borrar, recodificar, editar,
+     alta manual, categorías y unidades). Lo escribe insumo_hist_log desde las funciones
+     SECURITY DEFINER; la anon key sólo lo lee. Se recarga en cada stkInsRefresh(). */
+async function _stkInsHistFetch() {
+  const hdr = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+  const base = SUPABASE_URL + "/rest/v1/";
+  const g = function (u) { return fetch(base + u, { headers: hdr }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; }); };
+  const res = await Promise.all([
+    g("Movimientos_Stock?deposito=eq.insumos&select=ts,cod_art,descripcion,delta,tipo,legajo,unidad&order=ts.desc&limit=500"),
+    g("Insumos_Historial?select=ts,accion,cod,cod_nuevo,detalle,legajo,datos&order=ts.desc&limit=500")
+  ]);
+  const ev = [];
+  (res[0] || []).forEach(function (m) {
+    ev.push({ ts: m.ts, kind: "mov", tipo: m.tipo, cod: String(m.cod_art == null ? "" : m.cod_art), cod2: "",
+              detalle: m.descripcion || "", cant: (m.delta == null ? null : Number(m.delta)), uni: m.unidad || "", quien: m.legajo || "" });
+  });
+  (res[1] || []).forEach(function (c) {
+    ev.push({ ts: c.ts, kind: "cat", tipo: c.accion, cod: String(c.cod == null ? "" : c.cod), cod2: c.cod_nuevo || "",
+              detalle: c.detalle || "", cant: null, uni: "", quien: c.legajo || "" });
+  });
+  ev.sort(function (a, b) { return (a.ts < b.ts ? 1 : a.ts > b.ts ? -1 : 0); });
+  return ev;
+}
+/* A qué grupo de filtro pertenece cada evento. */
+function _stkInsHistGrupo(e) {
+  if (e.kind === "cat") return "cat";
+  if (e.tipo === "recepcion_insumo" || e.tipo === "entrega_insumo") return "flujo";
+  return "ajuste";   // ajuste + inicial
+}
+/* Chip de color según el tipo de evento. */
+function _stkInsHistChip(e) {
+  if (e.kind === "mov") {
+    if (e.tipo === "recepcion_insumo") return { t: "⬇ Ingreso", bg: "#dcfce7", fg: "#166534" };
+    if (e.tipo === "entrega_insumo") return { t: "⬆ Egreso", bg: "#fee2e2", fg: "#991b1b" };
+    if (e.tipo === "inicial") return { t: "Inicial", bg: "#e0e7ff", fg: "#3730a3" };
+    return { t: "Ajuste", bg: "#fef3c7", fg: "#92400e" };
+  }
+  const map = { aceptar: "Aceptado", fusionar: "🔗 Fusionado", alta: "Alta", recodificar: "Recodificado",
+                editar: "Editado", borrar: "Borrado", cat_guardar: "Categoría", cat_borrar: "Cat. borrada",
+                unidad_alta: "Unidad +", unidad_baja: "Unidad −" };
+  const del = (e.tipo === "borrar" || e.tipo === "cat_borrar" || e.tipo === "unidad_baja");
+  return { t: map[e.tipo] || e.tipo, bg: del ? "#fee2e2" : "#ede9fe", fg: del ? "#991b1b" : "#5b21b6" };
+}
+function _stkInsHist() {
+  const all = _stkIns.hist || [];
+  let h = _stkSec("hist", "🧾 Historial", all.length);
+  if (!_stkAbierta("hist")) return h;
+  h += '<div class="stk-cut">Todo lo que pasó con los insumos, lo más nuevo arriba: <b>ingresos</b> (recepciones) y <b>egresos</b> (entregas) con quién y cuándo, los <b>ajustes</b> de stock, y los <b>cambios del admin</b> (aceptar pendientes, <b>fusionar/unificar</b>, borrar, recodificar, editar, categorías y unidades).</div>';
+  const hf = _stkIns.hf || (_stkIns.hf = { cod: "", grupo: "" });
+  const tabs = [["", "Todo"], ["flujo", "Ingresos / egresos"], ["ajuste", "Ajustes"], ["cat", "Cambios de catálogo"]];
+  h += '<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:8px;">' +
+    tabs.map(function (t) {
+      const on = (hf.grupo || "") === t[0];
+      return '<button class="stk-btn"' + (on ? ' style="background:#4338ca;color:#fff;border-color:#4338ca;"' : "") + ' onclick="stkInsHistGrupo(\'' + t[0] + '\')">' + t[1] + '</button>';
+    }).join("") +
+    ' <input class="stk-inp" style="width:160px;" placeholder="🔎 código / detalle / quién" value="' + escapeHtml(hf.cod || "") + '" oninput="if(_stkIns){(_stkIns.hf=_stkIns.hf||{}).cod=this.value;stkRender();}"></div>';
+  const f = (hf.cod || "").toLowerCase().trim();
+  const lista = all.filter(function (e) {
+    if (hf.grupo && _stkInsHistGrupo(e) !== hf.grupo) return false;
+    if (f && (e.cod + " " + (e.cod2 || "") + " " + (e.detalle || "") + " " + (e.quien || "")).toLowerCase().indexOf(f) < 0) return false;
+    return true;
+  });
+  if (!lista.length) return h + '<div class="stk-empty">Nada' + (f || hf.grupo ? " con ese filtro" : " todavía") + '.</div>';
+  const TOPE = 250, rec = lista.slice(0, TOPE);
+  h += '<div class="stk-scroll"><table class="stk-tbl"><thead><tr><th>Fecha</th><th>Qué</th><th>Código</th><th>Detalle</th><th class="num">Cantidad</th><th>Quién</th></tr></thead><tbody>';
+  h += rec.map(function (e) {
+    const chip = _stkInsHistChip(e);
+    const cod = escapeHtml(e.cod || "—") + (e.cod2 ? ' <span class="stk-sub">→ ' + escapeHtml(e.cod2) + '</span>' : "");
+    let cant = '<span class="stk-sub">—</span>';
+    if (e.cant != null && isFinite(e.cant)) {
+      const v = Math.round(e.cant * 1000) / 1000;
+      const col = v < 0 ? "#b91c1c" : (v > 0 ? "#166534" : "#6b7280");
+      cant = '<span style="color:' + col + ';font-weight:700;">' + (v > 0 ? "+" : "") + v + (e.uni ? " " + escapeHtml(e.uni) : "") + '</span>';
+    }
+    return '<tr><td class="stk-sub" style="white-space:nowrap;">' + escapeHtml(stockFmtTs(e.ts)) + '</td>' +
+      '<td><span style="display:inline-block;padding:1px 8px;border-radius:9px;font-size:11px;font-weight:700;white-space:nowrap;background:' + chip.bg + ';color:' + chip.fg + ';">' + escapeHtml(chip.t) + '</span></td>' +
+      '<td>' + cod + '</td>' +
+      '<td>' + escapeHtml(e.detalle || "—") + '</td>' +
+      '<td class="num">' + cant + '</td>' +
+      '<td>' + (e.quien ? (e.quien === "admin" ? "admin" : "leg " + escapeHtml(e.quien)) : "—") + '</td></tr>';
+  }).join("");
+  h += '</tbody></table></div>';
+  if (lista.length > TOPE) h += '<div class="stk-sub" style="margin-top:6px;">Mostrando los ' + TOPE + ' más nuevos de ' + lista.length + '. Filtrá por código para ver el resto.</div>';
+  return h;
+}
+function stkInsHistGrupo(g) { if (!_stkIns) return; (_stkIns.hf = _stkIns.hf || {}).grupo = g; stkRender(); }
 
 /* ---------- helpers de UI ---------- */
 function _stkInsCatSel(id, sel) {
