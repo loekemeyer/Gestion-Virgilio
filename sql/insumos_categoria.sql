@@ -292,3 +292,14 @@ update public."Insumos" set categoria = 'partes_plasticas' where categoria = 'ma
 --     439E·COLADOR (−480) Uni → necesitan conteo físico. Se dejan.
 --   · 7711600 (vacío, "Mango ergonómico negro"): posible duplicado ISIS de 4496 → se deja.
 -- ---------------------------------------------------------------------
+
+-- 2026-08-04 (cont.) — cierre Importados/Partes plásticas (respuestas del usuario):
+--   · 2805 espiral TN: 63 MC → 126000 Uni (2000 u/MC del nombre, "lo primero").
+--   · 1546903 vastidor cortaqueso: 222 MC → 222 Uni (bruto 1:1, corrección manual después).
+--   · 967H(1)COPIA mango bambú: −4 MC → −4 Uni (bruto 1:1) → 967H = 8252 Uni.
+--   · 7711600 (vacío) borrado: duplicado ISIS de 4496.
+--   · Negativos sueltos 035/102E/439E (Uni) se dejan hasta el conteo físico.
+--   Estado final: Importados y Partes plásticas 100% en Uni (nada en MC ni (s/u)).
+--   Regla del usuario para las conversiones sin factor confiable: BRUTO 1:1, corrección
+--   manual posterior, todo queda en Insumos_Historial.
+-- ---------------------------------------------------------------------
