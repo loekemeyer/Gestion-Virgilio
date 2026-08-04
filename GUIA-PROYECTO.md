@@ -4,7 +4,39 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-04 · Versión app al documentar: **v7.15**
+> Última actualización: 2026-08-04 · Versión app al documentar: **v7.16**
+>
+> Nota: **v7.16 — PPP: botón 📦 "Chequeo de góndola" por pedido (y por tanda)** (pedido del
+> usuario). Al lado del 🖨 de cada pedido de la PPP hay ahora un botón **📦** que responde
+> *"¿tengo en góndola todo lo que necesito para armar este pedido?"* y, si falta algo, lo
+> **detalla artículo por artículo**. El mismo botón está en la **franja de la tanda/bloque**
+> (chequea todos sus pedidos JUNTOS, que es lo correcto: comparten la misma góndola).
+> **Qué cruza:** lo que **pide** el pedido sale de **`PPP_Base_Pedidos`** (`pedido, articulo,
+> cajas` — la misma base que arma el picking) y lo que **hay** de **`vista_saldos_stock`**
+> (respeta el `cutoff_ts` de `Stock_Config`), depósito **`terminado` = góndola**. Cada artículo
+> queda en uno de tres estados: **✅ OK** (góndola ≥ pedido) · **🔁 Bajar N** (no alcanza en
+> góndola pero hay en **excedente / racks / racks CH / a guardar / p-envasar** → se resuelve
+> moviendo) · **🚨 Faltan N** (no está en **ningún** depósito). Los problemas van primero;
+> cada fila muestra descripción, **📍 sector** de planimetría y dónde está lo que falta.
+> ⚠ **"Stock REAL al momento del chequeo"** (lo pidió explícito el usuario): la lectura es
+> siempre **fresca** (`cache:"no-store"`, sin cachés del front) **y** se corrige el desfasaje
+> conocido del pipeline — la baja de góndola del picking la escribe el cron
+> `reconciliar_pipeline_stock` (jobid 22, cada 10') y **recién cuando la tanda mandó TP**, así
+> que lo que un operario está sacando de la góndola AHORA (picking en curso, o TP de hace
+> <10 min) **todavía figura en el saldo**. El chequeo resta los **PKC de las tandas que aún no
+> tienen movimiento `picking` escrito** (excedente primero y después góndola, **igual reparto
+> que el cron**) y lo **avisa** en el modal ("⏳ Descontado del saldo el picking de N tanda(s)…").
+> Además, si la tanda ya se pickeó / se está pickeando, lo dice. **Códigos:** `equivResolve`
+> (029→437E) + `pkCodEmpresa` (437E→`437E CH` según la NP) igual que el picking; si el código
+> queda **pelado** se suma **toda la familia LK/CH** (mismo criterio que el SSG v7.04 — es la
+> misma mercadería física). **Es SOLO LECTURA**: no mueve stock, no reserva y no emite ningún
+> evento (si otra tanda pide el mismo artículo, se lo lleva el que pickee primero — está
+> aclarado en el pie del modal). Funciones nuevas: `pppChequeoNp` / `pppChkCompute` (núcleo
+> puro, testeable) / `_pppChkPicksPendientes` / `_pppChkFetchSaldos` / `_pppChkBody` /
+> `_pppChkBtn` / `pppChkReintentar` / `pppChkClose`, más `_pppArg` (escapa un texto para
+> meterlo entre comillas simples dentro de un `onclick` — sin eso una razón social con
+> apóstrofo, "D'Onofrio", rompía el handler). Test nuevo **`tests/ppp-chk-gondola.cjs`** en
+> `tests/run.sh`; suite completa OK; render a 400px y 1100px sin scroll lateral. Bump **v7.16**.
 >
 > Nota: **v7.15 — "Anular recepción": el botón rojo también en Recepción de Mercadería**. El usuario
 > avisó que veía el de picking pero no el de recepción (v7.13 había cubierto picking + insumos). En

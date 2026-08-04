@@ -111,4 +111,7 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== ins-admin (idea 5572 / v7.14: solapa Administrar Insumos en Stock y Compras) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ins-admin.cjs
 
+echo "== ppp-chk-gondola (v7.16: botón 📦 Chequeo de góndola por pedido/tanda en la PPP) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-chk-gondola.cjs
+
 echo "== TODO OK =="
