@@ -5970,7 +5970,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.43";
+const APP_VERSION = "v7.44";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -9870,6 +9870,7 @@ async function ocgEnter() {
   ocgStartCountdown();
   try {
     const res = await Promise.all([ocgFetchMaximos(), stockFetchMovs(), stockGetCutoff(), ocgDemanda(false, true), ocgFetchProyeccion(), ocgFetchCapacidad(), ocgFetchNCaja()]);
+    if (!_oc) return;   // se cerró el generador mientras calculaba: no escribir sobre _oc null (unhandledrejection)
     const maxs = res[0] || [], saldos = stockComputeSaldos(res[1] || [], res[2]), dem = res[3] || {}, proy = res[4] || {}, capac = res[5] || {}, ncajaMap = res[6] || {};
     // Cruce por código: TODO usa LA MISMA normalización (_ocgNorm = upper + sin ceros a la
     // izquierda). Las claves de stockComputeSaldos son el cod_art CRUDO del movimiento →
@@ -9906,7 +9907,7 @@ async function ocgEnter() {
     });
     _oc.gen = { items: items, fecha: new Date().toISOString().slice(0, 10) };
     ocRender();
-  } catch (e) { _oc.gen = { error: String(e.message || e), items: [] }; ocRender(); }
+  } catch (e) { if (_oc) { _oc.gen = { error: String(e.message || e), items: [] }; ocRender(); } }
 }
 function ocgGroups() {
   const g = {};
