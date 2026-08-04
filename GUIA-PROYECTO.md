@@ -4,7 +4,22 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-04 · Versión app al documentar: **v7.19**
+> Última actualización: 2026-08-04 · Versión app al documentar: **v7.20**
+>
+> Nota: **v7.20 — Fuera el piloto de "Picking con lectora"**. El usuario decidió que no lo van a
+> usar, así que se sacó de la app (no quedó apagado: se borró). Se fueron: el **switch del operario**
+> en la botonera (`_pkScanOperRow`, el que se veía como "🔫 Picking con lectora (piloto)"), la
+> **tarjeta del switch en Print Station** (admin), el **listener de la lectora** (`pkScanBind` +
+> `pkScanOn/SetOn/Toggle/AllowedLegajo`, `pkOnScan`, `pkScanToast`, EAN) y el **FALTA diferido** que
+> existía sólo para el scanner (`pkFaltaPend`, `_pk.faltaPend` en `pkSave`/`pkResume`/`pkRenderDone`
+> y `pkConfirmFaltaBatch`, la pantalla "¿Cuántas cajas pusiste?" en lote). El picking queda como
+> siempre: botonera Todas / Algunas / Sin stock, artículo por artículo. **Se conservó**
+> **`_pkItemCodes`** (acepta el código pelado además del partido por empresa, idea 9020) porque es
+> del cruce de códigos, no de la lectora. Se borró `tests/pk-scan.cjs` (y su línea de `run.sh`) y se
+> podaron del `emp-np.cjs` las dos aserciones que eran del scanner (`_pkNum3`). `tools/etiquetas-
+> gondola.html` **queda** (imprimir etiquetas de góndola sirve igual) y `docs/idea-picking-scanner-
+> etiquetas.md` pasó a `docs/archivo-idea-picking-scanner-etiquetas.md` con el cartel de descartada.
+> Suite completa OK. Bump **v7.20**.
 >
 > Nota: **v7.19 — Insumos: «a depurar» se vuelca en Pendientes (+ FUSIÓN) y borrar categoría pide
 > escribir el nombre** (idea 5572, pedido del usuario).

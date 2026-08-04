@@ -1,3 +1,8 @@
+> ⚠ **DESCARTADO (v7.20).** El usuario decidió no usar la lectora de código de barras:
+> el piloto se sacó de la app (switch del operario, switch de admin y listener). Este
+> documento queda como archivo de la idea. `tools/etiquetas-gondola.html` sigue en el
+> repo: sirve para imprimir etiquetas de góndola aunque no haya lectora.
+
 # Picking con lectora + etiquetas por lío — diseño (ideas 8243 y 5290)
 
 > Estado: **diseño / en desarrollo**. Todo el cambio en la app va **detrás de un

@@ -4755,8 +4755,6 @@ function renderPendingSuggestion(){
   const box = ensurePendingSuggestionContainer();
   box.innerHTML = "";
   if(!legajo) return;
-  _pkScanOperRow(box, legajo);   // switch del scanner (piloto) — sólo aparece para los legajos de prueba 0 y 1
-
   // (−2) "Che, ayer te quedó esto SIN CERRAR": tareas (picking/armado) que quedaron
   // ABIERTAS de un día anterior. Así saben qué les quedó mal y lo terminan si fue sin
   // querer (último minuto de ayer), o lo continúan si siguen. (v5.59)
@@ -5905,7 +5903,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.19";
+const APP_VERSION = "v7.20";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -7036,7 +7034,7 @@ function pkSave() {
     localStorage.setItem(PK_SAVE_PREFIX + _pk.legajo, JSON.stringify({
       day: getTodayKey(), tanda: _pk.tanda, legajo: _pk.legajo,
       items: _pk.items, idx: _pk.idx, results: _pk.results, mode: _pk.mode,
-      forced: _pk.forced || {}, faltaPend: _pk.faltaPend || {}
+      forced: _pk.forced || {}
     }));
   } catch (_e) { /* localStorage lleno / privado: no rompe el picking */ }
 }
@@ -7076,7 +7074,7 @@ function pkResume(legajo) {
   m.querySelector(".tanda-modal-title").textContent = "Picking — Tanda " + saved.tanda;
   _pk = { tanda: saved.tanda, legajo: saved.legajo, items: saved.items,
           idx: saved.idx || 0, results: saved.results || {}, mode: saved.mode || "item",
-          faltaPend: saved.faltaPend || {} };
+          forced: saved.forced || {} };
   m.classList.add("show");
   pkRender();
 }
@@ -7468,17 +7466,13 @@ function pkReclarify() {
 function pkRenderDone(body, N, nav) {
   // v4.26: los "Salteá" (skip) NO son pasos de pick → no cuentan para terminar.
   const pickItems = _pk.items.filter(it => !it.skip);
-  // Scanner (idea 8243): los "falta pendiente" (escaneados FALTA, cantidad diferida al
-  // TP) NO cuentan como "sin marcar" — se piden en lote más abajo. Sin scanner
-  // `_pk.faltaPend` no existe → isPend() siempre false y el cálculo queda idéntico.
-  const isPend = it => !!(_pk.faltaPend && _pk.faltaPend[it.key]);
-  let falt = 0; const conf = pkCount(); const pend = pickItems.filter(it => _pk.results[it.key] == null && !isPend(it)).length;
+  let falt = 0; const conf = pkCount(); const pend = pickItems.filter(it => _pk.results[it.key] == null).length;
   for (const it of pickItems) { const r = _pk.results[it.key]; if (r != null && r < it.esp) falt++; }
   N = pickItems.length;   // mostrar "X de <pasos reales>"
   // Si saltearon artículos con "Adelante" sin marcar Ok/F, NO se puede terminar:
   // hay que marcar cada uno (Ok o F) sí o sí. Listamos los que faltan.
   if (pend > 0) {
-    const faltanList = pickItems.filter(it => _pk.results[it.key] == null && !isPend(it)).map(it => escapeHtml(it.art));
+    const faltanList = pickItems.filter(it => _pk.results[it.key] == null).map(it => escapeHtml(it.art));
     body.innerHTML = `<div class="pk-flow">${nav || ""}<div class="pk-doneflow">
       <div class="pk-done-ico" style="color:#dc2626">!</div>
       <div class="pk-done-t">Te faltan ${pend} sin marcar</div>
@@ -7488,35 +7482,6 @@ function pkRenderDone(body, N, nav) {
     </div></div>`;
     return;
   }
-  // Scanner (idea 8243): las cantidades de los FALTA se piden TODAS JUNTAS acá, al
-  // terminar (TP), para que durante el picking el operario no toque la pantalla. Inputs
-  // type=text inputmode=numeric (como el fix del MG) para que se tipeen al derecho.
-  if (_pk.faltaPend) {
-    const pendFalta = pickItems.filter(it => _pk.faltaPend[it.key] && _pk.results[it.key] == null);
-    if (pendFalta.length) {
-      const rows = pendFalta.map(it => {
-        const i = _pk.items.indexOf(it);
-        const sec = String(it.sector || "—").replace(/-/g, "");
-        const rec = (it.dual && it.pick) ? it.pick : (it.real || it.art);
-        return '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 6px;border-bottom:1px solid #e5e7eb;">'
-          + '<div style="display:flex;flex-direction:column;line-height:1.15;min-width:0;">'
-          + '<span style="font-weight:800;font-size:16px;color:#0f172a;">' + escapeHtml(rec) + '</span>'
-          + '<span style="font-size:12px;color:#64748b;">Sector ' + escapeHtml(sec) + '</span></div>'
-          + '<div style="display:flex;align-items:center;gap:6px;flex:none;">'
-          + '<input id="pkBq_' + i + '" type="text" inputmode="numeric" placeholder="0" value="" '
-          + 'style="width:64px;padding:9px;border:2px solid #cbd5e1;border-radius:9px;font:800 18px system-ui;text-align:center;">'
-          + '<span style="font-size:13px;color:#94a3b8;font-weight:700;">/ ' + pkFmt(it.esp) + '</span></div></div>';
-      }).join("");
-      body.innerHTML = `<div class="pk-flow">${nav || ""}<div class="pk-doneflow">
-        <div class="pk-done-t">¿Cuántas cajas pusiste?</div>
-        <div class="pk-done-s">De los que escaneaste como <b>FALTA</b>. El resto ya quedó completo. (0 = no había)</div>
-        <div style="width:100%;max-height:44vh;overflow:auto;border:1px solid #e5e7eb;border-radius:12px;margin:6px 0 10px;">${rows}</div>
-        <button class="pk-btn pk-ok" onclick="pkConfirmFaltaBatch()">✓ Confirmar y terminar</button>
-        <button class="pk-btn pk-cancel" onclick="pkClose()">Cerrar (sigo después)</button>
-      </div></div>`;
-      return;
-    }
-  }
   body.innerHTML = `<div class="pk-flow">${nav || ""}<div class="pk-doneflow">
     <div class="pk-done-ico">✓</div>
     <div class="pk-done-t">Picking completo</div>
@@ -7524,25 +7489,6 @@ function pkRenderDone(body, N, nav) {
     <button class="pk-btn pk-ok" onclick="pkFinishPicking()">✓ Terminé el picking</button>
     <button class="pk-btn pk-cancel" onclick="pkClose()">Cerrar (sigo después)</button>
   </div></div>`;
-}
-/* Scanner (idea 8243): confirma en LOTE las cantidades de los FALTA diferidos y termina
-   el picking. Un PKC por artículo (mismo pkSendDetail que el flujo normal); blanco o
-   negativo = 0 (no había). Después llama a pkFinishPicking (TP). */
-function pkConfirmFaltaBatch() {
-  if (!_pk) return;
-  for (let i = 0; i < _pk.items.length; i++) {
-    const it = _pk.items[i];
-    if (it.skip) continue;
-    if (!(_pk.faltaPend && _pk.faltaPend[it.key]) || _pk.results[it.key] != null) continue;
-    const inp = document.getElementById("pkBq_" + i);
-    let real = inp ? parseFloat(String(inp.value).replace(",", ".")) : 0;
-    if (isNaN(real) || real < 0) real = 0;
-    const rec = (it.dual && it.pick) ? it.pick : it.art;
-    _pk.results[it.key] = real;
-    pkSendDetail(rec, it.esp, real);
-    delete _pk.faltaPend[it.key];
-  }
-  pkFinishPicking();
 }
 /* Salta al primer artículo sin marcar (Ok/F). Lo usa el botón "Completar los
    que faltan" cuando quedó alguno salteado con "Adelante". */
@@ -7563,7 +7509,6 @@ function pkOk() {
   const it = _pk.items[_pk.idx];
   const rec = (it.dual && it.pick) ? it.pick : it.art;   // par Nacional/Importado: registra el elegido
   _pk.results[it.key] = it.esp;
-  if (_pk.faltaPend) delete _pk.faltaPend[it.key];   // idea 8243: si venía marcado FALTA pendiente, se resuelve
   pkSendDetail(rec, it.esp, it.esp);
   pkAdvance();
 }
@@ -7574,147 +7519,20 @@ function pkSinStock() {
   const it = _pk.items[_pk.idx];
   const rec = (it.dual && it.pick) ? it.pick : it.art;
   _pk.results[it.key] = 0;
-  if (_pk.faltaPend) delete _pk.faltaPend[it.key];   // idea 8243
   pkSendDetail(rec, it.esp, 0);
   pkAdvance();
 }
 function pkF() { if (_pk) { _pk.mode = "fInput"; pkRender(); } }
-/* Scanner (idea 8243) — FALTA DIFERIDO: al escanear la etiqueta FALTA NO se abre el
-   input de cantidad (no se toca la pantalla durante el picking). Se marca el artículo
-   como "falta pendiente" y se avanza; la cantidad se pide EN LOTE al terminar (TP), en
-   pkRenderDone → pkConfirmFaltaBatch. Sólo se llega acá desde pkOnScan (listener gateado
-   por el switch); sin scanner `_pk.faltaPend` no existe y NADA cambia. */
-function pkFaltaPend() {
-  if (!_pk || _pk.idx >= _pk.items.length) return;
-  const it = _pk.items[_pk.idx];
-  if (!_pk.faltaPend) _pk.faltaPend = {};
-  _pk.faltaPend[it.key] = true;
-  if (Object.prototype.hasOwnProperty.call(_pk.results, it.key)) delete _pk.results[it.key]; // si venía marcado, pasa a pendiente
-  pkAdvance();
-}
-/* ===== Picking con LECTORA de código de barras (idea 8243) — TODO detrás del switch
-   `vir_picking_scanner`. Switch OFF (default) = el picking funciona EXACTO como hoy:
-   la 1ª línea de cada handler/listener corta, no se bindea ni corre nada. Switch ON =
-   cada disparo de la lectora dispara la MISMA botonera (pkOk/pkF) sobre el artículo que
-   matchea el código escaneado. Barcode Code-128 `CÓDIGO|T` (todas) / `CÓDIGO|A` (algunas).
-   Detalle: docs/idea-picking-scanner-etiquetas.md. ===== */
-function pkScanOn() { try { return localStorage.getItem("vir_picking_scanner") === "1"; } catch (_e) { return false; } }
-function pkScanSetOn(v) { try { localStorage.setItem("vir_picking_scanner", v ? "1" : "0"); } catch (_e) {} }
-function pkScanToggle() { pkScanSetOn(!pkScanOn()); try { if (typeof psRender === "function") psRender(); } catch (_e) {} try { if (typeof renderPendingSuggestion === "function") renderPendingSuggestion(); } catch (_e) {} }
-/* Piloto restringido a los legajos de PRUEBA (0 y 1): aunque el flag esté prendido, el
-   modo lectora sólo tiene efecto cuando el picking lo hace el legajo 0 o 1 (el dueño lo
-   prueba con esos). Para cualquier otro legajo el picking es SIEMPRE el de hoy — el
-   listener corta por acá y el toggle del operador ni se dibuja. */
-function pkScanAllowedLegajo(lg) { const s = String(lg == null ? "" : lg).trim(); return s === "0" || s === "1"; }
-/* Fila del switch del scanner para el MÓDULO DEL OPERADOR (se prende desde el celu
-   del operario, no solo desde el Print Station). Sólo dibuja el toggle; el modo
-   scanner en sí sigue 100% gateado por `pkScanOn()`. */
-function _pkScanOperRow(box, legajo) {
-  try {
-    if (!pkScanAllowedLegajo(legajo)) return;   // piloto: el toggle sólo aparece para legajos de prueba 0 y 1
-    const on = (typeof pkScanOn === "function") && pkScanOn();
-    const row = document.createElement("div");
-    row.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:10px;background:" + (on ? "#ecfdf5" : "#f8fafc") + ";border:1px solid " + (on ? "#16a34a" : "#cbd5e1") + ";border-radius:11px;padding:8px 12px;margin:8px 0;font-size:13px;color:#334155;line-height:1.3;";
-    row.innerHTML = '<span>🔫 <b>Picking con lectora</b> <small style="opacity:.7">(piloto)</small><br><small style="opacity:.7">' + (on ? "Activo — disparás en vez de tocar" : "Apagado — picking normal, igual que hoy") + '</small></span>';
-    const sw = document.createElement("span");
-    sw.className = "sup-sw" + (on ? " on" : ""); sw.setAttribute("role", "switch");
-    sw.innerHTML = '<span class="sup-sw-k"></span>';
-    sw.onclick = function () { try { pkScanToggle(); } catch (_e) {} };
-    row.appendChild(sw); box.appendChild(row);
-  } catch (_e) {}
-}
+/* Todos los códigos con los que se puede identificar un ítem del picking: el propio,
+   el real/elegido del par Nacional/Importado, y el PELADO cuando viene partido por
+   empresa (idea 9020: "438E LK" también matchea "438E"). Lo usa el cruce de códigos. */
 function _pkItemCodes(it) {
   const out = [];
   [it.art, it.real, it.pick].forEach(function (c) { if (c) out.push(String(c).toUpperCase().trim()); });
   if (it.dual) { if (it.dual.nac) out.push(String(it.dual.nac).toUpperCase().trim()); if (it.dual.imp) out.push(String(it.dual.imp).toUpperCase().trim()); }
-  // v6.84 (idea 9020): los códigos partidos por empresa quedan como "438E LK", pero la
-  // etiqueta pegada en el slot dice "438E" a secas → aceptar también el código PELADO,
-  // si no la lectora contesta "no está en esta tanda". (El EAN ya matchea: _pkNum3 saca
-  // los dígitos y el sufijo no aporta ninguno.)
   out.slice().forEach(function (c) { const b = codBase(c); if (b && out.indexOf(b) < 0) out.push(b); });
   return out;
 }
-function _pkFindByCode(code) {
-  if (!_pk) return -1;
-  const C = String(code).toUpperCase().trim(); if (!C) return -1;
-  const cur = _pk.items[_pk.idx];
-  if (cur && !cur.skip && _pk.results[cur.key] == null && _pkItemCodes(cur).indexOf(C) >= 0) return _pk.idx;
-  for (let i = 0; i < _pk.items.length; i++) { const it = _pk.items[i]; if (it.skip || _pk.results[it.key] != null) continue; if (_pkItemCodes(it).indexOf(C) >= 0) return i; }
-  for (let i = 0; i < _pk.items.length; i++) { const it = _pk.items[i]; if (it.skip) continue; if (_pkItemCodes(it).indexOf(C) >= 0) return i; }
-  return -1;
-}
-/* EAN interno (idea 8243): 13 dígitos = `77955870` + marcador + NNN(3) + verificador.
-   marcador 0 = TODO (mercadería completa) · 1 = FALTA (le falta algo → completar en tablet).
-   NNN = parte numérica del código (943E→943). El verificador (mod-10) no se usa para
-   decodificar (lo valida la lectora); se genera con el algoritmo público al imprimir. */
-function _pkNum3(code) { const d = String(code == null ? "" : code).replace(/\D/g, ""); return d ? d.slice(-3).padStart(3, "0") : ""; }
-function _pkDecodeEAN(s) {
-  const m = String(s == null ? "" : s).replace(/\D/g, "");
-  if (m.length !== 13 || m.slice(0, 8) !== "77955870") return null;
-  const marker = m[8];
-  if (marker !== "0" && marker !== "1") return null;
-  return { nnn: m.slice(9, 12), accion: (marker === "1" ? "A" : "T") };
-}
-function _pkFindByNum3(nnn) {
-  if (!_pk || !nnn) return -1;
-  const has = function (it) { return _pkItemCodes(it).some(function (c) { return _pkNum3(c) === nnn; }); };
-  const cur = _pk.items[_pk.idx];
-  if (cur && !cur.skip && _pk.results[cur.key] == null && has(cur)) return _pk.idx;
-  for (let i = 0; i < _pk.items.length; i++) { const it = _pk.items[i]; if (it.skip || _pk.results[it.key] != null) continue; if (has(it)) return i; }
-  for (let i = 0; i < _pk.items.length; i++) { const it = _pk.items[i]; if (it.skip) continue; if (has(it)) return i; }
-  return -1;
-}
-function pkOnScan(raw) {
-  if (!_pk) return;
-  const raw0 = String(raw || "").trim(); if (!raw0) return;
-  // 1) EAN interno (779558700 = todo / 779558701 = falta)
-  const ean = _pkDecodeEAN(raw0);
-  if (ean) {
-    const eidx = _pkFindByNum3(ean.nnn);
-    if (eidx < 0) { pkScanToast("✕ EAN …" + ean.nnn + " — no está en esta tanda", false); return; }
-    _pk.idx = eidx; _pk.mode = "item";
-    const eit = _pk.items[eidx];
-    const enom = eit.real || eit.pick || eit.art;
-    if (ean.accion === "A") { pkFaltaPend(); pkScanToast("✎ " + enom + " — falta (cantidad al terminar)", true); }
-    else { pkOk(); pkScanToast("✓ " + enom + " · " + pkFmt(eit.esp), true); }
-    return;
-  }
-  // 2) Code-128 interno CÓDIGO|T / CÓDIGO|A (sigue funcionando)
-  const s = raw0.toUpperCase();
-  let code = s, accion = "T";
-  const p = s.lastIndexOf("|");
-  if (p >= 0) { code = s.slice(0, p).trim(); accion = (s.slice(p + 1).trim() || "T"); }
-  const idx = _pkFindByCode(code);
-  if (idx < 0) { pkScanToast("✕ " + code + " — no está en esta tanda", false); return; }
-  const it = _pk.items[idx];
-  if (it.dual && !it.pick) {
-    if (it.dual.nac && String(it.dual.nac).toUpperCase() === code) it.pick = it.dual.nac;
-    else if (it.dual.imp && String(it.dual.imp).toUpperCase() === code) it.pick = it.dual.imp;
-  }
-  _pk.idx = idx; _pk.mode = "item";
-  if (accion === "A") { pkFaltaPend(); pkScanToast("✎ " + code + " — falta (cantidad al terminar)", true); }
-  else { pkOk(); pkScanToast("✓ " + code + " · " + pkFmt(it.esp), true); }
-}
-function pkScanToast(msg, ok) {
-  let el = document.getElementById("pkScanToast");
-  if (!el) { el = document.createElement("div"); el.id = "pkScanToast"; document.body.appendChild(el); }
-  el.textContent = msg;
-  el.style.cssText = "position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:99999;padding:12px 20px;border-radius:12px;font:800 18px system-ui,sans-serif;color:#fff;box-shadow:0 8px 28px rgba(0,0,0,.35);opacity:1;transition:opacity .3s;background:" + (ok ? "#16a34a" : "#dc2626") + ";";
-  clearTimeout(el._t); el._t = setTimeout(function () { el.style.opacity = "0"; }, 1400);
-}
-(function pkScanBind() {
-  let buf = "", last = 0;
-  document.addEventListener("keydown", function (e) {
-    if (!pkScanOn()) return;                                  // switch OFF → no hace NADA
-    const m = document.getElementById("tandaModal");
-    if (!m || !m.classList.contains("show")) return;          // sólo con el picking abierto
-    if (!_pk || !pkScanAllowedLegajo(_pk.legajo)) return;     // piloto: SÓLO legajos de prueba 0 y 1
-    const ae = document.activeElement;
-    if (ae && (ae.tagName === "INPUT" || ae.tagName === "TEXTAREA" || ae.tagName === "SELECT")) return; // no pisar el tipeo de cantidad
-    if (e.key === "Enter") { if (buf.length) { const sc = buf; buf = ""; e.preventDefault(); pkOnScan(sc); } return; }
-    if (e.key && e.key.length === 1) { const now = Date.now(); if (now - last > 120) buf = ""; last = now; buf += e.key; }
-  }, true);
-})();
 /* Recalcula "Faltan" (pedido − puestas) en vivo mientras el operario tipea, sin
    re-render para no perder el foco del input. */
 function pkFaltanCalc(esp) {
@@ -7814,7 +7632,6 @@ function pkConfirmF() {
   if (isNaN(real) || real < 0) real = 0;
   const rec = (it.dual && it.pick) ? it.pick : it.art;   // par Nacional/Importado: registra el elegido
   _pk.results[it.key] = real;
-  if (_pk.faltaPend) delete _pk.faltaPend[it.key];   // idea 8243
   pkSendDetail(rec, it.esp, real);
   pkAdvance();
 }
@@ -23158,11 +22975,6 @@ function psRender(){
   h += '<div class="ps-toggle-card"><div class="ps-tc-top"><span class="ps-tc-t">🧾 Auto-imprimir remito FACTURADO al tildar Facturación</span>' +
     '<span class="sup-sw' + (fon ? " on" : "") + '" onclick="facPrintToggle()" role="switch"><span class="sup-sw-k"></span></span></div>' +
     '<div class="ps-status ' + (fon ? "on" : "") + '">' + (fon ? "🟢 Activo — imprime el FACTURADO en esta PC al tildar" : "⚪ Apagado — no imprime el facturado (se auto-pregunta en el 1er tic)") + '</div></div>';
-  const scon = (typeof pkScanOn === "function") && pkScanOn();
-  h += '<div class="ps-toggle-card"><div class="ps-tc-top"><span class="ps-tc-t">🔫 Picking con lectora de código de barras (PILOTO)</span>' +
-    '<span class="sup-sw' + (scon ? " on" : "") + '" onclick="pkScanToggle()" role="switch"><span class="sup-sw-k"></span></span></div>' +
-    '<div class="ps-status ' + (scon ? "on" : "") + '">' + (scon ? "🟢 Activo — en el picking, cada disparo de la lectora marca el artículo (Code-128 <code>código|T</code> = todas / <code>código|A</code> = algunas)" : "⚪ Apagado — el picking funciona con la botonera de siempre (todas / algunas / sin stock)") + '</div>' +
-    '<div class="ps-help">Switch de prueba — <b>sólo tiene efecto para los legajos 0 y 1</b> (los de prueba); el resto de los operarios pican igual que hoy. <b>Apagado = el picking anda igual que hoy.</b> Imprimí las etiquetas de góndola con <code>tools/etiquetas-gondola.html</code> y emparejá la lectora Bluetooth al celu antes de prenderlo.</div></div>';
   const elon = (typeof etlOn === "function") && etlOn();
   h += '<div class="ps-toggle-card"><div class="ps-tc-top"><span class="ps-tc-t">🏷️ Etiqueta de lío automática (PILOTO)</span>' +
     '<span class="sup-sw' + (elon ? " on" : "") + '" onclick="etlToggleGlobal()" role="switch"><span class="sup-sw-k"></span></span></div>' +

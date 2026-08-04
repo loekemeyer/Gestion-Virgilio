@@ -11,7 +11,7 @@
       (faltantes, Entregas_Virgilio), que siempre habla en código pelado.
    4. _compMatchArt: un faltante de "438E LK" tiene que matchear la línea "438E" del
       pedido. Si esto se rompe, el faltante no se le asigna a ninguna NP (silencioso).
-   5. _pkItemCodes: la lectora de código de barras (idea 8243) escanea la etiqueta del
+   5. _pkItemCodes: el cruce de códigos acepta el código PELADO además del partido
       slot, que dice "438E" pelado → el ítem partido acepta pelado Y con sufijo.
    6. ocgDemanda(porEmpresa): CAJAS PEDIDAS de la tabla de Stock parte 809E por empresa;
       el generador de OCs la sigue pidiendo PELADA (cruza contra OC_Maximos).
@@ -61,10 +61,9 @@ catch (_e) {
       base4: codBase("546"),
       matchFaltante: _compMatchArt("438E", "438E LK"),
       matchDistinto: _compMatchArt("437E", "438E LK"),
-      // 5. la lectora (idea 8243) escanea la etiqueta del slot, que dice "438E" pelado:
+      // 5. el cruce de códigos acepta el pelado ("438E") además del partido ("438E LK"):
       //    el ítem partido tiene que aceptar los DOS códigos.
       scanCodes: _pkItemCodes({ art: "438E LK" }),
-      scanNum3: _pkNum3("438E LK"),
       // 6. CAJAS PEDIDAS de la tabla de Stock: la demanda se parte por empresa, pero
       //    el generador de OCs la sigue viendo pelada (cruza contra OC_Maximos).
       demanda: dem
@@ -88,8 +87,7 @@ catch (_e) {
   eq("_compMatchArt(pedido 438E, faltante 438E LK)", r.matchFaltante, true);
   eq("_compMatchArt(437E vs 438E LK)", r.matchDistinto, false);
   if (!(r.scanCodes || []).includes("438E LK")) fail.push("_pkItemCodes: falta el código con sufijo");
-  if (!(r.scanCodes || []).includes("438E")) fail.push("_pkItemCodes: falta el código PELADO (la lectora no encontraría el ítem)");
-  eq("_pkNum3(438E LK)", r.scanNum3, "438");
+  if (!(r.scanCodes || []).includes("438E")) fail.push("_pkItemCodes: falta el código PELADO");
   const dP = (r.demanda && r.demanda.partida) || {}, dL = (r.demanda && r.demanda.pelada) || {};
   eq("demanda partida: 809E LK (NP 98049)", dP["809E LK"], 5);
   eq("demanda partida: 809E CH (NP 44519)", dP["809E CH"], 3);
