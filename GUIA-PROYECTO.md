@@ -6,6 +6,24 @@
 >
 > Última actualización: 2026-08-04 · Versión app al documentar: **v7.36**
 >
+> Nota (backend, **sin bump de app**): **SIMULACIÓN semanal de las OCs automáticas antes del arranque
+> real**. El usuario pidió, antes de prender la generación de verdad (prevista **miércoles 12/08,
+> pendiente de confirmación**), correr una **prueba** los miércoles 7:00 que haga todos los chequeos y
+> la misma cuenta que la real pero **sin generar nada**, y que avise por Telegram el resultado (salga
+> bien o mal). Nueva función **`simular_ocs_automaticas()`** (dry-run: misma fórmula que
+> `generar_ocs_automaticas` pero es un SELECT, no inserta) que manda **siempre** un mensaje:
+> "🧪 SIMULACIÓN OCs automáticas — Generaría N líneas · P prov · C cajas. Top: …" (y "⚠ ya hay N OC(s)
+> de hoy → en la real NO se generaría" si aplica), o "🧪🚨 SIMULACIÓN OCs — FALLÓ … <error>" si algo
+> revienta; dedup `ocsim_<día>`. **Setup de crons**: se **DESACTIVÓ** `ocs-auto-miercoles` (la
+> generación REAL, `active=false`) — si no, generaba de verdad **mañana 05/08** (mañana es miércoles);
+> y se creó **`ocs-auto-sim`** (`0 10 * * 3` = miércoles 07:00 AR, activo) que corre la simulación,
+> arrancando mañana 05/08 y cada miércoles hasta el go-live. **Switch de go-live** (cuando se
+> confirme): `cron.alter_job(... 'ocs-auto-miercoles' ..., active := true)` +
+> `cron.alter_job(... 'ocs-auto-sim' ..., active := false)`. Verificado con transacción + `ROLLBACK`
+> (sin mandar Telegram): `ok_sim:111` → "Generaría 111 líneas · 19 proveedores · 9489 cajas · Top:
+> Poly (1930), Oscar (1464), Lucho (996), Pintos (798), Garcia / Lucho (686)". SQL en
+> `sql/simular_ocs_automaticas.sql`.
+>
 > Nota (backend, **sin bump de app**): **FIX — "✕ Anular este envío" de Recepción no revertía el
 > STOCK (fantasma en `a_guardar`)**. Revisando que Recepción de Mercadería interactúe bien con el
 > stock. Una recepción escribe en tres lados: `Entregas …`, `Movimientos_Stock` (`a_guardar` +cajas,
