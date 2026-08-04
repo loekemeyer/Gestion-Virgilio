@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Insumos — Guía rápida</title>
+<style>
+  :root{
+    --bg:#eef0f6; --surface:#ffffff; --surface-2:#f7f8fc;
+    --ink:#1a1d27; --muted:#5b6072; --faint:#8a8fa3;
+    --line:#e4e6f0; --line-strong:#d3d6e4;
+    --add:#4f46e5; --add-soft:#eef0ff; --add-ink:#3730a3;
+    --fix:#c2560d; --fix-soft:#fdf1e6; --fix-ink:#9a3d05;
+    --ok:#0f766e; --ok-soft:#e7f6f3;
+    --shadow:0 1px 2px rgba(20,22,40,.05), 0 12px 30px rgba(20,22,40,.06);
+    --radius:16px;
+    --sans:"Segoe UI Variable","Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
+    --mono:"SF Mono",ui-monospace,"Cascadia Mono","Consolas",monospace;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --bg:#0f1117; --surface:#181b23; --surface-2:#1f232d;
+      --ink:#eceef5; --muted:#a3a8ba; --faint:#787e92;
+      --line:#282c38; --line-strong:#333849;
+      --add:#8b86ff; --add-soft:#20213a; --add-ink:#c3bfff;
+      --fix:#f0a35e; --fix-soft:#2c2113; --fix-ink:#f6c493;
+      --ok:#4fd1c0; --ok-soft:#14261f;
+      --shadow:0 1px 2px rgba(0,0,0,.4), 0 16px 40px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="light"]{
+    --bg:#eef0f6; --surface:#ffffff; --surface-2:#f7f8fc;
+    --ink:#1a1d27; --muted:#5b6072; --faint:#8a8fa3; --line:#e4e6f0; --line-strong:#d3d6e4;
+    --add:#4f46e5; --add-soft:#eef0ff; --add-ink:#3730a3;
+    --fix:#c2560d; --fix-soft:#fdf1e6; --fix-ink:#9a3d05; --ok:#0f766e; --ok-soft:#e7f6f3;
+    --shadow:0 1px 2px rgba(20,22,40,.05), 0 12px 30px rgba(20,22,40,.06);
+  }
+  :root[data-theme="dark"]{
+    --bg:#0f1117; --surface:#181b23; --surface-2:#1f232d;
+    --ink:#eceef5; --muted:#a3a8ba; --faint:#787e92; --line:#282c38; --line-strong:#333849;
+    --add:#8b86ff; --add-soft:#20213a; --add-ink:#c3bfff;
+    --fix:#f0a35e; --fix-soft:#2c2113; --fix-ink:#f6c493; --ok:#4fd1c0; --ok-soft:#14261f;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 16px 40px rgba(0,0,0,.35);
+  }
+
+  *{box-sizing:border-box;}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5;
+    -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;}
+  .wrap{max-width:1120px;margin:0 auto;padding:clamp(20px,4vw,52px) clamp(16px,4vw,40px) 64px;}
+
+  /* ---- header ---- */
+  .masthead{margin-bottom:30px;}
+  .kicker{font-size:12px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--faint);margin:0 0 10px;}
+  h1{font-size:clamp(28px,4.4vw,42px);font-weight:800;letter-spacing:-.02em;line-height:1.05;
+    margin:0 0 12px;text-wrap:balance;}
+  .lede{font-size:clamp(15px,1.7vw,17px);color:var(--muted);max-width:60ch;margin:0;}
+  .lede b{color:var(--ink);font-weight:700;}
+
+  /* ---- grid of the two guides ---- */
+  .guides{display:grid;gap:22px;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));
+    align-items:start;margin-top:26px;}
+
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    box-shadow:var(--shadow);overflow:hidden;display:flex;flex-direction:column;}
+  .card-top{height:5px;}
+  .add .card-top{background:linear-gradient(90deg,var(--add),color-mix(in srgb,var(--add) 55%,#a78bfa));}
+  .fix .card-top{background:linear-gradient(90deg,var(--fix),color-mix(in srgb,var(--fix) 55%,#f59e0b));}
+  .card-head{padding:20px 22px 4px;}
+  .badge-row{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:14px;}
+  .pill{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:700;
+    padding:4px 10px;border-radius:999px;border:1px solid var(--line-strong);color:var(--muted);
+    background:var(--surface-2);letter-spacing:.01em;}
+  .add .pill.lead{background:var(--add-soft);color:var(--add-ink);border-color:transparent;}
+  .fix .pill.lead{background:var(--fix-soft);color:var(--fix-ink);border-color:transparent;}
+  .card h2{font-size:20px;font-weight:800;letter-spacing:-.01em;margin:0 0 6px;line-height:1.2;
+    text-wrap:balance;}
+  .when{font-size:13.5px;color:var(--muted);margin:0 0 4px;}
+  .when b{color:var(--ink);}
+
+  /* ---- steps ---- */
+  ol.steps{list-style:none;margin:14px 0 0;padding:6px 22px 4px;counter-reset:s;}
+  ol.steps>li{position:relative;padding:0 0 18px 46px;counter-increment:s;}
+  ol.steps>li::before{content:counter(s);position:absolute;left:0;top:-2px;
+    width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    font-size:14px;font-weight:800;font-variant-numeric:tabular-nums;color:#fff;}
+  .add ol.steps>li::before{background:var(--add);}
+  .fix ol.steps>li::before{background:var(--fix);}
+  /* connector line between step numbers */
+  ol.steps>li:not(:last-child)::after{content:"";position:absolute;left:14.5px;top:30px;bottom:2px;
+    width:2px;background:var(--line);}
+  .step-t{font-size:15px;line-height:1.45;}
+  .step-t .lo{color:var(--muted);}
+  .sub{display:block;font-size:12.5px;color:var(--faint);margin-top:3px;}
+
+  /* the exact thing to tap */
+  .tap{display:inline-flex;align-items:center;font-family:var(--sans);font-weight:700;font-size:13px;
+    padding:3px 9px;border-radius:8px;border:1px solid var(--line-strong);background:var(--surface-2);
+    color:var(--ink);white-space:nowrap;box-shadow:0 1px 0 var(--line-strong);}
+  .add .tap.key{background:var(--add-soft);color:var(--add-ink);border-color:color-mix(in srgb,var(--add) 30%,transparent);box-shadow:none;}
+  .fix .tap.key{background:var(--fix-soft);color:var(--fix-ink);border-color:color-mix(in srgb,var(--fix) 30%,transparent);box-shadow:none;}
+
+  /* ---- footer note in card ---- */
+  .note{margin:4px 22px 20px;padding:13px 15px;border-radius:12px;background:var(--surface-2);
+    border:1px solid var(--line);}
+  .note .lbl{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;
+    color:var(--ok);display:block;margin-bottom:4px;}
+  .fix .note .lbl{color:var(--fix-ink);}
+  .add .note .lbl{color:var(--add-ink);}
+  .note p{margin:0;font-size:13.5px;color:var(--muted);line-height:1.5;}
+  .note p+p{margin-top:9px;}
+  .note b{color:var(--ink);}
+  .tip{font-size:12.5px;color:var(--muted);}
+  .tip .t{font-weight:800;color:var(--ink);}
+
+  .footline{margin-top:30px;text-align:center;font-size:12.5px;color:var(--faint);
+    border-top:1px solid var(--line);padding-top:16px;}
+  .footline b{color:var(--muted);}
+
+  @media (max-width:520px){
+    ol.steps{padding-inline:16px;} .card-head{padding-inline:18px;} .note{margin-inline:16px;}
+  }
+  @media print{
+    body{background:#fff;}
+    .wrap{max-width:none;padding:0;}
+    .guides{grid-template-columns:1fr 1fr;gap:14px;}
+    .card{box-shadow:none;border-color:#ccc;break-inside:avoid;}
+    .footline{border-color:#ccc;}
+  }
+  @media (prefers-reduced-motion:no-preference){
+    .card{transition:none;}
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="masthead">
+    <p class="kicker">Producción Virgilio · Insumos</p>
+    <h1>Dos cosas que vas a necesitar hacer</h1>
+    <p class="lede">Agregar un insumo que <b>ves que hay pero no está en el sistema</b>, y corregir uno que quedó <b>mal cargado</b>. Cada paso dice exactamente qué botón tocar.</p>
+  </header>
+
+  <div class="guides">
+
+    <!-- ============ GUIDE 1 ============ -->
+    <section class="card add">
+      <div class="card-top"></div>
+      <div class="card-head">
+        <div class="badge-row">
+          <span class="pill lead">➕ Agregar un insumo nuevo</span>
+          <span class="pill">📱 En el celular</span>
+          <span class="pill">Lo hace: el operario</span>
+        </div>
+        <h2>Llegó algo que no aparece en ninguna lista</h2>
+        <p class="when"><b>Cuándo:</b> lo tenés adelante, lo estás recibiendo, y no lo encontrás en las categorías.</p>
+      </div>
+
+      <ol class="steps">
+        <li><div class="step-t">Entrá a <span class="tap">📥 Recepción de Insumos</span>.</div></li>
+        <li><div class="step-t">Tocá <span class="tap key">+ Agregar insumo</span> <span class="lo">(está al lado de las categorías).</span></div></li>
+        <li><div class="step-t"><b>Detalle:</b> escribí qué es, en tus palabras.
+          <span class="sub">Ej: “alambre finito que trajo Pérez”, “bolsa gris sin etiqueta”. Es lo único obligatorio.</span></div></li>
+        <li><div class="step-t"><b>Elegí la categoría</b> que corresponda.
+          <span class="sub">Si no estás seguro, tocá <span class="tap key">❓ Sin categoría clara</span> — después la ordena el encargado.</span></div></li>
+        <li><div class="step-t"><b>Cantidad:</b> poné el número que hay.</div></li>
+        <li><div class="step-t"><b>Unidad:</b> tocá en qué se mide (Kg, Bolsas, Uni…).
+          <span class="sub">Si la categoría ya tiene una fija, viene puesta sola.</span></div></li>
+        <li><div class="step-t">Tocá <span class="tap key">✓ Agregar insumo</span>.</div></li>
+        <li><div class="step-t">Para terminar, tocá <span class="tap key">✓ Registrar entrada</span>.</div></li>
+      </ol>
+
+      <div class="note">
+        <span class="lbl">Qué pasa después</span>
+        <p>El sistema le pone un <b>código temporal</b> (TMP-…). Más tarde, el encargado le pone el código y el nombre de verdad desde <b>Stock y Compras → Insumos</b>.</p>
+        <p class="tip"><span class="t">Ojo:</span> el <b>“+ Agregar insumo” sólo está en Recepción</b>. En una entrega no se puede sacar algo que no existe. Y si escribís un detalle que ya existe, la app te abre ese mismo para que sumes ahí (no crea duplicados).</p>
+      </div>
+    </section>
+
+    <!-- ============ GUIDE 2 ============ -->
+    <section class="card fix">
+      <div class="card-top"></div>
+      <div class="card-head">
+        <div class="badge-row">
+          <span class="pill lead">✏️ Corregir un insumo mal cargado</span>
+          <span class="pill">🖥 En la compu / monitor</span>
+          <span class="pill">Lo hace: el encargado</span>
+        </div>
+        <h2>Dice 20 kg pero en realidad hay 200 kg</h2>
+        <p class="when"><b>Cuándo:</b> la cantidad (o el código, la unidad, la ubicación) quedó mal y hay que dejarla bien.</p>
+      </div>
+
+      <ol class="steps">
+        <li><div class="step-t">Abrí <span class="tap">Stock y Compras</span> y entrá a la solapa <span class="tap key">🧰 Insumos</span>.</div></li>
+        <li><div class="step-t">Bajá a <span class="tap">🗂 Categorías</span> y, en la categoría del insumo, tocá <span class="tap key">▸ Ver insumos</span>.</div></li>
+        <li><div class="step-t">Buscá el código en la lista <span class="lo">(hay un buscador arriba)</span> y tocá <span class="tap key">Editar</span> en su fila.</div></li>
+        <li><div class="step-t">En <b>Cantidad</b>, borrá <b>20</b> y poné <b>200</b>.
+          <span class="sub">En esa misma fila también podés corregir código, detalle, categoría, ubicación o unidad.</span></div></li>
+        <li><div class="step-t">Tocá <span class="tap key">✓ Guardar</span>.</div></li>
+      </ol>
+
+      <div class="note">
+        <span class="lbl">Qué pasa después</span>
+        <p>No se borra ni se pisa nada. El sistema anota la <b>diferencia</b> (en el ejemplo, <b>+180 kg</b>) como un ajuste, y queda todo en el <b>🧾 Historial</b>: quién lo cambió y cuándo.</p>
+        <p class="tip"><span class="t">Ojo:</span> los insumos en <b>0</b> no salen en la lista de la categoría (para no ensuciar). Si necesitás uno que está en 0, miralo en la tabla <b>📋 Todos los insumos</b>, abajo de todo.</p>
+      </div>
+    </section>
+
+  </div>
+
+  <p class="footline">Cambios de cantidad y de código <b>siempre quedan registrados en el Historial</b>. Ante la duda, cargalo igual: es más fácil corregir que perder algo que llegó.</p>
+</div>
+</body>
+</html>
