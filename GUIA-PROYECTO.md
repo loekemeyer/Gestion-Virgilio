@@ -4,7 +4,16 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-04 · Versión app al documentar: **v7.33**
+> Última actualización: 2026-08-04 · Versión app al documentar: **v7.36**
+>
+> Nota: **v7.36 — el monitor del supervisor ignora legajo 0/1 (pruebas) al mostrar quién empezó
+> picking/armado**. Caso real: la tanda **D06C** la pickeó el legajo 122 (EP/TP) y después un **AP
+> fantasma de legajo 0** la hacía figurar *"armado por 0 / en curso"* en el tablero. `fetchMonitorEvents`
+> (query A → `statusMap.pickLegajo`/`sepLegajo`) era el **único** loop del monitor que no filtraba
+> legajo 0/1 (el resto — fichadas, silencios, `getActivityStatus`, `prodCompute` — ya lo hacía); se le
+> agregó el mismo `if (leg === "0" || leg === "1") continue;`. Además `facFetchFcKeys` (estado **FC** de
+> Facturación) ahora trae `legajo` y descarta 0/1, para que un AP de prueba **posterior a un TAP real**
+> no des-marque una tanda ya terminada. Smoke `tests/mon-armado-legajo0.cjs`. Bump **v7.36**.
 >
 > Nota (backend, **sin bump de app**): **OCs automáticas — aviso de ERROR y "revisá las OCs de hoy"**.
 > Dos pedidos del usuario sobre `generar_ocs_automaticas()` (cron `ocs-auto-miercoles`, miércoles

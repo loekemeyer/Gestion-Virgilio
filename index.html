@@ -5922,7 +5922,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.36";
+const APP_VERSION = "v7.37";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -21964,6 +21964,11 @@ async function fetchMonitorEvents(targetTandaKeys, sheetMap) {
     if (!t) continue;
     const ts  = ev.ts_cliente;
     const leg = String(ev.legajo || "").trim();
+    // v7.36: legajo 0/1 = PRUEBAS (test/basura). NO marcan una tanda como iniciada / en
+    // curso ni terminada en el monitor. Sin esto, un AP de prueba (caso real: D06C,
+    // legajo 0) hacía figurar la tanda "armada por 0". Mismo filtro que el resto del
+    // monitor (fichadas, silencios) y que getActivityStatus.
+    if (leg === "0" || leg === "1") continue;
     if (ev.opcion === "EP" || ev.opcion === "TP") {
       const cur = lastPick.get(t);
       if (!cur || ts > cur.ts) lastPick.set(t, { opcion: ev.opcion, ts });
@@ -23869,7 +23874,7 @@ async function facFetchFcKeys(targetTandaKeys){
     + "?opcion=in.(EP,TP,AP,TAP)"
     + "&texto=in.(" + filter + ")"
     + "&order=ts_cliente.asc"
-    + "&select=opcion,texto,ts_cliente"
+    + "&select=opcion,texto,ts_cliente,legajo"
     + "&limit=2000";
   const r = await fetch(url, {
     headers: { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY }
@@ -23880,6 +23885,10 @@ async function facFetchFcKeys(targetTandaKeys){
   for (const ev of data){
     const t = (ev.texto || "").trim().toUpperCase();
     if (!t) continue;
+    // v7.36: legajo 0/1 = PRUEBAS. Un AP/TAP de prueba no debe alterar el estado FC
+    // (p.ej. un AP fantasma de legajo 0 tras un TAP real des-marcaría la tanda como FC).
+    const _fcLeg = String(ev.legajo || "").trim();
+    if (_fcLeg === "0" || _fcLeg === "1") continue;
     if (ev.opcion === "EP" || ev.opcion === "TP"){
       const cur = lastP.get(t);
       if (!cur || ev.ts_cliente > cur.ts) lastP.set(t, { op: ev.opcion, ts: ev.ts_cliente });

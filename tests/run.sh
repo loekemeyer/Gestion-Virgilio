@@ -120,4 +120,7 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== pk-conteo-ciclico (idea 3798: conteo de góndola de un art de una sola celda) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pk-conteo-ciclico.cjs
 
+echo "== mon-armado-legajo0 (v7.36: el monitor ignora AP/EP de legajo 0/1 — no 'armado por 0') =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/mon-armado-legajo0.cjs
+
 echo "== TODO OK =="
