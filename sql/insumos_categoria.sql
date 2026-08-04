@@ -252,3 +252,13 @@ update public."Insumos" set categoria = 'partes_plasticas' where categoria = 'ma
 --   Invariante final OK: todo código con saldo en plastico/fleje/cajas está en su unidad
 --   canónica (Bolsas / Kg / Uni-Paquetes).
 -- ---------------------------------------------------------------------
+
+-- 2026-08-04 (cont.) — UNIDADES PERMITIDAS por categoría + normalización final:
+--   · Insumos_Categorias.unidades: plastico=['Bolsas'], fleje=['Kg'], cajas=['Uni','Paquetes'].
+--   · Se relabeló toda pata 0 residual (Uni/Kg/(s/u)) a la unidad canónica: plastico→Bolsas,
+--     fleje→Kg. Seguro: se verificó antes que ninguna unidad no-canónica tenía saldo ≠ 0
+--     (0 violaciones), así el relabel no mueve ningún total. Cajas ya estaban todas en Uni.
+--   Estado final: cada código tiene UNA sola unidad = la de su categoría (plastico Bolsas,
+--   fleje Kg, cajas Uni/Paquetes). Los ISIS vacíos sin movimientos (1262500/1071500…) quedan
+--   sin unidad (no tienen asientos). Registrado en Insumos_Historial (cat_guardar x3).
+-- ---------------------------------------------------------------------
