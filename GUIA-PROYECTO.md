@@ -4,6 +4,36 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
+> Última actualización: 2026-08-04 · Versión app al documentar: **v7.19**
+>
+> Nota: **v7.19 — Insumos: «a depurar» se vuelca en Pendientes (+ FUSIÓN) y borrar categoría pide
+> escribir el nombre** (idea 5572, pedido del usuario).
+>
+> **(1) «A depurar» dejó de ser una categoría escondida y vive dentro de «Pendientes de
+> identificar»**: son las dos caras de lo mismo — algo que espera una decisión del admin. La sección
+> muestra los dos tipos juntos (los `TMP-*` que sugirió un operario y los **43 códigos viejos**), con
+> el origen marcado en cada fila. La caja de «A depurar» ya no aparece en Categorías.
+>
+> **(2) FUSIÓN — el camino para netear los negativos.** `insumo_identificar` ahora acepta también los
+> `depurar`, y si el código destino **ya existe** mueve los movimientos ahí y borra la fila vieja: los
+> saldos se **suman**. Eso es exactamente lo que resuelve `505C·CUCHILLA CHINA` (−16.000) contra
+> `2955`, sin SQL a mano. Pide confirmación diciendo qué se fusiona con qué. ⚠ La fusión **sólo** sale
+> desde `depurar` — desde un `TMP-` se rechaza, porque juntaría el stock de dos insumos sin que nadie
+> lo haya decidido — y un insumo **en uso** no se puede ni identificar ni borrar. Los códigos viejos
+> **sin ningún movimiento** (9 de los 43) se borran del catálogo con `insumo_borrar`; con movimientos
+> no se borran, se fusionan. La cantidad/unidad sólo se editan en los `TMP-`: en un código viejo con
+> saldo lo que corresponde es fusionarlo, no reescribirle el número.
+>
+> **(3) Borrar una categoría pide escribir su nombre exacto.** Le cambia la pantalla a todos los
+> operarios, así que un OK al voleo no alcanza: el prompt explica qué implica y compara el texto.
+> Además, si la categoría tiene insumos adentro ni siquiera llega a preguntar.
+>
+> **(4) El operario relee la meta en CADA apertura** de RI/EI (`insLoadMeta(true)`): si el admin
+> renombra una categoría o agrega una unidad, se ve en la próxima entrada sin recargar la app.
+> `tests/ins-admin.cjs` lo verifica de punta a punta — mete en «la base» una categoría que **no**
+> existe en el fallback hardcodeado y comprueba que el operario la muestra, con su insumo adentro y
+> su unidad preseleccionada. Suite completa OK. Bump **v7.19**.
+>
 > Última actualización: 2026-08-04 · Versión app al documentar: **v7.18**
 >
 > Nota: **v7.18 — OCs AUTOMÁTICAS los miércoles 7:00, con la fórmula de stock que pidió el usuario**.

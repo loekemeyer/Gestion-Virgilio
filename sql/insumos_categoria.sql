@@ -150,3 +150,11 @@ update public."Insumos" set categoria = 'partes_plasticas' where categoria = 'ma
 --   1 sola → unidad fija · varias → el operario elige · vacío → cualquiera activa.
 -- ABM por insumo_cat_guardar / insumo_cat_borrar / insumo_unidad_guardar.
 -- ---------------------------------------------------------------------
+
+-- ---------------------------------------------------------------------
+-- v7.19 (idea 5572) — ver `insumos_identificar_depurar_y_fusion`:
+-- `insumo_identificar` acepta también los 'depurar' y, si el código destino YA existe,
+-- FUSIONA (mueve los movimientos y borra la fila vieja) → así se netean los negativos.
+-- La fusión sólo sale desde 'depurar', nunca desde un TMP-. `insumo_borrar` elimina del
+-- catálogo un viejo SIN movimientos. Un insumo en uso no se toca por ninguna de las dos.
+-- ---------------------------------------------------------------------
