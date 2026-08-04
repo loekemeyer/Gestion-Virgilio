@@ -1577,6 +1577,16 @@ button {
   overflow-y: auto;
 }
 #tandaModal.show{ display: flex; }
+/* v7.13 — "Anular picking": salida clara de una sesión empezada por error. Va en un
+   pie FIJO del modal (abajo de todo), no dentro del paso, así está siempre a mano. */
+.tanda-modal-foot:empty{ display:none; }
+.tanda-modal-foot{ padding: 0 14px 14px; }
+button.pk-anular{
+  width:100%; margin:0; padding:16px 14px; font-size:19px; font-weight:900;
+  background:#dc2626; color:#fff; border:none; border-radius:12px; cursor:pointer;
+}
+button.pk-anular:hover{ background:#b91c1c; }
+button.pk-anular small{ display:block; font-size:12px; font-weight:700; opacity:.9; margin-top:2px; }
 .tanda-modal-card{
   background: #fff;
   border-radius: 12px;
@@ -3010,6 +3020,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       <button class="hist-modal-close" onclick="closeTandaModal()">Cerrar</button>
     </div>
     <div class="tanda-modal-body"></div>
+    <div class="tanda-modal-foot"></div>
   </div>
 </div>
 
@@ -5823,7 +5834,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.12";
+const APP_VERSION = "v7.13";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -7280,6 +7291,7 @@ function pkRender() {
   const m = document.getElementById("tandaModal");
   if (!m || !_pk) return;
   pkSave();   // persistir el estado en CADA cambio (anti pérdida por bloqueo de pantalla)
+  pkFootRender(m);   // v7.13: pie con "Anular picking" (siempre visible en la sesión)
   const body = m.querySelector(".tanda-modal-body");
   const N = _pk.items.length;
   const pickTotal = _pk.items.filter(function (x) { return !x.skip; }).length || N;   // pasos reales (sin los "Salteá")
@@ -7736,6 +7748,73 @@ function pkConfirmF() {
   pkAdvance();
 }
 function pkClose() { _pk = null; closeTandaModal(); }
+
+/* ===== v7.13 — ANULAR PICKING =====
+   "Cerrar" sólo sale del modal: el picking sigue abierto (EP sin TP), la tanda queda
+   reservada y el operario no puede arrancar otra. Este botón lo ANULA de verdad:
+   borra el EP y sus detalles PKC en Supabase (RPC `anular_picking_virgilio`, que
+   además suelta el lock), saca lo que quedó en la cola local, limpia el avance
+   guardado y el estado del legajo. Después de esto puede volver a marcar EP. */
+function pkFootRender(m) {
+  const foot = m ? m.querySelector(".tanda-modal-foot") : null;
+  if (!foot) return;
+  foot.innerHTML = _pk
+    ? '<button class="pk-anular" onclick="pkAnular()">✕ Anular picking<small>borra lo cargado y libera la tanda</small></button>'
+    : "";
+}
+async function pkAnular() {
+  if (!_pk) return;
+  const tanda = String(_pk.tanda || ""), legajo = String(_pk.legajo || "");
+  const T = tanda.toUpperCase();
+  const hechos = Object.keys(_pk.results || {}).length;
+  const msg = "¿ANULAR el picking de la tanda " + tanda + "?\n\n" +
+    "Se borra el EP" + (hechos ? " y los " + hechos + " artículo(s) que marcaste" : "") +
+    ", la tanda queda libre y vas a poder empezarla de nuevo.\n\nNo se puede deshacer.";
+  if (!confirm(msg)) return;
+
+  // 1) sacar de la cola local lo de esta tanda (si no, se re-manda lo que borramos)
+  try {
+    readQueue().filter(function (it) {
+      return String(it.legajo || "") === legajo &&
+        ((it.opcion === "EP" && String(it.texto || "").toUpperCase() === T) ||
+         (it.opcion === "PKC" && String(it.texto || "").toUpperCase().indexOf(T + "|") === 0));
+    }).forEach(function (it) { removeFromQueue(it.id); });
+  } catch (_e) { /* no-op */ }
+
+  // 2) borrar en el server (EP + PKC) y soltar la reserva de la tanda
+  let r = null;
+  try {
+    const res = await fetch(SUPABASE_URL + "/rest/v1/rpc/anular_picking_virgilio", {
+      method: "POST",
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ p_legajo: legajo, p_tanda: tanda })
+    });
+    if (res.ok) r = await res.json();
+  } catch (_e) { /* sin red: igual se limpia local y el EP queda para cerrar a mano */ }
+  try { tandaLiberar(tanda, "picking", legajo); } catch (_e) {}
+
+  // 3) estado local + avance guardado + historial del día
+  try { const st = getLegajoState(legajo); st.picking = { active: false, value: "", ts_inicio: null }; setLegajoState(legajo, st); } catch (_e) {}
+  pkClearSaved(legajo);
+  try {
+    const f = getTodayKey();
+    writeDayHist(f, legajo, readDayHist(f, legajo).filter(function (h) {
+      return !((h.opcion === "EP" && String(h.texto || "").toUpperCase() === T) ||
+               (h.opcion === "PKC" && String(h.texto || "").toUpperCase().indexOf(T + "|") === 0));
+    }));
+  } catch (_e) { /* no-op */ }
+
+  _pk = null;
+  closeTandaModal();
+  try {
+    renderLegajoHistory(legajo);
+    updateCoreButtonsState();
+    renderPendingSuggestion();
+    updatePendingIndicator();
+  } catch (_e) { /* no-op */ }
+  if (r === "ya_cerrado") alert("Ese picking ya estaba cerrado con TP: no hay nada que anular.\nLo saqué de la pantalla igual.");
+  else alert("✕ Picking de la tanda " + tanda + " anulado. Ya podés arrancar otra.");
+}
 
 /* Pantalla final → sugerir "TP" (Fin Picking). Reusa el flujo de envío normal
    (toma ts_inicio del EP → duración, historial, etc.) seteando la acción y el
@@ -12458,7 +12537,7 @@ async function insFetchCatalogo() {
 async function showInsumoModal(mode, legajo, _resume) {
   if (!document.getElementById("insCss")) {
     const s = document.createElement("style"); s.id = "insCss";
-    s.textContent = "#insModal{display:none;position:fixed;inset:0;z-index:1296;background:rgba(2,6,23,.74);overflow:auto;padding:12px;}#insModal.show{display:block;}.ins-card{background:#f8fafc;max-width:480px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.ins-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;color:#fff;}.ins-head.in{background:linear-gradient(90deg,#4f46e5,#4338ca);}.ins-head.out{background:linear-gradient(90deg,#0d9488,#0f766e);}.ins-title{font-size:18px;font-weight:800;}.ins-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}.ins-body{padding:13px 14px;}.ins-loading,.ins-empty{padding:24px;text-align:center;color:#64748b;font-size:15px;}.ins-hint{font-size:12.5px;color:#64748b;margin-bottom:9px;}.ins-search{width:100%;box-sizing:border-box;height:42px;border:2px solid #cbd5e1;border-radius:10px;padding:0 12px;font-size:15px;margin-bottom:9px;}.ins-crear{background:#eef2ff;border:1px dashed #a5b4fc;border-radius:11px;padding:10px;margin-bottom:10px;font-size:12.5px;color:#3730a3;display:flex;flex-direction:column;gap:7px;}.ins-crear-r{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}.ins-nn{flex:1;min-width:130px;}.ins-nid{flex:1;min-width:150px;}.ins-crear input{height:34px;border:1px solid #c7d2fe;border-radius:8px;padding:0 9px;font-size:13px;}.ins-cbtn{background:#4f46e5;color:#fff;border:none;border-radius:8px;padding:7px 12px;font-weight:800;cursor:pointer;width:auto;}.ins-row{border:1px solid #e2e8f0;border-radius:12px;padding:9px 11px;margin-bottom:8px;background:#fff;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}.ins-info{flex:1;min-width:0;}.ins-cod{font-size:16px;font-weight:800;font-family:Consolas,Menlo,monospace;}.ins-cod-sec{font-family:inherit;color:#4338ca;}.ins-nom{font-size:12.5px;color:#475569;}.ins-stk{font-size:11.5px;color:#64748b;font-weight:700;margin-top:2px;}.ins-stp{display:flex;align-items:center;gap:5px;}.ins-sb{display:flex;align-items:center;justify-content:center;line-height:1;padding:0;margin:0;width:38px;height:40px;border:none;border-radius:9px;font-size:22px;font-weight:800;cursor:pointer;background:#e2e8f0;color:#475569;}.ins-inp{width:58px;height:40px;box-sizing:border-box;margin:0;padding:0;text-align:center;font-size:18px;font-weight:800;border:2px solid #cbd5e1;border-radius:9px;}.ins-warn{width:100%;font-size:11.5px;color:#b45309;font-weight:700;}.ins-fin{width:100%;margin-top:10px;padding:14px;border:none;border-radius:12px;color:#fff;font-size:17px;font-weight:800;cursor:pointer;}.ins-fin.in{background:#4f46e5;}.ins-fin.out{background:#0d9488;}.ins-fin:disabled{background:#cbd5e1;color:#64748b;cursor:not-allowed;}.ins-uni{flex-basis:100%;display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px dashed #e2e8f0;}.ins-uni-l{font-size:11.5px;color:#64748b;font-weight:700;}.ins-uchip{width:auto;margin:0;border:1px solid #cbd5e1;background:#fff;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:800;cursor:pointer;color:#475569;}.ins-uchip.on{background:#4f46e5;color:#fff;border-color:#4f46e5;}.ins-uadd{color:#4f46e5;font-size:15px;}.ins-cats{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;}.ins-cchip{width:auto;margin:0;border:1px solid #cbd5e1;background:#fff;border-radius:999px;padding:8px 13px;font-size:12.5px;font-weight:800;cursor:pointer;color:#475569;}.ins-cchip.on{background:#4f46e5;color:#fff;border-color:#4f46e5;}.ins-body.out .ins-cchip.on{background:#0d9488;border-color:#0d9488;}.ins-cchip.dep{border-style:dashed;color:#b45309;border-color:#fcd34d;}.ins-cchip.dep.on,.ins-body.out .ins-cchip.dep.on{background:#b45309;color:#fff;border-color:#b45309;}.ins-cn{opacity:.72;font-weight:700;}.ins-ubi{font-size:11.5px;color:#0f766e;font-weight:800;}.ins-cbadge{font-size:11px;font-weight:800;color:#64748b;}.ins-depw{background:#fffbeb;border:1px dashed #fcd34d;color:#92400e;border-radius:10px;padding:9px 11px;font-size:12px;margin-bottom:9px;}.ins-bar{display:flex;align-items:center;gap:9px;margin-bottom:11px;}.ins-bar-t{flex:1;text-align:center;font-size:16px;font-weight:900;color:#0f172a;}.ins-back{width:auto;margin:0;background:#fff;border:2px solid #cbd5e1;border-radius:11px;padding:10px 15px;font-size:14px;font-weight:800;color:#334155;cursor:pointer;white-space:nowrap;}.ins-grid{display:grid;gap:9px;grid-template-columns:repeat(auto-fill,minmax(102px,1fr));}.ins-catbtn,.ins-itbtn{aspect-ratio:1/1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;width:auto;margin:0;padding:7px;text-align:center;background:#fff;border:2px solid #cbd5e1;border-radius:14px;cursor:pointer;min-width:0;overflow-wrap:anywhere;}.ins-catem{font-size:29px;line-height:1;}.ins-catnm{font-size:12.5px;font-weight:900;color:#0f172a;line-height:1.15;}.ins-catn{font-size:11px;font-weight:800;color:#64748b;}.ins-catbtn.dep,.ins-itbtn.add{border-style:dashed;border-color:#fcd34d;background:#fffbeb;}.ins-itbtn.add{border-color:#a5b4fc;background:#eef2ff;color:#3730a3;}.ins-itadd{font-size:32px;line-height:1;font-weight:900;}.ins-catbtn.hasq,.ins-itbtn.on{border-color:#4f46e5;background:#eef2ff;}.ins-body.out .ins-catbtn.hasq,.ins-body.out .ins-itbtn.on{border-color:#0d9488;background:#f0fdfa;}.ins-itcod{font-size:16px;font-weight:900;font-family:Consolas,Menlo,monospace;color:#0f172a;}.ins-itnom{font-size:10.5px;font-weight:700;color:#64748b;line-height:1.15;}.ins-itubi{font-size:10px;font-weight:800;color:#0f766e;}.ins-itq{font-size:12px;font-weight:900;color:#4f46e5;}.ins-body.out .ins-itq{color:#0d9488;}.ins-itq.falta,.ins-body.out .ins-itq.falta{color:#b45309;}.ins-itbtn.on:has(.ins-itq.falta){border-color:#f59e0b;background:#fffbeb;}.ins-uni-l.falta{color:#b45309;}.ins-qov{position:fixed;inset:0;background:rgba(2,6,23,.62);z-index:1299;display:flex;align-items:flex-start;justify-content:center;padding:22px 13px;overflow:auto;}.ins-qc{background:#fff;border-radius:16px;padding:15px;width:100%;max-width:340px;box-shadow:0 24px 70px rgba(0,0,0,.5);}.ins-qh{display:flex;align-items:flex-start;justify-content:space-between;gap:9px;}.ins-qcod{font-size:21px;font-weight:900;font-family:Consolas,Menlo,monospace;color:#0f172a;}.ins-qnom{font-size:12.5px;color:#475569;font-weight:700;}.ins-qrow{display:flex;align-items:center;justify-content:center;gap:9px;margin:13px 0 4px;}.ins-qb{display:flex;align-items:center;justify-content:center;width:56px;height:64px;padding:0;margin:0;border:none;border-radius:12px;background:#e2e8f0;color:#475569;font-size:29px;font-weight:900;line-height:1;cursor:pointer;}.ins-qi{box-sizing:border-box;width:104px;height:64px;padding:0;margin:0;text-align:center;font-size:32px;font-weight:900;border:2px solid #cbd5e1;border-radius:12px;}.ins-qok{width:100%;margin-top:11px;padding:14px;border:none;border-radius:12px;color:#fff;font-size:17px;font-weight:900;cursor:pointer;}.ins-qok.in{background:#4f46e5;}.ins-qok.out{background:#0d9488;}.ins-nvl{font-size:13px;font-weight:900;color:#0f172a;margin:14px 0 7px;}.ins-nvq{display:block;width:130px;}.ins-nvt{box-sizing:border-box;width:100%;border:2px solid #cbd5e1;border-radius:11px;padding:10px 12px;font-size:15px;font-family:inherit;resize:vertical;}.ins-catbtn.add{border-style:dashed;border-color:#a5b4fc;background:#eef2ff;color:#3730a3;}.ins-catbtn.add .ins-catem{font-size:34px;font-weight:900;}.ins-catbtn.add .ins-catnm{color:#3730a3;}.ins-body.out .ins-catbtn.add,.ins-body.out .ins-itbtn.add{border-color:#5eead4;background:#f0fdfa;color:#115e59;}.ins-body.out .ins-catbtn.add .ins-catnm{color:#115e59;}";
+    s.textContent = "#insModal{display:none;position:fixed;inset:0;z-index:1296;background:rgba(2,6,23,.74);overflow:auto;padding:12px;}#insModal.show{display:block;}.ins-card{background:#f8fafc;max-width:480px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.ins-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;color:#fff;}.ins-head.in{background:linear-gradient(90deg,#4f46e5,#4338ca);}.ins-head.out{background:linear-gradient(90deg,#0d9488,#0f766e);}.ins-title{font-size:18px;font-weight:800;}.ins-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}.ins-body{padding:13px 14px;}.ins-loading,.ins-empty{padding:24px;text-align:center;color:#64748b;font-size:15px;}.ins-hint{font-size:12.5px;color:#64748b;margin-bottom:9px;}.ins-search{width:100%;box-sizing:border-box;height:42px;border:2px solid #cbd5e1;border-radius:10px;padding:0 12px;font-size:15px;margin-bottom:9px;}.ins-crear{background:#eef2ff;border:1px dashed #a5b4fc;border-radius:11px;padding:10px;margin-bottom:10px;font-size:12.5px;color:#3730a3;display:flex;flex-direction:column;gap:7px;}.ins-crear-r{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}.ins-nn{flex:1;min-width:130px;}.ins-nid{flex:1;min-width:150px;}.ins-crear input{height:34px;border:1px solid #c7d2fe;border-radius:8px;padding:0 9px;font-size:13px;}.ins-cbtn{background:#4f46e5;color:#fff;border:none;border-radius:8px;padding:7px 12px;font-weight:800;cursor:pointer;width:auto;}.ins-row{border:1px solid #e2e8f0;border-radius:12px;padding:9px 11px;margin-bottom:8px;background:#fff;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}.ins-info{flex:1;min-width:0;}.ins-cod{font-size:16px;font-weight:800;font-family:Consolas,Menlo,monospace;}.ins-cod-sec{font-family:inherit;color:#4338ca;}.ins-nom{font-size:12.5px;color:#475569;}.ins-stk{font-size:11.5px;color:#64748b;font-weight:700;margin-top:2px;}.ins-stp{display:flex;align-items:center;gap:5px;}.ins-sb{display:flex;align-items:center;justify-content:center;line-height:1;padding:0;margin:0;width:38px;height:40px;border:none;border-radius:9px;font-size:22px;font-weight:800;cursor:pointer;background:#e2e8f0;color:#475569;}.ins-inp{width:58px;height:40px;box-sizing:border-box;margin:0;padding:0;text-align:center;font-size:18px;font-weight:800;border:2px solid #cbd5e1;border-radius:9px;}.ins-warn{width:100%;font-size:11.5px;color:#b45309;font-weight:700;}.ins-fin{width:100%;margin-top:10px;padding:14px;border:none;border-radius:12px;color:#fff;font-size:17px;font-weight:800;cursor:pointer;}.ins-fin.in{background:#4f46e5;}.ins-fin.out{background:#0d9488;}.ins-fin:disabled{background:#cbd5e1;color:#64748b;cursor:not-allowed;}.ins-uni{flex-basis:100%;display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px dashed #e2e8f0;}.ins-uni-l{font-size:11.5px;color:#64748b;font-weight:700;}.ins-uchip{width:auto;margin:0;border:1px solid #cbd5e1;background:#fff;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:800;cursor:pointer;color:#475569;}.ins-uchip.on{background:#4f46e5;color:#fff;border-color:#4f46e5;}.ins-uadd{color:#4f46e5;font-size:15px;}.ins-cats{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;}.ins-cchip{width:auto;margin:0;border:1px solid #cbd5e1;background:#fff;border-radius:999px;padding:8px 13px;font-size:12.5px;font-weight:800;cursor:pointer;color:#475569;}.ins-cchip.on{background:#4f46e5;color:#fff;border-color:#4f46e5;}.ins-body.out .ins-cchip.on{background:#0d9488;border-color:#0d9488;}.ins-cchip.dep{border-style:dashed;color:#b45309;border-color:#fcd34d;}.ins-cchip.dep.on,.ins-body.out .ins-cchip.dep.on{background:#b45309;color:#fff;border-color:#b45309;}.ins-cn{opacity:.72;font-weight:700;}.ins-ubi{font-size:11.5px;color:#0f766e;font-weight:800;}.ins-cbadge{font-size:11px;font-weight:800;color:#64748b;}.ins-depw{background:#fffbeb;border:1px dashed #fcd34d;color:#92400e;border-radius:10px;padding:9px 11px;font-size:12px;margin-bottom:9px;}.ins-bar{display:flex;align-items:center;gap:9px;margin-bottom:11px;}.ins-bar-t{flex:1;text-align:center;font-size:16px;font-weight:900;color:#0f172a;}.ins-back{width:auto;margin:0;background:#fff;border:2px solid #cbd5e1;border-radius:11px;padding:10px 15px;font-size:14px;font-weight:800;color:#334155;cursor:pointer;white-space:nowrap;}.ins-grid{display:grid;gap:9px;grid-template-columns:repeat(auto-fill,minmax(102px,1fr));}.ins-catbtn,.ins-itbtn{aspect-ratio:1/1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;width:auto;margin:0;padding:7px;text-align:center;background:#fff;border:2px solid #cbd5e1;border-radius:14px;cursor:pointer;min-width:0;overflow-wrap:anywhere;}.ins-catem{font-size:29px;line-height:1;}.ins-catnm{font-size:12.5px;font-weight:900;color:#0f172a;line-height:1.15;}.ins-catn{font-size:11px;font-weight:800;color:#64748b;}.ins-catbtn.dep,.ins-itbtn.add{border-style:dashed;border-color:#fcd34d;background:#fffbeb;}.ins-itbtn.add{border-color:#a5b4fc;background:#eef2ff;color:#3730a3;}.ins-itadd{font-size:32px;line-height:1;font-weight:900;}.ins-catbtn.hasq,.ins-itbtn.on{border-color:#4f46e5;background:#eef2ff;}.ins-body.out .ins-catbtn.hasq,.ins-body.out .ins-itbtn.on{border-color:#0d9488;background:#f0fdfa;}.ins-itcod{font-size:16px;font-weight:900;font-family:Consolas,Menlo,monospace;color:#0f172a;}.ins-itnom{font-size:10.5px;font-weight:700;color:#64748b;line-height:1.15;}.ins-itubi{font-size:10px;font-weight:800;color:#0f766e;}.ins-itq{font-size:12px;font-weight:900;color:#4f46e5;}.ins-body.out .ins-itq{color:#0d9488;}.ins-itq.falta,.ins-body.out .ins-itq.falta{color:#b45309;}.ins-itbtn.on:has(.ins-itq.falta){border-color:#f59e0b;background:#fffbeb;}.ins-uni-l.falta{color:#b45309;}.ins-qov{position:fixed;inset:0;background:rgba(2,6,23,.62);z-index:1299;display:flex;align-items:flex-start;justify-content:center;padding:22px 13px;overflow:auto;}.ins-qc{background:#fff;border-radius:16px;padding:15px;width:100%;max-width:340px;box-shadow:0 24px 70px rgba(0,0,0,.5);}.ins-qh{display:flex;align-items:flex-start;justify-content:space-between;gap:9px;}.ins-qcod{font-size:21px;font-weight:900;font-family:Consolas,Menlo,monospace;color:#0f172a;}.ins-qnom{font-size:12.5px;color:#475569;font-weight:700;}.ins-qrow{display:flex;align-items:center;justify-content:center;gap:9px;margin:13px 0 4px;}.ins-qb{display:flex;align-items:center;justify-content:center;width:56px;height:64px;padding:0;margin:0;border:none;border-radius:12px;background:#e2e8f0;color:#475569;font-size:29px;font-weight:900;line-height:1;cursor:pointer;}.ins-qi{box-sizing:border-box;width:104px;height:64px;padding:0;margin:0;text-align:center;font-size:32px;font-weight:900;border:2px solid #cbd5e1;border-radius:12px;}.ins-qok{width:100%;margin-top:11px;padding:14px;border:none;border-radius:12px;color:#fff;font-size:17px;font-weight:900;cursor:pointer;}.ins-qok.in{background:#4f46e5;}.ins-qok.out{background:#0d9488;}.ins-nvl{font-size:13px;font-weight:900;color:#0f172a;margin:14px 0 7px;}.ins-nvq{display:block;width:130px;}.ins-nvt{box-sizing:border-box;width:100%;border:2px solid #cbd5e1;border-radius:11px;padding:10px 12px;font-size:15px;font-family:inherit;resize:vertical;}.ins-catbtn.add{border-style:dashed;border-color:#a5b4fc;background:#eef2ff;color:#3730a3;}.ins-catbtn.add .ins-catem{font-size:34px;font-weight:900;}.ins-catbtn.add .ins-catnm{color:#3730a3;}.ins-body.out .ins-catbtn.add,.ins-body.out .ins-itbtn.add{border-color:#5eead4;background:#f0fdfa;color:#115e59;}.ins-body.out .ins-catbtn.add .ins-catnm{color:#115e59;}.ins-anular{width:100%;margin-top:9px;padding:15px;border:none;border-radius:12px;background:#dc2626;color:#fff;font-size:17px;font-weight:900;cursor:pointer;}.ins-anular:hover{background:#b91c1c;}.ins-anular small{display:block;font-size:11.5px;font-weight:700;opacity:.9;margin-top:2px;}";
     document.head.appendChild(s);
   }
   let ov = document.getElementById("insModal");
@@ -12657,6 +12736,8 @@ function insRender() {
   // varias categorías y mandar todo junto).
   const nSel = _ins.items.filter(function (it) { return it.qty > 0; }).length;
   h += '<button class="ins-fin ' + (isIn ? "in" : "out") + '"' + (nSel <= 0 ? " disabled" : "") + ' onclick="insConfirmar()">' + (isIn ? "✓ Registrar entrada" : "✓ Registrar salida") + (nSel ? " (" + nSel + ")" : "") + "</button>";
+  // v7.13: salida clara de una sesión abierta por error (mismo criterio que el picking).
+  h += '<button class="ins-anular" onclick="insAnular()">✕ Anular ' + (isIn ? "recepción" : "entrega") + ' de insumos<small>descarta lo cargado y cierra la sesión</small></button>';
   if (_ins.qty !== null && _ins.qty !== undefined) h += _insQtyHtml(_ins.items[_ins.qty], _ins.qty, isIn);
   _renderKeepFocus(body, h);
 }
@@ -12815,6 +12896,56 @@ function insConfirmar() {
   try { alert("✓ " + (isIn ? "Entrada" : "Salida") + " registrada: " + sel.length + " insumo(s)."); } catch (_e) {}
 }
 function insHasProgress() { return !!(_ins && _ins.items && _ins.items.some(function (it) { return (it.qty > 0); })); }
+/* ===== v7.13 — ANULAR la sesión de insumos =====
+   "Cerrar" sale del modal (y ofrece guardar el borrador), pero el evento RI/EI de
+   apertura queda registrado en Supabase. Esto la anula de verdad: borra ese evento
+   (RPC `anular_toggle_virgilio`), tira el borrador y cierra el toggle. */
+async function insAnular() {
+  if (!_ins) return;
+  const legajo = String(_ins.legajo || ""), mode = _ins.mode === "EI" ? "EI" : "RI";
+  const qué = mode === "EI" ? "entrega" : "recepción";
+  const nSel = (_ins.items || []).filter(function (it) { return it.qty > 0; }).length;
+  if (!confirm("¿ANULAR esta " + qué + " de insumos?\n\n" +
+      (nSel ? "Se descartan los " + nSel + " insumo(s) que cargaste y se " : "Se ") +
+      "borra el " + mode + ".\n\nNo se puede deshacer.")) return;
+
+  // sacar de la cola local el RI/EI de apertura (si todavía no se sincronizó)
+  try {
+    readQueue().filter(function (it) {
+      return String(it.legajo || "") === legajo && it.opcion === mode && !it.ts_inicio_iso;
+    }).forEach(function (it) { removeFromQueue(it.id); });
+  } catch (_e) { /* no-op */ }
+
+  let r = null;
+  try {
+    const res = await fetch(SUPABASE_URL + "/rest/v1/rpc/anular_toggle_virgilio", {
+      method: "POST",
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ p_legajo: legajo, p_opcion: mode })
+    });
+    if (res.ok) r = await res.json();
+  } catch (_e) { /* sin red: se limpia local igual */ }
+
+  // historial del día: sacar la apertura anulada
+  try {
+    const f = getTodayKey();
+    writeDayHist(f, legajo, readDayHist(f, legajo).filter(function (h) {
+      return !(h.opcion === mode && !h.texto);
+    }));
+  } catch (_e) { /* no-op */ }
+
+  try { opDraftClear(legajo); } catch (_e) {}   // el borrador ya no vale
+  closeIns();                                    // cierra el modal y el toggle RI/EI
+  try {
+    renderLegajoHistory(legajo);
+    updateCoreButtonsState();
+    renderPendingSuggestion();
+    updatePendingIndicator();
+  } catch (_e) { /* no-op */ }
+  alert(r === "ya_cerrado"
+    ? "Esa sesión ya estaba cerrada: no había nada que anular.\nLa saqué de la pantalla igual."
+    : "✕ " + qué.charAt(0).toUpperCase() + qué.slice(1) + " de insumos anulada.");
+}
 function insAskClose() { opAskClose(insHasProgress(), "INS", _ins && _ins.legajo, (_ins && _ins.mode === "EI" ? "Entrega de insumos" : "Recepción de insumos"), _ins, closeIns); }
 function closeIns() {
   const ov = document.getElementById("insModal"); if (ov) ov.classList.remove("show");
@@ -15700,6 +15831,7 @@ function showTandaDetail(tandaCode) {
 }
 
 function closeTandaModal() {
+  try { const _f = document.querySelector("#tandaModal .tanda-modal-foot"); if (_f) _f.innerHTML = ""; } catch (_e) {}
   // Líos obligatorios: el modal de líos NO se cierra (ni por Cerrar ni tocando afuera)
   // hasta completar todos los pedidos. Sale solo con "Guardar líos".
   if (_lios) { try { alert("Antes de salir, completá los líos de todos los pedidos (si alguno no lleva, poné 0)."); } catch (_e) {} return; }

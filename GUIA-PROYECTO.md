@@ -4,7 +4,40 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-04 · Versión app al documentar: **v7.11**
+> Última actualización: 2026-08-04 · Versión app al documentar: **v7.13**
+>
+> Nota: **v7.13 — "Anular picking" / "Anular insumos": salida clara de una sesión empezada por
+> error**. Pedido del usuario: al empezar el picking de una tanda no había forma de darla de baja —
+> "Cerrar" sólo sale del modal y el picking queda **abierto** (EP sin TP = inconsistencia tipo A), con
+> la **tanda reservada** en `Tandas_Lock` y el operario sin poder arrancar otra. Ahora, **abajo de
+> todo** de la sesión, hay un botón grande rojo. **(1) PICKING**: pie FIJO del modal
+> (`.tanda-modal-foot`, lo pinta `pkFootRender` desde `pkRender`, así aparece en todos los pasos y en
+> el resumen; `closeTandaModal` lo limpia porque el modal lo reusan otros flujos) con **"✕ Anular
+> picking"**. `pkAnular()` pide confirmación y: saca de la **cola local** el EP y los PKC de esa tanda
+> (si no, se re-mandaban los que borramos), llama a la RPC **`anular_picking_virgilio(legajo, tanda)`**
+> — borra el EP abierto + sus PKC y hace `tanda_liberar` —, suelta la reserva también desde el cliente,
+> deja `picking = {active:false}`, borra el avance guardado (`vir_pk_<legajo>`) y saca EP/PKC del
+> historial del día. Después puede marcar EP de nuevo. **(2) INSUMOS (RI/EI)**: mismo criterio, botón
+> **"✕ Anular recepción/entrega de insumos"** debajo de "Registrar entrada/salida" (`insAnular()` →
+> RPC **`anular_toggle_virgilio(legajo,'RI'|'EI')`**, descarta el borrador `opDraft` y cierra el toggle
+> con `closeIns`). **Por qué RPC y no DELETE directo**: la policy de delete con la anon key sólo
+> alcanza lo creado hace **<15 min** (`delete_recientes_undo`, la del "Deshacer"), y un picking se
+> anula bastante después. Las dos funciones son `SECURITY DEFINER` con guardas: sólo el evento de
+> **apertura que sigue abierto**, del propio legajo, de las últimas **24 h**; devuelven `ok` /
+> `sin_ep` / `sin_apertura` / `ya_cerrado` / `faltan_datos` (mismo patrón que `anular_modo_op` de
+> recepción). Si dice `ya_cerrado` la app limpia igual la pantalla para no dejar trabado al operario.
+> SQL en **`sql/anular_sesion_virgilio.sql`**; probadas en Supabase (EP+PKC de prueba → `ok` → 0
+> filas). Test nuevo **`tests/anular-sesion.cjs`** en `tests/run.sh`; suite completa OK. Bump **v7.13**.
+>
+> Nota: **v7.12 — El "Reanudar recepción" se movió de la pantalla inicial a la botonera**. Pedido del
+> usuario: sacarlo de "Resumen de hoy" y darle **el mismo formato que el "▶ Seguir picking"** de una
+> sesión interrumpida. Ahora lo dibuja **`renderPendingSuggestion`** (dentro de `#pendingSuggestion`,
+> junto a "▶ Seguir picking" / "▶ Seguir armado" / "▶ Seguir …"), con la misma clase `primary-btn`:
+> **"▶ Seguir recepción Lucho (2 cód · 19 cajas)"** → `reanudarRecepcion(legajo)`. Se revirtió todo lo
+> que v7.09 había agregado a `renderLegajoHistory` y su CSS; el borrador de `recepcion.js` no cambió,
+> sólo **dónde** se ofrece retomarlo (`window.onRecepcionDraftChange` repinta la sugerencia en vez del
+> resumen). `tests/rcp-reanudar.cjs` actualizado (el botón va en la botonera y **no** en "Resumen de
+> hoy"). Bump **v7.12**.
 >
 > Nota: **v7.11 — Insumos: taxonomía definitiva (5 categorías) + el alta arranca por el Detalle**
 > (lo fijó el usuario). **(1) Las categorías quedaron así**: 🧪 **Plásticos** (9, todos en **Bolsas**) ·
@@ -4015,7 +4048,7 @@ Definidos en `index.html` (objeto `desc`, ~línea 1531). Los botones se arman en
 | `CR` | Control Remitos | TOGGLE | Sí — abre **popup de control de facturados** (`showControlRemitosCR`, v3.69): lista de facturados del reparto + Líos + tic **Controlado** → `CCR` por NP + cierra el toggle. (Fue toggle plano sin popup en v3.43–v3.68.) |
 | `RR` | Recepción Remitos | TOGGLE | Abre el popup de descarga (tabla NP cargados → tildar Controlado → «Terminé» = `CRN` por NP); desde v3.43 lleva la lógica que antes tenía `CR`. **v3.75+**: además hay un botón **"Recepción Remitos (RR)"** en Administración (`openRemitosAdmin` → `showControlRemitos("0", true)`) que abre la **MISMA lista** en modo admin (legajo `0`, sin cerrar toggle). Lo controlan operarios **y** admin. (v3.76 lo había sacado de los operarios; revertido en v3.77.) |
 | `CC` | Inicio/Fin Carga Camión | TOGGLE | Sí, al cerrar (Nro) |
-| `RT` | Recepción Mercadería | TOGGLE | Sí, al cerrar: `texto` = cantidad de cajas, **calculada sola** del Modo OP de Recepción (suma del día en `localStorage`, ver v2.61). Al abrir RT se lanza el Modo OP (`recepcion.js`); si el operario lo deja por la mitad, la recepción queda como **borrador** y se retoma con **"▶ Reanudar"** desde "Resumen de hoy" (v7.09). Desde **v7.07** la grilla de códigos muestra la **OC vigente** del proveedor y avisa por Telegram si lo recibido la excede (+20%, evento `ROC`). |
+| `RT` | Recepción Mercadería | TOGGLE | Sí, al cerrar: `texto` = cantidad de cajas, **calculada sola** del Modo OP de Recepción (suma del día en `localStorage`, ver v2.61). Al abrir RT se lanza el Modo OP (`recepcion.js`); si el operario lo deja por la mitad, la recepción queda como **borrador** y se retoma con **"▶ Seguir recepción …"** desde la botonera (v7.09, movido a la botonera en v7.12). Desde **v7.07** la grilla de códigos muestra la **OC vigente** del proveedor y avisa por Telegram si lo recibido la excede (+20%, evento `ROC`). |
 | `MG` | Guardado a Góndola | TOGGLE | No |
 | `RI` | Recepción Insumos | TOGGLE | Sí, al cerrar (cantidad) |
 | `EI` | Entrega Insumos | TOGGLE | Sí, al cerrar (cantidad) |
