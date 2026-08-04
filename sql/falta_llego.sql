@@ -32,6 +32,15 @@
 --  un date directo, el error lo tapa el `exception when others` y la función nunca
 --  alerta (pasó en la 1ª versión).
 --
+--  ⚠ v7.02 — SALDO SIN FILTRAR LEGAJO. El "hay N en 'a guardar'" del mensaje se calculaba
+--  con `coalesce(m.legajo,'') not in ('0','1')` y daba MENOS que la app. Hay movimientos
+--  REALES con legajo 0 (recepciones / `cp` / inicial cargados por sistema). Caso cod 234:
+--  la recepción +13 del 26-06 (legajo '0') quedaba afuera pero su `guardado` −13 (legajo
+--  104) sí contaba → el saldo quedaba 13 cajas abajo para siempre (app 42 / Telegram 29).
+--  Ahora el saldo es event-sourced sobre TODOS los movimientos, igual que
+--  `stockComputeSaldos` en el front y que `reporte_agentes_stock_estancado` (idea 1636).
+--  Mismo fix aplicado a `generar_reporte_agentes()` (bloques mg_pendiente y pipeline_atascado).
+--
 --  ⚠ SEGURIDAD: SECURITY DEFINER + manda Telegram → NO ejecutable por la anon key.
 --    revoke execute on function public.reporte_agentes_falta_llego() from public, anon, authenticated;
 --    grant  execute on function public.reporte_agentes_falta_llego() to service_role;

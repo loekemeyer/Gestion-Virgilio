@@ -4,7 +4,35 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-04 · Versión app al documentar: **v7.05**
+> Última actualización: 2026-08-04 · Versión app al documentar: **v7.06**
+>
+> Nota: **v7.06 — Cuatro cosas que reportó el usuario en el chat (todas con test + suite verde)**:
+> **(A) SSG "picking sin stock" — falso positivo por carrera con el cron.** Tanda `D16A` avisó
+> "764 pidió 20 / había 9" y "729E 5 / 0" con stock que **alcanzaba justo**. Desde v5.76 la baja del
+> picking la escribe **sólo el cron** (`reconciliar_pipeline_stock`, jobid 22); en D16A corrió
+> **antes** del chequeo del cliente → `stockBajaPicking` leía el saldo **ya descontado** y avisaba si
+> había menos del **doble** de lo pickeado. Fix: excluye del saldo los `tipo='picking'` de ESA tanda.
+> Texto reescrito ("se pickearon N cj · el sistema tenía M", aclara que el operario no agarró de más).
+> `tests/ssg-carrera-cron.cjs`.
+> **(B) SSG falso en códigos PARTIDOS POR EMPRESA** (`437E`/`438E`…). Tanda `D05D` avisó "437E: 1 / 0"
+> con **61 cajas en `437E LK`**. El stock vive con sufijo (`437E LK`/`437E CH`, idea 9020) pero el PKC
+> guarda el **pelado**; `stockBajaPicking` miraba `sal["437E"]` = 0. El descuento por NP lo hace bien el
+> cron; el bug era la alerta. Fix: suma **toda la familia** del código (pelado + `LK`/`CH`/`LOKE`, vía
+> `codBase()`). `tests/ssg-familia-empresa.cjs`.
+> **(C) "A guardar" no coincidía app vs Telegram** (cod `234`: app **42**, Telegram **29**).
+> `reporte_agentes_falta_llego()` filtraba `legajo not in ('0','1')`; la recepción `+13` (legajo 0,
+> real) quedaba afuera pero su `guardado −13` sí contaba → 13 de menos para siempre. Se sacó el filtro
+> ahí y en `generar_reporte_agentes()` (`mg_pendiente`, `pipeline_atascado`); mismo criterio que idea
+> 1636. Barrido: 17 códigos / 404 cajas. `sql/falta_llego.sql`.
+> **(D) La tabla de Stock ahora muestra `para_envasar` y `racks_ch`.** El `035E` tenía 44 cajas en
+> "p/ envasar" invisibles; artículos que estaban SOLO ahí (`439E`, `809E`) no aparecían. `stkBodyStocks`
+> tenía los depósitos hardcodeados sin ellos. Fix: agregados a `SECT` (`extra:true`) y `SECTKEYS`,
+> columnas/tiras **condicionales** (sólo si hay saldo), celda clickeable → `stkOpenMovsArt`, Total Stock
+> los incluye. Barrido: 884 + 840 cajas ocultas. `tests/stk-envasar-col.cjs`.
+> **(E) Tanda FANTASMA en el monitor por un EP de legajo 0.** `D05B` figuraba "en picking hace 17 h"
+> por un `EP` de legajo 0 (Pruebas). `getActivityStatus()` no excluía legajo 0/1 al armar el estado del
+> tablero. Fix: los saltea → las tandas de prueba no figuran iniciadas/en curso. `tests/act-legajo0.cjs`.
+> Bump **v7.06**.
 >
 > Nota: **v7.05 — Insumos (RI/EI): botonera de CATEGORÍAS** (idea 7917 del usuario). El modal de
 > Recepción/Entrega de Insumos listaba los **108 códigos planos ordenados por código** y la única
