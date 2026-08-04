@@ -35,15 +35,21 @@ falta reclasificar a mano los 65.
 
 ## Categorías propuestas (6 botones)
 
-| # | Botón | Códigos | Unidad típica |
+**Taxonomía definitiva (v7.11, la fijó el usuario) — 5 categorías:**
+
+| Botón | Clave | Códigos | Unidad |
 |---|---|---|---|
-| 1 | 🧵 **Fleje y alambre** | 32 | kg |
-| 2 | 🧪 **Plástico** | 9 | Bolsas |
-| 3 | 🍴 **Partes inox** | 11 | Uni / MC |
-| 4 | 🪵 **Mangos** | 3 | Uni |
-| 5 | 🌀 **Espirales** | 2 | MC |
-| 6 | 📦 **Cajas y embalaje** | 8 | Paquetes / Uni |
-|   | 🗑 _A depurar_ (oculta) | 43 | — |
+| 🧪 **Plásticos** | `plastico` | 9 | **Bolsas** (fija) |
+| 🧵 **Flejes y alambres** | `fleje` | 32 | **Kg** (fija) |
+| 🌎 **Importados** | `importados` | 13 | **libre** — la elige el operario |
+| 🧩 **Partes plásticas** | `partes_plasticas` | 3 | **libre** — la elige el operario |
+| 📦 **Cajas** | `cajas` | 8 | Paquetes / Uni |
+| 🗑 _A depurar_ (fuera del listado) | `depurar` | 43 | — |
+
+`Importados` = ex *Partes inox* + *Espirales*. `Partes plásticas` = ex *Mangos*.
+**Unidad libre** quiere decir que **no se preselecciona ninguna**: el operario tiene
+que elegir, y sin unidad el movimiento **no se manda**. Arrancar en "Uni" a ciegas es
+lo que venía partiendo los saldos.
 
 ---
 
@@ -240,11 +246,11 @@ que netean a 0 pero se muestran como dos líneas.
 6. **Alta de un insumo nuevo** (v7.10) — tile **`+ Agregar insumo`** junto a las
    categorías (y también dentro de cada una). Lleva a una pantalla propia con
    **categoría** (las 6 + **"Sin categoría clara"**), **cantidad**, **unidad** y un
-   **detalle** en las palabras del operario. **No pide código**: el operario no tiene
-   por qué saberlo. El sistema arma la identidad como `NUEVO·<DETALLE>` — el prefijo los
-   deja encontrables de un saque para asignarles el código real más adelante — y hay un
-   campo **opcional** de código de 7 dígitos para cuando sí se sabe, así no se genera un
-   huérfano al pedo. Elegir la categoría propone su unidad sola. Si ya existe uno con
+   **detalle** en las palabras del operario. El **detalle va primero**, que es lo único que el
+   operario sabe seguro. **No pide código** en ningún momento: el sistema arma la
+   identidad como `NUEVO·<DETALLE>` y el código real se lo asignan después desde Stock y
+   Compras (idea 5572). Elegir la categoría propone su unidad sola si la categoría tiene
+   una fija. Si ya existe uno con
    ese detalle no se duplica: se abre el que hay. El movimiento guarda la **ubicación
    física** en vez del sector.
    ⚠ Los `NUEVO·` **hay que reconciliarlos**: mientras no tengan código real no cruzan

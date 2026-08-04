@@ -4,7 +4,26 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-04 · Versión app al documentar: **v7.10**
+> Última actualización: 2026-08-04 · Versión app al documentar: **v7.11**
+>
+> Nota: **v7.11 — Insumos: taxonomía definitiva (5 categorías) + el alta arranca por el Detalle**
+> (lo fijó el usuario). **(1) Las categorías quedaron así**: 🧪 **Plásticos** (9, todos en **Bolsas**) ·
+> 🧵 **Flejes y alambres** (32, todos en **Kg**) · 🌎 **Importados** (13 — ex *Partes inox* + *Espirales*,
+> **unidad libre**) · 🧩 **Partes plásticas** (3 — ex *Mangos*, **unidad libre**) · 📦 **Cajas** (8,
+> Paquetes/Uni), más 🗑 *A depurar* (43) fuera del listado. **(2) "Unidad libre" = NO se preselecciona
+> ninguna**: en Importados y Partes plásticas cada insumo mide distinto, así que el chip arranca vacío y
+> el operario tiene que elegir. Y **sin unidad el movimiento NO se manda**: `insConfirmar` corta, nombra
+> los que le falta y abre el primero. Antes caía a `"Uni"` por defecto, que es exactamente lo que venía
+> **partiendo los saldos** (PP quedó con 151 Bolsas **+ 24 Uni**). El botón del insumo muestra
+> `4 ¿unidad?` en ámbar mientras falte. **(3) El alta empieza por el DETALLE** —lo único que el operario
+> sabe seguro— y **se sacó el campo de código**: el código real se lo asignan después desde Stock y
+> Compras. La identidad sigue siendo `NUEVO·<DETALLE>`. Migración de datos: `inox`+`espirales` →
+> `importados`, `mangos` → `partes_plasticas` (ver `sql/insumos_categoria.sql`). ⏳ La taxonomía
+> todavía vive en dos lados (`INS_CATS` en index.html + la tabla `Insumos`): el módulo para manejarla
+> desde **Stock y Compras** —con las sugerencias `NUEVO·` de los operarios, el orden de los insumos y el
+> alta con código— quedó anotado como **idea 5572**. `tests/ins-categorias.cjs` extendido (orden de los
+> campos del alta, categorías sin default, bloqueo por unidad faltante); suite completa OK; render 390px
+> sin overflow. Bump **v7.11**.
 >
 > Nota: **v7.10 — Insumos: ALTA de un insumo nuevo desde la botonera** (pedido del usuario). En la
 > grilla de categorías de RI/EI hay ahora un tile **`+ Agregar insumo`** (y otro dentro de cada

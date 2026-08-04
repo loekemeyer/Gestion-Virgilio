@@ -1,4 +1,4 @@
-/* Regresión v7.10 / idea 7917 — Insumos (RI/EI): navegación por categorías.
+/* Regresión v7.11 / idea 7917 — Insumos (RI/EI): navegación por categorías.
    MISMA FORMA que la Recepción de Mercadería (recepcion.js): pantalla 1 = grilla de
    CATEGORÍAS en botones cuadrados → pantalla 2 = grilla de los INSUMOS de esa categoría
    → pop-up de cantidad. "‹ Atrás" vuelve. Este test fija el contrato:
@@ -37,7 +37,7 @@ catch (_e) {
       { cod: "5", nombre: "38 X 0,55", sector: null, categoria: "fleje", ubicacion: "R4At" },
       { cod: "2745", nombre: "168 X 0,80", sector: null, categoria: "fleje", ubicacion: "V10 At" },
       { cod: "PP", nombre: "POLIPROPILENO (2630)", sector: null, categoria: "plastico", ubicacion: "AF1" },
-      { cod: "2955", nombre: "Cuchilla 505 Ac Inox", sector: null, categoria: "inox", ubicacion: "X20" },
+      { cod: "2955", nombre: "Cuchilla 505 Ac Inox", sector: null, categoria: "importados", ubicacion: "X20" },
       { cod: "505C·CUCHILLA CHINA", nombre: "CUCHILLA CHINA", sector: "505c", categoria: "depurar", ubicacion: null }
     ];
     window.fetch = function (url, opt) {
@@ -72,7 +72,7 @@ catch (_e) {
 
     // 1) PANTALLA 1: una tarjeta por categoría, ningún insumo listado
     out.cats = catTxt();
-    out.nCats = nCats();                                                    // 4 (fleje, plástico, inox, depurar)
+    out.nCats = nCats();                                                    // 4 (plásticos, flejes, importados, depurar)
     out.sinItemsEnP1 = nItems() === 0;
     out.hayDep = out.cats.some(function (t) { return /A depurar/.test(t); });
     out.enUso = /5 insumos en uso/.test(document.getElementById("insBody").textContent);   // no cuenta el depurar
@@ -82,7 +82,8 @@ catch (_e) {
     const byCod = {}; _ins.items.forEach(function (it) { byCod[it.cod] = it; });
     out.uni2745 = byCod["2745"].unidad;      // "Kg"  (fleje, sin saldo)
     out.uniPP = byCod["PP"].unidad;          // "Bolsas" (saldo en 1 sola unidad)
-    out.uni2955 = byCod["2955"].unidad;      // "Uni" (inox)
+    // "Importados" NO fija unidad: queda vacía a propósito, la elige el operario
+    out.uni2955 = byCod["2955"].unidad;      // "" (importados, sin default)
 
     // 3) Entrar a "fleje": SOLO flejes, ordenados por MEDIDA (38 → 121 → 168) + Atrás
     insSetCat("fleje");
@@ -133,6 +134,9 @@ catch (_e) {
     document.querySelector("#insBody .ins-catbtn.add").click();
     out.altaAbre = !!document.getElementById("insNvDet") && !!document.getElementById("insNvQty");
     out.altaTitulo = (document.querySelector("#insBody .ins-bar-t") || {}).textContent;
+    // el Detalle va ANTES que todo lo demás
+    const lbls = Array.prototype.map.call(document.querySelectorAll("#insBody .ins-nvl"), function (e) { return e.textContent.split("—")[0].trim(); });
+    out.ordenCampos = lbls.join(" | ");   // "Detalle | Elegí la categoría | Cantidad | Unidad"
     // "Sin categoría clara" es una opción más
     out.haySinCatClara = /Sin categoría clara/.test(document.getElementById("insBody").textContent);
     // unidades que ya usamos en otros lados (Bolsas/MC/Cajas, no sólo Uni/Paquetes/Kg)
@@ -165,15 +169,32 @@ catch (_e) {
     out.altaSinCat = nue2 ? nue2.cat : "(no se creó)";                      // "" → chip ❓
     out.altaSinQtyAbrePopup = !!document.querySelector("#insBody .ins-qov");  // sin cantidad, pide
     insCloseQty();
-    // un código de 7 dígitos mal puesto se rechaza
-    insNuevoOpen("");
-    document.getElementById("insNvDet").value = "Con codigo malo";
-    document.getElementById("insNvCod").value = "123";
+    // ya no hay campo de código: el operario no tiene por qué saberlo
+    out.altaSinCampoCod = !document.getElementById("insNvCod");
+    // categoría sin unidad fija: con cantidad y sin unidad no deja agregar
+    insNuevoOpen("importados");
+    document.getElementById("insNvDet").value = "Cosa importada rara";
+    document.getElementById("insNvQty").value = "5";
+    out.impSinDefault = _ins.nuevo.uni === "";
     insNuevoOk();
-    out.altaRechazaCodCorto = _ins.nuevo !== null && alerts === 2;
-    insNuevoCancel();
+    out.altaExigeUnidad = _ins.nuevo !== null && alerts === 2;
+    insNuevoPick("uni", "MC");
+    insNuevoOk();
+    out.altaConUnidadOk = _ins.nuevo === null;
     window.alert = _al;
     insBack();
+
+    // 8d) Sin unidad NO se manda: iría como "Uni" y partiría el saldo (lo que pasó con PP)
+    let alerts2 = 0; const _al2 = window.alert; window.alert = function () { alerts2++; };
+    let movBloq = null; const _sm0 = window.stockMove; window.stockMove = function (r) { movBloq = r; };
+    byCod["2955"].qty = 4;                       // importados: unidad vacía
+    insConfirmar();
+    out.confirmBloqueaSinUni = movBloq === null && alerts2 === 1;
+    out.confirmAbreElQueFalta = _ins.qty === _ins.items.indexOf(byCod["2955"]);
+    insSetUnidad(_ins.items.indexOf(byCod["2955"]), "MC");
+    insCloseQty();
+    byCod["2955"].qty = 0;                       // lo saco: no es parte del envío que mido abajo
+    window.stockMove = _sm0; window.alert = _al2;
 
     // 9) El movimiento lleva la UBICACIÓN física y la unidad del ítem
     let mov = null;
@@ -181,7 +202,7 @@ catch (_e) {
     window.alert = function () {};
     insConfirmar();
     window.stockMove = _sm;
-    out.movN = mov ? mov.length : 0;                                        // 2 (el 22 y el alta con 7)
+    out.movN = mov ? mov.length : 0;                                        // 3 (22 · bolsa gris · cosa importada)
     out.movNuevo = (mov || []).filter(function (m) { return /BOLSA GRIS/.test(m.cod_art); })[0] || null;
     out.movUbic = mov && mov[0] ? mov[0].ubicacion : null;                  // "V2 Ad"
     // "kg" en minúscula: el 22 ya tiene saldo en esa unidad y la idea 7382 manda sobre
@@ -196,7 +217,7 @@ catch (_e) {
 
   const pass =
     r.nCats === 4 && r.sinItemsEnP1 === true && r.hayDep === true && r.enUso === true && r.finDisabled === true &&
-    r.uni2745 === "Kg" && r.uniPP === "Bolsas" && r.uni2955 === "Uni" &&
+    r.uni2745 === "Kg" && r.uniPP === "Bolsas" && r.uni2955 === "" &&
     r.nFleje === 3 && r.ordenFleje === "5,22,2745" && r.hayAtras === true &&
     /Fleje/.test(r.tituloFleje || "") && r.ubicEnBoton === true && r.hayBotonAgregar === true &&
     r.popupAbierto === true && r.popupCod === "22" && r.popupStock === true && r.qtyTrasChg === 3 &&
@@ -210,8 +231,9 @@ catch (_e) {
     r.altaQty === 7 && r.altaNombre === "Bolsa gris sin etiqueta" && r.altaPosteoCat === "plastico" &&
     r.altaCierraPantalla === true && r.altaVaASuCat === true &&
     r.altaExigeDetalle === true && r.altaSinCat === "" && r.altaSinQtyAbrePopup === true &&
-    r.altaRechazaCodCorto === true &&
-    r.movN === 2 && r.movUbic === "V2 Ad" && r.movUni === "kg" && r.movDelta === -3 &&
+    r.altaSinCampoCod === true && r.impSinDefault === true && r.altaExigeUnidad === true && r.altaConUnidadOk === true &&
+    /^Detalle \| Elegí la categoría \| Cantidad \| Unidad$/.test(r.ordenCampos || "") &&
+    r.movN === 3 && r.confirmBloqueaSinUni === true && r.confirmAbreElQueFalta === true && r.movUbic === "V2 Ad" && r.movUni === "kg" && r.movDelta === -3 &&
     r.movNuevo && r.movNuevo.delta === -7 && r.movNuevo.unidad === "Bolsas" &&
     r.overflow === 0 &&
     errs.length === 0;

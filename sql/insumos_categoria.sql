@@ -113,3 +113,21 @@ update public."Insumos" set categoria = 'depurar' where categoria is null;
 -- ir contra el código real y la equivalencia de cada par la confirma el dueño.
 -- Mientras tanto quedan en 'depurar', a la vista pero fuera del listado por defecto.
 -- ---------------------------------------------------------------------
+
+-- ---------------------------------------------------------------------
+-- v7.11 — TAXONOMÍA DEFINITIVA (la fijó el usuario). De 6 categorías a 5:
+--   plastico         "Plásticos"           → todos en Bolsas
+--   fleje            "Flejes y alambres"   → todos en Kg
+--   importados       "Importados"          → ex `inox` + `espirales`; unidad LIBRE
+--   partes_plasticas "Partes plásticas"    → ex `mangos`;              unidad LIBRE
+--   cajas            "Cajas"               → Paquetes / Uni
+-- "Unidad libre" = la categoría NO preselecciona ninguna: el operario tiene que
+-- elegir, y sin unidad el movimiento no se manda. Arrancar en "Uni" a ciegas es lo
+-- que venía partiendo los saldos.
+-- ---------------------------------------------------------------------
+update public."Insumos" set categoria = 'importados'       where categoria in ('inox','espirales');
+update public."Insumos" set categoria = 'partes_plasticas' where categoria = 'mangos';
+
+-- ⏳ La taxonomía todavía vive en dos lados: acá y en `INS_CATS` (index.html). El
+-- módulo para manejarla desde Stock y Compras —junto con el orden de los insumos y
+-- la revisión de los `NUEVO·` que dan de alta los operarios— es la idea 5572.
