@@ -140,3 +140,13 @@ update public."Insumos" set categoria = 'partes_plasticas' where categoria = 'ma
 -- Todas SECURITY DEFINER con validación adentro: el anon key sigue sin UPDATE
 -- directo sobre Insumos ni sobre Movimientos_Stock.
 -- ---------------------------------------------------------------------
+
+-- ---------------------------------------------------------------------
+-- v7.17 (idea 5572) — ver la migración `insumos_categorias_y_unidades_editables`:
+-- las categorías y las unidades dejan de estar hardcodeadas en index.html y pasan a
+-- `Insumos_Categorias` (clave, nombre, emoji, unidades[], orden, activa) y
+-- `Insumos_Unidades` (nombre, orden, activa), que el admin edita desde
+-- Stock y Compras → Insumos. `unidades` de la categoría = las PERMITIDAS:
+--   1 sola → unidad fija · varias → el operario elige · vacío → cualquiera activa.
+-- ABM por insumo_cat_guardar / insumo_cat_borrar / insumo_unidad_guardar.
+-- ---------------------------------------------------------------------

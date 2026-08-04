@@ -1,4 +1,4 @@
-/* Regresión v7.14 / ideas 7917 + 5572 — Insumos (RI/EI): navegación por categorías.
+/* Regresión v7.17 / ideas 7917 + 5572 — Insumos (RI/EI): navegación por categorías.
    MISMA FORMA que la Recepción de Mercadería (recepcion.js): pantalla 1 = grilla de
    CATEGORÍAS en botones cuadrados → pantalla 2 = grilla de los INSUMOS de esa categoría
    → pop-up de cantidad. "‹ Atrás" vuelve. Este test fija el contrato:
@@ -49,6 +49,19 @@ catch (_e) {
       if (opt && String(opt.method || "").toUpperCase() === "POST" && url.indexOf("/Insumos") >= 0) {
         try { posted.push(JSON.parse(opt.body)); } catch (_e) {}
         return J({});
+      }
+      if (url.indexOf("Insumos_Categorias") >= 0) {
+        return J([
+          { clave: "plastico", nombre: "Plásticos", emoji: "🧪", unidades: ["Bolsas"], orden: 1 },
+          { clave: "fleje", nombre: "Flejes y alambres", emoji: "🧵", unidades: ["Kg"], orden: 2 },
+          { clave: "importados", nombre: "Importados", emoji: "🌎", unidades: [], orden: 3 },
+          { clave: "partes_plasticas", nombre: "Partes plásticas", emoji: "🧩", unidades: [], orden: 4 },
+          { clave: "cajas", nombre: "Cajas", emoji: "📦", unidades: ["Paquetes", "Uni"], orden: 5 },
+          { clave: "depurar", nombre: "A depurar", emoji: "🗑", unidades: [], orden: 99 }
+        ]);
+      }
+      if (url.indexOf("Insumos_Unidades") >= 0) {
+        return J(["Uni", "Kg", "Bolsas", "Paquetes", "MC", "Cajas"].map(function (n, i) { return { nombre: n, orden: i }; }));
       }
       if (url.indexOf("/Insumos") >= 0) return J(CAT);
       if (url.indexOf("vista_saldos_insumos_x_unidad") >= 0) {

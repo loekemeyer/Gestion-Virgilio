@@ -4,7 +4,42 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-04 · Versión app al documentar: **v7.16**
+> Última actualización: 2026-08-04 · Versión app al documentar: **v7.17**
+>
+> Nota: **v7.17 — Administrar Insumos: categorías y unidades EDITABLES + pendientes con todo a mano**
+> (idea 5572, pedido del usuario). Lo que estaba hardcodeado en `index.html` pasa a tablas que el
+> admin edita, y **lo que define ahí es exactamente lo que ve el operario** al sugerir un insumo.
+>
+> **(1) Pendientes de identificar** (primera sección de la solapa) — cada fila es **editable entera**:
+> **Código** (viene con el temporal **sugerido**, y no deja identificar si lo dejás así) · **Nombre**
+> (el detalle que escribió quien lo recibió) · **Categoría** (la que sugirió) · **Ubicación** ·
+> **Unidades** (antes decía "Saldo": ahora la **cantidad y la unidad son corregibles**). La corrección
+> de cantidad/unidad se hace con **asientos** (`tipo='ajuste'`), no editando el movimiento — el log es
+> append-only; si cambia la unidad saca todo de la vieja y pone en la nueva, y se postea **antes** de
+> renombrar, cuando el movimiento todavía está en el código temporal. Se sacó la columna **Orden** (la
+> columna `Insumos.orden` queda y el orden manual sigue mandando si se carga por SQL, pero ya no
+> tiene UI).
+>
+> **(2) Categorías** — tabla nueva **`Insumos_Categorias`** (`clave, nombre, emoji, unidades[], orden,
+> activa`). Se les cambia el **nombre**, el emoji y las **unidades permitidas**, se crean y se borran
+> (sólo si están vacías; «a depurar» nunca). `unidades` reemplaza al viejo `uni` único: **una sola** =
+> unidad fija · **varias** = el operario elige entre ésas · **ninguna** = cualquiera de las activas.
+> **El listado de insumos de cada categoría y el botón de agregar viven ADENTRO de la categoría**
+> (se despliega con "Ver insumos"): ahí se edita nombre/ubicación, se mueve de categoría y se dan de
+> alta con código.
+>
+> **(3) Unidades con las que trabajamos** — tabla nueva **`Insumos_Unidades`**. Es el vocabulario de
+> medidas que ve el operario; se agregan y se sacan (sacar **no toca** el stock ya cargado con esa
+> unidad, sólo deja de ofrecerse). Se sembró con las 6 en uso + las que aparecían en movimientos;
+> quedaron inactivas tres de basura (`325`, `unidad`, y `kg` que es `Kg` con otra grafía). El "+" de
+> unidad del **operario** ahora escribe en esta tabla (antes iba a `localStorage` y moría en su
+> celular).
+>
+> `INS_CATS` / `INS_UNIS` pasan a cargarse de la base (`insLoadMeta`), con los valores actuales como
+> **fallback** si no hay red. Funciones nuevas: `insumo_cat_guardar` / `insumo_cat_borrar` /
+> `insumo_unidad_guardar`, y `insumo_identificar` toma también la ubicación. Todas SECURITY DEFINER:
+> el anon key sigue sin UPDATE directo. `tests/ins-admin.cjs` reescrito para las tres secciones;
+> suite completa OK. Bump **v7.17**.
 >
 > Nota: **v7.16 — PPP: botón 📦 "Chequeo de góndola" por pedido (y por tanda)** (pedido del
 > usuario). Al lado del 🖨 de cada pedido de la PPP hay ahora un botón **📦** que responde
