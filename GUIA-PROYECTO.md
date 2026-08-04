@@ -6,6 +6,22 @@
 >
 > Última actualización: 2026-08-04 · Versión app al documentar: **v7.41**
 >
+> Nota (backend, **sin bump de app**): **OCs viejas imprimían Falta Pedidos / Uni x Caja / % Lleno en
+> "—" → backfill + refresco diario**. El usuario imprimió una OC de Oscar (del 29/07, generada ANTES
+> de v7.39) y las tres columnas nuevas salían **vacías**: esas OCs no tenían guardados
+> `oc_max/oc_pedidos/oc_stock/oc_uni_caja` (los llena el generador desde v7.39, pero las 101 previas
+> no). Nueva función **`oc_backfill_valores(p_solo_null)`** que calcula esos valores con la MISMA
+> fórmula del generador (Máximo = proy×índice topado a capacidad; Pedidos = demanda neteada por TP;
+> Stock = góndola+a_guardar+racks+excedente; Uni x Caja = `OC_Maximos.uni_x_caja`) y los escribe por
+> código normalizado — sin tocar `cantidad` (las cajas a pedir) ni las OCs `recibida`. **One-shot**:
+> se rellenaron las **101** OCs existentes (0 quedaron sin valores; la de Oscar ahora muestra p.ej.
+> 658 → falta 21 / −35%, 758 → falta 14 / −41%, 506 → 0 / 77%). Como **Falta Pedidos y % Lleno son
+> estado ACTUAL** (lo que falta cubrir / cuán llena está la góndola hoy, según lo definió el usuario),
+> se agregó además un **cron diario** **`oc-backfill-diario`** (`30 9 * * *` = 06:30 AR) que los
+> **refresca** en todas las OCs abiertas → el impreso nunca sale vacío ni desactualizado (cubre también
+> las de carga manual y el paso del tiempo). Sin cambios en la app (`ocPrintHtml`/`ocFetchRows` ya leen
+> esas columnas desde v7.40; sólo se rellenó la data + cron). SQL en `sql/oc_backfill_valores.sql`.
+>
 > Nota: **v7.41 — «picking difiere de la mesa» ya no infla góndola fantasma**. La regla v4.92
 > (`_compDifResolve`, evento **NPD**) devolvía a góndola (`terminado +qty`, `tipo=ajuste`,
 > `ref=picking_difiere`) **cada vez** que el armador marcaba *«de menos + no hay en góndola»*. Pero
