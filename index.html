@@ -1798,6 +1798,16 @@ button {
 .ppp-ocup-badge{ display:inline-block; font-size:10.5px; font-weight:700; padding:1px 6px; border-radius:6px; }
 .ppp-ocup-badge.ok{ background:#dcfce7; color:#166534; }
 .ppp-ocup-badge.pend{ background:#fef3c7; color:#92400e; }
+.ppp-ocup-badge.plan{ background:#ffedd5; color:#9a3412; }
+.ppp-ocup-hint{ font-size:12px; color:#475569; background:#fffbeb; border:1px solid #fde68a; border-radius:8px; padding:6px 9px; margin:0 0 8px; }
+.ppp-ocup-chips{ display:flex; flex-wrap:wrap; gap:6px; }
+.ppp-ocup-chip{ display:inline-flex; align-items:center; font-size:12px; color:#334155; background:#fff; border:1.5px solid #fdba74; border-radius:16px; padding:4px 10px; cursor:grab; user-select:none; }
+.ppp-ocup-chip.sel{ background:#fff7ed; border-color:#ea580c; box-shadow:0 0 0 2px rgba(234,88,12,.18); }
+.ppp-ocup-chip b{ color:#0f172a; }
+.ppp-ocup-x{ width:auto; margin:0; padding:0 6px; font-size:12px; line-height:1.6; border:1px solid #e2e8f0; border-radius:6px; background:#fff; color:#64748b; cursor:pointer; }
+.ppp-ocup-planbar{ display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; margin:0 0 8px; }
+.ppp-ocup-planmsg{ font-size:12.5px; color:#0f172a; background:#ecfdf5; border:1px solid #6ee7b7; border-radius:8px; padding:5px 9px; }
+.ppp-ocup-clear{ width:auto; margin:0; padding:6px 11px; font-size:12.5px; font-weight:bold; background:#fff; color:#b45309; border:1px solid #fdba74; border-radius:8px; cursor:pointer; }
 .ppp-ocup-empty{ color:#64748b; font-size:12.5px; padding:2px; }
 .ppp-tanda{ background:#fff; border:1px solid #e2e8f0; border-radius:10px; margin-bottom:5px; overflow:hidden; }
 .ppp-tanda.ppp-tanda-none{ border:1px solid #fcd34d; }
@@ -5770,7 +5780,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.03";
+const APP_VERSION = "v7.04";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -17320,6 +17330,10 @@ function _pppEntExcelHtml() {
 const OCUP_CAP_KEY = "vir_ocup_cap_m3";
 let _ocupWeek = 0;        // offset de semana respecto de la actual (−4…+4)
 let _ocupSelKey = null;   // día seleccionado (YYYYMMDD) o 'SINFECHA'
+/* v7.04 — Planificación LOCAL (proyección): asignar "a programar" a un día SIN tocar la
+   PPP real. Vive en localStorage (vir_ocup_plan = {np:"YYYYMMDD"}). Reversible. */
+const OCUP_PLAN_KEY = "vir_ocup_plan";
+let _ocupPlan = null, _ocupPlanSel = null, _ocupDragNp = null;
 /* Escala de referencia PROVISORIA (v7.03), calibrada con el histórico real de m³ por
    pedido (n≈2242: p25≈0.10, mediana≈0.17, p75≈0.34, p90≈0.76). Ajustable. */
 const OCUP_BK = [
@@ -17334,8 +17348,20 @@ function _ocupMonday(d) { const x = new Date(d.getFullYear(), d.getMonth(), d.ge
 function _ocupSizeBucket(m3) { for (let i = 0; i < OCUP_BK.length; i++) { if (m3 <= OCUP_BK[i].max) return i; } return OCUP_BK.length - 1; }
 function _ocupCap() { let v = 0; try { v = parseFloat(localStorage.getItem(OCUP_CAP_KEY) || "0"); } catch (_e) {} return isNaN(v) ? 0 : v; }
 function pppOcupSetCap(v) { const n = parseFloat(String(v).replace(",", ".")); try { if (!n || n <= 0) localStorage.removeItem(OCUP_CAP_KEY); else localStorage.setItem(OCUP_CAP_KEY, String(n)); } catch (_e) {} pppRenderProg(); }
-function pppOcupDay(k) { _ocupSelKey = (_ocupSelKey === k ? null : k); pppRenderProg(); }
+function pppOcupDay(k) {
+  if (_ocupPlanSel && k && k !== "SINFECHA") { pppOcupAssign(_ocupPlanSel, k); return; }   // modo asignar
+  _ocupSelKey = (_ocupSelKey === k ? null : k); pppRenderProg();
+}
 function pppOcupWeek(off) { _ocupWeek = Math.max(-4, Math.min(4, off | 0)); _ocupSelKey = null; pppRenderProg(); }
+function _ocupLoadPlan() { if (_ocupPlan) return _ocupPlan; try { _ocupPlan = JSON.parse(localStorage.getItem(OCUP_PLAN_KEY) || "{}"); } catch (_e) { _ocupPlan = {}; } if (!_ocupPlan || typeof _ocupPlan !== "object") _ocupPlan = {}; return _ocupPlan; }
+function _ocupSavePlan() { try { localStorage.setItem(OCUP_PLAN_KEY, JSON.stringify(_ocupLoadPlan())); } catch (_e) {} }
+function _ocupPlanCount() { return Object.keys(_ocupLoadPlan()).length; }
+function pppOcupAssign(np, dayKey) { if (!np || !dayKey || dayKey === "SINFECHA") return; _ocupLoadPlan()[String(np)] = String(dayKey); _ocupSavePlan(); _ocupPlanSel = null; _ocupDragNp = null; pppRenderProg(); }
+function pppOcupUnplan(np) { const pl = _ocupLoadPlan(); delete pl[String(np)]; _ocupSavePlan(); pppRenderProg(); }
+function pppOcupClearPlan() { _ocupPlan = {}; _ocupSavePlan(); _ocupPlanSel = null; pppRenderProg(); }
+function pppOcupChipSel(np) { np = String(np); _ocupPlanSel = (_ocupPlanSel === np ? null : np); pppRenderProg(); }
+function pppOcupDragStart(ev, np) { _ocupDragNp = String(np); try { ev.dataTransfer.setData("text/plain", String(np)); ev.dataTransfer.effectAllowed = "move"; } catch (_e) {} }
+function pppOcupDrop(ev, dayKey) { try { ev.preventDefault(); } catch (_e) {} let np = _ocupDragNp; if (!np) { try { np = ev.dataTransfer.getData("text/plain"); } catch (_e) {} } if (np) pppOcupAssign(np, dayKey); }
 async function pppRefreshOcupacion() {
   // reusa el espejo de entregados (PPP_Entregados_Meta) + el estado de armado por tanda (TAP).
   const jobs = [];
@@ -17351,11 +17377,19 @@ function _ocupUnified() {
   if (Array.isArray(_pppDeliveredFull)) {
     for (const p of _pppDeliveredFull) { if (!p.fkey || p.m3 == null) continue; dated.set(String(p.np), { np: String(p.np), m3: p.m3, key: p.fkey, rs: p.rs || p.cod || "", tanda: p.tanda || "", armado: true }); }
   }
+  const plan = _ocupLoadPlan();
   for (const p of (_pppParsed.prog || [])) {
     const np = String(p.np), m3 = Number(p.m3) || 0, fk = _pppFechaKey(p.fecha_entrega || "");
     const tanda = String(p.tanda == null ? "" : p.tanda).trim().toUpperCase();
     const armd = !!(arm && tanda && tanda !== "—" && arm.has(tanda));
-    if (fk === "99999999") { if (!p.programmed) sinFecha.push({ np: np, m3: m3, rs: p.razon_social || p.cod || "", tanda: tanda, armado: armd }); continue; }
+    if (fk === "99999999") {
+      if (!p.programmed) {
+        const pk = plan[np];
+        if (pk) dated.set(np, { np: np, m3: m3, key: pk, rs: p.razon_social || p.cod || "", tanda: tanda, armado: armd, plan: true });
+        else sinFecha.push({ np: np, m3: m3, rs: p.razon_social || p.cod || "", tanda: tanda, armado: armd });
+      }
+      continue;
+    }
     if (!dated.has(np)) dated.set(np, { np: np, m3: m3, key: fk, rs: p.razon_social || p.cod || "", tanda: tanda, armado: armd });
   }
   return { dated: dated, sinFecha: sinFecha };
@@ -17393,29 +17427,30 @@ function _ocupWeekSvg(wd, cap, showSin, todayKey) {
   if (cap > 0) { const yc = y(cap); s += '<line x1="' + padL + '" y1="' + yc.toFixed(1) + '" x2="' + (W - padR) + '" y2="' + yc.toFixed(1) + '" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="5 4"/><text x="' + (W - padR) + '" y="' + (yc - 3).toFixed(1) + '" text-anchor="end" font-size="9" fill="#dc2626">cap ' + cap.toFixed(1) + '</text>'; }
   for (let i = 0; i < bars.length; i++) {
     const b = bars[i], x = padL + i * step;
-    const sel = _ocupSelKey === b.key;
+    const sel = _ocupSelKey === b.key, droppable = !!_ocupPlanSel && !b.sin;
     if (b.isToday) s += '<rect x="' + (x - 3) + '" y="' + padT + '" width="' + (barW + 6) + '" height="' + plotH + '" fill="#f5f3ff"/>';
+    if (droppable) s += '<rect x="' + (x - 3) + '" y="' + padT + '" width="' + (barW + 6) + '" height="' + plotH + '" fill="#ecfdf5" stroke="#34d399" stroke-width="1" stroke-dasharray="3 2" ondragover="event.preventDefault()" ondrop="pppOcupDrop(event,\'' + b.key + '\')" onclick="pppOcupDay(\'' + b.key + '\')"/>';
     if (sel) s += '<rect x="' + (x - 3) + '" y="' + padT + '" width="' + (barW + 6) + '" height="' + plotH + '" fill="none" stroke="#1e6bd6" stroke-width="1.5" stroke-dasharray="3 2"/>';
-    // apilado POR PEDIDO (segmento = 1 pedido): color por tamaño, opacidad por armado.
+    // apilado POR PEDIDO (segmento = 1 pedido): color por tamaño, opacidad por armado; ámbar = plan local.
     const peds = b.pedidos.slice().sort(_ocupSortPeds);
     let yCur = baseY;
     for (const p of peds) {
       if (!(p.m3 > 0)) continue;
-      const hh = plotH * p.m3 / maxM3, yTop = yCur - hh;
-      const col = b.sin ? OCUP_SINFECHA_COL : OCUP_BK[_ocupSizeBucket(p.m3)].col;
+      const hh = plotH * p.m3 / maxM3, yTop = yCur - hh, isPlan = !!p.plan;
+      const col = (b.sin || isPlan) ? OCUP_SINFECHA_COL : OCUP_BK[_ocupSizeBucket(p.m3)].col;
       const op = p.armado ? 1 : 0.42;
-      const tip = "NP " + p.np + (p.rs ? " · " + p.rs : "") + " · " + p.m3.toFixed(3) + " m³ · " + (p.armado ? "✓ armado" : "⏳ a armar");
-      s += '<rect class="ppp-ocup-bar" x="' + x + '" y="' + yTop.toFixed(1) + '" width="' + barW + '" height="' + Math.max(0.6, hh).toFixed(1) + '" fill="' + col + '" opacity="' + op + '" stroke="#fff" stroke-width="0.4" onclick="pppOcupDay(\'' + b.key + '\')"><title>' + escapeHtml(tip) + '</title></rect>';
+      const tip = "NP " + p.np + (p.rs ? " · " + p.rs : "") + " · " + p.m3.toFixed(3) + " m³ · " + (p.armado ? "✓ armado" : "⏳ a armar") + (isPlan ? " · PLAN (local)" : "");
+      s += '<rect class="ppp-ocup-bar" x="' + x + '" y="' + yTop.toFixed(1) + '" width="' + barW + '" height="' + Math.max(0.6, hh).toFixed(1) + '" fill="' + col + '" opacity="' + op + '"' + (isPlan ? ' stroke="#b45309" stroke-width="1" stroke-dasharray="2 1.5"' : ' stroke="#fff" stroke-width="0.4"') + ' ondragover="event.preventDefault()" ondrop="pppOcupDrop(event,\'' + b.key + '\')" onclick="pppOcupDay(\'' + b.key + '\')"><title>' + escapeHtml(tip) + '</title></rect>';
       yCur = yTop;
     }
-    if (b.total <= 0) s += '<rect class="ppp-ocup-bar" x="' + x + '" y="' + (baseY - 2) + '" width="' + barW + '" height="2" fill="#e2e8f0" onclick="pppOcupDay(\'' + b.key + '\')"></rect>';
+    if (b.total <= 0) s += '<rect class="ppp-ocup-bar" x="' + x + '" y="' + (baseY - 2) + '" width="' + barW + '" height="2" fill="#e2e8f0" ondragover="event.preventDefault()" ondrop="pppOcupDrop(event,\'' + b.key + '\')" onclick="pppOcupDay(\'' + b.key + '\')"></rect>';
     if (b.total > 0) {
       s += '<text x="' + (x + barW / 2) + '" y="' + (y(b.total) - 4).toFixed(1) + '" text-anchor="middle" font-size="9" font-weight="700" fill="#334155">' + b.total.toFixed(1) + '</text>';
       const pct = Math.round(b.armM3 / b.total * 100);
       if (pct < 100) s += '<text x="' + (x + barW / 2) + '" y="' + (y(b.total) - 13).toFixed(1) + '" text-anchor="middle" font-size="8" fill="#16a34a">✓' + pct + '%</text>';
     }
     if (b.sin) { s += '<text x="' + (x + barW / 2) + '" y="' + (baseY + 13) + '" text-anchor="middle" font-size="8.5" fill="' + OCUP_SINFECHA_COL + '" font-weight="700">A prog.</text><text x="' + (x + barW / 2) + '" y="' + (baseY + 24) + '" text-anchor="middle" font-size="7.5" fill="#94a3b8">sin fecha</text>'; }
-    else { const lc = b.isToday ? "#7c3aed" : ((b.dow === 0 || b.dow === 6) ? "#cbd5e1" : "#64748b"); s += '<text x="' + (x + barW / 2) + '" y="' + (baseY + 13) + '" text-anchor="middle" font-size="9" fill="' + lc + '"' + (b.isToday ? ' font-weight="700"' : '') + '>' + _OCUP_DOW[b.dow] + '</text><text x="' + (x + barW / 2) + '" y="' + (baseY + 24) + '" text-anchor="middle" font-size="8.5" fill="' + lc + '">' + b.dom + '/' + b.mon + '</text>'; if (b.isToday) s += '<text x="' + (x + barW / 2) + '" y="' + (padT - 6) + '" text-anchor="middle" font-size="8.5" fill="#7c3aed" font-weight="700">HOY</text>'; }
+    else { const lc = b.isToday ? "#7c3aed" : ((b.dow === 0 || b.dow === 6) ? "#cbd5e1" : "#64748b"); s += '<text x="' + (x + barW / 2) + '" y="' + (baseY + 13) + '" text-anchor="middle" font-size="9" fill="' + lc + '"' + (b.isToday ? ' font-weight="700"' : '') + '>' + _OCUP_DOW[b.dow] + '</text><text x="' + (x + barW / 2) + '" y="' + (baseY + 24) + '" text-anchor="middle" font-size="8.5" fill="' + lc + '">' + b.dom + '/' + b.mon + '</text>'; if (b.isToday) s += '<text x="' + (x + barW / 2) + '" y="' + (padT - 6) + '" text-anchor="middle" font-size="8.5" fill="#7c3aed" font-weight="700">HOY</text>'; s += '<rect x="' + (x - 4) + '" y="' + (baseY + 2) + '" width="' + (barW + 8) + '" height="' + (padB - 4) + '" fill="transparent" ondragover="event.preventDefault()" ondrop="pppOcupDrop(event,\'' + b.key + '\')" onclick="pppOcupDay(\'' + b.key + '\')"></rect>'; }
   }
   s += '<line x1="' + padL + '" y1="' + baseY + '" x2="' + (W - padR) + '" y2="' + baseY + '" stroke="#cbd5e1"/></svg>';
   return s;
@@ -17423,18 +17458,25 @@ function _ocupWeekSvg(wd, cap, showSin, todayKey) {
 function _ocupSizeDot(m3) { return '<span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:' + OCUP_BK[_ocupSizeBucket(m3)].col + ';margin-right:5px;vertical-align:middle"></span>'; }
 function _ocupWeekDetailHtml(wd) {
   const DOWL = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+  // "A programar": chips arrastrables/tocables para asignar a un día (plan LOCAL).
+  if (_ocupSelKey === "SINFECHA") {
+    const peds = wd.sinFecha.pedidos.slice().sort(function (a, b) { return b.m3 - a.m3; });
+    let h = '<div class="ppp-ocup-detail"><h4>📋 A programar (sin fecha) · ' + wd.sinFecha.total.toFixed(2) + ' m³ · ' + peds.length + ' pedido(s)</h4>';
+    if (!peds.length) return h + '<div class="ppp-ocup-empty">Nada sin fecha 🎉</div></div>';
+    h += '<div class="ppp-ocup-hint">Arrastrá un pedido a un día del gráfico (o tocalo y después tocá el día) para asignarlo. Es planificación <b>LOCAL</b> — no toca la PPP real.</div><div class="ppp-ocup-chips">';
+    for (const p of peds) h += '<span class="ppp-ocup-chip' + (_ocupPlanSel === String(p.np) ? ' sel' : '') + '" draggable="true" ondragstart="pppOcupDragStart(event,\'' + p.np + '\')" onclick="pppOcupChipSel(\'' + p.np + '\')" title="Arrastrar o tocar para asignar">' + _ocupSizeDot(p.m3) + '<b>' + escapeHtml(String(p.np)) + '</b> · ' + p.m3.toFixed(2) + ' m³</span>';
+    return h + '</div></div>';
+  }
   let peds = null, ttl = "", tot = 0, armM3 = 0;
-  if (_ocupSelKey === "SINFECHA") { peds = wd.sinFecha.pedidos.slice(); tot = wd.sinFecha.total; armM3 = wd.sinFecha.armM3; ttl = "📋 A programar (sin fecha) · " + tot.toFixed(2) + " m³ · " + peds.length + " pedido(s)"; }
-  else if (_ocupSelKey) { const d = wd.days.filter(function (x) { return x.key === _ocupSelKey; })[0]; if (d) { peds = d.pedidos.slice(); tot = d.total; armM3 = d.armM3; ttl = "🗓️ " + DOWL[d.dow] + " " + d.dom + "/" + d.mon + " · " + tot.toFixed(2) + " m³ · " + peds.length + " pedido(s)"; } }
-  if (!peds) return '<div class="ppp-ocup-empty" style="margin-top:8px">Tocá una barra para ver los pedidos de ese día.</div>';
+  if (_ocupSelKey) { const d = wd.days.filter(function (x) { return x.key === _ocupSelKey; })[0]; if (d) { peds = d.pedidos.slice(); tot = d.total; armM3 = d.armM3; ttl = "🗓️ " + DOWL[d.dow] + " " + d.dom + "/" + d.mon + " · " + tot.toFixed(2) + " m³ · " + peds.length + " pedido(s)"; } }
+  if (!peds) return '<div class="ppp-ocup-empty" style="margin-top:8px">Tocá una barra para ver los pedidos de ese día (o "A prog." para asignar los sin fecha).</div>';
   if (!peds.length) return '<div class="ppp-ocup-detail"><h4>' + escapeHtml(ttl) + '</h4><div class="ppp-ocup-empty">Sin pedidos.</div></div>';
   const pct = tot > 0 ? Math.round(armM3 / tot * 100) : 0;
   peds.sort(_ocupSortPeds);
   let h = '<div class="ppp-ocup-detail"><h4>' + escapeHtml(ttl) + '</h4>';
   h += '<div class="ppp-ocup-arm">🔧 Armado: <b>' + pct + '%</b> (' + armM3.toFixed(2) + ' de ' + tot.toFixed(2) + ' m³) · falta armar <b>' + (tot - armM3).toFixed(2) + '</b> m³</div>';
-  for (const p of peds) h += '<div class="ppp-ocup-det-t">' + _ocupSizeDot(p.m3) + '<b>' + escapeHtml(String(p.np)) + '</b> ' + escapeHtml(String(p.rs || "").slice(0, 26)) + ' <span class="ppp-ent-m3">' + p.m3.toFixed(3) + ' m³</span> ' + (p.armado ? '<span class="ppp-ocup-badge ok">✓ armado</span>' : '<span class="ppp-ocup-badge pend">⏳ a armar</span>') + '</div>';
-  h += '</div>';
-  return h;
+  for (const p of peds) h += '<div class="ppp-ocup-det-t">' + _ocupSizeDot(p.m3) + '<b>' + escapeHtml(String(p.np)) + '</b> ' + escapeHtml(String(p.rs || "").slice(0, 26)) + ' <span class="ppp-ent-m3">' + p.m3.toFixed(3) + ' m³</span> ' + (p.plan ? '<span class="ppp-ocup-badge plan">📋 plan</span> <button class="ppp-ocup-x" onclick="pppOcupUnplan(\'' + p.np + '\')" title="Quitar del plan">✕</button>' : (p.armado ? '<span class="ppp-ocup-badge ok">✓ armado</span>' : '<span class="ppp-ocup-badge pend">⏳ a armar</span>')) + '</div>';
+  return h + '</div>';
 }
 function pppOcupHtml() {
   if (_pppDeliveredFull == null) return '<div class="planim-empty">Cargando ocupación…</div>';
@@ -17459,6 +17501,13 @@ function pppOcupHtml() {
   sel += '</div>';
   let h = sel;
   h += '<div class="ppp-ocup-wkttl">📅 Semana del <b>' + wd.mon.getDate() + '/' + (wd.mon.getMonth() + 1) + '</b> al <b>' + wkEnd.getDate() + '/' + (wkEnd.getMonth() + 1) + '</b>' + (_ocupWeek === 0 ? ' (actual)' : (_ocupWeek < 0 ? ' (' + (-_ocupWeek) + ' atrás)' : ' (+' + _ocupWeek + ')')) + ' · 🔧 Armado <b>' + wkPct + '%</b></div>';
+  const planN = _ocupPlanCount();
+  if (_ocupPlanSel || planN) {
+    h += '<div class="ppp-ocup-planbar">';
+    if (_ocupPlanSel) h += '<span class="ppp-ocup-planmsg">✋ Asignando <b>NP ' + escapeHtml(String(_ocupPlanSel)) + '</b> — tocá un día. <button class="ppp-ocup-x" onclick="pppOcupChipSel(\'' + _ocupPlanSel + '\')">✕</button></span>';
+    if (planN) h += '<button class="ppp-ocup-clear" onclick="pppOcupClearPlan()">🧹 Limpiar plan (' + planN + ')</button>';
+    h += '</div>';
+  }
   h += '<div class="ppp-ocup-kpis">' +
     '<div class="ppp-ocup-kpi"><div class="v">' + wkTot.toFixed(1) + '</div><div class="l">m³ de la semana</div></div>' +
     '<div class="ppp-ocup-kpi"><div class="v">' + wkPct + '%</div><div class="l">armado</div></div>' +

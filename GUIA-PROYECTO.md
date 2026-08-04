@@ -4,7 +4,21 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-03 · Versión app al documentar: **v7.03**
+> Última actualización: 2026-08-03 · Versión app al documentar: **v7.04**
+>
+> Nota: **v7.04 — Ocupación: drag&drop de "A programar" a días (planificación LOCAL)**. Completa el
+> #3 del usuario. Se pueden **arrastrar** los pedidos "a programar" (chips en el detalle de la barra
+> ámbar) a un día del gráfico, o **tocar el chip y después el día** (fallback touch, robusto). Asigna
+> una `fecha_entrega` **solo en el navegador** (localStorage `vir_ocup_plan = {np:"YYYYMMDD"}`) — NO
+> toca la PPP real (elección del usuario: proyección/planificación). El pedido planificado se dibuja
+> en su día en **ámbar con borde punteado** (color plan), suma a la ocupación proyectada de ese día,
+> y sale de la barra "A programar". Reversible: **✕** por pedido en el detalle + botón **"🧹 Limpiar
+> plan (N)"**. Drop targets = segmentos de cada día + zona de la etiqueta del día; en modo asignar
+> (`_ocupPlanSel`) los días se resaltan en verde. Funciones: `_ocupLoadPlan`/`_ocupSavePlan`,
+> `pppOcupAssign`, `pppOcupUnplan`, `pppOcupClearPlan`, `pppOcupChipSel`, `pppOcupDragStart`,
+> `pppOcupDrop`; `_ocupUnified` mueve los planificados de `sinFecha`→`dated` con flag `plan`. Verificado:
+> render headless del flujo tocar-chip→tocar-día (el pedido migra al día en ámbar, aparece "Limpiar
+> plan", badge 📋 plan + ✕). `checkhtml` + `smoke` OK. Bump **v7.04**.
 >
 > Nota: **v7.03 — Ocupación: armado vs a-entregar (%) + apilado POR PEDIDO + tooltip + escala del
 > histórico**. Tres pedidos del usuario. **(1) Comparativa armado vs a-entregar**: cada pedido trae
