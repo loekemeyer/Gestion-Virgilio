@@ -48,6 +48,71 @@ const sessionReady = (async () => {
 
 /* ============== Estado del puente con Producción ============== */
 const RECP = { legajo: null, dayKey: null };
+
+/* ===== BORRADOR de la recepción en curso (v7.09) =====
+   Si el operario arranca una recepción y se va para atrás / cierra la pantalla,
+   NO se pierde: el estado (tallerista, línea, fecha, remito y las cajas ya
+   marcadas) queda en localStorage por legajo+día. Producción lo lee para mostrar
+   el botón "▶ Reanudar" en "Resumen de hoy" (window.recepcionDraftInfo) y lo
+   restaura con window.reanudarRecepcionOp, volviendo al MISMO paso donde estaba.
+   El borrador se borra al enviar la recepción o al empezar una nueva. */
+const RCP_DRAFT_PREFIX = "vir_recepcion_draft_";
+function rcpDraftKey(legajo, dayKey) { return RCP_DRAFT_PREFIX + String(legajo || "") + "_" + String(dayKey || ""); }
+function rcpDraftNotify() {
+  try { if (typeof window.onRecepcionDraftChange === "function") window.onRecepcionDraftChange(); }
+  catch (_e) { /* no-op */ }
+}
+function rcpDraftClear(silencioso) {
+  try { if (RECP.legajo && RECP.dayKey) localStorage.removeItem(rcpDraftKey(RECP.legajo, RECP.dayKey)); }
+  catch (_e) { /* no-op */ }
+  if (!silencioso) rcpDraftNotify();
+}
+function rcpDraftSave() {
+  // Sólo el flujo del OPERARIO (entró por RT, con legajo). El supervisor que entra
+  // por el menú de Administración no deja borrador.
+  if (!RECP.legajo || !RECP.dayKey || opState.fromMenu === true) return;
+  const cargas = opState.cargas || {};
+  const hayAlgo = !!opState.tallNombre || Object.keys(cargas).length > 0;
+  if (!hayAlgo) { rcpDraftClear(); return; }   // todavía no eligió nada: no hay qué reanudar
+  try {
+    localStorage.setItem(rcpDraftKey(RECP.legajo, RECP.dayKey), JSON.stringify({
+      v: 1, ts: Date.now(), step: opState.step,
+      tipo: opState.tipo, tallCod: opState.tallCod, tallNombre: opState.tallNombre,
+      tallCods: opState.tallCods, articulosManual: opState.articulosManual,
+      linea: opState.linea, fecha: opState.fecha, remito: opState.remito,
+      articulos: opState.articulos, cargas: cargas
+    }));
+  } catch (_e) { /* localStorage lleno / modo privado: no rompe la carga */ }
+  rcpDraftNotify();
+}
+function rcpDraftLoad(legajo, dayKey) {
+  const hoy = String(dayKey || "");
+  const pref = RCP_DRAFT_PREFIX + String(legajo || "") + "_";
+  let d = null;
+  try {
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const k = localStorage.key(i);
+      if (!k || k.indexOf(pref) !== 0) continue;
+      if (k === pref + hoy) { try { d = JSON.parse(localStorage.getItem(k) || "null"); } catch (_e) { d = null; } }
+      // Sólo se limpia lo ANTERIOR al día consultado (YYYY-MM-DD compara bien como
+      // texto). Con `!==` una consulta por otro día borraba el borrador de hoy.
+      else if (k.slice(pref.length) < hoy) localStorage.removeItem(k);
+    }
+  } catch (_e) { return null; }
+  return (d && typeof d === "object") ? d : null;
+}
+/* Resumen del borrador para el botón de "Resumen de hoy" (lo llama index.html). */
+window.recepcionDraftInfo = function (legajo, dayKey) {
+  const d = rcpDraftLoad(legajo, dayKey);
+  if (!d) return null;
+  const cargas = d.cargas || {};
+  const cods = Object.keys(cargas).filter(function (c) { return cargas[c] > 0; });
+  let cajas = 0; cods.forEach(function (c) { cajas += Number(cargas[c]) || 0; });
+  return {
+    nombre: displayName(d.tallNombre || ""), linea: d.linea || "", remito: d.remito || "",
+    fecha: d.fecha || "", codigos: cods.length, cajas: cajas, step: d.step || "", ts: d.ts || 0
+  };
+};
 function recpAddCajas(n) {
   try {
     if (!RECP.legajo || !RECP.dayKey || !n) return;
@@ -294,12 +359,45 @@ function opResetState() {
 function openOp() {
   opResetState();
   opState.fromMenu = false;     // operario (RT) entra directo a la carga, sin menú
+  rcpDraftClear(true);          // v7.09: recepción NUEVA → el borrador anterior ya no sirve
   opPage.classList.remove("pendWide");
   opPage.classList.add("open");
   renderTipoElegir();
 }
+/* v7.09 — REANUDAR: vuelve a la recepción que el operario dejó por la mitad, en el
+   MISMO paso en el que estaba (lo llama el botón "▶ Reanudar" de "Resumen de hoy").
+   Sin borrador cae al flujo normal, así el botón nunca deja al operario colgado. */
+window.reanudarRecepcionOp = function (legajo, dayKey) {
+  RECP.legajo = String(legajo || "").trim() || null;
+  RECP.dayKey = dayKey || opTodayStr();
+  const d = rcpDraftLoad(RECP.legajo, RECP.dayKey);
+  if (!d) { openOp(); return; }
+  opResetState();
+  opState.fromMenu = false;
+  opState.tipo = d.tipo || null;
+  opState.tallCod = d.tallCod || null;
+  opState.tallNombre = d.tallNombre || null;
+  opState.tallCods = d.tallCods || null;
+  opState.articulosManual = d.articulosManual || null;
+  opState.linea = d.linea || null;
+  opState.fecha = d.fecha || opTodayStr();
+  opState.remito = d.remito || "";
+  opState.articulos = d.articulos || null;
+  opState.cargas = d.cargas || {};
+  opPage.classList.remove("pendWide");
+  opPage.classList.add("open");
+  if (d.step === "resumen" && Object.keys(opState.cargas).length) renderResumen();
+  else if (d.step === "articulos" && opState.linea) renderArticulos();
+  else if (d.step === "remito" && opState.linea) renderRemito();
+  else if (opState.tallNombre) renderLinea();
+  else renderTipoElegir();
+};
 let _pendTimer = null;   // timer del "hace X hs" en vivo de Pendientes
-function closeOp() { opPage.classList.remove("open"); if (_pendTimer) { clearInterval(_pendTimer); _pendTimer = null; } }
+function closeOp() {
+  rcpDraftSave();   // v7.09: salir NO pierde la recepción a medio cargar
+  opPage.classList.remove("open");
+  if (_pendTimer) { clearInterval(_pendTimer); _pendTimer = null; }
+}
 opClose.onclick = closeOp;
 
 opBack.onclick = () => {
@@ -467,6 +565,13 @@ function renderLista(tipo) {
   grid.id = "opListaGrid";
   grid.className = "opLista";
   opBody.appendChild(grid);
+  // Al REANUDAR se entra directo a un paso interno, así que la lista de
+  // talleristas puede no estar cargada todavía: se trae acá si falta.
+  if (opState.entidades === null) {
+    grid.innerHTML = '<div class="opEmpty">Cargando…</div>';
+    cargarEntidades().then(function () { if (opState.step === "lista") drawLista(search.value); });
+    return;
+  }
   drawLista("");
 }
 
@@ -554,6 +659,7 @@ function renderLinea() {
     row.appendChild(b);
   });
   opBody.appendChild(row);
+  rcpDraftSave();
 }
 
 /* ============== Paso 3: N° RTO/FC ============== */
@@ -597,6 +703,7 @@ function renderRemito() {
   opBody.appendChild(field);
 
   opActions.innerHTML = "";
+  rcpDraftSave();
 }
 
 /* ============== Órdenes de Compra vigentes (v7.07) ==============
@@ -833,6 +940,7 @@ function drawArticulosGrid() {
   enviarBtn.disabled = total === 0;
   enviarBtn.onclick = renderResumen;
   opActions.appendChild(enviarBtn);
+  rcpDraftSave();
 }
 
 /* ============== Agregar artículo a Log/Fabr (botón "+") ==============
@@ -950,6 +1058,7 @@ function renderResumen() {
   conf.onclick = opEnviar;
   opActions.appendChild(volver);
   opActions.appendChild(conf);
+  rcpDraftSave();
 }
 
 /* ============== Popup de cajas ============== */
@@ -1077,6 +1186,7 @@ async function opEnviar() {
 
   // Suma al acumulador del día para que Producción cierre RT con esta cantidad.
   recpAddCajas(totalCajas);
+  rcpDraftClear();   // v7.09: ya se envió, no hay nada que reanudar
 
   // v4.06: STOCK — lo recibido ENTRA a "Mercadería a guardar" (Movimientos_Stock).
   // Best-effort; si falla, queda en vir_stock_pend y lo reintenta index.html (stockFlushPend).
