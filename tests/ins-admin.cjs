@@ -102,6 +102,7 @@ catch (_e) {
       if (url.indexOf("/Insumos") >= 0) return J(CAT);
       if (url.indexOf("vista_saldos_insumos_x_unidad") >= 0) {
         return J([{ cod_art: "TMP-0001", unidad: "Bolsas", saldo: 7 }, { cod_art: "22", unidad: "kg", saldo: 1483.95 },
+                  { cod_art: "PP", unidad: "Bolsas", saldo: 50 },
                   { cod_art: "505C·CUCHILLA CHINA", unidad: "Uni", saldo: -16000 }]);
       }
       return J([]);
@@ -235,12 +236,11 @@ catch (_e) {
     stkInsAbrir("fleje");
     out.listadoAbre = /Agregar insumo a esta categor/.test(document.getElementById("stkBody").innerHTML);
     const tblF = document.querySelectorAll("#stkBody .stk-catlist table");
-    out.listadoFleje = tblF.length ? tblF[0].querySelectorAll("tbody tr").length : 0;   // 2 (22 y 5)
+    out.listadoFleje = tblF.length ? tblF[0].querySelectorAll("tbody tr").length : 0;   // 1 (solo 22; el 5 está en 0)
     out.listadoNoTraePP = tblF.length ? !/POLIPROPILENO/.test(tblF[0].innerHTML) : false;
-    // 0-code: el fleje "5" (38 X 0,55) no tiene saldo → igual muestra su unidad de
-    // categoría (Kg) en la columna Unidad, no "—".
-    const tr5 = tblF.length ? Array.prototype.filter.call(tblF[0].querySelectorAll("tbody tr"), function (tr) { return /38 X 0,55/.test(tr.textContent); })[0] : null;
-    out.ceroMuestraUni = !!tr5 && tr5.querySelectorAll("td")[5].textContent.trim() === "Kg";
+    // v7.37: un código en 0 (fleje "5", 38 X 0,55) NO se lista en su categoría — no
+    // ensucia la vista con lo que quedó neteado / sin stock.
+    out.ceroOcultoEnCat = tblF.length ? !/38 X 0,55/.test(tblF[0].innerHTML) : false;
     _stkIns.nuevoEn = "fleje"; stkRender();
     document.getElementById("nvCod").value = "7654321";
     await stkInsAlta("fleje");
@@ -292,6 +292,10 @@ catch (_e) {
     out.hayTablaTotal = /Todos los insumos/.test(document.getElementById("stkBody").innerHTML);
     out.totalCols = Array.prototype.map.call(tot.querySelectorAll("thead tr")[0].querySelectorAll("th"), function (e) { return e.textContent.trim(); }).join("|");
     out.totalFilas = tot.querySelectorAll("tbody tr").length;
+    // v7.37: el 0-code oculto de la categoría SIGUE en «Todos los insumos», con su unidad
+    // de categoría (Kg) en vez de "—" (fallback de v7.34). Nada se pierde.
+    const tr5Todos = Array.prototype.filter.call(tot.querySelectorAll("tbody tr"), function (tr) { return /38 X 0,55/.test(tr.textContent); })[0];
+    out.ceroEnTodosConUni = !!tr5Todos && /Kg/.test(tr5Todos.querySelectorAll("td")[5].textContent);
     out.totalSinEditar = !tot.querySelector("tbody input") && !tot.querySelector("tbody select");
     out.totalHayFiltros = !!tot.querySelector("thead tr.stk-filtros input");
     stkInsFiltro("cod", "22");
@@ -361,7 +365,8 @@ catch (_e) {
     r.ajusteN === 2 && r.ajusteSaca === true && r.ajustePone === true && r.ajusteSobreTmp === true &&
     r.borraTmpSinSaldo === true && r.borrarConSaldoAvisa === true && r.borrarCerorea === true &&
     r.nCajasCat === 6 && r.sinDepurar === true && r.catDetalle === true && r.catMuestraUnis === true &&
-    r.listadoOculto === true && r.listadoAbre === true && r.listadoFleje === 2 && r.listadoNoTraePP === true && r.ceroMuestraUni === true &&
+    r.listadoOculto === true && r.listadoAbre === true && r.listadoFleje === 1 && r.listadoNoTraePP === true &&
+    r.ceroOcultoEnCat === true && r.ceroEnTodosConUni === true &&
     r.altaEnSuCat === true &&
     r.catEditAbre === true && r.catGuardaNombre === "Cajas y embalaje" && r.catGuardaUnis === "Paquetes,Uni,MC" &&
     r.haySecUnidades === true && r.uniSacar === true && r.uniUsadaAvisa === true && r.uniLibreNoAvisa === true &&

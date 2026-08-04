@@ -12300,7 +12300,10 @@ function _stkInsPend(pend) {
 /* ---------- (2) CATEGORÍAS (con sus insumos adentro) ---------- */
 function _stkInsCats(items, pend) {
   const cnt = {};
-  items.forEach(function (it) { if (_stkInsPendiente(it)) return; const k = insCatDef(it.cat) ? it.cat : ""; cnt[k] = (cnt[k] || 0) + 1; });
+  // Los que quedaron en 0 (neteados / sin stock) NO se listan en su categoría (pedido
+  // del usuario): sólo cuentan y se muestran los que tienen saldo. Siguen enteros en la
+  // tabla «Todos los insumos» de abajo (la foto completa).
+  items.forEach(function (it) { if (_stkInsPendiente(it) || !_stkInsConStock(it)) return; const k = insCatDef(it.cat) ? it.cat : ""; cnt[k] = (cnt[k] || 0) + 1; });
   let h = _stkSec("cats", "🗂 Categorías", INS_CATS.length);
   if (!_stkAbierta("cats")) return h;
   h += '<div class="stk-cut">Cada categoría define <b>cómo la ve el operario</b>: el nombre, y en qué <b>unidades</b> puede cargar sus insumos. <b>Una sola</b> unidad = queda fija; <b>varias</b> = el operario elige entre ésas; <b>ninguna</b> = cualquiera de las de abajo.</div>';
@@ -12360,6 +12363,7 @@ function _stkInsListado(k, items) {
   const f = (_stkIns.filtro || "").toLowerCase().trim();
   const lista = items.filter(function (it) {
     if (_stkInsPendiente(it)) return false;
+    if (!_stkInsConStock(it)) return false;   // en 0 = no se lista acá (queda en «Todos los insumos»)
     const c = insCatDef(it.cat) ? it.cat : "";
     if (k === "?" ? c !== "" : c !== k) return false;
     return !f || (it.cod + " " + it.nombre + " " + it.ubic).toLowerCase().indexOf(f) >= 0;
