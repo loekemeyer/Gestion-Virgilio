@@ -2695,6 +2695,27 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
   .analisis-day-row{ grid-template-columns: 1fr 1fr 1fr; }
   .analisis-day-label{ grid-column: 1 / -1; }
 }
+/* v7.43 — "Producción por día" ahora lista 28 días hábiles: el recuadro conserva su
+   tamaño y el listado scrollea adentro (Hoy queda arriba de todo). */
+#analisisModal .analisis-day-totals{
+  max-height: clamp(300px, 46vh, 460px);
+  overflow-y: auto;
+  padding-right: 4px;
+}
+/* v7.43 — encabezado de cada gráfico: título + selector de período (última semana …
+   último año) alineados. El <select> va oscuro, acorde al modal. */
+#analisisModal .an-chart-head{
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; flex-wrap: wrap; margin-bottom: 8px;
+}
+#analisisModal .an-range-sel{
+  background: #0b1220; color: #e2e8f0; border: 1px solid #334155; border-radius: 8px;
+  padding: 5px 9px; font-size: 12px; font-weight: 600; width: auto; cursor: pointer;
+}
+/* v7.43 — "Rendimiento de operarios" (ex módulo Productividad) embebido: la tarjeta
+   clara .prod-card se adapta al modal oscuro (ancho completo, sin sombra de modal). El
+   contenido interno sigue siendo claro con texto oscuro → queda como un panel-sección. */
+#analisisModal .prod-card{ max-width: 100%; margin: 0; box-shadow: none; }
 
 /* Modal a pantalla completa pero contenido limitado a 1100px centrado —
    no tiene sentido estirar las filas al ancho de un monitor 24". */
@@ -2985,24 +3006,52 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
     <button class="hist-modal-close" onclick="closeAnalisis()" style="background:#1e293b;color:#f8fafc;border-color:#334155;width:auto;margin:0;flex:0 0 auto;">Cerrar</button>
   </div>
   <div class="analisis-body">
-    <!-- Producción por día: m3 picking + m3 pedido + empleados, hoy y últimos
-         días. Usa m3 del Sheet PPP (NO restringido a tandas a FC). -->
+    <!-- Producción por día: m3 picking + m3 pedido + empleados. Hoy en vivo +
+         últimos 28 días CONTABLES (se ocultan sábados/domingos sin m³ pickeado ni
+         pedido). El listado scrollea manteniendo el tamaño del recuadro. -->
     <div id="analisisDayTotalsCard" class="monitor-chart-card">
-      <div class="monitor-chart-title">📊 Producción por día (m³)</div>
+      <div class="monitor-chart-title">📊 Producción por día (m³) · últimos 28 días hábiles</div>
       <div id="analisisDayTotals" class="analisis-day-totals">
         <div class="monitor-chart-empty">Cargando…</div>
       </div>
     </div>
     <div id="prodChartPicking" class="monitor-chart-card">
-      <div class="monitor-chart-title">📊 Productividad Picking (m3/h)</div>
+      <div class="an-chart-head">
+        <div class="monitor-chart-title">📊 Productividad Picking (m3/h)</div>
+        <select class="an-range-sel" id="prodRangePick" onchange="prodChartSetRange('pick', this.value)" title="Período a mostrar (saltea sábados/domingos sin datos)">
+          <option value="7">Última semana</option>
+          <option value="30">Último mes</option>
+          <option value="90">Últimos 3 meses</option>
+          <option value="180">Últimos 6 meses</option>
+          <option value="ytd">YTD (este año)</option>
+          <option value="365">Último año</option>
+        </select>
+      </div>
       <div class="monitor-chart-canvas-wrap"><canvas id="prodCanvasPicking"></canvas></div>
     </div>
-    <div id="prodChartPickingEmpty" class="monitor-chart-card monitor-chart-empty" style="display:none">Sin datos de picking en los últimos 7 días</div>
+    <div id="prodChartPickingEmpty" class="monitor-chart-card monitor-chart-empty" style="display:none">Sin datos de picking en el período</div>
     <div id="prodChartPedido" class="monitor-chart-card">
-      <div class="monitor-chart-title">📈 Productividad Pedido (m3/h)</div>
+      <div class="an-chart-head">
+        <div class="monitor-chart-title">📈 Productividad Pedido (m3/h)</div>
+        <select class="an-range-sel" id="prodRangePed" onchange="prodChartSetRange('ped', this.value)" title="Período a mostrar (saltea sábados/domingos sin datos)">
+          <option value="7">Última semana</option>
+          <option value="30">Último mes</option>
+          <option value="90">Últimos 3 meses</option>
+          <option value="180">Últimos 6 meses</option>
+          <option value="ytd">YTD (este año)</option>
+          <option value="365">Último año</option>
+        </select>
+      </div>
       <div class="monitor-chart-canvas-wrap"><canvas id="prodCanvasPedido"></canvas></div>
     </div>
-    <div id="prodChartPedidoEmpty" class="monitor-chart-card monitor-chart-empty" style="display:none">Sin datos de pedido en los últimos 7 días</div>
+    <div id="prodChartPedidoEmpty" class="monitor-chart-card monitor-chart-empty" style="display:none">Sin datos de pedido en el período</div>
+    <!-- Rendimiento de operarios: antes era el módulo "Productividad" (overlay 📊
+         aparte). v7.43: fusionado acá como SECCIÓN debajo de los gráficos. Se
+         renderiza en #prodBody con prodRender(); openAnalisis() dispara prodLoad(). -->
+    <div id="analisisProdSection" class="prod-card">
+      <div class="prod-head"><span class="prod-title">📊 Rendimiento de operarios</span></div>
+      <div class="prod-body" id="prodBody"><div class="prod-empty">Cargando…</div></div>
+    </div>
   </div>
 </div>
 
@@ -3315,7 +3364,6 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
     <!-- CHICOS: uso ocasional. -->
     <div class="sup-actions sup-secondary">
       <button class="sup-action-btn" onclick="openAgentesAdmin()"><span class="sup-ico">🤖</span><span>Agentes</span></button>
-      <button class="sup-action-btn" onclick="openProductividad()"><span class="sup-ico">📊</span><span>Productividad</span></button>
       <button class="sup-action-btn" onclick="openMonitor()"><span class="sup-ico">📊</span><span>Monitor de operarios</span></button>
       <button class="sup-action-btn" onclick="openAnalisis()"><span class="sup-ico">📈</span><span>Análisis de productividad</span></button>
       <button class="sup-action-btn" onclick="openInconsistencias()"><span class="sup-ico">⚠</span><span>Inconsistencias</span></button>
@@ -5922,7 +5970,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.42";
+const APP_VERSION = "v7.43";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -10583,20 +10631,21 @@ function abastRender() {
 function abastToggle(codEnc) { if (!_abast) return; const cod = decodeURIComponent(codEnc); _abast.openCod = (_abast.openCod === cod) ? null : cod; if (_abast.openCod == null) _abast.mesesAll = false; abastRender(); }
 function abastToggleMeses() { if (!_abast) return; _abast.mesesAll = !_abast.mesesAll; abastRender(); }
 
-async function openProductividad() {
+function prodEnsureCss() {
   if (!document.getElementById("prodCss")) {
     const s = document.createElement("style"); s.id = "prodCss";
     s.textContent = "#prodOverlay{display:none;position:fixed;inset:0;z-index:1280;background:rgba(2,6,23,.74);overflow:auto;padding:14px;}#prodOverlay.show{display:block;}.prod-card{background:#f8fafc;max-width:880px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.prod-head{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:linear-gradient(90deg,#1d4ed8,#0b2a6b);color:#fff;}.prod-title{font-size:19px;font-weight:800;}.prod-close{background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;width:auto;}.prod-body{padding:14px 16px;}.prod-empty{padding:24px;text-align:center;color:#64748b;}.prod-bar2{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px;}.prod-period{font-size:12px;color:#64748b;}.prod-tg{display:inline-flex;align-items:center;gap:6px;cursor:pointer;user-select:none;}.prod-tg-l{font-size:12px;font-weight:700;color:#94a3b8;}.prod-tg-l.on{color:#1d4ed8;}.prod-sw{display:inline-block;width:34px;height:18px;border-radius:999px;background:#94a3b8;position:relative;transition:background .15s;}.prod-sw.on{background:#1d4ed8;}.prod-sw-k{position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;transition:left .15s;box-shadow:0 1px 2px rgba(0,0,0,.3);}.prod-sw.on .prod-sw-k{left:18px;}.prod-summary{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:11px 14px;margin-bottom:10px;}.prod-sum-row{display:flex;gap:18px;flex-wrap:wrap;}.prod-sum-row>div{display:flex;flex-direction:column;}.prod-sum-row b{font-size:18px;color:#0f172a;font-variant-numeric:tabular-nums;}.prod-sum-row span{font-size:11px;color:#64748b;}.prod-best{font-size:12.5px;color:#334155;margin-top:8px;border-top:1px solid #f1f5f9;padding-top:7px;}.prod-note{font-size:11.5px;color:#64748b;background:#f1f5f9;border-radius:8px;padding:8px 11px;margin-bottom:12px;}.prod-group-h{font-size:14px;font-weight:800;color:#0f172a;margin:14px 0 8px;}.prod-op{border:1px solid #e2e8f0;border-radius:12px;padding:12px 14px;margin-bottom:10px;background:#fff;}.prod-op-h{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:8px;}.prod-op-leg{font-weight:800;font-size:15px;color:#0f172a;}.prod-rank{display:inline-block;background:#0f172a;color:#fff;border-radius:6px;font-size:11px;padding:1px 6px;font-weight:800;margin-right:4px;}.prod-leg-id{font-size:11px;color:#94a3b8;font-weight:600;}.prod-op-rol{font-size:11.5px;font-weight:800;padding:2px 9px;border-radius:999px;}.prod-rol-arm{background:#ede9fe;color:#6d28d9;}.prod-rol-pick{background:#dbeafe;color:#1d4ed8;}.prod-kpi-u{font-size:13px;font-weight:700;color:#64748b;}.prod-up{color:#16a34a;font-size:14px;}.prod-down{color:#dc2626;font-size:14px;}.prod-flat{color:#94a3b8;font-size:13px;}.prod-approx{background:#fef9c3;color:#854d0e;font-size:10px;font-weight:700;padding:1px 6px;border-radius:6px;}.prod-spark{display:flex;gap:6px;align-items:flex-end;margin-top:10px;justify-content:flex-start;}.prod-sp{width:30px;display:flex;flex-direction:column;align-items:center;gap:3px;}.prod-sp-bar{width:100%;max-width:24px;border-radius:3px 3px 0 0;background:#93c5fd;}.prod-sp-l{font-size:9px;color:#94a3b8;}.prod-brk-h{font-size:12px;color:#334155;margin:11px 0 5px;}.prod-brk{display:flex;height:14px;border-radius:7px;overflow:hidden;background:#e2e8f0;}.prod-brk-seg{height:100%;}.prod-brk-leg{display:flex;flex-wrap:wrap;gap:8px;margin-top:5px;font-size:10.5px;color:#475569;}.prod-brk-leg span{display:inline-flex;align-items:center;gap:3px;}.prod-brk-leg i{width:9px;height:9px;border-radius:2px;display:inline-block;}.prod-dates{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:10px;background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:8px 11px;}.prod-dates label{font-size:11px;color:#64748b;font-weight:700;}.prod-dates input[type=date]{padding:4px 6px;border:1px solid #cbd5e1;border-radius:7px;font-size:12px;width:auto;color:#0f172a;}.prod-preset{background:#e2e8f0;border:none;border-radius:7px;padding:4px 10px;font-size:11px;font-weight:700;color:#334155;cursor:pointer;width:auto;}.prod-exc{font-size:10.5px;color:#b45309;margin-top:4px;}.prod-rates{display:flex;flex-wrap:wrap;gap:10px 18px;margin-bottom:8px;}.prod-rate{flex:1;min-width:140px;}.prod-rate-top{display:flex;align-items:baseline;gap:5px;flex-wrap:wrap;}.prod-rate-big{font-size:26px;font-weight:900;font-variant-numeric:tabular-nums;line-height:1;}.prod-rb-arm{color:#6d28d9;}.prod-rb-pick{color:#1d4ed8;}.prod-rate-sub{font-size:11.5px;color:#475569;margin-top:3px;}.prod-team2{font-size:12.5px;color:#334155;margin-top:7px;}.prod-team2 b{font-variant-numeric:tabular-nums;}.prod-rate-name{font-size:15px;font-weight:800;margin-bottom:1px;}.prod-brk-seg{cursor:pointer;}.prod-chip{cursor:pointer;padding:1px 4px;border-radius:5px;}.prod-chip:hover{background:#eef2ff;}.prod-brk-hint{font-size:10px;color:#94a3b8;font-weight:600;}.prod-det{background:#f8fafc;border:1px solid #e2e8f0;border-radius:9px;padding:8px 10px;margin-top:7px;max-height:250px;overflow:auto;}.prod-det-h{font-size:12.5px;font-weight:800;color:#0f172a;display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:5px;position:sticky;top:0;background:#f8fafc;}.prod-det-x{cursor:pointer;color:#64748b;font-weight:800;}.prod-det-r{display:flex;justify-content:space-between;gap:10px;font-size:11.5px;color:#475569;padding:2px 0;border-top:1px solid #eef2f6;}.prod-det-r span:first-child{font-weight:600;color:#334155;white-space:nowrap;}.prod-det-r span:last-child{text-align:right;}.prod-det-empty{font-size:11.5px;color:#94a3b8;padding:4px 0;}.prod-op-c{cursor:pointer;padding:11px 14px;}.prod-op-c:active{background:#f8fafc;}.prod-chev{color:#94a3b8;font-size:11px;}.prod-row1{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;}.prod-row1-r{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;justify-content:flex-end;}.prod-mini-grp{display:inline-flex;align-items:baseline;white-space:nowrap;}.prod-mini{font-size:22px;font-weight:900;font-variant-numeric:tabular-nums;white-space:nowrap;line-height:1;}.prod-mini-u{font-size:11px;color:#94a3b8;font-weight:700;}.prod-mini-poco{opacity:.5;}.prod-viewseg{display:flex;gap:6px;margin-bottom:10px;}.prod-vbtn{flex:1;background:#e2e8f0;border:none;border-radius:8px;padding:7px 10px;font-size:12.5px;font-weight:800;color:#334155;cursor:pointer;}.prod-vbtn.on{background:#1d4ed8;color:#fff;}.prod-tbl{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;}.prod-tbl th{font-size:11.5px;color:#475569;font-weight:800;text-align:right;padding:9px 8px;background:#f1f5f9;cursor:pointer;white-space:nowrap;border-bottom:1px solid #e2e8f0;}.prod-tbl th:first-child{text-align:left;}.prod-tbl th.on{color:#1d4ed8;}.prod-tbl td{font-size:13px;padding:9px 8px;text-align:right;border-bottom:1px solid #f1f5f9;font-variant-numeric:tabular-nums;}.prod-tbl tr{cursor:pointer;}.prod-tbl tbody tr:active{background:#f8fafc;}.prod-tdn{text-align:left;font-weight:700;color:#0f172a;}.prod-tbl td.prod-tdn{text-align:left;}.prod-tdv{font-weight:900;font-size:15px;}.prod-tdn2{color:#64748b;}.prod-tbl-hint{font-size:10.5px;color:#94a3b8;margin-top:6px;}.prod-metas{display:flex;align-items:center;gap:7px;flex-wrap:wrap;font-size:12.5px;color:#334155;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:8px 11px;margin-bottom:10px;}.prod-meta-in{width:64px;padding:3px 6px;border:1px solid #cbd5e1;border-radius:7px;font-size:12.5px;text-align:right;color:#0f172a;font-variant-numeric:tabular-nums;}.prod-metas-h{font-size:11px;color:#a16207;font-weight:600;}.prod-prem{font-size:12px;font-weight:800;padding:1px 6px;border-radius:6px;font-variant-numeric:tabular-nums;white-space:nowrap;margin-left:4px;}.prod-prem-lg{font-size:13px;padding:2px 9px;margin-left:2px;}.prod-prem-pos{background:#dcfce7;color:#15803d;}.prod-prem-neg{background:#fee2e2;color:#b91c1c;}.prod-prem-sub{font-size:10.5px;font-weight:800;margin-top:2px;font-variant-numeric:tabular-nums;}.prod-prem-sub.pos{color:#15803d;}.prod-prem-sub.neg{color:#b91c1c;}";
     document.head.appendChild(s);
   }
-  let ov = document.getElementById("prodOverlay");
-  if (!ov) { ov = document.createElement("div"); ov.id = "prodOverlay"; document.body.appendChild(ov); }
-  ov.classList.add("show");
-  ov.innerHTML = '<div class="prod-card"><div class="prod-head"><span class="prod-title">📊 Rendimiento de operarios</span><button class="prod-close" onclick="closeProductividad()">Cerrar</button></div><div class="prod-body" id="prodBody"><div class="prod-empty">Cargando…</div></div></div>';
-  if (!_prodPeriod) { var hoy = Date.now(); _prodPeriod = { d1: _pvYmd(hoy - 27 * _PV_DAY), d2: _pvYmd(hoy) }; }   // default: últimas 4 semanas
-  prodLoad();
 }
-function closeProductividad() { const ov = document.getElementById("prodOverlay"); if (ov) ov.classList.remove("show"); _prod = null; }
+/* v7.43 — "Productividad" (rendimiento de operarios) se fusionó con "Análisis de
+   productividad": ya no es un overlay propio, sino una SECCIÓN embebida debajo de los
+   gráficos dentro de #analisisModal (se renderiza en #prodBody con prodRender()). La CSS
+   de las tarjetas se extrajo a prodEnsureCss() para reusarla desde openAnalisis().
+   openProductividad / closeProductividad quedan como alias hacia la vista fusionada
+   (compat + muscle-memory + smoke-test). */
+function openProductividad() { openAnalisis(); }
+function closeProductividad() { closeAnalisis(); }
 function prodRender() {
   const body = document.getElementById("prodBody"); if (!body) return;
   const nombres = _prodNombres || new Map();
@@ -17991,10 +18040,93 @@ function closeMonitor() {
 
 let _analisisIntervalId = null;
 
-/* Trae los m3 hechos por día (today + 5 anteriores) y los renderiza en la
-   sección "Producción por día" del modal Análisis. Usa el sheet PPP para los
-   m3 por tanda y los eventos TP/TAP de Supabase para saber cuáles se hicieron
-   cada día — NO restringe a tandas a FC. */
+/* m³ por tanda: unión de las 3 fuentes (persistido localStorage + PPP actual +
+   Histórica). Extraído para reusarlo entre la "Producción por día" y los gráficos de
+   productividad (antes lo armaba fetchProductivityData inline). Mismo orden de
+   precedencia: PPP pisa persistido; la Histórica sólo rellena lo que falta. */
+async function buildM3ByTanda(){
+  if (!_pppCache) {
+    try { const fresh = await fetchMonitorSheet(); _pppCache = fresh; _pppCacheTs = Date.now(); } catch (_e) {}
+  }
+  const m3 = new Map();
+  const persisted = loadPersistedM3();
+  for (const [k, m] of persisted){ if (m > 0) m3.set(k, m); }
+  if (_pppCache){ for (const [k, v] of _pppCache){ if (v && v.m3 > 0) m3.set(k, v.m3); } }
+  try { const hist = await getHistoricMap(); for (const [k, m] of hist){ if (m > 0 && !m3.has(k)) m3.set(k, m); } } catch(e){}
+  return m3;
+}
+
+/* Partes de una fecha en hora Argentina (UTC-3 fijo, sin DST). ms → {key,label,wd}
+   donde wd 0=domingo … 6=sábado. Se usa para armar la lista de días y decidir findes. */
+function _anDateParts(ms){
+  const d = new Date(new Date(ms).toLocaleString("en-US", { timeZone: TZ_AR }));
+  const y = d.getFullYear(), m = d.getMonth() + 1, dd = d.getDate(), wd = d.getDay();
+  return {
+    key: `${y}-${String(m).padStart(2,"0")}-${String(dd).padStart(2,"0")}`,
+    label: `${String(dd).padStart(2,"0")}/${String(m).padStart(2,"0")}`,
+    wd: wd
+  };
+}
+/* ¿La fecha "YYYY-MM-DD" es sábado o domingo? (el día de la semana de una fecha de
+   calendario no depende de la zona horaria). Para saltear findes en los gráficos. */
+function _anIsWeekend(dayKey){
+  const p = String(dayKey).split("-");
+  const wd = new Date(+p[0], +p[1]-1, +p[2]).getDay();
+  return wd === 0 || wd === 6;
+}
+
+/* "Producción por día" histórica: últimos N días CONTABLES (hábiles). Trae TP/TAP para
+   los m³ y todos los eventos para el conteo de empleados, agrega por día y devuelve del
+   más reciente al más viejo, OCULTANDO sábados/domingos sin m³ pickeado ni pedido. HOY
+   se muestra aparte (en vivo), así que acá se excluye. Cacheado AN_DAYHIST_TTL_MS para
+   que el auto-refresh de 30 s no re-descargue toda la ventana. v7.43. */
+let _anDayHist = null, _anDayHistTs = 0;
+const AN_DAYHIST_TTL_MS = 5 * 60 * 1000;
+async function fetchDayTotalsHistory(nBiz){
+  nBiz = nBiz || 28;
+  const now = Date.now();
+  if (_anDayHist && (now - _anDayHistTs) < AN_DAYHIST_TTL_MS) return _anDayHist;
+  const WINDOW_DAYS = 60;   // margen para juntar ≥28 hábiles aún con feriados
+  const since = new Date(now - WINDOW_DAYS * 86400000);
+  const events = await supaFetchAll(SUPABASE_TABLE_ENDPOINT,
+    "ts_cliente=gte." + encodeURIComponent(since.toISOString()) + "&order=ts_cliente.asc&select=legajo,opcion,texto,ts_cliente");
+  const m3ByTanda = await buildM3ByTanda();
+  const todayKey = isoToDayKey(now);
+  const perDay = new Map();   // dayKey → {pick:Set<tanda>, sep:Set<tanda>, legs:Set<legajo>}
+  for (const ev of events){
+    const dk = isoToDayKey(ev.ts_cliente);
+    if (dk >= todayKey) continue;   // hoy va aparte (en vivo)
+    let agg = perDay.get(dk);
+    if (!agg){ agg = { pick: new Set(), sep: new Set(), legs: new Set() }; perDay.set(dk, agg); }
+    const leg = String(ev.legajo || "").trim();
+    if (leg && leg !== "0" && leg !== "1") agg.legs.add(leg);   // 0/1 = test/basura
+    const tanda = String(ev.texto || "").trim().toUpperCase();
+    if (tanda){
+      if (ev.opcion === "TP")  agg.pick.add(tanda);
+      if (ev.opcion === "TAP") agg.sep.add(tanda);
+    }
+  }
+  const out = [];
+  for (let i = 1; i <= WINDOW_DAYS && out.length < nBiz; i++){
+    const p = _anDateParts(now - i * 86400000);
+    const agg = perDay.get(p.key);
+    let totPick = 0, totSep = 0, empleados = 0;
+    if (agg){
+      for (const t of agg.pick) totPick += (m3ByTanda.get(t) || 0);
+      for (const t of agg.sep)  totSep  += (m3ByTanda.get(t) || 0);
+      empleados = agg.legs.size;
+    }
+    const weekend = (p.wd === 0 || p.wd === 6);
+    if (weekend && totPick <= 0 && totSep <= 0) continue;   // finde vacío → oculto
+    out.push({ label: p.label, totPick: totPick, totSep: totSep, empleados: empleados });
+  }
+  _anDayHist = out; _anDayHistTs = Date.now();
+  return out;
+}
+
+/* Renderiza la "Producción por día" del modal Análisis: fila HOY en vivo (TP/TAP hechos
+   hoy, del sheet PPP) + últimos 28 días CONTABLES (fetchDayTotalsHistory, findes vacíos
+   ocultos). El listado scrollea; el recuadro conserva su tamaño. */
 async function refreshAnalisisDayTotals(){
   const container = document.getElementById("analisisDayTotals");
   if (!container) return;
@@ -18008,7 +18140,7 @@ async function refreshAnalisisDayTotals(){
     const targetSet = new Set(wideDates);
     const targetTandaKeys = [];
     for (const [k, v] of sheetMap) if (targetSet.has(v.fechaEntregaRaw)) targetTandaKeys.push(k);
-    const { statusMap, empleadosHoy, pastDays } = await fetchMonitorEvents(targetTandaKeys, sheetMap);
+    const { statusMap, empleadosHoy } = await fetchMonitorEvents(targetTandaKeys, sheetMap);
     // Today: m3 con TP done hoy (picking) y m3 con TAP done hoy (separado).
     // No restringimos a tandas con ambas terminadas (no usamos "m3 FC").
     let todayPick = 0, todaySep = 0;
@@ -18021,6 +18153,9 @@ async function refreshAnalisisDayTotals(){
     }
     const todayStr = new Date().toLocaleDateString("es-AR", { day:"2-digit", month:"2-digit", timeZone:"America/Argentina/Buenos_Aires" });
     const fmt = n => (n || 0).toFixed(1).replace(".", ",");
+    // Últimos 28 días hábiles (cacheado; el tick de 30 s reusa el cache y sólo refresca HOY).
+    let pastDays = [];
+    try { pastDays = await fetchDayTotalsHistory(28); } catch(_e){ pastDays = []; }
     const rows = [
       { label: `Hoy ${todayStr}`, totPick: todayPick, totSep: todaySep, empleados: empleadosHoy != null ? empleadosHoy : "—", isToday: true },
       ...(pastDays || []).map(d => ({ label: d.label, totPick: d.totPick, totSep: d.totSep, empleados: d.empleados, isToday: false }))
@@ -18045,6 +18180,12 @@ function openAnalisis() {
   if (typeof Chart !== "undefined" && typeof refreshProductivityCharts === "function") {
     refreshProductivityCharts();
   }
+  // Sección "Rendimiento de operarios" embebida (fusión v7.43): asegura la CSS y carga
+  // UNA sola vez al abrir. No va en el interval para no pisar lo que el usuario expande,
+  // ordena o filtra por fecha dentro de la sección.
+  prodEnsureCss();
+  if (!_prodPeriod) { var hoy = Date.now(); _prodPeriod = { d1: _pvYmd(hoy - 27 * _PV_DAY), d2: _pvYmd(hoy) }; }
+  if (typeof prodLoad === "function") prodLoad();
   if (_analisisIntervalId) clearInterval(_analisisIntervalId);
   _analisisIntervalId = setInterval(function() {
     refreshAnalisisDayTotals();
@@ -24892,10 +25033,13 @@ const PROD_REFRESH_MS    = 30 * 1000;
 const PROD_DATA_TTL_MS   = 25 * 1000;
 let _prodChartPicking    = null;
 let _prodChartPedido     = null;
-let _prodDataCache       = null;
-let _prodDataTs          = 0;
-let _prodInflight        = null;
+/* v7.43 — cache POR ventana (daysBack), no una sola: cada gráfico (picking/pedido)
+   puede pedir un rango distinto (última semana … último año) sin pisarse. */
+const _prodDataCache     = new Map();   // daysBack → { data, ts }
+const _prodInflight      = new Map();   // daysBack → Promise
 let _prodLastRenderTs    = 0;
+let _prodPickRange       = "7";         // rango del gráfico Picking (7/30/90/180/ytd/365)
+let _prodPedRange        = "7";         // rango del gráfico Pedido
 
 /* Paleta — 12 colores distinguibles para hasta 12 operarios. Si hay más,
    loopea. Mismos colores para Picking y Pedido por operario (legajo). */
@@ -24920,10 +25064,11 @@ function prodColorFor(legajo, idx){
 async function fetchProductivityData(daysBack){
   daysBack = daysBack || PROD_DAYS_BACK;
   const now = Date.now();
-  if (_prodDataCache && (now - _prodDataTs) < PROD_DATA_TTL_MS) return _prodDataCache;
-  if (_prodInflight) return _prodInflight;
+  const cached = _prodDataCache.get(daysBack);
+  if (cached && (now - cached.ts) < PROD_DATA_TTL_MS) return cached.data;
+  if (_prodInflight.has(daysBack)) return _prodInflight.get(daysBack);
 
-  _prodInflight = (async () => {
+  const promise = (async () => {
     try {
       // Rango de días: hoy hacia atrás
       const today = new Date();
@@ -24945,33 +25090,9 @@ async function fetchProductivityData(daysBack){
       // supaFetchAll: EP/TP/AP/TAP de la ventana; blindado contra el corte de 1000 filas. v5.43.
       const events = await supaFetchAll(SUPABASE_TABLE_ENDPOINT, "opcion=in.(EP,TP,AP,TAP)&ts_cliente=gte." + encodeURIComponent(sinceIso) + "&order=ts_cliente.asc&select=opcion,texto,legajo,ts_cliente");
 
-      // m3 por tanda: union PPP cache + Historico.
-      // Si _pppCache no está cargado (p. ej. el monitor nunca se abrió),
-      // lo poblamos acá para no perder los m³ de las tandas activas.
-      if (!_pppCache) {
-        try {
-          const fresh = await fetchMonitorSheet();
-          _pppCache = fresh;
-          _pppCacheTs = Date.now();
-        } catch (_e) { /* sin PPP, seguimos con histórica */ }
-      }
-      const m3ByTanda = new Map();
-      // 1) Cache local persistente — tandas que vimos alguna vez con m³ > 0.
-      //    Sobrevive a recargas y a que la tanda salga de la PPP del día.
-      const persisted = loadPersistedM3();
-      for (const [k, m] of persisted){ if (m > 0) m3ByTanda.set(k, m); }
-      // 2) PPP "Programacion Diaria" actual (sobrescribe persistido si difiere).
-      if (_pppCache){
-        for (const [k, v] of _pppCache){
-          if (v && v.m3 > 0) m3ByTanda.set(k, v.m3);
-        }
-      }
-      try {
-        const hist = await getHistoricMap();
-        for (const [k, m] of hist){
-          if (m > 0 && !m3ByTanda.has(k)) m3ByTanda.set(k, m);
-        }
-      } catch(e){ /* sin histórico, seguimos con PPP */ }
+      // m3 por tanda: persistido + PPP actual + Histórica (helper compartido con
+      // "Producción por día"). Puebla _pppCache si hiciera falta.
+      const m3ByTanda = await buildM3ByTanda();
 
       // Empleados
       let empleados = new Map();
@@ -25107,14 +25228,53 @@ async function fetchProductivityData(daysBack){
         detailPicking: buildDetail("picking"),
         detailPedido:  buildDetail("pedido")
       };
-      _prodDataCache = out;
-      _prodDataTs = Date.now();
+      _prodDataCache.set(daysBack, { data: out, ts: Date.now() });
       return out;
     } finally {
-      _prodInflight = null;
+      _prodInflight.delete(daysBack);
     }
   })();
-  return _prodInflight;
+  _prodInflight.set(daysBack, promise);
+  return promise;
+}
+
+/* Rango del filtro de los gráficos → cantidad de días hacia atrás. YTD se calcula en el
+   momento (días desde el 1-ene AR, inclusive) para que no quede "congelado". v7.43. */
+function prodRangeDays(key){
+  if (key === "ytd"){
+    const p = _anDateParts(Date.now());
+    const y = +String(p.key).split("-")[0];
+    const jan1 = new Date(y, 0, 1), today = new Date(p.key.split("-")[0], +p.key.split("-")[1]-1, +p.key.split("-")[2]);
+    return Math.max(1, Math.round((today - jan1) / 86400000) + 1);
+  }
+  const n = parseInt(key, 10);
+  return (n > 0) ? n : PROD_DAYS_BACK;
+}
+
+/* Toma una tanda de datos (dayKeys/dayLabels/series) para una operación y SACA las
+   columnas de sábado/domingo que no tienen ningún dato (todas las series null ese día).
+   Los días hábiles vacíos (feriados) se conservan como hueco. Devuelve labels/dayKeys/
+   series ya filtrados; el detalle (para el click) se mantiene por dayKey. v7.43. */
+function prodBuildChartView(data, opKey){
+  const series = data[opKey] || [];
+  const keep = [];
+  for (let i = 0; i < data.dayKeys.length; i++){
+    const dk = data.dayKeys[i];
+    const hasData = series.some(s => s.data[i] != null);
+    if (hasData || !_anIsWeekend(dk)) keep.push(i);
+  }
+  return {
+    labels:  keep.map(i => data.dayLabels[i]),
+    dayKeys: keep.map(i => data.dayKeys[i]),
+    series:  series.map(s => ({ legajo: s.legajo, name: s.name, color: s.color, data: keep.map(i => s.data[i]) })),
+    detail:  opKey === "picking" ? data.detailPicking : data.detailPedido
+  };
+}
+
+/* El usuario cambió el período de un gráfico (pick|ped). Guarda el rango y re-renderiza. */
+function prodChartSetRange(which, val){
+  if (which === "pick") _prodPickRange = val; else _prodPedRange = val;
+  if (typeof refreshProductivityCharts === "function") refreshProductivityCharts();
 }
 
 /* Muestra la composición del promedio m3/h de un operario en un día:
@@ -25238,31 +25398,38 @@ const _prodPickRef = { chart: null };
 const _prodPedRef  = { chart: null };
 async function refreshProductivityCharts(){
   try {
-    const data = await fetchProductivityData();
     const containerP = document.getElementById("prodChartPicking");
     const containerA = document.getElementById("prodChartPedido");
     if (!containerP || !containerA) return;
     const emptyP = document.getElementById("prodChartPickingEmpty");
     const emptyA = document.getElementById("prodChartPedidoEmpty");
+    // Cada gráfico con SU propio período (el <select> guardó _prodPickRange/_prodPedRange).
+    // Se piden por separado (cacheados por ventana) y se filtran findes vacíos por operación.
+    const [dataP, dataA] = await Promise.all([
+      fetchProductivityData(prodRangeDays(_prodPickRange)),
+      fetchProductivityData(prodRangeDays(_prodPedRange))
+    ]);
     // Picking
-    if (data.picking.length === 0){
+    const viewP = prodBuildChartView(dataP, "picking");
+    if (viewP.series.length === 0){
       if (emptyP) emptyP.style.display = "block";
       containerP.style.display = "none";
       if (_prodPickRef.chart){ try{_prodPickRef.chart.destroy();}catch(e){} _prodPickRef.chart = null; }
     } else {
       if (emptyP) emptyP.style.display = "none";
       containerP.style.display = "block";
-      renderProdChart("prodCanvasPicking", data.dayLabels, data.picking, _prodPickRef, data.dayKeys, data.detailPicking, "Picking");
+      renderProdChart("prodCanvasPicking", viewP.labels, viewP.series, _prodPickRef, viewP.dayKeys, viewP.detail, "Picking");
     }
     // Pedido
-    if (data.pedido.length === 0){
+    const viewA = prodBuildChartView(dataA, "pedido");
+    if (viewA.series.length === 0){
       if (emptyA) emptyA.style.display = "block";
       containerA.style.display = "none";
       if (_prodPedRef.chart){ try{_prodPedRef.chart.destroy();}catch(e){} _prodPedRef.chart = null; }
     } else {
       if (emptyA) emptyA.style.display = "none";
       containerA.style.display = "block";
-      renderProdChart("prodCanvasPedido", data.dayLabels, data.pedido, _prodPedRef, data.dayKeys, data.detailPedido, "Pedido");
+      renderProdChart("prodCanvasPedido", viewA.labels, viewA.series, _prodPedRef, viewA.dayKeys, viewA.detail, "Pedido");
     }
     _prodLastRenderTs = Date.now();
   } catch (e){

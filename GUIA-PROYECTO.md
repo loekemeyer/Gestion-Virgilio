@@ -4,7 +4,28 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-04 · Versión app al documentar: **v7.42**
+> Última actualización: 2026-08-04 · Versión app al documentar: **v7.43**
+>
+> Nota: **v7.43 — Fusión «Productividad» → «Análisis de productividad» + Producción por día 28
+> días hábiles + filtro de período en los gráficos**. Tres pedidos del usuario, todos dentro del modal
+> **📈 Análisis de productividad** (`#analisisModal`, `openAnalisis`). (1) **Fusión**: el viejo botón/overlay
+> **📊 «Productividad»** (rendimiento de operarios, `openProductividad`/`prodRender`) dejó de ser un módulo
+> aparte y ahora es una **sección embebida DEBAJO de los gráficos** (`#analisisProdSection` → `#prodBody`,
+> tarjeta clara adaptada al modal oscuro). Se quitó el botón «Productividad» del menú supervisor; la CSS de
+> las tarjetas se extrajo a **`prodEnsureCss()`** (reusada por `openAnalisis`), y `openProductividad`/
+> `closeProductividad` quedaron como **alias** a `openAnalisis`/`closeAnalisis` (compat + smoke-test). La
+> sección se carga **una sola vez al abrir** (no en el auto-refresh de 30 s, para no pisar lo que el usuario
+> expande/ordena/filtra). (2) **Producción por día**: pasa de 5 a **28 días CONTABLES** (hábiles) con
+> **scroll** dentro del recuadro (mismo tamaño; `max-height`+`overflow-y`). Se **ocultan sábados/domingos
+> sin m³ pickeado ni pedido**. HOY sigue **en vivo**; el histórico lo trae **`fetchDayTotalsHistory()`**
+> (ventana 60 d, agrega TP→pick / TAP→sep por día + empleados = legajos con actividad, cache 5 min). (3)
+> **Gráficos Picking y Pedido**: cada uno con su **`<select>` de período** (Última semana · Último mes ·
+> Últimos 3/6 meses · YTD · Último año) — estado independiente `_prodPickRange`/`_prodPedRange`, `<select>`
+> `#prodRangePick`/`#prodRangePed`, handler `prodChartSetRange`. `fetchProductivityData` ahora **cachea por
+> ventana** (`_prodDataCache` = Map por `daysBack`) y usa el helper compartido **`buildM3ByTanda()`**. Se
+> **saltean los sábados/domingos sin datos** en el eje X (`prodBuildChartView` + `_anIsWeekend`; los días
+> hábiles vacíos quedan como hueco). Verificado: `tests/smoke.cjs` OK (todas las funciones presentes, sin
+> pageerrors) + chequeo headless de la lógica nueva (rangos, findes, filtrado). Bump **v7.43**.
 >
 > Nota: **v7.42 — Impreso de OC: columna «Caja N°» + Falta Pedidos/% Lleno CONGELADOS al generar**.
 > Dos pedidos del usuario. (1) **«Caja N°»**: la columna del ejemplo que en v7.39 se había omitido por
@@ -4937,12 +4958,15 @@ INCONSISTENCIAS"):
 `generar_reporte_agentes` (o a una función auxiliar encadenada en el cron 14 para no re-tipear la grande);
 (3) agregar el `key` al array `CATS` de `agtRender` + su CSS `.stk-rep-cat.<key>`. **Siempre las dos vías**.
 
-**Servicio Productividad / "Rendimiento de operarios"** (botón 📊, `openProductividad`/`prodRender`,
-v4.67): dashboard de ingeniería industrial 100% Supabase. Lee `vista_productividad_semanal` (ver
-`sql/productividad_operario.sql`) + `getEmpleadosNombres`. **KPI = m³/h por rol** (armador/picker, toggle
-min/m³ con `_prodToggle`/`prodToggleVista`) sobre **tiempo efectivo** (unión de intervalos), tendencia,
-sparkline, y **desglose de la jornada** (motivos de la ociosidad: productivo + secundarias + esperas). No
-es alerta; es analítica de equipo. El módulo 📈 Análisis (que usa el Sheet) es OTRA cosa y sigue vivo.
+**Servicio Productividad / "Rendimiento de operarios"** (`prodRender`, v4.67; **desde v7.43 embebido en el
+modal 📈 Análisis**): dashboard de ingeniería industrial. **Ya NO es un overlay/botón aparte**: es una
+**sección debajo de los gráficos** del modal Análisis (`#analisisProdSection` → `#prodBody`), que carga
+`openAnalisis` una vez al abrir. `openProductividad`/`closeProductividad` quedaron como **alias** a
+`openAnalisis`/`closeAnalisis`; la CSS de las tarjetas se inyecta con `prodEnsureCss()`. **KPI = m³/h por
+rol** (armador/picker, toggle min/m³ con `_prodToggle`/`prodToggleVista`) sobre **tiempo efectivo** (unión
+de intervalos), tendencia, sparkline, y **desglose de la jornada** (motivos de la ociosidad: productivo +
+secundarias + esperas). No es alerta; es analítica de equipo. (El resto del modal 📈 Análisis — Producción
+por día + gráficos Picking/Pedido, que salen del Sheet/eventos — es OTRA cosa y sigue arriba de esta sección.)
 **Premios (v4.82, solo esta pantalla admin)**: cada área tiene una **meta m³/h** editable (default Picking
 1.6 · Armado 0.7, en `localStorage 'prod_metas'`); el premio % de cada operario = `(ritmo ÷ meta − 1) × 100`
 con signo (badges verde/rojo en tarjetas + tabla). No se manda por Telegram. Nota técnica del motor: las
