@@ -1,4 +1,4 @@
-/* Regresión v7.28 / idea 5572 — Stock y Compras → solapa "🧰 Insumos" (Administrar
+/* Regresión v7.29 / idea 5572 — Stock y Compras → solapa "🧰 Insumos" (Administrar
    Insumos). Es el lado admin de la botonera del operario (idea 7917). Contrato:
      · la solapa existe, y arranca por "Pendientes de identificar"
      · pendientes = SOLO los TMP-*, con TODO editable: código (sugerido = el temporal),

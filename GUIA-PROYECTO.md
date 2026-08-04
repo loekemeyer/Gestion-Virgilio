@@ -4,7 +4,15 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-04 · Versión app al documentar: **v7.28**
+> Última actualización: 2026-08-04 · Versión app al documentar: **v7.29**
+>
+> Nota: **v7.29 — Insumos: «Agregar insumo» sólo en RECEPCIÓN** (pedido del usuario). En **Entrega de
+> insumos (EI)** desaparece el tile `+ Agregar insumo`, tanto el de la grilla de categorías como el de
+> adentro de cada categoría, y `insNuevoOpen` **se planta con un aviso** aunque la llamen a mano.
+> El criterio: no se puede entregar algo que no existe, y si existe tiene que estar registrado — el
+> alta es un acto de **recepción**. Antes se podía sugerir un insumo desde una entrega, lo que creaba
+> un `TMP-` cuyo primer movimiento era una **salida**, o sea un saldo negativo desde el minuto cero.
+> En RI queda todo igual. Bump **v7.29**.
 >
 > Nota: **v7.28 — Insumos (admin): la columna «Nombre» pasa a llamarse «Detalle»** en las tres
 > tablas de la solapa (Pendientes, el listado de cada categoría y «Todos los insumos») y en el

@@ -5908,7 +5908,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.28";
+const APP_VERSION = "v7.29";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -13235,8 +13235,10 @@ function insRender() {
         '</button>';
     }).join("") +
       (cnt[""] ? '<button class="ins-catbtn' + (cntQ[""] ? " hasq" : "") + '" onclick="insSetCat(\'?\')"><span class="ins-catem">❓</span><span class="ins-catnm">Sin categoría</span><span class="ins-catn">' + cnt[""] + '</span></button>' : "") +
-      // "+" junto a las categorías: llegó algo que no está en ninguna lista.
-      '<button class="ins-catbtn add" onclick="insNuevoOpen(\'\')"><span class="ins-catem">+</span><span class="ins-catnm">Agregar insumo</span><span class="ins-catn">nuevo</span></button>' +
+      // "+" junto a las categorías: llegó algo que no está en ninguna lista. Sólo en
+      // RECEPCIÓN: en una entrega no se puede sacar algo que no existe, y si existe
+      // tiene que estar registrado.
+      (isIn ? '<button class="ins-catbtn add" onclick="insNuevoOpen(\'\')"><span class="ins-catem">+</span><span class="ins-catnm">Agregar insumo</span><span class="ins-catn">nuevo</span></button>' : "") +
       '</div>';
     h += '<div class="ins-cbadge" style="margin-top:10px;">' + nOper + ' insumos en uso' + (cnt[""] ? ' · ' + cnt[""] + ' sin clasificar' : "") + '</div>';
   } else {
@@ -13265,7 +13267,7 @@ function insRender() {
           (it.qty > 0 ? '<span class="ins-itq' + (it.unidad ? "" : " falta") + '">' + it.qty + " " + escapeHtml(it.unidad || "¿unidad?") + '</span>' : "") +
           '</button>';
       }).join("") +
-        (cat ? '<button class="ins-itbtn add" onclick="insNuevoOpen(\'' + (cat === "?" ? "" : cat) + '\')"><span class="ins-itadd">+</span><span class="ins-itnom">Agregar insumo</span></button>' : "") +
+        (cat && isIn ? '<button class="ins-itbtn add" onclick="insNuevoOpen(\'' + (cat === "?" ? "" : cat) + '\')"><span class="ins-itadd">+</span><span class="ins-itnom">Agregar insumo</span></button>' : "") +
         '</div>';
     }
   }
@@ -13287,6 +13289,9 @@ function insRender() {
    admin desde Stock y Compras → Insumos (idea 5572). */
 function insNuevoOpen(cat) {
   if (!_ins) return;
+  // Guarda dura: dar de alta un insumo sólo tiene sentido recibiendo. En una entrega
+  // el insumo tiene que existir de antes.
+  if (_ins.mode !== "RI") { try { alert("En una entrega no se puede dar de alta un insumo.\n\nSi lo estás sacando es porque ya está: buscalo en su categoría. Si no aparece, se carga al recibirlo."); } catch (_e) {} return; }
   _ins.nuevo = { cat: insCatDef(cat) ? cat : "", qty: "", uni: "", det: "" };
   _ins.qty = null;
   insRender();

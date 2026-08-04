@@ -81,7 +81,7 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== etl-lio (idea 5290 / v6.89: etiquetas de lío al cerrar cada lío, switch + legajo 0/1) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/etl-lio.cjs
 
-echo "== ins-categorias (idea 7917 / v7.28: navegación + alta por categorías en RI/EI) =="
+echo "== ins-categorias (idea 7917 / v7.29: navegación + alta por categorías en RI/EI) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ins-categorias.cjs
 
 echo "== ssg-carrera-cron (v7.06: SSG no avisa si el cron ya descontó el picking de la tanda) =="
@@ -105,7 +105,7 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== anular-sesion (v7.15: botón rojo Anular picking / recepción / insumos) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/anular-sesion.cjs
 
-echo "== ins-admin (idea 5572 / v7.28: Administrar Insumos (pendientes + categorías + unidades)) =="
+echo "== ins-admin (idea 5572 / v7.29: Administrar Insumos (pendientes + categorías + unidades)) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ins-admin.cjs
 
 echo "== ppp-chk-gondola (v7.16: botón 📦 Chequeo de góndola por pedido/tanda en la PPP) =="
