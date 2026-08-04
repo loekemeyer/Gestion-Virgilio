@@ -4,8 +4,31 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-04 · Versión app al documentar: **v7.16**
+> Última actualización: 2026-08-04 · Versión app al documentar: **v7.17**
 >
+> Nota: **v7.17 — OCs AUTOMÁTICAS los miércoles 7:00, con la fórmula de stock que pidió el usuario**.
+> Dos cosas. **(1) NUEVA DEFINICIÓN de stock y demanda** (vale para el generador automático **y** para
+> el manual, así dan lo mismo): **Stock disponible = góndola (`terminado`) + `a_guardar` + `racks` +
+> `excedente`** — antes eran sólo góndola+racks+excedente, ahora **suma lo que está "a guardar"** (ya
+> llegó, es stock). **NO** entran `separar_pedidos` (pickeado), `a_facturar`, facturado/FC sin salida,
+> `racks_ch` ni `para_envasar`. Y del otro lado **NETEA**: un pedido deja de contar como **Pedidos**
+> (demanda) cuando su mercadería ya salió de la góndola, o sea cuando **su tanda tiene `TP`**
+> (picking terminado) — su stock está en `separar_pedidos`, que tampoco se cuenta, así que no se pide
+> dos veces lo mismo. Los pedidos **"en armar" sin ningún artículo marcado** o **sin empezar** (tanda
+> sin TP) **SÍ cuentan** como demanda. En el front: `stockN` suma `a_guardar` y `ocgDemanda(porEmpresa,
+> soloNoPickeadas)` acepta el flag nuevo — lo usa **sólo** el generador de OCs (`ocgEnter`), la tabla
+> de Stock sigue mostrando la demanda completa; falla **abierto** (si no puede leer los TP cuenta todo,
+> antes que sub-pedir). **(2) GENERACIÓN AUTOMÁTICA**: función **`generar_ocs_automaticas(p_forzar)`**
+> (SQL, replica exactamente la fórmula del manual: `A pedir = ceil(máx(0, Máximo + Pedidos − Stock))`,
+> `Máximo = proyección × índice` topado a capacidad, proveedores internos afuera) + cron
+> **`ocs-auto-miercoles`** `0 10 * * 3` = **miércoles 07:00 AR**. Las líneas entran en
+> `Ordenes_Compra` con `notas='auto <fecha>'`, estado `pendiente`, rubro `Art Term` → la **Recepción de
+> Mercadería las ve como OC vigente al toque** (los botones "OC N", v7.07). Es **idempotente por día**
+> (`ya_generada`) y avisa por **Telegram** al terminar. Prueba en seco del 04/08: **104 líneas · 19
+> proveedores · 9.198 cajas** (165 NPs sin facturar → **138** cuentan; 27 ya pickeadas se netean).
+> SQL en **`sql/generar_ocs_automaticas.sql`**. `tests/ocg-norm.cjs` extendido: verifica que
+> `a_guardar` suma, que pickeado/a-facturar **no** suman, y el neteo de la demanda (8 de 15 cajas).
+> Bump **v7.17**.
 > Nota: **v7.16 — PPP: botón 📦 "Chequeo de góndola" por pedido (y por tanda)** (pedido del
 > usuario). Al lado del 🖨 de cada pedido de la PPP hay ahora un botón **📦** que responde
 > *"¿tengo en góndola todo lo que necesito para armar este pedido?"* y, si falta algo, lo
