@@ -4,7 +4,16 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-04 · Versión app al documentar: **v7.20**
+> Última actualización: 2026-08-04 · Versión app al documentar: **v7.21**
+>
+> Nota: **v7.21 — Botón "⏸ Pausar" en el asistente de armado (AP)** (pedido del usuario). Antes el
+> asistente "Completar" (que se abre al tildar AP) sólo tenía **"Terminar" (TAP)**: para ir a hacer
+> otra tarea había que recargar la app. Ahora hay un botón **"⏸ Pausar"** al lado de Terminar que
+> **sale sin terminar**: no manda TAP, deja la tanda **pendiente** (`st.armado.active` sigue en true)
+> y el avance persistido en localStorage; en la pantalla del operario aparece **"▶ Seguir armado
+> tanda X · Paso N"** para retomarlo donde quedó (sin re-mandar AP). La pausa **no cuenta** en el
+> tiempo de armado (prodCompute ya descuenta del tramo AP→TAP lo que se haga en el medio). Nueva
+> función `compPausar()`; smoke `tests/comp-pausar.cjs`. Bump **v7.21**.
 >
 > Nota: **v7.20 — Fuera el piloto de "Picking con lectora"**. El usuario decidió que no lo van a
 > usar, así que se sacó de la app (no quedó apagado: se borró). Se fueron: el **switch del operario**
@@ -49,7 +58,6 @@
 > existe en el fallback hardcodeado y comprueba que el operario la muestra, con su insumo adentro y
 > su unidad preseleccionada. Suite completa OK. Bump **v7.19**.
 >
-> Última actualización: 2026-08-04 · Versión app al documentar: **v7.18**
 >
 > Nota: **v7.18 — OCs AUTOMÁTICAS los miércoles 7:00, con la fórmula de stock que pidió el usuario**.
 > Dos cosas. **(1) NUEVA DEFINICIÓN de stock y demanda** (vale para el generador automático **y** para

@@ -111,4 +111,7 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== ppp-chk-gondola (v7.16: botón 📦 Chequeo de góndola por pedido/tanda en la PPP) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-chk-gondola.cjs
 
+echo "== comp-pausar (v7.21: botón Pausar del armado — sale sin terminar, retomable) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/comp-pausar.cjs
+
 echo "== TODO OK =="
