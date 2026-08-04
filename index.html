@@ -5922,7 +5922,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.35";
+const APP_VERSION = "v7.36";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -10919,11 +10919,12 @@ function stkBodyStocks() {
   ];
   const totals = {};
   arts.forEach(function (a) { SECT.forEach(function (s) { totals[s.key] = (totals[s.key] || 0) + (Number(a[s.key]) || 0); }); });
-  let h = (_stk.cutoff ? '<div class="stk-cut">Stock contado desde <b>' + escapeHtml(stockFmtTs(_stk.cutoff)) + '</b> (lo anterior no se suma).</div>' : "");
+  let h = "";   // banner "Stock contado desde…" sacado a pedido del usuario
   h += stkAsOfControl();   // En vivo / a una fecha y hora determinada
   // Tira de totales por sector (todos, aunque estén en 0).
   h += '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;">';
   SECT.forEach(function (s) {
+    if (s.key === "insumos") return;   // el nº de insumos mezcla kg/bolsas/uni (sin sentido); vive en su propia solapa "Insumos"
     if (s.extra && (Number(totals[s.key]) || 0) === 0) return;   // v7.03: p/envasar y racks CH solo si hay algo
     h += '<span onclick="stkSectDetail(\'' + s.key + '\')" title="Ver el detalle por código y sector" style="cursor:pointer;display:inline-flex;flex-direction:column;align-items:center;min-width:78px;background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:6px 10px;">' +
       '<span style="font-size:10px;text-transform:uppercase;color:#64748b;font-weight:700;letter-spacing:.02em;">' + s.label + '</span>' +
