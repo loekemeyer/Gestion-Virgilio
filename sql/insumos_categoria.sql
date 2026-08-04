@@ -243,3 +243,12 @@ update public."Insumos" set categoria = 'partes_plasticas' where categoria = 'ma
 --   · 4600·ALTO IMPACTO = −925 Kg (−750 pre-inventario + −175 post). Falta Kg↔Bolsa para
 --     unificarlo contra AI. Idem empties ISIS 1262500/1266500/1062500/1071500 (0, se dejan).
 -- ---------------------------------------------------------------------
+
+-- 2026-08-04 (cont.) — cierre de los pendientes:
+--   · 4600·ALTO IMPACTO (−925 Kg) cerrado contra AI con 25 Kg/bolsa: se anula la entrega
+--     −750 Kg pre-inventario (02/07) y la real −175 Kg → −7 Bolsas. AI: 44 → 37 Bolsas.
+--   · "FLEJE PROLIPROPILENO·SUNCHOS 12 MM" movido de Cajas a Flejes, unidad Kg (0 de saldo).
+--   · Códigos ISIS vacíos (1262500/1266500/1062500/1071500) se dejan por ahora (referencia).
+--   Invariante final OK: todo código con saldo en plastico/fleje/cajas está en su unidad
+--   canónica (Bolsas / Kg / Uni-Paquetes).
+-- ---------------------------------------------------------------------

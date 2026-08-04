@@ -26,8 +26,12 @@
 > duplicados **confirmados por el historial de movimientos** (COPIAs, códigos `·` legacy y receptions
 > pre-inventario ya contadas en el inicial del 27/07). Resultados clave: `PP`=139 Bolsas (fusión de los
 > 3 códigos de POLIPROPILENO 2630), `AI`=44 Bolsas, `PE`=11 Bolsas, `7`=664 / `20`=635,2 / `74`=161 /
-> `1060500`=`5`=`25`=0 Kg, `0127`=768 Uni. **Quedó sin tocar `4600·ALTO IMPACTO` (−925 Kg)**: no hay
-> factor Kg↔Bolsa para unificarlo contra `AI`. Detalle en `sql/insumos_categoria.sql`.
+> `1060500`=`5`=`25`=0 Kg, `0127`=768 Uni. `4600·ALTO IMPACTO` (−925 Kg) se cerró contra `AI` con
+> **25 Kg/bolsa** (se anuló la entrega −750 pre-inventario y la real −175 → −7 Bolsas): `AI` quedó en
+> **37 Bolsas**. `Sunchos 12 mm` se movió de Cajas a **Flejes** (Kg). Tras esto, **todo código con
+> saldo en estas 3 categorías está en su unidad canónica** (Bolsas / Kg / Uni-Paquetes). Se dejaron
+> los códigos ISIS vacíos (`1262500`/`1266500`/`1062500`/`1071500`, en 0). Detalle en
+> `sql/insumos_categoria.sql`.
 >
 > Nota: **v7.31 — Insumos (admin): grupo «🧾 Historial»** (pedido del usuario), debajo de *Categorías*
 > en la solapa Administrar Insumos, colapsable (arranca cerrado). Es una **bitácora de sólo lectura**
