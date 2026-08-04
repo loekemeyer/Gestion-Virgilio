@@ -4,7 +4,36 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-04 · Versión app al documentar: **v7.24**
+> Última actualización: 2026-08-04 · Versión app al documentar: **v7.26**
+>
+> Nota: **v7.26 — Insumos: UN código = UNA cantidad y UNA unidad, edición completa en categorías y
+> secciones plegables** (idea 5572, pedido del usuario).
+>
+> **(1) Un código, una unidad.** Migración `insumos_una_unidad_por_codigo`, en dos pasos porque de los
+> **23** códigos que tenían "varias unidades", **6 eran la misma unidad mal escrita** (`kg` vs `Kg`):
+> partirlos habría inventado códigos por un problema de tipeo. Primero se **normaliza la grafía**
+> contra el vocabulario activo, y recién después se parten los que de verdad difieren: la unidad con
+> **más saldo** se queda en el código original y cada una de las otras se lleva a **`<cod>(N)COPIA`**
+> con su cantidad y su unidad, heredando nombre, categoría y ubicación. Ej.: `PP` queda con 151
+> Bolsas y nace `PP(1)COPIA` con 24 Uni; `942P` se abre en `942P` (1152 s/u), `942P(1)COPIA` (−5 Uni)
+> y `942P(2)COPIA` (−2 MC). Se aplicó a los pendientes **y** a los ya categorizados: 23 copias,
+> catálogo de 108 → 131, y **0 códigos con más de una unidad**.
+>
+> **(2) El listado de cada categoría se edita igual que Pendientes**: **Cantidad y Unidad en columnas
+> separadas** (antes iba todo junto en una), y ahora también se editan el **código**, la cantidad y la
+> unidad. Renombrar un insumo ya clasificado va por `insumo_recodificar`, que le mueve los
+> movimientos y **falla si el código destino existe** — fusionar dos stocks sigue siendo una decisión
+> que sólo se toma desde «Pendientes».
+>
+> **(3) Guardar manda sólo lo que CAMBIÓ.** Si tocás nada más la categoría, se manda nada más la
+> categoría y el insumo se muda ahí. Para eso `insumo_editar` entiende el marcador `'__sin__'`: antes
+> un null significaba "no tocar", así que no había forma de **sacarle** la categoría a un insumo.
+>
+> **(4) «A depurar» ya no existe en ningún lado** — la fila se borró de `Insumos_Categorias` en v7.24
+> y el selector se arma de esa tabla. Si todavía aparece es la app cacheada: se va al recargar.
+>
+> **(5) Pendientes, Unidades y Categorías son plegables** (`_stkSec` / `stkInsSec`). La tabla
+> **«Todos los insumos» queda siempre visible y entera**, sin plegar. Suite completa OK. Bump **v7.26**.
 >
 > Nota: **v7.24 — Insumos (admin): «a depurar» se elimina, categorías con DETALLE, tabla total y
 > bloqueo por unidad no permitida** (idea 5572, pedido del usuario). Cinco cosas:

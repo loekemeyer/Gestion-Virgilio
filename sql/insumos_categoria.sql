@@ -175,3 +175,15 @@ update public."Insumos" set categoria = 'partes_plasticas' where categoria = 'ma
 --   · insumo_identificar / insumo_borrar pasan a exigir "sin categoría" en vez de
 --     'depurar': un insumo ya clasificado no se renombra, fusiona ni borra.
 -- ---------------------------------------------------------------------
+
+-- ---------------------------------------------------------------------
+-- v7.26 (idea 5572) — ver `insumos_una_unidad_por_codigo`:
+--   · normaliza la grafía de las unidades (`kg` → `Kg`) contra el vocabulario activo:
+--     6 de los 23 códigos "con varias unidades" eran la misma unidad mal escrita.
+--   · los que igual difieren se parten: la unidad de MAYOR saldo se queda en el código
+--     original y cada otra se lleva a `<cod>(N)COPIA` con su cantidad y su unidad.
+--   · insumo_recodificar(cod, nuevo): renombra un insumo ya clasificado moviéndole los
+--     movimientos. Falla si el destino existe (fusionar es decisión de «Pendientes»).
+-- y `insumo_editar_permite_vaciar_categoria`: el marcador '__sin__' vacía la categoría
+-- (null seguía significando "no tocar", así que no se podía desclasificar un insumo).
+-- ---------------------------------------------------------------------

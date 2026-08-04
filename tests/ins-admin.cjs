@@ -1,4 +1,4 @@
-/* Regresión v7.24 / idea 5572 — Stock y Compras → solapa "🧰 Insumos" (Administrar
+/* Regresión v7.26 / idea 5572 — Stock y Compras → solapa "🧰 Insumos" (Administrar
    Insumos). Es el lado admin de la botonera del operario (idea 7917). Contrato:
      · la solapa existe, y arranca por "Pendientes de identificar"
      · pendientes = SOLO los TMP-*, con TODO editable: código (sugerido = el temporal),
@@ -21,6 +21,9 @@
      · «a depurar» ya no existe: lo que no tiene categoría es «Sin categoría»
      · tabla final de SÓLO LECTURA con todos los insumos, filtrable, que se actualiza
      · una unidad no permitida por la categoría se rechaza con alerta
+     · en el listado de cada categoría se edita código, nombre, categoría, ubicación,
+       CANTIDAD y UNIDAD (columnas separadas), y sólo se manda lo que cambió
+     · Pendientes / Unidades / Categorías son colapsables; la tabla final no
      · VÍNCULO CON EL OPERARIO: lo que define el admin es lo que ve el operario en
        RI/EI — categorías (nombre y unidades permitidas), insumos y unidades
    Sin red (fetch mockeado). */
@@ -228,6 +231,14 @@ catch (_e) {
     await stkInsAlta("fleje");
     out.altaRechazaDuplicado = rpc.length === antesAlta && /ya está en uso/i.test(alerted);
 
+    // 8b2) Secciones colapsables (la tabla final NO)
+    out.hayBotonesSec = document.querySelectorAll("#stkBody .stk-secbtn").length;   // 3
+    stkInsSec("pend");
+    out.pendColapsa = document.querySelectorAll("#stkBody table")[0] &&
+      !document.getElementById("idCod_TMP-0001");
+    stkInsSec("pend");
+    out.pendVuelve = !!document.getElementById("idCod_TMP-0001");
+
     // 8c) TABLA FINAL de sólo lectura, filtrable, y se actualiza con los cambios
     const tablas = document.querySelectorAll("#stkBody table");
     const tot = tablas[tablas.length - 1];
@@ -308,6 +319,7 @@ catch (_e) {
     r.catEditAbre === true && r.catGuardaNombre === "Cajas y embalaje" && r.catGuardaUnis === "Paquetes,Uni,MC" &&
     r.haySecUnidades === true && r.uniSacar === true && r.uniUsadaAvisa === true && r.uniLibreNoAvisa === true &&
     /Pendientes.*\|.*Unidades.*\|.*Categorías/.test(r.ordenSecciones || "") && r.altaRechazaDuplicado === true &&
+    r.hayBotonesSec === 3 && r.pendColapsa === true && r.pendVuelve === true &&
     r.hayTablaTotal === true && /Código\|Nombre\|Categoría\|Rack \/ sector\|Cantidad\|Unidad/.test(r.totalCols || "") &&
     r.totalSinEditar === true && r.totalHayFiltros === true && r.totalFiltraCod === 1 &&
     r.totalFiltraSinCat >= 1 && r.totalSeActualiza === true && r.uniProhibidaBloquea === true &&

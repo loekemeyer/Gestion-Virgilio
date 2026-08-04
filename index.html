@@ -5908,7 +5908,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.24";
+const APP_VERSION = "v7.26";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -9147,7 +9147,7 @@ async function openStockAdmin(soloConteo) {
   const _solo = soloConteo === true;   // rol "solo conteo" (Giuliana): solo la solapa Conteo
   if (!document.getElementById("stkCss")) {
     const s = document.createElement("style"); s.id = "stkCss";
-    s.textContent = "#stockAdminOverlay{display:none;position:fixed;inset:0;z-index:1280;background:rgba(2,6,23,.74);overflow:auto;padding:14px;}#stockAdminOverlay.show{display:block;}.stk-card{background:#f8fafc;max-width:min(1500px,97vw);margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.stk-head{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:linear-gradient(90deg,#1e6bd6,#1e3a8a);color:#fff;}.stk-title{font-size:19px;font-weight:800;}.stk-close{background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;width:auto;}.stk-body{padding:14px 16px;}.stk-loading,.stk-empty{padding:24px;text-align:center;color:#64748b;}.stk-sec{margin:16px 0 6px;font-size:14px;font-weight:900;color:#0f172a;display:flex;align-items:center;gap:7px;}.stk-secn{background:#e2e8f0;color:#475569;border-radius:999px;padding:1px 9px;font-size:11.5px;font-weight:800;}.stk-inp{border:1px solid #cbd5e1;border-radius:8px;padding:6px 8px;font-size:13px;font-family:inherit;background:#fff;}.stk-sub{font-size:10.5px;color:#94a3b8;font-weight:700;}.stk-nuevo{display:inline-flex;flex-wrap:wrap;align-items:center;gap:6px;}.stk-btn-x{color:#b91c1c;border-color:#fecaca;}.stk-scroll{overflow-x:auto;}.stk-catbox{border:1px solid #cbd5e1;border-radius:11px;padding:10px 11px;margin-bottom:8px;background:#fff;}.stk-catrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}.stk-catuni{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:7px;}.stk-catlist{margin-top:10px;padding-top:10px;border-top:1px dashed #e2e8f0;}.stk-catdesc{margin-top:5px;font-size:12px;color:#475569;line-height:1.35;}.stk-tbl tr.stk-filtros th{background:#f8fafc;padding:5px 9px;text-transform:none;}.stk-tbl tr.stk-viejo td{background:#fffbeb;}.stk-cut{background:#fffbeb;border:1px solid #fcd34d;color:#92400e;border-radius:9px;padding:8px 11px;font-size:12.5px;font-weight:700;margin-bottom:10px;}.stk-filtro{flex:1;min-width:180px;height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 11px;font-size:14px;}.stk-btn{background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:8px 12px;font-size:13px;font-weight:800;cursor:pointer;width:auto;}.stk-btn.ok{background:#16a34a;color:#fff;border-color:#16a34a;}.stk-btn.danger{background:#fff;color:#b91c1c;border-color:#fca5a5;}.stk-tbl{width:100%;border-collapse:collapse;font-size:13.5px;}.stk-tbl.stk-tbl-fit{width:auto;max-width:100%;}.stk-tbl.stk-tbl-fit td.stk-desc{max-width:210px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.stk-tbl.stk-tbl-sect td.stk-desc{max-width:140px;}.stk-tbl.stk-tbl-fit th.num,.stk-tbl.stk-tbl-fit td.num{text-align:right;padding-left:9px;padding-right:9px;}.stk-tblwrap{overflow-x:auto;max-width:100%;}.stk-tbl.stk-tbl-fit th.num{vertical-align:bottom;line-height:1.15;}.stk-tbl th{background:#f1f5f9;color:#475569;text-align:left;padding:7px 9px;font-size:11px;text-transform:uppercase;border-bottom:1px solid #cbd5e1;}.stk-tbl td{padding:7px 9px;}.stk-tbl th.num,.stk-tbl td.num{text-align:right;font-variant-numeric:tabular-nums;}.stk-row{cursor:pointer;border-bottom:1px solid #eef2f7;}.stk-row:hover{background:#eff6ff;}.stk-row td{padding:7px 9px;}.stk-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#1e6bd6;}.stk-desc{color:#475569;}.stk-neg{color:#b91c1c;font-weight:800;}.stk-pick-cell{cursor:pointer;color:#1e6bd6;font-weight:800;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px;}.stk-pick-cell:hover{background:#eff6ff;}.stk-tbl td.stk-hist0{color:#94a3b8;font-weight:700;}.stk-tbl td.stk-hist0:hover{background:#f1f5f9;color:#475569;}.stk-caret{color:#94a3b8;}.stk-detrow td{padding:0 9px 9px;background:#f8fafc;}.stk-det{border-left:3px solid #cbd5e1;padding:6px 0 6px 10px;}.stk-mv{display:flex;gap:9px;font-size:12px;padding:3px 0;align-items:center;}.stk-mv-old{opacity:.45;}.stk-mv-ts{color:#64748b;min-width:96px;}.stk-mv-tipo{font-weight:800;min-width:78px;}.stk-mv-dep{color:#64748b;min-width:74px;}.stk-mv-d{font-weight:800;min-width:44px;text-align:right;}.stk-mv-d.pos{color:#15803d;}.stk-mv-d.neg{color:#b91c1c;}.stk-mv-ref{color:#94a3b8;}.stk-ini-txt{width:100%;border:1px solid #cbd5e1;border-radius:9px;padding:9px;font-family:Consolas,Menlo,monospace;font-size:14px;}.stk-ini-btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}.stk-ini-warn{font-size:12px;color:#92400e;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:8px;margin-top:10px;}.stk-tabs{display:flex;gap:4px;padding:8px 12px 0;background:#1e3a8a;flex-wrap:wrap;}.stk-tab{flex:0 1 auto;width:auto;white-space:nowrap;background:rgba(255,255,255,.12);color:#cbd5e1;border:none;border-radius:9px 9px 0 0;padding:9px 13px;font-size:12.5px;font-weight:800;cursor:pointer;}.stk-tab.on{background:#f8fafc;color:#1e3a8a;}.stk-seg{display:flex;gap:6px;margin-bottom:10px;}.stk-segb{flex:1;background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:7px;font-size:13px;font-weight:800;cursor:pointer;}.stk-segb.on{background:#1e6bd6;color:#fff;border-color:#1e6bd6;}.stk-grp{margin-bottom:10px;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;}.stk-grp-h{background:#f1f5f9;padding:7px 10px;font-weight:800;font-size:13px;}.stk-grp-tot{color:#15803d;font-weight:800;margin-left:6px;}.stk-ing{display:flex;gap:9px;align-items:center;padding:5px 10px;border-top:1px solid #f1f5f9;font-size:12.5px;}.stk-ing-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#1e6bd6;}.stk-ing-desc{flex:1;color:#475569;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.stk-ing-rto{color:#94a3b8;font-size:11px;}.stk-aj-sec{border:1px solid #e2e8f0;border-radius:12px;padding:12px;margin-bottom:12px;}.stk-aj-h{font-size:15px;font-weight:800;margin-bottom:6px;}.stk-aj-hint{font-size:12px;color:#64748b;margin-bottom:7px;}.stk-aj-form{display:flex;gap:7px;flex-wrap:wrap;}.stk-aj-inp{flex:1;min-width:90px;height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 10px;font-size:14px;text-align:center;}.cnt-in{height:32px;border:1px solid #cbd5e1;border-radius:7px;padding:0 6px;font-size:13px;box-sizing:border-box;margin:0;width:auto;}.stk-aj-dep{margin-bottom:12px;font-size:13px;font-weight:800;}.stk-aj-dep select{height:36px;border:1px solid #cbd5e1;border-radius:8px;padding:0 8px;font-size:14px;font-weight:700;}.stk-rk-orden{background:#f1f5f9;border-radius:10px;padding:10px 12px;font-size:13px;margin-bottom:10px;}.stk-rk-orden.pend{background:#fffbeb;border:1.5px solid #fcd34d;color:#92400e;}.stk-rk-baj{display:flex;align-items:center;gap:10px;border:1px solid #e2e8f0;border-radius:11px;padding:9px 11px;margin-bottom:8px;background:#fff;}.stk-rk-baji{flex:1;min-width:0;}.stk-rk-q{font-size:12px;color:#1e6bd6;font-weight:700;margin-top:2px;}";
+    s.textContent = "#stockAdminOverlay{display:none;position:fixed;inset:0;z-index:1280;background:rgba(2,6,23,.74);overflow:auto;padding:14px;}#stockAdminOverlay.show{display:block;}.stk-card{background:#f8fafc;max-width:min(1500px,97vw);margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.stk-head{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:linear-gradient(90deg,#1e6bd6,#1e3a8a);color:#fff;}.stk-title{font-size:19px;font-weight:800;}.stk-close{background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;width:auto;}.stk-body{padding:14px 16px;}.stk-loading,.stk-empty{padding:24px;text-align:center;color:#64748b;}.stk-sec{margin:16px 0 6px;font-size:14px;font-weight:900;color:#0f172a;display:flex;align-items:center;gap:7px;}.stk-secn{background:#e2e8f0;color:#475569;border-radius:999px;padding:1px 9px;font-size:11.5px;font-weight:800;}.stk-inp{border:1px solid #cbd5e1;border-radius:8px;padding:6px 8px;font-size:13px;font-family:inherit;background:#fff;}.stk-sub{font-size:10.5px;color:#94a3b8;font-weight:700;}.stk-nuevo{display:inline-flex;flex-wrap:wrap;align-items:center;gap:6px;}.stk-btn-x{color:#b91c1c;border-color:#fecaca;}.stk-scroll{overflow-x:auto;}.stk-catbox{border:1px solid #cbd5e1;border-radius:11px;padding:10px 11px;margin-bottom:8px;background:#fff;}.stk-catrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}.stk-catuni{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:7px;}.stk-catlist{margin-top:10px;padding-top:10px;border-top:1px dashed #e2e8f0;}.stk-catdesc{margin-top:5px;font-size:12px;color:#475569;line-height:1.35;}.stk-tbl tr.stk-filtros th{background:#f8fafc;padding:5px 9px;text-transform:none;}.stk-secbtn{width:100%;text-align:left;background:#eef2ff;border:1px solid #c7d2fe;border-radius:10px;padding:9px 12px;cursor:pointer;margin:16px 0 8px;}.stk-caret{display:inline-block;width:16px;color:#4f46e5;font-weight:900;}.stk-tbl tr.stk-viejo td{background:#fffbeb;}.stk-cut{background:#fffbeb;border:1px solid #fcd34d;color:#92400e;border-radius:9px;padding:8px 11px;font-size:12.5px;font-weight:700;margin-bottom:10px;}.stk-filtro{flex:1;min-width:180px;height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 11px;font-size:14px;}.stk-btn{background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:8px 12px;font-size:13px;font-weight:800;cursor:pointer;width:auto;}.stk-btn.ok{background:#16a34a;color:#fff;border-color:#16a34a;}.stk-btn.danger{background:#fff;color:#b91c1c;border-color:#fca5a5;}.stk-tbl{width:100%;border-collapse:collapse;font-size:13.5px;}.stk-tbl.stk-tbl-fit{width:auto;max-width:100%;}.stk-tbl.stk-tbl-fit td.stk-desc{max-width:210px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.stk-tbl.stk-tbl-sect td.stk-desc{max-width:140px;}.stk-tbl.stk-tbl-fit th.num,.stk-tbl.stk-tbl-fit td.num{text-align:right;padding-left:9px;padding-right:9px;}.stk-tblwrap{overflow-x:auto;max-width:100%;}.stk-tbl.stk-tbl-fit th.num{vertical-align:bottom;line-height:1.15;}.stk-tbl th{background:#f1f5f9;color:#475569;text-align:left;padding:7px 9px;font-size:11px;text-transform:uppercase;border-bottom:1px solid #cbd5e1;}.stk-tbl td{padding:7px 9px;}.stk-tbl th.num,.stk-tbl td.num{text-align:right;font-variant-numeric:tabular-nums;}.stk-row{cursor:pointer;border-bottom:1px solid #eef2f7;}.stk-row:hover{background:#eff6ff;}.stk-row td{padding:7px 9px;}.stk-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#1e6bd6;}.stk-desc{color:#475569;}.stk-neg{color:#b91c1c;font-weight:800;}.stk-pick-cell{cursor:pointer;color:#1e6bd6;font-weight:800;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px;}.stk-pick-cell:hover{background:#eff6ff;}.stk-tbl td.stk-hist0{color:#94a3b8;font-weight:700;}.stk-tbl td.stk-hist0:hover{background:#f1f5f9;color:#475569;}.stk-caret{color:#94a3b8;}.stk-detrow td{padding:0 9px 9px;background:#f8fafc;}.stk-det{border-left:3px solid #cbd5e1;padding:6px 0 6px 10px;}.stk-mv{display:flex;gap:9px;font-size:12px;padding:3px 0;align-items:center;}.stk-mv-old{opacity:.45;}.stk-mv-ts{color:#64748b;min-width:96px;}.stk-mv-tipo{font-weight:800;min-width:78px;}.stk-mv-dep{color:#64748b;min-width:74px;}.stk-mv-d{font-weight:800;min-width:44px;text-align:right;}.stk-mv-d.pos{color:#15803d;}.stk-mv-d.neg{color:#b91c1c;}.stk-mv-ref{color:#94a3b8;}.stk-ini-txt{width:100%;border:1px solid #cbd5e1;border-radius:9px;padding:9px;font-family:Consolas,Menlo,monospace;font-size:14px;}.stk-ini-btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}.stk-ini-warn{font-size:12px;color:#92400e;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:8px;margin-top:10px;}.stk-tabs{display:flex;gap:4px;padding:8px 12px 0;background:#1e3a8a;flex-wrap:wrap;}.stk-tab{flex:0 1 auto;width:auto;white-space:nowrap;background:rgba(255,255,255,.12);color:#cbd5e1;border:none;border-radius:9px 9px 0 0;padding:9px 13px;font-size:12.5px;font-weight:800;cursor:pointer;}.stk-tab.on{background:#f8fafc;color:#1e3a8a;}.stk-seg{display:flex;gap:6px;margin-bottom:10px;}.stk-segb{flex:1;background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:7px;font-size:13px;font-weight:800;cursor:pointer;}.stk-segb.on{background:#1e6bd6;color:#fff;border-color:#1e6bd6;}.stk-grp{margin-bottom:10px;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;}.stk-grp-h{background:#f1f5f9;padding:7px 10px;font-weight:800;font-size:13px;}.stk-grp-tot{color:#15803d;font-weight:800;margin-left:6px;}.stk-ing{display:flex;gap:9px;align-items:center;padding:5px 10px;border-top:1px solid #f1f5f9;font-size:12.5px;}.stk-ing-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#1e6bd6;}.stk-ing-desc{flex:1;color:#475569;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.stk-ing-rto{color:#94a3b8;font-size:11px;}.stk-aj-sec{border:1px solid #e2e8f0;border-radius:12px;padding:12px;margin-bottom:12px;}.stk-aj-h{font-size:15px;font-weight:800;margin-bottom:6px;}.stk-aj-hint{font-size:12px;color:#64748b;margin-bottom:7px;}.stk-aj-form{display:flex;gap:7px;flex-wrap:wrap;}.stk-aj-inp{flex:1;min-width:90px;height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 10px;font-size:14px;text-align:center;}.cnt-in{height:32px;border:1px solid #cbd5e1;border-radius:7px;padding:0 6px;font-size:13px;box-sizing:border-box;margin:0;width:auto;}.stk-aj-dep{margin-bottom:12px;font-size:13px;font-weight:800;}.stk-aj-dep select{height:36px;border:1px solid #cbd5e1;border-radius:8px;padding:0 8px;font-size:14px;font-weight:700;}.stk-rk-orden{background:#f1f5f9;border-radius:10px;padding:10px 12px;font-size:13px;margin-bottom:10px;}.stk-rk-orden.pend{background:#fffbeb;border:1.5px solid #fcd34d;color:#92400e;}.stk-rk-baj{display:flex;align-items:center;gap:10px;border:1px solid #e2e8f0;border-radius:11px;padding:9px 11px;margin-bottom:8px;background:#fff;}.stk-rk-baji{flex:1;min-width:0;}.stk-rk-q{font-size:12px;color:#1e6bd6;font-weight:700;margin-top:2px;}";
     document.head.appendChild(s);
   }
   let ov = document.getElementById("stockAdminOverlay");
@@ -11929,7 +11929,7 @@ let _stkIns = null;
 async function stkInsLoad() {
   insEnsureCss();   // los chips de categoría usan .ins-cchip
   _stk.insLoaded = true;
-  _stkIns = { sec: "pend", cat: "", abierta: "", filtro: "", edit: null, nuevoEn: "", msg: "", tf: {} };
+  _stkIns = { cat: "", abierta: "", filtro: "", edit: null, nuevoEn: "", msg: "", tf: {}, abre: {} };
   const body = document.getElementById("stkBody");
   if (body) body.innerHTML = '<div class="stk-loading">Cargando insumos…</div>';
   await stkInsRefresh();
@@ -11959,6 +11959,16 @@ function _stkInsUni1(it) { return (it.xuni && it.xuni.length) ? it.xuni[0] : { u
 function _stkInsEsTmp(it) { return /^TMP-/.test(it.cod); }
 function _stkInsPendiente(it) { return _stkInsEsTmp(it) || insSinCat(it); }
 function _stkInsConStock(it) { return (it.xuni || []).some(function (u) { return Math.abs(u.saldo) > 0.0005; }); }
+/* Encabezado de sección plegable. La tabla final («Todos los insumos») NO usa esto:
+   queda siempre a la vista, entera. */
+function _stkSec(k, titulo, n) {
+  const ab = _stkIns.abre[k] !== false;
+  return '<button class="stk-sec stk-secbtn" onclick="stkInsSec(\'' + k + '\')">' +
+    '<span class="stk-caret">' + (ab ? "▾" : "▸") + '</span>' + titulo +
+    ' <span class="stk-secn">' + n + '</span></button>';
+}
+function stkInsSec(k) { if (!_stkIns) return; _stkIns.abre[k] = (_stkIns.abre[k] === false); stkRender(); }
+function _stkAbierta(k) { return _stkIns.abre[k] !== false; }
 function stkBodyInsumos() {
   if (!_stkIns) return '<div class="stk-loading">Cargando…</div>';
   const items = _stkIns.items || [];
@@ -11976,7 +11986,8 @@ function stkBodyInsumos() {
 /* ---------- (1) PENDIENTES ---------- */
 function _stkInsPend(pend) {
   const tmps = pend.filter(_stkInsEsTmp), viejos = pend.filter(function (it) { return !_stkInsEsTmp(it); });
-  let h = '<div class="stk-sec">🆕 Pendientes de identificar <span class="stk-secn">' + pend.length + '</span></div>';
+  let h = _stkSec("pend", "🆕 Pendientes de identificar", pend.length);
+  if (!_stkAbierta("pend")) return h;
   if (!pend.length) return h + '<div class="stk-empty">Nada pendiente.</div>';
   h += '<div class="stk-cut" style="background:#fffbeb;border:1px solid #fcd34d;color:#92400e;">Acá está todo lo que <b>espera una decisión</b>: lo que sugirió un operario sin código (<b>' + tmps.length + '</b>) y los códigos <b>viejos o duplicados</b> del catálogo (<b>' + viejos.length + '</b>). <b>Aceptar</b> le pone el código real y le lleva el stock; si ese código ya existe, los saldos se <b>suman</b> (así se netean los negativos). <b>Borrar</b> lo saca del catálogo.</div>';
   h += '<div class="stk-scroll"><table class="stk-tbl"><thead><tr><th>Código</th><th>Nombre</th><th>Categoría</th><th>Ubicación</th><th class="num">Cantidad</th><th>Unidad</th><th></th></tr></thead><tbody>';
@@ -12015,7 +12026,8 @@ function _stkInsPend(pend) {
 function _stkInsCats(items, pend) {
   const cnt = {};
   items.forEach(function (it) { if (_stkInsPendiente(it)) return; const k = insCatDef(it.cat) ? it.cat : ""; cnt[k] = (cnt[k] || 0) + 1; });
-  let h = '<div class="stk-sec">🗂 Categorías <span class="stk-secn">' + INS_CATS.length + '</span></div>';
+  let h = _stkSec("cats", "🗂 Categorías", INS_CATS.length);
+  if (!_stkAbierta("cats")) return h;
   h += '<div class="stk-cut">Cada categoría define <b>cómo la ve el operario</b>: el nombre, y en qué <b>unidades</b> puede cargar sus insumos. <b>Una sola</b> unidad = queda fija; <b>varias</b> = el operario elige entre ésas; <b>ninguna</b> = cualquiera de las de abajo.</div>';
   // «A depurar» no es una categoría de verdad: es la sala de espera, y ahora vive
   // arriba, dentro de Pendientes de identificar.
@@ -12067,7 +12079,8 @@ function _stkInsCats(items, pend) {
     : '<button class="stk-btn" onclick="stkInsEdit(\'cat:+\')">+ Categoría nueva</button>') + '</div>';
   return h;
 }
-/* Listado de los insumos de una categoría + alta, adentro de la categoría. */
+/* Listado de los insumos de una categoría + alta, adentro de la categoría. Se edita lo
+   mismo que en Pendientes: código, nombre, categoría, ubicación, cantidad y unidad. */
 function _stkInsListado(k, items) {
   const f = (_stkIns.filtro || "").toLowerCase().trim();
   const lista = items.filter(function (it) {
@@ -12083,20 +12096,24 @@ function _stkInsListado(k, items) {
     : (k === "?" ? "" : '<button class="stk-btn" onclick="if(_stkIns){_stkIns.nuevoEn=\'' + k + '\';stkRender();}">+ Agregar insumo a esta categoría</button>')) + '</div>';
   if (!lista.length) h += '<div class="stk-empty">Sin insumos' + (f ? " con ese filtro" : "") + '.</div>';
   else {
-    h += '<div class="stk-scroll"><table class="stk-tbl"><thead><tr><th>Código</th><th>Nombre</th><th>Ubic.</th><th>Unidades</th><th>Categoría</th><th></th></tr></thead><tbody>';
+    h += '<div class="stk-scroll"><table class="stk-tbl"><thead><tr><th>Código</th><th>Nombre</th><th>Categoría</th><th>Ubic.</th><th class="num">Cantidad</th><th>Unidad</th><th></th></tr></thead><tbody>';
     h += lista.map(function (it) {
       const ed = _stkIns.edit === "art:" + it.cod;
+      const u = _stkInsUni1(it);
       if (!ed) {
         return '<tr><td><b>' + escapeHtml(it.cod) + '</b></td><td>' + escapeHtml(it.nombre || "—") + '</td>' +
-          '<td>' + escapeHtml(it.ubic || "—") + '</td><td>' + escapeHtml(_stkInsSaldo(it)) + '</td>' +
-          '<td>' + escapeHtml(insCatLbl(insCatDef(it.cat) ? it.cat : "")) + '</td>' +
+          '<td>' + escapeHtml(insCatLbl(insCatOf(it))) + '</td>' +
+          '<td>' + escapeHtml(it.ubic || "—") + '</td>' +
+          '<td class="num"' + (u.saldo < 0 ? ' style="color:#b91c1c;font-weight:800;"' : "") + '>' + (Math.round(u.saldo * 1000) / 1000) + '</td>' +
+          '<td>' + escapeHtml(u.uni || "—") + '</td>' +
           '<td><button class="stk-btn" onclick="stkInsEdit(\'art:' + escapeHtml(it.cod) + '\')">Editar</button></td></tr>';
       }
-      return '<tr><td><b>' + escapeHtml(it.cod) + '</b></td>' +
-        '<td><input class="stk-inp" id="edNom_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.nombre) + '" style="width:160px;"></td>' +
-        '<td><input class="stk-inp" id="edUbi_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.ubic) + '" style="width:84px;"></td>' +
-        '<td>' + escapeHtml(_stkInsSaldo(it)) + '</td>' +
+      return '<tr><td><input class="stk-inp" id="edCod_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.cod) + '" style="width:130px;"></td>' +
+        '<td><input class="stk-inp" id="edNom_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.nombre) + '" style="width:150px;"></td>' +
         '<td>' + _stkInsCatSel("edCat_" + it.cod, it.cat) + '</td>' +
+        '<td><input class="stk-inp" id="edUbi_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.ubic) + '" style="width:80px;"></td>' +
+        '<td><input class="stk-inp" id="edQty_' + escapeHtml(it.cod) + '" type="number" step="any" value="' + escapeHtml(u.saldo) + '" style="width:82px;"></td>' +
+        '<td>' + _stkInsUniSel("edUni_" + it.cod, u.uni) + '</td>' +
         '<td><button class="stk-btn" onclick="stkInsGuardar(\'' + escapeHtml(it.cod) + '\')">✓ Guardar</button> ' +
         '<button class="stk-btn stk-btn-x" onclick="stkInsEdit(null)">Cancelar</button></td></tr>';
     }).join("");
@@ -12106,7 +12123,8 @@ function _stkInsListado(k, items) {
 }
 /* ---------- (3) UNIDADES ---------- */
 function _stkInsUnis(items) {
-  let h = '<div class="stk-sec">📏 Unidades con las que trabajamos <span class="stk-secn">' + INS_UNIS.length + '</span></div>';
+  let h = _stkSec("unis", "📏 Unidades con las que trabajamos", INS_UNIS.length);
+  if (!_stkAbierta("unis")) return h;
   h += '<div class="stk-cut">El vocabulario de medidas: es lo que puede elegir el operario. Las que están <b>en uso</b> avisan antes de sacarse.</div>';
   h += '<div class="ins-cats">' + INS_UNIS.map(function (u) {
     const uso = _stkInsUniUso(u, items);
@@ -12302,9 +12320,41 @@ async function _stkInsAjustar(it, cod, qtyStr, uniNueva) {
   if (!r.ok) throw new Error("no se pudo ajustar la cantidad (HTTP " + r.status + ")");
 }
 async function stkInsGuardar(cod) {
+  const it = (_stkIns.items || []).filter(function (x) { return x.cod === cod; })[0];
+  if (!it) return;
+  const nuevoCod = _stkInsVal("edCod_" + cod), nom = _stkInsVal("edNom_" + cod);
+  const cat = _stkInsVal("edCat_" + cod), ubi = _stkInsVal("edUbi_" + cod);
+  const uni = _stkInsVal("edUni_" + cod), qty = _stkInsVal("edQty_" + cod);
+  if (!nuevoCod) { alert("El código no puede quedar vacío."); return; }
+  if (nuevoCod !== cod && (_stkIns.items || []).some(function (x) { return x.cod === nuevoCod; })) {
+    alert("El código " + nuevoCod + " ya está en uso.\n\nPoné otro."); return;
+  }
+  if (uni && !insUniPermitida(cat, uni)) {
+    const c0 = insCatDef(cat);
+    alert("⛔ «" + uni + "» no está permitida en " + (c0 ? c0.lbl : "esa categoría") + ".\n\nSe carga en: " + (c0 ? c0.unis.join(" / ") : "?") + ".");
+    return;
+  }
   try {
-    await _stkInsRpc("insumo_editar", { p_cod: cod, p_categoria: _stkInsVal("edCat_" + cod) || null, p_nombre: _stkInsVal("edNom_" + cod) || null, p_ubicacion: _stkInsVal("edUbi_" + cod) || null });
-    _stkIns.edit = null; _stkIns.msg = "✓ " + cod + " actualizado.";
+    // Sólo se manda lo que CAMBIÓ. Si tocaron nada más la categoría, el insumo se
+    // mueve a esa categoría y listo: no se reescribe el resto.
+    const cambios = {};
+    if (nom !== it.nombre) cambios.p_nombre = nom || null;
+    if ((cat || "") !== (it.cat || "")) cambios.p_categoria = cat || null;
+    if (ubi !== it.ubic) cambios.p_ubicacion = ubi || null;
+    if (Object.keys(cambios).length) {
+      cambios.p_cod = cod;
+      // p_categoria = null en la función significa "no tocar"; para VACIARLA hay que
+      // pedirlo explícito, así que se manda el marcador que la función entiende.
+      if ("p_categoria" in cambios && cambios.p_categoria === null) cambios.p_categoria = "__sin__";
+      await _stkInsRpc("insumo_editar", cambios);
+    }
+    await _stkInsAjustar(it, cod, qty, uni);            // cantidad / unidad, con asiento
+    let msg = "✓ " + cod + " actualizado.";
+    if (nuevoCod !== cod) {                              // el rename va último
+      const n = await _stkInsRpc("insumo_recodificar", { p_cod: cod, p_nuevo: nuevoCod });
+      msg = "✓ " + cod + " → " + nuevoCod + " (" + (n || 0) + " movimiento(s) de stock).";
+    }
+    _stkIns.edit = null; _stkIns.msg = msg;
     await stkInsRefresh(); stkRender();
   } catch (e) { alert("No se pudo: " + (e.message || e)); }
 }
