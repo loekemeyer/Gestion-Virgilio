@@ -30,6 +30,17 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     // Mostrar el modal como si estuviera en curso.
     const modal = document.getElementById("completarModal"); if (modal) modal.classList.add("show");
 
+    // v7.2x layout: botones APILADOS (Pausar arriba, Terminar abajo), ambos a lo ancho.
+    // Regresión real: el global `button{width:100%}` aplastaba a "Terminar" a una tirita
+    // cuando iban lado a lado. Ahora van uno abajo del otro: medimos que NINGUNO quede
+    // aplastado y que Terminar quede DEBAJO de Pausar (mayor offsetTop).
+    const elP = document.getElementById("compPausar"), elF = document.getElementById("compFin");
+    const wPausar = elP.offsetWidth, wFin = elF.offsetWidth;
+    out.wPausar = wPausar; out.wFin = wFin;
+    out.ambosAnchos = wPausar > 120 && wFin > 120;        // ninguno es una tirita
+    out.mismoAncho = Math.abs(wPausar - wFin) <= 2;        // apilados = mismo ancho
+    out.finDebajo = elF.offsetTop > elP.offsetTop;         // Terminar debajo de Pausar
+
     // Espiar que NO se encole nada y que NO se llame compTerminar.
     let enqueued = 0;
     if (typeof enqueueReport === "function") { const _o = enqueueReport; window.enqueueReport = function () { enqueued++; return _o.apply(this, arguments); }; }
@@ -49,7 +60,8 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     return out;
   });
   const pass = r.btnExiste && r.fnExiste && r.modalCerrado && r.compNull && r.enqueued === 0 &&
-    r.armadoSigueActivo && r.persistido && r.ofreceSeguir && errs.length === 0;
+    r.armadoSigueActivo && r.persistido && r.ofreceSeguir &&
+    r.ambosAnchos && r.mismoAncho && r.finDebajo && errs.length === 0;
   console.log("comp-pausar:", JSON.stringify(r), "· pageerrors:", errs.length ? errs.join("|") : "none", "·", pass ? "✓ OK" : "✗ FAIL");
   await b.close(); process.exit(pass ? 0 : 1);
 })();
