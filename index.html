@@ -1873,6 +1873,7 @@ button.pk-anular small{ display:block; font-size:12px; font-weight:700; opacity:
 .ppp-row-btn.ppp-ctrl-yes{ background:#16a34a; color:#fff; margin-right:6px; } .ppp-row-btn.ppp-ctrl-yes:hover{ background:#15803d; }
 .ppp-row-btn.ppp-undo{ background:#fff; color:#b42318; border:1px solid #fecaca; }
 .ppp-row-btn.ppp-print{ background:#2563eb; color:#fff; margin-right:6px; } .ppp-row-btn.ppp-print:hover{ background:#1d4ed8; }
+.ppp-row-btn.ppp-chk{ background:#0f766e; color:#fff; margin-right:6px; } .ppp-row-btn.ppp-chk:hover{ background:#115e59; }
 .ppp-pdf-toggle{ margin-left:8px; border-color:#2563eb; color:#1d4ed8; } .ppp-pdf-toggle:hover{ background:#eff6ff; }
 .ppp-pdfdir-status{ font-size:12px; color:#475569; margin-left:8px; }
 .ppp-edit{ width:100%; min-width:62px; box-sizing:border-box; padding:5px 7px; font-size:13px; border:1px solid #cbd5e1; border-radius:6px; background:#fffbeb; color:#0f172a; }
@@ -2003,6 +2004,35 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pppres-tbl td.num, .pppres-tbl th.num{ text-align:right; font-variant-numeric:tabular-nums; }
 .pppres-tbl td.np{ font-family:Consolas,Menlo,monospace; font-weight:800; color:#0f766e; white-space:nowrap; }
 .pppres-tbl tfoot td{ font-weight:800; background:#f8fafc; }
+/* Chequeo de góndola (v7.16): modal del botón 📦 de cada pedido / tanda. Reusa
+   .pppres-ov/.pppres-card; la tabla es propia porque tiene que entrar en el celu. */
+.pppchk-msg{ padding:26px 16px; text-align:center; color:#475569; font-size:14px; font-weight:700; }
+.pppchk-msg.err{ color:#991b1b; }
+.pppchk-sum{ padding:11px 16px; font-size:13.5px; font-weight:700; border-bottom:1px solid #e2e8f0; }
+.pppchk-sum.ok{ background:#f0fdf4; color:#166534; }
+.pppchk-sum.warn{ background:#fffbeb; color:#92400e; }
+.pppchk-sum.bad{ background:#fef2f2; color:#991b1b; }
+.pppchk-sum b{ font-weight:900; }
+.pppchk-meta{ display:flex; flex-wrap:wrap; gap:8px 12px; align-items:center; justify-content:space-between; padding:7px 16px; font-size:11.5px; color:#64748b; background:#f8fafc; border-bottom:1px solid #e2e8f0; }
+.pppchk-re{ width:auto; margin:0; padding:5px 11px; font-size:12px; font-weight:800; border:none; border-radius:8px; background:#0f766e; color:#fff; cursor:pointer; }
+.pppchk-re:hover{ background:#115e59; }
+.pppchk-avisos{ padding:8px 16px; font-size:12px; font-weight:700; color:#92400e; background:#fffbeb; border-bottom:1px solid #fde68a; }
+.pppchk-avisos div + div{ margin-top:4px; }
+.pppchk-tbl{ width:100%; border-collapse:collapse; font-size:12.5px; table-layout:fixed; }
+.pppchk-tbl th{ position:sticky; top:0; background:#f1f5f9; color:#475569; text-align:left; padding:6px 8px; font-size:10.5px; text-transform:uppercase; border-bottom:1px solid #cbd5e1; }
+.pppchk-tbl td{ padding:6px 8px; border-bottom:1px solid #eef2f7; vertical-align:top; overflow-wrap:anywhere; }
+.pppchk-tbl td.num, .pppchk-tbl th.num{ text-align:right; font-variant-numeric:tabular-nums; }
+.pppchk-tbl tr.b td{ background:#fffbeb; }
+.pppchk-tbl tr.f td{ background:#fef2f2; }
+.pppchk-cod{ font-family:Consolas,Menlo,monospace; font-weight:800; color:#0f172a; }
+.pppchk-d{ display:block; color:#64748b; font-weight:600; font-size:11px; }
+.pppchk-sect{ display:inline-block; margin-top:3px; background:#e0e7ff; color:#3730a3; border-radius:5px; padding:0 5px; font-size:10.5px; font-weight:800; }
+.pppchk-pill{ display:inline-block; border-radius:6px; padding:1px 6px; font-size:11px; font-weight:800; white-space:nowrap; }
+.pppchk-pill.ok{ background:#dcfce7; color:#166534; }
+.pppchk-pill.b{ background:#fef3c7; color:#92400e; }
+.pppchk-pill.f{ background:#fee2e2; color:#991b1b; }
+.pppchk-hint{ display:block; margin-top:3px; color:#475569; font-size:11px; font-weight:600; }
+.pppchk-note{ padding:9px 16px; font-size:11.5px; color:#64748b; background:#f8fafc; border-top:1px solid #e2e8f0; }
 .ppp-restbl td.num{ text-align:right; font-variant-numeric:tabular-nums; }
 .ppp-restbl td.z0{ color:#cbd5e1; }
 .ppp-restbl td.tot{ font-weight:800; background:#f1f5f9; }
@@ -5875,7 +5905,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.15";
+const APP_VERSION = "v7.16";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -18750,6 +18780,22 @@ function _pppTieneTanda(p) { const t = (p.tanda || "").trim(); return !!t && t !
 function _pppFechaKey(s) { const m = /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/.exec(String(s || "")); if (!m) return "99999999"; let y = m[3]; if (y.length === 2) y = "20" + y; return y + String(m[2]).padStart(2, "0") + String(m[1]).padStart(2, "0"); }
 function _pppFechaDate(s) { const m = /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/.exec(String(s || "")); if (!m) return null; let y = +m[3]; if (y < 100) y += 2000; const d = new Date(y, +m[2] - 1, +m[1]); return isNaN(d.getTime()) ? null : d; }
 function _pppM3Sum(arr) { return arr.reduce(function (s, p) { return s + (Number(p.m3) || 0); }, 0); }
+/* Texto plano → argumento seguro para meterlo entre comillas simples DENTRO de un
+   atributo onclick: primero se escapa para JS (\ y ') y recién después para HTML. El
+   parser des-escapa las entidades y a JS le llega la comilla YA escapada. Sin esto,
+   una razón social con apóstrofo (D'Onofrio) rompe el handler entero. */
+function _pppArg(s) {
+  return escapeHtml(String(s == null ? "" : s).replace(/[\r\n\t]+/g, " ").replace(/\\/g, "\\\\").replace(/'/g, "\\'"));
+}
+/* Botón 📦 "Chequeo": ¿está en góndola todo lo que pide este pedido? (v7.16).
+   Va pegado al 🖨 de la fila. `conTexto` = fila editable (donde el 🖨 lleva rótulo). */
+function _pppChkBtn(p, npE, conTexto) {
+  const t = _pppArg((p && p.tanda && p.tanda !== "—") ? p.tanda : "");
+  const raz = String((p && p.razon_social) || "").trim();
+  const tit = _pppArg("Pedido " + String(p && p.np != null ? p.np : "") + (raz ? " · " + raz : ""));
+  return '<button class="ppp-row-btn ppp-chk" onclick="pppChequeoNp(\'' + npE + '\',\'' + tit + '\',\'' + t + '\')" ' +
+    'title="Chequear si hay en góndola todo lo que necesita este pedido (y qué falta)">📦' + (conTexto ? " Chequeo" : "") + '</button>';
+}
 /* Fila de pedido en modo SOLO-LECTURA: todo texto (sin inputs ni botones de edición),
    con badges de error (🚮 SACAR / ⚠ ZONA / ⚠ TANDA) y el botón 🖨 Imprimir. */
 function _pppRowTrRO(p, npE) {
@@ -18772,7 +18818,7 @@ function _pppRowTrRO(p, npE) {
     '<td>' + escapeHtml(p.zona || pppZonaDeBarrio(p.localidad) || "—") + '</td>' +
     '<td>' + (_pppListoFC(p) ? '<span class="ppp-fc ok" title="Armado terminado (TAP)">✓ Listo</span>' : '<span class="ppp-fc">·</span>') + '</td>' +
     '<td>' + (_pppEntregado(p) ? '<span class="ppp-fc ok2" title="Cargado al camión (CCN)">✓ Entregado</span>' : '<span class="ppp-fc">·</span>') + '</td>' +
-    '<td class="ppp-acc">' + ctrlBtn + '<button class="ppp-row-btn ppp-print" onclick="pppPrintNp(\'' + npE + '\')" title="Imprimir el PDF del pedido (ISIS)">🖨️</button>' + _pppApTapBadge(p) + '</td></tr>';
+    '<td class="ppp-acc">' + ctrlBtn + _pppChkBtn(p, npE, false) + '<button class="ppp-row-btn ppp-print" onclick="pppPrintNp(\'' + npE + '\')" title="Imprimir el PDF del pedido (ISIS)">🖨️</button>' + _pppApTapBadge(p) + '</td></tr>';
 }
 function _pppRowTr(p) {
   const npE = escapeHtml(String(p.np));
@@ -18796,7 +18842,7 @@ function _pppRowTr(p) {
     '<td>' + (cargVenc
         ? '<span class="ppp-fc cargvenc" title="Cargado al camión y SIN controlar pasado el plazo (30 hs; viernes→lunes 12 hs)">🚨 SIN CONTROLAR</span>'
         : (_pppEntregado(p) ? '<span class="ppp-fc ok2" title="Cargado al camión (CC)">✓ Entregado</span>' : '<span class="ppp-fc">·</span>')) + '</td>' +
-    '<td><button class="ppp-row-btn ppp-print" onclick="pppPrintNp(\'' + npE + '\')" title="Imprimir el PDF del pedido (Pedido de Cliente, ISIS)">🖨️ Imprimir</button>' +
+    '<td>' + _pppChkBtn(p, npE, true) + '<button class="ppp-row-btn ppp-print" onclick="pppPrintNp(\'' + npE + '\')" title="Imprimir el PDF del pedido (Pedido de Cliente, ISIS)">🖨️ Imprimir</button>' +
     '<button class="ppp-row-back ppp-edit-only" onclick="pppPedidoAProgramar(\'' + npE + '\')" title="Sacar de la tanda → A Programar">↩</button>' + btn + _pppApTapBadge(p) + '</td></tr>';
 }
 let _pppOpen = new Set();   // ids de bloques abiertos (por clave estable → persiste entre renders)
@@ -19087,6 +19133,252 @@ async function pppPrintTanda(npsCsv) {
   } catch (e) { pppSetStatus("Error al imprimir la tanda: " + (e && e.message ? e.message : e), false); }
   finally { _pdfDirBusy = false; }
 }
+/* ===== v7.16 — CHEQUEO DE GÓNDOLA (botón 📦 al lado del 🖨 de cada pedido) =====
+   Responde "¿tengo en góndola todo lo que necesito para armar este pedido?" y, si
+   falta algo, lo DETALLA artículo por artículo. El mismo botón está en la franja de
+   la tanda (chequea todos sus pedidos JUNTOS: comparten la misma góndola).
+
+   Qué cruza:
+     · lo que PIDE el pedido → `PPP_Base_Pedidos` (pedido, articulo, cajas), la misma
+       base que arma el picking;
+     · lo que HAY → `vista_saldos_stock` (respeta el cutoff de Stock_Config), depósito
+       `terminado` = góndola. Si no alcanza, mira excedente / racks / racks CH / a
+       guardar / p-envasar para distinguir "hay que bajarlo" de "no está en ningún lado".
+
+   ⚠ STOCK REAL AL MOMENTO (pedido del dueño): la lectura es SIEMPRE fresca (nada de
+   cache) y además se corrige el desfasaje conocido del pipeline — la baja de góndola
+   del picking la escribe el cron `reconciliar_pipeline_stock` (jobid 22, cada 10') y
+   recién cuando la tanda mandó **TP**. O sea: lo que un operario está sacando de la
+   góndola AHORA (picking en curso, o TP de hace <10') todavía figura en el saldo. Por
+   eso se restan los **PKC de las tandas sin movimiento de picking escrito** (excedente
+   primero y después góndola, igual que el cron) y se avisa en el modal.
+
+   Códigos: `equivResolve` (029→437E) + `pkCodEmpresa` (437E→"437E CH" según la NP),
+   igual que el picking; si el código queda PELADO se suma toda la FAMILIA LK/CH
+   (mismo criterio que el SSG v7.04 — físicamente es la misma mercadería).
+   Es SOLO LECTURA: no mueve stock ni registra ningún evento. */
+const PPPCHK_OTROS = [["exc", "excedente"], ["racks", "racks"], ["racks_ch", "racks CH"], ["aguardar", "a guardar"], ["envasar", "p/ envasar"]];
+let _pppChkBusy = false, _pppChkLast = null;
+function pppChkClose() { const ov = document.getElementById("pppChkOv"); if (ov) ov.classList.remove("show"); }
+function _pppChkNum(n) { const v = Math.round((Number(n) || 0) * 100) / 100; return String(v); }
+function _pppChkOv() {
+  let ov = document.getElementById("pppChkOv");
+  if (!ov) {
+    ov = document.createElement("div"); ov.id = "pppChkOv"; ov.className = "pppres-ov";
+    ov.addEventListener("click", function (e) { if (e.target === ov) pppChkClose(); });
+    document.body.appendChild(ov);
+  }
+  return ov;
+}
+function _pppChkCard(titulo, cuerpo) {
+  return '<div class="pppres-card">' +
+    '<div class="pppres-head"><span class="pppres-title">📦 Chequeo de góndola · ' + escapeHtml(titulo) + '</span>' +
+    '<button class="pppres-x" onclick="pppChkClose()">✕</button></div>' + cuerpo + '</div>';
+}
+/* Saldos FRESCOS por artículo (sin cache): góndola + los otros depósitos donde puede
+   estar la mercadería que falta. Devuelve las filas crudas de la vista. */
+function _pppChkFetchSaldos() {
+  return supaFetchAllSafe(SUPABASE_URL + "/rest/v1/vista_saldos_stock",
+    "select=cod_art,descripcion,terminado,excedente,racks,racks_ch,a_guardar,para_envasar");
+}
+/* Picking físicamente hecho pero TODAVÍA no descontado del stock (ver el ⚠ de arriba):
+   PKC de los últimos 3 días cuyas tandas no tienen ningún movimiento `picking` escrito.
+   Devuelve {porArt: {claveNorm: cajas}, tandas: [..]} para restarlo del saldo. */
+async function _pppChkPicksPendientes() {
+  const since3 = new Date(Date.now() - 3 * 24 * 3600 * 1000).toISOString();
+  const since7 = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
+  const [pkc, movs] = await Promise.all([
+    supaFetchAllSafe(SUPABASE_TABLE_ENDPOINT, "select=texto&opcion=eq.PKC&ts_cliente=gte." + encodeURIComponent(since3)),
+    supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Movimientos_Stock", "select=ref&tipo=eq.picking&ts=gte." + encodeURIComponent(since7))
+  ]);
+  const yaEnStock = {};
+  (movs || []).forEach(function (m) { const t = String(m.ref || "").split("|")[0].trim().toUpperCase(); if (t) yaEnStock[t] = 1; });
+  const porArt = {}, tandas = [];
+  (pkc || []).forEach(function (ev) {
+    const p = String(ev.texto || "").split("|");
+    const t = String(p[0] || "").trim().toUpperCase();
+    if (!t || yaEnStock[t]) return;
+    const art = equivResolve(String(p[1] || "").trim());
+    const real = parseInt(p[3], 10);
+    if (!art || isNaN(real) || real <= 0) return;
+    const k = _ocgNorm(codBase(art));   // el PKC guarda el código pelado; se resta a la familia
+    porArt[k] = (porArt[k] || 0) + real;
+    if (tandas.indexOf(t) < 0) tandas.push(t);
+  });
+  return { porArt: porArt, tandas: tandas };
+}
+/* Núcleo PURO (sin red, testeable): líneas del pedido × saldos → filas del chequeo. */
+function pppChkCompute(lineas, saldos, pendPorArt) {
+  const num = function (v) { return Number(v) || 0; };
+  const vacio = function () { return { gond: 0, exc: 0, racks: 0, racks_ch: 0, aguardar: 0, envasar: 0 }; };
+  const byKey = {}, byFam = {}, descs = {};
+  const acum = function (m, k, s) {
+    if (!k) return;
+    if (!m[k]) m[k] = vacio();
+    m[k].gond += num(s.terminado); m[k].exc += num(s.excedente);
+    m[k].racks += num(s.racks); m[k].racks_ch += num(s.racks_ch);
+    m[k].aguardar += num(s.a_guardar); m[k].envasar += num(s.para_envasar);
+  };
+  (saldos || []).forEach(function (s) {
+    const raw = String(s.cod_art == null ? "" : s.cod_art);
+    const k = _ocgNorm(raw);
+    acum(byKey, k, s); acum(byFam, _ocgNorm(codBase(raw)), s);
+    const d = String(s.descripcion || "").trim();
+    if (d && !descs[k]) descs[k] = d;
+  });
+  // Demanda por código resuelto (equivalencia + empresa por NP), sumando todas las NP.
+  const need = {}, orden = [];
+  (lineas || []).forEach(function (l) {
+    const np = pickNormNp(l.pedido);
+    const ped = String(l.articulo == null ? "" : l.articulo).trim();
+    const cj = Number(l.cajas) || 0;
+    if (!ped || cj <= 0) return;
+    const real = equivResolve(ped);
+    const cod = pkCodEmpresa(real, np);
+    const k = _ocgNorm(cod);
+    if (!need[k]) { need[k] = { k: k, cod: cod, ped: ped, real: real, need: 0, nps: [] }; orden.push(k); }
+    need[k].need += cj;
+    if (np && need[k].nps.indexOf(np) < 0) need[k].nps.push(np);
+  });
+  const G = (typeof window !== "undefined" && window.GONDOLA) ? window.GONDOLA : {};
+  const pend = pendPorArt || {};
+  const filas = orden.map(function (k) {
+    const n = need[k];
+    const famK = _ocgNorm(codBase(n.cod));
+    // Con sufijo de empresa (437E CH) → su propio saldo (el cron descuenta por empresa).
+    // Pelado → TODA la familia LK/CH: es la misma mercadería física (igual que el SSG).
+    const conEmp = /\s(LK|CH|LOKE)$/.test(String(n.cod).toUpperCase());
+    const s = (conEmp ? byKey[k] : byFam[famK]) || byKey[k] || vacio();
+    // Descontar lo pickeado-y-todavía-no-escrito: excedente primero, después góndola
+    // (mismo reparto que reconciliar_pipeline_stock_etapa1).
+    const pendCj = Math.max(0, num(pend[famK]));
+    const excBruto = Math.max(0, s.exc), gondBruto = Math.max(0, s.gond);
+    const pendExc = Math.min(excBruto, pendCj);
+    const exc = excBruto - pendExc;
+    const gond = Math.max(0, gondBruto - (pendCj - pendExc));
+    const racks = Math.max(0, s.racks), racks_ch = Math.max(0, s.racks_ch);
+    const aguardar = Math.max(0, s.aguardar), envasar = Math.max(0, s.envasar);
+    const falta = Math.max(0, n.need - gond);
+    const otros = exc + racks + racks_ch + aguardar + envasar;
+    const g = G[String(n.cod).toUpperCase()] || G[String(n.real).toUpperCase()] || G[String(n.ped).toUpperCase()] || null;
+    return {
+      cod: (typeof codCanon === "function" ? codCanon(n.cod) : n.cod), codRaw: n.cod, ped: n.ped, nps: n.nps,
+      desc: artNombre(n.cod, descs[k] || descs[famK] || ""),
+      sector: (g && g[0]) ? String(g[0]) : "",
+      need: n.need, gond: gond, falta: falta, pend: pendCj,
+      exc: exc, racks: racks, racks_ch: racks_ch, aguardar: aguardar, envasar: envasar, otros: otros,
+      estado: falta <= 0 ? "ok" : (otros >= falta ? "bajar" : "falta")
+    };
+  });
+  const rank = { falta: 0, bajar: 1, ok: 2 };
+  filas.sort(function (a, b) { return (rank[a.estado] - rank[b.estado]) || (b.falta - a.falta) || (a.cod < b.cod ? -1 : a.cod > b.cod ? 1 : 0); });
+  return filas;
+}
+/* Chequeo de una o varias NP (CSV). `tanda` (opcional) sirve para avisar si esa tanda
+   ya se pickeó — ahí la góndola YA se descontó y el chequeo pierde sentido. */
+async function pppChequeoNp(npsCsv, titulo, tanda) {
+  const nps = String(npsCsv || "").split(",").map(function (s) { return String(s).trim(); }).filter(Boolean);
+  if (!nps.length) return;
+  if (_pppChkBusy) return;
+  _pppChkBusy = true;
+  _pppChkLast = { nps: nps.join(","), titulo: titulo || "", tanda: tanda || "" };
+  const tit = titulo || (nps.length > 1 ? nps.length + " pedidos" : "Pedido " + nps[0]);
+  const ov = _pppChkOv();
+  ov.innerHTML = _pppChkCard(tit, '<div class="pppchk-msg">⏳ Leyendo el pedido y el stock de góndola de este momento…</div>');
+  ov.classList.add("show");
+  try {
+    const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+    const url = SUPABASE_PPP_BASE_ENDPOINT + "?pedido=in.(" + nps.map(encodeURIComponent).join(",") +
+      ")&select=pedido,articulo,cajas&limit=20000";
+    const [lineas, saldos, pend] = await Promise.all([
+      fetch(url, { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; }),
+      _pppChkFetchSaldos(),
+      _pppChkPicksPendientes().catch(function () { return { porArt: {}, tandas: [] }; })
+    ]);
+    try { await loadArtNombres(); } catch (_e) {}
+    try { await loadCodCanon(); } catch (_e) {}
+    let pickAviso = "";
+    if (tanda) {
+      try {
+        const st = await getActivityStatus();
+        const t = String(tanda).trim().toUpperCase();
+        if (st && st.pickingDone && st.pickingDone.has(t)) pickAviso = "La tanda " + t + " ya se pickeó: esta mercadería YA salió de la góndola, el chequeo es sólo informativo.";
+        else if (st && st.pickingEnCursoBy && st.pickingEnCursoBy.has(t)) pickAviso = "La tanda " + t + " se está pickeando ahora mismo.";
+      } catch (_e) {}
+    }
+    const filas = pppChkCompute(lineas, saldos, pend.porArt);
+    ov.innerHTML = _pppChkCard(tit, _pppChkBody(filas, nps, pend, pickAviso, lineas.length));
+  } catch (e) {
+    ov.innerHTML = _pppChkCard(tit, '<div class="pppchk-msg err">No pude hacer el chequeo: ' + escapeHtml(String(e && e.message ? e.message : e)) +
+      '</div><div class="pppchk-meta"><span>Necesita conexión para leer el stock.</span><button class="pppchk-re" onclick="pppChkReintentar()">🔄 Reintentar</button></div>');
+  } finally { _pppChkBusy = false; }
+}
+function pppChkReintentar() { const l = _pppChkLast; if (l) pppChequeoNp(l.nps, l.titulo, l.tanda); }
+function _pppChkBody(filas, nps, pend, pickAviso, nLineas) {
+  const faltan = filas.filter(function (f) { return f.estado !== "ok"; });
+  const sinNada = filas.filter(function (f) { return f.estado === "falta"; });
+  const bajables = filas.filter(function (f) { return f.estado === "bajar"; });
+  const cajasFaltan = faltan.reduce(function (s, f) { return s + f.falta; }, 0);
+  const cajasTot = filas.reduce(function (s, f) { return s + f.need; }, 0);
+  let sum;
+  if (!filas.length) {
+    sum = '<div class="pppchk-sum warn">⚠ No encontré artículos para ' + (nps.length > 1 ? 'estos pedidos' : 'el pedido ' + escapeHtml(nps[0])) +
+      ' en la base de picking' + (nLineas ? '' : ' (PPP_Base_Pedidos)') + '. Puede que la macro todavía no lo haya cargado.</div>';
+  } else if (!faltan.length) {
+    sum = '<div class="pppchk-sum ok">✅ <b>Está todo en góndola</b> — ' + filas.length + ' artículo(s) · ' + _pppChkNum(cajasTot) + ' cajas. Se puede armar.</div>';
+  } else {
+    const cls = sinNada.length ? "bad" : "warn";
+    const ico = sinNada.length ? "🚨" : "⚠";
+    sum = '<div class="pppchk-sum ' + cls + '">' + ico + ' <b>Faltan ' + faltan.length + ' de ' + filas.length + ' artículo(s)</b> en góndola (' + _pppChkNum(cajasFaltan) + ' cajas)' +
+      (bajables.length ? ' · <b>' + bajables.length + '</b> se puede(n) resolver bajando/subiendo de otro depósito' : '') +
+      (sinNada.length ? ' · <b>' + sinNada.length + '</b> no está(n) en ningún depósito' : '') + '.</div>';
+  }
+  let avisos = "";
+  if (pend && pend.tandas && pend.tandas.length) {
+    avisos += '<div>⏳ Descontado del saldo el picking de ' + pend.tandas.length + ' tanda(s) todavía sin impactar en el stock (' + escapeHtml(pend.tandas.slice(0, 6).join(", ")) + (pend.tandas.length > 6 ? "…" : "") + ').</div>';
+  }
+  if (pickAviso) avisos += '<div>ℹ️ ' + escapeHtml(pickAviso) + '</div>';
+  const avisosHtml = avisos ? '<div class="pppchk-avisos">' + avisos + '</div>' : '';
+  let cuerpo = "";
+  if (filas.length) {
+    let tr = "";
+    filas.forEach(function (f) {
+      const cls = f.estado === "falta" ? "f" : (f.estado === "bajar" ? "b" : "");
+      const pill = f.estado === "ok"
+        ? '<span class="pppchk-pill ok">✅ OK</span>'
+        : (f.estado === "bajar"
+          ? '<span class="pppchk-pill b">🔁 Bajar ' + _pppChkNum(f.falta) + '</span>'
+          : '<span class="pppchk-pill f">🚨 Faltan ' + _pppChkNum(f.falta) + '</span>');
+      let donde = "";
+      if (f.estado !== "ok") {
+        const partes = [];
+        PPPCHK_OTROS.forEach(function (d) { if (f[d[0]] > 0) partes.push(_pppChkNum(f[d[0]]) + " en " + d[1]); });
+        donde = partes.length
+          ? '<span class="pppchk-hint">Hay ' + escapeHtml(partes.join(" · ")) + (f.estado === "falta" ? " → igual no alcanza" : "") + '</span>'
+          : '<span class="pppchk-hint">No hay en ningún depósito.</span>';
+      }
+      const codDist = String(f.ped).toUpperCase() !== String(f.codRaw).toUpperCase()
+        ? '<span class="pppchk-d">pedido como ' + escapeHtml(f.ped) + '</span>' : '';
+      tr += '<tr' + (cls ? ' class="' + cls + '"' : '') + '>' +
+        '<td><span class="pppchk-cod">' + escapeHtml(f.cod) + '</span>' +
+          (f.desc ? '<span class="pppchk-d">' + escapeHtml(f.desc) + '</span>' : '') + codDist +
+          (f.sector ? '<span class="pppchk-sect">📍 ' + escapeHtml(f.sector) + '</span>' : '') + '</td>' +
+        '<td class="num">' + _pppChkNum(f.need) + '</td>' +
+        '<td class="num">' + _pppChkNum(f.gond) + '</td>' +
+        '<td>' + pill + donde + '</td></tr>';
+    });
+    cuerpo = '<div class="pppres-wrap"><table class="pppchk-tbl">' +
+      '<colgroup><col style="width:41%"><col style="width:13%"><col style="width:15%"><col style="width:31%"></colgroup>' +
+      '<thead><tr><th>Artículo</th><th class="num">Pide</th><th class="num">Góndola</th><th>Estado</th></tr></thead>' +
+      '<tbody>' + tr + '</tbody></table></div>';
+  }
+  const hora = (function () { try { return new Date().toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" }); } catch (_e) { return ""; } })();
+  const meta = '<div class="pppchk-meta"><span>🕓 Stock leído: <b>' + escapeHtml(hora) + '</b> · NP ' + escapeHtml(nps.slice(0, 8).join(", ")) + (nps.length > 8 ? "…" : "") +
+    '</span><button class="pppchk-re" onclick="pppChkReintentar()">🔄 Volver a chequear</button></div>';
+  const nota = '<div class="pppchk-note">Góndola = depósito <b>terminado</b> de Movimientos_Stock (con el corte de Stock_Config). ' +
+    'No reserva nada: si otra tanda pide el mismo artículo, se lo lleva el que pickee primero. Solo lectura.</div>';
+  return sum + avisosHtml + meta + cuerpo + nota;
+}
 /* Clave de cliente para cruzar pedidos (cód si hay; si no, razón social). */
 function _pppCliKey(p) { return String((p && (p.cod || p.razon_social)) || "").trim().toUpperCase(); }
 /* Agrega pedidos (de A Programar) a una tanda YA programada del mismo cliente: les pone
@@ -19169,6 +19461,9 @@ function _pppBlock(key, name, cls, meta, pedidos, headerExtra, editTanda) {
   const hasErr = pedidos.some(function (p) { return (p._err || []).length; });   // alguna fila con error → tanda en rojo + ⚠️
   const npsCsv = pedidos.map(function (p) { return String(p.np); }).join(",");
   const tandaPrintBtn = '<button class="ppp-tanda-print" onclick="event.stopPropagation();pppPrintTanda(\'' + npsCsv + '\')" title="Imprimir todos los PDF de esta tanda">🖨️</button>';
+  // v7.16 — chequeo de góndola de TODO el bloque junto (sus pedidos comparten la góndola).
+  const chkTit = editTanda ? ("Tanda " + String(editTanda).toUpperCase()) : (razStr || (pedidos.length + " pedidos"));
+  const tandaChkBtn = '<button class="ppp-tanda-print" onclick="event.stopPropagation();pppChequeoNp(\'' + npsCsv + '\',\'' + _pppArg(chkTit) + '\',\'' + _pppArg(editTanda || "") + '\')" title="Chequear si hay en góndola todo lo que necesitan los pedidos de este bloque (y qué falta)">📦</button>';
   const sum = cargBadge + (razStr ? '<span class="ppp-sum-raz">' + escapeHtml(razStr) + '</span> ' : '') + '<span class="ppp-sum-np">' + escapeHtml(npStr) + '</span>';
   const feHtml = fes.length ? '<span class="ppp-sum-fe' + (venc ? ' ppp-fe-venc' : '') + '">' + (venc ? '⏰ ' : '📅 ') + escapeHtml(fes.join(" / ")) + (venc ? ' ¡VENCIDA!' : '') + '</span>' : '';
   const hx = (headerExtra || "").replace(/__BLOCKID__/g, id);
@@ -19178,7 +19473,7 @@ function _pppBlock(key, name, cls, meta, pedidos, headerExtra, editTanda) {
       '<span class="ppp-tanda-name">' + (hasErr ? '⚠️ ' : '') + name + '</span>' +
       '<span class="ppp-tanda-sum">' + sum + '</span>' +
       '<span class="ppp-tanda-fe">' + feHtml + '</span>' +
-      '<span class="ppp-tanda-meta">' + meta + hx + tandaPrintBtn + '</span>' +
+      '<span class="ppp-tanda-meta">' + meta + hx + tandaChkBtn + tandaPrintBtn + '</span>' +
     '</div>';
   if (editTanda) {
     const te = escapeHtml(String(editTanda));
