@@ -5834,7 +5834,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.13";
+const APP_VERSION = "v7.14";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -9232,7 +9232,7 @@ async function openStockAdmin(soloConteo) {
   const _solo = soloConteo === true;   // rol "solo conteo" (Giuliana): solo la solapa Conteo
   if (!document.getElementById("stkCss")) {
     const s = document.createElement("style"); s.id = "stkCss";
-    s.textContent = "#stockAdminOverlay{display:none;position:fixed;inset:0;z-index:1280;background:rgba(2,6,23,.74);overflow:auto;padding:14px;}#stockAdminOverlay.show{display:block;}.stk-card{background:#f8fafc;max-width:min(1500px,97vw);margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.stk-head{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:linear-gradient(90deg,#1e6bd6,#1e3a8a);color:#fff;}.stk-title{font-size:19px;font-weight:800;}.stk-close{background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;width:auto;}.stk-body{padding:14px 16px;}.stk-loading,.stk-empty{padding:24px;text-align:center;color:#64748b;}.stk-cut{background:#fffbeb;border:1px solid #fcd34d;color:#92400e;border-radius:9px;padding:8px 11px;font-size:12.5px;font-weight:700;margin-bottom:10px;}.stk-filtro{flex:1;min-width:180px;height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 11px;font-size:14px;}.stk-btn{background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:8px 12px;font-size:13px;font-weight:800;cursor:pointer;width:auto;}.stk-btn.ok{background:#16a34a;color:#fff;border-color:#16a34a;}.stk-btn.danger{background:#fff;color:#b91c1c;border-color:#fca5a5;}.stk-tbl{width:100%;border-collapse:collapse;font-size:13.5px;}.stk-tbl.stk-tbl-fit{width:auto;max-width:100%;}.stk-tbl.stk-tbl-fit td.stk-desc{max-width:210px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.stk-tbl.stk-tbl-sect td.stk-desc{max-width:140px;}.stk-tbl.stk-tbl-fit th.num,.stk-tbl.stk-tbl-fit td.num{text-align:right;padding-left:9px;padding-right:9px;}.stk-tblwrap{overflow-x:auto;max-width:100%;}.stk-tbl.stk-tbl-fit th.num{vertical-align:bottom;line-height:1.15;}.stk-tbl th{background:#f1f5f9;color:#475569;text-align:left;padding:7px 9px;font-size:11px;text-transform:uppercase;border-bottom:1px solid #cbd5e1;}.stk-tbl td{padding:7px 9px;}.stk-tbl th.num,.stk-tbl td.num{text-align:right;font-variant-numeric:tabular-nums;}.stk-row{cursor:pointer;border-bottom:1px solid #eef2f7;}.stk-row:hover{background:#eff6ff;}.stk-row td{padding:7px 9px;}.stk-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#1e6bd6;}.stk-desc{color:#475569;}.stk-neg{color:#b91c1c;font-weight:800;}.stk-pick-cell{cursor:pointer;color:#1e6bd6;font-weight:800;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px;}.stk-pick-cell:hover{background:#eff6ff;}.stk-tbl td.stk-hist0{color:#94a3b8;font-weight:700;}.stk-tbl td.stk-hist0:hover{background:#f1f5f9;color:#475569;}.stk-caret{color:#94a3b8;}.stk-detrow td{padding:0 9px 9px;background:#f8fafc;}.stk-det{border-left:3px solid #cbd5e1;padding:6px 0 6px 10px;}.stk-mv{display:flex;gap:9px;font-size:12px;padding:3px 0;align-items:center;}.stk-mv-old{opacity:.45;}.stk-mv-ts{color:#64748b;min-width:96px;}.stk-mv-tipo{font-weight:800;min-width:78px;}.stk-mv-dep{color:#64748b;min-width:74px;}.stk-mv-d{font-weight:800;min-width:44px;text-align:right;}.stk-mv-d.pos{color:#15803d;}.stk-mv-d.neg{color:#b91c1c;}.stk-mv-ref{color:#94a3b8;}.stk-ini-txt{width:100%;border:1px solid #cbd5e1;border-radius:9px;padding:9px;font-family:Consolas,Menlo,monospace;font-size:14px;}.stk-ini-btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}.stk-ini-warn{font-size:12px;color:#92400e;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:8px;margin-top:10px;}.stk-tabs{display:flex;gap:4px;padding:8px 12px 0;background:#1e3a8a;flex-wrap:wrap;}.stk-tab{flex:0 1 auto;width:auto;white-space:nowrap;background:rgba(255,255,255,.12);color:#cbd5e1;border:none;border-radius:9px 9px 0 0;padding:9px 13px;font-size:12.5px;font-weight:800;cursor:pointer;}.stk-tab.on{background:#f8fafc;color:#1e3a8a;}.stk-seg{display:flex;gap:6px;margin-bottom:10px;}.stk-segb{flex:1;background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:7px;font-size:13px;font-weight:800;cursor:pointer;}.stk-segb.on{background:#1e6bd6;color:#fff;border-color:#1e6bd6;}.stk-grp{margin-bottom:10px;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;}.stk-grp-h{background:#f1f5f9;padding:7px 10px;font-weight:800;font-size:13px;}.stk-grp-tot{color:#15803d;font-weight:800;margin-left:6px;}.stk-ing{display:flex;gap:9px;align-items:center;padding:5px 10px;border-top:1px solid #f1f5f9;font-size:12.5px;}.stk-ing-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#1e6bd6;}.stk-ing-desc{flex:1;color:#475569;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.stk-ing-rto{color:#94a3b8;font-size:11px;}.stk-aj-sec{border:1px solid #e2e8f0;border-radius:12px;padding:12px;margin-bottom:12px;}.stk-aj-h{font-size:15px;font-weight:800;margin-bottom:6px;}.stk-aj-hint{font-size:12px;color:#64748b;margin-bottom:7px;}.stk-aj-form{display:flex;gap:7px;flex-wrap:wrap;}.stk-aj-inp{flex:1;min-width:90px;height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 10px;font-size:14px;text-align:center;}.cnt-in{height:32px;border:1px solid #cbd5e1;border-radius:7px;padding:0 6px;font-size:13px;box-sizing:border-box;margin:0;width:auto;}.stk-aj-dep{margin-bottom:12px;font-size:13px;font-weight:800;}.stk-aj-dep select{height:36px;border:1px solid #cbd5e1;border-radius:8px;padding:0 8px;font-size:14px;font-weight:700;}.stk-rk-orden{background:#f1f5f9;border-radius:10px;padding:10px 12px;font-size:13px;margin-bottom:10px;}.stk-rk-orden.pend{background:#fffbeb;border:1.5px solid #fcd34d;color:#92400e;}.stk-rk-baj{display:flex;align-items:center;gap:10px;border:1px solid #e2e8f0;border-radius:11px;padding:9px 11px;margin-bottom:8px;background:#fff;}.stk-rk-baji{flex:1;min-width:0;}.stk-rk-q{font-size:12px;color:#1e6bd6;font-weight:700;margin-top:2px;}";
+    s.textContent = "#stockAdminOverlay{display:none;position:fixed;inset:0;z-index:1280;background:rgba(2,6,23,.74);overflow:auto;padding:14px;}#stockAdminOverlay.show{display:block;}.stk-card{background:#f8fafc;max-width:min(1500px,97vw);margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.stk-head{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:linear-gradient(90deg,#1e6bd6,#1e3a8a);color:#fff;}.stk-title{font-size:19px;font-weight:800;}.stk-close{background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;width:auto;}.stk-body{padding:14px 16px;}.stk-loading,.stk-empty{padding:24px;text-align:center;color:#64748b;}.stk-sec{margin:16px 0 6px;font-size:14px;font-weight:900;color:#0f172a;display:flex;align-items:center;gap:7px;}.stk-secn{background:#e2e8f0;color:#475569;border-radius:999px;padding:1px 9px;font-size:11.5px;font-weight:800;}.stk-inp{border:1px solid #cbd5e1;border-radius:8px;padding:6px 8px;font-size:13px;font-family:inherit;background:#fff;}.stk-sub{font-size:10.5px;color:#94a3b8;font-weight:700;}.stk-nuevo{display:inline-flex;flex-wrap:wrap;align-items:center;gap:6px;}.stk-btn-x{color:#b91c1c;border-color:#fecaca;}.stk-cut{background:#fffbeb;border:1px solid #fcd34d;color:#92400e;border-radius:9px;padding:8px 11px;font-size:12.5px;font-weight:700;margin-bottom:10px;}.stk-filtro{flex:1;min-width:180px;height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 11px;font-size:14px;}.stk-btn{background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:8px 12px;font-size:13px;font-weight:800;cursor:pointer;width:auto;}.stk-btn.ok{background:#16a34a;color:#fff;border-color:#16a34a;}.stk-btn.danger{background:#fff;color:#b91c1c;border-color:#fca5a5;}.stk-tbl{width:100%;border-collapse:collapse;font-size:13.5px;}.stk-tbl.stk-tbl-fit{width:auto;max-width:100%;}.stk-tbl.stk-tbl-fit td.stk-desc{max-width:210px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.stk-tbl.stk-tbl-sect td.stk-desc{max-width:140px;}.stk-tbl.stk-tbl-fit th.num,.stk-tbl.stk-tbl-fit td.num{text-align:right;padding-left:9px;padding-right:9px;}.stk-tblwrap{overflow-x:auto;max-width:100%;}.stk-tbl.stk-tbl-fit th.num{vertical-align:bottom;line-height:1.15;}.stk-tbl th{background:#f1f5f9;color:#475569;text-align:left;padding:7px 9px;font-size:11px;text-transform:uppercase;border-bottom:1px solid #cbd5e1;}.stk-tbl td{padding:7px 9px;}.stk-tbl th.num,.stk-tbl td.num{text-align:right;font-variant-numeric:tabular-nums;}.stk-row{cursor:pointer;border-bottom:1px solid #eef2f7;}.stk-row:hover{background:#eff6ff;}.stk-row td{padding:7px 9px;}.stk-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#1e6bd6;}.stk-desc{color:#475569;}.stk-neg{color:#b91c1c;font-weight:800;}.stk-pick-cell{cursor:pointer;color:#1e6bd6;font-weight:800;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px;}.stk-pick-cell:hover{background:#eff6ff;}.stk-tbl td.stk-hist0{color:#94a3b8;font-weight:700;}.stk-tbl td.stk-hist0:hover{background:#f1f5f9;color:#475569;}.stk-caret{color:#94a3b8;}.stk-detrow td{padding:0 9px 9px;background:#f8fafc;}.stk-det{border-left:3px solid #cbd5e1;padding:6px 0 6px 10px;}.stk-mv{display:flex;gap:9px;font-size:12px;padding:3px 0;align-items:center;}.stk-mv-old{opacity:.45;}.stk-mv-ts{color:#64748b;min-width:96px;}.stk-mv-tipo{font-weight:800;min-width:78px;}.stk-mv-dep{color:#64748b;min-width:74px;}.stk-mv-d{font-weight:800;min-width:44px;text-align:right;}.stk-mv-d.pos{color:#15803d;}.stk-mv-d.neg{color:#b91c1c;}.stk-mv-ref{color:#94a3b8;}.stk-ini-txt{width:100%;border:1px solid #cbd5e1;border-radius:9px;padding:9px;font-family:Consolas,Menlo,monospace;font-size:14px;}.stk-ini-btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}.stk-ini-warn{font-size:12px;color:#92400e;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:8px;margin-top:10px;}.stk-tabs{display:flex;gap:4px;padding:8px 12px 0;background:#1e3a8a;flex-wrap:wrap;}.stk-tab{flex:0 1 auto;width:auto;white-space:nowrap;background:rgba(255,255,255,.12);color:#cbd5e1;border:none;border-radius:9px 9px 0 0;padding:9px 13px;font-size:12.5px;font-weight:800;cursor:pointer;}.stk-tab.on{background:#f8fafc;color:#1e3a8a;}.stk-seg{display:flex;gap:6px;margin-bottom:10px;}.stk-segb{flex:1;background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:7px;font-size:13px;font-weight:800;cursor:pointer;}.stk-segb.on{background:#1e6bd6;color:#fff;border-color:#1e6bd6;}.stk-grp{margin-bottom:10px;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;}.stk-grp-h{background:#f1f5f9;padding:7px 10px;font-weight:800;font-size:13px;}.stk-grp-tot{color:#15803d;font-weight:800;margin-left:6px;}.stk-ing{display:flex;gap:9px;align-items:center;padding:5px 10px;border-top:1px solid #f1f5f9;font-size:12.5px;}.stk-ing-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#1e6bd6;}.stk-ing-desc{flex:1;color:#475569;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.stk-ing-rto{color:#94a3b8;font-size:11px;}.stk-aj-sec{border:1px solid #e2e8f0;border-radius:12px;padding:12px;margin-bottom:12px;}.stk-aj-h{font-size:15px;font-weight:800;margin-bottom:6px;}.stk-aj-hint{font-size:12px;color:#64748b;margin-bottom:7px;}.stk-aj-form{display:flex;gap:7px;flex-wrap:wrap;}.stk-aj-inp{flex:1;min-width:90px;height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 10px;font-size:14px;text-align:center;}.cnt-in{height:32px;border:1px solid #cbd5e1;border-radius:7px;padding:0 6px;font-size:13px;box-sizing:border-box;margin:0;width:auto;}.stk-aj-dep{margin-bottom:12px;font-size:13px;font-weight:800;}.stk-aj-dep select{height:36px;border:1px solid #cbd5e1;border-radius:8px;padding:0 8px;font-size:14px;font-weight:700;}.stk-rk-orden{background:#f1f5f9;border-radius:10px;padding:10px 12px;font-size:13px;margin-bottom:10px;}.stk-rk-orden.pend{background:#fffbeb;border:1.5px solid #fcd34d;color:#92400e;}.stk-rk-baj{display:flex;align-items:center;gap:10px;border:1px solid #e2e8f0;border-radius:11px;padding:9px 11px;margin-bottom:8px;background:#fff;}.stk-rk-baji{flex:1;min-width:0;}.stk-rk-q{font-size:12px;color:#1e6bd6;font-weight:700;margin-top:2px;}";
     document.head.appendChild(s);
   }
   let ov = document.getElementById("stockAdminOverlay");
@@ -9731,7 +9731,7 @@ function stkAsOfApply() {
   stkRender();
 }
 function stkAsOfLive() { if (!_stk) return; _stk.asOf = null; _stk.openArt = null; stkRender(); }
-function stkTab(t) { if (!_stk) return; if (t === "compras") { openOCAdmin(); return; } _stk.tab = t; _stk.filtro = ""; _stk.openArt = null; if (t === "capacidad" && !_stk.capLoaded) { stkCapLoad(); return; } if (t === "racks" && !_stk.planiLoaded) { stkPlaniLoad(); return; } stkRender(); }
+function stkTab(t) { if (!_stk) return; if (t === "compras") { openOCAdmin(); return; } _stk.tab = t; _stk.filtro = ""; _stk.openArt = null; if (t === "capacidad" && !_stk.capLoaded) { stkCapLoad(); return; } if (t === "racks" && !_stk.planiLoaded) { stkPlaniLoad(); return; } if (t === "insumos" && !_stk.insLoaded) { stkInsLoad(); return; } stkRender(); }
 function stkRender() {
   if (!_stk) return;
   if (_stk.soloConteo) {   // rol "solo conteo": sin solapas, directo al conteo físico
@@ -9739,11 +9739,11 @@ function stkRender() {
     const body0 = document.getElementById("stkBody"); if (body0) _renderKeepFocus(body0, stkBodyConteo());
     return;
   }
-  const tabs = [["stocks", "📊 Stocks"], ["proceso", "📦 A Separar"], ["racks", "🏗 Racks"], ["conteo", "📋 Conteo"], ["capacidad", "📐 Capacidad"], ["ajustes", "⚙ Ajustes"], ["compras", "📑 Compras (OCs)"]];
+  const tabs = [["stocks", "📊 Stocks"], ["proceso", "📦 A Separar"], ["racks", "🏗 Racks"], ["conteo", "📋 Conteo"], ["capacidad", "📐 Capacidad"], ["insumos", "🧰 Insumos"], ["ajustes", "⚙ Ajustes"], ["compras", "📑 Compras (OCs)"]];
   const tb = document.getElementById("stkTabs");
   if (tb) tb.innerHTML = tabs.map(function (t) { return '<button class="stk-tab' + (_stk.tab === t[0] ? " on" : "") + '" onclick="stkTab(\'' + t[0] + '\')">' + t[1] + '</button>'; }).join("");
   const body = document.getElementById("stkBody"); if (!body) return;
-  _renderKeepFocus(body, _stk.tab === "proceso" ? stkBodyProceso() : _stk.tab === "conteo" ? stkBodyConteo() : _stk.tab === "capacidad" ? stkBodyCapacidad() : _stk.tab === "racks" ? stkBodyRacks() : _stk.tab === "ajustes" ? stkBodyAjustes() : stkBodyStocksTab());
+  _renderKeepFocus(body, _stk.tab === "proceso" ? stkBodyProceso() : _stk.tab === "conteo" ? stkBodyConteo() : _stk.tab === "capacidad" ? stkBodyCapacidad() : _stk.tab === "racks" ? stkBodyRacks() : _stk.tab === "insumos" ? stkBodyInsumos() : _stk.tab === "ajustes" ? stkBodyAjustes() : stkBodyStocksTab());
 }
 /* ===== v6.47 — FC s/SALIDA: NPs FACTURADAS (tick de la operadora en Facturación =
    fila en Facturacion_NP) que TODAVÍA NO se cargaron al camión (sin evento CCN del
@@ -11972,6 +11972,177 @@ function stkBodySalidas() {
   });
   return h + "</tbody></table>";
 }
+/* ===== ADMINISTRAR INSUMOS (idea 5572, v7.14) — solapa "🧰 Insumos" de Stock y
+   Compras. Es el lado admin de la botonera del operario (idea 7917):
+
+     (1) PENDIENTES: lo que los operarios dieron de alta desde el celular sin saber el
+         código. El sistema les puso una identidad temporal `TMP-NNNN` y acá se les
+         asigna el código y el nombre de verdad — el rename arrastra los movimientos
+         de stock ya cargados (`insumo_identificar`).
+     (2) CATÁLOGO: mover de categoría, renombrar, fijar ubicación y ORDEN dentro de la
+         categoría (vacío = orden automático de la app), o mandar a "a depurar".
+     (3) ALTA con código real.
+
+   El anon key sólo tiene INSERT+SELECT (el log de stock es append-only): cada acción
+   va por una función SECURITY DEFINER con su validación adentro, no por UPDATE suelto. */
+let _stkIns = null;
+async function stkInsLoad() {
+  insEnsureCss();   // los chips de categoría usan .ins-cchip
+  _stk.insLoaded = true;
+  _stkIns = { cat: "", filtro: "", edit: null, nuevo: false, msg: "" };
+  const body = document.getElementById("stkBody");
+  if (body) body.innerHTML = '<div class="stk-loading">Cargando insumos…</div>';
+  await stkInsRefresh();
+  stkRender();
+}
+async function stkInsRefresh() {
+  try {
+    const r = await Promise.all([
+      supaFetchAll(SUPABASE_URL + "/rest/v1/Insumos", "select=cod,nombre,categoria,ubicacion,orden,creado_por,creado"),
+      insFetchSaldosXUni()
+    ]);
+    _stkIns.items = (r[0] || []).map(function (c) {
+      return { cod: String(c.cod), nombre: c.nombre || "", cat: c.categoria || "", ubic: c.ubicacion || "",
+               orden: (c.orden === null || c.orden === undefined) ? "" : c.orden,
+               por: c.creado_por || "", creado: c.creado || "", xuni: r[1][String(c.cod)] || null };
+    });
+    _stkIns.items.sort(function (a, b) { return _insSortCod(a, b); });
+  } catch (e) { _stkIns.items = []; _stkIns.msg = "Error cargando: " + (e.message || e); }
+}
+function _stkInsSaldo(it) {
+  if (!it.xuni || !it.xuni.length) return "—";
+  return it.xuni.map(function (u) { return (Math.round(u.saldo * 1000) / 1000) + " " + u.uni; }).join(" · ");
+}
+function stkBodyInsumos() {
+  if (!_stkIns) return '<div class="stk-loading">Cargando…</div>';
+  const items = _stkIns.items || [];
+  const pend = items.filter(function (it) { return /^TMP-/.test(it.cod); });
+  const f = (_stkIns.filtro || "").toLowerCase().trim();
+  const cat = _stkIns.cat || "";
+  // los TMP no cuentan acá: tienen su propia sección arriba
+  const cnt = {}; items.forEach(function (it) { if (/^TMP-/.test(it.cod)) return; const k = insCatDef(it.cat) ? it.cat : ""; cnt[k] = (cnt[k] || 0) + 1; });
+  const lista = items.filter(function (it) {
+    if (/^TMP-/.test(it.cod)) return false;                     // van arriba, en Pendientes
+    const k = insCatDef(it.cat) ? it.cat : "";
+    if (cat && (cat === "?" ? k !== "" : k !== cat)) return false;
+    return !f || (it.cod + " " + it.nombre + " " + it.ubic).toLowerCase().indexOf(f) >= 0;
+  });
+
+  let h = '<div class="stk-cut" style="background:#eef2ff;border:1px solid #a5b4fc;color:#3730a3;">🧰 <b>Administrar insumos</b> — acá se identifican los que cargan los operarios desde el celular sin código, y se maneja la <b>categoría</b>, la <b>ubicación</b> y el <b>orden</b> con que los ve el operario en la botonera de RI/EI.</div>';
+  if (_stkIns.msg) h += '<div class="stk-cut" style="background:#f0fdf4;border:1px solid #86efac;color:#166534;">' + escapeHtml(_stkIns.msg) + '</div>';
+
+  // ---- (1) PENDIENTES DE IDENTIFICAR ----
+  h += '<div class="stk-sec">🆕 Pendientes de identificar <span class="stk-secn">' + pend.length + '</span></div>';
+  if (!pend.length) h += '<div class="stk-empty">Nada pendiente: no hay insumos cargados por operarios esperando código.</div>';
+  else {
+    h += '<div class="stk-cut" style="background:#fffbeb;border:1px solid #fcd34d;color:#92400e;">El operario los cargó sin código; el sistema les puso una identidad temporal. Al identificarlos, <b>el stock ya cargado se mueve al código nuevo</b>.</div>';
+    h += '<table class="stk-tbl"><thead><tr><th>Temporal</th><th>Lo que escribió el operario</th><th>Saldo</th><th>Código real</th><th>Nombre</th><th>Categoría</th><th></th></tr></thead><tbody>';
+    h += pend.map(function (it) {
+      return '<tr><td><b>' + escapeHtml(it.cod) + '</b><div class="stk-sub">' + escapeHtml(it.por ? "leg " + it.por : "") + '</div></td>' +
+        '<td>' + escapeHtml(it.nombre) + '</td>' +
+        '<td>' + escapeHtml(_stkInsSaldo(it)) + '</td>' +
+        '<td><input class="stk-inp" id="idCod_' + escapeHtml(it.cod) + '" placeholder="código" style="width:96px;"></td>' +
+        '<td><input class="stk-inp" id="idNom_' + escapeHtml(it.cod) + '" placeholder="nombre" value="' + escapeHtml(it.nombre) + '" style="width:150px;"></td>' +
+        '<td>' + _stkInsCatSel("idCat_" + it.cod, it.cat) + '</td>' +
+        '<td><button class="stk-btn" onclick="stkInsIdentificar(\'' + escapeHtml(it.cod) + '\')">✓ Identificar</button> ' +
+        '<button class="stk-btn stk-btn-x" onclick="stkInsDescartar(\'' + escapeHtml(it.cod) + '\')">Descartar</button></td></tr>';
+    }).join("");
+    h += '</tbody></table>';
+  }
+
+  // ---- (2) CATÁLOGO ----
+  h += '<div class="stk-sec">📚 Catálogo <span class="stk-secn">' + (items.length - pend.length) + '</span></div>';
+  h += '<div class="ins-cats" style="margin:8px 0;">' +
+    '<button class="ins-cchip' + (!cat ? " on" : "") + '" onclick="stkInsCat(\'\')">Todas</button>' +
+    INS_CATS.map(function (c) { return cnt[c.k] ? '<button class="ins-cchip' + (c.k === INS_CAT_DEP ? " dep" : "") + (cat === c.k ? " on" : "") + '" onclick="stkInsCat(\'' + c.k + '\')">' + c.lbl + ' <span class="ins-cn">' + cnt[c.k] + '</span></button>' : ""; }).join("") +
+    (cnt[""] ? '<button class="ins-cchip' + (cat === "?" ? " on" : "") + '" onclick="stkInsCat(\'?\')">❓ Sin categoría <span class="ins-cn">' + cnt[""] + '</span></button>' : "") +
+    '</div>';
+  h += '<input class="stk-inp" style="width:100%;box-sizing:border-box;margin-bottom:8px;" placeholder="🔎 Buscar código / nombre / ubicación" value="' + escapeHtml(_stkIns.filtro) + '" oninput="if(_stkIns){_stkIns.filtro=this.value;stkRender();}">';
+  h += '<div style="margin-bottom:8px;">' + (_stkIns.nuevo
+    ? '<span class="stk-nuevo"><input class="stk-inp" id="nvCod" placeholder="código" style="width:96px;"> <input class="stk-inp" id="nvNom" placeholder="nombre" style="width:170px;"> <input class="stk-inp" id="nvUbi" placeholder="ubicación" style="width:90px;"> ' + _stkInsCatSel("nvCat", "") + ' <button class="stk-btn" onclick="stkInsAlta()">✓ Crear</button> <button class="stk-btn stk-btn-x" onclick="if(_stkIns){_stkIns.nuevo=false;stkRender();}">Cancelar</button></span>'
+    : '<button class="stk-btn" onclick="if(_stkIns){_stkIns.nuevo=true;stkRender();}">+ Insumo nuevo (con código)</button>') + '</div>';
+  if (!lista.length) h += '<div class="stk-empty">No hay insumos con ese filtro.</div>';
+  else {
+    h += '<table class="stk-tbl"><thead><tr><th>Código</th><th>Nombre</th><th>Categoría</th><th>Ubic.</th><th class="num" title="Orden dentro de la categoría en la botonera del operario. Vacío = automático (flejes por medida, el resto por saldo).">Orden</th><th>Saldo</th><th></th></tr></thead><tbody>';
+    h += lista.map(function (it) {
+      const ed = _stkIns.edit === it.cod;
+      if (!ed) {
+        return '<tr><td><b>' + escapeHtml(it.cod) + '</b></td><td>' + escapeHtml(it.nombre || "—") + '</td>' +
+          '<td>' + escapeHtml(insCatLbl(insCatDef(it.cat) ? it.cat : "")) + '</td>' +
+          '<td>' + escapeHtml(it.ubic || "—") + '</td>' +
+          '<td class="num">' + (it.orden === "" ? "auto" : it.orden) + '</td>' +
+          '<td>' + escapeHtml(_stkInsSaldo(it)) + '</td>' +
+          '<td><button class="stk-btn" onclick="stkInsEdit(\'' + escapeHtml(it.cod) + '\')">Editar</button></td></tr>';
+      }
+      return '<tr><td><b>' + escapeHtml(it.cod) + '</b></td>' +
+        '<td><input class="stk-inp" id="edNom_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.nombre) + '" style="width:150px;"></td>' +
+        '<td>' + _stkInsCatSel("edCat_" + it.cod, it.cat) + '</td>' +
+        '<td><input class="stk-inp" id="edUbi_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.ubic) + '" style="width:80px;"></td>' +
+        '<td><input class="stk-inp" id="edOrd_' + escapeHtml(it.cod) + '" type="number" value="' + escapeHtml(it.orden) + '" placeholder="auto" style="width:62px;"></td>' +
+        '<td>' + escapeHtml(_stkInsSaldo(it)) + '</td>' +
+        '<td><button class="stk-btn" onclick="stkInsGuardar(\'' + escapeHtml(it.cod) + '\')">✓ Guardar</button> ' +
+        '<button class="stk-btn stk-btn-x" onclick="if(_stkIns){_stkIns.edit=null;stkRender();}">Cancelar</button></td></tr>';
+    }).join("");
+    h += '</tbody></table>';
+  }
+  return h;
+}
+function _stkInsCatSel(id, sel) {
+  return '<select class="stk-inp" id="' + escapeHtml(id) + '">' +
+    '<option value=""' + (insCatDef(sel) ? "" : " selected") + '>❓ Sin categoría</option>' +
+    INS_CATS.map(function (c) { return '<option value="' + c.k + '"' + (sel === c.k ? " selected" : "") + '>' + c.lbl + '</option>'; }).join("") +
+    '</select>';
+}
+function stkInsCat(k) { if (!_stkIns) return; _stkIns.cat = (_stkIns.cat === k) ? "" : k; _stkIns.edit = null; stkRender(); }
+function stkInsEdit(cod) { if (!_stkIns) return; _stkIns.edit = cod; stkRender(); }
+function _stkInsVal(id) { const e = document.getElementById(id); return e ? String(e.value || "").trim() : ""; }
+async function _stkInsRpc(fn, args) {
+  const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/" + fn, {
+    method: "POST",
+    headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify(args)
+  });
+  if (!r.ok) { let m = ""; try { m = (await r.json()).message || ""; } catch (_e) {} throw new Error(m || ("HTTP " + r.status)); }
+  return r.json().catch(function () { return null; });
+}
+async function stkInsIdentificar(tmp) {
+  const cod = _stkInsVal("idCod_" + tmp), nom = _stkInsVal("idNom_" + tmp), cat = _stkInsVal("idCat_" + tmp);
+  if (!cod) { alert("Poné el código real."); return; }
+  if (!confirm('Identificar "' + tmp + '" como código ' + cod + '?\n\nEl stock ya cargado con el temporal pasa al código nuevo.')) return;
+  try {
+    const n = await _stkInsRpc("insumo_identificar", { p_tmp: tmp, p_cod: cod, p_nombre: nom || null, p_categoria: cat || null });
+    _stkIns.msg = "✓ " + tmp + " → " + cod + " (" + (n || 0) + " movimiento(s) de stock actualizados).";
+    await stkInsRefresh(); stkRender();
+  } catch (e) { alert("No se pudo: " + (e.message || e)); }
+}
+async function stkInsDescartar(tmp) {
+  if (!confirm('Descartar "' + tmp + '"?\n\nPasa a "a depurar": deja de aparecerle al operario, pero el stock que tenga NO se toca.')) return;
+  try {
+    await _stkInsRpc("insumo_editar", { p_cod: tmp, p_categoria: INS_CAT_DEP });
+    _stkIns.msg = "✓ " + tmp + " mandado a «a depurar».";
+    await stkInsRefresh(); stkRender();
+  } catch (e) { alert("No se pudo: " + (e.message || e)); }
+}
+async function stkInsGuardar(cod) {
+  const ord = _stkInsVal("edOrd_" + cod);
+  try {
+    await _stkInsRpc("insumo_editar", {
+      p_cod: cod, p_categoria: _stkInsVal("edCat_" + cod) || null, p_nombre: _stkInsVal("edNom_" + cod) || null,
+      p_orden: ord === "" ? null : (parseInt(ord, 10) || 0), p_ubicacion: _stkInsVal("edUbi_" + cod) || null
+    });
+    _stkIns.edit = null; _stkIns.msg = "✓ " + cod + " actualizado.";
+    await stkInsRefresh(); stkRender();
+  } catch (e) { alert("No se pudo: " + (e.message || e)); }
+}
+async function stkInsAlta() {
+  const cod = _stkInsVal("nvCod");
+  if (!cod) { alert("Poné el código."); return; }
+  try {
+    await _stkInsRpc("insumo_alta", { p_cod: cod, p_nombre: _stkInsVal("nvNom") || null, p_categoria: _stkInsVal("nvCat") || null, p_ubicacion: _stkInsVal("nvUbi") || null, p_legajo: "admin" });
+    _stkIns.nuevo = false; _stkIns.msg = "✓ " + cod + " creado.";
+    await stkInsRefresh(); stkRender();
+  } catch (e) { alert("No se pudo: " + (e.message || e)); }
+}
 function stkBodyAjustes() {
   let h = '<div class="stk-aj-dep">Depósito: <select id="stkAjDep" onchange="stkIniHintUpdate()"><option value="terminado">Artículo Terminado (góndola)</option><option value="excedente">Excedente</option><option value="racks">Racks</option><option value="insumos">Insumos</option><option value="separar_pedidos">A Separar (pedidos)</option><option value="a_facturar">A Facturar</option><option value="a_guardar">Mercadería a guardar</option></select></div>';
   h += '<div class="stk-aj-sec"><div class="stk-aj-h">⚙ Ajustar stock</div>';
@@ -12530,16 +12701,20 @@ function insCatLbl(k) { const c = insCatDef(k); return c ? c.lbl : "❓ Sin cate
 function insCatOf(it) { const k = String((it && it.cat) || "").trim(); return insCatDef(k) ? k : ""; }
 async function insFetchCatalogo() {
   try {
-    const r = await fetch(SUPABASE_INSUMOS_ENDPOINT + "?select=cod,nombre,sector,categoria,ubicacion&order=cod.asc&limit=20000", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+    const r = await fetch(SUPABASE_INSUMOS_ENDPOINT + "?select=cod,nombre,sector,categoria,ubicacion,orden&order=cod.asc&limit=20000", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
     return r.ok ? await r.json() : [];
   } catch (_e) { return []; }
 }
-async function showInsumoModal(mode, legajo, _resume) {
-  if (!document.getElementById("insCss")) {
+/* El CSS del modal de insumos lo usa también la solapa "Insumos" de Stock y Compras
+   (chips de categoría), así que la inyección va aparte. */
+function insEnsureCss() {
+  if (document.getElementById("insCss")) return;
     const s = document.createElement("style"); s.id = "insCss";
     s.textContent = "#insModal{display:none;position:fixed;inset:0;z-index:1296;background:rgba(2,6,23,.74);overflow:auto;padding:12px;}#insModal.show{display:block;}.ins-card{background:#f8fafc;max-width:480px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.ins-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;color:#fff;}.ins-head.in{background:linear-gradient(90deg,#4f46e5,#4338ca);}.ins-head.out{background:linear-gradient(90deg,#0d9488,#0f766e);}.ins-title{font-size:18px;font-weight:800;}.ins-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}.ins-body{padding:13px 14px;}.ins-loading,.ins-empty{padding:24px;text-align:center;color:#64748b;font-size:15px;}.ins-hint{font-size:12.5px;color:#64748b;margin-bottom:9px;}.ins-search{width:100%;box-sizing:border-box;height:42px;border:2px solid #cbd5e1;border-radius:10px;padding:0 12px;font-size:15px;margin-bottom:9px;}.ins-crear{background:#eef2ff;border:1px dashed #a5b4fc;border-radius:11px;padding:10px;margin-bottom:10px;font-size:12.5px;color:#3730a3;display:flex;flex-direction:column;gap:7px;}.ins-crear-r{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}.ins-nn{flex:1;min-width:130px;}.ins-nid{flex:1;min-width:150px;}.ins-crear input{height:34px;border:1px solid #c7d2fe;border-radius:8px;padding:0 9px;font-size:13px;}.ins-cbtn{background:#4f46e5;color:#fff;border:none;border-radius:8px;padding:7px 12px;font-weight:800;cursor:pointer;width:auto;}.ins-row{border:1px solid #e2e8f0;border-radius:12px;padding:9px 11px;margin-bottom:8px;background:#fff;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}.ins-info{flex:1;min-width:0;}.ins-cod{font-size:16px;font-weight:800;font-family:Consolas,Menlo,monospace;}.ins-cod-sec{font-family:inherit;color:#4338ca;}.ins-nom{font-size:12.5px;color:#475569;}.ins-stk{font-size:11.5px;color:#64748b;font-weight:700;margin-top:2px;}.ins-stp{display:flex;align-items:center;gap:5px;}.ins-sb{display:flex;align-items:center;justify-content:center;line-height:1;padding:0;margin:0;width:38px;height:40px;border:none;border-radius:9px;font-size:22px;font-weight:800;cursor:pointer;background:#e2e8f0;color:#475569;}.ins-inp{width:58px;height:40px;box-sizing:border-box;margin:0;padding:0;text-align:center;font-size:18px;font-weight:800;border:2px solid #cbd5e1;border-radius:9px;}.ins-warn{width:100%;font-size:11.5px;color:#b45309;font-weight:700;}.ins-fin{width:100%;margin-top:10px;padding:14px;border:none;border-radius:12px;color:#fff;font-size:17px;font-weight:800;cursor:pointer;}.ins-fin.in{background:#4f46e5;}.ins-fin.out{background:#0d9488;}.ins-fin:disabled{background:#cbd5e1;color:#64748b;cursor:not-allowed;}.ins-uni{flex-basis:100%;display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px dashed #e2e8f0;}.ins-uni-l{font-size:11.5px;color:#64748b;font-weight:700;}.ins-uchip{width:auto;margin:0;border:1px solid #cbd5e1;background:#fff;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:800;cursor:pointer;color:#475569;}.ins-uchip.on{background:#4f46e5;color:#fff;border-color:#4f46e5;}.ins-uadd{color:#4f46e5;font-size:15px;}.ins-cats{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;}.ins-cchip{width:auto;margin:0;border:1px solid #cbd5e1;background:#fff;border-radius:999px;padding:8px 13px;font-size:12.5px;font-weight:800;cursor:pointer;color:#475569;}.ins-cchip.on{background:#4f46e5;color:#fff;border-color:#4f46e5;}.ins-body.out .ins-cchip.on{background:#0d9488;border-color:#0d9488;}.ins-cchip.dep{border-style:dashed;color:#b45309;border-color:#fcd34d;}.ins-cchip.dep.on,.ins-body.out .ins-cchip.dep.on{background:#b45309;color:#fff;border-color:#b45309;}.ins-cn{opacity:.72;font-weight:700;}.ins-ubi{font-size:11.5px;color:#0f766e;font-weight:800;}.ins-cbadge{font-size:11px;font-weight:800;color:#64748b;}.ins-depw{background:#fffbeb;border:1px dashed #fcd34d;color:#92400e;border-radius:10px;padding:9px 11px;font-size:12px;margin-bottom:9px;}.ins-bar{display:flex;align-items:center;gap:9px;margin-bottom:11px;}.ins-bar-t{flex:1;text-align:center;font-size:16px;font-weight:900;color:#0f172a;}.ins-back{width:auto;margin:0;background:#fff;border:2px solid #cbd5e1;border-radius:11px;padding:10px 15px;font-size:14px;font-weight:800;color:#334155;cursor:pointer;white-space:nowrap;}.ins-grid{display:grid;gap:9px;grid-template-columns:repeat(auto-fill,minmax(102px,1fr));}.ins-catbtn,.ins-itbtn{aspect-ratio:1/1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;width:auto;margin:0;padding:7px;text-align:center;background:#fff;border:2px solid #cbd5e1;border-radius:14px;cursor:pointer;min-width:0;overflow-wrap:anywhere;}.ins-catem{font-size:29px;line-height:1;}.ins-catnm{font-size:12.5px;font-weight:900;color:#0f172a;line-height:1.15;}.ins-catn{font-size:11px;font-weight:800;color:#64748b;}.ins-catbtn.dep,.ins-itbtn.add{border-style:dashed;border-color:#fcd34d;background:#fffbeb;}.ins-itbtn.add{border-color:#a5b4fc;background:#eef2ff;color:#3730a3;}.ins-itadd{font-size:32px;line-height:1;font-weight:900;}.ins-catbtn.hasq,.ins-itbtn.on{border-color:#4f46e5;background:#eef2ff;}.ins-body.out .ins-catbtn.hasq,.ins-body.out .ins-itbtn.on{border-color:#0d9488;background:#f0fdfa;}.ins-itcod{font-size:16px;font-weight:900;font-family:Consolas,Menlo,monospace;color:#0f172a;}.ins-itnom{font-size:10.5px;font-weight:700;color:#64748b;line-height:1.15;}.ins-itubi{font-size:10px;font-weight:800;color:#0f766e;}.ins-itq{font-size:12px;font-weight:900;color:#4f46e5;}.ins-body.out .ins-itq{color:#0d9488;}.ins-itq.falta,.ins-body.out .ins-itq.falta{color:#b45309;}.ins-itbtn.on:has(.ins-itq.falta){border-color:#f59e0b;background:#fffbeb;}.ins-uni-l.falta{color:#b45309;}.ins-qov{position:fixed;inset:0;background:rgba(2,6,23,.62);z-index:1299;display:flex;align-items:flex-start;justify-content:center;padding:22px 13px;overflow:auto;}.ins-qc{background:#fff;border-radius:16px;padding:15px;width:100%;max-width:340px;box-shadow:0 24px 70px rgba(0,0,0,.5);}.ins-qh{display:flex;align-items:flex-start;justify-content:space-between;gap:9px;}.ins-qcod{font-size:21px;font-weight:900;font-family:Consolas,Menlo,monospace;color:#0f172a;}.ins-qnom{font-size:12.5px;color:#475569;font-weight:700;}.ins-qrow{display:flex;align-items:center;justify-content:center;gap:9px;margin:13px 0 4px;}.ins-qb{display:flex;align-items:center;justify-content:center;width:56px;height:64px;padding:0;margin:0;border:none;border-radius:12px;background:#e2e8f0;color:#475569;font-size:29px;font-weight:900;line-height:1;cursor:pointer;}.ins-qi{box-sizing:border-box;width:104px;height:64px;padding:0;margin:0;text-align:center;font-size:32px;font-weight:900;border:2px solid #cbd5e1;border-radius:12px;}.ins-qok{width:100%;margin-top:11px;padding:14px;border:none;border-radius:12px;color:#fff;font-size:17px;font-weight:900;cursor:pointer;}.ins-qok.in{background:#4f46e5;}.ins-qok.out{background:#0d9488;}.ins-nvl{font-size:13px;font-weight:900;color:#0f172a;margin:14px 0 7px;}.ins-nvq{display:block;width:130px;}.ins-nvt{box-sizing:border-box;width:100%;border:2px solid #cbd5e1;border-radius:11px;padding:10px 12px;font-size:15px;font-family:inherit;resize:vertical;}.ins-catbtn.add{border-style:dashed;border-color:#a5b4fc;background:#eef2ff;color:#3730a3;}.ins-catbtn.add .ins-catem{font-size:34px;font-weight:900;}.ins-catbtn.add .ins-catnm{color:#3730a3;}.ins-body.out .ins-catbtn.add,.ins-body.out .ins-itbtn.add{border-color:#5eead4;background:#f0fdfa;color:#115e59;}.ins-body.out .ins-catbtn.add .ins-catnm{color:#115e59;}.ins-anular{width:100%;margin-top:9px;padding:15px;border:none;border-radius:12px;background:#dc2626;color:#fff;font-size:17px;font-weight:900;cursor:pointer;}.ins-anular:hover{background:#b91c1c;}.ins-anular small{display:block;font-size:11.5px;font-weight:700;opacity:.9;margin-top:2px;}";
     document.head.appendChild(s);
-  }
+}
+async function showInsumoModal(mode, legajo, _resume) {
+  insEnsureCss();
   let ov = document.getElementById("insModal");
   if (!ov) { ov = document.createElement("div"); ov.id = "insModal"; document.body.appendChild(ov); }
   ov.classList.add("show");
@@ -12560,7 +12735,7 @@ async function showInsumoModal(mode, legajo, _resume) {
     const _defUni = function (xu, cat) { if (xu && xu.length === 1) return xu[0].uni; const c = insCatDef(cat); return c ? c.uni : ""; };
     const items = (res[0] || []).map(function (c) {
       const cod = String(c.cod), sd = saldos[cod] || {}, xu = xUni[cod] || null, cat = String(c.categoria || "");
-      return { cod: cod, nombre: c.nombre || (sd.desc || ""), sector: c.sector || "", ubic: c.ubicacion || "", cat: cat, noCode: cod.indexOf("·") >= 0, stock: Number(sd.insumos || 0), stockByUni: xu, qty: 0, unidad: _defUni(xu, cat) };
+      return { cod: cod, nombre: c.nombre || (sd.desc || ""), sector: c.sector || "", ubic: c.ubicacion || "", cat: cat, orden: (c.orden === null || c.orden === undefined) ? null : Number(c.orden), noCode: cod.indexOf("·") >= 0, stock: Number(sd.insumos || 0), stockByUni: xu, qty: 0, unidad: _defUni(xu, cat) };
     });
     // insumos con movimientos pero fuera del catálogo (defensivo): quedan sin categoría,
     // en su propio chip — nunca se ocultan por un dato faltante.
@@ -12618,6 +12793,19 @@ function _insMedida(nombre) {
   return [parseFloat(m[1].replace(",", ".")), parseFloat(m[2].replace(",", "."))];
 }
 function _insSortCat(cat) {
+  // El ORDEN que fijó el admin en Stock y Compras → Insumos manda sobre el automático
+  // (idea 5572). Los que no tienen orden van después, con el criterio de siempre.
+  const auto = _insSortAuto(cat);
+  return function (a, b) {
+    const oa = (a.orden === null || a.orden === undefined) ? null : a.orden;
+    const ob = (b.orden === null || b.orden === undefined) ? null : b.orden;
+    if (oa !== null && ob === null) return -1;
+    if (oa === null && ob !== null) return 1;
+    if (oa !== null && ob !== null && oa !== ob) return oa - ob;
+    return auto(a, b);
+  };
+}
+function _insSortAuto(cat) {
   if (cat === "fleje") return function (a, b) {
     const ma = _insMedida(a.nombre), mb = _insMedida(b.nombre);
     if (ma && !mb) return -1; if (!ma && mb) return 1;
@@ -12657,7 +12845,11 @@ function _insStockForUnit(it) {
 function _insNum(n) { return Math.round(n * 1000) / 1000; }
 /* Etiqueta corta del insumo para el botón de la grilla: el código si tiene, o el
    sector con 📍 si es de los viejos (sector + descripción). */
-function _insBtnCod(it) { return it.noCode ? ("📍 " + (it.sector || String(it.cod).split("·")[0] || "")) : it.cod; }
+function _insEsTmp(it) { return !!(it && (it.tmp || /^TMP-/.test(String(it.cod || "")))); }
+function _insBtnCod(it) {
+  if (_insEsTmp(it)) return it.cod ? ("🆕 " + it.cod) : "🆕 …";
+  return it.noCode ? ("📍 " + (it.sector || String(it.cod).split("·")[0] || "")) : it.cod;
+}
 /* idea 7917 (v7.08) — MISMA FORMA que la Recepción de Mercadería (recepcion.js):
    pantalla 1 = grilla de CATEGORÍAS en botones cuadrados; tocás una y entrás a la
    pantalla 2 = grilla de los INSUMOS de esa categoría; tocás uno y se abre el pop-up
@@ -12744,9 +12936,9 @@ function insRender() {
 /* ---------- ALTA DE UN INSUMO NUEVO (pedido del usuario, v7.10) ----------
    Llegó algo que no está en ninguna lista. El operario NO tiene por qué saber el
    código: pone categoría + cantidad + unidad + un detalle en sus palabras, y listo.
-   El código lo pone el sistema (`NUEVO·<DETALLE>`) para que después se pueda buscar
-   y reconciliar; si el operario SÍ sabe el código de 7 dígitos, hay un campo opcional
-   para dárselo y evitar el huérfano. */
+   La IDENTIDAD la asigna el sistema (`TMP-0001`, `TMP-0002`, … vía `nuevo_insumo_tmp`)
+   y el detalle queda como descripción; el código y el nombre de verdad se los pone un
+   admin desde Stock y Compras → Insumos (idea 5572). */
 function insNuevoOpen(cat) {
   if (!_ins) return;
   _ins.nuevo = { cat: insCatDef(cat) && cat !== INS_CAT_DEP ? cat : "", qty: "", uni: "", det: "" };
@@ -12808,38 +13000,57 @@ function insNuevoOk() {
   const n = _ins.nuevo;
   const det = String(n.det || "").trim();
   if (!det) { alert("Escribí el detalle: qué es lo que llegó.\n\nCon eso alcanza, el código se lo ponen después desde Stock y Compras."); return; }
-  // El detalle ES la identidad: acá no se pide código (el operario no tiene por qué
-  // saberlo). El prefijo NUEVO· los deja encontrables de un saque para que en Stock y
-  // Compras les asignen el código real (idea 5572).
-  const cod = "NUEVO·" + det.toUpperCase();
+  // La IDENTIDAD la asigna el sistema (TMP-0001, TMP-0002…) y el detalle queda como
+  // descripción. Antes la clave era el texto del detalle: dos formas de escribir lo
+  // mismo creaban dos insumos, y un typo quedaba clavado en el cod_art de los
+  // movimientos. El código y el nombre de verdad se los pone el admin desde
+  // Stock y Compras → Insumos (idea 5572).
   const qty = Math.max(0, parseFloat(String(n.qty || "").replace(",", ".")) || 0);
   const cat = insCatDef(n.cat) && n.cat !== INS_CAT_DEP ? n.cat : "";
   const uni = String(n.uni || "").trim() || (insCatDef(cat) ? insCatDef(cat).uni : "");
   if (qty > 0 && !uni) { alert("Elegí la unidad: en qué se mide lo que llegó.\n\nEsta categoría no tiene una fija (cada insumo mide distinto)."); return; }
-  const ya = _ins.items.filter(function (it) { return it.cod === cod; })[0];
+  // Sin código no hay clave natural: se dedupe por el DETALLE (normalizado). Si ya
+  // hay uno escrito igual, no creo otro — lo abro para que sume sobre ese.
+  const _norm = function (x) { return String(x || "").trim().toLowerCase().replace(/\s+/g, " "); };
+  const ya = _ins.items.filter(function (it) { return _norm(it.nombre) === _norm(det); })[0];
   if (ya) {
-    // ya estaba: no duplico, lo abro para que sume sobre lo que hay
-    alert("Ese insumo ya está en la lista. Te lo abro para que pongas la cantidad.");
+    alert("Ya hay un insumo con ese detalle. Te lo abro para que pongas la cantidad.");
     _ins.nuevo = null; _ins.cat = insCatOf(ya) || "?"; _ins.filtro = "";
     _ins.qty = _ins.items.indexOf(ya);
     insRender(); return;
   }
-  const item = { cod: cod, nombre: det || cod, sector: "", ubic: "", cat: cat, noCode: true, stock: 0, stockByUni: null, qty: qty, unidad: uni };
-  insCrearItem(item);
+  const item = { cod: "", nombre: det, sector: "", ubic: "", cat: cat, noCode: true, tmp: true, stock: 0, stockByUni: null, qty: qty, unidad: uni };
   _ins.nuevo = null; _ins.filtro = "";
   _ins.cat = cat || "?";
-  _ins.qty = qty > 0 ? null : _ins.items.indexOf(item);   // sin cantidad, abro el pop-up
+  _ins.items.push(item);
   insRender();
+  insCrearTmp(item, det, cat).then(function () {
+    _ins && insRender();
+    // sin cantidad, abro el pop-up para que la ponga
+    if (_ins && item.qty <= 0) { _ins.qty = _ins.items.indexOf(item); insRender(); }
+  });
 }
-/* Alta en el catálogo (Supabase) + en la lista de la pantalla. Sin red igual entra a
-   la lista: el movimiento va por stockMove, que ya es offline-safe. */
-function insCrearItem(item) {
+/* Le pide al servidor la identidad temporal (TMP-NNNN). Sin red no se puede numerar
+   sin arriesgar que dos celulares saquen el mismo número, así que cae a una clave
+   local con el legajo y la hora — el admin la va a renombrar igual, y el movimiento
+   sale por stockMove que ya es offline-safe. */
+async function insCrearTmp(item, det, cat) {
+  let cod = "";
   try {
-    fetch(SUPABASE_INSUMOS_ENDPOINT, { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" }, body: JSON.stringify({ cod: item.cod, nombre: item.nombre || null, sector: item.sector || null, categoria: item.cat || null, creado_por: _ins.legajo || null }) })
-      .catch(function () {});
-  } catch (_e) { /* sin red: igual va a la lista */ }
-  _ins.items.push(item); _ins.items.sort(_insSortCod);
-  return item;
+    const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/nuevo_insumo_tmp", {
+      method: "POST",
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ p_detalle: det, p_categoria: cat || null, p_legajo: _ins ? _ins.legajo : null })
+    });
+    if (r.ok) { const t = await r.json(); cod = String(t || "").trim(); }
+  } catch (_e) { /* sin red */ }
+  if (!cod) {
+    const d = new Date();
+    const p2 = function (n) { return String(n).padStart(2, "0"); };
+    cod = "TMP-L" + ((_ins && _ins.legajo) || "0") + "-" + p2(d.getHours()) + p2(d.getMinutes()) + p2(d.getSeconds());
+  }
+  item.cod = cod;
+  return cod;
 }
 /* Pop-up de cantidad (mismo gesto que el de cajas de la Recepción de Mercadería). */
 function _insQtyHtml(it, i, isIn) {
@@ -12881,6 +13092,8 @@ function insConfirmar() {
   if (!sel.length) return;
   // Sin unidad no se manda: iría como "Uni" por defecto y partiría el saldo del insumo
   // en dos unidades distintas (es lo que pasó con PP: 151 Bolsas + 24 Uni).
+  const sinCod = sel.filter(function (it) { return !it.cod; });
+  if (sinCod.length) { try { alert("Esperá un segundo: el sistema todavía le está asignando el número a un insumo nuevo."); } catch (_e) {} return; }
   const sinUni = sel.filter(function (it) { return !it.unidad; });
   if (sinUni.length) {
     try { alert("Falta la unidad de:\n\n  " + sinUni.map(function (it) { return _insBtnCod(it) + (it.nombre ? " · " + it.nombre : ""); }).join("\n  ") + "\n\nTe abro el primero para que la elijas."); } catch (_e) {}

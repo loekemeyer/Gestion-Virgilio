@@ -131,3 +131,12 @@ update public."Insumos" set categoria = 'partes_plasticas' where categoria = 'ma
 -- ⏳ La taxonomía todavía vive en dos lados: acá y en `INS_CATS` (index.html). El
 -- módulo para manejarla desde Stock y Compras —junto con el orden de los insumos y
 -- la revisión de los `NUEVO·` que dan de alta los operarios— es la idea 5572.
+
+-- ---------------------------------------------------------------------
+-- v7.14 (idea 5572) — ver la migración `insumos_identidad_temporal_y_admin`:
+--   · Insumos.orden (orden manual dentro de la categoría; NULL = automático)
+--   · secuencia insumos_tmp_seq + nuevo_insumo_tmp()  → identidad TMP-NNNN
+--   · insumo_identificar() / insumo_editar() / insumo_alta()
+-- Todas SECURITY DEFINER con validación adentro: el anon key sigue sin UPDATE
+-- directo sobre Insumos ni sobre Movimientos_Stock.
+-- ---------------------------------------------------------------------

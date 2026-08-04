@@ -4,7 +4,41 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-04 · Versión app al documentar: **v7.13**
+> Última actualización: 2026-08-04 · Versión app al documentar: **v7.14**
+>
+> Nota: **v7.14 — ADMINISTRAR INSUMOS: solapa nueva en Stock y Compras + identidad temporal**
+> (idea **5572** del usuario). Dos mitades del mismo pedido.
+>
+> **(A) Identidad temporal asignada por el sistema.** Cuando el operario da de alta un insumo desde
+> RI/EI, la clave ya no es el texto del detalle (`NUEVO·<DETALLE>`, v7.10) sino un número que asigna
+> el servidor: **`TMP-0001`, `TMP-0002`, …** vía la función `nuevo_insumo_tmp(detalle, categoria,
+> legajo)`, y el detalle queda como **descripción**. El motivo: con el texto como clave, dos formas de
+> escribir lo mismo creaban dos insumos y un typo quedaba clavado en el `cod_art` de los movimientos.
+> Sin red cae a `TMP-L<legajo>-<hhmmss>` (numerar sin servidor arriesga que dos celulares saquen el
+> mismo número); el movimiento sale igual por `stockMove`, que ya es offline-safe. En la botonera se
+> ven como **🆕 TMP-000N** y no se pueden mandar hasta que el servidor devolvió el número. El alta
+> ahora dedupe por **detalle normalizado** (antes por código, que ya no existe).
+>
+> **(B) Solapa 🧰 Insumos** (`stkBodyInsumos`), entre *Capacidad* y *Ajustes*:
+> **(1) Pendientes de identificar** — los `TMP-*` que cargaron los operarios, con lo que escribieron,
+> su saldo y el legajo. Se les pone código + nombre + categoría y **el stock ya cargado se mueve al
+> código nuevo** (`insumo_identificar` renombra en `Insumos` **y** en `Movimientos_Stock`), o se
+> descartan a *a depurar* (no se borran: pueden tener stock). **(2) Catálogo** — filtro por categoría
+> y por texto; se edita nombre, categoría, ubicación y **orden**. **(3) Alta con código real**.
+>
+> **El `orden` que fija el admin manda sobre el orden automático** de la botonera (`_insSortCat`
+> envuelve a `_insSortAuto`): vacío = automático (flejes por medida, el resto por saldo).
+>
+> ⚠ **Seguridad**: el anon key sólo tiene INSERT+SELECT (el log de stock es append-only a propósito).
+> Para no abrirle UPDATE a las tablas, cada acción va por una función **SECURITY DEFINER** con su
+> validación adentro: `insumo_identificar` **sólo** acepta origen `TMP-*` (no se puede usar para
+> renombrar stock real) y **se niega a fusionar** contra un código que ya existe; `insumo_alta`
+> rechaza códigos `TMP-` a mano; `nuevo_insumo_tmp` exige detalle. Verificado contra la base real
+> (rename + guardas + limpieza). Columnas nuevas: `Insumos.orden`. Ver `sql/insumos_categoria.sql`.
+>
+> Bonus: el CSS del modal de insumos se extrajo a `insEnsureCss()` porque la solapa admin usa los
+> mismos chips de categoría. Test nuevo `tests/ins-admin.cjs` + `ins-categorias.cjs` actualizado;
+> suite completa OK. Bump **v7.14**.
 >
 > Nota: **v7.13 — "Anular picking" / "Anular insumos": salida clara de una sesión empezada por
 > error**. Pedido del usuario: al empezar el picking de una tanda no había forma de darla de baja —
