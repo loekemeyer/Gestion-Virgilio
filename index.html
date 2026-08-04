@@ -3303,7 +3303,6 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
     <div class="sup-actions sup-secondary">
       <button class="sup-action-btn" onclick="openAgentesAdmin()"><span class="sup-ico">🤖</span><span>Agentes</span></button>
       <button class="sup-action-btn" onclick="openProductividad()"><span class="sup-ico">📊</span><span>Productividad</span></button>
-      <button class="sup-action-btn" onclick="openAbastecimiento()"><span class="sup-ico">📈</span><span>Abastecimiento vs Venta</span></button>
       <button class="sup-action-btn" onclick="openMonitor()"><span class="sup-ico">📊</span><span>Monitor de operarios</span></button>
       <button class="sup-action-btn" onclick="openAnalisis()"><span class="sup-ico">📈</span><span>Análisis de productividad</span></button>
       <button class="sup-action-btn" onclick="openInconsistencias()"><span class="sup-ico">⚠</span><span>Inconsistencias</span></button>
@@ -5910,7 +5909,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.32";
+const APP_VERSION = "v7.33";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -9185,7 +9184,7 @@ async function ocFetchRows() {
 async function openOCAdmin() {
   if (!document.getElementById("ocCss")) {
     const s = document.createElement("style"); s.id = "ocCss";
-    s.textContent = "#ocAdminOverlay{display:none;position:fixed;inset:0;z-index:1281;background:rgba(2,6,23,.74);overflow:auto;padding:14px;}#ocAdminOverlay.show{display:block;}.oc-card{background:#f8fafc;max-width:860px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.oc-head{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:linear-gradient(90deg,#0f766e,#134e4a);color:#fff;}.oc-title{font-size:19px;font-weight:800;}.oc-close{background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;width:auto;}.oc-body{padding:14px 16px;}.oc-loading,.oc-empty{padding:24px;text-align:center;color:#64748b;}.oc-tools{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center;}.oc-btn{background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:8px 13px;font-size:13px;font-weight:800;cursor:pointer;width:auto;}.oc-btn.ok{background:#0f766e;color:#fff;border-color:#0f766e;}.oc-btn.danger{background:#fff;color:#b91c1c;border-color:#fca5a5;}.oc-filtro{flex:1;min-width:160px;height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 11px;font-size:14px;}.oc-tbl{width:100%;border-collapse:collapse;font-size:13.5px;}.oc-tbl th{background:#f1f5f9;color:#475569;text-align:left;padding:7px 9px;font-size:11px;text-transform:uppercase;border-bottom:1px solid #cbd5e1;}.oc-tbl th.num,.oc-tbl td.num{text-align:right;font-variant-numeric:tabular-nums;padding-left:14px;padding-right:14px;}.oc-tblwrap{overflow-x:auto;max-width:100%;-webkit-overflow-scrolling:touch;}.oc-tbl td{padding:7px 9px;border-bottom:1px solid #eef2f7;}.oc-rowc{cursor:pointer;}.oc-rowc:hover{background:#ecfdf5;}.oc-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#0f766e;}.oc-pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11px;font-weight:800;}.oc-pill.pendiente{background:#fef3c7;color:#92400e;}.oc-pill.recibida{background:#dcfce7;color:#166534;}.oc-pill.parcial{background:#dbeafe;color:#1e40af;}.oc-falt{color:#b91c1c;font-weight:800;}.oc-ok{color:#166534;font-weight:800;}.oc-rinp{width:78px;height:34px;text-align:center;border:1px solid #cbd5e1;border-radius:8px;padding:0;font-size:14px;font-weight:700;}.oc-form{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;}.oc-inp{height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 10px;font-size:14px;}.oc-meta{font-size:13px;color:#475569;margin-bottom:10px;}.oc-meta b{color:#0f172a;}.oc-additm{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-top:8px;}.oc-note{font-size:12px;color:#64748b;margin-top:10px;}@media (max-width:460px){.oc-tbl-det th:nth-child(3),.oc-tbl-det td:nth-child(3){display:none;}.oc-tbl-det td:nth-child(2){max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.oc-tbl-det th.num,.oc-tbl-det td.num{padding-left:6px;padding-right:6px;}.oc-tbl-det{font-size:12.5px;}.oc-tbl-det .oc-rinp{width:60px;height:32px;}}";
+    s.textContent = "#ocAdminOverlay{display:none;position:fixed;inset:0;z-index:1281;background:rgba(2,6,23,.74);overflow:auto;padding:14px;}#ocAdminOverlay.show{display:block;}.oc-card{background:#f8fafc;max-width:860px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.oc-head{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:linear-gradient(90deg,#0f766e,#134e4a);color:#fff;}.oc-title{font-size:19px;font-weight:800;}.oc-close{background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;width:auto;}.oc-body{padding:14px 16px;}.oc-loading,.oc-empty{padding:24px;text-align:center;color:#64748b;}.oc-tools{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center;}.oc-btn{background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:8px 13px;font-size:13px;font-weight:800;cursor:pointer;width:auto;}.oc-btn.ok{background:#0f766e;color:#fff;border-color:#0f766e;}.oc-btn.danger{background:#fff;color:#b91c1c;border-color:#fca5a5;}.oc-filtro{flex:1;min-width:160px;height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 11px;font-size:14px;}.oc-tbl{width:100%;border-collapse:collapse;font-size:13.5px;}.oc-tbl th{background:#f1f5f9;color:#475569;text-align:left;padding:7px 9px;font-size:11px;text-transform:uppercase;border-bottom:1px solid #cbd5e1;}.oc-tbl th.num,.oc-tbl td.num{text-align:right;font-variant-numeric:tabular-nums;padding-left:14px;padding-right:14px;}.oc-tblwrap{overflow-x:auto;max-width:100%;-webkit-overflow-scrolling:touch;}.oc-tbl td{padding:7px 9px;border-bottom:1px solid #eef2f7;}.oc-rowc{cursor:pointer;}.oc-rowc:hover{background:#ecfdf5;}.oc-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#0f766e;}.oc-pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11px;font-weight:800;}.oc-pill.pendiente{background:#fef3c7;color:#92400e;}.oc-pill.recibida{background:#dcfce7;color:#166534;}.oc-pill.parcial{background:#dbeafe;color:#1e40af;}.oc-falt{color:#b91c1c;font-weight:800;}.oc-ok{color:#166534;font-weight:800;}.oc-rinp{width:78px;height:34px;text-align:center;border:1px solid #cbd5e1;border-radius:8px;padding:0;font-size:14px;font-weight:700;}.oc-form{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;}.oc-inp{height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 10px;font-size:14px;}.oc-meta{font-size:13px;color:#475569;margin-bottom:10px;}.oc-meta b{color:#0f172a;}.oc-additm{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-top:8px;}.oc-note{font-size:12px;color:#64748b;margin-top:10px;}@media (max-width:460px){.oc-tbl-det th:nth-child(3),.oc-tbl-det td:nth-child(3){display:none;}.oc-tbl-det td:nth-child(2){max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.oc-tbl-det th.num,.oc-tbl-det td.num{padding-left:6px;padding-right:6px;}.oc-tbl-det{font-size:12.5px;}.oc-tbl-det .oc-rinp{width:60px;height:32px;}}.oc-boxgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}.oc-box{background:#fff;border:1px solid #cbd5e1;border-left:5px solid #0f766e;border-radius:12px;padding:12px 13px;cursor:pointer;transition:box-shadow .12s,transform .12s;}.oc-box:hover{box-shadow:0 6px 18px rgba(15,118,110,.16);transform:translateY(-1px);}.oc-box-t{font-size:16px;font-weight:800;color:#0f172a;display:flex;align-items:center;gap:6px;margin-bottom:5px;}.oc-box-sub{font-size:12px;color:#64748b;margin-bottom:7px;}.oc-box-row{display:flex;justify-content:space-between;font-size:12.5px;padding:1px 0;color:#475569;}.oc-box-row b{color:#0f172a;font-variant-numeric:tabular-nums;}.oc-box-foot{display:flex;justify-content:space-between;align-items:center;margin-top:8px;}.oc-box-go{font-size:12px;font-weight:800;color:#0f766e;}.oc-cd{background:#ecfdf5;border:1px solid #99f6e4;color:#065f46;border-radius:10px;padding:9px 12px;margin-bottom:10px;font-size:12.5px;}.oc-cd b{color:#065f46;}.oc-cd-num{font-variant-numeric:tabular-nums;font-weight:900;}.oc-tbl th.oc-grp{text-align:center;background:#ede9fe;color:#5b21b6;font-size:10px;}.oc-tbl th.oc-sep,.oc-tbl td.oc-sep{border-left:2px solid #c7d2fe;}.oc-neg{color:#b91c1c;font-weight:800;}.oc-pos{color:#15803d;font-weight:700;}.oc-chip{display:inline-block;border-radius:999px;padding:1px 8px;font-size:11px;font-weight:800;white-space:nowrap;}.oc-chip.bad{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;}.oc-chip.warn{background:#fffbeb;color:#b45309;border:1px solid #fde68a;}.oc-chip.ok{background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0;}.oc-chip.mut{background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0;}.oc-ent-hint{font-size:11.5px;color:#64748b;margin-top:8px;}@media(max-width:640px){.oc-boxgrid{grid-template-columns:repeat(2,1fr);}}@media(max-width:420px){.oc-boxgrid{grid-template-columns:1fr;}}";
     document.head.appendChild(s);
   }
   let ov = document.getElementById("ocAdminOverlay");
@@ -9199,35 +9198,109 @@ async function openOCAdmin() {
   } catch (e) { const b = document.getElementById("ocBody"); if (b) b.innerHTML = '<div class="oc-loading">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
 }
 function closeOCAdmin() { const ov = document.getElementById("ocAdminOverlay"); if (ov) ov.classList.remove("show"); _oc = null; }
-function ocRender() { if (!_oc) return; const body = document.getElementById("ocBody"); if (!body) return; _renderKeepFocus(body, _oc.view === "detail" ? ocBodyDetail() : _oc.view === "nueva" ? ocBodyNueva() : _oc.view === "gen" ? ocBodyGen() : _oc.view === "indices" ? ocBodyIndices() : _oc.view === "entregas" ? ocBodyEntregas() : _oc.view === "trazar" ? ocBodyTrazar() : ocBodyList()); }
+function ocRender() { if (!_oc) return; const body = document.getElementById("ocBody"); if (!body) return; _renderKeepFocus(body, _oc.view === "detail" ? ocBodyDetail() : _oc.view === "fecha" ? ocBodyFecha() : _oc.view === "nueva" ? ocBodyNueva() : _oc.view === "gen" ? ocBodyGen() : _oc.view === "indices" ? ocBodyIndices() : _oc.view === "entregas" ? ocBodyEntregas() : _oc.view === "trazar" ? ocBodyTrazar() : ocBodyList()); }
 /* v4.40 — % DE ENTREGAS: cruza lo PEDIDO (Ordenes_Compra.cantidad) contra lo
    ENTREGADO (cantidad_recibida) por artículo y global. Detalle del cumplimiento
    de los proveedores. (Ordenes_Compra retiene el histórico de OCs.) */
-function ocEntregas() { if (!_oc) return; _oc.view = "entregas"; _oc.filtro = ""; ocRender(); }
+/* v7.33 — % ENTREGAS = pantalla ÚNICA combinada (pedido del usuario): junta
+   ABASTECIMIENTO vs VENTA (fabricación/venta prom 3m + stock vs pedidos, de las
+   vistas server-side) con el % DE ENTREGAS de las OCs (pedido vs recibido), en una
+   sola tabla por artículo cruzada por clave normalizada. La data de abastecimiento
+   se trae lazy la 1ª vez (reusa abastCompute). El botón viejo del menú de supervisor
+   se sacó: esto vive solo acá. */
+async function ocEntregas() {
+  if (!_oc) return;
+  _oc.view = "entregas"; _oc.filtro = ""; ocRender();
+  if (!_oc.abast) {
+    try {
+      const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+      const res = await Promise.all([
+        fetch(SUPABASE_URL + "/rest/v1/vista_recepcion_mensual?select=cod,mes,proveedor,tipo,cajas,envios&limit=50000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }),
+        fetch(SUPABASE_URL + "/rest/v1/vista_venta_mensual?select=cod,mes,cajas,nps&limit=50000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }),
+        fetch(SUPABASE_URL + "/rest/v1/vista_stock_vs_pedidos?select=cod,stock_total,terminado,excedente,separar_pedidos,a_facturar,a_guardar,racks,racks_ch,para_envasar,pedidos_ped,nps_ped&limit=50000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }),
+        loadArtNombres()
+      ]);
+      _oc.abast = abastCompute(res[0] || [], res[1] || [], res[2] || []);
+    } catch (e) { _oc.abast = { error: String(e.message || e), rows: [] }; }
+    if (_oc.view === "entregas") ocRender();
+  }
+}
 function ocBodyEntregas() {
   const rows = _oc.rows || [];
   let h = '<div class="oc-tools"><button class="oc-btn" onclick="ocBack()">← Volver</button><input class="oc-filtro" type="search" placeholder="🔎 Buscar código / descripción / proveedor" value="' + escapeHtml(_oc.filtro || "") + '" oninput="if(_oc){_oc.filtro=this.value;ocRender();}"></div>';
-  if (!rows.length) return h + '<div class="oc-empty">No hay OCs cargadas todavía. El % de entregas aparece cuando se cargan/generan OCs y se marca lo recibido.</div>';
+  // 1) OC: pedido vs entregado por clave normalizada (27/027/0027 = mismo artículo)
   const byArt = {}; let totP = 0, totE = 0;
   rows.forEach(function (r) {
-    const k = _ocgNorm(r.codigo); if (!k) return;   // dedup por clave normalizada: 27/027/0027 = mismo artículo
+    const k = _ocgNorm(r.codigo); if (!k) return;
     const ped = Number(r.cantidad) || 0, ent = Number(r.cantidad_recibida) || 0;
     if (!byArt[k]) byArt[k] = { cod: codCanon(r.codigo), desc: r.descripcion || "", prov: r.proveedor || "", ped: 0, ent: 0 };
     byArt[k].ped += ped; byArt[k].ent += ent; totP += ped; totE += ent;
   });
+  // 2) Abastecimiento vs venta (lazy) indexado por clave normalizada
+  const loading = !_oc.abast, abErr = _oc.abast && _oc.abast.error, abReady = _oc.abast && !_oc.abast.error;
+  const ab = {}; if (abReady) (_oc.abast.rows || []).forEach(function (r) { const k = _ocgNorm(r.cod); if (k) ab[k] = r; });
+  const keyset = {}; Object.keys(byArt).forEach(function (k) { keyset[k] = 1; }); if (abReady) Object.keys(ab).forEach(function (k) { keyset[k] = 1; });
+  let keys = Object.keys(keyset);
+  if (!keys.length) return h + (loading ? '<div class="oc-loading">Cargando abastecimiento, ventas y % de entregas…</div>' : '<div class="oc-empty">No hay datos todavía. El % de entregas aparece cuando se cargan/generan OCs y se marca lo recibido.</div>');
   const pct = function (e, p) { return p > 0 ? Math.round(e / p * 1000) / 10 : 0; };
-  const f = (_oc.filtro || "").toLowerCase();
-  const arr = Object.keys(byArt).map(function (k) { return byArt[k]; })
-    .filter(function (a) { return f ? ((a.cod + " " + a.desc + " " + a.prov).toLowerCase().indexOf(f) >= 0) : true; })
-    .sort(function (a, b) { return pct(a.ent, a.ped) - pct(b.ent, b.ped); });
-  h += '<div class="oc-meta">% de entregas global: <b>' + pct(totE, totP) + '%</b> — ' + Math.round(totE) + ' entregadas de ' + Math.round(totP) + ' pedidas · ' + arr.length + ' artículo(s).</div>';
-  h += '<div class="oc-tblwrap"><table class="oc-tbl"><thead><tr><th>Código</th><th>Descripción</th><th>Proveedor</th><th class="num">Pedidas</th><th class="num">Entregadas</th><th class="num">%</th><th class="num">Falta</th></tr></thead><tbody>';
-  if (!arr.length) h += '<tr><td colspan="7" class="oc-empty">Sin resultados.</td></tr>';
-  arr.forEach(function (a) {
-    const p = pct(a.ent, a.ped); const col = p >= 100 ? "#166534" : (p >= 80 ? "#b45309" : "#b91c1c");
-    h += '<tr><td class="oc-cod">' + escapeHtml(a.cod) + '</td><td>' + escapeHtml(artNombre(a.cod, a.desc)) + '</td><td style="font-size:12px;color:#475569">' + escapeHtml(a.prov) + '</td><td class="num">' + Math.round(a.ped) + '</td><td class="num">' + Math.round(a.ent) + '</td><td class="num" style="color:' + col + ';font-weight:800">' + p + '%</td><td class="num oc-falt">' + (Math.max(0, Math.round(a.ped - a.ent)) || "—") + '</td></tr>';
+  const _n = function (x) { return String(Math.round((Number(x) || 0) * 10) / 10); };
+  const f = (_oc.filtro || "").toLowerCase().trim();
+  let arr = keys.map(function (k) {
+    const o = byArt[k] || {}, a = ab[k] || null;
+    const cod = o.cod || (a ? codCanon(a.cod) : k);
+    return { cod: cod, desc: artNombre(cod, o.desc || (a ? a.desc : "")), prov: o.prov || "",
+      ped: o.ped || 0, ent: o.ent || 0, hasOc: !!byArt[k], hasAb: !!a,
+      nProv: a ? a.nProv : 0, recAvg: a ? a.recAvg : 0, venAvg: a ? a.venAvg : 0, balAvg: a ? a.balAvg : 0,
+      stock: a ? a.stock : 0, pedidos: a ? a.pedidos : 0, npsPed: a ? a.npsPed : 0, falta: a ? a.falta : 0 };
   });
-  h += '</tbody></table></div>';
+  if (f) arr = arr.filter(function (x) { return (x.cod + " " + x.desc + " " + x.prov).toLowerCase().indexOf(f) >= 0; });
+  arr.sort(function (a, b) { return (b.falta - a.falta) || (pct(a.ent, a.ped) - pct(b.ent, b.ped)) || String(a.cod).localeCompare(String(b.cod), undefined, { numeric: true }); });
+  const conFalta = arr.filter(function (x) { return x.falta > 0.05; });
+  const totFalta = conFalta.reduce(function (s, x) { return s + x.falta; }, 0);
+  h += '<div class="oc-meta">% de entregas global (OC): <b>' + pct(totE, totP) + '%</b> — ' + Math.round(totE) + ' entregadas de ' + Math.round(totP) + ' pedidas · ' + arr.length + ' artículo(s).' +
+    (abReady ? ' &nbsp;·&nbsp; ' + (conFalta.length ? '<b class="oc-falt">⚠ ' + conFalta.length + ' sin stock para lo pedido</b> (faltan ' + _n(totFalta) + ' cajas)' : '<b class="oc-ok">✓ Stock cubre los pedidos</b>') : '') +
+    (_oc.abast && _oc.abast.nImport ? ' <span style="color:#64748b">· importados (E) excluidos: ' + _oc.abast.nImport + '</span>' : '') + '</div>';
+  if (loading) h += '<div class="oc-ent-hint">Cargando fabricación / venta / stock… (el % de entregas de proveedores ya está en la tabla).</div>';
+  if (abErr) h += '<div class="oc-ent-hint" style="color:#b45309">No se pudo cargar abastecimiento vs venta (' + escapeHtml(_oc.abast.error) + '). Se muestra solo el % de entregas.</div>';
+  const dash = '<span style="color:#cbd5e1">—</span>';
+  h += '<div class="oc-tblwrap"><table class="oc-tbl"><thead>' +
+    '<tr><th rowspan="2">Código</th><th rowspan="2">Descripción</th>' +
+    '<th colspan="4" class="oc-grp">🏭 Fabricación vs Venta (prom 3m)</th>' +
+    '<th colspan="3" class="oc-grp oc-sep">📦 Stock vs Pedidos (hoy)</th>' +
+    '<th colspan="4" class="oc-grp oc-sep">🚚 OC: Pedido vs Entrega</th>' +
+    '<th rowspan="2">Estado</th></tr>' +
+    '<tr><th class="num">Fabri-<br>cantes</th><th class="num">Recib.<br>/mes</th><th class="num">Vend.<br>/mes</th><th class="num">Bal.<br>/mes</th>' +
+    '<th class="num oc-sep">Stock<br>actual</th><th class="num">Pedido<br>pend.</th><th class="num">Falta p/<br>normaliz.</th>' +
+    '<th class="num oc-sep">Pedidas</th><th class="num">Entreg.</th><th class="num">%</th><th class="num">Falta</th></tr></thead><tbody>';
+  arr.forEach(function (x) {
+    const chips = [];
+    if (x.hasAb) {
+      const stkFalla = x.falta > 0.05, capFalla = x.venAvg > x.recAvg + 0.05, capReal = capFalla && stkFalla;
+      if (x.pedidos > 0) chips.push(stkFalla ? '<span class="oc-chip bad">⚠ Faltan ' + _n(x.falta) + '</span>' : '<span class="oc-chip ok">✓ Stock ok</span>');
+      if (capReal) chips.push('<span class="oc-chip warn">🏭 falta capacidad −' + _n(x.venAvg - x.recAvg) + '/m' + (x.nProv <= 1 ? ' · 1 fabri.' : '') + '</span>');
+    }
+    if (x.hasOc && x.ped > 0) { const p = pct(x.ent, x.ped); chips.push('<span class="oc-chip ' + (p >= 100 ? "ok" : (p >= 80 ? "warn" : "bad")) + '">🚚 OC ' + p + '%</span>'); }
+    if (!chips.length) chips.push(x.recAvg > 0 ? '<span class="oc-chip ok">✓ OK</span>' : '<span class="oc-chip mut">—</span>');
+    const ocP = pct(x.ent, x.ped), ocCol = ocP >= 100 ? "#166534" : (ocP >= 80 ? "#b45309" : "#b91c1c");
+    h += '<tr><td class="oc-cod">' + escapeHtml(x.cod) + '</td><td>' + escapeHtml(x.desc || "—") + '</td>' +
+      (x.hasAb ?
+        '<td class="num">' + x.nProv + '</td><td class="num">' + _n(x.recAvg) + '</td><td class="num">' + _n(x.venAvg) + '</td>' +
+        '<td class="num ' + (x.balAvg < -0.05 ? "oc-neg" : "oc-pos") + '">' + (x.balAvg >= 0 ? "+" : "") + _n(x.balAvg) + '</td>' +
+        '<td class="num oc-sep ' + (x.stock < -0.05 ? "oc-neg" : "") + '">' + _n(x.stock) + '</td>' +
+        '<td class="num">' + _n(x.pedidos) + (x.npsPed ? ' <span style="color:#94a3b8;font-size:11px">(' + x.npsPed + ')</span>' : '') + '</td>' +
+        '<td class="num ' + (x.falta > 0.05 ? "oc-neg" : "oc-pos") + '">' + (x.falta > 0.05 ? _n(x.falta) : "0") + '</td>'
+        :
+        '<td class="num">' + dash + '</td><td class="num">' + dash + '</td><td class="num">' + dash + '</td><td class="num">' + dash + '</td>' +
+        '<td class="num oc-sep">' + dash + '</td><td class="num">' + dash + '</td><td class="num">' + dash + '</td>') +
+      (x.hasOc ?
+        '<td class="num oc-sep">' + Math.round(x.ped) + '</td><td class="num">' + Math.round(x.ent) + '</td>' +
+        '<td class="num" style="color:' + ocCol + ';font-weight:800">' + ocP + '%</td>' +
+        '<td class="num oc-falt">' + (Math.max(0, Math.round(x.ped - x.ent)) || "—") + '</td>'
+        :
+        '<td class="num oc-sep">' + dash + '</td><td class="num">' + dash + '</td><td class="num">' + dash + '</td><td class="num">' + dash + '</td>') +
+      '<td>' + chips.join(" ") + '</td></tr>';
+  });
+  h += '</tbody></table></div><div class="oc-ent-hint">Ordenado por lo más urgente (falta de stock, después menor % de entrega). “—” = sin datos de ese lado. Fabricación/venta = promedio de los últimos 3 meses; OC = pedido vs recibido cargado en Compras.</div>';
   return h;
 }
 function ocGroups() {
@@ -9290,24 +9363,63 @@ function ocGroupStats(grp) {
   const estado = allRecibida ? "recibida" : (rec > 0 ? "parcial" : "pendiente");
   return { ped: ped, rec: rec, falta: ped - rec, estado: estado };
 }
+function _ocDdmm(f) { if (!f) return "s/fecha"; const p = String(f).split("-"); return p.length >= 3 ? p[2] + "/" + p[1] : f; }
+/* v7.33 — NIVEL 1 (pedido del usuario): cajas por FECHA de OC ("OC dd/mm", grid 3×).
+   Tocar una fecha → NIVEL 2 (cajas por tallerista) → tocar un tallerista → detalle. */
 function ocBodyList() {
   let h = '<div class="oc-tools"><button class="oc-btn ok" onclick="ocNueva()">+ Nueva OC (carga manual)</button><button class="oc-btn" onclick="ocgEnter()">⚙ Generar OCs</button><button class="oc-btn" onclick="ocEntregas()">📊 % Entregas</button><button class="oc-btn" onclick="ocTrazar()">🔎 Trazar artículo</button><input class="oc-filtro" type="search" placeholder="🔎 Buscar proveedor / rubro / fecha" value="' + escapeHtml(_oc.filtro) + '" oninput="if(_oc){_oc.filtro=this.value;ocRender();}"></div>';
-  const g = ocGroups();
-  let keys = Object.keys(g);
+  const g = ocGroups(), byF = {};
+  Object.keys(g).forEach(function (k) { const x = g[k], fe = x.fecha || ""; if (!byF[fe]) byF[fe] = { fecha: fe, groups: [], nItems: 0, ped: 0, rec: 0 }; const st = ocGroupStats(x); byF[fe].groups.push(x); byF[fe].nItems += x.rows.length; byF[fe].ped += st.ped; byF[fe].rec += st.rec; });
+  let fechas = Object.keys(byF);
   const f = (_oc.filtro || "").toLowerCase().trim();
-  if (f) keys = keys.filter(function (k) { const x = g[k]; return ((x.proveedor || "") + " " + (x.rubro || "") + " " + (x.fecha || "")).toLowerCase().indexOf(f) >= 0; });
-  keys.sort(function (a, b) { return (g[b].fecha || "").localeCompare(g[a].fecha || "") || (g[a].proveedor || "").localeCompare(g[b].proveedor || ""); });
-  if (!keys.length) return h + '<div class="oc-empty">No hay órdenes de compra que coincidan.<br><small>La importación desde los PDF de OC se agrega cuando definamos el formato.</small></div>';
-  h += '<div class="oc-tblwrap"><table class="oc-tbl"><thead><tr><th>Proveedor</th><th>Fecha</th><th>Rubro</th><th class="num">Ítems</th><th class="num">Pedido</th><th class="num">Falta</th><th>Estado</th></tr></thead><tbody>';
-  keys.forEach(function (k) {
-    const x = g[k], st = ocGroupStats(x);
-    h += '<tr class="oc-rowc" onclick="ocOpen(\'' + encodeURIComponent(k) + '\')"><td><b>' + escapeHtml(x.proveedor || "—") + '</b></td><td>' + escapeHtml(x.fecha || "—") + '</td><td>' + escapeHtml(x.rubro || "—") + '</td><td class="num">' + x.rows.length + '</td><td class="num">' + st.ped + '</td><td class="num ' + (st.falta > 0 ? "oc-falt" : "oc-ok") + '">' + (st.falta > 0 ? st.falta : "0") + '</td><td><span class="oc-pill ' + st.estado + '">' + st.estado + '</span></td></tr>';
+  if (f) fechas = fechas.filter(function (fe) { return _ocDdmm(fe).indexOf(f) >= 0 || fe.indexOf(f) >= 0 || byF[fe].groups.some(function (gr) { return ((gr.proveedor || "") + " " + (gr.rubro || "")).toLowerCase().indexOf(f) >= 0; }); });
+  fechas.sort(function (a, b) { return (b || "").localeCompare(a || ""); });
+  if (!fechas.length) return h + '<div class="oc-empty">No hay órdenes de compra que coincidan.</div>';
+  h += '<div class="oc-boxgrid">';
+  fechas.forEach(function (fe) {
+    const d = byF[fe], falta = d.ped - d.rec;
+    const estado = (d.ped > 0 && falta <= 0) ? "recibida" : (d.rec > 0 ? "parcial" : "pendiente");
+    const bc = estado === "recibida" ? "#16a34a" : (estado === "parcial" ? "#2563eb" : "#d97706");
+    h += '<div class="oc-box" style="border-left-color:' + bc + '" onclick="ocOpenFecha(\'' + encodeURIComponent(fe) + '\')">' +
+      '<div class="oc-box-t">📄 OC ' + escapeHtml(_ocDdmm(fe)) + '</div>' +
+      '<div class="oc-box-sub">' + d.groups.length + ' tallerista(s) · ' + d.nItems + ' ítem(s)</div>' +
+      '<div class="oc-box-row">Pedido <b>' + d.ped + '</b></div>' +
+      '<div class="oc-box-row">Falta <b class="' + (falta > 0 ? "oc-falt" : "oc-ok") + '">' + (falta > 0 ? falta : 0) + '</b></div>' +
+      '<div class="oc-box-foot"><span class="oc-pill ' + estado + '">' + estado + '</span><span class="oc-box-go">ver →</span></div>' +
+      '</div>';
   });
-  h += '</tbody></table></div><div class="oc-note">La columna <b>Falta</b> = pedido − recibido. Entrá a una OC para cargar lo recibido y marcar el faltante (escritura: requiere sesión de supervisor).</div>';
+  h += '</div><div class="oc-note">Tocá una fecha para ver las OCs de ese día separadas por tallerista.</div>';
   return h;
 }
-function ocOpen(kEnc) { if (!_oc) return; _oc.openKey = decodeURIComponent(kEnc); _oc.view = "detail"; ocRender(); }
-function ocBack() { if (!_oc) return; _oc.view = "list"; _oc.openKey = null; ocRender(); }
+function ocOpenFecha(feEnc) { if (!_oc) return; _oc.openFecha = decodeURIComponent(feEnc); _oc.view = "fecha"; ocRender(); }
+function ocBackFechas() { if (!_oc) return; _oc.view = "list"; _oc.openFecha = null; _oc.openKey = null; ocRender(); }
+function ocBodyFecha() {
+  const g = ocGroups(), fe = _oc.openFecha;
+  let groups = Object.keys(g).map(function (k) { return { key: k, x: g[k] }; }).filter(function (o) { return (o.x.fecha || "") === fe; });
+  let h = '<div class="oc-tools"><button class="oc-btn" onclick="ocBackFechas()">← Volver a fechas</button></div>';
+  if (!groups.length) { _oc.view = "list"; _oc.openFecha = null; return ocBodyList(); }
+  let tPed = 0, tRec = 0, tItems = 0;
+  groups.forEach(function (o) { o.st = ocGroupStats(o.x); tPed += o.st.ped; tRec += o.st.rec; tItems += o.x.rows.length; });
+  groups.sort(function (a, b) { return (b.st.falta - a.st.falta) || (a.x.proveedor || "").localeCompare(b.x.proveedor || ""); });
+  h += '<div class="oc-meta">📄 OC del <b>' + escapeHtml(_ocDdmm(fe)) + '</b> (' + escapeHtml(fe || "s/fecha") + ') — <b>' + groups.length + '</b> tallerista(s) · <b>' + tItems + '</b> ítem(s) · Pedido <b>' + tPed + '</b> · Falta <b class="oc-falt">' + Math.max(0, tPed - tRec) + '</b></div>';
+  h += '<div class="oc-boxgrid">';
+  groups.forEach(function (o) {
+    const x = o.x, st = o.st, falta = st.falta;
+    const bc = st.estado === "recibida" ? "#16a34a" : (st.estado === "parcial" ? "#2563eb" : "#d97706");
+    h += '<div class="oc-box" style="border-left-color:' + bc + '" onclick="ocOpen(\'' + encodeURIComponent(o.key) + '\')">' +
+      '<div class="oc-box-t">' + escapeHtml(x.proveedor || "—") + '</div>' +
+      '<div class="oc-box-sub">' + escapeHtml(x.rubro || "—") + ' · ' + x.rows.length + ' ítem(s)</div>' +
+      '<div class="oc-box-row">Pedido <b>' + st.ped + '</b></div>' +
+      '<div class="oc-box-row">Recibido <b>' + st.rec + '</b></div>' +
+      '<div class="oc-box-row">Falta <b class="' + (falta > 0 ? "oc-falt" : "oc-ok") + '">' + (falta > 0 ? falta : 0) + '</b></div>' +
+      '<div class="oc-box-foot"><span class="oc-pill ' + st.estado + '">' + st.estado + '</span><span class="oc-box-go">abrir →</span></div>' +
+      '</div>';
+  });
+  h += '</div>';
+  return h;
+}
+function ocOpen(kEnc) { if (!_oc) return; _oc.openKey = decodeURIComponent(kEnc); const g = ocGroups(), x = g[_oc.openKey]; if (x && x.fecha) _oc.openFecha = x.fecha; _oc.view = "detail"; ocRender(); }
+function ocBack() { if (!_oc) return; if (_oc.view === "detail") { _oc.view = _oc.openFecha ? "fecha" : "list"; _oc.openKey = null; } else { _oc.view = "list"; _oc.openKey = null; _oc.openFecha = null; } ocRender(); }
 function ocBodyDetail() {
   const g = ocGroups(), x = g[_oc.openKey];
   if (!x) { _oc.view = "list"; return ocBodyList(); }
@@ -9497,9 +9609,24 @@ async function ocgDemanda(porEmpresa, soloNoPickeadas) {
   });
   return dem;
 }
+/* v7.33 — COUNTDOWN a la generación AUTOMÁTICA. El cron corre '0 10 * * 3' (miércoles
+   10:00 UTC = 07:00 AR, UTC-3 fijo). Se calcula en UTC directo para no depender de la
+   zona del navegador. El generador manual (esta misma pantalla) sigue disponible siempre. */
+function _ocgNextAuto() {
+  const now = new Date();
+  const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 10, 0, 0));
+  while (d.getUTCDay() !== 3 || d.getTime() <= now.getTime()) d.setUTCDate(d.getUTCDate() + 1);
+  const ms = d.getTime() - now.getTime();
+  return { date: d, ms: ms, days: Math.floor(ms / 864e5), hours: Math.floor(ms % 864e5 / 36e5), mins: Math.floor(ms % 36e5 / 6e4) };
+}
+function _ocgNextAutoTxt() { const n = _ocgNextAuto(); return String(n.days).padStart(2, "0") + "d " + String(n.hours).padStart(2, "0") + "h " + String(n.mins).padStart(2, "0") + "m"; }
+function _ocgNextAutoFecha() { const n = _ocgNextAuto(); return "miércoles " + String(n.date.getUTCDate()).padStart(2, "0") + "/" + String(n.date.getUTCMonth() + 1).padStart(2, "0") + " 07:00"; }
+let _ocgCdTimer = null;
+function ocgStartCountdown() { if (_ocgCdTimer) return; _ocgCdTimer = setInterval(function () { const el = document.getElementById("ocgCountdown"); if (!el) { clearInterval(_ocgCdTimer); _ocgCdTimer = null; return; } el.textContent = _ocgNextAutoTxt(); }, 30000); }
 async function ocgEnter() {
   if (!_oc) return;
   _oc.view = "gen"; _oc.gen = null; ocRender();   // muestra "calculando…"
+  ocgStartCountdown();
   try {
     const res = await Promise.all([ocgFetchMaximos(), stockFetchMovs(), stockGetCutoff(), ocgDemanda(false, true), ocgFetchProyeccion(), ocgFetchCapacidad()]);
     const maxs = res[0] || [], saldos = stockComputeSaldos(res[1] || [], res[2]), dem = res[3] || {}, proy = res[4] || {}, capac = res[5] || {};
@@ -9547,6 +9674,7 @@ function ocgGroups() {
 }
 function ocBodyGen() {
   let h = '<div class="oc-tools"><button class="oc-btn" onclick="ocBack()">← Volver</button><button class="oc-btn" onclick="ocgEnterIndices()">⚙ Índices</button></div>';
+  h += '<div class="oc-cd">⏱ Próxima generación <b>automática</b>: <b>' + escapeHtml(_ocgNextAutoFecha()) + '</b> · faltan <b class="oc-cd-num" id="ocgCountdown">' + escapeHtml(_ocgNextAutoTxt()) + '</b>. Igual podés generarlas <b>a mano ahora</b> con ✓ Generar de abajo.</div>';
   h += '<div style="background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af;border-radius:9px;padding:9px 11px;margin-bottom:10px;font-size:12.5px"><b>A pedir = máx(0, Máximo + Pedidos − (Góndola + A guardar + Racks + Excedente))</b>, con <b>Máximo = Proyección por tendencia (PaginaLK) × índice</b>, topado a la <b>capacidad de góndola</b>. <b>No</b> se cuentan pickeados, a facturar ni FC sin salida — y los pedidos que ya están en esos estadios <b>tampoco suman a Pedidos</b> (netea). Si un artículo no tiene proyección, usa el objetivo del Excel (marcado <i>xls</i>). Se generan solas los <b>miércoles 7:00</b>; acá podés generarlas a mano cuando quieras. Revisá antes de generar.</div>';
   if (!_oc.gen) return h + '<div class="oc-loading">Calculando (stock + demanda PPP + proyección × índice)…</div>';
   if (_oc.gen.error) return h + '<div class="oc-empty" style="color:#b91c1c">Error: ' + escapeHtml(_oc.gen.error) + '</div>';
@@ -11140,7 +11268,7 @@ async function stkOpenEstadioArt(codEnc, dep) {
   }
   const totCaj = round1(refs.reduce(function (s, t) { return s + by[t]; }, 0));
   // v6.47: acceso a los MOVIMIENTOS del depósito (mismo detalle que góndola/racks/a guardar).
-  const _movBtn = '<div style="margin-bottom:10px"><button class="mva-clear" onclick="stkOpenMovsArt(\'' + encodeURIComponent(cod) + '\',\'' + dep + '\',\'' + (dep === "a_facturar" ? "A facturar" : "Pickeados") + '\',\'🔁\')">🔁 Ver movimientos (entradas/salidas + saldo)</button></div>';
+  const _movBtn = _stkArtViewSwitch(encodeURIComponent(cod), dep, "estadio");
   let h = liveHtml + '<div class="stkpop-hint"><b>' + escapeHtml(cod) + '</b> · ' + (dep === "a_facturar" ? "a facturar" : "pickeado") + ': <b>' + totCaj + ' cajas</b> en ' + refs.length + ' ' + (dep === "a_facturar" ? "grupo(s)" : "tanda(s)") + '. Los NPs con <b style="color:#166534">· pidió N</b> son los que pidieron este artículo.</div>' + _movBtn;
   // v5.102 — ubicación FÍSICA del pedido: pickeado = PUB (por TANDA: Mesa 1/2, Carro);
   // a facturar = AUB (por NP: AB10/AA4…). Se cruza por tanda / NP. Última carga gana.
@@ -11525,6 +11653,18 @@ function _stkMovsBlock() {
     : '<div class="stkpop-empty">Sin movimientos' + ((_stkPop.desde || _stkPop.hasta) ? ' en ese rango' : '') + '.</div>';
   return h;
 }
+/* v7.33 — switch de vistas del artículo pickeado / a facturar: NPs/tandas ↔
+   Movimientos (reemplaza los dos botones grandes). Estilo inline: hay un
+   button{width:100%} global en la app, por eso el width:auto explícito. */
+function _stkArtViewSwitch(codEnc, dep, active) {
+  const tit = dep === "a_facturar" ? "A facturar" : "Pickeados";
+  const base = "display:inline-flex;align-items:center;justify-content:center;gap:5px;width:auto;border:none;cursor:pointer;font-weight:800;font-size:12.5px;padding:7px 14px;border-radius:8px;";
+  const on = "background:#1d4ed8;color:#fff;", off = "background:transparent;color:#334155;";
+  return '<div style="display:inline-flex;background:#e2e8f0;border-radius:10px;padding:3px;gap:2px;margin-bottom:10px">' +
+    '<button style="' + base + (active === "estadio" ? on : off) + '" onclick="stkOpenEstadioArt(\'' + codEnc + '\',\'' + dep + '\')">📋 NPs / tandas</button>' +
+    '<button style="' + base + (active === "movs" ? on : off) + '" onclick="stkOpenMovsArt(\'' + codEnc + '\',\'' + dep + '\',\'' + tit + '\',\'🔁\')">🔁 Movimientos</button>' +
+    '</div>';
+}
 function stkMovsArtRender() {
   const body = document.getElementById("stkPopBody"); if (!body || !_stkPop) return;
   // v6.48: navegación de vuelta al detalle "clásico" del depósito (NPs/tandas para
@@ -11533,7 +11673,7 @@ function stkMovsArtRender() {
   let nav = "";
   const _ce = encodeURIComponent(_stkPop.cod);
   if (_stkPop.dep === "separar_pedidos" || _stkPop.dep === "a_facturar") {
-    nav = '<div style="margin-bottom:10px"><button class="mva-clear" onclick="stkOpenEstadioArt(\'' + _ce + '\',\'' + _stkPop.dep + '\')">📋 Ver NPs / tandas</button></div>';
+    nav = _stkArtViewSwitch(_ce, _stkPop.dep, "movs");
   } else if (_stkPop.dep === "excedente") {
     nav = '<div style="margin-bottom:10px"><button class="mva-clear" onclick="stkOpenExcedenteArt(\'' + _ce + '\')">📍 Ver ubicaciones</button></div>';
   }
@@ -12162,7 +12302,8 @@ function _stkInsTodos(items) {
     return true;
   });
   const unisEnUso = {}; (items || []).forEach(function (it) { (it.xuni || []).forEach(function (u) { unisEnUso[u.uni] = 1; }); });
-  let h = '<div class="stk-sec">📋 Todos los insumos <span class="stk-secn">' + lista.length + (lista.length !== (items || []).length ? " / " + (items || []).length : "") + '</span></div>';
+  let h = _stkSec("todos", "📋 Todos los insumos", lista.length + (lista.length !== (items || []).length ? " / " + (items || []).length : ""));
+  if (!_stkAbierta("todos")) return h;
   h += '<div class="stk-cut">Sólo lectura: la foto completa del catálogo. Se actualiza sola cuando editás algo arriba.</div>';
   h += '<div class="stk-scroll"><table class="stk-tbl"><thead><tr>' +
     '<th>Código</th><th>Detalle</th><th>Categoría</th><th>Rack / sector</th><th class="num">Cantidad</th><th>Unidad</th></tr>' +
@@ -12537,8 +12678,8 @@ async function stkInsUniSacar(u) {
 function stkBodyAjustes() {
   let h = '<div class="stk-aj-dep">Depósito: <select id="stkAjDep" onchange="stkIniHintUpdate()"><option value="terminado">Artículo Terminado (góndola)</option><option value="excedente">Excedente</option><option value="racks">Racks</option><option value="insumos">Insumos</option><option value="separar_pedidos">A Separar (pedidos)</option><option value="a_facturar">A Facturar</option><option value="a_guardar">Mercadería a guardar</option></select></div>';
   h += '<div class="stk-aj-sec"><div class="stk-aj-h">⚙ Ajustar stock</div>';
-  h += '<div class="stk-aj-hint">Sumá o restá con signo: <code>+10</code> / <code>-3</code>.</div><div class="stk-aj-form"><input id="stkAjCod" class="stk-aj-inp" placeholder="Código"><input id="stkAjCant" class="stk-aj-inp" type="number" placeholder="+/- cajas"><button class="stk-btn ok" onclick="stockAjustar()">Aplicar</button></div>';
-  h += '<div class="stk-aj-hint" style="margin-top:10px">O dejá el stock exacto:</div><div class="stk-aj-form"><input id="stkAjCod2" class="stk-aj-inp" placeholder="Código"><input id="stkAjFijar" class="stk-aj-inp" type="number" placeholder="Fijar en…"><button class="stk-btn" onclick="stockFijar()">Fijar</button></div></div>';
+  h += '<div class="stk-aj-hint">Sumá o restá con signo: <code>+10</code> / <code>-3</code>.</div><div class="stk-aj-form"><input id="stkAjCod" class="stk-aj-inp" style="flex:0 0 auto;width:150px" placeholder="Código"><input id="stkAjCant" class="stk-aj-inp" style="flex:0 0 auto;width:110px" type="number" placeholder="+/- cajas"><button class="stk-btn ok" onclick="stockAjustar()">Aplicar</button></div>';
+  h += '<div class="stk-aj-hint" style="margin-top:10px">O dejá el stock exacto:</div><div class="stk-aj-form"><input id="stkAjCod2" class="stk-aj-inp" style="flex:0 0 auto;width:150px" placeholder="Código"><input id="stkAjFijar" class="stk-aj-inp" style="flex:0 0 auto;width:110px" type="number" placeholder="Fijar en…"><button class="stk-btn" onclick="stockFijar()">Fijar</button></div></div>';
   h += '<div class="stk-aj-sec"><div class="stk-aj-h">➕ Stock inicial</div><div class="stk-aj-hint" id="stkIniHint">Una línea por artículo: <b>CÓDIGO CANTIDAD</b> (en el depósito de arriba). El stock inicial <b>siempre cuenta</b> como base.</div><textarea id="stkIniTxt" class="stk-ini-txt" rows="6" placeholder="544 30&#10;546 12"></textarea><div class="stk-ini-btns"><button class="stk-btn ok" onclick="stockGuardarInicial()">Guardar inicial</button><button class="stk-btn danger" onclick="stockMarcarInicio()">🔄 Marcar inicio (resetear)</button></div><div class="stk-ini-warn">⚠ Pasos: 1) cargá el inicial de cada depósito (cambiás el depósito de arriba y repetís); 2) tocás <b>Marcar inicio</b> una sola vez. Desde ahí los movimientos REALES anteriores (de prueba) dejan de sumar — quedan guardados, no se borran.</div></div>';
   return h;
 }

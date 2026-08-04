@@ -271,8 +271,11 @@ catch (_e) {
     await stkInsAlta("fleje");
     out.altaRechazaDuplicado = rpc.length === antesAlta && /ya está en uso/i.test(alerted);
 
-    // 8b2) Secciones colapsables (la tabla final NO)
-    out.hayBotonesSec = document.querySelectorAll("#stkBody .stk-secbtn").length;   // 4 (Pendientes, Unidades, Categorías, Historial)
+    // 8b2) Secciones colapsables (v7.33: "Todos los insumos" también es plegable)
+    out.hayBotonesSec = document.querySelectorAll("#stkBody .stk-secbtn").length;   // 5 (Pendientes, Unidades, Categorías, Historial, Todos)
+    stkInsSec("todos");   // v7.33: la tabla final también se pliega
+    out.todosColapsa = !/Sólo lectura: la foto completa/.test(document.getElementById("stkBody").innerHTML);
+    stkInsSec("todos");   // reabrir para el resto de los chequeos
     stkInsSec("pend");
     out.pendColapsa = document.querySelectorAll("#stkBody table")[0] &&
       !document.getElementById("idCod_TMP-0001");
@@ -359,7 +362,7 @@ catch (_e) {
     r.catEditAbre === true && r.catGuardaNombre === "Cajas y embalaje" && r.catGuardaUnis === "Paquetes,Uni,MC" &&
     r.haySecUnidades === true && r.uniSacar === true && r.uniUsadaAvisa === true && r.uniLibreNoAvisa === true &&
     /Pendientes.*\|.*Unidades.*\|.*Categorías/.test(r.ordenSecciones || "") && r.altaRechazaDuplicado === true &&
-    r.hayBotonesSec === 4 && r.pendColapsa === true && r.pendVuelve === true &&
+    r.hayBotonesSec === 5 && r.todosColapsa === true && r.pendColapsa === true && r.pendVuelve === true &&
     r.histColapsadoInicio === true && r.hayHist === true && r.histTieneIngreso === true && r.histTieneEgreso === true &&
     r.histTieneFusion === true && r.histTieneCatGuardar === true && r.histMuestraQuien === true &&
     r.histOrdenado === true && r.histFiltraCat === true &&

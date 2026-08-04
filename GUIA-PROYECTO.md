@@ -4,7 +4,25 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-04 · Versión app al documentar: **v7.31**
+> Última actualización: 2026-08-04 · Versión app al documentar: **v7.33**
+>
+> Nota: **v7.33 — Tanda de mejoras de UI (pedido del usuario)** en *Stock y Compras* y en el módulo
+> de *Órdenes de Compra*. Seis cambios: **(1)** El botón **«Abastecimiento vs Venta»** se sacó del menú
+> de supervisor (*Reportes*); ahora vive **combinado dentro de «% Entregas»** (📑 Órdenes de Compra →
+> **📊 % Entregas**): una **sola tabla por artículo** que junta *Fabricación vs Venta (prom 3m)* +
+> *Stock vs Pedidos (hoy)* (de `vista_recepcion_mensual` / `vista_venta_mensual` / `vista_stock_vs_pedidos`,
+> traídas *lazy* y reusando `abastCompute`) con el *% de entregas de las OC* (pedido vs recibido). Cruce
+> por clave normalizada `_ocgNorm`; “—” cuando falta un lado. **(2)** El generador **«⚙ Generar OCs»**
+> muestra un **countdown (dd hh mm)** a la próxima automática (cron `ocs-auto-miercoles`, miércoles 07:00 AR),
+> calculado en UTC (`_ocgNextAuto`), con timer autolimpiante; el botón de generar **a mano** sigue disponible.
+> **(3)** La lista de **Órdenes de Compra** se reorganizó en **3 niveles**: cajas por **fecha** (`OC dd/mm`,
+> grid 3×) → cajas por **tallerista** → detalle de la OC (`ocBodyFecha`/`ocOpenFecha`/`_ocDdmm`; `ocBack`
+> vuelve un nivel). **(4)** En el pop-up de **Pickeados / A facturar**, los dos botones grandes
+> (*Ver NPs/tandas* / *Ver movimientos*) se reemplazaron por un **switch** segmentado (`_stkArtViewSwitch`).
+> **(5)** El form **«⚙ Ajustar stock»** (solapa *Ajustes*) usa inputs de ancho fijo (más compacto).
+> **(6)** **«📋 Todos los insumos»** ahora es una **sección plegable** (`_stkSec`/`_stkAbierta`, clave
+> `todos`) como el resto. Bump **v7.33**. Tests: suite completa verde; `tests/ins-admin.cjs` extendido
+> (5 secciones plegables + `todosColapsa`).
 >
 > Nota: **v7.32 — idea 5703: aviso "la mercadería está en racks / a guardar" al pickear**.
 > Cuando al pickear una tanda **faltó** un artículo (PKC con `real < esp`) pero **HAY stock del
