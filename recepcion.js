@@ -81,6 +81,22 @@ const RCP_CSS = `
 #rcpRoot .resTotal{ margin-top:14px; font-size:16px; font-weight:900; color:#333; }
 #rcpRoot .cajasCodLine{ font-size:20px; margin-bottom:4px; }
 #rcpRoot .cajasCodLine strong{ font-size:34px; }
+#rcpRoot .cajasOc{ font-size:13px; font-weight:800; color:#a06000; background:#fff7e6; border:1px solid #ffd98a; border-radius:9px; padding:7px 10px; margin:6px 0 2px; }
+/* v7.04 — pop-up "Requiere aprobación" (recepción que excede la OC vigente +20%).
+   Va POR ENCIMA del pop-up de cajas (z-index 1500 > 1400) y lo deja abierto atrás,
+   así "Corregir" vuelve al número sin perder nada. */
+#rcpRoot .modal.aprob{ z-index:1500; align-items:center; }
+#rcpRoot .aprobCard{ max-width:340px; text-align:center; border:3px solid var(--danger); }
+#rcpRoot .aprobIco{ font-size:44px; line-height:1; }
+#rcpRoot .aprobTitle{ font-size:24px; font-weight:900; color:var(--danger); margin:6px 0 10px; }
+#rcpRoot .aprobTxt{ font-size:15px; color:#334155; font-weight:700; line-height:1.45; }
+#rcpRoot .aprobTxt b{ color:#111; }
+#rcpRoot .aprobActions{ margin-top:16px; display:flex; flex-direction:column; gap:9px; }
+#rcpRoot .aprobActions .btnSend{ height:52px; font-size:18px; }
+#rcpRoot .aprobActions .btnCancel{ height:44px; font-size:15px; }
+#rcpRoot .avisoExc{ border:2px solid var(--danger); background:#fff5f4; color:var(--danger); border-radius:10px; padding:10px 12px; font-size:13.5px; font-weight:800; line-height:1.4; margin-bottom:12px; }
+#rcpRoot .resItem.exceso{ border-color:var(--danger); background:#fff5f4; }
+#rcpRoot .resItem .resExc{ display:block; font-size:11.5px; font-weight:800; color:var(--danger); }
 #rcpRoot .cajasLabel{ display:block; font-weight:900; font-size:18px; margin:6px 0 10px; }
 #rcpRoot .cajasRow{ display:flex; align-items:stretch; gap:12px; }
 #rcpRoot .modalCard input[type="text"].cajasInput{ width:104px; height:104px; font-size:48px; font-weight:900; text-align:center; letter-spacing:normal; padding:0; border:2px solid var(--border); border-radius:12px; box-sizing:border-box; flex:0 0 auto; }
@@ -96,6 +112,11 @@ const RCP_CSS = `
 #rcpRoot .opCodeBtn{ aspect-ratio:1/1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; font-weight:900; font-size:18px; border:2px solid var(--border); border-radius:12px; background:#fff; cursor:pointer; padding:6px; text-align:center; min-width:0; overflow-wrap:anywhere; }
 #rcpRoot .opCodeBtn .cnt{ font-size:12px; font-weight:800; color:var(--ok); }
 #rcpRoot .opCodeBtn.loaded{ background:#eef7ee; border-color:var(--ok); color:#333; }
+/* v7.04 — detalle de la OC vigente en el botón del código (cuánto se pidió) y
+   marca roja cuando lo recibido excede la OC en más de 20%. */
+#rcpRoot .opCodeBtn .ocq{ font-size:11px; font-weight:800; color:#a06000; line-height:1.15; }
+#rcpRoot .opCodeBtn.exceso{ border-color:var(--danger); background:#fff5f4; }
+#rcpRoot .opCodeBtn.exceso .cnt{ color:var(--danger); }
 #rcpRoot .opCodeBtn.opCodeAdd{ border:2px dashed var(--ok); color:var(--ok); background:#f6fff8; }
 #rcpRoot .opCodeAddPlus{ font-size:34px; line-height:1; font-weight:900; }
 #rcpRoot .opLineRow{ display:flex; gap:14px; margin-top:14px; }
@@ -213,6 +234,7 @@ const RCP_HTML = `
       <button id="opCajasClose" class="modalClose" aria-label="Cerrar">×</button>
     </div>
     <div class="cajasCodLine">Código <strong id="opCajasCod"></strong></div>
+    <div id="opCajasOc" class="cajasOc" style="display:none"></div>
     <label for="opCajasInput" class="cajasLabel">¿Cuántas cajas?</label>
     <div class="cajasRow">
       <input id="opCajasInput" class="cajasInput" type="text" inputmode="numeric" />
@@ -220,6 +242,17 @@ const RCP_HTML = `
     </div>
     <div class="cajasActions">
       <button id="opCajasDelete" class="btnCancel" style="display:none">Quitar</button>
+    </div>
+  </div>
+</div>
+<div id="opAprobModal" class="modal aprob" role="dialog" aria-modal="true">
+  <div class="modalCard aprobCard">
+    <div class="aprobIco">⚠</div>
+    <div class="aprobTitle">Requiere aprobación</div>
+    <div id="opAprobTxt" class="aprobTxt"></div>
+    <div class="aprobActions">
+      <button id="opAprobGo" class="btnSend">Continuar</button>
+      <button id="opAprobFix" class="btnCancel">Corregir la cantidad</button>
     </div>
   </div>
 </div>
@@ -247,6 +280,11 @@ const opCajasInput = document.getElementById("opCajasInput");
 const opCajasNext = document.getElementById("opCajasNext");
 const opCajasDelete = document.getElementById("opCajasDelete");
 const opCajasClose = document.getElementById("opCajasClose");
+const opCajasOc = document.getElementById("opCajasOc");
+const opAprobModal = document.getElementById("opAprobModal");
+const opAprobTxt = document.getElementById("opAprobTxt");
+const opAprobGo = document.getElementById("opAprobGo");
+const opAprobFix = document.getElementById("opAprobFix");
 
 const opState = {
   step: null,
@@ -260,7 +298,9 @@ const opState = {
   articulos: null,   // [{Cod_Art, Desc}]
   cargas: {},        // { Cod_Art: cajas }
   cajasCod: null,    // codigo abierto en el popup
-  listaTipo: null
+  listaTipo: null,
+  ocPorCod: null,    // v7.04: OCs vigentes del proveedor { codNorm: {ped,rec,pend,fecha} } (null = sin cargar)
+  excesos: {}        // v7.04: { Cod_Art: {cajas, oc, pct} } — cargas que el operario aprobó pese a exceder la OC
 };
 
 function opTodayStr() {
@@ -280,6 +320,7 @@ function opResetState() {
   opState.articulosManual = null;
   opState.linea = null; opState.fecha = opTodayStr();
   opState.remito = ""; opState.articulos = null; opState.cargas = {};
+  opState.ocPorCod = null; opState.excesos = {};
 }
 function openOp() {
   opResetState();
@@ -478,6 +519,8 @@ function seleccionarEntidad(e) {
   opState.linea = null;
   opState.articulos = null;
   opState.cargas = {};
+  opState.ocPorCod = null;   // las OCs vigentes son POR proveedor → se recargan
+  opState.excesos = {};
   renderLinea();
 }
 
@@ -588,6 +631,105 @@ function renderRemito() {
   opActions.innerHTML = "";
 }
 
+/* ============== Órdenes de Compra vigentes (v7.04) ==============
+   El operario, al marcar la mercadería que recibe, ve en cada botón de código
+   CUÁNTO se le pidió a ese tallerista/proveedor en la OC vigente ("OC 100"), y si
+   carga más del +20% de esa cantidad salta el pop-up "Requiere aprobación".
+
+   FUENTE: tabla `Ordenes_Compra` — la MISMA que llena el generador de OCs desde el
+   PPP (index.html → "📑 Órdenes de Compra" → "⚙ Generar OCs": A pedir = máx(0,
+   Máximo + Pedidos PPP − Stock) por proveedor). O sea: lo que se muestra acá se
+   alimenta solo con cada generación de OCs; no hay tabla ni carga aparte. Lectura
+   con la anon key (policy `select_all`).
+
+   VIGENTE = línea con estado ≠ 'recibida' y pedido > recibido, de los últimos
+   OC_DIAS_VIGENCIA días. Si hay varias generaciones del mismo artículo se toma
+   SOLO la más nueva (sumando sus líneas), para no acumular OCs viejas que ya se
+   reemplazaron por una nueva corrida del generador.
+
+   PROVEEDOR: `Ordenes_Compra.proveedor` viene de `OC_Maximos` y no siempre es
+   idéntico al nombre del tallerista ("Martin C" = Martin, "Carlos E" = Carlos,
+   "Pettofrezza" = Rafael por ALIAS_NOMBRE) y puede ser COMPARTIDO ("Garcia /
+   Lucho", "Pintos / Maspoli" → la OC aplica a los dos). ocProvCoincide() parte por
+   "/" y compara con la misma clave normalizada de los talleristas. */
+const OC_EXCESO_PCT = 0.20;        // margen tolerado sobre lo pedido en la OC
+const OC_DIAS_VIGENCIA = 120;      // más viejo que esto ya no se considera vigente
+
+function ocSplitProv(prov) {
+  const t = String(prov || "").trim();
+  // El nombre ENTERO primero: hay proveedores que llevan "/" adentro y NO son
+  // compartidos ("Log/ Fabr"). Después las partes, para las OCs de a dos.
+  const keys = [claveTall(aliasNombre(t))];
+  t.split(/[\/,+&]|\sy\s/i).forEach(function (s) { keys.push(claveTall(aliasNombre(s.trim()))); });
+  return keys.filter(function (s, i) { return !!s && keys.indexOf(s) === i; });
+}
+function ocProvCoincide(prov, nombreEnt) {
+  const k = claveTall(aliasNombre(nombreEnt || ""));
+  if (!k) return false;
+  return ocSplitProv(prov).some(function (p) {
+    if (p === k) return true;
+    // "Martin C" / "Carlos E": mismo nombre + una inicial de apellido pegada en la
+    // config de OC. Se aceptan hasta 2 caracteres de diferencia, no más (para que
+    // "Poly" no matchee cualquier cosa que empiece igual).
+    const largo = p.length > k.length ? p : k, corto = p.length > k.length ? k : p;
+    return largo.length - corto.length <= 2 && largo.indexOf(corto) === 0;
+  });
+}
+function ocDiaLimite() {
+  const d = new Date(); d.setDate(d.getDate() - OC_DIAS_VIGENCIA);
+  const p = function (n) { return String(n).padStart(2, "0"); };
+  return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
+}
+/* Carga las OCs vigentes del proveedor elegido en opState.ocPorCod (clave = código
+   normalizado). Best-effort: si falla, queda {} y la pantalla funciona como antes. */
+async function cargarOCVigentes() {
+  const nombre = opState.tallNombre;
+  try {
+    await sessionReady;
+    const { data, error } = await supabase
+      .from("Ordenes_Compra")
+      .select("codigo,cantidad,cantidad_recibida,proveedor,fecha,estado")
+      .gte("fecha", ocDiaLimite())
+      .limit(5000);
+    if (error) throw error;
+    const porCod = {};
+    (data || []).forEach(function (r) {
+      if (String(r.estado || "").toLowerCase() === "recibida") return;
+      if (!ocProvCoincide(r.proveedor, nombre)) return;
+      const k = _ocgNorm(r.codigo); if (!k) return;
+      const ped = Number(r.cantidad) || 0, rec = Number(r.cantidad_recibida) || 0;
+      if (ped - rec <= 0) return;
+      const fe = r.fecha || "";
+      const cur = porCod[k];
+      if (!cur || fe > cur.fecha) porCod[k] = { fecha: fe, ped: ped, rec: rec, pend: ped - rec };
+      else if (fe === cur.fecha) { cur.ped += ped; cur.rec += rec; cur.pend = cur.ped - cur.rec; }
+    });
+    // Si cambió de proveedor mientras cargaba, este resultado ya no sirve.
+    if (opState.tallNombre !== nombre) return;
+    opState.ocPorCod = porCod;
+  } catch (e) {
+    console.warn("OCs vigentes (sigue sin el detalle):", e);
+    if (opState.tallNombre === nombre) opState.ocPorCod = {};
+  }
+}
+function ocDeCod(cod) {
+  const m = opState.ocPorCod;
+  if (!m) return null;
+  return m[_ocgNorm(cod)] || null;
+}
+/* Cantidad de referencia de la OC: lo que FALTA recibir (= lo pedido mientras no se
+   haya marcado nada recibido en el módulo de OCs). */
+function ocRef(oc) { return (oc && oc.pend > 0) ? oc.pend : (oc ? oc.ped : 0); }
+function ocExcede(cod, cajas) {
+  const oc = ocDeCod(cod);
+  const ref = ocRef(oc);
+  return (ref > 0 && cajas > ref * (1 + OC_EXCESO_PCT));
+}
+function ocPctExceso(cod, cajas) {
+  const ref = ocRef(ocDeCod(cod));
+  return ref > 0 ? Math.round((cajas / ref - 1) * 100) : 0;
+}
+
 /* ============== Paso 4: grilla de códigos ============== */
 async function renderArticulos() {
   opState.step = "articulos";
@@ -595,6 +737,14 @@ async function renderArticulos() {
   opTitle.textContent = displayName(opState.tallNombre);
   opSubtitle.textContent = opState.linea + " · " + fechaCorta(opState.fecha) + " · RTO/FC " + opState.remito;
   opActions.innerHTML = "";
+
+  // v7.04: las OCs vigentes se traen EN PARALELO (no bloquean la grilla); cuando
+  // llegan se repinta para que aparezca el detalle "OC N" en cada botón.
+  if (opState.ocPorCod === null) {
+    cargarOCVigentes().then(function () {
+      if (opState.step === "articulos") drawArticulosGrid();
+    });
+  }
 
   if (opState.articulos === null) {
     opBody.innerHTML = '<div class="opEmpty">Cargando códigos…</div>';
@@ -674,10 +824,22 @@ function drawArticulosGrid() {
   );
   artsOrden.forEach(a => {
     const cajas = opState.cargas[a.Cod_Art];
+    const oc = ocDeCod(a.Cod_Art);
+    const exc = cajas > 0 && ocExcede(a.Cod_Art, cajas);
     const b = document.createElement("button");
     b.type = "button";
-    b.className = "opCodeBtn" + (cajas > 0 ? " loaded" : "");
-    b.innerHTML = '<span>' + a.Cod_Art + '</span>' + (cajas > 0 ? '<span class="cnt">' + cajas + ' caja' + (cajas === 1 ? '' : 's') + '</span>' : '');
+    b.className = "opCodeBtn" + (cajas > 0 ? " loaded" : "") + (exc ? " exceso" : "");
+    // v7.04: detalle de la OC vigente del proveedor. "OC 100" = pedidas 100 cajas;
+    // si ya hay recibido parcial cargado en el módulo de OCs → "OC 40/100" (faltan/pedidas).
+    let ocHtml = "";
+    if (oc) {
+      const txt = (oc.rec > 0) ? (oc.pend + "/" + oc.ped) : String(oc.ped);
+      const title = "Orden de compra vigente (" + fechaCorta(oc.fecha) + "): " + oc.ped + " caja(s) pedidas" +
+        (oc.rec > 0 ? ", " + oc.rec + " ya recibida(s) → faltan " + oc.pend : "");
+      ocHtml = '<span class="ocq" title="' + escapeHtmlRcp(title) + '">OC ' + escapeHtmlRcp(txt) + '</span>';
+    }
+    b.innerHTML = '<span>' + a.Cod_Art + '</span>' + ocHtml +
+      (cajas > 0 ? '<span class="cnt">' + cajas + ' caja' + (cajas === 1 ? '' : 's') + (exc ? ' ⚠' : '') + '</span>' : '');
     b.onclick = () => openCajas(a.Cod_Art);
     grid.appendChild(b);
   });
@@ -788,13 +950,31 @@ function renderResumen() {
   h.textContent = displayName(opState.tallNombre);
   opBody.appendChild(h);
 
+  // v7.04: aviso arriba de todo si alguna carga excede la OC vigente (+20%).
+  const codsExc = items.map(i => i.cod).filter(c => opState.excesos[c] && ocExcede(c, opState.cargas[c]));
+  if (codsExc.length) {
+    const av = document.createElement("div");
+    av.className = "avisoExc";
+    av.innerHTML = "⚠ <b>Requiere aprobación</b> — " + codsExc.length + " código(s) por encima de la orden de compra: " +
+      codsExc.map(c => escapeHtmlRcp(String(c)) + " (+" + ocPctExceso(c, opState.cargas[c]) + "%)").join(" · ");
+    opBody.appendChild(av);
+  }
+
   const list = document.createElement("div");
   list.className = "resList";
   items.forEach(i => {
+    const exc = opState.excesos[i.cod] && ocExcede(i.cod, i.cajas);
+    const oc = ocDeCod(i.cod);
     const r = document.createElement("div");
-    r.className = "resItem";
+    r.className = "resItem" + (exc ? " exceso" : "");
     const c = document.createElement("span"); c.className = "resCod"; c.textContent = i.cod;
-    const q = document.createElement("span"); q.className = "resCajas"; q.textContent = i.cajas + " caja" + (i.cajas === 1 ? "" : "s");
+    const q = document.createElement("span"); q.className = "resCajas";
+    q.textContent = i.cajas + " caja" + (i.cajas === 1 ? "" : "s");
+    if (exc) {
+      const e = document.createElement("span"); e.className = "resExc";
+      e.textContent = "OC " + ocRef(oc) + " · +" + ocPctExceso(i.cod, i.cajas) + "%";
+      q.appendChild(e);
+    }
     r.appendChild(c); r.appendChild(q);
     list.appendChild(r);
   });
@@ -827,6 +1007,18 @@ function openCajas(cod) {
   const actual = opState.cargas[cod];
   opCajasInput.value = actual > 0 ? String(actual) : "";
   opCajasDelete.style.display = actual > 0 ? "" : "none";
+  // v7.04: recordatorio de la OC vigente mientras carga las cajas.
+  const oc = ocDeCod(cod);
+  if (opCajasOc) {
+    if (oc) {
+      opCajasOc.style.display = "";
+      opCajasOc.innerHTML = "📑 OC vigente (" + escapeHtmlRcp(fechaCorta(oc.fecha)) + "): <b>" + oc.ped + "</b> caja(s) pedidas" +
+        (oc.rec > 0 ? " · <b>" + oc.pend + "</b> por recibir" : "");
+    } else {
+      opCajasOc.style.display = "none";
+      opCajasOc.innerHTML = "";
+    }
+  }
   opCajasModal.classList.add("open");
   setTimeout(() => opCajasInput.focus(), 50);
 }
@@ -839,18 +1031,51 @@ opCajasClose.onclick = closeCajas;
 // Antes: tocar el fondo oscuro cerraba el pop-up. Lo sacamos para que NO se cierre
 // solo si el empleado tarda en cargar / toca fuera sin querer — solo se cierra con
 // la ✕ o al cargar el número. (Pedido: "que se mantenga".)
-opCajasNext.onclick = () => {
-  const n = parseInt(opCajasInput.value, 10) || 0;
-  if (n > 0) opState.cargas[opState.cajasCod] = n;
-  else delete opState.cargas[opState.cajasCod];
+function opAplicarCajas(cod, n) {
+  if (n > 0) opState.cargas[cod] = n;
+  else delete opState.cargas[cod];
+  if (!(n > 0) || !ocExcede(cod, n)) delete opState.excesos[cod];   // corrigió → deja de estar en exceso
   closeCajas();
   drawArticulosGrid();
+}
+opCajasNext.onclick = () => {
+  const cod = opState.cajasCod;
+  const n = parseInt(opCajasInput.value, 10) || 0;
+  // v7.04: más del +20% de lo pedido en la OC vigente → pide aprobación antes de cargarlo.
+  if (n > 0 && ocExcede(cod, n)) { aprobPedir(cod, n); return; }
+  opAplicarCajas(cod, n);
 };
 opCajasDelete.onclick = () => {
-  delete opState.cargas[opState.cajasCod];
+  const cod = opState.cajasCod;
+  delete opState.cargas[cod];
+  delete opState.excesos[cod];
   closeCajas();
   drawArticulosGrid();
 };
+
+/* ===== Pop-up "Requiere aprobación" (v7.04) =====
+   Se recibe más del +20% de lo que pide la OC vigente. Por ahora es un cartel local:
+   "Continuar" acepta la carga (y la deja marcada como exceso, para el resumen y para
+   el evento ROC que queda registrado al enviar) y "Corregir la cantidad" vuelve al
+   número. El aviso por Telegram va enganchado al evento ROC. */
+function aprobPedir(cod, cajas) {
+  const oc = ocDeCod(cod), ref = ocRef(oc), pct = ocPctExceso(cod, cajas);
+  opAprobTxt.innerHTML =
+    'Estás recibiendo <b>' + cajas + ' caja' + (cajas === 1 ? '' : 's') + '</b> del código <b>' + escapeHtmlRcp(String(cod)) + '</b>,<br>' +
+    'y la orden de compra vigente pide <b>' + ref + '</b>.<br><br>' +
+    '<span style="color:#b42318">Excede en un <b>' + pct + '%</b></span> (el límite es +' + Math.round(OC_EXCESO_PCT * 100) + '%).<br><br>' +
+    'Esta recepción <b>requiere aprobación</b>.';
+  opAprobGo.onclick = function () {
+    opAprobModal.classList.remove("open");
+    opState.excesos[cod] = { cajas: cajas, oc: ref, pct: pct };
+    opAplicarCajas(cod, cajas);
+  };
+  opAprobFix.onclick = function () {
+    opAprobModal.classList.remove("open");
+    setTimeout(function () { opCajasInput.focus(); opCajasInput.select(); }, 50);
+  };
+  opAprobModal.classList.add("open");
+}
 
 /* ============== Enviar (graba todo) ============== */
 async function opEnviar() {
@@ -974,6 +1199,24 @@ async function opEnviar() {
           ts_cliente: new Date().toISOString()
         }).then(() => {}, () => {});
       }
+    }
+  } catch (_e) {}
+
+  // v7.04 — AVISO recepción que EXCEDE la OC vigente (+20%): el operario ya lo aprobó
+  // en el pop-up "Requiere aprobación"; acá queda REGISTRADO el evento ROC (mismo
+  // patrón que RSP) con proveedor, remito y "cod:recibidas/pedidas". De ahí cuelga
+  // después el aviso por Telegram. Best-effort, no bloquea el envío.
+  try {
+    const exc = items.filter(i => opState.excesos[i.cod]);
+    if (exc.length) {
+      const det = exc.map(i => i.cod + ":" + i.cajas + "/" + opState.excesos[i.cod].oc).join(",");
+      const cid = "roc_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+      supabase.from("Registros_Produccion_Virgilio").insert({
+        client_id: cid, legajo: String(RECP.legajo || ""), opcion: "ROC",
+        descripcion: "Recepción excede la OC (+" + Math.round(OC_EXCESO_PCT * 100) + "%)",
+        texto: (opState.tallNombre || "?") + "|" + (opState.remito || "s/remito") + "|" + det,
+        ts_cliente: new Date().toISOString()
+      }).then(() => {}, () => {});
     }
   } catch (_e) {}
 
