@@ -47,6 +47,12 @@
 -- planilla del tallerista sin recalcular: Cajas=cantidad, Falta Pedidos=máx(0,
 -- Pedidos−Stock), % Lleno=(Stock−Pedidos)/Máximo, Uni x Caja=oc_uni_caja.
 --
+-- v7.42: guarda además oc_ncaja = tipo de caja del producto (columna "Caja N°" del
+-- impreso). Sale de `Articulos_Cajas.N_Caja`, tomando la N_Caja MÁS FRECUENTE por
+-- código normalizado (desempate: la más chica). Falta Pedidos y % Lleno quedan
+-- CONGELADOS al momento de generar (se desactivó el cron 'oc-backfill-diario' que los
+-- refrescaba a diario): reflejan el estado del día de la OC, no el de hoy.
+--
 -- Cron: 'ocs-auto-miercoles' → '0 10 * * 3' (10:00 UTC = 7:00 AR, UTC-3 fijo).
 -- Prueba en seco 2026-08-04: 104 líneas · 19 proveedores · 9.198 cajas
 -- (165 NPs sin facturar → 138 cuentan como demanda; 27 ya pickeadas se netean).
@@ -95,7 +101,8 @@ begin
     select regexp_replace(upper(btrim(m.cod)), '^0+(?=.)', '') as codn,
            upper(btrim(m.cod)) as cod, m.descripcion, btrim(coalesce(m.proveedor, '')) as proveedor,
            coalesce(m.max_cajas, 0)::numeric as max_excel,
-           case when coalesce(m.indice, 0) > 0 then m.indice::numeric else 1.5 end as indice
+           case when coalesce(m.indice, 0) > 0 then m.indice::numeric else 1.5 end as indice,
+           coalesce(m.uni_x_caja, 0)::numeric as uni_caja
       from public."OC_Maximos" m
      where m.activo and nullif(btrim(m.cod), '') is not null
   ),
@@ -133,8 +140,14 @@ begin
            sum(coalesce(cajas_max, 0))::numeric as cap
       from public."Capacidad_Sector" group by 1
   ),
+  ncaja as (   -- v7.42: "Caja N°" = N_Caja MÁS FRECUENTE por código (desempate: la más chica)
+    select distinct on (codn) codn, n_caja from (
+      select regexp_replace(upper(btrim("Cod_Art")), '^0+(?=.)', '') as codn, "N_Caja" as n_caja, count(*) as c
+        from public."Articulos_Cajas" where "N_Caja" is not null group by 1, 2
+    ) t order by codn, c desc, n_caja
+  ),
   calc as (
-    select n.cod, n.descripcion, n.proveedor,
+    select n.cod, n.descripcion, n.proveedor, n.uni_caja, nc.n_caja,
            coalesce(s.stock, 0) as stock, coalesce(d.pedidos, 0) as pedidos,
            least(
              ceil(case when p.proy is not null and p.proy > 0 then p.proy * n.indice else n.max_excel end),
@@ -145,15 +158,18 @@ begin
       left join dem d on d.codn = n.codn
       left join proy p on p.codn = n.codn
       left join cap c on c.codn = n.codn
+      left join ncaja nc on nc.codn = n.codn
      where upper(n.proveedor) not in ('RACKS', 'LOG/ FABR', 'LOG/FABR', 'LOG/ FABRICA')
        and nullif(n.proveedor, '') is not null
   ),
   ins as (
     insert into public."Ordenes_Compra"
-      (fecha, rubro, proveedor, codigo, descripcion, cantidad, cantidad_recibida, unidad, estado, notas)
+      (fecha, rubro, proveedor, codigo, descripcion, cantidad, cantidad_recibida, unidad, estado, notas,
+       oc_max, oc_pedidos, oc_stock, oc_uni_caja, oc_ncaja)
     select v_hoy, 'Art Term', proveedor, cod, nullif(descripcion, ''),
            ceil(maximo + pedidos - stock)::int, 0, 'Cajas', 'pendiente',
-           'auto ' || to_char(v_hoy, 'YYYY-MM-DD')
+           'auto ' || to_char(v_hoy, 'YYYY-MM-DD'),
+           maximo, pedidos, stock, uni_caja, n_caja
       from calc
      where ceil(maximo + pedidos - stock) > 0
     returning proveedor, cantidad

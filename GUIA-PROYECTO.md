@@ -4,7 +4,24 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-04 · Versión app al documentar: **v7.41**
+> Última actualización: 2026-08-04 · Versión app al documentar: **v7.42**
+>
+> Nota: **v7.42 — Impreso de OC: columna «Caja N°» + Falta Pedidos/% Lleno CONGELADOS al generar**.
+> Dos pedidos del usuario. (1) **«Caja N°»**: la columna del ejemplo que en v7.39 se había omitido por
+> no encontrar la fuente → se encontró en **`Articulos_Cajas.N_Caja`** (catálogo `Cajas`, 14 tipos con
+> medidas). El impreso agrega la columna **entre «Uni x Caja» y «% Lleno»**, mostrando la **N_Caja más
+> frecuente por código** (desempate: la más chica); "—" si el código no está en `Articulos_Cajas`. Se
+> guarda en la nueva columna **`Ordenes_Compra.oc_ncaja`** (nullable). (2) **Congelamiento**: Falta
+> Pedidos y % Lleno pasan a llenarse **al momento de generar** y quedar **fijos** (reflejan el estado
+> del día de la OC, no el de hoy) → se **eliminó el cron `oc-backfill-diario`** que los refrescaba a
+> diario (v7.39). Ambos generadores (`generar_ocs_automaticas` SQL + `ocgGenerar`/`ocgEnter` con la
+> nueva `ocgFetchNCaja()` sobre `Articulos_Cajas`) guardan `oc_ncaja`; `ocPrintHtml`/`ocFetchRows` lo
+> leen. Las **101 OCs previas** se dejaron con sus valores dinámicos **congelados** tal como estaban, y
+> aparte se les rellenó **sólo `oc_ncaja`** con un UPDATE dirigido (92/101 con dato; el resto sin match
+> en `Articulos_Cajas`) — sin tocar los valores ya congelados. `oc_backfill_valores` sigue existiendo
+> como herramienta MANUAL de reparación (ahora también llena `oc_ncaja`), sin cron. Verificado:
+> `tests/oc-print.cjs` extendido (7 columnas + aserción de Caja N°), suite completa OK. SQL en
+> `sql/generar_ocs_automaticas.sql` y `sql/oc_backfill_valores.sql`. Bump **v7.42**.
 >
 > Nota (backend, **sin bump de app**): **OCs viejas imprimían Falta Pedidos / Uni x Caja / % Lleno en
 > "—" → backfill + refresco diario**. El usuario imprimió una OC de Oscar (del 29/07, generada ANTES
