@@ -117,4 +117,7 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== pk-racks-aguardar (idea 5703: faltó al pickear pero hay en racks/a guardar → aviso) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pk-racks-aguardar.cjs
 
+echo "== pk-conteo-ciclico (idea 3798: conteo de góndola de un art de una sola celda) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pk-conteo-ciclico.cjs
+
 echo "== TODO OK =="

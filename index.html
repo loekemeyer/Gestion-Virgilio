@@ -2096,6 +2096,19 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pk-done-ico{ width: 64px; height: 64px; border-radius: 50%; background: #16a34a; color: #fff; font-size: 38px; line-height: 64px; }
 .pk-done-t{ font-size: 22px; font-weight: bold; color: #0f172a; }
 .pk-done-s{ font-size: 15px; color: #64748b; }
+/* idea 3798 — card del conteo cíclico de góndola (en el done del picking) */
+.pk-conteo{ width:100%; box-sizing:border-box; background:#fffbeb; border:1.5px solid #fcd34d; border-radius:13px; padding:12px 13px; text-align:left; }
+.pk-conteo.done{ background:#f0fdf4; border-color:#86efac; color:#166534; font-weight:700; text-align:center; }
+.pk-conteo-h{ font-size:14.5px; font-weight:800; color:#92400e; }
+.pk-conteo-s{ font-size:13px; color:#78350f; margin-top:4px; line-height:1.4; }
+.pk-conteo-row{ display:flex; gap:8px; margin-top:10px; }
+.pk-conteo-inp{ flex:1; min-width:0; height:48px; box-sizing:border-box; text-align:center; font-size:22px; font-weight:800; border:2px solid #fcd34d; border-radius:10px; padding:0 8px; -moz-appearance:textfield; }
+.pk-conteo-inp::-webkit-outer-spin-button,.pk-conteo-inp::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
+.pk-conteo-btn{ width:auto !important; flex:0 0 auto; padding:0 20px !important; font-size:16px !important; background:#b45309; }
+/* idea 3798 — banner de conteos de góndola en el detalle del artículo */
+.stk-cg{ background:#f0fdf4; border:1px solid #86efac; border-radius:10px; padding:9px 11px; margin-bottom:10px; }
+.stk-cg-h{ font-size:12px; font-weight:800; color:#166534; text-transform:uppercase; letter-spacing:.02em; margin-bottom:4px; }
+.stk-cg-row{ font-size:13px; color:#14532d; line-height:1.5; }
 
 /* Carga Camión — checklist de NPs. */
 .cc-sub{ font-size: 14px; color: #64748b; margin: 2px 0 10px; }
@@ -5909,7 +5922,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.34";
+const APP_VERSION = "v7.35";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -7320,6 +7333,7 @@ async function showPickingList(tanda, legajo, opts) {
     }
     pkRender();
     pkNotifySinPlanim(tNorm, _pk.legajo, items, G);   // aviso Telegram si hay códigos sin planimetría
+    pkPickConteo();   // idea 3798: elegir 1 artículo (de UNA sola celda) para el conteo cíclico
   } catch (e) {
     _pk = null;
     m.querySelector(".tanda-modal-body").innerHTML =
@@ -7492,9 +7506,94 @@ function pkRenderDone(body, N, nav) {
     <div class="pk-done-ico">✓</div>
     <div class="pk-done-t">Picking completo</div>
     <div class="pk-done-s">${conf} de ${N} confirmados${falt ? ` · <b style="color:#d97706">${falt} con faltante</b>` : ""}</div>
+    ${pkConteoCardHtml()}
     <button class="pk-btn pk-ok" onclick="pkFinishPicking()">✓ Terminé el picking</button>
     <button class="pk-btn pk-cancel" onclick="pkClose()">Cerrar (sigo después)</button>
   </div></div>`;
+}
+/* ===== idea 3798 — CONTEO CÍCLICO de góndola. Al terminar un picking se elige UN artículo
+   al azar (SOLO de los que tienen UNA sola celda en góndola, Capacidad_Sector) y se le pide
+   al operario que confirme cuántas cajas hay en góndola. NO bloquea (anota y sigue). Se
+   registra el evento CG y un trigger lo compara contra el sistema por Telegram ("contó N,
+   dio igual / X de diferencia"). Detrás del switch Stock_Config.conteo_ciclico_gondola (ON
+   por defecto). El conteo es SOLO de góndola (no excedente ni racks). ===== */
+let _pkCeldasCache = null;
+async function _pkCeldasPorCod() {
+  if (_pkCeldasCache) return _pkCeldasCache;
+  const m = {};
+  try {
+    const rows = await supaFetchAllSafe(SUPABASE_CAPACIDAD_ENDPOINT, "select=cod,sector");
+    (rows || []).forEach(function (r) {
+      const c = _ocgNorm(r.cod), s = String(r.sector || "").trim().toUpperCase();
+      if (!c || !s) return;
+      if (!m[c]) m[c] = {}; m[c][s] = 1;
+    });
+  } catch (_e) {}
+  const out = {}; Object.keys(m).forEach(function (c) { out[c] = Object.keys(m[c]).length; });
+  _pkCeldasCache = out; return out;
+}
+async function _pkConteoSwitchOn() {
+  try {
+    const r = await fetch(SUPABASE_URL + "/rest/v1/Stock_Config?clave=eq.conteo_ciclico_gondola&select=valor", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+    if (!r.ok) return true;                 // ante la duda, ON
+    const a = await r.json();
+    if (!a || !a.length) return true;       // ausente = ON (default)
+    return String(a[0].valor || "1") === "1";
+  } catch (_e) { return true; }
+}
+async function pkPickConteo() {
+  try {
+    if (!_pk || _pk.conteo) return;
+    if (!(await _pkConteoSwitchOn())) return;
+    const celdas = await _pkCeldasPorCod();
+    const seen = {}, cand = [];
+    (_pk.items || []).forEach(function (it) {
+      if (it.isExc || it.skip) return;
+      const art = String(it.art || "").trim(); if (!art) return;
+      const c = _ocgNorm(art);
+      if (celdas[c] !== 1) return;          // SOLO artículos de una sola celda
+      if (seen[c]) return; seen[c] = 1;
+      cand.push({ art: art, sector: it.sector || "" });
+    });
+    if (!cand.length || !_pk) return;
+    const pick = cand[Math.floor(Math.random() * cand.length)] || cand[0];
+    _pk.conteo = { art: pick.art, sector: pick.sector, done: false };
+    if (typeof pkRender === "function") pkRender();
+  } catch (_e) {}
+}
+function pkConteoCardHtml() {
+  if (!_pk || !_pk.conteo) return "";
+  const c = _pk.conteo;
+  if (c.done) return '<div class="pk-conteo done">🔢 ✓ Anotaste el conteo de <b>' + escapeHtml(c.art) + '</b>. ¡Gracias!</div>';
+  return '<div class="pk-conteo">' +
+    '<div class="pk-conteo-h">🔢 Control de góndola (rápido, 1 por día)</div>' +
+    '<div class="pk-conteo-s">Contá cuántas cajas de <b>' + escapeHtml(c.art) + '</b> hay en la <b>góndola</b>' + (c.sector ? ' (celda <b>' + escapeHtml(c.sector) + '</b>)' : '') + ' y anotá. No frena nada.</div>' +
+    '<div class="pk-conteo-row"><input id="pkConteoInp" type="number" inputmode="numeric" min="0" class="pk-conteo-inp" placeholder="cajas"><button class="pk-btn pk-ok pk-conteo-btn" onclick="pkConteoSubmit()">✓ Anotar</button></div>' +
+    '</div>';
+}
+function pkConteoSubmit() {
+  if (!_pk || !_pk.conteo || _pk.conteo.done) return;
+  const inp = document.getElementById("pkConteoInp");
+  const v = inp ? parseInt(inp.value, 10) : NaN;
+  if (isNaN(v) || v < 0) { try { if (inp) inp.focus(); } catch (_e) {} return; }
+  pkEmitConteo(_pk.conteo.art, v);
+  _pk.conteo.done = true;
+  pkRender();
+}
+/* Evento CG: conteo cíclico de góndola. texto = "COD|contado". Dedup por
+   cg_<legajo>_<cod>_<día>. Un trigger de Supabase compara vs el sistema y avisa por Telegram. */
+function pkEmitConteo(art, contado) {
+  const leg = String((_pk && _pk.legajo) || "").trim();
+  const payload = {
+    legajo: leg, opcion: "CG", descripcion: "Conteo cíclico de góndola",
+    texto: (String(art).toUpperCase() + "|" + contado),
+    ts: Date.now(),
+    id: ("cg_" + leg + "_" + String(art).toUpperCase() + "_" + getTodayKey()).replace(/[^a-zA-Z0-9_\-]/g, ""),
+    ts_inicio_iso: null
+  };
+  enqueueReport(payload);
+  if (typeof trySendOneReport === "function") trySendOneReport(payload).then(function (r) { if (r && r.ok) removeFromQueue(payload.id); }).catch(function () {});
+  try { updatePendingIndicator(); } catch (_e) {}
 }
 /* Salta al primer artículo sin marcar (Ok/F). Lo usa el botón "Completar los
    que faltan" cuando quedó alguno salteado con "Adelante". */
@@ -11475,6 +11574,23 @@ async function stkOpenMovsArt(codEnc, dep, titulo, icono) {
       if (_stkPop && _stkPop.kind === "movsArt" && _stkPop.cod === cod) { _stkPop.npByTanda = m; stkMovsArtRender(); }
     }
   } catch (_e) {}
+  // idea 3798 — en la góndola del artículo, mostrar los CONTEOS CÍCLICOS ("confirmado el DD/MM").
+  if (dep === "terminado") {
+    try {
+      const H2 = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+      const codBaseN = codBase(cod).toUpperCase();
+      const rows2 = await fetch(SUPABASE_TABLE_ENDPOINT + "?opcion=eq.CG&select=texto,legajo,ts_cliente,created_at&order=ts_cliente.desc&limit=500", { headers: H2, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; });
+      const conteos = [];
+      rows2.forEach(function (x) {
+        const p2 = String(x.texto || "").split("|");
+        if (codBase(String(p2[0] || "").trim()).toUpperCase() !== codBaseN) return;
+        const contado = parseInt(p2[1], 10); if (isNaN(contado)) return;
+        let fecha = ""; try { fecha = new Date(x.ts_cliente || x.created_at).toLocaleDateString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", day: "2-digit", month: "2-digit" }); } catch (_e2) {}
+        conteos.push({ fecha: fecha, contado: contado, leg: String(x.legajo || "").trim() });
+      });
+      if (_stkPop && _stkPop.kind === "movsArt" && _stkPop.cod === cod) { _stkPop.conteos = conteos; stkMovsArtRender(); }
+    } catch (_e) {}
+  }
 }
 function stkMovsArtDate(which, val) {
   if (!_stkPop) return;
@@ -11677,7 +11793,16 @@ function stkMovsArtRender() {
   } else if (_stkPop.dep === "excedente") {
     nav = '<div style="margin-bottom:10px"><button class="mva-clear" onclick="stkOpenExcedenteArt(\'' + _ce + '\')">📍 Ver ubicaciones</button></div>';
   }
-  body.innerHTML = nav + _stkMovsBlock();
+  body.innerHTML = nav + _stkConteoBanner() + _stkMovsBlock();
+}
+/* idea 3798 — banner con los conteos cíclicos de góndola del artículo (los eventos CG),
+   "confirmado el DD/MM · contó N". Solo en la góndola (dep='terminado'). */
+function _stkConteoBanner() {
+  if (!_stkPop || _stkPop.dep !== "terminado" || !_stkPop.conteos || !_stkPop.conteos.length) return "";
+  const rows = _stkPop.conteos.slice(0, 6).map(function (c) {
+    return '<div class="stk-cg-row">✅ Confirmado el <b>' + escapeHtml(c.fecha) + '</b> · contó <b>' + c.contado + '</b> cajas' + (c.leg ? ' <small style="color:#94a3b8">· legajo ' + escapeHtml(c.leg) + '</small>' : '') + '</div>';
+  }).join("");
+  return '<div class="stk-cg"><div class="stk-cg-h">🔢 Conteos de góndola</div>' + rows + '</div>';
 }
 /* v5.101 — Racks por artículo: posiciones de la planimetría (como antes) + los
    MOVIMIENTOS del depósito racks con filtro de rango de fechas y saldo. */
