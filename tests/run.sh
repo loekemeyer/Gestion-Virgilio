@@ -126,4 +126,7 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== stk-ajuste-deps (v7.38: Ajustes ofrece Para envasar y Racks CH en el selector de depósito) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stk-ajuste-deps.cjs
 
+echo "== oc-print (v7.39: impreso de OC con Cajas / Falta Pedidos / Uni x Caja / % Lleno) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/oc-print.cjs
+
 echo "== TODO OK =="

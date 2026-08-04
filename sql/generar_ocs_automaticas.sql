@@ -42,6 +42,11 @@
 -- El generador MANUAL de la app (index.html → ocgEnter) usa exactamente la misma
 -- fórmula desde v7.18, así que dan lo mismo.
 --
+-- v7.39: cada línea guarda además oc_max / oc_pedidos / oc_stock / oc_uni_caja (los
+-- valores usados al generar) para que el IMPRESO de la OC reproduzca el formato de la
+-- planilla del tallerista sin recalcular: Cajas=cantidad, Falta Pedidos=máx(0,
+-- Pedidos−Stock), % Lleno=(Stock−Pedidos)/Máximo, Uni x Caja=oc_uni_caja.
+--
 -- Cron: 'ocs-auto-miercoles' → '0 10 * * 3' (10:00 UTC = 7:00 AR, UTC-3 fijo).
 -- Prueba en seco 2026-08-04: 104 líneas · 19 proveedores · 9.198 cajas
 -- (165 NPs sin facturar → 138 cuentan como demanda; 27 ya pickeadas se netean).

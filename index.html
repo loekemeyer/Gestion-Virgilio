@@ -5922,7 +5922,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.38";
+const APP_VERSION = "v7.39";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -9277,7 +9277,7 @@ const SUPABASE_OC_ENDPOINT = SUPABASE_URL + "/rest/v1/Ordenes_Compra";
 let _oc = null;
 function _ocGroupKey(r) { return [r.proveedor || "", r.fecha || "", r.rubro || ""].join("~|~"); }
 async function ocFetchRows() {
-  const r = await fetch(SUPABASE_OC_ENDPOINT + "?select=id,fecha,rubro,proveedor,codigo,descripcion,cantidad,cantidad_recibida,unidad,estado&order=fecha.desc,proveedor.asc,codigo.asc&limit=20000", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+  const r = await fetch(SUPABASE_OC_ENDPOINT + "?select=id,fecha,rubro,proveedor,proveedor_telefono,codigo,descripcion,cantidad,cantidad_recibida,unidad,estado,oc_max,oc_pedidos,oc_stock,oc_uni_caja&order=fecha.desc,proveedor.asc,codigo.asc&limit=20000", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
   return r.ok ? r.json() : [];
 }
 async function openOCAdmin() {
@@ -9404,7 +9404,7 @@ function ocBodyEntregas() {
 }
 function ocGroups() {
   const g = {};
-  (_oc.rows || []).forEach(function (r) { const k = _ocGroupKey(r); if (!g[k]) g[k] = { key: k, proveedor: r.proveedor || "", fecha: r.fecha || "", rubro: r.rubro || "", rows: [] }; g[k].rows.push(r); });
+  (_oc.rows || []).forEach(function (r) { const k = _ocGroupKey(r); if (!g[k]) g[k] = { key: k, proveedor: r.proveedor || "", fecha: r.fecha || "", rubro: r.rubro || "", telefono: "", rows: [] }; if (!g[k].telefono && r.proveedor_telefono) g[k].telefono = String(r.proveedor_telefono); g[k].rows.push(r); });
   return g;
 }
 /* v6.41 — TRAZABILIDAD PUNTA A PUNTA por artículo. Cruza por código canónico:
@@ -9541,19 +9541,42 @@ function ocLiveFalt(id, ped, v) { const c = document.getElementById("ocfalt_" + 
 /* v6.41 — IMPRIMIR OC: hoja print-friendly de la OC abierta (1 proveedor · fecha · rubro).
    Reusa el patrón de pppPrintSug (window.open + document.write + auto-print). Muestra
    encabezado, ítems (código canónico, descripción, unidad, cantidad), total y pie de firma. */
-const _OC_PRINT_CSS = "body{font-family:Arial,Helvetica,sans-serif;color:#0f172a;margin:20px;} h2{font-size:20px;margin:0 0 2px;} .oc-p-sub{font-size:12.5px;color:#475569;margin-bottom:14px;} .oc-p-meta{font-size:13px;margin:2px 0;} .oc-p-meta b{color:#0f172a;} table{width:100%;border-collapse:collapse;margin:12px 0 10px;font-size:12.5px;} th,td{border:1px solid #cbd5e1;padding:6px 9px;text-align:left;} th{background:#0f766e;color:#fff;font-size:12px;text-transform:uppercase;} td.num,th.num{text-align:right;} tfoot td{font-weight:bold;background:#f1f5f9;} .oc-p-firma{margin-top:44px;display:flex;justify-content:space-between;font-size:12px;color:#475569;} .oc-p-firma span{border-top:1px solid #94a3b8;padding-top:5px;width:44%;text-align:center;}";
+const _OC_PRINT_CSS = "body{font-family:Arial,Helvetica,sans-serif;color:#0f172a;margin:20px;} .oc-p-head{display:flex;align-items:baseline;justify-content:space-between;border-bottom:2px solid #0f172a;padding-bottom:4px;margin-bottom:3px;} .oc-p-name{font-size:26px;font-weight:800;} .oc-p-date{font-size:15px;font-weight:700;color:#334155;} .oc-p-sub{font-size:12.5px;color:#475569;margin-bottom:12px;} table{width:100%;border-collapse:collapse;margin:10px 0;font-size:13px;} th,td{border:1px solid #94a3b8;padding:6px 9px;text-align:left;} th{background:#e2e8f0;color:#0f172a;font-size:11.5px;text-transform:uppercase;text-align:center;} td.num,th.num{text-align:right;} th.num{text-align:center;} td.cod{font-family:Consolas,Menlo,monospace;font-weight:800;} td.big{font-size:16px;font-weight:800;} td.falt{color:#b91c1c;font-weight:800;} tfoot td{font-weight:bold;background:#f1f5f9;} .oc-p-firma{margin-top:44px;display:flex;justify-content:space-between;font-size:12px;color:#475569;} .oc-p-firma span{border-top:1px solid #94a3b8;padding-top:5px;width:44%;text-align:center;}";
+/* v7.39 — IMPRESO de OC con el formato de la planilla del tallerista (pedido del
+   usuario). Columnas: Cod · Descripción · Cajas (a pedir) · Falta Pedidos · Uni x
+   Caja · % Lleno. Los tres últimos usan lo GUARDADO al generar (oc_max/oc_pedidos/
+   oc_stock/oc_uni_caja) para que el impreso sea fiel a esa fecha:
+     Cajas        = cantidad
+     Falta Pedidos= máx(0, Pedidos − Stock)
+     % Lleno      = (Stock − Pedidos) / Máximo
+   Las OCs viejas / de carga manual no tienen esos valores → esas columnas van "—".
+   Encabezado = tallerista + fecha + Tel (si la OC trae proveedor_telefono). */
 function ocPrintHtml(x) {
-  let tot = 0;
-  let rows = "";
+  let tot = 0, rows = "";
   x.rows.forEach(function (r) {
-    const ped = Number(r.cantidad) || 0; tot += ped;
-    rows += '<tr><td>' + escapeHtml(codCanon(r.codigo) || "—") + '</td><td>' + escapeHtml(artNombre(r.codigo, r.descripcion) || "") + '</td><td>' + escapeHtml(r.unidad || "") + '</td><td class="num">' + ped + '</td></tr>';
+    const cajas = Number(r.cantidad) || 0; tot += cajas;
+    const hayCalc = r.oc_max != null && r.oc_pedidos != null && r.oc_stock != null;
+    const ped = Number(r.oc_pedidos), stk = Number(r.oc_stock), max = Number(r.oc_max);
+    const faltaPed = hayCalc ? Math.max(0, Math.round(ped - stk)) : null;
+    const pct = (hayCalc && max > 0) ? Math.round((stk - ped) / max * 100) : null;
+    const uni = (r.oc_uni_caja != null && r.oc_uni_caja !== "") ? Math.round(Number(r.oc_uni_caja)) : null;
+    rows += '<tr>' +
+      '<td class="cod">' + escapeHtml(codCanon(r.codigo) || "—") + '</td>' +
+      '<td>' + escapeHtml(artNombre(r.codigo, r.descripcion) || "") + '</td>' +
+      '<td class="num big">' + cajas + '</td>' +
+      '<td class="num' + (faltaPed > 0 ? ' falt' : '') + '">' + (faltaPed != null ? faltaPed : "—") + '</td>' +
+      '<td class="num">' + (uni != null ? uni : "—") + '</td>' +
+      '<td class="num' + (pct != null && pct < 0 ? ' falt' : '') + '">' + (pct != null ? pct + "%" : "—") + '</td>' +
+    '</tr>';
   });
-  return '<h2>Orden de Compra</h2><div class="oc-p-sub">Producción Virgilio</div>' +
-    '<div class="oc-p-meta">Proveedor: <b>' + escapeHtml(x.proveedor || "—") + '</b></div>' +
-    '<div class="oc-p-meta">Fecha: <b>' + escapeHtml(x.fecha || "—") + '</b> · Rubro: <b>' + escapeHtml(x.rubro || "—") + '</b> · Ítems: <b>' + x.rows.length + '</b></div>' +
-    '<table><thead><tr><th>Código</th><th>Descripción</th><th>Unidad</th><th class="num">Cantidad</th></tr></thead><tbody>' + rows +
-    '</tbody><tfoot><tr><td colspan="3">Total</td><td class="num">' + tot + '</td></tr></tfoot></table>' +
+  const tel = String(x.telefono || "").trim();
+  return '<div class="oc-p-head"><span class="oc-p-name">' + escapeHtml(x.proveedor || "—") + '</span>' +
+      '<span class="oc-p-date">' + escapeHtml(x.fecha || "—") + '</span></div>' +
+    '<div class="oc-p-sub">Producción Virgilio' + (tel ? ' · Tel: ' + escapeHtml(tel) : '') + ' · Ítems: ' + x.rows.length + '</div>' +
+    '<table><thead><tr>' +
+      '<th>Cod</th><th>Descripcion</th><th class="num">Cajas</th><th class="num">Falta Pedidos</th><th class="num">Uni x Caja</th><th class="num">% Lleno</th>' +
+    '</tr></thead><tbody>' + rows +
+    '</tbody><tfoot><tr><td colspan="2">Total</td><td class="num">' + tot + '</td><td colspan="3"></td></tr></tfoot></table>' +
     '<div class="oc-p-firma"><span>Firma proveedor</span><span>Firma responsable</span></div>';
 }
 function ocPrintDetalle() {
@@ -9760,7 +9783,7 @@ async function ocgEnter() {
       if (capped) maxCajas = Math.floor(cap);
       const faltaRaw = maxCajas + demanda - stock;
       if (faltaRaw <= 0) return;
-      items.push({ cod: cod, desc: m.descripcion || "", prov: (m.proveedor || "(sin proveedor)").trim(), max: maxCajas, fuente: fuente, indice: indice, proy: (pc != null ? pc : null), demanda: demanda, stock: stock, falta: Math.ceil(faltaRaw), cap: (cap != null ? cap : null), capped: capped });
+      items.push({ cod: cod, desc: m.descripcion || "", prov: (m.proveedor || "(sin proveedor)").trim(), max: maxCajas, fuente: fuente, indice: indice, proy: (pc != null ? pc : null), demanda: demanda, stock: stock, falta: Math.ceil(faltaRaw), cap: (cap != null ? cap : null), capped: capped, uni: Number(m.uni_x_caja) || 0 });
     });
     _oc.gen = { items: items, fecha: new Date().toISOString().slice(0, 10) };
     ocRender();
@@ -9799,7 +9822,7 @@ async function ocgGenerar() {
   if (!_oc || !_oc.gen) return;
   const g = ocgGroups();
   const rows = [];
-  Object.keys(g).forEach(function (k) { if (g[k].interno) return; g[k].items.forEach(function (it) { rows.push({ proveedor: it.prov, fecha: _oc.gen.fecha, rubro: "Art Term", codigo: codCanon(it.cod), descripcion: it.desc || null, cantidad: it.falta, cantidad_recibida: 0, unidad: "Cajas", estado: "pendiente" }); }); });
+  Object.keys(g).forEach(function (k) { if (g[k].interno) return; g[k].items.forEach(function (it) { rows.push({ proveedor: it.prov, fecha: _oc.gen.fecha, rubro: "Art Term", codigo: codCanon(it.cod), descripcion: it.desc || null, cantidad: it.falta, cantidad_recibida: 0, unidad: "Cajas", estado: "pendiente", oc_max: it.max, oc_pedidos: it.demanda, oc_stock: it.stock, oc_uni_caja: it.uni }); }); });
   if (!rows.length) { alert("No hay OCs externas para generar."); return; }
   if (!confirm("Vas a generar " + rows.length + " línea(s) de OC (proveedores externos) en Ordenes_Compra. ¿Seguro?")) return;
   const headers = await facAuthWriteHeaders({ "Prefer": "return=minimal" });

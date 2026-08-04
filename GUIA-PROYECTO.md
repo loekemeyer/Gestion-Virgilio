@@ -4,7 +4,25 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-04 · Versión app al documentar: **v7.38**
+> Última actualización: 2026-08-04 · Versión app al documentar: **v7.39**
+>
+> Nota: **v7.39 — El impreso de la OC usa el formato de la planilla del tallerista** (pedido del
+> usuario, con foto de ejemplo). El impreso de "📑 Órdenes de Compra → Imprimir OC" pasó del formato
+> genérico (Código · Descripción · Unidad · Cantidad) al de la planilla: **Cod · Descripción · Cajas ·
+> Falta Pedidos · Uni x Caja · % Lleno**, con encabezado **tallerista + fecha + Tel** (si la OC trae
+> `proveedor_telefono`). Fórmulas confirmadas contra la foto del 29/07: **Cajas** = `cantidad` (a
+> pedir); **Falta Pedidos** = máx(0, Pedidos − Stock); **% Lleno** = (Stock − Pedidos) / Máximo
+> (negativo = falta, va en rojo, igual que Falta Pedidos). El usuario pidió **omitir** las columnas
+> "Lin" y "Caja N°" del ejemplo, y confirmó que "Uni x Caja" sale de `OC_Maximos.uni_x_caja` (el 1 del
+> 546 en la foto era error de tipeo). **Para que el impreso sea fiel a la fecha de generación** (no
+> recalculando stock/demanda después), cada línea de `Ordenes_Compra` guarda ahora los valores usados:
+> **columnas nuevas `oc_max`, `oc_pedidos`, `oc_stock`, `oc_uni_caja`** (nullable), que setean **los
+> dos generadores** — el automático (`generar_ocs_automaticas`, SQL) y el manual (`ocgGenerar` →
+> `ocgEnter` agrega `it.uni`). El impreso (`ocPrintHtml`) y `ocFetchRows`/`ocGroups` leen esas
+> columnas; las OCs viejas o de carga manual (sin esos valores) muestran **"—"** en Falta/Uni/%Lleno.
+> Verificado: generación real con `p_forzar` en transacción + `ROLLBACK` (guarda las 4 columnas y las
+> derivadas dan bien), render headless del impreso (reproduce la planilla de Lucho), test nuevo
+> `tests/oc-print.cjs`, suite completa OK. SQL `sql/generar_ocs_automaticas.sql`. Bump **v7.39**.
 >
 > Nota: **v7.38 — la solapa «⚙ Ajustes» ofrece TODOS los depósitos en el selector**. Faltaban
 > **«Para envasar»** (`para_envasar`) y **«Racks CH»** (`racks_ch`): esos depósitos ya se veían en la
