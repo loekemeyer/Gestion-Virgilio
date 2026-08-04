@@ -4,7 +4,23 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-03 · Versión app al documentar: **v7.02**
+> Última actualización: 2026-08-03 · Versión app al documentar: **v7.03**
+>
+> Nota: **v7.03 — Ocupación: armado vs a-entregar (%) + apilado POR PEDIDO + tooltip + escala del
+> histórico**. Tres pedidos del usuario. **(1) Comparativa armado vs a-entregar**: cada pedido trae
+> ahora `armado` (bool) en `_ocupUnified` — entregados (Meta) = armado; programados = su tanda tiene
+> **TAP** (`_pppArmadoDone`, se carga en `pppRefreshOcupacion`); a-programar = no. Se ve como **% del
+> total** por día (`✓X%` sobre la barra, línea "🔧 Armado X% (Y de Z m³) · falta armar W m³" en el
+> detalle, badges ✓ armado / ⏳ a armar por pedido, KPI "armado %" y % en el título de la semana), y
+> **visualmente**: los segmentos armados van **sólidos abajo**, los pendientes **claros arriba**
+> (`opacity` 1 vs 0.42, `_ocupSortPeds`). **(2) Escala provisoria del histórico**: los buckets de
+> tamaño se recalibraron con la distribución real de m³ por pedido (n≈2242: p25≈0.10, p75≈0.35,
+> p90≈0.75) → **Chico ≤0.10 · Mediano ≤0.35 · Grande ≤0.75 · Muy grande >0.75**. **(3, parcial)
+> Tooltip**: las barras ahora se apilan **por pedido individual** (segmento = 1 pedido, no bucket
+> agregado), cada uno con `<title>` = **NP · cliente · m³ · estado** (hover). ⏳ **Falta el drag&drop**
+> de #3 (arrastrar los "a programar" a días) — se decide aparte (planificación local vs programar de
+> verdad en Supabase). Verificado: render headless (semana con armado sólido/claro + %, detalle con
+> badges). `checkhtml` + `smoke` OK. Bump **v7.03**.
 >
 > Nota: **v7.02 — Ocupación: vista SEMANAL con barras apiladas por tamaño de pedido + "A programar"**.
 > El usuario pidió cambiar la visión: en vez del gráfico continuo de −30…+30 días, ahora es

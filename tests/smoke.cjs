@@ -48,7 +48,7 @@ catch (_e) {
       "facNCOpen", "facNCEmitir", "facNCEnsure", "facNCClose", "openAbastecimiento", "abastCompute", "abastRender", "abastToggle", "abastSetFiltro", "_abastEsImportado", "_abastCodDisp", "abastToggleMeses",
       "fetchSinSalidaMap", "crMarkSinSalida", "crSendSinSalida", "stkFcsFetch", "stkOpenFcsArt",
       "pppRefreshDelivered", "_pppEntBodyHtml", "pppTandaM3Map", "pppRefreshOcupacion", "pppOcupHtml", "pppOcupSetCap", "pppOcupDay", "pppOcupWeek",
-      "_ocupWeekSvg", "_ocupWeekData", "_ocupWeekDetailHtml", "_ocupUnified", "_ocupMonday", "_ocupSizeBucket",
+      "_ocupWeekSvg", "_ocupWeekData", "_ocupWeekDetailHtml", "_ocupUnified", "_ocupMonday", "_ocupSizeBucket", "_ocupSortPeds",
       "pppRefreshEntregadosFull", "pppEntMode", "_pppEntAppHtml", "_pppEntExcelHtml", "_pppEntTabsHtml", "_pppYmdKey", "_pppEntGroupedHtml", "_pppEntFilter"];
     const missing = need.filter((n) => typeof window[n] !== "function");
     const ts = new Date().toISOString();
