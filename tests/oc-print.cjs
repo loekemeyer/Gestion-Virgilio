@@ -29,12 +29,15 @@ catch (_e) {
     const out = {};
     const x = {
       proveedor: "Lucho", fecha: "2026-07-29", telefono: "11 3062-0152",
+      // A propósito DESORDENADas por %Lleno (505 99%, 518 28%, 123 -33%) para probar el orden.
       rows: [
-        // 123: Cajas 237, Pedidos 59, Stock 0, Máx 178 → Falta 59, %Lleno (0-59)/178=-33%
-        { codigo: "123", descripcion: "Pelador Plastico Loke", cantidad: 237, oc_max: 178, oc_pedidos: 59, oc_stock: 0, oc_uni_caja: 12 },
-        // 518: Cajas 70, Pedidos 0, Stock 27.5, Máx 97.5 → Falta 0, %Lleno 27.5/97.5=28%
+        // 505: %Lleno 99% (el más lleno → debe ir ÚLTIMO de los que tienen %)
+        { codigo: "505", descripcion: "Pelador Plastico - Env.", cantidad: 22, oc_max: 3750, oc_pedidos: 0, oc_stock: 3728, oc_uni_caja: 12 },
+        // 518: Cajas 70, Stock 27.5, Máx 97.5 → Falta 0, %Lleno 28%
         { codigo: "518", descripcion: "Sacafuente Pizzero", cantidad: 70, oc_max: 97.5, oc_pedidos: 0, oc_stock: 27.5, oc_uni_caja: 12 },
-        // OC vieja/manual: sin los valores guardados → "—" en Falta/Uni/%Lleno
+        // 123: Pedidos 59, Stock 0, Máx 178 → Falta 59, %Lleno -33% (el más negativo → PRIMERO)
+        { codigo: "123", descripcion: "Pelador Plastico Loke", cantidad: 237, oc_max: 178, oc_pedidos: 59, oc_stock: 0, oc_uni_caja: 12 },
+        // OC vieja/manual: sin los valores guardados → "—" y va al FINAL
         { codigo: "999", descripcion: "Manual", cantidad: 10, oc_max: null, oc_pedidos: null, oc_stock: null, oc_uni_caja: null }
       ]
     };
@@ -49,8 +52,11 @@ catch (_e) {
     out.pct518 = html.indexOf("28%") >= 0;
     // fila manual: "—" en las columnas derivadas
     out.manualGuion = html.indexOf("—") >= 0;
-    // total de cajas = 237+70+10 = 317
-    out.total = html.indexOf(">317<") >= 0;
+    // total de cajas = 22+70+237+10 = 339
+    out.total = html.indexOf(">339<") >= 0;
+    // ORDEN por % Lleno de menor a mayor: 123(-33) < 518(28) < 505(99) < manual(—, al final)
+    const pos = function (cod) { return html.indexOf('>' + cod + '<'); };
+    out.orden = pos("123") < pos("518") && pos("518") < pos("505") && pos("505") < pos("999");
     // sin teléfono → no aparece "Tel:"
     const x2 = { proveedor: "Poly", fecha: "2026-07-29", telefono: "", rows: [{ codigo: "31", descripcion: "X", cantidad: 5, oc_max: 100, oc_pedidos: 0, oc_stock: 20, oc_uni_caja: 24 }] };
     out.sinTel = ocPrintHtml(x2).indexOf("Tel:") < 0;

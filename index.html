@@ -5922,7 +5922,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.39";
+const APP_VERSION = "v7.40";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -9546,27 +9546,45 @@ const _OC_PRINT_CSS = "body{font-family:Arial,Helvetica,sans-serif;color:#0f172a
    usuario). Columnas: Cod · Descripción · Cajas (a pedir) · Falta Pedidos · Uni x
    Caja · % Lleno. Los tres últimos usan lo GUARDADO al generar (oc_max/oc_pedidos/
    oc_stock/oc_uni_caja) para que el impreso sea fiel a esa fecha:
-     Cajas        = cantidad
-     Falta Pedidos= máx(0, Pedidos − Stock)
-     % Lleno      = (Stock − Pedidos) / Máximo
-   Las OCs viejas / de carga manual no tienen esos valores → esas columnas van "—".
-   Encabezado = tallerista + fecha + Tel (si la OC trae proveedor_telefono). */
+     Cajas        = cantidad (a pedir)
+     Falta Pedidos= máx(0, Pedidos − Stock)  cajas de los pedidos ya programados que
+                    NO se llegan a cubrir con el stock
+     Uni x Caja   = unidades de ese producto por caja (OC_Maximos)
+     % Lleno      = (Stock − Pedidos) / Máximo  cuánto del espacio de góndola asignado
+                    al producto queda lleno tras reservar los pedidos (negativo = se
+                    debe entregar más de lo que hay → falta pedidos)
+   v7.40: las filas se ORDENAN por % Lleno de MENOR A MAYOR (los más "en rojo" /
+   con más falta primero, como en la planilla). Las filas sin % (OCs viejas / de
+   carga manual, sin los valores guardados) van al final y muestran "—". */
 function ocPrintHtml(x) {
-  let tot = 0, rows = "";
-  x.rows.forEach(function (r) {
-    const cajas = Number(r.cantidad) || 0; tot += cajas;
+  const items = (x.rows || []).map(function (r) {
+    const cajas = Number(r.cantidad) || 0;
     const hayCalc = r.oc_max != null && r.oc_pedidos != null && r.oc_stock != null;
     const ped = Number(r.oc_pedidos), stk = Number(r.oc_stock), max = Number(r.oc_max);
-    const faltaPed = hayCalc ? Math.max(0, Math.round(ped - stk)) : null;
-    const pct = (hayCalc && max > 0) ? Math.round((stk - ped) / max * 100) : null;
-    const uni = (r.oc_uni_caja != null && r.oc_uni_caja !== "") ? Math.round(Number(r.oc_uni_caja)) : null;
+    return {
+      r: r, cajas: cajas,
+      faltaPed: hayCalc ? Math.max(0, Math.round(ped - stk)) : null,
+      pct: (hayCalc && max > 0) ? Math.round((stk - ped) / max * 100) : null,
+      uni: (r.oc_uni_caja != null && r.oc_uni_caja !== "") ? Math.round(Number(r.oc_uni_caja)) : null
+    };
+  });
+  // Orden: % Lleno ascendente (menor a mayor); las que no tienen %, al final.
+  items.sort(function (a, b) {
+    if (a.pct == null && b.pct == null) return 0;
+    if (a.pct == null) return 1;
+    if (b.pct == null) return -1;
+    return a.pct - b.pct;
+  });
+  let tot = 0, rows = "";
+  items.forEach(function (it) {
+    tot += it.cajas;
     rows += '<tr>' +
-      '<td class="cod">' + escapeHtml(codCanon(r.codigo) || "—") + '</td>' +
-      '<td>' + escapeHtml(artNombre(r.codigo, r.descripcion) || "") + '</td>' +
-      '<td class="num big">' + cajas + '</td>' +
-      '<td class="num' + (faltaPed > 0 ? ' falt' : '') + '">' + (faltaPed != null ? faltaPed : "—") + '</td>' +
-      '<td class="num">' + (uni != null ? uni : "—") + '</td>' +
-      '<td class="num' + (pct != null && pct < 0 ? ' falt' : '') + '">' + (pct != null ? pct + "%" : "—") + '</td>' +
+      '<td class="cod">' + escapeHtml(codCanon(it.r.codigo) || "—") + '</td>' +
+      '<td>' + escapeHtml(artNombre(it.r.codigo, it.r.descripcion) || "") + '</td>' +
+      '<td class="num big">' + it.cajas + '</td>' +
+      '<td class="num' + (it.faltaPed > 0 ? ' falt' : '') + '">' + (it.faltaPed != null ? it.faltaPed : "—") + '</td>' +
+      '<td class="num">' + (it.uni != null ? it.uni : "—") + '</td>' +
+      '<td class="num' + (it.pct != null && it.pct < 0 ? ' falt' : '') + '">' + (it.pct != null ? it.pct + "%" : "—") + '</td>' +
     '</tr>';
   });
   const tel = String(x.telefono || "").trim();

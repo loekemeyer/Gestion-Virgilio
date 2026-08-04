@@ -4,7 +4,20 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-04 · Versión app al documentar: **v7.39**
+> Última actualización: 2026-08-04 · Versión app al documentar: **v7.40**
+>
+> Nota: **v7.40 — Impreso de OC: aclaración de las columnas + orden por % Lleno**. El usuario precisó
+> el significado de tres columnas (coinciden con lo de v7.39, se documenta fino) y pidió que las filas
+> se **ordenen de menor a mayor por % Lleno**. **Falta Pedidos** = cajas de los pedidos ya programados
+> que NO se llegan a cubrir con el stock (= máx(0, Pedidos − Stock)). **Uni x Caja** = unidades del
+> producto por caja. **% Lleno** = porcentaje del **espacio de góndola asignado** al producto que
+> queda lleno tras reservar los pedidos (= (Stock − Pedidos) / Máximo); es **negativo** cuando hay que
+> entregar más de lo que hay (falta pedidos), y en ese caso va en **rojo**. **Nuevo (v7.40)**:
+> `ocPrintHtml` ahora **ordena las filas por % Lleno ascendente** (los más negativos / con más falta
+> primero, como en la planilla del ejemplo: -33%, -26%, 0%, 28%…); las filas sin % (OCs viejas / de
+> carga manual, sin los valores guardados) van al final con "—". Verificado: render headless con las
+> filas entrando en orden de código y saliendo ordenadas por %; `tests/oc-print.cjs` extendido con la
+> aserción de orden; suite completa OK. Bump **v7.40**.
 >
 > Nota: **v7.39 — El impreso de la OC usa el formato de la planilla del tallerista** (pedido del
 > usuario, con foto de ejemplo). El impreso de "📑 Órdenes de Compra → Imprimir OC" pasó del formato
