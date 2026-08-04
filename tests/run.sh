@@ -114,4 +114,7 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== comp-pausar (v7.30: botón Pausar del armado — sale sin terminar, retomable) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/comp-pausar.cjs
 
+echo "== pk-racks-aguardar (idea 5703: faltó al pickear pero hay en racks/a guardar → aviso) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pk-racks-aguardar.cjs
+
 echo "== TODO OK =="
