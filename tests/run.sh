@@ -105,7 +105,7 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== rcp-reanudar (v7.12: recepcion a medio cargar sobrevive + boton Seguir recepcion) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/rcp-reanudar.cjs
 
-echo "== anular-sesion (v7.13: botón rojo Anular picking / Anular insumos) =="
+echo "== anular-sesion (v7.15: botón rojo Anular picking / recepción / insumos) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/anular-sesion.cjs
 
 echo "== ins-admin (idea 5572 / v7.14: solapa Administrar Insumos en Stock y Compras) =="

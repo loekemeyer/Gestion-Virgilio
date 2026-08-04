@@ -4,7 +4,23 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-04 · Versión app al documentar: **v7.14**
+> Última actualización: 2026-08-04 · Versión app al documentar: **v7.15**
+>
+> Nota: **v7.15 — "Anular recepción": el botón rojo también en Recepción de Mercadería**. El usuario
+> avisó que veía el de picking pero no el de recepción (v7.13 había cubierto picking + insumos). En
+> `recepcion.js` (`?v=3.80`) se agregó la barra **`#opAnularBar`** con **"✕ Anular recepción"**, que
+> vive **fuera de `#opBody` y `#opActions`** — los render de cada paso reescriben esos dos, así que
+> desde afuera queda visible en TODOS los pasos del operario sin tocar ninguna pantalla. Se prende en
+> `openOp`/`reanudarRecepcionOp` y se apaga en `closeOp` y en `renderMenu` (el supervisor que entra
+> por Administración no tiene sesión RT que anular). `opAnularSesion()` confirma, avisa a Producción
+> por **`window.anularRecepcionSesion(legajo)`** (nuevo en `index.html`) y cierra la pantalla dejando
+> el estado vacío → el borrador se descarta solo. El hook cierra el **toggle RT** del legajo, saca el
+> RT de la cola y del historial del día, pone en **0** el acumulador de cajas (`recepcionResetCajas`)
+> y llama a la RPC **`anular_toggle_virgilio(legajo,'RT')`** — se le agregó `'RT'` al whitelist, antes
+> sólo `RI`/`EI`. **Guarda importante**: si en esa sesión el operario YA mandó entregas, el hook pide
+> una **2ª confirmación** aclarando que se anula el RT (la tarea) pero **no** la mercadería recibida,
+> y devuelve `false` si dice que no. `tests/anular-sesion.cjs` cubre ahora las tres pantallas (la de
+> recepción con el módulo cargado aparte, igual que `rcp-reanudar`). Bump **v7.15**.
 >
 > Nota: **v7.14 — ADMINISTRAR INSUMOS: solapa nueva en Stock y Compras + identidad temporal**
 > (idea **5572** del usuario). Dos mitades del mismo pedido.
