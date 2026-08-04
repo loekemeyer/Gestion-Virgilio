@@ -1,5 +1,5 @@
 -- =====================================================================
--- recepcion_excede_oc_telegram.sql — Aviso Telegram (v7.05)
+-- recepcion_excede_oc_telegram.sql — Aviso Telegram (v7.06)
 --
 -- "📦⚠ RECEPCIÓN POR ENCIMA DE LA ORDEN DE COMPRA": cuando en Recepción de
 -- Mercadería entra de un código MÁS DEL +20% de lo que pide la OC vigente de

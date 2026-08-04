@@ -97,7 +97,7 @@ const RCP_CSS = `
 #rcpRoot .opCodeBtn{ aspect-ratio:1/1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; font-weight:900; font-size:18px; border:2px solid var(--border); border-radius:12px; background:#fff; cursor:pointer; padding:6px; text-align:center; min-width:0; overflow-wrap:anywhere; }
 #rcpRoot .opCodeBtn .cnt{ font-size:12px; font-weight:800; color:var(--ok); }
 #rcpRoot .opCodeBtn.loaded{ background:#eef7ee; border-color:var(--ok); color:#333; }
-/* v7.04 — detalle de la OC vigente en el botón del código (cuánto se pidió) y
+/* v7.06 — detalle de la OC vigente en el botón del código (cuánto se pidió) y
    marca roja cuando lo recibido excede la OC en más de 20%. */
 #rcpRoot .opCodeBtn .ocq{ font-size:11px; font-weight:800; color:#a06000; line-height:1.15; }
 #rcpRoot .opCodeBtn.exceso{ border-color:var(--danger); background:#fff5f4; }
@@ -269,7 +269,7 @@ const opState = {
   cargas: {},        // { Cod_Art: cajas }
   cajasCod: null,    // codigo abierto en el popup
   listaTipo: null,
-  ocPorCod: null     // v7.04: OCs vigentes del proveedor { codNorm: {ped,rec,pend,fecha} } (null = sin cargar)
+  ocPorCod: null     // v7.06: OCs vigentes del proveedor { codNorm: {ped,rec,pend,fecha} } (null = sin cargar)
 };
 
 function opTodayStr() {
@@ -599,7 +599,7 @@ function renderRemito() {
   opActions.innerHTML = "";
 }
 
-/* ============== Órdenes de Compra vigentes (v7.04) ==============
+/* ============== Órdenes de Compra vigentes (v7.06) ==============
    El operario, al marcar la mercadería que recibe, ve en cada botón de código
    CUÁNTO se le pidió a ese tallerista/proveedor en la OC vigente ("OC 100"). Si
    carga más del +20% de esa cantidad NO se le interrumpe (nada de pop-up): el
@@ -708,7 +708,7 @@ async function renderArticulos() {
   opSubtitle.textContent = opState.linea + " · " + fechaCorta(opState.fecha) + " · RTO/FC " + opState.remito;
   opActions.innerHTML = "";
 
-  // v7.04: las OCs vigentes se traen EN PARALELO (no bloquean la grilla); cuando
+  // v7.06: las OCs vigentes se traen EN PARALELO (no bloquean la grilla); cuando
   // llegan se repinta para que aparezca el detalle "OC N" en cada botón.
   if (opState.ocPorCod === null) {
     cargarOCVigentes().then(function () {
@@ -799,7 +799,7 @@ function drawArticulosGrid() {
     const b = document.createElement("button");
     b.type = "button";
     b.className = "opCodeBtn" + (cajas > 0 ? " loaded" : "") + (exc ? " exceso" : "");
-    // v7.04: detalle de la OC vigente del proveedor. "OC 100" = pedidas 100 cajas;
+    // v7.06: detalle de la OC vigente del proveedor. "OC 100" = pedidas 100 cajas;
     // si ya hay recibido parcial cargado en el módulo de OCs → "OC 40/100" (faltan/pedidas).
     let ocHtml = "";
     if (oc) {
@@ -959,7 +959,7 @@ function openCajas(cod) {
   const actual = opState.cargas[cod];
   opCajasInput.value = actual > 0 ? String(actual) : "";
   opCajasDelete.style.display = actual > 0 ? "" : "none";
-  // v7.04: recordatorio de la OC vigente mientras carga las cajas.
+  // v7.06: recordatorio de la OC vigente mientras carga las cajas.
   const oc = ocDeCod(cod);
   if (opCajasOc) {
     if (oc) {
@@ -1122,7 +1122,7 @@ async function opEnviar() {
     }
   } catch (_e) {}
 
-  // v7.04 — AVISO recepción que EXCEDE la OC vigente (+20%): SIN pop-up ni aprobación,
+  // v7.06 — AVISO recepción que EXCEDE la OC vigente (+20%): SIN pop-up ni aprobación,
   // al operario no se lo interrumpe. Se emite el evento ROC (mismo patrón que RSP) con
   // proveedor, remito y "cod:recibidas/pedidas"; el trigger
   // trg_recepcion_excede_oc_telegram manda el aviso por Telegram. Best-effort.

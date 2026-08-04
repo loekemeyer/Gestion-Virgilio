@@ -1,4 +1,4 @@
-/* Test de regresión (v7.04) — RECEPCIÓN: detalle de la ORDEN DE COMPRA vigente en
+/* Test de regresión (v7.06) — RECEPCIÓN: detalle de la ORDEN DE COMPRA vigente en
    los botones de código + aviso Telegram (evento ROC) cuando lo recibido excede la
    OC en más de 20%.
 
@@ -14,7 +14,7 @@
    - el botón muestra "OC N" y el pop-up de cajas la OC vigente,
    - +20%: 120 sobre 100 NO dispara, 121 SÍ; con recibido parcial la referencia es lo
      que FALTA,
-   - exceder NO interrumpe al operario (v7.05: sin pop-up de aprobación): la carga
+   - exceder NO interrumpe al operario (sin pop-up de aprobación): la carga
      entra derecho, el botón queda en rojo con ⚠ y al enviar sale UN evento `ROC`
      (proveedor|remito|cod:recibidas/pedidas) — el que dispara el Telegram — sólo con
      los códigos que se pasaron.

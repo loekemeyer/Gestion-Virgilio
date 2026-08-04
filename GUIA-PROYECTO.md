@@ -4,49 +4,73 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-04 · Versión app al documentar: **v7.05**
+> Última actualización: 2026-08-04 · Versión app al documentar: **v7.06**
 >
-> Nota: **v7.05 — Recepción que excede la OC: FUERA el pop-up, va por Telegram**. El usuario pidió
-> sacar el cartel "Requiere aprobación" (v7.04) y que el exceso se avise **sólo por Telegram**. En
-> `recepcion.js` (`?v=3.75`) se eliminó el modal `#opAprobModal` (HTML + CSS + `aprobPedir` + el
-> estado `opState.excesos`): cargar cajas vuelve a ser un paso directo, **nada interrumpe al
-> operario**. Lo único que queda visible es el botón del código **en rojo con ⚠** cuando se pasa del
-> +20%. El evento **`ROC`** ya no depende de ninguna aprobación: al enviar, `opEnviar` recalcula qué
-> códigos exceden (`ocExcede`) y emite UNA fila (`texto = proveedor|remito|cod:recibidas/pedidas`).
-> **Nuevo en Supabase**: función `notificar_recepcion_excede_oc_telegram()` + trigger
-> `trg_recepcion_excede_oc_telegram` (AFTER INSERT WHEN `opcion='ROC'`) — mismo mecanismo que el
-> resto (`tg_enqueue` → `telegram_outbox` → `tg_outbox_flush`, dedup por `client_id`, token del
-> Vault), con el legajo resuelto a nombre por `Empleados` y una línea por código con el %.
-> Archivo `sql/recepcion_excede_oc_telegram.sql`. **Test end-to-end OK**: evento ROC de prueba →
-> outbox → Telegram **HTTP 200** (message_id 678); el evento de prueba se borró después.
-> `tests/rcp-oc.cjs` actualizado (verifica que exceder NO frena, que el botón queda rojo y que sale
-> exactamente un `ROC` con los códigos pasados; suite completa OK). Bump **v7.05**.
+> Nota: **v7.06 — Recepción de Mercadería: la OC vigente en cada botón de código + aviso Telegram
+> si entra +20% de más**. Pedido del usuario, todo en `recepcion.js` (`?v=3.76`) + un trigger nuevo.
+> **(1) DETALLE DE LA OC EN EL BOTÓN**: al marcar la mercadería que recibe, cada código de la grilla
+> muestra debajo, chiquito y en ámbar, **`OC N`** = cajas pedidas a ese tallerista/proveedor en la
+> **orden de compra vigente** (si ya hay recibido parcial cargado en el módulo de OCs → **`OC
+> falta/pedidas`**, ej. `OC 40/100`). El pop-up de cajas repite la línea "📑 OC vigente (29/jul/26):
+> 49 caja(s) pedidas". **Fuente: `Ordenes_Compra`**, la MISMA tabla que llena el generador **desde el
+> PPP** (📑 Órdenes de Compra → ⚙ Generar OCs: A pedir = máx(0, Máximo + Pedidos PPP − Stock)) — no
+> hay tabla ni carga aparte: lo que se ve se alimenta solo con cada generación de OCs. Lectura con la
+> anon key (`select_all`), best-effort y **en paralelo** a la grilla (si falla, la pantalla queda como
+> antes). *Vigente* = línea con `estado ≠ 'recibida'` y `cantidad > cantidad_recibida` de los últimos
+> **120 días**, y si hay varias generaciones del mismo artículo se toma **sólo la más nueva** (sumando
+> sus líneas), para no acumular OCs viejas ya reemplazadas. El **proveedor** de la OC se cruza con el
+> tallerista por clave normalizada (`ocProvCoincide`): exacta, **compartida** ("Garcia / Lucho",
+> "Pintos / Maspoli" → aplica a los dos), con inicial de apellido pegada ("Martin C" = Martin,
+> "Carlos E" = Carlos) y por `ALIAS_NOMBRE` (Pettofrezza = Rafael); el código cruza con `_ocgNorm`
+> ("057" de la OC = botón "57"). **(2) EXCESO → TELEGRAM, SIN FRENAR AL OPERARIO**: si entra **más del
+> +20%** de lo que pide la OC (referencia = lo que FALTA recibir), **no hay pop-up ni aprobación** —
+> sólo el botón queda **en rojo con ⚠**. Al enviar, `opEnviar` recalcula qué códigos exceden
+> (`ocExcede`) y emite UNA fila **`ROC`** en `Registros_Produccion_Virgilio` (`texto =
+> proveedor|remito|cod:recibidas/pedidas`), y el trigger nuevo **`trg_recepcion_excede_oc_telegram`**
+> (función `notificar_recepcion_excede_oc_telegram`, `sql/recepcion_excede_oc_telegram.sql`) manda el
+> aviso por Telegram con el mismo mecanismo que el resto (`tg_enqueue` → `telegram_outbox` →
+> `tg_outbox_flush`, dedup por `client_id`, token del Vault) resolviendo el legajo a nombre por
+> `Empleados`. Hubo un paso intermedio con pop-up "Requiere aprobación" que el usuario pidió **sacar**
+> (nunca llegó a producción). **Test end-to-end OK**: evento ROC de prueba → outbox → Telegram
+> **HTTP 200** (message_id 678); el evento de prueba se borró después. Test nuevo
+> **`tests/rcp-oc.cjs`** (parchea el import de supabase-js por un cliente falso) en `tests/run.sh`;
+> suite completa OK + render headless a 390px (sin overflow). Bump **v7.06**.
 >
-> Nota: **v7.04 — Recepción: la OC vigente en cada botón de código + pop-up "Requiere aprobación"
-> por exceso (+20%)** (el pop-up se sacó en v7.05 — ver arriba). Pedido del usuario, todo en `recepcion.js` (`?v=3.74`). **(1) DETALLE DE LA OC
-> EN EL BOTÓN**: al marcar la mercadería que recibe, cada código de la grilla muestra debajo, chiquito
-> y en ámbar, **`OC N`** = cajas pedidas a ese tallerista/proveedor en la **orden de compra vigente**
-> (si ya hay recibido parcial cargado en el módulo de OCs → **`OC falta/pedidas`**, ej. `OC 40/100`).
-> El pop-up de cajas repite la línea "📑 OC vigente (29/jul/26): 49 caja(s) pedidas". **Fuente:
-> `Ordenes_Compra`**, la MISMA tabla que llena el generador **desde el PPP** (📑 Órdenes de Compra →
-> ⚙ Generar OCs: A pedir = máx(0, Máximo + Pedidos PPP − Stock)) — no hay tabla ni carga aparte: lo
-> que se ve se alimenta solo con cada generación de OCs. Lectura con la anon key (`select_all`),
-> best-effort y **en paralelo** a la grilla (si falla, la pantalla queda como antes). *Vigente* =
-> línea con `estado ≠ 'recibida'` y `cantidad > cantidad_recibida` de los últimos **120 días**, y si
-> hay varias generaciones del mismo artículo se toma **sólo la más nueva** (sumando sus líneas), para
-> no acumular OCs viejas ya reemplazadas. El **proveedor** de la OC se cruza con el tallerista por
-> clave normalizada (`ocProvCoincide`): exacta, **compartida** ("Garcia / Lucho", "Pintos / Maspoli" →
-> aplica a los dos), con inicial de apellido pegada ("Martin C" = Martin, "Carlos E" = Carlos) y por
-> `ALIAS_NOMBRE` (Pettofrezza = Rafael); el código cruza con `_ocgNorm` ("057" de la OC = botón "57").
-> **(2) APROBACIÓN POR EXCESO**: si carga **más del +20%** de lo que pide la OC (referencia = lo que
-> FALTA recibir), antes de aceptar el número salta el pop-up **"⚠ Requiere aprobación"** con el
-> detalle (recibidas vs pedidas y el %) y dos botones: **Continuar** (la ignora y carga igual) y
-> **Corregir la cantidad**. Lo aprobado queda marcado: botón en **rojo con ⚠**, aviso arriba del
-> resumen y, al enviar, evento **`ROC`** en `Registros_Produccion_Virgilio` (`texto =
-> proveedor|remito|cod:recibidas/pedidas`) — de ahí cuelga después el **aviso por Telegram**, que el
-> usuario pidió dejar para más adelante ("de momento, el cartel"). Test nuevo **`tests/rcp-oc.cjs`**
-> (parchea el import de supabase-js por un cliente falso) en `tests/run.sh`; suite completa OK +
-> render headless a 390px (sin overflow). Bump **v7.04**.
+> Nota: **v7.05 — Insumos (RI/EI): botonera de CATEGORÍAS** (idea 7917 del usuario). El modal de
+> Recepción/Entrega de Insumos listaba los **108 códigos planos ordenados por código** y la única
+> forma de llegar a uno era el buscador de texto (el operario tenía que saber que el fleje de
+> 121 × 1,20 es el código `22`). Ahora `Insumos` tiene **`categoria`** y **`ubicacion`**, y arriba
+> del buscador van los **chips**: `Todos` · 🧵 Fleje y alambre (32) · 🧪 Plástico (9) · 🍴 Partes
+> inox (11) · 🪵 Mangos (3) · 🌀 Espirales (2) · 📦 Cajas y embalaje (8) · 🗑 **A depurar (43)**.
+> **Cuatro cosas más, todas consecuencia de la agrupación**: **(1)** los **43 duplicados/negativos**
+> del formato viejo `sector·descripción` quedan **fuera del listado por defecto** (chip aparte, con
+> aviso ⚠ — no se esconden del todo porque algunos todavía arrastran saldo). **(2) Unidad por
+> defecto POR CATEGORÍA** (Fleje ⇒ Kg, Plástico ⇒ Bolsas, Espirales ⇒ MC, Cajas ⇒ Paquetes): es lo
+> que venía **partiendo los saldos** (`PP` tenía 151 Bolsas **+ 24 Uni** porque el chip arrancaba en
+> "Uni" y nadie lo cambiaba). La idea 7382 sigue mandando: si el insumo ya tiene saldo en **una
+> sola** unidad, gana esa. Los chips de unidad ahora **dedupean sin distinguir mayúsculas** (`Kg`
+> vs `kg` eran dos chips = dos saldos del mismo insumo). **(3)** Se **cargaron al catálogo los 62
+> insumos que sólo existían como movimiento** — antes un fleje que llegaba a 0 **desaparecía** del
+> modal y había que re-crearlo para poder recibirlo (`4`, `10` y `25` estaban así). **(4)** El
+> alta nace **con categoría** (selector en el formulario, arranca en la del chip activo) y el
+> movimiento guarda la **ubicación física** (`V9 Ad`, `AF7`) en vez del sector. Chip y buscador son
+> **alternativos** (buscar mira todo, incluso lo a depurar) para que nunca haya un "0 resultados"
+> por estar parado en la categoría equivocada. Relevamiento completo en `docs/INSUMOS-CATEGORIAS.md`.
+> Test nuevo `tests/ins-categorias.cjs`; suite completa OK; render 390px sin overflow. Bump **v7.05**.
+>
+> Nota: **v7.04 — Ocupación: drag&drop de "A programar" a días (planificación LOCAL)**. Completa el
+> #3 del usuario. Se pueden **arrastrar** los pedidos "a programar" (chips en el detalle de la barra
+> ámbar) a un día del gráfico, o **tocar el chip y después el día** (fallback touch, robusto). Asigna
+> una `fecha_entrega` **solo en el navegador** (localStorage `vir_ocup_plan = {np:"YYYYMMDD"}`) — NO
+> toca la PPP real (elección del usuario: proyección/planificación). El pedido planificado se dibuja
+> en su día en **ámbar con borde punteado** (color plan), suma a la ocupación proyectada de ese día,
+> y sale de la barra "A programar". Reversible: **✕** por pedido en el detalle + botón **"🧹 Limpiar
+> plan (N)"**. Drop targets = segmentos de cada día + zona de la etiqueta del día; en modo asignar
+> (`_ocupPlanSel`) los días se resaltan en verde. Funciones: `_ocupLoadPlan`/`_ocupSavePlan`,
+> `pppOcupAssign`, `pppOcupUnplan`, `pppOcupClearPlan`, `pppOcupChipSel`, `pppOcupDragStart`,
+> `pppOcupDrop`; `_ocupUnified` mueve los planificados de `sinFecha`→`dated` con flag `plan`. Verificado:
+> render headless del flujo tocar-chip→tocar-día (el pedido migra al día en ámbar, aparece "Limpiar
+> plan", badge 📋 plan + ✕). `checkhtml` + `smoke` OK. Bump **v7.04**.
 >
 > Nota: **v7.03 — Ocupación: armado vs a-entregar (%) + apilado POR PEDIDO + tooltip + escala del
 > histórico**. Tres pedidos del usuario. **(1) Comparativa armado vs a-entregar**: cada pedido trae
@@ -1942,7 +1966,8 @@
 > tocarse (inicio)**, abren un modal que registra **stock de insumos** en `Movimientos_Stock`
 > (`deposito='insumos'`, tipo `recepcion_insumo` `+` / `entrega_insumo` `−`). El modal
 > (`showInsumoModal('RI'|'EI', legajo)`) tiene **buscador** sobre el catálogo **`Insumos`** (tabla
-> nueva: `id, cod (unique), nombre, creado_por, creado`; RLS abierta anon+auth) y **alta de código
+> nueva: `id, cod (unique), nombre, creado_por, creado`, + `sector` desde v4.36 y
+> `categoria`/`ubicacion` desde **v7.05**; RLS: anon `select` + `insert`) y **alta de código
 > al vuelo** (`insCrear` → POST a `Insumos`) para cuando el insumo no está. Cada fila muestra el
 > **stock actual** y un stepper; en EI avisa si va a quedar negativo (no lo bloquea — "como entra,
 > puede salir"). Confirmar usa **`stockMove`** (offline-safe `vir_stock_pend`). En el **admin Stocks**
