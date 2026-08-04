@@ -5909,7 +5909,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.33";
+const APP_VERSION = "v7.34";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -12100,6 +12100,19 @@ function _stkInsSaldo(it) {
 /* La unidad y la cantidad que muestra la fila de un pendiente: el temporal recién
    creado tiene UNA sola (la que cargó el operario). Si mezcló, se edita la primera. */
 function _stkInsUni1(it) { return (it.xuni && it.xuni.length) ? it.xuni[0] : { uni: "", saldo: 0 }; }
+/* La unidad a MOSTRAR para un código: la que tiene saldo; si está en 0 (o el código no
+   tiene movimientos), la de su categoría —fija si admite una sola (Bolsas/Kg), la primera
+   permitida si admite varias (Cajas → Uni)—, así una fila en 0 igual muestra su unidad en
+   vez de "—". Sin categoría real no se inventa nada. */
+function _stkInsUniMostrar(it) {
+  const u1 = _stkInsUni1(it);
+  if (u1.uni) return u1.uni;
+  if (!insCatDef(it.cat)) return "";
+  const fija = insCatUni(it.cat);
+  if (fija) return fija;
+  const unis = insCatUnis(it.cat);
+  return (unis && unis.length) ? unis[0] : "";
+}
 function _stkInsEsTmp(it) { return /^TMP-/.test(it.cod); }
 function _stkInsPendiente(it) { return _stkInsEsTmp(it) || insSinCat(it); }
 function _stkInsConStock(it) { return (it.xuni || []).some(function (u) { return Math.abs(u.saldo) > 0.0005; }); }
@@ -12241,7 +12254,7 @@ function _stkInsListado(k, items) {
           '<td>' + escapeHtml(insCatLbl(insCatOf(it))) + '</td>' +
           '<td>' + escapeHtml(it.ubic || "—") + '</td>' +
           '<td class="num"' + (u.saldo < 0 ? ' style="color:#b91c1c;font-weight:800;"' : "") + '>' + (Math.round(u.saldo * 1000) / 1000) + '</td>' +
-          '<td>' + escapeHtml(u.uni || "—") + '</td>' +
+          '<td>' + escapeHtml(_stkInsUniMostrar(it) || "—") + '</td>' +
           '<td><button class="stk-btn" onclick="stkInsEdit(\'art:' + escapeHtml(it.cod) + '\')">Editar</button></td></tr>';
       }
       return '<tr><td><input class="stk-inp" id="edCod_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.cod) + '" style="width:130px;"></td>' +
@@ -12249,7 +12262,7 @@ function _stkInsListado(k, items) {
         '<td>' + _stkInsCatSel("edCat_" + it.cod, it.cat) + '</td>' +
         '<td><input class="stk-inp" id="edUbi_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.ubic) + '" style="width:80px;"></td>' +
         '<td><input class="stk-inp" id="edQty_' + escapeHtml(it.cod) + '" type="number" step="any" value="' + escapeHtml(u.saldo) + '" style="width:82px;"></td>' +
-        '<td>' + _stkInsUniSel("edUni_" + it.cod, u.uni) + '</td>' +
+        '<td>' + _stkInsUniSel("edUni_" + it.cod, _stkInsUniMostrar(it)) + '</td>' +
         '<td><button class="stk-btn" onclick="stkInsGuardar(\'' + escapeHtml(it.cod) + '\')">✓ Guardar</button> ' +
         '<button class="stk-btn stk-btn-x" onclick="stkInsEdit(null)">Cancelar</button></td></tr>';
     }).join("");
@@ -12327,7 +12340,7 @@ function _stkInsTodos(items) {
       '<td>' + escapeHtml(insCatLbl(insCatOf(it))) + '</td>' +
       '<td>' + escapeHtml(it.ubic || "—") + '</td>' +
       '<td class="num">' + (xs.length ? xs.map(function (x) { return '<div' + neg(x.saldo) + '>' + (Math.round(x.saldo * 1000) / 1000) + '</div>'; }).join("") : '<span class="stk-sub">0</span>') + '</td>' +
-      '<td>' + (xs.length ? xs.map(function (x) { return '<div>' + escapeHtml(x.uni) + '</div>'; }).join("") : '<span class="stk-sub">—</span>') + '</td></tr>';
+      '<td>' + (xs.length ? xs.map(function (x) { return '<div>' + escapeHtml(x.uni) + '</div>'; }).join("") : '<span class="stk-sub">' + escapeHtml(_stkInsUniMostrar(it) || "—") + '</span>') + '</td></tr>';
   }).join("");
   return h + '</tbody></table></div>';
 }

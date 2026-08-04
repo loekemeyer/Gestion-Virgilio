@@ -105,7 +105,7 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== anular-sesion (v7.15: botón rojo Anular picking / recepción / insumos) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/anular-sesion.cjs
 
-echo "== ins-admin (idea 5572 / v7.31: Administrar Insumos (pendientes + categorías + unidades + historial)) =="
+echo "== ins-admin (idea 5572 / v7.34: Administrar Insumos (pendientes + categorías + unidades + historial + unidad en 0)) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ins-admin.cjs
 
 echo "== ppp-chk-gondola (v7.16: botón 📦 Chequeo de góndola por pedido/tanda en la PPP) =="

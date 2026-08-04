@@ -237,6 +237,10 @@ catch (_e) {
     const tblF = document.querySelectorAll("#stkBody .stk-catlist table");
     out.listadoFleje = tblF.length ? tblF[0].querySelectorAll("tbody tr").length : 0;   // 2 (22 y 5)
     out.listadoNoTraePP = tblF.length ? !/POLIPROPILENO/.test(tblF[0].innerHTML) : false;
+    // 0-code: el fleje "5" (38 X 0,55) no tiene saldo → igual muestra su unidad de
+    // categoría (Kg) en la columna Unidad, no "—".
+    const tr5 = tblF.length ? Array.prototype.filter.call(tblF[0].querySelectorAll("tbody tr"), function (tr) { return /38 X 0,55/.test(tr.textContent); })[0] : null;
+    out.ceroMuestraUni = !!tr5 && tr5.querySelectorAll("td")[5].textContent.trim() === "Kg";
     _stkIns.nuevoEn = "fleje"; stkRender();
     document.getElementById("nvCod").value = "7654321";
     await stkInsAlta("fleje");
@@ -357,7 +361,7 @@ catch (_e) {
     r.ajusteN === 2 && r.ajusteSaca === true && r.ajustePone === true && r.ajusteSobreTmp === true &&
     r.borraTmpSinSaldo === true && r.borrarConSaldoAvisa === true && r.borrarCerorea === true &&
     r.nCajasCat === 6 && r.sinDepurar === true && r.catDetalle === true && r.catMuestraUnis === true &&
-    r.listadoOculto === true && r.listadoAbre === true && r.listadoFleje === 2 && r.listadoNoTraePP === true &&
+    r.listadoOculto === true && r.listadoAbre === true && r.listadoFleje === 2 && r.listadoNoTraePP === true && r.ceroMuestraUni === true &&
     r.altaEnSuCat === true &&
     r.catEditAbre === true && r.catGuardaNombre === "Cajas y embalaje" && r.catGuardaUnis === "Paquetes,Uni,MC" &&
     r.haySecUnidades === true && r.uniSacar === true && r.uniUsadaAvisa === true && r.uniLibreNoAvisa === true &&
