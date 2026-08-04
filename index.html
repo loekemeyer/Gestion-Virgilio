@@ -153,6 +153,16 @@ button {
   color: #333;
   word-break: break-word;
 }
+/* v7.09 — Recepción a medio cargar: el operario se fue para atrás / cerró la
+   pantalla y la recepción sigue viva. Se muestra acá con el botón "Reanudar". */
+.history-item.hist-pend{ border-color:#b45309; background:#fffbeb; }
+.hist-draft{ margin-top:8px; border-top:1px dashed #fcd34d; padding-top:8px; font-size:14px; color:#92400e; font-weight:700; }
+.hist-draft .hist-draft-cnt{ display:block; font-weight:600; color:#a16207; font-size:13px; margin-top:2px; }
+button.hist-reanudar{
+  width:100%; margin:9px 0 0; padding:12px 14px; font-size:17px; font-weight:900;
+  background:#b45309; color:#fff; border:none; border-radius:10px; cursor:pointer;
+}
+button.hist-reanudar:hover{ background:#92400e; }
 .history-empty{
   font-size: 16px;
   text-align: center;
@@ -3152,7 +3162,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      #rcpRoot, con su propio cliente Supabase (login anónimo). Portado de la app
      Control-Carga-Remitos-FC. Suma las cajas del día a localStorage para que RT
      se cierre con esa cantidad sin pedirla a mano. -->
-<script type="module" src="recepcion.js?v=3.77"></script>
+<script type="module" src="recepcion.js?v=3.78"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -3902,6 +3912,11 @@ function renderLegajoHistory(legajo) {
   // Orden defensivo: más reciente arriba, más viejo abajo.
   hist.sort((a, b) => (b.ts || 0) - (a.ts || 0));
   container.className = "history-list";
+  // v7.09: ¿quedó una recepción a medio cargar? El bloque "Reanudar" se cuelga del
+  // RT más reciente (es "el botón de esa recepción"); si no hay ninguna fila RT
+  // (evento perdido), va como tarjeta propia arriba de todo.
+  const draft = recepcionDraftDeHoy(legajo);
+  let draftPuesto = false;
   container.innerHTML = hist.map(h => {
     // "Llegó al server" usa createdAt (si Supabase lo devolvió) o sentAt
     // (la hora en que el cliente recibió la confirmación 201, que para
@@ -3911,18 +3926,61 @@ function renderLegajoHistory(legajo) {
     // operario. Para FJ ocultamos esa línea pero la entrada se muestra
     // igual (con su badge de estado, error incluido).
     const showDato = h.opcion !== "FJ" && h.texto;
+    let pend = "";
+    if (draft && !draftPuesto && h.opcion === "RT") { draftPuesto = true; pend = recepcionDraftHtml(draft, legajo); }
     return `
-      <div class="history-item">
+      <div class="history-item${pend ? " hist-pend" : ""}">
         <div class="line1">${escapeHtml(h.opcion)} — ${escapeHtml(h.descripcion)}${statusBadge(h.status)}</div>
         <div class="line2">
           ${showDato ? `Dato: <b>${escapeHtml(h.texto)}</b><br>` : ""}
           ${h.ts ? `Fecha: ${escapeHtml(formatDateTime(h.ts))}` : ""}
           ${arrived ? `<br>Llegó al server: ${escapeHtml(formatDateTime(arrived))}` : ""}
         </div>
+        ${pend}
       </div>
     `;
   }).join("");
+  if (draft && !draftPuesto) {
+    container.innerHTML = `<div class="history-item hist-pend">
+        <div class="line1">RT — Recepción Mercadería</div>
+        ${recepcionDraftHtml(draft, legajo)}
+      </div>` + container.innerHTML;
+  }
 }
+/* ===== v7.09 — RECEPCIÓN A MEDIO CARGAR (borrador de recepcion.js) =====
+   Si el operario arrancó una recepción y se fue para atrás / cerró la pantalla, el
+   módulo la deja guardada (localStorage, por legajo+día). Acá se muestra en "Resumen
+   de hoy" con "▶ Reanudar", que la reabre en el MISMO paso donde estaba. */
+function recepcionDraftDeHoy(legajo) {
+  try {
+    if (typeof window.recepcionDraftInfo !== "function") return null;   // módulo sin cargar
+    return window.recepcionDraftInfo(String(legajo || ""), getTodayKey());
+  } catch (_e) { return null; }
+}
+function recepcionDraftHtml(d, legajo) {
+  const quien = [d.nombre, d.linea, d.remito ? "RTO/FC " + d.remito : ""].filter(Boolean).join(" · ");
+  const cnt = d.codigos > 0
+    ? (d.codigos + " código" + (d.codigos === 1 ? "" : "s") + " · " + d.cajas + " caja" + (d.cajas === 1 ? "" : "s") + " ya marcadas")
+    : "todavía sin marcar cajas";
+  return `<div class="hist-draft">📦 Recepción sin terminar${quien ? " — " + escapeHtml(quien) : ""}
+      <span class="hist-draft-cnt">${escapeHtml(cnt)}</span>
+      <button type="button" class="hist-reanudar" data-leg="${escapeHtml(String(legajo || ""))}"
+              onclick="reanudarRecepcion(this.getAttribute('data-leg'))">▶ Reanudar</button>
+    </div>`;
+}
+function reanudarRecepcion(legajo) {
+  const leg = String(legajo || "").trim();
+  if (typeof window.reanudarRecepcionOp === "function") window.reanudarRecepcionOp(leg, getTodayKey());
+  else alert("El módulo de Recepción no cargó. Refrescá la página e intentá de nuevo.");
+}
+/* recepcion.js avisa cuando el borrador cambia (se guardó al salir, o se envió la
+   recepción) → se repinta el resumen para que el botón aparezca/desaparezca solo. */
+window.onRecepcionDraftChange = function () {
+  try {
+    const el = document.getElementById("legajoInput");
+    if (el) renderLegajoHistory(el.value);
+  } catch (_e) { /* no-op */ }
+};
 
 /* =========================================================
    LIMPIEZA AL CAMBIAR DE DÍA
@@ -5786,7 +5844,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.08";
+const APP_VERSION = "v7.09";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco

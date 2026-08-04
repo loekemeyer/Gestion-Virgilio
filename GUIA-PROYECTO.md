@@ -4,7 +4,27 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-04 · Versión app al documentar: **v7.08**
+> Última actualización: 2026-08-04 · Versión app al documentar: **v7.09**
+>
+> Nota: **v7.09 — Recepción a medio cargar: no se pierde y se REANUDA desde "Resumen de hoy"**.
+> Pedido del usuario: si el operario arranca una recepción y se va para atrás o cierra la pantalla,
+> antes perdía todo (tallerista, línea, remito y las cajas ya marcadas) y tenía que empezar de cero.
+> Ahora `recepcion.js` (`?v=3.78`) deja un **borrador** en `localStorage`
+> (`vir_recepcion_draft_<legajo>_<día>`) con el paso exacto donde estaba + todo el estado; se guarda
+> en cada paso (elegir línea, remito, cada cambio de cajas, resumen) y al salir (`closeOp`). En
+> **"Resumen de hoy"** aparece, colgado de la fila **RT** más reciente (o como tarjeta propia si esa
+> fila no está), el bloque ámbar **"📦 Recepción sin terminar — Lucho · LK · RTO/FC 38770 · 2 códigos
+> · 19 cajas ya marcadas"** con el botón **"▶ Reanudar"** (`recepcionDraftHtml` / `reanudarRecepcion`
+> en `index.html`), que llama a **`window.reanudarRecepcionOp(legajo, día)`** y reabre el módulo **en
+> el mismo paso**. El borrador se borra al **enviar** la recepción y al **empezar una nueva** (RT otra
+> vez); es **por legajo + día** (los de días viejos se limpian solos al leer) y el **supervisor** que
+> entra por Administración **no** deja borrador. `recepcion.js` avisa los cambios con
+> `window.onRecepcionDraftChange` → Producción repinta el resumen y el botón aparece/desaparece solo.
+> De paso, `renderLista` ahora carga los talleristas si faltan (al reanudar se entra directo a un paso
+> interno, y el "‹ Atrás" hasta la lista quedaba vacío). Test nuevo **`tests/rcp-reanudar.cjs`** (las
+> dos mitades: el borrador en `recepcion.js` y el botón en `index.html`; sirve la página por
+> `route()` con origen http real porque `localStorage` no funciona en `about:blank`) en
+> `tests/run.sh`; suite completa OK. Bump **v7.09**.
 >
 > Nota: **v7.08 — Insumos (RI/EI): navegación por categorías con la MISMA FORMA que RT**
 > (pedido del usuario sobre la 7917). Los chips de la v7.05 mostraban todos los insumos de una,
@@ -3956,7 +3976,7 @@ Definidos en `index.html` (objeto `desc`, ~línea 1531). Los botones se arman en
 | `CR` | Control Remitos | TOGGLE | Sí — abre **popup de control de facturados** (`showControlRemitosCR`, v3.69): lista de facturados del reparto + Líos + tic **Controlado** → `CCR` por NP + cierra el toggle. (Fue toggle plano sin popup en v3.43–v3.68.) |
 | `RR` | Recepción Remitos | TOGGLE | Abre el popup de descarga (tabla NP cargados → tildar Controlado → «Terminé» = `CRN` por NP); desde v3.43 lleva la lógica que antes tenía `CR`. **v3.75+**: además hay un botón **"Recepción Remitos (RR)"** en Administración (`openRemitosAdmin` → `showControlRemitos("0", true)`) que abre la **MISMA lista** en modo admin (legajo `0`, sin cerrar toggle). Lo controlan operarios **y** admin. (v3.76 lo había sacado de los operarios; revertido en v3.77.) |
 | `CC` | Inicio/Fin Carga Camión | TOGGLE | Sí, al cerrar (Nro) |
-| `RT` | Recepción Mercadería | TOGGLE | Sí, al cerrar: `texto` = cantidad de cajas, **calculada sola** del Modo OP de Recepción (suma del día en `localStorage`, ver v2.61). Al abrir RT se lanza el Modo OP (`recepcion.js`). Desde **v7.07** la grilla de códigos muestra la **OC vigente** del proveedor y avisa por Telegram si lo recibido la excede (+20%, evento `ROC`). |
+| `RT` | Recepción Mercadería | TOGGLE | Sí, al cerrar: `texto` = cantidad de cajas, **calculada sola** del Modo OP de Recepción (suma del día en `localStorage`, ver v2.61). Al abrir RT se lanza el Modo OP (`recepcion.js`); si el operario lo deja por la mitad, la recepción queda como **borrador** y se retoma con **"▶ Reanudar"** desde "Resumen de hoy" (v7.09). Desde **v7.07** la grilla de códigos muestra la **OC vigente** del proveedor y avisa por Telegram si lo recibido la excede (+20%, evento `ROC`). |
 | `MG` | Guardado a Góndola | TOGGLE | No |
 | `RI` | Recepción Insumos | TOGGLE | Sí, al cerrar (cantidad) |
 | `EI` | Entrega Insumos | TOGGLE | Sí, al cerrar (cantidad) |
