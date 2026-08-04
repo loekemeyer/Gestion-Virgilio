@@ -2004,7 +2004,7 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pppres-tbl td.num, .pppres-tbl th.num{ text-align:right; font-variant-numeric:tabular-nums; }
 .pppres-tbl td.np{ font-family:Consolas,Menlo,monospace; font-weight:800; color:#0f766e; white-space:nowrap; }
 .pppres-tbl tfoot td{ font-weight:800; background:#f8fafc; }
-/* Chequeo de góndola (v7.16): modal del botón 📦 de cada pedido / tanda. Reusa
+/* Chequeo de góndola (v7.17): modal del botón 📦 de cada pedido / tanda. Reusa
    .pppres-ov/.pppres-card; la tabla es propia porque tiene que entrar en el celu. */
 .pppchk-msg{ padding:26px 16px; text-align:center; color:#475569; font-size:14px; font-weight:700; }
 .pppchk-msg.err{ color:#991b1b; }
@@ -5905,7 +5905,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.17";
+const APP_VERSION = "v7.18";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -9611,11 +9611,30 @@ async function ocgFetchCapacidad() {
    lo llama SIN el flag a propósito: cruza la demanda contra `OC_Maximos`, donde el
    código está pelado, así que partirla ahí haría que no encuentre el máximo y pida
    de menos. Los códigos no partidos no cambian (pkCodEmpresa los devuelve igual). */
-async function ocgDemanda(porEmpresa) {
+async function ocgDemanda(porEmpresa, soloNoPickeadas) {
   let ppp = [];
-  try { ppp = await supaFetchAll(SUPABASE_PPP_PROG_ENDPOINT, "select=np"); } catch (_e) {}
+  try { ppp = await supaFetchAll(SUPABASE_PPP_PROG_ENDPOINT, "select=np,tanda"); } catch (_e) {}
+  // v7.18 (`soloNoPickeadas`, lo usa el GENERADOR DE OCs): un pedido deja de ser
+  // demanda cuando su mercadería ya salió de la góndola, o sea cuando su tanda tiene
+  // TP (picking terminado) → el stock pasó a separar_pedidos, que tampoco se cuenta
+  // como disponible: NETEA de los dos lados. Los pedidos "en armar sin marcar nada" o
+  // sin empezar (tanda sin TP) SIGUEN contando. Falla ABIERTO: si no se puede leer,
+  // cuenta todo (comportamiento anterior) en vez de sub-pedir.
+  let tpSet = null;
+  if (soloNoPickeadas) {
+    try {
+      const desde = new Date(Date.now() - 60 * 24 * 3600 * 1000).toISOString();
+      const rows = await supaFetchAll(SUPABASE_TABLE_ENDPOINT, "select=texto&opcion=eq.TP&created_at=gte." + encodeURIComponent(desde));
+      tpSet = new Set();
+      rows.forEach(function (r) { const t = String(r.texto || "").trim().toUpperCase(); if (t) tpSet.add(t); });
+    } catch (_e) { tpSet = null; }
+  }
   const npSet = {};
-  ppp.forEach(function (r) { const n = pickNormNp(r.np); if (n) npSet[n] = true; });
+  ppp.forEach(function (r) {
+    const n = pickNormNp(r.np); if (!n) return;
+    if (tpSet && tpSet.has(String(r.tanda || "").trim().toUpperCase())) return;   // ya pickeada
+    npSet[n] = true;
+  });
   // v6.47: descontar las NP ya FACTURADAS (tick de la operadora → Facturacion_NP). Una vez
   // facturada (esté o no cargada al camión — ver solapa FC s/Salida), el pedido dejó de ser
   // demanda: su stock ya salió de a_facturar. Si el fetch falla, se queda con todas (peor
@@ -9636,7 +9655,7 @@ async function ocgEnter() {
   if (!_oc) return;
   _oc.view = "gen"; _oc.gen = null; ocRender();   // muestra "calculando…"
   try {
-    const res = await Promise.all([ocgFetchMaximos(), stockFetchMovs(), stockGetCutoff(), ocgDemanda(), ocgFetchProyeccion(), ocgFetchCapacidad()]);
+    const res = await Promise.all([ocgFetchMaximos(), stockFetchMovs(), stockGetCutoff(), ocgDemanda(false, true), ocgFetchProyeccion(), ocgFetchCapacidad()]);
     const maxs = res[0] || [], saldos = stockComputeSaldos(res[1] || [], res[2]), dem = res[3] || {}, proy = res[4] || {}, capac = res[5] || {};
     // Cruce por código: TODO usa LA MISMA normalización (_ocgNorm = upper + sin ceros a la
     // izquierda). Las claves de stockComputeSaldos son el cod_art CRUDO del movimiento →
@@ -9646,7 +9665,10 @@ async function ocgEnter() {
     Object.keys(saldos).forEach(function (k) {
       const n = _ocgNorm(k); if (!n) return;
       const sd = saldos[k];
-      stockN[n] = (stockN[n] || 0) + (Number(sd.terminado) || 0) + (Number(sd.racks) || 0) + (Number(sd.excedente) || 0);
+      // v7.18: stock disponible = góndola + a guardar + racks + excedente. NO entran
+      // pickeados (separar_pedidos), a facturar ni facturado/FC sin salida: esa
+      // mercadería ya está comprometida y su pedido tampoco cuenta como demanda (netea).
+      stockN[n] = (stockN[n] || 0) + (Number(sd.terminado) || 0) + (Number(sd.a_guardar) || 0) + (Number(sd.racks) || 0) + (Number(sd.excedente) || 0);
     });
     const items = [];
     maxs.forEach(function (m) {
@@ -9679,7 +9701,7 @@ function ocgGroups() {
 }
 function ocBodyGen() {
   let h = '<div class="oc-tools"><button class="oc-btn" onclick="ocBack()">← Volver</button><button class="oc-btn" onclick="ocgEnterIndices()">⚙ Índices</button></div>';
-  h += '<div style="background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af;border-radius:9px;padding:9px 11px;margin-bottom:10px;font-size:12.5px"><b>A pedir = máx(0, Máximo + Pedidos − (Góndola+Racks+Excedente))</b>, con <b>Máximo = Proyección por tendencia (PaginaLK) × índice</b>, topado a la <b>capacidad de góndola</b>. Si un artículo no tiene proyección, usa el objetivo del Excel (marcado <i>xls</i>). Revisá antes de generar.</div>';
+  h += '<div style="background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af;border-radius:9px;padding:9px 11px;margin-bottom:10px;font-size:12.5px"><b>A pedir = máx(0, Máximo + Pedidos − (Góndola + A guardar + Racks + Excedente))</b>, con <b>Máximo = Proyección por tendencia (PaginaLK) × índice</b>, topado a la <b>capacidad de góndola</b>. <b>No</b> se cuentan pickeados, a facturar ni FC sin salida — y los pedidos que ya están en esos estadios <b>tampoco suman a Pedidos</b> (netea). Si un artículo no tiene proyección, usa el objetivo del Excel (marcado <i>xls</i>). Se generan solas los <b>miércoles 7:00</b>; acá podés generarlas a mano cuando quieras. Revisá antes de generar.</div>';
   if (!_oc.gen) return h + '<div class="oc-loading">Calculando (stock + demanda PPP + proyección × índice)…</div>';
   if (_oc.gen.error) return h + '<div class="oc-empty" style="color:#b91c1c">Error: ' + escapeHtml(_oc.gen.error) + '</div>';
   const g = ocgGroups(), keys = Object.keys(g).sort(function (a, b) { return (g[a].interno - g[b].interno) || a.localeCompare(b); });
@@ -18977,7 +18999,7 @@ function _pppM3Sum(arr) { return arr.reduce(function (s, p) { return s + (Number
 function _pppArg(s) {
   return escapeHtml(String(s == null ? "" : s).replace(/[\r\n\t]+/g, " ").replace(/\\/g, "\\\\").replace(/'/g, "\\'"));
 }
-/* Botón 📦 "Chequeo": ¿está en góndola todo lo que pide este pedido? (v7.16).
+/* Botón 📦 "Chequeo": ¿está en góndola todo lo que pide este pedido? (v7.17).
    Va pegado al 🖨 de la fila. `conTexto` = fila editable (donde el 🖨 lleva rótulo). */
 function _pppChkBtn(p, npE, conTexto) {
   const t = _pppArg((p && p.tanda && p.tanda !== "—") ? p.tanda : "");
