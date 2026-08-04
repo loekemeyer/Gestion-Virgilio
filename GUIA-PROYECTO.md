@@ -4,7 +4,34 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-04 · Versión app al documentar: **v7.22**
+> Última actualización: 2026-08-04 · Versión app al documentar: **v7.24**
+>
+> Nota: **v7.24 — Insumos (admin): «a depurar» se elimina, categorías con DETALLE, tabla total y
+> bloqueo por unidad no permitida** (idea 5572, pedido del usuario). Cinco cosas:
+>
+> **(1) «A depurar» dejó de existir como categoría.** Lo que no tiene categoría definida es
+> simplemente **Sin categoría**, y eso es lo que lo mete en «Pendientes de identificar»: algo sin
+> clasificar es algo que espera una decisión. Los 43 códigos viejos pasaron a `categoria = null` y la
+> fila `depurar` se borró de `Insumos_Categorias`. Las guardas de `insumo_identificar` /
+> `insumo_borrar` ahora miran **"sin categoría"** en vez de `'depurar'`: un insumo **ya clasificado**
+> (= en uso) sigue sin poder renombrarse, fusionarse ni borrarse. En la botonera del operario esos
+> códigos caen en la tarjeta **❓ Sin categoría**, con su aviso, y no cuentan entre los "en uso".
+>
+> **(2) Cada categoría tiene un DETALLE** (`Insumos_Categorias.descripcion`): qué entra en el grupo.
+> Se ve debajo del nombre y se edita junto con el resto. Las 5 quedaron descriptas.
+>
+> **(3) Tabla «📋 Todos los insumos» al final, SÓLO LECTURA**: la foto completa del catálogo, con
+> **filtros por código, nombre, categoría, rack/sector, cantidad (≥) y unidad**. No edita nada — para
+> cambiar algo se usa la sección de arriba que corresponda — y **se actualiza sola** porque sale del
+> mismo `items` que el resto, y todas las acciones terminan en `stkInsRefresh()` + `stkRender()`.
+>
+> **(4) Una unidad NO permitida por la categoría se rechaza** (`insUniPermitida`), en los tres
+> lugares donde se puede elegir: el pop-up de cantidad del operario (el chip prohibido sale tachado
+> en rojo con ⛔ y "Listo" queda deshabilitado), su pantalla de alta, y el "Aceptar" del admin. El
+> envío (`insConfirmar`) corta y abre el que está mal. ⚠ La comparación **no distingue mayúsculas**:
+> en los datos conviven `Kg` y `kg`, y bloquear por eso sería un falso positivo.
+>
+> **(5)** El chip de cada unidad muestra cuántos la usan. Suite completa OK. Bump **v7.24**.
 >
 > Nota: **v7.22 — Insumos (admin): Cantidad/Unidad separadas, Aceptar o Borrar, y unidades arriba**
 > (idea 5572, pedido del usuario). Cinco cosas:

@@ -1,9 +1,10 @@
-/* Regresión v7.22 / ideas 7917 + 5572 — Insumos (RI/EI): navegación por categorías.
+/* Regresión v7.24 / ideas 7917 + 5572 — Insumos (RI/EI): navegación por categorías.
    MISMA FORMA que la Recepción de Mercadería (recepcion.js): pantalla 1 = grilla de
    CATEGORÍAS en botones cuadrados → pantalla 2 = grilla de los INSUMOS de esa categoría
    → pop-up de cantidad. "‹ Atrás" vuelve. Este test fija el contrato:
      · pantalla 1 muestra una tarjeta por categoría con su conteo, sin listar insumos
-     · 'a depurar' tiene su tarjeta (con aviso al entrar) pero no cuenta como "en uso"
+     · lo que NO tiene categoría cae en la tarjeta ❓ (con aviso al entrar) y no cuenta
+       como "en uso": «a depurar» dejó de existir como categoría
      · entrar a una categoría muestra SOLO sus insumos, y los flejes por MEDIDA
      · tocar un insumo abre el pop-up; cargar cantidad marca la tarjeta y la categoría
      · Atrás vuelve a las categorías conservando lo cargado (se manda todo junto)
@@ -38,7 +39,7 @@ catch (_e) {
       { cod: "2745", nombre: "168 X 0,80", sector: null, categoria: "fleje", ubicacion: "V10 At" },
       { cod: "PP", nombre: "POLIPROPILENO (2630)", sector: null, categoria: "plastico", ubicacion: "AF1" },
       { cod: "2955", nombre: "Cuchilla 505 Ac Inox", sector: null, categoria: "importados", ubicacion: "X20" },
-      { cod: "505C·CUCHILLA CHINA", nombre: "CUCHILLA CHINA", sector: "505c", categoria: "depurar", ubicacion: null }
+      { cod: "505C·CUCHILLA CHINA", nombre: "CUCHILLA CHINA", sector: "505c", categoria: null, ubicacion: null }
     ];
     window.fetch = function (url, opt) {
       url = String(url);
@@ -56,8 +57,7 @@ catch (_e) {
           { clave: "fleje", nombre: "Flejes y alambres", emoji: "🧵", unidades: ["Kg"], orden: 2 },
           { clave: "importados", nombre: "Importados", emoji: "🌎", unidades: [], orden: 3 },
           { clave: "partes_plasticas", nombre: "Partes plásticas", emoji: "🧩", unidades: [], orden: 4 },
-          { clave: "cajas", nombre: "Cajas", emoji: "📦", unidades: ["Paquetes", "Uni"], orden: 5 },
-          { clave: "depurar", nombre: "A depurar", emoji: "🗑", unidades: [], orden: 99 }
+          { clave: "cajas", nombre: "Cajas", emoji: "📦", unidades: ["Paquetes", "Uni"], orden: 5 }
         ]);
       }
       if (url.indexOf("Insumos_Unidades") >= 0) {
@@ -89,10 +89,12 @@ catch (_e) {
 
     // 1) PANTALLA 1: una tarjeta por categoría, ningún insumo listado
     out.cats = catTxt();
-    out.nCats = nCats();                                                    // 4 (plásticos, flejes, importados, depurar)
+    out.nCats = nCats();                                                    // 4 (plásticos, flejes, importados, ❓ sin categoría)
     out.sinItemsEnP1 = nItems() === 0;
-    out.hayDep = out.cats.some(function (t) { return /A depurar/.test(t); });
-    out.enUso = /5 insumos en uso/.test(document.getElementById("insBody").textContent);   // no cuenta el depurar
+    out.hayDep = out.cats.some(function (t) { return /Sin categoría/.test(t); });
+    out.noHayDepurar = !/A depurar/.test(document.getElementById("insBody").innerHTML);
+    out.enUso = /5 insumos en uso/.test(document.getElementById("insBody").textContent) &&
+      /1 sin clasificar/.test(document.getElementById("insBody").textContent);
     out.finDisabled = document.querySelector("#insBody .ins-fin").disabled === true;
 
     // 2) Unidad por defecto POR CATEGORÍA; si ya hay saldo en UNA unidad, gana esa (7382)
@@ -134,14 +136,13 @@ catch (_e) {
     // 6) Buscar desde la pantalla 1 mira TODO (incluso lo 'a depurar')
     _ins.filtro = "cuchilla"; insRender();
     out.rowsBusca = nItems();                                               // 2 (2955 + el depurar)
-    out.buscaTraeDep = document.getElementById("insBody").innerHTML.indexOf("CUCHILLA CHINA") >= 0;
+    out.buscaTraeDep = document.getElementById("insBody").innerHTML.indexOf("CUCHILLA CHINA") >= 0;   // buscar mira todo, incluso lo sin clasificar
     insBack();
 
-    // 7) Entrar a 'a depurar' muestra el aviso
-    insSetCat("depurar");
+    // 7) Entrar a ❓ Sin categoría muestra el aviso
+    insSetCat("?");
     out.avisoDep = !!document.querySelector("#insBody .ins-depw");
     out.nDep = nItems();                                                    // 1
-    out.sinAgregarEnDep = !document.querySelector("#insBody .ins-itbtn.add");
     insBack();
 
     // 8) ALTA DE INSUMO NUEVO — el "+" está junto a las categorías (pantalla 1) y lleva
@@ -246,7 +247,7 @@ catch (_e) {
     r.popupCerrado === true && r.botonMarcado === true && r.finHabilitado === true && r.finCuenta === true &&
     r.volvioAP1 === true && r.flejeMarcada === true && r.catCargados === true && r.qtySobrevive === 3 &&
     r.rowsBusca === 2 && r.buscaTraeDep === true &&
-    r.avisoDep === true && r.nDep === 1 && r.sinAgregarEnDep === true &&
+    r.avisoDep === true && r.nDep === 1 && r.noHayDepurar === true &&
     r.hayMasEnP1 === true && r.altaAbre === true && /Insumo nuevo/.test(r.altaTitulo || "") &&
     r.haySinCatClara === true && r.uniOfrecidas === true && r.altaUniAuto === "Bolsas" &&
     /^TMP-\d+$/.test(r.altaCod || "") && r.altaPosteoDet === "Bolsa gris sin etiqueta" && r.altaCat === "plastico" && r.altaUni === "Bolsas" &&

@@ -5908,7 +5908,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.22";
+const APP_VERSION = "v7.24";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -9147,7 +9147,7 @@ async function openStockAdmin(soloConteo) {
   const _solo = soloConteo === true;   // rol "solo conteo" (Giuliana): solo la solapa Conteo
   if (!document.getElementById("stkCss")) {
     const s = document.createElement("style"); s.id = "stkCss";
-    s.textContent = "#stockAdminOverlay{display:none;position:fixed;inset:0;z-index:1280;background:rgba(2,6,23,.74);overflow:auto;padding:14px;}#stockAdminOverlay.show{display:block;}.stk-card{background:#f8fafc;max-width:min(1500px,97vw);margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.stk-head{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:linear-gradient(90deg,#1e6bd6,#1e3a8a);color:#fff;}.stk-title{font-size:19px;font-weight:800;}.stk-close{background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;width:auto;}.stk-body{padding:14px 16px;}.stk-loading,.stk-empty{padding:24px;text-align:center;color:#64748b;}.stk-sec{margin:16px 0 6px;font-size:14px;font-weight:900;color:#0f172a;display:flex;align-items:center;gap:7px;}.stk-secn{background:#e2e8f0;color:#475569;border-radius:999px;padding:1px 9px;font-size:11.5px;font-weight:800;}.stk-inp{border:1px solid #cbd5e1;border-radius:8px;padding:6px 8px;font-size:13px;font-family:inherit;background:#fff;}.stk-sub{font-size:10.5px;color:#94a3b8;font-weight:700;}.stk-nuevo{display:inline-flex;flex-wrap:wrap;align-items:center;gap:6px;}.stk-btn-x{color:#b91c1c;border-color:#fecaca;}.stk-scroll{overflow-x:auto;}.stk-catbox{border:1px solid #cbd5e1;border-radius:11px;padding:10px 11px;margin-bottom:8px;background:#fff;}.stk-catrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}.stk-catuni{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:7px;}.stk-catlist{margin-top:10px;padding-top:10px;border-top:1px dashed #e2e8f0;}.stk-tbl tr.stk-viejo td{background:#fffbeb;}.stk-cut{background:#fffbeb;border:1px solid #fcd34d;color:#92400e;border-radius:9px;padding:8px 11px;font-size:12.5px;font-weight:700;margin-bottom:10px;}.stk-filtro{flex:1;min-width:180px;height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 11px;font-size:14px;}.stk-btn{background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:8px 12px;font-size:13px;font-weight:800;cursor:pointer;width:auto;}.stk-btn.ok{background:#16a34a;color:#fff;border-color:#16a34a;}.stk-btn.danger{background:#fff;color:#b91c1c;border-color:#fca5a5;}.stk-tbl{width:100%;border-collapse:collapse;font-size:13.5px;}.stk-tbl.stk-tbl-fit{width:auto;max-width:100%;}.stk-tbl.stk-tbl-fit td.stk-desc{max-width:210px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.stk-tbl.stk-tbl-sect td.stk-desc{max-width:140px;}.stk-tbl.stk-tbl-fit th.num,.stk-tbl.stk-tbl-fit td.num{text-align:right;padding-left:9px;padding-right:9px;}.stk-tblwrap{overflow-x:auto;max-width:100%;}.stk-tbl.stk-tbl-fit th.num{vertical-align:bottom;line-height:1.15;}.stk-tbl th{background:#f1f5f9;color:#475569;text-align:left;padding:7px 9px;font-size:11px;text-transform:uppercase;border-bottom:1px solid #cbd5e1;}.stk-tbl td{padding:7px 9px;}.stk-tbl th.num,.stk-tbl td.num{text-align:right;font-variant-numeric:tabular-nums;}.stk-row{cursor:pointer;border-bottom:1px solid #eef2f7;}.stk-row:hover{background:#eff6ff;}.stk-row td{padding:7px 9px;}.stk-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#1e6bd6;}.stk-desc{color:#475569;}.stk-neg{color:#b91c1c;font-weight:800;}.stk-pick-cell{cursor:pointer;color:#1e6bd6;font-weight:800;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px;}.stk-pick-cell:hover{background:#eff6ff;}.stk-tbl td.stk-hist0{color:#94a3b8;font-weight:700;}.stk-tbl td.stk-hist0:hover{background:#f1f5f9;color:#475569;}.stk-caret{color:#94a3b8;}.stk-detrow td{padding:0 9px 9px;background:#f8fafc;}.stk-det{border-left:3px solid #cbd5e1;padding:6px 0 6px 10px;}.stk-mv{display:flex;gap:9px;font-size:12px;padding:3px 0;align-items:center;}.stk-mv-old{opacity:.45;}.stk-mv-ts{color:#64748b;min-width:96px;}.stk-mv-tipo{font-weight:800;min-width:78px;}.stk-mv-dep{color:#64748b;min-width:74px;}.stk-mv-d{font-weight:800;min-width:44px;text-align:right;}.stk-mv-d.pos{color:#15803d;}.stk-mv-d.neg{color:#b91c1c;}.stk-mv-ref{color:#94a3b8;}.stk-ini-txt{width:100%;border:1px solid #cbd5e1;border-radius:9px;padding:9px;font-family:Consolas,Menlo,monospace;font-size:14px;}.stk-ini-btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}.stk-ini-warn{font-size:12px;color:#92400e;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:8px;margin-top:10px;}.stk-tabs{display:flex;gap:4px;padding:8px 12px 0;background:#1e3a8a;flex-wrap:wrap;}.stk-tab{flex:0 1 auto;width:auto;white-space:nowrap;background:rgba(255,255,255,.12);color:#cbd5e1;border:none;border-radius:9px 9px 0 0;padding:9px 13px;font-size:12.5px;font-weight:800;cursor:pointer;}.stk-tab.on{background:#f8fafc;color:#1e3a8a;}.stk-seg{display:flex;gap:6px;margin-bottom:10px;}.stk-segb{flex:1;background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:7px;font-size:13px;font-weight:800;cursor:pointer;}.stk-segb.on{background:#1e6bd6;color:#fff;border-color:#1e6bd6;}.stk-grp{margin-bottom:10px;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;}.stk-grp-h{background:#f1f5f9;padding:7px 10px;font-weight:800;font-size:13px;}.stk-grp-tot{color:#15803d;font-weight:800;margin-left:6px;}.stk-ing{display:flex;gap:9px;align-items:center;padding:5px 10px;border-top:1px solid #f1f5f9;font-size:12.5px;}.stk-ing-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#1e6bd6;}.stk-ing-desc{flex:1;color:#475569;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.stk-ing-rto{color:#94a3b8;font-size:11px;}.stk-aj-sec{border:1px solid #e2e8f0;border-radius:12px;padding:12px;margin-bottom:12px;}.stk-aj-h{font-size:15px;font-weight:800;margin-bottom:6px;}.stk-aj-hint{font-size:12px;color:#64748b;margin-bottom:7px;}.stk-aj-form{display:flex;gap:7px;flex-wrap:wrap;}.stk-aj-inp{flex:1;min-width:90px;height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 10px;font-size:14px;text-align:center;}.cnt-in{height:32px;border:1px solid #cbd5e1;border-radius:7px;padding:0 6px;font-size:13px;box-sizing:border-box;margin:0;width:auto;}.stk-aj-dep{margin-bottom:12px;font-size:13px;font-weight:800;}.stk-aj-dep select{height:36px;border:1px solid #cbd5e1;border-radius:8px;padding:0 8px;font-size:14px;font-weight:700;}.stk-rk-orden{background:#f1f5f9;border-radius:10px;padding:10px 12px;font-size:13px;margin-bottom:10px;}.stk-rk-orden.pend{background:#fffbeb;border:1.5px solid #fcd34d;color:#92400e;}.stk-rk-baj{display:flex;align-items:center;gap:10px;border:1px solid #e2e8f0;border-radius:11px;padding:9px 11px;margin-bottom:8px;background:#fff;}.stk-rk-baji{flex:1;min-width:0;}.stk-rk-q{font-size:12px;color:#1e6bd6;font-weight:700;margin-top:2px;}";
+    s.textContent = "#stockAdminOverlay{display:none;position:fixed;inset:0;z-index:1280;background:rgba(2,6,23,.74);overflow:auto;padding:14px;}#stockAdminOverlay.show{display:block;}.stk-card{background:#f8fafc;max-width:min(1500px,97vw);margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.stk-head{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:linear-gradient(90deg,#1e6bd6,#1e3a8a);color:#fff;}.stk-title{font-size:19px;font-weight:800;}.stk-close{background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;width:auto;}.stk-body{padding:14px 16px;}.stk-loading,.stk-empty{padding:24px;text-align:center;color:#64748b;}.stk-sec{margin:16px 0 6px;font-size:14px;font-weight:900;color:#0f172a;display:flex;align-items:center;gap:7px;}.stk-secn{background:#e2e8f0;color:#475569;border-radius:999px;padding:1px 9px;font-size:11.5px;font-weight:800;}.stk-inp{border:1px solid #cbd5e1;border-radius:8px;padding:6px 8px;font-size:13px;font-family:inherit;background:#fff;}.stk-sub{font-size:10.5px;color:#94a3b8;font-weight:700;}.stk-nuevo{display:inline-flex;flex-wrap:wrap;align-items:center;gap:6px;}.stk-btn-x{color:#b91c1c;border-color:#fecaca;}.stk-scroll{overflow-x:auto;}.stk-catbox{border:1px solid #cbd5e1;border-radius:11px;padding:10px 11px;margin-bottom:8px;background:#fff;}.stk-catrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}.stk-catuni{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:7px;}.stk-catlist{margin-top:10px;padding-top:10px;border-top:1px dashed #e2e8f0;}.stk-catdesc{margin-top:5px;font-size:12px;color:#475569;line-height:1.35;}.stk-tbl tr.stk-filtros th{background:#f8fafc;padding:5px 9px;text-transform:none;}.stk-tbl tr.stk-viejo td{background:#fffbeb;}.stk-cut{background:#fffbeb;border:1px solid #fcd34d;color:#92400e;border-radius:9px;padding:8px 11px;font-size:12.5px;font-weight:700;margin-bottom:10px;}.stk-filtro{flex:1;min-width:180px;height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 11px;font-size:14px;}.stk-btn{background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:8px 12px;font-size:13px;font-weight:800;cursor:pointer;width:auto;}.stk-btn.ok{background:#16a34a;color:#fff;border-color:#16a34a;}.stk-btn.danger{background:#fff;color:#b91c1c;border-color:#fca5a5;}.stk-tbl{width:100%;border-collapse:collapse;font-size:13.5px;}.stk-tbl.stk-tbl-fit{width:auto;max-width:100%;}.stk-tbl.stk-tbl-fit td.stk-desc{max-width:210px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.stk-tbl.stk-tbl-sect td.stk-desc{max-width:140px;}.stk-tbl.stk-tbl-fit th.num,.stk-tbl.stk-tbl-fit td.num{text-align:right;padding-left:9px;padding-right:9px;}.stk-tblwrap{overflow-x:auto;max-width:100%;}.stk-tbl.stk-tbl-fit th.num{vertical-align:bottom;line-height:1.15;}.stk-tbl th{background:#f1f5f9;color:#475569;text-align:left;padding:7px 9px;font-size:11px;text-transform:uppercase;border-bottom:1px solid #cbd5e1;}.stk-tbl td{padding:7px 9px;}.stk-tbl th.num,.stk-tbl td.num{text-align:right;font-variant-numeric:tabular-nums;}.stk-row{cursor:pointer;border-bottom:1px solid #eef2f7;}.stk-row:hover{background:#eff6ff;}.stk-row td{padding:7px 9px;}.stk-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#1e6bd6;}.stk-desc{color:#475569;}.stk-neg{color:#b91c1c;font-weight:800;}.stk-pick-cell{cursor:pointer;color:#1e6bd6;font-weight:800;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px;}.stk-pick-cell:hover{background:#eff6ff;}.stk-tbl td.stk-hist0{color:#94a3b8;font-weight:700;}.stk-tbl td.stk-hist0:hover{background:#f1f5f9;color:#475569;}.stk-caret{color:#94a3b8;}.stk-detrow td{padding:0 9px 9px;background:#f8fafc;}.stk-det{border-left:3px solid #cbd5e1;padding:6px 0 6px 10px;}.stk-mv{display:flex;gap:9px;font-size:12px;padding:3px 0;align-items:center;}.stk-mv-old{opacity:.45;}.stk-mv-ts{color:#64748b;min-width:96px;}.stk-mv-tipo{font-weight:800;min-width:78px;}.stk-mv-dep{color:#64748b;min-width:74px;}.stk-mv-d{font-weight:800;min-width:44px;text-align:right;}.stk-mv-d.pos{color:#15803d;}.stk-mv-d.neg{color:#b91c1c;}.stk-mv-ref{color:#94a3b8;}.stk-ini-txt{width:100%;border:1px solid #cbd5e1;border-radius:9px;padding:9px;font-family:Consolas,Menlo,monospace;font-size:14px;}.stk-ini-btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}.stk-ini-warn{font-size:12px;color:#92400e;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:8px;margin-top:10px;}.stk-tabs{display:flex;gap:4px;padding:8px 12px 0;background:#1e3a8a;flex-wrap:wrap;}.stk-tab{flex:0 1 auto;width:auto;white-space:nowrap;background:rgba(255,255,255,.12);color:#cbd5e1;border:none;border-radius:9px 9px 0 0;padding:9px 13px;font-size:12.5px;font-weight:800;cursor:pointer;}.stk-tab.on{background:#f8fafc;color:#1e3a8a;}.stk-seg{display:flex;gap:6px;margin-bottom:10px;}.stk-segb{flex:1;background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:7px;font-size:13px;font-weight:800;cursor:pointer;}.stk-segb.on{background:#1e6bd6;color:#fff;border-color:#1e6bd6;}.stk-grp{margin-bottom:10px;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;}.stk-grp-h{background:#f1f5f9;padding:7px 10px;font-weight:800;font-size:13px;}.stk-grp-tot{color:#15803d;font-weight:800;margin-left:6px;}.stk-ing{display:flex;gap:9px;align-items:center;padding:5px 10px;border-top:1px solid #f1f5f9;font-size:12.5px;}.stk-ing-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#1e6bd6;}.stk-ing-desc{flex:1;color:#475569;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.stk-ing-rto{color:#94a3b8;font-size:11px;}.stk-aj-sec{border:1px solid #e2e8f0;border-radius:12px;padding:12px;margin-bottom:12px;}.stk-aj-h{font-size:15px;font-weight:800;margin-bottom:6px;}.stk-aj-hint{font-size:12px;color:#64748b;margin-bottom:7px;}.stk-aj-form{display:flex;gap:7px;flex-wrap:wrap;}.stk-aj-inp{flex:1;min-width:90px;height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 10px;font-size:14px;text-align:center;}.cnt-in{height:32px;border:1px solid #cbd5e1;border-radius:7px;padding:0 6px;font-size:13px;box-sizing:border-box;margin:0;width:auto;}.stk-aj-dep{margin-bottom:12px;font-size:13px;font-weight:800;}.stk-aj-dep select{height:36px;border:1px solid #cbd5e1;border-radius:8px;padding:0 8px;font-size:14px;font-weight:700;}.stk-rk-orden{background:#f1f5f9;border-radius:10px;padding:10px 12px;font-size:13px;margin-bottom:10px;}.stk-rk-orden.pend{background:#fffbeb;border:1.5px solid #fcd34d;color:#92400e;}.stk-rk-baj{display:flex;align-items:center;gap:10px;border:1px solid #e2e8f0;border-radius:11px;padding:9px 11px;margin-bottom:8px;background:#fff;}.stk-rk-baji{flex:1;min-width:0;}.stk-rk-q{font-size:12px;color:#1e6bd6;font-weight:700;margin-top:2px;}";
     document.head.appendChild(s);
   }
   let ov = document.getElementById("stockAdminOverlay");
@@ -11929,7 +11929,7 @@ let _stkIns = null;
 async function stkInsLoad() {
   insEnsureCss();   // los chips de categoría usan .ins-cchip
   _stk.insLoaded = true;
-  _stkIns = { sec: "pend", cat: "", abierta: "", filtro: "", edit: null, nuevoEn: "", msg: "" };
+  _stkIns = { sec: "pend", cat: "", abierta: "", filtro: "", edit: null, nuevoEn: "", msg: "", tf: {} };
   const body = document.getElementById("stkBody");
   if (body) body.innerHTML = '<div class="stk-loading">Cargando insumos…</div>';
   await stkInsRefresh();
@@ -11957,7 +11957,7 @@ function _stkInsSaldo(it) {
    creado tiene UNA sola (la que cargó el operario). Si mezcló, se edita la primera. */
 function _stkInsUni1(it) { return (it.xuni && it.xuni.length) ? it.xuni[0] : { uni: "", saldo: 0 }; }
 function _stkInsEsTmp(it) { return /^TMP-/.test(it.cod); }
-function _stkInsPendiente(it) { return _stkInsEsTmp(it) || it.cat === INS_CAT_DEP; }
+function _stkInsPendiente(it) { return _stkInsEsTmp(it) || insSinCat(it); }
 function _stkInsConStock(it) { return (it.xuni || []).some(function (u) { return Math.abs(u.saldo) > 0.0005; }); }
 function stkBodyInsumos() {
   if (!_stkIns) return '<div class="stk-loading">Cargando…</div>';
@@ -11970,6 +11970,7 @@ function stkBodyInsumos() {
   h += _stkInsPend(pend);
   h += _stkInsUnis(items);          // primero el vocabulario, después quién lo usa
   h += _stkInsCats(items, pend);
+  h += _stkInsTodos(items);         // foto completa, sólo lectura
   return h;
 }
 /* ---------- (1) PENDIENTES ---------- */
@@ -12014,11 +12015,11 @@ function _stkInsPend(pend) {
 function _stkInsCats(items, pend) {
   const cnt = {};
   items.forEach(function (it) { if (_stkInsPendiente(it)) return; const k = insCatDef(it.cat) ? it.cat : ""; cnt[k] = (cnt[k] || 0) + 1; });
-  let h = '<div class="stk-sec">🗂 Categorías <span class="stk-secn">' + INS_CATS.filter(function (c) { return c.k !== INS_CAT_DEP; }).length + '</span></div>';
+  let h = '<div class="stk-sec">🗂 Categorías <span class="stk-secn">' + INS_CATS.length + '</span></div>';
   h += '<div class="stk-cut">Cada categoría define <b>cómo la ve el operario</b>: el nombre, y en qué <b>unidades</b> puede cargar sus insumos. <b>Una sola</b> unidad = queda fija; <b>varias</b> = el operario elige entre ésas; <b>ninguna</b> = cualquiera de las de abajo.</div>';
   // «A depurar» no es una categoría de verdad: es la sala de espera, y ahora vive
   // arriba, dentro de Pendientes de identificar.
-  h += INS_CATS.filter(function (c) { return c.k !== INS_CAT_DEP; }).map(function (c) {
+  h += INS_CATS.map(function (c) {
     const abierta = _stkIns.abierta === c.k;
     const ed = _stkIns.edit === "cat:" + c.k;
     let b = '<div class="stk-catbox">';
@@ -12029,6 +12030,7 @@ function _stkInsCats(items, pend) {
     } else {
       b += '<b style="flex:1;">' + escapeHtml(c.lbl) + '</b>';
     }
+    void 0;
     b += '<span class="stk-secn">' + (cnt[c.k] || 0) + ' insumo' + ((cnt[c.k] || 0) === 1 ? "" : "s") + '</span>';
     b += '<button class="stk-btn" onclick="stkInsAbrir(\'' + c.k + '\')">' + (abierta ? "▾ Ocultar" : "▸ Ver insumos") + '</button>';
     b += ed
@@ -12036,6 +12038,10 @@ function _stkInsCats(items, pend) {
       : '<button class="stk-btn" onclick="stkInsEdit(\'cat:' + c.k + '\')">Editar</button>' +
         '<button class="stk-btn stk-btn-x" onclick="stkInsCatBorrar(\'' + c.k + '\')">Borrar</button>';
     b += '</div>';
+    // detalle del grupo: qué entra acá
+    b += ed
+      ? '<div style="margin-top:7px;"><textarea class="stk-inp" id="cDes_' + c.k + '" rows="2" style="width:100%;box-sizing:border-box;font-family:inherit;" placeholder="Detalle: qué entra en este grupo">' + escapeHtml(c.desc || "") + '</textarea></div>'
+      : (c.desc ? '<div class="stk-catdesc">' + escapeHtml(c.desc) + '</div>' : '<div class="stk-catdesc stk-sub">sin detalle</div>');
     // unidades permitidas
     b += '<div class="stk-catuni"><span class="ins-uni-l">Unidades permitidas:</span> ' +
       INS_UNIS.map(function (u) {
@@ -12057,7 +12063,7 @@ function _stkInsCats(items, pend) {
       (abierta ? _stkInsListado("?", items) : "") + '</div>';
   }
   h += '<div style="margin-top:8px;">' + (_stkIns.edit === "cat:+"
-    ? '<span class="stk-nuevo"><input class="stk-inp" id="cNvEmo" placeholder="🔧" style="width:48px;text-align:center;"> <input class="stk-inp" id="cNvNom" placeholder="nombre de la categoría" style="width:200px;"> <button class="stk-btn" onclick="stkInsCatCrear()">✓ Crear</button> <button class="stk-btn stk-btn-x" onclick="stkInsEdit(null)">Cancelar</button></span>'
+    ? '<span class="stk-nuevo"><input class="stk-inp" id="cNvEmo" placeholder="🔧" style="width:48px;text-align:center;"> <input class="stk-inp" id="cNvNom" placeholder="nombre de la categoría" style="width:200px;"> <input class="stk-inp" id="cNvDes" placeholder="detalle: qué entra acá" style="width:260px;"> <button class="stk-btn" onclick="stkInsCatCrear()">✓ Crear</button> <button class="stk-btn stk-btn-x" onclick="stkInsEdit(null)">Cancelar</button></span>'
     : '<button class="stk-btn" onclick="stkInsEdit(\'cat:+\')">+ Categoría nueva</button>') + '</div>';
   return h;
 }
@@ -12121,6 +12127,57 @@ function _stkInsUniUso(u, items) {
   const cats = INS_CATS.filter(function (c) { return (c.unis || []).indexOf(u) >= 0; });
   return { arts: arts.length, cats: cats.length, artsList: arts, catsList: cats };
 }
+/* ---------- (4) TODOS LOS INSUMOS — tabla de sólo lectura ----------
+   La foto completa del catálogo en un solo lugar, filtrable. No edita nada: para
+   cambiar algo se usa la sección de arriba que corresponda. Sale del mismo `items`
+   que el resto, así que se actualiza sola con cada guardado (todas las acciones
+   terminan en `stkInsRefresh()` + `stkRender()`). */
+function _stkInsTodos(items) {
+  const f = _stkIns.tf || {};
+  const _m = function (v, q) { return !q || String(v == null ? "" : v).toLowerCase().indexOf(String(q).toLowerCase().trim()) >= 0; };
+  const lista = (items || []).filter(function (it) {
+    if (!_m(it.cod, f.cod)) return false;
+    if (f.cat && (f.cat === "?" ? !insSinCat(it) : insCatOf(it) !== f.cat)) return false;
+    if (!_m(it.ubic, f.ubic)) return false;
+    if (!_m(it.nombre, f.nom)) return false;
+    if (f.uni && !(it.xuni || []).some(function (u) { return String(u.uni).toLowerCase() === String(f.uni).toLowerCase(); })) return false;
+    if (f.cant) {
+      const n = parseFloat(String(f.cant).replace(",", "."));
+      if (isFinite(n) && !(it.xuni || []).some(function (u) { return Math.abs(u.saldo) >= Math.abs(n); })) return false;
+    }
+    return true;
+  });
+  const unisEnUso = {}; (items || []).forEach(function (it) { (it.xuni || []).forEach(function (u) { unisEnUso[u.uni] = 1; }); });
+  let h = '<div class="stk-sec">📋 Todos los insumos <span class="stk-secn">' + lista.length + (lista.length !== (items || []).length ? " / " + (items || []).length : "") + '</span></div>';
+  h += '<div class="stk-cut">Sólo lectura: la foto completa del catálogo. Se actualiza sola cuando editás algo arriba.</div>';
+  h += '<div class="stk-scroll"><table class="stk-tbl"><thead><tr>' +
+    '<th>Código</th><th>Nombre</th><th>Categoría</th><th>Rack / sector</th><th class="num">Cantidad</th><th>Unidad</th></tr>' +
+    '<tr class="stk-filtros">' +
+    '<th><input class="stk-inp" style="width:100px;" placeholder="filtrar" value="' + escapeHtml(f.cod || "") + '" oninput="stkInsFiltro(\'cod\',this.value)"></th>' +
+    '<th><input class="stk-inp" style="width:140px;" placeholder="filtrar" value="' + escapeHtml(f.nom || "") + '" oninput="stkInsFiltro(\'nom\',this.value)"></th>' +
+    '<th><select class="stk-inp" onchange="stkInsFiltro(\'cat\',this.value)"><option value="">(todas)</option>' +
+      INS_CATS.map(function (c) { return '<option value="' + c.k + '"' + (f.cat === c.k ? " selected" : "") + '>' + escapeHtml(c.lbl) + '</option>'; }).join("") +
+      '<option value="?"' + (f.cat === "?" ? " selected" : "") + '>❓ Sin categoría</option></select></th>' +
+    '<th><input class="stk-inp" style="width:90px;" placeholder="filtrar" value="' + escapeHtml(f.ubic || "") + '" oninput="stkInsFiltro(\'ubic\',this.value)"></th>' +
+    '<th><input class="stk-inp" style="width:78px;" type="number" step="any" placeholder="≥" value="' + escapeHtml(f.cant || "") + '" oninput="stkInsFiltro(\'cant\',this.value)" title="Muestra los que tienen al menos esta cantidad (en valor absoluto) en alguna unidad"></th>' +
+    '<th><select class="stk-inp" onchange="stkInsFiltro(\'uni\',this.value)"><option value="">(todas)</option>' +
+      Object.keys(unisEnUso).sort().map(function (u) { return '<option value="' + escapeHtml(u) + '"' + (f.uni === u ? " selected" : "") + '>' + escapeHtml(u) + '</option>'; }).join("") +
+      '</select></th>' +
+    '</tr></thead><tbody>';
+  if (!lista.length) h += '<tr><td colspan="6" class="stk-empty">Nada con esos filtros.</td></tr>';
+  else h += lista.map(function (it) {
+    const xs = (it.xuni || []).filter(function (u) { return Math.abs(u.saldo) > 0.0005; });
+    const neg = function (x) { return x < 0 ? ' style="color:#b91c1c;font-weight:800;"' : ""; };
+    return '<tr><td><b>' + escapeHtml(it.cod) + '</b></td><td>' + escapeHtml(it.nombre || "—") + '</td>' +
+      '<td>' + escapeHtml(insCatLbl(insCatOf(it))) + '</td>' +
+      '<td>' + escapeHtml(it.ubic || "—") + '</td>' +
+      '<td class="num">' + (xs.length ? xs.map(function (x) { return '<div' + neg(x.saldo) + '>' + (Math.round(x.saldo * 1000) / 1000) + '</div>'; }).join("") : '<span class="stk-sub">0</span>') + '</td>' +
+      '<td>' + (xs.length ? xs.map(function (x) { return '<div>' + escapeHtml(x.uni) + '</div>'; }).join("") : '<span class="stk-sub">—</span>') + '</td></tr>';
+  }).join("");
+  return h + '</tbody></table></div>';
+}
+function stkInsFiltro(k, v) { if (!_stkIns) return; _stkIns.tf = _stkIns.tf || {}; _stkIns.tf[k] = v; stkRender(); }
+
 /* ---------- helpers de UI ---------- */
 function _stkInsCatSel(id, sel) {
   return '<select class="stk-inp" id="' + escapeHtml(id) + '">' +
@@ -12165,6 +12222,11 @@ async function stkInsAceptar(orig) {
   if (!cod) { alert("Poné el código real."); return; }
   if (/^TMP-/.test(cod)) { alert("Cambiá el código: " + cod + " es el temporal que puso el sistema.\n\nPonele el código de verdad."); return; }
   if (cod === orig) { alert("Ese ya es su código. Cambiálo por el real."); return; }
+  if (esTmp && uni && !insUniPermitida(cat, uni)) {
+    const c0 = insCatDef(cat);
+    alert("⛔ Unidad no permitida\n\n«" + uni + "» no entra en " + (c0 ? c0.lbl : "esa categoría") + ", que se carga en: " + (c0 ? c0.unis.join(" / ") : "?") + ".\n\nCambiá la unidad, o agregala a las permitidas de la categoría más abajo.");
+    return;
+  }
   const existente = (_stkIns.items || []).filter(function (x) { return x.cod === cod; })[0];
   if (existente && esTmp) {
     alert("El código " + cod + " ya está en uso" + (existente.nombre ? " (" + existente.nombre + ")" : "") + ".\n\nUna sugerencia del operario no se puede fusionar contra un insumo en uso: poné un código libre.");
@@ -12262,7 +12324,7 @@ async function stkInsCatGuardar(k) {
   const nom = _stkInsVal("cNom_" + k), emo = _stkInsVal("cEmo_" + k);
   if (!nom) { alert("Poné el nombre de la categoría."); return; }
   try {
-    await _stkInsRpc("insumo_cat_guardar", { p_clave: k, p_nombre: nom, p_emoji: emo || null, p_unidades: c.unis || [] });
+    await _stkInsRpc("insumo_cat_guardar", { p_clave: k, p_nombre: nom, p_emoji: emo || null, p_unidades: c.unis || [], p_descripcion: _stkInsVal("cDes_" + k) || null });
     _stkIns.edit = null; _stkIns.msg = "✓ Categoría «" + nom + "» actualizada.";
     await stkInsRefresh(); stkRender();
   } catch (e) { alert("No se pudo: " + (e.message || e)); }
@@ -12276,7 +12338,7 @@ async function stkInsCatCrear() {
   if (!clave) { alert("Ese nombre no sirve como categoría."); return; }
   if (insCatDef(clave)) { alert("Ya existe una categoría con ese nombre."); return; }
   try {
-    await _stkInsRpc("insumo_cat_guardar", { p_clave: clave, p_nombre: nom, p_emoji: emo || null, p_unidades: [], p_orden: 50 });
+    await _stkInsRpc("insumo_cat_guardar", { p_clave: clave, p_nombre: nom, p_emoji: emo || null, p_unidades: [], p_orden: 50, p_descripcion: _stkInsVal("cNvDes") || null });
     _stkIns.edit = null; _stkIns.msg = "✓ Categoría «" + nom + "» creada.";
     await stkInsRefresh(); stkRender();
   } catch (e) { alert("No se pudo: " + (e.message || e)); }
@@ -12876,12 +12938,11 @@ function _insSortCod(a, b) { return String(a.cod).localeCompare(String(b.cod), u
    ⚠ Esta lista y la categoría de cada insumo se editan A MANO por ahora. El módulo
    para manejarlas desde Stock y Compras es la idea 5572. */
 let INS_CATS = [
-  { k: "plastico", lbl: "🧪 Plásticos", unis: ["Bolsas"] },
-  { k: "fleje", lbl: "🧵 Flejes y alambres", unis: ["Kg"] },
-  { k: "importados", lbl: "🌎 Importados", unis: [] },
-  { k: "partes_plasticas", lbl: "🧩 Partes plásticas", unis: [] },
-  { k: "cajas", lbl: "📦 Cajas", unis: ["Paquetes", "Uni"] },
-  { k: "depurar", lbl: "🗑 A depurar", unis: [] }
+  { k: "plastico", lbl: "🧪 Plásticos", unis: ["Bolsas"], desc: "" },
+  { k: "fleje", lbl: "🧵 Flejes y alambres", unis: ["Kg"], desc: "" },
+  { k: "importados", lbl: "🌎 Importados", unis: [], desc: "" },
+  { k: "partes_plasticas", lbl: "🧩 Partes plásticas", unis: [], desc: "" },
+  { k: "cajas", lbl: "📦 Cajas", unis: ["Paquetes", "Uni"], desc: "" }
 ];
 let INS_UNIS = ["Uni", "Kg", "Bolsas", "Paquetes", "MC", "Cajas"];
 /* Trae categorías y unidades de Supabase. Se cachean para toda la sesión: las edita
@@ -12893,13 +12954,13 @@ async function insLoadMeta(force) {
   try {
     const h = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
     const r = await Promise.all([
-      fetch(SUPABASE_URL + "/rest/v1/Insumos_Categorias?select=clave,nombre,emoji,unidades,orden&activa=eq.true&order=orden.asc", { headers: h, cache: "no-store" }),
+      fetch(SUPABASE_URL + "/rest/v1/Insumos_Categorias?select=clave,nombre,emoji,unidades,orden,descripcion&activa=eq.true&order=orden.asc", { headers: h, cache: "no-store" }),
       fetch(SUPABASE_URL + "/rest/v1/Insumos_Unidades?select=nombre,orden&activa=eq.true&order=orden.asc", { headers: h, cache: "no-store" })
     ]);
     if (r[0].ok) {
       const cs = await r[0].json();
       if (cs && cs.length) INS_CATS = cs.map(function (c) {
-        return { k: String(c.clave), lbl: ((c.emoji || "") + " " + (c.nombre || c.clave)).trim(), unis: c.unidades || [] };
+        return { k: String(c.clave), lbl: ((c.emoji || "") + " " + (c.nombre || c.clave)).trim(), unis: c.unidades || [], desc: c.descripcion || "" };
       });
     }
     if (r[1].ok) {
@@ -12909,7 +12970,6 @@ async function insLoadMeta(force) {
     _insMetaOk = true;
   } catch (_e) { /* sin red: quedan los defaults */ }
 }
-const INS_CAT_DEP = "depurar";   // no entra en el listado por defecto
 function insCatDef(k) { for (let i = 0; i < INS_CATS.length; i++) { if (INS_CATS[i].k === k) return INS_CATS[i]; } return null; }
 /* Unidad FIJA de la categoría: sólo si tiene exactamente una permitida. Con varias
    (Cajas ⇒ Paquetes/Uni) o con ninguna (Importados) elige el operario. */
@@ -12917,11 +12977,24 @@ function insCatUni(k) { const c = insCatDef(k); return (c && c.unis && c.unis.le
 /* Unidades que se le ofrecen a un insumo de esta categoría. Vacío en la categoría =
    todas las que el admin tenga activas. */
 function insCatUnis(k) { const c = insCatDef(k); return (c && c.unis && c.unis.length) ? c.unis.slice() : INS_UNIS.slice(); }
+/* ¿La categoría permite esta unidad? Vacío en la categoría = permite todas. La
+   comparación NO distingue mayúsculas: en los datos conviven "Kg" y "kg", y bloquear
+   una carga por eso sería un falso positivo. */
+function insUniPermitida(k, u) {
+  const c = insCatDef(k);
+  if (!c || !c.unis || !c.unis.length) return true;
+  const x = String(u || "").trim().toLowerCase();
+  if (!x) return false;
+  return c.unis.some(function (p) { return String(p).trim().toLowerCase() === x; });
+}
 function insCatLbl(k) { const c = insCatDef(k); return c ? c.lbl : "❓ Sin categoría"; }
 /* Un insumo que llegó por saldo (no está en el catálogo) o que se creó sin categoría
    cae en "sin categoría": se muestra igual, en su propio chip, para que nunca
    desaparezca del listado por un dato faltante. */
 function insCatOf(it) { const k = String((it && it.cat) || "").trim(); return insCatDef(k) ? k : ""; }
+/* Sin categoría = sin clasificar = pendiente de una decisión del admin. En la botonera
+   del operario tiene su propia tarjeta ❓ y no se cuenta entre los "en uso". */
+function insSinCat(it) { return insCatOf(it) === ""; }
 async function insFetchCatalogo() {
   try {
     const r = await fetch(SUPABASE_INSUMOS_ENDPOINT + "?select=cod,nombre,sector,categoria,ubicacion,orden&order=cod.asc&limit=20000", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
@@ -12933,7 +13006,7 @@ async function insFetchCatalogo() {
 function insEnsureCss() {
   if (document.getElementById("insCss")) return;
     const s = document.createElement("style"); s.id = "insCss";
-    s.textContent = "#insModal{display:none;position:fixed;inset:0;z-index:1296;background:rgba(2,6,23,.74);overflow:auto;padding:12px;}#insModal.show{display:block;}.ins-card{background:#f8fafc;max-width:480px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.ins-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;color:#fff;}.ins-head.in{background:linear-gradient(90deg,#4f46e5,#4338ca);}.ins-head.out{background:linear-gradient(90deg,#0d9488,#0f766e);}.ins-title{font-size:18px;font-weight:800;}.ins-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}.ins-body{padding:13px 14px;}.ins-loading,.ins-empty{padding:24px;text-align:center;color:#64748b;font-size:15px;}.ins-hint{font-size:12.5px;color:#64748b;margin-bottom:9px;}.ins-search{width:100%;box-sizing:border-box;height:42px;border:2px solid #cbd5e1;border-radius:10px;padding:0 12px;font-size:15px;margin-bottom:9px;}.ins-crear{background:#eef2ff;border:1px dashed #a5b4fc;border-radius:11px;padding:10px;margin-bottom:10px;font-size:12.5px;color:#3730a3;display:flex;flex-direction:column;gap:7px;}.ins-crear-r{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}.ins-nn{flex:1;min-width:130px;}.ins-nid{flex:1;min-width:150px;}.ins-crear input{height:34px;border:1px solid #c7d2fe;border-radius:8px;padding:0 9px;font-size:13px;}.ins-cbtn{background:#4f46e5;color:#fff;border:none;border-radius:8px;padding:7px 12px;font-weight:800;cursor:pointer;width:auto;}.ins-row{border:1px solid #e2e8f0;border-radius:12px;padding:9px 11px;margin-bottom:8px;background:#fff;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}.ins-info{flex:1;min-width:0;}.ins-cod{font-size:16px;font-weight:800;font-family:Consolas,Menlo,monospace;}.ins-cod-sec{font-family:inherit;color:#4338ca;}.ins-nom{font-size:12.5px;color:#475569;}.ins-stk{font-size:11.5px;color:#64748b;font-weight:700;margin-top:2px;}.ins-stp{display:flex;align-items:center;gap:5px;}.ins-sb{display:flex;align-items:center;justify-content:center;line-height:1;padding:0;margin:0;width:38px;height:40px;border:none;border-radius:9px;font-size:22px;font-weight:800;cursor:pointer;background:#e2e8f0;color:#475569;}.ins-inp{width:58px;height:40px;box-sizing:border-box;margin:0;padding:0;text-align:center;font-size:18px;font-weight:800;border:2px solid #cbd5e1;border-radius:9px;}.ins-warn{width:100%;font-size:11.5px;color:#b45309;font-weight:700;}.ins-fin{width:100%;margin-top:10px;padding:14px;border:none;border-radius:12px;color:#fff;font-size:17px;font-weight:800;cursor:pointer;}.ins-fin.in{background:#4f46e5;}.ins-fin.out{background:#0d9488;}.ins-fin:disabled{background:#cbd5e1;color:#64748b;cursor:not-allowed;}.ins-uni{flex-basis:100%;display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px dashed #e2e8f0;}.ins-uni-l{font-size:11.5px;color:#64748b;font-weight:700;}.ins-uchip{width:auto;margin:0;border:1px solid #cbd5e1;background:#fff;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:800;cursor:pointer;color:#475569;}.ins-uchip.on{background:#4f46e5;color:#fff;border-color:#4f46e5;}.ins-uadd{color:#4f46e5;font-size:15px;}.ins-cats{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;}.ins-cchip{width:auto;margin:0;border:1px solid #cbd5e1;background:#fff;border-radius:999px;padding:8px 13px;font-size:12.5px;font-weight:800;cursor:pointer;color:#475569;}.ins-cchip.on{background:#4f46e5;color:#fff;border-color:#4f46e5;}.ins-body.out .ins-cchip.on{background:#0d9488;border-color:#0d9488;}.ins-cchip.dep{border-style:dashed;color:#b45309;border-color:#fcd34d;}.ins-cchip.dep.on,.ins-body.out .ins-cchip.dep.on{background:#b45309;color:#fff;border-color:#b45309;}.ins-cn{opacity:.72;font-weight:700;}.ins-ubi{font-size:11.5px;color:#0f766e;font-weight:800;}.ins-cbadge{font-size:11px;font-weight:800;color:#64748b;}.ins-depw{background:#fffbeb;border:1px dashed #fcd34d;color:#92400e;border-radius:10px;padding:9px 11px;font-size:12px;margin-bottom:9px;}.ins-bar{display:flex;align-items:center;gap:9px;margin-bottom:11px;}.ins-bar-t{flex:1;text-align:center;font-size:16px;font-weight:900;color:#0f172a;}.ins-back{width:auto;margin:0;background:#fff;border:2px solid #cbd5e1;border-radius:11px;padding:10px 15px;font-size:14px;font-weight:800;color:#334155;cursor:pointer;white-space:nowrap;}.ins-grid{display:grid;gap:9px;grid-template-columns:repeat(auto-fill,minmax(102px,1fr));}.ins-catbtn,.ins-itbtn{aspect-ratio:1/1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;width:auto;margin:0;padding:7px;text-align:center;background:#fff;border:2px solid #cbd5e1;border-radius:14px;cursor:pointer;min-width:0;overflow-wrap:anywhere;}.ins-catem{font-size:29px;line-height:1;}.ins-catnm{font-size:12.5px;font-weight:900;color:#0f172a;line-height:1.15;}.ins-catn{font-size:11px;font-weight:800;color:#64748b;}.ins-catbtn.dep,.ins-itbtn.add{border-style:dashed;border-color:#fcd34d;background:#fffbeb;}.ins-itbtn.add{border-color:#a5b4fc;background:#eef2ff;color:#3730a3;}.ins-itadd{font-size:32px;line-height:1;font-weight:900;}.ins-catbtn.hasq,.ins-itbtn.on{border-color:#4f46e5;background:#eef2ff;}.ins-body.out .ins-catbtn.hasq,.ins-body.out .ins-itbtn.on{border-color:#0d9488;background:#f0fdfa;}.ins-itcod{font-size:16px;font-weight:900;font-family:Consolas,Menlo,monospace;color:#0f172a;}.ins-itnom{font-size:10.5px;font-weight:700;color:#64748b;line-height:1.15;}.ins-itubi{font-size:10px;font-weight:800;color:#0f766e;}.ins-itq{font-size:12px;font-weight:900;color:#4f46e5;}.ins-body.out .ins-itq{color:#0d9488;}.ins-itq.falta,.ins-body.out .ins-itq.falta{color:#b45309;}.ins-itbtn.on:has(.ins-itq.falta){border-color:#f59e0b;background:#fffbeb;}.ins-uni-l.falta{color:#b45309;}.ins-qov{position:fixed;inset:0;background:rgba(2,6,23,.62);z-index:1299;display:flex;align-items:flex-start;justify-content:center;padding:22px 13px;overflow:auto;}.ins-qc{background:#fff;border-radius:16px;padding:15px;width:100%;max-width:340px;box-shadow:0 24px 70px rgba(0,0,0,.5);}.ins-qh{display:flex;align-items:flex-start;justify-content:space-between;gap:9px;}.ins-qcod{font-size:21px;font-weight:900;font-family:Consolas,Menlo,monospace;color:#0f172a;}.ins-qnom{font-size:12.5px;color:#475569;font-weight:700;}.ins-qrow{display:flex;align-items:center;justify-content:center;gap:9px;margin:13px 0 4px;}.ins-qb{display:flex;align-items:center;justify-content:center;width:56px;height:64px;padding:0;margin:0;border:none;border-radius:12px;background:#e2e8f0;color:#475569;font-size:29px;font-weight:900;line-height:1;cursor:pointer;}.ins-qi{box-sizing:border-box;width:104px;height:64px;padding:0;margin:0;text-align:center;font-size:32px;font-weight:900;border:2px solid #cbd5e1;border-radius:12px;}.ins-qok{width:100%;margin-top:11px;padding:14px;border:none;border-radius:12px;color:#fff;font-size:17px;font-weight:900;cursor:pointer;}.ins-qok.in{background:#4f46e5;}.ins-qok.out{background:#0d9488;}.ins-nvl{font-size:13px;font-weight:900;color:#0f172a;margin:14px 0 7px;}.ins-nvq{display:block;width:130px;}.ins-nvt{box-sizing:border-box;width:100%;border:2px solid #cbd5e1;border-radius:11px;padding:10px 12px;font-size:15px;font-family:inherit;resize:vertical;}.ins-catbtn.add{border-style:dashed;border-color:#a5b4fc;background:#eef2ff;color:#3730a3;}.ins-catbtn.add .ins-catem{font-size:34px;font-weight:900;}.ins-catbtn.add .ins-catnm{color:#3730a3;}.ins-body.out .ins-catbtn.add,.ins-body.out .ins-itbtn.add{border-color:#5eead4;background:#f0fdfa;color:#115e59;}.ins-body.out .ins-catbtn.add .ins-catnm{color:#115e59;}.ins-anular{width:100%;margin-top:9px;padding:15px;border:none;border-radius:12px;background:#dc2626;color:#fff;font-size:17px;font-weight:900;cursor:pointer;}.ins-anular:hover{background:#b91c1c;}.ins-anular small{display:block;font-size:11.5px;font-weight:700;opacity:.9;margin-top:2px;}";
+    s.textContent = "#insModal{display:none;position:fixed;inset:0;z-index:1296;background:rgba(2,6,23,.74);overflow:auto;padding:12px;}#insModal.show{display:block;}.ins-card{background:#f8fafc;max-width:480px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.ins-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;color:#fff;}.ins-head.in{background:linear-gradient(90deg,#4f46e5,#4338ca);}.ins-head.out{background:linear-gradient(90deg,#0d9488,#0f766e);}.ins-title{font-size:18px;font-weight:800;}.ins-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}.ins-body{padding:13px 14px;}.ins-loading,.ins-empty{padding:24px;text-align:center;color:#64748b;font-size:15px;}.ins-hint{font-size:12.5px;color:#64748b;margin-bottom:9px;}.ins-search{width:100%;box-sizing:border-box;height:42px;border:2px solid #cbd5e1;border-radius:10px;padding:0 12px;font-size:15px;margin-bottom:9px;}.ins-crear{background:#eef2ff;border:1px dashed #a5b4fc;border-radius:11px;padding:10px;margin-bottom:10px;font-size:12.5px;color:#3730a3;display:flex;flex-direction:column;gap:7px;}.ins-crear-r{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}.ins-nn{flex:1;min-width:130px;}.ins-nid{flex:1;min-width:150px;}.ins-crear input{height:34px;border:1px solid #c7d2fe;border-radius:8px;padding:0 9px;font-size:13px;}.ins-cbtn{background:#4f46e5;color:#fff;border:none;border-radius:8px;padding:7px 12px;font-weight:800;cursor:pointer;width:auto;}.ins-row{border:1px solid #e2e8f0;border-radius:12px;padding:9px 11px;margin-bottom:8px;background:#fff;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}.ins-info{flex:1;min-width:0;}.ins-cod{font-size:16px;font-weight:800;font-family:Consolas,Menlo,monospace;}.ins-cod-sec{font-family:inherit;color:#4338ca;}.ins-nom{font-size:12.5px;color:#475569;}.ins-stk{font-size:11.5px;color:#64748b;font-weight:700;margin-top:2px;}.ins-stp{display:flex;align-items:center;gap:5px;}.ins-sb{display:flex;align-items:center;justify-content:center;line-height:1;padding:0;margin:0;width:38px;height:40px;border:none;border-radius:9px;font-size:22px;font-weight:800;cursor:pointer;background:#e2e8f0;color:#475569;}.ins-inp{width:58px;height:40px;box-sizing:border-box;margin:0;padding:0;text-align:center;font-size:18px;font-weight:800;border:2px solid #cbd5e1;border-radius:9px;}.ins-warn{width:100%;font-size:11.5px;color:#b45309;font-weight:700;}.ins-fin{width:100%;margin-top:10px;padding:14px;border:none;border-radius:12px;color:#fff;font-size:17px;font-weight:800;cursor:pointer;}.ins-fin.in{background:#4f46e5;}.ins-fin.out{background:#0d9488;}.ins-fin:disabled{background:#cbd5e1;color:#64748b;cursor:not-allowed;}.ins-uni{flex-basis:100%;display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px dashed #e2e8f0;}.ins-uni-l{font-size:11.5px;color:#64748b;font-weight:700;}.ins-uchip{width:auto;margin:0;border:1px solid #cbd5e1;background:#fff;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:800;cursor:pointer;color:#475569;}.ins-uchip.on{background:#4f46e5;color:#fff;border-color:#4f46e5;}.ins-uchip.no{border-style:dashed;border-color:#fca5a5;color:#b91c1c;}.ins-uchip.no.on{background:#b91c1c;border-color:#b91c1c;color:#fff;}.ins-uadd{color:#4f46e5;font-size:15px;}.ins-cats{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;}.ins-cchip{width:auto;margin:0;border:1px solid #cbd5e1;background:#fff;border-radius:999px;padding:8px 13px;font-size:12.5px;font-weight:800;cursor:pointer;color:#475569;}.ins-cchip.on{background:#4f46e5;color:#fff;border-color:#4f46e5;}.ins-body.out .ins-cchip.on{background:#0d9488;border-color:#0d9488;}.ins-cchip.dep{border-style:dashed;color:#b45309;border-color:#fcd34d;}.ins-cchip.dep.on,.ins-body.out .ins-cchip.dep.on{background:#b45309;color:#fff;border-color:#b45309;}.ins-cn{opacity:.72;font-weight:700;}.ins-ubi{font-size:11.5px;color:#0f766e;font-weight:800;}.ins-cbadge{font-size:11px;font-weight:800;color:#64748b;}.ins-depw{background:#fffbeb;border:1px dashed #fcd34d;color:#92400e;border-radius:10px;padding:9px 11px;font-size:12px;margin-bottom:9px;}.ins-bar{display:flex;align-items:center;gap:9px;margin-bottom:11px;}.ins-bar-t{flex:1;text-align:center;font-size:16px;font-weight:900;color:#0f172a;}.ins-back{width:auto;margin:0;background:#fff;border:2px solid #cbd5e1;border-radius:11px;padding:10px 15px;font-size:14px;font-weight:800;color:#334155;cursor:pointer;white-space:nowrap;}.ins-grid{display:grid;gap:9px;grid-template-columns:repeat(auto-fill,minmax(102px,1fr));}.ins-catbtn,.ins-itbtn{aspect-ratio:1/1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;width:auto;margin:0;padding:7px;text-align:center;background:#fff;border:2px solid #cbd5e1;border-radius:14px;cursor:pointer;min-width:0;overflow-wrap:anywhere;}.ins-catem{font-size:29px;line-height:1;}.ins-catnm{font-size:12.5px;font-weight:900;color:#0f172a;line-height:1.15;}.ins-catn{font-size:11px;font-weight:800;color:#64748b;}.ins-catbtn.dep,.ins-itbtn.add{border-style:dashed;border-color:#fcd34d;background:#fffbeb;}.ins-itbtn.add{border-color:#a5b4fc;background:#eef2ff;color:#3730a3;}.ins-itadd{font-size:32px;line-height:1;font-weight:900;}.ins-catbtn.hasq,.ins-itbtn.on{border-color:#4f46e5;background:#eef2ff;}.ins-body.out .ins-catbtn.hasq,.ins-body.out .ins-itbtn.on{border-color:#0d9488;background:#f0fdfa;}.ins-itcod{font-size:16px;font-weight:900;font-family:Consolas,Menlo,monospace;color:#0f172a;}.ins-itnom{font-size:10.5px;font-weight:700;color:#64748b;line-height:1.15;}.ins-itubi{font-size:10px;font-weight:800;color:#0f766e;}.ins-itq{font-size:12px;font-weight:900;color:#4f46e5;}.ins-body.out .ins-itq{color:#0d9488;}.ins-itq.falta,.ins-body.out .ins-itq.falta{color:#b45309;}.ins-itbtn.on:has(.ins-itq.falta){border-color:#f59e0b;background:#fffbeb;}.ins-uni-l.falta{color:#b45309;}.ins-qov{position:fixed;inset:0;background:rgba(2,6,23,.62);z-index:1299;display:flex;align-items:flex-start;justify-content:center;padding:22px 13px;overflow:auto;}.ins-qc{background:#fff;border-radius:16px;padding:15px;width:100%;max-width:340px;box-shadow:0 24px 70px rgba(0,0,0,.5);}.ins-qh{display:flex;align-items:flex-start;justify-content:space-between;gap:9px;}.ins-qcod{font-size:21px;font-weight:900;font-family:Consolas,Menlo,monospace;color:#0f172a;}.ins-qnom{font-size:12.5px;color:#475569;font-weight:700;}.ins-qrow{display:flex;align-items:center;justify-content:center;gap:9px;margin:13px 0 4px;}.ins-qb{display:flex;align-items:center;justify-content:center;width:56px;height:64px;padding:0;margin:0;border:none;border-radius:12px;background:#e2e8f0;color:#475569;font-size:29px;font-weight:900;line-height:1;cursor:pointer;}.ins-qi{box-sizing:border-box;width:104px;height:64px;padding:0;margin:0;text-align:center;font-size:32px;font-weight:900;border:2px solid #cbd5e1;border-radius:12px;}.ins-qok{width:100%;margin-top:11px;padding:14px;border:none;border-radius:12px;color:#fff;font-size:17px;font-weight:900;cursor:pointer;}.ins-qok.in{background:#4f46e5;}.ins-qok.out{background:#0d9488;}.ins-nvl{font-size:13px;font-weight:900;color:#0f172a;margin:14px 0 7px;}.ins-nvq{display:block;width:130px;}.ins-nvt{box-sizing:border-box;width:100%;border:2px solid #cbd5e1;border-radius:11px;padding:10px 12px;font-size:15px;font-family:inherit;resize:vertical;}.ins-catbtn.add{border-style:dashed;border-color:#a5b4fc;background:#eef2ff;color:#3730a3;}.ins-catbtn.add .ins-catem{font-size:34px;font-weight:900;}.ins-catbtn.add .ins-catnm{color:#3730a3;}.ins-body.out .ins-catbtn.add,.ins-body.out .ins-itbtn.add{border-color:#5eead4;background:#f0fdfa;color:#115e59;}.ins-body.out .ins-catbtn.add .ins-catnm{color:#115e59;}.ins-anular{width:100%;margin-top:9px;padding:15px;border:none;border-radius:12px;background:#dc2626;color:#fff;font-size:17px;font-weight:900;cursor:pointer;}.ins-anular:hover{background:#b91c1c;}.ins-anular small{display:block;font-size:11.5px;font-weight:700;opacity:.9;margin-top:2px;}";
     document.head.appendChild(s);
 }
 async function showInsumoModal(mode, legajo, _resume) {
@@ -13097,7 +13170,7 @@ function insRender() {
     const k = insCatOf(it);
     cnt[k] = (cnt[k] || 0) + 1;
     if (it.qty > 0) cntQ[k] = (cntQ[k] || 0) + 1;
-    if (k !== INS_CAT_DEP) nOper++;
+    if (k) nOper++;
   });
   let h = "";
 
@@ -13114,7 +13187,7 @@ function insRender() {
       if (!cnt[c.k]) return "";
       const q = cntQ[c.k] || 0;
       const p = c.lbl.split(" ");
-      return '<button class="ins-catbtn' + (c.k === INS_CAT_DEP ? " dep" : "") + (q ? " hasq" : "") + '" onclick="insSetCat(\'' + c.k + '\')">' +
+      return '<button class="ins-catbtn' + (q ? " hasq" : "") + '" onclick="insSetCat(\'' + c.k + '\')">' +
         '<span class="ins-catem">' + p[0] + '</span>' +
         '<span class="ins-catnm">' + escapeHtml(p.slice(1).join(" ")) + '</span>' +
         '<span class="ins-catn">' + cnt[c.k] + (q ? ' · <b>' + q + ' cargado' + (q === 1 ? "" : "s") + '</b>' : "") + '</span>' +
@@ -13124,7 +13197,7 @@ function insRender() {
       // "+" junto a las categorías: llegó algo que no está en ninguna lista.
       '<button class="ins-catbtn add" onclick="insNuevoOpen(\'\')"><span class="ins-catem">+</span><span class="ins-catnm">Agregar insumo</span><span class="ins-catn">nuevo</span></button>' +
       '</div>';
-    h += '<div class="ins-cbadge" style="margin-top:10px;">' + nOper + ' insumos en uso' + (cnt[INS_CAT_DEP] ? ' · ' + cnt[INS_CAT_DEP] + ' viejos a depurar' : "") + '</div>';
+    h += '<div class="ins-cbadge" style="margin-top:10px;">' + nOper + ' insumos en uso' + (cnt[""] ? ' · ' + cnt[""] + ' sin clasificar' : "") + '</div>';
   } else {
     // ---------- PANTALLA 2: insumos de la categoría (o resultados de la búsqueda) ----------
     // Buscando se mira TODO (incluso lo que está a depurar): si el operario escribe el
@@ -13136,7 +13209,7 @@ function insRender() {
       .slice().sort(_insSortCat(cat));
     h += '<div class="ins-bar"><button class="ins-back" onclick="insBack()">‹ Atrás</button>' +
       '<span class="ins-bar-t">' + escapeHtml(cat ? insCatLbl(cat === "?" ? "" : cat) : "🔎 Buscar") + '</span></div>';
-    if (cat === INS_CAT_DEP) h += '<div class="ins-depw">⚠ Códigos <b>viejos o duplicados</b> (el conteo del 31/07 los dio de baja). No cargues acá: usá el código nuevo. Están a la vista sólo porque algunos todavía arrastran saldo.</div>';
+    if (cat === "?") h += '<div class="ins-depw">⚠ Códigos <b>sin clasificar</b>: viejos, duplicados o recién sugeridos. Esperan que los ordenen desde Stock y Compras. Si el que buscás está acá, avisá.</div>';
     h += '<input class="ins-search" type="search" placeholder="🔎 Buscar ' + (cat ? "en esta categoría" : "en TODOS") + '" value="' + escapeHtml(_ins.filtro) + '" oninput="if(_ins){_ins.filtro=this.value;insRender();}">';
     if (!shown.length) {
       h += '<div class="ins-empty">' + (f ? "No hay ninguno que diga “" + escapeHtml(_ins.filtro) + "”." : "No hay insumos en esta categoría.") + '</div>';
@@ -13151,7 +13224,7 @@ function insRender() {
           (it.qty > 0 ? '<span class="ins-itq' + (it.unidad ? "" : " falta") + '">' + it.qty + " " + escapeHtml(it.unidad || "¿unidad?") + '</span>' : "") +
           '</button>';
       }).join("") +
-        (cat && cat !== INS_CAT_DEP ? '<button class="ins-itbtn add" onclick="insNuevoOpen(\'' + (cat === "?" ? "" : cat) + '\')"><span class="ins-itadd">+</span><span class="ins-itnom">Agregar insumo</span></button>' : "") +
+        (cat ? '<button class="ins-itbtn add" onclick="insNuevoOpen(\'' + (cat === "?" ? "" : cat) + '\')"><span class="ins-itadd">+</span><span class="ins-itnom">Agregar insumo</span></button>' : "") +
         '</div>';
     }
   }
@@ -13173,7 +13246,7 @@ function insRender() {
    admin desde Stock y Compras → Insumos (idea 5572). */
 function insNuevoOpen(cat) {
   if (!_ins) return;
-  _ins.nuevo = { cat: insCatDef(cat) && cat !== INS_CAT_DEP ? cat : "", qty: "", uni: "", det: "" };
+  _ins.nuevo = { cat: insCatDef(cat) ? cat : "", qty: "", uni: "", det: "" };
   _ins.qty = null;
   insRender();
 }
@@ -13206,7 +13279,7 @@ function _insNuevoHtml(isIn) {
   h += '<div class="ins-nvl">Detalle <span class="ins-cbadge">— qué es, en tus palabras</span></div>' +
     '<textarea id="insNvDet" class="ins-nvt" rows="3" placeholder="Ej: alambre finito que trajo Pérez, bolsa gris sin etiqueta…" oninput="insNuevoSet(\'det\',this.value)">' + escapeHtml(n.det) + '</textarea>';
   h += '<div class="ins-nvl">Elegí la categoría</div><div class="ins-cats">' +
-    INS_CATS.filter(function (c) { return c.k !== INS_CAT_DEP; }).map(function (c) {
+    INS_CATS.map(function (c) {
       return '<button class="ins-cchip' + (n.cat === c.k ? " on" : "") + '" onclick="insNuevoPick(\'cat\',\'' + c.k + '\')">' + c.lbl + '</button>';
     }).join("") +
     '<button class="ins-cchip' + (n.cat === "" ? " on" : "") + '" onclick="insNuevoPick(\'cat\',\'\')">❓ Sin categoría clara</button>' +
@@ -13237,9 +13310,13 @@ function insNuevoOk() {
   // movimientos. El código y el nombre de verdad se los pone el admin desde
   // Stock y Compras → Insumos (idea 5572).
   const qty = Math.max(0, parseFloat(String(n.qty || "").replace(",", ".")) || 0);
-  const cat = insCatDef(n.cat) && n.cat !== INS_CAT_DEP ? n.cat : "";
+  const cat = insCatDef(n.cat) ? n.cat : "";
   const uni = String(n.uni || "").trim() || insCatUni(cat);
   if (qty > 0 && !uni) { alert("Elegí la unidad: en qué se mide lo que llegó.\n\nEsta categoría no tiene una fija (cada insumo mide distinto)."); return; }
+  if (uni && !insUniPermitida(cat, uni)) {
+    const c0 = insCatDef(cat);
+    alert("⛔ «" + uni + "» no está permitida en " + (c0 ? c0.lbl : "esa categoría") + ".\n\nSe carga en: " + (c0 ? c0.unis.join(" / ") : "?") + "."); return;
+  }
   // Sin código no hay clave natural: se dedupe por el DETALLE (normalizado). Si ya
   // hay uno escrito igual, no creo otro — lo abro para que sume sobre ese.
   const _norm = function (x) { return String(x || "").trim().toLowerCase().replace(/\s+/g, " "); };
@@ -13292,8 +13369,11 @@ function _insQtyHtml(it, i, isIn) {
   const stkLine = mix
     ? ('stock: ' + it.stockByUni.map(function (u) { return '<b>' + _insNum(u.saldo) + '</b> ' + escapeHtml(u.uni); }).join(' · '))
     : (it.unidad ? ('stock: ' + _insNum(stk) + ' ' + escapeHtml(it.unidad)) : 'stock: ' + _insNum(it.stock));
+  const _k = insCatOf(it);
   const chips = _insUnitsFor(it, insLoadUnits()).map(function (u) {
-    return '<button class="ins-uchip' + (it.unidad === u ? " on" : "") + '" onclick="insSetUnidad(' + i + ',\'' + u.replace(/'/g, "") + '\')">' + escapeHtml(u) + '</button>';
+    const ok = insUniPermitida(_k, u);
+    return '<button class="ins-uchip' + (it.unidad === u ? " on" : "") + (ok ? "" : " no") + '" onclick="insSetUnidad(' + i + ',\'' + u.replace(/'/g, "") + '\')"' +
+      (ok ? "" : ' title="No permitida en esta categoría"') + '>' + escapeHtml(u) + (ok ? "" : " ⛔") + '</button>';
   }).join("") + '<button class="ins-uchip ins-uadd" onclick="insAddUnidad(' + i + ')" title="Agregar unidad">+</button>';
   return '<div class="ins-qov" onclick="if(event.target===this)insCloseQty()"><div class="ins-qc">' +
     '<div class="ins-qh"><div><div class="ins-qcod">' + escapeHtml(_insBtnCod(it)) + '</div>' +
@@ -13305,8 +13385,9 @@ function _insQtyHtml(it, i, isIn) {
     '<button class="ins-qb" onclick="insChg(' + i + ',1)">+</button></div>' +
     '<div class="ins-uni"><span class="ins-uni-l' + (it.unidad ? "" : " falta") + '">Unidad:</span> ' + chips + '</div>' +
     (!it.unidad ? '<div class="ins-warn">⚠ elegí en qué se mide (esta categoría no tiene una fija)</div>' : "") +
+    (it.unidad && !insUniPermitida(_k, it.unidad) ? '<div class="ins-warn">⛔ «' + escapeHtml(it.unidad) + '» no está permitida en ' + escapeHtml(insCatLbl(_k)) + ' (se carga en ' + escapeHtml(insCatUnis(_k).join(" / ")) + ')</div>' : "") +
     (neg ? '<div class="ins-warn">⚠ el stock de ' + escapeHtml(it.unidad) + ' quedaría en ' + _insNum(stk - it.qty) + '</div>' : "") +
-    '<button class="ins-qok ' + (isIn ? "in" : "out") + '"' + (it.qty > 0 && !it.unidad ? " disabled" : "") + ' onclick="insCloseQty()">Listo</button>' +
+    '<button class="ins-qok ' + (isIn ? "in" : "out") + '"' + (it.qty > 0 && (!it.unidad || !insUniPermitida(_k, it.unidad)) ? " disabled" : "") + ' onclick="insCloseQty()">Listo</button>' +
     '</div></div>';
 }
 function insOpenQty(i) { if (!_ins || !_ins.items[i]) return; _ins.qty = i; insRender(); }
@@ -13325,6 +13406,16 @@ function insConfirmar() {
   // en dos unidades distintas (es lo que pasó con PP: 151 Bolsas + 24 Uni).
   const sinCod = sel.filter(function (it) { return !it.cod; });
   if (sinCod.length) { try { alert("Esperá un segundo: el sistema todavía le está asignando el número a un insumo nuevo."); } catch (_e) {} return; }
+  const mal = sel.filter(function (it) { return it.unidad && !insUniPermitida(insCatOf(it), it.unidad); });
+  if (mal.length) {
+    const it0 = mal[0], c0 = insCatDef(insCatOf(it0));
+    try { alert("⛔ Unidad no permitida\n\n" + _insBtnCod(it0) + (it0.nombre ? " · " + it0.nombre : "") +
+      "\nEstá en «" + (c0 ? c0.lbl : "?") + "», que se carga en: " + (c0 ? c0.unis.join(" / ") : "?") +
+      ".\nElegiste «" + it0.unidad + "».\n\nCambiá la unidad" + (mal.length > 1 ? " (hay " + mal.length + " así)" : "") + "."); } catch (_e) {}
+    _ins.cat = insCatOf(it0) || "?"; _ins.filtro = ""; _ins.nuevo = null;
+    _ins.qty = _ins.items.indexOf(it0);
+    insRender(); return;
+  }
   const sinUni = sel.filter(function (it) { return !it.unidad; });
   if (sinUni.length) {
     try { alert("Falta la unidad de:\n\n  " + sinUni.map(function (it) { return _insBtnCod(it) + (it.nombre ? " · " + it.nombre : ""); }).join("\n  ") + "\n\nTe abro el primero para que la elijas."); } catch (_e) {}

@@ -166,3 +166,12 @@ update public."Insumos" set categoria = 'partes_plasticas' where categoria = 'ma
 -- del catálogo aunque haya movimientos —son historia— pero exige saldo 0; el front lo
 -- deja en 0 con un asiento antes de llamarla.
 -- ---------------------------------------------------------------------
+
+-- ---------------------------------------------------------------------
+-- v7.24 (idea 5572) — ver `insumos_cat_descripcion_y_sin_categoria`:
+--   · Insumos_Categorias.descripcion (detalle del grupo: qué entra acá)
+--   · «a depurar» se ELIMINA como categoría: los 43 pasan a categoria = null y lo que
+--     no tiene categoría es «Sin categoría» (= pendiente de clasificar).
+--   · insumo_identificar / insumo_borrar pasan a exigir "sin categoría" en vez de
+--     'depurar': un insumo ya clasificado no se renombra, fusiona ni borra.
+-- ---------------------------------------------------------------------

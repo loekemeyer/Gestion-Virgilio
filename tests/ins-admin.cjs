@@ -1,4 +1,4 @@
-/* Regresión v7.22 / idea 5572 — Stock y Compras → solapa "🧰 Insumos" (Administrar
+/* Regresión v7.24 / idea 5572 — Stock y Compras → solapa "🧰 Insumos" (Administrar
    Insumos). Es el lado admin de la botonera del operario (idea 7917). Contrato:
      · la solapa existe, y arranca por "Pendientes de identificar"
      · pendientes = SOLO los TMP-*, con TODO editable: código (sugerido = el temporal),
@@ -17,6 +17,10 @@
      · no se puede dar de alta un código que ya está en uso
      · borrar una categoría exige escribir su nombre exacto
      · sección UNIDADES: el vocabulario de medidas, se agregan y se sacan
+     · cada categoría tiene un DETALLE editable (qué entra en el grupo)
+     · «a depurar» ya no existe: lo que no tiene categoría es «Sin categoría»
+     · tabla final de SÓLO LECTURA con todos los insumos, filtrable, que se actualiza
+     · una unidad no permitida por la categoría se rechaza con alerta
      · VÍNCULO CON EL OPERARIO: lo que define el admin es lo que ve el operario en
        RI/EI — categorías (nombre y unidades permitidas), insumos y unidades
    Sin red (fetch mockeado). */
@@ -46,8 +50,8 @@ catch (_e) {
       { clave: "fleje", nombre: "Flejes y alambres", emoji: "🧵", unidades: ["Kg"], orden: 2 },
       { clave: "importados", nombre: "Importados", emoji: "🌎", unidades: [], orden: 3 },
       { clave: "partes_plasticas", nombre: "Partes plásticas", emoji: "🧩", unidades: [], orden: 4 },
-      { clave: "cajas", nombre: "Cajas", emoji: "📦", unidades: ["Paquetes", "Uni"], orden: 5 },
-      { clave: "depurar", nombre: "A depurar", emoji: "🗑", unidades: [], orden: 99 }
+      { clave: "cajas", nombre: "Cajas", emoji: "📦", unidades: ["Paquetes", "Uni"], orden: 5, descripcion: "Cartón y embalaje" },
+      { clave: "cajas2", nombre: "Cajas grandes", emoji: "🗃", unidades: [], orden: 6 }
     ];
     let UNIS_DB = ["Uni", "Kg", "Bolsas", "Paquetes", "MC", "Cajas"];
     function J(data) {
@@ -59,8 +63,8 @@ catch (_e) {
       { cod: "PP", nombre: "POLIPROPILENO", categoria: "plastico", ubicacion: "AF1", orden: null, creado_por: "104" },
       { cod: "TMP-0001", nombre: "Bolsa gris sin etiqueta", categoria: "plastico", ubicacion: null, orden: null, creado_por: "104" },
       { cod: "TMP-0002", nombre: "Alambre finito que trajo Perez", categoria: "", ubicacion: null, orden: null, creado_por: "231" },
-      { cod: "505C·CUCHILLA CHINA", nombre: "CUCHILLA CHINA", categoria: "depurar", ubicacion: null, orden: null, creado_por: "104" },
-      { cod: "FLEJE ESPIRAL·1", nombre: "1", categoria: "depurar", ubicacion: null, orden: null, creado_por: "104" }
+      { cod: "505C·CUCHILLA CHINA", nombre: "CUCHILLA CHINA", categoria: null, ubicacion: null, orden: null, creado_por: "104" },
+      { cod: "FLEJE ESPIRAL·1", nombre: "1", categoria: null, ubicacion: null, orden: null, creado_por: "104" }
     ];
     window.fetch = function (url, opt) {
       url = String(url);
@@ -130,12 +134,15 @@ catch (_e) {
     document.getElementById("idNom_TMP-0001").value = "Nylon especial";
     document.getElementById("idUbi_TMP-0001").value = "AF9";
     document.getElementById("idQty_TMP-0001").value = "12";
+    // pasa a «fleje», que se carga en Kg: la unidad tiene que ser compatible con la
+    // categoría elegida (si no, la bloquea el chequeo del punto 8d)
+    document.getElementById("idCat_TMP-0001").value = "fleje";
     document.getElementById("idUni_TMP-0001").value = "Kg";
     await stkInsAceptar("TMP-0001");
     const ident = rpc.filter(function (x) { return x.fn === "insumo_identificar"; })[0];
     out.identCod = ident ? ident.body.p_cod : null;          // "1234567"
     out.identNom = ident ? ident.body.p_nombre : null;       // "Nylon especial"
-    out.identCat = ident ? ident.body.p_categoria : null;    // "plastico"
+    out.identCat = ident ? ident.body.p_categoria : null;    // "fleje"
     out.identUbi = ident ? ident.body.p_ubicacion : null;    // "AF9"
     // cambió Bolsas→Kg: saca las 7 Bolsas y pone 12 Kg, con el código TODAVÍA temporal
     out.ajusteN = movs.length;                               // 2
@@ -174,7 +181,9 @@ catch (_e) {
 
     // 5) CATEGORÍAS: una caja por categoría, con sus unidades permitidas
     const cajas = document.querySelectorAll("#stkBody .stk-catbox");
-    out.nCajasCat = cajas.length;                            // 5 (depurar vive en Pendientes)
+    out.nCajasCat = cajas.length;                            // 6 categorías, ninguna es «a depurar»
+    out.sinDepurar = !/A depurar/.test(document.getElementById("stkBody").innerHTML);
+    out.catDetalle = /Cartón y embalaje/.test(document.getElementById("stkBody").innerHTML);
     out.catMuestraUnis = /Unidades permitidas/.test(document.getElementById("stkBody").innerHTML);
     out.catCuentaInsumos = /3 insumos|2 insumos|1 insumo/.test(cajas[0].textContent);
 
@@ -219,13 +228,43 @@ catch (_e) {
     await stkInsAlta("fleje");
     out.altaRechazaDuplicado = rpc.length === antesAlta && /ya está en uso/i.test(alerted);
 
+    // 8c) TABLA FINAL de sólo lectura, filtrable, y se actualiza con los cambios
+    const tablas = document.querySelectorAll("#stkBody table");
+    const tot = tablas[tablas.length - 1];
+    out.hayTablaTotal = /Todos los insumos/.test(document.getElementById("stkBody").innerHTML);
+    out.totalCols = Array.prototype.map.call(tot.querySelectorAll("thead tr")[0].querySelectorAll("th"), function (e) { return e.textContent.trim(); }).join("|");
+    out.totalFilas = tot.querySelectorAll("tbody tr").length;
+    out.totalSinEditar = !tot.querySelector("tbody input") && !tot.querySelector("tbody select");
+    out.totalHayFiltros = !!tot.querySelector("thead tr.stk-filtros input");
+    stkInsFiltro("cod", "22");
+    const tablas2 = document.querySelectorAll("#stkBody table");
+    out.totalFiltraCod = tablas2[tablas2.length - 1].querySelectorAll("tbody tr").length;   // 1
+    stkInsFiltro("cod", ""); stkInsFiltro("cat", "?");
+    const tablas3 = document.querySelectorAll("#stkBody table");
+    out.totalFiltraSinCat = tablas3[tablas3.length - 1].querySelectorAll("tbody tr").length;
+    stkInsFiltro("cat", "");
+    // se actualiza sola: cambio el nombre de un insumo y la tabla lo refleja
+    CAT[0].nombre = "RENOMBRADO DESDE ARRIBA";
+    await stkInsRefresh(); stkRender();
+    const tablas4 = document.querySelectorAll("#stkBody table");
+    out.totalSeActualiza = /RENOMBRADO DESDE ARRIBA/.test(tablas4[tablas4.length - 1].innerHTML);
+
+    // 8d) Unidad no permitida por la categoría → alerta y no manda
+    _stkIns.abierta = ""; stkRender();
+    const antesUni = rpc.length; alerted = "";
+    document.getElementById("idCod_TMP-0002").value = "9998887";
+    document.getElementById("idCat_TMP-0002").value = "cajas";      // permite Paquetes/Uni
+    document.getElementById("idUni_TMP-0002").value = "Kg";         // no permitida
+    await stkInsAceptar("TMP-0002");
+    out.uniProhibidaBloquea = rpc.length === antesUni && /no permitida/i.test(alerted) && /Paquetes/.test(alerted);
+
     // 9) VÍNCULO CON EL OPERARIO — el modal de RI/EI lee las MISMAS tablas.
     //    Se prueba con una categoría y una unidad que NO están en el fallback
     //    hardcodeado: si el operario las muestra, es porque salieron de la base.
     CATS_DB = [
       { clave: "etiquetas", nombre: "Etiquetas y sunchos", emoji: "🏷", unidades: ["Rollos"], orden: 1 },
       { clave: "fleje", nombre: "Flejes RENOMBRADO", emoji: "🧵", unidades: ["Kg"], orden: 2 },
-      { clave: "depurar", nombre: "A depurar", emoji: "🗑", unidades: [], orden: 99 }
+      { clave: "cajas2", nombre: "Cajas grandes", emoji: "🗃", unidades: [], orden: 6 }
     ];
     UNIS_DB = ["Rollos", "Kg"];
     CAT.push({ cod: "ET1", nombre: "Etiqueta chica", categoria: "etiquetas", ubicacion: null, creado_por: "104" });
@@ -260,15 +299,18 @@ catch (_e) {
     r.pendCat === "plastico" && r.pendUbicEditable === true && r.pendQty === "7" && r.pendUni === "Bolsas" &&
     r.sinColumnaOrden === true && r.pendMuestraLegajo === true &&
     r.rechazaTmpComoCod === true &&
-    r.identCod === "1234567" && r.identNom === "Nylon especial" && r.identCat === "plastico" && r.identUbi === "AF9" &&
+    r.identCod === "1234567" && r.identNom === "Nylon especial" && r.identCat === "fleje" && r.identUbi === "AF9" &&
     r.ajusteN === 2 && r.ajusteSaca === true && r.ajustePone === true && r.ajusteSobreTmp === true &&
     r.borraTmpSinSaldo === true && r.borrarConSaldoAvisa === true && r.borrarCerorea === true &&
-    r.nCajasCat === 5 && r.catMuestraUnis === true &&
+    r.nCajasCat === 6 && r.sinDepurar === true && r.catDetalle === true && r.catMuestraUnis === true &&
     r.listadoOculto === true && r.listadoAbre === true && r.listadoFleje === 2 && r.listadoNoTraePP === true &&
     r.altaEnSuCat === true &&
     r.catEditAbre === true && r.catGuardaNombre === "Cajas y embalaje" && r.catGuardaUnis === "Paquetes,Uni,MC" &&
     r.haySecUnidades === true && r.uniSacar === true && r.uniUsadaAvisa === true && r.uniLibreNoAvisa === true &&
     /Pendientes.*\|.*Unidades.*\|.*Categorías/.test(r.ordenSecciones || "") && r.altaRechazaDuplicado === true &&
+    r.hayTablaTotal === true && /Código\|Nombre\|Categoría\|Rack \/ sector\|Cantidad\|Unidad/.test(r.totalCols || "") &&
+    r.totalSinEditar === true && r.totalHayFiltros === true && r.totalFiltraCod === 1 &&
+    r.totalFiltraSinCat >= 1 && r.totalSeActualiza === true && r.uniProhibidaBloquea === true &&
     r.opVeCatNueva === true && r.opVeRenombrada === true && r.opVeInsumoDeLaCat === true &&
     r.opUniDeLaCat === "Rollos" && r.opAltaUnidades === "Rollos,Kg" && r.opAltaUniDeLaCat === "Rollos" &&
     /Etiquetas y sunchos/.test(r.opAltaCats || "") && /Flejes RENOMBRADO/.test(r.opAltaCats || "") &&
