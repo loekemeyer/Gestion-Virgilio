@@ -11551,6 +11551,8 @@ function stkFiltroToggleE() {
 }
 /* v7.48 — tilde "🔴 Negativos": muestra sólo los artículos con saldo negativo en algún depósito. */
 function stkToggleSoloNeg() { if (!_stk) return; _stk.soloNeg = !_stk.soloNeg; stkRender(); }
+// v7.54: filtro "stock bajo" — códigos donde stock actual < pedidos
+function stkToggleSoloLow() { if (!_stk) return; _stk.soloLow = !_stk.soloLow; stkRender(); }
 /* v6.30 — Ratio de guardado: helpers para la tarjeta "horas de guardado pendientes".
    Ratio y switch de racks viven en Stock_Config (los trae openStockAdmin en _stk.gConf).
    El ratio lo autoajusta el server (guardado_recalc_ratio) con las sesiones medidas. */
@@ -11591,7 +11593,8 @@ function stkBodyStocks() {
   // (son cajas físicas reales). Sin ellos, artículos que están SOLO en esos depósitos
   // (ej. 439E = 84 p/envasar, 809E = 360 racks CH) no aparecían en la tabla, y el 035E
   // mostraba 33 cuando físicamente hay 33 + 44 p/envasar. insumos sigue aparte.
-  const SECTKEYS = ["terminado", "excedente", "separar_pedidos", "a_facturar", "a_guardar", "racks", "para_envasar", "racks_ch"];
+  // v7.54: racks_ch sumado a racks (una sola columna "Racks")
+  const SECTKEYS = ["terminado", "excedente", "separar_pedidos", "a_facturar", "a_guardar", "racks", "para_envasar"];
   // v7.48: helpers del tilde "🔴 Negativos" — un artículo está negativo si CUALQUIER depósito
   // (redondeado a lo que se muestra) da < 0. "insumos" se chequea aparte en su sección.
   const _stkIsNeg = function (n) { return Math.round((Number(n) || 0) * 10) / 10 < 0; };
@@ -11602,7 +11605,18 @@ function stkBodyStocks() {
   // v7.48: tilde "🔴 Negativos" — se aplica ADEMÁS del buscador. Deja sólo los artículos con
   // saldo negativo en algún depósito (para cazar inconsistencias de stock de un vistazo).
   const _stkNegCount = arts.filter(_stkArtHasNeg).length + arts.filter(function (a) { return _stkIsNeg(a.insumos); }).length;
+  // v7.54: tilde "⚠ Stock bajo" — códigos donde stock actual < pedidos
+  const _stkLowCount = arts.filter(function (a) {
+    const stock = (Number(a.terminado) || 0) + (Number(a.excedente) || 0) + (Number(a.separar_pedidos) || 0) + (Number(a.a_facturar) || 0) + (Number(a.a_guardar) || 0) + (Number(a.racks) || 0) + (Number(a.racks_ch) || 0);
+    const ped = Number(dem[_ocgNorm(a.cod)]) || 0;
+    return stock < ped && ped > 0;
+  }).length;
   if (_stk.soloNeg) shown = shown.filter(_stkArtHasNeg);
+  if (_stk.soloLow) shown = shown.filter(function (a) {
+    const stock = (Number(a.terminado) || 0) + (Number(a.excedente) || 0) + (Number(a.separar_pedidos) || 0) + (Number(a.a_facturar) || 0) + (Number(a.a_guardar) || 0) + (Number(a.racks) || 0) + (Number(a.racks_ch) || 0);
+    const ped = Number(dem[_ocgNorm(a.cod)]) || 0;
+    return stock < ped && ped > 0;
+  });
   // v4.23: "cuánto hay en cada sector". Totales por depósito (GLOBAL, no filtrado)
   // para la tira de arriba; columnas por sector en la tabla (góndola y a guardar
   // siempre; racks / a separar / a facturar solo si tienen algo).
@@ -11610,14 +11624,17 @@ function stkBodyStocks() {
   const SECT = [
     { key: "terminado", label: "Góndola" }, { key: "excedente", label: "Excedente" },
     { key: "separar_pedidos", label: "Pickeados" }, { key: "a_facturar", label: "A facturar" },
-    { key: "a_guardar", label: "A guardar" }, { key: "racks", label: "Racks" },
+    { key: "a_guardar", label: "A guardar" }, { key: "racks", label: "Racks", racksKey: true },
     // v7.03: depósitos del flujo de envasado / Cervantes. `extra:true` = tira y columna
     // SÓLO cuando hay saldo (no ensucian la tabla en el celular los días que están en 0).
-    { key: "para_envasar", label: "P/ envasar", extra: true }, { key: "racks_ch", label: "Racks CH", extra: true },
+    { key: "para_envasar", label: "P/ envasar", extra: true },
     { key: "insumos", label: "Insumos" }
   ];
   const totals = {};
-  arts.forEach(function (a) { SECT.forEach(function (s) { totals[s.key] = (totals[s.key] || 0) + (Number(a[s.key]) || 0); }); });
+  arts.forEach(function (a) { SECT.forEach(function (s) {
+    const val = s.racksKey ? ((Number(a[s.key]) || 0) + (Number(a.racks_ch) || 0)) : (Number(a[s.key]) || 0);
+    totals[s.key] = (totals[s.key] || 0) + val;
+  }); });
   let h = "";   // banner "Stock contado desde…" sacado a pedido del usuario
   h += stkAsOfControl();   // En vivo / a una fecha y hora determinada
   // Tira de totales por sector (todos, aunque estén en 0).
@@ -11644,6 +11661,7 @@ function stkBodyStocks() {
   h += '</div>';
   // v6.30 — Tarjeta "horas de guardado pendientes" (backlog a_guardar [+ racks si el switch] ÷ ratio).
   var _gRate = stkGRate(), _gRacks = stkGRacksOn();
+  // v7.54: totals.racks ya incluye racks_ch
   var _gBacklog = Math.max(0, (Number(totals.a_guardar) || 0) + (_gRacks ? (Number(totals.racks) || 0) : 0));
   var _gHoras = _gRate > 0 ? Math.round((_gBacklog / _gRate) * 10) / 10 : 0;
   var _gCol = _gHoras > 6 ? "#b91c1c" : (_gHoras >= 4 ? "#b45309" : "#166534");
@@ -11670,6 +11688,9 @@ function stkBodyStocks() {
     '<button type="button" onclick="stkFiltroToggleE()" title="Agregar/quitar la E (importado)" style="width:auto;margin:0;flex:0 0 auto;padding:0 18px;height:38px;border:1.5px solid #cbd5e1;border-radius:9px;background:#fff;font-weight:800;font-size:16px;cursor:pointer;">E</button>' +
     '<button type="button" onclick="stkToggleSoloNeg()" title="Mostrar sólo los artículos con saldo NEGATIVO en algún depósito (góndola, racks, a facturar, etc.)" style="width:auto;margin:0;flex:0 0 auto;padding:0 13px;height:38px;border:1.5px solid ' + (_stk.soloNeg ? "#dc2626" : "#cbd5e1") + ';border-radius:9px;background:' + (_stk.soloNeg ? "#fef2f2" : "#fff") + ';color:' + (_stk.soloNeg ? "#b91c1c" : "#334155") + ';font-weight:800;font-size:13px;cursor:pointer;white-space:nowrap;">' + (_stk.soloNeg ? "☑" : "☐") + ' 🔴 Negativos' + (_stkNegCount ? " (" + _stkNegCount + ")" : "") + '</button>' +
     '</div>';
+  h += '<div style="display:flex;gap:6px;margin-bottom:10px;align-items:center;flex-wrap:wrap;">' +
+    '<button type="button" onclick="stkToggleSoloLow()" title="Mostrar sólo los códigos donde la suma de depósitos (góndola+excedente+pickeados+a facturar+a guardar+racks) es MENOR que lo pedido" style="width:auto;margin:0;flex:0 0 auto;padding:0 13px;height:38px;border:1.5px solid ' + (_stk.soloLow ? "#dc2626" : "#cbd5e1") + ';border-radius:9px;background:' + (_stk.soloLow ? "#fef2f2" : "#fff") + ';color:' + (_stk.soloLow ? "#b91c1c" : "#334155") + ';font-weight:800;font-size:13px;cursor:pointer;white-space:nowrap;">' + (_stk.soloLow ? "☑" : "☐") + ' ⚠ Stock bajo' + (_stkLowCount ? " (" + _stkLowCount + ")" : "") + '</button>' +
+    '</div>';
   // Columnas: sectores fijos (menos insumos, que va en su sección). Los `extra`
   // (p/envasar, racks CH) SOLO se muestran como columna si algún artículo visible
   // tiene saldo ahí — así no agregan 2 columnas al pedo en el celular (v7.03).
@@ -11683,7 +11704,7 @@ function stkBodyStocks() {
   cols.forEach(function (c) { th += '<th class="num">' + c.label.replace(" ", "<br>") + '</th>'; });
   th += '<th class="num" style="background:#eef2ff;color:#1e3a8a;" title="Facturado sin salida: mercadería ya facturada (salió del stock contable) pero todavía física en el depósito, sin cargar al camión. Tocá el número para ver las NP.">FC<br>s/Salida</th>';   // v6.70
   h += '<div class="stk-tblwrap"><table class="stk-tbl stk-tbl-fit"><thead><tr>' + th + '<th></th></tr></thead><tbody>';
-  if (!shown.length) h += '<tr><td colspan="' + ncol + '" class="stk-empty">' + (_stk.soloNeg ? "✅ No hay stock negativo en ningún depósito." : "Sin stock todavía.") + '</td></tr>';
+  if (!shown.length) h += '<tr><td colspan="' + ncol + '" class="stk-empty">' + (_stk.soloNeg ? "✅ No hay stock negativo en ningún depósito." : (_stk.soloLow ? "✅ Todo está en stock — no hay códigos con faltante." : "Sin stock todavía.")) + '</td></tr>';
   // v6.67 — celdas de depósito clickeables AUNQUE el saldo sea 0, si el artículo TUVO
   // movimientos ahí alguna vez (el pop-up muestra el historial que neteó a 0). Se cachea
   // en _stk._histDeps (Set "codN|deposito") — O(movs) una sola vez, no por tecla.
@@ -11694,16 +11715,17 @@ function stkBodyStocks() {
   }
   const _histDeps = _stk._histDeps;
   shown.forEach(function (a) {
-    const _tot = SECTKEYS.reduce(function (s, k) { return s + (Number(a[k]) || 0); }, 0);
+    const _tot = SECTKEYS.reduce(function (s, k) { return s + (Number(a[k]) || 0); }, 0) + (Number(a.racks_ch) || 0);  // v7.54: racks_ch sumado al total
     const _ped = Number(dem[_ocgNorm(a.cod)]) || 0;
     const _cap = Number(capByCod[_ocgNorm(a.cod)]) || 0;
     let tds = '<td class="stk-cod">' + escapeHtml(a.cod) + '</td><td class="stk-desc">' + escapeHtml(artNombre(a.cod, a.desc) || "—") + '</td><td class="num ' + (_tot < 0 ? "stk-neg" : "") + '" style="background:#f8fafc"><b>' + fmtCajas(_tot) + '</b></td>' + (_ped ? '<td class="num stk-pick-cell" style="background:#fffbeb;color:#92400e" onclick="event.stopPropagation();stkOpenCajasPedidasArt(\'' + encodeURIComponent(a.cod) + '\')" title="Solo NP programadas en el PPP. Tocá para ver el detalle por NP (incluye también las NP sin programar, por eso el total del detalle puede ser mayor)"><b>' + fmtCajas(_ped) + '</b></td>' : '<td class="num" style="background:#fffbeb;color:#92400e"></td>') + (_cap ? '<td class="num stk-pick-cell" style="background:#f0fdf4;color:#166534" onclick="event.stopPropagation();stkOpenCapArt(\'' + encodeURIComponent(a.cod) + '\')" title="Ubicaciones y capacidad de góndola"><b>' + fmtCajas(_cap) + '</b></td>' : '<td class="num" style="background:#f0fdf4;color:#166534"></td>');
     cols.forEach(function (c) {
-      const v = Number(a[c.key]) || 0;
+      const v = (c.racksKey ? ((Number(a[c.key]) || 0) + (Number(a.racks_ch) || 0)) : (Number(a[c.key]) || 0));
       // v5.82: columnas clickeables → detalle. Pickeados/A facturar → NPs; Excedente/Racks → ubicación.
       // v6.67: también con saldo 0 si TUVO movimientos en ese depósito (ver el historial).
+      // v7.54: racks suma racks + racks_ch para mostrar una sola columna "Racks"
       let _clk = "";
-      const _hasHist = _histDeps.has(_stkNormCod(a.cod) + "|" + c.key);
+      const _hasHist = _histDeps.has(_stkNormCod(a.cod) + "|" + c.key) || (c.racksKey && _histDeps.has(_stkNormCod(a.cod) + "|racks_ch"));
       if (v > 0.05 || _hasHist) {
         const _ce = encodeURIComponent(a.cod);
         if (c.key === "separar_pedidos") _clk = "stkOpenMovsArt('" + _ce + "','separar_pedidos','Pickeados','🛒')";   // v6.47: ver movimientos (como góndola)
