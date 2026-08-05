@@ -4,7 +4,21 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-05 · Versión app al documentar: **v7.45**
+> Última actualización: 2026-08-05 · Versión app al documentar: **v7.46**
+>
+> Nota: **v7.46 — «Monitor de operarios» + «Análisis de productividad» = UN módulo con dos
+> pestañas**. Pedido del usuario. Los dos modales (`#monitorModal` y `#analisisModal`) ahora se
+> presentan como un solo módulo con un **switch de pestañas en el header de ambos** (`.mod-switch`:
+> 🖥️ Monitor · 📈 Análisis, misma posición izquierda en los dos → el switch queda fijo y cambia el
+> contenido). **Abre en Monitor** (entrada única: botón **«Monitor y Análisis»**, ex «Monitor de
+> operarios»); se **quitó el botón suelto «Análisis de productividad»** del menú supervisor (ahora es la
+> segunda pestaña). El cambio de vista lo hacen `switchToMonitor()`/`switchToAnalisis()`, que **cierran un
+> modal y abren el otro** para respetar el lifecycle propio de cada uno (el monitor: modo TV/vp +
+> auto-refresh 30 s + inconsistencias; el análisis: gráficos + Producción por día + sección Rendimiento de
+> operarios). En **modo kiosko** (pantalla de pared) el switch se **oculta** (`__tvKioskMode`, display de
+> solo-lectura). No cambia ninguna lógica de datos; es reorganización de navegación. Verificado:
+> `tests/smoke.cjs` OK + chequeo headless (funciones, pestaña activa correcta en cada vista, botón viejo
+> ausente, sin pageerrors) + screenshots de ambos headers. Bump **v7.46**.
 >
 > Nota: **v7.45 — PPP: el 📦 del chequeo pasa a ser un SEMÁFORO automático** (pedido del usuario
 > sobre la v7.16). El ícono ya no es un botón neutro que hay que tocar: **se auto-chequea al abrir

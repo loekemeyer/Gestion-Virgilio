@@ -520,6 +520,21 @@ button {
   border-bottom: 1px solid #e5e7eb;
 }
 .monitor-title{ font-size: 18px; font-weight: bold; }
+/* v7.44 — Monitor de operarios y Análisis de productividad son UN módulo con dos
+   pestañas: el switch va en el header de ambos (headers oscuros → mismo look). Al tocar
+   la pestaña inactiva se cierra un modal y se abre el otro (switchToMonitor/Analisis). */
+.mod-switch{ display: inline-flex; gap: 4px; background: #1e293b; border: 1px solid #334155;
+  border-radius: 11px; padding: 4px; flex: 0 0 auto; }
+.mod-tab{ background: transparent; color: #94a3b8; border: none; border-radius: 8px;
+  padding: 7px 14px; font-size: 14px; font-weight: 800; cursor: pointer; white-space: nowrap;
+  width: auto; margin: 0; line-height: 1.1; }
+.mod-tab.on{ background: #1d4ed8; color: #fff; }
+.mod-tab:not(.on):hover{ color: #e2e8f0; background: #334155; }
+.mod-hdr-left{ display: flex; align-items: center; gap: 14px; min-width: 0; }
+/* Modo TV (monitor a pantalla completa): el switch escala como el resto del header. */
+#monitorModal.tv .mod-switch{ border-radius: clamp(11px, 1.4vh, 16px); }
+#monitorModal.tv .mod-tab{ font-size: clamp(13px, 1.9vh, 22px);
+  padding: clamp(6px, 1vh, 12px) clamp(12px, 1.5vw, 24px); }
 /* Logo de la app en los headers del Monitor Virgilio y de Facturación (ventas).
    Escala con el tamaño del título (em), así se agranda solo en modo TV. */
 .hdr-logo{ height: 1.3em; width: auto; vertical-align: middle; margin-right: 8px; }
@@ -2984,12 +2999,20 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
 <div id="monitorModal" onclick="if(event.target.id==='monitorModal') closeMonitor()">
   <div class="monitor-card">
     <div class="monitor-header">
-      <div>
-        <div class="monitor-title"><img class="hdr-logo" src="icon.svg" alt=""><span id="monitorTitleText">Monitor Virgilio</span> <span id="monitorRefresh" class="monitor-refresh"></span><span id="monitorVpInfo" style="color:#888;font-size:12px;margin-left:8px"></span><span id="monitorCountdown" style="color:#888;font-size:12px;margin-left:8px"></span></div>
-        <div class="monitor-meta" id="monitorMeta"></div>
-        <div class="mon-filter-wrap">
-          <input id="monFilter" class="mon-filter" type="search" placeholder="🔎 Buscar tanda / operario" oninput="_monApplyFilter()" autocomplete="off">
-          <span id="monFilterNote" class="mon-filter-note"></span>
+      <div class="mod-hdr-left">
+        <!-- v7.44: pestañas del módulo unificado (Monitor ↔ Análisis). Se oculta en
+             modo kiosko/pared (openMonitor lo esconde si __tvKioskMode). -->
+        <div class="mod-switch" id="monTabSwitch">
+          <button class="mod-tab on" onclick="switchToMonitor()" title="Monitor de operarios (en vivo)">🖥️ Monitor</button>
+          <button class="mod-tab" onclick="switchToAnalisis()" title="Análisis de productividad">📈 Análisis</button>
+        </div>
+        <div>
+          <div class="monitor-title"><img class="hdr-logo" src="icon.svg" alt=""><span id="monitorTitleText">Monitor Virgilio</span> <span id="monitorRefresh" class="monitor-refresh"></span><span id="monitorVpInfo" style="color:#888;font-size:12px;margin-left:8px"></span><span id="monitorCountdown" style="color:#888;font-size:12px;margin-left:8px"></span></div>
+          <div class="monitor-meta" id="monitorMeta"></div>
+          <div class="mon-filter-wrap">
+            <input id="monFilter" class="mon-filter" type="search" placeholder="🔎 Buscar tanda / operario" oninput="_monApplyFilter()" autocomplete="off">
+            <span id="monFilterNote" class="mon-filter-note"></span>
+          </div>
         </div>
       </div>
       <div id="monitorClock"></div>
@@ -3010,7 +3033,14 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
 <!-- Modal: Análisis Productividad — gráficos picking y pedido m3/h -->
 <div id="analisisModal">
   <div class="analisis-header">
-    <div class="analisis-title">📈 Análisis Productividad</div>
+    <div class="mod-hdr-left">
+      <!-- v7.44: mismas pestañas del módulo unificado (Monitor ↔ Análisis). -->
+      <div class="mod-switch" id="anTabSwitch">
+        <button class="mod-tab" onclick="switchToMonitor()" title="Monitor de operarios (en vivo)">🖥️ Monitor</button>
+        <button class="mod-tab on" onclick="switchToAnalisis()" title="Análisis de productividad">📈 Análisis</button>
+      </div>
+      <div class="analisis-title">📈 Análisis Productividad</div>
+    </div>
     <button class="hist-modal-close" onclick="closeAnalisis()" style="background:#1e293b;color:#f8fafc;border-color:#334155;width:auto;margin:0;flex:0 0 auto;">Cerrar</button>
   </div>
   <div class="analisis-body">
@@ -3372,8 +3402,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
     <!-- CHICOS: uso ocasional. -->
     <div class="sup-actions sup-secondary">
       <button class="sup-action-btn" onclick="openAgentesAdmin()"><span class="sup-ico">🤖</span><span>Agentes</span></button>
-      <button class="sup-action-btn" onclick="openMonitor()"><span class="sup-ico">📊</span><span>Monitor de operarios</span></button>
-      <button class="sup-action-btn" onclick="openAnalisis()"><span class="sup-ico">📈</span><span>Análisis de productividad</span></button>
+      <button class="sup-action-btn" onclick="openMonitor()"><span class="sup-ico">📊</span><span>Monitor y Análisis</span></button>
       <button class="sup-action-btn" onclick="openInconsistencias()"><span class="sup-ico">⚠</span><span>Inconsistencias</span></button>
       <button class="sup-action-btn" onclick="openFaltantes()"><span class="sup-ico">📦</span><span>Faltantes</span></button>
       <button class="sup-action-btn" onclick="openNpConsulta()"><span class="sup-ico">🔎</span><span>Consultar NP / Líos</span></button>
@@ -5978,7 +6007,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.45";
+const APP_VERSION = "v7.46";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -17993,6 +18022,10 @@ function openMonitor() {
   if (!requireSupervisor()) return;
   const m = document.getElementById("monitorModal");
   m.classList.add("show");
+  // v7.44: en modo kiosko (pantalla de pared) ocultamos las pestañas Monitor/Análisis
+  // — es un display de solo-lectura, nadie debería poder cambiar de vista tocándola.
+  const _swt = document.getElementById("monTabSwitch");
+  if (_swt) _swt.style.display = window.__tvKioskMode ? "none" : "";
   // Siempre en modo TV (fondo azul, tablero completo): aunque la pantalla sea
   // chica, mostramos la visualización entera en vez del popup blanco.
   m.classList.add("tv");
@@ -18180,6 +18213,13 @@ async function refreshAnalisisDayTotals(){
     container.innerHTML = `<div class="monitor-chart-empty">Error: ${escapeHtml(e.message || String(e))}</div>`;
   }
 }
+
+/* v7.44 — Monitor de operarios + Análisis de productividad = UN módulo con 2 pestañas.
+   Abre en Monitor; el switch del header cambia de vista cerrando un modal y abriendo el
+   otro, así se respetan los intervalos y el lifecycle propio de cada uno (el monitor su
+   modo TV/vp + auto-refresh; el análisis sus gráficos + sección de operarios). */
+function switchToMonitor(){ if (typeof closeAnalisis === "function") closeAnalisis(); openMonitor(); }
+function switchToAnalisis(){ if (typeof closeMonitor === "function") closeMonitor(); openAnalisis(); }
 
 function openAnalisis() {
   if (!requireSupervisor()) return;
