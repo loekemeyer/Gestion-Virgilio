@@ -6028,7 +6028,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.62";
+const APP_VERSION = "v7.64";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -10015,12 +10015,14 @@ async function ocNuevaCrear() {
    OC_Maximos (config importada del Excel); Stock de Movimientos_Stock (góndola+racks, NO "a guardar");
    Pedidos (demanda) = Σ cajas por artículo en los pedidos del PPP (PPP_Programacion_Diaria) según la
    base de picking (PPP_Base_Pedidos). Agrupa por proveedor y, al confirmar, escribe las OCs en
-   Ordenes_Compra (escritura: sesión de supervisor). Proveedores INTERNOS (Racks=importación,
-   Log/Fabr=fábrica) se muestran pero NO generan OC externa. BETA: no usar hasta cargar el stock. */
+   Ordenes_Compra (escritura: sesión de supervisor). v7.64: "Log/ Fabr" (fábrica) SÍ genera OC
+   (pedido del usuario); "Racks" (importación) se EXCLUYE del generador — se abastece por otra vía. */
 const SUPABASE_OCMAX_ENDPOINT = SUPABASE_URL + "/rest/v1/OC_Maximos";
 const SUPABASE_CAPACIDAD_ENDPOINT = SUPABASE_URL + "/rest/v1/Capacidad_Sector";
-const OCG_INTERNOS = ["RACKS", "LOG/ FABR", "LOG/FABR", "LOG/ FABRICA"];
-function _ocgInterno(prov) { return OCG_INTERNOS.indexOf(String(prov || "").toUpperCase().trim()) >= 0; }
+/* Proveedores que NO entran al generador de OCs (ni preview ni generación). Racks se
+   abastece por importación (otro flujo), así que se saca de acá. */
+const OCG_EXCLUIDOS = ["RACKS", "RACK"];
+function _ocgExcluido(prov) { return OCG_EXCLUIDOS.indexOf(String(prov || "").toUpperCase().trim()) >= 0; }
 async function ocgFetchMaximos() {
   return supaFetchAllSafe(SUPABASE_OCMAX_ENDPOINT, "select=cod,descripcion,linea,max_cajas,proveedor,uni_x_caja,indice&activo=eq.true");
 }
@@ -10156,6 +10158,7 @@ async function ocgEnter() {
     });
     const items = [];
     maxs.forEach(function (m) {
+      if (_ocgExcluido(m.proveedor)) return;   // Racks no va al generador (se importa por otra vía)
       const cod = String(m.cod).toUpperCase().trim();
       const codN = _ocgNorm(cod);
       const stock = stockN[codN] || 0;
@@ -10180,7 +10183,7 @@ async function ocgEnter() {
 }
 function ocgGroups() {
   const g = {};
-  ((_oc.gen && _oc.gen.items) || []).forEach(function (it) { const k = it.prov; if (!g[k]) g[k] = { prov: k, interno: _ocgInterno(k), items: [], total: 0 }; g[k].items.push(it); g[k].total += it.falta; });
+  ((_oc.gen && _oc.gen.items) || []).forEach(function (it) { const k = it.prov; if (!g[k]) g[k] = { prov: k, items: [], total: 0 }; g[k].items.push(it); g[k].total += it.falta; });
   return g;
 }
 function ocBodyGen() {
@@ -10189,14 +10192,13 @@ function ocBodyGen() {
   h += '<div style="background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af;border-radius:9px;padding:9px 11px;margin-bottom:10px;font-size:12.5px"><b>A pedir = máx(0, Máximo + Pedidos − (Góndola + A guardar + Racks + Excedente))</b>, con <b>Máximo = Proyección por tendencia (PaginaLK) × índice</b>, topado a la <b>capacidad de góndola</b>. <b>No</b> se cuentan pickeados, a facturar ni FC sin salida — y los pedidos que ya están en esos estadios <b>tampoco suman a Pedidos</b> (netea). Si un artículo no tiene proyección (sin ventas), su proyección figura en <b>0</b> y usa el <b>objetivo</b> configurado en <b>⚙ Config (máximos)</b>. Se generan solas los <b>miércoles 7:00</b>; acá podés generarlas a mano cuando quieras. Revisá antes de generar.</div>';
   if (!_oc.gen) return h + '<div class="oc-loading">Calculando (stock + demanda PPP + proyección × índice)…</div>';
   if (_oc.gen.error) return h + '<div class="oc-empty" style="color:#b91c1c">Error: ' + escapeHtml(_oc.gen.error) + '</div>';
-  const g = ocgGroups(), keys = Object.keys(g).sort(function (a, b) { return (g[a].interno - g[b].interno) || a.localeCompare(b); });
+  const g = ocgGroups(), keys = Object.keys(g).sort(function (a, b) { return a.localeCompare(b); });
   if (!keys.length) return h + '<div class="oc-empty">No hay nada para pedir (todo está en o sobre el máximo).<br><small>Con el stock en 0, va a dar todo para pedir cuando lo cargues.</small></div>';
-  const externos = keys.filter(function (k) { return !g[k].interno; });
-  const totExt = externos.reduce(function (s, k) { return s + g[k].items.length; }, 0);
-  h += '<div class="oc-meta">Fecha <b>' + escapeHtml(_oc.gen.fecha) + '</b> · <b>' + externos.length + '</b> proveedor(es) externos · <b>' + totExt + '</b> ítem(s) a pedir.</div><div class="oc-tools" style="margin-top:8px"><button class="oc-btn ok" onclick="ocgGenerar()">✓ Generar las OCs</button></div>';
+  const totItems = keys.reduce(function (s, k) { return s + g[k].items.length; }, 0);
+  h += '<div class="oc-meta">Fecha <b>' + escapeHtml(_oc.gen.fecha) + '</b> · <b>' + keys.length + '</b> proveedor(es) · <b>' + totItems + '</b> ítem(s) a pedir.</div><div class="oc-tools" style="margin-top:8px"><button class="oc-btn ok" onclick="ocgGenerar()">✓ Generar las OCs</button></div>';
   keys.forEach(function (k) {
     const x = g[k];
-    h += '<div class="oc-meta" style="margin-top:12px;margin-bottom:4px"><b>' + escapeHtml(k) + '</b>' + (x.interno ? ' <span style="color:#64748b">(interno — no se genera OC)</span>' : '') + ' · ' + x.items.length + ' ítem(s) · ' + x.total + ' cajas</div>';
+    h += '<div class="oc-meta" style="margin-top:12px;margin-bottom:4px"><b>' + escapeHtml(k) + '</b> · ' + x.items.length + ' ítem(s) · ' + x.total + ' cajas</div>';
     h += '<div class="oc-tblwrap"><table class="oc-tbl"><thead><tr><th>Código</th><th>Descripción</th><th class="num">Proy</th><th class="num">Índice</th><th class="num">Máx</th><th class="num">Pedidos</th><th class="num">Stock</th><th class="num">A pedir</th></tr></thead><tbody>';
     x.items.sort(function (a, b) { return b.falta - a.falta; }).forEach(function (it) {
       const proyTxt = (it.fuente === "proy") ? (Math.round(it.proy) + "") : '<span style="color:#94a3b8" title="Sin ventas registradas → proyección 0; usa el objetivo de Config (máximos)">0</span>';
@@ -10211,9 +10213,9 @@ async function ocgGenerar() {
   if (!_oc || !_oc.gen) return;
   const g = ocgGroups();
   const rows = [];
-  Object.keys(g).forEach(function (k) { if (g[k].interno) return; g[k].items.forEach(function (it) { rows.push({ proveedor: it.prov, fecha: _oc.gen.fecha, rubro: "Art Term", codigo: codCanon(it.cod), descripcion: it.desc || null, cantidad: it.falta, cantidad_recibida: 0, unidad: "Cajas", estado: "pendiente", oc_max: it.max, oc_pedidos: it.demanda, oc_stock: it.stock, oc_uni_caja: it.uni, oc_ncaja: (it.ncaja != null ? it.ncaja : null) }); }); });
-  if (!rows.length) { alert("No hay OCs externas para generar."); return; }
-  if (!confirm("Vas a generar " + rows.length + " línea(s) de OC (proveedores externos) en Ordenes_Compra. ¿Seguro?")) return;
+  Object.keys(g).forEach(function (k) { g[k].items.forEach(function (it) { rows.push({ proveedor: it.prov, fecha: _oc.gen.fecha, rubro: "Art Term", codigo: codCanon(it.cod), descripcion: it.desc || null, cantidad: it.falta, cantidad_recibida: 0, unidad: "Cajas", estado: "pendiente", oc_max: it.max, oc_pedidos: it.demanda, oc_stock: it.stock, oc_uni_caja: it.uni, oc_ncaja: (it.ncaja != null ? it.ncaja : null) }); }); });
+  if (!rows.length) { alert("No hay OCs para generar."); return; }
+  if (!confirm("Vas a generar " + rows.length + " línea(s) de OC en Ordenes_Compra. ¿Seguro?")) return;
   const headers = await facAuthWriteHeaders({ "Prefer": "return=minimal" });
   if (!headers) { alert(authNoSesionMsg("Para generar las OCs necesitás iniciar sesión con Google (supervisor).")); return; }
   try {
