@@ -6054,7 +6054,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.73";
+const APP_VERSION = "v7.74";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -6434,6 +6434,24 @@ async function send() {
   if (opcion === "TP" && texto) {
     _pubUbic = await askPickUbicacion(texto);
     if (_pubUbic == null) return;   // canceló → no registra el TP
+  }
+  // v7.74 — NO dejar TERMINAR el armado (TAP) sin haber completado el asistente «Completar»
+  // (que graba las Entregas + líos). El TAP mueve el stock y marca la tanda armada, pero si el
+  // asistente no se terminó, la tanda queda ARMADA SIN REGISTROS → no aparece en el PDF de
+  // Facturado ni en la Composición a líos (caso real D06B: armado + stock movido, 0 Entregas).
+  // Fast-path local (`_armadoRegistrado`, que setea compTerminar al grabar); si no está, se
+  // confirma contra el server (`_compTandaYaArmada` = ¿tiene Entregas?). Si NO hay registros,
+  // avisamos y abrimos el asistente en vez de emitir un TAP hueco. El legajo de PRUEBA no crea
+  // Entregas (v7.69) → no aplica. Falla ABIERTO (sin red / error no bloquea).
+  if (opcion === "TAP" && texto && !(typeof esOperadorPrueba === "function" && esOperadorPrueba())
+      && !(typeof _armadoRegistrado !== "undefined" && _armadoRegistrado.has(texto))) {
+    let _tieneReg = null;
+    try { _tieneReg = await _compTandaYaArmada(texto); } catch (_e) { _tieneReg = null; }
+    if (_tieneReg === false) {
+      try { alert("⚠ Todavía no completaste el armado de " + texto + " en el asistente «Completar».\n\nSi terminás así, el pedido NO queda registrado y no se va a poder facturar / imprimir. Te abro el asistente para que lo completes."); } catch (_e) {}
+      try { showCompletarWizard(legajoStr, texto); } catch (_e) {}
+      return;   // no emitimos el TAP hueco
+    }
   }
   // v5.86: al TERMINAR ARMADO preguntar EN QUÉ UBICACIÓN queda cada NP de la tanda.
   // Se emiten eventos AUB (más abajo). Cancelar (null) → aborta el TAP; "Omitir" ({})
@@ -9100,6 +9118,9 @@ async function _compTandaYaArmada(tanda) {
     return Array.isArray(rows) && rows.length > 0;
   } catch (_e) { return false; }
 }
+// v7.74 — tandas cuyo armado se COMPLETÓ en el asistente (con Entregas grabadas) en esta sesión.
+// Fast-path para el gate del TAP en send(): evita el race de leer las Entregas recién posteadas.
+const _armadoRegistrado = new Set();
 async function compTerminar() {
   if (!_comp) return;
   // Paso 1 — faltantes: no se puede faltar MÁS de lo que dio el picking
@@ -9151,7 +9172,7 @@ async function compTerminar() {
   _compClearPersist(tanda);   // v4.04: completado → borrar el avance persistido
   _comp = null;
   const ov = document.getElementById("completarModal"); if (ov) ov.classList.remove("show");
-  if (rows.length) _compSaveEntregas(rows);
+  if (rows.length) { _compSaveEntregas(rows); try { _armadoRegistrado.add(String(tanda).trim().toUpperCase()); } catch (_e) {} }   // v7.74: marca la tanda como armado registrado (habilita el TAP)
   try { alert("✓ Completado: líos guardados" + (nFalt ? " · " + nFalt + " artículo(s) con faltante" : "") + ". Entregas registradas: " + rows.length + "."); } catch (_e) {}
   try { updatePendingIndicator(); } catch (_e) {}
 }

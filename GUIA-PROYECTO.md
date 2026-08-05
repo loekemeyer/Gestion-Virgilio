@@ -4,7 +4,20 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-05 · Versión app al documentar: **v7.72**
+> Última actualización: 2026-08-05 · Versión app al documentar: **v7.74**
+>
+> Nota: **v7.74 — no se puede TERMINAR el armado (TAP) sin completar el asistente «Completar»**. El
+> armado tiene dos pasos: (1) el asistente `compTerminar` graba los **registros** (`Entregas_Virgilio`
+> + líos `TAL`), y (2) el botón **TAP** emite el evento y mueve el stock (`stockSepararAFacturar`).
+> Estaban **desacoplados**: si el operario apretaba el **TAP suelto sin completar el asistente**, la
+> tanda quedaba **armada (stock movido) pero SIN registros** → no aparecía en el **PDF de Facturado**
+> ni en **Consulta NP → Composición a líos**. Caso real **D06B** (leg 8): armado 08-04, stock
+> separado/facturado, **0 Entregas / 0 TAL** → quedó en limbo. Fix: gate en `send()` — al emitir un TAP,
+> si la tanda **no tiene registros** (ni en el `Set` local `_armadoRegistrado` que setea `compTerminar`,
+> ni Entregas en el server vía `_compTandaYaArmada`), **avisa y abre el asistente** en vez de emitir el
+> TAP hueco. El legajo de PRUEBA no crea Entregas (v7.69) → no aplica; falla ABIERTO (sin red no
+> bloquea). Datos: reconstruidas a mano las Entregas de D06B (98151/98154/98155, con el faltante real
+> del 234). Smoke `tests/tap-sin-completar.cjs`. Bump **v7.74**.
 >
 > Nota: **v7.72 — fix de regresión (v7.54): un artículo SOLO en `racks_ch` volvió a aparecer en la
 > tabla de Stock**. v7.54 fusionó `racks_ch` en la columna «Racks» pero lo **sacó de `SECTKEYS`**, que
