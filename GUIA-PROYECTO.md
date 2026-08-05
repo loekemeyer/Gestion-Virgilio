@@ -4,7 +4,25 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-05 · Versión app al documentar: **v7.54**
+> Última actualización: 2026-08-05 · Versión app al documentar: **v7.55**
+>
+> Nota: **v7.55 — Generador de OCs: «Depurar incompletos», proyección 0 en vez de `xls`, y
+> parámetros de proyección (período + suavizar anómalos)**. Cuatro cosas pedidas por el usuario.
+> **(1) Botón «🧹 Depurar incompletos»** al lado de «Generar las OCs»: lista los artículos ACTIVOS de
+> `OC_Maximos` con datos faltantes (**sin proveedor / sin objetivo / sin uni×caja**) o **sin historial
+> de ventas** (sin proyección), con chips por problema y un resumen por tipo (`ocgEnterDepurar`/
+> `ocBodyDepurar`, usa `_oc.gen.maxs` + `_oc.gen.proy`). **(2)** En el visualizador, los artículos sin
+> proyección ahora muestran **0** en la columna Proy (antes `xls`) — "no hay data → 0"; igual usan el
+> objetivo como Máximo. **(3)** El botón **⚙ Config (máximos)** pasó a **⚙ Configurar parámetros**.
+> **(4)** En esa pantalla, además del índice general, una caja **📈 Parámetros de la proyección** con
+> **período a contemplar (meses)** y un switch **«Suavizar anómalos»** (descarta el pico de un pedido
+> puntual a favor del promedio — ej.: un cliente compra 1000/mes y un mes 2500 → ese 2500 no cuenta).
+> Se guardan en la tabla **`Config_Proyeccion`** (Virgilio) y **recalculan la proyección en el momento**
+> (botón «💾 Guardar y recalcular» → PATCH + `POST /rpc/refresh_proyeccion_madre`, ahora con `execute`
+> para `authenticated`). El motor **`fn_proyeccion_madre_emp`** de PáginaLK acepta ahora
+> `p_meses`/`p_suavizar` (defaults 24/true = comportamiento previo; verificado: 24/true = 372 códigos,
+> sin suavizar = 372 pero +40% cajas por los picos). Tests `tests/ocg-depurar.cjs` (+ `ocg-config`).
+> SQL en `sql/config_proyeccion.sql`. Bump **v7.55**.
 >
 > Nota: **v7.54 — Impreso de OC: la separación se cierra con líneas + el teléfono va DEBAJO del
 > nombre** (ajustes del pedido de v7.52). Dos cosas en `ocPrintHtml`. **(1)** La columna de
