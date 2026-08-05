@@ -4,7 +4,26 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-05 · Versión app al documentar: **v7.52**
+> Última actualización: 2026-08-05 · Versión app al documentar: **v7.53**
+>
+> Nota: **v7.53 — Auditoría del time-tracking del operario + Atención/Conteo/Permiso dejan de
+> esconderse en «Otros»**. El usuario pidió chequear que TODO lo que se cronometra desde el operario
+> (picking, armado, baño, guardado, atención, limpieza, comida, etc.) registre bien el tiempo, suba a
+> Supabase, quede en el historial y se vea en Análisis. **Resultado de la auditoría (todo OK):** el
+> mecanismo es sólido — un toggle guarda su `ts_inicio` (ISO) al abrir y el evento de **cierre** sale
+> con ese `ts_inicio` (⇒ duración); picking/armado igual con EP↔TP y AP↔TAP (ver `selectOption`
+> ~6412). Todo se **encola** (`enqueueReport`) y sube a `Registros_Produccion_Virgilio` con `ts_inicio`
+> (también desde el Service Worker, `sw.js`). Verificado con **datos reales de 30 días** (SQL): cada
+> opción timeada tiene sus cierres con `ts_inicio`, duraciones sensatas y **0 negativos** (sin bug de
+> reloj) — MG mediana 9,8′, TP 25,5′, TAP 57,7′, AT 2,4′, CT 26′, PB 4,4′, PC 31′, etc. **El único
+> hueco:** tres actividades timeadas caían en el bucket genérico **«Otros»** del desglose de Rendimiento
+> — **AT (Atendí Timbre = atención, 172 eventos)**, **CT (Conteo, 70)** y **Perm (Permiso de salida)**.
+> Ahora tienen **bucket propio** (`_PV_BUCKET`: `AT→atencion`, `CT→conteo`, `Perm→permiso`; sumados a
+> `_PV_ORDER`/`_PV_CAP`), con su franja y color en «En qué se va la jornada» (Atención `#ea580c`, Conteo
+> `#14b8a6`, Permiso `#a855f7`). Además la franja **«Movimiento» se renombró a «Guardado»** (es el único
+> código del bucket, `MG` = guardado a góndola/racks) para que se reconozca. Verificado headless: las 14
+> actividades caen cada una en SU bucket, `Otros`=0. **Sin cambios de captura/subida** (ya andaban); es
+> sólo cómo se **etiqueta** en Análisis. Bump **v7.53**.
 >
 > Nota: **v7.52 — Visualizador de OCs: se alimenta de la RECEPCIÓN + impreso con el formato de la
 > planilla (operador / tallerista)** (pedido del usuario). Dos cosas en el módulo **📑 Órdenes de

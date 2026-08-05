@@ -6008,7 +6008,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.52";
+const APP_VERSION = "v7.53";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -10618,9 +10618,9 @@ function _pvSub(a, b) {
   }
   return _pvNorm(out);
 }
-var _PV_BUCKET = { CC: "carga", CCN: "carga", CCR: "carga", CR: "control", CRN: "control", MG: "movim", EI: "insumos", RI: "insumos", RT: "recep", RR: "recep", CP: "completar", PC: "comida", PB: "pausa", Limp: "limpieza" };   // v7.49: CP (Completar Pedido) mide su tiempo → bucket propio
-var _PV_ORDER = ["comida", "pausa", "carga", "control", "movim", "insumos", "recep", "completar", "limpieza", "otros"];   // descansos primero (recortan tareas dejadas abiertas)
-var _PV_CAP = { comida: 90, pausa: 60, carga: 180, control: 45, movim: 30, insumos: 240, recep: 240, completar: 120, limpieza: 45, otros: 90 };   // topes (min) SOLO de tareas secundarias
+var _PV_BUCKET = { CC: "carga", CCN: "carga", CCR: "carga", CR: "control", CRN: "control", MG: "movim", EI: "insumos", RI: "insumos", RT: "recep", RR: "recep", CP: "completar", AT: "atencion", CT: "conteo", Perm: "permiso", PC: "comida", PB: "pausa", Limp: "limpieza" };   // v7.53: AT (timbre), CT (conteo) y Perm (permiso) dejan de caer en "Otros" → bucket propio
+var _PV_ORDER = ["comida", "pausa", "permiso", "carga", "control", "movim", "insumos", "recep", "completar", "atencion", "conteo", "limpieza", "otros"];   // descansos primero (recortan tareas dejadas abiertas)
+var _PV_CAP = { comida: 90, pausa: 60, permiso: 120, carga: 180, control: 45, movim: 30, insumos: 240, recep: 240, completar: 120, atencion: 45, conteo: 180, limpieza: 45, otros: 90 };   // topes (min) SOLO de tareas secundarias
 function _pvOperator(evs, m3of, D1, D2) {
   evs = evs.filter(function (e) { return e.cli >= D1 && e.cli < D2; }).sort(function (a, b) { return a.cli - b.cli; });
   var byDay = {}, e, d, o, i;
@@ -11012,10 +11012,13 @@ function prodRender() {
       { lbl: "Productivo", key: "productivo", min: minOf(t.armTime + t.pickTime), col: "#16a34a" },
       { lbl: "Carga camión", key: "carga", min: minOf(bk.carga), col: "#0891b2" },
       { lbl: "Control", key: "control", min: minOf(bk.control), col: "#7c3aed" },
-      { lbl: "Movimiento", key: "movim", min: minOf(bk.movim), col: "#f59e0b" },
+      { lbl: "Guardado", key: "movim", min: minOf(bk.movim), col: "#f59e0b" },
       { lbl: "Recepción", key: "recep", min: minOf(bk.recep), col: "#0284c7" },
       { lbl: "Insumos", key: "insumos", min: minOf(bk.insumos), col: "#0ea5e9" },
       { lbl: "Completar Ped.", key: "completar", min: minOf(bk.completar), col: "#c026d3" },
+      { lbl: "Atención", key: "atencion", min: minOf(bk.atencion), col: "#ea580c" },
+      { lbl: "Conteo", key: "conteo", min: minOf(bk.conteo), col: "#14b8a6" },
+      { lbl: "Permiso", key: "permiso", min: minOf(bk.permiso), col: "#a855f7" },
       { lbl: "Comida", key: "comida", min: minOf(bk.comida), col: "#64748b" },
       { lbl: "Pausa", key: "pausa", min: minOf(bk.pausa), col: "#94a3b8" },
       { lbl: "Limpieza", key: "limpieza", min: minOf(bk.limpieza), col: "#84cc16" },
@@ -11026,7 +11029,7 @@ function prodRender() {
   };
 
   // panel de detalle al tocar un color del desglose (de qué se compone ese tiempo)
-  const PV_LBL = { productivo: "Productivo", carga: "Carga camión", control: "Control", movim: "Movimiento", recep: "Recepción", insumos: "Insumos", completar: "Completar Pedido", comida: "Comida", pausa: "Pausa", limpieza: "Limpieza", otros: "Otros", ocio: "Ocio" };
+  const PV_LBL = { productivo: "Productivo", carga: "Carga camión", control: "Control", movim: "Guardado", recep: "Recepción", insumos: "Insumos", completar: "Completar Pedido", atencion: "Atención (timbre)", conteo: "Conteo", permiso: "Permiso de salida", comida: "Comida", pausa: "Pausa", limpieza: "Limpieza", otros: "Otros", ocio: "Ocio" };
   const fmtMin = function (ms) { const m = Math.round(ms / 60000); return m >= 60 ? (Math.floor(m / 60) + "h " + _pv2(m % 60) + "m") : (m + "m"); };
   const detailPanel = function (o, key, bd) {
     const seg = bd.segs.filter(function (s) { return s.key === key; })[0];
