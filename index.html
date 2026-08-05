@@ -6007,7 +6007,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.48";
+const APP_VERSION = "v7.49";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -9353,6 +9353,23 @@ async function loadCodCanon() {
 /* Devuelve el código canónico para mostrar (027, no 27/0027). Usa el mapa de OC_Maximos
    si ya se cargó; si no, cae al pad. Nunca rompe: siempre devuelve algo mostrable. */
 function codCanon(cod) { const k = _ocgNorm(cod); return (_codCanon && _codCanon[k]) || _padCod(cod); }
+/* v7.49 — LÍNEA (LK/CH) por código, desde OC_Maximos (config). La usa el IMPRESO de OC
+   para replicar la primera columna "Linea" de la planilla del tallerista (LK en rojo,
+   CH en azul). Mapa clave normalizada → 'LK'/'CH'. Best-effort: si falla, la columna
+   muestra "—" y el resto del impreso sale igual. */
+let _ocLineas = null;
+async function ocLoadLineas() {
+  if (_ocLineas) return _ocLineas;
+  const m = {};
+  try {
+    (await supaFetchAllSafe(SUPABASE_OCMAX_ENDPOINT, "select=cod,linea&activo=eq.true")).forEach(function (x) {
+      const k = _ocgNorm(x.cod), l = String(x.linea == null ? "" : x.linea).toUpperCase().trim();
+      if (k && l && !m[k]) m[k] = l;
+    });
+  } catch (_e) {}
+  _ocLineas = m; return m;
+}
+function ocLinea(cod) { return (_ocLineas && _ocLineas[_ocgNorm(cod)]) || ""; }
 async function openStockAdmin(soloConteo) {
   const _solo = soloConteo === true;   // rol "solo conteo" (Giuliana): solo la solapa Conteo
   if (!document.getElementById("stkCss")) {
@@ -9390,6 +9407,107 @@ async function ocFetchRows() {
   const r = await fetch(SUPABASE_OC_ENDPOINT + "?select=id,fecha,rubro,proveedor,proveedor_telefono,codigo,descripcion,cantidad,cantidad_recibida,unidad,estado,oc_max,oc_pedidos,oc_stock,oc_uni_caja,oc_ncaja&order=fecha.desc,proveedor.asc,codigo.asc&limit=20000", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
   return r.ok ? r.json() : [];
 }
+/* ===== RECEPCIÓN → OC (v7.49, pedido del usuario / backlog v4.11 punto b) =====
+   El visualizador se ALIMENTA de lo realmente recibido en Recepción de Mercadería
+   (recepcion.js graba en "Entregas Tallerista Virgilio" y "Entregas Prov AT") y marca
+   solo, por OC, cuánto se recibió de lo pedido — sin cargar el "recibido" a mano.
+   VÍNCULO recepción→OC: proveedor(nombre) + código (clave normalizada) + FECHA, contando
+   desde la fecha de la OC y hasta la fecha de la OC SIGUIENTE del mismo proveedor+código
+   (ventana [fecha_OC, fecha_OC_siguiente)) para no atribuir dos veces la misma entrega.
+   Las dos tablas de entregas tienen select_all para anon → la lectura va con la anon key.
+   Best-effort: si algo falla, el visualizador cae al recibido manual (cantidad_recibida). */
+const SUPABASE_ENTREGAS_TALL_ENDPOINT = SUPABASE_URL + "/rest/v1/" + encodeURIComponent("Entregas Tallerista Virgilio");
+const SUPABASE_ENTREGAS_PROVAT_ENDPOINT = SUPABASE_URL + "/rest/v1/" + encodeURIComponent("Entregas Prov AT");
+/* Clave de proveedor/tallerista: saca acentos, minúsculas, saca espacios/guiones/barras/puntos
+   (mismo criterio que claveTall de recepcion.js). */
+function _ocProvNorm(s) { return String(s == null ? "" : s).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[\s\-\/.]/g, ""); }
+/* Un proveedor de OC puede ser COMPARTIDO ("Garcia / Lucho") o traer inicial de apellido
+   pegada ("Martin C"). Devuelve las claves candidatas: el nombre entero + cada parte. */
+function _ocProvKeys(prov) {
+  const t = String(prov == null ? "" : prov).trim();
+  const keys = [_ocProvNorm(t)];
+  t.split(/[\/,+&]|\sy\s/i).forEach(function (s) { const k = _ocProvNorm(s); if (k) keys.push(k); });
+  return keys.filter(function (s, i) { return !!s && keys.indexOf(s) === i; });
+}
+/* ¿Alguna clave del proveedor de la OC coincide con la de quien entregó? Igualdad exacta
+   o prefijo con ≤2 caracteres de diferencia (tolera "Martin C" = Martin), como recepcion.js. */
+function _ocProvKeysMatch(ocKeys, entKey) {
+  if (!entKey) return false;
+  return ocKeys.some(function (p) {
+    if (p === entKey) return true;
+    const largo = p.length > entKey.length ? p : entKey, corto = p.length > entKey.length ? entKey : p;
+    return corto.length >= 3 && largo.length - corto.length <= 2 && largo.indexOf(corto) === 0;
+  });
+}
+/* "DD-MM" (Entregas Prov AT, sin año) → "YYYY-MM-DD" asumiendo el año en curso
+   (best-effort, igual que el Histórico de Recepción v6.50). "YYYY-MM-DD" queda igual. */
+function _ocRecepYmd(v) {
+  const s = String(v == null ? "" : v).trim();
+  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); if (m) return m[1] + "-" + m[2] + "-" + m[3];
+  m = s.match(/^(\d{1,2})[-\/](\d{1,2})$/); if (m) return String(new Date().getFullYear()) + "-" + String(m[2]).padStart(2, "0") + "-" + String(m[1]).padStart(2, "0");
+  return s;
+}
+/* Carga las entregas de las dos tablas → lista normalizada {provKeys, codKey, fecha(YMD), cajas}. */
+async function ocFetchRecepcion() {
+  const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, out = [];
+  try {
+    const r = await fetch(SUPABASE_ENTREGAS_TALL_ENDPOINT + "?select=Nombre_Tall,Cod,Cajas,Fecha&limit=50000", { headers: H, cache: "no-store" });
+    if (r.ok) (await r.json()).forEach(function (e) {
+      const ck = _ocgNorm(e.Cod); if (!ck) return;
+      out.push({ provKeys: _ocProvKeys(e.Nombre_Tall), codKey: ck, fecha: _ocRecepYmd(e.Fecha), cajas: Number(e.Cajas) || 0 });
+    });
+  } catch (_e) {}
+  try {
+    const r = await fetch(SUPABASE_ENTREGAS_PROVAT_ENDPOINT + "?select=Proveedor,Cod_Art,Cantidad,Dia_mes&limit=50000", { headers: H, cache: "no-store" });
+    if (r.ok) (await r.json()).forEach(function (e) {
+      const ck = _ocgNorm(e.Cod_Art); if (!ck) return;
+      out.push({ provKeys: _ocProvKeys(e.Proveedor), codKey: ck, fecha: _ocRecepYmd(e.Dia_mes), cajas: Number(e.Cantidad) || 0 });
+    });
+  } catch (_e) {}
+  return out;
+}
+/* Reparte lo entregado sobre las OCs por (proveedor+código) usando la ventana de fechas
+   [fecha_OC, fecha_OC_siguiente_del_mismo_prov+cód). Devuelve { row.id → cajas recibidas }. */
+function ocBuildRecep() {
+  const out = {};
+  if (!_oc || !_oc.recep) return out;
+  const recepByCode = {};
+  _oc.recep.forEach(function (e) { (recepByCode[e.codKey] || (recepByCode[e.codKey] = [])).push(e); });
+  const ocByCode = {};
+  (_oc.rows || []).forEach(function (r) { const ck = _ocgNorm(r.codigo); if (ck) (ocByCode[ck] || (ocByCode[ck] = [])).push(r); });
+  Object.keys(ocByCode).forEach(function (ck) {
+    const list = ocByCode[ck], receps = recepByCode[ck] || [];
+    list.forEach(function (r) {
+      const from = String(r.fecha || ""), rKeys = _ocProvKeys(r.proveedor);
+      // Fin de ventana = fecha de la OC más próxima POSTERIOR del mismo código con proveedor solapado.
+      let to = null;
+      list.forEach(function (o) {
+        if (o === r) return;
+        const of = String(o.fecha || "");
+        if (!from || of <= from) return;
+        if (!_ocProvKeys(o.proveedor).some(function (k) { return _ocProvKeysMatch(rKeys, k); })) return;
+        if (to === null || of < to) to = of;
+      });
+      let sum = 0;
+      receps.forEach(function (e) {
+        if (from && e.fecha && e.fecha < from) return;
+        if (to && e.fecha && e.fecha >= to) return;
+        if (!e.provKeys.some(function (k) { return _ocProvKeysMatch(rKeys, k); })) return;
+        sum += e.cajas;
+      });
+      out[r.id] = Math.round(sum);
+    });
+  });
+  return out;
+}
+/* Recibido EFECTIVO de una línea: si hay recibido cargado a mano (cantidad_recibida>0)
+   ese manda (OCs viejas / de carga manual); si no, lo que marcó la recepción. */
+function ocRecEff(r) {
+  const man = Number(r && r.cantidad_recibida) || 0;
+  if (man > 0) return man;
+  return (_oc && _oc.recepByRow && _oc.recepByRow[r && r.id]) || 0;
+}
+function ocRecDe(r) { return (_oc && _oc.recepByRow && _oc.recepByRow[r && r.id]) || 0; }
 async function openOCAdmin() {
   if (!document.getElementById("ocCss")) {
     const s = document.createElement("style"); s.id = "ocCss";
@@ -9401,8 +9519,9 @@ async function openOCAdmin() {
   ov.classList.add("show");
   ov.innerHTML = '<div class="oc-card"><div class="oc-head"><span class="oc-title">📑 Órdenes de Compra</span><button class="oc-close" onclick="closeOCAdmin()">Cerrar</button></div><div class="oc-body" id="ocBody"><div class="oc-loading">Cargando…</div></div></div>';
   try {
-    const r2 = await Promise.all([ocFetchRows(), loadArtNombres(), loadCodCanon()]);
-    _oc = { rows: r2[0], view: "list", openKey: null, filtro: "", nueva: { proveedor: "", fecha: "", rubro: "", unidad: "Cajas", items: [{ cod: "", desc: "", cant: "" }] } };
+    const r2 = await Promise.all([ocFetchRows(), loadArtNombres(), loadCodCanon(), ocLoadLineas(), ocFetchRecepcion()]);
+    _oc = { rows: r2[0], view: "list", openKey: null, filtro: "", lineas: r2[3] || {}, recep: r2[4] || [], recepByRow: {}, nueva: { proveedor: "", fecha: "", rubro: "", unidad: "Cajas", items: [{ cod: "", desc: "", cant: "" }] } };
+    _oc.recepByRow = ocBuildRecep();   // marca solo cuánto se recibió por OC (recepción→OC)
     ocRender();
   } catch (e) { const b = document.getElementById("ocBody"); if (b) b.innerHTML = '<div class="oc-loading">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
 }
@@ -9568,7 +9687,9 @@ function ocBodyTrazar() {
 }
 function ocGroupStats(grp) {
   let ped = 0, rec = 0, allRecibida = true;
-  grp.rows.forEach(function (r) { ped += Number(r.cantidad) || 0; rec += Number(r.cantidad_recibida) || 0; if (String(r.estado || "") !== "recibida") allRecibida = false; });
+  // v7.49: "recibido" EFECTIVO = recibido manual si lo hay, si no lo que marcó la
+  // recepción (recepción→OC) → las tarjetas del visualizador se marcan solas.
+  grp.rows.forEach(function (r) { ped += Number(r.cantidad) || 0; rec += ocRecEff(r); if (String(r.estado || "") !== "recibida") allRecibida = false; });
   const estado = allRecibida ? "recibida" : (rec > 0 ? "parcial" : "pendiente");
   return { ped: ped, rec: rec, falta: ped - rec, estado: estado };
 }
@@ -9635,23 +9756,63 @@ function ocBodyDetail() {
   const st = ocGroupStats(x);
   let h = '<div class="oc-tools"><button class="oc-btn" onclick="ocBack()">← Volver</button>';
   h += '<button class="oc-btn ok" onclick="ocGuardarRecibido()">💾 Guardar recibido</button>';
+  h += '<button class="oc-btn" onclick="ocTraerRecepcion()" title="Copia a mano lo que marcó la recepción de mercadería">📥 Traer de recepción</button>';
   if (st.estado !== "recibida") h += '<button class="oc-btn" onclick="ocMarcar(\'recibida\')">✓ Marcar recibida</button>';
   else h += '<button class="oc-btn" onclick="ocMarcar(\'pendiente\')">↩ Reabrir</button>';
-  h += '<button class="oc-btn" onclick="ocPrintDetalle()">🖨 Imprimir OC</button>';
+  h += '<button class="oc-btn" onclick="ocPrintDetalle(true)" title="Con las 3 columnas de Cajas Recibidas para chequear">🖨 Operador</button>';
+  h += '<button class="oc-btn" onclick="ocPrintDetalle(false)" title="Para enviarle al tallerista (sin Cajas Recibidas)">🖨 Tallerista</button>';
   h += '</div>';
-  h += '<div class="oc-meta">Proveedor <b>' + escapeHtml(x.proveedor || "—") + '</b> · Fecha <b>' + escapeHtml(x.fecha || "—") + '</b> · Rubro <b>' + escapeHtml(x.rubro || "—") + '</b> · Pedido <b>' + st.ped + '</b> · Falta <b>' + (st.falta > 0 ? st.falta : 0) + '</b></div>';
-  h += '<div class="oc-tblwrap"><table class="oc-tbl oc-tbl-det"><thead><tr><th>Código</th><th>Descripción</th><th>Unidad</th><th class="num">Pedido</th><th class="num">Recibido</th><th class="num">Falta</th></tr></thead><tbody>';
+  h += '<div class="oc-meta">Proveedor <b>' + escapeHtml(x.proveedor || "—") + '</b> · Fecha <b>' + escapeHtml(x.fecha || "—") + '</b> · Rubro <b>' + escapeHtml(x.rubro || "—") + '</b> · Pedido <b>' + st.ped + '</b> · Recibido <b class="oc-ok">' + st.rec + '</b> · Falta <b class="' + (st.falta > 0 ? "oc-falt" : "oc-ok") + '">' + (st.falta > 0 ? st.falta : 0) + '</b></div>';
+  h += '<div class="oc-note" style="margin-top:0;margin-bottom:8px">📥 <b>Recep.</b> = lo que marcó la Recepción de Mercadería para este tallerista y código (se alimenta solo). El campo <b>Recibido</b> es editable: viene con lo de recepción y podés ajustarlo a mano y <b>Guardar</b>.</div>';
+  h += '<div class="oc-tblwrap"><table class="oc-tbl oc-tbl-det"><thead><tr><th>Código</th><th>Descripción</th><th>Unidad</th><th class="num">Pedido</th><th class="num">📥 Recep.</th><th class="num">Recibido</th><th class="num">Falta</th></tr></thead><tbody>';
   x.rows.forEach(function (r) {
-    const ped = Number(r.cantidad) || 0, rec = Number(r.cantidad_recibida) || 0, falt = ped - rec;
-    h += '<tr><td class="oc-cod">' + escapeHtml(codCanon(r.codigo) || "—") + '</td><td>' + escapeHtml(r.descripcion || "") + '</td><td>' + escapeHtml(r.unidad || "") + '</td><td class="num">' + ped + '</td><td class="num"><input class="oc-rinp" type="number" min="0" inputmode="numeric" data-id="' + r.id + '" value="' + rec + '" oninput="ocLiveFalt(' + r.id + ',' + ped + ',this.value)"></td><td class="num ' + (falt > 0 ? "oc-falt" : "oc-ok") + '" id="ocfalt_' + r.id + '">' + (falt !== 0 ? falt : "0") + '</td></tr>';
+    const ped = Number(r.cantidad) || 0, recp = ocRecDe(r), val = ocRecEff(r), falt = ped - val;
+    h += '<tr><td class="oc-cod">' + escapeHtml(codCanon(r.codigo) || "—") + '</td><td>' + escapeHtml(artNombre(r.codigo, r.descripcion) || "") + '</td><td>' + escapeHtml(r.unidad || "") + '</td><td class="num">' + ped + '</td><td class="num" title="Recibido según Recepción de Mercadería">' + (recp > 0 ? "📥 " + recp : "—") + '</td><td class="num"><input class="oc-rinp" type="number" min="0" inputmode="numeric" data-id="' + r.id + '" data-ped="' + ped + '" data-recep="' + recp + '" value="' + val + '" oninput="ocLiveFalt(' + r.id + ',' + ped + ',this.value)"></td><td class="num ' + (falt > 0 ? "oc-falt" : "oc-ok") + '" id="ocfalt_' + r.id + '">' + (falt !== 0 ? falt : "0") + '</td></tr>';
   });
   return h + "</tbody></table></div>";
 }
 function ocLiveFalt(id, ped, v) { const c = document.getElementById("ocfalt_" + id); if (!c) return; const falt = ped - (parseInt(v, 10) || 0); c.textContent = falt !== 0 ? falt : "0"; c.className = "num " + (falt > 0 ? "oc-falt" : "oc-ok"); }
+/* v7.49 — copia a los campos "Recibido" lo que marcó la recepción de mercadería (data-recep),
+   para revisarlo y Guardar. Útil cuando lo de recepción difiere del recibido cargado a mano. */
+function ocTraerRecepcion() {
+  document.querySelectorAll('#ocBody .oc-rinp').forEach(function (el) {
+    const rec = el.getAttribute("data-recep"); if (rec == null) return;
+    el.value = Math.max(0, parseInt(rec, 10) || 0);
+    ocLiveFalt(el.getAttribute("data-id"), parseInt(el.getAttribute("data-ped"), 10) || 0, el.value);
+  });
+}
 /* v6.41 — IMPRIMIR OC: hoja print-friendly de la OC abierta (1 proveedor · fecha · rubro).
-   Reusa el patrón de pppPrintSug (window.open + document.write + auto-print). Muestra
-   encabezado, ítems (código canónico, descripción, unidad, cantidad), total y pie de firma. */
-const _OC_PRINT_CSS = "body{font-family:Arial,Helvetica,sans-serif;color:#0f172a;margin:20px;} .oc-p-head{display:flex;align-items:baseline;justify-content:space-between;border-bottom:2px solid #0f172a;padding-bottom:4px;margin-bottom:3px;} .oc-p-name{font-size:26px;font-weight:800;} .oc-p-date{font-size:15px;font-weight:700;color:#334155;} .oc-p-sub{font-size:12.5px;color:#475569;margin-bottom:12px;} table{width:100%;border-collapse:collapse;margin:10px 0;font-size:13px;} th,td{border:1px solid #94a3b8;padding:6px 9px;text-align:left;} th{background:#e2e8f0;color:#0f172a;font-size:11.5px;text-transform:uppercase;text-align:center;} td.num,th.num{text-align:right;} th.num{text-align:center;} td.cod{font-family:Consolas,Menlo,monospace;font-weight:800;} td.big{font-size:16px;font-weight:800;} td.falt{color:#b91c1c;font-weight:800;} tfoot td{font-weight:bold;background:#f1f5f9;} .oc-p-firma{margin-top:44px;display:flex;justify-content:space-between;font-size:12px;color:#475569;} .oc-p-firma span{border-top:1px solid #94a3b8;padding-top:5px;width:44%;text-align:center;}";
+   Reusa el patrón de pppPrintSug (window.open + document.write + auto-print).
+   v7.49 — Formato replicando la planilla que usa el depósito: nombre grande arriba a la
+   izq, fecha en rojo a la der, Tel centrado; grilla con bordes negros; primera columna
+   Linea (LK rojo / CH azul); títulos de columna en DOBLE FILA para ocupar menos;
+   Descripción con más espacio; columna en blanco (separación) entre Falta Pedido y N°
+   Caja. Dos variantes: OPERADOR (con las 3 columnas "Cajas Recibidas" para chequear a
+   mano) y TALLERISTA (sin esas 3 columnas, para enviarle el pedido). */
+const _OC_PRINT_CSS = "body{font-family:Arial,Helvetica,sans-serif;color:#111;margin:14px;}" +
+  ".oc-p-head{display:flex;align-items:baseline;justify-content:space-between;padding:0 3px 3px;}" +
+  ".oc-p-name{font-size:30px;font-weight:800;}" +
+  ".oc-p-date{font-size:18px;font-weight:800;color:#c0261f;}" +
+  ".oc-p-tel{text-align:center;font-size:13px;font-weight:700;border:1.5px solid #111;border-bottom:none;padding:3px 0;}" +
+  "table{width:100%;border-collapse:collapse;table-layout:auto;font-size:13px;}" +
+  "th,td{border:1.5px solid #111;padding:3px 6px;text-align:center;vertical-align:middle;}" +
+  "thead th{background:#efefef;color:#111;font-size:11px;font-weight:800;line-height:1.05;white-space:nowrap;}" +
+  "td.num,th.num{white-space:nowrap;width:1%;}" +
+  "th.desc,td.desc{text-align:left;width:auto;white-space:normal;}" +
+  "td.desc{font-size:12.5px;line-height:1.1;}" +
+  "td.cod{font-family:Consolas,Menlo,monospace;font-weight:800;width:1%;white-space:nowrap;}" +
+  "td.big{font-size:17px;font-weight:800;}" +
+  "td.falt{color:#c0261f;font-weight:800;}" +
+  "th.lin{width:1%;white-space:nowrap;}" +
+  "td.lin{width:1%;white-space:nowrap;font-weight:800;font-size:14px;}" +
+  "td.lin.lk{color:#c0261f;}td.lin.ch{color:#1e6fce;}" +
+  ".gap{border-style:hidden;background:#fff;width:16px;min-width:16px;padding:0;}" +
+  "th.recib{background:#efefef;}td.recib,th.recib{width:52px;min-width:52px;}" +
+  "tfoot td{font-weight:800;background:#efefef;}tfoot td.gap{background:#fff;}" +
+  ".oc-p-foot{margin-top:8px;font-size:10.5px;color:#666;}" +
+  "@media print{body{margin:6mm;}@page{margin:8mm;}}";
+/* "2026-08-05" → "05/08/2026" para el encabezado del impreso (como la planilla). */
+function _ocFechaLarga(f) { const m = String(f == null ? "" : f).match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? (m[3] + "/" + m[2] + "/" + m[1]) : (String(f == null ? "" : f) || "—"); }
 /* v7.39 — IMPRESO de OC con el formato de la planilla del tallerista (pedido del
    usuario). Columnas: Cod · Descripción · Cajas (a pedir) · Falta Pedidos · Uni x
    Caja · Caja N° · % Lleno. Los derivados usan lo GUARDADO al generar (oc_max/
@@ -9668,13 +9829,15 @@ const _OC_PRINT_CSS = "body{font-family:Arial,Helvetica,sans-serif;color:#0f172a
    v7.40: las filas se ORDENAN por % Lleno de MENOR A MAYOR (los más "en rojo" /
    con más falta primero, como en la planilla). Las filas sin % (OCs viejas / de
    carga manual, sin los valores guardados) van al final y muestran "—". */
-function ocPrintHtml(x) {
+function ocPrintHtml(x, opts) {
+  const conRecibidas = !!(opts && opts.conRecibidas);   // OPERADOR = con las 3 columnas Cajas Recibidas
   const items = (x.rows || []).map(function (r) {
     const cajas = Number(r.cantidad) || 0;
     const hayCalc = r.oc_max != null && r.oc_pedidos != null && r.oc_stock != null;
     const ped = Number(r.oc_pedidos), stk = Number(r.oc_stock), max = Number(r.oc_max);
     return {
       r: r, cajas: cajas,
+      linea: String(r.linea || ocLinea(r.codigo) || "").toUpperCase().trim(),
       faltaPed: hayCalc ? Math.max(0, Math.round(ped - stk)) : null,
       pct: (hayCalc && max > 0) ? Math.round((stk - ped) / max * 100) : null,
       uni: (r.oc_uni_caja != null && r.oc_uni_caja !== "") ? Math.round(Number(r.oc_uni_caja)) : null,
@@ -9691,32 +9854,49 @@ function ocPrintHtml(x) {
   let tot = 0, rows = "";
   items.forEach(function (it) {
     tot += it.cajas;
+    const linClass = it.linea === "LK" ? " lk" : (it.linea === "CH" ? " ch" : "");
     rows += '<tr>' +
+      '<td class="lin' + linClass + '">' + escapeHtml(it.linea || "—") + '</td>' +
       '<td class="cod">' + escapeHtml(codCanon(it.r.codigo) || "—") + '</td>' +
-      '<td>' + escapeHtml(artNombre(it.r.codigo, it.r.descripcion) || "") + '</td>' +
+      '<td class="desc">' + escapeHtml(artNombre(it.r.codigo, it.r.descripcion) || "") + '</td>' +
       '<td class="num big">' + it.cajas + '</td>' +
       '<td class="num' + (it.faltaPed > 0 ? ' falt' : '') + '">' + (it.faltaPed != null ? it.faltaPed : "—") + '</td>' +
-      '<td class="num">' + (it.uni != null ? it.uni : "—") + '</td>' +
+      '<td class="gap"></td>' +
       '<td class="num">' + (it.ncaja != null ? it.ncaja : "—") + '</td>' +
+      '<td class="num">' + (it.uni != null ? it.uni : "—") + '</td>' +
       '<td class="num' + (it.pct != null && it.pct < 0 ? ' falt' : '') + '">' + (it.pct != null ? it.pct + "%" : "—") + '</td>' +
+      (conRecibidas ? '<td class="recib"></td><td class="recib"></td><td class="recib"></td>' : '') +
     '</tr>';
   });
   const tel = String(x.telefono || "").trim();
+  const rs = conRecibidas ? ' rowspan="2"' : '';
+  const head1 = '<tr>' +
+    '<th' + rs + ' class="lin">Linea</th>' +
+    '<th' + rs + '>Cod</th>' +
+    '<th' + rs + ' class="desc">Descripcion</th>' +
+    '<th' + rs + ' class="num">Cajas</th>' +
+    '<th' + rs + ' class="num">Falta<br>Pedido</th>' +
+    '<th' + rs + ' class="gap"></th>' +
+    '<th' + rs + ' class="num">N°<br>Caja</th>' +
+    '<th' + rs + ' class="num">Uni x<br>Caja</th>' +
+    '<th' + rs + ' class="num">%<br>Lleno</th>' +
+    (conRecibidas ? '<th colspan="3" class="recib">Cajas Recibidas</th>' : '') +
+    '</tr>';
+  const head2 = conRecibidas ? '<tr><th class="recib"></th><th class="recib"></th><th class="recib"></th></tr>' : '';
   return '<div class="oc-p-head"><span class="oc-p-name">' + escapeHtml(x.proveedor || "—") + '</span>' +
-      '<span class="oc-p-date">' + escapeHtml(x.fecha || "—") + '</span></div>' +
-    '<div class="oc-p-sub">Producción Virgilio' + (tel ? ' · Tel: ' + escapeHtml(tel) : '') + ' · Ítems: ' + x.rows.length + '</div>' +
-    '<table><thead><tr>' +
-      '<th>Cod</th><th>Descripcion</th><th class="num">Cajas</th><th class="num">Falta Pedidos</th><th class="num">Uni x Caja</th><th class="num">Caja N°</th><th class="num">% Lleno</th>' +
-    '</tr></thead><tbody>' + rows +
-    '</tbody><tfoot><tr><td colspan="2">Total</td><td class="num">' + tot + '</td><td colspan="4"></td></tr></tfoot></table>' +
-    '<div class="oc-p-firma"><span>Firma proveedor</span><span>Firma responsable</span></div>';
+      '<span class="oc-p-date">' + escapeHtml(_ocFechaLarga(x.fecha)) + '</span></div>' +
+    '<div class="oc-p-tel">' + (tel ? 'Tel: ' + escapeHtml(tel) : '&nbsp;') + '</div>' +
+    '<table><thead>' + head1 + head2 + '</thead><tbody>' + rows +
+    '</tbody><tfoot><tr><td colspan="3">Total</td><td class="num big">' + tot + '</td><td class="num"></td><td class="gap"></td><td colspan="' + (conRecibidas ? 6 : 3) + '"></td></tr></tfoot></table>' +
+    '<div class="oc-p-foot">Producción Virgilio · ' + x.rows.length + ' ítem(s)' + (conRecibidas ? ' · hoja del operador (chequear en Cajas Recibidas)' : '') + '</div>';
 }
-function ocPrintDetalle() {
+function ocPrintDetalle(conRecibidas) {
   if (!_oc || !_oc.openKey) return;
   const g = ocGroups(), x = g[_oc.openKey]; if (!x || !x.rows.length) { alert("No hay ítems para imprimir."); return; }
   const w = window.open("", "_blank");
   if (!w) { alert("El navegador bloqueó la ventana de impresión. Permití los pop-ups y reintentá."); return; }
-  w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>OC ' + escapeHtml(x.proveedor || "") + ' ' + escapeHtml(x.fecha || "") + '</title><style>' + _OC_PRINT_CSS + '</style></head><body>' + ocPrintHtml(x) + '<scr' + 'ipt>window.onload=function(){setTimeout(function(){window.print();},150);};</scr' + 'ipt></body></html>');
+  const suf = conRecibidas ? " (operador)" : " (tallerista)";
+  w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>OC ' + escapeHtml(x.proveedor || "") + ' ' + escapeHtml(x.fecha || "") + suf + '</title><style>' + _OC_PRINT_CSS + '</style></head><body>' + ocPrintHtml(x, { conRecibidas: !!conRecibidas }) + '<scr' + 'ipt>window.onload=function(){setTimeout(function(){window.print();},150);};</scr' + 'ipt></body></html>');
   w.document.close();
 }
 function _ocCollectRecibido() {
@@ -9730,7 +9910,7 @@ async function ocGuardarRecibido() {
   if (!headers) { alert(authNoSesionMsg("Para guardar necesitás iniciar sesión con Google (supervisor).")); return; }
   try {
     await Promise.all(_ocCollectRecibido().map(function (r) { return fetch(SUPABASE_OC_ENDPOINT + "?id=eq." + r.id, { method: "PATCH", headers: headers, body: JSON.stringify({ cantidad_recibida: r.val }) }); }));
-    _oc.rows = await ocFetchRows(); ocRender();
+    _oc.rows = await ocFetchRows(); _oc.recepByRow = ocBuildRecep(); ocRender();
     alert("✓ Recibido guardado.");
   } catch (e) { alert("Error guardando: " + (e.message || e)); }
 }
@@ -9742,7 +9922,7 @@ async function ocMarcar(estado) {
   try {
     if (estado === "recibida") { await Promise.all(_ocCollectRecibido().map(function (r) { return fetch(SUPABASE_OC_ENDPOINT + "?id=eq." + r.id, { method: "PATCH", headers: headers, body: JSON.stringify({ cantidad_recibida: r.val }) }); })); }
     await Promise.all(x.rows.map(function (r) { return fetch(SUPABASE_OC_ENDPOINT + "?id=eq." + r.id, { method: "PATCH", headers: headers, body: JSON.stringify({ estado: estado }) }); }));
-    _oc.rows = await ocFetchRows(); ocRender();
+    _oc.rows = await ocFetchRows(); _oc.recepByRow = ocBuildRecep(); ocRender();
   } catch (e) { alert("Error: " + (e.message || e)); }
 }
 function ocNueva() { if (!_oc) return; _oc.view = "nueva"; if (!_oc.nueva || !_oc.nueva.items) _oc.nueva = { proveedor: "", fecha: "", rubro: "", unidad: "Cajas", items: [{ cod: "", desc: "", cant: "" }] }; ocRender(); }
@@ -9770,7 +9950,7 @@ async function ocNuevaCrear() {
   try {
     const r = await fetch(SUPABASE_OC_ENDPOINT, { method: "POST", headers: headers, body: JSON.stringify(rows) });
     if (!r.ok) throw new Error("HTTP " + r.status);
-    _oc.rows = await ocFetchRows();
+    _oc.rows = await ocFetchRows(); _oc.recepByRow = ocBuildRecep();
     _oc.nueva = { proveedor: "", fecha: "", rubro: "", unidad: "Cajas", items: [{ cod: "", desc: "", cant: "" }] };
     _oc.openKey = [rows[0].proveedor || "", rows[0].fecha || "", rows[0].rubro || ""].join("~|~");
     _oc.view = "detail"; ocRender();
@@ -9987,7 +10167,7 @@ async function ocgGenerar() {
   try {
     const r = await fetch(SUPABASE_OC_ENDPOINT, { method: "POST", headers: headers, body: JSON.stringify(rows) });
     if (!r.ok) throw new Error("HTTP " + r.status);
-    _oc.rows = await ocFetchRows();
+    _oc.rows = await ocFetchRows(); _oc.recepByRow = ocBuildRecep();
     _oc.view = "list"; ocRender();
     alert("✓ Generadas " + rows.length + " línea(s) de OC. Las ves en la lista, agrupadas por proveedor.");
   } catch (e) { alert("Error generando OCs: " + (e.message || e)); }
