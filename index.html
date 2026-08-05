@@ -6054,7 +6054,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.79";
+const APP_VERSION = "v7.80";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -12690,12 +12690,14 @@ function stkDescargarExcel() {
   // Preparar datos para Excel — números como número real (no string) para que
   // Excel los trate como numéricos y no como texto.
   const num = function (n) { return Math.round((Number(n) || 0) * 10) / 10; };
-  const headers = ["Código", "Descripción", "Total Stock", "Cajas Pedidas", "Capacidad Góndola", "Góndola", "Excedente", "Pickeados", "A facturar", "A guardar", "Racks", "P/ envasar"];
+  const _fcArt = (_stk.fcs && _stk.fcs.porArt) || {};
+  const headers = ["Código", "Descripción", "Total Stock", "Cajas Pedidas", "Capacidad Góndola", "Góndola", "Excedente", "Pickeados", "A facturar", "A guardar", "Racks", "P/ envasar", "FC s/Salida"];
   const aoa = [headers];
   shown.forEach(function (a) {
     const _tot = SECTKEYS.reduce(function (s, k) { return s + (Number(a[k]) || 0); }, 0) + (Number(a.racks_ch) || 0);
     const _ped = Number(dem[_ocgNorm(a.cod)]) || 0;
     const _cap = Number(capByCod[_ocgNorm(a.cod)]) || 0;
+    const _fcV = Number((_fcArt[_ocgNorm(a.cod)] || {}).cajas) || 0;
     aoa.push([
       String(a.cod || ""),
       String(artNombre(a.cod, a.desc) || ""),
@@ -12708,13 +12710,14 @@ function stkDescargarExcel() {
       num(a.a_facturar),
       num(a.a_guardar),
       num((Number(a.racks) || 0) + (Number(a.racks_ch) || 0)),
-      num(a.para_envasar)
+      num(a.para_envasar),
+      num(_fcV)
     ]);
   });
 
   pppLoadXlsx().then(function (XLSX) {
     const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws["!cols"] = [{ wch: 9 }, { wch: 34 }, { wch: 11 }, { wch: 13 }, { wch: 16 }, { wch: 9 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 9 }, { wch: 11 }];
+    ws["!cols"] = [{ wch: 9 }, { wch: 34 }, { wch: 11 }, { wch: 13 }, { wch: 16 }, { wch: 9 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 9 }, { wch: 11 }, { wch: 12 }];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Stock");
     XLSX.writeFile(wb, "Stock_" + new Date().toISOString().split("T")[0] + ".xlsx");
