@@ -4,7 +4,18 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-05 · Versión app al documentar: **v7.74**
+> Última actualización: 2026-08-05 · Versión app al documentar: **v7.75**
+>
+> Nota: **v7.75 — unificar TAP con el asistente Completar** (eliminación de los botones sueltos
+> **TP** y **TAP** de la botonera principal). El armado tenía dos pasos desacoplados: (1) el
+> asistente `compTerminar` grababa los **registros** (`Entregas_Virgilio` + líos `TAL`), y (2) el
+> botón separado **TAP** emitía el evento y movía el stock. **Fix v7.75:** El botón "Terminar" del
+> asistente ahora hace **TODO en una sola acción**: graba registros, emite TAP event, y mueve
+> stock (`stockSepararAFacturar`) — así no existe la ventana donde TAP se aprieta sin completar
+> (que causó la crisis D06B en v7.74). **Botonera:** remover TP (picking termina dentro del picking,
+> no desde pantalla principal) y TAP (unificado). **Layout:** AP «Empecé Armado» pasa a row1
+> (derecha de EP) — ahora ambos starters en la misma fila. Smoke `tests/comp-terminar-unificado.cjs`.
+> Bump **v7.75**.
 >
 > Nota: **v7.74 — no se puede TERMINAR el armado (TAP) sin completar el asistente «Completar»**. El
 > armado tiene dos pasos: (1) el asistente `compTerminar` graba los **registros** (`Entregas_Virgilio`
