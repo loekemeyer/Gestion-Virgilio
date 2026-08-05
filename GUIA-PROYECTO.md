@@ -4,7 +4,22 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-05 · Versión app al documentar: **v7.50**
+> Última actualización: 2026-08-05 · Versión app al documentar: **v7.51**
+>
+> Nota: **v7.51 — Config del generador de OCs (`OC_Maximos`) EDITABLE desde la app → se elimina la
+> dependencia del Excel**. El generador leía dos cosas que venían de un Excel importado a mano:
+> la proyección (ya resuelta: ahora se calcula de las ventas en Supabase, ver la nota de la proyección
+> más abajo) y la tabla **`OC_Maximos`** (objetivo/`max_cajas`, `uni_x_caja`, `indice`, `proveedor`,
+> `activo`). El viejo botón **⚙ Índices** (que sólo editaba el índice) pasó a **⚙ Config (máximos)**:
+> un editor completo de `OC_Maximos` con **Objetivo · Uni×Caja · Índice · Proveedor · Activo** editables
+> por artículo, **"➕ Agregar artículo"** (alta, `cod` es PK → alta duplicada da 409) y filtro. Escribe
+> con **sesión de supervisor** (RLS `ocm_write` → `authenticated`, PATCH por `cod` / POST para el alta;
+> no hizo falta RPC). El estado de cambios es un **PATCH parcial por código** (`_oc.cfg.changed =
+> {cod:{campo:valor}}`) que mergea varios campos y guarda todo junto. **⚠ Ahora `OC_Maximos` es la
+> fuente de verdad: NO re-importar el Excel encima** (pisaría lo editado). La **fórmula del generador
+> no cambió**. Funciones: `ocgEnterCfg`/`ocBodyCfg`/`ocCfgEdit`/`ocCfgSetAllIndice`/`ocCfgSave` +
+> alta `ocCfgAltaOpen`/`ocCfgAltaSave`. Test `tests/ocg-config.cjs`. Bump **v7.51**. (Quedan 25 códigos
+> sin proyección que usan el objetivo — ahora editable acá en vez del Excel.)
 >
 > Nota: **v7.50 — Chooser de Insumos: dos opciones, el alta vive adentro de «Recibir»**
 > (ajuste del pedido de v7.49). El popup `insumoChooser` deja de tener tres botones: ahora son

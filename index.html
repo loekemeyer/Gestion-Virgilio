@@ -6008,7 +6008,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.50";
+const APP_VERSION = "v7.51";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -9408,7 +9408,7 @@ async function openOCAdmin() {
   } catch (e) { const b = document.getElementById("ocBody"); if (b) b.innerHTML = '<div class="oc-loading">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
 }
 function closeOCAdmin() { const ov = document.getElementById("ocAdminOverlay"); if (ov) ov.classList.remove("show"); _oc = null; }
-function ocRender() { if (!_oc) return; const body = document.getElementById("ocBody"); if (!body) return; _renderKeepFocus(body, _oc.view === "detail" ? ocBodyDetail() : _oc.view === "fecha" ? ocBodyFecha() : _oc.view === "nueva" ? ocBodyNueva() : _oc.view === "gen" ? ocBodyGen() : _oc.view === "indices" ? ocBodyIndices() : _oc.view === "entregas" ? ocBodyEntregas() : _oc.view === "trazar" ? ocBodyTrazar() : ocBodyList()); }
+function ocRender() { if (!_oc) return; const body = document.getElementById("ocBody"); if (!body) return; _renderKeepFocus(body, _oc.view === "detail" ? ocBodyDetail() : _oc.view === "fecha" ? ocBodyFecha() : _oc.view === "nueva" ? ocBodyNueva() : _oc.view === "gen" ? ocBodyGen() : _oc.view === "cfg" ? ocBodyCfg() : _oc.view === "entregas" ? ocBodyEntregas() : _oc.view === "trazar" ? ocBodyTrazar() : ocBodyList()); }
 /* v4.40 — % DE ENTREGAS: cruza lo PEDIDO (Ordenes_Compra.cantidad) contra lo
    ENTREGADO (cantidad_recibida) por artículo y global. Detalle del cumplimiento
    de los proveedores. (Ordenes_Compra retiene el histórico de OCs.) */
@@ -9953,9 +9953,9 @@ function ocgGroups() {
   return g;
 }
 function ocBodyGen() {
-  let h = '<div class="oc-tools"><button class="oc-btn" onclick="ocBack()">← Volver</button><button class="oc-btn" onclick="ocgEnterIndices()">⚙ Índices</button></div>';
+  let h = '<div class="oc-tools"><button class="oc-btn" onclick="ocBack()">← Volver</button><button class="oc-btn" onclick="ocgEnterCfg()">⚙ Config (máximos)</button></div>';
   h += '<div class="oc-cd">⏱ Próxima generación <b>automática</b>: <b>' + escapeHtml(_ocgNextAutoFecha()) + '</b> · faltan <b class="oc-cd-num" id="ocgCountdown">' + escapeHtml(_ocgNextAutoTxt()) + '</b>. Igual podés generarlas <b>a mano ahora</b> con ✓ Generar de abajo.</div>';
-  h += '<div style="background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af;border-radius:9px;padding:9px 11px;margin-bottom:10px;font-size:12.5px"><b>A pedir = máx(0, Máximo + Pedidos − (Góndola + A guardar + Racks + Excedente))</b>, con <b>Máximo = Proyección por tendencia (PaginaLK) × índice</b>, topado a la <b>capacidad de góndola</b>. <b>No</b> se cuentan pickeados, a facturar ni FC sin salida — y los pedidos que ya están en esos estadios <b>tampoco suman a Pedidos</b> (netea). Si un artículo no tiene proyección, usa el objetivo del Excel (marcado <i>xls</i>). Se generan solas los <b>miércoles 7:00</b>; acá podés generarlas a mano cuando quieras. Revisá antes de generar.</div>';
+  h += '<div style="background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af;border-radius:9px;padding:9px 11px;margin-bottom:10px;font-size:12.5px"><b>A pedir = máx(0, Máximo + Pedidos − (Góndola + A guardar + Racks + Excedente))</b>, con <b>Máximo = Proyección por tendencia (PaginaLK) × índice</b>, topado a la <b>capacidad de góndola</b>. <b>No</b> se cuentan pickeados, a facturar ni FC sin salida — y los pedidos que ya están en esos estadios <b>tampoco suman a Pedidos</b> (netea). Si un artículo no tiene proyección, usa el <b>objetivo</b> configurado en <b>⚙ Config (máximos)</b> (marcado <i>xls</i>). Se generan solas los <b>miércoles 7:00</b>; acá podés generarlas a mano cuando quieras. Revisá antes de generar.</div>';
   if (!_oc.gen) return h + '<div class="oc-loading">Calculando (stock + demanda PPP + proyección × índice)…</div>';
   if (_oc.gen.error) return h + '<div class="oc-empty" style="color:#b91c1c">Error: ' + escapeHtml(_oc.gen.error) + '</div>';
   const g = ocgGroups(), keys = Object.keys(g).sort(function (a, b) { return (g[a].interno - g[b].interno) || a.localeCompare(b); });
@@ -9994,62 +9994,126 @@ async function ocgGenerar() {
   } catch (e) { alert("Error generando OCs: " + (e.message || e)); }
 }
 
-/* v4.17: módulo para editar el ÍNDICE (meses de stock) por artículo — máximo = proyección × índice.
-   Default 1,5; editable global ("a todos en X") y por artículo. Guarda en OC_Maximos.indice
-   (escritura con sesión de supervisor). */
-let _ociChanged = {};
-async function ocgEnterIndices() {
+/* v7.51 — CONFIG de compras (OC_Maximos) EDITABLE desde la app → el Excel deja de ser
+   necesario. Antes sólo se editaba el índice; ahora se edita TODO lo que el generador y el
+   impreso usan de OC_Maximos: objetivo (max_cajas, fallback de Máximo cuando el artículo no
+   tiene proyección de ventas), uni×caja (impreso), índice (Máximo = proyección × índice) y
+   proveedor, más activar/desactivar y ALTA de artículos nuevos. Escribe con sesión de supervisor
+   (RLS ocm_write → authenticated; cod es PK). ⚠ Esta es la FUENTE DE VERDAD: no re-importar el
+   Excel encima (pisaría lo editado acá). _oc.cfg.changed = { cod: {campo:valor,...} } (patch parcial). */
+async function ocgEnterCfg() {
   if (!_oc) return;
-  _oc.view = "indices"; _oc.indices = null; _oc.idxFiltro = ""; _oc.idxError = null; _ociChanged = {}; ocRender();
+  _oc.view = "cfg"; _oc.cfg = { rows: null, changed: {}, filtro: "", error: null, alta: null }; ocRender();
   try {
-    const r = await fetch(SUPABASE_OCMAX_ENDPOINT + "?select=cod,descripcion,proveedor,indice,activo&activo=eq.true&order=cod.asc&limit=20000", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+    const r = await fetch(SUPABASE_OCMAX_ENDPOINT + "?select=cod,descripcion,proveedor,max_cajas,uni_x_caja,indice,activo&order=activo.desc,cod.asc&limit=20000", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
     const rows = r.ok ? await r.json() : [];
-    _oc.indices = rows.map(function (x) { return { cod: String(x.cod), desc: x.descripcion || "", prov: x.proveedor || "", indice: (x.indice == null ? 1.5 : Number(x.indice)) }; });
+    _oc.cfg.rows = rows.map(function (x) {
+      return { cod: String(x.cod), descripcion: x.descripcion || "", proveedor: x.proveedor || "",
+        max_cajas: (x.max_cajas == null ? 0 : Number(x.max_cajas)), uni_x_caja: (x.uni_x_caja == null ? 0 : Number(x.uni_x_caja)),
+        indice: (x.indice == null ? 1.5 : Number(x.indice)), activo: (x.activo !== false) };
+    });
     ocRender();
-  } catch (e) { _oc.indices = []; _oc.idxError = String(e.message || e); ocRender(); }
+  } catch (e) { _oc.cfg.rows = []; _oc.cfg.error = String(e.message || e); ocRender(); }
 }
-function ocBodyIndices() {
-  let h = '<div class="oc-tools"><button class="oc-btn" onclick="ocgEnter()">← Volver al generador</button></div>';
-  h += '<div class="oc-meta">El <b>índice</b> = meses de stock objetivo. <b>Máximo = proyección × índice</b>. Default 1,5. Cambialo global o por artículo y guardá.</div>';
-  if (!_oc.indices) return h + '<div class="oc-loading">Cargando índices…</div>';
-  if (_oc.idxError) return h + '<div class="oc-empty" style="color:#b91c1c">Error: ' + escapeHtml(_oc.idxError) + '</div>';
-  h += '<div class="oc-tools"><span style="font-size:13px">Poner a todos en:</span> <input id="ociAll" class="oc-inp" style="width:80px" type="number" step="0.1" min="0" placeholder="1.5"><button class="oc-btn" onclick="ociSetAll()">Aplicar a todos</button>';
-  h += '<button id="ociSaveBtn" class="oc-btn ok" onclick="ociSave()">💾 Guardar' + (Object.keys(_ociChanged).length ? ' (' + Object.keys(_ociChanged).length + ')' : '') + '</button>';
-  h += '<input class="oc-filtro" type="search" placeholder="🔎 código / descripción / proveedor" value="' + escapeHtml(_oc.idxFiltro || "") + '" oninput="if(_oc){_oc.idxFiltro=this.value;ocRender();}"></div>';
-  const f = (_oc.idxFiltro || "").toLowerCase().trim();
-  const shown = f ? _oc.indices.filter(function (a) { return (a.cod + " " + a.desc + " " + a.prov).toLowerCase().indexOf(f) >= 0; }) : _oc.indices;
-  h += '<div class="oc-tblwrap"><table class="oc-tbl"><thead><tr><th>Código</th><th>Descripción</th><th>Proveedor</th><th class="num">Índice</th></tr></thead><tbody>';
-  if (!shown.length) h += '<tr><td colspan="4" class="oc-empty">Sin resultados.</td></tr>';
+function _ocCfgChangedN() { return (_oc && _oc.cfg) ? Object.keys(_oc.cfg.changed).length : 0; }
+function ocBodyCfg() {
+  let h = '<div class="oc-tools"><button class="oc-btn" onclick="ocgEnter()">← Volver al generador</button><button class="oc-btn ok" onclick="ocCfgAltaOpen()">➕ Agregar artículo</button></div>';
+  h += '<div class="oc-meta">Config del generador de OCs (<b>OC_Maximos</b>). <b>Objetivo</b> = máximo de cajas cuando el artículo no tiene proyección de ventas. <b>Uni×Caja</b> = unidades por caja (impreso). <b>Índice</b> = meses de stock objetivo (Máximo = proyección × índice, default 1,5). Se edita <b>acá</b> — ya no hace falta el Excel.</div>';
+  if (!_oc.cfg || !_oc.cfg.rows) return h + '<div class="oc-loading">Cargando config…</div>';
+  if (_oc.cfg.error) return h + '<div class="oc-empty" style="color:#b91c1c">Error: ' + escapeHtml(_oc.cfg.error) + '</div>';
+  if (_oc.cfg.alta) h += _ocCfgAltaForm();
+  h += '<div class="oc-tools"><span style="font-size:13px">Índice a todos:</span> <input id="ociAll" class="oc-inp" style="width:80px" type="number" step="0.1" min="0" placeholder="1.5"><button class="oc-btn" onclick="ocCfgSetAllIndice()">Aplicar</button>';
+  h += '<button id="ociSaveBtn" class="oc-btn ok" onclick="ocCfgSave()">💾 Guardar' + (_ocCfgChangedN() ? ' (' + _ocCfgChangedN() + ')' : '') + '</button>';
+  h += '<input class="oc-filtro" type="search" placeholder="🔎 código / descripción / proveedor" value="' + escapeHtml(_oc.cfg.filtro || "") + '" oninput="if(_oc&&_oc.cfg){_oc.cfg.filtro=this.value;ocRender();}"></div>';
+  const f = (_oc.cfg.filtro || "").toLowerCase().trim();
+  const shown = f ? _oc.cfg.rows.filter(function (a) { return (a.cod + " " + a.descripcion + " " + a.proveedor).toLowerCase().indexOf(f) >= 0; }) : _oc.cfg.rows;
+  h += '<div class="oc-tblwrap"><table class="oc-tbl"><thead><tr><th>Código</th><th>Descripción</th><th>Proveedor</th><th class="num">Objetivo</th><th class="num">Uni×Caja</th><th class="num">Índice</th><th>Activo</th></tr></thead><tbody>';
+  if (!shown.length) h += '<tr><td colspan="7" class="oc-empty">Sin resultados.</td></tr>';
   shown.forEach(function (a) {
-    const i = _oc.indices.indexOf(a);
-    const ch = (_ociChanged[a.cod] != null) ? ' style="background:#fef3c7"' : '';
-    h += '<tr' + ch + '><td class="oc-cod">' + escapeHtml(a.cod) + '</td><td>' + escapeHtml(artNombre(a.cod, a.desc)) + '</td><td>' + escapeHtml(a.prov || "—") + '</td><td class="num"><input class="oc-rinp" type="number" step="0.1" min="0" value="' + a.indice + '" oninput="ociEdit(' + i + ',this.value)"></td></tr>';
+    const i = _oc.cfg.rows.indexOf(a);
+    const ch = _oc.cfg.changed[a.cod] ? ' style="background:#fef3c7"' : (a.activo ? '' : ' style="opacity:.55"');
+    h += '<tr' + ch + '><td class="oc-cod">' + escapeHtml(a.cod) + '</td>' +
+      '<td>' + escapeHtml(artNombre(a.cod, a.descripcion)) + '</td>' +
+      '<td><input class="oc-rinp" style="width:120px" type="text" value="' + escapeHtml(a.proveedor) + '" oninput="ocCfgEdit(' + i + ',&quot;proveedor&quot;,this.value)"></td>' +
+      '<td class="num"><input class="oc-rinp" type="number" min="0" step="1" value="' + a.max_cajas + '" oninput="ocCfgEdit(' + i + ',&quot;max_cajas&quot;,this.value)"></td>' +
+      '<td class="num"><input class="oc-rinp" type="number" min="0" step="1" value="' + a.uni_x_caja + '" oninput="ocCfgEdit(' + i + ',&quot;uni_x_caja&quot;,this.value)"></td>' +
+      '<td class="num"><input class="oc-rinp" type="number" min="0" step="0.1" value="' + a.indice + '" oninput="ocCfgEdit(' + i + ',&quot;indice&quot;,this.value)"></td>' +
+      '<td style="text-align:center"><input type="checkbox" ' + (a.activo ? 'checked' : '') + ' onchange="ocCfgEdit(' + i + ',&quot;activo&quot;,this.checked)"></td></tr>';
   });
   return h + '</tbody></table></div>';
 }
-function ociEdit(i, v) {
-  if (!_oc || !_oc.indices) return; const a = _oc.indices[i]; if (!a) return;
-  a.indice = Math.max(0, parseFloat(v) || 0); _ociChanged[a.cod] = a.indice;   // sin re-render (no perder foco)
-  const b = document.getElementById("ociSaveBtn"); if (b) b.textContent = "💾 Guardar (" + Object.keys(_ociChanged).length + ")";
+function ocCfgEdit(i, field, v) {
+  if (!_oc || !_oc.cfg || !_oc.cfg.rows) return;
+  const a = _oc.cfg.rows[i]; if (!a) return;
+  let val;
+  if (field === "activo") val = !!v;
+  else if (field === "proveedor") val = String(v);
+  else val = Math.max(0, parseFloat(v) || 0);   // max_cajas / uni_x_caja / indice
+  a[field] = val;
+  if (!_oc.cfg.changed[a.cod]) _oc.cfg.changed[a.cod] = {};
+  _oc.cfg.changed[a.cod][field] = val;   // sin re-render (no perder foco)
+  const b = document.getElementById("ociSaveBtn"); if (b) b.textContent = "💾 Guardar (" + _ocCfgChangedN() + ")";
 }
-function ociSetAll() {
-  if (!_oc || !_oc.indices) return;
+function ocCfgSetAllIndice() {
+  if (!_oc || !_oc.cfg || !_oc.cfg.rows) return;
   const el = document.getElementById("ociAll"); const n = Math.max(0, parseFloat(el && el.value) || 0);
   if (!n) { alert("Poné un índice (ej. 1.5)."); return; }
-  _oc.indices.forEach(function (a) { if (a.indice !== n) { a.indice = n; _ociChanged[a.cod] = n; } });
+  _oc.cfg.rows.forEach(function (a) { if (a.indice !== n) { a.indice = n; if (!_oc.cfg.changed[a.cod]) _oc.cfg.changed[a.cod] = {}; _oc.cfg.changed[a.cod].indice = n; } });
   ocRender();
 }
-async function ociSave() {
-  if (!_oc) return;
-  const cods = Object.keys(_ociChanged);
+async function ocCfgSave() {
+  if (!_oc || !_oc.cfg) return;
+  const cods = Object.keys(_oc.cfg.changed);
   if (!cods.length) { alert("No hay cambios para guardar."); return; }
   const headers = await facAuthWriteHeaders({ "Prefer": "return=minimal" });
-  if (!headers) { alert(authNoSesionMsg("Para guardar los índices necesitás iniciar sesión con Google (supervisor).")); return; }
+  if (!headers) { alert(authNoSesionMsg("Para guardar la config necesitás iniciar sesión con Google (supervisor).")); return; }
   try {
-    await Promise.all(cods.map(function (c) { return fetch(SUPABASE_OCMAX_ENDPOINT + "?cod=eq." + encodeURIComponent(c), { method: "PATCH", headers: headers, body: JSON.stringify({ indice: _ociChanged[c] }) }); }));
-    alert("✓ Guardados " + cods.length + " índice(s). Volvé a generar para ver el efecto.");
-    _ociChanged = {}; ocRender();
-  } catch (e) { alert("Error guardando índices: " + (e.message || e)); }
+    await Promise.all(cods.map(function (c) {
+      return fetch(SUPABASE_OCMAX_ENDPOINT + "?cod=eq." + encodeURIComponent(c), { method: "PATCH", headers: headers, body: JSON.stringify(_oc.cfg.changed[c]) })
+        .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status + " (" + c + ")"); });
+    }));
+    alert("✓ Guardados " + cods.length + " artículo(s). Volvé a generar para ver el efecto.");
+    _oc.cfg.changed = {}; ocRender();
+  } catch (e) { alert("Error guardando: " + (e.message || e)); }
+}
+/* Alta de artículo nuevo en OC_Maximos (POST) — reemplaza darlo de alta en el Excel. cod = PK. */
+function ocCfgAltaOpen() { if (_oc && _oc.cfg) { _oc.cfg.alta = {}; ocRender(); } }
+function ocCfgAltaCancel() { if (_oc && _oc.cfg) { _oc.cfg.alta = null; ocRender(); } }
+function _ocCfgAltaForm() {
+  return '<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:11px;margin-bottom:11px">' +
+    '<div style="font-weight:800;margin-bottom:8px">➕ Artículo nuevo</div>' +
+    '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end">' +
+    '<label style="font-size:12px">Código<br><input id="ocmaCod" class="oc-inp" style="width:90px" type="text"></label>' +
+    '<label style="font-size:12px">Descripción<br><input id="ocmaDesc" class="oc-inp" style="width:180px" type="text"></label>' +
+    '<label style="font-size:12px">Proveedor<br><input id="ocmaProv" class="oc-inp" style="width:130px" type="text"></label>' +
+    '<label style="font-size:12px">Objetivo<br><input id="ocmaMax" class="oc-inp" style="width:80px" type="number" min="0" step="1"></label>' +
+    '<label style="font-size:12px">Uni×Caja<br><input id="ocmaUni" class="oc-inp" style="width:80px" type="number" min="0" step="1"></label>' +
+    '<label style="font-size:12px">Índice<br><input id="ocmaInd" class="oc-inp" style="width:70px" type="number" min="0" step="0.1" value="1.5"></label>' +
+    '<button class="oc-btn ok" onclick="ocCfgAltaSave()">Guardar</button>' +
+    '<button class="oc-btn" onclick="ocCfgAltaCancel()">Cancelar</button>' +
+    '</div></div>';
+}
+async function ocCfgAltaSave() {
+  if (!_oc || !_oc.cfg) return;
+  const g = function (id) { const el = document.getElementById(id); return el ? el.value : ""; };
+  const cod = String(g("ocmaCod") || "").trim();
+  if (!cod) { alert("Poné un código."); return; }
+  const codU = cod.toUpperCase();
+  if ((_oc.cfg.rows || []).some(function (a) { return a.cod.toUpperCase() === codU; })) { alert("Ya existe el código " + cod + " en la config."); return; }
+  const body = {
+    cod: cod, descripcion: String(g("ocmaDesc") || "").trim() || null, proveedor: String(g("ocmaProv") || "").trim() || null,
+    max_cajas: Math.max(0, parseFloat(g("ocmaMax")) || 0), uni_x_caja: Math.max(0, parseFloat(g("ocmaUni")) || 0),
+    indice: Math.max(0, parseFloat(g("ocmaInd")) || 1.5), activo: true
+  };
+  const headers = await facAuthWriteHeaders({ "Prefer": "return=minimal" });
+  if (!headers) { alert(authNoSesionMsg("Para dar de alta un artículo necesitás iniciar sesión con Google (supervisor).")); return; }
+  try {
+    const r = await fetch(SUPABASE_OCMAX_ENDPOINT, { method: "POST", headers: headers, body: JSON.stringify(body) });
+    if (!r.ok) throw new Error(r.status === 409 ? "ya existe ese código" : "HTTP " + r.status);
+    _oc.cfg.alta = null;
+    await ocgEnterCfg();
+    alert("✓ Artículo " + cod + " agregado.");
+  } catch (e) { alert("Error en el alta: " + (e.message || e)); }
 }
 /* v5.40 — "En vivo" (default) vs "a una fecha y hora determinada" (snapshot histórico).
    Como el stock es event-sourced, el punto en el tiempo = recomputar saldos contando
