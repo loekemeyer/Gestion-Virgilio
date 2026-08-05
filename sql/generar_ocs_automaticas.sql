@@ -13,9 +13,17 @@
 --     uno ya pickeado NO — su mercadería está en separar_pedidos, que tampoco se
 --     cuenta como stock: NETEA de los dos lados y no se pide dos veces lo mismo.
 --   Máximo = proyección por tendencia (proyeccion_madre) × índice (OC_Maximos.indice,
---     default 1,5), topado a la capacidad de góndola (Capacidad_Sector). Si el
---     artículo no tiene proyección, cae al objetivo del Excel (OC_Maximos.max_cajas).
+--     default 1,5), topado a la capacidad de góndola (Capacidad_Sector). Si el artículo
+--     NO tiene proyección: el objetivo = capacidad de góndola (v7.68), pero SOLO para los
+--     que tienen proveedor real (si no, no se pide por tener góndola vacía).
 --   A pedir = ceil(max(0, Máximo + Pedidos − Stock)).
+--
+-- v7.68 — CAMBIO DE FONDO: el universo YA NO sale de OC_Maximos (lista a mano) sino de
+--   STOCK. Todo se encapsula en la vista `vista_generador_oc` (universo = productos
+--   terminados de stock ∪ proyección ∪ pedidos; stock con empresa LK/CH mergeada — arregla
+--   el sobre-pedido de códigos partidos; uni×caja = maestro→backup estático→uxb). OC_Maximos
+--   quedó como SOLO config de proveedor/%/índice/activo por código. El front (ocgEnter) y
+--   este cron leen la MISMA vista. Los "(sin proveedor)" se muestran pero NO se auto-generan.
 --
 -- v7.65: "Log/ Fabr" (fábrica) SÍ genera OC (pedido del usuario). "Racks" (importación)
 -- se EXCLUYE — se abastece por otra vía. (Igual que el generador manual.)
@@ -98,86 +106,22 @@ begin
 
   -- la generación va en su propio bloque: si algo revienta, el aviso sobrevive.
   begin
-  with norm as (   -- misma normalización que el front (_ocgNorm)
-    select regexp_replace(upper(btrim(m.cod)), '^0+(?=.)', '') as codn,
-           upper(btrim(m.cod)) as cod, m.descripcion, btrim(coalesce(m.proveedor, '')) as proveedor,
-           nullif(btrim(coalesce(m.proveedor2, '')), '') as proveedor2,
-           coalesce(m.prop_prov1, 100)::numeric as pr1, coalesce(m.prop_prov2, 0)::numeric as pr2,
-           coalesce(m.max_cajas, 0)::numeric as max_excel,
-           case when coalesce(m.indice, 0) > 0 then m.indice::numeric else 1.5 end as indice,
-           coalesce(m.uni_x_caja, 0)::numeric as uni_caja
-      from public."OC_Maximos" m
-     where m.activo and nullif(btrim(m.cod), '') is not null
-  ),
-  stk as (   -- SOLO góndola + a guardar + racks + excedente
-    select regexp_replace(upper(btrim(cod_art)), '^0+(?=.)', '') as codn,
-           sum(coalesce(terminado, 0) + coalesce(a_guardar, 0) + coalesce(racks, 0) + coalesce(excedente, 0)) as stock
-      from public.vista_saldos_stock group by 1
-  ),
-  pickeadas as (   -- tandas con picking TERMINADO: su stock ya salió de góndola
-    select distinct upper(btrim(texto)) as tanda
-      from public."Registros_Produccion_Virgilio"
-     where opcion = 'TP' and nullif(btrim(coalesce(texto, '')), '') is not null
-  ),
-  pend_np as (     -- pedidos que todavía no consumieron stock (netea)
-    select distinct btrim(p.np) as np
-      from public."PPP_Programacion_Diaria" p
-     where btrim(p.np) not in (select btrim(np) from public."Facturacion_NP")
-       and upper(btrim(coalesce(p.tanda, ''))) not in (select tanda from pickeadas)
-  ),
-  dem as (
-    select regexp_replace(upper(btrim(b.articulo)), '^0+(?=.)', '') as codn,
-           sum(coalesce(b.cajas, 0)) as pedidos
-      from public."PPP_Base_Pedidos" b
-      join pend_np n on btrim(b.pedido) = n.np
-     where nullif(btrim(b.articulo), '') is not null
-     group by 1
-  ),
-  proy as (
-    select regexp_replace(upper(btrim(cod)), '^0+(?=.)', '') as codn,
-           max(coalesce(proy_cajas_mes, 0))::numeric as proy
-      from public.proyeccion_madre group by 1
-  ),
-  cap as (
-    select regexp_replace(upper(btrim(cod)), '^0+(?=.)', '') as codn,
-           sum(coalesce(cajas_max, 0))::numeric as cap
-      from public."Capacidad_Sector" group by 1
-  ),
-  ncaja as (   -- v7.42: "Caja N°" = N_Caja MÁS FRECUENTE por código (desempate: la más chica)
-    select distinct on (codn) codn, n_caja from (
-      select regexp_replace(upper(btrim("Cod_Art")), '^0+(?=.)', '') as codn, "N_Caja" as n_caja, count(*) as c
-        from public."Articulos_Cajas" where "N_Caja" is not null group by 1, 2
-    ) t order by codn, c desc, n_caja
-  ),
-  calc as (
-    select n.cod, n.descripcion, n.proveedor, n.proveedor2, n.pr1, n.pr2, n.uni_caja, nc.n_caja,
-           coalesce(s.stock, 0) as stock, coalesce(d.pedidos, 0) as pedidos,
-           least(
-             ceil(case when p.proy is not null and p.proy > 0 then p.proy * n.indice else n.max_excel end),
-             coalesce(nullif(c.cap, 0), 1e9)
-           ) as maximo
-      from norm n
-      left join stk s on s.codn = n.codn
-      left join dem d on d.codn = n.codn
-      left join proy p on p.codn = n.codn
-      left join cap c on c.codn = n.codn
-      left join ncaja nc on nc.codn = n.codn
-     where nullif(n.proveedor, '') is not null
-  ),
-  falta as (
-    select *, ceil(maximo + pedidos - stock)::int as total
-      from calc where ceil(maximo + pedidos - stock) > 0
-  ),
-  split as (   -- v7.66: reparto por proveedor (Prov 1 % pr1 / Prov 2 % pr2). El Prov 2 recibe el RESTO para sumar exacto.
-    select cod, descripcion, uni_caja, n_caja, proveedor as prov,
+  with split as (   -- v7.68: TODO el cálculo vive en vista_generador_oc (universo desde STOCK,
+                    -- Máximo = proy×índice o capacidad de góndola como objetivo, stock con empresa
+                    -- LK/CH mergeada, pedidos, uni×caja). Acá SOLO se parte por proveedor (Prov 1 %
+                    -- pr1 / Prov 2 = resto) y se insertan los que tienen proveedor real: los
+                    -- "(sin proveedor)" se muestran en el front pero NO se auto-generan.
+    select cod, descripcion, uni_x_caja as uni_caja, n_caja, proveedor as prov,
            round(maximo * pr1 / 100.0) as oc_max, round(pedidos * pr1 / 100.0) as oc_ped, round(stock * pr1 / 100.0) as oc_stk,
            round(total * pr1 / 100.0)::int as cantidad
-      from falta
+      from public.vista_generador_oc
+     where activo and total > 0 and tiene_prov_real
     union all
-    select cod, descripcion, uni_caja, n_caja, proveedor2 as prov,
+    select cod, descripcion, uni_x_caja, n_caja, proveedor2 as prov,
            maximo - round(maximo * pr1 / 100.0), pedidos - round(pedidos * pr1 / 100.0), stock - round(stock * pr1 / 100.0),
            total - round(total * pr1 / 100.0)::int
-      from falta where proveedor2 is not null and pr2 > 0
+      from public.vista_generador_oc
+     where activo and total > 0 and tiene_prov_real and proveedor2 is not null and pr2 > 0
   ),
   ins as (
     insert into public."Ordenes_Compra"

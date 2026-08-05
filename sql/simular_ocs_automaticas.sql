@@ -39,69 +39,14 @@ begin
   select count(*) into v_hay from public."Ordenes_Compra" where fecha = v_hoy;
 
   begin
-    with norm as (
-      select regexp_replace(upper(btrim(m.cod)), '^0+(?=.)', '') as codn,
-             btrim(coalesce(m.proveedor, '')) as proveedor,
-             nullif(btrim(coalesce(m.proveedor2, '')), '') as proveedor2,
-             coalesce(m.prop_prov1, 100)::numeric as pr1, coalesce(m.prop_prov2, 0)::numeric as pr2,
-             coalesce(m.max_cajas, 0)::numeric as max_excel,
-             case when coalesce(m.indice, 0) > 0 then m.indice::numeric else 1.5 end as indice
-        from public."OC_Maximos" m
-       where m.activo and nullif(btrim(m.cod), '') is not null
-    ),
-    stk as (
-      select regexp_replace(upper(btrim(cod_art)), '^0+(?=.)', '') as codn,
-             sum(coalesce(terminado, 0) + coalesce(a_guardar, 0) + coalesce(racks, 0) + coalesce(excedente, 0)) as stock
-        from public.vista_saldos_stock group by 1
-    ),
-    pickeadas as (
-      select distinct upper(btrim(texto)) as tanda
-        from public."Registros_Produccion_Virgilio"
-       where opcion = 'TP' and nullif(btrim(coalesce(texto, '')), '') is not null
-    ),
-    pend_np as (
-      select distinct btrim(p.np) as np
-        from public."PPP_Programacion_Diaria" p
-       where btrim(p.np) not in (select btrim(np) from public."Facturacion_NP")
-         and upper(btrim(coalesce(p.tanda, ''))) not in (select tanda from pickeadas)
-    ),
-    dem as (
-      select regexp_replace(upper(btrim(b.articulo)), '^0+(?=.)', '') as codn,
-             sum(coalesce(b.cajas, 0)) as pedidos
-        from public."PPP_Base_Pedidos" b
-        join pend_np n on btrim(b.pedido) = n.np
-       where nullif(btrim(b.articulo), '') is not null
-       group by 1
-    ),
-    proy as (
-      select regexp_replace(upper(btrim(cod)), '^0+(?=.)', '') as codn,
-             max(coalesce(proy_cajas_mes, 0))::numeric as proy
-        from public.proyeccion_madre group by 1
-    ),
-    cap as (
-      select regexp_replace(upper(btrim(cod)), '^0+(?=.)', '') as codn,
-             sum(coalesce(cajas_max, 0))::numeric as cap
-        from public."Capacidad_Sector" group by 1
-    ),
-    calc as (
-      select n.proveedor, n.proveedor2, n.pr1, n.pr2,
-             ceil(least(
-               ceil(case when p.proy is not null and p.proy > 0 then p.proy * n.indice else n.max_excel end),
-               coalesce(nullif(c.cap, 0), 1e9)
-             ) + coalesce(d.pedidos, 0) - coalesce(s.stock, 0))::int as total
-        from norm n
-        left join stk s on s.codn = n.codn
-        left join dem d on d.codn = n.codn
-        left join proy p on p.codn = n.codn
-        left join cap c on c.codn = n.codn
-       where nullif(n.proveedor, '') is not null
-    ),
-    faltas as (select * from calc where total > 0),
-    pos as (   -- v7.66: reparto por proveedor (Prov 1 % pr1 / Prov 2 % pr2). Racks afuera.
+    with pos as (   -- v7.68: todo el cálculo vive en vista_generador_oc; acá solo se parte por
+                    -- proveedor (Prov 1 % pr1 / Prov 2 = resto). Racks afuera; "(sin proveedor)" no cuenta.
       select proveedor, a_pedir from (
-        select proveedor, round(total * pr1 / 100.0)::int as a_pedir from faltas
+        select proveedor, round(total * pr1 / 100.0)::int as a_pedir
+          from public.vista_generador_oc where activo and total > 0 and tiene_prov_real
         union all
-        select proveedor2, (total - round(total * pr1 / 100.0))::int from faltas where proveedor2 is not null and pr2 > 0
+        select proveedor2, (total - round(total * pr1 / 100.0))::int
+          from public.vista_generador_oc where activo and total > 0 and tiene_prov_real and proveedor2 is not null and pr2 > 0
       ) s
       where a_pedir > 0 and nullif(btrim(proveedor), '') is not null and upper(btrim(proveedor)) not in ('RACKS', 'RACK')
     )
