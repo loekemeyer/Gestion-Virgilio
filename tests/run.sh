@@ -132,6 +132,9 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== ocg-config (v7.51: editor de OC_Maximos (objetivo/uni×caja/índice/proveedor/activo + alta) → sin Excel) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ocg-config.cjs
 
+echo "== ocg-wa (v7.62: enviar OC por WhatsApp al tallerista — matcheo tel + botón) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ocg-wa.cjs
+
 echo "== comp-dif-nofantasma (v7.39: 'picking difiere' no infla góndola fantasma — sólo compensa negativo) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/comp-dif-nofantasma.cjs
 

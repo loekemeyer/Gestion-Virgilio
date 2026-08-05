@@ -4,7 +4,22 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-05 · Versión app al documentar: **v7.62**
+> Última actualización: 2026-08-05 · Versión app al documentar: **v7.63**
+>
+> Nota: **v7.63 — 📲 Enviar la OC por WhatsApp al tallerista**. En el detalle de una OC, botón nuevo
+> **📲 WhatsApp** (junto a 🖨 Operador / 🖨 Tallerista): **copia la OC como IMAGEN al portapapeles** y
+> **abre WhatsApp Web/app del tallerista** — se pega con Ctrl+V en el chat y se manda. ⚠ El navegador
+> **no puede copiar un PDF** al portapapeles (ni WhatsApp acepta pegar PDF), por eso se copia una
+> imagen (lo más cercano a "listo para enviar"). La imagen se genera **sin librerías**: `ocPrintHtml`
+> (vista tallerista) → `<style>`+HTML serializado con `XMLSerializer` → SVG `foreignObject` → canvas →
+> PNG (`_ocPngBlob`). El copiado va **dentro del gesto** del click (con `ClipboardItem` tomando una
+> Promise de blob) y **recién después** abre WhatsApp (para que el pop-up no se bloquee); si el
+> portapapeles no está (Firefox/Safari viejos), **descarga** el PNG como fallback. **El teléfono sale de
+> `ocTelDe`** (tabla **`Talleristas_Contacto`**, v7.62) — una sola fuente de verdad, editable, que ya
+> resuelve **duales** («Garcia / Lucho») y el caso **«no enviar por WhatsApp»** (Oscar, Pedernera,
+> Paternal Goma, Manfer tienen tel NULL → el botón avisa y no abre nada). Se le sacan los no-dígitos
+> para armar `https://wa.me/<num>`. Los botones de impresión (PDF) siguen igual. Test `tests/ocg-wa.cjs`;
+> `dead-handlers` OK. Bump **v7.63**.
 >
 > Nota: **v7.62 — Teléfonos de talleristas en el impreso de OC (tabla nueva) + aclaraciones de
 > Log/Fabr y duales**. El dueño pasó los teléfonos de los talleristas (antes no había ninguno en la

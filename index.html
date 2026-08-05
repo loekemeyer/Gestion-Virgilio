@@ -6028,7 +6028,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.62";
+const APP_VERSION = "v7.63";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -9813,6 +9813,7 @@ function ocBodyDetail() {
   else h += '<button class="oc-btn" onclick="ocMarcar(\'pendiente\')">↩ Reabrir</button>';
   h += '<button class="oc-btn" onclick="ocPrintDetalle(true)" title="Con las 3 columnas de Cajas Recibidas para chequear">🖨 Operador</button>';
   h += '<button class="oc-btn" onclick="ocPrintDetalle(false)" title="Para enviarle al tallerista (sin Cajas Recibidas)">🖨 Tallerista</button>';
+  h += '<button class="oc-btn" onclick="ocWhatsappTallerista()" title="Copia la OC como imagen y abre WhatsApp del tallerista">📲 WhatsApp</button>';
   h += '</div>';
   h += '<div class="oc-meta">Proveedor <b>' + escapeHtml(x.proveedor || "—") + '</b> · Fecha <b>' + escapeHtml(x.fecha || "—") + '</b> · Rubro <b>' + escapeHtml(x.rubro || "—") + '</b> · Pedido <b>' + st.ped + '</b> · Recibido <b class="oc-ok">' + st.rec + '</b> · Falta <b class="' + (st.falta > 0 ? "oc-falt" : "oc-ok") + '">' + (st.falta > 0 ? st.falta : 0) + '</b></div>';
   h += '<div class="oc-note" style="margin-top:0;margin-bottom:8px"><b>Recibido</b> = lo que registró la Recepción de Mercadería para este tallerista y código, <b>dentro del período de esta OC</b> (no acumula entregas anteriores ni de otra OC). Se alimenta solo.</div>';
@@ -9960,6 +9961,64 @@ function ocPrintDetalle(conRecibidas) {
   const suf = conRecibidas ? " (operador)" : " (tallerista)";
   w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>OC ' + escapeHtml(x.proveedor || "") + ' ' + escapeHtml(x.fecha || "") + suf + '</title><style>' + _OC_PRINT_CSS + '</style></head><body>' + ocPrintHtml(x, { conRecibidas: !!conRecibidas }) + '<scr' + 'ipt>window.onload=function(){setTimeout(function(){window.print();},150);};</scr' + 'ipt></body></html>');
   w.document.close();
+}
+/* v7.63 — 📲 Enviar OC por WhatsApp al tallerista. Copia la OC como IMAGEN al portapapeles
+   (el navegador NO puede copiar un PDF; una imagen sí se pega con Ctrl+V en WhatsApp) y abre
+   WhatsApp Web/app del tallerista. El teléfono sale de `ocTelDe` (tabla Talleristas_Contacto,
+   v7.62): respeta duales y el caso "no enviar por WhatsApp" (esos no tienen tel → no se puede).
+   Si el portapapeles no está disponible (Firefox/Safari viejos), baja la imagen como fallback. */
+/* Renderiza la OC (vista tallerista) a un blob PNG vía SVG foreignObject + canvas (sin libs). */
+function _ocPngBlob(x) {
+  return new Promise(function (resolve, reject) {
+    const host = document.createElement("div");
+    host.setAttribute("style", "position:fixed;left:-99999px;top:0;background:#fff");
+    host.innerHTML = '<style>' + _OC_PRINT_CSS + '</style><div class="ocimg" style="background:#fff;padding:16px;display:inline-block">' + ocPrintHtml(x, {}) + '</div>';
+    document.body.appendChild(host);
+    const inner = host.querySelector(".ocimg");
+    const W = Math.ceil(inner.scrollWidth) + 2, H = Math.ceil(inner.scrollHeight) + 2;
+    let xhtml = "";
+    try { for (let i = 0; i < host.childNodes.length; i++) xhtml += new XMLSerializer().serializeToString(host.childNodes[i]); }
+    catch (e) { document.body.removeChild(host); reject(e); return; }
+    document.body.removeChild(host);
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + W + '" height="' + H + '"><foreignObject x="0" y="0" width="100%" height="100%"><div xmlns="http://www.w3.org/1999/xhtml">' + xhtml + '</div></foreignObject></svg>';
+    const img = new Image();
+    img.onload = function () {
+      try {
+        const c = document.createElement("canvas"); c.width = W; c.height = H;
+        const g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, W, H); g.drawImage(img, 0, 0);
+        c.toBlob(function (b) { b ? resolve(b) : reject(new Error("toBlob null")); }, "image/png");
+      } catch (e) { reject(e); }
+    };
+    img.onerror = function () { reject(new Error("no se pudo renderizar la imagen")); };
+    img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
+  });
+}
+async function ocWhatsappTallerista() {
+  if (!_oc || !_oc.openKey) return;
+  const g = ocGroups(), x = g[_oc.openKey]; if (!x || !x.rows.length) { alert("No hay ítems para enviar."); return; }
+  const tel = String(ocTelDe(x.proveedor) || "").replace(/\D/g, "");   // sólo dígitos para wa.me
+  if (!tel) { alert('No hay WhatsApp cargado para "' + (x.proveedor || "") + '" (o está marcado para no enviarle por WhatsApp). Se administra en la tabla Talleristas_Contacto.'); return; }
+  const waUrl = "https://wa.me/" + tel;
+  // Copiar la imagen DENTRO del gesto (doc enfocado) y recién después abrir WhatsApp
+  // (así el bloqueador de pop-ups no corta el window.open).
+  let copiada = false;
+  if (navigator.clipboard && window.ClipboardItem) {
+    try { navigator.clipboard.write([new ClipboardItem({ "image/png": _ocPngBlob(x) })]); copiada = true; }
+    catch (e) { copiada = false; }
+  }
+  window.open(waUrl, "_blank");
+  if (copiada) { alert("✓ OC copiada como imagen. En el chat de WhatsApp que se abrió, pegala con Ctrl+V y enviala."); return; }
+  // Fallback: descargar la imagen para adjuntarla a mano.
+  try {
+    const b = await _ocPngBlob(x);
+    const url = URL.createObjectURL(b), a = document.createElement("a");
+    a.href = url; a.download = "OC " + String(x.proveedor || "").replace(/[^\w -]/g, "") + " " + (x.fecha || "") + ".png";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 5000);
+    alert("Descargué la OC como imagen (carpeta Descargas). Adjuntala en el chat de WhatsApp que se abrió.");
+  } catch (e2) {
+    alert("Abrí el chat de WhatsApp. No pude generar la imagen — usá 🖨 Tallerista y adjuntá el PDF a mano.");
+  }
 }
 /* v7.58 — el "recibido" ya no se carga a mano: es lo que registró la recepción. Al
    marcar RECIBIDA se toma una FOTO de ese valor en `cantidad_recibida` (para dejar el
