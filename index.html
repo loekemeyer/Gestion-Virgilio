@@ -6028,7 +6028,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.57";
+const APP_VERSION = "v7.58";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -9495,6 +9495,17 @@ async function ocFetchRecepcion() {
 }
 /* Reparte lo entregado sobre las OCs por (proveedor+código) usando la ventana de fechas
    [fecha_OC, fecha_OC_siguiente_del_mismo_prov+cód). Devuelve { row.id → cajas recibidas }. */
+/* Vigencia de una OC para contar recepción: solo se cuenta lo recibido DENTRO del
+   período de la OC, nunca acumulando entregas de antes ni de otra corrida. La ventana
+   arranca en la fecha de la OC y termina en la más TEMPRANA de: (a) la fecha de la OC
+   SIGUIENTE del mismo tallerista+código (la reemplaza), o (b) fecha_OC + vigencia. */
+const OC_RECEP_VIGENCIA_DIAS = 120;   // mismo criterio de vigencia que recepcion.js
+function _ocAddDias(ymd, n) {
+  const m = String(ymd == null ? "" : ymd).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return "";
+  const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])); d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
 function ocBuildRecep() {
   const out = {};
   if (!_oc || !_oc.recep) return out;
@@ -9506,19 +9517,23 @@ function ocBuildRecep() {
     const list = ocByCode[ck], receps = recepByCode[ck] || [];
     list.forEach(function (r) {
       const from = String(r.fecha || ""), rKeys = _ocProvKeys(r.proveedor);
-      // Fin de ventana = fecha de la OC más próxima POSTERIOR del mismo código con proveedor solapado.
-      let to = null;
+      // Sin fecha no se puede acotar el período → no se atribuye nada (evita sumar pasado).
+      if (!from) { out[r.id] = 0; return; }
+      // Tope de la ventana (exclusivo): por defecto fecha_OC + vigencia, y se recorta a la
+      // fecha de la OC SIGUIENTE del mismo tallerista+código si es anterior.
+      let to = _ocAddDias(from, OC_RECEP_VIGENCIA_DIAS);
       list.forEach(function (o) {
         if (o === r) return;
         const of = String(o.fecha || "");
-        if (!from || of <= from) return;
+        if (!of || of <= from) return;
         if (!_ocProvKeys(o.proveedor).some(function (k) { return _ocProvKeysMatch(rKeys, k); })) return;
-        if (to === null || of < to) to = of;
+        if (of < to) to = of;
       });
       let sum = 0;
       receps.forEach(function (e) {
-        if (from && e.fecha && e.fecha < from) return;
-        if (to && e.fecha && e.fecha >= to) return;
+        if (!e.fecha) return;
+        if (e.fecha < from) return;            // entrega anterior a la OC → no cuenta
+        if (to && e.fecha >= to) return;       // fuera del período vigente (o de la OC siguiente)
         if (!e.provKeys.some(function (k) { return _ocProvKeysMatch(rKeys, k); })) return;
         sum += e.cajas;
       });
@@ -9527,14 +9542,10 @@ function ocBuildRecep() {
   });
   return out;
 }
-/* Recibido EFECTIVO de una línea: si hay recibido cargado a mano (cantidad_recibida>0)
-   ese manda (OCs viejas / de carga manual); si no, lo que marcó la recepción. */
-function ocRecEff(r) {
-  const man = Number(r && r.cantidad_recibida) || 0;
-  if (man > 0) return man;
-  return (_oc && _oc.recepByRow && _oc.recepByRow[r && r.id]) || 0;
-}
-function ocRecDe(r) { return (_oc && _oc.recepByRow && _oc.recepByRow[r && r.id]) || 0; }
+/* Recibido de una línea = lo que la RECEPCIÓN registró en el período vigente de la OC
+   (no acumula pasado; ver ocBuildRecep). Es la única fuente del "recibido" que muestra
+   el visualizador (v7.58: se unificó con la columna manual). */
+function ocRecEff(r) { return (_oc && _oc.recepByRow && _oc.recepByRow[r && r.id]) || 0; }
 async function openOCAdmin() {
   if (!document.getElementById("ocCss")) {
     const s = document.createElement("style"); s.id = "ocCss";
@@ -9587,7 +9598,7 @@ function ocBodyEntregas() {
   const byArt = {}; let totP = 0, totE = 0;
   rows.forEach(function (r) {
     const k = _ocgNorm(r.codigo); if (!k) return;
-    const ped = Number(r.cantidad) || 0, ent = Number(r.cantidad_recibida) || 0;
+    const ped = Number(r.cantidad) || 0, ent = ocRecEff(r);   // v7.58: entregado = lo que registró la recepción
     if (!byArt[k]) byArt[k] = { cod: codCanon(r.codigo), desc: r.descripcion || "", prov: r.proveedor || "", ped: 0, ent: 0 };
     byArt[k].ped += ped; byArt[k].ent += ent; totP += ped; totE += ent;
   });
@@ -9702,7 +9713,7 @@ function ocBodyTrazar() {
   else {
     h += '<div class="oc-tblwrap"><table class="oc-tbl"><thead><tr><th>Fecha</th><th>Proveedor</th><th class="num">Pedido</th><th class="num">Recibido</th><th class="num">Falta</th><th>Estado</th></tr></thead><tbody>';
     ordenes.slice().sort(function (a, b) { return (b.fecha || "").localeCompare(a.fecha || ""); }).forEach(function (r) {
-      const ped = Number(r.cantidad) || 0, rec = Number(r.cantidad_recibida) || 0, falt = ped - rec; tp += ped; tr += rec;
+      const ped = Number(r.cantidad) || 0, rec = ocRecEff(r), falt = ped - rec; tp += ped; tr += rec;   // v7.58: recibido = recepción
       h += '<tr><td>' + escapeHtml(r.fecha || "—") + '</td><td>' + escapeHtml(r.proveedor || "—") + '</td><td class="num">' + ped + '</td><td class="num">' + rec + '</td><td class="num ' + (falt > 0 ? "oc-falt" : "oc-ok") + '">' + (falt !== 0 ? falt : "0") + '</td><td><span class="oc-pill ' + escapeHtml(r.estado || "pendiente") + '">' + escapeHtml(r.estado || "pendiente") + '</span></td></tr>';
     });
     h += '</tbody></table></div>';
@@ -9782,31 +9793,19 @@ function ocBodyDetail() {
   if (!x) { _oc.view = "list"; return ocBodyList(); }
   const st = ocGroupStats(x);
   let h = '<div class="oc-tools"><button class="oc-btn" onclick="ocBack()">← Volver</button>';
-  h += '<button class="oc-btn ok" onclick="ocGuardarRecibido()">💾 Guardar recibido</button>';
-  h += '<button class="oc-btn" onclick="ocTraerRecepcion()" title="Copia a mano lo que marcó la recepción de mercadería">📥 Traer de recepción</button>';
   if (st.estado !== "recibida") h += '<button class="oc-btn" onclick="ocMarcar(\'recibida\')">✓ Marcar recibida</button>';
   else h += '<button class="oc-btn" onclick="ocMarcar(\'pendiente\')">↩ Reabrir</button>';
   h += '<button class="oc-btn" onclick="ocPrintDetalle(true)" title="Con las 3 columnas de Cajas Recibidas para chequear">🖨 Operador</button>';
   h += '<button class="oc-btn" onclick="ocPrintDetalle(false)" title="Para enviarle al tallerista (sin Cajas Recibidas)">🖨 Tallerista</button>';
   h += '</div>';
   h += '<div class="oc-meta">Proveedor <b>' + escapeHtml(x.proveedor || "—") + '</b> · Fecha <b>' + escapeHtml(x.fecha || "—") + '</b> · Rubro <b>' + escapeHtml(x.rubro || "—") + '</b> · Pedido <b>' + st.ped + '</b> · Recibido <b class="oc-ok">' + st.rec + '</b> · Falta <b class="' + (st.falta > 0 ? "oc-falt" : "oc-ok") + '">' + (st.falta > 0 ? st.falta : 0) + '</b></div>';
-  h += '<div class="oc-note" style="margin-top:0;margin-bottom:8px">📥 <b>Recep.</b> = lo que marcó la Recepción de Mercadería para este tallerista y código (se alimenta solo). El campo <b>Recibido</b> es editable: viene con lo de recepción y podés ajustarlo a mano y <b>Guardar</b>.</div>';
-  h += '<div class="oc-tblwrap"><table class="oc-tbl oc-tbl-det"><thead><tr><th>Código</th><th>Descripción</th><th>Unidad</th><th class="num">Pedido</th><th class="num">📥 Recep.</th><th class="num">Recibido</th><th class="num">Falta</th></tr></thead><tbody>';
+  h += '<div class="oc-note" style="margin-top:0;margin-bottom:8px"><b>Recibido</b> = lo que registró la Recepción de Mercadería para este tallerista y código, <b>dentro del período de esta OC</b> (no acumula entregas anteriores ni de otra OC). Se alimenta solo.</div>';
+  h += '<div class="oc-tblwrap"><table class="oc-tbl oc-tbl-det"><thead><tr><th>Código</th><th>Descripción</th><th>Unidad</th><th class="num">Pedido</th><th class="num">Recibido</th><th class="num">Falta</th></tr></thead><tbody>';
   x.rows.forEach(function (r) {
-    const ped = Number(r.cantidad) || 0, recp = ocRecDe(r), val = ocRecEff(r), falt = ped - val;
-    h += '<tr><td class="oc-cod">' + escapeHtml(codCanon(r.codigo) || "—") + '</td><td>' + escapeHtml(artNombre(r.codigo, r.descripcion) || "") + '</td><td>' + escapeHtml(r.unidad || "") + '</td><td class="num">' + ped + '</td><td class="num" title="Recibido según Recepción de Mercadería">' + (recp > 0 ? "📥 " + recp : "—") + '</td><td class="num"><input class="oc-rinp" type="number" min="0" inputmode="numeric" data-id="' + r.id + '" data-ped="' + ped + '" data-recep="' + recp + '" value="' + val + '" oninput="ocLiveFalt(' + r.id + ',' + ped + ',this.value)"></td><td class="num ' + (falt > 0 ? "oc-falt" : "oc-ok") + '" id="ocfalt_' + r.id + '">' + (falt !== 0 ? falt : "0") + '</td></tr>';
+    const ped = Number(r.cantidad) || 0, rec = ocRecEff(r), falt = ped - rec;
+    h += '<tr><td class="oc-cod">' + escapeHtml(codCanon(r.codigo) || "—") + '</td><td>' + escapeHtml(artNombre(r.codigo, r.descripcion) || "") + '</td><td>' + escapeHtml(r.unidad || "") + '</td><td class="num">' + ped + '</td><td class="num ' + (rec > 0 ? "oc-ok" : "") + '">' + rec + '</td><td class="num ' + (falt > 0 ? "oc-falt" : "oc-ok") + '">' + (falt !== 0 ? falt : "0") + '</td></tr>';
   });
   return h + "</tbody></table></div>";
-}
-function ocLiveFalt(id, ped, v) { const c = document.getElementById("ocfalt_" + id); if (!c) return; const falt = ped - (parseInt(v, 10) || 0); c.textContent = falt !== 0 ? falt : "0"; c.className = "num " + (falt > 0 ? "oc-falt" : "oc-ok"); }
-/* v7.49 — copia a los campos "Recibido" lo que marcó la recepción de mercadería (data-recep),
-   para revisarlo y Guardar. Útil cuando lo de recepción difiere del recibido cargado a mano. */
-function ocTraerRecepcion() {
-  document.querySelectorAll('#ocBody .oc-rinp').forEach(function (el) {
-    const rec = el.getAttribute("data-recep"); if (rec == null) return;
-    el.value = Math.max(0, parseInt(rec, 10) || 0);
-    ocLiveFalt(el.getAttribute("data-id"), parseInt(el.getAttribute("data-ped"), 10) || 0, el.value);
-  });
 }
 /* v6.41 — IMPRIMIR OC: hoja print-friendly de la OC abierta (1 proveedor · fecha · rubro).
    Reusa el patrón de pppPrintSug (window.open + document.write + auto-print).
@@ -9942,29 +9941,19 @@ function ocPrintDetalle(conRecibidas) {
   w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>OC ' + escapeHtml(x.proveedor || "") + ' ' + escapeHtml(x.fecha || "") + suf + '</title><style>' + _OC_PRINT_CSS + '</style></head><body>' + ocPrintHtml(x, { conRecibidas: !!conRecibidas }) + '<scr' + 'ipt>window.onload=function(){setTimeout(function(){window.print();},150);};</scr' + 'ipt></body></html>');
   w.document.close();
 }
-function _ocCollectRecibido() {
-  const out = [];
-  document.querySelectorAll('#ocBody .oc-rinp').forEach(function (el) { out.push({ id: el.getAttribute("data-id"), val: Math.max(0, parseInt(el.value, 10) || 0) }); });
-  return out;
-}
-async function ocGuardarRecibido() {
-  if (!_oc) return;
-  const headers = await facAuthWriteHeaders({ "Prefer": "return=minimal" });
-  if (!headers) { alert(authNoSesionMsg("Para guardar necesitás iniciar sesión con Google (supervisor).")); return; }
-  try {
-    await Promise.all(_ocCollectRecibido().map(function (r) { return fetch(SUPABASE_OC_ENDPOINT + "?id=eq." + r.id, { method: "PATCH", headers: headers, body: JSON.stringify({ cantidad_recibida: r.val }) }); }));
-    _oc.rows = await ocFetchRows(); _oc.recepByRow = ocBuildRecep(); ocRender();
-    alert("✓ Recibido guardado.");
-  } catch (e) { alert("Error guardando: " + (e.message || e)); }
-}
+/* v7.58 — el "recibido" ya no se carga a mano: es lo que registró la recepción. Al
+   marcar RECIBIDA se toma una FOTO de ese valor en `cantidad_recibida` (para dejar el
+   registro fijo y que lo vean otras vistas/herramientas); Reabrir solo cambia el estado. */
 async function ocMarcar(estado) {
   if (!_oc || !_oc.openKey) return;
   const g = ocGroups(), x = g[_oc.openKey]; if (!x) return;
   const headers = await facAuthWriteHeaders({ "Prefer": "return=minimal" });
   if (!headers) { alert(authNoSesionMsg("Para esto necesitás iniciar sesión con Google (supervisor).")); return; }
   try {
-    if (estado === "recibida") { await Promise.all(_ocCollectRecibido().map(function (r) { return fetch(SUPABASE_OC_ENDPOINT + "?id=eq." + r.id, { method: "PATCH", headers: headers, body: JSON.stringify({ cantidad_recibida: r.val }) }); })); }
-    await Promise.all(x.rows.map(function (r) { return fetch(SUPABASE_OC_ENDPOINT + "?id=eq." + r.id, { method: "PATCH", headers: headers, body: JSON.stringify({ estado: estado }) }); }));
+    await Promise.all(x.rows.map(function (r) {
+      const body = (estado === "recibida") ? { estado: estado, cantidad_recibida: ocRecEff(r) } : { estado: estado };
+      return fetch(SUPABASE_OC_ENDPOINT + "?id=eq." + r.id, { method: "PATCH", headers: headers, body: JSON.stringify(body) });
+    }));
     _oc.rows = await ocFetchRows(); _oc.recepByRow = ocBuildRecep(); ocRender();
   } catch (e) { alert("Error: " + (e.message || e)); }
 }
