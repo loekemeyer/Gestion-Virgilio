@@ -11773,6 +11773,7 @@ function stkBodyStocks() {
     '<button onclick="stkOpenPedidos()" style="width:auto;margin:0;padding:9px 13px;border:1px solid #c7d2fe;border-radius:10px;background:#eef2ff;color:#3730a3;font-size:13px;font-weight:800;cursor:pointer;">📋 Pedidos por estadio</button>' +
     '<button onclick="stkOpenGondola()" style="width:auto;margin:0;padding:9px 13px;border:1px solid #bbf7d0;border-radius:10px;background:#f0fdf4;color:#15803d;font-size:13px;font-weight:800;cursor:pointer;">🔁 Movimientos de góndola</button>' +
     '<button onclick="stkOpenHistorial()" style="width:auto;margin:0;padding:9px 13px;border:1px solid #fde68a;border-radius:10px;background:#fffbeb;color:#92400e;font-size:13px;font-weight:800;cursor:pointer;">🕓 Historial</button>' +
+    '<button onclick="stkDescargarExcel()" style="width:auto;margin:0;padding:9px 13px;border:1px solid #dbeafe;border-radius:10px;background:#eff6ff;color:#1e40af;font-size:13px;font-weight:800;cursor:pointer;">📥 Descargar Excel</button>' +
     '</div>';
   // Teclado NUMÉRICO por defecto (los códigos son números); botón "E" para los
   // importados (506 → 506E) sin tener que cambiar de teclado (pedido del dueño).
@@ -12665,6 +12666,62 @@ function stkOpenGondola() {
   // v5.98: cargar nombres (legajo→nombre) para mostrar quién hizo cada movimiento;
   // al resolver, re-render. Cacheado 1h → normalmente ya está y no re-dibuja de más.
   try { getEmpleadosNombres().then(function () { if (_stkPop) stkGondRender(); }).catch(function () {}); } catch (_e) {}
+}
+// v7.74: descargar tabla de stock en Excel
+function stkDescargarExcel() {
+  if (!_stk) return;
+  const saldos = stockComputeSaldos(_stk.movs, _stk.cutoff, _stk.asOf);
+  const dem = _stk.dem || {};
+  const capByCod = {};
+  (_stk.cap || []).forEach(function (r) { const k = _ocgNorm(r.cod); if (!k) return; capByCod[k] = (capByCod[k] || 0) + (Number(r.cajas_max) || 0); });
+  let arts = Object.keys(saldos).map(function (k) { return saldos[k]; });
+  const _seenN = {}; arts.forEach(function (a) { _seenN[_ocgNorm(a.cod)] = true; });
+  Object.keys(dem).forEach(function (k) { if (!_seenN[k] && (Number(dem[k]) || 0) > 0) arts.push({ cod: k, desc: artNombre(k, ""), terminado: 0, excedente: 0, separar_pedidos: 0, a_facturar: 0, a_guardar: 0, racks: 0, insumos: 0, racks_ch: 0 }); });
+  arts.sort(function (a, b) { return (parseInt(a.cod, 10) || 0) - (parseInt(b.cod, 10) || 0); });
+  const f = (_stk.filtro || "").toLowerCase();
+  const SECTKEYS = ["terminado", "excedente", "separar_pedidos", "a_facturar", "a_guardar", "racks", "para_envasar"];
+  const _stkStockKeys = SECTKEYS.concat(["racks_ch"]);
+  const _insCodsSet = new Set((_stk.insumosCods || []).map(function (c) { return String(c || "").trim().toUpperCase(); }));
+  let shown = f
+    ? arts.filter(function (a) { return (a.cod + " " + a.desc).toLowerCase().indexOf(f) >= 0; })
+    : arts.filter(function (a) { return _stkStockKeys.some(function (k) { return (Number(a[k]) || 0) !== 0; }) || (Number(dem[_ocgNorm(a.cod)]) || 0) > 0; });
+  shown = shown.filter(function (a) { return !_insCodsSet.has(String(a.cod || "").trim().toUpperCase()); });
+
+  // Preparar datos para Excel
+  const fmtCajas = function (n) { return String(Math.round(n * 10) / 10); };
+  const headers = ["Código", "Descripción", "Total Stock", "Cajas Pedidas", "Capacidad Góndola", "Góndola", "Excedente", "Pickeados", "A facturar", "A guardar", "Racks"];
+  const rows = shown.map(function (a) {
+    const _tot = SECTKEYS.reduce(function (s, k) { return s + (Number(a[k]) || 0); }, 0) + (Number(a.racks_ch) || 0);
+    const _ped = Number(dem[_ocgNorm(a.cod)]) || 0;
+    const _cap = Number(capByCod[_ocgNorm(a.cod)]) || 0;
+    return [
+      a.cod,
+      a.desc,
+      fmtCajas(_tot),
+      fmtCajas(_ped),
+      fmtCajas(_cap),
+      fmtCajas(Number(a.terminado) || 0),
+      fmtCajas(Number(a.excedente) || 0),
+      fmtCajas(Number(a.separar_pedidos) || 0),
+      fmtCajas(Number(a.a_facturar) || 0),
+      fmtCajas(Number(a.a_guardar) || 0),
+      fmtCajas((Number(a.racks) || 0) + (Number(a.racks_ch) || 0))
+    ];
+  });
+
+  // Generar CSV y descargar
+  let csv = headers.join("\t") + "\n";
+  rows.forEach(function (row) { csv += row.join("\t") + "\n"; });
+
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const link = document.createElement("a");
+  const url = URL.createObjectURL(blob);
+  link.setAttribute("href", url);
+  link.setAttribute("download", "Stock_" + new Date().toISOString().split("T")[0] + ".csv");
+  link.style.visibility = "hidden";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
 }
 function stkGondSetFilter(f) { if (!_stkPop) return; _stkPop.filter = f; stkGondRender(); }
 function stkGondSearch(v) { if (!_stkPop) return; _stkPop.search = String(v == null ? "" : v); stkGondRender(); }
