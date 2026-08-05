@@ -6,6 +6,25 @@
 >
 > Última actualización: 2026-08-05 · Versión app al documentar: **v7.48**
 >
+> Nota (backend, **sin bump de app**): **La PROYECCIÓN que alimenta el generador de OCs estaba
+> CONGELADA y fallaba en silencio → arreglada**. El Máximo del generador = `proyección × índice`;
+> la proyección vive en `proyeccion_madre`, que se trae del proyecto Supabase **"loekemeyer's web"**
+> (PáginaLK, `kwkclwhmoygunqmlegrg`) vía `refresh_proyeccion_madre()` → `fn_proyeccion_madre_emp`,
+> que la calcula de **`sales_lines`** (228k líneas de venta 2020→hoy: promedio mensual de cajas por
+> artículo/cliente en 24 meses, descartando picos one-off). O sea, **ventas + clientes + artículos ya
+> están en Supabase** y la proyección sale de ahí, no de un Excel. **El problema:** esa función corre
+> en ~2 s pero por REST la mataba el `statement_timeout` corto del rol anon de PáginaLK (HTTP 500 /
+> 57014 con caché fría) → `refresh_proyeccion_madre()` devolvía **-1 sin recargar** y nadie se enteraba
+> (el cron marcaba "succeeded"). `proyeccion_madre` quedó **frozen desde el 21/07** y la cobertura del
+> generador era 112/190 = **59%** (el resto caía al Excel `OC_Maximos.max_cajas`). **Arreglos:**
+> **(A)** en PáginaLK, `alter function fn_proyeccion_madre_emp(text) set statement_timeout to '60s'`
+> (no cambia resultados, sólo el techo); **(B)** en Virgilio, `refresh_proyeccion_madre()` ahora **avisa
+> por Telegram si falla** (dedup `projmadre_fail_<día>`) y **no pisa** la última proyección buena, y su
+> cron pasó de **mensual (día 5) a semanal los miércoles 06:00 AR**, 1 h antes de la generación (07:00
+> AR). Tras el refresco: **357 códigos** (antes 216) y cobertura **165/190 = 87%**; quedan 25 sin
+> historial de ventas → fallback Excel (inevitable, no hay demanda para esos en ningún lado). La
+> **fórmula del generador no cambió**. SQL en `sql/refresh_proyeccion_madre.sql`.
+>
 > Nota: **v7.48 — tilde «🔴 Negativos» en la solapa Stocks** (pedido del usuario). Al lado del
 > buscador y del botón «E» hay un toggle **☐/☑ 🔴 Negativos (N)** que deja en la tabla **sólo los
 > artículos con saldo negativo en ALGÚN depósito** (góndola, excedente, pickeados, a facturar, a
