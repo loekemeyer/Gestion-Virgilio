@@ -12684,7 +12684,7 @@ function stkDescargarExcel() {
   const _insCodsSet = new Set((_stk.insumosCods || []).map(function (c) { return String(c || "").trim().toUpperCase(); }));
   let shown = f
     ? arts.filter(function (a) { return (a.cod + " " + a.desc).toLowerCase().indexOf(f) >= 0; })
-    : arts.filter(function (a) { return _stkStockKeys.some(function (k) { return (Number(a[k]) || 0) !== 0; }) || (Number(dem[_ocgNorm(a.cod)]) || 0) > 0; });
+    : arts.filter(function (a) { return _stkStockKeys.some(function (k) { return (Number(a[k]) || 0) !== 0; }) || (Number(dem[_ocgNorm(a.cod)]) || 0) > 0 || (Number((_fcArt[_ocgNorm(a.cod)] || {}).cajas) || 0) > 0; });
   shown = shown.filter(function (a) { return !_insCodsSet.has(String(a.cod || "").trim().toUpperCase()); });
 
   // Preparar datos para Excel — números como número real (no string) para que
