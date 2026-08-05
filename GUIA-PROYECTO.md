@@ -4,7 +4,23 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-05 · Versión app al documentar: **v7.63**
+> Última actualización: 2026-08-05 · Versión app al documentar: **v7.65**
+>
+> Nota: **v7.65 — Generador de OCs: Log/Fabr AHORA genera OC; Racks se saca del generador**
+> (pedido del usuario). **(1) Log/ Fabr** (la fábrica) pasa a generar OC como cualquier proveedor
+> (antes estaba marcado "interno — no se genera OC"). **(2) Racks** (importación) se **excluye por
+> completo** del generador — ni aparece en el preview ni genera (se abastece por otra vía). Se
+> eliminó el concepto "interno" (`OCG_INTERNOS`/`_ocgInterno`) y se reemplazó por
+> **`OCG_EXCLUIDOS = ["RACKS","RACK"]`** + `_ocgExcluido`, que filtra en `ocgEnter` **al construir
+> los ítems** (así Racks no entra ni al preview). `ocgGroups`/`ocBodyGen`/`ocgGenerar` ya no tienen
+> ramas de "interno". Cambio replicado en el **cron del miércoles**: `generar_ocs_automaticas` y
+> `simular_ocs_automaticas` (SQL) — el filtro pasó de `not in ('RACKS','LOG/ FABR',…)` a `not in
+> ('RACKS','RACK')`; ambas funciones **redeployadas** en Supabase. Verificado (dry-run read-only):
+> Log/ Fabr generaría **21 líneas / 1.336 cajas**; Racks no aparece. **(3)** Los duales de talleristas
+> («Garcia / Lucho», etc. = códigos repartidos proporcionalmente entre dos talleristas) quedan
+> **pendientes a pedido del usuario** → anotado como idea **1382** (`agente_propuestas` +
+> `docs/IDEAS-USUARIO.md`): partir la OC dual en dos por proporción; la tabla
+> `Proporcion_Articulo_Tallerista` existe pero está vacía y falta la data. Bump **v7.65**.
 >
 > Nota: **v7.63 — 📲 Enviar la OC por WhatsApp al tallerista**. En el detalle de una OC, botón nuevo
 > **📲 WhatsApp** (junto a 🖨 Operador / 🖨 Tallerista): **copia la OC como IMAGEN al portapapeles** y
