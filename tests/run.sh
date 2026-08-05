@@ -144,4 +144,7 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== send-prueba-nobloquea (v7.57: un operario real no queda bloqueado por un dueño de prueba 0/1) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/send-prueba-nobloquea.cjs
 
+echo "== ssg-sin-datos (v7.58: el SSG no dispara si no se pudo LEER el stock — evita aviso masivo falso) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ssg-sin-datos.cjs
+
 echo "== TODO OK =="

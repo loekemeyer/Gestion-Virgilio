@@ -6028,7 +6028,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.58";
+const APP_VERSION = "v7.59";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -16448,13 +16448,19 @@ async function stockBajaPicking(tanda, legajo) {
     // 764 tenía 29 en góndola, pickeó 20 → avisó "20 / había 9"; 729E tenía 5, pickeó 5
     // → avisó "5 / había 0". Por eso se excluyen del saldo los movimientos de picking
     // de ESTA tanda: son justamente los que se están validando.
-    let sal = {};
+    let sal = {}, salOk = false;
     try {
       const movs = (await stockFetchMovs()).filter(function (mv) {
         return !(mv.tipo === "picking" && String(mv.ref || "").split("|")[0].trim().toUpperCase() === t);
       });
-      sal = stockComputeSaldos(movs, await stockGetCutoff());
-    } catch (_e) {}
+      if (movs && movs.length) { sal = stockComputeSaldos(movs, await stockGetCutoff()); salOk = true; }
+    } catch (_e) { salOk = false; }
+    // v7.58 — si NO se pudo leer el stock (supaFetchAll TIRA si falla cualquier página del
+    // paginado, o vino vacío), NO disparamos el SSG ni el aviso racks/a-guardar: "no sé el
+    // stock" ≠ "hay 0". Sin esto, un fetch fallido en el celular del operario (tabla
+    // Movimientos_Stock enorme) avisaba "picking sin stock" de TODOS los códigos pickeados
+    // (caso real D06A, leg 122: 28 códigos "tenía 0" con la góndola llena — 504=1251, 505=2574…).
+    if (!salOk) return;
     // v7.04 — SUMAR TODA LA FAMILIA del código (pelado + variantes de empresa). Los
     // códigos partidos guardan el stock con sufijo ("437E LK" / "437E CH"), pero el PKC
     // guarda el código PELADO ("437E"). Mirando sólo sal["437E"] la góndola daba 0 y

@@ -4,7 +4,18 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-05 · Versión app al documentar: **v7.58**
+> Última actualización: 2026-08-05 · Versión app al documentar: **v7.59**
+>
+> Nota: **v7.59 — el SSG «picking sin stock en góndola» NO dispara si no se pudo LEER el stock**.
+> `stockBajaPicking` lee TODOS los movimientos con `stockFetchMovs` → `supaFetchAll`, que **tira** si
+> falla cualquier página del paginado (Range). Cuando eso pasaba (celular del operario + tabla
+> `Movimientos_Stock` enorme), `sal` quedaba `{}` y el `catch` seguía como si **todo estuviera en 0** →
+> el SSG avisaba «picking sin stock» de **TODOS** los códigos pickeados. Caso real **D06A** (leg 122):
+> **28 códigos** con «el sistema tenía 0» mientras la góndola estaba **llena** (504=1251, 505=2574,
+> 506=2356, 513=1968…). Ahora se marca `salOk` sólo si el fetch trajo movimientos; si falló o vino
+> vacío, **`return` temprano** — «no sé el stock» ≠ «hay 0» — y no se dispara ni el SSG ni el aviso
+> racks/a-guardar. La detección real sigue igual cuando los datos se leen bien. El aviso de D06A fue
+> **falso positivo puro** (no hubo que tocar datos). Smoke `tests/ssg-sin-datos.cjs`. Bump **v7.59**.
 >
 > Nota: **v7.58 — Visualizador de OCs: «Recibido» y «Recep.» se unifican en UNA sola columna + el
 > recibido se acota al PERÍODO de la OC** (pedido del usuario). **(1) UNA columna.** En el detalle
