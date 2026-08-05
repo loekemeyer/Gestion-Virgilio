@@ -6028,7 +6028,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.66";
+const APP_VERSION = "v7.67";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -10199,9 +10199,11 @@ function _ocgNextAuto() {
   return { date: d, ms: ms, days: Math.floor(ms / 864e5), hours: Math.floor(ms % 864e5 / 36e5), mins: Math.floor(ms % 36e5 / 6e4) };
 }
 function _ocgNextAutoTxt() { const n = _ocgNextAuto(); return String(n.days).padStart(2, "0") + "d " + String(n.hours).padStart(2, "0") + "h " + String(n.mins).padStart(2, "0") + "m"; }
+/* v7.67 — texto del contador que va DENTRO del botón "Generar las OCs". */
+function _ocgAutoEnTxt() { const n = _ocgNextAuto(); return "se genera automáticamente en " + n.days + "D" + n.hours + "H" + n.mins + "M"; }
 function _ocgNextAutoFecha() { const n = _ocgNextAuto(); return "miércoles " + String(n.date.getUTCDate()).padStart(2, "0") + "/" + String(n.date.getUTCMonth() + 1).padStart(2, "0") + " 07:00"; }
 let _ocgCdTimer = null;
-function ocgStartCountdown() { if (_ocgCdTimer) return; _ocgCdTimer = setInterval(function () { const el = document.getElementById("ocgCountdown"); if (!el) { clearInterval(_ocgCdTimer); _ocgCdTimer = null; return; } el.textContent = _ocgNextAutoTxt(); }, 30000); }
+function ocgStartCountdown() { if (_ocgCdTimer) return; _ocgCdTimer = setInterval(function () { const el = document.getElementById("ocgCountdown"); if (!el) { clearInterval(_ocgCdTimer); _ocgCdTimer = null; return; } el.textContent = _ocgAutoEnTxt(); }, 30000); }
 async function ocgEnter() {
   if (!_oc) return;
   _oc.view = "gen"; _oc.gen = null; ocRender();   // muestra "calculando…"
@@ -10260,6 +10262,7 @@ async function ocgEnter() {
     });
     _oc.gen = { items: items, fecha: new Date().toISOString().slice(0, 10) };
     ocRender();
+    ocgStartCountdown();   // v7.67: contador vivo dentro del botón "Generar las OCs"
   } catch (e) { if (_oc) { _oc.gen = { error: String(e.message || e), items: [] }; ocRender(); } }
 }
 function ocgGroups() {
@@ -10272,7 +10275,7 @@ function ocBodyGen() {
   const g = (gen && !gen.error) ? ocgGroups() : {};
   const keys = Object.keys(g).sort(function (a, b) { return a.localeCompare(b); });
   // v7.66: botón grande "Generar las OCs" arriba, a la altura del ← Volver (pedido del usuario).
-  const genBtn = keys.length ? '<button class="oc-btn ok" style="font-size:15px;padding:9px 20px;font-weight:800" onclick="ocgGenerar()">✓ Generar las OCs</button>' : '';
+  const genBtn = keys.length ? '<button class="oc-btn ok" style="font-size:15px;padding:8px 20px;font-weight:800;line-height:1.2;text-align:center" onclick="ocgGenerar()">✓ Generar las OCs<br><span id="ocgCountdown" style="font-size:10.5px;font-weight:600;opacity:.9">' + escapeHtml(_ocgAutoEnTxt()) + '</span></button>' : '';
   let h = '<div class="oc-tools"><button class="oc-btn" onclick="ocBack()">← Volver</button>' + genBtn + '<button class="oc-btn" onclick="ocgEnterCfg()">⚙ Configuraciones</button></div>';
   if (!gen) return h + '<div class="oc-loading">Calculando (stock + demanda PPP + proyección × índice)…</div>';
   if (gen.error) return h + '<div class="oc-empty" style="color:#b91c1c">Error: ' + escapeHtml(gen.error) + '</div>';
@@ -10347,9 +10350,9 @@ async function ocgEnterCfg() {
 }
 /* <option>s de un desplegable de proveedor. Si el valor actual no está en la lista
    (dato viejo), se agrega igual para no perderlo al guardar. */
-function _ocProvOptions(current, provs, allowEmpty) {
+function _ocProvOptions(current, provs, emptyLabel) {
   const cur = String(current == null ? "" : current).trim();
-  let o = allowEmpty ? '<option value=""' + (!cur ? ' selected' : '') + '>— (ninguno)</option>' : '';
+  let o = emptyLabel ? '<option value=""' + (!cur ? ' selected' : '') + '>' + escapeHtml(emptyLabel) + '</option>' : '';
   let has = false;
   (provs || []).forEach(function (p) { const sel = (p === cur) ? ' selected' : ''; if (sel) has = true; o += '<option value="' + escapeHtml(p) + '"' + sel + '>' + escapeHtml(p) + '</option>'; });
   if (cur && !has) o += '<option value="' + escapeHtml(cur) + '" selected>' + escapeHtml(cur) + ' (?)</option>';
@@ -10358,7 +10361,7 @@ function _ocProvOptions(current, provs, allowEmpty) {
 function _ocCfgChangedN() { return (_oc && _oc.cfg) ? Object.keys(_oc.cfg.changed).length : 0; }
 function ocBodyCfg() {
   let h = '<div class="oc-tools"><button class="oc-btn" onclick="ocgEnter()">← Volver al generador</button><button class="oc-btn ok" onclick="ocCfgAltaOpen()">➕ Agregar artículo</button><button class="oc-btn ok" onclick="ocCfgProvOpen()">➕ Agregar proveedor</button></div>';
-  h += '<div class="oc-meta">Config del generador de OCs (<b>OC_Maximos</b>). <b>Objetivo</b> = máximo de cajas cuando el artículo no tiene proyección de ventas. <b>Uni×Caja</b> = unidades por caja (impreso). <b>Índice</b> = meses de stock objetivo (Máximo = proyección × índice, default 1,5). <b>Proveedor 1/2</b> + <b>% Prov 1/2</b> = a qué tallerista(s) se le hace el artículo y en qué proporción al generar las OCs (los dos % tienen que sumar <b>100</b>; artículo de un solo proveedor = 100% al Prov 1). Se edita <b>acá</b> — ya no hace falta el Excel.</div>';
+  h += '<div class="oc-meta">Config del generador de OCs (<b>OC_Maximos</b>). <b>Objetivo</b> = máximo de cajas cuando el artículo no tiene proyección de ventas (editable acá). <b>Uni×Caja</b> = unidades por caja — sale de la ficha del artículo, es <b>solo lectura</b>. <b>Índice</b> = meses de stock objetivo (Máximo = proyección × índice, default 1,5). <b>Proveedor 1/2</b> + <b>% Prov 1/2</b> = a qué tallerista(s) se le hace el artículo y en qué proporción al generar las OCs (los dos % tienen que sumar <b>100</b>; artículo de un solo proveedor = 100% al Prov 1). Se edita <b>acá</b> — ya no hace falta el Excel.</div>';
   if (!_oc.cfg || !_oc.cfg.rows) return h + '<div class="oc-loading">Cargando config…</div>';
   if (_oc.cfg.error) return h + '<div class="oc-empty" style="color:#b91c1c">Error: ' + escapeHtml(_oc.cfg.error) + '</div>';
   if (_oc.cfg.altaProv) h += _ocCfgProvForm();
@@ -10379,12 +10382,12 @@ function ocBodyCfg() {
     const pctStyle = bad ? ' style="color:#b91c1c;font-weight:800"' : '';
     h += '<tr' + ch + '><td class="oc-cod">' + escapeHtml(a.cod) + '</td>' +
       '<td>' + escapeHtml(artNombre(a.cod, a.descripcion)) + '</td>' +
-      '<td><select class="oc-rinp" style="width:118px" onchange="ocCfgEdit(' + i + ',&quot;proveedor&quot;,this.value)">' + _ocProvOptions(a.proveedor, provs, false) + '</select></td>' +
+      '<td><select class="oc-rinp" style="width:118px" onchange="ocCfgEdit(' + i + ',&quot;proveedor&quot;,this.value)">' + _ocProvOptions(a.proveedor, provs, "(sin proveedor)") + '</select></td>' +
       '<td class="num"><input class="oc-rinp" style="width:56px"' + pctStyle + ' type="number" min="0" max="100" step="1" value="' + a.prop_prov1 + '" oninput="ocCfgEdit(' + i + ',&quot;prop_prov1&quot;,this.value)"></td>' +
-      '<td><select class="oc-rinp" style="width:118px" onchange="ocCfgEdit(' + i + ',&quot;proveedor2&quot;,this.value)">' + _ocProvOptions(a.proveedor2, provs, true) + '</select></td>' +
+      '<td><select class="oc-rinp" style="width:118px" onchange="ocCfgEdit(' + i + ',&quot;proveedor2&quot;,this.value)">' + _ocProvOptions(a.proveedor2, provs, "— (ninguno)") + '</select></td>' +
       '<td class="num"><input class="oc-rinp" style="width:56px"' + pctStyle + ' type="number" min="0" max="100" step="1" value="' + a.prop_prov2 + '" oninput="ocCfgEdit(' + i + ',&quot;prop_prov2&quot;,this.value)"' + ((a.proveedor2 || "").trim() ? '' : ' disabled title="Sin Proveedor 2"') + '></td>' +
       '<td class="num"><input class="oc-rinp" type="number" min="0" step="1" value="' + a.max_cajas + '" oninput="ocCfgEdit(' + i + ',&quot;max_cajas&quot;,this.value)"></td>' +
-      '<td class="num"><input class="oc-rinp" type="number" min="0" step="1" value="' + a.uni_x_caja + '" oninput="ocCfgEdit(' + i + ',&quot;uni_x_caja&quot;,this.value)"></td>' +
+      '<td class="num" title="Uni×Caja sale de la ficha del artículo (packaging) — no se edita acá">' + (a.uni_x_caja || "—") + '</td>' +
       '<td class="num"><input class="oc-rinp" type="number" min="0" step="0.1" value="' + a.indice + '" oninput="ocCfgEdit(' + i + ',&quot;indice&quot;,this.value)"></td>' +
       '<td style="text-align:center"><input type="checkbox" ' + (a.activo ? 'checked' : '') + ' onchange="ocCfgEdit(' + i + ',&quot;activo&quot;,this.checked)"></td></tr>';
   });
@@ -10480,9 +10483,9 @@ function _ocCfgAltaForm() {
     '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end">' +
     '<label style="font-size:12px">Código<br><input id="ocmaCod" class="oc-inp" style="width:90px" type="text"></label>' +
     '<label style="font-size:12px">Descripción<br><input id="ocmaDesc" class="oc-inp" style="width:170px" type="text"></label>' +
-    '<label style="font-size:12px">Proveedor 1<br><select id="ocmaProv" class="oc-inp" style="width:130px">' + _ocProvOptions("", provs, false) + '</select></label>' +
+    '<label style="font-size:12px">Proveedor 1<br><select id="ocmaProv" class="oc-inp" style="width:130px">' + _ocProvOptions("", provs, "(sin proveedor)") + '</select></label>' +
     '<label style="font-size:12px">% P1<br><input id="ocmaP1" class="oc-inp" style="width:60px" type="number" min="0" max="100" step="1" value="100"></label>' +
-    '<label style="font-size:12px">Proveedor 2<br><select id="ocmaProv2" class="oc-inp" style="width:130px">' + _ocProvOptions("", provs, true) + '</select></label>' +
+    '<label style="font-size:12px">Proveedor 2<br><select id="ocmaProv2" class="oc-inp" style="width:130px">' + _ocProvOptions("", provs, "— (ninguno)") + '</select></label>' +
     '<label style="font-size:12px">% P2<br><input id="ocmaP2" class="oc-inp" style="width:60px" type="number" min="0" max="100" step="1" value="0"></label>' +
     '<label style="font-size:12px">Objetivo<br><input id="ocmaMax" class="oc-inp" style="width:80px" type="number" min="0" step="1"></label>' +
     '<label style="font-size:12px">Uni×Caja<br><input id="ocmaUni" class="oc-inp" style="width:80px" type="number" min="0" step="1"></label>' +

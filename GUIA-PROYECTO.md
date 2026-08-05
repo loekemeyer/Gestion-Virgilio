@@ -4,7 +4,24 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-05 · Versión app al documentar: **v7.66**
+> Última actualización: 2026-08-05 · Versión app al documentar: **v7.67**
+>
+> Nota: **v7.67 — Configuraciones del generador: "Sin proveedor" como opción, Objetivo/Uni×Caja bien
+> tratados y cuenta regresiva dentro del botón** (pedido del usuario). **(1) "Sin proveedor"** es ahora
+> una opción explícita del desplegable **Proveedor 1** (antes un código sin proveedor —como el `55289`—
+> mostraba un valor pero al generar caía en "(sin proveedor)" sin poder elegirlo). El helper
+> `_ocProvOptions` pasó de un bool `allowEmpty` a un `emptyLabel` (Prov 1 = "(sin proveedor)", Prov 2 =
+> "— (ninguno)"). **(2) Objetivo vs Uni×Caja:** **Uni×Caja** sale de la **ficha del artículo**
+> (packaging, `Articulos Virgilio X Tallerista`) → en la lista de Configuraciones se muestra
+> **solo lectura** (no se edita ahí); **Objetivo** (`OC_Maximos.max_cajas`, tope/fallback cuando no hay
+> proyección) **sigue editable** porque es propio del generador. **(3) Cuenta regresiva** hasta la
+> generación automática del miércoles 07:00 AR, **adentro del botón ✓ Generar las OCs**, formato
+> **"se genera automáticamente en xDxHxM"** (`_ocgAutoEnTxt` + `ocgStartCountdown`, refresco cada minuto).
+> **(4) Auditoría de datos del cálculo** (a pedido): proyección sana (369 códigos, todos >0), todas las
+> proporciones suman 100, el único sin proveedor era `55289` (ahora seleccionable), 5 duales al 50/50; se
+> trazó la aritmética de 8 códigos (`031→848`, `123→94` split, `809E`=Racks correctamente excluido,
+> `55289→334`) y da bien. Verificado: suite completa + render headless (generador con la cuenta regresiva,
+> editor con 55289 en "(sin proveedor)" y Uni×Caja solo lectura). Bump **v7.67**.
 >
 > Nota: **v7.66 — Generador de OCs: reparto por proveedor (duales) + registro de proveedores +
 > limpieza de la pantalla** (pedido del usuario, cierra la idea 1382). **(A) UI del generador:** se
