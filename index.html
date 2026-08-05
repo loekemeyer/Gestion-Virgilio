@@ -6007,7 +6007,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.47";
+const APP_VERSION = "v7.48";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -11041,6 +11041,8 @@ function stkFiltroToggleE() {
   _stk.filtro = /e$/i.test(f) ? f.replace(/e$/i, "") : (f + "E");
   stkRender();
 }
+/* v7.48 — tilde "🔴 Negativos": muestra sólo los artículos con saldo negativo en algún depósito. */
+function stkToggleSoloNeg() { if (!_stk) return; _stk.soloNeg = !_stk.soloNeg; stkRender(); }
 /* v6.30 — Ratio de guardado: helpers para la tarjeta "horas de guardado pendientes".
    Ratio y switch de racks viven en Stock_Config (los trae openStockAdmin en _stk.gConf).
    El ratio lo autoajusta el server (guardado_recalc_ratio) con las sesiones medidas. */
@@ -11082,9 +11084,17 @@ function stkBodyStocks() {
   // (ej. 439E = 84 p/envasar, 809E = 360 racks CH) no aparecían en la tabla, y el 035E
   // mostraba 33 cuando físicamente hay 33 + 44 p/envasar. insumos sigue aparte.
   const SECTKEYS = ["terminado", "excedente", "separar_pedidos", "a_facturar", "a_guardar", "racks", "para_envasar", "racks_ch"];
-  const shown = f
+  // v7.48: helpers del tilde "🔴 Negativos" — un artículo está negativo si CUALQUIER depósito
+  // (redondeado a lo que se muestra) da < 0. "insumos" se chequea aparte en su sección.
+  const _stkIsNeg = function (n) { return Math.round((Number(n) || 0) * 10) / 10 < 0; };
+  const _stkArtHasNeg = function (a) { return SECTKEYS.some(function (k) { return _stkIsNeg(a[k]); }); };
+  let shown = f
     ? arts.filter(function (a) { return (a.cod + " " + a.desc).toLowerCase().indexOf(f) >= 0; })
     : arts.filter(function (a) { return SECTKEYS.some(function (k) { return (Number(a[k]) || 0) !== 0; }) || (Number(dem[_ocgNorm(a.cod)]) || 0) > 0 || _fcArtCajas(a.cod) > 0; });
+  // v7.48: tilde "🔴 Negativos" — se aplica ADEMÁS del buscador. Deja sólo los artículos con
+  // saldo negativo en algún depósito (para cazar inconsistencias de stock de un vistazo).
+  const _stkNegCount = arts.filter(_stkArtHasNeg).length + arts.filter(function (a) { return _stkIsNeg(a.insumos); }).length;
+  if (_stk.soloNeg) shown = shown.filter(_stkArtHasNeg);
   // v4.23: "cuánto hay en cada sector". Totales por depósito (GLOBAL, no filtrado)
   // para la tira de arriba; columnas por sector en la tabla (góndola y a guardar
   // siempre; racks / a separar / a facturar solo si tienen algo).
@@ -11147,9 +11157,10 @@ function stkBodyStocks() {
     '</div>';
   // Teclado NUMÉRICO por defecto (los códigos son números); botón "E" para los
   // importados (506 → 506E) sin tener que cambiar de teclado (pedido del dueño).
-  h += '<div style="display:flex;gap:6px;margin-bottom:10px;align-items:center;">' +
+  h += '<div style="display:flex;gap:6px;margin-bottom:10px;align-items:center;flex-wrap:wrap;">' +
     '<input class="stk-filtro" style="margin:0;" type="text" inputmode="numeric" enterkeyhint="search" placeholder="🔎 Buscar código" value="' + escapeHtml(_stk.filtro) + '" oninput="if(_stk){_stk.filtro=this.value;stkRender();}">' +
     '<button type="button" onclick="stkFiltroToggleE()" title="Agregar/quitar la E (importado)" style="width:auto;margin:0;flex:0 0 auto;padding:0 18px;height:38px;border:1.5px solid #cbd5e1;border-radius:9px;background:#fff;font-weight:800;font-size:16px;cursor:pointer;">E</button>' +
+    '<button type="button" onclick="stkToggleSoloNeg()" title="Mostrar sólo los artículos con saldo NEGATIVO en algún depósito (góndola, racks, a facturar, etc.)" style="width:auto;margin:0;flex:0 0 auto;padding:0 13px;height:38px;border:1.5px solid ' + (_stk.soloNeg ? "#dc2626" : "#cbd5e1") + ';border-radius:9px;background:' + (_stk.soloNeg ? "#fef2f2" : "#fff") + ';color:' + (_stk.soloNeg ? "#b91c1c" : "#334155") + ';font-weight:800;font-size:13px;cursor:pointer;white-space:nowrap;">' + (_stk.soloNeg ? "☑" : "☐") + ' 🔴 Negativos' + (_stkNegCount ? " (" + _stkNegCount + ")" : "") + '</button>' +
     '</div>';
   // Columnas: sectores fijos (menos insumos, que va en su sección). Los `extra`
   // (p/envasar, racks CH) SOLO se muestran como columna si algún artículo visible
@@ -11164,7 +11175,7 @@ function stkBodyStocks() {
   cols.forEach(function (c) { th += '<th class="num">' + c.label.replace(" ", "<br>") + '</th>'; });
   th += '<th class="num" style="background:#eef2ff;color:#1e3a8a;" title="Facturado sin salida: mercadería ya facturada (salió del stock contable) pero todavía física en el depósito, sin cargar al camión. Tocá el número para ver las NP.">FC<br>s/Salida</th>';   // v6.70
   h += '<div class="stk-tblwrap"><table class="stk-tbl stk-tbl-fit"><thead><tr>' + th + '<th></th></tr></thead><tbody>';
-  if (!shown.length) h += '<tr><td colspan="' + ncol + '" class="stk-empty">Sin stock todavía.</td></tr>';
+  if (!shown.length) h += '<tr><td colspan="' + ncol + '" class="stk-empty">' + (_stk.soloNeg ? "✅ No hay stock negativo en ningún depósito." : "Sin stock todavía.") + '</td></tr>';
   // v6.67 — celdas de depósito clickeables AUNQUE el saldo sea 0, si el artículo TUVO
   // movimientos ahí alguna vez (el pop-up muestra el historial que neteó a 0). Se cachea
   // en _stk._histDeps (Set "codN|deposito") — O(movs) una sola vez, no por tecla.
@@ -11220,7 +11231,8 @@ function stkBodyStocks() {
   h += "</tbody></table></div>";
   // v4.09: insumos (depósito 'insumos') — sección aparte, mismo filtro.
   const ins = arts.filter(function (a) { return (a.insumos || 0) !== 0; });
-  const insShown = f ? ins.filter(function (a) { return (a.cod + " " + a.desc).toLowerCase().indexOf(f) >= 0; }) : ins;
+  let insShown = f ? ins.filter(function (a) { return (a.cod + " " + a.desc).toLowerCase().indexOf(f) >= 0; }) : ins;
+  if (_stk.soloNeg) insShown = insShown.filter(function (a) { return _stkIsNeg(a.insumos); });   // v7.48: tilde "🔴 Negativos"
   if (insShown.length) {
     // idea 7382: el saldo de insumos MEZCLABA unidades (kg/Uni/Bolsas/MC/…) sumándolas como
     // si fueran lo mismo → número sin sentido físico. Desglosamos el saldo POR UNIDAD desde

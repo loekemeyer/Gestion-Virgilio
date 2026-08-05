@@ -132,4 +132,7 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== comp-dif-nofantasma (v7.39: 'picking difiere' no infla góndola fantasma — sólo compensa negativo) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/comp-dif-nofantasma.cjs
 
+echo "== stk-solo-negativos (v7.48: tilde 🔴 Negativos filtra los art con saldo negativo en algún depósito) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stk-solo-negativos.cjs
+
 echo "== TODO OK =="

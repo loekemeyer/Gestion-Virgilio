@@ -4,8 +4,17 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-05 · Versión app al documentar: **v7.46**
-> Última actualización: 2026-08-05 · Versión app al documentar: **v7.47**
+> Última actualización: 2026-08-05 · Versión app al documentar: **v7.48**
+>
+> Nota: **v7.48 — tilde «🔴 Negativos» en la solapa Stocks** (pedido del usuario). Al lado del
+> buscador y del botón «E» hay un toggle **☐/☑ 🔴 Negativos (N)** que deja en la tabla **sólo los
+> artículos con saldo negativo en ALGÚN depósito** (góndola, excedente, pickeados, a facturar, a
+> guardar, racks, p/envasar, racks CH) — más los **insumos** negativos en su sección. El contador `(N)`
+> muestra cuántos hay. Se aplica **además** del buscador; con 0 negativos dice *«✅ No hay stock
+> negativo en ningún depósito.»*. Los negativos ya salían en rojo (`.stk-neg`); esto agrega el **filtro
+> rápido** para cazarlos. Funciones `stkToggleSoloNeg` + estado `_stk.soloNeg`; helper `_stkArtHasNeg`
+> (compara el saldo **redondeado a lo que se muestra**). Smoke `tests/stk-solo-negativos.cjs`. Bump **v7.48**.
+>
 > Nota: **v7.47 — PPP · Ocupación: fuera las semanas pasadas, ahora es semana actual + 7 a futuro**
 > (pedido del usuario). La solapa **📦 Ocupación** tenía un selector de 9 semanas (−4…+4), pero las
 > semanas **pasadas nunca tienen datos** — el picking/PPP siempre proyecta a futuro (los pedidos
