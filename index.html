@@ -12698,7 +12698,7 @@ function stkDescargarExcel() {
     const _cap = Number(capByCod[_ocgNorm(a.cod)]) || 0;
     aoa.push([
       String(a.cod || ""),
-      String(a.desc || ""),
+      String(artNombre(a.cod, a.desc) || ""),
       num(_tot),
       num(_ped),
       num(_cap),
