@@ -4,7 +4,21 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-05 · Versión app al documentar: **v7.70**
+> Última actualización: 2026-08-05 · Versión app al documentar: **v7.71**
+>
+> Nota: **v7.71 — la tabla de Stock oculta la fila FANTASMA del código base de una familia
+> empresa-split** (pedido del usuario). En el empresa-split, el pedido usa el **código base** (ej.
+> `438E`) y el stock físico vive en `438E LK` / `438E CH`; la vista mostraba entonces una fila del
+> base con **0 stock pero con cajas pedidas** (fila fantasma que confunde: parece faltante). Ahora
+> `stkBodyStocks` **oculta la fila del base** cuando (a) es un base sin sufijo (`codBase(cod)===cod`),
+> (b) su familia tiene stock en una variante LK/CH/LOKE, y (c) el base **no tiene stock propio**. Un
+> base **con** stock propio (ej. `437E`, 36 cj) **sigue visible**. La demanda del base la cubre la
+> familia; la detección de faltantes family-aware sigue por otro lado (Chequeo de góndola en la PPP,
+> Facturación). Smoke `tests/stk-base-split-oculta.cjs`. Bump **v7.71**. — Contexto: se unificaron a
+> mano los códigos duplicados **727/727EN→727E**, **438E/438EL→438E LK/CH**, **439E/439EL→439E LK/CH**
+> (re-etiquetado de `Movimientos_Stock` — el cron `reconciliar_pipeline_stock_etapa1` dedupea por
+> **tanda** (ref), no por código, así que re-etiquetar no re-crea; equivalencias en
+> `Equivalencias_Codigos` para los typos; typos ya sacados del Sheet por el usuario).
 >
 > Nota: **v7.70 — Aviso URGENTE por Telegram: faltó en el picking pero HABÍA stock en góndola**
 > (pedido del usuario). Nuevo evento **`FGU`**. Al **TERMINAR el picking** (`stockBajaPicking`, TP),

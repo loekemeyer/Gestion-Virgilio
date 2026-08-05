@@ -6054,7 +6054,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.70";
+const APP_VERSION = "v7.71";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -11616,6 +11616,24 @@ function stkBodyStocks() {
     const stock = (Number(a.terminado) || 0) + (Number(a.excedente) || 0) + (Number(a.separar_pedidos) || 0) + (Number(a.a_facturar) || 0) + (Number(a.a_guardar) || 0) + (Number(a.racks) || 0) + (Number(a.racks_ch) || 0);
     const ped = Number(dem[_ocgNorm(a.cod)]) || 0;
     return stock < ped && ped > 0;
+  });
+  // v7.71 — ocultar la fila del CÓDIGO BASE de una familia empresa-split (ej. "438E") cuando NO
+  // tiene stock propio y la familia SÍ tiene stock en su variante LK/CH. El stock físico vive en
+  // "438E LK"/"438E CH" y la demanda del base se cubre por la familia; sin esto quedaba una fila
+  // FANTASMA (base con 0 stock pero con cajas pedidas) que confunde. Un base CON stock propio
+  // (ej. 437E) NO se oculta. La detección de faltantes family-aware sigue por otro lado
+  // (Chequeo de góndola en la PPP, Facturación). Pedido del usuario: dejar sólo LK/CH.
+  const _famSplitConStock = {};   // codBase → true si una variante SUFIJADA (LK/CH/LOKE) tiene stock
+  arts.forEach(function (a) {
+    const cu = String(a.cod == null ? "" : a.cod).trim().toUpperCase();
+    const b = codBase(cu);
+    if (b !== cu && SECTKEYS.some(function (k) { return (Number(a[k]) || 0) !== 0; })) _famSplitConStock[b] = true;
+  });
+  shown = shown.filter(function (a) {
+    const cu = String(a.cod == null ? "" : a.cod).trim().toUpperCase();
+    // base sin sufijo + su familia tiene stock en LK/CH + el base NO tiene stock propio → ocultar
+    if (codBase(cu) === cu && _famSplitConStock[cu] && !SECTKEYS.some(function (k) { return (Number(a[k]) || 0) !== 0; })) return false;
+    return true;
   });
   // v4.23: "cuánto hay en cada sector". Totales por depósito (GLOBAL, no filtrado)
   // para la tira de arriba; columnas por sector en la tabla (góndola y a guardar

@@ -156,4 +156,7 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== comp-entregas-prueba (v7.69: el operador de prueba 0/1 no crea Entregas fantasma que bloqueen el armado) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/comp-entregas-prueba.cjs
 
+echo "== stk-base-split-oculta (v7.71: la tabla de Stock oculta el código base sin stock de una familia LK/CH) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stk-base-split-oculta.cjs
+
 echo "== TODO OK =="
