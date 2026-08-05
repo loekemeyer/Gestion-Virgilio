@@ -5096,7 +5096,7 @@ function showInstructivo() {
     { t: "🏭 Recepción", c: "RT · RR", x: "RT = recibí mercadería (entra a <b>“a guardar”</b>). RR = controlar los remitos cargados al camión." },
     { t: "🚚 Carga y control", c: "CC · CR", x: "CC = inicio/fin de la carga del camión. CR = control de remitos." },
     { t: "📥 Guardar a góndola", c: "MG", x: "Lo que está en <b>“a guardar”</b> lo pasás a góndola. Si la góndola está llena, marcás <b>Excedente</b> y su ubicación." },
-    { t: "🧰 Insumos y Cervantes", c: "Insumos · SC", x: "<b>Insumos</b> = un solo botón: elegís <b>Recibir</b> (entra stock), <b>Entregar</b> (sale) o <b>Agregar</b> uno nuevo que no está en el sistema. SC = salida de mercadería a Cervantes." },
+    { t: "🧰 Insumos y Cervantes", c: "Insumos · SC", x: "<b>Insumos</b> = un solo botón: elegís <b>Recibir</b> (entra stock) o <b>Entregar</b> (sale). ¿El insumo no está en el sistema? Entrás por <b>Recibir</b> y ahí tenés <b>“+ Agregar insumo nuevo”</b>. SC = salida de mercadería a Cervantes." },
     { t: "⏱ Pausas y otros", c: "AT · PB · Limp · Perm · PC · CT", x: "Marcá cuándo: atendés el timbre (AT), vas al baño (PB), limpiás (Limp), pedís permiso (Perm), parás a comer (PC) o hacés conteo (CT). Tocás al <b>empezar</b> y otra vez al <b>terminar</b>." }
   ];
   ov.innerHTML = '<div class="instr-card"><div class="instr-head"><span class="instr-title">❓ ¿Cómo se usa?</span><button class="instr-close" onclick="closeInstructivo()">Cerrar</button></div><div class="instr-body">' +
@@ -6008,7 +6008,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.49";
+const APP_VERSION = "v7.50";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -13618,11 +13618,12 @@ async function insFetchCatalogo() {
     return r.ok ? await r.json() : [];
   } catch (_e) { return []; }
 }
-/* v7.49 — Botón unificado "Insumos": en vez de dos botones sueltos (RI / EI), el
-   operario toca UN botón y elige qué hacer. Recibir → RI, Entregar → EI (misma mecánica
-   de siempre: selectOption abre el toggle + el modal de insumos). "Agregar insumo nuevo"
-   va a RI y abre directo el alta (el mismo "+ Agregar insumo nuevo" que ya tiene la
-   recepción). El chooser es un popup liviano al estilo de showMGChooser. */
+/* v7.49 — Botón unificado "Insumos": el operario toca UN botón y elige qué hacer.
+   DOS opciones nada más: Recibir → RI, Entregar → EI (misma mecánica de siempre:
+   selectOption abre el toggle + el modal de insumos). v7.50: el "agregar insumo nuevo"
+   NO es un ítem del chooser — vive DENTRO de Recibir (el modal de RI ya trae su botón
+   "+ Agregar insumo nuevo"; dar de alta sólo tiene sentido recibiendo). Popup liviano
+   al estilo de showMGChooser. */
 function insumoChooser(legajo) {
   let ov = document.getElementById("insChooserModal");
   if (!ov) { ov = document.createElement("div"); ov.id = "insChooserModal"; ov.style.cssText = "position:fixed;inset:0;z-index:1297;background:rgba(2,6,23,.74);display:flex;align-items:center;justify-content:center;padding:16px;"; document.body.appendChild(ov); }
@@ -13631,20 +13632,16 @@ function insumoChooser(legajo) {
   ov.innerHTML = '<div style="background:#f8fafc;max-width:380px;width:100%;border-radius:16px;padding:18px;box-shadow:0 24px 70px rgba(0,0,0,.5);box-sizing:border-box;">' +
     '<div style="font-size:18px;font-weight:800;margin-bottom:3px;">🧰 Insumos</div>' +
     '<div style="font-size:13px;color:#64748b;margin-bottom:16px;">¿Qué querés hacer?</div>' +
-    '<button onclick="insChooserGo(\'RI\')" style="' + btn + 'background:#4f46e5;">📥 Recibir insumos <span style="' + sub + '">(entra stock)</span></button>' +
+    '<button onclick="insChooserGo(\'RI\')" style="' + btn + 'background:#4f46e5;">📥 Recibir insumos <span style="' + sub + '">(entra stock — o agregá uno nuevo)</span></button>' +
     '<button onclick="insChooserGo(\'EI\')" style="' + btn + 'background:#0d9488;">📤 Entregar insumos <span style="' + sub + '">(sale stock)</span></button>' +
-    '<button onclick="insChooserGo(\'NUEVO\')" style="' + btn + 'background:#1e6bd6;">➕ Agregar insumo nuevo <span style="' + sub + '">(no está en el sistema)</span></button>' +
     '<button onclick="closeInsumoChooser()" style="width:100%;padding:11px;border:none;border-radius:10px;background:#e2e8f0;color:#475569;font-weight:700;cursor:pointer;">Cancelar</button>' +
     '</div>';
   ov.style.display = "flex";
 }
 function closeInsumoChooser() { const ov = document.getElementById("insChooserModal"); if (ov) ov.style.display = "none"; }
-/* "NUEVO" = recibir (RI) + abrir directo el alta de insumo. El flag lo consume
-   showInsumoModal cuando termina de cargar el catálogo (mode RI). */
 function insChooserGo(which) {
   closeInsumoChooser();
-  window._insAutoNuevo = (which === "NUEVO");
-  selectOption(which === "NUEVO" ? "RI" : which);   // RI | EI — misma mecánica que los botones viejos
+  selectOption(which);   // RI | EI — misma mecánica que los botones viejos. El alta vive dentro de RI.
 }
 /* El CSS del modal de insumos lo usa también la solapa "Insumos" de Stock y Compras
    (chips de categoría), así que la inyección va aparte. */
@@ -13687,8 +13684,6 @@ async function showInsumoModal(mode, legajo, _resume) {
     items.sort(_insSortCod);
     _ins = { mode: mode, legajo: String(legajo || "").trim(), items: items, filtro: "", cat: "", qty: null, nuevo: null };
     insRender();
-    // v7.49: si vino por "➕ Agregar insumo nuevo" del chooser, abrir el alta directo (solo RI).
-    if (window._insAutoNuevo) { window._insAutoNuevo = false; if (mode === "RI") { try { insNuevoOpen(""); } catch (_e) {} } }
   } catch (e) { const b = document.getElementById("insBody"); if (b) b.innerHTML = '<div class="ins-loading">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
 }
 /* v4.36 — INSUMOS rediseñado: alta por CÓDIGO (7 dígitos sí o sí) o por SECTOR +

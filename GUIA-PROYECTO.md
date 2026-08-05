@@ -4,7 +4,17 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-05 · Versión app al documentar: **v7.49**
+> Última actualización: 2026-08-05 · Versión app al documentar: **v7.50**
+>
+> Nota: **v7.50 — Chooser de Insumos: dos opciones, el alta vive adentro de «Recibir»**
+> (ajuste del pedido de v7.49). El popup `insumoChooser` deja de tener tres botones: ahora son
+> **SOLO dos** — **📥 Recibir** (RI) y **📤 Entregar** (EI). Se **sacó** el tercer ítem «➕ Agregar
+> insumo nuevo»: dar de alta un insumo sólo tiene sentido **recibiendo**, así que ya vive **dentro
+> de Recibir** (el modal de RI trae su botón «+ Agregar insumo nuevo», sin cambios). El subtítulo de
+> «Recibir» ahora dice *«(entra stock — o agregá uno nuevo)»* para que se note. Se removió el flag
+> `_insAutoNuevo` y su auto-apertura en `showInsumoModal` (ya no hacía falta); `insChooserGo(which)`
+> quedó en un simple `selectOption(which)`. Sólo UI del chooser. Verificado: `tests/run.sh` OK +
+> chequeo headless (chooser con 2 opciones, sin ítem NUEVO). Bump **v7.50**.
 >
 > Nota: **v7.49 — Completar Pedido (CP) ahora MIDE su tiempo + botón de Insumos unificado**.
 > Dos pedidos del usuario, ambos del lado del operario. (1) **CP mide tiempo**: antes el evento
