@@ -6,6 +6,19 @@
 >
 > Última actualización: 2026-08-05 · Versión app al documentar: **v7.61**
 >
+> Nota (backend, **sin bump de app**): **La proyección que alimenta las OCs pasa a 6 meses (fallback
+> 12) y combina Loekemeyer + Chef**. Pedido del usuario: la proyección de ventas que fija el Máximo del
+> generador debe usar los **últimos 6 meses corridos** (no 24), combinando **LK + Chef** con el suavizado
+> de anomalías ya integrado; **si un producto proyecta 0 en 6 meses, se miran los últimos 12; si sigue en
+> 0, queda en 0**. Se creó en PáginaLK (`kwkclwhmoygunqmlegrg`) la función **`fn_proyeccion_oc_virgilio()`**
+> (helper `_fn_proy_window(p_meses)` que calcula la proyección combinada+suavizada por ventana; la
+> principal hace el coalesce 6m→12m→0). **`refresh_proyeccion_madre()`** (Virgilio) ahora consume esa
+> función en vez de `fn_proyeccion_madre_emp?p_emp=lk` (que sigue existiendo, LK-only 24m, pero el refresh
+> ya no la usa). Verificado: **369 códigos** (345 con proy en 6m + 23 al fallback de 12m; 28 quedan en 0),
+> refresh end-to-end OK, cobertura del generador **175/190 activos = 92%** (subió de 165). El generador y
+> el resto de la app no cambian (siguen leyendo `proyeccion_madre`). SQL en
+> `sql/fn_proyeccion_oc_virgilio.sql` + `sql/refresh_proyeccion_madre.sql`.
+>
 > Nota: **v7.61 — REVERT de v7.55: se sacan «Depurar incompletos» y los «Parámetros de la
 > proyección» (período + suavizar) del generador de OCs**. Decisión del usuario: la proyección NO se
 > configura desde la app — la provee **PáginaLK** ("loekemeyer's web"). Cambios: **(1)** se quitó

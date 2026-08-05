@@ -8,12 +8,12 @@
 -- ref `kwkclwhmoygunqmlegrg`), donde vive el registro de ventas.
 --
 -- ── DE DÓNDE SALE (PáginaLK) ─────────────────────────────────────────────────
--- Función `fn_proyeccion_madre_emp(p_emp)` sobre `public.sales_lines` (228k+ líneas
--- de venta, 2020→hoy: invoice_date, item_code, customer_code, boxes, empresa). Para
--- cada artículo estima cajas/mes = suma, sobre cada cliente, del promedio mensual de
--- cajas de los últimos 24 meses, DESCARTANDO picos "one-off" (un pedido gigante que no
--- se repite: v > 1.5×promedio, aislado y sin continuidad). Aplica remaps
--- (`sales_item_remap`), exclusiones (`sales_excluded_items`) y clientes basura
+-- Función `fn_proyeccion_oc_virgilio()` sobre `public.sales_lines` (228k+ líneas de venta,
+-- 2020→hoy). COMBINA Loekemeyer + Chef, ventana PRIMARIA de 6 meses con fallback a 12
+-- (si un producto proyecta 0 en 6m usa 12m; si sigue en 0, queda en 0), con el suavizado de
+-- anomalías integrado. Detalle en `sql/fn_proyeccion_oc_virgilio.sql`. (Antes se usaba
+-- `fn_proyeccion_madre_emp(p_emp)`, LK-only 24m — sigue existiendo pero el refresh ya no la
+-- usa.) Aplica remaps (`sales_item_remap`), exclusiones (`sales_excluded_items`) y clientes basura
 -- ('1','3878'); toma uxb de `products`/`loke_products`. Corre en ~2 s.
 --   → O sea: ventas + clientes + artículos ya están en Supabase; la proyección se
 --     calcula de ahí, no de ningún Excel. (El Excel `OC_Maximos.max_cajas` sólo queda
@@ -58,7 +58,7 @@ declare
 begin
   begin
     resp := public.http(('GET',
-      'https://kwkclwhmoygunqmlegrg.supabase.co/rest/v1/rpc/fn_proyeccion_madre_emp?p_emp=lk',
+      'https://kwkclwhmoygunqmlegrg.supabase.co/rest/v1/rpc/fn_proyeccion_oc_virgilio',
       array[ public.http_header('apikey', k), public.http_header('Authorization', 'Bearer ' || k) ],
       null, null)::public.http_request);
   exception when others then
@@ -71,7 +71,7 @@ begin
       perform public.tg_enqueue(
         '🚨 PROYECCIÓN NO ACTUALIZADA — ' || to_char((now() at time zone 'America/Argentina/Buenos_Aires'), 'DD/MM') || E'\n' ||
         'El generador de OCs sigue con la última proyección buena. Motivo: ' || v_err || E'\n' ||
-        'Revisá el motor fn_proyeccion_madre_emp en "loekemeyer''s web".',
+        'Revisá el motor fn_proyeccion_oc_virgilio en "loekemeyer''s web".',
         'projmadre_fail_' || v_dia);
       perform public.tg_outbox_flush();
     exception when others then null; end;
