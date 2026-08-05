@@ -3774,8 +3774,8 @@ const SUPABASE_PLANIMETRIA_ENDPOINT =
   SUPABASE_URL + "/rest/v1/Planimetria";
 
 const filas = {
-  row1: ["EP","TP"],                                   // Picking (grande, azul)
-  row2: ["AP","TAP"],                                  // Armado (grande, verde)
+  row1: ["EP","AP"],                                   // Picking + Armado starters (grande, azul/verde) — v7.75: TP/TAP removed (finalize inline)
+  row2: [],                                            // (was Armado finish, now unused)
   row3: ["RT","MG","CC"],                              // Depósito y carga (mediano)
   row4: ["CR","RR","INS","CP","RC","IR","EA","SC"],    // secundarias (chico) + 🔀 Mover al final. v7.49: RI+EI unificados en INS (chooser)
   row5: ["AT","PB","Limp","Perm","PC","CT"]            // tiempos / pausas (chico)
@@ -6054,7 +6054,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.74";
+const APP_VERSION = "v7.75";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -9172,8 +9172,53 @@ async function compTerminar() {
   _compClearPersist(tanda);   // v4.04: completado → borrar el avance persistido
   _comp = null;
   const ov = document.getElementById("completarModal"); if (ov) ov.classList.remove("show");
-  if (rows.length) { _compSaveEntregas(rows); try { _armadoRegistrado.add(String(tanda).trim().toUpperCase()); } catch (_e) {} }   // v7.74: marca la tanda como armado registrado (habilita el TAP)
+  if (rows.length) { _compSaveEntregas(rows); try { _armadoRegistrado.add(String(tanda).trim().toUpperCase()); } catch (_e) {} }   // v7.74: marca la tanda como armado registrado
   try { alert("✓ Completado: líos guardados" + (nFalt ? " · " + nFalt + " artículo(s) con faltante" : "") + ". Entregas registradas: " + rows.length + "."); } catch (_e) {}
+
+  // v7.75: Emitir TAP event + mover stock (antes estaba suelto, ahora unificado con "Terminar" del asistente).
+  // Captura ts_inicio del armado para el cierre, marca como inactivo, y emite el evento.
+  try {
+    const st = getLegajoState(legajo);
+    const ts_inicio_iso = (st && st.armado && st.armado.ts_inicio) || null;
+    const nowMs = Date.now();
+    const nowIso = new Date(nowMs).toISOString();
+
+    // Construir payload TAP (igual que send() haría).
+    const payload = {
+      legajo: legajo,
+      opcion: "TAP",
+      descripcion: desc["TAP"] || "Terminé Armado Pedido",
+      texto: tanda,
+      ts: nowMs,
+      id: nowMs.toString(36) + "_" + Math.random().toString(36).slice(2, 8),
+      ts_inicio_iso: ts_inicio_iso
+    };
+
+    // Actualizar estado: marcar armado como inactivo.
+    st.armado = { active: false, value: "", ts_inicio: null };
+    setLegajoState(legajo, st);
+
+    // Agregar a historial local.
+    pushHistoryForLegajo(legajo, {
+      ts: payload.ts, opcion: "TAP", descripcion: payload.descripcion, texto: tanda,
+      id: payload.id,
+      ts_inicio_iso: payload.ts_inicio_iso || null,
+      status: "queued"
+    });
+
+    // Encolar y enviar el reporte TAP.
+    enqueueReport(payload);
+    _activityStatusTs = 0;   // invalidar cache de actividad
+
+    try { await trySendOneReport(payload).then(function (r) { if (r && r.ok) removeFromQueue(payload.id); }).catch(function () {}); } catch (_e) {}
+
+    // Soltar la reserva del armado.
+    try { tandaLiberar(tanda, "armado", legajo); } catch (_e) {}
+
+    // Mover stock (separado → a_facturar).
+    try { await stockSepararAFacturar(tanda, legajo); } catch (_e) {}
+  } catch (_e) { console.warn("compTerminar TAP emission:", _e); }
+
   try { updatePendingIndicator(); } catch (_e) {}
 }
 /* v7.07 — PAUSAR / SALIR del armado sin terminar (pedido del usuario). Antes el asistente

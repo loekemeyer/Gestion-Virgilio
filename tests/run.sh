@@ -159,7 +159,7 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== stk-base-split-oculta (v7.71: la tabla de Stock oculta el código base sin stock de una familia LK/CH) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stk-base-split-oculta.cjs
 
-echo "== tap-sin-completar (v7.74: no se puede TAP el armado sin completar el asistente — evita tanda sin registros) =="
-PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/tap-sin-completar.cjs
+echo "== comp-terminar-unificado (v7.75: botón 'Terminar' emite TAP + mueve stock — sin TAP/TP sueltos) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/comp-terminar-unificado.cjs
 
 echo "== TODO OK =="
