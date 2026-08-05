@@ -9460,8 +9460,9 @@ async function openStockAdmin(soloConteo) {
     const res = await Promise.all([stockFetchMovs(), stockGetCutoff(), stockFetchArtFactors(), racksFetchOrdenes(), racksFetchBajadas(), loadArtNombres(), ocgDemanda(true).catch(function(){ return {}; }),   /* v6.85: demanda PARTIDA por empresa (809E CH ≠ 809E LK) */
       supaFetchAllSafe(SUPABASE_CAPACIDAD_ENDPOINT, "select=sector,cod,cajas_max"),
       fetch(SUPABASE_URL + "/rest/v1/Stock_Config?clave=in.(guardado_cajas_por_hora,guardado_incluir_racks)&select=clave,valor", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; }),
-      (_solo ? Promise.resolve({ pend: {}, porArt: {} }) : stkFcsFetch().catch(function () { return { pend: {}, porArt: {} }; }))]);   // v6.70: FC s/Salida como columna
-    _stk = { movs: res[0] || [], cutoff: res[1], factors: res[2] || {}, ordenes: res[3] || [], bajadas: res[4] || [], tab: _solo ? "conteo" : "stocks", soloConteo: _solo, filtro: "", openArt: null, ingMode: "remito", asOf: null, asOfInput: "", dem: res[6] || {}, cap: res[7] || [], gConf: res[8] || [], fcs: res[9] || { pend: {}, porArt: {} }, fcsLoaded: true };
+      (_solo ? Promise.resolve({ pend: {}, porArt: {} }) : stkFcsFetch().catch(function () { return { pend: {}, porArt: {} }; })),   // v6.70: FC s/Salida como columna
+      supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Insumos", "select=cod").catch(function () { return []; })]);   // v7.73: cargar códigos de insumos para filtrarlos de Stock
+    _stk = { movs: res[0] || [], cutoff: res[1], factors: res[2] || {}, ordenes: res[3] || [], bajadas: res[4] || [], tab: _solo ? "conteo" : "stocks", soloConteo: _solo, filtro: "", openArt: null, ingMode: "remito", asOf: null, asOfInput: "", dem: res[6] || {}, cap: res[7] || [], gConf: res[8] || [], fcs: res[9] || { pend: {}, porArt: {} }, fcsLoaded: true, insumosCods: (res[10] || []).map(function(i) { return String(i.cod || "").trim().toUpperCase(); }) };
     stkRender();
   } catch (e) { const b = document.getElementById("stkBody"); if (b) b.innerHTML = '<div class="stk-loading">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
 }
@@ -11607,6 +11608,9 @@ function stkBodyStocks() {
   let shown = f
     ? arts.filter(function (a) { return (a.cod + " " + a.desc).toLowerCase().indexOf(f) >= 0; })
     : arts.filter(function (a) { return _stkStockKeys.some(function (k) { return (Number(a[k]) || 0) !== 0; }) || (Number(dem[_ocgNorm(a.cod)]) || 0) > 0 || _fcArtCajas(a.cod) > 0; });
+  // v7.73: excluir códigos que están en la tabla Insumos de Supabase (gestión separada en solapa Insumos)
+  const _insCodsSet = new Set((_stk.insumosCods || []).map(function (c) { return String(c || "").trim().toUpperCase(); }));
+  shown = shown.filter(function (a) { return !_insCodsSet.has(String(a.cod || "").trim().toUpperCase()); });
   // v7.48: tilde "🔴 Negativos" — se aplica ADEMÁS del buscador. Deja sólo los artículos con
   // saldo negativo en algún depósito (para cazar inconsistencias de stock de un vistazo).
   const _stkNegCount = arts.filter(_stkArtHasNeg).length + arts.filter(function (a) { return _stkIsNeg(a.insumos); }).length;
