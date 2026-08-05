@@ -5,6 +5,17 @@
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
 > Última actualización: 2026-08-05 · Versión app al documentar: **v7.46**
+> Última actualización: 2026-08-05 · Versión app al documentar: **v7.47**
+> Nota: **v7.47 — PPP · Ocupación: fuera las semanas pasadas, ahora es semana actual + 7 a futuro**
+> (pedido del usuario). La solapa **📦 Ocupación** tenía un selector de 9 semanas (−4…+4), pero las
+> semanas **pasadas nunca tienen datos** — el picking/PPP siempre proyecta a futuro (los pedidos
+> viven por `fecha_entrega`, que es de hoy en adelante). Se sacaron: el selector va ahora de la
+> **semana actual (0) a las 7 próximas (+7)** = 8 botones ("Esta sem", después las fechas de cada
+> lunes). Cambios en `index.html`: `OCUP_WK_MAX = 7`, `pppOcupWeek` clampa a `[0, 7]` (antes
+> `[-4, 4]`), el loop del selector va `0…7`, `showSin = true` (todas las semanas son actual/futuras
+> → el backlog "A programar" se muestra siempre) y el título de semana perdió la rama "(N atrás)".
+> `_ocupWeek` ya arrancaba en 0. Sólo UI de esa solapa; nada de datos ni de stock. Suite completa OK;
+> render 400px (los 8 botones envuelven 7+1) y 1000px sin overflow. Bump **v7.47**.
 >
 > Nota: **v7.46 — «Monitor de operarios» + «Análisis de productividad» = UN módulo con dos
 > pestañas**. Pedido del usuario. Los dos modales (`#monitorModal` y `#analisisModal`) ahora se

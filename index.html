@@ -6007,7 +6007,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.46";
+const APP_VERSION = "v7.47";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -19101,9 +19101,12 @@ function _pppEntExcelHtml() {
   return '<div class="ppp-ent-note">📄 Histórico completo del Excel "PPP Pedidos Entregados" — NP, cliente, <b>fecha</b> y <b>m³</b>. <b>' + r.total + '</b> pedido(s) · <b>' + totM3.toFixed(2) + '</b> m³' + (r.capped ? ' · mostrando los ' + CAP + ' más recientes (usá el 🔎 buscador para el resto)' : '') + '.</div>' + r.html;
 }
 /* ---- Ocupación (v7.02): vista SEMANAL. Barras apiladas por DÍA (fecha de entrega),
-   segmentadas por TAMAÑO de pedido. Selector de 9 semanas (−4…+4). Incluye "A programar"
-   (pedidos sin fecha) como barra de proyección. Fuentes por fecha_entrega, por pedido:
-   entregados = PPP_Entregados_Meta (_pppDeliveredFull); programados/a-programar = _pppParsed.prog. ---- */
+   segmentadas por TAMAÑO de pedido. Selector: semana ACTUAL + las 7 PRÓXIMAS (0…+7) —
+   las semanas pasadas no tienen datos (el picking/PPP siempre proyecta a futuro), así
+   que se sacaron (v7.47). Incluye "A programar" (pedidos sin fecha) como barra de
+   proyección. Fuentes por fecha_entrega, por pedido: entregados = PPP_Entregados_Meta
+   (_pppDeliveredFull); programados/a-programar = _pppParsed.prog. ---- */
+const OCUP_WK_MAX = 7;    // semana actual (0) + 7 hacia adelante
 const OCUP_CAP_KEY = "vir_ocup_cap_m3";
 let _ocupWeek = 0;        // offset de semana respecto de la actual (−4…+4)
 let _ocupSelKey = null;   // día seleccionado (YYYYMMDD) o 'SINFECHA'
@@ -19129,7 +19132,7 @@ function pppOcupDay(k) {
   if (_ocupPlanSel && k && k !== "SINFECHA") { pppOcupAssign(_ocupPlanSel, k); return; }   // modo asignar
   _ocupSelKey = (_ocupSelKey === k ? null : k); pppRenderProg();
 }
-function pppOcupWeek(off) { _ocupWeek = Math.max(-4, Math.min(4, off | 0)); _ocupSelKey = null; pppRenderProg(); }
+function pppOcupWeek(off) { _ocupWeek = Math.max(0, Math.min(OCUP_WK_MAX, off | 0)); _ocupSelKey = null; pppRenderProg(); }
 function _ocupLoadPlan() { if (_ocupPlan) return _ocupPlan; try { _ocupPlan = JSON.parse(localStorage.getItem(OCUP_PLAN_KEY) || "{}"); } catch (_e) { _ocupPlan = {}; } if (!_ocupPlan || typeof _ocupPlan !== "object") _ocupPlan = {}; return _ocupPlan; }
 function _ocupSavePlan() { try { localStorage.setItem(OCUP_PLAN_KEY, JSON.stringify(_ocupLoadPlan())); } catch (_e) {} }
 function _ocupPlanCount() { return Object.keys(_ocupLoadPlan()).length; }
@@ -19261,23 +19264,23 @@ function pppOcupHtml() {
   const todayKey = _ocupKey(today);
   const wd = _ocupWeekData(_ocupWeek);
   const cap = _ocupCap();
-  const showSin = _ocupWeek >= 0;   // "A programar" (backlog sin fecha) sólo en semana actual/futuras
+  const showSin = true;   // "A programar" (backlog sin fecha) — todas las semanas son actual/futuras
   const wkTot = wd.days.reduce(function (a, d) { return a + d.total; }, 0);
   const wkArm = wd.days.reduce(function (a, d) { return a + d.armM3; }, 0);
   const wkPed = wd.days.reduce(function (a, d) { return a + d.pedidos.length; }, 0);
   const wkPct = wkTot > 0 ? Math.round(wkArm / wkTot * 100) : 0;
   let pico = { total: 0, d: null }; for (const d of wd.days) if (d.total > pico.total) pico = { total: d.total, d: d };
   const wkEnd = new Date(wd.mon.getFullYear(), wd.mon.getMonth(), wd.mon.getDate() + 6);
-  // selector de 9 semanas
+  // selector: semana actual (0) + las 7 próximas (v7.47 — sin semanas pasadas)
   let sel = '<div class="ppp-ocup-wks">';
-  for (let o = -4; o <= 4; o++) {
+  for (let o = 0; o <= OCUP_WK_MAX; o++) {
     const m = _ocupMonday(today); m.setDate(m.getDate() + o * 7);
     const lbl = o === 0 ? "Esta sem" : (m.getDate() + "/" + (m.getMonth() + 1));
     sel += '<button class="ppp-ocup-wk' + (o === _ocupWeek ? " on" : "") + (o === 0 ? " now" : "") + '" onclick="pppOcupWeek(' + o + ')">' + lbl + '</button>';
   }
   sel += '</div>';
   let h = sel;
-  h += '<div class="ppp-ocup-wkttl">📅 Semana del <b>' + wd.mon.getDate() + '/' + (wd.mon.getMonth() + 1) + '</b> al <b>' + wkEnd.getDate() + '/' + (wkEnd.getMonth() + 1) + '</b>' + (_ocupWeek === 0 ? ' (actual)' : (_ocupWeek < 0 ? ' (' + (-_ocupWeek) + ' atrás)' : ' (+' + _ocupWeek + ')')) + ' · 🔧 Armado <b>' + wkPct + '%</b></div>';
+  h += '<div class="ppp-ocup-wkttl">📅 Semana del <b>' + wd.mon.getDate() + '/' + (wd.mon.getMonth() + 1) + '</b> al <b>' + wkEnd.getDate() + '/' + (wkEnd.getMonth() + 1) + '</b>' + (_ocupWeek === 0 ? ' (actual)' : ' (+' + _ocupWeek + ')') + ' · 🔧 Armado <b>' + wkPct + '%</b></div>';
   const planN = _ocupPlanCount();
   if (_ocupPlanSel || planN) {
     h += '<div class="ppp-ocup-planbar">';
