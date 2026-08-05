@@ -4,7 +4,17 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-05 · Versión app al documentar: **v7.56**
+> Última actualización: 2026-08-05 · Versión app al documentar: **v7.57**
+>
+> Nota: **v7.57 — un operario real ya no queda bloqueado por un dueño de PRUEBA (legajo 0/1)**.
+> Caso real **D06C**: un **AP fantasma de legajo 0** dejaba la tanda *«en curso por el legajo 0»* y
+> ningún operario podía arrancar el armado. `getActivityStatus` ya filtraba 0/1 (v7.06) pero los
+> **dos gates de `send()`** (exclusividad por `getActivityStatus` **y** reserva atómica por
+> `Tandas_Lock`) igual podían mostrar «ya la está armando el legajo 0» — sobre todo en clientes con la
+> app **cacheada vieja**, o si quedaba un lock 0/1 viejo. Ahora ambos gates ignoran a un dueño de
+> prueba (`&& !esLegajoPrueba(dueno/lock.legajo)`). Datos reconciliados: borrado el AP fantasma de
+> D06C y liberado el lock huérfano (lo tenía 122, que en realidad estaba armando D06D). Smoke
+> `tests/send-prueba-nobloquea.cjs` (dispara `send()` con dueño 0 → no bloquea; con 237 → sí). Bump **v7.57**.
 >
 > Nota: **v7.56 — Monitor: panel «En este momento» (qué está haciendo AHORA cada operario)**.
 > Pedido del usuario: la tabla del monitor sólo mostraba la actividad del que trabajaba una tanda

@@ -6028,7 +6028,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.56";
+const APP_VERSION = "v7.57";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -6351,7 +6351,11 @@ async function send() {
     if (sAct) {
       const dueno = (opcion === "EP") ? (sAct.pickingEnCursoBy && sAct.pickingEnCursoBy.get(texto))
                                       : (sAct.armadoEnCursoBy && sAct.armadoEnCursoBy.get(texto));
-      if (dueno && String(dueno) !== legajoStr) {
+      // v7.57: un dueño de PRUEBA (legajo 0/1) NUNCA bloquea a un operario real. Sin esto, un
+      // EP/AP fantasma de legajo 0 dejaba la tanda "en curso por el legajo 0" y nadie la podía
+      // arrancar (caso real D06C). getActivityStatus ya filtra 0/1, pero esto lo blinda también
+      // acá por si un cliente viejo cacheado o un futuro cambio deja pasar un dueño de prueba.
+      if (dueno && String(dueno) !== legajoStr && !esLegajoPrueba(dueno)) {
         let nom = "";
         try { const mp = await getEmpleadosNombres(); if (mp && mp.get) nom = mp.get(String(dueno)) || ""; } catch (_e) {}
         const quien = nom ? (nom + " (leg " + dueno + ")") : ("el legajo " + dueno);
@@ -6388,7 +6392,9 @@ async function send() {
     let nombreMio = "";
     try { const mp = await getEmpleadosNombres(); if (mp && mp.get) nombreMio = mp.get(legajoStr) || ""; } catch (_e) {}
     const lock = await tandaReservar(texto, fase, legajoStr, nombreMio);
-    if (lock && lock.legajo && String(lock.legajo) !== legajoStr) {
+    // v7.57: un lock de PRUEBA (legajo 0/1) tampoco bloquea a un operario real (defensa en
+    // profundidad: la prueba ni siquiera reserva, pero si quedó un lock 0/1 viejo, lo ignoramos).
+    if (lock && lock.legajo && String(lock.legajo) !== legajoStr && !esLegajoPrueba(lock.legajo)) {
       const quien = lock.nombre ? (lock.nombre + " (leg " + lock.legajo + ")") : ("el legajo " + lock.legajo);
       const q = (opcion === "EP") ? "pickeando" : "armando";
       try { alert("⛔ La tanda " + texto + " ya la está " + q + " " + quien + ".\n\nNo pueden hacer dos el mismo. Elegí otra."); } catch (_e) {}

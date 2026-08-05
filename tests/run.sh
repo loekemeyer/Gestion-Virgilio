@@ -141,4 +141,7 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== stk-solo-negativos (v7.48: tilde 🔴 Negativos filtra los art con saldo negativo en algún depósito) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stk-solo-negativos.cjs
 
+echo "== send-prueba-nobloquea (v7.57: un operario real no queda bloqueado por un dueño de prueba 0/1) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/send-prueba-nobloquea.cjs
+
 echo "== TODO OK =="
