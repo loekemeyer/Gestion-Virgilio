@@ -3812,7 +3812,7 @@ const LAST_LEGAJO_KEY = "legajo_last_virgilio_v1";        // último legajo usad
 const TZ_AR           = "America/Argentina/Buenos_Aires";
 const MAX_PROD_DAYS   = 10;        // se retienen N días PRODUCTIVOS (con datos), no calendario
 const HIST_MAX_PER_DAY = 700;      // tope de reportes por día por legajo en localStorage
-const SURVIVING_TOGGLES = ["CR","RR","MG"]; // únicos toggles que sobreviven al cambio de día
+const SURVIVING_TOGGLES = ["CR","RR"]; // únicos toggles que sobreviven al cambio de día (MG salió en v7.68: dejó de ser toggle)
 
 /* Auto-cierre al fin de jornada para toggles abiertos que quedaron sin cerrar.
    Si la limpieza del día siguiente encuentra alguno de estos abierto, genera
@@ -4738,7 +4738,7 @@ legajoInput.addEventListener("input", () => {
    - toggles: { CR:true, AT:true, ... } (1ra vez inicia, 2da termina)
    ========================================================= */
 const CORE_CODES   = ["EP","TP","AP","TAP"];
-const TOGGLE_CODES = ["CR","RR","CC","RT","MG","RI","EI","AT","PB","Limp","PC","Perm","CT"];
+const TOGGLE_CODES = ["CR","RR","CC","RT","RI","EI","AT","PB","Limp","PC","Perm","CT"]; // v7.68: MG salió — ya no es toggle, abre/cierra como módulo (CP/SC)
 
 /* Códigos de TIEMPO MUERTO. Cuando uno está abierto, se bloquea todo lo
    demás hasta cerrarlo (tocando el mismo botón otra vez). El resto de
@@ -4794,6 +4794,24 @@ function toggleStartOrEnd(legajo, code){
   }
   setLegajoState(legajo, st);
   return { started: !wasActive, ended: wasActive };
+}
+
+/* v7.68 — MG dejó de ser un toggle. Limpieza única: borrar cualquier `st.toggles.MG`
+   que haya quedado marcado de la versión vieja. Sin esto, ese flag no lo apaga nadie
+   más (el flujo nuevo no lo toca) y el botón MG quedaría en ROJO para siempre. Corre
+   en cada arranque: es idempotente y barato. */
+function migrateClearMGToggle(){
+  try {
+    const map = readStateMap();
+    let changed = false;
+    Object.keys(map).forEach(function (leg) {
+      const st = map[leg];
+      if (st && st.toggles && Object.prototype.hasOwnProperty.call(st.toggles, "MG")) {
+        delete st.toggles.MG; changed = true;
+      }
+    });
+    if (changed) { writeStateMap(map); try { updateCoreButtonsState(); } catch (_e) {} }
+  } catch (_e) {}
 }
 
 /* =========================================================
@@ -4996,8 +5014,7 @@ function renderPendingSuggestion(){
     { tipo:"Picking", activa: !!(st.picking && st.picking.active), valor: (st.picking && st.picking.value) || "" },
     { tipo:"Armado",  activa: !!(st.armado  && st.armado.active),  valor: (st.armado  && st.armado.value)  || "" },
     { tipo:"CR",      activa: !!(st.toggles && st.toggles.CR),     valor: "" },
-    { tipo:"RR",      activa: !!(st.toggles && st.toggles.RR),     valor: "" },
-    { tipo:"MG",      activa: !!(st.toggles && st.toggles.MG),     valor: "" }
+    { tipo:"RR",      activa: !!(st.toggles && st.toggles.RR),     valor: "" }
   ];
   for (const cd of continuarDefs) {
     const marca = cont[cd.tipo];
@@ -5425,6 +5442,15 @@ function selectOption(code) {
   // modal al confirmar). Operario (botonera, 4ª fila) y Marianela (panel admin).
   if (code === "CP") { showCPModal(legajoStr); return; }
 
+  // v7.68: Guardado a Góndola (MG) — abre el chooser DIRECTO, igual que CP/SC (sin
+  // Enviar, sin evento y SIN toggle). Antes MG era un toggle: al cerrar el modal el
+  // botón quedaba en ROJO y el toque para "volver a entrar" en realidad lo CERRABA
+  // (registrando un evento MG que fallaba). Ahora entrar/salir no deja nada colgado —
+  // un apretón por error se deshace con Cancelar/Cerrar (botón vuelve a normal, nada
+  // registrado). El evento MG (con su DURACIÓN, para Rendimiento/Monitor) lo emite el
+  // modal al CONFIRMAR el guardado (mgConfirmar → mgEmitGuardado), una sola vez.
+  if (code === "MG") { showMGChooser(legajoStr); return; }
+
   // v5.49: Pasar cajas a un pedido urgente — sacale cajas a un pedido que sale
   // después (armado o pickeado) y dáselas a uno urgente que sale antes. Abre el
   // modal directo (sin Enviar; el evento RC lo emite el modal al confirmar).
@@ -5475,7 +5501,7 @@ function selectOption(code) {
   const ending = isToggleEnding(legajoStr, code);
 
   // Estos NUNCA piden input
-  const NEVER_INPUT = ["AT","PB","Limp","PC","Perm","MG","CR","RR","CT"];  // 👈 CR/RR y CT no piden cantidad
+  const NEVER_INPUT = ["AT","PB","Limp","PC","Perm","CR","RR","CT"];  // 👈 CR/RR y CT no piden cantidad (MG salió en v7.68: ya no pasa por acá)
 
   if (ending && !NEVER_INPUT.includes(code)) {
     inputArea.classList.remove("hidden");
@@ -6028,7 +6054,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.67";
+const APP_VERSION = "v7.68";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -6549,11 +6575,8 @@ async function send() {
     const stCR = getLegajoState(legajoStr);
     if (stCR && stCR.toggles && stCR.toggles.CR) showControlRemitosCR(legajoStr);
   }
-  // v4.07: al INICIAR Guardado a Góndola (MG): pantalla para pasar de "Mercadería a guardar" a "Terminado".
-  if (opcion === "MG") {
-    const stMG = getLegajoState(legajoStr);
-    if (stMG && stMG.toggles && stMG.toggles.MG) showMGChooser(legajoStr);   // v5.15: pregunta qué baja (a guardar / racks)
-  }
+  // v7.68: MG (Guardado a Góndola) ya NO pasa por acá — se abre directo en selectOption
+  // (chooser sin Enviar/evento/toggle); el evento MG lo emite mgConfirmar → mgEmitGuardado.
   // v4.09: al INICIAR Recepción/Entrega de Insumos (RI/EI): buscador de insumos para registrar
   // el stock que entra (+) o sale (−) en el depósito 'insumos' (con alta de código al vuelo).
   if (opcion === "RI") {
@@ -6770,6 +6793,10 @@ if ("serviceWorker" in navigator) {
    (módulo al final del body) resuelve email -> Legajo y rellena el input
    recién cuando hay sesión. Hasta entonces el "Resumen de hoy" queda vacío. */
 renderLegajoHistory("");
+
+/* v7.68 — MG dejó de ser toggle: limpiar cualquier marca vieja para que el botón no
+   quede en rojo (el flujo nuevo ya no lo apaga desde la botonera). */
+migrateClearMGToggle();
 
 updatePendingIndicator();
 
@@ -14840,6 +14867,7 @@ function mgConfirmar() {
   closeMG();
   stockMove(rows);
   try { emitGuardadoSesion(nG + nE, _tsIni, _leg); } catch (_e) {}   // ratio de guardado (se autonutre)
+  try { mgEmitGuardado(_leg, _tsIni); } catch (_e) {}   // v7.68: evento MG (con duración open→confirmar) para Rendimiento/Monitor
   try { alert("✓ Guardado: " + nG + " caja(s) a góndola" + (nE > 0 ? " y " + nE + " a excedente" : "") + "."); } catch (_e) {}
 }
 /* v6.30 — Instrumentación del ratio de guardado (cajas/hora). Al confirmar un MG registra
@@ -14858,6 +14886,43 @@ function emitGuardadoSesion(cajas, tsInicio, legajo) {
       headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" },
       body: JSON.stringify({ legajo: String(legajo || "").trim() || null, segundos: seg, cajas: c })
     }).catch(function () {});
+  } catch (_e) {}
+}
+/* v7.68 — MG dejó de ser un toggle (arranca/para) y pasó a ser un módulo que abrís
+   y cerrás como CP. El evento MG se emite ACÁ, al CONFIRMAR el guardado, UNA sola vez
+   por guardado, llevando la DURACIÓN real (open del modal → confirmar) en ts_inicio.
+   Así Rendimiento (t_movim) y el Monitor (movMs) lo cuentan igual que antes, pero sin
+   depender de que el operario acuerde tocar MG dos veces. Aparece en "Resumen de hoy"
+   como una entrada limpia. Guarda ts_inicio solo si es válido (evita duraciones absurdas
+   de un borrador viejo reabierto). Mismo camino de cola/reintento que el resto. */
+function mgEmitGuardado(legajo, tsInicioMs) {
+  try {
+    const leg = String(legajo || "").trim();
+    const iniOk = (tsInicioMs && tsInicioMs <= Date.now()) ? new Date(tsInicioMs).toISOString() : null;
+    const nowMs = Date.now();
+    const payload = {
+      legajo: leg, opcion: "MG", descripcion: "Guardado a Góndola", texto: "",
+      ts: nowMs, id: nowMs.toString(36) + "_" + Math.random().toString(36).slice(2, 8),
+      ts_inicio_iso: iniOk
+    };
+    try {
+      pushHistoryForLegajo(leg, { ts: nowMs, opcion: "MG", descripcion: "Guardado a Góndola", texto: "", id: payload.id, ts_inicio_iso: iniOk, status: "queued" });
+    } catch (_e) {}
+    enqueueReport(payload);
+    if (typeof trySendOneReport === "function") {
+      trySendOneReport(payload).then(function (r) {
+        if (r && r.ok) {
+          removeFromQueue(payload.id);
+          try { setHistoryItemStatus(leg, getTodayKey(), payload.id, "sent", new Date().toISOString(), r.created_at); } catch (_e) {}
+        } else if (r && !r.networkFail) {
+          try { setHistoryItemStatus(leg, getTodayKey(), payload.id, "failed"); } catch (_e) {}
+        }
+      }).catch(function () {});
+    }
+    try { updatePendingIndicator(); } catch (_e) {}
+    if (legajoInput && legajoScreen && !legajoScreen.classList.contains("hidden")) {
+      try { renderLegajoHistory(legajoInput.value); } catch (_e) {}
+    }
   } catch (_e) {}
 }
 /* Evento MGX: se guardó un código que NO estaba en "Mercadería a guardar". Un

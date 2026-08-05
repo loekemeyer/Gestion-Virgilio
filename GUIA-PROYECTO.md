@@ -4,7 +4,24 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-05 · Versión app al documentar: **v7.67**
+> Última actualización: 2026-08-05 · Versión app al documentar: **v7.68**
+>
+> Nota: **v7.68 — Guardado a Góndola (MG) deja de ser un toggle: entrar/salir sin el botón
+> trabado en rojo** (pedido del usuario). **Problema:** MG era un toggle (arranca/para). Al cerrar
+> el modal (Cerrar/Cancelar) el toggle **no** se apagaba → el botón quedaba en **rojo**, y como es
+> toggle, el toque para "volver a entrar" en realidad lo **cerraba** (registrando un evento MG que,
+> sin red, fallaba) en vez de reabrir. Resultado: no se podía re-entrar en un toque, el botón
+> quedaba rojo y se acumulaban "MG — falló" en el Resumen. **Fix:** MG pasa a ser un **módulo
+> directo** como CP/SC: `selectOption("MG")` abre el chooser y `return` (sin Enviar, sin evento y
+> **sin toggle**). Entrar/salir no deja nada colgado; un **apretón por error** se deshace con
+> **Cancelar/Cerrar** (botón vuelve a normal, no registra nada). El evento `MG` **con su duración**
+> (open del modal → confirmar; lo usan Rendimiento `t_movim` y el Monitor `movMs`) lo emite
+> `mgConfirmar`→**`mgEmitGuardado`** una sola vez, al **confirmar** el guardado (mismo patrón que
+> `cpConfirm`), y aparece limpio en el Resumen. MG salió de `TOGGLE_CODES`, `SURVIVING_TOGGLES`,
+> `NEVER_INPUT` y de la sugerencia "Continuar" (sigue en `MOV_TOGGLE_CODES`/`INC_TOGGLE` porque esos
+> **leen** el evento cerrado). Migración `migrateClearMGToggle()` (corre al arrancar) borra cualquier
+> `st.toggles.MG` viejo para destrabar el botón rojo ya existente. Regresión nueva
+> `tests/mg-reentrada.cjs`. Bump **v7.68**.
 >
 > Nota: **v7.67 — Configuraciones del generador: "Sin proveedor" como opción, Objetivo/Uni×Caja bien
 > tratados y cuenta regresiva dentro del botón** (pedido del usuario). **(1) "Sin proveedor"** es ahora
@@ -3783,7 +3800,7 @@
 > `CRN` por NP + cierra el toggle `RR`); reusa todo el código `_cr*`/`crRender`/`fetchCRData`
 > (sólo cambió a qué toggle se ata). **CR = "Control Remitos"** quedó como **toggle plano**: el
 > operario sólo lo toca **al inicio y al fin** (sin popup, no pide cantidad). Ambos están en
-> `SURVIVING_TOGGLES` (`["CR","RR","MG"]`), `TOGGLE_CODES`, `NEVER_INPUT`, `INC_TOGGLE`/`INC_DESC`
+> `SURVIVING_TOGGLES` (`["CR","RR"]`; MG salió en v7.68), `TOGGLE_CODES`, `NEVER_INPUT`, `INC_TOGGLE`/`INC_DESC`
 > y la sugerencia "Continuar". Los eventos **CRN/CRA** y la integración PPP (controlados →
 > Pedidos Entregados) **no cambiaron** (siguen leyendo `CRN`).
 >
@@ -5041,7 +5058,7 @@ Definidos en `index.html` (objeto `desc`, ~línea 1531). Los botones se arman en
 | `RR` | Recepción Remitos | TOGGLE | Abre el popup de descarga (tabla NP cargados → tildar Controlado → «Terminé» = `CRN` por NP); desde v3.43 lleva la lógica que antes tenía `CR`. **v3.75+**: además hay un botón **"Recepción Remitos (RR)"** en Administración (`openRemitosAdmin` → `showControlRemitos("0", true)`) que abre la **MISMA lista** en modo admin (legajo `0`, sin cerrar toggle). Lo controlan operarios **y** admin. (v3.76 lo había sacado de los operarios; revertido en v3.77.) |
 | `CC` | Inicio/Fin Carga Camión | TOGGLE | Sí, al cerrar (Nro) |
 | `RT` | Recepción Mercadería | TOGGLE | Sí, al cerrar: `texto` = cantidad de cajas, **calculada sola** del Modo OP de Recepción (suma del día en `localStorage`, ver v2.61). Al abrir RT se lanza el Modo OP (`recepcion.js`); si el operario lo deja por la mitad, la recepción queda como **borrador** y se retoma con **"▶ Seguir recepción …"** desde la botonera (v7.09, movido a la botonera en v7.12). Desde **v7.07** la grilla de códigos muestra la **OC vigente** del proveedor y avisa por Telegram si lo recibido la excede (+20%, evento `ROC`). |
-| `MG` | Guardado a Góndola | TOGGLE | No |
+| `MG` | Guardado a Góndola | MÓDULO (abre/cierra, como CP/SC) | No — abre el chooser directo (📥 a guardar / excedente / racks). **v7.68**: dejó de ser toggle. Entrar/salir **NO** deja el botón en rojo; un apretón por error se deshace con **Cancelar/Cerrar** (sale limpio, no registra nada). El evento `MG` con su **duración** (open del modal → confirmar; lo usan Rendimiento `t_movim` y el Monitor `movMs`) lo emite `mgConfirmar`→`mgEmitGuardado` **una** vez por guardado confirmado (no más pares apertura/cierre). |
 | `RI` | Recepción Insumos | TOGGLE | Sí, al cerrar (cantidad) |
 | `EI` | Entrega Insumos | TOGGLE | Sí, al cerrar (cantidad) |
 | `AT` | Atendí Timbre | TOGGLE / tiempo muerto | No |
@@ -5079,11 +5096,11 @@ Definidos en `index.html` (objeto `desc`, ~línea 1531). Los botones se arman en
 
 **Grupos (constantes en `index.html`):**
 - `CORE_CODES = [EP, TP, AP, TAP]` — el trabajo medible (picking / armado).
-- `TOGGLE_CODES = [CR, RR, CC, RT, MG, RI, EI, AT, PB, Limp, PC, Perm, CT]` — abren y cierran.
+- `TOGGLE_CODES = [CR, RR, CC, RT, RI, EI, AT, PB, Limp, PC, Perm, CT]` — abren y cierran. (MG salió en **v7.68**: pasó a módulo directo tipo CP/SC.)
 - `DEAD_TIME_CODES = [AT, PB, Limp, PC, CT]` — mientras están abiertos **bloquean todo**.
 - `ALWAYS_ALLOWED_CODES = [PB, PC]` — nunca se bloquean.
 - `CLOSE_NEEDS_INPUT_CODES = [CC, RT, RI, EI]` — piden dato al cerrar.
-- `SURVIVING_TOGGLES = [CR, RR, MG]` — sobreviven la medianoche; el resto se autocierra.
+- `SURVIVING_TOGGLES = [CR, RR]` — sobreviven la medianoche; el resto se autocierra. (MG salió en **v7.68**: ya no es toggle.)
 - `AUTO_CLOSE_CODES = [AT, PB, Limp, PC, CT, Perm, CC, RT, RI, EI]` — se autocierran a las **17:00** (`WORKDAY_END_HOUR_AR = 17`) del día si quedaron abiertos.
 
 ### Continuar tarea al día siguiente (v2.44)
