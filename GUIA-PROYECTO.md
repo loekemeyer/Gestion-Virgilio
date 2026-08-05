@@ -4,7 +4,40 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-05 · Versión app al documentar: **v7.51**
+> Última actualización: 2026-08-05 · Versión app al documentar: **v7.52**
+>
+> Nota: **v7.52 — Visualizador de OCs: se alimenta de la RECEPCIÓN + impreso con el formato de la
+> planilla (operador / tallerista)** (pedido del usuario). Dos cosas en el módulo **📑 Órdenes de
+> Compra** (`openOCAdmin`). **(1) RECEPCIÓN → OC (backlog v4.11 punto b, ahora hecho).** El
+> visualizador **se alimenta solo** de lo realmente recibido en Recepción de Mercadería y marca, por
+> OC, cuánto se recibió de lo pedido — sin cargar el "recibido" a mano. **Vínculo recepción→OC:**
+> `proveedor(nombre) + código(clave normalizada) + FECHA`, contando desde la fecha de la OC y **hasta
+> la fecha de la OC SIGUIENTE** del mismo proveedor+código (ventana `[fecha_OC, fecha_OC_siguiente)`)
+> para no atribuir dos veces la misma entrega. Fuentes anon-readable: **`Entregas Tallerista Virgilio`**
+> (`Nombre_Tall,Cod,Cajas,Fecha`) y **`Entregas Prov AT`** (`Proveedor,Cod_Art,Cantidad,Dia_mes` — su
+> `Dia_mes` "DD-MM" sin año asume el año en curso, como el Histórico v6.50). El proveedor se matchea con
+> las mismas reglas que `recepcion.js` (`_ocProvKeys`/`_ocProvKeysMatch`: parte por "/" para OCs
+> compartidas tipo "Garcia / Lucho", tolera "Martin C"=Martin). Funciones nuevas: `ocFetchRecepcion`,
+> `ocBuildRecep` (devuelve `{row.id → cajas recibidas}`), `ocRecEff` (recibido EFECTIVO = manual si
+> `cantidad_recibida>0`, si no lo de recepción), `ocRecDe`. `ocGroupStats` usa el recibido efectivo → las
+> **tarjetas de la lista/fecha y los semáforos pendiente/parcial/recibida se marcan solos**. En el
+> **detalle** se agregó la columna **📥 Recep.** (solo lectura) y el botón **📥 Traer de recepción** (copia
+> lo de recepción a los campos editables para revisar y Guardar). Best-effort: si las tablas de entregas
+> no cargan, cae al recibido manual como antes. **(2) IMPRESO con el formato de la planilla.** `ocPrintHtml`
+> se reescribió para replicar la hoja que usa el depósito: **nombre grande arriba a la izq, fecha en rojo
+> a la der, Tel centrado**, grilla con bordes negros, **primera columna `Linea` (LK en rojo / CH en azul**,
+> del `OC_Maximos.linea` vía `ocLoadLineas`/`ocLinea`), **títulos de columna en DOBLE FILA** (para ocupar
+> menos), **más espacio para Descripción** (`table-layout:auto` + numéricas al contenido), y una **columna
+> en blanco de separación** (`.gap`, `border-style:hidden`) **entre «Falta Pedido» y «N° Caja»** (lo que
+> pidió el usuario). Orden de columnas: `Linea · Cod · Descripcion · Cajas · Falta Pedido · [sep] · N° Caja
+> · Uni x Caja · % Lleno`. **Dos variantes** (dos botones en el detalle): **🖨 Operador** = con las **3
+> columnas «Cajas Recibidas»** vacías para chequear a mano contra lo físico; **🖨 Tallerista** = sin esas
+> 3 columnas, para enviarle el pedido (`ocPrintDetalle(conRecibidas)` → `ocPrintHtml(x,{conRecibidas})`).
+> Se quitó el pie de firmas (no está en la planilla). Regla del % Lleno / Falta Pedido y el orden
+> ascendente por % Lleno **no cambian** (siguen congelados al generar, v7.42). Test `tests/oc-print.cjs`
+> actualizado al formato nuevo. Verificado: suite completa (`tests/run.sh`) **TODO OK** + screenshots
+> headless de las dos variantes + chequeo unitario del match recepción→OC (ventana por fechas, proveedor
+> compartido, override manual). Bump **v7.52** (`APP_VERSION` + `SW_VERSION` `v7.52-vir`).
 >
 > Nota: **v7.51 — Config del generador de OCs (`OC_Maximos`) EDITABLE desde la app → se elimina la
 > dependencia del Excel**. El generador leía dos cosas que venían de un Excel importado a mano:
