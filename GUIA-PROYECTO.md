@@ -4,7 +4,27 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-05 · Versión app al documentar: **v7.65**
+> Última actualización: 2026-08-05 · Versión app al documentar: **v7.66**
+>
+> Nota: **v7.66 — Generador de OCs: reparto por proveedor (duales) + registro de proveedores +
+> limpieza de la pantalla** (pedido del usuario, cierra la idea 1382). **(A) UI del generador:** se
+> sacaron el recuadro verde ("próxima generación automática") y el azul ("A pedir = máx…"); el botón
+> **✓ Generar las OCs** ahora va **grande arriba**, a la altura del ← Volver; el botón de config se
+> llama **⚙ Configuraciones**. **(B) Reparto por proveedor (duales).** `OC_Maximos` suma
+> **`prop_prov1`, `proveedor2`, `prop_prov2`** (Proveedor 1 = `proveedor`). En **Configuraciones** cada
+> código tiene **Proveedor 1 (desplegable) · % P1 · Proveedor 2 (desplegable) · % P2 · Objetivo ·
+> Uni×Caja · Índice · Activo**; los desplegables salen del **registro de proveedores** (tabla
+> `Talleristas_Contacto` + col `es_proveedor_oc`; se agregaron Kuffo/Log Fabr/Racks y se sacaron los
+> rótulos duales); los dos % **deben sumar 100** (valida al guardar, marca en rojo si no). Botón nuevo
+> **➕ Agregar proveedor** (nombre + teléfono → `Talleristas_Contacto`, que alimenta también el impreso
+> y el WhatsApp). El alta de artículo usa los mismos desplegables + % P1/P2. **(C) Generación con
+> split:** el generador (front `ocgEnter` y cron `generar_ocs_automaticas`/`simular_ocs_automaticas`,
+> redeployados) reparte el "a pedir" en **dos líneas de OC** por proporción (P2 recibe el resto para
+> sumar exacto); un solo proveedor = 100% al P1. Racks se sigue excluyendo por sub-línea. **Migración:**
+> los duales viejos (`123`, `222`, `505`, `505I`, `910`) pasaron de `"X / Y"` a Prov 1/Prov 2 **50/50**
+> (el dueño ajusta las proporciones reales en Configuraciones). Verificado: dry-run del split (123 →
+> Garcia 47 / Lucho 47) + suite completa + chequeo headless del editor y del generador. Cierra la idea
+> de usuario **1382**. Bump **v7.66**.
 >
 > Nota: **v7.65 — Generador de OCs: Log/Fabr AHORA genera OC; Racks se saca del generador**
 > (pedido del usuario). **(1) Log/ Fabr** (la fábrica) pasa a generar OC como cualquier proveedor

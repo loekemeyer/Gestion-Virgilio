@@ -42,6 +42,8 @@ begin
     with norm as (
       select regexp_replace(upper(btrim(m.cod)), '^0+(?=.)', '') as codn,
              btrim(coalesce(m.proveedor, '')) as proveedor,
+             nullif(btrim(coalesce(m.proveedor2, '')), '') as proveedor2,
+             coalesce(m.prop_prov1, 100)::numeric as pr1, coalesce(m.prop_prov2, 0)::numeric as pr2,
              coalesce(m.max_cajas, 0)::numeric as max_excel,
              case when coalesce(m.indice, 0) > 0 then m.indice::numeric else 1.5 end as indice
         from public."OC_Maximos" m
@@ -82,20 +84,27 @@ begin
         from public."Capacidad_Sector" group by 1
     ),
     calc as (
-      select n.proveedor,
+      select n.proveedor, n.proveedor2, n.pr1, n.pr2,
              ceil(least(
                ceil(case when p.proy is not null and p.proy > 0 then p.proy * n.indice else n.max_excel end),
                coalesce(nullif(c.cap, 0), 1e9)
-             ) + coalesce(d.pedidos, 0) - coalesce(s.stock, 0)) as a_pedir
+             ) + coalesce(d.pedidos, 0) - coalesce(s.stock, 0))::int as total
         from norm n
         left join stk s on s.codn = n.codn
         left join dem d on d.codn = n.codn
         left join proy p on p.codn = n.codn
         left join cap c on c.codn = n.codn
-       where upper(n.proveedor) not in ('RACKS', 'RACK')   -- v7.65: Racks afuera; Log/Fabr SÍ genera
-         and nullif(n.proveedor, '') is not null
+       where nullif(n.proveedor, '') is not null
     ),
-    pos as (select proveedor, a_pedir from calc where a_pedir > 0)
+    faltas as (select * from calc where total > 0),
+    pos as (   -- v7.66: reparto por proveedor (Prov 1 % pr1 / Prov 2 % pr2). Racks afuera.
+      select proveedor, a_pedir from (
+        select proveedor, round(total * pr1 / 100.0)::int as a_pedir from faltas
+        union all
+        select proveedor2, (total - round(total * pr1 / 100.0))::int from faltas where proveedor2 is not null and pr2 > 0
+      ) s
+      where a_pedir > 0 and nullif(btrim(proveedor), '') is not null and upper(btrim(proveedor)) not in ('RACKS', 'RACK')
+    )
     select
       (select count(*) from pos),
       (select coalesce(sum(a_pedir), 0) from pos),

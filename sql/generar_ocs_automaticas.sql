@@ -101,6 +101,8 @@ begin
   with norm as (   -- misma normalización que el front (_ocgNorm)
     select regexp_replace(upper(btrim(m.cod)), '^0+(?=.)', '') as codn,
            upper(btrim(m.cod)) as cod, m.descripcion, btrim(coalesce(m.proveedor, '')) as proveedor,
+           nullif(btrim(coalesce(m.proveedor2, '')), '') as proveedor2,
+           coalesce(m.prop_prov1, 100)::numeric as pr1, coalesce(m.prop_prov2, 0)::numeric as pr2,
            coalesce(m.max_cajas, 0)::numeric as max_excel,
            case when coalesce(m.indice, 0) > 0 then m.indice::numeric else 1.5 end as indice,
            coalesce(m.uni_x_caja, 0)::numeric as uni_caja
@@ -148,7 +150,7 @@ begin
     ) t order by codn, c desc, n_caja
   ),
   calc as (
-    select n.cod, n.descripcion, n.proveedor, n.uni_caja, nc.n_caja,
+    select n.cod, n.descripcion, n.proveedor, n.proveedor2, n.pr1, n.pr2, n.uni_caja, nc.n_caja,
            coalesce(s.stock, 0) as stock, coalesce(d.pedidos, 0) as pedidos,
            least(
              ceil(case when p.proy is not null and p.proy > 0 then p.proy * n.indice else n.max_excel end),
@@ -160,19 +162,34 @@ begin
       left join proy p on p.codn = n.codn
       left join cap c on c.codn = n.codn
       left join ncaja nc on nc.codn = n.codn
-     where upper(n.proveedor) not in ('RACKS', 'RACK')   -- v7.65: Racks afuera; Log/Fabr SÍ genera
-       and nullif(n.proveedor, '') is not null
+     where nullif(n.proveedor, '') is not null
+  ),
+  falta as (
+    select *, ceil(maximo + pedidos - stock)::int as total
+      from calc where ceil(maximo + pedidos - stock) > 0
+  ),
+  split as (   -- v7.66: reparto por proveedor (Prov 1 % pr1 / Prov 2 % pr2). El Prov 2 recibe el RESTO para sumar exacto.
+    select cod, descripcion, uni_caja, n_caja, proveedor as prov,
+           round(maximo * pr1 / 100.0) as oc_max, round(pedidos * pr1 / 100.0) as oc_ped, round(stock * pr1 / 100.0) as oc_stk,
+           round(total * pr1 / 100.0)::int as cantidad
+      from falta
+    union all
+    select cod, descripcion, uni_caja, n_caja, proveedor2 as prov,
+           maximo - round(maximo * pr1 / 100.0), pedidos - round(pedidos * pr1 / 100.0), stock - round(stock * pr1 / 100.0),
+           total - round(total * pr1 / 100.0)::int
+      from falta where proveedor2 is not null and pr2 > 0
   ),
   ins as (
     insert into public."Ordenes_Compra"
       (fecha, rubro, proveedor, codigo, descripcion, cantidad, cantidad_recibida, unidad, estado, notas,
        oc_max, oc_pedidos, oc_stock, oc_uni_caja, oc_ncaja)
-    select v_hoy, 'Art Term', proveedor, cod, nullif(descripcion, ''),
-           ceil(maximo + pedidos - stock)::int, 0, 'Cajas', 'pendiente',
+    select v_hoy, 'Art Term', prov, cod, nullif(descripcion, ''),
+           cantidad, 0, 'Cajas', 'pendiente',
            'auto ' || to_char(v_hoy, 'YYYY-MM-DD'),
-           maximo, pedidos, stock, uni_caja, n_caja
-      from calc
-     where ceil(maximo + pedidos - stock) > 0
+           oc_max, oc_ped, oc_stk, uni_caja, n_caja
+      from split
+     where cantidad > 0 and nullif(btrim(prov), '') is not null
+       and upper(btrim(prov)) not in ('RACKS', 'RACK')   -- v7.65: Racks afuera; Log/Fabr SÍ genera
     returning proveedor, cantidad
   )
   select count(*), coalesce(sum(cantidad), 0), count(distinct proveedor) into v_n, v_cajas, v_prov from ins;
