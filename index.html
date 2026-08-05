@@ -6008,7 +6008,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.53";
+const APP_VERSION = "v7.54";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -9791,10 +9791,10 @@ function ocTraerRecepcion() {
    Caja. Dos variantes: OPERADOR (con las 3 columnas "Cajas Recibidas" para chequear a
    mano) y TALLERISTA (sin esas 3 columnas, para enviarle el pedido). */
 const _OC_PRINT_CSS = "body{font-family:Arial,Helvetica,sans-serif;color:#111;margin:14px;}" +
-  ".oc-p-head{display:flex;align-items:baseline;justify-content:space-between;padding:0 3px 3px;}" +
-  ".oc-p-name{font-size:30px;font-weight:800;}" +
+  ".oc-p-head{display:flex;align-items:flex-start;justify-content:space-between;padding:0 3px 4px;}" +
+  ".oc-p-name{font-size:30px;font-weight:800;line-height:1.05;}" +
   ".oc-p-date{font-size:18px;font-weight:800;color:#c0261f;}" +
-  ".oc-p-tel{text-align:center;font-size:13px;font-weight:700;border:1.5px solid #111;border-bottom:none;padding:3px 0;}" +
+  ".oc-p-tel{font-size:13.5px;font-weight:700;color:#111;margin-top:2px;}" +
   "table{width:100%;border-collapse:collapse;table-layout:auto;font-size:13px;}" +
   "th,td{border:1.5px solid #111;padding:3px 6px;text-align:center;vertical-align:middle;}" +
   "thead th{background:#efefef;color:#111;font-size:11px;font-weight:800;line-height:1.05;white-space:nowrap;}" +
@@ -9807,13 +9807,29 @@ const _OC_PRINT_CSS = "body{font-family:Arial,Helvetica,sans-serif;color:#111;ma
   "th.lin{width:1%;white-space:nowrap;}" +
   "td.lin{width:1%;white-space:nowrap;font-weight:800;font-size:14px;}" +
   "td.lin.lk{color:#c0261f;}td.lin.ch{color:#1e6fce;}" +
-  ".gap{border-style:hidden;background:#fff;width:16px;min-width:16px;padding:0;}" +
+  ".gap{background:#fff;width:18px;min-width:18px;padding:0;}" +
   "th.recib{background:#efefef;}td.recib,th.recib{width:52px;min-width:52px;}" +
   "tfoot td{font-weight:800;background:#efefef;}tfoot td.gap{background:#fff;}" +
   ".oc-p-foot{margin-top:8px;font-size:10.5px;color:#666;}" +
   "@media print{body{margin:6mm;}@page{margin:8mm;}}";
 /* "2026-08-05" → "05/08/2026" para el encabezado del impreso (como la planilla). */
 function _ocFechaLarga(f) { const m = String(f == null ? "" : f).match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? (m[3] + "/" + m[2] + "/" + m[1]) : (String(f == null ? "" : f) || "—"); }
+/* v7.54 — Teléfono del tallerista para el encabezado del impreso (va DEBAJO del nombre).
+   El dato vive en `Ordenes_Compra.proveedor_telefono` (lo mantiene una herramienta
+   externa). Como puede estar cargado en UNA OC del tallerista y faltar en otra, se busca
+   en TODAS las filas del mismo proveedor (por nombre normalizado, con las reglas de
+   `_ocProvKeys`) y se usa el primero con dato. Si no hay ninguno cargado, devuelve ""
+   (no se muestra la línea Tel) — NO inventa números. */
+function ocTelDe(prov) {
+  if (!_oc || !_oc.rows) return "";
+  const keys = _ocProvKeys(prov);
+  for (let i = 0; i < _oc.rows.length; i++) {
+    const r = _oc.rows[i], t = String(r.proveedor_telefono == null ? "" : r.proveedor_telefono).trim();
+    if (!t) continue;
+    if (_ocProvKeys(r.proveedor).some(function (k) { return _ocProvKeysMatch(keys, k); })) return t;
+  }
+  return "";
+}
 /* v7.39 — IMPRESO de OC con el formato de la planilla del tallerista (pedido del
    usuario). Columnas: Cod · Descripción · Cajas (a pedir) · Falta Pedidos · Uni x
    Caja · Caja N° · % Lleno. Los derivados usan lo GUARDADO al generar (oc_max/
@@ -9869,7 +9885,7 @@ function ocPrintHtml(x, opts) {
       (conRecibidas ? '<td class="recib"></td><td class="recib"></td><td class="recib"></td>' : '') +
     '</tr>';
   });
-  const tel = String(x.telefono || "").trim();
+  const tel = String(x.telefono || ocTelDe(x.proveedor) || "").trim();
   const rs = conRecibidas ? ' rowspan="2"' : '';
   const head1 = '<tr>' +
     '<th' + rs + ' class="lin">Linea</th>' +
@@ -9884,9 +9900,9 @@ function ocPrintHtml(x, opts) {
     (conRecibidas ? '<th colspan="3" class="recib">Cajas Recibidas</th>' : '') +
     '</tr>';
   const head2 = conRecibidas ? '<tr><th class="recib"></th><th class="recib"></th><th class="recib"></th></tr>' : '';
-  return '<div class="oc-p-head"><span class="oc-p-name">' + escapeHtml(x.proveedor || "—") + '</span>' +
+  return '<div class="oc-p-head"><div class="oc-p-headL"><div class="oc-p-name">' + escapeHtml(x.proveedor || "—") + '</div>' +
+      (tel ? '<div class="oc-p-tel">Tel: ' + escapeHtml(tel) + '</div>' : '') + '</div>' +
       '<span class="oc-p-date">' + escapeHtml(_ocFechaLarga(x.fecha)) + '</span></div>' +
-    '<div class="oc-p-tel">' + (tel ? 'Tel: ' + escapeHtml(tel) : '&nbsp;') + '</div>' +
     '<table><thead>' + head1 + head2 + '</thead><tbody>' + rows +
     '</tbody><tfoot><tr><td colspan="3">Total</td><td class="num big">' + tot + '</td><td class="num"></td><td class="gap"></td><td colspan="' + (conRecibidas ? 6 : 3) + '"></td></tr></tfoot></table>' +
     '<div class="oc-p-foot">Producción Virgilio · ' + x.rows.length + ' ítem(s)' + (conRecibidas ? ' · hoja del operador (chequear en Cajas Recibidas)' : '') + '</div>';

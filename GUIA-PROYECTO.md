@@ -4,7 +4,24 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-05 · Versión app al documentar: **v7.53**
+> Última actualización: 2026-08-05 · Versión app al documentar: **v7.54**
+>
+> Nota: **v7.54 — Impreso de OC: la separación se cierra con líneas + el teléfono va DEBAJO del
+> nombre** (ajustes del pedido de v7.52). Dos cosas en `ocPrintHtml`. **(1)** La columna de
+> separación entre «Falta Pedido» y «N° Caja» quedaba **abierta** (se veía un hueco feo: la grilla
+> se cortaba arriba/abajo) porque usaba `border-style:hidden`. Ahora la `.gap` es una **columna
+> vacía angosta (18px) CON bordes** (hereda el borde negro de la grilla) → la tabla queda cerrada y
+> la separación se sigue notando. **(2)** El **teléfono** pasa de una fila centrada arriba de la
+> tabla a ir **debajo del nombre del tallerista** (bloque `.oc-p-headL`: nombre grande + `Tel: …`
+> chico a la izquierda; la fecha en rojo sigue arriba a la derecha). Si no hay teléfono, **no** se
+> muestra la línea (antes quedaba una franja vacía). **Origen del teléfono:** `Ordenes_Compra.
+> proveedor_telefono` (lo mantiene una herramienta externa). Helper nuevo **`ocTelDe(prov)`**: si la
+> OC abierta no trae el tel, lo busca en **cualquier otra OC del mismo tallerista** (nombre
+> normalizado con `_ocProvKeys`) y usa el primero con dato; si no hay ninguno, no inventa. **Estado
+> real (2026-08-05): la columna `proveedor_telefono` está VACÍA para todos los talleristas** (y la
+> tabla `Proveedores` de ARCA no tiene teléfonos ni es de talleristas), así que hoy el impreso sale
+> **sin** teléfono — pero en cuanto se cargue el dato en `Ordenes_Compra.proveedor_telefono`
+> aparece solo bajo el nombre. Test `tests/oc-print.cjs` sigue OK. Bump **v7.54**.
 >
 > Nota: **v7.53 — Auditoría del time-tracking del operario + Atención/Conteo/Permiso dejan de
 > esconderse en «Otros»**. El usuario pidió chequear que TODO lo que se cronometra desde el operario
