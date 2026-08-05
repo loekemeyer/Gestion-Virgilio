@@ -1,9 +1,12 @@
-/* Test de regresión (v5.17, hallazgo ALTA de la auditoría SE): el generador de OCs
-   (ocgEnter) tiene que cruzar máximos ↔ stock ↔ demanda ↔ proyección ↔ capacidad con
-   LA MISMA normalización de código (_ocgNorm = upper + sin ceros a la izquierda).
-   Fixture: el máximo dice "007"/"066" pero el stock está cargado como "7"/"66" y la
-   capacidad como "66". Si alguna pata vuelve a cruzar sin normalizar, el stock da 0
-   silencioso y el generador sobre-pide → este test falla. Sale 1 si falla. */
+/* Test de regresión del generador de OCs (v7.68). Desde v7.68 TODO el cálculo (universo
+   desde stock, Máximo = proy×índice o capacidad, stock con empresa LK/CH mergeada, pedidos)
+   vive en la vista Supabase vista_generador_oc; ocgEnter solo la lee y arma los ítems +
+   reparto por proveedor. Este test stubea el fetch de la vista y verifica el armado:
+   - pasa stock/falta/capped tal cual,
+   - parte los duales por proporción (P2 = resto),
+   - muestra "(sin proveedor)" con su flag (no se envía, pero se ve),
+   - excluye Racks.
+   Part 2: la DEMANDA (ocgDemanda) netea los pedidos ya pickeados (tanda con TP). Sale 1 si falla. */
 const path = require("path");
 let chromium;
 try { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
@@ -19,39 +22,43 @@ catch (_e) {
   p.on("pageerror", (e) => errs.push(e.message));
   await p.goto("file://" + path.join(root, "index.html"), { waitUntil: "domcontentloaded" });
   const r = await p.evaluate(async () => {
-    // Stubs: son bindings léxicos globales (function/let), se reasignan SIN window.
-    ocgFetchMaximos = async () => [
-      { cod: "007", descripcion: "test A", max_cajas: 100, proveedor: "PROV", indice: null },
-      { cod: "066", descripcion: "test B", max_cajas: 50, proveedor: "PROV", indice: null }
-    ];
-    stockFetchMovs = async () => [
-      { cod_art: "7", deposito: "terminado", delta: 50, tipo: "inicial", ts: "2026-06-30T00:00:00Z" },
-      // v7.18: "a guardar" TAMBIÉN es stock disponible para el generador (7 → 50+10=60)
-      { cod_art: "7", deposito: "a_guardar", delta: 10, tipo: "inicial", ts: "2026-06-30T00:00:00Z" },
-      { cod_art: "66", deposito: "terminado", delta: 20, tipo: "inicial", ts: "2026-06-30T00:00:00Z" },
-      // pickeado / a facturar: NO cuentan como disponible
-      { cod_art: "66", deposito: "separar_pedidos", delta: 40, tipo: "inicial", ts: "2026-06-30T00:00:00Z" },
-      { cod_art: "66", deposito: "a_facturar", delta: 30, tipo: "inicial", ts: "2026-06-30T00:00:00Z" }
-    ];
-    stockGetCutoff = async () => null;
-    ocgDemanda = async () => ({});
-    ocgFetchProyeccion = async () => ({});
-    ocgFetchCapacidad = async () => ({ "66": 30 });
+    // Stub del fetch de la vista (bindings léxicos globales, se reasignan SIN window).
+    supaFetchAllSafe = async (url) => {
+      if (String(url).indexOf("vista_generador_oc") >= 0) return [
+        { cod: "031", descripcion: "A", proveedor: "Poly", tiene_prov_real: true, pr1: 100, proveedor2: null, pr2: 0, indice: 1.5, proy: 100, cap: 0, maximo: 150, pedidos: 0, stock: 60, uni_x_caja: 24, n_caja: 1, total: 90 },
+        { cod: "066", descripcion: "B", proveedor: "PROV", tiene_prov_real: true, pr1: 100, proveedor2: null, pr2: 0, indice: 1.5, proy: 100, cap: 30, maximo: 30, pedidos: 0, stock: 20, uni_x_caja: 12, n_caja: 2, total: 10 },
+        { cod: "123", descripcion: "Dual", proveedor: "Garcia", tiene_prov_real: true, pr1: 50, proveedor2: "Lucho", pr2: 50, indice: 1.5, proy: 120, cap: 0, maximo: 164, pedidos: 0, stock: 70, uni_x_caja: 12, n_caja: 3, total: 94 },
+        { cod: "580", descripcion: "SinProv", proveedor: "(sin proveedor)", tiene_prov_real: false, pr1: 100, proveedor2: null, pr2: 0, indice: 1.5, proy: 0, cap: 66, maximo: 66, pedidos: 0, stock: 65, uni_x_caja: 0, n_caja: null, total: 1 },
+        { cod: "809E", descripcion: "Racks", proveedor: "Racks", tiene_prov_real: true, pr1: 100, proveedor2: null, pr2: 0, indice: 1.5, proy: 50, cap: 0, maximo: 75, pedidos: 0, stock: 0, uni_x_caja: 12, n_caja: 4, total: 75 }
+      ];
+      return [];
+    };
     _oc = { view: "gen", gen: null, rows: [] };
     ocRender = function () {};   // sin DOM del modal
     await ocgEnter();
     const items = (_oc.gen && _oc.gen.items) || [];
-    const A = items.find((i) => i.cod === "007"), B = items.find((i) => i.cod === "066");
+    const A = items.find((i) => i.cod === "031"), B = items.find((i) => i.cod === "066");
+    const dual = items.filter((i) => i.cod === "123");
+    const sin = items.find((i) => i.cod === "580");
+    const racks = items.find((i) => i.cod === "809E");
     return {
-      A_stock: A ? A.stock : null, A_falta: A ? A.falta : null,                       // esperado 60 / 40
-      B_stock: B ? B.stock : null, B_capped: B ? B.capped : null, B_falta: B ? B.falta : null,  // esperado 20 / true / 10
+      A_stock: A ? A.stock : null, A_falta: A ? A.falta : null, A_capped: A ? A.capped : null,       // 60 / 90 / false
+      B_stock: B ? B.stock : null, B_capped: B ? B.capped : null, B_falta: B ? B.falta : null,       // 20 / true / 10
+      dualN: dual.length, dualGarcia: (dual.find((i) => i.prov === "Garcia") || {}).falta, dualLucho: (dual.find((i) => i.prov === "Lucho") || {}).falta,  // 2 / 47 / 47
+      sinProv: sin ? sin.prov : null, sinFlag: sin ? !!sin.sinProv : null,                            // "(sin proveedor)" / true
+      racksExcl: !racks,                                                                              // true (Racks afuera)
       error: (_oc.gen && _oc.gen.error) || null
     };
   });
-  const pass = r.A_stock === 60 && r.A_falta === 40 && r.B_stock === 20 && r.B_capped === true && r.B_falta === 10 && !r.error && errs.length === 0;
+  const pass = r.A_stock === 60 && r.A_falta === 90 && r.A_capped === false &&
+    r.B_stock === 20 && r.B_capped === true && r.B_falta === 10 &&
+    r.dualN === 2 && r.dualGarcia === 47 && r.dualLucho === 47 &&
+    r.sinProv === "(sin proveedor)" && r.sinFlag === true && r.racksExcl === true &&
+    !r.error && errs.length === 0;
   console.log("ocg-norm:", JSON.stringify(r), "· pageerrors:", errs.length ? errs.join("|") : "none", "·", pass ? "✓ OK" : "✗ FAIL");
+  if (!pass) { await b.close(); process.exit(1); }
+
   // v7.18 — la DEMANDA del generador netea los pedidos ya pickeados (tanda con TP).
-  // (recarga: la fase 1 dejó ocgDemanda stubeada)
   await p.goto("file://" + path.join(root, "index.html"), { waitUntil: "domcontentloaded" });
   const r2 = await p.evaluate(async () => {
     supaFetchAll = async (url, q) => {

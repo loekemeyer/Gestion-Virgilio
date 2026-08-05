@@ -4,7 +4,31 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-05 · Versión app al documentar: **v7.75**
+> Última actualización: 2026-08-05 · Versión app al documentar: **v7.81**
+>
+> Nota: **v7.81 — CAMBIO DE FONDO: el generador de OCs sale de STOCK, no de una lista a mano** (pedido
+> del usuario). Antes el universo de artículos era `OC_Maximos` (lista cargada a mano). Ahora sale de lo
+> que el sistema **lleva y registra como stock** más lo que vende. Todo el cálculo se encapsuló en la
+> vista Supabase **`vista_generador_oc`** (la leen el front `ocgEnter`/`ocgEnterCfg` **y** el cron del
+> miércoles — una sola fuente, no se desincronizan). **(1) Universo** = productos TERMINADOS de
+> `vista_saldos_stock` ∪ proyección ∪ pedidos ∪ config existente (insumos afuera: no tienen capacidad ni
+> proyección). **(2) Proveedor** = de `OC_Maximos` (que pasó a ser SOLO config de proveedor/%/índice/
+> activo por código); sin config → **"(sin proveedor)"**: se muestra en el generador y en Configuraciones
+> (resaltado) para asignarlo, pero **no** se auto-genera (no se puede enviar). **(3) Stock** ahora suma la
+> familia por **empresa `LK`/`CH`** (`437E LK` + `437E CH` → `437E`): arregla un **bug de sobre-pedido**
+> (437E/438E/439E veían stock 0 y pedían ~132 cajas de más). **(4) Máximo** = proyección × índice (topado
+> a capacidad); si **no hay proyección** (sin ventas 6m→12m→0), el **objetivo = capacidad de góndola**
+> (`Capacidad_Sector`), pero SOLO para códigos con proveedor real. **(5) uni×caja** ya no se carga a mano:
+> sale de **`vista_uni_x_caja`** (maestro `Articulos Virgilio X Tallerista` → `OC_Maximos` live → `uxb`);
+> se migraron al maestro los que faltaban y se dejó **`OC_Maximos_backup_estatico`** (snapshot congelado,
+> RLS on) como respaldo. **(6) Configuraciones**: se sacó **"➕ Agregar artículo"** (los artículos aparecen
+> solos desde stock) y las columnas **Objetivo** y **Uni×Caja editable** (uni×caja queda read-only). El
+> editor hace **upsert** en `OC_Maximos` (INSERT para códigos nuevos de stock, PATCH para los existentes).
+> Ambas vistas son **SECURITY INVOKER** (sin advisor). Cron real sigue **desactivado** (corre la
+> simulación). Dry-run nuevo: **111 líneas · 18 prov · 7.630 cajas** (antes 104/9.198 — bajó el
+> sobre-pedido). Tests `ocg-norm`/`ocg-config` reescritos. SQL en `sql/vista_generador_oc.sql`,
+> `sql/oc_maximos_backup_estatico.sql`, `sql/generar_ocs_automaticas.sql`, `sql/simular_ocs_automaticas.sql`.
+> Bump **v7.81**.
 >
 > Nota: **v7.75 — unificar TAP con el asistente Completar** (eliminación de los botones sueltos
 > **TP** y **TAP** de la botonera principal). El armado tenía dos pasos desacoplados: (1) el

@@ -1,11 +1,12 @@
-/* Test de regresión (v7.51) — EDITOR de config de compras (OC_Maximos) desde la app,
-   para que el Excel deje de ser necesario. Verifica sobre las funciones puras/estado
-   (sin red, sin sesión de supervisor):
-   - ocBodyCfg() dibuja las columnas nuevas (Objetivo · Uni×Caja · Índice · Activo),
-     el botón de alta y los valores/proveedor cargados,
-   - ocCfgEdit acumula un PATCH parcial por código en _oc.cfg.changed (merge de campos),
-   - ocCfgSetAllIndice pone el índice a todos y lo registra como cambio,
-   - ocCfgAltaOpen abre el formulario de alta.
+/* Test de regresión (v7.68) — EDITOR de config del generador de OCs. Desde v7.68 la lista
+   sale SOLA de stock (vista_generador_oc): acá solo se configura proveedor(es) + % + índice +
+   activo. Ya NO hay columna Objetivo, ni "➕ Agregar artículo", ni uni×caja editable. Verifica
+   sobre funciones puras/estado (sin red, sin sesión):
+   - ocBodyCfg() dibuja Proveedor 1/2 (dropdown) · % P1/P2 · Uni×Caja (solo lectura) · Índice · Activo,
+     y NO dibuja Objetivo ni "Agregar artículo",
+   - el desplegable ofrece "(sin proveedor)" y resalta las filas sin proveedor,
+   - ocCfgEdit acumula un PATCH parcial por código en _oc.cfg.changed,
+   - ocCfgSetAllIndice pone el índice a todos y lo registra como cambio.
    Sale 1 si falla. */
 const path = require("path");
 let chromium;
@@ -26,26 +27,30 @@ catch (_e) {
   const r = await p.evaluate(() => {
     const out = {};
     _oc = { view: "cfg", cfg: {
-      changed: {}, filtro: "", error: null, alta: null,
+      changed: {}, filtro: "", error: null, altaProv: null,
+      provs: ["Lucho", "Poly", "Garcia"],
       rows: [
-        { cod: "107", descripcion: "Colador", proveedor: "Lucho", max_cajas: 100, uni_x_caja: 12, indice: 1.5, activo: true },
-        { cod: "202", descripcion: "Otro",    proveedor: "Poly",  max_cajas: 50,  uni_x_caja: 24, indice: 1.5, activo: true }
+        { cod: "107", descripcion: "Colador", proveedor: "Lucho", prop_prov1: 100, proveedor2: "", prop_prov2: 0, uni_x_caja: 12, indice: 1.5, activo: true, en_config: true, total: 40 },
+        { cod: "202", descripcion: "SinProv", proveedor: "", prop_prov1: 100, proveedor2: "", prop_prov2: 0, uni_x_caja: 24, indice: 1.5, activo: true, en_config: false, total: 10 }
       ]
     } };
     ocRender = function () {};   // sin re-dibujar el modal
 
     const html = ocBodyCfg();
-    out.cols = ["Objetivo", "Uni×Caja", "Índice", "Activo"].every((c) => html.indexOf(c) >= 0);
-    out.alta = html.indexOf("➕ Agregar artículo") >= 0;
-    out.provInput = html.indexOf('value="Lucho"') >= 0;      // proveedor editable
-    out.objetivo = html.indexOf('value="100"') >= 0;          // objetivo (max_cajas) editable
-    out.noExcelWord = html.indexOf("ya no hace falta el Excel") >= 0;
+    out.cols = ["Proveedor 1", "% P1", "Proveedor 2", "% P2", "Uni×Caja", "Índice", "Activo"].every((c) => html.indexOf(c) >= 0);
+    out.noObjetivoCol = html.indexOf(">Objetivo<") < 0;                 // ya no hay columna Objetivo
+    out.noAlta = html.indexOf("➕ Agregar artículo") < 0;              // ya no se dan de alta a mano
+    out.noMaxInput = html.indexOf("max_cajas") < 0;                    // no hay input de objetivo
+    out.provDropdown = html.indexOf("(sin proveedor)") >= 0;           // opción del desplegable
+    out.provOption = html.indexOf('value="Lucho"') >= 0;               // proveedor cargado como <option>
+    out.sinProvHighlight = html.indexOf("#fff7ed") >= 0;               // fila sin proveedor resaltada
+    out.stockWord = html.indexOf("sola de stock") >= 0;               // texto nuevo (la lista sale de stock)
 
-    // Editar dos campos del 107 → PATCH parcial acumulado (merge)
-    ocCfgEdit(0, "max_cajas", "99");
-    ocCfgEdit(0, "uni_x_caja", "6");
-    out.mergePatch = _oc.cfg.changed["107"] && _oc.cfg.changed["107"].max_cajas === 99 && _oc.cfg.changed["107"].uni_x_caja === 6;
-    out.rowUpdated = _oc.cfg.rows[0].max_cajas === 99;
+    // Editar proveedor + índice del 107 → PATCH parcial acumulado (merge)
+    ocCfgEdit(0, "proveedor", "Poly");
+    ocCfgEdit(0, "indice", "2");
+    out.mergePatch = _oc.cfg.changed["107"] && _oc.cfg.changed["107"].proveedor === "Poly" && _oc.cfg.changed["107"].indice === 2;
+    out.rowUpdated = _oc.cfg.rows[0].proveedor === "Poly";
 
     // Desactivar el 202
     ocCfgEdit(1, "activo", false);
@@ -58,10 +63,6 @@ catch (_e) {
     ocCfgSetAllIndice();
     out.setAll = _oc.cfg.rows.every((a) => a.indice === 3) &&
                  _oc.cfg.changed["107"].indice === 3 && _oc.cfg.changed["202"].indice === 3;
-
-    // Alta: abre el formulario
-    ocCfgAltaOpen();
-    out.altaForm = ocBodyCfg().indexOf('id="ocmaCod"') >= 0;
     return out;
   });
 
@@ -70,6 +71,6 @@ catch (_e) {
   Object.keys(r).forEach(function (k) { if (r[k] !== true) fail.push(k + "=" + JSON.stringify(r[k])); });
   if (errs.length) fail.push("pageerror: " + errs.join(" | "));
   if (fail.length) { console.error("ocg-config: FALLÓ →", fail.join(", ")); process.exit(1); }
-  console.log("ocg-config: OK — editor de OC_Maximos (objetivo/uni×caja/índice/proveedor/activo + alta)");
+  console.log("ocg-config: OK — editor de config (proveedor dropdown + '(sin proveedor)' + índice/activo, lista desde stock)");
   process.exit(0);
 })();
