@@ -67,13 +67,21 @@ catch (_e) {
     const st3 = getLegajoState("77");
     out.cNoToggle = !(st3.toggles && st3.toggles.MG);   // confirmar tampoco deja el botón rojo
 
-    // ===== (D) migración limpia un toggle MG viejo =====
+    // ===== (D) botón rojo pegado de la versión vieja (st.toggles.MG dejado antes de v7.66):
+    //          aun con el flag viejo el botón MG NO se pinta rojo (MG salió de TOGGLE_CODES),
+    //          y la migración borra el flag. Reproduce el caso reportado (legajo con MG rojo). =====
     const m = readStateMap();
     m["88"] = { picking: { active: false, value: "" }, armado: { active: false, value: "" }, toggles: { MG: new Date().toISOString() }, continuar: {} };
     writeStateMap(m);
     out.dAntes = !!(getLegajoState("88").toggles.MG);
+    legajoInput.value = "88";
+    updateCoreButtonsState();
+    const mgBox = document.querySelector('.box[data-code="MG"]');
+    out.dNoRojoConFlag = !!(mgBox && !mgBox.classList.contains("pending"));   // aun con flag viejo: NO rojo
     migrateClearMGToggle();
     out.dDespues = !(getLegajoState("88").toggles.MG);
+    updateCoreButtonsState();
+    out.dNoRojoFinal = !!(mgBox && !mgBox.classList.contains("pending"));
 
     return out;
   });
@@ -83,7 +91,8 @@ catch (_e) {
     ["B no-toggle", r.bNoToggle], ["B sin evento", r.bSinEvento], ["B re-entra en 1 toque", r.bReentraOk],
     ["C un evento MG", r.cUnEvento], ["C con duración", r.cConDuracion], ["C texto vacío", r.cTextoVacio],
     ["C en historial", r.cEnHistorial], ["C no-toggle tras confirmar", r.cNoToggle],
-    ["D había MG viejo", r.dAntes], ["D se limpió", r.dDespues],
+    ["D había MG viejo", r.dAntes], ["D botón NO rojo con flag viejo", r.dNoRojoConFlag],
+    ["D se limpió", r.dDespues], ["D botón NO rojo tras migración", r.dNoRojoFinal],
   ];
   const pass = checks.every((c) => c[1]) && errs.length === 0;
   console.log("mg-reentrada:", JSON.stringify(r), "· pageerrors:", errs.length ? errs.join("|") : "none");
