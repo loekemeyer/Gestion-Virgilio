@@ -6054,7 +6054,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.71";
+const APP_VERSION = "v7.72";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -11595,13 +11595,18 @@ function stkBodyStocks() {
   // mostraba 33 cuando físicamente hay 33 + 44 p/envasar. insumos sigue aparte.
   // v7.54: racks_ch sumado a racks (una sola columna "Racks")
   const SECTKEYS = ["terminado", "excedente", "separar_pedidos", "a_facturar", "a_guardar", "racks", "para_envasar"];
+  // v7.71 — racks_ch se MUESTRA sumado en la columna "Racks" (v7.54), pero SIGUE contando como
+  // stock físico para "mostrar" / negativos / base-split. Sin esto, un artículo SOLO en racks_ch
+  // (ej. 712E/809E) no aparecía en la tabla (regresión que introdujo v7.54 al sacar racks_ch de
+  // SECTKEYS). `SECTKEYS` = columnas; `_stkStockKeys` = depósitos que hacen visible una fila.
+  const _stkStockKeys = SECTKEYS.concat(["racks_ch"]);
   // v7.48: helpers del tilde "🔴 Negativos" — un artículo está negativo si CUALQUIER depósito
   // (redondeado a lo que se muestra) da < 0. "insumos" se chequea aparte en su sección.
   const _stkIsNeg = function (n) { return Math.round((Number(n) || 0) * 10) / 10 < 0; };
-  const _stkArtHasNeg = function (a) { return SECTKEYS.some(function (k) { return _stkIsNeg(a[k]); }); };
+  const _stkArtHasNeg = function (a) { return _stkStockKeys.some(function (k) { return _stkIsNeg(a[k]); }); };
   let shown = f
     ? arts.filter(function (a) { return (a.cod + " " + a.desc).toLowerCase().indexOf(f) >= 0; })
-    : arts.filter(function (a) { return SECTKEYS.some(function (k) { return (Number(a[k]) || 0) !== 0; }) || (Number(dem[_ocgNorm(a.cod)]) || 0) > 0 || _fcArtCajas(a.cod) > 0; });
+    : arts.filter(function (a) { return _stkStockKeys.some(function (k) { return (Number(a[k]) || 0) !== 0; }) || (Number(dem[_ocgNorm(a.cod)]) || 0) > 0 || _fcArtCajas(a.cod) > 0; });
   // v7.48: tilde "🔴 Negativos" — se aplica ADEMÁS del buscador. Deja sólo los artículos con
   // saldo negativo en algún depósito (para cazar inconsistencias de stock de un vistazo).
   const _stkNegCount = arts.filter(_stkArtHasNeg).length + arts.filter(function (a) { return _stkIsNeg(a.insumos); }).length;
@@ -11627,12 +11632,12 @@ function stkBodyStocks() {
   arts.forEach(function (a) {
     const cu = String(a.cod == null ? "" : a.cod).trim().toUpperCase();
     const b = codBase(cu);
-    if (b !== cu && SECTKEYS.some(function (k) { return (Number(a[k]) || 0) !== 0; })) _famSplitConStock[b] = true;
+    if (b !== cu && _stkStockKeys.some(function (k) { return (Number(a[k]) || 0) !== 0; })) _famSplitConStock[b] = true;
   });
   shown = shown.filter(function (a) {
     const cu = String(a.cod == null ? "" : a.cod).trim().toUpperCase();
     // base sin sufijo + su familia tiene stock en LK/CH + el base NO tiene stock propio → ocultar
-    if (codBase(cu) === cu && _famSplitConStock[cu] && !SECTKEYS.some(function (k) { return (Number(a[k]) || 0) !== 0; })) return false;
+    if (codBase(cu) === cu && _famSplitConStock[cu] && !_stkStockKeys.some(function (k) { return (Number(a[k]) || 0) !== 0; })) return false;
     return true;
   });
   // v4.23: "cuánto hay en cada sector". Totales por depósito (GLOBAL, no filtrado)

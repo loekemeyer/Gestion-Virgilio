@@ -4,7 +4,15 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-05 · Versión app al documentar: **v7.71**
+> Última actualización: 2026-08-05 · Versión app al documentar: **v7.72**
+>
+> Nota: **v7.72 — fix de regresión (v7.54): un artículo SOLO en `racks_ch` volvió a aparecer en la
+> tabla de Stock**. v7.54 fusionó `racks_ch` en la columna «Racks» pero lo **sacó de `SECTKEYS`**, que
+> es la lista que decide si una fila se muestra — así un código con stock **sólo** en racks CH (ej.
+> 712E, 809E) desaparecía. Se agrega **`_stkStockKeys = SECTKEYS + racks_ch`** para el filtro de
+> «mostrar», negativos y el base-split (v7.71); racks_ch se sigue **mostrando sumado** en «Racks».
+> Test `tests/stk-envasar-col.cjs` actualizado a la conducta v7.54 (sin columna separada «Racks CH»;
+> 712E visible con su 444 en «Racks»). Bump **v7.72**.
 >
 > Nota: **v7.71 — la tabla de Stock oculta la fila FANTASMA del código base de una familia
 > empresa-split** (pedido del usuario). En el empresa-split, el pedido usa el **código base** (ej.

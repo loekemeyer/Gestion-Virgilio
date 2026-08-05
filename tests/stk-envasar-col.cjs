@@ -42,10 +42,12 @@ const MOVS_SIN = [
     const html = render(fix.MOVS);
     // Fila 035E: Total Stock 77 y una celda con 44.
     out.tieneColEnvasar = html.indexOf("P/<br>envasar") >= 0;   // header "P/ envasar" → "P/<br>envasar"
-    out.tieneColRacksCh = html.indexOf("Racks<br>CH") >= 0;
+    // v7.54: racks_ch se fusionó en la columna "Racks" → NO hay columna separada "Racks CH".
+    out.noSepRacksCh = html.indexOf("Racks<br>CH") < 0;
     out.muestra035E = html.indexOf("035E") >= 0;
     out.muestra439E = html.indexOf("439E") >= 0;      // antes NO aparecía (solo envasar)
-    out.muestra712E = html.indexOf("712E") >= 0;      // antes NO aparecía (solo racks CH)
+    out.muestra712E = html.indexOf("712E") >= 0;      // v7.71: art SOLO en racks_ch vuelve a aparecer
+    out.racks712E = html.indexOf(">444<") >= 0;       // v7.54/v7.71: su racks_ch (444) va en la columna "Racks"
     out.total77 = html.indexOf(">77<") >= 0;          // Total Stock de 035E = 31+2+44
     out.tieneTira = html.indexOf("P/ envasar") >= 0 || html.indexOf("P/<br>envasar") >= 0;
     // Sin envasar/racks_ch → columnas extra ausentes.
@@ -56,8 +58,8 @@ const MOVS_SIN = [
     return out;
   }, { MOVS: MOVS, MOVS_SIN: MOVS_SIN });
 
-  const pass = r.tieneColEnvasar && r.tieneColRacksCh && r.muestra035E && r.muestra439E &&
-    r.muestra712E && r.total77 && r.sinColEnvasar && r.sinColRacksCh && errs.length === 0;
+  const pass = r.tieneColEnvasar && r.noSepRacksCh && r.muestra035E && r.muestra439E &&
+    r.muestra712E && r.racks712E && r.total77 && r.sinColEnvasar && r.sinColRacksCh && errs.length === 0;
   console.log("stk-envasar-col:", JSON.stringify(r), "· pageerrors:", errs.length ? errs.join("|") : "none", "·", pass ? "✓ OK" : "✗ FAIL");
   await b.close(); process.exit(pass ? 0 : 1);
 })();
