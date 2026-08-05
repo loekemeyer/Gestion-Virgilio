@@ -17,7 +17,8 @@
 --     artículo no tiene proyección, cae al objetivo del Excel (OC_Maximos.max_cajas).
 --   A pedir = ceil(max(0, Máximo + Pedidos − Stock)).
 --
--- Proveedores INTERNOS (Racks, Log/Fabr) no generan OC (igual que el manual).
+-- v7.65: "Log/ Fabr" (fábrica) SÍ genera OC (pedido del usuario). "Racks" (importación)
+-- se EXCLUYE — se abastece por otra vía. (Igual que el generador manual.)
 -- Las líneas quedan en `Ordenes_Compra` con `notas = 'auto <fecha>'`, estado
 -- 'pendiente' y rubro 'Art Term' — o sea que la Recepción de Mercadería las ve
 -- como OC vigente al toque (ver `ROC` / v7.07).
@@ -159,7 +160,7 @@ begin
       left join proy p on p.codn = n.codn
       left join cap c on c.codn = n.codn
       left join ncaja nc on nc.codn = n.codn
-     where upper(n.proveedor) not in ('RACKS', 'LOG/ FABR', 'LOG/FABR', 'LOG/ FABRICA')
+     where upper(n.proveedor) not in ('RACKS', 'RACK')   -- v7.65: Racks afuera; Log/Fabr SÍ genera
        and nullif(n.proveedor, '') is not null
   ),
   ins as (

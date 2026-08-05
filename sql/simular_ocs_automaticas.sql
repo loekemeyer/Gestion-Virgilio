@@ -92,7 +92,7 @@ begin
         left join dem d on d.codn = n.codn
         left join proy p on p.codn = n.codn
         left join cap c on c.codn = n.codn
-       where upper(n.proveedor) not in ('RACKS', 'LOG/ FABR', 'LOG/FABR', 'LOG/ FABRICA')
+       where upper(n.proveedor) not in ('RACKS', 'RACK')   -- v7.65: Racks afuera; Log/Fabr SÍ genera
          and nullif(n.proveedor, '') is not null
     ),
     pos as (select proveedor, a_pedir from calc where a_pedir > 0)
