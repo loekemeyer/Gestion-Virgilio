@@ -4,7 +4,28 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-04 · Versión app al documentar: **v7.43**
+> Última actualización: 2026-08-05 · Versión app al documentar: **v7.45**
+>
+> Nota: **v7.45 — PPP: el 📦 del chequeo pasa a ser un SEMÁFORO automático** (pedido del usuario
+> sobre la v7.16). El ícono ya no es un botón neutro que hay que tocar: **se auto-chequea al abrir
+> la PPP** y se pinta solo según el stock REAL de góndola de ese momento — 🟢 **tilde verde** (está
+> en góndola **todo** lo que pide el pedido) · 🟠 **! naranja** (faltan **algunos** artículos) · 🔴
+> **✕ roja** (no hay en góndola **ninguno**) · ⚪ **⋯ gris** (chequeando / sin datos aún). El
+> **hover** (atributo `title`) da el resumen — *"✅ Todo OK — los N están en góndola · chequeado
+> HH:MM"* / *"⚠ Faltan X de N (…cajas) · chequeado HH:MM"* / *"🚨 No hay ninguno de los N"* — con la
+> **hora del último chequeo**; el **click** abre el detalle artículo-por-artículo y **re-chequea en
+> ese momento** (`pppChequeoNp`, sin cambios). El mismo semáforo va en la **franja de cada tanda/bloque**
+> (estado combinado de todos sus pedidos, que comparten góndola). **Cómo se banca ~700 pedidos sin
+> reventar la red:** una **única carga compartida** por corrida (`pppChkAutoLoad`, TTL 90 s) —
+> `fetchPickingBase` (Map NP→líneas, ya cacheada 5′) + `vista_saldos_stock` fresca + los PKC pendientes
+> de descontar — y el estado de cada fila/tanda se calcula **en memoria** (`_pppChkStatusFor` +
+> `_pppChkBuildMaps`, saldos pre-agregados una sola vez). Cuando el usuario abre el detalle de un
+> pedido, esa lectura (la más fresca) **refresca el semáforo de TODO el tablero** con la misma hora,
+> sin pegarle de nuevo a la DB. Sigue todo el criterio de la v7.16 (equivalencias 029→437E, empresa
+> por NP, familia LK/CH, resta del picking en curso que el cron todavía no escribió) y sigue siendo
+> **SOLO LECTURA**. `_pppChkBtn`/`tandaChkBtn` ahora delegan en `_pppChkIcon`; núcleo `pppChkCompute`
+> partido para reusar los mapas. Test `tests/ppp-chk-gondola.cjs` extendido (estados del semáforo +
+> render del ícono); suite completa OK; render 400px/1100px sin overflow. Bump **v7.45**.
 >
 > Nota: **v7.43 — Fusión «Productividad» → «Análisis de productividad» + Producción por día 28
 > días hábiles + filtro de período en los gráficos**. Tres pedidos del usuario, todos dentro del modal

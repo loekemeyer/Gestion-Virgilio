@@ -1873,7 +1873,15 @@ button.pk-anular small{ display:block; font-size:12px; font-weight:700; opacity:
 .ppp-row-btn.ppp-ctrl-yes{ background:#16a34a; color:#fff; margin-right:6px; } .ppp-row-btn.ppp-ctrl-yes:hover{ background:#15803d; }
 .ppp-row-btn.ppp-undo{ background:#fff; color:#b42318; border:1px solid #fecaca; }
 .ppp-row-btn.ppp-print{ background:#2563eb; color:#fff; margin-right:6px; } .ppp-row-btn.ppp-print:hover{ background:#1d4ed8; }
-.ppp-row-btn.ppp-chk{ background:#0f766e; color:#fff; margin-right:6px; } .ppp-row-btn.ppp-chk:hover{ background:#115e59; }
+/* Semáforo de góndola (v7.45): ícono auto-chequeado por pedido/tanda. Verde=todo en
+   góndola · naranja=faltan algunos · rojo=no hay ninguno · gris=chequeando. Click = re-chequeo. */
+.ppp-chk-ico{ width:auto; margin:0 6px 0 0; padding:3px 9px; min-width:26px; font-size:13.5px; font-weight:900; line-height:1.1; border:none; border-radius:7px; cursor:pointer; vertical-align:middle; text-align:center; transition:background .12s; }
+.ppp-chk-ico.big{ margin:0 0 0 6px; padding:4px 10px; font-size:14px; }
+.ppp-chk-ico.ok{ background:#16a34a; color:#fff; } .ppp-chk-ico.ok:hover{ background:#15803d; }
+.ppp-chk-ico.warn{ background:#f59e0b; color:#fff; } .ppp-chk-ico.warn:hover{ background:#d97706; }
+.ppp-chk-ico.bad{ background:#dc2626; color:#fff; } .ppp-chk-ico.bad:hover{ background:#b91c1c; }
+.ppp-chk-ico.wait{ background:#e2e8f0; color:#64748b; } .ppp-chk-ico.wait:hover{ background:#cbd5e1; }
+.ppp-chk-ico.big.wait{ background:rgba(255,255,255,.28); color:#fff; } .ppp-chk-ico.big.wait:hover{ background:rgba(255,255,255,.42); }
 .ppp-pdf-toggle{ margin-left:8px; border-color:#2563eb; color:#1d4ed8; } .ppp-pdf-toggle:hover{ background:#eff6ff; }
 .ppp-pdfdir-status{ font-size:12px; color:#475569; margin-left:8px; }
 .ppp-edit{ width:100%; min-width:62px; box-sizing:border-box; padding:5px 7px; font-size:13px; border:1px solid #cbd5e1; border-radius:6px; background:#fffbeb; color:#0f172a; }
@@ -2004,7 +2012,7 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pppres-tbl td.num, .pppres-tbl th.num{ text-align:right; font-variant-numeric:tabular-nums; }
 .pppres-tbl td.np{ font-family:Consolas,Menlo,monospace; font-weight:800; color:#0f766e; white-space:nowrap; }
 .pppres-tbl tfoot td{ font-weight:800; background:#f8fafc; }
-/* Chequeo de góndola (v7.17): modal del botón 📦 de cada pedido / tanda. Reusa
+/* Chequeo de góndola (v7.16): modal del botón 📦 de cada pedido / tanda. Reusa
    .pppres-ov/.pppres-card; la tabla es propia porque tiene que entrar en el celu. */
 .pppchk-msg{ padding:26px 16px; text-align:center; color:#475569; font-size:14px; font-weight:700; }
 .pppchk-msg.err{ color:#991b1b; }
@@ -5970,7 +5978,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.44";
+const APP_VERSION = "v7.45";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -18251,6 +18259,7 @@ function openPPP() {
   if (!_pppParsed.prog || !_pppParsed.prog.length) { const st = pppLoadPedidosStore(); if (st.length) _pppParsed.prog = st; }
   pppShowBaseInfo();
   pppRenderProg();
+  pppChkAutoLoad(true);        // arranca el semáforo de góndola (carga compartida: base + saldos + picking pendiente)
   pppLoadProgFromSupabase();   // BASE = Supabase (Programación Diaria): reemplaza la lista local + deja _pppSupaNps para el dedupe de imports
   pppRefreshArmado();
   pppRefreshEntregado();
@@ -19770,14 +19779,13 @@ function _pppM3Sum(arr) { return arr.reduce(function (s, p) { return s + (Number
 function _pppArg(s) {
   return escapeHtml(String(s == null ? "" : s).replace(/[\r\n\t]+/g, " ").replace(/\\/g, "\\\\").replace(/'/g, "\\'"));
 }
-/* Botón 📦 "Chequeo": ¿está en góndola todo lo que pide este pedido? (v7.17).
-   Va pegado al 🖨 de la fila. `conTexto` = fila editable (donde el 🖨 lleva rótulo). */
+/* Semáforo de góndola de la fila (v7.45): ícono auto-chequeado, click = re-chequeo.
+   `npE` y `conTexto` quedan por compatibilidad de firma; el estado sale de la NP. */
 function _pppChkBtn(p, npE, conTexto) {
-  const t = _pppArg((p && p.tanda && p.tanda !== "—") ? p.tanda : "");
+  const t = (p && p.tanda && p.tanda !== "—") ? p.tanda : "";
   const raz = String((p && p.razon_social) || "").trim();
-  const tit = _pppArg("Pedido " + String(p && p.np != null ? p.np : "") + (raz ? " · " + raz : ""));
-  return '<button class="ppp-row-btn ppp-chk" onclick="pppChequeoNp(\'' + npE + '\',\'' + tit + '\',\'' + t + '\')" ' +
-    'title="Chequear si hay en góndola todo lo que necesita este pedido (y qué falta)">📦' + (conTexto ? " Chequeo" : "") + '</button>';
+  const tit = "Pedido " + String(p && p.np != null ? p.np : "") + (raz ? " · " + raz : "");
+  return _pppChkIcon([String(p && p.np != null ? p.np : "")], tit, t, false);
 }
 /* Fila de pedido en modo SOLO-LECTURA: todo texto (sin inputs ni botones de edición),
    con badges de error (🚮 SACAR / ⚠ ZONA / ⚠ TANDA) y el botón 🖨 Imprimir. */
@@ -20190,8 +20198,10 @@ async function _pppChkPicksPendientes() {
   });
   return { porArt: porArt, tandas: tandas };
 }
-/* Núcleo PURO (sin red, testeable): líneas del pedido × saldos → filas del chequeo. */
-function pppChkCompute(lineas, saldos, pendPorArt) {
+/* Pre-agrega los saldos por clave normalizada (código pelado) y por familia LK/CH, una
+   sola vez. Se puede cachear y pasar a pppChkCompute para no reconstruirlo por cada
+   pedido cuando el semáforo chequea cientos de filas de un saque. */
+function _pppChkBuildMaps(saldos) {
   const num = function (v) { return Number(v) || 0; };
   const vacio = function () { return { gond: 0, exc: 0, racks: 0, racks_ch: 0, aguardar: 0, envasar: 0 }; };
   const byKey = {}, byFam = {}, descs = {};
@@ -20209,6 +20219,15 @@ function pppChkCompute(lineas, saldos, pendPorArt) {
     const d = String(s.descripcion || "").trim();
     if (d && !descs[k]) descs[k] = d;
   });
+  return { byKey: byKey, byFam: byFam, descs: descs };
+}
+/* Núcleo PURO (sin red, testeable): líneas del pedido × saldos → filas del chequeo.
+   `maps` opcional = salida de _pppChkBuildMaps ya calculada (para no rehacerla). */
+function pppChkCompute(lineas, saldos, pendPorArt, maps) {
+  const num = function (v) { return Number(v) || 0; };
+  const vacio = function () { return { gond: 0, exc: 0, racks: 0, racks_ch: 0, aguardar: 0, envasar: 0 }; };
+  const M = maps || _pppChkBuildMaps(saldos);
+  const byKey = M.byKey, byFam = M.byFam, descs = M.descs;
   // Demanda por código resuelto (equivalencia + empresa por NP), sumando todas las NP.
   const need = {}, orden = [];
   (lineas || []).forEach(function (l) {
@@ -20257,6 +20276,80 @@ function pppChkCompute(lineas, saldos, pendPorArt) {
   filas.sort(function (a, b) { return (rank[a.estado] - rank[b.estado]) || (b.falta - a.falta) || (a.cod < b.cod ? -1 : a.cod > b.cod ? 1 : 0); });
   return filas;
 }
+/* ===== v7.45 — SEMÁFORO AUTOMÁTICO por pedido/tanda =====
+   El ícono de cada fila (y de cada franja de tanda) se auto-chequea contra el stock
+   REAL de góndola y se pinta solo: 🟢 tilde = está todo · 🟠 ! = faltan algunos ·
+   🔴 ✕ = no hay ninguno · ⚪ ⋯ = chequeando. El hover da el detalle + la hora del
+   último chequeo; el click abre el detalle y re-chequea en ese momento (pppChequeoNp).
+
+   Para no pegarle a la red por cada uno de los ~700 pedidos, se hace UNA sola carga
+   compartida (base de picking cacheada + saldos frescos + picking pendiente) y el
+   estado de cada fila/tanda se calcula en memoria con esos datos. */
+let _pppChkData = null;        // { saldos, pend, maps, ts }
+let _pppChkDataBusy = false;
+const PPPCHK_TTL_MS = 90 * 1000;
+function _pppChkHora(ts) { try { return new Date(ts).toLocaleTimeString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", hour: "2-digit", minute: "2-digit" }); } catch (_e) { return ""; } }
+/* Carga (o refresca) los datos compartidos del semáforo y repinta la PPP. Con TTL:
+   no re-consulta si hace <90 s, salvo `force`. */
+async function pppChkAutoLoad(force) {
+  if (_pppChkDataBusy) return;
+  if (!force && _pppChkData && (Date.now() - _pppChkData.ts) < PPPCHK_TTL_MS) return;
+  _pppChkDataBusy = true;
+  try {
+    const res = await Promise.all([
+      fetchPickingBase().catch(function () { return null; }),   // puebla _pickBaseCache (Map NP→líneas)
+      _pppChkFetchSaldos(),
+      _pppChkPicksPendientes().catch(function () { return { porArt: {}, tandas: [] }; })
+    ]);
+    const saldos = res[1] || [];
+    _pppChkSet(saldos, res[2] || { porArt: {}, tandas: [] });
+    try { pppRenderProg(); } catch (_e) {}
+  } catch (_e) { /* sin red: los íconos quedan con el estado previo o en ⏳ */ }
+  finally { _pppChkDataBusy = false; }
+}
+/* Guarda la lectura fresca (saldos + pendientes) ya pre-agregada, con la hora. */
+function _pppChkSet(saldos, pend) {
+  _pppChkData = { saldos: saldos || [], pend: pend || { porArt: {}, tandas: [] }, maps: _pppChkBuildMaps(saldos || []), ts: Date.now() };
+}
+/* Estado del semáforo para un conjunto de NP (una fila = [np]; una tanda = todas sus
+   NP juntas, que es lo correcto: comparten la góndola). Síncrono, sin red: usa la base
+   cacheada + los saldos ya cargados. `ready:false` mientras no hay datos. */
+function _pppChkStatusFor(nps) {
+  if (!_pppChkData || !_pickBaseCache) return { ready: false };
+  const lineas = [];
+  for (let i = 0; i < nps.length; i++) {
+    const np = pickNormNp(nps[i]);
+    const rows = _pickBaseCache.get(np);
+    if (rows) for (let j = 0; j < rows.length; j++) lineas.push({ pedido: np, articulo: rows[j].art, cajas: rows[j].cajas });
+  }
+  if (!lineas.length) return { ready: true, estado: "vacio", total: 0, faltan: 0, cajasFaltan: 0 };
+  const filas = pppChkCompute(lineas, _pppChkData.saldos, _pppChkData.pend.porArt, _pppChkData.maps);
+  const total = filas.length;
+  let faltan = 0, cajasFaltan = 0;
+  for (let i = 0; i < filas.length; i++) { if (filas[i].estado !== "ok") { faltan++; cajasFaltan += filas[i].falta; } }
+  const estado = faltan === 0 ? "ok" : (faltan >= total ? "bad" : "warn");
+  return { ready: true, estado: estado, total: total, faltan: faltan, cajasFaltan: cajasFaltan };
+}
+/* Ícono-semáforo clickeable. `nps` = NP a chequear; `tituloRaw`/`tanda` van al modal. */
+function _pppChkIcon(nps, tituloRaw, tanda, big) {
+  const st = _pppChkStatusFor(nps);
+  let cls = "wait", glyph = "⋯", lbl;
+  if (!st.ready) {
+    lbl = "Chequeando el stock de góndola…";
+  } else if (st.estado === "vacio") {
+    glyph = "?"; lbl = "Sin artículos en la base de picking todavía — tocá para chequear.";
+  } else {
+    const hora = (_pppChkData && _pppChkData.ts) ? _pppChkHora(_pppChkData.ts) : "";
+    if (st.estado === "ok") { cls = "ok"; glyph = "✓"; lbl = "✅ Todo OK — los " + st.total + " artículo(s) están en góndola"; }
+    else if (st.estado === "warn") { cls = "warn"; glyph = "!"; lbl = "⚠ Faltan " + st.faltan + " de " + st.total + " artículo(s) en góndola (" + _pppChkNum(st.cajasFaltan) + " cajas)"; }
+    else { cls = "bad"; glyph = "✕"; lbl = "🚨 No hay en góndola NINGUNO de los " + st.total + " artículo(s)"; }
+    if (hora) lbl += " · chequeado " + hora;
+    lbl += ". Tocá para el detalle y volver a chequear ahora.";
+  }
+  const csv = nps.map(function (x) { return String(x); }).join(",");
+  return '<button class="ppp-chk-ico ' + cls + (big ? " big" : "") + '" onclick="event.stopPropagation();pppChequeoNp(\'' +
+    _pppArg(csv) + '\',\'' + _pppArg(tituloRaw || "") + '\',\'' + _pppArg(tanda || "") + '\')" title="' + _pppArg(lbl) + '">' + glyph + '</button>';
+}
 /* Chequeo de una o varias NP (CSV). `tanda` (opcional) sirve para avisar si esa tanda
    ya se pickeó — ahí la góndola YA se descontó y el chequeo pierde sentido. */
 async function pppChequeoNp(npsCsv, titulo, tanda) {
@@ -20291,6 +20384,9 @@ async function pppChequeoNp(npsCsv, titulo, tanda) {
     }
     const filas = pppChkCompute(lineas, saldos, pend.porArt);
     ov.innerHTML = _pppChkCard(tit, _pppChkBody(filas, nps, pend, pickAviso, lineas.length));
+    // La lectura del modal es la más fresca que hay → refrescá con ella el semáforo de
+    // TODAS las filas (misma hora de "último chequeo") sin pegarle de nuevo a la red.
+    try { _pppChkSet(saldos, pend); pppRenderProg(); } catch (_e) {}
   } catch (e) {
     ov.innerHTML = _pppChkCard(tit, '<div class="pppchk-msg err">No pude hacer el chequeo: ' + escapeHtml(String(e && e.message ? e.message : e)) +
       '</div><div class="pppchk-meta"><span>Necesita conexión para leer el stock.</span><button class="pppchk-re" onclick="pppChkReintentar()">🔄 Reintentar</button></div>');
@@ -20444,9 +20540,9 @@ function _pppBlock(key, name, cls, meta, pedidos, headerExtra, editTanda) {
   const hasErr = pedidos.some(function (p) { return (p._err || []).length; });   // alguna fila con error → tanda en rojo + ⚠️
   const npsCsv = pedidos.map(function (p) { return String(p.np); }).join(",");
   const tandaPrintBtn = '<button class="ppp-tanda-print" onclick="event.stopPropagation();pppPrintTanda(\'' + npsCsv + '\')" title="Imprimir todos los PDF de esta tanda">🖨️</button>';
-  // v7.16 — chequeo de góndola de TODO el bloque junto (sus pedidos comparten la góndola).
+  // v7.45 — semáforo de góndola de TODO el bloque junto (sus pedidos comparten la góndola).
   const chkTit = editTanda ? ("Tanda " + String(editTanda).toUpperCase()) : (razStr || (pedidos.length + " pedidos"));
-  const tandaChkBtn = '<button class="ppp-tanda-print" onclick="event.stopPropagation();pppChequeoNp(\'' + npsCsv + '\',\'' + _pppArg(chkTit) + '\',\'' + _pppArg(editTanda || "") + '\')" title="Chequear si hay en góndola todo lo que necesitan los pedidos de este bloque (y qué falta)">📦</button>';
+  const tandaChkBtn = _pppChkIcon(pedidos.map(function (p) { return String(p.np); }), chkTit, editTanda || "", true);
   const sum = cargBadge + (razStr ? '<span class="ppp-sum-raz">' + escapeHtml(razStr) + '</span> ' : '') + '<span class="ppp-sum-np">' + escapeHtml(npStr) + '</span>';
   const feHtml = fes.length ? '<span class="ppp-sum-fe' + (venc ? ' ppp-fe-venc' : '') + '">' + (venc ? '⏰ ' : '📅 ') + escapeHtml(fes.join(" / ")) + (venc ? ' ¡VENCIDA!' : '') + '</span>' : '';
   const hx = (headerExtra || "").replace(/__BLOCKID__/g, id);
@@ -20883,6 +20979,9 @@ function pppGoToRow(np) {
 }
 function pppRenderProg() {
   const box = document.getElementById("pppPreview"); if (!box) return;
+  // Semáforo de góndola: en las solapas con íconos, dispará (o refrescá) la carga
+  // compartida. Guarda TTL/busy adentro → no entra en loop con el re-render.
+  if (_pppTab === "prog" || _pppTab === "plan") { try { pppChkAutoLoad(); } catch (_e) {} }
   const ed = pppLoadEdits();
   const merge = function (p) {
     if (PPP_READONLY) return p;   // solo Supabase: sin ediciones locales

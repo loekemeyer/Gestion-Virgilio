@@ -108,7 +108,7 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== ins-admin (idea 5572 / v7.34: Administrar Insumos (pendientes + categorías + unidades + historial + unidad en 0)) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ins-admin.cjs
 
-echo "== ppp-chk-gondola (v7.16: botón 📦 Chequeo de góndola por pedido/tanda en la PPP) =="
+echo "== ppp-chk-gondola (v7.45: semáforo auto de góndola por pedido/tanda en la PPP) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-chk-gondola.cjs
 
 echo "== comp-pausar (v7.30: botón Pausar del armado — sale sin terminar, retomable) =="

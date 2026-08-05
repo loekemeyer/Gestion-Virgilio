@@ -1,4 +1,4 @@
-/* Regresión v7.16 — CHEQUEO DE GÓNDOLA en la PPP (botón 📦 al lado del 🖨).
+/* Regresión v7.16/v7.45 — CHEQUEO DE GÓNDOLA en la PPP (semáforo auto + modal).
 
    Verifica el núcleo puro `pppChkCompute` (pedido × saldos → filas del chequeo):
      · alcanza en góndola                       → ✅ ok
@@ -8,6 +8,10 @@
      · código pelado sin sufijo en planimetría  → suma la FAMILIA LK/CH (criterio SSG v7.04)
      · picking hecho y todavía NO descontado    → se resta (excedente primero, luego góndola)
      · orden: primero lo que falta
+
+   El SEMÁFORO automático (v7.45): `_pppChkStatusFor` colapsa las filas a un estado
+   (ok / warn=faltan algunos / bad=no hay ninguno) y `_pppChkIcon` lo pinta con el
+   glifo + clase correctos y el título con resumen + hora del último chequeo.
 
    Y el flujo completo `pppChequeoNp` con la red mockeada: abre el modal, resume el
    estado y NO toca el stock. Sale 1 si falla. */
@@ -92,14 +96,44 @@ const PEND = { "840": 8 };
     out.horaLeida  = /Stock le/.test(txt);
     out.sinTocarStock = movio === 0;
 
-    // el botón sale en la fila (y sobrevive un apóstrofo en la razón social)
+    // el ícono sale en la fila (onclick re-chequea; sobrevive un apóstrofo en la razón social)
     const html = _pppRowTr({ np: "44548", tanda: "D77A", cod: "2686", razon_social: "D'Onofrio S.A.", fecha: "03/08/2026", m3: 1.19, localidad: "Moreno" });
-    out.botonFila = /pppChequeoNp\(/.test(html) && html.indexOf("D\\&#39;Onofrio") >= 0;
+    out.botonFila = /pppChequeoNp\(/.test(html) && html.indexOf("D\\&#39;Onofrio") >= 0 && /ppp-chk-ico/.test(html);
+
+    // --- semáforo automático (v7.45) ---
+    _pickBaseCache = new Map([
+      ["44548", fx.LINEAS.map(function (l) { return { art: l.articulo, cajas: l.cajas }; })],
+      ["90001", [{ art: "097", cajas: 2 }]],                       // 193 en góndola → todo OK
+      ["90002", [{ art: "999", cajas: 3 }, { art: "998", cajas: 2 }]]   // nada en ningún lado → bad
+    ]);
+    _pickBaseCacheTs = Date.now();
+    _pppChkSet(fx.SALDOS, { porArt: fx.PEND, tandas: ["D99Z"] });
+    out.baseSet = (_pickBaseCache instanceof Map) && !!_pppChkData;
+
+    const stW = _pppChkStatusFor(["44548"]);
+    out.semWarn = stW.ready && stW.estado === "warn" && stW.total === 6 && stW.faltan === 4;
+    const stOk = _pppChkStatusFor(["90001"]);
+    out.semOk = stOk.ready && stOk.estado === "ok" && stOk.faltan === 0 && stOk.total === 1;
+    const stBad = _pppChkStatusFor(["90002"]);
+    out.semBad = stBad.ready && stBad.estado === "bad" && stBad.faltan === stBad.total && stBad.total === 2;
+
+    const icoW = _pppChkIcon(["44548"], "Pedido 44548", "D77A", false);
+    out.icoWarn = /ppp-chk-ico warn/.test(icoW) && icoW.indexOf(">!<") >= 0 && /Faltan 4 de 6/.test(icoW) && /chequeado/.test(icoW);
+    const icoOk = _pppChkIcon(["90001"], "x", "", true);
+    out.icoOk = /ppp-chk-ico ok big/.test(icoOk) && icoOk.indexOf(">✓<") >= 0;   // ✓
+    const icoBad = _pppChkIcon(["90002"], "x", "", false);
+    out.icoBad = /ppp-chk-ico bad/.test(icoBad) && icoBad.indexOf(">✕<") >= 0;    // ✕
+
+    // sin datos cargados → estado de espera (gris ⋯)
+    _pppChkData = null;
+    const icoWait = _pppChkIcon(["44548"], "x", "", false);
+    out.icoWait = /ppp-chk-ico wait/.test(icoWait) && icoWait.indexOf(">⋯<") >= 0;   // ⋯
     return out;
   }, { LINEAS: LINEAS, SALDOS: SALDOS, PEND: PEND });
 
   const claves = ["ok097", "bajar758", "falta439", "equivEmp", "pend840", "fam888", "ordenado",
-                  "abrio", "resume", "detalla", "avisaPend", "horaLeida", "sinTocarStock", "botonFila"];
+                  "abrio", "resume", "detalla", "avisaPend", "horaLeida", "sinTocarStock", "botonFila",
+                  "baseSet", "semWarn", "semOk", "semBad", "icoWarn", "icoOk", "icoBad", "icoWait"];
   const fallan = claves.filter((k) => !r[k]);
   const pass = fallan.length === 0 && errs.length === 0;
   console.log("ppp-chk-gondola:", JSON.stringify(r), fallan.length ? "· fallan: " + fallan.join(",") : "",
