@@ -901,6 +901,26 @@ button {
 .monitor-flex{ display: block; }
 .monitor-flex .monitor-table-wrap{ width: 100%; overflow: visible; }
 .monitor-flex .monitor-table{ width: 100%; }
+/* v7.56 — panel "En este momento" (qué hace cada operario ahora), debajo de la tabla. */
+.mon-act-panel{ margin-top: 12px; background: #0b1220; border: 1px solid #1e293b; border-radius: 12px; padding: 10px 12px; }
+.mon-act-h{ font-size: 13px; font-weight: 800; color: #93c5fd; margin-bottom: 8px; }
+.mon-act-h b{ color: #4ade80; }
+.mon-act-row{ display: flex; align-items: center; gap: 9px; padding: 7px 4px; border-top: 1px solid #17203400; font-size: 14px; }
+.mon-act-row + .mon-act-row{ border-top-color: #172034; }
+.mon-act-who{ flex: 0 0 auto; min-width: 130px; color: #cbd5e1; font-weight: 600; white-space: nowrap; }
+.mon-act-who b{ color: #f8fafc; margin-right: 3px; }
+.mon-act-ic{ flex: 0 0 auto; font-size: 17px; line-height: 1; }
+.mon-act-what{ flex: 1 1 auto; color: #e2e8f0; font-weight: 700; }
+.mon-act-dur{ flex: 0 0 auto; font-size: 12px; font-weight: 800; white-space: nowrap; }
+.mon-act-idle{ opacity: .5; }
+.mon-act-idle .mon-act-what{ color: #94a3b8; font-weight: 500; font-style: italic; }
+/* Modo TV (pantalla de pared): escala como el resto del tablero. */
+#monitorModal.tv .mon-act-panel{ margin-top: clamp(10px, 1.6vh, 20px); padding: clamp(10px, 1.4vh, 16px) clamp(12px, 1.4vw, 20px); }
+#monitorModal.tv .mon-act-h{ font-size: clamp(14px, 2vh, 26px); margin-bottom: clamp(6px, 1vh, 12px); }
+#monitorModal.tv .mon-act-row{ font-size: clamp(14px, 2vh, 26px); gap: clamp(9px, 1.2vw, 18px); }
+#monitorModal.tv .mon-act-who{ min-width: clamp(130px, 15vw, 260px); }
+#monitorModal.tv .mon-act-ic{ font-size: clamp(17px, 2.3vh, 30px); }
+#monitorModal.tv .mon-act-dur{ font-size: clamp(12px, 1.6vh, 22px); }
 /* idea 1864 — buscador rápido del monitor: filtra client-side las filas de tanda
    (por tanda, legajo o nombre del operario) y se re-aplica tras cada refresh. */
 .mon-filter-wrap{ display:flex; align-items:center; gap:8px; margin-top:6px; }
@@ -6008,7 +6028,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.55";
+const APP_VERSION = "v7.56";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -22544,6 +22564,7 @@ function getHistoricMap() {
    hora_salida) — sirve para calcular el "tiempo nocturno" a restar en
    cierres cross-day por operario. */
 let _empleadosNombres   = new Map();
+let _monActividad       = [];   // v7.56: actividad actual por operario (panel "En este momento")
 let _empleadosHorarios  = new Map();   // legajo -> { entrada: "HH:MM:SS", salida: "HH:MM:SS" }
 let _empleadosNombresTs = 0;
 const EMPLEADOS_TTL_MS  = 60 * 60 * 1000;
@@ -22613,6 +22634,56 @@ function _monEnSilencio(eventos, todayKey, fjHoy, nowMs, gapMin) {
   out.sort(function (a, b) { return b.min - a.min; });                // el más silencioso primero
   return out;
 }
+/* v7.56 — Qué está haciendo AHORA cada operario. Replay de los eventos de HOY por legajo
+   para encontrar la acción ABIERTA más reciente: picking (EP sin TP), armado (AP sin TAP),
+   o un toggle abierto (apertura sin cierre — el cierre lleva ts_inicio, la apertura no).
+   Si no hay nada abierto queda "libre" (idle) con el tiempo desde su último evento. Excluye
+   legajos 0/1 y a los que ya hicieron FJ. Alimenta el panel "En este momento" del monitor. */
+var _MON_ACT_TOGGLES = { CR: 1, RR: 1, CC: 1, RT: 1, MG: 1, RI: 1, EI: 1, AT: 1, PB: 1, Limp: 1, PC: 1, Perm: 1, CT: 1 };
+var _MON_ACT_INFO = {
+  pick: { ic: "🛒", vb: "Pickeando" }, arm: { ic: "🔨", vb: "Armando" },
+  CC: { ic: "🚛", tx: "Cargando camión" }, RT: { ic: "🏭", tx: "Recibiendo mercadería" },
+  MG: { ic: "📥", tx: "Guardando" }, RI: { ic: "📥", tx: "Recibiendo insumos" },
+  EI: { ic: "📤", tx: "Entregando insumos" }, CR: { ic: "📋", tx: "Controlando remitos" },
+  RR: { ic: "🚚", tx: "Recepción de remitos" }, AT: { ic: "🔔", tx: "Atendiendo timbre" },
+  PB: { ic: "🚽", tx: "En el baño" }, Limp: { ic: "🧹", tx: "Limpiando" },
+  PC: { ic: "🍽", tx: "Comiendo" }, Perm: { ic: "🚪", tx: "Permiso de salida" },
+  CT: { ic: "🔢", tx: "Conteo" }
+};
+function _monActividadActual(eventos, todayKey, fjHoy, nowMs) {
+  var byLeg = {};
+  for (var i = 0; i < (eventos || []).length; i++) {
+    var ev = eventos[i], leg = String(ev.legajo == null ? "" : ev.legajo).trim();
+    if (!leg || leg === "0" || leg === "1") continue;                 // test/basura
+    if (isoToDayKey(ev.ts_cliente) !== todayKey) continue;            // sólo hoy
+    (byLeg[leg] || (byLeg[leg] = [])).push({ op: ev.opcion, tx: String(ev.texto || "").trim().toUpperCase(), ini: ev.ts_inicio, ts: new Date(ev.ts_cliente).getTime() });
+  }
+  var out = [];
+  for (var leg in byLeg) {
+    if (fjHoy && fjHoy.has(leg)) continue;                            // ya cerró jornada
+    var evs = byLeg[leg].sort(function (a, b) { return a.ts - b.ts; });
+    var pick = null, pickTs = 0, arm = null, armTs = 0, tog = null, togTs = 0, lastTs = 0;
+    for (var k = 0; k < evs.length; k++) {
+      var e = evs[k]; if (e.ts > lastTs) lastTs = e.ts;
+      if (e.op === "EP") { pick = e.tx; pickTs = e.ts; }
+      else if (e.op === "TP") { if (!e.tx || pick === e.tx) pick = null; }
+      else if (e.op === "AP") { arm = e.tx; armTs = e.ts; }
+      else if (e.op === "TAP") { if (!e.tx || arm === e.tx) arm = null; }
+      else if (_MON_ACT_TOGGLES[e.op]) { if (!e.ini) { tog = e.op; togTs = e.ts; } else if (tog === e.op) { tog = null; } }
+    }
+    var cands = [];                                                  // acciones abiertas → la más reciente manda
+    if (pick) cands.push({ k: "pick", ts: pickTs, tanda: pick });
+    if (arm) cands.push({ k: "arm", ts: armTs, tanda: arm });
+    if (tog) cands.push({ k: tog, ts: togTs });
+    cands.sort(function (a, b) { return b.ts - a.ts; });
+    var row = { legajo: leg, idle: !cands.length, sinceTs: cands.length ? cands[0].ts : lastTs, kind: null, tanda: "" };
+    if (cands.length) { row.kind = cands[0].k; row.tanda = cands[0].tanda || ""; }
+    out.push(row);
+  }
+  // trabajando primero; dentro de cada grupo, el de arranque más viejo arriba (tarea larga / más idle)
+  out.sort(function (a, b) { return (a.idle - b.idle) || (a.sinceTs - b.sinceTs); });
+  return out;
+}
 async function fetchMonitorEvents(targetTandaKeys, sheetMap) {
   const now = new Date();
   const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -22648,7 +22719,9 @@ async function fetchMonitorEvents(targetTandaKeys, sheetMap) {
   // marcar quién ya cerró jornada hoy (tiene FJ).
   // ⚠ supaFetchAll: trae TODAS las opciones de 10 días (>1800 filas hoy). Con fetch simple
   // PostgREST cortaba en 1000 y se caía HOY → "empleados hoy", jornada y "últimos días" mal. v5.43.
-  const dataC = await supaFetchAll(SUPABASE_TABLE_ENDPOINT, "ts_cliente=gte." + encodeURIComponent(start6DaysIso) + "&select=legajo,ts_cliente,opcion");
+  // v7.56: +texto +ts_inicio → alcanza para saber qué está haciendo AHORA cada operario
+  // (picking/armado por tanda, y toggle abierto: el cierre lleva ts_inicio, la apertura no).
+  const dataC = await supaFetchAll(SUPABASE_TABLE_ENDPOINT, "ts_cliente=gte." + encodeURIComponent(start6DaysIso) + "&select=legajo,ts_cliente,opcion,texto,ts_inicio");
 
   // Query D: fichadas de ingreso de HOY (Supabase Fichadas_Virgilio).
   // Si la query falla (red flaky, RLS mal), no rompemos el monitor — el
@@ -22835,7 +22908,10 @@ async function fetchMonitorEvents(targetTandaKeys, sheetMap) {
     pastDays.push({ key: dayKey, label, totPick, totSep, empleados });
   }
 
-  return { statusMap, alertasOffSheet: [...alertasSet].sort(), empleadosHoy, pastDays, fichadasResumen, enSilencio };
+  // v7.56: qué está haciendo AHORA cada operario (panel "En este momento" del monitor).
+  const currentActivity = _monActividadActual(dataC, todayKey, perDayFJ.get(todayKey) || new Set(), Date.now());
+
+  return { statusMap, alertasOffSheet: [...alertasSet].sort(), empleadosHoy, pastDays, fichadasResumen, enSilencio, currentActivity };
 }
 
 function statusIconToday(s) {
@@ -22921,6 +22997,37 @@ function statusCell(state, legajo, tanda, kind, startTs) {
     }
   }
   return `<span class="status-wrap tanda-clickable" data-tanda="${escapeHtml(t)}" data-kind="${escapeHtml(kind)}" onclick="showTandaMessages(this.dataset.tanda, this.dataset.kind)">${icon}${monitorLegajoTag(legajo, state)}${dur}</span>`;
+}
+
+/* v7.56 — Panel "En este momento" (debajo de la tabla del monitor): una fila por operario
+   activo con lo que está haciendo AHORA (pickeando/armando tal tanda, en el baño, guardando,
+   comiendo, etc.) + hace cuánto (ámbar >1 h, rojo >2 h). Los que no tienen nada abierto van
+   como "libre". Datos de _monActividadActual (replay de eventos de hoy). */
+function _monActPanelHtml(list, nombres) {
+  if (!list || !list.length) return "";
+  var fmtDur = function (ts) { var m = Math.round((Date.now() - ts) / 60000); if (!(m >= 0)) return ""; return m >= 60 ? (Math.floor(m / 60) + "h" + String(m % 60).padStart(2, "0")) : (m + "m"); };
+  var durCol = function (ts) { var m = Math.round((Date.now() - ts) / 60000); return m >= 120 ? "#f87171" : (m >= 60 ? "#fbbf24" : "#94a3b8"); };
+  var rows = list.map(function (r) {
+    var nom = (nombres && nombres.get) ? (nombres.get(String(r.legajo)) || "") : "";
+    var sig = initialsFromName(nom, r.legajo);
+    var quien = nom ? String(nom).trim().split(/\s+/)[0] : ("Leg " + r.legajo);
+    var dur = fmtDur(r.sinceTs);
+    var actHtml;
+    if (r.idle) {
+      actHtml = '<span class="mon-act-ic">💤</span><span class="mon-act-what">libre · sin tarea abierta</span>';
+    } else {
+      var info = _MON_ACT_INFO[r.kind] || { ic: "•", tx: r.kind };
+      var txt = info.vb ? (info.vb + " " + escapeHtml(r.tanda)) : info.tx;
+      actHtml = '<span class="mon-act-ic">' + (info.ic || "•") + '</span><span class="mon-act-what">' + txt + '</span>';
+    }
+    return '<div class="mon-act-row ' + (r.idle ? "mon-act-idle" : "mon-act-on") + '">' +
+      '<span class="mon-act-who" title="' + escapeHtml(nom || ("Legajo " + r.legajo)) + '"><b>' + escapeHtml(sig || ("#" + r.legajo)) + '</b> ' + escapeHtml(quien) + '</span>' +
+      actHtml +
+      (dur ? '<span class="mon-act-dur" style="color:' + durCol(r.sinceTs) + '">' + dur + '</span>' : '') +
+      '</div>';
+  }).join("");
+  var doing = list.filter(function (r) { return !r.idle; }).length;
+  return '<div class="mon-act-panel"><div class="mon-act-h">🟢 En este momento · <b>' + doing + '</b> trabajando' + (list.length > doing ? ' · ' + (list.length - doing) + ' libre(s)' : '') + '</div>' + rows + '</div>';
 }
 
 /* Toggle de la vista de productividad: "m3h" (m³ por hora) ↔ "minm3" (minutos por m³).
@@ -23422,6 +23529,7 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
       <div class="monitor-table-wrap">
         ${leftHtml}
         ${beyondHtml}
+        ${_monActPanelHtml(_monActividad, _empleadosNombres)}
       </div>
       <div class="monitor-right-side">
         <div class="monitor-right-top">
@@ -23480,7 +23588,8 @@ async function refreshMonitor() {
       if (wideTargetSet.has(v.fechaEntregaRaw)) targetTandaKeys.push(k);
     }
     // 2) Eventos: status por tanda + alertas de hoy + empleados de hoy + 5 días anteriores
-    const { statusMap, alertasOffSheet, empleadosHoy, pastDays, fichadasResumen, enSilencio } = await fetchMonitorEvents(targetTandaKeys, sheetMap);
+    const { statusMap, alertasOffSheet, empleadosHoy, pastDays, fichadasResumen, enSilencio, currentActivity } = await fetchMonitorEvents(targetTandaKeys, sheetMap);
+    _monActividad = currentActivity || [];   // v7.55: lo lee renderMonitor para el panel "En este momento"
     monitorLastOkTs = Date.now();
     // 3) Decidir cuántos días mostrar: por default los próximos 3. Pero si en
     //    la ventana corta ya quedan POCOS pickings por hacer (≤3), expandimos

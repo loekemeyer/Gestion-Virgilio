@@ -4,7 +4,26 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-05 · Versión app al documentar: **v7.55**
+> Última actualización: 2026-08-05 · Versión app al documentar: **v7.56**
+>
+> Nota: **v7.56 — Monitor: panel «En este momento» (qué está haciendo AHORA cada operario)**.
+> Pedido del usuario: la tabla del monitor sólo mostraba la actividad del que trabajaba una tanda
+> visible (ej. JF armando D15A con su spinner), no la del resto. Ahora, **debajo de la tabla**, un
+> panel lista **por operario activo** lo que está haciendo en este momento + hace cuánto (ámbar >1 h,
+> rojo >2 h): **pickeando/armando tal tanda**, **en el baño**, **guardando**, **comiendo**,
+> **recibiendo mercadería/insumos**, **cargando camión**, **atendiendo timbre**, **limpiando**,
+> **conteo**, **permiso**, etc. Los que no tienen ninguna acción abierta salen como **«libre»**. Cómo
+> se calcula: **`_monActividadActual`** hace un *replay* de los eventos de HOY por legajo y busca la
+> acción **ABIERTA** más reciente — picking (EP sin TP), armado (AP sin TAP) o un **toggle abierto**
+> (la apertura NO lleva `ts_inicio`, el cierre SÍ). Excluye legajos 0/1 y a los que ya hicieron **FJ**.
+> Para eso la query `dataC` de `fetchMonitorEvents` ahora trae también **`texto` y `ts_inicio`**
+> (mismas filas, 2 columnas más); devuelve `currentActivity`, que `refreshMonitor` guarda en
+> `_monActividad` y `renderMonitor` pinta con **`_monActPanelHtml`** (siglas `initialsFromName` +
+> ícono + tarea + duración), debajo de `leftHtml` en `.monitor-table-wrap`. CSS `.mon-act-*` (oscuro +
+> escala en modo TV). Sin cambios de datos/subida — sólo LECTURA/visualización. Verificado headless:
+> el replay ubica cada operario en su tarea (JF→Armando D15A 9m, baño, guardando, libre…), excluye
+> FJ/prueba, prioriza la acción abierta actual sobre una anterior ya cerrada; smoke extendido con
+> `_monActividadActual`/`_monActPanelHtml`; `dead-handlers` OK; + screenshot del panel. Bump **v7.56**.
 >
 > Nota: **v7.55 — Generador de OCs: «Depurar incompletos», proyección 0 en vez de `xls`, y
 > parámetros de proyección (período + suavizar anómalos)**. Cuatro cosas pedidas por el usuario.

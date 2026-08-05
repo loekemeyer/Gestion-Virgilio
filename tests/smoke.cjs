@@ -30,6 +30,7 @@ catch (_e) {
       "faltSnoozeId", "faltMaybeCompletar", "faltHtmlPend", "faltHtmlMine", "faltHtmlTaken", "showFaltAvisar", "faltCrear",
       "facFetchTareas", "facTareaActiva", "facTareaBadge", "_compTandaYaArmada",
       "getActivityStatus", "tandaReservar", "tandaLiberar",
+      "_monActividadActual", "_monActPanelHtml", "_monEnSilencio",
       "showMGChooser", "showRacksBajarModal", "rkbRender", "rkbConfirmar", "rkbFetchCxM", "rkbSetSec",
       "showExcModal", "excRender", "excConfirmar", "excSet", "excChg", "excAskClose", "closeExc",
       "showCPModal", "cpRender", "cpConfirm", "cpLoadPickSinArmar", "showInstructivo", "equivResolve", "pppZonaDeBarrio",
