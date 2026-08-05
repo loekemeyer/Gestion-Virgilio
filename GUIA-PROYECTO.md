@@ -4,7 +4,22 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-05 · Versión app al documentar: **v7.60**
+> Última actualización: 2026-08-05 · Versión app al documentar: **v7.61**
+>
+> Nota: **v7.61 — REVERT de v7.55: se sacan «Depurar incompletos» y los «Parámetros de la
+> proyección» (período + suavizar) del generador de OCs**. Decisión del usuario: la proyección NO se
+> configura desde la app — la provee **PáginaLK** ("loekemeyer's web"). Cambios: **(1)** se quitó
+> el botón **🧹 Depurar incompletos** y su vista (`ocgEnterDepurar`/`ocBodyDepurar`). **(2)** Se quitó
+> la caja **📈 Parámetros de la proyección** (`_ocCfgParamsBox`/`ocCfgSaveParams`, inputs de meses/
+> suavizar) de la pantalla de config. **(3)** El botón volvió a **⚙ Config (máximos)** y esa pantalla
+> vuelve a editar **sólo `OC_Maximos`** (objetivo/uni×caja/índice/proveedor/activo + alta), como antes
+> de v7.55. Backend revertido: **`fn_proyeccion_madre_emp(p_emp)`** volvió a **1 argumento** (se
+> conserva el fix de `statement_timeout` 60s); **`refresh_proyeccion_madre()`** vuelve a llamar
+> `?p_emp=lk` sin parámetros (conserva aviso Telegram + cron semanal); se **eliminó** la tabla
+> `Config_Proyeccion`. Se **mantiene** de v7.55 sólo la **proyección 0 en vez de `xls`** en el
+> visualizador (era un pedido aparte del usuario). Suite completa OK; se removieron
+> `tests/ocg-depurar.cjs` y `sql/config_proyeccion.sql`. Bump **v7.61**. (La ventana de la proyección
+> se ajusta enseguida a 6 meses con fallback a 12 — ver nota de backend siguiente.)
 >
 > Nota: **v7.60 — Panel «En este momento»: ahora incluye a TODOS los que ficharon hoy** (repregunta
 > del usuario: «¿todos los que ficharon aparecen ahí?» — antes **no**). El panel se armaba sólo con la
