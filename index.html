@@ -6028,7 +6028,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.58";
+const APP_VERSION = "v7.62";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -9397,6 +9397,22 @@ async function ocLoadLineas() {
   _ocLineas = m; return m;
 }
 function ocLinea(cod) { return (_ocLineas && _ocLineas[_ocgNorm(cod)]) || ""; }
+/* v7.62 — Teléfonos de talleristas (tabla Talleristas_Contacto, solo lectura con anon).
+   Los usa el impreso de OC para poner el Tel debajo del nombre. Devuelve una lista
+   { keys: claves normalizadas del nombre, tel } solo de los que TIENEN teléfono (los que
+   se marcan "no se le manda"/"pausa"/etc. quedan sin tel → no aparece la línea). */
+let _ocTels = null;
+async function ocLoadTels() {
+  if (_ocTels) return _ocTels;
+  const arr = [];
+  try {
+    (await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Talleristas_Contacto", "select=nombre,telefono&activo=eq.true")).forEach(function (x) {
+      const t = String(x.telefono == null ? "" : x.telefono).trim();
+      if (t) arr.push({ keys: _ocProvKeys(x.nombre), tel: t });
+    });
+  } catch (_e) {}
+  _ocTels = arr; return arr;
+}
 async function openStockAdmin(soloConteo) {
   const _solo = soloConteo === true;   // rol "solo conteo" (Giuliana): solo la solapa Conteo
   if (!document.getElementById("stkCss")) {
@@ -9557,8 +9573,8 @@ async function openOCAdmin() {
   ov.classList.add("show");
   ov.innerHTML = '<div class="oc-card"><div class="oc-head"><span class="oc-title">📑 Órdenes de Compra</span><button class="oc-close" onclick="closeOCAdmin()">Cerrar</button></div><div class="oc-body" id="ocBody"><div class="oc-loading">Cargando…</div></div></div>';
   try {
-    const r2 = await Promise.all([ocFetchRows(), loadArtNombres(), loadCodCanon(), ocLoadLineas(), ocFetchRecepcion()]);
-    _oc = { rows: r2[0], view: "list", openKey: null, filtro: "", lineas: r2[3] || {}, recep: r2[4] || [], recepByRow: {}, nueva: { proveedor: "", fecha: "", rubro: "", unidad: "Cajas", items: [{ cod: "", desc: "", cant: "" }] } };
+    const r2 = await Promise.all([ocFetchRows(), loadArtNombres(), loadCodCanon(), ocLoadLineas(), ocFetchRecepcion(), ocLoadTels()]);
+    _oc = { rows: r2[0], view: "list", openKey: null, filtro: "", lineas: r2[3] || {}, recep: r2[4] || [], recepByRow: {}, tels: r2[5] || [], nueva: { proveedor: "", fecha: "", rubro: "", unidad: "Cajas", items: [{ cod: "", desc: "", cant: "" }] } };
     _oc.recepByRow = ocBuildRecep();   // marca solo cuánto se recibió por OC (recepción→OC)
     ocRender();
   } catch (e) { const b = document.getElementById("ocBody"); if (b) b.innerHTML = '<div class="oc-loading">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
@@ -9839,19 +9855,23 @@ const _OC_PRINT_CSS = "body{font-family:Arial,Helvetica,sans-serif;color:#111;ma
   "@media print{body{margin:6mm;}@page{margin:8mm;}}";
 /* "2026-08-05" → "05/08/2026" para el encabezado del impreso (como la planilla). */
 function _ocFechaLarga(f) { const m = String(f == null ? "" : f).match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? (m[3] + "/" + m[2] + "/" + m[1]) : (String(f == null ? "" : f) || "—"); }
-/* v7.54 — Teléfono del tallerista para el encabezado del impreso (va DEBAJO del nombre).
-   El dato vive en `Ordenes_Compra.proveedor_telefono` (lo mantiene una herramienta
-   externa). Como puede estar cargado en UNA OC del tallerista y faltar en otra, se busca
-   en TODAS las filas del mismo proveedor (por nombre normalizado, con las reglas de
-   `_ocProvKeys`) y se usa el primero con dato. Si no hay ninguno cargado, devuelve ""
+/* v7.54/59 — Teléfono del tallerista para el encabezado del impreso (va DEBAJO del nombre).
+   Fuente principal: la tabla `Talleristas_Contacto` (cargada en `_oc.tels`). Fallback:
+   `Ordenes_Compra.proveedor_telefono` (por si alguna OC lo trae de otra herramienta). El
+   match es por nombre normalizado (`_ocProvKeys`): tolera duales ("Garcia / Lucho" toma el
+   de Garcia o Lucho) y variantes ("Martin C" = Martin). Si no hay ninguno, devuelve ""
    (no se muestra la línea Tel) — NO inventa números. */
 function ocTelDe(prov) {
-  if (!_oc || !_oc.rows) return "";
   const keys = _ocProvKeys(prov);
-  for (let i = 0; i < _oc.rows.length; i++) {
-    const r = _oc.rows[i], t = String(r.proveedor_telefono == null ? "" : r.proveedor_telefono).trim();
-    if (!t) continue;
-    if (_ocProvKeys(r.proveedor).some(function (k) { return _ocProvKeysMatch(keys, k); })) return t;
+  const tels = (_oc && _oc.tels) || [];
+  for (let i = 0; i < tels.length; i++) {
+    if (tels[i].tel && tels[i].keys.some(function (k) { return _ocProvKeysMatch(keys, k); })) return tels[i].tel;
+  }
+  if (_oc && _oc.rows) {
+    for (let i = 0; i < _oc.rows.length; i++) {
+      const r = _oc.rows[i], t = String(r.proveedor_telefono == null ? "" : r.proveedor_telefono).trim();
+      if (t && _ocProvKeys(r.proveedor).some(function (k) { return _ocProvKeysMatch(keys, k); })) return t;
+    }
   }
   return "";
 }

@@ -4,7 +4,30 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-05 · Versión app al documentar: **v7.58**
+> Última actualización: 2026-08-05 · Versión app al documentar: **v7.62**
+>
+> Nota: **v7.62 — Teléfonos de talleristas en el impreso de OC (tabla nueva) + aclaraciones de
+> Log/Fabr y duales**. El dueño pasó los teléfonos de los talleristas (antes no había ninguno en la
+> base). **(1) Tabla `Talleristas_Contacto`** (`sql/talleristas_contacto.sql`): `nombre, telefono,
+> enviar_por_telefono, nota, activo`. RLS **solo lectura** para el front (anon + authenticated);
+> **sin política de escritura** — los teléfonos los administra un supervisor por SQL/migración
+> (service_role). Cargados: Poly, Lucho, Martin C, Pintos, Carriero, German, Maspoli, Tierra Nativa,
+> Carlos E, Garcia, Pettofrezza, Lopez Jose, The Plast. **Sin teléfono a propósito** (quedan con
+> `enviar_por_telefono=false` + nota): Oscar y Pedernera (*se les manda desde la fábrica*, no por
+> WhatsApp), Paternal Goma (*en pausa*), Manfer (*no existe más*). **Duales** «Garcia / Lucho» y
+> «Pintos / Maspoli»: el impreso toma el número de cualquiera de los dos (el de «garcia/lucho» vino
+> incompleto). **(2) App**: `ocLoadTels()` carga la tabla en `_oc.tels` (en el `Promise.all` de
+> `openOCAdmin`); `ocTelDe(prov)` ahora busca **primero** en `Talleristas_Contacto` (por nombre
+> normalizado con `_ocProvKeys`, tolera duales y variantes «Martin C»=Martin) y cae a
+> `Ordenes_Compra.proveedor_telefono` como fallback. El impreso muestra el Tel **debajo del nombre**
+> (v7.54). **(3) Aclaración Log/Fabr**: **no es un bug** — «Log/ Fabr» (fábrica) y «Racks»
+> (importación) están en `OCG_INTERNOS`, se marcan **interno** y el generador **no** les crea OC
+> externa (no se le compra a la propia fábrica); aparecen en el preview del generador como «(interno —
+> no se genera OC)». `OC_Maximos` tiene 47 ítems activos de Log/Fabr y 78 de Racks. **(4) Duales /
+> split**: `Proporcion_Articulo_Tallerista` (cod_art, tallerista, proporcion) **existe pero está
+> VACÍA y no la usa nadie** → hoy los duales se generan como **una sola OC combinada** (no se parte
+> proporcionalmente). Queda anotado como posible mejora (partir la OC dual en dos por proporción, con
+> su propio teléfono cada una) — a confirmar con el dueño y con los datos de proporción. Bump **v7.62**.
 >
 > Nota: **v7.58 — Visualizador de OCs: «Recibido» y «Recep.» se unifican en UNA sola columna + el
 > recibido se acota al PERÍODO de la OC** (pedido del usuario). **(1) UNA columna.** En el detalle
