@@ -4,7 +4,24 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-05 · Versión app al documentar: **v7.54**
+> Última actualización: 2026-08-05 · Versión app al documentar: **v7.58**
+>
+> Nota: **v7.58 — Visualizador de OCs: «Recibido» y «Recep.» se unifican en UNA sola columna + el
+> recibido se acota al PERÍODO de la OC** (pedido del usuario). **(1) UNA columna.** En el detalle
+> de la OC se saca la columna «📥 Recep.» y el campo editable «Recibido» a mano (y con eso los botones
+> «💾 Guardar recibido» y «📥 Traer de recepción», y las funciones `ocGuardarRecibido`,
+> `_ocCollectRecibido`, `ocTraerRecepcion`, `ocLiveFalt`, `ocRecDe`). Queda **una sola columna
+> «Recibido» = lo que registró la Recepción de Mercadería** (solo lectura). `ocRecEff` ahora devuelve
+> **puro lo de recepción** (se sacó el "si hay manual, manda"); como TODAS las OCs tenían
+> `cantidad_recibida = 0`, no se pierde nada. Se alinearon a la misma fuente **% Entregas**
+> (`ocBodyEntregas`) y **Trazar** (`ocBodyTrazar`). **Marcar recibida** ahora toma una **foto** del
+> recibido de recepción en `cantidad_recibida` (registro fijo); Reabrir solo cambia el estado.
+> **(2) PERÍODO VIGENTE (no acumula pasado).** `ocBuildRecep` cuenta lo recibido de ese
+> tallerista+código **solo dentro del período de la OC**: ventana `[fecha_OC, tope)` donde
+> `tope = min(fecha de la OC SIGUIENTE del mismo tallerista+código, fecha_OC + `OC_RECEP_VIGENCIA_DIAS`
+> (120 d))`. Las entregas **anteriores** a la OC no cuentan y, si la OC no tiene fecha, no se atribuye
+> nada (antes, sin fecha, podía sumar todo el histórico). Helper nuevo `_ocAddDias`. Test
+> `tests/oc-print.cjs` sin cambios (OK). Bump **v7.58**.
 >
 > Nota: **v7.54 — Impreso de OC: la separación se cierra con líneas + el teléfono va DEBAJO del
 > nombre** (ajustes del pedido de v7.52). Dos cosas en `ocPrintHtml`. **(1)** La columna de
