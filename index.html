@@ -6054,7 +6054,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.68";
+const APP_VERSION = "v7.69";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -9180,6 +9180,11 @@ function compPausar() {
 /* Guarda el pedido entero en la tabla Entregas_Virgilio (POST en bloque, 1 sola llamada).
    Si no hay red, lo deja en localStorage para reintentar al volver online (_compFlushEntregas). */
 function _compSaveEntregas(rows) {
+  // v7.69 — el operador de PRUEBA (legajo 0/1) NO persiste Entregas, igual que stockMove.
+  // Sin esto, un armado de prueba creaba filas en Entregas_Virgilio y, como `_compTandaYaArmada`
+  // usa esa tabla como señal de "ya fue armada", BLOQUEABA a un operario real de armar la tanda
+  // (caso real D06C: 28 Entregas fantasma del legajo 0 → "La tanda D06C ya fue armada").
+  if (typeof esOperadorPrueba === "function" && esOperadorPrueba()) { try { console.warn("[PRUEBA] Entregas NO persistidas (operador de prueba)"); } catch (_e) {} return; }
   const headers = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" };
   fetch(SUPABASE_ENTREGAS_ENDPOINT, { method: "POST", headers: headers, body: JSON.stringify(rows) })
     .then(function (r) { if (r.ok || (r.status >= 400 && r.status < 500)) return; throw new Error("HTTP " + r.status); })   // 4xx = error de datos → no reintentar (evita loop)

@@ -150,4 +150,7 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== ssg-sin-datos (v7.58: el SSG no dispara si no se pudo LEER el stock — evita aviso masivo falso) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ssg-sin-datos.cjs
 
+echo "== comp-entregas-prueba (v7.69: el operador de prueba 0/1 no crea Entregas fantasma que bloqueen el armado) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/comp-entregas-prueba.cjs
+
 echo "== TODO OK =="

@@ -4,7 +4,19 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-05 · Versión app al documentar: **v7.68**
+> Última actualización: 2026-08-05 · Versión app al documentar: **v7.69**
+>
+> Nota: **v7.69 — el operador de PRUEBA (legajo 0/1) ya no crea Entregas fantasma que bloqueen el
+> armado**. `_compTandaYaArmada` usa `Entregas_Virgilio` como señal de *«la tanda ya fue armada»*
+> (candado anti doble-armado, `showCompletarWizard`). Pero `_compSaveEntregas` **no** estaba guardado
+> contra el operador de prueba (a diferencia de `stockMove`, que sí se salta), así que un **armado de
+> prueba del legajo 0** creaba filas en `Entregas_Virgilio` **sin mover stock** — y esas Entregas
+> fantasma hacían que un operario **real** viera *«La tanda X ya fue armada. No se abre el armado…»* y
+> **no pudiera armarla**. Caso real **D06C**: 28 Entregas del legajo 0 (creadas 08-04 13:51, justo tras
+> el AP fantasma) bloqueaban al legajo 122. Fix: `_compSaveEntregas` ahora hace `return` temprano si
+> `esOperadorPrueba()`. Datos: borradas las 28 Entregas fantasma de D06C (stock intacto — el armado de
+> prueba nunca lo tocó; D06C quedó pickeada, lista para armar). Smoke `tests/comp-entregas-prueba.cjs`.
+> Bump **v7.69**.
 >
 > Nota: **v7.68 — Guardado a Góndola (MG) deja de ser un toggle: entrar/salir sin el botón
 > trabado en rojo** (pedido del usuario). **Problema:** MG era un toggle (arranca/para). Al cerrar
