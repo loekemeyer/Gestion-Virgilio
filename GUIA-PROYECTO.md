@@ -4,7 +4,20 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-05 · Versión app al documentar: **v7.59**
+> Última actualización: 2026-08-05 · Versión app al documentar: **v7.60**
+>
+> Nota: **v7.60 — Panel «En este momento»: ahora incluye a TODOS los que ficharon hoy** (repregunta
+> del usuario: «¿todos los que ficharon aparecen ahí?» — antes **no**). El panel se armaba sólo con la
+> **actividad** (`dataC` = eventos de `Registros`), así que un operario aparecía únicamente si ya había
+> **tocado algún botón** hoy. Ahora `_monActividadActual` recibe también **`fichadosHoyByLeg`** (legajo →
+> hora de ingreso, de la tabla `Fichadas_Virgilio`) y **suma a los que ficharon pero todavía NO
+> arrancaron**: salen como **«🕐 fichó · sin arrancar»** desde su hora de ingreso. Sigue **excluyendo a
+> los que ya hicieron FJ** (terminaron la jornada) aunque hayan fichado. Cada fila lleva `arranco`:
+> `true` = trabajó (muestra su tarea, o «💤 libre · sin tarea abierta» si cerró lo último) · `false` =
+> fichó y no tocó nada. Es decir, el panel ahora = **todos los presentes hoy** (fichados y/o con
+> actividad, menos los que cerraron jornada). Verificado headless: un legajo que sólo fichó aparece como
+> «sin arrancar» desde su ingreso; uno que trabajó y paró, como «libre»; uno que fichó pero hizo FJ, NO
+> aparece; smoke/dead-handlers OK. Bump **v7.60**.
 >
 > Nota: **v7.59 — el SSG «picking sin stock en góndola» NO dispara si no se pudo LEER el stock**.
 > `stockBajaPicking` lee TODOS los movimientos con `stockFetchMovs` → `supaFetchAll`, que **tira** si

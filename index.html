@@ -6028,7 +6028,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.59";
+const APP_VERSION = "v7.60";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -22651,7 +22651,7 @@ var _MON_ACT_INFO = {
   PC: { ic: "🍽", tx: "Comiendo" }, Perm: { ic: "🚪", tx: "Permiso de salida" },
   CT: { ic: "🔢", tx: "Conteo" }
 };
-function _monActividadActual(eventos, todayKey, fjHoy, nowMs) {
+function _monActividadActual(eventos, todayKey, fjHoy, nowMs, fichados) {
   var byLeg = {};
   for (var i = 0; i < (eventos || []).length; i++) {
     var ev = eventos[i], leg = String(ev.legajo == null ? "" : ev.legajo).trim();
@@ -22659,9 +22659,9 @@ function _monActividadActual(eventos, todayKey, fjHoy, nowMs) {
     if (isoToDayKey(ev.ts_cliente) !== todayKey) continue;            // sólo hoy
     (byLeg[leg] || (byLeg[leg] = [])).push({ op: ev.opcion, tx: String(ev.texto || "").trim().toUpperCase(), ini: ev.ts_inicio, ts: new Date(ev.ts_cliente).getTime() });
   }
-  var out = [];
+  var out = [], vistos = {};
   for (var leg in byLeg) {
-    if (fjHoy && fjHoy.has(leg)) continue;                            // ya cerró jornada
+    if (fjHoy && fjHoy.has(leg)) { vistos[leg] = 1; continue; }       // ya cerró jornada → fuera
     var evs = byLeg[leg].sort(function (a, b) { return a.ts - b.ts; });
     var pick = null, pickTs = 0, arm = null, armTs = 0, tog = null, togTs = 0, lastTs = 0;
     for (var k = 0; k < evs.length; k++) {
@@ -22677,9 +22677,20 @@ function _monActividadActual(eventos, todayKey, fjHoy, nowMs) {
     if (arm) cands.push({ k: "arm", ts: armTs, tanda: arm });
     if (tog) cands.push({ k: tog, ts: togTs });
     cands.sort(function (a, b) { return b.ts - a.ts; });
-    var row = { legajo: leg, idle: !cands.length, sinceTs: cands.length ? cands[0].ts : lastTs, kind: null, tanda: "" };
+    var row = { legajo: leg, idle: !cands.length, sinceTs: cands.length ? cands[0].ts : lastTs, kind: null, tanda: "", arranco: true };
     if (cands.length) { row.kind = cands[0].k; row.tanda = cands[0].tanda || ""; }
-    out.push(row);
+    out.push(row); vistos[leg] = 1;
+  }
+  // v7.60: TAMBIÉN los que FICHARON hoy pero todavía no tocaron ningún botón (ni hicieron FJ):
+  // aparecen como "fichado · sin arrancar" desde su hora de ingreso. Así el panel = todos los presentes.
+  if (fichados && fichados.forEach) {
+    fichados.forEach(function (fecha, leg) {
+      leg = String(leg);
+      if (leg === "0" || leg === "1" || vistos[leg]) return;
+      if (fjHoy && fjHoy.has(leg)) return;                            // fichó y ya cerró jornada → fuera
+      var ts = (fecha instanceof Date) ? fecha.getTime() : new Date(fecha).getTime();
+      out.push({ legajo: leg, idle: true, sinceTs: ts || nowMs, kind: null, tanda: "", arranco: false });
+    });
   }
   // trabajando primero; dentro de cada grupo, el de arranque más viejo arriba (tarea larga / más idle)
   out.sort(function (a, b) { return (a.idle - b.idle) || (a.sinceTs - b.sinceTs); });
@@ -22910,7 +22921,7 @@ async function fetchMonitorEvents(targetTandaKeys, sheetMap) {
   }
 
   // v7.56: qué está haciendo AHORA cada operario (panel "En este momento" del monitor).
-  const currentActivity = _monActividadActual(dataC, todayKey, perDayFJ.get(todayKey) || new Set(), Date.now());
+  const currentActivity = _monActividadActual(dataC, todayKey, perDayFJ.get(todayKey) || new Set(), Date.now(), fichadosHoyByLeg);
 
   return { statusMap, alertasOffSheet: [...alertasSet].sort(), empleadosHoy, pastDays, fichadasResumen, enSilencio, currentActivity };
 }
@@ -23015,7 +23026,10 @@ function _monActPanelHtml(list, nombres) {
     var dur = fmtDur(r.sinceTs);
     var actHtml;
     if (r.idle) {
-      actHtml = '<span class="mon-act-ic">💤</span><span class="mon-act-what">libre · sin tarea abierta</span>';
+      // arranco=false → fichó pero todavía no tocó ningún botón; true → trabajó y ahora no tiene nada abierto.
+      actHtml = (r.arranco === false)
+        ? '<span class="mon-act-ic">🕐</span><span class="mon-act-what">fichó · sin arrancar</span>'
+        : '<span class="mon-act-ic">💤</span><span class="mon-act-what">libre · sin tarea abierta</span>';
     } else {
       var info = _MON_ACT_INFO[r.kind] || { ic: "•", tx: r.kind };
       var txt = info.vb ? (info.vb + " " + escapeHtml(r.tanda)) : info.tx;
