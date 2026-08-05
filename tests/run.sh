@@ -96,6 +96,9 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== ssg-familia-empresa (v7.06: SSG suma la familia LK/CH del código partido) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ssg-familia-empresa.cjs
 
+echo "== fgu-faltante-gondola (faltó al pickear pero había stock en góndola → aviso URGENTE Telegram) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/fgu-faltante-gondola.cjs
+
 echo "== act-legajo0 (v7.06: getActivityStatus ignora legajo 0/1 → no tandas fantasma) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/act-legajo0.cjs
 

@@ -6054,7 +6054,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.69";
+const APP_VERSION = "v7.70";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -16689,6 +16689,21 @@ async function stockBajaPicking(tanda, legajo) {
       try { stockEmitRacksAguardar(t, legajo, enDeposito); } catch (_e) {}
       try { showRacksAguardarPopup(t, enDeposito); } catch (_e) {}
     }
+    // idea del usuario — FALTÓ (esp>real) pero la GÓNDOLA (familia, disponible a esta tanda)
+    // tenía AL MENOS lo pedido → contradicción: había stock en góndola y aun así salió corto.
+    // Aviso URGENTE a Telegram (evento FGU). Condición conservadora (gond ≥ esp) para no
+    // falsos-positivos: excluye la escasez legítima (góndola parcial) y no se pisa con el SSG
+    // (que es "pickeó MÁS de lo disponible"). Familia-aware (codBase), como SSG/RAG.
+    const gondUrgente = [];
+    Object.keys(espByArt).forEach(function (art) {
+      const esp = espByArt[art] || 0;
+      const falto = esp - (realByArt[art] || 0);
+      if (falto <= 0.5) return;
+      const f = fam[codBase(art)] || { gond: 0 };
+      const enG = Math.round(f.gond || 0);
+      if (enG >= esp) gondUrgente.push({ art: art, falto: Math.round(falto), gond: enG });
+    });
+    if (gondUrgente.length) { try { stockEmitFaltanteGondola(t, legajo, gondUrgente); } catch (_e) {} }
   } catch (_e) {}
 }
 /* Evento SSG: se sacaron cajas de góndola que el sistema NO tenía (stock negativo
@@ -16716,6 +16731,24 @@ function stockEmitRacksAguardar(tanda, legajo, arr) {
     texto: (String(tanda).toUpperCase() + "|" + arr.map(function (x) { return x.art + ":" + x.falto + ":" + x.racks + ":" + x.aguardar; }).join(",")),
     ts: Date.now(),
     id: ("rag_" + String(legajo || "").trim() + "_" + String(tanda).toUpperCase() + "_" + getTodayKey()).replace(/[^a-zA-Z0-9_\-]/g, ""),
+    ts_inicio_iso: null
+  };
+  enqueueReport(payload);
+  if (typeof trySendOneReport === "function") trySendOneReport(payload).then(function (r) { if (r && r.ok) removeFromQueue(payload.id); }).catch(function () {});
+  try { updatePendingIndicator(); } catch (_e) {}
+}
+/* idea del usuario — evento FGU (URGENTE): al pickear FALTÓ un artículo (esp>real) PERO el
+   sistema dice que la GÓNDOLA tenía stock SUFICIENTE (gond de la familia, disponible a ESTA
+   tanda, ≥ lo pedido). Es una contradicción grave: la mercadería estaba en góndola y aun así
+   salió corto (mal ubicada, mal contada, o el operario no la vio). Un trigger de Supabase
+   (trg_faltante_gondola_telegram) lo reenvía como "🚨 URGENTE!!" por Telegram.
+   texto = "TANDA|art:falto:gond,…". Dedup 1×/tanda/legajo/día (id determinístico). */
+function stockEmitFaltanteGondola(tanda, legajo, arr) {
+  const payload = {
+    legajo: String(legajo || "").trim(), opcion: "FGU", descripcion: "Faltó al pickear pero había stock en góndola",
+    texto: (String(tanda).toUpperCase() + "|" + arr.map(function (x) { return x.art + ":" + x.falto + ":" + x.gond; }).join(",")),
+    ts: Date.now(),
+    id: ("fgu_" + String(legajo || "").trim() + "_" + String(tanda).toUpperCase() + "_" + getTodayKey()).replace(/[^a-zA-Z0-9_\-]/g, ""),
     ts_inicio_iso: null
   };
   enqueueReport(payload);
