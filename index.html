@@ -3757,7 +3757,7 @@ const filas = {
   row1: ["EP","TP"],                                   // Picking (grande, azul)
   row2: ["AP","TAP"],                                  // Armado (grande, verde)
   row3: ["RT","MG","CC"],                              // Depósito y carga (mediano)
-  row4: ["CR","RR","RI","EI","CP","RC","IR","EA","SC"],// secundarias (chico) + 🔀 Mover al final
+  row4: ["CR","RR","INS","CP","RC","IR","EA","SC"],    // secundarias (chico) + 🔀 Mover al final. v7.49: RI+EI unificados en INS (chooser)
   row5: ["AT","PB","Limp","Perm","PC","CT"]            // tiempos / pausas (chico)
 };
 // Rediseño v5.92 (pedido del dueño): más peso a los botones más usados. Primarias
@@ -3771,7 +3771,7 @@ const desc = {
   TAP:"Terminé Armado Pedido", CR:"Control Remitos", CC:"Inicio/Fin Carga Camión",
   RR:"Recepción Remitos",
   RT:"Recepción Mercadería", MG:"Guardado a Góndola",
-  RI:"Recepción Insumos", EI:"Entrega Insumos", EA:"Entrega p/ envasar", SC:"Salida a Cervantes",
+  RI:"Recepción Insumos", EI:"Entrega Insumos", INS:"Entregar/Recibir Insumos", EA:"Entrega p/ envasar", SC:"Salida a Cervantes",
   CP:"Completar Pedido", RC:"Pasar a urgente", IR:"Ingreso a Racks",
   AT:"Atendí Timbre", PB:"Paré Baño", Limp:"Limpieza",
   Perm:"Permiso de Salida", PC:"Paré Comida",CT:"Conteo",
@@ -5045,10 +5045,11 @@ Object.keys(filas).forEach(rowId => {
     d.className = sec ? "box box-sm" : "box";
     d.setAttribute("data-code", code);
     d.innerHTML = `
-      <div class="box-title">${code}</div>
+      <div class="box-title">${code === "INS" ? "🧰" : code}</div>
       <div class="box-desc">${desc[code]}</div>
     `;
-    d.onclick = () => selectOption(code);
+    // v7.49: "INS" es un botón UI unificado (no un opcode): abre el chooser Recibir/Entregar/Nuevo.
+    d.onclick = (code === "INS") ? (() => insumoChooser(String(legajoInput.value || ""))) : (() => selectOption(code));
     document.getElementById(rowId).appendChild(d);
   });
 });
@@ -5095,7 +5096,7 @@ function showInstructivo() {
     { t: "🏭 Recepción", c: "RT · RR", x: "RT = recibí mercadería (entra a <b>“a guardar”</b>). RR = controlar los remitos cargados al camión." },
     { t: "🚚 Carga y control", c: "CC · CR", x: "CC = inicio/fin de la carga del camión. CR = control de remitos." },
     { t: "📥 Guardar a góndola", c: "MG", x: "Lo que está en <b>“a guardar”</b> lo pasás a góndola. Si la góndola está llena, marcás <b>Excedente</b> y su ubicación." },
-    { t: "🧰 Insumos y Cervantes", c: "RI · EI · SC", x: "RI/EI = recepción/entrega de insumos. SC = salida de mercadería a Cervantes." },
+    { t: "🧰 Insumos y Cervantes", c: "Insumos · SC", x: "<b>Insumos</b> = un solo botón: elegís <b>Recibir</b> (entra stock), <b>Entregar</b> (sale) o <b>Agregar</b> uno nuevo que no está en el sistema. SC = salida de mercadería a Cervantes." },
     { t: "⏱ Pausas y otros", c: "AT · PB · Limp · Perm · PC · CT", x: "Marcá cuándo: atendés el timbre (AT), vas al baño (PB), limpiás (Limp), pedís permiso (Perm), parás a comer (PC) o hacés conteo (CT). Tocás al <b>empezar</b> y otra vez al <b>terminar</b>." }
   ];
   ov.innerHTML = '<div class="instr-card"><div class="instr-head"><span class="instr-title">❓ ¿Cómo se usa?</span><button class="instr-close" onclick="closeInstructivo()">Cerrar</button></div><div class="instr-body">' +
@@ -6007,7 +6008,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.48";
+const APP_VERSION = "v7.49";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -10373,9 +10374,9 @@ function _pvSub(a, b) {
   }
   return _pvNorm(out);
 }
-var _PV_BUCKET = { CC: "carga", CCN: "carga", CCR: "carga", CR: "control", CRN: "control", MG: "movim", EI: "insumos", RI: "insumos", RT: "recep", RR: "recep", PC: "comida", PB: "pausa", Limp: "limpieza" };
-var _PV_ORDER = ["comida", "pausa", "carga", "control", "movim", "insumos", "recep", "limpieza", "otros"];   // descansos primero (recortan tareas dejadas abiertas)
-var _PV_CAP = { comida: 90, pausa: 60, carga: 180, control: 45, movim: 30, insumos: 240, recep: 240, limpieza: 45, otros: 90 };   // topes (min) SOLO de tareas secundarias
+var _PV_BUCKET = { CC: "carga", CCN: "carga", CCR: "carga", CR: "control", CRN: "control", MG: "movim", EI: "insumos", RI: "insumos", RT: "recep", RR: "recep", CP: "completar", PC: "comida", PB: "pausa", Limp: "limpieza" };   // v7.49: CP (Completar Pedido) mide su tiempo → bucket propio
+var _PV_ORDER = ["comida", "pausa", "carga", "control", "movim", "insumos", "recep", "completar", "limpieza", "otros"];   // descansos primero (recortan tareas dejadas abiertas)
+var _PV_CAP = { comida: 90, pausa: 60, carga: 180, control: 45, movim: 30, insumos: 240, recep: 240, completar: 120, limpieza: 45, otros: 90 };   // topes (min) SOLO de tareas secundarias
 function _pvOperator(evs, m3of, D1, D2) {
   evs = evs.filter(function (e) { return e.cli >= D1 && e.cli < D2; }).sort(function (a, b) { return a.cli - b.cli; });
   var byDay = {}, e, d, o, i;
@@ -10770,6 +10771,7 @@ function prodRender() {
       { lbl: "Movimiento", key: "movim", min: minOf(bk.movim), col: "#f59e0b" },
       { lbl: "Recepción", key: "recep", min: minOf(bk.recep), col: "#0284c7" },
       { lbl: "Insumos", key: "insumos", min: minOf(bk.insumos), col: "#0ea5e9" },
+      { lbl: "Completar Ped.", key: "completar", min: minOf(bk.completar), col: "#c026d3" },
       { lbl: "Comida", key: "comida", min: minOf(bk.comida), col: "#64748b" },
       { lbl: "Pausa", key: "pausa", min: minOf(bk.pausa), col: "#94a3b8" },
       { lbl: "Limpieza", key: "limpieza", min: minOf(bk.limpieza), col: "#84cc16" },
@@ -10780,7 +10782,7 @@ function prodRender() {
   };
 
   // panel de detalle al tocar un color del desglose (de qué se compone ese tiempo)
-  const PV_LBL = { productivo: "Productivo", carga: "Carga camión", control: "Control", movim: "Movimiento", recep: "Recepción", insumos: "Insumos", comida: "Comida", pausa: "Pausa", limpieza: "Limpieza", otros: "Otros", ocio: "Ocio" };
+  const PV_LBL = { productivo: "Productivo", carga: "Carga camión", control: "Control", movim: "Movimiento", recep: "Recepción", insumos: "Insumos", completar: "Completar Pedido", comida: "Comida", pausa: "Pausa", limpieza: "Limpieza", otros: "Otros", ocio: "Ocio" };
   const fmtMin = function (ms) { const m = Math.round(ms / 60000); return m >= 60 ? (Math.floor(m / 60) + "h " + _pv2(m % 60) + "m") : (m + "m"); };
   const detailPanel = function (o, key, bd) {
     const seg = bd.segs.filter(function (s) { return s.key === key; })[0];
@@ -13616,6 +13618,34 @@ async function insFetchCatalogo() {
     return r.ok ? await r.json() : [];
   } catch (_e) { return []; }
 }
+/* v7.49 — Botón unificado "Insumos": en vez de dos botones sueltos (RI / EI), el
+   operario toca UN botón y elige qué hacer. Recibir → RI, Entregar → EI (misma mecánica
+   de siempre: selectOption abre el toggle + el modal de insumos). "Agregar insumo nuevo"
+   va a RI y abre directo el alta (el mismo "+ Agregar insumo nuevo" que ya tiene la
+   recepción). El chooser es un popup liviano al estilo de showMGChooser. */
+function insumoChooser(legajo) {
+  let ov = document.getElementById("insChooserModal");
+  if (!ov) { ov = document.createElement("div"); ov.id = "insChooserModal"; ov.style.cssText = "position:fixed;inset:0;z-index:1297;background:rgba(2,6,23,.74);display:flex;align-items:center;justify-content:center;padding:16px;"; document.body.appendChild(ov); }
+  const btn = "width:100%;margin-bottom:10px;padding:16px;border:none;border-radius:12px;color:#fff;font-size:16px;font-weight:800;cursor:pointer;text-align:left;";
+  const sub = 'font-weight:600;opacity:.85;';
+  ov.innerHTML = '<div style="background:#f8fafc;max-width:380px;width:100%;border-radius:16px;padding:18px;box-shadow:0 24px 70px rgba(0,0,0,.5);box-sizing:border-box;">' +
+    '<div style="font-size:18px;font-weight:800;margin-bottom:3px;">🧰 Insumos</div>' +
+    '<div style="font-size:13px;color:#64748b;margin-bottom:16px;">¿Qué querés hacer?</div>' +
+    '<button onclick="insChooserGo(\'RI\')" style="' + btn + 'background:#4f46e5;">📥 Recibir insumos <span style="' + sub + '">(entra stock)</span></button>' +
+    '<button onclick="insChooserGo(\'EI\')" style="' + btn + 'background:#0d9488;">📤 Entregar insumos <span style="' + sub + '">(sale stock)</span></button>' +
+    '<button onclick="insChooserGo(\'NUEVO\')" style="' + btn + 'background:#1e6bd6;">➕ Agregar insumo nuevo <span style="' + sub + '">(no está en el sistema)</span></button>' +
+    '<button onclick="closeInsumoChooser()" style="width:100%;padding:11px;border:none;border-radius:10px;background:#e2e8f0;color:#475569;font-weight:700;cursor:pointer;">Cancelar</button>' +
+    '</div>';
+  ov.style.display = "flex";
+}
+function closeInsumoChooser() { const ov = document.getElementById("insChooserModal"); if (ov) ov.style.display = "none"; }
+/* "NUEVO" = recibir (RI) + abrir directo el alta de insumo. El flag lo consume
+   showInsumoModal cuando termina de cargar el catálogo (mode RI). */
+function insChooserGo(which) {
+  closeInsumoChooser();
+  window._insAutoNuevo = (which === "NUEVO");
+  selectOption(which === "NUEVO" ? "RI" : which);   // RI | EI — misma mecánica que los botones viejos
+}
 /* El CSS del modal de insumos lo usa también la solapa "Insumos" de Stock y Compras
    (chips de categoría), así que la inyección va aparte. */
 function insEnsureCss() {
@@ -13657,6 +13687,8 @@ async function showInsumoModal(mode, legajo, _resume) {
     items.sort(_insSortCod);
     _ins = { mode: mode, legajo: String(legajo || "").trim(), items: items, filtro: "", cat: "", qty: null, nuevo: null };
     insRender();
+    // v7.49: si vino por "➕ Agregar insumo nuevo" del chooser, abrir el alta directo (solo RI).
+    if (window._insAutoNuevo) { window._insAutoNuevo = false; if (mode === "RI") { try { insNuevoOpen(""); } catch (_e) {} } }
   } catch (e) { const b = document.getElementById("insBody"); if (b) b.innerHTML = '<div class="ins-loading">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
 }
 /* v4.36 — INSUMOS rediseñado: alta por CÓDIGO (7 dígitos sí o sí) o por SECTOR +
@@ -15439,6 +15471,7 @@ function cpRender() {
 function cpPickFalt(i) {
   if (!_cp) return; const e = _cp.falt[i]; if (!e) return;
   _cp.justDone = "";
+  _cp.tStart = Date.now();   // v7.49: arranca el cronómetro de ESTE completado (para medir cuánto tarda)
   _cp.sel = e; _cp.step = 2; _cp.qty = Math.max(1, Math.round(Number(e.cajas_falto) || 1));
   const sal = e._saldo || {};
   _cp.origen = (Number(sal.a_guardar) || 0) > 0 ? "a_guardar" : ((Number(sal.terminado) || 0) > 0 ? "terminado" : "a_guardar");
@@ -15547,10 +15580,15 @@ async function cpConfirm() {
     { cod_art: s.cod_art, descripcion: s.desc || null, deposito: "a_facturar", delta: qty, tipo: "cp", ref: String(s.np), legajo: leg || null }
   ];
   const lioTag = lioSel === "__new__" ? "NUEVA" : lioSel;
+  // v7.49: el CP ahora MIDE su tiempo. ts_inicio = cuando el operario eligió el faltante
+  // (_cp.tStart); ts = ahora (al confirmar). Así el evento CP lleva duración y el dashboard
+  // de Rendimiento lo cuenta en el bucket "Completar Pedido". Guard: si no hay tStart o quedó
+  // en el futuro (borrador viejo), no mandamos ts_inicio (evita duraciones absurdas).
+  var _cpIni = (_cp && _cp.tStart && _cp.tStart <= Date.now()) ? new Date(_cp.tStart).toISOString() : null;
   const payload = {
     legajo: String(leg || ""), opcion: "CP", descripcion: "Completar Pedido",
     texto: (String(s.np) + "|" + String(s.cod_art) + "|" + qty + "|" + (origen === "terminado" ? "GONDOLA" : "AGUARDAR") + "|" + lioTag).toUpperCase(),
-    ts: Date.now(), id: ("cp_" + s.np + "_" + s.cod_art + "_" + Date.now()).replace(/[^a-zA-Z0-9_\-]/g, ""), ts_inicio_iso: null
+    ts: Date.now(), id: ("cp_" + s.np + "_" + s.cod_art + "_" + Date.now()).replace(/[^a-zA-Z0-9_\-]/g, ""), ts_inicio_iso: _cpIni
   };
   try { enqueueReport(payload); if (typeof trySendOneReport === "function") trySendOneReport(payload).then(function (r) { if (r && r.ok) removeFromQueue(payload.id); }).catch(function () {}); } catch (_e) {}
   try { await stockMove(rows); } catch (_e) {}

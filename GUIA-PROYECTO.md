@@ -4,7 +4,30 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-05 · Versión app al documentar: **v7.48**
+> Última actualización: 2026-08-05 · Versión app al documentar: **v7.49**
+>
+> Nota: **v7.49 — Completar Pedido (CP) ahora MIDE su tiempo + botón de Insumos unificado**.
+> Dos pedidos del usuario, ambos del lado del operario. (1) **CP mide tiempo**: antes el evento
+> `CP` se emitía con `ts_inicio_iso=null` → era un evento puntual, **no registraba cuánto tardó** y
+> el dashboard de Rendimiento **no lo contaba**. Ahora `cpPickFalt` arranca un cronómetro
+> (`_cp.tStart`) cuando el operario **elige el faltante**, y `cpConfirm` manda el `CP` con
+> `ts_inicio` = ese arranque y `ts_cliente` = al confirmar → el evento lleva **duración**. En el
+> motor de monitoreo se agregó el bucket **`completar`** (`_PV_BUCKET.CP='completar'`, en
+> `_PV_ORDER`/`_PV_CAP` cap 120 min) y una franja **«Completar Ped.»** (color `#c026d3`) en el
+> desglose «En qué se va la jornada» de la sección Rendimiento de operarios. Guard: si `tStart`
+> falta o quedó en el futuro (borrador viejo), se manda sin `ts_inicio` (evita duraciones
+> absurdas). (2) **Insumos = un botón**: los dos botones sueltos **RI (Recepción)** y **EI
+> (Entrega)** de la 4ª fila se reemplazaron por **UN** botón 🧰 **«Entregar/Recibir Insumos»**
+> (código UI `INS` en `filas.row4`, no es un opcode). Al tocarlo abre un **chooser** liviano
+> (`insumoChooser`, estilo `showMGChooser`) con: **📥 Recibir** → `selectOption('RI')`, **📤
+> Entregar** → `selectOption('EI')` (misma mecánica de toggle + modal de siempre) y **➕ Agregar
+> insumo nuevo** → RI + abre directo el alta (flag `_insAutoNuevo` que consume `showInsumoModal`,
+> el mismo «+ Agregar insumo nuevo» que ya tenía la recepción; el alta sigue **solo en RI**, en EI
+> no se puede). Los eventos y descripciones RI/EI **no cambian** (siguen en `desc` para el
+> historial). Verificado: `tests/run.sh` completo OK (incl. `dead-handlers`, `prod-compute`,
+> `ins-categorias`, `ins-admin`, `version-sync`) + chequeo headless (CP suma 30 min al bucket
+> `completar` sin contaminar picking; botonera con `INS` y sin `RI`/`EI`; chooser con las 3
+> opciones) + screenshot del chooser. Bump **v7.49**.
 >
 > Nota (backend, **sin bump de app**): **La PROYECCIÓN que alimenta el generador de OCs estaba
 > CONGELADA y fallaba en silencio → arreglada**. El Máximo del generador = `proyección × índice`;
