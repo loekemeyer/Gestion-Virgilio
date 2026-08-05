@@ -4,7 +4,19 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-05 · Versión app al documentar: **v7.63**
+> Última actualización: 2026-08-05 · Versión app al documentar: **v7.64**
+>
+> Nota: **v7.64 — Fix del botón 📲 WhatsApp: ahora SÍ copia la imagen + reusa la misma pestaña**.
+> Dos correcciones sobre v7.63. **(1) No copiaba** (reportado por el usuario): el copiado (`clipboard.
+> write`) se disparaba **sin `await`** y **antes** de abrir WhatsApp, así que el cambio de foco a la
+> pestaña nueva **cortaba** el write y no copiaba nada. Ahora se **espera** a que el copiado TERMINE
+> con el documento enfocado y **recién después** se abre WhatsApp (el `window.open` sigue dentro de la
+> activación transitoria del click de 5 s, así que no lo bloquea el pop-up). Verificado que `_ocPngBlob`
+> genera el PNG bien (sin *taint* del canvas). **(2) Abría ventana nueva cada vez**: el `window.open`
+> ahora usa un **target con nombre fijo** (`"pv_whatsapp"`) → reusa la MISMA pestaña de WhatsApp en
+> clicks sucesivos (+ `win.focus()`). ⚠ Límite del navegador: **no** se puede tomar una pestaña de
+> WhatsApp que abrió el usuario por su cuenta (aislamiento entre pestañas); sólo se reusa la que abre la
+> app. Si el portapapeles falla, sigue el fallback de **descargar** la imagen. Bump **v7.64**.
 >
 > Nota: **v7.63 — 📲 Enviar la OC por WhatsApp al tallerista**. En el detalle de una OC, botón nuevo
 > **📲 WhatsApp** (junto a 🖨 Operador / 🖨 Tallerista): **copia la OC como IMAGEN al portapapeles** y

@@ -6028,7 +6028,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.63";
+const APP_VERSION = "v7.64";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -9999,26 +9999,34 @@ async function ocWhatsappTallerista() {
   const tel = String(ocTelDe(x.proveedor) || "").replace(/\D/g, "");   // sólo dígitos para wa.me
   if (!tel) { alert('No hay WhatsApp cargado para "' + (x.proveedor || "") + '" (o está marcado para no enviarle por WhatsApp). Se administra en la tabla Talleristas_Contacto.'); return; }
   const waUrl = "https://wa.me/" + tel;
-  // Copiar la imagen DENTRO del gesto (doc enfocado) y recién después abrir WhatsApp
-  // (así el bloqueador de pop-ups no corta el window.open).
+  // ⚠ Hay que ESPERAR (await) a que el copiado TERMINE con el documento ENFOCADO. Si abrimos
+  // WhatsApp antes, el cambio de foco a la pestaña nueva corta el write y no copia nada (bug
+  // v7.63). Copiamos primero, y recién después abrimos WhatsApp — el window.open sigue dentro
+  // de la activación transitoria del click (5 s), así que no lo bloquea el pop-up.
   let copiada = false;
   if (navigator.clipboard && window.ClipboardItem) {
-    try { navigator.clipboard.write([new ClipboardItem({ "image/png": _ocPngBlob(x) })]); copiada = true; }
+    try { await navigator.clipboard.write([new ClipboardItem({ "image/png": _ocPngBlob(x) })]); copiada = true; }
     catch (e) { copiada = false; }
   }
-  window.open(waUrl, "_blank");
-  if (copiada) { alert("✓ OC copiada como imagen. En el chat de WhatsApp que se abrió, pegala con Ctrl+V y enviala."); return; }
-  // Fallback: descargar la imagen para adjuntarla a mano.
-  try {
-    const b = await _ocPngBlob(x);
-    const url = URL.createObjectURL(b), a = document.createElement("a");
-    a.href = url; a.download = "OC " + String(x.proveedor || "").replace(/[^\w -]/g, "") + " " + (x.fecha || "") + ".png";
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(function () { URL.revokeObjectURL(url); }, 5000);
-    alert("Descargué la OC como imagen (carpeta Descargas). Adjuntala en el chat de WhatsApp que se abrió.");
-  } catch (e2) {
-    alert("Abrí el chat de WhatsApp. No pude generar la imagen — usá 🖨 Tallerista y adjuntá el PDF a mano.");
+  if (!copiada) {
+    // Fallback (portapapeles no disponible o falló): descargar la imagen para adjuntarla a mano.
+    try {
+      const b = await _ocPngBlob(x);
+      const url = URL.createObjectURL(b), a = document.createElement("a");
+      a.href = url; a.download = "OC " + String(x.proveedor || "").replace(/[^\w -]/g, "") + " " + (x.fecha || "") + ".png";
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 5000);
+    } catch (e2) { /* ni copiar ni descargar: igual abrimos WhatsApp para poder escribirle */ }
   }
+  // Target con NOMBRE fijo → reusa la MISMA pestaña de WhatsApp en clicks sucesivos (no abre
+  // una nueva cada vez). Nota: el navegador NO permite tomar una pestaña que abrió el usuario
+  // por su cuenta; sólo se reusa la que abrió la app con este nombre.
+  const win = window.open(waUrl, "pv_whatsapp");
+  if (win) { try { win.focus(); } catch (e) {} }
+  if (!win) { alert((copiada ? "OC copiada como imagen. " : "") + "El navegador bloqueó la ventana. Permití los pop-ups para este sitio y volvé a tocar 📲 WhatsApp."); return; }
+  alert(copiada
+    ? "✓ OC copiada como imagen. En el chat de WhatsApp que se abrió, pegala con Ctrl+V y enviala."
+    : "Descargué la OC como imagen (carpeta Descargas). Adjuntala en el chat de WhatsApp que se abrió.");
 }
 /* v7.58 — el "recibido" ya no se carga a mano: es lo que registró la recepción. Al
    marcar RECIBIDA se toma una FOTO de ese valor en `cantidad_recibida` (para dejar el
