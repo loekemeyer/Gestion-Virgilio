@@ -6054,7 +6054,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.72";
+const APP_VERSION = "v7.73";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -11782,55 +11782,6 @@ function stkBodyStocks() {
     }
   });
   h += "</tbody></table></div>";
-  // v4.09: insumos (depósito 'insumos') — sección aparte, mismo filtro.
-  const ins = arts.filter(function (a) { return (a.insumos || 0) !== 0; });
-  let insShown = f ? ins.filter(function (a) { return (a.cod + " " + a.desc).toLowerCase().indexOf(f) >= 0; }) : ins;
-  if (_stk.soloNeg) insShown = insShown.filter(function (a) { return _stkIsNeg(a.insumos); });   // v7.48: tilde "🔴 Negativos"
-  if (insShown.length) {
-    // idea 7382: el saldo de insumos MEZCLABA unidades (kg/Uni/Bolsas/MC/…) sumándolas como
-    // si fueran lo mismo → número sin sentido físico. Desglosamos el saldo POR UNIDAD desde
-    // los movimientos (kg y Kg se unifican case-insensitive; null/vacío = "(s/u)"), con el
-    // mismo corte/asOf que el resto. Si un insumo tiene >1 unidad, mostramos cada una aparte.
-    const _insCut = _stk.cutoff ? new Date(_stk.cutoff).getTime() : 0;
-    const _insLim = _stk.asOf ? new Date(_stk.asOf).getTime() : 0;
-    const _insByUni = {};
-    _stk.movs.forEach(function (mv) {
-      if (mv.deposito !== "insumos") return;
-      var t = new Date(mv.ts).getTime();
-      if (_insLim && mv.tipo !== "inicial" && t > _insLim) return;
-      if (_insCut && mv.tipo !== "inicial" && t < _insCut) return;
-      var c = String(mv.cod_art);
-      var uniRaw = String(mv.unidad == null ? "" : mv.unidad).trim();
-      var uniKey = uniRaw ? uniRaw.toLowerCase() : "(s/u)";
-      if (!_insByUni[c]) _insByUni[c] = {};
-      if (!_insByUni[c][uniKey]) _insByUni[c][uniKey] = { uni: uniRaw || "(s/u)", saldo: 0 };
-      _insByUni[c][uniKey].saldo += Number(mv.delta || 0);
-    });
-    const _insUnidades = function (cod) {
-      var m = _insByUni[cod] || {};
-      return Object.keys(m).map(function (k) { return m[k]; })
-        .filter(function (u) { return Math.round(u.saldo * 1000) !== 0; })
-        .sort(function (a, b) { return String(a.uni).localeCompare(String(b.uni)); });
-    };
-    const _num = function (n) { return Math.round(n * 1000) / 1000; };
-    h += '<div class="stk-aj-h" style="margin-top:18px">📦 Insumos</div>';
-    h += '<table class="stk-tbl"><thead><tr><th>Código</th><th>Descripción</th><th class="num">Stock</th><th>Medida</th><th>Sector</th></tr></thead><tbody>';
-    insShown.sort(function (a, b) { return String(a.cod).localeCompare(String(b.cod), undefined, { numeric: true }); }).forEach(function (a) {
-      var us = _insUnidades(a.cod);
-      var stockCell, medidaCell;
-      if (us.length > 1) {
-        stockCell = us.map(function (u) { return '<div class="' + (u.saldo < 0 ? "stk-neg" : "") + '"><b>' + _num(u.saldo) + '</b> <small style="color:#64748b;font-weight:600">' + escapeHtml(u.uni) + '</small></div>'; }).join("");
-        medidaCell = '<span style="color:#b45309;font-size:11px;font-weight:700" title="Este insumo tiene movimientos en más de una unidad — el saldo va SEPARADO por unidad, no sumado">⚠ varias</span>';
-      } else {
-        var only = us[0];
-        var v = only ? _num(only.saldo) : a.insumos;
-        stockCell = '<b class="' + (v < 0 ? "stk-neg" : "") + '">' + v + '</b>';
-        medidaCell = escapeHtml((only && only.uni) || a._uni || "—");
-      }
-      h += '<tr><td class="stk-cod">' + escapeHtml(a.cod) + '</td><td class="stk-desc">' + escapeHtml(artNombre(a.cod, a.desc) || "—") + '</td><td class="num">' + stockCell + '</td><td>' + medidaCell + '</td><td>' + escapeHtml(a._ubi || "—") + '</td></tr>';
-    });
-    h += "</tbody></table>";
-  }
   return h;
 }
 /* v4.22 — Solapa "A Separar": pipeline de stock entre el picking y la facturación.
