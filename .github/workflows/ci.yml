@@ -17,8 +17,8 @@ jobs:
       # tests/run.sh respeta esta variable (no cae al path /opt del sandbox).
       PLAYWRIGHT_BROWSERS_PATH: "0"
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v4.1.7
+      - uses: actions/setup-node@v4.0.3
         with:
           node-version: "20"
       - name: Instalar Playwright + Chromium
