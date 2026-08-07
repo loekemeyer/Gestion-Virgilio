@@ -296,7 +296,21 @@ catch (_e) {
     // de categoría (Kg) en vez de "—" (fallback de v7.34). Nada se pierde.
     const tr5Todos = Array.prototype.filter.call(tot.querySelectorAll("tbody tr"), function (tr) { return /38 X 0,55/.test(tr.textContent); })[0];
     out.ceroEnTodosConUni = !!tr5Todos && /Kg/.test(tr5Todos.querySelectorAll("td")[5].textContent);
-    out.totalSinEditar = !tot.querySelector("tbody input") && !tot.querySelector("tbody select");
+    // v7.82: la tabla de «Todos los insumos» tiene botón Editar en cada fila (editor
+    // de cantidad inline). Sin editar no hay inputs en tbody (sólo botones).
+    out.totalTieneEditar = !!tot.querySelector("tbody button") && /Editar/.test(tot.querySelector("tbody button").textContent);
+    out.totalSinEditarInline = !tot.querySelector("tbody input") && !tot.querySelector("tbody select");
+    // Click en Editar de la fila del código 5 (38 X 0,55, en 0): aparecen inputs
+    const btnEd5 = Array.prototype.filter.call(tot.querySelectorAll("tbody button"), function (b) { return b.textContent === "Editar" && b.closest("tr").textContent.indexOf("38 X 0,55") >= 0; })[0];
+    if (btnEd5) btnEd5.click();
+    const tot2 = document.querySelectorAll("#stkBody table"); const totAfter = tot2[tot2.length - 1];
+    out.totalEditAbreInputs = !!totAfter.querySelector("tbody input#edQty_5");
+    out.totalEditAbreGuardar = !!totAfter.querySelector("tbody button") && /Guardar/.test(totAfter.innerHTML);
+    // Cancelar vuelve al modo lectura
+    const btnCancel = Array.prototype.filter.call(totAfter.querySelectorAll("tbody button"), function (b) { return b.textContent === "Cancelar"; })[0];
+    if (btnCancel) btnCancel.click();
+    const tot3 = document.querySelectorAll("#stkBody table"); const totAfter2 = tot3[tot3.length - 1];
+    out.totalEditCancela = !totAfter2.querySelector("tbody input#edQty_5");
     out.totalHayFiltros = !!tot.querySelector("thead tr.stk-filtros input");
     stkInsFiltro("cod", "22");
     const tablas2 = document.querySelectorAll("#stkBody table");
@@ -376,7 +390,9 @@ catch (_e) {
     r.histTieneFusion === true && r.histTieneCatGuardar === true && r.histMuestraQuien === true &&
     r.histOrdenado === true && r.histFiltraCat === true &&
     r.hayTablaTotal === true && /Código\|Detalle\|Categoría\|Rack \/ sector\|Cantidad\|Unidad/.test(r.totalCols || "") &&
-    r.totalSinEditar === true && r.totalHayFiltros === true && r.totalFiltraCod === 1 &&
+    r.totalTieneEditar === true && r.totalSinEditarInline === true &&
+    r.totalEditAbreInputs === true && r.totalEditAbreGuardar === true && r.totalEditCancela === true &&
+    r.totalHayFiltros === true && r.totalFiltraCod === 1 &&
     r.totalFiltraSinCat >= 1 && r.totalSeActualiza === true && r.uniProhibidaBloquea === true &&
     r.opVeCatNueva === true && r.opVeRenombrada === true && r.opVeInsumoDeLaCat === true &&
     r.opUniDeLaCat === "Rollos" && r.opAltaUnidades === "Rollos,Kg" && r.opAltaUniDeLaCat === "Rollos" &&
