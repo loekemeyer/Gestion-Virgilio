@@ -311,6 +311,20 @@ catch (_e) {
     if (btnCancel) btnCancel.click();
     const tot3 = document.querySelectorAll("#stkBody table"); const totAfter2 = tot3[tot3.length - 1];
     out.totalEditCancela = !totAfter2.querySelector("tbody input#edQty_5");
+    // v7.82 bug-fix: ejercitar el flujo completo de Guardar desde "Todos" en un código
+    // con stock 0 (código 5, fleje, sin saldo en la vista). El POST tiene que llegar.
+    stkInsEdit("art:5");                                       // abrir editor
+    var preMovs = movs.length;
+    alerted = "";
+    var eQ = document.getElementById("edQty_5");
+    if (eQ) eQ.value = "666";
+    await stkInsGuardar("5");
+    out.totalGuardaPostea = movs.length > preMovs;
+    out.totalGuardaDelta = movs.length > preMovs ? movs[movs.length - 1].delta : null;
+    out.totalGuardaUni = movs.length > preMovs ? movs[movs.length - 1].unidad : null;
+    out.totalGuardaCod = movs.length > preMovs ? movs[movs.length - 1].cod_art : null;
+    out.totalGuardaMsg = _stkIns.msg || "";
+    out.totalGuardaAlert = alerted;
     out.totalHayFiltros = !!tot.querySelector("thead tr.stk-filtros input");
     stkInsFiltro("cod", "22");
     const tablas2 = document.querySelectorAll("#stkBody table");
@@ -392,6 +406,7 @@ catch (_e) {
     r.hayTablaTotal === true && /Código\|Detalle\|Categoría\|Rack \/ sector\|Cantidad\|Unidad/.test(r.totalCols || "") &&
     r.totalTieneEditar === true && r.totalSinEditarInline === true &&
     r.totalEditAbreInputs === true && r.totalEditAbreGuardar === true && r.totalEditCancela === true &&
+    r.totalGuardaPostea === true && r.totalGuardaDelta === 666 && r.totalGuardaUni === "Kg" && r.totalGuardaCod === "5" &&
     r.totalHayFiltros === true && r.totalFiltraCod === 1 &&
     r.totalFiltraSinCat >= 1 && r.totalSeActualiza === true && r.uniProhibidaBloquea === true &&
     r.opVeCatNueva === true && r.opVeRenombrada === true && r.opVeInsumoDeLaCat === true &&
