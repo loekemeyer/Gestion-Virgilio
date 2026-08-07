@@ -14,6 +14,37 @@ inventes**.
 **Mantené `GUIA-PROYECTO.md` actualizada** cuando cambie el código o los datos
 (nuevos códigos `opcion`, tablas, flujo, versión, etc.).
 
+## ⚠ PROTOCOLO OBLIGATORIO: Backups antes de tocar datos en Supabase
+
+**SIEMPRE que edites/alters/truncates/deletes en tablas de Supabase:**
+
+1. **Haz un backup ANTES** de cualquier cambio:
+   ```sql
+   -- Exportar completa la tabla como SQL restore-ready
+   SELECT * FROM table_name;
+   -- Copiar resultado → archivo SQL con CREATE + INSERTs
+   ```
+2. **Guarda el backup** como `backup_table_YYYYMMDD_hhmmss.sql` en un lugar seguro (comentario/notas).
+3. **Ejecuta tu cambio** (ALTER, TRUNCATE, DELETE, INSERT).
+4. **Si algo falla o se rompe:** Restore inmediato ejecutando el SQL guardado.
+
+**Ejemplo:**
+```sql
+-- BACKUP (ejecutar primero, guardar resultado)
+SELECT 'INSERT INTO Capacidad_Sector (empresa, sector, cod, cajas_max) VALUES (' ||
+  quote_literal(empresa) || ',' || quote_literal(sector) || ',' || 
+  quote_literal(cod) || ',' || quote_literal(cajas_max) || ');'
+FROM "Capacidad_Sector"
+WHERE empresa IS NOT NULL;
+
+-- Aquí va tu cambio (DESPUÉS de guardar el backup)
+ALTER TABLE Capacidad_Sector ADD COLUMN nueva_col TEXT;
+
+-- Si falla: restore ejecutando los INSERTs guardados
+```
+
+**Historial de incidentes:** 2026-08-07 — TRUNCATE accidental de Capacidad_Sector (730 registros perdidos). Lección aprendida → este protocolo existe.
+
 ## Quick-ref
 
 - **Datos**: Supabase, proyecto `Control Partes Talleristas`, id
