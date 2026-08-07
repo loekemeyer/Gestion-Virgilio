@@ -6054,7 +6054,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.84";
+const APP_VERSION = "v7.85";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -11649,7 +11649,8 @@ function stkBodyStocks() {
   shown = shown.filter(function (a) { return !_insCodsSet.has(String(a.cod || "").trim().toUpperCase()); });
   // v7.48: tilde "🔴 Negativos" — se aplica ADEMÁS del buscador. Deja sólo los artículos con
   // saldo negativo en algún depósito (para cazar inconsistencias de stock de un vistazo).
-  const _stkNegCount = arts.filter(_stkArtHasNeg).length + arts.filter(function (a) { return _stkIsNeg(a.insumos); }).length;
+  // v7.85: solo cuenta stock negativo (no insumos), para que el badge coincida con lo que muestra el filtro
+  const _stkNegCount = arts.filter(_stkArtHasNeg).length;
   // v7.54: tilde "⚠ Stock bajo" — códigos donde stock actual < pedidos
   const _stkLowCount = arts.filter(function (a) {
     const stock = (Number(a.terminado) || 0) + (Number(a.excedente) || 0) + (Number(a.separar_pedidos) || 0) + (Number(a.a_facturar) || 0) + (Number(a.a_guardar) || 0) + (Number(a.racks) || 0) + (Number(a.racks_ch) || 0);
