@@ -6054,7 +6054,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.82";
+const APP_VERSION = "v7.83";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -12191,7 +12191,6 @@ function stkOpenCapArt(codEnc) {
   const body = document.getElementById("stkPopBody"); if (!body) return;
   const mine = (_stk.cap || []).filter(function (r) { return _ocgNorm(r.cod) === codN; })
     .map(function (r) { return { sector: String(r.sector || "—").trim(), cajas: Number(r.cajas_max) || 0 }; })
-    .filter(function (r) { return r.cajas > 0; })
     .sort(function (a, b) { return String(a.sector).localeCompare(String(b.sector), undefined, { numeric: true }); });
   if (!mine.length) { body.innerHTML = '<div class="stkpop-empty">No hay capacidad de góndola cargada para ' + escapeHtml(cod) + '.</div>'; return; }
   const tot = mine.reduce(function (s, r) { return s + r.cajas; }, 0);
