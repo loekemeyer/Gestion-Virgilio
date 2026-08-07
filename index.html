@@ -6054,7 +6054,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.81";
+const APP_VERSION = "v7.82";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -13220,11 +13220,12 @@ function _stkInsUniUso(u, items) {
   const cats = INS_CATS.filter(function (c) { return (c.unis || []).indexOf(u) >= 0; });
   return { arts: arts.length, cats: cats.length, artsList: arts, catsList: cats };
 }
-/* ---------- (4) TODOS LOS INSUMOS — tabla de sólo lectura ----------
-   La foto completa del catálogo en un solo lugar, filtrable. No edita nada: para
-   cambiar algo se usa la sección de arriba que corresponda. Sale del mismo `items`
-   que el resto, así que se actualiza sola con cada guardado (todas las acciones
-   terminan en `stkInsRefresh()` + `stkRender()`). */
+/* ---------- (4) TODOS LOS INSUMOS — foto completa con editor de cantidad ----------
+   La foto completa del catálogo en un solo lugar, filtrable. Incluye los que están
+   en 0 (que las categorías de arriba ocultan). Cada fila tiene un botón «Editar»
+   que permite corregir cantidad, unidad, nombre, categoría y ubicación in-line —
+   ideal para ponerle stock a un código que está en 0 y no aparece arriba. Usa el
+   mismo `_stkIns.edit = "art:<cod>"` y `stkInsGuardar` que el listado por categoría. */
 function _stkInsTodos(items) {
   const f = _stkIns.tf || {};
   const _m = function (v, q) { return !q || String(v == null ? "" : v).toLowerCase().indexOf(String(q).toLowerCase().trim()) >= 0; };
@@ -13243,9 +13244,9 @@ function _stkInsTodos(items) {
   const unisEnUso = {}; (items || []).forEach(function (it) { (it.xuni || []).forEach(function (u) { unisEnUso[u.uni] = 1; }); });
   let h = _stkSec("todos", "📋 Todos los insumos", lista.length + (lista.length !== (items || []).length ? " / " + (items || []).length : ""));
   if (!_stkAbierta("todos")) return h;
-  h += '<div class="stk-cut">Sólo lectura: la foto completa del catálogo. Se actualiza sola cuando editás algo arriba.</div>';
+  h += '<div class="stk-cut">La foto completa del catálogo. Podés <b>editar cantidad y unidad</b> de cualquier insumo (incluidos los que están en 0). Se actualiza sola cuando editás algo arriba.</div>';
   h += '<div class="stk-scroll"><table class="stk-tbl"><thead><tr>' +
-    '<th>Código</th><th>Detalle</th><th>Categoría</th><th>Rack / sector</th><th class="num">Cantidad</th><th>Unidad</th></tr>' +
+    '<th>Código</th><th>Detalle</th><th>Categoría</th><th>Rack / sector</th><th class="num">Cantidad</th><th>Unidad</th><th></th></tr>' +
     '<tr class="stk-filtros">' +
     '<th><input class="stk-inp" style="width:100px;" placeholder="filtrar" value="' + escapeHtml(f.cod || "") + '" oninput="stkInsFiltro(\'cod\',this.value)"></th>' +
     '<th><input class="stk-inp" style="width:140px;" placeholder="filtrar" value="' + escapeHtml(f.nom || "") + '" oninput="stkInsFiltro(\'nom\',this.value)"></th>' +
@@ -13257,16 +13258,31 @@ function _stkInsTodos(items) {
     '<th><select class="stk-inp" onchange="stkInsFiltro(\'uni\',this.value)"><option value="">(todas)</option>' +
       Object.keys(unisEnUso).sort().map(function (u) { return '<option value="' + escapeHtml(u) + '"' + (f.uni === u ? " selected" : "") + '>' + escapeHtml(u) + '</option>'; }).join("") +
       '</select></th>' +
+    '<th></th>' +
     '</tr></thead><tbody>';
-  if (!lista.length) h += '<tr><td colspan="6" class="stk-empty">Nada con esos filtros.</td></tr>';
+  if (!lista.length) h += '<tr><td colspan="7" class="stk-empty">Nada con esos filtros.</td></tr>';
   else h += lista.map(function (it) {
-    const xs = (it.xuni || []).filter(function (u) { return Math.abs(u.saldo) > 0.0005; });
-    const neg = function (x) { return x < 0 ? ' style="color:#b91c1c;font-weight:800;"' : ""; };
+    const ed = _stkIns.edit === "art:" + it.cod;
+    if (ed) {
+      // ---------- fila en modo edición (mismos IDs que _stkInsListado → stkInsGuardar) ----------
+      var u = _stkInsUni1(it);
+      return '<tr><td><input class="stk-inp" id="edCod_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.cod) + '" style="width:100px;"></td>' +
+        '<td><input class="stk-inp" id="edNom_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.nombre) + '" style="width:140px;"></td>' +
+        '<td>' + _stkInsCatSel("edCat_" + it.cod, it.cat) + '</td>' +
+        '<td><input class="stk-inp" id="edUbi_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.ubic) + '" style="width:80px;"></td>' +
+        '<td><input class="stk-inp" id="edQty_' + escapeHtml(it.cod) + '" type="number" step="any" value="' + escapeHtml(u.saldo) + '" style="width:82px;"></td>' +
+        '<td>' + _stkInsUniSel("edUni_" + it.cod, _stkInsUniMostrar(it)) + '</td>' +
+        '<td><button class="stk-btn" onclick="stkInsGuardar(\'' + escapeHtml(it.cod) + '\')">✓ Guardar</button> ' +
+        '<button class="stk-btn stk-btn-x" onclick="stkInsEdit(null)">Cancelar</button></td></tr>';
+    }
+    var xs = (it.xuni || []).filter(function (u) { return Math.abs(u.saldo) > 0.0005; });
+    var neg = function (x) { return x < 0 ? ' style="color:#b91c1c;font-weight:800;"' : ""; };
     return '<tr><td><b>' + escapeHtml(it.cod) + '</b></td><td>' + escapeHtml(it.nombre || "—") + '</td>' +
       '<td>' + escapeHtml(insCatLbl(insCatOf(it))) + '</td>' +
       '<td>' + escapeHtml(it.ubic || "—") + '</td>' +
       '<td class="num">' + (xs.length ? xs.map(function (x) { return '<div' + neg(x.saldo) + '>' + (Math.round(x.saldo * 1000) / 1000) + '</div>'; }).join("") : '<span class="stk-sub">0</span>') + '</td>' +
-      '<td>' + (xs.length ? xs.map(function (x) { return '<div>' + escapeHtml(x.uni) + '</div>'; }).join("") : '<span class="stk-sub">' + escapeHtml(_stkInsUniMostrar(it) || "—") + '</span>') + '</td></tr>';
+      '<td>' + (xs.length ? xs.map(function (x) { return '<div>' + escapeHtml(x.uni) + '</div>'; }).join("") : '<span class="stk-sub">' + escapeHtml(_stkInsUniMostrar(it) || "—") + '</span>') + '</td>' +
+      '<td><button class="stk-btn" onclick="stkInsEdit(\'art:' + escapeHtml(it.cod) + '\')">Editar</button></td></tr>';
   }).join("");
   return h + '</tbody></table></div>';
 }
