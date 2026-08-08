@@ -3289,6 +3289,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       <span class="fac-chip orange">NPs pendientes: <span id="facCntPend">0</span></span>
       <span class="fac-chip green">NPs facturados hoy: <span id="facCntDone">0</span></span>
       <span class="fac-chip red clickable" id="facChipFalt" onclick="facToggleSoloFalt()" style="display:none" title="Pedidos que salieron con faltante — clic para ver SOLO esos y revisarlos antes de facturar">⚠ Con faltante: <span id="facCntFalt">0</span></span>
+      <span class="fac-chip clickable" id="facChipCorr" onclick="facCorreccOpen()" style="display:none;background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe;" title="Pedidos cargados en código SECUNDARIO. Cambiá la NP en el ERP y confirmá acá → el picking levanta el principal">🔀 Corregir códigos: <span id="facCntCorr">0</span></span>
       <button id="facBtnRevertir" class="fac-btn-revertir" disabled onclick="facRevertir()" title="Borra todos los ticks pendientes de cierre">↺ Revertir</button>
       <span class="fac-chip"><span class="fac-dot" id="facDot"></span><span id="facStatusTxt">Cargando…</span></span>
     </div>
@@ -6143,7 +6144,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.90";
+const APP_VERSION = "v7.91";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -7256,6 +7257,30 @@ async function fetchPickingBaseFromSupabase() {
 /* (v5.34) fetchPickingBaseFromSheets eliminado: la base de pedidos se lee de
    Supabase (fetchPickingBaseFromSupabase). */
 
+/* v7.91 — Correcciones por NP confirmadas por la operadora (secundario → principal).
+   Cuando la operadora da OK (ya cambió la NP en el ERP), se guarda en Correcciones_Pedido.
+   El picking las levanta → usa el PRINCIPAL para esa NP, sin esperar el resync del ERP. */
+const SUPABASE_CORRECC_ENDPOINT = SUPABASE_URL + "/rest/v1/Correcciones_Pedido";
+let _correccCache = null, _correccTs = 0;
+async function fetchCorrecciones(force) {
+  const now = Date.now();
+  if (!force && _correccCache && (now - _correccTs) < 60000) return _correccCache;
+  const m = {};
+  try {
+    const rows = await supaFetchAllSafe(SUPABASE_CORRECC_ENDPOINT, "select=np,cod_secundario,cod_principal");
+    rows.forEach(function (r) {
+      const np = pickNormNp(r.np), sec = _ocgNorm(r.cod_secundario);
+      if (np && sec && r.cod_principal) m[np + "|" + sec] = String(r.cod_principal).trim();
+    });
+  } catch (_e) { /* sin red: sin correcciones (el picking usa el código tal cual) */ }
+  _correccCache = m; _correccTs = now; return m;
+}
+/* Si (np, art) tiene una corrección confirmada, devuelve el PRINCIPAL; si no, el código igual. */
+function corrArt(art, np, corr) {
+  if (!corr) return art;
+  return corr[pickNormNp(np) + "|" + _ocgNorm(art)] || art;
+}
+
 /* m³ por artículo desde Supabase (tabla "Volumen_Articulos", migrada de la hoja
    "VolumenArticulos" en v5.33 — incluye los DOS bloques de la hoja, que el parser
    gviz perdía). Devuelve Map<códigoUP, m3>. v>0 entra al mapa; 0 = sin medir → el
@@ -7436,7 +7461,7 @@ async function showPickingList(tanda, legajo, opts) {
   m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">Cargando artículos…</div>`;
   m.classList.add("show");
   try {
-    const [sheetMap, pickBase] = await Promise.all([fetchMonitorSheet(), fetchPickingBase()]);
+    const [sheetMap, pickBase, corrMap] = await Promise.all([fetchMonitorSheet(), fetchPickingBase(), fetchCorrecciones()]);
     const entry = sheetMap.get(tNorm);
     const nps = [];
     if (entry && entry.pedidos) {
@@ -7455,7 +7480,9 @@ async function showPickingList(tanda, legajo, opts) {
     // partidos siguen sumando igual que siempre.
     const aggFrom = (base) => {
       const a = {};
-      for (const np of nps) for (const it of (base.get(np) || [])) { const k = pkCodEmpresa(it.art, np); a[k] = (a[k] || 0) + it.cajas; }
+      // v7.91 — si la operadora confirmó la corrección de esa NP (secundario→principal),
+      // el picking levanta el PRINCIPAL (corrArt) antes de partir por empresa.
+      for (const np of nps) for (const it of (base.get(np) || [])) { const k = pkCodEmpresa(corrArt(it.art, np, corrMap), np); a[k] = (a[k] || 0) + it.cajas; }
       return a;
     };
     let agg = aggFrom(pickBase);
@@ -25766,6 +25793,7 @@ function openFacturacion(){
   if (!requireSupervisor()) return;
   document.getElementById("facturacionModal").classList.add("show");
   facTick();
+  facCorreccRefreshCount();   // v7.91: chip "🔀 Corregir códigos" (pedidos en secundario)
   if (_facIntervalId) clearInterval(_facIntervalId);
   _facIntervalId = setInterval(facTick, FAC_REFRESH_MS);
 }
@@ -25932,6 +25960,77 @@ function facFaltDist(np){
     }
     return s;
   }).join(", ");
+}
+/* v7.91 — PANEL de la operadora: pedidos cargados en código SECUNDARIO a corregir.
+   Lee la vista vista_pedidos_secundarios (PPP_Base_Pedidos × Equivalencias_Familia) y
+   descarta los que ya confirmó (Correcciones_Pedido). Al confirmar, escribe la corrección
+   → el picking levanta el principal para esa NP. */
+async function facCorreccData(){
+  const [secRows, corr] = await Promise.all([
+    supaFetchAllSafe(SUPABASE_URL + "/rest/v1/vista_pedidos_secundarios", "select=np,cod_secundario,cod_principal,descripcion,cajas").catch(function(){ return []; }),
+    fetchCorrecciones(true)
+  ]);
+  const pend = [];
+  secRows.forEach(function(r){
+    const np = pickNormNp(r.np), sec = _ocgNorm(r.cod_secundario);
+    if (!np || !sec) return;
+    if (corr[np + "|" + sec]) return;   // ya confirmada
+    pend.push({ np: np, sec: String(r.cod_secundario).trim(), ppal: String(r.cod_principal).trim(), desc: r.descripcion || "", cajas: Number(r.cajas) || 0 });
+  });
+  pend.sort(function(a,b){ return (a.sec < b.sec ? -1 : a.sec > b.sec ? 1 : 0) || (a.np < b.np ? -1 : 1); });
+  return pend;
+}
+async function facCorreccRefreshCount(){
+  try {
+    const pend = await facCorreccData();
+    const chip = document.getElementById("facChipCorr"), n = document.getElementById("facCntCorr");
+    if (n) n.textContent = pend.length;
+    if (chip) chip.style.display = pend.length ? "" : "none";
+  } catch(_e){}
+}
+function facCorreccOpen(){
+  let ov = document.getElementById("facCorreccOverlay");
+  if (!ov){ ov = document.createElement("div"); ov.id = "facCorreccOverlay"; ov.style.cssText = "position:fixed;inset:0;z-index:1400;background:rgba(2,6,23,.7);overflow:auto;padding:16px;"; document.body.appendChild(ov); }
+  ov.style.display = "block";
+  ov.innerHTML = '<div style="max-width:640px;margin:0 auto;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5);">'
+    + '<div style="display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:linear-gradient(90deg,#1e6bd6,#1e3a8a);color:#fff;"><b style="font-size:17px;">🔀 Corregir códigos (secundario → principal)</b><button onclick="facCorreccClose()" style="width:auto;background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;">Cerrar</button></div>'
+    + '<div id="facCorreccBody" style="padding:14px 16px;"><div style="text-align:center;color:#64748b;padding:20px;">Cargando…</div></div></div>';
+  facCorreccRender();
+}
+function facCorreccClose(){ const ov = document.getElementById("facCorreccOverlay"); if (ov) ov.style.display = "none"; }
+async function facCorreccRender(){
+  const body = document.getElementById("facCorreccBody"); if (!body) return;
+  let pend;
+  try { pend = await facCorreccData(); } catch(_e){ body.innerHTML = '<div style="color:#b91c1c;padding:16px;">Error cargando.</div>'; return; }
+  if (!pend.length){ body.innerHTML = '<div style="text-align:center;color:#16a34a;padding:24px;font-weight:700;">✅ No hay códigos para corregir.</div>'; facCorreccRefreshCount(); return; }
+  let h = '<div style="font-size:12.5px;color:#64748b;margin-bottom:10px;">Estos pedidos entraron en un código <b>secundario</b>. Cambiá la NP en el ERP al principal y confirmá acá — el picking va a levantar el principal.</div>';
+  pend.forEach(function(p){
+    h += '<div style="display:flex;align-items:center;gap:10px;border:1px solid #e2e8f0;border-radius:10px;padding:9px 11px;margin-bottom:8px;">'
+      + '<div style="flex:1;min-width:0;"><div style="font-weight:800;">NP ' + escapeHtml(p.np) + ' · <span style="color:#b91c1c;">' + escapeHtml(p.sec) + '</span> → <span style="color:#16a34a;">' + escapeHtml(p.ppal) + '</span></div>'
+      + '<div style="font-size:12px;color:#64748b;">' + escapeHtml(p.desc) + ' · ' + p.cajas + ' cajas</div></div>'
+      + '<button onclick="facCorreccConfirm(this,\'' + encodeURIComponent(p.np) + '\',\'' + encodeURIComponent(p.sec) + '\',\'' + encodeURIComponent(p.ppal) + '\',' + p.cajas + ')" style="width:auto;flex:0 0 auto;background:#16a34a;color:#fff;border:none;border-radius:9px;padding:9px 13px;font-size:13px;font-weight:800;cursor:pointer;white-space:nowrap;">✓ Ya lo cambié</button>'
+      + '</div>';
+  });
+  body.innerHTML = h;
+}
+async function facCorreccConfirm(btn, npE, secE, ppalE, cajas){
+  const np = decodeURIComponent(npE), sec = decodeURIComponent(secE), ppal = decodeURIComponent(ppalE);
+  if (btn){ btn.disabled = true; btn.textContent = "Guardando…"; }
+  try {
+    let em = "";
+    try { if (typeof __identity !== "undefined" && __identity) em = __identity.email || __identity.nombre || ""; } catch(_e){}
+    const res = await fetch(SUPABASE_CORRECC_ENDPOINT, {
+      method: "POST",
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal,resolution=ignore-duplicates" },
+      body: JSON.stringify({ np: np, cod_secundario: sec, cod_principal: ppal, cajas: cajas, confirmado_por: em })
+    });
+    if (!res.ok && res.status !== 409) throw new Error("HTTP " + res.status);
+    _correccCache = null;   // invalidar cache → picking y panel toman la corrección nueva
+    facCorreccRender();
+  } catch(e){
+    if (btn){ btn.disabled = false; btn.textContent = "✓ Ya lo cambié"; }
+    try { alert("No se pudo guardar: " + (e.message || e)); } catch(_e){}
+  }
 }
 /* Tareas de faltante EN PROGRESO por NP (Faltantes_Tareas activas) → aviso AMARILLO
    en Facturación: "están agregando cajas a esta NP ahora, esperá antes de facturar".

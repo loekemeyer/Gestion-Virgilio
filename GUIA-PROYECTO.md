@@ -4,7 +4,22 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-08 · Versión app al documentar: **v7.90**
+> Última actualización: 2026-08-08 · Versión app al documentar: **v7.91**
+>
+> Nota: **v7.91 — Alerta Telegram por pedido a secundario + corrección por NP que el picking levanta.**
+> **(A) Alerta Telegram:** tabla `Equivalencias_Familia` (secundario→principal, 13 familias, la misma
+> lista curada que `EQUIV_FAMILIAS`) + trigger `trg_pedido_secundario_telegram` en `PPP_Base_Pedidos`
+> (por statement, transition table `newrows`, dedup `sec_<np>_<cod>`, blindado): cuando entra un pedido
+> a un código secundario, avisa al grupo Faltantes Virgilio (`tg_enqueue`/outbox). El backlog inicial
+> (231 combos) se sembró como "ya avisado" para no spamear; solo avisa los nuevos. **(B) Corrección por
+> NP:** tabla `Correcciones_Pedido` (np, cod_secundario, cod_principal, cajas, confirmado_por,
+> confirmado_en; PK np+cod_secundario; RLS select+insert para la app) + vista `vista_pedidos_secundarios`
+> (PPP_Base_Pedidos × Equivalencias_Familia). En Facturación (panel de la operadora) hay un chip
+> **🔀 Corregir códigos (N)** → abre la lista de pedidos en secundario; cada uno con **✓ Ya lo cambié**
+> (POST a Correcciones_Pedido, idempotente `ignore-duplicates`). El **picking** carga las correcciones
+> (`fetchCorrecciones`) y en `aggFrom` (showPickingList) aplica `corrArt(art,np,corr)` antes de
+> `pkCodEmpresa` → levanta el PRINCIPAL para esa NP sin esperar el resync del ERP. **PENDIENTE (2ª etapa):**
+> descuento incremental de stock durante el picking (EP).
 >
 > Nota: **v7.90 — Familias de EQUIVALENTES (mismo producto, distinto SKU, MISMA empresa).**
 > Constante curada `EQUIV_FAMILIAS` en `index.html` (13 familias, ⚠ NO incluye pares Loeke↔Chef,
