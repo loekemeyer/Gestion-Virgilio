@@ -6143,7 +6143,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.89";
+const APP_VERSION = "v7.90";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -10291,6 +10291,48 @@ async function ocgFetchMaximos() {
 const SUPABASE_PROY_ENDPOINT = SUPABASE_URL + "/rest/v1/proyeccion_madre";
 const OCG_FACTOR_MAXIMO = 1.5;
 function _ocgNorm(c) { return String(c || "").toUpperCase().trim().replace(/^0+(?=.)/, ""); }
+/* v7.90 — FAMILIAS DE EQUIVALENTES (curadas a mano con el dueño). Mismo producto
+   funcional, MISMA empresa: intercambiables para PLANIFICAR y FACTURAR (cambiando la
+   NP en el ERP), pero DISTINTOS para el picking (el operario NO debe confundirlos).
+   ⚠ NO incluir pares Loeke↔Chef: se facturan por empresas distintas.
+   `def` = código que se manda/stockea normalmente (el resto son excepcionales o
+   nacionales discontinuos que se sustituyen por el default). La sustitución la dispara
+   el STOCK: si el código pedido no tiene stock y un hermano sí, se avisa el cambio de NP. */
+const EQUIV_FAMILIAS = [
+  // Grupo A — con/sin E (productos sueltos)
+  { desc: "Corta Queso De Alambre",   def: "574E", cods: ["574E", "574"] },
+  { desc: "Sacacorcho Cabo Madera",   def: "525E", cods: ["525E", "525"] },
+  { desc: "Batidor Mini",             def: "580",  cods: ["580", "580E"] },
+  { desc: "Abrelata Mariposa",        def: "702E", cods: ["702E", "702EN"] },
+  { desc: "Sacacorcho Cabo Madera (CH)", def: "725E", cods: ["725E", "725"] },
+  { desc: "Rallador Cilíndrico/Mini", def: "323E", cods: ["323E", "323"] },
+  { desc: "Pinza De Hielo",           def: "607E", cods: ["607E", "565"] },
+  // Grupo B — 33x nacional (Carlos E) ↔ 94xE importada (Log/Fabr), LK. Nacional discontinuo → default = importada.
+  { desc: "Espátula Lisa",            def: "941E", cods: ["941E", "338"] },
+  { desc: "Cuchara Ac. Inox",         def: "942E", cods: ["942E", "334"] },
+  { desc: "Cucharón Ac. Inox",        def: "943E", cods: ["943E", "336"] },
+  { desc: "Espátula / Calada Ac. Inox", def: "945E", cods: ["945E", "332"] },
+  { desc: "Cuchara Calada/Mango Mad.", def: "946E", cods: ["946E", "335"] },
+  { desc: "Espumadera Ac. Inox",      def: "948E", cods: ["948E", "333"] }
+];
+let _equivIdx = null;
+function _equivBuild() {
+  if (_equivIdx) return _equivIdx;
+  const famOf = {}, defOf = {};
+  EQUIV_FAMILIAS.forEach(function (f) {
+    f._defN = _ocgNorm(f.def);
+    f._codsN = (f.cods || []).map(_ocgNorm);
+    f._codsN.forEach(function (cn) { if (cn) { famOf[cn] = f; defOf[cn] = f._defN; } });
+  });
+  _equivIdx = { famOf: famOf, defOf: defOf };
+  return _equivIdx;
+}
+/* Familia de un código (o null si no está en ninguna). */
+function equivFam(cod) { return _equivBuild().famOf[_ocgNorm(cod)] || null; }
+/* Clave canónica de familia = default normalizado (para agrupar). Si no hay familia, el propio código. */
+function equivFamKey(cod) { const f = equivFam(cod); return f ? f._defN : _ocgNorm(cod); }
+/* Miembros normalizados de la familia de un código (incluye el propio). */
+function equivMiembros(cod) { const f = equivFam(cod); return f ? f._codsN.slice() : [_ocgNorm(cod)]; }
 async function ocgFetchProyeccion() {
   try {
     const r = await fetch(SUPABASE_PROY_ENDPOINT + "?select=cod,proy_cajas_mes&limit=20000", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
@@ -11711,7 +11753,18 @@ function stkBodyStocks() {
   const _fcArt = (_stk.fcs && _stk.fcs.porArt) || {};
   const _fcArtCajas = function (cod) { return Number((_fcArt[_ocgNorm(cod)] || {}).cajas) || 0; };
   Object.keys(_fcArt).forEach(function (k) { if (!_seenN[k] && (Number((_fcArt[k] || {}).cajas) || 0) > 0) { arts.push({ cod: _fcArt[k].cod || k, desc: artNombre(k, ""), terminado: 0, excedente: 0, separar_pedidos: 0, a_facturar: 0, a_guardar: 0, racks: 0, insumos: 0 }); _seenN[k] = true; } });
-  arts.sort(function (a, b) { return (parseInt(a.cod, 10) || 0) - (parseInt(b.cod, 10) || 0); });
+  // v7.90 — los equivalentes van ALEDAÑOS pero cada uno en su fila (NO se fusionan): se
+  // ordenan por la posición del PRINCIPAL de su familia y, dentro, el principal primero.
+  arts.sort(function (a, b) {
+    var fa = equivFam(a.cod), fb = equivFam(b.cod);
+    var ka = fa ? (parseInt(fa._defN, 10) || 0) : (parseInt(a.cod, 10) || 0);
+    var kb = fb ? (parseInt(fb._defN, 10) || 0) : (parseInt(b.cod, 10) || 0);
+    if (ka !== kb) return ka - kb;
+    var da = (fa && _ocgNorm(a.cod) === fa._defN) ? 0 : 1;   // principal antes que secundarios
+    var db = (fb && _ocgNorm(b.cod) === fb._defN) ? 0 : 1;
+    if (da !== db) return da - db;
+    return (parseInt(a.cod, 10) || 0) - (parseInt(b.cod, 10) || 0) || String(a.cod).localeCompare(String(b.cod));
+  });
   const f = (_stk.filtro || "").toLowerCase();
   // Sin búsqueda: ocultar artículos que están en 0 en TODOS los sectores (típicamente
   // los solo-insumos, que tienen su propia sección abajo) — si no, ensucian la tabla
@@ -11875,7 +11928,14 @@ function stkBodyStocks() {
     const _ped = Number(dem[_ocgNorm(a.cod)]) || 0;
     const _cap = Number(capByCod[_ocgNorm(a.cod)]) || 0;
     const _lin = ocLinea(a.cod);
-    let tds = '<td class="stk-cod">' + escapeHtml(a.cod) + '</td><td style="text-align:center;font-weight:800;font-size:11px;padding:3px 4px;color:' + (_lin === "LK" ? "#b91c1c" : (_lin === "CH" ? "#1e40af" : "#94a3b8")) + ';">' + (_lin || "—") + '</td><td class="stk-desc">' + escapeHtml(artNombre(a.cod, a.desc) || "—") + '</td><td class="num ' + (_tot < 0 ? "stk-neg" : "") + '" style="background:#f8fafc"><b>' + fmtCajas(_tot) + '</b></td>' + (_ped ? '<td class="num stk-pick-cell" style="background:#fffbeb;color:#92400e" onclick="event.stopPropagation();stkOpenCajasPedidasArt(\'' + encodeURIComponent(a.cod) + '\')" title="Solo NP programadas en el PPP. Tocá para ver el detalle por NP (incluye también las NP sin programar, por eso el total del detalle puede ser mayor)"><b>' + fmtCajas(_ped) + '</b></td>' : '<td class="num" style="background:#fffbeb;color:#92400e"></td>') + (_cap ? '<td class="num stk-pick-cell" style="background:#f0fdf4;color:#166534" onclick="event.stopPropagation();stkOpenCapArt(\'' + encodeURIComponent(a.cod) + '\')" title="Ubicaciones y capacidad de góndola"><b>' + fmtCajas(_cap) + '</b></td>' : '<td class="num" style="background:#f0fdf4;color:#166534">—</td>');
+    // v7.90 — marca de familia de equivalentes: principal (⭐) / secundario (⇄ va al principal).
+    const _fam = equivFam(a.cod);
+    let _famTag = "";
+    if (_fam) {
+      if (_ocgNorm(a.cod) === _fam._defN) _famTag = ' <span title="Principal de la familia — es el que se debe pedir/mandar" style="color:#16a34a;font-size:10px;">★</span>';
+      else _famTag = ' <span title="SECUNDARIO — no deben entrar pedidos acá. El principal es ' + escapeHtml(_equivDisp(_fam, _fam._defN)) + '." style="color:#1e40af;font-size:10px;font-weight:800;">⇄' + escapeHtml(_equivDisp(_fam, _fam._defN)) + '</span>';
+    }
+    let tds = '<td class="stk-cod">' + escapeHtml(a.cod) + _famTag + '</td><td style="text-align:center;font-weight:800;font-size:11px;padding:3px 4px;color:' + (_lin === "LK" ? "#b91c1c" : (_lin === "CH" ? "#1e40af" : "#94a3b8")) + ';">' + (_lin || "—") + '</td><td class="stk-desc">' + escapeHtml(artNombre(a.cod, a.desc) || "—") + '</td><td class="num ' + (_tot < 0 ? "stk-neg" : "") + '" style="background:#f8fafc"><b>' + fmtCajas(_tot) + '</b></td>' + (_ped ? '<td class="num stk-pick-cell" style="background:#fffbeb;color:#92400e" onclick="event.stopPropagation();stkOpenCajasPedidasArt(\'' + encodeURIComponent(a.cod) + '\')" title="Solo NP programadas en el PPP. Tocá para ver el detalle por NP (incluye también las NP sin programar, por eso el total del detalle puede ser mayor)"><b>' + fmtCajas(_ped) + '</b></td>' : '<td class="num" style="background:#fffbeb;color:#92400e"></td>') + (_cap ? '<td class="num stk-pick-cell" style="background:#f0fdf4;color:#166534" onclick="event.stopPropagation();stkOpenCapArt(\'' + encodeURIComponent(a.cod) + '\')" title="Ubicaciones y capacidad de góndola"><b>' + fmtCajas(_cap) + '</b></td>' : '<td class="num" style="background:#f0fdf4;color:#166534">—</td>');
     cols.forEach(function (c) {
       const v = (c.racksKey ? ((Number(a[c.key]) || 0) + (Number(a.racks_ch) || 0)) : (Number(a[c.key]) || 0));
       // v5.82: columnas clickeables → detalle. Pickeados/A facturar → NPs; Excedente/Racks → ubicación.
@@ -12948,7 +13008,7 @@ async function stkFaltLoad() {
       items.forEach(function (it) {
         var cod = _ocgNorm(it.art); if (!cod) return;
         if (!demanda[cod]) demanda[cod] = [];
-        demanda[cod].push({ fecha: info.fecha, np: np, rs: info.rs, cajas: Number(it.cajas) || 0 });
+        demanda[cod].push({ fecha: info.fecha, np: np, rs: info.rs, cajas: Number(it.cajas) || 0, cod: cod });
       });
     });
     _stk.falt = {
@@ -13027,37 +13087,44 @@ function stkBodyFaltante() {
     for (var dt = hoy; dt <= maxDia; dt = _faltAddDays(dt, 1)) diasCols.push(dt);
   }
 
-  // Construir datos por artículo
+  // Construir datos por FAMILIA de equivalentes (v7.90). Los miembros de una familia
+  // (mismo producto, distinto SKU, misma empresa) se combinan en UNA fila: el faltante
+  // REAL es el de la familia (stock combinado), porque se puede cubrir con cualquiera
+  // cambiando la NP en el ERP. Los códigos sueltos quedan como una "familia" de uno.
   var arts = [];
-  // Todos los códigos con demanda o stock
   var allCods = {};
   Object.keys(dem).forEach(function (c) { allCods[c] = true; });
   Object.keys(sMap).forEach(function (c) { allCods[c] = true; });
-
+  // Agrupar por clave de familia (equivFamKey). Sin familia → su propio código.
+  var famMembers = {};
   Object.keys(allCods).forEach(function (cod) {
-    var s = sMap[cod] || { total: 0, desc: "" };
-    var entries = dem[cod] || [];
-    // Demanda por fecha (excluyendo NPs tachadas)
-    var demDia = {};
-    var sinFecha = 0;
-    entries.forEach(function (e) {
+    var key = equivFamKey(cod);
+    (famMembers[key] = famMembers[key] || []).push(cod);
+  });
+
+  Object.keys(famMembers).forEach(function (key) {
+    var members = famMembers[key];
+    var fam = equivFam(key);
+    var esFam = members.length > 1 || !!fam;
+    // Stock combinado + descripción/proveedor
+    var stockFam = 0, descFam = "";
+    members.forEach(function (m) { var s = sMap[m] || { total: 0, desc: "" }; stockFam += s.total; if (!descFam && s.desc) descFam = s.desc; });
+    // Demanda combinada por fecha (excluyendo NPs tachadas) + sinFecha
+    var entriesFam = [];
+    members.forEach(function (m) { (dem[m] || []).forEach(function (e) { entriesFam.push(e); }); });
+    var demDia = {}, sinFecha = 0;
+    entriesFam.forEach(function (e) {
       if (excl[e.np]) return;
       if (!e.fecha) { sinFecha += e.cajas; return; }
       demDia[e.fecha] = (demDia[e.fecha] || 0) + e.cajas;
     });
+    var totalDem = entriesFam.reduce(function (ac, e) { return ac + (excl[e.np] ? 0 : e.cajas); }, 0);
+    if (totalDem === 0 && stockFam === 0) return;
 
-    var totalDem = entries.reduce(function (ac, e) { return ac + (excl[e.np] ? 0 : e.cajas); }, 0);
-    if (totalDem === 0 && s.total === 0) return;
-
-    // Balance acumulado: stock - sinFecha - demanda pasada - demanda día a día
-    var bal = s.total - sinFecha;
-    // Restar demanda pasada (pedidos con fecha < hoy que no se entregaron)
+    // Balance acumulado combinado: stock - sinFecha - demanda pasada - demanda día a día
+    var bal = stockFam - sinFecha;
     todasFechas.forEach(function (f) { if (f < hoy) bal -= (demDia[f] || 0); });
-
-    // Calcular faltante para CADA día desde hoy en adelante
-    // Necesitamos recorrer todos los días cronológicamente para que el balance acumule
     var allDiasDesdeHoy = todasFechas.filter(function (f) { return f >= hoy; });
-    // Agregar los diasCols que no estén (para tener un faltante interpolado)
     diasCols.forEach(function (d) { if (allDiasDesdeHoy.indexOf(d) < 0) allDiasDesdeHoy.push(d); });
     allDiasDesdeHoy.sort();
 
@@ -13071,18 +13138,28 @@ function stkBodyFaltante() {
       if (f >= lunesHoy && f <= finS1) faltS1 = Math.max(faltS1, falt);
       if (f >= lunesS2 && f <= finS2) faltS2 = Math.max(faltS2, falt);
     });
-    // Faltante para los días sin demanda antes del primer día con demanda:
-    // rellenar diasCols que quedaron sin valor con el faltante al inicio (balance post-pasadas)
-    diasCols.forEach(function (d) {
-      if (diasFalt[d] === undefined) diasFalt[d] = bal < 0 ? Math.abs(bal) : 0;
-    });
+    diasCols.forEach(function (d) { if (diasFalt[d] === undefined) diasFalt[d] = bal < 0 ? Math.abs(bal) : 0; });
+
+    // v7.90 — cajas que requieren CAMBIO DE NP: demanda cargada sobre códigos SECUNDARIOS
+    // (no el principal). No deben entrar pedidos al secundario → hay que corregir la NP.
+    var subCambio = 0;
+    if (esFam && fam) {
+      members.forEach(function (m) {
+        if (m === fam._defN) return;   // el principal no se corrige
+        subCambio += (dem[m] || []).reduce(function (ac, e) { return ac + (excl[e.np] ? 0 : e.cajas); }, 0);
+      });
+      subCambio = Math.round(subCambio);
+    }
+
+    var codShow = esFam ? key : members[0];
+    var miembrosDisp = fam ? fam._codsN.map(function (cn) { return _equivDisp(fam, cn); }) : [codShow];
 
     arts.push({
-      cod: cod, desc: s.desc || artNombre(cod, ""), prov: provMap[cod] || "",
-      stock: Math.round(s.total), totalDem: Math.round(totalDem),
+      cod: codShow, key: key, esFam: esFam, miembros: miembrosDisp,
+      desc: descFam || artNombre(codShow, ""), prov: provMap[key] || provMap[members[0]] || "",
+      stock: Math.round(stockFam), totalDem: Math.round(totalDem),
       faltS1: Math.round(faltS1), faltS2: Math.round(faltS2),
-      diasFalt: diasFalt, sinFecha: sinFecha,
-      demEntries: entries
+      diasFalt: diasFalt, sinFecha: sinFecha, subCambio: subCambio
     });
   });
 
@@ -13131,7 +13208,8 @@ function stkBodyFaltante() {
   h += '<div class="falt-wrap"><table class="falt-tbl"><thead><tr>' +
     '<th class="falt-cod">Cód</th><th class="falt-desc">Descripción</th><th class="falt-fab">Fabricante</th>' +
     '<th class="falt-stk">Stock</th>' +
-    '<th class="falt-sem">Falt S1</th><th class="falt-sem">Falt S2</th>';
+    '<th class="falt-sem">Falt S1</th><th class="falt-sem">Falt S2</th>' +
+    '<th class="falt-sem" title="Cajas que hay que cambiar de NP en el ERP: el código pedido no tiene stock pero un hermano equivalente (mismo producto, otro SKU) sí. El detalle por NP está en Facturación.">⚠ Cambio NP</th>';
   // Headers de días
   diasCols.forEach(function (d) {
     var esHoy = d === hoy;
@@ -13141,21 +13219,35 @@ function stkBodyFaltante() {
   h += '</tr></thead><tbody>';
 
   if (arts.length === 0) {
-    h += '<tr><td colspan="' + (6 + diasCols.length) + '" style="text-align:center;padding:20px;color:#94a3b8;">Sin artículos con demanda pendiente</td></tr>';
+    h += '<tr><td colspan="' + (7 + diasCols.length) + '" style="text-align:center;padding:20px;color:#94a3b8;">Sin artículos con demanda pendiente</td></tr>';
   }
 
   arts.forEach(function (a) {
-    h += '<tr><td class="falt-cod">' + escapeHtml(codCanon(a.cod)) + '</td>' +
+    // Celda de código: familia = default en negrita + hermanos chiquitos abajo
+    var codCell;
+    if (a.esFam && a.miembros.length > 1) {
+      var otros = a.miembros.filter(function (m) { return _ocgNorm(m) !== _ocgNorm(a.cod); });
+      codCell = '<b>' + escapeHtml(codCanon(a.cod)) + '</b>' +
+        (otros.length ? '<br><span style="font-size:10px;color:#94a3b8;font-weight:600;" title="Equivalentes de la familia">' + otros.map(function (o) { return escapeHtml(codCanon(o)); }).join(" · ") + '</span>' : '');
+    } else {
+      codCell = escapeHtml(codCanon(a.cod));
+    }
+    // Celda de cambio de NP
+    var subCell = a.subCambio > 0
+      ? '<td class="num" style="font-weight:800;color:#1e40af;background:#eff6ff;" title="' + a.subCambio + ' cajas: el código pedido no tiene stock pero un hermano equivalente sí — cambiar la NP en el ERP (detalle por NP en Facturación)">⇄ ' + a.subCambio + '</td>'
+      : '<td class="num falt-ok">—</td>';
+    h += '<tr data-fkey="' + escapeHtml(a.key) + '"><td class="falt-cod">' + codCell + '</td>' +
       '<td class="falt-desc" title="' + escapeHtml(a.desc) + '">' + escapeHtml(a.desc) + '</td>' +
       '<td class="falt-fab" title="' + escapeHtml(a.prov) + '">' + escapeHtml(a.prov || "—") + '</td>' +
       '<td class="num" style="font-weight:700">' + a.stock + '</td>';
     // Faltante S1 / S2
     h += _faltCelda(a.faltS1, true);
     h += _faltCelda(a.faltS2, true);
+    h += subCell;
     // Días
     diasCols.forEach(function (d) {
       var v = a.diasFalt[d] || 0;
-      h += _faltCelda(v, false, a.cod, d);
+      h += _faltCelda(v, false, a.key, d);
     });
     h += '</tr>';
   });
@@ -13207,14 +13299,18 @@ function stkFaltDrill(cod, fecha, evt) {
     stkFaltCloseDrill(); return;
   }
   F.openCell = { cod: cod, fecha: fecha };
-  // Buscar entries para este cod y fecha
-  var entries = (F.demanda[cod] || []).filter(function (e) { return e.fecha === fecha; });
+  // v7.90 — `cod` es la clave de familia: juntar entries de TODOS los miembros equivalentes.
+  var mems = equivMiembros(cod);
+  var entries = [];
+  mems.forEach(function (m) { (F.demanda[m] || []).forEach(function (e) { if (e.fecha === fecha) entries.push(e); }); });
   if (entries.length === 0) { stkFaltCloseDrill(); return; }
-  // Agrupar por NP (puede haber duplicados si tienen varios ítems del mismo artículo)
+  // Agrupar por NP (puede haber varios ítems). Guardar qué SKU pidió cada NP.
+  var esFam = mems.length > 1;
   var byNp = {};
   entries.forEach(function (e) {
-    if (!byNp[e.np]) byNp[e.np] = { np: e.np, rs: e.rs, cajas: 0 };
+    if (!byNp[e.np]) byNp[e.np] = { np: e.np, rs: e.rs, cajas: 0, cods: {} };
     byNp[e.np].cajas += e.cajas;
+    if (e.cod) byNp[e.np].cods[codCanon(e.cod)] = true;
   });
   var lista = Object.keys(byNp).map(function (k) { return byNp[k]; })
     .sort(function (a, b) { return b.cajas - a.cajas; });
@@ -13235,10 +13331,12 @@ function stkFaltDrill(cod, fecha, evt) {
     (lista.length > 1 ? "s" : "") + ' piden este artículo. Destildar para excluir del cálculo.</div>';
   lista.forEach(function (it) {
     var isExcl = !!F.excluidos[it.np];
+    // v7.90 — si es familia, mostrar qué SKU pidió esta NP (para saber si hay que cambiarla)
+    var skuTag = esFam ? ' <span style="font-size:10px;color:#1e40af;font-weight:700;">(' + Object.keys(it.cods).join(", ") + ')</span>' : '';
     ih += '<div class="falt-drill-row' + (isExcl ? " excl" : "") + '">' +
       '<label><input type="checkbox"' + (isExcl ? "" : " checked") +
       ' onchange="stkFaltToggleNp(\'' + it.np + '\',this.checked)">' +
-      '<span class="falt-np">NP ' + escapeHtml(it.np) + '</span>' +
+      '<span class="falt-np">NP ' + escapeHtml(it.np) + '</span>' + skuTag +
       '<span class="falt-rs">' + escapeHtml(it.rs) + '</span></label>' +
       '<span class="falt-cj">' + Math.round(it.cajas) + ' cj</span></div>';
   });
@@ -13283,8 +13381,8 @@ function stkFaltToggleNp(np, incluir) {
       // Buscar la celda correspondiente y simular click
       var rows = tbl.querySelectorAll("tbody tr");
       for (var i = 0; i < rows.length; i++) {
-        var codTd = rows[i].querySelector(".falt-cod");
-        if (codTd && _ocgNorm(codTd.textContent) === cell.cod) {
+        // v7.90 — matchear por data-fkey (la celda de código ahora muestra la familia)
+        if (rows[i].getAttribute("data-fkey") === cell.cod) {
           var cells = rows[i].querySelectorAll(".falt-cell");
           for (var j = 0; j < cells.length; j++) {
             var onclick = cells[j].getAttribute("onclick") || "";
@@ -25814,13 +25912,26 @@ function facFaltBadge(np){
   const mas = f.items.length > 8 ? " +" + (f.items.length - 8) : "";
   return '<div class="fac-falta-badge" title="Faltan ' + f.cajas + ' cajas en ' + f.items.length + ' artículo(s) — facturá por lo ENTREGADO">⚠ FALTA ' + f.cajas + ' cj: ' + det + mas + '</div>';
 }
+/* v7.90 — código en formato display de un miembro normalizado dentro de su familia. */
+function _equivDisp(fam, kn){ if(!fam) return kn; const i = fam._codsN.indexOf(kn); return i>=0 ? fam.cods[i] : kn; }
 /* v5.80 — Faltantes en COLUMNA aparte (no dentro de la Razón Social): SOLO la
    distribución por artículo (cod×faltó), sin el total "FALTA N cj". La operadora
-   la usa para facturar por lo ENTREGADO. */
+   la usa para facturar por lo ENTREGADO.
+   v7.90 — si el código pedido es un SECUNDARIO de su familia (no el principal), avisa
+   que hay que CAMBIAR LA NP en el ERP al principal. No queremos pedidos en el secundario. */
 function facFaltDist(np){
   const f = facFaltInfo(np);
   if (!f || !f.cajas) return "";
-  return f.items.map(function(it){ return escapeHtml(it.cod) + "×" + it.falto; }).join(", ");
+  return f.items.map(function(it){
+    const kn = _cpNorm(it.cod);
+    let s = escapeHtml(it.cod) + "×" + it.falto;
+    const fam = equivFam(it.cod);
+    if (fam && kn !== fam._defN) {
+      const defD = _equivDisp(fam, fam._defN);
+      s += ' <span style="color:#1e40af;font-weight:800;white-space:nowrap;" title="El código ' + escapeHtml(it.cod) + ' es SECUNDARIO. Cambiá la NP en el ERP al principal ' + escapeHtml(defD) + ' y facturá/mandá ese (no deben entrar pedidos al secundario).">→ ' + escapeHtml(defD) + ' (cambiar NP)</span>';
+    }
+    return s;
+  }).join(", ");
 }
 /* Tareas de faltante EN PROGRESO por NP (Faltantes_Tareas activas) → aviso AMARILLO
    en Facturación: "están agregando cajas a esta NP ahora, esperá antes de facturar".

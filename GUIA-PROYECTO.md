@@ -4,7 +4,28 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-07 · Versión app al documentar: **v7.82**
+> Última actualización: 2026-08-08 · Versión app al documentar: **v7.90**
+>
+> Nota: **v7.90 — Familias de EQUIVALENTES (mismo producto, distinto SKU, MISMA empresa).**
+> Constante curada `EQUIV_FAMILIAS` en `index.html` (13 familias, ⚠ NO incluye pares Loeke↔Chef,
+> que se facturan por empresas distintas). Cada familia tiene un **principal** (`def`, el que se
+> pide/manda/stockea) y **secundario(s)** (excepcionales o nacionales discontinuos). Helpers:
+> `equivFam(cod)`, `equivFamKey(cod)` (= default normalizado, clave de agrupación), `equivMiembros(cod)`,
+> `_equivDisp(fam,kn)`. **(A) Faltante por día:** los miembros se combinan en UNA fila → faltante REAL
+> por familia (stock combinado, porque se cubre con cualquiera cambiando la NP). Nueva columna **⚠ Cambio
+> NP** = cajas de demanda cargadas sobre secundarios (hay que corregir la NP al principal). El drill por
+> día junta las NP de todos los miembros y muestra el SKU que pidió cada una. **(B) Ventana de stocks:**
+> los equivalentes van **aledaños pero cada uno en su fila** (NO se fusionan): se ordenan por la posición
+> del principal y, dentro, el principal primero (★ principal / ⇄principal en el secundario). **(C)
+> Facturación (columna Faltantes):** si un ítem faltante está sobre un código secundario, muestra
+> `cod×n → PRINCIPAL (cambiar NP)` — no deben entrar pedidos al secundario. Familias:
+> 574E·574, 525E·525, 580·580E, 702E·702EN, 725E·725, 323E·323, 607E·565 (Grupo A) y
+> 941E·338, 942E·334, 943E·336, 945E·332, 946E·335, 948E·333 (Grupo B: nacional 33x discontinuo ↔
+> importada 94xE, LK). Sueltos sin par: 337, 944E. **PENDIENTE (2ª etapa):** alerta Telegram cuando
+> entra un pedido a un secundario; descuento incremental de stock durante el picking (EP).
+>
+> Nota: **v7.89 — Columna LK/CH en la tabla de stock** (izquierda de Descripción; LK rojo, CH azul,
+> desde `OC_Maximos.linea` vía `ocLoadLineas`). Además fixes visuales del módulo Faltante.
 >
 > Nota: **v7.82 — Editor de cantidad en "Todos los insumos" + fix trigger `fn_canon_cod_art` para insumos**. **(A) EDITOR:** La tabla de abajo de todo en la solapa Insumos ("📋 Todos los insumos") ahora tiene un botón **"Editar"** en cada fila → abre edición inline con inputs de código, detalle, categoría, ubicación, **cantidad y unidad** (reutiliza `stkInsGuardar` = mismos IDs que el listado por categoría). Permite **cargar stock a insumos que están en 0** (los que quedan ocultos en los listados por categoría porque se filtran los de saldo 0). Se agregó 7ª columna y se actualizó el colspan y el hint del `stk-cut`. Test: `ins-admin.cjs` ahora ejercita el flujo completo de Editar/Guardar/Cancelar desde esta tabla (incluida la verificación del POST a `Movimientos_Stock` con delta=666). **(B) BUG FIX — TRIGGER `fn_canon_cod_art`.** Al editar un insumo con código numérico corto (ej. `25`, `7`, `22`, `62`), el ajuste se **POSTeaba correctamente** a `Movimientos_Stock`, pero el trigger `trg_canon_cod_art` **zero-paddeaba** el `cod_art` a 3 dígitos (`25`→`025`, `7`→`007`). Como `Insumos.cod` guarda sin padding (`25`) y la vista `vista_saldos_insumos_x_unidad` agrupa por `cod_art`, los movimientos caían en un **grupo fantasma** (`025`) que la app nunca leía → parecía que no guardaba. Afectaba **todos los ajustes y entregas de insumos con código numérico < 3 dígitos** (27 códigos en el catálogo). **Fix:** `fn_canon_cod_art` ahora hace `if NEW.deposito = 'insumos' then return NEW; end if;` al principio → los códigos de insumo quedan **tal cual están en la tabla `Insumos`**, sin canonicalizar. **Datos limpiados:** `022`→`22` (−207 Kg de entrega), `062`→`62` (−164 Kg), `007`→`7` (4 movimientos, incluidos 9000 Uni y −345 Kg), y 3 filas huérfanas con `025` borradas (intentos fallidos del usuario). Los saldos que la app mostraba estaban **inflados** (les faltaban esas entregas/ajustes).
 >
