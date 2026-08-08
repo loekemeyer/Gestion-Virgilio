@@ -25943,6 +25943,9 @@ async function generateFacturacionPDF(){
   }
 
   // 3) PATCH cierre_id en todos los NPs facturados pendientes (mismo JWT)
+  //    v7.87-fix: si el PATCH falla, ABORTAR — no generar PDF ni limpiar
+  //    el set local. Un PDF sin cierre_id en los NPs causa reparto duplicado
+  //    porque las NPs siguen apareciendo como "pendiente" en el próximo cierre.
   try {
     const hPatch = await facAuthWriteHeaders({ Prefer: "return=minimal" });
     const npsCsv = filas.map(f => encodeURIComponent(f.np)).join(",");
@@ -25952,8 +25955,9 @@ async function generateFacturacionPDF(){
     );
     if (!rP.ok) throw new Error("HTTP " + rP.status);
   } catch (e) {
-    facShowToast("Cierre creado pero error asociando NPs: " + e.message);
-    // No abortamos — igual generamos el PDF
+    facShowToast("⚠ Error asociando NPs al cierre: " + e.message + ". Reintentá en unos segundos.");
+    btn.disabled = false; btn.textContent = "Terminé — Generar PDF";
+    return;   // ABORTAR: no limpiar set local ni generar PDF → el usuario puede reintentar
   }
 
   // 4) Refresca set local (los NPs ahora tienen cierre_id → desaparecen)
