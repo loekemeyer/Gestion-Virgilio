@@ -181,5 +181,7 @@ echo "== equiv-resolve (idea 2260: equivResolve/equivLookup — resolución de c
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/equiv-resolve.cjs
 echo "== stk-conteo-fisico (idea 2793: conteo físico de góndola — cálculo, comparación y guardado) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stk-conteo-fisico.cjs
+echo "== cp-gondola-vacia (idea 6497: Completar Pedido avisa cartel+Telegram si retira de góndola en 0) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/cp-gondola-vacia.cjs
 
 echo "== TODO OK =="
