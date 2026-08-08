@@ -3020,27 +3020,31 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
   transform: scale(1.02);
 }
 /* v7.88 — Faltante por día */
-.falt-filters { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px; }
-.falt-fbtn { padding:6px 12px; border:1px solid #e2e8f0; border-radius:8px; background:#fff;
-  color:#64748b; font-size:12px; font-weight:700; cursor:pointer; }
-.falt-fbtn.on { background:#1e40af; color:#fff; border-color:#1e40af; }
+.falt-top { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:10px; }
+.falt-filters { display:flex; gap:5px; flex-wrap:nowrap; }
+.falt-fbtn { width:auto !important; padding:5px 11px !important; margin:0 !important;
+  border:1px solid #cbd5e1; border-radius:7px; background:#fff;
+  color:#64748b; font-size:11.5px; font-weight:700; cursor:pointer; white-space:nowrap; }
+.falt-fbtn.on { background:#1e3a8a; color:#fff; border-color:#1e3a8a; }
+.falt-fbtn:hover:not(.on) { background:#f1f5f9; }
+.falt-search { padding:5px 10px; border:1px solid #cbd5e1; border-radius:7px; font-size:12px;
+  width:180px; box-sizing:border-box; }
+.falt-hint { font-size:11px; color:#94a3b8; margin-bottom:6px; }
 .falt-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; max-height:60vh; }
-.falt-tbl { border-collapse:collapse; font-size:12px; width:100%; min-width:600px; }
-.falt-tbl th { position:sticky; top:0; z-index:2; background:#1e293b; color:#fff; padding:6px 7px;
+.falt-tbl { border-collapse:collapse; font-size:12px; width:auto; max-width:100%; }
+.falt-tbl th { position:sticky; top:0; z-index:2; background:#1e293b; color:#fff; padding:5px 8px;
   text-align:center; white-space:nowrap; font-weight:700; font-size:11px; }
-.falt-tbl th.falt-cod { text-align:left; min-width:55px; }
-.falt-tbl th.falt-desc { text-align:left; min-width:100px; }
-.falt-tbl th.falt-fab { text-align:left; min-width:80px; }
-.falt-tbl th.falt-stk { min-width:48px; }
-.falt-tbl th.falt-sem { background:#334155; min-width:50px; }
-.falt-tbl th.falt-dia { min-width:42px; }
+.falt-tbl th.falt-cod { text-align:left; }
+.falt-tbl th.falt-desc { text-align:left; }
+.falt-tbl th.falt-fab { text-align:left; }
+.falt-tbl th.falt-sem { background:#334155; }
 .falt-tbl th.falt-dia.hoy { background:#1e40af; }
-.falt-tbl td { padding:5px 7px; border-bottom:1px solid #f1f5f9; white-space:nowrap; }
+.falt-tbl td { padding:4px 8px; border-bottom:1px solid #f1f5f9; white-space:nowrap; }
 .falt-tbl td.num { text-align:center; font-variant-numeric:tabular-nums; }
-.falt-tbl td.falt-cod { font-weight:700; color:#1e293b; }
-.falt-tbl td.falt-desc { color:#475569; max-width:140px; overflow:hidden; text-overflow:ellipsis; }
-.falt-tbl td.falt-fab { color:#6b7280; font-size:11px; max-width:100px; overflow:hidden; text-overflow:ellipsis; }
-.falt-tbl td.falt-ok { background:#f0fdf4; color:#15803d; }
+.falt-tbl td.falt-cod { font-family:Consolas,Menlo,monospace; font-weight:800; color:#1e6bd6; }
+.falt-tbl td.falt-desc { color:#475569; max-width:180px; overflow:hidden; text-overflow:ellipsis; }
+.falt-tbl td.falt-fab { color:#6b7280; font-size:11px; max-width:110px; overflow:hidden; text-overflow:ellipsis; }
+.falt-tbl td.falt-ok { background:#f0fdf4; color:#16a34a; }
 .falt-tbl td.falt-warn { background:#fef9c3; color:#854d0e; }
 .falt-tbl td.falt-bad { background:#fee2e2; color:#991b1b; font-weight:700; }
 .falt-tbl td.falt-crit { background:#dc2626; color:#fff; font-weight:800; }
@@ -3062,17 +3066,16 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
 .falt-drill-row .falt-rs { color:#475569; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .falt-drill-row .falt-cj { font-weight:700; color:#1e293b; white-space:nowrap; }
 .falt-drill-row.excl { opacity:.45; text-decoration:line-through; }
-.falt-drill-close { float:right; background:none; border:none; font-size:16px; cursor:pointer; color:#94a3b8; }
+.falt-drill-close { float:right; background:none; border:none; font-size:16px; cursor:pointer;
+  color:#94a3b8; width:auto !important; padding:0 !important; margin:0 !important; }
 .falt-drill-close:hover { color:#1e293b; }
-.falt-sim-bar { margin-top:8px; padding:8px 10px; background:#eff6ff; border:1px solid #bfdbfe;
+.falt-sim-bar { margin-bottom:8px; padding:8px 10px; background:#eff6ff; border:1px solid #bfdbfe;
   border-radius:8px; font-size:12px; color:#1e40af; display:flex; align-items:center; gap:8px; }
-.falt-sim-bar button { padding:4px 10px; border:1px solid #3b82f6; background:#fff;
+.falt-sim-bar button { width:auto !important; padding:4px 10px !important; margin:0 !important;
+  border:1px solid #3b82f6; background:#fff;
   border-radius:6px; font-size:11px; font-weight:700; color:#3b82f6; cursor:pointer; }
 .falt-sim-bar button:hover { background:#dbeafe; }
-.falt-search { padding:7px 10px; border:1px solid #e2e8f0; border-radius:8px; font-size:13px;
-  width:100%; max-width:240px; box-sizing:border-box; margin-bottom:10px; }
-.falt-hint { font-size:11px; color:#94a3b8; margin-bottom:8px; }
-.falt-sf { color:#94a3b8; font-size:10px; }
+.falt-foot { margin-top:6px; font-size:11px; color:#94a3b8; }
 </style>
 
 <!-- jsPDF + autotable para generar PDF de cierre de facturación (Marianela).
@@ -6140,7 +6143,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.88";
+const APP_VERSION = "v7.89";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -9613,7 +9616,8 @@ async function openStockAdmin(soloConteo) {
       supaFetchAllSafe(SUPABASE_CAPACIDAD_ENDPOINT, "select=sector,cod,cajas_max"),
       fetch(SUPABASE_URL + "/rest/v1/Stock_Config?clave=in.(guardado_cajas_por_hora,guardado_incluir_racks)&select=clave,valor", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; }),
       (_solo ? Promise.resolve({ pend: {}, porArt: {} }) : stkFcsFetch().catch(function () { return { pend: {}, porArt: {} }; })),   // v6.70: FC s/Salida como columna
-      supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Insumos", "select=cod").catch(function () { return []; })]);   // v7.73: cargar códigos de insumos para filtrarlos de Stock
+      supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Insumos", "select=cod").catch(function () { return []; }),
+      ocLoadLineas().catch(function () { return {}; })]);   // v7.73: cargar códigos de insumos para filtrarlos de Stock + v7.89: LK/CH
     _stk = { movs: res[0] || [], cutoff: res[1], factors: res[2] || {}, ordenes: res[3] || [], bajadas: res[4] || [], tab: _solo ? "conteo" : "stocks", soloConteo: _solo, filtro: "", openArt: null, ingMode: "remito", asOf: null, asOfInput: "", dem: res[6] || {}, cap: res[7] || [], gConf: res[8] || [], fcs: res[9] || { pend: {}, porArt: {} }, fcsLoaded: true, insumosCods: (res[10] || []).map(function(i) { return String(i.cod || "").trim().toUpperCase(); }) };
     stkRender();
   } catch (e) { const b = document.getElementById("stkBody"); if (b) b.innerHTML = '<div class="stk-loading">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
@@ -11851,8 +11855,8 @@ function stkBodyStocks() {
     if (s.extra) return shown.some(function (a) { return (Number(a[s.key]) || 0) !== 0; });
     return true;
   });
-  const ncol = 5 + cols.length + 2;   // +1 FC s/Salida (v6.70) +1 caret
-  let th = '<th>Código</th><th>Descripción</th><th class="num" style="background:#eef2ff;color:#1e3a8a;">Total<br>Stock</th><th class="num" style="background:#fef3c7;color:#92400e;" title="Cajas pedidas SOLO de NP programadas en el PPP y todavía NO facturadas (lo que falta pickear). Las NP ya facturadas (ver solapa FC s/Salida) están descontadas. El detalle al tocar el número muestra solo PENDIENTES, pero incluye también NP sin programar — puede dar algo más que la columna.">Cajas<br>Pedidas</th><th class="num" style="background:#dcfce7;color:#166534;">Capacidad<br>góndola</th>';
+  const ncol = 6 + cols.length + 2;   // +1 LK/CH (v7.89) +1 FC s/Salida (v6.70) +1 caret
+  let th = '<th>Código</th><th style="text-align:center;padding:7px 5px;font-size:10px;">LK/<br>CH</th><th>Descripción</th><th class="num" style="background:#eef2ff;color:#1e3a8a;">Total<br>Stock</th><th class="num" style="background:#fef3c7;color:#92400e;" title="Cajas pedidas SOLO de NP programadas en el PPP y todavía NO facturadas (lo que falta pickear). Las NP ya facturadas (ver solapa FC s/Salida) están descontadas. El detalle al tocar el número muestra solo PENDIENTES, pero incluye también NP sin programar — puede dar algo más que la columna.">Cajas<br>Pedidas</th><th class="num" style="background:#dcfce7;color:#166534;">Capacidad<br>góndola</th>';
   cols.forEach(function (c) { th += '<th class="num">' + c.label.replace(" ", "<br>") + '</th>'; });
   th += '<th class="num" style="background:#eef2ff;color:#1e3a8a;" title="Facturado sin salida: mercadería ya facturada (salió del stock contable) pero todavía física en el depósito, sin cargar al camión. Tocá el número para ver las NP.">FC<br>s/Salida</th>';   // v6.70
   h += '<div class="stk-tblwrap"><table class="stk-tbl stk-tbl-fit"><thead><tr>' + th + '<th></th></tr></thead><tbody>';
@@ -11870,7 +11874,8 @@ function stkBodyStocks() {
     const _tot = SECTKEYS.reduce(function (s, k) { return s + (Number(a[k]) || 0); }, 0) + (Number(a.racks_ch) || 0);  // v7.54: racks_ch sumado al total
     const _ped = Number(dem[_ocgNorm(a.cod)]) || 0;
     const _cap = Number(capByCod[_ocgNorm(a.cod)]) || 0;
-    let tds = '<td class="stk-cod">' + escapeHtml(a.cod) + '</td><td class="stk-desc">' + escapeHtml(artNombre(a.cod, a.desc) || "—") + '</td><td class="num ' + (_tot < 0 ? "stk-neg" : "") + '" style="background:#f8fafc"><b>' + fmtCajas(_tot) + '</b></td>' + (_ped ? '<td class="num stk-pick-cell" style="background:#fffbeb;color:#92400e" onclick="event.stopPropagation();stkOpenCajasPedidasArt(\'' + encodeURIComponent(a.cod) + '\')" title="Solo NP programadas en el PPP. Tocá para ver el detalle por NP (incluye también las NP sin programar, por eso el total del detalle puede ser mayor)"><b>' + fmtCajas(_ped) + '</b></td>' : '<td class="num" style="background:#fffbeb;color:#92400e"></td>') + (_cap ? '<td class="num stk-pick-cell" style="background:#f0fdf4;color:#166534" onclick="event.stopPropagation();stkOpenCapArt(\'' + encodeURIComponent(a.cod) + '\')" title="Ubicaciones y capacidad de góndola"><b>' + fmtCajas(_cap) + '</b></td>' : '<td class="num" style="background:#f0fdf4;color:#166534">—</td>');
+    const _lin = ocLinea(a.cod);
+    let tds = '<td class="stk-cod">' + escapeHtml(a.cod) + '</td><td style="text-align:center;font-weight:800;font-size:11px;padding:3px 4px;color:' + (_lin === "LK" ? "#b91c1c" : (_lin === "CH" ? "#1e40af" : "#94a3b8")) + ';">' + (_lin || "—") + '</td><td class="stk-desc">' + escapeHtml(artNombre(a.cod, a.desc) || "—") + '</td><td class="num ' + (_tot < 0 ? "stk-neg" : "") + '" style="background:#f8fafc"><b>' + fmtCajas(_tot) + '</b></td>' + (_ped ? '<td class="num stk-pick-cell" style="background:#fffbeb;color:#92400e" onclick="event.stopPropagation();stkOpenCajasPedidasArt(\'' + encodeURIComponent(a.cod) + '\')" title="Solo NP programadas en el PPP. Tocá para ver el detalle por NP (incluye también las NP sin programar, por eso el total del detalle puede ser mayor)"><b>' + fmtCajas(_ped) + '</b></td>' : '<td class="num" style="background:#fffbeb;color:#92400e"></td>') + (_cap ? '<td class="num stk-pick-cell" style="background:#f0fdf4;color:#166534" onclick="event.stopPropagation();stkOpenCapArt(\'' + encodeURIComponent(a.cod) + '\')" title="Ubicaciones y capacidad de góndola"><b>' + fmtCajas(_cap) + '</b></td>' : '<td class="num" style="background:#f0fdf4;color:#166534">—</td>');
     cols.forEach(function (c) {
       const v = (c.racksKey ? ((Number(a[c.key]) || 0) + (Number(a.racks_ch) || 0)) : (Number(a[c.key]) || 0));
       // v5.82: columnas clickeables → detalle. Pickeados/A facturar → NPs; Excedente/Racks → ubicación.
@@ -13107,21 +13112,21 @@ function stkBodyFaltante() {
   if (nExcl > 0) {
     h += '<div class="falt-sim-bar">🔮 Simulación: ' + nExcl + ' NP' + (nExcl > 1 ? "s" : "") +
       ' excluida' + (nExcl > 1 ? "s" : "") + ' del cálculo ' +
-      '<button onclick="stkFaltResetSim()">Limpiar simulación</button></div>';
+      '<button onclick="stkFaltResetSim()">Limpiar</button></div>';
   }
-  // Filtros
-  h += '<div class="falt-filters">' +
-    '<button class="falt-fbtn' + (filtro === "s1" ? " on" : "") + '" onclick="stkFaltFiltro(\'s1\')">📅 Esta semana</button>' +
-    '<button class="falt-fbtn' + (filtro === "s2" ? " on" : "") + '" onclick="stkFaltFiltro(\'s2\')">📅 Próx. semana</button>' +
-    '<button class="falt-fbtn' + (filtro === "resto" ? " on" : "") + '" onclick="stkFaltFiltro(\'resto\')">📅 Resto</button>' +
-    '<button class="falt-fbtn' + (filtro === "todo" ? " on" : "") + '" onclick="stkFaltFiltro(\'todo\')">📅 Todo</button>' +
+  // Fila compacta: filtros + búsqueda
+  h += '<div class="falt-top">' +
+    '<div class="falt-filters">' +
+    '<button class="falt-fbtn' + (filtro === "s1" ? " on" : "") + '" onclick="stkFaltFiltro(\'s1\')">Esta sem</button>' +
+    '<button class="falt-fbtn' + (filtro === "s2" ? " on" : "") + '" onclick="stkFaltFiltro(\'s2\')">Próx sem</button>' +
+    '<button class="falt-fbtn' + (filtro === "resto" ? " on" : "") + '" onclick="stkFaltFiltro(\'resto\')">Resto</button>' +
+    '<button class="falt-fbtn' + (filtro === "todo" ? " on" : "") + '" onclick="stkFaltFiltro(\'todo\')">Todo</button>' +
+    '</div>' +
+    '<input class="falt-search" type="text" placeholder="🔍 Buscar…" value="' +
+    escapeHtml(F.search || "") + '" oninput="stkFaltSearch(this.value)">' +
     '</div>';
-  // Búsqueda
-  h += '<input class="falt-search" type="text" placeholder="🔍 Buscar código, descripción o fabricante…" value="' +
-    escapeHtml(F.search || "") + '" oninput="stkFaltSearch(this.value)">';
-  // Hint
-  h += '<div class="falt-hint">Faltante acumulado por día. Tocá una celda para ver las NPs que piden ese artículo. ' +
-    (nExcl ? '🔮 Modo simulación activo.' : '') + '</div>';
+  h += '<div class="falt-hint">Tocá una celda para ver las NPs. ' +
+    (nExcl ? '🔮 Simulación activa.' : '') + '</div>';
   // Tabla
   h += '<div class="falt-wrap"><table class="falt-tbl"><thead><tr>' +
     '<th class="falt-cod">Cód</th><th class="falt-desc">Descripción</th><th class="falt-fab">Fabricante</th>' +
@@ -13156,7 +13161,7 @@ function stkBodyFaltante() {
   });
 
   h += '</tbody></table></div>';
-  h += '<div style="margin-top:8px;font-size:11px;color:#94a3b8;">' + arts.length + ' artículos con demanda. Stock = todos los depósitos (góndola+exc+racks+a_guardar+envasar).</div>';
+  h += '<div class="falt-foot">' + arts.length + ' artículos con demanda. Stock = góndola+exc+racks+a_guardar+envasar.</div>';
   return h;
 }
 
