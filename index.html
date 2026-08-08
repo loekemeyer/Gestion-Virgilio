@@ -2995,6 +2995,30 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
   #monitorModal.tv.show ~ #qrFichadaBox .qr-countdown{ font-size: 11px; margin-top: 3px; }
   #monitorModal.tv.show ~ #qrFichadaBox #qrCanvas{ width: clamp(120px, 24vh, 150px); height: clamp(120px, 24vh, 150px); }
 }
+
+/* v7.87 — Modal para crear códigos nuevos */
+.stk-modal-overlay {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center;
+  z-index: 100;
+}
+.stk-modal {
+  animation: slideUp .2s ease-out;
+}
+@keyframes slideUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+.stk-modal-hint {
+  font-size: 13px; line-height: 1.4;
+}
+.stk-tipobtn {
+  transition: all .12s;
+}
+.stk-tipobtn:hover {
+  border-color: inherit !important;
+  transform: scale(1.02);
+}
 </style>
 
 <!-- jsPDF + autotable para generar PDF de cierre de facturación (Marianela).
@@ -6054,7 +6078,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.82";
+const APP_VERSION = "v7.86";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -9515,7 +9539,7 @@ async function openStockAdmin(soloConteo) {
   const _solo = soloConteo === true;   // rol "solo conteo" (Giuliana): solo la solapa Conteo
   if (!document.getElementById("stkCss")) {
     const s = document.createElement("style"); s.id = "stkCss";
-    s.textContent = "#stockAdminOverlay{display:none;position:fixed;inset:0;z-index:1280;background:rgba(2,6,23,.74);overflow:auto;padding:14px;}#stockAdminOverlay.show{display:block;}.stk-card{background:#f8fafc;max-width:min(1500px,97vw);margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.stk-head{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:linear-gradient(90deg,#1e6bd6,#1e3a8a);color:#fff;}.stk-title{font-size:19px;font-weight:800;}.stk-close{background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;width:auto;}.stk-body{padding:14px 16px;}.stk-loading,.stk-empty{padding:24px;text-align:center;color:#64748b;}.stk-sec{margin:16px 0 6px;font-size:14px;font-weight:900;color:#0f172a;display:flex;align-items:center;gap:7px;}.stk-secn{background:#e2e8f0;color:#475569;border-radius:999px;padding:1px 9px;font-size:11.5px;font-weight:800;}.stk-inp{border:1px solid #cbd5e1;border-radius:8px;padding:6px 8px;font-size:13px;font-family:inherit;background:#fff;}.stk-sub{font-size:10.5px;color:#94a3b8;font-weight:700;}.stk-nuevo{display:inline-flex;flex-wrap:wrap;align-items:center;gap:6px;}.stk-btn-x{color:#b91c1c;border-color:#fecaca;}.stk-scroll{overflow-x:auto;}.stk-catbox{border:1px solid #cbd5e1;border-radius:11px;padding:10px 11px;margin-bottom:8px;background:#fff;}.stk-catrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}.stk-catuni{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:7px;}.stk-catlist{margin-top:10px;padding-top:10px;border-top:1px dashed #e2e8f0;}.stk-catdesc{margin-top:5px;font-size:12px;color:#475569;line-height:1.35;}.stk-tbl tr.stk-filtros th{background:#f8fafc;padding:5px 9px;text-transform:none;}.stk-secbtn{width:100%;text-align:left;background:#eef2ff;border:1px solid #c7d2fe;border-radius:10px;padding:9px 12px;cursor:pointer;margin:16px 0 8px;}.stk-caret{display:inline-block;width:16px;color:#4f46e5;font-weight:900;}.stk-tbl tr.stk-viejo td{background:#fffbeb;}input.stk-inp.stk-neg{color:#b91c1c;font-weight:800;}.stk-cut{background:#fffbeb;border:1px solid #fcd34d;color:#92400e;border-radius:9px;padding:8px 11px;font-size:12.5px;font-weight:700;margin-bottom:10px;}.stk-filtro{flex:1;min-width:180px;height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 11px;font-size:14px;}.stk-btn{background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:8px 12px;font-size:13px;font-weight:800;cursor:pointer;width:auto;}.stk-btn.ok{background:#16a34a;color:#fff;border-color:#16a34a;}.stk-btn.danger{background:#fff;color:#b91c1c;border-color:#fca5a5;}.stk-tbl{width:100%;border-collapse:collapse;font-size:13.5px;}.stk-tbl.stk-tbl-fit{width:auto;max-width:100%;}.stk-tbl.stk-tbl-fit td.stk-desc{max-width:210px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.stk-tbl.stk-tbl-sect td.stk-desc{max-width:140px;}.stk-tbl.stk-tbl-fit th.num,.stk-tbl.stk-tbl-fit td.num{text-align:right;padding-left:9px;padding-right:9px;}.stk-tblwrap{overflow-x:auto;max-width:100%;}.stk-tbl.stk-tbl-fit th.num{vertical-align:bottom;line-height:1.15;}.stk-tbl th{background:#f1f5f9;color:#475569;text-align:left;padding:7px 9px;font-size:11px;text-transform:uppercase;border-bottom:1px solid #cbd5e1;}.stk-tbl td{padding:7px 9px;}.stk-tbl th.num,.stk-tbl td.num{text-align:right;font-variant-numeric:tabular-nums;}.stk-row{cursor:pointer;border-bottom:1px solid #eef2f7;}.stk-row:hover{background:#eff6ff;}.stk-row td{padding:7px 9px;}.stk-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#1e6bd6;}.stk-desc{color:#475569;}.stk-neg{color:#b91c1c;font-weight:800;}.stk-pick-cell{cursor:pointer;color:#1e6bd6;font-weight:800;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px;}.stk-pick-cell:hover{background:#eff6ff;}.stk-tbl td.stk-hist0{color:#94a3b8;font-weight:700;}.stk-tbl td.stk-hist0:hover{background:#f1f5f9;color:#475569;}.stk-caret{color:#94a3b8;}.stk-detrow td{padding:0 9px 9px;background:#f8fafc;}.stk-det{border-left:3px solid #cbd5e1;padding:6px 0 6px 10px;}.stk-mv{display:flex;gap:9px;font-size:12px;padding:3px 0;align-items:center;}.stk-mv-old{opacity:.45;}.stk-mv-ts{color:#64748b;min-width:96px;}.stk-mv-tipo{font-weight:800;min-width:78px;}.stk-mv-dep{color:#64748b;min-width:74px;}.stk-mv-d{font-weight:800;min-width:44px;text-align:right;}.stk-mv-d.pos{color:#15803d;}.stk-mv-d.neg{color:#b91c1c;}.stk-mv-ref{color:#94a3b8;}.stk-ini-txt{width:100%;border:1px solid #cbd5e1;border-radius:9px;padding:9px;font-family:Consolas,Menlo,monospace;font-size:14px;}.stk-ini-btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}.stk-ini-warn{font-size:12px;color:#92400e;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:8px;margin-top:10px;}.stk-tabs{display:flex;gap:4px;padding:8px 12px 0;background:#1e3a8a;flex-wrap:wrap;}.stk-tab{flex:0 1 auto;width:auto;white-space:nowrap;background:rgba(255,255,255,.12);color:#cbd5e1;border:none;border-radius:9px 9px 0 0;padding:9px 13px;font-size:12.5px;font-weight:800;cursor:pointer;}.stk-tab.on{background:#f8fafc;color:#1e3a8a;}.stk-seg{display:flex;gap:6px;margin-bottom:10px;}.stk-segb{flex:1;background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:7px;font-size:13px;font-weight:800;cursor:pointer;}.stk-segb.on{background:#1e6bd6;color:#fff;border-color:#1e6bd6;}.stk-grp{margin-bottom:10px;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;}.stk-grp-h{background:#f1f5f9;padding:7px 10px;font-weight:800;font-size:13px;}.stk-grp-tot{color:#15803d;font-weight:800;margin-left:6px;}.stk-ing{display:flex;gap:9px;align-items:center;padding:5px 10px;border-top:1px solid #f1f5f9;font-size:12.5px;}.stk-ing-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#1e6bd6;}.stk-ing-desc{flex:1;color:#475569;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.stk-ing-rto{color:#94a3b8;font-size:11px;}.stk-aj-sec{border:1px solid #e2e8f0;border-radius:12px;padding:12px;margin-bottom:12px;}.stk-aj-h{font-size:15px;font-weight:800;margin-bottom:6px;}.stk-aj-hint{font-size:12px;color:#64748b;margin-bottom:7px;}.stk-aj-form{display:flex;gap:7px;flex-wrap:wrap;}.stk-aj-inp{flex:1;min-width:90px;height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 10px;font-size:14px;text-align:center;}.cnt-in{height:32px;border:1px solid #cbd5e1;border-radius:7px;padding:0 6px;font-size:13px;box-sizing:border-box;margin:0;width:auto;}.stk-aj-dep{margin-bottom:12px;font-size:13px;font-weight:800;}.stk-aj-dep select{height:36px;border:1px solid #cbd5e1;border-radius:8px;padding:0 8px;font-size:14px;font-weight:700;}.stk-rk-orden{background:#f1f5f9;border-radius:10px;padding:10px 12px;font-size:13px;margin-bottom:10px;}.stk-rk-orden.pend{background:#fffbeb;border:1.5px solid #fcd34d;color:#92400e;}.stk-rk-baj{display:flex;align-items:center;gap:10px;border:1px solid #e2e8f0;border-radius:11px;padding:9px 11px;margin-bottom:8px;background:#fff;}.stk-rk-baji{flex:1;min-width:0;}.stk-rk-q{font-size:12px;color:#1e6bd6;font-weight:700;margin-top:2px;}";
+    s.textContent = "#stockAdminOverlay{display:none;position:fixed;inset:0;z-index:1280;background:rgba(2,6,23,.74);overflow:auto;padding:14px;}#stockAdminOverlay.show{display:block;}.stk-card{background:#f8fafc;max-width:min(1500px,97vw);margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.stk-head{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:linear-gradient(90deg,#1e6bd6,#1e3a8a);color:#fff;}.stk-title{font-size:19px;font-weight:800;}.stk-close{background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;width:auto;}.stk-body{padding:14px 16px;}.stk-loading,.stk-empty{padding:24px;text-align:center;color:#64748b;}.stk-sec{margin:16px 0 6px;font-size:14px;font-weight:900;color:#0f172a;display:flex;align-items:center;gap:7px;}.stk-secn{background:#e2e8f0;color:#475569;border-radius:999px;padding:1px 9px;font-size:11.5px;font-weight:800;}.stk-inp{border:1px solid #cbd5e1;border-radius:8px;padding:6px 8px;font-size:13px;font-family:inherit;background:#fff;}.stk-sub{font-size:10.5px;color:#94a3b8;font-weight:700;}.stk-nuevo{display:inline-flex;flex-wrap:wrap;align-items:center;gap:6px;}.stk-btn-x{color:#b91c1c;border-color:#fecaca;}.stk-scroll{overflow-x:auto;}.stk-catbox{border:1px solid #cbd5e1;border-radius:11px;padding:10px 11px;margin-bottom:8px;background:#fff;}.stk-catrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}.stk-catuni{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:7px;}.stk-catlist{margin-top:10px;padding-top:10px;border-top:1px dashed #e2e8f0;}.stk-catdesc{margin-top:5px;font-size:12px;color:#475569;line-height:1.35;}.stk-tbl tr.stk-filtros th{background:#f8fafc;padding:5px 9px;text-transform:none;}.stk-secbtn{width:100%;text-align:left;background:#eef2ff;border:1px solid #c7d2fe;border-radius:10px;padding:9px 12px;cursor:pointer;margin:16px 0 8px;}.stk-caret{display:inline-block;width:16px;color:#4f46e5;font-weight:900;}.stk-tbl tr.stk-viejo td{background:#fffbeb;}input.stk-inp.stk-neg{color:#b91c1c;font-weight:800;}.stk-cut{background:#fffbeb;border:1px solid #fcd34d;color:#92400e;border-radius:9px;padding:8px 11px;font-size:12.5px;font-weight:700;margin-bottom:10px;}.stk-filtro{flex:1;min-width:180px;height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 11px;font-size:14px;}.stk-btn{background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:8px 12px;font-size:13px;font-weight:800;cursor:pointer;width:auto;}.stk-btn.ok{background:#16a34a;color:#fff;border-color:#16a34a;}.stk-btn.danger{background:#fff;color:#b91c1c;border-color:#fca5a5;}.stk-tbl{width:100%;border-collapse:collapse;font-size:13.5px;}.stk-tbl.stk-tbl-fit{width:auto;max-width:100%;}.stk-tbl.stk-tbl-fit td.stk-desc{max-width:210px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.stk-tbl.stk-tbl-sect td.stk-desc{max-width:140px;}.stk-tbl.stk-tbl-fit th.num,.stk-tbl.stk-tbl-fit td.num{text-align:right;padding-left:9px;padding-right:9px;}.stk-tblwrap{overflow-x:auto;overflow-y:auto;max-width:100%;max-height:60vh;}.stk-tbl.stk-tbl-fit th.num{vertical-align:bottom;line-height:1.15;}.stk-tbl th{background:#f1f5f9;color:#475569;text-align:left;padding:7px 9px;font-size:11px;text-transform:uppercase;border-bottom:1px solid #cbd5e1;position:sticky;top:0;z-index:10;}.stk-tbl td{padding:7px 9px;}.stk-tbl th.num,.stk-tbl td.num{text-align:right;font-variant-numeric:tabular-nums;}.stk-row{cursor:pointer;border-bottom:1px solid #eef2f7;}.stk-row:hover{background:#eff6ff;}.stk-row td{padding:7px 9px;}.stk-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#1e6bd6;}.stk-desc{color:#475569;}.stk-neg{color:#b91c1c;font-weight:800;}.stk-pick-cell{cursor:pointer;color:#1e6bd6;font-weight:800;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px;}.stk-pick-cell:hover{background:#eff6ff;}.stk-tbl td.stk-hist0{color:#94a3b8;font-weight:700;}.stk-tbl td.stk-hist0:hover{background:#f1f5f9;color:#475569;}.stk-caret{color:#94a3b8;}.stk-detrow td{padding:0 9px 9px;background:#f8fafc;}.stk-det{border-left:3px solid #cbd5e1;padding:6px 0 6px 10px;}.stk-mv{display:flex;gap:9px;font-size:12px;padding:3px 0;align-items:center;}.stk-mv-old{opacity:.45;}.stk-mv-ts{color:#64748b;min-width:96px;}.stk-mv-tipo{font-weight:800;min-width:78px;}.stk-mv-dep{color:#64748b;min-width:74px;}.stk-mv-d{font-weight:800;min-width:44px;text-align:right;}.stk-mv-d.pos{color:#15803d;}.stk-mv-d.neg{color:#b91c1c;}.stk-mv-ref{color:#94a3b8;}.stk-ini-txt{width:100%;border:1px solid #cbd5e1;border-radius:9px;padding:9px;font-family:Consolas,Menlo,monospace;font-size:14px;}.stk-ini-btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}.stk-ini-warn{font-size:12px;color:#92400e;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:8px;margin-top:10px;}.stk-tabs{display:flex;gap:4px;padding:8px 12px 0;background:#1e3a8a;flex-wrap:wrap;}.stk-tab{flex:0 1 auto;width:auto;white-space:nowrap;background:rgba(255,255,255,.12);color:#cbd5e1;border:none;border-radius:9px 9px 0 0;padding:9px 13px;font-size:12.5px;font-weight:800;cursor:pointer;}.stk-tab.on{background:#f8fafc;color:#1e3a8a;}.stk-seg{display:flex;gap:6px;margin-bottom:10px;}.stk-segb{flex:1;background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:7px;font-size:13px;font-weight:800;cursor:pointer;}.stk-segb.on{background:#1e6bd6;color:#fff;border-color:#1e6bd6;}.stk-grp{margin-bottom:10px;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;}.stk-grp-h{background:#f1f5f9;padding:7px 10px;font-weight:800;font-size:13px;}.stk-grp-tot{color:#15803d;font-weight:800;margin-left:6px;}.stk-ing{display:flex;gap:9px;align-items:center;padding:5px 10px;border-top:1px solid #f1f5f9;font-size:12.5px;}.stk-ing-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#1e6bd6;}.stk-ing-desc{flex:1;color:#475569;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.stk-ing-rto{color:#94a3b8;font-size:11px;}.stk-aj-sec{border:1px solid #e2e8f0;border-radius:12px;padding:12px;margin-bottom:12px;}.stk-aj-h{font-size:15px;font-weight:800;margin-bottom:6px;}.stk-aj-hint{font-size:12px;color:#64748b;margin-bottom:7px;}.stk-aj-form{display:flex;gap:7px;flex-wrap:wrap;}.stk-aj-inp{flex:1;min-width:90px;height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 10px;font-size:14px;text-align:center;}.cnt-in{height:32px;border:1px solid #cbd5e1;border-radius:7px;padding:0 6px;font-size:13px;box-sizing:border-box;margin:0;width:auto;}.stk-aj-dep{margin-bottom:12px;font-size:13px;font-weight:800;}.stk-aj-dep select{height:36px;border:1px solid #cbd5e1;border-radius:8px;padding:0 8px;font-size:14px;font-weight:700;}.stk-rk-orden{background:#f1f5f9;border-radius:10px;padding:10px 12px;font-size:13px;margin-bottom:10px;}.stk-rk-orden.pend{background:#fffbeb;border:1.5px solid #fcd34d;color:#92400e;}.stk-rk-baj{display:flex;align-items:center;gap:10px;border:1px solid #e2e8f0;border-radius:11px;padding:9px 11px;margin-bottom:8px;background:#fff;}.stk-rk-baji{flex:1;min-width:0;}.stk-rk-q{font-size:12px;color:#1e6bd6;font-weight:700;margin-top:2px;}";
     document.head.appendChild(s);
   }
   let ov = document.getElementById("stockAdminOverlay");
@@ -11649,7 +11673,8 @@ function stkBodyStocks() {
   shown = shown.filter(function (a) { return !_insCodsSet.has(String(a.cod || "").trim().toUpperCase()); });
   // v7.48: tilde "🔴 Negativos" — se aplica ADEMÁS del buscador. Deja sólo los artículos con
   // saldo negativo en algún depósito (para cazar inconsistencias de stock de un vistazo).
-  const _stkNegCount = arts.filter(_stkArtHasNeg).length + arts.filter(function (a) { return _stkIsNeg(a.insumos); }).length;
+  // v7.85: solo cuenta stock negativo (no insumos), para que el badge coincida con lo que muestra el filtro
+  const _stkNegCount = arts.filter(_stkArtHasNeg).length;
   // v7.54: tilde "⚠ Stock bajo" — códigos donde stock actual < pedidos
   const _stkLowCount = arts.filter(function (a) {
     const stock = (Number(a.terminado) || 0) + (Number(a.excedente) || 0) + (Number(a.separar_pedidos) || 0) + (Number(a.a_facturar) || 0) + (Number(a.a_guardar) || 0) + (Number(a.racks) || 0) + (Number(a.racks_ch) || 0);
@@ -11740,6 +11765,7 @@ function stkBodyStocks() {
     '</div>';
   // v5.53 — dos pop-ups: NPs por estadio (pickeado→facturar) y movimientos de góndola.
   h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">' +
+    '<button onclick="stkCrearCodigoNuevo()" style="width:auto;margin:0;padding:9px 13px;border:1px solid #f87171;border-radius:10px;background:#fee2e2;color:#dc2626;font-size:13px;font-weight:800;cursor:pointer;">➕ Crear código</button>' +
     '<button onclick="stkOpenPedidos()" style="width:auto;margin:0;padding:9px 13px;border:1px solid #c7d2fe;border-radius:10px;background:#eef2ff;color:#3730a3;font-size:13px;font-weight:800;cursor:pointer;">📋 Pedidos por estadio</button>' +
     '<button onclick="stkOpenGondola()" style="width:auto;margin:0;padding:9px 13px;border:1px solid #bbf7d0;border-radius:10px;background:#f0fdf4;color:#15803d;font-size:13px;font-weight:800;cursor:pointer;">🔁 Movimientos de góndola</button>' +
     '<button onclick="stkOpenHistorial()" style="width:auto;margin:0;padding:9px 13px;border:1px solid #fde68a;border-radius:10px;background:#fffbeb;color:#92400e;font-size:13px;font-weight:800;cursor:pointer;">🕓 Historial</button>' +
@@ -11782,7 +11808,7 @@ function stkBodyStocks() {
     const _tot = SECTKEYS.reduce(function (s, k) { return s + (Number(a[k]) || 0); }, 0) + (Number(a.racks_ch) || 0);  // v7.54: racks_ch sumado al total
     const _ped = Number(dem[_ocgNorm(a.cod)]) || 0;
     const _cap = Number(capByCod[_ocgNorm(a.cod)]) || 0;
-    let tds = '<td class="stk-cod">' + escapeHtml(a.cod) + '</td><td class="stk-desc">' + escapeHtml(artNombre(a.cod, a.desc) || "—") + '</td><td class="num ' + (_tot < 0 ? "stk-neg" : "") + '" style="background:#f8fafc"><b>' + fmtCajas(_tot) + '</b></td>' + (_ped ? '<td class="num stk-pick-cell" style="background:#fffbeb;color:#92400e" onclick="event.stopPropagation();stkOpenCajasPedidasArt(\'' + encodeURIComponent(a.cod) + '\')" title="Solo NP programadas en el PPP. Tocá para ver el detalle por NP (incluye también las NP sin programar, por eso el total del detalle puede ser mayor)"><b>' + fmtCajas(_ped) + '</b></td>' : '<td class="num" style="background:#fffbeb;color:#92400e"></td>') + (_cap ? '<td class="num stk-pick-cell" style="background:#f0fdf4;color:#166534" onclick="event.stopPropagation();stkOpenCapArt(\'' + encodeURIComponent(a.cod) + '\')" title="Ubicaciones y capacidad de góndola"><b>' + fmtCajas(_cap) + '</b></td>' : '<td class="num" style="background:#f0fdf4;color:#166534"></td>');
+    let tds = '<td class="stk-cod">' + escapeHtml(a.cod) + '</td><td class="stk-desc">' + escapeHtml(artNombre(a.cod, a.desc) || "—") + '</td><td class="num ' + (_tot < 0 ? "stk-neg" : "") + '" style="background:#f8fafc"><b>' + fmtCajas(_tot) + '</b></td>' + (_ped ? '<td class="num stk-pick-cell" style="background:#fffbeb;color:#92400e" onclick="event.stopPropagation();stkOpenCajasPedidasArt(\'' + encodeURIComponent(a.cod) + '\')" title="Solo NP programadas en el PPP. Tocá para ver el detalle por NP (incluye también las NP sin programar, por eso el total del detalle puede ser mayor)"><b>' + fmtCajas(_ped) + '</b></td>' : '<td class="num" style="background:#fffbeb;color:#92400e"></td>') + (_cap ? '<td class="num stk-pick-cell" style="background:#f0fdf4;color:#166534" onclick="event.stopPropagation();stkOpenCapArt(\'' + encodeURIComponent(a.cod) + '\')" title="Ubicaciones y capacidad de góndola"><b>' + fmtCajas(_cap) + '</b></td>' : '<td class="num" style="background:#f0fdf4;color:#166534">—</td>');
     cols.forEach(function (c) {
       const v = (c.racksKey ? ((Number(a[c.key]) || 0) + (Number(a.racks_ch) || 0)) : (Number(a[c.key]) || 0));
       // v5.82: columnas clickeables → detalle. Pickeados/A facturar → NPs; Excedente/Racks → ubicación.
@@ -11823,6 +11849,52 @@ function stkBodyStocks() {
     }
   });
   h += "</tbody></table></div>";
+
+  // Modal para crear código nuevo
+  if (_stk.crearCodigo) {
+    h += '<div class="stk-modal-overlay" onclick="if(event.target===this) stkCrearCodigoCancel()">' +
+      '<div class="stk-modal" style="width:400px;padding:20px;background:#fff;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,0.2);">' +
+      '<h3 style="margin:0 0 16px 0;font-size:18px;color:#1e293b;">➕ Crear código nuevo</h3>' +
+      '<div class="stk-modal-hint" style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:10px;margin-bottom:16px;font-size:12px;color:#166534;">' +
+      'Registra un código nuevo en Movimientos_Stock. Si es insumo, se agrega también a la tabla de Insumos.' +
+      '</div>' +
+      '<div style="margin-bottom:12px;">' +
+      '<label style="display:block;font-size:12px;font-weight:700;color:#64748b;margin-bottom:4px;">Código *</label>' +
+      '<input id="crCod" type="text" value="' + escapeHtml(_stk.crearCodigo.cod || "") + '" placeholder="ej: 439E" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #e2e8f0;border-radius:6px;font-size:14px;" oninput="if(_stk&&_stk.crearCodigo){_stk.crearCodigo.cod=this.value;}">' +
+      '</div>' +
+      '<div style="margin-bottom:12px;">' +
+      '<label style="display:block;font-size:12px;font-weight:700;color:#64748b;margin-bottom:4px;">Descripción</label>' +
+      '<input id="crDesc" type="text" value="' + escapeHtml(_stk.crearCodigo.desc || "") + '" placeholder="ej: Colador 16cm" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #e2e8f0;border-radius:6px;font-size:14px;" oninput="if(_stk&&_stk.crearCodigo){_stk.crearCodigo.desc=this.value;}">' +
+      '</div>' +
+      '<div style="margin-bottom:12px;">' +
+      '<label style="display:block;font-size:12px;font-weight:700;color:#64748b;margin-bottom:4px;">Tipo *</label>' +
+      '<div style="display:flex;gap:8px;">' +
+      '<button class="stk-tipobtn' + (_stk.crearCodigo.tipo === "stock" ? " on" : "") + '" onclick="if(_stk&&_stk.crearCodigo){_stk.crearCodigo.tipo=\'stock\';stkRender();}" style="flex:1;padding:8px;border:1px solid ' + (_stk.crearCodigo.tipo === "stock" ? "#1e6bd6" : "#e2e8f0") + ';background:' + (_stk.crearCodigo.tipo === "stock" ? "#eff6ff" : "#fff") + ';border-radius:6px;color:' + (_stk.crearCodigo.tipo === "stock" ? "#1e6bd6" : "#64748b") + ';font-weight:700;cursor:pointer;">📦 Mercadería</button>' +
+      '<button class="stk-tipobtn' + (_stk.crearCodigo.tipo === "insumo" ? " on" : "") + '" onclick="if(_stk&&_stk.crearCodigo){_stk.crearCodigo.tipo=\'insumo\';stkRender();}" style="flex:1;padding:8px;border:1px solid ' + (_stk.crearCodigo.tipo === "insumo" ? "#15803d" : "#e2e8f0") + ';background:' + (_stk.crearCodigo.tipo === "insumo" ? "#f0fdf4" : "#fff") + ';border-radius:6px;color:' + (_stk.crearCodigo.tipo === "insumo" ? "#15803d" : "#64748b") + ';font-weight:700;cursor:pointer;">🧰 Insumo</button>' +
+      '</div>' +
+      '</div>' +
+      '<div style="margin-bottom:12px;">' +
+      '<label style="display:block;font-size:12px;font-weight:700;color:#64748b;margin-bottom:4px;">Cantidad inicial</label>' +
+      '<input id="crCant" type="number" step="any" value="' + escapeHtml(_stk.crearCodigo.cantidad || "") + '" placeholder="0" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #e2e8f0;border-radius:6px;font-size:14px;" oninput="if(_stk&&_stk.crearCodigo){_stk.crearCodigo.cantidad=this.value;}">' +
+      '</div>' +
+      '<div style="margin-bottom:16px;">' +
+      '<label style="display:block;font-size:12px;font-weight:700;color:#64748b;margin-bottom:4px;">Depósito inicial</label>' +
+      '<select id="crDep" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #e2e8f0;border-radius:6px;font-size:14px;" onchange="if(_stk&&_stk.crearCodigo){_stk.crearCodigo.deposito=this.value;}">' +
+      '<option value="terminado"' + (_stk.crearCodigo.deposito === "terminado" ? " selected" : "") + '>Góndola</option>' +
+      '<option value="excedente"' + (_stk.crearCodigo.deposito === "excedente" ? " selected" : "") + '>Excedente</option>' +
+      '<option value="a_guardar"' + (_stk.crearCodigo.deposito === "a_guardar" ? " selected" : "") + '>A guardar</option>' +
+      '<option value="racks"' + (_stk.crearCodigo.deposito === "racks" ? " selected" : "") + '>Racks</option>' +
+      '<option value="insumos"' + (_stk.crearCodigo.deposito === "insumos" ? " selected" : "") + '>Insumos</option>' +
+      '</select>' +
+      '</div>' +
+      '<div style="display:flex;gap:8px;justify-content:flex-end;">' +
+      '<button onclick="stkCrearCodigoCancel()" style="padding:8px 16px;border:1px solid #e2e8f0;background:#fff;border-radius:6px;color:#64748b;font-weight:700;cursor:pointer;">Cancelar</button>' +
+      '<button onclick="stkCrearCodigoGuardar()" style="padding:8px 16px;border:none;background:#dc2626;color:#fff;border-radius:6px;font-weight:700;cursor:pointer;">Crear</button>' +
+      '</div>' +
+      '</div>' +
+      '</div>';
+  }
+
   return h;
 }
 /* v4.22 — Solapa "A Separar": pipeline de stock entre el picking y la facturación.
@@ -12693,6 +12765,69 @@ function stkDescargarExcel() {
   }).catch(function (e) {
     alert("No pude generar el Excel: " + (e && e.message ? e.message : e));
   });
+}
+/* v7.87 — Crear código nuevo (mercadería o insumo) */
+function stkCrearCodigoNuevo() {
+  if (!_stk) return;
+  _stk.crearCodigo = { cod: "", desc: "", tipo: "stock", cantidad: "", deposito: "terminado" };
+  stkRender();
+}
+function stkCrearCodigoCancel() {
+  if (!_stk) return;
+  _stk.crearCodigo = null;
+  stkRender();
+}
+async function stkCrearCodigoGuardar() {
+  if (!_stk || !_stk.crearCodigo) return;
+  const cod = String(_stk.crearCodigo.cod || "").trim().toUpperCase();
+  const desc = String(_stk.crearCodigo.desc || "").trim();
+  const tipo = String(_stk.crearCodigo.tipo || "stock");
+  const cantidadStr = String(_stk.crearCodigo.cantidad || "").trim();
+  const deposito = String(_stk.crearCodigo.deposito || "terminado");
+
+  if (!cod) { alert("El código es obligatorio."); return; }
+  if (tipo === "stock" && !desc) { alert("La descripción es obligatoria."); return; }
+
+  const cantidad = cantidadStr ? parseFloat(cantidadStr) : 0;
+  if (isNaN(cantidad)) { alert("La cantidad debe ser un número válido."); return; }
+
+  try {
+    // 1. Registrar movimiento inicial en Movimientos_Stock
+    const movRows = [{
+      cod_art: cod,
+      descripcion: desc || null,
+      deposito: deposito,
+      delta: cantidad,
+      tipo: "inicial",
+      ref: null,
+      legajo: (typeof _legajo !== "undefined" ? _legajo : "admin"),
+      unidad: null
+    }];
+
+    await stockMove(movRows);
+
+    // 2. Si es insumo, agregar a tabla Insumos
+    if (tipo === "insumo") {
+      try {
+        await _stkInsRpc("insumo_alta", {
+          p_cod: cod,
+          p_nombre: desc || null,
+          p_categoria: null,
+          p_ubicacion: null,
+          p_legajo: (typeof _legajo !== "undefined" ? _legajo : "admin")
+        });
+      } catch (e) {
+        // Si falla crear en Insumos pero el movimiento se registró, avisar pero no revertir
+        console.warn("Movimiento registrado pero no se pudo agregar a tabla Insumos:", e);
+      }
+    }
+
+    _stk.crearCodigo = null;
+    _stk.msg = "✓ Código " + cod + " creado.";
+    stkRefresh().then(() => stkRender()).catch(() => stkRender());
+  } catch (e) {
+    alert("No se pudo crear el código: " + (e.message || e));
+  }
 }
 function stkGondSetFilter(f) { if (!_stkPop) return; _stkPop.filter = f; stkGondRender(); }
 function stkGondSearch(v) { if (!_stkPop) return; _stkPop.search = String(v == null ? "" : v); stkGondRender(); }
