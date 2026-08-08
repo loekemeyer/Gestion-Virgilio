@@ -6145,7 +6145,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.93";
+const APP_VERSION = "v7.94";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -25985,6 +25985,54 @@ async function facCorreccData(){
   pend.sort(function(a,b){ return (a.sec < b.sec ? -1 : a.sec > b.sec ? 1 : 0) || (a.np < b.np ? -1 : 1); });
   return pend;
 }
+/* v7.94 — stock físico total de una fila de vista_saldos_stock. */
+function _corrStk(r){ return (Number(r.terminado)||0)+(Number(r.excedente)||0)+(Number(r.a_guardar)||0)+(Number(r.racks)||0)+(Number(r.racks_ch)||0)+(Number(r.para_envasar)||0); }
+/* v7.94 — etiqueta/estado [label, color, fondo]. */
+function _corrEstado(e){
+  const M = { sinpickear:["Sin pickear","#64748b","#f1f5f9"], enpicking:["En picking","#1e40af","#eff6ff"], pickeado:["Pickeado","#b45309","#fffbeb"], afacturar:["A facturar","#166534","#f0fdf4"], facturado:["Facturado","#065f46","#d1fae5"] };
+  return M[e] || M.sinpickear;
+}
+/* v7.94 — enriquece el panel: razón social, stock (sec/ppal), lo que puso el operario
+   (Entregas_Virgilio) y el estado (CORE events EP/TP/AP/TAP + Facturacion_NP). */
+async function facCorreccDataRich(){
+  const pend = await facCorreccData();
+  if (!pend.length) return [];
+  const nps = Array.from(new Set(pend.map(function(p){ return p.np; })));
+  const cods = Array.from(new Set(pend.reduce(function(a,p){ a.push(p.sec); a.push(p.ppal); return a; }, [])));
+  const inNps = nps.map(encodeURIComponent).join(",");
+  const inCods = cods.map(encodeURIComponent).join(",");
+  const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+  const q = function(url){ return fetch(url, { headers: H, cache: "no-store" }).then(function(r){ return r.ok ? r.json() : []; }).catch(function(){ return []; }); };
+  const res = await Promise.all([
+    q(SUPABASE_PPP_PROG_ENDPOINT + "?np=in.(" + inNps + ")&select=np,tanda,razon_social&limit=8000"),
+    q(SUPABASE_URL + "/rest/v1/vista_saldos_stock?cod_art=in.(" + inCods + ")&select=cod_art,terminado,excedente,a_guardar,racks,racks_ch,para_envasar"),
+    q(SUPABASE_URL + "/rest/v1/Entregas_Virgilio?np=in.(" + inNps + ")&select=np,cod_art,cajas_pedidas,cajas_entregadas,cajas_falto&limit=8000"),
+    q(SUPABASE_FACTURACION_NP_ENDPOINT + "?np=in.(" + inNps + ")&select=np&limit=8000")
+  ]);
+  const ppp = res[0], saldos = res[1], entregas = res[2], fact = res[3];
+  const npInfo = {}; ppp.forEach(function(r){ const n = pickNormNp(r.np); if (n && !npInfo[n]) npInfo[n] = { tanda: String(r.tanda||"").trim().toUpperCase(), rs: r.razon_social||"" }; });
+  const stk = {}; saldos.forEach(function(r){ stk[_ocgNorm(r.cod_art)] = _corrStk(r); });
+  const ent = {}; entregas.forEach(function(r){ ent[pickNormNp(r.np)+"|"+_ocgNorm(r.cod_art)] = { ped: Number(r.cajas_pedidas)||0, entr: Number(r.cajas_entregadas)||0, falto: Number(r.cajas_falto)||0 }; });
+  const factSet = {}; fact.forEach(function(r){ factSet[pickNormNp(r.np)] = true; });
+  // Estado por tanda (últimos EP/TP y AP/TAP; excluye legajos 0/1 de prueba).
+  const tandas = Array.from(new Set(nps.map(function(n){ return (npInfo[n]||{}).tanda; }).filter(Boolean)));
+  const estadoTanda = {};
+  if (tandas.length){
+    const evs = await q(SUPABASE_TABLE_ENDPOINT + "?opcion=in.(EP,TP,AP,TAP)&texto=in.(" + tandas.map(encodeURIComponent).join(",") + ")&order=ts_cliente.asc&select=opcion,texto,legajo&limit=5000");
+    const lastP = {}, lastA = {};
+    evs.forEach(function(e){ const lg = String(e.legajo); if (lg==="0"||lg==="1") return; const t = String(e.texto||"").trim().toUpperCase(); if (!t) return; if (e.opcion==="EP"||e.opcion==="TP") lastP[t]=e.opcion; else if (e.opcion==="AP"||e.opcion==="TAP") lastA[t]=e.opcion; });
+    tandas.forEach(function(t){ const p=lastP[t], a=lastA[t]; estadoTanda[t] = !p ? "sinpickear" : (p==="EP" ? "enpicking" : (p==="TP" && a==="TAP" ? "afacturar" : "pickeado")); });
+  }
+  pend.forEach(function(p){
+    const info = npInfo[p.np] || { tanda:"", rs:"" };
+    p.rs = info.rs; p.tanda = info.tanda;
+    p.stkSec = stk[_ocgNorm(p.sec)] || 0;
+    p.stkPpal = stk[_ocgNorm(p.ppal)] || 0;
+    p.oper = ent[p.np+"|"+_ocgNorm(p.sec)] || ent[p.np+"|"+_ocgNorm(p.ppal)] || null;
+    p.estado = factSet[p.np] ? "facturado" : (estadoTanda[info.tanda] || "sinpickear");
+  });
+  return pend;
+}
 async function facCorreccRefreshCount(){
   try {
     const pend = await facCorreccData();
@@ -26011,13 +26059,26 @@ function facCorreccClose(){ const ov = document.getElementById("facCorreccOverla
 async function facCorreccRender(){
   const body = document.getElementById("facCorreccBody"); if (!body) return;
   let pend;
-  try { pend = await facCorreccData(); } catch(_e){ body.innerHTML = '<div style="color:#b91c1c;padding:16px;">Error cargando.</div>'; return; }
+  try { pend = await facCorreccDataRich(); } catch(_e){ body.innerHTML = '<div style="color:#b91c1c;padding:16px;">Error cargando.</div>'; return; }
   if (!pend.length){ body.innerHTML = '<div style="text-align:center;color:#16a34a;padding:24px;font-weight:700;">✅ No hay códigos para corregir.</div>'; facCorreccRefreshCount(); return; }
   let h = '<div style="font-size:12.5px;color:#64748b;margin-bottom:10px;">Estos pedidos entraron en un código <b>secundario</b>. Cambiá la NP en el ERP al principal y confirmá acá — el picking va a levantar el principal.</div>';
   pend.forEach(function(p){
-    h += '<div style="display:flex;align-items:center;gap:10px;border:1px solid #e2e8f0;border-radius:10px;padding:9px 11px;margin-bottom:8px;">'
-      + '<div style="flex:1;min-width:0;"><div style="font-weight:800;">NP ' + escapeHtml(p.np) + ' · <span style="color:#b91c1c;">' + escapeHtml(p.sec) + '</span> → <span style="color:#16a34a;">' + escapeHtml(p.ppal) + '</span></div>'
-      + '<div style="font-size:12px;color:#64748b;">' + escapeHtml(p.desc) + ' · ' + p.cajas + ' cajas</div></div>'
+    const est = _corrEstado(p.estado);
+    const oper = p.oper
+      ? ('pedidas ' + Math.round(p.oper.ped) + ' · entregó ' + Math.round(p.oper.entr) + (p.oper.falto>0 ? ' · <b style="color:#b91c1c;">faltó ' + Math.round(p.oper.falto) + '</b>' : ''))
+      : '<span style="color:#94a3b8;">todavía sin picking/armado</span>';
+    h += '<div style="display:flex;align-items:flex-start;gap:10px;border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;margin-bottom:8px;">'
+      + '<div style="flex:1;min-width:0;">'
+        + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
+          + '<span style="font-weight:800;">NP ' + escapeHtml(p.np) + '</span>'
+          + '<span style="font-size:10.5px;font-weight:800;color:' + est[1] + ';background:' + est[2] + ';border-radius:999px;padding:1px 8px;">' + est[0] + '</span>'
+          + (p.tanda ? '<span style="font-size:11px;color:#94a3b8;">Tanda ' + escapeHtml(p.tanda) + '</span>' : '')
+        + '</div>'
+        + '<div style="font-size:13px;color:#334155;margin-top:2px;font-weight:600;">' + escapeHtml(p.rs || '—') + '</div>'
+        + '<div style="margin-top:3px;font-size:13px;"><span style="color:#b91c1c;font-weight:800;">' + escapeHtml(p.sec) + '</span> → <span style="color:#16a34a;font-weight:800;">' + escapeHtml(p.ppal) + '</span> <span style="color:#64748b;">· ' + escapeHtml(p.desc) + ' · ' + p.cajas + ' cajas</span></div>'
+        + '<div style="font-size:12px;color:#475569;margin-top:3px;">📦 Stock: <b>' + escapeHtml(p.sec) + '</b>=' + Math.round(p.stkSec) + ' · <b>' + escapeHtml(p.ppal) + '</b>=' + Math.round(p.stkPpal) + '</div>'
+        + '<div style="font-size:12px;color:#475569;">👷 Operario: ' + oper + '</div>'
+      + '</div>'
       + '<button onclick="facCorreccConfirm(this,\'' + encodeURIComponent(p.np) + '\',\'' + encodeURIComponent(p.sec) + '\',\'' + encodeURIComponent(p.ppal) + '\',' + p.cajas + ')" style="width:auto;flex:0 0 auto;background:#16a34a;color:#fff;border:none;border-radius:9px;padding:9px 13px;font-size:13px;font-weight:800;cursor:pointer;white-space:nowrap;">✓ Ya lo cambié</button>'
       + '</div>';
   });
