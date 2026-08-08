@@ -186,5 +186,7 @@ echo "== stk-conteo-fisico (idea 2793: conteo físico de góndola — cálculo, 
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stk-conteo-fisico.cjs
 echo "== cp-gondola-vacia (idea 6497: Completar Pedido avisa cartel+Telegram si retira de góndola en 0) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/cp-gondola-vacia.cjs
+echo "== curso-dur-laboral (idea 2865: badge 'en curso' horario-laboral-aware, no reloj de pared) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/curso-dur-laboral.cjs
 
 echo "== TODO OK =="
