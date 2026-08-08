@@ -6145,7 +6145,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.94";
+const APP_VERSION = "v7.95";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -26007,13 +26007,15 @@ async function facCorreccDataRich(){
     q(SUPABASE_PPP_PROG_ENDPOINT + "?np=in.(" + inNps + ")&select=np,tanda,razon_social&limit=8000"),
     q(SUPABASE_URL + "/rest/v1/vista_saldos_stock?cod_art=in.(" + inCods + ")&select=cod_art,terminado,excedente,a_guardar,racks,racks_ch,para_envasar"),
     q(SUPABASE_URL + "/rest/v1/Entregas_Virgilio?np=in.(" + inNps + ")&select=np,cod_art,cajas_pedidas,cajas_entregadas,cajas_falto&limit=8000"),
-    q(SUPABASE_FACTURACION_NP_ENDPOINT + "?np=in.(" + inNps + ")&select=np&limit=8000")
+    q(SUPABASE_FACTURACION_NP_ENDPOINT + "?np=in.(" + inNps + ")&select=np,razon_social,tanda&limit=8000")
   ]);
   const ppp = res[0], saldos = res[1], entregas = res[2], fact = res[3];
   const npInfo = {}; ppp.forEach(function(r){ const n = pickNormNp(r.np); if (n && !npInfo[n]) npInfo[n] = { tanda: String(r.tanda||"").trim().toUpperCase(), rs: r.razon_social||"" }; });
   const stk = {}; saldos.forEach(function(r){ stk[_ocgNorm(r.cod_art)] = _corrStk(r); });
   const ent = {}; entregas.forEach(function(r){ ent[pickNormNp(r.np)+"|"+_ocgNorm(r.cod_art)] = { ped: Number(r.cajas_pedidas)||0, entr: Number(r.cajas_entregadas)||0, falto: Number(r.cajas_falto)||0 }; });
-  const factSet = {}; fact.forEach(function(r){ factSet[pickNormNp(r.np)] = true; });
+  // Facturacion_NP: set de facturados + respaldo de razón social/tanda para NP que ya salieron del PPP.
+  const factSet = {}, rsFact = {}, tandaFact = {};
+  fact.forEach(function(r){ const n = pickNormNp(r.np); factSet[n] = true; if (r.razon_social && !rsFact[n]) rsFact[n] = r.razon_social; if (r.tanda && !tandaFact[n]) tandaFact[n] = String(r.tanda).trim().toUpperCase(); });
   // Estado por tanda (últimos EP/TP y AP/TAP; excluye legajos 0/1 de prueba).
   const tandas = Array.from(new Set(nps.map(function(n){ return (npInfo[n]||{}).tanda; }).filter(Boolean)));
   const estadoTanda = {};
@@ -26025,7 +26027,8 @@ async function facCorreccDataRich(){
   }
   pend.forEach(function(p){
     const info = npInfo[p.np] || { tanda:"", rs:"" };
-    p.rs = info.rs; p.tanda = info.tanda;
+    p.rs = info.rs || rsFact[p.np] || "";
+    p.tanda = info.tanda || tandaFact[p.np] || "";
     p.stkSec = stk[_ocgNorm(p.sec)] || 0;
     p.stkPpal = stk[_ocgNorm(p.ppal)] || 0;
     p.oper = ent[p.np+"|"+_ocgNorm(p.sec)] || ent[p.np+"|"+_ocgNorm(p.ppal)] || null;
@@ -26053,15 +26056,37 @@ function facCorreccOpen(){
   ov.innerHTML = '<div style="max-width:640px;margin:0 auto;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5);">'
     + '<div style="display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:linear-gradient(90deg,#1e6bd6,#1e3a8a);color:#fff;"><b style="font-size:17px;">🔀 Corregir códigos (secundario → principal)</b><button onclick="facCorreccClose()" style="width:auto;background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;">Cerrar</button></div>'
     + '<div id="facCorreccBody" style="padding:14px 16px;"><div style="text-align:center;color:#64748b;padding:20px;">Cargando…</div></div></div>';
-  facCorreccRender();
+  facCorreccReload();
 }
 function facCorreccClose(){ const ov = document.getElementById("facCorreccOverlay"); if (ov) ov.style.display = "none"; }
-async function facCorreccRender(){
+/* v7.95 — filtro por estado + carga cacheada (cambiar de pestaña no re-consulta). */
+let _facCorrFiltro = "todo";
+let _facCorrRows = null;
+async function facCorreccReload(){
+  _facCorrRows = null;
+  try { _facCorrRows = await facCorreccDataRich(); } catch(_e){ _facCorrRows = []; }
+  facCorreccRender();
+}
+function facCorreccFiltro(f){ _facCorrFiltro = f; facCorreccRender(); }
+function facCorreccRender(){
   const body = document.getElementById("facCorreccBody"); if (!body) return;
-  let pend;
-  try { pend = await facCorreccDataRich(); } catch(_e){ body.innerHTML = '<div style="color:#b91c1c;padding:16px;">Error cargando.</div>'; return; }
-  if (!pend.length){ body.innerHTML = '<div style="text-align:center;color:#16a34a;padding:24px;font-weight:700;">✅ No hay códigos para corregir.</div>'; facCorreccRefreshCount(); return; }
-  let h = '<div style="font-size:12.5px;color:#64748b;margin-bottom:10px;">Estos pedidos entraron en un código <b>secundario</b>. Cambiá la NP en el ERP al principal y confirmá acá — el picking va a levantar el principal.</div>';
+  const rows = _facCorrRows;
+  if (rows === null){ body.innerHTML = '<div style="text-align:center;color:#64748b;padding:20px;">Cargando…</div>'; return; }
+  facCorreccRefreshCount();
+  // Pestañas de filtro por estado (con conteo)
+  const TABS = [["todo","Todo"],["facturado","Facturado"],["afacturar","Para facturar"],["pickeado","Pickeado"],["enpicking","En picking"],["sinpickear","Sin pickear"]];
+  const cnt = {}; rows.forEach(function(p){ cnt[p.estado] = (cnt[p.estado]||0)+1; });
+  const cntOf = function(k){ return k==="todo" ? rows.length : (cnt[k]||0); };
+  let h = '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">';
+  TABS.forEach(function(t){
+    const on = _facCorrFiltro === t[0];
+    h += '<button onclick="facCorreccFiltro(\'' + t[0] + '\')" style="width:auto;flex:0 0 auto;padding:6px 11px;border-radius:999px;border:1px solid ' + (on?'#1e6bd6':'#cbd5e1') + ';background:' + (on?'#1e6bd6':'#fff') + ';color:' + (on?'#fff':'#334155') + ';font-size:12px;font-weight:800;cursor:pointer;">' + t[1] + ' (' + cntOf(t[0]) + ')</button>';
+  });
+  h += '</div>';
+  if (!rows.length){ body.innerHTML = h + '<div style="text-align:center;color:#16a34a;padding:24px;font-weight:700;">✅ No hay códigos para corregir.</div>'; return; }
+  const pend = _facCorrFiltro === "todo" ? rows : rows.filter(function(p){ return p.estado === _facCorrFiltro; });
+  h += '<div style="font-size:12.5px;color:#64748b;margin-bottom:10px;">Estos pedidos entraron en un código <b>secundario</b>. Cambiá la NP en el ERP al principal y confirmá acá — el picking va a levantar el principal.</div>';
+  if (!pend.length){ body.innerHTML = h + '<div style="text-align:center;color:#94a3b8;padding:20px;">No hay pedidos en este estado.</div>'; return; }
   pend.forEach(function(p){
     const est = _corrEstado(p.estado);
     const oper = p.oper
@@ -26097,7 +26122,7 @@ async function facCorreccConfirm(btn, npE, secE, ppalE, cajas){
     });
     if (!res.ok && res.status !== 409) throw new Error("HTTP " + res.status);
     _correccCache = null;   // invalidar cache → picking y panel toman la corrección nueva
-    facCorreccRender();
+    facCorreccReload();
   } catch(e){
     if (btn){ btn.disabled = false; btn.textContent = "✓ Ya lo cambié"; }
     try { alert("No se pudo guardar: " + (e.message || e)); } catch(_e){}
