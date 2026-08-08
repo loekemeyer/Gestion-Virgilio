@@ -114,7 +114,8 @@ create policy "correcc_insert" on public."Correcciones_Pedido" for insert with c
 revoke update, delete, truncate, references, trigger on public."Correcciones_Pedido" from anon, authenticated;
 -- Confirmación idempotente desde el front: Prefer resolution=ignore-duplicates.
 
--- Vista para el panel de la operadora: pedidos ACTUALES cargados en secundario.
+-- Vista para el panel de la operadora: pedidos cargados en secundario que TODAVÍA corren
+-- (v7.97: excluye los ya ENTREGADOS — si la NP está en PPP_Entregados_Meta, ya salió).
 create or replace view public.vista_pedidos_secundarios
 with (security_invoker = true) as
 select btrim(b.pedido)          as np,
@@ -125,5 +126,6 @@ from public."PPP_Base_Pedidos" b
 join public."Equivalencias_Familia" ef
   on ef.cod_secundario = regexp_replace(upper(btrim(b.articulo)),'^0+(?=.)','')
 where b.pedido is not null and btrim(b.pedido) <> ''
+  and not exists (select 1 from public."PPP_Entregados_Meta" e where btrim(e.np) = btrim(b.pedido))
 group by btrim(b.pedido), upper(btrim(b.articulo)), ef.cod_principal, ef.descripcion;
 grant select on public.vista_pedidos_secundarios to anon, authenticated;

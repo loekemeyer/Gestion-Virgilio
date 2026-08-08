@@ -6145,7 +6145,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.96";
+const APP_VERSION = "v7.97";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -25982,14 +25982,9 @@ async function facCorreccData(){
     if (corr[np + "|" + sec]) return;   // ya confirmada
     pend0.push({ np: np, sec: String(r.cod_secundario).trim(), ppal: String(r.cod_principal).trim(), desc: r.descripcion || "", cajas: Number(r.cajas) || 0 });
   });
-  // v7.96 — excluir NP ya CARGADAS A CAMIÓN (despachadas): si el pedido ya salió, listo.
-  // Las facturadas-pero-no-cargadas SIGUEN apareciendo (todavía se pueden corregir).
-  let pend = pend0;
-  if (pend0.length){
-    let desp = new Set();
-    try { desp = await fetchDespachadosTodos(true); } catch(_e){ desp = new Set(); }
-    pend = pend0.filter(function(p){ return !(desp && desp.has && desp.has(p.np)); });
-  }
+  // v7.97 — las NP ya ENTREGADAS se excluyen en la propia vista (vista_pedidos_secundarios
+  // filtra por PPP_Entregados_Meta), así que acá ya llegan solo las que todavía corren.
+  const pend = pend0;
   pend.sort(function(a,b){ return (a.sec < b.sec ? -1 : a.sec > b.sec ? 1 : 0) || (a.np < b.np ? -1 : 1); });
   return pend;
 }
