@@ -6145,7 +6145,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.98";
+const APP_VERSION = "v7.99";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -9567,6 +9567,15 @@ async function loadArtNombres() {
   _artNombres = m; return m;
 }
 function artNombre(cod, fb) { const n = _artNombres && _artNombres[_ocgNorm(cod)]; return n || fb || ""; }
+/* v7.99 — NOMBRE por EMPRESA (Paquete B): códigos que son PRODUCTOS DISTINTOS según la
+   empresa. La empresa la dice la NP (empresaDeNp). Ej. 809E: Loeke=Corta Pizza, Chef=Corta
+   Queso. Los coladores 437E/438E/439E son el MISMO producto en las dos → NO van acá. */
+const NOMBRE_POR_EMPRESA = { "809E": { LK: "Corta Pizza Familiar", CH: "Corta Queso" } };
+function artNombreEmp(cod, np, fb) {
+  const m = NOMBRE_POR_EMPRESA[_ocgNorm(cod)];
+  if (m) { const e = empresaDeNp(np); if (e && m[e]) return m[e]; }
+  return artNombre(cod, fb);
+}
 /* v6.41 — CÓDIGO CANÓNICO. En las hojas fuente (E.Madre LK / "Pedidos Talleristas-Prov")
    un mismo artículo aparece con distinto relleno de ceros (ej. 27 / 027 / 0027). Todos
    normalizan a la misma clave (_ocgNorm = sin ceros a la izq), pero al MOSTRARLOS conviene
@@ -16796,7 +16805,7 @@ async function showCPModal(legajo, _resume, focusNp) {
     const racksNoGon = await cpLoadRacksNoGondola(saldos);
     const today = cpTodayAR(), cut = today ? cpDateMinus(today, 21) : "";
     let fr = falt.filter(function (e) { const d = String(e.fecha_salida || "").slice(0, 10); return !d || !cut || d >= cut; });
-    fr.forEach(function (e) { e.desc = artNombre(e.cod_art, ""); e._saldo = sN[_cpNorm(e.cod_art)] || null; e._guardadoHoy = guardadoHoy.has(_cpNorm(e.cod_art)); });
+    fr.forEach(function (e) { e.desc = artNombreEmp(e.cod_art, e.np, ""); e._saldo = sN[_cpNorm(e.cod_art)] || null; e._guardadoHoy = guardadoHoy.has(_cpNorm(e.cod_art)); });
     // v6.18: el CP muestra un faltante si el artículo está EN "a guardar" (a_guardar>0) O se
     // GUARDÓ HOY (aunque ya esté en góndola) — lo que llegó/se guardó hoy es lo que se completa
     // en los pedidos ya armados. Si no está a guardar ni se guardó hoy, no figura (faltante de
@@ -16928,7 +16937,7 @@ async function cpReloadFaltantes() {
   const today = cpTodayAR(), cut = today ? cpDateMinus(today, 21) : "";
   let fr = falt.filter(function (e) { const d = String(e.fecha_salida || "").slice(0, 10); return !d || !cut || d >= cut; });
   const _gh = (_cp && _cp.guardadoHoy) || new Set();
-  fr.forEach(function (e) { e.desc = artNombre(e.cod_art, ""); e._saldo = (_cp.saldosN || {})[_cpNorm(e.cod_art)] || null; e._guardadoHoy = _gh.has(_cpNorm(e.cod_art)); });
+  fr.forEach(function (e) { e.desc = artNombreEmp(e.cod_art, e.np, ""); e._saldo = (_cp.saldosN || {})[_cpNorm(e.cod_art)] || null; e._guardadoHoy = _gh.has(_cpNorm(e.cod_art)); });
   // v6.18: mismo filtro que showCPModal — a_guardar>0 O guardado hoy, salvo enfoque en una NP.
   if (_cp && !_cp.focusNp) fr = fr.filter(function (e) { return (Number((e._saldo || {}).a_guardar) || 0) > 0 || e._guardadoHoy; });
   try { const rsMap = await cpLoadRazonSocial(fr.map(function (e) { return e.np; })); fr.forEach(function (e) { e.rs = rsMap[String(e.np).trim().replace(/\.0+$/, "")] || ""; }); } catch (_e) {}
@@ -17329,7 +17338,7 @@ function rcRender() {
   if (!fs.length) { h += '<div class="rc-empty">No hay pedidos con faltantes sin facturar. 👍</div>'; _renderKeepFocus(body, h); return; }
   h += fs.map(function (e) {
     const dmy = npcDmy(String(e.fecha_salida || "").slice(0, 10));
-    return '<button class="rc-frow" onclick="rcPickUrgent(' + Number(e.id) + ')"><div class="rc-ftop"><span class="rc-cod">' + escapeHtml(String(e.cod_art)) + '</span> <span class="rc-fdesc">' + escapeHtml(artNombre(e.cod_art, e.desc) || "") + '</span></div><div class="rc-fbot"><span class="rc-np">NP ' + escapeHtml(String(e.np)) + (e.tanda ? ' · ' + escapeHtml(String(e.tanda)) : '') + ' · sale <b>' + escapeHtml(dmy || "—") + '</b></span><span class="rc-faltan">faltan ' + (Math.round(Number(e.cajas_falto) || 0)) + '</span></div></button>';
+    return '<button class="rc-frow" onclick="rcPickUrgent(' + Number(e.id) + ')"><div class="rc-ftop"><span class="rc-cod">' + escapeHtml(String(e.cod_art)) + '</span> <span class="rc-fdesc">' + escapeHtml(artNombreEmp(e.cod_art, e.np, e.desc) || "") + '</span></div><div class="rc-fbot"><span class="rc-np">NP ' + escapeHtml(String(e.np)) + (e.tanda ? ' · ' + escapeHtml(String(e.tanda)) : '') + ' · sale <b>' + escapeHtml(dmy || "—") + '</b></span><span class="rc-faltan">faltan ' + (Math.round(Number(e.cajas_falto) || 0)) + '</span></div></button>';
   }).join("");
   _renderKeepFocus(body, h);
 }
@@ -17363,7 +17372,7 @@ function rcRenderStep2(body) {
   const s = _rc.sel; const dmy = npcDmy(String(s.fecha_salida || "").slice(0, 10));
   const maxFalt = Math.max(1, Math.round(Number(s.cajas_falto) || 1));
   let h = '<button class="rc-back" onclick="rcBack()">← Volver</button>';
-  h += '<div class="rc-sel"><span class="rc-cod">' + escapeHtml(String(s.cod_art)) + '</span> <span class="rc-fdesc">' + escapeHtml(artNombre(s.cod_art, s.desc) || "") + '</span><div class="rc-selnp">🔥 Urgente: NP ' + escapeHtml(String(s.np)) + ' · sale ' + escapeHtml(dmy || "—") + ' · faltan ' + maxFalt + '</div></div>';
+  h += '<div class="rc-sel"><span class="rc-cod">' + escapeHtml(String(s.cod_art)) + '</span> <span class="rc-fdesc">' + escapeHtml(artNombreEmp(s.cod_art, s.np, s.desc) || "") + '</span><div class="rc-selnp">🔥 Urgente: NP ' + escapeHtml(String(s.np)) + ' · sale ' + escapeHtml(dmy || "—") + ' · faltan ' + maxFalt + '</div></div>';
   h += '<div class="rc-fld"><div class="rc-lbl">¿De qué pedido lo saco? (sugeridos: los que salen después)</div>';
   if (_rc.donorsLoading) h += '<div class="rc-liosload">buscando pedidos con ' + escapeHtml(String(s.cod_art)) + '…</div>';
   else {

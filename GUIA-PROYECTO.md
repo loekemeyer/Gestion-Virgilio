@@ -4,7 +4,25 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-08 · Versión app al documentar: **v7.91**
+> Última actualización: 2026-08-08 · Versión app al documentar: **v7.99**
+>
+> Nota: **v7.99 — Códigos IMPORTADOS por empresa: dos paquetes.** Se documenta y empieza a
+> resolver el cruce por empresa (la empresa la dice la NP: >90000 = Loeke, si no Chef).
+> **Paquete A — 437E / 438E / 439E (coladores):** MISMO producto en las dos empresas, pero
+> **stock separado por empresa**. Importados por Chef, se venden Chef→Loeke listos para venta.
+> En **Loeke**: stock en Racks + Góndola. En **Chef**: el mismo artículo arranca como **INSUMO**;
+> para venderlo se descuenta el insumo (envío de insumos) y **vuelve como 438E listo para venta**
+> (Góndola, o Racks si se envasa mucho). El nombre es el mismo en las dos → no hace falta nombre
+> por empresa; sí separación de stock/ubicación (sufijo "438E LK"/"438E CH", vía pkCodEmpresa).
+> **Paquete B — 809E:** MISMO código, **PRODUCTOS DISTINTOS** por empresa: Loeke = **Corta Pizza
+> Familiar**, Chef = **Corta Queso**. No tienen nada que ver; solo comparten el número. Nunca deben
+> mezclarse. → v7.99 agrega `NOMBRE_POR_EMPRESA` + `artNombreEmp(cod, np)` (index.html): para el
+> 809E muestra el nombre correcto según la empresa de la NP. Aplicado en Completar Pedido y
+> Recepción (donde el operario ve el nombre). **PENDIENTE:** separación de stock/empresa de punta
+> a punta (Completar escribe stock suffijado, faltantes/facturación por empresa) y sacar la
+> equivalencia fija 809E→809E CH (que hoy fuerza Chef siempre).
+>
+> Nota: **v7.91
 >
 > Nota: **v7.91 — Alerta Telegram por pedido a secundario + corrección por NP que el picking levanta.**
 > **(A) Alerta Telegram:** tabla `Equivalencias_Familia` (secundario→principal, 13 familias, la misma
