@@ -3507,6 +3507,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       <button class="sup-action-btn" onclick="openMonitor()"><span class="sup-ico">📊</span><span>Monitor y Análisis</span></button>
       <button class="sup-action-btn" onclick="openInconsistencias()"><span class="sup-ico">⚠</span><span>Inconsistencias</span></button>
       <button class="sup-action-btn" onclick="openFaltantes()"><span class="sup-ico">📦</span><span>Faltantes</span></button>
+      <button class="sup-action-btn" onclick="openCorreccPanel()"><span class="sup-ico">🔀</span><span>Corregir códigos</span></button>
       <button class="sup-action-btn" onclick="openNpConsulta()"><span class="sup-ico">🔎</span><span>Consultar NP / Líos</span></button>
       <button class="sup-action-btn" onclick="openPrintStation()"><span class="sup-ico">🖨️</span><span>Cola de impresión</span></button>
       <button class="sup-action-btn" onclick="openPlanimEditor()"><span class="sup-ico">🗺️</span><span>Editar Planimetría</span></button>
@@ -6144,7 +6145,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.92";
+const APP_VERSION = "v7.93";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -25991,6 +25992,11 @@ async function facCorreccRefreshCount(){
     if (n) n.textContent = pend.length;
     if (chip) chip.style.display = pend.length ? "" : "none";
   } catch(_e){}
+}
+/* v7.93 — entrada directa desde Administración (sin pasar por Facturación). */
+function openCorreccPanel(){
+  try { if (typeof requireSupervisor === "function" && !requireSupervisor()) return; } catch(_e){}
+  facCorreccOpen();
 }
 function facCorreccOpen(){
   let ov = document.getElementById("facCorreccOverlay");
