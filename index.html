@@ -5678,12 +5678,11 @@ async function registerBackgroundSync() {
    legajo 0 movió stock real y desincronizó la alerta). */
 function esLegajoPrueba(leg) { const s = String(leg == null ? "" : leg).trim(); return s === "0" || s === "1"; }
 function esOperadorPrueba() { try { const el = document.getElementById("legajoInput"); return esLegajoPrueba(el ? el.value : ""); } catch (_e) { return false; } }
-function enqueueReport(payload) {
-  if (esOperadorPrueba()) { try { console.warn("[PRUEBA] evento NO persistido (legajo de prueba):", payload && payload.opcion); } catch (_e) {} return; }
-  // fecha = día (hora Arg) del ts del payload. Para un reporte normal
-  // payload.ts es Date.now() así que cae en hoy. Para un auto-cierre del
-  // día anterior, payload.ts es las 17:00 de ayer y la fecha va a ser ayer
-  // — así el setHistoryItemStatus actualiza el ítem en el archivo correcto.
+/* v7.87-fix — _enqueueReportRaw: lógica interna de encolado, sin el gate de
+   operador-prueba. Separada para que enqueueAutoClose pueda chequear
+   esLegajoPrueba(payload.legajo) en vez de leer el input DOM (bug: si el input
+   mostraba "0" al cambiar de día, el auto-cierre de legajos reales se descartaba). */
+function _enqueueReportRaw(payload) {
   const fechaHist = payload.ts ? isoToDayKey(payload.ts) : getTodayKey();
   const item = {
     id: payload.id,
@@ -5707,6 +5706,10 @@ function enqueueReport(payload) {
   // Best-effort, fire-and-forget: si falla, el evento ya quedó en
   // Registros_Produccion_Virgilio (fuente de verdad para producción).
   mirrorOperatorEventToHistorico(payload).catch(() => {});
+}
+function enqueueReport(payload) {
+  if (esOperadorPrueba()) { try { console.warn("[PRUEBA] evento NO persistido (legajo de prueba):", payload && payload.opcion); } catch (_e) {} return; }
+  _enqueueReportRaw(payload);
 }
 
 /* =====================================================================
@@ -5851,8 +5854,13 @@ async function mirrorOperatorEventToHistorico(payload) {
 }
 
 /* Genera un cierre automático para un toggle que quedó abierto al cambiar
-   de día. ts_cliente = fin de jornada (17:00 Arg) del día en que se abrió. */
+   de día. ts_cliente = fin de jornada (17:00 Arg) del día en que se abrió.
+   v7.87-fix: usa esLegajoPrueba(legajo) + _enqueueReportRaw en vez de
+   esOperadorPrueba() (que lee el input DOM). Así el auto-cierre de un
+   operario REAL (ej. 122) no se descarta si el input muestra "0". */
 function enqueueAutoClose(legajo, code, tsInicioIso) {
+  // Filtrar por legajo del PAYLOAD, no por el input DOM
+  if (esLegajoPrueba(legajo)) return;
   const endTs   = endOfWorkdayArgFor(tsInicioIso);
   const startTs = new Date(tsInicioIso).getTime();
   // Defensa: si los timestamps son inválidos (localStorage corrupto), abortar.
@@ -5880,7 +5888,7 @@ function enqueueAutoClose(legajo, code, tsInicioIso) {
     texto: "", id: id, status: "queued",
     ts_inicio_iso: tsInicioIso
   });
-  enqueueReport(payload);
+  _enqueueReportRaw(payload);
 }
 function removeFromQueue(id) {
   writeQueue(readQueue().filter(it => it.id !== id));
