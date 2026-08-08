@@ -173,5 +173,7 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== equiv-resolve (idea 2260: equivResolve/equivLookup — resolución de códigos equivalentes) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/equiv-resolve.cjs
+echo "== stk-conteo-fisico (idea 2793: conteo físico de góndola — cálculo, comparación y guardado) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stk-conteo-fisico.cjs
 
 echo "== TODO OK =="
