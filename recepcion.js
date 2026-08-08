@@ -347,12 +347,25 @@ const opState = {
   ocPorCod: null     // v7.07: OCs vigentes del proveedor { codNorm: {ped,rec,pend,fecha} } (null = sin cargar)
 };
 
+/* v3.81-fix: usar TZ Argentina (igual que getTodayKey() en index.html) en
+   vez de la hora LOCAL del dispositivo. Si la tablet tiene TZ mal configurada
+   (UTC, etc.), el operario veía "hoy" en fecha incorrecta y descuadraba la
+   ventana de OC vigente y el Dia_mes grabado en Entregas Tallerista. */
 function opTodayStr() {
-  const d = new Date();
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return yyyy + "-" + mm + "-" + dd;
+  try {
+    const d = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Argentina/Buenos_Aires" }));
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return yyyy + "-" + mm + "-" + dd;
+  } catch (_e) {
+    // Fallback: hora local del dispositivo (mejor que nada)
+    const d = new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return yyyy + "-" + mm + "-" + dd;
+  }
 }
 
 /* ===== v7.15 — ANULAR la sesión de recepción =====
