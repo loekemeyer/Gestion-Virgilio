@@ -2995,6 +2995,84 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
   #monitorModal.tv.show ~ #qrFichadaBox .qr-countdown{ font-size: 11px; margin-top: 3px; }
   #monitorModal.tv.show ~ #qrFichadaBox #qrCanvas{ width: clamp(120px, 24vh, 150px); height: clamp(120px, 24vh, 150px); }
 }
+
+/* v7.87 — Modal para crear códigos nuevos */
+.stk-modal-overlay {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center;
+  z-index: 100;
+}
+.stk-modal {
+  animation: slideUp .2s ease-out;
+}
+@keyframes slideUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+.stk-modal-hint {
+  font-size: 13px; line-height: 1.4;
+}
+.stk-tipobtn {
+  transition: all .12s;
+}
+.stk-tipobtn:hover {
+  border-color: inherit !important;
+  transform: scale(1.02);
+}
+/* v7.88 — Faltante por día */
+.falt-filters { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px; }
+.falt-fbtn { padding:6px 12px; border:1px solid #e2e8f0; border-radius:8px; background:#fff;
+  color:#64748b; font-size:12px; font-weight:700; cursor:pointer; }
+.falt-fbtn.on { background:#1e40af; color:#fff; border-color:#1e40af; }
+.falt-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; max-height:60vh; }
+.falt-tbl { border-collapse:collapse; font-size:12px; width:100%; min-width:600px; }
+.falt-tbl th { position:sticky; top:0; z-index:2; background:#1e293b; color:#fff; padding:6px 7px;
+  text-align:center; white-space:nowrap; font-weight:700; font-size:11px; }
+.falt-tbl th.falt-cod { text-align:left; min-width:55px; }
+.falt-tbl th.falt-desc { text-align:left; min-width:100px; }
+.falt-tbl th.falt-fab { text-align:left; min-width:80px; }
+.falt-tbl th.falt-stk { min-width:48px; }
+.falt-tbl th.falt-sem { background:#334155; min-width:50px; }
+.falt-tbl th.falt-dia { min-width:42px; }
+.falt-tbl th.falt-dia.hoy { background:#1e40af; }
+.falt-tbl td { padding:5px 7px; border-bottom:1px solid #f1f5f9; white-space:nowrap; }
+.falt-tbl td.num { text-align:center; font-variant-numeric:tabular-nums; }
+.falt-tbl td.falt-cod { font-weight:700; color:#1e293b; }
+.falt-tbl td.falt-desc { color:#475569; max-width:140px; overflow:hidden; text-overflow:ellipsis; }
+.falt-tbl td.falt-fab { color:#6b7280; font-size:11px; max-width:100px; overflow:hidden; text-overflow:ellipsis; }
+.falt-tbl td.falt-ok { background:#f0fdf4; color:#15803d; }
+.falt-tbl td.falt-warn { background:#fef9c3; color:#854d0e; }
+.falt-tbl td.falt-bad { background:#fee2e2; color:#991b1b; font-weight:700; }
+.falt-tbl td.falt-crit { background:#dc2626; color:#fff; font-weight:800; }
+.falt-tbl td.falt-cell { cursor:pointer; }
+.falt-tbl td.falt-cell:hover { outline:2px solid #3b82f6; outline-offset:-2px; border-radius:3px; }
+.falt-tbl tr:hover td { background-color:#f8fafc; }
+.falt-tbl tr:hover td.falt-ok { background:#dcfce7; }
+.falt-tbl tr:hover td.falt-warn { background:#fef08a; }
+.falt-tbl tr:hover td.falt-bad { background:#fecaca; }
+.falt-tbl tr:hover td.falt-crit { background:#b91c1c; }
+.falt-drill { position:fixed; z-index:200; background:#fff; border:1px solid #e2e8f0;
+  border-radius:10px; box-shadow:0 8px 25px rgba(0,0,0,.18); padding:14px; min-width:280px;
+  max-width:380px; max-height:50vh; overflow-y:auto; animation:slideUp .15s ease-out; }
+.falt-drill h4 { margin:0 0 8px; font-size:14px; color:#1e293b; }
+.falt-drill-row { display:flex; align-items:center; gap:8px; padding:5px 0;
+  border-bottom:1px solid #f1f5f9; font-size:12px; }
+.falt-drill-row label { display:flex; align-items:center; gap:6px; flex:1; cursor:pointer; }
+.falt-drill-row .falt-np { font-weight:700; color:#1e40af; }
+.falt-drill-row .falt-rs { color:#475569; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.falt-drill-row .falt-cj { font-weight:700; color:#1e293b; white-space:nowrap; }
+.falt-drill-row.excl { opacity:.45; text-decoration:line-through; }
+.falt-drill-close { float:right; background:none; border:none; font-size:16px; cursor:pointer; color:#94a3b8; }
+.falt-drill-close:hover { color:#1e293b; }
+.falt-sim-bar { margin-top:8px; padding:8px 10px; background:#eff6ff; border:1px solid #bfdbfe;
+  border-radius:8px; font-size:12px; color:#1e40af; display:flex; align-items:center; gap:8px; }
+.falt-sim-bar button { padding:4px 10px; border:1px solid #3b82f6; background:#fff;
+  border-radius:6px; font-size:11px; font-weight:700; color:#3b82f6; cursor:pointer; }
+.falt-sim-bar button:hover { background:#dbeafe; }
+.falt-search { padding:7px 10px; border:1px solid #e2e8f0; border-radius:8px; font-size:13px;
+  width:100%; max-width:240px; box-sizing:border-box; margin-bottom:10px; }
+.falt-hint { font-size:11px; color:#94a3b8; margin-bottom:8px; }
+.falt-sf { color:#94a3b8; font-size:10px; }
 </style>
 
 <!-- jsPDF + autotable para generar PDF de cierre de facturación (Marianela).
@@ -6062,7 +6140,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.86";
+const APP_VERSION = "v7.88";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -10626,7 +10704,7 @@ function stkAsOfApply() {
   stkRender();
 }
 function stkAsOfLive() { if (!_stk) return; _stk.asOf = null; _stk.openArt = null; stkRender(); }
-function stkTab(t) { if (!_stk) return; if (t === "compras") { openOCAdmin(); return; } _stk.tab = t; _stk.filtro = ""; _stk.openArt = null; if (t === "capacidad" && !_stk.capLoaded) { stkCapLoad(); return; } if (t === "racks" && !_stk.planiLoaded) { stkPlaniLoad(); return; } if (t === "insumos" && !_stk.insLoaded) { stkInsLoad(); return; } stkRender(); }
+function stkTab(t) { if (!_stk) return; if (t === "compras") { openOCAdmin(); return; } _stk.tab = t; _stk.filtro = ""; _stk.openArt = null; if (t === "capacidad" && !_stk.capLoaded) { stkCapLoad(); return; } if (t === "racks" && !_stk.planiLoaded) { stkPlaniLoad(); return; } if (t === "insumos" && !_stk.insLoaded) { stkInsLoad(); return; } if (t === "faltante" && !_stk.faltLoaded) { stkFaltLoad(); return; } stkRender(); }
 function stkRender() {
   if (!_stk) return;
   if (_stk.soloConteo) {   // rol "solo conteo": sin solapas, directo al conteo físico
@@ -10634,11 +10712,11 @@ function stkRender() {
     const body0 = document.getElementById("stkBody"); if (body0) _renderKeepFocus(body0, stkBodyConteo());
     return;
   }
-  const tabs = [["stocks", "📊 Stocks"], ["proceso", "📦 A Separar"], ["racks", "🏗 Racks"], ["conteo", "📋 Conteo"], ["capacidad", "📐 Capacidad"], ["insumos", "🧰 Insumos"], ["ajustes", "⚙ Ajustes"], ["compras", "📑 Compras (OCs)"]];
+  const tabs = [["stocks", "📊 Stocks"], ["faltante", "📉 Faltante"], ["proceso", "📦 A Separar"], ["racks", "🏗 Racks"], ["conteo", "📋 Conteo"], ["capacidad", "📐 Capacidad"], ["insumos", "🧰 Insumos"], ["ajustes", "⚙ Ajustes"], ["compras", "📑 Compras (OCs)"]];
   const tb = document.getElementById("stkTabs");
   if (tb) tb.innerHTML = tabs.map(function (t) { return '<button class="stk-tab' + (_stk.tab === t[0] ? " on" : "") + '" onclick="stkTab(\'' + t[0] + '\')">' + t[1] + '</button>'; }).join("");
   const body = document.getElementById("stkBody"); if (!body) return;
-  _renderKeepFocus(body, _stk.tab === "proceso" ? stkBodyProceso() : _stk.tab === "conteo" ? stkBodyConteo() : _stk.tab === "capacidad" ? stkBodyCapacidad() : _stk.tab === "racks" ? stkBodyRacks() : _stk.tab === "insumos" ? stkBodyInsumos() : _stk.tab === "ajustes" ? stkBodyAjustes() : stkBodyStocksTab());
+  _renderKeepFocus(body, _stk.tab === "faltante" ? stkBodyFaltante() : _stk.tab === "proceso" ? stkBodyProceso() : _stk.tab === "conteo" ? stkBodyConteo() : _stk.tab === "capacidad" ? stkBodyCapacidad() : _stk.tab === "racks" ? stkBodyRacks() : _stk.tab === "insumos" ? stkBodyInsumos() : _stk.tab === "ajustes" ? stkBodyAjustes() : stkBodyStocksTab());
 }
 /* ===== v6.47 — FC s/SALIDA: NPs FACTURADAS (tick de la operadora en Facturación =
    fila en Facturacion_NP) que TODAVÍA NO se cargaron al camión (sin evento CCN del
@@ -11749,6 +11827,7 @@ function stkBodyStocks() {
     '</div>';
   // v5.53 — dos pop-ups: NPs por estadio (pickeado→facturar) y movimientos de góndola.
   h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">' +
+    '<button onclick="stkCrearCodigoNuevo()" style="width:auto;margin:0;padding:9px 13px;border:1px solid #f87171;border-radius:10px;background:#fee2e2;color:#dc2626;font-size:13px;font-weight:800;cursor:pointer;">➕ Crear código</button>' +
     '<button onclick="stkOpenPedidos()" style="width:auto;margin:0;padding:9px 13px;border:1px solid #c7d2fe;border-radius:10px;background:#eef2ff;color:#3730a3;font-size:13px;font-weight:800;cursor:pointer;">📋 Pedidos por estadio</button>' +
     '<button onclick="stkOpenGondola()" style="width:auto;margin:0;padding:9px 13px;border:1px solid #bbf7d0;border-radius:10px;background:#f0fdf4;color:#15803d;font-size:13px;font-weight:800;cursor:pointer;">🔁 Movimientos de góndola</button>' +
     '<button onclick="stkOpenHistorial()" style="width:auto;margin:0;padding:9px 13px;border:1px solid #fde68a;border-radius:10px;background:#fffbeb;color:#92400e;font-size:13px;font-weight:800;cursor:pointer;">🕓 Historial</button>' +
@@ -11832,6 +11911,52 @@ function stkBodyStocks() {
     }
   });
   h += "</tbody></table></div>";
+
+  // Modal para crear código nuevo
+  if (_stk.crearCodigo) {
+    h += '<div class="stk-modal-overlay" onclick="if(event.target===this) stkCrearCodigoCancel()">' +
+      '<div class="stk-modal" style="width:400px;padding:20px;background:#fff;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,0.2);">' +
+      '<h3 style="margin:0 0 16px 0;font-size:18px;color:#1e293b;">➕ Crear código nuevo</h3>' +
+      '<div class="stk-modal-hint" style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:10px;margin-bottom:16px;font-size:12px;color:#166534;">' +
+      'Registra un código nuevo en Movimientos_Stock. Si es insumo, se agrega también a la tabla de Insumos.' +
+      '</div>' +
+      '<div style="margin-bottom:12px;">' +
+      '<label style="display:block;font-size:12px;font-weight:700;color:#64748b;margin-bottom:4px;">Código *</label>' +
+      '<input id="crCod" type="text" value="' + escapeHtml(_stk.crearCodigo.cod || "") + '" placeholder="ej: 439E" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #e2e8f0;border-radius:6px;font-size:14px;" oninput="if(_stk&&_stk.crearCodigo){_stk.crearCodigo.cod=this.value;}">' +
+      '</div>' +
+      '<div style="margin-bottom:12px;">' +
+      '<label style="display:block;font-size:12px;font-weight:700;color:#64748b;margin-bottom:4px;">Descripción</label>' +
+      '<input id="crDesc" type="text" value="' + escapeHtml(_stk.crearCodigo.desc || "") + '" placeholder="ej: Colador 16cm" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #e2e8f0;border-radius:6px;font-size:14px;" oninput="if(_stk&&_stk.crearCodigo){_stk.crearCodigo.desc=this.value;}">' +
+      '</div>' +
+      '<div style="margin-bottom:12px;">' +
+      '<label style="display:block;font-size:12px;font-weight:700;color:#64748b;margin-bottom:4px;">Tipo *</label>' +
+      '<div style="display:flex;gap:8px;">' +
+      '<button class="stk-tipobtn' + (_stk.crearCodigo.tipo === "stock" ? " on" : "") + '" onclick="if(_stk&&_stk.crearCodigo){_stk.crearCodigo.tipo=\'stock\';stkRender();}" style="flex:1;padding:8px;border:1px solid ' + (_stk.crearCodigo.tipo === "stock" ? "#1e6bd6" : "#e2e8f0") + ';background:' + (_stk.crearCodigo.tipo === "stock" ? "#eff6ff" : "#fff") + ';border-radius:6px;color:' + (_stk.crearCodigo.tipo === "stock" ? "#1e6bd6" : "#64748b") + ';font-weight:700;cursor:pointer;">📦 Mercadería</button>' +
+      '<button class="stk-tipobtn' + (_stk.crearCodigo.tipo === "insumo" ? " on" : "") + '" onclick="if(_stk&&_stk.crearCodigo){_stk.crearCodigo.tipo=\'insumo\';stkRender();}" style="flex:1;padding:8px;border:1px solid ' + (_stk.crearCodigo.tipo === "insumo" ? "#15803d" : "#e2e8f0") + ';background:' + (_stk.crearCodigo.tipo === "insumo" ? "#f0fdf4" : "#fff") + ';border-radius:6px;color:' + (_stk.crearCodigo.tipo === "insumo" ? "#15803d" : "#64748b") + ';font-weight:700;cursor:pointer;">🧰 Insumo</button>' +
+      '</div>' +
+      '</div>' +
+      '<div style="margin-bottom:12px;">' +
+      '<label style="display:block;font-size:12px;font-weight:700;color:#64748b;margin-bottom:4px;">Cantidad inicial</label>' +
+      '<input id="crCant" type="number" step="any" value="' + escapeHtml(_stk.crearCodigo.cantidad || "") + '" placeholder="0" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #e2e8f0;border-radius:6px;font-size:14px;" oninput="if(_stk&&_stk.crearCodigo){_stk.crearCodigo.cantidad=this.value;}">' +
+      '</div>' +
+      '<div style="margin-bottom:16px;">' +
+      '<label style="display:block;font-size:12px;font-weight:700;color:#64748b;margin-bottom:4px;">Depósito inicial</label>' +
+      '<select id="crDep" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #e2e8f0;border-radius:6px;font-size:14px;" onchange="if(_stk&&_stk.crearCodigo){_stk.crearCodigo.deposito=this.value;}">' +
+      '<option value="terminado"' + (_stk.crearCodigo.deposito === "terminado" ? " selected" : "") + '>Góndola</option>' +
+      '<option value="excedente"' + (_stk.crearCodigo.deposito === "excedente" ? " selected" : "") + '>Excedente</option>' +
+      '<option value="a_guardar"' + (_stk.crearCodigo.deposito === "a_guardar" ? " selected" : "") + '>A guardar</option>' +
+      '<option value="racks"' + (_stk.crearCodigo.deposito === "racks" ? " selected" : "") + '>Racks</option>' +
+      '<option value="insumos"' + (_stk.crearCodigo.deposito === "insumos" ? " selected" : "") + '>Insumos</option>' +
+      '</select>' +
+      '</div>' +
+      '<div style="display:flex;gap:8px;justify-content:flex-end;">' +
+      '<button onclick="stkCrearCodigoCancel()" style="padding:8px 16px;border:1px solid #e2e8f0;background:#fff;border-radius:6px;color:#64748b;font-weight:700;cursor:pointer;">Cancelar</button>' +
+      '<button onclick="stkCrearCodigoGuardar()" style="padding:8px 16px;border:none;background:#dc2626;color:#fff;border-radius:6px;font-weight:700;cursor:pointer;">Crear</button>' +
+      '</div>' +
+      '</div>' +
+      '</div>';
+  }
+
   return h;
 }
 /* v4.22 — Solapa "A Separar": pipeline de stock entre el picking y la facturación.
@@ -12703,6 +12828,473 @@ function stkDescargarExcel() {
     alert("No pude generar el Excel: " + (e && e.message ? e.message : e));
   });
 }
+/* v7.87 — Crear código nuevo (mercadería o insumo) */
+function stkCrearCodigoNuevo() {
+  if (!_stk) return;
+  _stk.crearCodigo = { cod: "", desc: "", tipo: "stock", cantidad: "", deposito: "terminado" };
+  stkRender();
+}
+function stkCrearCodigoCancel() {
+  if (!_stk) return;
+  _stk.crearCodigo = null;
+  stkRender();
+}
+async function stkCrearCodigoGuardar() {
+  if (!_stk || !_stk.crearCodigo) return;
+  const cod = String(_stk.crearCodigo.cod || "").trim().toUpperCase();
+  const desc = String(_stk.crearCodigo.desc || "").trim();
+  const tipo = String(_stk.crearCodigo.tipo || "stock");
+  const cantidadStr = String(_stk.crearCodigo.cantidad || "").trim();
+  const deposito = String(_stk.crearCodigo.deposito || "terminado");
+
+  if (!cod) { alert("El código es obligatorio."); return; }
+  if (tipo === "stock" && !desc) { alert("La descripción es obligatoria."); return; }
+
+  const cantidad = cantidadStr ? parseFloat(cantidadStr) : 0;
+  if (isNaN(cantidad)) { alert("La cantidad debe ser un número válido."); return; }
+
+  try {
+    // 1. Registrar movimiento inicial en Movimientos_Stock
+    const movRows = [{
+      cod_art: cod,
+      descripcion: desc || null,
+      deposito: deposito,
+      delta: cantidad,
+      tipo: "inicial",
+      ref: null,
+      legajo: (typeof _legajo !== "undefined" ? _legajo : "admin"),
+      unidad: null
+    }];
+
+    await stockMove(movRows);
+
+    // 2. Si es insumo, agregar a tabla Insumos
+    if (tipo === "insumo") {
+      try {
+        await _stkInsRpc("insumo_alta", {
+          p_cod: cod,
+          p_nombre: desc || null,
+          p_categoria: null,
+          p_ubicacion: null,
+          p_legajo: (typeof _legajo !== "undefined" ? _legajo : "admin")
+        });
+      } catch (e) {
+        // Si falla crear en Insumos pero el movimiento se registró, avisar pero no revertir
+        console.warn("Movimiento registrado pero no se pudo agregar a tabla Insumos:", e);
+      }
+    }
+
+    _stk.crearCodigo = null;
+    _stk.msg = "✓ Código " + cod + " creado.";
+    stkRefresh().then(() => stkRender()).catch(() => stkRender());
+  } catch (e) {
+    alert("No se pudo crear el código: " + (e.message || e));
+  }
+}
+
+/* ====================================================================
+   v7.88 — FALTANTE POR DÍA
+   Cruza stock actual (todos los depósitos) contra demanda diaria del PPP
+   (PPP_Base_Pedidos × PPP_Programacion_Diaria, excluyendo NPs facturadas).
+   Muestra quiebre de stock por artículo, día a día.
+   ==================================================================== */
+
+async function stkFaltLoad() {
+  if (!_stk) return;
+  _stk.faltLoaded = "loading"; stkRender();
+  try {
+    var res = await Promise.all([
+      supaFetchAllSafe(SUPABASE_PPP_PROG_ENDPOINT, "select=np,fecha_entrega,razon_social,tanda"),
+      fetchPickingBase(),
+      supaFetchAllSafe(SUPABASE_FACTURACION_NP_ENDPOINT, "select=np"),
+      supaFetchAllSafe(SUPABASE_OCMAX_ENDPOINT, "select=cod,proveedor&activo=eq.true"),
+      supaFetchAllSafe(SUPABASE_URL + "/rest/v1/vista_saldos_stock",
+        "select=cod_art,descripcion,terminado,excedente,a_guardar,racks,racks_ch,para_envasar,separar_pedidos,a_facturar,insumos")
+    ]);
+    var ppp = res[0] || [], base = res[1], facRows = res[2] || [], ocmax = res[3] || [], saldos = res[4] || [];
+    // Set de NPs facturadas
+    var facSet = {};
+    facRows.forEach(function (r) { var n = pickNormNp(r.np); if (n) facSet[n] = true; });
+    // Mapa proveedor por código normalizado
+    var provMap = {};
+    ocmax.forEach(function (r) { var k = _ocgNorm(r.cod); if (k) provMap[k] = r.proveedor || ""; });
+    // Mapa saldos por código normalizado → stock total (todos los depósitos)
+    var saldoMap = {};
+    saldos.forEach(function (r) {
+      var k = _ocgNorm(r.cod_art); if (!k) return;
+      saldoMap[k] = {
+        total: (Number(r.terminado) || 0) + (Number(r.excedente) || 0) + (Number(r.a_guardar) || 0) +
+               (Number(r.racks) || 0) + (Number(r.racks_ch) || 0) + (Number(r.para_envasar) || 0),
+        desc: r.descripcion || ""
+      };
+    });
+    // NPs pendientes con fecha_entrega
+    var npInfo = {};
+    ppp.forEach(function (r) {
+      var np = pickNormNp(r.np); if (!np) return;
+      if (facSet[np]) return;
+      npInfo[np] = { fecha: String(r.fecha_entrega || "").trim(), rs: r.razon_social || "", tanda: r.tanda || "" };
+    });
+    // Demanda por artículo: cod → [{fecha, np, rs, cajas}]
+    var demanda = {};
+    Object.keys(npInfo).forEach(function (np) {
+      var info = npInfo[np];
+      var items = base.get(np) || [];
+      items.forEach(function (it) {
+        var cod = _ocgNorm(it.art); if (!cod) return;
+        if (!demanda[cod]) demanda[cod] = [];
+        demanda[cod].push({ fecha: info.fecha, np: np, rs: info.rs, cajas: Number(it.cajas) || 0 });
+      });
+    });
+    _stk.falt = {
+      demanda: demanda, provMap: provMap, saldoMap: saldoMap,
+      excluidos: {}, filtro: "s1", openCell: null, search: ""
+    };
+    _stk.faltLoaded = true;
+  } catch (e) {
+    console.error("stkFaltLoad:", e);
+    _stk.falt = { demanda: {}, provMap: {}, saldoMap: {}, excluidos: {}, filtro: "s1", openCell: null, search: "" };
+    _stk.faltLoaded = true;
+  }
+  if (_stk) stkRender();
+}
+
+/* Helpers de fechas para Faltante */
+function _faltHoy() {
+  // Hoy en AR (UTC-3), devuelve "YYYY-MM-DD"
+  var d = new Date(Date.now() - 3 * 3600000);
+  return d.toISOString().slice(0, 10);
+}
+function _faltLunes(dateStr) {
+  // Devuelve el lunes de la semana de dateStr
+  var d = new Date(dateStr + "T12:00:00Z");
+  var dow = d.getUTCDay(); // 0=dom
+  var off = dow === 0 ? 6 : dow - 1;
+  d.setUTCDate(d.getUTCDate() - off);
+  return d.toISOString().slice(0, 10);
+}
+function _faltAddDays(dateStr, n) {
+  var d = new Date(dateStr + "T12:00:00Z");
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+function _faltDiaSem(dateStr) {
+  var dias = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+  var d = new Date(dateStr + "T12:00:00Z");
+  return dias[d.getUTCDay()];
+}
+function _faltFechaCorta(dateStr) {
+  // "08/12" format
+  return dateStr.slice(8, 10) + "/" + dateStr.slice(5, 7);
+}
+
+function stkBodyFaltante() {
+  if (!_stk || !_stk.falt) return '<div class="stk-loading">Cargando faltante…</div>';
+  if (_stk.faltLoaded === "loading") return '<div class="stk-loading">Cargando demanda PPP + stock…</div>';
+  var F = _stk.falt, dem = F.demanda, sMap = F.saldoMap, provMap = F.provMap, excl = F.excluidos;
+  var hoy = _faltHoy();
+  var lunesHoy = _faltLunes(hoy);
+  var lunesS2 = _faltAddDays(lunesHoy, 7);
+  var finS1 = _faltAddDays(lunesHoy, 5); // sábado esta semana
+  var finS2 = _faltAddDays(lunesS2, 5);  // sábado próxima semana
+
+  // Recopilar todas las fechas con demanda
+  var fechasSet = {};
+  Object.keys(dem).forEach(function (cod) {
+    dem[cod].forEach(function (e) { if (e.fecha) fechasSet[e.fecha] = true; });
+  });
+  var todasFechas = Object.keys(fechasSet).sort();
+
+  // Definir columnas diarias según filtro
+  var filtro = F.filtro || "s1";
+  var diasCols = [];
+  if (filtro === "s1") {
+    // Desde hoy hasta fin de esta semana
+    for (var d = hoy; d <= finS1; d = _faltAddDays(d, 1)) diasCols.push(d);
+  } else if (filtro === "s2") {
+    for (var d2 = lunesS2; d2 <= finS2; d2 = _faltAddDays(d2, 1)) diasCols.push(d2);
+  } else if (filtro === "resto") {
+    var inicioResto = _faltAddDays(finS2, 1);
+    todasFechas.forEach(function (f) { if (f >= inicioResto) diasCols.push(f); });
+  } else {
+    // "todo": desde hoy hasta la última fecha con demanda, máximo 21 días
+    var maxDia = _faltAddDays(hoy, 20);
+    for (var dt = hoy; dt <= maxDia; dt = _faltAddDays(dt, 1)) diasCols.push(dt);
+  }
+
+  // Construir datos por artículo
+  var arts = [];
+  // Todos los códigos con demanda o stock
+  var allCods = {};
+  Object.keys(dem).forEach(function (c) { allCods[c] = true; });
+  Object.keys(sMap).forEach(function (c) { allCods[c] = true; });
+
+  Object.keys(allCods).forEach(function (cod) {
+    var s = sMap[cod] || { total: 0, desc: "" };
+    var entries = dem[cod] || [];
+    // Demanda por fecha (excluyendo NPs tachadas)
+    var demDia = {};
+    var sinFecha = 0;
+    entries.forEach(function (e) {
+      if (excl[e.np]) return;
+      if (!e.fecha) { sinFecha += e.cajas; return; }
+      demDia[e.fecha] = (demDia[e.fecha] || 0) + e.cajas;
+    });
+
+    var totalDem = entries.reduce(function (ac, e) { return ac + (excl[e.np] ? 0 : e.cajas); }, 0);
+    if (totalDem === 0 && s.total === 0) return;
+
+    // Balance acumulado: stock - sinFecha - demanda pasada - demanda día a día
+    var bal = s.total - sinFecha;
+    // Restar demanda pasada (pedidos con fecha < hoy que no se entregaron)
+    todasFechas.forEach(function (f) { if (f < hoy) bal -= (demDia[f] || 0); });
+
+    // Calcular faltante para CADA día desde hoy en adelante
+    // Necesitamos recorrer todos los días cronológicamente para que el balance acumule
+    var allDiasDesdeHoy = todasFechas.filter(function (f) { return f >= hoy; });
+    // Agregar los diasCols que no estén (para tener un faltante interpolado)
+    diasCols.forEach(function (d) { if (allDiasDesdeHoy.indexOf(d) < 0) allDiasDesdeHoy.push(d); });
+    allDiasDesdeHoy.sort();
+
+    var diasFalt = {};
+    var faltS1 = 0, faltS2 = 0;
+    var balRun = bal;
+    allDiasDesdeHoy.forEach(function (f) {
+      balRun -= (demDia[f] || 0);
+      var falt = balRun < 0 ? Math.abs(balRun) : 0;
+      diasFalt[f] = falt;
+      if (f >= lunesHoy && f <= finS1) faltS1 = Math.max(faltS1, falt);
+      if (f >= lunesS2 && f <= finS2) faltS2 = Math.max(faltS2, falt);
+    });
+    // Faltante para los días sin demanda antes del primer día con demanda:
+    // rellenar diasCols que quedaron sin valor con el faltante al inicio (balance post-pasadas)
+    diasCols.forEach(function (d) {
+      if (diasFalt[d] === undefined) diasFalt[d] = bal < 0 ? Math.abs(bal) : 0;
+    });
+
+    arts.push({
+      cod: cod, desc: s.desc || artNombre(cod, ""), prov: provMap[cod] || "",
+      stock: Math.round(s.total), totalDem: Math.round(totalDem),
+      faltS1: Math.round(faltS1), faltS2: Math.round(faltS2),
+      diasFalt: diasFalt, sinFecha: sinFecha,
+      demEntries: entries
+    });
+  });
+
+  // Filtrar por búsqueda
+  var sq = String(F.search || "").trim().toLowerCase();
+  if (sq) {
+    arts = arts.filter(function (a) {
+      return codCanon(a.cod).toLowerCase().indexOf(sq) >= 0 ||
+             a.desc.toLowerCase().indexOf(sq) >= 0 ||
+             a.prov.toLowerCase().indexOf(sq) >= 0;
+    });
+  }
+
+  // Ordenar: primero los que tienen mayor faltante S1, luego S2, luego por código
+  arts.sort(function (a, b) {
+    if (b.faltS1 !== a.faltS1) return b.faltS1 - a.faltS1;
+    if (b.faltS2 !== a.faltS2) return b.faltS2 - a.faltS2;
+    return codCanon(a.cod).localeCompare(codCanon(b.cod), undefined, { numeric: true });
+  });
+
+  // Solo mostrar artículos con demanda o faltante (no todos los del stock)
+  arts = arts.filter(function (a) { return a.totalDem > 0; });
+
+  var nExcl = Object.keys(excl).length;
+  var h = '';
+  // Barra de simulación si hay NPs excluidas
+  if (nExcl > 0) {
+    h += '<div class="falt-sim-bar">🔮 Simulación: ' + nExcl + ' NP' + (nExcl > 1 ? "s" : "") +
+      ' excluida' + (nExcl > 1 ? "s" : "") + ' del cálculo ' +
+      '<button onclick="stkFaltResetSim()">Limpiar simulación</button></div>';
+  }
+  // Filtros
+  h += '<div class="falt-filters">' +
+    '<button class="falt-fbtn' + (filtro === "s1" ? " on" : "") + '" onclick="stkFaltFiltro(\'s1\')">📅 Esta semana</button>' +
+    '<button class="falt-fbtn' + (filtro === "s2" ? " on" : "") + '" onclick="stkFaltFiltro(\'s2\')">📅 Próx. semana</button>' +
+    '<button class="falt-fbtn' + (filtro === "resto" ? " on" : "") + '" onclick="stkFaltFiltro(\'resto\')">📅 Resto</button>' +
+    '<button class="falt-fbtn' + (filtro === "todo" ? " on" : "") + '" onclick="stkFaltFiltro(\'todo\')">📅 Todo</button>' +
+    '</div>';
+  // Búsqueda
+  h += '<input class="falt-search" type="text" placeholder="🔍 Buscar código, descripción o fabricante…" value="' +
+    escapeHtml(F.search || "") + '" oninput="stkFaltSearch(this.value)">';
+  // Hint
+  h += '<div class="falt-hint">Faltante acumulado por día. Tocá una celda para ver las NPs que piden ese artículo. ' +
+    (nExcl ? '🔮 Modo simulación activo.' : '') + '</div>';
+  // Tabla
+  h += '<div class="falt-wrap"><table class="falt-tbl"><thead><tr>' +
+    '<th class="falt-cod">Cód</th><th class="falt-desc">Descripción</th><th class="falt-fab">Fabricante</th>' +
+    '<th class="falt-stk">Stock</th>' +
+    '<th class="falt-sem">Falt S1</th><th class="falt-sem">Falt S2</th>';
+  // Headers de días
+  diasCols.forEach(function (d) {
+    var esHoy = d === hoy;
+    h += '<th class="falt-dia' + (esHoy ? " hoy" : "") + '" title="' + d + '">' +
+      _faltDiaSem(d) + '<br>' + _faltFechaCorta(d) + '</th>';
+  });
+  h += '</tr></thead><tbody>';
+
+  if (arts.length === 0) {
+    h += '<tr><td colspan="' + (6 + diasCols.length) + '" style="text-align:center;padding:20px;color:#94a3b8;">Sin artículos con demanda pendiente</td></tr>';
+  }
+
+  arts.forEach(function (a) {
+    h += '<tr><td class="falt-cod">' + escapeHtml(codCanon(a.cod)) + '</td>' +
+      '<td class="falt-desc" title="' + escapeHtml(a.desc) + '">' + escapeHtml(a.desc) + '</td>' +
+      '<td class="falt-fab" title="' + escapeHtml(a.prov) + '">' + escapeHtml(a.prov || "—") + '</td>' +
+      '<td class="num" style="font-weight:700">' + a.stock + '</td>';
+    // Faltante S1 / S2
+    h += _faltCelda(a.faltS1, true);
+    h += _faltCelda(a.faltS2, true);
+    // Días
+    diasCols.forEach(function (d) {
+      var v = a.diasFalt[d] || 0;
+      h += _faltCelda(v, false, a.cod, d);
+    });
+    h += '</tr>';
+  });
+
+  h += '</tbody></table></div>';
+  h += '<div style="margin-top:8px;font-size:11px;color:#94a3b8;">' + arts.length + ' artículos con demanda. Stock = todos los depósitos (góndola+exc+racks+a_guardar+envasar).</div>';
+  return h;
+}
+
+function _faltCelda(falt, esSem, cod, fecha) {
+  var v = Math.round(falt);
+  var cls = "num";
+  if (v === 0) cls += " falt-ok";
+  else if (v <= 10) cls += " falt-warn";
+  else if (v <= 50) cls += " falt-bad";
+  else cls += " falt-crit";
+  var click = "";
+  if (cod && fecha) {
+    cls += " falt-cell";
+    click = ' onclick="stkFaltDrill(\'' + cod + '\',\'' + fecha + '\',event)"';
+  }
+  return '<td class="' + cls + '"' + (esSem ? ' style="font-weight:800"' : '') + click + '>' + (v > 0 ? v : "—") + '</td>';
+}
+
+function stkFaltFiltro(f) {
+  if (!_stk || !_stk.falt) return;
+  _stk.falt.filtro = f;
+  _stk.falt.openCell = null;
+  stkRender();
+}
+function stkFaltSearch(v) {
+  if (!_stk || !_stk.falt) return;
+  _stk.falt.search = v;
+  stkRender();
+}
+function stkFaltResetSim() {
+  if (!_stk || !_stk.falt) return;
+  _stk.falt.excluidos = {};
+  _stk.falt.openCell = null;
+  stkRender();
+}
+
+/* Drill-down: muestra las NPs que piden ese artículo en ese día (o en general) */
+function stkFaltDrill(cod, fecha, evt) {
+  if (!_stk || !_stk.falt) return;
+  var F = _stk.falt;
+  // Si ya está abierto el mismo, cerrar
+  if (F.openCell && F.openCell.cod === cod && F.openCell.fecha === fecha) {
+    stkFaltCloseDrill(); return;
+  }
+  F.openCell = { cod: cod, fecha: fecha };
+  // Buscar entries para este cod y fecha
+  var entries = (F.demanda[cod] || []).filter(function (e) { return e.fecha === fecha; });
+  if (entries.length === 0) { stkFaltCloseDrill(); return; }
+  // Agrupar por NP (puede haber duplicados si tienen varios ítems del mismo artículo)
+  var byNp = {};
+  entries.forEach(function (e) {
+    if (!byNp[e.np]) byNp[e.np] = { np: e.np, rs: e.rs, cajas: 0 };
+    byNp[e.np].cajas += e.cajas;
+  });
+  var lista = Object.keys(byNp).map(function (k) { return byNp[k]; })
+    .sort(function (a, b) { return b.cajas - a.cajas; });
+
+  // Crear popup
+  var old = document.getElementById("faltDrill");
+  if (old) old.remove();
+  var div = document.createElement("div");
+  div.className = "falt-drill";
+  div.id = "faltDrill";
+  // Posicionar cerca del click
+  var x = evt.clientX, y = evt.clientY;
+  div.style.left = Math.min(x, window.innerWidth - 400) + "px";
+  div.style.top = Math.min(y + 10, window.innerHeight - 300) + "px";
+  var ih = '<button class="falt-drill-close" onclick="stkFaltCloseDrill()">✕</button>' +
+    '<h4>' + escapeHtml(codCanon(cod)) + ' — ' + _faltDiaSem(fecha) + ' ' + _faltFechaCorta(fecha) + '</h4>' +
+    '<div style="font-size:11px;color:#64748b;margin-bottom:8px;">' + lista.length + ' NP' +
+    (lista.length > 1 ? "s" : "") + ' piden este artículo. Destildar para excluir del cálculo.</div>';
+  lista.forEach(function (it) {
+    var isExcl = !!F.excluidos[it.np];
+    ih += '<div class="falt-drill-row' + (isExcl ? " excl" : "") + '">' +
+      '<label><input type="checkbox"' + (isExcl ? "" : " checked") +
+      ' onchange="stkFaltToggleNp(\'' + it.np + '\',this.checked)">' +
+      '<span class="falt-np">NP ' + escapeHtml(it.np) + '</span>' +
+      '<span class="falt-rs">' + escapeHtml(it.rs) + '</span></label>' +
+      '<span class="falt-cj">' + Math.round(it.cajas) + ' cj</span></div>';
+  });
+  div.innerHTML = ih;
+  document.body.appendChild(div);
+  // Cerrar al hacer click fuera
+  setTimeout(function () {
+    document.addEventListener("click", _faltDrillOutside);
+  }, 50);
+}
+
+function _faltDrillOutside(evt) {
+  var drill = document.getElementById("faltDrill");
+  if (drill && !drill.contains(evt.target) && !evt.target.classList.contains("falt-cell")) {
+    stkFaltCloseDrill();
+  }
+}
+
+function stkFaltCloseDrill() {
+  var el = document.getElementById("faltDrill");
+  if (el) el.remove();
+  document.removeEventListener("click", _faltDrillOutside);
+  if (_stk && _stk.falt) _stk.falt.openCell = null;
+}
+
+function stkFaltToggleNp(np, incluir) {
+  if (!_stk || !_stk.falt) return;
+  if (incluir) {
+    delete _stk.falt.excluidos[np];
+  } else {
+    _stk.falt.excluidos[np] = true;
+  }
+  // Re-renderizar tabla (el drill se va a re-abrir automáticamente)
+  var cell = _stk.falt.openCell;
+  stkFaltCloseDrill();
+  stkRender();
+  // Re-abrir el drill en la misma celda
+  if (cell) {
+    setTimeout(function () {
+      var tbl = document.querySelector(".falt-tbl");
+      if (!tbl) return;
+      // Buscar la celda correspondiente y simular click
+      var rows = tbl.querySelectorAll("tbody tr");
+      for (var i = 0; i < rows.length; i++) {
+        var codTd = rows[i].querySelector(".falt-cod");
+        if (codTd && _ocgNorm(codTd.textContent) === cell.cod) {
+          var cells = rows[i].querySelectorAll(".falt-cell");
+          for (var j = 0; j < cells.length; j++) {
+            var onclick = cells[j].getAttribute("onclick") || "";
+            if (onclick.indexOf("'" + cell.fecha + "'") >= 0) {
+              var rect = cells[j].getBoundingClientRect();
+              stkFaltDrill(cell.cod, cell.fecha, { clientX: rect.left, clientY: rect.top });
+              return;
+            }
+          }
+        }
+      }
+    }, 100);
+  }
+}
+
 function stkGondSetFilter(f) { if (!_stkPop) return; _stkPop.filter = f; stkGondRender(); }
 function stkGondSearch(v) { if (!_stkPop) return; _stkPop.search = String(v == null ? "" : v); stkGondRender(); }
 function stkGondRender() {
