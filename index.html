@@ -2995,6 +2995,30 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
   #monitorModal.tv.show ~ #qrFichadaBox .qr-countdown{ font-size: 11px; margin-top: 3px; }
   #monitorModal.tv.show ~ #qrFichadaBox #qrCanvas{ width: clamp(120px, 24vh, 150px); height: clamp(120px, 24vh, 150px); }
 }
+
+/* v7.87 — Modal para crear códigos nuevos */
+.stk-modal-overlay {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center;
+  z-index: 100;
+}
+.stk-modal {
+  animation: slideUp .2s ease-out;
+}
+@keyframes slideUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+.stk-modal-hint {
+  font-size: 13px; line-height: 1.4;
+}
+.stk-tipobtn {
+  transition: all .12s;
+}
+.stk-tipobtn:hover {
+  border-color: inherit !important;
+  transform: scale(1.02);
+}
 </style>
 
 <!-- jsPDF + autotable para generar PDF de cierre de facturación (Marianela).
@@ -11741,6 +11765,7 @@ function stkBodyStocks() {
     '</div>';
   // v5.53 — dos pop-ups: NPs por estadio (pickeado→facturar) y movimientos de góndola.
   h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">' +
+    '<button onclick="stkCrearCodigoNuevo()" style="width:auto;margin:0;padding:9px 13px;border:1px solid #f87171;border-radius:10px;background:#fee2e2;color:#dc2626;font-size:13px;font-weight:800;cursor:pointer;">➕ Crear código</button>' +
     '<button onclick="stkOpenPedidos()" style="width:auto;margin:0;padding:9px 13px;border:1px solid #c7d2fe;border-radius:10px;background:#eef2ff;color:#3730a3;font-size:13px;font-weight:800;cursor:pointer;">📋 Pedidos por estadio</button>' +
     '<button onclick="stkOpenGondola()" style="width:auto;margin:0;padding:9px 13px;border:1px solid #bbf7d0;border-radius:10px;background:#f0fdf4;color:#15803d;font-size:13px;font-weight:800;cursor:pointer;">🔁 Movimientos de góndola</button>' +
     '<button onclick="stkOpenHistorial()" style="width:auto;margin:0;padding:9px 13px;border:1px solid #fde68a;border-radius:10px;background:#fffbeb;color:#92400e;font-size:13px;font-weight:800;cursor:pointer;">🕓 Historial</button>' +
@@ -11824,6 +11849,52 @@ function stkBodyStocks() {
     }
   });
   h += "</tbody></table></div>";
+
+  // Modal para crear código nuevo
+  if (_stk.crearCodigo) {
+    h += '<div class="stk-modal-overlay" onclick="if(event.target===this) stkCrearCodigoCancel()">' +
+      '<div class="stk-modal" style="width:400px;padding:20px;background:#fff;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,0.2);">' +
+      '<h3 style="margin:0 0 16px 0;font-size:18px;color:#1e293b;">➕ Crear código nuevo</h3>' +
+      '<div class="stk-modal-hint" style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:10px;margin-bottom:16px;font-size:12px;color:#166534;">' +
+      'Registra un código nuevo en Movimientos_Stock. Si es insumo, se agrega también a la tabla de Insumos.' +
+      '</div>' +
+      '<div style="margin-bottom:12px;">' +
+      '<label style="display:block;font-size:12px;font-weight:700;color:#64748b;margin-bottom:4px;">Código *</label>' +
+      '<input id="crCod" type="text" value="' + escapeHtml(_stk.crearCodigo.cod || "") + '" placeholder="ej: 439E" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #e2e8f0;border-radius:6px;font-size:14px;" oninput="if(_stk&&_stk.crearCodigo){_stk.crearCodigo.cod=this.value;}">' +
+      '</div>' +
+      '<div style="margin-bottom:12px;">' +
+      '<label style="display:block;font-size:12px;font-weight:700;color:#64748b;margin-bottom:4px;">Descripción</label>' +
+      '<input id="crDesc" type="text" value="' + escapeHtml(_stk.crearCodigo.desc || "") + '" placeholder="ej: Colador 16cm" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #e2e8f0;border-radius:6px;font-size:14px;" oninput="if(_stk&&_stk.crearCodigo){_stk.crearCodigo.desc=this.value;}">' +
+      '</div>' +
+      '<div style="margin-bottom:12px;">' +
+      '<label style="display:block;font-size:12px;font-weight:700;color:#64748b;margin-bottom:4px;">Tipo *</label>' +
+      '<div style="display:flex;gap:8px;">' +
+      '<button class="stk-tipobtn' + (_stk.crearCodigo.tipo === "stock" ? " on" : "") + '" onclick="if(_stk&&_stk.crearCodigo){_stk.crearCodigo.tipo=\'stock\';stkRender();}" style="flex:1;padding:8px;border:1px solid ' + (_stk.crearCodigo.tipo === "stock" ? "#1e6bd6" : "#e2e8f0") + ';background:' + (_stk.crearCodigo.tipo === "stock" ? "#eff6ff" : "#fff") + ';border-radius:6px;color:' + (_stk.crearCodigo.tipo === "stock" ? "#1e6bd6" : "#64748b") + ';font-weight:700;cursor:pointer;">📦 Mercadería</button>' +
+      '<button class="stk-tipobtn' + (_stk.crearCodigo.tipo === "insumo" ? " on" : "") + '" onclick="if(_stk&&_stk.crearCodigo){_stk.crearCodigo.tipo=\'insumo\';stkRender();}" style="flex:1;padding:8px;border:1px solid ' + (_stk.crearCodigo.tipo === "insumo" ? "#15803d" : "#e2e8f0") + ';background:' + (_stk.crearCodigo.tipo === "insumo" ? "#f0fdf4" : "#fff") + ';border-radius:6px;color:' + (_stk.crearCodigo.tipo === "insumo" ? "#15803d" : "#64748b") + ';font-weight:700;cursor:pointer;">🧰 Insumo</button>' +
+      '</div>' +
+      '</div>' +
+      '<div style="margin-bottom:12px;">' +
+      '<label style="display:block;font-size:12px;font-weight:700;color:#64748b;margin-bottom:4px;">Cantidad inicial</label>' +
+      '<input id="crCant" type="number" step="any" value="' + escapeHtml(_stk.crearCodigo.cantidad || "") + '" placeholder="0" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #e2e8f0;border-radius:6px;font-size:14px;" oninput="if(_stk&&_stk.crearCodigo){_stk.crearCodigo.cantidad=this.value;}">' +
+      '</div>' +
+      '<div style="margin-bottom:16px;">' +
+      '<label style="display:block;font-size:12px;font-weight:700;color:#64748b;margin-bottom:4px;">Depósito inicial</label>' +
+      '<select id="crDep" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #e2e8f0;border-radius:6px;font-size:14px;" onchange="if(_stk&&_stk.crearCodigo){_stk.crearCodigo.deposito=this.value;}">' +
+      '<option value="terminado"' + (_stk.crearCodigo.deposito === "terminado" ? " selected" : "") + '>Góndola</option>' +
+      '<option value="excedente"' + (_stk.crearCodigo.deposito === "excedente" ? " selected" : "") + '>Excedente</option>' +
+      '<option value="a_guardar"' + (_stk.crearCodigo.deposito === "a_guardar" ? " selected" : "") + '>A guardar</option>' +
+      '<option value="racks"' + (_stk.crearCodigo.deposito === "racks" ? " selected" : "") + '>Racks</option>' +
+      '<option value="insumos"' + (_stk.crearCodigo.deposito === "insumos" ? " selected" : "") + '>Insumos</option>' +
+      '</select>' +
+      '</div>' +
+      '<div style="display:flex;gap:8px;justify-content:flex-end;">' +
+      '<button onclick="stkCrearCodigoCancel()" style="padding:8px 16px;border:1px solid #e2e8f0;background:#fff;border-radius:6px;color:#64748b;font-weight:700;cursor:pointer;">Cancelar</button>' +
+      '<button onclick="stkCrearCodigoGuardar()" style="padding:8px 16px;border:none;background:#dc2626;color:#fff;border-radius:6px;font-weight:700;cursor:pointer;">Crear</button>' +
+      '</div>' +
+      '</div>' +
+      '</div>';
+  }
+
   return h;
 }
 /* v4.22 — Solapa "A Separar": pipeline de stock entre el picking y la facturación.
@@ -12694,6 +12765,69 @@ function stkDescargarExcel() {
   }).catch(function (e) {
     alert("No pude generar el Excel: " + (e && e.message ? e.message : e));
   });
+}
+/* v7.87 — Crear código nuevo (mercadería o insumo) */
+function stkCrearCodigoNuevo() {
+  if (!_stk) return;
+  _stk.crearCodigo = { cod: "", desc: "", tipo: "stock", cantidad: "", deposito: "terminado" };
+  stkRender();
+}
+function stkCrearCodigoCancel() {
+  if (!_stk) return;
+  _stk.crearCodigo = null;
+  stkRender();
+}
+async function stkCrearCodigoGuardar() {
+  if (!_stk || !_stk.crearCodigo) return;
+  const cod = String(_stk.crearCodigo.cod || "").trim().toUpperCase();
+  const desc = String(_stk.crearCodigo.desc || "").trim();
+  const tipo = String(_stk.crearCodigo.tipo || "stock");
+  const cantidadStr = String(_stk.crearCodigo.cantidad || "").trim();
+  const deposito = String(_stk.crearCodigo.deposito || "terminado");
+
+  if (!cod) { alert("El código es obligatorio."); return; }
+  if (tipo === "stock" && !desc) { alert("La descripción es obligatoria."); return; }
+
+  const cantidad = cantidadStr ? parseFloat(cantidadStr) : 0;
+  if (isNaN(cantidad)) { alert("La cantidad debe ser un número válido."); return; }
+
+  try {
+    // 1. Registrar movimiento inicial en Movimientos_Stock
+    const movRows = [{
+      cod_art: cod,
+      descripcion: desc || null,
+      deposito: deposito,
+      delta: cantidad,
+      tipo: "inicial",
+      ref: null,
+      legajo: (typeof _legajo !== "undefined" ? _legajo : "admin"),
+      unidad: null
+    }];
+
+    await stockMove(movRows);
+
+    // 2. Si es insumo, agregar a tabla Insumos
+    if (tipo === "insumo") {
+      try {
+        await _stkInsRpc("insumo_alta", {
+          p_cod: cod,
+          p_nombre: desc || null,
+          p_categoria: null,
+          p_ubicacion: null,
+          p_legajo: (typeof _legajo !== "undefined" ? _legajo : "admin")
+        });
+      } catch (e) {
+        // Si falla crear en Insumos pero el movimiento se registró, avisar pero no revertir
+        console.warn("Movimiento registrado pero no se pudo agregar a tabla Insumos:", e);
+      }
+    }
+
+    _stk.crearCodigo = null;
+    _stk.msg = "✓ Código " + cod + " creado.";
+    stkRefresh().then(() => stkRender()).catch(() => stkRender());
+  } catch (e) {
+    alert("No se pudo crear el código: " + (e.message || e));
+  }
 }
 function stkGondSetFilter(f) { if (!_stkPop) return; _stkPop.filter = f; stkGondRender(); }
 function stkGondSearch(v) { if (!_stkPop) return; _stkPop.search = String(v == null ? "" : v); stkGondRender(); }
