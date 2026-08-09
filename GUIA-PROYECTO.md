@@ -4,7 +4,26 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-09 · Versión app al documentar: **v8.00**
+> Última actualización: 2026-08-09 · Versión app al documentar: **v8.04**
+>
+> Nota: **v8.02–v8.04 — mejoras faltantes + separación por empresa (parte).**
+> **v8.02** Faltante por día: resumen arriba (en quiebre S1/S2, cajas, cambios NP), toggle
+> "Solo quiebre", leyenda de colores, borde rojo en el primer día de quiebre.
+> **v8.03** Facturación: botón "✓ Ya lo cambié" inline en la columna "Cambiar cód" (confirma
+> los cambios de la NP sin abrir el panel). Módulo Faltantes (picking supervisor): tandas
+> ordenadas por más faltante primero + magnitud coloreada.
+> **v8.04 (#1 parte + #2):** `codEmpSplit(cod,np)` — resuelve los códigos de los paquetes
+> importados (437E/438E/439E/809/809E) al **suffijado por empresa** ("438E LK"/"809E CH", etc.,
+> la empresa la dice la NP). Aplicado en **Completar Pedido / Recepción** (`cpLoadFaltantes`):
+> ahora completa/descuenta el bucket de stock correcto por empresa (+ aplica también la
+> corrección secundario→principal, como el picking). El stock ya vivía suffijado (picking);
+> antes CP escribía pelado y divergía. **#2 (familia 809 Chef):** en `Equivalencias_Familia`
+> se agregó `809 (nacional) → 809E (importado)` empresa CH (809 es Chef-only) → un pedido de
+> Chef al 809 aparece en Corregir códigos/Telegram y el picking levanta 809E al confirmar.
+> **PENDIENTE:** suffijar también el faltante-por-día (para agrupar 809 CH↔809E CH ahí) y
+> limpiar los buckets pelados legacy (ej. 437E=36).
+>
+> Nota: **v8.00 — Descuento de stock del picking INCREMENTAL (por PKC).**
 >
 > Nota: **v8.00 — Descuento de stock del picking INCREMENTAL (por PKC).** Antes el picking
 > descontaba stock en lote, server-side, recién después del TP (cron cada 10'). Ahora baja por

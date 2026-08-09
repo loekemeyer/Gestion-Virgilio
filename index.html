@@ -6154,7 +6154,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.03";
+const APP_VERSION = "v8.04";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -9584,6 +9584,17 @@ function artNombreEmp(cod, np, fb) {
   const m = NOMBRE_POR_EMPRESA[_ocgNorm(cod)];
   if (m) { const e = empresaDeNp(np); if (e && m[e]) return m[e]; }
   return artNombre(cod, fb);
+}
+/* v8.04 — SEPARACIÓN POR EMPRESA de los códigos importados (Paquete A coladores
+   437E/438E/439E · Paquete B 809/809E). El stock vive suffijado ("438E LK"/"438E CH");
+   la empresa la dice la NP. Resuelve el código pelado al suffijado por empresa. Los
+   demás códigos quedan igual. Determinístico (no depende de la planimetría). */
+const EMPRESA_SPLIT_CODS = { "437E": 1, "438E": 1, "439E": 1, "809E": 1, "809": 1 };
+function codEmpSplit(cod, np) {
+  const k = _ocgNorm(cod);
+  if (!EMPRESA_SPLIT_CODS[k]) return String(cod == null ? "" : cod).trim().toUpperCase();
+  const e = empresaDeNp(np);
+  return e ? (k + " " + e) : String(cod == null ? "" : cod).trim().toUpperCase();
 }
 /* v6.41 — CÓDIGO CANÓNICO. En las hojas fuente (E.Madre LK / "Pedidos Talleristas-Prov")
    un mismo artículo aparece con distinto relleno de ceros (ej. 27 / 027 / 0027). Todos
@@ -16706,7 +16717,13 @@ async function cpLoadFaltantes() {
     const fac = rf.ok ? await rf.json() : [];
     fac.forEach(function (x) { facSet[String(x.np).trim()] = 1; });
   } catch (_e) {}
-  return rows.filter(function (e) { return Number(e.cajas_falto) > 0 && !facSet[String(e.np).trim()]; });
+  // v8.04 — resolver el código por EMPRESA (paquetes importados) y por CORRECCIÓN confirmada
+  // (secundario→principal), igual que el picking, así Completar muestra/completa/descuenta el
+  // código correcto (ej. "809E CH", "438E LK") en vez del pelado. Códigos comunes: sin cambio.
+  let corrMap = {};
+  try { corrMap = await fetchCorrecciones(); } catch (_e) { corrMap = {}; }
+  return rows.filter(function (e) { return Number(e.cajas_falto) > 0 && !facSet[String(e.np).trim()]; })
+    .map(function (e) { e._cod_orig = e.cod_art; e.cod_art = codEmpSplit(corrArt(e.cod_art, e.np, corrMap), e.np); return e; });
 }
 /* Tandas PICKEADAS con faltantes pero SIN armar todavía (no tienen filas en
    Entregas_Virgilio) → sus faltantes aún NO llegaron al CP. Se listan como aviso
