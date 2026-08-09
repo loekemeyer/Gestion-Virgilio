@@ -1,0 +1,28 @@
+-- =====================================================================
+-- picking_incremental_pkc.sql — v8.00
+-- Descuento de stock del picking INCREMENTAL: baja por CADA artículo confirmado
+-- (evento PKC), no todo junto al TP + cron.
+--
+-- Diseño (hacia adelante, sin tocar la historia):
+--  • Marcador Stock_Config('etapa1_pkc_desde') = ts de activación. Los pickings con
+--    actividad >= ese ts usan la ruta NUEVA (por artículo, DO UPDATE, sin gate de TP).
+--    Lo anterior (< marcador) sigue con la lógica ORIGINAL (por tanda, gated en TP,
+--    DO NOTHING) → intacto. Ver restore-point en backup_pipeline_stock_20260809.sql.
+--  • reconciliar_pipeline_stock_etapa1(): 2 ramas (A histórico / B forward). B reparte
+--    excedente-primero (excedente disponible = neto excluyendo el propio picking forward,
+--    para ser idempotente) y hace UPSERT por (tanda, art, depósito) → refleja re-picks.
+--  • Trigger trg_pkc_reconciliar_stock: AFTER INSERT OR UPDATE WHEN opcion='PKC' →
+--    dispara etapa1 (además del trigger del TP y del cron cada 10', que quedan de red).
+--  • anular_picking_virgilio(): al anular (antes del TP) pone en 0 las filas 'picking'
+--    de la tanda → devuelve góndola/excedente y separar_pedidos vuelve a 0.
+--
+-- Un solo escritor: sigue siendo el server (trigger/cron). El cliente NO escribe picking
+-- (v5.76). Índice de dedup: mov_stock_pipeline_dedup UNIQUE
+-- (upper(trim(ref)), upper(trim(cod_art)), deposito, tipo) WHERE tipo IN
+-- ('picking','separado','facturado') — la rama B usa ON CONFLICT ... DO UPDATE.
+--
+-- La definición viva está en las migraciones Supabase:
+--   etapa1_picking_incremental_por_pkc · trigger_pkc_reconciliar_stock ·
+--   anular_picking_revierte_stock
+-- (este archivo es la doc del diseño; ver esas migraciones para el cuerpo exacto).
+-- =====================================================================

@@ -4,7 +4,21 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-08 · Versión app al documentar: **v7.99**
+> Última actualización: 2026-08-09 · Versión app al documentar: **v8.00**
+>
+> Nota: **v8.00 — Descuento de stock del picking INCREMENTAL (por PKC).** Antes el picking
+> descontaba stock en lote, server-side, recién después del TP (cron cada 10'). Ahora baja por
+> **cada artículo confirmado** (evento PKC). Diseño hacia adelante para no tocar la historia:
+> marcador `Stock_Config('etapa1_pkc_desde')`; los pickings con actividad ≥ ese ts usan la ruta
+> nueva (por artículo, excedente-primero, UPSERT por (tanda,art,depósito) → refleja re-picks),
+> lo anterior queda con la lógica original (por tanda, gated en TP) intacto. Trigger
+> `trg_pkc_reconciliar_stock` (AFTER INSERT OR UPDATE WHEN opcion='PKC') dispara `etapa1`; el
+> trigger del TP y el cron cada 10' quedan de red de seguridad (siguen siendo el único escritor
+> server-side; el cliente NO escribe picking desde v5.76). `anular_picking_virgilio()` ahora
+> **devuelve el stock** (pone en 0 las filas 'picking' de la tanda) al anular antes del TP.
+> Restore-point: `sql/backup_pipeline_stock_20260809.sql`. Diseño: `sql/picking_incremental_pkc.sql`.
+>
+> Nota: **v7.99 — Códigos IMPORTADOS por empresa: dos paquetes.**
 >
 > Nota: **v7.99 — Códigos IMPORTADOS por empresa: dos paquetes.** Se documenta y empieza a
 > resolver el cruce por empresa (la empresa la dice la NP: >90000 = Loeke, si no Chef).

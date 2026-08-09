@@ -6145,7 +6145,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v7.99";
+const APP_VERSION = "v8.00";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -12285,9 +12285,10 @@ async function stkOpenEstadioArt(codEnc, dep) {
   });
   const refs = Object.keys(by).filter(function (t) { return by[t] > 0.05; })
     .sort(function (a, b) { return String(a).localeCompare(String(b), undefined, { numeric: true }); });
-  // v5.87: en el popup de PICKEADOS marcar también las tandas que se están pickeando
-  // AHORA (EP sin TP) que incluyen este artículo. Todavía NO están en separar_pedidos
-  // (el stock baja al TP), por eso van aparte, arriba y en verde.
+  // v5.87 / v8.00: en el popup de PICKEADOS marcar también las tandas en curso (EP) que
+  // incluyen este artículo pero TODAVÍA no confirmaron ningún PKC (sin movimiento en
+  // separar_pedidos aún). Desde v8.00 el stock baja por CADA PKC (no al TP), así que apenas
+  // hay un PKC la tanda ya aparece en `refs` (movimiento real) y sale de esta lista.
   let liveTandas = [];
   if (dep === "separar_pedidos") {
     try {
