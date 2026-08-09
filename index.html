@@ -6154,7 +6154,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.05";
+const APP_VERSION = "v8.06";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -26080,6 +26080,13 @@ function _corrEstado(e){
   const M = { sinpickear:["Sin pickear","#64748b","#f1f5f9"], enpicking:["En picking","#1e40af","#eff6ff"], pickeado:["Pickeado","#b45309","#fffbeb"], afacturar:["A facturar","#166534","#f0fdf4"], facturado:["Facturado","#065f46","#d1fae5"] };
   return M[e] || M.sinpickear;
 }
+/* v8.06 — fecha de salida (PPP fecha_entrega / Entregas fecha_salida) → "DD/MM". */
+function _corrFecha(s){
+  s = String(s || "").trim(); if (!s) return "";
+  var m = s.match(/(\d{4})-(\d{2})-(\d{2})/); if (m) return m[3] + "/" + m[2];
+  var m2 = s.match(/(\d{1,2})\/(\d{1,2})/); if (m2) return ("0" + m2[1]).slice(-2) + "/" + ("0" + m2[2]).slice(-2);
+  return s.slice(0, 10);
+}
 /* v7.94 — enriquece el panel: razón social, stock (sec/ppal), lo que puso el operario
    (Entregas_Virgilio) y el estado (CORE events EP/TP/AP/TAP + Facturacion_NP). */
 async function facCorreccDataRich(){
@@ -26092,15 +26099,15 @@ async function facCorreccDataRich(){
   const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
   const q = function(url){ return fetch(url, { headers: H, cache: "no-store" }).then(function(r){ return r.ok ? r.json() : []; }).catch(function(){ return []; }); };
   const res = await Promise.all([
-    q(SUPABASE_PPP_PROG_ENDPOINT + "?np=in.(" + inNps + ")&select=np,tanda,razon_social&limit=8000"),
+    q(SUPABASE_PPP_PROG_ENDPOINT + "?np=in.(" + inNps + ")&select=np,tanda,razon_social,fecha_entrega&limit=8000"),
     q(SUPABASE_URL + "/rest/v1/vista_saldos_stock?cod_art=in.(" + inCods + ")&select=cod_art,terminado,excedente,a_guardar,racks,racks_ch,para_envasar"),
-    q(SUPABASE_URL + "/rest/v1/Entregas_Virgilio?np=in.(" + inNps + ")&select=np,cod_art,cajas_pedidas,cajas_entregadas,cajas_falto&limit=8000"),
+    q(SUPABASE_URL + "/rest/v1/Entregas_Virgilio?np=in.(" + inNps + ")&select=np,cod_art,cajas_pedidas,cajas_entregadas,cajas_falto,fecha_salida&limit=8000"),
     q(SUPABASE_FACTURACION_NP_ENDPOINT + "?np=in.(" + inNps + ")&select=np,razon_social,tanda&limit=8000")
   ]);
   const ppp = res[0], saldos = res[1], entregas = res[2], fact = res[3];
-  const npInfo = {}; ppp.forEach(function(r){ const n = pickNormNp(r.np); if (n && !npInfo[n]) npInfo[n] = { tanda: String(r.tanda||"").trim().toUpperCase(), rs: r.razon_social||"" }; });
+  const npInfo = {}; ppp.forEach(function(r){ const n = pickNormNp(r.np); if (n && !npInfo[n]) npInfo[n] = { tanda: String(r.tanda||"").trim().toUpperCase(), rs: r.razon_social||"", fecha: String(r.fecha_entrega||"").trim() }; });
   const stk = {}; saldos.forEach(function(r){ stk[_ocgNorm(r.cod_art)] = _corrStk(r); });
-  const ent = {}; entregas.forEach(function(r){ ent[pickNormNp(r.np)+"|"+_ocgNorm(r.cod_art)] = { ped: Number(r.cajas_pedidas)||0, entr: Number(r.cajas_entregadas)||0, falto: Number(r.cajas_falto)||0 }; });
+  const ent = {}, fechaEnt = {}; entregas.forEach(function(r){ const n = pickNormNp(r.np); ent[n+"|"+_ocgNorm(r.cod_art)] = { ped: Number(r.cajas_pedidas)||0, entr: Number(r.cajas_entregadas)||0, falto: Number(r.cajas_falto)||0 }; if (r.fecha_salida && !fechaEnt[n]) fechaEnt[n] = String(r.fecha_salida).trim(); });
   // Facturacion_NP: set de facturados + respaldo de razón social/tanda para NP que ya salieron del PPP.
   const factSet = {}, rsFact = {}, tandaFact = {};
   fact.forEach(function(r){ const n = pickNormNp(r.np); factSet[n] = true; if (r.razon_social && !rsFact[n]) rsFact[n] = r.razon_social; if (r.tanda && !tandaFact[n]) tandaFact[n] = String(r.tanda).trim().toUpperCase(); });
@@ -26117,6 +26124,7 @@ async function facCorreccDataRich(){
     const info = npInfo[p.np] || { tanda:"", rs:"" };
     p.rs = info.rs || rsFact[p.np] || "";
     p.tanda = info.tanda || tandaFact[p.np] || "";
+    p.fecha = info.fecha || fechaEnt[p.np] || "";
     p.stkSec = stk[_ocgNorm(p.sec)] || 0;
     p.stkPpal = stk[_ocgNorm(p.ppal)] || 0;
     p.oper = ent[p.np+"|"+_ocgNorm(p.sec)] || ent[p.np+"|"+_ocgNorm(p.ppal)] || null;
@@ -26188,6 +26196,7 @@ function facCorreccRender(){
           + '<span style="font-weight:800;">NP ' + escapeHtml(np) + '</span>'
           + '<span style="font-size:10.5px;font-weight:800;color:' + est[1] + ';background:' + est[2] + ';border-radius:999px;padding:1px 8px;">' + est[0] + '</span>'
           + (p0.tanda ? '<span style="font-size:11px;color:#94a3b8;">Tanda ' + escapeHtml(p0.tanda) + '</span>' : '')
+          + (p0.fecha ? '<span style="font-size:11px;font-weight:800;color:#0f766e;" title="Fecha de salida (PPP)">🚚 ' + escapeHtml(_corrFecha(p0.fecha)) + '</span>' : '')
           + (items.length > 1 ? '<span style="font-size:10.5px;font-weight:800;color:#6d28d9;background:#f5f3ff;border-radius:999px;padding:1px 8px;">' + items.length + ' cambios</span>' : '')
         + '</div>'
         + '<div style="font-size:13px;color:#334155;margin-top:2px;font-weight:600;">' + escapeHtml(p0.rs || '—') + '</div>'
