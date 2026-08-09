@@ -4,7 +4,15 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-09 · Versión app al documentar: **v8.33**
+> Última actualización: 2026-08-09 · Versión app al documentar: **v8.35**
+>
+> Nota: **v8.35 — Insumos admin: editar factores en la fila "Editar" + UX.** (1) En **Editar** ahora
+> se cargan **Cant secundaria / Unidad secundaria / Factor** directo (sin entrar al ⚖): `stkInsAutoSec`
+> autocompleta — cargás Cant sec O Factor y el otro se llena (primaria = secundaria × factor; primaria
+> = qty base). Al guardar, `stkInsGuardar` graba los factores (base = unidad del qty). El ⚖ queda para
+> multi-unidad. (2) **"Pendientes de identificar" no aparece si es 0.** (3) **Todas las secciones del
+> admin arrancan CERRADAS** (`abre` default cerrado; `_stkAbierta`=== true). (v8.34: Excel entregados
+> con salida real + PPP; headers sticky en la planilla por categoría.)
 >
 > Nota: **v8.33 — "Pedidos Entregados": la fecha de salida sale de CARGA CAMIÓN (CCN), default PPP.**
 > El bug del sábado era que la fecha venía de `Facturacion_Cierres.fecha_reparto` (= cierre+1, la

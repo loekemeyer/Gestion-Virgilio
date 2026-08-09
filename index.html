@@ -6159,7 +6159,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.34";
+const APP_VERSION = "v8.35";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -14024,7 +14024,7 @@ let _stkIns = null;
 async function stkInsLoad() {
   insEnsureCss();   // los chips de categoría usan .ins-cchip
   _stk.insLoaded = true;
-  _stkIns = { cat: "", abierta: "", filtro: "", edit: null, nuevoEn: "", msg: "", tf: {}, hf: { cod: "", grupo: "" }, abre: { hist: false } };
+  _stkIns = { cat: "", abierta: "", filtro: "", edit: null, nuevoEn: "", msg: "", tf: {}, hf: { cod: "", grupo: "" }, abre: {} };   // v8.35 — todo cerrado al entrar
   const body = document.getElementById("stkBody");
   if (body) body.innerHTML = '<div class="stk-loading">Cargando insumos…</div>';
   await stkInsRefresh();
@@ -14072,13 +14072,13 @@ function _stkInsConStock(it) { return (it.xuni || []).some(function (u) { return
 /* Encabezado de sección plegable. La tabla final («Todos los insumos») NO usa esto:
    queda siempre a la vista, entera. */
 function _stkSec(k, titulo, n) {
-  const ab = _stkIns.abre[k] !== false;
+  const ab = _stkIns.abre[k] === true;
   return '<button class="stk-sec stk-secbtn" onclick="stkInsSec(\'' + k + '\')">' +
     '<span class="stk-caret">' + (ab ? "▾" : "▸") + '</span>' + titulo +
     ' <span class="stk-secn">' + n + '</span></button>';
 }
-function stkInsSec(k) { if (!_stkIns) return; _stkIns.abre[k] = (_stkIns.abre[k] === false); stkRender(); }
-function _stkAbierta(k) { return _stkIns.abre[k] !== false; }
+function stkInsSec(k) { if (!_stkIns) return; _stkIns.abre[k] = (_stkIns.abre[k] !== true); stkRender(); }   // v8.35 — default CERRADO
+function _stkAbierta(k) { return _stkIns.abre[k] === true; }
 function stkBodyInsumos() {
   if (!_stkIns) return '<div class="stk-loading">Cargando…</div>';
   const items = _stkIns.items || [];
@@ -14087,7 +14087,7 @@ function stkBodyInsumos() {
   const pend = items.filter(function (it) { return _stkInsPendiente(it); });
   let h = '';
   if (_stkIns.msg) h += '<div class="stk-cut" style="background:#f0fdf4;border:1px solid #86efac;color:#166534;">' + escapeHtml(_stkIns.msg) + '</div>';
-  h += _stkInsPend(pend);
+  if (pend.length) h += _stkInsPend(pend);   // v8.35 — si no hay pendientes, no aparece la sección
   h += _stkInsCats(items, pend);
   h += _stkInsHist();               // bitácora: movimientos + cambios del admin
   h += _stkInsTodos(items);         // foto completa, sólo lectura
@@ -14245,15 +14245,17 @@ function _stkInsListado(k, items) {
           '<td><button class="stk-btn" onclick="stkInsEdit(\'art:' + escapeHtml(it.cod) + '\')">Editar</button> ' +
           '<button class="stk-btn" onclick="stkInsEditFact(\'' + escapeHtml(it.cod) + '\')" title="Unidades y factores (⚖)">⚖</button></td></tr>';
       }
+      const du = _insDosUnidades(it);   // v8.35 — prellenar secundaria/factor en la edición
       return '<tr>' +
         '<td><input class="stk-inp" id="edCod_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.cod) + '" style="width:88px;" title="Código conocido (clave del stock)"></td>' +
         '<td><input class="stk-inp" id="edIsis_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.isis || "") + '" placeholder="isis" style="width:78px;color:#64748b;" title="Código del sistema (isis)"></td>' +
         '<td><input class="stk-inp" id="edNom_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.nombre) + '" style="width:150px;"><br><span class="stk-sub">cat:</span> ' + _stkInsCatSel("edCat_" + it.cod, it.cat) + '</td>' +
         '<td><input class="stk-inp" id="edUbi_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.ubic) + '" style="width:66px;"></td>' +
-        '<td style="border-left:1px solid #eef2f7;"><input class="stk-inp" id="edQty_' + escapeHtml(it.cod) + '" type="number" step="any" value="' + escapeHtml(u.saldo) + '" style="width:70px;"></td>' +
-        '<td>' + _stkInsUniSel("edUni_" + it.cod, _stkInsUniMostrar(it)) + '</td>' +
-        '<td colspan="2" class="stk-sub" style="border-left:1px solid #eef2f7;">otras unidades → ⚖</td>' +
-        '<td class="stk-sub" style="border-left:1px solid #eef2f7;">—</td>' +
+        '<td style="border-left:1px solid #eef2f7;"><input class="stk-inp" id="edQty_' + escapeHtml(it.cod) + '" type="number" step="any" value="' + escapeHtml(u.saldo) + '" style="width:70px;" oninput="stkInsAutoSec(\'' + escapeHtml(it.cod) + '\',\'qty\')" title="Cantidad primaria (en la unidad base)"></td>' +
+        '<td>' + _stkInsUniSel("edUni_" + it.cod, du.uniP || _stkInsUniMostrar(it)) + '</td>' +
+        '<td style="border-left:1px solid #eef2f7;"><input class="stk-inp" id="edSecQty_' + escapeHtml(it.cod) + '" type="number" step="any" value="' + escapeHtml(du.cantS) + '" style="width:66px;" placeholder="cant" oninput="stkInsAutoSec(\'' + escapeHtml(it.cod) + '\',\'sec\')" title="Cargá Cant secundaria O el Factor: el otro se completa solo"></td>' +
+        '<td>' + _stkInsUniSel("edSecUni_" + it.cod, du.uniS) + '</td>' +
+        '<td style="border-left:1px solid #eef2f7;"><input class="stk-inp" id="edFactor_' + escapeHtml(it.cod) + '" type="number" step="any" value="' + escapeHtml(du.factor) + '" style="width:58px;" placeholder="factor" oninput="stkInsAutoSec(\'' + escapeHtml(it.cod) + '\',\'factor\')" title="Cuántas ' + escapeHtml(du.uniP || "base") + ' hay en 1 de la secundaria"></td>' +
         '<td><button class="stk-btn" onclick="stkInsGuardar(\'' + escapeHtml(it.cod) + '\')">✓ Guardar</button> ' +
         '<button class="stk-btn stk-btn-x" onclick="stkInsEdit(null)">Cancelar</button> ' +
         '<button class="stk-btn" onclick="stkInsEditFact(\'' + escapeHtml(it.cod) + '\')" title="Unidades/factores">⚖</button></td></tr>';
@@ -14479,6 +14481,20 @@ function _stkInsUniSel(id, sel) {
 }
 function stkInsEdit(k) { if (!_stkIns) return; _stkIns.edit = k; stkRender(); }
 /* v8.29 — editor de factores por insumo. Estado: base (unidad más chica) + equivalencias [{u,f}]. */
+/* v8.35 — autocompletado en la edición: cargás Cant secundaria O Factor y el otro se llena.
+   primaria (edQty) = base; primaria = secundaria × factor. */
+function stkInsAutoSec(cod, from) {
+  const num = function (id) { return parseFloat(String(_stkInsVal(id)).replace(",", ".")) || 0; };
+  const p = num("edQty_" + cod);
+  const sEl = document.getElementById("edSecQty_" + cod), fEl = document.getElementById("edFactor_" + cod);
+  if (from === "sec") {
+    const s = num("edSecQty_" + cod);
+    if (fEl) fEl.value = (s > 0 && p) ? (Math.round((p / s) * 1000) / 1000) : "";
+  } else {   // "factor" o "qty" → recalcula la cant secundaria
+    const f = num("edFactor_" + cod);
+    if (sEl) sEl.value = (f > 0 && p) ? (Math.round((p / f) * 1000) / 1000) : "";
+  }
+}
 function stkInsEditFact(cod) {
   if (!_stkIns) return;
   const f = insFactDe(cod);
@@ -14692,6 +14708,18 @@ async function stkInsGuardar(cod) {
     if (nuevoCod !== cod) {                              // el rename va último
       const n = await _stkInsRpc("insumo_recodificar", { p_cod: cod, p_nuevo: nuevoCod });
       msg = "✓ " + cod + " → " + nuevoCod + " (" + (n || 0) + " movimiento(s) de stock).";
+    }
+    // v8.35 — factores desde la propia edición: primaria = unidad del qty (base) + secundaria/factor
+    const finalCod = (nuevoCod !== cod) ? nuevoCod : cod;
+    const secUni = _stkInsVal("edSecUni_" + cod);
+    const factor = parseFloat(String(_stkInsVal("edFactor_" + cod)).replace(",", ".")) || 0;
+    const baseUni = uni || _stkInsUniMostrar(it) || "Uni";
+    if (secUni && factor > 0 && !_insUEq(secUni, baseUni)) {
+      await _stkInsRpc("insumo_factores_guardar", { p_cod: finalCod, p_factores: [
+        { unidad: baseUni, factor: 1, es_base: true },
+        { unidad: secUni, factor: factor, es_base: false }
+      ]});
+      await insFetchFactores();
     }
     _stkIns.edit = null; _stkIns.msg = msg;
     await stkInsRefresh(); stkRender();
