@@ -4,7 +4,17 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-09 · Versión app al documentar: **v8.45**
+> Última actualización: 2026-08-09 · Versión app al documentar: **v8.46**
+>
+> Nota: **v8.46 — "¿Qué bajar primero?": filtros + tabla imprimible + regla de master caja.**
+> El módulo `showGuardarOrden` ahora: (1) arranca en **Todos** (junta racks + a guardar + excedente,
+> ordenado por góndola más vacía) y tiene pestañas para ver **solo un origen** (Racks / A guardar /
+> Excedente). (2) Tabla con formato **Cód · Descripción · Cajas a bajar · Góndola · Máximo** +
+> botón **🖨 Imprimir** (`gordenPrint` abre ventana con la tabla y `print()`). (3) **Cajas a bajar** =
+> lo que entra hasta el máximo (`capacidad − góndola`); de **racks** se baja por **master caja entera**
+> (`cxm` = inner cajas por master, de `Racks_Planimetria` vía `rkbFetchCxM`): si el hueco no alcanza
+> para 1 master, ese código **no aparece** (ej. góndola 89/100, master de 12 → 0). En 'Todos' el hueco
+> se llena primero con a guardar, después excedente, y el resto con racks (por master).
 >
 > Nota: **v8.45 — Operaria: "¿Qué bajar primero?" + Stocks: menos botones.** (1) En el chooser
 > **"📥 Bajar a góndola"** (`showMGChooser`) hay un botón nuevo **📋 ¿Qué conviene bajar primero?**
