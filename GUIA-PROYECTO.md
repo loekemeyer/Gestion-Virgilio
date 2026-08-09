@@ -4,7 +4,14 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-09 · Versión app al documentar: **v8.43**
+> Última actualización: 2026-08-09 · Versión app al documentar: **v8.44**
+>
+> Nota: **v8.44 — Stocks: barra compacta · Corregir códigos: contar NPs.** (1) En la solapa **Stocks**
+> el buscador se achicó a ~5 dígitos (`width:96px`, `maxlength=5`, placeholder "🔎 cód") y **E ·
+> 🔴 Negativos · ⚠ Stock bajo** entran todos en **una sola fila**. (2) **Corregir códigos**
+> (`facCorreccRender`/`facCorreccRefreshCount`): las pestañas y el chip ahora cuentan **NPs distintas**
+> (unidad de acción — se cambia una vez por NP en el ERP), no ítems. Ej.: 67 ítems en código secundario
+> = **50 NPs** a corregir.
 >
 > Nota: **v8.43 — Insumos: botón "＋ unidad" en la edición inline (para la 3ª unidad o más).**
 > En la fila de edición por categoría, a la derecha de Guardar/Cancelar, hay un **＋ unidad** que abre

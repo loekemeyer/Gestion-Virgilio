@@ -6166,7 +6166,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.43";
+const APP_VERSION = "v8.44";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -11969,13 +11969,12 @@ function stkBodyStocks() {
     '</div>';
   // Teclado NUMÉRICO por defecto (los códigos son números); botón "E" para los
   // importados (506 → 506E) sin tener que cambiar de teclado (pedido del dueño).
+  // v8.44 — buscador angosto (≤5 dígitos) + TODOS los botones en una sola fila.
   h += '<div style="display:flex;gap:6px;margin-bottom:10px;align-items:center;flex-wrap:wrap;">' +
-    '<input class="stk-filtro" style="margin:0;" type="text" inputmode="numeric" enterkeyhint="search" placeholder="🔎 Buscar código" value="' + escapeHtml(_stk.filtro) + '" oninput="if(_stk){_stk.filtro=this.value;stkRender();}">' +
-    '<button type="button" onclick="stkFiltroToggleE()" title="Agregar/quitar la E (importado)" style="width:auto;margin:0;flex:0 0 auto;padding:0 18px;height:38px;border:1.5px solid #cbd5e1;border-radius:9px;background:#fff;font-weight:800;font-size:16px;cursor:pointer;">E</button>' +
-    '<button type="button" onclick="stkToggleSoloNeg()" title="Mostrar sólo los artículos con saldo NEGATIVO en algún depósito (góndola, racks, a facturar, etc.)" style="width:auto;margin:0;flex:0 0 auto;padding:0 13px;height:38px;border:1.5px solid ' + (_stk.soloNeg ? "#dc2626" : "#cbd5e1") + ';border-radius:9px;background:' + (_stk.soloNeg ? "#fef2f2" : "#fff") + ';color:' + (_stk.soloNeg ? "#b91c1c" : "#334155") + ';font-weight:800;font-size:13px;cursor:pointer;white-space:nowrap;">' + (_stk.soloNeg ? "☑" : "☐") + ' 🔴 Negativos' + (_stkNegCount ? " (" + _stkNegCount + ")" : "") + '</button>' +
-    '</div>';
-  h += '<div style="display:flex;gap:6px;margin-bottom:10px;align-items:center;flex-wrap:wrap;">' +
-    '<button type="button" onclick="stkToggleSoloLow()" title="Mostrar sólo los códigos donde la suma de depósitos (góndola+excedente+pickeados+a facturar+a guardar+racks) es MENOR que lo pedido" style="width:auto;margin:0;flex:0 0 auto;padding:0 13px;height:38px;border:1.5px solid ' + (_stk.soloLow ? "#dc2626" : "#cbd5e1") + ';border-radius:9px;background:' + (_stk.soloLow ? "#fef2f2" : "#fff") + ';color:' + (_stk.soloLow ? "#b91c1c" : "#334155") + ';font-weight:800;font-size:13px;cursor:pointer;white-space:nowrap;">' + (_stk.soloLow ? "☑" : "☐") + ' ⚠ Stock bajo' + (_stkLowCount ? " (" + _stkLowCount + ")" : "") + '</button>' +
+    '<input class="stk-filtro" style="margin:0;flex:0 0 auto;width:96px;" type="text" inputmode="numeric" enterkeyhint="search" maxlength="5" placeholder="🔎 cód" value="' + escapeHtml(_stk.filtro) + '" oninput="if(_stk){_stk.filtro=this.value;stkRender();}">' +
+    '<button type="button" onclick="stkFiltroToggleE()" title="Agregar/quitar la E (importado)" style="width:auto;margin:0;flex:0 0 auto;padding:0 14px;height:38px;border:1.5px solid #cbd5e1;border-radius:9px;background:#fff;font-weight:800;font-size:16px;cursor:pointer;">E</button>' +
+    '<button type="button" onclick="stkToggleSoloNeg()" title="Mostrar sólo los artículos con saldo NEGATIVO en algún depósito (góndola, racks, a facturar, etc.)" style="width:auto;margin:0;flex:0 0 auto;padding:0 11px;height:38px;border:1.5px solid ' + (_stk.soloNeg ? "#dc2626" : "#cbd5e1") + ';border-radius:9px;background:' + (_stk.soloNeg ? "#fef2f2" : "#fff") + ';color:' + (_stk.soloNeg ? "#b91c1c" : "#334155") + ';font-weight:800;font-size:13px;cursor:pointer;white-space:nowrap;">' + (_stk.soloNeg ? "☑" : "☐") + ' 🔴 Negativos' + (_stkNegCount ? " (" + _stkNegCount + ")" : "") + '</button>' +
+    '<button type="button" onclick="stkToggleSoloLow()" title="Mostrar sólo los códigos donde la suma de depósitos (góndola+excedente+pickeados+a facturar+a guardar+racks) es MENOR que lo pedido" style="width:auto;margin:0;flex:0 0 auto;padding:0 11px;height:38px;border:1.5px solid ' + (_stk.soloLow ? "#dc2626" : "#cbd5e1") + ';border-radius:9px;background:' + (_stk.soloLow ? "#fef2f2" : "#fff") + ';color:' + (_stk.soloLow ? "#b91c1c" : "#334155") + ';font-weight:800;font-size:13px;cursor:pointer;white-space:nowrap;">' + (_stk.soloLow ? "☑" : "☐") + ' ⚠ Stock bajo' + (_stkLowCount ? " (" + _stkLowCount + ")" : "") + '</button>' +
     '</div>';
   // Columnas: sectores fijos (menos insumos, que va en su sección). Los `extra`
   // (p/envasar, racks CH) SOLO se muestran como columna si algún artículo visible
@@ -26764,7 +26763,9 @@ async function facCorreccRefreshCount(){
   try {
     const pend = await facCorreccData();
     const chip = document.getElementById("facChipCorr"), n = document.getElementById("facCntCorr");
-    if (n) n.textContent = pend.length;
+    // v8.44 — contar NPs distintas (unidad de acción), no ítems.
+    const nNps = Object.keys(pend.reduce(function(a,p){ a[p.np]=1; return a; }, {})).length;
+    if (n) n.textContent = nNps;
     if (chip) chip.style.display = pend.length ? "" : "none";
   } catch(_e){}
 }
@@ -26799,8 +26800,11 @@ function facCorreccRender(){
   facCorreccRefreshCount();
   // Pestañas de filtro por estado (con conteo)
   const TABS = [["todo","Todo"],["facturado","Facturado"],["afacturar","Para facturar"],["pickeado","Pickeado"],["enpicking","En picking"],["sinpickear","Sin pickear"]];
-  const cnt = {}; rows.forEach(function(p){ cnt[p.estado] = (cnt[p.estado]||0)+1; });
-  const cntOf = function(k){ return k==="todo" ? rows.length : (cnt[k]||0); };
+  // v8.44 — contar NPs DISTINTAS a corregir (unidad de acción: se cambia una vez por NP en el ERP),
+  // no la cantidad de ítems (una NP puede tener varias líneas en código secundario).
+  const npsBy = {}, allNps = {};
+  rows.forEach(function(p){ allNps[p.np] = 1; (npsBy[p.estado] = npsBy[p.estado] || {})[p.np] = 1; });
+  const cntOf = function(k){ return k==="todo" ? Object.keys(allNps).length : Object.keys(npsBy[k]||{}).length; };
   let h = '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">';
   TABS.forEach(function(t){
     const on = _facCorrFiltro === t[0];
