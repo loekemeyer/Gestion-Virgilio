@@ -4,7 +4,18 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-09 · Versión app al documentar: **v8.39**
+> Última actualización: 2026-08-09 · Versión app al documentar: **v8.40**
+>
+> Nota: **v8.40 — Guardar a góndola por PRIORIDAD + Faltantes buscador numérico + Insumos consolidan.**
+> (1) **Guardar a góndola (MG, `showMGModal`/`mgRender`)**: la lista se ordena por **prioridad** =
+> góndola más vacía primero (`terminado ÷ capacidad`, capacidad de `ocgFetchCapacidad`/`Capacidad_Sector`);
+> sin capacidad cargada → al final. Cada fila muestra un chip **🛒 Góndola G/C · faltan X** (rojo/ámbar/
+> verde según qué tan vacía) para que el operario sepa qué bajar primero. (2) **Faltantes x día**: el
+> buscador ahora es `inputmode="numeric" enterkeyhint="search"` (igual al de Stocks) — teclado numérico
+> y sin perder el foco al tipear. (3) **Insumos**: `_stkInsAjustar` ahora **consolida** en la unidad
+> base — al guardar cero-ea las unidades no-base (con factor conocido) y deja UNA sola línea base.
+> Cierra el hallazgo de `guardian-stock` sobre v8.39: evita "fantasmas" por-unidad y el descuadre de
+> `vista_saldos_stock.insumos` (que suma crudo distintas unidades). Stock-neutral en base.
 >
 > Nota: **v8.39 — Insumos (Paso 2): al guardar cantidad, el asiento va en la unidad BASE.** Antes el
 > movimiento de stock se guardaba en la unidad elegida y el display convertía. Ahora, si el insumo
