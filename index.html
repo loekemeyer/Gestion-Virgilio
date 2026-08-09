@@ -6158,7 +6158,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.08";
+const APP_VERSION = "v8.09";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -13107,6 +13107,19 @@ function _faltDiaArmado(fechaYMD) {
   else if (dow === 6) d.setUTCDate(d.getUTCDate() - 1);    // sáb → vie
   return d.toISOString().slice(0, 10);
 }
+/* v8.09 — inverso: dado un día de ARMADO, la fecha de SALIDA es el día hábil SIGUIENTE
+   (para agrupar Falt S1/S2 por semana de entrega). Ej.: arma jue 13/8 → sale vie 14/8;
+   arma vie 14/8 → sale lun 17/8 (saltea sáb/dom). */
+function _faltProxHabil(fechaYMD) {
+  fechaYMD = String(fechaYMD || "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(fechaYMD)) return fechaYMD;
+  var d = new Date(fechaYMD + "T12:00:00Z");
+  d.setUTCDate(d.getUTCDate() + 1);
+  var dow = d.getUTCDay();
+  if (dow === 6) d.setUTCDate(d.getUTCDate() + 2);         // sáb → lun
+  else if (dow === 0) d.setUTCDate(d.getUTCDate() + 1);    // dom → lun
+  return d.toISOString().slice(0, 10);
+}
 function _faltLunes(dateStr) {
   // Devuelve el lunes de la semana de dateStr
   var d = new Date(dateStr + "T12:00:00Z");
@@ -13212,8 +13225,11 @@ function stkBodyFaltante() {
       balRun -= (demDia[f] || 0);
       var falt = balRun < 0 ? Math.abs(balRun) : 0;
       diasFalt[f] = falt;
-      if (f >= lunesHoy && f <= finS1) faltS1 = Math.max(faltS1, falt);
-      if (f >= lunesS2 && f <= finS2) faltS2 = Math.max(faltS2, falt);
+      // v8.09 — el faltante pasa el día de ARMADO (f), pero S1/S2 se agrupan por la
+      // SEMANA DE SALIDA (día hábil siguiente al armado).
+      var _sal = _faltProxHabil(f);
+      if (_sal >= lunesHoy && _sal <= finS1) faltS1 = Math.max(faltS1, falt);
+      if (_sal >= lunesS2 && _sal <= finS2) faltS2 = Math.max(faltS2, falt);
     });
     diasCols.forEach(function (d) { if (diasFalt[d] === undefined) diasFalt[d] = bal < 0 ? Math.abs(bal) : 0; });
 
@@ -13295,7 +13311,7 @@ function stkBodyFaltante() {
     '<input class="falt-search" type="text" placeholder="🔍 Buscar…" value="' +
     escapeHtml(F.search || "") + '" oninput="stkFaltSearch(this.value)">' +
     '</div>';
-  h += '<div class="falt-hint">Tocá una celda para ver las NPs. La celda con <b style="color:#b91c1c;">borde rojo</b> es el primer día de quiebre. Colores:' +
+  h += '<div class="falt-hint">Las columnas de día son el <b>día de armado</b> (un día hábil antes de la salida). <b>Falt S1/S2</b> agrupan por <b>semana de salida</b>. Tocá una celda para ver las NPs; la del <b style="color:#b91c1c;">borde rojo</b> es el primer día de quiebre. Colores:' +
     ' <span class="falt-leg falt-warn">1–10</span> <span class="falt-leg falt-bad">11–50</span> <span class="falt-leg falt-crit">+50</span>' +
     (nExcl ? ' · 🔮 Simulación activa.' : '') + '</div>';
   // Tabla
