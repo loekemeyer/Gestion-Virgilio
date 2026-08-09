@@ -4,7 +4,15 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-09 · Versión app al documentar: **v8.47**
+> Última actualización: 2026-08-09 · Versión app al documentar: **v8.48**
+>
+> Nota: **v8.48 — "¿Qué bajar primero?": total + hueco topado + s/master.** (1) **Total** de lo que hay
+> para bajar: chips arriba (📦 total cajas · N códigos · 🏗 master cajas) + fila TOTAL al pie de la
+> tabla (y en el impreso). (2) El **hueco se topa a la capacidad**: si la góndola quedó **negativa**
+> (error de stock), `cap − gond` inflaba las "cajas a bajar" por encima del máximo — ahora se limita a
+> la capacidad (ej. 566E góndola −29, máx 90 → hueco 90, no 119). (3) Los códigos de racks **sin master
+> cargado** en `Racks_Planimetria` (cxm=0) se marcan **"· s/master"** — por eso no muestran master
+> cajas (se bajan 1:1). Para que muestre MC hay que cargarles la planimetría.
 >
 > Nota: **v8.47 — "¿Qué bajar primero?" también en Administración.** Se agregó el botón 📋 **Qué bajar
 > primero** en Administración → Reportes y configuración (`showGuardarOrden('')`), además del acceso del
