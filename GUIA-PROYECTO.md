@@ -4,7 +4,11 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-09 · Versión app al documentar: **v8.52**
+> Última actualización: 2026-08-09 · Versión app al documentar: **v8.53**
+>
+> Nota: **v8.53 — Stocks: la tarjeta "Horas de guardado" se ajusta al contenido.** El panel verde/rojo
+> tenía ancho completo (llegaba al fondo al pedo); ahora `width:fit-content` → solo ocupa lo que mide su
+> contenido.
 >
 > Nota: **v8.52 — Stocks: filtro LK/CH · búsqueda multi-código · fijar códigos · backlog capacity-aware.**
 > (1) **Filtro LK / CH** (`_stk.filLinea`, por `ocLinea`/OC_Maximos.linea). (2) El buscador acepta
