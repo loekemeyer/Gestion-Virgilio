@@ -4,7 +4,13 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-09 · Versión app al documentar: **v8.50**
+> Última actualización: 2026-08-09 · Versión app al documentar: **v8.51**
+>
+> Nota: **v8.51 — Faltantes x día: sin scroll lateral + orden por fabricante por defecto.** (1) Se
+> quitaron las **columnas de día** (eran ~15 y generaban el scroll horizontal): la tabla ahora entra
+> sin scroll lateral. El detalle por franja sigue en los pop-ups de **Falt S1 / S2 / Resto / Sin fecha**
+> (clickeables). (2) El módulo arranca **ordenado por fabricante** (`_stk.falt.ordenFab = true` por
+> defecto; el botón "Fabricante" lo alterna).
 >
 > Nota: **v8.50 — "¿Qué bajar primero?": switch "Ver todo".** Toggle `gordenVerTodo` (`_gorden.verTodo`):
 > por defecto muestra **solo lo que entra ahora** (Cajas a bajar > 0); al activarlo muestra **todo** lo

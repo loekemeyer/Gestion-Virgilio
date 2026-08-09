@@ -6167,7 +6167,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.50";
+const APP_VERSION = "v8.51";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -13171,7 +13171,7 @@ async function stkFaltLoad() {
     _stk.falt = {
       demanda: demanda, provMap: provMap, saldoMap: saldoMap, discont: discont,
       realFalt: realFalt, realDet: realDet, enCurso: Object.keys(enCurso).length,
-      ajustes: {}, filtro: "s1", openCell: null, search: ""
+      ajustes: {}, filtro: "s1", openCell: null, search: "", ordenFab: true
     };
     _stk.faltLoaded = true;
   } catch (e) {
@@ -13490,18 +13490,13 @@ function stkBodyFaltante() {
     '<th class="falt-sem">Falt S1</th><th class="falt-sem">Falt S2</th>' +
     '<th class="falt-sem" title="Faltante proyectado para salidas MÁS ALLÁ de la S2 (semana 3 en adelante).">Resto</th>' +
     '<th class="falt-sem" title="Faltante de pedidos SIN fecha PPP (o con fecha ya pasada): consumen stock pero no caen en ninguna columna de día. Acá aparece lo que falta y no se ve en S1/S2/Resto. Falt S1 + S2 + Resto + Sin fecha = Total − Stock.">Sin<br>fecha</th>' +
-    '<th class="falt-sem" title="Cajas que hay que cambiar de NP en el ERP: el código pedido no tiene stock pero un hermano equivalente (mismo producto, otro SKU) sí. El detalle por NP está en Facturación.">⚠ Cambio<br>NP</th>' +
-    '<th class="falt-sep"></th>';
-  // Headers de días
-  diasCols.forEach(function (d) {
-    var esHoy = d === hoy;
-    h += '<th class="falt-dia' + (esHoy ? " hoy" : "") + '" title="' + d + '">' +
-      _faltDiaSem(d) + '<br>' + _faltFechaCorta(d) + '</th>';
-  });
+    '<th class="falt-sem" title="Cajas que hay que cambiar de NP en el ERP: el código pedido no tiene stock pero un hermano equivalente (mismo producto, otro SKU) sí. El detalle por NP está en Facturación.">⚠ Cambio<br>NP</th>';
+  // v8.51 — columnas de día quitadas (sacaban el scroll lateral). El detalle por franja está en
+  // los pop-ups de Falt S1 / Falt S2 / Resto / Sin fecha (clickeables).
   h += '</tr></thead><tbody>';
 
   if (arts.length === 0) {
-    h += '<tr><td colspan="' + (12 + diasCols.length) + '" style="text-align:center;padding:20px;color:#94a3b8;">Sin artículos con demanda pendiente</td></tr>';
+    h += '<tr><td colspan="11" style="text-align:center;padding:20px;color:#94a3b8;">Sin artículos con demanda pendiente</td></tr>';
   }
 
   arts.forEach(function (a) {
@@ -13541,14 +13536,7 @@ function stkBodyFaltante() {
       ? '<td class="num falt-cell ' + _sfCls + '" style="font-weight:800;cursor:pointer;" onclick="stkFaltDrillSinF(\'' + a.key + '\',event)" title="' + _sf + ' cajas de pedidos SIN fecha PPP (o con fecha pasada) que el stock no alcanza a cubrir. Tocá para ver las NPs.">' + _sf + '</td>'
       : '<td class="num falt-ok">—</td>';
     h += subCell;
-    h += '<td class="falt-sep"></td>';   // v8.24 — separador visual entre resumen y días
-    // Días — marcar el PRIMER día de quiebre (borde rojo)
-    var _primer = null;
-    for (var _i = 0; _i < diasCols.length; _i++) { if ((a.diasFalt[diasCols[_i]] || 0) > 0) { _primer = diasCols[_i]; break; } }
-    diasCols.forEach(function (d) {
-      var v = a.diasFalt[d] || 0;
-      h += _faltCelda(v, false, a.key, d, d === _primer);
-    });
+    // v8.51 — columnas de día quitadas (scroll lateral). Detalle por franja en los pop-ups.
     h += '</tr>';
   });
 
