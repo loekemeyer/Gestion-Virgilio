@@ -3051,6 +3051,10 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
 .falt-tbl td { padding:4px 8px; border-bottom:1px solid #f1f5f9; white-space:nowrap; }
 .falt-tbl td.num { text-align:center; font-variant-numeric:tabular-nums; }
 .falt-tbl td.falt-cod { font-family:Consolas,Menlo,monospace; font-weight:800; color:#1e6bd6; }
+/* v8.08 — columna Código fija a la izquierda: se puede scrollear hasta los días sin perder el código */
+.falt-tbl th.falt-cod, .falt-tbl td.falt-cod { position:sticky; left:0; z-index:3; }
+.falt-tbl td.falt-cod { background:#fff; box-shadow:1px 0 0 #e2e8f0; }
+.falt-tbl th.falt-cod { z-index:4; }
 .falt-tbl td.falt-desc { color:#475569; max-width:180px; overflow:hidden; text-overflow:ellipsis; }
 .falt-tbl td.falt-fab { color:#6b7280; font-size:11px; max-width:110px; overflow:hidden; text-overflow:ellipsis; }
 .falt-tbl td.falt-ok { background:#f0fdf4; color:#16a34a; }
@@ -6154,7 +6158,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.07";
+const APP_VERSION = "v8.08";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -13056,7 +13060,7 @@ async function stkFaltLoad() {
     ppp.forEach(function (r) {
       var np = pickNormNp(r.np); if (!np) return;
       if (facSet[np]) return;
-      npInfo[np] = { fecha: String(r.fecha_entrega || "").trim(), rs: r.razon_social || "", tanda: r.tanda || "" };
+      npInfo[np] = { fecha: String(r.fecha_entrega || "").trim().slice(0, 10), rs: r.razon_social || "", tanda: r.tanda || "" };
     });
     // Demanda por artículo: cod → [{fecha, np, rs, cajas}]
     var demanda = {};
@@ -13066,7 +13070,9 @@ async function stkFaltLoad() {
       items.forEach(function (it) {
         var cod = _ocgNorm(it.art); if (!cod) return;
         if (!demanda[cod]) demanda[cod] = [];
-        demanda[cod].push({ fecha: info.fecha, np: np, rs: info.rs, cajas: Number(it.cajas) || 0, cod: cod });
+        // v8.08 — el faltante se cuenta el DÍA DE ARMADO (día hábil anterior a la salida),
+        // no el día de la PPP. Guardo también la fecha de salida para el drill.
+        demanda[cod].push({ fecha: _faltDiaArmado(info.fecha), fechaSalida: info.fecha, np: np, rs: info.rs, cajas: Number(it.cajas) || 0, cod: cod });
       });
     });
     _stk.falt = {
@@ -13086,6 +13092,19 @@ async function stkFaltLoad() {
 function _faltHoy() {
   // Hoy en AR (UTC-3), devuelve "YYYY-MM-DD"
   var d = new Date(Date.now() - 3 * 3600000);
+  return d.toISOString().slice(0, 10);
+}
+/* v8.08 — Día de ARMADO = último día HÁBIL antes de la fecha de salida (el pedido se
+   arma el día previo; si ese día cae sábado o domingo, se corre al viernes).
+   Ej.: salida vie 14/8 → arma jue 13/8 · salida lun 17/8 → arma vie 14/8. */
+function _faltDiaArmado(fechaYMD) {
+  fechaYMD = String(fechaYMD || "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(fechaYMD)) return fechaYMD;
+  var d = new Date(fechaYMD + "T12:00:00Z");
+  d.setUTCDate(d.getUTCDate() - 1);
+  var dow = d.getUTCDay();                                 // 0=dom, 6=sáb
+  if (dow === 0) d.setUTCDate(d.getUTCDate() - 2);         // dom → vie
+  else if (dow === 6) d.setUTCDate(d.getUTCDate() - 1);    // sáb → vie
   return d.toISOString().slice(0, 10);
 }
 function _faltLunes(dateStr) {
