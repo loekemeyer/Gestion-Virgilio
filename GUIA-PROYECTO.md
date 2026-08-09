@@ -4,7 +4,16 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-09 · Versión app al documentar: **v8.14**
+> Última actualización: 2026-08-09 · Versión app al documentar: **v8.16**
+>
+> Nota: **v8.16 — Faltante: popups clickeables en las columnas visibles (celular).** En el celular
+> las columnas de día quedan scrolleadas a la derecha; las visibles (🔴 Faltó armado / Falt S1 /
+> Falt S2) no abrían nada. Ahora las tres abren su drill: **Falt S1/S2** → NPs sin pickear con salida
+> en esa ventana (con destildar-para-simular); **🔴 Faltó armado** → NPs/tandas que ya salieron
+> cortas (read-only, muestra tanda y "faltó N"). Drill unificado en `_faltDrillOpen(cod, kind, key)`
+> (kind day/win/real); re-apertura tras destildar por coords guardadas (no más matcheo por DOM).
+> `stkFaltLoad` ahora guarda `realDet` (detalle {tanda,np,rs,cod,falto}). (v8.15: header "Faltó
+> armado" en dos líneas.)
 >
 > Nota: **v8.14 — Faltante por día: separar "ya preparado" (real) de "aún no preparado" (proyección).**
 > Antes el faltante era 100% conceptual (demanda PPP vs stock). Problema: si un pedido YA se pickeó,

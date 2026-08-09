@@ -6158,7 +6158,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.15";
+const APP_VERSION = "v8.16";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -13084,6 +13084,7 @@ async function stkFaltLoad() {
     });
     var tandas = Object.keys(tandaNp);
     var realFalt = {};      // codNorm(suffijado) → cajas que faltaron al ARMAR (real, TP)
+    var realDet = {};       // codNorm → [{tanda, np, rs, cod, falto}] (detalle para el drill)
     var enCurso = {};       // TANDAs en picking (para el contador "en curso")
     if (tandas.length) {
       var inT = tandas.map(encodeURIComponent).join(",");
@@ -13120,8 +13121,10 @@ async function stkFaltLoad() {
       });
       Object.keys(lastPk).forEach(function (k) {
         var o = lastPk[k], falto = o.esp - o.real; if (falto <= 0) return;
-        var cod = _ocgNorm(codEmpSplit(o.c, tandaNp[o.t])); if (!cod) return;
+        var np = tandaNp[o.t];
+        var cod = _ocgNorm(codEmpSplit(o.c, np)); if (!cod) return;
         realFalt[cod] = (realFalt[cod] || 0) + falto;
+        (realDet[cod] = realDet[cod] || []).push({ tanda: o.t, np: np, rs: (npInfo[np] || {}).rs || "", cod: o.c, falto: falto });
       });
     }
 
@@ -13145,13 +13148,13 @@ async function stkFaltLoad() {
     });
     _stk.falt = {
       demanda: demanda, provMap: provMap, saldoMap: saldoMap,
-      realFalt: realFalt, enCurso: Object.keys(enCurso).length,
+      realFalt: realFalt, realDet: realDet, enCurso: Object.keys(enCurso).length,
       excluidos: {}, filtro: "s1", openCell: null, search: ""
     };
     _stk.faltLoaded = true;
   } catch (e) {
     console.error("stkFaltLoad:", e);
-    _stk.falt = { demanda: {}, provMap: {}, saldoMap: {}, realFalt: {}, enCurso: 0, excluidos: {}, filtro: "s1", openCell: null, search: "" };
+    _stk.falt = { demanda: {}, provMap: {}, saldoMap: {}, realFalt: {}, realDet: {}, enCurso: 0, excluidos: {}, filtro: "s1", openCell: null, search: "" };
     _stk.faltLoaded = true;
   }
   if (_stk) stkRender();
@@ -13459,13 +13462,14 @@ function stkBodyFaltante() {
       '<td class="falt-desc" title="' + escapeHtml(a.desc) + '">' + escapeHtml(a.desc) + '</td>' +
       '<td class="falt-fab" title="' + escapeHtml(a.prov) + '">' + escapeHtml(a.prov || "—") + '</td>' +
       '<td class="num" style="font-weight:700">' + a.stock + '</td>';
-    // v8.14 — Faltó al armar (REAL, ya preparado): rojo sólido para diferenciar de la proyección
+    // v8.14 — Faltó al armar (REAL, ya preparado): rojo sólido para diferenciar de la proyección.
+    // v8.16 — clickeable → muestra qué NPs/tandas salieron cortas.
     h += (a.realFalt > 0)
-      ? '<td class="num" style="font-weight:900;color:#fff;background:#b91c1c;" title="Ya se pickeó y faltaron ' + a.realFalt + ' cajas (no se encontraron en el rack). Dato real.">' + a.realFalt + '</td>'
+      ? '<td class="num falt-cell" style="font-weight:900;color:#fff;background:#b91c1c;cursor:pointer;" onclick="stkFaltDrillReal(\'' + a.key + '\',event)" title="Ya se pickeó y faltaron ' + a.realFalt + ' cajas (no se encontraron en el rack). Tocá para ver las NPs.">' + a.realFalt + '</td>'
       : '<td class="num falt-ok">—</td>';
-    // Faltante S1 / S2 (proyección de lo aún no pickeado)
-    h += _faltCelda(a.faltS1, true);
-    h += _faltCelda(a.faltS2, true);
+    // Faltante S1 / S2 (proyección de lo aún no pickeado) — clickeable para ver las NPs
+    h += _faltCelda(a.faltS1, true, a.key, null, false, "s1");
+    h += _faltCelda(a.faltS2, true, a.key, null, false, "s2");
     h += subCell;
     // Días — marcar el PRIMER día de quiebre (borde rojo)
     var _primer = null;
@@ -13482,7 +13486,7 @@ function stkBodyFaltante() {
   return h;
 }
 
-function _faltCelda(falt, esSem, cod, fecha, esPrimer) {
+function _faltCelda(falt, esSem, cod, fecha, esPrimer, winKey) {
   var v = Math.round(falt);
   var cls = "num";
   if (v === 0) cls += " falt-ok";
@@ -13493,6 +13497,10 @@ function _faltCelda(falt, esSem, cod, fecha, esPrimer) {
   if (cod && fecha) {
     cls += " falt-cell";
     click = ' onclick="stkFaltDrill(\'' + cod + '\',\'' + fecha + '\',event)"';
+  } else if (cod && winKey) {
+    // v8.16 — celdas de resumen S1/S2 clickeables (mostrar NPs de la ventana)
+    cls += " falt-cell";
+    click = ' onclick="stkFaltDrillWin(\'' + cod + '\',\'' + winKey + '\',event)"';
   }
   if (esPrimer) cls += " falt-primer";
   var titAttr = esPrimer ? ' title="Primer día de quiebre"' : '';
@@ -13523,62 +13531,97 @@ function stkFaltResetSim() {
   stkRender();
 }
 
-/* Drill-down: muestra las NPs que piden ese artículo en ese día (o en general) */
-function stkFaltDrill(cod, fecha, evt) {
+/* Drill-down genérico: NPs detrás de una celda.
+   kind='day' (día de armado, key=fecha) · 'win' (ventana, key='s1'|'s2') · 'real' (faltó al armar).
+   Los dos primeros salen de la PROYECCIÓN (demanda sin pickear); 'real' de lo ya pickeado (ESP−REAL). */
+function stkFaltDrill(cod, fecha, evt) { _faltDrillOpen(cod, "day", fecha, evt); }
+function stkFaltDrillWin(cod, win, evt) { _faltDrillOpen(cod, "win", win, evt); }
+function stkFaltDrillReal(cod, evt) { _faltDrillOpen(cod, "real", "real", evt); }
+
+function _faltDrillOpen(cod, kind, key, evt) {
   if (!_stk || !_stk.falt) return;
   var F = _stk.falt;
-  // Si ya está abierto el mismo, cerrar
-  if (F.openCell && F.openCell.cod === cod && F.openCell.fecha === fecha) {
+  // Toggle: si ya está abierto el mismo, cerrar
+  if (F.openCell && F.openCell.cod === cod && F.openCell.kind === kind && F.openCell.key === key) {
     stkFaltCloseDrill(); return;
   }
-  F.openCell = { cod: cod, fecha: fecha };
-  // v7.90 — `cod` es la clave de familia: juntar entries de TODOS los miembros equivalentes.
+  // `cod` es la clave de familia: juntar TODOS los miembros equivalentes.
   var mems = equivMiembros(cod);
-  var entries = [];
-  mems.forEach(function (m) { (F.demanda[m] || []).forEach(function (e) { if (e.fecha === fecha) entries.push(e); }); });
-  if (entries.length === 0) { stkFaltCloseDrill(); return; }
-  // Agrupar por NP (puede haber varios ítems). Guardar qué SKU pidió cada NP.
   var esFam = mems.length > 1;
-  var byNp = {};
-  entries.forEach(function (e) {
-    if (!byNp[e.np]) byNp[e.np] = { np: e.np, rs: e.rs, cajas: 0, cods: {} };
-    byNp[e.np].cajas += e.cajas;
-    if (e.cod) byNp[e.np].cods[codCanon(e.cod)] = true;
-  });
-  var lista = Object.keys(byNp).map(function (k) { return byNp[k]; })
-    .sort(function (a, b) { return b.cajas - a.cajas; });
+  var lista = [], title = "", sub = "", allowExcl = true, esReal = false;
 
-  // Crear popup
+  if (kind === "real") {
+    esReal = true; allowExcl = false;
+    var byNpR = {};
+    mems.forEach(function (m) {
+      ((F.realDet && F.realDet[m]) || []).forEach(function (d) {
+        if (!byNpR[d.np]) byNpR[d.np] = { np: d.np, rs: d.rs, cajas: 0, cods: {}, tandas: {} };
+        byNpR[d.np].cajas += d.falto;
+        if (d.cod) byNpR[d.np].cods[codCanon(d.cod)] = true;
+        if (d.tanda) byNpR[d.np].tandas[d.tanda] = true;
+      });
+    });
+    lista = Object.keys(byNpR).map(function (k) { return byNpR[k]; }).sort(function (a, b) { return b.cajas - a.cajas; });
+    if (!lista.length) { stkFaltCloseDrill(); return; }
+    title = escapeHtml(codCanon(cod)) + " — 🔴 Faltó al armar";
+    sub = lista.length + " NP" + (lista.length > 1 ? "s" : "") + " salieron cortas (ya pickeadas). Dato real, no proyección.";
+  } else {
+    var hoy = _faltHoy(), finS1 = _faltAddHabiles(hoy, 5), lunesS2 = _faltAddHabiles(finS1, 1), finS2 = _faltAddHabiles(finS1, 5);
+    var entries = [];
+    mems.forEach(function (m) {
+      (F.demanda[m] || []).forEach(function (e) {
+        var ok;
+        if (kind === "day") ok = (e.fecha === key);
+        else { var sal = String(e.fechaSalida || "").slice(0, 10); ok = (key === "s1") ? (sal >= hoy && sal <= finS1) : (sal >= lunesS2 && sal <= finS2); }
+        if (ok) entries.push(e);
+      });
+    });
+    if (!entries.length) { stkFaltCloseDrill(); return; }
+    var byNp = {};
+    entries.forEach(function (e) {
+      if (!byNp[e.np]) byNp[e.np] = { np: e.np, rs: e.rs, cajas: 0, cods: {} };
+      byNp[e.np].cajas += e.cajas;
+      if (e.cod) byNp[e.np].cods[codCanon(e.cod)] = true;
+    });
+    lista = Object.keys(byNp).map(function (k) { return byNp[k]; }).sort(function (a, b) { return b.cajas - a.cajas; });
+    title = escapeHtml(codCanon(cod)) + " — " + (kind === "day" ? (_faltDiaSem(key) + " " + _faltFechaCorta(key)) : (key === "s1" ? "Esta sem" : "Próx sem"));
+    sub = lista.length + " NP" + (lista.length > 1 ? "s" : "") + " piden este artículo. Destildar para excluir del cálculo.";
+  }
+
+  F.openCell = { cod: cod, kind: kind, key: key, x: evt.clientX, y: evt.clientY };
+
   var old = document.getElementById("faltDrill");
   if (old) old.remove();
   var div = document.createElement("div");
   div.className = "falt-drill";
   div.id = "faltDrill";
-  // Posicionar cerca del click
-  var x = evt.clientX, y = evt.clientY;
-  div.style.left = Math.min(x, window.innerWidth - 400) + "px";
-  div.style.top = Math.min(y + 10, window.innerHeight - 300) + "px";
+  div.style.left = Math.min(evt.clientX, window.innerWidth - 400) + "px";
+  div.style.top = Math.min(evt.clientY + 10, window.innerHeight - 300) + "px";
   var ih = '<button class="falt-drill-close" onclick="stkFaltCloseDrill()">✕</button>' +
-    '<h4>' + escapeHtml(codCanon(cod)) + ' — ' + _faltDiaSem(fecha) + ' ' + _faltFechaCorta(fecha) + '</h4>' +
-    '<div style="font-size:11px;color:#64748b;margin-bottom:8px;">' + lista.length + ' NP' +
-    (lista.length > 1 ? "s" : "") + ' piden este artículo. Destildar para excluir del cálculo.</div>';
+    '<h4>' + title + '</h4>' +
+    '<div style="font-size:11px;color:#64748b;margin-bottom:8px;">' + sub + '</div>';
   lista.forEach(function (it) {
-    var isExcl = !!F.excluidos[it.np];
-    // v7.90 — si es familia, mostrar qué SKU pidió esta NP (para saber si hay que cambiarla)
-    var skuTag = esFam ? ' <span style="font-size:10px;color:#1e40af;font-weight:700;">(' + Object.keys(it.cods).join(", ") + ')</span>' : '';
-    ih += '<div class="falt-drill-row' + (isExcl ? " excl" : "") + '">' +
-      '<label><input type="checkbox"' + (isExcl ? "" : " checked") +
-      ' onchange="stkFaltToggleNp(\'' + it.np + '\',this.checked)">' +
-      '<span class="falt-np">NP ' + escapeHtml(it.np) + '</span>' + skuTag +
-      '<span class="falt-rs">' + escapeHtml(it.rs) + '</span></label>' +
-      '<span class="falt-cj">' + Math.round(it.cajas) + ' cj</span></div>';
+    // Si es familia, mostrar qué SKU pidió cada NP (para saber si hay que cambiarla)
+    var skuTag = (esFam && Object.keys(it.cods).length) ? ' <span style="font-size:10px;color:#1e40af;font-weight:700;">(' + Object.keys(it.cods).join(", ") + ')</span>' : '';
+    var tandaTag = (esReal && it.tandas && Object.keys(it.tandas).length) ? ' <span style="font-size:10px;color:#b45309;font-weight:700;">t.' + Object.keys(it.tandas).join(",") + '</span>' : '';
+    if (allowExcl) {
+      var isExcl = !!F.excluidos[it.np];
+      ih += '<div class="falt-drill-row' + (isExcl ? " excl" : "") + '">' +
+        '<label><input type="checkbox"' + (isExcl ? "" : " checked") +
+        ' onchange="stkFaltToggleNp(\'' + it.np + '\',this.checked)">' +
+        '<span class="falt-np">NP ' + escapeHtml(it.np) + '</span>' + skuTag +
+        '<span class="falt-rs">' + escapeHtml(it.rs) + '</span></label>' +
+        '<span class="falt-cj">' + Math.round(it.cajas) + ' cj</span></div>';
+    } else {
+      ih += '<div class="falt-drill-row">' +
+        '<label><span class="falt-np">NP ' + escapeHtml(it.np) + '</span>' + skuTag + tandaTag +
+        '<span class="falt-rs">' + escapeHtml(it.rs) + '</span></label>' +
+        '<span class="falt-cj" style="color:#b91c1c;font-weight:800;">faltó ' + Math.round(it.cajas) + '</span></div>';
+    }
   });
   div.innerHTML = ih;
   document.body.appendChild(div);
-  // Cerrar al hacer click fuera
-  setTimeout(function () {
-    document.addEventListener("click", _faltDrillOutside);
-  }, 50);
+  setTimeout(function () { document.addEventListener("click", _faltDrillOutside); }, 50);
 }
 
 function _faltDrillOutside(evt) {
@@ -13602,32 +13645,14 @@ function stkFaltToggleNp(np, incluir) {
   } else {
     _stk.falt.excluidos[np] = true;
   }
-  // Re-renderizar tabla (el drill se va a re-abrir automáticamente)
+  // Re-renderizar tabla y re-abrir el mismo drill (guardo la celda antes de cerrar).
   var cell = _stk.falt.openCell;
   stkFaltCloseDrill();
   stkRender();
-  // Re-abrir el drill en la misma celda
   if (cell) {
     setTimeout(function () {
-      var tbl = document.querySelector(".falt-tbl");
-      if (!tbl) return;
-      // Buscar la celda correspondiente y simular click
-      var rows = tbl.querySelectorAll("tbody tr");
-      for (var i = 0; i < rows.length; i++) {
-        // v7.90 — matchear por data-fkey (la celda de código ahora muestra la familia)
-        if (rows[i].getAttribute("data-fkey") === cell.cod) {
-          var cells = rows[i].querySelectorAll(".falt-cell");
-          for (var j = 0; j < cells.length; j++) {
-            var onclick = cells[j].getAttribute("onclick") || "";
-            if (onclick.indexOf("'" + cell.fecha + "'") >= 0) {
-              var rect = cells[j].getBoundingClientRect();
-              stkFaltDrill(cell.cod, cell.fecha, { clientX: rect.left, clientY: rect.top });
-              return;
-            }
-          }
-        }
-      }
-    }, 100);
+      _faltDrillOpen(cell.cod, cell.kind, cell.key, { clientX: cell.x, clientY: cell.y });
+    }, 60);
   }
 }
 
