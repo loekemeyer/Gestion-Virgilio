@@ -6159,7 +6159,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.35";
+const APP_VERSION = "v8.36";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -13276,7 +13276,7 @@ function stkBodyFaltante() {
   var todasFechas = Object.keys(fechasSet).sort();
 
   // Definir columnas diarias según filtro
-  var filtro = F.filtro || "s1";
+  var filtro = "todo";   // v8.36 — siempre "Todo" (se sacaron los 4 botones de filtro)
   var diasCols = [];
   if (filtro === "s1") {
     // Desde hoy hasta fin de esta semana
@@ -13457,19 +13457,13 @@ function stkBodyFaltante() {
   // Fila compacta: filtros + solo quiebre + búsqueda
   h += '<div class="falt-top">' +
     '<div class="falt-filters">' +
-    '<button class="falt-fbtn' + (filtro === "s1" ? " on" : "") + '" onclick="stkFaltFiltro(\'s1\')">Esta sem</button>' +
-    '<button class="falt-fbtn' + (filtro === "s2" ? " on" : "") + '" onclick="stkFaltFiltro(\'s2\')">Próx sem</button>' +
-    '<button class="falt-fbtn' + (filtro === "resto" ? " on" : "") + '" onclick="stkFaltFiltro(\'resto\')">Resto</button>' +
-    '<button class="falt-fbtn' + (filtro === "todo" ? " on" : "") + '" onclick="stkFaltFiltro(\'todo\')">Todo</button>' +
     '<button class="falt-fbtn' + (F.soloQuiebre ? " on" : "") + '" onclick="stkFaltSoloQuiebre()" title="Mostrar solo los artículos que tienen faltante">' + (F.soloQuiebre ? "☑" : "☐") + ' Solo quiebre</button>' +
     '<button class="falt-fbtn' + (F.sinE ? " on" : "") + '" onclick="stkFaltSinE()" title="Ocultar códigos importados (E) que no tienen equivalente nacional para reponer. Mantiene los 94xE y las familias con nacional (574E/590E/809E CH/etc.).">' + (F.sinE ? "☑" : "☐") + ' Sin E</button>' +
     '</div>' +
     '<input class="falt-search" type="text" placeholder="🔍 Buscar…" value="' +
     escapeHtml(F.search || "") + '" oninput="stkFaltSearch(this.value)">' +
     '</div>';
-  h += '<div class="falt-hint"><b style="color:#b91c1c;">🔴 Faltó armado</b> = ya se pickeó y faltó (dato real, lo que no se encontró en el rack). Las columnas de <b>Falt S1/S2</b> y de día son la <b>proyección</b> de lo que <b>aún no se pickeó</b> (día de armado = un día hábil antes de la salida). <b>Falt S1</b> = salida en los <b>próximos 5 días hábiles</b>; <b>Falt S2</b> = los 5 hábiles siguientes. Tocá una celda de día para ver las NPs; la del <b style="color:#b91c1c;">borde rojo</b> es el primer día de quiebre. Colores:' +
-    ' <span class="falt-leg falt-warn">1–10</span> <span class="falt-leg falt-bad">11–50</span> <span class="falt-leg falt-crit">+50</span>' +
-    (nExcl ? ' · 🔮 Simulación activa.' : '') + '</div>';
+  // v8.36 — cartel de ayuda quitado (pedido del usuario)
   // Tabla
   h += '<div class="falt-wrap"><table class="falt-tbl"><thead><tr>' +
     '<th class="falt-cod">Cód</th><th class="falt-desc">Descripción</th><th class="falt-fab" style="cursor:pointer;" onclick="stkFaltOrdenFab()" title="Ordenar por fabricante">Fabricante' + (F.ordenFab ? ' ▾' : '') + '</th>' +
