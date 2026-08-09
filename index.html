@@ -6167,7 +6167,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.51";
+const APP_VERSION = "v8.52";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -9689,8 +9689,9 @@ async function openStockAdmin(soloConteo) {
       fetch(SUPABASE_URL + "/rest/v1/Stock_Config?clave=in.(guardado_cajas_por_hora,guardado_incluir_racks)&select=clave,valor", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; }),
       (_solo ? Promise.resolve({ pend: {}, porArt: {} }) : stkFcsFetch().catch(function () { return { pend: {}, porArt: {} }; })),   // v6.70: FC s/Salida como columna
       supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Insumos", "select=cod").catch(function () { return []; }),
-      ocLoadLineas().catch(function () { return {}; })]);   // v7.73: cargar códigos de insumos para filtrarlos de Stock + v7.89: LK/CH
-    _stk = { movs: res[0] || [], cutoff: res[1], factors: res[2] || {}, ordenes: res[3] || [], bajadas: res[4] || [], tab: _solo ? "conteo" : "stocks", soloConteo: _solo, filtro: "", openArt: null, ingMode: "remito", asOf: null, asOfInput: "", dem: res[6] || {}, cap: res[7] || [], gConf: res[8] || [], fcs: res[9] || { pend: {}, porArt: {} }, fcsLoaded: true, insumosCods: (res[10] || []).map(function(i) { return String(i.cod || "").trim().toUpperCase(); }) };
+      ocLoadLineas().catch(function () { return {}; }),   // v7.73: cargar códigos de insumos para filtrarlos de Stock + v7.89: LK/CH
+      rkbFetchCxM().catch(function () { return { cxm: {} }; })]);   // v8.52: inner×master de racks (backlog capacity-aware)
+    _stk = { movs: res[0] || [], cutoff: res[1], factors: res[2] || {}, ordenes: res[3] || [], bajadas: res[4] || [], tab: _solo ? "conteo" : "stocks", soloConteo: _solo, filtro: "", openArt: null, ingMode: "remito", asOf: null, asOfInput: "", dem: res[6] || {}, cap: res[7] || [], gConf: res[8] || [], fcs: res[9] || { pend: {}, porArt: {} }, fcsLoaded: true, insumosCods: (res[10] || []).map(function(i) { return String(i.cod || "").trim().toUpperCase(); }), cxm: (res[11] && res[11].cxm) || {} };
     stkRender();
   } catch (e) { const b = document.getElementById("stkBody"); if (b) b.innerHTML = '<div class="stk-loading">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
 }
@@ -11800,6 +11801,20 @@ function stkFiltroToggleE() {
 function stkToggleSoloNeg() { if (!_stk) return; _stk.soloNeg = !_stk.soloNeg; stkRender(); }
 // v7.54: filtro "stock bajo" — códigos donde stock actual < pedidos
 function stkToggleSoloLow() { if (!_stk) return; _stk.soloLow = !_stk.soloLow; stkRender(); }
+// v8.52 — filtro por línea LK/CH (empresa) + fijar códigos (📌, persistente en localStorage)
+function stkFiltroLinea(l) { if (!_stk) return; _stk.filLinea = (_stk.filLinea === l) ? "" : l; _stk.openArt = null; stkRender(); }
+function stkToggleSoloPin() { if (!_stk) return; _stk.soloPin = !_stk.soloPin; _stk.openArt = null; stkRender(); }
+const STK_PINS_KEY = "stk_pins_vir";
+function _stkPinsLoad() { try { const a = JSON.parse(localStorage.getItem(STK_PINS_KEY) || "[]"); return Array.isArray(a) ? a : []; } catch (_e) { return []; } }
+function _stkPinsSave(arr) { try { localStorage.setItem(STK_PINS_KEY, JSON.stringify(arr || [])); } catch (_e) {} }
+function stkTogglePin(codEnc) {
+  if (!_stk) return;
+  const cod = decodeURIComponent(codEnc), u = String(cod).trim().toUpperCase();
+  if (!_stk.pins) _stk.pins = _stkPinsLoad();
+  const i = _stk.pins.findIndex(function (c) { return String(c).trim().toUpperCase() === u; });
+  if (i >= 0) _stk.pins.splice(i, 1); else _stk.pins.push(cod);
+  _stkPinsSave(_stk.pins); stkRender();
+}
 /* v6.30 — Ratio de guardado: helpers para la tarjeta "horas de guardado pendientes".
    Ratio y switch de racks viven en Stock_Config (los trae openStockAdmin en _stk.gConf).
    El ratio lo autoajusta el server (guardado_recalc_ratio) con las sesiones medidas. */
@@ -11862,9 +11877,15 @@ function stkBodyStocks() {
   // (redondeado a lo que se muestra) da < 0. "insumos" se chequea aparte en su sección.
   const _stkIsNeg = function (n) { return Math.round((Number(n) || 0) * 10) / 10 < 0; };
   const _stkArtHasNeg = function (a) { return _stkStockKeys.some(function (k) { return _stkIsNeg(a[k]); }); };
-  let shown = f
-    ? arts.filter(function (a) { return (a.cod + " " + a.desc).toLowerCase().indexOf(f) >= 0; })
-    : arts.filter(function (a) { return _stkStockKeys.some(function (k) { return (Number(a[k]) || 0) !== 0; }) || (Number(dem[_ocgNorm(a.cod)]) || 0) > 0 || _fcArtCajas(a.cod) > 0; });
+  // v8.52 — búsqueda de VARIOS códigos a la vez (separá con espacio o coma) + "📌 Fijados"
+  if (!_stk.pins) _stk.pins = _stkPinsLoad();
+  const _pinSet = new Set((_stk.pins || []).map(function (c) { return String(c).trim().toUpperCase(); }));
+  const _terms = f.split(/[\s,]+/).filter(Boolean);
+  let shown = _stk.soloPin
+    ? arts.filter(function (a) { return _pinSet.has(String(a.cod).trim().toUpperCase()); })
+    : (_terms.length
+      ? arts.filter(function (a) { const s = (a.cod + " " + a.desc).toLowerCase(); return _terms.some(function (t) { return s.indexOf(t) >= 0; }); })
+      : arts.filter(function (a) { return _stkStockKeys.some(function (k) { return (Number(a[k]) || 0) !== 0; }) || (Number(dem[_ocgNorm(a.cod)]) || 0) > 0 || _fcArtCajas(a.cod) > 0; }));
   // v7.73: excluir códigos que están en la tabla Insumos de Supabase (gestión separada en solapa Insumos)
   const _insCodsSet = new Set((_stk.insumosCods || []).map(function (c) { return String(c || "").trim().toUpperCase(); }));
   shown = shown.filter(function (a) { return !_insCodsSet.has(String(a.cod || "").trim().toUpperCase()); });
@@ -11884,6 +11905,8 @@ function stkBodyStocks() {
     const ped = Number(dem[_ocgNorm(a.cod)]) || 0;
     return stock < ped && ped > 0;
   });
+  // v8.52 — filtro por línea LK / CH (empresa)
+  if (_stk.filLinea) shown = shown.filter(function (a) { return ocLinea(a.cod) === _stk.filLinea; });
   // v7.71 — ocultar la fila del CÓDIGO BASE de una familia empresa-split (ej. "438E") cuando NO
   // tiene stock propio y la familia SÍ tiene stock en su variante LK/CH. El stock físico vive en
   // "438E LK"/"438E CH" y la demanda del base se cubre por la familia; sin esto quedaba una fila
@@ -11944,16 +11967,35 @@ function stkBodyStocks() {
     '<span style="font-size:10px;text-transform:uppercase;color:#166534;font-weight:700;letter-spacing:.02em;">Capacidad</span>' +
     '<span style="font-size:17px;font-weight:800;color:#166534;font-variant-numeric:tabular-nums;">' + fmtCajas(totCap) + '</span></span>';
   h += '</div>';
-  // v6.30 — Tarjeta "horas de guardado pendientes" (backlog a_guardar [+ racks si el switch] ÷ ratio).
+  // v6.30 — Tarjeta "horas de guardado pendientes" (backlog ÷ ratio).
   var _gRate = stkGRate(), _gRacks = stkGRacksOn();
-  // v7.54: totals.racks ya incluye racks_ch
-  var _gBacklog = Math.max(0, (Number(totals.a_guardar) || 0) + (_gRacks ? (Number(totals.racks) || 0) : 0));
+  // v8.52 — el backlog SOLO cuenta lo que realmente ENTRA en góndola (misma lógica que "¿Qué bajar
+  // primero?"): por artículo, hueco = min(capacidad, capacidad − góndola). a guardar entra suelto
+  // (min con el hueco); racks entra por MASTER CAJA entera (cxm) con el hueco que quede. Sin ese
+  // tope, el backlog contaba cajas que no tienen dónde ir (góndola llena) → horas infladas.
+  var _gCxm = (_stk && _stk.cxm) || {};
+  var _gBacklog = 0;
+  arts.forEach(function (a) {
+    var cap = Number(capByCod[_ocgNorm(a.cod)]) || 0; if (cap <= 0) return;
+    var gond = Number(a.terminado) || 0;
+    var room = cap - gond; if (room < 0) room = 0; if (room > cap) room = cap;
+    if (room <= 0) return;
+    var g = Math.min(Number(a.a_guardar) || 0, room); _gBacklog += g;
+    if (_gRacks) {
+      var r2 = room - g; if (r2 > 0) {
+        var rk = (Number(a.racks) || 0) + (Number(a.racks_ch) || 0);
+        var cxm = Number(_gCxm[_cpNorm(a.cod)]) || 0;
+        _gBacklog += (cxm > 0) ? (Math.min(Math.floor(rk / cxm), Math.floor(r2 / cxm)) * cxm) : Math.min(rk, r2);
+      }
+    }
+  });
+  _gBacklog = Math.max(0, _gBacklog);
   var _gHoras = _gRate > 0 ? Math.round((_gBacklog / _gRate) * 10) / 10 : 0;
   var _gCol = _gHoras > 6 ? "#b91c1c" : (_gHoras >= 4 ? "#b45309" : "#166534");
   var _gBg = _gHoras > 6 ? "#fef2f2" : (_gHoras >= 4 ? "#fffbeb" : "#f0fdf4");
   var _gBd = _gHoras > 6 ? "#fca5a5" : (_gHoras >= 4 ? "#fcd34d" : "#86efac");
   h += '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:' + _gBg + ';border:1.5px solid ' + _gBd + ';border-radius:12px;padding:10px 14px;margin-bottom:12px;">' +
-    '<div style="flex:1;min-width:190px;"><span style="font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:#64748b;font-weight:800;">⏱ Horas de guardado pendientes</span><br>' +
+    '<div style="flex:0 1 auto;min-width:190px;"><span style="font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:#64748b;font-weight:800;">⏱ Horas de guardado pendientes</span><br>' +
     '<span style="font-size:26px;font-weight:800;color:' + _gCol + ';font-variant-numeric:tabular-nums;">' + _gHoras + ' h</span> ' +
     '<span style="font-size:12.5px;color:#64748b;">' + Math.round(_gBacklog) + ' cajas ÷ ' + Math.round(_gRate) + ' cajas/h</span>' +
     (_gHoras > 6 ? '<br><span style="font-size:12px;font-weight:800;color:#b91c1c;">🆘 Más de 6 h — pedir personal a Cervantes</span>' : '') +
@@ -11967,12 +12009,18 @@ function stkBodyStocks() {
     '</div>';
   // Teclado NUMÉRICO por defecto (los códigos son números); botón "E" para los
   // importados (506 → 506E) sin tener que cambiar de teclado (pedido del dueño).
-  // v8.44 — buscador angosto (≤5 dígitos) + TODOS los botones en una sola fila.
+  // v8.52 — búsqueda de VARIOS códigos + filtro LK/CH + Fijados. Botones en fila (wrap si no entran).
+  const _linBtn = function (l) {
+    const on = _stk.filLinea === l, col = l === "LK" ? "#b91c1c" : "#1e40af";
+    return '<button type="button" onclick="stkFiltroLinea(\'' + l + '\')" title="Mostrar sólo línea ' + l + '" style="width:auto;margin:0;flex:0 0 auto;padding:0 13px;height:38px;border:1.5px solid ' + (on ? col : "#cbd5e1") + ';border-radius:9px;background:' + (on ? col : "#fff") + ';color:' + (on ? "#fff" : col) + ';font-weight:800;font-size:13px;cursor:pointer;">' + l + '</button>';
+  };
   h += '<div style="display:flex;gap:6px;margin-bottom:10px;align-items:center;flex-wrap:wrap;">' +
-    '<input class="stk-filtro" style="margin:0;flex:0 0 auto;width:96px;" type="text" inputmode="numeric" enterkeyhint="search" maxlength="5" placeholder="🔎 cód" value="' + escapeHtml(_stk.filtro) + '" oninput="if(_stk){_stk.filtro=this.value;stkRender();}">' +
+    '<input class="stk-filtro" style="margin:0;flex:1 1 170px;min-width:120px;max-width:300px;" type="text" enterkeyhint="search" autocomplete="off" placeholder="🔎 códigos (varios: 026 031 508)" value="' + escapeHtml(_stk.filtro) + '" oninput="if(_stk){_stk.filtro=this.value;stkRender();}">' +
     '<button type="button" onclick="stkFiltroToggleE()" title="Agregar/quitar la E (importado)" style="width:auto;margin:0;flex:0 0 auto;padding:0 14px;height:38px;border:1.5px solid #cbd5e1;border-radius:9px;background:#fff;font-weight:800;font-size:16px;cursor:pointer;">E</button>' +
+    _linBtn("LK") + _linBtn("CH") +
     '<button type="button" onclick="stkToggleSoloNeg()" title="Mostrar sólo los artículos con saldo NEGATIVO en algún depósito (góndola, racks, a facturar, etc.)" style="width:auto;margin:0;flex:0 0 auto;padding:0 11px;height:38px;border:1.5px solid ' + (_stk.soloNeg ? "#dc2626" : "#cbd5e1") + ';border-radius:9px;background:' + (_stk.soloNeg ? "#fef2f2" : "#fff") + ';color:' + (_stk.soloNeg ? "#b91c1c" : "#334155") + ';font-weight:800;font-size:13px;cursor:pointer;white-space:nowrap;">' + (_stk.soloNeg ? "☑" : "☐") + ' 🔴 Negativos' + (_stkNegCount ? " (" + _stkNegCount + ")" : "") + '</button>' +
     '<button type="button" onclick="stkToggleSoloLow()" title="Mostrar sólo los códigos donde la suma de depósitos (góndola+excedente+pickeados+a facturar+a guardar+racks) es MENOR que lo pedido" style="width:auto;margin:0;flex:0 0 auto;padding:0 11px;height:38px;border:1.5px solid ' + (_stk.soloLow ? "#dc2626" : "#cbd5e1") + ';border-radius:9px;background:' + (_stk.soloLow ? "#fef2f2" : "#fff") + ';color:' + (_stk.soloLow ? "#b91c1c" : "#334155") + ';font-weight:800;font-size:13px;cursor:pointer;white-space:nowrap;">' + (_stk.soloLow ? "☑" : "☐") + ' ⚠ Stock bajo' + (_stkLowCount ? " (" + _stkLowCount + ")" : "") + '</button>' +
+    '<button type="button" onclick="stkToggleSoloPin()" title="Mostrar sólo los códigos que fijaste (📌). Se guardan aunque cierres la app." style="width:auto;margin:0;flex:0 0 auto;padding:0 11px;height:38px;border:1.5px solid ' + (_stk.soloPin ? "#b45309" : "#cbd5e1") + ';border-radius:9px;background:' + (_stk.soloPin ? "#fffbeb" : "#fff") + ';color:' + (_stk.soloPin ? "#b45309" : "#334155") + ';font-weight:800;font-size:13px;cursor:pointer;white-space:nowrap;">' + (_stk.soloPin ? "☑" : "📌") + ' Fijados' + ((_stk.pins || []).length ? " (" + _stk.pins.length + ")" : "") + '</button>' +
     '</div>';
   // Columnas: sectores fijos (menos insumos, que va en su sección). Los `extra`
   // (p/envasar, racks CH) SOLO se muestran como columna si algún artículo visible
@@ -12041,7 +12089,8 @@ function stkBodyStocks() {
     } else {
       tds += '<td class="num" style="background:#eef2ff"></td>';
     }
-    tds += '<td class="stk-caret">' + (_stk.openArt === a.cod ? "▾" : "✚") + '</td>';
+    const _pinned = _pinSet.has(String(a.cod).trim().toUpperCase());
+    tds += '<td class="stk-caret" style="white-space:nowrap;"><span onclick="event.stopPropagation();stkTogglePin(\'' + encodeURIComponent(a.cod) + '\')" title="' + (_pinned ? "Soltar" : "Fijar") + ' este código (se guarda)" style="cursor:pointer;margin-right:7px;' + (_pinned ? "" : "opacity:.28;") + '">📌</span>' + (_stk.openArt === a.cod ? "▾" : "✚") + '</td>';
     h += '<tr class="stk-row" onclick="stockToggleArt(\'' + encodeURIComponent(a.cod) + '\')">' + tds + '</tr>';
     if (_stk.openArt === a.cod) {
       const _lim = _stk.asOf ? new Date(_stk.asOf).getTime() : 0;

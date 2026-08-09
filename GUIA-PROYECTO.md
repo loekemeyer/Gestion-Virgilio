@@ -4,7 +4,17 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-09 · Versión app al documentar: **v8.51**
+> Última actualización: 2026-08-09 · Versión app al documentar: **v8.52**
+>
+> Nota: **v8.52 — Stocks: filtro LK/CH · búsqueda multi-código · fijar códigos · backlog capacity-aware.**
+> (1) **Filtro LK / CH** (`_stk.filLinea`, por `ocLinea`/OC_Maximos.linea). (2) El buscador acepta
+> **varios códigos** a la vez (separá con espacio o coma → OR-match; se sacó el `maxlength`). (3) **📌
+> Fijar** códigos: pin por fila (persistente en `localStorage` `stk_pins_vir`) + botón **📌 Fijados**
+> para ver solo esos (`_stk.pins`/`_stk.soloPin`). (4) La tarjeta **"Horas de guardado pendientes"**
+> ahora cuenta **solo lo que entra en góndola** (misma lógica que "¿Qué bajar primero?"): por artículo
+> hueco = min(capacidad, capacidad−góndola); a guardar suelto + racks por master caja (`cxm`, cargado
+> en `_stk.cxm` vía `rkbFetchCxM`). Antes contaba todo el a_guardar/racks → horas infladas. El botón
+> "Incluir racks" ya no se aleja al pedo (se sacó el `flex:1`).
 >
 > Nota: **v8.51 — Faltantes x día: sin scroll lateral + orden por fabricante por defecto.** (1) Se
 > quitaron las **columnas de día** (eran ~15 y generaban el scroll horizontal): la tabla ahora entra
