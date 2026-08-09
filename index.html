@@ -6167,7 +6167,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.55";
+const APP_VERSION = "v8.56";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -13525,6 +13525,7 @@ function stkBodyFaltante() {
     '<div class="falt-filters">' +
     '<button class="falt-fbtn' + (F.soloQuiebre ? " on" : "") + '" onclick="stkFaltSoloQuiebre()" title="Mostrar solo los artículos que tienen faltante">' + (F.soloQuiebre ? "☑" : "☐") + ' Solo quiebre</button>' +
     '<button class="falt-fbtn' + (F.sinE ? " on" : "") + '" onclick="stkFaltSinE()" title="Ocultar códigos importados (E) que no tienen equivalente nacional para reponer. Mantiene los 94xE y las familias con nacional (574E/590E/809E CH/etc.).">' + (F.sinE ? "☑" : "☐") + ' Sin E</button>' +
+    '<button class="falt-fbtn' + (F.verDias ? " on" : "") + '" onclick="stkFaltVerDias()" title="Mostrar el detalle día por día (agrega las columnas de cada día — puede necesitar scroll lateral).">' + (F.verDias ? "☑" : "☐") + ' 📅 Ver días</button>' +
     '</div>' +
     '<input class="falt-search" type="text" inputmode="numeric" enterkeyhint="search" autocomplete="off" placeholder="🔎 Buscar código" value="' +
     escapeHtml(F.search || "") + '" oninput="stkFaltSearch(this.value)">' +
@@ -13540,12 +13541,18 @@ function stkBodyFaltante() {
     '<th class="falt-sem" title="Faltante proyectado para salidas MÁS ALLÁ de la S2 (semana 3 en adelante).">Resto</th>' +
     '<th class="falt-sem" title="Faltante de pedidos SIN fecha PPP (o con fecha ya pasada): consumen stock pero no caen en ninguna columna de día. Acá aparece lo que falta y no se ve en S1/S2/Resto. Falt S1 + S2 + Resto + Sin fecha = Total − Stock.">Sin<br>fecha</th>' +
     '<th class="falt-sem" title="Cajas que hay que cambiar de NP en el ERP: el código pedido no tiene stock pero un hermano equivalente (mismo producto, otro SKU) sí. El detalle por NP está en Facturación.">⚠ Cambio<br>NP</th>';
-  // v8.51 — columnas de día quitadas (sacaban el scroll lateral). El detalle por franja está en
-  // los pop-ups de Falt S1 / Falt S2 / Resto / Sin fecha (clickeables).
+  // v8.56 — columnas de día SOLO si "📅 Ver días" está activo (por defecto ocultas → sin scroll lateral).
+  if (F.verDias) {
+    h += '<th class="falt-sep"></th>';
+    diasCols.forEach(function (d) {
+      var esHoy = d === hoy;
+      h += '<th class="falt-dia' + (esHoy ? " hoy" : "") + '" title="' + d + '">' + _faltDiaSem(d) + '<br>' + _faltFechaCorta(d) + '</th>';
+    });
+  }
   h += '</tr></thead><tbody>';
 
   if (arts.length === 0) {
-    h += '<tr><td colspan="11" style="text-align:center;padding:20px;color:#94a3b8;">Sin artículos con demanda pendiente</td></tr>';
+    h += '<tr><td colspan="' + (11 + (F.verDias ? (1 + diasCols.length) : 0)) + '" style="text-align:center;padding:20px;color:#94a3b8;">Sin artículos con demanda pendiente</td></tr>';
   }
 
   arts.forEach(function (a) {
@@ -13585,7 +13592,13 @@ function stkBodyFaltante() {
       ? '<td class="num falt-cell ' + _sfCls + '" style="font-weight:800;cursor:pointer;" onclick="stkFaltDrillSinF(\'' + a.key + '\',event)" title="' + _sf + ' cajas de pedidos SIN fecha PPP (o con fecha pasada) que el stock no alcanza a cubrir. Tocá para ver las NPs.">' + _sf + '</td>'
       : '<td class="num falt-ok">—</td>';
     h += subCell;
-    // v8.51 — columnas de día quitadas (scroll lateral). Detalle por franja en los pop-ups.
+    // v8.56 — celdas de día SOLO con "📅 Ver días" activo
+    if (F.verDias) {
+      h += '<td class="falt-sep"></td>';
+      var _primer = null;
+      for (var _i = 0; _i < diasCols.length; _i++) { if ((a.diasFalt[diasCols[_i]] || 0) > 0) { _primer = diasCols[_i]; break; } }
+      diasCols.forEach(function (d) { var v = a.diasFalt[d] || 0; h += _faltCelda(v, false, a.key, d, d === _primer); });
+    }
     h += '</tr>';
   });
 
@@ -13623,6 +13636,12 @@ function stkFaltSoloQuiebre() {
 function stkFaltSinE() {
   if (!_stk || !_stk.falt) return;
   _stk.falt.sinE = !_stk.falt.sinE;
+  _stk.falt.openCell = null;
+  stkRender();
+}
+function stkFaltVerDias() {
+  if (!_stk || !_stk.falt) return;
+  _stk.falt.verDias = !_stk.falt.verDias;
   _stk.falt.openCell = null;
   stkRender();
 }

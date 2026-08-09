@@ -4,7 +4,12 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-09 · Versión app al documentar: **v8.55**
+> Última actualización: 2026-08-09 · Versión app al documentar: **v8.56**
+>
+> Nota: **v8.56 — Faltantes x día: las columnas de día vuelven, detrás de "📅 Ver días".** En v8.51 se
+> habían quitado (scroll lateral). Ahora hay un toggle **📅 Ver días** (`stkFaltVerDias` / `F.verDias`,
+> apagado por defecto): apagado = tabla angosta sin scroll; encendido = agrega el separador + las
+> columnas de cada día (como antes). Colspan y header/celdas condicionados a `F.verDias`.
 >
 > Nota: **v8.55 — Capacidad: "Libre" fuera + sectores colapsados + fix de códigos sin E (datos).**
 > (1) En la solapa **Capacidad**, `cod='Libre'` (posiciones de góndola vacías) ya **no** se cuenta como
