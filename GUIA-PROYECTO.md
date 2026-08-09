@@ -8,9 +8,13 @@
 >
 > Nota: **v8.58 — Facturación: se saca el badge "🧾 Facturá X (no pelado)" de abajo de Razón Social.**
 > El aviso de equivalencia (`_facEquiv`/`vista_pedidos_equivalencia`, pelado→código de empresa) se
-> quitó de la celda de razón social: esos avisos ya están cubiertos por la columna **"Cambiar cód"**
-> (secundario→principal). Se mantiene el badge de tarea activa. (`facFetchEquiv` sigue cargando pero
-> ya no se muestra.)
+> quitó de la celda de razón social **por decisión del usuario** (queda solo el badge de tarea activa).
+> Ojo: NO se solapa con la columna "Cambiar cód" (secundario→principal, `Equivalencias_Familia`) —
+> son tablas distintas. Los códigos pelado→empresa (438E→438E LK, 809E→809E CH, 437E→437E LK,
+> 439E→439E LK) quedan **sin aviso** a propósito. Los que SÍ eran secundario→principal (029→437E,
+> 030→438E) se **migraron** de `Equivalencias_Codigos` a `Equivalencias_Familia` (backup en
+> `sql/backup_equivalencias_029_030_20260809.sql`) → los toma "Cambiar cód". (`facFetchEquiv` sigue
+> cargando pero ya no se muestra.)
 >
 > Nota: **v8.57 — Faltantes x día: se saca la columna "⚠ Cambio NP".**
 >
