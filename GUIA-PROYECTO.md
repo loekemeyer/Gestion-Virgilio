@@ -4,7 +4,13 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-09 · Versión app al documentar: **v8.23**
+> Última actualización: 2026-08-09 · Versión app al documentar: **v8.24**
+>
+> Nota: **v8.24 — Faltantes x día: orden por fabricante + separador visual.** (1) El header
+> **"Fabricante" es clickeable** (`stkFaltOrdenFab` / `F.ordenFab`): alterna orden por fabricante
+> (agrupado, "sin fabricante" al final) ↔ por urgencia (default: real → S1 → S2 → código); marca ▾.
+> (2) **Columna separadora** (`.falt-sep`, 14px gris) entre las 4 columnas de resumen (Faltó armado/
+> S1/S2/Resto/Cambio NP) y las columnas de día, para despegar visualmente resumen de proyección diaria.
 >
 > Nota: **v8.23 — Faltantes x día: columna "Total Pedidos" + el pop-up ACHICA cajas (no anula NP).**
 > (1) Nueva columna **Total Pedidos** a la derecha de Stock (= `totalDem`, demanda pendiente).
