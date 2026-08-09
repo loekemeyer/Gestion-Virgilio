@@ -4,7 +4,16 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-09 · Versión app al documentar: **v8.24**
+> Última actualización: 2026-08-09 · Versión app al documentar: **v8.26**
+>
+> Nota: **v8.26 — Insumos: unidades con FACTOR de conversión (mismo stock, distinta forma).**
+> Varias unidades = el mismo stock (no se suman). Cada insumo elige su **base** (la más chica) y
+> define cuántas base hay en 1 de cada otra (ej. 1 MC = 240 uni). Tabla `Insumos_Factores` +
+> RPC `insumo_factores_guardar` (ver `sql/insumos_factores.sql`). Frontend: editor **⚖** por insumo
+> (`stkInsEditFact`) y **display de equivalencias** en "Todos los insumos" (ej. "480 uni · 2 MC").
+> **PENDIENTE (paso 2):** al guardar cantidad, convertir a la base y registrar el movimiento en
+> base (hoy se guarda en la unidad elegida; el display convierte lo existente). (v8.25: carteles
+> verde/rojo de Corregir códigos abreviados.)
 >
 > Nota: **v8.24 — Faltantes x día: orden por fabricante + separador visual.** (1) El header
 > **"Fabricante" es clickeable** (`stkFaltOrdenFab` / `F.ordenFab`): alterna orden por fabricante

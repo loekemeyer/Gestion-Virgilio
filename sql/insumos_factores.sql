@@ -1,0 +1,21 @@
+-- =====================================================================
+-- insumos_factores.sql — v8.26
+-- Factores de conversión por insumo: varias unidades que expresan el MISMO stock
+-- (no se suman). La base la elige el insumo. factor = cuántas unidades BASE hay en 1
+-- de esta unidad; la base tiene factor=1 y es_base=true.
+--
+-- Definición viva en la migración Supabase `insumos_factores_unidades`:
+--   · tabla public."Insumos_Factores" (cod_art, unidad, factor>0, es_base, actualizado)
+--     PK (cod_art, unidad). RLS: select con anon; sin insert/update/delete directo.
+--   · RPC insumo_factores_guardar(p_cod text, p_factores jsonb) SECURITY DEFINER:
+--     reemplaza TODO el set de factores del insumo. Valida exactamente 1 base.
+--     grant execute a anon/authenticated (mismo patrón que insumo_cat/unidad_guardar).
+--
+-- Frontend (index.html, admin Insumos): _insFactores + insFetchFactores + helpers
+-- (insAbase / insSaldoBase / insEquivStr) + editor ⚖ (stkInsEditFact/…FactGuardar) +
+-- display de equivalencias en "Todos los insumos".
+--
+-- PENDIENTE (siguiente paso): al GUARDAR cantidad, convertir a la unidad BASE y
+-- registrar el movimiento en base (hoy se guarda en la unidad elegida; el display
+-- convierte lo que haya). Eso cierra del todo el anti-duplicado al cargar en varias unidades.
+-- =====================================================================
