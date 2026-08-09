@@ -4,7 +4,12 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-09 · Versión app al documentar: **v8.12**
+> Última actualización: 2026-08-09 · Versión app al documentar: **v8.13**
+>
+> Nota: **v8.13 — Faltante por día: ocultar columnas de fin de semana.** Las columnas de día
+> son el día de ARMADO, que nunca cae sábado ni domingo, así que una columna de finde siempre
+> quedaba vacía. Nuevo helper `_faltEsHabil(ymd)` y `diasCols = diasCols.filter(_faltEsHabil)`
+> → sáb/dom no se muestran (aplica a S1/S2/Todo; "Resto" ya venía de fechas de armado hábiles).
 >
 > Nota: **v8.12 — Faltante por día: celda = faltante del DÍA (no acumulado) + fix pop-up NPs.**
 > Las columnas de día mostraban el **déficit acumulado corrido** (`balRun`): una vez negativo,

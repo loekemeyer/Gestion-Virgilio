@@ -6158,7 +6158,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.12";
+const APP_VERSION = "v8.13";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -13162,6 +13162,14 @@ function _faltFechaCorta(dateStr) {
   // "08/12" format
   return dateStr.slice(8, 10) + "/" + dateStr.slice(5, 7);
 }
+/* v8.13 — ¿es día HÁBIL? (no sábado ni domingo). Las columnas de día son el día de
+   ARMADO, que nunca cae fin de semana, así que las columnas de finde se ocultan. */
+function _faltEsHabil(ymd) {
+  ymd = String(ymd || "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return true;
+  var dow = new Date(ymd + "T12:00:00Z").getUTCDay();
+  return dow !== 0 && dow !== 6;   // 0=dom, 6=sáb
+}
 
 function stkBodyFaltante() {
   if (!_stk || !_stk.falt) return '<div class="stk-loading">Cargando faltante…</div>';
@@ -13197,6 +13205,9 @@ function stkBodyFaltante() {
     var maxDia = _faltAddDays(hoy, 20);
     for (var dt = hoy; dt <= maxDia; dt = _faltAddDays(dt, 1)) diasCols.push(dt);
   }
+  // v8.13 — ocultar columnas de fin de semana: el día de armado nunca cae sáb/dom,
+  // así que un sábado/domingo jamás tiene demanda (columna vacía sin sentido).
+  diasCols = diasCols.filter(_faltEsHabil);
 
   // Construir datos por FAMILIA de equivalentes (v7.90). Los miembros de una familia
   // (mismo producto, distinto SKU, misma empresa) se combinan en UNA fila: el faltante
