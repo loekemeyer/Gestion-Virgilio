@@ -3068,7 +3068,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
 .falt-tbl tr:hover td.falt-warn { background:#fef08a; }
 .falt-tbl tr:hover td.falt-bad { background:#fecaca; }
 .falt-tbl tr:hover td.falt-crit { background:#b91c1c; }
-.falt-drill { position:fixed; z-index:200; background:#fff; border:1px solid #e2e8f0;
+.falt-drill { position:fixed; z-index:1600; background:#fff; border:1px solid #e2e8f0;
   border-radius:10px; box-shadow:0 8px 25px rgba(0,0,0,.18); padding:14px; min-width:280px;
   max-width:380px; max-height:50vh; overflow-y:auto; animation:slideUp .15s ease-out; }
 .falt-drill h4 { margin:0 0 8px; font-size:14px; color:#1e293b; }
@@ -6158,7 +6158,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.18";
+const APP_VERSION = "v8.19";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -10827,7 +10827,7 @@ function stkRender() {
     const body0 = document.getElementById("stkBody"); if (body0) _renderKeepFocus(body0, stkBodyConteo());
     return;
   }
-  const tabs = [["stocks", "📊 Stocks"], ["faltante", "📉 Faltante"], ["proceso", "📦 A Separar"], ["racks", "🏗 Racks"], ["conteo", "📋 Conteo"], ["capacidad", "📐 Capacidad"], ["insumos", "🧰 Insumos"], ["ajustes", "⚙ Ajustes"], ["compras", "📑 Compras (OCs)"]];
+  const tabs = [["stocks", "📊 Stocks"], ["faltante", "📉 Faltantes x día"], ["proceso", "📦 A Separar"], ["racks", "🏗 Racks"], ["conteo", "📋 Conteo"], ["capacidad", "📐 Capacidad"], ["insumos", "🧰 Insumos"], ["ajustes", "⚙ Ajustes"], ["compras", "📑 Compras (OCs)"]];
   const tb = document.getElementById("stkTabs");
   if (tb) tb.innerHTML = tabs.map(function (t) { return '<button class="stk-tab' + (_stk.tab === t[0] ? " on" : "") + '" onclick="stkTab(\'' + t[0] + '\')">' + t[1] + '</button>'; }).join("");
   const body = document.getElementById("stkBody"); if (!body) return;
@@ -13349,15 +13349,15 @@ function stkBodyFaltante() {
       // aparecen números fantasma en días sin pedido (que además rompían el pop-up de NPs).
       var demF = demDia[f] || 0;
       var dispF = balRun > 0 ? balRun : 0;
-      diasFalt[f] = demF > dispF ? (demF - dispF) : 0;
+      var faltDia = demF > dispF ? (demF - dispF) : 0;
+      diasFalt[f] = faltDia;
       balRun -= demF;
-      // El déficit ACUMULADO sigue alimentando el resumen S1/S2 (total de cajas que faltan
-      // para las salidas de cada ventana). El faltante pasa el día de ARMADO (f), pero S1/S2
-      // se agrupan por la SEMANA DE SALIDA (día hábil siguiente al armado).
-      var faltCum = balRun < 0 ? Math.abs(balRun) : 0;
+      // v8.19 — Falt S1/S2 = SUMA de los faltantes DIARIOS de la ventana (reconcilia con las
+      // celdas de día: si sumás los días de la semana, da Falt S1). El faltante pasa el día de
+      // ARMADO (f), pero S1/S2 se agrupan por la SEMANA DE SALIDA (día hábil siguiente al armado).
       var _sal = _faltProxHabil(f);
-      if (_sal >= lunesHoy && _sal <= finS1) faltS1 = Math.max(faltS1, faltCum);
-      if (_sal >= lunesS2 && _sal <= finS2) faltS2 = Math.max(faltS2, faltCum);
+      if (_sal >= lunesHoy && _sal <= finS1) faltS1 += faltDia;
+      if (_sal >= lunesS2 && _sal <= finS2) faltS2 += faltDia;
     });
     diasCols.forEach(function (d) { if (diasFalt[d] === undefined) diasFalt[d] = 0; });
 

@@ -4,7 +4,15 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-09 · Versión app al documentar: **v8.18**
+> Última actualización: 2026-08-09 · Versión app al documentar: **v8.19**
+>
+> Nota: **v8.19 — Faltante: 3 fixes.** (1) **Pop-up NO aparecía**: `.falt-drill` estaba en
+> `z-index:200` y el modal de Stock (`#stockAdminOverlay`) en `1280` → el pop-up se abría DETRÁS
+> del modal. Subido a `z-index:1600`. (Era el motivo real de "no andan los popups".) (2) **Falt
+> S1/S2 no cuadraba con los días**: usaba el déficit ACUMULADO (arrastraba saldo inicial + sinFecha)
+> mientras las celdas de día son incrementales → ahora **Falt S1/S2 = SUMA de los faltantes diarios**
+> de la ventana (por salida), reconcilia con lo que se ve por día. (3) Tab renombrado
+> "Faltante" → **"Faltantes x día"**.
 >
 > Nota: **v8.18 — Faltante: header "Cambio NP" en dos filas · switch "Sin E" · familia 590E/548.**
 > (1) Header ⚠ Cambio NP en dos líneas (ahorra ancho, como Faltó armado). (2) Switch **"Sin E"**
