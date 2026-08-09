@@ -13,7 +13,11 @@
 > cajas fantasma que inflaban la lista. Ahora `vista_generador_oc` (CTE `proy`) **strippea la "L"
 > final y aglomera en el código base sumando UNIDADES / uni×caja del base** → el 505L cae dentro
 > del 505 (se pide 505, nunca 505L). Efecto: "sin proveedor" bajó de **70 ítems/2.431 cj** a
-> **6 ítems/521 cj** (reales: 55289 Colador c/333 pedidos y 546E; el resto mínimos/contables).
+> **6 ítems/521 cj**. Además **alias puntual 546E → 546**: el 546E NO existe como producto real
+> (solo en la proyección; el 546 real tiene config "Log/ Fabr", stock y pedidos) → es el mismo 546,
+> un typo de la proyección. Se mapea en el CTE `proy` (único caso "E fantasma"; la "E" NO se
+> strippea en general porque 574E/809E/etc. sí existen). Con eso "sin proveedor" quedó en **5 ítems/
+> 338 cj** (el grande real es 55289 Colador c/333 pedidos; el resto mínimos/contables).
 > Backup del def original en `sql/backup_vista_generador_oc_20260809.sql`.
 >
 > Nota: **v8.21 — Faltantes x día: columna "Resto".** Nueva columna de resumen (entre Falt S2 y
