@@ -16,7 +16,11 @@
 > guarda **pelado**, Chef-only; el 809E de Chef suffijado) — agrupa sólo esos dos; el **809E LK**
 > (cortapizza) queda solo. Fallback de fabricante en `provMap` que strippea el sufijo LK/CH.
 > **Nota:** `EMPRESA_SPLIT_CODS` = { 437E, 438E, 439E, 809E } — el **809 NO** va (pelado).
-> **PENDIENTE (menor):** limpiar buckets pelados legacy (ej. 437E=36 sin empresa).
+> **PENDIENTE (menor, a revisar con usuario):** único stock pelado "colgado" = **437E = 36
+> en `racks_ch`** (Chef). Todo el resto de los split netea a cero pelado (438E/439E ya no
+> tienen pelados; 809E pelado = 0; **809 pelado = 1 es CORRECTO**, nacional Chef-only). Duda
+> abierta: ese 36 ¿es Chef real → reasignar a "437E CH", o duplica el ajuste racks=36 que ya
+> tiene 437E CH? → cuando se resuelva: backup + `ajuste` compensatorio (no borrar historia).
 >
 > Nota: **v8.02–v8.04 — mejoras faltantes + separación por empresa (parte).**
 > **v8.02** Faltante por día: resumen arriba (en quiebre S1/S2, cajas, cambios NP), toggle
