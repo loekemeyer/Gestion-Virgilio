@@ -4,7 +4,11 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-09 · Versión app al documentar: **v8.46**
+> Última actualización: 2026-08-09 · Versión app al documentar: **v8.47**
+>
+> Nota: **v8.47 — "¿Qué bajar primero?" también en Administración.** Se agregó el botón 📋 **Qué bajar
+> primero** en Administración → Reportes y configuración (`showGuardarOrden('')`), además del acceso del
+> operario en el chooser "Bajar a góndola". Así el supervisor puede verlo/imprimirlo directo.
 >
 > Nota: **v8.46 — "¿Qué bajar primero?": filtros + tabla imprimible + regla de master caja.**
 > El módulo `showGuardarOrden` ahora: (1) arranca en **Todos** (junta racks + a guardar + excedente,
