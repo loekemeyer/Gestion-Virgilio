@@ -4,7 +4,19 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-09 · Versión app al documentar: **v8.04**
+> Última actualización: 2026-08-09 · Versión app al documentar: **v8.11**
+>
+> Nota: **v8.11 (#1 completo) — separación por empresa en Faltante por día.**
+> El módulo **Faltante por día** (`stkFaltLoad`/`stkBodyFaltante`) ahora keya la demanda con
+> `codEmpSplit(it.art, np)`: los códigos split (437E/438E/439E/809E) se cuentan **suffijados
+> por empresa** ("438E LK"/"438E CH", etc.), igual que el stock de `vista_saldos_stock` (que ya
+> vive suffijado). Antes la demanda iba pelada contra stock suffijado → **faltantes falsos**.
+> Ahora "438E LK" y "438E CH" son **dos filas** (mismo producto, distinta empresa). Se agregó
+> la familia **Corta Queso (Chef)** `809E CH ↔ 809` a `EQUIV_FAMILIAS` (el 809 nacional se
+> guarda **pelado**, Chef-only; el 809E de Chef suffijado) — agrupa sólo esos dos; el **809E LK**
+> (cortapizza) queda solo. Fallback de fabricante en `provMap` que strippea el sufijo LK/CH.
+> **Nota:** `EMPRESA_SPLIT_CODS` = { 437E, 438E, 439E, 809E } — el **809 NO** va (pelado).
+> **PENDIENTE (menor):** limpiar buckets pelados legacy (ej. 437E=36 sin empresa).
 >
 > Nota: **v8.02–v8.04 — mejoras faltantes + separación por empresa (parte).**
 > **v8.02** Faltante por día: resumen arriba (en quiebre S1/S2, cajas, cambios NP), toggle

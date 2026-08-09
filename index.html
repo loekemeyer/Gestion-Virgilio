@@ -6158,7 +6158,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.10";
+const APP_VERSION = "v8.11";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -9593,7 +9593,9 @@ function artNombreEmp(cod, np, fb) {
    437E/438E/439E · Paquete B 809/809E). El stock vive suffijado ("438E LK"/"438E CH");
    la empresa la dice la NP. Resuelve el código pelado al suffijado por empresa. Los
    demás códigos quedan igual. Determinístico (no depende de la planimetría). */
-const EMPRESA_SPLIT_CODS = { "437E": 1, "438E": 1, "439E": 1, "809E": 1, "809": 1 };
+// 809 (nacional) NO va: es Chef-only y su stock se guarda pelado ("809"); solo el 809E
+// (ambiguo Loeke cortapizza / Chef cortaqueso) y los coladores viven suffijados por empresa.
+const EMPRESA_SPLIT_CODS = { "437E": 1, "438E": 1, "439E": 1, "809E": 1 };
 function codEmpSplit(cod, np) {
   const k = _ocgNorm(cod);
   if (!EMPRESA_SPLIT_CODS[k]) return String(cod == null ? "" : cod).trim().toUpperCase();
@@ -10374,7 +10376,11 @@ const EQUIV_FAMILIAS = [
   { desc: "Cucharón Ac. Inox",        def: "943E", cods: ["943E", "336"] },
   { desc: "Espátula / Calada Ac. Inox", def: "945E", cods: ["945E", "332"] },
   { desc: "Cuchara Calada/Mango Mad.", def: "946E", cods: ["946E", "335"] },
-  { desc: "Espumadera Ac. Inox",      def: "948E", cods: ["948E", "333"] }
+  { desc: "Espumadera Ac. Inox",      def: "948E", cods: ["948E", "333"] },
+  // v8.11 — Corta Queso (Chef): 809 nacional ↔ 809E importado, ambos Chef. El 809E de Chef
+  // vive suffijado ("809E CH"); el 809 nacional se guarda PELADO. Sólo agrupa el 809E de Chef
+  // con el 809 pelado — el "809E LK" (cortapizza) NO entra acá y queda solo.
+  { desc: "Corta Queso (Chef)",       def: "809E CH", cods: ["809E CH", "809"] }
 ];
 let _equivIdx = null;
 function _equivBuild() {
@@ -13068,7 +13074,10 @@ async function stkFaltLoad() {
       var info = npInfo[np];
       var items = base.get(np) || [];
       items.forEach(function (it) {
-        var cod = _ocgNorm(it.art); if (!cod) return;
+        // v8.11 — key por código SUFIJADO por empresa (437E/438E/439E/809E → "438E LK"/"438E CH")
+        // para que la demanda case con el stock que también está suffijado por empresa. Los códigos
+        // no-split quedan pelados (el codEmpSplit los devuelve tal cual).
+        var cod = _ocgNorm(codEmpSplit(it.art, np)); if (!cod) return;
         if (!demanda[cod]) demanda[cod] = [];
         // v8.08 — el faltante se cuenta el DÍA DE ARMADO (día hábil anterior a la salida),
         // no el día de la PPP. Guardo también la fecha de salida para el drill.
@@ -13261,7 +13270,7 @@ function stkBodyFaltante() {
 
     arts.push({
       cod: codShow, key: key, esFam: esFam, miembros: miembrosDisp,
-      desc: descFam || artNombre(codShow, ""), prov: provMap[key] || provMap[members[0]] || "",
+      desc: descFam || artNombre(codShow, ""), prov: provMap[key] || provMap[String(key).replace(/\s+(LK|CH)$/, "")] || provMap[members[0]] || "",
       stock: Math.round(stockFam), totalDem: Math.round(totalDem),
       faltS1: Math.round(faltS1), faltS2: Math.round(faltS2),
       diasFalt: diasFalt, sinFecha: sinFecha, subCambio: subCambio
