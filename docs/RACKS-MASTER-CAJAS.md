@@ -16,18 +16,23 @@ de master a nivel producto — cuando esté completa la lista, se decide el meca
 | 438E (y 438E LK) | Colador 20cm | **3** |
 | 198E | Pelador Negro Dentado Loke | **12** |
 
+## ➖ SIN master caja (se bajan 1:1 — es correcto, NO es un dato faltante)
+
+Nacionales palletizados, pero **no vienen en master caja** con inner fijo → se bajan sueltos (1:1).
+No hay que cargarles ratio; "s/master" es el comportamiento correcto para ellos.
+
+| Cód | Descripción | En racks |
+|-----|-------------|---------:|
+| 505I | Pelador Plástico | 1310 |
+| 501 | Abrelatas Manija A y E | 1018 |
+| 505 | Pelador Plástico - Env. | 1000 |
+| 504 | Afila Cuchillos | 634 |
+
 ## ⏳ Pendientes (completar el ratio)
 
 | Cód | Descripción | En racks | inner × master |
 |-----|-------------|---------:|:--------------:|
-| 505I | Pelador Plástico | 1310 | _(nacional, palletizado)_ ___ |
-| 501 | Abrelatas Manija A y E | 1018 | ___ |
-| 505 | Pelador Plástico - Env. | 1000 | ___ |
-| 504 | Afila Cuchillos | 634 | ___ |
 | 809E CH | (809 CH) | 336 | ___ |
 | 809E LK | (809 LK) | 48 | ___ |
 | 988E | Espumadera Línea Premium | 12 | ___ |
 | 566E | Aceitera 100 ml | 128 | ___ _(además tiene góndola −29 a corregir)_ |
-
-> Nota: 505I / 501 / 505 / 504 **no son importados** — se guardaron en racks porque llegó mucho y
-> está palletizado. Igual necesitan su ratio inner×master para bajarlos por master caja.
