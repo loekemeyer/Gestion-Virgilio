@@ -6158,7 +6158,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.09";
+const APP_VERSION = "v8.10";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -13120,6 +13120,17 @@ function _faltProxHabil(fechaYMD) {
   else if (dow === 0) d.setUTCDate(d.getUTCDate() + 1);    // dom → lun
   return d.toISOString().slice(0, 10);
 }
+/* v8.10 — suma N días HÁBILES (saltea sáb/dom). "Esta semana" = hoy + 5 hábiles. */
+function _faltAddHabiles(fechaYMD, n) {
+  var d = new Date(String(fechaYMD).slice(0, 10) + "T12:00:00Z");
+  var added = 0;
+  while (added < n) {
+    d.setUTCDate(d.getUTCDate() + 1);
+    var dow = d.getUTCDay();
+    if (dow !== 0 && dow !== 6) added++;
+  }
+  return d.toISOString().slice(0, 10);
+}
 function _faltLunes(dateStr) {
   // Devuelve el lunes de la semana de dateStr
   var d = new Date(dateStr + "T12:00:00Z");
@@ -13148,10 +13159,11 @@ function stkBodyFaltante() {
   if (_stk.faltLoaded === "loading") return '<div class="stk-loading">Cargando demanda PPP + stock…</div>';
   var F = _stk.falt, dem = F.demanda, sMap = F.saldoMap, provMap = F.provMap, excl = F.excluidos;
   var hoy = _faltHoy();
-  var lunesHoy = _faltLunes(hoy);
-  var lunesS2 = _faltAddDays(lunesHoy, 7);
-  var finS1 = _faltAddDays(lunesHoy, 5); // sábado esta semana
-  var finS2 = _faltAddDays(lunesS2, 5);  // sábado próxima semana
+  // v8.10 — "Esta semana" = HOY + 5 días hábiles (ventana móvil), NO la semana calendario.
+  var lunesHoy = hoy;                        // S1 arranca hoy
+  var finS1 = _faltAddHabiles(hoy, 5);       // S1 = hoy + 5 hábiles
+  var lunesS2 = _faltAddHabiles(finS1, 1);   // S2 arranca el hábil siguiente
+  var finS2 = _faltAddHabiles(finS1, 5);     // S2 = otros 5 hábiles
 
   // Recopilar todas las fechas con demanda
   var fechasSet = {};
@@ -13311,7 +13323,7 @@ function stkBodyFaltante() {
     '<input class="falt-search" type="text" placeholder="🔍 Buscar…" value="' +
     escapeHtml(F.search || "") + '" oninput="stkFaltSearch(this.value)">' +
     '</div>';
-  h += '<div class="falt-hint">Las columnas de día son el <b>día de armado</b> (un día hábil antes de la salida). <b>Falt S1/S2</b> agrupan por <b>semana de salida</b>. Tocá una celda para ver las NPs; la del <b style="color:#b91c1c;">borde rojo</b> es el primer día de quiebre. Colores:' +
+  h += '<div class="falt-hint">Las columnas de día son el <b>día de armado</b> (un día hábil antes de la salida). <b>Falt S1</b> = salida en los <b>próximos 5 días hábiles</b>; <b>Falt S2</b> = los 5 hábiles siguientes. Tocá una celda para ver las NPs; la del <b style="color:#b91c1c;">borde rojo</b> es el primer día de quiebre. Colores:' +
     ' <span class="falt-leg falt-warn">1–10</span> <span class="falt-leg falt-bad">11–50</span> <span class="falt-leg falt-crit">+50</span>' +
     (nExcl ? ' · 🔮 Simulación activa.' : '') + '</div>';
   // Tabla
