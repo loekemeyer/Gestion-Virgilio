@@ -6159,7 +6159,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.27";
+const APP_VERSION = "v8.28";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -14034,13 +14034,13 @@ async function stkInsRefresh() {
   try {
     await insLoadMeta(true);
     const r = await Promise.all([
-      supaFetchAll(SUPABASE_URL + "/rest/v1/Insumos", "select=cod,nombre,categoria,ubicacion,creado_por,creado"),
+      supaFetchAll(SUPABASE_URL + "/rest/v1/Insumos", "select=cod,nombre,categoria,ubicacion,isis,creado_por,creado"),
       insFetchSaldosXUni(),
       _stkInsHistFetch()
     ]);
     _stkIns.items = (r[0] || []).map(function (c) {
       return { cod: String(c.cod), nombre: c.nombre || "", cat: c.categoria || "", ubic: c.ubicacion || "",
-               por: c.creado_por || "", xuni: r[1][String(c.cod)] || null };
+               isis: c.isis || "", por: c.creado_por || "", xuni: r[1][String(c.cod)] || null };
     });
     _stkIns.items.sort(_insSortCod);
     _stkIns.hist = r[2] || [];
@@ -14207,14 +14207,16 @@ function _stkInsListado(k, items) {
       const ed = _stkIns.edit === "art:" + it.cod;
       const u = _stkInsUni1(it);
       if (!ed) {
-        return '<tr><td><b>' + escapeHtml(it.cod) + '</b></td><td>' + escapeHtml(it.nombre || "—") + '</td>' +
+        return '<tr><td><b>' + escapeHtml(it.cod) + '</b>' + (it.isis ? '<div class="stk-sub">isis: ' + escapeHtml(it.isis) + '</div>' : '') + '</td><td>' + escapeHtml(it.nombre || "—") + '</td>' +
           '<td>' + escapeHtml(insCatLbl(insCatOf(it))) + '</td>' +
           '<td>' + escapeHtml(it.ubic || "—") + '</td>' +
           '<td class="num"' + (u.saldo < 0 ? ' style="color:#b91c1c;font-weight:800;"' : "") + '>' + (Math.round(u.saldo * 1000) / 1000) + '</td>' +
           '<td>' + escapeHtml(_stkInsUniMostrar(it) || "—") + '</td>' +
-          '<td><button class="stk-btn" onclick="stkInsEdit(\'art:' + escapeHtml(it.cod) + '\')">Editar</button></td></tr>';
+          '<td><button class="stk-btn" onclick="stkInsEdit(\'art:' + escapeHtml(it.cod) + '\')">Editar</button> ' +
+          '<button class="stk-btn" onclick="stkInsEditFact(\'' + escapeHtml(it.cod) + '\')" title="Unidades y factores">⚖</button></td></tr>';
       }
-      return '<tr><td><input class="stk-inp" id="edCod_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.cod) + '" style="width:130px;"></td>' +
+      return '<tr><td><input class="stk-inp" id="edCod_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.cod) + '" style="width:130px;" title="Código conocido (clave del stock)"><br>' +
+        '<input class="stk-inp" id="edIsis_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.isis || "") + '" placeholder="isis (sistema)" style="width:130px;margin-top:3px;color:#64748b;" title="Código del sistema (isis) — informativo, no toca el stock"></td>' +
         '<td><input class="stk-inp" id="edNom_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.nombre) + '" style="width:150px;"></td>' +
         '<td>' + _stkInsCatSel("edCat_" + it.cod, it.cat) + '</td>' +
         '<td><input class="stk-inp" id="edUbi_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.ubic) + '" style="width:80px;"></td>' +
@@ -14298,7 +14300,8 @@ function _stkInsTodos(items) {
     if (ed) {
       // ---------- fila en modo edición (mismos IDs que _stkInsListado → stkInsGuardar) ----------
       var u = _stkInsUni1(it);
-      return '<tr><td><input class="stk-inp" id="edCod_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.cod) + '" style="width:100px;"></td>' +
+      return '<tr><td><input class="stk-inp" id="edCod_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.cod) + '" style="width:100px;" title="Código conocido (clave del stock)"><br>' +
+        '<input class="stk-inp" id="edIsis_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.isis || "") + '" placeholder="isis (sistema)" style="width:100px;margin-top:3px;color:#64748b;" title="Código del sistema (isis) — informativo, no toca el stock"></td>' +
         '<td><input class="stk-inp" id="edNom_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.nombre) + '" style="width:140px;"></td>' +
         '<td>' + _stkInsCatSel("edCat_" + it.cod, it.cat) + '</td>' +
         '<td><input class="stk-inp" id="edUbi_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.ubic) + '" style="width:80px;"></td>' +
@@ -14345,7 +14348,7 @@ function _stkInsTodos(items) {
       cantCell = xs.length ? xs.map(function (x) { return '<div' + neg(x.saldo) + '>' + (Math.round(x.saldo * 1000) / 1000) + '</div>'; }).join("") : '<span class="stk-sub">0</span>';
       uniCell = xs.length ? xs.map(function (x) { return '<div>' + escapeHtml(x.uni) + '</div>'; }).join("") : '<span class="stk-sub">' + escapeHtml(_stkInsUniMostrar(it) || "—") + '</span>';
     }
-    return '<tr><td><b>' + escapeHtml(it.cod) + '</b></td><td>' + escapeHtml(it.nombre || "—") + '</td>' +
+    return '<tr><td><b>' + escapeHtml(it.cod) + '</b>' + (it.isis ? '<div class="stk-sub">isis: ' + escapeHtml(it.isis) + '</div>' : '') + '</td><td>' + escapeHtml(it.nombre || "—") + '</td>' +
       '<td>' + escapeHtml(insCatLbl(insCatOf(it))) + '</td>' +
       '<td>' + escapeHtml(it.ubic || "—") + '</td>' +
       '<td class="num">' + cantCell + '</td>' +
@@ -14616,6 +14619,7 @@ async function stkInsGuardar(cod) {
   const nuevoCod = _stkInsVal("edCod_" + cod), nom = _stkInsVal("edNom_" + cod);
   const cat = _stkInsVal("edCat_" + cod), ubi = _stkInsVal("edUbi_" + cod);
   const uni = _stkInsVal("edUni_" + cod), qty = _stkInsVal("edQty_" + cod);
+  const isis = _stkInsVal("edIsis_" + cod);   // v8.28 — código del sistema (informativo)
   if (!nuevoCod) { alert("El código no puede quedar vacío."); return; }
   if (nuevoCod !== cod && (_stkIns.items || []).some(function (x) { return x.cod === nuevoCod; })) {
     alert("El código " + nuevoCod + " ya está en uso.\n\nPoné otro."); return;
@@ -14632,6 +14636,7 @@ async function stkInsGuardar(cod) {
     if (nom !== it.nombre) cambios.p_nombre = nom || null;
     if ((cat || "") !== (it.cat || "")) cambios.p_categoria = cat || null;
     if (ubi !== it.ubic) cambios.p_ubicacion = ubi || null;
+    if ((isis || "") !== (it.isis || "")) cambios.p_isis = isis ? isis : "__sin__";   // v8.28
     if (Object.keys(cambios).length) {
       cambios.p_cod = cod;
       // p_categoria = null en la función significa "no tocar"; para VACIARLA hay que

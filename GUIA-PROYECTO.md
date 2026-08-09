@@ -4,7 +4,13 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-09 · Versión app al documentar: **v8.26**
+> Última actualización: 2026-08-09 · Versión app al documentar: **v8.28**
+>
+> Nota: **v8.28 — Insumos: código `isis` (del sistema) separado del `cod` conocido.** Columna nueva
+> `Insumos.isis` (informativa); el `cod` conocido **sigue siendo la clave del stock**. Se edita en el
+> form (input "isis (sistema)" bajo el código) y se muestra como sub-línea "isis: …". RPC
+> `insumo_editar` ahora acepta `p_isis` (marcador `__sin__` para vaciarlo). (v8.27: admin Insumos sin
+> el banner, "Unidades" abajo de "Todos", botón ⚖ también en edición.)
 >
 > Nota: **v8.26 — Insumos: unidades con FACTOR de conversión (mismo stock, distinta forma).**
 > Varias unidades = el mismo stock (no se suman). Cada insumo elige su **base** (la más chica) y
