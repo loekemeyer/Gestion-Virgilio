@@ -6167,7 +6167,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.58";
+const APP_VERSION = "v8.59";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -26364,27 +26364,40 @@ async function psStart(){
 function psStop(){ if (_ps && _ps.timer){ clearInterval(_ps.timer); _ps.timer = null; } psRender(); }
 function psSetAuto(on){ try { localStorage.setItem(PS_AUTO_KEY, on ? "1" : "0"); } catch (_e) {} if (on) psStart(); else psStop(); }
 function psToggle(){ psSetAuto(!psIsAuto()); }
-async function psPoll(){
-  if (!psIsAuto()) return;
+/* v8.59 — psPoll(force): con force=true revisa aunque el auto esté apagado ("Revisar ahora").
+   Registra última revisión OK y errores de conexión para mostrarlos (visibilidad de si está vivo). */
+async function psPoll(force){
+  if (!force && !psIsAuto()) return;
   _psEnsure();
   const since = _ps.lastSeen || new Date(Date.now() - 3600000).toISOString();
   try {
     const url = SUPABASE_TABLE_ENDPOINT + "?opcion=eq.TAL&ts_cliente=gt." + encodeURIComponent(since) + "&select=texto,ts_cliente,legajo&order=ts_cliente.asc&limit=2000";
-    const rows = await fetch(url, { headers: psH(), cache: "no-store" }).then(function (r){ return r.ok ? r.json() : []; });
-    if (!rows.length) return;
-    const printed = psGetPrinted(); let maxTs = since; const fresh = [];
-    rows.forEach(function (ev){
-      if (String(ev.ts_cliente) > maxTs) maxTs = String(ev.ts_cliente);
-      const p = String(ev.texto || "").split("|"); const np = String(p[0] || "").trim().replace(/\.0+$/, "");
-      if (!np || printed.has(np)) return;
-      const resumen = p[3] || "";
-      if (!resumen){ psMarkPrinted(np); return; }   // TAL sin resumen (viejo) → nada que imprimir
-      fresh.push({ np: np, tanda: String(p[2] || "").trim().toUpperCase(), resumen: resumen, armadorLeg: String(ev.legajo || "") });
-    });
-    _ps.lastSeen = maxTs; try { localStorage.setItem(PS_LASTSEEN_KEY, maxTs); } catch (_e) {}
-    if (fresh.length) await psPrintBatch(fresh);
-  } catch (_e){}
+    const rows = await fetch(url, { headers: psH(), cache: "no-store" }).then(function (r){ if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); });
+    _ps.lastPollTs = Date.now(); _ps.lastErr = "";
+    if (rows.length) {
+      const printed = psGetPrinted(); let maxTs = since; const fresh = [];
+      rows.forEach(function (ev){
+        if (String(ev.ts_cliente) > maxTs) maxTs = String(ev.ts_cliente);
+        const p = String(ev.texto || "").split("|"); const np = String(p[0] || "").trim().replace(/\.0+$/, "");
+        if (!np || printed.has(np)) return;
+        const resumen = p[3] || "";
+        if (!resumen){ psMarkPrinted(np); return; }   // TAL sin resumen (viejo) → nada que imprimir
+        fresh.push({ np: np, tanda: String(p[2] || "").trim().toUpperCase(), resumen: resumen, armadorLeg: String(ev.legajo || "") });
+      });
+      _ps.lastSeen = maxTs; try { localStorage.setItem(PS_LASTSEEN_KEY, maxTs); } catch (_e) {}
+      if (fresh.length) await psPrintBatch(fresh);
+    }
+  } catch (_e){ _ps.lastErr = "sin conexión con Supabase"; }
+  _psUpdatePollInfo();
 }
+function _psHhmm(ts){ try { return new Date(ts).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }); } catch (_e) { return ""; } }
+function _psPollInfoText(){
+  if (!_ps) return "";
+  if (_ps.lastErr) return "⚠ " + _ps.lastErr + (_ps.lastPollTs ? " · última OK " + _psHhmm(_ps.lastPollTs) : "");
+  if (_ps.lastPollTs) return "✓ última revisión " + _psHhmm(_ps.lastPollTs);
+  return "esperando primera revisión…";
+}
+function _psUpdatePollInfo(){ const el = document.getElementById("psPollInfo"); if (el) { el.textContent = _psPollInfoText(); el.style.color = (_ps && _ps.lastErr) ? "#b91c1c" : "#64748b"; } }
 async function psPrintBatch(items){
   const npIn = items.map(function (x){ return encodeURIComponent(x.np); }).join(",");
   const tandas = items.map(function (x){ return String(x.tanda || "").toUpperCase(); }).filter(function (t, i, a){ return t && a.indexOf(t) === i; });
@@ -26477,7 +26490,9 @@ function psRender(){
   let h = "";
   h += '<div class="ps-toggle-card"><div class="ps-tc-top"><span class="ps-tc-t">🖨️ Auto-imprimir remitos al terminar armado</span>' +
     '<span class="sup-sw' + (on ? " on" : "") + '" onclick="psToggle()" role="switch"><span class="sup-sw-k"></span></span></div>' +
-    '<div class="ps-status ' + (on ? "on" : "") + '">' + (on ? (running ? "🟢 Activo — escuchando pedidos terminados (cada 12 s)" : "🟢 Activo") : "⚪ Apagado — los remitos no se imprimen solos") + '</div></div>';
+    '<div class="ps-status ' + (on ? "on" : "") + '">' + (on ? (running ? "🟢 Activo — escuchando pedidos terminados (cada 12 s)" : "🟢 Activo") : "⚪ Apagado — los remitos no se imprimen solos") + '</div>' +
+    '<div class="ps-help" id="psPollInfo" style="color:' + ((_ps && _ps.lastErr) ? "#b91c1c" : "#64748b") + ';">' + escapeHtml(_psPollInfoText()) + '</div>' +
+    '<div style="margin-top:6px;"><button class="ps-test" style="padding:6px 12px;font-size:12px;" onclick="psPoll(true)">🔄 Revisar ahora</button></div></div>';
   const fon = facPrintIsOn();
   h += '<div class="ps-toggle-card"><div class="ps-tc-top"><span class="ps-tc-t">🧾 Auto-imprimir remito FACTURADO al tildar Facturación</span>' +
     '<span class="sup-sw' + (fon ? " on" : "") + '" onclick="facPrintToggle()" role="switch"><span class="sup-sw-k"></span></span></div>' +
