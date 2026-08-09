@@ -6167,7 +6167,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.60";
+const APP_VERSION = "v8.61";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -21361,7 +21361,7 @@ async function pppRefreshDelivered() {
       });
     }
     _pppDelivered = list;
-    if (_pppTab === "ent") pppRenderProg();
+    pppRenderProg();   // v8.61 — re-render siempre: el aviso de discrepancia PPP vs salida se ve en cualquier tab
   } catch (_e) { if (!_pppDelivered) _pppDelivered = []; }
 }
 async function pppRefreshEntregadosFull() {
@@ -23375,6 +23375,8 @@ function pppGoToRow(np) {
 }
 function pppRenderProg() {
   const box = document.getElementById("pppPreview"); if (!box) return;
+  // v8.61 — cargar (una vez) los entregados para el aviso "salió en fecha ≠ a la PPP".
+  if (_pppDelivered == null) { try { pppRefreshDelivered(); } catch (_e) {} }
   // Semáforo de góndola: en las solapas con íconos, dispará (o refrescá) la carga
   // compartida. Guarda TTL/busy adentro → no entra en loop con el re-render.
   if (_pppTab === "prog" || _pppTab === "plan") { try { pppChkAutoLoad(); } catch (_e) {} }
@@ -23423,6 +23425,21 @@ function pppRenderProg() {
       '<button class="ppp-tab ' + (_pppTab === "ocup" ? "on" : "") + '" onclick="pppTab(\'ocup\')">📦 Ocupación</button>' +
     '</div>';
   html += '<div class="ppp-search"><input id="pppSearchInp" type="search" autocomplete="off" placeholder="🔎 Buscar: NP, cliente, cód, tanda, localidad, zona, fecha…" value="' + escapeHtml(_pppSearch) + '" oninput="pppSetSearch(this.value)">' + (_pppSearch ? '<button class="ppp-search-clr" onclick="pppSetSearch(\'\')" title="Limpiar búsqueda">✕</button><span class="ppp-search-n">' + (programados.length + aProgramar.length + entreg.length) + ' coincidencia(s)</span>' : '') + '</div>';
+  // v8.61 — aviso: pedidos que SALIERON en fecha ≠ a la programada en la PPP (para corregir la carga
+  // de raíz). Reusa _pppDelivered.discrep (carga camión ≠ fecha PPP). No bloquea, es informativo.
+  if (_pppDelivered && _pppDelivered.length) {
+    var _disc = _pppDelivered.filter(function (d) { return d.discrep; });
+    if (_disc.length) {
+      var _fs = function (s) { var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s || "")); return m ? (m[3] + "/" + m[2]) : String(s || ""); };
+      var _dl = _disc.slice(0, 12).map(function (d) {
+        return '<div style="padding:2px 0;">NP <b>' + escapeHtml(d.np) + '</b> · tanda ' + escapeHtml(d.tanda) + ' · PPP decía <b>' + escapeHtml(_fs(d.pppDate)) + '</b> → salió <b style="color:#b45309;">' + escapeHtml(_fs(d.frep)) + '</b></div>';
+      }).join("");
+      html += '<div style="background:#fffbeb;border:1.5px solid #fcd34d;border-radius:11px;padding:10px 13px;margin:0 0 10px;color:#92400e;font-size:12.5px;">' +
+        '<b>⚠ ' + _disc.length + ' pedido(s) salieron en una fecha distinta a la programada en la PPP.</b> Suele ser un error al cargar la fecha en la PPP — conviene corregir la carga para que la PPP refleje la salida real.' +
+        '<details style="margin-top:6px;"><summary style="cursor:pointer;font-weight:800;">Ver cuáles</summary><div style="margin-top:5px;">' + _dl + (_disc.length > 12 ? '<div style="margin-top:4px;color:#b45309;">…y ' + (_disc.length - 12) + ' más (ver solapa Pedidos Entregados)</div>' : '') + '</div></details>' +
+        '</div>';
+    }
+  }
   if (PPP_READONLY && _errInfo) html += pppErroresHtml(_errInfo);   // panel de errores (SACAR / sin zona / zona / tanda)
   // Diagnóstico del mapeo (tocá para ver las columnas del Excel).
   if (_pppLastDetect) {
