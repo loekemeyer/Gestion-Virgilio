@@ -6159,7 +6159,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.28";
+const APP_VERSION = "v8.29";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -14206,6 +14206,7 @@ function _stkInsListado(k, items) {
     h += lista.map(function (it) {
       const ed = _stkIns.edit === "art:" + it.cod;
       const u = _stkInsUni1(it);
+      if (_stkIns.edit === "fact:" + it.cod) return _stkInsFactRow(it);   // v8.28 — editor de factores
       if (!ed) {
         return '<tr><td><b>' + escapeHtml(it.cod) + '</b>' + (it.isis ? '<div class="stk-sub">isis: ' + escapeHtml(it.isis) + '</div>' : '') + '</td><td>' + escapeHtml(it.nombre || "—") + '</td>' +
           '<td>' + escapeHtml(insCatLbl(insCatOf(it))) + '</td>' +
@@ -14311,30 +14312,8 @@ function _stkInsTodos(items) {
         '<button class="stk-btn stk-btn-x" onclick="stkInsEdit(null)">Cancelar</button> ' +
         '<button class="stk-btn" onclick="stkInsEditFact(\'' + escapeHtml(it.cod) + '\')" title="Agregar/definir unidades de medida (master cajas, inner, uni…) y sus factores">⚖ Unidades</button></td></tr>';
     }
-    // v8.26 — editor de UNIDADES/FACTORES del insumo
-    if (_stkIns.edit === "fact:" + it.cod) {
-      var fr = _stkIns.factRows || [];
-      var baseU = (fr.filter(function (x) { return x.base; })[0] || {}).u || "base";
-      var opts = function (sel) { return INS_UNIS.map(function (u) { return '<option' + (_insUEq(u, sel) ? ' selected' : '') + '>' + escapeHtml(u) + '</option>'; }).join(""); };
-      var body = fr.map(function (row, i) {
-        return '<div style="display:flex;gap:6px;align-items:center;margin:3px 0;flex-wrap:wrap;">' +
-          '<label style="font-size:11px;"><input type="radio" name="fBase" ' + (row.base ? "checked" : "") + ' onchange="stkInsFactBase(' + i + ')"> base</label>' +
-          '<span style="font-size:12px;">1</span>' +
-          '<select class="stk-inp" id="fU_' + i + '" style="width:110px;">' + opts(row.u) + '</select>' +
-          '<span style="font-size:12px;">=</span>' +
-          '<input class="stk-inp" id="fF_' + i + '" type="number" step="any" value="' + escapeHtml(row.base ? 1 : row.f) + '" style="width:80px;"' + (row.base ? ' disabled' : '') + '>' +
-          '<span style="font-size:12px;color:#64748b;">' + escapeHtml(baseU) + '</span>' +
-          (row.base ? '' : '<button class="stk-btn stk-btn-x" onclick="stkInsFactDel(' + i + ')" style="padding:2px 7px;">✕</button>') +
-          '</div>';
-      }).join("");
-      return '<tr class="stk-detrow"><td colspan="7"><div class="stk-det">' +
-        '<div style="font-weight:800;margin-bottom:5px;">⚖ Unidades de <b>' + escapeHtml(it.cod) + '</b> — el <b>mismo stock</b> expresado distinto (no se suman). Marcá la <b>base</b> (la más chica) y poné cuántas BASE hay en 1 de cada otra.</div>' +
-        body +
-        '<div style="margin-top:7px;"><button class="stk-btn" onclick="stkInsFactAdd()">+ unidad</button> ' +
-        '<button class="stk-btn ok" onclick="stkInsFactGuardar(\'' + escapeHtml(it.cod) + '\')">✓ Guardar</button> ' +
-        '<button class="stk-btn stk-btn-x" onclick="stkInsEdit(null)">Cancelar</button></div>' +
-        '</div></td></tr>';
-    }
+    // v8.26/28 — editor de UNIDADES/FACTORES del insumo (misma función en las dos listas)
+    if (_stkIns.edit === "fact:" + it.cod) return _stkInsFactRow(it);
     var xs = (it.xuni || []).filter(function (u) { return Math.abs(u.saldo) > 0.0005; });
     var neg = function (x) { return x < 0 ? ' style="color:#b91c1c;font-weight:800;"' : ""; };
     // v8.26 — si tiene factores: mostrar el saldo en TODAS sus unidades (mismo stock)
@@ -14474,6 +14453,30 @@ function stkInsEditFact(cod) {
   const f = insFactDe(cod);
   _stkIns.factRows = (f && f.unis.length) ? f.unis.map(function (u) { return { u: u.u, f: u.f, base: !!u.base }; }) : [{ u: "Uni", f: 1, base: true }];
   _stkIns.edit = "fact:" + cod; stkRender();
+}
+/* v8.28 — fila-editor de factores (colspan). Se usa en las dos listas de insumos. */
+function _stkInsFactRow(it) {
+  const fr = _stkIns.factRows || [];
+  const baseU = (fr.filter(function (x) { return x.base; })[0] || {}).u || "base";
+  const opts = function (sel) { return INS_UNIS.map(function (u) { return '<option' + (_insUEq(u, sel) ? ' selected' : '') + '>' + escapeHtml(u) + '</option>'; }).join(""); };
+  const body = fr.map(function (row, i) {
+    return '<div style="display:flex;gap:6px;align-items:center;margin:3px 0;flex-wrap:wrap;">' +
+      '<label style="font-size:11px;"><input type="radio" name="fBase" ' + (row.base ? "checked" : "") + ' onchange="stkInsFactBase(' + i + ')"> base</label>' +
+      '<span style="font-size:12px;">1</span>' +
+      '<select class="stk-inp" id="fU_' + i + '" style="width:110px;">' + opts(row.u) + '</select>' +
+      '<span style="font-size:12px;">=</span>' +
+      '<input class="stk-inp" id="fF_' + i + '" type="number" step="any" value="' + escapeHtml(row.base ? 1 : row.f) + '" style="width:80px;"' + (row.base ? ' disabled' : '') + '>' +
+      '<span style="font-size:12px;color:#64748b;">' + escapeHtml(baseU) + '</span>' +
+      (row.base ? '' : '<button class="stk-btn stk-btn-x" onclick="stkInsFactDel(' + i + ')" style="padding:2px 7px;">✕</button>') +
+      '</div>';
+  }).join("");
+  return '<tr class="stk-detrow"><td colspan="7"><div class="stk-det">' +
+    '<div style="font-weight:800;margin-bottom:5px;">⚖ Unidades de <b>' + escapeHtml(it.cod) + '</b> — el <b>mismo stock</b> expresado distinto (no se suman). Marcá la <b>base</b> (la más chica) y poné cuántas BASE hay en 1 de cada otra.</div>' +
+    body +
+    '<div style="margin-top:7px;"><button class="stk-btn" onclick="stkInsFactAdd()">+ unidad</button> ' +
+    '<button class="stk-btn ok" onclick="stkInsFactGuardar(\'' + escapeHtml(it.cod) + '\')">✓ Guardar</button> ' +
+    '<button class="stk-btn stk-btn-x" onclick="stkInsEdit(null)">Cancelar</button></div>' +
+    '</div></td></tr>';
 }
 function _stkInsFactRead() {
   if (!_stkIns || !_stkIns.factRows) return;
