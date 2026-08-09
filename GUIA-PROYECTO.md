@@ -4,7 +4,19 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-09 · Versión app al documentar: **v8.13**
+> Última actualización: 2026-08-09 · Versión app al documentar: **v8.14**
+>
+> Nota: **v8.14 — Faltante por día: separar "ya preparado" (real) de "aún no preparado" (proyección).**
+> Antes el faltante era 100% conceptual (demanda PPP vs stock). Problema: si un pedido YA se pickeó,
+> su stock se movió a `separar_pedidos` (fuera del total) pero **seguía contando como demanda** →
+> **doble-conteo** (faltante inflado). Ahora, en `stkFaltLoad`, cada NP se clasifica por el estado
+> de su TANDA (EP/TP): **sin pickear → proyección** (día a día vs stock); **en picking (EP sin TP)
+> → fuera de la proyección**, se cuenta aparte (chip "⏳ N en picking"); **preparado (TP) → faltante
+> REAL** = Σ(ESP−REAL) de los PKC = lo que el pickeador no encontró en el rack (dato, no pronóstico).
+> Nueva columna **🔴 Faltó armado** (rojo sólido) + chip resumen "🔴 N faltaron al armar"; ordena
+> primero por real. El real se suffija por empresa (`codEmpSplit`) y se combina por familia como el
+> resto. Fuentes: `Registros_Produccion_Virgilio` opcion EP/TP (estado) y PKC `TANDA|COD|ESP|REAL`.
+> "Real solo al cerrar el picking (TP)": en picking parcial NO cuenta como real hasta el TP.
 >
 > Nota: **v8.13 — Faltante por día: ocultar columnas de fin de semana.** Las columnas de día
 > son el día de ARMADO, que nunca cae sábado ni domingo, así que una columna de finde siempre

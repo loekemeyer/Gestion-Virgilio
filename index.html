@@ -6158,7 +6158,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.13";
+const APP_VERSION = "v8.14";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -13066,12 +13066,71 @@ async function stkFaltLoad() {
     ppp.forEach(function (r) {
       var np = pickNormNp(r.np); if (!np) return;
       if (facSet[np]) return;
-      npInfo[np] = { fecha: String(r.fecha_entrega || "").trim().slice(0, 10), rs: r.razon_social || "", tanda: r.tanda || "" };
+      npInfo[np] = { fecha: String(r.fecha_entrega || "").trim().slice(0, 10), rs: r.razon_social || "", tanda: String(r.tanda || "").trim().toUpperCase() };
     });
-    // Demanda por artículo: cod → [{fecha, np, rs, cajas}]
+
+    // v8.14 — separar "ya preparado" de "aún no preparado" (día de armado):
+    //  · Estado de picking por TANDA (EP/TP): sin pickear · en picking · preparado(TP).
+    //  · La PROYECCIÓN (demanda futura vs stock) solo cuenta las NPs SIN pickear. Las que ya
+    //    empezaron a pickearse movieron su stock a separar_pedidos (fuera del total) → contarlas
+    //    también en la demanda era un DOBLE-CONTEO (faltante inflado). Ahora quedan afuera.
+    //  · El faltante REAL de lo ya preparado (TP) NO se proyecta: sale de los PKC como
+    //    Σ(ESP−REAL) = lo que el pickeador no encontró en el rack. Es dato, no pronóstico.
+    var estadoTanda = {};   // TANDA → 'sinpickear'|'enpicking'|'preparado'
+    var tandaNp = {};       // TANDA → una NP representativa (para resolver empresa del código)
+    Object.keys(npInfo).forEach(function (np) {
+      var t = npInfo[np].tanda; if (!t) return;
+      if (!(t in tandaNp)) tandaNp[t] = np;
+    });
+    var tandas = Object.keys(tandaNp);
+    var realFalt = {};      // codNorm(suffijado) → cajas que faltaron al ARMAR (real, TP)
+    var enCurso = {};       // TANDAs en picking (para el contador "en curso")
+    if (tandas.length) {
+      var inT = tandas.map(encodeURIComponent).join(",");
+      var _cut = new Date(Date.now() - 45 * 86400000).toISOString();
+      var ev = await Promise.all([
+        supaFetchAllSafe(SUPABASE_TABLE_ENDPOINT, "opcion=in.(EP,TP)&texto=in.(" + inT + ")&select=opcion,texto,legajo"),
+        supaFetchAllSafe(SUPABASE_TABLE_ENDPOINT, "opcion=eq.PKC&ts_cliente=gte." + encodeURIComponent(_cut) + "&select=texto,ts_cliente")
+      ]);
+      var epV = ev[0] || [], pkcV = ev[1] || [];
+      var hasEP = {}, hasTP = {};
+      epV.forEach(function (e) {
+        var lg = String(e.legajo); if (lg === "0" || lg === "1") return;   // legajos de prueba
+        var t = String(e.texto || "").trim().toUpperCase(); if (!t) return;
+        if (e.opcion === "EP") hasEP[t] = true; else if (e.opcion === "TP") hasTP[t] = true;
+      });
+      tandas.forEach(function (t) {
+        estadoTanda[t] = hasTP[t] ? "preparado" : (hasEP[t] ? "enpicking" : "sinpickear");
+        if (estadoTanda[t] === "enpicking") enCurso[t] = true;
+      });
+      // Faltante real: por (tanda,art) tomar el ÚLTIMO PKC (ESP−REAL); solo tandas preparadas.
+      var lastPk = {};
+      pkcV.forEach(function (r) {
+        var p = String(r.texto || "").split("|");
+        var t = String(p[0] || "").trim().toUpperCase(), c = String(p[1] || "").trim();
+        if (!t || !c || estadoTanda[t] !== "preparado") return;
+        var k = t + "|" + c.toUpperCase();
+        if (!lastPk[k] || r.ts_cliente > lastPk[k].ts) {
+          lastPk[k] = {
+            esp: parseInt(String(p[2] || "").replace(/[^0-9-]/g, ""), 10) || 0,
+            real: parseInt(String(p[3] || "").replace(/[^0-9-]/g, ""), 10) || 0,
+            ts: r.ts_cliente, t: t, c: c
+          };
+        }
+      });
+      Object.keys(lastPk).forEach(function (k) {
+        var o = lastPk[k], falto = o.esp - o.real; if (falto <= 0) return;
+        var cod = _ocgNorm(codEmpSplit(o.c, tandaNp[o.t])); if (!cod) return;
+        realFalt[cod] = (realFalt[cod] || 0) + falto;
+      });
+    }
+
+    // Demanda por artículo (PROYECCIÓN): solo NPs SIN pickear. cod → [{fecha, np, rs, cajas}]
     var demanda = {};
     Object.keys(npInfo).forEach(function (np) {
       var info = npInfo[np];
+      var est = estadoTanda[info.tanda];
+      if (est && est !== "sinpickear") return;   // ya preparado / en picking → fuera de la proyección
       var items = base.get(np) || [];
       items.forEach(function (it) {
         // v8.11 — key por código SUFIJADO por empresa (437E/438E/439E/809E → "438E LK"/"438E CH")
@@ -13086,12 +13145,13 @@ async function stkFaltLoad() {
     });
     _stk.falt = {
       demanda: demanda, provMap: provMap, saldoMap: saldoMap,
+      realFalt: realFalt, enCurso: Object.keys(enCurso).length,
       excluidos: {}, filtro: "s1", openCell: null, search: ""
     };
     _stk.faltLoaded = true;
   } catch (e) {
     console.error("stkFaltLoad:", e);
-    _stk.falt = { demanda: {}, provMap: {}, saldoMap: {}, excluidos: {}, filtro: "s1", openCell: null, search: "" };
+    _stk.falt = { demanda: {}, provMap: {}, saldoMap: {}, realFalt: {}, enCurso: 0, excluidos: {}, filtro: "s1", openCell: null, search: "" };
     _stk.faltLoaded = true;
   }
   if (_stk) stkRender();
@@ -13175,6 +13235,7 @@ function stkBodyFaltante() {
   if (!_stk || !_stk.falt) return '<div class="stk-loading">Cargando faltante…</div>';
   if (_stk.faltLoaded === "loading") return '<div class="stk-loading">Cargando demanda PPP + stock…</div>';
   var F = _stk.falt, dem = F.demanda, sMap = F.saldoMap, provMap = F.provMap, excl = F.excluidos;
+  var realFalt = F.realFalt || {};   // v8.14 — faltante REAL (ya preparado / TP) por código
   var hoy = _faltHoy();
   // v8.10 — "Esta semana" = HOY + 5 días hábiles (ventana móvil), NO la semana calendario.
   var lunesHoy = hoy;                        // S1 arranca hoy
@@ -13217,6 +13278,7 @@ function stkBodyFaltante() {
   var allCods = {};
   Object.keys(dem).forEach(function (c) { allCods[c] = true; });
   Object.keys(sMap).forEach(function (c) { allCods[c] = true; });
+  Object.keys(realFalt).forEach(function (c) { allCods[c] = true; });   // v8.14 — códigos que faltaron al armar
   // Agrupar por clave de familia (equivFamKey). Sin familia → su propio código.
   var famMembers = {};
   Object.keys(allCods).forEach(function (cod) {
@@ -13231,6 +13293,9 @@ function stkBodyFaltante() {
     // Stock combinado + descripción/proveedor
     var stockFam = 0, descFam = "";
     members.forEach(function (m) { var s = sMap[m] || { total: 0, desc: "" }; stockFam += s.total; if (!descFam && s.desc) descFam = s.desc; });
+    // v8.14 — faltante REAL combinado (lo que ya faltó al armar en tandas pickeadas)
+    var realFam = 0;
+    members.forEach(function (m) { realFam += (realFalt[m] || 0); });
     // Demanda combinada por fecha (excluyendo NPs tachadas) + sinFecha
     var entriesFam = [];
     members.forEach(function (m) { (dem[m] || []).forEach(function (e) { entriesFam.push(e); }); });
@@ -13241,7 +13306,7 @@ function stkBodyFaltante() {
       demDia[e.fecha] = (demDia[e.fecha] || 0) + e.cajas;
     });
     var totalDem = entriesFam.reduce(function (ac, e) { return ac + (excl[e.np] ? 0 : e.cajas); }, 0);
-    if (totalDem === 0 && stockFam === 0) return;
+    if (totalDem === 0 && stockFam === 0 && realFam === 0) return;
 
     // Balance acumulado combinado: stock - sinFecha - demanda pasada - demanda día a día
     var bal = stockFam - sinFecha;
@@ -13290,6 +13355,7 @@ function stkBodyFaltante() {
       cod: codShow, key: key, esFam: esFam, miembros: miembrosDisp,
       desc: descFam || artNombre(codShow, ""), prov: provMap[key] || provMap[String(key).replace(/\s+(LK|CH)$/, "")] || provMap[members[0]] || "",
       stock: Math.round(stockFam), totalDem: Math.round(totalDem),
+      realFalt: Math.round(realFam),
       faltS1: Math.round(faltS1), faltS2: Math.round(faltS2),
       diasFalt: diasFalt, sinFecha: sinFecha, subCambio: subCambio
     });
@@ -13305,20 +13371,21 @@ function stkBodyFaltante() {
     });
   }
 
-  // Ordenar: primero los que tienen mayor faltante S1, luego S2, luego por código
+  // Ordenar: primero lo que YA FALTÓ al armar (real, urgente), luego mayor faltante S1, S2, código
   arts.sort(function (a, b) {
+    if ((b.realFalt || 0) !== (a.realFalt || 0)) return (b.realFalt || 0) - (a.realFalt || 0);
     if (b.faltS1 !== a.faltS1) return b.faltS1 - a.faltS1;
     if (b.faltS2 !== a.faltS2) return b.faltS2 - a.faltS2;
     return codCanon(a.cod).localeCompare(codCanon(b.cod), undefined, { numeric: true });
   });
 
-  // Solo mostrar artículos con demanda (no todos los del stock)
-  arts = arts.filter(function (a) { return a.totalDem > 0; });
+  // Mostrar artículos con demanda proyectada O con faltante real ya armado
+  arts = arts.filter(function (a) { return a.totalDem > 0 || (a.realFalt || 0) > 0; });
 
   // v8.02 — resumen (sobre TODOS los con demanda, antes de "solo quiebre")
-  var _hayQ = function (a) { return a.faltS1 > 0 || a.faltS2 > 0 || diasCols.some(function (d) { return (a.diasFalt[d] || 0) > 0; }); };
-  var sumNQ = 0, sumCajS1 = 0, sumNQ2 = 0, sumCambio = 0;
-  arts.forEach(function (a) { if (a.faltS1 > 0) { sumNQ++; sumCajS1 += a.faltS1; } if (a.faltS2 > 0) sumNQ2++; if (a.subCambio > 0) sumCambio++; });
+  var _hayQ = function (a) { return (a.realFalt || 0) > 0 || a.faltS1 > 0 || a.faltS2 > 0 || diasCols.some(function (d) { return (a.diasFalt[d] || 0) > 0; }); };
+  var sumNQ = 0, sumCajS1 = 0, sumNQ2 = 0, sumCambio = 0, sumRealN = 0, sumRealCj = 0;
+  arts.forEach(function (a) { if (a.faltS1 > 0) { sumNQ++; sumCajS1 += a.faltS1; } if (a.faltS2 > 0) sumNQ2++; if (a.subCambio > 0) sumCambio++; if ((a.realFalt || 0) > 0) { sumRealN++; sumRealCj += a.realFalt; } });
 
   // v8.02 — "solo quiebre": esconde los que no faltan (ruido)
   if (F.soloQuiebre) arts = arts.filter(_hayQ);
@@ -13327,10 +13394,12 @@ function stkBodyFaltante() {
   var h = '';
   // Resumen de un vistazo
   h += '<div class="falt-sum">' +
+    (sumRealCj > 0 ? '<span class="falt-sum-i" style="background:#fee2e2;border-color:#fecaca;" title="Cajas que ya faltaron al ARMAR (tandas pickeadas): el pickeador no las encontró. Es dato real, no proyección — el pedido está por salir corto.">🔴 <b style="color:#b91c1c;">' + sumRealCj + '</b> faltaron al armar</span>' : '') +
     '<span class="falt-sum-i"><b style="color:#b91c1c;">' + sumNQ + '</b> en quiebre esta sem</span>' +
     '<span class="falt-sum-i"><b>' + sumCajS1 + '</b> cajas faltan (S1)</span>' +
     '<span class="falt-sum-i"><b>' + sumNQ2 + '</b> quiebre próx sem</span>' +
     (sumCambio > 0 ? '<span class="falt-sum-i" style="color:#1e40af;">⇄ <b style="color:#1e40af;">' + sumCambio + '</b> con cambio NP</span>' : '') +
+    ((F.enCurso || 0) > 0 ? '<span class="falt-sum-i" style="color:#1e40af;" title="Tandas que se están pickeando ahora (empezaron pero no cerraron). Su faltante se confirma al terminar el picking.">⏳ <b style="color:#1e40af;">' + F.enCurso + '</b> en picking</span>' : '') +
     '</div>';
   // Barra de simulación si hay NPs excluidas
   if (nExcl > 0) {
@@ -13350,13 +13419,14 @@ function stkBodyFaltante() {
     '<input class="falt-search" type="text" placeholder="🔍 Buscar…" value="' +
     escapeHtml(F.search || "") + '" oninput="stkFaltSearch(this.value)">' +
     '</div>';
-  h += '<div class="falt-hint">Las columnas de día son el <b>día de armado</b> (un día hábil antes de la salida). <b>Falt S1</b> = salida en los <b>próximos 5 días hábiles</b>; <b>Falt S2</b> = los 5 hábiles siguientes. Tocá una celda para ver las NPs; la del <b style="color:#b91c1c;">borde rojo</b> es el primer día de quiebre. Colores:' +
+  h += '<div class="falt-hint"><b style="color:#b91c1c;">🔴 Faltó armado</b> = ya se pickeó y faltó (dato real, lo que no se encontró en el rack). Las columnas de <b>Falt S1/S2</b> y de día son la <b>proyección</b> de lo que <b>aún no se pickeó</b> (día de armado = un día hábil antes de la salida). <b>Falt S1</b> = salida en los <b>próximos 5 días hábiles</b>; <b>Falt S2</b> = los 5 hábiles siguientes. Tocá una celda de día para ver las NPs; la del <b style="color:#b91c1c;">borde rojo</b> es el primer día de quiebre. Colores:' +
     ' <span class="falt-leg falt-warn">1–10</span> <span class="falt-leg falt-bad">11–50</span> <span class="falt-leg falt-crit">+50</span>' +
     (nExcl ? ' · 🔮 Simulación activa.' : '') + '</div>';
   // Tabla
   h += '<div class="falt-wrap"><table class="falt-tbl"><thead><tr>' +
     '<th class="falt-cod">Cód</th><th class="falt-desc">Descripción</th><th class="falt-fab">Fabricante</th>' +
     '<th class="falt-stk">Stock</th>' +
+    '<th class="falt-sem" title="Cajas que YA faltaron al armar (tandas pickeadas): lo que el pickeador no encontró. Dato real, no proyección.">🔴 Faltó armado</th>' +
     '<th class="falt-sem">Falt S1</th><th class="falt-sem">Falt S2</th>' +
     '<th class="falt-sem" title="Cajas que hay que cambiar de NP en el ERP: el código pedido no tiene stock pero un hermano equivalente (mismo producto, otro SKU) sí. El detalle por NP está en Facturación.">⚠ Cambio NP</th>';
   // Headers de días
@@ -13368,7 +13438,7 @@ function stkBodyFaltante() {
   h += '</tr></thead><tbody>';
 
   if (arts.length === 0) {
-    h += '<tr><td colspan="' + (7 + diasCols.length) + '" style="text-align:center;padding:20px;color:#94a3b8;">Sin artículos con demanda pendiente</td></tr>';
+    h += '<tr><td colspan="' + (8 + diasCols.length) + '" style="text-align:center;padding:20px;color:#94a3b8;">Sin artículos con demanda pendiente</td></tr>';
   }
 
   arts.forEach(function (a) {
@@ -13389,7 +13459,11 @@ function stkBodyFaltante() {
       '<td class="falt-desc" title="' + escapeHtml(a.desc) + '">' + escapeHtml(a.desc) + '</td>' +
       '<td class="falt-fab" title="' + escapeHtml(a.prov) + '">' + escapeHtml(a.prov || "—") + '</td>' +
       '<td class="num" style="font-weight:700">' + a.stock + '</td>';
-    // Faltante S1 / S2
+    // v8.14 — Faltó al armar (REAL, ya preparado): rojo sólido para diferenciar de la proyección
+    h += (a.realFalt > 0)
+      ? '<td class="num" style="font-weight:900;color:#fff;background:#b91c1c;" title="Ya se pickeó y faltaron ' + a.realFalt + ' cajas (no se encontraron en el rack). Dato real.">' + a.realFalt + '</td>'
+      : '<td class="num falt-ok">—</td>';
+    // Faltante S1 / S2 (proyección de lo aún no pickeado)
     h += _faltCelda(a.faltS1, true);
     h += _faltCelda(a.faltS2, true);
     h += subCell;
