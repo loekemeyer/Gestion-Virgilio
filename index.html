@@ -6154,7 +6154,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.04";
+const APP_VERSION = "v8.05";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -26195,6 +26195,7 @@ function facCorreccRender(){
             return '<div style="margin-top:6px;' + (items.length>1?'padding-top:6px;border-top:1px dashed #eef2f7;':'') + '">'
               + '<div style="font-size:13px;"><span style="color:#b91c1c;font-weight:800;">' + escapeHtml(p.sec) + '</span> → <span style="color:#16a34a;font-weight:800;">' + escapeHtml(p.ppal) + '</span> <span style="color:#64748b;">· ' + escapeHtml(p.desc) + ' · ' + p.cajas + ' cajas</span></div>'
               + '<div style="font-size:12px;color:#475569;">📦 Stock: <b>' + escapeHtml(p.sec) + '</b>=' + Math.round(p.stkSec) + ' · <b>' + escapeHtml(p.ppal) + '</b>=' + Math.round(p.stkPpal) + ' · 👷 ' + _operTxt(p) + '</div>'
+              + (p.stkSec > 0 ? '<div style="font-size:12px;font-weight:800;color:#166534;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:3px 8px;margin-top:3px;">✔ Hay stock del secundario ' + escapeHtml(p.sec) + ' (' + Math.round(p.stkSec) + (p.stkSec >= p.cajas ? ' — alcanza' : ' — no alcanza para ' + p.cajas) + '): podés <b>mandar el secundario tal cual y cerrar</b>, sin cambiar la NP.</div>' : '')
               + '</div>';
           }).join('')
       + '</div>'
