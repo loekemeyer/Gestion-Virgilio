@@ -4,7 +4,10 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-09 · Versión app al documentar: **v8.53**
+> Última actualización: 2026-08-09 · Versión app al documentar: **v8.54**
+>
+> Nota: **v8.54 — Stock: se saca la pestaña "📦 A Separar" (tab `proceso`).** Quitada de la barra de
+> pestañas del módulo Stock y Compras. `stkBodyProceso` queda en el código pero sin acceso por UI.
 >
 > Nota: **v8.53 — Stocks: la tarjeta "Horas de guardado" se ajusta al contenido.** El panel verde/rojo
 > tenía ancho completo (llegaba al fondo al pedo); ahora `width:fit-content` → solo ocupa lo que mide su

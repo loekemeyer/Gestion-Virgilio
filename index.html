@@ -6167,7 +6167,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.53";
+const APP_VERSION = "v8.54";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -10837,7 +10837,7 @@ function stkRender() {
     const body0 = document.getElementById("stkBody"); if (body0) _renderKeepFocus(body0, stkBodyConteo());
     return;
   }
-  const tabs = [["stocks", "📊 Stocks"], ["faltante", "📉 Faltantes x día"], ["proceso", "📦 A Separar"], ["racks", "🏗 Racks"], ["conteo", "📋 Conteo"], ["capacidad", "📐 Capacidad"], ["insumos", "🧰 Insumos"], ["ajustes", "⚙ Ajustes"], ["compras", "📑 Compras (OCs)"]];
+  const tabs = [["stocks", "📊 Stocks"], ["faltante", "📉 Faltantes x día"], ["racks", "🏗 Racks"], ["conteo", "📋 Conteo"], ["capacidad", "📐 Capacidad"], ["insumos", "🧰 Insumos"], ["ajustes", "⚙ Ajustes"], ["compras", "📑 Compras (OCs)"]];
   const tb = document.getElementById("stkTabs");
   if (tb) tb.innerHTML = tabs.map(function (t) { return '<button class="stk-tab' + (_stk.tab === t[0] ? " on" : "") + '" onclick="stkTab(\'' + t[0] + '\')">' + t[1] + '</button>'; }).join("");
   const body = document.getElementById("stkBody"); if (!body) return;
