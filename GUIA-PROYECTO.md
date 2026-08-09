@@ -4,7 +4,17 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-09 · Versión app al documentar: **v8.17**
+> Última actualización: 2026-08-09 · Versión app al documentar: **v8.18**
+>
+> Nota: **v8.18 — Faltante: header "Cambio NP" en dos filas · switch "Sin E" · familia 590E/548.**
+> (1) Header ⚠ Cambio NP en dos líneas (ahorra ancho, como Faltó armado). (2) Switch **"Sin E"**
+> (`stkFaltSinE` / `F.sinE`): oculta los códigos IMPORTADOS (E) que **no tienen equivalente
+> nacional** para reponer — regla `_faltEsSoloE(a)`: si ningún miembro de la familia es nacional
+> (no termina en E). Así mantiene 94xE (33x), 574E/574, **590E/548**, 809E CH/809; oculta los
+> importados solos (727E, 363E, 367E, 809E LK, 437E/438E/439E, etc.). (3) Nueva familia **Pincel
+> Silicona: 590E (importado, PRIMARIO) ↔ 548 (nacional, secundario)** en `EQUIV_FAMILIAS` y en la
+> tabla server `Equivalencias_Familia` (empresa LK — solo descriptivo, la vista no lo usa; 590E se
+> pide 63× LK vs 2× CH). Backup previo en `sql/backup_equivalencias_familia_20260809.sql`.
 >
 > Nota: **v8.17 — Faltante: columna "Fabricante" espeja el Generador de OCs.** Antes salía de
 > `OC_Maximos` crudo (y quedaba vacía para muchos). Ahora `stkFaltLoad` la trae de

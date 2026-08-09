@@ -6158,7 +6158,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.17";
+const APP_VERSION = "v8.18";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -10377,6 +10377,8 @@ const EQUIV_FAMILIAS = [
   { desc: "Espátula / Calada Ac. Inox", def: "945E", cods: ["945E", "332"] },
   { desc: "Cuchara Calada/Mango Mad.", def: "946E", cods: ["946E", "335"] },
   { desc: "Espumadera Ac. Inox",      def: "948E", cods: ["948E", "333"] },
+  // v8.18 — Pincel Silicona: 590E (importado, PRIMARIO) ↔ 548 (nacional, secundario).
+  { desc: "Pincel Silicona",          def: "590E", cods: ["590E", "548"] },
   // v8.11 — Corta Queso (Chef): 809 nacional ↔ 809E importado, ambos Chef. El 809E de Chef
   // vive suffijado ("809E CH"); el 809 nacional se guarda PELADO. Sólo agrupa el 809E de Chef
   // con el 809 pelado — el "809E LK" (cortapizza) NO entra acá y queda solo.
@@ -13243,6 +13245,15 @@ function _faltEsHabil(ymd) {
   var dow = new Date(ymd + "T12:00:00Z").getUTCDay();
   return dow !== 0 && dow !== 6;   // 0=dom, 6=sáb
 }
+/* v8.18 — ¿es un código IMPORTADO (E) SIN equivalente nacional para reponer? Se usa en el
+   switch "Sin E": oculta esos (no hay forma de completarlos). Mantiene los que tienen algún
+   miembro nacional en su familia: 94xE (338/334/…), 574E/574, 590E/548, 809E CH/809, etc. */
+function _faltEsSoloE(a) {
+  var fam = equivFam(a.key);
+  var cods = fam ? fam._codsN : [_ocgNorm(a.cod)];
+  var hayNacional = cods.some(function (c) { return !/E$/.test(String(c).replace(/\s+(LK|CH)$/, "")); });
+  return !hayNacional;   // todos los miembros terminan en E → importado sin reposición nacional
+}
 
 function stkBodyFaltante() {
   if (!_stk || !_stk.falt) return '<div class="stk-loading">Cargando faltante…</div>';
@@ -13384,6 +13395,9 @@ function stkBodyFaltante() {
     });
   }
 
+  // v8.18 — switch "Sin E": ocultar importados sin equivalente nacional (no se pueden reponer)
+  if (F.sinE) arts = arts.filter(function (a) { return !_faltEsSoloE(a); });
+
   // Ordenar: primero lo que YA FALTÓ al armar (real, urgente), luego mayor faltante S1, S2, código
   arts.sort(function (a, b) {
     if ((b.realFalt || 0) !== (a.realFalt || 0)) return (b.realFalt || 0) - (a.realFalt || 0);
@@ -13428,6 +13442,7 @@ function stkBodyFaltante() {
     '<button class="falt-fbtn' + (filtro === "resto" ? " on" : "") + '" onclick="stkFaltFiltro(\'resto\')">Resto</button>' +
     '<button class="falt-fbtn' + (filtro === "todo" ? " on" : "") + '" onclick="stkFaltFiltro(\'todo\')">Todo</button>' +
     '<button class="falt-fbtn' + (F.soloQuiebre ? " on" : "") + '" onclick="stkFaltSoloQuiebre()" title="Mostrar solo los artículos que tienen faltante">' + (F.soloQuiebre ? "☑" : "☐") + ' Solo quiebre</button>' +
+    '<button class="falt-fbtn' + (F.sinE ? " on" : "") + '" onclick="stkFaltSinE()" title="Ocultar códigos importados (E) que no tienen equivalente nacional para reponer. Mantiene los 94xE y las familias con nacional (574E/590E/809E CH/etc.).">' + (F.sinE ? "☑" : "☐") + ' Sin E</button>' +
     '</div>' +
     '<input class="falt-search" type="text" placeholder="🔍 Buscar…" value="' +
     escapeHtml(F.search || "") + '" oninput="stkFaltSearch(this.value)">' +
@@ -13441,7 +13456,7 @@ function stkBodyFaltante() {
     '<th class="falt-stk">Stock</th>' +
     '<th class="falt-sem" title="Cajas que YA faltaron al armar (tandas pickeadas): lo que el pickeador no encontró. Dato real, no proyección.">🔴 Faltó<br>armado</th>' +
     '<th class="falt-sem">Falt S1</th><th class="falt-sem">Falt S2</th>' +
-    '<th class="falt-sem" title="Cajas que hay que cambiar de NP en el ERP: el código pedido no tiene stock pero un hermano equivalente (mismo producto, otro SKU) sí. El detalle por NP está en Facturación.">⚠ Cambio NP</th>';
+    '<th class="falt-sem" title="Cajas que hay que cambiar de NP en el ERP: el código pedido no tiene stock pero un hermano equivalente (mismo producto, otro SKU) sí. El detalle por NP está en Facturación.">⚠ Cambio<br>NP</th>';
   // Headers de días
   diasCols.forEach(function (d) {
     var esHoy = d === hoy;
@@ -13519,6 +13534,12 @@ function _faltCelda(falt, esSem, cod, fecha, esPrimer, winKey) {
 function stkFaltSoloQuiebre() {
   if (!_stk || !_stk.falt) return;
   _stk.falt.soloQuiebre = !_stk.falt.soloQuiebre;
+  _stk.falt.openCell = null;
+  stkRender();
+}
+function stkFaltSinE() {
+  if (!_stk || !_stk.falt) return;
+  _stk.falt.sinE = !_stk.falt.sinE;
   _stk.falt.openCell = null;
   stkRender();
 }
