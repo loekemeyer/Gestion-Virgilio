@@ -3030,6 +3030,15 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
 .falt-search { padding:5px 10px; border:1px solid #cbd5e1; border-radius:7px; font-size:12px;
   width:180px; box-sizing:border-box; }
 .falt-hint { font-size:11px; color:#94a3b8; margin-bottom:6px; }
+/* v8.02 — resumen + leyenda + marca de primer quiebre */
+.falt-sum { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px; }
+.falt-sum-i { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:4px 10px; font-size:12px; color:#475569; }
+.falt-sum-i b { font-size:14px; color:#0f172a; }
+.falt-leg { display:inline-block; border-radius:5px; padding:0 6px; font-size:10.5px; font-weight:800; margin-left:3px; }
+.falt-leg.falt-warn { background:#fef9c3; color:#854d0e; }
+.falt-leg.falt-bad { background:#fed7aa; color:#9a3412; }
+.falt-leg.falt-crit { background:#fecaca; color:#991b1b; }
+.falt-tbl td.falt-primer { box-shadow: inset 3px 0 0 #b91c1c; }
 .falt-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; max-height:60vh; }
 .falt-tbl { border-collapse:collapse; font-size:12px; width:auto; max-width:100%; }
 .falt-tbl th { position:sticky; top:0; z-index:2; background:#1e293b; color:#fff; padding:5px 8px;
@@ -6145,7 +6154,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.01";
+const APP_VERSION = "v8.02";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -13218,30 +13227,47 @@ function stkBodyFaltante() {
     return codCanon(a.cod).localeCompare(codCanon(b.cod), undefined, { numeric: true });
   });
 
-  // Solo mostrar artículos con demanda o faltante (no todos los del stock)
+  // Solo mostrar artículos con demanda (no todos los del stock)
   arts = arts.filter(function (a) { return a.totalDem > 0; });
+
+  // v8.02 — resumen (sobre TODOS los con demanda, antes de "solo quiebre")
+  var _hayQ = function (a) { return a.faltS1 > 0 || a.faltS2 > 0 || diasCols.some(function (d) { return (a.diasFalt[d] || 0) > 0; }); };
+  var sumNQ = 0, sumCajS1 = 0, sumNQ2 = 0, sumCambio = 0;
+  arts.forEach(function (a) { if (a.faltS1 > 0) { sumNQ++; sumCajS1 += a.faltS1; } if (a.faltS2 > 0) sumNQ2++; if (a.subCambio > 0) sumCambio++; });
+
+  // v8.02 — "solo quiebre": esconde los que no faltan (ruido)
+  if (F.soloQuiebre) arts = arts.filter(_hayQ);
 
   var nExcl = Object.keys(excl).length;
   var h = '';
+  // Resumen de un vistazo
+  h += '<div class="falt-sum">' +
+    '<span class="falt-sum-i"><b style="color:#b91c1c;">' + sumNQ + '</b> en quiebre esta sem</span>' +
+    '<span class="falt-sum-i"><b>' + sumCajS1 + '</b> cajas faltan (S1)</span>' +
+    '<span class="falt-sum-i"><b>' + sumNQ2 + '</b> quiebre próx sem</span>' +
+    (sumCambio > 0 ? '<span class="falt-sum-i" style="color:#1e40af;">⇄ <b style="color:#1e40af;">' + sumCambio + '</b> con cambio NP</span>' : '') +
+    '</div>';
   // Barra de simulación si hay NPs excluidas
   if (nExcl > 0) {
     h += '<div class="falt-sim-bar">🔮 Simulación: ' + nExcl + ' NP' + (nExcl > 1 ? "s" : "") +
       ' excluida' + (nExcl > 1 ? "s" : "") + ' del cálculo ' +
       '<button onclick="stkFaltResetSim()">Limpiar</button></div>';
   }
-  // Fila compacta: filtros + búsqueda
+  // Fila compacta: filtros + solo quiebre + búsqueda
   h += '<div class="falt-top">' +
     '<div class="falt-filters">' +
     '<button class="falt-fbtn' + (filtro === "s1" ? " on" : "") + '" onclick="stkFaltFiltro(\'s1\')">Esta sem</button>' +
     '<button class="falt-fbtn' + (filtro === "s2" ? " on" : "") + '" onclick="stkFaltFiltro(\'s2\')">Próx sem</button>' +
     '<button class="falt-fbtn' + (filtro === "resto" ? " on" : "") + '" onclick="stkFaltFiltro(\'resto\')">Resto</button>' +
     '<button class="falt-fbtn' + (filtro === "todo" ? " on" : "") + '" onclick="stkFaltFiltro(\'todo\')">Todo</button>' +
+    '<button class="falt-fbtn' + (F.soloQuiebre ? " on" : "") + '" onclick="stkFaltSoloQuiebre()" title="Mostrar solo los artículos que tienen faltante">' + (F.soloQuiebre ? "☑" : "☐") + ' Solo quiebre</button>' +
     '</div>' +
     '<input class="falt-search" type="text" placeholder="🔍 Buscar…" value="' +
     escapeHtml(F.search || "") + '" oninput="stkFaltSearch(this.value)">' +
     '</div>';
-  h += '<div class="falt-hint">Tocá una celda para ver las NPs. ' +
-    (nExcl ? '🔮 Simulación activa.' : '') + '</div>';
+  h += '<div class="falt-hint">Tocá una celda para ver las NPs. La celda con <b style="color:#b91c1c;">borde rojo</b> es el primer día de quiebre. Colores:' +
+    ' <span class="falt-leg falt-warn">1–10</span> <span class="falt-leg falt-bad">11–50</span> <span class="falt-leg falt-crit">+50</span>' +
+    (nExcl ? ' · 🔮 Simulación activa.' : '') + '</div>';
   // Tabla
   h += '<div class="falt-wrap"><table class="falt-tbl"><thead><tr>' +
     '<th class="falt-cod">Cód</th><th class="falt-desc">Descripción</th><th class="falt-fab">Fabricante</th>' +
@@ -13282,10 +13308,12 @@ function stkBodyFaltante() {
     h += _faltCelda(a.faltS1, true);
     h += _faltCelda(a.faltS2, true);
     h += subCell;
-    // Días
+    // Días — marcar el PRIMER día de quiebre (borde rojo)
+    var _primer = null;
+    for (var _i = 0; _i < diasCols.length; _i++) { if ((a.diasFalt[diasCols[_i]] || 0) > 0) { _primer = diasCols[_i]; break; } }
     diasCols.forEach(function (d) {
       var v = a.diasFalt[d] || 0;
-      h += _faltCelda(v, false, a.key, d);
+      h += _faltCelda(v, false, a.key, d, d === _primer);
     });
     h += '</tr>';
   });
@@ -13295,7 +13323,7 @@ function stkBodyFaltante() {
   return h;
 }
 
-function _faltCelda(falt, esSem, cod, fecha) {
+function _faltCelda(falt, esSem, cod, fecha, esPrimer) {
   var v = Math.round(falt);
   var cls = "num";
   if (v === 0) cls += " falt-ok";
@@ -13307,7 +13335,15 @@ function _faltCelda(falt, esSem, cod, fecha) {
     cls += " falt-cell";
     click = ' onclick="stkFaltDrill(\'' + cod + '\',\'' + fecha + '\',event)"';
   }
-  return '<td class="' + cls + '"' + (esSem ? ' style="font-weight:800"' : '') + click + '>' + (v > 0 ? v : "—") + '</td>';
+  if (esPrimer) cls += " falt-primer";
+  var titAttr = esPrimer ? ' title="Primer día de quiebre"' : '';
+  return '<td class="' + cls + '"' + (esSem ? ' style="font-weight:800"' : '') + titAttr + click + '>' + (v > 0 ? v : "—") + '</td>';
+}
+function stkFaltSoloQuiebre() {
+  if (!_stk || !_stk.falt) return;
+  _stk.falt.soloQuiebre = !_stk.falt.soloQuiebre;
+  _stk.falt.openCell = null;
+  stkRender();
 }
 
 function stkFaltFiltro(f) {
