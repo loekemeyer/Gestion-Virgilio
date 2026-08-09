@@ -6159,7 +6159,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.31";
+const APP_VERSION = "v8.32";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -27403,8 +27403,12 @@ async function generateFacturacionPDF(){
     || (a.np || "").localeCompare(b.np || "")
   );
 
-  // Fecha de reparto = mañana (es lo que sale al día siguiente)
+  // Fecha de reparto = mañana (es lo que sale al día siguiente). v8.32 — no cae fin de semana:
+  // si mañana es sábado/domingo, el reparto se corre al lunes (no se reparte los findes).
   const d = new Date(); d.setDate(d.getDate() + 1);
+  const _dowRep = d.getDay();
+  if (_dowRep === 6) d.setDate(d.getDate() + 2);        // sábado → lunes
+  else if (_dowRep === 0) d.setDate(d.getDate() + 1);   // domingo → lunes
   const fechaReparto = `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()}`;
   const fechaCierreISO = facTodayKey();
   const fechaRepartoISO = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
