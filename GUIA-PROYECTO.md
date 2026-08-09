@@ -4,7 +4,15 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-09 · Versión app al documentar: **v8.44**
+> Última actualización: 2026-08-09 · Versión app al documentar: **v8.45**
+>
+> Nota: **v8.45 — Operaria: "¿Qué bajar primero?" + Stocks: menos botones.** (1) En el chooser
+> **"📥 Bajar a góndola"** (`showMGChooser`) hay un botón nuevo **📋 ¿Qué conviene bajar primero?**
+> → `showGuardarOrden`: overview de solo-lectura que junta las 3 fuentes (a guardar + excedente +
+> racks/racks_ch) y las ordena por **góndola más vacía** (stock góndola ÷ capacidad de
+> `Capacidad_Sector`). Cada fila: código, % lleno (color) y badges de lo que espera (📦 a guardar ·
+> 📦 excedente · 🏗 racks). (2) En la solapa **Stocks** se sacaron los botones "Pedidos por estadio",
+> "Movimientos de góndola" e "Historial" del toolbar (quedan Crear código y Descargar Excel).
 >
 > Nota: **v8.44 — Stocks: barra compacta · Corregir códigos: contar NPs.** (1) En la solapa **Stocks**
 > el buscador se achicó a ~5 dígitos (`width:96px`, `maxlength=5`, placeholder "🔎 cód") y **E ·
