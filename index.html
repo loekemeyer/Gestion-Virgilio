@@ -6159,7 +6159,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.30";
+const APP_VERSION = "v8.31";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -14184,6 +14184,23 @@ function _stkInsCats(items, pend) {
     : '<button class="stk-btn" onclick="stkInsEdit(\'cat:+\')">+ Categoría nueva</button>') + '</div>';
   return h;
 }
+/* v8.31 — dos unidades para la planilla: primaria = base; secundaria = la unidad no-base de
+   mayor factor; + el factor. Sin factores → una sola unidad en primaria. */
+function _insDosUnidades(it) {
+  const fac = insFactDe(it.cod);
+  if (fac && fac.unis.length) {
+    const sb = insSaldoBase(it);
+    const secs = fac.unis.filter(function (u) { return !u.base; }).sort(function (a, b) { return b.f - a.f; });
+    const sec = secs[0] || null;
+    return { cantP: Math.round(sb.base * 1000) / 1000, uniP: fac.base,
+             cantS: sec ? (Math.round((sb.base / sec.f) * 1000) / 1000) : "", uniS: sec ? sec.u : "",
+             factor: sec ? sec.f : "", neg: sb.base < 0 };
+  }
+  const xs = (it.xuni || []).filter(function (u) { return Math.abs(u.saldo) > 0.0005; });
+  const x0 = xs[0] || null;
+  return { cantP: x0 ? (Math.round(x0.saldo * 1000) / 1000) : 0, uniP: x0 ? x0.uni : (_stkInsUniMostrar(it) || "—"),
+           cantS: "", uniS: "", factor: "", neg: x0 ? x0.saldo < 0 : false };
+}
 /* Listado de los insumos de una categoría + alta, adentro de la categoría. Se edita lo
    mismo que en Pendientes: código, nombre, categoría, ubicación, cantidad y unidad. */
 function _stkInsListado(k, items) {
@@ -14202,30 +14219,44 @@ function _stkInsListado(k, items) {
     : (k === "?" ? "" : '<button class="stk-btn" onclick="if(_stkIns){_stkIns.nuevoEn=\'' + k + '\';stkRender();}">+ Agregar insumo a esta categoría</button>')) + '</div>';
   if (!lista.length) h += '<div class="stk-empty">Sin insumos' + (f ? " con ese filtro" : "") + '.</div>';
   else {
-    h += '<div class="stk-scroll"><table class="stk-tbl"><thead><tr><th>Código</th><th>Detalle</th><th>Categoría</th><th>Ubic.</th><th class="num">Cantidad</th><th>Unidad</th><th></th></tr></thead><tbody>';
+    h += '<div class="stk-scroll"><table class="stk-tbl"><thead>' +
+      '<tr><th rowspan="2">Cód</th><th rowspan="2">ISIS</th><th rowspan="2">Detalle</th><th rowspan="2">Ubic.</th>' +
+      '<th colspan="2" style="text-align:center;border-left:1px solid #cbd5e1;">Primaria</th>' +
+      '<th colspan="2" style="text-align:center;border-left:1px solid #cbd5e1;">Secundaria</th>' +
+      '<th rowspan="2" class="num" style="border-left:1px solid #cbd5e1;">Factor</th><th rowspan="2"></th></tr>' +
+      '<tr><th class="num" style="border-left:1px solid #cbd5e1;">Cant</th><th>Un.</th>' +
+      '<th class="num" style="border-left:1px solid #cbd5e1;">Cant</th><th>Un.</th></tr>' +
+      '</thead><tbody>';
     h += lista.map(function (it) {
       const ed = _stkIns.edit === "art:" + it.cod;
       const u = _stkInsUni1(it);
-      if (_stkIns.edit === "fact:" + it.cod) return _stkInsFactRow(it);   // v8.28 — editor de factores
+      if (_stkIns.edit === "fact:" + it.cod) return _stkInsFactRow(it);   // editor de factores
       if (!ed) {
-        return '<tr><td><b>' + escapeHtml(it.cod) + '</b>' + (it.isis ? '<div class="stk-sub">isis: ' + escapeHtml(it.isis) + '</div>' : '') + '</td><td>' + escapeHtml(it.nombre || "—") + '</td>' +
-          '<td>' + escapeHtml(insCatLbl(insCatOf(it))) + '</td>' +
+        const du = _insDosUnidades(it);
+        return '<tr><td><b>' + escapeHtml(it.cod) + '</b></td>' +
+          '<td class="stk-sub">' + escapeHtml(it.isis || "—") + '</td>' +
+          '<td>' + escapeHtml(it.nombre || "—") + '</td>' +
           '<td>' + escapeHtml(it.ubic || "—") + '</td>' +
-          '<td class="num"' + (u.saldo < 0 ? ' style="color:#b91c1c;font-weight:800;"' : "") + '>' + (Math.round(u.saldo * 1000) / 1000) + '</td>' +
-          '<td>' + escapeHtml(_stkInsUniMostrar(it) || "—") + '</td>' +
+          '<td class="num"' + (du.neg ? ' style="color:#b91c1c;font-weight:800;"' : "") + ' style="border-left:1px solid #eef2f7;">' + du.cantP + '</td>' +
+          '<td>' + escapeHtml(du.uniP || "—") + '</td>' +
+          '<td class="num" style="border-left:1px solid #eef2f7;">' + (du.cantS !== "" ? du.cantS : '<span class="stk-sub">—</span>') + '</td>' +
+          '<td>' + (du.uniS ? escapeHtml(du.uniS) : '<span class="stk-sub">—</span>') + '</td>' +
+          '<td class="num" style="border-left:1px solid #eef2f7;">' + (du.factor !== "" ? du.factor : '<span class="stk-sub">—</span>') + '</td>' +
           '<td><button class="stk-btn" onclick="stkInsEdit(\'art:' + escapeHtml(it.cod) + '\')">Editar</button> ' +
-          '<button class="stk-btn" onclick="stkInsEditFact(\'' + escapeHtml(it.cod) + '\')" title="Unidades y factores">⚖</button></td></tr>';
+          '<button class="stk-btn" onclick="stkInsEditFact(\'' + escapeHtml(it.cod) + '\')" title="Unidades y factores (⚖)">⚖</button></td></tr>';
       }
-      return '<tr><td><input class="stk-inp" id="edCod_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.cod) + '" style="width:130px;" title="Código conocido (clave del stock)"><br>' +
-        '<input class="stk-inp" id="edIsis_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.isis || "") + '" placeholder="isis (sistema)" style="width:130px;margin-top:3px;color:#64748b;" title="Código del sistema (isis) — informativo, no toca el stock"></td>' +
-        '<td><input class="stk-inp" id="edNom_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.nombre) + '" style="width:150px;"></td>' +
-        '<td>' + _stkInsCatSel("edCat_" + it.cod, it.cat) + '</td>' +
-        '<td><input class="stk-inp" id="edUbi_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.ubic) + '" style="width:80px;"></td>' +
-        '<td><input class="stk-inp" id="edQty_' + escapeHtml(it.cod) + '" type="number" step="any" value="' + escapeHtml(u.saldo) + '" style="width:82px;"></td>' +
+      return '<tr>' +
+        '<td><input class="stk-inp" id="edCod_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.cod) + '" style="width:88px;" title="Código conocido (clave del stock)"></td>' +
+        '<td><input class="stk-inp" id="edIsis_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.isis || "") + '" placeholder="isis" style="width:78px;color:#64748b;" title="Código del sistema (isis)"></td>' +
+        '<td><input class="stk-inp" id="edNom_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.nombre) + '" style="width:150px;"><br><span class="stk-sub">cat:</span> ' + _stkInsCatSel("edCat_" + it.cod, it.cat) + '</td>' +
+        '<td><input class="stk-inp" id="edUbi_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.ubic) + '" style="width:66px;"></td>' +
+        '<td style="border-left:1px solid #eef2f7;"><input class="stk-inp" id="edQty_' + escapeHtml(it.cod) + '" type="number" step="any" value="' + escapeHtml(u.saldo) + '" style="width:70px;"></td>' +
         '<td>' + _stkInsUniSel("edUni_" + it.cod, _stkInsUniMostrar(it)) + '</td>' +
+        '<td colspan="2" class="stk-sub" style="border-left:1px solid #eef2f7;">otras unidades → ⚖</td>' +
+        '<td class="stk-sub" style="border-left:1px solid #eef2f7;">—</td>' +
         '<td><button class="stk-btn" onclick="stkInsGuardar(\'' + escapeHtml(it.cod) + '\')">✓ Guardar</button> ' +
         '<button class="stk-btn stk-btn-x" onclick="stkInsEdit(null)">Cancelar</button> ' +
-        '<button class="stk-btn" onclick="stkInsEditFact(\'' + escapeHtml(it.cod) + '\')" title="Agregar/definir unidades de medida (master cajas, inner, uni…) y sus factores">⚖ Unidades</button></td></tr>';
+        '<button class="stk-btn" onclick="stkInsEditFact(\'' + escapeHtml(it.cod) + '\')" title="Unidades/factores">⚖</button></td></tr>';
     }).join("");
     h += '</tbody></table></div>';
   }
@@ -14472,7 +14503,7 @@ function _stkInsFactRow(it) {
       '<button class="stk-btn stk-btn-x" onclick="stkInsFactDel(' + i + ')" style="padding:2px 8px;">✕</button>' +
       '</div>';
   }).join("");
-  return '<tr class="stk-detrow"><td colspan="7"><div class="stk-det">' +
+  return '<tr class="stk-detrow"><td colspan="12"><div class="stk-det">' +
     '<div style="font-weight:800;margin-bottom:6px;">⚖ Unidades de <b>' + escapeHtml(it.cod) + '</b> — el <b>mismo stock</b> en distintas unidades (no se suman).</div>' +
     '<div style="margin-bottom:8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;">' +
     '<b style="font-size:13px;">Unidad base</b> <span class="stk-sub">(la más chica, ej. Uni)</span>: ' +
