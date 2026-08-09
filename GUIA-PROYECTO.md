@@ -16,7 +16,8 @@
 >
 > Nota SERVER: **Generador OCs — 55289 Colador = proveedor "Log/ Fabr"; se filtran códigos que no
 > empiezan con dígito** (GASTOTRRECH/TRANSFRECH: filas contables). Con esto + L/546E, "sin proveedor"
-> quedó en **2 ítems/2 cajas** (597, 438EZ, mínimos).
+> quedó en **2 ítems** → luego **597 (discontinuo)** y **438EZ (no existe más)** se marcaron
+> `activo=false` en OC_Maximos → **generador con 0 "sin proveedor"**.
 >
 > Nota SERVER (sin bump de app): **Generador de OCs — aglomerar códigos "L" en su base.**
 > La `proyeccion_madre` trae, por cada código, un gemelo con sufijo **"L" = lo que Chef le vende
