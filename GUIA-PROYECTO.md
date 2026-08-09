@@ -4,7 +4,15 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-09 · Versión app al documentar: **v8.56**
+> Última actualización: 2026-08-09 · Versión app al documentar: **v8.58**
+>
+> Nota: **v8.58 — Facturación: se saca el badge "🧾 Facturá X (no pelado)" de abajo de Razón Social.**
+> El aviso de equivalencia (`_facEquiv`/`vista_pedidos_equivalencia`, pelado→código de empresa) se
+> quitó de la celda de razón social: esos avisos ya están cubiertos por la columna **"Cambiar cód"**
+> (secundario→principal). Se mantiene el badge de tarea activa. (`facFetchEquiv` sigue cargando pero
+> ya no se muestra.)
+>
+> Nota: **v8.57 — Faltantes x día: se saca la columna "⚠ Cambio NP".**
 >
 > Nota: **v8.56 — Faltantes x día: las columnas de día vuelven, detrás de "📅 Ver días".** En v8.51 se
 > habían quitado (scroll lateral). Ahora hay un toggle **📅 Ver días** (`stkFaltVerDias` / `F.verDias`,
