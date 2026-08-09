@@ -6158,7 +6158,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.21";
+const APP_VERSION = "v8.23";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -13161,12 +13161,12 @@ async function stkFaltLoad() {
     _stk.falt = {
       demanda: demanda, provMap: provMap, saldoMap: saldoMap,
       realFalt: realFalt, realDet: realDet, enCurso: Object.keys(enCurso).length,
-      excluidos: {}, filtro: "s1", openCell: null, search: ""
+      ajustes: {}, filtro: "s1", openCell: null, search: ""
     };
     _stk.faltLoaded = true;
   } catch (e) {
     console.error("stkFaltLoad:", e);
-    _stk.falt = { demanda: {}, provMap: {}, saldoMap: {}, realFalt: {}, realDet: {}, enCurso: 0, excluidos: {}, filtro: "s1", openCell: null, search: "" };
+    _stk.falt = { demanda: {}, provMap: {}, saldoMap: {}, realFalt: {}, realDet: {}, enCurso: 0, ajustes: {}, filtro: "s1", openCell: null, search: "" };
     _stk.faltLoaded = true;
   }
   if (_stk) stkRender();
@@ -13258,7 +13258,7 @@ function _faltEsSoloE(a) {
 function stkBodyFaltante() {
   if (!_stk || !_stk.falt) return '<div class="stk-loading">Cargando faltante…</div>';
   if (_stk.faltLoaded === "loading") return '<div class="stk-loading">Cargando demanda PPP + stock…</div>';
-  var F = _stk.falt, dem = F.demanda, sMap = F.saldoMap, provMap = F.provMap, excl = F.excluidos;
+  var F = _stk.falt, dem = F.demanda, sMap = F.saldoMap, provMap = F.provMap, ajustes = F.ajustes || (F.ajustes = {});
   var realFalt = F.realFalt || {};   // v8.14 — faltante REAL (ya preparado / TP) por código
   var hoy = _faltHoy();
   // v8.10 — "Esta semana" = HOY + 5 días hábiles (ventana móvil), NO la semana calendario.
@@ -13320,16 +13320,27 @@ function stkBodyFaltante() {
     // v8.14 — faltante REAL combinado (lo que ya faltó al armar en tandas pickeadas)
     var realFam = 0;
     members.forEach(function (m) { realFam += (realFalt[m] || 0); });
-    // Demanda combinada por fecha (excluyendo NPs tachadas) + sinFecha
+    // Demanda combinada por fecha + sinFecha. v8.23 — AJUSTE DE CAJAS por NP: el operador no anula
+    // la entrega, achica cuántas cajas van. ajustes[np|key] = cajas reales; si está, reemplaza el
+    // total pedido de ese NP (se reparte proporcional entre sus entries por si son varias).
     var entriesFam = [];
     members.forEach(function (m) { (dem[m] || []).forEach(function (e) { entriesFam.push(e); }); });
+    var _origNp = {};
+    entriesFam.forEach(function (e) { _origNp[e.np] = (_origNp[e.np] || 0) + e.cajas; });
+    var _cjEff = function (e) {
+      var aj = ajustes[e.np + "|" + key];
+      if (aj == null) return e.cajas;
+      var o = _origNp[e.np] || 0;
+      return o > 0 ? e.cajas * (aj / o) : 0;
+    };
     var demDia = {}, sinFecha = 0;
     entriesFam.forEach(function (e) {
-      if (excl[e.np]) return;
-      if (!e.fecha) { sinFecha += e.cajas; return; }
-      demDia[e.fecha] = (demDia[e.fecha] || 0) + e.cajas;
+      var cj = _cjEff(e);
+      if (cj <= 0) return;
+      if (!e.fecha) { sinFecha += cj; return; }
+      demDia[e.fecha] = (demDia[e.fecha] || 0) + cj;
     });
-    var totalDem = entriesFam.reduce(function (ac, e) { return ac + (excl[e.np] ? 0 : e.cajas); }, 0);
+    var totalDem = entriesFam.reduce(function (ac, e) { return ac + _cjEff(e); }, 0);
     if (totalDem === 0 && stockFam === 0 && realFam === 0) return;
 
     // Balance acumulado combinado: stock - sinFecha - demanda pasada - demanda día a día
@@ -13368,7 +13379,7 @@ function stkBodyFaltante() {
     if (esFam && fam) {
       members.forEach(function (m) {
         if (m === fam._defN) return;   // el principal no se corrige
-        subCambio += (dem[m] || []).reduce(function (ac, e) { return ac + (excl[e.np] ? 0 : e.cajas); }, 0);
+        subCambio += (dem[m] || []).reduce(function (ac, e) { return ac + _cjEff(e); }, 0);
       });
       subCambio = Math.round(subCambio);
     }
@@ -13418,7 +13429,7 @@ function stkBodyFaltante() {
   // v8.02 — "solo quiebre": esconde los que no faltan (ruido)
   if (F.soloQuiebre) arts = arts.filter(_hayQ);
 
-  var nExcl = Object.keys(excl).length;
+  var nExcl = Object.keys(ajustes).length;
   var h = '';
   // Resumen de un vistazo
   h += '<div class="falt-sum">' +
@@ -13429,10 +13440,10 @@ function stkBodyFaltante() {
     (sumCambio > 0 ? '<span class="falt-sum-i" style="color:#1e40af;">⇄ <b style="color:#1e40af;">' + sumCambio + '</b> con cambio NP</span>' : '') +
     ((F.enCurso || 0) > 0 ? '<span class="falt-sum-i" style="color:#1e40af;" title="Tandas que se están pickeando ahora (empezaron pero no cerraron). Su faltante se confirma al terminar el picking.">⏳ <b style="color:#1e40af;">' + F.enCurso + '</b> en picking</span>' : '') +
     '</div>';
-  // Barra de simulación si hay NPs excluidas
+  // Barra de simulación si hay NPs con cantidad ajustada
   if (nExcl > 0) {
     h += '<div class="falt-sim-bar">🔮 Simulación: ' + nExcl + ' NP' + (nExcl > 1 ? "s" : "") +
-      ' excluida' + (nExcl > 1 ? "s" : "") + ' del cálculo ' +
+      ' con cantidad ajustada ' +
       '<button onclick="stkFaltResetSim()">Limpiar</button></div>';
   }
   // Fila compacta: filtros + solo quiebre + búsqueda
@@ -13455,6 +13466,7 @@ function stkBodyFaltante() {
   h += '<div class="falt-wrap"><table class="falt-tbl"><thead><tr>' +
     '<th class="falt-cod">Cód</th><th class="falt-desc">Descripción</th><th class="falt-fab">Fabricante</th>' +
     '<th class="falt-stk">Stock</th>' +
+    '<th class="falt-stk" title="Total de cajas pedidas (demanda pendiente) de este artículo/familia.">Total<br>Pedidos</th>' +
     '<th class="falt-sem" title="Cajas que YA faltaron al armar (tandas pickeadas): lo que el pickeador no encontró. Dato real, no proyección.">🔴 Faltó<br>armado</th>' +
     '<th class="falt-sem">Falt S1</th><th class="falt-sem">Falt S2</th>' +
     '<th class="falt-sem" title="Faltante proyectado para salidas MÁS ALLÁ de la S2 (semana 3 en adelante).">Resto</th>' +
@@ -13468,7 +13480,7 @@ function stkBodyFaltante() {
   h += '</tr></thead><tbody>';
 
   if (arts.length === 0) {
-    h += '<tr><td colspan="' + (9 + diasCols.length) + '" style="text-align:center;padding:20px;color:#94a3b8;">Sin artículos con demanda pendiente</td></tr>';
+    h += '<tr><td colspan="' + (10 + diasCols.length) + '" style="text-align:center;padding:20px;color:#94a3b8;">Sin artículos con demanda pendiente</td></tr>';
   }
 
   arts.forEach(function (a) {
@@ -13488,7 +13500,8 @@ function stkBodyFaltante() {
     h += '<tr data-fkey="' + escapeHtml(a.key) + '"><td class="falt-cod">' + codCell + '</td>' +
       '<td class="falt-desc" title="' + escapeHtml(a.desc) + '">' + escapeHtml(a.desc) + '</td>' +
       '<td class="falt-fab" title="' + escapeHtml(a.prov) + '">' + escapeHtml(a.prov || "—") + '</td>' +
-      '<td class="num" style="font-weight:700">' + a.stock + '</td>';
+      '<td class="num" style="font-weight:700">' + a.stock + '</td>' +
+      '<td class="num" style="font-weight:700;color:#334155;">' + a.totalDem + '</td>';
     // v8.14 — Faltó al armar (REAL, ya preparado): rojo sólido para diferenciar de la proyección.
     // v8.16 — clickeable → muestra qué NPs/tandas salieron cortas.
     h += (a.realFalt > 0)
@@ -13560,7 +13573,7 @@ function stkFaltSearch(v) {
 }
 function stkFaltResetSim() {
   if (!_stk || !_stk.falt) return;
-  _stk.falt.excluidos = {};
+  _stk.falt.ajustes = {};
   _stk.falt.openCell = null;
   stkRender();
 }
@@ -13619,7 +13632,7 @@ function _faltDrillOpen(cod, kind, key, evt) {
     });
     lista = Object.keys(byNp).map(function (k) { return byNp[k]; }).sort(function (a, b) { return b.cajas - a.cajas; });
     title = escapeHtml(codCanon(cod)) + " — " + (kind === "day" ? (_faltDiaSem(key) + " " + _faltFechaCorta(key)) : (key === "s1" ? "Esta sem" : key === "s2" ? "Próx sem" : "Resto"));
-    sub = lista.length + " NP" + (lista.length > 1 ? "s" : "") + " piden este artículo. Destildar para excluir del cálculo.";
+    sub = lista.length + " NP" + (lista.length > 1 ? "s" : "") + " piden este artículo. Editá las cajas si va a salir menos (achicar la entrega).";
   }
 
   F.openCell = { cod: cod, kind: kind, key: key, x: evt.clientX, y: evt.clientY };
@@ -13639,13 +13652,16 @@ function _faltDrillOpen(cod, kind, key, evt) {
     var skuTag = (esFam && Object.keys(it.cods).length) ? ' <span style="font-size:10px;color:#1e40af;font-weight:700;">(' + Object.keys(it.cods).join(", ") + ')</span>' : '';
     var tandaTag = (esReal && it.tandas && Object.keys(it.tandas).length) ? ' <span style="font-size:10px;color:#b45309;font-weight:700;">t.' + Object.keys(it.tandas).join(",") + '</span>' : '';
     if (allowExcl) {
-      var isExcl = !!F.excluidos[it.np];
-      ih += '<div class="falt-drill-row' + (isExcl ? " excl" : "") + '">' +
-        '<label><input type="checkbox"' + (isExcl ? "" : " checked") +
-        ' onchange="stkFaltToggleNp(\'' + it.np + '\',this.checked)">' +
-        '<span class="falt-np">NP ' + escapeHtml(it.np) + '</span>' + skuTag +
+      // v8.23 — input para ACHICAR las cajas de este NP (no anular). "15 / 20" = van 15 de 20 pedidas.
+      var _orig = Math.round(it.cajas);
+      var _aj = (F.ajustes || {})[it.np + "|" + cod];
+      var _val = (_aj == null) ? _orig : Math.round(_aj);
+      ih += '<div class="falt-drill-row' + (_aj != null && _aj < _orig ? " excl" : "") + '">' +
+        '<label><span class="falt-np">NP ' + escapeHtml(it.np) + '</span>' + skuTag +
         '<span class="falt-rs">' + escapeHtml(it.rs) + '</span></label>' +
-        '<span class="falt-cj">' + Math.round(it.cajas) + ' cj</span></div>';
+        '<span class="falt-cj"><input type="number" min="0" max="' + _orig + '" value="' + _val + '" ' +
+        'style="width:46px;text-align:right;padding:2px 4px;border:1px solid #cbd5e1;border-radius:5px;font-size:12px;" ' +
+        'onchange="stkFaltSetCajas(\'' + it.np + '\',\'' + escapeHtml(cod) + '\',this.value,' + _orig + ')"> / ' + _orig + ' cj</span></div>';
     } else {
       ih += '<div class="falt-drill-row">' +
         '<label><span class="falt-np">NP ' + escapeHtml(it.np) + '</span>' + skuTag + tandaTag +
@@ -13672,13 +13688,16 @@ function stkFaltCloseDrill() {
   if (_stk && _stk.falt) _stk.falt.openCell = null;
 }
 
-function stkFaltToggleNp(np, incluir) {
+/* v8.23 — achicar las cajas de un NP para una familia (no anular la entrega).
+   n = cajas reales; si vuelve al original, se limpia el ajuste. */
+function stkFaltSetCajas(np, key, val, orig) {
   if (!_stk || !_stk.falt) return;
-  if (incluir) {
-    delete _stk.falt.excluidos[np];
-  } else {
-    _stk.falt.excluidos[np] = true;
-  }
+  if (!_stk.falt.ajustes) _stk.falt.ajustes = {};
+  orig = Math.round(Number(orig) || 0);
+  var n = Math.max(0, Math.min(orig, Math.round(Number(val) || 0)));
+  var k = np + "|" + key;
+  if (n === orig) delete _stk.falt.ajustes[k];
+  else _stk.falt.ajustes[k] = n;
   // Re-renderizar tabla y re-abrir el mismo drill (guardo la celda antes de cerrar).
   var cell = _stk.falt.openCell;
   stkFaltCloseDrill();

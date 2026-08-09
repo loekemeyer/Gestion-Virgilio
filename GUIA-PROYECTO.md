@@ -4,7 +4,19 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-09 · Versión app al documentar: **v8.21**
+> Última actualización: 2026-08-09 · Versión app al documentar: **v8.23**
+>
+> Nota: **v8.23 — Faltantes x día: columna "Total Pedidos" + el pop-up ACHICA cajas (no anula NP).**
+> (1) Nueva columna **Total Pedidos** a la derecha de Stock (= `totalDem`, demanda pendiente).
+> (2) El pop-up ya **no excluye la NP entera** con un checkbox; ahora tiene un **input de cajas por NP**
+> ("15 / 20 cj" = van 15 de 20 pedidas) porque el operador no anula la entrega, la achica. Estado
+> `F.ajustes[np|famKey]` = cajas reales (reemplaza `excluidos`); la agregación aplica `_cjEff(e)`
+> (escala proporcional por si el NP tiene varias entries). `stkFaltSetCajas(np,key,val,orig)` +
+> `stkFaltResetSim` limpian/ajustan. Poner 0 = de hecho excluye.
+>
+> Nota SERVER: **Generador OCs — 55289 Colador = proveedor "Log/ Fabr"; se filtran códigos que no
+> empiezan con dígito** (GASTOTRRECH/TRANSFRECH: filas contables). Con esto + L/546E, "sin proveedor"
+> quedó en **2 ítems/2 cajas** (597, 438EZ, mínimos).
 >
 > Nota SERVER (sin bump de app): **Generador de OCs — aglomerar códigos "L" en su base.**
 > La `proyeccion_madre` trae, por cada código, un gemelo con sufijo **"L" = lo que Chef le vende
