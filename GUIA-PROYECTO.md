@@ -4,7 +4,14 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-09 · Versión app al documentar: **v8.48**
+> Última actualización: 2026-08-09 · Versión app al documentar: **v8.49**
+>
+> Nota: **v8.49 — "¿Qué bajar primero?": columna "Hay p/ guardar" (disponible).** Además de "Cajas a
+> bajar" (lo que entra hasta el máximo) ahora se ve **cuánto HAY** para guardar en el origen del filtro
+> (`_gordenDisp`: a guardar / excedente / racks / suma en "todos"). Columna nueva **Hay p/ guardar** +
+> chip **📥 Hay para guardar: N** + total al pie (y en el impreso). El filtro ahora muestra todo lo que
+> tiene stock en el origen (`disp > 0`), aunque no entre nada ahora — esos aparecen abajo con "Cajas a
+> bajar = 0 · góndola llena".
 >
 > Nota: **v8.48 — "¿Qué bajar primero?": total + hueco topado + s/master.** (1) **Total** de lo que hay
 > para bajar: chips arriba (📦 total cajas · N códigos · 🏗 master cajas) + fila TOTAL al pie de la

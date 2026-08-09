@@ -6167,7 +6167,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.48";
+const APP_VERSION = "v8.49";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -16617,12 +16617,19 @@ function _gordenBajar(src, it) {
   let r = room; const g = Math.min(it.aGuardar, r); r -= g; const e = Math.min(it.exc, r); r -= e; const rk = racksMaster(r);
   return { cajas: g + e + rk, mc: it.cxm > 0 ? Math.round(rk / it.cxm) : 0, rk: rk };
 }
+/* Disponible = lo que HAY para guardar en el origen del filtro (independiente del hueco de góndola). */
+function _gordenDisp(src, it) {
+  if (src === "guardar") return it.aGuardar;
+  if (src === "excedente") return it.exc;
+  if (src === "racks") return it.racks;
+  return it.aGuardar + it.exc + it.racks;
+}
 function _gordenRows() {
   const F = _gorden.filtro;
   return _gorden.items.map(function (it) {
     const r = _gordenBajar(F, it);
-    return { it: it, cajas: r.cajas, mc: r.mc, rk: r.rk, ratio: it.cap > 0 ? it.gond / it.cap : Infinity };
-  }).filter(function (x) { return x.it.cap > 0 && x.cajas > 0; })
+    return { it: it, cajas: r.cajas, mc: r.mc, rk: r.rk, disp: _gordenDisp(F, it), ratio: it.cap > 0 ? it.gond / it.cap : Infinity };
+  }).filter(function (x) { return x.it.cap > 0 && x.disp > 0; })
     .sort(function (a, c) { if (a.ratio !== c.ratio) return a.ratio - c.ratio; return (parseInt(a.it.cod, 10) || 0) - (parseInt(c.it.cod, 10) || 0); });
 }
 function renderGuardarOrden() {
@@ -16638,28 +16645,32 @@ function renderGuardarOrden() {
   h += '</div>';
   h += '<div style="font-size:12px;color:#64748b;margin-bottom:8px;">Ordenado por <b>góndola más vacía</b>. <b>Cajas a bajar</b> = lo que entra hasta el máximo' + ((F === "racks" || F === "todos") ? '. De <b>racks</b> se baja por <b>master caja</b> entera — si no entra una, no aparece' : '') + '.</div>';
   if (!rows.length) { b.innerHTML = h + '<div style="text-align:center;color:#16a34a;padding:22px;font-weight:700;">✅ Nada para bajar' + (F !== "todos" ? " de este origen" : "") + '.</div>'; return; }
-  // v8.48 — total de lo que hay para bajar (suma de "cajas a bajar" del filtro actual)
+  // v8.48/49 — totales: lo que HAY para guardar (disponible) y lo que ENTRA ahora (a bajar)
   const totCajas = rows.reduce(function (s, x) { return s + x.cajas; }, 0);
+  const totDisp = rows.reduce(function (s, x) { return s + x.disp; }, 0);
   const totMc = rows.reduce(function (s, x) { return s + (x.mc || 0); }, 0);
   h += '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;">' +
-    '<span style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:9px;padding:6px 11px;font-size:12.5px;font-weight:800;color:#1e40af;">📦 Total a bajar: ' + totCajas + ' cajas</span>' +
+    '<span style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:9px;padding:6px 11px;font-size:12.5px;font-weight:800;color:#15803d;">📥 Hay para guardar: ' + totDisp + ' cajas</span>' +
+    '<span style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:9px;padding:6px 11px;font-size:12.5px;font-weight:800;color:#1e40af;">📦 Entran ahora: ' + totCajas + ' cajas</span>' +
     '<span style="background:#f1f5f9;border:1px solid #e2e8f0;border-radius:9px;padding:6px 11px;font-size:12.5px;font-weight:800;color:#334155;">' + rows.length + ' códigos</span>' +
     (totMc > 0 ? '<span style="background:#eef2ff;border:1px solid #c7d2fe;border-radius:9px;padding:6px 11px;font-size:12.5px;font-weight:800;color:#3730a3;">🏗 ' + totMc + ' master cajas</span>' : '') +
     '</div>';
   h += '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12.5px;"><thead><tr style="text-align:left;color:#64748b;border-bottom:2px solid #e2e8f0;">' +
-    '<th style="padding:5px 6px;">Cód</th><th style="padding:5px 6px;">Descripción</th><th style="padding:5px 6px;text-align:right;">Cajas a bajar</th><th style="padding:5px 6px;text-align:right;">Góndola</th><th style="padding:5px 6px;text-align:right;">Máximo</th></tr></thead><tbody>';
+    '<th style="padding:5px 6px;">Cód</th><th style="padding:5px 6px;">Descripción</th><th style="padding:5px 6px;text-align:right;" title="Lo que hay para guardar en el depósito">Hay p/ guardar</th><th style="padding:5px 6px;text-align:right;" title="Lo que entra hasta el máximo de góndola">Cajas a bajar</th><th style="padding:5px 6px;text-align:right;">Góndola</th><th style="padding:5px 6px;text-align:right;">Máximo</th></tr></thead><tbody>';
   h += rows.map(function (x) {
     const it = x.it, pct = Math.round(x.ratio * 100), pc = pct <= 34 ? "#b91c1c" : pct <= 67 ? "#92400e" : "#15803d";
     const mcTxt = (x.mc > 0) ? ' <span style="color:#1e40af;font-size:10.5px;font-weight:700;">(' + x.mc + ' MC×' + it.cxm + ')</span>'
       : (x.rk > 0 && it.cxm <= 0 ? ' <span style="color:#b45309;font-size:10.5px;font-weight:700;">· s/master</span>' : '');
+    const bajarTxt = x.cajas > 0 ? ('<span style="font-weight:900;color:#0f172a;">' + x.cajas + '</span>' + mcTxt) : '<span style="color:#94a3b8;font-weight:700;">0 · góndola llena</span>';
     return '<tr style="border-bottom:1px solid #f1f5f9;">' +
       '<td style="padding:6px;font-weight:800;font-family:Consolas,Menlo,monospace;">' + escapeHtml(it.cod) + '</td>' +
       '<td style="padding:6px;color:#475569;">' + escapeHtml(it.desc || "") + '</td>' +
-      '<td style="padding:6px;text-align:right;font-weight:900;color:#0f172a;">' + x.cajas + mcTxt + '</td>' +
+      '<td style="padding:6px;text-align:right;font-weight:800;color:#15803d;">' + x.disp + '</td>' +
+      '<td style="padding:6px;text-align:right;">' + bajarTxt + '</td>' +
       '<td style="padding:6px;text-align:right;color:' + pc + ';font-weight:800;">' + it.gond + ' <span style="color:#94a3b8;font-weight:600;">(' + pct + '%)</span></td>' +
       '<td style="padding:6px;text-align:right;">' + it.cap + '</td></tr>';
   }).join("");
-  h += '</tbody><tfoot><tr style="border-top:2px solid #e2e8f0;font-weight:900;color:#0f172a;"><td style="padding:6px;" colspan="2">TOTAL (' + rows.length + ')</td><td style="padding:6px;text-align:right;">' + totCajas + '</td><td colspan="2"></td></tr></tfoot></table></div>';
+  h += '</tbody><tfoot><tr style="border-top:2px solid #e2e8f0;font-weight:900;color:#0f172a;"><td style="padding:6px;" colspan="2">TOTAL (' + rows.length + ')</td><td style="padding:6px;text-align:right;color:#15803d;">' + totDisp + '</td><td style="padding:6px;text-align:right;">' + totCajas + '</td><td colspan="2"></td></tr></tfoot></table></div>';
   b.innerHTML = h;
 }
 function gordenFiltro(f) { if (!_gorden) return; _gorden.filtro = f; renderGuardarOrden(); }
@@ -16671,10 +16682,11 @@ function gordenPrint() {
   let fecha = ""; try { fecha = new Date().toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }); } catch (_e) {}
   let t = '<!doctype html><html><head><meta charset="utf-8"><title>Orden de guardado</title><style>body{font-family:Arial,sans-serif;padding:18px;color:#0f172a;}h1{font-size:18px;margin:0 0 2px;}.sub{color:#64748b;font-size:12px;margin-bottom:12px;}table{width:100%;border-collapse:collapse;font-size:12px;}th,td{border:1px solid #cbd5e1;padding:5px 7px;text-align:left;}th{background:#f1f5f9;}td.n,th.n{text-align:right;}</style></head><body>';
   const totCajas = rows.reduce(function (s, x) { return s + x.cajas; }, 0);
-  t += '<h1>Orden de guardado — ' + lblF + '</h1><div class="sub">' + escapeHtml(fecha) + ' · góndola más vacía primero · ' + rows.length + ' códigos · <b>total a bajar: ' + totCajas + ' cajas</b></div>';
-  t += '<table><thead><tr><th>Cód</th><th>Descripción</th><th class="n">Cajas a bajar</th><th class="n">Góndola</th><th class="n">Máximo</th></tr></thead><tbody>';
-  t += rows.map(function (x) { const it = x.it; const extra = x.mc > 0 ? (' (' + x.mc + ' MC)') : (x.rk > 0 && it.cxm <= 0 ? ' (s/master)' : ''); return '<tr><td>' + escapeHtml(it.cod) + '</td><td>' + escapeHtml(it.desc || "") + '</td><td class="n">' + x.cajas + extra + '</td><td class="n">' + it.gond + '</td><td class="n">' + it.cap + '</td></tr>'; }).join("");
-  t += '</tbody><tfoot><tr><th colspan="2" style="text-align:left;">TOTAL (' + rows.length + ')</th><th class="n">' + totCajas + '</th><th colspan="2"></th></tr></tfoot></table></body></html>';
+  const totDisp = rows.reduce(function (s, x) { return s + x.disp; }, 0);
+  t += '<h1>Orden de guardado — ' + lblF + '</h1><div class="sub">' + escapeHtml(fecha) + ' · góndola más vacía primero · ' + rows.length + ' códigos · <b>hay para guardar: ' + totDisp + ' · entran ahora: ' + totCajas + ' cajas</b></div>';
+  t += '<table><thead><tr><th>Cód</th><th>Descripción</th><th class="n">Hay p/ guardar</th><th class="n">Cajas a bajar</th><th class="n">Góndola</th><th class="n">Máximo</th></tr></thead><tbody>';
+  t += rows.map(function (x) { const it = x.it; const extra = x.mc > 0 ? (' (' + x.mc + ' MC)') : (x.rk > 0 && it.cxm <= 0 ? ' (s/master)' : ''); return '<tr><td>' + escapeHtml(it.cod) + '</td><td>' + escapeHtml(it.desc || "") + '</td><td class="n">' + x.disp + '</td><td class="n">' + x.cajas + extra + '</td><td class="n">' + it.gond + '</td><td class="n">' + it.cap + '</td></tr>'; }).join("");
+  t += '</tbody><tfoot><tr><th colspan="2" style="text-align:left;">TOTAL (' + rows.length + ')</th><th class="n">' + totDisp + '</th><th class="n">' + totCajas + '</th><th colspan="2"></th></tr></tfoot></table></body></html>';
   const w = window.open("", "_blank");
   if (!w) { alert("Habilitá las ventanas emergentes para poder imprimir."); return; }
   w.document.open(); w.document.write(t); w.document.close(); w.focus();
