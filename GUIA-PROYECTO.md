@@ -4,7 +4,11 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-09 · Versión app al documentar: **v8.49**
+> Última actualización: 2026-08-09 · Versión app al documentar: **v8.50**
+>
+> Nota: **v8.50 — "¿Qué bajar primero?": switch "Ver todo".** Toggle `gordenVerTodo` (`_gorden.verTodo`):
+> por defecto muestra **solo lo que entra ahora** (Cajas a bajar > 0); al activarlo muestra **todo** lo
+> que tiene stock para guardar aunque la góndola esté llena (Cajas a bajar = 0). Filtro en `_gordenRows`.
 >
 > Nota: **v8.49 — "¿Qué bajar primero?": columna "Hay p/ guardar" (disponible).** Además de "Cajas a
 > bajar" (lo que entra hasta el máximo) ahora se ve **cuánto HAY** para guardar en el origen del filtro

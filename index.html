@@ -6167,7 +6167,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.49";
+const APP_VERSION = "v8.50";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -16629,7 +16629,7 @@ function _gordenRows() {
   return _gorden.items.map(function (it) {
     const r = _gordenBajar(F, it);
     return { it: it, cajas: r.cajas, mc: r.mc, rk: r.rk, disp: _gordenDisp(F, it), ratio: it.cap > 0 ? it.gond / it.cap : Infinity };
-  }).filter(function (x) { return x.it.cap > 0 && x.disp > 0; })
+  }).filter(function (x) { return x.it.cap > 0 && x.disp > 0 && (_gorden.verTodo || x.cajas > 0); })
     .sort(function (a, c) { if (a.ratio !== c.ratio) return a.ratio - c.ratio; return (parseInt(a.it.cod, 10) || 0) - (parseInt(c.it.cod, 10) || 0); });
 }
 function renderGuardarOrden() {
@@ -16641,6 +16641,7 @@ function renderGuardarOrden() {
     const on = F === t[0];
     h += '<button onclick="gordenFiltro(\'' + t[0] + '\')" style="width:auto;flex:0 0 auto;padding:7px 12px;border-radius:999px;border:1px solid ' + (on ? '#1e6bd6' : '#cbd5e1') + ';background:' + (on ? '#1e6bd6' : '#fff') + ';color:' + (on ? '#fff' : '#334155') + ';font-size:12.5px;font-weight:800;cursor:pointer;">' + t[1] + '</button>';
   });
+  h += '<button onclick="gordenVerTodo()" title="Ver todo incluye los que tienen stock para guardar aunque la góndola esté llena (Cajas a bajar = 0)" style="width:auto;flex:0 0 auto;padding:7px 12px;border-radius:999px;border:1px solid ' + (_gorden.verTodo ? '#15803d' : '#cbd5e1') + ';background:' + (_gorden.verTodo ? '#f0fdf4' : '#fff') + ';color:' + (_gorden.verTodo ? '#15803d' : '#334155') + ';font-size:12.5px;font-weight:800;cursor:pointer;">' + (_gorden.verTodo ? '☑ Ver todo' : '☐ Ver todo') + '</button>';
   h += '<button onclick="gordenPrint()" style="width:auto;flex:0 0 auto;margin-left:auto;padding:7px 13px;border-radius:999px;border:1px solid #1e6bd6;background:#eff6ff;color:#1e40af;font-size:12.5px;font-weight:800;cursor:pointer;">🖨 Imprimir</button>';
   h += '</div>';
   h += '<div style="font-size:12px;color:#64748b;margin-bottom:8px;">Ordenado por <b>góndola más vacía</b>. <b>Cajas a bajar</b> = lo que entra hasta el máximo' + ((F === "racks" || F === "todos") ? '. De <b>racks</b> se baja por <b>master caja</b> entera — si no entra una, no aparece' : '') + '.</div>';
@@ -16674,6 +16675,7 @@ function renderGuardarOrden() {
   b.innerHTML = h;
 }
 function gordenFiltro(f) { if (!_gorden) return; _gorden.filtro = f; renderGuardarOrden(); }
+function gordenVerTodo() { if (!_gorden) return; _gorden.verTodo = !_gorden.verTodo; renderGuardarOrden(); }
 function closeGuardarOrden() { const ov = document.getElementById("gordenModal"); if (ov) ov.style.display = "none"; }
 function gordenPrint() {
   if (!_gorden) return;
