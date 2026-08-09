@@ -6166,7 +6166,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.40";
+const APP_VERSION = "v8.41";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -15647,7 +15647,9 @@ async function showInsumoModal(mode, legajo, _resume) {
     });
     // insumos con movimientos pero fuera del catálogo (defensivo): quedan sin categoría,
     // en su propio chip — nunca se ocultan por un dato faltante.
-    Object.keys(saldos).forEach(function (k) { const sd = saldos[k], xu = xUni[k] || null; if ((sd.insumos || 0) !== 0 && !items.some(function (it) { return it.cod === k; })) items.push({ cod: k, nombre: sd.desc || "", sector: "", ubic: "", cat: "", noCode: String(k).indexOf("·") >= 0, stock: Number(sd.insumos || 0), stockByUni: xu, qty: 0, unidad: _defUni(xu, "") }); });
+    // v8.40 — incluir también los que tienen saldo por-unidad aunque la suma cruda dé 0 (ej.
+    // +10 Caja y −10 Uni netean 0 en vista_saldos_stock.insumos pero hay stock real en 2 unidades).
+    Object.keys(saldos).forEach(function (k) { const sd = saldos[k], xu = xUni[k] || null; if (((sd.insumos || 0) !== 0 || (xu && xu.length)) && !items.some(function (it) { return it.cod === k; })) items.push({ cod: k, nombre: sd.desc || "", sector: "", ubic: "", cat: "", noCode: String(k).indexOf("·") >= 0, stock: Number(sd.insumos || 0), stockByUni: xu, qty: 0, unidad: _defUni(xu, "") }); });
     items.sort(_insSortCod);
     _ins = { mode: mode, legajo: String(legajo || "").trim(), items: items, filtro: "", cat: "", qty: null, nuevo: null };
     insRender();
@@ -15745,16 +15747,33 @@ async function insFetchSaldosXUni() {
   } catch (_e) {}
   return m;
 }
+/* v8.40 — saldo TOTAL en la unidad base a partir de un desglose por-unidad (stockByUni),
+   convirtiendo cada unidad conocida con su factor. null si el insumo no tiene factores. */
+function _insBaseTotal(cod, arr) {
+  const f = insFactDe(cod); if (!f || !f.unis.length) return null;
+  let base = 0;
+  (arr || []).forEach(function (x) { const fa = insFactorDe(cod, x.uni); if (fa != null) base += (Number(x.saldo) || 0) * fa; });
+  return base;
+}
 /* Saldo de la UNIDAD que el operario tiene seleccionada (para el aviso "quedaría en…").
-   Si el insumo tiene desglose por unidad, devuelve el saldo de ESA unidad (0 si no hay
-   movimientos en ella); si no, cae al saldo único histórico. */
+   v8.40 — FACTOR-AWARE: si el insumo tiene unidad base y la unidad elegida tiene factor,
+   devuelve el saldo TOTAL en base convertido a esa unidad (baseTotal ÷ factor). Así, aunque
+   el stock esté consolidado en base (Uni), pedir en "Caja" ve el saldo real, no 0. Si no hay
+   factores, cae al desglose por-unidad (saldo de ESA unidad) o al saldo único histórico. */
 function _insStockForUnit(it) {
-  if (it && it.stockByUni && it.stockByUni.length) {
+  if (!it) return 0;
+  const f = insFactDe(it.cod);
+  if (f && f.base) {
+    const baseTot = _insBaseTotal(it.cod, it.stockByUni);
+    const fu = insFactorDe(it.cod, it.unidad);
+    if (baseTot != null && fu != null && fu > 0) return baseTot / fu;   // base → unidad elegida
+  }
+  if (it.stockByUni && it.stockByUni.length) {
     const u = String(it.unidad || "").trim().toLowerCase();
     for (let k = 0; k < it.stockByUni.length; k++) { if (String(it.stockByUni[k].uni).trim().toLowerCase() === u) return it.stockByUni[k].saldo; }
     return 0;
   }
-  return it ? it.stock : 0;
+  return it.stock;
 }
 function _insNum(n) { return Math.round(n * 1000) / 1000; }
 /* Etiqueta corta del insumo para el botón de la grilla: el código si tiene, o el
@@ -15979,10 +15998,16 @@ function _insQtyHtml(it, i, isIn) {
   if (!it) return "";
   const stk = _insStockForUnit(it);
   const neg = !isIn && it.qty > stk;
+  // v8.40 — con factores: mostrar el MISMO stock en todas las unidades (equivalencias), no un
+  // split que sume distinto. Sin factores: split por-unidad (no se pueden sumar) o el saldo simple.
+  const _fdef = insFactDe(it.cod);
+  const _baseTot = (_fdef && _fdef.base) ? _insBaseTotal(it.cod, it.stockByUni) : null;
   const mix = it.stockByUni && it.stockByUni.length > 1;
-  const stkLine = mix
-    ? ('stock: ' + it.stockByUni.map(function (u) { return '<b>' + _insNum(u.saldo) + '</b> ' + escapeHtml(u.uni); }).join(' · '))
-    : (it.unidad ? ('stock: ' + _insNum(stk) + ' ' + escapeHtml(it.unidad)) : 'stock: ' + _insNum(it.stock));
+  const stkLine = (_baseTot != null)
+    ? ('stock: ' + insEquivStr(it.cod, _baseTot))
+    : mix
+      ? ('stock: ' + it.stockByUni.map(function (u) { return '<b>' + _insNum(u.saldo) + '</b> ' + escapeHtml(u.uni); }).join(' · '))
+      : (it.unidad ? ('stock: ' + _insNum(stk) + ' ' + escapeHtml(it.unidad)) : 'stock: ' + _insNum(it.stock));
   const _k = insCatOf(it);
   const chips = _insUnitsFor(it, insLoadUnits()).map(function (u) {
     const ok = insUniPermitida(_k, u);

@@ -4,7 +4,18 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-09 · Versión app al documentar: **v8.40**
+> Última actualización: 2026-08-09 · Versión app al documentar: **v8.41**
+>
+> Nota: **v8.41 — Insumos: saldo del operario FACTOR-AWARE (cierra el descuadre por unidades).**
+> El catálogo del operario (RI/EI) mostraba el saldo desde `_insStockForUnit`, que era por-unidad:
+> tras consolidar en base (v8.40), pedir en "Caja" veía **0** aunque hubiera stock en la base "Uni".
+> Ahora `_insStockForUnit` es factor-aware: si el insumo tiene unidad base y la elegida tiene factor,
+> devuelve el **saldo total en base ÷ factor** (helper nuevo `_insBaseTotal` suma el desglose por
+> unidad × factor). El pop-up muestra las **equivalencias** (`insEquivStr`) para insumos con factores
+> (mismo stock en todas las unidades) en vez de un split que suma distinto. Además incluye insumos con
+> saldo por-unidad aunque la suma cruda de `vista_saldos_stock.insumos` dé 0 (ej. +10 Caja/−10 Uni).
+> Cierra el hallazgo Punto 2/3 de `guardian-stock`. (Pendiente aparte: insumos SIN factores cargados
+> en varias unidades siguen sumando mal en esa vista — se resuelve definiéndoles factores.)
 >
 > Nota: **v8.40 — Guardar a góndola por PRIORIDAD + Faltantes buscador numérico + Insumos consolidan.**
 > (1) **Guardar a góndola (MG, `showMGModal`/`mgRender`)**: la lista se ordena por **prioridad** =
