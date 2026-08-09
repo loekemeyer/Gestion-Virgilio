@@ -6154,7 +6154,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.02";
+const APP_VERSION = "v8.03";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -23251,7 +23251,10 @@ async function refreshFaltantes() {
       seen.add(k);
       (byTanda[tanda] = byTanda[tanda] || []).push({ art, esp, real, falta: esp - real, legajo: ev.legajo || "" });
     }
-    const tandas = Object.keys(byTanda).sort();
+    // v8.03 — ordenar las tandas por MÁS cajas faltantes primero (antes: alfabético)
+    const _tandaTot = {};
+    Object.keys(byTanda).forEach(function (t) { _tandaTot[t] = byTanda[t].reduce(function (s, x) { return s + x.falta; }, 0); });
+    const tandas = Object.keys(byTanda).sort(function (a, b) { return (_tandaTot[b] - _tandaTot[a]) || (a < b ? -1 : 1); });
     if (!tandas.length) {
       body.innerHTML = `<div class="falt-empty">✓ Sin faltantes el ${_faltLbl(dayKey)}.</div>`;
       return;
@@ -23319,7 +23322,9 @@ async function refreshFaltantes() {
       let tFalt = 0;
       const rows = arr.map(x => {
         totArts++; totCajas += x.falta; tFalt += x.falta;
-        const main = `<tr><td class="c-art">${escapeHtml(x.art)}</td><td class="num c-muted">${x.real}</td><td class="num c-muted">${x.esp}</td><td class="falt"><span>${x.falta}</span></td><td class="c-leg">${escapeHtml(x.legajo)}</td></tr>`;
+        const _fc = x.falta <= 10 ? "#854d0e" : x.falta <= 50 ? "#9a3412" : "#991b1b";
+        const _fb = x.falta <= 10 ? "#fef9c3" : x.falta <= 50 ? "#fed7aa" : "#fecaca";
+        const main = `<tr><td class="c-art">${escapeHtml(x.art)}</td><td class="num c-muted">${x.real}</td><td class="num c-muted">${x.esp}</td><td class="falt"><span style="background:${_fb};color:${_fc};border-radius:5px;padding:1px 8px;font-weight:800;">${x.falta}</span></td><td class="c-leg">${escapeHtml(x.legajo)}</td></tr>`;
         return main + whoRow(tanda, x.art, x.real);
       }).join("");
       html += `<div class="falt-tanda"><div class="falt-tanda-h"><span class="falt-tanda-name">Tanda ${escapeHtml(tanda)}</span><span class="falt-tanda-badge">${tFalt} cajas faltan</span></div>` +
@@ -26006,11 +26011,28 @@ function facFaltDist(np){
    _facSecByNp. Muestra "secundario → principal". */
 let _facSecByNp = new Map();
 function facCambioCod(np){
-  const list = _facSecByNp.get(String(np).trim().replace(/\.0+$/, ""));
+  const npN = String(np).trim().replace(/\.0+$/, "");
+  const list = _facSecByNp.get(npN);
   if (!list || !list.length) return "";
-  return list.map(function(x){
-    return '<span title="Pedido en secundario ' + escapeHtml(x.sec) + '. Cambiá la NP en el ERP a ' + escapeHtml(x.ppal) + ' y confirmá en 🔀 Corregir códigos — el picking levanta el principal.">' + escapeHtml(x.sec) + ' → <b>' + escapeHtml(x.ppal) + '</b></span>';
+  const txt = list.map(function(x){
+    return '<span title="Pedido en secundario ' + escapeHtml(x.sec) + '. Cambiá la NP en el ERP a ' + escapeHtml(x.ppal) + ' — el picking levanta el principal al confirmar.">' + escapeHtml(x.sec) + ' → <b>' + escapeHtml(x.ppal) + '</b></span>';
   }).join("<br>");
+  // v8.03 — confirmar inline (sin abrir el panel): marca los cambios de esta NP como hechos.
+  return txt + '<br><button onclick="event.stopPropagation();facCambioCodConfirm(\'' + encodeURIComponent(npN) + '\')" style="width:auto;margin-top:4px;background:#16a34a;color:#fff;border:none;border-radius:7px;padding:3px 9px;font-size:11px;font-weight:800;cursor:pointer;">✓ Ya lo cambié</button>';
+}
+/* v8.03 — confirma inline (desde la columna Cambiar cód) todos los cambios de esa NP. */
+async function facCambioCodConfirm(npE){
+  const np = decodeURIComponent(npE);
+  const list = (_facSecByNp.get(np) || []).slice();
+  if (!list.length) return;
+  if (!confirm("Confirmás que ya cambiaste en el ERP:\n\n" + list.map(function(x){ return "NP " + np + ": " + x.sec + " → " + x.ppal + " (" + x.cajas + " cajas)"; }).join("\n") + "\n\nEl picking va a levantar el principal.")) return;
+  try {
+    for (var i = 0; i < list.length; i++) { await _correccPost(np, list[i].sec, list[i].ppal, list[i].cajas); }
+    _correccCache = null;
+    _facSecByNp.delete(np);
+    if (typeof facRender === "function") facRender(_facLastTandas || []);
+    facCorreccRefreshCount();
+  } catch(e){ try { alert("No se pudo guardar: " + (e.message || e)); } catch(_e){} }
 }
 /* v7.91 — PANEL de la operadora: pedidos cargados en código SECUNDARIO a corregir.
    Lee la vista vista_pedidos_secundarios (PPP_Base_Pedidos × Equivalencias_Familia) y
