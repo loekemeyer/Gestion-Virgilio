@@ -4,7 +4,18 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-09 · Versión app al documentar: **v8.30**
+> Última actualización: 2026-08-09 · Versión app al documentar: **v8.33**
+>
+> Nota: **v8.33 — "Pedidos Entregados": la fecha de salida sale de CARGA CAMIÓN (CCN), default PPP.**
+> El bug del sábado era que la fecha venía de `Facturacion_Cierres.fecha_reparto` (= cierre+1, la
+> escribía la app; v8.32 le puso weekend-skip). Ahora `vista_ppp_pedidos_entregados` expone
+> **`fecha_carga`** (día del CCN, `Registros...opcion='CCN'`, texto=NP|TANDA, en tz AR) y **`fecha_ppp`**
+> (fecha_entrega de la PPP). El front usa `frep = fecha_carga || fecha_ppp || fecha_salida ||
+> facturado_at` → **la que vale es carga camión; default la PPP**. Si carga ≠ PPP, marca
+> **"⚠ PPP decía DD/MM"** en el pedido + contador arriba (para detectar PPP mal cargadas). **Ya no usa
+> `fecha_reparto`** → los 15 cierres viejos con reparto sábado se muestran solos en su fecha real, sin
+> migrar datos. (v8.31: planilla Insumos por categoría con columnas Cód/ISIS/Detalle/Ubic/Primaria/
+> Secundaria/Factor.)
 >
 > Nota: **v8.30 — Insumos: fix guardado (isis) + editor ⚖ rediseñado (más claro).**
 > (1) **Bug**: `insumo_editar` fallaba con "malformed array literal: 'isis'" (append de literal a
