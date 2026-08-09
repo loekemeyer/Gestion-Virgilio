@@ -6166,7 +6166,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.41";
+const APP_VERSION = "v8.42";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -14332,8 +14332,7 @@ function _stkInsListado(k, items) {
           '<td class="num" style="border-left:1px solid #eef2f7;">' + (du.cantS !== "" ? du.cantS : '<span class="stk-sub">—</span>') + '</td>' +
           '<td>' + (du.uniS ? escapeHtml(du.uniS) : '<span class="stk-sub">—</span>') + '</td>' +
           '<td class="num" style="border-left:1px solid #eef2f7;">' + (du.factor !== "" ? du.factor : '<span class="stk-sub">—</span>') + '</td>' +
-          '<td><button class="stk-btn" onclick="stkInsEdit(\'art:' + escapeHtml(it.cod) + '\')">Editar</button> ' +
-          '<button class="stk-btn" onclick="stkInsEditFact(\'' + escapeHtml(it.cod) + '\')" title="Unidades y factores (⚖)">⚖</button></td></tr>';
+          '<td><button class="stk-btn" onclick="stkInsEdit(\'art:' + escapeHtml(it.cod) + '\')">Editar</button></td></tr>';
       }
       const du = _insDosUnidades(it);   // v8.35 — prellenar secundaria/factor en la edición
       return '<tr>' +
@@ -14347,8 +14346,7 @@ function _stkInsListado(k, items) {
         '<td>' + _stkInsUniSel("edSecUni_" + it.cod, du.uniS) + '</td>' +
         '<td style="border-left:1px solid #eef2f7;"><input class="stk-inp" id="edFactor_' + escapeHtml(it.cod) + '" type="number" step="any" value="' + escapeHtml(du.factor) + '" style="width:58px;" placeholder="factor" oninput="stkInsAutoSec(\'' + escapeHtml(it.cod) + '\',\'factor\')" title="Cuántas ' + escapeHtml(du.uniP || "base") + ' hay en 1 de la secundaria"></td>' +
         '<td><button class="stk-btn" onclick="stkInsGuardar(\'' + escapeHtml(it.cod) + '\')">✓ Guardar</button> ' +
-        '<button class="stk-btn stk-btn-x" onclick="stkInsEdit(null)">Cancelar</button> ' +
-        '<button class="stk-btn" onclick="stkInsEditFact(\'' + escapeHtml(it.cod) + '\')" title="Unidades/factores">⚖</button></td></tr>';
+        '<button class="stk-btn stk-btn-x" onclick="stkInsEdit(null)">Cancelar</button></td></tr>';
     }).join("");
     h += '</tbody></table></div>';
   }

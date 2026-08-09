@@ -4,7 +4,14 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-09 · Versión app al documentar: **v8.41**
+> Última actualización: 2026-08-09 · Versión app al documentar: **v8.42**
+>
+> Nota: **v8.42 — Insumos: se saca la ⚖ de la lista por categoría (la edición inline alcanza).**
+> En la lista **por categoría** (`_stkInsListado`) la edición inline de Cant secundaria / Unidad /
+> Factor (v8.35) ya cubre definir la unidad secundaria + factor, así que el botón **⚖** (editor
+> `stkInsEditFact`/`_stkInsFactRow`) se quitó de las filas (lectura y edición) — menos ruido. La ⚖
+> sigue disponible en la lista **"Todos"** (buscador global) como editor avanzado para insumos con
+> 3+ unidades / elegir la base (esa lista no tiene la edición inline de secundaria/factor).
 >
 > Nota: **v8.41 — Insumos: saldo del operario FACTOR-AWARE (cierra el descuadre por unidades).**
 > El catálogo del operario (RI/EI) mostraba el saldo desde `_insStockForUnit`, que era por-unidad:
