@@ -4,7 +4,14 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-09 · Versión app al documentar: **v8.28**
+> Última actualización: 2026-08-09 · Versión app al documentar: **v8.30**
+>
+> Nota: **v8.30 — Insumos: fix guardado (isis) + editor ⚖ rediseñado (más claro).**
+> (1) **Bug**: `insumo_editar` fallaba con "malformed array literal: 'isis'" (append de literal a
+> `text[]`); se pasó a `array_append(...)` en todos los cambios. (2) **Editor de factores** rediseñado:
+> se elige la **unidad base arriba una sola vez** y cada equivalencia se lee natural **"1 MC = 240 Uni"**
+> (+ ejemplo). Estado `_stkIns.factBase` + `_stkIns.factEq` (antes `factRows` con radios, confuso).
+> (v8.29: el editor ⚖ no abría fuera de "Todos" → extraído a `_stkInsFactRow` y usado en las dos listas.)
 >
 > Nota: **v8.28 — Insumos: código `isis` (del sistema) separado del `cod` conocido.** Columna nueva
 > `Insumos.isis` (informativa); el `cod` conocido **sigue siendo la clave del stock**. Se edita en el

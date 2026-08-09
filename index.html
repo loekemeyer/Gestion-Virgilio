@@ -6159,7 +6159,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.29";
+const APP_VERSION = "v8.30";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -14447,65 +14447,74 @@ function _stkInsUniSel(id, sel) {
     '</select>';
 }
 function stkInsEdit(k) { if (!_stkIns) return; _stkIns.edit = k; stkRender(); }
-/* v8.26 — editor de factores de conversión por insumo */
+/* v8.29 — editor de factores por insumo. Estado: base (unidad más chica) + equivalencias [{u,f}]. */
 function stkInsEditFact(cod) {
   if (!_stkIns) return;
   const f = insFactDe(cod);
-  _stkIns.factRows = (f && f.unis.length) ? f.unis.map(function (u) { return { u: u.u, f: u.f, base: !!u.base }; }) : [{ u: "Uni", f: 1, base: true }];
+  if (f && f.unis.length) {
+    _stkIns.factBase = f.base || (f.unis[0] || {}).u || "Uni";
+    _stkIns.factEq = f.unis.filter(function (u) { return !_insUEq(u.u, _stkIns.factBase); }).map(function (u) { return { u: u.u, f: u.f }; });
+  } else { _stkIns.factBase = "Uni"; _stkIns.factEq = []; }
   _stkIns.edit = "fact:" + cod; stkRender();
 }
-/* v8.28 — fila-editor de factores (colspan). Se usa en las dos listas de insumos. */
+/* v8.29 — fila-editor de factores (colspan). Base arriba (una vez) + equivalencias "1 X = N base". */
 function _stkInsFactRow(it) {
-  const fr = _stkIns.factRows || [];
-  const baseU = (fr.filter(function (x) { return x.base; })[0] || {}).u || "base";
-  const opts = function (sel) { return INS_UNIS.map(function (u) { return '<option' + (_insUEq(u, sel) ? ' selected' : '') + '>' + escapeHtml(u) + '</option>'; }).join(""); };
-  const body = fr.map(function (row, i) {
-    return '<div style="display:flex;gap:6px;align-items:center;margin:3px 0;flex-wrap:wrap;">' +
-      '<label style="font-size:11px;"><input type="radio" name="fBase" ' + (row.base ? "checked" : "") + ' onchange="stkInsFactBase(' + i + ')"> base</label>' +
-      '<span style="font-size:12px;">1</span>' +
-      '<select class="stk-inp" id="fU_' + i + '" style="width:110px;">' + opts(row.u) + '</select>' +
-      '<span style="font-size:12px;">=</span>' +
-      '<input class="stk-inp" id="fF_' + i + '" type="number" step="any" value="' + escapeHtml(row.base ? 1 : row.f) + '" style="width:80px;"' + (row.base ? ' disabled' : '') + '>' +
-      '<span style="font-size:12px;color:#64748b;">' + escapeHtml(baseU) + '</span>' +
-      (row.base ? '' : '<button class="stk-btn stk-btn-x" onclick="stkInsFactDel(' + i + ')" style="padding:2px 7px;">✕</button>') +
+  const base = _stkIns.factBase || "Uni";
+  const eq = _stkIns.factEq || [];
+  const opt = function (sel) { return INS_UNIS.map(function (u) { return '<option' + (_insUEq(u, sel) ? ' selected' : '') + '>' + escapeHtml(u) + '</option>'; }).join(""); };
+  const rows = eq.map(function (r, i) {
+    return '<div style="display:flex;gap:6px;align-items:center;margin:4px 0;flex-wrap:wrap;">' +
+      '<span style="font-size:13px;">1</span>' +
+      '<select class="stk-inp" id="fU_' + i + '" style="width:120px;">' + opt(r.u) + '</select>' +
+      '<span style="font-size:13px;">=</span>' +
+      '<input class="stk-inp" id="fF_' + i + '" type="number" step="any" value="' + escapeHtml(r.f) + '" style="width:90px;" placeholder="cuántas">' +
+      '<b style="font-size:13px;">' + escapeHtml(base) + '</b>' +
+      '<button class="stk-btn stk-btn-x" onclick="stkInsFactDel(' + i + ')" style="padding:2px 8px;">✕</button>' +
       '</div>';
   }).join("");
   return '<tr class="stk-detrow"><td colspan="7"><div class="stk-det">' +
-    '<div style="font-weight:800;margin-bottom:5px;">⚖ Unidades de <b>' + escapeHtml(it.cod) + '</b> — el <b>mismo stock</b> expresado distinto (no se suman). Marcá la <b>base</b> (la más chica) y poné cuántas BASE hay en 1 de cada otra.</div>' +
-    body +
-    '<div style="margin-top:7px;"><button class="stk-btn" onclick="stkInsFactAdd()">+ unidad</button> ' +
+    '<div style="font-weight:800;margin-bottom:6px;">⚖ Unidades de <b>' + escapeHtml(it.cod) + '</b> — el <b>mismo stock</b> en distintas unidades (no se suman).</div>' +
+    '<div style="margin-bottom:8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;">' +
+    '<b style="font-size:13px;">Unidad base</b> <span class="stk-sub">(la más chica, ej. Uni)</span>: ' +
+    '<select class="stk-inp" id="fBase" onchange="stkInsFactBaseSet()" style="width:120px;">' + opt(base) + '</select></div>' +
+    (eq.length ? '<div class="stk-sub" style="margin-bottom:3px;">Cuántas <b>' + escapeHtml(base) + '</b> hay en 1 de cada otra unidad:</div>' : '') +
+    rows +
+    '<div style="margin-top:8px;"><button class="stk-btn" onclick="stkInsFactAdd()">+ otra unidad</button> ' +
     '<button class="stk-btn ok" onclick="stkInsFactGuardar(\'' + escapeHtml(it.cod) + '\')">✓ Guardar</button> ' +
     '<button class="stk-btn stk-btn-x" onclick="stkInsEdit(null)">Cancelar</button></div>' +
+    '<div class="stk-sub" style="margin-top:6px;">Ej.: base <b>Uni</b> y <b>1 MC = 240 Uni</b> → si hay 6000 Uni, se muestra también <b>25 MC</b> (mismo stock, dos formas).</div>' +
     '</div></td></tr>';
 }
 function _stkInsFactRead() {
-  if (!_stkIns || !_stkIns.factRows) return;
-  _stkIns.factRows.forEach(function (row, i) {
+  if (!_stkIns) return;
+  const b = document.getElementById("fBase"); if (b) _stkIns.factBase = b.value;
+  (_stkIns.factEq || []).forEach(function (r, i) {
     const us = document.getElementById("fU_" + i), fs = document.getElementById("fF_" + i);
-    if (us) row.u = us.value;
-    if (fs) row.f = row.base ? 1 : (parseFloat(String(fs.value).replace(",", ".")) || 0);
+    if (us) r.u = us.value;
+    if (fs) r.f = parseFloat(String(fs.value).replace(",", ".")) || 0;
   });
 }
-function stkInsFactBase(i) { _stkInsFactRead(); (_stkIns.factRows || []).forEach(function (r, j) { r.base = (j === i); if (r.base) r.f = 1; }); stkRender(); }
-function stkInsFactAdd() { _stkInsFactRead(); (_stkIns.factRows = _stkIns.factRows || []).push({ u: "", f: 1, base: false }); stkRender(); }
-function stkInsFactDel(i) { _stkInsFactRead(); _stkIns.factRows.splice(i, 1); if (_stkIns.factRows.length && !_stkIns.factRows.some(function (r) { return r.base; })) { _stkIns.factRows[0].base = true; _stkIns.factRows[0].f = 1; } stkRender(); }
+function stkInsFactBaseSet() { _stkInsFactRead(); stkRender(); }
+function stkInsFactAdd() { _stkInsFactRead(); (_stkIns.factEq = _stkIns.factEq || []).push({ u: "", f: 1 }); stkRender(); }
+function stkInsFactDel(i) { _stkInsFactRead(); (_stkIns.factEq || []).splice(i, 1); stkRender(); }
 async function stkInsFactGuardar(cod) {
   _stkInsFactRead();
-  const seen = {}, out = [];
-  (_stkIns.factRows || []).forEach(function (r) {
-    const u = String(r.u || "").trim(); if (!u) return;
+  const base = String(_stkIns.factBase || "").trim();
+  if (!base) { alert("Elegí la unidad base."); return; }
+  const seen = {}, out = [{ unidad: base, factor: 1, es_base: true }]; seen[base.toLowerCase()] = 1;
+  let bad = false;
+  (_stkIns.factEq || []).forEach(function (r) {
+    const u = String(r.u || "").trim(); if (!u || _insUEq(u, base)) return;
     const k = u.toLowerCase(); if (seen[k]) return; seen[k] = 1;
-    out.push({ unidad: u, factor: r.base ? 1 : (Number(r.f) || 0), es_base: !!r.base });
+    if (!(Number(r.f) > 0)) bad = true;
+    out.push({ unidad: u, factor: Number(r.f) || 0, es_base: false });
   });
-  if (out.length) {
-    if (out.filter(function (r) { return r.es_base; }).length !== 1) { alert("Marcá exactamente UNA unidad base (la más chica)."); return; }
-    if (out.some(function (r) { return !r.es_base && !(r.factor > 0); })) { alert("Cada unidad que no es base necesita un factor > 0 (cuántas base entran en 1)."); return; }
-  }
+  if (bad) { alert("Cada unidad necesita cuántas " + base + " hay en 1 (un número > 0)."); return; }
   try {
     await _stkInsRpc("insumo_factores_guardar", { p_cod: cod, p_factores: out });
     await insFetchFactores();
     _stkIns.msg = "✓ Unidades de " + cod + " guardadas.";
-    _stkIns.edit = null; _stkIns.factRows = null;
+    _stkIns.edit = null; _stkIns.factEq = null; _stkIns.factBase = null;
     await stkInsRefresh(); stkRender();
   } catch (e) { alert("No se pudo: " + (e.message || e)); }
 }
