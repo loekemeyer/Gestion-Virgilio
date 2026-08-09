@@ -6158,7 +6158,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.14";
+const APP_VERSION = "v8.15";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -13426,7 +13426,7 @@ function stkBodyFaltante() {
   h += '<div class="falt-wrap"><table class="falt-tbl"><thead><tr>' +
     '<th class="falt-cod">Cód</th><th class="falt-desc">Descripción</th><th class="falt-fab">Fabricante</th>' +
     '<th class="falt-stk">Stock</th>' +
-    '<th class="falt-sem" title="Cajas que YA faltaron al armar (tandas pickeadas): lo que el pickeador no encontró. Dato real, no proyección.">🔴 Faltó armado</th>' +
+    '<th class="falt-sem" title="Cajas que YA faltaron al armar (tandas pickeadas): lo que el pickeador no encontró. Dato real, no proyección.">🔴 Faltó<br>armado</th>' +
     '<th class="falt-sem">Falt S1</th><th class="falt-sem">Falt S2</th>' +
     '<th class="falt-sem" title="Cajas que hay que cambiar de NP en el ERP: el código pedido no tiene stock pero un hermano equivalente (mismo producto, otro SKU) sí. El detalle por NP está en Facturación.">⚠ Cambio NP</th>';
   // Headers de días
