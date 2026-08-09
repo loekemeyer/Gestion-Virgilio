@@ -3072,7 +3072,14 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
 .falt-drill { position:fixed; z-index:1600; background:#fff; border:1px solid #e2e8f0;
   border-radius:10px; box-shadow:0 8px 25px rgba(0,0,0,.18); padding:14px; min-width:280px;
   max-width:380px; max-height:50vh; overflow-y:auto; animation:slideUp .15s ease-out; }
+.falt-drill.wide { max-width:560px; min-width:420px; }
 .falt-drill h4 { margin:0 0 8px; font-size:14px; color:#1e293b; }
+.falt-ped-tbl { width:100%; border-collapse:collapse; font-size:11px; }
+.falt-ped-tbl th { text-align:left; color:#64748b; font-weight:700; padding:3px 6px;
+  border-bottom:1px solid #e2e8f0; white-space:nowrap; position:sticky; top:0; background:#fff; }
+.falt-ped-tbl th.num, .falt-ped-tbl td.num { text-align:right; }
+.falt-ped-tbl td { padding:3px 6px; border-bottom:1px solid #f1f5f9; color:#334155; white-space:nowrap; }
+.falt-ped-tbl td.rs { max-width:150px; overflow:hidden; text-overflow:ellipsis; }
 .falt-drill-row { display:flex; align-items:center; gap:8px; padding:5px 0;
   border-bottom:1px solid #f1f5f9; font-size:12px; }
 .falt-drill-row label { display:flex; align-items:center; gap:6px; flex:1; cursor:pointer; }
@@ -6159,7 +6166,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.36";
+const APP_VERSION = "v8.37";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -13040,7 +13047,7 @@ async function stkFaltLoad() {
   _stk.faltLoaded = "loading"; stkRender();
   try {
     var res = await Promise.all([
-      supaFetchAllSafe(SUPABASE_PPP_PROG_ENDPOINT, "select=np,fecha_entrega,razon_social,tanda"),
+      supaFetchAllSafe(SUPABASE_PPP_PROG_ENDPOINT, "select=np,fecha_entrega,razon_social,tanda,cod"),
       fetchPickingBase(),
       supaFetchAllSafe(SUPABASE_FACTURACION_NP_ENDPOINT, "select=np"),
       // v8.17 — "Fabricante" espeja el GENERADOR DE OCs: proveedor(es) de vista_generador_oc
@@ -13079,7 +13086,7 @@ async function stkFaltLoad() {
     ppp.forEach(function (r) {
       var np = pickNormNp(r.np); if (!np) return;
       if (facSet[np]) return;
-      npInfo[np] = { fecha: String(r.fecha_entrega || "").trim().slice(0, 10), rs: r.razon_social || "", tanda: String(r.tanda || "").trim().toUpperCase() };
+      npInfo[np] = { fecha: String(r.fecha_entrega || "").trim().slice(0, 10), rs: r.razon_social || "", tanda: String(r.tanda || "").trim().toUpperCase(), cliente: String(r.cod || "").trim() };
     });
 
     // v8.14 — separar "ya preparado" de "aún no preparado" (día de armado):
@@ -13156,7 +13163,7 @@ async function stkFaltLoad() {
         if (!demanda[cod]) demanda[cod] = [];
         // v8.08 — el faltante se cuenta el DÍA DE ARMADO (día hábil anterior a la salida),
         // no el día de la PPP. Guardo también la fecha de salida para el drill.
-        demanda[cod].push({ fecha: _faltDiaArmado(info.fecha), fechaSalida: info.fecha, np: np, rs: info.rs, cajas: Number(it.cajas) || 0, cod: cod });
+        demanda[cod].push({ fecha: _faltDiaArmado(info.fecha), fechaSalida: info.fecha, np: np, rs: info.rs, cliente: info.cliente, cajas: Number(it.cajas) || 0, cod: cod });
       });
     });
     _stk.falt = {
@@ -13504,7 +13511,9 @@ function stkBodyFaltante() {
       '<td class="falt-desc" title="' + escapeHtml(a.desc) + '">' + escapeHtml(a.desc) + '</td>' +
       '<td class="falt-fab" title="' + escapeHtml(a.prov) + '">' + escapeHtml(a.prov || "—") + '</td>' +
       '<td class="num" style="font-weight:700">' + a.stock + '</td>' +
-      '<td class="num" style="font-weight:700;color:#334155;">' + a.totalDem + '</td>';
+      (a.totalDem > 0
+        ? '<td class="num falt-cell" style="font-weight:700;color:#334155;cursor:pointer;" onclick="stkFaltDrillPed(\'' + a.key + '\',event)" title="Tocá para ver cada pedido: NP, cliente, cajas, fecha PPP y a qué franja (S1/S2/Resto) cae.">' + a.totalDem + '</td>'
+        : '<td class="num" style="font-weight:700;color:#334155;">' + a.totalDem + '</td>');
     // v8.14 — Faltó al armar (REAL, ya preparado): rojo sólido para diferenciar de la proyección.
     // v8.16 — clickeable → muestra qué NPs/tandas salieron cortas.
     h += (a.realFalt > 0)
@@ -13595,6 +13604,16 @@ function stkFaltResetSim() {
 function stkFaltDrill(cod, fecha, evt) { _faltDrillOpen(cod, "day", fecha, evt); }
 function stkFaltDrillWin(cod, win, evt) { _faltDrillOpen(cod, "win", win, evt); }
 function stkFaltDrillReal(cod, evt) { _faltDrillOpen(cod, "real", "real", evt); }
+function stkFaltDrillPed(cod, evt) { _faltDrillOpen(cod, "ped", "ped", evt); }
+/* v8.37 — franja (S1/S2/Resto/sin fecha/pasada) de un pedido según su fecha de SALIDA (PPP). */
+function _faltFranja(fechaSalida, hoy, finS1, lunesS2, finS2) {
+  var sal = String(fechaSalida || "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(sal)) return { key: "sinfecha", label: "sin fecha", color: "#94a3b8" };
+  if (sal < hoy) return { key: "pasada", label: "pasada", color: "#b45309" };
+  if (sal <= finS1) return { key: "s1", label: "S1", color: "#b91c1c" };
+  if (sal >= lunesS2 && sal <= finS2) return { key: "s2", label: "S2", color: "#c2410c" };
+  return { key: "resto", label: "Resto", color: "#1e40af" };
+}
 
 function _faltDrillOpen(cod, kind, key, evt) {
   if (!_stk || !_stk.falt) return;
@@ -13606,9 +13625,36 @@ function _faltDrillOpen(cod, kind, key, evt) {
   // `cod` es la clave de familia: juntar TODOS los miembros equivalentes.
   var mems = equivMiembros(cod);
   var esFam = mems.length > 1;
-  var lista = [], title = "", sub = "", allowExcl = true, esReal = false;
+  var lista = [], title = "", sub = "", allowExcl = true, esReal = false, esPed = false;
 
-  if (kind === "real") {
+  if (kind === "ped") {
+    // v8.37 — TODOS los pedidos que forman "Total Pedidos" (demanda sin pickear), cada uno con
+    // su franja (S1/S2/Resto/sin fecha/pasada). Explica por qué el total no cae siempre en S1/S2.
+    esPed = true; allowExcl = false;
+    var hoyP = _faltHoy(), finS1P = _faltAddHabiles(hoyP, 5), lunesS2P = _faltAddHabiles(finS1P, 1), finS2P = _faltAddHabiles(finS1P, 5);
+    var byNpP = {};
+    mems.forEach(function (m) {
+      (F.demanda[m] || []).forEach(function (e) {
+        if (!byNpP[e.np]) byNpP[e.np] = { np: e.np, rs: e.rs, cliente: e.cliente || "", cajas: 0, fechaSalida: e.fechaSalida || "", cods: {} };
+        byNpP[e.np].cajas += (Number(e.cajas) || 0);
+        if (e.cod) byNpP[e.np].cods[codCanon(e.cod)] = true;
+      });
+    });
+    lista = Object.keys(byNpP).map(function (k) {
+      var o = byNpP[k]; o.franja = _faltFranja(o.fechaSalida, hoyP, finS1P, lunesS2P, finS2P); return o;
+    });
+    if (!lista.length) { stkFaltCloseDrill(); return; }
+    // Ordenar: primero por franja (s1 < s2 < resto < pasada < sin fecha), luego por cajas desc.
+    var _rank = { s1: 0, s2: 1, resto: 2, pasada: 3, sinfecha: 4 };
+    lista.sort(function (a, b) {
+      var ra = _rank[a.franja.key], rb = _rank[b.franja.key];
+      if (ra !== rb) return ra - rb;
+      return b.cajas - a.cajas;
+    });
+    var _tot = lista.reduce(function (ac, o) { return ac + o.cajas; }, 0);
+    title = escapeHtml(codCanon(cod)) + " — Total pedidos: " + Math.round(_tot) + " cj";
+    sub = lista.length + " NP" + (lista.length > 1 ? "s" : "") + " sin pickear. La franja sale de la fecha PPP: por eso lo que cae en <b>sin fecha</b> o <b>pasada</b> no aparece en S1/S2/Resto.";
+  } else if (kind === "real") {
     esReal = true; allowExcl = false;
     var byNpR = {};
     mems.forEach(function (m) {
@@ -13651,13 +13697,39 @@ function _faltDrillOpen(cod, kind, key, evt) {
   var old = document.getElementById("faltDrill");
   if (old) old.remove();
   var div = document.createElement("div");
-  div.className = "falt-drill";
+  div.className = esPed ? "falt-drill wide" : "falt-drill";
   div.id = "faltDrill";
-  div.style.left = Math.min(evt.clientX, window.innerWidth - 400) + "px";
+  var _w = esPed ? 560 : 400;
+  div.style.left = Math.max(6, Math.min(evt.clientX, window.innerWidth - _w)) + "px";
   div.style.top = Math.min(evt.clientY + 10, window.innerHeight - 300) + "px";
   var ih = '<button class="falt-drill-close" onclick="stkFaltCloseDrill()">✕</button>' +
     '<h4>' + title + '</h4>' +
     '<div style="font-size:11px;color:#64748b;margin-bottom:8px;">' + sub + '</div>';
+  if (esPed) {
+    ih += '<table class="falt-ped-tbl"><thead><tr>' +
+      '<th>NP</th><th>Cód cli</th><th>Razón social</th><th class="num">Cajas</th><th>Fecha PPP</th><th>Estado</th><th>Franja</th>' +
+      '</tr></thead><tbody>';
+    lista.forEach(function (it) {
+      var skuTag = (esFam && Object.keys(it.cods).length) ? ' <span style="color:#1e40af;font-weight:700;">(' + Object.keys(it.cods).join(", ") + ')</span>' : '';
+      var fppp = /^\d{4}-\d{2}-\d{2}$/.test(String(it.fechaSalida || "").slice(0, 10))
+        ? (_faltDiaSem(it.fechaSalida.slice(0, 10)) + " " + _faltFechaCorta(it.fechaSalida.slice(0, 10)))
+        : '<span style="color:#94a3b8;">—</span>';
+      ih += '<tr>' +
+        '<td style="font-weight:700;">' + escapeHtml(it.np) + skuTag + '</td>' +
+        '<td>' + escapeHtml(it.cliente || "—") + '</td>' +
+        '<td class="rs" title="' + escapeHtml(it.rs) + '">' + escapeHtml(it.rs || "—") + '</td>' +
+        '<td class="num" style="font-weight:700;">' + Math.round(it.cajas) + '</td>' +
+        '<td>' + fppp + '</td>' +
+        '<td style="color:#0369a1;">Sin pickear</td>' +
+        '<td style="font-weight:800;color:' + it.franja.color + ';">' + it.franja.label + '</td>' +
+        '</tr>';
+    });
+    ih += '</tbody></table>';
+    div.innerHTML = ih;
+    document.body.appendChild(div);
+    setTimeout(function () { document.addEventListener("click", _faltDrillOutside); }, 50);
+    return;
+  }
   lista.forEach(function (it) {
     // Si es familia, mostrar qué SKU pidió cada NP (para saber si hay que cambiarla)
     var skuTag = (esFam && Object.keys(it.cods).length) ? ' <span style="font-size:10px;color:#1e40af;font-weight:700;">(' + Object.keys(it.cods).join(", ") + ')</span>' : '';

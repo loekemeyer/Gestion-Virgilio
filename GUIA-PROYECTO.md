@@ -4,7 +4,17 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-09 · Versión app al documentar: **v8.35**
+> Última actualización: 2026-08-09 · Versión app al documentar: **v8.37**
+>
+> Nota: **v8.37 — Faltantes x día: "Total Pedidos" clickeable → pedidos con franja.** La celda
+> **Total Pedidos** ahora abre un drill (`stkFaltDrillPed` → `_faltDrillOpen` kind `"ped"`) con la
+> tabla de cada NP que compone el total: **NP · Cód cli · Razón social · Cajas · Fecha PPP · Estado
+> (siempre "Sin pickear", por construcción el total solo cuenta la demanda proyectada) · Franja**.
+> La **franja** (`_faltFranja`) sale de la fecha de SALIDA (PPP): `S1`/`S2`/`Resto`/`pasada`/`sin
+> fecha`, mismas ventanas que Falt S1/S2. Así se ve por qué el total no cae siempre en S1/S2/Resto:
+> los pedidos **sin fecha** o con fecha **pasada** consumen stock pero no aparecen en las columnas de
+> semana. `stkFaltLoad` ahora trae `PPP_Programacion_Diaria.cod` (Cód cliente) → `npInfo[np].cliente`
+> → cada entry de `demanda`. La `.falt-drill.wide` (max 560px) usa `.falt-ped-tbl`.
 >
 > Nota: **v8.35 — Insumos admin: editar factores en la fila "Editar" + UX.** (1) En **Editar** ahora
 > se cargan **Cant secundaria / Unidad secundaria / Factor** directo (sin entrar al ⚖): `stkInsAutoSec`
