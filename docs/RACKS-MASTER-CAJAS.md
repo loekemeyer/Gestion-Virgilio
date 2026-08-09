@@ -15,6 +15,7 @@ de master a nivel producto — cuando esté completa la lista, se decide el meca
 | 437E (y 437E LK / 437E CH) | Colador 16cm | **3** |
 | 438E (y 438E LK) | Colador 20cm | **3** |
 | 198E | Pelador Negro Dentado Loke | **12** |
+| 988E | Espumadera Línea Premium | **12** |
 
 ## ➖ SIN master caja (se bajan 1:1 — es correcto, NO es un dato faltante)
 
@@ -34,5 +35,4 @@ No hay que cargarles ratio; "s/master" es el comportamiento correcto para ellos.
 |-----|-------------|---------:|:--------------:|
 | 809E CH | (809 CH) | 336 | ___ |
 | 809E LK | (809 LK) | 48 | ___ |
-| 988E | Espumadera Línea Premium | 12 | ___ |
 | 566E | Aceitera 100 ml | 128 | ___ _(además tiene góndola −29 a corregir)_ |
