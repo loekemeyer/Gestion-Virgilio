@@ -6166,7 +6166,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.42";
+const APP_VERSION = "v8.43";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -14346,7 +14346,8 @@ function _stkInsListado(k, items) {
         '<td>' + _stkInsUniSel("edSecUni_" + it.cod, du.uniS) + '</td>' +
         '<td style="border-left:1px solid #eef2f7;"><input class="stk-inp" id="edFactor_' + escapeHtml(it.cod) + '" type="number" step="any" value="' + escapeHtml(du.factor) + '" style="width:58px;" placeholder="factor" oninput="stkInsAutoSec(\'' + escapeHtml(it.cod) + '\',\'factor\')" title="Cuántas ' + escapeHtml(du.uniP || "base") + ' hay en 1 de la secundaria"></td>' +
         '<td><button class="stk-btn" onclick="stkInsGuardar(\'' + escapeHtml(it.cod) + '\')">✓ Guardar</button> ' +
-        '<button class="stk-btn stk-btn-x" onclick="stkInsEdit(null)">Cancelar</button></td></tr>';
+        '<button class="stk-btn stk-btn-x" onclick="stkInsEdit(null)">Cancelar</button> ' +
+        '<button class="stk-btn" onclick="stkInsEditFact(\'' + escapeHtml(it.cod) + '\',true)" title="Agregar una 3ª unidad (o más) y su factor — abre el editor de unidades con lo que ya cargaste">＋ unidad</button></td></tr>';
     }).join("");
     h += '</tbody></table></div>';
   }
@@ -14583,10 +14584,23 @@ function stkInsAutoSec(cod, from) {
     if (sEl) sEl.value = (f > 0 && p) ? (Math.round((p / f) * 1000) / 1000) : "";
   }
 }
-function stkInsEditFact(cod) {
+function stkInsEditFact(cod, fromInline) {
   if (!_stkIns) return;
   const f = insFactDe(cod);
-  if (f && f.unis.length) {
+  // v8.43 — si venís de la edición inline ("＋ unidad"), arrancá el editor con lo que YA cargaste:
+  // base = unidad primaria tipeada, + las unidades guardadas, + la secundaria del renglón, + una
+  // fila en blanco para la 3ª. Así no se pierde nada al pasar del inline al editor multi-unidad.
+  const baseInline = fromInline ? _stkInsVal("edUni_" + cod) : "";
+  if (baseInline) {
+    _stkIns.factBase = baseInline;
+    _stkIns.factEq = [];
+    const seen = {};
+    if (f && f.unis.length) f.unis.forEach(function (u) { if (!_insUEq(u.u, baseInline)) { _stkIns.factEq.push({ u: u.u, f: u.f }); seen[String(u.u).toLowerCase()] = 1; } });
+    const secUni = _stkInsVal("edSecUni_" + cod);
+    const secFac = parseFloat(String(_stkInsVal("edFactor_" + cod)).replace(",", ".")) || 0;
+    if (secUni && !_insUEq(secUni, baseInline) && !seen[secUni.toLowerCase()]) _stkIns.factEq.push({ u: secUni, f: secFac || 1 });
+    _stkIns.factEq.push({ u: "", f: 1 });   // fila lista para la nueva unidad
+  } else if (f && f.unis.length) {
     _stkIns.factBase = f.base || (f.unis[0] || {}).u || "Uni";
     _stkIns.factEq = f.unis.filter(function (u) { return !_insUEq(u.u, _stkIns.factBase); }).map(function (u) { return { u: u.u, f: u.f }; });
   } else { _stkIns.factBase = "Uni"; _stkIns.factEq = []; }

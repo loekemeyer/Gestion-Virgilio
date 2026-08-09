@@ -4,7 +4,15 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-09 · Versión app al documentar: **v8.42**
+> Última actualización: 2026-08-09 · Versión app al documentar: **v8.43**
+>
+> Nota: **v8.43 — Insumos: botón "＋ unidad" en la edición inline (para la 3ª unidad o más).**
+> En la fila de edición por categoría, a la derecha de Guardar/Cancelar, hay un **＋ unidad** que abre
+> el editor multi-unidad (`stkInsEditFact(cod, true)` → `_stkInsFactRow`) **sembrado con lo que ya
+> cargaste inline**: base = unidad primaria, + las unidades ya guardadas, + la secundaria del renglón,
+> + una fila en blanco para la nueva. Así el caso normal (base + 1 secundaria) se hace inline y, si
+> hace falta una 3ª, se agrega sin perder lo tipeado. La ⚖ de la lista "Todos" sigue igual (arranca
+> desde los factores guardados: `stkInsEditFact(cod)` sin el flag).
 >
 > Nota: **v8.42 — Insumos: se saca la ⚖ de la lista por categoría (la edición inline alcanza).**
 > En la lista **por categoría** (`_stkInsListado`) la edición inline de Cant secundaria / Unidad /
