@@ -4,7 +4,17 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-09 · Versión app al documentar: **v8.11**
+> Última actualización: 2026-08-09 · Versión app al documentar: **v8.12**
+>
+> Nota: **v8.12 — Faltante por día: celda = faltante del DÍA (no acumulado) + fix pop-up NPs.**
+> Las columnas de día mostraban el **déficit acumulado corrido** (`balRun`): una vez negativo,
+> arrastraba el faltante a todos los días siguientes (ej.: 395 mostraba 14 el 09/08, 14 el 10/08,
+> 19 el 11/08 aunque no hubiera pedido nuevo esos días). Ahora cada celda muestra **solo lo que
+> falta ESE día** = la parte de la demanda del día de armado que el saldo disponible no cubre;
+> día sin demanda (o cubierto) → celda "—". Efecto secundario resuelto: como los números fantasma
+> no tenían NPs reales en esa fecha, tocar la celda cerraba el drill sin mostrar nada → **ahora
+> toda celda con número tiene NPs detrás y el pop-up aparece**. El resumen **Falt S1/S2 sigue
+> usando el déficit ACUMULADO** (total de cajas que faltan por ventana de salida), sin cambios.
 >
 > Nota: **v8.11 (#1 completo) — separación por empresa en Faltante por día.**
 > El módulo **Faltante por día** (`stkFaltLoad`/`stkBodyFaltante`) ahora keya la demanda con

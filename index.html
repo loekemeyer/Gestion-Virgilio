@@ -6158,7 +6158,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.11";
+const APP_VERSION = "v8.12";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -13243,16 +13243,23 @@ function stkBodyFaltante() {
     var faltS1 = 0, faltS2 = 0;
     var balRun = bal;
     allDiasDesdeHoy.forEach(function (f) {
-      balRun -= (demDia[f] || 0);
-      var falt = balRun < 0 ? Math.abs(balRun) : 0;
-      diasFalt[f] = falt;
-      // v8.09 — el faltante pasa el día de ARMADO (f), pero S1/S2 se agrupan por la
-      // SEMANA DE SALIDA (día hábil siguiente al armado).
+      // v8.12 — la celda de cada día muestra SOLO lo que falta ESE día (no el acumulado
+      // arrastrado): la parte de la demanda del día de armado que el saldo disponible no
+      // alcanza a cubrir. Un día sin demanda (o cubierto) queda en 0 → celda "—", y así no
+      // aparecen números fantasma en días sin pedido (que además rompían el pop-up de NPs).
+      var demF = demDia[f] || 0;
+      var dispF = balRun > 0 ? balRun : 0;
+      diasFalt[f] = demF > dispF ? (demF - dispF) : 0;
+      balRun -= demF;
+      // El déficit ACUMULADO sigue alimentando el resumen S1/S2 (total de cajas que faltan
+      // para las salidas de cada ventana). El faltante pasa el día de ARMADO (f), pero S1/S2
+      // se agrupan por la SEMANA DE SALIDA (día hábil siguiente al armado).
+      var faltCum = balRun < 0 ? Math.abs(balRun) : 0;
       var _sal = _faltProxHabil(f);
-      if (_sal >= lunesHoy && _sal <= finS1) faltS1 = Math.max(faltS1, falt);
-      if (_sal >= lunesS2 && _sal <= finS2) faltS2 = Math.max(faltS2, falt);
+      if (_sal >= lunesHoy && _sal <= finS1) faltS1 = Math.max(faltS1, faltCum);
+      if (_sal >= lunesS2 && _sal <= finS2) faltS2 = Math.max(faltS2, faltCum);
     });
-    diasCols.forEach(function (d) { if (diasFalt[d] === undefined) diasFalt[d] = bal < 0 ? Math.abs(bal) : 0; });
+    diasCols.forEach(function (d) { if (diasFalt[d] === undefined) diasFalt[d] = 0; });
 
     // v7.90 — cajas que requieren CAMBIO DE NP: demanda cargada sobre códigos SECUNDARIOS
     // (no el principal). No deben entrar pedidos al secundario → hay que corregir la NP.
