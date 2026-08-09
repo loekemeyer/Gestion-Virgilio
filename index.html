@@ -6159,7 +6159,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.33";
+const APP_VERSION = "v8.34";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -14219,13 +14219,13 @@ function _stkInsListado(k, items) {
     : (k === "?" ? "" : '<button class="stk-btn" onclick="if(_stkIns){_stkIns.nuevoEn=\'' + k + '\';stkRender();}">+ Agregar insumo a esta categoría</button>')) + '</div>';
   if (!lista.length) h += '<div class="stk-empty">Sin insumos' + (f ? " con ese filtro" : "") + '.</div>';
   else {
-    h += '<div class="stk-scroll"><table class="stk-tbl"><thead>' +
+    h += '<div class="stk-tblwrap"><table class="stk-tbl"><thead>' +
       '<tr><th rowspan="2">Cód</th><th rowspan="2">ISIS</th><th rowspan="2">Detalle</th><th rowspan="2">Ubic.</th>' +
       '<th colspan="2" style="text-align:center;border-left:1px solid #cbd5e1;">Primaria</th>' +
       '<th colspan="2" style="text-align:center;border-left:1px solid #cbd5e1;">Secundaria</th>' +
       '<th rowspan="2" class="num" style="border-left:1px solid #cbd5e1;">Factor</th><th rowspan="2"></th></tr>' +
-      '<tr><th class="num" style="border-left:1px solid #cbd5e1;">Cant</th><th>Un.</th>' +
-      '<th class="num" style="border-left:1px solid #cbd5e1;">Cant</th><th>Un.</th></tr>' +
+      '<tr><th class="num" style="border-left:1px solid #cbd5e1;top:30px;">Cant</th><th style="top:30px;">Un.</th>' +
+      '<th class="num" style="border-left:1px solid #cbd5e1;top:30px;">Cant</th><th style="top:30px;">Un.</th></tr>' +
       '</thead><tbody>';
     h += lista.map(function (it) {
       const ed = _stkIns.edit === "art:" + it.cod;
@@ -20424,7 +20424,7 @@ const PPP_XLS_HOJAS = [
   { view: "vista_ppp_programacion_pendiente", hoja: "Programación Diaria", order: "tanda.asc,np.asc",
     cols: [["tanda","Tanda"],["np","NP"],["tipo","Tipo"],["cod_cliente","Cód cliente"],["razon_social","Razón social"],["m3","m³"],["zona","Zona"],["barrio","Barrio"],["direccion","Dirección"],["op","Op"],["fecha_recep","Fecha recep"],["fecha_entrega","Fecha entrega"],["fecha_fc","Fecha FC"],["observaciones","Observaciones"]] },
   { view: "vista_ppp_pedidos_entregados", hoja: "Pedidos Entregados", order: "facturado_at.desc",
-    cols: [["np","NP"],["tanda","Tanda"],["cod_cliente","Cód cliente"],["razon_social","Razón social"],["m3","m³"],["fecha_salida","Fecha salida"],["fecha_cierre","Fecha cierre"],["fecha_reparto","Fecha reparto"],["facturado_at","Facturado"],["cajas_pedidas","Cajas ped."],["cajas_entregadas","Cajas entr."],["cajas_falto","Faltó"]] }
+    cols: [["np","NP"],["tanda","Tanda"],["cod_cliente","Cód cliente"],["razon_social","Razón social"],["m3","m³"],["fecha_salida_real","Salió (carga cam.)"],["fecha_ppp","Fecha PPP"],["fecha_cierre","Fecha cierre"],["facturado_at","Facturado"],["cajas_pedidas","Cajas ped."],["cajas_entregadas","Cajas entr."],["cajas_falto","Faltó"]] }
 ];
 async function pppExportExcel() {
   try {
