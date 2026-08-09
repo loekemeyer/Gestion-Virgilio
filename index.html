@@ -6167,7 +6167,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.61";
+const APP_VERSION = "v8.62";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -13912,7 +13912,7 @@ async function stkCapLoad() {
   try {
     const res = await Promise.all([
       supaFetchAllSafe(SUPABASE_CAPACIDAD_ENDPOINT, "select=sector,cod,cajas_max"),
-      supaFetchAllSafe(SUPABASE_OCMAX_ENDPOINT, "select=cod,descripcion,max_cajas,indice"),
+      supaFetchAllSafe(SUPABASE_OCMAX_ENDPOINT, "select=cod,descripcion,max_cajas,indice,activo"),
       ocgFetchProyeccion()
     ]);
     _stk.cap  = res[0] || [];
@@ -13989,7 +13989,10 @@ function stkBodyCapacidad() {
   // ⚠ Revisar: artículos con lugar en góndola pero SIN proyección/máximo. No debería
   // pasar (regla del dueño): suele ser el código mal escrito (le falta la E, un cero…).
   // Si el mismo código + "E" SÍ tiene máximo, lo sugerimos.
-  const revisar = arts.filter(function (r) { return r.max == null && r.capacidad > 0; });
+  // v8.62 — set de discontinuados (activo=false en OC_Maximos), para separarlos del "sin máximo".
+  const discontCap = {};
+  cmax.forEach(function (x) { if (x.activo === false) { const k = _ocgNorm(x.cod); if (k) discontCap[k] = true; } });
+  const revisar = arts.filter(function (r) { return r.max == null && r.capacidad > 0 && !discontCap[_ocgNorm(r.cod)]; });
   if (revisar.length) {
     const sugE = function (cod) { const k = _ocgNorm(cod); return maxByCod[k + "E"] ? (cod + "E") : null; };
     h += '<div style="background:#fef2f2;border:1.5px solid #fca5a5;border-radius:11px;padding:10px 12px;margin:0 0 12px;color:#991b1b;font-size:12.5px;line-height:1.4;">' +
@@ -13997,6 +14000,15 @@ function stkBodyCapacidad() {
       '<div style="margin-top:7px;">' + revisar.map(function (r) {
         const s = sugE(r.cod);
         return '<span style="display:inline-block;background:#fff;border:1px solid #fecaca;border-radius:8px;padding:3px 8px;margin:0 4px 4px 0;font-family:Consolas,Menlo,monospace;"><b>' + escapeHtml(r.cod) + '</b> <span style="color:#64748b;font-family:system-ui;">(' + r.capacidad + ' cj)</span>' + (s ? ' <b style="color:#166534;">→ ¿' + escapeHtml(s) + '?</b>' : '') + '</span>';
+      }).join("") + '</div></div>';
+  }
+  // v8.62 — discontinuados que TODAVÍA ocupan lugar en góndola → liberar el sector.
+  const discOcupa = arts.filter(function (r) { return discontCap[_ocgNorm(r.cod)] && r.capacidad > 0; });
+  if (discOcupa.length) {
+    h += '<div style="background:#f1f5f9;border:1.5px solid #cbd5e1;border-radius:11px;padding:10px 12px;margin:0 0 12px;color:#475569;font-size:12.5px;line-height:1.4;">' +
+      '<b>🚫 ' + discOcupa.length + ' discontinuado(s) que todavía ocupan lugar en góndola.</b> No se venden más — conviene <b>liberar el sector</b> (marcarlo “Libre” en Editar Planimetría) para reasignarlo.' +
+      '<div style="margin-top:7px;">' + discOcupa.map(function (r) {
+        return '<span style="display:inline-block;background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:3px 8px;margin:0 4px 4px 0;font-family:Consolas,Menlo,monospace;"><b>' + escapeHtml(r.cod) + '</b> <span style="color:#64748b;font-family:system-ui;">(' + r.capacidad + ' cj · ' + escapeHtml((r.sectores || []).slice(0, 3).join(", ")) + ')</span></span>';
       }).join("") + '</div></div>';
   }
   h += '<input class="stk-filtro" type="search" placeholder="🔎 Buscar código / sector" value="' + escapeHtml(_stk.filtro) + '" oninput="if(_stk){_stk.filtro=this.value;stkRender();}">';
