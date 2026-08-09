@@ -6158,7 +6158,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.20";
+const APP_VERSION = "v8.21";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -13340,7 +13340,7 @@ function stkBodyFaltante() {
     allDiasDesdeHoy.sort();
 
     var diasFalt = {};
-    var faltS1 = 0, faltS2 = 0;
+    var faltS1 = 0, faltS2 = 0, faltResto = 0;
     var balRun = bal;
     allDiasDesdeHoy.forEach(function (f) {
       // v8.12 — la celda de cada día muestra SOLO lo que falta ESE día (no el acumulado
@@ -13357,7 +13357,8 @@ function stkBodyFaltante() {
       // ARMADO (f), pero S1/S2 se agrupan por la SEMANA DE SALIDA (día hábil siguiente al armado).
       var _sal = _faltProxHabil(f);
       if (_sal >= lunesHoy && _sal <= finS1) faltS1 += faltDia;
-      if (_sal >= lunesS2 && _sal <= finS2) faltS2 += faltDia;
+      else if (_sal >= lunesS2 && _sal <= finS2) faltS2 += faltDia;
+      else if (_sal > finS2) faltResto += faltDia;   // v8.21 — salida más allá de la S2
     });
     diasCols.forEach(function (d) { if (diasFalt[d] === undefined) diasFalt[d] = 0; });
 
@@ -13380,7 +13381,7 @@ function stkBodyFaltante() {
       desc: descFam || artNombre(codShow, ""), prov: provMap[key] || provMap[String(key).replace(/\s+(LK|CH)$/, "")] || provMap[members[0]] || "",
       stock: Math.round(stockFam), totalDem: Math.round(totalDem),
       realFalt: Math.round(realFam),
-      faltS1: Math.round(faltS1), faltS2: Math.round(faltS2),
+      faltS1: Math.round(faltS1), faltS2: Math.round(faltS2), faltResto: Math.round(faltResto),
       diasFalt: diasFalt, sinFecha: sinFecha, subCambio: subCambio
     });
   });
@@ -13410,7 +13411,7 @@ function stkBodyFaltante() {
   arts = arts.filter(function (a) { return a.totalDem > 0 || (a.realFalt || 0) > 0; });
 
   // v8.02 — resumen (sobre TODOS los con demanda, antes de "solo quiebre")
-  var _hayQ = function (a) { return (a.realFalt || 0) > 0 || a.faltS1 > 0 || a.faltS2 > 0 || diasCols.some(function (d) { return (a.diasFalt[d] || 0) > 0; }); };
+  var _hayQ = function (a) { return (a.realFalt || 0) > 0 || a.faltS1 > 0 || a.faltS2 > 0 || (a.faltResto || 0) > 0 || diasCols.some(function (d) { return (a.diasFalt[d] || 0) > 0; }); };
   var sumNQ = 0, sumCajS1 = 0, sumNQ2 = 0, sumCambio = 0, sumRealN = 0, sumRealCj = 0;
   arts.forEach(function (a) { if (a.faltS1 > 0) { sumNQ++; sumCajS1 += a.faltS1; } if (a.faltS2 > 0) sumNQ2++; if (a.subCambio > 0) sumCambio++; if ((a.realFalt || 0) > 0) { sumRealN++; sumRealCj += a.realFalt; } });
 
@@ -13456,6 +13457,7 @@ function stkBodyFaltante() {
     '<th class="falt-stk">Stock</th>' +
     '<th class="falt-sem" title="Cajas que YA faltaron al armar (tandas pickeadas): lo que el pickeador no encontró. Dato real, no proyección.">🔴 Faltó<br>armado</th>' +
     '<th class="falt-sem">Falt S1</th><th class="falt-sem">Falt S2</th>' +
+    '<th class="falt-sem" title="Faltante proyectado para salidas MÁS ALLÁ de la S2 (semana 3 en adelante).">Resto</th>' +
     '<th class="falt-sem" title="Cajas que hay que cambiar de NP en el ERP: el código pedido no tiene stock pero un hermano equivalente (mismo producto, otro SKU) sí. El detalle por NP está en Facturación.">⚠ Cambio<br>NP</th>';
   // Headers de días
   diasCols.forEach(function (d) {
@@ -13466,7 +13468,7 @@ function stkBodyFaltante() {
   h += '</tr></thead><tbody>';
 
   if (arts.length === 0) {
-    h += '<tr><td colspan="' + (8 + diasCols.length) + '" style="text-align:center;padding:20px;color:#94a3b8;">Sin artículos con demanda pendiente</td></tr>';
+    h += '<tr><td colspan="' + (9 + diasCols.length) + '" style="text-align:center;padding:20px;color:#94a3b8;">Sin artículos con demanda pendiente</td></tr>';
   }
 
   arts.forEach(function (a) {
@@ -13492,9 +13494,10 @@ function stkBodyFaltante() {
     h += (a.realFalt > 0)
       ? '<td class="num falt-cell" style="font-weight:900;color:#fff;background:#b91c1c;cursor:pointer;" onclick="stkFaltDrillReal(\'' + a.key + '\',event)" title="Ya se pickeó y faltaron ' + a.realFalt + ' cajas (no se encontraron en el rack). Tocá para ver las NPs.">' + a.realFalt + '</td>'
       : '<td class="num falt-ok">—</td>';
-    // Faltante S1 / S2 (proyección de lo aún no pickeado) — clickeable para ver las NPs
+    // Faltante S1 / S2 / Resto (proyección de lo aún no pickeado) — clickeable para ver las NPs
     h += _faltCelda(a.faltS1, true, a.key, null, false, "s1");
     h += _faltCelda(a.faltS2, true, a.key, null, false, "s2");
+    h += _faltCelda(a.faltResto, true, a.key, null, false, "resto");
     h += subCell;
     // Días — marcar el PRIMER día de quiebre (borde rojo)
     var _primer = null;
@@ -13603,7 +13606,7 @@ function _faltDrillOpen(cod, kind, key, evt) {
       (F.demanda[m] || []).forEach(function (e) {
         var ok;
         if (kind === "day") ok = (e.fecha === key);
-        else { var sal = String(e.fechaSalida || "").slice(0, 10); ok = (key === "s1") ? (sal >= hoy && sal <= finS1) : (sal >= lunesS2 && sal <= finS2); }
+        else { var sal = String(e.fechaSalida || "").slice(0, 10); ok = (key === "s1") ? (sal >= hoy && sal <= finS1) : (key === "s2") ? (sal >= lunesS2 && sal <= finS2) : (sal > finS2); }
         if (ok) entries.push(e);
       });
     });
@@ -13615,7 +13618,7 @@ function _faltDrillOpen(cod, kind, key, evt) {
       if (e.cod) byNp[e.np].cods[codCanon(e.cod)] = true;
     });
     lista = Object.keys(byNp).map(function (k) { return byNp[k]; }).sort(function (a, b) { return b.cajas - a.cajas; });
-    title = escapeHtml(codCanon(cod)) + " — " + (kind === "day" ? (_faltDiaSem(key) + " " + _faltFechaCorta(key)) : (key === "s1" ? "Esta sem" : "Próx sem"));
+    title = escapeHtml(codCanon(cod)) + " — " + (kind === "day" ? (_faltDiaSem(key) + " " + _faltFechaCorta(key)) : (key === "s1" ? "Esta sem" : key === "s2" ? "Próx sem" : "Resto"));
     sub = lista.length + " NP" + (lista.length > 1 ? "s" : "") + " piden este artículo. Destildar para excluir del cálculo.";
   }
 

@@ -4,7 +4,12 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-09 · Versión app al documentar: **v8.19**
+> Última actualización: 2026-08-09 · Versión app al documentar: **v8.21**
+>
+> Nota: **v8.21 — Faltantes x día: columna "Resto".** Nueva columna de resumen (entre Falt S2 y
+> Cambio NP) que suma los faltantes diarios cuya SALIDA cae **más allá de la S2** (semana 3+),
+> igual que el filtro "Resto". Clickeable (drill `key='resto'`). (v8.20: badge NP del pop-up sin
+> fondo negro ni letra azul — `.falt-drill-row .falt-np` pisa el `.falt-np` global oscuro.)
 >
 > Nota: **v8.19 — Faltante: 3 fixes.** (1) **Pop-up NO aparecía**: `.falt-drill` estaba en
 > `z-index:200` y el modal de Stock (`#stockAdminOverlay`) en `1280` → el pop-up se abría DETRÁS
