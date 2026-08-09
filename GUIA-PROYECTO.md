@@ -6,6 +6,16 @@
 >
 > Última actualización: 2026-08-09 · Versión app al documentar: **v8.21**
 >
+> Nota SERVER (sin bump de app): **Generador de OCs — aglomerar códigos "L" en su base.**
+> La `proyeccion_madre` trae, por cada código, un gemelo con sufijo **"L" = lo que Chef le vende
+> de Loekemeyer a sus clientes** (ej. `505L`). Antes el generador los tomaba como productos
+> aparte (uxb nulo → proy_cajas mal, y sin config → "(sin proveedor)"): eran 63 códigos ≈ 1.265
+> cajas fantasma que inflaban la lista. Ahora `vista_generador_oc` (CTE `proy`) **strippea la "L"
+> final y aglomera en el código base sumando UNIDADES / uni×caja del base** → el 505L cae dentro
+> del 505 (se pide 505, nunca 505L). Efecto: "sin proveedor" bajó de **70 ítems/2.431 cj** a
+> **6 ítems/521 cj** (reales: 55289 Colador c/333 pedidos y 546E; el resto mínimos/contables).
+> Backup del def original en `sql/backup_vista_generador_oc_20260809.sql`.
+>
 > Nota: **v8.21 — Faltantes x día: columna "Resto".** Nueva columna de resumen (entre Falt S2 y
 > Cambio NP) que suma los faltantes diarios cuya SALIDA cae **más allá de la S2** (semana 3+),
 > igual que el filtro "Resto". Clickeable (drill `key='resto'`). (v8.20: badge NP del pop-up sin

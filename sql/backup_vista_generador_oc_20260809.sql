@@ -1,0 +1,15 @@
+-- =====================================================================
+-- backup_vista_generador_oc_20260809.sql — RESTORE POINT (protocolo CLAUDE.md)
+-- Antes de v8.22: aglomerar los códigos "L" (Chef vende de Loekemeyer) en su
+-- código base. El CTE `proy` ORIGINAL era (por si hay que revertir):
+--
+--   ), proy AS (
+--    SELECT regexp_replace(upper(btrim(proyeccion_madre.cod)), '^0+(?=.)', '') AS codn,
+--       max(COALESCE(proyeccion_madre.proy_cajas_mes, 0)) AS proy
+--      FROM proyeccion_madre
+--     GROUP BY (regexp_replace(upper(btrim(proyeccion_madre.cod)), '^0+(?=.)', ''))
+--   ),
+--
+-- El resto de la vista NO cambió. Para revertir: CREATE OR REPLACE VIEW con este
+-- CTE proy original (el resto igual que la versión nueva).
+-- =====================================================================
