@@ -6166,7 +6166,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.38";
+const APP_VERSION = "v8.39";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -14740,11 +14740,33 @@ async function _stkInsCerorear(it) {
 }
 /* La cantidad/unidad se corrigen con ASIENTOS, no editando el movimiento: el log de
    stock es append-only. Si cambia la unidad, se saca todo de la vieja y se pone en la
-   nueva; si sólo cambia la cantidad, va la diferencia. */
+   nueva; si sólo cambia la cantidad, va la diferencia.
+   v8.39 (Paso 2) — si el insumo tiene unidad BASE definida y la unidad elegida tiene factor
+   conocido, el asiento se registra en la unidad BASE (convierte la cantidad ingresada). Así el
+   stock se acumula SIEMPRE en una sola unidad y no hay que sumar unidades distintas al mostrarlo.
+   El ajuste se calcula contra el saldo TOTAL en base (insSaldoBase), no contra xuni[0] — antes,
+   si el stock estaba repartido en varias unidades, el ajuste comparaba mal (bug latente). */
 async function _stkInsAjustar(it, cod, qtyStr, uniNueva) {
   const u0 = _stkInsUni1(it);
   const qNueva = parseFloat(String(qtyStr).replace(",", "."));
   if (!isFinite(qNueva)) return;
+  const fdef = insFactDe(cod);
+  const uniEl = uniNueva || u0.uni || null;
+  const facEl = uniEl ? insFactorDe(cod, uniEl) : null;
+  if (fdef && fdef.base && facEl != null) {
+    const base = fdef.base;
+    const desiredBase = qNueva * facEl;                       // cantidad ingresada → unidad base
+    const sb = insSaldoBase(it);
+    const curBase = sb ? (Number(sb.base) || 0) : 0;          // saldo actual TOTAL convertido a base
+    const delta = desiredBase - curBase;
+    if (Math.abs(delta) <= 0.0005) return;                    // sin cambio real
+    const r0 = await fetch(SUPABASE_URL + "/rest/v1/Movimientos_Stock", {
+      method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" },
+      body: JSON.stringify([{ cod_art: cod, descripcion: it.nombre || null, deposito: "insumos", delta: delta, tipo: "ajuste", unidad: base, legajo: "admin" }])
+    });
+    if (!r0.ok) throw new Error("no se pudo ajustar la cantidad (HTTP " + r0.status + ")");
+    return;
+  }
   const cambiaUni = uniNueva && uniNueva !== u0.uni;
   const cambiaQty = Math.abs(qNueva - (Number(u0.saldo) || 0)) > 0.0005;
   if (!cambiaUni && !cambiaQty) return;

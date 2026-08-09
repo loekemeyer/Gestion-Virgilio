@@ -4,7 +4,17 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-09 · Versión app al documentar: **v8.38**
+> Última actualización: 2026-08-09 · Versión app al documentar: **v8.39**
+>
+> Nota: **v8.39 — Insumos (Paso 2): al guardar cantidad, el asiento va en la unidad BASE.** Antes el
+> movimiento de stock se guardaba en la unidad elegida y el display convertía. Ahora, si el insumo
+> tiene unidad base definida y la unidad elegida tiene factor conocido, `_stkInsAjustar` **convierte
+> la cantidad a base** (`qNueva × factor`) y registra el ajuste en la unidad base → el stock se
+> acumula SIEMPRE en una sola unidad (cierra el anti-duplicado al cargar en varias). Además el ajuste
+> se calcula contra el **saldo TOTAL en base** (`insSaldoBase`), no contra `xuni[0]` — antes, con
+> stock repartido en varias unidades, el ajuste comparaba mal (bug latente corregido). Si el insumo
+> no tiene factores o la unidad no tiene factor conocido, sigue el comportamiento clásico (asiento en
+> la unidad elegida). Es append-only y stock-neutral (el neto en base cambia exactamente lo pedido).
 >
 > Nota: **v8.38 — Faltantes x día: columna "Sin fecha" + ocultar discontinuos.** (1) Nueva columna
 > **Sin fecha** (entre Resto y Cambio NP): faltante de pedidos SIN `fecha_entrega` PPP (o con fecha ya

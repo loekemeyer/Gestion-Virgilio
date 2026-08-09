@@ -15,7 +15,10 @@
 -- (insAbase / insSaldoBase / insEquivStr) + editor ⚖ (stkInsEditFact/…FactGuardar) +
 -- display de equivalencias en "Todos los insumos".
 --
--- PENDIENTE (siguiente paso): al GUARDAR cantidad, convertir a la unidad BASE y
--- registrar el movimiento en base (hoy se guarda en la unidad elegida; el display
--- convierte lo que haya). Eso cierra del todo el anti-duplicado al cargar en varias unidades.
+-- HECHO (Paso 2, v8.39): al GUARDAR cantidad, si el insumo tiene unidad base definida y la
+-- unidad elegida tiene factor conocido, `_stkInsAjustar` (index.html) convierte la cantidad a
+-- BASE (qNueva × factor) y registra el asiento en la unidad base. El ajuste se calcula contra el
+-- saldo TOTAL en base (insSaldoBase), no contra xuni[0]. Sin factores → comportamiento clásico
+-- (asiento en la unidad elegida). Append-only y stock-neutral. Cierra el anti-duplicado al cargar
+-- en varias unidades.
 -- =====================================================================
