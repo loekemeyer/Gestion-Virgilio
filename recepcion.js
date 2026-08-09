@@ -1127,21 +1127,42 @@ function openCajas(cod) {
   opCajasDelete.style.display = actual > 0 ? "" : "none";
   // v7.07: recordatorio de la OC vigente mientras carga las cajas.
   const oc = ocDeCod(cod);
+  opState.cajasOc = oc || null;   // v8.60 — guardado para el aviso de exceso en vivo
   if (opCajasOc) {
     if (oc) {
       opCajasOc.style.display = "";
-      opCajasOc.innerHTML = "📑 OC vigente (" + escapeHtmlRcp(fechaCorta(oc.fecha)) + "): <b>" + oc.ped + "</b> caja(s) pedidas" +
-        (oc.rec > 0 ? " · <b>" + oc.pend + "</b> por recibir" : "");
+      opCajasOc.style.background = ""; opCajasOc.style.borderColor = "";
+      opCajasOc.innerHTML = _opCajasOcBase(oc);
     } else {
       opCajasOc.style.display = "none";
       opCajasOc.innerHTML = "";
     }
   }
   opCajasModal.classList.add("open");
-  setTimeout(() => opCajasInput.focus(), 50);
+  setTimeout(() => { opCajasInput.focus(); _opCajasExceso(); }, 50);
+}
+/* v8.60 — texto base del recordatorio de OC. */
+function _opCajasOcBase(oc) {
+  return "📑 OC vigente (" + escapeHtmlRcp(fechaCorta(oc.fecha)) + "): <b>" + oc.ped + "</b> caja(s) pedidas" +
+    (oc.rec > 0 ? " · <b>" + oc.pend + "</b> por recibir" : "");
+}
+/* v8.60 — aviso EN VIVO si lo tipeado supera lo que falta recibir por OC (caza typos tipo 500 vs 50
+   antes de enviar; sin pop-up, no bloquea — mismo espíritu que el aviso ROC pero visible al momento). */
+function _opCajasExceso() {
+  if (!opCajasOc) return;
+  const oc = opState.cajasOc;
+  if (!oc || !(oc.pend > 0)) return;
+  const n = parseInt(opCajasInput.value, 10) || 0;
+  if (n > oc.pend) {
+    opCajasOc.style.background = "#fef2f2"; opCajasOc.style.borderColor = "#fca5a5";
+    opCajasOc.innerHTML = _opCajasOcBase(oc) + '<br><b style="color:#b91c1c;">⚠ Cargás ' + n + ' pero por OC faltan ' + oc.pend + '. Revisá que no sea un error de tipeo.</b>';
+  } else {
+    opCajasOc.style.background = ""; opCajasOc.style.borderColor = "";
+    opCajasOc.innerHTML = _opCajasOcBase(oc);
+  }
 }
 function closeCajas() { opCajasModal.classList.remove("open"); opState.cajasCod = null; }
-opCajasInput.oninput = () => { opCajasInput.value = opCajasInput.value.replace(/\D/g, ""); };
+opCajasInput.oninput = () => { opCajasInput.value = opCajasInput.value.replace(/\D/g, ""); _opCajasExceso(); };
 opCajasInput.addEventListener("keydown", e => {
   if (e.key === "Enter") { e.preventDefault(); opCajasNext.click(); }
 });
