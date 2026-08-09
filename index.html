@@ -3075,7 +3075,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
 .falt-drill-row { display:flex; align-items:center; gap:8px; padding:5px 0;
   border-bottom:1px solid #f1f5f9; font-size:12px; }
 .falt-drill-row label { display:flex; align-items:center; gap:6px; flex:1; cursor:pointer; }
-.falt-drill-row .falt-np { font-weight:700; color:#1e40af; }
+.falt-drill-row .falt-np { font-weight:700; color:#1e293b; background:none; border:none; border-radius:0; padding:0; margin:0; }
 .falt-drill-row .falt-rs { color:#475569; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .falt-drill-row .falt-cj { font-weight:700; color:#1e293b; white-space:nowrap; }
 .falt-drill-row.excl { opacity:.45; text-decoration:line-through; }
@@ -6158,7 +6158,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.19";
+const APP_VERSION = "v8.20";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
