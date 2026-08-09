@@ -4,7 +4,14 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-09 · Versión app al documentar: **v8.16**
+> Última actualización: 2026-08-09 · Versión app al documentar: **v8.17**
+>
+> Nota: **v8.17 — Faltante: columna "Fabricante" espeja el Generador de OCs.** Antes salía de
+> `OC_Maximos` crudo (y quedaba vacía para muchos). Ahora `stkFaltLoad` la trae de
+> `vista_generador_oc` (mismo dato que se ve en Generar OCs): proveedor real, ignora
+> "(sin proveedor)"; si hay reparto a un 2° proveedor (pr2>0) muestra "P1 / P2". Nota: en esa
+> vista el **580 figura "(sin proveedor)"** (su equivalente 580E = "Racks") → si se le quiere
+> poner un fabricante, se asigna en el generador y aparece solo acá.
 >
 > Nota: **v8.16 — Faltante: popups clickeables en las columnas visibles (celular).** En el celular
 > las columnas de día quedan scrolleadas a la derecha; las visibles (🔴 Faltó armado / Falt S1 /

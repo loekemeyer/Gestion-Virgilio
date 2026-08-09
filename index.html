@@ -6158,7 +6158,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.16";
+const APP_VERSION = "v8.17";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -13040,17 +13040,27 @@ async function stkFaltLoad() {
       supaFetchAllSafe(SUPABASE_PPP_PROG_ENDPOINT, "select=np,fecha_entrega,razon_social,tanda"),
       fetchPickingBase(),
       supaFetchAllSafe(SUPABASE_FACTURACION_NP_ENDPOINT, "select=np"),
-      supaFetchAllSafe(SUPABASE_OCMAX_ENDPOINT, "select=cod,proveedor&activo=eq.true"),
+      // v8.17 — "Fabricante" espeja el GENERADOR DE OCs: proveedor(es) de vista_generador_oc
+      // (mismo dato que se ve en Generar OCs), no OC_Maximos crudo.
+      supaFetchAllSafe(SUPABASE_GENERADOR_ENDPOINT, "select=cod,proveedor,tiene_prov_real,proveedor2,pr2&activo=eq.true"),
       supaFetchAllSafe(SUPABASE_URL + "/rest/v1/vista_saldos_stock",
         "select=cod_art,descripcion,terminado,excedente,a_guardar,racks,racks_ch,para_envasar,separar_pedidos,a_facturar,insumos")
     ]);
-    var ppp = res[0] || [], base = res[1], facRows = res[2] || [], ocmax = res[3] || [], saldos = res[4] || [];
+    var ppp = res[0] || [], base = res[1], facRows = res[2] || [], genProv = res[3] || [], saldos = res[4] || [];
     // Set de NPs facturadas
     var facSet = {};
     facRows.forEach(function (r) { var n = pickNormNp(r.np); if (n) facSet[n] = true; });
-    // Mapa proveedor por código normalizado
+    // Mapa proveedor por código normalizado, igual que el generador de OCs: proveedor real
+    // (ignora "(sin proveedor)"); si hay reparto a un 2° proveedor, se muestra "P1 / P2".
     var provMap = {};
-    ocmax.forEach(function (r) { var k = _ocgNorm(r.cod); if (k) provMap[k] = r.proveedor || ""; });
+    genProv.forEach(function (r) {
+      var k = _ocgNorm(r.cod); if (!k) return;
+      var p1 = String(r.proveedor || "").trim();
+      if (!r.tiene_prov_real || p1 === "(sin proveedor)") p1 = "";
+      var p2 = String(r.proveedor2 || "").trim();
+      if (p2 && p2 !== "(sin proveedor)" && (Number(r.pr2) || 0) > 0) p1 = p1 ? (p1 + " / " + p2) : p2;
+      if (p1) provMap[k] = p1;
+    });
     // Mapa saldos por código normalizado → stock total (todos los depósitos)
     var saldoMap = {};
     saldos.forEach(function (r) {
