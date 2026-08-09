@@ -4,7 +4,16 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-09 · Versión app al documentar: **v8.54**
+> Última actualización: 2026-08-09 · Versión app al documentar: **v8.55**
+>
+> Nota: **v8.55 — Capacidad: "Libre" fuera + sectores colapsados + fix de códigos sin E (datos).**
+> (1) En la solapa **Capacidad**, `cod='Libre'` (posiciones de góndola vacías) ya **no** se cuenta como
+> artículo (se excluye del armado y del flag "sin proyección/máximo"). (2) La columna **Sectores** se
+> **colapsa**: si hay >3 ubicaciones muestra las 2 primeras + "+N ubic." y se ensancha al tocar
+> (`stkCapToggleSec` / `_stk.capExp`) — antes la tabla quedaba anchísima. (3) **Datos** (`Capacidad_Sector`,
+> con backup en `sql/backup_capacidad_sector_20260809_codigos_sinE.sql`): renombrados los códigos mal
+> escritos (les faltaba la E) → **102→102E, 106→106E, 124→124E, 439→439E, 877→877E**. Pendiente aparte:
+> **592E** es discontinuo (tiene lugar en góndola sin proyección — decidir si se libera el sector).
 >
 > Nota: **v8.54 — Stock: se saca la pestaña "📦 A Separar" (tab `proceso`).** Quitada de la barra de
 > pestañas del módulo Stock y Compras. `stkBodyProceso` queda en el código pero sin acceso por UI.

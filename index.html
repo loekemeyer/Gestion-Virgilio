@@ -6167,7 +6167,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.54";
+const APP_VERSION = "v8.55";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -13914,6 +13914,7 @@ function stkBodyCapacidad() {
   const byCod = {};
   cap.forEach(function (r) {
     const k = _ocgNorm(r.cod); if (!k) return;
+    if (k.toLowerCase() === "libre") return;   // v8.55 — "Libre" = posición vacía, NO es un artículo
     if (!byCod[k]) byCod[k] = { cod: String(r.cod), cajas: 0, sectores: [] };
     byCod[k].cajas += Number(r.cajas_max) || 0;
     const s = String(r.sector || "").trim();
@@ -13993,10 +13994,28 @@ function stkBodyCapacidad() {
           : '<span style="color:#1e40af;font-weight:800">0</span>'));
     const mesesCell = (r.meses == null) ? '<span style="color:#94a3b8">—</span>'
       : '<b style="color:' + (r.meses < 1 ? "#b91c1c" : (r.meses < 2 ? "#854d0e" : "#15803d")) + '">' + r.meses.toFixed(2) + '</b>';
-    h += '<tr><td class="stk-cod">' + escapeHtml(r.cod) + '</td><td style="font-size:12px;color:#475569">' + escapeHtml(r.sectores.join(", ")) + '</td><td class="num"><b>' + r.capacidad + '</b></td><td class="num">' + (r.proyMes ? r.proyMes : "—") + '</td><td class="num">' + mesesCell + '</td><td class="num">' + (r.max != null ? r.max : "—") + '</td><td class="num">' + flag + '</td></tr>';
+    // v8.55 — sectores colapsados: si hay muchos, mostrar los primeros + "+N ubic." (se ensancha al tocar)
+    const _secs = r.sectores || [];
+    const _enc = encodeURIComponent(r.cod);
+    const _exp = _stk.capExp && _stk.capExp[r.cod];
+    const _MAXSEC = 3;
+    let secCell;
+    if (_secs.length <= _MAXSEC || _exp) {
+      secCell = escapeHtml(_secs.join(", ")) + (_secs.length > _MAXSEC ? ' <span style="color:#1e6bd6;cursor:pointer;font-weight:800;" onclick="stkCapToggleSec(\'' + _enc + '\')">▲</span>' : '');
+    } else {
+      secCell = escapeHtml(_secs.slice(0, 2).join(", ")) + ' <span style="color:#1e6bd6;cursor:pointer;font-weight:800;" title="Ver todas las ubicaciones" onclick="stkCapToggleSec(\'' + _enc + '\')">+' + (_secs.length - 2) + ' ubic.</span>';
+    }
+    h += '<tr><td class="stk-cod">' + escapeHtml(r.cod) + '</td><td style="font-size:12px;color:#475569;max-width:240px;">' + secCell + '</td><td class="num"><b>' + r.capacidad + '</b></td><td class="num">' + (r.proyMes ? r.proyMes : "—") + '</td><td class="num">' + mesesCell + '</td><td class="num">' + (r.max != null ? r.max : "—") + '</td><td class="num">' + flag + '</td></tr>';
   });
   h += '</tbody></table>';
   return h;
+}
+function stkCapToggleSec(codEnc) {
+  if (!_stk) return;
+  const cod = decodeURIComponent(codEnc);
+  if (!_stk.capExp) _stk.capExp = {};
+  _stk.capExp[cod] = !_stk.capExp[cod];
+  stkRender();
 }
 async function stkCapImport() {
   const txt = ((document.getElementById("stkCapTxt") || {}).value) || "";
