@@ -6159,7 +6159,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.26";
+const APP_VERSION = "v8.27";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -14085,13 +14085,13 @@ function stkBodyInsumos() {
   // "A depurar" y los TMP son las dos caras de lo mismo: algo que espera una decisión
   // del admin. Van juntos en Pendientes, en vez de escondidos en una categoría.
   const pend = items.filter(function (it) { return _stkInsPendiente(it); });
-  let h = '<div class="stk-cut" style="background:#eef2ff;border:1px solid #a5b4fc;color:#3730a3;">🧰 <b>Administrar insumos</b> — lo que se define acá es <b>lo que ve el operario</b> cuando carga o sugiere un insumo desde el celular.</div>';
+  let h = '';
   if (_stkIns.msg) h += '<div class="stk-cut" style="background:#f0fdf4;border:1px solid #86efac;color:#166534;">' + escapeHtml(_stkIns.msg) + '</div>';
   h += _stkInsPend(pend);
-  h += _stkInsUnis(items);          // primero el vocabulario, después quién lo usa
   h += _stkInsCats(items, pend);
   h += _stkInsHist();               // bitácora: movimientos + cambios del admin
   h += _stkInsTodos(items);         // foto completa, sólo lectura
+  h += _stkInsUnis(items);          // v8.27 — las unidades van al final, abajo de Todos los insumos
   return h;
 }
 /* ---------- (1) PENDIENTES ---------- */
@@ -14221,7 +14221,8 @@ function _stkInsListado(k, items) {
         '<td><input class="stk-inp" id="edQty_' + escapeHtml(it.cod) + '" type="number" step="any" value="' + escapeHtml(u.saldo) + '" style="width:82px;"></td>' +
         '<td>' + _stkInsUniSel("edUni_" + it.cod, _stkInsUniMostrar(it)) + '</td>' +
         '<td><button class="stk-btn" onclick="stkInsGuardar(\'' + escapeHtml(it.cod) + '\')">✓ Guardar</button> ' +
-        '<button class="stk-btn stk-btn-x" onclick="stkInsEdit(null)">Cancelar</button></td></tr>';
+        '<button class="stk-btn stk-btn-x" onclick="stkInsEdit(null)">Cancelar</button> ' +
+        '<button class="stk-btn" onclick="stkInsEditFact(\'' + escapeHtml(it.cod) + '\')" title="Agregar/definir unidades de medida (master cajas, inner, uni…) y sus factores">⚖ Unidades</button></td></tr>';
     }).join("");
     h += '</tbody></table></div>';
   }
@@ -14304,7 +14305,8 @@ function _stkInsTodos(items) {
         '<td><input class="stk-inp" id="edQty_' + escapeHtml(it.cod) + '" type="number" step="any" value="' + escapeHtml(u.saldo) + '" style="width:82px;"></td>' +
         '<td>' + _stkInsUniSel("edUni_" + it.cod, _stkInsUniMostrar(it)) + '</td>' +
         '<td><button class="stk-btn" onclick="stkInsGuardar(\'' + escapeHtml(it.cod) + '\')">✓ Guardar</button> ' +
-        '<button class="stk-btn stk-btn-x" onclick="stkInsEdit(null)">Cancelar</button></td></tr>';
+        '<button class="stk-btn stk-btn-x" onclick="stkInsEdit(null)">Cancelar</button> ' +
+        '<button class="stk-btn" onclick="stkInsEditFact(\'' + escapeHtml(it.cod) + '\')" title="Agregar/definir unidades de medida (master cajas, inner, uni…) y sus factores">⚖ Unidades</button></td></tr>';
     }
     // v8.26 — editor de UNIDADES/FACTORES del insumo
     if (_stkIns.edit === "fact:" + it.cod) {
