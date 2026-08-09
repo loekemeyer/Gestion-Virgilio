@@ -4,7 +4,19 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-09 · Versión app al documentar: **v8.37**
+> Última actualización: 2026-08-09 · Versión app al documentar: **v8.38**
+>
+> Nota: **v8.38 — Faltantes x día: columna "Sin fecha" + ocultar discontinuos.** (1) Nueva columna
+> **Sin fecha** (entre Resto y Cambio NP): faltante de pedidos SIN `fecha_entrega` PPP (o con fecha ya
+> pasada) que el stock no cubre — antes eran **invisibles** (consumían stock pero no caían en ninguna
+> columna de día). Ahora **Falt S1 + Falt S2 + Resto + Sin fecha = Total Pedidos − Stock** (todo el
+> faltante queda a la vista). Se calcula como `Math.max(0, -bal)` (bal = stock − sinFecha − demanda
+> pasada). Clickeable → drill `stkFaltDrillSinF` (kind `"sinf"` en `_faltDrillOpen`) con las NPs sin
+> fecha/pasadas, editables (achicar cajas). Ej. real 395: Total 59 − Stock 30 = 29 = S1 8 + S2 6 +
+> Resto 1 + **Sin fecha 14** (las 14 eran las que "no se veían"). (2) Los códigos **discontinuos**
+> (`activo=false` en `OC_Maximos`) ya **no aparecen** en Faltantes: `stkFaltLoad` trae el set
+> `discont` y `stkBodyFaltante` saltea la familia si TODOS sus miembros están discontinuados
+> (ej. 396/556/573/597/438EZ).
 >
 > Nota: **v8.37 — Faltantes x día: "Total Pedidos" clickeable → pedidos con franja.** La celda
 > **Total Pedidos** ahora abre un drill (`stkFaltDrillPed` → `_faltDrillOpen` kind `"ped"`) con la

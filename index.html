@@ -6166,7 +6166,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.37";
+const APP_VERSION = "v8.38";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -13054,9 +13054,14 @@ async function stkFaltLoad() {
       // (mismo dato que se ve en Generar OCs), no OC_Maximos crudo.
       supaFetchAllSafe(SUPABASE_GENERADOR_ENDPOINT, "select=cod,proveedor,tiene_prov_real,proveedor2,pr2&activo=eq.true"),
       supaFetchAllSafe(SUPABASE_URL + "/rest/v1/vista_saldos_stock",
-        "select=cod_art,descripcion,terminado,excedente,a_guardar,racks,racks_ch,para_envasar,separar_pedidos,a_facturar,insumos")
+        "select=cod_art,descripcion,terminado,excedente,a_guardar,racks,racks_ch,para_envasar,separar_pedidos,a_facturar,insumos"),
+      // v8.38 — códigos DISCONTINUOS (activo=false en OC_Maximos): no se muestran en Faltantes.
+      supaFetchAllSafe(SUPABASE_OCMAX_ENDPOINT, "select=cod&activo=eq.false")
     ]);
-    var ppp = res[0] || [], base = res[1], facRows = res[2] || [], genProv = res[3] || [], saldos = res[4] || [];
+    var ppp = res[0] || [], base = res[1], facRows = res[2] || [], genProv = res[3] || [], saldos = res[4] || [], discRows = res[5] || [];
+    // Set de códigos discontinuos (normalizados) → se filtran de la tabla.
+    var discont = {};
+    discRows.forEach(function (r) { var k = _ocgNorm(r.cod); if (k) discont[k] = true; });
     // Set de NPs facturadas
     var facSet = {};
     facRows.forEach(function (r) { var n = pickNormNp(r.np); if (n) facSet[n] = true; });
@@ -13167,14 +13172,14 @@ async function stkFaltLoad() {
       });
     });
     _stk.falt = {
-      demanda: demanda, provMap: provMap, saldoMap: saldoMap,
+      demanda: demanda, provMap: provMap, saldoMap: saldoMap, discont: discont,
       realFalt: realFalt, realDet: realDet, enCurso: Object.keys(enCurso).length,
       ajustes: {}, filtro: "s1", openCell: null, search: ""
     };
     _stk.faltLoaded = true;
   } catch (e) {
     console.error("stkFaltLoad:", e);
-    _stk.falt = { demanda: {}, provMap: {}, saldoMap: {}, realFalt: {}, realDet: {}, enCurso: 0, ajustes: {}, filtro: "s1", openCell: null, search: "" };
+    _stk.falt = { demanda: {}, provMap: {}, saldoMap: {}, discont: {}, realFalt: {}, realDet: {}, enCurso: 0, ajustes: {}, filtro: "s1", openCell: null, search: "" };
     _stk.faltLoaded = true;
   }
   if (_stk) stkRender();
@@ -13268,6 +13273,7 @@ function stkBodyFaltante() {
   if (_stk.faltLoaded === "loading") return '<div class="stk-loading">Cargando demanda PPP + stock…</div>';
   var F = _stk.falt, dem = F.demanda, sMap = F.saldoMap, provMap = F.provMap, ajustes = F.ajustes || (F.ajustes = {});
   var realFalt = F.realFalt || {};   // v8.14 — faltante REAL (ya preparado / TP) por código
+  var discont = F.discont || {};     // v8.38 — códigos discontinuos (activo=false): no se muestran
   var hoy = _faltHoy();
   // v8.10 — "Esta semana" = HOY + 5 días hábiles (ventana móvil), NO la semana calendario.
   var lunesHoy = hoy;                        // S1 arranca hoy
@@ -13320,6 +13326,8 @@ function stkBodyFaltante() {
 
   Object.keys(famMembers).forEach(function (key) {
     var members = famMembers[key];
+    // v8.38 — si TODOS los miembros están discontinuados (activo=false en OC_Maximos), no mostrar.
+    if (members.every(function (m) { return discont[m]; })) return;
     var fam = equivFam(key);
     var esFam = members.length > 1 || !!fam;
     // Stock combinado + descripción/proveedor
@@ -13354,6 +13362,10 @@ function stkBodyFaltante() {
     // Balance acumulado combinado: stock - sinFecha - demanda pasada - demanda día a día
     var bal = stockFam - sinFecha;
     todasFechas.forEach(function (f) { if (f < hoy) bal -= (demDia[f] || 0); });
+    // v8.38 — faltante que NO cae en ninguna columna de día: pedidos sin fecha PPP (o con fecha ya
+    // pasada) que el stock no alcanza a cubrir. Es el "-bal" negativo antes de arrancar los días.
+    // Con esto: Falt S1 + Falt S2 + Resto + Sin fecha = Total Pedidos − Stock (todo el faltante).
+    var faltSinFecha = Math.max(0, -bal);
     var allDiasDesdeHoy = todasFechas.filter(function (f) { return f >= hoy; });
     diasCols.forEach(function (d) { if (allDiasDesdeHoy.indexOf(d) < 0) allDiasDesdeHoy.push(d); });
     allDiasDesdeHoy.sort();
@@ -13401,6 +13413,7 @@ function stkBodyFaltante() {
       stock: Math.round(stockFam), totalDem: Math.round(totalDem),
       realFalt: Math.round(realFam),
       faltS1: Math.round(faltS1), faltS2: Math.round(faltS2), faltResto: Math.round(faltResto),
+      faltSinFecha: Math.round(faltSinFecha),
       diasFalt: diasFalt, sinFecha: sinFecha, subCambio: subCambio
     });
   });
@@ -13479,6 +13492,7 @@ function stkBodyFaltante() {
     '<th class="falt-sem" title="Cajas que YA faltaron al armar (tandas pickeadas): lo que el pickeador no encontró. Dato real, no proyección.">🔴 Faltó<br>armado</th>' +
     '<th class="falt-sem">Falt S1</th><th class="falt-sem">Falt S2</th>' +
     '<th class="falt-sem" title="Faltante proyectado para salidas MÁS ALLÁ de la S2 (semana 3 en adelante).">Resto</th>' +
+    '<th class="falt-sem" title="Faltante de pedidos SIN fecha PPP (o con fecha ya pasada): consumen stock pero no caen en ninguna columna de día. Acá aparece lo que falta y no se ve en S1/S2/Resto. Falt S1 + S2 + Resto + Sin fecha = Total − Stock.">Sin<br>fecha</th>' +
     '<th class="falt-sem" title="Cajas que hay que cambiar de NP en el ERP: el código pedido no tiene stock pero un hermano equivalente (mismo producto, otro SKU) sí. El detalle por NP está en Facturación.">⚠ Cambio<br>NP</th>' +
     '<th class="falt-sep"></th>';
   // Headers de días
@@ -13490,7 +13504,7 @@ function stkBodyFaltante() {
   h += '</tr></thead><tbody>';
 
   if (arts.length === 0) {
-    h += '<tr><td colspan="' + (11 + diasCols.length) + '" style="text-align:center;padding:20px;color:#94a3b8;">Sin artículos con demanda pendiente</td></tr>';
+    h += '<tr><td colspan="' + (12 + diasCols.length) + '" style="text-align:center;padding:20px;color:#94a3b8;">Sin artículos con demanda pendiente</td></tr>';
   }
 
   arts.forEach(function (a) {
@@ -13523,6 +13537,12 @@ function stkBodyFaltante() {
     h += _faltCelda(a.faltS1, true, a.key, null, false, "s1");
     h += _faltCelda(a.faltS2, true, a.key, null, false, "s2");
     h += _faltCelda(a.faltResto, true, a.key, null, false, "resto");
+    // v8.38 — columna "Sin fecha": faltante de pedidos sin fecha PPP / pasada (clickeable)
+    var _sf = a.faltSinFecha || 0;
+    var _sfCls = _sf === 0 ? "falt-ok" : _sf <= 10 ? "falt-warn" : _sf <= 50 ? "falt-bad" : "falt-crit";
+    h += _sf > 0
+      ? '<td class="num falt-cell ' + _sfCls + '" style="font-weight:800;cursor:pointer;" onclick="stkFaltDrillSinF(\'' + a.key + '\',event)" title="' + _sf + ' cajas de pedidos SIN fecha PPP (o con fecha pasada) que el stock no alcanza a cubrir. Tocá para ver las NPs.">' + _sf + '</td>'
+      : '<td class="num falt-ok">—</td>';
     h += subCell;
     h += '<td class="falt-sep"></td>';   // v8.24 — separador visual entre resumen y días
     // Días — marcar el PRIMER día de quiebre (borde rojo)
@@ -13605,6 +13625,7 @@ function stkFaltDrill(cod, fecha, evt) { _faltDrillOpen(cod, "day", fecha, evt);
 function stkFaltDrillWin(cod, win, evt) { _faltDrillOpen(cod, "win", win, evt); }
 function stkFaltDrillReal(cod, evt) { _faltDrillOpen(cod, "real", "real", evt); }
 function stkFaltDrillPed(cod, evt) { _faltDrillOpen(cod, "ped", "ped", evt); }
+function stkFaltDrillSinF(cod, evt) { _faltDrillOpen(cod, "sinf", "sinf", evt); }
 /* v8.37 — franja (S1/S2/Resto/sin fecha/pasada) de un pedido según su fecha de SALIDA (PPP). */
 function _faltFranja(fechaSalida, hoy, finS1, lunesS2, finS2) {
   var sal = String(fechaSalida || "").slice(0, 10);
@@ -13676,6 +13697,7 @@ function _faltDrillOpen(cod, kind, key, evt) {
       (F.demanda[m] || []).forEach(function (e) {
         var ok;
         if (kind === "day") ok = (e.fecha === key);
+        else if (kind === "sinf") { var salf = String(e.fechaSalida || "").slice(0, 10); ok = !/^\d{4}-\d{2}-\d{2}$/.test(salf) || salf < hoy; }
         else { var sal = String(e.fechaSalida || "").slice(0, 10); ok = (key === "s1") ? (sal >= hoy && sal <= finS1) : (key === "s2") ? (sal >= lunesS2 && sal <= finS2) : (sal > finS2); }
         if (ok) entries.push(e);
       });
@@ -13688,8 +13710,10 @@ function _faltDrillOpen(cod, kind, key, evt) {
       if (e.cod) byNp[e.np].cods[codCanon(e.cod)] = true;
     });
     lista = Object.keys(byNp).map(function (k) { return byNp[k]; }).sort(function (a, b) { return b.cajas - a.cajas; });
-    title = escapeHtml(codCanon(cod)) + " — " + (kind === "day" ? (_faltDiaSem(key) + " " + _faltFechaCorta(key)) : (key === "s1" ? "Esta sem" : key === "s2" ? "Próx sem" : "Resto"));
-    sub = lista.length + " NP" + (lista.length > 1 ? "s" : "") + " piden este artículo. Editá las cajas si va a salir menos (achicar la entrega).";
+    title = escapeHtml(codCanon(cod)) + " — " + (kind === "day" ? (_faltDiaSem(key) + " " + _faltFechaCorta(key)) : kind === "sinf" ? "Sin fecha / pasadas" : (key === "s1" ? "Esta sem" : key === "s2" ? "Próx sem" : "Resto"));
+    sub = (kind === "sinf")
+      ? lista.length + " NP" + (lista.length > 1 ? "s" : "") + " SIN fecha PPP (o con fecha ya pasada). No caen en S1/S2/Resto pero consumen stock. Editá las cajas si va a salir menos."
+      : lista.length + " NP" + (lista.length > 1 ? "s" : "") + " piden este artículo. Editá las cajas si va a salir menos (achicar la entrega).";
   }
 
   F.openCell = { cod: cod, kind: kind, key: key, x: evt.clientX, y: evt.clientY };
