@@ -6213,7 +6213,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.75";
+const APP_VERSION = "v8.76";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -13355,12 +13355,14 @@ async function stkFaltLoad() {
     _stk.falt = {
       demanda: demanda, provMap: provMap, saldoMap: saldoMap, discont: discont,
       realFalt: realFalt, realDet: realDet, enCurso: Object.keys(enCurso).length,
-      ajustes: {}, filtro: "s1", openCell: null, search: "", ordenFab: true
+      ajustes: {}, filtro: "s1", openCell: null, search: "",
+      // v8.71 — por defecto: orden fabricante→faltó armado + los 3 botones activos.
+      ordenFab: true, soloQuiebre: true, sinE: true, verDias: true
     };
     _stk.faltLoaded = true;
   } catch (e) {
     console.error("stkFaltLoad:", e);
-    _stk.falt = { demanda: {}, provMap: {}, saldoMap: {}, discont: {}, realFalt: {}, realDet: {}, enCurso: 0, ajustes: {}, filtro: "s1", openCell: null, search: "" };
+    _stk.falt = { demanda: {}, provMap: {}, saldoMap: {}, discont: {}, realFalt: {}, realDet: {}, enCurso: 0, ajustes: {}, filtro: "s1", openCell: null, search: "", ordenFab: true, soloQuiebre: true, sinE: true, verDias: true };
     _stk.faltLoaded = true;
   }
   if (_stk) stkRender();

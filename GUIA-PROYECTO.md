@@ -4,7 +4,13 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-10 · Versión app al documentar: **v8.74**
+> Última actualización: 2026-08-10 · Versión app al documentar: **v8.76**
+>
+> Nota: **v8.76 — Faltantes x día: defaults nuevos.** El estado `_stk.falt` arranca con los 3
+> botones ACTIVOS por defecto: `soloQuiebre: true` (solo artículos que faltan), `sinE: true`
+> (oculta importados sin nacional) y `verDias: true` (columnas por día). Y el orden por defecto
+> es `ordenFab: true` → **1° Fabricante, 2° "Faltó armado"** (`realFalt` desc), que ya era la
+> lógica de sort. Ambos paths de init (ok y catch) quedan consistentes.
 >
 > Nota: **v8.74 — Wizard "Completar": chip "1 Falt." fuera del stepper.** Coherencia visual con
 > v8.73 (el Paso 1 desapareció del flujo). Ahora el stepper muestra sólo **1 Separar → 2 Líos**
