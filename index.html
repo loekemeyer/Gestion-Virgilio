@@ -6289,7 +6289,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.98";
+const APP_VERSION = "v8.99";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -10578,6 +10578,12 @@ async function ocgDemanda(porEmpresa, soloNoPickeadas) {
     const fac = await supaFetchAll(SUPABASE_FACTURACION_NP_ENDPOINT, "select=np");
     fac.forEach(function (r) { const n = pickNormNp(r.np); if (n) facSet[n] = true; });
   } catch (_e) {}
+  // v8.99 — NP ya ENTREGADAS (PPP_Entregados_Meta, espejo de "PPP Pedidos Entregados"). Si el
+  // pedido ya se entregó, tampoco es demanda (aunque no figure facturado). Se suma a facSet.
+  try {
+    const ent = await supaFetchAll(SUPABASE_URL + "/rest/v1/PPP_Entregados_Meta", "select=np");
+    ent.forEach(function (r) { const n = pickNormNp(r.np); if (n) facSet[n] = true; });
+  } catch (_e) {}
   // v8.97 — set de NP PROGRAMADAS (PPP_Programacion_Diaria). Se usa para MARCAR con ⚠ los
   // códigos cuya demanda incluye NP que están en la base de pedidos pero NO están programadas.
   // Falla ABIERTO: si no se puede leer, progSet=null → no se marca nada.
@@ -12722,9 +12728,14 @@ async function stkOpenCajasPedidasArt(codEnc) {
     const fac = await fetch(SUPABASE_FACTURACION_NP_ENDPOINT + "?np=in.(" + npsAll.slice(0, 800).map(encodeURIComponent).join(",") + ")&select=np&limit=20000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; });
     fac.forEach(function (x) { const np = String(x.np || "").trim().replace(/\.0+$/, ""); if (np) _facSet[np] = true; });
   } catch (_e) {}
+  // v8.99 — también descontar las NP ya ENTREGADAS (PPP_Entregados_Meta), igual que la columna.
+  try {
+    const ent = await fetch(SUPABASE_URL + "/rest/v1/PPP_Entregados_Meta?np=in.(" + npsAll.slice(0, 800).map(encodeURIComponent).join(",") + ")&select=np&limit=20000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; });
+    ent.forEach(function (x) { const np = String(x.np || "").trim().replace(/\.0+$/, ""); if (np) _facSet[np] = true; });
+  } catch (_e) {}
   const nps = npsAll.filter(function (np) { return !_facSet[np]; });
   const yaFact = npsAll.length - nps.length;
-  if (!nps.length) { if (body) body.innerHTML = '<div class="stkpop-empty">Todo lo que pidió ' + escapeHtml(_codDisp) + (_empFiltro ? ' (' + _empFiltro + ')' : '') + ' ya está <b>facturado</b> (' + yaFact + ' NP). El recorrido está en 🕓 Historial.</div>'; return; }
+  if (!nps.length) { if (body) body.innerHTML = '<div class="stkpop-empty">Todo lo que pidió ' + escapeHtml(_codDisp) + (_empFiltro ? ' (' + _empFiltro + ')' : '') + ' ya está <b>facturado o entregado</b> (' + yaFact + ' NP). El recorrido está en 🕓 Historial.</div>'; return; }
   const npInfo = {};
   try {
     const prog = await fetch(SUPABASE_PPP_PROG_ENDPOINT + "?np=in.(" + nps.map(encodeURIComponent).join(",") + ")&select=np,tanda,razon_social,fecha_entrega&limit=8000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; });
@@ -12762,7 +12773,7 @@ async function stkOpenCajasPedidasArt(codEnc) {
   // v8.98 — cuáles NP están SIN programar en el PPP (las que disparan el ⚠ de la columna). Es "el argumento".
   var _spRows = rowsArr.filter(function (r) { return r.sinProg; });
   var _cSP = round1(_spRows.reduce(function (s, r) { return s + r.pidio; }, 0));
-  let h = '<div class="stkpop-hint"><b>' + escapeHtml(_codDisp) + '</b>' + (_empFiltro ? ' <b style="color:' + (_empFiltro === "LK" ? "#b91c1c" : "#1e40af") + '">' + _empFiltro + '</b>' : '') + ' · pedido <b>PENDIENTE</b>: <b>' + totP + ' cajas</b> en ' + nps.length + ' NP(s)' + (yaFact ? ' <small style="color:#94a3b8">(+' + yaFact + ' NP ya facturadas — no se muestran; verlas en 🕓 Historial)</small>' : '') + '.' + (_spRows.length > 0 ? '<br><small style="color:#b45309">⚠️ ' + _spRows.length + ' NP (' + _cSP + ' cajas) en la base pero SIN programar en el PPP — marcadas ⚠️ abajo (esto dispara el ⚠️ de la columna).</small>' : '') + '</div>';
+  let h = '<div class="stkpop-hint"><b>' + escapeHtml(_codDisp) + '</b>' + (_empFiltro ? ' <b style="color:' + (_empFiltro === "LK" ? "#b91c1c" : "#1e40af") + '">' + _empFiltro + '</b>' : '') + ' · pedido <b>PENDIENTE</b>: <b>' + totP + ' cajas</b> en ' + nps.length + ' NP(s)' + (yaFact ? ' <small style="color:#94a3b8">(+' + yaFact + ' NP ya facturadas/entregadas — no se muestran; verlas en 🕓 Historial)</small>' : '') + '.' + (_spRows.length > 0 ? '<br><small style="color:#b45309">⚠️ ' + _spRows.length + ' NP (' + _cSP + ' cajas) en la base pero SIN programar en el PPP — marcadas ⚠️ abajo (esto dispara el ⚠️ de la columna).</small>' : '') + '</div>';
   h += '<div style="margin-bottom:10px"><button class="mva-clear" style="background:#166534;color:#fff;border-color:#166534" onclick="stkCajasPedidasExport()">⬇ Exportar a Excel</button></div>';
   // v8.90: formato tabla en lugar de lista
   h += '<div class="mva-tblwrap"><table class="mva-tbl"><thead><tr><th>NP</th><th>Razón Social</th><th class="num">Cajas</th><th style="text-align:center">📦 Pick</th><th style="text-align:center">🧾 Arm</th></tr></thead><tbody>';
