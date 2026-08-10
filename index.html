@@ -6289,7 +6289,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.95";
+const APP_VERSION = "v8.96";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -10566,41 +10566,48 @@ async function ocgFetchNCaja() {
    código está pelado, así que partirla ahí haría que no encuentre el máximo y pida
    de menos. Los códigos no partidos no cambian (pkCodEmpresa los devuelve igual). */
 async function ocgDemanda(porEmpresa, soloNoPickeadas) {
-  let ppp = [];
-  try { ppp = await supaFetchAll(SUPABASE_PPP_PROG_ENDPOINT, "select=np,tanda"); } catch (_e) {}
-  // v7.18 (`soloNoPickeadas`, lo usa el GENERADOR DE OCs): un pedido deja de ser
-  // demanda cuando su mercadería ya salió de la góndola, o sea cuando su tanda tiene
-  // TP (picking terminado) → el stock pasó a separar_pedidos, que tampoco se cuenta
-  // como disponible: NETEA de los dos lados. Los pedidos "en armar sin marcar nada" o
-  // sin empezar (tanda sin TP) SIGUEN contando. Falla ABIERTO: si no se puede leer,
-  // cuenta todo (comportamiento anterior) en vez de sub-pedir.
-  let tpSet = null;
+  // Base de pedidos = TODOS los NP que pidieron algo (PPP_Base_Pedidos). Misma fuente que
+  // el pop-up "Cajas pedidas".
+  let base = new Map();
+  try { base = await fetchPickingBase(); } catch (_e) {}
+  // NP ya FACTURADAS (tick de la operadora → Facturacion_NP). Una vez facturada (esté o no
+  // cargada al camión — ver FC s/Salida), el pedido YA SALIÓ: no cuenta como demanda. Falla
+  // ABIERTO: si no se puede leer, cuenta todo (peor caso = comportamiento anterior).
+  const facSet = {};
+  try {
+    const fac = await supaFetchAll(SUPABASE_FACTURACION_NP_ENDPOINT, "select=np");
+    fac.forEach(function (r) { const n = pickNormNp(r.np); if (n) facSet[n] = true; });
+  } catch (_e) {}
+  // v8.96 — la columna "Cajas Pedidas" cuenta TODAS las cajas pedidas (estén programadas en
+  // PPP_Programacion_Diaria o NO), y solo descuenta las ya facturadas/salidas. Así coincide
+  // con el pop-up (que también incluye NP sin programar). Antes arrancaba desde las programadas.
+  let npList;
   if (soloNoPickeadas) {
+    // (GENERADOR DE OCs) — mantiene el criterio viejo: solo NP programadas y todavía NO pickeadas
+    // (tanda con TP = ya salió de góndola → netea de los dos lados). Falla abierto.
+    let ppp = [];
+    try { ppp = await supaFetchAll(SUPABASE_PPP_PROG_ENDPOINT, "select=np,tanda"); } catch (_e) {}
+    let tpSet = null;
     try {
       const desde = new Date(Date.now() - 60 * 24 * 3600 * 1000).toISOString();
       const rows = await supaFetchAll(SUPABASE_TABLE_ENDPOINT, "select=texto&opcion=eq.TP&created_at=gte." + encodeURIComponent(desde));
       tpSet = new Set();
       rows.forEach(function (r) { const t = String(r.texto || "").trim().toUpperCase(); if (t) tpSet.add(t); });
     } catch (_e) { tpSet = null; }
+    const s = {};
+    ppp.forEach(function (r) {
+      const n = pickNormNp(r.np); if (!n) return;
+      if (tpSet && tpSet.has(String(r.tanda || "").trim().toUpperCase())) return;   // ya pickeada
+      s[n] = true;
+    });
+    npList = Object.keys(s);
+  } else {
+    // COLUMNA DE STOCK: todos los NP de la base de pedidos.
+    npList = Array.from(base.keys());
   }
-  const npSet = {};
-  ppp.forEach(function (r) {
-    const n = pickNormNp(r.np); if (!n) return;
-    if (tpSet && tpSet.has(String(r.tanda || "").trim().toUpperCase())) return;   // ya pickeada
-    npSet[n] = true;
-  });
-  // v6.47: descontar las NP ya FACTURADAS (tick de la operadora → Facturacion_NP). Una vez
-  // facturada (esté o no cargada al camión — ver solapa FC s/Salida), el pedido dejó de ser
-  // demanda: su stock ya salió de a_facturar. Si el fetch falla, se queda con todas (peor
-  // caso = el comportamiento anterior).
-  try {
-    const fac = await supaFetchAll(SUPABASE_FACTURACION_NP_ENDPOINT, "select=np");
-    fac.forEach(function (r) { const n = pickNormNp(r.np); if (n) delete npSet[n]; });
-  } catch (_e) {}
-  let base = new Map();
-  try { base = await fetchPickingBase(); } catch (_e) {}
   const dem = {};
-  Object.keys(npSet).forEach(function (np) {
+  npList.forEach(function (np) {
+    if (facSet[np]) return;   // ya facturada/salió → no es demanda
     (base.get(np) || []).forEach(function (it) { const a = _ocgNorm(porEmpresa ? pkCodEmpresa(it.art, np) : it.art); if (a) dem[a] = (dem[a] || 0) + (Number(it.cajas) || 0); });
   });
   return dem;
@@ -12146,7 +12153,7 @@ function stkBodyStocks() {
   };
   let th = '<th>Código</th><th style="text-align:center;padding:7px 5px;font-size:10px;">LK/<br>CH</th><th>Descripción</th>' +
     _thNum("_tot", "Total<br>Stock", "background:#eef2ff;color:#1e3a8a;", "Stock total") +
-    _thNum("_ped", "Cajas<br>Pedidas", "background:#fef3c7;color:#92400e;", "Cajas pedidas (NP programadas y no facturadas)") +
+    _thNum("_ped", "Cajas<br>Pedidas", "background:#fef3c7;color:#92400e;", "Cajas pedidas — TODAS las NP (programadas o no) que todavía no se facturaron") +
     _thNum("_cap", "Capacidad<br>góndola", "background:#dcfce7;color:#166534;", "Capacidad de góndola");
   cols.forEach(function (c) { th += _thNum(c.key, c.label.replace(" ", "<br>"), "", c.label); });
   th += _thNum("_fc", "FC<br>s/Salida", "background:#eef2ff;color:#1e3a8a;", "Facturado sin salida");   // v6.70
@@ -12177,7 +12184,7 @@ function stkBodyStocks() {
       if (_ocgNorm(a.cod) === _fam._defN) _famTag = ' <span title="Principal de la familia — es el que se debe pedir/mandar" style="color:#16a34a;font-size:10px;">★</span>';
       else _famTag = ' <span title="SECUNDARIO — no deben entrar pedidos acá. El principal es ' + escapeHtml(_equivDisp(_fam, _fam._defN)) + '." style="color:#1e40af;font-size:10px;font-weight:800;">⇄' + escapeHtml(_equivDisp(_fam, _fam._defN)) + '</span>';
     }
-    let tds = '<td class="stk-cod">' + escapeHtml(_codDisplay) + _famTag + '</td><td style="text-align:center;font-weight:800;font-size:11px;padding:3px 4px;color:' + (_lin === "LK" ? "#b91c1c" : (_lin === "CH" ? "#1e40af" : "#94a3b8")) + ';">' + (_lin || "—") + '</td><td class="stk-desc">' + escapeHtml(artNombre(a.cod, a.desc) || "—") + '</td><td class="num ' + (_tot < 0 ? "stk-neg" : "") + '" style="background:#f8fafc"><b>' + fmtCajas(_tot) + '</b></td>' + (_ped ? '<td class="num stk-pick-cell" style="background:#fffbeb;color:#92400e" onclick="event.stopPropagation();stkOpenCajasPedidasArt(\'' + encodeURIComponent(a.cod) + '\')" title="Solo NP programadas en el PPP. Tocá para ver el detalle por NP (incluye también las NP sin programar, por eso el total del detalle puede ser mayor)"><b>' + fmtCajas(_ped) + '</b></td>' : '<td class="num" style="background:#fffbeb;color:#92400e"></td>') + (_cap ? '<td class="num stk-pick-cell" style="background:#f0fdf4;color:#166534" onclick="event.stopPropagation();stkOpenCapArt(\'' + encodeURIComponent(a.cod) + '\')" title="Ubicaciones y capacidad de góndola"><b>' + fmtCajas(_cap) + '</b></td>' : '<td class="num" style="background:#f0fdf4;color:#166534">—</td>');
+    let tds = '<td class="stk-cod">' + escapeHtml(_codDisplay) + _famTag + '</td><td style="text-align:center;font-weight:800;font-size:11px;padding:3px 4px;color:' + (_lin === "LK" ? "#b91c1c" : (_lin === "CH" ? "#1e40af" : "#94a3b8")) + ';">' + (_lin || "—") + '</td><td class="stk-desc">' + escapeHtml(artNombre(a.cod, a.desc) || "—") + '</td><td class="num ' + (_tot < 0 ? "stk-neg" : "") + '" style="background:#f8fafc"><b>' + fmtCajas(_tot) + '</b></td>' + (_ped ? '<td class="num stk-pick-cell" style="background:#fffbeb;color:#92400e" onclick="event.stopPropagation();stkOpenCajasPedidasArt(\'' + encodeURIComponent(a.cod) + '\')" title="Todas las cajas pedidas (programadas o no) todavía no facturadas. Tocá para ver el detalle por NP"><b>' + fmtCajas(_ped) + '</b></td>' : '<td class="num" style="background:#fffbeb;color:#92400e"></td>') + (_cap ? '<td class="num stk-pick-cell" style="background:#f0fdf4;color:#166534" onclick="event.stopPropagation();stkOpenCapArt(\'' + encodeURIComponent(a.cod) + '\')" title="Ubicaciones y capacidad de góndola"><b>' + fmtCajas(_cap) + '</b></td>' : '<td class="num" style="background:#f0fdf4;color:#166534">—</td>');
     cols.forEach(function (c) {
       const v = (c.racksKey ? ((Number(a[c.key]) || 0) + (Number(a.racks_ch) || 0)) : (Number(a[c.key]) || 0));
       // v5.82: columnas clickeables → detalle. Pickeados/A facturar → NPs; Excedente/Racks → ubicación.
@@ -12729,7 +12736,7 @@ async function stkOpenCajasPedidasArt(codEnc) {
   const totP = round1(nps.reduce(function (s, np) { return s + pedByNp[np]; }, 0));
   const rowsArr = nps.map(function (np) { const info = npInfo[np] || {}, t = info.tanda || ""; return { np: np, tanda: t, rs: info.rs || "", fecha: info.fecha || "", pidio: round1(pedByNp[np]), pickeado: !!(t && pickTandas[t]), separado: !!(t && sepTandas[t]) }; });
   _stkPop = { kind: "cajasPed", cod: cod, rows: rowsArr };   // v5.104: guardar para el export a Excel
-  let h = '<div class="stkpop-hint"><b>' + escapeHtml(_codDisp) + '</b>' + (_empFiltro ? ' <b style="color:' + (_empFiltro === "LK" ? "#b91c1c" : "#1e40af") + '">' + _empFiltro + '</b>' : '') + ' · pedido <b>PENDIENTE</b>: <b>' + totP + ' cajas</b> en ' + nps.length + ' NP(s)' + (yaFact ? ' <small style="color:#94a3b8">(+' + yaFact + ' NP ya facturadas — no se muestran; verlas en 🕓 Historial)</small>' : '') + '.<br><small style="color:#94a3b8">Incluye NP sin programar todavía — puede dar más que la columna.</small></div>';
+  let h = '<div class="stkpop-hint"><b>' + escapeHtml(_codDisp) + '</b>' + (_empFiltro ? ' <b style="color:' + (_empFiltro === "LK" ? "#b91c1c" : "#1e40af") + '">' + _empFiltro + '</b>' : '') + ' · pedido <b>PENDIENTE</b>: <b>' + totP + ' cajas</b> en ' + nps.length + ' NP(s)' + (yaFact ? ' <small style="color:#94a3b8">(+' + yaFact + ' NP ya facturadas — no se muestran; verlas en 🕓 Historial)</small>' : '') + '.<br><small style="color:#94a3b8">Incluye NP programadas y sin programar (mismo criterio que la columna).</small></div>';
   h += '<div style="margin-bottom:10px"><button class="mva-clear" style="background:#166534;color:#fff;border-color:#166534" onclick="stkCajasPedidasExport()">⬇ Exportar a Excel</button></div>';
   // v8.90: formato tabla en lugar de lista
   h += '<div class="mva-tblwrap"><table class="mva-tbl"><thead><tr><th>NP</th><th>Razón Social</th><th class="num">Cajas</th><th style="text-align:center">📦 Pick</th><th style="text-align:center">🧾 Arm</th></tr></thead><tbody>';
