@@ -99,6 +99,11 @@ catch (_e) {
       if (url.indexOf("/Movimientos_Stock") >= 0) return J(MOV_DB);   // GET (el POST ya se atrapó arriba)
       if (url.indexOf("Insumos_Categorias") >= 0) return J(CATS_DB);
       if (url.indexOf("Insumos_Unidades") >= 0) return J(UNIS_DB.map(function (n, i) { return { nombre: n, orden: i }; }));
+      if (url.indexOf("Insumos_Ubicaciones") >= 0) return J([
+        { id: 1, cod: "22", sector: "V2 Ad", cantidad: 0, capacidad: null, unidad: null, notas: null },
+        { id: 2, cod: "PP", sector: "AF1", cantidad: 0, capacidad: null, unidad: null, notas: null }
+      ]);
+      if (url.indexOf("Insumos_Factores") >= 0) return J([]);
       if (url.indexOf("/Insumos") >= 0) return J(CAT);
       if (url.indexOf("vista_saldos_insumos_x_unidad") >= 0) {
         return J([{ cod_art: "TMP-0001", unidad: "Bolsas", saldo: 7 }, { cod_art: "22", unidad: "kg", saldo: 1483.95 },
@@ -126,6 +131,9 @@ catch (_e) {
     await stkInsLoad();
     const body = function () { return document.getElementById("stkBody").innerHTML; };
     const filas = function (sel) { return document.querySelectorAll(sel).length; };
+
+    // v8.35 cerró todas las secciones por default: abrirlas para el test
+    stkInsSec("pend");
 
     // 1) Pendientes primero y con TODO editable
     out.primeraSec = (document.querySelector("#stkBody .stk-sec") || {}).textContent || "";
@@ -224,6 +232,7 @@ catch (_e) {
     out.catBorrarConNombre = rpc.some(function (x) { return x.fn === "insumo_cat_borrar" && x.body.p_clave === "cajas"; });
 
     // 5) CATEGORÍAS: una caja por categoría, con sus unidades permitidas
+    stkInsSec("cats");   // abrir sección
     const cajas = document.querySelectorAll("#stkBody .stk-catbox");
     out.nCajasCat = cajas.length;                            // 6 categorías, ninguna es «a depurar»
     out.sinDepurar = !/A depurar/.test(document.getElementById("stkBody").innerHTML);
@@ -287,6 +296,7 @@ catch (_e) {
     out.pendVuelve = !!document.getElementById("idCod_TMP-0001");
 
     // 8c) TABLA FINAL de sólo lectura, filtrable, y se actualiza con los cambios
+    stkInsSec("todos");   // abrir sección
     const tablas = document.querySelectorAll("#stkBody table");
     const tot = tablas[tablas.length - 1];
     out.hayTablaTotal = /Todos los insumos/.test(document.getElementById("stkBody").innerHTML);
@@ -398,7 +408,7 @@ catch (_e) {
     r.altaEnSuCat === true &&
     r.catEditAbre === true && r.catGuardaNombre === "Cajas y embalaje" && r.catGuardaUnis === "Paquetes,Uni,MC" &&
     r.haySecUnidades === true && r.uniSacar === true && r.uniUsadaAvisa === true && r.uniLibreNoAvisa === true &&
-    /Pendientes.*\|.*Unidades.*\|.*Categorías/.test(r.ordenSecciones || "") && r.altaRechazaDuplicado === true &&
+    /Pendientes.*\|.*Categor.*\|.*Todos.*\|.*Unidades/.test(r.ordenSecciones || "") && r.altaRechazaDuplicado === true &&
     r.hayBotonesSec === 5 && r.todosColapsa === true && r.pendColapsa === true && r.pendVuelve === true &&
     r.histColapsadoInicio === true && r.hayHist === true && r.histTieneIngreso === true && r.histTieneEgreso === true &&
     r.histTieneFusion === true && r.histTieneCatGuardar === true && r.histMuestraQuien === true &&

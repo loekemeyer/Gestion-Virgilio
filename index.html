@@ -6213,7 +6213,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.71";
+const APP_VERSION = "v8.72";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -14289,15 +14289,100 @@ async function stkInsRefresh() {
     const r = await Promise.all([
       supaFetchAll(SUPABASE_URL + "/rest/v1/Insumos", "select=cod,nombre,categoria,ubicacion,isis,creado_por,creado"),
       insFetchSaldosXUni(),
-      _stkInsHistFetch()
+      _stkInsHistFetch(),
+      supaFetchAllSafe(SUPABASE_INS_UBIC_ENDPOINT, "select=id,cod,sector,cantidad,capacidad,unidad,notas")  // v8.72
     ]);
+    // v8.72 — agrupar ubicaciones por cod
+    var _ubMap = {};
+    (r[3] || []).forEach(function (u) { var k = String(u.cod || "").trim().toUpperCase(); if (!_ubMap[k]) _ubMap[k] = []; _ubMap[k].push(u); });
     _stkIns.items = (r[0] || []).map(function (c) {
+      var ck = String(c.cod).trim().toUpperCase();
       return { cod: String(c.cod), nombre: c.nombre || "", cat: c.categoria || "", ubic: c.ubicacion || "",
-               isis: c.isis || "", por: c.creado_por || "", xuni: r[1][String(c.cod)] || null };
+               isis: c.isis || "", por: c.creado_por || "", xuni: r[1][String(c.cod)] || null,
+               ubics: _ubMap[ck] || [] };
     });
     _stkIns.items.sort(_insSortCod);
     _stkIns.hist = r[2] || [];
   } catch (e) { _stkIns.items = []; _stkIns.msg = "⚠ Error cargando: " + (e.message || e); }
+}
+/* v8.72 — mostrar ubicaciones múltiples en 1 línea (read-only). Usa Insumos_Ubicaciones
+   si hay, sino fallback al campo viejo Insumos.ubicacion. */
+function _stkInsUbicStr(it) {
+  if (it.ubics && it.ubics.length) return it.ubics.map(function (u) { return u.sector; }).join(" · ");
+  return it.ubic || "";
+}
+/* v8.72 — HTML para editar ubicaciones múltiples inline (mini-lista con botón +/x) */
+function _stkInsUbicEdit(cod, ubics) {
+  var ubs = (ubics && ubics.length) ? ubics : [];
+  var h = '<div id="edUbics_' + escapeHtml(cod) + '" style="min-width:100px;">';
+  h += ubs.map(function (u, i) {
+    return '<div style="display:flex;align-items:center;gap:2px;margin-bottom:2px;">' +
+      '<input class="stk-inp insUbicSec" data-cod="' + escapeHtml(cod) + '" data-idx="' + i + '" value="' + escapeHtml(u.sector) + '" style="width:80px;" placeholder="sector">' +
+      '<button class="stk-btn stk-btn-x" style="padding:1px 5px;font-size:11px;" onclick="stkInsUbicQuitar(\'' + escapeHtml(cod) + '\',' + i + ')" title="Quitar">✕</button></div>';
+  }).join("");
+  h += '<button class="stk-btn" style="padding:1px 8px;font-size:11px;margin-top:2px;" onclick="stkInsUbicAgregar(\'' + escapeHtml(cod) + '\')" title="Agregar ubicación">＋</button>';
+  h += '</div>';
+  return h;
+}
+/* v8.72 — agregar una línea de ubicación al editor inline */
+function stkInsUbicAgregar(cod) {
+  var wrap = document.getElementById("edUbics_" + cod);
+  if (!wrap) return;
+  var inputs = wrap.querySelectorAll("input.insUbicSec");
+  var idx = inputs.length;
+  var div = document.createElement("div");
+  div.style.cssText = "display:flex;align-items:center;gap:2px;margin-bottom:2px;";
+  div.innerHTML = '<input class="stk-inp insUbicSec" data-cod="' + escapeHtml(cod) + '" data-idx="' + idx + '" value="" style="width:80px;" placeholder="sector">' +
+    '<button class="stk-btn stk-btn-x" style="padding:1px 5px;font-size:11px;" onclick="stkInsUbicQuitar(\'' + escapeHtml(cod) + '\',' + idx + ')" title="Quitar">✕</button>';
+  // Insertar antes del botón +
+  var btn = wrap.querySelector("button:last-child");
+  wrap.insertBefore(div, btn);
+  div.querySelector("input").focus();
+}
+/* v8.72 — quitar una línea de ubicación del editor inline */
+function stkInsUbicQuitar(cod, idx) {
+  var wrap = document.getElementById("edUbics_" + cod);
+  if (!wrap) return;
+  var divs = wrap.querySelectorAll("div[style]");
+  if (divs[idx]) divs[idx].remove();
+  // Re-numerar idx
+  var inputs = wrap.querySelectorAll("input.insUbicSec");
+  for (var i = 0; i < inputs.length; i++) inputs[i].setAttribute("data-idx", i);
+}
+/* v8.72 — leer las ubicaciones del editor inline → array de strings */
+function _stkInsUbicLeer(cod) {
+  var wrap = document.getElementById("edUbics_" + cod);
+  if (!wrap) return [];
+  var inputs = wrap.querySelectorAll("input.insUbicSec");
+  var out = [];
+  for (var i = 0; i < inputs.length; i++) {
+    var v = String(inputs[i].value || "").trim();
+    if (v) out.push(v);
+  }
+  return out;
+}
+/* v8.72 — guardar ubicaciones múltiples en Insumos_Ubicaciones (CRUD sync) */
+async function _stkInsUbicSync(cod, nuevas) {
+  var hdr = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" };
+  // Traer las actuales
+  var act = [];
+  try {
+    var r = await fetch(SUPABASE_INS_UBIC_ENDPOINT + "?cod=eq." + encodeURIComponent(cod) + "&select=id,sector", { headers: hdr, cache: "no-store" });
+    if (r.ok) act = await r.json();
+  } catch (_e) {}
+  var actMap = {}; act.forEach(function (u) { actMap[u.sector.toUpperCase()] = u; });
+  var nuevasMap = {}; nuevas.forEach(function (s) { nuevasMap[s.toUpperCase()] = s; });
+  // Borrar las que ya no están
+  var aBorrar = act.filter(function (u) { return !nuevasMap[u.sector.toUpperCase()]; });
+  for (var i = 0; i < aBorrar.length; i++) {
+    await fetch(SUPABASE_INS_UBIC_ENDPOINT + "?id=eq." + aBorrar[i].id, { method: "DELETE", headers: hdr });
+  }
+  // Agregar las nuevas que no existían
+  var aAgregar = nuevas.filter(function (s) { return !actMap[s.toUpperCase()]; });
+  if (aAgregar.length) {
+    var rows = aAgregar.map(function (s) { return { cod: cod, sector: s }; });
+    await fetch(SUPABASE_INS_UBIC_ENDPOINT, { method: "POST", headers: hdr, body: JSON.stringify(rows) });
+  }
 }
 function _stkInsSaldo(it) {
   if (!it.xuni || !it.xuni.length) return "—";
@@ -14482,7 +14567,7 @@ function _stkInsListado(k, items) {
     if (!_stkInsConStock(it)) return false;   // en 0 = no se lista acá (queda en «Todos los insumos»)
     const c = insCatDef(it.cat) ? it.cat : "";
     if (k === "?" ? c !== "" : c !== k) return false;
-    return !f || (it.cod + " " + it.nombre + " " + it.ubic).toLowerCase().indexOf(f) >= 0;
+    return !f || (it.cod + " " + it.nombre + " " + _stkInsUbicStr(it)).toLowerCase().indexOf(f) >= 0;
   });
   let h = '<div class="stk-catlist">';
   h += '<input class="stk-inp" style="width:100%;box-sizing:border-box;margin-bottom:7px;" placeholder="🔎 Buscar código / nombre / ubicación" value="' + escapeHtml(_stkIns.filtro) + '" oninput="if(_stkIns){_stkIns.filtro=this.value;stkRender();}">';
@@ -14508,7 +14593,7 @@ function _stkInsListado(k, items) {
         return '<tr><td><b>' + escapeHtml(it.cod) + '</b></td>' +
           '<td class="stk-sub">' + escapeHtml(it.isis || "—") + '</td>' +
           '<td>' + escapeHtml(it.nombre || "—") + '</td>' +
-          '<td>' + escapeHtml(it.ubic || "—") + '</td>' +
+          '<td>' + escapeHtml(_stkInsUbicStr(it) || "—") + '</td>' +
           '<td class="num"' + (du.neg ? ' style="color:#b91c1c;font-weight:800;"' : "") + ' style="border-left:1px solid #eef2f7;">' + du.cantP + '</td>' +
           '<td>' + escapeHtml(du.uniP || "—") + '</td>' +
           '<td class="num" style="border-left:1px solid #eef2f7;">' + (du.cantS !== "" ? du.cantS : '<span class="stk-sub">—</span>') + '</td>' +
@@ -14521,7 +14606,7 @@ function _stkInsListado(k, items) {
         '<td><input class="stk-inp" id="edCod_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.cod) + '" style="width:88px;" title="Código conocido (clave del stock)"></td>' +
         '<td><input class="stk-inp" id="edIsis_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.isis || "") + '" placeholder="isis" style="width:78px;color:#64748b;" title="Código del sistema (isis)"></td>' +
         '<td><input class="stk-inp" id="edNom_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.nombre) + '" style="width:150px;"><br><span class="stk-sub">cat:</span> ' + _stkInsCatSel("edCat_" + it.cod, it.cat) + '</td>' +
-        '<td><input class="stk-inp" id="edUbi_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.ubic) + '" style="width:66px;"></td>' +
+        '<td>' + _stkInsUbicEdit(it.cod, it.ubics) + '</td>' +
         '<td style="border-left:1px solid #eef2f7;"><input class="stk-inp" id="edQty_' + escapeHtml(it.cod) + '" type="number" step="any" value="' + escapeHtml(u.saldo) + '" style="width:70px;" oninput="stkInsAutoSec(\'' + escapeHtml(it.cod) + '\',\'qty\')" title="Cantidad primaria (en la unidad base)"></td>' +
         '<td>' + _stkInsUniSel("edUni_" + it.cod, du.uniP || _stkInsUniMostrar(it)) + '</td>' +
         '<td style="border-left:1px solid #eef2f7;"><input class="stk-inp" id="edSecQty_' + escapeHtml(it.cod) + '" type="number" step="any" value="' + escapeHtml(du.cantS) + '" style="width:66px;" placeholder="cant" oninput="stkInsAutoSec(\'' + escapeHtml(it.cod) + '\',\'sec\')" title="Cargá Cant secundaria O el Factor: el otro se completa solo"></td>' +
@@ -14571,7 +14656,7 @@ function _stkInsTodos(items) {
   const lista = (items || []).filter(function (it) {
     if (!_m(it.cod, f.cod)) return false;
     if (f.cat && (f.cat === "?" ? !insSinCat(it) : insCatOf(it) !== f.cat)) return false;
-    if (!_m(it.ubic, f.ubic)) return false;
+    if (!_m(_stkInsUbicStr(it), f.ubic)) return false;
     if (!_m(it.nombre, f.nom)) return false;
     if (f.uni && !(it.xuni || []).some(function (u) { return String(u.uni).toLowerCase() === String(f.uni).toLowerCase(); })) return false;
     if (f.cant) {
@@ -14609,7 +14694,7 @@ function _stkInsTodos(items) {
         '<input class="stk-inp" id="edIsis_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.isis || "") + '" placeholder="isis (sistema)" style="width:100px;margin-top:3px;color:#64748b;" title="Código del sistema (isis) — informativo, no toca el stock"></td>' +
         '<td><input class="stk-inp" id="edNom_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.nombre) + '" style="width:140px;"></td>' +
         '<td>' + _stkInsCatSel("edCat_" + it.cod, it.cat) + '</td>' +
-        '<td><input class="stk-inp" id="edUbi_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.ubic) + '" style="width:80px;"></td>' +
+        '<td>' + _stkInsUbicEdit(it.cod, it.ubics) + '</td>' +
         '<td><input class="stk-inp" id="edQty_' + escapeHtml(it.cod) + '" type="number" step="any" value="' + escapeHtml(u.saldo) + '" style="width:82px;"></td>' +
         '<td>' + _stkInsUniSel("edUni_" + it.cod, _stkInsUniMostrar(it)) + '</td>' +
         '<td><button class="stk-btn" onclick="stkInsGuardar(\'' + escapeHtml(it.cod) + '\')">✓ Guardar</button> ' +
@@ -14633,7 +14718,7 @@ function _stkInsTodos(items) {
     }
     return '<tr><td><b>' + escapeHtml(it.cod) + '</b>' + (it.isis ? '<div class="stk-sub">isis: ' + escapeHtml(it.isis) + '</div>' : '') + '</td><td>' + escapeHtml(it.nombre || "—") + '</td>' +
       '<td>' + escapeHtml(insCatLbl(insCatOf(it))) + '</td>' +
-      '<td>' + escapeHtml(it.ubic || "—") + '</td>' +
+      '<td>' + escapeHtml(_stkInsUbicStr(it) || "—") + '</td>' +
       '<td class="num">' + cantCell + '</td>' +
       '<td>' + uniCell + '</td>' +
       '<td><button class="stk-btn" onclick="stkInsEdit(\'art:' + escapeHtml(it.cod) + '\')">Editar</button> ' +
@@ -14898,6 +14983,8 @@ async function stkInsAceptar(orig) {
     // en el código viejo (el log es append-only: se corrige con un asiento, no editando).
     await _stkInsAjustar(it, orig, qty, uni);
     const n = await _stkInsRpc("insumo_identificar", { p_tmp: orig, p_cod: cod, p_nombre: nom || null, p_categoria: cat || null, p_ubicacion: ubi || null });
+    // v8.72 — si el admin puso ubicación, crear la fila en Insumos_Ubicaciones
+    if (ubi) await _stkInsUbicSync(cod, [ubi]);
     _stkIns.msg = "✓ " + orig + (existente ? " sumado a " : " → ") + cod + " (" + (n || 0) + " movimiento(s) de stock).";
     await stkInsRefresh(); stkRender();
   } catch (e) { alert("No se pudo: " + (e.message || e)); }
@@ -14994,7 +15081,9 @@ async function stkInsGuardar(cod) {
   const it = (_stkIns.items || []).filter(function (x) { return x.cod === cod; })[0];
   if (!it) return;
   const nuevoCod = _stkInsVal("edCod_" + cod), nom = _stkInsVal("edNom_" + cod);
-  const cat = _stkInsVal("edCat_" + cod), ubi = _stkInsVal("edUbi_" + cod);
+  const cat = _stkInsVal("edCat_" + cod);
+  const ubics = _stkInsUbicLeer(cod);  // v8.72 — ubicaciones múltiples
+  const ubi = ubics.join(" · ");       // v8.72 — fallback para el campo viejo
   const uni = _stkInsVal("edUni_" + cod), qty = _stkInsVal("edQty_" + cod);
   const isis = _stkInsVal("edIsis_" + cod);   // v8.28 — código del sistema (informativo)
   if (!nuevoCod) { alert("El código no puede quedar vacío."); return; }
@@ -15039,6 +15128,10 @@ async function stkInsGuardar(cod) {
       ]});
       await insFetchFactores();
     }
+    // v8.72 — sincronizar ubicaciones múltiples en Insumos_Ubicaciones
+    if (ubics.length || (it.ubics && it.ubics.length)) {
+      await _stkInsUbicSync(finalCod, ubics);
+    }
     _stkIns.edit = null; _stkIns.msg = msg;
     await stkInsRefresh(); stkRender();
   } catch (e) { alert("No se pudo: " + (e.message || e)); }
@@ -15049,7 +15142,12 @@ async function stkInsAlta(k) {
   const ya = (_stkIns.items || []).filter(function (x) { return x.cod === cod; })[0];
   if (ya) { alert("El código " + cod + " ya está en uso" + (ya.nombre ? " (" + ya.nombre + ")" : "") + ".\n\nPoné otro."); return; }
   try {
-    await _stkInsRpc("insumo_alta", { p_cod: cod, p_nombre: _stkInsVal("nvNom") || null, p_categoria: k === "?" ? null : k, p_ubicacion: _stkInsVal("nvUbi") || null, p_legajo: "admin" });
+    var ubiAlta = _stkInsVal("nvUbi") || null;
+    await _stkInsRpc("insumo_alta", { p_cod: cod, p_nombre: _stkInsVal("nvNom") || null, p_categoria: k === "?" ? null : k, p_ubicacion: ubiAlta, p_legajo: "admin" });
+    // v8.72 — si se cargó ubicación en el alta, crear la fila en Insumos_Ubicaciones también
+    if (ubiAlta) {
+      await _stkInsUbicSync(cod, [ubiAlta]);
+    }
     _stkIns.nuevoEn = ""; _stkIns.msg = "✓ " + cod + " creado.";
     await stkInsRefresh(); stkRender();
   } catch (e) { alert("No se pudo: " + (e.message || e)); }
@@ -15657,6 +15755,7 @@ function closeBajarRacks() { const ov = document.getElementById("brModal"); if (
    sobre el catálogo Insumos; si no está, se crea el código en el momento. La entrada/salida
    se hace con stockMove (offline-safe, vir_stock_pend). Operario-facing. ===== */
 const SUPABASE_INSUMOS_ENDPOINT = SUPABASE_URL + "/rest/v1/Insumos";
+const SUPABASE_INS_UBIC_ENDPOINT = SUPABASE_URL + "/rest/v1/Insumos_Ubicaciones";  // v8.72
 let _ins = null;
 function _insSortCod(a, b) { return String(a.cod).localeCompare(String(b.cod), undefined, { numeric: true, sensitivity: "base" }); }
 /* idea 7917 — BOTONERA DE CATEGORÍAS. El modal listaba los 108 códigos planos por
