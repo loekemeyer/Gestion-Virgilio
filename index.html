@@ -9782,7 +9782,12 @@ async function openStockAdmin(soloConteo) {
       supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Insumos", "select=cod").catch(function () { return []; }),
       ocLoadLineas().catch(function () { return {}; }),   // v7.73: cargar códigos de insumos para filtrarlos de Stock + v7.89: LK/CH
       rkbFetchCxM().catch(function () { return { cxm: {} }; })]);   // v8.52: inner×master de racks (backlog capacity-aware)
-    _stk = { movs: res[0] || [], cutoff: res[1], factors: res[2] || {}, ordenes: res[3] || [], bajadas: res[4] || [], tab: _solo ? "conteo" : "stocks", soloConteo: _solo, filtro: "", openArt: null, ingMode: "remito", asOf: null, asOfInput: "", dem: res[6] || {}, cap: res[7] || [], gConf: res[8] || [], fcs: res[9] || { pend: {}, porArt: {} }, fcsLoaded: true, insumosCods: (res[10] || []).map(function(i) { return String(i.cod || "").trim().toUpperCase(); }), cxm: (res[11] && res[11].cxm) || {} };
+    // v8.90: cxm primario = planimetría; fallback = Articulos.Cajas_x_Master (para códigos sin posición en racks)
+    var _cxmPlani = (res[11] && res[11].cxm) || {}, _cxmMerge = {};
+    Object.keys(_cxmPlani).forEach(function (k) { _cxmMerge[k] = _cxmPlani[k]; });
+    var _fac = res[2] || {};
+    Object.keys(_fac).forEach(function (k) { var kN = _cpNorm(k); if (!_cxmMerge[kN] && _fac[k].cajasXMaster > 0) _cxmMerge[kN] = _fac[k].cajasXMaster; });
+    _stk = { movs: res[0] || [], cutoff: res[1], factors: _fac, ordenes: res[3] || [], bajadas: res[4] || [], tab: _solo ? "conteo" : "stocks", soloConteo: _solo, filtro: "", openArt: null, ingMode: "remito", asOf: null, asOfInput: "", dem: res[6] || {}, cap: res[7] || [], gConf: res[8] || [], fcs: res[9] || { pend: {}, porArt: {} }, fcsLoaded: true, insumosCods: (res[10] || []).map(function(i) { return String(i.cod || "").trim().toUpperCase(); }), cxm: _cxmMerge };
     stkRender();
   } catch (e) { const b = document.getElementById("stkBody"); if (b) b.innerHTML = '<div class="stk-loading">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
 }
@@ -17054,14 +17059,17 @@ async function showGuardarOrden(legajo) {
     + '<div style="display:flex;align-items:center;justify-content:space-between;padding:13px 15px;background:linear-gradient(90deg,#1e6bd6,#1e3a8a);color:#fff;"><b style="font-size:17px;">📋 ¿Qué bajar primero?</b><button onclick="closeGuardarOrden()" style="width:auto;background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;">Cerrar</button></div>'
     + '<div id="gordenBody" style="padding:13px 14px;"><div style="text-align:center;color:#64748b;padding:24px;">Calculando prioridades…</div></div></div>';
   try {
-    const res = await Promise.all([stockFetchSaldos(), ocgFetchCapacidad(), loadArtNombres(), rkbFetchCxM()]);
-    const saldos = res[0] || {}, capMap = res[1] || {}, cxmMap = (res[3] && res[3].cxm) || {};
+    const res = await Promise.all([stockFetchSaldos(), ocgFetchCapacidad(), loadArtNombres(), rkbFetchCxM(), stockFetchArtFactors()]);
+    const saldos = res[0] || {}, capMap = res[1] || {}, cxmMap = (res[3] && res[3].cxm) || {}, _facG = res[4] || {};
     const items = Object.keys(saldos).map(function (k) {
       const a = saldos[k];
       const aGuardar = Math.round(Number(a.a_guardar) || 0), exc = Math.round(Number(a.excedente) || 0), racks = Math.round(Number(a.racks) || 0);
       if (aGuardar + exc + racks <= 0) return null;   // nada esperando para bajar
       const cap = Math.round(capMap[_ocgNorm(a.cod)] || 0), gond = Math.round(Number(a.terminado) || 0);
-      return { cod: a.cod, desc: artNombre(a.cod, a.desc), gond: gond, cap: cap, aGuardar: aGuardar, exc: exc, racks: racks, cxm: cxmMap[_cpNorm(a.cod)] || 0 };
+      // v8.90: cxm de planimetría; si no hay, fallback a Cajas_x_Master de la tabla de artículos
+      var _cxmVal = cxmMap[_cpNorm(a.cod)] || 0;
+      if (!_cxmVal) { var _fG = _facG[String(a.cod).toUpperCase()]; if (_fG && _fG.cajasXMaster > 0) _cxmVal = _fG.cajasXMaster; }
+      return { cod: a.cod, desc: artNombre(a.cod, a.desc), gond: gond, cap: cap, aGuardar: aGuardar, exc: exc, racks: racks, cxm: _cxmVal };
     }).filter(Boolean);
     _gorden = { filtro: "todos", items: items };
     renderGuardarOrden();
@@ -17212,17 +17220,20 @@ async function showRacksBajarModal(legajo, _resume) {
   ov.innerHTML = '<div class="rkb-card"><div class="rkb-head"><span class="rkb-title">🏗 Bajar de racks a góndola</span><button class="rkb-close" onclick="rkbAskClose()">Cerrar</button></div><div class="rkb-body" id="rkbBody"><div class="rkb-empty">Cargando racks…</div></div></div>';
   if (_resume) { _rkb = _resume; rkbRender(); return; }
   try {
-    const res = await Promise.all([stockFetchSaldos(), loadArtNombres(), rkbFetchCxM()]);
+    const res = await Promise.all([stockFetchSaldos(), loadArtNombres(), rkbFetchCxM(), stockFetchArtFactors()]);
     const saldos = res[0] || {};
     const plani = res[2] || {};
-    const cxmMap = plani.cxm || {}, locsMap = plani.locs || {};
+    const cxmMap = plani.cxm || {}, locsMap = plani.locs || {}, _facRkb = res[3] || {};
     const sN = {}; Object.keys(saldos).forEach(function (k) { sN[_cpNorm(k)] = saldos[k]; });
     const items = Object.keys(saldos).map(function (k) { return saldos[k]; }).filter(function (a) { return (a.racks || 0) > 0; })
       .sort(function (a, b) { return (parseInt(a.cod, 10) || 0) - (parseInt(b.cod, 10) || 0); })
       .map(function (a) {
         const kN = _cpNorm(a.cod), locs = locsMap[kN] || [];
+        // v8.90: cxm de planimetría; fallback a Cajas_x_Master de la tabla de artículos
+        var _cxmR = cxmMap[kN] || 0;
+        if (!_cxmR) { var _fR = _facRkb[String(a.cod).toUpperCase()]; if (_fR && _fR.cajasXMaster > 0) _cxmR = _fR.cajasXMaster; }
         // sec preseleccionada = la ubicación con más stock (planimetría viva, v5.22)
-        return { cod: a.cod, desc: artNombre(a.cod, a.desc), racks: Math.round(a.racks), cxm: cxmMap[kN] || 0, locs: locs, sec: (locs[0] ? locs[0].sector : ""), baja: 0, manual: false };
+        return { cod: a.cod, desc: artNombre(a.cod, a.desc), racks: Math.round(a.racks), cxm: _cxmR, locs: locs, sec: (locs[0] ? locs[0].sector : ""), baja: 0, manual: false };
       });
     _rkb = { legajo: String(legajo || ""), items: items, saldosN: sN, cxmMap: cxmMap, locsMap: locsMap, filtro: "" };
     rkbRender();
