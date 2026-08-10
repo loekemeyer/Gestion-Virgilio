@@ -140,8 +140,8 @@ function _pppMapEntregados_(values) {
 }
 
 /* ---- Base Datos Pedidos: por POSICIÓN (igual que fetchPickingBase):
-        Pedido=A(0), Artículo=C(2), Cajas=F(5). Fila válida si Pedido empieza
-        con dígito (saltea el header "Pedido"). ---- */
+        Pedido=A(0), Fecha=B(1), Artículo=C(2), Cliente=E(4), Cajas=F(5).
+        Fila válida si Pedido empieza con dígito (saltea el header "Pedido"). ---- */
 function _pppMapBasePedidos_(values) {
   var out = [];
   for (var i = 0; i < values.length; i++) {
@@ -150,7 +150,10 @@ function _pppMapBasePedidos_(values) {
     if (!/^\d/.test(ped)) continue;
     var art = _pppStr_(r[2]);
     if (!art) continue;
-    out.push({ pedido: ped, articulo: art, cajas: _pppNum_(r[5]) });
+    // v9.02 — guardar también fecha (col B) y cliente/razón social (col E), para revisar
+    // las NP que están en la base pero no en Programación Diaria con su cliente y fecha.
+    out.push({ pedido: ped, articulo: art, cajas: _pppNum_(r[5]),
+               fecha: _pppStr_(r[1]) || null, cliente: _pppStr_(r[4]) || null });
   }
   return out;
 }
