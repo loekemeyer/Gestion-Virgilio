@@ -4,7 +4,20 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-09 · Versión app al documentar: **v8.58**
+> Última actualización: 2026-08-10 · Versión app al documentar: **v8.64**
+>
+> Nota: **v8.59–v8.64 — Batch de mejoras a otros módulos.** (v8.59) Cola de impresión: estado
+> "última revisión / sin conexión" + botón "Revisar ahora" (`psPoll(force)`). (v8.60) Recepción
+> (`recepcion.js`): aviso en vivo si las cajas tipeadas superan lo que falta por OC (`_opCajasExceso`).
+> (v8.61) PPP: banner de pedidos que salieron en fecha ≠ a la programada (reusa `_pppDelivered.discrep`).
+> (v8.62) Capacidad: panel de discontinuados que ocupan góndola (`activo=false` en OC_Maximos).
+> (v8.63) Insumos: aviso de insumos con varias unidades sin factor (`_stkInsMezclaUni`). (v8.64)
+> Completar Pedido: colapsable de faltantes huérfanos (>21 días) que se caen del CP.
+> **Pendiente (necesita decisión/clarificación):** semáforo de camión en Monitor (no hay campo de
+> "camión" en la data), alertas Telegram por cron (PPP entrega-hoy-sin-armar, watchdog de impresión),
+> y capturar el conteo CT (toca un toggle sensible).
+>
+> Nota: **v8.58 — Facturación: se saca el badge "🧾 Facturá X (no pelado)" de abajo de Razón Social.**
 >
 > Nota: **v8.58 — Facturación: se saca el badge "🧾 Facturá X (no pelado)" de abajo de Razón Social.**
 > El aviso de equivalencia (`_facEquiv`/`vista_pedidos_equivalencia`, pelado→código de empresa) se
