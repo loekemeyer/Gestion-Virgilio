@@ -6310,7 +6310,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.88";
+const APP_VERSION = "v8.89";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -11504,7 +11504,7 @@ function _abastN(n) { n = Number(n) || 0; return String(Math.round(n * 10) / 10)
 function _abastEsImportado(cod) { return /E/i.test(String(cod || "")); }
 /* Display: los códigos numéricos van a 3 dígitos (las vistas los guardan sin ceros a la
    izquierda → "31"; el usuario los quiere como "031"). Los que tienen letras quedan igual. */
-function _abastCodDisp(cod) { const c = String(cod || ""); return /^[0-9]+$/.test(c) ? c.padStart(3, "0") : c; }
+function _abastCodDisp(cod) { const c = String(codBase(cod) || ""); return /^[0-9]+$/.test(c) ? c.padStart(3, "0") : c; }
 function _mesAdd(mes, delta) {
   const p = String(mes).split("-"); const d = new Date(parseInt(p[0], 10), parseInt(p[1], 10) - 1 + delta, 1);
   return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
@@ -12074,13 +12074,18 @@ function stkBodyStocks() {
   // (un artículo puede estar en varias celdas; ej. el 506 = total de cajas que entran).
   const capByCod = {};
   (_stk.cap || []).forEach(function (r) { const k = _ocgNorm(r.cod); if (!k) return; capByCod[k] = (capByCod[k] || 0) + (Number(r.cajas_max) || 0); });
+  // v8.88: lookup helpers para desconcatenación — dem y capByCod pueden estar indexados
+  // por código base ("437E") pero los saldos tienen sufijo ("437E LK"). Busca exacto primero,
+  // fallback al base.
+  var _demOf = function (cod) { var k = _ocgNorm(cod); return Number(dem[k] || dem[_ocgNorm(codBase(cod))]) || 0; };
+  var _capOf = function (cod) { var k = _ocgNorm(cod); return Number(capByCod[k] || capByCod[_ocgNorm(codBase(cod))]) || 0; };
   const arts = Object.keys(saldos).map(function (k) { return saldos[k]; });
   // v5.48: sumar artículos que tienen CAJAS PEDIDAS (demanda del PPP) aunque no tengan stock cargado.
   const _seenN = {}; arts.forEach(function (a) { _seenN[_ocgNorm(a.cod)] = true; });
   Object.keys(dem).forEach(function (k) { if (!_seenN[k] && (Number(dem[k]) || 0) > 0) arts.push({ cod: k, desc: artNombre(k, ""), terminado: 0, excedente: 0, separar_pedidos: 0, a_facturar: 0, a_guardar: 0, racks: 0, insumos: 0 }); });
   // v6.70: FC s/Salida por artículo (facturado sin cargar al camión) → columna a la derecha de Racks.
   const _fcArt = (_stk.fcs && _stk.fcs.porArt) || {};
-  const _fcArtCajas = function (cod) { return Number((_fcArt[_ocgNorm(cod)] || {}).cajas) || 0; };
+  const _fcArtCajas = function (cod) { return Number((_fcArt[_ocgNorm(cod)] || _fcArt[_ocgNorm(codBase(cod))] || {}).cajas) || 0; };
   Object.keys(_fcArt).forEach(function (k) { if (!_seenN[k] && (Number((_fcArt[k] || {}).cajas) || 0) > 0) { arts.push({ cod: _fcArt[k].cod || k, desc: artNombre(k, ""), terminado: 0, excedente: 0, separar_pedidos: 0, a_facturar: 0, a_guardar: 0, racks: 0, insumos: 0 }); _seenN[k] = true; } });
   // v7.90 — los equivalentes van ALEDAÑOS pero cada uno en su fila (NO se fusionan): se
   // ordenan por la posición del PRINCIPAL de su familia y, dentro, el principal primero.
@@ -12121,7 +12126,7 @@ function stkBodyStocks() {
     ? arts.filter(function (a) { return _pinSet.has(String(a.cod).trim().toUpperCase()); })
     : (_terms.length
       ? arts.filter(function (a) { const s = (a.cod + " " + a.desc).toLowerCase(); return _terms.some(function (t) { return s.indexOf(t) >= 0; }); })
-      : arts.filter(function (a) { return _stkStockKeys.some(function (k) { return (Number(a[k]) || 0) !== 0; }) || (Number(dem[_ocgNorm(a.cod)]) || 0) > 0 || _fcArtCajas(a.cod) > 0; }));
+      : arts.filter(function (a) { return _stkStockKeys.some(function (k) { return (Number(a[k]) || 0) !== 0; }) || _demOf(a.cod) > 0 || _fcArtCajas(a.cod) > 0; }));
   // v7.73→v8.71: excluir códigos que están en la tabla Insumos, SALVO que tengan
   // stock en algún depósito de producto (terminado/excedente/separar/facturar/guardar/racks/p.env/rch).
   // Así un mismo código puede ser insumo Y producto sin desaparecer de Stock.
@@ -12137,14 +12142,12 @@ function stkBodyStocks() {
   // v7.54: tilde "⚠ Stock bajo" — códigos donde stock actual < pedidos
   const _stkLowCount = arts.filter(function (a) {
     const stock = (Number(a.terminado) || 0) + (Number(a.excedente) || 0) + (Number(a.separar_pedidos) || 0) + (Number(a.a_facturar) || 0) + (Number(a.a_guardar) || 0) + (Number(a.racks) || 0) + (Number(a.racks_ch) || 0);
-    const ped = Number(dem[_ocgNorm(a.cod)]) || 0;
-    return stock < ped && ped > 0;
+    return stock < _demOf(a.cod) && _demOf(a.cod) > 0;
   }).length;
   if (_stk.soloNeg) shown = shown.filter(_stkArtHasNeg);
   if (_stk.soloLow) shown = shown.filter(function (a) {
     const stock = (Number(a.terminado) || 0) + (Number(a.excedente) || 0) + (Number(a.separar_pedidos) || 0) + (Number(a.a_facturar) || 0) + (Number(a.a_guardar) || 0) + (Number(a.racks) || 0) + (Number(a.racks_ch) || 0);
-    const ped = Number(dem[_ocgNorm(a.cod)]) || 0;
-    return stock < ped && ped > 0;
+    return stock < _demOf(a.cod) && _demOf(a.cod) > 0;
   });
   // v8.52 — filtro por línea LK / CH (empresa)
   // v8.88: también detecta marca del sufijo del código (desconcatenación)
@@ -12222,7 +12225,7 @@ function stkBodyStocks() {
   var _gCxm = (_stk && _stk.cxm) || {};
   var _gBacklog = 0;
   arts.forEach(function (a) {
-    var cap = Number(capByCod[_ocgNorm(a.cod)]) || 0; if (cap <= 0) return;
+    var cap = _capOf(a.cod); if (cap <= 0) return;
     var gond = Number(a.terminado) || 0;
     var room = cap - gond; if (room < 0) room = 0; if (room > cap) room = cap;
     if (room <= 0) return;
@@ -12293,8 +12296,8 @@ function stkBodyStocks() {
   const _histDeps = _stk._histDeps;
   shown.forEach(function (a) {
     const _tot = SECTKEYS.reduce(function (s, k) { return s + (Number(a[k]) || 0); }, 0) + (Number(a.racks_ch) || 0);  // v7.54: racks_ch sumado al total
-    const _ped = Number(dem[_ocgNorm(a.cod)]) || 0;
-    const _cap = Number(capByCod[_ocgNorm(a.cod)]) || 0;
+    const _ped = _demOf(a.cod);
+    const _cap = _capOf(a.cod);
     // v8.88 — desconcatenación: si el código tiene sufijo LK/CH/LOKE, la marca
     // sale del propio código (no de OC_Maximos); y en CÓDIGO se muestra el base.
     const _codSuffix = String(a.cod || "").match(/\s+(LK|CH|LOKE)$/i);
@@ -12634,7 +12637,7 @@ async function stkOpenEstadioArt(codEnc, dep) {
         .filter(function (t) { return t && refs.indexOf(t) < 0; });
     } catch (_e) { liveTandas = []; }
   }
-  if (!refs.length && !liveTandas.length) { if (body) body.innerHTML = '<div class="stkpop-empty">No hay ' + (dep === "a_facturar" ? "a facturar" : "pickeado") + ' de ' + escapeHtml(cod) + ' en este momento.</div>'; return; }
+  if (!refs.length && !liveTandas.length) { if (body) body.innerHTML = '<div class="stkpop-empty">No hay ' + (dep === "a_facturar" ? "a facturar" : "pickeado") + ' de ' + escapeHtml(codBase(cod)) + ' en este momento.</div>'; return; }
   const tandas = refs.filter(function (r) { return /[A-Z]/.test(r); });     // ref con letra = tanda
   const npRefs = refs.filter(function (r) { return !/[A-Z]/.test(r); });    // ref numérica = NP directo (CP/RC)
   const npMap = await _stkFetchNpsByTanda(tandas.concat(liveTandas));
@@ -13119,7 +13122,7 @@ function _stkMovsBlock() {
     const movBody = '<span class="mva-movtipo">' + escapeHtml(String(mv.tipo || "")) + '</span>' + (mv.ref ? '<span class="mva-ref">' + escapeHtml(String(mv.ref)) + '</span>' : '') + npTxt + _chTag + _stkQuienChip(mv);
     return '<tr><td class="mva-ts">' + escapeHtml(stockFmtTs(mv.ts)) + '</td><td class="mva-mov"><div class="mva-movrow">' + plus + '<span class="mva-movbody">' + movBody + '</span></div></td><td class="mva-cant">' + cant + '</td><td class="mva-sal">' + round1(saldo) + '</td></tr>' + detrow;
   }).join("");
-  let h = '<div class="stkpop-hint">Movimientos de <b>' + escapeHtml(_stkPop.cod) + '</b> en <b>' + escapeHtml(_stkPop.titulo) + '</b>, por fecha. Entró <b style="color:#15803d">+' + round1(totIn) + '</b> · salió <b style="color:#b91c1c">' + round1(totOut) + '</b> · <b>saldo ' + round1(saldo) + '</b>.<br><small style="color:#94a3b8">👤 = siglas y legajo del que lo hizo (en <b>recepcion</b>, del que recibió). En <span class="mva-qui aprox">ámbar ~</span> va el deducido por la sesión de RT (recepciones viejas, sin legajo guardado).</small></div>';
+  let h = '<div class="stkpop-hint">Movimientos de <b>' + escapeHtml(codBase(_stkPop.cod)) + '</b> en <b>' + escapeHtml(_stkPop.titulo) + '</b>, por fecha. Entró <b style="color:#15803d">+' + round1(totIn) + '</b> · salió <b style="color:#b91c1c">' + round1(totOut) + '</b> · <b>saldo ' + round1(saldo) + '</b>.<br><small style="color:#94a3b8">👤 = siglas y legajo del que lo hizo (en <b>recepcion</b>, del que recibió). En <span class="mva-qui aprox">ámbar ~</span> va el deducido por la sesión de RT (recepciones viejas, sin legajo guardado).</small></div>';
   h += '<div class="mva-daterow">Desde <input type="date" class="mva-date" value="' + escapeHtml(_stkPop.desde) + '" onchange="stkMovsArtDate(\'desde\',this.value)"> hasta <input type="date" class="mva-date" value="' + escapeHtml(_stkPop.hasta) + '" onchange="stkMovsArtDate(\'hasta\',this.value)">' + ((_stkPop.desde || _stkPop.hasta) ? ' <button class="mva-clear" onclick="stkMovsArtDate(\'clear\')">✕</button>' : '') + '</div>';
   h += list.length
     ? '<div class="mva-tblwrap"><table class="mva-tbl"><thead><tr><th>Fecha</th><th>Movimiento</th><th class="num">Cant.</th><th class="num">Saldo</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
@@ -13170,10 +13173,10 @@ function stkRacksArtRender() {
   if (mine.length) {
     const totInner = mine.reduce(function (s, x) { return s + (Number(x.innercajas) || 0); }, 0);
     const totMaster = mine.reduce(function (s, x) { return s + (Number(x.master_cajas) || 0); }, 0);
-    h += '<div class="stkpop-hint"><b>' + escapeHtml(_stkPop.cod) + '</b> · racks (planimetría): <b>' + totInner + ' cajas</b>' + (totMaster ? ' · ' + totMaster + ' master' : '') + ' en ' + mine.length + ' posición(es).</div>';
+    h += '<div class="stkpop-hint"><b>' + escapeHtml(codBase(_stkPop.cod)) + '</b> · racks (planimetría): <b>' + totInner + ' cajas</b>' + (totMaster ? ' · ' + totMaster + ' master' : '') + ' en ' + mine.length + ' posición(es).</div>';
     h += '<div class="stkpop-grp"><div class="stkpop-nps">' + mine.map(function (x) { return '<span class="stkpop-np"><b>🏗 ' + escapeHtml(String(x.sector)) + '</b> · ' + (Number(x.innercajas) || 0) + ' cajas' + (Number(x.master_cajas) ? ' · ' + (Number(x.master_cajas)) + ' master' : '') + '</span>'; }).join("") + '</div></div>';
   } else {
-    h += '<div class="stkpop-hint">Sin posiciones de rack en la planimetría para ' + escapeHtml(_stkPop.cod) + '.</div>';
+    h += '<div class="stkpop-hint">Sin posiciones de rack en la planimetría para ' + escapeHtml(codBase(_stkPop.cod)) + '.</div>';
   }
   h += '<div class="stkpop-hint" style="margin-top:8px;font-weight:800;color:#0f172a;">Movimientos de racks</div>';
   h += _stkMovsBlock();
@@ -13262,6 +13265,9 @@ function stkDescargarExcel() {
   const dem = _stk.dem || {};
   const capByCod = {};
   (_stk.cap || []).forEach(function (r) { const k = _ocgNorm(r.cod); if (!k) return; capByCod[k] = (capByCod[k] || 0) + (Number(r.cajas_max) || 0); });
+  // v8.88: helpers desconcatenación (mismo patrón que stkBodyStocks)
+  var _demOf = function (cod) { var k = _ocgNorm(cod); return Number(dem[k] || dem[_ocgNorm(codBase(cod))]) || 0; };
+  var _capOf = function (cod) { var k = _ocgNorm(cod); return Number(capByCod[k] || capByCod[_ocgNorm(codBase(cod))]) || 0; };
   let arts = Object.keys(saldos).map(function (k) { return saldos[k]; });
   const _seenN = {}; arts.forEach(function (a) { _seenN[_ocgNorm(a.cod)] = true; });
   Object.keys(dem).forEach(function (k) { if (!_seenN[k] && (Number(dem[k]) || 0) > 0) arts.push({ cod: k, desc: artNombre(k, ""), terminado: 0, excedente: 0, separar_pedidos: 0, a_facturar: 0, a_guardar: 0, racks: 0, insumos: 0, racks_ch: 0 }); });
@@ -13273,7 +13279,7 @@ function stkDescargarExcel() {
   const _insCodsSet = new Set((_stk.insumosCods || []).map(function (c) { return String(c || "").trim().toUpperCase(); }));
   let shown = f
     ? arts.filter(function (a) { return (a.cod + " " + a.desc).toLowerCase().indexOf(f) >= 0; })
-    : arts.filter(function (a) { return _stkStockKeys.some(function (k) { return (Number(a[k]) || 0) !== 0; }) || (Number(dem[_ocgNorm(a.cod)]) || 0) > 0 || (Number((_fcArt[_ocgNorm(a.cod)] || {}).cajas) || 0) > 0; });
+    : arts.filter(function (a) { return _stkStockKeys.some(function (k) { return (Number(a[k]) || 0) !== 0; }) || _demOf(a.cod) > 0 || (Number((_fcArt[_ocgNorm(a.cod)] || _fcArt[_ocgNorm(codBase(a.cod))] || {}).cajas) || 0) > 0; });
   shown = shown.filter(function (a) {
     if (!_insCodsSet.has(String(a.cod || "").trim().toUpperCase())) return true;
     return (Number(a.terminado) || 0) !== 0 || (Number(a.excedente) || 0) !== 0 || (Number(a.separar_pedidos) || 0) !== 0 || (Number(a.a_facturar) || 0) !== 0 || (Number(a.a_guardar) || 0) !== 0 || (Number(a.racks) || 0) !== 0 || (Number(a.para_envasar) || 0) !== 0 || (Number(a.racks_ch) || 0) !== 0;
@@ -13287,11 +13293,11 @@ function stkDescargarExcel() {
   const aoa = [headers];
   shown.forEach(function (a) {
     const _tot = SECTKEYS.reduce(function (s, k) { return s + (Number(a[k]) || 0); }, 0) + (Number(a.racks_ch) || 0);
-    const _ped = Number(dem[_ocgNorm(a.cod)]) || 0;
-    const _cap = Number(capByCod[_ocgNorm(a.cod)]) || 0;
-    const _fcV = Number((_fcArt[_ocgNorm(a.cod)] || {}).cajas) || 0;
+    const _ped = _demOf(a.cod);
+    const _cap = _capOf(a.cod);
+    const _fcV = Number((_fcArt[_ocgNorm(a.cod)] || _fcArt[_ocgNorm(codBase(a.cod))] || {}).cajas) || 0;
     aoa.push([
-      String(a.cod || ""),
+      String(codBase(a.cod) || ""),
       String(artNombre(a.cod, a.desc) || ""),
       num(_tot),
       num(_ped),
@@ -14378,12 +14384,25 @@ function stkBodyCapacidad() {
     const mesesCell = (r.meses == null) ? '<span style="color:#94a3b8">—</span>'
       : '<b style="color:' + (r.meses < 1 ? "#b91c1c" : (r.meses < 2 ? "#854d0e" : "#15803d")) + '">' + r.meses.toFixed(2) + '</b>';
     // v8.55 — sectores colapsados: si hay muchos, mostrar los primeros + "+N ubic." (se ensancha al tocar)
+    // v8.88 — empresa-split: agrupar sectores por marca (LK/CH) con badge de color
     const _secs = r.sectores || [];
     const _enc = encodeURIComponent(r.cod);
     const _exp = _stk.capExp && _stk.capExp[r.cod];
     const _MAXSEC = 3;
     let secCell;
-    if (_secs.length <= _MAXSEC || _exp) {
+    var _dualInfo = (typeof PICK_UBIC_DUAL !== "undefined" && typeof EMPRESA_SPLIT_CODS !== "undefined" && EMPRESA_SPLIT_CODS[_ocgNorm(r.cod)]) ? PICK_UBIC_DUAL[_ocgNorm(r.cod)] : null;
+    if (_dualInfo && _secs.length > 1) {
+      var _lkPfx = String(_dualInfo.loeke.sector)[0].toUpperCase();
+      var _chPfx = String(_dualInfo.chef.sector)[0].toUpperCase();
+      var _lkS = _secs.filter(function (s) { return String(s)[0].toUpperCase() === _lkPfx; });
+      var _chS = _secs.filter(function (s) { return String(s)[0].toUpperCase() === _chPfx; });
+      var _otherS = _secs.filter(function (s) { var p = String(s)[0].toUpperCase(); return p !== _lkPfx && p !== _chPfx; });
+      secCell = "";
+      if (_lkS.length) secCell += '<span style="display:inline-block;background:#fef2f2;color:#b91c1c;font-size:10px;font-weight:800;padding:1px 5px;border-radius:4px;margin-right:3px;">LK</span>' + escapeHtml(_lkS.join(", "));
+      if (_lkS.length && _chS.length) secCell += " · ";
+      if (_chS.length) secCell += '<span style="display:inline-block;background:#dbeafe;color:#1e40af;font-size:10px;font-weight:800;padding:1px 5px;border-radius:4px;margin-right:3px;">CH</span>' + escapeHtml(_chS.join(", "));
+      if (_otherS.length) secCell += " · " + escapeHtml(_otherS.join(", "));
+    } else if (_secs.length <= _MAXSEC || _exp) {
       secCell = escapeHtml(_secs.join(", ")) + (_secs.length > _MAXSEC ? ' <span style="color:#1e6bd6;cursor:pointer;font-weight:800;" onclick="stkCapToggleSec(\'' + _enc + '\')">▲</span>' : '');
     } else {
       secCell = escapeHtml(_secs.slice(0, 2).join(", ")) + ' <span style="color:#1e6bd6;cursor:pointer;font-weight:800;" title="Ver todas las ubicaciones" onclick="stkCapToggleSec(\'' + _enc + '\')">+' + (_secs.length - 2) + ' ubic.</span>';
@@ -14489,7 +14508,7 @@ function stkBodyConteo() {
       const s = sys[k] || { cod: k, gond: 0, exc: 0, proc: 0 };
       const sysv = (s.gond || 0) + (s.exc || 0); const dif = Math.round((cont[k] - sysv) * 100) / 100;
       const col = dif === 0 ? "#15803d" : (dif < 0 ? "#b91c1c" : "#b45309");
-      h += '<tr><td class="stk-cod">' + escapeHtml(s.cod || k) + '</td><td class="num"><b>' + (Math.round(cont[k] * 10) / 10) + '</b></td><td class="num">' + (Math.round(sysv * 10) / 10) + '</td><td class="num" style="color:' + col + ';font-weight:800">' + (dif > 0 ? "+" : "") + dif + '</td><td class="num" style="color:#94a3b8">' + (s.proc > 0 ? Math.round(s.proc * 10) / 10 : "—") + '</td></tr>';
+      h += '<tr><td class="stk-cod">' + escapeHtml(codBase(s.cod || k)) + '</td><td class="num"><b>' + (Math.round(cont[k] * 10) / 10) + '</b></td><td class="num">' + (Math.round(sysv * 10) / 10) + '</td><td class="num" style="color:' + col + ';font-weight:800">' + (dif > 0 ? "+" : "") + dif + '</td><td class="num" style="color:#94a3b8">' + (s.proc > 0 ? Math.round(s.proc * 10) / 10 : "—") + '</td></tr>';
     });
     h += '</tbody></table></div>';
   }
@@ -15758,13 +15777,13 @@ function stkAutoBajadaSection() {
     h += '<div class="stk-tblwrap"><table class="stk-tbl"><thead><tr><th>Código</th><th class="num">Cap.</th><th class="num">Góndola</th><th class="num">Hueco</th><th class="num">Bajar</th><th class="num">Racks</th></tr></thead><tbody>';
     r.bajar.forEach(function (x) {
       totC += x.cajas; totM += x.masters;
-      h += '<tr><td class="stk-cod">' + escapeHtml(x.cod) + '</td><td class="num">' + x.capg + '</td><td class="num">' + x.gond + '</td><td class="num">' + x.hueco + '</td><td class="num"><b>' + x.masters + ' mstr</b> · ' + x.cajas + ' cj</td><td class="num">' + x.racks + '</td></tr>';
+      h += '<tr><td class="stk-cod">' + escapeHtml(codBase(x.cod)) + '</td><td class="num">' + x.capg + '</td><td class="num">' + x.gond + '</td><td class="num">' + x.hueco + '</td><td class="num"><b>' + x.masters + ' mstr</b> · ' + x.cajas + ' cj</td><td class="num">' + x.racks + '</td></tr>';
     });
     h += '</tbody></table></div>';
     h += '<div style="font-size:12.5px;color:#334155;margin-top:6px;"><b>Total a bajar:</b> ' + totM + ' master · ' + totC + ' cajas.</div>';
     h += '<button class="stk-btn ok" style="width:100%;margin-top:10px;" onclick="stkAutoBajadaGenerar()">📋 Generar la bajada (queda para que Marianela apruebe)</button>';
   }
-  if (r.sinMaster.length) h += '<div style="font-size:11.5px;color:#92400e;margin-top:6px;">⚠ ' + r.sinMaster.length + ' con hueco y stock en racks pero <b>sin master (CxM) cargado</b> → no entran al automático: ' + r.sinMaster.map(function (x) { return escapeHtml(x.cod); }).join(", ") + '.</div>';
+  if (r.sinMaster.length) h += '<div style="font-size:11.5px;color:#92400e;margin-top:6px;">⚠ ' + r.sinMaster.length + ' con hueco y stock en racks pero <b>sin master (CxM) cargado</b> → no entran al automático: ' + r.sinMaster.map(function (x) { return escapeHtml(codBase(x.cod)); }).join(", ") + '.</div>';
   return h + '<div style="height:14px;border-bottom:1px solid #e2e8f0;margin:12px 0;"></div>';
 }
 /* Zonas de racks reservadas para INSUMOS (regla del dueño): V01–V16 + V21/V22 y
@@ -15882,7 +15901,7 @@ function stkBodyRacks() {
     const enRacks = Math.round((Number(((saldos[String(b.cod_art)] || {}).racks) || 0)) * 100) / 100;
     const al = racksBajadaAlerta(b, saldos);
     const alHtml = al ? '<div style="font-size:11.5px;font-weight:800;color:#b91c1c;background:#fef2f2;border:1px solid #fca5a5;border-radius:7px;padding:2px 7px;margin-top:3px;display:inline-block;">⚠ ' + (al.neg ? 'dejaría racks en <b>' + (Math.round((al.saldoRacks - al.pedir) * 100) / 100) + '</b>' : '') + (al.neg && al.otras.length ? ' · ' : '') + (al.otras.length ? 'ya hay otra bajada de este código hoy' : '') + '</div>' : '';
-    return '<div class="stk-rk-baj"><div class="stk-rk-baji"><span class="stk-cod">' + escapeHtml(b.cod_art) + '</span> <span class="stk-desc">' + escapeHtml(artNombre(b.cod_art, b.descripcion) || "") + '</span><div class="stk-rk-q">' + b.cajas + " cajas" + (u ? " · " + u : "") + ' <span style="color:#64748b;font-weight:600">· en racks hoy: <b style="color:' + (enRacks < b.cajas ? "#b91c1c" : "#475569") + '">' + enRacks + '</b></span></div>' + alHtml + '</div><div style="display:flex;flex-direction:column;gap:5px;flex:0 0 auto"><button class="stk-btn ok" onclick="racksAprobar(' + b.id + ')">✓ Aprobar</button><button class="stk-btn danger" onclick="racksRechazar(' + b.id + ')">✗ Rechazar</button></div></div>';
+    return '<div class="stk-rk-baj"><div class="stk-rk-baji"><span class="stk-cod">' + escapeHtml(codBase(b.cod_art)) + '</span> <span class="stk-desc">' + escapeHtml(artNombre(b.cod_art, b.descripcion) || "") + '</span><div class="stk-rk-q">' + b.cajas + " cajas" + (u ? " · " + u : "") + ' <span style="color:#64748b;font-weight:600">· en racks hoy: <b style="color:' + (enRacks < b.cajas ? "#b91c1c" : "#475569") + '">' + enRacks + '</b></span></div>' + alHtml + '</div><div style="display:flex;flex-direction:column;gap:5px;flex:0 0 auto"><button class="stk-btn ok" onclick="racksAprobar(' + b.id + ')">✓ Aprobar</button><button class="stk-btn danger" onclick="racksRechazar(' + b.id + ')">✗ Rechazar</button></div></div>';
   }).join("");
   const arts = Object.keys(saldos).map(function (k) { return saldos[k]; }).filter(function (a) { return (a.racks || 0) !== 0; }).sort(function (a, b) { return (parseInt(a.cod, 10) || 0) - (parseInt(b.cod, 10) || 0); });
   h += '<div class="stk-aj-h" style="margin-top:16px">Stock en racks</div>';
@@ -15890,7 +15909,7 @@ function stkBodyRacks() {
   if (!arts.length) h += '<tr><td colspan="5" class="stk-empty">Sin stock en racks. Cargalo en ⚙ Ajustes (depósito = racks).</td></tr>';
   arts.forEach(function (a) {
     const f = _stk.factors[String(a.cod).toUpperCase()] || {}, M = f.cajasXMaster > 0 ? f.cajasXMaster : 0, U = f.uniXCaja > 0 ? f.uniXCaja : 0;
-    h += '<tr><td class="stk-cod">' + escapeHtml(a.cod) + '</td><td class="stk-desc">' + escapeHtml(artNombre(a.cod, a.desc) || "—") + '</td><td class="num">' + (M ? (Math.round((a.racks / M) * 100) / 100) : "—") + '</td><td class="num"><b>' + a.racks + '</b></td><td class="num">' + (U ? (a.racks * U) : "—") + "</td></tr>";
+    h += '<tr><td class="stk-cod">' + escapeHtml(codBase(a.cod)) + '</td><td class="stk-desc">' + escapeHtml(artNombre(a.cod, a.desc) || "—") + '</td><td class="num">' + (M ? (Math.round((a.racks / M) * 100) / 100) : "—") + '</td><td class="num"><b>' + a.racks + '</b></td><td class="num">' + (U ? (a.racks * U) : "—") + "</td></tr>";
   });
   return h + "</tbody></table>";
 }
@@ -16740,7 +16759,7 @@ function scRender() {
   if (!shown.length) h += '<div class="sc-empty">No hay artículos que coincidan.</div>';
   else h += shown.map(function (it) {
     const i = _sc.items.indexOf(it);
-    return '<div class="sc-row"><div class="sc-info"><span class="sc-cod">' + escapeHtml(it.cod) + '</span> <span class="sc-desc">' + escapeHtml(it.desc || "") + '</span><div class="sc-disp">en góndola: ' + it.disponible + ' cajas</div></div><div class="sc-stp"><button class="sc-sb" onclick="scChg(' + i + ',-1)">–</button><input class="sc-inp" type="number" min="0" max="' + it.disponible + '" inputmode="numeric" value="' + it.sacar + '" oninput="scSet(' + i + ',this.value)"><button class="sc-sb" onclick="scChg(' + i + ',1)">+</button></div></div>';
+    return '<div class="sc-row"><div class="sc-info"><span class="sc-cod">' + escapeHtml(codBase(it.cod)) + '</span> <span class="sc-desc">' + escapeHtml(it.desc || "") + '</span><div class="sc-disp">en góndola: ' + it.disponible + ' cajas</div></div><div class="sc-stp"><button class="sc-sb" onclick="scChg(' + i + ',-1)">–</button><input class="sc-inp" type="number" min="0" max="' + it.disponible + '" inputmode="numeric" value="' + it.sacar + '" oninput="scSet(' + i + ',this.value)"><button class="sc-sb" onclick="scChg(' + i + ',1)">+</button></div></div>';
   }).join("");
   const tot = _sc.items.reduce(function (s, it) { return s + it.sacar; }, 0);
   h += '<button class="sc-fin"' + (tot <= 0 ? " disabled" : "") + ' onclick="scConfirmar()">✓ Mandar ' + tot + ' caja(s) a Cervantes</button>';
@@ -17077,7 +17096,7 @@ function excRender() {
     const rest = it.disponible - it.bajar;
     const restTxt = '<span class="exc-rest' + (rest <= 0 ? ' ok' : '') + '">' + (rest <= 0 ? '✓ Todo' : 'Quedan ' + rest) + '</span>';
     return '<div class="exc-row">' +
-      '<div class="exc-headline"><div class="exc-info"><span class="exc-cod">' + escapeHtml(it.cod) + '</span> <span class="exc-desc">' + escapeHtml(it.desc || "") + '</span>' + ubicHtml + '</div><span class="exc-av">excedente <b>' + it.disponible + '</b></span></div>' +
+      '<div class="exc-headline"><div class="exc-info"><span class="exc-cod">' + escapeHtml(codBase(it.cod)) + '</span> <span class="exc-desc">' + escapeHtml(it.desc || "") + '</span>' + ubicHtml + '</div><span class="exc-av">excedente <b>' + it.disponible + '</b></span></div>' +
       '<div class="exc-foot"><div class="exc-stp"><button class="exc-sb" onclick="excChg(' + i + ',-1)">–</button><input class="exc-inp" type="number" min="0" max="' + mx + '" inputmode="numeric" value="' + it.bajar + '" oninput="excSet(' + i + ',this.value)"><button class="exc-sb" onclick="excChg(' + i + ',1)">+</button></div>' + restTxt + '</div>' +
       '</div>';
   }).join("");
@@ -17227,7 +17246,7 @@ function renderGuardarOrden() {
       : (x.rk > 0 && it.cxm <= 0 ? ' <span style="color:#b45309;font-size:10.5px;font-weight:700;">· s/master</span>' : '');
     const bajarTxt = x.cajas > 0 ? ('<span style="font-weight:900;color:#0f172a;">' + x.cajas + '</span>' + mcTxt) : '<span style="color:#94a3b8;font-weight:700;">0 · góndola llena</span>';
     return '<tr style="border-bottom:1px solid #f1f5f9;">' +
-      '<td style="padding:6px;font-weight:800;font-family:Consolas,Menlo,monospace;">' + escapeHtml(it.cod) + '</td>' +
+      '<td style="padding:6px;font-weight:800;font-family:Consolas,Menlo,monospace;">' + escapeHtml(codBase(it.cod)) + '</td>' +
       '<td style="padding:6px;color:#475569;">' + escapeHtml(it.desc || "") + '</td>' +
       '<td style="padding:6px;text-align:right;font-weight:800;color:#15803d;">' + x.disp + '</td>' +
       '<td style="padding:6px;text-align:right;">' + bajarTxt + '</td>' +
@@ -17250,7 +17269,7 @@ function gordenPrint() {
   const totDisp = rows.reduce(function (s, x) { return s + x.disp; }, 0);
   t += '<h1>Orden de guardado — ' + lblF + '</h1><div class="sub">' + escapeHtml(fecha) + ' · góndola más vacía primero · ' + rows.length + ' códigos · <b>hay para guardar: ' + totDisp + ' · entran ahora: ' + totCajas + ' cajas</b></div>';
   t += '<table><thead><tr><th>Cód</th><th>Descripción</th><th class="n">Hay p/ guardar</th><th class="n">Cajas a bajar</th><th class="n">Góndola</th><th class="n">Máximo</th></tr></thead><tbody>';
-  t += rows.map(function (x) { const it = x.it; const extra = x.mc > 0 ? (' (' + x.mc + ' MC)') : (x.rk > 0 && it.cxm <= 0 ? ' (s/master)' : ''); return '<tr><td>' + escapeHtml(it.cod) + '</td><td>' + escapeHtml(it.desc || "") + '</td><td class="n">' + x.disp + '</td><td class="n">' + x.cajas + extra + '</td><td class="n">' + it.gond + '</td><td class="n">' + it.cap + '</td></tr>'; }).join("");
+  t += rows.map(function (x) { const it = x.it; const extra = x.mc > 0 ? (' (' + x.mc + ' MC)') : (x.rk > 0 && it.cxm <= 0 ? ' (s/master)' : ''); return '<tr><td>' + escapeHtml(codBase(it.cod)) + '</td><td>' + escapeHtml(it.desc || "") + '</td><td class="n">' + x.disp + '</td><td class="n">' + x.cajas + extra + '</td><td class="n">' + it.gond + '</td><td class="n">' + it.cap + '</td></tr>'; }).join("");
   t += '</tbody><tfoot><tr><th colspan="2" style="text-align:left;">TOTAL (' + rows.length + ')</th><th class="n">' + totDisp + '</th><th class="n">' + totCajas + '</th><th colspan="2"></th></tr></tfoot></table></body></html>';
   const w = window.open("", "_blank");
   if (!w) { alert("Habilitá las ventanas emergentes para poder imprimir."); return; }
@@ -17357,7 +17376,7 @@ function rkbRender() {
         return '<span class="rkb-loc' + on + '" onclick="rkbSetSec(' + i + ',\'' + escapeHtml(L.sector) + '\')">' + escapeHtml(L.sector) + " · " + q + "</span>";
       }).join("") + "</div>";
     }
-    return '<div class="rkb-row"><div class="rkb-info"><span class="rkb-cod">' + escapeHtml(it.cod) + '</span> <span class="rkb-desc">' + escapeHtml(it.desc || "") + '</span><div>' + head + '</div>' + locsHtml + '</div>' +
+    return '<div class="rkb-row"><div class="rkb-info"><span class="rkb-cod">' + escapeHtml(codBase(it.cod)) + '</span> <span class="rkb-desc">' + escapeHtml(it.desc || "") + '</span><div>' + head + '</div>' + locsHtml + '</div>' +
       '<div class="rkb-stpcol"><span class="rkb-u">' + (usaMaster ? "master" : "cajas") + '</span><div class="rkb-stp"><button class="rkb-sb" onclick="rkbChg(' + i + ',-1)">–</button><input class="rkb-inp" type="number" min="0" max="' + mx + '" inputmode="numeric" value="' + it.baja + '" oninput="rkbSet(' + i + ',this.value)"><button class="rkb-sb" onclick="rkbChg(' + i + ',1)">+</button></div></div></div>';
   }).join("");
   const tot = _rkb.items.reduce(function (s, it) { return s + (it.baja || 0); }, 0);
@@ -17495,7 +17514,7 @@ function mvRenderStep2(body) {
   const fd = _mv.filtroD.trim().toLowerCase();
   const dShown = fd ? dests.filter(function (r) { return String(r.sector).toLowerCase().indexOf(fd) >= 0; }) : dests;
   let h = '<button class="mv-back" onclick="mvBack()">← Volver</button>';
-  h += '<div class="mv-sel"><div class="mv-r1"><span class="mv-sec">' + escapeHtml(o.sector) + '</span> · <span class="mv-cod">' + escapeHtml(o.cod) + '</span> <span class="mv-desc">' + escapeHtml(o.desc) + '</span></div><div class="mv-av">tiene ' + o.inner + ' cajas' + (o.master ? ' · ' + o.master + ' master' : '') + '</div></div>';
+  h += '<div class="mv-sel"><div class="mv-r1"><span class="mv-sec">' + escapeHtml(o.sector) + '</span> · <span class="mv-cod">' + escapeHtml(codBase(o.cod)) + '</span> <span class="mv-desc">' + escapeHtml(o.desc) + '</span></div><div class="mv-av">tiene ' + o.inner + ' cajas' + (o.master ? ' · ' + o.master + ' master' : '') + '</div></div>';
   h += '<div class="mv-fld"><div class="mv-lbl">¿Cuántas cajas movés?</div><div class="mv-stp"><button class="mv-sb" onclick="mvChg(-1)">–</button><input class="mv-inp" type="number" min="1" max="' + o.inner + '" inputmode="numeric" value="' + _mv.mover + '" oninput="mvSet(this.value)"><button class="mv-sb" onclick="mvChg(1)">+</button></div></div>';
   h += '<div class="mv-fld"><div class="mv-lbl">¿A qué ubicación?</div>';
   h += '<input class="mv-search" type="search" autocomplete="off" placeholder="🔎 Buscar ubicación…" value="' + escapeHtml(_mv.filtroD) + '" oninput="if(_mv){_mv.filtroD=this.value;mvRender();}">';
@@ -17599,7 +17618,7 @@ function eaRender() {
       ? ubs.map(function (u) { return '<span class="ea-loc-chip" onclick="eaEditUbic(\'' + escapeHtml(it.cod) + '\',' + u.id + ')">' + escapeHtml(u.sector) + (u.inner ? ' · ' + u.inner : '') + '</span>'; }).join("")
       : '<span class="ea-loc-none">sin ubicación</span> ';
     loc += '<button class="ea-loc-add" onclick="eaEditUbic(\'' + escapeHtml(it.cod) + '\',0)">+ ubicación</button></div>';
-    return '<div class="ea-row"><div class="ea-info"><span class="ea-cod">' + escapeHtml(it.cod) + '</span> <span class="ea-desc">' + escapeHtml(it.desc || "") + '</span><div class="ea-av">para envasar: <b>' + it.saldo + '</b> cajas</div>' + loc + '</div>' +
+    return '<div class="ea-row"><div class="ea-info"><span class="ea-cod">' + escapeHtml(codBase(it.cod)) + '</span> <span class="ea-desc">' + escapeHtml(it.desc || "") + '</span><div class="ea-av">para envasar: <b>' + it.saldo + '</b> cajas</div>' + loc + '</div>' +
       '<div class="ea-stpcol"><span class="ea-u">cajas</span><div class="ea-stp"><button class="ea-sb" onclick="eaChg(' + i + ',-1)">–</button><input class="ea-inp" type="number" min="0" max="' + mx + '" inputmode="numeric" value="' + it.baja + '" oninput="eaSet(' + i + ',this.value)"><button class="ea-sb" onclick="eaChg(' + i + ',1)">+</button></div></div></div>';
   }).join("");
   const tot = _ea.items.reduce(function (s, it) { return s + (it.baja || 0); }, 0);
@@ -17797,13 +17816,13 @@ function irRender() {
       + '<button class="ir-segb' + (_ir.origen === "excedente" ? " on" : "") + '" onclick="irSetOrigen(\'excedente\')">Excedente</button>'
       + '</div></div>';
     h += '<div class="ir-fld"><div class="ir-lbl">Código con stock en ' + origTxt + '</div><input id="irPick" class="ir-inp" type="text" autocomplete="off" placeholder="🔎 buscar código o nombre" value="' + escapeHtml(_ir.codPick || "") + '" oninput="irSetPick(this.value)"></div>';
-    if (_ir.cod) h += '<div class="ir-desc">Elegido: <b>' + escapeHtml(_ir.cod) + '</b> ' + escapeHtml(nombre || "") + ' · <b>' + Math.round(disp) + '</b> cajas en ' + origTxt + '</div>';
+    if (_ir.cod) h += '<div class="ir-desc">Elegido: <b>' + escapeHtml(codBase(_ir.cod)) + '</b> ' + escapeHtml(nombre || "") + ' · <b>' + Math.round(disp) + '</b> cajas en ' + origTxt + '</div>';
     h += _irListaNac();
     h += '<div class="ir-fld"><div class="ir-lbl">Cajas a mover' + (_ir.cod ? ' (máx ' + Math.round(disp) + ')' : '') + '</div><div class="ir-stp"><button class="ir-sb" onclick="irChgI(-1)">–</button><input class="ir-inp ir-num" type="number" min="0" inputmode="numeric" value="' + (Number(_ir.inner) || 0) + '" oninput="irSetI(this.value)"><button class="ir-sb" onclick="irChgI(1)">+</button></div></div>';
-    if (_ir.cod && Number(_ir.inner) > disp) h += '<div class="ir-warn">⚠ No hay tantas: solo hay ' + Math.round(disp) + ' cajas de ' + escapeHtml(_ir.cod) + ' en ' + origTxt + '.</div>';
+    if (_ir.cod && Number(_ir.inner) > disp) h += '<div class="ir-warn">⚠ No hay tantas: solo hay ' + Math.round(disp) + ' cajas de ' + escapeHtml(codBase(_ir.cod)) + ' en ' + origTxt + '.</div>';
   } else {
     h += '<div class="ir-hint">Cargá lo que llegó, <b>un palet por vez</b>: código, cuántos <b>masters</b> (te calcula las cajas si sé el CxM) y el <b>sector</b> (te sugiero uno libre). Se guarda en el mapa de racks y en el stock.</div>';
-    h += '<div class="ir-fld"><div class="ir-lbl">Código</div><input id="irCod" class="ir-inp" type="text" autocomplete="off" placeholder="ej. 582E" value="' + escapeHtml(_ir.cod) + '" oninput="irSetCod(this.value)"></div>';
+    h += '<div class="ir-fld"><div class="ir-lbl">Código</div><input id="irCod" class="ir-inp" type="text" autocomplete="off" placeholder="ej. 582E" value="' + escapeHtml(codBase(_ir.cod)) + '" oninput="irSetCod(this.value)"></div>';
     if (_ir.cod) h += '<div class="ir-desc">' + escapeHtml(nombre || "(código nuevo, sin nombre)") + (cxm ? ' · <b>' + cxm + '</b> cajas por master' : ' · <span style="color:#b45309">no sé el CxM — poné las cajas a mano</span>') + '</div>';
     h += '<div class="ir-row2"><div class="ir-fld"><div class="ir-lbl">Masters</div><div class="ir-stp"><button class="ir-sb" onclick="irChgM(-1)">–</button><input class="ir-inp ir-num" type="number" min="0" inputmode="numeric" value="' + (Number(_ir.masters) || 0) + '" oninput="irSetM(this.value)"><button class="ir-sb" onclick="irChgM(1)">+</button></div></div>';
     h += '<div class="ir-fld"><div class="ir-lbl">Cajas (inner)</div><div class="ir-stp"><button class="ir-sb" onclick="irChgI(-1)">–</button><input class="ir-inp ir-num" type="number" min="0" inputmode="numeric" value="' + (Number(_ir.inner) || 0) + '" oninput="irSetI(this.value)"><button class="ir-sb" onclick="irChgI(1)">+</button></div></div></div>';
@@ -17818,7 +17837,7 @@ function irRender() {
   h += '<button class="ir-fin"' + (ok ? "" : " disabled") + ' onclick="irRevisar()">Revisar carga →' + (secU && Number(_ir.inner) > 0 ? ' (' + (Number(_ir.inner) || 0) + ' cajas a ' + escapeHtml(secU) + ')' : '') + '</button>';
   if (_ir.done.length) {
     h += '<div class="ir-done-h">Cargados en esta sesión (' + _ir.done.length + ')</div>';
-    h += _ir.done.map(function (d) { return '<div class="ir-done-row"><span class="ir-done-sec">' + escapeHtml(d.sector) + '</span> <span class="ir-done-cod">' + escapeHtml(d.cod) + '</span><span class="ir-done-q">' + d.inner + ' cajas' + (d.masters ? ' · ' + d.masters + ' master' : '') + (d.nac ? ' · 🏠 desde ' + escapeHtml(d.nac) : '') + '</span></div>'; }).join("");
+    h += _ir.done.map(function (d) { return '<div class="ir-done-row"><span class="ir-done-sec">' + escapeHtml(d.sector) + '</span> <span class="ir-done-cod">' + escapeHtml(codBase(d.cod)) + '</span><span class="ir-done-q">' + d.inner + ' cajas' + (d.masters ? ' · ' + d.masters + ' master' : '') + (d.nac ? ' · 🏠 desde ' + escapeHtml(d.nac) : '') + '</span></div>'; }).join("");
   }
   _renderKeepFocus(body, h);
 }
@@ -17853,7 +17872,7 @@ function _irListaNac() {
   arr.slice(0, 40).forEach(function (x) {
     const on = String(_ir.cod) === String(x.cod);
     h += '<button onclick="irPickCod(\'' + encodeURIComponent(x.cod) + '\')" style="display:flex;width:100%;align-items:baseline;gap:8px;padding:8px 10px;border:none;border-bottom:1px solid #f1f5f9;background:' + (on ? "#0e7490" : "#fff") + ';color:' + (on ? "#fff" : "#0f172a") + ';cursor:pointer;text-align:left;font-size:13.5px;">'
-      + '<span style="font-family:Consolas,Menlo,monospace;font-weight:800;">' + escapeHtml(x.cod) + '</span>'
+      + '<span style="font-family:Consolas,Menlo,monospace;font-weight:800;">' + escapeHtml(codBase(x.cod)) + '</span>'
       + '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:' + (on ? "#e0f2fe" : "#475569") + ';">' + escapeHtml(x.nom || "—") + '</span>'
       + '<span style="font-weight:800;white-space:nowrap;">' + Math.round(x.q) + ' cj</span></button>';
   });
