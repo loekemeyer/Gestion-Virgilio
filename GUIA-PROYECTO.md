@@ -38,6 +38,15 @@
 > solo mostraba movimientos del depósito `racks`, pero la columna muestra `racks + racks_ch`
 > (v7.54). Ahora incluye ambos y etiqueta los de `racks_ch` con chip "CH".
 >
+> Nota: **v8.85 — Góndola: mostrar quién pickeó en vez de "pipeline".** En el popup de
+> movimientos por artículo (Stock → click en Góndola/Pickeados/etc.), los movimientos de
+> picking/separado escritos por el cron `reconciliar_pipeline_stock` tenían `legajo='pipeline'`
+> y mostraban "👤 pipeline · pipeline". Ahora `_stkQuienChip` detecta `legajo='pipeline'` y
+> busca el legajo real del TP (Terminó Picking) o TAP (Terminó Armado) de esa tanda en
+> `Registros_Produccion_Virgilio`. Se precargan en `stkOpenMovsArt` como `_stkPop._tpByTanda`
+> / `_stkPop._tapByTanda`. Si no se encuentra el TP/TAP, no muestra nada (mejor vacío que
+> "pipeline"). Idea 1851.
+>
 > Nota: **v8.84 — Alertas anómalas: NPs reales + detalle de pedido en PPP.** (1) Las tarjetas de
 > alertas de pedidos web anómalos ahora muestran las **NPs reales** (ej. "NP 98360, 98361") en vez del
 > `order_id` interno del Mayorista, cruzando `cod_cliente` con `PPP_Programacion_Diaria` (enriquecimiento
