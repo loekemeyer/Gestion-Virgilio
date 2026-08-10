@@ -1994,6 +1994,17 @@ button.pk-anular small{ display:block; font-size:12px; font-weight:700; opacity:
 .ppp-row-btn.ppp-ctrl-yes{ background:#16a34a; color:#fff; margin-right:6px; } .ppp-row-btn.ppp-ctrl-yes:hover{ background:#15803d; }
 .ppp-row-btn.ppp-undo{ background:#fff; color:#b42318; border:1px solid #fecaca; }
 .ppp-row-btn.ppp-print{ background:#2563eb; color:#fff; margin-right:6px; } .ppp-row-btn.ppp-print:hover{ background:#1d4ed8; }
+/* Expandir detalle de pedido (v8.84): click en NP → muestra productos (PPP_Base_Pedidos). */
+.ppp-np-link{ cursor:pointer; color:#1e6bd6; text-decoration:underline; text-decoration-style:dotted; text-underline-offset:2px; }
+.ppp-np-link:hover{ color:#1d4ed8; text-decoration-style:solid; }
+.ppp-np-link.open{ color:#7c3aed; }
+.ppp-detalle-row td{ padding:0 !important; border-bottom:1px solid #e2e8f0 !important; }
+.ppp-detalle-wrap{ background:#f0f4ff; padding:8px 14px 10px; border-top:1px dashed #cbd5e1; }
+.ppp-detalle-tbl{ width:auto; min-width:260px; border-collapse:collapse; font-size:12.5px; margin:2px 0; }
+.ppp-detalle-tbl th{ text-align:left; padding:3px 10px; font-size:11px; color:#64748b; text-transform:uppercase; border-bottom:1px solid #cbd5e1; }
+.ppp-detalle-tbl td{ padding:3px 10px; border-bottom:1px solid #f1f5f9; color:#0f172a; }
+.ppp-detalle-tbl td.num{ text-align:right; font-variant-numeric:tabular-nums; font-weight:600; }
+.ppp-detalle-load{ color:#64748b; font-size:12px; padding:4px 0; }
 /* Semáforo de góndola (v7.45): ícono auto-chequeado por pedido/tanda. Verde=todo en
    góndola · naranja=faltan algunos · rojo=no hay ninguno · gris=chequeando. Click = re-chequeo. */
 .ppp-chk-ico{ width:auto; margin:0 6px 0 0; padding:3px 9px; min-width:26px; font-size:13.5px; font-weight:900; line-height:1.1; border:none; border-radius:7px; cursor:pointer; vertical-align:middle; text-align:center; transition:background .12s; }
@@ -6299,7 +6310,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.83";
+const APP_VERSION = "v8.84";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -22649,7 +22660,7 @@ function _pppRowTrRO(p, npE) {
     : '';
   return '<tr id="ppprow_' + npE + '"' + (cls ? ' class="' + cls + '"' : '') + '>' +
     '<td>' + escapeHtml(p.tanda && p.tanda !== "—" ? p.tanda : "—") + '</td>' +
-    '<td>' + escapeHtml(p.cod || "") + '</td><td><b>' + npE + '</b></td><td>' + escapeHtml(p.fecha || "") + '</td>' +
+    '<td>' + escapeHtml(p.cod || "") + '</td><td><b class="ppp-np-link" onclick="pppToggleDetalle(\'' + npE + '\')" title="Ver contenido del pedido">' + npE + '</b></td><td>' + escapeHtml(p.fecha || "") + '</td>' +
     '<td class="ppp-cli"><span class="ppp-cli-in" title="' + escapeHtml(p.razon_social || "") + '">' + escapeHtml(p.razon_social || "") + '</span>' + (badges ? ' ' + badges : "") + '</td>' +
     '<td class="num">' + (p.m3 != null && p.m3 !== "" ? Number(p.m3).toFixed(2) : "") + '</td>' +
     '<td>' + escapeHtml(pppLocDisp(p.localidad)) + '</td>' +
@@ -22672,7 +22683,7 @@ function _pppRowTr(p) {
   const cargVenc = _pppCargaVencida(p);
   return '<tr id="ppprow_' + npE + '"' + (cargVenc ? ' class="ppp-cargvenc-row"' : '') + '>' +
     '<td><input class="ppp-edit ppp-edit-tanda" value="' + tEd + '" placeholder="—" onchange="pppSetEdit(\'' + npE + '\',\'tanda\',this.value.trim().toUpperCase(),true)"></td>' +
-    '<td>' + escapeHtml(p.cod || "") + '</td><td><b>' + npE + '</b></td><td>' + escapeHtml(p.fecha || "") +
+    '<td>' + escapeHtml(p.cod || "") + '</td><td><b class="ppp-np-link" onclick="pppToggleDetalle(\'' + npE + '\')" title="Ver contenido del pedido">' + npE + '</b></td><td>' + escapeHtml(p.fecha || "") +
     '</td><td class="ppp-cli"><span class="ppp-cli-in" title="' + escapeHtml(p.razon_social || "") + '">' + escapeHtml(p.razon_social || "") + '</span></td><td class="num">' + (p.m3 != null && p.m3 !== "" ? Number(p.m3).toFixed(2) : "") +
     '</td><td>' + escapeHtml(pppLocDisp(p.localidad)) + '</td>' +
     '<td><input class="ppp-edit ppp-edit-fe" value="' + feEd + '" placeholder="dd/mm/aaaa" onchange="pppSetEdit(\'' + npE + '\',\'fecha_entrega\',this.value.trim(),false)"></td>' +
@@ -24068,6 +24079,72 @@ async function pppCountTable(endpoint) {
   } catch (_e) { return null; }
 }
 
+/* ===== Expandir detalle de pedido (v8.84) — click en NP muestra productos ===== */
+let _pppDetalleCache = {};   // np → [{articulo, cajas}, ...]
+
+async function pppToggleDetalle(np) {
+  const trId = "ppprow_" + np;
+  const detId = "pppdet_" + np;
+  const existing = document.getElementById(detId);
+  // Toggle: si ya existe, lo saco
+  if (existing) {
+    existing.remove();
+    var link = document.querySelector('#' + trId + ' .ppp-np-link');
+    if (link) link.classList.remove("open");
+    return;
+  }
+  var link2 = document.querySelector('#' + trId + ' .ppp-np-link');
+  if (link2) link2.classList.add("open");
+  var row = document.getElementById(trId);
+  if (!row) return;
+  // Contar columnas del thead para el colspan
+  var cols = 12;
+  // Crear la fila de detalle
+  var detTr = document.createElement("tr");
+  detTr.id = detId;
+  detTr.className = "ppp-detalle-row";
+  var detTd = document.createElement("td");
+  detTd.colSpan = cols;
+  var wrap = document.createElement("div");
+  wrap.className = "ppp-detalle-wrap";
+  // Mostrar loading o datos cacheados
+  if (_pppDetalleCache[np]) {
+    wrap.innerHTML = _pppDetalleHtml(_pppDetalleCache[np], np);
+  } else {
+    wrap.innerHTML = '<div class="ppp-detalle-load">Cargando productos…</div>';
+    pppFetchDetalle(np).then(function (items) {
+      _pppDetalleCache[np] = items;
+      var w = document.querySelector('#' + detId + ' .ppp-detalle-wrap');
+      if (w) w.innerHTML = _pppDetalleHtml(items, np);
+    });
+  }
+  detTd.appendChild(wrap);
+  detTr.appendChild(detTd);
+  row.after(detTr);
+}
+
+async function pppFetchDetalle(np) {
+  try {
+    var url = SUPABASE_URL + "/rest/v1/PPP_Base_Pedidos?pedido=eq." + encodeURIComponent(np) + "&select=articulo,cajas&order=articulo";
+    var r = await fetch(url, {
+      headers: { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY }
+    });
+    if (!r.ok) return [];
+    return await r.json();
+  } catch (_e) { return []; }
+}
+
+function _pppDetalleHtml(items, np) {
+  if (!items.length) return '<div class="ppp-detalle-load">Sin productos cargados para NP ' + escapeHtml(np) + '.</div>';
+  var totalCajas = items.reduce(function (s, i) { return s + (Number(i.cajas) || 0); }, 0);
+  var h = '<table class="ppp-detalle-tbl"><thead><tr><th>Artículo</th><th style="text-align:right">Cajas</th></tr></thead><tbody>';
+  items.forEach(function (i) {
+    h += '<tr><td>' + escapeHtml(String(i.articulo || "")) + '</td><td class="num">' + (Number(i.cajas) || 0) + '</td></tr>';
+  });
+  h += '</tbody><tfoot><tr><td style="font-weight:700">' + items.length + ' artículo(s)</td><td class="num" style="font-weight:700">' + totalCajas + '</td></tr></tfoot></table>';
+  return h;
+}
+
 /* ===== Alertas Pedidos Web Anómalos (v8.82) — badge + banner en PPP ===== */
 let _pppAlertasWeb = [];
 let _pppAlertPollTimer = null;
@@ -24106,7 +24183,7 @@ function pppAlertBannerRender(alertas) {
     var ratioTxt = a.ratio ? a.ratio + "x" : "—";
     return '<div class="ppp-alert-card" data-alert-id="' + a.id + '">'
       + '<div class="ppp-alert-card-head">'
-      + '<span class="ppp-alert-card-title">⚠ Pedido #' + a.order_id + ' — ' + (a.cliente || "?") + ' (cód ' + (a.cod_cliente || "?") + ')</span>'
+      + '<span class="ppp-alert-card-title">⚠ ' + (a._nps && a._nps.length ? 'NP ' + a._nps.join(', ') : 'Pedido #' + a.order_id) + ' — ' + (a.cliente || "?") + ' (cód ' + (a.cod_cliente || "?") + ')</span>'
       + '<span class="ppp-alert-card-score">Score ' + a.score + '</span>'
       + '</div>'
       + '<div class="ppp-alert-card-body">'
@@ -24152,6 +24229,23 @@ async function pppAlertRevisar(id, estado, btn) {
 
 async function pppRefreshAlertasWeb() {
   _pppAlertasWeb = await pppFetchAlertasWeb();
+  // Enriquecer con NPs de PPP_Programacion_Diaria (por cod_cliente)
+  if (_pppAlertasWeb.length) {
+    var cods = [];
+    _pppAlertasWeb.forEach(function (a) { if (a.cod_cliente && cods.indexOf(String(a.cod_cliente)) < 0) cods.push(String(a.cod_cliente)); });
+    if (cods.length) {
+      try {
+        var url = SUPABASE_URL + "/rest/v1/PPP_Programacion_Diaria?cod=in.(" + cods.join(",") + ")&select=np,cod";
+        var r = await fetch(url, { headers: { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY } });
+        if (r.ok) {
+          var rows = await r.json();
+          var npsByCod = {};
+          rows.forEach(function (x) { var c = String(x.cod); if (!npsByCod[c]) npsByCod[c] = []; npsByCod[c].push(String(x.np)); });
+          _pppAlertasWeb.forEach(function (a) { a._nps = npsByCod[String(a.cod_cliente)] || []; });
+        }
+      } catch (_e) {}
+    }
+  }
   pppAlertBadgeUpdate(_pppAlertasWeb);
   pppAlertBannerRender(_pppAlertasWeb);
 }
