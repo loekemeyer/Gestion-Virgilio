@@ -86,23 +86,19 @@ borró). Layout:
   `styles.css`, `sw.js`) y volver a poner el botón "Cambiar planta". Último sync desde
   commit `d2d6a59` (2026-06-04).
 
-## Agentes diarios + código de 4 dígitos (Telegram)
+## Agentes + código de 4 dígitos (Telegram)
 
-Loop de tres etapas (tareas programadas, sesión nueva). Detalle en `docs/AGENTES-DIARIOS.md`.
+Los agentes ya **NO corren automáticos** (el loop cada 2 h y el curador diario
+fueron eliminados el 2026-08-10 para bajar consumo de tokens). Los subagentes
+siguen definidos en `.claude/agents/` y se invocan **a mano** cuando hace falta:
+`mejoras-virgilio`, `revisor-logica`, `auditor-consistencia`, `auditor-supabase`,
+`guardian-stock`, `guardian-tests`, `revisor-render`, `keeper-guia`,
+`curador-telegram`. Detalle en `docs/AGENTES-DIARIOS.md`.
 
-- **Cada 2 h — TODOS los agentes proponen (cada uno en su especialidad) y las
-  ideas se desarrollan solas en su rama.** Participan `mejoras-virgilio`,
-  `revisor-logica`, `auditor-consistencia`, `auditor-supabase`, `guardian-stock`,
-  `guardian-tests`, `revisor-render` y `keeper-guia`. Cada idea nueva entra a
-  `agente_propuestas` (`estado='pendiente'`) y, hasta 5 por corrida, se implementa
-  y verifica en su rama **`idea/<código>`** (queda `estado='lista'`, `rama` seteada).
-  **Nunca** se toca `main`.
-- **A las 8:00 AR — el `curador-telegram` decide qué te llega.** Parado sobre el
-  repo y sobre todo la `GUIA-PROYECTO.md` (lo que pidió el usuario), revisa lo
-  acumulado sin enviar, **descarta ruido/duplicados/lo que contradice la guía**,
-  arma **una lista definitiva** y la manda por Telegram al privado del usuario
-  (bot `@Faltantes_Virgilio_bot`). Marca enviadas (`enviado_en=now()`) y
-  descartadas (`estado='descartada'` + `curador_nota`).
+Cuando se invoca un agente, cada idea nueva entra a `agente_propuestas`
+(`estado='pendiente'`). Si se implementa y verifica (`node --check` + smoke
+headless), pasa a `estado='lista'` en su rama **`idea/<código>`**. **Nunca** se
+toca `main` desde el agente.
 
 Cada propuesta tiene un **código de 4 dígitos** único.
 
@@ -131,9 +127,8 @@ en el chat (aunque no dé ningún número), **registrala para que no se pierda**
    `- [ ] **<cod>** (AAAA-MM-DD) — <idea> — _pendiente_`, y commiteá/pusheá a `main`.
 4. Confirmale al usuario: "Anotada como **<cod>**" (así puede activarla después por número).
 
-Las ideas del usuario tienen **prioridad**: el loop de cada 2 h las desarrolla primero
-y el curador de las 8 las **incluye todos los días hasta que el usuario las active o
-descarte** (no se marcan como enviadas de forma permanente).
+Las ideas del usuario tienen **prioridad**: quedan `pendientes` en la tabla hasta
+que el usuario las active por número o las descarte.
 
 **Idea aceptada (por número o tildada en el checklist)** — cuando el usuario diga
 un **código de 4 dígitos** (`4837`, "hacé el 4837", "acepto 4837") o tilde ideas
