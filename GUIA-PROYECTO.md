@@ -4,7 +4,15 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-10 · Versión app al documentar: **v8.83**
+> Última actualización: 2026-08-10 · Versión app al documentar: **v8.87**
+>
+> Nota: **v8.87 — Desconcatenación 43XE: limpieza pelado 437E + fix popup racks.**
+> Se limpió el último residuo de stock legacy pelado de la familia 43XE: un ajuste
+> compensatorio −36 en `racks_ch` del "437E" (duplicado de los 36 que ya estaban en
+> "437E CH"). Ahora 437E, 438E y 439E tienen **cero stock pelado** — todo vive en LK/CH.
+> Bug fix: el popup de movimientos de racks (click en la columna "Racks" de la tabla de stock)
+> solo mostraba movimientos del depósito `racks`, pero la columna muestra `racks + racks_ch`
+> (v7.54). Ahora incluye ambos y etiqueta los de `racks_ch` con chip "CH".
 >
 > Nota: **v8.83 — Completar datos producto: módulos por categoría.** La pantalla 🚦 ahora agrupa
 > los productos faltantes en 3 secciones: **📦 Artículos de venta (stock)** (códigos que existen en
@@ -461,11 +469,11 @@
 > guarda **pelado**, Chef-only; el 809E de Chef suffijado) — agrupa sólo esos dos; el **809E LK**
 > (cortapizza) queda solo. Fallback de fabricante en `provMap` que strippea el sufijo LK/CH.
 > **Nota:** `EMPRESA_SPLIT_CODS` = { 437E, 438E, 439E, 809E } — el **809 NO** va (pelado).
-> **PENDIENTE (menor, a revisar con usuario):** único stock pelado "colgado" = **437E = 36
-> en `racks_ch`** (Chef). Todo el resto de los split netea a cero pelado (438E/439E ya no
-> tienen pelados; 809E pelado = 0; **809 pelado = 1 es CORRECTO**, nacional Chef-only). Duda
-> abierta: ese 36 ¿es Chef real → reasignar a "437E CH", o duplica el ajuste racks=36 que ya
-> tiene 437E CH? → cuando se resuelva: backup + `ajuste` compensatorio (no borrar historia).
+> **RESUELTO (v8.87):** el stock pelado "colgado" **437E = 36 en `racks_ch`** era un **duplicado**
+> del ajuste que ya estaba en 437E CH (ambos originados en la migración del 4/8). Se limpió con
+> ajuste compensatorio −36 en `racks_ch` del pelado. Ahora **toda la familia 43XE** (437E, 438E,
+> 439E) tiene **cero stock pelado** — todo vive en las variantes LK/CH.
+> **809 pelado = 1 es CORRECTO** (nacional, Chef-only).
 >
 > Nota: **v8.02–v8.04 — mejoras faltantes + separación por empresa (parte).**
 > **v8.02** Faltante por día: resumen arriba (en quiebre S1/S2, cajas, cambios NP), toggle
@@ -481,8 +489,8 @@
 > antes CP escribía pelado y divergía. **#2 (familia 809 Chef):** en `Equivalencias_Familia`
 > se agregó `809 (nacional) → 809E (importado)` empresa CH (809 es Chef-only) → un pedido de
 > Chef al 809 aparece en Corregir códigos/Telegram y el picking levanta 809E al confirmar.
-> **PENDIENTE:** suffijar también el faltante-por-día (para agrupar 809 CH↔809E CH ahí) y
-> limpiar los buckets pelados legacy (ej. 437E=36).
+> **PENDIENTE:** suffijar también el faltante-por-día (para agrupar 809 CH↔809E CH ahí).
+> ~~limpiar los buckets pelados legacy (ej. 437E=36)~~ → **HECHO en v8.87**.
 >
 > Nota: **v8.00 — Descuento de stock del picking INCREMENTAL (por PKC).**
 >
