@@ -6289,7 +6289,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.91";
+const APP_VERSION = "v8.92";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -10909,6 +10909,10 @@ async function ocCfgProvSave() {
    Como el stock es event-sourced, el punto en el tiempo = recomputar saldos contando
    sólo los movimientos con ts ≤ la fecha/hora elegida (hora Argentina, UTC-3 fijo).
    Sólo aplica a la solapa Stocks. */
+// v8.92 — botón "Excedentes por ubicación (Excel)" reutilizable (va en la fila "Ver stock").
+function stkExcedentesBtn() {
+  return '<button class="stk-btn" style="width:auto;margin:0;background:#fffbeb;border-color:#fcd34d;color:#92400e;font-weight:800;white-space:nowrap;" onclick="stkExportExcedentes()">⬇ Excedentes por ubicación (Excel)</button>';
+}
 function stkAsOfControl() {
   if (!_stk) return "";
   const on = !!_stk.asOf;
@@ -10918,6 +10922,7 @@ function stkAsOfControl() {
   h += '<input type="datetime-local" id="stkAsOfInp" value="' + escapeHtml(_stk.asOfInput || '') + '" onchange="if(_stk){_stk.asOfInput=this.value;}" style="height:36px;border:1px solid #cbd5e1;border-radius:8px;padding:0 8px;font-size:13px;">';
   h += '<button class="stk-btn" onclick="stkAsOfApply()">📅 A esa fecha/hora</button>';
   if (on) h += '<span style="font-size:12.5px;font-weight:800;color:#92400e;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:5px 9px;">📅 Stock al <b>' + escapeHtml(stockFmtTs(_stk.asOf)) + '</b> hs (histórico, no el actual)</span>';
+  h += '<span style="margin-left:auto;">' + stkExcedentesBtn() + '</span>';   // v8.92 — Excedentes a la derecha, misma fila
   h += '</div>';
   return h;
 }
@@ -11841,7 +11846,9 @@ function stkBodyStocksTab() {
   const view = _stk.stkView || "stocks";
   const seg = function (v, label) { return '<button class="stk-segb' + (view === v ? " on" : "") + '" onclick="stkSetView(\'' + v + '\')">' + label + '</button>'; };
   let h = '<div class="stk-seg">' + seg("stocks", "📊 Stock") + seg("ingresos", "📥 Ingresos") + seg("salidas", "📤 Salidas") + '</div>';   // v6.70: FC s/Salida pasó a ser una COLUMNA de la tabla (no un segmento)
-  h += '<button class="stk-btn" style="width:100%;margin:0 0 10px;background:#fffbeb;border-color:#fcd34d;color:#92400e;font-weight:800;" onclick="stkExportExcedentes()">⬇ Excedentes por ubicación (Excel)</button>';
+  // v8.92 — el botón "Excedentes por ubicación" se movió a la fila "Ver stock" (stkAsOfControl) para
+  // ahorrar una fila. En ingresos/salidas (sin esa fila) se muestra acá compacto, alineado a la derecha.
+  if (view !== "stocks") h += '<div style="display:flex;justify-content:flex-end;margin-bottom:10px;">' + stkExcedentesBtn() + '</div>';
   h += (view === "ingresos") ? stkBodyIngresos() : (view === "salidas") ? stkBodySalidas() : stkBodyStocks();
   return h;
 }
@@ -11947,7 +11954,30 @@ function stkBodyStocks() {
   // por código base ("437E") pero los saldos tienen sufijo ("437E LK"). Busca exacto primero,
   // fallback al base.
   var _demOf = function (cod) { var k = _ocgNorm(cod); return Number(dem[k] || dem[_ocgNorm(codBase(cod))]) || 0; };
-  var _capOf = function (cod) { var k = _ocgNorm(cod); return Number(capByCod[k] || capByCod[_ocgNorm(codBase(cod))]) || 0; };
+  var _capOf = function (cod) {
+    var k = _ocgNorm(cod);
+    if (capByCod[k] != null) return Number(capByCod[k]) || 0;   // match exacto (si la celda tuviera sufijo)
+    var _cbN = _ocgNorm(codBase(cod));
+    // v8.92 — desconcatenación: si el código es dual y tiene sufijo (437E LK / 437E CH), la
+    // capacidad de esa fila es SOLO la de los sectores de esa marca (Loeke=F.., Chef=L..),
+    // no la suma de las dos empresas. Mismo criterio que el pop-up stkOpenCapArt.
+    var _sfx = String(cod || "").match(/\s+(LK|CH|LOKE)$/i);
+    var _emp = _sfx ? _sfx[1].toUpperCase().replace("LOKE", "LK") : "";
+    if (_emp && typeof PICK_UBIC_DUAL !== "undefined" && PICK_UBIC_DUAL[_cbN]) {
+      var _d = PICK_UBIC_DUAL[_cbN];
+      var _pfx = (_emp === "LK" ? String(_d.loeke.sector || "") : String(_d.chef.sector || "")).charAt(0).toUpperCase();
+      if (_pfx) {
+        var _sum = 0;
+        (_stk.cap || []).forEach(function (r) {
+          if (_ocgNorm(r.cod) !== _cbN) return;
+          if (String(r.sector || "").charAt(0).toUpperCase() !== _pfx) return;
+          _sum += Number(r.cajas_max) || 0;
+        });
+        return _sum;
+      }
+    }
+    return Number(capByCod[_cbN]) || 0;
+  };
   const arts = Object.keys(saldos).map(function (k) { return saldos[k]; });
   // v5.48: sumar artículos que tienen CAJAS PEDIDAS (demanda del PPP) aunque no tengan stock cargado.
   const _seenN = {}; arts.forEach(function (a) { _seenN[_ocgNorm(a.cod)] = true; });
@@ -12342,6 +12372,7 @@ var STK_POP_CSS =
   ".mva-tbl td.mva-ts{width:31%;color:#475569;font-size:11px;line-height:1.35;padding-top:8px;}.mva-tbl td.mva-mov{width:39%;}" +
   ".mva-tbl thead th{position:sticky;top:0;background:#f8fafc;color:#64748b;font-size:10px;text-transform:uppercase;letter-spacing:.03em;font-weight:800;}" +
   ".mva-tbl th.num,.mva-tbl td.mva-cant,.mva-tbl td.mva-sal{text-align:right;font-variant-numeric:tabular-nums;font-weight:800;width:15%;padding-top:8px;}" +
+  ".mva-tbl td.num{text-align:right;font-variant-numeric:tabular-nums;}" +   // v8.92 — alinear números de la columna Cajas con su header
   ".mva-tbl .mva-pos{color:#15803d;}.mva-tbl .mva-neg{color:#b91c1c;}" +
   // v6.68 — celda MOVIMIENTO como flex: slot fijo para el toggle (vacío en guardado) →
   // 'recepcion' y 'guardado' arrancan alineados; cuerpo con chips que fluyen prolijo.
@@ -12625,6 +12656,12 @@ function stkOpenCapArt(codEnc) {
 /* v5.103 — CAJAS PEDIDAS por artículo: qué NP pidió cuántas de ese código y si su
    TANDA ya se pickeó (hay picking en separar_pedidos) y/o separó (separado en
    a_facturar). NP→tanda de PPP_Programacion_Diaria; estado de _stk.movs. */
+// v8.92 — formatea la fecha de la NP (PPP_Programacion_Diaria) "2026-08-14 00:00:00" → "14/8".
+function _stkFmtFechaNP(v) {
+  var s = String(v == null ? "" : v).trim(); if (!s) return "";
+  var m = s.match(/(\d{4})-(\d{2})-(\d{2})/);
+  return m ? (String(parseInt(m[3], 10)) + "/" + String(parseInt(m[2], 10))) : "";
+}
 async function stkOpenCajasPedidasArt(codEnc) {
   if (!_stk) return;
   const cod = decodeURIComponent(codEnc), codN = _stkNormCod(cod);
@@ -12659,8 +12696,8 @@ async function stkOpenCajasPedidasArt(codEnc) {
   if (!nps.length) { if (body) body.innerHTML = '<div class="stkpop-empty">Todo lo que pidió ' + escapeHtml(_codDisp) + (_empFiltro ? ' (' + _empFiltro + ')' : '') + ' ya está <b>facturado</b> (' + yaFact + ' NP). El recorrido está en 🕓 Historial.</div>'; return; }
   const npInfo = {};
   try {
-    const prog = await fetch(SUPABASE_PPP_PROG_ENDPOINT + "?np=in.(" + nps.map(encodeURIComponent).join(",") + ")&select=np,tanda,razon_social&limit=8000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; });
-    prog.forEach(function (x) { const np = String(x.np || "").trim().replace(/\.0+$/, ""); if (np && !npInfo[np]) npInfo[np] = { tanda: String(x.tanda || "").trim().toUpperCase(), rs: String(x.razon_social || "").trim() }; });
+    const prog = await fetch(SUPABASE_PPP_PROG_ENDPOINT + "?np=in.(" + nps.map(encodeURIComponent).join(",") + ")&select=np,tanda,razon_social,fecha_entrega&limit=8000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; });
+    prog.forEach(function (x) { const np = String(x.np || "").trim().replace(/\.0+$/, ""); if (np && !npInfo[np]) npInfo[np] = { tanda: String(x.tanda || "").trim().toUpperCase(), rs: String(x.razon_social || "").trim(), fecha: _stkFmtFechaNP(x.fecha_entrega) }; });
   } catch (_e) {}
   const pickTandas = {}, sepTandas = {};
   _stk.movs.forEach(function (mv) {
@@ -12689,7 +12726,7 @@ async function stkOpenCajasPedidasArt(codEnc) {
   const round1 = function (n) { return Math.round(n * 10) / 10; };
   nps.sort(function (a, b) { return String(a).localeCompare(String(b), undefined, { numeric: true }); });
   const totP = round1(nps.reduce(function (s, np) { return s + pedByNp[np]; }, 0));
-  const rowsArr = nps.map(function (np) { const info = npInfo[np] || {}, t = info.tanda || ""; return { np: np, tanda: t, rs: info.rs || "", pidio: round1(pedByNp[np]), pickeado: !!(t && pickTandas[t]), separado: !!(t && sepTandas[t]) }; });
+  const rowsArr = nps.map(function (np) { const info = npInfo[np] || {}, t = info.tanda || ""; return { np: np, tanda: t, rs: info.rs || "", fecha: info.fecha || "", pidio: round1(pedByNp[np]), pickeado: !!(t && pickTandas[t]), separado: !!(t && sepTandas[t]) }; });
   _stkPop = { kind: "cajasPed", cod: cod, rows: rowsArr };   // v5.104: guardar para el export a Excel
   let h = '<div class="stkpop-hint"><b>' + escapeHtml(_codDisp) + '</b>' + (_empFiltro ? ' <b style="color:' + (_empFiltro === "LK" ? "#b91c1c" : "#1e40af") + '">' + _empFiltro + '</b>' : '') + ' · pedido <b>PENDIENTE</b>: <b>' + totP + ' cajas</b> en ' + nps.length + ' NP(s)' + (yaFact ? ' <small style="color:#94a3b8">(+' + yaFact + ' NP ya facturadas — no se muestran; verlas en 🕓 Historial)</small>' : '') + '.<br><small style="color:#94a3b8">Incluye NP sin programar todavía — puede dar más que la columna.</small></div>';
   h += '<div style="margin-bottom:10px"><button class="mva-clear" style="background:#166534;color:#fff;border-color:#166534" onclick="stkCajasPedidasExport()">⬇ Exportar a Excel</button></div>';
@@ -12698,7 +12735,7 @@ async function stkOpenCajasPedidasArt(codEnc) {
   h += rowsArr.map(function (r) {
     var pkCell = r.pickeado ? '<span style="color:#166534;font-weight:800">✓' + stkSigBadge(stkSigla(pickerByTanda[r.tanda]), "#166534") + '</span>' : '<span style="color:#b45309">—</span>';
     var spCell = r.separado ? '<span style="color:#1e40af;font-weight:800">✓' + stkSigBadge(stkSigla(sepByTanda[r.tanda]), "#1e40af") + '</span>' : '<span style="color:#94a3b8">—</span>';
-    return '<tr><td><b>' + escapeHtml(r.np) + '</b>' + (r.tanda ? ' <small style="color:#94a3b8">' + escapeHtml(r.tanda) + '</small>' : '') + '</td><td style="font-size:12px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escapeHtml(r.rs || "—") + '</td><td class="num"><b>' + r.pidio + '</b></td><td style="text-align:center">' + pkCell + '</td><td style="text-align:center">' + spCell + '</td></tr>';
+    return '<tr><td><b>' + escapeHtml(r.np) + '</b>' + (r.tanda ? ' <small style="color:#94a3b8">' + escapeHtml(r.tanda) + '</small>' : '') + (r.fecha ? '<br><small style="color:#64748b">📅 ' + escapeHtml(r.fecha) + '</small>' : '') + '</td><td style="font-size:12px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escapeHtml(r.rs || "—") + '</td><td class="num"><b>' + r.pidio + '</b></td><td style="text-align:center">' + pkCell + '</td><td style="text-align:center">' + spCell + '</td></tr>';
   }).join("") + '</tbody>';
   h += '<tfoot><tr style="font-weight:800;border-top:2px solid #334155"><td colspan="2">TOTAL (' + nps.length + ' NP)</td><td class="num">' + totP + '</td><td></td><td></td></tr></tfoot></table></div>';
   if (body) body.innerHTML = h;
@@ -12713,8 +12750,8 @@ function stkCajasPedidasExport() {
   let total = 0; rows.forEach(function (r) { total += Number(r.pidio) || 0; });
   let html = '<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"><style>td,th{border:1px solid #ccc;padding:3px 7px;font-family:Calibri,Arial,sans-serif;} th{background:#92400E;color:#fff;text-align:left;}</style></head><body>';
   html += '<h3>Cajas pedidas — ' + esc(cod) + ' — Producción Virgilio (' + esc(fecha) + ')</h3>';
-  html += '<table><tr><th>NP</th><th>Tanda</th><th>Razon Social</th><th>Pidio (cajas)</th><th>Pickeado</th><th>Separado</th></tr>';
-  rows.forEach(function (r) { html += '<tr><td>' + esc(r.np) + '</td><td>' + esc(r.tanda) + '</td><td>' + esc(r.rs) + '</td><td>' + (Number(r.pidio) || 0) + '</td><td>' + (r.pickeado ? "SI" : "no") + '</td><td>' + (r.separado ? "SI" : "no") + '</td></tr>'; });
+  html += '<table><tr><th>NP</th><th>Tanda</th><th>Fecha</th><th>Razon Social</th><th>Pidio (cajas)</th><th>Pickeado</th><th>Separado</th></tr>';
+  rows.forEach(function (r) { html += '<tr><td>' + esc(r.np) + '</td><td>' + esc(r.tanda) + '</td><td>' + esc(r.fecha || "") + '</td><td>' + esc(r.rs) + '</td><td>' + (Number(r.pidio) || 0) + '</td><td>' + (r.pickeado ? "SI" : "no") + '</td><td>' + (r.separado ? "SI" : "no") + '</td></tr>'; });
   html += '<tr><td><b>TOTAL (' + rows.length + ' NP)</b></td><td></td><td></td><td><b>' + (Math.round(total * 10) / 10) + '</b></td><td></td><td></td></tr>';
   html += '</table></body></html>';
   try {
@@ -13128,7 +13165,30 @@ function stkDescargarExcel() {
   (_stk.cap || []).forEach(function (r) { const k = _ocgNorm(r.cod); if (!k) return; capByCod[k] = (capByCod[k] || 0) + (Number(r.cajas_max) || 0); });
   // v8.88: helpers desconcatenación (mismo patrón que stkBodyStocks)
   var _demOf = function (cod) { var k = _ocgNorm(cod); return Number(dem[k] || dem[_ocgNorm(codBase(cod))]) || 0; };
-  var _capOf = function (cod) { var k = _ocgNorm(cod); return Number(capByCod[k] || capByCod[_ocgNorm(codBase(cod))]) || 0; };
+  var _capOf = function (cod) {
+    var k = _ocgNorm(cod);
+    if (capByCod[k] != null) return Number(capByCod[k]) || 0;   // match exacto (si la celda tuviera sufijo)
+    var _cbN = _ocgNorm(codBase(cod));
+    // v8.92 — desconcatenación: si el código es dual y tiene sufijo (437E LK / 437E CH), la
+    // capacidad de esa fila es SOLO la de los sectores de esa marca (Loeke=F.., Chef=L..),
+    // no la suma de las dos empresas. Mismo criterio que el pop-up stkOpenCapArt.
+    var _sfx = String(cod || "").match(/\s+(LK|CH|LOKE)$/i);
+    var _emp = _sfx ? _sfx[1].toUpperCase().replace("LOKE", "LK") : "";
+    if (_emp && typeof PICK_UBIC_DUAL !== "undefined" && PICK_UBIC_DUAL[_cbN]) {
+      var _d = PICK_UBIC_DUAL[_cbN];
+      var _pfx = (_emp === "LK" ? String(_d.loeke.sector || "") : String(_d.chef.sector || "")).charAt(0).toUpperCase();
+      if (_pfx) {
+        var _sum = 0;
+        (_stk.cap || []).forEach(function (r) {
+          if (_ocgNorm(r.cod) !== _cbN) return;
+          if (String(r.sector || "").charAt(0).toUpperCase() !== _pfx) return;
+          _sum += Number(r.cajas_max) || 0;
+        });
+        return _sum;
+      }
+    }
+    return Number(capByCod[_cbN]) || 0;
+  };
   let arts = Object.keys(saldos).map(function (k) { return saldos[k]; });
   const _seenN = {}; arts.forEach(function (a) { _seenN[_ocgNorm(a.cod)] = true; });
   Object.keys(dem).forEach(function (k) { if (!_seenN[k] && (Number(dem[k]) || 0) > 0) arts.push({ cod: k, desc: artNombre(k, ""), terminado: 0, excedente: 0, separar_pedidos: 0, a_facturar: 0, a_guardar: 0, racks: 0, insumos: 0, racks_ch: 0 }); });
