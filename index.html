@@ -2360,21 +2360,9 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .falt-note{ font-size:12.5px; color:#fbbf24; margin:-8px 0 16px; opacity:.9; }
 
 /* Aviso "preguntá a Marianela" (armador, tanda con faltantes) */
-#marianelaModal{ display:none; position:fixed; inset:0; z-index:1300; background:rgba(2,6,23,.74); align-items:center; justify-content:center; padding:20px; }
-#marianelaModal.show{ display:flex; }
-.mar-card{ background:#1c1407; border:2px solid #f59e0b; border-radius:18px; padding:24px 22px; max-width:440px; width:100%; text-align:center; box-shadow:0 24px 70px rgba(0,0,0,.55); }
-.mar-ico{ font-size:46px; line-height:1; }
-.mar-title{ font-size:21px; font-weight:800; color:#fde68a; margin:10px 0 6px; }
-.mar-tanda{ font-size:13.5px; font-weight:700; color:#fbbf24; margin:6px 0; }
-.mar-arts{ display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin:8px 0 2px; }
-.mar-art{ font-size:13.5px; color:#fed7aa; background:rgba(245,158,11,.12); border:1px solid rgba(245,158,11,.4); border-radius:8px; padding:4px 10px; }
-.mar-art b{ color:#fca5a5; }
-.mar-art .mar-np{ font-size:11px; font-weight:700; color:#fde68a; background:rgba(0,0,0,.25); border-radius:6px; padding:1px 6px; margin-left:3px; }
-.mar-art-rep{ background:rgba(220,38,38,.20); border-color:rgba(248,113,113,.65); color:#fecaca; }
-.mar-art-rep .mar-np{ color:#fee2e2; background:rgba(127,29,29,.55); }
-.mar-msg{ font-size:17px; color:#fff; margin:16px 0 20px; line-height:1.45; }
-.mar-msg b{ color:#fbbf24; font-size:20px; letter-spacing:.3px; }
-/* Wizard "Completar" al dar TAP (Paso 1 líos por NP · Paso 2 reparto de faltantes) */
+/* v8.75 (idea 9849): CSS del aviso "Preguntá a Marianela" (#marianelaModal + .mar-*) borrado
+   — el aviso salió del flujo cuando el reparto pasó a ser automático (v8.73). */
+/* Wizard "Completar" al dar TAP (Paso 2 Separar · Paso 3 Líos — v8.75; el Paso 1 se borró) */
 #completarModal{ display:none; position:fixed; inset:0; z-index:1300; background:rgba(2,6,23,.74); align-items:flex-start; justify-content:center; padding:14px; overflow:auto; }
 #completarModal.show{ display:flex; }
 .comp-card{ background:#fff; border-radius:18px; width:100%; max-width:520px; margin:auto; box-shadow:0 24px 70px rgba(0,0,0,.5); display:flex; flex-direction:column; max-height:96vh; overflow:hidden; }
@@ -2571,8 +2559,6 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .comp-fnp-inp.m-cargo{ border-color:#86efac; } .comp-fnp-inp.m-cargo:focus{ outline:none; border-color:#16a34a; }
 .comp-fnp-sec{ font-size:11px; font-weight:800; min-height:14px; }
 .comp-sec-cargo{ color:#166534; } .comp-sec-falt{ color:#b42318; }
-.mar-btn{ width:100%; margin:0; padding:14px; font-size:17px; font-weight:800; background:#f59e0b; color:#241803; border:none; border-radius:10px; cursor:pointer; }
-.mar-btn:hover{ background:#fbbf24; }
 
 /* Modales (historial de días anteriores y "Terminar Día") */
 #histModal,
@@ -3335,20 +3321,13 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
   <div class="falt-body" id="faltantesBody"><div class="falt-empty">Cargando…</div></div>
 </div>
 
-<!-- Aviso al armador: si la tanda del pedido se pickeó con faltantes, preguntar a
-     Marianela cómo repartir antes de separar (v2.87). Lo abre showMarianelaAviso. -->
-<div id="marianelaModal">
-  <div class="mar-card">
-    <div class="mar-ico">⚠️</div>
-    <div class="mar-title">Esta tanda se pickeó con faltantes</div>
-    <div id="marianelaBody"></div>
-    <div class="mar-msg">Revisá los faltantes antes de separar. Lo marcado en <b>rojo</b> hay que repartir entre pedidos — preguntale a <b>MARIANELA</b>.</div>
-    <button class="mar-btn" onclick="closeMarianela()">Entendido</button>
-  </div>
-</div>
+<!-- v8.75 (idea 9849): #marianelaModal borrado — el aviso "Preguntá a Marianela" salió del
+     flujo cuando el reparto pasó a ser automático (v8.73). Reemplazado por
+     _compAsigProporcional (Hamilton) en el propio wizard "Completar". -->
 
-<!-- Pop-up al dar TAP: repartir las cajas faltantes del picking entre las NP que pidieron
-     cada artículo. 1 NP → automático; 2+ NP → el operario reparte. Guarda en Supabase (opcion FAL). -->
+<!-- Pop-up al dar TAP: reparto automático de faltantes (v8.73, proporcional) + separar + líos.
+     Todos los faltantes se resuelven solos (arts[i].auto siempre true) → arranca en Paso 2
+     (Separar) y termina en Paso 3 (Líos). Guarda faltantes en Supabase (opcion FAL). -->
 <div id="completarModal">
   <div class="comp-card">
     <div class="comp-head">
@@ -3367,8 +3346,8 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       </div>
     </div>
     <div class="comp-body">
-      <div class="comp-step on" id="compStep1"></div>
-      <div class="comp-step" id="compStepSep"></div>
+      <!-- v8.75 (idea 9849): #compStep1 borrado — el Paso 1 (reparto manual) no existe más. -->
+      <div class="comp-step on" id="compStepSep"></div>
       <div class="comp-step" id="compStep2"></div>
     </div>
     <div class="comp-foot">
@@ -6830,8 +6809,9 @@ async function send() {
   // defecto; showArmadoGuide corta solo si la flag está en false). No bloquea AP.
   if (opcion === "AP" && (texto || "").trim()) {
     showArmadoGuide(texto, legajoStr);
-    // v4.04: al EMPEZAR armado se abre el wizard "Completar" (Paso 1 Faltantes → Paso 2 Líos).
-    // Antes era el aviso read-only showMarianelaAviso y el wizard salía recién en TAP.
+    // v4.04: al EMPEZAR armado se abre el wizard "Completar" (Separar → Líos).
+    // v8.75: antes tenía un Paso 1 de reparto manual de faltantes; hoy el reparto es
+    // automático (proporcional) y el wizard arranca directo en Separar.
     showCompletarWizard(legajoStr, texto);
   }
   // Al INICIAR carga camión (1er toque de CC): checklist de NPs listas (TAP).
@@ -8595,87 +8575,21 @@ async function faltantesDeTanda(tanda) {
     return out;
   } catch (_e) { return []; }
 }
-async function showMarianelaAviso(codigo, legajo) {
-  const code = String(codigo || "").trim().toUpperCase();
-  if (!code) return;
-  try {
-    // 1) Faltantes de la tanda (probando el código como tanda; si no, como pedido → su tanda).
-    let enr = null; try { enr = await faltGetEnrich(); } catch (_e) {}
-    let tanda = code, falt = await faltantesDeTanda(code);
-    if (!falt.length && enr && enr.sheetMap) {
-      const np = pickNormNp(code);
-      for (const [k, v] of enr.sheetMap) {
-        if (!v || !v.pedidos) continue;
-        if (v.pedidos.some(p => String(p.np || "").split(/[,/]/).map(s => pickNormNp(s)).indexOf(np) >= 0)) {
-          tanda = String(v.tanda || k).trim().toUpperCase(); break;
-        }
-      }
-      if (tanda && tanda !== code) falt = await faltantesDeTanda(tanda);
-    }
-    if (!falt.length) return;
-    if (enr) { try { await faltEnsureBase(enr, [tanda]); } catch (_e) {} }  // sana NP atrasados en Supabase
-    // 2) Mostrar SOLO si hay una decisión de reparto: por cada artículo faltante,
-    //    pickearon >1 caja, falta >1 (sino va a un solo cliente) y lo pidió MÁS de
-    //    1 pedido. La cantidad de pedidos que pidieron el artículo sale de la PPP.
-    const contarPedidos = (art) => {
-      if (!enr || !enr.sheetMap) return null;                 // no se pudo determinar
-      const entry = enr.sheetMap.get(String(tanda).trim().toUpperCase());
-      if (!entry || !entry.pedidos) return null;
-      const wantU = String(art).toUpperCase(), wantBase = wantU.replace(/E$/, "");
-      const seenNp = new Set(); let n = 0;
-      for (const p of entry.pedidos) {
-        for (const part of String(p.np || "").split(/[,/]/)) {
-          const np = pickNormNp(part);
-          if (!np || !/\d/.test(np) || seenNp.has(np)) continue;
-          seenNp.add(np);
-          let cajas = 0;
-          for (const it of (enr.pickBase.get(np) || [])) {
-            const aU = String(it.art).toUpperCase();
-            if (aU === wantU || aU.replace(/E$/, "") === wantBase) cajas += it.cajas;
-          }
-          if (cajas > 0) n++;                                  // este pedido pidió el artículo
-        }
-      }
-      return n;
-    };
-    // TODOS los faltantes de la tanda; marcamos en rojo los que además hay que REPARTIR
-    // entre varios pedidos (pickearon >1, falta >1 y lo pidió más de un pedido).
-    const items = falt.map(function (f) {
-      const n = contarPedidos(f.art);
-      const reparto = (f.real > 1) && (f.falta > 1) && !(n !== null && n <= 1);
-      return { art: f.art, falta: f.falta, nped: n, reparto: reparto };
-    });
-    if (!items.length) return;
-    items.sort(function (a, b) { return (Number(b.reparto) - Number(a.reparto)) || (b.falta - a.falta); });   // reparto primero, luego por cantidad
-    const chips = items.map(function (f) {
-      return '<span class="mar-art' + (f.reparto ? ' mar-art-rep' : '') + '">Art ' + escapeHtml(f.art) + ' <b>−' + f.falta + '</b>' +
-        (f.reparto ? ' <span class="mar-np">repartir' + (f.nped ? ' · ' + f.nped + ' ped.' : '') + '</span>' : '') + '</span>';
-    }).join("");
-    const body = document.getElementById("marianelaBody");
-    if (body) body.innerHTML =
-      '<div class="mar-tanda">Tanda ' + escapeHtml(tanda) + ' · faltantes del picking</div>' +
-      '<div class="mar-arts">' + chips + '</div>';
-    const ov = document.getElementById("marianelaModal");
-    if (ov) ov.classList.add("show");
-  } catch (_e) { /* sin red: no se muestra el aviso */ }
-}
-function closeMarianela() {
-  const ov = document.getElementById("marianelaModal");
-  if (ov) ov.classList.remove("show");
-}
+// v8.75 (idea 9849): showMarianelaAviso / closeMarianela borradas — el aviso salió del flujo
+// cuando el reparto pasó a ser automático (v8.73). No las llamaba nadie.
 
-/* ===== Wizard "Completar" al dar TAP: Paso 1 líos por NP + Paso 2 reparto de
-   faltantes (si los hay). Al Terminar guarda líos (opcion TAL, como siempre) y los
-   faltantes (opcion FAL: texto = tanda|np|cod_cliente|cod_art|cajas_faltantes). La vista
-   Entregas_Virgilio cruza la base − FAL → cajas_entregadas. v3.97. ===== */
+/* ===== Wizard "Completar" al dar TAP: Paso 2 Separar por NP + Paso 3 Líos.
+   El reparto de faltantes es AUTOMÁTICO (v8.73 · _compAsigProporcional, Hamilton):
+   cuando 2+ NPs pidieron un artículo faltante, se reparte proporcional a lo pedido;
+   con 1 sola NP o real=0 va directo (100% a esa NP o "cada NP faltó lo que pidió").
+   El operario ya NO decide el reparto — arranca directo en Separar (v8.75).
+   Al Terminar guarda líos (opcion TAL) y faltantes (opcion FAL: texto =
+   tanda|np|cod_cliente|cod_art|cajas_faltantes). La vista Entregas_Virgilio cruza la
+   base − FAL → cajas_entregadas. ===== */
 let _comp = null;
 const SUPABASE_ENTREGAS_ENDPOINT = SUPABASE_URL + "/rest/v1/Entregas_Virgilio";
-/* Modo de carga del Paso 2: "cargo" = el operario anota lo que CARGÓ (DEFAULT, elegido por
-   el usuario; el faltante sale por diferencia pidió−cargó) · "falto" = anota lo que faltó.
-   El switch es SOLO de UI: internamente siempre se guarda el FALTANTE (asig), así FAL / la
-   vista Entregas_Virgilio / los cálculos NO cambian. Hay un toggle en vivo en el Paso 2;
-   para fijar uno definitivo, cambiar este valor (y/o sacar el toggle). */
-let _compMode = "cargo";
+// v8.75 (idea 9849): _compMode ("cargo"/"falto") borrado — servía al Paso 1 del wizard, que
+// desapareció con v8.73. El reparto es automático (_compAsigProporcional) y ya no hay input.
 function _compMatchArt(a, want) { const aU = codBase(a), w = codBase(want); return aU === w || aU.replace(/E$/, "") === w.replace(/E$/, ""); }
 /* v8.73 (idea 9849): reparto proporcional del picking entre 2+ NPs que pidieron el mismo
    artículo faltante. Método Hamilton (largest remainder):
@@ -8757,7 +8671,7 @@ async function showCompletarWizard(legajo, codigo) {
       const d20 = document.getElementById("compD2"), ln0 = document.getElementById("compLine");
       if (d20) d20.style.display = ""; if (ln0) ln0.style.display = "";
       if (!_comp.nps[0] || !_comp.nps[0].codes) _compBuildLiosData();   // v4.90: si el avance se guardó en Paso 1 (sin codes), armar la data de líos para habilitar Terminar
-      _compRenderFalt(); _compGo(Math.max(Number(_comp.step) || 2, 2));   // v8.73 (idea 9849): el Paso 1 (reparto manual) desaparece — retomar en Paso 2 (Separar) como mínimo
+      _compGo(Math.max(Number(_comp.step) || 2, 2));   // v8.73 (idea 9849): el Paso 1 (reparto manual) desaparece — retomar en Paso 2 (Separar) como mínimo
       modal.classList.add("show");
       return;
     }
@@ -8807,7 +8721,7 @@ async function showCompletarWizard(legajo, codigo) {
       }
     }
     const hayFalt = arts.some(a => a.nps.length);
-    _comp = { legajo: String(legajo || "").trim(), tanda: tanda, fecha: fecha, nps: nps, arts: arts, pedidoFull: pedidoFull, hayFalt: hayFalt, step: 1, pickUbic: _pickUbic, dirByNp: _dirByNp };
+    _comp = { legajo: String(legajo || "").trim(), tanda: tanda, fecha: fecha, nps: nps, arts: arts, pedidoFull: pedidoFull, hayFalt: hayFalt, step: 2, pickUbic: _pickUbic, dirByNp: _dirByNp };   // v8.75 (idea 9849): step=2 desde el arranque (Paso 1 borrado)
     try { etlLoadGlobal(); } catch (_e) {}   // idea 5290: traer el ajuste GLOBAL de etiquetas de lío para este armado
     const t = document.getElementById("compTanda"); if (t) t.textContent = "Tanda " + tanda + (nps[0] && nps[0].rs ? " · " + nps[0].rs : "");
     const d2 = document.getElementById("compD2"), ln = document.getElementById("compLine");
@@ -8815,7 +8729,7 @@ async function showCompletarWizard(legajo, codigo) {
     if (ln) ln.style.display = "";
     _comp.liosNpIdx = 0;
     _compBuildLiosData();   // v4.90: armar la data de líos YA al abrir → liosDone correcto desde el arranque (si todo faltó, no obliga a entrar a Líos para habilitar Terminar)
-    _compRenderFalt(); _compGo(2);   // v8.73 (idea 9849): reparto de faltantes es automático (proporcional) → arrancamos DIRECTO en Separar
+    _compGo(2);   // v8.73 (idea 9849): reparto de faltantes es automático (proporcional) → arrancamos DIRECTO en Separar
     modal.classList.add("show");
   } catch (_e) { /* sin datos: no se muestra */ }
 }
@@ -9388,75 +9302,22 @@ function _compDifHtml() {
   h += '<div class="csep-difnote">Se avisa al picking por Telegram + Agentes. Seguí armando, no te frena.</div>';
   return h;
 }
-function _compRenderFalt() {
-  const el = document.getElementById("compStep1"); if (!el || !_comp) return;
-  if (!_comp.hayFalt) { el.innerHTML = '<div class="comp-okempty"><div class="comp-okemoji">👍</div><div class="comp-okttl">Sin faltantes en esta tanda</div><div class="comp-oksub">Está todo. Tocá <b>Separar →</b> para seguir.</div></div>'; return; }
-  const cargo = (_compMode === "cargo");
-  const toggle = '<button type="button" class="comp-mode-toggle" onclick="_compToggleMode()">Anotás lo que <b>' + (cargo ? "CARGÓ" : "FALTÓ") + '</b> · tocá para cambiar a lo que ' + (cargo ? "faltó" : "cargó") + '</button>';
-  el.innerHTML = '<div class="comp-step-t">' + (cargo ? '¿Cuántas cajas CARGÓ a cada pedido?' : '¿Cuántas cajas FALTARON por pedido?') + '</div>' + toggle +
-    '<div class="comp-hint">' + (cargo ? 'De lo que pidió cada NP. El <b style="color:#b42318">faltó</b> sale solo por diferencia.' : '⚠ Es lo que <b>FALTÓ</b> (no lo que salió). Cada NP no puede faltar más de lo que pidió.') + '</div>' +
-    _comp.arts.map(function (a, ai) {
-      if (!a.nps.length) return '<div class="comp-art"><div class="comp-art-h"><span class="comp-art-cod">Art ' + escapeHtml(a.art) + '</span><span class="comp-art-falta">faltaron ' + a.falta + '</span></div><div class="comp-cli">⚠ Ningún pedido pidió este artículo.</div></div>';
-      const ro = !!a.auto;   // readonly cuando es automático (1 cliente o agarró 0)
-      const rows = a.nps.map(function (n, ni) {
-        const falt = n.asig || 0;
-        const inputVal = cargo ? (n.pidio - falt) : (falt === 0 && !ro ? "" : falt);
-        const sec = cargo ? ('<span class="comp-sec-falt">faltó ' + falt + '</span>') : ('<span class="comp-sec-cargo">cargó ' + (n.pidio - falt) + '</span>');
-        return '<div class="comp-fnp"><div class="comp-info"><span class="comp-np">NP ' + escapeHtml(n.np) + '</span> <span class="comp-cli">cli ' + escapeHtml(n.cod || "—") + ' · pidió ' + n.pidio + '</span></div>' +
-          '<div class="comp-fnp-box"><div class="comp-fnp-lbl ' + (cargo ? "lbl-cargo" : "lbl-falt") + '">' + (cargo ? "CARGÓ" : "FALTÓ") + '</div>' +
-          '<input class="comp-fnp-inp ' + (cargo ? "m-cargo" : "m-falt") + '" type="number" min="0" max="' + n.pidio + '" inputmode="numeric" data-ai="' + ai + '" data-ni="' + ni + '" placeholder="0" value="' + inputVal + '"' + (ro ? " readonly" : "") + ' oninput="_compFaltInput(this)">' +
-          '<div class="comp-fnp-sec" id="comp-sec-' + ai + '-' + ni + '">' + sec + '</div></div></div>';
-      }).join("");
-      const badge = (a.nps.length === 1) ? '✓ 1 cliente' : (a.real === 0 ? '✓ agarró 0 → faltó todo' : '');
-      const head = ro ? '<span class="comp-badge-def">' + badge + '</span>' : '<span class="comp-art-falta">faltaron ' + a.falta + ' caja' + (a.falta === 1 ? "" : "s") + '</span>';
-      const sum = ro ? '<div class="comp-sum ok">' + (a.real === 0 ? 'Agarró 0 → cada NP faltó lo que pidió (automático)' : 'Faltaron las ' + a.falta + ' de esta NP (automático)') + '</div>' : '<div class="comp-sum" id="comp-sum-' + ai + '"></div>';
-      return '<div class="comp-art' + (ro ? " defined" : "") + '" id="comp-art-' + ai + '"><div class="comp-art-h"><span class="comp-art-cod">Art ' + escapeHtml(a.art) + '</span>' + head + '</div>' + rows + sum + '</div>';
-    }).join("");
-}
-function _compFaltInput(el) {
-  if (!_comp) return;
-  const ai = +el.getAttribute("data-ai"), ni = +el.getAttribute("data-ni");
-  const n = _comp.arts[ai].nps[ni];
-  let v = Math.max(0, parseInt(el.value, 10) || 0);
-  if (v > n.pidio) { v = n.pidio; el.value = v; }            // TOPE: no más de lo que pidió esa NP
-  n.asig = (_compMode === "cargo") ? (n.pidio - v) : v;      // canónico = FALTANTE (cargo: pidió − cargó)
-  _comp._liosDirty = true;   // v4.90: cambió un faltante → rearmar la data de líos al entrar al Paso 2
-  _compUpdateSec(ai, ni); _compRecalc();
-}
-function _compUpdateSec(ai, ni) {
-  if (!_comp) return;
-  const n = _comp.arts[ai].nps[ni]; const sec = document.getElementById("comp-sec-" + ai + "-" + ni); if (!sec) return;
-  sec.innerHTML = (_compMode === "cargo")
-    ? '<span class="comp-sec-falt">faltó ' + n.asig + '</span>'
-    : '<span class="comp-sec-cargo">cargó ' + (n.pidio - n.asig) + '</span>';
-}
-function _compToggleMode() {
-  if (!_comp) return;
-  _compMode = (_compMode === "falto") ? "cargo" : "falto";
-  _compRenderFalt(); _compRecalc();
-}
+// v8.75 (idea 9849): borradas — _compRenderFalt / _compFaltInput / _compUpdateSec /
+// _compToggleMode (todas del Paso 1 del wizard, que dejó de existir con v8.73).
+// _compRecalc quedó simplificada: como todos los arts son `auto:true`, el faltOk
+// siempre da true; sólo hay que chequear que los líos estén cerrados.
 function _compRecalc() {
   if (!_comp) return;
-  let faltOk = true;
-  if (_comp.hayFalt) _comp.arts.forEach(function (a, ai) {
-    if (!a.nps.length || a.auto) return;   // sin NP o automático (1 cliente / agarró 0) → completo
-    const sum = a.nps.reduce(function (s, n) { return s + (n.asig || 0); }, 0); const ok = (sum <= a.falta);   // llegó stock → puede faltar MENOS (o nada) de lo que marcó el picking
-    const se = document.getElementById("comp-sum-" + ai); if (se) { se.textContent = (sum < a.falta ? "Faltaron " + sum + " · picking marcó " + a.falta + " (se completaron " + (a.falta - sum) + ")" : "Faltaron " + sum + " / " + a.falta); se.className = "comp-sum " + (ok ? "ok" : ""); }
-    const ae = document.getElementById("comp-art-" + ai); if (ae) ae.classList.toggle("ok", ok);
-    if (!ok) faltOk = false;
-  });
   const liosOk = !_comp._liosDirty && _comp.nps.every(function (n) { return n.liosDone; });   // v4.90: si cambió un faltante, primero rearmar líos (entrar al Paso 2)
-  const fin = document.getElementById("compFin"); if (fin) fin.disabled = !(liosOk && faltOk);
+  const fin = document.getElementById("compFin"); if (fin) fin.disabled = !liosOk;
   _compPersist();   // v4.04: persistir avance (faltantes + líos) por si se cierra la app durante el armado
 }
 function _compGo(s) {
   if (!_comp) return;
   _comp.step = s;
-  // v8.74 (idea 9849): compD1/compStep1 pueden no existir (el chip "1 Falt." se sacó del stepper).
-  const _s1 = document.getElementById("compStep1"); if (_s1) _s1.classList.toggle("on", s === 1);
+  // v8.75 (idea 9849): compStep1 y compD1 ya no existen (Paso 1 borrado). Sólo Separar (2) y Líos (3).
   document.getElementById("compStepSep").classList.toggle("on", s === 2);
   document.getElementById("compStep2").classList.toggle("on", s === 3);
-  const _d1 = document.getElementById("compD1"); if (_d1) _d1.classList.toggle("on", s === 1);
   const _dsep = document.getElementById("compDSep"); if (_dsep) _dsep.classList.toggle("on", s === 2);
   document.getElementById("compD2").classList.toggle("on", s === 3);
   const bk = document.getElementById("compBack"), nx = document.getElementById("compNext");
@@ -9492,7 +9353,8 @@ const _armadoRegistrado = new Set();
 async function compTerminar() {
   if (!_comp) return;
   // Paso 1 — faltantes: no se puede faltar MÁS de lo que dio el picking
-  if (_comp.hayFalt) { for (const a of _comp.arts) { if (a.nps.length >= 2 && !a.auto) { const sum = a.nps.reduce(function (s, n) { return s + (n.asig || 0); }, 0); if (sum > a.falta) { _compGo(1); try { alert("El Art " + a.art + ": marcaste " + sum + " faltantes pero el picking solo dio " + a.falta + " cortas. No puede faltar más de eso."); } catch (_e) {} return; } } } }
+  // v8.75 (idea 9849): validación de "suma de faltantes ≤ picking" removida — el reparto lo
+  // hace _compAsigProporcional y ya garantiza la invariante (Σasig = falta), no puede fallar.
   // Clasificación (v5.12): todos los NP deben estar clasificados (lío/etiqueta/nada).
   if (!_comp.clasifDone || _comp.nps.some(function (n) { return !n.clase; })) { _comp.clasifDone = false; _compGo(2); try { alert("Clasificá cada pedido (Lío / Etiqueta / Nada) antes de terminar."); } catch (_e) {} return; }
   // Paso 2 — líos. v6.11: el cartel de confirmación (v5.84, para evitar el toque

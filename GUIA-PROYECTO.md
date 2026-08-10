@@ -4,7 +4,23 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-10 · Versión app al documentar: **v8.88**
+> Última actualización: 2026-08-10 · Versión app al documentar: **v8.89**
+>
+> Nota: **v8.89 — Limpieza del código muerto de la idea 9849 (reparto proporcional).** Ahora que
+> el reparto es automático y el Paso 1 del wizard "Completar" no existe más (v8.73/v8.74), se
+> borraron todos los restos: **(a)** aviso "Preguntá a Marianela" — `#marianelaModal` (HTML),
+> `.mar-*` (CSS), `showMarianelaAviso()` y `closeMarianela()` (JS); **(b)** Paso 1 del wizard —
+> `#compStep1` (HTML), `_compRenderFalt()`, `_compFaltInput()`, `_compUpdateSec()`,
+> `_compToggleMode()` y `let _compMode` (JS); **(c)** simplificaciones: `_compRecalc` ya no itera
+> `_comp.arts` (todos son `auto:true`, sólo chequea que los líos estén cerrados); `compTerminar`
+> sacó la validación de "Σasig ≤ falta" (el reparto Hamilton la garantiza por construcción);
+> `_compGo` sacó las refs a `compStep1`/`compD1`; `_comp.step` arranca en `2` en lugar de `1`;
+> comentarios viejos que mencionaban "Paso 1 faltantes" actualizados. **Nota histórica:** los
+> comentarios del código dicen `v8.75 (idea 9849)` porque ahí se hizo el trabajo — el número
+> saltó a `v8.89` durante los rebases sobre las versiones que aparecieron en `main` (v8.76–v8.88).
+> **Verificado:** `checkhtml` (2 scripts, 0 errores), `dead-handlers` (487 handlers, 0 muertos —
+> ningún `onclick=` colgado), y toda la suite `comp-*` (dif-nofantasma, doblearmado,
+> entregas-prueba, pausar, terminar-unificado) pasa en verde.
 >
 > Nota: **v8.88 — Desconcatenación: código limpio en tabla de stock.**
 > En la solapa **Stocks**, la columna CÓDIGO ahora muestra el código base (sin sufijo LK/CH/LOKE)
@@ -21,6 +37,40 @@
 > Bug fix: el popup de movimientos de racks (click en la columna "Racks" de la tabla de stock)
 > solo mostraba movimientos del depósito `racks`, pero la columna muestra `racks + racks_ch`
 > (v7.54). Ahora incluye ambos y etiqueta los de `racks_ch` con chip "CH".
+>
+> Nota: **v8.85 — Góndola: mostrar quién pickeó en vez de "pipeline".** En el popup de
+> movimientos por artículo (Stock → click en Góndola/Pickeados/etc.), los movimientos de
+> picking/separado escritos por el cron `reconciliar_pipeline_stock` tenían `legajo='pipeline'`
+> y mostraban "👤 pipeline · pipeline". Ahora `_stkQuienChip` detecta `legajo='pipeline'` y
+> busca el legajo real del TP (Terminó Picking) o TAP (Terminó Armado) de esa tanda en
+> `Registros_Produccion_Virgilio`. Se precargan en `stkOpenMovsArt` como `_stkPop._tpByTanda`
+> / `_stkPop._tapByTanda`. Si no se encuentra el TP/TAP, no muestra nada (mejor vacío que
+> "pipeline"). Idea 1851.
+>
+> Nota: **v8.84 — Alertas anómalas: NPs reales + detalle de pedido en PPP.** (1) Las tarjetas de
+> alertas de pedidos web anómalos ahora muestran las **NPs reales** (ej. "NP 98360, 98361") en vez del
+> `order_id` interno del Mayorista, cruzando `cod_cliente` con `PPP_Programacion_Diaria` (enriquecimiento
+> en `pppRefreshAlertasWeb`, campo transitorio `a._nps`). (2) Click en el **N° Pedido** en la tabla PPP
+> ahora **expande la fila** mostrando los productos del pedido (artículo + cajas) desde
+> `PPP_Base_Pedidos`. Toggle click (abrir/cerrar). Cache local `_pppDetalleCache`. Funciones:
+> `pppToggleDetalle(np)`, `pppFetchDetalle(np)`, `_pppDetalleHtml(items, np)`. CSS: `.ppp-np-link`,
+> `.ppp-detalle-row`, `.ppp-detalle-tbl`, `.ppp-detalle-wrap`, `.ppp-detalle-load`.
+>
+> Nota: **v8.83 — Alertas pedidos web anómalos + código de 4 dígitos en Recepción.** (1) **Alertas
+> pedidos web anómalos**: badge rojo con contador en el botón PPP (pulsa), banner con tarjetas dentro
+> del overlay PPP con acciones "Revisado" / "Descartar", poll cada 2 min (`pppAlertPollStart`). Tabla
+> Supabase **`Alertas_Pedidos_Web`** en Virgilio (`id`, `order_id`, `cod_cliente`, `cliente`,
+> `total_pedido`, `total_historico`, `ratio`, `cajas`, `lineas`, `score`, `motivo`, `origen`, `estado`,
+> `revisado_en`, `revisado_por`, `creado_en`). RLS: anon INSERT/SELECT/UPDATE. Trigger
+> `trg_alerta_pedido_telegram` → `notificar_alerta_pedido_web()` → `tg_enqueue` al insertar alerta.
+> Detección en Mayorista (`kwkclwhmoygunqmlegrg`): función `detectar_pedidos_anomalos()` cada 5 min
+> (pg_cron), tabla `alertas_pedidos_log`. 4 señales: ratio vs histórico (>3x/5x/10x), units-as-boxes
+> (>70%), cliente nuevo + pedido grande, cajas/línea > 30. Score >= 5 → POST a Virgilio. SQL referencia:
+> `sql/alertas_pedidos_web.sql`. Funciones front: `pppFetchAlertasWeb`, `pppAlertBadgeUpdate`,
+> `pppAlertBannerRender`, `pppAlertRevisar`, `pppRefreshAlertasWeb`. (2) **Código de 4 dígitos en
+> Recepción de Mercadería**: se genera con `pendGenCodigo()` al momento del envío del operario
+> (`opEnviar` en `recepcion.js`), se guarda en `Control_Modo_OP.codigo`, se muestra en pantalla de
+> éxito. Evita colisiones consultando códigos del día.
 >
 > Nota: **v8.83 — Completar datos producto: módulos por categoría.** La pantalla 🚦 ahora agrupa
 > los productos faltantes en 3 secciones: **📦 Artículos de venta (stock)** (códigos que existen en
@@ -5669,6 +5719,36 @@ loguean en:
   `ARCA_CERT`/`ARCA_KEY` (cert `virgilioapp`), `ARCA_ENV=prod`, `ARCA_PTO_VTA=11`,
   `ARCA_CUIT`, `WEB_SERVICE_KEY`. Detalle en `docs/facturacion-arca.md`.
 
+**`Alertas_Pedidos_Web`** (v8.83) — alertas de **pedidos web anómalos** detectados por el
+Mayorista. Una fila por alerta:
+
+| Columna | Tipo | Notas |
+|---|---|---|
+| `id` | bigint | autonumérico |
+| `order_id` | bigint | UNIQUE — id del pedido en el Mayorista |
+| `cod_cliente` | text | código de cliente |
+| `cliente` | text | razón social |
+| `total_pedido` | numeric | monto del pedido |
+| `total_historico` | numeric | promedio histórico del cliente |
+| `ratio` | numeric | total/histórico |
+| `cajas` | integer | total de cajas del pedido |
+| `lineas` | integer | cantidad de líneas |
+| `score` | integer | puntaje de anomalía (>= 5 para alertar) |
+| `motivo` | text | descripción de las señales detectadas |
+| `origen` | text | siempre `mayorista_detector` |
+| `estado` | text | `pendiente` / `revisada` / `descartada` |
+| `revisado_en` | timestamptz | cuándo se revisó/descartó |
+| `revisado_por` | text | legajo del supervisor que revisó |
+| `creado_en` | timestamptz | default `now()` |
+
+RLS: `anon` INSERT (el Mayorista POSTea con la publishable key) + SELECT (el front lee) +
+UPDATE (el supervisor marca revisada/descartada). Trigger `trg_alerta_pedido_telegram` →
+`notificar_alerta_pedido_web()` → `tg_enqueue` al insertar. La **detección** corre en el
+proyecto Mayorista (`kwkclwhmoygunqmlegrg`): función `detectar_pedidos_anomalos()` cada 5 min
+(pg_cron), con tabla de log `alertas_pedidos_log` (evita re-alertar). 4 señales: ratio vs
+histórico (>3x +2 / >5x +4 / >10x +6), units-as-boxes >70% (+4), cliente nuevo + pedido >$3M
+(+3), cajas/línea >30 (+2). Score >= 5 → POST a Virgilio vía REST. DDL: `sql/alertas_pedidos_web.sql`.
+
 **Subsistema NC (devoluciones — comprobantes de proveedores, v6.64):** ingestión local
 por `agente-local/nc_ingest.py` (parsea PDFs de Notas de Crédito/Débito) a dos tablas:
 - **`Comprobantes_NC`** — cabecera. Cols: `id`, `division`, `tipo`, `numero`, `fecha`,
@@ -6026,7 +6106,7 @@ INCONSISTENCIAS"):
   errores de operario en 7 días: error_envio/picking_sin_stock/carga_sin_control/mg_fuera_lista/error_app).
   Solo se muestran las categorías **con datos** (las vacías no aparecen).
 
-**Las 19 categorías de `reporte_agentes`** (cada una = `categoria`; las con ⚡ también van a Telegram):
+**Las 20 categorías de `reporte_agentes`** (cada una = `categoria`; las con ⚡ también van a Telegram):
 
 | categoría | qué | fuente | Telegram |
 |---|---|---|---|
@@ -6050,6 +6130,7 @@ INCONSISTENCIAS"):
 | `error_app` | crashes JS de operarios (7 d) | `errores_cliente` | — |
 | `error_envio` | envíos de operarios que fallaron (7 d) | `Auditoria_*` | — |
 | `outbox` | Telegram trabado >15 min | `telegram_outbox` | ⚡ `notificar_outbox_salud` (cron) |
+| — (sólo Telegram + PPP) | **pedido web anómalo** (score >= 5) | `Alertas_Pedidos_Web` (v8.83) | ⚡ `trg_alerta_pedido_telegram` (trigger INSERT) |
 
 **Para agregar una alerta nueva**: (1) si la detecta el cliente → emitir un evento `Registros` con un
 `opcion` nuevo + trigger `notificar_*` que llame `tg_enqueue`; (2) sumar la categoría a
