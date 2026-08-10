@@ -4,7 +4,23 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-10 · Versión app al documentar: **v8.88**
+> Última actualización: 2026-08-10 · Versión app al documentar: **v8.89**
+>
+> Nota: **v8.89 — Limpieza del código muerto de la idea 9849 (reparto proporcional).** Ahora que
+> el reparto es automático y el Paso 1 del wizard "Completar" no existe más (v8.73/v8.74), se
+> borraron todos los restos: **(a)** aviso "Preguntá a Marianela" — `#marianelaModal` (HTML),
+> `.mar-*` (CSS), `showMarianelaAviso()` y `closeMarianela()` (JS); **(b)** Paso 1 del wizard —
+> `#compStep1` (HTML), `_compRenderFalt()`, `_compFaltInput()`, `_compUpdateSec()`,
+> `_compToggleMode()` y `let _compMode` (JS); **(c)** simplificaciones: `_compRecalc` ya no itera
+> `_comp.arts` (todos son `auto:true`, sólo chequea que los líos estén cerrados); `compTerminar`
+> sacó la validación de "Σasig ≤ falta" (el reparto Hamilton la garantiza por construcción);
+> `_compGo` sacó las refs a `compStep1`/`compD1`; `_comp.step` arranca en `2` en lugar de `1`;
+> comentarios viejos que mencionaban "Paso 1 faltantes" actualizados. **Nota histórica:** los
+> comentarios del código dicen `v8.75 (idea 9849)` porque ahí se hizo el trabajo — el número
+> saltó a `v8.89` durante los rebases sobre las versiones que aparecieron en `main` (v8.76–v8.88).
+> **Verificado:** `checkhtml` (2 scripts, 0 errores), `dead-handlers` (487 handlers, 0 muertos —
+> ningún `onclick=` colgado), y toda la suite `comp-*` (dif-nofantasma, doblearmado,
+> entregas-prueba, pausar, terminar-unificado) pasa en verde.
 >
 > Nota: **v8.88 — Desconcatenación: código limpio en tabla de stock.**
 > En la solapa **Stocks**, la columna CÓDIGO ahora muestra el código base (sin sufijo LK/CH/LOKE)
