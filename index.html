@@ -1840,6 +1840,11 @@ button.pk-anular small{ display:block; font-size:12px; font-weight:700; opacity:
 .ppp-drophint{ font-size:12px; color:#64748b; margin:8px 2px 0; text-align:center; }
 .ppp-baseinfo{ font-size:13px; color:#334155; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:8px 12px; margin-top:12px; }
 .ppp-imp-mini{ position:relative; display:inline-block; margin-bottom:4px; }
+/* v8.100 — los 4 botones del PPP en una sola fila (antes apilados full-width) */
+.ppp-btnrow{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom:6px; align-items:stretch; }
+.ppp-btnrow>.ppp-imp-mini{ flex:1 1 auto; margin-bottom:0; }
+.ppp-btnrow>.ppp-imp-mini>.ppp-imp-toggle{ width:100%; }
+.ppp-btnrow>.ppp-imp-toggle{ flex:1 1 auto; width:auto; }
 .ppp-imp-toggle{ padding:6px 12px; font-size:13px; font-weight:700; border:1px solid #1e6bd6; border-radius:8px; background:#fff; color:#1e6bd6; cursor:pointer; }
 .ppp-sup-toggle{ margin-left:8px; border-color:#d97706; color:#b45309; }
 .ppp-sup-toggle:hover{ background:#fffbeb; }
@@ -3721,19 +3726,21 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
     <div class="planim-body">
       <div id="pppAlertBanner" class="ppp-alert-banner"><div id="pppAlertCards"></div></div>
       <div class="ppp-warn">⚠ <b>EN PRUEBAS — SOLO LOCAL.</b> Importás el Excel y lo ves acá; <b>todavía NO se escribe nada en Supabase</b>. Ajustamos el formato y, cuando te guste, lo conectamos.</div>
-      <div class="ppp-imp-mini">
-        <button class="ppp-imp-toggle" onclick="pppToggleImport()">⬆ Importar Excel ▾</button>
-        <div id="pppImportMenu" class="ppp-imp-menu hidden">
-          <button class="ppp-imp-btn" onclick="pppImportar('prog');pppCloseImport()" ondragover="pppDragOver(event,this)" ondragleave="pppDragLeave(event,this)" ondrop="pppDrop(event,'prog',this);pppCloseImport()"><span>⬆</span> Importar Formato PPP</button>
-          <button class="ppp-imp-btn" onclick="pppImportar('base');pppCloseImport()" ondragover="pppDragOver(event,this)" ondragleave="pppDragLeave(event,this)" ondrop="pppDrop(event,'base',this);pppCloseImport()"><span>⬆</span> Importar Base Pedidos (Picking)</button>
-          <div class="ppp-drophint">💡 Tocá un botón o arrastrá el .xls encima.</div>
-          <div id="pppBaseInfo" class="ppp-baseinfo"></div>
-          <div id="pppAutoBox" class="ppp-auto"></div>
+      <div class="ppp-btnrow">
+        <div class="ppp-imp-mini">
+          <button class="ppp-imp-toggle" onclick="pppToggleImport()">⬆ Importar Excel ▾</button>
+          <div id="pppImportMenu" class="ppp-imp-menu hidden">
+            <button class="ppp-imp-btn" onclick="pppImportar('prog');pppCloseImport()" ondragover="pppDragOver(event,this)" ondragleave="pppDragLeave(event,this)" ondrop="pppDrop(event,'prog',this);pppCloseImport()"><span>⬆</span> Importar Formato PPP</button>
+            <button class="ppp-imp-btn" onclick="pppImportar('base');pppCloseImport()" ondragover="pppDragOver(event,this)" ondragleave="pppDragLeave(event,this)" ondrop="pppDrop(event,'base',this);pppCloseImport()"><span>⬆</span> Importar Base Pedidos (Picking)</button>
+            <div class="ppp-drophint">💡 Tocá un botón o arrastrá el .xls encima.</div>
+            <div id="pppBaseInfo" class="ppp-baseinfo"></div>
+            <div id="pppAutoBox" class="ppp-auto"></div>
+          </div>
         </div>
+        <button class="ppp-imp-toggle" onclick="pppExportExcel()" title="Baja un Excel de 2 hojas (Programación Diaria pendiente + Pedidos Entregados), en vivo desde Supabase.">⬇ Exportar Excel</button>
+        <button class="ppp-imp-toggle ppp-sup-toggle" onclick="openPppSupers()" title="Agregar/quitar clientes súper">🛒 Clientes súper</button>
+        <button class="ppp-imp-toggle ppp-pdf-toggle" onclick="pppConnectPdfDir()" title="Conectar las carpetas con los PDF de ISIS (ej. X:\PDF_ISIS y X:\PDF_ISISCHEF). Podés agregar VARIAS: tocá una vez por carpeta. Elegí la subcarpeta, NO el disco entero (Chrome bloquea raíces de disco y carpetas del sistema). Necesita Chrome/Edge en PC.">🖨️ Carpeta(s) PDF</button>
       </div>
-      <button class="ppp-imp-toggle" onclick="pppExportExcel()" title="Baja un Excel de 2 hojas (Programación Diaria pendiente + Pedidos Entregados), en vivo desde Supabase.">⬇ Exportar Excel</button>
-      <button class="ppp-imp-toggle ppp-sup-toggle" onclick="openPppSupers()" title="Agregar/quitar clientes súper">🛒 Clientes súper</button>
-      <button class="ppp-imp-toggle ppp-pdf-toggle" onclick="pppConnectPdfDir()" title="Conectar las carpetas con los PDF de ISIS (ej. X:\PDF_ISIS y X:\PDF_ISISCHEF). Podés agregar VARIAS: tocá una vez por carpeta. Elegí la subcarpeta, NO el disco entero (Chrome bloquea raíces de disco y carpetas del sistema). Necesita Chrome/Edge en PC.">🖨️ Carpeta(s) PDF</button>
       <span id="pppPdfDirStatus" class="ppp-pdfdir-status"></span>
       <div id="pppPreview" class="ppp-preview"></div>
       <div id="pppStatus" class="planim-status"></div>
@@ -6289,7 +6296,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.99";
+const APP_VERSION = "v8.100";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
