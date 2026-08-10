@@ -4,7 +4,15 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-10 · Versión app al documentar: **v8.87**
+> Última actualización: 2026-08-10 · Versión app al documentar: **v8.88**
+>
+> Nota: **v8.88 — Desconcatenación: código limpio en tabla de stock.**
+> En la solapa **Stocks**, la columna CÓDIGO ahora muestra el código base (sin sufijo LK/CH/LOKE)
+> para artículos que tienen marca concatenada en el código (`codBase()`). La columna **LK/CH** detecta
+> la marca directamente del sufijo del código además de la OC (fallback `ocLinea()`). El filtro por
+> línea (LK/CH) también funciona con códigos sufijados. Internamente los handlers (popups, detalle de
+> movimientos, etc.) siguen usando el código completo con sufijo para que las búsquedas y los
+> movimientos se resuelvan correctamente. Bump `APP_VERSION`/`SW_VERSION` `v8.88`.
 >
 > Nota: **v8.87 — Desconcatenación 43XE: limpieza pelado 437E + fix popup racks.**
 > Se limpió el último residuo de stock legacy pelado de la familia 43XE: un ajuste
