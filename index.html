@@ -6213,7 +6213,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.74";
+const APP_VERSION = "v8.75";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -15704,24 +15704,16 @@ function racksBajadaAlerta(b, saldos) {
 async function racksAprobar(bajadaId) {
   const b = (_stk.bajadas || []).find(function (x) { return x.id === bajadaId; });
   if (!b) return;
-  const al = racksBajadaAlerta(b);
-  if (al) {
-    let msg = "";
-    if (al.neg) msg += "⚠ En racks hay " + al.saldoRacks + " caja(s) de " + b.cod_art + " y estás por bajar " + al.pedir + ". Quedaría en " + (Math.round((al.saldoRacks - al.pedir) * 100) / 100) + " (NEGATIVO — imposible).\n\n";
-    if (al.otras.length) msg += "⚠ Ya hay otra bajada de " + b.cod_art + " hoy: " + al.otras.map(function (x) { return x.cajas + " cj (" + (x.estado || "") + ")"; }).join(", ") + ".\n¿No es la misma mercadería contada dos veces" + (al.M ? " (1 MC = " + al.M + " cajas)" : "") + "?\n\n";
-    if (!confirm(msg + "¿Aprobar igual la bajada de " + b.cajas + " caja(s)?")) return;
-  }
+  // v8.73 — la aprobación es solo para la carga en el sistema contable (ERP).
+  // El stock ya se movió al momento de registrar la bajada (brConfirmar).
+  if (!confirm("¿Aprobar la bajada de " + b.cajas + " caja(s) de " + b.cod_art + " para cargar en el sistema?")) return;
   try {
-    await stockMove([
-      { cod_art: b.cod_art, descripcion: b.descripcion || null, deposito: "racks", delta: -Number(b.cajas), tipo: "baja_racks", ref: "orden " + (b.orden_id || ""), legajo: "0" },
-      { cod_art: b.cod_art, descripcion: b.descripcion || null, deposito: "terminado", delta: Number(b.cajas), tipo: "baja_racks", ref: "orden " + (b.orden_id || ""), legajo: "0" }
-    ]);
     await fetch(SUPABASE_RACKS_BAJ_ENDPOINT + "?id=eq." + bajadaId, { method: "PATCH", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" }, body: JSON.stringify({ estado: "aprobada", aprobada_at: new Date().toISOString() }) });
     const restantes = (_stk.bajadas || []).filter(function (x) { return x.orden_id === b.orden_id && x.estado === "propuesta" && x.id !== bajadaId; });
     if (b.orden_id && !restantes.length) {
       await fetch(SUPABASE_RACKS_ORD_ENDPOINT + "?id=eq." + b.orden_id, { method: "PATCH", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" }, body: JSON.stringify({ estado: "bajado", cerrada_at: new Date().toISOString() }) });
     }
-    alert("✓ Aprobado: " + b.cajas + " caja(s) de " + b.cod_art + " pasaron de racks a góndola."); openStockAdmin();
+    alert("✓ Aprobado para cargar en sistema: " + b.cajas + " caja(s) de " + b.cod_art + ". (Stock ya descontado.)"); openStockAdmin();
   } catch (e) { alert("Error: " + (e.message || e)); }
 }
 /* v5.94 — Rechazar una bajada propuesta (ej. duplicado / error de carga). NO
@@ -15781,7 +15773,7 @@ async function showBajarRacks(ordenId) {
 function brRender() {
   if (!_br) return; const body = document.getElementById("brBody"); if (!body) return;
   if (!_br.items.length) { body.innerHTML = '<div class="br-empty">No hay stock en racks para bajar.</div>'; return; }
-  let h = '<div class="br-hint">Marcá cuántas <b>cajas</b> bajás de cada artículo. Lo confirma Marianela y recién ahí pasa a góndola.</div>';
+  let h = '<div class="br-hint">Marcá cuántas <b>cajas</b> bajás de cada artículo. El stock se descuenta <b>al registrar</b>.</div>';
   h += _br.items.map(function (it, i) {
     const u = stkUnits(it.bajar, it.cod, _br.factors), ud = stkUnits(it.disponible, it.cod, _br.factors);
     return '<div class="br-row"><div class="br-r1"><div class="br-info"><span class="br-cod">' + escapeHtml(it.cod) + '</span> <span class="br-desc">' + escapeHtml(it.desc || "") + '</span><div class="br-disp">en racks: ' + it.disponible + " cajas" + (ud ? " · " + ud : "") + '</div></div><div class="br-stp"><button class="br-sb" onclick="brChg(' + i + ',-1)">–</button><input class="br-inp" type="number" min="0" max="' + it.disponible + '" inputmode="numeric" value="' + it.bajar + '" oninput="brSet(' + i + ',this.value)"><button class="br-sb" onclick="brChg(' + i + ',1)">+</button></div></div>' + (it.bajar > 0 && u ? '<div class="br-conv">bajás: ' + it.bajar + " cajas · " + u + "</div>" : "") + "</div>";
@@ -15799,10 +15791,19 @@ function brConfirmar() {
   const rows = sel.map(function (it) { return { orden_id: _br.ordenId || null, cod_art: it.cod, descripcion: it.desc || null, cajas: it.bajar, estado: "propuesta", creada_por: _br.legajo || null }; });
   const n = sel.reduce(function (s, it) { return s + it.bajar; }, 0);
   closeBajarRacks();
+  // v8.73 — mover stock INMEDIATAMENTE (racks → góndola) al registrar la bajada,
+  // sin esperar la aprobación de la operadora. La aprobación es solo para la carga
+  // en el sistema contable (ERP), no debe bloquear el stock.
+  var stkRows = [];
+  sel.forEach(function (it) {
+    stkRows.push({ cod_art: it.cod, descripcion: it.desc || null, deposito: "racks", delta: -it.bajar, tipo: "baja_racks", ref: "orden " + (_br.ordenId || ""), legajo: _br.legajo || "0" });
+    stkRows.push({ cod_art: it.cod, descripcion: it.desc || null, deposito: "terminado", delta: it.bajar, tipo: "baja_racks", ref: "orden " + (_br.ordenId || ""), legajo: _br.legajo || "0" });
+  });
+  stockMove(stkRows);
   fetch(SUPABASE_RACKS_BAJ_ENDPOINT, { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" }, body: JSON.stringify(rows) })
     .then(function (r) { if (r.ok || (r.status >= 400 && r.status < 500)) return; throw new Error("HTTP " + r.status); })
     .catch(function () { try { const p = JSON.parse(localStorage.getItem("vir_racks_pend") || "[]"); p.push.apply(p, rows); localStorage.setItem("vir_racks_pend", JSON.stringify(p.slice(-2000))); } catch (_e) {} });
-  try { alert("✓ Registraste " + n + " caja(s) para bajar. Marianela lo aprueba y pasa a góndola."); } catch (_e) {}
+  try { alert("✓ Registraste " + n + " caja(s) bajadas de racks. El stock ya se actualizó."); } catch (_e) {}
 }
 function closeBajarRacks() { const ov = document.getElementById("brModal"); if (ov) ov.classList.remove("show"); _br = null; }
 
@@ -27223,7 +27224,10 @@ async function facCambioCodConfirm(npE){
   if (!list.length) return;
   if (!confirm("Confirmás que ya cambiaste en el ERP:\n\n" + list.map(function(x){ return "NP " + np + ": " + x.sec + " → " + x.ppal + " (" + x.cajas + " cajas)"; }).join("\n") + "\n\nEl picking va a levantar el principal.")) return;
   try {
-    for (var i = 0; i < list.length; i++) { await _correccPost(np, list[i].sec, list[i].ppal, list[i].cajas); }
+    for (var i = 0; i < list.length; i++) {
+      await _correccPost(np, list[i].sec, list[i].ppal, list[i].cajas);
+      _correccCreateEntrega(np, list[i].ppal, list[i].cajas);   // v8.73 → aparece en CP
+    }
     _correccCache = null;
     _facSecByNp.delete(np);
     if (typeof facRender === "function") facRender(_facLastTandas || []);
@@ -27246,8 +27250,8 @@ async function facCorreccData(){
     if (corr[np + "|" + sec]) return;   // ya confirmada
     pend0.push({ np: np, sec: String(r.cod_secundario).trim(), ppal: String(r.cod_principal).trim(), desc: r.descripcion || "", cajas: Number(r.cajas) || 0 });
   });
-  // v7.97 — las NP ya ENTREGADAS se excluyen en la propia vista (vista_pedidos_secundarios
-  // filtra por PPP_Entregados_Meta), así que acá ya llegan solo las que todavía corren.
+  // v7.97/v8.73 — las NP ya ENTREGADAS se excluyen en la propia vista (vista_pedidos_secundarios
+  // filtra por PPP_Entregados_Meta Y por Facturacion_NP), así que acá ya llegan solo las que todavía corren.
   const pend = pend0;
   pend.sort(function(a,b){ return (a.sec < b.sec ? -1 : a.sec > b.sec ? 1 : 0) || (a.np < b.np ? -1 : 1); });
   return pend;
@@ -27434,7 +27438,10 @@ async function facCorrGrpConfirm(npE){
   const btn = ov ? ov.querySelector('button[onclick^="facCorrGrpConfirm"]') : null;
   if (btn){ btn.disabled = true; btn.textContent = "Guardando…"; }
   try {
-    for (var k = 0; k < sel.length; k++){ await _correccPost(sel[k].np, sel[k].sec, sel[k].ppal, sel[k].cajas); }
+    for (var k = 0; k < sel.length; k++){
+      await _correccPost(sel[k].np, sel[k].sec, sel[k].ppal, sel[k].cajas);
+      _correccCreateEntrega(sel[k].np, sel[k].ppal, sel[k].cajas);   // v8.73 → aparece en CP
+    }
     _correccCache = null;
     facCorrGrpClose();
     facCorreccReload();
@@ -27454,10 +27461,30 @@ async function _correccPost(np, sec, ppal, cajas){
   });
   if (!res.ok && res.status !== 409) throw new Error("HTTP " + res.status);
 }
+/* v8.73 — al confirmar una corrección, crear un faltante en Entregas_Virgilio
+   con el código PRINCIPAL para que los operarios lo vean en "Completar pedidos"
+   y sepan que tienen que pickear el artículo correcto. Idempotente: si ya existe
+   una fila para esa NP+cod_principal con cajas_falto > 0, no duplica. */
+async function _correccCreateEntrega(np, ppal, cajas) {
+  try {
+    const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+    // Chequear si ya existe un faltante para esta NP + cod principal
+    const chk = await fetch(SUPABASE_ENTREGAS_ENDPOINT + "?np=eq." + encodeURIComponent(np) + "&cod_art=eq." + encodeURIComponent(ppal) + "&cajas_falto=gt.0&select=id&limit=1", { headers: H, cache: "no-store" });
+    if (chk.ok) { const ex = await chk.json(); if (ex && ex.length) return; }
+    // Crear el faltante: cajas_falto = cajas para que aparezca en CP
+    await fetch(SUPABASE_ENTREGAS_ENDPOINT, {
+      method: "POST",
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" },
+      body: JSON.stringify({ np: np, cod_art: ppal, cajas_pedidas: cajas, cajas_entregadas: 0, cajas_falto: cajas })
+    });
+  } catch (_e) { /* best-effort: si falla no bloquea la corrección */ }
+}
 async function facCorreccConfirm(btn, npE, secE, ppalE, cajas){
   if (btn){ btn.disabled = true; btn.textContent = "Guardando…"; }
   try {
-    await _correccPost(decodeURIComponent(npE), decodeURIComponent(secE), decodeURIComponent(ppalE), cajas);
+    const npD = decodeURIComponent(npE), ppalD = decodeURIComponent(ppalE);
+    await _correccPost(npD, decodeURIComponent(secE), ppalD, cajas);
+    _correccCreateEntrega(npD, ppalD, cajas);   // v8.73 → aparece en CP
     _correccCache = null;   // invalidar cache → picking y panel toman la corrección nueva
     facCorreccReload();
   } catch(e){
