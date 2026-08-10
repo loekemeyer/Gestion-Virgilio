@@ -6289,7 +6289,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.90";
+const APP_VERSION = "v8.91";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -12085,41 +12085,8 @@ function stkBodyStocks() {
     '<span style="font-size:10px;text-transform:uppercase;color:#166534;font-weight:700;letter-spacing:.02em;">Capacidad</span>' +
     '<span style="font-size:17px;font-weight:800;color:#166534;font-variant-numeric:tabular-nums;">' + fmtCajas(totCap) + '</span></span>';
   h += '</div>';
-  // v6.30 — Tarjeta "horas de guardado pendientes" (backlog ÷ ratio).
-  var _gRate = stkGRate(), _gRacks = stkGRacksOn();
-  // v8.52 — el backlog SOLO cuenta lo que realmente ENTRA en góndola (misma lógica que "¿Qué bajar
-  // primero?"): por artículo, hueco = min(capacidad, capacidad − góndola). a guardar entra suelto
-  // (min con el hueco); racks entra por MASTER CAJA entera (cxm) con el hueco que quede. Sin ese
-  // tope, el backlog contaba cajas que no tienen dónde ir (góndola llena) → horas infladas.
-  var _gCxm = (_stk && _stk.cxm) || {};
-  var _gBacklog = 0;
-  arts.forEach(function (a) {
-    var cap = _capOf(a.cod); if (cap <= 0) return;
-    var gond = Number(a.terminado) || 0;
-    var room = cap - gond; if (room < 0) room = 0; if (room > cap) room = cap;
-    if (room <= 0) return;
-    var g = Math.min(Number(a.a_guardar) || 0, room); _gBacklog += g;
-    if (_gRacks) {
-      var r2 = room - g; if (r2 > 0) {
-        var rk = (Number(a.racks) || 0) + (Number(a.racks_ch) || 0);
-        var cxm = Number(_gCxm[_cpNorm(a.cod)]) || 0;
-        _gBacklog += (cxm > 0) ? (Math.min(Math.floor(rk / cxm), Math.floor(r2 / cxm)) * cxm) : Math.min(rk, r2);
-      }
-    }
-  });
-  _gBacklog = Math.max(0, _gBacklog);
-  var _gHoras = _gRate > 0 ? Math.round((_gBacklog / _gRate) * 10) / 10 : 0;
-  var _gCol = _gHoras > 6 ? "#b91c1c" : (_gHoras >= 4 ? "#b45309" : "#166534");
-  var _gBg = _gHoras > 6 ? "#fef2f2" : (_gHoras >= 4 ? "#fffbeb" : "#f0fdf4");
-  var _gBd = _gHoras > 6 ? "#fca5a5" : (_gHoras >= 4 ? "#fcd34d" : "#86efac");
-  h += '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;width:fit-content;max-width:100%;background:' + _gBg + ';border:1.5px solid ' + _gBd + ';border-radius:12px;padding:10px 14px;margin-bottom:12px;">' +
-    '<div style="flex:0 1 auto;min-width:0;"><span style="font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:#64748b;font-weight:800;">⏱ Horas de guardado pendientes</span><br>' +
-    '<span style="font-size:26px;font-weight:800;color:' + _gCol + ';font-variant-numeric:tabular-nums;">' + _gHoras + ' h</span> ' +
-    '<span style="font-size:12.5px;color:#64748b;">' + Math.round(_gBacklog) + ' cajas ÷ ' + Math.round(_gRate) + ' cajas/h</span>' +
-    (_gHoras > 6 ? '<br><span style="font-size:12px;font-weight:800;color:#b91c1c;">🆘 Más de 6 h — pedir personal a Cervantes</span>' : '') +
-    '</div>' +
-    '<button onclick="stkGuardadoToggleRacks()" title="Sumar al cálculo lo que hay que bajar de racks (por ahora apagado)" style="width:auto;margin:0;background:' + (_gRacks ? "#1e6bd6" : "#fff") + ';color:' + (_gRacks ? "#fff" : "#334155") + ';border:1px solid ' + (_gRacks ? "#1e6bd6" : "#cbd5e1") + ';border-radius:9px;padding:9px 13px;font-size:12.5px;font-weight:800;cursor:pointer;white-space:nowrap;">' + (_gRacks ? "☑" : "☐") + ' Incluir racks</button>' +
-    '</div>';
+  // v8.91 — la tarjeta "horas de guardado pendientes" se movió al pop-up "¿Qué bajar primero?"
+  // (renderGuardarOrden) para que se calcule con los saldos frescos de vista_saldos_stock.
   // v5.53 — dos pop-ups: NPs por estadio (pickeado→facturar) y movimientos de góndola.
   h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">' +
     '<button onclick="stkCrearCodigoNuevo()" style="width:auto;margin:0;padding:9px 13px;border:1px solid #f87171;border-radius:10px;background:#fee2e2;color:#dc2626;font-size:13px;font-weight:800;cursor:pointer;">➕ Crear código</button>' +
@@ -17059,8 +17026,11 @@ async function showGuardarOrden(legajo) {
     + '<div style="display:flex;align-items:center;justify-content:space-between;padding:13px 15px;background:linear-gradient(90deg,#1e6bd6,#1e3a8a);color:#fff;"><b style="font-size:17px;">📋 ¿Qué bajar primero?</b><button onclick="closeGuardarOrden()" style="width:auto;background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;">Cerrar</button></div>'
     + '<div id="gordenBody" style="padding:13px 14px;"><div style="text-align:center;color:#64748b;padding:24px;">Calculando prioridades…</div></div></div>';
   try {
-    const res = await Promise.all([stockFetchSaldos(), ocgFetchCapacidad(), loadArtNombres(), rkbFetchCxM(), stockFetchArtFactors()]);
+    const res = await Promise.all([stockFetchSaldos(), ocgFetchCapacidad(), loadArtNombres(), rkbFetchCxM(), stockFetchArtFactors(),
+      fetch(SUPABASE_URL + "/rest/v1/Stock_Config?clave=eq.guardado_cajas_por_hora&select=valor", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; })]);
     const saldos = res[0] || {}, capMap = res[1] || {}, cxmMap = (res[3] && res[3].cxm) || {}, _facG = res[4] || {};
+    // v8.91 — ratio de guardado (cajas/h) directo de Stock_Config; si no hay, 380. Para la tarjeta de horas.
+    var _rateRow = (res[5] && res[5][0]) || null; var _gRateVal = _rateRow ? parseFloat(_rateRow.valor) : 380; if (!(_gRateVal > 0)) _gRateVal = 380;
     const items = Object.keys(saldos).map(function (k) {
       const a = saldos[k];
       const aGuardar = Math.round(Number(a.a_guardar) || 0), exc = Math.round(Number(a.excedente) || 0), racks = Math.round(Number(a.racks) || 0);
@@ -17071,7 +17041,7 @@ async function showGuardarOrden(legajo) {
       if (!_cxmVal) { var _fG = _facG[String(a.cod).toUpperCase()]; if (_fG && _fG.cajasXMaster > 0) _cxmVal = _fG.cajasXMaster; }
       return { cod: a.cod, desc: artNombre(a.cod, a.desc), gond: gond, cap: cap, aGuardar: aGuardar, exc: exc, racks: racks, cxm: _cxmVal };
     }).filter(Boolean);
-    _gorden = { filtro: "todos", items: items };
+    _gorden = { filtro: "todos", items: items, rate: _gRateVal };
     renderGuardarOrden();
   } catch (e) { const b = document.getElementById("gordenBody"); if (b) b.innerHTML = '<div style="text-align:center;color:#b91c1c;padding:20px;">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
 }
@@ -17129,6 +17099,19 @@ function renderGuardarOrden() {
   const totCajas = rows.reduce(function (s, x) { return s + x.cajas; }, 0);
   const totDisp = rows.reduce(function (s, x) { return s + x.disp; }, 0);
   const totMc = rows.reduce(function (s, x) { return s + (x.mc || 0); }, 0);
+  // v8.91 — tarjeta "horas de guardado pendientes" (backlog ÷ ratio). El backlog = lo que ENTRA
+  // ahora a góndola (totCajas del filtro activo), misma base que muestra la tabla → siempre fresco.
+  const _gRate = (_gorden && _gorden.rate > 0) ? _gorden.rate : stkGRate();
+  const _gHoras = _gRate > 0 ? Math.round((totCajas / _gRate) * 10) / 10 : 0;
+  const _gCol = _gHoras > 6 ? "#b91c1c" : (_gHoras >= 4 ? "#b45309" : "#166534");
+  const _gBg = _gHoras > 6 ? "#fef2f2" : (_gHoras >= 4 ? "#fffbeb" : "#f0fdf4");
+  const _gBd = _gHoras > 6 ? "#fca5a5" : (_gHoras >= 4 ? "#fcd34d" : "#86efac");
+  h += '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:' + _gBg + ';border:1.5px solid ' + _gBd + ';border-radius:12px;padding:10px 14px;margin-bottom:10px;">' +
+    '<div style="flex:0 1 auto;min-width:0;"><span style="font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:#64748b;font-weight:800;">⏱ Horas de guardado pendientes</span><br>' +
+    '<span style="font-size:26px;font-weight:800;color:' + _gCol + ';font-variant-numeric:tabular-nums;">' + _gHoras + ' h</span> ' +
+    '<span style="font-size:12.5px;color:#64748b;">' + totCajas + ' cajas ÷ ' + Math.round(_gRate) + ' cajas/h</span>' +
+    (_gHoras > 6 ? '<br><span style="font-size:12px;font-weight:800;color:#b91c1c;">🆘 Más de 6 h — pedir personal a Cervantes</span>' : '') +
+    '</div></div>';
   h += '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;">' +
     '<span style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:9px;padding:6px 11px;font-size:12.5px;font-weight:800;color:#15803d;">📥 Hay para guardar: ' + totDisp + ' cajas</span>' +
     '<span style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:9px;padding:6px 11px;font-size:12.5px;font-weight:800;color:#1e40af;">📦 Entran ahora: ' + totCajas + ' cajas</span>' +
