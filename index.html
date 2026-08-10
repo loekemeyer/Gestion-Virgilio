@@ -6167,7 +6167,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.65";
+const APP_VERSION = "v8.66";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -18195,24 +18195,37 @@ function faltEnsureAvisar() {
 async function showFaltAvisar() {
   const ov = faltEnsureAvisar(); ov.classList.add("show");
   try {
-    const falt = await cpLoadFaltantes();
-    const activas = await faltFetchActivasNps();
-    faltAvRender(falt, activas);
+    // v8.66 — traer saldos para filtrar: un faltante SOLO aparece si hay con qué
+    // completarlo (stock en góndola / a guardar / excedente / racks). Si no hay
+    // en ninguno de esos, no tiene sentido ofrecer "Cargar yo" ni "Avisar".
+    const res = await Promise.all([cpLoadFaltantes(), faltFetchActivasNps(), stockFetchSaldos()]);
+    const falt = res[0] || [], activas = res[1] || {}, saldos = res[2] || {};
+    const sN = {}; Object.keys(saldos).forEach(function (k) { sN[_cpNorm(k)] = saldos[k]; });
+    faltAvRender(falt, activas, sN);
   } catch (e) { const b = document.getElementById("faltAvBody"); if (b) b.innerHTML = '<div class="fav-empty">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
 }
 function closeFaltAvisar() { const ov = document.getElementById("faltAvModal"); if (ov) ov.classList.remove("show"); }
-function faltAvRender(falt, activas) {
+function faltAvRender(falt, activas, saldosN) {
   const body = document.getElementById("faltAvBody"); if (!body) return;
+  const sN = saldosN || {};
+  // v8.66 — stock DISPONIBLE para completar = góndola (terminado) + a guardar + excedente + racks.
+  // (separar_pedidos y a_facturar NO cuentan: ya están comprometidos a un pedido.)
+  const _dispAv = function (cod) {
+    const s = sN[_cpNorm(cod)] || {};
+    return Math.round((Number(s.terminado) || 0) + (Number(s.a_guardar) || 0) + (Number(s.excedente) || 0) + (Number(s.racks) || 0));
+  };
   _faltAvData = {};
   (falt || []).forEach(function (e) {
+    const disp = _dispAv(e.cod_art);
+    if (disp <= 0) return;   // v8.66: sin stock en góndola/a guardar/excedente/racks → no se puede completar, no lo muestro
     const np = _faltNpNorm(e.np);
     if (!_faltAvData[np]) _faltAvData[np] = { np: np, cliente: e.cod_cliente || "", tanda: e.tanda || "", rs: e.razon_social || "", arts: [], cajas: 0 };
-    _faltAvData[np].arts.push({ cod: String(e.cod_art), falto: Number(e.cajas_falto) || 0 });
+    _faltAvData[np].arts.push({ cod: String(e.cod_art), falto: Number(e.cajas_falto) || 0, disp: disp });
     _faltAvData[np].cajas += Number(e.cajas_falto) || 0;
   });
   const list = Object.keys(_faltAvData).map(function (k) { return _faltAvData[k]; }).sort(function (a, b) { return String(a.np).localeCompare(String(b.np)); });
-  let h = '<div class="fav-hint">Pedidos con un <b>faltante</b> que todavía <b>no salió ni se facturó</b>. Por cada uno: <b>📦➕ Cargar yo</b> (lo completás vos ahora) o <b>📢 Avisar</b> (les salta el pop-up a los celulares de Virgilio y lo completa alguien; solo uno lo toma).</div>';
-  if (!list.length) { h += '<div class="fav-empty">No hay pedidos con faltantes sin facturar. 👍</div>'; body.innerHTML = h; return; }
+  let h = '<div class="fav-hint">Pedidos con un <b>faltante</b> que todavía <b>no salió ni se facturó</b> y que <b>tienen stock para completarse</b> (góndola / a guardar / excedente / racks). Por cada uno: <b>📦➕ Cargar yo</b> (lo completás vos ahora) o <b>📢 Avisar</b> (les salta el pop-up a los celulares de Virgilio y lo completa alguien; solo uno lo toma).</div>';
+  if (!list.length) { h += '<div class="fav-empty">No hay faltantes con stock para completar ahora. 👍</div>'; body.innerHTML = h; return; }
   h += list.map(function (g) {
     const det = g.arts.map(function (a) { return escapeHtml(a.cod) + '×' + a.falto; }).join(", ");
     const ya = activas[g.np];

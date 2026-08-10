@@ -4,7 +4,14 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-10 · Versión app al documentar: **v8.65**
+> Última actualización: 2026-08-10 · Versión app al documentar: **v8.66**
+>
+> Nota: **v8.66 — "Completar Pedido — faltante que llegó" (panel `showFaltAvisar`): solo faltantes
+> con stock para completar.** Antes listaba TODO faltante sin facturar; ahora solo aparece una NP si
+> el artículo tiene stock disponible en **góndola (`terminado`) / a guardar (`a_guardar`) / excedente
+> (`excedente`) / racks (`racks`)** (`separar_pedidos`/`a_facturar` NO cuentan, ya están comprometidos).
+> Si no hay con qué completarlo, no se muestra (no tiene sentido "Cargar yo"/"Avisar"). Se trae
+> `stockFetchSaldos()` en el panel y se filtra por artículo en `faltAvRender` (helper `_dispAv`).
 >
 > Nota: **v8.65 — Conteo cíclico de góndola (CG): cruce confiable (timing).** El CG ya estaba completo
 > (front pide contar 1 artículo random durante el picking + trigger `trg_conteo_gondola_telegram`
