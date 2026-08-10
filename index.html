@@ -6310,7 +6310,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.86";
+const APP_VERSION = "v8.87";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -13072,10 +13072,15 @@ function _stkRtoDetail(mv) {
    y Racks (stkRacksArtRender, que además muestra las posiciones arriba). v5.101. */
 function _stkMovsBlock() {
   const dep = _stkPop.dep, codN = _stkPop.codN, round1 = function (n) { return Math.round(n * 10) / 10; };
+  // v8.73: cuando el popup es de racks (kind=racksArt), incluir también racks_ch
+  // porque la columna "Racks" suma ambos depósitos (v7.54).
+  const _depMatch = _stkPop.kind === "racksArt"
+    ? function (d) { return d === "racks" || d === "racks_ch"; }
+    : function (d) { return d === dep; };
   const desdeT = _stkPop.desde ? new Date(_stkPop.desde + "T00:00:00").getTime() : 0;
   const hastaT = _stkPop.hasta ? new Date(_stkPop.hasta + "T23:59:59").getTime() : 0;
   const list = _stk.movs.filter(function (mv) {
-    if (mv.deposito !== dep || _stkNormCod(mv.cod_art) !== codN || !_stkWin(mv, true)) return false;
+    if (!_depMatch(mv.deposito) || _stkNormCod(mv.cod_art) !== codN || !_stkWin(mv, true)) return false;
     const t = new Date(mv.ts).getTime();
     if (desdeT && t < desdeT) return false;
     if (hastaT && t > hastaT) return false;
@@ -13100,7 +13105,9 @@ function _stkMovsBlock() {
     // v6.68 — celda MOVIMIENTO en flex: slot fijo para el "+" (vacío en no-recepciones)
     // → los rótulos ('recepcion'/'guardado'/'cp'…) arrancan alineados; chips prolijos.
     const detrow = open ? '<tr class="mva-detrow"><td colspan="4" class="mva-detcell">' + _stkRtoDetail(mv) + '</td></tr>' : '';
-    const movBody = '<span class="mva-movtipo">' + escapeHtml(String(mv.tipo || "")) + '</span>' + (mv.ref ? '<span class="mva-ref">' + escapeHtml(String(mv.ref)) + '</span>' : '') + npTxt + _stkQuienChip(mv);
+    // v8.73: en el popup unificado de racks, etiquetar si el movimiento es de racks_ch
+    const _chTag = (_stkPop.kind === "racksArt" && mv.deposito === "racks_ch") ? '<span style="display:inline-block;background:#dbeafe;color:#1e40af;font-size:10px;font-weight:800;padding:1px 5px;border-radius:4px;margin-left:4px">CH</span>' : '';
+    const movBody = '<span class="mva-movtipo">' + escapeHtml(String(mv.tipo || "")) + '</span>' + (mv.ref ? '<span class="mva-ref">' + escapeHtml(String(mv.ref)) + '</span>' : '') + npTxt + _chTag + _stkQuienChip(mv);
     return '<tr><td class="mva-ts">' + escapeHtml(stockFmtTs(mv.ts)) + '</td><td class="mva-mov"><div class="mva-movrow">' + plus + '<span class="mva-movbody">' + movBody + '</span></div></td><td class="mva-cant">' + cant + '</td><td class="mva-sal">' + round1(saldo) + '</td></tr>' + detrow;
   }).join("");
   let h = '<div class="stkpop-hint">Movimientos de <b>' + escapeHtml(_stkPop.cod) + '</b> en <b>' + escapeHtml(_stkPop.titulo) + '</b>, por fecha. Entró <b style="color:#15803d">+' + round1(totIn) + '</b> · salió <b style="color:#b91c1c">' + round1(totOut) + '</b> · <b>saldo ' + round1(saldo) + '</b>.<br><small style="color:#94a3b8">👤 = siglas y legajo del que lo hizo (en <b>recepcion</b>, del que recibió). En <span class="mva-qui aprox">ámbar ~</span> va el deducido por la sesión de RT (recepciones viejas, sin legajo guardado).</small></div>';
