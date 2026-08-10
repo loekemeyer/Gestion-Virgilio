@@ -3076,6 +3076,8 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
 .falt-tbl th.falt-fab { text-align:left; }
 .falt-tbl th.falt-sem { background:#334155; }
 .falt-tbl th.falt-dia.hoy { background:#1e40af; }
+/* v8.77 — marca "S" (supermercado) en el row de arriba, sobre la columna de super */
+.falt-tbl th.falt-super-mark { background:#0e7490; color:#fff; font-weight:900; letter-spacing:1px; padding:2px 8px; }
 .falt-tbl td { padding:4px 8px; border-bottom:1px solid #f1f5f9; white-space:nowrap; }
 .falt-tbl td.num { text-align:center; font-variant-numeric:tabular-nums; }
 .falt-tbl td.falt-cod { font-family:Consolas,Menlo,monospace; font-weight:800; color:#1e6bd6; }
@@ -6213,7 +6215,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.76";
+const APP_VERSION = "v8.77";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -13228,7 +13230,7 @@ async function stkFaltLoad() {
   _stk.faltLoaded = "loading"; stkRender();
   try {
     var res = await Promise.all([
-      supaFetchAllSafe(SUPABASE_PPP_PROG_ENDPOINT, "select=np,fecha_entrega,razon_social,tanda,cod"),
+      supaFetchAllSafe(SUPABASE_PPP_PROG_ENDPOINT, "select=np,fecha_entrega,razon_social,tanda,cod,zona"),
       fetchPickingBase(),
       supaFetchAllSafe(SUPABASE_FACTURACION_NP_ENDPOINT, "select=np"),
       // v8.17 — "Fabricante" espeja el GENERADOR DE OCs: proveedor(es) de vista_generador_oc
@@ -13272,7 +13274,7 @@ async function stkFaltLoad() {
     ppp.forEach(function (r) {
       var np = pickNormNp(r.np); if (!np) return;
       if (facSet[np]) return;
-      npInfo[np] = { fecha: String(r.fecha_entrega || "").trim().slice(0, 10), rs: r.razon_social || "", tanda: String(r.tanda || "").trim().toUpperCase(), cliente: String(r.cod || "").trim() };
+      npInfo[np] = { fecha: String(r.fecha_entrega || "").trim().slice(0, 10), rs: r.razon_social || "", tanda: String(r.tanda || "").trim().toUpperCase(), cliente: String(r.cod || "").trim(), esSuper: String(r.zona || "").trim().toLowerCase() === "super" };
     });
 
     // v8.14 — separar "ya preparado" de "aún no preparado" (día de armado):
@@ -13349,7 +13351,7 @@ async function stkFaltLoad() {
         if (!demanda[cod]) demanda[cod] = [];
         // v8.08 — el faltante se cuenta el DÍA DE ARMADO (día hábil anterior a la salida),
         // no el día de la PPP. Guardo también la fecha de salida para el drill.
-        demanda[cod].push({ fecha: _faltDiaArmado(info.fecha), fechaSalida: info.fecha, np: np, rs: info.rs, cliente: info.cliente, cajas: Number(it.cajas) || 0, cod: cod });
+        demanda[cod].push({ fecha: _faltDiaArmado(info.fecha), fechaSalida: info.fecha, np: np, rs: info.rs, cliente: info.cliente, cajas: Number(it.cajas) || 0, cod: cod, esSuper: !!info.esSuper });
       });
     });
     _stk.falt = {
@@ -13496,6 +13498,7 @@ function stkBodyFaltante() {
   // REAL es el de la familia (stock combinado), porque se puede cubrir con cualquiera
   // cambiando la NP en el ERP. Los códigos sueltos quedan como una "familia" de uno.
   var arts = [];
+  var superDiaSet = {};   // v8.77 — días (fecha de armado) que tienen demanda de SUPERMERCADO
   var allCods = {};
   Object.keys(dem).forEach(function (c) { allCods[c] = true; });
   Object.keys(sMap).forEach(function (c) { allCods[c] = true; });
@@ -13533,11 +13536,14 @@ function stkBodyFaltante() {
       return o > 0 ? e.cajas * (aj / o) : 0;
     };
     var demDia = {}, sinFecha = 0;
+    var demDiaSuper = {}, demDiaCli = {};   // v8.77 — demanda del día separada super vs clientes
     entriesFam.forEach(function (e) {
       var cj = _cjEff(e);
       if (cj <= 0) return;
       if (!e.fecha) { sinFecha += cj; return; }
       demDia[e.fecha] = (demDia[e.fecha] || 0) + cj;
+      if (e.esSuper) { demDiaSuper[e.fecha] = (demDiaSuper[e.fecha] || 0) + cj; superDiaSet[e.fecha] = true; }
+      else { demDiaCli[e.fecha] = (demDiaCli[e.fecha] || 0) + cj; }
     });
     var totalDem = entriesFam.reduce(function (ac, e) { return ac + _cjEff(e); }, 0);
     if (totalDem === 0 && stockFam === 0 && realFam === 0) return;
@@ -13554,6 +13560,7 @@ function stkBodyFaltante() {
     allDiasDesdeHoy.sort();
 
     var diasFalt = {};
+    var diasFaltSuper = {}, diasFaltCli = {};   // v8.77 — faltante del día separado super vs clientes
     var faltS1 = 0, faltS2 = 0, faltResto = 0;
     var balRun = bal;
     allDiasDesdeHoy.forEach(function (f) {
@@ -13565,6 +13572,14 @@ function stkBodyFaltante() {
       var dispF = balRun > 0 ? balRun : 0;
       var faltDia = demF > dispF ? (demF - dispF) : 0;
       diasFalt[f] = faltDia;
+      // v8.77 — reparto SUPERMERCADO PRIMERO: el stock disponible del día cubre primero al
+      // super; lo que sobra va a clientes. faltSuper + faltCli === faltDia (mismo total).
+      var demS = demDiaSuper[f] || 0, demC = demDiaCli[f] || 0;
+      var faltSuper = demS > dispF ? (demS - dispF) : 0;
+      var dispTrasS = dispF - demS; if (dispTrasS < 0) dispTrasS = 0;
+      var faltCli = demC > dispTrasS ? (demC - dispTrasS) : 0;
+      diasFaltSuper[f] = faltSuper;
+      diasFaltCli[f] = faltCli;
       balRun -= demF;
       // v8.19 — Falt S1/S2 = SUMA de los faltantes DIARIOS de la ventana (reconcilia con las
       // celdas de día: si sumás los días de la semana, da Falt S1). El faltante pasa el día de
@@ -13574,7 +13589,11 @@ function stkBodyFaltante() {
       else if (_sal >= lunesS2 && _sal <= finS2) faltS2 += faltDia;
       else if (_sal > finS2) faltResto += faltDia;   // v8.21 — salida más allá de la S2
     });
-    diasCols.forEach(function (d) { if (diasFalt[d] === undefined) diasFalt[d] = 0; });
+    diasCols.forEach(function (d) {
+      if (diasFalt[d] === undefined) diasFalt[d] = 0;
+      if (diasFaltSuper[d] === undefined) diasFaltSuper[d] = 0;
+      if (diasFaltCli[d] === undefined) diasFaltCli[d] = 0;
+    });
 
     // v7.90 — cajas que requieren CAMBIO DE NP: demanda cargada sobre códigos SECUNDARIOS
     // (no el principal). No deben entrar pedidos al secundario → hay que corregir la NP.
@@ -13597,7 +13616,8 @@ function stkBodyFaltante() {
       realFalt: Math.round(realFam),
       faltS1: Math.round(faltS1), faltS2: Math.round(faltS2), faltResto: Math.round(faltResto),
       faltSinFecha: Math.round(faltSinFecha),
-      diasFalt: diasFalt, sinFecha: sinFecha, subCambio: subCambio
+      diasFalt: diasFalt, diasFaltSuper: diasFaltSuper, diasFaltCli: diasFaltCli,
+      sinFecha: sinFecha, subCambio: subCambio
     });
   });
 
@@ -13669,26 +13689,51 @@ function stkBodyFaltante() {
     '</div>';
   // v8.36 — cartel de ayuda quitado (pedido del usuario)
   // Tabla
+  // v8.77 — días que tienen demanda de SUPERMERCADO se muestran DOS veces (Super | Clientes),
+  // con una "S" en un row arriba sobre la columna de super. El resto de los días, una sola vez.
+  var superDays = diasCols.filter(function (d) { return superDiaSet[d]; });
+  var twoRow = F.verDias && superDays.length > 0;
+  var rs = twoRow ? ' rowspan="2"' : '';
   h += '<div class="falt-wrap"><table class="falt-tbl"><thead><tr>' +
-    '<th class="falt-cod">Cód</th><th class="falt-desc">Descripción</th><th class="falt-fab" style="cursor:pointer;" onclick="stkFaltOrdenFab()" title="Ordenar por fabricante">Fabricante' + (F.ordenFab ? ' ▾' : '') + '</th>' +
-    '<th class="falt-stk">Stock</th>' +
-    '<th class="falt-stk" title="Total de cajas pedidas (demanda pendiente) de este artículo/familia.">Total<br>Pedidos</th>' +
-    '<th class="falt-sem" title="Cajas que YA faltaron al armar (tandas pickeadas): lo que el pickeador no encontró. Dato real, no proyección.">🔴 Faltó<br>armado</th>' +
-    '<th class="falt-sem">Falt S1</th><th class="falt-sem">Falt S2</th>' +
-    '<th class="falt-sem" title="Faltante proyectado para salidas MÁS ALLÁ de la S2 (semana 3 en adelante).">Resto</th>' +
-    '<th class="falt-sem" title="Faltante de pedidos SIN fecha PPP (o con fecha ya pasada): consumen stock pero no caen en ninguna columna de día. Acá aparece lo que falta y no se ve en S1/S2/Resto. Falt S1 + S2 + Resto + Sin fecha = Total − Stock.">Sin<br>fecha</th>';
+    '<th class="falt-cod"' + rs + '>Cód</th><th class="falt-desc"' + rs + '>Descripción</th><th class="falt-fab"' + rs + ' style="cursor:pointer;" onclick="stkFaltOrdenFab()" title="Ordenar por fabricante">Fabricante' + (F.ordenFab ? ' ▾' : '') + '</th>' +
+    '<th class="falt-stk"' + rs + '>Stock</th>' +
+    '<th class="falt-stk"' + rs + ' title="Total de cajas pedidas (demanda pendiente) de este artículo/familia.">Total<br>Pedidos</th>' +
+    '<th class="falt-sem"' + rs + ' title="Cajas que YA faltaron al armar (tandas pickeadas): lo que el pickeador no encontró. Dato real, no proyección.">🔴 Faltó<br>armado</th>' +
+    '<th class="falt-sem"' + rs + '>Falt S1</th><th class="falt-sem"' + rs + '>Falt S2</th>' +
+    '<th class="falt-sem"' + rs + ' title="Faltante proyectado para salidas MÁS ALLÁ de la S2 (semana 3 en adelante).">Resto</th>' +
+    '<th class="falt-sem"' + rs + ' title="Faltante de pedidos SIN fecha PPP (o con fecha ya pasada): consumen stock pero no caen en ninguna columna de día. Acá aparece lo que falta y no se ve en S1/S2/Resto. Falt S1 + S2 + Resto + Sin fecha = Total − Stock.">Sin<br>fecha</th>';
   // v8.56 — columnas de día SOLO si "📅 Ver días" está activo (por defecto ocultas → sin scroll lateral).
   if (F.verDias) {
-    h += '<th class="falt-sep"></th>';
-    diasCols.forEach(function (d) {
-      var esHoy = d === hoy;
-      h += '<th class="falt-dia' + (esHoy ? " hoy" : "") + '" title="' + d + '">' + _faltDiaSem(d) + '<br>' + _faltFechaCorta(d) + '</th>';
-    });
+    h += '<th class="falt-sep"' + rs + '></th>';
+    if (twoRow) {
+      // Row de arriba: "S" sobre la sub-columna de supermercado; vacío en el resto.
+      diasCols.forEach(function (d) {
+        if (superDiaSet[d]) h += '<th class="falt-dia falt-super-mark" title="Supermercado">S</th><th class="falt-dia"></th>';
+        else h += '<th class="falt-dia"></th>';
+      });
+      h += '</tr><tr>';
+      // Row de abajo: el label del día (dos veces en días de super: Super | Clientes).
+      diasCols.forEach(function (d) {
+        var esHoy = d === hoy;
+        var lbl = _faltDiaSem(d) + '<br>' + _faltFechaCorta(d);
+        if (superDiaSet[d]) {
+          h += '<th class="falt-dia' + (esHoy ? " hoy" : "") + '" title="' + d + ' · Supermercado">' + lbl + '</th>' +
+               '<th class="falt-dia' + (esHoy ? " hoy" : "") + '" title="' + d + ' · Clientes">' + lbl + '</th>';
+        } else {
+          h += '<th class="falt-dia' + (esHoy ? " hoy" : "") + '" title="' + d + '">' + lbl + '</th>';
+        }
+      });
+    } else {
+      diasCols.forEach(function (d) {
+        var esHoy = d === hoy;
+        h += '<th class="falt-dia' + (esHoy ? " hoy" : "") + '" title="' + d + '">' + _faltDiaSem(d) + '<br>' + _faltFechaCorta(d) + '</th>';
+      });
+    }
   }
   h += '</tr></thead><tbody>';
 
   if (arts.length === 0) {
-    h += '<tr><td colspan="' + (10 + (F.verDias ? (1 + diasCols.length) : 0)) + '" style="text-align:center;padding:20px;color:#94a3b8;">Sin artículos con demanda pendiente</td></tr>';
+    h += '<tr><td colspan="' + (10 + (F.verDias ? (1 + diasCols.length + superDays.length) : 0)) + '" style="text-align:center;padding:20px;color:#94a3b8;">Sin artículos con demanda pendiente</td></tr>';
   }
 
   arts.forEach(function (a) {
@@ -13729,7 +13774,15 @@ function stkBodyFaltante() {
       h += '<td class="falt-sep"></td>';
       var _primer = null;
       for (var _i = 0; _i < diasCols.length; _i++) { if ((a.diasFalt[diasCols[_i]] || 0) > 0) { _primer = diasCols[_i]; break; } }
-      diasCols.forEach(function (d) { var v = a.diasFalt[d] || 0; h += _faltCelda(v, false, a.key, d, d === _primer); });
+      diasCols.forEach(function (d) {
+        if (superDiaSet[d]) {
+          // Día de super → dos celdas: Supermercado | Clientes (v8.77).
+          h += _faltCelda(a.diasFaltSuper[d] || 0, false, a.key, d, d === _primer);
+          h += _faltCelda(a.diasFaltCli[d] || 0, false, a.key, d, d === _primer);
+        } else {
+          h += _faltCelda(a.diasFalt[d] || 0, false, a.key, d, d === _primer);
+        }
+      });
     }
     h += '</tr>';
   });

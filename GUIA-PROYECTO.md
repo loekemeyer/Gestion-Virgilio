@@ -4,7 +4,20 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-10 · Versión app al documentar: **v8.76**
+> Última actualización: 2026-08-10 · Versión app al documentar: **v8.77**
+>
+> Nota: **v8.77 — Faltantes x día: días de SUPERMERCADO desdoblados (Super | Clientes).** En el
+> detalle "📅 Ver días", un día que tiene demanda de **supermercado** ahora se muestra **dos veces**:
+> una columna **Super** y otra **Clientes**, con una **"S"** en un row arriba (thead de 2 filas) sobre
+> la columna de super. El marcador de supermercado sale de `PPP_Programacion_Diaria.zona = 'Super'`
+> (se agregó `zona` al select del fetch; `npInfo[np].esSuper`, propagado a cada entry de `demanda`).
+> El **reparto del stock disponible es "supermercado primero"**: cada día, el saldo cubre primero al
+> super y lo que sobra va a clientes → `faltSuper = max(0, demSuper − disp)`,
+> `dispTrasS = max(0, disp − demSuper)`, `faltCli = max(0, demCli − dispTrasS)`. Invariante:
+> `faltSuper + faltCli === faltDia` (el total por día no cambia; S1/S2/Resto/Sin fecha intactos). Los
+> días sin super se muestran una sola vez como siempre. `superDiaSet` marca qué fechas (día de armado)
+> tienen super; `arts[].diasFaltSuper` / `diasFaltCli` guardan el split por día. Drill de ambas
+> sub-celdas va al día completo (v1). CSS: `.falt-super-mark`.
 >
 > Nota: **v8.76 — Faltantes x día: defaults nuevos.** El estado `_stk.falt` arranca con los 3
 > botones ACTIVOS por defecto: `soloQuiebre: true` (solo artículos que faltan), `sinE: true`
