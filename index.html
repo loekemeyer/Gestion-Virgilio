@@ -6298,7 +6298,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v9.09";
+const APP_VERSION = "v9.10";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -12497,7 +12497,7 @@ function _stkNpFaltanRender() {
       var inner;
       if (det == null) inner = '<span style="color:#94a3b8">Cargando…</span>';
       else if (!det.length) inner = '<span style="color:#94a3b8">Sin detalle.</span>';
-      else inner = '<div style="display:flex;flex-wrap:wrap;gap:5px">' + det.map(function (d) { return '<span style="background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:2px 7px;font-size:11px;"><b>' + escapeHtml(d.art) + '</b> · ' + round1(d.cajas) + '</span>'; }).join("") + '</div>';
+      else { var _detTot = det.reduce(function (s, d) { return s + (Number(d.cajas) || 0); }, 0); inner = '<div style="display:flex;flex-wrap:wrap;gap:5px">' + det.map(function (d) { return '<span style="background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:2px 7px;font-size:11px;"><b>' + escapeHtml(d.art) + '</b> · ' + round1(d.cajas) + '</span>'; }).join("") + '</div><div style="margin-top:5px;font-size:11.5px;font-weight:800;color:#166534;">💰 Valorización: ' + round1(_detTot) + ' cajas</div>'; }
       detHtml = '<tr><td colspan="5" style="background:#f8fafc;padding:6px 10px;"><div style="font-size:11px;color:#64748b;font-weight:700;margin-bottom:3px;">🧾 Composición del pedido ' + escapeHtml(np) + ' (' + (det ? det.length : "…") + ' códigos):</div>' + inner + '</td></tr>';
     }
     return '<tr' + (_stkPop.cancelNp === np ? ' style="background:#fffbeb"' : '') + '><td onclick="stkNpFaltanDetalle(\'' + encodeURIComponent(np) + '\')" style="cursor:pointer;" title="Ver la composición del pedido"><b>' + escapeHtml(np) + '</b> <span style="color:#94a3b8;font-size:11px;">' + (_stkPop.detNp === np ? "▾" : "▸") + '</span></td>' +
