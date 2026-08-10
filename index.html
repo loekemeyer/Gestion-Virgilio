@@ -6167,7 +6167,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.62";
+const APP_VERSION = "v8.63";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -14256,12 +14256,31 @@ function stkBodyInsumos() {
   const pend = items.filter(function (it) { return _stkInsPendiente(it); });
   let h = '';
   if (_stkIns.msg) h += '<div class="stk-cut" style="background:#f0fdf4;border:1px solid #86efac;color:#166534;">' + escapeHtml(_stkIns.msg) + '</div>';
+  h += _stkInsMezclaUni(items);   // v8.63 — aviso: insumos con varias unidades sin factor (suma sin sentido)
   if (pend.length) h += _stkInsPend(pend);   // v8.35 — si no hay pendientes, no aparece la sección
   h += _stkInsCats(items, pend);
   h += _stkInsHist();               // bitácora: movimientos + cambios del admin
   h += _stkInsTodos(items);         // foto completa, sólo lectura
   h += _stkInsUnis(items);          // v8.27 — las unidades van al final, abajo de Todos los insumos
   return h;
+}
+/* v8.63 — insumos con stock en VARIAS unidades sin factor de conversión que las cubra: la suma
+   cruda no significa nada (Kg + Uni). Aviso para que el admin cargue el factor (⚖ / "＋ unidad"). */
+function _stkInsMezclaUni(items) {
+  const bad = (items || []).filter(function (it) {
+    const xs = (it.xuni || []).filter(function (u) { return Math.abs(Number(u.saldo) || 0) > 0.0005; });
+    if (xs.length < 2) return false;
+    const f = insFactDe(it.cod);
+    if (f && f.unis && f.unis.length && xs.every(function (u) { return insFactorDe(it.cod, u.uni) != null; })) return false;
+    return true;
+  });
+  if (!bad.length) return "";
+  return '<div class="stk-cut" style="background:#fffbeb;border:1px solid #fcd34d;color:#92400e;">' +
+    '<b>⚠ ' + bad.length + ' insumo(s) con stock en varias unidades SIN factor de conversión.</b> La suma cruda no significa nada (ej. Kg + Uni). Cargales el factor con la <b>⚖</b> (o "＋ unidad") así se suman bien.' +
+    '<div style="margin-top:6px;">' + bad.map(function (it) {
+      const xs = (it.xuni || []).filter(function (u) { return Math.abs(Number(u.saldo) || 0) > 0.0005; });
+      return '<div style="margin:2px 0;"><b style="font-family:Consolas,Menlo,monospace;">' + escapeHtml(it.cod) + '</b> ' + escapeHtml(it.nombre || "") + ' — ' + xs.map(function (u) { return (Math.round(u.saldo * 1000) / 1000) + " " + escapeHtml(u.uni); }).join(" + ") + '</div>';
+    }).join("") + '</div></div>';
 }
 /* ---------- (1) PENDIENTES ---------- */
 function _stkInsPend(pend) {
