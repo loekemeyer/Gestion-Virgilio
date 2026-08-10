@@ -140,6 +140,10 @@ button {
 .dp-msg.ok { color:#166534; }
 .dp-msg.err { color:#b42318; }
 .dp-done-tag { display:inline-block; font-size:10px; font-weight:700; color:#166534; background:#dcfce7; padding:2px 8px; border-radius:6px; }
+.dp-mod-hdr { font-size:14px; font-weight:800; color:#1e293b; margin:18px 0 8px; padding:8px 12px; background:#f1f5f9; border-radius:8px; display:flex; align-items:center; gap:8px; }
+.dp-mod-hdr:first-child { margin-top:0; }
+.dp-mod-hdr .dp-mod-count { font-size:11px; font-weight:600; color:#64748b; }
+.dp-mod-hint { font-size:11px; color:#94a3b8; margin:-4px 0 8px 12px; font-style:italic; }
 /* Nombre del usuario logueado, fijo arriba a la izquierda. */
 #userTag {
   position: fixed; top: 8px; left: 8px; z-index: 60;
@@ -24508,9 +24512,10 @@ async function dpLoad(force) {
         supaFetchAllSafe(SUPABASE_URL + "/rest/v1/PPP_Programacion_Diaria", "select=cod"),
         supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Articulos_Cajas", "select=Cod_Art,Descripcion,Marca,N_Caja,Uni_x_Caja"),
         supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Volumen_Articulos", "select=codigo,m3"),
-        supaFetchAllSafe(SUPABASE_CAPACIDAD_ENDPOINT, "select=cod,empresa,sector,cajas_max")
+        supaFetchAllSafe(SUPABASE_CAPACIDAD_ENDPOINT, "select=cod,empresa,sector,cajas_max"),
+        supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Insumos", "select=cod,isis,nombre,categoria")
       ]);
-      var pppRows = res[0], cajasRows = res[1], volRows = res[2], capRows = res[3];
+      var pppRows = res[0], cajasRows = res[1], volRows = res[2], capRows = res[3], insRows = res[4];
 
       // Indexar por código normalizado
       var cajasMap = {};
@@ -24525,6 +24530,14 @@ async function dpLoad(force) {
         var k = _ocgNorm(r.cod); if (!k) return;
         if (!capMap[k]) capMap[k] = [];
         capMap[k].push({ empresa: r.empresa, sector: r.sector, cajas_max: r.cajas_max });
+      });
+      // Índice de insumos por código ISIS → categoría de insumo
+      var insIsisMap = {};
+      insRows.forEach(function (r) {
+        var ik = r.isis ? _ocgNorm(r.isis) : null;
+        if (ik) insIsisMap[ik] = { nombre: r.nombre || "", cat: r.categoria || "" };
+        var dk = _ocgNorm(r.cod);
+        if (dk) insIsisMap[dk] = { nombre: r.nombre || "", cat: r.categoria || "" };
       });
 
       // Códigos únicos de PPP
@@ -24541,13 +24554,24 @@ async function dpLoad(force) {
       }).forEach(function (k) {
         var hC = !!cajasMap[k], hV = k in volMap, hCp = !!capMap[k];
         if (!hC || !hV || !hCp) {
+          // Clasificar: insumo / venta / otro
+          var modulo;
+          if (insIsisMap[k]) {
+            modulo = "insumo";
+          } else if (artNombre(k) || cajasMap[k]) {
+            modulo = "venta";
+          } else {
+            modulo = "otro";
+          }
           missing.push({
             cod: pppSet[k] || k, codNorm: k,
-            desc: artNombre(k) || (cajasMap[k] && cajasMap[k].desc) || "",
+            desc: artNombre(k) || (insIsisMap[k] && insIsisMap[k].nombre) || (cajasMap[k] && cajasMap[k].desc) || "",
             cajas: hC, vol: hV, cap: hCp,
             cajasData: cajasMap[k] || null,
             volVal: hV ? volMap[k] : null,
-            capData: capMap[k] || null
+            capData: capMap[k] || null,
+            modulo: modulo,
+            insCat: insIsisMap[k] ? insIsisMap[k].cat : null
           });
         }
       });
@@ -24590,25 +24614,39 @@ function dpRender(filter) {
   }
   if (sum && !f) sum.textContent = rows.length + " producto(s) con datos faltantes — tocá uno para completar";
 
-  list.innerHTML = rows.map(function (r) {
-    var cn = r.codNorm;
-    var falta = [];
-    if (!r.cajas) falta.push("Cajas");
-    if (!r.vol) falta.push("m³");
-    if (!r.cap) falta.push("Sector");
-    return '<div class="dp-card" id="dpC_' + cn + '">' +
-      '<div class="dp-card-head" onclick="dpToggle(\'' + cn + '\')">' +
-        '<span class="dp-cod">' + escapeHtml(r.cod) + '</span>' +
-        '<span class="dp-desc">' + escapeHtml(r.desc || "(sin nombre)") + '</span>' +
-        '<span class="dp-dots">' +
-          '<span class="dp-dot-g" title="Cajas (empaque)"><span class="dp-dot ' + (r.cajas ? "ok" : "miss") + '"></span><span class="dp-dot-label">Cj</span></span>' +
-          '<span class="dp-dot-g" title="Volumen m³"><span class="dp-dot ' + (r.vol ? "ok" : "miss") + '"></span><span class="dp-dot-label">m³</span></span>' +
-          '<span class="dp-dot-g" title="Sector góndola"><span class="dp-dot ' + (r.cap ? "ok" : "miss") + '"></span><span class="dp-dot-label">Sc</span></span>' +
-        '</span>' +
-      '</div>' +
-      '<div class="dp-form" id="dpF_' + cn + '">' + dpBuildForm(r) + '</div>' +
-    '</div>';
-  }).join("");
+  // Agrupar por módulo: venta → insumo → otro
+  var grupos = { venta: [], insumo: [], otro: [] };
+  rows.forEach(function (r) { (grupos[r.modulo] || grupos.otro).push(r); });
+  var modDefs = [
+    { key: "venta",  ico: "📦", label: "Artículos de venta (stock)", hint: "" },
+    { key: "insumo", ico: "🔧", label: "Insumos", hint: "" },
+    { key: "otro",   ico: "❓", label: "Otros", hint: "Códigos de ISIS que figuran en PPP Programación Diaria pero no tienen registro en las tablas de Virgilio." }
+  ];
+
+  var html = "";
+  modDefs.forEach(function (m) {
+    var items = grupos[m.key];
+    if (!items || !items.length) return;
+    html += '<div class="dp-mod-hdr">' + m.ico + " " + escapeHtml(m.label) + ' <span class="dp-mod-count">(' + items.length + ')</span></div>';
+    if (m.hint) html += '<div class="dp-mod-hint">' + escapeHtml(m.hint) + '</div>';
+    items.forEach(function (r) { html += _dpRenderCard(r); });
+  });
+  list.innerHTML = html;
+}
+function _dpRenderCard(r) {
+  var cn = r.codNorm;
+  return '<div class="dp-card" id="dpC_' + cn + '">' +
+    '<div class="dp-card-head" onclick="dpToggle(\'' + cn + '\')">' +
+      '<span class="dp-cod">' + escapeHtml(r.cod) + '</span>' +
+      '<span class="dp-desc">' + escapeHtml(r.desc || "(sin nombre)") + '</span>' +
+      '<span class="dp-dots">' +
+        '<span class="dp-dot-g" title="Cajas (empaque)"><span class="dp-dot ' + (r.cajas ? "ok" : "miss") + '"></span><span class="dp-dot-label">Cj</span></span>' +
+        '<span class="dp-dot-g" title="Volumen m³"><span class="dp-dot ' + (r.vol ? "ok" : "miss") + '"></span><span class="dp-dot-label">m³</span></span>' +
+        '<span class="dp-dot-g" title="Sector góndola"><span class="dp-dot ' + (r.cap ? "ok" : "miss") + '"></span><span class="dp-dot-label">Sc</span></span>' +
+      '</span>' +
+    '</div>' +
+    '<div class="dp-form" id="dpF_' + cn + '">' + dpBuildForm(r) + '</div>' +
+  '</div>';
 }
 
 function dpToggle(cn) {

@@ -4,7 +4,15 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-10 · Versión app al documentar: **v8.82**
+> Última actualización: 2026-08-10 · Versión app al documentar: **v8.83**
+>
+> Nota: **v8.83 — Completar datos producto: módulos por categoría.** La pantalla 🚦 ahora agrupa
+> los productos faltantes en 3 secciones: **📦 Artículos de venta (stock)** (códigos que existen en
+> `vista_nombres_articulos` o `Articulos_Cajas`), **🔧 Insumos** (códigos que cruzan con la tabla
+> `Insumos` vía campo `isis` o `cod`), y **❓ Otros** (códigos de ISIS que figuran en
+> `PPP_Programacion_Diaria` pero no tienen registro en las tablas de Virgilio — con nota explicativa).
+> Se fetchea `Insumos` (select=cod,isis,nombre,categoria) en paralelo con las otras tablas.
+> Función `_dpRenderCard` extraída de `dpRender` para reutilización.
 >
 > Nota: **v8.82 — Completar datos producto (pantalla + badge semáforo).** Nuevo botón 🚦 en el menú
 > de administración (entre "Consultar NP/Líos" y "Configuración") que detecta códigos de producto
