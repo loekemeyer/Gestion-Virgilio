@@ -24716,7 +24716,8 @@ async function dpLoad(force) {
       // Códigos únicos: PPP_Programacion_Diaria + PPP_Base_Pedidos (pedidos activos)
       var pppSet = {};
       pppRows.forEach(function (r) { var k = _ocgNorm(r.cod); if (k) pppSet[k] = r.cod; });
-      pedRows.forEach(function (r) { var k = _ocgNorm(r.articulo); if (k && !pppSet[k]) pppSet[k] = r.articulo; });
+      var pedSet = {};
+      pedRows.forEach(function (r) { var k = _ocgNorm(r.articulo); if (k) { pedSet[k] = true; if (!pppSet[k]) pppSet[k] = r.articulo; } });
 
       await loadArtNombres();
 
@@ -24729,8 +24730,11 @@ async function dpLoad(force) {
         var hC = !!cajasMap[k], hV = k in volMap, hCp = !!capMap[k];
         if (!hC || !hV || !hCp) {
           // Clasificar: insumo / venta / otro
+          // Si tiene pedidos en PPP_Base_Pedidos → siempre es artículo de venta.
           var modulo;
-          if (insIsisMap[k]) {
+          if (pedSet[k]) {
+            modulo = "venta";
+          } else if (insIsisMap[k]) {
             modulo = "insumo";
           } else if (artNombre(k) || cajasMap[k]) {
             modulo = "venta";
