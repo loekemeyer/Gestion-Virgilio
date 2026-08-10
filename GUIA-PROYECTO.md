@@ -4,7 +4,13 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-10 · Versión app al documentar: **v8.78**
+> Última actualización: 2026-08-10 · Versión app al documentar: **v8.79**
+>
+> Nota: **v8.79 — Faltantes x día: se quitó la columna "🔴 Faltó armado" (pedido del usuario).** La
+> tabla pasa de 10 a **9 columnas fijas**. El dato real (`realFalt`) **NO se borró**: se sigue usando
+> en el resumen de arriba (chip "🔴 X faltaron al armar") y como **desempate del orden** (fabricante →
+> realFalt → S1 → S2 → código). Solo desapareció la columna del cuerpo/thead y el drill `stkFaltDrillReal`
+> quedó sin botón (la función sigue existiendo). Colspan del empty-row: `9 + (verDias ? 1+días+super : 0)`.
 >
 > Nota: **v8.78 — Faltantes x día (super): 2 ajustes.** (1) El día se DESDOBLA (Super | Clientes)
 > **solo si hay faltante REAL de super ese día** en algún artículo visible: si el super está cubierto
