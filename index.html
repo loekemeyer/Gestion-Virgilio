@@ -6310,7 +6310,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.85";
+const APP_VERSION = "v8.86";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -7869,10 +7869,23 @@ function pkRender() {
   const equivHint = it.real
     ? `<div style="background:#fff7ed;border:1px solid #fdba74;color:#9a3412;border-radius:10px;padding:9px 11px;margin-top:8px;font-size:14px;font-weight:800;text-align:center;line-height:1.25;">👉 Levantá el <b>${escapeHtml(it.real)}</b>${it.realNota ? " — " + escapeHtml(it.realNota) : ""}<br><small style="font-weight:700;opacity:.85;">(el cliente lo pidió como ${escapeHtml(it.art)})</small></div>`
     : ``;
+  // v8.85 — aviso si el código pertenece a una familia de equivalentes y NO es el
+  // primario/default. El operario puede estar pickeando un secundario porque la NP
+  // no se corrigió en el ERP. Le preguntamos si es el correcto.
+  let famWarn = "";
+  const _fam85 = equivFam(rec);
+  if (_fam85 && _ocgNorm(rec) !== _fam85._defN) {
+    const _defDisp = _equivDisp(_fam85, _fam85._defN);
+    famWarn = `<div style="background:#fef2f2;border:2px solid #fca5a5;color:#991b1b;border-radius:12px;padding:11px 13px;margin-top:8px;font-size:14px;font-weight:800;text-align:center;line-height:1.35;">
+      ⚠️ Este código (<b>${escapeHtml(rec)}</b>) es <u>secundario</u>.<br>
+      El primario es <b>${escapeHtml(_defDisp)}</b> (${escapeHtml(_fam85.desc)}).<br>
+      <small style="font-weight:700;opacity:.85;">¿Estás seguro que querés pickear <b>${escapeHtml(rec)}</b> y no <b>${escapeHtml(_defDisp)}</b>?</small>
+    </div>`;
+  }
   const bigRow = `<div class="pk-big-row">
       <div class="pk-big-col"><span class="pk-cod-lbl">${it.isExc ? "📦 UBICACIÓN" : "SECTOR"}</span>${sectorBig}</div>
       <div class="pk-big-col pk-big-right"><span class="pk-cod-lbl">${it.isExc ? "EXCEDENTE" : "CÓDIGO"}</span><span class="pk-cod-big">${escapeHtml(rec)}</span></div>
-    </div>${equivHint}`;
+    </div>${equivHint}${famWarn}`;
   if (_pk.mode === "fInput") {
     body.innerHTML = `<div class="pk-flow">${nav}
       ${bigRow}
@@ -24164,23 +24177,42 @@ async function pppToggleDetalle(np) {
 
 async function pppFetchDetalle(np) {
   try {
+    var H = { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY };
     var url = SUPABASE_URL + "/rest/v1/PPP_Base_Pedidos?pedido=eq." + encodeURIComponent(np) + "&select=articulo,cajas&order=articulo";
-    var r = await fetch(url, {
-      headers: { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY }
-    });
+    var r = await fetch(url, { headers: H });
     if (!r.ok) return [];
-    return await r.json();
+    var items = await r.json();
+    // v8.85 — traer uni_x_caja de OC_Maximos para cada artículo → mostrar unidades.
+    try {
+      var cods = items.map(function(i){ return _ocgNorm(i.articulo); }).filter(Boolean);
+      if (cods.length) {
+        var uniUrl = SUPABASE_URL + "/rest/v1/OC_Maximos?cod=in.(" + cods.map(encodeURIComponent).join(",") + ")&select=cod,uni_x_caja&activo=eq.true";
+        var ru = await fetch(uniUrl, { headers: H, cache: "no-store" });
+        if (ru.ok) {
+          var uniRows = await ru.json();
+          var uniMap = {};
+          uniRows.forEach(function(u){ if (u.uni_x_caja != null) uniMap[_ocgNorm(u.cod)] = Number(u.uni_x_caja) || 0; });
+          items.forEach(function(i){ i._uni = uniMap[_ocgNorm(i.articulo)] || 0; });
+        }
+      }
+    } catch(_ue){}
+    return items;
   } catch (_e) { return []; }
 }
 
 function _pppDetalleHtml(items, np) {
   if (!items.length) return '<div class="ppp-detalle-load">Sin productos cargados para NP ' + escapeHtml(np) + '.</div>';
   var totalCajas = items.reduce(function (s, i) { return s + (Number(i.cajas) || 0); }, 0);
-  var h = '<table class="ppp-detalle-tbl"><thead><tr><th>Artículo</th><th style="text-align:right">Cajas</th></tr></thead><tbody>';
+  // v8.85 — columna UNIDADES = cajas × uni_x_caja (del maestro OC_Maximos).
+  var hayUni = items.some(function(i){ return i._uni > 0; });
+  var totalUni = hayUni ? items.reduce(function (s, i) { return s + (Number(i.cajas) || 0) * (Number(i._uni) || 0); }, 0) : 0;
+  var h = '<table class="ppp-detalle-tbl"><thead><tr><th>Artículo</th><th style="text-align:right">Cajas</th>' + (hayUni ? '<th style="text-align:right">Unidades</th>' : '') + '</tr></thead><tbody>';
   items.forEach(function (i) {
-    h += '<tr><td>' + escapeHtml(String(i.articulo || "")) + '</td><td class="num">' + (Number(i.cajas) || 0) + '</td></tr>';
+    var cj = Number(i.cajas) || 0;
+    var uni = (i._uni > 0) ? (cj * i._uni) : 0;
+    h += '<tr><td>' + escapeHtml(String(i.articulo || "")) + '</td><td class="num">' + cj + '</td>' + (hayUni ? '<td class="num">' + (uni > 0 ? uni : '—') + '</td>' : '') + '</tr>';
   });
-  h += '</tbody><tfoot><tr><td style="font-weight:700">' + items.length + ' artículo(s)</td><td class="num" style="font-weight:700">' + totalCajas + '</td></tr></tfoot></table>';
+  h += '</tbody><tfoot><tr><td style="font-weight:700">' + items.length + ' artículo(s)</td><td class="num" style="font-weight:700">' + totalCajas + '</td>' + (hayUni ? '<td class="num" style="font-weight:700">' + totalUni + '</td>' : '') + '</tr></tfoot></table>';
   return h;
 }
 
@@ -27880,7 +27912,7 @@ function facCambioCod(np){
   const list = _facSecByNp.get(npN);
   if (!list || !list.length) return "";
   const txt = list.map(function(x){
-    return '<span title="Pedido en secundario ' + escapeHtml(x.sec) + '. Cambiá la NP en el ERP a ' + escapeHtml(x.ppal) + ' — el picking levanta el principal al confirmar.">' + escapeHtml(x.sec) + ' → <b>' + escapeHtml(x.ppal) + '</b></span>';
+    return '<span title="Pedido en secundario ' + escapeHtml(x.sec) + '. Cambiá la NP en el ERP a ' + escapeHtml(x.ppal) + ' — el picking levanta el principal al confirmar.">' + escapeHtml(x.sec) + ' → <b>' + escapeHtml(x.ppal) + '</b>' + (x.cajas ? ' <span style="color:#64748b;">(' + x.cajas + ')</span>' : '') + '</span>';
   }).join("<br>");
   // v8.03 — confirmar inline (sin abrir el panel): marca los cambios de esta NP como hechos.
   return txt + '<br><button onclick="event.stopPropagation();facCambioCodConfirm(\'' + encodeURIComponent(npN) + '\')" style="width:auto;margin-top:4px;background:#16a34a;color:#fff;border:none;border-radius:7px;padding:3px 9px;font-size:11px;font-weight:800;cursor:pointer;">✓ Ya lo cambié</button>';
@@ -27971,6 +28003,30 @@ async function facCorreccDataRich(){
     evs.forEach(function(e){ const lg = String(e.legajo); if (lg==="0"||lg==="1") return; const t = String(e.texto||"").trim().toUpperCase(); if (!t) return; if (e.opcion==="EP"||e.opcion==="TP") lastP[t]=e.opcion; else if (e.opcion==="AP"||e.opcion==="TAP") lastA[t]=e.opcion; });
     tandas.forEach(function(t){ const p=lastP[t], a=lastA[t]; estadoTanda[t] = !p ? "sinpickear" : (p==="EP" ? "enpicking" : (p==="TP" && a==="TAP" ? "afacturar" : "pickeado")); });
   }
+  // v8.xx — traer PKC (detalle de picking por artículo) para tandas con picking
+  // iniciado/terminado, así se muestra la cantidad pickeada aunque Entregas_Virgilio
+  // no esté aún (se escribe recién al armar/TAP).
+  const pkcByTandaCod = {};   // "TANDA|COD" → reales (última marca gana)
+  const tandasPkc = tandas.filter(function(t){ var e = estadoTanda[t]; return e === "enpicking" || e === "pickeado"; });
+  if (tandasPkc.length){
+    const pkcRows = await q(SUPABASE_TABLE_ENDPOINT + "?opcion=eq.PKC&texto=like.*" + encodeURIComponent(tandasPkc[0]) + "*&select=texto&limit=10000"
+      // para múltiples tandas, repetir el fetch
+    ).catch(function(){ return []; });
+    // si hay más de una tanda, traer las demás en paralelo
+    const extraPkc = tandasPkc.length > 1
+      ? await Promise.all(tandasPkc.slice(1).map(function(t){ return q(SUPABASE_TABLE_ENDPOINT + "?opcion=eq.PKC&texto=like.*" + encodeURIComponent(t) + "*&select=texto&limit=10000").catch(function(){ return []; }); }))
+      : [];
+    var allPkc = pkcRows;
+    extraPkc.forEach(function(arr){ allPkc = allPkc.concat(arr); });
+    allPkc.forEach(function(r){
+      var parts = String((r && r.texto) || "").split("|");
+      if (parts.length < 4) return;
+      var t = String(parts[0]).trim().toUpperCase();
+      var cod = String(parts[1]).trim().toUpperCase();
+      var real = Number(parts[3]);
+      if (t && cod) pkcByTandaCod[t + "|" + cod] = isNaN(real) ? 0 : real;
+    });
+  }
   pend.forEach(function(p){
     const info = npInfo[p.np] || { tanda:"", rs:"" };
     p.rs = info.rs || rsFact[p.np] || "";
@@ -27980,6 +28036,12 @@ async function facCorreccDataRich(){
     p.stkPpal = stk[_ocgNorm(p.ppal)] || 0;
     p.oper = ent[p.np+"|"+_ocgNorm(p.sec)] || ent[p.np+"|"+_ocgNorm(p.ppal)] || null;
     p.estado = factSet[p.np] ? "facturado" : (estadoTanda[info.tanda] || "sinpickear");
+    // PKC: cantidad pickeada del artículo en la tanda (puede ser sec o ppal)
+    var tU = String(p.tanda).trim().toUpperCase();
+    var pkcSec = pkcByTandaCod[tU + "|" + String(p.sec).trim().toUpperCase()];
+    var pkcPpal = pkcByTandaCod[tU + "|" + String(p.ppal).trim().toUpperCase()];
+    p.pkcReal = (pkcSec != null ? pkcSec : 0) + (pkcPpal != null ? pkcPpal : 0);
+    p.pkcHay = pkcSec != null || pkcPpal != null;   // true si hubo al menos un PKC
   });
   return pend;
 }
@@ -28043,7 +28105,7 @@ function facCorreccRender(){
   const BTN = 'width:auto;flex:0 0 auto;background:#16a34a;color:#fff;border:none;border-radius:9px;padding:9px 13px;font-size:13px;font-weight:800;cursor:pointer;white-space:nowrap;';
   const order = [], byNp = {};
   pend.forEach(function(p){ if (!byNp[p.np]){ byNp[p.np] = []; order.push(p.np); } byNp[p.np].push(p); });
-  const _operTxt = function(p){ return p.oper ? ('pedidas ' + Math.round(p.oper.ped) + ' · entregó ' + Math.round(p.oper.entr) + (p.oper.falto>0 ? ' · <b style="color:#b91c1c;">faltó ' + Math.round(p.oper.falto) + '</b>' : '')) : '<span style="color:#94a3b8;">todavía sin picking/armado</span>'; };
+  const _operTxt = function(p){ return p.oper ? ('pedidas ' + Math.round(p.oper.ped) + ' · entregó ' + Math.round(p.oper.entr) + (p.oper.falto>0 ? ' · <b style="color:#b91c1c;">faltó ' + Math.round(p.oper.falto) + '</b>' : '')) : (p.pkcHay ? ('<span style="color:#166534;">pickeadas ' + Math.round(p.pkcReal) + '/' + p.cajas + '</span> · sin armar aún') : '<span style="color:#94a3b8;">todavía sin picking/armado</span>'); };
   order.forEach(function(np){
     const items = byNp[np], p0 = items[0], est = _corrEstado(p0.estado);
     h += '<div style="display:flex;align-items:flex-start;gap:10px;border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;margin-bottom:8px;">'
