@@ -6298,7 +6298,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v9.07";
+const APP_VERSION = "v9.08";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -24803,9 +24803,13 @@ async function dpLoad(force) {
         supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Volumen_Articulos", "select=codigo,m3"),
         supaFetchAllSafe(SUPABASE_CAPACIDAD_ENDPOINT, "select=cod,empresa,sector,cajas_max"),
         supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Insumos", "select=cod,isis,nombre,categoria"),
-        supaFetchAllSafe(SUPABASE_URL + "/rest/v1/PPP_Base_Pedidos", "select=articulo")
+        supaFetchAllSafe(SUPABASE_URL + "/rest/v1/PPP_Base_Pedidos", "select=articulo"),
+        supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Articulos_Discontinuados", "select=cod")   // v9.08: discontinuos → no se muestran
       ]);
       var pppRows = res[0], cajasRows = res[1], volRows = res[2], capRows = res[3], insRows = res[4], pedRows = res[5];
+      // v9.08 — set de códigos DISCONTINUOS (no se venden más). Se excluyen del módulo.
+      var discSet = {};
+      (res[6] || []).forEach(function (r) { var k = _ocgNorm(r.cod); if (k) discSet[k] = true; });
 
       // Indexar por código normalizado
       var cajasMap = {};
@@ -24844,6 +24848,7 @@ async function dpLoad(force) {
         if (!isNaN(na) && !isNaN(nb) && na !== nb) return na - nb;
         return a < b ? -1 : a > b ? 1 : 0;
       }).forEach(function (k) {
+        if (discSet[k]) return;   // v9.08 — discontinuo → no se muestra
         var hC = !!cajasMap[k], hV = k in volMap, hCp = !!capMap[k];
         if (!hC || !hV || !hCp) {
           // Clasificar: insumo / venta / otro
@@ -24939,9 +24944,23 @@ function _dpRenderCard(r) {
         '<span class="dp-dot-g" title="Volumen m³"><span class="dp-dot ' + (r.vol ? "ok" : "miss") + '"></span><span class="dp-dot-label">m³</span></span>' +
         '<span class="dp-dot-g" title="Sector góndola"><span class="dp-dot ' + (r.cap ? "ok" : "miss") + '"></span><span class="dp-dot-label">Sc</span></span>' +
       '</span>' +
+      '<button onclick="event.stopPropagation();dpMarkDiscontinuo(\'' + encodeURIComponent(r.cod) + '\')" title="Marcar DISCONTINUO (no se vende más) → se saca de esta lista" style="width:auto;margin:0 0 0 8px;padding:3px 8px;border:1px solid #fca5a5;border-radius:7px;background:#fee2e2;color:#dc2626;font-size:11px;font-weight:800;cursor:pointer;white-space:nowrap;">🚫 Discontinuo</button>' +
     '</div>' +
     '<div class="dp-form" id="dpF_' + cn + '">' + dpBuildForm(r) + '</div>' +
   '</div>';
+}
+async function dpMarkDiscontinuo(codEnc) {
+  var cod = decodeURIComponent(codEnc);
+  try { if (!confirm("¿Marcar " + cod + " como DISCONTINUO? Se saca de esta lista (no se vende más).")) return; } catch (_e) {}
+  try {
+    var r = await fetch(SUPABASE_URL + "/rest/v1/Articulos_Discontinuados?on_conflict=cod", {
+      method: "POST",
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" },
+      body: JSON.stringify({ cod: cod, motivo: "discontinuo (marcado a mano)" })
+    });
+    if (!r.ok && r.status !== 409) { try { alert("No se pudo marcar (HTTP " + r.status + ")."); } catch (_e) {} return; }
+  } catch (_e) { try { alert("No se pudo marcar (sin conexión)."); } catch (_e2) {} return; }
+  dpLoad(true);   // v9.08 — recargar excluyendo el nuevo discontinuo
 }
 
 function dpToggle(cn) {
