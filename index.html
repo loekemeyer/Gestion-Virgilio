@@ -1725,6 +1725,12 @@ button.pk-anular small{ display:block; font-size:12px; font-weight:700; opacity:
 /* Overlay del panel Admin de Recepción embebido (v2.75) */
 .recp-admin-overlay{ display: none; position: fixed; inset: 0; z-index: 1250; background: #0b1220; flex-direction: column; }
 .recp-admin-overlay.show{ display: flex; }
+/* v8.68 — grilla de botones del hub Configuración (2 columnas, angosto y centrado).
+   Selector con doble clase (.sup-actions.cfg-actions) para ganarle en especificidad a
+   .sup-actions.sup-secondary (que fuerza 7/3 columnas). */
+.sup-actions.cfg-actions{ max-width: 640px; margin: 20px auto 0; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+.cfg-actions .sup-action-btn{ min-height: 92px; font-size: 14px; }
+.cfg-actions .sup-action-btn .sup-ico{ font-size: 26px; }
 .recp-admin-bar{ display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 14px; background: #0b1220; color: #f8fafc; border-bottom: 1px solid #334155; }
 .recp-admin-title{ font-size: 18px; font-weight: bold; }
 .recp-admin-close{ width: auto; margin: 0; padding: 10px 18px; background: #1e293b; color: #f8fafc; border: 1px solid #334155; border-radius: 8px; font-size: 15px; font-weight: bold; cursor: pointer; }
@@ -3543,14 +3549,10 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       <button class="sup-action-btn" onclick="openAgentesAdmin()"><span class="sup-ico">🤖</span><span>Agentes</span></button>
       <button class="sup-action-btn" onclick="openMonitor()"><span class="sup-ico">📊</span><span>Monitor y Análisis</span></button>
       <button class="sup-action-btn" onclick="openInconsistencias()"><span class="sup-ico">⚠</span><span>Inconsistencias</span></button>
-      <button class="sup-action-btn" onclick="openFaltantes()"><span class="sup-ico">📦</span><span>Faltantes</span></button>
       <button class="sup-action-btn" onclick="showGuardarOrden('')"><span class="sup-ico">📋</span><span>Qué bajar primero</span></button>
-      <button class="sup-action-btn" onclick="openCorreccPanel()"><span class="sup-ico">🔀</span><span>Corregir códigos</span></button>
+      <button class="sup-action-btn" onclick="openCorreccPanel()"><span class="sup-ico">🔀</span><span>Corregir códigos de NPs</span></button>
       <button class="sup-action-btn" onclick="openNpConsulta()"><span class="sup-ico">🔎</span><span>Consultar NP / Líos</span></button>
-      <button class="sup-action-btn" onclick="openPrintStation()"><span class="sup-ico">🖨️</span><span>Cola de impresión</span></button>
-      <button class="sup-action-btn" onclick="openPlanimEditor()"><span class="sup-ico">🗺️</span><span>Editar Planimetría</span></button>
-      <button class="sup-action-btn" onclick="openTallEditor()"><span class="sup-ico">👷</span><span>Talleristas de Recepción</span></button>
-      <button class="sup-action-btn" onclick="openMailsEditor()"><span class="sup-ico">✉️</span><span>Mails autorizados</span></button>
+      <button class="sup-action-btn" onclick="openConfiguracion()"><span class="sup-ico">⚙️</span><span>Configuración</span></button>
     </div>
     <style id="ssgSwCss">
       .sup-cfg{max-width:520px;margin:14px auto 0;background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:11px 14px;}
@@ -3562,13 +3564,8 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       .sup-sw-k{position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .15s;box-shadow:0 1px 2px rgba(0,0,0,.3);}
       .sup-sw.on .sup-sw-k{left:23px;}
     </style>
-    <div class="sup-cfg" id="ssgSwitchRow">
-      <div class="sup-cfg-top">
-        <span class="sup-cfg-t">📦 Aviso Telegram “stock en negativo”</span>
-        <span class="sup-sw" id="ssgSw" onclick="toggleSsgAlert()" role="switch"><span class="sup-sw-k"></span></span>
-      </div>
-      <div class="sup-cfg-hint" id="ssgSwHint">Cargando…</div>
-    </div>
+    <!-- v8.68 — El toggle "Aviso Telegram stock en negativo" se movió DENTRO de
+         Configuración (⚙️). Ver #configOverlay más abajo. -->
     <div class="auth-logout-row">
       <button class="auth-logout-btn" onclick="signOutGoogle()">Salir</button>
     </div>
@@ -3704,6 +3701,32 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       </div>
       <div class="planim-sec-t">Lista de súper</div>
       <div id="pppSupersList" class="planim-list"></div>
+    </div>
+  </div>
+
+  <!-- v8.68 — Hub "Configuración": agrupa Cola de impresión, el aviso Telegram de
+       "stock en negativo", Mails autorizados, Editar Planimetría y Talleristas de
+       Recepción (antes eran botones sueltos del home). z-index 1240 → los sub-editores
+       (1250) se abren ENCIMA y al cerrarlos volvés acá. -->
+  <div id="configOverlay" class="recp-admin-overlay" style="z-index:1240;">
+    <div class="recp-admin-bar">
+      <span class="recp-admin-title">⚙️ Configuración</span>
+      <button class="recp-admin-close" onclick="closeConfiguracion()">Cerrar</button>
+    </div>
+    <div class="planim-body">
+      <div class="sup-actions sup-secondary cfg-actions">
+        <button class="sup-action-btn" onclick="cfgGo(openPrintStation)"><span class="sup-ico">🖨️</span><span>Cola de impresión</span></button>
+        <button class="sup-action-btn" onclick="cfgGo(openMailsEditor)"><span class="sup-ico">✉️</span><span>Mails autorizados</span></button>
+        <button class="sup-action-btn" onclick="cfgGo(openPlanimEditor)"><span class="sup-ico">🗺️</span><span>Editar Planimetría</span></button>
+        <button class="sup-action-btn" onclick="cfgGo(openTallEditor)"><span class="sup-ico">👷</span><span>Talleristas de Recepción</span></button>
+      </div>
+      <div class="sup-cfg" id="ssgSwitchRow" style="max-width:none;margin:16px auto 0;">
+        <div class="sup-cfg-top">
+          <span class="sup-cfg-t">📦 Aviso Telegram “stock en negativo”</span>
+          <span class="sup-sw" id="ssgSw" onclick="toggleSsgAlert()" role="switch"><span class="sup-sw-k"></span></span>
+        </div>
+        <div class="sup-cfg-hint" id="ssgSwHint">Cargando…</div>
+      </div>
     </div>
   </div>
 
@@ -6183,7 +6206,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.67";
+const APP_VERSION = "v8.68";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -23719,6 +23742,22 @@ async function pppCountTable(endpoint) {
 // v5.03: declarado ACÁ (antes de su 1er uso en openMailsEditor) para evitar un TDZ
 // "_supervisoresRemotos is not defined" si el login lo toca durante la carga (lo cazó el agente).
 let _supervisoresRemotos = null;
+/* v8.68 — Hub "Configuración": cola de impresión + aviso Telegram + mails + planimetría
+   + talleristas. Al abrir se relee el estado del switch Telegram (loadSsgSwitch): antes
+   solo se cargaba en modo kiosko, por eso al supervisor logueado le quedaba "Cargando…". */
+function openConfiguracion() {
+  if (!requireSupervisor()) return;
+  const ov = document.getElementById("configOverlay");
+  if (ov) ov.classList.add("show");
+  try { loadSsgSwitch(); } catch (_e) {}
+}
+function closeConfiguracion() {
+  const ov = document.getElementById("configOverlay");
+  if (ov) ov.classList.remove("show");
+}
+/* Abre una herramienta del hub cerrando Configuración primero (la cola de impresión
+   usa z-index bajo y quedaría tapada; así todas abren a pantalla completa por igual). */
+function cfgGo(fn) { closeConfiguracion(); try { fn(); } catch (_e) {} }
 function openMailsEditor() {
   if (!requireSupervisor()) return;
   const ov = document.getElementById("mailsEditorOverlay");

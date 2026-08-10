@@ -4,7 +4,17 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-10 · Versión app al documentar: **v8.67**
+> Última actualización: 2026-08-10 · Versión app al documentar: **v8.68**
+>
+> Nota: **v8.68 — Reorganización del menú del supervisor + hub "Configuración".** (1) Nuevo botón
+> **⚙️ Configuración** (`openConfiguracion`, modal `#configOverlay`) que agrupa lo que antes eran
+> botones sueltos: **Cola de impresión, Mails autorizados, Editar Planimetría, Talleristas de
+> Recepción** y el **toggle "Aviso Telegram stock en negativo"**. Los botones del hub cierran
+> Configuración antes de abrir (`cfgGo`) porque la cola de impresión usa z-index bajo (210) y
+> quedaría tapada. (2) **Fix del toggle Telegram**: `loadSsgSwitch()` solo se llamaba en modo
+> kiosko → al supervisor logueado le quedaba "Cargando…". Ahora se llama al abrir Configuración.
+> (3) Botón **"Corregir códigos" → "Corregir códigos de NPs"**. (4) Botón **"Faltantes" quitado**
+> (esos datos ya están en Supabase y en Consultar NP/Líos; `openFaltantes` queda como código muerto).
 >
 > Nota: **v8.67 — Header del Monitor/Inconsistencias en celular angosto (fix de layout).** En
 > pantallas ≤560px el header se encimaba (pestañas Monitor/Análisis, título, reloj, "Cerrar", stats
