@@ -4,7 +4,29 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-10 · Versión app al documentar: **v8.89**
+> Última actualización: 2026-08-10 · Versión app al documentar: **v9.04**
+>
+> Nota: **v8.96–v9.04 — Cajas Pedidas = toda la demanda real + módulo "NP que faltan".**
+> **Demanda (`ocgDemanda`, columna "Cajas Pedidas" del stock):** dejó de contar solo las NP
+> programadas en `PPP_Programacion_Diaria`; ahora arranca desde **TODA** la base de pedidos
+> (`PPP_Base_Pedidos`, misma fuente que el pop-up) y solo descuenta las NP que **ya salieron**:
+> **facturadas** (`Facturacion_NP`) + **entregadas** (`PPP_Entregados_Meta`) + **canceladas**
+> (`NP_Canceladas`, ver abajo). Así la columna coincide con el pop-up de cajas pedidas.
+> **⚠ (v8.97):** una celda de Cajas Pedidas muestra ⚠ cuando parte de su demanda viene de NP que
+> están en la base pero **no** en Programación Diaria (`dem._sinProg`, no-enumerable; helper
+> `_demSPOf`). **Módulo "NP que faltan" (v9.02, botón ⚠️ en la solapa Stocks):** lista esas NP
+> (en la base, sin programar, sin facturar/entregar/cancelar) con **NP · Fecha · Razón Social ·
+> Cajas** + valorizado (total de cajas) + export. Lee la vista **`vista_np_sin_programar`**
+> (`PPP_Base_Pedidos` − prog − facturadas − entregadas − canceladas, agregada por NP). La operadora
+> marca **🚫 "No va"** con motivo (cancelado/error/duplicado/bloqueado/ya salió/reemplazado/otro) →
+> se guarda en **`NP_Canceladas`** (np PK, motivo, legajo, creado; RLS select+insert+delete anon) →
+> la NP deja de contar, deja de disparar ⚠ y desaparece del módulo (refresca el stock al instante).
+> **Columnas nuevas en `PPP_Base_Pedidos`:** `cliente` (razón social, col E del Excel) y `fecha`
+> (col B), sincronizadas por la macro (Apps Script `_pppMapBasePedidos_` en "Carga PPP.gs") y por
+> el import manual de la app (`pppMapBase`). **Otros (v8.92/8.95):** capacidad de góndola por marca
+> en la tabla (códigos duales suman solo los sectores de su marca vía `PICK_UBIC_DUAL`); filtro
+> `> 0` clickeable en TODOS los headers de columna (`_stk.filCol`); se sacó la tira de tarjetas de
+> totales de arriba. Bump `APP_VERSION`/`SW_VERSION` `v9.04`.
 >
 > Nota: **v8.89 — Desconcatenación completa + fix lookups de capacidad/demanda.**
 > En **toda la app** (stocks, racks admin, bajar a góndola, excedente, mover stock, conteo,
