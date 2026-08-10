@@ -6289,7 +6289,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.96";
+const APP_VERSION = "v8.97";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -10578,6 +10578,17 @@ async function ocgDemanda(porEmpresa, soloNoPickeadas) {
     const fac = await supaFetchAll(SUPABASE_FACTURACION_NP_ENDPOINT, "select=np");
     fac.forEach(function (r) { const n = pickNormNp(r.np); if (n) facSet[n] = true; });
   } catch (_e) {}
+  // v8.97 — set de NP PROGRAMADAS (PPP_Programacion_Diaria). Se usa para MARCAR con ⚠ los
+  // códigos cuya demanda incluye NP que están en la base de pedidos pero NO están programadas.
+  // Falla ABIERTO: si no se puede leer, progSet=null → no se marca nada.
+  let progSet = null;
+  if (!soloNoPickeadas) {
+    try {
+      const pr = await supaFetchAll(SUPABASE_PPP_PROG_ENDPOINT, "select=np");
+      progSet = {};
+      pr.forEach(function (r) { const n = pickNormNp(r.np); if (n) progSet[n] = true; });
+    } catch (_e) { progSet = null; }
+  }
   // v8.96 — la columna "Cajas Pedidas" cuenta TODAS las cajas pedidas (estén programadas en
   // PPP_Programacion_Diaria o NO), y solo descuenta las ya facturadas/salidas. Así coincide
   // con el pop-up (que también incluye NP sin programar). Antes arrancaba desde las programadas.
@@ -10605,11 +10616,20 @@ async function ocgDemanda(porEmpresa, soloNoPickeadas) {
     // COLUMNA DE STOCK: todos los NP de la base de pedidos.
     npList = Array.from(base.keys());
   }
-  const dem = {};
+  const dem = {}, sinProg = {};
   npList.forEach(function (np) {
     if (facSet[np]) return;   // ya facturada/salió → no es demanda
-    (base.get(np) || []).forEach(function (it) { const a = _ocgNorm(porEmpresa ? pkCodEmpresa(it.art, np) : it.art); if (a) dem[a] = (dem[a] || 0) + (Number(it.cajas) || 0); });
+    var _noProg = progSet && !progSet[np];   // NP con pedido en la base pero SIN programar en el PPP
+    (base.get(np) || []).forEach(function (it) {
+      const a = _ocgNorm(porEmpresa ? pkCodEmpresa(it.art, np) : it.art); if (!a) return;
+      const c = Number(it.cajas) || 0;
+      dem[a] = (dem[a] || 0) + c;
+      if (_noProg) sinProg[a] = (sinProg[a] || 0) + c;
+    });
   });
+  // v8.97 — devuelve dem (total) + sinProg (parte que viene de NP sin programar, para el ⚠).
+  // Compat: el objeto ES el mapa dem, con sinProg colgado como propiedad no-enumerable.
+  Object.defineProperty(dem, "_sinProg", { value: sinProg, enumerable: false });
   return dem;
 }
 /* v7.33 — COUNTDOWN a la generación AUTOMÁTICA. El cron corre '0 10 * * 3' (miércoles
@@ -11962,6 +11982,9 @@ function stkBodyStocks() {
   // por código base ("437E") pero los saldos tienen sufijo ("437E LK"). Busca exacto primero,
   // fallback al base.
   var _demOf = function (cod) { var k = _ocgNorm(cod); return Number(dem[k] || dem[_ocgNorm(codBase(cod))]) || 0; };
+  // v8.97 — cajas pedidas que vienen de NP SIN programar (en la base pero no en PPP_Programacion_Diaria) → ⚠.
+  var _demSP = (dem && dem._sinProg) || {};
+  var _demSPOf = function (cod) { var k = _ocgNorm(cod); return Number(_demSP[k] || _demSP[_ocgNorm(codBase(cod))]) || 0; };
   var _capOf = function (cod) {
     var k = _ocgNorm(cod);
     if (capByCod[k] != null) return Number(capByCod[k]) || 0;   // match exacto (si la celda tuviera sufijo)
@@ -12184,7 +12207,7 @@ function stkBodyStocks() {
       if (_ocgNorm(a.cod) === _fam._defN) _famTag = ' <span title="Principal de la familia — es el que se debe pedir/mandar" style="color:#16a34a;font-size:10px;">★</span>';
       else _famTag = ' <span title="SECUNDARIO — no deben entrar pedidos acá. El principal es ' + escapeHtml(_equivDisp(_fam, _fam._defN)) + '." style="color:#1e40af;font-size:10px;font-weight:800;">⇄' + escapeHtml(_equivDisp(_fam, _fam._defN)) + '</span>';
     }
-    let tds = '<td class="stk-cod">' + escapeHtml(_codDisplay) + _famTag + '</td><td style="text-align:center;font-weight:800;font-size:11px;padding:3px 4px;color:' + (_lin === "LK" ? "#b91c1c" : (_lin === "CH" ? "#1e40af" : "#94a3b8")) + ';">' + (_lin || "—") + '</td><td class="stk-desc">' + escapeHtml(artNombre(a.cod, a.desc) || "—") + '</td><td class="num ' + (_tot < 0 ? "stk-neg" : "") + '" style="background:#f8fafc"><b>' + fmtCajas(_tot) + '</b></td>' + (_ped ? '<td class="num stk-pick-cell" style="background:#fffbeb;color:#92400e" onclick="event.stopPropagation();stkOpenCajasPedidasArt(\'' + encodeURIComponent(a.cod) + '\')" title="Todas las cajas pedidas (programadas o no) todavía no facturadas. Tocá para ver el detalle por NP"><b>' + fmtCajas(_ped) + '</b></td>' : '<td class="num" style="background:#fffbeb;color:#92400e"></td>') + (_cap ? '<td class="num stk-pick-cell" style="background:#f0fdf4;color:#166534" onclick="event.stopPropagation();stkOpenCapArt(\'' + encodeURIComponent(a.cod) + '\')" title="Ubicaciones y capacidad de góndola"><b>' + fmtCajas(_cap) + '</b></td>' : '<td class="num" style="background:#f0fdf4;color:#166534">—</td>');
+    let tds = '<td class="stk-cod">' + escapeHtml(_codDisplay) + _famTag + '</td><td style="text-align:center;font-weight:800;font-size:11px;padding:3px 4px;color:' + (_lin === "LK" ? "#b91c1c" : (_lin === "CH" ? "#1e40af" : "#94a3b8")) + ';">' + (_lin || "—") + '</td><td class="stk-desc">' + escapeHtml(artNombre(a.cod, a.desc) || "—") + '</td><td class="num ' + (_tot < 0 ? "stk-neg" : "") + '" style="background:#f8fafc"><b>' + fmtCajas(_tot) + '</b></td>' + (_ped ? '<td class="num stk-pick-cell" style="background:#fffbeb;color:#92400e" onclick="event.stopPropagation();stkOpenCajasPedidasArt(\'' + encodeURIComponent(a.cod) + '\')" title="Todas las cajas pedidas (programadas o no) todavía no facturadas. Tocá para ver el detalle por NP"><b>' + fmtCajas(_ped) + '</b>' + (_demSPOf(a.cod) > 0.05 ? ' <span title="⚠ ' + fmtCajas(_demSPOf(a.cod)) + ' caja(s) pedidas están en la base de pedidos pero SIN programar en el PPP (Programación Diaria)" style="cursor:help">⚠️</span>' : '') + '</td>' : '<td class="num" style="background:#fffbeb;color:#92400e"></td>') + (_cap ? '<td class="num stk-pick-cell" style="background:#f0fdf4;color:#166534" onclick="event.stopPropagation();stkOpenCapArt(\'' + encodeURIComponent(a.cod) + '\')" title="Ubicaciones y capacidad de góndola"><b>' + fmtCajas(_cap) + '</b></td>' : '<td class="num" style="background:#f0fdf4;color:#166534">—</td>');
     cols.forEach(function (c) {
       const v = (c.racksKey ? ((Number(a[c.key]) || 0) + (Number(a.racks_ch) || 0)) : (Number(a[c.key]) || 0));
       // v5.82: columnas clickeables → detalle. Pickeados/A facturar → NPs; Excedente/Racks → ubicación.
@@ -13173,6 +13196,9 @@ function stkDescargarExcel() {
   (_stk.cap || []).forEach(function (r) { const k = _ocgNorm(r.cod); if (!k) return; capByCod[k] = (capByCod[k] || 0) + (Number(r.cajas_max) || 0); });
   // v8.88: helpers desconcatenación (mismo patrón que stkBodyStocks)
   var _demOf = function (cod) { var k = _ocgNorm(cod); return Number(dem[k] || dem[_ocgNorm(codBase(cod))]) || 0; };
+  // v8.97 — cajas pedidas que vienen de NP SIN programar (en la base pero no en PPP_Programacion_Diaria) → ⚠.
+  var _demSP = (dem && dem._sinProg) || {};
+  var _demSPOf = function (cod) { var k = _ocgNorm(cod); return Number(_demSP[k] || _demSP[_ocgNorm(codBase(cod))]) || 0; };
   var _capOf = function (cod) {
     var k = _ocgNorm(cod);
     if (capByCod[k] != null) return Number(capByCod[k]) || 0;   // match exacto (si la celda tuviera sufijo)
