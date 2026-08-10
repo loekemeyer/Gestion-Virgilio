@@ -6310,7 +6310,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.84";
+const APP_VERSION = "v8.85";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -12850,6 +12850,31 @@ async function stkOpenMovsArt(codEnc, dep, titulo, icono) {
   _stkPopShell((icono || "🔁") + " " + (titulo || dep) + " — " + escapeHtml(cod), "stkPopBody");
   stkMovsArtRender();   // render inmediato (el NP de cada picking aparece cuando llega el fetch)
   _stkQuienLoad(stkMovsArtRender);   // v6.66 — 👤 siglas + legajo (nombres + sesiones de RT)
+  // v8.71 — resolver "pipeline" al operario real: cargar TP/TAP de las tandas con legajo='pipeline'.
+  try {
+    const tandas = {};
+    _stk.movs.forEach(function (mv) {
+      if (_stkNormCod(mv.cod_art) !== _stkPop.codN || mv.deposito !== dep) return;
+      if (String(mv.legajo || "").trim() !== "pipeline") return;
+      const ref = String(mv.ref || "").toUpperCase().split("|")[0]; if (ref) tandas[ref] = true;
+    });
+    const tList = Object.keys(tandas);
+    if (tList.length) {
+      const H0 = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+      const tIn = tList.map(encodeURIComponent).join(",");
+      Promise.all([
+        fetch(SUPABASE_TABLE_ENDPOINT + "?opcion=eq.TP&texto=in.(" + tIn + ")&select=texto,legajo&order=ts_cliente.desc&limit=3000", { headers: H0, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; }),
+        fetch(SUPABASE_TABLE_ENDPOINT + "?opcion=eq.TAP&texto=in.(" + tIn + ")&select=texto,legajo&order=ts_cliente.desc&limit=3000", { headers: H0, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; })
+      ]).then(function (res) {
+        if (!_stkPop || _stkPop.kind !== "movsArt" || _stkPop.cod !== cod) return;
+        var tp = {}, tap = {};
+        (res[0] || []).forEach(function (x) { var t = String(x.texto || "").trim().toUpperCase(); if (t && !tp[t]) tp[t] = String(x.legajo || "").trim(); });
+        (res[1] || []).forEach(function (x) { var t = String(x.texto || "").trim().toUpperCase(); if (t && !tap[t]) tap[t] = String(x.legajo || "").trim(); });
+        _stkPop._tpByTanda = tp; _stkPop._tapByTanda = tap;
+        stkMovsArtRender();
+      });
+    }
+  } catch (_e) {}
   // v6.32 — NP(s) que pidieron ESTE artículo en cada tanda → para las filas de picking/separado.
   try {
     const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
@@ -12936,6 +12961,20 @@ function _stkRtQuien(ts) {
 /* Chip "👤 SIGLAS · legajo" del movimiento (vacío si no se puede saber quién fue). */
 function _stkQuienChip(mv) {
   let leg = mv.legajo != null ? String(mv.legajo).trim() : "", aprox = false;
+  // v8.71 — "pipeline" NO es una persona: el cron reconciliar_pipeline_stock escribe los
+  // movimientos de picking/separado con legajo='pipeline'. Buscar quién realmente hizo el
+  // TP (picking) o TAP (separado/armado) de esa tanda en _stkPop._tpByTanda / _tapByTanda.
+  if (leg === "pipeline" && _stkPop) {
+    const ref = String(mv.ref || "").toUpperCase().split("|")[0];
+    const tipo = String(mv.tipo || "");
+    if (ref && tipo === "picking" && _stkPop._tpByTanda && _stkPop._tpByTanda[ref]) {
+      leg = _stkPop._tpByTanda[ref]; aprox = false;
+    } else if (ref && tipo === "separado" && _stkPop._tapByTanda && _stkPop._tapByTanda[ref]) {
+      leg = _stkPop._tapByTanda[ref]; aprox = false;
+    } else {
+      leg = ""; // no mostrar "pipeline" — mejor vacío que confuso
+    }
+  }
   if (!leg && String(mv.tipo || "") === "recepcion") { leg = _stkRtQuien(mv.ts); aprox = !!leg; }
   if (!leg) return "";
   const nom = (typeof _empleadosNombres !== "undefined" && _empleadosNombres) ? (_empleadosNombres.get(leg) || "") : "";
