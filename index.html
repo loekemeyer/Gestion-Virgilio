@@ -6289,7 +6289,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.93";
+const APP_VERSION = "v8.94";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -11915,6 +11915,7 @@ function stkToggleSoloNeg() { if (!_stk) return; _stk.soloNeg = !_stk.soloNeg; s
 function stkToggleSoloLow() { if (!_stk) return; _stk.soloLow = !_stk.soloLow; stkRender(); }
 // v8.52 — filtro por línea LK/CH (empresa) + fijar códigos (📌, persistente en localStorage)
 function stkFiltroLinea(l) { if (!_stk) return; _stk.filLinea = (_stk.filLinea === l) ? "" : l; _stk.openArt = null; stkRender(); }
+function stkToggleFilGuardar() { if (!_stk) return; _stk.filGuardar = !_stk.filGuardar; _stk.openArt = null; stkRender(); }   // v8.93 — filtro A guardar > 0
 function stkToggleSoloPin() { if (!_stk) return; _stk.soloPin = !_stk.soloPin; _stk.openArt = null; stkRender(); }
 const STK_PINS_KEY = "stk_pins_vir";
 function _stkPinsLoad() { try { const a = JSON.parse(localStorage.getItem(STK_PINS_KEY) || "[]"); return Array.isArray(a) ? a : []; } catch (_e) { return []; } }
@@ -12055,6 +12056,8 @@ function stkBodyStocks() {
     var _marca = _sfx ? _sfx[1].toUpperCase().replace("LOKE", "LK") : ocLinea(a.cod);
     return _marca === _stk.filLinea;
   });
+  // v8.93 — filtro rápido: tocar el header "A guardar" muestra solo los que tienen a_guardar > 0.
+  if (_stk.filGuardar) shown = shown.filter(function (a) { return (Number(a.a_guardar) || 0) > 0.05; });
   // v7.71 — ocultar la fila del CÓDIGO BASE de una familia empresa-split (ej. "438E") cuando NO
   // tiene stock propio y la familia SÍ tiene stock en su variante LK/CH. El stock físico vive en
   // "438E LK"/"438E CH" y la demanda del base se cubre por la familia; sin esto quedaba una fila
@@ -12143,7 +12146,15 @@ function stkBodyStocks() {
   });
   const ncol = 6 + cols.length + 2;   // +1 LK/CH (v7.89) +1 FC s/Salida (v6.70) +1 caret
   let th = '<th>Código</th><th style="text-align:center;padding:7px 5px;font-size:10px;">LK/<br>CH</th><th>Descripción</th><th class="num" style="background:#eef2ff;color:#1e3a8a;">Total<br>Stock</th><th class="num" style="background:#fef3c7;color:#92400e;" title="Cajas pedidas SOLO de NP programadas en el PPP y todavía NO facturadas (lo que falta pickear). Las NP ya facturadas (ver solapa FC s/Salida) están descontadas. El detalle al tocar el número muestra solo PENDIENTES, pero incluye también NP sin programar — puede dar algo más que la columna.">Cajas<br>Pedidas</th><th class="num" style="background:#dcfce7;color:#166534;">Capacidad<br>góndola</th>';
-  cols.forEach(function (c) { th += '<th class="num">' + c.label.replace(" ", "<br>") + '</th>'; });
+  cols.forEach(function (c) {
+    // v8.93 — el header "A guardar" es clickeable: filtra la tabla a los que tienen a_guardar > 0.
+    if (c.key === "a_guardar") {
+      var _fgOn = !!_stk.filGuardar;
+      th += '<th class="num" onclick="stkToggleFilGuardar()" title="Tocá para mostrar solo los códigos con A guardar > 0" style="cursor:pointer;' + (_fgOn ? "background:#16a34a;color:#fff;" : "") + '">' + c.label.replace(" ", "<br>") + (_fgOn ? " ✓" : " ⌵") + '</th>';
+    } else {
+      th += '<th class="num">' + c.label.replace(" ", "<br>") + '</th>';
+    }
+  });
   th += '<th class="num" style="background:#eef2ff;color:#1e3a8a;" title="Facturado sin salida: mercadería ya facturada (salió del stock contable) pero todavía física en el depósito, sin cargar al camión. Tocá el número para ver las NP.">FC<br>s/Salida</th>';   // v6.70
   h += '<div class="stk-tblwrap"><table class="stk-tbl stk-tbl-fit"><thead><tr>' + th + '<th></th></tr></thead><tbody>';
   if (!shown.length) h += '<tr><td colspan="' + ncol + '" class="stk-empty">' + (_stk.soloNeg ? "✅ No hay stock negativo en ningún depósito." : (_stk.soloLow ? "✅ Todo está en stock — no hay códigos con faltante." : "Sin stock todavía.")) + '</td></tr>';
