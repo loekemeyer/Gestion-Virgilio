@@ -6213,7 +6213,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.70";
+const APP_VERSION = "v8.71";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -11961,9 +11961,14 @@ function stkBodyStocks() {
     : (_terms.length
       ? arts.filter(function (a) { const s = (a.cod + " " + a.desc).toLowerCase(); return _terms.some(function (t) { return s.indexOf(t) >= 0; }); })
       : arts.filter(function (a) { return _stkStockKeys.some(function (k) { return (Number(a[k]) || 0) !== 0; }) || (Number(dem[_ocgNorm(a.cod)]) || 0) > 0 || _fcArtCajas(a.cod) > 0; }));
-  // v7.73: excluir códigos que están en la tabla Insumos de Supabase (gestión separada en solapa Insumos)
+  // v7.73→v8.71: excluir códigos que están en la tabla Insumos, SALVO que tengan
+  // stock en algún depósito de producto (terminado/excedente/separar/facturar/guardar/racks/p.env/rch).
+  // Así un mismo código puede ser insumo Y producto sin desaparecer de Stock.
   const _insCodsSet = new Set((_stk.insumosCods || []).map(function (c) { return String(c || "").trim().toUpperCase(); }));
-  shown = shown.filter(function (a) { return !_insCodsSet.has(String(a.cod || "").trim().toUpperCase()); });
+  shown = shown.filter(function (a) {
+    if (!_insCodsSet.has(String(a.cod || "").trim().toUpperCase())) return true;
+    return (Number(a.terminado) || 0) !== 0 || (Number(a.excedente) || 0) !== 0 || (Number(a.separar_pedidos) || 0) !== 0 || (Number(a.a_facturar) || 0) !== 0 || (Number(a.a_guardar) || 0) !== 0 || (Number(a.racks) || 0) !== 0 || (Number(a.para_envasar) || 0) !== 0 || (Number(a.racks_ch) || 0) !== 0;
+  });
   // v7.48: tilde "🔴 Negativos" — se aplica ADEMÁS del buscador. Deja sólo los artículos con
   // saldo negativo en algún depósito (para cazar inconsistencias de stock de un vistazo).
   // v7.85: solo cuenta stock negativo (no insumos), para que el badge coincida con lo que muestra el filtro
@@ -13048,11 +13053,15 @@ function stkDescargarExcel() {
   const f = (_stk.filtro || "").toLowerCase();
   const SECTKEYS = ["terminado", "excedente", "separar_pedidos", "a_facturar", "a_guardar", "racks", "para_envasar"];
   const _stkStockKeys = SECTKEYS.concat(["racks_ch"]);
+  // v8.71: mismo filtro dinámico que stkBodyStocks — oculta insumos SALVO que tengan stock de producto
   const _insCodsSet = new Set((_stk.insumosCods || []).map(function (c) { return String(c || "").trim().toUpperCase(); }));
   let shown = f
     ? arts.filter(function (a) { return (a.cod + " " + a.desc).toLowerCase().indexOf(f) >= 0; })
     : arts.filter(function (a) { return _stkStockKeys.some(function (k) { return (Number(a[k]) || 0) !== 0; }) || (Number(dem[_ocgNorm(a.cod)]) || 0) > 0 || (Number((_fcArt[_ocgNorm(a.cod)] || {}).cajas) || 0) > 0; });
-  shown = shown.filter(function (a) { return !_insCodsSet.has(String(a.cod || "").trim().toUpperCase()); });
+  shown = shown.filter(function (a) {
+    if (!_insCodsSet.has(String(a.cod || "").trim().toUpperCase())) return true;
+    return (Number(a.terminado) || 0) !== 0 || (Number(a.excedente) || 0) !== 0 || (Number(a.separar_pedidos) || 0) !== 0 || (Number(a.a_facturar) || 0) !== 0 || (Number(a.a_guardar) || 0) !== 0 || (Number(a.racks) || 0) !== 0 || (Number(a.para_envasar) || 0) !== 0 || (Number(a.racks_ch) || 0) !== 0;
+  });
 
   // Preparar datos para Excel — números como número real (no string) para que
   // Excel los trate como numéricos y no como texto.
