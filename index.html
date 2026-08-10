@@ -6289,7 +6289,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.97";
+const APP_VERSION = "v8.98";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -12757,16 +12757,19 @@ async function stkOpenCajasPedidasArt(codEnc) {
   const round1 = function (n) { return Math.round(n * 10) / 10; };
   nps.sort(function (a, b) { return String(a).localeCompare(String(b), undefined, { numeric: true }); });
   const totP = round1(nps.reduce(function (s, np) { return s + pedByNp[np]; }, 0));
-  const rowsArr = nps.map(function (np) { const info = npInfo[np] || {}, t = info.tanda || ""; return { np: np, tanda: t, rs: info.rs || "", fecha: info.fecha || "", pidio: round1(pedByNp[np]), pickeado: !!(t && pickTandas[t]), separado: !!(t && sepTandas[t]) }; });
+  const rowsArr = nps.map(function (np) { const info = npInfo[np] || {}, t = info.tanda || ""; return { np: np, tanda: t, rs: info.rs || "", fecha: info.fecha || "", sinProg: !npInfo[np], pidio: round1(pedByNp[np]), pickeado: !!(t && pickTandas[t]), separado: !!(t && sepTandas[t]) }; });
   _stkPop = { kind: "cajasPed", cod: cod, rows: rowsArr };   // v5.104: guardar para el export a Excel
-  let h = '<div class="stkpop-hint"><b>' + escapeHtml(_codDisp) + '</b>' + (_empFiltro ? ' <b style="color:' + (_empFiltro === "LK" ? "#b91c1c" : "#1e40af") + '">' + _empFiltro + '</b>' : '') + ' · pedido <b>PENDIENTE</b>: <b>' + totP + ' cajas</b> en ' + nps.length + ' NP(s)' + (yaFact ? ' <small style="color:#94a3b8">(+' + yaFact + ' NP ya facturadas — no se muestran; verlas en 🕓 Historial)</small>' : '') + '.<br><small style="color:#94a3b8">Incluye NP programadas y sin programar (mismo criterio que la columna).</small></div>';
+  // v8.98 — cuáles NP están SIN programar en el PPP (las que disparan el ⚠ de la columna). Es "el argumento".
+  var _spRows = rowsArr.filter(function (r) { return r.sinProg; });
+  var _cSP = round1(_spRows.reduce(function (s, r) { return s + r.pidio; }, 0));
+  let h = '<div class="stkpop-hint"><b>' + escapeHtml(_codDisp) + '</b>' + (_empFiltro ? ' <b style="color:' + (_empFiltro === "LK" ? "#b91c1c" : "#1e40af") + '">' + _empFiltro + '</b>' : '') + ' · pedido <b>PENDIENTE</b>: <b>' + totP + ' cajas</b> en ' + nps.length + ' NP(s)' + (yaFact ? ' <small style="color:#94a3b8">(+' + yaFact + ' NP ya facturadas — no se muestran; verlas en 🕓 Historial)</small>' : '') + '.' + (_spRows.length > 0 ? '<br><small style="color:#b45309">⚠️ ' + _spRows.length + ' NP (' + _cSP + ' cajas) en la base pero SIN programar en el PPP — marcadas ⚠️ abajo (esto dispara el ⚠️ de la columna).</small>' : '') + '</div>';
   h += '<div style="margin-bottom:10px"><button class="mva-clear" style="background:#166534;color:#fff;border-color:#166534" onclick="stkCajasPedidasExport()">⬇ Exportar a Excel</button></div>';
   // v8.90: formato tabla en lugar de lista
   h += '<div class="mva-tblwrap"><table class="mva-tbl"><thead><tr><th>NP</th><th>Razón Social</th><th class="num">Cajas</th><th style="text-align:center">📦 Pick</th><th style="text-align:center">🧾 Arm</th></tr></thead><tbody>';
   h += rowsArr.map(function (r) {
     var pkCell = r.pickeado ? '<span style="color:#166534;font-weight:800">✓' + stkSigBadge(stkSigla(pickerByTanda[r.tanda]), "#166534") + '</span>' : '<span style="color:#b45309">—</span>';
     var spCell = r.separado ? '<span style="color:#1e40af;font-weight:800">✓' + stkSigBadge(stkSigla(sepByTanda[r.tanda]), "#1e40af") + '</span>' : '<span style="color:#94a3b8">—</span>';
-    return '<tr><td><b>' + escapeHtml(r.np) + '</b>' + (r.tanda ? ' <small style="color:#94a3b8">' + escapeHtml(r.tanda) + '</small>' : '') + (r.fecha ? '<br><small style="color:#64748b">📅 ' + escapeHtml(r.fecha) + '</small>' : '') + '</td><td style="font-size:12px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escapeHtml(r.rs || "—") + '</td><td class="num"><b>' + r.pidio + '</b></td><td style="text-align:center">' + pkCell + '</td><td style="text-align:center">' + spCell + '</td></tr>';
+    return '<tr' + (r.sinProg ? ' style="background:#fffbeb"' : '') + '><td><b>' + escapeHtml(r.np) + '</b>' + (r.sinProg ? ' <span title="En la base de pedidos pero SIN programar en el PPP" style="cursor:help">⚠️</span>' : '') + (r.tanda ? ' <small style="color:#94a3b8">' + escapeHtml(r.tanda) + '</small>' : '') + (r.fecha ? '<br><small style="color:#64748b">📅 ' + escapeHtml(r.fecha) + '</small>' : '') + '</td><td style="font-size:12px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escapeHtml(r.rs || "—") + '</td><td class="num"><b>' + r.pidio + '</b></td><td style="text-align:center">' + pkCell + '</td><td style="text-align:center">' + spCell + '</td></tr>';
   }).join("") + '</tbody>';
   h += '<tfoot><tr style="font-weight:800;border-top:2px solid #334155"><td colspan="2">TOTAL (' + nps.length + ' NP)</td><td class="num">' + totP + '</td><td></td><td></td></tr></tfoot></table></div>';
   if (body) body.innerHTML = h;
