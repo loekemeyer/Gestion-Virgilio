@@ -6289,7 +6289,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.92";
+const APP_VERSION = "v8.93";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -12117,11 +12117,7 @@ function stkBodyStocks() {
   h += '</div>';
   // v8.91 — la tarjeta "horas de guardado pendientes" se movió al pop-up "¿Qué bajar primero?"
   // (renderGuardarOrden) para que se calcule con los saldos frescos de vista_saldos_stock.
-  // v5.53 — dos pop-ups: NPs por estadio (pickeado→facturar) y movimientos de góndola.
-  h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">' +
-    '<button onclick="stkCrearCodigoNuevo()" style="width:auto;margin:0;padding:9px 13px;border:1px solid #f87171;border-radius:10px;background:#fee2e2;color:#dc2626;font-size:13px;font-weight:800;cursor:pointer;">➕ Crear código</button>' +
-    '<button onclick="stkDescargarExcel()" style="width:auto;margin:0;padding:9px 13px;border:1px solid #dbeafe;border-radius:10px;background:#eff6ff;color:#1e40af;font-size:13px;font-weight:800;cursor:pointer;">📥 Descargar Excel</button>' +
-    '</div>';
+  // v8.93 — se sacaron los botones "➕ Crear código" y "📥 Descargar Excel" de acá (pedido del usuario).
   // Teclado NUMÉRICO por defecto (los códigos son números); botón "E" para los
   // importados (506 → 506E) sin tener que cambiar de teclado (pedido del dueño).
   // v8.52 — búsqueda de VARIOS códigos + filtro LK/CH + Fijados. Botones en fila (wrap si no entran).
