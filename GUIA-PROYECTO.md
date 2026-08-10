@@ -4,7 +4,20 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-10 · Versión app al documentar: **v9.04**
+> Última actualización: 2026-08-10 · Versión app al documentar: **v9.09**
+>
+> Nota: **OCs — consolidación de familias en el principal + discontinuos (2026-08-10, solo Supabase).**
+> **`vista_generador_oc`** ahora **consolida la proyección de las familias de equivalentes en el
+> PRINCIPAL**: en la CTE `proy`, cada código secundario (de `Equivalencias_Familia`) se remapea a su
+> `cod_principal` y se **suma** su `proy` al del principal; el secundario queda con `proy=0`. Así el
+> principal pide por **toda la familia** y el secundario deja de pedir por proyección. Además se puso
+> **`activo=false`** en `OC_Maximos` a **todos los secundarios** de `Equivalencias_Familia` (el front y
+> el cron sólo generan `activo=true`), para que tampoco pidan por capacidad/pedidos. Es **durable**: la
+> consolidación pasa al LEER la vista, así que el sync mensual de `proyeccion_madre` (por código) no la
+> revierte. Backup de la def anterior de la vista quedó en el historial (pg_get_viewdef). **Discontinuos
+> sueltos** (no de familia): se pusieron `activo=false` en `OC_Maximos` a **618, 619, 724, 759**
+> (652/771/957EL no existían en el sistema de OCs). Módulo "Completar datos producto" excluye la tabla
+> **`Articulos_Discontinuados`** (15,75,563,396,456,517,556 + 029,030,828,830 reemplazados por 437E/438E).
 >
 > Nota: **v8.96–v9.04 — Cajas Pedidas = toda la demanda real + módulo "NP que faltan".**
 > **Demanda (`ocgDemanda`, columna "Cajas Pedidas" del stock):** dejó de contar solo las NP
