@@ -36,6 +36,15 @@
 > `vol_art_insert_auth` + `vol_art_update_auth` en `Volumen_Articulos` para que supervisores
 > autenticados puedan insertar/actualizar m³.
 >
+> Nota: **v8.80–v8.81 — Facturación: columna "Cajas" + limpieza de columnas.** (v8.80) Nueva columna
+> **Cajas** a la derecha de Líos en la tabla "NPs a FC": muestra `sum(cajas_pedidas)` por NP desde
+> `Entregas_Virgilio` (reutiliza `_facCajas`, sin query nueva). La columna Líos vuelve a mostrar
+> **solo líos** (se quitó el caso especial que mostraba cajas para zona Súper). CSS `.fac-cajas-cell`
+> en azul (`#0369a1`) para diferenciar del ámbar de Líos. (v8.81) Se eliminaron las columnas
+> **Dirección, M3, Localidad y Zona** del módulo Facturación (sin uso). Los anchos se redistribuyeron
+> en las columnas restantes. Columnas finales: **Tanda · Salida · NP · Cod · Razón Social · Faltantes
+> · Cambiar cód · Líos · Cajas · Acción**.
+>
 > Nota: **v8.79 — Faltantes x día: se quitó la columna "🔴 Faltó armado" (pedido del usuario).** La
 > tabla pasa de 10 a **9 columnas fijas**. El dato real (`realFalt`) **NO se borró**: se sigue usando
 > en el resumen de arriba (chip "🔴 X faltaron al armar") y como **desempate del orden** (fabricante →

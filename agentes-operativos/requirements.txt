@@ -1,0 +1,3 @@
+# Agentes operativos — Producción Virgilio (Claude Managed Agents)
+# pip install -r requirements.txt
+anthropic>=0.40.0
