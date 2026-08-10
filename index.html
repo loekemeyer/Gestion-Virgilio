@@ -24685,9 +24685,10 @@ async function dpLoad(force) {
         supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Articulos_Cajas", "select=Cod_Art,Descripcion,Marca,N_Caja,Uni_x_Caja"),
         supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Volumen_Articulos", "select=codigo,m3"),
         supaFetchAllSafe(SUPABASE_CAPACIDAD_ENDPOINT, "select=cod,empresa,sector,cajas_max"),
-        supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Insumos", "select=cod,isis,nombre,categoria")
+        supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Insumos", "select=cod,isis,nombre,categoria"),
+        supaFetchAllSafe(SUPABASE_URL + "/rest/v1/PPP_Base_Pedidos", "select=articulo")
       ]);
-      var pppRows = res[0], cajasRows = res[1], volRows = res[2], capRows = res[3], insRows = res[4];
+      var pppRows = res[0], cajasRows = res[1], volRows = res[2], capRows = res[3], insRows = res[4], pedRows = res[5];
 
       // Indexar por código normalizado
       var cajasMap = {};
@@ -24712,9 +24713,10 @@ async function dpLoad(force) {
         if (dk) insIsisMap[dk] = { nombre: r.nombre || "", cat: r.categoria || "" };
       });
 
-      // Códigos únicos de PPP
+      // Códigos únicos: PPP_Programacion_Diaria + PPP_Base_Pedidos (pedidos activos)
       var pppSet = {};
       pppRows.forEach(function (r) { var k = _ocgNorm(r.cod); if (k) pppSet[k] = r.cod; });
+      pedRows.forEach(function (r) { var k = _ocgNorm(r.articulo); if (k && !pppSet[k]) pppSet[k] = r.articulo; });
 
       await loadArtNombres();
 
