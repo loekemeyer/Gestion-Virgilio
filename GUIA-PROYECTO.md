@@ -4,7 +4,13 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-10 · Versión app al documentar: **v8.69**
+> Última actualización: 2026-08-10 · Versión app al documentar: **v8.70**
+>
+> Nota: **v8.70 — Buscador de "Trazar artículo" (Órdenes de Compra) igual al de Stocks/Faltantes.**
+> El input pasó a `type="text" inputmode="numeric" enterkeyhint="search" autocomplete="off"` (teclado
+> numérico, no te saca del campo — `ocRender` ya usa `_renderKeepFocus`). Y el match se hizo
+> **tolerante a la E**: como el teclado numérico no tipea "E", el filtro compara por BASE del código
+> (normalizado sin la E final), así "437" encuentra "437E" (helper `_base` en `ocBodyTrazar`).
 >
 > Nota: **v8.69 — Monitor / Análisis / Inconsistencias = un solo botón.** En el home quedó un
 > único botón **"Monitor / Análisis / Inconsistencias"** (`openMonitor`, abre por defecto la

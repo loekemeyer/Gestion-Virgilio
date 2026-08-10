@@ -6213,7 +6213,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.69";
+const APP_VERSION = "v8.70";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -10030,16 +10030,23 @@ async function ocTrazar() {
   if (!_oc.max) { try { _oc.max = await ocgFetchMaximos(); } catch (_e) { _oc.max = []; } ocRender(); }
 }
 function ocBodyTrazar() {
-  let h = '<div class="oc-tools"><button class="oc-btn" onclick="ocBack()">← Volver</button><input class="oc-filtro" type="search" placeholder="🔎 Código o descripción del artículo" value="' + escapeHtml(_oc.trazaCod || "") + '" oninput="if(_oc){_oc.trazaCod=this.value;ocRender();}"></div>';
+  // v8.70 — buscador igual al de Stocks/Faltantes: teclado numérico + E (inputmode numeric,
+  // enterkeyhint search, autocomplete off). El render usa _renderKeepFocus → no te saca del campo.
+  let h = '<div class="oc-tools"><button class="oc-btn" onclick="ocBack()">← Volver</button><input class="oc-filtro" type="text" inputmode="numeric" enterkeyhint="search" autocomplete="off" placeholder="🔎 Buscar código" value="' + escapeHtml(_oc.trazaCod || "") + '" oninput="if(_oc){_oc.trazaCod=this.value;ocRender();}"></div>';
   if (!_oc.max) return h + '<div class="oc-loading">Cargando config de artículos…</div>';
   const q = (_oc.trazaCod || "").trim();
   if (!q) return h + '<div class="oc-empty">Escribí un código (ej. <b>027</b>) o parte de la descripción para trazar el artículo de punta a punta.</div>';
-  const qn = _ocgNorm(q), ql = q.toLowerCase();
-  // Config: fila de OC_Maximos que matchea por clave normalizada o por descripción.
-  const cfg = (_oc.max || []).filter(function (m) { return _ocgNorm(m.cod) === qn || String(m.descripcion || "").toLowerCase().indexOf(ql) >= 0; });
-  // Órdenes: líneas de Ordenes_Compra del mismo artículo (por clave normalizada de los cfg o del query).
-  const claves = {}; cfg.forEach(function (m) { claves[_ocgNorm(m.cod)] = true; }); if (qn) claves[qn] = true;
-  const ordenes = (_oc.rows || []).filter(function (r) { return claves[_ocgNorm(r.codigo)]; });
+  const ql = q.toLowerCase();
+  // v8.70 — match TOLERANTE a la E (como Stocks/Faltantes): con teclado numérico no se
+  // puede tipear la "E", así que "437" tiene que encontrar "437E". Comparamos por BASE
+  // (código normalizado sin la E final): 437 y 437E comparten base "437".
+  const _base = function (c) { return _ocgNorm(c).replace(/E$/, ""); };
+  const qb = _base(q);
+  // Config: fila de OC_Maximos que matchea por base del código o por descripción.
+  const cfg = (_oc.max || []).filter(function (m) { return (qb && _base(m.cod) === qb) || String(m.descripcion || "").toLowerCase().indexOf(ql) >= 0; });
+  // Órdenes: líneas de Ordenes_Compra del mismo artículo (por base de los cfg o del query).
+  const claves = {}; cfg.forEach(function (m) { claves[_base(m.cod)] = true; }); if (qb) claves[qb] = true;
+  const ordenes = (_oc.rows || []).filter(function (r) { return claves[_base(r.codigo)]; });
   if (!cfg.length && !ordenes.length) return h + '<div class="oc-empty">No encontré ese artículo ni en la config (OC_Maximos) ni en las órdenes.</div>';
   const cod0 = cfg.length ? codCanon(cfg[0].cod) : codCanon(q);
   const nombre = artNombre(cod0, cfg.length ? cfg[0].descripcion : (ordenes[0] && ordenes[0].descripcion) || "");
