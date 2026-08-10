@@ -103,6 +103,43 @@ button {
   .sup-actions.sup-secondary { grid-template-columns: repeat(3, 1fr); }
   .sup-primary .sup-action-btn { min-height: 120px; }
 }
+/* v8.80 — Badge + pantalla "Completar datos producto" */
+.dp-badge {
+  position:absolute; top:2px; right:2px; min-width:18px; height:18px; padding:0 5px;
+  border-radius:999px; background:#dc2626; color:#fff;
+  font-size:10px; font-weight:800; line-height:18px; text-align:center; pointer-events:none;
+}
+.dp-badge.ok { background:#16a34a; }
+.dp-summary { font-size:13px; color:#64748b; margin-bottom:10px; }
+.dp-list { display:flex; flex-direction:column; gap:8px; max-width:640px; margin:0 auto; }
+.dp-card { background:#fff; border:1px solid #e2e8f0; border-radius:10px; overflow:hidden; }
+.dp-card-head { display:flex; align-items:center; gap:8px; padding:10px 14px; cursor:pointer; user-select:none; }
+.dp-card-head:hover { background:#f8fafc; }
+.dp-cod { font-size:16px; font-weight:800; color:#0f172a; min-width:54px; }
+.dp-desc { flex:1; font-size:13px; color:#64748b; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.dp-dots { display:flex; gap:6px; flex-shrink:0; align-items:flex-start; }
+.dp-dot-g { display:flex; flex-direction:column; align-items:center; gap:1px; }
+.dp-dot { width:12px; height:12px; border-radius:50%; }
+.dp-dot.ok { background:#16a34a; }
+.dp-dot.miss { background:#dc2626; }
+.dp-dot-label { font-size:8px; color:#94a3b8; line-height:1; }
+.dp-form { display:none; padding:0 14px 14px; border-top:1px solid #e2e8f0; }
+.dp-form.open { display:block; padding-top:12px; }
+.dp-sec-title { font-size:11.5px; font-weight:700; color:#475569; margin:10px 0 6px; padding-bottom:4px; border-bottom:1px solid #f1f5f9; }
+.dp-sec-title:first-child { margin-top:0; }
+.dp-row { display:flex; gap:8px; align-items:center; margin-bottom:6px; flex-wrap:wrap; }
+.dp-lbl { font-size:11.5px; font-weight:600; color:#64748b; min-width:70px; flex-shrink:0; }
+.dp-inp { flex:1; min-width:80px; padding:6px 9px; font-size:13px; border:1px solid #cbd5e1; border-radius:6px; box-sizing:border-box; }
+.dp-inp:focus { border-color:#3b82f6; outline:none; }
+.dp-sel { padding:6px 9px; font-size:13px; border:1px solid #cbd5e1; border-radius:6px; background:#fff; }
+.dp-save-row { margin-top:8px; display:flex; align-items:center; gap:10px; }
+.dp-save-btn { padding:7px 20px; font-size:13px; font-weight:700; background:#1e6bd6; color:#fff; border:none; border-radius:8px; cursor:pointer; }
+.dp-save-btn:hover { background:#1d4ed8; }
+.dp-save-btn:disabled { opacity:.5; cursor:default; }
+.dp-msg { font-size:12px; }
+.dp-msg.ok { color:#166534; }
+.dp-msg.err { color:#b42318; }
+.dp-done-tag { display:inline-block; font-size:10px; font-weight:700; color:#166534; background:#dcfce7; padding:2px 8px; border-radius:6px; }
 /* Nombre del usuario logueado, fijo arriba a la izquierda. */
 #userTag {
   position: fixed; top: 8px; left: 8px; z-index: 60;
@@ -3569,6 +3606,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       <button class="sup-action-btn" onclick="showGuardarOrden('')"><span class="sup-ico">📋</span><span>Qué bajar primero</span></button>
       <button class="sup-action-btn" onclick="openCorreccPanel()"><span class="sup-ico">🔀</span><span>Corregir códigos de NPs</span></button>
       <button class="sup-action-btn" onclick="openNpConsulta()"><span class="sup-ico">🔎</span><span>Consultar NP / Líos</span></button>
+      <button class="sup-action-btn" onclick="openDatosProducto()" style="position:relative;"><span class="sup-ico">🚦</span><span>Completar datos producto</span><span id="dpBadge" class="dp-badge" style="display:none;"></span></button>
       <button class="sup-action-btn" onclick="openConfiguracion()"><span class="sup-ico">⚙️</span><span>Configuración</span></button>
     </div>
     <style id="ssgSwCss">
@@ -3817,6 +3855,22 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       <input id="tallArtsSearch" class="planim-inp planim-search" type="text" placeholder="🔍 Buscar artículo (código o descripción)…" oninput="tallArtsRender(this.value)">
       <div id="tallArtsList" class="planim-list"></div>
       <div id="tallArtsStatus" class="planim-status"></div>
+    </div>
+  </div>
+
+  <!-- v8.80 — Completar datos producto: muestra códigos con datos faltantes y permite
+       cargarlos (Articulos_Cajas, Volumen_Articulos, Capacidad_Sector). -->
+  <div id="datosProductoOverlay" class="recp-admin-overlay">
+    <div class="recp-admin-bar">
+      <span class="recp-admin-title">🚦 Completar datos producto</span>
+      <button class="recp-admin-close" onclick="closeDatosProducto()">Cerrar</button>
+    </div>
+    <div class="planim-body">
+      <div style="max-width:640px;margin:0 auto;">
+        <div id="dpSummary" class="dp-summary">Cargando…</div>
+        <input id="dpSearch" type="text" class="planim-inp planim-search" placeholder="🔍 Buscar código…" oninput="dpRender(this.value)" style="margin-bottom:10px;">
+        <div id="dpList" class="dp-list"></div>
+      </div>
     </div>
   </div>
 
@@ -6223,7 +6277,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.81";
+const APP_VERSION = "v8.82";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -24293,6 +24347,260 @@ async function tallArtDelete(el) {
   } catch (_e) { tallArtsSetStatus("Sin conexión.", false); }
 }
 
+/* ================================================================
+   v8.80 — COMPLETAR DATOS PRODUCTO
+   Detecta códigos que aparecen en PPP_Programacion_Diaria pero les faltan
+   datos en Articulos_Cajas (empaque), Volumen_Articulos (m³) o
+   Capacidad_Sector (ubicación en góndola). Permite cargarlos inline.
+   ================================================================ */
+let _dpCache = null;    // { missing: [...], ts }
+let _dpInflight = null;
+
+function openDatosProducto() {
+  if (!requireSupervisor()) return;
+  var ov = document.getElementById("datosProductoOverlay");
+  if (ov) ov.classList.add("show");
+  var s = document.getElementById("dpSearch"); if (s) s.value = "";
+  dpLoad();
+}
+function closeDatosProducto() {
+  var ov = document.getElementById("datosProductoOverlay");
+  if (ov) ov.classList.remove("show");
+}
+
+/* Carga completa: 4 tablas en paralelo → arma lista de faltantes → badge + render. */
+async function dpLoad(force) {
+  if (!force && _dpCache && (Date.now() - _dpCache.ts) < 300000) {
+    dpUpdateBadge(_dpCache.missing.length);
+    dpRender(""); return;
+  }
+  if (_dpInflight) return _dpInflight;
+  var sum = document.getElementById("dpSummary");
+  var list = document.getElementById("dpList");
+  if (sum) sum.textContent = "Cargando datos…";
+  if (list) list.innerHTML = '<div class="planim-empty">Cargando…</div>';
+
+  _dpInflight = (async function () {
+    try {
+      var res = await Promise.all([
+        supaFetchAllSafe(SUPABASE_URL + "/rest/v1/PPP_Programacion_Diaria", "select=cod"),
+        supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Articulos_Cajas", "select=Cod_Art,Descripcion,Marca,N_Caja,Uni_x_Caja"),
+        supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Volumen_Articulos", "select=codigo,m3"),
+        supaFetchAllSafe(SUPABASE_CAPACIDAD_ENDPOINT, "select=cod,empresa,sector,cajas_max")
+      ]);
+      var pppRows = res[0], cajasRows = res[1], volRows = res[2], capRows = res[3];
+
+      // Indexar por código normalizado
+      var cajasMap = {};
+      cajasRows.forEach(function (r) {
+        var k = _ocgNorm(r.Cod_Art);
+        if (k && !cajasMap[k]) cajasMap[k] = { desc: r.Descripcion || "", marca: r.Marca || "", ncaja: r.N_Caja, uxc: r.Uni_x_Caja };
+      });
+      var volMap = {};
+      volRows.forEach(function (r) { var k = _ocgNorm(r.codigo); if (k) volMap[k] = +r.m3; });
+      var capMap = {};
+      capRows.forEach(function (r) {
+        var k = _ocgNorm(r.cod); if (!k) return;
+        if (!capMap[k]) capMap[k] = [];
+        capMap[k].push({ empresa: r.empresa, sector: r.sector, cajas_max: r.cajas_max });
+      });
+
+      // Códigos únicos de PPP
+      var pppSet = {};
+      pppRows.forEach(function (r) { var k = _ocgNorm(r.cod); if (k) pppSet[k] = r.cod; });
+
+      await loadArtNombres();
+
+      var missing = [];
+      Object.keys(pppSet).sort(function (a, b) {
+        var na = parseInt(a, 10), nb = parseInt(b, 10);
+        if (!isNaN(na) && !isNaN(nb) && na !== nb) return na - nb;
+        return a < b ? -1 : a > b ? 1 : 0;
+      }).forEach(function (k) {
+        var hC = !!cajasMap[k], hV = k in volMap, hCp = !!capMap[k];
+        if (!hC || !hV || !hCp) {
+          missing.push({
+            cod: pppSet[k] || k, codNorm: k,
+            desc: artNombre(k) || (cajasMap[k] && cajasMap[k].desc) || "",
+            cajas: hC, vol: hV, cap: hCp,
+            cajasData: cajasMap[k] || null,
+            volVal: hV ? volMap[k] : null,
+            capData: capMap[k] || null
+          });
+        }
+      });
+
+      _dpCache = { missing: missing, ts: Date.now() };
+      dpUpdateBadge(missing.length);
+      dpRender("");
+    } catch (e) {
+      if (sum) sum.textContent = "Error: " + (e.message || e);
+      if (list) list.innerHTML = '<div class="planim-empty">Error al cargar.</div>';
+    } finally { _dpInflight = null; }
+  })();
+  return _dpInflight;
+}
+
+function dpUpdateBadge(count) {
+  var b = document.getElementById("dpBadge"); if (!b) return;
+  if (count > 0) {
+    b.textContent = String(count); b.style.display = ""; b.className = "dp-badge";
+  } else {
+    b.textContent = "✓"; b.style.display = ""; b.className = "dp-badge ok";
+  }
+}
+
+/* Badge liviano: se llama desde showSupervisor (fire-and-forget). */
+async function dpLoadBadge() { try { await dpLoad(); } catch (_e) {} }
+
+function dpRender(filter) {
+  var list = document.getElementById("dpList"); if (!list) return;
+  var sum = document.getElementById("dpSummary");
+  if (!_dpCache) { list.innerHTML = '<div class="planim-empty">Cargando…</div>'; return; }
+  var rows = _dpCache.missing;
+  var f = String(filter || "").trim().toLowerCase();
+  if (f) rows = rows.filter(function (r) { return (r.cod + " " + r.desc).toLowerCase().indexOf(f) >= 0; });
+
+  if (!rows.length) {
+    list.innerHTML = '<div class="planim-empty">' + (f ? "Nada coincide." : "✅ ¡Todos los productos tienen datos completos!") + "</div>";
+    if (sum && !f) sum.textContent = "0 productos con datos faltantes";
+    return;
+  }
+  if (sum && !f) sum.textContent = rows.length + " producto(s) con datos faltantes — tocá uno para completar";
+
+  list.innerHTML = rows.map(function (r) {
+    var cn = r.codNorm;
+    var falta = [];
+    if (!r.cajas) falta.push("Cajas");
+    if (!r.vol) falta.push("m³");
+    if (!r.cap) falta.push("Sector");
+    return '<div class="dp-card" id="dpC_' + cn + '">' +
+      '<div class="dp-card-head" onclick="dpToggle(\'' + cn + '\')">' +
+        '<span class="dp-cod">' + escapeHtml(r.cod) + '</span>' +
+        '<span class="dp-desc">' + escapeHtml(r.desc || "(sin nombre)") + '</span>' +
+        '<span class="dp-dots">' +
+          '<span class="dp-dot-g" title="Cajas (empaque)"><span class="dp-dot ' + (r.cajas ? "ok" : "miss") + '"></span><span class="dp-dot-label">Cj</span></span>' +
+          '<span class="dp-dot-g" title="Volumen m³"><span class="dp-dot ' + (r.vol ? "ok" : "miss") + '"></span><span class="dp-dot-label">m³</span></span>' +
+          '<span class="dp-dot-g" title="Sector góndola"><span class="dp-dot ' + (r.cap ? "ok" : "miss") + '"></span><span class="dp-dot-label">Sc</span></span>' +
+        '</span>' +
+      '</div>' +
+      '<div class="dp-form" id="dpF_' + cn + '">' + dpBuildForm(r) + '</div>' +
+    '</div>';
+  }).join("");
+}
+
+function dpToggle(cn) {
+  var f = document.getElementById("dpF_" + cn);
+  if (f) f.classList.toggle("open");
+}
+
+function dpBuildForm(r) {
+  var cn = r.codNorm;
+  var html = "";
+
+  // Sección: CAJAS (Articulos_Cajas)
+  if (!r.cajas) {
+    html += '<div class="dp-sec-title">📦 Datos de empaque <small>(Articulos_Cajas)</small></div>';
+    html += '<div class="dp-row"><span class="dp-lbl">Descripción</span><input class="dp-inp" id="dpCjDesc_' + cn + '" placeholder="Ej: COLADOR N°8" value="' + escapeHtml(r.desc || "") + '"></div>';
+    html += '<div class="dp-row"><span class="dp-lbl">Marca</span><select class="dp-sel" id="dpCjMarca_' + cn + '"><option value="LK">LK</option><option value="CH">CH</option><option value="LOKE">LOKE</option></select></div>';
+    html += '<div class="dp-row"><span class="dp-lbl">N° Caja</span><input class="dp-inp" id="dpCjNCaja_' + cn + '" type="number" min="1" placeholder="Tipo caja" style="max-width:100px;"></div>';
+    html += '<div class="dp-row"><span class="dp-lbl">Uni × Caja</span><input class="dp-inp" id="dpCjUxC_' + cn + '" type="number" min="1" placeholder="Unidades" style="max-width:100px;"></div>';
+    html += '<div class="dp-save-row"><button class="dp-save-btn" onclick="dpSaveCajas(\'' + cn + '\')">Guardar empaque</button><span class="dp-msg" id="dpCjMsg_' + cn + '"></span></div>';
+  } else {
+    html += '<div class="dp-sec-title">📦 Empaque <span class="dp-done-tag">✓ cargado</span></div>';
+  }
+
+  // Sección: VOLUMEN (Volumen_Articulos)
+  if (!r.vol) {
+    html += '<div class="dp-sec-title">📐 Volumen m³ <small>(Volumen_Articulos)</small></div>';
+    html += '<div class="dp-row"><span class="dp-lbl">m³</span><input class="dp-inp" id="dpVolM3_' + cn + '" type="number" step="0.0001" min="0" placeholder="0.0051" style="max-width:130px;"></div>';
+    html += '<div class="dp-save-row"><button class="dp-save-btn" onclick="dpSaveVol(\'' + cn + '\')">Guardar m³</button><span class="dp-msg" id="dpVolMsg_' + cn + '"></span></div>';
+  } else {
+    html += '<div class="dp-sec-title">📐 Volumen <span class="dp-done-tag">✓ ' + (r.volVal != null ? r.volVal + ' m³' : 'cargado') + '</span></div>';
+  }
+
+  // Sección: SECTOR (Capacidad_Sector)
+  if (!r.cap) {
+    html += '<div class="dp-sec-title">🗺️ Sector de góndola <small>(Capacidad_Sector)</small></div>';
+    html += '<div class="dp-row"><span class="dp-lbl">Empresa</span><select class="dp-sel" id="dpCapEmp_' + cn + '"><option value="LK">LK</option><option value="CH">CH</option></select></div>';
+    html += '<div class="dp-row"><span class="dp-lbl">Sector</span><input class="dp-inp" id="dpCapSec_' + cn + '" placeholder="Ej: A01, B05" style="max-width:100px;" oninput="this.value=this.value.toUpperCase()"></div>';
+    html += '<div class="dp-row"><span class="dp-lbl">Cajas máx</span><input class="dp-inp" id="dpCapMax_' + cn + '" type="number" min="1" placeholder="Máximo" style="max-width:100px;"></div>';
+    html += '<div class="dp-save-row"><button class="dp-save-btn" onclick="dpSaveCap(\'' + cn + '\')">Guardar sector</button><span class="dp-msg" id="dpCapMsg_' + cn + '"></span></div>';
+  } else {
+    var capInfo = r.capData.map(function (c) { return c.sector + " (" + c.cajas_max + ")"; }).join(", ");
+    html += '<div class="dp-sec-title">🗺️ Sector <span class="dp-done-tag">✓ ' + escapeHtml(capInfo) + '</span></div>';
+  }
+
+  return html;
+}
+
+function _dpMsg(id, msg, ok) {
+  var el = document.getElementById(id);
+  if (el) { el.textContent = msg; el.className = "dp-msg " + (ok ? "ok" : "err"); }
+}
+
+async function dpSaveCajas(cn) {
+  var desc = (document.getElementById("dpCjDesc_" + cn) || {}).value || "";
+  var marca = (document.getElementById("dpCjMarca_" + cn) || {}).value || "LK";
+  var ncaja = parseInt((document.getElementById("dpCjNCaja_" + cn) || {}).value, 10);
+  var uxc = parseInt((document.getElementById("dpCjUxC_" + cn) || {}).value, 10);
+  if (!ncaja || ncaja < 1) { _dpMsg("dpCjMsg_" + cn, "Falta N° Caja", false); return; }
+  if (!uxc || uxc < 1) { _dpMsg("dpCjMsg_" + cn, "Falta Uni × Caja", false); return; }
+  // Buscar el código original (puede tener E, letras, etc.)
+  var item = (_dpCache.missing || []).find(function (r) { return r.codNorm === cn; });
+  var codArt = item ? item.cod : cn;
+  var headers = await facAuthWriteHeaders({ "Prefer": "return=minimal" });
+  if (!headers) { _dpMsg("dpCjMsg_" + cn, authNoSesionMsg("Iniciá sesión con Google."), false); return; }
+  _dpMsg("dpCjMsg_" + cn, "Guardando…", true);
+  try {
+    var body = { Cod_Art: codArt, Descripcion: desc.trim(), Marca: marca, N_Caja: ncaja, Uni_x_Caja: uxc, Suspendido: false };
+    var r = await fetch(SUPABASE_URL + "/rest/v1/Articulos_Cajas", { method: "POST", headers: headers, body: JSON.stringify(body) });
+    if (!r.ok) { _dpMsg("dpCjMsg_" + cn, "Error HTTP " + r.status, false); return; }
+    _dpMsg("dpCjMsg_" + cn, "✓ Empaque guardado", true);
+    _dpCache = null; _artNombres = null;  // invalidar caches
+    setTimeout(function () { dpLoad(true); }, 800);
+  } catch (_e) { _dpMsg("dpCjMsg_" + cn, "Sin conexión.", false); }
+}
+
+async function dpSaveVol(cn) {
+  var m3 = parseFloat((document.getElementById("dpVolM3_" + cn) || {}).value);
+  if (isNaN(m3) || m3 <= 0) { _dpMsg("dpVolMsg_" + cn, "Ingresá un valor de m³ > 0", false); return; }
+  var item = (_dpCache.missing || []).find(function (r) { return r.codNorm === cn; });
+  var codigo = item ? item.cod : cn;
+  var headers = await facAuthWriteHeaders({ "Prefer": "return=minimal" });
+  if (!headers) { _dpMsg("dpVolMsg_" + cn, authNoSesionMsg("Iniciá sesión con Google."), false); return; }
+  _dpMsg("dpVolMsg_" + cn, "Guardando…", true);
+  try {
+    var body = { codigo: codigo, m3: m3 };
+    var r = await fetch(SUPABASE_URL + "/rest/v1/Volumen_Articulos", { method: "POST", headers: headers, body: JSON.stringify(body) });
+    if (!r.ok) { _dpMsg("dpVolMsg_" + cn, "Error HTTP " + r.status, false); return; }
+    _dpMsg("dpVolMsg_" + cn, "✓ m³ guardado", true);
+    _dpCache = null; _pickM3Cache = null;  // invalidar caches
+    setTimeout(function () { dpLoad(true); }, 800);
+  } catch (_e) { _dpMsg("dpVolMsg_" + cn, "Sin conexión.", false); }
+}
+
+async function dpSaveCap(cn) {
+  var empresa = (document.getElementById("dpCapEmp_" + cn) || {}).value || "LK";
+  var sector = ((document.getElementById("dpCapSec_" + cn) || {}).value || "").trim().toUpperCase();
+  var cajasMax = parseInt((document.getElementById("dpCapMax_" + cn) || {}).value, 10);
+  if (!sector) { _dpMsg("dpCapMsg_" + cn, "Falta el sector (ej: A01)", false); return; }
+  if (!cajasMax || cajasMax < 1) { _dpMsg("dpCapMsg_" + cn, "Falta cajas máx", false); return; }
+  var item = (_dpCache.missing || []).find(function (r) { return r.codNorm === cn; });
+  var cod = item ? item.cod : cn;
+  var headers = await facAuthWriteHeaders({ "Prefer": "return=minimal" });
+  if (!headers) { _dpMsg("dpCapMsg_" + cn, authNoSesionMsg("Iniciá sesión con Google."), false); return; }
+  _dpMsg("dpCapMsg_" + cn, "Guardando…", true);
+  try {
+    var body = { cod: cod, empresa: empresa, sector: sector, cajas_max: cajasMax };
+    var r = await fetch(SUPABASE_CAPACIDAD_ENDPOINT, { method: "POST", headers: headers, body: JSON.stringify(body) });
+    if (!r.ok) { _dpMsg("dpCapMsg_" + cn, "Error HTTP " + r.status, false); return; }
+    _dpMsg("dpCapMsg_" + cn, "✓ Sector guardado", true);
+    _dpCache = null;
+    setTimeout(function () { dpLoad(true); }, 800);
+  } catch (_e) { _dpMsg("dpCapMsg_" + cn, "Sin conexión.", false); }
+}
+
 function openPlanimEditor() {
   if (!requireSupervisor()) return;
   const ov = document.getElementById("planimEditorOverlay");
@@ -28994,6 +29302,8 @@ function showSupervisor(email) {
   setLegajoTitle(null);
   // Si la URL pedía abrir un monitor/TV (?monitor=tv/fc/incons), ahora sí.
   try { if (typeof window.maybeAutoOpenMonitor === "function") window.maybeAutoOpenMonitor(); } catch (_e) {}
+  // v8.80: badge "Completar datos producto" (fire-and-forget)
+  try { dpLoadBadge(); } catch (_e) {}
 }
 
 function showOperario(emp) {

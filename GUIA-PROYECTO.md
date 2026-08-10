@@ -4,7 +4,21 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-10 · Versión app al documentar: **v8.79**
+> Última actualización: 2026-08-10 · Versión app al documentar: **v8.82**
+>
+> Nota: **v8.82 — Completar datos producto (pantalla + badge semáforo).** Nuevo botón 🚦 en el menú
+> de administración (entre "Consultar NP/Líos" y "Configuración") que detecta códigos de producto
+> presentes en `PPP_Programacion_Diaria` pero con datos faltantes en una o más de estas tablas:
+> **Articulos_Cajas** (empaque: descripción, marca, N° caja, uni×caja), **Volumen_Articulos** (m³),
+> **Capacidad_Sector** (sector de góndola + cajas máx). El botón lleva un badge rojo con la cuenta de
+> productos incompletos (se carga asíncronamente al login del supervisor). Al abrir la pantalla, lista
+> cada código con un semáforo de 3 puntos (Cj/m³/Sc — verde=cargado, rojo=faltante). Tocando un código
+> se despliega un formulario por sección faltante para cargar los datos directo a Supabase (POST
+> autenticado). Tras guardar, la card se actualiza automáticamente. Funciones: `openDatosProducto`,
+> `dpLoad`, `dpRender`, `dpBuildForm`, `dpSaveCajas`, `dpSaveVol`, `dpSaveCap`, `dpLoadBadge`.
+> Overlay: `#datosProductoOverlay`. Cache 5 min (`_dpCache`). Se agregaron policies RLS
+> `vol_art_insert_auth` + `vol_art_update_auth` en `Volumen_Articulos` para que supervisores
+> autenticados puedan insertar/actualizar m³.
 >
 > Nota: **v8.79 — Faltantes x día: se quitó la columna "🔴 Faltó armado" (pedido del usuario).** La
 > tabla pasa de 10 a **9 columnas fijas**. El dato real (`realFalt`) **NO se borró**: se sigue usando
