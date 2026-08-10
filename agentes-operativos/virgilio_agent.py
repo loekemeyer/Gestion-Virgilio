@@ -22,7 +22,7 @@ Uso:
     export ANTHROPIC_API_KEY=sk-ant-...
     export SUPABASE_URL=https://hrxfctzncixxqmpfhskv.supabase.co
     export SUPABASE_SERVICE_KEY=...                    # service role (recomendado; bypassa RLS)
-    export TELEGRAM_CHAT_ID=-1002231959863             # grupo o privado del user
+    export TELEGRAM_CHAT_ID=-1004379879565             # grupo o privado del user
     pip install anthropic
     python virgilio_agent.py
 
@@ -49,7 +49,7 @@ SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://hrxfctzncixxqmpfhskv.supa
 # Service role host-side (recomendado). Fallback a anon solo para lectura de vistas
 # ya expuestas; para escribir en telegram_outbox hace falta la service key.
 SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_KEY") or os.environ.get("SUPABASE_ANON_KEY", "")
-TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "-1002231959863")
+TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "-1004379879565")
 
 SYSTEM_PROMPT = """\
 Sos un auditor de datos de Producción Virgilio (depósito). Trabajás sobre

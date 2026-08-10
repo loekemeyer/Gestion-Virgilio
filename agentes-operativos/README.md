@@ -36,7 +36,7 @@ Events (SSE):  agent.message / agent.custom_tool_use  ↔  user.message / user.c
 export ANTHROPIC_API_KEY=sk-ant-...
 export SUPABASE_URL=https://hrxfctzncixxqmpfhskv.supabase.co
 export SUPABASE_SERVICE_KEY=...          # service role, HOST-SIDE (recomendado)
-export TELEGRAM_CHAT_ID=-1002231959863   # grupo o privado del user
+export TELEGRAM_CHAT_ID=-1004379879565   # grupo o privado del user
 pip install anthropic
 ```
 
