@@ -6289,7 +6289,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.89";
+const APP_VERSION = "v8.90";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -10989,13 +10989,15 @@ async function stkFcsFetch() {
 function stkOpenFcsArt(codEnc) {
   if (!_stk) return;
   const cod = decodeURIComponent(codEnc), k = _ocgNorm(cod);
-  _stkPopShell("🧾 FC s/Salida — " + escapeHtml(cod), "stkPopBody");
+  // v8.90: desconcatenación — título y mensajes con código base
+  const _codBfc = codBase(cod), _kB = _ocgNorm(_codBfc);
+  _stkPopShell("🧾 FC s/Salida — " + escapeHtml(_codBfc), "stkPopBody");
   const body = document.getElementById("stkPopBody"); if (!body) return;
-  const a = (_stk.fcs && _stk.fcs.porArt) ? _stk.fcs.porArt[k] : null;
-  if (!a || !a.nps || !a.nps.length) { body.innerHTML = '<div class="stkpop-empty">No hay facturado sin salida de <b>' + escapeHtml(cod) + '</b> ahora.</div>'; return; }
+  const a = (_stk.fcs && _stk.fcs.porArt) ? (_stk.fcs.porArt[k] || _stk.fcs.porArt[_kB]) : null;
+  if (!a || !a.nps || !a.nps.length) { body.innerHTML = '<div class="stkpop-empty">No hay facturado sin salida de <b>' + escapeHtml(_codBfc) + '</b> ahora.</div>'; return; }
   const pend = (_stk.fcs && _stk.fcs.pend) || {};
   const nps = a.nps.slice().sort(function (x, y) { return y.cajas - x.cajas || String(x.np).localeCompare(String(y.np), undefined, { numeric: true }); });
-  let h = '<div class="stkpop-hint"><b>' + escapeHtml(cod) + '</b> · facturado <b>sin salida</b>: <b>' + (Math.round(a.cajas * 10) / 10) + ' cajas</b> en ' + nps.length + ' NP(s). Ya salió del stock contable (facturada) pero sigue <b>física</b> en el depósito — todavía sin cargar al camión.</div>';
+  let h = '<div class="stkpop-hint"><b>' + escapeHtml(_codBfc) + '</b> · facturado <b>sin salida</b>: <b>' + (Math.round(a.cajas * 10) / 10) + ' cajas</b> en ' + nps.length + ' NP(s). Ya salió del stock contable (facturada) pero sigue <b>física</b> en el depósito — todavía sin cargar al camión.</div>';
   h += '<div class="stkpop-grp"><div class="stkpop-nps">' + nps.map(function (n) { const p = pend[n.np] || {}; return '<span class="stkpop-np" style="display:block"><b>NP ' + escapeHtml(n.np) + '</b>' + (p.tanda ? ' <small style="color:#94a3b8">· ' + escapeHtml(p.tanda) + '</small>' : '') + ' · ' + escapeHtml(p.rs || "—") + ' <b>· ' + n.cajas + ' cajas</b>' + (p.fecha ? ' <small style="color:#94a3b8">· fact. ' + escapeHtml(p.fecha) + '</small>' : '') + '</span>'; }).join("") + '</div></div>';
   body.innerHTML = h;
 }
@@ -12580,7 +12582,9 @@ async function stkOpenEstadioArt(codEnc, dep) {
 async function stkOpenExcedenteArt(codEnc) {
   if (!_stk) return;
   const cod = decodeURIComponent(codEnc), codN = _stkNormCod(cod);
-  _stkPopShell("🧊 Excedente — " + escapeHtml(cod), "stkPopBody");
+  // v8.90: desconcatenación — título y mensajes con código base
+  const _codBex = codBase(cod);
+  _stkPopShell("🧊 Excedente — " + escapeHtml(_codBex), "stkPopBody");
   const body = document.getElementById("stkPopBody"); if (!body) return;
   const byU = {}; let sinU = 0;
   _stk.movs.forEach(function (mv) {
@@ -12593,9 +12597,9 @@ async function stkOpenExcedenteArt(codEnc) {
   if (ubics.length === 1) byU[ubics[0]] += sinU;   // única ubicación → absorbe las bajas sin ubicación (como el export)
   ubics = ubics.filter(function (u) { return round1(byU[u]) > 0.05; })
     .sort(function (a, b) { const ka = String(a).match(/^([A-Za-z]+)(\d+)/), kb = String(b).match(/^([A-Za-z]+)(\d+)/); if (ka && kb && ka[1].toUpperCase() !== kb[1].toUpperCase()) return ka[1] < kb[1] ? -1 : 1; if (ka && kb) return (+ka[2]) - (+kb[2]); return String(a).localeCompare(String(b)); });
-  if (!ubics.length) { body.innerHTML = '<div class="stkpop-empty">No hay excedente de ' + escapeHtml(cod) + ' con ubicación' + (round1(sinU) > 0 ? ' (' + round1(sinU) + ' cajas sin ubicación cargada)' : '') + '.</div><div style="margin-top:10px;text-align:center"><button class="mva-clear" onclick="stkOpenMovsArt(\'' + encodeURIComponent(cod) + '\',\'excedente\',\'Excedente\',\'🔁\')">🔁 Ver movimientos</button></div>'; return; }
+  if (!ubics.length) { body.innerHTML = '<div class="stkpop-empty">No hay excedente de ' + escapeHtml(_codBex) + ' con ubicación' + (round1(sinU) > 0 ? ' (' + round1(sinU) + ' cajas sin ubicación cargada)' : '') + '.</div><div style="margin-top:10px;text-align:center"><button class="mva-clear" onclick="stkOpenMovsArt(\'' + encodeURIComponent(cod) + '\',\'excedente\',\'Excedente\',\'🔁\')">🔁 Ver movimientos</button></div>'; return; }
   const tot = round1(ubics.reduce(function (s, u) { return s + byU[u]; }, 0));
-  let h = '<div class="stkpop-hint"><b>' + escapeHtml(cod) + '</b> · excedente: <b>' + tot + ' cajas</b> en ' + ubics.length + ' ubicación(es).</div>';
+  let h = '<div class="stkpop-hint"><b>' + escapeHtml(_codBex) + '</b> · excedente: <b>' + tot + ' cajas</b> en ' + ubics.length + ' ubicación(es).</div>';
   // v6.47: acceso a los MOVIMIENTOS del depósito (mismo detalle que góndola/racks/a guardar).
   h += '<div style="margin-bottom:10px"><button class="mva-clear" onclick="stkOpenMovsArt(\'' + encodeURIComponent(cod) + '\',\'excedente\',\'Excedente\',\'🔁\')">🔁 Ver movimientos (entradas/salidas + saldo)</button></div>';
   h += '<div class="stkpop-grp"><div class="stkpop-nps">' + ubics.map(function (u) { return '<span class="stkpop-np"><b>📍 ' + escapeHtml(u) + '</b> · ' + round1(byU[u]) + ' cajas</span>'; }).join("") + '</div></div>';
@@ -12606,7 +12610,7 @@ async function stkOpenRacksArt(codEnc) {
   if (!_stk) return;
   const cod = decodeURIComponent(codEnc), codN = _stkNormCod(cod);
   _stkPop = { kind: "racksArt", cod: cod, codN: codN, dep: "racks", titulo: "Racks", icono: "🏗", desde: "", hasta: "", pos: [] };
-  _stkPopShell("🏗 Racks — " + escapeHtml(cod), "stkPopBody");
+  _stkPopShell("🏗 Racks — " + escapeHtml(codBase(cod)), "stkPopBody");
   const body = document.getElementById("stkPopBody"); if (body) body.innerHTML = '<div class="stkpop-empty">Cargando…</div>';
   let rows = [];
   try {
@@ -12625,14 +12629,24 @@ function _stkEsGuardado(mv) { return mv.tipo === "guardado" || mv.tipo === "guar
 function stkOpenCapArt(codEnc) {
   if (!_stk) return;
   const cod = decodeURIComponent(codEnc), codN = _ocgNorm(cod);
-  _stkPopShell("📥 Capacidad de góndola — " + escapeHtml(cod), "stkPopBody");
+  // v8.89: desconcatenación — buscar capacidad por código base (la tabla Capacidad_Sector no tiene sufijos)
+  const _codB = codBase(cod), _codBN = _ocgNorm(_codB);
+  const _sfxCap = String(cod || "").match(/\s+(LK|CH|LOKE)$/i);
+  const _empCap = _sfxCap ? _sfxCap[1].toUpperCase().replace("LOKE", "LK") : "";
+  _stkPopShell("📥 Capacidad de góndola — " + escapeHtml(_codB) + (_empCap ? ' <span style="font-size:14px;font-weight:800;color:' + (_empCap === "LK" ? "#b91c1c" : "#1e40af") + ';">' + _empCap + '</span>' : ''), "stkPopBody");
   const body = document.getElementById("stkPopBody"); if (!body) return;
-  const mine = (_stk.cap || []).filter(function (r) { return _ocgNorm(r.cod) === codN; })
+  var mine = (_stk.cap || []).filter(function (r) { return _ocgNorm(r.cod) === codN || _ocgNorm(r.cod) === _codBN; })
     .map(function (r) { return { sector: String(r.sector || "—").trim(), cajas: Number(r.cajas_max) || 0 }; })
     .sort(function (a, b) { return String(a.sector).localeCompare(String(b.sector), undefined, { numeric: true }); });
-  if (!mine.length) { body.innerHTML = '<div class="stkpop-empty">No hay capacidad de góndola cargada para ' + escapeHtml(cod) + '.</div>'; return; }
+  // v8.90: si el código es dual y tiene sufijo, filtrar solo los sectores de esa marca
+  if (_empCap && typeof PICK_UBIC_DUAL !== "undefined" && PICK_UBIC_DUAL[_codBN]) {
+    var _dual = PICK_UBIC_DUAL[_codBN];
+    var _sectorPfx = _empCap === "LK" ? String(_dual.loeke.sector || "").charAt(0).toUpperCase() : String(_dual.chef.sector || "").charAt(0).toUpperCase();
+    if (_sectorPfx) mine = mine.filter(function (r) { return String(r.sector).charAt(0).toUpperCase() === _sectorPfx; });
+  }
+  if (!mine.length) { body.innerHTML = '<div class="stkpop-empty">No hay capacidad de góndola cargada para ' + escapeHtml(_codB) + (_empCap ? ' (' + _empCap + ')' : '') + '.</div>'; return; }
   const tot = mine.reduce(function (s, r) { return s + r.cajas; }, 0);
-  let h = '<div class="stkpop-hint"><b>' + escapeHtml(cod) + '</b> · capacidad de góndola: <b>' + tot + ' cajas</b> en ' + mine.length + ' ubicación(es).</div>';
+  let h = '<div class="stkpop-hint"><b>' + escapeHtml(_codB) + '</b>' + (_empCap ? ' <b style="color:' + (_empCap === "LK" ? "#b91c1c" : "#1e40af") + '">' + _empCap + '</b>' : '') + ' · capacidad de góndola: <b>' + tot + ' cajas</b> en ' + mine.length + ' ubicación(es).</div>';
   h += '<div class="stkpop-grp"><div class="stkpop-nps">' + mine.map(function (r) { return '<span class="stkpop-np"><b>📍 ' + escapeHtml(r.sector) + '</b> · ' + r.cajas + ' cajas</span>'; }).join("") + '</div></div>';
   body.innerHTML = h;
 }
@@ -12642,15 +12656,24 @@ function stkOpenCapArt(codEnc) {
 async function stkOpenCajasPedidasArt(codEnc) {
   if (!_stk) return;
   const cod = decodeURIComponent(codEnc), codN = _stkNormCod(cod);
-  _stkPopShell("🟡 Cajas pedidas — " + escapeHtml(cod), "stkPopBody");
+  // v8.89: desconcatenación — buscar por código base en la base de picking y filtrar por marca
+  const _codB = codBase(cod), _codDisp = codBase(cod);
+  const _sfx = String(cod || "").match(/\s+(LK|CH|LOKE)$/i);
+  const _empFiltro = _sfx ? _sfx[1].toUpperCase().replace("LOKE", "LK") : "";
+  _stkPopShell("🟡 Cajas pedidas — " + escapeHtml(_codDisp) + (_empFiltro ? ' <span style="font-size:14px;font-weight:800;color:' + (_empFiltro === "LK" ? "#b91c1c" : "#1e40af") + ';">' + _empFiltro + '</span>' : ''), "stkPopBody");
   const body = document.getElementById("stkPopBody"); if (body) body.innerHTML = '<div class="stkpop-empty">Cargando pedidos…</div>';
   const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
   let base = [];
-  try { base = await fetch(SUPABASE_URL + "/rest/v1/PPP_Base_Pedidos?articulo=eq." + encodeURIComponent(cod) + "&select=pedido,cajas&limit=20000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }); } catch (_e) {}
+  try { base = await fetch(SUPABASE_URL + "/rest/v1/PPP_Base_Pedidos?articulo=eq." + encodeURIComponent(_codB) + "&select=pedido,cajas&limit=20000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }); } catch (_e) {}
   const pedByNp = {};
-  base.forEach(function (x) { const np = String(x.pedido || "").trim().replace(/\.0+$/, ""); if (np) pedByNp[np] = (pedByNp[np] || 0) + (Number(x.cajas) || 0); });
+  base.forEach(function (x) {
+    const np = String(x.pedido || "").trim().replace(/\.0+$/, "");
+    // Si el código tenía sufijo, filtrar solo NPs de esa marca
+    if (_empFiltro && np) { var _e = empresaDeNp(np); if (_e && _e !== _empFiltro) return; }
+    if (np) pedByNp[np] = (pedByNp[np] || 0) + (Number(x.cajas) || 0);
+  });
   const npsAll = Object.keys(pedByNp).filter(function (np) { return pedByNp[np] > 0.05; });
-  if (!npsAll.length) { if (body) body.innerHTML = '<div class="stkpop-empty">Ningún pedido pidió ' + escapeHtml(cod) + ' en la base de picking.</div>'; return; }
+  if (!npsAll.length) { if (body) body.innerHTML = '<div class="stkpop-empty">Ningún pedido pidió ' + escapeHtml(_codDisp) + (_empFiltro ? ' (' + _empFiltro + ')' : '') + ' en la base de picking.</div>'; return; }
   // v6.49 — SOLO PENDIENTES: las NP ya facturadas (tick de la operadora → Facturacion_NP)
   // no se muestran, para que el detalle acompañe a la columna (que ya las descuenta).
   // El recorrido completo (incluidas facturadas/cargadas) está en 🕓 Historial.
@@ -12661,7 +12684,7 @@ async function stkOpenCajasPedidasArt(codEnc) {
   } catch (_e) {}
   const nps = npsAll.filter(function (np) { return !_facSet[np]; });
   const yaFact = npsAll.length - nps.length;
-  if (!nps.length) { if (body) body.innerHTML = '<div class="stkpop-empty">Todo lo que pidió ' + escapeHtml(cod) + ' ya está <b>facturado</b> (' + yaFact + ' NP). El recorrido está en 🕓 Historial.</div>'; return; }
+  if (!nps.length) { if (body) body.innerHTML = '<div class="stkpop-empty">Todo lo que pidió ' + escapeHtml(_codDisp) + (_empFiltro ? ' (' + _empFiltro + ')' : '') + ' ya está <b>facturado</b> (' + yaFact + ' NP). El recorrido está en 🕓 Historial.</div>'; return; }
   const npInfo = {};
   try {
     const prog = await fetch(SUPABASE_PPP_PROG_ENDPOINT + "?np=in.(" + nps.map(encodeURIComponent).join(",") + ")&select=np,tanda,razon_social&limit=8000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; });
@@ -12696,13 +12719,16 @@ async function stkOpenCajasPedidasArt(codEnc) {
   const totP = round1(nps.reduce(function (s, np) { return s + pedByNp[np]; }, 0));
   const rowsArr = nps.map(function (np) { const info = npInfo[np] || {}, t = info.tanda || ""; return { np: np, tanda: t, rs: info.rs || "", pidio: round1(pedByNp[np]), pickeado: !!(t && pickTandas[t]), separado: !!(t && sepTandas[t]) }; });
   _stkPop = { kind: "cajasPed", cod: cod, rows: rowsArr };   // v5.104: guardar para el export a Excel
-  let h = '<div class="stkpop-hint"><b>' + escapeHtml(cod) + '</b> · pedido <b>PENDIENTE</b>: <b>' + totP + ' cajas</b> en ' + nps.length + ' NP(s)' + (yaFact ? ' <small style="color:#94a3b8">(+' + yaFact + ' NP ya facturadas — no se muestran; verlas en 🕓 Historial)</small>' : '') + '. Por cada NP: cuántas pidió y si su tanda ya se <b style="color:#166534">pickeó</b> / <b style="color:#1e40af">separó</b>.<br><small style="color:#94a3b8">Incluye también NP <b>sin programar</b> todavía, por eso puede dar más que la columna (que cuenta solo las programadas).</small></div>';
+  let h = '<div class="stkpop-hint"><b>' + escapeHtml(_codDisp) + '</b>' + (_empFiltro ? ' <b style="color:' + (_empFiltro === "LK" ? "#b91c1c" : "#1e40af") + '">' + _empFiltro + '</b>' : '') + ' · pedido <b>PENDIENTE</b>: <b>' + totP + ' cajas</b> en ' + nps.length + ' NP(s)' + (yaFact ? ' <small style="color:#94a3b8">(+' + yaFact + ' NP ya facturadas — no se muestran; verlas en 🕓 Historial)</small>' : '') + '.<br><small style="color:#94a3b8">Incluye NP sin programar todavía — puede dar más que la columna.</small></div>';
   h += '<div style="margin-bottom:10px"><button class="mva-clear" style="background:#166534;color:#fff;border-color:#166534" onclick="stkCajasPedidasExport()">⬇ Exportar a Excel</button></div>';
-  h += '<div class="stkpop-grp"><div class="stkpop-nps">' + rowsArr.map(function (r) {
-    const bPk = r.pickeado ? '<b style="color:#166534">📦 pickeado ✓' + stkSigBadge(stkSigla(pickerByTanda[r.tanda]), "#166534") + '</b>' : '<span style="color:#b45309">📦 sin pickear</span>';
-    const bSp = r.separado ? '<b style="color:#1e40af">🧾 separado ✓' + stkSigBadge(stkSigla(sepByTanda[r.tanda]), "#1e40af") + '</b>' : '<span style="color:#94a3b8">🧾 sin separar</span>';
-    return '<span class="stkpop-np" style="display:block"><b>NP ' + escapeHtml(r.np) + '</b>' + (r.tanda ? ' <small style="color:#94a3b8">· ' + escapeHtml(r.tanda) + '</small>' : '') + ' · ' + escapeHtml(r.rs || "—") + ' <b>· pidió ' + r.pidio + '</b><br>' + bPk + ' · ' + bSp + '</span>';
-  }).join("") + '</div></div>';
+  // v8.90: formato tabla en lugar de lista
+  h += '<div class="mva-tblwrap"><table class="mva-tbl"><thead><tr><th>NP</th><th>Razón Social</th><th class="num">Cajas</th><th style="text-align:center">📦 Pick</th><th style="text-align:center">🧾 Arm</th></tr></thead><tbody>';
+  h += rowsArr.map(function (r) {
+    var pkCell = r.pickeado ? '<span style="color:#166534;font-weight:800">✓' + stkSigBadge(stkSigla(pickerByTanda[r.tanda]), "#166534") + '</span>' : '<span style="color:#b45309">—</span>';
+    var spCell = r.separado ? '<span style="color:#1e40af;font-weight:800">✓' + stkSigBadge(stkSigla(sepByTanda[r.tanda]), "#1e40af") + '</span>' : '<span style="color:#94a3b8">—</span>';
+    return '<tr><td><b>' + escapeHtml(r.np) + '</b>' + (r.tanda ? ' <small style="color:#94a3b8">' + escapeHtml(r.tanda) + '</small>' : '') + '</td><td style="font-size:12px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escapeHtml(r.rs || "—") + '</td><td class="num"><b>' + r.pidio + '</b></td><td style="text-align:center">' + pkCell + '</td><td style="text-align:center">' + spCell + '</td></tr>';
+  }).join("") + '</tbody>';
+  h += '<tfoot><tr style="font-weight:800;border-top:2px solid #334155"><td colspan="2">TOTAL (' + nps.length + ' NP)</td><td class="num">' + totP + '</td><td></td><td></td></tr></tfoot></table></div>';
   if (body) body.innerHTML = h;
 }
 /* v5.104 — Exportar "Cajas pedidas" a Excel (.xls vía tabla HTML, mismo patrón que
@@ -12734,7 +12760,7 @@ async function stkOpenMovsArt(codEnc, dep, titulo, icono) {
   if (!_stk) return;
   const cod = decodeURIComponent(codEnc);
   _stkPop = { kind: "movsArt", cod: cod, codN: _stkNormCod(cod), dep: dep, titulo: titulo || dep, icono: icono || "🔁", desde: "", hasta: "", npByTanda: {} };
-  _stkPopShell((icono || "🔁") + " " + (titulo || dep) + " — " + escapeHtml(cod), "stkPopBody");
+  _stkPopShell((icono || "🔁") + " " + (titulo || dep) + " — " + escapeHtml(codBase(cod)), "stkPopBody");
   stkMovsArtRender();   // render inmediato (el NP de cada picking aparece cuando llega el fetch)
   _stkQuienLoad(stkMovsArtRender);   // v6.66 — 👤 siglas + legajo (nombres + sesiones de RT)
   // v8.71 — resolver "pipeline" al operario real: cargar TP/TAP de las tandas con legajo='pipeline'.
@@ -12955,6 +12981,7 @@ function _stkMovsBlock() {
   const hastaT = _stkPop.hasta ? new Date(_stkPop.hasta + "T23:59:59").getTime() : 0;
   const list = _stk.movs.filter(function (mv) {
     if (!_depMatch(mv.deposito) || _stkNormCod(mv.cod_art) !== codN || !_stkWin(mv, true)) return false;
+    if (Number(mv.delta) === 0) return false;   // v8.90: ocultar movimientos con cantidad 0 (ruido)
     const t = new Date(mv.ts).getTime();
     if (desdeT && t < desdeT) return false;
     if (hastaT && t > hastaT) return false;
