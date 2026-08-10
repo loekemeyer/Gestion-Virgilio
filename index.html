@@ -3278,11 +3278,11 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       <div class="comp-steps">
         <button class="comp-arrow" id="compBack" onclick="_compNav(-1)" title="Volver">←</button>
         <div class="comp-dots">
-          <span class="comp-dot on" id="compD1"><span class="comp-num">1</span> Falt.</span>
-          <span class="comp-line"></span>
-          <span class="comp-dot" id="compDSep"><span class="comp-num">2</span> Separar</span>
+          <!-- v8.74 (idea 9849): el chip "1 Falt." se quitó del stepper porque el reparto
+               es automático y ese paso ya no existe. Ahora quedan 1 Separar → 2 Líos. -->
+          <span class="comp-dot on" id="compDSep"><span class="comp-num">1</span> Separar</span>
           <span class="comp-line" id="compLine"></span>
-          <span class="comp-dot" id="compD2"><span class="comp-num">3</span> Líos</span>
+          <span class="comp-dot" id="compD2"><span class="comp-num">2</span> Líos</span>
         </div>
         <button class="comp-arrow" id="compNext" onclick="_compNav(1)" title="Siguiente">→</button>
       </div>
@@ -6213,7 +6213,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.73";
+const APP_VERSION = "v8.74";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -9342,10 +9342,11 @@ function _compRecalc() {
 function _compGo(s) {
   if (!_comp) return;
   _comp.step = s;
-  document.getElementById("compStep1").classList.toggle("on", s === 1);
+  // v8.74 (idea 9849): compD1/compStep1 pueden no existir (el chip "1 Falt." se sacó del stepper).
+  const _s1 = document.getElementById("compStep1"); if (_s1) _s1.classList.toggle("on", s === 1);
   document.getElementById("compStepSep").classList.toggle("on", s === 2);
   document.getElementById("compStep2").classList.toggle("on", s === 3);
-  document.getElementById("compD1").classList.toggle("on", s === 1);
+  const _d1 = document.getElementById("compD1"); if (_d1) _d1.classList.toggle("on", s === 1);
   const _dsep = document.getElementById("compDSep"); if (_dsep) _dsep.classList.toggle("on", s === 2);
   document.getElementById("compD2").classList.toggle("on", s === 3);
   const bk = document.getElementById("compBack"), nx = document.getElementById("compNext");

@@ -4,7 +4,14 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-10 · Versión app al documentar: **v8.73**
+> Última actualización: 2026-08-10 · Versión app al documentar: **v8.74**
+>
+> Nota: **v8.74 — Wizard "Completar": chip "1 Falt." fuera del stepper.** Coherencia visual con
+> v8.73 (el Paso 1 desapareció del flujo). Ahora el stepper muestra sólo **1 Separar → 2 Líos**
+> en vez de "1 Falt. · 2 Separar · 3 Líos". Cambios: se quitó el `<span id="compD1">1 Falt.</span>`
+> y su `<span class="comp-line">` en `#completarModal .comp-dots`; se renumeraron los otros dos.
+> `_compGo` pasó a chequear `compD1`/`compStep1` con `if (el)` para tolerar que ya no existan (los
+> steps internos siguen usando los números 2/3 en el JS — sólo cambió lo que ve el operario).
 >
 > Nota: **v8.73 — Reparto de faltantes automático + adiós al Paso 1 del wizard "Completar" (idea 9849
 > del usuario).** Cuando 2+ NPs pidieron el mismo artículo faltante y el picking agarró **algo pero no
