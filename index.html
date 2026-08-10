@@ -6289,7 +6289,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.94";
+const APP_VERSION = "v8.95";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -11915,7 +11915,7 @@ function stkToggleSoloNeg() { if (!_stk) return; _stk.soloNeg = !_stk.soloNeg; s
 function stkToggleSoloLow() { if (!_stk) return; _stk.soloLow = !_stk.soloLow; stkRender(); }
 // v8.52 — filtro por línea LK/CH (empresa) + fijar códigos (📌, persistente en localStorage)
 function stkFiltroLinea(l) { if (!_stk) return; _stk.filLinea = (_stk.filLinea === l) ? "" : l; _stk.openArt = null; stkRender(); }
-function stkToggleFilGuardar() { if (!_stk) return; _stk.filGuardar = !_stk.filGuardar; _stk.openArt = null; stkRender(); }   // v8.93 — filtro A guardar > 0
+function stkToggleFilCol(key) { if (!_stk) return; _stk.filCol = (_stk.filCol === key) ? "" : key; _stk.openArt = null; stkRender(); }   // v8.95 — filtro por columna > 0
 function stkToggleSoloPin() { if (!_stk) return; _stk.soloPin = !_stk.soloPin; _stk.openArt = null; stkRender(); }
 const STK_PINS_KEY = "stk_pins_vir";
 function _stkPinsLoad() { try { const a = JSON.parse(localStorage.getItem(STK_PINS_KEY) || "[]"); return Array.isArray(a) ? a : []; } catch (_e) { return []; } }
@@ -12056,8 +12056,21 @@ function stkBodyStocks() {
     var _marca = _sfx ? _sfx[1].toUpperCase().replace("LOKE", "LK") : ocLinea(a.cod);
     return _marca === _stk.filLinea;
   });
-  // v8.93 — filtro rápido: tocar el header "A guardar" muestra solo los que tienen a_guardar > 0.
-  if (_stk.filGuardar) shown = shown.filter(function (a) { return (Number(a.a_guardar) || 0) > 0.05; });
+  // v8.95 — filtro rápido por columna: tocar el header de una columna muestra solo las filas
+  // con ese valor > 0. Vale para todas (depósitos + Total Stock/Pedidas/Capacidad/FC s/Salida).
+  if (_stk.filCol) {
+    var _fcK = _stk.filCol;
+    shown = shown.filter(function (a) {
+      var v;
+      if (_fcK === "_tot") v = SECTKEYS.reduce(function (s, k) { return s + (Number(a[k]) || 0); }, 0) + (Number(a.racks_ch) || 0);
+      else if (_fcK === "_ped") v = _demOf(a.cod);
+      else if (_fcK === "_cap") v = _capOf(a.cod);
+      else if (_fcK === "_fc") v = _fcArtCajas(a.cod);
+      else if (_fcK === "racks") v = (Number(a.racks) || 0) + (Number(a.racks_ch) || 0);
+      else v = Number(a[_fcK]) || 0;
+      return v > 0.05;
+    });
+  }
   // v7.71 — ocultar la fila del CÓDIGO BASE de una familia empresa-split (ej. "438E") cuando NO
   // tiene stock propio y la familia SÍ tiene stock en su variante LK/CH. El stock físico vive en
   // "438E LK"/"438E CH" y la demanda del base se cubre por la familia; sin esto quedaba una fila
@@ -12096,28 +12109,8 @@ function stkBodyStocks() {
   }); });
   let h = "";   // banner "Stock contado desde…" sacado a pedido del usuario
   h += stkAsOfControl();   // En vivo / a una fecha y hora determinada
-  // Tira de totales por sector (todos, aunque estén en 0).
-  h += '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;">';
-  SECT.forEach(function (s) {
-    if (s.key === "insumos") return;   // el nº de insumos mezcla kg/bolsas/uni (sin sentido); vive en su propia solapa "Insumos"
-    if (s.extra && (Number(totals[s.key]) || 0) === 0) return;   // v7.03: p/envasar y racks CH solo si hay algo
-    h += '<span onclick="stkSectDetail(\'' + s.key + '\')" title="Ver el detalle por código y sector" style="cursor:pointer;display:inline-flex;flex-direction:column;align-items:center;min-width:78px;background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:6px 10px;">' +
-      '<span style="font-size:10px;text-transform:uppercase;color:#64748b;font-weight:700;letter-spacing:.02em;">' + s.label + '</span>' +
-      '<span style="font-size:17px;font-weight:800;color:' + ((totals[s.key] || 0) < 0 ? "#b91c1c" : "#1e3a8a") + ';font-variant-numeric:tabular-nums;">' + fmtCajas(totals[s.key]) + '</span></span>';
-  });
-  var totDem = Object.keys(dem).reduce(function (s, k) { return s + (Number(dem[k]) || 0); }, 0);
-  h += '<span title="Suma de cajas pedidas — SOLO NP programadas en el PPP y no facturadas (no incluye NP sin programar; las facturadas están descontadas)" style="display:inline-flex;flex-direction:column;align-items:center;min-width:78px;background:#fffbeb;border:1px solid #fcd34d;border-radius:10px;padding:6px 10px;">' +
-    '<span style="font-size:10px;text-transform:uppercase;color:#92400e;font-weight:700;letter-spacing:.02em;">Pedidas</span>' +
-    '<span style="font-size:17px;font-weight:800;color:#92400e;font-variant-numeric:tabular-nums;">' + fmtCajas(totDem) + '</span></span>';
-  var totFcs = Object.keys(_fcArt).reduce(function (s, k) { return s + (Number((_fcArt[k] || {}).cajas) || 0); }, 0);
-  if (totFcs > 0) h += '<span title="Facturado sin salida: ya facturado (fuera del stock contable) pero todavía físico en el depósito, sin cargar al camión. Tocá el número en cada fila para ver las NP." style="display:inline-flex;flex-direction:column;align-items:center;min-width:78px;background:#eef2ff;border:1px solid #c7d2fe;border-radius:10px;padding:6px 10px;">' +
-    '<span style="font-size:10px;text-transform:uppercase;color:#1e3a8a;font-weight:700;letter-spacing:.02em;">FC s/Salida</span>' +
-    '<span style="font-size:17px;font-weight:800;color:#1e3a8a;font-variant-numeric:tabular-nums;">' + fmtCajas(totFcs) + '</span></span>';
-  var totCap = Object.keys(capByCod).reduce(function (s, k) { return s + (Number(capByCod[k]) || 0); }, 0);
-  h += '<span title="Capacidad máxima de góndola (suma de las celdas de cada artículo)" style="display:inline-flex;flex-direction:column;align-items:center;min-width:78px;background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:6px 10px;">' +
-    '<span style="font-size:10px;text-transform:uppercase;color:#166534;font-weight:700;letter-spacing:.02em;">Capacidad</span>' +
-    '<span style="font-size:17px;font-weight:800;color:#166534;font-variant-numeric:tabular-nums;">' + fmtCajas(totCap) + '</span></span>';
-  h += '</div>';
+  // v8.95 — la tira de totales de arriba (Góndola/Excedente/…/Pedidas/Capacidad) se sacó a
+  // pedido del usuario. Ahora se filtra tocando el header de cada columna (ver _thNum abajo).
   // v8.91 — la tarjeta "horas de guardado pendientes" se movió al pop-up "¿Qué bajar primero?"
   // (renderGuardarOrden) para que se calcule con los saldos frescos de vista_saldos_stock.
   // v8.93 — se sacaron los botones "➕ Crear código" y "📥 Descargar Excel" de acá (pedido del usuario).
@@ -12145,17 +12138,18 @@ function stkBodyStocks() {
     return true;
   });
   const ncol = 6 + cols.length + 2;   // +1 LK/CH (v7.89) +1 FC s/Salida (v6.70) +1 caret
-  let th = '<th>Código</th><th style="text-align:center;padding:7px 5px;font-size:10px;">LK/<br>CH</th><th>Descripción</th><th class="num" style="background:#eef2ff;color:#1e3a8a;">Total<br>Stock</th><th class="num" style="background:#fef3c7;color:#92400e;" title="Cajas pedidas SOLO de NP programadas en el PPP y todavía NO facturadas (lo que falta pickear). Las NP ya facturadas (ver solapa FC s/Salida) están descontadas. El detalle al tocar el número muestra solo PENDIENTES, pero incluye también NP sin programar — puede dar algo más que la columna.">Cajas<br>Pedidas</th><th class="num" style="background:#dcfce7;color:#166534;">Capacidad<br>góndola</th>';
-  cols.forEach(function (c) {
-    // v8.93 — el header "A guardar" es clickeable: filtra la tabla a los que tienen a_guardar > 0.
-    if (c.key === "a_guardar") {
-      var _fgOn = !!_stk.filGuardar;
-      th += '<th class="num" onclick="stkToggleFilGuardar()" title="Tocá para mostrar solo los códigos con A guardar > 0" style="cursor:pointer;' + (_fgOn ? "background:#16a34a;color:#fff;" : "") + '">' + c.label.replace(" ", "<br>") + (_fgOn ? " ✓" : " ⌵") + '</th>';
-    } else {
-      th += '<th class="num">' + c.label.replace(" ", "<br>") + '</th>';
-    }
-  });
-  th += '<th class="num" style="background:#eef2ff;color:#1e3a8a;" title="Facturado sin salida: mercadería ya facturada (salió del stock contable) pero todavía física en el depósito, sin cargar al camión. Tocá el número para ver las NP.">FC<br>s/Salida</th>';   // v6.70
+  // v8.95 — header numérico clickeable: toca para filtrar filas con esa columna > 0 (se marca verde con ✓).
+  const _thNum = function (key, label, baseStyle, title) {
+    const on = _stk.filCol === key;
+    const st = on ? "background:#16a34a;color:#fff;" : (baseStyle || "");
+    return '<th class="num" onclick="stkToggleFilCol(\'' + key + '\')" title="' + (title || "Filtrar") + ' — tocá para mostrar solo los que tienen &gt; 0" style="cursor:pointer;' + st + '">' + label + (on ? " ✓" : " <span style=\"opacity:.4;font-weight:400\">⌵</span>") + '</th>';
+  };
+  let th = '<th>Código</th><th style="text-align:center;padding:7px 5px;font-size:10px;">LK/<br>CH</th><th>Descripción</th>' +
+    _thNum("_tot", "Total<br>Stock", "background:#eef2ff;color:#1e3a8a;", "Stock total") +
+    _thNum("_ped", "Cajas<br>Pedidas", "background:#fef3c7;color:#92400e;", "Cajas pedidas (NP programadas y no facturadas)") +
+    _thNum("_cap", "Capacidad<br>góndola", "background:#dcfce7;color:#166534;", "Capacidad de góndola");
+  cols.forEach(function (c) { th += _thNum(c.key, c.label.replace(" ", "<br>"), "", c.label); });
+  th += _thNum("_fc", "FC<br>s/Salida", "background:#eef2ff;color:#1e3a8a;", "Facturado sin salida");   // v6.70
   h += '<div class="stk-tblwrap"><table class="stk-tbl stk-tbl-fit"><thead><tr>' + th + '<th></th></tr></thead><tbody>';
   if (!shown.length) h += '<tr><td colspan="' + ncol + '" class="stk-empty">' + (_stk.soloNeg ? "✅ No hay stock negativo en ningún depósito." : (_stk.soloLow ? "✅ Todo está en stock — no hay códigos con faltante." : "Sin stock todavía.")) + '</td></tr>';
   // v6.67 — celdas de depósito clickeables AUNQUE el saldo sea 0, si el artículo TUVO
