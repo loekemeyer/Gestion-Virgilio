@@ -6213,7 +6213,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.72";
+const APP_VERSION = "v8.73";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -8567,6 +8567,40 @@ const SUPABASE_ENTREGAS_ENDPOINT = SUPABASE_URL + "/rest/v1/Entregas_Virgilio";
    para fijar uno definitivo, cambiar este valor (y/o sacar el toggle). */
 let _compMode = "cargo";
 function _compMatchArt(a, want) { const aU = codBase(a), w = codBase(want); return aU === w || aU.replace(/E$/, "") === w.replace(/E$/, ""); }
+/* v8.73 (idea 9849): reparto proporcional del picking entre 2+ NPs que pidieron el mismo
+   artículo faltante. Método Hamilton (largest remainder):
+     recibido_i = floor(pidio_i × real / total_pedido)
+   y el remanente (real − Σfloors) se reparte de a 1 a las NPs con mayor resto decimal.
+   Empate de resto → NP con MÁS cajas totales pedidas en la tanda (para el caso "NP1 pide 1,
+   NP2 pide 1, pickearon 1 sola"); si aún empata, NP numérica más baja (determinístico).
+   Muta anps[i].asig = pidio − recibido (asig = cajas faltantes de esa NP). */
+function _compAsigProporcional(anps, real, totalByNp) {
+  if (!anps || !anps.length) return;
+  let total = 0; for (let i = 0; i < anps.length; i++) total += (Number(anps[i].pidio) || 0);
+  if (total <= 0) return;
+  const real2 = Math.max(0, Math.min(Number(real) || 0, total));   // no repartir más de lo pedido ni menos que 0
+  const floors = new Array(anps.length), rems = [];
+  let sumFloor = 0;
+  for (let j = 0; j < anps.length; j++) {
+    const q = (Number(anps[j].pidio) || 0) * real2 / total;
+    const fl = Math.floor(q);
+    floors[j] = fl; sumFloor += fl;
+    rems.push({ i: j, rem: q - fl });
+  }
+  let sobrante = real2 - sumFloor;
+  if (sobrante > 0) {
+    rems.sort(function (a, b) {
+      if (b.rem !== a.rem) return b.rem - a.rem;                      // mayor resto primero
+      const ta = Number(totalByNp && totalByNp[anps[a.i].np]) || 0;
+      const tb = Number(totalByNp && totalByNp[anps[b.i].np]) || 0;
+      if (tb !== ta) return tb - ta;                                  // desempate: más cajas totales en la tanda
+      const na = Number(anps[a.i].np) || 0, nb = Number(anps[b.i].np) || 0;
+      return na - nb;                                                 // fallback determinístico: NP más baja
+    });
+    for (let k = 0; k < rems.length && sobrante > 0; k++, sobrante--) floors[rems[k].i] += 1;
+  }
+  for (let m = 0; m < anps.length; m++) anps[m].asig = (Number(anps[m].pidio) || 0) - floors[m];
+}
 async function showCompletarWizard(legajo, codigo) {
   const code = String(codigo || "").trim().toUpperCase(); if (!code) return;
   const modal = document.getElementById("completarModal"); if (!modal) return;
@@ -8613,7 +8647,7 @@ async function showCompletarWizard(legajo, codigo) {
       const d20 = document.getElementById("compD2"), ln0 = document.getElementById("compLine");
       if (d20) d20.style.display = ""; if (ln0) ln0.style.display = "";
       if (!_comp.nps[0] || !_comp.nps[0].codes) _compBuildLiosData();   // v4.90: si el avance se guardó en Paso 1 (sin codes), armar la data de líos para habilitar Terminar
-      _compRenderFalt(); _compGo(_comp.step || 1);
+      _compRenderFalt(); _compGo(Math.max(Number(_comp.step) || 2, 2));   // v8.73 (idea 9849): el Paso 1 (reparto manual) desaparece — retomar en Paso 2 (Separar) como mínimo
       modal.classList.add("show");
       return;
     }
@@ -8630,6 +8664,16 @@ async function showCompletarWizard(legajo, codigo) {
     if (!nps.length) return;   // sin pedidos en el PPP → no abre (no rompe el TAP)
     let falt = []; try { falt = await faltantesDeTanda(tanda); } catch (_e) {}
     if (falt.length && enr) { try { await faltEnsureBase(enr, [tanda]); } catch (_e) {} }
+    // v8.73 (idea 9849): total de cajas pedidas por NP en TODA la tanda, para desempatar
+    // el reparto proporcional cuando dos NPs quedan con el mismo resto decimal (ver
+    // _compAsigProporcional). Ej.: NP1 y NP2 piden 1 caja del art X y se pickeó 1 sola →
+    // gana la NP con más cajas TOTALES en la tanda.
+    const totalByNp = {};
+    for (const _n of nps) {
+      const pn = pickNormNp(_n.np); if (!pn) continue;
+      let _tot = 0; for (const _it of (pickBase.get(pn) || [])) _tot += (Number(_it.cajas) || 0);
+      totalByNp[pn] = _tot;
+    }
     const arts = [];
     if (falt.length && pickBase) {
       for (const f of falt) {
@@ -8640,10 +8684,16 @@ async function showCompletarWizard(legajo, codigo) {
           if (cajas > 0) anps.push({ np: np, cod: String(p.cod || ""), rs: String(p.razonSocial || ""), pidio: cajas, asig: 0 });
         }
         const real = Number(f.real) || 0;
-        // Automático: 1 solo cliente → todo el faltante a esa NP; agarraron 0 (real=0) → cada NP faltó lo que pidió.
+        // v8.73 (idea 9849): SIEMPRE automático — el sistema decide el reparto solo,
+        // no le pregunta al operario. Casos:
+        //  · 1 NP pidió el art → todo el faltante a esa NP.
+        //  · Agarraron 0 (real=0) → cada NP faltó lo que pidió.
+        //  · 2+ NPs con algo pickeado → reparto PROPORCIONAL a lo pedido (Hamilton, con
+        //    desempate por total-de-cajas-de-la-NP-en-la-tanda; ver _compAsigProporcional).
         if (anps.length === 1) anps[0].asig = f.falta;
         else if (real === 0) anps.forEach(function (n) { n.asig = n.pidio; });
-        arts.push({ art: f.art, falta: f.falta, real: real, nps: anps, auto: (anps.length === 1 || real === 0) });
+        else _compAsigProporcional(anps, real, totalByNp);
+        arts.push({ art: f.art, falta: f.falta, real: real, nps: anps, auto: true });
       }
     }
     const hayFalt = arts.some(a => a.nps.length);
@@ -8655,7 +8705,7 @@ async function showCompletarWizard(legajo, codigo) {
     if (ln) ln.style.display = "";
     _comp.liosNpIdx = 0;
     _compBuildLiosData();   // v4.90: armar la data de líos YA al abrir → liosDone correcto desde el arranque (si todo faltó, no obliga a entrar a Líos para habilitar Terminar)
-    _compRenderFalt(); _compGo(1);   // Paso 1 = Faltantes
+    _compRenderFalt(); _compGo(2);   // v8.73 (idea 9849): reparto de faltantes es automático (proporcional) → arrancamos DIRECTO en Separar
     modal.classList.add("show");
   } catch (_e) { /* sin datos: no se muestra */ }
 }
@@ -9299,7 +9349,7 @@ function _compGo(s) {
   const _dsep = document.getElementById("compDSep"); if (_dsep) _dsep.classList.toggle("on", s === 2);
   document.getElementById("compD2").classList.toggle("on", s === 3);
   const bk = document.getElementById("compBack"), nx = document.getElementById("compNext");
-  if (bk) bk.disabled = (s === 1);
+  if (bk) bk.disabled = (s <= 2);   // v8.73 (idea 9849): Paso 1 salteado — el ← queda deshabilitado también en Separar (nuevo primer paso visible)
   if (nx) nx.disabled = (s === 3);
   const fab = document.getElementById("compFab");
   if (fab) fab.classList.toggle("hidden", s !== 3);
@@ -9308,7 +9358,7 @@ function _compGo(s) {
   if (s === 3) _compRenderLios();
   _compRecalc();
 }
-function _compNav(d) { if (!_comp) return; const s = Math.min(3, Math.max(1, (_comp.step || 1) + d)); _compGo(s); }
+function _compNav(d) { if (!_comp) return; const s = Math.min(3, Math.max(2, (_comp.step || 2) + d)); _compGo(s); }   // v8.73 (idea 9849): mínimo Paso 2 (Separar) — nunca se vuelve a Paso 1
 /* v5.72: ¿la tanda YA fue armada? (ya tiene filas en Entregas_Virgilio). Sirve de
    candado anti doble-armado: si alguien reabre y re-arma una tanda ya terminada,
    duplicaría el pedido (fue lo que rompió la NP 98114: 2 armados → 2 filas por

@@ -4,7 +4,22 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-10 · Versión app al documentar: **v8.70**
+> Última actualización: 2026-08-10 · Versión app al documentar: **v8.73**
+>
+> Nota: **v8.73 — Reparto de faltantes automático + adiós al Paso 1 del wizard "Completar" (idea 9849
+> del usuario).** Cuando 2+ NPs pidieron el mismo artículo faltante y el picking agarró **algo pero no
+> alcanza**, el operario del TAP **ya no decide** cuántas cajas van a cada NP: el sistema reparte
+> **proporcional a lo pedido** (método **Hamilton / largest remainder**). Cada NP recibe
+> `floor(pedida × real / total)`; el remanente (para que sume exactamente lo pickeado) se entrega de
+> a 1 a las NPs con mayor resto decimal. **Desempate de resto** → NP con **más cajas totales pedidas
+> en la tanda** (así el caso "NP1 pide 1, NP2 pide 1, pickearon 1 sola" va al pedido más grande); si
+> aún empata, NP numérica más baja. Ej. NP1=10, NP2=5, NP3=3, real=16 → **9 / 4 / 3**. Los otros dos
+> casos automáticos siguen igual (1 sola NP → todo a esa NP; agarraron 0 → a cada NP le faltó lo que
+> pidió). Implementación: nueva `_compAsigProporcional(anps, real, totalByNp)` (usa `totalByNp` armado
+> desde `pickBase` al abrir el wizard); todos los `arts` quedan `auto: true`; `showCompletarWizard`
+> arranca en `_compGo(2)` (Separar) y al retomar hace `Math.max(step, 2)` — el Paso 1 (reparto manual)
+> queda inalcanzable. `_compNav` no baja del Paso 2 y el `←` queda deshabilitado allí. El aviso
+> "Preguntá a Marianela" del AP ya venía sin uso (código huérfano: función definida, cero llamadas).
 >
 > Nota: **v8.70 — Buscador de "Trazar artículo" (Órdenes de Compra) igual al de Stocks/Faltantes.**
 > El input pasó a `type="text" inputmode="numeric" enterkeyhint="search" autocomplete="off"` (teclado
