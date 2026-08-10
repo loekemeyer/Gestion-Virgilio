@@ -4,7 +4,15 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-10 · Versión app al documentar: **v8.68**
+> Última actualización: 2026-08-10 · Versión app al documentar: **v8.69**
+>
+> Nota: **v8.69 — Monitor / Análisis / Inconsistencias = un solo botón.** En el home quedó un
+> único botón **"Monitor / Análisis / Inconsistencias"** (`openMonitor`, abre por defecto la
+> pestaña Monitor). Inconsistencias dejó de ser botón aparte: ahora es la **tercera pestaña** del
+> `mod-switch` (junto a Monitor y Análisis), en ambos headers (`#monTabSwitch` y `#anTabSwitch`).
+> `setMonitorTab` resalta la pestaña activa; `switchToIncons()` cambia de vista sin re-abrir si el
+> monitor ya está abierto. Las pestañas se achican y reparten a lo ancho en celular (≤560px) para
+> que las 3 entren sin encimarse. `openInconsistencias` sigue existiendo (lo usa la pestaña).
 >
 > Nota: **v8.68 — Reorganización del menú del supervisor + hub "Configuración".** (1) Nuevo botón
 > **⚙️ Configuración** (`openConfiguracion`, modal `#configOverlay`) que agrupa lo que antes eran

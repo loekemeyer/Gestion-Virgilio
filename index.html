@@ -1032,10 +1032,16 @@ button {
   .monitor-header > #monitorClock{ order: 1; margin: 0 auto 0 0; font-size: 12px; }
   .monitor-header > div:last-child{ order: 2; flex: 0 0 auto; }
   .monitor-header .mod-hdr-left{ order: 3; flex: 1 1 100%; flex-direction: column; align-items: stretch; gap: 9px; }
-  .monitor-header .mod-switch{ align-self: flex-start; }
+  /* v8.69 — 3 pestañas (Monitor/Análisis/Inconsist.): a lo ancho y repartidas para que
+     entren sin encimarse ni cortarse en celular. */
+  .monitor-header .mod-switch{ align-self: stretch; width: 100%; }
+  .monitor-header .mod-tab{ flex: 1 1 0; padding: 7px 6px; font-size: 12px; }
   .monitor-header .monitor-title{ font-size: 16px; line-height: 1.25; }
   .monitor-header .mon-filter-wrap{ flex-wrap: wrap; }
   .monitor-header .mon-filter{ width: 100%; max-width: none; }
+  /* v8.69 — mismas pestañas más chicas en el header de Análisis. */
+  .analisis-header .mod-switch{ flex-wrap: wrap; }
+  .analisis-header .mod-tab{ padding: 7px 8px; font-size: 12px; }
 }
 
 /* =====================================================
@@ -3147,8 +3153,9 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
         <!-- v7.44: pestañas del módulo unificado (Monitor ↔ Análisis). Se oculta en
              modo kiosko/pared (openMonitor lo esconde si __tvKioskMode). -->
         <div class="mod-switch" id="monTabSwitch">
-          <button class="mod-tab on" onclick="switchToMonitor()" title="Monitor de operarios (en vivo)">🖥️ Monitor</button>
-          <button class="mod-tab" onclick="switchToAnalisis()" title="Análisis de productividad">📈 Análisis</button>
+          <button class="mod-tab on" id="monTabMon" onclick="setMonitorTab('monitor')" title="Monitor de operarios (en vivo)">🖥️ Monitor</button>
+          <button class="mod-tab" id="monTabAn" onclick="switchToAnalisis()" title="Análisis de productividad">📈 Análisis</button>
+          <button class="mod-tab" id="monTabInc" onclick="setMonitorTab('incons')" title="Inconsistencias del día">⚠ Inconsist.</button>
         </div>
         <div>
           <div class="monitor-title"><img class="hdr-logo" src="icon.svg" alt=""><span id="monitorTitleText">Monitor Virgilio</span> <span id="monitorRefresh" class="monitor-refresh"></span><span id="monitorVpInfo" style="color:#888;font-size:12px;margin-left:8px"></span><span id="monitorCountdown" style="color:#888;font-size:12px;margin-left:8px"></span></div>
@@ -3182,6 +3189,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       <div class="mod-switch" id="anTabSwitch">
         <button class="mod-tab" onclick="switchToMonitor()" title="Monitor de operarios (en vivo)">🖥️ Monitor</button>
         <button class="mod-tab on" onclick="switchToAnalisis()" title="Análisis de productividad">📈 Análisis</button>
+        <button class="mod-tab" onclick="switchToIncons()" title="Inconsistencias del día">⚠ Inconsist.</button>
       </div>
       <div class="analisis-title">📈 Análisis Productividad</div>
     </div>
@@ -3547,8 +3555,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
     <!-- CHICOS: uso ocasional. -->
     <div class="sup-actions sup-secondary">
       <button class="sup-action-btn" onclick="openAgentesAdmin()"><span class="sup-ico">🤖</span><span>Agentes</span></button>
-      <button class="sup-action-btn" onclick="openMonitor()"><span class="sup-ico">📊</span><span>Monitor y Análisis</span></button>
-      <button class="sup-action-btn" onclick="openInconsistencias()"><span class="sup-ico">⚠</span><span>Inconsistencias</span></button>
+      <button class="sup-action-btn" onclick="openMonitor()"><span class="sup-ico">📊</span><span>Monitor / Análisis / Inconsistencias</span></button>
       <button class="sup-action-btn" onclick="showGuardarOrden('')"><span class="sup-ico">📋</span><span>Qué bajar primero</span></button>
       <button class="sup-action-btn" onclick="openCorreccPanel()"><span class="sup-ico">🔀</span><span>Corregir códigos de NPs</span></button>
       <button class="sup-action-btn" onclick="openNpConsulta()"><span class="sup-ico">🔎</span><span>Consultar NP / Líos</span></button>
@@ -6206,7 +6213,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.68";
+const APP_VERSION = "v8.69";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -20685,6 +20692,15 @@ async function refreshAnalisisDayTotals(){
    modo TV/vp + auto-refresh; el análisis sus gráficos + sección de operarios). */
 function switchToMonitor(){ if (typeof closeAnalisis === "function") closeAnalisis(); openMonitor(); }
 function switchToAnalisis(){ if (typeof closeMonitor === "function") closeMonitor(); openAnalisis(); }
+/* v8.69 — Inconsistencias es una pestaña más: si ya estamos en el monitor solo cambia
+   la vista (sin re-abrir); si venimos de Análisis, cierra Análisis y abre el monitor
+   directo en Inconsistencias. */
+function switchToIncons(){
+  const m = document.getElementById("monitorModal");
+  if (m && m.classList.contains("show")) { setMonitorTab("incons"); return; }
+  if (typeof closeAnalisis === "function") closeAnalisis();
+  openInconsistencias();
+}
 
 function openAnalisis() {
   if (!requireSupervisor()) return;
@@ -25828,7 +25844,11 @@ function setMonitorTab(tab) {
   _inconsActive = (tab === "incons");
   if (cont) cont.classList.toggle("hidden", _inconsActive);
   if (inc)  inc.classList.toggle("hidden", !_inconsActive);
-  // Sin pestañas: el título refleja qué vista se está mostrando.
+  // v8.69 — Inconsistencias es una pestaña más del módulo unificado: resaltar la activa.
+  const swMon = document.getElementById("monTabMon"), swInc = document.getElementById("monTabInc"), swAn = document.getElementById("monTabAn");
+  if (swMon) swMon.classList.toggle("on", !_inconsActive);
+  if (swInc) swInc.classList.toggle("on", _inconsActive);
+  if (swAn)  swAn.classList.remove("on");
   const titleEl = document.getElementById("monitorTitleText");
   if (titleEl) titleEl.textContent = _inconsActive ? "Inconsistencias" : "Monitor Virgilio";
   if (_inconsActive) refreshInconsistencias();
