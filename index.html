@@ -1919,6 +1919,23 @@ button.pk-anular small{ display:block; font-size:12px; font-weight:700; opacity:
 .ppp-ocup-planmsg{ font-size:12.5px; color:#0f172a; background:#ecfdf5; border:1px solid #6ee7b7; border-radius:8px; padding:5px 9px; }
 .ppp-ocup-clear{ width:auto; margin:0; padding:6px 11px; font-size:12.5px; font-weight:bold; background:#fff; color:#b45309; border:1px solid #fdba74; border-radius:8px; cursor:pointer; }
 .ppp-ocup-empty{ color:#64748b; font-size:12.5px; padding:2px; }
+/* Alerta pedidos web anómalos — badge en botón PPP + banner dentro del overlay (v8.82). */
+.sup-action-btn{ position:relative; }
+.ppp-alert-badge{ position:absolute; top:6px; right:6px; min-width:20px; height:20px; line-height:20px; padding:0 5px; border-radius:999px; background:#dc2626; color:#fff; font-size:11px; font-weight:900; text-align:center; box-shadow:0 2px 6px rgba(220,38,38,.45); animation:pppAlertPulse 1.8s ease-in-out infinite; display:none; z-index:2; }
+.ppp-alert-badge.on{ display:block; }
+@keyframes pppAlertPulse{ 0%,100%{ transform:scale(1); } 50%{ transform:scale(1.15); } }
+.ppp-alert-banner{ display:none; width:100%; }
+.ppp-alert-banner.on{ display:block; }
+.ppp-alert-card{ background:#fef2f2; border:1px solid #fca5a5; border-radius:10px; padding:10px 12px; margin-bottom:8px; }
+.ppp-alert-card-head{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:4px; }
+.ppp-alert-card-title{ font-weight:700; color:#991b1b; font-size:13px; }
+.ppp-alert-card-score{ background:#dc2626; color:#fff; font-size:11px; font-weight:800; padding:2px 8px; border-radius:999px; }
+.ppp-alert-card-body{ font-size:12.5px; color:#450a0a; line-height:1.5; }
+.ppp-alert-card-actions{ margin-top:7px; display:flex; gap:8px; }
+.ppp-alert-dismiss{ padding:5px 12px; font-size:12px; font-weight:700; border:none; border-radius:7px; cursor:pointer; background:#16a34a; color:#fff; }
+.ppp-alert-dismiss:hover{ background:#15803d; }
+.ppp-alert-dismiss.danger{ background:#fff; color:#dc2626; border:1px solid #fca5a5; }
+.ppp-alert-dismiss.danger:hover{ background:#fef2f2; }
 .ppp-tanda{ background:#fff; border:1px solid #e2e8f0; border-radius:10px; margin-bottom:5px; overflow:hidden; }
 .ppp-tanda.ppp-tanda-none{ border:1px solid #fcd34d; }
 .ppp-tanda.ppp-tanda-none .ppp-tanda-h{ background:linear-gradient(90deg,#d97706,#b45309); }
@@ -3592,7 +3609,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
     <!-- GRANDES: uso diario (orden definido por el usuario). "Stock y Compras" = Stocks + OC en un solo botón. -->
     <div class="sup-actions sup-primary">
       <button class="sup-action-btn" onclick="openFacturacion()"><span class="sup-ico">📋</span><span>Facturación</span></button>
-      <button class="sup-action-btn" onclick="openPPP()"><span class="sup-ico">🗓️</span><span>PPP</span></button>
+      <button class="sup-action-btn" onclick="openPPP()"><span id="pppAlertBadge" class="ppp-alert-badge"></span><span class="sup-ico">🗓️</span><span>PPP</span></button>
       <button class="sup-action-btn" onclick="openRecepcionAdmin()"><span class="sup-ico">🏭</span><span>Carga Recepción Mercadería</span></button>
       <button class="sup-action-btn" onclick="showFaltAvisar()"><span class="sup-ico">📦➕</span><span>Completar Pedido</span></button>
       <button class="sup-action-btn" onclick="openStockAdmin()"><span class="sup-ico">📦</span><span>Stock y Compras</span></button>
@@ -3708,6 +3725,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       <button class="recp-admin-close" onclick="closePPP()">Cerrar</button>
     </div>
     <div class="planim-body">
+      <div id="pppAlertBanner" class="ppp-alert-banner"><div id="pppAlertCards"></div></div>
       <div class="ppp-warn">⚠ <b>EN PRUEBAS — SOLO LOCAL.</b> Importás el Excel y lo ves acá; <b>todavía NO se escribe nada en Supabase</b>. Ajustamos el formato y, cuando te guste, lo conectamos.</div>
       <div class="ppp-imp-mini">
         <button class="ppp-imp-toggle" onclick="pppToggleImport()">⬆ Importar Excel ▾</button>
@@ -6277,7 +6295,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.82";
+const APP_VERSION = "v8.83";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -21082,6 +21100,7 @@ function openPPP() {
   pppAutoRenderStatus();    // auto-carga (File System Access): estado + arranque del chequeo
   pppAutoStart();
   pppRenderPdfDirStatus();  // estado de la carpeta de PDF (ISIS) para imprimir pedidos
+  pppRefreshAlertasWeb();   // v8.82: alertas de pedidos web anómalos
 }
 function pppToggleImport() { const m = document.getElementById("pppImportMenu"); if (!m) return; m.classList.toggle("hidden"); if (!m.classList.contains("hidden")) { pppShowBaseInfo(); pppAutoRenderStatus(); } }
 function pppCloseImport() { const m = document.getElementById("pppImportMenu"); if (m) m.classList.add("hidden"); }
@@ -24043,6 +24062,109 @@ async function pppCountTable(endpoint) {
     const m = /\/(\d+)\s*$/.exec(r.headers.get("content-range") || "");
     return m ? parseInt(m[1], 10) : null;
   } catch (_e) { return null; }
+}
+
+/* ===== Alertas Pedidos Web Anómalos (v8.82) — badge + banner en PPP ===== */
+let _pppAlertasWeb = [];
+let _pppAlertPollTimer = null;
+
+async function pppFetchAlertasWeb() {
+  try {
+    const url = SUPABASE_URL + "/rest/v1/Alertas_Pedidos_Web?estado=eq.pendiente&order=creado_en.desc&limit=20";
+    const r = await fetch(url, {
+      headers: { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY }
+    });
+    if (!r.ok) return [];
+    return await r.json();
+  } catch (_e) { return []; }
+}
+
+function pppAlertBadgeUpdate(alertas) {
+  const badge = document.getElementById("pppAlertBadge");
+  if (!badge) return;
+  if (alertas.length > 0) {
+    badge.textContent = alertas.length;
+    badge.classList.add("on");
+  } else {
+    badge.textContent = "";
+    badge.classList.remove("on");
+  }
+}
+
+function pppAlertBannerRender(alertas) {
+  const banner = document.getElementById("pppAlertBanner");
+  const cards  = document.getElementById("pppAlertCards");
+  if (!banner || !cards) return;
+  if (!alertas.length) { banner.classList.remove("on"); cards.innerHTML = ""; return; }
+  banner.classList.add("on");
+  cards.innerHTML = alertas.map(function (a) {
+    const fmt = function (n) { return n != null ? "$" + Number(n).toLocaleString("es-AR", { maximumFractionDigits: 0 }) : "—"; };
+    var ratioTxt = a.ratio ? a.ratio + "x" : "—";
+    return '<div class="ppp-alert-card" data-alert-id="' + a.id + '">'
+      + '<div class="ppp-alert-card-head">'
+      + '<span class="ppp-alert-card-title">⚠ Pedido #' + a.order_id + ' — ' + (a.cliente || "?") + ' (cód ' + (a.cod_cliente || "?") + ')</span>'
+      + '<span class="ppp-alert-card-score">Score ' + a.score + '</span>'
+      + '</div>'
+      + '<div class="ppp-alert-card-body">'
+      + '<b>Total:</b> ' + fmt(a.total_pedido) + ' · <b>Histórico:</b> ' + fmt(a.total_historico) + ' · <b>Ratio:</b> ' + ratioTxt
+      + ' · <b>Cajas:</b> ' + (a.cajas || "—") + ' · <b>Líneas:</b> ' + (a.lineas || "—")
+      + '<br><b>Motivo:</b> ' + (a.motivo || "—")
+      + '</div>'
+      + '<div class="ppp-alert-card-actions">'
+      + '<button class="ppp-alert-dismiss" onclick="pppAlertRevisar(' + a.id + ',\'revisada\',this)">✅ Revisado</button>'
+      + '<button class="ppp-alert-dismiss danger" onclick="pppAlertRevisar(' + a.id + ',\'descartada\',this)">✗ Descartar</button>'
+      + '</div>'
+      + '</div>';
+  }).join("");
+}
+
+async function pppAlertRevisar(id, estado, btn) {
+  if (btn) btn.disabled = true;
+  try {
+    const url = SUPABASE_URL + "/rest/v1/Alertas_Pedidos_Web?id=eq." + id;
+    var body = { estado: estado, revisado_en: new Date().toISOString() };
+    if (window._legajo) body.revisado_por = String(window._legajo);
+    await fetch(url, {
+      method: "PATCH",
+      headers: {
+        "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY,
+        "Content-Type": "application/json", "Prefer": "return=minimal"
+      },
+      body: JSON.stringify(body)
+    });
+    _pppAlertasWeb = _pppAlertasWeb.filter(function (a) { return a.id !== id; });
+    var card = document.querySelector('.ppp-alert-card[data-alert-id="' + id + '"]');
+    if (card) card.remove();
+    pppAlertBadgeUpdate(_pppAlertasWeb);
+    if (!_pppAlertasWeb.length) {
+      var banner = document.getElementById("pppAlertBanner");
+      if (banner) banner.classList.remove("on");
+    }
+  } catch (_e) {
+    if (btn) btn.disabled = false;
+    alert("No se pudo marcar la alerta. Revisá la conexión.");
+  }
+}
+
+async function pppRefreshAlertasWeb() {
+  _pppAlertasWeb = await pppFetchAlertasWeb();
+  pppAlertBadgeUpdate(_pppAlertasWeb);
+  pppAlertBannerRender(_pppAlertasWeb);
+}
+
+/* Poll cada 2 min mientras el panel de supervisor esté visible. */
+function pppAlertPollStart() {
+  if (_pppAlertPollTimer) return;
+  pppRefreshAlertasWeb();   // primera carga inmediata
+  _pppAlertPollTimer = setInterval(function () {
+    var sup = document.getElementById("supervisorPanel");
+    if (sup && !sup.classList.contains("hidden") && document.visibilityState === "visible") {
+      pppRefreshAlertasWeb();
+    }
+  }, 2 * 60 * 1000);
+}
+function pppAlertPollStop() {
+  if (_pppAlertPollTimer) { clearInterval(_pppAlertPollTimer); _pppAlertPollTimer = null; }
 }
 
 /* ===== Editor de Mails autorizados (supervisores) — tabla Supabase
@@ -29304,6 +29426,7 @@ function showSupervisor(email) {
   try { if (typeof window.maybeAutoOpenMonitor === "function") window.maybeAutoOpenMonitor(); } catch (_e) {}
   // v8.80: badge "Completar datos producto" (fire-and-forget)
   try { dpLoadBadge(); } catch (_e) {}
+  try { if (typeof pppAlertPollStart === "function") pppAlertPollStart(); } catch (_e) {}
 }
 
 function showOperario(emp) {
