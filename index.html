@@ -1935,13 +1935,15 @@ button.pk-anular small{ display:block; font-size:12px; font-weight:700; opacity:
 @keyframes pppAlertPulse{ 0%,100%{ transform:scale(1); } 50%{ transform:scale(1.15); } }
 .ppp-alert-banner{ display:none; width:100%; }
 .ppp-alert-banner.on{ display:block; }
-.ppp-alert-card{ background:#fef2f2; border:1px solid #fca5a5; border-radius:10px; padding:10px 12px; margin-bottom:8px; }
-.ppp-alert-card-head{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:4px; }
-.ppp-alert-card-title{ font-weight:700; color:#991b1b; font-size:13px; }
-.ppp-alert-card-score{ background:#dc2626; color:#fff; font-size:11px; font-weight:800; padding:2px 8px; border-radius:999px; }
-.ppp-alert-card-body{ font-size:12.5px; color:#450a0a; line-height:1.5; }
-.ppp-alert-card-actions{ margin-top:7px; display:flex; gap:8px; }
-.ppp-alert-dismiss{ padding:5px 12px; font-size:12px; font-weight:700; border:none; border-radius:7px; cursor:pointer; background:#16a34a; color:#fff; }
+/* v9.05 — tarjetas de alerta del PPP compactas (~1/4 del tamaño): todo en una fila, botones chicos */
+.ppp-alert-card{ background:#fef2f2; border:1px solid #fca5a5; border-radius:7px; padding:3px 8px; margin-bottom:3px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.ppp-alert-card-head{ display:flex; align-items:center; gap:6px; margin:0; flex:0 0 auto; }
+.ppp-alert-card-title{ font-weight:700; color:#991b1b; font-size:11px; }
+.ppp-alert-card-score{ background:#dc2626; color:#fff; font-size:9px; font-weight:800; padding:0 5px; border-radius:999px; }
+.ppp-alert-card-body{ font-size:10px; color:#450a0a; line-height:1.2; flex:1 1 auto; min-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ppp-alert-card-body br{ display:none; }
+.ppp-alert-card-actions{ margin:0; display:flex; gap:5px; flex:0 0 auto; }
+.ppp-alert-dismiss{ padding:2px 8px; font-size:10px; font-weight:700; border:none; border-radius:6px; cursor:pointer; background:#16a34a; color:#fff; }
 .ppp-alert-dismiss:hover{ background:#15803d; }
 .ppp-alert-dismiss.danger{ background:#fff; color:#dc2626; border:1px solid #fca5a5; }
 .ppp-alert-dismiss.danger:hover{ background:#fef2f2; }
@@ -3725,7 +3727,6 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
     </div>
     <div class="planim-body">
       <div id="pppAlertBanner" class="ppp-alert-banner"><div id="pppAlertCards"></div></div>
-      <div class="ppp-warn">⚠ <b>EN PRUEBAS — SOLO LOCAL.</b> Importás el Excel y lo ves acá; <b>todavía NO se escribe nada en Supabase</b>. Ajustamos el formato y, cuando te guste, lo conectamos.</div>
       <div class="ppp-btnrow">
         <div class="ppp-imp-mini">
           <button class="ppp-imp-toggle" onclick="pppToggleImport()">⬆ Importar Excel ▾</button>
@@ -6296,7 +6297,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v9.04";
+const APP_VERSION = "v9.05";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -24378,7 +24379,7 @@ function pppAlertBannerRender(alertas) {
       + '<span class="ppp-alert-card-title">⚠ ' + (a._nps && a._nps.length ? 'NP ' + a._nps.join(', ') : 'Pedido #' + a.order_id) + ' — ' + (a.cliente || "?") + ' (cód ' + (a.cod_cliente || "?") + ')</span>'
       + '<span class="ppp-alert-card-score">Score ' + a.score + '</span>'
       + '</div>'
-      + '<div class="ppp-alert-card-body">'
+      + '<div class="ppp-alert-card-body" title="' + escapeHtml('Total ' + fmt(a.total_pedido) + ' · Histórico ' + fmt(a.total_historico) + ' · Ratio ' + ratioTxt + ' · Cajas ' + (a.cajas || "—") + ' · Líneas ' + (a.lineas || "—") + ' · Motivo: ' + (a.motivo || "—")) + '">'
       + '<b>Total:</b> ' + fmt(a.total_pedido) + ' · <b>Histórico:</b> ' + fmt(a.total_historico) + ' · <b>Ratio:</b> ' + ratioTxt
       + ' · <b>Cajas:</b> ' + (a.cajas || "—") + ' · <b>Líneas:</b> ' + (a.lineas || "—")
       + '<br><b>Motivo:</b> ' + (a.motivo || "—")
