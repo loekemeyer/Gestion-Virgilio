@@ -1328,11 +1328,15 @@ async function opEnviar() {
     }
   } catch (_e) {}
 
+  // v8.83: generar código de 4 dígitos ANTES de insertar, así el operario lo ve de una.
+  let codigoConf = null;
+  try { codigoConf = await pendGenCodigo(); } catch (_e) {}
+
   // Registro para el checklist de Marianela (un renglón por envío). No bloquea.
   let pendId = null;
   try {
     const detalle = items.map(i => i.cod + " → " + i.cajas).join(" · ");
-    const { data: regData, error: errReg } = await supabase.from("Control_Modo_OP").insert({
+    const insertObj = {
       fecha: opState.fecha,
       tipo: opState.tipo,
       nombre: opState.tallNombre,
@@ -1342,7 +1346,9 @@ async function opEnviar() {
       detalle: detalle,
       cantidad_total: totalCajas,
       estado: 'pendiente'
-    }).select("id").single();
+    };
+    if (codigoConf) insertObj.codigo = codigoConf;
+    const { data: regData, error: errReg } = await supabase.from("Control_Modo_OP").insert(insertObj).select("id").single();
     if (errReg) console.warn("Control_Modo_OP insert error (¿falta crear la tabla?):", errReg);
     else { pendId = regData ? regData.id : null; }
   } catch (e) { console.warn("Control_Modo_OP excepcion:", e); }
@@ -1356,6 +1362,20 @@ async function opEnviar() {
   ok.textContent = "✓ Enviado. " + rows.length + " código(s) guardado(s) para " + displayName(opState.tallNombre) +
     " (" + opState.linea + ") · RTO/FC " + opState.remito + ".";
   opBody.appendChild(ok);
+  // v8.83: mostrar código de confirmación al operario
+  if (codigoConf) {
+    const codWrap = document.createElement("div");
+    codWrap.style.cssText = "text-align:center;margin:14px 0 6px;";
+    const codLbl = document.createElement("div");
+    codLbl.style.cssText = "font-size:13px;color:#64748b;margin-bottom:4px;";
+    codLbl.textContent = "Código de confirmación:";
+    const codBox = document.createElement("div");
+    codBox.className = "codigoBox";
+    codBox.textContent = codigoConf;
+    codWrap.appendChild(codLbl);
+    codWrap.appendChild(codBox);
+    opBody.appendChild(codWrap);
+  }
 
   opActions.innerHTML = "";
   const cerrar = document.createElement("button");
