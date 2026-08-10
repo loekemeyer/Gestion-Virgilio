@@ -6,6 +6,17 @@
 >
 > Última actualización: 2026-08-10 · Versión app al documentar: **v8.89**
 >
+> Nota: **v8.89 — Desconcatenación completa + fix lookups de capacidad/demanda.**
+> En **toda la app** (stocks, racks admin, bajar a góndola, excedente, mover stock, conteo,
+> salida Cervantes, ingreso racks, para envasar, qué bajar primero, abastecimiento, Excel export)
+> el código de artículo ahora muestra el código base sin sufijo LK/CH (`codBase()`). **Lookups**:
+> `_demOf()` y `_capOf()` con fallback al código base para que la demanda y la capacidad se
+> encuentren correctamente aunque `dem`/`capByCod` estén indexados por código pelado y los saldos
+> tengan sufijo. **Capacidad**: en la pantalla de capacidad de góndola, los sectores de códigos
+> empresa-split (437E, 438E, 439E, 809E) se agrupan por marca con badges LK (rojo) / CH (azul)
+> usando `PICK_UBIC_DUAL`. Picking y completar siguen mostrando el código sufijado (intencional:
+> el operario necesita saber de qué marca es). Bump `APP_VERSION`/`SW_VERSION` `v8.89`.
+>
 > Nota: **v8.89 — Limpieza del código muerto de la idea 9849 (reparto proporcional).** Ahora que
 > el reparto es automático y el Paso 1 del wizard "Completar" no existe más (v8.73/v8.74), se
 > borraron todos los restos: **(a)** aviso "Preguntá a Marianela" — `#marianelaModal` (HTML),
