@@ -14311,55 +14311,60 @@ function _stkInsUbicStr(it) {
   if (it.ubics && it.ubics.length) return it.ubics.map(function (u) { return u.sector; }).join(" · ");
   return it.ubic || "";
 }
-/* v8.72 — HTML para editar ubicaciones múltiples inline (mini-lista con botón +/x) */
+/* v8.72 — HTML para editar ubicaciones múltiples inline (mini-lista con botón +/x).
+   State-driven: usa _stkIns.edUbics[cod] como fuente; ＋ y ✕ mutan ese array y
+   llaman stkRender(). Los inputs guardan su valor en _stkIns.edUbics[cod][i] on-input
+   para no perder lo escrito al re-renderizar. */
+function _stkInsUbicEditInit(cod, ubics) {
+  if (!_stkIns.edUbics) _stkIns.edUbics = {};
+  if (!_stkIns.edUbics[cod]) {
+    _stkIns.edUbics[cod] = (ubics && ubics.length) ? ubics.map(function (u) { return u.sector || ""; }) : [];
+  }
+}
 function _stkInsUbicEdit(cod, ubics) {
-  var ubs = (ubics && ubics.length) ? ubics : [];
-  var h = '<div id="edUbics_' + escapeHtml(cod) + '" style="min-width:100px;">';
-  h += ubs.map(function (u, i) {
+  _stkInsUbicEditInit(cod, ubics);
+  var arr = _stkIns.edUbics[cod];
+  var h = '<div style="min-width:100px;">';
+  h += arr.map(function (sec, i) {
     return '<div style="display:flex;align-items:center;gap:2px;margin-bottom:2px;">' +
-      '<input class="stk-inp insUbicSec" data-cod="' + escapeHtml(cod) + '" data-idx="' + i + '" value="' + escapeHtml(u.sector) + '" style="width:80px;" placeholder="sector">' +
-      '<button class="stk-btn stk-btn-x" style="padding:1px 5px;font-size:11px;" onclick="stkInsUbicQuitar(\'' + escapeHtml(cod) + '\',' + i + ')" title="Quitar">✕</button></div>';
+      '<input class="stk-inp" value="' + escapeHtml(sec) + '" style="width:80px;" placeholder="sector" ' +
+      'oninput="stkInsUbicChg(\'' + escapeHtml(cod) + '\',' + i + ',this.value)">' +
+      '<button class="stk-btn stk-btn-x" style="padding:1px 5px;font-size:11px;" ' +
+      'onclick="stkInsUbicQuitar(\'' + escapeHtml(cod) + '\',' + i + ')" title="Quitar">✕</button></div>';
   }).join("");
-  h += '<button class="stk-btn" style="padding:1px 8px;font-size:11px;margin-top:2px;" onclick="stkInsUbicAgregar(\'' + escapeHtml(cod) + '\')" title="Agregar ubicación">＋</button>';
+  h += '<button class="stk-btn" style="padding:1px 8px;font-size:11px;margin-top:2px;" ' +
+    'onclick="stkInsUbicAgregar(\'' + escapeHtml(cod) + '\')" title="Agregar ubicación">＋</button>';
   h += '</div>';
   return h;
 }
-/* v8.72 — agregar una línea de ubicación al editor inline */
+/* v8.72 — actualizar valor del input sin re-render (para no perder foco) */
+function stkInsUbicChg(cod, idx, val) {
+  if (!_stkIns || !_stkIns.edUbics || !_stkIns.edUbics[cod]) return;
+  _stkIns.edUbics[cod][idx] = val;
+}
+/* v8.72 — agregar una línea de ubicación */
 function stkInsUbicAgregar(cod) {
-  var wrap = document.getElementById("edUbics_" + cod);
-  if (!wrap) return;
-  var inputs = wrap.querySelectorAll("input.insUbicSec");
-  var idx = inputs.length;
-  var div = document.createElement("div");
-  div.style.cssText = "display:flex;align-items:center;gap:2px;margin-bottom:2px;";
-  div.innerHTML = '<input class="stk-inp insUbicSec" data-cod="' + escapeHtml(cod) + '" data-idx="' + idx + '" value="" style="width:80px;" placeholder="sector">' +
-    '<button class="stk-btn stk-btn-x" style="padding:1px 5px;font-size:11px;" onclick="stkInsUbicQuitar(\'' + escapeHtml(cod) + '\',' + idx + ')" title="Quitar">✕</button>';
-  // Insertar antes del botón +
-  var btn = wrap.querySelector("button:last-child");
-  wrap.insertBefore(div, btn);
-  div.querySelector("input").focus();
+  if (!_stkIns) return;
+  if (!_stkIns.edUbics) _stkIns.edUbics = {};
+  if (!_stkIns.edUbics[cod]) _stkIns.edUbics[cod] = [];
+  _stkIns.edUbics[cod].push("");
+  stkRender();
+  // Focus en el nuevo input (último)
+  setTimeout(function () {
+    var inputs = document.querySelectorAll("[oninput*='stkInsUbicChg'][oninput*='" + cod + "']");
+    if (inputs.length) inputs[inputs.length - 1].focus();
+  }, 50);
 }
-/* v8.72 — quitar una línea de ubicación del editor inline */
+/* v8.72 — quitar una línea de ubicación */
 function stkInsUbicQuitar(cod, idx) {
-  var wrap = document.getElementById("edUbics_" + cod);
-  if (!wrap) return;
-  var divs = wrap.querySelectorAll("div[style]");
-  if (divs[idx]) divs[idx].remove();
-  // Re-numerar idx
-  var inputs = wrap.querySelectorAll("input.insUbicSec");
-  for (var i = 0; i < inputs.length; i++) inputs[i].setAttribute("data-idx", i);
+  if (!_stkIns || !_stkIns.edUbics || !_stkIns.edUbics[cod]) return;
+  _stkIns.edUbics[cod].splice(idx, 1);
+  stkRender();
 }
-/* v8.72 — leer las ubicaciones del editor inline → array de strings */
+/* v8.72 — leer las ubicaciones del estado → array de strings (para guardar) */
 function _stkInsUbicLeer(cod) {
-  var wrap = document.getElementById("edUbics_" + cod);
-  if (!wrap) return [];
-  var inputs = wrap.querySelectorAll("input.insUbicSec");
-  var out = [];
-  for (var i = 0; i < inputs.length; i++) {
-    var v = String(inputs[i].value || "").trim();
-    if (v) out.push(v);
-  }
-  return out;
+  if (!_stkIns || !_stkIns.edUbics || !_stkIns.edUbics[cod]) return [];
+  return _stkIns.edUbics[cod].filter(function (s) { return String(s || "").trim() !== ""; }).map(function (s) { return String(s).trim(); });
 }
 /* v8.72 — guardar ubicaciones múltiples en Insumos_Ubicaciones (CRUD sync) */
 async function _stkInsUbicSync(cod, nuevas) {
@@ -14835,7 +14840,7 @@ function _stkInsUniSel(id, sel) {
     us.map(function (u) { return '<option value="' + escapeHtml(u) + '"' + (sel === u ? " selected" : "") + '>' + escapeHtml(u) + '</option>'; }).join("") +
     '</select>';
 }
-function stkInsEdit(k) { if (!_stkIns) return; _stkIns.edit = k; stkRender(); }
+function stkInsEdit(k) { if (!_stkIns) return; _stkIns.edit = k; _stkIns.edUbics = {}; stkRender(); }
 /* v8.29 — editor de factores por insumo. Estado: base (unidad más chica) + equivalencias [{u,f}]. */
 /* v8.35 — autocompletado en la edición: cargás Cant secundaria O Factor y el otro se llena.
    primaria (edQty) = base; primaria = secundaria × factor. */
@@ -15132,7 +15137,7 @@ async function stkInsGuardar(cod) {
     if (ubics.length || (it.ubics && it.ubics.length)) {
       await _stkInsUbicSync(finalCod, ubics);
     }
-    _stkIns.edit = null; _stkIns.msg = msg;
+    _stkIns.edit = null; _stkIns.edUbics = {}; _stkIns.msg = msg;
     await stkInsRefresh(); stkRender();
   } catch (e) { alert("No se pudo: " + (e.message || e)); }
 }
