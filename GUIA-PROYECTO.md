@@ -4,7 +4,19 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-10 · Versión app al documentar: **v8.64**
+> Última actualización: 2026-08-10 · Versión app al documentar: **v8.65**
+>
+> Nota: **v8.65 — Conteo cíclico de góndola (CG): cruce confiable (timing).** El CG ya estaba completo
+> (front pide contar 1 artículo random durante el picking + trigger `trg_conteo_gondola_telegram`
+> compara vs góndola del sistema y avisa por Telegram "dio igual / X de diferencia"). Fix del timing
+> (contar antes/después de sacar daba falsos): (1) la tarjeta aclara **"contala ANTES de empezar a
+> sacar de esa celda"**; (2) se elige preferentemente un artículo **todavía no pickeado** en la tanda
+> (`pkPickConteo`); (3) **snapshot** de la góndola del sistema al mostrar la tarjeta (pre-picking),
+> mandado como 3er campo del evento `CG` (`COD|contado|sistema`, `_pkConteoSistema`/`pkEmitConteo`) →
+> el trigger usa ese snapshot si vino (así el TP a mitad no ensucia el cruce). Backup del trigger
+> previo en `sql/backup_notificar_conteo_gondola_20260810.sql`.
+>
+> Nota: **v8.59–v8.64 — Batch de mejoras a otros módulos.**
 >
 > Nota: **v8.59–v8.64 — Batch de mejoras a otros módulos.** (v8.59) Cola de impresión: estado
 > "última revisión / sin conexión" + botón "Revisar ahora" (`psPoll(force)`). (v8.60) Recepción

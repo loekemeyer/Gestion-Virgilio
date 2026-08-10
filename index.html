@@ -6167,7 +6167,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.64";
+const APP_VERSION = "v8.65";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -7828,6 +7828,16 @@ async function _pkCeldasPorCod() {
   const out = {}; Object.keys(m).forEach(function (c) { out[c] = Object.keys(m[c]).length; });
   _pkCeldasCache = out; return out;
 }
+/* v8.65 — snapshot de la góndola del sistema para el código a contar (al mostrar la tarjeta,
+   pre-picking). Los artículos de conteo son de UNA sola celda (no split), así que el terminado
+   del código exacto = lo que suma el trigger. Devuelve null si no se pudo. */
+async function _pkConteoSistema(art) {
+  try {
+    const rows = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/vista_saldos_stock", "select=cod_art,terminado&cod_art=eq." + encodeURIComponent(String(art).trim()));
+    let s = 0; (rows || []).forEach(function (r) { s += Number(r.terminado) || 0; });
+    return Math.round(s);
+  } catch (_e) { return null; }
+}
 async function _pkConteoSwitchOn() {
   try {
     const r = await fetch(SUPABASE_URL + "/rest/v1/Stock_Config?clave=eq.conteo_ciclico_gondola&select=valor", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
@@ -7852,9 +7862,19 @@ async function pkPickConteo() {
       cand.push({ art: art, sector: it.sector || "" });
     });
     if (!cand.length || !_pk) return;
-    const pick = cand[Math.floor(Math.random() * cand.length)] || cand[0];
-    _pk.conteo = { art: pick.art, sector: pick.sector, done: false };
+    // v8.65 (#3) — preferir un artículo TODAVÍA NO pickeado en esta tanda: su góndola no se está
+    // tocando, así que es natural contarlo ANTES de sacar → el cruce es válido.
+    const _sinPickear = cand.filter(function (x) {
+      const it = (_pk.items || []).filter(function (i) { return String(i.art || "").trim() === x.art; })[0];
+      return it && _pk.results[it.key] == null;
+    });
+    const pool = _sinPickear.length ? _sinPickear : cand;
+    const pick = pool[Math.floor(Math.random() * pool.length)] || pool[0];
+    _pk.conteo = { art: pick.art, sector: pick.sector, done: false, sistema: null };
     if (typeof pkRender === "function") pkRender();
+    // v8.65 (#2) — snapshot de la góndola del sistema AL MOSTRAR la tarjeta (pre-picking): el cruce
+    // no se ensucia aunque el TP caiga en el medio. Async, no bloquea.
+    _pkConteoSistema(pick.art).then(function (s) { if (_pk && _pk.conteo && !_pk.conteo.done && _pk.conteo.art === pick.art) _pk.conteo.sistema = s; });
   } catch (_e) {}
 }
 function pkConteoCardHtml() {
@@ -7862,8 +7882,8 @@ function pkConteoCardHtml() {
   const c = _pk.conteo;
   if (c.done) return '<div class="pk-conteo done">🔢 ✓ Anotaste el conteo de <b>' + escapeHtml(c.art) + '</b>. ¡Gracias!</div>';
   return '<div class="pk-conteo">' +
-    '<div class="pk-conteo-h">🔢 Control de góndola (rápido, 1 por día)</div>' +
-    '<div class="pk-conteo-s">Contá cuántas cajas de <b>' + escapeHtml(c.art) + '</b> hay en la <b>góndola</b>' + (c.sector ? ' (celda <b>' + escapeHtml(c.sector) + '</b>)' : '') + ' y anotá. No frena nada.</div>' +
+    '<div class="pk-conteo-h">🔢 Control de góndola (rápido)</div>' +
+    '<div class="pk-conteo-s">Contá cuántas cajas de <b>' + escapeHtml(c.art) + '</b> hay en la <b>góndola</b>' + (c.sector ? ' (celda <b>' + escapeHtml(c.sector) + '</b>)' : '') + ' y anotá. <b>Contala ANTES de empezar a sacar de esa celda</b> (si no, va a dar diferencia). No frena nada.</div>' +
     '<div class="pk-conteo-row"><input id="pkConteoInp" type="number" inputmode="numeric" min="0" class="pk-conteo-inp" placeholder="cajas"><button class="pk-btn pk-ok pk-conteo-btn" onclick="pkConteoSubmit()">✓ Anotar</button></div>' +
     '</div>';
 }
@@ -7872,17 +7892,19 @@ function pkConteoSubmit() {
   const inp = document.getElementById("pkConteoInp");
   const v = inp ? parseInt(inp.value, 10) : NaN;
   if (isNaN(v) || v < 0) { try { if (inp) inp.focus(); } catch (_e) {} return; }
-  pkEmitConteo(_pk.conteo.art, v);
+  pkEmitConteo(_pk.conteo.art, v, _pk.conteo.sistema);
   _pk.conteo.done = true;
   pkRender();
 }
 /* Evento CG: conteo cíclico de góndola. texto = "COD|contado". Dedup por
    cg_<legajo>_<cod>_<día>. Un trigger de Supabase compara vs el sistema y avisa por Telegram. */
-function pkEmitConteo(art, contado) {
+function pkEmitConteo(art, contado, sistema) {
   const leg = String((_pk && _pk.legajo) || "").trim();
+  // v8.65 — 3er campo: snapshot de la góndola del sistema al mostrar la tarjeta (si se pudo leer).
+  const snap = (sistema == null || isNaN(Number(sistema))) ? "" : ("|" + Math.round(Number(sistema)));
   const payload = {
     legajo: leg, opcion: "CG", descripcion: "Conteo cíclico de góndola",
-    texto: (String(art).toUpperCase() + "|" + contado),
+    texto: (String(art).toUpperCase() + "|" + contado + snap),
     ts: Date.now(),
     id: ("cg_" + leg + "_" + String(art).toUpperCase() + "_" + getTodayKey()).replace(/[^a-zA-Z0-9_\-]/g, ""),
     ts_inicio_iso: null
