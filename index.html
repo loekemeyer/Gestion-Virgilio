@@ -3624,6 +3624,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       <button class="sup-action-btn" onclick="showGuardarOrden('')"><span class="sup-ico">📋</span><span>Qué bajar primero</span></button>
       <button class="sup-action-btn" onclick="openCorreccPanel()"><span class="sup-ico">🔀</span><span>Corregir códigos de NPs</span></button>
       <button class="sup-action-btn" onclick="openNpConsulta()"><span class="sup-ico">🔎</span><span>Consultar NP / Líos</span></button>
+      <button class="sup-action-btn" onclick="stkOpenNpFaltan()"><span class="sup-ico">⚠️</span><span>Pedidos sin cargar en PPP</span></button>
       <button class="sup-action-btn" onclick="openDatosProducto()" style="position:relative;"><span class="sup-ico">🚦</span><span>Completar datos producto</span><span id="dpBadge" class="dp-badge" style="display:none;"></span></button>
       <button class="sup-action-btn" onclick="openConfiguracion()"><span class="sup-ico">⚙️</span><span>Configuración</span></button>
     </div>
@@ -6297,7 +6298,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v9.06";
+const APP_VERSION = "v9.07";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
