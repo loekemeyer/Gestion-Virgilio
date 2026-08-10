@@ -1022,6 +1022,22 @@ button {
   .monitor-header{ padding: 8px 0 6px 0; }
 }
 
+/* v8.67 — Header del Monitor/Inconsistencias en celular angosto: se APILA en renglones
+   en vez de encimarse. Antes (≤460px) las pestañas, el título, el reloj, el "Cerrar",
+   las stats y el buscador se pisaban y se cortaban a la derecha (ver reporte usuario).
+   Ahora: fila 1 = reloj (izq) + Cerrar (der); después pestañas, título, stats y buscador,
+   cada uno en su renglón y a lo ancho. NO afecta modo TV (aplica solo a pantallas chicas). */
+@media (max-width: 560px){
+  .monitor-header{ flex-wrap: wrap; align-items: center; row-gap: 8px; column-gap: 8px; }
+  .monitor-header > #monitorClock{ order: 1; margin: 0 auto 0 0; font-size: 12px; }
+  .monitor-header > div:last-child{ order: 2; flex: 0 0 auto; }
+  .monitor-header .mod-hdr-left{ order: 3; flex: 1 1 100%; flex-direction: column; align-items: stretch; gap: 9px; }
+  .monitor-header .mod-switch{ align-self: flex-start; }
+  .monitor-header .monitor-title{ font-size: 16px; line-height: 1.25; }
+  .monitor-header .mon-filter-wrap{ flex-wrap: wrap; }
+  .monitor-header .mon-filter{ width: 100%; max-width: none; }
+}
+
 /* =====================================================
    MODO TV — fullscreen adaptativo (con scroll si el contenido no entra).
    Tamaños en clamp(vh) para escalar de monitor chico a 32".
@@ -6167,7 +6183,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.66";
+const APP_VERSION = "v8.67";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco

@@ -4,7 +4,13 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-10 · Versión app al documentar: **v8.66**
+> Última actualización: 2026-08-10 · Versión app al documentar: **v8.67**
+>
+> Nota: **v8.67 — Header del Monitor/Inconsistencias en celular angosto (fix de layout).** En
+> pantallas ≤560px el header se encimaba (pestañas Monitor/Análisis, título, reloj, "Cerrar", stats
+> y buscador se pisaban y se cortaban a la derecha). Ahora se apila en renglones: fila 1 = reloj +
+> Cerrar; después pestañas, título (`Inconsistencias · al día · WxH · próx`), stats y buscador a lo
+> ancho. Solo CSS (nuevo `@media (max-width:560px)` sobre `.monitor-header`); no toca el modo TV.
 >
 > Nota: **v8.66 — "Completar Pedido — faltante que llegó" (panel `showFaltAvisar`): solo faltantes
 > con stock para completar.** Antes listaba TODO faltante sin facturar; ahora solo aparece una NP si
