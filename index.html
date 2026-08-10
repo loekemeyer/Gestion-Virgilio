@@ -6298,7 +6298,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v9.08";
+const APP_VERSION = "v9.09";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -12490,14 +12490,41 @@ function _stkNpFaltanRender() {
     } else {
       act = '<button onclick="stkNpFaltanAskCancel(\'' + encodeURIComponent(np) + '\')" title="Marcar que este pedido NO va (cancelado / error). Deja de contar y desaparece del stock." style="width:auto;margin:0;padding:4px 9px;border:1px solid #fca5a5;border-radius:8px;background:#fee2e2;color:#dc2626;font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap;">🚫 No va</button>';
     }
-    return '<tr' + (_stkPop.cancelNp === np ? ' style="background:#fffbeb"' : '') + '><td><b>' + escapeHtml(np) + '</b></td>' +
+    // v9.09 — fila de detalle (composición del pedido) al tocar la NP
+    var detHtml = "";
+    if (_stkPop.detNp === np) {
+      var det = (_stkPop.detCache && _stkPop.detCache[np]) || null;
+      var inner;
+      if (det == null) inner = '<span style="color:#94a3b8">Cargando…</span>';
+      else if (!det.length) inner = '<span style="color:#94a3b8">Sin detalle.</span>';
+      else inner = '<div style="display:flex;flex-wrap:wrap;gap:5px">' + det.map(function (d) { return '<span style="background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:2px 7px;font-size:11px;"><b>' + escapeHtml(d.art) + '</b> · ' + round1(d.cajas) + '</span>'; }).join("") + '</div>';
+      detHtml = '<tr><td colspan="5" style="background:#f8fafc;padding:6px 10px;"><div style="font-size:11px;color:#64748b;font-weight:700;margin-bottom:3px;">🧾 Composición del pedido ' + escapeHtml(np) + ' (' + (det ? det.length : "…") + ' códigos):</div>' + inner + '</td></tr>';
+    }
+    return '<tr' + (_stkPop.cancelNp === np ? ' style="background:#fffbeb"' : '') + '><td onclick="stkNpFaltanDetalle(\'' + encodeURIComponent(np) + '\')" style="cursor:pointer;" title="Ver la composición del pedido"><b>' + escapeHtml(np) + '</b> <span style="color:#94a3b8;font-size:11px;">' + (_stkPop.detNp === np ? "▾" : "▸") + '</span></td>' +
       '<td style="font-size:12px">' + escapeHtml(_stkFmtFechaNP(r.fecha) || r.fecha || "—") + '</td>' +
       '<td style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escapeHtml(r.cliente || "—") + '</td>' +
       '<td class="num"><b>' + round1(r.cajas) + '</b></td>' +
-      '<td style="text-align:right">' + act + '</td></tr>';
+      '<td style="text-align:right">' + act + '</td></tr>' + detHtml;
   }).join("") + '</tbody>';
   h += '<tfoot><tr style="font-weight:800;border-top:2px solid #334155"><td colspan="3">TOTAL (' + rows.length + ' NP)</td><td class="num">' + round1(totCajas) + '</td><td></td></tr></tfoot></table></div>';
   body.innerHTML = h;
+}
+async function stkNpFaltanDetalle(npEnc) {
+  if (!_stkPop || _stkPop.kind !== "npFaltan") return;
+  var np = decodeURIComponent(npEnc);
+  if (_stkPop.detNp === np) { _stkPop.detNp = null; _stkNpFaltanRender(); return; }   // toggle cerrar
+  _stkPop.detNp = np; _stkPop.detCache = _stkPop.detCache || {};
+  if (!_stkPop.detCache[np]) {
+    _stkNpFaltanRender();   // muestra "Cargando…"
+    try {
+      var H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+      var rws = await fetch(SUPABASE_URL + "/rest/v1/PPP_Base_Pedidos?pedido=in.(" + encodeURIComponent(np) + "," + encodeURIComponent(np + ".0") + ")&select=articulo,cajas&limit=2000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; });
+      var agg = {};
+      rws.forEach(function (x) { var a = String(x.articulo || "").trim(); if (!a) return; agg[a] = (agg[a] || 0) + (Number(x.cajas) || 0); });
+      _stkPop.detCache[np] = Object.keys(agg).sort(function (a, b) { return (parseInt(a, 10) || 0) - (parseInt(b, 10) || 0) || (a < b ? -1 : 1); }).map(function (a) { return { art: a, cajas: agg[a] }; });
+    } catch (_e) { _stkPop.detCache[np] = []; }
+  }
+  if (_stkPop.detNp === np) _stkNpFaltanRender();
 }
 function stkNpFaltanAskCancel(npEnc) { if (!_stkPop) return; _stkPop.cancelNp = decodeURIComponent(npEnc); _stkNpFaltanRender(); }
 function stkNpFaltanCancelBack() { if (!_stkPop) return; _stkPop.cancelNp = null; _stkNpFaltanRender(); }
