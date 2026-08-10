@@ -19,6 +19,17 @@
 > (652/771/957EL no existían en el sistema de OCs). Módulo "Completar datos producto" excluye la tabla
 > **`Articulos_Discontinuados`** (15,75,563,396,456,517,556 + 029,030,828,830 reemplazados por 437E/438E).
 >
+> Nota: **v9.11 — Pantalla "Proveedor de importación".** Botón 🏭 en Administración
+> (`stkOpenProvImp`). Lista los códigos **importados** (terminan en **E**, activos, no discontinuos)
+> desde la vista **`vista_prov_importacion`** (`OC_Maximos` ⨝ `Proveedores_Importacion`, GRANT SELECT
+> anon) con un desplegable por fila para asignar el **proveedor chino**: Hugo Wong, Becky Chen,
+> Ownland, Kangli, Fujian, Stephen, Frontier (`_PROV_IMP_LISTA`). **García NO está** (reenvasa lo de
+> insumos, no importa). Guarda al instante por upsert en **`Proveedores_Importacion`**
+> (cod PK, proveedor, nota, actualizado; RLS select+insert+update anon) con `on_conflict=cod`.
+> Buscador por código/descripción, toggle "Solo sin asignar", filas sin proveedor resaltadas. Sirve
+> de base para emitir la OC directo al proveedor y para el rediseño de OC de importados (índice 10
+> meses, stock sumado en todos los estadios). Bump `v9.11`.
+>
 > Nota: **v8.96–v9.04 — Cajas Pedidas = toda la demanda real + módulo "NP que faltan".**
 > **Demanda (`ocgDemanda`, columna "Cajas Pedidas" del stock):** dejó de contar solo las NP
 > programadas en `PPP_Programacion_Diaria`; ahora arranca desde **TODA** la base de pedidos
