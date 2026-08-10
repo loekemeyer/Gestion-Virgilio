@@ -3077,7 +3077,13 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
 .falt-tbl th.falt-sem { background:#334155; }
 .falt-tbl th.falt-dia.hoy { background:#1e40af; }
 /* v8.77 — marca "S" (supermercado) en el row de arriba, sobre la columna de super */
-.falt-tbl th.falt-super-mark { background:#0e7490; color:#fff; font-weight:900; letter-spacing:1px; padding:2px 8px; }
+.falt-tbl th.falt-super-mark { background:#0e7490; color:#fff; font-weight:900; letter-spacing:1px; }
+/* v8.77 — thead de 2 filas: la fila de la "S" sticky arriba (top:0) y la fila de los días
+   sticky pegada debajo (top: alto de la fila de la S). Sin esto, ambas quedaban en top:0 y la
+   fila de días tapaba la "S" al scrollear ("al bajar se va la S"). */
+.falt-tbl thead tr:first-child th { top:0; }
+.falt-tbl thead tr:first-child th.falt-dia { padding:1px 8px; line-height:15px; height:15px; }
+.falt-tbl thead tr:nth-child(2) th { top:17px; }
 .falt-tbl td { padding:4px 8px; border-bottom:1px solid #f1f5f9; white-space:nowrap; }
 .falt-tbl td.num { text-align:center; font-variant-numeric:tabular-nums; }
 .falt-tbl td.falt-cod { font-family:Consolas,Menlo,monospace; font-weight:800; color:#1e6bd6; }
@@ -6215,7 +6221,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.77";
+const APP_VERSION = "v8.78";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -13498,7 +13504,7 @@ function stkBodyFaltante() {
   // REAL es el de la familia (stock combinado), porque se puede cubrir con cualquiera
   // cambiando la NP en el ERP. Los códigos sueltos quedan como una "familia" de uno.
   var arts = [];
-  var superDiaSet = {};   // v8.77 — días (fecha de armado) que tienen demanda de SUPERMERCADO
+  var superDiaSet = {};   // v8.77 — días (armado) con faltante REAL de super (se computa tras los filtros)
   var allCods = {};
   Object.keys(dem).forEach(function (c) { allCods[c] = true; });
   Object.keys(sMap).forEach(function (c) { allCods[c] = true; });
@@ -13542,7 +13548,7 @@ function stkBodyFaltante() {
       if (cj <= 0) return;
       if (!e.fecha) { sinFecha += cj; return; }
       demDia[e.fecha] = (demDia[e.fecha] || 0) + cj;
-      if (e.esSuper) { demDiaSuper[e.fecha] = (demDiaSuper[e.fecha] || 0) + cj; superDiaSet[e.fecha] = true; }
+      if (e.esSuper) { demDiaSuper[e.fecha] = (demDiaSuper[e.fecha] || 0) + cj; }
       else { demDiaCli[e.fecha] = (demDiaCli[e.fecha] || 0) + cj; }
     });
     var totalDem = entriesFam.reduce(function (ac, e) { return ac + _cjEff(e); }, 0);
@@ -13659,6 +13665,14 @@ function stkBodyFaltante() {
 
   // v8.02 — "solo quiebre": esconde los que no faltan (ruido)
   if (F.soloQuiebre) arts = arts.filter(_hayQ);
+
+  // v8.77 — un día se DESDOBLA (Super | Clientes) SOLO si hay faltante REAL de supermercado ese
+  // día en algún artículo VISIBLE. Si el super está cubierto (faltante 0), la columna quedaría
+  // vacía al lado de la de clientes → sin sentido: se muestra el día una sola vez (pedido del usuario).
+  superDiaSet = {};
+  arts.forEach(function (a) {
+    diasCols.forEach(function (d) { if ((a.diasFaltSuper[d] || 0) > 0) superDiaSet[d] = true; });
+  });
 
   var nExcl = Object.keys(ajustes).length;
   var h = '';

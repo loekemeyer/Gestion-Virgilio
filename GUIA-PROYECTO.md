@@ -4,7 +4,15 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-10 · Versión app al documentar: **v8.77**
+> Última actualización: 2026-08-10 · Versión app al documentar: **v8.78**
+>
+> Nota: **v8.78 — Faltantes x día (super): 2 ajustes.** (1) El día se DESDOBLA (Super | Clientes)
+> **solo si hay faltante REAL de super ese día** en algún artículo visible: si el super está cubierto
+> (faltante 0), la columna quedaba vacía al lado de la de clientes → sin sentido; ahora se muestra el
+> día una sola vez. `superDiaSet` se recalcula **tras los filtros** desde `diasFaltSuper` (>0), no
+> desde la demanda. (2) La **"S"** del thead superior ahora es **sticky con offset** (`tr:first-child`
+> top:0, `tr:nth-child(2)` top:17px): antes las dos filas del thead quedaban en top:0 y la fila de
+> días tapaba la "S" al scrollear ("al bajar se va la S").
 >
 > Nota: **v8.77 — Faltantes x día: días de SUPERMERCADO desdoblados (Super | Clientes).** En el
 > detalle "📅 Ver días", un día que tiene demanda de **supermercado** ahora se muestra **dos veces**:
