@@ -2863,7 +2863,7 @@ table.fac-np-tbl td.num{ text-align: right; font-variant-numeric: tabular-nums; 
 table.fac-np-tbl td.center{ text-align: center; }
 .fac-np-cell{ font-family: monospace; font-weight: bold; color: #1e6bd6; font-size: 13px; }
 .fac-cod-cell{ font-family: monospace; color: #475569; font-size: 12px; }
-.fac-dir-cell{ color: #475569; font-size: 12px; }
+/* .fac-dir-cell removido en v8.81 (columna Dirección eliminada de Facturación) */
 /* Razón Social: el nombre trunca en su renglón, pero los avisos (⚠ FALTA / 🧾
    equivalencia) tienen que poder BAJAR y verse — antes el td tenía overflow:hidden
    + nowrap y CLIPEABA el badge de faltante (no se veía nunca). v5.70. */
@@ -6223,7 +6223,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v8.80";
+const APP_VERSION = "v8.81";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -27711,10 +27711,6 @@ function facRender(tandas){
         <td class="fac-rs-cell"><span class="fac-rs-name">${escapeHtml(f.rs)}</span>${_ft ? facTareaBadge(f.np) : ''}</td>
         <td class="fac-falta-col">${facFaltDist(f.np)}</td>
         <td style="white-space:normal;font-size:11px;font-weight:800;color:#1e40af;line-height:1.3;">${facCambioCod(f.np)}</td>
-        <td class="fac-dir-cell">${escapeHtml(f.dir)}</td>
-        <td class="num">${f.m3 ? f.m3.toFixed(1).replace(".",",") : ""}</td>
-        <td>${escapeHtml(f.barrio)}</td>
-        <td>${escapeHtml(f.zona)}</td>
         <td class="fac-lios-cell">${(() => {
           const np = String(f.np).trim().replace(/\.0+$/, "");
           const v = _facLios.get(np); return (v == null) ? '<span class="fac-lios0">—</span>' : escapeHtml(String(v));
@@ -27732,20 +27728,16 @@ function facRender(tandas){
       <table class="fac-np-tbl">
         <thead>
           <tr>
-            <th style="width:6%">Tanda</th>
-            <th class="center" style="width:5%">Salida</th>
-            <th style="width:7%">NP</th>
-            <th style="width:5%">Cod</th>
-            <th style="width:14%">Razón Social</th>
-            <th style="width:10%">Faltantes</th>
-            <th style="width:9%" title="Pedidos en código secundario a corregir (secundario → principal). Confirmá en 🔀 Corregir códigos.">Cambiar cód</th>
-            <th style="width:11%">Dirección</th>
-            <th class="num" style="width:3.5%">M3</th>
-            <th style="width:7%">Localidad</th>
-            <th style="width:8%">Zona</th>
-            <th class="center" style="width:3.5%">Líos</th>
-            <th class="center" style="width:3.5%">Cajas</th>
-            <th class="center fac-accion-th" style="width:7.5%">Acción</th>
+            <th style="width:8%">Tanda</th>
+            <th class="center" style="width:6%">Salida</th>
+            <th style="width:8%">NP</th>
+            <th style="width:6%">Cod</th>
+            <th style="width:22%">Razón Social</th>
+            <th style="width:16%">Faltantes</th>
+            <th style="width:14%" title="Pedidos en código secundario a corregir (secundario → principal). Confirmá en 🔀 Corregir códigos.">Cambiar cód</th>
+            <th class="center" style="width:5%">Líos</th>
+            <th class="center" style="width:5%">Cajas</th>
+            <th class="center fac-accion-th" style="width:10%">Acción</th>
           </tr>
         </thead>
         <tbody>${rowsHtml}</tbody>
