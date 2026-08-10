@@ -6296,7 +6296,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v9.02";
+const APP_VERSION = "v9.03";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -12466,7 +12466,7 @@ async function stkOpenNpFaltan() {
   h += '<div class="mva-tblwrap"><table class="mva-tbl"><thead><tr><th>NP</th><th>Fecha</th><th>Razón Social</th><th class="num">Cajas</th></tr></thead><tbody>';
   h += rows.map(function (r) {
     return '<tr><td><b>' + escapeHtml(String(r.np)) + '</b></td>' +
-      '<td style="font-size:12px">' + escapeHtml(r.fecha || "—") + '</td>' +
+      '<td style="font-size:12px">' + escapeHtml(_stkFmtFechaNP(r.fecha) || r.fecha || "—") + '</td>' +
       '<td style="font-size:12px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escapeHtml(r.cliente || "—") + '</td>' +
       '<td class="num"><b>' + round1(r.cajas) + '</b></td></tr>';
   }).join("") + '</tbody>';
@@ -12482,7 +12482,7 @@ function stkNpFaltanExport() {
   let html = '<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"><style>td,th{border:1px solid #ccc;padding:3px 7px;font-family:Calibri,Arial,sans-serif;} th{background:#B45309;color:#fff;text-align:left;}</style></head><body>';
   html += '<h3>NP que faltan (en la base, sin programar) — Producción Virgilio (' + esc(fecha) + ')</h3>';
   html += '<table><tr><th>NP</th><th>Fecha</th><th>Razon Social</th><th>Cajas</th></tr>';
-  rows.forEach(function (r) { html += '<tr><td>' + esc(r.np) + '</td><td>' + esc(r.fecha) + '</td><td>' + esc(r.cliente) + '</td><td>' + (Math.round((Number(r.cajas) || 0) * 10) / 10) + '</td></tr>'; });
+  rows.forEach(function (r) { html += '<tr><td>' + esc(r.np) + '</td><td>' + esc(_stkFmtFechaNP(r.fecha) || r.fecha) + '</td><td>' + esc(r.cliente) + '</td><td>' + (Math.round((Number(r.cajas) || 0) * 10) / 10) + '</td></tr>'; });
   html += '<tr><td colspan="3"><b>TOTAL (' + rows.length + ' NP)</b></td><td><b>' + (Math.round(total * 10) / 10) + '</b></td></tr>';
   html += '</table></body></html>';
   const blob = new Blob([html], { type: "application/vnd.ms-excel" });
