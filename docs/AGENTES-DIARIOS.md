@@ -1,37 +1,31 @@
-# Agentes diarios de Producción Virgilio
+# Agentes de Producción Virgilio (uso manual)
 
-Loop autónomo en tres etapas. Todos los agentes del repo proponen desde su
-especialidad, las ideas se **pre-desarrollan solas en su rama**, un curador decide
-qué te llega, y vos confirmás por Telegram / chat con un **código de 4 dígitos**.
+> **Los loops automáticos fueron eliminados** (2026-08-10) para bajar consumo de
+> tokens. Los subagentes siguen definidos en `.claude/agents/` y se invocan a
+> mano cuando hace falta.
 
-## Etapas
+## Agentes disponibles
 
-### 1. Cada 2 h — proponer + desarrollar en rama (`Ideas + ramas agentes Virgilio`)
-Corren **todos** los agentes, cada uno en su especialidad:
-`mejoras-virgilio`, `revisor-logica`, `auditor-consistencia`, `auditor-supabase`,
-`guardian-stock`, `guardian-tests`, `revisor-render`, `keeper-guia`.
+Se invocan desde cualquier chat de Claude sobre este repo, por nombre:
+
+- `mejoras-virgilio` — audita el repo y propone backlog de mejoras.
+- `revisor-logica` — busca bugs, casos borde, inconsistencias de estado.
+- `auditor-consistencia` — CSS/JS muerto, patrones repetidos, funciones sin uso.
+- `auditor-supabase` — RLS, advisors, permisos anon.
+- `guardian-stock` — invariantes del stock event-sourced.
+- `guardian-tests` — corre y mantiene los smoke-tests.
+- `revisor-render` — audita estética/layout headless (móvil ≤460px + monitor).
+- `keeper-guia` — mantiene `GUIA-PROYECTO.md` al día.
+- `curador-telegram` — cuando hay ideas acumuladas, arma la lista definitiva y
+  la manda por Telegram al privado (bot `@Faltantes_Virgilio_bot`).
+
+## Flujo cuando se invoca un agente
 
 - Cada idea nueva → fila en `agente_propuestas` (`estado='pendiente'`).
-- Hasta **5 ideas por corrida** se implementan y verifican (`node --check` + smoke
-  headless) en su rama **`idea/<código>`** → quedan `estado='lista'` con `rama` seteada.
-- **Nunca** se toca `main`. Si una idea no verifica, queda `pendiente` sin rama.
-
-### 2. A las 8:00 AR — curar y avisar (`Curador Virgilio → Telegram`)
-El `curador-telegram`, parado sobre el repo y sobre todo la **`GUIA-PROYECTO.md`**
-(lo que pediste), revisa lo acumulado sin enviar:
-- Descarta ruido, duplicados y lo que contradice la guía (`estado='descartada'` +
-  `curador_nota`).
-- Arma **una lista definitiva** (prioriza las `lista`, ya mergeables) y la manda por
-  Telegram a tu **privado** con el bot `@Faltantes_Virgilio_bot`. Marca `enviado_en`.
-
-### 3. Vos confirmás — merge directo a main
-En **cualquier chat** de Claude sobre este repo:
-- Escribís **`:`** → te muestra **todas las ideas creadas** como **checklist, de a 5**.
-  Tildás las que querés.
-- O decís el **número** (`hacé el 4837`).
-- Cada idea aceptada se **mergea a `main` directamente** desde su rama `idea/<código>`
-  (sin mostrar diff, salvo que lo pidas). Si todavía no tenía rama, se desarrolla en
-  el momento y se mergea. Queda `estado='hecha'`.
+- Si se implementa y verifica (`node --check` + smoke headless), queda
+  `estado='lista'` con rama **`idea/<código>`**. **Nunca** se toca `main`.
+- El usuario confirma en el chat (número de 4 díg o checklist con `:`) y ahí se
+  mergea a `main` directo.
 
 ## Tabla `agente_propuestas` (Supabase `hrxfctzncixxqmpfhskv`)
 `codigo` (4 díg, PK) · `agente` · `titulo` · `detalle` · `impacto` · `esfuerzo` ·
@@ -39,18 +33,18 @@ En **cualquier chat** de Claude sobre este repo:
 `rama` · `creado_en` · `desarrollada_en` · `enviado_en` · `curador_nota`.
 RLS activa, sin acceso anon. Código libre: `select public.nuevo_codigo_propuesta();`
 
-## Telegram
+## Telegram (si se invoca `curador-telegram`)
 Reusa el bot `@Faltantes_Virgilio_bot` (token en Vault), manda al **privado**:
 `select public.tg_enqueue('<msg>','<dedup>','<CHAT_ID_PRIVADO>','HTML');`
 `select public.tg_outbox_flush();`
 
-## Tareas programadas (Routines)
-- `30 */2 * * *` (cada 2 h) → proponer + desarrollar en ramas. Sin Telegram.
-- `0 11 * * *` (08:00 AR) → curador + envío de la lista definitiva.
+## Histórico (loops eliminados)
 
-## Mantenimiento
-- Cambiar cadencia / horario: editar el cron de la Routine.
-- Pausar: deshabilitar la/s Routine/s.
-- Cambiar chat destino: actualizar `CHAT_ID_PRIVADO` en el prompt de la Routine de
-  las 8:00 (el `chat_id` no es secreto; el token vive en el Vault).
-- Limpiar ramas de ideas descartadas: `git push origin --delete idea/<código>`.
+Hasta el 2026-08-10 corrían dos Routines automáticas:
+- `30 */2 * * *` → todos los agentes proponen + desarrollan hasta 5 ideas por
+  corrida.
+- `0 11 * * *` (08:00 AR) → curador manda lista definitiva por Telegram.
+
+Se eliminaron porque disparaban ~96 auditorías/día del repo grande con Opus, lo
+que llevó el consumo semanal del ~60% al ~99%. Si en algún momento se quisieran
+volver a activar, están documentadas en el git log.
