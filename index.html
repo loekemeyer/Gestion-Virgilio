@@ -6383,7 +6383,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v9.26";
+const APP_VERSION = "v9.27";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -9879,7 +9879,7 @@ async function openStockAdmin(soloConteo) {
   ov.classList.add("show");
   ov.innerHTML = '<div class="stk-card"><div class="stk-head"><span class="stk-title">' + (_solo ? "📋 Conteo de stock" : "📦 Stock y Compras") + '</span><button class="stk-close" onclick="closeStockAdmin()">Cerrar</button></div><div class="stk-tabs" id="stkTabs"></div><div class="stk-body" id="stkBody"><div class="stk-loading">Cargando…</div></div></div>';
   try {
-    const res = await Promise.all([stockFetchMovs(), stockGetCutoff(), stockFetchArtFactors(), racksFetchOrdenes(), racksFetchBajadas(), loadArtNombres(), ocgDemanda(true).catch(function(){ return {}; }),   /* v6.85: demanda PARTIDA por empresa (809E CH ≠ 809E LK) */
+    const res = await Promise.all([stockFetchMovs(), stockGetCutoff(), stockFetchArtFactors(), racksFetchOrdenes(), racksFetchBajadas(), loadArtNombres(), supaFetchAllSafe(SUPABASE_URL + "/rest/v1/v_cajas_pedidas", "select=articulo,cajas_pedidas").then(function(rows) { var dem = {}; (rows || []).forEach(function(r) { var k = _ocgNorm(r.articulo); if (k) dem[k] = (dem[k] || 0) + (Number(r.cajas_pedidas) || 0); }); return dem; }).catch(function(){ return {}; }),   /* v9.25: demanda desde vista SQL (siempre excluye canceladas) */
       supaFetchAllSafe(SUPABASE_CAPACIDAD_ENDPOINT, "select=sector,cod,cajas_max"),
       fetch(SUPABASE_URL + "/rest/v1/Stock_Config?clave=in.(guardado_cajas_por_hora,guardado_incluir_racks)&select=clave,valor", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; }),
       (_solo ? Promise.resolve({ pend: {}, porArt: {} }) : stkFcsFetch().catch(function () { return { pend: {}, porArt: {} }; })),   // v6.70: FC s/Salida como columna
@@ -12734,7 +12734,7 @@ async function stkNpFaltanDoCancel(npEnc, motivoEnc) {
   _stkPop.cancelNp = null;
   _stkNpFaltanRender();
   // Refrescar la demanda del stock para que el ⚠ y las Cajas Pedidas se actualicen ya.
-  try { if (_stk) { _stk.dem = await ocgDemanda(true); stkRender(); } } catch (_e) {}
+  try { if (_stk) { const rows = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/v_cajas_pedidas", "select=articulo,cajas_pedidas"); var dem = {}; (rows || []).forEach(function(r) { var k = _ocgNorm(r.articulo); if (k) dem[k] = (dem[k] || 0) + (Number(r.cajas_pedidas) || 0); }); _stk.dem = dem; stkRender(); } } catch (_e) {}
 }
 function stkNpFaltanExport() {
   if (!_stkPop || _stkPop.kind !== "npFaltan" || !_stkPop.rows || !_stkPop.rows.length) { try { alert("Abrí primero el módulo de NP que faltan."); } catch (_e) {} return; }
@@ -17376,7 +17376,7 @@ function mgSetExc(i, v) { if (!_mg) return; const it = _mg.items[i]; if (!it) re
 // Ubicación del excedente: 1 letra + 2 letras (3 letras, mayúsculas). Solo guarda
 // (no re-render → no pierde foco mientras tipean).
 function mgSetUbic(i, v) { if (!_mg) return; const it = _mg.items[i]; if (!it) return; it.ubic = String(v == null ? "" : v).toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6); }
-function mgConfirmar() {
+async function mgConfirmar() {
   if (!_mg) return;
   const sel = _mg.items.filter(function (it) { return (it.cargar > 0) || (it.exc > 0); });
   if (!sel.length) return;
@@ -17384,6 +17384,46 @@ function mgConfirmar() {
   // de dato (la usa el picking).
   const sinUbic = sel.find(function (it) { return (it.exc || 0) > 0 && String(it.ubic || "").trim().length < 1; });
   if (sinUbic) { try { alert("📍 Falta la ubicación del excedente de " + sinUbic.cod + ".\nEscribí dónde lo pusiste (letras y números, ej. A12) — el excedente no tiene lugar fijo, hay que anotarla para el picking."); } catch (_e) {} return; }
+  // v9.27: Verificación de código 4 dígitos antes de confirmar (inline para no depender de recepcion.js)
+  const verified = await (new Promise(function (resolve) {
+    const code = Math.floor(1000 + Math.random() * 9000).toString();
+    const overlay = document.createElement("div");
+    overlay.style.cssText = "position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;";
+    const modal = document.createElement("div");
+    modal.style.cssText = "background:white;border-radius:12px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,0.3);max-width:400px;width:90vw;text-align:center;";
+    modal.innerHTML = '<h2 style="margin:0 0 16px 0;font-size:18px;color:#1f2937;">Verificación de Gondola</h2>' +
+      '<p style="margin:0 0 16px 0;color:#6b7280;font-size:14px;">Escribí este código en la góndola y copialo acá:</p>' +
+      '<div style="background:#f3f4f6;padding:16px;border-radius:8px;font-size:32px;font-weight:bold;letter-spacing:8px;margin:0 0 8px 0;font-family:monospace;color:#1f2937;">' + code + '</div>' +
+      '<p style="margin:0 0 20px 0;color:#9ca3af;font-size:13px;font-style:italic;">✏️ Escribir en la góndola física</p>' +
+      '<input id="mgVerifyInput" type="text" placeholder="Escribí el código" maxlength="4" style="width:100%;padding:12px;font-size:18px;border:2px solid #e5e7eb;border-radius:8px;box-sizing:border-box;margin:0 0 16px 0;font-family:monospace;letter-spacing:4px;text-align:center;">' +
+      '<div style="display:flex;gap:10px;"><button id="mgVerifyConfirm" style="flex:1;padding:12px;background:#2563eb;color:white;border:none;border-radius:8px;font-size:14px;font-weight:bold;cursor:pointer;">✓ Confirmar</button>' +
+      '<button id="mgVerifyCancel" style="flex:1;padding:12px;background:#e5e7eb;color:#1f2937;border:none;border-radius:8px;font-size:14px;font-weight:bold;cursor:pointer;">✕ Cancelar</button></div>';
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+    const inp = document.getElementById("mgVerifyInput");
+    inp.oninput = function () { this.value = this.value.replace(/[^0-9]/g, ""); };
+    document.getElementById("mgVerifyConfirm").onclick = function () {
+      if (inp.value === code) {
+        overlay.remove();
+        resolve(true);
+      } else {
+        inp.style.borderColor = "#ef4444";
+        inp.style.background = "#fee2e2";
+        setTimeout(function () {
+          inp.style.borderColor = "#e5e7eb";
+          inp.style.background = "white";
+          inp.value = "";
+          inp.focus();
+        }, 1000);
+      }
+    };
+    document.getElementById("mgVerifyCancel").onclick = function () {
+      overlay.remove();
+      resolve(false);
+    };
+    inp.focus();
+  }));
+  if (!verified) return;
   const rows = [];
   sel.forEach(function (it) {
     const tot = it.cargar + (it.exc || 0);
@@ -17858,10 +17898,30 @@ function rkbSet(i, v) { if (!_rkb) return; const it = _rkb.items[i]; if (!it) re
 function closeRkb() { const ov = document.getElementById("rkbModal"); if (ov) ov.classList.remove("show"); _rkb = null; }
 function rkbHasProgress() { return !!(_rkb && _rkb.items && _rkb.items.some(function (it) { return (it.baja > 0); })); }
 function rkbAskClose() { opAskClose(rkbHasProgress(), "RKB", _rkb && _rkb.legajo, "Bajar de racks", _rkb, closeRkb); }
-function rkbConfirmar() {
+async function rkbConfirmar() {
   if (!_rkb) return;
   const sel = _rkb.items.filter(function (it) { return it.baja > 0; });
   if (!sel.length) return;
+  // v9.27: Mostrar código 4 dígitos para escribir en rack (sin verificación)
+  await (new Promise(function (resolve) {
+    const code = Math.floor(1000 + Math.random() * 9000).toString();
+    const overlay = document.createElement("div");
+    overlay.style.cssText = "position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;";
+    const modal = document.createElement("div");
+    modal.style.cssText = "background:white;border-radius:12px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,0.3);max-width:400px;width:90vw;text-align:center;";
+    modal.innerHTML = '<h2 style="margin:0 0 16px 0;font-size:18px;color:#1f2937;">Verificación de Racks</h2>' +
+      '<p style="margin:0 0 16px 0;color:#6b7280;font-size:14px;">Escribí este código en el rack y copialo acá:</p>' +
+      '<div style="background:#f3f4f6;padding:16px;border-radius:8px;font-size:32px;font-weight:bold;letter-spacing:8px;margin:0 0 20px 0;font-family:monospace;color:#1f2937;">' + code + '</div>' +
+      '<p style="margin:0 0 20px 0;color:#9ca3af;font-size:13px;font-style:italic;">✏️ Escribir en el rack físico</p>' +
+      '<button id="rkbVerifyOk" style="width:100%;padding:12px;background:#2563eb;color:white;border:none;border-radius:8px;font-size:14px;font-weight:bold;cursor:pointer;">✓ Entendido</button>';
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+    document.getElementById("rkbVerifyOk").onclick = function () {
+      overlay.remove();
+      resolve(true);
+    };
+    document.getElementById("rkbVerifyOk").focus();
+  }));
   // v5.30: la bajada del operario queda PROPUESTA en Racks_Bajadas (cola de aprobación de
   // Marianela en Recepción → "Bajadas Racks → góndola"). El stock recién se mueve al APROBAR
   // (racksAprobarBaja), igual que la bajada de las OCs. Antes movía el stock directo y no

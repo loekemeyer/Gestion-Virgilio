@@ -48,6 +48,13 @@
 --  con la app. (Idem 323E.) Los movimientos de sistema usan legajos especiales —
 --  'pipeline', 'reconcilia', '0'— que NO son basura de test para el stock.
 --
+--  NP + DÍA DE PPP (v9.26): cada línea de PICKEADO agrega la tanda (del `ref` del
+--  movimiento más reciente que dejó stock en ese depósito), y a partir de la tanda,
+--  las NP(s) y el día de PPP (fecha_entrega). Fuente tanda→NP+fecha = PPP_Entregados_Meta
+--  (histórico) ∪ PPP_Programacion_Diaria (actual). El "resto sin guardar" (recepción)
+--  no lleva NP (no viene de un pedido). Ej:
+--    cod 106E — 51 cj · pickeado sin facturar (hace 4 d. háb.) · tanda D15A · NP 44531/44532/44533 · PPP 05/08
+--
 --  Solo TELEGRAM. Respeta el cutoff. Lista los 15 más viejos
 --  + "… y N más". Dedup diario por el set (depósito|cod).
 --
@@ -76,7 +83,7 @@ begin
   with cfg as (select valor::timestamptz as cutoff from public."Stock_Config" where clave = 'cutoff_ts' limit 1),
   mv as (
     select upper(regexp_replace(trim(m.cod_art), '^0+(.)', '\1')) as cod,
-           m.deposito, m.tipo, m.delta, m.ts, m.id
+           m.deposito, m.tipo, m.delta, m.ts, m.id, m.ref
     from public."Movimientos_Stock" m left join cfg on true
     where m.deposito in ('a_guardar', 'separar_pedidos', 'a_facturar')
       and (cfg.cutoff is null or m.tipo = 'inicial' or m.ts >= cfg.cutoff)
@@ -85,12 +92,9 @@ begin
   run as (
     select cod, tipo, ts, id,
            sum(delta) over (partition by cod order by ts, id rows between unbounded preceding and current row) as saldo_run
-    from mv
-    where deposito = 'a_guardar'
+    from mv where deposito = 'a_guardar'
   ),
-  -- fin del último ciclo CERRADO = última vez que se guardó todo (saldo volvió a 0)
   cero as (select cod, max(ts) as cero_ts from run where saldo_run <= 0.5 group by cod),
-  -- último `guardado` DENTRO del ciclo abierto + el resto que dejó sin guardar
   ultg as (
     select distinct on (r.cod) r.cod, r.ts as g_ts, r.saldo_run as resto
     from run r left join cero c on c.cod = r.cod
@@ -106,23 +110,19 @@ begin
   -- (2) pickeado sin avanzar: separar_pedidos / a_facturar con saldo > 0
   pick as (
     select deposito, cod, sum(delta) as saldo, max(ts) as ult
-    from mv
-    where deposito in ('separar_pedidos', 'a_facturar')
-    group by deposito, cod
-    having sum(delta) > 0.5
+    from mv where deposito in ('separar_pedidos', 'a_facturar')
+    group by deposito, cod having sum(delta) > 0.5
   ),
   todo as (
     select 'a_guardar'::text as deposito, cod, saldo, ult,
            'resto sin guardar (guardaron una parte de lo que llegó)'::text as est from ag
     union all
     select deposito, cod, saldo, ult,
-           case deposito when 'a_facturar' then 'pickeado sin facturar'
-                         else 'pickeado sin separar/armar' end
+           case deposito when 'a_facturar' then 'pickeado sin facturar' else 'pickeado sin separar/armar' end
     from pick
   ),
   etiq as (
     select deposito, cod, round(saldo) as cajas,
-           -- antigüedad en días HÁBILES (lun–vie), sin contar sáb/dom
            (select count(*) from generate_series(
               (ult at time zone 'America/Argentina/Buenos_Aires')::date + 1,
               (now() at time zone 'America/Argentina/Buenos_Aires')::date,
@@ -131,14 +131,35 @@ begin
            est
     from todo
   ),
+  -- tanda del movimiento más reciente que dejó stock pickeado en ese depósito (ref = tanda)
+  tanda_cod as (
+    select distinct on (deposito, cod) deposito, cod, split_part(ref, '|', 1) as tanda
+    from mv
+    where deposito in ('separar_pedidos', 'a_facturar') and delta > 0 and nullif(btrim(ref), '') is not null
+    order by deposito, cod, ts desc, id desc
+  ),
+  -- tanda → NP(s) + fecha PPP (histórico PPP_Entregados_Meta ∪ programación actual)
+  pppmap as (
+    select upper(btrim(tanda)) as tanda,
+           string_agg(distinct np, '/' order by np) as nps,
+           to_char(max(nullif(btrim(fecha_entrega), '')::date), 'DD/MM') as fecha
+    from (select np, tanda, fecha_entrega from public."PPP_Entregados_Meta"
+          union all select np, tanda, fecha_entrega from public."PPP_Programacion_Diaria") u
+    where nullif(btrim(tanda), '') is not null
+    group by upper(btrim(tanda))
+  ),
   fil as (
-    select deposito, cod, cajas, dh, est,
-           row_number() over (order by dh desc, cod) as rn
-    from etiq
-    where dh >= dias
+    select e.deposito, e.cod, e.cajas, e.dh, e.est, tc.tanda, pm.nps, pm.fecha,
+           row_number() over (order by e.dh desc, e.cod) as rn
+    from etiq e
+    left join tanda_cod tc on tc.deposito = e.deposito and tc.cod = e.cod
+    left join pppmap pm on pm.tanda = upper(btrim(tc.tanda))
+    where e.dh >= dias
   )
   select count(*),
-         string_agg('cod ' || cod || ' — ' || cajas || ' cj · ' || est || ' (hace ' || dh || ' d. háb.)', E'\n• ' order by rn) filter (where rn <= 15),
+         string_agg('cod ' || cod || ' — ' || cajas || ' cj · ' || est || ' (hace ' || dh || ' d. háb.)'
+           || coalesce(' · tanda ' || tanda, '') || coalesce(' · NP ' || nps, '') || coalesce(' · PPP ' || fecha, ''),
+           E'\n• ' order by rn) filter (where rn <= 15),
          string_agg(deposito || '|' || cod, ',' order by deposito, cod),
          greatest(count(*) - 15, 0)
     into n, detalle, ids, extra

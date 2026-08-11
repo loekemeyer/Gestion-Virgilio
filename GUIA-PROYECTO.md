@@ -15,6 +15,26 @@
 > `_fetchAndRenderHistory()` en background, que trae datos de Supabase y los cachea en `_historyCache`.
 > Combina sin duplicados (remoto + local pendiente) en `_renderHistoryWithRemote()`. Bump `v9.26`.
 >
+> Nota SERVER (sin bump de app): **FIX stock — pedidos Chef facturados afuera dejaban stock LK trabado.**
+> Los pedidos de **Chef (NP 44xxx)** facturan mercadería **LK** afuera de la app (Cencosud/Chef, lo del
+> sufijo "L"). La **ETAPA 3** de `reconciliar_pipeline_stock()` drenaba `a_facturar` **solo si la tanda
+> seguía en el PPP del día** (`PPP_Programacion_Diaria`, que se reemplaza a diario). Como los Chef se
+> facturan **después** de que la tanda se cae del PPP, nunca drenaban → **stock LK fantasma** en
+> `a_facturar` que rompe stocks (caso D15A: 550 cajas colgadas desde 05/08; el 100% de la alerta "stock
+> estancado" era esto). **Fix:** ETAPA 3 usa fuente **durable** = NPs de la tanda de `PPP_Entregados_Meta`
+> (histórico) ∪ `PPP_Programacion_Diaria` (actual) → drena cuando todas las NP están facturadas, tenga o
+> no la tanda en el PPP. **Backlog** (D15A 550 + D06E 3 = 553 cajas) se drenó a mano (`facturado`,
+> `legajo='reconcilia'`, `ref='<tanda>|FIX_CHEF_ESTANCADO_20260811'` → trazable/reversible), scope desde
+> 1/8. Verificado: sin a_facturar negativos, backlog en 0. SQL en `sql/reconciliar_pipeline_stock.sql`.
+>
+> Nota SERVER (sin bump de app): **Alerta "STOCK ESTANCADO" ahora dice NP + día de PPP.**
+> Cada línea de **pickeado** agrega la **tanda** (del `ref` del movimiento más reciente que dejó
+> stock en `separar_pedidos`/`a_facturar`) y, a partir de ella, las **NP(s)** y el **día de PPP**
+> (`fecha_entrega`). Fuente tanda→NP+fecha = `PPP_Entregados_Meta` (histórico) ∪
+> `PPP_Programacion_Diaria` (actual). El "resto sin guardar" (recepción) no lleva NP. Ej:
+> `cod 106E — 51 cj · pickeado sin facturar (hace 4 d. háb.) · tanda D15A · NP 44531/44532/44533 · PPP 05/08`.
+> Función `reporte_agentes_stock_estancado()`, SQL en `sql/stock_estancado.sql`.
+>
 > Nota: **v9.25 — Stock de PARTE cuenta como stock del terminado importado (94xP → 94xE).**
 > Los **94xE** (cubiertos ac. inox) se **importan** (maestro, Becky) pero **Log/Fabr los ARMA** a
 > partir de la parte **94xP**. El stock de 94xP (depósito `insumos`, en **unidades**) es "94xE en
@@ -123,6 +143,11 @@
 > **descartada** por redundante. Bump `v9.12`.
 >
 > Nota: **v8.96–v9.04 — Cajas Pedidas = toda la demanda real + módulo "NP que faltan".**
+> **v9.25 — Cajas Pedidas desde vista SQL:** La columna "Cajas Pedidas" del stock ahora lee 
+> directamente de la vista `v_cajas_pedidas` (no del caché JavaScript `ocgDemanda()`), así siempre 
+> refleja canceladas sin lag. Fórmula: `PPP_Base_Pedidos` − (`Facturacion_NP` + `PPP_Entregados_Meta` 
+> + `NP_Canceladas`), agregada por artículo. Los filtros "no programadas" (⚠) usan todavía `ocgDemanda()` 
+> internamente.
 > **Demanda (`ocgDemanda`, columna "Cajas Pedidas" del stock):** dejó de contar solo las NP
 > programadas en `PPP_Programacion_Diaria`; ahora arranca desde **TODA** la base de pedidos
 > (`PPP_Base_Pedidos`, misma fuente que el pop-up) y solo descuenta las NP que **ya salieron**:

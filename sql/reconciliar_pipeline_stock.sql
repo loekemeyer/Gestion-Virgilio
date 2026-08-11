@@ -108,6 +108,22 @@
 --    ahora incluye `etapa4=N`. Backlog: al aplicar la migración se corrió una vez a mano
 --    → drenó los 13 casos colgados (incluido el 534).
 --
+--  v9.26 — ETAPA 3 FUENTE DURABLE (fix pedidos Chef que rompían stock).
+--    Root cause: la ETAPA 3 drenaba `a_facturar` SOLO si la tanda seguía en
+--    `PPP_Programacion_Diaria` (el PPP del día, que se reemplaza a diario). Los
+--    pedidos de CHEF (44xxx, que facturan mercadería LK afuera de la app) se
+--    facturan DESPUÉS de que la tanda se cae del PPP → la condición `exists(PPP...)`
+--    daba falso → NUNCA drenaba → el stock LK quedaba trabado en a_facturar (fantasma
+--    que rompe stocks). Caso testigo: tanda D15A (NPs 44531/44532/44533), 550 cajas
+--    colgadas desde el 05/08. Fix: ETAPA 3 usa una CTE `tandanp` = NPs de la tanda de
+--    `PPP_Entregados_Meta` (histórico, durable) ∪ `PPP_Programacion_Diaria` (actual),
+--    en vez de solo el PPP del día. Así drena cuando TODAS las NP de la tanda están en
+--    `Facturacion_NP`, tenga o no la tanda en el PPP. Los guards anti-doble se mantienen
+--    (`not exists facturado` por tanda + índice único). Backlog colgado (D15A 550 +
+--    D06E 3 = 553 cajas) se drenó a mano con `facturado`/`legajo='reconcilia'`,
+--    `ref='<tanda>|FIX_CHEF_ESTANCADO_20260811'` (trazable/reversible). Verificado: sin
+--    a_facturar negativos.
+--
 --  La definición viva de la función está en la migración homónima en Supabase.
 --  Este archivo es la documentación del diseño (convención de sql/).
 -- =====================================================================

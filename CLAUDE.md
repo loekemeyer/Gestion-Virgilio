@@ -1,5 +1,16 @@
 # CLAUDE.md — Producción Virgilio
 
+## 🪨 Modo Caveman (SIEMPRE activo)
+
+**Cada conversación abre con caveman activo por defecto.** Responder en modo **caveman**:
+frases cortas, directas, mínimas palabras, sin relleno. Solo aplica al **chat** (no al
+código, comentarios ni mensajes de commit).
+
+- **`desactiva caveman`** = responder solo el **próximo mensaje** normal/completo, y después **volver solo** a caveman.
+- **`caveman desactivacion total`** = apagar caveman por completo (queda desactivado hasta que se reactive).
+
+---
+
 App web (PWA, sin framework) para registrar producción de depósito (picking,
 armado, carga de camión, recepción). La usan operarios desde el celular y
 supervisores desde un monitor. Se sirve por GitHub Pages desde `main`.
