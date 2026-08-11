@@ -14003,9 +14003,15 @@ async function gvTopCargar() {
     _gvTop.seguimiento = m;
     _gvTop.loadedFor = key;
     _gvTopRender();
-    var conAlerta = (sg.data || []).filter(function (x) { return x.alerta; }).length;
-    st.innerHTML = '<b>' + _gvTop.rows.length + '</b> clientes · ' +
-      (conAlerta ? '<span style="color:#b91c1c;font-weight:bold;">' + conAlerta + ' con ALERTA</span>' : '<span style="color:#059669;">todos al día</span>') +
+    var aFrec = (sg.data || []).filter(function (x) { return x.alerta_frecuencia; }).length;
+    var aVol  = (sg.data || []).filter(function (x) { return x.alerta_volumen; }).length;
+    var aAny  = (sg.data || []).filter(function (x) { return x.alerta_frecuencia || x.alerta_volumen; }).length;
+    var partes = [];
+    if (aFrec) partes.push('<span style="color:#b91c1c;font-weight:bold;">🕑 ' + aFrec + ' sin comprar</span>');
+    if (aVol)  partes.push('<span style="color:#b91c1c;font-weight:bold;">📉 ' + aVol + ' menos cajas</span>');
+    if (!partes.length) partes.push('<span style="color:#059669;">✓ todos al día</span>');
+    st.innerHTML = '<b>' + _gvTop.rows.length + '</b> clientes · ' + partes.join(' · ') +
+      (aAny ? ' · <b>' + aAny + ' con alguna alerta</b>' : '') +
       ' · empresa <b>' + (_gvTop.emp === "lk" ? "Loekemeyer" : "Chef") + '</b> · orden por <b>' + (_gvTop.tab === "hist" ? "histórico total" : "pedido máximo") + '</b>';
   } catch (e) {
     st.innerHTML = '<span style="color:#b91c1c;">Error: ' + _gvfEsc(e.message || e) + '</span>';
@@ -14033,12 +14039,14 @@ function _gvTopRender() {
       '<th style="padding:6px 8px;text-align:right;">' + (_gvTop.tab === "max" ? "Histórico" : "Pedido máx") + '</th>' +
       '<th style="padding:6px 8px;text-align:center;">Freq</th>' +
       '<th style="padding:6px 8px;text-align:center;">Sin comprar</th>' +
+      '<th style="padding:6px 8px;text-align:center;" title="Mediana de cajas por pedido histórico vs promedio de los últimos 3">Cajas hist→rec</th>' +
+      '<th style="padding:6px 8px;text-align:center;">Alerta</th>' +
       mesesHdr.map(function (m) {
         return '<th style="padding:4px 3px;text-align:center;font-size:10px;color:#64748b;font-weight:normal;transform:rotate(-45deg);white-space:nowrap;min-width:24px;">' + m.slice(2) + '</th>';
       }).join("") +
     '</tr></thead><tbody>';
   h += rows.map(function (r) {
-    var s = seg[r.cod_cliente] || { meses: [], frecuencia_meses: null, meses_sin_comprar: null, alerta: false };
+    var s = seg[r.cod_cliente] || {};
     var mesesArr = Array.isArray(s.meses) ? s.meses : [];
     var maxMonto = 0;
     mesesArr.forEach(function (m) { if (Number(m.monto) > maxMonto) maxMonto = Number(m.monto); });
@@ -14047,7 +14055,7 @@ function _gvTopRender() {
       var pct = maxMonto > 0 ? mm / maxMonto : 0;
       var bg = "#f1f5f9", color = "#94a3b8", txt = "·";
       if (mm > 0) {
-        var g = 220 - Math.round(pct * 130);      // más verde cuanto más alto
+        var g = 220 - Math.round(pct * 130);
         bg = "rgb(" + g + "," + Math.min(255, g+30) + "," + g + ")";
         color = "#065f46"; txt = _gvfPlata(mm).replace("$","");
       }
@@ -14055,20 +14063,34 @@ function _gvTopRender() {
     }).join("");
     var freq = s.frecuencia_meses != null ? Number(s.frecuencia_meses).toFixed(1) : "—";
     var sin  = s.meses_sin_comprar != null && s.meses_sin_comprar < 999 ? s.meses_sin_comprar + "m" : "—";
-    var alertaColor = s.alerta ? "#b91c1c" : "#059669";
-    var alertaBg    = s.alerta ? "#fee2e2" : "transparent";
-    return '<tr' + (s.alerta ? ' style="background:#fef2f2;"' : '') + '>' +
+    var cajasHist = s.cajas_hist_median != null ? Math.round(s.cajas_hist_median) : null;
+    var cajasRec  = s.cajas_recientes_avg != null ? Math.round(s.cajas_recientes_avg) : null;
+    var cajasTxt = "—";
+    var cajasColor = "#64748b";
+    if (cajasHist != null && cajasRec != null) {
+      cajasTxt = cajasHist + " → " + cajasRec;
+      if (s.alerta_volumen) cajasColor = "#b91c1c";
+      else if (cajasRec >= cajasHist) cajasColor = "#059669";
+    }
+    var alertaBadges = [];
+    if (s.alerta_frecuencia) alertaBadges.push('<span title="Se pasó de su ciclo habitual de compra" style="background:#fee2e2;color:#b91c1c;padding:2px 6px;border-radius:4px;font-size:11px;font-weight:bold;">🕑 sin comprar</span>');
+    if (s.alerta_volumen)    alertaBadges.push('<span title="Cajas por pedido cayeron a menos de la mitad" style="background:#fee2e2;color:#b91c1c;padding:2px 6px;border-radius:4px;font-size:11px;font-weight:bold;">📉 menos cajas</span>');
+    var alertaHtml = alertaBadges.length ? alertaBadges.join(' ') : '<span style="color:#059669;font-size:11px;">✓ OK</span>';
+    var rowBg = (s.alerta_frecuencia || s.alerta_volumen) ? 'background:#fef2f2;' : '';
+    return '<tr' + (rowBg ? ' style="' + rowBg + '"' : '') + '>' +
       '<td style="padding:6px 8px;text-align:center;font-weight:bold;color:#64748b;">' + r.ranking + '</td>' +
       '<td style="padding:6px 8px;"><b>' + _gvfEsc(r.cod_cliente) + '</b> <span style="color:#64748b;">' + _gvfEsc((r.business_name || "—").slice(0, 30)) + '</span>' + (r.vendedor_nombre ? '<br><span style="font-size:10px;color:#94a3b8;">' + _gvfEsc(r.vendedor_nombre) + '</span>' : '') + '</td>' +
       '<td style="padding:6px 8px;text-align:right;font-weight:bold;">' + _gvfPlata(_gvTop.tab === "max" ? r.max_pedido_monto : r.total_historico) + '</td>' +
       '<td style="padding:6px 8px;text-align:right;color:#64748b;">' + _gvfPlata(_gvTop.tab === "max" ? r.total_historico : r.max_pedido_monto) + '</td>' +
       '<td style="padding:6px 8px;text-align:center;font-size:11px;color:#64748b;">' + freq + 'm</td>' +
-      '<td style="padding:6px 8px;text-align:center;font-weight:bold;color:' + alertaColor + ';background:' + alertaBg + ';">' + sin + (s.alerta ? ' ⚠' : '') + '</td>' +
+      '<td style="padding:6px 8px;text-align:center;font-weight:bold;color:' + (s.alerta_frecuencia ? '#b91c1c' : '#64748b') + ';">' + sin + '</td>' +
+      '<td style="padding:6px 8px;text-align:center;font-weight:bold;color:' + cajasColor + ';font-size:11px;">' + cajasTxt + '</td>' +
+      '<td style="padding:6px 8px;text-align:center;white-space:nowrap;">' + alertaHtml + '</td>' +
       cellsHtml +
     '</tr>';
   }).join("");
   h += '</tbody></table></div>';
-  h += '<div style="margin-top:10px;font-size:11px;color:#94a3b8;">Meses ordenados de más reciente a más viejo. Celda verde = compró (intensidad = monto vs su máx). Fila rosa = alerta (gap actual > 1.5× la frecuencia habitual del cliente).</div>';
+  h += '<div style="margin-top:10px;font-size:11px;color:#94a3b8;">Meses de más reciente a más viejo. Celda verde = compró (intensidad = monto). <b>🕑 sin comprar</b>: pasó su ciclo habitual (compra cada N meses y ya lleva N meses sin comprar). <b>📉 menos cajas</b>: promedio de los últimos 3 pedidos cayó a menos de la mitad de las cajas del pedido típico histórico.</div>';
   cont.innerHTML = h;
 }
 
@@ -14095,6 +14117,10 @@ async function gvTopExcel() {
       TotalPedidos: r.total_pedidos || 0,
       FrecuenciaMeses: s.frecuencia_meses != null ? Number(s.frecuencia_meses) : "",
       MesesSinComprar: s.meses_sin_comprar != null && s.meses_sin_comprar < 999 ? s.meses_sin_comprar : "",
+      CajasHistMedian: s.cajas_hist_median != null ? Math.round(s.cajas_hist_median) : "",
+      CajasRecientesAvg: s.cajas_recientes_avg != null ? Math.round(s.cajas_recientes_avg) : "",
+      AlertaFrecuencia: s.alerta_frecuencia ? "SI" : "no",
+      AlertaVolumen: s.alerta_volumen ? "SI" : "no",
       Alerta: s.alerta ? "SI" : "no",
     };
     (s.meses || []).forEach(function (m) { base["M " + m.mes] = Number(m.monto) || 0; });
