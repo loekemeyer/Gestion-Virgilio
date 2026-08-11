@@ -6384,7 +6384,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v9.35";
+const APP_VERSION = "v9.36";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -10595,6 +10595,8 @@ const EQUIV_FAMILIAS = [
   { desc: "Espátula / Calada Ac. Inox", def: "945E", cods: ["945E", "332"] },
   { desc: "Cuchara Calada/Mango Mad.", def: "946E", cods: ["946E", "335"] },
   { desc: "Espumadera Ac. Inox",      def: "948E", cods: ["948E", "333"] },
+  // v9.36 — Rallador Chico Chocolate: 838E (importado, PRIMARIO) ↔ 839 (nacional, secundario).
+  { desc: "Rallador Chico Chocolate", def: "838E", cods: ["838E", "839"] },
   // v8.18 — Pincel Silicona: 590E (importado, PRIMARIO) ↔ 548 (nacional, secundario).
   { desc: "Pincel Silicona",          def: "590E", cods: ["590E", "548"] },
   // v8.11 — Corta Queso (Chef): 809 nacional ↔ 809E importado, ambos Chef. El 809E de Chef

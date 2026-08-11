@@ -4,7 +4,17 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-11 · Versión app al documentar: **v9.35**
+> Última actualización: 2026-08-11 · Versión app al documentar: **v9.36**
+>
+> Nota **v9.36** — **839 (Rallador Chico Chocolate) es secundario de 838E (primario).** Se cargó la
+> equivalencia en las **DOS** fuentes (⚠ están separadas y hay que mantenerlas sincronizadas):
+> (a) el array **hardcodeado `EQUIV_FAMILIAS`** en `index.html` (lo usa la pantalla de **Faltantes** y
+> el picking vía `equivFam`/`equivFamKey` — agrupa 839 bajo 838E y netea el stock, así 839 deja de
+> figurar como faltante fantasma), y (b) la tabla Supabase **`Equivalencias_Familia`** (la usa
+> `vista_pedidos_secundarios` → módulo "Corregir códigos de NPs"). Antes 839 no estaba en ninguna,
+> por eso su demanda no se neteaba contra el stock de 838E y aparecía como faltante que no faltaba.
+>
+> Nota **v9.35** — **"¿Qué bajar primero?" ahora marca los URGENTES (góndola < 20%).**
 >
 > Nota **v9.35** — **"¿Qué bajar primero?" ahora marca los URGENTES (góndola < 20%).** Arriba de
 > todo, una alerta roja lista los códigos con góndola < 20% de su máximo (sobre TODOS los códigos
