@@ -6403,7 +6403,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v9.53";
+const APP_VERSION = "v9.54";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -25926,7 +25926,7 @@ async function ppLoad() {
   var H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
   var q = function (u) { return fetch(SUPABASE_URL + "/rest/v1/" + u, { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; }); };
   var res = await Promise.all([
-    q("Entregas_Virgilio?select=np,cod_art,cajas_falto,fecha_salida,cod_cliente&cajas_falto=gt.0&limit=100000"),
+    q("Entregas_Virgilio?select=np,cod_art,cajas_falto,cajas_pedidas,cajas_entregadas,fecha_salida,cod_cliente&cajas_falto=gt.0&limit=100000"),
     q("precios_venta?select=cod,precio_unit,uxb,descripcion&limit=5000"),
     q("clientes_vendedor?select=cod_cliente,vend&limit=30000"),
     q("Facturacion_NP?select=np,razon_social&limit=100000")
@@ -25935,7 +25935,7 @@ async function ppLoad() {
   var precio = {}; pv.forEach(function (r) { var k = _ocgNorm(r.cod); var pu = Number(r.precio_unit) || 0; precio[k] = { pu: pu, uxb: Number(r.uxb) || 1, desc: r.descripcion || "", ok: pu > 0 && pu !== 8888 }; });
   var vendDe = {}; cv.forEach(function (r) { vendDe[String(r.cod_cliente).trim()] = String(r.vend || "").trim(); });
   var rsDe = {}; fac.forEach(function (r) { var n = pickNormNp(r.np); if (n && r.razon_social && !rsDe[n]) rsDe[n] = r.razon_social; });
-  _pp.rows = ent.map(function (r) { return { codN: _ocgNorm(r.cod_art), cod: String(r.cod_art || "").trim(), cajas: Number(r.cajas_falto) || 0, fecha: _ppFecha10(r.fecha_salida), cli: String(r.cod_cliente || "").trim(), np: pickNormNp(r.np) }; }).filter(function (r) { return r.cajas > 0; });
+  _pp.rows = ent.map(function (r) { return { codN: _ocgNorm(r.cod_art), cod: String(r.cod_art || "").trim(), cajas: Number(r.cajas_falto) || 0, ped: Number(r.cajas_pedidas) || 0, ent: Number(r.cajas_entregadas) || 0, fecha: _ppFecha10(r.fecha_salida), cli: String(r.cod_cliente || "").trim(), np: pickNormNp(r.np) }; }).filter(function (r) { return r.cajas > 0; });
   _pp.precio = precio; _pp.vendDe = vendDe; _pp.rsDe = rsDe;
   // años CON DATOS (para el dropdown); por defecto el año actual si tiene datos, si no el más reciente.
   var ys = {}; _pp.rows.forEach(function (r) { var y = r.fecha ? r.fecha.slice(0, 4) : ""; if (/^\d{4}$/.test(y)) ys[y] = 1; });
@@ -25954,23 +25954,28 @@ function ppSetMD2(k, v) {   // v9.43 — entra "dd/mm" (sin año; el año es el 
   if (m) { var dd = ("0" + m[1]).slice(-2), mm = ("0" + m[2]).slice(-2); if (+mm >= 1 && +mm <= 12 && +dd >= 1 && +dd <= 31) _pp[k] = mm + "-" + dd; }
   ppRender();
 }
-function ppRender() {
-  var body = document.getElementById("ppBody"); if (!body || !_pp) return;
-  var yr = _pp.anio, d1 = _pp.desde, d2 = _pp.hasta;   // yr = año seleccionado; d1/d2 = "MM-DD"
-  var rows = _pp.rows.filter(function (r) {
-    if (!r.fecha || r.fecha.slice(0, 4) !== yr) return false;   // solo el año elegido
+/* v9.54 — filas del período seleccionado (año + rango dd/mm), reutilizado por la tabla y el drill-down. */
+function _ppRowsPeriodo() {
+  if (!_pp) return [];
+  var yr = _pp.anio, d1 = _pp.desde, d2 = _pp.hasta;
+  return _pp.rows.filter(function (r) {
+    if (!r.fecha || r.fecha.slice(0, 4) !== yr) return false;
     var md = r.fecha.slice(5);
     if (d1 && md < d1) return false;
     if (d2 && md > d2) return false;
     return true;
   });
+}
+function ppRender() {
+  var body = document.getElementById("ppBody"); if (!body || !_pp) return;
+  var rows = _ppRowsPeriodo();
   var groups = {}, totPlata = 0, totCajas = 0, spCajas = 0, spSet = {};
   rows.forEach(function (r) {
     var key, label;
     if (_pp.group === "cli") { key = r.cli || "—"; label = (r.cli || "—") + (r.np && _pp.rsDe[r.np] ? " · " + _pp.rsDe[r.np] : ""); }
     else if (_pp.group === "vend") { var v = _pp.vendDe[r.cli] || ""; key = v || "—"; label = v === "7" ? "Vend 7 (fábrica)" : (v ? "Vend " + v : "— sin vend —"); }
     else { key = r.codN; var p = _ppPrice(r.codN); label = codBase(r.cod) + (p && p.desc ? " · " + p.desc : ""); }
-    var g = groups[key] || (groups[key] = { label: label, cajas: 0, plata: 0, sp: false });
+    var g = groups[key] || (groups[key] = { key: key, label: label, cajas: 0, plata: 0, sp: false });
     var pl = _ppPlata(r); g.cajas += r.cajas; g.plata += pl; totCajas += r.cajas;
     if (pl > 0) totPlata += pl; else { g.sp = true; spCajas += r.cajas; spSet[r.codN] = 1; }
   });
@@ -25983,10 +25988,77 @@ function ppRender() {
   h += '<div class="pp-total"><span style="font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:#7f1d1d;font-weight:800;">💸 Plata perdida (faltante por quiebre = cajas pedidas que no se entregaron por falta de stock)</span><br><b>' + _ppMoney(totPlata) + '</b> <span style="font-size:12.5px;color:#7f1d1d;">· ' + Math.round(totCajas) + ' cajas no entregadas</span>' + (Object.keys(spSet).length ? '<br><span class="pp-sp">⚠ ' + Object.keys(spSet).length + ' código(s) sin precio (' + Math.round(spCajas) + ' cajas no valorizadas) — cargá el precio en precios_venta.</span>' : '') + '</div>';
   if (!arr.length) { body.innerHTML = h + '<div style="text-align:center;color:#16a34a;padding:24px;font-weight:700;">✅ Sin faltante por quiebre en el período.</div>'; return; }
   var colKey = _pp.group === "art" ? "Artículo" : _pp.group === "cli" ? "Cliente" : "Vendedor";
+  h += '<div style="font-size:11.5px;color:#94a3b8;margin:2px 0 6px;">👆 Tocá una fila para ver el detalle (fecha · cliente · pedido · valor no entregado).</div>';
   h += '<div class="pp-tblwrap"><table class="pp-tbl"><thead><tr><th>' + colKey + '</th><th class="num">Cajas faltó</th><th class="num">Plata perdida</th></tr></thead><tbody>';
-  h += arr.map(function (g) { return '<tr><td>' + escapeHtml(g.label) + (g.sp ? ' <span class="pp-sp">(sin precio)</span>' : '') + '</td><td class="num">' + Math.round(g.cajas) + '</td><td class="num" style="font-weight:800;color:#b91c1c;">' + (g.plata > 0 ? _ppMoney(g.plata) : "—") + '</td></tr>'; }).join("");
+  h += arr.map(function (g) { return '<tr class="pp-clk" style="cursor:pointer;" onclick="ppOpenDetail(\'' + encodeURIComponent(g.key) + '\')"><td>' + escapeHtml(g.label) + (g.sp ? ' <span class="pp-sp">(sin precio)</span>' : '') + '</td><td class="num">' + Math.round(g.cajas) + '</td><td class="num" style="font-weight:800;color:#b91c1c;">' + (g.plata > 0 ? _ppMoney(g.plata) : "—") + '</td></tr>'; }).join("");
   h += '</tbody></table></div>';
   body.innerHTML = h;
+}
+
+/* v9.54 — DRILL-DOWN: al tocar una fila (artículo/cliente/vendedor) abre un pop-up con el
+   detalle del período: Fecha · Cod Cliente · Razón Social · Pedido (NP) · Entregado · Valor
+   No entregado. Botón "Resumido" agrupa por cliente (Cliente · Cajas del plazo · Valor no
+   entregado). Hereda el grupo y el período de la vista principal. */
+var _ppDet = null;
+function ppOpenDetail(encKey) {
+  if (!_pp) return;
+  var key = decodeURIComponent(encKey);
+  _ppDet = { key: key, group: _pp.group, mode: "det" };
+  var ov = document.getElementById("ppDetOverlay");
+  if (!ov) { ov = document.createElement("div"); ov.id = "ppDetOverlay"; ov.style.cssText = "position:fixed;inset:0;z-index:1450;background:rgba(2,6,23,.78);overflow:auto;padding:14px;"; document.body.appendChild(ov); }
+  ov.style.display = "block";
+  ppDetRender();
+}
+function ppDetClose() { var ov = document.getElementById("ppDetOverlay"); if (ov) ov.style.display = "none"; _ppDet = null; }
+function ppDetMode(m) { if (_ppDet) { _ppDet.mode = m; ppDetRender(); } }
+function _ppDetRows() {
+  var g = _ppDet.group, k = _ppDet.key;
+  return _ppRowsPeriodo().filter(function (r) {
+    if (g === "cli") return (r.cli || "—") === k;
+    if (g === "vend") return (_pp.vendDe[r.cli] || "—") === k;
+    return r.codN === k;   // artículo
+  });
+}
+function ppDetRender() {
+  var ov = document.getElementById("ppDetOverlay"); if (!ov || !_ppDet) return;
+  var rows = _ppDetRows();
+  // Título del pop-up según el grupo
+  var titulo;
+  if (_ppDet.group === "cli") { var rr = rows[0]; titulo = "Cliente " + escapeHtml(_ppDet.key) + (rr && rr.np && _pp.rsDe[rr.np] ? " · " + escapeHtml(_pp.rsDe[rr.np]) : ""); }
+  else if (_ppDet.group === "vend") { titulo = _ppDet.key === "7" ? "Vend 7 (fábrica)" : (_ppDet.key === "—" ? "Sin vendedor" : "Vendedor " + escapeHtml(_ppDet.key)); }
+  else { var p0 = _ppPrice(_ppDet.key); var d0 = rows[0]; titulo = escapeHtml(d0 ? codBase(d0.cod) : _ppDet.key) + (p0 && p0.desc ? " · " + escapeHtml(p0.desc) : ""); }
+  var totPlata = 0, totCajas = 0; rows.forEach(function (r) { totPlata += _ppPlata(r); totCajas += r.cajas; });
+  var h = '<div class="pp-card" style="max-width:820px;"><div class="pp-head" style="background:linear-gradient(90deg,#991b1b,#450a0a);"><b>💸 ' + titulo + '</b>' +
+    '<button class="pp-tab' + (_ppDet.mode === "det" ? " on" : "") + '" style="margin-left:auto;" onclick="ppDetMode(\'det\')">Detalle</button>' +
+    '<button class="pp-tab' + (_ppDet.mode === "res" ? " on" : "") + '" onclick="ppDetMode(\'res\')">Resumido</button>' +
+    '<button class="pp-x" onclick="ppDetClose()">Cerrar</button></div>' +
+    '<div class="pp-body">';
+  h += '<div class="pp-total" style="margin-bottom:8px;"><b style="font-size:22px;">' + _ppMoney(totPlata) + '</b> <span style="font-size:12px;color:#7f1d1d;">· ' + Math.round(totCajas) + ' cajas no entregadas · ' + rows.length + ' registro(s)</span></div>';
+  h += '<div class="pp-tblwrap">';
+  if (_ppDet.mode === "res") {
+    // Resumido por CLIENTE: Cliente · Cajas del plazo · Valor no entregado
+    var gc = {};
+    rows.forEach(function (r) {
+      var k = r.cli || "—"; var g = gc[k] || (gc[k] = { cli: k, rs: "", cajas: 0, plata: 0 });
+      if (!g.rs && r.np && _pp.rsDe[r.np]) g.rs = _pp.rsDe[r.np];
+      g.cajas += r.cajas; g.plata += _ppPlata(r);
+    });
+    var arrc = Object.keys(gc).map(function (k) { return gc[k]; }).sort(function (a, b) { return b.plata - a.plata || b.cajas - a.cajas; });
+    h += '<table class="pp-tbl"><thead><tr><th>Cliente</th><th class="num" title="Cajas no entregadas en el período (plazo) seleccionado">Cajas del plazo</th><th class="num">Valor no entregado</th></tr></thead><tbody>';
+    h += arrc.map(function (g) { return '<tr><td>' + escapeHtml(g.cli) + (g.rs ? ' · ' + escapeHtml(g.rs) : "") + '</td><td class="num">' + Math.round(g.cajas) + '</td><td class="num" style="font-weight:800;color:#b91c1c;">' + (g.plata > 0 ? _ppMoney(g.plata) : "—") + '</td></tr>'; }).join("");
+    h += '</tbody></table>';
+  } else {
+    // Detalle por registro: Fecha · Cod Cliente · Razón Social · Pedido (NP) · Entregado · Valor No entregado
+    var arrd = rows.slice().sort(function (a, b) { return _ppPlata(b) - _ppPlata(a) || (a.fecha < b.fecha ? 1 : -1); });
+    h += '<table class="pp-tbl"><thead><tr><th>Fecha</th><th>Cod Cliente</th><th>Razón Social</th><th>Pedido</th><th class="num">Entregado</th><th class="num">Valor no entregado</th></tr></thead><tbody>';
+    h += arrd.map(function (r) {
+      var pl = _ppPlata(r);
+      return '<tr><td>' + escapeHtml(r.fecha) + '</td><td>' + escapeHtml(r.cli || "—") + '</td><td>' + escapeHtml((r.np && _pp.rsDe[r.np]) || "—") + '</td><td>' + escapeHtml(r.np || "—") + '</td><td class="num">' + Math.round(r.ent) + '</td><td class="num" style="font-weight:800;color:#b91c1c;">' + (pl > 0 ? _ppMoney(pl) : '<span class="pp-sp">s/precio</span>') + '</td></tr>';
+    }).join("");
+    h += '</tbody></table>';
+  }
+  h += '</div></div>';
+  ov.innerHTML = h;
 }
 
 function dpRender(filter) {

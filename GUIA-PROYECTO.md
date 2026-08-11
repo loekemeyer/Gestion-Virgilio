@@ -4,7 +4,13 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-11 · Versión app al documentar: **v9.53**
+> Última actualización: 2026-08-11 · Versión app al documentar: **v9.54**
+>
+> Nota **v9.54** — **Plata perdida: drill-down por fila.** Tocar una fila (artículo/cliente/
+> vendedor) abre un pop-up con el detalle del período: **Fecha · Cod Cliente · Razón Social ·
+> Pedido (NP) · Entregado · Valor no entregado**. Botón **"Resumido"** agrupa por cliente
+> (**Cliente · Cajas del plazo · Valor no entregado**). Se sumaron `cajas_pedidas`/`cajas_entregadas`
+> al fetch de `Entregas_Virgilio`. `ppOpenDetail`/`ppDetRender`.
 >
 > Nota **v9.53** — (a) **Badge en "Carga Recepción Mercadería"** (panel supervisor): círculo
 > rojo con la cantidad de **remitos pendientes de cargar** (`Control_Modo_OP` estado='pendiente'),
