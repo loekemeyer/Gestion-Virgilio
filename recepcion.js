@@ -1226,10 +1226,17 @@ async function showVerificationModal() {
     codeDisplay.style.cssText = `
       background: #f3f4f6; padding: 16px; border-radius: 8px;
       font-size: 32px; font-weight: bold; letter-spacing: 8px;
-      margin: 0 0 20px 0; font-family: 'Courier New', monospace;
+      margin: 0 0 8px 0; font-family: 'Courier New', monospace;
       color: #1f2937;
     `;
     modal.appendChild(codeDisplay);
+
+    const codeHint = document.createElement("p");
+    codeHint.textContent = "✏️ Escribir en el remito físico";
+    codeHint.style.cssText = `
+      margin: 0 0 20px 0; color: #9ca3af; font-size: 13px; font-style: italic;
+    `;
+    modal.appendChild(codeHint);
 
     const input = document.createElement("input");
     input.type = "text";
