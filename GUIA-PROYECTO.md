@@ -4,7 +4,16 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-11 · Versión app al documentar: **v9.63**
+> Última actualización: 2026-08-11 · Versión app al documentar: **v9.65**
+>
+> Nota **v9.65** — **Generador de OCs: `stock` = TODO el módulo Stocks.** `vista_generador_oc`
+> ahora suma los 8 depósitos (terminado + a_guardar + racks + excedente + separar_pedidos +
+> a_facturar + para_envasar + racks_ch, NO insumos), igual que la columna "Total Stock". Antes
+> solo góndola + a_guardar + racks + excedente. Fórmula intacta (A pedir = máx(0, máximo + pedidos
+> − stock)). `sql/vista_generador_oc.sql`. (v9.64: acceso a Avisar programación restringido a 3
+> personas — Tomas Gonzalez, Marianela Becker, Giuliana.)
+>
+> Nota anterior · Versión app al documentar: **v9.63**
 >
 > Nota **v9.61–v9.63** — **Avisar programación:** (v9.61) `_avpTel` normaliza el teléfono al
 > formato **wa.me** (54 9 + área sin 0 + número sin 15) — antes los números locales daban links

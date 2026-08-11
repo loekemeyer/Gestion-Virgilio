@@ -6403,7 +6403,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v9.64";
+const APP_VERSION = "v9.65";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -10570,9 +10570,10 @@ async function ocNuevaCrear() {
 }
 
 /* ===== GENERADOR DE OCs (v4.13): replica la lógica del Excel "Pedidos Talleristas/Prov".
-   Por artículo: A pedir = max(0, Máximo + Pedidos − Stock). Stock (vista_generador_oc) = góndola +
-   a_guardar + racks + EXCEDENTE (todo lo que hay en mano) → lo que está en excedente NO se re-pide.
-   Máximo y Proveedor salen de OC_Maximos (config importada del Excel);
+   Por artículo: A pedir = max(0, Máximo + Pedidos − Stock). Stock (vista_generador_oc, v9.65) =
+   TODO el módulo Stocks = terminado + a_guardar + racks + excedente + separar_pedidos + a_facturar
+   + para_envasar + racks_ch (NO insumos). Todo lo que hay en mano cuenta → no se re-pide; los
+   pedidos se descuentan vía la fórmula. Máximo y Proveedor salen de OC_Maximos (config del Excel);
    Pedidos (demanda) = Σ cajas por artículo en los pedidos del PPP (PPP_Programacion_Diaria) según la
    base de picking (PPP_Base_Pedidos). Agrupa por proveedor y, al confirmar, escribe las OCs en
    Ordenes_Compra (escritura: sesión de supervisor). v7.65: "Log/ Fabr" (fábrica) SÍ genera OC
