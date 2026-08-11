@@ -10829,7 +10829,7 @@ async function ocgFetchImportados() {
 }
 async function ocgEnter() {
   if (!_oc) return;
-  _oc.view = "gen"; _oc.gen = null; ocRender();   // muestra "calculando…"
+  _oc.view = "gen"; _oc.gen = null; _oc.genFiltro = ""; ocRender();   // muestra "calculando…"
   try {
     // v7.68: TODO el cálculo vive en la vista vista_generador_oc (universo desde stock,
     // Máximo = proy×índice o capacidad como objetivo, stock con empresa mergeada, pedidos,
@@ -10886,19 +10886,24 @@ function ocBodyGen() {
   const keys = Object.keys(g).sort(function (a, b) { return a.localeCompare(b); });
   // v7.66: botón grande "Generar las OCs" arriba, a la altura del ← Volver (pedido del usuario).
   const genBtn = keys.length ? '<button class="oc-btn ok" style="font-size:15px;padding:8px 20px;font-weight:800;line-height:1.2;text-align:center" onclick="ocgGenerar()">✓ Generar las OCs<br><span id="ocgCountdown" style="font-size:10.5px;font-weight:600;opacity:.9">' + escapeHtml(_ocgAutoEnTxt()) + '</span></button>' : '';
-  let h = '<div class="oc-tools"><button class="oc-btn" onclick="ocBack()">← Volver</button>' + genBtn + '<button class="oc-btn" onclick="ocgEnterCfg()">⚙ Configuraciones</button></div>';
+  let h = '<div class="oc-tools"><button class="oc-btn" onclick="ocBack()">← Volver</button>' + genBtn + '<button class="oc-btn" onclick="ocgEnterCfg()">⚙ Configuraciones</button><input class="oc-filtro" type="search" placeholder="🔎 Buscar código / descripción / proveedor" value="' + escapeHtml(_oc.genFiltro || "") + '" oninput="if(_oc){_oc.genFiltro=this.value;ocRender();}"></div>';
   if (!gen) return h + '<div class="oc-loading">Calculando (stock + demanda PPP + proyección × índice)…</div>';
   if (gen.error) return h + '<div class="oc-empty" style="color:#b91c1c">Error: ' + escapeHtml(gen.error) + '</div>';
   if (!keys.length) return h + '<div class="oc-empty">No hay nada para pedir (todo está en o sobre el máximo).<br><small>Con el stock en 0, va a dar todo para pedir cuando lo cargues.</small></div>';
+  const gf = (_oc.genFiltro || "").toLowerCase().trim();
   const totItems = keys.reduce(function (s, k) { return s + g[k].items.length; }, 0);
   const sinG = g["(sin proveedor)"]; const nReal = keys.filter(function (k) { return k !== "(sin proveedor)"; }).length;
   h += '<div class="oc-meta">Fecha <b>' + escapeHtml(gen.fecha) + '</b> · <b>' + nReal + '</b> proveedor(es) · <b>' + totItems + '</b> ítem(s) a pedir' + (sinG ? ' · <b style="color:#b45309">' + sinG.items.length + ' sin proveedor</b>' : '') + '.</div>';
   keys.forEach(function (k) {
     const x = g[k];
     const sinP = (k === "(sin proveedor)");
-    h += '<div class="oc-meta" style="margin-top:12px;margin-bottom:4px' + (sinP ? ';color:#b45309' : '') + '"><b>' + escapeHtml(k) + '</b> · ' + x.items.length + ' ítem(s) · ' + x.total + ' cajas' + (sinP ? ' &nbsp;<span style="font-weight:800">⚠ asigná proveedor en ⚙ Configuraciones para poder generarlas (así no se envían)</span>' : '') + '</div>';
+    // v9.34: filtrar items si hay búsqueda activa
+    const fitems = gf ? x.items.filter(function (it) { return (codCanon(it.cod) + " " + (it.desc || "") + " " + (it.prov || "")).toLowerCase().indexOf(gf) !== -1; }) : x.items;
+    if (gf && !fitems.length) return;   // ocultar proveedor entero si ningún item matchea
+    const fTotal = fitems.reduce(function (s, it) { return s + it.falta; }, 0);
+    h += '<div class="oc-meta" style="margin-top:12px;margin-bottom:4px' + (sinP ? ';color:#b45309' : '') + '"><b>' + escapeHtml(k) + '</b> · ' + fitems.length + ' ítem(s) · ' + fTotal + ' cajas' + (sinP ? ' &nbsp;<span style="font-weight:800">⚠ asigná proveedor en ⚙ Configuraciones para poder generarlas (así no se envían)</span>' : '') + '</div>';
     h += '<div class="oc-tblwrap"><table class="oc-tbl"><thead><tr><th>Código</th><th>Descripción</th><th class="num">Proy</th><th class="num">Índice</th><th class="num">Máx</th><th class="num">Pedidos</th><th class="num">Stock</th><th class="num">A pedir</th></tr></thead><tbody>';
-    x.items.sort(function (a, b) { return b.falta - a.falta; }).forEach(function (it) {
+    fitems.sort(function (a, b) { return b.falta - a.falta; }).forEach(function (it) {
       const proyTxt = (it.fuente === "proy") ? (Math.round(it.proy) + "") : '<span style="color:#94a3b8" title="Sin ventas (proyección 0) → el Máximo sale de la capacidad de góndola">0</span>';
       const maxTxt = it.max + (it.capped ? ' <span style="color:#b45309;font-weight:800" title="Topado a la capacidad de góndola (' + it.cap + ' cajas) — proy×índice daba más">⤓</span>' : '');
       h += '<tr><td class="oc-cod">' + escapeHtml(codCanon(it.cod)) + '</td><td>' + escapeHtml(artNombre(it.cod, it.desc)) + '</td><td class="num">' + proyTxt + '</td><td class="num">' + it.indice + '</td><td class="num">' + maxTxt + '</td><td class="num">' + it.demanda + '</td><td class="num">' + it.stock + '</td><td class="num oc-falt">' + it.falta + '</td></tr>';
@@ -10916,13 +10921,17 @@ function ocBodyGenImportados() {
   if (!gen) return "";
   if (!gen.imp) return '<div class="oc-meta" style="margin-top:16px;color:#94a3b8">🌎 Importados: calculando…</div>';
   const items = (gen.imp.items || []).filter(function (it) { return it.aPedirUni > 0; });
+  const gf = (_oc.genFiltro || "").toLowerCase().trim();
   let h = '<div class="oc-meta" style="margin-top:18px;border-top:2px solid #e2e8f0;padding-top:12px"><b>🌎 Importados — OC por proveedor chino</b> · índice <b>' + (gen.imp.meses || 10) + ' meses</b> · <small style="color:#94a3b8">stock y proyección en unidades (motor <code>v_importados_ordenes</code>). Vista previa — la emisión se afina con más análisis.</small></div>';
   if (!items.length) { h += '<div class="oc-empty" style="margin-top:6px">No hay importados para pedir (todo en o sobre el objetivo).</div>'; return h; }
   const g = {};
   items.forEach(function (it) { const k = it.prov || "(sin proveedor)"; if (!g[k]) g[k] = []; g[k].push(it); });
   const keys = Object.keys(g).sort(function (a, b) { return a.localeCompare(b); });
   keys.forEach(function (k) {
-    const arr = g[k]; const sinP = (k === "(sin proveedor)");
+    const sinP = (k === "(sin proveedor)");
+    // v9.34: filtro compartido con la sección principal
+    const arr = gf ? g[k].filter(function (it) { return (codCanon(it.cod) + " " + (it.desc || "") + " " + (it.prov || "")).toLowerCase().indexOf(gf) !== -1; }) : g[k];
+    if (gf && !arr.length) return;
     const totCaj = arr.reduce(function (s, it) { return s + (it.aPedirCajas || 0); }, 0);
     h += '<div class="oc-meta" style="margin-top:12px;margin-bottom:4px' + (sinP ? ';color:#b45309' : '') + '"><b>' + escapeHtml(k) + '</b> · ' + arr.length + ' ítem(s) · ' + totCaj + ' cajas' + (sinP ? ' &nbsp;<span style="font-weight:800">⚠ asigná proveedor en 🏭 Proveedor de importación</span>' : '') + '</div>';
     h += '<div class="oc-tblwrap"><table class="oc-tbl"><thead><tr><th>Código</th><th>Descripción</th><th class="num">Proy u/mes</th><th class="num">Meses</th><th class="num">Objetivo u</th><th class="num">Stock u</th><th class="num">En curso</th><th class="num">A pedir u</th><th class="num">Cajas</th></tr></thead><tbody>';
