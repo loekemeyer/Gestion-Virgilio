@@ -22,12 +22,8 @@ async function checkAuth() {
     // mayorista.html; acá lo servimos suelto en Producción Virgilio, así
     // que necesitamos el formulario propio.
     if (statusEl) statusEl.textContent = "Iniciá sesión";
-    var f = document.getElementById("lkLoginForm");
-    if (f) {
-      f.style.display = "block";
-      var cuit = document.getElementById("lkLoginCuit");
-      if (cuit) cuit.focus();
-    }
+    var f = document.getElementById("lkLoginBox");
+    if (f) f.style.display = "block";
     return false;
   }
   var userId = result.data.session.user.id;
@@ -41,12 +37,8 @@ async function checkAuth() {
     // otra vez para que pueda probar con otro CUIT sin quedar atrapado.
     try { await sb.auth.signOut(); } catch (e) {}
     if (statusEl) statusEl.textContent = "Acceso denegado. Solo administradores.";
-    var f2 = document.getElementById("lkLoginForm");
-    if (f2) {
-      f2.style.display = "block";
-      var pin = document.getElementById("lkLoginPin");
-      if (pin) pin.value = "";
-    }
+    var f2 = document.getElementById("lkLoginBox");
+    if (f2) f2.style.display = "block";
     return false;
   }
   var email = (result.data.session.user.email || "").toLowerCase();
@@ -13623,37 +13615,104 @@ function _gvQ(v) {
   return "'" + String(v).replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/"/g, "&quot;") + "'";
 }
 
-// ===== Login local CUIT+PIN (agregado para servir el admin desde Producción Virgilio)
-// Duplica lo mínimo del flujo de mayorista.html: normaliza el CUIT a dígitos,
-// arma el email sintético <cuit>@cuit.loekemeyer y hace signInWithPassword con
-// el PIN. Al éxito recarga para que checkAuth() encuentre la sesión válida.
-async function lkLoginSubmit(ev) {
-  if (ev && ev.preventDefault) ev.preventDefault();
-  var cuitEl = document.getElementById("lkLoginCuit");
-  var pinEl  = document.getElementById("lkLoginPin");
-  var errEl  = document.getElementById("lkLoginError");
-  var btnEl  = document.getElementById("lkLoginBtn");
+// ===== Login por OTP (código de 6 dígitos al mail) — agregado para servir el
+// admin desde Producción Virgilio, donde no venimos con sesión de mayorista.html.
+// Paso 1: signInWithOtp manda el código al mail; con shouldCreateUser:false
+// evitamos crear usuarios nuevos, así solo entran los que ya existen en el
+// auth de LK.
+// Paso 2: verifyOtp con el código crea la sesión. Recargamos para que
+// checkAuth() haga el chequeo de admins y renderice el panel.
+window._lkOtpEmail = null;
+
+async function lkSendOtp() {
+  var emailEl = document.getElementById("lkLoginEmail");
+  var errEl   = document.getElementById("lkLoginError");
+  var msgEl   = document.getElementById("lkLoginMsg");
+  var btnEl   = document.getElementById("lkSendCodeBtn");
   if (errEl) errEl.textContent = "";
-  var cuit = ((cuitEl && cuitEl.value) || "").replace(/\D+/g, "");
-  var pin  = ((pinEl && pinEl.value) || "").trim();
-  if (!cuit) { if (errEl) errEl.textContent = "Ingresá tu CUIT."; return false; }
-  if (!/^\d{6}$/.test(pin)) { if (errEl) errEl.textContent = "El PIN son 6 dígitos."; return false; }
-  var email = cuit + "@cuit.loekemeyer";
-  if (btnEl) { btnEl.disabled = true; btnEl.textContent = "Entrando..."; }
+  if (msgEl) msgEl.textContent = "";
+  var email = ((emailEl && emailEl.value) || "").trim().toLowerCase();
+  if (!email || email.indexOf("@") < 0) {
+    if (errEl) errEl.textContent = "Ingresá un mail válido.";
+    return;
+  }
+  if (btnEl) { btnEl.disabled = true; btnEl.textContent = "Enviando..."; }
   try {
-    var r = await sb.auth.signInWithPassword({ email: email, password: pin });
+    var r = await sb.auth.signInWithOtp({
+      email: email,
+      options: { shouldCreateUser: false }
+    });
     if (r.error) {
-      if (errEl) errEl.textContent = "CUIT o PIN incorrectos.";
-      if (btnEl) { btnEl.disabled = false; btnEl.textContent = "Entrar"; }
-      return false;
+      // Casos típicos: mail no registrado, rate limit, etc. — mostrar el mensaje real.
+      if (errEl) errEl.textContent = r.error.message || "No se pudo enviar el código.";
+      if (btnEl) { btnEl.disabled = false; btnEl.textContent = "Enviarme el código al mail"; }
+      return;
     }
-    // Sesión creada. Recargamos para que checkAuth() haga el chequeo de admins
-    // y renderice el panel completo desde cero.
+    window._lkOtpEmail = email;
+    var shown = document.getElementById("lkLoginEmailShown");
+    if (shown) shown.textContent = email;
+    var s1 = document.getElementById("lkLoginStep1");
+    var s2 = document.getElementById("lkLoginStep2");
+    if (s1) s1.style.display = "none";
+    if (s2) s2.style.display = "block";
+    if (msgEl) msgEl.textContent = "Código enviado. Revisá tu mail.";
+    var codeEl = document.getElementById("lkLoginCode");
+    if (codeEl) { codeEl.value = ""; setTimeout(function () { codeEl.focus(); }, 100); }
+  } catch (e) {
+    if (errEl) errEl.textContent = "Error de conexión. Reintentá.";
+    if (btnEl) { btnEl.disabled = false; btnEl.textContent = "Enviarme el código al mail"; }
+  }
+}
+
+async function lkVerifyOtp() {
+  var codeEl = document.getElementById("lkLoginCode");
+  var errEl  = document.getElementById("lkLoginError");
+  var msgEl  = document.getElementById("lkLoginMsg");
+  var btnEl  = document.getElementById("lkVerifyCodeBtn");
+  if (errEl) errEl.textContent = "";
+  var code = ((codeEl && codeEl.value) || "").replace(/\D+/g, "");
+  if (!/^\d{6}$/.test(code)) {
+    if (errEl) errEl.textContent = "El código son 6 dígitos.";
+    return;
+  }
+  if (!window._lkOtpEmail) {
+    if (errEl) errEl.textContent = "Reenviá el código.";
+    return;
+  }
+  if (btnEl) { btnEl.disabled = true; btnEl.textContent = "Verificando..."; }
+  try {
+    var r = await sb.auth.verifyOtp({
+      email: window._lkOtpEmail,
+      token: code,
+      type: "email"
+    });
+    if (r.error) {
+      if (errEl) errEl.textContent = "Código inválido o expirado.";
+      if (btnEl) { btnEl.disabled = false; btnEl.textContent = "Verificar código"; }
+      return;
+    }
+    if (msgEl) msgEl.textContent = "Sesión iniciada. Cargando...";
     location.reload();
   } catch (e) {
     if (errEl) errEl.textContent = "Error de conexión. Reintentá.";
-    if (btnEl) { btnEl.disabled = false; btnEl.textContent = "Entrar"; }
+    if (btnEl) { btnEl.disabled = false; btnEl.textContent = "Verificar código"; }
   }
-  return false;
 }
-window.lkLoginSubmit = lkLoginSubmit;
+
+function lkResetOtp() {
+  window._lkOtpEmail = null;
+  var s1 = document.getElementById("lkLoginStep1");
+  var s2 = document.getElementById("lkLoginStep2");
+  var btn = document.getElementById("lkSendCodeBtn");
+  var errEl = document.getElementById("lkLoginError");
+  var msgEl = document.getElementById("lkLoginMsg");
+  if (s2) s2.style.display = "none";
+  if (s1) s1.style.display = "block";
+  if (btn) { btn.disabled = false; btn.textContent = "Enviarme el código al mail"; }
+  if (errEl) errEl.textContent = "";
+  if (msgEl) msgEl.textContent = "";
+}
+
+window.lkSendOtp   = lkSendOtp;
+window.lkVerifyOtp = lkVerifyOtp;
+window.lkResetOtp  = lkResetOtp;

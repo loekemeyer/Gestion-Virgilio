@@ -38,22 +38,36 @@
         <h2 class="login-title">Panel Administrador</h2>
         <p class="login-sub" id="authStatus">Verificando sesion...</p>
 
-        <!-- Login local CUIT+PIN — sólo se muestra si checkAuth() no encuentra
-             sesión activa. Copia mínima del flujo de mayorista.html para que
-             el admin funcione servido desde Producción Virgilio sin depender
-             del sitio LK. Escribe la misma sesión Supabase que mayorista.html
-             (mismo esquema sintético <cuit>@cuit.loekemeyer + PIN de 6). -->
-        <form id="lkLoginForm" style="display:none;margin-top:18px;text-align:left;" onsubmit="return lkLoginSubmit(event);">
-          <label style="display:block;font-size:13px;color:#555;margin-bottom:4px;">CUIT (sin guiones)</label>
-          <input id="lkLoginCuit" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="username" required
-                 style="width:100%;box-sizing:border-box;padding:10px;font-size:16px;border:1px solid #ccc;border-radius:6px;margin-bottom:10px;" />
-          <label style="display:block;font-size:13px;color:#555;margin-bottom:4px;">PIN (6 dígitos)</label>
-          <input id="lkLoginPin" type="password" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="current-password" required
-                 style="width:100%;box-sizing:border-box;padding:10px;font-size:16px;border:1px solid #ccc;border-radius:6px;margin-bottom:10px;" />
-          <button id="lkLoginBtn" type="submit"
-                  style="width:100%;padding:12px;font-size:16px;background:#111;color:#fff;border:none;border-radius:6px;cursor:pointer;">Entrar</button>
-          <p id="lkLoginError" style="min-height:18px;text-align:center;color:#c0392b;margin:8px 0 0;font-size:13px;"></p>
-        </form>
+        <!-- Login por código OTP de 6 dígitos al mail — se muestra si checkAuth()
+             no encuentra sesión. Paso 1: pide mail y llama signInWithOtp para
+             mandar el código. Paso 2: input del código y verifyOtp para crear
+             la sesión. Al verificar recarga la página así checkAuth() encuentra
+             la sesión y renderiza el panel.
+
+             Requiere que el template "Magic Link" del proyecto Supabase LK
+             (Auth → Email Templates) incluya {{ .Token }} en el cuerpo; el
+             default suele traerlo. Si Supabase manda solo el link, el usuario
+             puede leer el código en el asunto/HTML del mail igual. -->
+        <div id="lkLoginBox" style="display:none;margin-top:18px;text-align:left;">
+          <div id="lkLoginStep1">
+            <label style="display:block;font-size:13px;color:#555;margin-bottom:4px;">Mail del administrador</label>
+            <input id="lkLoginEmail" type="email" autocomplete="email" value="loekemeyer.n8n@gmail.com"
+                   style="width:100%;box-sizing:border-box;padding:10px;font-size:16px;border:1px solid #ccc;border-radius:6px;margin-bottom:10px;" />
+            <button id="lkSendCodeBtn" type="button" onclick="lkSendOtp()"
+                    style="width:100%;padding:12px;font-size:16px;background:#111;color:#fff;border:none;border-radius:6px;cursor:pointer;">Enviarme el código al mail</button>
+          </div>
+          <div id="lkLoginStep2" style="display:none;">
+            <p style="font-size:13px;color:#555;margin:0 0 8px;">Te mandamos un código de 6 dígitos a <strong id="lkLoginEmailShown"></strong>.</p>
+            <input id="lkLoginCode" type="tel" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" placeholder="Código"
+                   style="width:100%;box-sizing:border-box;padding:10px;font-size:20px;text-align:center;letter-spacing:6px;border:1px solid #ccc;border-radius:6px;margin-bottom:10px;" />
+            <button id="lkVerifyCodeBtn" type="button" onclick="lkVerifyOtp()"
+                    style="width:100%;padding:12px;font-size:16px;background:#111;color:#fff;border:none;border-radius:6px;cursor:pointer;">Verificar código</button>
+            <button type="button" onclick="lkResetOtp()"
+                    style="width:100%;padding:8px;font-size:13px;background:transparent;color:#666;border:none;margin-top:6px;cursor:pointer;">← Cambiar mail o reenviar</button>
+          </div>
+          <p id="lkLoginMsg"   style="min-height:18px;text-align:center;color:#2c7a2c;margin:8px 0 0;font-size:13px;"></p>
+          <p id="lkLoginError" style="min-height:18px;text-align:center;color:#c0392b;margin:0;font-size:13px;"></p>
+        </div>
       </div>
     </div>
 
