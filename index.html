@@ -3612,7 +3612,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
     <div class="sup-actions sup-primary">
       <button class="sup-action-btn" onclick="openFacturacion()"><span class="sup-ico">📋</span><span>Facturación</span></button>
       <button class="sup-action-btn" onclick="openPPP()"><span id="pppAlertBadge" class="ppp-alert-badge"></span><span class="sup-ico">🗓️</span><span>PPP</span></button>
-      <button class="sup-action-btn" onclick="openRecepcionAdmin()" style="position:relative;"><span class="sup-ico">🏭</span><span>Carga Recepción Mercadería</span><span id="recepBadge" class="dp-badge" style="display:none;" title="Remitos pendientes de cargar (Recepción)"></span></button>
+      <button class="sup-action-btn" onclick="openRecepcionAdmin()" style="position:relative;"><span class="sup-ico">🏭</span><span>Carga Recepción Mercadería</span><span id="recepBadge" class="dp-badge" style="display:none;min-width:26px;height:26px;line-height:26px;font-size:15px;padding:0 6px;border-radius:13px;" title="Pendiente en Recepción: remitos por cargar + bajadas de racks por aprobar"></span></button>
       <button class="sup-action-btn" onclick="showFaltAvisar()"><span class="sup-ico">📦➕</span><span>Completar Pedido</span></button>
       <button class="sup-action-btn" onclick="openStockAdmin()"><span class="sup-ico">📦</span><span>Stock y Compras</span></button>
       <button class="sup-action-btn" onclick="openPanelWebLK()"><span class="sup-ico">🌐</span><span>Panel Web LK</span></button>
@@ -6403,7 +6403,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v9.54";
+const APP_VERSION = "v9.55";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -25700,15 +25700,22 @@ async function qbpLoadBadge() {
   } catch (_e) {}
 }
 
-/* v9.53 — badge "Carga Recepción Mercadería": remitos PENDIENTES de cargar
-   (Control_Modo_OP estado='pendiente'), el mismo contador que el botón "📋 Pendientes"
-   del menú de recepción. Lectura anon (RLS select true). */
+/* v9.53/9.55 — badge "Carga Recepción Mercadería": TODO lo pendiente del menú de recepción =
+   remitos por cargar (Control_Modo_OP estado='pendiente') + bajadas de racks por aprobar
+   (Racks_Bajadas estado='propuesta'). Mismos contadores que los botones "📋 Pendientes" y
+   "📦 Bajadas Racks → góndola". Lectura anon (RLS select true). */
+function _recepCount(tabla, filtro) {
+  return fetch(SUPABASE_URL + "/rest/v1/" + tabla + "?select=id&" + filtro, { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Range-Unit": "items", Range: "0-0", Prefer: "count=exact" }, cache: "no-store" })
+    .then(function (r) { var cr = r.headers.get("content-range") || "", s = cr.indexOf("/"); return s >= 0 ? (parseInt(cr.slice(s + 1), 10) || 0) : 0; })
+    .catch(function () { return 0; });
+}
 async function recepLoadBadge() {
   try {
-    var r = await fetch(SUPABASE_URL + "/rest/v1/Control_Modo_OP?select=id&estado=eq.pendiente", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Range-Unit": "items", Range: "0-0", Prefer: "count=exact" }, cache: "no-store" });
-    var cr = r.headers.get("content-range") || "", slash = cr.indexOf("/");
-    var n = slash >= 0 ? (parseInt(cr.slice(slash + 1), 10) || 0) : 0;
-    supSetBadge("recepBadge", n);
+    var res = await Promise.all([
+      _recepCount("Control_Modo_OP", "estado=eq.pendiente"),
+      _recepCount("Racks_Bajadas", "estado=eq.propuesta")
+    ]);
+    supSetBadge("recepBadge", (res[0] || 0) + (res[1] || 0));
   } catch (_e) {}
 }
 
