@@ -4,7 +4,22 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-11 · Versión app al documentar: **v9.38**
+> Última actualización: 2026-08-11 · Versión app al documentar: **v9.45**
+>
+> Nota **v9.44/9.45** — **Faltantes x día:** (a) el **faltó al armar** (realFalt, dato real de tandas
+> pickeadas) ahora se ubica en la **celda del día de su fecha de salida** (badge roja) además del
+> badge total en el código; (b) los **headers de columna son clickeables** para filtrar: tocar
+> **Falt S1 / S2 / Resto / Sin fecha** o **un día** muestra solo los artículos con faltante en esa
+> columna, ordenados por ese valor (🔎 en el header activo; chip "✕ Filtro" para quitarlo).
+>
+> Nota SERVER **v9.45** — **NC a Loeke: 437E/438E solo con la variante "...L".** `vista_nc_loeke_chef`
+> agarraba también los códigos **pelados** (437E/438E) → 27 pendientes con 20 que no correspondían.
+> Ahora 437E/438E hacen NC a Loeke **solo si el pedido es "...L" (ej. 437EL)**. (439E y demás quedan
+> igual — confirmar si también deben requerir "L".) `sql/vista_nc_loeke_chef.sql`. Quedó en 7.
+>
+> Nota (diagnóstico) — **584E ("Aceitera 400 Ml") no está en la pestaña Stocks** porque su stock
+> (2400) está en el depósito **`insumos`**, no en terminados (tot terminados = 0). Se ve en **🧰 Insumos**.
+> Probable error de recepción (cargado como insumo).
 >
 > Nota **v9.38** — **(a) "Corregir códigos de NPs" ahora tiene 2 badges:** ROJO (arriba-derecha) =
 > NPs que hay que corregir SÍ o SÍ (el secundario **no tiene stock**), VERDE (arriba-izquierda) =

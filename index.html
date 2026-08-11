@@ -6403,7 +6403,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v9.44";
+const APP_VERSION = "v9.45";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -14337,9 +14337,9 @@ function stkBodyFaltante() {
   // Ordenar. Por defecto: lo que YA FALTÓ al armar (real, urgente), luego S1, S2, código.
   // v8.24 — si F.ordenFab: primero por FABRICANTE (los "sin fabricante" al final), después la misma prioridad.
   arts.sort(function (a, b) {
-    if (F.soloS1) {   // v9.41 — "Solo S1": primer semana primero (ordena por Falt S1 desc)
-      if (b.faltS1 !== a.faltS1) return b.faltS1 - a.faltS1;
-      if (b.faltS2 !== a.faltS2) return b.faltS2 - a.faltS2;
+    if (F.colFiltro) {   // v9.45 — filtro por columna (S1/S2/Resto/Sin fecha/día): ordena por esa columna desc
+      var _va = _faltColVal(a, F.colFiltro), _vb = _faltColVal(b, F.colFiltro);
+      if (_vb !== _va) return _vb - _va;
       return codCanon(a.cod).localeCompare(codCanon(b.cod), undefined, { numeric: true });
     }
     if (F.ordenFab) {
@@ -14364,7 +14364,7 @@ function stkBodyFaltante() {
 
   // v8.02 — "solo quiebre": esconde los que no faltan (ruido)
   if (F.soloQuiebre) arts = arts.filter(_hayQ);
-  if (F.soloS1) arts = arts.filter(function (a) { return a.faltS1 > 0; });   // v9.41 — solo la primer semana (S1)
+  if (F.colFiltro) arts = arts.filter(function (a) { return _faltColVal(a, F.colFiltro) > 0; });   // v9.45 — solo la columna elegida
 
   // v8.77 — un día se DESDOBLA (Super | Clientes) SOLO si hay faltante REAL de supermercado ese
   // día en algún artículo VISIBLE. Si el super está cubierto (faltante 0), la columna quedaría
@@ -14395,7 +14395,7 @@ function stkBodyFaltante() {
   h += '<div class="falt-top">' +
     '<div class="falt-filters">' +
     '<button class="falt-fbtn' + (F.soloQuiebre ? " on" : "") + '" onclick="stkFaltSoloQuiebre()" title="Mostrar solo los artículos que tienen faltante">' + (F.soloQuiebre ? "☑" : "☐") + ' Solo quiebre</button>' +
-    '<button class="falt-fbtn' + (F.soloS1 ? " on" : "") + '" onclick="stkFaltSoloS1()" title="Ver SOLO lo que falta en la PRIMER semana (S1), ordenado por Falt S1 de mayor a menor.">' + (F.soloS1 ? "☑" : "☐") + ' 📅 Solo S1</button>' +
+    (F.colFiltro ? '<button class="falt-fbtn on" onclick="stkFaltColFiltro(\'' + F.colFiltro + '\')" title="Viendo solo la columna. Tocá para quitar el filtro (o tocá otro header para cambiarlo).">✕ Filtro: ' + escapeHtml(_faltColLabel(F.colFiltro)) + '</button>' : '') +
     '<button class="falt-fbtn' + (F.sinE ? " on" : "") + '" onclick="stkFaltSinE()" title="Ocultar códigos importados (E) que no tienen equivalente nacional para reponer. Mantiene los 94xE y las familias con nacional (574E/590E/809E CH/etc.).">' + (F.sinE ? "☑" : "☐") + ' Sin E</button>' +
     '<button class="falt-fbtn' + (F.verDias ? " on" : "") + '" onclick="stkFaltVerDias()" title="Mostrar el detalle día por día (agrega las columnas de cada día — puede necesitar scroll lateral).">' + (F.verDias ? "☑" : "☐") + ' 📅 Ver días</button>' +
     '</div>' +
@@ -14413,9 +14413,10 @@ function stkBodyFaltante() {
     '<th class="falt-cod"' + rs + '>Cód</th><th class="falt-desc"' + rs + '>Descripción</th><th class="falt-fab"' + rs + ' style="cursor:pointer;" onclick="stkFaltOrdenFab()" title="Ordenar por fabricante">Fabricante' + (F.ordenFab ? ' ▾' : '') + '</th>' +
     '<th class="falt-stk"' + rs + '>Stock</th>' +
     '<th class="falt-stk"' + rs + ' title="Total de cajas pedidas (demanda pendiente) de este artículo/familia.">Total<br>Pedidos</th>' +
-    '<th class="falt-sem"' + rs + '>Falt S1</th><th class="falt-sem"' + rs + '>Falt S2</th>' +
-    '<th class="falt-sem"' + rs + ' title="Faltante proyectado para salidas MÁS ALLÁ de la S2 (semana 3 en adelante).">Resto</th>' +
-    '<th class="falt-sem"' + rs + ' title="Faltante de pedidos SIN fecha PPP (o con fecha ya pasada): consumen stock pero no caen en ninguna columna de día. Acá aparece lo que falta y no se ve en S1/S2/Resto. Falt S1 + S2 + Resto + Sin fecha = Total − Stock.">Sin<br>fecha</th>';
+    _faltSemTh(F, rs, "s1", "Falt S1", "la primer semana (S1)") +
+    _faltSemTh(F, rs, "s2", "Falt S2", "la segunda semana (S2)") +
+    _faltSemTh(F, rs, "resto", "Resto", "Resto (salidas más allá de la S2)") +
+    _faltSemTh(F, rs, "sinfecha", "Sin<br>fecha", "Sin fecha PPP (o pasada)");
   // v8.56 — columnas de día SOLO si "📅 Ver días" está activo (por defecto ocultas → sin scroll lateral).
   if (F.verDias) {
     h += '<th class="falt-sep"' + rs + '></th>';
@@ -14428,20 +14429,11 @@ function stkBodyFaltante() {
       h += '</tr><tr>';
       // Row de abajo: el label del día (dos veces en días de super: Super | Clientes).
       diasCols.forEach(function (d) {
-        var esHoy = d === hoy;
-        var lbl = _faltDiaSem(d) + '<br>' + _faltFechaCorta(d);
-        if (superDiaSet[d]) {
-          h += '<th class="falt-dia' + (esHoy ? " hoy" : "") + '" title="' + d + ' · Supermercado">' + lbl + '</th>' +
-               '<th class="falt-dia' + (esHoy ? " hoy" : "") + '" title="' + d + ' · Clientes">' + lbl + '</th>';
-        } else {
-          h += '<th class="falt-dia' + (esHoy ? " hoy" : "") + '" title="' + d + '">' + lbl + '</th>';
-        }
+        if (superDiaSet[d]) { h += _faltDiaTh(F, d, hoy, " · Super") + _faltDiaTh(F, d, hoy, " · Clientes"); }
+        else h += _faltDiaTh(F, d, hoy, "");
       });
     } else {
-      diasCols.forEach(function (d) {
-        var esHoy = d === hoy;
-        h += '<th class="falt-dia' + (esHoy ? " hoy" : "") + '" title="' + d + '">' + _faltDiaSem(d) + '<br>' + _faltFechaCorta(d) + '</th>';
-      });
+      diasCols.forEach(function (d) { h += _faltDiaTh(F, d, hoy, ""); });
     }
   }
   h += '</tr></thead><tbody>';
@@ -14536,9 +14528,29 @@ function stkFaltSoloQuiebre() {
   _stk.falt.openCell = null;
   stkRender();
 }
-function stkFaltSoloS1() {   // v9.41 — filtra a la primer semana (S1) y ordena por Falt S1
+/* v9.45 — filtro por COLUMNA (tocando el header): S1/S2/Resto/Sin fecha o un día. Muestra solo
+   los artículos con faltante en esa columna y ordena por ese valor. Tocar de nuevo lo quita. */
+function _faltColVal(a, key) {
+  if (key === "s1") return a.faltS1 || 0;
+  if (key === "s2") return a.faltS2 || 0;
+  if (key === "resto") return a.faltResto || 0;
+  if (key === "sinfecha") return a.faltSinFecha || 0;
+  return (a.diasFalt && a.diasFalt[key]) || 0;   // día 'YYYY-MM-DD'
+}
+function _faltColLabel(key) {
+  return key === "s1" ? "Falt S1" : key === "s2" ? "Falt S2" : key === "resto" ? "Resto" : key === "sinfecha" ? "Sin fecha" : key;
+}
+function _faltSemTh(F, rs, key, label, tip) {
+  var on = F.colFiltro === key;
+  return '<th class="falt-sem"' + rs + ' style="cursor:pointer;' + (on ? 'background:#bfdbfe;color:#1e3a8a;' : '') + '" onclick="stkFaltColFiltro(\'' + key + '\')" title="Tocá para ver SOLO ' + tip + '">' + label + (on ? ' 🔎' : '') + '</th>';
+}
+function _faltDiaTh(F, d, hoy, sub) {
+  var esHoy = d === hoy, on = F.colFiltro === d;
+  return '<th class="falt-dia' + (esHoy ? " hoy" : "") + '" style="cursor:pointer;' + (on ? 'background:#bfdbfe;color:#1e3a8a;' : '') + '" onclick="stkFaltColFiltro(\'' + d + '\')" title="' + d + (sub || "") + ' — tocá para ver solo este día">' + _faltDiaSem(d) + '<br>' + _faltFechaCorta(d) + (on ? ' 🔎' : '') + '</th>';
+}
+function stkFaltColFiltro(key) {
   if (!_stk || !_stk.falt) return;
-  _stk.falt.soloS1 = !_stk.falt.soloS1;
+  _stk.falt.colFiltro = (_stk.falt.colFiltro === key) ? null : key;   // toggle
   _stk.falt.openCell = null;
   stkRender();
 }
