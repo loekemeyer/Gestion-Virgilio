@@ -4,7 +4,18 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-11 · Versión app al documentar: **v9.36**
+> Última actualización: 2026-08-11 · Versión app al documentar: **v9.37**
+>
+> Nota **v9.37** — **Módulo "💸 Plata perdida de facturar" (faltante por quiebre).** Panel supervisor.
+> Valoriza las cajas que el cliente pidió y **no se pudieron entregar por falta de stock**
+> (`Entregas_Virgilio.cajas_falto`) a **precio de venta**: `plata = cajas_falto × precio_unit × uxb`.
+> Precio de venta = snapshot de LK `products.list_price` (por unidad) + `uxb`, en la tabla nueva
+> **`precios_venta`** (`sql/plata_perdida.sql`; sin FDW, se re-sincroniza a mano). Agrupa por
+> **Artículo / Cliente / Vendedor** (reusa `clientes_vendedor` para el vendedor) con filtro de
+> período por fecha de salida. Total actual ~$51M (29/06–13/08). ⚠ precio **8888** en LK = placeholder
+> → no se valoriza, se marca "sin precio" (23 códigos sin precio → cargar en `precios_venta`).
+>
+> Nota **v9.36** — **839 (Rallador Chico Chocolate) es secundario de 838E (primario).**
 >
 > Nota **v9.36** — **839 (Rallador Chico Chocolate) es secundario de 838E (primario).** Se cargó la
 > equivalencia en las **DOS** fuentes (⚠ están separadas y hay que mantenerlas sincronizadas):

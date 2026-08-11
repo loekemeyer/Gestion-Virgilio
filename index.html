@@ -3631,6 +3631,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       <button class="sup-action-btn" onclick="stkOpenProvImp()"><span class="sup-ico">🏭</span><span>Proveedor de importación</span></button>
       <button class="sup-action-btn" onclick="openPedidosImportacion()"><span class="sup-ico">📦</span><span>Pedidos Importación</span></button>
       <button class="sup-action-btn" onclick="openAvisoProg()"><span class="sup-ico">📲</span><span>Avisar programación</span></button>
+      <button class="sup-action-btn" onclick="openPlataPerdida()"><span class="sup-ico">💸</span><span>Plata perdida de facturar</span></button>
       <button class="sup-action-btn" onclick="openDatosProducto()" style="position:relative;"><span class="sup-ico">🚦</span><span>Completar datos producto</span><span id="dpBadge" class="dp-badge" style="display:none;"></span></button>
       <button class="sup-action-btn" onclick="openConfiguracion()"><span class="sup-ico">⚙️</span><span>Configuración</span></button>
     </div>
@@ -6402,7 +6403,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v9.36";
+const APP_VERSION = "v9.37";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -25756,6 +25757,76 @@ async function avpSendVendedor(vendEnc) {
   var lines = keys.map(function (k) { return notif[k]; }).sort(function (a, b) { return String(a.fppp).localeCompare(String(b.fppp)); });
   avpLog("vendedor", null, null, v);
   window.open(_avpWa(meta.tel, avpMsgVendedor(meta.nombre, lines)), "_blank");
+}
+
+/* ===== v9.37 — MÓDULO "💸 Plata perdida de facturar" =================================
+   Valoriza el FALTANTE POR QUIEBRE: cajas que el cliente pidió y NO se pudieron entregar
+   por falta de stock (Entregas_Virgilio.cajas_falto), a PRECIO DE VENTA (tabla precios_venta:
+   list_price × uxb, snapshot de LK.products). Plata perdida = cajas_falto × precio_unit × uxb.
+   Agrupa por Artículo / Cliente / Vendedor, con filtro de período por fecha de salida.
+   ⚠ precio 8888 = placeholder de LK (sin precio real) → no se valoriza, se marca "sin precio". */
+var _pp = null;
+function _ppMoney(n) { return '$' + Math.round(n || 0).toLocaleString('es-AR'); }
+function _ppFecha10(s) { var m = String(s || "").match(/(\d{4})-(\d{2})-(\d{2})/); return m ? (m[1] + "-" + m[2] + "-" + m[3]) : ""; }
+function _ppPrice(codN) { return (_pp.precio[codN] || _pp.precio[codN.replace(/(LK|CH)$/, "")] || null); }
+function _ppPlata(r) { var p = _ppPrice(r.codN); return (p && p.ok) ? r.cajas * p.pu * p.uxb : 0; }
+async function openPlataPerdida() {
+  try { if (typeof requireSupervisor === "function" && !requireSupervisor()) return; } catch (_e) {}
+  if (!document.getElementById("ppCss")) {
+    var st = document.createElement("style"); st.id = "ppCss";
+    st.textContent = "#ppOverlay .pp-card{max-width:900px;margin:0 auto;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5);display:flex;flex-direction:column;max-height:92vh;}.pp-head{display:flex;align-items:center;gap:12px;padding:13px 16px;background:linear-gradient(90deg,#7c2d12,#431407);color:#fff;flex:0 0 auto;}.pp-head b{font-size:17px;}.pp-x{margin-left:auto;width:auto;background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;}.pp-body{padding:14px 16px;display:flex;flex-direction:column;min-height:0;flex:1;}.pp-ctrl{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px;flex:0 0 auto;font-size:12.5px;color:#475569;}.pp-ctrl input[type=date]{padding:6px 8px;border:1px solid #cbd5e1;border-radius:8px;font-size:12.5px;}.pp-tab{width:auto;padding:6px 12px;border-radius:999px;border:1px solid #cbd5e1;background:#fff;color:#334155;font-size:12.5px;font-weight:800;cursor:pointer;}.pp-tab.on{background:#7c2d12;border-color:#7c2d12;color:#fff;}.pp-total{background:#fef2f2;border:1.5px solid #fca5a5;border-radius:12px;padding:11px 14px;margin-bottom:10px;flex:0 0 auto;}.pp-total b{font-size:28px;color:#b91c1c;font-variant-numeric:tabular-nums;}.pp-tblwrap{overflow:auto;flex:1;min-height:0;}.pp-tbl{width:100%;border-collapse:collapse;font-size:13px;}.pp-tbl th,.pp-tbl td{border-bottom:1px solid #eef2f7;padding:6px 8px;text-align:left;}.pp-tbl th{background:#f8fafc;font-size:11.5px;color:#475569;position:sticky;top:0;}.pp-tbl .num{text-align:right;font-variant-numeric:tabular-nums;}.pp-sp{font-size:11px;color:#b45309;font-weight:700;}";
+    document.head.appendChild(st);
+  }
+  _pp = { desde: "", hasta: "", group: "art", rows: [], precio: {}, vendDe: {}, rsDe: {} };
+  var ov = document.getElementById("ppOverlay");
+  if (!ov) { ov = document.createElement("div"); ov.id = "ppOverlay"; ov.style.cssText = "position:fixed;inset:0;z-index:1400;background:rgba(2,6,23,.72);overflow:auto;padding:14px;"; document.body.appendChild(ov); }
+  ov.style.display = "block";
+  ov.innerHTML = '<div class="pp-card"><div class="pp-head"><b>💸 Plata perdida de facturar</b><button class="pp-x" onclick="ppClose()">Cerrar</button></div><div id="ppBody" class="pp-body"><div style="text-align:center;color:#94a3b8;padding:24px;">Calculando…</div></div></div>';
+  await ppLoad();
+}
+function ppClose() { var ov = document.getElementById("ppOverlay"); if (ov) ov.style.display = "none"; }
+async function ppLoad() {
+  var H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+  var q = function (u) { return fetch(SUPABASE_URL + "/rest/v1/" + u, { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; }); };
+  var res = await Promise.all([
+    q("Entregas_Virgilio?select=np,cod_art,cajas_falto,fecha_salida,cod_cliente&cajas_falto=gt.0&limit=100000"),
+    q("precios_venta?select=cod,precio_unit,uxb,descripcion&limit=5000"),
+    q("clientes_vendedor?select=cod_cliente,vend&limit=30000"),
+    q("Facturacion_NP?select=np,razon_social&limit=100000")
+  ]);
+  var ent = res[0], pv = res[1], cv = res[2], fac = res[3];
+  var precio = {}; pv.forEach(function (r) { var k = _ocgNorm(r.cod); var pu = Number(r.precio_unit) || 0; precio[k] = { pu: pu, uxb: Number(r.uxb) || 1, desc: r.descripcion || "", ok: pu > 0 && pu !== 8888 }; });
+  var vendDe = {}; cv.forEach(function (r) { vendDe[String(r.cod_cliente).trim()] = String(r.vend || "").trim(); });
+  var rsDe = {}; fac.forEach(function (r) { var n = pickNormNp(r.np); if (n && r.razon_social && !rsDe[n]) rsDe[n] = r.razon_social; });
+  _pp.rows = ent.map(function (r) { return { codN: _ocgNorm(r.cod_art), cod: String(r.cod_art || "").trim(), cajas: Number(r.cajas_falto) || 0, fecha: _ppFecha10(r.fecha_salida), cli: String(r.cod_cliente || "").trim(), np: pickNormNp(r.np) }; }).filter(function (r) { return r.cajas > 0; });
+  _pp.precio = precio; _pp.vendDe = vendDe; _pp.rsDe = rsDe;
+  ppRender();
+}
+function ppSet(k, v) { if (!_pp) return; _pp[k] = v; ppRender(); }
+function ppRender() {
+  var body = document.getElementById("ppBody"); if (!body || !_pp) return;
+  var d1 = _pp.desde, d2 = _pp.hasta;
+  var rows = _pp.rows.filter(function (r) { if (d1 && (!r.fecha || r.fecha < d1)) return false; if (d2 && (!r.fecha || r.fecha > d2)) return false; return true; });
+  var groups = {}, totPlata = 0, totCajas = 0, spCajas = 0, spSet = {};
+  rows.forEach(function (r) {
+    var key, label;
+    if (_pp.group === "cli") { key = r.cli || "—"; label = (r.cli || "—") + (r.np && _pp.rsDe[r.np] ? " · " + _pp.rsDe[r.np] : ""); }
+    else if (_pp.group === "vend") { var v = _pp.vendDe[r.cli] || ""; key = v || "—"; label = v === "7" ? "Vend 7 (fábrica)" : (v ? "Vend " + v : "— sin vend —"); }
+    else { key = r.codN; var p = _ppPrice(r.codN); label = codBase(r.cod) + (p && p.desc ? " · " + p.desc : ""); }
+    var g = groups[key] || (groups[key] = { label: label, cajas: 0, plata: 0, sp: false });
+    var pl = _ppPlata(r); g.cajas += r.cajas; g.plata += pl; totCajas += r.cajas;
+    if (pl > 0) totPlata += pl; else { g.sp = true; spCajas += r.cajas; spSet[r.codN] = 1; }
+  });
+  var arr = Object.keys(groups).map(function (k) { return groups[k]; }).sort(function (a, b) { return b.plata - a.plata || b.cajas - a.cajas; });
+  var h = '<div class="pp-ctrl">Desde <input type="date" value="' + escapeHtml(d1) + '" onchange="ppSet(\'desde\',this.value)"> Hasta <input type="date" value="' + escapeHtml(d2) + '" onchange="ppSet(\'hasta\',this.value)"> <span style="width:6px;display:inline-block"></span>' +
+    ["art", "cli", "vend"].map(function (g) { var lbl = g === "art" ? "Por artículo" : g === "cli" ? "Por cliente" : "Por vendedor"; return '<button class="pp-tab' + (_pp.group === g ? " on" : "") + '" onclick="ppSet(\'group\',\'' + g + '\')">' + lbl + '</button>'; }).join("") + '</div>';
+  h += '<div class="pp-total"><span style="font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:#7f1d1d;font-weight:800;">💸 Plata perdida (faltante por quiebre = cajas pedidas que no se entregaron por falta de stock)</span><br><b>' + _ppMoney(totPlata) + '</b> <span style="font-size:12.5px;color:#7f1d1d;">· ' + Math.round(totCajas) + ' cajas no entregadas</span>' + (Object.keys(spSet).length ? '<br><span class="pp-sp">⚠ ' + Object.keys(spSet).length + ' código(s) sin precio (' + Math.round(spCajas) + ' cajas no valorizadas) — cargá el precio en precios_venta.</span>' : '') + '</div>';
+  if (!arr.length) { body.innerHTML = h + '<div style="text-align:center;color:#16a34a;padding:24px;font-weight:700;">✅ Sin faltante por quiebre en el período.</div>'; return; }
+  var colKey = _pp.group === "art" ? "Artículo" : _pp.group === "cli" ? "Cliente" : "Vendedor";
+  h += '<div class="pp-tblwrap"><table class="pp-tbl"><thead><tr><th>' + colKey + '</th><th class="num">Cajas faltó</th><th class="num">Plata perdida</th></tr></thead><tbody>';
+  h += arr.map(function (g) { return '<tr><td>' + escapeHtml(g.label) + (g.sp ? ' <span class="pp-sp">(sin precio)</span>' : '') + '</td><td class="num">' + Math.round(g.cajas) + '</td><td class="num" style="font-weight:800;color:#b91c1c;">' + (g.plata > 0 ? _ppMoney(g.plata) : "—") + '</td></tr>'; }).join("");
+  h += '</tbody></table></div>';
+  body.innerHTML = h;
 }
 
 function dpRender(filter) {
