@@ -4,7 +4,18 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-11 · Versión app al documentar: **v9.25**
+> Última actualización: 2026-08-11 · Versión app al documentar: **v9.28**
+>
+> Nota **v9.28** — **Badges de pendientes en el panel supervisor.** Igual que el badge rojo de
+> "Completar datos producto" (`dp-badge`), ahora **"Corregir códigos de NPs"** y **"Pedidos sin
+> cargar en PPP"** muestran un contador con cuánto hay para corregir: NPs **distintas** en código
+> secundario (`facCorreccData()`) y NPs sin programar (`vista_np_sin_programar`). Se cargan
+> fire-and-forget al abrir el panel (`corrLoadBadge`/`npFaltanLoadBadge` en `showSupervisor`); el
+> de sin-programar se refresca al marcar "🚫 No va". Helper común `supSetBadge(id,count)`.
+>
+> Nota SERVER (sin bump de app): **Importados — 067 usa el espiral importado 1000900.** Se agregó
+> el mapeo `('1000900','067')` a `Importados_Partes_Map` (067 Sacacorcho Tipo Mozo Suelto), así la
+> proyección de la parte 1000900 suma la demanda del terminado 067. Deployado + `sql/importados_partes_y_super.sql`.
 >
 > Nota SERVER (sin bump de app): **FIX alerta ESTANCADO — la tanda mostrada estaba mal (mostraba la última movida, no la trabada).**
 > El "pickeado sin avanzar" tomaba la tanda del `ref` del movimiento **más reciente** que dejó stock en
