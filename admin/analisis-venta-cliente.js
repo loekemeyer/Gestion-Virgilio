@@ -71,7 +71,7 @@ async function avcCheckAuth() {
   if (sess.error || !sess.data || !sess.data.session) {
     if (statusEl) statusEl.textContent = "Sin sesión. Redirigiendo...";
     setTimeout(function () {
-      location.href = "/mayorista";
+      location.href = "../";
     }, 1200);
     return false;
   }
@@ -84,7 +84,7 @@ async function avcCheckAuth() {
   if (adminCheck.error || !adminCheck.data) {
     if (statusEl) statusEl.textContent = "Acceso denegado. Solo admins.";
     setTimeout(function () {
-      location.href = "/mayorista";
+      location.href = "../";
     }, 1500);
     return false;
   }

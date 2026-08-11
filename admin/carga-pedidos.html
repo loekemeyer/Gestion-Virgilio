@@ -665,7 +665,7 @@
     <div class="app" id="app">
       <div class="app-header">
         <div>
-          <a class="back-link" href="/mayorista">← Volver a Mayorista</a>
+          <a class="back-link" href="../">← Volver a Mayorista</a>
           <h1 style="margin-top: 8px">Generador de Ofertas</h1>
           <p class="app-header-sub">
             Buscá el cliente, subí el cotizador y se descarga el flyer
@@ -891,7 +891,7 @@
         if (result.error || !result.data || !result.data.session) {
           if (statusEl) statusEl.textContent = "No hay sesion. Redirigiendo...";
           setTimeout(function () {
-            location.href = "/mayorista";
+            location.href = "../";
           }, 1200);
           return false;
         }
@@ -906,7 +906,7 @@
           if (statusEl)
             statusEl.textContent = "Acceso denegado. Solo administradores.";
           setTimeout(function () {
-            location.href = "/mayorista";
+            location.href = "../";
           }, 1500);
           return false;
         }

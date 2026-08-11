@@ -666,6 +666,12 @@ document.querySelectorAll(".nav-item").forEach(function (btn) {
       }
     }
     if (
+      btn.dataset.page === "ranking-clientes" &&
+      typeof inicRankingClientes === "function"
+    ) {
+      inicRankingClientes();
+    }
+    if (
       btn.dataset.page === "grupos-clientes" &&
       typeof cargarGruposClientes === "function"
     ) {
@@ -13742,3 +13748,169 @@ function lkResetOtp() {
 window.lkSendOtp   = lkSendOtp;
 window.lkVerifyOtp = lkVerifyOtp;
 window.lkResetOtp  = lkResetOtp;
+/* ============================================================================
+   Ranking Clientes (ACTIVOS)
+   Espeja el Ranking Inactivos pero al revés: muestra a los clientes que
+   compraron en el período y los ordena por facturación neta. Consume la
+   RPC get_ranking_clientes.
+   Pedido explícito del user (2026-08-11): "otra cosa que hay que desarrollar
+   en paginalk es un modulo de ranking de clientes".
+   ============================================================================ */
+var _rcState = { page: 1, pageSize: 25, total: 0, loaded: false, rows: [] };
+
+function _rcFmt(n) {
+  var v = Number(n) || 0;
+  return v.toLocaleString("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 });
+}
+function _rcEsc(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+  });
+}
+
+async function cargarRankingClientes(page) {
+  _rcState.page = Math.max(1, Number(page) || 1);
+  var meses = Number(document.getElementById("rcPeriodo").value) || 12;
+  var minMonto = Number(document.getElementById("rcMinMonto").value) || 0;
+  var q = (document.getElementById("rcBuscar").value || "").trim() || null;
+  var cont = document.getElementById("rcTabla");
+  var res  = document.getElementById("rcResumen");
+  var pgr  = document.getElementById("rcPager");
+  cont.innerHTML = '<div style="padding:16px;color:#64748b;">Cargando…</div>';
+  res.textContent = "";
+  pgr.innerHTML = "";
+  var offset = (_rcState.page - 1) * _rcState.pageSize;
+  var r = await sb.rpc("get_ranking_clientes", {
+    p_meses: meses,
+    p_empresa: "lk",
+    p_limit: _rcState.pageSize,
+    p_offset: offset,
+    p_q: q,
+    p_vendedores: null,
+    p_min_monto: minMonto,
+  });
+  if (r.error) {
+    cont.innerHTML = '<div style="padding:16px;color:#b91c1c;">Error: ' + _rcEsc(r.error.message) + '</div>';
+    return;
+  }
+  _rcState.rows = r.data || [];
+  _rcState.total = _rcState.rows.length ? Number(_rcState.rows[0].total_filas) || 0 : 0;
+  _rcState.loaded = true;
+  _rcRender();
+}
+
+function _rcRender() {
+  var cont = document.getElementById("rcTabla");
+  var res  = document.getElementById("rcResumen");
+  var pgr  = document.getElementById("rcPager");
+  var rows = _rcState.rows;
+  var tot  = _rcState.total;
+  var totFact = 0;
+  for (var i = 0; i < rows.length; i++) totFact += Number(rows[i].total_historico) || 0;
+  res.innerHTML = "<b>" + tot.toLocaleString("es-AR") + "</b> cliente(s) en el período · Página muestra <b>" + rows.length + "</b> · Facturado (esta página) <b>" + _rcFmt(totFact) + "</b>";
+  if (!rows.length) {
+    cont.innerHTML = '<div style="padding:20px;color:#64748b;text-align:center;">Sin clientes que cumplan los filtros.</div>';
+    return;
+  }
+  var h = '<div style="overflow-x:auto;"><table class="est-table" style="width:100%;border-collapse:collapse;font-size:13.5px;">' +
+    '<thead><tr>' +
+      '<th style="padding:8px;">Puesto</th>' +
+      '<th style="padding:8px;">Código</th>' +
+      '<th style="padding:8px;">Razón social</th>' +
+      '<th style="padding:8px;">CUIT</th>' +
+      '<th style="padding:8px;">Vendedor</th>' +
+      '<th style="padding:8px;text-align:right;">Facturado</th>' +
+      '<th style="padding:8px;text-align:right;">Pedidos</th>' +
+      '<th style="padding:8px;text-align:right;">Arts. dist.</th>' +
+      '<th style="padding:8px;">Últ. compra</th>' +
+    '</tr></thead><tbody>';
+  h += rows.map(function (r) {
+    return '<tr>' +
+      '<td style="padding:6px 8px;text-align:center;font-weight:bold;">' + r.ranking + '</td>' +
+      '<td style="padding:6px 8px;"><b>' + _rcEsc(r.cod_cliente) + '</b></td>' +
+      '<td style="padding:6px 8px;">' + _rcEsc(r.business_name || "—") + '</td>' +
+      '<td style="padding:6px 8px;font-size:12px;color:#64748b;">' + _rcEsc(r.cuit || "—") + '</td>' +
+      '<td style="padding:6px 8px;font-size:12px;">' + _rcEsc(r.vendedor_nombre || r.vendedor || "—") + '</td>' +
+      '<td style="padding:6px 8px;text-align:right;font-weight:bold;">' + _rcFmt(r.total_historico) + '</td>' +
+      '<td style="padding:6px 8px;text-align:right;">' + (r.total_pedidos || 0) + '</td>' +
+      '<td style="padding:6px 8px;text-align:right;">' + (r.articulos_distintos || 0) + '</td>' +
+      '<td style="padding:6px 8px;font-size:12px;color:#64748b;">' + _rcEsc(r.last_date || "—") + '</td>' +
+    '</tr>';
+  }).join("");
+  h += '</tbody></table></div>';
+  cont.innerHTML = h;
+  // Pager
+  var pages = Math.max(1, Math.ceil(tot / _rcState.pageSize));
+  var cur = _rcState.page;
+  var pg = '';
+  pg += '<button ' + (cur <= 1 ? 'disabled' : '') + ' onclick="cargarRankingClientes(' + (cur - 1) + ')" style="padding:6px 12px;">‹ Anterior</button>';
+  pg += '<span style="margin:0 8px;">Página <b>' + cur + '</b> de ' + pages + '</span>';
+  pg += '<button ' + (cur >= pages ? 'disabled' : '') + ' onclick="cargarRankingClientes(' + (cur + 1) + ')" style="padding:6px 12px;">Siguiente ›</button>';
+  pgr.innerHTML = pg;
+}
+
+async function descargarRankingClientesExcel() {
+  // Trae todo el ranking del período (sin paginado) llamando a la RPC con
+  // p_limit grande. Formato mínimo — el user ya conoce el pattern del
+  // Ranking Inactivos.
+  var meses = Number(document.getElementById("rcPeriodo").value) || 12;
+  var minMonto = Number(document.getElementById("rcMinMonto").value) || 0;
+  var q = (document.getElementById("rcBuscar").value || "").trim() || null;
+  var btn = document.getElementById("rcBtnExcel");
+  var txt0 = btn.textContent; btn.disabled = true; btn.textContent = "Generando…";
+  try {
+    var r = await sb.rpc("get_ranking_clientes", {
+      p_meses: meses, p_empresa: "lk",
+      p_limit: 10000, p_offset: 0, p_q: q,
+      p_vendedores: null, p_min_monto: minMonto,
+    });
+    if (r.error) { alert("Error: " + r.error.message); return; }
+    var rows = (r.data || []).map(function (x) {
+      return {
+        Puesto: x.ranking,
+        Codigo: x.cod_cliente,
+        RazonSocial: x.business_name || "",
+        CUIT: x.cuit || "",
+        Vendedor: x.vendedor_nombre || x.vendedor || "",
+        Facturado: Number(x.total_historico) || 0,
+        Pedidos: x.total_pedidos || 0,
+        ArticulosDistintos: x.articulos_distintos || 0,
+        UltimaCompra: x.last_date || "",
+      };
+    });
+    if (!rows.length) { alert("Nada para exportar."); return; }
+    var ws = XLSX.utils.json_to_sheet(rows);
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Ranking " + meses + "m");
+    var fname = "ranking_clientes_" + meses + "m_" + new Date().toISOString().slice(0, 10) + ".xlsx";
+    XLSX.writeFile(wb, fname);
+  } catch (e) {
+    alert("Falló el Excel: " + (e.message || e));
+  } finally {
+    btn.disabled = false; btn.textContent = txt0;
+  }
+}
+
+// Wiring del module (se llama en inicRankingClientes al abrir la pestaña)
+function inicRankingClientes() {
+  var btn = document.getElementById("rcBtnCargar");
+  var btnX = document.getElementById("rcBtnExcel");
+  var inpQ = document.getElementById("rcBuscar");
+  if (btn && !btn._wired) {
+    btn._wired = true;
+    btn.addEventListener("click", function () { cargarRankingClientes(1); });
+  }
+  if (btnX && !btnX._wired) {
+    btnX._wired = true;
+    btnX.addEventListener("click", function () { descargarRankingClientesExcel(); });
+  }
+  if (inpQ && !inpQ._wired) {
+    inpQ._wired = true;
+    inpQ.addEventListener("keydown", function (e) { if (e.key === "Enter") cargarRankingClientes(1); });
+  }
+  if (!_rcState.loaded) cargarRankingClientes(1);
+}
+
+window.cargarRankingClientes = cargarRankingClientes;
+window.descargarRankingClientesExcel = descargarRankingClientesExcel;
+window.inicRankingClientes = inicRankingClientes;

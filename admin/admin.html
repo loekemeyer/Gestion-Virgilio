@@ -263,6 +263,17 @@
                 </span>
                 <span>Estadística Clientes</span>
               </button>
+              <button class="nav-item" data-page="ranking-clientes">
+                <span class="nav-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <path d="M4 20h4v-6H4z" />
+                    <path d="M10 20h4V8h-4z" />
+                    <path d="M16 20h4v-9h-4z" />
+                    <path d="M4 4l16 0" />
+                  </svg>
+                </span>
+                <span>Ranking Clientes</span>
+              </button>
               <button class="nav-item" data-page="grupos-clientes">
                 <span class="nav-icon">
                   <svg
@@ -2170,6 +2181,37 @@
              Chef quedan fuera del buscador y de las sugerencias.
              El id de la sección queda como grupos-clientes: es lo que usa el
              deep-link por hash y renombrarlo rompería los enlaces guardados. -->
+        <!-- Ranking de clientes ACTIVOS por facturación en el período. Es el
+             opuesto de "Ranking Inactivos" (que muestra los que dejaron de
+             comprar). Consume get_ranking_clientes que espeja el mismo motor.
+             Fase 2 etapa 2 — pedido explícito del user: "otra cosa que hay
+             que desarrollar en paginalk es un modulo de ranking de clientes". -->
+        <section class="page" id="ranking-clientes">
+          <div class="page-header">
+            <div>
+              <h1>Ranking Clientes</h1>
+              <p class="page-sub">Clientes que compraron en el período, ordenados por facturación neta (list_price × uxb × (1 − dto_vol) × (1 − 2% web)). Espeja el cálculo del Ranking Inactivos.</p>
+            </div>
+            <div class="rc-actions" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+              <select id="rcPeriodo" style="padding:8px;border:1px solid #cbd5e1;border-radius:6px;">
+                <option value="1">1 mes</option>
+                <option value="3">3 meses</option>
+                <option value="6">6 meses</option>
+                <option value="12" selected>12 meses</option>
+                <option value="24">24 meses</option>
+                <option value="36">36 meses</option>
+              </select>
+              <input id="rcMinMonto" type="number" min="0" step="1000" placeholder="Monto mín ($)" style="padding:8px;border:1px solid #cbd5e1;border-radius:6px;width:130px;">
+              <input id="rcBuscar" placeholder="🔎 Código / razón social / CUIT" style="padding:8px;border:1px solid #cbd5e1;border-radius:6px;min-width:220px;">
+              <button id="rcBtnCargar" class="btn-primary" style="padding:8px 14px;">Cargar</button>
+              <button id="rcBtnExcel" class="btn-secondary" style="padding:8px 14px;">📥 Excel</button>
+            </div>
+          </div>
+          <div id="rcResumen" style="margin:10px 0;color:#64748b;font-size:13px;"></div>
+          <div id="rcTabla"></div>
+          <div id="rcPager" style="margin-top:12px;display:flex;gap:8px;align-items:center;justify-content:center;"></div>
+        </section>
+
         <section class="page" id="grupos-clientes">
           <div class="page-header">
             <div>

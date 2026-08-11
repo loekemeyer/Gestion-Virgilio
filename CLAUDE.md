@@ -130,8 +130,13 @@ Al verificar setea un password temporal aleatorio en el user y el front hace
   para que ni buscadores ni la revisión del TWA lo indexen, (d) handler de
   login OTP `lkSendOtp`/`lkVerifyOtp` al final de admin.js que llama a la
   Edge Function `admin-login-otp`, (e) form de OTP dentro del `#loadingScreen`
-  de admin.html. Si al re-sincronizar se pisa alguno, buscarlo por `LK_ADMIN_EMAIL`,
-  `LK_OTP_FN_URL`, `_lkOtpFn` o `lkLoginBox`.
+  de admin.html, (f) redirects `/mayorista` → `../` en `carga-pedidos.html`
+  (3 lugares), `historial.html`, `historial.js`, `sugerencias.html`,
+  `sugerencias.js`, `analisis-venta-cliente.js` (2 lugares) — el original
+  apunta a `mayorista.html` del sitio LK que no existe en Virgilio,
+  (g) `historial.html` usa `img/favicon.jpg` (no `.png`, no existe). Si al
+  re-sincronizar se pisa alguno, buscar por `LK_ADMIN_EMAIL`, `LK_OTP_FN_URL`,
+  `_lkOtpFn`, `lkLoginBox`, o `grep -r "/mayorista"` (no debe haber ninguno).
 
 ### Convenciones operativas
 

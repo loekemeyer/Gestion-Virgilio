@@ -79,7 +79,7 @@ async function getSession() {
   }
   if (!data?.session) {
     setStatus("No hay sesión iniciada. Volviendo a Mayorista…");
-    setTimeout(() => (location.href = "/mayorista"), 800);
+    setTimeout(() => (location.href = "../"), 800);
     return null;
   }
 
