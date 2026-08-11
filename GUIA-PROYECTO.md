@@ -6,6 +6,16 @@
 >
 > Última actualización: 2026-08-11 · Versión app al documentar: **v9.25**
 >
+> Nota SERVER (sin bump de app): **FIX alerta ESTANCADO — la tanda mostrada estaba mal (mostraba la última movida, no la trabada).**
+> El "pickeado sin avanzar" tomaba la tanda del `ref` del movimiento **más reciente** que dejó stock en
+> `separar_pedidos`/`a_facturar`. Pero el saldo trabado casi siempre viene de una tanda **vieja** que
+> nunca salió, no de la última que se movió → mostraba **NP y día de PPP equivocados** (ej. cod `598E`:
+> mostraba `D07x/Loeke` —última movida— cuando lo clavado era de `D15A/Chef`, más vieja). **Fix:** el CTE
+> `tanda_cod` ahora toma la tanda del ingreso **más viejo cuyo stock nunca se descontó** dentro del
+> **ciclo abierto** (mismo criterio de "ciclo" que la sección 1: arranca justo después del último
+> movimiento que dejó el saldo del depósito en 0). Deployado + `sql/stock_estancado.sql` actualizado.
+> Verificado sobre stock actual: ~50 códigos re-atribuidos a su tanda vieja real (D09B/D08A/D07B/D15A…).
+>
 > Nota SERVER (sin bump de app): **FIX stock — pedidos Chef facturados afuera dejaban stock LK trabado.**
 > Los pedidos de **Chef (NP 44xxx)** facturan mercadería **LK** afuera de la app (Cencosud/Chef, lo del
 > sufijo "L"). La **ETAPA 3** de `reconciliar_pipeline_stock()` drenaba `a_facturar` **solo si la tanda
