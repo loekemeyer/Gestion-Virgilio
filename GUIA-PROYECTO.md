@@ -4,7 +4,17 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-11 · Versión app al documentar: **v9.28**
+> Última actualización: 2026-08-11 · Versión app al documentar: **v9.29**
+>
+> Nota **v9.29** — **Pedidos Importación operable (editar en curso + marcar llegada).** El módulo
+> "📦 Pedidos Importación" era solo-lectura; ahora cada fila tiene **✏️** (editar unidades EN CURSO
+> = lo pedido/en camino → `Importados.pedido_curso`, que el motor resta de "a pedir") y **📥**
+> (marcar LLEGADA: inserta `Importados_Mov_Stock` tipo `ingreso` +delta_uni y descuenta esa cantidad
+> de `pedido_curso`, piso 0). Ambas por RPC **SECURITY DEFINER** por `Importados.id`
+> (`importados_set_curso`, `importados_marcar_llegada`; grant anon+authenticated) — el INSERT en
+> `Importados_Mov_Stock` es solo-authenticated para anon, por eso va por función. `ocgFetchImportados`
+> ahora trae `id` y las filas por marca (`det`). SQL en `sql/importados_pedidos_rpc.sql`. Códigos
+> multi-marca (solo 2) se editan por fila. Nuevo tipo de movimiento importado: `ingreso`.
 >
 > Nota **v9.28** — **Badges de pendientes en el panel supervisor.** Igual que el badge rojo de
 > "Completar datos producto" (`dp-badge`), ahora **"Corregir códigos de NPs"** y **"Pedidos sin
