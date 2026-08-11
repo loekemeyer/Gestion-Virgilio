@@ -6403,7 +6403,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v9.41";
+const APP_VERSION = "v9.42";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -13490,6 +13490,9 @@ function _stkQuienChip(mv) {
   }
   if (!leg && String(mv.tipo || "") === "recepcion") { leg = _stkRtQuien(mv.ts); aprox = !!leg; }
   if (!leg) return "";
+  // v9.42 — legajo 0/1 (pruebas/admin) NO es un operario: mostrar "admin", no el nombre de prueba
+  // (ej. antes los CP de supervisor quedaban "TL · 0"). Los CP nuevos ya guardan el legajo real.
+  if (leg === "0" || leg === "1") return ' <span class="mva-qui" title="Movimiento de administración / sistema (sin legajo de operario)">👤 <b>admin</b></span>';
   const nom = (typeof _empleadosNombres !== "undefined" && _empleadosNombres) ? (_empleadosNombres.get(leg) || "") : "";
   const sig = (typeof initialsFromName === "function" ? initialsFromName(nom, leg) : "") || nom || leg;
   const tip = (nom || ("legajo " + leg)) + (aprox ? " — deducido por la sesión de RT (recepción vieja, sin legajo guardado)" : "");
@@ -19475,10 +19478,17 @@ async function faltCrear(np) {
 }
 /* v5.95 — "Cargar yo": el supervisor completa el faltante de esa NP él mismo AHORA
    (en vez de avisar para que lo haga un operario). Cierra este modal y abre el CP
-   enfocado en esa NP (mismo showCPModal de la botonera; legajo '0' = admin). */
+   enfocado en esa NP (mismo showCPModal de la botonera).
+   v9.42 — pide el LEGAJO de quién saca las cajas (antes iba fijo '0' = admin, y en los
+   movimientos quedaba "TL · 0" sin saber quién lo hizo). */
 function faltCargarYo(np) {
+  var leg;
+  try { leg = prompt("¿Qué LEGAJO saca las cajas? (queda registrado como quién completó el pedido)", ""); } catch (_e) { return; }
+  if (leg == null) return;                                   // canceló
+  leg = String(leg).trim().replace(/[^\d]/g, "");
+  if (!leg || leg === "0" || leg === "1") { try { alert("Poné un legajo válido de quién saca las cajas (no 0/1)."); } catch (_e) {} return; }
   closeFaltAvisar();
-  try { showCPModal("0", null, _faltNpNorm(np)); } catch (_e) {}
+  try { showCPModal(leg, null, _faltNpNorm(np)); } catch (_e) {}
 }
 
 /* ===== RC · Pasar cajas a un pedido URGENTE (v5.49). El operario le saca cajas a un pedido
