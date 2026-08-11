@@ -3414,6 +3414,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
   <div id="facContainer">
     <div class="fac-empty">Cargando tandas…</div>
   </div>
+  <div id="facNcList" style="display:none"></div>
   <div class="fac-cierre">
     <div class="fac-cierre-info">
       <b>📄 Cierre de jornada</b><br>
@@ -6300,7 +6301,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v9.20";
+const APP_VERSION = "v9.21";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -28233,6 +28234,63 @@ async function facFetchEquiv(){
   } catch (_e) { /* sin red: queda el último cache */ }
   return _facEquiv;
 }
+/* v9.21 — NCs Loeke→Chef pendientes (vista_nc_loeke_chef): NPs de Chef que piden un
+   artículo importado por Chef y home Loeke (Coladores 437E/438E/439E). Al facturarlos
+   por Chef hay que hacer NOTA DE CRÉDITO a Loeke y pasar el stock a Chef. Se muestran
+   como FILAS con ✓ "NC hecha" en Facturación, para que la operadora no se olvide.
+   NO tiene injerencia en la carga del camión ni en el cierre — es un checklist aparte. */
+let _facNcPend = [];
+async function facFetchNcChef(){
+  try {
+    const rows = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/vista_nc_loeke_chef", "select=np,cod,descripcion,cajas");
+    _facNcPend = (rows || []).map(function(r){ return { np: String(r.np).trim().replace(/\.0+$/, ""), cod: String(r.cod || "").trim(), desc: r.descripcion || "", cajas: Number(r.cajas) || 0 }; });
+  } catch (_e) { /* sin red: queda el último cache */ }
+  return _facNcPend;
+}
+function facRenderNc(){
+  const box = document.getElementById("facNcList");
+  if (!box) return;
+  const list = _facNcPend || [];
+  if (!list.length){ box.style.display = "none"; box.innerHTML = ""; return; }
+  const rsByNp = new Map();
+  (_facLastTandas || []).forEach(function(t){ (t.pedidos || []).forEach(function(p){ rsByNp.set(String(p.np).trim().replace(/\.0+$/, ""), p.razonSocial || ""); }); });
+  list.sort(function(a,b){ return String(a.np).localeCompare(String(b.np), undefined, { numeric: true }) || a.cod.localeCompare(b.cod); });
+  const rows = list.map(function(x){
+    const rs = rsByNp.get(x.np) || "";
+    const args = JSON.stringify({ np: x.np, cod: x.cod }).replace(/&/g, "&amp;").replace(/'/g, "&apos;").replace(/</g, "&lt;");
+    return '<tr>'
+      + '<td style="font-weight:800;">' + escapeHtml(x.np) + '</td>'
+      + '<td>' + escapeHtml(x.cod) + '</td>'
+      + '<td style="color:#475569;">' + escapeHtml(x.desc) + '</td>'
+      + '<td class="center">' + (x.cajas || "") + '</td>'
+      + '<td style="color:#475569;">' + escapeHtml(rs) + '</td>'
+      + '<td class="center"><button data-nc=\'' + args + '\' onclick="facNcConfirm(this)" style="background:#16a34a;color:#fff;border:none;border-radius:7px;padding:5px 12px;font-weight:800;cursor:pointer;">✓ NC hecha</button></td>'
+      + '</tr>';
+  }).join("");
+  box.innerHTML = '<div style="margin:16px 0 6px;font-weight:800;color:#92400e;">🧾 NC a Loeke + pasar stock a Chef — ' + list.length + ' pendiente(s)'
+    + '<div style="font-weight:600;font-size:12px;color:#64748b;margin-top:2px;">Artículos importados por Chef que se facturan por Chef → hacé la Nota de Crédito a Loeke y pasá el stock. Confirmá con ✓ para que no se te olvide. No afecta la carga del camión.</div></div>'
+    + '<div class="fac-table-wrap"><table class="fac-np-tbl"><thead><tr>'
+    + '<th style="width:12%">NP</th><th style="width:10%">Cód</th><th style="width:34%">Artículo</th><th class="center" style="width:8%">Cajas</th><th style="width:24%">Razón Social</th><th class="center" style="width:12%">Acción</th>'
+    + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+  box.style.display = "";
+}
+async function facNcConfirm(el){
+  let d; try { d = JSON.parse(el.getAttribute("data-nc")); } catch (_e) { return; }
+  const headers = await facAuthWriteHeaders({ Prefer: "resolution=merge-duplicates,return=minimal" });
+  if (!headers){ facShowToast(authNoSesionMsg("Iniciá sesión con Google para confirmar la NC")); return; }
+  el.disabled = true;
+  try {
+    let por = ""; try { por = (window.__authEmail || (typeof __identity !== "undefined" && __identity && (__identity.email || __identity.nombre)) || ""); } catch (_e) {}
+    const r = await fetch(SUPABASE_URL + "/rest/v1/NC_Loeke_Chef_Hechas", {
+      method: "POST", headers: headers,
+      body: JSON.stringify({ np: d.np, cod: d.cod, confirmado_por: String(por || "") })
+    });
+    if (!r.ok && r.status !== 409) throw new Error("HTTP " + r.status);
+    _facNcPend = (_facNcPend || []).filter(function(x){ return !(x.np === d.np && x.cod === d.cod); });
+    facRenderNc();
+    facShowToast("NC confirmada ✓");
+  } catch (e) { facShowToast("Error: " + e.message); el.disabled = false; }
+}
 /* Faltantes por NP (Entregas_Virgilio, cajas_falto>0) — para AVISAR en Facturación
    antes de facturar una NP que salió incompleta. Map NP -> { cajas, items:[{cod,falto,ped}] }.
    Cache 30s, mismo patrón que facFetchLios. v5.36. */
@@ -28704,6 +28762,7 @@ function facRender(tandas){
   const btnRev = document.getElementById("facBtnRevertir");
   if (btnRev) btnRev.disabled = _facNpsHoy.size === 0;
   facRenderTicked();   // v6.61: refrescar la lista de tildados debajo de "Armar ruta"
+  facRenderNc();       // v9.21: filas de NC Loeke→Chef pendientes (checklist aparte)
 
   // v5.70: chip "⚠ Con faltante: N" + filtro "solo faltantes". Los pedidos que
   // salieron cortos (Entregas_Virgilio.cajas_falto>0) ya vienen marcados en la
@@ -29207,7 +29266,8 @@ async function facTick(){
       facFetchTareas().catch(function(){ return _facTareas; }),       // tareas en progreso por NP → aviso ⏳ amarillo (v5.71)
       stockFetchSaldos().catch(function(){ return {}; }),             // v6.16: saldos → ocultar ⏳ si el faltante no tiene stock para completar
       cpLoadGuardadoHoy().catch(function(){ return new Set(); }),      // v6.18: guardados hoy → el ⏳ también aplica a lo guardado hoy
-      facCorreccData().catch(function(){ return []; })                 // v7.92: pedidos en secundario por NP → columna "Cambiar cód" + chip
+      facCorreccData().catch(function(){ return []; }),                // v7.92: pedidos en secundario por NP → columna "Cambiar cód" + chip
+      facFetchNcChef().catch(function(){ return _facNcPend; })          // v9.21: NCs Loeke→Chef pendientes → filas ✓ "NC hecha"
     ]);
     const fcKeys = _facPar[0] || new Set();
     try { const _sal = _facPar[8] || {}; _facSaldosN = {}; Object.keys(_sal).forEach(function(k){ _facSaldosN[_cpNorm(k)] = _sal[k]; }); } catch(_e){ _facSaldosN = {}; }
