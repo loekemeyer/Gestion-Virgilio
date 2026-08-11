@@ -6,6 +6,14 @@
 >
 > Última actualización: 2026-08-11 · Versión app al documentar: **v9.25**
 >
+> Nota SERVER (sin bump de app): **Alerta "STOCK ESTANCADO" ahora dice NP + día de PPP.**
+> Cada línea de **pickeado** agrega la **tanda** (del `ref` del movimiento más reciente que dejó
+> stock en `separar_pedidos`/`a_facturar`) y, a partir de ella, las **NP(s)** y el **día de PPP**
+> (`fecha_entrega`). Fuente tanda→NP+fecha = `PPP_Entregados_Meta` (histórico) ∪
+> `PPP_Programacion_Diaria` (actual). El "resto sin guardar" (recepción) no lleva NP. Ej:
+> `cod 106E — 51 cj · pickeado sin facturar (hace 4 d. háb.) · tanda D15A · NP 44531/44532/44533 · PPP 05/08`.
+> Función `reporte_agentes_stock_estancado()`, SQL en `sql/stock_estancado.sql`.
+>
 > Nota: **v9.25 — Stock de PARTE cuenta como stock del terminado importado (94xP → 94xE).**
 > Los **94xE** (cubiertos ac. inox) se **importan** (maestro, Becky) pero **Log/Fabr los ARMA** a
 > partir de la parte **94xP**. El stock de 94xP (depósito `insumos`, en **unidades**) es "94xE en
