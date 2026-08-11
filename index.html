@@ -6403,7 +6403,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v9.49";
+const APP_VERSION = "v9.50";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -9913,7 +9913,7 @@ async function openStockAdmin(soloConteo) {
     var _fac = res[2] || {};
     Object.keys(_fac).forEach(function (k) { var kN = _cpNorm(k); if (!_cxmMerge[kN] && _fac[k].cajasXMaster > 0) _cxmMerge[kN] = _fac[k].cajasXMaster; });
     var _proyMap = {};   // v9.49: proyección caj/mes por código normalizado (antes del índice de las OCs)
-    (res[12] || []).forEach(function (x) { var k = _ocgNorm(x.cod); if (k) _proyMap[k] = Number(x.proy_cajas_mes) || 0; });
+    (Array.isArray(res[13]) ? res[13] : []).forEach(function (x) { var k = _ocgNorm(x.cod); if (k) _proyMap[k] = Number(x.proy_cajas_mes) || 0; });
     _stk = { movs: res[0] || [], cutoff: res[1], factors: _fac, ordenes: res[3] || [], bajadas: res[4] || [], tab: _solo ? "conteo" : "stocks", soloConteo: _solo, filtro: "", openArt: null, ingMode: "remito", asOf: null, asOfInput: "", dem: res[6] || {}, cap: res[7] || [], gConf: res[8] || [], fcs: res[9] || { pend: {}, porArt: {} }, fcsLoaded: true, insumosCods: (res[10] || []).map(function(i) { return String(i.cod || "").trim().toUpperCase(); }), cxm: _cxmMerge, proy: _proyMap };
     stkRender();
   } catch (e) { const b = document.getElementById("stkBody"); if (b) b.innerHTML = '<div class="stk-loading">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
