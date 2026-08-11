@@ -6403,7 +6403,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v9.40";
+const APP_VERSION = "v9.41";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -14328,6 +14328,11 @@ function stkBodyFaltante() {
   // Ordenar. Por defecto: lo que YA FALTÓ al armar (real, urgente), luego S1, S2, código.
   // v8.24 — si F.ordenFab: primero por FABRICANTE (los "sin fabricante" al final), después la misma prioridad.
   arts.sort(function (a, b) {
+    if (F.soloS1) {   // v9.41 — "Solo S1": primer semana primero (ordena por Falt S1 desc)
+      if (b.faltS1 !== a.faltS1) return b.faltS1 - a.faltS1;
+      if (b.faltS2 !== a.faltS2) return b.faltS2 - a.faltS2;
+      return codCanon(a.cod).localeCompare(codCanon(b.cod), undefined, { numeric: true });
+    }
     if (F.ordenFab) {
       var pa = String(a.prov || "").trim(), pb = String(b.prov || "").trim();
       if (!pa !== !pb) return pa ? -1 : 1;                 // sin fabricante → al final
@@ -14350,6 +14355,7 @@ function stkBodyFaltante() {
 
   // v8.02 — "solo quiebre": esconde los que no faltan (ruido)
   if (F.soloQuiebre) arts = arts.filter(_hayQ);
+  if (F.soloS1) arts = arts.filter(function (a) { return a.faltS1 > 0; });   // v9.41 — solo la primer semana (S1)
 
   // v8.77 — un día se DESDOBLA (Super | Clientes) SOLO si hay faltante REAL de supermercado ese
   // día en algún artículo VISIBLE. Si el super está cubierto (faltante 0), la columna quedaría
@@ -14380,6 +14386,7 @@ function stkBodyFaltante() {
   h += '<div class="falt-top">' +
     '<div class="falt-filters">' +
     '<button class="falt-fbtn' + (F.soloQuiebre ? " on" : "") + '" onclick="stkFaltSoloQuiebre()" title="Mostrar solo los artículos que tienen faltante">' + (F.soloQuiebre ? "☑" : "☐") + ' Solo quiebre</button>' +
+    '<button class="falt-fbtn' + (F.soloS1 ? " on" : "") + '" onclick="stkFaltSoloS1()" title="Ver SOLO lo que falta en la PRIMER semana (S1), ordenado por Falt S1 de mayor a menor.">' + (F.soloS1 ? "☑" : "☐") + ' 📅 Solo S1</button>' +
     '<button class="falt-fbtn' + (F.sinE ? " on" : "") + '" onclick="stkFaltSinE()" title="Ocultar códigos importados (E) que no tienen equivalente nacional para reponer. Mantiene los 94xE y las familias con nacional (574E/590E/809E CH/etc.).">' + (F.sinE ? "☑" : "☐") + ' Sin E</button>' +
     '<button class="falt-fbtn' + (F.verDias ? " on" : "") + '" onclick="stkFaltVerDias()" title="Mostrar el detalle día por día (agrega las columnas de cada día — puede necesitar scroll lateral).">' + (F.verDias ? "☑" : "☐") + ' 📅 Ver días</button>' +
     '</div>' +
@@ -14513,6 +14520,12 @@ function _faltCelda(falt, esSem, cod, fecha, esPrimer, winKey) {
 function stkFaltSoloQuiebre() {
   if (!_stk || !_stk.falt) return;
   _stk.falt.soloQuiebre = !_stk.falt.soloQuiebre;
+  _stk.falt.openCell = null;
+  stkRender();
+}
+function stkFaltSoloS1() {   // v9.41 — filtra a la primer semana (S1) y ordena por Falt S1
+  if (!_stk || !_stk.falt) return;
+  _stk.falt.soloS1 = !_stk.falt.soloS1;
   _stk.falt.openCell = null;
   stkRender();
 }
