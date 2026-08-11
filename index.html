@@ -3625,7 +3625,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       <button class="sup-action-btn" onclick="openAgentesAdmin()"><span class="sup-ico">🤖</span><span>Agentes</span></button>
       <button class="sup-action-btn" onclick="openMonitor()"><span class="sup-ico">📊</span><span>Monitor / Análisis / Inconsistencias</span></button>
       <button class="sup-action-btn" onclick="showGuardarOrden('')"><span class="sup-ico">📋</span><span>Qué bajar primero</span></button>
-      <button class="sup-action-btn" onclick="openCorreccPanel()" style="position:relative;"><span class="sup-ico">🔀</span><span>Corregir códigos de NPs</span><span id="corrBadge" class="dp-badge" style="display:none;"></span></button>
+      <button class="sup-action-btn" onclick="openCorreccPanel()" style="position:relative;"><span class="sup-ico">🔀</span><span>Corregir códigos de NPs</span><span id="corrBadgeGreen" class="dp-badge" style="left:2px;right:auto;background:#16a34a;display:none;" title="Se pueden corregir pero NO es obligatorio (hay stock del secundario)"></span><span id="corrBadge" class="dp-badge" style="display:none;" title="Hay que corregir SÍ o SÍ (el secundario no tiene stock)"></span></button>
       <button class="sup-action-btn" onclick="openNpConsulta()"><span class="sup-ico">🔎</span><span>Consultar NP / Líos</span></button>
       <button class="sup-action-btn" onclick="stkOpenNpFaltan()" style="position:relative;"><span class="sup-ico">⚠️</span><span>Pedidos sin cargar en PPP</span><span id="npFaltanBadge" class="dp-badge" style="display:none;"></span></button>
       <button class="sup-action-btn" onclick="stkOpenProvImp()"><span class="sup-ico">🏭</span><span>Proveedor de importación</span></button>
@@ -6403,7 +6403,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v9.37";
+const APP_VERSION = "v9.38";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -12692,19 +12692,41 @@ async function stkOpenNpFaltan() {
   const body = document.getElementById("stkPopBody"); if (!body) return;
   body.innerHTML = '<div class="stkpop-empty">Cargando…</div>';
   const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
-  let rows = [];
-  try { rows = await fetch(SUPABASE_URL + "/rest/v1/vista_np_sin_programar?select=np,fecha,cliente,cajas,lineas&order=np&limit=5000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }); } catch (_e) {}
+  let rows = [], gaps = [];
+  try {
+    var _out = await Promise.all([
+      fetch(SUPABASE_URL + "/rest/v1/vista_np_sin_programar?select=np,fecha,cliente,cajas,lineas&order=np&limit=5000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; }),
+      // v9.38 — NP salteadas en la secuencia numérica (huecos ≤5 entre NPs que sí existen)
+      fetch(SUPABASE_URL + "/rest/v1/vista_np_faltantes_secuencia?select=np_faltante,anterior,siguiente&order=np_faltante.desc&limit=1000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; })
+    ]);
+    rows = _out[0]; gaps = _out[1];
+  } catch (_e) {}
   try { supSetBadge("npFaltanBadge", (rows || []).length); } catch (_e) {}   // sincroniza el badge del panel con lo que se muestra
-  _stkPop = { kind: "npFaltan", rows: rows, cancelNp: null };
+  _stkPop = { kind: "npFaltan", rows: rows, gaps: gaps, cancelNp: null };
   _stkNpFaltanRender();
+}
+/* v9.38 — sección "NP salteadas en la secuencia": números que faltan entre NPs que sí existen. */
+function _stkNpGapsHtml() {
+  var gaps = (_stkPop && _stkPop.gaps) || [];
+  if (!gaps.length) return "";
+  var shown = gaps.slice(0, 150);
+  var chips = shown.map(function (g) {
+    return '<span title="hueco entre ' + escapeHtml(String(g.anterior)) + ' y ' + escapeHtml(String(g.siguiente)) + '" style="display:inline-block;background:#fff;border:1px solid #fde68a;border-radius:7px;padding:2px 7px;margin:2px;font-size:11.5px;font-weight:800;color:#92400e;">' + escapeHtml(String(g.np_faltante)) + '</span>';
+  }).join("");
+  var extra = gaps.length > shown.length ? '<span style="font-size:11px;color:#92400e;font-weight:700;"> … y ' + (gaps.length - shown.length) + ' más</span>' : '';
+  return '<div style="background:#fffbeb;border:1.5px solid #fde68a;border-radius:12px;padding:9px 12px;margin-bottom:12px;">' +
+    '<div style="font-weight:800;color:#92400e;font-size:13.5px;margin-bottom:3px;">🔢 ' + gaps.length + ' NP salteada(s) en la secuencia</div>' +
+    '<div style="font-size:11px;color:#7c5b12;margin-bottom:6px;">Números que faltan entre NPs que <b>sí</b> existen (hueco ≤5). Puede ser un pedido que <b>no se cargó</b> o una NP <b>anulada</b> en el ERP. Revisá si alguna debería estar.</div>' +
+    '<div style="max-height:130px;overflow:auto;">' + chips + extra + '</div></div>';
 }
 function _stkNpFaltanRender() {
   const body = document.getElementById("stkPopBody"); if (!body || !_stkPop || _stkPop.kind !== "npFaltan") return;
   const rows = _stkPop.rows || [];
   const round1 = function (n) { return Math.round((Number(n) || 0) * 10) / 10; };
-  if (!rows.length) { body.innerHTML = '<div class="stkpop-empty">✅ No hay NP sin programar. Todo lo que está en la base está programado, facturado, entregado o marcado como que NO va.</div>'; return; }
+  const gapsH = _stkNpGapsHtml();
+  if (!rows.length) { body.innerHTML = gapsH + '<div class="stkpop-empty">✅ No hay NP sin programar. Todo lo que está en la base está programado, facturado, entregado o marcado como que NO va.</div>'; return; }
   const totCajas = rows.reduce(function (s, r) { return s + (Number(r.cajas) || 0); }, 0);
-  let h = '<div class="stkpop-hint"><b>' + rows.length + ' NP</b> están en la base de pedidos pero <b>NO</b> en Programación Diaria (y no se facturaron ni entregaron). <b>Valorizado: ' + round1(totCajas) + ' cajas.</b><br><small style="color:#94a3b8">Si es un <b>error real</b> (debería estar) → programalo en el PPP. Si el pedido <b>NO va</b> (cancelado, cargado por error, etc.) → marcalo con 🚫 y deja de contar en el stock.</small></div>';
+  let h = gapsH + '<div class="stkpop-hint"><b>' + rows.length + ' NP</b> están en la base de pedidos pero <b>NO</b> en Programación Diaria (y no se facturaron ni entregaron). <b>Valorizado: ' + round1(totCajas) + ' cajas.</b><br><small style="color:#94a3b8">Si es un <b>error real</b> (debería estar) → programalo en el PPP. Si el pedido <b>NO va</b> (cancelado, cargado por error, etc.) → marcalo con 🚫 y deja de contar en el stock.</small></div>';
   h += '<div style="margin-bottom:10px"><button class="mva-clear" style="background:#166534;color:#fff;border-color:#166534" onclick="stkNpFaltanExport()">⬇ Exportar a Excel</button></div>';
   h += '<div class="mva-tblwrap"><table class="mva-tbl"><thead><tr><th>NP</th><th>Fecha</th><th>Razón Social</th><th class="num">Cajas</th><th></th></tr></thead><tbody>';
   h += rows.map(function (r) {
@@ -25561,13 +25583,30 @@ function supSetBadge(id, count) {
   if (count > 0) { b.textContent = String(count); b.style.display = ""; b.className = "dp-badge"; }
   else { b.textContent = "✓"; b.style.display = ""; b.className = "dp-badge ok"; }
 }
+/* v9.38 — dos badges: ROJO = NPs que hay que corregir SÍ o SÍ (el secundario no tiene stock),
+   VERDE = NPs donde el secundario TIENE stock → se puede mandar tal cual, corregir es opcional. */
 async function corrLoadBadge() {
   try {
     var pend = await facCorreccData();
-    // NPs distintas (unidad de acción: se corrige una vez por NP), igual que el chip del panel.
-    var n = Object.keys(pend.reduce(function (a, p) { a[p.np] = 1; return a; }, {})).length;
-    supSetBadge("corrBadge", n);
+    if (!pend.length) { corrSetRed(0); corrSetGreen(0); return; }
+    var cods = Array.from(new Set(pend.map(function (p) { return p.sec; }))).map(encodeURIComponent).join(",");
+    var H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+    var saldos = await fetch(SUPABASE_URL + "/rest/v1/vista_saldos_stock?cod_art=in.(" + cods + ")&select=cod_art,terminado,excedente,a_guardar,racks,racks_ch,para_envasar", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; });
+    var stk = {}; saldos.forEach(function (r) { stk[_ocgNorm(r.cod_art)] = _corrStk(r); });
+    var byNp = {};   // np → true si ALGÚN item de esa NP tiene secundario SIN stock (obligatorio)
+    pend.forEach(function (p) { var s = stk[_ocgNorm(p.sec)] || 0; if (!(p.np in byNp)) byNp[p.np] = false; if (s <= 0) byNp[p.np] = true; });
+    var must = 0, opt = 0;
+    Object.keys(byNp).forEach(function (np) { if (byNp[np]) must++; else opt++; });
+    corrSetRed(must); corrSetGreen(opt);
   } catch (_e) {}
+}
+function corrSetRed(count) {
+  var b = document.getElementById("corrBadge"); if (!b) return;
+  if (count > 0) { b.textContent = String(count); b.style.display = ""; b.className = "dp-badge"; } else { b.style.display = "none"; }
+}
+function corrSetGreen(count) {
+  var b = document.getElementById("corrBadgeGreen"); if (!b) return;
+  if (count > 0) { b.textContent = String(count); b.style.display = ""; } else { b.style.display = "none"; }
 }
 async function npFaltanLoadBadge() {
   try {

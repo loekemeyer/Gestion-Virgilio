@@ -4,7 +4,20 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-11 · Versión app al documentar: **v9.37**
+> Última actualización: 2026-08-11 · Versión app al documentar: **v9.38**
+>
+> Nota **v9.38** — **(a) "Corregir códigos de NPs" ahora tiene 2 badges:** ROJO (arriba-derecha) =
+> NPs que hay que corregir SÍ o SÍ (el secundario **no tiene stock**), VERDE (arriba-izquierda) =
+> NPs donde el secundario **tiene stock** → se puede mandar tal cual, corregir es opcional.
+> `corrLoadBadge` cruza `facCorreccData()` con `vista_saldos_stock` de los secundarios; rojo si algún
+> item de la NP tiene stock del secundario ≤0. **(b) "Pedidos sin cargar en PPP" ahora avisa NP
+> salteadas en la secuencia numérica** (huecos ≤5 entre NPs que sí existen; ej. 98576 y 98578 sin
+> 98577). Vista nueva `vista_np_faltantes_secuencia` (`sql/np_faltantes_secuencia.sql`, unión de
+> PPP_Base ∪ Programacion ∪ Facturacion ∪ Entregados ∪ Canceladas). Puede ser un pedido no cargado
+> o una NP anulada en el ERP. **(c) Precio de venta confirmado:** LK `products.list_price` (proyecto
+> "loekemeyer's web" = `kwkclwhmoygunqmlegrg`) es la fuente correcta que ya usa `precios_venta`.
+>
+> Nota **v9.37** — **Módulo "💸 Plata perdida de facturar" (faltante por quiebre).**
 >
 > Nota **v9.37** — **Módulo "💸 Plata perdida de facturar" (faltante por quiebre).** Panel supervisor.
 > Valoriza las cajas que el cliente pidió y **no se pudieron entregar por falta de stock**
