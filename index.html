@@ -6403,7 +6403,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v9.56";
+const APP_VERSION = "v9.57";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -17988,19 +17988,8 @@ function renderGuardarOrden() {
   const b = document.getElementById("gordenBody"); if (!b || !_gorden) return;
   const F = _gorden.filtro, rows = _gordenRows();
   const TABS = [["todos", "Todos"], ["racks", "🏗 Racks"], ["guardar", "📦 A guardar"], ["excedente", "📦 Excedente"]];
-  // v9.35 — ALERTA DE URGENTES: góndola < 20% del máximo. Va arriba de todo, bien visible.
+  // v9.57 — se sacó la alerta de urgentes (góndola < 20%) de esta pantalla (pedido del dueño).
   let h = "";
-  var _urg = _gorden.urgentes || [];
-  if (_urg.length) {
-    var _chips = _urg.map(function (u) {
-      var pct = Math.round(u.ratio * 100), noBack = u.back <= 0;
-      return '<span style="display:inline-flex;align-items:center;gap:4px;background:#fff;border:1px solid #fca5a5;border-radius:8px;padding:3px 8px;font-size:11.5px;font-weight:800;color:#991b1b;margin:2px;">' + escapeHtml(codBase(u.cod)) + ' <b>' + pct + '%</b>' + (noBack ? ' <span style="color:#7c2d12;font-size:10px;font-weight:700;">·sin stock atrás</span>' : '') + '</span>';
-    }).join("");
-    h += '<div style="background:#fef2f2;border:1.5px solid #fca5a5;border-radius:12px;padding:9px 12px;margin-bottom:10px;">' +
-      '<div style="font-weight:900;color:#b91c1c;font-size:14px;margin-bottom:3px;">🆘 ' + _urg.length + ' urgente(s) — góndola &lt; 20%</div>' +
-      '<div style="font-size:11px;color:#7f1d1d;margin-bottom:6px;">Góndola casi vacía. Las marcadas «sin stock atrás» no se pueden bajar acá → hace falta <b>producir / OC</b>.</div>' +
-      '<div style="max-height:150px;overflow:auto;">' + _chips + '</div></div>';
-  }
   h += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;align-items:center;">';
   TABS.forEach(function (t) {
     const on = F === t[0];
