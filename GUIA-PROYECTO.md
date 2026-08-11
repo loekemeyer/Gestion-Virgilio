@@ -19,16 +19,26 @@
 > (652/771/957EL no existían en el sistema de OCs). Módulo "Completar datos producto" excluye la tabla
 > **`Articulos_Discontinuados`** (15,75,563,396,456,517,556 + 029,030,828,830 reemplazados por 437E/438E).
 >
-> Nota: **v9.11 — Pantalla "Proveedor de importación".** Botón 🏭 en Administración
-> (`stkOpenProvImp`). Lista los códigos **importados** (terminan en **E**, activos, no discontinuos)
-> desde la vista **`vista_prov_importacion`** (`OC_Maximos` ⨝ `Proveedores_Importacion`, GRANT SELECT
-> anon) con un desplegable por fila para asignar el **proveedor chino**: Hugo Wong, Becky Chen,
-> Ownland, Kangli, Fujian, Stephen, Frontier (`_PROV_IMP_LISTA`). **García NO está** (reenvasa lo de
-> insumos, no importa). Guarda al instante por upsert en **`Proveedores_Importacion`**
-> (cod PK, proveedor, nota, actualizado; RLS select+insert+update anon) con `on_conflict=cod`.
-> Buscador por código/descripción, toggle "Solo sin asignar", filas sin proveedor resaltadas. Sirve
-> de base para emitir la OC directo al proveedor y para el rediseño de OC de importados (índice 10
-> meses, stock sumado en todos los estadios). Bump `v9.11`.
+> Nota: **v9.11/v9.12 — Circuito de IMPORTADOS (maestro `Importados` + OC por proveedor chino).**
+> ⚠ **Ya existía** (desde 2026-07-16) todo el subsistema de importados, separado del generador
+> nacional: **`Importados`** (maestro real, 147 códigos; cols `cod_art`, `marca`, `proveedor`,
+> `uni_x_caja`, `principal`, `activo`, `est_madre_seed/override`, `pedido_manual`, `pedido_curso`),
+> **`Importados_Config`** (`meses_objetivo` = **índice**, ahora **10**), **`Importados_Mov_Stock`**
+> (stock **en unidades** event-sourced; `delta_uni`, `tipo='inicial'`) y la vista
+> **`v_importados_ordenes`** (motor: `stock_actual` en unidades = mov − ventas×uni_x_caja desde el
+> inicial; `est_madre_eff` = proyección madre live/seed; `meses_objetivo`). **Pantalla "Proveedor de
+> importación"** (botón 🏭 en Administración, `stkOpenProvImp`): lee/escribe el **maestro `Importados`**
+> vía la vista **`vista_prov_importacion`** (1 fila por `cod_art` activo; `cod, descripcion, marca,
+> proveedor, n_prov, es_e`; GRANT SELECT anon). Al tocar el desplegable hace **PATCH `Importados.proveedor`**
+> (todas las marcas del código; policy anon UPDATE `imp_upd_anon`). Proveedores reales: Fujian, Hugo
+> Wong, Becky/Becky 1/Becky 2/Becky 1/2, Kangli, Ownland, Zhixin (= Stephen), Frontier. **García NO
+> está** (reenvasa insumos, no importa). **OC de importados dentro de "Generar OCs"** (`ocgFetchImportados`
+> + `ocBodyGenImportados`): sección al pie agrupada por proveedor chino; por `cod_art` suma marcas/plantas
+> (principal=true) → objetivo = proy_u/mes × meses(10), a pedir en **unidades** y en **cajas** (÷ uni_x_caja).
+> **Vista previa (solo lectura)**: la emisión de la OC al proveedor y la fórmula fina (stock por todos los
+> estadios: góndola+racks+para_envasar+insumos, partes 94xP→94xE, etc.) **se afinan con más análisis**.
+> ⚠ La tabla `Proveedores_Importacion` que se había creado (leía `OC_Maximos`, solo 93 E) fue
+> **descartada** por redundante. Bump `v9.12`.
 >
 > Nota: **v8.96–v9.04 — Cajas Pedidas = toda la demanda real + módulo "NP que faltan".**
 > **Demanda (`ocgDemanda`, columna "Cajas Pedidas" del stock):** dejó de contar solo las NP
