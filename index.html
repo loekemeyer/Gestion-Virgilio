@@ -6403,7 +6403,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v9.63";
+const APP_VERSION = "v9.64";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -10570,8 +10570,9 @@ async function ocNuevaCrear() {
 }
 
 /* ===== GENERADOR DE OCs (v4.13): replica la lógica del Excel "Pedidos Talleristas/Prov".
-   Por artículo: A pedir = max(0, Máximo + Pedidos − (Góndola + Racks)). Máximo y Proveedor salen de
-   OC_Maximos (config importada del Excel); Stock de Movimientos_Stock (góndola+racks, NO "a guardar");
+   Por artículo: A pedir = max(0, Máximo + Pedidos − Stock). Stock (vista_generador_oc) = góndola +
+   a_guardar + racks + EXCEDENTE (todo lo que hay en mano) → lo que está en excedente NO se re-pide.
+   Máximo y Proveedor salen de OC_Maximos (config importada del Excel);
    Pedidos (demanda) = Σ cajas por artículo en los pedidos del PPP (PPP_Programacion_Diaria) según la
    base de picking (PPP_Base_Pedidos). Agrupa por proveedor y, al confirmar, escribe las OCs en
    Ordenes_Compra (escritura: sesión de supervisor). v7.65: "Log/ Fabr" (fábrica) SÍ genera OC
@@ -25762,12 +25763,32 @@ function _avpTel(t) {
 }
 function _avpWa(tel, msg) { return "https://wa.me/" + _avpTel(tel) + "?text=" + encodeURIComponent(msg); }
 function _avpGroup(key) { var g = _avp ? (_avp.groups || []) : []; for (var i = 0; i < g.length; i++) if (g[i].key === key) return g[i]; return null; }
+/* v9.64 — SOLO estas 3 personas pueden entrar al módulo de Avisar programación (pedido del dueño).
+   El nombre elegido queda registrado en cada aviso (envio_programacion_log.quien). */
+var AVP_QUIEN = ["Tomas Gonzalez", "Marianela Becker", "Giuliana"];
+function _avpPickQuien() {
+  return new Promise(function (resolve) {
+    var ov = document.createElement("div");
+    ov.style.cssText = "position:fixed;inset:0;z-index:1500;background:rgba(2,6,23,.72);display:flex;align-items:center;justify-content:center;padding:16px;";
+    ov.innerHTML = '<div style="background:#fff;border-radius:14px;max-width:360px;width:100%;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5);">' +
+      '<div style="padding:14px 16px;background:linear-gradient(90deg,#0f766e,#0b3b36);color:#fff;font-weight:800;font-size:16px;">📲 ¿Quién entra?</div>' +
+      '<div style="padding:14px;display:flex;flex-direction:column;gap:8px;">' +
+      AVP_QUIEN.map(function (n, i) { return '<button data-q="' + i + '" style="width:100%;padding:13px;border:1px solid #cbd5e1;border-radius:10px;background:#f0fdfa;color:#0f172a;font-size:15px;font-weight:800;cursor:pointer;">' + escapeHtml(n) + '</button>'; }).join("") +
+      '<button data-cancel="1" style="width:100%;padding:10px;border:none;border-radius:10px;background:#f1f5f9;color:#64748b;font-size:13px;font-weight:700;cursor:pointer;margin-top:4px;">Cancelar</button>' +
+      '</div></div>';
+    document.body.appendChild(ov);
+    ov.addEventListener("click", function (e) {
+      var t = e.target;
+      if (t === ov || (t.getAttribute && t.getAttribute("data-cancel"))) { ov.remove(); resolve(null); return; }
+      var q = t.getAttribute && t.getAttribute("data-q");
+      if (q != null) { ov.remove(); resolve(AVP_QUIEN[+q] || null); }
+    });
+  });
+}
 async function openAvisoProg() {
   try { if (typeof requireSupervisor === "function" && !requireSupervisor()) return; } catch (_e) {}
-  var quien; try { quien = prompt("¿Quién entra a este módulo? (tu nombre — queda registrado en cada aviso que mandes)", ""); } catch (_e) { return; }
-  if (quien == null) return;
-  quien = String(quien).trim();
-  if (!quien) { try { alert("Poné tu nombre para entrar."); } catch (_e) {} return; }
+  var quien = await _avpPickQuien();
+  if (!quien) return;
   if (!document.getElementById("avpCss")) {
     var st = document.createElement("style"); st.id = "avpCss";
     st.textContent = "#avpOverlay .avp-card{max-width:960px;margin:0 auto;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5);display:flex;flex-direction:column;max-height:92vh;}.avp-head{display:flex;align-items:center;gap:12px;padding:13px 16px;background:linear-gradient(90deg,#0f766e,#0b3b36);color:#fff;flex:0 0 auto;}.avp-head b{font-size:17px;flex:0 0 auto;}.avp-who{flex:1;font-size:13px;opacity:.9;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.avp-x{width:auto;background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;}.avp-body{padding:14px 16px;display:flex;flex-direction:column;min-height:0;flex:1;}.avp-hint{font-size:12.5px;color:#64748b;margin-bottom:8px;flex:0 0 auto;}.avp-filtro{width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid #cbd5e1;border-radius:9px;margin-bottom:8px;font-size:13px;flex:0 0 auto;}.avp-vend{flex:0 0 auto;max-height:30vh;overflow:auto;border:1px solid #cdeee7;border-radius:10px;padding:8px 10px;background:#f0fdfa;margin-bottom:8px;}.avp-vend-h{font-weight:800;font-size:12.5px;color:#0f766e;margin-bottom:4px;}.avp-vgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;margin-top:6px;}.avp-vcard{display:flex;flex-direction:column;gap:4px;padding:7px 8px;border:1px solid #cdeee7;border-radius:9px;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.05);}.avp-vname{font-weight:800;font-size:12px;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}.avp-vlist{font-size:10px;color:#64748b;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;min-height:25px;}.avp-vcard .avp-btn{width:100%;padding:5px 6px;font-size:11px;}.avp-vcard .avp-notel{text-align:center;padding:4px 0;}.avp-empty{text-align:center;color:#94a3b8;padding:22px;}.avp-tblwrap{overflow:auto;flex:1;min-height:0;}.avp-tbl{width:100%;border-collapse:collapse;font-size:13px;}.avp-tbl th,.avp-tbl td{border-bottom:1px solid #eef2f7;padding:6px 8px;text-align:left;vertical-align:top;}.avp-tbl th{background:#f8fafc;font-size:11.5px;color:#475569;position:sticky;top:0;}.avp-tbl .num{text-align:right;}.avp-rs{max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.avp-btn{width:auto;border:none;border-radius:8px;padding:6px 10px;font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap;color:#fff;}.avp-btn.cli{background:#16a34a;}.avp-btn.ven{background:#2563eb;}.avp-btn.tel{background:#64748b;}.avp-mini{width:auto;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:6px;padding:2px 7px;font-size:12px;cursor:pointer;color:#334155;vertical-align:middle;}.avp-mini:hover{background:#e2e8f0;}.avp-notel{font-size:11px;color:#94a3b8;}.avp-fab{font-size:11px;color:#b45309;font-weight:700;}.avp-vtag{font-size:11px;color:#334155;font-weight:700;}.avp-npn{font-size:10px;color:#7c3aed;font-weight:700;}.avp-done{font-size:10.5px;color:#166534;margin-top:3px;font-weight:700;}.avp-avis{margin-top:10px;}.avp-avis>summary{cursor:pointer;font-weight:800;font-size:12.5px;color:#166534;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:9px;padding:8px 12px;list-style:none;}.avp-avis>summary::-webkit-details-marker{display:none;}.avp-avis[open]>summary{margin-bottom:8px;}";
