@@ -6403,7 +6403,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v9.51";
+const APP_VERSION = "v9.52";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -10540,7 +10540,7 @@ function ocNueva() { if (!_oc) return; _oc.view = "nueva"; if (!_oc.nueva || !_o
 function ocBodyNueva() {
   const n = _oc.nueva;
   let h = '<div class="oc-tools"><button class="oc-btn" onclick="ocBack()">← Volver</button></div>';
-  h += '<div class="oc-form"><input class="oc-inp" placeholder="Proveedor" value="' + escapeHtml(n.proveedor) + '" oninput="if(_oc)_oc.nueva.proveedor=this.value"><input class="oc-inp" type="date" value="' + escapeHtml(n.fecha) + '" oninput="if(_oc)_oc.nueva.fecha=this.value"><input class="oc-inp" placeholder="Rubro (ej: Cajas)" value="' + escapeHtml(n.rubro) + '" oninput="if(_oc)_oc.nueva.rubro=this.value"><input class="oc-inp" placeholder="Unidad" style="width:90px" value="' + escapeHtml(n.unidad) + '" oninput="if(_oc)_oc.nueva.unidad=this.value"></div>';
+  h += '<div class="oc-form"><input class="oc-inp" placeholder="Proveedor" value="' + escapeHtml(n.proveedor) + '" oninput="if(_oc)_oc.nueva.proveedor=this.value"><input class="oc-inp" type="date" min="2025-01-01" value="' + escapeHtml(n.fecha) + '" oninput="if(_oc)_oc.nueva.fecha=this.value"><input class="oc-inp" placeholder="Rubro (ej: Cajas)" value="' + escapeHtml(n.rubro) + '" oninput="if(_oc)_oc.nueva.rubro=this.value"><input class="oc-inp" placeholder="Unidad" style="width:90px" value="' + escapeHtml(n.unidad) + '" oninput="if(_oc)_oc.nueva.unidad=this.value"></div>';
   h += '<div class="oc-tblwrap"><table class="oc-tbl"><thead><tr><th>Código</th><th>Descripción</th><th class="num">Cantidad</th><th></th></tr></thead><tbody>';
   n.items.forEach(function (it, i) {
     h += '<tr><td><input class="oc-inp" style="width:100px" placeholder="cod" value="' + escapeHtml(it.cod) + '" oninput="if(_oc)_oc.nueva.items[' + i + '].cod=this.value"></td><td><input class="oc-inp" style="width:100%;box-sizing:border-box" placeholder="descripción" value="' + escapeHtml(it.desc) + '" oninput="if(_oc)_oc.nueva.items[' + i + '].desc=this.value"></td><td class="num"><input class="oc-rinp" type="number" min="0" inputmode="numeric" value="' + escapeHtml(String(it.cant)) + '" oninput="if(_oc)_oc.nueva.items[' + i + '].cant=this.value"></td><td><button class="oc-btn danger" onclick="ocNuevaDelItem(' + i + ')">✕</button></td></tr>';
@@ -11843,8 +11843,8 @@ function prodRender() {
   // selector de fechas (siempre arriba)
   const d1v = _prod ? _prod.d1 : (_prodPeriod ? _prodPeriod.d1 : "");
   const d2v = _prod ? _prod.d2 : (_prodPeriod ? _prodPeriod.d2 : "");
-  const sel = '<div class="prod-dates"><label>Desde</label><input id="prodD1" type="date" value="' + d1v + '" onchange="prodSetPeriod(this.value, document.getElementById(\'prodD2\').value)">' +
-    '<label>Hasta</label><input id="prodD2" type="date" value="' + d2v + '" onchange="prodSetPeriod(document.getElementById(\'prodD1\').value, this.value)">' +
+  const sel = '<div class="prod-dates"><label>Desde</label><input id="prodD1" type="date" min="2025-01-01" value="' + d1v + '" onchange="prodSetPeriod(this.value, document.getElementById(\'prodD2\').value)">' +
+    '<label>Hasta</label><input id="prodD2" type="date" min="2025-01-01" value="' + d2v + '" onchange="prodSetPeriod(document.getElementById(\'prodD1\').value, this.value)">' +
     '<button class="prod-preset" onclick="prodPreset(7)">7 días</button><button class="prod-preset" onclick="prodPreset(28)">4 sem</button><button class="prod-preset" onclick="prodPreset(56)">8 sem</button><button class="prod-preset" onclick="prodExportCsv()" style="background:#16a34a;color:#fff" title="Bajar la tabla a Excel/CSV (totales por operario)">⬇ Excel</button>' +
     '<button class="prod-preset" onclick="prodExportCsvDiario()" style="background:#0891b2;color:#fff" title="Bajar el detalle por empleado y DÍA: horas, m³ y ritmo de picking y de armado">⬇ Excel × día</button></div>';
 
@@ -13626,7 +13626,7 @@ function _stkMovsBlock() {
     return '<tr><td class="mva-ts">' + escapeHtml(stockFmtTs(mv.ts)) + '</td><td class="mva-mov"><div class="mva-movrow">' + plus + '<span class="mva-movbody">' + movBody + '</span></div></td><td class="mva-cant">' + cant + '</td><td class="mva-sal">' + round1(saldo) + '</td></tr>' + detrow;
   }).join("");
   let h = '<div class="stkpop-hint">Movimientos de <b>' + escapeHtml(codBase(_stkPop.cod)) + '</b> en <b>' + escapeHtml(_stkPop.titulo) + '</b>, por fecha. Entró <b style="color:#15803d">+' + round1(totIn) + '</b> · salió <b style="color:#b91c1c">' + round1(totOut) + '</b> · <b>saldo ' + round1(saldo) + '</b>.<br><small style="color:#94a3b8">👤 = siglas y legajo del que lo hizo (en <b>recepcion</b>, del que recibió). En <span class="mva-qui aprox">ámbar ~</span> va el deducido por la sesión de RT (recepciones viejas, sin legajo guardado).</small></div>';
-  h += '<div class="mva-daterow">Desde <input type="date" class="mva-date" value="' + escapeHtml(_stkPop.desde) + '" onchange="stkMovsArtDate(\'desde\',this.value)"> hasta <input type="date" class="mva-date" value="' + escapeHtml(_stkPop.hasta) + '" onchange="stkMovsArtDate(\'hasta\',this.value)">' + ((_stkPop.desde || _stkPop.hasta) ? ' <button class="mva-clear" onclick="stkMovsArtDate(\'clear\')">✕</button>' : '') + '</div>';
+  h += '<div class="mva-daterow">Desde <input type="date" min="2025-01-01" class="mva-date" value="' + escapeHtml(_stkPop.desde) + '" onchange="stkMovsArtDate(\'desde\',this.value)"> hasta <input type="date" min="2025-01-01" class="mva-date" value="' + escapeHtml(_stkPop.hasta) + '" onchange="stkMovsArtDate(\'hasta\',this.value)">' + ((_stkPop.desde || _stkPop.hasta) ? ' <button class="mva-clear" onclick="stkMovsArtDate(\'clear\')">✕</button>' : '') + '</div>';
   h += list.length
     ? '<div class="mva-tblwrap"><table class="mva-tbl"><thead><tr><th>Fecha</th><th>Movimiento</th><th class="num">Cant.</th><th class="num">Saldo</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
     : '<div class="stkpop-empty">Sin movimientos' + ((_stkPop.desde || _stkPop.hasta) ? ' en ese rango' : '') + '.</div>';
@@ -24344,7 +24344,7 @@ function _pppBlock(key, name, cls, meta, pedidos, headerExtra, editTanda) {
     // Panel de EDICIÓN (modo ✏️): cambiar fecha / devolver. Sólo modo editable (en solo-lectura se corrige en Excel).
     if (!PPP_READONLY) {
       h += '<div class="ppp-edit-panel">' +
-        '<span class="ppp-ep-l">📅 Fecha de toda la tanda <input type="date" class="ppp-ep-date" id="' + id + '_d"> <button class="ppp-ep-btn" onclick="pppTandaFecha(\'' + id + '\',\'' + te + '\')">Aplicar</button></span>' +
+        '<span class="ppp-ep-l">📅 Fecha de toda la tanda <input type="date" min="2025-01-01" class="ppp-ep-date" id="' + id + '_d"> <button class="ppp-ep-btn" onclick="pppTandaFecha(\'' + id + '\',\'' + te + '\')">Aplicar</button></span>' +
         '<button class="ppp-ep-btn ppp-ep-back" onclick="pppTandaAProgramar(\'' + te + '\')">↩ Toda la tanda a A Programar</button>' +
         '<span class="ppp-ep-hint">Para <b>mover</b> un pedido a otra tanda: cambiá su <b>Tanda</b> en la fila. Para <b>sacarlo</b>: ↩ en su fila.</span>' +
         '</div>';
@@ -24646,7 +24646,7 @@ async function ruteoLoad() {
 }
 function ruteoRender() {
   const body = document.getElementById("ruteoBody"); if (!body || !_ruteo) return;
-  let h = '<div class="rt-bar"><label>Día de entrega</label><input type="date" value="' + escapeHtml(_ruteo.fecha || "") + '" onchange="prodSetRuteoFecha(this.value)"><button class="rt-recalc" onclick="ruteoLoad()">↻ Recalcular</button></div>';
+  let h = '<div class="rt-bar"><label>Día de entrega</label><input type="date" min="2025-01-01" value="' + escapeHtml(_ruteo.fecha || "") + '" onchange="prodSetRuteoFecha(this.value)"><button class="rt-recalc" onclick="ruteoLoad()">↻ Recalcular</button></div>';
   if (_ruteo.error) { body.innerHTML = h + '<div class="rt-empty" style="color:#b91c1c">Error: ' + escapeHtml(_ruteo.error) + '</div>'; return; }
   if (_ruteo.cargando) {
     const pct = _ruteo.progTot ? Math.round(100 * _ruteo.prog / _ruteo.progTot) : 0;
