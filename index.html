@@ -6403,7 +6403,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v9.57";
+const APP_VERSION = "v9.58";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -25743,7 +25743,7 @@ async function openAvisoProg() {
   if (!quien) { try { alert("Poné tu nombre para entrar."); } catch (_e) {} return; }
   if (!document.getElementById("avpCss")) {
     var st = document.createElement("style"); st.id = "avpCss";
-    st.textContent = "#avpOverlay .avp-card{max-width:960px;margin:0 auto;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5);display:flex;flex-direction:column;max-height:92vh;}.avp-head{display:flex;align-items:center;gap:12px;padding:13px 16px;background:linear-gradient(90deg,#0f766e,#0b3b36);color:#fff;flex:0 0 auto;}.avp-head b{font-size:17px;flex:0 0 auto;}.avp-who{flex:1;font-size:13px;opacity:.9;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.avp-x{width:auto;background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;}.avp-body{padding:14px 16px;display:flex;flex-direction:column;min-height:0;flex:1;}.avp-hint{font-size:12.5px;color:#64748b;margin-bottom:8px;flex:0 0 auto;}.avp-filtro{width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid #cbd5e1;border-radius:9px;margin-bottom:8px;font-size:13px;flex:0 0 auto;}.avp-vend{flex:0 0 auto;max-height:30vh;overflow:auto;border:1px solid #cdeee7;border-radius:10px;padding:8px 10px;background:#f0fdfa;margin-bottom:8px;}.avp-vend-h{font-weight:800;font-size:12.5px;color:#0f766e;margin-bottom:4px;}.avp-vgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;margin-top:6px;}.avp-vcard{display:flex;flex-direction:column;gap:4px;padding:7px 8px;border:1px solid #cdeee7;border-radius:9px;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.05);}.avp-vname{font-weight:800;font-size:12px;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}.avp-vlist{font-size:10px;color:#64748b;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;min-height:25px;}.avp-vcard .avp-btn{width:100%;padding:5px 6px;font-size:11px;}.avp-vcard .avp-notel{text-align:center;padding:4px 0;}.avp-empty{text-align:center;color:#94a3b8;padding:22px;}.avp-tblwrap{overflow:auto;flex:1;min-height:0;}.avp-tbl{width:100%;border-collapse:collapse;font-size:13px;}.avp-tbl th,.avp-tbl td{border-bottom:1px solid #eef2f7;padding:6px 8px;text-align:left;vertical-align:top;}.avp-tbl th{background:#f8fafc;font-size:11.5px;color:#475569;position:sticky;top:0;}.avp-tbl .num{text-align:right;}.avp-rs{max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.avp-btn{width:auto;border:none;border-radius:8px;padding:6px 10px;font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap;color:#fff;}.avp-btn.cli{background:#16a34a;}.avp-btn.ven{background:#2563eb;}.avp-notel{font-size:11px;color:#94a3b8;}.avp-fab{font-size:11px;color:#b45309;font-weight:700;}.avp-vtag{font-size:11px;color:#334155;font-weight:700;}.avp-npn{font-size:10px;color:#7c3aed;font-weight:700;}.avp-done{font-size:10.5px;color:#166534;margin-top:3px;font-weight:700;}";
+    st.textContent = "#avpOverlay .avp-card{max-width:960px;margin:0 auto;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5);display:flex;flex-direction:column;max-height:92vh;}.avp-head{display:flex;align-items:center;gap:12px;padding:13px 16px;background:linear-gradient(90deg,#0f766e,#0b3b36);color:#fff;flex:0 0 auto;}.avp-head b{font-size:17px;flex:0 0 auto;}.avp-who{flex:1;font-size:13px;opacity:.9;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.avp-x{width:auto;background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;}.avp-body{padding:14px 16px;display:flex;flex-direction:column;min-height:0;flex:1;}.avp-hint{font-size:12.5px;color:#64748b;margin-bottom:8px;flex:0 0 auto;}.avp-filtro{width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid #cbd5e1;border-radius:9px;margin-bottom:8px;font-size:13px;flex:0 0 auto;}.avp-vend{flex:0 0 auto;max-height:30vh;overflow:auto;border:1px solid #cdeee7;border-radius:10px;padding:8px 10px;background:#f0fdfa;margin-bottom:8px;}.avp-vend-h{font-weight:800;font-size:12.5px;color:#0f766e;margin-bottom:4px;}.avp-vgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;margin-top:6px;}.avp-vcard{display:flex;flex-direction:column;gap:4px;padding:7px 8px;border:1px solid #cdeee7;border-radius:9px;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.05);}.avp-vname{font-weight:800;font-size:12px;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}.avp-vlist{font-size:10px;color:#64748b;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;min-height:25px;}.avp-vcard .avp-btn{width:100%;padding:5px 6px;font-size:11px;}.avp-vcard .avp-notel{text-align:center;padding:4px 0;}.avp-empty{text-align:center;color:#94a3b8;padding:22px;}.avp-tblwrap{overflow:auto;flex:1;min-height:0;}.avp-tbl{width:100%;border-collapse:collapse;font-size:13px;}.avp-tbl th,.avp-tbl td{border-bottom:1px solid #eef2f7;padding:6px 8px;text-align:left;vertical-align:top;}.avp-tbl th{background:#f8fafc;font-size:11.5px;color:#475569;position:sticky;top:0;}.avp-tbl .num{text-align:right;}.avp-rs{max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.avp-btn{width:auto;border:none;border-radius:8px;padding:6px 10px;font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap;color:#fff;}.avp-btn.cli{background:#16a34a;}.avp-btn.ven{background:#2563eb;}.avp-notel{font-size:11px;color:#94a3b8;}.avp-fab{font-size:11px;color:#b45309;font-weight:700;}.avp-vtag{font-size:11px;color:#334155;font-weight:700;}.avp-npn{font-size:10px;color:#7c3aed;font-weight:700;}.avp-done{font-size:10.5px;color:#166534;margin-top:3px;font-weight:700;}.avp-avis{margin-top:10px;}.avp-avis>summary{cursor:pointer;font-weight:800;font-size:12.5px;color:#166534;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:9px;padding:8px 12px;list-style:none;}.avp-avis>summary::-webkit-details-marker{display:none;}.avp-avis[open]>summary{margin-bottom:8px;}";
     document.head.appendChild(st);
   }
   _avp = { quien: quien, groups: [], lastCli: {}, vendNotified: {}, vendW: {}, filtro: "" };
@@ -25796,13 +25796,18 @@ async function avpLoad() {
     if (r.tipo !== "cliente") return;
     var key = npKey[r.np != null ? String(r.np) : ""]; if (!key) return;
     if (!lastCli[key]) lastCli[key] = r;                        // log viene ts desc → primero = más reciente
-    var g = keyMap[key]; if (!g || !g.vend || g.vend === "7") return;
+    var g = keyMap[key]; if (!g || !g.vend || _avpNoVend(g.vend)) return;
     if (!vendNotified[g.vend]) vendNotified[g.vend] = {};
     if (!vendNotified[g.vend][key]) vendNotified[g.vend][key] = { rs: g.rs, fppp: g.fppp, cod: g.cod };
   });
   _avp.groups = groups; _avp.lastCli = lastCli; _avp.vendNotified = vendNotified; _avp.vendW = vendW;
   avpRender();
 }
+/* v9.58 — vendedores INTERNOS ("somos nosotros"): 7 = fábrica, 20 = super. A vend 20 NO se
+   le avisa NI al cliente NI al vendedor (son pedidos nuestros). A vend 7 (fábrica) no se arma
+   resumen de vendedor, pero el cliente igual puede recibir aviso. */
+function _avpNoVend(v) { return v === "7" || v === "20"; }   // no arma resumen de vendedor
+function _avpNoCliente(v) { return v === "20"; }             // tampoco se avisa al cliente (super = nosotros)
 function avpRender() {
   var body = document.getElementById("avpBody"); if (!body || !_avp) return;
   var groups = _avp.groups || [];
@@ -25810,7 +25815,7 @@ function avpRender() {
   var shown = f ? groups.filter(function (g) { return (g.cod + " " + g.rs + " " + g.nps.join(" ")).toLowerCase().indexOf(f) >= 0; }) : groups;
   // --- panel de vendedores FIJO ARRIBA: se llena a medida que avisás a sus clientes ---
   var vends = {};
-  groups.forEach(function (g) { if (g.vend && g.vend !== "7") vends[g.vend] = { tel: g.telVend, nombre: g.vendNombre }; });
+  groups.forEach(function (g) { if (g.vend && !_avpNoVend(g.vend)) vends[g.vend] = { tel: g.telVend, nombre: g.vendNombre }; });
   var vk = Object.keys(vends).sort(function (a, b) { return (+a || 0) - (+b || 0) || (a < b ? -1 : 1); });
   var vh = '<div class="avp-vend"><div class="avp-vend-h">📇 Vendedores — el resumen se arma con los clientes que vas avisando</div>';
   if (!vk.length) vh += '<div class="avp-notel">Sin vendedores (todo fábrica o sin asignar).</div>';
@@ -25826,23 +25831,33 @@ function avpRender() {
   });
   if (vk.length) vh += '</div>';
   vh += '</div>';
-  var h = '<div class="avp-hint">Pedidos <b>programados</b> por fecha de salida. Mismo cliente + misma fecha = <b>1 mensaje</b> (une sus NPs). Al avisar a un cliente, su línea se suma al resumen del vendedor de arriba. vend 7 = fábrica. Entró: <b>' + escapeHtml(_avp.quien) + '</b> · ' + shown.length + ' envío(s).</div>';
+  var h = '<div class="avp-hint">Pedidos <b>programados</b> por fecha de salida. Mismo cliente + misma fecha = <b>1 mensaje</b> (une sus NPs). Al avisar a un cliente, su línea se suma al resumen del vendedor de arriba. vend 7 = fábrica · vend 20 (super) = nosotros → no se avisa. Entró: <b>' + escapeHtml(_avp.quien) + '</b> · ' + shown.length + ' envío(s).</div>';
   h += '<input class="avp-filtro" type="search" placeholder="🔎 Buscar cod / razón social / NP" value="' + escapeHtml(_avp.filtro || "") + '" oninput="if(_avp){_avp.filtro=this.value;avpRender();}">';
+  // v9.58 — fila de la tabla (reutilizada por pendientes y avisados)
+  var _avpTr = function (g) {
+    var lc = _avp.lastCli[g.key];
+    var cliDone = lc ? '<div class="avp-done">✅ ' + escapeHtml(_avpTs(lc.ts)) + ' · ' + escapeHtml(lc.quien || "") + '</div>' : '';
+    var cliCell = _avpNoCliente(g.vend)
+      ? '<span class="avp-fab" title="Vend 20 (super) = somos nosotros → no se avisa">🏢 nosotros</span>'
+      : (g.telCli
+        ? '<button class="avp-btn cli" onclick="avpSendCliente(\'' + encodeURIComponent(g.key) + '\')">📲 Cliente</button>' + cliDone
+        : '<span class="avp-notel">sin tel</span>' + cliDone);
+    var venLbl = g.vend === "7" ? '<span class="avp-fab">🏭 fábrica</span>' : (g.vend === "20" ? '<span class="avp-fab">🏢 super (nosotros)</span>' : (!g.vend ? '<span class="avp-notel">— sin vend —</span>' : '<span class="avp-vtag">Vend ' + escapeHtml(g.vend) + '</span>'));
+    var npNote = g.nps.length > 1 ? ' <span class="avp-npn">(' + g.nps.length + ' NP)</span>' : '';
+    return '<tr><td><b>' + escapeHtml(g.cod) + '</b>' + npNote + '</td><td class="avp-rs" title="' + escapeHtml(g.rs) + '">' + escapeHtml(g.rs) + '</td><td>' + escapeHtml(_avpFechaDMY(g.fped)) + '</td><td><b>' + escapeHtml(_avpFechaDMY(g.fppp)) + '</b></td><td class="num">' + (g.dias == null ? "—" : g.dias) + '</td><td>' + cliCell + '</td><td>' + venLbl + '</td></tr>';
+  };
+  var _thead = '<thead><tr><th>Cod</th><th>Razón social</th><th>F. pedido</th><th>F. salida</th><th class="num">Días</th><th>WhatsApp Cliente</th><th>Vend.</th></tr></thead>';
+  // v9.58 — solo PENDIENTES (sin aviso al cliente) en la tabla principal; los ya avisados van
+  // a una sección aparte colapsable. "avisado" = tiene marca lastCli.
+  var pend = shown.filter(function (g) { return !_avp.lastCli[g.key]; });
+  var avis = shown.filter(function (g) { return !!_avp.lastCli[g.key]; });
   var t;
   if (!shown.length) t = '<div class="avp-empty">Sin pedidos programados.</div>';
   else {
-    t = '<div class="avp-tblwrap"><table class="avp-tbl"><thead><tr><th>Cod</th><th>Razón social</th><th>F. pedido</th><th>F. salida</th><th class="num">Días</th><th>WhatsApp Cliente</th><th>Vend.</th></tr></thead><tbody>';
-    shown.forEach(function (g) {
-      var lc = _avp.lastCli[g.key];
-      var cliDone = lc ? '<div class="avp-done">✅ ' + escapeHtml(_avpTs(lc.ts)) + ' · ' + escapeHtml(lc.quien || "") + '</div>' : '';
-      var cliCell = g.telCli
-        ? '<button class="avp-btn cli" onclick="avpSendCliente(\'' + encodeURIComponent(g.key) + '\')">📲 Cliente</button>' + cliDone
-        : '<span class="avp-notel">sin tel</span>' + cliDone;
-      var venLbl = g.vend === "7" ? '<span class="avp-fab">🏭 fábrica</span>' : (!g.vend ? '<span class="avp-notel">— sin vend —</span>' : '<span class="avp-vtag">Vend ' + escapeHtml(g.vend) + '</span>');
-      var npNote = g.nps.length > 1 ? ' <span class="avp-npn">(' + g.nps.length + ' NP)</span>' : '';
-      t += '<tr><td><b>' + escapeHtml(g.cod) + '</b>' + npNote + '</td><td class="avp-rs" title="' + escapeHtml(g.rs) + '">' + escapeHtml(g.rs) + '</td><td>' + escapeHtml(_avpFechaDMY(g.fped)) + '</td><td><b>' + escapeHtml(_avpFechaDMY(g.fppp)) + '</b></td><td class="num">' + (g.dias == null ? "—" : g.dias) + '</td><td>' + cliCell + '</td><td>' + venLbl + '</td></tr>';
-    });
-    t += '</tbody></table></div>';
+    t = pend.length
+      ? '<div class="avp-tblwrap"><table class="avp-tbl">' + _thead + '<tbody>' + pend.map(_avpTr).join("") + '</tbody></table></div>'
+      : '<div class="avp-empty" style="color:#16a34a;font-weight:700;">✅ No quedan pendientes por avisar.</div>';
+    if (avis.length) t += '<details class="avp-avis"><summary>✅ Avisados (' + avis.length + ') — tocá para ver</summary><div class="avp-tblwrap"><table class="avp-tbl">' + _thead + '<tbody>' + avis.map(_avpTr).join("") + '</tbody></table></div></details>';
   }
   _renderKeepFocus(body, h + vh + t);
 }
@@ -25871,11 +25886,12 @@ async function avpLog(tipo, np, cod, vend) {
 async function avpSendCliente(keyEnc) {
   if (!_avp) return;
   var g = _avpGroup(decodeURIComponent(keyEnc)); if (!g) return;
+  if (_avpNoCliente(g.vend)) { try { alert("Vend 20 (super) = somos nosotros: a estos pedidos no se les avisa."); } catch (_e) {} return; }
   if (!g.telCli) { try { alert("Ese cliente no tiene teléfono cargado en whatsapp_clientes."); } catch (_e) {} return; }
   var msg = avpMsgCliente(g);
   avpLog("cliente", g.nps[0] || null, g.cod, g.vend);
   _avp.lastCli[g.key] = { ts: new Date().toISOString(), quien: _avp.quien };
-  if (g.vend && g.vend !== "7") {                              // suma la línea al resumen del vendedor
+  if (g.vend && !_avpNoVend(g.vend)) {                         // suma la línea al resumen del vendedor
     if (!_avp.vendNotified[g.vend]) _avp.vendNotified[g.vend] = {};
     _avp.vendNotified[g.vend][g.key] = { rs: g.rs, fppp: g.fppp, cod: g.cod };
   }
@@ -25884,7 +25900,7 @@ async function avpSendCliente(keyEnc) {
 }
 async function avpSendVendedor(vendEnc) {
   if (!_avp) return;
-  var v = decodeURIComponent(vendEnc); if (v === "7") return;
+  var v = decodeURIComponent(vendEnc); if (_avpNoVend(v)) return;
   var notif = _avp.vendNotified[v] || {}, keys = Object.keys(notif);
   if (!keys.length) { try { alert("Primero avisá a los clientes de este vendedor; su resumen se arma con esos avisos."); } catch (_e) {} return; }
   var meta = (_avp.vendW && _avp.vendW[v]) || {};
