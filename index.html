@@ -6403,7 +6403,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v9.38";
+const APP_VERSION = "v9.39";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -25818,7 +25818,7 @@ async function openPlataPerdida() {
     st.textContent = "#ppOverlay .pp-card{max-width:900px;margin:0 auto;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5);display:flex;flex-direction:column;max-height:92vh;}.pp-head{display:flex;align-items:center;gap:12px;padding:13px 16px;background:linear-gradient(90deg,#7c2d12,#431407);color:#fff;flex:0 0 auto;}.pp-head b{font-size:17px;}.pp-x{margin-left:auto;width:auto;background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;}.pp-body{padding:14px 16px;display:flex;flex-direction:column;min-height:0;flex:1;}.pp-ctrl{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px;flex:0 0 auto;font-size:12.5px;color:#475569;}.pp-ctrl input[type=date]{padding:6px 8px;border:1px solid #cbd5e1;border-radius:8px;font-size:12.5px;}.pp-tab{width:auto;padding:6px 12px;border-radius:999px;border:1px solid #cbd5e1;background:#fff;color:#334155;font-size:12.5px;font-weight:800;cursor:pointer;}.pp-tab.on{background:#7c2d12;border-color:#7c2d12;color:#fff;}.pp-total{background:#fef2f2;border:1.5px solid #fca5a5;border-radius:12px;padding:11px 14px;margin-bottom:10px;flex:0 0 auto;}.pp-total b{font-size:28px;color:#b91c1c;font-variant-numeric:tabular-nums;}.pp-tblwrap{overflow:auto;flex:1;min-height:0;}.pp-tbl{width:100%;border-collapse:collapse;font-size:13px;}.pp-tbl th,.pp-tbl td{border-bottom:1px solid #eef2f7;padding:6px 8px;text-align:left;}.pp-tbl th{background:#f8fafc;font-size:11.5px;color:#475569;position:sticky;top:0;}.pp-tbl .num{text-align:right;font-variant-numeric:tabular-nums;}.pp-sp{font-size:11px;color:#b45309;font-weight:700;}";
     document.head.appendChild(st);
   }
-  _pp = { desde: "", hasta: "", group: "art", rows: [], precio: {}, vendDe: {}, rsDe: {} };
+  _pp = { anio: "", desde: "", hasta: "", group: "art", rows: [], years: [], precio: {}, vendDe: {}, rsDe: {} };
   var ov = document.getElementById("ppOverlay");
   if (!ov) { ov = document.createElement("div"); ov.id = "ppOverlay"; ov.style.cssText = "position:fixed;inset:0;z-index:1400;background:rgba(2,6,23,.72);overflow:auto;padding:14px;"; document.body.appendChild(ov); }
   ov.style.display = "block";
@@ -25841,13 +25841,25 @@ async function ppLoad() {
   var rsDe = {}; fac.forEach(function (r) { var n = pickNormNp(r.np); if (n && r.razon_social && !rsDe[n]) rsDe[n] = r.razon_social; });
   _pp.rows = ent.map(function (r) { return { codN: _ocgNorm(r.cod_art), cod: String(r.cod_art || "").trim(), cajas: Number(r.cajas_falto) || 0, fecha: _ppFecha10(r.fecha_salida), cli: String(r.cod_cliente || "").trim(), np: pickNormNp(r.np) }; }).filter(function (r) { return r.cajas > 0; });
   _pp.precio = precio; _pp.vendDe = vendDe; _pp.rsDe = rsDe;
+  // años CON DATOS (para el dropdown); por defecto el año actual si tiene datos, si no el más reciente.
+  var ys = {}; _pp.rows.forEach(function (r) { var y = r.fecha ? r.fecha.slice(0, 4) : ""; if (/^\d{4}$/.test(y)) ys[y] = 1; });
+  _pp.years = Object.keys(ys).sort(function (a, b) { return b.localeCompare(a); });
+  var cur = String(new Date().getFullYear());
+  _pp.anio = (_pp.years.indexOf(cur) >= 0) ? cur : (_pp.years[0] || cur);
   ppRender();
 }
 function ppSet(k, v) { if (!_pp) return; _pp[k] = v; ppRender(); }
+function ppSetMD(k, v) { if (!_pp) return; _pp[k] = v ? String(v).slice(5) : ""; ppRender(); }   // guarda solo MM-DD (el año lo pone el dropdown)
 function ppRender() {
   var body = document.getElementById("ppBody"); if (!body || !_pp) return;
-  var d1 = _pp.desde, d2 = _pp.hasta;
-  var rows = _pp.rows.filter(function (r) { if (d1 && (!r.fecha || r.fecha < d1)) return false; if (d2 && (!r.fecha || r.fecha > d2)) return false; return true; });
+  var yr = _pp.anio, d1 = _pp.desde, d2 = _pp.hasta;   // yr = año seleccionado; d1/d2 = "MM-DD"
+  var rows = _pp.rows.filter(function (r) {
+    if (!r.fecha || r.fecha.slice(0, 4) !== yr) return false;   // solo el año elegido
+    var md = r.fecha.slice(5);
+    if (d1 && md < d1) return false;
+    if (d2 && md > d2) return false;
+    return true;
+  });
   var groups = {}, totPlata = 0, totCajas = 0, spCajas = 0, spSet = {};
   rows.forEach(function (r) {
     var key, label;
@@ -25859,7 +25871,11 @@ function ppRender() {
     if (pl > 0) totPlata += pl; else { g.sp = true; spCajas += r.cajas; spSet[r.codN] = 1; }
   });
   var arr = Object.keys(groups).map(function (k) { return groups[k]; }).sort(function (a, b) { return b.plata - a.plata || b.cajas - a.cajas; });
-  var h = '<div class="pp-ctrl">Desde <input type="date" value="' + escapeHtml(d1) + '" onchange="ppSet(\'desde\',this.value)"> Hasta <input type="date" value="' + escapeHtml(d2) + '" onchange="ppSet(\'hasta\',this.value)"> <span style="width:6px;display:inline-block"></span>' +
+  var yearOpts = (_pp.years || []).map(function (y) { return '<option value="' + y + '"' + (y === yr ? ' selected' : '') + '>' + y + '</option>'; }).join("");
+  var dVal = d1 ? (yr + '-' + d1) : '';   // el input muestra el año del dropdown; solo se usa el día/mes
+  var hVal = d2 ? (yr + '-' + d2) : '';
+  var h = '<div class="pp-ctrl">Año <select onchange="ppSet(\'anio\',this.value)" style="padding:6px 8px;border:1px solid #cbd5e1;border-radius:8px;font-size:12.5px;font-weight:800;">' + (yearOpts || '<option>' + escapeHtml(yr) + '</option>') + '</select> ' +
+    'Desde <input type="date" value="' + dVal + '" onchange="ppSetMD(\'desde\',this.value)"> Hasta <input type="date" value="' + hVal + '" onchange="ppSetMD(\'hasta\',this.value)"> <span style="width:6px;display:inline-block"></span>' +
     ["art", "cli", "vend"].map(function (g) { var lbl = g === "art" ? "Por artículo" : g === "cli" ? "Por cliente" : "Por vendedor"; return '<button class="pp-tab' + (_pp.group === g ? " on" : "") + '" onclick="ppSet(\'group\',\'' + g + '\')">' + lbl + '</button>'; }).join("") + '</div>';
   h += '<div class="pp-total"><span style="font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:#7f1d1d;font-weight:800;">💸 Plata perdida (faltante por quiebre = cajas pedidas que no se entregaron por falta de stock)</span><br><b>' + _ppMoney(totPlata) + '</b> <span style="font-size:12.5px;color:#7f1d1d;">· ' + Math.round(totCajas) + ' cajas no entregadas</span>' + (Object.keys(spSet).length ? '<br><span class="pp-sp">⚠ ' + Object.keys(spSet).length + ' código(s) sin precio (' + Math.round(spCajas) + ' cajas no valorizadas) — cargá el precio en precios_venta.</span>' : '') + '</div>';
   if (!arr.length) { body.innerHTML = h + '<div style="text-align:center;color:#16a34a;padding:24px;font-weight:700;">✅ Sin faltante por quiebre en el período.</div>'; return; }
