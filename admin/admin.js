@@ -13629,6 +13629,27 @@ window._lkOtpEmail = null;
 // un auth.users con su email y exponer un selector acá.
 var LK_ADMIN_EMAIL = "loekemeyer.n8n@gmail.com";
 
+// Endpoint de la Edge Function admin-login-otp — patrón que usa Resend directo
+// (esquiva el SMTP nativo del proyecto, que rechaza el sender @loekemeyer.com
+// por dominio no verificado). El código de la función vive en
+// admin/supabase/admin-login-otp/index.ts. Deploy: verify_jwt = false.
+var LK_OTP_FN_URL = SUPABASE_URL + "/functions/v1/admin-login-otp";
+
+async function _lkOtpFn(action, code) {
+  // Aunque la función tenga verify_jwt=false, Supabase igual exige apikey en el header.
+  var apikey = SUPABASE_ANON_KEY;
+  var body = { action: action };
+  if (code) body.code = code;
+  var res = await fetch(LK_OTP_FN_URL, {
+    method: "POST",
+    headers: { apikey: apikey, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  var data = {};
+  try { data = await res.json(); } catch (_) {}
+  return { ok: res.ok, status: res.status, data: data };
+}
+
 async function lkSendOtp() {
   var errEl = document.getElementById("lkLoginError");
   var msgEl = document.getElementById("lkLoginMsg");
@@ -13638,13 +13659,10 @@ async function lkSendOtp() {
   var email = LK_ADMIN_EMAIL;
   if (btnEl) { btnEl.disabled = true; btnEl.textContent = "Enviando..."; }
   try {
-    var r = await sb.auth.signInWithOtp({
-      email: email,
-      options: { shouldCreateUser: false }
-    });
-    if (r.error) {
-      // Casos típicos: mail no registrado, rate limit, etc. — mostrar el mensaje real.
-      if (errEl) errEl.textContent = r.error.message || "No se pudo enviar el código.";
+    var r = await _lkOtpFn("send", null);
+    if (!r.ok) {
+      var det = (r.data && (r.data.detail || r.data.error)) || "HTTP " + r.status;
+      if (errEl) errEl.textContent = "No se pudo enviar: " + det;
       if (btnEl) { btnEl.disabled = false; btnEl.textContent = "Enviarme el código al mail"; }
       return;
     }
@@ -13684,13 +13702,18 @@ async function lkVerifyOtp() {
   }
   if (btnEl) { btnEl.disabled = true; btnEl.textContent = "Verificando..."; }
   try {
-    var r = await sb.auth.verifyOtp({
-      email: window._lkOtpEmail,
-      token: code,
-      type: "email"
-    });
-    if (r.error) {
-      if (errEl) errEl.textContent = "Código inválido o expirado.";
+    var r = await _lkOtpFn("verify", code);
+    if (!r.ok || !r.data || !r.data.tmp_password) {
+      var det = (r.data && (r.data.detail || r.data.error)) || "HTTP " + r.status;
+      if (errEl) errEl.textContent = det === "invalid_code" ? "Código inválido o expirado." : "No se pudo verificar: " + det;
+      if (btnEl) { btnEl.disabled = false; btnEl.textContent = "Verificar código"; }
+      return;
+    }
+    // La Edge Function seteó un password temporal en el user. Lo usamos para
+    // crear sesión con signInWithPassword y recargar el panel.
+    var sr = await sb.auth.signInWithPassword({ email: r.data.email, password: r.data.tmp_password });
+    if (sr.error) {
+      if (errEl) errEl.textContent = "No se pudo iniciar sesión: " + sr.error.message;
       if (btnEl) { btnEl.disabled = false; btnEl.textContent = "Verificar código"; }
       return;
     }
