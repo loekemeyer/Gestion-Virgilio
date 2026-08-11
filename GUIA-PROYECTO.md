@@ -4,7 +4,28 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-10 · Versión app al documentar: **v9.09**
+> Última actualización: 2026-08-11 · Versión app al documentar: **v9.14**
+>
+> Nota: **v9.14 — PARTES importadas: la demanda sale de sus TERMINADOS + regla "SUPER".**
+> Algunos códigos del maestro `Importados` **no son productos de venta sino PARTES** que se meten
+> dentro de un terminado nacional; su proyección **no** puede salir de "ventas de la parte" (no se
+> vende suelta) sino de la **SUMA de la proyección de los terminados que la usan**. Se formaliza con
+> la tabla **`Importados_Partes_Map`** (`parte, terminado`, PK, RLS select anon + all authenticated)
+> y la vista **`vista_importados_partes`** (`cod`=parte, `proy_uni_mes`=Σ proy de sus terminados,
+> `detalle` jsonb con el aporte de cada terminado). Mapeo inicial: **`523C`** cremallera → 523
+> (1.525) · **`1546903`** corta queso → 546 (5.655) · **`1000900`** espiral →
+> 520,521,530,531,581,735,730,731,104 (6.160) · **`505C`** cuchilla → 505,586,099,713,123,114,186
+> (**29.653**). El front (`ocgFetchImportados`) **pisa** la proyección de esas partes con la suma
+> (objetivo = suma × meses(10)); en la OC salen con badge **🧩** y tooltip del detalle. **Ojo códigos:**
+> el pelador es **099** (Pelapapas), NO 097 (Afila Cuchillo). **Regla "SUPER"** (equivalente
+> primario/secundario *solo para super*): un código super (ej. **`505I`**) es el **mismo producto**
+> que su base (**`505`**) pero es el código con el que los supermercados lo piden. Tabla
+> **`Equivalencias_Super`** (`super_cod → base_cod`, +empresa/descripcion/nota; RLS igual que arriba)
+> y vista **`vista_proyeccion_super`** = `proyeccion_madre` con el super **plegado** sobre su base
+> (Σ). `vista_importados_partes` lee la proyección plegada, así que en el mapeo alcanza con poner el
+> **base** (505) y el super suma solo. Hoy 505i no tenía proyección propia (no estaba en
+> `proyeccion_madre`); al plegar sobre 505 la cuchilla queda en 29.653. Ambas views con
+> **`security_invoker=on`** (advisors limpios). SQL en `sql/importados_partes_y_super.sql`. Bump `v9.14`.
 >
 > Nota: **OCs — consolidación de familias en el principal + discontinuos (2026-08-10, solo Supabase).**
 > **`vista_generador_oc`** ahora **consolida la proyección de las familias de equivalentes en el
