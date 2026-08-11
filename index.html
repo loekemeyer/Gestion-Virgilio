@@ -6403,7 +6403,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v9.46";
+const APP_VERSION = "v9.47";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -12307,10 +12307,12 @@ function stkBodyStocks() {
   // v7.73→v8.71: excluir códigos que están en la tabla Insumos, SALVO que tengan
   // stock en algún depósito de producto (terminado/excedente/separar/facturar/guardar/racks/p.env/rch).
   // Así un mismo código puede ser insumo Y producto sin desaparecer de Stock.
+  // v9.47: …o si tiene PEDIDOS (demanda del PPP) / FC pendiente — un producto cargado como insumo
+  // (ej. 584E) con pedidos y 0 en góndola tiene que aparecer igual.
   const _insCodsSet = new Set((_stk.insumosCods || []).map(function (c) { return String(c || "").trim().toUpperCase(); }));
   shown = shown.filter(function (a) {
     if (!_insCodsSet.has(String(a.cod || "").trim().toUpperCase())) return true;
-    return (Number(a.terminado) || 0) !== 0 || (Number(a.excedente) || 0) !== 0 || (Number(a.separar_pedidos) || 0) !== 0 || (Number(a.a_facturar) || 0) !== 0 || (Number(a.a_guardar) || 0) !== 0 || (Number(a.racks) || 0) !== 0 || (Number(a.para_envasar) || 0) !== 0 || (Number(a.racks_ch) || 0) !== 0;
+    return (Number(a.terminado) || 0) !== 0 || (Number(a.excedente) || 0) !== 0 || (Number(a.separar_pedidos) || 0) !== 0 || (Number(a.a_facturar) || 0) !== 0 || (Number(a.a_guardar) || 0) !== 0 || (Number(a.racks) || 0) !== 0 || (Number(a.para_envasar) || 0) !== 0 || (Number(a.racks_ch) || 0) !== 0 || _demOf(a.cod) > 0 || _fcArtCajas(a.cod) > 0;
   });
   // v7.48: tilde "🔴 Negativos" — se aplica ADEMÁS del buscador. Deja sólo los artículos con
   // saldo negativo en algún depósito (para cazar inconsistencias de stock de un vistazo).
