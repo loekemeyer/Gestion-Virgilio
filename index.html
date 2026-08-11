@@ -11721,7 +11721,7 @@ async function openAbastecimiento() {
 function closeAbastecimiento() { const ov = document.getElementById("abastOverlay"); if (ov) ov.classList.remove("show"); _abast = null; }
 /* Filtro: re-render + restaurar foco/cursor al final (si no, se re-dibuja el input
    en cada tecla y se pierde el foco → "solo entra 1 dígito"). Patrón de pppSetSearch. */
-function abastSetFiltro(v) { if (!_abast) return; _abast.filtro = String(v == null ? "" : v); abastRender(); const el = document.getElementById("abastFiltroInp"); if (el) { el.focus(); const n = el.value.length; try { el.setSelectionRange(n, n); } catch (_e) {} } }
+function abastSetFiltro(v) { if (!_abast) return; _abast.filtro = String(v == null ? "" : v); abastRender(); }
 /* Vista ÚNICA integrada: fabricación vs venta (mensual) + stock vs pedidos (hoy), por artículo. */
 function abastRender() {
   const body = document.getElementById("abastBody"); if (!body || !_abast) return;
@@ -11798,7 +11798,7 @@ function abastRender() {
     }
   });
   h += '</tbody></table></div>';
-  body.innerHTML = h;
+  _renderKeepFocus(body, h);
 }
 function abastToggle(codEnc) { if (!_abast) return; const cod = decodeURIComponent(codEnc); _abast.openCod = (_abast.openCod === cod) ? null : cod; if (_abast.openCod == null) _abast.mesesAll = false; abastRender(); }
 function abastToggleMeses() { if (!_abast) return; _abast.mesesAll = !_abast.mesesAll; abastRender(); }
@@ -22547,7 +22547,7 @@ let _pppArmadoStarted = null;        // Set de tandas (UPPER) con AP (armado emp
 let _pppTab = "prog";
 let _pppSearch = "";
 function _pppSearchStr(p) { return [p.np, p.cod, p.razon_social, p.tanda, p.localidad, p.zona, p.fecha, p.fecha_entrega, p.tipo].join(" ").toLowerCase(); }
-function pppSetSearch(v) { _pppSearch = String(v == null ? "" : v).trim(); pppRenderProg(); const el = document.getElementById("pppSearchInp"); if (el) { el.focus(); const n = el.value.length; try { el.setSelectionRange(n, n); } catch (_e) {} } }
+function pppSetSearch(v) { _pppSearch = String(v == null ? "" : v).trim(); pppRenderProg(); }
 function pppLoadEntregados() { if (_pppEntregados) return _pppEntregados; let a = []; try { a = JSON.parse(localStorage.getItem(PPP_ENT_KEY) || "[]"); } catch (_e) {} _pppEntregados = new Set(Array.isArray(a) ? a.map(String) : []); return _pppEntregados; }
 function pppSaveEntregados() { try { localStorage.setItem(PPP_ENT_KEY, JSON.stringify(Array.from(pppLoadEntregados()))); } catch (_e) {} }
 function pppTab(t) { _pppTab = t; pppRenderProg(); if (t === "plan" || t === "ent" || t === "resumen") { pppRefreshArmado(); pppRefreshEntregado(); pppRefreshControlado(); } if (t === "ent") pppRefreshDelivered(); if (t === "ocup") pppRefreshOcupacion(); }
@@ -24711,7 +24711,7 @@ function pppRenderProg() {
   // (programado/entregado en los edits/entregados) define en qué solapa cae.
   const all = []; const _vistos = {};
   for (const p of (_pppParsed.prog || [])) { const k = String(p.np).trim(); if (!k || _vistos[k]) continue; _vistos[k] = 1; all.push(merge(p)); }
-  if (!all.length) { box.innerHTML = '<div class="planim-empty">Importá el <b>Formato PPP</b> — los pedidos del día se suman a los que ya estaban y caen en <b>A Programar</b>.</div>'; return; }
+  if (!all.length) { _renderKeepFocus(box, '<div class="planim-empty">Importá el <b>Formato PPP</b> — los pedidos del día se suman a los que ya estaban y caen en <b>A Programar</b>.</div>'); return; }
   const ent = pppLoadEntregados();
   let programados, aProgramar, entreg, _errInfo = null;
   if (PPP_READONLY) {
@@ -24772,16 +24772,16 @@ function pppRenderProg() {
       '<div class="ppp-diag-grid">' + fl.map(function (x) { const i = dg.map[x[1]]; return '<span>' + x[0] + ': <b' + (i < 0 ? ' class="ppp-falta"' : '') + '>' + colN(i) + '</b></span>'; }).join("") + '</div>' +
       '<table class="ppp-diag-tbl"><thead><tr><th>Col</th><th>Encabezado</th><th>Ejemplos</th></tr></thead><tbody>' + dump + '</tbody></table></details>';
   }
-  if (_pppTab === "resumen") { html += pppResumenHtml(programados); box.innerHTML = html; return; }
+  if (_pppTab === "resumen") { html += pppResumenHtml(programados); _renderKeepFocus(box, html); return; }
   if (_pppTab === "ocup") {
-    html += pppOcupHtml(); box.innerHTML = html;
+    html += pppOcupHtml(); _renderKeepFocus(box, html);
     return;
   }
-  if (_pppTab === "ent") { html += _pppEntBodyHtml(); box.innerHTML = html; return; }
+  if (_pppTab === "ent") { html += _pppEntBodyHtml(); _renderKeepFocus(box, html); return; }
   if (_pppTab === "plan") {
     // PROGRAMACIÓN — pedidos programados, agrupados por Fecha de Entrega → por tanda.
     // (La columna "Listo FC" se actualiza sola: pppRefreshArmado se llama al entrar al tab.)
-    if (!programados.length) { html += '<div class="planim-empty">Todavía no hay nada programado. Andá a <b>📥 A Programar</b>, armá las tandas y tocá <b>✅ Confirmar y programar</b>.</div>'; box.innerHTML = html; return; }
+    if (!programados.length) { html += '<div class="planim-empty">Todavía no hay nada programado. Andá a <b>📥 A Programar</b>, armá las tandas y tocá <b>✅ Confirmar y programar</b>.</div>'; _renderKeepFocus(box, html); return; }
     html += '<div class="ppp-res-leg">🎨 Color por camión: <span class="rtleg rt-so">Sur/Centro/Oeste</span> <span class="rtleg rt-n">Norte</span> <span class="rtleg rt-ret">Retira</span> <span class="rtleg rt-sup">Súper</span>. Tocá una tanda para abrirla.</div>';
     const DOW = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
     const byD = {}; for (const p of programados) { const k = _pppFechaKey(p.fecha_entrega || ""); if (!byD[k]) byD[k] = { fecha: p.fecha_entrega || "—", ped: [] }; byD[k].ped.push(p); }
@@ -24797,7 +24797,7 @@ function pppRenderProg() {
         html += _pppBlock("plan_" + dk + "_" + t, (es ? "🛒 " : "") + (t === "—" ? "Sin tanda" : "Tanda " + escapeHtml(t)), es ? "ppp-tanda-super" : "", byT[t].length + " ped · " + _pppM3Sum(byT[t]).toFixed(2) + " m³", byT[t], pencil + entBtn, (t !== "—" ? t : null));
       }
     }
-    box.innerHTML = html; return;
+    _renderKeepFocus(box, html); return;
   }
   // ===== Tab "A Programar" → (en modo editable) armar tandas y confirmar; en SOLO-LECTURA sólo lista =====
   const cfg = pppGetCfg();
@@ -24888,7 +24888,7 @@ function pppRenderProg() {
       html += _pppBlock("zona_" + z, chip + escapeHtml(z), none ? "ppp-tanda-none" : "", ps.length + " ped · " + _pppM3Sum(ps).toFixed(2) + " m³", ps);
     }
   }
-  box.innerHTML = html;
+  _renderKeepFocus(box, html);
   pppAutoBaseN();   // N° base automático: última tanda en Supabase (Prog. Diaria) + 1, un número por día
 }
 async function pppSubir(tipo) {
@@ -25750,7 +25750,7 @@ function avpRender() {
     });
     t += '</tbody></table></div>';
   }
-  body.innerHTML = h + vh + t;
+  _renderKeepFocus(body, h + vh + t);
 }
 /* Mensaje al cliente (texto definitivo del dueño). El día = fecha de salida (PPP). */
 function avpMsgCliente(r) {
