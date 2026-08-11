@@ -12297,11 +12297,13 @@ function stkBodyStocks() {
   if (!_stk.pins) _stk.pins = _stkPinsLoad();
   const _pinSet = new Set((_stk.pins || []).map(function (c) { return String(c).trim().toUpperCase(); }));
   const _terms = f.split(/[\s,]+/).filter(Boolean);
+  // v9.34: helper — ¿tiene stock en algún depósito de producto, o demanda, o FC pendiente?
+  const _stkHasAny = function (a) { return _stkStockKeys.some(function (k) { return (Number(a[k]) || 0) !== 0; }) || _demOf(a.cod) > 0 || _fcArtCajas(a.cod) > 0; };
   let shown = _stk.soloPin
     ? arts.filter(function (a) { return _pinSet.has(String(a.cod).trim().toUpperCase()); })
     : (_terms.length
-      ? arts.filter(function (a) { const s = (a.cod + " " + a.desc).toLowerCase(); return _terms.some(function (t) { return s.indexOf(t) >= 0; }); })
-      : arts.filter(function (a) { return _stkStockKeys.some(function (k) { return (Number(a[k]) || 0) !== 0; }) || _demOf(a.cod) > 0 || _fcArtCajas(a.cod) > 0; }));
+      ? arts.filter(function (a) { if (!_stkHasAny(a)) return false; const s = (a.cod + " " + a.desc).toLowerCase(); return _terms.some(function (t) { return s.indexOf(t) >= 0; }); })
+      : arts.filter(_stkHasAny));
   // v7.73→v8.71: excluir códigos que están en la tabla Insumos, SALVO que tengan
   // stock en algún depósito de producto (terminado/excedente/separar/facturar/guardar/racks/p.env/rch).
   // Así un mismo código puede ser insumo Y producto sin desaparecer de Stock.
