@@ -4213,27 +4213,27 @@ function _renderKeepFocus(container, html) {
     try { ss = a.selectionStart; se = a.selectionEnd; } catch (_e) {}
     mark = { sel: sel, idx: idx < 0 ? 0 : idx, ss: ss, se: se, node: a };
   }
-  /* v9.34: En Android, reemplazar innerHTML destruye el input y al recrearlo +
-     focus(), Gboard resetea el teclado al layout por defecto (el usuario pasa a
-     numérico y vuelve solo a letras). Para evitarlo: si el input focuseado sigue
-     existiendo en el nuevo HTML con el mismo value, lo sacamos del DOM ANTES del
-     innerHTML (así no se destruye), y lo reinsertamos en el lugar del clon nuevo. */
+  /* v9.34: Preservar el nodo DOM del input con foco para que Android/Gboard no
+     resetee el layout del teclado. Lo sacamos del DOM antes del innerHTML y lo
+     reinsertamos en el lugar del clon nuevo, restaurando foco y cursor. */
   if (mark && mark.node) {
     var _savedInput = mark.node;
-    var _placeholder = document.createComment("_rkf");
-    _savedInput.parentNode.insertBefore(_placeholder, _savedInput);
-    _savedInput.parentNode.removeChild(_savedInput);
+    // Sacarlo del container antes de destruir el innerHTML
+    try { _savedInput.parentNode.removeChild(_savedInput); } catch (_e) {}
     container.innerHTML = html;
     try {
       var _newList = container.querySelectorAll(mark.sel);
       var _newEl = _newList[mark.idx] || _newList[0];
       if (_newEl && _newEl.tagName === _savedInput.tagName) {
         _newEl.parentNode.replaceChild(_savedInput, _newEl);
-        // NO llamamos focus() — el nodo nunca perdió el foco
+        _savedInput.focus();
         if (mark.ss != null && _savedInput.setSelectionRange) { try { _savedInput.setSelectionRange(mark.ss, mark.se); } catch (_e) {} }
+      } else {
+        // No encontró el slot — refocus en el primero disponible
+        var _any = container.querySelector("input,textarea");
+        if (_any) { _any.focus(); }
       }
     } catch (_e) {
-      // fallback: si algo falla, el input ya no está en el DOM — re-focus manual
       try { var _fb = container.querySelectorAll(mark.sel); var _fbEl = _fb[mark.idx] || _fb[0]; if (_fbEl) { _fbEl.focus(); if (mark.ss != null && _fbEl.setSelectionRange) _fbEl.setSelectionRange(mark.ss, mark.se); } } catch (_e2) {}
     }
   } else {
