@@ -169,7 +169,9 @@ Deno.serve(async (req: Request) => {
 
       // Password temporal aleatorio. El front lo usa inmediatamente para signInWithPassword
       // y queda con sesión. El user nunca lo ve; cambia en cada login por OTP.
-      const tmpPassword = crypto.randomUUID() + "-" + crypto.randomUUID();
+      // 36 chars de UUID (122 bits) alcanzan y sobran; NO usar dos concatenados
+      // porque Supabase Auth (bcrypt) tope 72 chars y dos UUID + "-" son 73.
+      const tmpPassword = crypto.randomUUID();
       const upd2 = await admin.auth.admin.updateUserById(userId, { password: tmpPassword });
       if (upd2.error) return jsonResponse({ error: "set_password_failed", detail: upd2.error.message }, 500);
 
