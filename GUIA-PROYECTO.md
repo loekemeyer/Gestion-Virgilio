@@ -4,7 +4,12 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-11 · Versión app al documentar: **v9.45**
+> Última actualización: 2026-08-11 · Versión app al documentar: **v9.49**
+>
+> Nota **v9.49** — **Pestaña Stocks: nueva columna "Proy. caj/mes"** (antes de *Total Stock*).
+> Muestra la **proyección de venta en cajas/mes** por código, tomada de `proyeccion_madre.proy_cajas_mes`
+> (el mismo valor "antes del índice" que usa el generador de OCs). Header clickeable como las demás
+> (filtra filas con proyección > 0). Lookup exacto → base (`_proyOf`). `index.html`.
 >
 > Nota **v9.44/9.45** — **Faltantes x día:** (a) el **faltó al armar** (realFalt, dato real de tandas
 > pickeadas) ahora se ubica en la **celda del día de su fecha de salida** (badge roja) además del
