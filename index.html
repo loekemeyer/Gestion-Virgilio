@@ -3624,7 +3624,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       <button class="sup-action-btn" onclick="openDeuda()"><span class="sup-ico">💰</span><span>Deuda a cobrar</span></button>
       <button class="sup-action-btn" onclick="openAgentesAdmin()"><span class="sup-ico">🤖</span><span>Agentes</span></button>
       <button class="sup-action-btn" onclick="openMonitor()"><span class="sup-ico">📊</span><span>Monitor / Análisis / Inconsistencias</span></button>
-      <button class="sup-action-btn" onclick="showGuardarOrden('')"><span class="sup-ico">📋</span><span>Qué bajar primero</span></button>
+      <button class="sup-action-btn" onclick="showGuardarOrden('')" style="position:relative;"><span class="sup-ico">📋</span><span>Qué bajar primero</span><span id="qbpBadge" class="dp-badge" style="display:none;" title="Urgentes (SOS): góndola < 20% con stock atrás para bajar"></span></button>
       <button class="sup-action-btn" onclick="openCorreccPanel()" style="position:relative;"><span class="sup-ico">🔀</span><span>Corregir códigos de NPs</span><span id="corrBadgeGreen" class="dp-badge" style="left:2px;right:auto;background:#16a34a;display:none;" title="Se pueden corregir pero NO es obligatorio (hay stock del secundario)"></span><span id="corrBadge" class="dp-badge" style="display:none;" title="Hay que corregir SÍ o SÍ (el secundario no tiene stock)"></span></button>
       <button class="sup-action-btn" onclick="openNpConsulta()"><span class="sup-ico">🔎</span><span>Consultar NP / Líos</span></button>
       <button class="sup-action-btn" onclick="stkOpenNpFaltan()" style="position:relative;"><span class="sup-ico">⚠️</span><span>Pedidos sin cargar en PPP</span><span id="npFaltanBadge" class="dp-badge" style="display:none;"></span></button>
@@ -6403,7 +6403,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v9.47";
+const APP_VERSION = "v9.48";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -25674,6 +25674,22 @@ async function npFaltanLoadBadge() {
     supSetBadge("npFaltanBadge", (rows || []).length);
   } catch (_e) {}
 }
+/* v9.48 — badge "Qué bajar primero": cantidad de URGENTES (SOS) = góndola < 20% del máximo
+   Y con stock atrás para bajar (a_guardar/excedente/racks) — los mismos 🆘 que salen en la lista. */
+async function qbpLoadBadge() {
+  try {
+    var res = await Promise.all([stockFetchSaldos(), ocgFetchCapacidad()]);
+    var saldos = res[0] || {}, capMap = res[1] || {}, n = 0;
+    Object.keys(saldos).forEach(function (k) {
+      var a = saldos[k];
+      var back = Math.round((Number(a.a_guardar) || 0) + (Number(a.excedente) || 0) + (Number(a.racks) || 0));
+      if (back <= 0) return;                                   // sin stock atrás → no está en la lista
+      var cap = Math.round(capMap[_ocgNorm(a.cod)] || 0); if (cap <= 0) return;
+      if ((Math.round(Number(a.terminado) || 0)) / cap < 0.20) n++;   // góndola < 20%
+    });
+    supSetBadge("qbpBadge", n);
+  } catch (_e) {}
+}
 
 /* ===== v9.31 — MÓDULO "📲 Avisar programación" =========================================
    Cuando se programa un pedido, este módulo lista los pedidos programados (con fecha de
@@ -30935,6 +30951,7 @@ function showSupervisor(email) {
   // badges "Corregir códigos de NPs" y "Pedidos sin cargar en PPP" (fire-and-forget)
   try { corrLoadBadge(); } catch (_e) {}
   try { npFaltanLoadBadge(); } catch (_e) {}
+  try { qbpLoadBadge(); } catch (_e) {}   // badge SOS de "Qué bajar primero"
   try { if (typeof pppAlertPollStart === "function") pppAlertPollStart(); } catch (_e) {}
 }
 
