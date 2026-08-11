@@ -6299,7 +6299,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v9.11";
+const APP_VERSION = "v9.12";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -12563,44 +12563,50 @@ function stkNpFaltanExport() {
   const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "NP-sin-programar-" + fecha + ".xls";
   document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
 }
-/* v9.11 — Módulo "Proveedor de importación": asignar a cada código importado (termina en E)
-   el proveedor chino que lo fabrica (para poder emitir la OC directo al proveedor). Lee
-   vista_prov_importacion (cod · descripción · proveedor actual) y guarda en Proveedores_Importacion
-   por upsert (on_conflict=cod) al instante. García NO es proveedor de importación (reenvasa lo de
-   insumos), por eso no está en la lista. */
-const _PROV_IMP_LISTA = ["Hugo Wong", "Becky Chen", "Ownland", "Kangli", "Fujian", "Stephen", "Frontier"];
+/* v9.11/v9.12 — Módulo "Proveedor de importación": revisar/corregir el proveedor chino de cada
+   artículo IMPORTADO. Lee y escribe el MAESTRO real `Importados` (vía vista_prov_importacion:
+   una fila por cod_art de los activos, con su proveedor actual, ya cargado). Al tocar el
+   desplegable, hace PATCH del proveedor en Importados (todas las marcas de ese código). Este
+   maestro alimenta el circuito de OC de importados (v_importados_ordenes, índice = 10 meses en
+   Importados_Config). García NO está: reenvasa lo de insumos, no importa. */
+const _PROV_IMP_LISTA = ["Fujian", "Hugo Wong", "Becky", "Becky 1", "Becky 2", "Becky 1/2", "Kangli", "Ownland", "Zhixin", "Stephen", "Frontier"];
 async function stkOpenProvImp() {
-  _stkPopShell("🏭 Proveedor de importación (códigos E)", "stkPopBody");
+  _stkPopShell("🏭 Proveedor de importación", "stkPopBody");
   const body = document.getElementById("stkPopBody"); if (!body) return;
   body.innerHTML = '<div class="stkpop-empty">Cargando…</div>';
   const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
   let rows = [];
-  try { rows = await fetch(SUPABASE_URL + "/rest/v1/vista_prov_importacion?select=cod,descripcion,proveedor&order=cod&limit=5000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }); } catch (_e) {}
-  _stkPop = { kind: "provImp", rows: rows, q: "", soloSin: false, _focusQ: false };
+  try { rows = await fetch(SUPABASE_URL + "/rest/v1/vista_prov_importacion?select=cod,descripcion,marca,proveedor,n_prov,es_e&order=cod&limit=5000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }); } catch (_e) {}
+  // lista de proveedores = base conocida ∪ los que ya aparecen en el maestro (para no perder ninguno)
+  const provs = _PROV_IMP_LISTA.slice();
+  rows.forEach(function (r) { if (r.proveedor && provs.indexOf(r.proveedor) < 0) provs.push(r.proveedor); });
+  _stkPop = { kind: "provImp", rows: rows, provs: provs, q: "", soloSin: false, _focusQ: false };
   _provImpRender();
 }
 function _provImpRender() {
   const body = document.getElementById("stkPopBody"); if (!body || !_stkPop || _stkPop.kind !== "provImp") return;
   const all = _stkPop.rows || [];
+  const provs = _stkPop.provs || _PROV_IMP_LISTA;
   const q = String(_stkPop.q || "").trim().toUpperCase();
   const conProv = all.filter(function (r) { return r.proveedor; }).length;
   let rows = all;
   if (_stkPop.soloSin) rows = rows.filter(function (r) { return !r.proveedor; });
   if (q) rows = rows.filter(function (r) { return String(r.cod).toUpperCase().indexOf(q) >= 0 || String(r.descripcion || "").toUpperCase().indexOf(q) >= 0; });
-  let h = '<div class="stkpop-hint"><b>' + conProv + ' de ' + all.length + '</b> códigos E con proveedor asignado. Elegí el <b>proveedor chino</b> de cada artículo importado (se guarda al instante). Los que faltan van resaltados. <small style="color:#94a3b8">García no está en la lista: reenvasa lo de insumos, no importa.</small></div>';
+  let h = '<div class="stkpop-hint"><b>' + all.length + '</b> artículos importados (' + conProv + ' con proveedor). Tocá el desplegable para <b>corregir el proveedor chino</b> de cada uno (se guarda al instante en el maestro <code>Importados</code>, que alimenta la OC de importados). <small style="color:#94a3b8">García no está: reenvasa lo de insumos, no importa.</small></div>';
   h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center">';
   h += '<input id="provImpQ" placeholder="Buscar código o descripción…" value="' + escapeHtml(_stkPop.q || "") + '" oninput="provImpSearch(this.value)" style="flex:1;min-width:150px;padding:6px 10px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px">';
-  h += '<button class="mva-clear" style="' + (_stkPop.soloSin ? 'background:#b45309;color:#fff;border-color:#b45309' : '') + '" onclick="provImpToggleSin()">' + (_stkPop.soloSin ? '✓ ' : '') + 'Solo sin asignar</button>';
+  h += '<button class="mva-clear" style="' + (_stkPop.soloSin ? 'background:#b45309;color:#fff;border-color:#b45309' : '') + '" onclick="provImpToggleSin()">' + (_stkPop.soloSin ? '✓ ' : '') + 'Solo sin proveedor</button>';
   h += '</div>';
   if (!rows.length) { body.innerHTML = h + '<div class="stkpop-empty">Sin resultados.</div>'; return; }
   h += '<div class="mva-tblwrap"><table class="mva-tbl"><thead><tr><th>Código</th><th>Descripción</th><th>Proveedor</th></tr></thead><tbody>';
   h += rows.map(function (r) {
     const cod = String(r.cod);
     const cur = r.proveedor || "";
-    let opts = '<option value="">— sin asignar —</option>' + _PROV_IMP_LISTA.map(function (p) { return '<option value="' + escapeHtml(p) + '"' + (p === cur ? ' selected' : '') + '>' + escapeHtml(p) + '</option>'; }).join("");
-    if (cur && _PROV_IMP_LISTA.indexOf(cur) < 0) opts += '<option value="' + escapeHtml(cur) + '" selected>' + escapeHtml(cur) + '</option>';
+    let opts = '<option value="">— sin proveedor —</option>' + provs.map(function (p) { return '<option value="' + escapeHtml(p) + '"' + (p === cur ? ' selected' : '') + '>' + escapeHtml(p) + '</option>'; }).join("");
+    if (cur && provs.indexOf(cur) < 0) opts += '<option value="' + escapeHtml(cur) + '" selected>' + escapeHtml(cur) + '</option>';
     const sel = '<select onchange="provImpSet(\'' + encodeURIComponent(cod) + '\',this.value)" style="padding:5px 8px;border:1px solid ' + (cur ? '#16a34a' : '#f59e0b') + ';border-radius:8px;font-size:12.5px;background:' + (cur ? '#f0fdf4' : '#fffbeb') + ';font-weight:700;color:#0f172a;max-width:160px">' + opts + '</select>';
-    return '<tr' + (cur ? '' : ' style="background:#fffbeb"') + '><td><b>' + escapeHtml(cod) + '</b></td><td style="font-size:12px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escapeHtml(r.descripcion || "") + '">' + escapeHtml(r.descripcion || "—") + '</td><td>' + sel + '</td></tr>';
+    const mk = r.marca ? ' <span style="color:#94a3b8;font-size:10.5px;font-weight:700">' + escapeHtml(String(r.marca)) + '</span>' : '';
+    return '<tr' + (cur ? '' : ' style="background:#fffbeb"') + '><td><b>' + escapeHtml(cod) + '</b>' + mk + '</td><td style="font-size:12px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escapeHtml(r.descripcion || "") + '">' + escapeHtml(r.descripcion || "—") + '</td><td>' + sel + '</td></tr>';
   }).join("") + '</tbody></table></div>';
   body.innerHTML = h;
   if (_stkPop._focusQ) { const qi = document.getElementById("provImpQ"); if (qi) { qi.focus(); try { qi.setSelectionRange(qi.value.length, qi.value.length); } catch (_e) {} } }
@@ -12615,12 +12621,13 @@ async function provImpSet(codEnc, prov) {
   if (row) row.proveedor = prov || null;   // optimista
   _stkPop._focusQ = false;
   try {
-    const r = await fetch(SUPABASE_URL + "/rest/v1/Proveedores_Importacion?on_conflict=cod", {
-      method: "POST",
-      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" },
-      body: JSON.stringify({ cod: cod, proveedor: prov || null, actualizado: new Date().toISOString() })
+    // PATCH del maestro Importados: actualiza el proveedor de TODAS las filas (marcas) de ese cod_art
+    const r = await fetch(SUPABASE_URL + "/rest/v1/Importados?cod_art=eq." + encodeURIComponent(cod), {
+      method: "PATCH",
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" },
+      body: JSON.stringify({ proveedor: prov || null, actualizado: new Date().toISOString() })
     });
-    if (!r.ok && r.status !== 409) { if (row) row.proveedor = prev; try { alert("No se pudo guardar (HTTP " + r.status + ")."); } catch (_e) {} }
+    if (!r.ok) { if (row) row.proveedor = prev; try { alert("No se pudo guardar (HTTP " + r.status + ")."); } catch (_e) {} }
   } catch (_e) { if (row) row.proveedor = prev; try { alert("No se pudo guardar (sin conexión)."); } catch (_e2) {} }
   _provImpRender();
 }
