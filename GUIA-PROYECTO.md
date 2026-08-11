@@ -4,7 +4,32 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-11 · Versión app al documentar: **v9.14**
+> Última actualización: 2026-08-11 · Versión app al documentar: **v9.21**
+>
+> Nota: **v9.20/v9.21 — Sufijo "L" (Cencosud/Chef), pelado en picking + NC Loeke→Chef en Facturación.**
+> **Contexto de negocio:** el sufijo `L`/`EL` al final del código de artículo (ej. `438EL`, `957EL`)
+> marca un artículo Loeke facturado dentro de **Chef** (clientes de NP **44xxx**: Cencosud, Dorinka,
+> Renatek, etc.). Nace del circuito **Chef importa → vende a Loeke → NC → el tallerista (Brian)
+> reenvasa x24 → vuelve como `...EL`**. La `L` se **pela aguas arriba** en el Excel "PPP Base Datos
+> Pedidos" (por eso a Supabase llegan casi todos ya pelados; sobrevivió `957EL`). Dos importadores de
+> los proveedores chinos: **Chef** (Ownland, Kangli, Fujian, Frontier) y **Tierra Nativa SA** (Becky,
+> Hugo Wong, Zhixin) — es otra empresa, NO Loeke. El importador está en `Importados.proveedor`.
+> **(1) v9.20 — picking pela la L:** `pkStripL()` saca una `L` final pegada a dígito o `E` (`505L`,
+> `438EL`, `957EL` → base), aplicado en `aggFrom` **antes** de `pkCodEmpresa`; así la empresa (LK/CH)
+> la sigue poniendo el NP (438EL en NP Chef → `438E` → `438E CH`, misma góndola que hoy) y se tapa el
+> `957EL` que caía en "sin planimetría" y **nunca descontaba stock**. `Equivalencias_Codigos` sigue con
+> `438E→438E LK`, `809E→809E CH` (nativo Chef). **(2) Corrección de stock:** `437E CH` tenía **36 MC
+> (×72 = 2.592 u)** mal en depósito `racks` → son **insumos** (Colador importado por Chef, se envasa
+> x24). Movidas `racks→insumos` (2 movimientos `ajuste`). Backup `sql/backup_movimientos_437E_20260811.sql`.
+> **(3) v9.21 — NC Loeke→Chef en Facturación:** cuando un cliente de Chef (NP 44xxx) compra un artículo
+> **importado por Chef + home Loeke** (Coladores `437E/438E/439E`), al facturarlo por Chef hay que hacer
+> **NC a Loeke y pasar el stock a Chef**. Tabla `NC_Loeke_Chef_Hechas` (np,cod,confirmado_por; RLS: lee
+> anon, escribe authenticated) + vista `vista_nc_loeke_chef` (pendientes, derivada del maestro:
+> importado por Chef ∧ partido LK/CH ∧ home Loeke; excluye nativo-Chef `809E` y lo de Tierra Nativa
+> `957E`; excluye las ya confirmadas). En el módulo Facturación, **una fila por NC pendiente**
+> (NP·cód·artículo·cajas·RS) con botón **✓ "NC hecha"** (`facFetchNcChef`/`facRenderNc`/`facNcConfirm`,
+> contenedor `#facNcList`). Es un **checklist aparte**: NO toca pedidos, cierre ni carga de camión.
+> SQL en `sql/nc_loeke_chef.sql`. Bump `v9.21`.
 >
 > Nota: **v9.14 — PARTES importadas: la demanda sale de sus TERMINADOS + regla "SUPER".**
 > Algunos códigos del maestro `Importados` **no son productos de venta sino PARTES** que se meten
