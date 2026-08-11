@@ -1306,6 +1306,11 @@ async function showVerificationModal() {
   });
 }
 
+/* Exponer showVerificationModal globalmente para acceso desde index.html (MG, etc.) */
+if (typeof window !== "undefined") {
+  window.showVerificationModal = showVerificationModal;
+}
+
 /* ============== Enviar (graba todo) ============== */
 async function opEnviar() {
   // v9.26: Verificación de código antes de enviar

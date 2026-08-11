@@ -6383,7 +6383,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v9.26";
+const APP_VERSION = "v9.27";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -17376,7 +17376,7 @@ function mgSetExc(i, v) { if (!_mg) return; const it = _mg.items[i]; if (!it) re
 // Ubicación del excedente: 1 letra + 2 letras (3 letras, mayúsculas). Solo guarda
 // (no re-render → no pierde foco mientras tipean).
 function mgSetUbic(i, v) { if (!_mg) return; const it = _mg.items[i]; if (!it) return; it.ubic = String(v == null ? "" : v).toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6); }
-function mgConfirmar() {
+async function mgConfirmar() {
   if (!_mg) return;
   const sel = _mg.items.filter(function (it) { return (it.cargar > 0) || (it.exc > 0); });
   if (!sel.length) return;
@@ -17384,6 +17384,11 @@ function mgConfirmar() {
   // de dato (la usa el picking).
   const sinUbic = sel.find(function (it) { return (it.exc || 0) > 0 && String(it.ubic || "").trim().length < 1; });
   if (sinUbic) { try { alert("📍 Falta la ubicación del excedente de " + sinUbic.cod + ".\nEscribí dónde lo pusiste (letras y números, ej. A12) — el excedente no tiene lugar fijo, hay que anotarla para el picking."); } catch (_e) {} return; }
+  // v9.26: Verificación de código 4 dígitos antes de confirmar
+  if (typeof window.showVerificationModal === "function") {
+    const verified = await window.showVerificationModal();
+    if (!verified) return;
+  }
   const rows = [];
   sel.forEach(function (it) {
     const tot = it.cargar + (it.exc || 0);
