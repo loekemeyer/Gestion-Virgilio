@@ -4032,7 +4032,7 @@ const filas = {
   row1: ["EP","AP"],                                   // Picking + Armado starters (grande, azul/verde) — v7.75: TP/TAP removed (finalize inline)
   row2: [],                                            // (was Armado finish, now unused)
   row3: ["RT","MG","CC"],                              // Depósito y carga (mediano)
-  row4: ["CR","RR","INS","CP","RC","IR","EA","SC"],    // secundarias (chico) + 🔀 Mover al final. v7.49: RI+EI unificados en INS (chooser)
+  row4: ["CR","RR","INS","CP","RC","IR"],              // secundarias (chico) + 🔀 Mover al final. v7.49: RI+EI+SC unificados en INS (chooser). v9.15: EA removido (no se usa)
   row5: ["AT","PB","Limp","Perm","PC","CT"]            // tiempos / pausas (chico)
 };
 // Rediseño v5.92 (pedido del dueño): más peso a los botones más usados. Primarias
@@ -4046,7 +4046,7 @@ const desc = {
   TAP:"Terminé Armado Pedido", CR:"Control Remitos", CC:"Inicio/Fin Carga Camión",
   RR:"Recepción Remitos",
   RT:"Recepción Mercadería", MG:"Guardado a Góndola",
-  RI:"Recepción Insumos", EI:"Entrega Insumos", INS:"Entregar/Recibir Insumos", EA:"Entrega p/ envasar", SC:"Salida a Cervantes",
+  RI:"Recepción Insumos", EI:"Entrega Insumos", INS:"📦 Insumos y Productos Movimiento",
   CP:"Completar Pedido", RC:"Pasar a urgente", IR:"Ingreso a Racks",
   AT:"Atendí Timbre", PB:"Paré Baño", Limp:"Limpieza",
   Perm:"Permiso de Salida", PC:"Paré Comida",CT:"Conteo",
@@ -5403,7 +5403,7 @@ Object.keys(filas).forEach(rowId => {
     d.className = sec ? "box box-sm" : "box";
     d.setAttribute("data-code", code);
     d.innerHTML = `
-      <div class="box-title">${code === "INS" ? "🧰" : code}</div>
+      <div class="box-title">${code === "INS" ? "📦" : code}</div>
       <div class="box-desc">${desc[code]}</div>
     `;
     // v7.49: "INS" es un botón UI unificado (no un opcode): abre el chooser Recibir/Entregar/Nuevo.
@@ -5423,16 +5423,16 @@ try {
   if (r4) r4.appendChild(mov);
 } catch (_e) { /* no-op */ }
 
-// Planilla Conteo Cajas — secundario (botón en row4 para operarios)
-try {
-  const pcm = document.createElement("div");
-  pcm.className = "box box-sm";
-  pcm.setAttribute("data-code", "PCM");
-  pcm.innerHTML = `<div class="box-title" style="font-size:15px">📋</div><div class="box-desc">Planilla Conteo</div>`;
-  pcm.onclick = () => PCM.open();
-  const r4 = document.getElementById("row4");
-  if (r4) r4.appendChild(pcm);
-} catch (_e) { /* no-op */ }
+// v9.15: Planilla Conteo removida — no se usa
+// try {
+//   const pcm = document.createElement("div");
+//   pcm.className = "box box-sm";
+//   pcm.setAttribute("data-code", "PCM");
+//   pcm.innerHTML = `<div class="box-title" style="font-size:15px">📋</div><div class="box-desc">Planilla Conteo</div>`;
+//   pcm.onclick = () => PCM.open();
+//   const r4 = document.getElementById("row4");
+//   if (r4) r4.appendChild(pcm);
+// } catch (_e) { /* no-op */ }
 
 /* =========================================================
    NAVEGACIÓN
@@ -5454,7 +5454,7 @@ function showInstructivo() {
     { t: "🏭 Recepción", c: "RT · RR", x: "RT = recibí mercadería (entra a <b>“a guardar”</b>). RR = controlar los remitos cargados al camión." },
     { t: "🚚 Carga y control", c: "CC · CR", x: "CC = inicio/fin de la carga del camión. CR = control de remitos." },
     { t: "📥 Guardar a góndola", c: "MG", x: "Lo que está en <b>“a guardar”</b> lo pasás a góndola. Si la góndola está llena, marcás <b>Excedente</b> y su ubicación." },
-    { t: "🧰 Insumos y Cervantes", c: "Insumos · SC", x: "<b>Insumos</b> = un solo botón: elegís <b>Recibir</b> (entra stock) o <b>Entregar</b> (sale). ¿El insumo no está en el sistema? Entrás por <b>Recibir</b> y ahí tenés <b>“+ Agregar insumo nuevo”</b>. SC = salida de mercadería a Cervantes." },
+    { t: "📦 Insumos y Productos Movimiento", c: "INS (RI · EI · SC)", x: "Un solo botón que te da <b>3 opciones</b>: <b>📥 Recibir</b> (entra stock), <b>📤 Entregar</b> (sale stock), o <b>🚚 Salida a Cervantes</b> (envío a la central). Al elegir Recibir o Entregar te pide <b>de dónde/a dónde</b>. ¿El insumo no está? Entrás por Recibir y usás <b>“+ Agregar insumo nuevo”</b>." },
     { t: "⏱ Pausas y otros", c: "AT · PB · Limp · Perm · PC · CT", x: "Marcá cuándo: atendés el timbre (AT), vas al baño (PB), limpiás (Limp), pedís permiso (Perm), parás a comer (PC) o hacés conteo (CT). Tocás al <b>empezar</b> y otra vez al <b>terminar</b>." }
   ];
   ov.innerHTML = '<div class="instr-card"><div class="instr-head"><span class="instr-title">❓ ¿Cómo se usa?</span><button class="instr-close" onclick="closeInstructivo()">Cerrar</button></div><div class="instr-body">' +
@@ -5754,9 +5754,9 @@ function selectOption(code) {
     }
   }
 
-  // v4.10: Salida a Cervantes — abre el modal directo (sin Enviar ni evento en
-  // Registros); la salida se registra como baja de góndola en Movimientos_Stock.
-  if (code === "SC") { showCervantesModal(legajoStr); return; }
+  // v4.10: Salida a Cervantes — REMOVIDO de selectOption (ahora accesible solo desde el chooser de INS).
+  // v9.15: SC ahora está dentro del modal combinado de INS (insumoChooser) junto con RI/EI.
+  // if (code === "SC") { showCervantesModal(legajoStr); return; }
 
   // v5.05: Completar Pedido — agrega cajas que llegaron tarde a una NP armada SIN
   // facturar. Abre el modal directo (sin Enviar ni evento; el evento CP lo emite el
@@ -5777,9 +5777,9 @@ function selectOption(code) {
   // modal directo (sin Enviar; el evento RC lo emite el modal al confirmar).
   if (code === "RC") { showRCModal(legajoStr); return; }
 
-  // v5.52: Entrega Artículos para envasar — muestra el stock del depósito
-  // "para_envasar" y lo da de baja al entregarlo (modal directo; evento EA).
-  if (code === "EA") { showEAModal(legajoStr); return; }
+  // v5.52: Entrega Artículos para envasar — REMOVIDO (no se usa).
+  // v9.15: EA ha sido sacado del flujo operativo.
+  // if (code === "EA") { showEAModal(legajoStr); return; }
 
   // v5.67: Ingreso a Racks — da de alta lo que llega (importaciones) a los racks, con
   // su posición. Modal directo (sin Enviar; el evento IR lo emite al cargar cada palet).
@@ -16613,21 +16613,21 @@ async function insFetchCatalogo() {
   } catch (_e) { return []; }
 }
 /* v7.49 — Botón unificado "Insumos": el operario toca UN botón y elige qué hacer.
-   DOS opciones nada más: Recibir → RI, Entregar → EI (misma mecánica de siempre:
-   selectOption abre el toggle + el modal de insumos). v7.50: el "agregar insumo nuevo"
-   NO es un ítem del chooser — vive DENTRO de Recibir (el modal de RI ya trae su botón
-   "+ Agregar insumo nuevo"; dar de alta sólo tiene sentido recibiendo). Popup liviano
-   al estilo de showMGChooser. */
+   TRES opciones: Recibir insumos (RI), Entregar insumos (EI), Salida a Cervantes (SC).
+   v7.50: el "agregar insumo nuevo" NO es un ítem del chooser — vive DENTRO de Recibir
+   (el modal de RI ya trae su botón "+ Agregar insumo nuevo"; dar de alta sólo tiene
+   sentido recibiendo). Popup liviano al estilo de showMGChooser. */
 function insumoChooser(legajo) {
   let ov = document.getElementById("insChooserModal");
   if (!ov) { ov = document.createElement("div"); ov.id = "insChooserModal"; ov.style.cssText = "position:fixed;inset:0;z-index:1297;background:rgba(2,6,23,.74);display:flex;align-items:center;justify-content:center;padding:16px;"; document.body.appendChild(ov); }
   const btn = "width:100%;margin-bottom:10px;padding:16px;border:none;border-radius:12px;color:#fff;font-size:16px;font-weight:800;cursor:pointer;text-align:left;";
   const sub = 'font-weight:600;opacity:.85;';
   ov.innerHTML = '<div style="background:#f8fafc;max-width:380px;width:100%;border-radius:16px;padding:18px;box-shadow:0 24px 70px rgba(0,0,0,.5);box-sizing:border-box;">' +
-    '<div style="font-size:18px;font-weight:800;margin-bottom:3px;">🧰 Insumos</div>' +
+    '<div style="font-size:18px;font-weight:800;margin-bottom:3px;">📦 Insumos y Productos Movimiento</div>' +
     '<div style="font-size:13px;color:#64748b;margin-bottom:16px;">¿Qué querés hacer?</div>' +
     '<button onclick="insChooserGo(\'RI\')" style="' + btn + 'background:#4f46e5;">📥 Recibir insumos <span style="' + sub + '">(entra stock — o agregá uno nuevo)</span></button>' +
     '<button onclick="insChooserGo(\'EI\')" style="' + btn + 'background:#0d9488;">📤 Entregar insumos <span style="' + sub + '">(sale stock)</span></button>' +
+    '<button onclick="insChooserGo(\'SC\')" style="' + btn + 'background:#dc2626;">🚚 Salida a Cervantes <span style="' + sub + '">(envío a central)</span></button>' +
     '<button onclick="closeInsumoChooser()" style="width:100%;padding:11px;border:none;border-radius:10px;background:#e2e8f0;color:#475569;font-weight:700;cursor:pointer;">Cancelar</button>' +
     '</div>';
   ov.style.display = "flex";
@@ -16635,7 +16635,57 @@ function insumoChooser(legajo) {
 function closeInsumoChooser() { const ov = document.getElementById("insChooserModal"); if (ov) ov.style.display = "none"; }
 function insChooserGo(which) {
   closeInsumoChooser();
-  selectOption(which);   // RI | EI — misma mecánica que los botones viejos. El alta vive dentro de RI.
+  if (which === "SC") {
+    showCervantesModal(String(legajoInput.value || ""));
+  } else if (which === "RI" || which === "EI") {
+    // v9.15: Pedir ubicación ANTES de abrir el modal de insumos
+    askInsUbicacion(which);
+  }
+}
+
+/* v9.15: Modal para preguntár DÓNDE se envía/recibe antes de abrir el modal de insumos.
+   Esto es obligatorio al inicio del proceso RI/EI. */
+function askInsUbicacion(mode) {
+  const isIn = mode === "RI";
+  const titulo = isIn ? "¿De dónde recibís?" : "¿A dónde lo envías?";
+  const hint = isIn ? "Origen/Proveedor" : "Destino/Ubicación";
+
+  let ov = document.getElementById("insUbicModal");
+  if (!ov) { ov = document.createElement("div"); ov.id = "insUbicModal"; ov.style.cssText = "position:fixed;inset:0;z-index:1298;background:rgba(2,6,23,.78);display:flex;align-items:center;justify-content:center;padding:16px;"; document.body.appendChild(ov); }
+
+  ov.innerHTML = '<div style="background:#f8fafc;max-width:420px;width:100%;border-radius:16px;padding:20px;box-shadow:0 24px 70px rgba(0,0,0,.5);box-sizing:border-box;">' +
+    '<div style="font-size:18px;font-weight:800;margin-bottom:3px;">' + (isIn ? "📥 Recepción" : "📤 Entrega") + '</div>' +
+    '<div style="font-size:13px;color:#64748b;margin-bottom:16px;">' + titulo + '</div>' +
+    '<input type="text" id="insUbicInput" placeholder="' + hint + ' (ej: Cervantes, Centro, Proveedor X)" ' +
+      'style="width:100%;box-sizing:border-box;height:48px;border:2px solid #cbd5e1;border-radius:12px;padding:0 12px;font-size:16px;margin-bottom:12px;" />' +
+    '<div style="display:flex;gap:10px;">' +
+      '<button onclick="insUbicCancel()" style="flex:1;padding:14px;border:none;border-radius:10px;background:#e2e8f0;color:#475569;font-weight:700;cursor:pointer;font-size:16px;">Cancelar</button>' +
+      '<button onclick="insUbicOk(\'' + mode + '\')" style="flex:1;padding:14px;border:none;border-radius:10px;background:' + (isIn ? '#4f46e5' : '#0d9488') + ';color:#fff;font-weight:700;cursor:pointer;font-size:16px;">Continuar</button>' +
+    '</div>' +
+    '</div>';
+  ov.style.display = "flex";
+
+  // Auto-focus en el input
+  setTimeout(() => {
+    const inp = document.getElementById("insUbicInput");
+    if (inp) inp.focus();
+  }, 100);
+}
+function insUbicCancel() {
+  const ov = document.getElementById("insUbicModal");
+  if (ov) ov.style.display = "none";
+}
+function insUbicOk(mode) {
+  const inp = document.getElementById("insUbicInput");
+  const ubicacion = (inp && inp.value) ? String(inp.value).trim() : "";
+  if (!ubicacion) {
+    alert("Completá la ubicación");
+    return;
+  }
+  insUbicCancel();
+  // Guardar la ubicación en el toggle data y abrir el modal de insumos
+  window._insUbicacion = ubicacion;  // Estado temporal
+  selectOption(mode);
 }
 /* El CSS del modal de insumos lo usa también la solapa "Insumos" de Stock y Compras
    (chips de categoría), así que la inyección va aparte. */
@@ -17089,12 +17139,15 @@ function insConfirmar() {
     _ins.qty = _ins.items.indexOf(sinUni[0]);
     insRender(); return;
   }
-  const rows = sel.map(function (it) { return { cod_art: it.cod, descripcion: it.nombre || null, deposito: "insumos", delta: isIn ? it.qty : -it.qty, tipo: isIn ? "recepcion_insumo" : "entrega_insumo", ref: null, legajo: _ins.legajo || null, unidad: it.unidad, ubicacion: it.ubic || it.sector || null }; });
+  // v9.15: incluir la ubicación origen/destino (preguntada al inicio) en el ref de cada row
+  const ubic = window._insUbicacion || null;
+  const rows = sel.map(function (it) { return { cod_art: it.cod, descripcion: it.nombre || null, deposito: "insumos", delta: isIn ? it.qty : -it.qty, tipo: isIn ? "recepcion_insumo" : "entrega_insumo", ref: ubic, legajo: _ins.legajo || null, unidad: it.unidad, ubicacion: it.ubic || it.sector || null }; });
   const tot = sel.reduce(function (s, it) { return s + it.qty; }, 0);
   try { opDraftClear(_ins && _ins.legajo); } catch (_e) {}
   closeIns();
+  window._insUbicacion = null;  // limpiar
   stockMove(rows);   // offline-safe (vir_stock_pend)
-  try { alert("✓ " + (isIn ? "Entrada" : "Salida") + " registrada: " + sel.length + " insumo(s)."); } catch (_e) {}
+  try { alert("✓ " + (isIn ? "Entrada" : "Salida") + " registrada: " + sel.length + " insumo(s)." + (ubic ? "\n" + (isIn ? "Origen" : "Destino") + ": " + ubic : "")); } catch (_e) {}
 }
 function insHasProgress() { return !!(_ins && _ins.items && _ins.items.some(function (it) { return (it.qty > 0); })); }
 /* ===== v7.13 — ANULAR la sesión de insumos =====
