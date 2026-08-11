@@ -4,7 +4,22 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-11 · Versión app al documentar: **v9.21**
+> Última actualización: 2026-08-11 · Versión app al documentar: **v9.22**
+>
+> Nota: **v9.22 — Módulo "Pedidos Importación" + maestro Importados al día.**
+> Los pedidos de importados se manejan **por fuera de las OC de talleristas** (que quedan igual que
+> antes). Nueva pantalla **"📦 Pedidos Importación"** (botón en el panel supervisor, al lado de "🏭
+> Proveedor de importación"): `openPedidosImportacion` → reusa `ocgFetchImportados()` (motor
+> `v_importados_ordenes` + lógica de partes) y agrupa por **IMPORTADOR → proveedor chino**:
+> **Chef** = Ownland/Kangli/Fujian/Frontier · **Tierra Nativa** (empresa aparte, NO Loeke) =
+> Becky/Hugo Wong/Zhixin (mapa `_IMPORTADOR_DE`). Columnas: proy u/mes, objetivo, stock, en curso,
+> a pedir (u y cajas); 🧩 = parte. Solo lectura por ahora. **Reenvasado por talleristas:** García
+> (Cod_Tallerista 4317) reenvasa importados x24 (437E/438E/439E/440E/035E/113/566E/584E/590E/590ES);
+> Lopez Jose arma Coladores (110/111/112/824/825); Log/Fabr los 838E/877E. Los importados que **nadie
+> reenvasa** quedan con proveedor `Racks` en `OC_Maximos` = "se importa por otra vía, excluido del
+> generador de talleristas". **Maestro `Importados`:** 100% de los importados cruzados contra proveedor
+> chino (0 sin proveedor); se cargó el nuevo **`599E` Pelador Mgo Madera** (Hugo Wong/Tierra Nativa,
+> marca LK, uxb 12, FOB 0.65, 144 pcs/master). Bump `v9.22`.
 >
 > Nota: **v9.20/v9.21 — Sufijo "L" (Cencosud/Chef), pelado en picking + NC Loeke→Chef en Facturación.**
 > **Contexto de negocio:** el sufijo `L`/`EL` al final del código de artículo (ej. `438EL`, `957EL`)

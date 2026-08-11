@@ -3629,6 +3629,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       <button class="sup-action-btn" onclick="openNpConsulta()"><span class="sup-ico">🔎</span><span>Consultar NP / Líos</span></button>
       <button class="sup-action-btn" onclick="stkOpenNpFaltan()"><span class="sup-ico">⚠️</span><span>Pedidos sin cargar en PPP</span></button>
       <button class="sup-action-btn" onclick="stkOpenProvImp()"><span class="sup-ico">🏭</span><span>Proveedor de importación</span></button>
+      <button class="sup-action-btn" onclick="openPedidosImportacion()"><span class="sup-ico">📦</span><span>Pedidos Importación</span></button>
       <button class="sup-action-btn" onclick="openDatosProducto()" style="position:relative;"><span class="sup-ico">🚦</span><span>Completar datos producto</span><span id="dpBadge" class="dp-badge" style="display:none;"></span></button>
       <button class="sup-action-btn" onclick="openConfiguracion()"><span class="sup-ico">⚙️</span><span>Configuración</span></button>
     </div>
@@ -6316,7 +6317,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v9.23";
+const APP_VERSION = "v9.24";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -12740,6 +12741,62 @@ async function provImpSet(codEnc, prov) {
     if (!r.ok) { if (row) row.proveedor = prev; try { alert("No se pudo guardar (HTTP " + r.status + ")."); } catch (_e) {} }
   } catch (_e) { if (row) row.proveedor = prev; try { alert("No se pudo guardar (sin conexión)."); } catch (_e2) {} }
   _provImpRender();
+}
+
+/* v9.22 — Módulo "Pedidos Importación": pantalla dedicada (FUERA de las OC de talleristas)
+   para los pedidos a los proveedores chinos. Reusa ocgFetchImportados() (motor
+   v_importados_ordenes + lógica de partes). Agrupa por IMPORTADOR (Chef / Tierra Nativa) →
+   proveedor chino. Muestra proy, objetivo, stock, en curso y lo a pedir (unidades y cajas).
+   Solo lectura por ahora (la emisión/curso se afina aparte). */
+const _IMPORTADOR_DE = { "Ownland": "Chef", "Kangli": "Chef", "Fujian": "Chef", "Frontier": "Chef",
+                         "Becky": "Tierra Nativa", "Hugo Wong": "Tierra Nativa", "Zhixin": "Tierra Nativa" };
+async function openPedidosImportacion() {
+  _stkPopShell("📦 Pedidos Importación", "stkPopBody");
+  const body = document.getElementById("stkPopBody"); if (!body) return;
+  body.innerHTML = '<div class="stkpop-empty">Calculando pedidos de importación…</div>';
+  let data = { items: [], meses: 10 };
+  try { data = await ocgFetchImportados(); } catch (_e) {}
+  _stkPop = { kind: "pedImp", data: data, soloPedir: true };
+  _pedImpRender();
+}
+function pedImpToggle() { if (!_stkPop || _stkPop.kind !== "pedImp") return; _stkPop.soloPedir = !_stkPop.soloPedir; _pedImpRender(); }
+function _pedImpRender() {
+  const body = document.getElementById("stkPopBody"); if (!body || !_stkPop || _stkPop.kind !== "pedImp") return;
+  const data = _stkPop.data || { items: [], meses: 10 };
+  let items = data.items || [];
+  if (_stkPop.soloPedir) items = items.filter(function (it) { return it.aPedirUni > 0; });
+  const byImp = {};
+  items.forEach(function (it) {
+    const prov = it.prov || "(sin proveedor)";
+    const imp = _IMPORTADOR_DE[prov] || "(sin importador)";
+    if (!byImp[imp]) byImp[imp] = {};
+    if (!byImp[imp][prov]) byImp[imp][prov] = [];
+    byImp[imp][prov].push(it);
+  });
+  let h = '<div class="stkpop-hint">Pedidos a los proveedores chinos (motor <code>v_importados_ordenes</code>, índice <b>' + (data.meses || 10) + ' meses</b>). Separado de las OC de talleristas. 🧩 = parte (proyección = suma de sus terminados).</div>';
+  h += '<div style="margin-bottom:10px"><button class="mva-clear" style="' + (_stkPop.soloPedir ? 'background:#0f766e;color:#fff;border-color:#0f766e' : '') + '" onclick="pedImpToggle()">' + (_stkPop.soloPedir ? '✓ ' : '') + 'Solo lo que hay que pedir</button></div>';
+  const impOrder = ["Chef", "Tierra Nativa", "(sin importador)"];
+  Object.keys(byImp).forEach(function (k) { if (impOrder.indexOf(k) < 0) impOrder.push(k); });
+  let algo = false;
+  impOrder.forEach(function (imp) {
+    const provs = byImp[imp]; if (!provs || !Object.keys(provs).length) return;
+    algo = true;
+    h += '<div style="margin-top:16px;font-size:15px;font-weight:800;color:#0f172a;border-bottom:2px solid #e2e8f0;padding-bottom:4px">🏭 ' + escapeHtml(imp) + '</div>';
+    Object.keys(provs).sort().forEach(function (prov) {
+      const arr = provs[prov];
+      const totCaj = arr.reduce(function (s, it) { return s + (it.aPedirCajas || 0); }, 0);
+      h += '<div class="stkpop-hint" style="margin:8px 0 3px;font-weight:700">' + escapeHtml(prov) + ' · ' + arr.length + ' ítem(s)' + (totCaj ? ' · ' + totCaj + ' cajas' : '') + '</div>';
+      h += '<div class="mva-tblwrap"><table class="mva-tbl"><thead><tr><th>Código</th><th>Descripción</th><th class="num">Proy u/mes</th><th class="num">Objetivo</th><th class="num">Stock</th><th class="num">En curso</th><th class="num">A pedir u</th><th class="num">Cajas</th></tr></thead><tbody>';
+      arr.sort(function (a, b) { return b.aPedirUni - a.aPedirUni; }).forEach(function (it) {
+        const cajTxt = (it.aPedirCajas == null) ? '<span style="color:#94a3b8" title="Sin uni×caja cargado">—</span>' : String(it.aPedirCajas);
+        const badge = it.esParte ? ' <span style="color:#7c3aed" title="Parte">🧩</span>' : '';
+        h += '<tr><td><b>' + escapeHtml(codCanon(it.cod)) + '</b>' + badge + '</td><td style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escapeHtml(it.desc || "") + '">' + escapeHtml(artNombre(it.cod, it.desc)) + '</td><td class="num">' + it.proyUni + '</td><td class="num">' + it.objetivoUni + '</td><td class="num">' + it.stockUni + '</td><td class="num">' + it.enCurso + '</td><td class="num" style="font-weight:800;color:#b45309">' + it.aPedirUni + '</td><td class="num">' + cajTxt + '</td></tr>';
+      });
+      h += '</tbody></table></div>';
+    });
+  });
+  if (!algo) h += '<div class="stkpop-empty">No hay importados ' + (_stkPop.soloPedir ? 'para pedir (todo en o sobre el objetivo)' : 'cargados') + '.</div>';
+  body.innerHTML = h;
 }
 function _stkWin(mv, exemptInicial) {
   const cut = _stk.cutoff ? new Date(_stk.cutoff).getTime() : 0;
