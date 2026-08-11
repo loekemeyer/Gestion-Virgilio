@@ -6,6 +6,18 @@
 >
 > Última actualización: 2026-08-11 · Versión app al documentar: **v9.25**
 >
+> Nota SERVER (sin bump de app): **FIX stock — pedidos Chef facturados afuera dejaban stock LK trabado.**
+> Los pedidos de **Chef (NP 44xxx)** facturan mercadería **LK** afuera de la app (Cencosud/Chef, lo del
+> sufijo "L"). La **ETAPA 3** de `reconciliar_pipeline_stock()` drenaba `a_facturar` **solo si la tanda
+> seguía en el PPP del día** (`PPP_Programacion_Diaria`, que se reemplaza a diario). Como los Chef se
+> facturan **después** de que la tanda se cae del PPP, nunca drenaban → **stock LK fantasma** en
+> `a_facturar` que rompe stocks (caso D15A: 550 cajas colgadas desde 05/08; el 100% de la alerta "stock
+> estancado" era esto). **Fix:** ETAPA 3 usa fuente **durable** = NPs de la tanda de `PPP_Entregados_Meta`
+> (histórico) ∪ `PPP_Programacion_Diaria` (actual) → drena cuando todas las NP están facturadas, tenga o
+> no la tanda en el PPP. **Backlog** (D15A 550 + D06E 3 = 553 cajas) se drenó a mano (`facturado`,
+> `legajo='reconcilia'`, `ref='<tanda>|FIX_CHEF_ESTANCADO_20260811'` → trazable/reversible), scope desde
+> 1/8. Verificado: sin a_facturar negativos, backlog en 0. SQL en `sql/reconciliar_pipeline_stock.sql`.
+>
 > Nota SERVER (sin bump de app): **Alerta "STOCK ESTANCADO" ahora dice NP + día de PPP.**
 > Cada línea de **pickeado** agrega la **tanda** (del `ref` del movimiento más reciente que dejó
 > stock en `separar_pedidos`/`a_facturar`) y, a partir de ella, las **NP(s)** y el **día de PPP**
