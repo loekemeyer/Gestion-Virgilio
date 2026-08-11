@@ -10670,6 +10670,43 @@ function _ocgAutoEnTxt() { const n = _ocgNextAuto(); return "se genera automáti
 function _ocgNextAutoFecha() { const n = _ocgNextAuto(); return "miércoles " + String(n.date.getUTCDate()).padStart(2, "0") + "/" + String(n.date.getUTCMonth() + 1).padStart(2, "0") + " 07:00"; }
 let _ocgCdTimer = null;
 function ocgStartCountdown() { if (_ocgCdTimer) return; _ocgCdTimer = setInterval(function () { const el = document.getElementById("ocgCountdown"); if (!el) { clearInterval(_ocgCdTimer); _ocgCdTimer = null; return; } el.textContent = _ocgAutoEnTxt(); }, 30000); }
+/* v9.12 — OC de IMPORTADOS (circuito propio, aparte del generador nacional). Lee la vista
+   `v_importados_ordenes` (motor de importados: stock en UNIDADES event-sourced, proyección madre
+   en unidades/mes y meses objetivo = 10 de Importados_Config). Agrega por cod_art sumando las
+   marcas/plantas (principal=true), y calcula lo a pedir en unidades y en cajas (÷ uni_x_caja).
+   Se muestra como sección dentro de "Generar OCs", agrupado por PROVEEDOR CHINO. La fórmula fina
+   (stock por todos los estadios, partes, etc.) se sigue afinando. */
+const SUPABASE_IMPORTADOS_OC_ENDPOINT = SUPABASE_URL + "/rest/v1/v_importados_ordenes";
+async function ocgFetchImportados() {
+  let rows = [];
+  try {
+    rows = await supaFetchAllSafe(SUPABASE_IMPORTADOS_OC_ENDPOINT, "select=cod_art,marca,proveedor,descripcion,uni_x_caja,est_madre_eff,meses_objetivo,stock_actual,pedido_curso,principal,activo&principal=eq.true&activo=eq.true");
+  } catch (_e) { return { items: [], meses: 10 }; }
+  const by = {};
+  let meses = 10;
+  (rows || []).forEach(function (r) {
+    const cod = String(r.cod_art || "").trim(); if (!cod) return;
+    const k = cod.toUpperCase();
+    if (!by[k]) by[k] = { cod: cod, desc: r.descripcion || "", prov: String(r.proveedor || "").trim() || "(sin proveedor)", uxc: 0, proyUni: 0, stockUni: 0, enCurso: 0 };
+    const o = by[k];
+    o.proyUni += Number(r.est_madre_eff) || 0;
+    o.stockUni += Number(r.stock_actual) || 0;
+    o.enCurso += Number(r.pedido_curso) || 0;
+    const u = Number(r.uni_x_caja) || 0; if (u > o.uxc) o.uxc = u;
+    const m = Number(r.meses_objetivo) || 0; if (m > 0) meses = m;
+    if (!o.desc && r.descripcion) o.desc = r.descripcion;
+    if ((o.prov === "(sin proveedor)") && r.proveedor) o.prov = String(r.proveedor).trim();
+  });
+  const items = [];
+  Object.keys(by).forEach(function (k) {
+    const o = by[k];
+    const objetivoUni = Math.round(o.proyUni * meses);
+    const aPedirUni = Math.max(0, Math.ceil(objetivoUni - o.stockUni - o.enCurso));
+    const aPedirCajas = (o.uxc > 0) ? Math.ceil(aPedirUni / o.uxc) : null;
+    items.push({ cod: o.cod, desc: o.desc, prov: o.prov, proyUni: Math.round(o.proyUni), meses: meses, objetivoUni: objetivoUni, stockUni: Math.round(o.stockUni), enCurso: Math.round(o.enCurso), aPedirUni: aPedirUni, uxc: o.uxc, aPedirCajas: aPedirCajas });
+  });
+  return { items: items, meses: meses };
+}
 async function ocgEnter() {
   if (!_oc) return;
   _oc.view = "gen"; _oc.gen = null; ocRender();   // muestra "calculando…"
@@ -10714,6 +10751,8 @@ async function ocgEnter() {
     _oc.gen = { items: items, fecha: new Date().toISOString().slice(0, 10) };
     ocRender();
     ocgStartCountdown();   // v7.67: contador vivo dentro del botón "Generar las OCs"
+    // v9.12 — sección de importados (circuito propio). No rompe el generador nacional si falla.
+    try { const imp = await ocgFetchImportados(); if (_oc && _oc.gen) { _oc.gen.imp = imp; ocRender(); } } catch (_e) {}
   } catch (e) { if (_oc) { _oc.gen = { error: String(e.message || e), items: [] }; ocRender(); } }
 }
 function ocgGroups() {
@@ -10743,6 +10782,33 @@ function ocBodyGen() {
       const proyTxt = (it.fuente === "proy") ? (Math.round(it.proy) + "") : '<span style="color:#94a3b8" title="Sin ventas (proyección 0) → el Máximo sale de la capacidad de góndola">0</span>';
       const maxTxt = it.max + (it.capped ? ' <span style="color:#b45309;font-weight:800" title="Topado a la capacidad de góndola (' + it.cap + ' cajas) — proy×índice daba más">⤓</span>' : '');
       h += '<tr><td class="oc-cod">' + escapeHtml(codCanon(it.cod)) + '</td><td>' + escapeHtml(artNombre(it.cod, it.desc)) + '</td><td class="num">' + proyTxt + '</td><td class="num">' + it.indice + '</td><td class="num">' + maxTxt + '</td><td class="num">' + it.demanda + '</td><td class="num">' + it.stock + '</td><td class="num oc-falt">' + it.falta + '</td></tr>';
+    });
+    h += '</tbody></table></div>';
+  });
+  h += ocBodyGenImportados();
+  return h;
+}
+/* v9.12 — Sección "Importados (por proveedor chino)" dentro de Generar OCs. Vista previa del
+   circuito de importados (unidades → cajas, índice = meses objetivo). Solo lectura por ahora:
+   la emisión de la OC al proveedor chino se afina con más análisis. */
+function ocBodyGenImportados() {
+  const gen = _oc && _oc.gen;
+  if (!gen) return "";
+  if (!gen.imp) return '<div class="oc-meta" style="margin-top:16px;color:#94a3b8">🌎 Importados: calculando…</div>';
+  const items = (gen.imp.items || []).filter(function (it) { return it.aPedirUni > 0; });
+  let h = '<div class="oc-meta" style="margin-top:18px;border-top:2px solid #e2e8f0;padding-top:12px"><b>🌎 Importados — OC por proveedor chino</b> · índice <b>' + (gen.imp.meses || 10) + ' meses</b> · <small style="color:#94a3b8">stock y proyección en unidades (motor <code>v_importados_ordenes</code>). Vista previa — la emisión se afina con más análisis.</small></div>';
+  if (!items.length) { h += '<div class="oc-empty" style="margin-top:6px">No hay importados para pedir (todo en o sobre el objetivo).</div>'; return h; }
+  const g = {};
+  items.forEach(function (it) { const k = it.prov || "(sin proveedor)"; if (!g[k]) g[k] = []; g[k].push(it); });
+  const keys = Object.keys(g).sort(function (a, b) { return a.localeCompare(b); });
+  keys.forEach(function (k) {
+    const arr = g[k]; const sinP = (k === "(sin proveedor)");
+    const totCaj = arr.reduce(function (s, it) { return s + (it.aPedirCajas || 0); }, 0);
+    h += '<div class="oc-meta" style="margin-top:12px;margin-bottom:4px' + (sinP ? ';color:#b45309' : '') + '"><b>' + escapeHtml(k) + '</b> · ' + arr.length + ' ítem(s) · ' + totCaj + ' cajas' + (sinP ? ' &nbsp;<span style="font-weight:800">⚠ asigná proveedor en 🏭 Proveedor de importación</span>' : '') + '</div>';
+    h += '<div class="oc-tblwrap"><table class="oc-tbl"><thead><tr><th>Código</th><th>Descripción</th><th class="num">Proy u/mes</th><th class="num">Meses</th><th class="num">Objetivo u</th><th class="num">Stock u</th><th class="num">En curso</th><th class="num">A pedir u</th><th class="num">Cajas</th></tr></thead><tbody>';
+    arr.sort(function (a, b) { return b.aPedirUni - a.aPedirUni; }).forEach(function (it) {
+      const cajTxt = (it.aPedirCajas == null) ? '<span style="color:#94a3b8" title="Sin uni×caja cargado">—</span>' : String(it.aPedirCajas);
+      h += '<tr><td class="oc-cod">' + escapeHtml(codCanon(it.cod)) + '</td><td>' + escapeHtml(artNombre(it.cod, it.desc)) + '</td><td class="num">' + it.proyUni + '</td><td class="num">' + it.meses + '</td><td class="num">' + it.objetivoUni + '</td><td class="num">' + it.stockUni + '</td><td class="num">' + it.enCurso + '</td><td class="num oc-falt">' + it.aPedirUni + '</td><td class="num">' + cajTxt + '</td></tr>';
     });
     h += '</tbody></table></div>';
   });
