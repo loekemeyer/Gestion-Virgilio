@@ -4,7 +4,16 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-11 · Versión app al documentar: **v9.60**
+> Última actualización: 2026-08-11 · Versión app al documentar: **v9.63**
+>
+> Nota **v9.61–v9.63** — **Avisar programación:** (v9.61) `_avpTel` normaliza el teléfono al
+> formato **wa.me** (54 9 + área sin 0 + número sin 15) — antes los números locales daban links
+> rotos; (v9.62) **cargar/editar teléfono inline** (`avpEditTel` → `whatsapp_clientes`) y **deshacer
+> aviso** (`avpUndoCliente` → borra el log, policy `epl_del`). **Recepción (idea 3239, v9.63):**
+> `gondReturnCheck` avisa (no bloquea) al recibir si un artículo no estaba en la OC + no entra en
+> góndola (×1.20) + baja rotación (<50 caj/mes) → pedir autorización. `recepcion.js?v=9.63`.
+>
+> Nota anterior · Versión app al documentar: **v9.60**
 >
 > Nota **v9.60** — **Bajada de racks del operario = INMEDIATA.** El flujo `rkbSubmit`
 > (botón RKB del operario) ahora mueve el stock al instante (`stockMove`: racks − / góndola +)

@@ -864,6 +864,43 @@ function ocPctExceso(cod, cajas) {
   return ref > 0 ? Math.round((cajas / ref - 1) * 100) : 0;
 }
 
+/* v9.63 (idea 3239) — AVISO "no entra en góndola / capaz se devuelve". Al recibir, marca (NO
+   bloquea) los artículos que cumplen LAS TRES: (1) NO estaban en la OC vigente, (2) NO entran en
+   góndola por mucho ((góndola actual + lo recibido) > capacidad × 1.20), (3) baja rotación
+   (proyección < 50 caj/mes). El operario tiene que pedir confirmación de que no se devuelve.
+   Best-effort: si no hay capacidad cargada para el código, NO avisa (evita falsos positivos).
+   Datos: Capacidad_Sector (góndola máx), vista_saldos_stock.terminado (góndola actual),
+   proyeccion_madre.proy_cajas_mes (rotación), opState.ocPorCod (lo pedido en la OC). */
+const GOND_EXCESO_FACTOR = 1.20;   // "por mucho" = 20% arriba de la capacidad de góndola
+const GOND_BAJA_ROT = 50;          // baja rotación = menos de 50 cajas/mes de proyección
+async function gondReturnCheck(items) {
+  try {
+    await sessionReady;
+    const cods = [];
+    (items || []).forEach(function (it) { const c = String(it.cod || "").trim(); if (c && cods.indexOf(c) < 0) cods.push(c); });
+    if (!cods.length) return [];
+    const res = await Promise.all([
+      supabase.from("Capacidad_Sector").select("cod,cajas_max"),
+      supabase.from("vista_saldos_stock").select("cod_art,terminado").in("cod_art", cods),
+      supabase.from("proyeccion_madre").select("cod,proy_cajas_mes")
+    ]);
+    const cap = {}, gond = {}, proy = {};
+    ((res[0] && res[0].data) || []).forEach(function (r) { const k = _ocgNorm(r.cod); if (k) cap[k] = (cap[k] || 0) + (Number(r.cajas_max) || 0); });
+    ((res[1] && res[1].data) || []).forEach(function (r) { gond[_ocgNorm(r.cod_art)] = Number(r.terminado) || 0; });
+    ((res[2] && res[2].data) || []).forEach(function (r) { const k = _ocgNorm(r.cod); if (k) proy[k] = Number(r.proy_cajas_mes) || 0; });
+    const flag = [];
+    (items || []).forEach(function (it) {
+      const k = _ocgNorm(it.cod);
+      const c = cap[k] || 0; if (c <= 0) return;             // sin capacidad conocida → no aviso (evita falso positivo)
+      if (ocDeCod(it.cod)) return;                           // estaba en la OC → no aviso
+      const p = proy[k] || 0; if (p >= GOND_BAJA_ROT) return; // rota bien → no aviso
+      const g = gond[k] || 0;
+      if ((g + Number(it.cajas || 0)) > c * GOND_EXCESO_FACTOR) flag.push({ cod: it.cod, cajas: it.cajas, cap: c, gond: g, proy: p });
+    });
+    return flag;
+  } catch (_e) { return []; }
+}
+
 /* ============== Paso 4: grilla de códigos ============== */
 async function renderArticulos() {
   opState.step = "articulos";
@@ -1420,6 +1457,14 @@ async function opEnviar() {
       localStorage.setItem("vir_stock_pend", JSON.stringify(p.slice(-5000)));
     } catch (_e) {}
   }
+
+  // idea 3239 — AVISO (no bloquea): lo recibido no entra en góndola + no estaba en la OC + baja
+  // rotación → pedir confirmación de que no se devuelve. Best-effort, después de registrar.
+  gondReturnCheck(items).then(function (flag) {
+    if (!flag || !flag.length) return;
+    const txt = flag.map(function (f) { return "• " + f.cod + " — llegan " + f.cajas + " (góndola " + Math.round(f.gond) + "/" + Math.round(f.cap) + " máx · proy " + Math.round(f.proy) + " caj/mes)"; }).join("\n");
+    try { alert("⚠ OJO: esto NO entra en góndola, es de baja rotación y NO estaba en la OC:\n\n" + txt + "\n\nPedí AUTORIZACIÓN / confirmación de que no se devuelve."); } catch (_e) {}
+  }).catch(function () {});
 
   // v4.61 — AVISO recepción sin planimetría: si llegan códigos que NO tienen lugar en
   // la góndola (window.GONDOLA, planimetría), se emite un evento RSP → trigger Telegram
