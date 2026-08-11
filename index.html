@@ -6299,7 +6299,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v9.13";
+const APP_VERSION = "v9.14";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -10697,13 +10697,24 @@ async function ocgFetchImportados() {
     if (!o.desc && r.descripcion) o.desc = r.descripcion;
     if ((o.prov === "(sin proveedor)") && r.proveedor) o.prov = String(r.proveedor).trim();
   });
+  // v9.14 — PARTES: la proyección de una parte (cremallera 523C, espiral 1000900, corta queso
+  // 1546903, cuchilla 505C) NO sale de sus ventas sino de la SUMA de proyección de los terminados
+  // que la usan (tabla Importados_Partes_Map → vista_importados_partes). Se pisa proyUni.
+  const parteProy = {};
+  try {
+    const pr = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/vista_importados_partes", "select=cod,proy_uni_mes,detalle");
+    (pr || []).forEach(function (r) { parteProy[String(r.cod).toUpperCase().trim()] = { proy: Number(r.proy_uni_mes) || 0, detalle: r.detalle || null }; });
+  } catch (_e) {}
   const items = [];
   Object.keys(by).forEach(function (k) {
     const o = by[k];
-    const objetivoUni = Math.round(o.proyUni * meses);
+    const pp = parteProy[String(o.cod).toUpperCase().trim()];
+    const esParte = !!pp;
+    const proyUni = esParte ? pp.proy : o.proyUni;
+    const objetivoUni = Math.round(proyUni * meses);
     const aPedirUni = Math.max(0, Math.ceil(objetivoUni - o.stockUni - o.enCurso));
     const aPedirCajas = (o.uxc > 0) ? Math.ceil(aPedirUni / o.uxc) : null;
-    items.push({ cod: o.cod, desc: o.desc, prov: o.prov, proyUni: Math.round(o.proyUni), meses: meses, objetivoUni: objetivoUni, stockUni: Math.round(o.stockUni), enCurso: Math.round(o.enCurso), aPedirUni: aPedirUni, uxc: o.uxc, aPedirCajas: aPedirCajas });
+    items.push({ cod: o.cod, desc: o.desc, prov: o.prov, proyUni: Math.round(proyUni), meses: meses, objetivoUni: objetivoUni, stockUni: Math.round(o.stockUni), enCurso: Math.round(o.enCurso), aPedirUni: aPedirUni, uxc: o.uxc, aPedirCajas: aPedirCajas, esParte: esParte, parteDet: (pp ? pp.detalle : null) });
   });
   return { items: items, meses: meses };
 }
@@ -10808,7 +10819,13 @@ function ocBodyGenImportados() {
     h += '<div class="oc-tblwrap"><table class="oc-tbl"><thead><tr><th>Código</th><th>Descripción</th><th class="num">Proy u/mes</th><th class="num">Meses</th><th class="num">Objetivo u</th><th class="num">Stock u</th><th class="num">En curso</th><th class="num">A pedir u</th><th class="num">Cajas</th></tr></thead><tbody>';
     arr.sort(function (a, b) { return b.aPedirUni - a.aPedirUni; }).forEach(function (it) {
       const cajTxt = (it.aPedirCajas == null) ? '<span style="color:#94a3b8" title="Sin uni×caja cargado">—</span>' : String(it.aPedirCajas);
-      h += '<tr><td class="oc-cod">' + escapeHtml(codCanon(it.cod)) + '</td><td>' + escapeHtml(artNombre(it.cod, it.desc)) + '</td><td class="num">' + it.proyUni + '</td><td class="num">' + it.meses + '</td><td class="num">' + it.objetivoUni + '</td><td class="num">' + it.stockUni + '</td><td class="num">' + it.enCurso + '</td><td class="num oc-falt">' + it.aPedirUni + '</td><td class="num">' + cajTxt + '</td></tr>';
+      var parteBadge = "";
+      if (it.esParte) {
+        var detTxt = "";
+        try { if (it.parteDet && it.parteDet.length) detTxt = it.parteDet.map(function (d) { return d.cod + ": " + d.proy; }).join("  ·  "); } catch (_e) {}
+        parteBadge = ' <span style="color:#7c3aed;font-weight:800;cursor:help" title="Parte: la proyección es la SUMA de los terminados que la usan → ' + escapeHtml(detTxt) + '">🧩</span>';
+      }
+      h += '<tr><td class="oc-cod">' + escapeHtml(codCanon(it.cod)) + parteBadge + '</td><td>' + escapeHtml(artNombre(it.cod, it.desc)) + '</td><td class="num">' + it.proyUni + '</td><td class="num">' + it.meses + '</td><td class="num">' + it.objetivoUni + '</td><td class="num">' + it.stockUni + '</td><td class="num">' + it.enCurso + '</td><td class="num oc-falt">' + it.aPedirUni + '</td><td class="num">' + cajTxt + '</td></tr>';
     });
     h += '</tbody></table></div>';
   });
