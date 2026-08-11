@@ -6384,7 +6384,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v9.33";
+const APP_VERSION = "v9.34";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -13869,15 +13869,22 @@ async function stkFaltLoad() {
       supaFetchAllSafe(SUPABASE_URL + "/rest/v1/vista_saldos_stock",
         "select=cod_art,descripcion,terminado,excedente,a_guardar,racks,racks_ch,para_envasar,separar_pedidos,a_facturar,insumos"),
       // v8.38 — códigos DISCONTINUOS (activo=false en OC_Maximos): no se muestran en Faltantes.
-      supaFetchAllSafe(SUPABASE_OCMAX_ENDPOINT, "select=cod&activo=eq.false")
+      supaFetchAllSafe(SUPABASE_OCMAX_ENDPOINT, "select=cod&activo=eq.false"),
+      // v9.34 — NP ya ENTREGADAS (completadas) y CANCELADAS: no son faltante (igual que ocgDemanda).
+      supaFetchAllSafe(SUPABASE_URL + "/rest/v1/PPP_Entregados_Meta", "select=np"),
+      supaFetchAllSafe(SUPABASE_URL + "/rest/v1/NP_Canceladas", "select=np")
     ]);
-    var ppp = res[0] || [], base = res[1], facRows = res[2] || [], genProv = res[3] || [], saldos = res[4] || [], discRows = res[5] || [];
+    var ppp = res[0] || [], base = res[1], facRows = res[2] || [], genProv = res[3] || [], saldos = res[4] || [], discRows = res[5] || [], entRows = res[6] || [], canRows = res[7] || [];
     // Set de códigos discontinuos (normalizados) → se filtran de la tabla.
     var discont = {};
     discRows.forEach(function (r) { var k = _ocgNorm(r.cod); if (k) discont[k] = true; });
-    // Set de NPs facturadas
+    // Set de NPs que YA NO son faltante: facturadas + entregadas (completadas) + canceladas ("no va").
+    // v9.34 — antes solo miraba facturadas; las entregadas/canceladas seguían apareciendo como
+    // "faltante que no falta" aunque el pedido ya estaba cumplido o dado de baja.
     var facSet = {};
     facRows.forEach(function (r) { var n = pickNormNp(r.np); if (n) facSet[n] = true; });
+    entRows.forEach(function (r) { var n = pickNormNp(r.np); if (n) facSet[n] = true; });
+    canRows.forEach(function (r) { var n = pickNormNp(r.np); if (n) facSet[n] = true; });
     // Mapa proveedor por código normalizado, igual que el generador de OCs: proveedor real
     // (ignora "(sin proveedor)"); si hay reparto a un 2° proveedor, se muestra "P1 / P2".
     var provMap = {};
