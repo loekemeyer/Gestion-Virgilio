@@ -6403,7 +6403,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v9.67";
+const APP_VERSION = "v9.68";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -20048,10 +20048,11 @@ function ccReleaseWakeLock() { try { if (_ccWakeLock) { _ccWakeLock.release(); _
    NO se muestran. De acá en adelante: todo NP facturado+cerrado que NO se haya
    cargado (sin CCN) aparece, hasta que se cargue (sin ventana de tiempo). v3.50. */
 const CC_REPARTO_DESDE_ISO = "2026-06-22T00:00:00-03:00";
-/* v9.67 — el reparto (Carga Camión) muestra SOLO lo que sigue en la Programación Diaria (el plan
-   vivo). Un facturado que ya salió del plan se asume entregado → no se muestra. Reemplaza la
-   ventana de días de v9.66: así un pedido viejo pero todavía planeado se mantiene, y uno reciente
-   ya sacado del plan desaparece. Ver fetchCCData (fetch de PPP_Programacion_Diaria + filtro). */
+/* v9.68 — el reparto (Carga Camión) muestra lo que REALMENTE falta cargar: facturado + NO cargado
+   (CCN) + NO entregado. El estado terminal del flujo es "Pedido entregado" (PPP_Entregados_Meta),
+   así que ese es el corte: sale del CC al cargarse (CCN) o al entregarse (aunque olvidaran el CCN).
+   Lo que queda = facturado sin cargar sin entregar, incluidos los olvidados (así se ven, no se
+   esconden). Reemplaza el filtro por Programación Diaria (v9.67) y la ventana de días (v9.66). */
 
 /* Arma el REPARTO del CC: NP facturados Y CERRADOS (cierre_id no nulo = pasaron
    por "Generar PDF") desde CC_REPARTO_DESDE_ISO, MENOS los ya cargados al camión
@@ -20067,8 +20068,10 @@ async function fetchCCData() {
   const ccnUrl = SUPABASE_TABLE_ENDPOINT
     + "?opcion=eq.CCN&ts_cliente=gte." + encodeURIComponent(desdeIso)
     + "&select=texto,ts_cliente&limit=20000";
-  // v9.67 — NP que siguen en la Programación Diaria (plan vivo): solo esas se muestran en el reparto.
-  const progUrl = SUPABASE_URL + "/rest/v1/PPP_Programacion_Diaria?select=np&limit=50000";
+  // v9.68 — NP ya ENTREGADAS (estado terminal del flujo, tabla propia). Se sacan del reparto:
+  // el pedido sale del CC al cargarse (CCN) o, si olvidaron el CCN, al entregarse. Lo que queda es
+  // lo que REALMENTE falta cargar (facturado, sin cargar, sin entregar) — incluidos los olvidados.
+  const entrUrl = SUPABASE_URL + "/rest/v1/PPP_Entregados_Meta?select=np&limit=100000";
   // Líos por NP: eventos TAL (anotados al terminar armado). Mismo origen que usa Recepción Remitos.
   const talUrl = SUPABASE_TABLE_ENDPOINT
     + "?opcion=eq.TAL&ts_cliente=gte." + encodeURIComponent(sinceTal)
@@ -20078,12 +20081,12 @@ async function fetchCCData() {
     fetch(ccnUrl, { headers, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }),
     fetch(talUrl, { headers, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }),
     fetchSinSalidaMap(desdeIso),
-    fetch(progUrl, { headers, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; })
+    fetch(entrUrl, { headers, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; })
   ]);
-  const repR = _par[0], ccnR = _par[1], talR = _par[2], fssMap = _par[3], progR = _par[4];
-  // v9.67 — set de NP que siguen en la Programación Diaria (plan vivo). Si el fetch falla, queda
-  // null → NO filtramos (degradación segura: mejor mostrar de más que ocultar un reparto real).
-  const progSet = (progR && progR.length) ? new Set(progR.map(function (p) { return String(p.np || "").trim().replace(/\.0+$/, ""); })) : null;
+  const repR = _par[0], ccnR = _par[1], talR = _par[2], fssMap = _par[3], entrR = _par[4];
+  // v9.68 — set de NP ya ENTREGADAS. Si el fetch falla queda vacío → NO filtramos por entrega
+  // (degradación segura: mejor mostrar de más que ocultar un reparto real).
+  const entregadas = new Set((entrR || []).map(function (p) { return String(p.np || "").trim().replace(/\.0+$/, ""); }));
   // Última carga (CCN) por NP; una NP está "cargada" salvo que haya un FSS más reciente
   // (volvió al depósito) → reaparece en Carga Camión para re-despacharla. v6.66.
   const maxCcn = new Map();
@@ -20105,7 +20108,7 @@ async function fetchCCData() {
   for (const row of repR) {
     const np = String(row.np || "").trim().replace(/\.0+$/, "");
     if (!np || seen.has(np) || cargados.has(np)) continue;   // ya cargado → fuera
-    if (progSet && !progSet.has(np)) continue;               // v9.67: ya salió del plan (Prog. Diaria) → entregado, fuera
+    if (entregadas.has(np)) continue;                        // v9.68: ya entregado (estado terminal) → fuera
     seen.add(np);
     items.push({ np: np, tanda: (String(row.tanda || "").trim() || "—"), rs: row.razon_social || "", lios: lios.has(np) ? lios.get(np) : null });
   }
