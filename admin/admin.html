@@ -3,6 +3,11 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Panel administrativo hospedado bajo /admin/ dentro del repo de Producción
+         Virgilio (que se sirve por GitHub Pages y va en la app Play Store como TWA).
+         noindex/nofollow para que ni buscadores ni la revisión del TWA lo indexen
+         como parte del app pública. -->
+    <meta name="robots" content="noindex,nofollow" />
     <title>Admin - Loekemeyer</title>
     <link rel="icon" type="image/jpeg" href="img/favicon.jpg?v=2" />
     <link rel="stylesheet" href="css/analisis-venta-cliente.css?v=23176" />
@@ -448,6 +453,20 @@
           </div>
 
           <!-- ===== Items sueltos ===== -->
+          <!-- Análisis de Cobranzas: página aparte (no es una <section data-page>),
+               por eso va como <a> y no como <button>. target="_blank" para no
+               perder el estado del panel al abrir. -->
+          <a class="nav-item" href="analisis-cobranzas.html" target="_blank" rel="noopener">
+            <span class="nav-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                <path d="M4 4h16v4H4z"/>
+                <path d="M4 10h10v10H4z"/>
+                <path d="M16 12l4 4-4 4"/>
+                <path d="M20 16h-6"/>
+              </svg>
+            </span>
+            <span>Análisis de Cobranzas</span>
+          </a>
           <button class="nav-item" data-page="analisis-venta-cliente">
             <span class="nav-icon">
               <svg

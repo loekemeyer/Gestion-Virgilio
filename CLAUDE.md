@@ -86,6 +86,80 @@ borró). Layout:
   `styles.css`, `sw.js`) y volver a poner el botón "Cambiar planta". Último sync desde
   commit `d2d6a59` (2026-06-04).
 
+## Panel Web LK bajo `/admin/`
+
+Desde v9.11 el repo hospeda una **copia del panel admin de PaginaLK** bajo
+`/admin/`. Se accede desde el panel supervisor de Virgilio con el botón grande
+**🌐 Panel Web LK** (fila principal, 7 columnas). El botón chequea supervisor y
+navega a `admin/admin.html`. Login: **código OTP de 6 dígitos al mail** vía la
+Edge Function `admin-login-otp` (verify_jwt=false) que manda el código con
+Resend directo (`onboarding@resend.dev` como sender — el SMTP nativo del
+proyecto LK apunta a `@loekemeyer.com` sin verificar en Resend y rechazaría).
+Al verificar setea un password temporal aleatorio en el user y el front hace
+`signInWithPassword` para quedar con sesión.
+
+### Decisión de arquitectura: coexistencia, NO migración
+
+- El admin apunta al proyecto Supabase **LK** (`kwkclwhmoygunqmlegrg`) —
+  distinto del de Virgilio (`hrxfctzncixxqmpfhskv`).
+- Son **dos proyectos Supabase separados a propósito**: producción y comercial
+  son dominios distintos con dueños de datos distintos (ISIS/ERP produce
+  `sales_lines`; Virgilio produce `Registros_Produccion_Virgilio`).
+- **No migrar tablas ni RPCs de LK a Virgilio.** La copia del admin son 31k
+  líneas con 60 RPCs, 40+ tablas, 4 Edge Fns, caches y crons propios; moverlo
+  serían semanas de trabajo sin ganar función que hoy no exista.
+- Cuando desde Virgilio haga falta un dato del admin (BCRA, deuda, historia de
+  un cliente titular de una NP), agregar un cruce puntual vía `postgres_fdw`
+  (mismo patrón que ya usa Virgilio contra LK para PPP, o LK contra Chef para
+  el padrón). Un cruce por vez, on-demand.
+
+### La copia bajo `/admin/` es un espejo, no un fork
+
+- Cambios que hagan falta al admin **deben originarse en el repo `PaginaLK`**
+  y después re-copiarse acá. Mismo patrón que `/cervantes/`.
+- Archivos copiados: `admin.html`, `admin.js`, `admin-supercot.js`,
+  `admin-osa.js`, `admin-excel-krikos.js`, `analisis-venta-cliente.js`,
+  `analisis-cobranzas.html/.js/.css`, `carga-pedidos.html`, `historial.html/.js`,
+  `sugerencias.html/.js`, `excel-parser-smart.js`, `argentina-map-data.js`,
+  `argentina-provinces.json`, `version.js`, `css/admin.css`, `css/productos.css`,
+  `osa/`, `img/favicon.jpg`, `img/no-image.jpg`.
+- **Ajustes propios de la copia** (no revertir al re-sincronizar): (a) redirects
+  `location.href = "/mayorista"` en admin.js → `"../"` (index Virgilio),
+  (b) botón sidebar "Volver a Mayorista" → "Volver a Producción" con `href="../"`,
+  (c) `<meta name="robots" content="noindex,nofollow" />` en los HTML del admin
+  para que ni buscadores ni la revisión del TWA lo indexen, (d) handler de
+  login OTP `lkSendOtp`/`lkVerifyOtp` al final de admin.js que llama a la
+  Edge Function `admin-login-otp`, (e) form de OTP dentro del `#loadingScreen`
+  de admin.html. Si al re-sincronizar se pisa alguno, buscarlo por `LK_ADMIN_EMAIL`,
+  `LK_OTP_FN_URL`, `_lkOtpFn` o `lkLoginBox`.
+
+### Convenciones operativas
+
+- El SW de Virgilio **no cachea** (`self.addEventListener("fetch", () => {})`
+  es no-op), así que no colisiona con `/admin/`.
+- El TWA de Play Store apunta a la raíz de Virgilio; el admin está dentro del
+  `scope`, por eso lleva `robots noindex,nofollow`. No usarlo nunca como `start_url`.
+- Los HTML del admin llevan hardcodeado un `?v=23176` heredado del repo LK
+  (cache-busting). **No hay hook automático que lo bumpee** desde Virgilio. Si
+  se toca un `.js` o `.css` del admin y se necesita invalidar cache, se
+  hace a mano incrementando ese número — o el user hace `Ctrl+F5` (que es lo
+  habitual).
+- La anon key de LK vive en `admin/admin.js` (además de en `sw.js` y `index.html`
+  del propio proyecto LK). Al rotar la anon key de LK, actualizarla también acá.
+
+### Edge Function `admin-login-otp` (proyecto Supabase LK)
+
+- Código fuente: `admin/supabase/admin-login-otp/index.ts`.
+- Deployada manualmente desde el Dashboard de Supabase LK (verify_jwt=off).
+- Reusa la tabla `admin_otp_codes` y los secrets `RESEND_API_KEY` / `RESEND_FROM`
+  del vault, que ya usa la Edge Fn `admin-otp` (2FA del admin PPP).
+- Destinatario **hardcodeado** a `loekemeyer.n8n@gmail.com`. El user está creado
+  a mano en `auth.users` del proyecto LK y vinculado en `public.admins`.
+- Si se cambia el destinatario o se agrega otro admin, editar `RECIPIENT_EMAIL`
+  en la función Y re-deployar; crear el nuevo user en LK y agregarlo a `admins`.
+- **Sensible: 73 chars rompen bcrypt.** El password temporal usa
+  `crypto.randomUUID()` (36 chars). No concatenar dos UUIDs — pasa de 72 y falla.
+
 ## Agentes + código de 4 dígitos (Telegram)
 
 Los agentes ya **NO corren automáticos** (el loop cada 2 h y el curador diario
