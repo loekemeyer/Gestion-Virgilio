@@ -13624,18 +13624,18 @@ function _gvQ(v) {
 // checkAuth() haga el chequeo de admins y renderice el panel.
 window._lkOtpEmail = null;
 
+// Mail del admin hardcodeado (único admin registrado con OTP en el proyecto LK).
+// Si en el futuro hay otro admin, agregar su fila en public.admins vinculada a
+// un auth.users con su email y exponer un selector acá.
+var LK_ADMIN_EMAIL = "loekemeyer.n8n@gmail.com";
+
 async function lkSendOtp() {
-  var emailEl = document.getElementById("lkLoginEmail");
-  var errEl   = document.getElementById("lkLoginError");
-  var msgEl   = document.getElementById("lkLoginMsg");
-  var btnEl   = document.getElementById("lkSendCodeBtn");
+  var errEl = document.getElementById("lkLoginError");
+  var msgEl = document.getElementById("lkLoginMsg");
+  var btnEl = document.getElementById("lkSendCodeBtn");
   if (errEl) errEl.textContent = "";
   if (msgEl) msgEl.textContent = "";
-  var email = ((emailEl && emailEl.value) || "").trim().toLowerCase();
-  if (!email || email.indexOf("@") < 0) {
-    if (errEl) errEl.textContent = "Ingresá un mail válido.";
-    return;
-  }
+  var email = LK_ADMIN_EMAIL;
   if (btnEl) { btnEl.disabled = true; btnEl.textContent = "Enviando..."; }
   try {
     var r = await sb.auth.signInWithOtp({
@@ -13651,6 +13651,9 @@ async function lkSendOtp() {
     window._lkOtpEmail = email;
     var shown = document.getElementById("lkLoginEmailShown");
     if (shown) shown.textContent = email;
+    // Sanitizar cualquier "Verificando sesion..." que quede visible del checkAuth().
+    var st = document.getElementById("authStatus");
+    if (st) st.textContent = "Iniciá sesión";
     var s1 = document.getElementById("lkLoginStep1");
     var s2 = document.getElementById("lkLoginStep2");
     if (s1) s1.style.display = "none";
