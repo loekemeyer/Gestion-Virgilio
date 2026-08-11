@@ -6,11 +6,10 @@
 -- (coladores 437E/438E/439E). Al facturarlos por Chef hay que hacer Nota de Crédito a Loeke
 -- y pasar el stock. Se muestra como filas ✓ "NC hecha" en Facturación (facFetchNcChef).
 --
--- v9.45 (dueño) — 437E y 438E hacen NC a Loeke SOLO si el pedido usa la variante "...L"
--- (ej. 437EL, el código de Loeke); el código PELADO (437E/438E) NO. Antes la vista
--- normalizaba sacando la "L" final y agarraba también los pelados (27 filas → quedaban
--- 20 de 437E/438E que no correspondían). El fix agrega, en el WHERE, que si el base es
--- 437E/438E el artículo del pedido tenga que terminar en "L". (439E y demás quedan igual.)
+-- v9.45/9.46 (dueño) — 437E, 438E y 439E hacen NC a Loeke SOLO si el pedido usa la variante
+-- "...L" (ej. 437EL, el código de Loeke); el código PELADO NO. Antes la vista normalizaba
+-- sacando la "L" final y agarraba también los pelados. El fix agrega, en el WHERE, que si el
+-- base es 437E/438E/439E el artículo del pedido tenga que terminar en "L".
 -- ============================================================
 
 create or replace view public.vista_nc_loeke_chef as
@@ -41,8 +40,8 @@ create or replace view public.vista_nc_loeke_chef as
    FROM ("PPP_Base_Pedidos" b
      JOIN candidatos k ON ((k.base = ltrim(upper(regexp_replace(upper(btrim(b.articulo)), '([0-9E])L$'::text, '\1'::text)), '0'::text))))
   WHERE ((b.pedido ~ '^[0-9]+$'::text) AND ((b.pedido)::bigint < 90000)
-     -- v9.45: 437E/438E → NC a Loeke SOLO si el pedido es la variante "...L" (ej. 437EL); el pelado NO.
-     AND (NOT (k.base = ANY (ARRAY['437E'::text, '438E'::text])) OR (upper(btrim(b.articulo)) ~ 'L$'::text))
+     -- v9.45/9.46: 437E/438E/439E → NC a Loeke SOLO si el pedido es la variante "...L"; el pelado NO.
+     AND (NOT (k.base = ANY (ARRAY['437E'::text, '438E'::text, '439E'::text])) OR (upper(btrim(b.articulo)) ~ 'L$'::text))
      AND (NOT (EXISTS ( SELECT 1 FROM "NC_Loeke_Chef_Hechas" h
           WHERE ((btrim(h.np) = btrim(b.pedido)) AND (ltrim(upper(btrim(h.cod)), '0'::text) = k.base))))))
   GROUP BY (btrim(b.pedido)), k.base
