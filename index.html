@@ -4306,6 +4306,10 @@ function getAllPrevDaysForLegajo(legajo) {
   return result;
 }
 
+/* v9.26: Caché de históricos consultados para evitar queries duplicadas */
+var _historyCache = {};
+function _getCacheKey(legajo, fecha) { return legajo + "::" + fecha; }
+
 function renderLegajoHistory(legajo) {
   const container = document.getElementById("legajoHistoryContent");
   if (!legajo) {
@@ -4313,23 +4317,46 @@ function renderLegajoHistory(legajo) {
     container.innerText = "Ingresá tu legajo para ver el resumen";
     return;
   }
-  const hist = readDayHist(getTodayKey(), String(legajo));
-  if (!hist.length) {
-    container.className = "history-empty";
-    container.innerText = "No hay reportes hoy para este legajo en este dispositivo.";
+
+  // v9.26: Combinar histórico de localStorage (pendientes) + Supabase (confirmados)
+  const localHist = readDayHist(getTodayKey(), String(legajo));
+
+  // Intentar traer de caché local primero
+  const cacheKey = _getCacheKey(String(legajo), getTodayKey());
+  if (_historyCache[cacheKey]) {
+    _renderHistoryWithRemote(legajo, localHist, _historyCache[cacheKey]);
     return;
   }
+
+  // Si no está en caché, lanzar query en background (no bloquea)
+  _fetchAndRenderHistory(legajo, localHist);
+}
+
+/* Función que render el histórico combinado (local + remote). Llamada desde
+   renderLegajoHistory (sync, si hay caché) o desde _fetchAndRenderHistory (async). */
+function _renderHistoryWithRemote(legajo, localHist, remoteHist) {
+  const container = document.getElementById("legajoHistoryContent");
+
+  // Combinar sin duplicados (por ID):
+  // - remoteHist son definitivos (ya en server)
+  // - localHist se agregan si su ID no está en remoteHist
+  const remoteIds = new Set(remoteHist.map(r => r.id));
+  const combined = [
+    ...remoteHist,
+    ...localHist.filter(l => !remoteIds.has(l.id))
+  ];
+
+  if (!combined.length) {
+    container.className = "history-empty";
+    container.innerText = "No hay reportes hoy para este legajo.";
+    return;
+  }
+
   // Orden defensivo: más reciente arriba, más viejo abajo.
-  hist.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+  combined.sort((a, b) => (b.ts || b.createdAt || 0) - (a.ts || a.createdAt || 0));
   container.className = "history-list";
-  container.innerHTML = hist.map(h => {
-    // "Llegó al server" usa createdAt (si Supabase lo devolvió) o sentAt
-    // (la hora en que el cliente recibió la confirmación 201, que para
-    // efectos prácticos es cuando llegó a Supabase).
+  container.innerHTML = combined.map(h => {
     const arrived = h.createdAt || h.sentAt;
-    // El "Dato" del FJ es el JSON con conteos; técnico, confunde al
-    // operario. Para FJ ocultamos esa línea pero la entrada se muestra
-    // igual (con su badge de estado, error incluido).
     const showDato = h.opcion !== "FJ" && h.texto;
     return `
       <div class="history-item">
@@ -4342,6 +4369,45 @@ function renderLegajoHistory(legajo) {
       </div>
     `;
   }).join("");
+}
+
+/* Fetch async del histórico en background. No bloquea el UI. */
+async function _fetchAndRenderHistory(legajo, localHist) {
+  const cacheKey = _getCacheKey(String(legajo), getTodayKey());
+  let remoteHist = [];
+
+  try {
+    const today = getTodayKey(); // formato AAAA-MM-DD en zona horaria Buenos Aires
+    const [year, month, day] = today.split('-').map(Number);
+    const startOfDay = new Date(year, month - 1, day, 0, 0, 0);
+    const endOfDay = new Date(year, month - 1, day, 23, 59, 59);
+
+    const { data, error } = await sb.from("Registros_Produccion_Virgilio")
+      .select("id,legajo,opcion,descripcion,texto,ts_inicio,ts_cliente,created_at")
+      .eq("legajo", String(legajo))
+      .gte("created_at", startOfDay.toISOString())
+      .lte("created_at", endOfDay.toISOString());
+
+    if (!error && data) {
+      remoteHist = data.map(r => ({
+        id: r.id,
+        legajo: r.legajo,
+        opcion: r.opcion,
+        descripcion: r.descripcion,
+        texto: r.texto,
+        ts: r.ts_cliente ? new Date(r.ts_cliente).getTime() : 0,
+        createdAt: r.created_at ? new Date(r.created_at).getTime() : 0,
+        status: "sent"  // ya llegó al server
+      }));
+    }
+  } catch (_e) {
+    console.warn("[renderLegajoHistory] Error al traer histórico de Supabase:", _e);
+    // Si falla la consulta, continuar con solo localStorage
+  }
+
+  // Guardar en caché y renderizar
+  _historyCache[cacheKey] = remoteHist;
+  _renderHistoryWithRemote(legajo, localHist, remoteHist);
 }
 /* ===== v7.12 — RECEPCIÓN A MEDIO CARGAR (borrador de recepcion.js) =====
    Si el operario arrancó una recepción y se fue para atrás / cerró la pantalla, el

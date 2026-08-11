@@ -1183,9 +1183,135 @@ opCajasDelete.onclick = () => {
   drawArticulosGrid();
 };
 
+/* ============== Verificación de código (v9.26) ============== */
+/* Genera código de 4 dígitos al azar */
+function generateVerificationCode() {
+  return Math.floor(1000 + Math.random() * 9000).toString();
+}
+
+/* Modal de verificación: pide escribir el código antes de enviar */
+async function showVerificationModal() {
+  const code = generateVerificationCode();
+
+  return new Promise((resolve) => {
+    const overlay = document.createElement("div");
+    overlay.id = "rcpVerifyOverlay";
+    overlay.style.cssText = `
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.5); z-index: 9999;
+      display: flex; align-items: center; justify-content: center;
+      font-family: inherit;
+    `;
+
+    const modal = document.createElement("div");
+    modal.style.cssText = `
+      background: white; border-radius: 12px; padding: 24px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      max-width: 400px; width: 90vw; text-align: center;
+      font-family: inherit;
+    `;
+
+    const title = document.createElement("h2");
+    title.textContent = "Verificación de Remito";
+    title.style.cssText = `margin: 0 0 16px 0; font-size: 18px; color: #1f2937;`;
+    modal.appendChild(title);
+
+    const instruction = document.createElement("p");
+    instruction.textContent = "Escribí este código en el remito y copialo acá:";
+    instruction.style.cssText = `margin: 0 0 16px 0; color: #6b7280; font-size: 14px;`;
+    modal.appendChild(instruction);
+
+    const codeDisplay = document.createElement("div");
+    codeDisplay.textContent = code;
+    codeDisplay.style.cssText = `
+      background: #f3f4f6; padding: 16px; border-radius: 8px;
+      font-size: 32px; font-weight: bold; letter-spacing: 8px;
+      margin: 0 0 8px 0; font-family: 'Courier New', monospace;
+      color: #1f2937;
+    `;
+    modal.appendChild(codeDisplay);
+
+    const codeHint = document.createElement("p");
+    codeHint.textContent = "✏️ Escribir en el remito físico";
+    codeHint.style.cssText = `
+      margin: 0 0 20px 0; color: #9ca3af; font-size: 13px; font-style: italic;
+    `;
+    modal.appendChild(codeHint);
+
+    const input = document.createElement("input");
+    input.type = "text";
+    input.placeholder = "Escribí el código";
+    input.maxLength = "4";
+    input.style.cssText = `
+      width: 100%; padding: 12px; font-size: 18px; border: 2px solid #e5e7eb;
+      border-radius: 8px; box-sizing: border-box; margin: 0 0 16px 0;
+      font-family: 'Courier New', monospace; letter-spacing: 4px;
+      text-align: center;
+    `;
+    input.oninput = () => {
+      input.value = input.value.replace(/[^0-9]/g, "");
+    };
+    modal.appendChild(input);
+
+    const buttonContainer = document.createElement("div");
+    buttonContainer.style.cssText = `
+      display: flex; gap: 10px; margin-top: 16px;
+    `;
+
+    const confirmBtn = document.createElement("button");
+    confirmBtn.textContent = "✓ Confirmar";
+    confirmBtn.style.cssText = `
+      flex: 1; padding: 12px; background: #2563eb; color: white;
+      border: none; border-radius: 8px; font-size: 14px; font-weight: bold;
+      cursor: pointer; transition: background 0.2s;
+    `;
+    confirmBtn.onmouseover = () => { confirmBtn.style.background = "#1d4ed8"; };
+    confirmBtn.onmouseout = () => { confirmBtn.style.background = "#2563eb"; };
+    confirmBtn.onclick = () => {
+      if (input.value === code) {
+        overlay.remove();
+        resolve(true);
+      } else {
+        input.style.borderColor = "#ef4444";
+        input.style.background = "#fee2e2";
+        setTimeout(() => {
+          input.style.borderColor = "#e5e7eb";
+          input.style.background = "white";
+          input.value = "";
+          input.focus();
+        }, 1000);
+      }
+    };
+    buttonContainer.appendChild(confirmBtn);
+
+    const cancelBtn = document.createElement("button");
+    cancelBtn.textContent = "✕ Cancelar";
+    cancelBtn.style.cssText = `
+      flex: 1; padding: 12px; background: #e5e7eb; color: #1f2937;
+      border: none; border-radius: 8px; font-size: 14px; font-weight: bold;
+      cursor: pointer; transition: background 0.2s;
+    `;
+    cancelBtn.onmouseover = () => { cancelBtn.style.background = "#d1d5db"; };
+    cancelBtn.onmouseout = () => { cancelBtn.style.background = "#e5e7eb"; };
+    cancelBtn.onclick = () => {
+      overlay.remove();
+      resolve(false);
+    };
+    buttonContainer.appendChild(cancelBtn);
+
+    modal.appendChild(buttonContainer);
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+    input.focus();
+  });
+}
 
 /* ============== Enviar (graba todo) ============== */
 async function opEnviar() {
+  // v9.26: Verificación de código antes de enviar
+  const verified = await showVerificationModal();
+  if (!verified) return;
+
   const descPorCod = {};
   (opState.articulos || []).forEach(a => { descPorCod[a.Cod_Art] = a.Desc || ""; });
   const items = Object.entries(opState.cargas)
