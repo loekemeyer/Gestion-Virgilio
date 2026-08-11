@@ -23,12 +23,14 @@ CREATE POLICY ipm_sel ON "Importados_Partes_Map" FOR SELECT TO anon, authenticat
 DROP POLICY IF EXISTS ipm_all ON "Importados_Partes_Map";
 CREATE POLICY ipm_all ON "Importados_Partes_Map" FOR ALL TO authenticated USING (true) WITH CHECK (true);
 
+-- v9.22 — mapeo afinado con el dueño: 505C NO usa 114 (afila cuchillo) / 587 (cuchilla laser) /
+-- 569 (pelanaranjas); cremallera 523C va en 523 y 723; 1546903 no usa 574. 1 parte por unidad.
 INSERT INTO "Importados_Partes_Map" (parte, terminado) VALUES
- ('523C','523'),
+ ('523C','523'),('523C','723'),
  ('1546903','546'),
  ('1000900','520'),('1000900','521'),('1000900','530'),('1000900','531'),
  ('1000900','581'),('1000900','735'),('1000900','730'),('1000900','731'),('1000900','104'),
- ('505C','505'),('505C','586'),('505C','099'),('505C','713'),('505C','123'),('505C','114'),('505C','186')
+ ('505C','505'),('505C','586'),('505C','099'),('505C','713'),('505C','123'),('505C','186')
 ON CONFLICT (parte, terminado) DO NOTHING;
 
 -- ---------- Regla SUPER ----------
