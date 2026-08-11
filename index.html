@@ -6403,7 +6403,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v9.39";
+const APP_VERSION = "v9.40";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -14444,6 +14444,9 @@ function stkBodyFaltante() {
     } else {
       codCell = escapeHtml(codCanon(a.cod));
     }
+    // v9.40 — badge "faltó al armar" por fila (dato REAL de tandas pickeadas, lo mismo que se ve en
+    // Facturación). Es lo que faltó al armar, NO proyección — por eso no está en las columnas S1/S2.
+    if ((a.realFalt || 0) > 0) codCell += ' <span style="display:inline-block;background:#fee2e2;border:1px solid #fecaca;color:#b91c1c;border-radius:6px;padding:0 5px;font-size:10px;font-weight:800;vertical-align:middle;white-space:nowrap;" title="Ya faltaron ' + a.realFalt + ' caja(s) al ARMAR en tandas pickeadas (dato real, no proyección). Es lo que también aparece en Facturación.">🔴 ' + a.realFalt + '</span>';
     h += '<tr data-fkey="' + escapeHtml(a.key) + '"><td class="falt-cod">' + codCell + '</td>' +
       '<td class="falt-desc" title="' + escapeHtml(a.desc) + '">' + escapeHtml(a.desc) + '</td>' +
       '<td class="falt-fab" title="' + escapeHtml(a.prov) + '">' + escapeHtml(a.prov || "—") + '</td>' +
