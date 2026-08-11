@@ -4,7 +4,18 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-11 · Versión app al documentar: **v9.54**
+> Última actualización: 2026-08-11 · Versión app al documentar: **v9.59**
+>
+> Nota **v9.55–v9.59** — **Avisar programación** (varias): (a) badge de Recepción suma remitos por
+> cargar + bajadas de racks; (b) fix 401 al marcar Discontinuo (RLS `Articulos_Discontinuados`);
+> (c) date pickers con `min=2025-01-01`; (d) Plata perdida con drill-down por fila (detalle + resumido);
+> (e) vendedores en grid de boxes compactos; (f) se sacó la alerta de urgentes de "Qué bajar primero";
+> (g) **vend 20 (super) = interno "nosotros"** — no se avisa ni al cliente ni al vendedor
+> (`_avpNoVend`/`_avpNoCliente`); (h) la tabla deja solo **pendientes**, los avisados van a una sección
+> colapsable; (i) **registro de lo enviado al vendedor**: al mandar el resumen se logea cada grupo
+> (tipo='vendedor' con NP) y esos pedidos **no reaparecen** en el resumen los días siguientes
+> (`vendSent` en `avpLoad`/`avpSendVendedor`). Teléfonos cargados en `whatsapp_clientes` (473) y
+> `whatsapp_vendedores` (vend 6).
 >
 > Nota **v9.54** — **Plata perdida: drill-down por fila.** Tocar una fila (artículo/cliente/
 > vendedor) abre un pop-up con el detalle del período: **Fecha · Cod Cliente · Razón Social ·

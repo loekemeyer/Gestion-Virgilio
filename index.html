@@ -6403,7 +6403,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v9.58";
+const APP_VERSION = "v9.59";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -25790,17 +25790,27 @@ async function avpLoad() {
   groups.sort(function (a, b) { return String(a.fppp).localeCompare(String(b.fppp)) || String(a.rs).localeCompare(String(b.rs)); });
   var keyMap = {}, npKey = {};
   groups.forEach(function (g) { keyMap[g.key] = g; g.nps.forEach(function (n) { npKey[n] = g.key; }); });
-  // estado desde el log (avisos a cliente): última marca por grupo + acumulado por vendedor
-  var lastCli = {}, vendNotified = {};
+  // estado desde el log: última marca de aviso a cliente por grupo + resumen pendiente por vendedor.
+  // v9.59 — vendSent = grupos que YA se le mandaron al vendedor (log tipo='vendedor' con np). Esos NO
+  // reaparecen en el resumen del vendedor los días siguientes (no re-mandar la misma programación).
+  var lastCli = {}, vendNotified = {}, vendSent = {};
+  // pass 1: qué grupos ya se le enviaron a cada vendedor
+  log.forEach(function (r) {
+    if (r.tipo !== "vendedor" || r.np == null || !r.vend) return;
+    var key = npKey[String(r.np)]; if (!key) return;
+    (vendSent[r.vend] || (vendSent[r.vend] = {}))[key] = true;
+  });
+  // pass 2: avisos a cliente → estado + resumen del vendedor (excluye lo ya mandado al vendedor)
   log.forEach(function (r) {
     if (r.tipo !== "cliente") return;
     var key = npKey[r.np != null ? String(r.np) : ""]; if (!key) return;
     if (!lastCli[key]) lastCli[key] = r;                        // log viene ts desc → primero = más reciente
     var g = keyMap[key]; if (!g || !g.vend || _avpNoVend(g.vend)) return;
+    if (vendSent[g.vend] && vendSent[g.vend][key]) return;      // ya se lo mandé al vendedor → no reaparece
     if (!vendNotified[g.vend]) vendNotified[g.vend] = {};
     if (!vendNotified[g.vend][key]) vendNotified[g.vend][key] = { rs: g.rs, fppp: g.fppp, cod: g.cod };
   });
-  _avp.groups = groups; _avp.lastCli = lastCli; _avp.vendNotified = vendNotified; _avp.vendW = vendW;
+  _avp.groups = groups; _avp.lastCli = lastCli; _avp.vendNotified = vendNotified; _avp.vendSent = vendSent; _avp.vendW = vendW;
   avpRender();
 }
 /* v9.58 — vendedores INTERNOS ("somos nosotros"): 7 = fábrica, 20 = super. A vend 20 NO se
@@ -25906,7 +25916,16 @@ async function avpSendVendedor(vendEnc) {
   var meta = (_avp.vendW && _avp.vendW[v]) || {};
   if (!meta.tel) { try { alert("El vendedor " + v + " no tiene teléfono en whatsapp_vendedores."); } catch (_e) {} return; }
   var lines = keys.map(function (k) { return notif[k]; }).sort(function (a, b) { return String(a.fppp).localeCompare(String(b.fppp)); });
-  avpLog("vendedor", null, null, v);
+  // v9.59 — registrar QUÉ grupos se le mandaron al vendedor (un row por grupo, con su NP) para que
+  // no vuelvan a aparecer mañana. Y sacarlos del resumen en vivo (queda en 0).
+  if (!_avp.vendSent[v]) _avp.vendSent[v] = {};
+  keys.forEach(function (k) {
+    var g = _avpGroup(k);
+    avpLog("vendedor", (g && g.nps && g.nps[0]) || String(k), (g && g.cod) || null, v);
+    _avp.vendSent[v][k] = true;
+  });
+  _avp.vendNotified[v] = {};                                   // ya enviado → resumen vuelve a 0
+  avpRender();
   window.open(_avpWa(meta.tel, avpMsgVendedor(meta.nombre, lines)), "_blank");
 }
 
