@@ -4,7 +4,16 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-11 · Versión app al documentar: **v9.25**
+> Última actualización: 2026-08-11 · Versión app al documentar: **v9.26**
+>
+> Nota: **v9.26 — Resumen de hoy sincroniza desde Supabase (multi-dispositivo).**
+> El "Resumen de hoy" (módulo Producc, tab "Resumen" / botonera "◀ Resumen del día") ahora carga el
+> histórico de Supabase, no solo localStorage del dispositivo actual. Fixes: si un operario realiza MG
+> en celular A y luego ingresa en celular B, el resumen en B ahora muestra el MG de A (porque está en
+> Supabase). Antes desaparecía porque cada dispositivo tenía su propio localStorage.
+> **Implementación:** `renderLegajoHistory()` sigue siendo sincrónica (no rompe handlers), pero lanza
+> `_fetchAndRenderHistory()` en background, que trae datos de Supabase y los cachea en `_historyCache`.
+> Combina sin duplicados (remoto + local pendiente) en `_renderHistoryWithRemote()`. Bump `v9.26`.
 >
 > Nota: **v9.25 — Stock de PARTE cuenta como stock del terminado importado (94xP → 94xE).**
 > Los **94xE** (cubiertos ac. inox) se **importan** (maestro, Becky) pero **Log/Fabr los ARMA** a
