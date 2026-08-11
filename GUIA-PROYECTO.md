@@ -4,7 +4,16 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-11 · Versión app al documentar: **v9.59**
+> Última actualización: 2026-08-11 · Versión app al documentar: **v9.60**
+>
+> Nota **v9.60** — **Bajada de racks del operario = INMEDIATA.** El flujo `rkbSubmit`
+> (botón RKB del operario) ahora mueve el stock al instante (`stockMove`: racks − / góndola +)
+> y deja la fila en `Racks_Bajadas` como **'aprobada'** — ya NO espera la aprobación de la
+> operadora ni entra a la cola "Bajadas Racks → góndola" (por eso tampoco se cuenta doble). El
+> otro flujo `brConfirmar` (orden de racks) ya movía inmediato desde v8.73. La bajada AUTO
+> (`creada_por='auto'`) sigue como 'propuesta' (sugerencia, requiere aprobación).
+>
+> Nota anterior · Versión app al documentar: **v9.59**
 >
 > Nota **v9.55–v9.59** — **Avisar programación** (varias): (a) badge de Recepción suma remitos por
 > cargar + bajadas de racks; (b) fix 401 al marcar Discontinuo (RLS `Articulos_Discontinuados`);
