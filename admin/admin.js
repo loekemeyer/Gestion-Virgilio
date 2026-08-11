@@ -13914,3 +13914,218 @@ function inicRankingClientes() {
 window.cargarRankingClientes = cargarRankingClientes;
 window.descargarRankingClientesExcel = descargarRankingClientesExcel;
 window.inicRankingClientes = inicRankingClientes;
+/* ============================================================================
+   Panel Top-50 seguimiento clientes (dentro de Gerente de ventas)
+   Dos rankings paralelos (histórico total / pedido máximo individual) para las
+   dos empresas (LK y Chef). Debajo de cada fila, matriz de seguimiento mensual
+   con celdas coloreadas (verde = compró, gris = no compró, rojo = alerta) más
+   un badge de frecuencia habitual y meses sin comprar.
+   Backend: get_top_clientes_hist, get_top_clientes_max_pedido, get_seguimiento_mensual.
+   Pedido explícito 2026-08-11: "no perder pisada de si me están comprando".
+   ============================================================================ */
+var _gvTop = {
+  tab: "hist",       // "hist" | "max"
+  emp: "lk",         // "lk" | "chef"
+  loadedFor: null,   // "tab-emp-mesesAct-mesesSeg" key para no re-pegar sin cambios
+  rows: [],
+  seguimiento: {},   // { cod: {meses[], frecuencia_meses, meses_sin_comprar, alerta} }
+};
+
+function _gvfPlata(n) {
+  var v = Number(n) || 0;
+  if (v >= 1e9) return "$" + (v / 1e9).toFixed(2) + " MM";
+  if (v >= 1e6) return "$" + (v / 1e6).toFixed(1) + " M";
+  if (v >= 1e3) return "$" + (v / 1e3).toFixed(0) + " k";
+  return "$" + Math.round(v).toLocaleString("es-AR");
+}
+function _gvfEsc(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+  });
+}
+
+function gvTopSetTab(t) {
+  if (t !== "hist" && t !== "max") return;
+  _gvTop.tab = t;
+  var bH = document.getElementById("gvTopTabHist");
+  var bM = document.getElementById("gvTopTabMax");
+  if (bH && bM) {
+    bH.style.background = t === "hist" ? "#111" : "transparent";
+    bH.style.color = t === "hist" ? "#fff" : "#333";
+    bM.style.background = t === "max"  ? "#111" : "transparent";
+    bM.style.color = t === "max"  ? "#fff" : "#333";
+  }
+  gvTopCargar();
+}
+function gvTopSetEmp(e) {
+  if (e !== "lk" && e !== "chef") return;
+  _gvTop.emp = e;
+  var bL = document.getElementById("gvTopEmpLk");
+  var bC = document.getElementById("gvTopEmpCh");
+  if (bL && bC) {
+    bL.style.background = e === "lk"   ? "#1e6bd6" : "transparent";
+    bL.style.color      = e === "lk"   ? "#fff"    : "#333";
+    bC.style.background = e === "chef" ? "#1e6bd6" : "transparent";
+    bC.style.color      = e === "chef" ? "#fff"    : "#333";
+  }
+  gvTopCargar();
+}
+window.gvTopSetTab = gvTopSetTab;
+window.gvTopSetEmp = gvTopSetEmp;
+
+async function gvTopCargar() {
+  var st = document.getElementById("gvTopStatus");
+  var cont = document.getElementById("gvTopTabla");
+  if (!cont) return;
+  var mesesSeg = Number(document.getElementById("gvTopMeses").value) || 12;
+  var minActRaw = document.getElementById("gvTopMinAct").value;
+  var minAct = minActRaw ? Number(minActRaw) : null;
+  var key = _gvTop.tab + "-" + _gvTop.emp + "-" + (minAct||"") + "-" + mesesSeg;
+  st.textContent = "Cargando…";
+  cont.innerHTML = "";
+  try {
+    var fn = _gvTop.tab === "max" ? "get_top_clientes_max_pedido" : "get_top_clientes_hist";
+    var rr = await sb.rpc(fn, { p_empresa: _gvTop.emp, p_limit: 50, p_min_periodo_meses: minAct });
+    if (rr.error) throw rr.error;
+    _gvTop.rows = rr.data || [];
+    if (!_gvTop.rows.length) {
+      st.textContent = "";
+      cont.innerHTML = '<div style="padding:20px;color:#64748b;text-align:center;">Sin datos para ' + _gvTop.emp + '.</div>';
+      _gvTop.loadedFor = key;
+      return;
+    }
+    // Traigo el seguimiento de los 50
+    var cods = _gvTop.rows.map(function (r) { return r.cod_cliente; });
+    var sg = await sb.rpc("get_seguimiento_mensual", { p_cods: cods, p_empresa: _gvTop.emp, p_meses: mesesSeg });
+    if (sg.error) throw sg.error;
+    var m = {};
+    (sg.data || []).forEach(function (x) { m[x.cod_cliente] = x; });
+    _gvTop.seguimiento = m;
+    _gvTop.loadedFor = key;
+    _gvTopRender();
+    var conAlerta = (sg.data || []).filter(function (x) { return x.alerta; }).length;
+    st.innerHTML = '<b>' + _gvTop.rows.length + '</b> clientes · ' +
+      (conAlerta ? '<span style="color:#b91c1c;font-weight:bold;">' + conAlerta + ' con ALERTA</span>' : '<span style="color:#059669;">todos al día</span>') +
+      ' · empresa <b>' + (_gvTop.emp === "lk" ? "Loekemeyer" : "Chef") + '</b> · orden por <b>' + (_gvTop.tab === "hist" ? "histórico total" : "pedido máximo") + '</b>';
+  } catch (e) {
+    st.innerHTML = '<span style="color:#b91c1c;">Error: ' + _gvfEsc(e.message || e) + '</span>';
+  }
+}
+window.gvTopCargar = gvTopCargar;
+
+function _gvTopRender() {
+  var cont = document.getElementById("gvTopTabla");
+  if (!cont) return;
+  var rows = _gvTop.rows;
+  var seg  = _gvTop.seguimiento;
+  var mesesSeg = Number(document.getElementById("gvTopMeses").value) || 12;
+  // Header de meses (mismo orden que devuelve el seguimiento: desc)
+  var mesesHdr = [];
+  if (rows.length) {
+    var s0 = seg[rows[0].cod_cliente];
+    if (s0 && Array.isArray(s0.meses)) mesesHdr = s0.meses.map(function (x) { return x.mes; });
+  }
+  var h = '<div style="overflow-x:auto;"><table class="est-table" style="width:100%;border-collapse:collapse;font-size:12.5px;">' +
+    '<thead><tr>' +
+      '<th style="padding:6px 8px;text-align:center;">#</th>' +
+      '<th style="padding:6px 8px;text-align:left;">Cliente</th>' +
+      '<th style="padding:6px 8px;text-align:right;">' + (_gvTop.tab === "max" ? "Pedido máx" : "Histórico") + '</th>' +
+      '<th style="padding:6px 8px;text-align:right;">' + (_gvTop.tab === "max" ? "Histórico" : "Pedido máx") + '</th>' +
+      '<th style="padding:6px 8px;text-align:center;">Freq</th>' +
+      '<th style="padding:6px 8px;text-align:center;">Sin comprar</th>' +
+      mesesHdr.map(function (m) {
+        return '<th style="padding:4px 3px;text-align:center;font-size:10px;color:#64748b;font-weight:normal;transform:rotate(-45deg);white-space:nowrap;min-width:24px;">' + m.slice(2) + '</th>';
+      }).join("") +
+    '</tr></thead><tbody>';
+  h += rows.map(function (r) {
+    var s = seg[r.cod_cliente] || { meses: [], frecuencia_meses: null, meses_sin_comprar: null, alerta: false };
+    var mesesArr = Array.isArray(s.meses) ? s.meses : [];
+    var maxMonto = 0;
+    mesesArr.forEach(function (m) { if (Number(m.monto) > maxMonto) maxMonto = Number(m.monto); });
+    var cellsHtml = mesesArr.map(function (m) {
+      var mm = Number(m.monto) || 0;
+      var pct = maxMonto > 0 ? mm / maxMonto : 0;
+      var bg = "#f1f5f9", color = "#94a3b8", txt = "·";
+      if (mm > 0) {
+        var g = 220 - Math.round(pct * 130);      // más verde cuanto más alto
+        bg = "rgb(" + g + "," + Math.min(255, g+30) + "," + g + ")";
+        color = "#065f46"; txt = _gvfPlata(mm).replace("$","");
+      }
+      return '<td title="' + m.mes + ' · ' + _gvfPlata(mm) + ' · ' + m.pedidos + ' pedido(s)" style="padding:2px 3px;text-align:center;background:' + bg + ';color:' + color + ';font-weight:' + (mm > 0 ? 'bold' : 'normal') + ';font-size:10px;">' + txt + '</td>';
+    }).join("");
+    var freq = s.frecuencia_meses != null ? Number(s.frecuencia_meses).toFixed(1) : "—";
+    var sin  = s.meses_sin_comprar != null && s.meses_sin_comprar < 999 ? s.meses_sin_comprar + "m" : "—";
+    var alertaColor = s.alerta ? "#b91c1c" : "#059669";
+    var alertaBg    = s.alerta ? "#fee2e2" : "transparent";
+    return '<tr' + (s.alerta ? ' style="background:#fef2f2;"' : '') + '>' +
+      '<td style="padding:6px 8px;text-align:center;font-weight:bold;color:#64748b;">' + r.ranking + '</td>' +
+      '<td style="padding:6px 8px;"><b>' + _gvfEsc(r.cod_cliente) + '</b> <span style="color:#64748b;">' + _gvfEsc((r.business_name || "—").slice(0, 30)) + '</span>' + (r.vendedor_nombre ? '<br><span style="font-size:10px;color:#94a3b8;">' + _gvfEsc(r.vendedor_nombre) + '</span>' : '') + '</td>' +
+      '<td style="padding:6px 8px;text-align:right;font-weight:bold;">' + _gvfPlata(_gvTop.tab === "max" ? r.max_pedido_monto : r.total_historico) + '</td>' +
+      '<td style="padding:6px 8px;text-align:right;color:#64748b;">' + _gvfPlata(_gvTop.tab === "max" ? r.total_historico : r.max_pedido_monto) + '</td>' +
+      '<td style="padding:6px 8px;text-align:center;font-size:11px;color:#64748b;">' + freq + 'm</td>' +
+      '<td style="padding:6px 8px;text-align:center;font-weight:bold;color:' + alertaColor + ';background:' + alertaBg + ';">' + sin + (s.alerta ? ' ⚠' : '') + '</td>' +
+      cellsHtml +
+    '</tr>';
+  }).join("");
+  h += '</tbody></table></div>';
+  h += '<div style="margin-top:10px;font-size:11px;color:#94a3b8;">Meses ordenados de más reciente a más viejo. Celda verde = compró (intensidad = monto vs su máx). Fila rosa = alerta (gap actual > 1.5× la frecuencia habitual del cliente).</div>';
+  cont.innerHTML = h;
+}
+
+async function gvTopExcel() {
+  if (!_gvTop.rows.length) { alert("Cargá primero el ranking."); return; }
+  var rows = _gvTop.rows;
+  var seg  = _gvTop.seguimiento;
+  var mesesHdr = [];
+  if (rows.length) {
+    var s0 = seg[rows[0].cod_cliente];
+    if (s0 && Array.isArray(s0.meses)) mesesHdr = s0.meses.map(function (x) { return x.mes; });
+  }
+  var data = rows.map(function (r) {
+    var s = seg[r.cod_cliente] || { meses: [] };
+    var base = {
+      Puesto: r.ranking,
+      Codigo: r.cod_cliente,
+      RazonSocial: r.business_name || "",
+      Vendedor: r.vendedor_nombre || r.vendedor || "",
+      HistoricoTotal: Number(r.total_historico) || 0,
+      PedidoMaximo: Number(r.max_pedido_monto) || 0,
+      FechaPedidoMax: r.max_pedido_fecha || "",
+      UltimaCompra: r.ultima_compra || "",
+      TotalPedidos: r.total_pedidos || 0,
+      FrecuenciaMeses: s.frecuencia_meses != null ? Number(s.frecuencia_meses) : "",
+      MesesSinComprar: s.meses_sin_comprar != null && s.meses_sin_comprar < 999 ? s.meses_sin_comprar : "",
+      Alerta: s.alerta ? "SI" : "no",
+    };
+    (s.meses || []).forEach(function (m) { base["M " + m.mes] = Number(m.monto) || 0; });
+    return base;
+  });
+  var ws = XLSX.utils.json_to_sheet(data);
+  var wb = XLSX.utils.book_new();
+  var sheetName = "Top50 " + _gvTop.emp.toUpperCase() + " " + (_gvTop.tab === "max" ? "MaxPed" : "Hist");
+  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+  var fname = "top50_" + _gvTop.emp + "_" + _gvTop.tab + "_" + new Date().toISOString().slice(0, 10) + ".xlsx";
+  XLSX.writeFile(wb, fname);
+}
+window.gvTopExcel = gvTopExcel;
+
+// Hook: cuando se abre la card por primera vez, cargar
+function _gvTopInit() {
+  if (_gvTop.loadedFor) return;
+  gvTopCargar();
+}
+
+// Sobreescribo toggleEstCard para disparar la carga al abrir la card del Top-50
+// solo si es la primera vez. No re-carga en cada toggle.
+(function () {
+  var _origToggle = typeof window.toggleEstCard === "function" ? window.toggleEstCard : null;
+  if (!_origToggle) return;
+  window.toggleEstCard = function (id, headEl) {
+    var r = _origToggle(id, headEl);
+    if (id === "gvTopBody") {
+      var body = document.getElementById("gvTopBody");
+      if (body && body.style.display !== "none") _gvTopInit();
+    }
+    return r;
+  };
+})();

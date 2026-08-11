@@ -2589,6 +2589,56 @@
               </div>
             </div>
           </div>
+
+          <!-- Panel Top-50 seguimiento clientes (Fase 2 etapa 2 — pedido explícito
+               del user 2026-08-11: "no perder pisada de si me están comprando o no").
+               Dos rankings paralelos (histórico total / pedido máximo individual) para
+               las dos empresas (LK y Chef). Debajo, matriz de seguimiento mensual con
+               alerta cuando el gap actual supera 1.5× la frecuencia habitual del
+               cliente. Backend: get_top_clientes_hist, get_top_clientes_max_pedido,
+               get_seguimiento_mensual. -->
+          <div class="card" style="margin-bottom: 18px">
+            <div class="est-card-head" onclick="toggleEstCard('gvTopBody', this)">
+              <span class="est-card-caret">▾</span>
+              <h2 style="margin: 0; font-size: 21px">🎯 Top-50 seguimiento clientes</h2>
+              <span style="color: #666; font-size: 13px" id="gvTopResumen">
+                Los clientes que no querés perder. Alertas cuando dejan de comprar.
+              </span>
+            </div>
+            <div class="est-card-body" id="gvTopBody" style="display: none;">
+              <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center;">
+                <div style="display:flex;gap:2px;background:#f1f5f9;padding:3px;border-radius:8px;">
+                  <button id="gvTopTabHist" type="button" onclick="gvTopSetTab('hist')" style="padding:6px 14px;border:none;background:#111;color:#fff;border-radius:6px;cursor:pointer;font-size:13px;">Histórico total</button>
+                  <button id="gvTopTabMax"  type="button" onclick="gvTopSetTab('max')"  style="padding:6px 14px;border:none;background:transparent;color:#333;border-radius:6px;cursor:pointer;font-size:13px;">Pedido máximo</button>
+                </div>
+                <div style="display:flex;gap:2px;background:#f1f5f9;padding:3px;border-radius:8px;">
+                  <button id="gvTopEmpLk"  type="button" onclick="gvTopSetEmp('lk')"   style="padding:6px 14px;border:none;background:#1e6bd6;color:#fff;border-radius:6px;cursor:pointer;font-size:13px;">Loekemeyer</button>
+                  <button id="gvTopEmpCh"  type="button" onclick="gvTopSetEmp('chef')" style="padding:6px 14px;border:none;background:transparent;color:#333;border-radius:6px;cursor:pointer;font-size:13px;">Chef</button>
+                </div>
+                <label style="font-size:13px;color:#64748b;">Ver últimos
+                  <select id="gvTopMeses" onchange="gvTopCargar()" style="padding:6px;border:1px solid #cbd5e1;border-radius:6px;margin:0 4px;">
+                    <option value="6">6 m</option>
+                    <option value="12" selected>12 m</option>
+                    <option value="18">18 m</option>
+                    <option value="24">24 m</option>
+                  </select>
+                  de seguimiento
+                </label>
+                <label style="font-size:13px;color:#64748b;">Solo activos últimos
+                  <select id="gvTopMinAct" onchange="gvTopCargar()" style="padding:6px;border:1px solid #cbd5e1;border-radius:6px;margin:0 4px;">
+                    <option value="">— todos —</option>
+                    <option value="24">24 m</option>
+                    <option value="36" selected>36 m</option>
+                    <option value="60">60 m</option>
+                  </select>
+                </label>
+                <button type="button" class="btn-secondary" onclick="gvTopCargar()" style="padding:6px 14px;">↻ Recargar</button>
+                <button type="button" class="btn-secondary" onclick="gvTopExcel()" style="padding:6px 14px;">📥 Excel</button>
+              </div>
+              <div id="gvTopStatus" style="margin:8px 0;color:#64748b;font-size:13px;"></div>
+              <div id="gvTopTabla"></div>
+            </div>
+          </div>
         </section>
 
         <!-- Modal de composición (drill-down del dashboard) -->
