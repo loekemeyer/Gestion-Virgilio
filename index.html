@@ -3630,6 +3630,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       <button class="sup-action-btn" onclick="stkOpenNpFaltan()" style="position:relative;"><span class="sup-ico">⚠️</span><span>Pedidos sin cargar en PPP</span><span id="npFaltanBadge" class="dp-badge" style="display:none;"></span></button>
       <button class="sup-action-btn" onclick="stkOpenProvImp()"><span class="sup-ico">🏭</span><span>Proveedor de importación</span></button>
       <button class="sup-action-btn" onclick="openPedidosImportacion()"><span class="sup-ico">📦</span><span>Pedidos Importación</span></button>
+      <button class="sup-action-btn" onclick="openAvisoProg()"><span class="sup-ico">📲</span><span>Avisar programación</span></button>
       <button class="sup-action-btn" onclick="openDatosProducto()" style="position:relative;"><span class="sup-ico">🚦</span><span>Completar datos producto</span><span id="dpBadge" class="dp-badge" style="display:none;"></span></button>
       <button class="sup-action-btn" onclick="openConfiguracion()"><span class="sup-ico">⚙️</span><span>Configuración</span></button>
     </div>
@@ -6383,7 +6384,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v9.30";
+const APP_VERSION = "v9.31";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -25492,6 +25493,158 @@ async function npFaltanLoadBadge() {
     var rows = await fetch(SUPABASE_URL + "/rest/v1/vista_np_sin_programar?select=np&limit=5000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; });
     supSetBadge("npFaltanBadge", (rows || []).length);
   } catch (_e) {}
+}
+
+/* ===== v9.31 — MÓDULO "📲 Avisar programación" =========================================
+   Cuando se programa un pedido, este módulo lista los pedidos programados (con fecha de
+   salida) ordenados por esa fecha, y permite avisar por WhatsApp al CLIENTE y al VENDEDOR
+   que corresponde (salvo vend 7 = fábrica = nosotros). Datos:
+     - Pedidos: vista_ppp_programacion_pendiente (cod_cliente, razon_social, fecha_recep, fecha_entrega)
+     - Tel cliente: whatsapp_clientes (cod_cliente -> telefono)
+     - Tel vendedor: whatsapp_vendedores (vend -> telefono, nombre)
+     - Cliente -> vendedor: clientes_vendedor (snapshot de LK.customers.vend; vend 7 = fábrica)
+   Al entrar pregunta QUIÉN entra (queda en el log). Cada click abre WhatsApp Web con el
+   mensaje armado y registra dia/hora + quién en envio_programacion_log; eso se muestra en
+   la fila. El mensaje del vendedor agrupa todos sus clientes (razón social + fecha salida).
+   ⚠ MSG CLIENTE = placeholder hasta que el dueño pase el texto (#1) — ver avpMsgCliente. */
+var _avp = null;
+function _avpFechaDMY(s) { var m = String(s || "").match(/(\d{4})-(\d{2})-(\d{2})/); return m ? (m[3] + "/" + m[2]) : ""; }
+function _avpDias(recep, entrega) {
+  var a = String(recep || "").match(/(\d{4})-(\d{2})-(\d{2})/), b = String(entrega || "").match(/(\d{4})-(\d{2})-(\d{2})/);
+  if (!a || !b) return null;
+  return Math.round((Date.UTC(+b[1], +b[2] - 1, +b[3]) - Date.UTC(+a[1], +a[2] - 1, +a[3])) / 86400000);
+}
+function _avpTs(ts) {
+  try { return new Date(ts).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }); }
+  catch (_e) { return String(ts || ""); }
+}
+function _avpTel(t) { return String(t || "").replace(/[^\d]/g, ""); }
+function _avpWa(tel, msg) { return "https://wa.me/" + _avpTel(tel) + "?text=" + encodeURIComponent(msg); }
+function _avpRowByNp(np) { var r = _avp ? (_avp.rows || []) : []; for (var i = 0; i < r.length; i++) if (r[i].np === np) return r[i]; return null; }
+function _avpRowsByVend(v) { var r = _avp ? (_avp.rows || []) : [], out = []; for (var i = 0; i < r.length; i++) if (r[i].vend === v) out.push(r[i]); return out; }
+async function openAvisoProg() {
+  try { if (typeof requireSupervisor === "function" && !requireSupervisor()) return; } catch (_e) {}
+  var quien; try { quien = prompt("¿Quién entra a este módulo? (tu nombre — queda registrado en cada aviso que mandes)", ""); } catch (_e) { return; }
+  if (quien == null) return;
+  quien = String(quien).trim();
+  if (!quien) { try { alert("Poné tu nombre para entrar."); } catch (_e) {} return; }
+  if (!document.getElementById("avpCss")) {
+    var st = document.createElement("style"); st.id = "avpCss";
+    st.textContent = "#avpOverlay .avp-card{max-width:940px;margin:0 auto;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5);}.avp-head{display:flex;align-items:center;gap:12px;padding:13px 16px;background:linear-gradient(90deg,#0f766e,#0b3b36);color:#fff;}.avp-head b{font-size:17px;flex:0 0 auto;}.avp-who{flex:1;font-size:13px;opacity:.9;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.avp-x{width:auto;background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;}.avp-body{padding:14px 16px;}.avp-hint{font-size:12.5px;color:#64748b;margin-bottom:10px;}.avp-filtro{width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid #cbd5e1;border-radius:9px;margin-bottom:10px;font-size:13px;}.avp-empty{text-align:center;color:#94a3b8;padding:22px;}.avp-tblwrap{overflow-x:auto;}.avp-tbl{width:100%;border-collapse:collapse;font-size:13px;}.avp-tbl th,.avp-tbl td{border-bottom:1px solid #eef2f7;padding:6px 8px;text-align:left;vertical-align:top;}.avp-tbl th{background:#f8fafc;font-size:11.5px;color:#475569;position:sticky;top:0;}.avp-tbl .num{text-align:right;}.avp-rs{max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.avp-btn{width:auto;border:none;border-radius:8px;padding:6px 10px;font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap;color:#fff;}.avp-btn.cli{background:#16a34a;}.avp-btn.ven{background:#2563eb;}.avp-notel{font-size:11px;color:#94a3b8;}.avp-fab{font-size:11px;color:#b45309;font-weight:700;}.avp-done{font-size:10.5px;color:#166534;margin-top:3px;font-weight:700;}";
+    document.head.appendChild(st);
+  }
+  _avp = { quien: quien, rows: [], lastCli: {}, lastVend: {}, filtro: "" };
+  var ov = document.getElementById("avpOverlay");
+  if (!ov) { ov = document.createElement("div"); ov.id = "avpOverlay"; ov.style.cssText = "position:fixed;inset:0;z-index:1400;background:rgba(2,6,23,.7);overflow:auto;padding:14px;"; document.body.appendChild(ov); }
+  ov.style.display = "block";
+  ov.innerHTML = _avpShell('<div class="avp-empty">Cargando pedidos programados…</div>');
+  await avpLoad();
+}
+function avpClose() { var ov = document.getElementById("avpOverlay"); if (ov) ov.style.display = "none"; }
+function _avpShell(inner) {
+  return '<div class="avp-card"><div class="avp-head"><b>📲 Avisar programación</b><span class="avp-who">👤 ' + escapeHtml((_avp && _avp.quien) || "") + '</span><button class="avp-x" onclick="avpClose()">Cerrar</button></div><div id="avpBody" class="avp-body">' + inner + '</div></div>';
+}
+async function avpLoad() {
+  var H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+  var q = function (u) { return fetch(SUPABASE_URL + "/rest/v1/" + u, { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; }); };
+  var res = await Promise.all([
+    q("vista_ppp_programacion_pendiente?select=np,cod_cliente,razon_social,fecha_recep,fecha_entrega&limit=20000"),
+    q("whatsapp_clientes?select=cod_cliente,telefono&limit=20000"),
+    q("whatsapp_vendedores?select=vend,telefono,nombre&limit=2000"),
+    q("clientes_vendedor?select=cod_cliente,vend&limit=30000"),
+    q("envio_programacion_log?select=np,cod_cliente,vend,tipo,quien,ts&order=ts.desc&limit=30000")
+  ]);
+  var ped = res[0], wc = res[1], wv = res[2], cv = res[3], log = res[4];
+  var telCli = {}; wc.forEach(function (r) { telCli[String(r.cod_cliente).trim()] = r.telefono; });
+  var vendW = {}; wv.forEach(function (r) { vendW[String(r.vend).trim()] = { tel: r.telefono, nombre: r.nombre }; });
+  var vendDe = {}; cv.forEach(function (r) { vendDe[String(r.cod_cliente).trim()] = String(r.vend || "").trim(); });
+  var lastCli = {}, lastVend = {};
+  log.forEach(function (r) {
+    if (r.tipo === "cliente" && r.np != null && !lastCli[r.np]) lastCli[r.np] = r;
+    if (r.tipo === "vendedor" && r.vend != null && !lastVend[String(r.vend)]) lastVend[String(r.vend)] = r;
+  });
+  var rows = [];
+  ped.forEach(function (p) {
+    if (!_avpFechaDMY(p.fecha_entrega)) return;   // solo pedidos PROGRAMADOS (con fecha de salida)
+    var cod = String(p.cod_cliente || "").trim();
+    var vend = vendDe[cod] || "";
+    var vw = vendW[vend] || {};
+    rows.push({ np: String(p.np || "").trim(), cod: cod, rs: p.razon_social || "", fped: p.fecha_recep, fppp: p.fecha_entrega, dias: _avpDias(p.fecha_recep, p.fecha_entrega), vend: vend, telCli: telCli[cod] || "", telVend: vw.tel || "", vendNombre: vw.nombre || "" });
+  });
+  rows.sort(function (a, b) { return String(a.fppp).localeCompare(String(b.fppp)); });
+  _avp.rows = rows; _avp.lastCli = lastCli; _avp.lastVend = lastVend;
+  avpRender();
+}
+function avpRender() {
+  var body = document.getElementById("avpBody"); if (!body || !_avp) return;
+  var rows = _avp.rows || [];
+  var f = (_avp.filtro || "").toLowerCase();
+  var shown = f ? rows.filter(function (r) { return (r.cod + " " + r.rs + " " + r.np).toLowerCase().indexOf(f) >= 0; }) : rows;
+  var h = '<div class="avp-hint">Pedidos <b>programados</b> (con fecha de salida), ordenados por fecha de salida. <b>📲 Cliente</b> / <b>📲 Vend.</b> abren WhatsApp con el mensaje armado y quedan registrados (día/hora + quién). vend 7 = fábrica (sin aviso a vendedor). Entró: <b>' + escapeHtml(_avp.quien) + '</b> · ' + shown.length + ' pedido(s).</div>';
+  h += '<input class="avp-filtro" type="search" placeholder="🔎 Buscar cod / razón social / NP" value="' + escapeHtml(_avp.filtro || "") + '" oninput="if(_avp){_avp.filtro=this.value;avpRender();}">';
+  if (!shown.length) { body.innerHTML = h + '<div class="avp-empty">Sin pedidos programados.</div>'; return; }
+  h += '<div class="avp-tblwrap"><table class="avp-tbl"><thead><tr><th>Cod</th><th>Razón social</th><th>F. pedido</th><th>F. salida</th><th class="num">Días</th><th>WhatsApp Cliente</th><th>WhatsApp Vend.</th></tr></thead><tbody>';
+  shown.forEach(function (r) {
+    var lc = _avp.lastCli[r.np];
+    var cliDone = lc ? '<div class="avp-done">✅ ' + escapeHtml(_avpTs(lc.ts)) + ' · ' + escapeHtml(lc.quien || "") + '</div>' : '';
+    var cliCell = r.telCli
+      ? '<button class="avp-btn cli" onclick="avpSendCliente(\'' + encodeURIComponent(r.np) + '\')">📲 Cliente</button>' + cliDone
+      : '<span class="avp-notel">sin tel</span>' + cliDone;
+    var venCell;
+    if (r.vend === "7") venCell = '<span class="avp-fab">🏭 fábrica</span>';
+    else if (!r.vend) venCell = '<span class="avp-notel">— sin vend —</span>';
+    else {
+      var lv = _avp.lastVend[r.vend];
+      var venDone = lv ? '<div class="avp-done">✅ ' + escapeHtml(_avpTs(lv.ts)) + ' · ' + escapeHtml(lv.quien || "") + '</div>' : '';
+      venCell = r.telVend
+        ? '<button class="avp-btn ven" onclick="avpSendVendedor(\'' + encodeURIComponent(r.vend) + '\')">📲 Vend. ' + escapeHtml(r.vend) + '</button>' + venDone
+        : '<span class="avp-notel">vend ' + escapeHtml(r.vend) + ' sin tel</span>' + venDone;
+    }
+    h += '<tr><td><b>' + escapeHtml(r.cod) + '</b></td><td class="avp-rs" title="' + escapeHtml(r.rs) + '">' + escapeHtml(r.rs) + '</td><td>' + escapeHtml(_avpFechaDMY(r.fped)) + '</td><td><b>' + escapeHtml(_avpFechaDMY(r.fppp)) + '</b></td><td class="num">' + (r.dias == null ? "—" : r.dias) + '</td><td>' + cliCell + '</td><td>' + venCell + '</td></tr>';
+  });
+  h += '</tbody></table></div>';
+  body.innerHTML = h;
+}
+/* ⚠ PLACEHOLDER hasta el texto definitivo (#1). Cambiar SOLO este return. */
+function avpMsgCliente(r) {
+  return "Hola " + (r.rs || "") + "! Te avisamos que tu pedido está programado para salir el " + _avpFechaDMY(r.fppp) + ". Cualquier duda quedamos a disposición. ¡Gracias!";
+}
+function avpMsgVendedor(vend, rowsV) {
+  var nombre = (rowsV[0] && rowsV[0].vendNombre) ? (" " + rowsV[0].vendNombre) : "";
+  var arr = rowsV.slice().sort(function (a, b) { return String(a.fppp).localeCompare(String(b.fppp)); });
+  var lineas = arr.map(function (r) { return "• " + (r.rs || ("cliente " + r.cod)) + " — sale " + _avpFechaDMY(r.fppp); }).join("\n");
+  return "Hola" + nombre + "! Te paso la programación de salida de tus clientes:\n\n" + lineas + "\n\nCualquier duda avisame. ¡Gracias!";
+}
+async function avpLog(tipo, np, cod, vend) {
+  try {
+    await fetch(SUPABASE_URL + "/rest/v1/envio_programacion_log", {
+      method: "POST",
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" },
+      body: JSON.stringify({ tipo: tipo, np: np, cod_cliente: cod, vend: vend, quien: (_avp && _avp.quien) || "" })
+    });
+  } catch (_e) {}
+  var now = new Date().toISOString();
+  if (tipo === "cliente" && np != null) _avp.lastCli[np] = { ts: now, quien: _avp.quien };
+  if (tipo === "vendedor" && vend != null) _avp.lastVend[String(vend)] = { ts: now, quien: _avp.quien };
+  avpRender();
+}
+async function avpSendCliente(npEnc) {
+  if (!_avp) return;
+  var r = _avpRowByNp(decodeURIComponent(npEnc)); if (!r) return;
+  if (!r.telCli) { try { alert("Ese cliente no tiene teléfono cargado en whatsapp_clientes."); } catch (_e) {} return; }
+  var msg = avpMsgCliente(r);
+  await avpLog("cliente", r.np, r.cod, r.vend);
+  window.open(_avpWa(r.telCli, msg), "_blank");
+}
+async function avpSendVendedor(vendEnc) {
+  if (!_avp) return;
+  var vend = decodeURIComponent(vendEnc);
+  var rowsV = _avpRowsByVend(vend); if (!rowsV.length) return;
+  if (vend === "7") { try { alert("Vendedor 7 es la fábrica (nosotros) — no se avisa."); } catch (_e) {} return; }
+  if (!rowsV[0].telVend) { try { alert("El vendedor " + vend + " no tiene teléfono en whatsapp_vendedores."); } catch (_e) {} return; }
+  var msg = avpMsgVendedor(vend, rowsV);
+  await avpLog("vendedor", null, null, vend);
+  window.open(_avpWa(rowsV[0].telVend, msg), "_blank");
 }
 
 function dpRender(filter) {

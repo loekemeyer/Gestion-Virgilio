@@ -4,7 +4,21 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-11 · Versión app al documentar: **v9.30**
+> Última actualización: 2026-08-11 · Versión app al documentar: **v9.31**
+>
+> Nota **v9.31** — **Módulo "📲 Avisar programación".** Panel supervisor → lista los pedidos
+> **programados** (con fecha de salida, de `vista_ppp_programacion_pendiente`) ordenados por fecha
+> de salida, con columnas: Cod cliente · Razón social · Fecha pedido (`fecha_recep`) · Fecha PPP
+> (`fecha_entrega`) · Días demora · WhatsApp Cliente · WhatsApp Vend. Al **entrar pregunta quién**
+> entra (queda en el log). Cada botón abre **WhatsApp Web** (`wa.me`) con el mensaje armado y
+> registra día/hora + quién en `envio_programacion_log` (se muestra en la fila). El mensaje del
+> **vendedor agrupa** todos sus clientes (razón social + fecha de salida). **vend 7 = fábrica
+> (nosotros) → sin aviso a vendedor.** 4 tablas nuevas en Virgilio (`sql/aviso_programacion.sql`):
+> `clientes_vendedor` (snapshot cliente→vend de LK.customers, 1245 filas, 596 fábrica),
+> `whatsapp_clientes` (cod→tel), `whatsapp_vendedores` (vend→tel+nombre), `envio_programacion_log`.
+> ⚠ **El mensaje del cliente es un PLACEHOLDER** (`avpMsgCliente` en index.html) hasta el texto
+> definitivo del dueño — cambiar solo ese `return`. Las tablas de teléfonos arrancan vacías (cargar
+> a mano). Sin FDW Virgilio↔LK: el mapeo cliente→vend se re-sincroniza a mano (ver el SQL).
 >
 > Nota **v9.30** — **Conteo físico exportable a CSV con "Stock del sistema".** El módulo de conteo
 > (Stock → "📋 Hacer conteo") ya comparaba contado vs sistema en pantalla; ahora tiene botón
