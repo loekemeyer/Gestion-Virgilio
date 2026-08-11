@@ -6299,7 +6299,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v9.12";
+const APP_VERSION = "v9.13";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -12635,7 +12635,7 @@ function stkNpFaltanExport() {
    desplegable, hace PATCH del proveedor en Importados (todas las marcas de ese código). Este
    maestro alimenta el circuito de OC de importados (v_importados_ordenes, índice = 10 meses en
    Importados_Config). García NO está: reenvasa lo de insumos, no importa. */
-const _PROV_IMP_LISTA = ["Fujian", "Hugo Wong", "Becky", "Becky 1", "Becky 2", "Becky 1/2", "Kangli", "Ownland", "Zhixin", "Stephen", "Frontier"];
+const _PROV_IMP_LISTA = ["Fujian", "Hugo Wong", "Becky", "Kangli", "Ownland", "Zhixin", "Frontier"];
 async function stkOpenProvImp() {
   _stkPopShell("🏭 Proveedor de importación", "stkPopBody");
   const body = document.getElementById("stkPopBody"); if (!body) return;
