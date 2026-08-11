@@ -37,6 +37,23 @@
         </div>
         <h2 class="login-title">Panel Administrador</h2>
         <p class="login-sub" id="authStatus">Verificando sesion...</p>
+
+        <!-- Login local CUIT+PIN — sólo se muestra si checkAuth() no encuentra
+             sesión activa. Copia mínima del flujo de mayorista.html para que
+             el admin funcione servido desde Producción Virgilio sin depender
+             del sitio LK. Escribe la misma sesión Supabase que mayorista.html
+             (mismo esquema sintético <cuit>@cuit.loekemeyer + PIN de 6). -->
+        <form id="lkLoginForm" style="display:none;margin-top:18px;text-align:left;" onsubmit="return lkLoginSubmit(event);">
+          <label style="display:block;font-size:13px;color:#555;margin-bottom:4px;">CUIT (sin guiones)</label>
+          <input id="lkLoginCuit" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="username" required
+                 style="width:100%;box-sizing:border-box;padding:10px;font-size:16px;border:1px solid #ccc;border-radius:6px;margin-bottom:10px;" />
+          <label style="display:block;font-size:13px;color:#555;margin-bottom:4px;">PIN (6 dígitos)</label>
+          <input id="lkLoginPin" type="password" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="current-password" required
+                 style="width:100%;box-sizing:border-box;padding:10px;font-size:16px;border:1px solid #ccc;border-radius:6px;margin-bottom:10px;" />
+          <button id="lkLoginBtn" type="submit"
+                  style="width:100%;padding:12px;font-size:16px;background:#111;color:#fff;border:none;border-radius:6px;cursor:pointer;">Entrar</button>
+          <p id="lkLoginError" style="min-height:18px;text-align:center;color:#c0392b;margin:8px 0 0;font-size:13px;"></p>
+        </form>
       </div>
     </div>
 
