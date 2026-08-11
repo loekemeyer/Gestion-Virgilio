@@ -48,9 +48,14 @@
 --  con la app. (Idem 323E.) Los movimientos de sistema usan legajos especiales —
 --  'pipeline', 'reconcilia', '0'— que NO son basura de test para el stock.
 --
---  NP + DÍA DE PPP (v9.26): cada línea de PICKEADO agrega la tanda (del `ref` del
---  movimiento más reciente que dejó stock en ese depósito), y a partir de la tanda,
---  las NP(s) y el día de PPP (fecha_entrega). Fuente tanda→NP+fecha = PPP_Entregados_Meta
+--  NP + DÍA DE PPP (v9.26): cada línea de PICKEADO agrega la tanda, y a partir de la
+--  tanda, las NP(s) y el día de PPP (fecha_entrega). ⚠ La tanda NO es la del movimiento
+--  más reciente, sino la del ingreso MÁS VIEJO cuyo stock nunca se descontó dentro del
+--  ciclo abierto (mismo criterio de "ciclo" que la sección 1): el saldo trabado viene de
+--  la tanda que quedó sin salir, no de la que se movió al final. Antes se tomaba el `ref`
+--  del movimiento más reciente → mostraba NP y día de PPP equivocados (ej. cod 598E:
+--  mostraba D07x/Loeke —última movida— cuando lo trabado era de D15A/Chef, más vieja).
+--  Fuente tanda→NP+fecha = PPP_Entregados_Meta
 --  (histórico) ∪ PPP_Programacion_Diaria (actual). El "resto sin guardar" (recepción)
 --  no lleva NP (no viene de un pedido). Ej:
 --    cod 106E — 51 cj · pickeado sin facturar (hace 4 d. háb.) · tanda D15A · NP 44531/44532/44533 · PPP 05/08
@@ -131,12 +136,21 @@ begin
            est
     from todo
   ),
-  -- tanda del movimiento más reciente que dejó stock pickeado en ese depósito (ref = tanda)
+  -- ciclo abierto del pickeado: saldo corrido por (deposito, cod), como en la sección 1
+  pick_run as (
+    select deposito, cod, ts, id, ref, delta,
+           sum(delta) over (partition by deposito, cod order by ts, id rows between unbounded preceding and current row) as saldo_run
+    from mv where deposito in ('separar_pedidos', 'a_facturar')
+  ),
+  pick_cero as (select deposito, cod, max(ts) as cero_ts from pick_run where saldo_run <= 0.5 group by deposito, cod),
+  -- tanda del ingreso MÁS VIEJO cuyo stock nunca se descontó (dentro del ciclo abierto),
+  -- NO la del movimiento más reciente: el saldo trabado viene de la tanda que quedó sin salir
   tanda_cod as (
-    select distinct on (deposito, cod) deposito, cod, split_part(ref, '|', 1) as tanda
-    from mv
-    where deposito in ('separar_pedidos', 'a_facturar') and delta > 0 and nullif(btrim(ref), '') is not null
-    order by deposito, cod, ts desc, id desc
+    select distinct on (r.deposito, r.cod) r.deposito, r.cod, split_part(r.ref, '|', 1) as tanda
+    from pick_run r left join pick_cero c on c.deposito = r.deposito and c.cod = r.cod
+    where r.delta > 0 and nullif(btrim(r.ref), '') is not null
+      and (c.cero_ts is null or r.ts > c.cero_ts)
+    order by r.deposito, r.cod, r.ts asc, r.id asc
   ),
   -- tanda → NP(s) + fecha PPP (histórico PPP_Entregados_Meta ∪ programación actual)
   pppmap as (

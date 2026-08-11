@@ -4,16 +4,158 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-11 · Versión app al documentar: **v9.26**
+> Última actualización: 2026-08-11 · Versión app al documentar: **v9.59**
 >
-> Nota: **v9.26 — Resumen de hoy sincroniza desde Supabase (multi-dispositivo).**
-> El "Resumen de hoy" (módulo Producc, tab "Resumen" / botonera "◀ Resumen del día") ahora carga el
-> histórico de Supabase, no solo localStorage del dispositivo actual. Fixes: si un operario realiza MG
-> en celular A y luego ingresa en celular B, el resumen en B ahora muestra el MG de A (porque está en
-> Supabase). Antes desaparecía porque cada dispositivo tenía su propio localStorage.
-> **Implementación:** `renderLegajoHistory()` sigue siendo sincrónica (no rompe handlers), pero lanza
-> `_fetchAndRenderHistory()` en background, que trae datos de Supabase y los cachea en `_historyCache`.
-> Combina sin duplicados (remoto + local pendiente) en `_renderHistoryWithRemote()`. Bump `v9.26`.
+> Nota **v9.55–v9.59** — **Avisar programación** (varias): (a) badge de Recepción suma remitos por
+> cargar + bajadas de racks; (b) fix 401 al marcar Discontinuo (RLS `Articulos_Discontinuados`);
+> (c) date pickers con `min=2025-01-01`; (d) Plata perdida con drill-down por fila (detalle + resumido);
+> (e) vendedores en grid de boxes compactos; (f) se sacó la alerta de urgentes de "Qué bajar primero";
+> (g) **vend 20 (super) = interno "nosotros"** — no se avisa ni al cliente ni al vendedor
+> (`_avpNoVend`/`_avpNoCliente`); (h) la tabla deja solo **pendientes**, los avisados van a una sección
+> colapsable; (i) **registro de lo enviado al vendedor**: al mandar el resumen se logea cada grupo
+> (tipo='vendedor' con NP) y esos pedidos **no reaparecen** en el resumen los días siguientes
+> (`vendSent` en `avpLoad`/`avpSendVendedor`). Teléfonos cargados en `whatsapp_clientes` (473) y
+> `whatsapp_vendedores` (vend 6).
+>
+> Nota **v9.54** — **Plata perdida: drill-down por fila.** Tocar una fila (artículo/cliente/
+> vendedor) abre un pop-up con el detalle del período: **Fecha · Cod Cliente · Razón Social ·
+> Pedido (NP) · Entregado · Valor no entregado**. Botón **"Resumido"** agrupa por cliente
+> (**Cliente · Cajas del plazo · Valor no entregado**). Se sumaron `cajas_pedidas`/`cajas_entregadas`
+> al fetch de `Entregas_Virgilio`. `ppOpenDetail`/`ppDetRender`.
+>
+> Nota **v9.53** — (a) **Badge en "Carga Recepción Mercadería"** (panel supervisor): círculo
+> rojo con la cantidad de **remitos pendientes de cargar** (`Control_Modo_OP` estado='pendiente'),
+> mismo contador que el botón "📋 Pendientes" del menú de recepción. `recepLoadBadge()`.
+> (b) **Fix 401 "marcar Discontinuo"** en *Completar datos producto*: la tabla
+> `Articulos_Discontinuados` solo tenía SELECT para anon → el upsert daba HTTP 401. Se
+> agregaron policies INSERT+UPDATE para anon (`sql/articulos_discontinuados_rls.sql`).
+>
+> Nota **v9.52** — **Date pickers con `min="2025-01-01"`**: los selectores de fecha
+> (movimientos de stock, producción, OC, fecha de tanda, ruteo) ya no ofrecen años previos a 2025.
+>
+> Nota **v9.49** — **Pestaña Stocks: nueva columna "Proy. caj/mes"** (antes de *Total Stock*).
+> Muestra la **proyección de venta en cajas/mes** por código, tomada de `proyeccion_madre.proy_cajas_mes`
+> (el mismo valor "antes del índice" que usa el generador de OCs). Header clickeable como las demás
+> (filtra filas con proyección > 0). Lookup exacto → base (`_proyOf`). `index.html`.
+>
+> Nota **v9.44/9.45** — **Faltantes x día:** (a) el **faltó al armar** (realFalt, dato real de tandas
+> pickeadas) ahora se ubica en la **celda del día de su fecha de salida** (badge roja) además del
+> badge total en el código; (b) los **headers de columna son clickeables** para filtrar: tocar
+> **Falt S1 / S2 / Resto / Sin fecha** o **un día** muestra solo los artículos con faltante en esa
+> columna, ordenados por ese valor (🔎 en el header activo; chip "✕ Filtro" para quitarlo).
+>
+> Nota SERVER **v9.45** — **NC a Loeke: 437E/438E solo con la variante "...L".** `vista_nc_loeke_chef`
+> agarraba también los códigos **pelados** (437E/438E) → 27 pendientes con 20 que no correspondían.
+> Ahora 437E/438E hacen NC a Loeke **solo si el pedido es "...L" (ej. 437EL)**. (439E y demás quedan
+> igual — confirmar si también deben requerir "L".) `sql/vista_nc_loeke_chef.sql`. Quedó en 7.
+>
+> Nota (diagnóstico) — **584E ("Aceitera 400 Ml") no está en la pestaña Stocks** porque su stock
+> (2400) está en el depósito **`insumos`**, no en terminados (tot terminados = 0). Se ve en **🧰 Insumos**.
+> Probable error de recepción (cargado como insumo).
+>
+> Nota **v9.38** — **(a) "Corregir códigos de NPs" ahora tiene 2 badges:** ROJO (arriba-derecha) =
+> NPs que hay que corregir SÍ o SÍ (el secundario **no tiene stock**), VERDE (arriba-izquierda) =
+> NPs donde el secundario **tiene stock** → se puede mandar tal cual, corregir es opcional.
+> `corrLoadBadge` cruza `facCorreccData()` con `vista_saldos_stock` de los secundarios; rojo si algún
+> item de la NP tiene stock del secundario ≤0. **(b) "Pedidos sin cargar en PPP" ahora avisa NP
+> salteadas en la secuencia numérica** (huecos ≤5 entre NPs que sí existen; ej. 98576 y 98578 sin
+> 98577). Vista nueva `vista_np_faltantes_secuencia` (`sql/np_faltantes_secuencia.sql`, unión de
+> PPP_Base ∪ Programacion ∪ Facturacion ∪ Entregados ∪ Canceladas). Puede ser un pedido no cargado
+> o una NP anulada en el ERP. **(c) Precio de venta confirmado:** LK `products.list_price` (proyecto
+> "loekemeyer's web" = `kwkclwhmoygunqmlegrg`) es la fuente correcta que ya usa `precios_venta`.
+>
+> Nota **v9.37** — **Módulo "💸 Plata perdida de facturar" (faltante por quiebre).**
+>
+> Nota **v9.37** — **Módulo "💸 Plata perdida de facturar" (faltante por quiebre).** Panel supervisor.
+> Valoriza las cajas que el cliente pidió y **no se pudieron entregar por falta de stock**
+> (`Entregas_Virgilio.cajas_falto`) a **precio de venta**: `plata = cajas_falto × precio_unit × uxb`.
+> Precio de venta = snapshot de LK `products.list_price` (por unidad) + `uxb`, en la tabla nueva
+> **`precios_venta`** (`sql/plata_perdida.sql`; sin FDW, se re-sincroniza a mano). Agrupa por
+> **Artículo / Cliente / Vendedor** (reusa `clientes_vendedor` para el vendedor) con filtro de
+> período por fecha de salida. Total actual ~$51M (29/06–13/08). ⚠ precio **8888** en LK = placeholder
+> → no se valoriza, se marca "sin precio" (23 códigos sin precio → cargar en `precios_venta`).
+>
+> Nota **v9.36** — **839 (Rallador Chico Chocolate) es secundario de 838E (primario).**
+>
+> Nota **v9.36** — **839 (Rallador Chico Chocolate) es secundario de 838E (primario).** Se cargó la
+> equivalencia en las **DOS** fuentes (⚠ están separadas y hay que mantenerlas sincronizadas):
+> (a) el array **hardcodeado `EQUIV_FAMILIAS`** en `index.html` (lo usa la pantalla de **Faltantes** y
+> el picking vía `equivFam`/`equivFamKey` — agrupa 839 bajo 838E y netea el stock, así 839 deja de
+> figurar como faltante fantasma), y (b) la tabla Supabase **`Equivalencias_Familia`** (la usa
+> `vista_pedidos_secundarios` → módulo "Corregir códigos de NPs"). Antes 839 no estaba en ninguna,
+> por eso su demanda no se neteaba contra el stock de 838E y aparecía como faltante que no faltaba.
+>
+> Nota **v9.35** — **"¿Qué bajar primero?" ahora marca los URGENTES (góndola < 20%).**
+>
+> Nota **v9.35** — **"¿Qué bajar primero?" ahora marca los URGENTES (góndola < 20%).** Arriba de
+> todo, una alerta roja lista los códigos con góndola < 20% de su máximo (sobre TODOS los códigos
+> con capacidad, tengan o no stock atrás para bajar); los que dicen «sin stock atrás» no se pueden
+> resolver ahí → producir/OC. Además las filas urgentes de la tabla van resaltadas (🆘 + fondo rojo).
+> `showGuardarOrden`/`renderGuardarOrden`, umbral 20% (`_URG`).
+>
+> Nota **v9.34** — **Faltantes excluye también entregadas y canceladas** (consistencia con
+> `ocgDemanda`): `stkFaltLoad` ya excluía facturadas + tandas pickeadas; ahora suma al set de
+> exclusión `PPP_Entregados_Meta` y `NP_Canceladas`.
+>
+> Nota **v9.33** — **Avisar programación: vendedores unificados + dedup.** Panel de vendedores fijo
+> arriba; el resumen de cada vendedor se arma con los clientes que se van avisando (1 línea por
+> aviso). Dedup: mismo cliente + misma fecha de salida = 1 solo mensaje (une sus NPs). El badge de
+> "Pedidos sin cargar en PPP" se sincroniza al abrir el módulo.
+>
+> Última actualización previa · Versión app al documentar: **v9.31**
+>
+> Nota **v9.31** — **Módulo "📲 Avisar programación".** Panel supervisor → lista los pedidos
+> **programados** (con fecha de salida, de `vista_ppp_programacion_pendiente`) ordenados por fecha
+> de salida, con columnas: Cod cliente · Razón social · Fecha pedido (`fecha_recep`) · Fecha PPP
+> (`fecha_entrega`) · Días demora · WhatsApp Cliente · WhatsApp Vend. Al **entrar pregunta quién**
+> entra (queda en el log). Cada botón abre **WhatsApp Web** (`wa.me`) con el mensaje armado y
+> registra día/hora + quién en `envio_programacion_log` (se muestra en la fila). El mensaje del
+> **vendedor agrupa** todos sus clientes (razón social + fecha de salida). **vend 7 = fábrica
+> (nosotros) → sin aviso a vendedor.** 4 tablas nuevas en Virgilio (`sql/aviso_programacion.sql`):
+> `clientes_vendedor` (snapshot cliente→vend de LK.customers, 1245 filas, 596 fábrica),
+> `whatsapp_clientes` (cod→tel), `whatsapp_vendedores` (vend→tel+nombre), `envio_programacion_log`.
+> Mensaje al cliente (v9.32, texto del dueño): *"Estimado Cliente: Su pedido ya fue programado para
+> el día {fecha salida DD/MM/AAAA}. Tenga en cuenta que la fecha … es aproximada y puede tener una
+> diferencia de 2 o 3 días … Saludos. Dpto. de Ventas."* (en `avpMsgCliente`). Las tablas de
+> teléfonos arrancan vacías (cargar a mano). Sin FDW Virgilio↔LK: el mapeo cliente→vend se
+> re-sincroniza a mano (ver el SQL).
+>
+> Nota **v9.30** — **Conteo físico exportable a CSV con "Stock del sistema".** El módulo de conteo
+> (Stock → "📋 Hacer conteo") ya comparaba contado vs sistema en pantalla; ahora tiene botón
+> **⬇ Exportar CSV** (`cntExportCsv`) que baja el conteo con columnas: Sector, Código, Pilas,
+> Cajas por pila, Sueltas, Contado (cajas), **Stock del sistema** (góndola+excedente, mismo cálculo
+> que la comparación), Diferencia y En proceso. Formato Excel es-AR (BOM utf-8, `;`, coma decimal).
+>
+> Nota **v9.29** — **Pedidos Importación operable (editar en curso + marcar llegada).** El módulo
+> "📦 Pedidos Importación" era solo-lectura; ahora cada fila tiene **✏️** (editar unidades EN CURSO
+> = lo pedido/en camino → `Importados.pedido_curso`, que el motor resta de "a pedir") y **📥**
+> (marcar LLEGADA: inserta `Importados_Mov_Stock` tipo `ingreso` +delta_uni y descuenta esa cantidad
+> de `pedido_curso`, piso 0). Ambas por RPC **SECURITY DEFINER** por `Importados.id`
+> (`importados_set_curso`, `importados_marcar_llegada`; grant anon+authenticated) — el INSERT en
+> `Importados_Mov_Stock` es solo-authenticated para anon, por eso va por función. `ocgFetchImportados`
+> ahora trae `id` y las filas por marca (`det`). SQL en `sql/importados_pedidos_rpc.sql`. Códigos
+> multi-marca (solo 2) se editan por fila. Nuevo tipo de movimiento importado: `ingreso`.
+>
+> Nota **v9.28** — **Badges de pendientes en el panel supervisor.** Igual que el badge rojo de
+> "Completar datos producto" (`dp-badge`), ahora **"Corregir códigos de NPs"** y **"Pedidos sin
+> cargar en PPP"** muestran un contador con cuánto hay para corregir: NPs **distintas** en código
+> secundario (`facCorreccData()`) y NPs sin programar (`vista_np_sin_programar`). Se cargan
+> fire-and-forget al abrir el panel (`corrLoadBadge`/`npFaltanLoadBadge` en `showSupervisor`); el
+> de sin-programar se refresca al marcar "🚫 No va". Helper común `supSetBadge(id,count)`.
+>
+> Nota SERVER (sin bump de app): **Importados — 067 usa el espiral importado 1000900.** Se agregó
+> el mapeo `('1000900','067')` a `Importados_Partes_Map` (067 Sacacorcho Tipo Mozo Suelto), así la
+> proyección de la parte 1000900 suma la demanda del terminado 067. Deployado + `sql/importados_partes_y_super.sql`.
+>
+> Nota SERVER (sin bump de app): **FIX alerta ESTANCADO — la tanda mostrada estaba mal (mostraba la última movida, no la trabada).**
+> El "pickeado sin avanzar" tomaba la tanda del `ref` del movimiento **más reciente** que dejó stock en
+> `separar_pedidos`/`a_facturar`. Pero el saldo trabado casi siempre viene de una tanda **vieja** que
+> nunca salió, no de la última que se movió → mostraba **NP y día de PPP equivocados** (ej. cod `598E`:
+> mostraba `D07x/Loeke` —última movida— cuando lo clavado era de `D15A/Chef`, más vieja). **Fix:** el CTE
+> `tanda_cod` ahora toma la tanda del ingreso **más viejo cuyo stock nunca se descontó** dentro del
+> **ciclo abierto** (mismo criterio de "ciclo" que la sección 1: arranca justo después del último
+> movimiento que dejó el saldo del depósito en 0). Deployado + `sql/stock_estancado.sql` actualizado.
+> Verificado sobre stock actual: ~50 códigos re-atribuidos a su tanda vieja real (D09B/D08A/D07B/D15A…).
 >
 > Nota SERVER (sin bump de app): **FIX stock — pedidos Chef facturados afuera dejaban stock LK trabado.**
 > Los pedidos de **Chef (NP 44xxx)** facturan mercadería **LK** afuera de la app (Cencosud/Chef, lo del
@@ -143,11 +285,6 @@
 > **descartada** por redundante. Bump `v9.12`.
 >
 > Nota: **v8.96–v9.04 — Cajas Pedidas = toda la demanda real + módulo "NP que faltan".**
-> **v9.25 — Cajas Pedidas desde vista SQL:** La columna "Cajas Pedidas" del stock ahora lee 
-> directamente de la vista `v_cajas_pedidas` (no del caché JavaScript `ocgDemanda()`), así siempre 
-> refleja canceladas sin lag. Fórmula: `PPP_Base_Pedidos` − (`Facturacion_NP` + `PPP_Entregados_Meta` 
-> + `NP_Canceladas`), agregada por artículo. Los filtros "no programadas" (⚠) usan todavía `ocgDemanda()` 
-> internamente.
 > **Demanda (`ocgDemanda`, columna "Cajas Pedidas" del stock):** dejó de contar solo las NP
 > programadas en `PPP_Programacion_Diaria`; ahora arranca desde **TODA** la base de pedidos
 > (`PPP_Base_Pedidos`, misma fuente que el pop-up) y solo descuenta las NP que **ya salieron**:

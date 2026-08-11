@@ -3612,7 +3612,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
     <div class="sup-actions sup-primary">
       <button class="sup-action-btn" onclick="openFacturacion()"><span class="sup-ico">📋</span><span>Facturación</span></button>
       <button class="sup-action-btn" onclick="openPPP()"><span id="pppAlertBadge" class="ppp-alert-badge"></span><span class="sup-ico">🗓️</span><span>PPP</span></button>
-      <button class="sup-action-btn" onclick="openRecepcionAdmin()"><span class="sup-ico">🏭</span><span>Carga Recepción Mercadería</span></button>
+      <button class="sup-action-btn" onclick="openRecepcionAdmin()" style="position:relative;"><span class="sup-ico">🏭</span><span>Carga Recepción Mercadería</span><span id="recepBadge" class="dp-badge" style="display:none;min-width:26px;height:26px;line-height:26px;font-size:15px;padding:0 6px;border-radius:13px;" title="Pendiente en Recepción: remitos por cargar + bajadas de racks por aprobar"></span></button>
       <button class="sup-action-btn" onclick="showFaltAvisar()"><span class="sup-ico">📦➕</span><span>Completar Pedido</span></button>
       <button class="sup-action-btn" onclick="openStockAdmin()"><span class="sup-ico">📦</span><span>Stock y Compras</span></button>
       <button class="sup-action-btn" onclick="openPanelWebLK()"><span class="sup-ico">🌐</span><span>Panel Web LK</span></button>
@@ -3624,12 +3624,14 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       <button class="sup-action-btn" onclick="openDeuda()"><span class="sup-ico">💰</span><span>Deuda a cobrar</span></button>
       <button class="sup-action-btn" onclick="openAgentesAdmin()"><span class="sup-ico">🤖</span><span>Agentes</span></button>
       <button class="sup-action-btn" onclick="openMonitor()"><span class="sup-ico">📊</span><span>Monitor / Análisis / Inconsistencias</span></button>
-      <button class="sup-action-btn" onclick="showGuardarOrden('')"><span class="sup-ico">📋</span><span>Qué bajar primero</span></button>
-      <button class="sup-action-btn" onclick="openCorreccPanel()"><span class="sup-ico">🔀</span><span>Corregir códigos de NPs</span></button>
+      <button class="sup-action-btn" onclick="showGuardarOrden('')" style="position:relative;"><span class="sup-ico">📋</span><span>Qué bajar primero</span><span id="qbpBadge" class="dp-badge" style="display:none;" title="Urgentes (SOS): góndola < 20% con stock atrás para bajar"></span></button>
+      <button class="sup-action-btn" onclick="openCorreccPanel()" style="position:relative;"><span class="sup-ico">🔀</span><span>Corregir códigos de NPs</span><span id="corrBadgeGreen" class="dp-badge" style="left:2px;right:auto;background:#16a34a;display:none;" title="Se pueden corregir pero NO es obligatorio (hay stock del secundario)"></span><span id="corrBadge" class="dp-badge" style="display:none;" title="Hay que corregir SÍ o SÍ (el secundario no tiene stock)"></span></button>
       <button class="sup-action-btn" onclick="openNpConsulta()"><span class="sup-ico">🔎</span><span>Consultar NP / Líos</span></button>
-      <button class="sup-action-btn" onclick="stkOpenNpFaltan()"><span class="sup-ico">⚠️</span><span>Pedidos sin cargar en PPP</span></button>
+      <button class="sup-action-btn" onclick="stkOpenNpFaltan()" style="position:relative;"><span class="sup-ico">⚠️</span><span>Pedidos sin cargar en PPP</span><span id="npFaltanBadge" class="dp-badge" style="display:none;"></span></button>
       <button class="sup-action-btn" onclick="stkOpenProvImp()"><span class="sup-ico">🏭</span><span>Proveedor de importación</span></button>
       <button class="sup-action-btn" onclick="openPedidosImportacion()"><span class="sup-ico">📦</span><span>Pedidos Importación</span></button>
+      <button class="sup-action-btn" onclick="openAvisoProg()"><span class="sup-ico">📲</span><span>Avisar programación</span></button>
+      <button class="sup-action-btn" onclick="openPlataPerdida()"><span class="sup-ico">💸</span><span>Plata perdida de facturar</span></button>
       <button class="sup-action-btn" onclick="openDatosProducto()" style="position:relative;"><span class="sup-ico">🚦</span><span>Completar datos producto</span><span id="dpBadge" class="dp-badge" style="display:none;"></span></button>
       <button class="sup-action-btn" onclick="openConfiguracion()"><span class="sup-ico">⚙️</span><span>Configuración</span></button>
     </div>
@@ -4032,7 +4034,7 @@ const filas = {
   row1: ["EP","AP"],                                   // Picking + Armado starters (grande, azul/verde) — v7.75: TP/TAP removed (finalize inline)
   row2: [],                                            // (was Armado finish, now unused)
   row3: ["RT","MG","CC"],                              // Depósito y carga (mediano)
-  row4: ["CR","RR","INS","CP","RC","IR","EA","SC"],    // secundarias (chico) + 🔀 Mover al final. v7.49: RI+EI unificados en INS (chooser)
+  row4: ["CR","RR","INS","CP","RC","IR"],              // secundarias (chico) + 🔀 Mover al final. v7.49: RI+EI+SC unificados en INS (chooser). v9.15: EA removido (no se usa)
   row5: ["AT","PB","Limp","Perm","PC","CT"]            // tiempos / pausas (chico)
 };
 // Rediseño v5.92 (pedido del dueño): más peso a los botones más usados. Primarias
@@ -4046,7 +4048,7 @@ const desc = {
   TAP:"Terminé Armado Pedido", CR:"Control Remitos", CC:"Inicio/Fin Carga Camión",
   RR:"Recepción Remitos",
   RT:"Recepción Mercadería", MG:"Guardado a Góndola",
-  RI:"Recepción Insumos", EI:"Entrega Insumos", INS:"Entregar/Recibir Insumos", EA:"Entrega p/ envasar", SC:"Salida a Cervantes",
+  RI:"Recepción Insumos", EI:"Entrega Insumos", INS:"📦 Insumos y Productos Movimiento",
   CP:"Completar Pedido", RC:"Pasar a urgente", IR:"Ingreso a Racks",
   AT:"Atendí Timbre", PB:"Paré Baño", Limp:"Limpieza",
   Perm:"Permiso de Salida", PC:"Paré Comida",CT:"Conteo",
@@ -4210,15 +4212,33 @@ function _renderKeepFocus(container, html) {
     try { idx = Array.prototype.indexOf.call(container.querySelectorAll(sel), a); } catch (_e) {}
     let ss = null, se = null;
     try { ss = a.selectionStart; se = a.selectionEnd; } catch (_e) {}
-    mark = { sel: sel, idx: idx < 0 ? 0 : idx, ss: ss, se: se };
+    mark = { sel: sel, idx: idx < 0 ? 0 : idx, ss: ss, se: se, node: a };
   }
-  container.innerHTML = html;
-  if (mark) {
+  /* v9.34: Preservar el nodo DOM del input con foco para que Android/Gboard no
+     resetee el layout del teclado. Lo sacamos del DOM antes del innerHTML y lo
+     reinsertamos en el lugar del clon nuevo, restaurando foco y cursor. */
+  if (mark && mark.node) {
+    var _savedInput = mark.node;
+    // Sacarlo del container antes de destruir el innerHTML
+    try { _savedInput.parentNode.removeChild(_savedInput); } catch (_e) {}
+    container.innerHTML = html;
     try {
-      const list = container.querySelectorAll(mark.sel);
-      const el = list[mark.idx] || list[0];
-      if (el) { el.focus(); if (mark.ss != null && el.setSelectionRange) { try { el.setSelectionRange(mark.ss, mark.se); } catch (_e) {} } }
-    } catch (_e) {}
+      var _newList = container.querySelectorAll(mark.sel);
+      var _newEl = _newList[mark.idx] || _newList[0];
+      if (_newEl && _newEl.tagName === _savedInput.tagName) {
+        _newEl.parentNode.replaceChild(_savedInput, _newEl);
+        _savedInput.focus();
+        if (mark.ss != null && _savedInput.setSelectionRange) { try { _savedInput.setSelectionRange(mark.ss, mark.se); } catch (_e) {} }
+      } else {
+        // No encontró el slot — refocus en el primero disponible
+        var _any = container.querySelector("input,textarea");
+        if (_any) { _any.focus(); }
+      }
+    } catch (_e) {
+      try { var _fb = container.querySelectorAll(mark.sel); var _fbEl = _fb[mark.idx] || _fb[0]; if (_fbEl) { _fbEl.focus(); if (mark.ss != null && _fbEl.setSelectionRange) _fbEl.setSelectionRange(mark.ss, mark.se); } } catch (_e2) {}
+    }
+  } else {
+    container.innerHTML = html;
   }
 }
 
@@ -5403,7 +5423,7 @@ Object.keys(filas).forEach(rowId => {
     d.className = sec ? "box box-sm" : "box";
     d.setAttribute("data-code", code);
     d.innerHTML = `
-      <div class="box-title">${code === "INS" ? "🧰" : code}</div>
+      <div class="box-title">${code === "INS" ? "📦" : code}</div>
       <div class="box-desc">${desc[code]}</div>
     `;
     // v7.49: "INS" es un botón UI unificado (no un opcode): abre el chooser Recibir/Entregar/Nuevo.
@@ -5423,16 +5443,16 @@ try {
   if (r4) r4.appendChild(mov);
 } catch (_e) { /* no-op */ }
 
-// Planilla Conteo Cajas — secundario (botón en row4 para operarios)
-try {
-  const pcm = document.createElement("div");
-  pcm.className = "box box-sm";
-  pcm.setAttribute("data-code", "PCM");
-  pcm.innerHTML = `<div class="box-title" style="font-size:15px">📋</div><div class="box-desc">Planilla Conteo</div>`;
-  pcm.onclick = () => PCM.open();
-  const r4 = document.getElementById("row4");
-  if (r4) r4.appendChild(pcm);
-} catch (_e) { /* no-op */ }
+// v9.15: Planilla Conteo removida — no se usa
+// try {
+//   const pcm = document.createElement("div");
+//   pcm.className = "box box-sm";
+//   pcm.setAttribute("data-code", "PCM");
+//   pcm.innerHTML = `<div class="box-title" style="font-size:15px">📋</div><div class="box-desc">Planilla Conteo</div>`;
+//   pcm.onclick = () => PCM.open();
+//   const r4 = document.getElementById("row4");
+//   if (r4) r4.appendChild(pcm);
+// } catch (_e) { /* no-op */ }
 
 /* =========================================================
    NAVEGACIÓN
@@ -5454,7 +5474,7 @@ function showInstructivo() {
     { t: "🏭 Recepción", c: "RT · RR", x: "RT = recibí mercadería (entra a <b>“a guardar”</b>). RR = controlar los remitos cargados al camión." },
     { t: "🚚 Carga y control", c: "CC · CR", x: "CC = inicio/fin de la carga del camión. CR = control de remitos." },
     { t: "📥 Guardar a góndola", c: "MG", x: "Lo que está en <b>“a guardar”</b> lo pasás a góndola. Si la góndola está llena, marcás <b>Excedente</b> y su ubicación." },
-    { t: "🧰 Insumos y Cervantes", c: "Insumos · SC", x: "<b>Insumos</b> = un solo botón: elegís <b>Recibir</b> (entra stock) o <b>Entregar</b> (sale). ¿El insumo no está en el sistema? Entrás por <b>Recibir</b> y ahí tenés <b>“+ Agregar insumo nuevo”</b>. SC = salida de mercadería a Cervantes." },
+    { t: "📦 Insumos y Productos Movimiento", c: "INS (RI · EI · SC)", x: "Un solo botón que te da <b>3 opciones</b>: <b>📥 Recibir</b> (entra stock), <b>📤 Entregar</b> (sale stock), o <b>🚚 Salida a Cervantes</b> (envío a la central). Al elegir Recibir o Entregar te pide <b>de dónde/a dónde</b>. ¿El insumo no está? Entrás por Recibir y usás <b>“+ Agregar insumo nuevo”</b>." },
     { t: "⏱ Pausas y otros", c: "AT · PB · Limp · Perm · PC · CT", x: "Marcá cuándo: atendés el timbre (AT), vas al baño (PB), limpiás (Limp), pedís permiso (Perm), parás a comer (PC) o hacés conteo (CT). Tocás al <b>empezar</b> y otra vez al <b>terminar</b>." }
   ];
   ov.innerHTML = '<div class="instr-card"><div class="instr-head"><span class="instr-title">❓ ¿Cómo se usa?</span><button class="instr-close" onclick="closeInstructivo()">Cerrar</button></div><div class="instr-body">' +
@@ -5754,9 +5774,9 @@ function selectOption(code) {
     }
   }
 
-  // v4.10: Salida a Cervantes — abre el modal directo (sin Enviar ni evento en
-  // Registros); la salida se registra como baja de góndola en Movimientos_Stock.
-  if (code === "SC") { showCervantesModal(legajoStr); return; }
+  // v4.10: Salida a Cervantes — REMOVIDO de selectOption (ahora accesible solo desde el chooser de INS).
+  // v9.15: SC ahora está dentro del modal combinado de INS (insumoChooser) junto con RI/EI.
+  // if (code === "SC") { showCervantesModal(legajoStr); return; }
 
   // v5.05: Completar Pedido — agrega cajas que llegaron tarde a una NP armada SIN
   // facturar. Abre el modal directo (sin Enviar ni evento; el evento CP lo emite el
@@ -5777,9 +5797,9 @@ function selectOption(code) {
   // modal directo (sin Enviar; el evento RC lo emite el modal al confirmar).
   if (code === "RC") { showRCModal(legajoStr); return; }
 
-  // v5.52: Entrega Artículos para envasar — muestra el stock del depósito
-  // "para_envasar" y lo da de baja al entregarlo (modal directo; evento EA).
-  if (code === "EA") { showEAModal(legajoStr); return; }
+  // v5.52: Entrega Artículos para envasar — REMOVIDO (no se usa).
+  // v9.15: EA ha sido sacado del flujo operativo.
+  // if (code === "EA") { showEAModal(legajoStr); return; }
 
   // v5.67: Ingreso a Racks — da de alta lo que llega (importaciones) a los racks, con
   // su posición. Modal directo (sin Enviar; el evento IR lo emite al cargar cada palet).
@@ -6383,7 +6403,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v9.27";
+const APP_VERSION = "v9.59";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -9871,7 +9891,7 @@ async function openStockAdmin(soloConteo) {
   const _solo = soloConteo === true;   // rol "solo conteo" (Giuliana): solo la solapa Conteo
   if (!document.getElementById("stkCss")) {
     const s = document.createElement("style"); s.id = "stkCss";
-    s.textContent = "#stockAdminOverlay{display:none;position:fixed;inset:0;z-index:1280;background:rgba(2,6,23,.74);overflow:auto;padding:14px;}#stockAdminOverlay.show{display:block;}.stk-card{background:#f8fafc;max-width:min(1500px,97vw);margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.stk-head{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:linear-gradient(90deg,#1e6bd6,#1e3a8a);color:#fff;}.stk-title{font-size:19px;font-weight:800;}.stk-close{background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;width:auto;}.stk-body{padding:14px 16px;}.stk-loading,.stk-empty{padding:24px;text-align:center;color:#64748b;}.stk-sec{margin:16px 0 6px;font-size:14px;font-weight:900;color:#0f172a;display:flex;align-items:center;gap:7px;}.stk-secn{background:#e2e8f0;color:#475569;border-radius:999px;padding:1px 9px;font-size:11.5px;font-weight:800;}.stk-inp{border:1px solid #cbd5e1;border-radius:8px;padding:6px 8px;font-size:13px;font-family:inherit;background:#fff;}.stk-sub{font-size:10.5px;color:#94a3b8;font-weight:700;}.stk-nuevo{display:inline-flex;flex-wrap:wrap;align-items:center;gap:6px;}.stk-btn-x{color:#b91c1c;border-color:#fecaca;}.stk-scroll{overflow-x:auto;}.stk-catbox{border:1px solid #cbd5e1;border-radius:11px;padding:10px 11px;margin-bottom:8px;background:#fff;}.stk-catrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}.stk-catuni{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:7px;}.stk-catlist{margin-top:10px;padding-top:10px;border-top:1px dashed #e2e8f0;}.stk-catdesc{margin-top:5px;font-size:12px;color:#475569;line-height:1.35;}.stk-tbl tr.stk-filtros th{background:#f8fafc;padding:5px 9px;text-transform:none;}.stk-secbtn{width:100%;text-align:left;background:#eef2ff;border:1px solid #c7d2fe;border-radius:10px;padding:9px 12px;cursor:pointer;margin:16px 0 8px;}.stk-caret{display:inline-block;width:16px;color:#4f46e5;font-weight:900;}.stk-tbl tr.stk-viejo td{background:#fffbeb;}input.stk-inp.stk-neg{color:#b91c1c;font-weight:800;}.stk-cut{background:#fffbeb;border:1px solid #fcd34d;color:#92400e;border-radius:9px;padding:8px 11px;font-size:12.5px;font-weight:700;margin-bottom:10px;}.stk-filtro{flex:1;min-width:180px;height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 11px;font-size:14px;}.stk-btn{background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:8px 12px;font-size:13px;font-weight:800;cursor:pointer;width:auto;}.stk-btn.ok{background:#16a34a;color:#fff;border-color:#16a34a;}.stk-btn.danger{background:#fff;color:#b91c1c;border-color:#fca5a5;}.stk-tbl{width:100%;border-collapse:collapse;font-size:13.5px;}.stk-tbl.stk-tbl-fit{width:auto;max-width:100%;}.stk-tbl.stk-tbl-fit td.stk-desc{max-width:210px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.stk-tbl.stk-tbl-sect td.stk-desc{max-width:140px;}.stk-tbl.stk-tbl-fit th.num,.stk-tbl.stk-tbl-fit td.num{text-align:right;padding-left:9px;padding-right:9px;}.stk-tblwrap{overflow-x:auto;overflow-y:auto;max-width:100%;max-height:60vh;}.stk-tbl.stk-tbl-fit th.num{vertical-align:bottom;line-height:1.15;}.stk-tbl th{background:#f1f5f9;color:#475569;text-align:left;padding:7px 9px;font-size:11px;text-transform:uppercase;border-bottom:1px solid #cbd5e1;position:sticky;top:0;z-index:10;}.stk-tbl td{padding:7px 9px;}.stk-tbl th.num,.stk-tbl td.num{text-align:right;font-variant-numeric:tabular-nums;}.stk-row{cursor:pointer;border-bottom:1px solid #eef2f7;}.stk-row:hover{background:#eff6ff;}.stk-row td{padding:7px 9px;}.stk-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#1e6bd6;}.stk-desc{color:#475569;}.stk-neg{color:#b91c1c;font-weight:800;}.stk-pick-cell{cursor:pointer;color:#1e6bd6;font-weight:800;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px;}.stk-pick-cell:hover{background:#eff6ff;}.stk-tbl td.stk-hist0{color:#94a3b8;font-weight:700;}.stk-tbl td.stk-hist0:hover{background:#f1f5f9;color:#475569;}.stk-caret{color:#94a3b8;}.stk-detrow td{padding:0 9px 9px;background:#f8fafc;}.stk-det{border-left:3px solid #cbd5e1;padding:6px 0 6px 10px;}.stk-mv{display:flex;gap:9px;font-size:12px;padding:3px 0;align-items:center;}.stk-mv-old{opacity:.45;}.stk-mv-ts{color:#64748b;min-width:96px;}.stk-mv-tipo{font-weight:800;min-width:78px;}.stk-mv-dep{color:#64748b;min-width:74px;}.stk-mv-d{font-weight:800;min-width:44px;text-align:right;}.stk-mv-d.pos{color:#15803d;}.stk-mv-d.neg{color:#b91c1c;}.stk-mv-ref{color:#94a3b8;}.stk-ini-txt{width:100%;border:1px solid #cbd5e1;border-radius:9px;padding:9px;font-family:Consolas,Menlo,monospace;font-size:14px;}.stk-ini-btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}.stk-ini-warn{font-size:12px;color:#92400e;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:8px;margin-top:10px;}.stk-tabs{display:flex;gap:4px;padding:8px 12px 0;background:#1e3a8a;flex-wrap:wrap;}.stk-tab{flex:0 1 auto;width:auto;white-space:nowrap;background:rgba(255,255,255,.12);color:#cbd5e1;border:none;border-radius:9px 9px 0 0;padding:9px 13px;font-size:12.5px;font-weight:800;cursor:pointer;}.stk-tab.on{background:#f8fafc;color:#1e3a8a;}.stk-seg{display:flex;gap:6px;margin-bottom:10px;}.stk-segb{flex:1;background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:7px;font-size:13px;font-weight:800;cursor:pointer;}.stk-segb.on{background:#1e6bd6;color:#fff;border-color:#1e6bd6;}.stk-grp{margin-bottom:10px;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;}.stk-grp-h{background:#f1f5f9;padding:7px 10px;font-weight:800;font-size:13px;}.stk-grp-tot{color:#15803d;font-weight:800;margin-left:6px;}.stk-ing{display:flex;gap:9px;align-items:center;padding:5px 10px;border-top:1px solid #f1f5f9;font-size:12.5px;}.stk-ing-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#1e6bd6;}.stk-ing-desc{flex:1;color:#475569;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.stk-ing-rto{color:#94a3b8;font-size:11px;}.stk-aj-sec{border:1px solid #e2e8f0;border-radius:12px;padding:12px;margin-bottom:12px;}.stk-aj-h{font-size:15px;font-weight:800;margin-bottom:6px;}.stk-aj-hint{font-size:12px;color:#64748b;margin-bottom:7px;}.stk-aj-form{display:flex;gap:7px;flex-wrap:wrap;}.stk-aj-inp{flex:1;min-width:90px;height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 10px;font-size:14px;text-align:center;}.cnt-in{height:32px;border:1px solid #cbd5e1;border-radius:7px;padding:0 6px;font-size:13px;box-sizing:border-box;margin:0;width:auto;}.stk-aj-dep{margin-bottom:12px;font-size:13px;font-weight:800;}.stk-aj-dep select{height:36px;border:1px solid #cbd5e1;border-radius:8px;padding:0 8px;font-size:14px;font-weight:700;}.stk-rk-orden{background:#f1f5f9;border-radius:10px;padding:10px 12px;font-size:13px;margin-bottom:10px;}.stk-rk-orden.pend{background:#fffbeb;border:1.5px solid #fcd34d;color:#92400e;}.stk-rk-baj{display:flex;align-items:center;gap:10px;border:1px solid #e2e8f0;border-radius:11px;padding:9px 11px;margin-bottom:8px;background:#fff;}.stk-rk-baji{flex:1;min-width:0;}.stk-rk-q{font-size:12px;color:#1e6bd6;font-weight:700;margin-top:2px;}";
+    s.textContent = "#stockAdminOverlay{display:none;position:fixed;inset:0;z-index:1280;background:rgba(2,6,23,.74);overflow:auto;padding:14px;}#stockAdminOverlay.show{display:block;}.stk-card{background:#f8fafc;max-width:min(1500px,97vw);margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.stk-head{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:linear-gradient(90deg,#1e6bd6,#1e3a8a);color:#fff;}.stk-title{font-size:19px;font-weight:800;}.stk-close{background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;width:auto;}.stk-body{padding:14px 16px;}.stk-loading,.stk-empty{padding:24px;text-align:center;color:#64748b;}.stk-sec{margin:16px 0 6px;font-size:14px;font-weight:900;color:#0f172a;display:flex;align-items:center;gap:7px;}.stk-secn{background:#e2e8f0;color:#475569;border-radius:999px;padding:1px 9px;font-size:11.5px;font-weight:800;}.stk-inp{border:1px solid #cbd5e1;border-radius:8px;padding:6px 8px;font-size:13px;font-family:inherit;background:#fff;}.stk-sub{font-size:10.5px;color:#94a3b8;font-weight:700;}.stk-nuevo{display:inline-flex;flex-wrap:wrap;align-items:center;gap:6px;}.stk-btn-x{color:#b91c1c;border-color:#fecaca;}.stk-scroll{overflow-x:auto;}.stk-catbox{border:1px solid #cbd5e1;border-radius:11px;padding:10px 11px;margin-bottom:8px;background:#fff;}.stk-catrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}.stk-catuni{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:7px;}.stk-catlist{margin-top:10px;padding-top:10px;border-top:1px dashed #e2e8f0;}.stk-catdesc{margin-top:5px;font-size:12px;color:#475569;line-height:1.35;}.stk-tbl tr.stk-filtros th{background:#f8fafc;padding:5px 9px;text-transform:none;}.stk-secbtn{width:100%;text-align:left;background:#eef2ff;border:1px solid #c7d2fe;border-radius:10px;padding:9px 12px;cursor:pointer;margin:16px 0 8px;}.stk-caret{display:inline-block;width:16px;color:#4f46e5;font-weight:900;}.stk-tbl tr.stk-viejo td{background:#fffbeb;}input.stk-inp.stk-neg{color:#b91c1c;font-weight:800;}.stk-cut{background:#fffbeb;border:1px solid #fcd34d;color:#92400e;border-radius:9px;padding:8px 11px;font-size:12.5px;font-weight:700;margin-bottom:10px;}.stk-filtro{flex:1;min-width:180px;height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 11px;font-size:14px;}.stk-btn{background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:8px 12px;font-size:13px;font-weight:800;cursor:pointer;width:auto;}.stk-btn.ok{background:#16a34a;color:#fff;border-color:#16a34a;}.stk-btn.danger{background:#fff;color:#b91c1c;border-color:#fca5a5;}.stk-tbl{width:100%;border-collapse:collapse;font-size:13.5px;}.stk-tbl.stk-tbl-fit{width:auto;max-width:100%;}.stk-tbl.stk-tbl-fit td.stk-desc{max-width:210px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.stk-tbl.stk-tbl-sect td.stk-desc{max-width:140px;}.stk-tbl.stk-tbl-fit th.num,.stk-tbl.stk-tbl-fit td.num{text-align:right;padding-left:9px;padding-right:9px;}.stk-tblwrap{overflow-x:auto;overflow-y:auto;max-width:100%;max-height:60vh;}.stk-tbl.stk-tbl-fit th.num{vertical-align:bottom;line-height:1.15;}.stk-tbl th{background:#f1f5f9;color:#475569;text-align:left;padding:7px 9px;font-size:11px;text-transform:uppercase;border-bottom:1px solid #cbd5e1;position:sticky;top:0;z-index:10;}.stk-tbl td{padding:7px 9px;}.stk-tbl th.num,.stk-tbl td.num{text-align:right;font-variant-numeric:tabular-nums;}.stk-row{cursor:pointer;border-bottom:1px solid #eef2f7;}.stk-row:hover{background:#eff6ff;}.stk-row td{padding:7px 9px;}.stk-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#1e6bd6;}.stk-desc{color:#475569;}.stk-neg{color:#b91c1c;font-weight:800;}.stk-pick-cell{cursor:pointer;color:#1e6bd6;font-weight:800;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px;}.stk-pick-cell:hover{background:#eff6ff;}.stk-tbl td.stk-hist0{color:#94a3b8;font-weight:700;}.stk-tbl td.stk-hist0:hover{background:#f1f5f9;color:#475569;}.stk-caret{color:#94a3b8;}.stk-detrow td{padding:0 9px 9px;background:#f8fafc;}.stk-det{border-left:3px solid #cbd5e1;padding:6px 0 6px 10px;}.stk-mv{display:flex;gap:9px;font-size:12px;padding:3px 0;align-items:center;}.stk-mv-old{opacity:.45;}.stk-mv-ts{color:#64748b;min-width:96px;}.stk-mv-tipo{font-weight:800;min-width:78px;}.stk-mv-dep{color:#64748b;min-width:74px;}.stk-mv-d{font-weight:800;min-width:44px;text-align:right;}.stk-mv-d.pos{color:#15803d;}.stk-mv-d.neg{color:#b91c1c;}.stk-mv-ref{color:#94a3b8;}.stk-ini-txt{width:100%;border:1px solid #cbd5e1;border-radius:9px;padding:9px;font-family:Consolas,Menlo,monospace;font-size:14px;}.stk-ini-btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}.stk-ini-warn{font-size:12px;color:#92400e;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:8px;margin-top:10px;}.stk-tabs{display:flex;gap:4px;padding:8px 12px 0;background:#1e3a8a;flex-wrap:wrap;}.stk-tab{flex:0 1 auto;width:auto;white-space:nowrap;background:rgba(255,255,255,.12);color:#cbd5e1;border:none;border-radius:9px 9px 0 0;padding:9px 13px;font-size:12.5px;font-weight:800;cursor:pointer;}.stk-tab.on{background:#f8fafc;color:#1e3a8a;}.stk-seg{display:flex;gap:6px;margin-bottom:10px;}.stk-segb{flex:1;background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:7px;font-size:13px;font-weight:800;cursor:pointer;}.stk-segb.on{background:#1e6bd6;color:#fff;border-color:#1e6bd6;}.stk-grp{margin-bottom:10px;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;}.stk-grp-h{background:#f1f5f9;padding:7px 10px;font-weight:800;font-size:13px;}.stk-grp-tot{color:#15803d;font-weight:800;margin-left:6px;}.stk-ing{display:flex;gap:9px;align-items:center;padding:5px 10px;border-top:1px solid #f1f5f9;font-size:12.5px;}.stk-ing-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#1e6bd6;}.stk-ing-desc{flex:1;color:#475569;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.stk-ing-rto{color:#94a3b8;font-size:11px;}.stk-aj-sec{border:1px solid #e2e8f0;border-radius:12px;padding:12px;margin-bottom:12px;}.stk-aj-h{font-size:15px;font-weight:800;margin-bottom:6px;}.stk-aj-hint{font-size:12px;color:#64748b;margin-bottom:7px;}.stk-aj-form{display:flex;gap:7px;flex-wrap:wrap;}.stk-aj-inp{flex:1;min-width:90px;height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 10px;font-size:14px;text-align:center;}.cnt-in{height:32px;border:1px solid #cbd5e1;border-radius:7px;padding:0 6px;font-size:13px;box-sizing:border-box;margin:0;width:auto;}.stk-aj-dep{margin-bottom:12px;font-size:13px;font-weight:800;}.stk-aj-dep select{height:36px;border:1px solid #cbd5e1;border-radius:8px;padding:0 8px;font-size:14px;font-weight:700;}.stk-rk-orden{background:#f1f5f9;border-radius:10px;padding:10px 12px;font-size:13px;margin-bottom:10px;}.stk-rk-orden.pend{background:#fffbeb;border:1.5px solid #fcd34d;color:#92400e;}.stk-rk-baj{display:flex;align-items:center;gap:10px;border:1px solid #e2e8f0;border-radius:11px;padding:9px 11px;margin-bottom:8px;background:#fff;}.stk-rk-baji{flex:1;min-width:0;}.stk-rk-q{font-size:12px;color:#1e6bd6;font-weight:700;margin-top:2px;}.stk-catgrid{display:flex;flex-wrap:wrap;gap:10px;}.stk-catbtn{position:relative;min-width:150px;flex:1 1 150px;max-width:240px;min-height:100px;background:linear-gradient(135deg,#eef2ff,#e0e7ff);border:2px solid #c7d2fe;border-radius:14px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:18px 16px 36px;transition:border-color .15s,box-shadow .15s;}.stk-catbtn:hover{border-color:#818cf8;box-shadow:0 4px 16px rgba(99,102,241,.18);}.stk-catbtn-sincat{background:linear-gradient(135deg,#fef9c3,#fef3c7);border-color:#fcd34d;}.stk-catbtn-sincat:hover{border-color:#f59e0b;box-shadow:0 4px 16px rgba(245,158,11,.18);}.stk-catbtn-lbl{font-size:18px;font-weight:800;color:#1e3a8a;text-align:center;line-height:1.3;word-break:break-word;}.stk-catbtn-n{position:absolute;top:7px;right:9px;background:#6366f1;color:#fff;border-radius:999px;padding:1px 8px;font-size:11px;font-weight:800;}.stk-catbtn-ed,.stk-catbtn-del{position:absolute;bottom:6px;background:rgba(255,255,255,.85);border:1px solid #cbd5e1;border-radius:7px;padding:3px 7px;font-size:13px;cursor:pointer;line-height:1;transition:background .15s;width:auto;}.stk-catbtn-ed:hover,.stk-catbtn-del:hover{background:#fff;border-color:#818cf8;}.stk-catbtn-ed{left:8px;}.stk-catbtn-del{right:8px;}";
     document.head.appendChild(s);
   }
   let ov = document.getElementById("stockAdminOverlay");
@@ -9885,13 +9905,16 @@ async function openStockAdmin(soloConteo) {
       (_solo ? Promise.resolve({ pend: {}, porArt: {} }) : stkFcsFetch().catch(function () { return { pend: {}, porArt: {} }; })),   // v6.70: FC s/Salida como columna
       supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Insumos", "select=cod").catch(function () { return []; }),
       ocLoadLineas().catch(function () { return {}; }),   // v7.73: cargar códigos de insumos para filtrarlos de Stock + v7.89: LK/CH
-      rkbFetchCxM().catch(function () { return { cxm: {} }; })]);   // v8.52: inner×master de racks (backlog capacity-aware)
+      rkbFetchCxM().catch(function () { return { cxm: {} }; }),   // v8.52: inner×master de racks (backlog capacity-aware)
+      supaFetchAllSafe(SUPABASE_URL + "/rest/v1/proyeccion_madre", "select=cod,proy_cajas_mes").catch(function () { return []; })]);   // v9.49: proyección caj/mes (antes del índice de las OCs)
     // v8.90: cxm primario = planimetría; fallback = Articulos.Cajas_x_Master (para códigos sin posición en racks)
     var _cxmPlani = (res[11] && res[11].cxm) || {}, _cxmMerge = {};
     Object.keys(_cxmPlani).forEach(function (k) { _cxmMerge[k] = _cxmPlani[k]; });
     var _fac = res[2] || {};
     Object.keys(_fac).forEach(function (k) { var kN = _cpNorm(k); if (!_cxmMerge[kN] && _fac[k].cajasXMaster > 0) _cxmMerge[kN] = _fac[k].cajasXMaster; });
-    _stk = { movs: res[0] || [], cutoff: res[1], factors: _fac, ordenes: res[3] || [], bajadas: res[4] || [], tab: _solo ? "conteo" : "stocks", soloConteo: _solo, filtro: "", openArt: null, ingMode: "remito", asOf: null, asOfInput: "", dem: res[6] || {}, cap: res[7] || [], gConf: res[8] || [], fcs: res[9] || { pend: {}, porArt: {} }, fcsLoaded: true, insumosCods: (res[10] || []).map(function(i) { return String(i.cod || "").trim().toUpperCase(); }), cxm: _cxmMerge };
+    var _proyMap = {};   // v9.49: proyección caj/mes por código normalizado (antes del índice de las OCs)
+    (Array.isArray(res[13]) ? res[13] : []).forEach(function (x) { var k = _ocgNorm(x.cod); if (k) _proyMap[k] = Number(x.proy_cajas_mes) || 0; });
+    _stk = { movs: res[0] || [], cutoff: res[1], factors: _fac, ordenes: res[3] || [], bajadas: res[4] || [], tab: _solo ? "conteo" : "stocks", soloConteo: _solo, filtro: "", openArt: null, ingMode: "remito", asOf: null, asOfInput: "", dem: res[6] || {}, cap: res[7] || [], gConf: res[8] || [], fcs: res[9] || { pend: {}, porArt: {} }, fcsLoaded: true, insumosCods: (res[10] || []).map(function(i) { return String(i.cod || "").trim().toUpperCase(); }), cxm: _cxmMerge, proy: _proyMap };
     stkRender();
   } catch (e) { const b = document.getElementById("stkBody"); if (b) b.innerHTML = '<div class="stk-loading">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
 }
@@ -10517,7 +10540,7 @@ function ocNueva() { if (!_oc) return; _oc.view = "nueva"; if (!_oc.nueva || !_o
 function ocBodyNueva() {
   const n = _oc.nueva;
   let h = '<div class="oc-tools"><button class="oc-btn" onclick="ocBack()">← Volver</button></div>';
-  h += '<div class="oc-form"><input class="oc-inp" placeholder="Proveedor" value="' + escapeHtml(n.proveedor) + '" oninput="if(_oc)_oc.nueva.proveedor=this.value"><input class="oc-inp" type="date" value="' + escapeHtml(n.fecha) + '" oninput="if(_oc)_oc.nueva.fecha=this.value"><input class="oc-inp" placeholder="Rubro (ej: Cajas)" value="' + escapeHtml(n.rubro) + '" oninput="if(_oc)_oc.nueva.rubro=this.value"><input class="oc-inp" placeholder="Unidad" style="width:90px" value="' + escapeHtml(n.unidad) + '" oninput="if(_oc)_oc.nueva.unidad=this.value"></div>';
+  h += '<div class="oc-form"><input class="oc-inp" placeholder="Proveedor" value="' + escapeHtml(n.proveedor) + '" oninput="if(_oc)_oc.nueva.proveedor=this.value"><input class="oc-inp" type="date" min="2025-01-01" value="' + escapeHtml(n.fecha) + '" oninput="if(_oc)_oc.nueva.fecha=this.value"><input class="oc-inp" placeholder="Rubro (ej: Cajas)" value="' + escapeHtml(n.rubro) + '" oninput="if(_oc)_oc.nueva.rubro=this.value"><input class="oc-inp" placeholder="Unidad" style="width:90px" value="' + escapeHtml(n.unidad) + '" oninput="if(_oc)_oc.nueva.unidad=this.value"></div>';
   h += '<div class="oc-tblwrap"><table class="oc-tbl"><thead><tr><th>Código</th><th>Descripción</th><th class="num">Cantidad</th><th></th></tr></thead><tbody>';
   n.items.forEach(function (it, i) {
     h += '<tr><td><input class="oc-inp" style="width:100px" placeholder="cod" value="' + escapeHtml(it.cod) + '" oninput="if(_oc)_oc.nueva.items[' + i + '].cod=this.value"></td><td><input class="oc-inp" style="width:100%;box-sizing:border-box" placeholder="descripción" value="' + escapeHtml(it.desc) + '" oninput="if(_oc)_oc.nueva.items[' + i + '].desc=this.value"></td><td class="num"><input class="oc-rinp" type="number" min="0" inputmode="numeric" value="' + escapeHtml(String(it.cant)) + '" oninput="if(_oc)_oc.nueva.items[' + i + '].cant=this.value"></td><td><button class="oc-btn danger" onclick="ocNuevaDelItem(' + i + ')">✕</button></td></tr>';
@@ -10594,6 +10617,8 @@ const EQUIV_FAMILIAS = [
   { desc: "Espátula / Calada Ac. Inox", def: "945E", cods: ["945E", "332"] },
   { desc: "Cuchara Calada/Mango Mad.", def: "946E", cods: ["946E", "335"] },
   { desc: "Espumadera Ac. Inox",      def: "948E", cods: ["948E", "333"] },
+  // v9.36 — Rallador Chico Chocolate: 838E (importado, PRIMARIO) ↔ 839 (nacional, secundario).
+  { desc: "Rallador Chico Chocolate", def: "838E", cods: ["838E", "839"] },
   // v8.18 — Pincel Silicona: 590E (importado, PRIMARIO) ↔ 548 (nacional, secundario).
   { desc: "Pincel Silicona",          def: "590E", cods: ["590E", "548"] },
   // v8.11 — Corta Queso (Chef): 809 nacional ↔ 809E importado, ambos Chef. El 809E de Chef
@@ -10774,18 +10799,20 @@ const SUPABASE_IMPORTADOS_OC_ENDPOINT = SUPABASE_URL + "/rest/v1/v_importados_or
 async function ocgFetchImportados() {
   let rows = [];
   try {
-    rows = await supaFetchAllSafe(SUPABASE_IMPORTADOS_OC_ENDPOINT, "select=cod_art,marca,proveedor,descripcion,uni_x_caja,est_madre_eff,meses_objetivo,stock_actual,pedido_curso,principal,activo&principal=eq.true&activo=eq.true");
+    rows = await supaFetchAllSafe(SUPABASE_IMPORTADOS_OC_ENDPOINT, "select=id,cod_art,marca,proveedor,descripcion,uni_x_caja,est_madre_eff,meses_objetivo,stock_actual,pedido_curso,principal,activo&principal=eq.true&activo=eq.true");
   } catch (_e) { return { items: [], meses: 10 }; }
   const by = {};
   let meses = 10;
   (rows || []).forEach(function (r) {
     const cod = String(r.cod_art || "").trim(); if (!cod) return;
     const k = cod.toUpperCase();
-    if (!by[k]) by[k] = { cod: cod, desc: r.descripcion || "", prov: String(r.proveedor || "").trim() || "(sin proveedor)", uxc: 0, proyUni: 0, stockUni: 0, enCurso: 0 };
+    if (!by[k]) by[k] = { cod: cod, desc: r.descripcion || "", prov: String(r.proveedor || "").trim() || "(sin proveedor)", uxc: 0, proyUni: 0, stockUni: 0, enCurso: 0, det: [] };
     const o = by[k];
     o.proyUni += Number(r.est_madre_eff) || 0;
     o.stockUni += Number(r.stock_actual) || 0;
     o.enCurso += Number(r.pedido_curso) || 0;
+    // filas subyacentes (por marca/planta) para poder editar "en curso" y marcar llegada por Importados.id
+    if (r.id != null) o.det.push({ id: r.id, marca: String(r.marca || "").trim(), prov: String(r.proveedor || "").trim(), curso: Number(r.pedido_curso) || 0, uxc: Number(r.uni_x_caja) || 0 });
     const u = Number(r.uni_x_caja) || 0; if (u > o.uxc) o.uxc = u;
     const m = Number(r.meses_objetivo) || 0; if (m > 0) meses = m;
     if (!o.desc && r.descripcion) o.desc = r.descripcion;
@@ -10820,13 +10847,13 @@ async function ocgFetchImportados() {
     const objetivoUni = Math.round(proyUni * meses);
     const aPedirUni = Math.max(0, Math.ceil(objetivoUni - stockTot - o.enCurso));
     const aPedirCajas = (o.uxc > 0) ? Math.ceil(aPedirUni / o.uxc) : null;
-    items.push({ cod: o.cod, desc: o.desc, prov: o.prov, proyUni: Math.round(proyUni), meses: meses, objetivoUni: objetivoUni, stockUni: Math.round(stockTot), stockPropio: Math.round(o.stockUni), stockParteU: Math.round(stockParteU), stockParteCods: (sp ? sp.partes : ""), enCurso: Math.round(o.enCurso), aPedirUni: aPedirUni, uxc: o.uxc, aPedirCajas: aPedirCajas, esParte: esParte, parteDet: (pp ? pp.detalle : null) });
+    items.push({ cod: o.cod, desc: o.desc, prov: o.prov, proyUni: Math.round(proyUni), meses: meses, objetivoUni: objetivoUni, stockUni: Math.round(stockTot), stockPropio: Math.round(o.stockUni), stockParteU: Math.round(stockParteU), stockParteCods: (sp ? sp.partes : ""), enCurso: Math.round(o.enCurso), aPedirUni: aPedirUni, uxc: o.uxc, aPedirCajas: aPedirCajas, esParte: esParte, parteDet: (pp ? pp.detalle : null), det: o.det || [] });
   });
   return { items: items, meses: meses };
 }
 async function ocgEnter() {
   if (!_oc) return;
-  _oc.view = "gen"; _oc.gen = null; ocRender();   // muestra "calculando…"
+  _oc.view = "gen"; _oc.gen = null; _oc.genFiltro = ""; ocRender();   // muestra "calculando…"
   try {
     // v7.68: TODO el cálculo vive en la vista vista_generador_oc (universo desde stock,
     // Máximo = proy×índice o capacidad como objetivo, stock con empresa mergeada, pedidos,
@@ -10883,19 +10910,24 @@ function ocBodyGen() {
   const keys = Object.keys(g).sort(function (a, b) { return a.localeCompare(b); });
   // v7.66: botón grande "Generar las OCs" arriba, a la altura del ← Volver (pedido del usuario).
   const genBtn = keys.length ? '<button class="oc-btn ok" style="font-size:15px;padding:8px 20px;font-weight:800;line-height:1.2;text-align:center" onclick="ocgGenerar()">✓ Generar las OCs<br><span id="ocgCountdown" style="font-size:10.5px;font-weight:600;opacity:.9">' + escapeHtml(_ocgAutoEnTxt()) + '</span></button>' : '';
-  let h = '<div class="oc-tools"><button class="oc-btn" onclick="ocBack()">← Volver</button>' + genBtn + '<button class="oc-btn" onclick="ocgEnterCfg()">⚙ Configuraciones</button></div>';
+  let h = '<div class="oc-tools"><button class="oc-btn" onclick="ocBack()">← Volver</button>' + genBtn + '<button class="oc-btn" onclick="ocgEnterCfg()">⚙ Configuraciones</button><input class="oc-filtro" type="search" placeholder="🔎 Buscar código / descripción / proveedor" value="' + escapeHtml(_oc.genFiltro || "") + '" oninput="if(_oc){_oc.genFiltro=this.value;ocRender();}"></div>';
   if (!gen) return h + '<div class="oc-loading">Calculando (stock + demanda PPP + proyección × índice)…</div>';
   if (gen.error) return h + '<div class="oc-empty" style="color:#b91c1c">Error: ' + escapeHtml(gen.error) + '</div>';
   if (!keys.length) return h + '<div class="oc-empty">No hay nada para pedir (todo está en o sobre el máximo).<br><small>Con el stock en 0, va a dar todo para pedir cuando lo cargues.</small></div>';
+  const gf = (_oc.genFiltro || "").toLowerCase().trim();
   const totItems = keys.reduce(function (s, k) { return s + g[k].items.length; }, 0);
   const sinG = g["(sin proveedor)"]; const nReal = keys.filter(function (k) { return k !== "(sin proveedor)"; }).length;
   h += '<div class="oc-meta">Fecha <b>' + escapeHtml(gen.fecha) + '</b> · <b>' + nReal + '</b> proveedor(es) · <b>' + totItems + '</b> ítem(s) a pedir' + (sinG ? ' · <b style="color:#b45309">' + sinG.items.length + ' sin proveedor</b>' : '') + '.</div>';
   keys.forEach(function (k) {
     const x = g[k];
     const sinP = (k === "(sin proveedor)");
-    h += '<div class="oc-meta" style="margin-top:12px;margin-bottom:4px' + (sinP ? ';color:#b45309' : '') + '"><b>' + escapeHtml(k) + '</b> · ' + x.items.length + ' ítem(s) · ' + x.total + ' cajas' + (sinP ? ' &nbsp;<span style="font-weight:800">⚠ asigná proveedor en ⚙ Configuraciones para poder generarlas (así no se envían)</span>' : '') + '</div>';
+    // v9.34: filtrar items si hay búsqueda activa
+    const fitems = gf ? x.items.filter(function (it) { return (codCanon(it.cod) + " " + (it.desc || "") + " " + (it.prov || "")).toLowerCase().indexOf(gf) !== -1; }) : x.items;
+    if (gf && !fitems.length) return;   // ocultar proveedor entero si ningún item matchea
+    const fTotal = fitems.reduce(function (s, it) { return s + it.falta; }, 0);
+    h += '<div class="oc-meta" style="margin-top:12px;margin-bottom:4px' + (sinP ? ';color:#b45309' : '') + '"><b>' + escapeHtml(k) + '</b> · ' + fitems.length + ' ítem(s) · ' + fTotal + ' cajas' + (sinP ? ' &nbsp;<span style="font-weight:800">⚠ asigná proveedor en ⚙ Configuraciones para poder generarlas (así no se envían)</span>' : '') + '</div>';
     h += '<div class="oc-tblwrap"><table class="oc-tbl"><thead><tr><th>Código</th><th>Descripción</th><th class="num">Proy</th><th class="num">Índice</th><th class="num">Máx</th><th class="num">Pedidos</th><th class="num">Stock</th><th class="num">A pedir</th></tr></thead><tbody>';
-    x.items.sort(function (a, b) { return b.falta - a.falta; }).forEach(function (it) {
+    fitems.sort(function (a, b) { return b.falta - a.falta; }).forEach(function (it) {
       const proyTxt = (it.fuente === "proy") ? (Math.round(it.proy) + "") : '<span style="color:#94a3b8" title="Sin ventas (proyección 0) → el Máximo sale de la capacidad de góndola">0</span>';
       const maxTxt = it.max + (it.capped ? ' <span style="color:#b45309;font-weight:800" title="Topado a la capacidad de góndola (' + it.cap + ' cajas) — proy×índice daba más">⤓</span>' : '');
       h += '<tr><td class="oc-cod">' + escapeHtml(codCanon(it.cod)) + '</td><td>' + escapeHtml(artNombre(it.cod, it.desc)) + '</td><td class="num">' + proyTxt + '</td><td class="num">' + it.indice + '</td><td class="num">' + maxTxt + '</td><td class="num">' + it.demanda + '</td><td class="num">' + it.stock + '</td><td class="num oc-falt">' + it.falta + '</td></tr>';
@@ -10913,13 +10945,17 @@ function ocBodyGenImportados() {
   if (!gen) return "";
   if (!gen.imp) return '<div class="oc-meta" style="margin-top:16px;color:#94a3b8">🌎 Importados: calculando…</div>';
   const items = (gen.imp.items || []).filter(function (it) { return it.aPedirUni > 0; });
+  const gf = (_oc.genFiltro || "").toLowerCase().trim();
   let h = '<div class="oc-meta" style="margin-top:18px;border-top:2px solid #e2e8f0;padding-top:12px"><b>🌎 Importados — OC por proveedor chino</b> · índice <b>' + (gen.imp.meses || 10) + ' meses</b> · <small style="color:#94a3b8">stock y proyección en unidades (motor <code>v_importados_ordenes</code>). Vista previa — la emisión se afina con más análisis.</small></div>';
   if (!items.length) { h += '<div class="oc-empty" style="margin-top:6px">No hay importados para pedir (todo en o sobre el objetivo).</div>'; return h; }
   const g = {};
   items.forEach(function (it) { const k = it.prov || "(sin proveedor)"; if (!g[k]) g[k] = []; g[k].push(it); });
   const keys = Object.keys(g).sort(function (a, b) { return a.localeCompare(b); });
   keys.forEach(function (k) {
-    const arr = g[k]; const sinP = (k === "(sin proveedor)");
+    const sinP = (k === "(sin proveedor)");
+    // v9.34: filtro compartido con la sección principal
+    const arr = gf ? g[k].filter(function (it) { return (codCanon(it.cod) + " " + (it.desc || "") + " " + (it.prov || "")).toLowerCase().indexOf(gf) !== -1; }) : g[k];
+    if (gf && !arr.length) return;
     const totCaj = arr.reduce(function (s, it) { return s + (it.aPedirCajas || 0); }, 0);
     h += '<div class="oc-meta" style="margin-top:12px;margin-bottom:4px' + (sinP ? ';color:#b45309' : '') + '"><b>' + escapeHtml(k) + '</b> · ' + arr.length + ' ítem(s) · ' + totCaj + ' cajas' + (sinP ? ' &nbsp;<span style="font-weight:800">⚠ asigná proveedor en 🏭 Proveedor de importación</span>' : '') + '</div>';
     h += '<div class="oc-tblwrap"><table class="oc-tbl"><thead><tr><th>Código</th><th>Descripción</th><th class="num">Proy u/mes</th><th class="num">Meses</th><th class="num">Objetivo u</th><th class="num">Stock u</th><th class="num">En curso</th><th class="num">A pedir u</th><th class="num">Cajas</th></tr></thead><tbody>';
@@ -11188,6 +11224,7 @@ function stkRender() {
   if (tb) tb.innerHTML = tabs.map(function (t) { return '<button class="stk-tab' + (_stk.tab === t[0] ? " on" : "") + '" onclick="stkTab(\'' + t[0] + '\')">' + t[1] + '</button>'; }).join("");
   const body = document.getElementById("stkBody"); if (!body) return;
   _renderKeepFocus(body, _stk.tab === "faltante" ? stkBodyFaltante() : _stk.tab === "proceso" ? stkBodyProceso() : _stk.tab === "conteo" ? stkBodyConteo() : _stk.tab === "capacidad" ? stkBodyCapacidad() : _stk.tab === "racks" ? stkBodyRacks() : _stk.tab === "insumos" ? stkBodyInsumos() : _stk.tab === "ajustes" ? stkBodyAjustes() : stkBodyStocksTab());
+  _stkInsCatPopupRefresh();   // v9.32: refresca popup de categoría si está abierto
 }
 /* ===== v6.47 — FC s/SALIDA: NPs FACTURADAS (tick de la operadora en Facturación =
    fila en Facturacion_NP) que TODAVÍA NO se cargaron al camión (sin evento CCN del
@@ -11687,7 +11724,7 @@ async function openAbastecimiento() {
 function closeAbastecimiento() { const ov = document.getElementById("abastOverlay"); if (ov) ov.classList.remove("show"); _abast = null; }
 /* Filtro: re-render + restaurar foco/cursor al final (si no, se re-dibuja el input
    en cada tecla y se pierde el foco → "solo entra 1 dígito"). Patrón de pppSetSearch. */
-function abastSetFiltro(v) { if (!_abast) return; _abast.filtro = String(v == null ? "" : v); abastRender(); const el = document.getElementById("abastFiltroInp"); if (el) { el.focus(); const n = el.value.length; try { el.setSelectionRange(n, n); } catch (_e) {} } }
+function abastSetFiltro(v) { if (!_abast) return; _abast.filtro = String(v == null ? "" : v); abastRender(); }
 /* Vista ÚNICA integrada: fabricación vs venta (mensual) + stock vs pedidos (hoy), por artículo. */
 function abastRender() {
   const body = document.getElementById("abastBody"); if (!body || !_abast) return;
@@ -11764,7 +11801,7 @@ function abastRender() {
     }
   });
   h += '</tbody></table></div>';
-  body.innerHTML = h;
+  _renderKeepFocus(body, h);
 }
 function abastToggle(codEnc) { if (!_abast) return; const cod = decodeURIComponent(codEnc); _abast.openCod = (_abast.openCod === cod) ? null : cod; if (_abast.openCod == null) _abast.mesesAll = false; abastRender(); }
 function abastToggleMeses() { if (!_abast) return; _abast.mesesAll = !_abast.mesesAll; abastRender(); }
@@ -11806,8 +11843,8 @@ function prodRender() {
   // selector de fechas (siempre arriba)
   const d1v = _prod ? _prod.d1 : (_prodPeriod ? _prodPeriod.d1 : "");
   const d2v = _prod ? _prod.d2 : (_prodPeriod ? _prodPeriod.d2 : "");
-  const sel = '<div class="prod-dates"><label>Desde</label><input id="prodD1" type="date" value="' + d1v + '" onchange="prodSetPeriod(this.value, document.getElementById(\'prodD2\').value)">' +
-    '<label>Hasta</label><input id="prodD2" type="date" value="' + d2v + '" onchange="prodSetPeriod(document.getElementById(\'prodD1\').value, this.value)">' +
+  const sel = '<div class="prod-dates"><label>Desde</label><input id="prodD1" type="date" min="2025-01-01" value="' + d1v + '" onchange="prodSetPeriod(this.value, document.getElementById(\'prodD2\').value)">' +
+    '<label>Hasta</label><input id="prodD2" type="date" min="2025-01-01" value="' + d2v + '" onchange="prodSetPeriod(document.getElementById(\'prodD1\').value, this.value)">' +
     '<button class="prod-preset" onclick="prodPreset(7)">7 días</button><button class="prod-preset" onclick="prodPreset(28)">4 sem</button><button class="prod-preset" onclick="prodPreset(56)">8 sem</button><button class="prod-preset" onclick="prodExportCsv()" style="background:#16a34a;color:#fff" title="Bajar la tabla a Excel/CSV (totales por operario)">⬇ Excel</button>' +
     '<button class="prod-preset" onclick="prodExportCsvDiario()" style="background:#0891b2;color:#fff" title="Bajar el detalle por empleado y DÍA: horas, m³ y ritmo de picking y de armado">⬇ Excel × día</button></div>';
 
@@ -12193,6 +12230,9 @@ function stkBodyStocks() {
   // por código base ("437E") pero los saldos tienen sufijo ("437E LK"). Busca exacto primero,
   // fallback al base.
   var _demOf = function (cod) { var k = _ocgNorm(cod); return Number(dem[k] || dem[_ocgNorm(codBase(cod))]) || 0; };
+  // v9.49 — proyección caj/mes (proyeccion_madre): valor "antes del índice" que se usa en las OCs. Mismo lookup exacto→base.
+  var _proyM = (_stk && _stk.proy) || {};
+  var _proyOf = function (cod) { var k = _ocgNorm(cod); return Number(_proyM[k] || _proyM[_ocgNorm(codBase(cod))]) || 0; };
   // v8.97 — cajas pedidas que vienen de NP SIN programar (en la base pero no en PPP_Programacion_Diaria) → ⚠.
   var _demSP = (dem && dem._sinProg) || {};
   var _demSPOf = function (cod) { var k = _ocgNorm(cod); return Number(_demSP[k] || _demSP[_ocgNorm(codBase(cod))]) || 0; };
@@ -12263,18 +12303,22 @@ function stkBodyStocks() {
   if (!_stk.pins) _stk.pins = _stkPinsLoad();
   const _pinSet = new Set((_stk.pins || []).map(function (c) { return String(c).trim().toUpperCase(); }));
   const _terms = f.split(/[\s,]+/).filter(Boolean);
+  // v9.34: helper — ¿tiene stock en algún depósito de producto, o demanda, o FC pendiente?
+  const _stkHasAny = function (a) { return _stkStockKeys.some(function (k) { return (Number(a[k]) || 0) !== 0; }) || _demOf(a.cod) > 0 || _fcArtCajas(a.cod) > 0; };
   let shown = _stk.soloPin
     ? arts.filter(function (a) { return _pinSet.has(String(a.cod).trim().toUpperCase()); })
     : (_terms.length
-      ? arts.filter(function (a) { const s = (a.cod + " " + a.desc).toLowerCase(); return _terms.some(function (t) { return s.indexOf(t) >= 0; }); })
-      : arts.filter(function (a) { return _stkStockKeys.some(function (k) { return (Number(a[k]) || 0) !== 0; }) || _demOf(a.cod) > 0 || _fcArtCajas(a.cod) > 0; }));
+      ? arts.filter(function (a) { if (!_stkHasAny(a)) return false; const s = (a.cod + " " + a.desc).toLowerCase(); return _terms.some(function (t) { return s.indexOf(t) >= 0; }); })
+      : arts.filter(_stkHasAny));
   // v7.73→v8.71: excluir códigos que están en la tabla Insumos, SALVO que tengan
   // stock en algún depósito de producto (terminado/excedente/separar/facturar/guardar/racks/p.env/rch).
   // Así un mismo código puede ser insumo Y producto sin desaparecer de Stock.
+  // v9.47: …o si tiene PEDIDOS (demanda del PPP) / FC pendiente — un producto cargado como insumo
+  // (ej. 584E) con pedidos y 0 en góndola tiene que aparecer igual.
   const _insCodsSet = new Set((_stk.insumosCods || []).map(function (c) { return String(c || "").trim().toUpperCase(); }));
   shown = shown.filter(function (a) {
     if (!_insCodsSet.has(String(a.cod || "").trim().toUpperCase())) return true;
-    return (Number(a.terminado) || 0) !== 0 || (Number(a.excedente) || 0) !== 0 || (Number(a.separar_pedidos) || 0) !== 0 || (Number(a.a_facturar) || 0) !== 0 || (Number(a.a_guardar) || 0) !== 0 || (Number(a.racks) || 0) !== 0 || (Number(a.para_envasar) || 0) !== 0 || (Number(a.racks_ch) || 0) !== 0;
+    return (Number(a.terminado) || 0) !== 0 || (Number(a.excedente) || 0) !== 0 || (Number(a.separar_pedidos) || 0) !== 0 || (Number(a.a_facturar) || 0) !== 0 || (Number(a.a_guardar) || 0) !== 0 || (Number(a.racks) || 0) !== 0 || (Number(a.para_envasar) || 0) !== 0 || (Number(a.racks_ch) || 0) !== 0 || _demOf(a.cod) > 0 || _fcArtCajas(a.cod) > 0;
   });
   // v7.48: tilde "🔴 Negativos" — se aplica ADEMÁS del buscador. Deja sólo los artículos con
   // saldo negativo en algún depósito (para cazar inconsistencias de stock de un vistazo).
@@ -12304,6 +12348,7 @@ function stkBodyStocks() {
     shown = shown.filter(function (a) {
       var v;
       if (_fcK === "_tot") v = SECTKEYS.reduce(function (s, k) { return s + (Number(a[k]) || 0); }, 0) + (Number(a.racks_ch) || 0);
+      else if (_fcK === "_proy") v = _proyOf(a.cod);
       else if (_fcK === "_ped") v = _demOf(a.cod);
       else if (_fcK === "_cap") v = _capOf(a.cod);
       else if (_fcK === "_fc") v = _fcArtCajas(a.cod);
@@ -12380,7 +12425,7 @@ function stkBodyStocks() {
     if (s.extra) return shown.some(function (a) { return (Number(a[s.key]) || 0) !== 0; });
     return true;
   });
-  const ncol = 6 + cols.length + 2;   // +1 LK/CH (v7.89) +1 FC s/Salida (v6.70) +1 caret
+  const ncol = 6 + cols.length + 3;   // +1 LK/CH (v7.89) +1 FC s/Salida (v6.70) +1 caret +1 Proyección (v9.49)
   // v8.95 — header numérico clickeable: toca para filtrar filas con esa columna > 0 (se marca verde con ✓).
   const _thNum = function (key, label, baseStyle, title) {
     const on = _stk.filCol === key;
@@ -12388,6 +12433,7 @@ function stkBodyStocks() {
     return '<th class="num" onclick="stkToggleFilCol(\'' + key + '\')" title="' + (title || "Filtrar") + ' — tocá para mostrar solo los que tienen &gt; 0" style="cursor:pointer;' + st + '">' + label + (on ? " ✓" : " <span style=\"opacity:.4;font-weight:400\">⌵</span>") + '</th>';
   };
   let th = '<th>Código</th><th style="text-align:center;padding:7px 5px;font-size:10px;">LK/<br>CH</th><th>Descripción</th>' +
+    _thNum("_proy", "Proy.<br>caj/mes", "background:#f5f3ff;color:#6d28d9;", "Proyección de venta (cajas/mes) — el valor antes del índice que se usa en las OCs") +
     _thNum("_tot", "Total<br>Stock", "background:#eef2ff;color:#1e3a8a;", "Stock total") +
     _thNum("_ped", "Cajas<br>Pedidas", "background:#fef3c7;color:#92400e;", "Cajas pedidas — TODAS las NP (programadas o no) que todavía no se facturaron") +
     _thNum("_cap", "Capacidad<br>góndola", "background:#dcfce7;color:#166534;", "Capacidad de góndola");
@@ -12420,7 +12466,8 @@ function stkBodyStocks() {
       if (_ocgNorm(a.cod) === _fam._defN) _famTag = ' <span title="Principal de la familia — es el que se debe pedir/mandar" style="color:#16a34a;font-size:10px;">★</span>';
       else _famTag = ' <span title="SECUNDARIO — no deben entrar pedidos acá. El principal es ' + escapeHtml(_equivDisp(_fam, _fam._defN)) + '." style="color:#1e40af;font-size:10px;font-weight:800;">⇄' + escapeHtml(_equivDisp(_fam, _fam._defN)) + '</span>';
     }
-    let tds = '<td class="stk-cod">' + escapeHtml(_codDisplay) + _famTag + '</td><td style="text-align:center;font-weight:800;font-size:11px;padding:3px 4px;color:' + (_lin === "LK" ? "#b91c1c" : (_lin === "CH" ? "#1e40af" : "#94a3b8")) + ';">' + (_lin || "—") + '</td><td class="stk-desc">' + escapeHtml(artNombre(a.cod, a.desc) || "—") + '</td><td class="num ' + (_tot < 0 ? "stk-neg" : "") + '" style="background:#f8fafc"><b>' + fmtCajas(_tot) + '</b></td>' + (_ped ? '<td class="num stk-pick-cell" style="background:#fffbeb;color:#92400e" onclick="event.stopPropagation();stkOpenCajasPedidasArt(\'' + encodeURIComponent(a.cod) + '\')" title="Todas las cajas pedidas (programadas o no) todavía no facturadas. Tocá para ver el detalle por NP"><b>' + fmtCajas(_ped) + '</b>' + (_demSPOf(a.cod) > 0.05 ? ' <span title="⚠ ' + fmtCajas(_demSPOf(a.cod)) + ' caja(s) pedidas están en la base de pedidos pero SIN programar en el PPP (Programación Diaria)" style="cursor:help">⚠️</span>' : '') + '</td>' : '<td class="num" style="background:#fffbeb;color:#92400e"></td>') + (_cap ? '<td class="num stk-pick-cell" style="background:#f0fdf4;color:#166534" onclick="event.stopPropagation();stkOpenCapArt(\'' + encodeURIComponent(a.cod) + '\')" title="Ubicaciones y capacidad de góndola"><b>' + fmtCajas(_cap) + '</b></td>' : '<td class="num" style="background:#f0fdf4;color:#166534">—</td>');
+    const _proy = _proyOf(a.cod);
+    let tds = '<td class="stk-cod">' + escapeHtml(_codDisplay) + _famTag + '</td><td style="text-align:center;font-weight:800;font-size:11px;padding:3px 4px;color:' + (_lin === "LK" ? "#b91c1c" : (_lin === "CH" ? "#1e40af" : "#94a3b8")) + ';">' + (_lin || "—") + '</td><td class="stk-desc">' + escapeHtml(artNombre(a.cod, a.desc) || "—") + '</td>' + (_proy > 0.05 ? '<td class="num" style="background:#faf5ff;color:#6d28d9" title="Proyección de venta: ' + fmtCajas(_proy) + ' caj/mes (antes del índice de las OCs)">' + Math.round(_proy) + '</td>' : '<td class="num" style="background:#faf5ff;color:#c4b5fd">—</td>') + '<td class="num ' + (_tot < 0 ? "stk-neg" : "") + '" style="background:#f8fafc"><b>' + fmtCajas(_tot) + '</b></td>' + (_ped ? '<td class="num stk-pick-cell" style="background:#fffbeb;color:#92400e" onclick="event.stopPropagation();stkOpenCajasPedidasArt(\'' + encodeURIComponent(a.cod) + '\')" title="Todas las cajas pedidas (programadas o no) todavía no facturadas. Tocá para ver el detalle por NP"><b>' + fmtCajas(_ped) + '</b>' + (_demSPOf(a.cod) > 0.05 ? ' <span title="⚠ ' + fmtCajas(_demSPOf(a.cod)) + ' caja(s) pedidas están en la base de pedidos pero SIN programar en el PPP (Programación Diaria)" style="cursor:help">⚠️</span>' : '') + '</td>' : '<td class="num" style="background:#fffbeb;color:#92400e"></td>') + (_cap ? '<td class="num stk-pick-cell" style="background:#f0fdf4;color:#166534" onclick="event.stopPropagation();stkOpenCapArt(\'' + encodeURIComponent(a.cod) + '\')" title="Ubicaciones y capacidad de góndola"><b>' + fmtCajas(_cap) + '</b></td>' : '<td class="num" style="background:#f0fdf4;color:#166534">—</td>');
     cols.forEach(function (c) {
       const v = (c.racksKey ? ((Number(a[c.key]) || 0) + (Number(a.racks_ch) || 0)) : (Number(a[c.key]) || 0));
       // v5.82: columnas clickeables → detalle. Pickeados/A facturar → NPs; Excedente/Racks → ubicación.
@@ -12656,18 +12703,41 @@ async function stkOpenNpFaltan() {
   const body = document.getElementById("stkPopBody"); if (!body) return;
   body.innerHTML = '<div class="stkpop-empty">Cargando…</div>';
   const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
-  let rows = [];
-  try { rows = await fetch(SUPABASE_URL + "/rest/v1/vista_np_sin_programar?select=np,fecha,cliente,cajas,lineas&order=np&limit=5000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }); } catch (_e) {}
-  _stkPop = { kind: "npFaltan", rows: rows, cancelNp: null };
+  let rows = [], gaps = [];
+  try {
+    var _out = await Promise.all([
+      fetch(SUPABASE_URL + "/rest/v1/vista_np_sin_programar?select=np,fecha,cliente,cajas,lineas&order=np&limit=5000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; }),
+      // v9.38 — NP salteadas en la secuencia numérica (huecos ≤5 entre NPs que sí existen)
+      fetch(SUPABASE_URL + "/rest/v1/vista_np_faltantes_secuencia?select=np_faltante,anterior,siguiente&order=np_faltante.desc&limit=1000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; })
+    ]);
+    rows = _out[0]; gaps = _out[1];
+  } catch (_e) {}
+  try { supSetBadge("npFaltanBadge", (rows || []).length); } catch (_e) {}   // sincroniza el badge del panel con lo que se muestra
+  _stkPop = { kind: "npFaltan", rows: rows, gaps: gaps, cancelNp: null };
   _stkNpFaltanRender();
+}
+/* v9.38 — sección "NP salteadas en la secuencia": números que faltan entre NPs que sí existen. */
+function _stkNpGapsHtml() {
+  var gaps = (_stkPop && _stkPop.gaps) || [];
+  if (!gaps.length) return "";
+  var shown = gaps.slice(0, 150);
+  var chips = shown.map(function (g) {
+    return '<span title="hueco entre ' + escapeHtml(String(g.anterior)) + ' y ' + escapeHtml(String(g.siguiente)) + '" style="display:inline-block;background:#fff;border:1px solid #fde68a;border-radius:7px;padding:2px 7px;margin:2px;font-size:11.5px;font-weight:800;color:#92400e;">' + escapeHtml(String(g.np_faltante)) + '</span>';
+  }).join("");
+  var extra = gaps.length > shown.length ? '<span style="font-size:11px;color:#92400e;font-weight:700;"> … y ' + (gaps.length - shown.length) + ' más</span>' : '';
+  return '<div style="background:#fffbeb;border:1.5px solid #fde68a;border-radius:12px;padding:9px 12px;margin-bottom:12px;">' +
+    '<div style="font-weight:800;color:#92400e;font-size:13.5px;margin-bottom:3px;">🔢 ' + gaps.length + ' NP salteada(s) en la secuencia</div>' +
+    '<div style="font-size:11px;color:#7c5b12;margin-bottom:6px;">Números que faltan entre NPs que <b>sí</b> existen (hueco ≤5). Puede ser un pedido que <b>no se cargó</b> o una NP <b>anulada</b> en el ERP. Revisá si alguna debería estar.</div>' +
+    '<div style="max-height:130px;overflow:auto;">' + chips + extra + '</div></div>';
 }
 function _stkNpFaltanRender() {
   const body = document.getElementById("stkPopBody"); if (!body || !_stkPop || _stkPop.kind !== "npFaltan") return;
   const rows = _stkPop.rows || [];
   const round1 = function (n) { return Math.round((Number(n) || 0) * 10) / 10; };
-  if (!rows.length) { body.innerHTML = '<div class="stkpop-empty">✅ No hay NP sin programar. Todo lo que está en la base está programado, facturado, entregado o marcado como que NO va.</div>'; return; }
+  const gapsH = _stkNpGapsHtml();
+  if (!rows.length) { body.innerHTML = gapsH + '<div class="stkpop-empty">✅ No hay NP sin programar. Todo lo que está en la base está programado, facturado, entregado o marcado como que NO va.</div>'; return; }
   const totCajas = rows.reduce(function (s, r) { return s + (Number(r.cajas) || 0); }, 0);
-  let h = '<div class="stkpop-hint"><b>' + rows.length + ' NP</b> están en la base de pedidos pero <b>NO</b> en Programación Diaria (y no se facturaron ni entregaron). <b>Valorizado: ' + round1(totCajas) + ' cajas.</b><br><small style="color:#94a3b8">Si es un <b>error real</b> (debería estar) → programalo en el PPP. Si el pedido <b>NO va</b> (cancelado, cargado por error, etc.) → marcalo con 🚫 y deja de contar en el stock.</small></div>';
+  let h = gapsH + '<div class="stkpop-hint"><b>' + rows.length + ' NP</b> están en la base de pedidos pero <b>NO</b> en Programación Diaria (y no se facturaron ni entregaron). <b>Valorizado: ' + round1(totCajas) + ' cajas.</b><br><small style="color:#94a3b8">Si es un <b>error real</b> (debería estar) → programalo en el PPP. Si el pedido <b>NO va</b> (cancelado, cargado por error, etc.) → marcalo con 🚫 y deja de contar en el stock.</small></div>';
   h += '<div style="margin-bottom:10px"><button class="mva-clear" style="background:#166534;color:#fff;border-color:#166534" onclick="stkNpFaltanExport()">⬇ Exportar a Excel</button></div>';
   h += '<div class="mva-tblwrap"><table class="mva-tbl"><thead><tr><th>NP</th><th>Fecha</th><th>Razón Social</th><th class="num">Cajas</th><th></th></tr></thead><tbody>';
   h += rows.map(function (r) {
@@ -12733,6 +12803,7 @@ async function stkNpFaltanDoCancel(npEnc, motivoEnc) {
   _stkPop.rows = (_stkPop.rows || []).filter(function (x) { return String(x.np) !== np; });
   _stkPop.cancelNp = null;
   _stkNpFaltanRender();
+  try { npFaltanLoadBadge(); } catch (_e) {}
   // Refrescar la demanda del stock para que el ⚠ y las Cajas Pedidas se actualicen ya.
   try { if (_stk) { const rows = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/v_cajas_pedidas", "select=articulo,cajas_pedidas"); var dem = {}; (rows || []).forEach(function(r) { var k = _ocgNorm(r.articulo); if (k) dem[k] = (dem[k] || 0) + (Number(r.cajas_pedidas) || 0); }); _stk.dem = dem; stkRender(); } } catch (_e) {}
 }
@@ -12851,7 +12922,7 @@ function _pedImpRender() {
     if (!byImp[imp][prov]) byImp[imp][prov] = [];
     byImp[imp][prov].push(it);
   });
-  let h = '<div class="stkpop-hint">Pedidos a los proveedores chinos (motor <code>v_importados_ordenes</code>, índice <b>' + (data.meses || 10) + ' meses</b>). Separado de las OC de talleristas. 🧩 = parte (proyección = suma de sus terminados).</div>';
+  let h = '<div class="stkpop-hint">Pedidos a los proveedores chinos (motor <code>v_importados_ordenes</code>, índice <b>' + (data.meses || 10) + ' meses</b>). Separado de las OC de talleristas. 🧩 = parte (proyección = suma de sus terminados).<br><b>✏️</b> editar unidades en curso (lo ya pedido/en camino) · <b>📥</b> marcar que el pedido llegó (suma al stock y baja de en curso).</div>';
   h += '<div style="margin-bottom:10px"><button class="mva-clear" style="' + (_stkPop.soloPedir ? 'background:#0f766e;color:#fff;border-color:#0f766e' : '') + '" onclick="pedImpToggle()">' + (_stkPop.soloPedir ? '✓ ' : '') + 'Solo lo que hay que pedir</button></div>';
   const impOrder = ["Chef", "Tierra Nativa", "(sin importador)"];
   Object.keys(byImp).forEach(function (k) { if (impOrder.indexOf(k) < 0) impOrder.push(k); });
@@ -12864,20 +12935,66 @@ function _pedImpRender() {
       const arr = provs[prov];
       const totCaj = arr.reduce(function (s, it) { return s + (it.aPedirCajas || 0); }, 0);
       h += '<div class="stkpop-hint" style="margin:8px 0 3px;font-weight:700">' + escapeHtml(prov) + ' · ' + arr.length + ' ítem(s)' + (totCaj ? ' · ' + totCaj + ' cajas' : '') + '</div>';
-      h += '<div class="mva-tblwrap"><table class="mva-tbl"><thead><tr><th>Código</th><th>Descripción</th><th class="num">Proy u/mes</th><th class="num">Objetivo</th><th class="num">Stock</th><th class="num">En curso</th><th class="num">A pedir u</th><th class="num">Cajas</th></tr></thead><tbody>';
+      h += '<div class="mva-tblwrap"><table class="mva-tbl"><thead><tr><th>Código</th><th>Descripción</th><th class="num">Proy u/mes</th><th class="num">Objetivo</th><th class="num">Stock</th><th class="num">En curso</th><th class="num">A pedir u</th><th class="num">Cajas</th><th>Acciones</th></tr></thead><tbody>';
       arr.sort(function (a, b) { return b.aPedirUni - a.aPedirUni; }).forEach(function (it) {
         const cajTxt = (it.aPedirCajas == null) ? '<span style="color:#94a3b8" title="Sin uni×caja cargado">—</span>' : String(it.aPedirCajas);
         const badge = it.esParte ? ' <span style="color:#7c3aed" title="Parte">🧩</span>' : '';
         const stockTxt = (it.stockParteU > 0)
           ? it.stockUni + ' <span style="color:#7c3aed;font-weight:700;font-size:11px" title="Incluye ' + it.stockParteU + ' u de la parte ' + escapeHtml(it.stockParteCods || '') + ' (' + it.stockPropio + ' propio + ' + it.stockParteU + ' parte)">🔧+' + it.stockParteU + '</span>'
           : String(it.stockUni);
-        h += '<tr><td><b>' + escapeHtml(codCanon(it.cod)) + '</b>' + badge + '</td><td style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escapeHtml(it.desc || "") + '">' + escapeHtml(artNombre(it.cod, it.desc)) + '</td><td class="num">' + it.proyUni + '</td><td class="num">' + it.objetivoUni + '</td><td class="num">' + stockTxt + '</td><td class="num">' + it.enCurso + '</td><td class="num" style="font-weight:800;color:#b45309">' + it.aPedirUni + '</td><td class="num">' + cajTxt + '</td></tr>';
+        var actHtml = (it.det || []).map(function (d) {
+          var multi = (it.det || []).length > 1;
+          var lbl = (multi && d.marca) ? ('<span style="font-size:10px;color:#64748b;margin-right:2px">' + escapeHtml(d.marca) + '</span>') : '';
+          var codEnc = encodeURIComponent(it.cod);
+          return '<div style="white-space:nowrap;margin:1px 0">' + lbl +
+            '<button class="stk-btn" style="padding:3px 7px;font-size:12px" title="Editar unidades en curso (pedido en camino)" onclick="pedImpSetCurso(' + d.id + ',\'' + codEnc + '\',' + (d.curso || 0) + ')">✏️</button> ' +
+            '<button class="stk-btn ok" style="padding:3px 7px;font-size:12px" title="Marcar que el pedido llegó: suma al stock y baja de en curso" onclick="pedImpLlego(' + d.id + ',\'' + codEnc + '\',' + (d.curso || 0) + ')">📥</button></div>';
+        }).join('');
+        h += '<tr><td><b>' + escapeHtml(codCanon(it.cod)) + '</b>' + badge + '</td><td style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escapeHtml(it.desc || "") + '">' + escapeHtml(artNombre(it.cod, it.desc)) + '</td><td class="num">' + it.proyUni + '</td><td class="num">' + it.objetivoUni + '</td><td class="num">' + stockTxt + '</td><td class="num">' + it.enCurso + '</td><td class="num" style="font-weight:800;color:#b45309">' + it.aPedirUni + '</td><td class="num">' + cajTxt + '</td><td>' + actHtml + '</td></tr>';
       });
       h += '</tbody></table></div>';
     });
   });
   if (!algo) h += '<div class="stkpop-empty">No hay importados ' + (_stkPop.soloPedir ? 'para pedir (todo en o sobre el objetivo)' : 'cargados') + '.</div>';
   body.innerHTML = h;
+}
+/* v9.29 — Pedidos Importación operable: editar "en curso" y marcar llegada.
+   Ambas acciones van por RPC SECURITY DEFINER (sql/importados_pedidos_rpc.sql) apuntando
+   por Importados.id. Tras cada acción se re-consulta el motor y se re-renderiza. */
+async function _pedImpRpc(fn, body) {
+  var r = await fetch(SUPABASE_URL + "/rest/v1/rpc/" + fn, {
+    method: "POST",
+    headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  });
+  if (!r.ok) { var t = ""; try { t = await r.text(); } catch (_e) {} throw new Error("HTTP " + r.status + (t ? (" — " + t) : "")); }
+  try { return await r.json(); } catch (_e) { return null; }
+}
+async function pedImpReload() {
+  try { var data = await ocgFetchImportados(); if (_stkPop && _stkPop.kind === "pedImp") { _stkPop.data = data; _pedImpRender(); } } catch (_e) {}
+}
+async function pedImpSetCurso(id, codEnc, curso) {
+  var cod = decodeURIComponent(codEnc);
+  var val; try { val = prompt("Unidades EN CURSO (pedido a China / en camino) de " + cod + ":", String(Math.round(curso || 0))); } catch (_e) { return; }
+  if (val == null) return;
+  var uni = parseInt(String(val).replace(/[^\d]/g, ""), 10);
+  if (!(uni >= 0)) { try { alert("Número inválido."); } catch (_e) {} return; }
+  try { await _pedImpRpc("importados_set_curso", { p_id: id, p_uni: uni }); }
+  catch (e) { try { alert("No se pudo guardar: " + (e.message || e)); } catch (_e) {} return; }
+  await pedImpReload();
+}
+async function pedImpLlego(id, codEnc, curso) {
+  var cod = decodeURIComponent(codEnc);
+  var def = Math.round(curso || 0);
+  var val; try { val = prompt("¿Cuántas unidades LLEGARON de " + cod + "?\n(Entran al stock y bajan de 'en curso'.)", String(def > 0 ? def : "")); } catch (_e) { return; }
+  if (val == null) return;
+  var uni = parseInt(String(val).replace(/[^\d]/g, ""), 10);
+  if (!(uni > 0)) { try { alert("Poné un número mayor a 0."); } catch (_e) {} return; }
+  var leg = ""; try { leg = String(window.__authEmail || ""); } catch (_e) {}
+  try { await _pedImpRpc("importados_marcar_llegada", { p_id: id, p_uni: uni, p_legajo: leg }); }
+  catch (e) { try { alert("No se pudo marcar la llegada: " + (e.message || e)); } catch (_e) {} return; }
+  try { alert("✅ " + uni + " u de " + cod + " ingresadas al stock."); } catch (_e) {}
+  await pedImpReload();
 }
 function _stkWin(mv, exemptInicial) {
   const cut = _stk.cutoff ? new Date(_stk.cutoff).getTime() : 0;
@@ -13384,6 +13501,9 @@ function _stkQuienChip(mv) {
   }
   if (!leg && String(mv.tipo || "") === "recepcion") { leg = _stkRtQuien(mv.ts); aprox = !!leg; }
   if (!leg) return "";
+  // v9.42 — legajo 0/1 (pruebas/admin) NO es un operario: mostrar "admin", no el nombre de prueba
+  // (ej. antes los CP de supervisor quedaban "TL · 0"). Los CP nuevos ya guardan el legajo real.
+  if (leg === "0" || leg === "1") return ' <span class="mva-qui" title="Movimiento de administración / sistema (sin legajo de operario)">👤 <b>admin</b></span>';
   const nom = (typeof _empleadosNombres !== "undefined" && _empleadosNombres) ? (_empleadosNombres.get(leg) || "") : "";
   const sig = (typeof initialsFromName === "function" ? initialsFromName(nom, leg) : "") || nom || leg;
   const tip = (nom || ("legajo " + leg)) + (aprox ? " — deducido por la sesión de RT (recepción vieja, sin legajo guardado)" : "");
@@ -13506,7 +13626,7 @@ function _stkMovsBlock() {
     return '<tr><td class="mva-ts">' + escapeHtml(stockFmtTs(mv.ts)) + '</td><td class="mva-mov"><div class="mva-movrow">' + plus + '<span class="mva-movbody">' + movBody + '</span></div></td><td class="mva-cant">' + cant + '</td><td class="mva-sal">' + round1(saldo) + '</td></tr>' + detrow;
   }).join("");
   let h = '<div class="stkpop-hint">Movimientos de <b>' + escapeHtml(codBase(_stkPop.cod)) + '</b> en <b>' + escapeHtml(_stkPop.titulo) + '</b>, por fecha. Entró <b style="color:#15803d">+' + round1(totIn) + '</b> · salió <b style="color:#b91c1c">' + round1(totOut) + '</b> · <b>saldo ' + round1(saldo) + '</b>.<br><small style="color:#94a3b8">👤 = siglas y legajo del que lo hizo (en <b>recepcion</b>, del que recibió). En <span class="mva-qui aprox">ámbar ~</span> va el deducido por la sesión de RT (recepciones viejas, sin legajo guardado).</small></div>';
-  h += '<div class="mva-daterow">Desde <input type="date" class="mva-date" value="' + escapeHtml(_stkPop.desde) + '" onchange="stkMovsArtDate(\'desde\',this.value)"> hasta <input type="date" class="mva-date" value="' + escapeHtml(_stkPop.hasta) + '" onchange="stkMovsArtDate(\'hasta\',this.value)">' + ((_stkPop.desde || _stkPop.hasta) ? ' <button class="mva-clear" onclick="stkMovsArtDate(\'clear\')">✕</button>' : '') + '</div>';
+  h += '<div class="mva-daterow">Desde <input type="date" min="2025-01-01" class="mva-date" value="' + escapeHtml(_stkPop.desde) + '" onchange="stkMovsArtDate(\'desde\',this.value)"> hasta <input type="date" min="2025-01-01" class="mva-date" value="' + escapeHtml(_stkPop.hasta) + '" onchange="stkMovsArtDate(\'hasta\',this.value)">' + ((_stkPop.desde || _stkPop.hasta) ? ' <button class="mva-clear" onclick="stkMovsArtDate(\'clear\')">✕</button>' : '') + '</div>';
   h += list.length
     ? '<div class="mva-tblwrap"><table class="mva-tbl"><thead><tr><th>Fecha</th><th>Movimiento</th><th class="num">Cant.</th><th class="num">Saldo</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
     : '<div class="stkpop-empty">Sin movimientos' + ((_stkPop.desde || _stkPop.hasta) ? ' en ese rango' : '') + '.</div>';
@@ -13817,15 +13937,22 @@ async function stkFaltLoad() {
       supaFetchAllSafe(SUPABASE_URL + "/rest/v1/vista_saldos_stock",
         "select=cod_art,descripcion,terminado,excedente,a_guardar,racks,racks_ch,para_envasar,separar_pedidos,a_facturar,insumos"),
       // v8.38 — códigos DISCONTINUOS (activo=false en OC_Maximos): no se muestran en Faltantes.
-      supaFetchAllSafe(SUPABASE_OCMAX_ENDPOINT, "select=cod&activo=eq.false")
+      supaFetchAllSafe(SUPABASE_OCMAX_ENDPOINT, "select=cod&activo=eq.false"),
+      // v9.34 — NP ya ENTREGADAS (completadas) y CANCELADAS: no son faltante (igual que ocgDemanda).
+      supaFetchAllSafe(SUPABASE_URL + "/rest/v1/PPP_Entregados_Meta", "select=np"),
+      supaFetchAllSafe(SUPABASE_URL + "/rest/v1/NP_Canceladas", "select=np")
     ]);
-    var ppp = res[0] || [], base = res[1], facRows = res[2] || [], genProv = res[3] || [], saldos = res[4] || [], discRows = res[5] || [];
+    var ppp = res[0] || [], base = res[1], facRows = res[2] || [], genProv = res[3] || [], saldos = res[4] || [], discRows = res[5] || [], entRows = res[6] || [], canRows = res[7] || [];
     // Set de códigos discontinuos (normalizados) → se filtran de la tabla.
     var discont = {};
     discRows.forEach(function (r) { var k = _ocgNorm(r.cod); if (k) discont[k] = true; });
-    // Set de NPs facturadas
+    // Set de NPs que YA NO son faltante: facturadas + entregadas (completadas) + canceladas ("no va").
+    // v9.34 — antes solo miraba facturadas; las entregadas/canceladas seguían apareciendo como
+    // "faltante que no falta" aunque el pedido ya estaba cumplido o dado de baja.
     var facSet = {};
     facRows.forEach(function (r) { var n = pickNormNp(r.np); if (n) facSet[n] = true; });
+    entRows.forEach(function (r) { var n = pickNormNp(r.np); if (n) facSet[n] = true; });
+    canRows.forEach(function (r) { var n = pickNormNp(r.np); if (n) facSet[n] = true; });
     // Mapa proveedor por código normalizado, igual que el generador de OCs: proveedor real
     // (ignora "(sin proveedor)"); si hay reparto a un 2° proveedor, se muestra "P1 / P2".
     var provMap = {};
@@ -13870,6 +13997,7 @@ async function stkFaltLoad() {
     });
     var tandas = Object.keys(tandaNp);
     var realFalt = {};      // codNorm(suffijado) → cajas que faltaron al ARMAR (real, TP)
+    var realFaltDia = {};   // v9.44 — codNorm → { 'YYYY-MM-DD' (fecha SALIDA): cajas } para ubicarlo en el calendario
     var realDet = {};       // codNorm → [{tanda, np, rs, cod, falto}] (detalle para el drill)
     var enCurso = {};       // TANDAs en picking (para el contador "en curso")
     if (tandas.length) {
@@ -13911,6 +14039,8 @@ async function stkFaltLoad() {
         var cod = _ocgNorm(codEmpSplit(o.c, np)); if (!cod) return;
         realFalt[cod] = (realFalt[cod] || 0) + falto;
         (realDet[cod] = realDet[cod] || []).push({ tanda: o.t, np: np, rs: (npInfo[np] || {}).rs || "", cod: o.c, falto: falto });
+        var _sal = String((npInfo[np] || {}).fecha || "").slice(0, 10);   // v9.44 — fecha de SALIDA de la tanda
+        if (_sal) { (realFaltDia[cod] = realFaltDia[cod] || {})[_sal] = (realFaltDia[cod][_sal] || 0) + falto; }
       });
     }
 
@@ -13934,7 +14064,7 @@ async function stkFaltLoad() {
     });
     _stk.falt = {
       demanda: demanda, provMap: provMap, saldoMap: saldoMap, discont: discont,
-      realFalt: realFalt, realDet: realDet, enCurso: Object.keys(enCurso).length,
+      realFalt: realFalt, realFaltDia: realFaltDia, realDet: realDet, enCurso: Object.keys(enCurso).length,
       ajustes: {}, filtro: "s1", openCell: null, search: "",
       // v8.71 — por defecto: orden fabricante→faltó armado + los 3 botones activos.
       ordenFab: true, soloQuiebre: true, sinE: true, verDias: true
@@ -14036,6 +14166,7 @@ function stkBodyFaltante() {
   if (_stk.faltLoaded === "loading") return '<div class="stk-loading">Cargando demanda PPP + stock…</div>';
   var F = _stk.falt, dem = F.demanda, sMap = F.saldoMap, provMap = F.provMap, ajustes = F.ajustes || (F.ajustes = {});
   var realFalt = F.realFalt || {};   // v8.14 — faltante REAL (ya preparado / TP) por código
+  var realFaltDia = F.realFaltDia || {};   // v9.44 — realFalt por fecha de salida (para el calendario)
   var discont = F.discont || {};     // v8.38 — códigos discontinuos (activo=false): no se muestran
   var hoy = _faltHoy();
   // v8.10 — "Esta semana" = HOY + 5 días hábiles (ventana móvil), NO la semana calendario.
@@ -14100,6 +14231,19 @@ function stkBodyFaltante() {
     // v8.14 — faltante REAL combinado (lo que ya faltó al armar en tandas pickeadas)
     var realFam = 0;
     members.forEach(function (m) { realFam += (realFalt[m] || 0); });
+    var realDiaFam = {};   // v9.44 — realFalt de la familia por fecha de salida (para ubicarlo en el calendario)
+    members.forEach(function (m) { var rd = realFaltDia[m]; if (rd) Object.keys(rd).forEach(function (dd) { realDiaFam[dd] = (realDiaFam[dd] || 0) + rd[dd]; }); });
+    // v9.46 — realFalt clasificado por VENTANA (S1/S2/Resto/Sin fecha) según su fecha de SALIDA,
+    // para que el faltó al armar también sume en la columna que corresponde (ej. 13 del 14/08 → S1).
+    var realWin = { s1: 0, s2: 0, resto: 0, sinfecha: 0 };
+    Object.keys(realDiaFam).forEach(function (sal) {
+      var qq = realDiaFam[sal];
+      if (sal < hoy) realWin.sinfecha += qq;
+      else if (sal <= finS1) realWin.s1 += qq;
+      else if (sal >= lunesS2 && sal <= finS2) realWin.s2 += qq;
+      else if (sal > finS2) realWin.resto += qq;
+      else realWin.s1 += qq;   // hueco (fin de semana) entre S1 y S2 → S1
+    });
     // Demanda combinada por fecha + sinFecha. v8.23 — AJUSTE DE CAJAS por NP: el operador no anula
     // la entrega, achica cuántas cajas van. ajustes[np|key] = cajas reales; si está, reemplaza el
     // total pedido de ese NP (se reparte proporcional entre sus entries por si son varias).
@@ -14191,7 +14335,7 @@ function stkBodyFaltante() {
       cod: codShow, key: key, esFam: esFam, miembros: miembrosDisp,
       desc: descFam || artNombre(codShow, ""), prov: provMap[key] || provMap[String(key).replace(/\s+(LK|CH)$/, "")] || provMap[members[0]] || "",
       stock: Math.round(stockFam), totalDem: Math.round(totalDem),
-      realFalt: Math.round(realFam),
+      realFalt: Math.round(realFam), realDia: realDiaFam, realWin: realWin,
       faltS1: Math.round(faltS1), faltS2: Math.round(faltS2), faltResto: Math.round(faltResto),
       faltSinFecha: Math.round(faltSinFecha),
       diasFalt: diasFalt, diasFaltSuper: diasFaltSuper, diasFaltCli: diasFaltCli,
@@ -14215,6 +14359,11 @@ function stkBodyFaltante() {
   // Ordenar. Por defecto: lo que YA FALTÓ al armar (real, urgente), luego S1, S2, código.
   // v8.24 — si F.ordenFab: primero por FABRICANTE (los "sin fabricante" al final), después la misma prioridad.
   arts.sort(function (a, b) {
+    if (F.colFiltro) {   // v9.45 — filtro por columna (S1/S2/Resto/Sin fecha/día): ordena por esa columna desc
+      var _va = _faltColVal(a, F.colFiltro), _vb = _faltColVal(b, F.colFiltro);
+      if (_vb !== _va) return _vb - _va;
+      return codCanon(a.cod).localeCompare(codCanon(b.cod), undefined, { numeric: true });
+    }
     if (F.ordenFab) {
       var pa = String(a.prov || "").trim(), pb = String(b.prov || "").trim();
       if (!pa !== !pb) return pa ? -1 : 1;                 // sin fabricante → al final
@@ -14237,6 +14386,7 @@ function stkBodyFaltante() {
 
   // v8.02 — "solo quiebre": esconde los que no faltan (ruido)
   if (F.soloQuiebre) arts = arts.filter(_hayQ);
+  if (F.colFiltro) arts = arts.filter(function (a) { return _faltColVal(a, F.colFiltro) > 0; });   // v9.45 — solo la columna elegida
 
   // v8.77 — un día se DESDOBLA (Super | Clientes) SOLO si hay faltante REAL de supermercado ese
   // día en algún artículo VISIBLE. Si el super está cubierto (faltante 0), la columna quedaría
@@ -14267,6 +14417,7 @@ function stkBodyFaltante() {
   h += '<div class="falt-top">' +
     '<div class="falt-filters">' +
     '<button class="falt-fbtn' + (F.soloQuiebre ? " on" : "") + '" onclick="stkFaltSoloQuiebre()" title="Mostrar solo los artículos que tienen faltante">' + (F.soloQuiebre ? "☑" : "☐") + ' Solo quiebre</button>' +
+    (F.colFiltro ? '<button class="falt-fbtn on" onclick="stkFaltColFiltro(\'' + F.colFiltro + '\')" title="Viendo solo la columna. Tocá para quitar el filtro (o tocá otro header para cambiarlo).">✕ Filtro: ' + escapeHtml(_faltColLabel(F.colFiltro)) + '</button>' : '') +
     '<button class="falt-fbtn' + (F.sinE ? " on" : "") + '" onclick="stkFaltSinE()" title="Ocultar códigos importados (E) que no tienen equivalente nacional para reponer. Mantiene los 94xE y las familias con nacional (574E/590E/809E CH/etc.).">' + (F.sinE ? "☑" : "☐") + ' Sin E</button>' +
     '<button class="falt-fbtn' + (F.verDias ? " on" : "") + '" onclick="stkFaltVerDias()" title="Mostrar el detalle día por día (agrega las columnas de cada día — puede necesitar scroll lateral).">' + (F.verDias ? "☑" : "☐") + ' 📅 Ver días</button>' +
     '</div>' +
@@ -14284,9 +14435,10 @@ function stkBodyFaltante() {
     '<th class="falt-cod"' + rs + '>Cód</th><th class="falt-desc"' + rs + '>Descripción</th><th class="falt-fab"' + rs + ' style="cursor:pointer;" onclick="stkFaltOrdenFab()" title="Ordenar por fabricante">Fabricante' + (F.ordenFab ? ' ▾' : '') + '</th>' +
     '<th class="falt-stk"' + rs + '>Stock</th>' +
     '<th class="falt-stk"' + rs + ' title="Total de cajas pedidas (demanda pendiente) de este artículo/familia.">Total<br>Pedidos</th>' +
-    '<th class="falt-sem"' + rs + '>Falt S1</th><th class="falt-sem"' + rs + '>Falt S2</th>' +
-    '<th class="falt-sem"' + rs + ' title="Faltante proyectado para salidas MÁS ALLÁ de la S2 (semana 3 en adelante).">Resto</th>' +
-    '<th class="falt-sem"' + rs + ' title="Faltante de pedidos SIN fecha PPP (o con fecha ya pasada): consumen stock pero no caen en ninguna columna de día. Acá aparece lo que falta y no se ve en S1/S2/Resto. Falt S1 + S2 + Resto + Sin fecha = Total − Stock.">Sin<br>fecha</th>';
+    _faltSemTh(F, rs, "s1", "Falt S1", "la primer semana (S1)") +
+    _faltSemTh(F, rs, "s2", "Falt S2", "la segunda semana (S2)") +
+    _faltSemTh(F, rs, "resto", "Resto", "Resto (salidas más allá de la S2)") +
+    _faltSemTh(F, rs, "sinfecha", "Sin<br>fecha", "Sin fecha PPP (o pasada)");
   // v8.56 — columnas de día SOLO si "📅 Ver días" está activo (por defecto ocultas → sin scroll lateral).
   if (F.verDias) {
     h += '<th class="falt-sep"' + rs + '></th>';
@@ -14299,20 +14451,11 @@ function stkBodyFaltante() {
       h += '</tr><tr>';
       // Row de abajo: el label del día (dos veces en días de super: Super | Clientes).
       diasCols.forEach(function (d) {
-        var esHoy = d === hoy;
-        var lbl = _faltDiaSem(d) + '<br>' + _faltFechaCorta(d);
-        if (superDiaSet[d]) {
-          h += '<th class="falt-dia' + (esHoy ? " hoy" : "") + '" title="' + d + ' · Supermercado">' + lbl + '</th>' +
-               '<th class="falt-dia' + (esHoy ? " hoy" : "") + '" title="' + d + ' · Clientes">' + lbl + '</th>';
-        } else {
-          h += '<th class="falt-dia' + (esHoy ? " hoy" : "") + '" title="' + d + '">' + lbl + '</th>';
-        }
+        if (superDiaSet[d]) { h += _faltDiaTh(F, d, hoy, " · Super") + _faltDiaTh(F, d, hoy, " · Clientes"); }
+        else h += _faltDiaTh(F, d, hoy, "");
       });
     } else {
-      diasCols.forEach(function (d) {
-        var esHoy = d === hoy;
-        h += '<th class="falt-dia' + (esHoy ? " hoy" : "") + '" title="' + d + '">' + _faltDiaSem(d) + '<br>' + _faltFechaCorta(d) + '</th>';
-      });
+      diasCols.forEach(function (d) { h += _faltDiaTh(F, d, hoy, ""); });
     }
   }
   h += '</tr></thead><tbody>';
@@ -14331,6 +14474,8 @@ function stkBodyFaltante() {
     } else {
       codCell = escapeHtml(codCanon(a.cod));
     }
+    // v9.46 — el badge "faltó al armar" del código se sacó: el realFalt ahora se ve en la columna
+    // que corresponde (S1/S2/Resto/Sin fecha) y en la celda del día de su salida.
     h += '<tr data-fkey="' + escapeHtml(a.key) + '"><td class="falt-cod">' + codCell + '</td>' +
       '<td class="falt-desc" title="' + escapeHtml(a.desc) + '">' + escapeHtml(a.desc) + '</td>' +
       '<td class="falt-fab" title="' + escapeHtml(a.prov) + '">' + escapeHtml(a.prov || "—") + '</td>' +
@@ -14341,14 +14486,17 @@ function stkBodyFaltante() {
     // v8.79 — columna "Faltó armado" quitada del módulo (pedido del usuario). El dato real (realFalt)
     // se sigue usando para el resumen (🔴 faltaron al armar) y como desempate del orden.
     // Faltante S1 / S2 / Resto (proyección de lo aún no pickeado) — clickeable para ver las NPs
-    h += _faltCelda(a.faltS1, true, a.key, null, false, "s1");
-    h += _faltCelda(a.faltS2, true, a.key, null, false, "s2");
-    h += _faltCelda(a.faltResto, true, a.key, null, false, "resto");
+    var _rw = a.realWin || { s1: 0, s2: 0, resto: 0, sinfecha: 0 };   // v9.46 — faltó al armar por ventana
+    h += _faltCelda(a.faltS1, true, a.key, null, false, "s1", _rw.s1);
+    h += _faltCelda(a.faltS2, true, a.key, null, false, "s2", _rw.s2);
+    h += _faltCelda(a.faltResto, true, a.key, null, false, "resto", _rw.resto);
     // v8.38 — columna "Sin fecha": faltante de pedidos sin fecha PPP / pasada (clickeable)
     var _sf = a.faltSinFecha || 0;
+    var _sfReal = Math.round(_rw.sinfecha || 0);   // v9.46 — faltó al armar con salida ya pasada
+    var _sfBadge = _sfReal > 0 ? '<span style="display:block;font-size:9px;font-weight:800;color:#b91c1c;line-height:1.1;" title="Faltó al armar (real): ' + _sfReal + ' caja(s) con salida ya pasada.">🔴' + _sfReal + '</span>' : '';
     var _sfCls = _sf === 0 ? "falt-ok" : _sf <= 10 ? "falt-warn" : _sf <= 50 ? "falt-bad" : "falt-crit";
-    h += _sf > 0
-      ? '<td class="num falt-cell ' + _sfCls + '" style="font-weight:800;cursor:pointer;" onclick="stkFaltDrillSinF(\'' + a.key + '\',event)" title="' + _sf + ' cajas de pedidos SIN fecha PPP (o con fecha pasada) que el stock no alcanza a cubrir. Tocá para ver las NPs.">' + _sf + '</td>'
+    h += (_sf > 0 || _sfReal > 0)
+      ? '<td class="num falt-cell ' + _sfCls + '" style="font-weight:800;cursor:pointer;" onclick="stkFaltDrillSinF(\'' + a.key + '\',event)" title="' + _sf + ' cajas de pedidos SIN fecha PPP (o con fecha pasada) que el stock no alcanza a cubrir. Tocá para ver las NPs.">' + (_sf > 0 ? _sf : "—") + _sfBadge + '</td>'
       : '<td class="num falt-ok">—</td>';
     // v8.57 — columna "Cambio NP" quitada del módulo (pedido del usuario)
     // v8.56 — celdas de día SOLO con "📅 Ver días" activo
@@ -14357,12 +14505,13 @@ function stkBodyFaltante() {
       var _primer = null;
       for (var _i = 0; _i < diasCols.length; _i++) { if ((a.diasFalt[diasCols[_i]] || 0) > 0) { _primer = diasCols[_i]; break; } }
       diasCols.forEach(function (d) {
+        var _rd = (a.realDia && a.realDia[d]) || 0;   // v9.44 — faltó al armar que cae este día (fecha de salida)
         if (superDiaSet[d]) {
           // Día de super → dos celdas: Supermercado | Clientes (v8.77).
           h += _faltCelda(a.diasFaltSuper[d] || 0, false, a.key, d, d === _primer);
-          h += _faltCelda(a.diasFaltCli[d] || 0, false, a.key, d, d === _primer);
+          h += _faltCelda(a.diasFaltCli[d] || 0, false, a.key, d, d === _primer, null, _rd);
         } else {
-          h += _faltCelda(a.diasFalt[d] || 0, false, a.key, d, d === _primer);
+          h += _faltCelda(a.diasFalt[d] || 0, false, a.key, d, d === _primer, null, _rd);
         }
       });
     }
@@ -14374,8 +14523,9 @@ function stkBodyFaltante() {
   return h;
 }
 
-function _faltCelda(falt, esSem, cod, fecha, esPrimer, winKey) {
+function _faltCelda(falt, esSem, cod, fecha, esPrimer, winKey, real) {
   var v = Math.round(falt);
+  var realN = Math.round(real || 0);   // v9.44 — faltó al armar (real) que cae este día (fecha de salida)
   var cls = "num";
   if (v === 0) cls += " falt-ok";
   else if (v <= 10) cls += " falt-warn";
@@ -14392,11 +14542,40 @@ function _faltCelda(falt, esSem, cod, fecha, esPrimer, winKey) {
   }
   if (esPrimer) cls += " falt-primer";
   var titAttr = esPrimer ? ' title="Primer día de quiebre"' : '';
-  return '<td class="' + cls + '"' + (esSem ? ' style="font-weight:800"' : '') + titAttr + click + '>' + (v > 0 ? v : "—") + '</td>';
+  // v9.44 — realFalt (faltó al armar) del día: badge roja debajo del número de proyección.
+  var realBadge = realN > 0 ? '<span style="display:block;font-size:9px;font-weight:800;color:#b91c1c;line-height:1.1;" title="Faltó al armar (real): ' + realN + ' caja(s) que salen cortas este día. Ya está armado — no es proyección.">🔴' + realN + '</span>' : '';
+  return '<td class="' + cls + '"' + (esSem ? ' style="font-weight:800"' : '') + titAttr + click + '>' + (v > 0 ? v : "—") + realBadge + '</td>';
 }
 function stkFaltSoloQuiebre() {
   if (!_stk || !_stk.falt) return;
   _stk.falt.soloQuiebre = !_stk.falt.soloQuiebre;
+  _stk.falt.openCell = null;
+  stkRender();
+}
+/* v9.45 — filtro por COLUMNA (tocando el header): S1/S2/Resto/Sin fecha o un día. Muestra solo
+   los artículos con faltante en esa columna y ordena por ese valor. Tocar de nuevo lo quita. */
+function _faltColVal(a, key) {
+  var rw = a.realWin || {};   // v9.46 — suma también el faltó al armar de esa ventana/día
+  if (key === "s1") return (a.faltS1 || 0) + (rw.s1 || 0);
+  if (key === "s2") return (a.faltS2 || 0) + (rw.s2 || 0);
+  if (key === "resto") return (a.faltResto || 0) + (rw.resto || 0);
+  if (key === "sinfecha") return (a.faltSinFecha || 0) + (rw.sinfecha || 0);
+  return ((a.diasFalt && a.diasFalt[key]) || 0) + ((a.realDia && a.realDia[key]) || 0);   // día 'YYYY-MM-DD'
+}
+function _faltColLabel(key) {
+  return key === "s1" ? "Falt S1" : key === "s2" ? "Falt S2" : key === "resto" ? "Resto" : key === "sinfecha" ? "Sin fecha" : key;
+}
+function _faltSemTh(F, rs, key, label, tip) {
+  var on = F.colFiltro === key;
+  return '<th class="falt-sem"' + rs + ' style="cursor:pointer;' + (on ? 'background:#bfdbfe;color:#1e3a8a;' : '') + '" onclick="stkFaltColFiltro(\'' + key + '\')" title="Tocá para ver SOLO ' + tip + '">' + label + (on ? ' 🔎' : '') + '</th>';
+}
+function _faltDiaTh(F, d, hoy, sub) {
+  var esHoy = d === hoy, on = F.colFiltro === d;
+  return '<th class="falt-dia' + (esHoy ? " hoy" : "") + '" style="cursor:pointer;' + (on ? 'background:#bfdbfe;color:#1e3a8a;' : '') + '" onclick="stkFaltColFiltro(\'' + d + '\')" title="' + d + (sub || "") + ' — tocá para ver solo este día">' + _faltDiaSem(d) + '<br>' + _faltFechaCorta(d) + (on ? ' 🔎' : '') + '</th>';
+}
+function stkFaltColFiltro(key) {
+  if (!_stk || !_stk.falt) return;
+  _stk.falt.colFiltro = (_stk.falt.colFiltro === key) ? null : key;   // toggle
   _stk.falt.openCell = null;
   stkRender();
 }
@@ -14870,6 +15049,35 @@ function cntSet(i, f, v) {
 function cntAddRow() { if (!_stk || !_stk.conteo) return; _stk.conteo.rows.push({ sector: "", cod: "", pilas: "", cxp: "", sueltas: "" }); stkRender(); }
 function cntDelRow(i) { if (!_stk || !_stk.conteo) return; _stk.conteo.rows.splice(i, 1); if (!_stk.conteo.rows.length) _stk.conteo.rows.push({ sector: "", cod: "", pilas: "", cxp: "", sueltas: "" }); stkRender(); }
 function cntCompara() { if (!_stk || !_stk.conteo) return; _stk.conteo.showComp = true; stkRender(); }
+/* v9.30 — Exporta el conteo físico a CSV, con la columna "Stock del sistema" (góndola +
+   excedente, mismo cálculo que "Comparar con el sistema") para cotejar afuera. Formato
+   Excel es-AR: BOM utf-8, separador ; y coma decimal (igual que prodExportCsv). */
+function cntExportCsv() {
+  if (!_stk || !_stk.conteo) { try { alert("No hay conteo abierto."); } catch (_e) {} return; }
+  var rows = (_stk.conteo.rows || []).filter(function (r) { return _ocgNorm(r.cod); });
+  if (!rows.length) { try { alert("Cargá al menos una fila con código."); } catch (_e) {} return; }
+  var saldos = stockComputeSaldos(_stk.movs, _stk.cutoff);
+  var sys = {};
+  Object.keys(saldos).forEach(function (cc) {
+    var k = _ocgNorm(cc); if (!sys[k]) sys[k] = { gond: 0, exc: 0, proc: 0 };
+    sys[k].gond += Number(saldos[cc].terminado) || 0;
+    sys[k].exc += Number(saldos[cc].excedente) || 0;
+    sys[k].proc += (Number(saldos[cc].separar_pedidos) || 0) + (Number(saldos[cc].a_facturar) || 0);
+  });
+  var esn = function (v) { return (v || v === 0) ? String(Math.round(v * 100) / 100).replace(".", ",") : ""; };
+  var out = [["Sector", "Codigo", "Pilas", "Cajas por pila", "Sueltas", "Contado (cajas)", "Stock del sistema", "Diferencia", "En proceso"]];
+  rows.forEach(function (r) {
+    var k = _ocgNorm(r.cod), cont = _cntCajas(r), s = sys[k] || { gond: 0, exc: 0, proc: 0 };
+    var sysv = (s.gond || 0) + (s.exc || 0);
+    out.push([r.sector || "", codBase(r.cod || ""), r.pilas || "", r.cxp || "", r.sueltas || "", esn(cont), esn(sysv), esn(cont - sysv), esn(s.proc)]);
+  });
+  var csv = "﻿" + out.map(function (rr) { return rr.map(function (c) { return '"' + String(c).replace(/"/g, '""') + '"'; }).join(";"); }).join("\r\n");
+  var blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  var fecha = (function () { try { return new Date().toLocaleDateString("en-CA", { timeZone: "America/Argentina/Buenos_Aires" }); } catch (_e) { return "hoy"; } })();
+  var a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "conteo_" + fecha + ".csv";
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+}
 function cntGuardar() {
   if (!_stk || !_stk.conteo) return;
   const c = _stk.conteo;
@@ -14904,7 +15112,7 @@ function stkBodyConteo() {
       '</tr>';
   });
   h += '</tbody></table></div>';
-  h += '<div class="stk-ini-btns"><button class="stk-btn" onclick="cntAddRow()">+ Fila</button> <button class="stk-btn" onclick="cntCompara()">📊 Comparar con el sistema</button> <button class="stk-btn ok" onclick="cntGuardar()">💾 Guardar conteo</button></div>';
+  h += '<div class="stk-ini-btns"><button class="stk-btn" onclick="cntAddRow()">+ Fila</button> <button class="stk-btn" onclick="cntCompara()">📊 Comparar con el sistema</button> <button class="stk-btn" onclick="cntExportCsv()">⬇ Exportar CSV</button> <button class="stk-btn ok" onclick="cntGuardar()">💾 Guardar conteo</button></div>';
   if (c.showComp) {
     const cont = {};
     c.rows.forEach(function (r) { const k = _ocgNorm(r.cod); if (!k) return; cont[k] = (cont[k] || 0) + _cntCajas(r); });
@@ -15187,7 +15395,7 @@ function _stkInsPend(pend) {
   }).join("");
   return h + '</tbody></table></div>';
 }
-/* ---------- (2) CATEGORÍAS (con sus insumos adentro) ---------- */
+/* ---------- (2) CATEGORÍAS (botones grandes con editar/borrar en esquinas) ---------- */
 function _stkInsCats(items, pend) {
   const cnt = {};
   // Los que quedaron en 0 (neteados / sin stock) NO se listan en su categoría (pedido
@@ -15196,56 +15404,72 @@ function _stkInsCats(items, pend) {
   items.forEach(function (it) { if (_stkInsPendiente(it) || !_stkInsConStock(it)) return; const k = insCatDef(it.cat) ? it.cat : ""; cnt[k] = (cnt[k] || 0) + 1; });
   let h = _stkSec("cats", "🗂 Categorías", INS_CATS.length);
   if (!_stkAbierta("cats")) return h;
-  h += '<div class="stk-cut">Cada categoría define <b>cómo la ve el operario</b>: el nombre, y en qué <b>unidades</b> puede cargar sus insumos. <b>Una sola</b> unidad = queda fija; <b>varias</b> = el operario elige entre ésas; <b>ninguna</b> = cualquiera de las de abajo.</div>';
-  // «A depurar» no es una categoría de verdad: es la sala de espera, y ahora vive
-  // arriba, dentro de Pendientes de identificar.
+  h += '<div class="stk-cut">Cada categoría define <b>cómo la ve el operario</b>: el nombre, y en qué <b>unidades</b> puede cargar sus insumos. Tocá una categoría para ver sus insumos.</div>';
+  // v9.32 — botones grandes: click central → popup con insumos, esquina izq → editar, esquina der → borrar
+  h += '<div class="stk-catgrid">';
   h += INS_CATS.map(function (c) {
-    const abierta = _stkIns.abierta === c.k;
     const ed = _stkIns.edit === "cat:" + c.k;
-    let b = '<div class="stk-catbox">';
-    b += '<div class="stk-catrow">';
+    const n = cnt[c.k] || 0;
     if (ed) {
-      b += '<input class="stk-inp" id="cEmo_' + c.k + '" value="' + escapeHtml((c.lbl.split(" ")[0] || "")) + '" style="width:48px;text-align:center;">' +
-        '<input class="stk-inp" id="cNom_' + c.k + '" value="' + escapeHtml(c.lbl.split(" ").slice(1).join(" ")) + '" style="width:170px;">';
-    } else {
-      b += '<b style="flex:1;">' + escapeHtml(c.lbl) + '</b>';
+      // modo edición: inputs inline (mismo que antes)
+      return '<div class="stk-catbox">' +
+        '<div class="stk-catrow" style="flex-wrap:wrap;">' +
+          '<input class="stk-inp" id="cEmo_' + c.k + '" value="' + escapeHtml((c.lbl.split(" ")[0] || "")) + '" style="width:48px;text-align:center;">' +
+          '<input class="stk-inp" id="cNom_' + c.k + '" value="' + escapeHtml(c.lbl.split(" ").slice(1).join(" ")) + '" style="width:170px;">' +
+        '</div>' +
+        '<div style="margin-top:7px;"><textarea class="stk-inp" id="cDes_' + c.k + '" rows="2" style="width:100%;box-sizing:border-box;font-family:inherit;" placeholder="Detalle: qué entra en este grupo">' + escapeHtml(c.desc || "") + '</textarea></div>' +
+        '<div class="stk-catuni"><span class="ins-uni-l">Unidades permitidas:</span> ' +
+          INS_UNIS.map(function (u) {
+            const on = (c.unis || []).indexOf(u) >= 0;
+            return '<button class="ins-uchip' + (on ? " on" : "") + '" onclick="stkInsCatUni(\'' + c.k + '\',\'' + u.replace(/'/g, "") + '\')">' + escapeHtml(u) + '</button>';
+          }).join("") +
+          ((c.unis || []).length ? "" : '<span class="stk-sub">ninguna marcada = todas</span>') + '</div>' +
+        '<div style="margin-top:7px;display:flex;gap:6px;">' +
+          '<button class="stk-btn" onclick="stkInsCatGuardar(\'' + c.k + '\')">✓ Guardar</button>' +
+          '<button class="stk-btn stk-btn-x" onclick="stkInsEdit(null)">Cancelar</button>' +
+        '</div></div>';
     }
-    void 0;
-    b += '<span class="stk-secn">' + (cnt[c.k] || 0) + ' insumo' + ((cnt[c.k] || 0) === 1 ? "" : "s") + '</span>';
-    b += '<button class="stk-btn" onclick="stkInsAbrir(\'' + c.k + '\')">' + (abierta ? "▾ Ocultar" : "▸ Ver insumos") + '</button>';
-    b += ed
-      ? '<button class="stk-btn" onclick="stkInsCatGuardar(\'' + c.k + '\')">✓ Guardar</button><button class="stk-btn stk-btn-x" onclick="stkInsEdit(null)">Cancelar</button>'
-      : '<button class="stk-btn" onclick="stkInsEdit(\'cat:' + c.k + '\')">Editar</button>' +
-        '<button class="stk-btn stk-btn-x" onclick="stkInsCatBorrar(\'' + c.k + '\')">Borrar</button>';
-    b += '</div>';
-    // detalle del grupo: qué entra acá
-    b += ed
-      ? '<div style="margin-top:7px;"><textarea class="stk-inp" id="cDes_' + c.k + '" rows="2" style="width:100%;box-sizing:border-box;font-family:inherit;" placeholder="Detalle: qué entra en este grupo">' + escapeHtml(c.desc || "") + '</textarea></div>'
-      : (c.desc ? '<div class="stk-catdesc">' + escapeHtml(c.desc) + '</div>' : '<div class="stk-catdesc stk-sub">sin detalle</div>');
-    // unidades permitidas
-    b += '<div class="stk-catuni"><span class="ins-uni-l">Unidades permitidas:</span> ' +
-      INS_UNIS.map(function (u) {
-        const on = (c.unis || []).indexOf(u) >= 0;
-        return ed
-          ? '<button class="ins-uchip' + (on ? " on" : "") + '" onclick="stkInsCatUni(\'' + c.k + '\',\'' + u.replace(/'/g, "") + '\')">' + escapeHtml(u) + '</button>'
-          : (on ? '<span class="ins-uchip on">' + escapeHtml(u) + '</span>' : "");
-      }).join("") +
-      ((c.unis || []).length ? "" : '<span class="stk-sub">' + (ed ? "ninguna marcada = todas" : "todas") + '</span>') + '</div>';
-    if (abierta) b += _stkInsListado(c.k, items);
-    return b + '</div>';
+    // botón grande de categoría — nombre sin emoji, texto grande centrado
+    var _catNom = c.lbl.split(" ").slice(1).join(" ") || c.lbl;   // saca el emoji del frente
+    return '<div class="stk-catbtn" onclick="stkInsCatPopup(\'' + c.k + '\')">' +
+      '<div class="stk-catbtn-lbl">' + escapeHtml(_catNom) + '</div>' +
+      '<span class="stk-catbtn-n">' + n + '</span>' +
+      '<button class="stk-catbtn-ed" onclick="event.stopPropagation();stkInsEdit(\'cat:' + c.k + '\')" title="Editar categoría">✏️</button>' +
+      '<button class="stk-catbtn-del" onclick="event.stopPropagation();stkInsCatBorrar(\'' + c.k + '\')" title="Borrar categoría">🗑️</button>' +
+    '</div>';
   }).join("");
   // sin categoría (no es una categoría de verdad: es lo que quedó suelto)
   if (cnt[""]) {
-    const abierta = _stkIns.abierta === "?";
-    h += '<div class="stk-catbox"><div class="stk-catrow"><b style="flex:1;">❓ Sin categoría</b>' +
-      '<span class="stk-secn">' + cnt[""] + '</span>' +
-      '<button class="stk-btn" onclick="stkInsAbrir(\'?\')">' + (abierta ? "▾ Ocultar" : "▸ Ver insumos") + '</button></div>' +
-      (abierta ? _stkInsListado("?", items) : "") + '</div>';
+    h += '<div class="stk-catbtn stk-catbtn-sincat" onclick="stkInsCatPopup(\'?\')">' +
+      '<div class="stk-catbtn-lbl">❓ Sin categoría</div>' +
+      '<span class="stk-catbtn-n">' + cnt[""] + '</span>' +
+    '</div>';
   }
+  h += '</div>';
   h += '<div style="margin-top:8px;">' + (_stkIns.edit === "cat:+"
     ? '<span class="stk-nuevo"><input class="stk-inp" id="cNvEmo" placeholder="🔧" style="width:48px;text-align:center;"> <input class="stk-inp" id="cNvNom" placeholder="nombre de la categoría" style="width:200px;"> <input class="stk-inp" id="cNvDes" placeholder="detalle: qué entra acá" style="width:260px;"> <button class="stk-btn" onclick="stkInsCatCrear()">✓ Crear</button> <button class="stk-btn stk-btn-x" onclick="stkInsEdit(null)">Cancelar</button></span>'
     : '<button class="stk-btn" onclick="stkInsEdit(\'cat:+\')">+ Categoría nueva</button>') + '</div>';
   return h;
+}
+/* v9.32 — popup de insumos de una categoría (reemplaza el inline toggle) */
+function stkInsCatPopup(k) {
+  if (!_stkIns) return;
+  const cDef = k === "?" ? null : insCatDef(k);
+  const titulo = cDef ? cDef.lbl : "❓ Sin categoría";
+  _stkIns.abierta = k;
+  _stkIns.filtro = "";
+  _stkIns.nuevoEn = "";
+  _stkPopShell("📦 " + titulo, "stkInsCatPopBody");
+  const body = document.getElementById("stkInsCatPopBody");
+  if (!body) return;
+  body.innerHTML = _stkInsListado(k, _stkIns.items);
+}
+/* Refresca el contenido del popup de categoría si está abierto (después de editar/crear/borrar insumo) */
+function _stkInsCatPopupRefresh() {
+  if (!_stkIns || !_stkIns.abierta) return;
+  const body = document.getElementById("stkInsCatPopBody");
+  if (!body) return;
+  body.innerHTML = _stkInsListado(_stkIns.abierta, _stkIns.items);
 }
 /* v8.31 — dos unidades para la planilla: primaria = base; secundaria = la unidad no-base de
    mayor factor; + el factor. Sin factores → una sola unidad en primaria. */
@@ -16613,21 +16837,21 @@ async function insFetchCatalogo() {
   } catch (_e) { return []; }
 }
 /* v7.49 — Botón unificado "Insumos": el operario toca UN botón y elige qué hacer.
-   DOS opciones nada más: Recibir → RI, Entregar → EI (misma mecánica de siempre:
-   selectOption abre el toggle + el modal de insumos). v7.50: el "agregar insumo nuevo"
-   NO es un ítem del chooser — vive DENTRO de Recibir (el modal de RI ya trae su botón
-   "+ Agregar insumo nuevo"; dar de alta sólo tiene sentido recibiendo). Popup liviano
-   al estilo de showMGChooser. */
+   TRES opciones: Recibir insumos (RI), Entregar insumos (EI), Salida a Cervantes (SC).
+   v7.50: el "agregar insumo nuevo" NO es un ítem del chooser — vive DENTRO de Recibir
+   (el modal de RI ya trae su botón "+ Agregar insumo nuevo"; dar de alta sólo tiene
+   sentido recibiendo). Popup liviano al estilo de showMGChooser. */
 function insumoChooser(legajo) {
   let ov = document.getElementById("insChooserModal");
   if (!ov) { ov = document.createElement("div"); ov.id = "insChooserModal"; ov.style.cssText = "position:fixed;inset:0;z-index:1297;background:rgba(2,6,23,.74);display:flex;align-items:center;justify-content:center;padding:16px;"; document.body.appendChild(ov); }
   const btn = "width:100%;margin-bottom:10px;padding:16px;border:none;border-radius:12px;color:#fff;font-size:16px;font-weight:800;cursor:pointer;text-align:left;";
   const sub = 'font-weight:600;opacity:.85;';
   ov.innerHTML = '<div style="background:#f8fafc;max-width:380px;width:100%;border-radius:16px;padding:18px;box-shadow:0 24px 70px rgba(0,0,0,.5);box-sizing:border-box;">' +
-    '<div style="font-size:18px;font-weight:800;margin-bottom:3px;">🧰 Insumos</div>' +
+    '<div style="font-size:18px;font-weight:800;margin-bottom:3px;">📦 Insumos y Productos Movimiento</div>' +
     '<div style="font-size:13px;color:#64748b;margin-bottom:16px;">¿Qué querés hacer?</div>' +
     '<button onclick="insChooserGo(\'RI\')" style="' + btn + 'background:#4f46e5;">📥 Recibir insumos <span style="' + sub + '">(entra stock — o agregá uno nuevo)</span></button>' +
     '<button onclick="insChooserGo(\'EI\')" style="' + btn + 'background:#0d9488;">📤 Entregar insumos <span style="' + sub + '">(sale stock)</span></button>' +
+    '<button onclick="insChooserGo(\'SC\')" style="' + btn + 'background:#dc2626;">🚚 Salida a Cervantes <span style="' + sub + '">(envío a central)</span></button>' +
     '<button onclick="closeInsumoChooser()" style="width:100%;padding:11px;border:none;border-radius:10px;background:#e2e8f0;color:#475569;font-weight:700;cursor:pointer;">Cancelar</button>' +
     '</div>';
   ov.style.display = "flex";
@@ -16635,7 +16859,57 @@ function insumoChooser(legajo) {
 function closeInsumoChooser() { const ov = document.getElementById("insChooserModal"); if (ov) ov.style.display = "none"; }
 function insChooserGo(which) {
   closeInsumoChooser();
-  selectOption(which);   // RI | EI — misma mecánica que los botones viejos. El alta vive dentro de RI.
+  if (which === "SC") {
+    showCervantesModal(String(legajoInput.value || ""));
+  } else if (which === "RI" || which === "EI") {
+    // v9.15: Pedir ubicación ANTES de abrir el modal de insumos
+    askInsUbicacion(which);
+  }
+}
+
+/* v9.15: Modal para preguntár DÓNDE se envía/recibe antes de abrir el modal de insumos.
+   Esto es obligatorio al inicio del proceso RI/EI. */
+function askInsUbicacion(mode) {
+  const isIn = mode === "RI";
+  const titulo = isIn ? "¿De dónde recibís?" : "¿A dónde lo envías?";
+  const hint = isIn ? "Origen/Proveedor" : "Destino/Ubicación";
+
+  let ov = document.getElementById("insUbicModal");
+  if (!ov) { ov = document.createElement("div"); ov.id = "insUbicModal"; ov.style.cssText = "position:fixed;inset:0;z-index:1298;background:rgba(2,6,23,.78);display:flex;align-items:center;justify-content:center;padding:16px;"; document.body.appendChild(ov); }
+
+  ov.innerHTML = '<div style="background:#f8fafc;max-width:420px;width:100%;border-radius:16px;padding:20px;box-shadow:0 24px 70px rgba(0,0,0,.5);box-sizing:border-box;">' +
+    '<div style="font-size:18px;font-weight:800;margin-bottom:3px;">' + (isIn ? "📥 Recepción" : "📤 Entrega") + '</div>' +
+    '<div style="font-size:13px;color:#64748b;margin-bottom:16px;">' + titulo + '</div>' +
+    '<input type="text" id="insUbicInput" placeholder="' + hint + ' (ej: Cervantes, Centro, Proveedor X)" ' +
+      'style="width:100%;box-sizing:border-box;height:48px;border:2px solid #cbd5e1;border-radius:12px;padding:0 12px;font-size:16px;margin-bottom:12px;" />' +
+    '<div style="display:flex;gap:10px;">' +
+      '<button onclick="insUbicCancel()" style="flex:1;padding:14px;border:none;border-radius:10px;background:#e2e8f0;color:#475569;font-weight:700;cursor:pointer;font-size:16px;">Cancelar</button>' +
+      '<button onclick="insUbicOk(\'' + mode + '\')" style="flex:1;padding:14px;border:none;border-radius:10px;background:' + (isIn ? '#4f46e5' : '#0d9488') + ';color:#fff;font-weight:700;cursor:pointer;font-size:16px;">Continuar</button>' +
+    '</div>' +
+    '</div>';
+  ov.style.display = "flex";
+
+  // Auto-focus en el input
+  setTimeout(() => {
+    const inp = document.getElementById("insUbicInput");
+    if (inp) inp.focus();
+  }, 100);
+}
+function insUbicCancel() {
+  const ov = document.getElementById("insUbicModal");
+  if (ov) ov.style.display = "none";
+}
+function insUbicOk(mode) {
+  const inp = document.getElementById("insUbicInput");
+  const ubicacion = (inp && inp.value) ? String(inp.value).trim() : "";
+  if (!ubicacion) {
+    alert("Completá la ubicación");
+    return;
+  }
+  insUbicCancel();
+  // Guardar la ubicación en el toggle data y abrir el modal de insumos
+  window._insUbicacion = ubicacion;  // Estado temporal
+  selectOption(mode);
 }
 /* El CSS del modal de insumos lo usa también la solapa "Insumos" de Stock y Compras
    (chips de categoría), así que la inyección va aparte. */
@@ -17089,12 +17363,15 @@ function insConfirmar() {
     _ins.qty = _ins.items.indexOf(sinUni[0]);
     insRender(); return;
   }
-  const rows = sel.map(function (it) { return { cod_art: it.cod, descripcion: it.nombre || null, deposito: "insumos", delta: isIn ? it.qty : -it.qty, tipo: isIn ? "recepcion_insumo" : "entrega_insumo", ref: null, legajo: _ins.legajo || null, unidad: it.unidad, ubicacion: it.ubic || it.sector || null }; });
+  // v9.15: incluir la ubicación origen/destino (preguntada al inicio) en el ref de cada row
+  const ubic = window._insUbicacion || null;
+  const rows = sel.map(function (it) { return { cod_art: it.cod, descripcion: it.nombre || null, deposito: "insumos", delta: isIn ? it.qty : -it.qty, tipo: isIn ? "recepcion_insumo" : "entrega_insumo", ref: ubic, legajo: _ins.legajo || null, unidad: it.unidad, ubicacion: it.ubic || it.sector || null }; });
   const tot = sel.reduce(function (s, it) { return s + it.qty; }, 0);
   try { opDraftClear(_ins && _ins.legajo); } catch (_e) {}
   closeIns();
+  window._insUbicacion = null;  // limpiar
   stockMove(rows);   // offline-safe (vir_stock_pend)
-  try { alert("✓ " + (isIn ? "Entrada" : "Salida") + " registrada: " + sel.length + " insumo(s)."); } catch (_e) {}
+  try { alert("✓ " + (isIn ? "Entrada" : "Salida") + " registrada: " + sel.length + " insumo(s)." + (ubic ? "\n" + (isIn ? "Origen" : "Destino") + ": " + ubic : "")); } catch (_e) {}
 }
 function insHasProgress() { return !!(_ins && _ins.items && _ins.items.some(function (it) { return (it.qty > 0); })); }
 /* ===== v7.13 — ANULAR la sesión de insumos =====
@@ -17656,7 +17933,18 @@ async function showGuardarOrden(legajo) {
       if (!_cxmVal) { var _fG = _facG[String(a.cod).toUpperCase()]; if (_fG && _fG.cajasXMaster > 0) _cxmVal = _fG.cajasXMaster; }
       return { cod: a.cod, desc: artNombre(a.cod, a.desc), gond: gond, cap: cap, aGuardar: aGuardar, exc: exc, racks: racks, cxm: _cxmVal };
     }).filter(Boolean);
-    _gorden = { filtro: "todos", items: items, rate: _gRateVal };
+    // v9.35 — URGENTES: góndola < 20% de su máximo (sobre TODOS los códigos con capacidad, tengan
+    // o no stock atrás para bajar). Los que no tienen stock atrás no se pueden resolver acá → OC/prod.
+    var _URG = 0.20;
+    var urgentes = Object.keys(saldos).map(function (k) {
+      var a = saldos[k];
+      var cap = Math.round(capMap[_ocgNorm(a.cod)] || 0); if (cap <= 0) return null;
+      var gond = Math.round(Number(a.terminado) || 0);
+      var ratio = gond / cap; if (ratio >= _URG) return null;
+      var back = Math.round((Number(a.a_guardar) || 0) + (Number(a.excedente) || 0) + (Number(a.racks) || 0));
+      return { cod: a.cod, desc: artNombre(a.cod, a.desc), gond: gond, cap: cap, ratio: ratio, back: back };
+    }).filter(Boolean).sort(function (a, c) { return a.ratio - c.ratio; });
+    _gorden = { filtro: "todos", items: items, rate: _gRateVal, urgentes: urgentes };
     renderGuardarOrden();
   } catch (e) { const b = document.getElementById("gordenBody"); if (b) b.innerHTML = '<div style="text-align:center;color:#b91c1c;padding:20px;">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
 }
@@ -17700,7 +17988,9 @@ function renderGuardarOrden() {
   const b = document.getElementById("gordenBody"); if (!b || !_gorden) return;
   const F = _gorden.filtro, rows = _gordenRows();
   const TABS = [["todos", "Todos"], ["racks", "🏗 Racks"], ["guardar", "📦 A guardar"], ["excedente", "📦 Excedente"]];
-  let h = '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;align-items:center;">';
+  // v9.57 — se sacó la alerta de urgentes (góndola < 20%) de esta pantalla (pedido del dueño).
+  let h = "";
+  h += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;align-items:center;">';
   TABS.forEach(function (t) {
     const on = F === t[0];
     h += '<button onclick="gordenFiltro(\'' + t[0] + '\')" style="width:auto;flex:0 0 auto;padding:7px 12px;border-radius:999px;border:1px solid ' + (on ? '#1e6bd6' : '#cbd5e1') + ';background:' + (on ? '#1e6bd6' : '#fff') + ';color:' + (on ? '#fff' : '#334155') + ';font-size:12.5px;font-weight:800;cursor:pointer;">' + t[1] + '</button>';
@@ -17737,11 +18027,12 @@ function renderGuardarOrden() {
     '<th style="padding:5px 6px;">Cód</th><th style="padding:5px 6px;">Descripción</th><th style="padding:5px 6px;text-align:right;" title="Lo que hay para guardar en el depósito">Hay p/ guardar</th><th style="padding:5px 6px;text-align:right;" title="Lo que entra hasta el máximo de góndola">Cajas a bajar</th><th style="padding:5px 6px;text-align:right;">Góndola</th><th style="padding:5px 6px;text-align:right;">Máximo</th></tr></thead><tbody>';
   h += rows.map(function (x) {
     const it = x.it, pct = Math.round(x.ratio * 100), pc = pct <= 34 ? "#b91c1c" : pct <= 67 ? "#92400e" : "#15803d";
+    const urg = x.ratio < 0.20;   // v9.35 — góndola urgente (<20%)
     const mcTxt = (x.mc > 0) ? ' <span style="color:#1e40af;font-size:10.5px;font-weight:700;">(' + x.mc + ' MC×' + it.cxm + ')</span>'
       : (x.rk > 0 && it.cxm <= 0 ? ' <span style="color:#b45309;font-size:10.5px;font-weight:700;">· s/master</span>' : '');
     const bajarTxt = x.cajas > 0 ? ('<span style="font-weight:900;color:#0f172a;">' + x.cajas + '</span>' + mcTxt) : '<span style="color:#94a3b8;font-weight:700;">0 · góndola llena</span>';
-    return '<tr style="border-bottom:1px solid #f1f5f9;">' +
-      '<td style="padding:6px;font-weight:800;font-family:Consolas,Menlo,monospace;">' + escapeHtml(codBase(it.cod)) + '</td>' +
+    return '<tr style="border-bottom:1px solid #f1f5f9;' + (urg ? 'background:#fef2f2;' : '') + '">' +
+      '<td style="padding:6px;font-weight:800;font-family:Consolas,Menlo,monospace;">' + (urg ? '🆘 ' : '') + escapeHtml(codBase(it.cod)) + '</td>' +
       '<td style="padding:6px;color:#475569;">' + escapeHtml(it.desc || "") + '</td>' +
       '<td style="padding:6px;text-align:right;font-weight:800;color:#15803d;">' + x.disp + '</td>' +
       '<td style="padding:6px;text-align:right;">' + bajarTxt + '</td>' +
@@ -19221,12 +19512,14 @@ async function faltCrear(np) {
   } catch (e) { try { alert("No se pudo avisar: " + (e.message || e)); } catch (_e2) {} }
   showFaltAvisar();
 }
-/* v5.95 — "Cargar yo": el supervisor completa el faltante de esa NP él mismo AHORA
-   (en vez de avisar para que lo haga un operario). Cierra este modal y abre el CP
-   enfocado en esa NP (mismo showCPModal de la botonera; legajo '0' = admin). */
+/* v5.95 — "Cargar yo": completa el faltante de esa NP AHORA (en vez de avisar). Cierra este
+   modal y abre el CP enfocado en esa NP (mismo showCPModal de la botonera).
+   v9.43 — usa el LEGAJO del operario ya logueado en la botonera (legajoInput), sin preguntar.
+   Antes iba fijo '0' (admin) y los movimientos CP quedaban "TL · 0" sin saber quién lo hizo. */
 function faltCargarYo(np) {
+  var leg = _faltMiLegajo();   // legajo del que está logueado; queda registrado en el movimiento CP
   closeFaltAvisar();
-  try { showCPModal("0", null, _faltNpNorm(np)); } catch (_e) {}
+  try { showCPModal(leg, null, _faltNpNorm(np)); } catch (_e) {}
 }
 
 /* ===== RC · Pasar cajas a un pedido URGENTE (v5.49). El operario le saca cajas a un pedido
@@ -22311,7 +22604,7 @@ let _pppArmadoStarted = null;        // Set de tandas (UPPER) con AP (armado emp
 let _pppTab = "prog";
 let _pppSearch = "";
 function _pppSearchStr(p) { return [p.np, p.cod, p.razon_social, p.tanda, p.localidad, p.zona, p.fecha, p.fecha_entrega, p.tipo].join(" ").toLowerCase(); }
-function pppSetSearch(v) { _pppSearch = String(v == null ? "" : v).trim(); pppRenderProg(); const el = document.getElementById("pppSearchInp"); if (el) { el.focus(); const n = el.value.length; try { el.setSelectionRange(n, n); } catch (_e) {} } }
+function pppSetSearch(v) { _pppSearch = String(v == null ? "" : v).trim(); pppRenderProg(); }
 function pppLoadEntregados() { if (_pppEntregados) return _pppEntregados; let a = []; try { a = JSON.parse(localStorage.getItem(PPP_ENT_KEY) || "[]"); } catch (_e) {} _pppEntregados = new Set(Array.isArray(a) ? a.map(String) : []); return _pppEntregados; }
 function pppSaveEntregados() { try { localStorage.setItem(PPP_ENT_KEY, JSON.stringify(Array.from(pppLoadEntregados()))); } catch (_e) {} }
 function pppTab(t) { _pppTab = t; pppRenderProg(); if (t === "plan" || t === "ent" || t === "resumen") { pppRefreshArmado(); pppRefreshEntregado(); pppRefreshControlado(); } if (t === "ent") pppRefreshDelivered(); if (t === "ocup") pppRefreshOcupacion(); }
@@ -24040,7 +24333,7 @@ function _pppBlock(key, name, cls, meta, pedidos, headerExtra, editTanda) {
     // Panel de EDICIÓN (modo ✏️): cambiar fecha / devolver. Sólo modo editable (en solo-lectura se corrige en Excel).
     if (!PPP_READONLY) {
       h += '<div class="ppp-edit-panel">' +
-        '<span class="ppp-ep-l">📅 Fecha de toda la tanda <input type="date" class="ppp-ep-date" id="' + id + '_d"> <button class="ppp-ep-btn" onclick="pppTandaFecha(\'' + id + '\',\'' + te + '\')">Aplicar</button></span>' +
+        '<span class="ppp-ep-l">📅 Fecha de toda la tanda <input type="date" min="2025-01-01" class="ppp-ep-date" id="' + id + '_d"> <button class="ppp-ep-btn" onclick="pppTandaFecha(\'' + id + '\',\'' + te + '\')">Aplicar</button></span>' +
         '<button class="ppp-ep-btn ppp-ep-back" onclick="pppTandaAProgramar(\'' + te + '\')">↩ Toda la tanda a A Programar</button>' +
         '<span class="ppp-ep-hint">Para <b>mover</b> un pedido a otra tanda: cambiá su <b>Tanda</b> en la fila. Para <b>sacarlo</b>: ↩ en su fila.</span>' +
         '</div>';
@@ -24342,7 +24635,7 @@ async function ruteoLoad() {
 }
 function ruteoRender() {
   const body = document.getElementById("ruteoBody"); if (!body || !_ruteo) return;
-  let h = '<div class="rt-bar"><label>Día de entrega</label><input type="date" value="' + escapeHtml(_ruteo.fecha || "") + '" onchange="prodSetRuteoFecha(this.value)"><button class="rt-recalc" onclick="ruteoLoad()">↻ Recalcular</button></div>';
+  let h = '<div class="rt-bar"><label>Día de entrega</label><input type="date" min="2025-01-01" value="' + escapeHtml(_ruteo.fecha || "") + '" onchange="prodSetRuteoFecha(this.value)"><button class="rt-recalc" onclick="ruteoLoad()">↻ Recalcular</button></div>';
   if (_ruteo.error) { body.innerHTML = h + '<div class="rt-empty" style="color:#b91c1c">Error: ' + escapeHtml(_ruteo.error) + '</div>'; return; }
   if (_ruteo.cargando) {
     const pct = _ruteo.progTot ? Math.round(100 * _ruteo.prog / _ruteo.progTot) : 0;
@@ -24475,7 +24768,7 @@ function pppRenderProg() {
   // (programado/entregado en los edits/entregados) define en qué solapa cae.
   const all = []; const _vistos = {};
   for (const p of (_pppParsed.prog || [])) { const k = String(p.np).trim(); if (!k || _vistos[k]) continue; _vistos[k] = 1; all.push(merge(p)); }
-  if (!all.length) { box.innerHTML = '<div class="planim-empty">Importá el <b>Formato PPP</b> — los pedidos del día se suman a los que ya estaban y caen en <b>A Programar</b>.</div>'; return; }
+  if (!all.length) { _renderKeepFocus(box, '<div class="planim-empty">Importá el <b>Formato PPP</b> — los pedidos del día se suman a los que ya estaban y caen en <b>A Programar</b>.</div>'); return; }
   const ent = pppLoadEntregados();
   let programados, aProgramar, entreg, _errInfo = null;
   if (PPP_READONLY) {
@@ -24536,16 +24829,16 @@ function pppRenderProg() {
       '<div class="ppp-diag-grid">' + fl.map(function (x) { const i = dg.map[x[1]]; return '<span>' + x[0] + ': <b' + (i < 0 ? ' class="ppp-falta"' : '') + '>' + colN(i) + '</b></span>'; }).join("") + '</div>' +
       '<table class="ppp-diag-tbl"><thead><tr><th>Col</th><th>Encabezado</th><th>Ejemplos</th></tr></thead><tbody>' + dump + '</tbody></table></details>';
   }
-  if (_pppTab === "resumen") { html += pppResumenHtml(programados); box.innerHTML = html; return; }
+  if (_pppTab === "resumen") { html += pppResumenHtml(programados); _renderKeepFocus(box, html); return; }
   if (_pppTab === "ocup") {
-    html += pppOcupHtml(); box.innerHTML = html;
+    html += pppOcupHtml(); _renderKeepFocus(box, html);
     return;
   }
-  if (_pppTab === "ent") { html += _pppEntBodyHtml(); box.innerHTML = html; return; }
+  if (_pppTab === "ent") { html += _pppEntBodyHtml(); _renderKeepFocus(box, html); return; }
   if (_pppTab === "plan") {
     // PROGRAMACIÓN — pedidos programados, agrupados por Fecha de Entrega → por tanda.
     // (La columna "Listo FC" se actualiza sola: pppRefreshArmado se llama al entrar al tab.)
-    if (!programados.length) { html += '<div class="planim-empty">Todavía no hay nada programado. Andá a <b>📥 A Programar</b>, armá las tandas y tocá <b>✅ Confirmar y programar</b>.</div>'; box.innerHTML = html; return; }
+    if (!programados.length) { html += '<div class="planim-empty">Todavía no hay nada programado. Andá a <b>📥 A Programar</b>, armá las tandas y tocá <b>✅ Confirmar y programar</b>.</div>'; _renderKeepFocus(box, html); return; }
     html += '<div class="ppp-res-leg">🎨 Color por camión: <span class="rtleg rt-so">Sur/Centro/Oeste</span> <span class="rtleg rt-n">Norte</span> <span class="rtleg rt-ret">Retira</span> <span class="rtleg rt-sup">Súper</span>. Tocá una tanda para abrirla.</div>';
     const DOW = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
     const byD = {}; for (const p of programados) { const k = _pppFechaKey(p.fecha_entrega || ""); if (!byD[k]) byD[k] = { fecha: p.fecha_entrega || "—", ped: [] }; byD[k].ped.push(p); }
@@ -24561,7 +24854,7 @@ function pppRenderProg() {
         html += _pppBlock("plan_" + dk + "_" + t, (es ? "🛒 " : "") + (t === "—" ? "Sin tanda" : "Tanda " + escapeHtml(t)), es ? "ppp-tanda-super" : "", byT[t].length + " ped · " + _pppM3Sum(byT[t]).toFixed(2) + " m³", byT[t], pencil + entBtn, (t !== "—" ? t : null));
       }
     }
-    box.innerHTML = html; return;
+    _renderKeepFocus(box, html); return;
   }
   // ===== Tab "A Programar" → (en modo editable) armar tandas y confirmar; en SOLO-LECTURA sólo lista =====
   const cfg = pppGetCfg();
@@ -24652,7 +24945,7 @@ function pppRenderProg() {
       html += _pppBlock("zona_" + z, chip + escapeHtml(z), none ? "ppp-tanda-none" : "", ps.length + " ped · " + _pppM3Sum(ps).toFixed(2) + " m³", ps);
     }
   }
-  box.innerHTML = html;
+  _renderKeepFocus(box, html);
   pppAutoBaseN();   // N° base automático: última tanda en Supabase (Prog. Diaria) + 1, un número por día
 }
 async function pppSubir(tipo) {
@@ -25339,6 +25632,467 @@ function dpUpdateBadge(count) {
 
 /* Badge liviano: se llama desde showSupervisor (fire-and-forget). */
 async function dpLoadBadge() { try { await dpLoad(); } catch (_e) {} }
+
+/* Badges de cuántas cosas hay que corregir (mismo estilo .dp-badge que "Completar
+   datos producto"): "Corregir códigos de NPs" y "Pedidos sin cargar en PPP". */
+function supSetBadge(id, count) {
+  var b = document.getElementById(id); if (!b) return;
+  if (count > 0) { b.textContent = String(count); b.style.display = ""; b.className = "dp-badge"; }
+  else { b.textContent = "✓"; b.style.display = ""; b.className = "dp-badge ok"; }
+}
+/* v9.38 — dos badges: ROJO = NPs que hay que corregir SÍ o SÍ (el secundario no tiene stock),
+   VERDE = NPs donde el secundario TIENE stock → se puede mandar tal cual, corregir es opcional. */
+async function corrLoadBadge() {
+  try {
+    var pend = await facCorreccData();
+    if (!pend.length) { corrSetRed(0); corrSetGreen(0); return; }
+    var cods = Array.from(new Set(pend.map(function (p) { return p.sec; }))).map(encodeURIComponent).join(",");
+    var H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+    var saldos = await fetch(SUPABASE_URL + "/rest/v1/vista_saldos_stock?cod_art=in.(" + cods + ")&select=cod_art,terminado,excedente,a_guardar,racks,racks_ch,para_envasar", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; });
+    var stk = {}; saldos.forEach(function (r) { stk[_ocgNorm(r.cod_art)] = _corrStk(r); });
+    var byNp = {};   // np → true si ALGÚN item de esa NP tiene secundario SIN stock (obligatorio)
+    pend.forEach(function (p) { var s = stk[_ocgNorm(p.sec)] || 0; if (!(p.np in byNp)) byNp[p.np] = false; if (s <= 0) byNp[p.np] = true; });
+    var must = 0, opt = 0;
+    Object.keys(byNp).forEach(function (np) { if (byNp[np]) must++; else opt++; });
+    corrSetRed(must); corrSetGreen(opt);
+  } catch (_e) {}
+}
+function corrSetRed(count) {
+  var b = document.getElementById("corrBadge"); if (!b) return;
+  if (count > 0) { b.textContent = String(count); b.style.display = ""; b.className = "dp-badge"; } else { b.style.display = "none"; }
+}
+function corrSetGreen(count) {
+  var b = document.getElementById("corrBadgeGreen"); if (!b) return;
+  if (count > 0) { b.textContent = String(count); b.style.display = ""; } else { b.style.display = "none"; }
+}
+async function npFaltanLoadBadge() {
+  try {
+    var H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+    var rows = await fetch(SUPABASE_URL + "/rest/v1/vista_np_sin_programar?select=np&limit=5000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; });
+    supSetBadge("npFaltanBadge", (rows || []).length);
+  } catch (_e) {}
+}
+/* v9.48 — badge "Qué bajar primero": cantidad de URGENTES (SOS) = góndola < 20% del máximo
+   Y con stock atrás para bajar (a_guardar/excedente/racks) — los mismos 🆘 que salen en la lista. */
+async function qbpLoadBadge() {
+  try {
+    var res = await Promise.all([stockFetchSaldos(), ocgFetchCapacidad()]);
+    var saldos = res[0] || {}, capMap = res[1] || {}, n = 0;
+    Object.keys(saldos).forEach(function (k) {
+      var a = saldos[k];
+      var back = Math.round((Number(a.a_guardar) || 0) + (Number(a.excedente) || 0) + (Number(a.racks) || 0));
+      if (back <= 0) return;                                   // sin stock atrás → no está en la lista
+      var cap = Math.round(capMap[_ocgNorm(a.cod)] || 0); if (cap <= 0) return;
+      if ((Math.round(Number(a.terminado) || 0)) / cap < 0.20) n++;   // góndola < 20%
+    });
+    supSetBadge("qbpBadge", n);
+  } catch (_e) {}
+}
+
+/* v9.53/9.55 — badge "Carga Recepción Mercadería": TODO lo pendiente del menú de recepción =
+   remitos por cargar (Control_Modo_OP estado='pendiente') + bajadas de racks por aprobar
+   (Racks_Bajadas estado='propuesta'). Mismos contadores que los botones "📋 Pendientes" y
+   "📦 Bajadas Racks → góndola". Lectura anon (RLS select true). */
+function _recepCount(tabla, filtro) {
+  return fetch(SUPABASE_URL + "/rest/v1/" + tabla + "?select=id&" + filtro, { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Range-Unit": "items", Range: "0-0", Prefer: "count=exact" }, cache: "no-store" })
+    .then(function (r) { var cr = r.headers.get("content-range") || "", s = cr.indexOf("/"); return s >= 0 ? (parseInt(cr.slice(s + 1), 10) || 0) : 0; })
+    .catch(function () { return 0; });
+}
+async function recepLoadBadge() {
+  try {
+    var res = await Promise.all([
+      _recepCount("Control_Modo_OP", "estado=eq.pendiente"),
+      _recepCount("Racks_Bajadas", "estado=eq.propuesta")
+    ]);
+    supSetBadge("recepBadge", (res[0] || 0) + (res[1] || 0));
+  } catch (_e) {}
+}
+
+/* ===== v9.31 — MÓDULO "📲 Avisar programación" =========================================
+   Cuando se programa un pedido, este módulo lista los pedidos programados (con fecha de
+   salida) ordenados por esa fecha, y permite avisar por WhatsApp al CLIENTE y al VENDEDOR
+   que corresponde (salvo vend 7 = fábrica = nosotros). Datos:
+     - Pedidos: vista_ppp_programacion_pendiente (cod_cliente, razon_social, fecha_recep, fecha_entrega)
+     - Tel cliente: whatsapp_clientes (cod_cliente -> telefono)
+     - Tel vendedor: whatsapp_vendedores (vend -> telefono, nombre)
+     - Cliente -> vendedor: clientes_vendedor (snapshot de LK.customers.vend; vend 7 = fábrica)
+   Al entrar pregunta QUIÉN entra (queda en el log). Cada click abre WhatsApp Web con el
+   mensaje armado y registra dia/hora + quién en envio_programacion_log; eso se muestra en
+   la fila. El mensaje del vendedor agrupa todos sus clientes (razón social + fecha salida).
+   ⚠ MSG CLIENTE = placeholder hasta que el dueño pase el texto (#1) — ver avpMsgCliente. */
+var _avp = null;
+function _avpFechaDMY(s) { var m = String(s || "").match(/(\d{4})-(\d{2})-(\d{2})/); return m ? (m[3] + "/" + m[2]) : ""; }
+function _avpFechaDMYA(s) { var m = String(s || "").match(/(\d{4})-(\d{2})-(\d{2})/); return m ? (m[3] + "/" + m[2] + "/" + m[1]) : ""; }
+function _avpDias(recep, entrega) {
+  var a = String(recep || "").match(/(\d{4})-(\d{2})-(\d{2})/), b = String(entrega || "").match(/(\d{4})-(\d{2})-(\d{2})/);
+  if (!a || !b) return null;
+  return Math.round((Date.UTC(+b[1], +b[2] - 1, +b[3]) - Date.UTC(+a[1], +a[2] - 1, +a[3])) / 86400000);
+}
+function _avpTs(ts) {
+  try { return new Date(ts).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }); }
+  catch (_e) { return String(ts || ""); }
+}
+function _avpTel(t) { return String(t || "").replace(/[^\d]/g, ""); }
+function _avpWa(tel, msg) { return "https://wa.me/" + _avpTel(tel) + "?text=" + encodeURIComponent(msg); }
+function _avpGroup(key) { var g = _avp ? (_avp.groups || []) : []; for (var i = 0; i < g.length; i++) if (g[i].key === key) return g[i]; return null; }
+async function openAvisoProg() {
+  try { if (typeof requireSupervisor === "function" && !requireSupervisor()) return; } catch (_e) {}
+  var quien; try { quien = prompt("¿Quién entra a este módulo? (tu nombre — queda registrado en cada aviso que mandes)", ""); } catch (_e) { return; }
+  if (quien == null) return;
+  quien = String(quien).trim();
+  if (!quien) { try { alert("Poné tu nombre para entrar."); } catch (_e) {} return; }
+  if (!document.getElementById("avpCss")) {
+    var st = document.createElement("style"); st.id = "avpCss";
+    st.textContent = "#avpOverlay .avp-card{max-width:960px;margin:0 auto;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5);display:flex;flex-direction:column;max-height:92vh;}.avp-head{display:flex;align-items:center;gap:12px;padding:13px 16px;background:linear-gradient(90deg,#0f766e,#0b3b36);color:#fff;flex:0 0 auto;}.avp-head b{font-size:17px;flex:0 0 auto;}.avp-who{flex:1;font-size:13px;opacity:.9;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.avp-x{width:auto;background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;}.avp-body{padding:14px 16px;display:flex;flex-direction:column;min-height:0;flex:1;}.avp-hint{font-size:12.5px;color:#64748b;margin-bottom:8px;flex:0 0 auto;}.avp-filtro{width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid #cbd5e1;border-radius:9px;margin-bottom:8px;font-size:13px;flex:0 0 auto;}.avp-vend{flex:0 0 auto;max-height:30vh;overflow:auto;border:1px solid #cdeee7;border-radius:10px;padding:8px 10px;background:#f0fdfa;margin-bottom:8px;}.avp-vend-h{font-weight:800;font-size:12.5px;color:#0f766e;margin-bottom:4px;}.avp-vgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;margin-top:6px;}.avp-vcard{display:flex;flex-direction:column;gap:4px;padding:7px 8px;border:1px solid #cdeee7;border-radius:9px;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.05);}.avp-vname{font-weight:800;font-size:12px;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}.avp-vlist{font-size:10px;color:#64748b;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;min-height:25px;}.avp-vcard .avp-btn{width:100%;padding:5px 6px;font-size:11px;}.avp-vcard .avp-notel{text-align:center;padding:4px 0;}.avp-empty{text-align:center;color:#94a3b8;padding:22px;}.avp-tblwrap{overflow:auto;flex:1;min-height:0;}.avp-tbl{width:100%;border-collapse:collapse;font-size:13px;}.avp-tbl th,.avp-tbl td{border-bottom:1px solid #eef2f7;padding:6px 8px;text-align:left;vertical-align:top;}.avp-tbl th{background:#f8fafc;font-size:11.5px;color:#475569;position:sticky;top:0;}.avp-tbl .num{text-align:right;}.avp-rs{max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.avp-btn{width:auto;border:none;border-radius:8px;padding:6px 10px;font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap;color:#fff;}.avp-btn.cli{background:#16a34a;}.avp-btn.ven{background:#2563eb;}.avp-notel{font-size:11px;color:#94a3b8;}.avp-fab{font-size:11px;color:#b45309;font-weight:700;}.avp-vtag{font-size:11px;color:#334155;font-weight:700;}.avp-npn{font-size:10px;color:#7c3aed;font-weight:700;}.avp-done{font-size:10.5px;color:#166534;margin-top:3px;font-weight:700;}.avp-avis{margin-top:10px;}.avp-avis>summary{cursor:pointer;font-weight:800;font-size:12.5px;color:#166534;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:9px;padding:8px 12px;list-style:none;}.avp-avis>summary::-webkit-details-marker{display:none;}.avp-avis[open]>summary{margin-bottom:8px;}";
+    document.head.appendChild(st);
+  }
+  _avp = { quien: quien, groups: [], lastCli: {}, vendNotified: {}, vendW: {}, filtro: "" };
+  var ov = document.getElementById("avpOverlay");
+  if (!ov) { ov = document.createElement("div"); ov.id = "avpOverlay"; ov.style.cssText = "position:fixed;inset:0;z-index:1400;background:rgba(2,6,23,.7);overflow:auto;padding:14px;"; document.body.appendChild(ov); }
+  ov.style.display = "block";
+  ov.innerHTML = _avpShell('<div class="avp-empty">Cargando pedidos programados…</div>');
+  await avpLoad();
+}
+function avpClose() { var ov = document.getElementById("avpOverlay"); if (ov) ov.style.display = "none"; }
+function _avpShell(inner) {
+  return '<div class="avp-card"><div class="avp-head"><b>📲 Avisar programación</b><span class="avp-who">👤 ' + escapeHtml((_avp && _avp.quien) || "") + '</span><button class="avp-x" onclick="avpClose()">Cerrar</button></div><div id="avpBody" class="avp-body">' + inner + '</div></div>';
+}
+async function avpLoad() {
+  var H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+  var q = function (u) { return fetch(SUPABASE_URL + "/rest/v1/" + u, { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; }); };
+  var res = await Promise.all([
+    q("vista_ppp_programacion_pendiente?select=np,cod_cliente,razon_social,fecha_recep,fecha_entrega&limit=20000"),
+    q("whatsapp_clientes?select=cod_cliente,telefono&limit=20000"),
+    q("whatsapp_vendedores?select=vend,telefono,nombre&limit=2000"),
+    q("clientes_vendedor?select=cod_cliente,vend&limit=30000"),
+    q("envio_programacion_log?select=np,cod_cliente,vend,tipo,quien,ts&order=ts.desc&limit=30000")
+  ]);
+  var ped = res[0], wc = res[1], wv = res[2], cv = res[3], log = res[4];
+  var telCli = {}; wc.forEach(function (r) { telCli[String(r.cod_cliente).trim()] = r.telefono; });
+  var vendW = {}; wv.forEach(function (r) { vendW[String(r.vend).trim()] = { tel: r.telefono, nombre: r.nombre }; });
+  var vendDe = {}; cv.forEach(function (r) { vendDe[String(r.cod_cliente).trim()] = String(r.vend || "").trim(); });
+  // AGRUPAR: mismo cliente + misma fecha de salida = 1 solo envío/mensaje (une sus NPs).
+  var gm = {};
+  ped.forEach(function (p) {
+    if (!_avpFechaDMY(p.fecha_entrega)) return;                 // solo programados (con fecha de salida)
+    var cod = String(p.cod_cliente || "").trim();
+    var key = cod + "|" + String(p.fecha_entrega).slice(0, 10);
+    var g = gm[key];
+    if (!g) {
+      var vend = vendDe[cod] || "", vw = vendW[vend] || {};
+      g = gm[key] = { key: key, cod: cod, rs: p.razon_social || "", fppp: p.fecha_entrega, fped: p.fecha_recep, vend: vend, telCli: telCli[cod] || "", telVend: vw.tel || "", vendNombre: vw.nombre || "", nps: [] };
+    }
+    var np = String(p.np || "").trim(); if (np && g.nps.indexOf(np) < 0) g.nps.push(np);
+    if (!g.rs && p.razon_social) g.rs = p.razon_social;
+    if (p.fecha_recep && (!g.fped || String(p.fecha_recep) < String(g.fped))) g.fped = p.fecha_recep;  // fecha pedido = la más vieja
+  });
+  var groups = Object.keys(gm).map(function (k) { var g = gm[k]; g.dias = _avpDias(g.fped, g.fppp); return g; });
+  groups.sort(function (a, b) { return String(a.fppp).localeCompare(String(b.fppp)) || String(a.rs).localeCompare(String(b.rs)); });
+  var keyMap = {}, npKey = {};
+  groups.forEach(function (g) { keyMap[g.key] = g; g.nps.forEach(function (n) { npKey[n] = g.key; }); });
+  // estado desde el log: última marca de aviso a cliente por grupo + resumen pendiente por vendedor.
+  // v9.59 — vendSent = grupos que YA se le mandaron al vendedor (log tipo='vendedor' con np). Esos NO
+  // reaparecen en el resumen del vendedor los días siguientes (no re-mandar la misma programación).
+  var lastCli = {}, vendNotified = {}, vendSent = {};
+  // pass 1: qué grupos ya se le enviaron a cada vendedor
+  log.forEach(function (r) {
+    if (r.tipo !== "vendedor" || r.np == null || !r.vend) return;
+    var key = npKey[String(r.np)]; if (!key) return;
+    (vendSent[r.vend] || (vendSent[r.vend] = {}))[key] = true;
+  });
+  // pass 2: avisos a cliente → estado + resumen del vendedor (excluye lo ya mandado al vendedor)
+  log.forEach(function (r) {
+    if (r.tipo !== "cliente") return;
+    var key = npKey[r.np != null ? String(r.np) : ""]; if (!key) return;
+    if (!lastCli[key]) lastCli[key] = r;                        // log viene ts desc → primero = más reciente
+    var g = keyMap[key]; if (!g || !g.vend || _avpNoVend(g.vend)) return;
+    if (vendSent[g.vend] && vendSent[g.vend][key]) return;      // ya se lo mandé al vendedor → no reaparece
+    if (!vendNotified[g.vend]) vendNotified[g.vend] = {};
+    if (!vendNotified[g.vend][key]) vendNotified[g.vend][key] = { rs: g.rs, fppp: g.fppp, cod: g.cod };
+  });
+  _avp.groups = groups; _avp.lastCli = lastCli; _avp.vendNotified = vendNotified; _avp.vendSent = vendSent; _avp.vendW = vendW;
+  avpRender();
+}
+/* v9.58 — vendedores INTERNOS ("somos nosotros"): 7 = fábrica, 20 = super. A vend 20 NO se
+   le avisa NI al cliente NI al vendedor (son pedidos nuestros). A vend 7 (fábrica) no se arma
+   resumen de vendedor, pero el cliente igual puede recibir aviso. */
+function _avpNoVend(v) { return v === "7" || v === "20"; }   // no arma resumen de vendedor
+function _avpNoCliente(v) { return v === "20"; }             // tampoco se avisa al cliente (super = nosotros)
+function avpRender() {
+  var body = document.getElementById("avpBody"); if (!body || !_avp) return;
+  var groups = _avp.groups || [];
+  var f = (_avp.filtro || "").toLowerCase();
+  var shown = f ? groups.filter(function (g) { return (g.cod + " " + g.rs + " " + g.nps.join(" ")).toLowerCase().indexOf(f) >= 0; }) : groups;
+  // --- panel de vendedores FIJO ARRIBA: se llena a medida que avisás a sus clientes ---
+  var vends = {};
+  groups.forEach(function (g) { if (g.vend && !_avpNoVend(g.vend)) vends[g.vend] = { tel: g.telVend, nombre: g.vendNombre }; });
+  var vk = Object.keys(vends).sort(function (a, b) { return (+a || 0) - (+b || 0) || (a < b ? -1 : 1); });
+  var vh = '<div class="avp-vend"><div class="avp-vend-h">📇 Vendedores — el resumen se arma con los clientes que vas avisando</div>';
+  if (!vk.length) vh += '<div class="avp-notel">Sin vendedores (todo fábrica o sin asignar).</div>';
+  else vh += '<div class="avp-vgrid">';
+  vk.forEach(function (v) {
+    var meta = vends[v], notif = _avp.vendNotified[v] || {}, keys = Object.keys(notif);
+    var lines = keys.map(function (k) { return notif[k]; }).sort(function (a, b) { return String(a.fppp).localeCompare(String(b.fppp)); });
+    var preview = lines.length ? lines.map(function (x) { return escapeHtml(x.rs || ("cliente " + x.cod)); }).join(", ") : "— sin avisos —";
+    var btn = meta.tel
+      ? '<button class="avp-btn ven"' + (keys.length ? '' : ' disabled style="opacity:.4;cursor:default"') + ' onclick="avpSendVendedor(\'' + encodeURIComponent(v) + '\')">📲 Resumen (' + keys.length + ')</button>'
+      : '<span class="avp-notel">sin tel</span>';
+    vh += '<div class="avp-vcard"><span class="avp-vname" title="Vend ' + escapeHtml(v) + (meta.nombre ? ' · ' + escapeHtml(meta.nombre) : '') + '">Vend ' + escapeHtml(v) + (meta.nombre ? ' · ' + escapeHtml(meta.nombre) : '') + '</span><span class="avp-vlist" title="' + escapeHtml(preview) + '">' + preview + '</span>' + btn + '</div>';
+  });
+  if (vk.length) vh += '</div>';
+  vh += '</div>';
+  var h = '<div class="avp-hint">Pedidos <b>programados</b> por fecha de salida. Mismo cliente + misma fecha = <b>1 mensaje</b> (une sus NPs). Al avisar a un cliente, su línea se suma al resumen del vendedor de arriba. vend 7 = fábrica · vend 20 (super) = nosotros → no se avisa. Entró: <b>' + escapeHtml(_avp.quien) + '</b> · ' + shown.length + ' envío(s).</div>';
+  h += '<input class="avp-filtro" type="search" placeholder="🔎 Buscar cod / razón social / NP" value="' + escapeHtml(_avp.filtro || "") + '" oninput="if(_avp){_avp.filtro=this.value;avpRender();}">';
+  // v9.58 — fila de la tabla (reutilizada por pendientes y avisados)
+  var _avpTr = function (g) {
+    var lc = _avp.lastCli[g.key];
+    var cliDone = lc ? '<div class="avp-done">✅ ' + escapeHtml(_avpTs(lc.ts)) + ' · ' + escapeHtml(lc.quien || "") + '</div>' : '';
+    var cliCell = _avpNoCliente(g.vend)
+      ? '<span class="avp-fab" title="Vend 20 (super) = somos nosotros → no se avisa">🏢 nosotros</span>'
+      : (g.telCli
+        ? '<button class="avp-btn cli" onclick="avpSendCliente(\'' + encodeURIComponent(g.key) + '\')">📲 Cliente</button>' + cliDone
+        : '<span class="avp-notel">sin tel</span>' + cliDone);
+    var venLbl = g.vend === "7" ? '<span class="avp-fab">🏭 fábrica</span>' : (g.vend === "20" ? '<span class="avp-fab">🏢 super (nosotros)</span>' : (!g.vend ? '<span class="avp-notel">— sin vend —</span>' : '<span class="avp-vtag">Vend ' + escapeHtml(g.vend) + '</span>'));
+    var npNote = g.nps.length > 1 ? ' <span class="avp-npn">(' + g.nps.length + ' NP)</span>' : '';
+    return '<tr><td><b>' + escapeHtml(g.cod) + '</b>' + npNote + '</td><td class="avp-rs" title="' + escapeHtml(g.rs) + '">' + escapeHtml(g.rs) + '</td><td>' + escapeHtml(_avpFechaDMY(g.fped)) + '</td><td><b>' + escapeHtml(_avpFechaDMY(g.fppp)) + '</b></td><td class="num">' + (g.dias == null ? "—" : g.dias) + '</td><td>' + cliCell + '</td><td>' + venLbl + '</td></tr>';
+  };
+  var _thead = '<thead><tr><th>Cod</th><th>Razón social</th><th>F. pedido</th><th>F. salida</th><th class="num">Días</th><th>WhatsApp Cliente</th><th>Vend.</th></tr></thead>';
+  // v9.58 — solo PENDIENTES (sin aviso al cliente) en la tabla principal; los ya avisados van
+  // a una sección aparte colapsable. "avisado" = tiene marca lastCli.
+  var pend = shown.filter(function (g) { return !_avp.lastCli[g.key]; });
+  var avis = shown.filter(function (g) { return !!_avp.lastCli[g.key]; });
+  var t;
+  if (!shown.length) t = '<div class="avp-empty">Sin pedidos programados.</div>';
+  else {
+    t = pend.length
+      ? '<div class="avp-tblwrap"><table class="avp-tbl">' + _thead + '<tbody>' + pend.map(_avpTr).join("") + '</tbody></table></div>'
+      : '<div class="avp-empty" style="color:#16a34a;font-weight:700;">✅ No quedan pendientes por avisar.</div>';
+    if (avis.length) t += '<details class="avp-avis"><summary>✅ Avisados (' + avis.length + ') — tocá para ver</summary><div class="avp-tblwrap"><table class="avp-tbl">' + _thead + '<tbody>' + avis.map(_avpTr).join("") + '</tbody></table></div></details>';
+  }
+  _renderKeepFocus(body, h + vh + t);
+}
+/* Mensaje al cliente (texto definitivo del dueño). El día = fecha de salida (PPP). */
+function avpMsgCliente(r) {
+  return "Estimado Cliente:\n" +
+    "Su pedido ya fue programado para el día " + _avpFechaDMYA(r.fppp) + "\n" +
+    "Tenga en cuenta que la fecha en que saldrá su pedido de nuestro centro de distribución es aproximada y puede tener una diferencia de 2 o 3 días de lo informado.\n" +
+    "Saludos.\n" +
+    "Dpto. de Ventas.";
+}
+function avpMsgVendedor(nombre, lines) {
+  var head = "Hola" + (nombre ? " " + nombre : "") + "! Te paso la programación de salida de tus clientes:\n\n";
+  var body = lines.map(function (x) { return "• " + (x.rs || ("cliente " + x.cod)) + " — sale " + _avpFechaDMY(x.fppp); }).join("\n");
+  return head + body + "\n\nCualquier duda avisame. ¡Gracias!";
+}
+async function avpLog(tipo, np, cod, vend) {
+  try {
+    await fetch(SUPABASE_URL + "/rest/v1/envio_programacion_log", {
+      method: "POST",
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" },
+      body: JSON.stringify({ tipo: tipo, np: np, cod_cliente: cod, vend: vend, quien: (_avp && _avp.quien) || "" })
+    });
+  } catch (_e) {}
+}
+async function avpSendCliente(keyEnc) {
+  if (!_avp) return;
+  var g = _avpGroup(decodeURIComponent(keyEnc)); if (!g) return;
+  if (_avpNoCliente(g.vend)) { try { alert("Vend 20 (super) = somos nosotros: a estos pedidos no se les avisa."); } catch (_e) {} return; }
+  if (!g.telCli) { try { alert("Ese cliente no tiene teléfono cargado en whatsapp_clientes."); } catch (_e) {} return; }
+  var msg = avpMsgCliente(g);
+  avpLog("cliente", g.nps[0] || null, g.cod, g.vend);
+  _avp.lastCli[g.key] = { ts: new Date().toISOString(), quien: _avp.quien };
+  if (g.vend && !_avpNoVend(g.vend)) {                         // suma la línea al resumen del vendedor
+    if (!_avp.vendNotified[g.vend]) _avp.vendNotified[g.vend] = {};
+    _avp.vendNotified[g.vend][g.key] = { rs: g.rs, fppp: g.fppp, cod: g.cod };
+  }
+  avpRender();
+  window.open(_avpWa(g.telCli, msg), "_blank");
+}
+async function avpSendVendedor(vendEnc) {
+  if (!_avp) return;
+  var v = decodeURIComponent(vendEnc); if (_avpNoVend(v)) return;
+  var notif = _avp.vendNotified[v] || {}, keys = Object.keys(notif);
+  if (!keys.length) { try { alert("Primero avisá a los clientes de este vendedor; su resumen se arma con esos avisos."); } catch (_e) {} return; }
+  var meta = (_avp.vendW && _avp.vendW[v]) || {};
+  if (!meta.tel) { try { alert("El vendedor " + v + " no tiene teléfono en whatsapp_vendedores."); } catch (_e) {} return; }
+  var lines = keys.map(function (k) { return notif[k]; }).sort(function (a, b) { return String(a.fppp).localeCompare(String(b.fppp)); });
+  // v9.59 — registrar QUÉ grupos se le mandaron al vendedor (un row por grupo, con su NP) para que
+  // no vuelvan a aparecer mañana. Y sacarlos del resumen en vivo (queda en 0).
+  if (!_avp.vendSent[v]) _avp.vendSent[v] = {};
+  keys.forEach(function (k) {
+    var g = _avpGroup(k);
+    avpLog("vendedor", (g && g.nps && g.nps[0]) || String(k), (g && g.cod) || null, v);
+    _avp.vendSent[v][k] = true;
+  });
+  _avp.vendNotified[v] = {};                                   // ya enviado → resumen vuelve a 0
+  avpRender();
+  window.open(_avpWa(meta.tel, avpMsgVendedor(meta.nombre, lines)), "_blank");
+}
+
+/* ===== v9.37 — MÓDULO "💸 Plata perdida de facturar" =================================
+   Valoriza el FALTANTE POR QUIEBRE: cajas que el cliente pidió y NO se pudieron entregar
+   por falta de stock (Entregas_Virgilio.cajas_falto), a PRECIO DE VENTA (tabla precios_venta:
+   list_price × uxb, snapshot de LK.products). Plata perdida = cajas_falto × precio_unit × uxb.
+   Agrupa por Artículo / Cliente / Vendedor, con filtro de período por fecha de salida.
+   ⚠ precio 8888 = placeholder de LK (sin precio real) → no se valoriza, se marca "sin precio". */
+var _pp = null;
+function _ppMoney(n) { return '$' + Math.round(n || 0).toLocaleString('es-AR'); }
+function _ppFecha10(s) { var m = String(s || "").match(/(\d{4})-(\d{2})-(\d{2})/); return m ? (m[1] + "-" + m[2] + "-" + m[3]) : ""; }
+function _ppPrice(codN) { return (_pp.precio[codN] || _pp.precio[codN.replace(/(LK|CH)$/, "")] || null); }
+function _ppPlata(r) { var p = _ppPrice(r.codN); return (p && p.ok) ? r.cajas * p.pu * p.uxb : 0; }
+async function openPlataPerdida() {
+  try { if (typeof requireSupervisor === "function" && !requireSupervisor()) return; } catch (_e) {}
+  if (!document.getElementById("ppCss")) {
+    var st = document.createElement("style"); st.id = "ppCss";
+    st.textContent = "#ppOverlay .pp-card{max-width:900px;margin:0 auto;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5);display:flex;flex-direction:column;max-height:92vh;}.pp-head{display:flex;align-items:center;gap:12px;padding:13px 16px;background:linear-gradient(90deg,#7c2d12,#431407);color:#fff;flex:0 0 auto;}.pp-head b{font-size:17px;}.pp-x{margin-left:auto;width:auto;background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;}.pp-body{padding:14px 16px;display:flex;flex-direction:column;min-height:0;flex:1;}.pp-ctrl{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px;flex:0 0 auto;font-size:12.5px;color:#475569;}.pp-ctrl input[type=date]{padding:6px 8px;border:1px solid #cbd5e1;border-radius:8px;font-size:12.5px;}.pp-tab{width:auto;padding:6px 12px;border-radius:999px;border:1px solid #cbd5e1;background:#fff;color:#334155;font-size:12.5px;font-weight:800;cursor:pointer;}.pp-tab.on{background:#7c2d12;border-color:#7c2d12;color:#fff;}.pp-total{background:#fef2f2;border:1.5px solid #fca5a5;border-radius:12px;padding:11px 14px;margin-bottom:10px;flex:0 0 auto;}.pp-total b{font-size:28px;color:#b91c1c;font-variant-numeric:tabular-nums;}.pp-tblwrap{overflow:auto;flex:1;min-height:0;}.pp-tbl{width:100%;border-collapse:collapse;font-size:13px;}.pp-tbl th,.pp-tbl td{border-bottom:1px solid #eef2f7;padding:6px 8px;text-align:left;}.pp-tbl th{background:#f8fafc;font-size:11.5px;color:#475569;position:sticky;top:0;}.pp-tbl .num{text-align:right;font-variant-numeric:tabular-nums;}.pp-sp{font-size:11px;color:#b45309;font-weight:700;}";
+    document.head.appendChild(st);
+  }
+  _pp = { anio: "", desde: "", hasta: "", group: "art", rows: [], years: [], precio: {}, vendDe: {}, rsDe: {} };
+  var ov = document.getElementById("ppOverlay");
+  if (!ov) { ov = document.createElement("div"); ov.id = "ppOverlay"; ov.style.cssText = "position:fixed;inset:0;z-index:1400;background:rgba(2,6,23,.72);overflow:auto;padding:14px;"; document.body.appendChild(ov); }
+  ov.style.display = "block";
+  ov.innerHTML = '<div class="pp-card"><div class="pp-head"><b>💸 Plata perdida de facturar</b><button class="pp-x" onclick="ppClose()">Cerrar</button></div><div id="ppBody" class="pp-body"><div style="text-align:center;color:#94a3b8;padding:24px;">Calculando…</div></div></div>';
+  await ppLoad();
+}
+function ppClose() { var ov = document.getElementById("ppOverlay"); if (ov) ov.style.display = "none"; }
+async function ppLoad() {
+  var H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+  var q = function (u) { return fetch(SUPABASE_URL + "/rest/v1/" + u, { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; }); };
+  var res = await Promise.all([
+    q("Entregas_Virgilio?select=np,cod_art,cajas_falto,cajas_pedidas,cajas_entregadas,fecha_salida,cod_cliente&cajas_falto=gt.0&limit=100000"),
+    q("precios_venta?select=cod,precio_unit,uxb,descripcion&limit=5000"),
+    q("clientes_vendedor?select=cod_cliente,vend&limit=30000"),
+    q("Facturacion_NP?select=np,razon_social&limit=100000")
+  ]);
+  var ent = res[0], pv = res[1], cv = res[2], fac = res[3];
+  var precio = {}; pv.forEach(function (r) { var k = _ocgNorm(r.cod); var pu = Number(r.precio_unit) || 0; precio[k] = { pu: pu, uxb: Number(r.uxb) || 1, desc: r.descripcion || "", ok: pu > 0 && pu !== 8888 }; });
+  var vendDe = {}; cv.forEach(function (r) { vendDe[String(r.cod_cliente).trim()] = String(r.vend || "").trim(); });
+  var rsDe = {}; fac.forEach(function (r) { var n = pickNormNp(r.np); if (n && r.razon_social && !rsDe[n]) rsDe[n] = r.razon_social; });
+  _pp.rows = ent.map(function (r) { return { codN: _ocgNorm(r.cod_art), cod: String(r.cod_art || "").trim(), cajas: Number(r.cajas_falto) || 0, ped: Number(r.cajas_pedidas) || 0, ent: Number(r.cajas_entregadas) || 0, fecha: _ppFecha10(r.fecha_salida), cli: String(r.cod_cliente || "").trim(), np: pickNormNp(r.np) }; }).filter(function (r) { return r.cajas > 0; });
+  _pp.precio = precio; _pp.vendDe = vendDe; _pp.rsDe = rsDe;
+  // años CON DATOS (para el dropdown); por defecto el año actual si tiene datos, si no el más reciente.
+  var ys = {}; _pp.rows.forEach(function (r) { var y = r.fecha ? r.fecha.slice(0, 4) : ""; if (/^\d{4}$/.test(y)) ys[y] = 1; });
+  _pp.years = Object.keys(ys).sort(function (a, b) { return b.localeCompare(a); });
+  var cur = String(new Date().getFullYear());
+  _pp.anio = (_pp.years.indexOf(cur) >= 0) ? cur : (_pp.years[0] || cur);
+  ppRender();
+}
+function ppSet(k, v) { if (!_pp) return; _pp[k] = v; ppRender(); }
+function _ppMDdisp(md) { if (!md) return ""; var p = String(md).split("-"); return p.length === 2 ? (p[1] + "/" + p[0]) : ""; }   // "MM-DD" → "DD/MM"
+function ppSetMD2(k, v) {   // v9.43 — entra "dd/mm" (sin año; el año es el dropdown) → guarda "MM-DD"
+  if (!_pp) return;
+  v = String(v || "").trim();
+  if (!v) { _pp[k] = ""; ppRender(); return; }
+  var m = v.match(/^(\d{1,2})[\/\-.](\d{1,2})$/);
+  if (m) { var dd = ("0" + m[1]).slice(-2), mm = ("0" + m[2]).slice(-2); if (+mm >= 1 && +mm <= 12 && +dd >= 1 && +dd <= 31) _pp[k] = mm + "-" + dd; }
+  ppRender();
+}
+/* v9.54 — filas del período seleccionado (año + rango dd/mm), reutilizado por la tabla y el drill-down. */
+function _ppRowsPeriodo() {
+  if (!_pp) return [];
+  var yr = _pp.anio, d1 = _pp.desde, d2 = _pp.hasta;
+  return _pp.rows.filter(function (r) {
+    if (!r.fecha || r.fecha.slice(0, 4) !== yr) return false;
+    var md = r.fecha.slice(5);
+    if (d1 && md < d1) return false;
+    if (d2 && md > d2) return false;
+    return true;
+  });
+}
+function ppRender() {
+  var body = document.getElementById("ppBody"); if (!body || !_pp) return;
+  var rows = _ppRowsPeriodo();
+  var groups = {}, totPlata = 0, totCajas = 0, spCajas = 0, spSet = {};
+  rows.forEach(function (r) {
+    var key, label;
+    if (_pp.group === "cli") { key = r.cli || "—"; label = (r.cli || "—") + (r.np && _pp.rsDe[r.np] ? " · " + _pp.rsDe[r.np] : ""); }
+    else if (_pp.group === "vend") { var v = _pp.vendDe[r.cli] || ""; key = v || "—"; label = v === "7" ? "Vend 7 (fábrica)" : (v ? "Vend " + v : "— sin vend —"); }
+    else { key = r.codN; var p = _ppPrice(r.codN); label = codBase(r.cod) + (p && p.desc ? " · " + p.desc : ""); }
+    var g = groups[key] || (groups[key] = { key: key, label: label, cajas: 0, plata: 0, sp: false });
+    var pl = _ppPlata(r); g.cajas += r.cajas; g.plata += pl; totCajas += r.cajas;
+    if (pl > 0) totPlata += pl; else { g.sp = true; spCajas += r.cajas; spSet[r.codN] = 1; }
+  });
+  var arr = Object.keys(groups).map(function (k) { return groups[k]; }).sort(function (a, b) { return b.plata - a.plata || b.cajas - a.cajas; });
+  var yearOpts = (_pp.years || []).map(function (y) { return '<option value="' + y + '"' + (y === yr ? ' selected' : '') + '>' + y + '</option>'; }).join("");
+  var _mdInp = 'type="text" inputmode="numeric" placeholder="dd/mm" style="width:66px;padding:6px 8px;border:1px solid #cbd5e1;border-radius:8px;font-size:12.5px;text-align:center;"';
+  var h = '<div class="pp-ctrl">Año <select onchange="ppSet(\'anio\',this.value)" style="padding:6px 8px;border:1px solid #cbd5e1;border-radius:8px;font-size:12.5px;font-weight:800;">' + (yearOpts || '<option>' + escapeHtml(yr) + '</option>') + '</select> ' +
+    'Desde <input ' + _mdInp + ' value="' + _ppMDdisp(d1) + '" onchange="ppSetMD2(\'desde\',this.value)"> Hasta <input ' + _mdInp + ' value="' + _ppMDdisp(d2) + '" onchange="ppSetMD2(\'hasta\',this.value)"> <span style="width:6px;display:inline-block"></span>' +
+    ["art", "cli", "vend"].map(function (g) { var lbl = g === "art" ? "Por artículo" : g === "cli" ? "Por cliente" : "Por vendedor"; return '<button class="pp-tab' + (_pp.group === g ? " on" : "") + '" onclick="ppSet(\'group\',\'' + g + '\')">' + lbl + '</button>'; }).join("") + '</div>';
+  h += '<div class="pp-total"><span style="font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:#7f1d1d;font-weight:800;">💸 Plata perdida (faltante por quiebre = cajas pedidas que no se entregaron por falta de stock)</span><br><b>' + _ppMoney(totPlata) + '</b> <span style="font-size:12.5px;color:#7f1d1d;">· ' + Math.round(totCajas) + ' cajas no entregadas</span>' + (Object.keys(spSet).length ? '<br><span class="pp-sp">⚠ ' + Object.keys(spSet).length + ' código(s) sin precio (' + Math.round(spCajas) + ' cajas no valorizadas) — cargá el precio en precios_venta.</span>' : '') + '</div>';
+  if (!arr.length) { body.innerHTML = h + '<div style="text-align:center;color:#16a34a;padding:24px;font-weight:700;">✅ Sin faltante por quiebre en el período.</div>'; return; }
+  var colKey = _pp.group === "art" ? "Artículo" : _pp.group === "cli" ? "Cliente" : "Vendedor";
+  h += '<div style="font-size:11.5px;color:#94a3b8;margin:2px 0 6px;">👆 Tocá una fila para ver el detalle (fecha · cliente · pedido · valor no entregado).</div>';
+  h += '<div class="pp-tblwrap"><table class="pp-tbl"><thead><tr><th>' + colKey + '</th><th class="num">Cajas faltó</th><th class="num">Plata perdida</th></tr></thead><tbody>';
+  h += arr.map(function (g) { return '<tr class="pp-clk" style="cursor:pointer;" onclick="ppOpenDetail(\'' + encodeURIComponent(g.key) + '\')"><td>' + escapeHtml(g.label) + (g.sp ? ' <span class="pp-sp">(sin precio)</span>' : '') + '</td><td class="num">' + Math.round(g.cajas) + '</td><td class="num" style="font-weight:800;color:#b91c1c;">' + (g.plata > 0 ? _ppMoney(g.plata) : "—") + '</td></tr>'; }).join("");
+  h += '</tbody></table></div>';
+  body.innerHTML = h;
+}
+
+/* v9.54 — DRILL-DOWN: al tocar una fila (artículo/cliente/vendedor) abre un pop-up con el
+   detalle del período: Fecha · Cod Cliente · Razón Social · Pedido (NP) · Entregado · Valor
+   No entregado. Botón "Resumido" agrupa por cliente (Cliente · Cajas del plazo · Valor no
+   entregado). Hereda el grupo y el período de la vista principal. */
+var _ppDet = null;
+function ppOpenDetail(encKey) {
+  if (!_pp) return;
+  var key = decodeURIComponent(encKey);
+  _ppDet = { key: key, group: _pp.group, mode: "det" };
+  var ov = document.getElementById("ppDetOverlay");
+  if (!ov) { ov = document.createElement("div"); ov.id = "ppDetOverlay"; ov.style.cssText = "position:fixed;inset:0;z-index:1450;background:rgba(2,6,23,.78);overflow:auto;padding:14px;"; document.body.appendChild(ov); }
+  ov.style.display = "block";
+  ppDetRender();
+}
+function ppDetClose() { var ov = document.getElementById("ppDetOverlay"); if (ov) ov.style.display = "none"; _ppDet = null; }
+function ppDetMode(m) { if (_ppDet) { _ppDet.mode = m; ppDetRender(); } }
+function _ppDetRows() {
+  var g = _ppDet.group, k = _ppDet.key;
+  return _ppRowsPeriodo().filter(function (r) {
+    if (g === "cli") return (r.cli || "—") === k;
+    if (g === "vend") return (_pp.vendDe[r.cli] || "—") === k;
+    return r.codN === k;   // artículo
+  });
+}
+function ppDetRender() {
+  var ov = document.getElementById("ppDetOverlay"); if (!ov || !_ppDet) return;
+  var rows = _ppDetRows();
+  // Título del pop-up según el grupo
+  var titulo;
+  if (_ppDet.group === "cli") { var rr = rows[0]; titulo = "Cliente " + escapeHtml(_ppDet.key) + (rr && rr.np && _pp.rsDe[rr.np] ? " · " + escapeHtml(_pp.rsDe[rr.np]) : ""); }
+  else if (_ppDet.group === "vend") { titulo = _ppDet.key === "7" ? "Vend 7 (fábrica)" : (_ppDet.key === "—" ? "Sin vendedor" : "Vendedor " + escapeHtml(_ppDet.key)); }
+  else { var p0 = _ppPrice(_ppDet.key); var d0 = rows[0]; titulo = escapeHtml(d0 ? codBase(d0.cod) : _ppDet.key) + (p0 && p0.desc ? " · " + escapeHtml(p0.desc) : ""); }
+  var totPlata = 0, totCajas = 0; rows.forEach(function (r) { totPlata += _ppPlata(r); totCajas += r.cajas; });
+  var h = '<div class="pp-card" style="max-width:820px;"><div class="pp-head" style="background:linear-gradient(90deg,#991b1b,#450a0a);"><b>💸 ' + titulo + '</b>' +
+    '<button class="pp-tab' + (_ppDet.mode === "det" ? " on" : "") + '" style="margin-left:auto;" onclick="ppDetMode(\'det\')">Detalle</button>' +
+    '<button class="pp-tab' + (_ppDet.mode === "res" ? " on" : "") + '" onclick="ppDetMode(\'res\')">Resumido</button>' +
+    '<button class="pp-x" onclick="ppDetClose()">Cerrar</button></div>' +
+    '<div class="pp-body">';
+  h += '<div class="pp-total" style="margin-bottom:8px;"><b style="font-size:22px;">' + _ppMoney(totPlata) + '</b> <span style="font-size:12px;color:#7f1d1d;">· ' + Math.round(totCajas) + ' cajas no entregadas · ' + rows.length + ' registro(s)</span></div>';
+  h += '<div class="pp-tblwrap">';
+  if (_ppDet.mode === "res") {
+    // Resumido por CLIENTE: Cliente · Cajas del plazo · Valor no entregado
+    var gc = {};
+    rows.forEach(function (r) {
+      var k = r.cli || "—"; var g = gc[k] || (gc[k] = { cli: k, rs: "", cajas: 0, plata: 0 });
+      if (!g.rs && r.np && _pp.rsDe[r.np]) g.rs = _pp.rsDe[r.np];
+      g.cajas += r.cajas; g.plata += _ppPlata(r);
+    });
+    var arrc = Object.keys(gc).map(function (k) { return gc[k]; }).sort(function (a, b) { return b.plata - a.plata || b.cajas - a.cajas; });
+    h += '<table class="pp-tbl"><thead><tr><th>Cliente</th><th class="num" title="Cajas no entregadas en el período (plazo) seleccionado">Cajas del plazo</th><th class="num">Valor no entregado</th></tr></thead><tbody>';
+    h += arrc.map(function (g) { return '<tr><td>' + escapeHtml(g.cli) + (g.rs ? ' · ' + escapeHtml(g.rs) : "") + '</td><td class="num">' + Math.round(g.cajas) + '</td><td class="num" style="font-weight:800;color:#b91c1c;">' + (g.plata > 0 ? _ppMoney(g.plata) : "—") + '</td></tr>'; }).join("");
+    h += '</tbody></table>';
+  } else {
+    // Detalle por registro: Fecha · Cod Cliente · Razón Social · Pedido (NP) · Entregado · Valor No entregado
+    var arrd = rows.slice().sort(function (a, b) { return _ppPlata(b) - _ppPlata(a) || (a.fecha < b.fecha ? 1 : -1); });
+    h += '<table class="pp-tbl"><thead><tr><th>Fecha</th><th>Cod Cliente</th><th>Razón Social</th><th>Pedido</th><th class="num">Entregado</th><th class="num">Valor no entregado</th></tr></thead><tbody>';
+    h += arrd.map(function (r) {
+      var pl = _ppPlata(r);
+      return '<tr><td>' + escapeHtml(r.fecha) + '</td><td>' + escapeHtml(r.cli || "—") + '</td><td>' + escapeHtml((r.np && _pp.rsDe[r.np]) || "—") + '</td><td>' + escapeHtml(r.np || "—") + '</td><td class="num">' + Math.round(r.ent) + '</td><td class="num" style="font-weight:800;color:#b91c1c;">' + (pl > 0 ? _ppMoney(pl) : '<span class="pp-sp">s/precio</span>') + '</td></tr>';
+    }).join("");
+    h += '</tbody></table>';
+  }
+  h += '</div></div>';
+  ov.innerHTML = h;
+}
 
 function dpRender(filter) {
   var list = document.getElementById("dpList"); if (!list) return;
@@ -30320,6 +31074,11 @@ function showSupervisor(email) {
   try { if (typeof window.maybeAutoOpenMonitor === "function") window.maybeAutoOpenMonitor(); } catch (_e) {}
   // v8.80: badge "Completar datos producto" (fire-and-forget)
   try { dpLoadBadge(); } catch (_e) {}
+  // badges "Corregir códigos de NPs" y "Pedidos sin cargar en PPP" (fire-and-forget)
+  try { corrLoadBadge(); } catch (_e) {}
+  try { npFaltanLoadBadge(); } catch (_e) {}
+  try { qbpLoadBadge(); } catch (_e) {}   // badge SOS de "Qué bajar primero"
+  try { recepLoadBadge(); } catch (_e) {}   // v9.53: badge remitos pendientes de cargar (Recepción)
   try { if (typeof pppAlertPollStart === "function") pppAlertPollStart(); } catch (_e) {}
 }
 
