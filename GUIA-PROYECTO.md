@@ -16,9 +16,11 @@
 > (nosotros) → sin aviso a vendedor.** 4 tablas nuevas en Virgilio (`sql/aviso_programacion.sql`):
 > `clientes_vendedor` (snapshot cliente→vend de LK.customers, 1245 filas, 596 fábrica),
 > `whatsapp_clientes` (cod→tel), `whatsapp_vendedores` (vend→tel+nombre), `envio_programacion_log`.
-> ⚠ **El mensaje del cliente es un PLACEHOLDER** (`avpMsgCliente` en index.html) hasta el texto
-> definitivo del dueño — cambiar solo ese `return`. Las tablas de teléfonos arrancan vacías (cargar
-> a mano). Sin FDW Virgilio↔LK: el mapeo cliente→vend se re-sincroniza a mano (ver el SQL).
+> Mensaje al cliente (v9.32, texto del dueño): *"Estimado Cliente: Su pedido ya fue programado para
+> el día {fecha salida DD/MM/AAAA}. Tenga en cuenta que la fecha … es aproximada y puede tener una
+> diferencia de 2 o 3 días … Saludos. Dpto. de Ventas."* (en `avpMsgCliente`). Las tablas de
+> teléfonos arrancan vacías (cargar a mano). Sin FDW Virgilio↔LK: el mapeo cliente→vend se
+> re-sincroniza a mano (ver el SQL).
 >
 > Nota **v9.30** — **Conteo físico exportable a CSV con "Stock del sistema".** El módulo de conteo
 > (Stock → "📋 Hacer conteo") ya comparaba contado vs sistema en pantalla; ahora tiene botón

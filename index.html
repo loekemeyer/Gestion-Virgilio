@@ -6384,7 +6384,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v9.31";
+const APP_VERSION = "v9.32";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -25509,6 +25509,7 @@ async function npFaltanLoadBadge() {
    ⚠ MSG CLIENTE = placeholder hasta que el dueño pase el texto (#1) — ver avpMsgCliente. */
 var _avp = null;
 function _avpFechaDMY(s) { var m = String(s || "").match(/(\d{4})-(\d{2})-(\d{2})/); return m ? (m[3] + "/" + m[2]) : ""; }
+function _avpFechaDMYA(s) { var m = String(s || "").match(/(\d{4})-(\d{2})-(\d{2})/); return m ? (m[3] + "/" + m[2] + "/" + m[1]) : ""; }
 function _avpDias(recep, entrega) {
   var a = String(recep || "").match(/(\d{4})-(\d{2})-(\d{2})/), b = String(entrega || "").match(/(\d{4})-(\d{2})-(\d{2})/);
   if (!a || !b) return null;
@@ -25605,9 +25606,13 @@ function avpRender() {
   h += '</tbody></table></div>';
   body.innerHTML = h;
 }
-/* ⚠ PLACEHOLDER hasta el texto definitivo (#1). Cambiar SOLO este return. */
+/* Mensaje al cliente (texto definitivo del dueño). El día = fecha de salida (PPP). */
 function avpMsgCliente(r) {
-  return "Hola " + (r.rs || "") + "! Te avisamos que tu pedido está programado para salir el " + _avpFechaDMY(r.fppp) + ". Cualquier duda quedamos a disposición. ¡Gracias!";
+  return "Estimado Cliente:\n" +
+    "Su pedido ya fue programado para el día " + _avpFechaDMYA(r.fppp) + "\n" +
+    "Tenga en cuenta que la fecha en que saldrá su pedido de nuestro centro de distribución es aproximada y puede tener una diferencia de 2 o 3 días de lo informado.\n" +
+    "Saludos.\n" +
+    "Dpto. de Ventas.";
 }
 function avpMsgVendedor(vend, rowsV) {
   var nombre = (rowsV[0] && rowsV[0].vendNombre) ? (" " + rowsV[0].vendNombre) : "";
