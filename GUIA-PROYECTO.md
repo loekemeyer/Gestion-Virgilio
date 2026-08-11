@@ -134,6 +134,11 @@
 > **descartada** por redundante. Bump `v9.12`.
 >
 > Nota: **v8.96–v9.04 — Cajas Pedidas = toda la demanda real + módulo "NP que faltan".**
+> **v9.25 — Cajas Pedidas desde vista SQL:** La columna "Cajas Pedidas" del stock ahora lee 
+> directamente de la vista `v_cajas_pedidas` (no del caché JavaScript `ocgDemanda()`), así siempre 
+> refleja canceladas sin lag. Fórmula: `PPP_Base_Pedidos` − (`Facturacion_NP` + `PPP_Entregados_Meta` 
+> + `NP_Canceladas`), agregada por artículo. Los filtros "no programadas" (⚠) usan todavía `ocgDemanda()` 
+> internamente.
 > **Demanda (`ocgDemanda`, columna "Cajas Pedidas" del stock):** dejó de contar solo las NP
 > programadas en `PPP_Programacion_Diaria`; ahora arranca desde **TODA** la base de pedidos
 > (`PPP_Base_Pedidos`, misma fuente que el pop-up) y solo descuenta las NP que **ya salieron**:
