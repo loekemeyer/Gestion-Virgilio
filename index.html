@@ -6403,7 +6403,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v9.43";
+const APP_VERSION = "v9.44";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -13986,6 +13986,7 @@ async function stkFaltLoad() {
     });
     var tandas = Object.keys(tandaNp);
     var realFalt = {};      // codNorm(suffijado) → cajas que faltaron al ARMAR (real, TP)
+    var realFaltDia = {};   // v9.44 — codNorm → { 'YYYY-MM-DD' (fecha SALIDA): cajas } para ubicarlo en el calendario
     var realDet = {};       // codNorm → [{tanda, np, rs, cod, falto}] (detalle para el drill)
     var enCurso = {};       // TANDAs en picking (para el contador "en curso")
     if (tandas.length) {
@@ -14027,6 +14028,8 @@ async function stkFaltLoad() {
         var cod = _ocgNorm(codEmpSplit(o.c, np)); if (!cod) return;
         realFalt[cod] = (realFalt[cod] || 0) + falto;
         (realDet[cod] = realDet[cod] || []).push({ tanda: o.t, np: np, rs: (npInfo[np] || {}).rs || "", cod: o.c, falto: falto });
+        var _sal = String((npInfo[np] || {}).fecha || "").slice(0, 10);   // v9.44 — fecha de SALIDA de la tanda
+        if (_sal) { (realFaltDia[cod] = realFaltDia[cod] || {})[_sal] = (realFaltDia[cod][_sal] || 0) + falto; }
       });
     }
 
@@ -14050,7 +14053,7 @@ async function stkFaltLoad() {
     });
     _stk.falt = {
       demanda: demanda, provMap: provMap, saldoMap: saldoMap, discont: discont,
-      realFalt: realFalt, realDet: realDet, enCurso: Object.keys(enCurso).length,
+      realFalt: realFalt, realFaltDia: realFaltDia, realDet: realDet, enCurso: Object.keys(enCurso).length,
       ajustes: {}, filtro: "s1", openCell: null, search: "",
       // v8.71 — por defecto: orden fabricante→faltó armado + los 3 botones activos.
       ordenFab: true, soloQuiebre: true, sinE: true, verDias: true
@@ -14152,6 +14155,7 @@ function stkBodyFaltante() {
   if (_stk.faltLoaded === "loading") return '<div class="stk-loading">Cargando demanda PPP + stock…</div>';
   var F = _stk.falt, dem = F.demanda, sMap = F.saldoMap, provMap = F.provMap, ajustes = F.ajustes || (F.ajustes = {});
   var realFalt = F.realFalt || {};   // v8.14 — faltante REAL (ya preparado / TP) por código
+  var realFaltDia = F.realFaltDia || {};   // v9.44 — realFalt por fecha de salida (para el calendario)
   var discont = F.discont || {};     // v8.38 — códigos discontinuos (activo=false): no se muestran
   var hoy = _faltHoy();
   // v8.10 — "Esta semana" = HOY + 5 días hábiles (ventana móvil), NO la semana calendario.
@@ -14216,6 +14220,8 @@ function stkBodyFaltante() {
     // v8.14 — faltante REAL combinado (lo que ya faltó al armar en tandas pickeadas)
     var realFam = 0;
     members.forEach(function (m) { realFam += (realFalt[m] || 0); });
+    var realDiaFam = {};   // v9.44 — realFalt de la familia por fecha de salida (para ubicarlo en el calendario)
+    members.forEach(function (m) { var rd = realFaltDia[m]; if (rd) Object.keys(rd).forEach(function (dd) { realDiaFam[dd] = (realDiaFam[dd] || 0) + rd[dd]; }); });
     // Demanda combinada por fecha + sinFecha. v8.23 — AJUSTE DE CAJAS por NP: el operador no anula
     // la entrega, achica cuántas cajas van. ajustes[np|key] = cajas reales; si está, reemplaza el
     // total pedido de ese NP (se reparte proporcional entre sus entries por si son varias).
@@ -14307,7 +14313,7 @@ function stkBodyFaltante() {
       cod: codShow, key: key, esFam: esFam, miembros: miembrosDisp,
       desc: descFam || artNombre(codShow, ""), prov: provMap[key] || provMap[String(key).replace(/\s+(LK|CH)$/, "")] || provMap[members[0]] || "",
       stock: Math.round(stockFam), totalDem: Math.round(totalDem),
-      realFalt: Math.round(realFam),
+      realFalt: Math.round(realFam), realDia: realDiaFam,
       faltS1: Math.round(faltS1), faltS2: Math.round(faltS2), faltResto: Math.round(faltResto),
       faltSinFecha: Math.round(faltSinFecha),
       diasFalt: diasFalt, diasFaltSuper: diasFaltSuper, diasFaltCli: diasFaltCli,
@@ -14483,12 +14489,13 @@ function stkBodyFaltante() {
       var _primer = null;
       for (var _i = 0; _i < diasCols.length; _i++) { if ((a.diasFalt[diasCols[_i]] || 0) > 0) { _primer = diasCols[_i]; break; } }
       diasCols.forEach(function (d) {
+        var _rd = (a.realDia && a.realDia[d]) || 0;   // v9.44 — faltó al armar que cae este día (fecha de salida)
         if (superDiaSet[d]) {
           // Día de super → dos celdas: Supermercado | Clientes (v8.77).
           h += _faltCelda(a.diasFaltSuper[d] || 0, false, a.key, d, d === _primer);
-          h += _faltCelda(a.diasFaltCli[d] || 0, false, a.key, d, d === _primer);
+          h += _faltCelda(a.diasFaltCli[d] || 0, false, a.key, d, d === _primer, null, _rd);
         } else {
-          h += _faltCelda(a.diasFalt[d] || 0, false, a.key, d, d === _primer);
+          h += _faltCelda(a.diasFalt[d] || 0, false, a.key, d, d === _primer, null, _rd);
         }
       });
     }
@@ -14500,8 +14507,9 @@ function stkBodyFaltante() {
   return h;
 }
 
-function _faltCelda(falt, esSem, cod, fecha, esPrimer, winKey) {
+function _faltCelda(falt, esSem, cod, fecha, esPrimer, winKey, real) {
   var v = Math.round(falt);
+  var realN = Math.round(real || 0);   // v9.44 — faltó al armar (real) que cae este día (fecha de salida)
   var cls = "num";
   if (v === 0) cls += " falt-ok";
   else if (v <= 10) cls += " falt-warn";
@@ -14518,7 +14526,9 @@ function _faltCelda(falt, esSem, cod, fecha, esPrimer, winKey) {
   }
   if (esPrimer) cls += " falt-primer";
   var titAttr = esPrimer ? ' title="Primer día de quiebre"' : '';
-  return '<td class="' + cls + '"' + (esSem ? ' style="font-weight:800"' : '') + titAttr + click + '>' + (v > 0 ? v : "—") + '</td>';
+  // v9.44 — realFalt (faltó al armar) del día: badge roja debajo del número de proyección.
+  var realBadge = realN > 0 ? '<span style="display:block;font-size:9px;font-weight:800;color:#b91c1c;line-height:1.1;" title="Faltó al armar (real): ' + realN + ' caja(s) que salen cortas este día. Ya está armado — no es proyección.">🔴' + realN + '</span>' : '';
+  return '<td class="' + cls + '"' + (esSem ? ' style="font-weight:800"' : '') + titAttr + click + '>' + (v > 0 ? v : "—") + realBadge + '</td>';
 }
 function stkFaltSoloQuiebre() {
   if (!_stk || !_stk.falt) return;
