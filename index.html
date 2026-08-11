@@ -6383,7 +6383,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v9.29";
+const APP_VERSION = "v9.30";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -14919,6 +14919,35 @@ function cntSet(i, f, v) {
 function cntAddRow() { if (!_stk || !_stk.conteo) return; _stk.conteo.rows.push({ sector: "", cod: "", pilas: "", cxp: "", sueltas: "" }); stkRender(); }
 function cntDelRow(i) { if (!_stk || !_stk.conteo) return; _stk.conteo.rows.splice(i, 1); if (!_stk.conteo.rows.length) _stk.conteo.rows.push({ sector: "", cod: "", pilas: "", cxp: "", sueltas: "" }); stkRender(); }
 function cntCompara() { if (!_stk || !_stk.conteo) return; _stk.conteo.showComp = true; stkRender(); }
+/* v9.30 — Exporta el conteo físico a CSV, con la columna "Stock del sistema" (góndola +
+   excedente, mismo cálculo que "Comparar con el sistema") para cotejar afuera. Formato
+   Excel es-AR: BOM utf-8, separador ; y coma decimal (igual que prodExportCsv). */
+function cntExportCsv() {
+  if (!_stk || !_stk.conteo) { try { alert("No hay conteo abierto."); } catch (_e) {} return; }
+  var rows = (_stk.conteo.rows || []).filter(function (r) { return _ocgNorm(r.cod); });
+  if (!rows.length) { try { alert("Cargá al menos una fila con código."); } catch (_e) {} return; }
+  var saldos = stockComputeSaldos(_stk.movs, _stk.cutoff);
+  var sys = {};
+  Object.keys(saldos).forEach(function (cc) {
+    var k = _ocgNorm(cc); if (!sys[k]) sys[k] = { gond: 0, exc: 0, proc: 0 };
+    sys[k].gond += Number(saldos[cc].terminado) || 0;
+    sys[k].exc += Number(saldos[cc].excedente) || 0;
+    sys[k].proc += (Number(saldos[cc].separar_pedidos) || 0) + (Number(saldos[cc].a_facturar) || 0);
+  });
+  var esn = function (v) { return (v || v === 0) ? String(Math.round(v * 100) / 100).replace(".", ",") : ""; };
+  var out = [["Sector", "Codigo", "Pilas", "Cajas por pila", "Sueltas", "Contado (cajas)", "Stock del sistema", "Diferencia", "En proceso"]];
+  rows.forEach(function (r) {
+    var k = _ocgNorm(r.cod), cont = _cntCajas(r), s = sys[k] || { gond: 0, exc: 0, proc: 0 };
+    var sysv = (s.gond || 0) + (s.exc || 0);
+    out.push([r.sector || "", codBase(r.cod || ""), r.pilas || "", r.cxp || "", r.sueltas || "", esn(cont), esn(sysv), esn(cont - sysv), esn(s.proc)]);
+  });
+  var csv = "﻿" + out.map(function (rr) { return rr.map(function (c) { return '"' + String(c).replace(/"/g, '""') + '"'; }).join(";"); }).join("\r\n");
+  var blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  var fecha = (function () { try { return new Date().toLocaleDateString("en-CA", { timeZone: "America/Argentina/Buenos_Aires" }); } catch (_e) { return "hoy"; } })();
+  var a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "conteo_" + fecha + ".csv";
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+}
 function cntGuardar() {
   if (!_stk || !_stk.conteo) return;
   const c = _stk.conteo;
@@ -14953,7 +14982,7 @@ function stkBodyConteo() {
       '</tr>';
   });
   h += '</tbody></table></div>';
-  h += '<div class="stk-ini-btns"><button class="stk-btn" onclick="cntAddRow()">+ Fila</button> <button class="stk-btn" onclick="cntCompara()">📊 Comparar con el sistema</button> <button class="stk-btn ok" onclick="cntGuardar()">💾 Guardar conteo</button></div>';
+  h += '<div class="stk-ini-btns"><button class="stk-btn" onclick="cntAddRow()">+ Fila</button> <button class="stk-btn" onclick="cntCompara()">📊 Comparar con el sistema</button> <button class="stk-btn" onclick="cntExportCsv()">⬇ Exportar CSV</button> <button class="stk-btn ok" onclick="cntGuardar()">💾 Guardar conteo</button></div>';
   if (c.showComp) {
     const cont = {};
     c.rows.forEach(function (r) { const k = _ocgNorm(r.cod); if (!k) return; cont[k] = (cont[k] || 0) + _cntCajas(r); });

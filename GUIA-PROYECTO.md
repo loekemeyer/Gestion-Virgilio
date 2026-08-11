@@ -4,7 +4,13 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-11 · Versión app al documentar: **v9.29**
+> Última actualización: 2026-08-11 · Versión app al documentar: **v9.30**
+>
+> Nota **v9.30** — **Conteo físico exportable a CSV con "Stock del sistema".** El módulo de conteo
+> (Stock → "📋 Hacer conteo") ya comparaba contado vs sistema en pantalla; ahora tiene botón
+> **⬇ Exportar CSV** (`cntExportCsv`) que baja el conteo con columnas: Sector, Código, Pilas,
+> Cajas por pila, Sueltas, Contado (cajas), **Stock del sistema** (góndola+excedente, mismo cálculo
+> que la comparación), Diferencia y En proceso. Formato Excel es-AR (BOM utf-8, `;`, coma decimal).
 >
 > Nota **v9.29** — **Pedidos Importación operable (editar en curso + marcar llegada).** El módulo
 > "📦 Pedidos Importación" era solo-lectura; ahora cada fila tiene **✏️** (editar unidades EN CURSO
