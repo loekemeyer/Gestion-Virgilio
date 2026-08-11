@@ -6403,7 +6403,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v9.42";
+const APP_VERSION = "v9.43";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -19476,17 +19476,12 @@ async function faltCrear(np) {
   } catch (e) { try { alert("No se pudo avisar: " + (e.message || e)); } catch (_e2) {} }
   showFaltAvisar();
 }
-/* v5.95 — "Cargar yo": el supervisor completa el faltante de esa NP él mismo AHORA
-   (en vez de avisar para que lo haga un operario). Cierra este modal y abre el CP
-   enfocado en esa NP (mismo showCPModal de la botonera).
-   v9.42 — pide el LEGAJO de quién saca las cajas (antes iba fijo '0' = admin, y en los
-   movimientos quedaba "TL · 0" sin saber quién lo hizo). */
+/* v5.95 — "Cargar yo": completa el faltante de esa NP AHORA (en vez de avisar). Cierra este
+   modal y abre el CP enfocado en esa NP (mismo showCPModal de la botonera).
+   v9.43 — usa el LEGAJO del operario ya logueado en la botonera (legajoInput), sin preguntar.
+   Antes iba fijo '0' (admin) y los movimientos CP quedaban "TL · 0" sin saber quién lo hizo. */
 function faltCargarYo(np) {
-  var leg;
-  try { leg = prompt("¿Qué LEGAJO saca las cajas? (queda registrado como quién completó el pedido)", ""); } catch (_e) { return; }
-  if (leg == null) return;                                   // canceló
-  leg = String(leg).trim().replace(/[^\d]/g, "");
-  if (!leg || leg === "0" || leg === "1") { try { alert("Poné un legajo válido de quién saca las cajas (no 0/1)."); } catch (_e) {} return; }
+  var leg = _faltMiLegajo();   // legajo del que está logueado; queda registrado en el movimiento CP
   closeFaltAvisar();
   try { showCPModal(leg, null, _faltNpNorm(np)); } catch (_e) {}
 }
@@ -25875,7 +25870,15 @@ async function ppLoad() {
   ppRender();
 }
 function ppSet(k, v) { if (!_pp) return; _pp[k] = v; ppRender(); }
-function ppSetMD(k, v) { if (!_pp) return; _pp[k] = v ? String(v).slice(5) : ""; ppRender(); }   // guarda solo MM-DD (el año lo pone el dropdown)
+function _ppMDdisp(md) { if (!md) return ""; var p = String(md).split("-"); return p.length === 2 ? (p[1] + "/" + p[0]) : ""; }   // "MM-DD" → "DD/MM"
+function ppSetMD2(k, v) {   // v9.43 — entra "dd/mm" (sin año; el año es el dropdown) → guarda "MM-DD"
+  if (!_pp) return;
+  v = String(v || "").trim();
+  if (!v) { _pp[k] = ""; ppRender(); return; }
+  var m = v.match(/^(\d{1,2})[\/\-.](\d{1,2})$/);
+  if (m) { var dd = ("0" + m[1]).slice(-2), mm = ("0" + m[2]).slice(-2); if (+mm >= 1 && +mm <= 12 && +dd >= 1 && +dd <= 31) _pp[k] = mm + "-" + dd; }
+  ppRender();
+}
 function ppRender() {
   var body = document.getElementById("ppBody"); if (!body || !_pp) return;
   var yr = _pp.anio, d1 = _pp.desde, d2 = _pp.hasta;   // yr = año seleccionado; d1/d2 = "MM-DD"
@@ -25898,10 +25901,9 @@ function ppRender() {
   });
   var arr = Object.keys(groups).map(function (k) { return groups[k]; }).sort(function (a, b) { return b.plata - a.plata || b.cajas - a.cajas; });
   var yearOpts = (_pp.years || []).map(function (y) { return '<option value="' + y + '"' + (y === yr ? ' selected' : '') + '>' + y + '</option>'; }).join("");
-  var dVal = d1 ? (yr + '-' + d1) : '';   // el input muestra el año del dropdown; solo se usa el día/mes
-  var hVal = d2 ? (yr + '-' + d2) : '';
+  var _mdInp = 'type="text" inputmode="numeric" placeholder="dd/mm" style="width:66px;padding:6px 8px;border:1px solid #cbd5e1;border-radius:8px;font-size:12.5px;text-align:center;"';
   var h = '<div class="pp-ctrl">Año <select onchange="ppSet(\'anio\',this.value)" style="padding:6px 8px;border:1px solid #cbd5e1;border-radius:8px;font-size:12.5px;font-weight:800;">' + (yearOpts || '<option>' + escapeHtml(yr) + '</option>') + '</select> ' +
-    'Desde <input type="date" value="' + dVal + '" onchange="ppSetMD(\'desde\',this.value)"> Hasta <input type="date" value="' + hVal + '" onchange="ppSetMD(\'hasta\',this.value)"> <span style="width:6px;display:inline-block"></span>' +
+    'Desde <input ' + _mdInp + ' value="' + _ppMDdisp(d1) + '" onchange="ppSetMD2(\'desde\',this.value)"> Hasta <input ' + _mdInp + ' value="' + _ppMDdisp(d2) + '" onchange="ppSetMD2(\'hasta\',this.value)"> <span style="width:6px;display:inline-block"></span>' +
     ["art", "cli", "vend"].map(function (g) { var lbl = g === "art" ? "Por artículo" : g === "cli" ? "Por cliente" : "Por vendedor"; return '<button class="pp-tab' + (_pp.group === g ? " on" : "") + '" onclick="ppSet(\'group\',\'' + g + '\')">' + lbl + '</button>'; }).join("") + '</div>';
   h += '<div class="pp-total"><span style="font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:#7f1d1d;font-weight:800;">💸 Plata perdida (faltante por quiebre = cajas pedidas que no se entregaron por falta de stock)</span><br><b>' + _ppMoney(totPlata) + '</b> <span style="font-size:12.5px;color:#7f1d1d;">· ' + Math.round(totCajas) + ' cajas no entregadas</span>' + (Object.keys(spSet).length ? '<br><span class="pp-sp">⚠ ' + Object.keys(spSet).length + ' código(s) sin precio (' + Math.round(spCajas) + ' cajas no valorizadas) — cargá el precio en precios_venta.</span>' : '') + '</div>';
   if (!arr.length) { body.innerHTML = h + '<div style="text-align:center;color:#16a34a;padding:24px;font-weight:700;">✅ Sin faltante por quiebre en el período.</div>'; return; }
