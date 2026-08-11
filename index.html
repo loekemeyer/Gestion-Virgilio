@@ -6300,7 +6300,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v9.18";
+const APP_VERSION = "v9.19";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -15113,8 +15113,19 @@ function _stkInsListado(k, items) {
   });
   let h = '<div class="stk-catlist">';
   h += '<input class="stk-inp" style="width:100%;box-sizing:border-box;margin-bottom:7px;" placeholder="🔎 Buscar código / nombre / ubicación" value="' + escapeHtml(_stkIns.filtro) + '" oninput="if(_stkIns){_stkIns.filtro=this.value;stkRender();}">';
+  // v9.19 — alta con stock inicial opcional. Si se completa "cant" (y unidad si hace
+  // falta), después de crear el insumo se registra un movimiento de ajuste para dejar
+  // el saldo en esa cantidad y así aparecer en la tabla (que filtra los que están en 0).
   h += '<div style="margin-bottom:7px;">' + (_stkIns.nuevoEn === k
-    ? '<span class="stk-nuevo"><input class="stk-inp" id="nvCod" placeholder="código" style="width:96px;"> <input class="stk-inp" id="nvNom" placeholder="detalle" style="width:170px;"> <input class="stk-inp" id="nvUbi" placeholder="ubicación" style="width:90px;"> <button class="stk-btn" onclick="stkInsAlta(\'' + k + '\')">✓ Crear</button> <button class="stk-btn stk-btn-x" onclick="if(_stkIns){_stkIns.nuevoEn=\'\';stkRender();}">Cancelar</button></span>'
+    ? '<span class="stk-nuevo">' +
+        '<input class="stk-inp" id="nvCod" placeholder="código" style="width:96px;"> ' +
+        '<input class="stk-inp" id="nvNom" placeholder="detalle" style="width:170px;"> ' +
+        '<input class="stk-inp" id="nvUbi" placeholder="ubicación" style="width:90px;"> ' +
+        '<input class="stk-inp" id="nvQty" type="number" step="any" placeholder="cant" title="Stock inicial (opcional)" style="width:70px;"> ' +
+        _stkInsUniSel("nvUni", "") + ' ' +
+        '<button class="stk-btn" onclick="stkInsAlta(\'' + k + '\')">✓ Crear</button> ' +
+        '<button class="stk-btn stk-btn-x" onclick="if(_stkIns){_stkIns.nuevoEn=\'\';stkRender();}">Cancelar</button>' +
+      '</span>'
     : (k === "?" ? "" : '<button class="stk-btn" onclick="if(_stkIns){_stkIns.nuevoEn=\'' + k + '\';stkRender();}">+ Agregar insumo a esta categoría</button>')) + '</div>';
   if (!lista.length) h += '<div class="stk-empty">Sin insumos' + (f ? " con ese filtro" : "") + '.</div>';
   else {
@@ -15683,14 +15694,30 @@ async function stkInsAlta(k) {
   if (!cod) { alert("Poné el código."); return; }
   const ya = (_stkIns.items || []).filter(function (x) { return x.cod === cod; })[0];
   if (ya) { alert("El código " + cod + " ya está en uso" + (ya.nombre ? " (" + ya.nombre + ")" : "") + ".\n\nPoné otro."); return; }
+  // v9.19 — stock inicial opcional. Si viene con cant > 0, después del alta
+  // insertamos un movimiento de ajuste para que arranque con saldo (si no,
+  // no aparecería en la tabla de la categoría, que oculta los que están en 0).
+  const qtyStr = _stkInsVal("nvQty");
+  const qty = qtyStr ? parseFloat(String(qtyStr).replace(",", ".")) : 0;
+  const uni = _stkInsVal("nvUni") || null;
+  if (qty && !uni) { alert("Elegí la unidad para la cantidad inicial."); return; }
   try {
     var ubiAlta = _stkInsVal("nvUbi") || null;
-    await _stkInsRpc("insumo_alta", { p_cod: cod, p_nombre: _stkInsVal("nvNom") || null, p_categoria: k === "?" ? null : k, p_ubicacion: ubiAlta, p_legajo: "admin" });
+    const nom = _stkInsVal("nvNom") || null;
+    await _stkInsRpc("insumo_alta", { p_cod: cod, p_nombre: nom, p_categoria: k === "?" ? null : k, p_ubicacion: ubiAlta, p_legajo: "admin" });
     // v8.72 — si se cargó ubicación en el alta, crear la fila en Insumos_Ubicaciones también
     if (ubiAlta) {
       await _stkInsUbicSync(cod, [ubiAlta]);
     }
-    _stkIns.nuevoEn = ""; _stkIns.msg = "✓ " + cod + " creado.";
+    if (qty > 0) {
+      const r = await fetch(SUPABASE_URL + "/rest/v1/Movimientos_Stock", {
+        method: "POST",
+        headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" },
+        body: JSON.stringify([{ cod_art: cod, descripcion: nom, deposito: "insumos", delta: qty, tipo: "ajuste", unidad: uni, legajo: "admin" }])
+      });
+      if (!r.ok) throw new Error("insumo creado pero falló el stock inicial (HTTP " + r.status + ")");
+    }
+    _stkIns.nuevoEn = ""; _stkIns.msg = "✓ " + cod + " creado" + (qty > 0 ? " con " + qty + " " + uni : "") + ".";
     await stkInsRefresh(); stkRender();
   } catch (e) { alert("No se pudo: " + (e.message || e)); }
 }
