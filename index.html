@@ -4211,15 +4211,33 @@ function _renderKeepFocus(container, html) {
     try { idx = Array.prototype.indexOf.call(container.querySelectorAll(sel), a); } catch (_e) {}
     let ss = null, se = null;
     try { ss = a.selectionStart; se = a.selectionEnd; } catch (_e) {}
-    mark = { sel: sel, idx: idx < 0 ? 0 : idx, ss: ss, se: se };
+    mark = { sel: sel, idx: idx < 0 ? 0 : idx, ss: ss, se: se, node: a };
   }
-  container.innerHTML = html;
-  if (mark) {
+  /* v9.34: En Android, reemplazar innerHTML destruye el input y al recrearlo +
+     focus(), Gboard resetea el teclado al layout por defecto (el usuario pasa a
+     numérico y vuelve solo a letras). Para evitarlo: si el input focuseado sigue
+     existiendo en el nuevo HTML con el mismo value, lo sacamos del DOM ANTES del
+     innerHTML (así no se destruye), y lo reinsertamos en el lugar del clon nuevo. */
+  if (mark && mark.node) {
+    var _savedInput = mark.node;
+    var _placeholder = document.createComment("_rkf");
+    _savedInput.parentNode.insertBefore(_placeholder, _savedInput);
+    _savedInput.parentNode.removeChild(_savedInput);
+    container.innerHTML = html;
     try {
-      const list = container.querySelectorAll(mark.sel);
-      const el = list[mark.idx] || list[0];
-      if (el) { el.focus(); if (mark.ss != null && el.setSelectionRange) { try { el.setSelectionRange(mark.ss, mark.se); } catch (_e) {} } }
-    } catch (_e) {}
+      var _newList = container.querySelectorAll(mark.sel);
+      var _newEl = _newList[mark.idx] || _newList[0];
+      if (_newEl && _newEl.tagName === _savedInput.tagName) {
+        _newEl.parentNode.replaceChild(_savedInput, _newEl);
+        // NO llamamos focus() — el nodo nunca perdió el foco
+        if (mark.ss != null && _savedInput.setSelectionRange) { try { _savedInput.setSelectionRange(mark.ss, mark.se); } catch (_e) {} }
+      }
+    } catch (_e) {
+      // fallback: si algo falla, el input ya no está en el DOM — re-focus manual
+      try { var _fb = container.querySelectorAll(mark.sel); var _fbEl = _fb[mark.idx] || _fb[0]; if (_fbEl) { _fbEl.focus(); if (mark.ss != null && _fbEl.setSelectionRange) _fbEl.setSelectionRange(mark.ss, mark.se); } } catch (_e2) {}
+    }
+  } else {
+    container.innerHTML = html;
   }
 }
 
