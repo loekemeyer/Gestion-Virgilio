@@ -3625,9 +3625,9 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       <button class="sup-action-btn" onclick="openAgentesAdmin()"><span class="sup-ico">🤖</span><span>Agentes</span></button>
       <button class="sup-action-btn" onclick="openMonitor()"><span class="sup-ico">📊</span><span>Monitor / Análisis / Inconsistencias</span></button>
       <button class="sup-action-btn" onclick="showGuardarOrden('')"><span class="sup-ico">📋</span><span>Qué bajar primero</span></button>
-      <button class="sup-action-btn" onclick="openCorreccPanel()"><span class="sup-ico">🔀</span><span>Corregir códigos de NPs</span></button>
+      <button class="sup-action-btn" onclick="openCorreccPanel()" style="position:relative;"><span class="sup-ico">🔀</span><span>Corregir códigos de NPs</span><span id="corrBadge" class="dp-badge" style="display:none;"></span></button>
       <button class="sup-action-btn" onclick="openNpConsulta()"><span class="sup-ico">🔎</span><span>Consultar NP / Líos</span></button>
-      <button class="sup-action-btn" onclick="stkOpenNpFaltan()"><span class="sup-ico">⚠️</span><span>Pedidos sin cargar en PPP</span></button>
+      <button class="sup-action-btn" onclick="stkOpenNpFaltan()" style="position:relative;"><span class="sup-ico">⚠️</span><span>Pedidos sin cargar en PPP</span><span id="npFaltanBadge" class="dp-badge" style="display:none;"></span></button>
       <button class="sup-action-btn" onclick="stkOpenProvImp()"><span class="sup-ico">🏭</span><span>Proveedor de importación</span></button>
       <button class="sup-action-btn" onclick="openPedidosImportacion()"><span class="sup-ico">📦</span><span>Pedidos Importación</span></button>
       <button class="sup-action-btn" onclick="openDatosProducto()" style="position:relative;"><span class="sup-ico">🚦</span><span>Completar datos producto</span><span id="dpBadge" class="dp-badge" style="display:none;"></span></button>
@@ -6383,7 +6383,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v9.27";
+const APP_VERSION = "v9.28";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -12733,6 +12733,7 @@ async function stkNpFaltanDoCancel(npEnc, motivoEnc) {
   _stkPop.rows = (_stkPop.rows || []).filter(function (x) { return String(x.np) !== np; });
   _stkPop.cancelNp = null;
   _stkNpFaltanRender();
+  try { npFaltanLoadBadge(); } catch (_e) {}
   // Refrescar la demanda del stock para que el ⚠ y las Cajas Pedidas se actualicen ya.
   try { if (_stk) { _stk.dem = await ocgDemanda(true); stkRender(); } } catch (_e) {}
 }
@@ -25393,6 +25394,29 @@ function dpUpdateBadge(count) {
 /* Badge liviano: se llama desde showSupervisor (fire-and-forget). */
 async function dpLoadBadge() { try { await dpLoad(); } catch (_e) {} }
 
+/* Badges de cuántas cosas hay que corregir (mismo estilo .dp-badge que "Completar
+   datos producto"): "Corregir códigos de NPs" y "Pedidos sin cargar en PPP". */
+function supSetBadge(id, count) {
+  var b = document.getElementById(id); if (!b) return;
+  if (count > 0) { b.textContent = String(count); b.style.display = ""; b.className = "dp-badge"; }
+  else { b.textContent = "✓"; b.style.display = ""; b.className = "dp-badge ok"; }
+}
+async function corrLoadBadge() {
+  try {
+    var pend = await facCorreccData();
+    // NPs distintas (unidad de acción: se corrige una vez por NP), igual que el chip del panel.
+    var n = Object.keys(pend.reduce(function (a, p) { a[p.np] = 1; return a; }, {})).length;
+    supSetBadge("corrBadge", n);
+  } catch (_e) {}
+}
+async function npFaltanLoadBadge() {
+  try {
+    var H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+    var rows = await fetch(SUPABASE_URL + "/rest/v1/vista_np_sin_programar?select=np&limit=5000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; });
+    supSetBadge("npFaltanBadge", (rows || []).length);
+  } catch (_e) {}
+}
+
 function dpRender(filter) {
   var list = document.getElementById("dpList"); if (!list) return;
   var sum = document.getElementById("dpSummary");
@@ -30373,6 +30397,9 @@ function showSupervisor(email) {
   try { if (typeof window.maybeAutoOpenMonitor === "function") window.maybeAutoOpenMonitor(); } catch (_e) {}
   // v8.80: badge "Completar datos producto" (fire-and-forget)
   try { dpLoadBadge(); } catch (_e) {}
+  // badges "Corregir códigos de NPs" y "Pedidos sin cargar en PPP" (fire-and-forget)
+  try { corrLoadBadge(); } catch (_e) {}
+  try { npFaltanLoadBadge(); } catch (_e) {}
   try { if (typeof pppAlertPollStart === "function") pppAlertPollStart(); } catch (_e) {}
 }
 
