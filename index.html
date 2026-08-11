@@ -6300,7 +6300,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v9.19";
+const APP_VERSION = "v9.20";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -7023,6 +7023,16 @@ function pkCodEmpresa(art, np) {
   const cand = a + " " + emp;
   return G[cand] ? cand : a;
 }
+/* v9.16 — código con "L" final (reenvasado x24, ej. 438EL / 439EL / 957EL): para
+   nosotros es el MISMO artículo que su base (438E / 439E / 957E). La "L" nace del
+   circuito Chef→NC→tallerista (Brian envasa x24) y no debe crear un código aparte.
+   Se pela la L SOLO cuando viene pegada a dígito o "E" (505L, 438EL) — nunca toca
+   " LK"/" CH" (terminan en K/H). Después de pelar, la empresa (LK/CH) la pone
+   pkCodEmpresa por el número de NP, así el ruteo de góndola/stock queda igual que hoy
+   (438EL en NP Chef → 438E → 438E CH) y se tapan los códigos con L sin mapear (957EL). */
+function pkStripL(cod) {
+  return String(cod == null ? "" : cod).trim().toUpperCase().replace(/([0-9E])L$/, "$1");
+}
 /* Saca el sufijo de empresa. El sufijo vive SÓLO en el picking (para el sector) y
    en el stock (para el saldo); todo lo que se cruza contra el PEDIDO —faltantes,
    Entregas_Virgilio, facturación— usa el código pelado, que es el que pidió el
@@ -7639,7 +7649,7 @@ async function showPickingList(tanda, legajo, opts) {
       const a = {};
       // v7.91 — si la operadora confirmó la corrección de esa NP (secundario→principal),
       // el picking levanta el PRINCIPAL (corrArt) antes de partir por empresa.
-      for (const np of nps) for (const it of (base.get(np) || [])) { const k = pkCodEmpresa(corrArt(it.art, np, corrMap), np); a[k] = (a[k] || 0) + it.cajas; }
+      for (const np of nps) for (const it of (base.get(np) || [])) { const k = pkCodEmpresa(corrArt(pkStripL(it.art), np, corrMap), np); a[k] = (a[k] || 0) + it.cajas; }
       return a;
     };
     let agg = aggFrom(pickBase);
