@@ -6384,7 +6384,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v9.34";
+const APP_VERSION = "v9.35";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -17822,7 +17822,18 @@ async function showGuardarOrden(legajo) {
       if (!_cxmVal) { var _fG = _facG[String(a.cod).toUpperCase()]; if (_fG && _fG.cajasXMaster > 0) _cxmVal = _fG.cajasXMaster; }
       return { cod: a.cod, desc: artNombre(a.cod, a.desc), gond: gond, cap: cap, aGuardar: aGuardar, exc: exc, racks: racks, cxm: _cxmVal };
     }).filter(Boolean);
-    _gorden = { filtro: "todos", items: items, rate: _gRateVal };
+    // v9.35 — URGENTES: góndola < 20% de su máximo (sobre TODOS los códigos con capacidad, tengan
+    // o no stock atrás para bajar). Los que no tienen stock atrás no se pueden resolver acá → OC/prod.
+    var _URG = 0.20;
+    var urgentes = Object.keys(saldos).map(function (k) {
+      var a = saldos[k];
+      var cap = Math.round(capMap[_ocgNorm(a.cod)] || 0); if (cap <= 0) return null;
+      var gond = Math.round(Number(a.terminado) || 0);
+      var ratio = gond / cap; if (ratio >= _URG) return null;
+      var back = Math.round((Number(a.a_guardar) || 0) + (Number(a.excedente) || 0) + (Number(a.racks) || 0));
+      return { cod: a.cod, desc: artNombre(a.cod, a.desc), gond: gond, cap: cap, ratio: ratio, back: back };
+    }).filter(Boolean).sort(function (a, c) { return a.ratio - c.ratio; });
+    _gorden = { filtro: "todos", items: items, rate: _gRateVal, urgentes: urgentes };
     renderGuardarOrden();
   } catch (e) { const b = document.getElementById("gordenBody"); if (b) b.innerHTML = '<div style="text-align:center;color:#b91c1c;padding:20px;">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
 }
@@ -17866,7 +17877,20 @@ function renderGuardarOrden() {
   const b = document.getElementById("gordenBody"); if (!b || !_gorden) return;
   const F = _gorden.filtro, rows = _gordenRows();
   const TABS = [["todos", "Todos"], ["racks", "🏗 Racks"], ["guardar", "📦 A guardar"], ["excedente", "📦 Excedente"]];
-  let h = '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;align-items:center;">';
+  // v9.35 — ALERTA DE URGENTES: góndola < 20% del máximo. Va arriba de todo, bien visible.
+  let h = "";
+  var _urg = _gorden.urgentes || [];
+  if (_urg.length) {
+    var _chips = _urg.map(function (u) {
+      var pct = Math.round(u.ratio * 100), noBack = u.back <= 0;
+      return '<span style="display:inline-flex;align-items:center;gap:4px;background:#fff;border:1px solid #fca5a5;border-radius:8px;padding:3px 8px;font-size:11.5px;font-weight:800;color:#991b1b;margin:2px;">' + escapeHtml(codBase(u.cod)) + ' <b>' + pct + '%</b>' + (noBack ? ' <span style="color:#7c2d12;font-size:10px;font-weight:700;">·sin stock atrás</span>' : '') + '</span>';
+    }).join("");
+    h += '<div style="background:#fef2f2;border:1.5px solid #fca5a5;border-radius:12px;padding:9px 12px;margin-bottom:10px;">' +
+      '<div style="font-weight:900;color:#b91c1c;font-size:14px;margin-bottom:3px;">🆘 ' + _urg.length + ' urgente(s) — góndola &lt; 20%</div>' +
+      '<div style="font-size:11px;color:#7f1d1d;margin-bottom:6px;">Góndola casi vacía. Las marcadas «sin stock atrás» no se pueden bajar acá → hace falta <b>producir / OC</b>.</div>' +
+      '<div style="max-height:150px;overflow:auto;">' + _chips + '</div></div>';
+  }
+  h += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;align-items:center;">';
   TABS.forEach(function (t) {
     const on = F === t[0];
     h += '<button onclick="gordenFiltro(\'' + t[0] + '\')" style="width:auto;flex:0 0 auto;padding:7px 12px;border-radius:999px;border:1px solid ' + (on ? '#1e6bd6' : '#cbd5e1') + ';background:' + (on ? '#1e6bd6' : '#fff') + ';color:' + (on ? '#fff' : '#334155') + ';font-size:12.5px;font-weight:800;cursor:pointer;">' + t[1] + '</button>';
@@ -17903,11 +17927,12 @@ function renderGuardarOrden() {
     '<th style="padding:5px 6px;">Cód</th><th style="padding:5px 6px;">Descripción</th><th style="padding:5px 6px;text-align:right;" title="Lo que hay para guardar en el depósito">Hay p/ guardar</th><th style="padding:5px 6px;text-align:right;" title="Lo que entra hasta el máximo de góndola">Cajas a bajar</th><th style="padding:5px 6px;text-align:right;">Góndola</th><th style="padding:5px 6px;text-align:right;">Máximo</th></tr></thead><tbody>';
   h += rows.map(function (x) {
     const it = x.it, pct = Math.round(x.ratio * 100), pc = pct <= 34 ? "#b91c1c" : pct <= 67 ? "#92400e" : "#15803d";
+    const urg = x.ratio < 0.20;   // v9.35 — góndola urgente (<20%)
     const mcTxt = (x.mc > 0) ? ' <span style="color:#1e40af;font-size:10.5px;font-weight:700;">(' + x.mc + ' MC×' + it.cxm + ')</span>'
       : (x.rk > 0 && it.cxm <= 0 ? ' <span style="color:#b45309;font-size:10.5px;font-weight:700;">· s/master</span>' : '');
     const bajarTxt = x.cajas > 0 ? ('<span style="font-weight:900;color:#0f172a;">' + x.cajas + '</span>' + mcTxt) : '<span style="color:#94a3b8;font-weight:700;">0 · góndola llena</span>';
-    return '<tr style="border-bottom:1px solid #f1f5f9;">' +
-      '<td style="padding:6px;font-weight:800;font-family:Consolas,Menlo,monospace;">' + escapeHtml(codBase(it.cod)) + '</td>' +
+    return '<tr style="border-bottom:1px solid #f1f5f9;' + (urg ? 'background:#fef2f2;' : '') + '">' +
+      '<td style="padding:6px;font-weight:800;font-family:Consolas,Menlo,monospace;">' + (urg ? '🆘 ' : '') + escapeHtml(codBase(it.cod)) + '</td>' +
       '<td style="padding:6px;color:#475569;">' + escapeHtml(it.desc || "") + '</td>' +
       '<td style="padding:6px;text-align:right;font-weight:800;color:#15803d;">' + x.disp + '</td>' +
       '<td style="padding:6px;text-align:right;">' + bajarTxt + '</td>' +

@@ -4,7 +4,24 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-11 · Versión app al documentar: **v9.31**
+> Última actualización: 2026-08-11 · Versión app al documentar: **v9.35**
+>
+> Nota **v9.35** — **"¿Qué bajar primero?" ahora marca los URGENTES (góndola < 20%).** Arriba de
+> todo, una alerta roja lista los códigos con góndola < 20% de su máximo (sobre TODOS los códigos
+> con capacidad, tengan o no stock atrás para bajar); los que dicen «sin stock atrás» no se pueden
+> resolver ahí → producir/OC. Además las filas urgentes de la tabla van resaltadas (🆘 + fondo rojo).
+> `showGuardarOrden`/`renderGuardarOrden`, umbral 20% (`_URG`).
+>
+> Nota **v9.34** — **Faltantes excluye también entregadas y canceladas** (consistencia con
+> `ocgDemanda`): `stkFaltLoad` ya excluía facturadas + tandas pickeadas; ahora suma al set de
+> exclusión `PPP_Entregados_Meta` y `NP_Canceladas`.
+>
+> Nota **v9.33** — **Avisar programación: vendedores unificados + dedup.** Panel de vendedores fijo
+> arriba; el resumen de cada vendedor se arma con los clientes que se van avisando (1 línea por
+> aviso). Dedup: mismo cliente + misma fecha de salida = 1 solo mensaje (une sus NPs). El badge de
+> "Pedidos sin cargar en PPP" se sincroniza al abrir el módulo.
+>
+> Última actualización previa · Versión app al documentar: **v9.31**
 >
 > Nota **v9.31** — **Módulo "📲 Avisar programación".** Panel supervisor → lista los pedidos
 > **programados** (con fecha de salida, de `vista_ppp_programacion_pendiente`) ordenados por fecha
