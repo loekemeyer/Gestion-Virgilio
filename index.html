@@ -6317,7 +6317,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v9.24";
+const APP_VERSION = "v9.25";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -10733,16 +10733,28 @@ async function ocgFetchImportados() {
     const pr = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/vista_importados_partes", "select=cod,proy_uni_mes,detalle");
     (pr || []).forEach(function (r) { parteProy[String(r.cod).toUpperCase().trim()] = { proy: Number(r.proy_uni_mes) || 0, detalle: r.detalle || null }; });
   } catch (_e) {}
+  // v9.24 — STOCK DE PARTE: para ciertos importados el stock de su PARTE cuenta como stock del
+  // terminado (ej. 94xP arma 94xE vía Log/Fabr, en unidades). Se SUMA al stock antes de calcular
+  // lo a pedir. Tabla Importados_Stock_Parte → vista_importados_stock_parte.
+  const stockParte = {};
+  try {
+    const sp = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/vista_importados_stock_parte", "select=cod,stock_parte,partes");
+    (sp || []).forEach(function (r) { stockParte[String(r.cod).toUpperCase().trim()] = { u: Number(r.stock_parte) || 0, partes: r.partes || "" }; });
+  } catch (_e) {}
   const items = [];
   Object.keys(by).forEach(function (k) {
     const o = by[k];
-    const pp = parteProy[String(o.cod).toUpperCase().trim()];
+    const kk = String(o.cod).toUpperCase().trim();
+    const pp = parteProy[kk];
     const esParte = !!pp;
     const proyUni = esParte ? pp.proy : o.proyUni;
+    const sp = stockParte[kk];
+    const stockParteU = sp ? sp.u : 0;
+    const stockTot = o.stockUni + stockParteU;   // el stock de la parte cuenta como stock del terminado
     const objetivoUni = Math.round(proyUni * meses);
-    const aPedirUni = Math.max(0, Math.ceil(objetivoUni - o.stockUni - o.enCurso));
+    const aPedirUni = Math.max(0, Math.ceil(objetivoUni - stockTot - o.enCurso));
     const aPedirCajas = (o.uxc > 0) ? Math.ceil(aPedirUni / o.uxc) : null;
-    items.push({ cod: o.cod, desc: o.desc, prov: o.prov, proyUni: Math.round(proyUni), meses: meses, objetivoUni: objetivoUni, stockUni: Math.round(o.stockUni), enCurso: Math.round(o.enCurso), aPedirUni: aPedirUni, uxc: o.uxc, aPedirCajas: aPedirCajas, esParte: esParte, parteDet: (pp ? pp.detalle : null) });
+    items.push({ cod: o.cod, desc: o.desc, prov: o.prov, proyUni: Math.round(proyUni), meses: meses, objetivoUni: objetivoUni, stockUni: Math.round(stockTot), stockPropio: Math.round(o.stockUni), stockParteU: Math.round(stockParteU), stockParteCods: (sp ? sp.partes : ""), enCurso: Math.round(o.enCurso), aPedirUni: aPedirUni, uxc: o.uxc, aPedirCajas: aPedirCajas, esParte: esParte, parteDet: (pp ? pp.detalle : null) });
   });
   return { items: items, meses: meses };
 }
@@ -12790,7 +12802,10 @@ function _pedImpRender() {
       arr.sort(function (a, b) { return b.aPedirUni - a.aPedirUni; }).forEach(function (it) {
         const cajTxt = (it.aPedirCajas == null) ? '<span style="color:#94a3b8" title="Sin uni×caja cargado">—</span>' : String(it.aPedirCajas);
         const badge = it.esParte ? ' <span style="color:#7c3aed" title="Parte">🧩</span>' : '';
-        h += '<tr><td><b>' + escapeHtml(codCanon(it.cod)) + '</b>' + badge + '</td><td style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escapeHtml(it.desc || "") + '">' + escapeHtml(artNombre(it.cod, it.desc)) + '</td><td class="num">' + it.proyUni + '</td><td class="num">' + it.objetivoUni + '</td><td class="num">' + it.stockUni + '</td><td class="num">' + it.enCurso + '</td><td class="num" style="font-weight:800;color:#b45309">' + it.aPedirUni + '</td><td class="num">' + cajTxt + '</td></tr>';
+        const stockTxt = (it.stockParteU > 0)
+          ? it.stockUni + ' <span style="color:#7c3aed;font-weight:700;font-size:11px" title="Incluye ' + it.stockParteU + ' u de la parte ' + escapeHtml(it.stockParteCods || '') + ' (' + it.stockPropio + ' propio + ' + it.stockParteU + ' parte)">🔧+' + it.stockParteU + '</span>'
+          : String(it.stockUni);
+        h += '<tr><td><b>' + escapeHtml(codCanon(it.cod)) + '</b>' + badge + '</td><td style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escapeHtml(it.desc || "") + '">' + escapeHtml(artNombre(it.cod, it.desc)) + '</td><td class="num">' + it.proyUni + '</td><td class="num">' + it.objetivoUni + '</td><td class="num">' + stockTxt + '</td><td class="num">' + it.enCurso + '</td><td class="num" style="font-weight:800;color:#b45309">' + it.aPedirUni + '</td><td class="num">' + cajTxt + '</td></tr>';
       });
       h += '</tbody></table></div>';
     });

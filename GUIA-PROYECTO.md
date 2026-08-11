@@ -4,7 +4,19 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-11 · Versión app al documentar: **v9.22**
+> Última actualización: 2026-08-11 · Versión app al documentar: **v9.25**
+>
+> Nota: **v9.25 — Stock de PARTE cuenta como stock del terminado importado (94xP → 94xE).**
+> Los **94xE** (cubiertos ac. inox) se **importan** (maestro, Becky) pero **Log/Fabr los ARMA** a
+> partir de la parte **94xP**. El stock de 94xP (depósito `insumos`, en **unidades**) es "94xE en
+> parte" → cuenta como stock del 94xE al decidir cuánto importar: `a pedir = objetivo − (stock 94xE +
+> stock 94xP) − en curso`. Tabla **`Importados_Stock_Parte`** (`terminado, parte`; hoy
+> 942E←942P, 943E←943P, 944E←944P, 945E←945P, 948E←948P) + vista **`vista_importados_stock_parte`**
+> (saldo neto de la parte en `Movimientos_Stock`; los `...(2)COPIA` netean 0). `ocgFetchImportados()`
+> suma ese stock al del terminado; el módulo Pedidos Importación lo muestra con badge **🔧+N**.
+> ⚠ NO es parts-map de demanda (los 94xE se siguen importando como terminados) — solo suma stock.
+> Distinto de `Importados_Partes_Map` (505C/1000900/etc.), donde la PROYECCIÓN de la parte sale de
+> sus terminados. SQL en `sql/importados_stock_parte.sql`. Bump `v9.25`.
 >
 > Nota: **v9.22 — Módulo "Pedidos Importación" + maestro Importados al día.**
 > Los pedidos de importados se manejan **por fuera de las OC de talleristas** (que quedan igual que
