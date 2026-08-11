@@ -4,7 +4,17 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-11 · Versión app al documentar: **v9.49**
+> Última actualización: 2026-08-11 · Versión app al documentar: **v9.53**
+>
+> Nota **v9.53** — (a) **Badge en "Carga Recepción Mercadería"** (panel supervisor): círculo
+> rojo con la cantidad de **remitos pendientes de cargar** (`Control_Modo_OP` estado='pendiente'),
+> mismo contador que el botón "📋 Pendientes" del menú de recepción. `recepLoadBadge()`.
+> (b) **Fix 401 "marcar Discontinuo"** en *Completar datos producto*: la tabla
+> `Articulos_Discontinuados` solo tenía SELECT para anon → el upsert daba HTTP 401. Se
+> agregaron policies INSERT+UPDATE para anon (`sql/articulos_discontinuados_rls.sql`).
+>
+> Nota **v9.52** — **Date pickers con `min="2025-01-01"`**: los selectores de fecha
+> (movimientos de stock, producción, OC, fecha de tanda, ruteo) ya no ofrecen años previos a 2025.
 >
 > Nota **v9.49** — **Pestaña Stocks: nueva columna "Proy. caj/mes"** (antes de *Total Stock*).
 > Muestra la **proyección de venta en cajas/mes** por código, tomada de `proyeccion_madre.proy_cajas_mes`

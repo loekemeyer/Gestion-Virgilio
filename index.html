@@ -3612,7 +3612,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
     <div class="sup-actions sup-primary">
       <button class="sup-action-btn" onclick="openFacturacion()"><span class="sup-ico">📋</span><span>Facturación</span></button>
       <button class="sup-action-btn" onclick="openPPP()"><span id="pppAlertBadge" class="ppp-alert-badge"></span><span class="sup-ico">🗓️</span><span>PPP</span></button>
-      <button class="sup-action-btn" onclick="openRecepcionAdmin()"><span class="sup-ico">🏭</span><span>Carga Recepción Mercadería</span></button>
+      <button class="sup-action-btn" onclick="openRecepcionAdmin()" style="position:relative;"><span class="sup-ico">🏭</span><span>Carga Recepción Mercadería</span><span id="recepBadge" class="dp-badge" style="display:none;" title="Remitos pendientes de cargar (Recepción)"></span></button>
       <button class="sup-action-btn" onclick="showFaltAvisar()"><span class="sup-ico">📦➕</span><span>Completar Pedido</span></button>
       <button class="sup-action-btn" onclick="openStockAdmin()"><span class="sup-ico">📦</span><span>Stock y Compras</span></button>
       <button class="sup-action-btn" onclick="openPanelWebLK()"><span class="sup-ico">🌐</span><span>Panel Web LK</span></button>
@@ -6403,7 +6403,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v9.52";
+const APP_VERSION = "v9.53";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -25700,6 +25700,18 @@ async function qbpLoadBadge() {
   } catch (_e) {}
 }
 
+/* v9.53 — badge "Carga Recepción Mercadería": remitos PENDIENTES de cargar
+   (Control_Modo_OP estado='pendiente'), el mismo contador que el botón "📋 Pendientes"
+   del menú de recepción. Lectura anon (RLS select true). */
+async function recepLoadBadge() {
+  try {
+    var r = await fetch(SUPABASE_URL + "/rest/v1/Control_Modo_OP?select=id&estado=eq.pendiente", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Range-Unit": "items", Range: "0-0", Prefer: "count=exact" }, cache: "no-store" });
+    var cr = r.headers.get("content-range") || "", slash = cr.indexOf("/");
+    var n = slash >= 0 ? (parseInt(cr.slice(slash + 1), 10) || 0) : 0;
+    supSetBadge("recepBadge", n);
+  } catch (_e) {}
+}
+
 /* ===== v9.31 — MÓDULO "📲 Avisar programación" =========================================
    Cuando se programa un pedido, este módulo lista los pedidos programados (con fecha de
    salida) ordenados por esa fecha, y permite avisar por WhatsApp al CLIENTE y al VENDEDOR
@@ -30961,6 +30973,7 @@ function showSupervisor(email) {
   try { corrLoadBadge(); } catch (_e) {}
   try { npFaltanLoadBadge(); } catch (_e) {}
   try { qbpLoadBadge(); } catch (_e) {}   // badge SOS de "Qué bajar primero"
+  try { recepLoadBadge(); } catch (_e) {}   // v9.53: badge remitos pendientes de cargar (Recepción)
   try { if (typeof pppAlertPollStart === "function") pppAlertPollStart(); } catch (_e) {}
 }
 
