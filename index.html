@@ -4046,7 +4046,7 @@ const desc = {
   TAP:"Terminé Armado Pedido", CR:"Control Remitos", CC:"Inicio/Fin Carga Camión",
   RR:"Recepción Remitos",
   RT:"Recepción Mercadería", MG:"Guardado a Góndola",
-  RI:"Recepción Insumos", EI:"Entrega Insumos", INS:"📦 Insumos y Cervantes",
+  RI:"Recepción Insumos", EI:"Entrega Insumos", INS:"📦 Insumos y Productos Movimiento",
   CP:"Completar Pedido", RC:"Pasar a urgente", IR:"Ingreso a Racks",
   AT:"Atendí Timbre", PB:"Paré Baño", Limp:"Limpieza",
   Perm:"Permiso de Salida", PC:"Paré Comida",CT:"Conteo",
@@ -5388,7 +5388,7 @@ function showInstructivo() {
     { t: "🏭 Recepción", c: "RT · RR", x: "RT = recibí mercadería (entra a <b>“a guardar”</b>). RR = controlar los remitos cargados al camión." },
     { t: "🚚 Carga y control", c: "CC · CR", x: "CC = inicio/fin de la carga del camión. CR = control de remitos." },
     { t: "📥 Guardar a góndola", c: "MG", x: "Lo que está en <b>“a guardar”</b> lo pasás a góndola. Si la góndola está llena, marcás <b>Excedente</b> y su ubicación." },
-    { t: "📦 Insumos y Cervantes", c: "INS (RI · EI · SC)", x: "Un solo botón que te da <b>3 opciones</b>: <b>📥 Recibir</b> (entra stock), <b>📤 Entregar</b> (sale stock), o <b>🚚 Salida a Cervantes</b> (envío a la central). Al elegir Recibir o Entregar te pide <b>de dónde/a dónde</b>. ¿El insumo no está? Entrás por Recibir y usás <b>“+ Agregar insumo nuevo”</b>." },
+    { t: "📦 Insumos y Productos Movimiento", c: "INS (RI · EI · SC)", x: "Un solo botón que te da <b>3 opciones</b>: <b>📥 Recibir</b> (entra stock), <b>📤 Entregar</b> (sale stock), o <b>🚚 Salida a Cervantes</b> (envío a la central). Al elegir Recibir o Entregar te pide <b>de dónde/a dónde</b>. ¿El insumo no está? Entrás por Recibir y usás <b>“+ Agregar insumo nuevo”</b>." },
     { t: "⏱ Pausas y otros", c: "AT · PB · Limp · Perm · PC · CT", x: "Marcá cuándo: atendés el timbre (AT), vas al baño (PB), limpiás (Limp), pedís permiso (Perm), parás a comer (PC) o hacés conteo (CT). Tocás al <b>empezar</b> y otra vez al <b>terminar</b>." }
   ];
   ov.innerHTML = '<div class="instr-card"><div class="instr-head"><span class="instr-title">❓ ¿Cómo se usa?</span><button class="instr-close" onclick="closeInstructivo()">Cerrar</button></div><div class="instr-body">' +
@@ -16557,7 +16557,7 @@ function insumoChooser(legajo) {
   const btn = "width:100%;margin-bottom:10px;padding:16px;border:none;border-radius:12px;color:#fff;font-size:16px;font-weight:800;cursor:pointer;text-align:left;";
   const sub = 'font-weight:600;opacity:.85;';
   ov.innerHTML = '<div style="background:#f8fafc;max-width:380px;width:100%;border-radius:16px;padding:18px;box-shadow:0 24px 70px rgba(0,0,0,.5);box-sizing:border-box;">' +
-    '<div style="font-size:18px;font-weight:800;margin-bottom:3px;">📦 Insumos y Cervantes</div>' +
+    '<div style="font-size:18px;font-weight:800;margin-bottom:3px;">📦 Insumos y Productos Movimiento</div>' +
     '<div style="font-size:13px;color:#64748b;margin-bottom:16px;">¿Qué querés hacer?</div>' +
     '<button onclick="insChooserGo(\'RI\')" style="' + btn + 'background:#4f46e5;">📥 Recibir insumos <span style="' + sub + '">(entra stock — o agregá uno nuevo)</span></button>' +
     '<button onclick="insChooserGo(\'EI\')" style="' + btn + 'background:#0d9488;">📤 Entregar insumos <span style="' + sub + '">(sale stock)</span></button>' +
