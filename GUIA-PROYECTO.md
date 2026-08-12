@@ -4,7 +4,18 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-12 · Versión app al documentar: **v9.73**
+> Última actualización: 2026-08-12 · Versión app al documentar: **v9.74**
+>
+> Nota **v9.74** — **Sugerir tandas: empaque BALANCEADO.** Antes empacaba por cliente hasta
+> un cap (0.8) y el cierre final dejaba restos chicos (tandas de 0.20). Ahora, por zona (NUNCA
+> mezcla zonas), reparte balanceado: **mínimo 0.60 · ideal 0.80 · máximo 1.00 m³**. Ej: 1.60 →
+> 2×0.80 (no 1.0+0.6). Un cliente (todas sus NPs juntas) que pesa > 1.00 va en tanda propia
+> (indivisible). Lo que no llega a 0.60 en su zona sin mezclar queda **PENDIENTE** (no se
+> programa, espera volumen). **Súper** = 1 tanda por **razón social**, van solos (sin mínimo).
+> Helper `_pppBalancearZona` (LPT balanceado); usado por `pppSugerirTandas` (escribe) y
+> `_pppComputeSugerencia` (vista). El ideal sale de `cfg.tandaCap` (0.80 por defecto).
+>
+> Nota anterior · Versión app al documentar: **v9.73**
 >
 > Nota **normalización cod_art (2026-08-12)** — Para que no vuelvan los códigos fantasma:
 > (1) se **enganchó el trigger `trg_canon_cod_art`** (`fn_canon_cod_art`) en `Movimientos_Stock`

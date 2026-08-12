@@ -6403,7 +6403,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v9.73";
+const APP_VERSION = "v9.74";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -23275,8 +23275,55 @@ async function pppAutoBaseN() {
   _pppRenderBaseNote();
   return String(base);
 }
+/* v9.74 — Empaque BALANCEADO de una zona en tandas. Cada "cliente" es un bloque
+   indivisible (todas sus NPs juntas). Reparte apuntando a IDEAL, sin pasar MAX ni
+   bajar de MIN, y BALANCEA para no dejar restos chicos (1.60 → 2×0.80, no 1.0+0.6).
+   Un cliente que ya pesa > MAX va en tanda propia (no hay cómo partirlo). Lo que no
+   llega a MIN sin mezclar zona queda PENDIENTE (no se programa). NO mezcla zonas: se
+   llama por zona. Devuelve { tandas:[[pedidos]], pend:[pedidos] }. */
+function _pppBalancearZona(clientes, MIN, IDEAL, MAX) {
+  const EPS = 1e-9, tandas = [], pend = [], chicos = [];
+  clientes.forEach(function (c) { if (c.m3 > MAX + EPS) tandas.push(c.pedidos.slice()); else chicos.push(c); });
+  let T = 0; chicos.forEach(function (c) { T += c.m3; });
+  if (chicos.length && T < MIN - EPS) { chicos.forEach(function (c) { pend.push.apply(pend, c.pedidos); }); return { tandas: tandas, pend: pend }; }
+  if (chicos.length) {
+    let n = Math.max(1, Math.round(T / IDEAL));
+    n = Math.max(n, Math.ceil(T / MAX - EPS));
+    n = Math.min(n, Math.max(1, Math.floor(T / MIN + EPS)));
+    const desc = chicos.slice().sort(function (a, b) { return b.m3 - a.m3; });
+    let buckets = [];
+    for (let guard = 0; guard < 60; guard++) {
+      buckets = []; for (let i = 0; i < n; i++) buckets.push({ m3: 0, peds: [] });
+      let over = false;
+      for (const c of desc) {
+        let best = -1;
+        for (let i = 0; i < buckets.length; i++) {
+          if (buckets[i].m3 + c.m3 > MAX + EPS) continue;
+          if (best < 0 || buckets[i].m3 < buckets[best].m3) best = i;
+        }
+        if (best < 0) { over = true; break; }   // no entra en ninguno → hace falta una tanda más
+        buckets[best].m3 += c.m3; buckets[best].peds.push.apply(buckets[best].peds, c.pedidos);
+      }
+      if (!over) break;
+      n++;
+    }
+    // MIN: si algún bucket quedó < MIN, absorberlo en otro que aguante ≤ MAX; si no se puede, pendiente.
+    buckets.sort(function (a, b) { return b.m3 - a.m3; });   // grandes primero (absorben)
+    const fin = [];
+    for (const b of buckets) {
+      if (!b.peds.length) continue;
+      if (b.m3 >= MIN - EPS) { fin.push(b); continue; }
+      let abs = -1;
+      for (let i = 0; i < fin.length; i++) { if (fin[i].m3 + b.m3 <= MAX + EPS) { abs = i; break; } }
+      if (abs >= 0) { fin[abs].m3 += b.m3; fin[abs].peds.push.apply(fin[abs].peds, b.peds); }
+      else pend.push.apply(pend, b.peds);
+    }
+    fin.forEach(function (b) { tandas.push(b.peds); });
+  }
+  return { tandas: tandas, pend: pend };
+}
 function pppSugerirTandas() {
-  const cfg = pppGetCfg(), cap = cfg.tandaCap > 0 ? cfg.tandaCap : 0.8;
+  const cfg = pppGetCfg(); const T_MIN = 0.60, T_MAX = 1.00; let T_IDEAL = cfg.tandaCap > 0 ? cfg.tandaCap : 0.80; if (T_IDEAL < T_MIN) T_IDEAL = T_MIN; if (T_IDEAL > T_MAX) T_IDEAL = T_MAX;
   if (!_pppEntregados) _pppEntregados = new Set();
   const ed = pppLoadEdits();
   const tandaDe = function (p) { const e = ed[String(p.np)]; const t = (e && e.tanda != null) ? e.tanda : (p.tanda || ""); return (t && t !== "—") ? t : ""; };
@@ -23300,13 +23347,14 @@ function pppSugerirTandas() {
   const assign = function (ps, code) { for (const p of ps) (ed[String(p.np)] = ed[String(p.np)] || {}).tanda = code; };
   let nT = 0;
 
-  // Súper: una tanda por cliente.
+  // Súper: una tanda por cliente (por RAZÓN SOCIAL). v9.74.
+  let nPend = 0;
   const sup = pend.filter(pppEsSuper), bySupC = {}, supOrd = [];
-  for (const p of sup) { const k = String(p.cod || p.razon_social); if (!(k in bySupC)) supOrd.push(k); (bySupC[k] = bySupC[k] || []).push(p); }
+  for (const p of sup) { const k = String(p.razon_social || p.cod); if (!(k in bySupC)) supOrd.push(k); (bySupC[k] = bySupC[k] || []).push(p); }
   if (sup.length) nextZone();
   for (const k of supOrd) { assign(bySupC[k], next()); nT++; }
 
-  // Resto CON zona: por zona, ordenar por fecha de recepción, empacar por cliente ≤ cap.
+  // Resto CON zona: por zona, BALANCEAR en tandas T_MIN–T_MAX (ideal T_IDEAL), sin mezclar zonas. v9.74.
   const resto = pend.filter(function (p) { return !pppEsSuper(p) && pppZonaDeBarrio(p.localidad); });
   const byZ = {}; for (const p of resto) { const z = pppZonaDeBarrio(p.localidad); (byZ[z] = byZ[z] || []).push(p); }
   const zorder = Object.keys(byZ).sort(function (a, b) { const ia = PPP_ZONAS.indexOf(a), ib = PPP_ZONAS.indexOf(b); return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib); });
@@ -23315,19 +23363,14 @@ function pppSugerirTandas() {
     const byC = {}, cord = [];
     for (const p of byZ[z]) { const k = String(p.cod || p.razon_social); if (!(k in byC)) cord.push(k); (byC[k] = byC[k] || []).push(p); }
     cord.sort(function (a, b) { const fa = Math.min.apply(null, byC[a].map(function (p) { return +_pppFechaKey(p.fecha); })); const fb = Math.min.apply(null, byC[b].map(function (p) { return +_pppFechaKey(p.fecha); })); return fa - fb; });
-    let bucket = [], bm3 = 0;
-    const flush = function () { if (bucket.length) { assign(bucket, next()); nT++; bucket = []; bm3 = 0; } };
-    for (const k of cord) {
-      const ps = byC[k], m3 = _pppM3Sum(ps);
-      if (bucket.length && (bm3 + m3) > cap) flush();
-      bucket = bucket.concat(ps); bm3 += m3;
-      if (bm3 >= cap) flush();
-    }
-    flush();
+    const clientes = cord.map(function (k) { return { m3: _pppM3Sum(byC[k]), pedidos: byC[k] }; });
+    const bal = _pppBalancearZona(clientes, T_MIN, T_IDEAL, T_MAX);
+    for (const t of bal.tandas) { assign(t, next()); nT++; }
+    nPend += bal.pend.length;
   }
   pppSaveEdits(); pppRenderProg();
   const sinZona = pend.filter(function (p) { return !pppEsSuper(p) && !pppZonaDeBarrio(p.localidad); }).length;
-  pppSetStatus("🪄 " + nT + " tandas sugeridas" + (sinZona ? " · " + sinZona + " quedaron sin zona (asigná el barrio)" : "") + ". Revisá y ajustá.", true);
+  pppSetStatus("🪄 " + nT + " tandas sugeridas" + (nPend ? " · " + nPend + " ped. pendientes (no llegan a " + T_MIN.toFixed(2) + " m³ sin mezclar zona)" : "") + (sinZona ? " · " + sinZona + " sin zona (asigná el barrio)" : "") + ". Revisá y ajustá.", true);
 }
 function pppLimpiarTandas() {
   if (!confirm("¿Borrar TODAS las tandas y la programación? Los pedidos vuelven a 'Pedidos a Programar'.")) return;
@@ -23339,7 +23382,7 @@ function pppLimpiarTandas() {
    PERO no escribe nada: devuelve la sugerencia para verla e imprimirla. ===== */
 let _pppSugCache = null;
 function _pppComputeSugerencia() {
-  const cfg = pppGetCfg(), cap = cfg.tandaCap > 0 ? cfg.tandaCap : 0.8;
+  const cfg = pppGetCfg(); const T_MIN = 0.60, T_MAX = 1.00; let T_IDEAL = cfg.tandaCap > 0 ? cfg.tandaCap : 0.80; if (T_IDEAL < T_MIN) T_IDEAL = T_MIN; if (T_IDEAL > T_MAX) T_IDEAL = T_MAX;
   const ent = pppLoadEntregados();
   const pend = (_pppParsed.prog || []).filter(function (p) { return !ent.has(String(p.np)) && !_pppTieneTanda(p) && !p.programmed; });
   const out = [];
@@ -23359,8 +23402,9 @@ function _pppComputeSugerencia() {
     return code;
   };
 
+  const pendientes = [];
   const sup = pend.filter(pppEsSuper), bySupC = {}, supOrd = [];
-  for (const p of sup) { const k = String(p.cod || p.razon_social); if (!(k in bySupC)) supOrd.push(k); (bySupC[k] = bySupC[k] || []).push(p); }
+  for (const p of sup) { const k = String(p.razon_social || p.cod); if (!(k in bySupC)) supOrd.push(k); (bySupC[k] = bySupC[k] || []).push(p); }
   if (sup.length) nextZone();
   for (const k of supOrd) out.push({ code: nextTanda(), sup: true, pedidos: bySupC[k] });
 
@@ -23372,18 +23416,18 @@ function _pppComputeSugerencia() {
     const byC = {}, cord = [];
     for (const p of byZ[z]) { const k = String(p.cod || p.razon_social); if (!(k in byC)) cord.push(k); (byC[k] = byC[k] || []).push(p); }
     cord.sort(function (a, b) { const fa = Math.min.apply(null, byC[a].map(function (p) { return +_pppFechaKey(p.fecha); })); const fb = Math.min.apply(null, byC[b].map(function (p) { return +_pppFechaKey(p.fecha); })); return fa - fb; });
-    let bucket = [], bm3 = 0;
-    const flush = function () { if (bucket.length) { out.push({ code: nextTanda(), zona: z, pedidos: bucket }); bucket = []; bm3 = 0; } };
-    for (const k of cord) { const ps = byC[k], m3 = _pppM3Sum(ps); if (bucket.length && (bm3 + m3) > cap) flush(); bucket = bucket.concat(ps); bm3 += m3; if (bm3 >= cap) flush(); }
-    flush();
+    const clientes = cord.map(function (k) { return { m3: _pppM3Sum(byC[k]), pedidos: byC[k] }; });
+    const bal = _pppBalancearZona(clientes, T_MIN, T_IDEAL, T_MAX);
+    for (const t of bal.tandas) out.push({ code: nextTanda(), zona: z, pedidos: t });
+    pendientes.push.apply(pendientes, bal.pend);
   }
   const sinZona = pend.filter(function (p) { return !pppEsSuper(p) && !pppZonaDeBarrio(p.localidad); });
-  return { tandas: out, sinZona: sinZona, cap: cap };
+  return { tandas: out, sinZona: sinZona, pendientes: pendientes, ideal: T_IDEAL, min: T_MIN, max: T_MAX };
 }
 function _pppSugHtml(s) {
   let tot = 0, np = 0;
   let h = '<div class="ppp-sug-doc"><h2>🪄 Sugerencia de tandas — cargar a mano en el Excel</h2>' +
-    '<div class="ppp-sug-sub">' + s.tandas.length + ' tandas sugeridas · objetivo ' + s.cap + ' m³/tanda. Es una <b>sugerencia</b>: la PPP no cambia, programá en el Excel.</div>';
+    '<div class="ppp-sug-sub">' + s.tandas.length + ' tandas sugeridas · objetivo ' + Number(s.ideal).toFixed(2) + ' m³ (rango ' + Number(s.min).toFixed(2) + '–' + Number(s.max).toFixed(2) + '). Es una <b>sugerencia</b>: la PPP no cambia, programá en el Excel.</div>';
   for (const t of s.tandas) {
     const m3 = _pppM3Sum(t.pedidos); tot += m3; np += t.pedidos.length;
     h += '<table class="ppp-sug-tbl"><thead>' +
@@ -23393,6 +23437,7 @@ function _pppSugHtml(s) {
     h += '</tbody></table>';
   }
   if (s.sinZona && s.sinZona.length) h += '<div class="ppp-sug-sinzona">⚠ ' + s.sinZona.length + ' pedido(s) SIN ZONA quedaron fuera (asigná el barrio en el Excel): ' + s.sinZona.map(function (p) { return escapeHtml(String(p.np)) + " (" + escapeHtml(pppLocDisp(p.localidad) || "?") + ")"; }).join(" · ") + '</div>';
+  if (s.pendientes && s.pendientes.length) h += '<div class="ppp-sug-sinzona">⏳ ' + s.pendientes.length + ' pedido(s) PENDIENTES: no llegan al mínimo ' + Number(s.min).toFixed(2) + ' m³ en su zona sin mezclar. Esperan más volumen: ' + s.pendientes.map(function (p) { return escapeHtml(String(p.np)) + " (" + escapeHtml(pppLocDisp(p.localidad) || "?") + ")"; }).join(" · ") + '</div>';
   h += '<div class="ppp-sug-tot">TOTAL: ' + np + ' pedidos · ' + s.tandas.length + ' tandas · ' + tot.toFixed(2) + ' m³</div></div>';
   return h;
 }
