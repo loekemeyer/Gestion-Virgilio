@@ -317,6 +317,15 @@
 > Cajas por pila, Sueltas, Contado (cajas), **Stock del sistema** (góndola+excedente, mismo cálculo
 > que la comparación), Diferencia y En proceso. Formato Excel es-AR (BOM utf-8, `;`, coma decimal).
 >
+> Nota **v10.17** — **Completar Pedido (operario) muestra todos los faltantes con stock (sin depender
+> de "Avisar").** El CP del operario (`showCPModal`) filtraba angosto: solo faltantes cuyo artículo
+> estuviera **a guardar** (`a_guardar>0`) o **guardado hoy**. Por eso faltantes completables desde
+> góndola/excedente NO le aparecían al operario y dependían de que Marianela apretara **📢 Avisar** en
+> el admin (`showFaltAvisar`). Ahora el CP del operario usa el **mismo criterio que el admin**: muestra
+> todo faltante con stock en **góndola + a guardar + excedente + racks** (`disp>0`). Aparecen solos, sin
+> avisar. El marcador `_guardadoHoy` se conserva para destacar lo recién llegado. El pop-up push
+> (`faltPollStart`, vía tarea de "Avisar") sigue existiendo como aviso proactivo aparte.
+>
 > Nota **v10.16** — **FIX raíz (backend): stock del armado reconciliado contra Entregas.** Al volver
 > al modelo de stock por-PKC, el pase **separar_pedidos → a_facturar** (ETAPA 2 del pipeline + el
 > fast-path del front `stockSepararAFacturar`) movía TODO lo pickeado a `a_facturar` sin mirar el
