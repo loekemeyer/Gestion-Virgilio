@@ -66,6 +66,30 @@ const FILAS = [
     return { filas: rows.length, primera: rows[0] || [] };
   });
 
+  // (c2) resolver: "Salió" abre los motivos y al elegir uno llama a la RPC y saca la fila.
+  //      Se captura el body para verificar que el front NO manda la cantidad (la calcula el server).
+  await page.evaluate(() => window.stkFaltFactToggleArt());   // volver a caso por caso
+  const rpc = { llamadas: [] };
+  await page.exposeFunction("__rpcSpy", (b) => rpc.llamadas.push(JSON.parse(b)));
+  await page.route("**/rpc/faltante_resolver", async (route) => {
+    await page.evaluate(() => {});
+    route.fulfill({ status: 200, contentType: "application/json", body: '"ok"' });
+  });
+  page.on("request", (req) => {
+    if (req.url().includes("/rpc/faltante_resolver")) {
+      try { rpc.llamadas.push(JSON.parse(req.postData() || "{}")); } catch (_e) {}
+    }
+  });
+  await page.evaluate(() => window.stkFaltFactAsk(encodeURIComponent("D17A|870E"), "descontar"));
+  const motivosVisibles = await page.evaluate(() => document.getElementById("stkPopBody").textContent.includes("Salió completo después"));
+  await page.evaluate(() => window.stkFaltFactDo(encodeURIComponent("D17A|870E"), "descontar", encodeURIComponent("Salió completo después")));
+  await page.waitForFunction(() => !document.getElementById("stkPopBody").textContent.includes("D17A"));
+  const trasResolver = await page.evaluate(() => ({
+    filas: document.querySelectorAll("#stkPopBody tbody tr").length,
+    total: document.getElementById("stkPopBody").textContent.includes("215")   // 383 - 168
+  }));
+  const envio = rpc.llamadas[0] || {};
+
   // (d) vacío
   filas = [];
   await page.evaluate(() => window.stkPopClose());
@@ -81,9 +105,12 @@ const FILAS = [
   const ok = caso.filas === 3 && caso.tieneTanda && caso.tieneCod && caso.tieneNp &&
              caso.tieneCliente && caso.total &&
              agrup.filas === 2 && agrup.primera[0] === "870E" && agrup.primera[2] === "312" && agrup.primera[3] === "2" &&
+             motivosVisibles && trasResolver.filas === 2 && trasResolver.total &&
+             envio.p_tanda === "D17A" && envio.p_cod === "870E" && envio.p_accion === "descontar" &&
+             !("p_cajas" in envio) &&                      // el front NUNCA manda la cantidad
              vacio && pageerrors.length === 0;
 
-  console.log("falt-fact:", JSON.stringify({ caso, agrup, vacio }),
+  console.log("falt-fact:", JSON.stringify({ caso, agrup, motivosVisibles, trasResolver, envio, vacio }),
               "· pageerrors:", pageerrors.length ? pageerrors.join(" | ") : "none",
               ok ? "· ✓ OK" : "· ✗ FALLÓ");
   process.exit(ok ? 0 : 1);

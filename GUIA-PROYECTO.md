@@ -4,7 +4,42 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-12 · Versión app al documentar: **v10.17**
+> Última actualización: 2026-08-12 · Versión app al documentar: **v10.18**
+>
+> Nota **2026-08-12 — Aviso por Telegram de "faltantes facturados sin completar".**
+> Función `notificar_faltantes_sin_completar_telegram()` + cron **`faltantes-sin-completar`**
+> (`45 12 * * 1-5` = **09:45 AR de lunes a viernes**). Es un **digest**: junta los casos nuevos
+> desde el último aviso y manda UN mensaje (top 12 + total); si no hay nada nuevo **no dice nada**.
+> Un caso se avisa **una sola vez** — se registra en la tabla **`Faltantes_Avisados`** (PK
+> tanda+cod, RLS on y **sin policies**: solo la escribe la función). Se marca DESPUÉS de encolar,
+> así un fallo del enqueue no lo pierde.
+> ⚠ **El backlog se sembró como "ya avisado"**: al crearlo había **372 casos históricos** y se
+> insertaron todos en `Faltantes_Avisados` en la misma migración, para que el primer disparo no
+> mande una avalancha. Esos 372 se trabajan desde el módulo 📉. Para re-avisar uno, borrar su fila.
+> **`dedup_key = 'faltsincompletar_<YYYYMMDD>'`** — NO usar `'faltfact_'`: ya es de
+> `notificar_falta_facturacion_telegram` (`faltfact_hoy_…`/`faltfact_manana_…`) y confunde.
+> Verificado: corrida en seco → 0 nuevos, 0 encolados, **ningún mensaje mandado al grupo**.
+> Diseño en `sql/faltantes_resolver.sql`.
+>
+> Nota **v10.18 — "Faltantes facturados sin completar": ahora se RESUELVE desde el módulo.**
+> El listado (v10.16) solo mostraba; cerrar un caso había que hacerlo a mano por SQL. Ahora cada
+> fila tiene dos botones: **📉 "Salió"** (las cajas salieron y se facturaron → ajuste de stock) y
+> **✓ "Está bien"** (al cliente se le facturó de menos → el stock ya está bien, solo se archiva).
+> Los dos piden **motivo** (lista corta + "Otro" con texto libre), que queda guardado para saber
+> después por qué se cerró cada caso — mismo patrón que el 🚫 "No va" de NP que faltan.
+> **Backend:** tabla **`Faltantes_Revisados`** (PK tanda+cod; RLS con SELECT para anon y **sin
+> policy de INSERT a propósito**) + RPC **`faltante_resolver(tanda, cod, accion, legajo, motivo)`**
+> (SECURITY DEFINER). La vista suma la exclusión **(c) ya revisado**, así el caso desaparece solo.
+> ⚠ **El front NO manda la cantidad**: la calcula el server leyendo la vista. Es a propósito —
+> esto escribe stock, la policy `mst_insert` tiene `with_check = true` (la anon key puede insertar
+> cualquier movimiento) y el repo ya se quemó con el fast-path del cliente en v5.76 (~486 cajas
+> duplicadas en 4 tandas). **Idempotencia en 3 capas:** la RPC lee la vista primero y devuelve
+> `ya_resuelto` si el caso no está + PK de `Faltantes_Revisados` + handler de `unique_violation`
+> sobre `client_id` (`faltres_<tanda>_<cod>`). Probado contra un caso real (C58A/035E): dos
+> llamadas seguidas → `ok` y `ya_resuelto`, **un solo** movimiento de −1; después se revirtió.
+> **No hay "deshacer" en la app** — para revertir, los DELETE están en `sql/faltantes_resolver.sql`.
+> Smoke `tests/falt-fact.cjs` (verifica que el POST no lleve la cantidad). Diseño en
+> `sql/faltantes_resolver.sql`.
 >
 > Nota **v10.17 — Facturación: el tilde de una NP EN PROGRESO va NARANJA.** Mismo criterio que
 > ya pintaba la fila de amarillo (`tr.fac-en-progreso`, de `facTareaActiva(np)` = le están

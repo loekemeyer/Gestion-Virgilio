@@ -13179,18 +13179,66 @@ function _stkFaltFactRender() {
     }).join("") + '</tbody>';
     h += '<tfoot><tr style="font-weight:800;border-top:2px solid #334155"><td colspan="2">TOTAL (' + arr.length + ' códigos)</td><td class="num">' + round1(totCajas) + '</td><td></td></tr></tfoot></table></div>';
   } else {
-    h += '<div class="mva-tblwrap"><table class="mva-tbl"><thead><tr><th>Tanda</th><th>Código</th><th class="num">Cajas</th><th>NP</th><th>Cliente</th><th>Entrega</th></tr></thead><tbody>';
+    h += '<div class="mva-tblwrap"><table class="mva-tbl"><thead><tr><th>Tanda</th><th>Código</th><th class="num">Cajas</th><th>NP</th><th>Cliente</th><th>Entrega</th><th></th></tr></thead><tbody>';
     h += rows.map(function (r) {
-      return '<tr><td><b>' + escapeHtml(r.tanda) + '</b></td>' +
+      const key = String(r.tanda) + "|" + String(r.cod);
+      const kEnc = encodeURIComponent(key);
+      let act;
+      if (_stkPop.act && _stkPop.act.key === key) {
+        const esDesc = _stkPop.act.accion === "descontar";
+        const motivos = esDesc ? _FALT_MOT_DESC : _FALT_MOT_OK;
+        const color = esDesc ? "#dc2626" : "#166534", bg = esDesc ? "#fef2f2" : "#f0fdf4", bd = esDesc ? "#fca5a5" : "#86efac";
+        act = '<div style="text-align:right;line-height:1.9">' + motivos.map(function (m) {
+          return '<button onclick="stkFaltFactDo(\'' + kEnc + '\',\'' + _stkPop.act.accion + '\',\'' + encodeURIComponent(m) + '\')" style="width:auto;margin:2px;padding:3px 7px;border:1px solid ' + bd + ';border-radius:7px;background:' + bg + ';color:' + color + ';font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">' + escapeHtml(m) + '</button>';
+        }).join("") + '<button onclick="stkFaltFactBack()" title="Volver" style="width:auto;margin:2px;padding:3px 8px;border:1px solid #cbd5e1;border-radius:7px;background:#fff;color:#64748b;font-size:11px;font-weight:700;cursor:pointer;">✕</button></div>';
+      } else {
+        act = '<div style="display:flex;gap:4px;justify-content:flex-end;white-space:nowrap">' +
+          '<button onclick="stkFaltFactAsk(\'' + kEnc + '\',\'descontar\')" title="Estas cajas SALIERON y se facturaron → descontarlas del stock (genera un ajuste trazable)." style="width:auto;margin:0;padding:4px 9px;border:1px solid #fca5a5;border-radius:8px;background:#fee2e2;color:#dc2626;font-size:12px;font-weight:800;cursor:pointer;">📉 Salió</button>' +
+          '<button onclick="stkFaltFactAsk(\'' + kEnc + '\',\'ok\')" title="Al cliente se le facturó DE MENOS → el stock ya está bien, solo archivar el caso." style="width:auto;margin:0;padding:4px 9px;border:1px solid #86efac;border-radius:8px;background:#dcfce7;color:#166534;font-size:12px;font-weight:800;cursor:pointer;">✓ Está bien</button></div>';
+      }
+      return '<tr' + (_stkPop.act && _stkPop.act.key === key ? ' style="background:#fffbeb"' : '') + '><td><b>' + escapeHtml(r.tanda) + '</b></td>' +
         '<td><b>' + escapeHtml(r.cod) + '</b></td>' +
         '<td class="num"><b>' + round1(r.cajas) + '</b></td>' +
         '<td style="font-size:12px">' + escapeHtml(r.nps_lista || "—") + '</td>' +
         '<td style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escapeHtml(r.clientes || "") + '">' + escapeHtml(r.clientes || "—") + '</td>' +
-        '<td style="font-size:12px">' + escapeHtml(_stkFmtFechaNP(r.fecha_entrega) || r.fecha_entrega || "—") + '</td></tr>';
+        '<td style="font-size:12px">' + escapeHtml(_stkFmtFechaNP(r.fecha_entrega) || r.fecha_entrega || "—") + '</td>' +
+        '<td style="text-align:right">' + act + '</td></tr>';
     }).join("") + '</tbody>';
-    h += '<tfoot><tr style="font-weight:800;border-top:2px solid #334155"><td colspan="2">TOTAL (' + rows.length + ' casos)</td><td class="num">' + round1(totCajas) + '</td><td colspan="3"></td></tr></tfoot></table></div>';
+    h += '<tfoot><tr style="font-weight:800;border-top:2px solid #334155"><td colspan="2">TOTAL (' + rows.length + ' casos)</td><td class="num">' + round1(totCajas) + '</td><td colspan="4"></td></tr></tfoot></table></div>';
   }
   body.innerHTML = h;
+}
+/* v10.18 — resolver un caso. Los motivos quedan guardados en Faltantes_Revisados para saber
+   DESPUÉS por qué se archivó cada uno (mismo criterio que el 🚫 "No va" de NP que faltan). */
+const _FALT_MOT_DESC = ["Salió completo después", "Se cargó al camión igual", "Otro"];
+const _FALT_MOT_OK   = ["Se facturó de menos", "El cliente lo rechazó", "Ya se ajustó aparte", "Otro"];
+function stkFaltFactAsk(keyEnc, accion) { if (!_stkPop) return; _stkPop.act = { key: decodeURIComponent(keyEnc), accion: accion }; _stkFaltFactRender(); }
+function stkFaltFactBack() { if (!_stkPop) return; _stkPop.act = null; _stkFaltFactRender(); }
+/* Llama a la RPC `faltante_resolver`. OJO: el front NO manda la cantidad — la calcula el server
+   desde la vista. Así ni un doble-tap ni un bug de acá pueden inventar un ajuste de stock
+   (el repo ya tuvo doble-conteo por escrituras del cliente, ver v5.76). */
+async function stkFaltFactDo(keyEnc, accion, motivoEnc) {
+  if (!_stkPop) return;
+  const key = decodeURIComponent(keyEnc), parts = key.split("|");
+  const tanda = parts[0], cod = parts[1];
+  let motivo = decodeURIComponent(motivoEnc);
+  if (motivo === "Otro") { let t = ""; try { t = prompt("Motivo:", "") || ""; } catch (_e) {} motivo = t.trim() || "Otro"; }
+  let legajo = ""; try { legajo = (legajoInput && legajoInput.value) || ""; } catch (_e) {}
+  let out = "";
+  try {
+    const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/faltante_resolver", {
+      method: "POST",
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ p_tanda: tanda, p_cod: cod, p_accion: accion, p_legajo: legajo, p_motivo: motivo })
+    });
+    if (!r.ok) { try { alert("No se pudo resolver (HTTP " + r.status + ")."); } catch (_e) {} return; }
+    out = await r.json();
+  } catch (_e) { try { alert("No se pudo resolver (sin conexión)."); } catch (_e2) {} return; }
+  if (String(out).indexOf("error") === 0) { try { alert("No se pudo resolver: " + out); } catch (_e) {} return; }
+  // 'ok' y 'ya_resuelto' sacan la fila igual: en los dos casos el caso quedó cerrado.
+  _stkPop.rows = (_stkPop.rows || []).filter(function (x) { return !(String(x.tanda) === tanda && String(x.cod) === cod); });
+  _stkPop.act = null;
+  _stkFaltFactRender();
 }
 function stkFaltFactExport() {
   if (!_stkPop || _stkPop.kind !== "faltFact" || !_stkPop.rows || !_stkPop.rows.length) { try { alert("Abrí primero el módulo de faltantes facturados."); } catch (_e) {} return; }
