@@ -817,28 +817,24 @@ function ocDiaLimite() {
 /* Carga las OCs vigentes del proveedor elegido en opState.ocPorCod (clave = código
    normalizado). Best-effort: si falla, queda {} y la pantalla funciona como antes. */
 async function cargarOCVigentes() {
+  /* v10.10 — reemplaza fetch de 5000 OC rows + filtro client-side por RPC server-side
+     oc_vigentes_por_proveedor(nombre). La RPC aplica alias (Pettofrezza→Rafael),
+     split por delimitadores (/,+& y), y prefix match con ≤2 chars de slack. */
   const nombre = opState.tallNombre;
   try {
     await sessionReady;
-    const { data, error } = await supabase
-      .from("Ordenes_Compra")
-      .select("codigo,cantidad,cantidad_recibida,proveedor,fecha,estado")
-      .gte("fecha", ocDiaLimite())
-      .limit(5000);
-    if (error) throw error;
-    const porCod = {};
-    (data || []).forEach(function (r) {
-      if (String(r.estado || "").toLowerCase() === "recibida") return;
-      if (!ocProvCoincide(r.proveedor, nombre)) return;
-      const k = _ocgNorm(r.codigo); if (!k) return;
-      const ped = Number(r.cantidad) || 0, rec = Number(r.cantidad_recibida) || 0;
-      if (ped - rec <= 0) return;
-      const fe = r.fecha || "";
-      const cur = porCod[k];
-      if (!cur || fe > cur.fecha) porCod[k] = { fecha: fe, ped: ped, rec: rec, pend: ped - rec };
-      else if (fe === cur.fecha) { cur.ped += ped; cur.rec += rec; cur.pend = cur.ped - cur.rec; }
+    const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" };
+    const res = await fetch(SUPABASE_URL + "/rest/v1/rpc/oc_vigentes_por_proveedor", {
+      method: "POST", headers: H, cache: "no-store",
+      body: JSON.stringify({ p_nombre: nombre })
     });
-    // Si cambió de proveedor mientras cargaba, este resultado ya no sirve.
+    if (!res.ok) throw new Error("RPC status " + res.status);
+    const rows = await res.json();
+    const porCod = {};
+    (rows || []).forEach(function (r) {
+      const k = String(r.cod || ""); if (!k) return;
+      porCod[k] = { fecha: r.fecha || "", ped: Number(r.ped) || 0, rec: Number(r.rec) || 0, pend: Number(r.pend) || 0 };
+    });
     if (opState.tallNombre !== nombre) return;
     opState.ocPorCod = porCod;
   } catch (e) {
@@ -1350,10 +1346,8 @@ if (typeof window !== "undefined") {
 
 /* ============== Enviar (graba todo) ============== */
 async function opEnviar() {
-  // v9.26: Verificación de código antes de enviar
-  const verified = await showVerificationModal();
-  if (!verified) return;
-
+  // v10.11 — SACADA la "Verificación de Remito" (código a escribir en el remito ANTES de enviar):
+  // la recepción da UN SOLO código, el de confirmación del final (pendGenCodigo, más abajo).
   const descPorCod = {};
   (opState.articulos || []).forEach(a => { descPorCod[a.Cod_Art] = a.Desc || ""; });
   const items = Object.entries(opState.cargas)

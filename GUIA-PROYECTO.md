@@ -4,7 +4,18 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-12 · Versión app al documentar: **v10.03**
+> Última actualización: 2026-08-12 · Versión app al documentar: **v10.05**
+>
+> Nota **v10.05 — front conectado a vistas/RPCs backend.** Las funciones
+> `stkFcsFetch()`, `openAbastecimiento()`, `facCorreccDataRich()` (index.html) y
+> `cargarOCVigentes()` (recepcion.js) ahora hacen **1 fetch** cada una contra las
+> vistas/RPCs server-side (`vista_fc_sin_salida`, `vista_abastecimiento`,
+> `vista_correcciones_pedido_rich`, `oc_vigentes_por_proveedor`) en vez de múltiples
+> fetches + lógica client-side. El drill-down mensual de Abastecimiento carga lazy
+> (por cod, al expandir). `abastCompute()` se mantiene para el módulo OC. Helpers:
+> `norm_cod(text)`, `norm_nombre(text)`. Ver § 3 → "Vistas y funciones backend".
+>
+> Nota anterior · Versión app al documentar: **v10.03**
 >
 > Nota **2026-08-12 — Fuga de stock: "faltó en el picking pero se facturó igual" (sin CP).**
 > Caso testigo NPs **98140/98142/98155** (tandas D05B/D06B). El pickeador registró
@@ -267,6 +278,81 @@
 > **⬇ Exportar CSV** (`cntExportCsv`) que baja el conteo con columnas: Sector, Código, Pilas,
 > Cajas por pila, Sueltas, Contado (cajas), **Stock del sistema** (góndola+excedente, mismo cálculo
 > que la comparación), Diferencia y En proceso. Formato Excel es-AR (BOM utf-8, `;`, coma decimal).
+>
+> Nota **v10.14** — **FIX regresión: "avisar que pickearon mal" borraba separado + líos.** El fix de
+> v10.10 (`_compDifResolve` "de menos") ponía `_comp._liosDirty = true` cuando la NP ya tenía líos
+> armados, lo que hacía `_compBuildLiosData()` en el próximo `_compRenderSep()` y **reconstruía todo
+> desde cero** → se perdía lo separado y los líos de TODAS las NPs. Ahora el descuento reduce sólo el
+> `sale`/`rest` de ese código (y registra el faltante para Entregas), **sin** forzar el rebuild. El
+> resto del avance queda intacto.
+>
+> Nota **v10.13** — **Completar Pedido (CP): feedback del lío destino.** En "📦➕ Completar Pedido"
+> (`showCPModal` → `cpRenderStep2`/`cpConfirm`), al completar un faltante el destino por defecto ya
+> era **lío nuevo** (`_cp.lioSel = "__new__"`, y `cpUpdateLio` con lioSel no-numérico empuja un lío
+> nuevo). El problema era de **feedback**: el botón decía sólo "→ a facturar" y el mensaje de éxito no
+> nombraba el lío, así que el operario no sabía si se agregaba como lío nuevo. Ahora el botón muestra
+> el destino (**"→ Lío NUEVO X"** o **"→ Lío A"** si eligió uno existente) y el mensaje de éxito lo
+> confirma ("· Lío NUEVO X (a facturar)"). No cambia la lógica, sólo lo hace explícito.
+>
+> Nota **v10.12** — **Completar: ubicación del pedido separado por NP.** En el wizard Completar,
+> el paso de armar líos (`_compRenderLios`) ahora muestra, por cada NP, un banner 📦 con **dónde
+> quedó/lo dejó el picking** (`_comp.pickUbic`, del evento PUB más reciente), además del que ya
+> estaba en el header del paso Separar. Así el armador sabe dónde ir a buscar el pedido. (Pendiente,
+> idea usuario **3688**: sacar mercadería de excedente moviendo stock.)
+>
+> Nota **v10.11** — **Un solo código de verificación (recepción), sacado del guardado.** (1) El
+> **Guardado a Góndola** (MG, `mgConfirmar`) YA NO pide la "Verificación de Góndola" (código de 4
+> dígitos que había que escribir en la góndola) — se confirma directo. (2) La **Recepción**
+> (`opEnviar` en `recepcion.js`) daba DOS códigos: uno a escribir en el remito ANTES de enviar
+> (`showVerificationModal`) y el **código de confirmación** del final (`pendGenCodigo`, guardado en
+> `Control_Modo_OP.codigo` para el checklist). Se sacó el primero → **un solo código, el de
+> confirmación al terminar de recibir**. `showVerificationModal` queda definida pero sin uso.
+>
+> Nota **v10.10** — **FIX Completar/Separar: "de menos" ahora se descuenta del pedido.** En el
+> wizard Completar (Separar → Líos), cuando el armador reporta que un artículo **difiere de la mesa
+> "de menos"** (hay menos que lo que marcó el picking, ej. "el 366 no estaba en lo que pidieron"),
+> antes SOLO emitía el aviso NPD (`Picking difiere de mesa`) y seguía **entero**: se armaba en los
+> líos y se facturaba completo. Ahora `_compDifResolve('menos',…)` además **descuenta** ese faltante
+> del armado (`c.sale`/`c.rest`) y lo registra como faltante manual en `_comp.arts` (helper nuevo
+> `_compAddFaltManual`, NP normalizada con `pickNormNp`), de modo que `compTerminar` lo reste también
+> de `Entregas_Virgilio` (`cajas_falto`) → **no se factura lo que no estaba**. El "de más" no cambia
+> (las que sobran se re-guardan; el pedido no crece). Es todo front-end (el wizard calcula líos y FAL
+> en el cliente). El aviso NPD por Telegram/Agentes se mantiene igual.
+>
+> Nota **v10.09** — **Botón "Ver módulo operarios" en el panel admin.** En el panel de
+> Administración (`#supervisorPanel`, sección "Reportes y configuración") hay un botón nuevo
+> **👁️ Ver módulo operarios** (`openOperarioView()`) que abre la grilla completa del operario
+> (`#optionsScreen`, EP/TP/AP/MG/etc.) para que el supervisor la recorra sin desloguearse. Entra
+> con el **legajo de PRUEBAS (1)** (test/basura, excluido de reportes) — así cualquier toque queda
+> como prueba y no ensucia datos — y muestra un banner ámbar con botón "← Volver al panel". Como
+> `goToOptions()` oculta todo `#legajoScreen` (que contiene el panel admin), al volver reaparece el
+> panel solo; se restaura el "último legajo" para no dejar el 1 pegado en el login por legajo.
+>
+> Nota **v10.08** — **Guardado a Góndola muestra la ubicación del artículo.** En el módulo "📥 Guardar
+> a góndola" (MG), cada fila ahora muestra un chip 📍 con **dónde va el artículo en góndola** (primera
+> celda destacada + las siguientes entre paréntesis) y **cuántas ubicaciones tiene** (ej. `📍 Va en P39
+> (A12, B03) · 3 ubicaciones`). Sale de `Capacidad_Sector.sector` vía la función nueva `ocgFetchCeldas()`
+> (cod → [sectores], ignora celdas `Libre`, mismo `_ocgNorm` que la capacidad). Si el código no tiene
+> celda fija cargada → `📍 sin ubicación fija cargada`. Es solo lectura/ayuda visual para el operario;
+> no cambia el flujo de guardado ni la ubicación del **excedente** (que sigue siendo un input aparte).
+>
+> Nota **v10.07** — **Pedidos Importación: cotización USD (FOB) + volumen (m³), todo en Supabase.**
+> Cada ítem del módulo "📦 Pedidos Importación" muestra: **FOB u$s/u** (editable ✏ → `Importados.fob_uni`,
+> USD/unidad del proveedor), **u$s pedido** (= unidades a pedir × FOB), **Master cjs** (master cajas
+> enteras), **m³/master** (editable ✏ → tabla `Importados_Volumen`) y **m³ pedido** (= master cjs ×
+> m³/master). Arriba, dos tarjetas con el **TOTAL del pedido**: USD (Σ) y m³ (Σ), con aviso de ítems
+> sin FOB/volumen. Subtotales por proveedor (cajas · u$s · m³) y todo baja al Excel + fila TOTALES.
+> - ⚠ **Master caja ≠ inner caja.** `Importados.uni_x_caja` es la caja **inner**; el divisor correcto
+>   para master cajas es **`Importados_Volumen.uni_master`** (del Excel). Master cjs = `ceil(a_pedir /
+>   uni_master)` (sin decimales); si un ítem no tiene `uni_master` cargado, cae a `uni_x_caja` como
+>   aprox y se marca con `~`.
+> - **Tabla `Importados_Volumen`** (RLS anon select/insert/update): `cod` (PK, = `cod_art` en mayúsculas),
+>   `largo_cm`, `ancho_cm`, `alto_cm`, `m3_master`, `uni_master`, `uni_inner`, `fuente`. El ✏ de m³/master
+>   pide `Largo×Ancho×Alto` (cm) y calcula m³ = L·A·H/1e6, o acepta el m³ directo.
+> - **Carga inicial (2026-08-12)**: se subió el Excel "QUIEBRE ART IMP 11-08" (hojas `Todos` +
+>   `TRAZABILIDAD`) a Supabase: **149 códigos** en `Importados_Volumen` (medidas + m³ + uni_master) y
+>   **144** FOB actualizados en `Importados`. Backup del FOB previo en `sql/backup_importados_fob_20260812.sql`.
+>   **La app no toca el Excel**: todo corre de Supabase. Para re-cargar (nuevo Excel), repetir el upsert.
 >
 > Nota **v9.29** — **Pedidos Importación operable (editar en curso + marcar llegada).** El módulo
 > "📦 Pedidos Importación" era solo-lectura; ahora cada fila tiene **✏️** (editar unidades EN CURSO
@@ -6254,6 +6340,138 @@ RLS `anon` (hardening 2026-07): lectura + escritura **acotada por tabla** — in
 siempre; update sólo donde la app lo usa; **sin delete** salvo `Envasar_Ubicaciones`.
 Ver `sql/agente_propuestas.sql` y las notas de seguridad.
 
+### Vistas y funciones backend (v10.10, 2026-08-12)
+
+Desde v10.10, lógica que antes se hacía con múltiples fetches en el front se movió a
+vistas/funciones server-side. El front consume estas vistas en un solo fetch cada una:
+
+- **`norm_cod(text)`** — función `IMMUTABLE`. Normaliza códigos de artículo:
+  `regexp_replace(upper(trim(coalesce(c,''))), '^0+(?=.)', '')`. Usada por
+  `vista_stock_procesada` (exclusión de insumos puros) y otras vistas.
+- **`norm_nombre(text)`** — función `IMMUTABLE`. Normaliza nombres para matching
+  fuzzy: `lower(trim(…))`, quita acentos con `translate`, reemplaza `.`, `,`, `'`
+  por espacio, colapsa espacios múltiples. Usada por `oc_vigentes_por_proveedor`.
+- **`vista_fc_sin_salida`** — VIEW. Reemplaza 6 fetches de `stkFcsFetch()`:
+  NPs facturadas no cargadas a camión. Columnas: `cod`, `cajas`, `cant_nps`,
+  `detalle_nps` (jsonb: `[{np, cajas, tanda, rs, fecha}]`). Front: `stkFcsFetch()`.
+- **`vista_abastecimiento`** — VIEW. Reemplaza 3 fetches + `abastCompute()` (~120k
+  filas) del módulo Abastecimiento. Columnas principales: `cod`, `descripcion`,
+  `rec_avg`, `rec_ult`, `ven_avg`, `ven_ult`, `bal_avg`, `bal_ult`, `n_prov`,
+  `stock`, `pedidos`, `nps_ped`, 8 columnas de depósito, `falta`, `cap_falla`,
+  `stk_falla`, `provs_ult_detalle` (jsonb), `mes_ultimo`, `es_importado`.
+  Front: `openAbastecimiento()`. Detalle mensual por artículo se carga lazy
+  desde `vista_recepcion_mensual` / `vista_venta_mensual` al expandir la fila.
+  Nota: `abastCompute()` sigue existiendo — la usa el módulo OC (línea ~10114).
+- **`vista_correcciones_pedido_rich`** — VIEW. Reemplaza 5+ fetches secuenciales
+  de `facCorreccDataRich()` para el panel de correcciones. Columnas: `np`, `sec`,
+  `ppal`, `descripcion`, `cajas`, `razon_social`, `tanda`, `fecha`, `stk_sec`,
+  `stk_ppal`, `ent_ped`, `ent_entr`, `ent_falto`, `estado`.
+  Front: `facCorreccDataRich()`. Nota: `pkcReal`/`pkcHay` no están en la vista
+  (se hardcodean a 0/false en el front — solo afectan drill-down de enpicking).
+- **`oc_vigentes_por_proveedor(p_nombre text)`** — RPC (SECURITY INVOKER). Reemplaza
+  fetch de 5000 filas + filtrado client-side de `cargarOCVigentes()` en `recepcion.js`.
+  Recibe nombre de proveedor, maneja alias (Pettofrezza→Rafael), splits por
+  `/,+& y`, prefix match con ≤2 chars de slack. Columnas: `cod`, `fecha`, `ped`,
+  `rec`, `pend` (bigint). Front: `cargarOCVigentes()` en `recepcion.js`.
+- **`vista_tanda_status`** — VIEW. Estado de tandas para el monitor + correcciones.
+  Columnas: `tanda`, `last_pick_op`, `pick_legajo`, `pick_start_ts`, `last_arm_op`,
+  `arm_legajo`, `arm_start_ts`, `estado`. **No conectada al front todavía** (prioridad media).
+
+Rollback batch 1: `rollback_alta_prioridad_20260812.sql` en el scratchpad del agente.
+Backup de `vista_stock_procesada` pre-cambios: `backup_vista_stock_procesada_matview_20260812.sql`.
+
+#### Batch 2 — objetos ALTA prioridad (v10.10b, 2026-08-12)
+
+Segundo lote de migración front→back. Objetos creados, **aún no conectados al front**:
+
+- **`generar_inconsistencias(p_dia date)`** — RPC (VOLATILE, SECURITY DEFINER).
+  Reemplaza `computeInconsistencias()` (~135 líneas de motor de reglas, 5k events).
+  Todas las reglas replicadas: pedido duplicado, FJ duplicado, evento post-FJ,
+  jornada sin FJ (solo días pasados), jornada >12h, duración excesiva (TP/TAP >8h,
+  toggles >3h, comida >90min), múltiples comidas, cierre sin apertura, abierto sin
+  cerrar (con threshold 3h para hoy), pedido inválido (no en PPP), hueco >90min.
+  Excluye legajos 0/1 (test). Devuelve `(sev, cat, legajo, hora, detalle)`.
+  Front: `refreshInconsistencias()` en index.html.
+
+- **`vista_faltante_catalogo`** — VIEW. 1 fila por artículo con stock (neto/bruto),
+  proveedor (con reparto P1/P2), flag discontinuo, última entrega (fecha/cajas),
+  OC pendiente (cajas/fecha/prov), notas (día resolución/motivo). Pre-joinea
+  `vista_saldos_stock` + `vista_generador_oc` + `OC_Maximos` + `Movimientos_Stock`
+  + `Ordenes_Compra` + `Faltantes_Notas`. Reemplaza 6 de los 13 fetches de
+  `stkFaltLoad()`.
+
+- **`vista_faltante_demanda`** — VIEW. 1 fila por (NP, artículo) con empresa-split
+  (437E/438E/439E/809E → LK/CH), estado picking por tanda (sinpickear/enpicking/
+  preparado), fecha armado (día hábil previo vía `dia_armado()`), fecha salida,
+  razón social, es_super. Pre-joinea `PPP_Programacion_Diaria` + `PPP_Base_Pedidos`
+  + EP/TP de `Registros_Produccion_Virgilio`, excluye NPs facturadas/entregadas/
+  canceladas. Reemplaza 5 de los 13 fetches de `stkFaltLoad()`.
+
+- **`vista_faltante_real`** — VIEW. Faltante real del picking: último PKC por
+  (tanda, artículo), ESP−REAL > 0. Solo tandas "preparado" (con TP). Con empresa-
+  split. Reemplaza los 2 fetches de PKC de `stkFaltLoad()`.
+
+- **`vista_avisar_programacion`** — VIEW. Reemplaza 5 fetches de `avpLoad()`.
+  Agrupa PPP pendiente por (cliente, fecha_salida) = 1 envío, pre-joinea teléfonos
+  (whatsapp_clientes), vendedor (clientes_vendedor), teléfono/nombre vendedor
+  (whatsapp_vendedores), último aviso al cliente (envio_programacion_log), flag
+  ya-enviado al vendedor. Columnas: `grp_key`, `cod`, `rs`, `fppp`, `fped`, `dias`,
+  `nps` (array), `tel_cli`, `vend`, `tel_vend`, `vend_nombre`, `last_cli_ts`,
+  `last_cli_quien`, `vend_sent`.
+
+- **`vista_racks_bajadas_pendientes`** — VIEW. Reemplaza fetch de 20k filas en
+  `renderBajadasRacks()`. Joinea `Racks_Bajadas` (estado='propuesta') con
+  `Articulos Virgilio X Tallerista` para cajas_x_master y uni_x_caja.
+
+- **`gondola_return_check(p_items jsonb)`** — RPC (STABLE). Reemplaza 3 fetches
+  de `gondReturnCheck()`. Recibe `[{cod, cajas}]`, devuelve flags `exceso_gondola`
+  (stock+cajas > cap×1.2) y `baja_rotacion` (proyección < 50).
+
+- **`vista_plata_perdida`** — VIEW. Reemplaza 4 fetches/200k filas de `ppLoad()`.
+  Columnas: `np`, `cod`, `cajas`, `ped`, `ent`, `fecha`, `cod_cliente`, `precio_unit`,
+  `uxb`, `descripcion`, `precio_ok`, `plata`, `vendedor`, `razon_social`.
+
+- **`dia_armado(date)`** — función `IMMUTABLE`. Último día hábil antes de una fecha
+  (sáb/dom → viernes). Helper para `vista_faltante_demanda`.
+- **`prox_habil(date)`** — función `IMMUTABLE`. Próximo día hábil después de una fecha.
+
+Rollback batch 2: `sql/rollback_alta_batch2_20260812.sql`.
+
+- **`vista_insumos`** — VIEW. Pestaña Insumos lee ubicación como read-only desde
+  esta vista (v10.10+). COALESCE de 3 fuentes en orden de prioridad:
+  (1) `Racks_Planimetria` (sectores ocupados, para producto terminado en racks),
+  (2) `Insumos_Ubicaciones` (tabla relacional de piezas/flejes),
+  (3) `Insumos.ubicacion` (campo legacy directo).
+  Columnas: id, cod, nombre, categoria, isis, creado_por, creado, orden, ubicacion.
+  Ubicación es read-only en el front; cambios solo vía "Mover Racks" o edición
+  directa de las tablas fuente.
+
+#### Batch 3 — objetos MEDIA prioridad (v10.10c, 2026-08-12)
+
+Tercer lote. Objetos creados, **aún no conectados al front**:
+
+- **`vista_entidades_recepcion`** — VIEW. Reemplaza 2 fetches de `cargarEntidades()`
+  (recepcion.js). Une talleristas (Codigos X Tallerista, agrupados por nombre con
+  cod_lk/cod_ch) + proveedores AT (Tall_ProvAT_PS, activos con rec_virg).
+
+- **`vista_historial_entregas`** — VIEW. Reemplaza 2 fetches paralelos de `histLoad()`
+  (recepcion.js). Unifica `Entregas Tallerista Virgilio` + `Entregas Prov AT` con
+  columnas normalizadas (fuente, fecha, cod_art, cajas, quien, remito). El cliente
+  filtra por cod/quien/remito/fechas con PostgREST.
+
+- **`vista_articulos_prov_at`** — VIEW. Reemplaza 2 fetches secuenciales de
+  `renderArticulos()` (rama prov_at, recepcion.js). Pre-joinea `Articulos x Prov AT`
+  (activos) con `Articulos Virgilio X Tallerista` para la línea LK/CH. El cliente
+  filtra por proveedor y linea.
+
+- **`vista_control_remitos`** — VIEW. Reemplaza 5 fetches de `fetchCRData()`.
+  Consolida CCN/TAL/CRN/FSS (últimos 7 días) con metadatos PPP/Entregados. Ya
+  excluye controlados (CRN) y sin salida (FSS), ordena vencidos primero. Columnas:
+  np, tanda, lios, cod_cliente, rs, vencido, first_load, last_ccn.
+
+**Pendiente MEDIA**: `prodLoad/prodCompute` — RPC parametrizado por rango de fechas,
+cálculo de productividad con m³ y factores. Complejidad alta, dejado para después.
+
 ---
 
 ## 4. Códigos de acción (`opcion`)
@@ -6440,11 +6658,11 @@ En `showDayBreakdown` (monitor, por operario por día):
 
 ## 10. Versionado y cache
 
-- `index.html`: `APP_VERSION = "v6.65"`. Badge en pantalla `#versionBadge`:
-  `"v6.65 ✓"` (sin cola), `"v6.65 ⏳ N"` (pendientes), `"v6.65 ⚠ N"` (error).
+- `index.html`: `APP_VERSION = "v10.05"`. Badge en pantalla `#versionBadge`:
+  `"v10.05 ✓"` (sin cola), `"v10.05 ⏳ N"` (pendientes), `"v10.05 ⚠ N"` (error).
   **Sirve para confirmar qué versión cargó cada pantalla** (mirá el badge en la TV
   para saber si está al día).
-- `sw.js`: `SW_VERSION = "v6.65-vir"`. **No precachea nada**; el handler de `fetch`
+- `sw.js`: `SW_VERSION = "v10.05-vir"`. **No precachea nada**; el handler de `fetch`
   está vacío. Usa `skipWaiting()` + `clients.claim()`. La página hace
   `reg.update()` cada 60 s con `updateViaCache:"none"` (esto **sólo actualiza el
   SW**; NO recarga la app ni cambia lo que se ve en pantalla).

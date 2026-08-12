@@ -25,6 +25,16 @@ inventes**.
 **Mantené `GUIA-PROYECTO.md` actualizada** cuando cambie el código o los datos
 (nuevos códigos `opcion`, tablas, flujo, versión, etc.).
 
+## ⚠ PROTOCOLO OBLIGATORIO: Backend vs Front-end — preguntar ANTES de implementar
+
+**Cuando alguien pide cambiar lógica** (normalización de códigos, cálculos,
+filtros, agregaciones, reglas de negocio, etc.), **SIEMPRE preguntar si quiere
+que se aplique en el backend (vista/función/RPC de Supabase) o en el front-end
+antes de implementar.** No asumir. Muchas veces se piden cambios que deberían
+ir al backend y terminan implementados en el front.
+
+Aplica a **todos los chats** (nuevos y vigentes) sobre este repo.
+
 ## ⚠ PROTOCOLO OBLIGATORIO: Backups antes de tocar datos en Supabase
 
 **SIEMPRE que edites/alters/truncates/deletes en tablas de Supabase:**

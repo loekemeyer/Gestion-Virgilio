@@ -2404,6 +2404,8 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .cmpl-cli{ font-size:12px; color:#64748b; }
 .cmpl-npidx{ font-size:12px; font-weight:800; background:#e2e8f0; color:#475569; border-radius:999px; padding:2px 9px; white-space:nowrap; }
 .cmpl-prog{ font-size:12.5px; font-weight:800; color:#1e3a8a; margin-bottom:9px; }
+.cmpl-ubic{ font-size:12.5px; font-weight:700; color:#075985; background:#e0f2fe; border:1px solid #bae6fd; border-radius:8px; padding:5px 9px; margin:0 0 8px; }
+.cmpl-ubic b{ color:#0c4a6e; }
 .cmpl-empty{ font-size:13px; color:#64748b; background:#f1f5f9; border-radius:10px; padding:12px; text-align:center; }
 .cmpl-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:7px; }
 .cmpl-sq{ position:relative; background:#fff; border:1.5px solid #e2e8f0; border-radius:13px; padding:15px 6px 17px; text-align:center; cursor:pointer; -webkit-tap-highlight-color:transparent; }
@@ -3642,6 +3644,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       <button class="sup-action-btn" onclick="openPlataPerdida()"><span class="sup-ico">💸</span><span>Plata perdida de facturar</span></button>
       <button class="sup-action-btn" onclick="openDatosProducto()" style="position:relative;"><span class="sup-ico">🚦</span><span>Completar datos producto</span><span id="dpBadge" class="dp-badge" style="display:none;"></span></button>
       <button class="sup-action-btn" onclick="openConfiguracion()"><span class="sup-ico">⚙️</span><span>Configuración</span></button>
+      <button class="sup-action-btn" onclick="openOperarioView()"><span class="sup-ico">👁️</span><span>Ver módulo operarios</span></button>
     </div>
     <style id="ssgSwCss">
       .sup-cfg{max-width:520px;margin:14px auto 0;background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:11px 14px;}
@@ -5518,6 +5521,38 @@ function backToLegajo() {
   renderLegajoHistory(legajoInput.value);
 }
 
+/* v10.09 — VER MÓDULO OPERARIOS desde el panel admin. Abre la grilla completa del
+   operario (optionsScreen) para que el supervisor la recorra tal cual la ve un operario,
+   sin desloguearse. Usa el legajo de PRUEBAS (1) — test/basura, excluido de reportes — así
+   cualquier toque queda como prueba y no ensucia datos. goToOptions() oculta todo
+   #legajoScreen (que contiene el panel admin), por eso al volver reaparece el panel solo.
+   Restauramos el "último legajo" para no dejar el 1 pegado en el login por legajo. */
+function openOperarioView() {
+  var prevLast = "";
+  try { prevLast = localStorage.getItem(LAST_LEGAJO_KEY) || ""; } catch (_e) {}
+  window._supPreview = true;
+  legajoInput.value = "1";
+  goToOptions();
+  try { saveLastLegajo(prevLast); } catch (_e) {}
+  try {
+    var os = document.getElementById("optionsScreen");
+    var b = document.getElementById("supPreviewBanner");
+    if (!b) {
+      b = document.createElement("div");
+      b.id = "supPreviewBanner";
+      b.style.cssText = "background:#fef3c7;border:1.5px solid #f59e0b;color:#92400e;border-radius:10px;padding:9px 12px;margin:8px 0;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;";
+      os.insertBefore(b, os.firstChild);
+    }
+    b.innerHTML = '👁️ <span>Vista de supervisor — módulo de operarios (legajo de <b>prueba</b>). Lo que toques queda como PRUEBA.</span> <button onclick="supExitOperarioView()" style="background:#92400e;color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;flex:0 0 auto;">← Volver al panel</button>';
+    b.style.display = "flex";
+  } catch (_e) {}
+}
+function supExitOperarioView() {
+  window._supPreview = false;
+  var b = document.getElementById("supPreviewBanner"); if (b) b.style.display = "none";
+  backToLegajo();
+}
+
 /* Lista de tandas planificadas (Op=SI) del PPP — fetched cuando el operario
    abre EP/TP/AP/TAP/CC para que pueda tocar una en vez de tipearla.
    Cache 30 s, se rinde solo si la fetch falla. */
@@ -5600,17 +5635,15 @@ async function getActivityStatus(force) {
   };
   try {
     const since = new Date(Date.now() - ACTIVITY_LOOKBACK_DAYS*24*60*60*1000).toISOString();
-    const url = SUPABASE_TABLE_ENDPOINT +
-      "?opcion=in.(EP,TP,AP,TAP)" +
+    // v10.06: usa supaFetchAll para paginar con Range — el fetch directo con
+    // limit=20000 solo traía max-rows (~1000) y con 3400+ registros en 180 días
+    // los TP/AP recientes quedaban truncados → tandas pickeadas no aparecían
+    // en la lista de armado.
+    const data = await supaFetchAll(SUPABASE_TABLE_ENDPOINT,
+      "opcion=in.(EP,TP,AP,TAP)" +
       "&ts_cliente=gte." + encodeURIComponent(since) +
       "&order=ts_cliente.asc" +
-      "&limit=20000" +
-      "&select=opcion,texto,ts_cliente,legajo";
-    const r = await fetch(url, {
-      headers: { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY }
-    });
-    if (!r.ok) throw new Error("Supabase HTTP " + r.status);
-    const data = await r.json();
+      "&select=opcion,texto,ts_cliente,legajo");
     const lastPick       = new Map();   // normalizado
     const lastPickStrict = new Map();   // texto exacto
     const lastArm        = new Map();   // normalizado
@@ -6420,7 +6453,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v10.03";
+const APP_VERSION = "v10.15";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -9128,6 +9161,7 @@ function _compRenderLios() {
   if (n.clase === "etiqueta" || n.clase === "nada") {   // v5.12: súper/retira no arman líos
     const _lbl = n.clase === "etiqueta" ? "🏷 Etiqueta (súper)" : "🚶 Retira";
     let hh = '<div class="cmpl-nphead"><div class="cmpl-npinfo"><span class="cmpl-np">NP ' + escapeHtml(n.np) + '</span> <span class="cmpl-cli">' + escapeHtml(n.rs || "") + '</span></div><span class="cmpl-npidx">' + (idx + 1) + " / " + _comp.nps.length + '</span></div>';
+    if (_comp.pickUbic) hh += '<div class="cmpl-ubic">📦 Pedido separado / dejado en: <b>' + escapeHtml(_comp.pickUbic) + '</b></div>';   // v10.12
     hh += '<div class="cmpl-empty">' + _lbl + ' — sin líos. Ya está marcado 👍 Pasá a la siguiente.</div>';
     hh += '<div class="cmpl-npbtns"><button class="cmpl-npbtn" onclick="_compLioNp(-1)"' + (idx <= 0 ? " disabled" : "") + '>← NP anterior</button><button class="cmpl-npbtn pri" onclick="_compLioNp(1)"' + (idx >= _comp.nps.length - 1 ? " disabled" : "") + '>NP siguiente →</button></div>';
     el.innerHTML = hh;
@@ -9142,6 +9176,7 @@ function _compRenderLios() {
   const groups = _compLioGroups(n);
   const curLetter = _compLetter(groups.length);
   let h = '<div class="cmpl-nphead"><div class="cmpl-npinfo"><span class="cmpl-np">NP ' + escapeHtml(n.np) + '</span> <span class="cmpl-cli">' + (n.cod ? "cli " + escapeHtml(n.cod) + " · " : "") + escapeHtml(n.rs) + '</span></div><span class="cmpl-npidx">' + (idx + 1) + " / " + _comp.nps.length + '</span></div>';
+  if (_comp.pickUbic) h += '<div class="cmpl-ubic">📦 Pedido separado / dejado en: <b>' + escapeHtml(_comp.pickUbic) + '</b></div>';   // v10.12
   h += '<div class="cmpl-prog">' + (enLios + curCajas) + " / " + TOTAL + " cajas · " + n.liosArr.length + " líos</div>";
   if (TOTAL === 0) {
     h += '<div class="cmpl-empty">Esta NP no lleva nada a armar (todo faltó). Pasá a la siguiente.</div>';
@@ -9404,8 +9439,39 @@ function _compDifResolve(tipo, gond) {
       if (ret > 0) { try { stockMove([{ cod_art: c.cod, descripcion: "", deposito: "terminado", delta: ret, tipo: "ajuste", ref: "picking_difiere", legajo: _comp.legajo }]); } catch (_e) {} }
     })();
   }
+  // v10.10 — FIX: "de menos" (lo que no estaba en el pedido) ahora SÍ se descuenta del
+  // armado (líos) Y de Entregas_Virgilio (no se factura). Antes solo emitía el aviso NPD y
+  // seguía entero → el operario tenía que armar/facturar cajas que no estaban. Ahora se
+  // reduce el código en los líos y se registra el faltante para el cruce de facturación.
+  if (tipo === "menos" && qty > 0) {
+    // v10.14 — descontar SOLO en este código, SIN reconstruir la data de líos (antes se ponía
+    // _comp._liosDirty=true, que hacía _compBuildLiosData y BORRABA todo lo separado + los líos de
+    // TODAS las NPs). Se reduce sale/rest de este código; el resto del avance queda intacto.
+    c.sale = Math.max(0, (Number(c.sale) || 0) - qty);
+    c.rest = Math.max(0, (Number(c.rest) || 0) - qty);
+    if (c.sale === 0) c.sep = true;                              // nada que separar → queda marcado
+    _compAddFaltManual(n.np, c.cod, qty, n.cod, n.rs);           // faltante → Entregas_Virgilio (no factura)
+    try { _compLioMark(n); } catch (_e) {}
+  }
   _comp.sepDif = null; _compRenderSep();
-  try { alert("✓ Avisado al picking · " + c.cod + " (" + (tipo === "mas" ? "de más" : "de menos") + " " + qty + "). Seguí armando."); } catch (_e) {}
+  try { _compRecalc(); } catch (_e) {}
+  try { alert("✓ Avisado al picking · " + c.cod + " (" + (tipo === "mas" ? "de más" : "de menos") + " " + qty + "). " + (tipo === "menos" ? "Descontado del pedido. " : "") + "Seguí armando."); } catch (_e) {}
+}
+/* v10.10 — faltante MANUAL reportado en Separar ("de menos" / no estaba en el pedido). Lo mete
+   en _comp.arts (mismo formato que los faltantes automáticos del picking) para que se descuente
+   TANTO del armado de líos (sale = pedido − faltMap) COMO de Entregas_Virgilio (cajas_falto) al
+   Terminar. La NP se normaliza (pickNormNp) para que matchee con pedidoFull en compTerminar. */
+function _compAddFaltManual(np, cod, cajas, codCli, rs) {
+  if (!_comp || !(cajas > 0)) return;
+  var npN = (typeof pickNormNp === "function") ? pickNormNp(np) : String(np);
+  var ka = String(cod).toUpperCase().replace(/E$/, "");
+  var a = (_comp.arts || []).find(function (x) { return String(x.art).toUpperCase().replace(/E$/, "") === ka; });
+  if (!a) { a = { art: cod, falta: 0, real: 0, nps: [], auto: false, manual: true }; (_comp.arts = _comp.arts || []).push(a); }
+  var nn = a.nps.find(function (x) { return String(x.np) === String(npN); });
+  if (!nn) { nn = { np: String(npN), cod: codCli || "", rs: rs || "", pidio: 0, asig: 0 }; a.nps.push(nn); }
+  nn.asig = (Number(nn.asig) || 0) + cajas;
+  a.falta = (Number(a.falta) || 0) + cajas;
+  _comp.hayFalt = true;
 }
 function _compDifHtml() {
   const d = _comp.sepDif, n = _comp.nps[d.npIdx];
@@ -10697,6 +10763,22 @@ async function ocgFetchCapacidad() {
     return m;
   } catch (_e) { return {}; }
 }
+/* v10.08 — celdas de góndola por código (Capacidad_Sector.sector). Devuelve { codNorm: [sectores…] }
+   ordenados. Se usa en Guardado a Góndola para mostrarle al operario DÓNDE va cada artículo y cuántas
+   ubicaciones tiene. Ignora celdas 'Libre'. Mismo criterio de normalización (_ocgNorm) que la capacidad. */
+async function ocgFetchCeldas() {
+  try {
+    const rows = await supaFetchAllSafe(SUPABASE_CAPACIDAD_ENDPOINT, "select=cod,sector&order=sector.asc");
+    const m = {};
+    rows.forEach(function (x) {
+      const k = _ocgNorm(x.cod); if (!k || k === "LIBRE") return;
+      const sec = String(x.sector || "").trim(); if (!sec) return;
+      (m[k] || (m[k] = [])).push(sec);
+    });
+    Object.keys(m).forEach(function (k) { m[k] = Array.from(new Set(m[k])).sort(); });
+    return m;
+  } catch (_e) { return {}; }
+}
 /* v7.42 — "Caja N°" (tipo de caja del producto) desde Articulos_Cajas.N_Caja. Dato
    estático para el impreso de la OC. Si un código tiene varias N_Caja, toma la MÁS
    FRECUENTE. Devuelve { codNorm: N_Caja }. */
@@ -10833,18 +10915,19 @@ const SUPABASE_IMPORTADOS_OC_ENDPOINT = SUPABASE_URL + "/rest/v1/v_importados_or
 async function ocgFetchImportados() {
   let rows = [];
   try {
-    rows = await supaFetchAllSafe(SUPABASE_IMPORTADOS_OC_ENDPOINT, "select=id,cod_art,marca,proveedor,descripcion,uni_x_caja,est_madre_eff,meses_objetivo,stock_actual,pedido_curso,principal,activo&principal=eq.true&activo=eq.true");
+    rows = await supaFetchAllSafe(SUPABASE_IMPORTADOS_OC_ENDPOINT, "select=id,cod_art,marca,proveedor,descripcion,uni_x_caja,fob_uni,est_madre_eff,meses_objetivo,stock_actual,pedido_curso,principal,activo&principal=eq.true&activo=eq.true");
   } catch (_e) { return { items: [], meses: 10 }; }
   const by = {};
   let meses = 10;
   (rows || []).forEach(function (r) {
     const cod = String(r.cod_art || "").trim(); if (!cod) return;
     const k = cod.toUpperCase();
-    if (!by[k]) by[k] = { cod: cod, desc: r.descripcion || "", prov: String(r.proveedor || "").trim() || "(sin proveedor)", uxc: 0, proyUni: 0, stockUni: 0, enCurso: 0, det: [] };
+    if (!by[k]) by[k] = { cod: cod, desc: r.descripcion || "", prov: String(r.proveedor || "").trim() || "(sin proveedor)", uxc: 0, fob: 0, proyUni: 0, stockUni: 0, enCurso: 0, det: [] };
     const o = by[k];
     o.proyUni += Number(r.est_madre_eff) || 0;
     o.stockUni += Number(r.stock_actual) || 0;
     o.enCurso += Number(r.pedido_curso) || 0;
+    const fb = Number(r.fob_uni) || 0; if (fb > 0 && !o.fob) o.fob = fb;   // v10.06 — FOB USD/unidad (del maestro Importados)
     // filas subyacentes (por marca/planta) para poder editar "en curso" y marcar llegada por Importados.id
     if (r.id != null) o.det.push({ id: r.id, marca: String(r.marca || "").trim(), prov: String(r.proveedor || "").trim(), curso: Number(r.pedido_curso) || 0, uxc: Number(r.uni_x_caja) || 0 });
     const u = Number(r.uni_x_caja) || 0; if (u > o.uxc) o.uxc = u;
@@ -10868,6 +10951,12 @@ async function ocgFetchImportados() {
     const sp = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/vista_importados_stock_parte", "select=cod,stock_parte,partes");
     (sp || []).forEach(function (r) { stockParte[String(r.cod).toUpperCase().trim()] = { u: Number(r.stock_parte) || 0, partes: r.partes || "" }; });
   } catch (_e) {}
+  // v10.05 — VOLUMEN de la MASTER caja (m³) por código, editable (tabla Importados_Volumen).
+  const volMaster = {};
+  try {
+    const vm = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Importados_Volumen", "select=cod,largo_cm,ancho_cm,alto_cm,m3_master,uni_master");
+    (vm || []).forEach(function (r) { volMaster[String(r.cod).toUpperCase().trim()] = { m3: Number(r.m3_master) || 0, um: Number(r.uni_master) || 0, l: Number(r.largo_cm) || 0, a: Number(r.ancho_cm) || 0, h: Number(r.alto_cm) || 0 }; });
+  } catch (_e) {}
   const items = [];
   Object.keys(by).forEach(function (k) {
     const o = by[k];
@@ -10880,8 +10969,20 @@ async function ocgFetchImportados() {
     const stockTot = o.stockUni + stockParteU;   // el stock de la parte cuenta como stock del terminado
     const objetivoUni = Math.round(proyUni * meses);
     const aPedirUni = Math.max(0, Math.ceil(objetivoUni - stockTot - o.enCurso));
-    const aPedirCajas = (o.uxc > 0) ? Math.ceil(aPedirUni / o.uxc) : null;
-    items.push({ cod: o.cod, desc: o.desc, prov: o.prov, proyUni: Math.round(proyUni), meses: meses, objetivoUni: objetivoUni, stockUni: Math.round(stockTot), stockPropio: Math.round(o.stockUni), stockParteU: Math.round(stockParteU), stockParteCods: (sp ? sp.partes : ""), enCurso: Math.round(o.enCurso), aPedirUni: aPedirUni, uxc: o.uxc, aPedirCajas: aPedirCajas, esParte: esParte, parteDet: (pp ? pp.detalle : null), det: o.det || [] });
+    // v10.07 — MASTER CAJAS: el divisor correcto es uni_master (del Excel/Importados_Volumen), NO
+    // uni_x_caja (que es la caja INNER). Si no hay uni_master cargado, caemos a uni_x_caja como aprox.
+    const vm = volMaster[kk] || null;
+    const uniMaster = (vm && vm.um > 0) ? vm.um : 0;
+    const divisorCaja = uniMaster > 0 ? uniMaster : o.uxc;
+    const cajasEsMaster = uniMaster > 0;
+    const aPedirCajas = (divisorCaja > 0) ? Math.ceil(aPedirUni / divisorCaja) : null;   // master cajas enteras
+    // m³ del pedido = master cajas a pedir (enteras) × m³ por master caja
+    const m3Master = vm ? vm.m3 : 0;
+    const m3Total = (aPedirCajas != null && m3Master > 0) ? (aPedirCajas * m3Master) : 0;
+    // v10.06 — cotización USD = unidades a pedir × FOB unitario (por ítem; el total se suma en el render)
+    const fobUni = o.fob || 0;
+    const usdTotal = (fobUni > 0) ? (aPedirUni * fobUni) : 0;
+    items.push({ cod: o.cod, desc: o.desc, prov: o.prov, proyUni: Math.round(proyUni), meses: meses, objetivoUni: objetivoUni, stockUni: Math.round(stockTot), stockPropio: Math.round(o.stockUni), stockParteU: Math.round(stockParteU), stockParteCods: (sp ? sp.partes : ""), enCurso: Math.round(o.enCurso), aPedirUni: aPedirUni, uxc: o.uxc, uniMaster: uniMaster, cajasEsMaster: cajasEsMaster, aPedirCajas: aPedirCajas, fobUni: fobUni, usdTotal: usdTotal, m3Master: m3Master, m3Dims: vm ? { l: vm.l, a: vm.a, h: vm.h } : null, m3Total: m3Total, esParte: esParte, parteDet: (pp ? pp.detalle : null), det: o.det || [] });
   });
   return { items: items, meses: meses };
 }
@@ -11272,35 +11373,18 @@ function stkRender() {
    tabla de Stock (a la derecha de Racks) — pedido del usuario. Se carga junto con el
    stock (openStockAdmin). Devuelve { pend: {np->…}, porArt: {codN->{cod,cajas,nps}} }. */
 async function stkFcsFetch() {
+  /* v10.10 — reemplaza 6 fetches client-side por 1 fetch de vista_fc_sin_salida (server-side).
+     La vista ya resuelve CCN/FSS/Facturacion_NP/Entregas y agrupa por artículo con detalle NP. */
   const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
-  const res = await Promise.all([
-    fetch(SUPABASE_FACTURACION_NP_ENDPOINT + "?facturado_at=gte." + encodeURIComponent(CC_REPARTO_DESDE_ISO) + "&select=np,tanda,razon_social,facturado_at&limit=20000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }),
-    fetch(SUPABASE_TABLE_ENDPOINT + "?opcion=eq.CCN&ts_cliente=gte." + encodeURIComponent(CC_REPARTO_DESDE_ISO) + "&select=texto,ts_cliente&limit=20000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }),
-    supaFetchAll(SUPABASE_ENTREGAS_ENDPOINT, "select=np,cod_art,cajas_entregadas"),
-    loadArtNombres(), loadCodCanon(),
-    fetchSinSalidaMap(CC_REPARTO_DESDE_ISO)
-  ]);
-  // Cargada al camión = última CCN, salvo que un FSS más reciente la haya devuelto al
-  // depósito ("facturado sin salida") → vuelve a aparecer acá. v6.66.
-  const fssMap = res[5] || new Map();
-  const maxCcn = {};
-  (res[1] || []).forEach(function (ev) { const np = String(ev.texto || "").split("|")[0].trim().replace(/\.0+$/, ""); if (!np) return; const ms = ev.ts_cliente ? new Date(ev.ts_cliente).getTime() : 0; if (ms > (maxCcn[np] || 0)) maxCcn[np] = ms; });
-  const cargados = {};
-  Object.keys(maxCcn).forEach(function (np) { const fss = (fssMap.get && fssMap.get(np)) || 0; if (!(fss && fss > maxCcn[np])) cargados[np] = true; });
-  const pend = {};
-  (res[0] || []).forEach(function (r) {
-    const np = String(r.np || "").trim().replace(/\.0+$/, "");
-    if (!np || cargados[np] || pend[np]) return;
-    pend[np] = { np: np, tanda: String(r.tanda || "").trim() || "—", rs: r.razon_social || "", fecha: String(r.facturado_at || "").slice(0, 10), cajas: 0 };
-  });
-  const porArt = {};
-  (res[2] || []).forEach(function (x) {
-    const np = String(x.np || "").trim().replace(/\.0+$/, ""); if (!np || !pend[np]) return;
-    const cj = Number(x.cajas_entregadas) || 0; if (!cj) return;
-    const k = _ocgNorm(x.cod_art); if (!k) return;
-    if (!porArt[k]) porArt[k] = { cod: codCanon(x.cod_art), cajas: 0, nps: [] };
-    porArt[k].cajas += cj; porArt[k].nps.push({ np: np, cajas: cj });
-    pend[np].cajas += cj;
+  const rows = await fetch(SUPABASE_URL + "/rest/v1/vista_fc_sin_salida?select=cod,cajas,cant_nps,detalle_nps&limit=50000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; });
+  const porArt = {}, pend = {};
+  (rows || []).forEach(function (r) {
+    var nps = r.detalle_nps || [];
+    porArt[r.cod] = { cod: r.cod, cajas: r.cajas, nps: nps };
+    nps.forEach(function (d) {
+      if (!pend[d.np]) pend[d.np] = { np: d.np, tanda: d.tanda || "—", rs: d.rs || "", fecha: String(d.fecha || ""), cajas: 0 };
+      pend[d.np].cajas += Number(d.cajas) || 0;
+    });
   });
   return { pend: pend, porArt: porArt };
 }
@@ -11745,14 +11829,37 @@ async function openAbastecimiento() {
   ov.classList.add("show");
   ov.innerHTML = '<div class="abast-card"><div class="abast-head"><span class="abast-title">📈 Abastecimiento vs Venta</span><button class="abast-close" onclick="closeAbastecimiento()">Cerrar</button></div><div class="abast-body" id="abastBody"><div class="abast-loading">Cargando entregas y ventas…</div></div></div>';
   try {
+    /* v10.10 — reemplaza 3 fetches (~120k filas) + abastCompute() por 1 fetch de vista_abastecimiento
+       (~300 filas pre-procesadas server-side: avg 3m, falta, cap_falla, etc.). El detalle
+       mes-a-mes (drill-down al expandir un artículo) se carga lazy on-demand. */
     const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
     const res = await Promise.all([
-      fetch(SUPABASE_URL + "/rest/v1/vista_recepcion_mensual?select=cod,mes,proveedor,tipo,cajas,envios&limit=50000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }),
-      fetch(SUPABASE_URL + "/rest/v1/vista_venta_mensual?select=cod,mes,cajas,nps&limit=50000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }),
-      fetch(SUPABASE_URL + "/rest/v1/vista_stock_vs_pedidos?select=cod,stock_total,terminado,excedente,separar_pedidos,a_facturar,a_guardar,racks,racks_ch,para_envasar,pedidos_ped,nps_ped&limit=50000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }),
+      fetch(SUPABASE_URL + "/rest/v1/vista_abastecimiento?select=cod,descripcion,rec_avg,rec_ult,ven_avg,ven_ult,bal_avg,bal_ult,n_prov,stock,pedidos,nps_ped,terminado,excedente,separar_pedidos,a_facturar,a_guardar,racks,racks_ch,para_envasar,falta,cap_falla,stk_falla,provs_ult_detalle,mes_ultimo,es_importado&limit=50000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }),
       loadArtNombres()
     ]);
-    _abast = abastCompute(res[0] || [], res[1] || [], res[2] || []);
+    var viewRows = res[0] || [];
+    var mesUltimo = (viewRows[0] && viewRows[0].mes_ultimo) || "";
+    var info = _abastMonthsInfo();
+    var nImport = 0;
+    var rows = [];
+    viewRows.forEach(function (r) {
+      if (r.es_importado) { nImport++; return; }
+      var dep = {};
+      ABAST_DEPS.forEach(function (d) { dep[d[0]] = Number(r[d[0]]) || 0; });
+      var provs = (r.provs_ult_detalle || []).map(function (p) { return { nombre: p.nombre, cajas: Number(p.cajas) || 0 }; }).sort(function (x, y) { return y.cajas - x.cajas; });
+      rows.push({
+        cod: r.cod, desc: r.descripcion || artNombre(r.cod, ""),
+        recUlt: Number(r.rec_ult) || 0, venUlt: Number(r.ven_ult) || 0,
+        recAvg: Number(r.rec_avg) || 0, venAvg: Number(r.ven_avg) || 0,
+        balUlt: Number(r.bal_ult) || 0, balAvg: Number(r.bal_avg) || 0,
+        nProv: Number(r.n_prov) || 0, provs: provs,
+        stock: Number(r.stock) || 0, pedidos: Number(r.pedidos) || 0,
+        npsPed: Number(r.nps_ped) || 0, dep: dep, tieneSp: true,
+        falta: Number(r.falta) || 0,
+        _a: null   /* lazy: se carga al expandir (abastToggle) desde las vistas mensuales */
+      });
+    });
+    _abast = { ultimo: mesUltimo || info.ultimo, cur: info.cur, tres: [mesUltimo || info.ultimo, _mesAdd(mesUltimo || info.ultimo, -1), _mesAdd(mesUltimo || info.ultimo, -2)], rows: rows, filtro: "", nImport: nImport };
     abastRender();
   } catch (e) { const b = document.getElementById("abastBody"); if (b) b.innerHTML = '<div class="abast-loading" style="color:#b91c1c">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
 }
@@ -11807,6 +11914,9 @@ function abastRender() {
       '<td class="' + (stkFalla(r) ? "abast-neg" : "abast-pos") + '">' + (stkFalla(r) ? _abastN(r.falta) : "0") + '</td>' +
       '<td class="l">' + chips.join(" ") + '</td></tr>';
     if (open) {
+      if (r._a === "loading" || r._a === null) {
+        h += '<tr class="abast-det"><td colspan="10" class="l"><div style="text-align:center;color:#64748b;padding:12px;">Cargando detalle mensual…</div></td></tr>';
+      } else {
       const a = r._a; const mesesAll = Object.keys(a.mesesSet).sort();
       const meses = _abast.mesesAll ? mesesAll : mesesAll.slice(-6);
       const provTxt = r.provs.length ? r.provs.map(function (p) { return escapeHtml(p.nombre) + ' ' + _abastN(p.cajas); }).join(" · ") : "—";
@@ -11833,12 +11943,39 @@ function abastRender() {
       dr += '<div class="abast-prov" style="margin-top:4px">Pedido pendiente: <b>' + _abastN(r.pedidos) + '</b> cajas en <b>' + (r.npsPed || 0) + '</b> NP(s)' + (stkFalla(r) ? ' · falta fabricar/reponer <b style="color:#b91c1c">' + _abastN(r.falta) + '</b>' : ' · stock suficiente ✓') + '</div></div>';
       dt += dl + dr + '</div>';
       h += '<tr class="abast-det"><td colspan="10" class="l">' + dt + '</td></tr>';
+      }
     }
   });
   h += '</tbody></table></div>';
   _renderKeepFocus(body, h);
 }
-function abastToggle(codEnc) { if (!_abast) return; const cod = decodeURIComponent(codEnc); _abast.openCod = (_abast.openCod === cod) ? null : cod; if (_abast.openCod == null) _abast.mesesAll = false; abastRender(); }
+function abastToggle(codEnc) {
+  if (!_abast) return;
+  const cod = decodeURIComponent(codEnc);
+  _abast.openCod = (_abast.openCod === cod) ? null : cod;
+  if (_abast.openCod == null) { _abast.mesesAll = false; abastRender(); return; }
+  /* v10.10 — lazy-load detalle mensual para el artículo expandido (evita los 120k rows iniciales).
+     _a null = todavía sin cargar → fetch on-demand de vista_recepcion_mensual + vista_venta_mensual
+     solo para ese código, armar recepMes/ventaMes/provMes/mesesSet y re-render. */
+  var row = _abast.rows.find(function (r) { return r.cod === cod; });
+  if (row && row._a === null) {
+    row._a = "loading";
+    abastRender();
+    var H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+    Promise.all([
+      fetch(SUPABASE_URL + "/rest/v1/vista_recepcion_mensual?cod=eq." + encodeURIComponent(cod) + "&select=mes,proveedor,cajas&limit=5000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }),
+      fetch(SUPABASE_URL + "/rest/v1/vista_venta_mensual?cod=eq." + encodeURIComponent(cod) + "&select=mes,cajas&limit=5000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; })
+    ]).then(function (res) {
+      var recepMes = {}, ventaMes = {}, provMes = {}, mesesSet = {};
+      (res[0] || []).forEach(function (r) { var m = r.mes, q = Number(r.cajas) || 0; recepMes[m] = (recepMes[m] || 0) + q; mesesSet[m] = 1; if (!provMes[m]) provMes[m] = {}; var pv = r.proveedor || "(s/nombre)"; provMes[m][pv] = (provMes[m][pv] || 0) + q; });
+      (res[1] || []).forEach(function (r) { var m = r.mes; ventaMes[m] = (ventaMes[m] || 0) + (Number(r.cajas) || 0); mesesSet[m] = 1; });
+      row._a = { recepMes: recepMes, ventaMes: ventaMes, provMes: provMes, mesesSet: mesesSet };
+      if (_abast && _abast.openCod === cod) abastRender();
+    }).catch(function () { row._a = { recepMes: {}, ventaMes: {}, provMes: {}, mesesSet: {} }; if (_abast && _abast.openCod === cod) abastRender(); });
+    return;
+  }
+  abastRender();
+}
 function abastToggleMeses() { if (!_abast) return; _abast.mesesAll = !_abast.mesesAll; abastRender(); }
 
 function prodEnsureCss() {
@@ -12153,14 +12290,10 @@ function stkBodySectDetail() {
   return h;
 }
 function stkBodyStocksTab() {
-  const view = _stk.stkView || "stocks";
-  const seg = function (v, label) { return '<button class="stk-segb' + (view === v ? " on" : "") + '" onclick="stkSetView(\'' + v + '\')">' + label + '</button>'; };
-  let h = '<div class="stk-seg">' + seg("stocks", "📊 Stock") + seg("ingresos", "📥 Ingresos") + seg("salidas", "📤 Salidas") + '</div>';   // v6.70: FC s/Salida pasó a ser una COLUMNA de la tabla (no un segmento)
-  // v8.92 — el botón "Excedentes por ubicación" se movió a la fila "Ver stock" (stkAsOfControl) para
-  // ahorrar una fila. En ingresos/salidas (sin esa fila) se muestra acá compacto, alineado a la derecha.
-  if (view !== "stocks") h += '<div style="display:flex;justify-content:flex-end;margin-bottom:10px;">' + stkExcedentesBtn() + '</div>';
-  h += (view === "ingresos") ? stkBodyIngresos() : (view === "salidas") ? stkBodySalidas() : stkBodyStocks();
-  return h;
+  // v10.02 — se sacaron los 3 botones de segmento (Stock / Ingresos / Salidas): no tenían sentido
+  // desde esta solapa (pedido del usuario). La solapa muestra directo el Stock. Ingresos/Salidas
+  // (stkBodyIngresos/stkBodySalidas) siguen definidos por si se re-enganchan desde otro lado.
+  return stkBodyStocks();
 }
 /* Descarga un Excel (.xls, tabla HTML → lo abre Excel; sin librería) del depósito
    "excedente" ORDENADO POR UBICACIÓN: una fila por (ubicación, código) — si un código
@@ -12431,6 +12564,14 @@ function stkBodyStocks() {
   }); });
   let h = "";   // banner "Stock contado desde…" sacado a pedido del usuario
   h += stkAsOfControl();   // En vivo / a una fecha y hora determinada
+  // v10.02 — símbolo ROJO arriba con la cantidad de códigos en negativo (problema de integridad).
+  // Tocarlo filtra la tabla a solo esos códigos (mismo toggle que el botón "🔴 Negativos"). Pedido del usuario.
+  if (_stkNegCount > 0) {
+    h += '<div onclick="stkToggleSoloNeg()" title="Códigos con saldo NEGATIVO en algún depósito — no debería pasar. Tocá para verlos." ' +
+      'style="cursor:pointer;display:flex;align-items:center;gap:8px;background:' + (_stk.soloNeg ? "#dc2626" : "#fef2f2") + ';color:' + (_stk.soloNeg ? "#fff" : "#b91c1c") + ';border:1.5px solid #dc2626;border-radius:10px;padding:8px 12px;margin-bottom:10px;font-weight:800;font-size:13.5px;">' +
+      '🔴 <span>' + _stkNegCount + ' código' + (_stkNegCount > 1 ? "s" : "") + ' con stock NEGATIVO</span>' +
+      '<span style="margin-left:auto;font-weight:700;font-size:12px;opacity:.85;">' + (_stk.soloNeg ? "✕ quitar filtro" : "tocá para verlos ›") + '</span></div>';
+  }
   // v8.95 — la tira de totales de arriba (Góndola/Excedente/…/Pedidas/Capacidad) se sacó a
   // pedido del usuario. Ahora se filtra tocando el header de cada columna (ver _thNum abajo).
   // v8.91 — la tarjeta "horas de guardado pendientes" se movió al pop-up "¿Qué bajar primero?"
@@ -12495,7 +12636,9 @@ function stkBodyStocks() {
     // sale del propio código (no de OC_Maximos); y en CÓDIGO se muestra el base.
     const _codSuffix = String(a.cod || "").match(/\s+(LK|CH|LOKE)$/i);
     const _lin = _codSuffix ? _codSuffix[1].toUpperCase().replace("LOKE", "LK") : ocLinea(a.cod);
-    const _codDisplay = _codSuffix ? codBase(a.cod) : a.cod;
+    // v10.02 — mostrar SIEMPRE el código canónico con cero(s) a la izquierda (026, 035E). La vista
+    // vista_stock_procesada (v10.00) devuelve el código sin ceros ("26"), así que se re-pad acá.
+    const _codDisplay = codCanon(_codSuffix ? codBase(a.cod) : a.cod);
     // v7.90 — marca de familia de equivalentes: principal (⭐) / secundario (⇄ va al principal).
     const _fam = equivFam(a.cod);
     let _famTag = "";
@@ -12960,7 +13103,18 @@ function _pedImpRender() {
     byImp[imp][prov].push(it);
   });
   let h = '<div class="stkpop-hint">Pedidos a los proveedores chinos (motor <code>v_importados_ordenes</code>, índice <b>' + (data.meses || 10) + ' meses</b>). Separado de las OC de talleristas. 🧩 = parte (proyección = suma de sus terminados).<br><b>✏️</b> editar unidades en curso (lo ya pedido/en camino) · <b>📥</b> marcar que el pedido llegó (suma al stock y baja de en curso).</div>';
-  h += '<div style="margin-bottom:10px"><button class="mva-clear" style="' + (_stkPop.soloPedir ? 'background:#0f766e;color:#fff;border-color:#0f766e' : '') + '" onclick="pedImpToggle()">' + (_stkPop.soloPedir ? '✓ ' : '') + 'Solo lo que hay que pedir</button></div>';
+  h += '<div style="margin-bottom:10px;display:flex;gap:8px;flex-wrap:wrap;"><button class="mva-clear" style="' + (_stkPop.soloPedir ? 'background:#0f766e;color:#fff;border-color:#0f766e' : '') + '" onclick="pedImpToggle()">' + (_stkPop.soloPedir ? '✓ ' : '') + 'Solo lo que hay que pedir</button>' +
+    '<button class="mva-clear" style="background:#166534;color:#fff;border-color:#166534" onclick="pedImpExportExcel()" title="Bajar a Excel lo que se está viendo">📥 Bajar a Excel</button></div>';
+  // v10.06 — TOTAL del pedido (lo que se está viendo): USD (Σ unidades×FOB) + m³ (Σ master cajas×m³/master)
+  const _gUsd = items.reduce(function (s, it) { return s + (Number(it.usdTotal) || 0); }, 0);
+  const _gM3 = items.reduce(function (s, it) { return s + (Number(it.m3Total) || 0); }, 0);
+  const _gUsdFmt = "u$s " + Math.round(_gUsd).toLocaleString("es-AR");
+  const _nSinFob = items.filter(function (it) { return it.aPedirUni > 0 && !(it.fobUni > 0); }).length;
+  const _nSinVol = items.filter(function (it) { return it.aPedirUni > 0 && !(it.m3Master > 0); }).length;
+  h += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">' +
+    '<div style="flex:1;min-width:150px;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:10px;padding:10px 14px"><div style="font-size:11px;color:#047857;font-weight:700;text-transform:uppercase;letter-spacing:.4px">Total pedido (FOB)</div><div style="font-size:22px;font-weight:800;color:#065f46">' + _gUsdFmt + '</div>' + (_nSinFob ? '<div style="font-size:11px;color:#b45309">⚠ ' + _nSinFob + ' ítem(s) sin FOB cargado</div>' : '') + '</div>' +
+    '<div style="flex:1;min-width:150px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:10px 14px"><div style="font-size:11px;color:#1d4ed8;font-weight:700;text-transform:uppercase;letter-spacing:.4px">Volumen total</div><div style="font-size:22px;font-weight:800;color:#1e3a8a">' + (Math.round(_gM3 * 100) / 100).toLocaleString("es-AR") + ' m³</div>' + (_nSinVol ? '<div style="font-size:11px;color:#b45309">⚠ ' + _nSinVol + ' ítem(s) sin volumen cargado</div>' : '') + '</div>' +
+    '</div>';
   const impOrder = ["Chef", "Tierra Nativa", "(sin importador)"];
   Object.keys(byImp).forEach(function (k) { if (impOrder.indexOf(k) < 0) impOrder.push(k); });
   let algo = false;
@@ -12971,14 +13125,18 @@ function _pedImpRender() {
     Object.keys(provs).sort().forEach(function (prov) {
       const arr = provs[prov];
       const totCaj = arr.reduce(function (s, it) { return s + (it.aPedirCajas || 0); }, 0);
-      h += '<div class="stkpop-hint" style="margin:8px 0 3px;font-weight:700">' + escapeHtml(prov) + ' · ' + arr.length + ' ítem(s)' + (totCaj ? ' · ' + totCaj + ' cajas' : '') + '</div>';
-      h += '<div class="mva-tblwrap"><table class="mva-tbl"><thead><tr><th>Código</th><th>Descripción</th><th class="num">Proy u/mes</th><th class="num">Objetivo</th><th class="num">Stock</th><th class="num">En curso</th><th class="num">A pedir u</th><th class="num">Cajas</th><th>Acciones</th></tr></thead><tbody>';
+      const totM3 = arr.reduce(function (s, it) { return s + (Number(it.m3Total) || 0); }, 0);   // v10.05
+      const totUsd = arr.reduce(function (s, it) { return s + (Number(it.usdTotal) || 0); }, 0);  // v10.06
+      h += '<div class="stkpop-hint" style="margin:8px 0 3px;font-weight:700">' + escapeHtml(prov) + ' · ' + arr.length + ' ítem(s)' + (totCaj ? ' · ' + totCaj + ' cajas' : '') + (totUsd > 0 ? ' · <span style="color:#065f46">u$s ' + Math.round(totUsd).toLocaleString("es-AR") + '</span>' : '') + (totM3 > 0 ? ' · <span style="color:#0369a1">' + (Math.round(totM3 * 100) / 100) + ' m³</span>' : '') + '</div>';
+      h += '<div class="mva-tblwrap"><table class="mva-tbl"><thead><tr><th>Código</th><th>Descripción</th><th class="num">Proy u/mes</th><th class="num">Objetivo</th><th class="num">Stock</th><th class="num">En curso</th><th class="num">A pedir u</th><th class="num" title="Master cajas = ceil(a pedir ÷ uni por master). Siempre enteras. Un ~ marca que no hay uni_master cargado y se aproximó con la caja inner.">Master cjs</th><th class="num" title="FOB unitario (USD) del maestro Importados">FOB u$s/u</th><th class="num" title="Cotización del ítem = unidades a pedir × FOB unitario">u$s pedido</th><th class="num" title="m³ de UNA master caja (medidas cargadas a mano). Tocá el ✏ para cargar/editar.">m³/master</th><th class="num" title="m³ del pedido = master cajas a pedir × m³ por master">m³ pedido</th><th>Acciones</th></tr></thead><tbody>';
       arr.sort(function (a, b) { return b.aPedirUni - a.aPedirUni; }).forEach(function (it) {
-        const cajTxt = (it.aPedirCajas == null) ? '<span style="color:#94a3b8" title="Sin uni×caja cargado">—</span>' : String(it.aPedirCajas);
+        const cajTxt = (it.aPedirCajas == null) ? '<span style="color:#94a3b8" title="Sin uni×caja cargado">—</span>' : (String(it.aPedirCajas) + (it.cajasEsMaster ? '' : '<span style="color:#f59e0b" title="Sin uni_master cargado: aprox con caja inner">~</span>'));
         const badge = it.esParte ? ' <span style="color:#7c3aed" title="Parte">🧩</span>' : '';
+        // v10.02 — stock negativo (más pedidos que stock) se muestra como 0 (no negativo), pedido del usuario.
+        const _stkShow = Math.max(0, Number(it.stockUni) || 0);
         const stockTxt = (it.stockParteU > 0)
-          ? it.stockUni + ' <span style="color:#7c3aed;font-weight:700;font-size:11px" title="Incluye ' + it.stockParteU + ' u de la parte ' + escapeHtml(it.stockParteCods || '') + ' (' + it.stockPropio + ' propio + ' + it.stockParteU + ' parte)">🔧+' + it.stockParteU + '</span>'
-          : String(it.stockUni);
+          ? _stkShow + ' <span style="color:#7c3aed;font-weight:700;font-size:11px" title="Incluye ' + it.stockParteU + ' u de la parte ' + escapeHtml(it.stockParteCods || '') + ' (' + it.stockPropio + ' propio + ' + it.stockParteU + ' parte)">🔧+' + it.stockParteU + '</span>'
+          : String(_stkShow);
         var actHtml = (it.det || []).map(function (d) {
           var multi = (it.det || []).length > 1;
           var lbl = (multi && d.marca) ? ('<span style="font-size:10px;color:#64748b;margin-right:2px">' + escapeHtml(d.marca) + '</span>') : '';
@@ -12987,13 +13145,66 @@ function _pedImpRender() {
             '<button class="stk-btn" style="padding:3px 7px;font-size:12px" title="Editar unidades en curso (pedido en camino)" onclick="pedImpSetCurso(' + d.id + ',\'' + codEnc + '\',' + (d.curso || 0) + ')">✏️</button> ' +
             '<button class="stk-btn ok" style="padding:3px 7px;font-size:12px" title="Marcar que el pedido llegó: suma al stock y baja de en curso" onclick="pedImpLlego(' + d.id + ',\'' + codEnc + '\',' + (d.curso || 0) + ')">📥</button></div>';
         }).join('');
-        h += '<tr><td><b>' + escapeHtml(codCanon(it.cod)) + '</b>' + badge + '</td><td style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escapeHtml(it.desc || "") + '">' + escapeHtml(artNombre(it.cod, it.desc)) + '</td><td class="num">' + it.proyUni + '</td><td class="num">' + it.objetivoUni + '</td><td class="num">' + stockTxt + '</td><td class="num">' + it.enCurso + '</td><td class="num" style="font-weight:800;color:#b45309">' + it.aPedirUni + '</td><td class="num">' + cajTxt + '</td><td>' + actHtml + '</td></tr>';
+        // v10.05 — m³/master (editable) + m³ del pedido
+        var _codEncV = encodeURIComponent(it.cod);
+        var _m3m = Number(it.m3Master) || 0;
+        var _dimTip = it.m3Dims && it.m3Dims.l ? (it.m3Dims.l + '×' + it.m3Dims.a + '×' + it.m3Dims.h + ' cm') : '';
+        var m3MasterTxt = _m3m > 0
+          ? '<span style="cursor:pointer" title="' + (_dimTip ? escapeHtml(_dimTip) + ' — ' : '') + 'tocá para editar" onclick="pedImpEditVol(\'' + _codEncV + '\')">' + (Math.round(_m3m * 10000) / 10000) + ' <span style="color:#94a3b8;font-size:11px">✏️</span></span>'
+          : '<span style="cursor:pointer;color:#cbd5e1" title="Cargar medidas de la master (cm) para calcular m³" onclick="pedImpEditVol(\'' + _codEncV + '\')">✏️</span>';
+        var m3TotTxt = (Number(it.m3Total) || 0) > 0 ? '<b style="color:#0369a1">' + (Math.round(it.m3Total * 100) / 100) + '</b>' : '<span style="color:#cbd5e1">—</span>';
+        // v10.06 — FOB unitario (editable ✏) + cotización USD del ítem
+        var _fob = Number(it.fobUni) || 0;
+        var fobTxt = _fob > 0
+          ? '<span style="cursor:pointer" title="Tocá para editar el FOB" onclick="pedImpEditFob(\'' + _codEncV + '\')">' + _fob.toFixed(3) + ' <span style="color:#94a3b8;font-size:11px">✏️</span></span>'
+          : '<span style="cursor:pointer;color:#cbd5e1" title="Cargar FOB unitario (USD)" onclick="pedImpEditFob(\'' + _codEncV + '\')">✏️</span>';
+        var usdTxt = (Number(it.usdTotal) || 0) > 0 ? '<b style="color:#065f46">u$s ' + Math.round(it.usdTotal).toLocaleString("es-AR") + '</b>' : '<span style="color:#cbd5e1">—</span>';
+        h += '<tr><td><b>' + escapeHtml(codCanon(it.cod)) + '</b>' + badge + '</td><td style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escapeHtml(it.desc || "") + '">' + escapeHtml(artNombre(it.cod, it.desc)) + '</td><td class="num">' + it.proyUni + '</td><td class="num">' + it.objetivoUni + '</td><td class="num">' + stockTxt + '</td><td class="num">' + it.enCurso + '</td><td class="num" style="font-weight:800;color:#b45309">' + it.aPedirUni + '</td><td class="num">' + cajTxt + '</td><td class="num">' + fobTxt + '</td><td class="num">' + usdTxt + '</td><td class="num">' + m3MasterTxt + '</td><td class="num">' + m3TotTxt + '</td><td>' + actHtml + '</td></tr>';
       });
       h += '</tbody></table></div>';
     });
   });
   if (!algo) h += '<div class="stkpop-empty">No hay importados ' + (_stkPop.soloPedir ? 'para pedir (todo en o sobre el objetivo)' : 'cargados') + '.</div>';
   body.innerHTML = h;
+}
+/* v10.02 — Bajar a Excel los Pedidos Importación (lo que se está viendo, respeta "Solo lo que hay
+   que pedir"). Stock negativo se exporta como 0 (igual que en pantalla). Sin librería (.xls = tabla HTML). */
+function pedImpExportExcel() {
+  if (!_stkPop || _stkPop.kind !== "pedImp") return;
+  var data = _stkPop.data || { items: [] };
+  var items = (data.items || []).slice();
+  if (_stkPop.soloPedir) items = items.filter(function (it) { return it.aPedirUni > 0; });
+  if (!items.length) { try { alert("No hay ítems para exportar."); } catch (_e) {} return; }
+  var esc = function (s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); };
+  var fecha = (function () { try { return new Date().toLocaleDateString("en-CA", { timeZone: "America/Argentina/Buenos_Aires" }); } catch (_e) { return "hoy"; } })();
+  // Orden: por importador, proveedor, y dentro por A pedir desc (como en pantalla)
+  items.sort(function (a, b) {
+    var ia = _IMPORTADOR_DE[a.prov || ""] || "(sin importador)", ib = _IMPORTADOR_DE[b.prov || ""] || "(sin importador)";
+    if (ia !== ib) return ia < ib ? -1 : 1;
+    var pa = a.prov || "", pb = b.prov || ""; if (pa !== pb) return pa < pb ? -1 : 1;
+    return (b.aPedirUni || 0) - (a.aPedirUni || 0);
+  });
+  var html = '<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"><style>td,th{border:1px solid #ccc;padding:3px 7px;font-family:Calibri,Arial,sans-serif;} th{background:#166534;color:#fff;text-align:left;}</style></head><body>';
+  html += '<h3>Pedidos Importación — Producción Virgilio (' + esc(fecha) + ', índice ' + (data.meses || 10) + ' meses)</h3>';
+  html += '<table><tr><th>Importador</th><th>Proveedor</th><th>Codigo</th><th>Descripcion</th><th>Proy u/mes</th><th>Objetivo</th><th>Stock</th><th>En curso</th><th>A pedir u</th><th>Master cjs</th><th>FOB u$s/u</th><th>u$s pedido</th><th>m3/master</th><th>m3 pedido</th></tr>';
+  var _totM3 = 0, _totUsd = 0;
+  items.forEach(function (it) {
+    var imp = _IMPORTADOR_DE[it.prov || ""] || "(sin importador)";
+    var stk = Math.max(0, Number(it.stockUni) || 0);   // negativo → 0 (igual que pantalla)
+    var caj = (it.aPedirCajas == null) ? "" : it.aPedirCajas;
+    var m3m = Number(it.m3Master) || 0, m3t = Number(it.m3Total) || 0; _totM3 += m3t;
+    var fob = Number(it.fobUni) || 0, usd = Number(it.usdTotal) || 0; _totUsd += usd;
+    html += '<tr><td>' + esc(imp) + '</td><td>' + esc(it.prov || "") + '</td><td>' + esc(codCanon(it.cod)) + '</td><td>' + esc(artNombre(it.cod, it.desc)) + '</td><td>' + (it.proyUni || 0) + '</td><td>' + (it.objetivoUni || 0) + '</td><td>' + stk + '</td><td>' + (it.enCurso || 0) + '</td><td>' + (it.aPedirUni || 0) + '</td><td>' + caj + '</td><td>' + (fob > 0 ? fob : "") + '</td><td>' + (usd > 0 ? Math.round(usd) : "") + '</td><td>' + (m3m > 0 ? m3m : "") + '</td><td>' + (m3t > 0 ? (Math.round(m3t * 100) / 100) : "") + '</td></tr>';
+  });
+  html += '<tr><td colspan="11"><b>TOTALES</b></td><td><b>' + Math.round(_totUsd) + '</b></td><td></td><td><b>' + (Math.round(_totM3 * 100) / 100) + '</b></td></tr>';
+  html += '</table></body></html>';
+  try {
+    var blob = new Blob(["﻿" + html], { type: "application/vnd.ms-excel" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a"); a.href = url; a.download = "Pedidos_Importacion_" + fecha + ".xls";
+    document.body.appendChild(a); a.click();
+    setTimeout(function () { try { document.body.removeChild(a); URL.revokeObjectURL(url); } catch (_e) {} }, 1500);
+  } catch (e) { try { alert("No se pudo generar el Excel: " + (e.message || e)); } catch (_e) {} }
 }
 /* v9.29 — Pedidos Importación operable: editar "en curso" y marcar llegada.
    Ambas acciones van por RPC SECURITY DEFINER (sql/importados_pedidos_rpc.sql) apuntando
@@ -13009,6 +13220,65 @@ async function _pedImpRpc(fn, body) {
 }
 async function pedImpReload() {
   try { var data = await ocgFetchImportados(); if (_stkPop && _stkPop.kind === "pedImp") { _stkPop.data = data; _pedImpRender(); } } catch (_e) {}
+}
+/* v10.05 — cargar/editar el VOLUMEN de la master caja de un importado. Pide las medidas en cm
+   (Largo x Ancho x Alto), calcula m³ = L×A×H/1.000.000 y lo guarda en Importados_Volumen (upsert).
+   Se puede ingresar directamente el m³ escribiendo un solo número (ej. 0.045). */
+async function pedImpEditVol(codEnc) {
+  var cod = decodeURIComponent(codEnc);
+  var cur = null;
+  try {
+    var data = (_stkPop && _stkPop.data) || {};
+    (data.items || []).some(function (it) { if (String(it.cod).toUpperCase().trim() === cod.toUpperCase().trim()) { cur = it; return true; } return false; });
+  } catch (_e) {}
+  var prev = (cur && cur.m3Dims && cur.m3Dims.l) ? (cur.m3Dims.l + "x" + cur.m3Dims.a + "x" + cur.m3Dims.h) : (cur && cur.m3Master > 0 ? String(cur.m3Master) : "");
+  var val = prompt("Medidas de la MASTER caja de " + codCanon(cod) + " en cm (Largo x Ancho x Alto).\nEj: 60x40x30\n\n(O escribí directo el m³ de la master, ej: 0.072)", prev);
+  if (val === null) return;
+  val = String(val).trim().toLowerCase().replace(/,/g, ".");
+  var l = 0, a = 0, h = 0, m3 = 0;
+  var parts = val.split(/[x*×]/).map(function (s) { return parseFloat(s.replace(/[^0-9.]/g, "")); }).filter(function (n) { return !isNaN(n); });
+  if (parts.length >= 3) {
+    l = parts[0]; a = parts[1]; h = parts[2];
+    m3 = (l * a * h) / 1000000;
+  } else if (parts.length === 1) {
+    m3 = parts[0];   // ingresó el m³ directo
+  } else {
+    try { alert("No entendí las medidas. Usá 60x40x30 (cm) o un m³ directo como 0.072."); } catch (_e) {}
+    return;
+  }
+  m3 = Math.round(m3 * 1000000) / 1000000;
+  try {
+    await fetch(SUPABASE_URL + "/rest/v1/Importados_Volumen?on_conflict=cod", {
+      method: "POST",
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" },
+      body: JSON.stringify({ cod: cod, largo_cm: l || null, ancho_cm: a || null, alto_cm: h || null, m3_master: m3, actualizado: new Date().toISOString() })
+    });
+    await pedImpReload();
+  } catch (e) { try { alert("No se pudo guardar el volumen: " + (e.message || e)); } catch (_e) {} }
+}
+/* v10.06 — editar el FOB unitario (USD) de un importado. Escribe fob_uni en TODAS las filas del
+   código en Importados (todas las marcas/plantas comparten el mismo FOB del proveedor). */
+async function pedImpEditFob(codEnc) {
+  var cod = decodeURIComponent(codEnc);
+  var cur = 0;
+  try {
+    var data = (_stkPop && _stkPop.data) || {};
+    (data.items || []).some(function (it) { if (String(it.cod).toUpperCase().trim() === cod.toUpperCase().trim()) { cur = Number(it.fobUni) || 0; return true; } return false; });
+  } catch (_e) {}
+  var val = prompt("FOB unitario (USD por unidad) de " + codCanon(cod) + ":", cur > 0 ? String(cur) : "");
+  if (val === null) return;
+  val = String(val).trim().replace(/,/g, ".").replace(/[^0-9.]/g, "");
+  var fob = parseFloat(val);
+  if (isNaN(fob) || fob < 0) { try { alert("FOB inválido."); } catch (_e) {} return; }
+  fob = Math.round(fob * 100000) / 100000;
+  try {
+    await fetch(SUPABASE_URL + "/rest/v1/Importados?cod_art=eq." + encodeURIComponent(cod), {
+      method: "PATCH",
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" },
+      body: JSON.stringify({ fob_uni: fob, actualizado: new Date().toISOString() })
+    });
+    await pedImpReload();
+  } catch (e) { try { alert("No se pudo guardar el FOB: " + (e.message || e)); } catch (_e) {} }
 }
 async function pedImpSetCurso(id, codEnc, curso) {
   var cod = decodeURIComponent(codEnc);
@@ -13965,195 +14235,59 @@ async function stkFaltLoad() {
   if (!_stk) return;
   _stk.faltLoaded = "loading"; stkRender();
   try {
+    // v10.09: 3 vistas reemplazan 13 fetches crudos.
     var res = await Promise.all([
-      supaFetchAllSafe(SUPABASE_PPP_PROG_ENDPOINT, "select=np,fecha_entrega,razon_social,tanda,cod,zona"),
-      fetchPickingBase(),
-      supaFetchAllSafe(SUPABASE_FACTURACION_NP_ENDPOINT, "select=np"),
-      // v8.17 — "Fabricante" espeja el GENERADOR DE OCs: proveedor(es) de vista_generador_oc
-      // (mismo dato que se ve en Generar OCs), no OC_Maximos crudo.
-      supaFetchAllSafe(SUPABASE_GENERADOR_ENDPOINT, "select=cod,proveedor,tiene_prov_real,proveedor2,pr2&activo=eq.true"),
-      supaFetchAllSafe(SUPABASE_URL + "/rest/v1/vista_saldos_stock",
-        "select=cod_art,descripcion,terminado,excedente,a_guardar,racks,racks_ch,para_envasar,separar_pedidos,a_facturar,insumos"),
-      // v8.38 — códigos DISCONTINUOS (activo=false en OC_Maximos): no se muestran en Faltantes.
-      supaFetchAllSafe(SUPABASE_OCMAX_ENDPOINT, "select=cod&activo=eq.false"),
-      // v9.34 — NP ya ENTREGADAS (completadas) y CANCELADAS: no son faltante (igual que ocgDemanda).
-      supaFetchAllSafe(SUPABASE_URL + "/rest/v1/PPP_Entregados_Meta", "select=np"),
-      supaFetchAllSafe(SUPABASE_URL + "/rest/v1/NP_Canceladas", "select=np"),
-      // v9.85 — ÚLTIMA ENTREGA (recepción a góndola): fecha + cajas de la última recepción por código.
-      supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Movimientos_Stock", "select=cod_art,delta,ts&tipo=eq.recepcion&deposito=eq.a_guardar&delta=gt.0"),
-      // v9.85 — OC pendiente de esta semana (Ordenes_Compra) por código/proveedor.
-      supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Ordenes_Compra", "select=codigo,cantidad,cantidad_recibida,fecha,proveedor&estado=eq.pendiente"),
-      // v9.85 — notas editables (Día resolución / Motivo) para el reporte al gerente.
-      supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Faltantes_Notas", "select=cod,dia_resolucion,motivo")
+      supaFetchAllSafe(SUPABASE_URL + "/rest/v1/vista_faltante_catalogo",
+        "select=cod,descripcion,stock_neto,stock_bruto,proveedor,discontinuo,ult_entrega_fecha,ult_entrega_cajas,oc_pend_cajas,oc_pend_fecha,oc_pend_prov,nota_dia,nota_motivo"),
+      supaFetchAllSafe(SUPABASE_URL + "/rest/v1/vista_faltante_demanda",
+        "select=cod,np,rs,cod_cliente,cajas,fecha_salida,fecha_armado,tanda,estado_picking,es_super"),
+      supaFetchAllSafe(SUPABASE_URL + "/rest/v1/vista_faltante_real",
+        "select=cod,tanda,np,rs,cajas_falto,cod_raw,fecha_salida")
     ]);
-    var ppp = res[0] || [], base = res[1], facRows = res[2] || [], genProv = res[3] || [], saldos = res[4] || [], discRows = res[5] || [], entRows = res[6] || [], canRows = res[7] || [], ultRows = res[8] || [], ocRows = res[9] || [], notaRows = res[10] || [];
-    // Set de códigos discontinuos (normalizados) → se filtran de la tabla.
-    var discont = {};
-    discRows.forEach(function (r) { var k = _ocgNorm(r.cod); if (k) discont[k] = true; });
-    // Set de NPs que YA NO son faltante: facturadas + entregadas (completadas) + canceladas ("no va").
-    // v9.34 — antes solo miraba facturadas; las entregadas/canceladas seguían apareciendo como
-    // "faltante que no falta" aunque el pedido ya estaba cumplido o dado de baja.
-    var facSet = {};
-    facRows.forEach(function (r) { var n = pickNormNp(r.np); if (n) facSet[n] = true; });
-    entRows.forEach(function (r) { var n = pickNormNp(r.np); if (n) facSet[n] = true; });
-    canRows.forEach(function (r) { var n = pickNormNp(r.np); if (n) facSet[n] = true; });
-    // Mapa proveedor por código normalizado, igual que el generador de OCs: proveedor real
-    // (ignora "(sin proveedor)"); si hay reparto a un 2° proveedor, se muestra "P1 / P2".
-    var provMap = {};
-    genProv.forEach(function (r) {
-      var k = _ocgNorm(r.cod); if (!k) return;
-      var p1 = String(r.proveedor || "").trim();
-      if (!r.tiene_prov_real || p1 === "(sin proveedor)") p1 = "";
-      var p2 = String(r.proveedor2 || "").trim();
-      if (p2 && p2 !== "(sin proveedor)" && (Number(r.pr2) || 0) > 0) p1 = p1 ? (p1 + " / " + p2) : p2;
-      if (p1) provMap[k] = p1;
-    });
-    // Mapa saldos por código normalizado → stock.
-    //  · total     = NETO disponible para la PROYECCIÓN (depósitos NO comprometidos con picking):
-    //                góndola+exc+a_guardar+racks+racks_ch+envasar. NO cuenta separar_pedidos (ya
-    //                pickeado) ni a_facturar (ya facturable) → se balancea con la demanda sin-pickear.
-    //  · totalGross = STOCK TOTAL (v9.85): suma TAMBIÉN separar_pedidos + a_facturar. Es el número
-    //                que se MUESTRA en la columna Stock, para que coincida con la solapa Stocks y el
-    //                controlador no desconfíe ("stock total", pedido del usuario).
-    var saldoMap = {};
-    saldos.forEach(function (r) {
-      var k = _ocgNorm(r.cod_art); if (!k) return;
-      var neto = (Number(r.terminado) || 0) + (Number(r.excedente) || 0) + (Number(r.a_guardar) || 0) +
-                 (Number(r.racks) || 0) + (Number(r.racks_ch) || 0) + (Number(r.para_envasar) || 0);
-      saldoMap[k] = {
-        total: neto,
-        totalGross: neto + (Number(r.separar_pedidos) || 0) + (Number(r.a_facturar) || 0),
-        desc: r.descripcion || ""
-      };
-    });
-    // v9.85 — ÚLTIMA ENTREGA por código: fecha (día AR) + cajas de la última recepción a góndola.
-    // Se toma la fecha más reciente y se SUMAN las cajas recibidas ESE día (varios movimientos = 1 entrega).
-    var ultEnt = {};
-    ultRows.forEach(function (r) {
-      var k = _ocgNorm(r.cod_art); if (!k) return;
-      var dia = String(r.ts || "").slice(0, 10);   // ts ya viene UTC-3 al guardarse; día calendario
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(dia)) return;
-      var cur = ultEnt[k];
-      if (!cur || dia > cur.fecha) ultEnt[k] = { fecha: dia, cajas: Number(r.delta) || 0 };
-      else if (dia === cur.fecha) cur.cajas += (Number(r.delta) || 0);
-    });
-    // v9.85 — OC PENDIENTE por código: cajas pendientes (cantidad − recibida) + fecha más reciente + proveedor.
-    var ocMap = {};
-    ocRows.forEach(function (r) {
-      var k = _ocgNorm(r.codigo); if (!k) return;
-      var pend = (Number(r.cantidad) || 0) - (Number(r.cantidad_recibida) || 0);
-      if (pend <= 0) return;
-      var f = String(r.fecha || "").slice(0, 10);
-      if (!ocMap[k]) ocMap[k] = { cajas: 0, fecha: f, prov: String(r.proveedor || "").trim() };
-      ocMap[k].cajas += pend;
-      if (f && f > (ocMap[k].fecha || "")) ocMap[k].fecha = f;
-    });
-    // v9.85 — notas editables (Día resolución / Motivo) por código.
-    var notasMap = {};
-    notaRows.forEach(function (r) {
-      var k = String(r.cod || "").trim(); if (!k) return;
-      notasMap[k] = { dia: String(r.dia_resolucion || ""), motivo: String(r.motivo || "") };
-    });
-    // NPs pendientes con fecha_entrega
-    var npInfo = {};
-    ppp.forEach(function (r) {
-      var np = pickNormNp(r.np); if (!np) return;
-      if (facSet[np]) return;
-      npInfo[np] = { fecha: String(r.fecha_entrega || "").trim().slice(0, 10), rs: r.razon_social || "", tanda: String(r.tanda || "").trim().toUpperCase(), cliente: String(r.cod || "").trim(), esSuper: String(r.zona || "").trim().toLowerCase() === "super" };
+    var catRows = res[0] || [], demRows = res[1] || [], realRows = res[2] || [];
+
+    // CATÁLOGO: 1 fila por código → provMap, saldoMap, discont, ultEnt, ocMap, notasMap
+    var provMap = {}, saldoMap = {}, discont = {}, ultEnt = {}, ocMap = {}, notasMap = {};
+    catRows.forEach(function (r) {
+      var k = r.cod || ""; if (!k) return;
+      if (r.discontinuo) { discont[k] = true; return; }
+      if (r.proveedor) provMap[k] = r.proveedor;
+      saldoMap[k] = { total: Number(r.stock_neto) || 0, totalGross: Number(r.stock_bruto) || 0, desc: r.descripcion || "" };
+      if (r.ult_entrega_fecha) ultEnt[k] = { fecha: r.ult_entrega_fecha, cajas: Number(r.ult_entrega_cajas) || 0 };
+      var oc = Number(r.oc_pend_cajas) || 0;
+      if (oc > 0) ocMap[k] = { cajas: oc, fecha: r.oc_pend_fecha || "", prov: r.oc_pend_prov || "" };
+      if (r.nota_dia || r.nota_motivo) notasMap[k] = { dia: r.nota_dia || "", motivo: r.nota_motivo || "" };
     });
 
-    // v8.14 — separar "ya preparado" de "aún no preparado" (día de armado):
-    //  · Estado de picking por TANDA (EP/TP): sin pickear · en picking · preparado(TP).
-    //  · La PROYECCIÓN (demanda futura vs stock) solo cuenta las NPs SIN pickear. Las que ya
-    //    empezaron a pickearse movieron su stock a separar_pedidos (fuera del total) → contarlas
-    //    también en la demanda era un DOBLE-CONTEO (faltante inflado). Ahora quedan afuera.
-    //  · El faltante REAL de lo ya preparado (TP) NO se proyecta: sale de los PKC como
-    //    Σ(ESP−REAL) = lo que el pickeador no encontró en el rack. Es dato, no pronóstico.
-    var estadoTanda = {};   // TANDA → 'sinpickear'|'enpicking'|'preparado'
-    var tandaNp = {};       // TANDA → una NP representativa (para resolver empresa del código)
-    Object.keys(npInfo).forEach(function (np) {
-      var t = npInfo[np].tanda; if (!t) return;
-      if (!(t in tandaNp)) tandaNp[t] = np;
+    // DEMANDA: 1 fila por (código, NP)
+    var demanda = {}, demTotDet = {}, enCursoSet = {};
+    demRows.forEach(function (r) {
+      var cod = r.cod || "", np = r.np || ""; if (!cod) return;
+      var cj = Number(r.cajas) || 0, est = r.estado_picking || "sinpickear";
+      // demTotDet: TODAS las NPs (bruto, para el drill de "Total Pedidos")
+      (demTotDet[cod] = demTotDet[cod] || []).push({ np: np, rs: r.rs || "", cliente: r.cod_cliente || "", cajas: cj, fechaSalida: r.fecha_salida || "", estado: est });
+      // enCurso: tandas en picking
+      if (est === "enpicking" && r.tanda) enCursoSet[r.tanda] = true;
+      // demanda (PROYECCIÓN): solo sin pickear
+      if (est !== "sinpickear") return;
+      if (!demanda[cod]) demanda[cod] = [];
+      demanda[cod].push({ fecha: r.fecha_armado || "", fechaSalida: r.fecha_salida || "", np: np, rs: r.rs || "", cliente: r.cod_cliente || "", cajas: cj, cod: cod, esSuper: !!r.es_super });
     });
-    var tandas = Object.keys(tandaNp);
-    var realFalt = {};      // codNorm(suffijado) → cajas que faltaron al ARMAR (real, TP)
-    var realFaltDia = {};   // v9.44 — codNorm → { 'YYYY-MM-DD' (fecha SALIDA): cajas } para ubicarlo en el calendario
-    var realDet = {};       // codNorm → [{tanda, np, rs, cod, falto}] (detalle para el drill)
-    var enCurso = {};       // TANDAs en picking (para el contador "en curso")
-    if (tandas.length) {
-      var inT = tandas.map(encodeURIComponent).join(",");
-      var _cut = new Date(Date.now() - 45 * 86400000).toISOString();
-      var ev = await Promise.all([
-        supaFetchAllSafe(SUPABASE_TABLE_ENDPOINT, "opcion=in.(EP,TP)&texto=in.(" + inT + ")&select=opcion,texto,legajo"),
-        supaFetchAllSafe(SUPABASE_TABLE_ENDPOINT, "opcion=eq.PKC&ts_cliente=gte." + encodeURIComponent(_cut) + "&select=texto,ts_cliente")
-      ]);
-      var epV = ev[0] || [], pkcV = ev[1] || [];
-      var hasEP = {}, hasTP = {};
-      epV.forEach(function (e) {
-        var lg = String(e.legajo); if (lg === "0" || lg === "1") return;   // legajos de prueba
-        var t = String(e.texto || "").trim().toUpperCase(); if (!t) return;
-        if (e.opcion === "EP") hasEP[t] = true; else if (e.opcion === "TP") hasTP[t] = true;
-      });
-      tandas.forEach(function (t) {
-        estadoTanda[t] = hasTP[t] ? "preparado" : (hasEP[t] ? "enpicking" : "sinpickear");
-        if (estadoTanda[t] === "enpicking") enCurso[t] = true;
-      });
-      // Faltante real: por (tanda,art) tomar el ÚLTIMO PKC (ESP−REAL); solo tandas preparadas.
-      var lastPk = {};
-      pkcV.forEach(function (r) {
-        var p = String(r.texto || "").split("|");
-        var t = String(p[0] || "").trim().toUpperCase(), c = String(p[1] || "").trim();
-        if (!t || !c || estadoTanda[t] !== "preparado") return;
-        var k = t + "|" + c.toUpperCase();
-        if (!lastPk[k] || r.ts_cliente > lastPk[k].ts) {
-          lastPk[k] = {
-            esp: parseInt(String(p[2] || "").replace(/[^0-9-]/g, ""), 10) || 0,
-            real: parseInt(String(p[3] || "").replace(/[^0-9-]/g, ""), 10) || 0,
-            ts: r.ts_cliente, t: t, c: c
-          };
-        }
-      });
-      Object.keys(lastPk).forEach(function (k) {
-        var o = lastPk[k], falto = o.esp - o.real; if (falto <= 0) return;
-        var np = tandaNp[o.t];
-        var cod = _ocgNorm(codEmpSplit(o.c, np)); if (!cod) return;
-        realFalt[cod] = (realFalt[cod] || 0) + falto;
-        (realDet[cod] = realDet[cod] || []).push({ tanda: o.t, np: np, rs: (npInfo[np] || {}).rs || "", cod: o.c, falto: falto });
-        var _sal = String((npInfo[np] || {}).fecha || "").slice(0, 10);   // v9.44 — fecha de SALIDA de la tanda
-        if (_sal) { (realFaltDia[cod] = realFaltDia[cod] || {})[_sal] = (realFaltDia[cod][_sal] || 0) + falto; }
-      });
-    }
 
-    // Demanda por artículo (PROYECCIÓN): solo NPs SIN pickear. cod → [{fecha, np, rs, cajas}]
-    // v9.85 — además demTotal = TOTAL PEDIDOS (bruto): TODAS las NPs no facturadas, incluyendo las
-    // ya pickeadas/armadas, hasta que se facturen. Es el número que se MUESTRA en "Total Pedidos"
-    // (las 7 cajas del 922 que salen y aún no se facturaron deben sumar; mismo criterio p/ todos).
-    // demTotDet = detalle de TODAS las NPs (para el drill del Total Pedidos), cada una con su
-    // estado de picking → así el drill del total bruto muestra todo y marca lo ya pickeado.
-    var demanda = {}, demTotDet = {};
-    Object.keys(npInfo).forEach(function (np) {
-      var info = npInfo[np];
-      var est = estadoTanda[info.tanda];
-      var sinPickear = !(est && est !== "sinpickear");   // proyección solo cuenta lo sin pickear
-      var items = base.get(np) || [];
-      items.forEach(function (it) {
-        // v8.11 — key por código SUFIJADO por empresa (437E/438E/439E/809E → "438E LK"/"438E CH")
-        // para que la demanda case con el stock que también está suffijado por empresa. Los códigos
-        // no-split quedan pelados (el codEmpSplit los devuelve tal cual).
-        var cod = _ocgNorm(codEmpSplit(it.art, np)); if (!cod) return;
-        var cj = Number(it.cajas) || 0;
-        (demTotDet[cod] = demTotDet[cod] || []).push({ np: np, rs: info.rs, cliente: info.cliente, cajas: cj, fechaSalida: info.fecha, estado: est || "sinpickear" });
-        if (!sinPickear) return;                     // ya preparado / en picking → fuera de la proyección
-        if (!demanda[cod]) demanda[cod] = [];
-        // v8.08 — el faltante se cuenta el DÍA DE ARMADO (día hábil anterior a la salida),
-        // no el día de la PPP. Guardo también la fecha de salida para el drill.
-        demanda[cod].push({ fecha: _faltDiaArmado(info.fecha), fechaSalida: info.fecha, np: np, rs: info.rs, cliente: info.cliente, cajas: cj, cod: cod, esSuper: !!info.esSuper });
-      });
+    // FALTANTE REAL (PKC): 1 fila por (código, tanda, NP) con cajas_falto
+    var realFalt = {}, realFaltDia = {}, realDet = {};
+    realRows.forEach(function (r) {
+      var cod = r.cod || "", falto = Number(r.cajas_falto) || 0; if (!cod || falto <= 0) return;
+      realFalt[cod] = (realFalt[cod] || 0) + falto;
+      (realDet[cod] = realDet[cod] || []).push({ tanda: r.tanda || "", np: r.np || "", rs: r.rs || "", cod: r.cod_raw || "", falto: falto });
+      var sal = String(r.fecha_salida || "").slice(0, 10);
+      if (sal) { (realFaltDia[cod] = realFaltDia[cod] || {})[sal] = (realFaltDia[cod][sal] || 0) + falto; }
     });
+
     _stk.falt = {
       demanda: demanda, demTotDet: demTotDet, provMap: provMap, saldoMap: saldoMap, discont: discont,
       ultEnt: ultEnt, ocMap: ocMap, notasMap: notasMap,
-      realFalt: realFalt, realFaltDia: realFaltDia, realDet: realDet, enCurso: Object.keys(enCurso).length,
+      realFalt: realFalt, realFaltDia: realFaltDia, realDet: realDet, enCurso: Object.keys(enCursoSet).length,
       ajustes: {}, filtro: "s1", openCell: null, search: "",
       // v8.71 — por defecto: orden fabricante→faltó armado + los 3 botones activos.
       ordenFab: true, soloQuiebre: true, sinE: true, verDias: true
@@ -15403,28 +15537,22 @@ async function stkInsRefresh() {
   try {
     await insLoadMeta(true);
     const r = await Promise.all([
-      supaFetchAll(SUPABASE_URL + "/rest/v1/Insumos", "select=cod,nombre,categoria,ubicacion,isis,creado_por,creado"),
+      supaFetchAll(SUPABASE_URL + "/rest/v1/vista_insumos", "select=cod,nombre,categoria,ubicacion,isis,creado_por,creado"),
       insFetchSaldosXUni(),
-      _stkInsHistFetch(),
-      supaFetchAllSafe(SUPABASE_INS_UBIC_ENDPOINT, "select=id,cod,sector,cantidad,capacidad,unidad,notas")  // v8.72
+      _stkInsHistFetch()
     ]);
-    // v8.72 — agrupar ubicaciones por cod
-    var _ubMap = {};
-    (r[3] || []).forEach(function (u) { var k = String(u.cod || "").trim().toUpperCase(); if (!_ubMap[k]) _ubMap[k] = []; _ubMap[k].push(u); });
+    // v10.10 — ubicación viene de vista_insumos (lee Racks_Planimetria), read-only
     _stkIns.items = (r[0] || []).map(function (c) {
-      var ck = String(c.cod).trim().toUpperCase();
       return { cod: String(c.cod), nombre: c.nombre || "", cat: c.categoria || "", ubic: c.ubicacion || "",
                isis: c.isis || "", por: c.creado_por || "", xuni: r[1][String(c.cod)] || null,
-               ubics: _ubMap[ck] || [] };
+               ubics: [] };
     });
     _stkIns.items.sort(_insSortCod);
     _stkIns.hist = r[2] || [];
   } catch (e) { _stkIns.items = []; _stkIns.msg = "⚠ Error cargando: " + (e.message || e); }
 }
-/* v8.72 — mostrar ubicaciones múltiples en 1 línea (read-only). Usa Insumos_Ubicaciones
-   si hay, sino fallback al campo viejo Insumos.ubicacion. */
+/* v10.10 — ubicación read-only desde vista_insumos (Racks_Planimetria). */
 function _stkInsUbicStr(it) {
-  if (it.ubics && it.ubics.length) return it.ubics.map(function (u) { return u.sector; }).join(" · ");
   return it.ubic || "";
 }
 /* v8.72 — HTML para editar ubicaciones múltiples inline (mini-lista con botón +/x).
@@ -15754,7 +15882,7 @@ function _stkInsListado(k, items) {
         '<td><input class="stk-inp" id="edCod_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.cod) + '" style="width:88px;" title="Código conocido (clave del stock)"></td>' +
         '<td><input class="stk-inp" id="edIsis_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.isis || "") + '" placeholder="isis" style="width:78px;color:#64748b;" title="Código del sistema (isis)"></td>' +
         '<td><input class="stk-inp" id="edNom_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.nombre) + '" style="width:150px;"><br><span class="stk-sub">cat:</span> ' + _stkInsCatSel("edCat_" + it.cod, it.cat) + '</td>' +
-        '<td>' + _stkInsUbicEdit(it.cod, it.ubics) + '</td>' +
+        '<td style="color:#64748b;font-size:11px;" title="Ubicación desde Racks (read-only)">' + escapeHtml(_stkInsUbicStr(it)) + '</td>' +
         '<td style="border-left:1px solid #eef2f7;"><input class="stk-inp" id="edQty_' + escapeHtml(it.cod) + '" type="number" step="any" value="' + escapeHtml(u.saldo) + '" style="width:70px;" oninput="stkInsAutoSec(\'' + escapeHtml(it.cod) + '\',\'qty\')" title="Cantidad primaria (en la unidad base)"></td>' +
         '<td>' + _stkInsUniSel("edUni_" + it.cod, du.uniP || _stkInsUniMostrar(it)) + '</td>' +
         '<td style="border-left:1px solid #eef2f7;"><input class="stk-inp" id="edSecQty_' + escapeHtml(it.cod) + '" type="number" step="any" value="' + escapeHtml(du.cantS) + '" style="width:66px;" placeholder="cant" oninput="stkInsAutoSec(\'' + escapeHtml(it.cod) + '\',\'sec\')" title="Cargá Cant secundaria O el Factor: el otro se completa solo"></td>' +
@@ -15842,7 +15970,7 @@ function _stkInsTodos(items) {
         '<input class="stk-inp" id="edIsis_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.isis || "") + '" placeholder="isis (sistema)" style="width:100px;margin-top:3px;color:#64748b;" title="Código del sistema (isis) — informativo, no toca el stock"></td>' +
         '<td><input class="stk-inp" id="edNom_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.nombre) + '" style="width:140px;"></td>' +
         '<td>' + _stkInsCatSel("edCat_" + it.cod, it.cat) + '</td>' +
-        '<td>' + _stkInsUbicEdit(it.cod, it.ubics) + '</td>' +
+        '<td style="color:#64748b;font-size:11px;" title="Ubicación desde Racks (read-only)">' + escapeHtml(_stkInsUbicStr(it)) + '</td>' +
         '<td><input class="stk-inp" id="edQty_' + escapeHtml(it.cod) + '" type="number" step="any" value="' + escapeHtml(u.saldo) + '" style="width:82px;"></td>' +
         '<td>' + _stkInsUniSel("edUni_" + it.cod, _stkInsUniMostrar(it)) + '</td>' +
         '<td><button class="stk-btn" onclick="stkInsGuardar(\'' + escapeHtml(it.cod) + '\')">✓ Guardar</button> ' +
@@ -16230,8 +16358,7 @@ async function stkInsGuardar(cod) {
   if (!it) return;
   const nuevoCod = _stkInsVal("edCod_" + cod), nom = _stkInsVal("edNom_" + cod);
   const cat = _stkInsVal("edCat_" + cod);
-  const ubics = _stkInsUbicLeer(cod);  // v8.72 — ubicaciones múltiples
-  const ubi = ubics.join(" · ");       // v8.72 — fallback para el campo viejo
+  // v10.10 — ubicación es read-only (viene de Racks_Planimetria), no se guarda desde acá
   const uni = _stkInsVal("edUni_" + cod), qty = _stkInsVal("edQty_" + cod);
   const isis = _stkInsVal("edIsis_" + cod);   // v8.28 — código del sistema (informativo)
   if (!nuevoCod) { alert("El código no puede quedar vacío."); return; }
@@ -16249,7 +16376,6 @@ async function stkInsGuardar(cod) {
     const cambios = {};
     if (nom !== it.nombre) cambios.p_nombre = nom || null;
     if ((cat || "") !== (it.cat || "")) cambios.p_categoria = cat || null;
-    if (ubi !== it.ubic) cambios.p_ubicacion = ubi || null;
     if ((isis || "") !== (it.isis || "")) cambios.p_isis = isis ? isis : "__sin__";   // v8.28
     if (Object.keys(cambios).length) {
       cambios.p_cod = cod;
@@ -16276,10 +16402,6 @@ async function stkInsGuardar(cod) {
       ]});
       await insFetchFactores();
     }
-    // v8.72 — sincronizar ubicaciones múltiples en Insumos_Ubicaciones
-    if (ubics.length || (it.ubics && it.ubics.length)) {
-      await _stkInsUbicSync(finalCod, ubics);
-    }
     _stkIns.edit = null; _stkIns.edUbics = {}; _stkIns.msg = msg;
     await stkInsRefresh(); stkRender();
   } catch (e) { alert("No se pudo: " + (e.message || e)); }
@@ -16297,13 +16419,9 @@ async function stkInsAlta(k) {
   const uni = _stkInsVal("nvUni") || null;
   if (qty && !uni) { alert("Elegí la unidad para la cantidad inicial."); return; }
   try {
-    var ubiAlta = _stkInsVal("nvUbi") || null;
     const nom = _stkInsVal("nvNom") || null;
-    await _stkInsRpc("insumo_alta", { p_cod: cod, p_nombre: nom, p_categoria: k === "?" ? null : k, p_ubicacion: ubiAlta, p_legajo: "admin" });
-    // v8.72 — si se cargó ubicación en el alta, crear la fila en Insumos_Ubicaciones también
-    if (ubiAlta) {
-      await _stkInsUbicSync(cod, [ubiAlta]);
-    }
+    // v10.10 — ubicación ya no se carga en el alta de insumos (viene de Racks_Planimetria)
+    await _stkInsRpc("insumo_alta", { p_cod: cod, p_nombre: nom, p_categoria: k === "?" ? null : k, p_ubicacion: null, p_legajo: "admin" });
     if (qty > 0) {
       const r = await fetch(SUPABASE_URL + "/rest/v1/Movimientos_Stock", {
         method: "POST",
@@ -16871,9 +16989,13 @@ async function showBajarRacks(ordenId) {
   ov.classList.add("show");
   ov.innerHTML = '<div class="br-card"><div class="br-head"><span class="br-title">📦 Bajar racks → góndola</span><button class="br-close" onclick="closeBajarRacks()">Cerrar</button></div><div class="br-body" id="brBody"><div class="br-loading">Cargando stock de racks…</div></div></div>';
   try {
-    const res = await Promise.all([stockFetchSaldos(), stockFetchArtFactors(), loadArtNombres()]);
+    const res = await Promise.all([stockFetchSaldos(), stockFetchArtFactors(), loadArtNombres(),
+      supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Racks_Planimetria", "select=cod_art,sector&estado=eq.ocupado")]);
     const saldos = res[0] || {};
-    const items = Object.keys(saldos).map(function (k) { return saldos[k]; }).filter(function (a) { return (a.racks || 0) > 0; }).sort(function (a, b) { return (parseInt(a.cod, 10) || 0) - (parseInt(b.cod, 10) || 0); }).map(function (a) { return { cod: a.cod, desc: artNombre(a.cod, a.desc), disponible: a.racks, bajar: 0 }; });
+    // v10.15: mapa cod→sectores para grabar de qué rack se baja
+    var _brSecs = {};
+    (res[3] || []).forEach(function (r) { var c = _ocgNorm(r.cod_art || ""); if (c) { if (!_brSecs[c]) _brSecs[c] = []; _brSecs[c].push(r.sector); } });
+    const items = Object.keys(saldos).map(function (k) { return saldos[k]; }).filter(function (a) { return (a.racks || 0) > 0; }).sort(function (a, b) { return (parseInt(a.cod, 10) || 0) - (parseInt(b.cod, 10) || 0); }).map(function (a) { var c = _ocgNorm(a.cod); return { cod: a.cod, desc: artNombre(a.cod, a.desc), disponible: a.racks, bajar: 0, secs: (_brSecs[c] || []).sort() }; });
     _br = { ordenId: ordenId, legajo: String((typeof legajoInput !== "undefined" && legajoInput && legajoInput.value) || "").trim(), factors: res[1] || {}, items: items };
     brRender();
   } catch (e) { const b = document.getElementById("brBody"); if (b) b.innerHTML = '<div class="br-loading">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
@@ -16900,7 +17022,8 @@ function brConfirmar() {
   // el stock ya se mueve acá (racks − / góndola +) y la fila queda 'aprobada' directo, para que
   // NO aparezca en la cola "Bajadas Racks → góndola". La operadora ya no aprueba nada.
   const _brNowIso = new Date().toISOString();
-  const rows = sel.map(function (it) { return { orden_id: _br.ordenId || null, cod_art: it.cod, descripcion: it.desc || null, cajas: it.bajar, estado: "aprobada", aprobada_at: _brNowIso, creada_por: _br.legajo || null }; });
+  // v10.15: sector(es) del artículo van en la fila de Racks_Bajadas y en el ref del movimiento
+  const rows = sel.map(function (it) { return { orden_id: _br.ordenId || null, cod_art: it.cod, descripcion: it.desc || null, cajas: it.bajar, estado: "aprobada", aprobada_at: _brNowIso, creada_por: _br.legajo || null, sector: (it.secs || []).join(" · ") || null }; });
   const n = sel.reduce(function (s, it) { return s + it.bajar; }, 0);
   closeBajarRacks();
   // v8.73 — mover stock INMEDIATAMENTE (racks → góndola) al registrar la bajada,
@@ -16908,8 +17031,9 @@ function brConfirmar() {
   // en el sistema contable (ERP), no debe bloquear el stock.
   var stkRows = [];
   sel.forEach(function (it) {
-    stkRows.push({ cod_art: it.cod, descripcion: it.desc || null, deposito: "racks", delta: -it.bajar, tipo: "baja_racks", ref: "orden " + (_br.ordenId || ""), legajo: _br.legajo || "0" });
-    stkRows.push({ cod_art: it.cod, descripcion: it.desc || null, deposito: "terminado", delta: it.bajar, tipo: "baja_racks", ref: "orden " + (_br.ordenId || ""), legajo: _br.legajo || "0" });
+    var _ref = (it.secs && it.secs.length) ? "rack " + it.secs.join(" · ") : "orden " + (_br.ordenId || "");
+    stkRows.push({ cod_art: it.cod, descripcion: it.desc || null, deposito: "racks", delta: -it.bajar, tipo: "baja_racks", ref: _ref, legajo: _br.legajo || "0" });
+    stkRows.push({ cod_art: it.cod, descripcion: it.desc || null, deposito: "terminado", delta: it.bajar, tipo: "baja_racks", ref: _ref, legajo: _br.legajo || "0" });
   });
   stockMove(stkRows);
   fetch(SUPABASE_RACKS_BAJ_ENDPOINT, { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" }, body: JSON.stringify(rows) })
@@ -17759,7 +17883,7 @@ let _mg = null;
 async function showMGModal(legajo, _resume) {
   if (!document.getElementById("mgCss")) {
     const s = document.createElement("style"); s.id = "mgCss";
-    s.textContent = "#mgModal{display:none;position:fixed;inset:0;z-index:1290;background:rgba(2,6,23,.74);overflow:auto;padding:12px;}#mgModal.show{display:block;}.mg-card{background:#f8fafc;max-width:460px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.mg-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;background:linear-gradient(90deg,#16a34a,#15803d);color:#fff;}.mg-title{font-size:18px;font-weight:800;}.mg-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}.mg-body{padding:13px 14px;}.mg-loading,.mg-empty{padding:26px;text-align:center;color:#64748b;font-size:15px;}.mg-hint{font-size:12.5px;color:#64748b;margin-bottom:10px;}.mg-row{display:flex;flex-direction:column;gap:9px;border:1px solid #e2e8f0;border-radius:13px;padding:11px 12px;margin-bottom:9px;background:#fff;}.mg-headline{display:flex;align-items:baseline;justify-content:space-between;gap:8px;}.mg-agu{font-size:11.5px;color:#64748b;white-space:nowrap;}.mg-agu b{color:#0f172a;font-size:14px;}.mg-box{font-size:19px;line-height:1;}.mg-info{flex:1 1 110px;min-width:0;}.mg-def{display:flex;gap:10px;align-items:stretch;}.mg-gond-box{flex:1.7;display:flex;flex-direction:column;align-items:center;gap:8px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:11px 8px;}.mg-exc-q{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:8px;background:#fffbeb;border:1.5px dashed #f59e0b;border-radius:12px;padding:11px 8px;color:#92400e;font-weight:800;font-size:12.5px;text-align:center;cursor:pointer;line-height:1.15;}.mg-exc-q-b{height:50px;display:flex;align-items:center;justify-content:center;}.mg-exc-q .mg-box{font-size:30px;}.mg-exp{display:flex;gap:10px;align-items:stretch;}.mg-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:7px;border-radius:12px;padding:9px 6px;}.mg-col.g{background:#f0fdf4;border:1px solid #bbf7d0;}.mg-col.e{background:#fff;border:1px solid #e2e8f0;}.mg-exc-hdr{background:none;border:none;color:#b45309;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;cursor:pointer;padding:0;width:auto;}.mg-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:2px;min-height:22px;}.mg-foot .mg-faltan{font-size:13px;white-space:nowrap;}.mg-foot .mg-faltan.ok{color:#15803d;}.mg-stp.big .mg-inp{width:62px;height:50px;font-size:23px;}.mg-stp.big .mg-sb{width:44px;height:50px;font-size:25px;}.mg-cod{font-size:16px;font-weight:800;font-family:Consolas,Menlo,monospace;}.mg-desc{font-size:12px;color:#475569;}.mg-faltan{font-size:11.5px;font-weight:800;color:#b45309;margin-top:1px;}.mg-faltan.ok{color:#15803d;}.mg-stp{display:flex;align-items:center;gap:5px;}.mg-sb{display:flex;align-items:center;justify-content:center;line-height:1;padding:0;margin:0;width:36px;height:40px;border:none;border-radius:9px;font-size:22px;font-weight:800;cursor:pointer;background:#e2e8f0;color:#475569;}.mg-inp{width:48px;height:40px;box-sizing:border-box;margin:0;text-align:center;font-size:18px;font-weight:800;border:2px solid #cbd5e1;border-radius:9px;padding:0;-moz-appearance:textfield;}.mg-inp::-webkit-outer-spin-button,.mg-inp::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}.mg-fin{width:100%;margin-top:10px;padding:14px;border:none;border-radius:12px;background:#16a34a;color:#fff;font-size:17px;font-weight:800;cursor:pointer;}.mg-fin:disabled{background:#cbd5e1;color:#64748b;cursor:not-allowed;}.mg-lbl{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:#64748b;}.mg-lbl.gond{color:#15803d;}.mg-lbl.exc{color:#b45309;}.mg-search{width:100%;height:44px;border:2px solid #cbd5e1;border-radius:11px;padding:0 13px;font-size:16px;font-weight:700;margin-bottom:10px;box-sizing:border-box;}.mg-addrow{background:#fffbeb;border:1px solid #fcd34d;border-radius:11px;padding:11px 12px;margin-bottom:10px;font-size:13px;color:#92400e;}.mg-add-btn{margin-left:6px;background:#16a34a;color:#fff;border:none;border-radius:9px;padding:8px 13px;font-weight:800;cursor:pointer;width:auto;}.mg-add-note{font-size:11.5px;color:#b45309;margin-top:7px;}.mg-disp-x{color:#b45309;font-weight:800;}.mg-ubic{flex-basis:100%;display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:9px;padding-top:9px;border-top:1px dashed #fcd34d;font-size:12.5px;color:#92400e;}.mg-ubic-lbl{font-weight:800;}.mg-ubic-lbl small{font-weight:700;opacity:.8;}.mg-ubic-inp{width:84px;height:40px;border:2px solid #f59e0b;border-radius:9px;padding:0;font-size:20px;font-weight:800;text-align:center;letter-spacing:4px;text-transform:uppercase;box-sizing:border-box;}.mg-gfill{display:inline-block;margin-top:4px;font-size:11px;font-weight:800;padding:1px 8px;border-radius:8px;}.mg-gfill.lo{background:#fee2e2;color:#b91c1c;}.mg-gfill.mid{background:#fef3c7;color:#92400e;}.mg-gfill.hi{background:#dcfce7;color:#15803d;}.mg-gfill.unk{background:#f1f5f9;color:#64748b;}.mg-prio{display:inline-block;margin-right:6px;font-size:10px;font-weight:900;color:#fff;background:#b91c1c;border-radius:6px;padding:1px 6px;vertical-align:middle;}";
+    s.textContent = "#mgModal{display:none;position:fixed;inset:0;z-index:1290;background:rgba(2,6,23,.74);overflow:auto;padding:12px;}#mgModal.show{display:block;}.mg-card{background:#f8fafc;max-width:460px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.mg-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;background:linear-gradient(90deg,#16a34a,#15803d);color:#fff;}.mg-title{font-size:18px;font-weight:800;}.mg-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}.mg-body{padding:13px 14px;}.mg-loading,.mg-empty{padding:26px;text-align:center;color:#64748b;font-size:15px;}.mg-hint{font-size:12.5px;color:#64748b;margin-bottom:10px;}.mg-row{display:flex;flex-direction:column;gap:9px;border:1px solid #e2e8f0;border-radius:13px;padding:11px 12px;margin-bottom:9px;background:#fff;}.mg-headline{display:flex;align-items:baseline;justify-content:space-between;gap:8px;}.mg-agu{font-size:11.5px;color:#64748b;white-space:nowrap;}.mg-agu b{color:#0f172a;font-size:14px;}.mg-box{font-size:19px;line-height:1;}.mg-info{flex:1 1 110px;min-width:0;}.mg-def{display:flex;gap:10px;align-items:stretch;}.mg-gond-box{flex:1.7;display:flex;flex-direction:column;align-items:center;gap:8px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:11px 8px;}.mg-exc-q{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:8px;background:#fffbeb;border:1.5px dashed #f59e0b;border-radius:12px;padding:11px 8px;color:#92400e;font-weight:800;font-size:12.5px;text-align:center;cursor:pointer;line-height:1.15;}.mg-exc-q-b{height:50px;display:flex;align-items:center;justify-content:center;}.mg-exc-q .mg-box{font-size:30px;}.mg-exp{display:flex;gap:10px;align-items:stretch;}.mg-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:7px;border-radius:12px;padding:9px 6px;}.mg-col.g{background:#f0fdf4;border:1px solid #bbf7d0;}.mg-col.e{background:#fff;border:1px solid #e2e8f0;}.mg-exc-hdr{background:none;border:none;color:#b45309;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;cursor:pointer;padding:0;width:auto;}.mg-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:2px;min-height:22px;}.mg-foot .mg-faltan{font-size:13px;white-space:nowrap;}.mg-foot .mg-faltan.ok{color:#15803d;}.mg-stp.big .mg-inp{width:62px;height:50px;font-size:23px;}.mg-stp.big .mg-sb{width:44px;height:50px;font-size:25px;}.mg-cod{font-size:16px;font-weight:800;font-family:Consolas,Menlo,monospace;}.mg-desc{font-size:12px;color:#475569;}.mg-faltan{font-size:11.5px;font-weight:800;color:#b45309;margin-top:1px;}.mg-faltan.ok{color:#15803d;}.mg-stp{display:flex;align-items:center;gap:5px;}.mg-sb{display:flex;align-items:center;justify-content:center;line-height:1;padding:0;margin:0;width:36px;height:40px;border:none;border-radius:9px;font-size:22px;font-weight:800;cursor:pointer;background:#e2e8f0;color:#475569;}.mg-inp{width:48px;height:40px;box-sizing:border-box;margin:0;text-align:center;font-size:18px;font-weight:800;border:2px solid #cbd5e1;border-radius:9px;padding:0;-moz-appearance:textfield;}.mg-inp::-webkit-outer-spin-button,.mg-inp::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}.mg-fin{width:100%;margin-top:10px;padding:14px;border:none;border-radius:12px;background:#16a34a;color:#fff;font-size:17px;font-weight:800;cursor:pointer;}.mg-fin:disabled{background:#cbd5e1;color:#64748b;cursor:not-allowed;}.mg-lbl{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:#64748b;}.mg-lbl.gond{color:#15803d;}.mg-lbl.exc{color:#b45309;}.mg-search{width:100%;height:44px;border:2px solid #cbd5e1;border-radius:11px;padding:0 13px;font-size:16px;font-weight:700;margin-bottom:10px;box-sizing:border-box;}.mg-addrow{background:#fffbeb;border:1px solid #fcd34d;border-radius:11px;padding:11px 12px;margin-bottom:10px;font-size:13px;color:#92400e;}.mg-add-btn{margin-left:6px;background:#16a34a;color:#fff;border:none;border-radius:9px;padding:8px 13px;font-weight:800;cursor:pointer;width:auto;}.mg-add-note{font-size:11.5px;color:#b45309;margin-top:7px;}.mg-disp-x{color:#b45309;font-weight:800;}.mg-ubic{flex-basis:100%;display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:9px;padding-top:9px;border-top:1px dashed #fcd34d;font-size:12.5px;color:#92400e;}.mg-ubic-lbl{font-weight:800;}.mg-ubic-lbl small{font-weight:700;opacity:.8;}.mg-ubic-inp{width:84px;height:40px;border:2px solid #f59e0b;border-radius:9px;padding:0;font-size:20px;font-weight:800;text-align:center;letter-spacing:4px;text-transform:uppercase;box-sizing:border-box;}.mg-gfill{display:inline-block;margin-top:4px;font-size:11px;font-weight:800;padding:1px 8px;border-radius:8px;}.mg-gfill.lo{background:#fee2e2;color:#b91c1c;}.mg-gfill.mid{background:#fef3c7;color:#92400e;}.mg-gfill.hi{background:#dcfce7;color:#15803d;}.mg-gfill.unk{background:#f1f5f9;color:#64748b;}.mg-gfill.loc{display:block;background:#e0f2fe;color:#075985;margin-top:5px;}.mg-gfill.loc b{color:#0c4a6e;}.mg-prio{display:inline-block;margin-right:6px;font-size:10px;font-weight:900;color:#fff;background:#b91c1c;border-radius:6px;padding:1px 6px;vertical-align:middle;}";
     document.head.appendChild(s);
   }
   let ov = document.getElementById("mgModal");
@@ -17768,16 +17892,18 @@ async function showMGModal(legajo, _resume) {
   ov.innerHTML = '<div class="mg-card"><div class="mg-head"><span class="mg-title">📥 Guardar a góndola</span><button class="mg-close" onclick="mgAskClose()">Cerrar</button></div><div class="mg-body" id="mgBody"><div class="mg-loading">Cargando lo que hay para guardar…</div></div></div>';
   if (_resume) { _mg = _resume; mgRender(); return; }
   try {
-    const res = await Promise.all([stockFetchSaldos(), loadArtNombres(), ocgFetchCapacidad()]);
+    const res = await Promise.all([stockFetchSaldos(), loadArtNombres(), ocgFetchCapacidad(), ocgFetchCeldas()]);
     const saldos = res[0] || {};
     const capMap = res[2] || {};
+    const celdasMap = res[3] || {};   // v10.08 — cod → [celdas de góndola]
     // v8.40 — orden por PRIORIDAD: primero lo que tiene la góndola más vacía (stock góndola ÷
     // capacidad). Así el operario baja primero lo más urgente para no quedarse sin en el picking.
     // Sin capacidad cargada → al final (no se puede priorizar). Empate → por código.
     const items = Object.keys(saldos).map(function (k) { return saldos[k]; }).filter(function (a) { return a.a_guardar > 0; }).map(function (a) {
       const cap = capMap[_ocgNorm(a.cod)] || 0;
       const gond = Number(a.terminado) || 0;
-      return { cod: a.cod, desc: artNombre(a.cod, a.desc), disponible: a.a_guardar, gond: gond, cap: cap, prio: (cap > 0 ? gond / cap : Infinity), cargar: 0, exc: 0, ubic: "", excOn: false };
+      const celdas = celdasMap[_ocgNorm(a.cod)] || [];   // v10.08 — dónde va en góndola
+      return { cod: a.cod, desc: artNombre(a.cod, a.desc), disponible: a.a_guardar, gond: gond, cap: cap, celdas: celdas, prio: (cap > 0 ? gond / cap : Infinity), cargar: 0, exc: 0, ubic: "", excOn: false };
     }).sort(function (a, b) {
       if (a.prio !== b.prio) return a.prio - b.prio;   // góndola más vacía primero
       return (parseInt(a.cod, 10) || 0) - (parseInt(b.cod, 10) || 0);
@@ -17815,6 +17941,16 @@ function mgRender() {
         gfill = '<div class="mg-gfill ' + (ratio <= .34 ? "lo" : ratio <= .67 ? "mid" : "hi") + '">🛒 Góndola ' + Math.round(it.gond) + '/' + Math.round(it.cap) + (falt > 0 ? ' · faltan ' + falt : ' · llena') + '</div>';
       } else {
         gfill = '<div class="mg-gfill unk">🛒 góndola s/capacidad</div>';
+      }
+      // v10.08 — DÓNDE va en góndola: primera ubicación (destacada) + cuántas celdas tiene.
+      const _cel = it.celdas || [];
+      if (_cel.length) {
+        const _first = _cel[0], _rest = _cel.slice(1, 3).join(", ");
+        const _more = _cel.length > 3 ? (" +" + (_cel.length - 3)) : "";
+        const _restTxt = _cel.length > 1 ? (' <span style="opacity:.75">(' + escapeHtml(_rest + _more) + ')</span>') : '';
+        gfill += '<div class="mg-gfill loc" title="Ubicaciones en góndola de ' + escapeHtml(it.cod) + ': ' + escapeHtml(_cel.join(", ")) + '">📍 Va en <b>' + escapeHtml(_first) + '</b>' + _restTxt + ' · ' + _cel.length + (_cel.length === 1 ? ' ubicación' : ' ubicaciones') + '</div>';
+      } else {
+        gfill += '<div class="mg-gfill unk">📍 sin ubicación fija cargada</div>';
       }
     }
     const gondStp = function (big) { return '<div class="mg-stp' + (big ? ' big' : '') + '"><button class="mg-sb" onclick="mgChg(' + i + ',-1)">–</button><input class="mg-inp" type="text" min="0" max="' + maxG + '" inputmode="numeric" value="' + it.cargar + '" oninput="mgSet(' + i + ',this.value)"><button class="mg-sb" onclick="mgChg(' + i + ',1)">+</button></div>'; };
@@ -17872,46 +18008,8 @@ async function mgConfirmar() {
   // de dato (la usa el picking).
   const sinUbic = sel.find(function (it) { return (it.exc || 0) > 0 && String(it.ubic || "").trim().length < 1; });
   if (sinUbic) { try { alert("📍 Falta la ubicación del excedente de " + sinUbic.cod + ".\nEscribí dónde lo pusiste (letras y números, ej. A12) — el excedente no tiene lugar fijo, hay que anotarla para el picking."); } catch (_e) {} return; }
-  // v9.27: Verificación de código 4 dígitos antes de confirmar (inline para no depender de recepcion.js)
-  const verified = await (new Promise(function (resolve) {
-    const code = Math.floor(1000 + Math.random() * 9000).toString();
-    const overlay = document.createElement("div");
-    overlay.style.cssText = "position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;";
-    const modal = document.createElement("div");
-    modal.style.cssText = "background:white;border-radius:12px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,0.3);max-width:400px;width:90vw;text-align:center;";
-    modal.innerHTML = '<h2 style="margin:0 0 16px 0;font-size:18px;color:#1f2937;">Verificación de Gondola</h2>' +
-      '<p style="margin:0 0 16px 0;color:#6b7280;font-size:14px;">Escribí este código en la góndola y copialo acá:</p>' +
-      '<div style="background:#f3f4f6;padding:16px;border-radius:8px;font-size:32px;font-weight:bold;letter-spacing:8px;margin:0 0 8px 0;font-family:monospace;color:#1f2937;">' + code + '</div>' +
-      '<p style="margin:0 0 20px 0;color:#9ca3af;font-size:13px;font-style:italic;">✏️ Escribir en la góndola física</p>' +
-      '<input id="mgVerifyInput" type="text" placeholder="Escribí el código" maxlength="4" style="width:100%;padding:12px;font-size:18px;border:2px solid #e5e7eb;border-radius:8px;box-sizing:border-box;margin:0 0 16px 0;font-family:monospace;letter-spacing:4px;text-align:center;">' +
-      '<div style="display:flex;gap:10px;"><button id="mgVerifyConfirm" style="flex:1;padding:12px;background:#2563eb;color:white;border:none;border-radius:8px;font-size:14px;font-weight:bold;cursor:pointer;">✓ Confirmar</button>' +
-      '<button id="mgVerifyCancel" style="flex:1;padding:12px;background:#e5e7eb;color:#1f2937;border:none;border-radius:8px;font-size:14px;font-weight:bold;cursor:pointer;">✕ Cancelar</button></div>';
-    overlay.appendChild(modal);
-    document.body.appendChild(overlay);
-    const inp = document.getElementById("mgVerifyInput");
-    inp.oninput = function () { this.value = this.value.replace(/[^0-9]/g, ""); };
-    document.getElementById("mgVerifyConfirm").onclick = function () {
-      if (inp.value === code) {
-        overlay.remove();
-        resolve(true);
-      } else {
-        inp.style.borderColor = "#ef4444";
-        inp.style.background = "#fee2e2";
-        setTimeout(function () {
-          inp.style.borderColor = "#e5e7eb";
-          inp.style.background = "white";
-          inp.value = "";
-          inp.focus();
-        }, 1000);
-      }
-    };
-    document.getElementById("mgVerifyCancel").onclick = function () {
-      overlay.remove();
-      resolve(false);
-    };
-    inp.focus();
-  }));
-  if (!verified) return;
+  // v10.11 — SACADA la "Verificación de Góndola" (código 4 dígitos) del guardado a góndola:
+  // el código sólo va en RECEPCIÓN (una vez, al terminar de recibir). Acá se confirma directo.
   const rows = [];
   sel.forEach(function (it) {
     const tot = it.cargar + (it.exc || 0);
@@ -19300,6 +19398,7 @@ function cpRenderStep2(body) {
     '<button class="cp-opt' + (_cp.origen === "terminado" ? " on" : "") + '" onclick="cpOrigen(\'terminado\')">Góndola<small>hay ' + gon + '</small></button>' +
     '</div></div>';
   h += '<div class="cp-fld"><div class="cp-lbl">¿A qué lío va?</div>';
+  let _destTxt = "Lío nuevo";   // v10.13 — destino visible en el botón/mensaje
   if (_cp.liosLoading) h += '<div class="cp-liosload">cargando líos…</div>';
   else {
     const info = _cp._liosInfo || { resumen: "" };
@@ -19312,10 +19411,11 @@ function cpRenderStep2(body) {
     chips += '<button class="cp-lio cp-lio-new' + (_cp.lioSel === "__new__" ? " on" : "") + '" onclick="cpLio(\'__new__\')">🆕 Lío nuevo</button>';
     h += '<div class="cp-lios">' + chips + '</div>';
     if (!lios.length) h += '<div class="cp-note">Sin líos con detalle en este pedido — se crea uno nuevo.</div>';
+    _destTxt = (typeof _cp.lioSel === "number" && lios[_cp.lioSel]) ? ("Lío " + labels[_cp.lioSel]) : ("Lío NUEVO " + cpLioLetter(lios.length));
   }
   h += '</div>';
   const ok = _cp.qty > 0 && !_cp.liosLoading;
-  h += '<button class="cp-fin"' + (ok ? "" : " disabled") + ' onclick="cpConfirm()">✓ Completar ' + _cp.qty + ' caja(s) → a facturar</button>';
+  h += '<button class="cp-fin"' + (ok ? "" : " disabled") + ' onclick="cpConfirm()">✓ Completar ' + _cp.qty + ' caja(s) → <b>' + escapeHtml(_destTxt) + '</b></button>';
   _renderKeepFocus(body, h);
 }
 function cpBack() { if (!_cp) return; _cp.step = 1; _cp.sel = null; cpRender(); }
@@ -19418,7 +19518,11 @@ async function cpConfirm() {
   try { await cpCerrarTareaSiCompleta(String(s.np)); } catch (_e) {}   // v6.19: cierra la tarea aunque NO se haya tomado por pop-up
   try { opDraftClear(leg); } catch (_e) {}
   if (!_cp) return;
-  _cp.justDone = "✓ " + qty + " caja(s) de " + s.cod_art + " → NP " + s.np + " (a facturar)";
+  // v10.13 — feedback explícito del lío destino (nuevo o existente) para que se vea qué pasó en la NP.
+  var _liosB = cpParseResumen((info && info.resumen) || "");
+  var _wasNew = !(typeof lioSel === "number" && _liosB[lioSel]);
+  var _destLbl = _wasNew ? cpLioLetter(_liosB.length) : (liosLabels(_liosB)[lioSel] || "");
+  _cp.justDone = "✓ " + qty + " caja(s) de " + s.cod_art + " → NP " + s.np + " · " + (_wasNew ? "Lío NUEVO " : "Lío ") + _destLbl + " (a facturar)";
   _cp.sel = null; _cp.step = 1; _cp.liosLoading = false; _cp._liosInfo = null;
   try { _cp.falt = await cpReloadFaltantes(); } catch (_e) {}
   if (_cp) cpRender();
@@ -26332,58 +26436,36 @@ function _avpShell(inner) {
   return '<div class="avp-card"><div class="avp-head"><b>📲 Avisar programación</b><span class="avp-who">👤 ' + escapeHtml((_avp && _avp.quien) || "") + '</span><button class="avp-x" onclick="avpClose()">Cerrar</button></div><div id="avpBody" class="avp-body">' + inner + '</div></div>';
 }
 async function avpLoad() {
-  var H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
-  var q = function (u) { return fetch(SUPABASE_URL + "/rest/v1/" + u, { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; }); };
-  var res = await Promise.all([
-    q("vista_ppp_programacion_pendiente?select=np,cod_cliente,razon_social,fecha_recep,fecha_entrega&limit=20000"),
-    q("whatsapp_clientes?select=cod_cliente,telefono&limit=20000"),
-    q("whatsapp_vendedores?select=vend,telefono,nombre&limit=2000"),
-    q("clientes_vendedor?select=cod_cliente,vend&limit=30000"),
-    q("envio_programacion_log?select=np,cod_cliente,vend,tipo,quien,ts&order=ts.desc&limit=30000")
-  ]);
-  var ped = res[0], wc = res[1], wv = res[2], cv = res[3], log = res[4];
-  var telCli = {}; wc.forEach(function (r) { telCli[String(r.cod_cliente).trim()] = r.telefono; });
-  var vendW = {}; wv.forEach(function (r) { vendW[String(r.vend).trim()] = { tel: r.telefono, nombre: r.nombre }; });
-  var vendDe = {}; cv.forEach(function (r) { vendDe[String(r.cod_cliente).trim()] = String(r.vend || "").trim(); });
-  // AGRUPAR: mismo cliente + misma fecha de salida = 1 solo envío/mensaje (une sus NPs).
-  var gm = {};
-  ped.forEach(function (p) {
-    if (!_avpFechaDMY(p.fecha_entrega)) return;                 // solo programados (con fecha de salida)
-    var cod = String(p.cod_cliente || "").trim();
-    var key = cod + "|" + String(p.fecha_entrega).slice(0, 10);
-    var g = gm[key];
-    if (!g) {
-      var vend = vendDe[cod] || "", vw = vendW[vend] || {};
-      g = gm[key] = { key: key, cod: cod, rs: p.razon_social || "", fppp: p.fecha_entrega, fped: p.fecha_recep, vend: vend, telCli: telCli[cod] || "", telVend: vw.tel || "", vendNombre: vw.nombre || "", nps: [] };
+  // v10.09: 1 fetch a vista_avisar_programacion reemplaza 5 fetches crudos.
+  var data = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/vista_avisar_programacion",
+    "select=grp_key,cod,rs,fppp,fped,dias,nps,tel_cli,vend,tel_vend,vend_nombre,last_cli_ts,last_cli_quien,vend_sent");
+  var groups = [], lastCli = {}, vendNotified = {}, vendSent = {}, vendW = {};
+  data.forEach(function (r) {
+    var g = {
+      key: r.grp_key, cod: r.cod || "", rs: r.rs || "", fppp: r.fppp || "",
+      fped: r.fped || "", dias: r.dias, nps: r.nps || [],
+      telCli: r.tel_cli || "", vend: r.vend || "",
+      telVend: r.tel_vend || "", vendNombre: r.vend_nombre || ""
+    };
+    groups.push(g);
+    // vendW (para avpSendVendedor — necesita tel y nombre por vend)
+    if (g.vend && !vendW[g.vend]) vendW[g.vend] = { tel: g.telVend, nombre: g.vendNombre };
+    // lastCli: último aviso a cliente
+    if (r.last_cli_ts) lastCli[g.key] = { ts: r.last_cli_ts, quien: r.last_cli_quien || "" };
+    // vendSent: grupos ya mandados al vendedor
+    if (r.vend_sent && g.vend) {
+      if (!vendSent[g.vend]) vendSent[g.vend] = {};
+      vendSent[g.vend][g.key] = true;
     }
-    var np = String(p.np || "").trim(); if (np && g.nps.indexOf(np) < 0) g.nps.push(np);
-    if (!g.rs && p.razon_social) g.rs = p.razon_social;
-    if (p.fecha_recep && (!g.fped || String(p.fecha_recep) < String(g.fped))) g.fped = p.fecha_recep;  // fecha pedido = la más vieja
+    // vendNotified: avisados al cliente pero NO al vendedor → armar resumen pendiente
+    if (r.last_cli_ts && g.vend && !_avpNoVend(g.vend)) {
+      if (!(vendSent[g.vend] && vendSent[g.vend][g.key])) {
+        if (!vendNotified[g.vend]) vendNotified[g.vend] = {};
+        vendNotified[g.vend][g.key] = { rs: g.rs, fppp: g.fppp, cod: g.cod };
+      }
+    }
   });
-  var groups = Object.keys(gm).map(function (k) { var g = gm[k]; g.dias = _avpDias(g.fped, g.fppp); return g; });
   groups.sort(function (a, b) { return String(a.fppp).localeCompare(String(b.fppp)) || String(a.rs).localeCompare(String(b.rs)); });
-  var keyMap = {}, npKey = {};
-  groups.forEach(function (g) { keyMap[g.key] = g; g.nps.forEach(function (n) { npKey[n] = g.key; }); });
-  // estado desde el log: última marca de aviso a cliente por grupo + resumen pendiente por vendedor.
-  // v9.59 — vendSent = grupos que YA se le mandaron al vendedor (log tipo='vendedor' con np). Esos NO
-  // reaparecen en el resumen del vendedor los días siguientes (no re-mandar la misma programación).
-  var lastCli = {}, vendNotified = {}, vendSent = {};
-  // pass 1: qué grupos ya se le enviaron a cada vendedor
-  log.forEach(function (r) {
-    if (r.tipo !== "vendedor" || r.np == null || !r.vend) return;
-    var key = npKey[String(r.np)]; if (!key) return;
-    (vendSent[r.vend] || (vendSent[r.vend] = {}))[key] = true;
-  });
-  // pass 2: avisos a cliente → estado + resumen del vendedor (excluye lo ya mandado al vendedor)
-  log.forEach(function (r) {
-    if (r.tipo !== "cliente") return;
-    var key = npKey[r.np != null ? String(r.np) : ""]; if (!key) return;
-    if (!lastCli[key]) lastCli[key] = r;                        // log viene ts desc → primero = más reciente
-    var g = keyMap[key]; if (!g || !g.vend || _avpNoVend(g.vend)) return;
-    if (vendSent[g.vend] && vendSent[g.vend][key]) return;      // ya se lo mandé al vendedor → no reaparece
-    if (!vendNotified[g.vend]) vendNotified[g.vend] = {};
-    if (!vendNotified[g.vend][key]) vendNotified[g.vend][key] = { rs: g.rs, fppp: g.fppp, cod: g.cod };
-  });
   _avp.groups = groups; _avp.lastCli = lastCli; _avp.vendNotified = vendNotified; _avp.vendSent = vendSent; _avp.vendW = vendW;
   avpRender();
 }
@@ -26611,20 +26693,56 @@ async function openPlataPerdida() {
   await ppLoad();
 }
 function ppClose() { var ov = document.getElementById("ppOverlay"); if (ov) ov.style.display = "none"; }
-async function ppLoad() {
-  var H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
-  var q = function (u) { return fetch(SUPABASE_URL + "/rest/v1/" + u, { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; }); };
-  var res = await Promise.all([
-    q("Entregas_Virgilio?select=np,cod_art,cajas_falto,cajas_pedidas,cajas_entregadas,fecha_salida,cod_cliente&cajas_falto=gt.0&limit=100000"),
-    q("precios_venta?select=cod,precio_unit,uxb,descripcion&limit=5000"),
-    q("clientes_vendedor?select=cod_cliente,vend&limit=30000"),
-    q("Facturacion_NP?select=np,razon_social&limit=100000")
+/* v10.15 — fallback: lee las 4 tablas directas y arma el join en JS (igual que pre-v10.09). */
+async function _ppFallbackLoad() {
+  var r = await Promise.all([
+    supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Entregas_Virgilio", "select=np,cod_art,cajas_falto,cajas_pedidas,cajas_entregadas,fecha_salida,cod_cliente&cajas_falto=gt.0"),
+    supaFetchAllSafe(SUPABASE_URL + "/rest/v1/precios_venta", "select=cod,precio_unit,uxb,descripcion"),
+    supaFetchAllSafe(SUPABASE_URL + "/rest/v1/clientes_vendedor", "select=cod_cliente,vend"),
+    supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Facturacion_NP", "select=np,razon_social")
   ]);
-  var ent = res[0], pv = res[1], cv = res[2], fac = res[3];
-  var precio = {}; pv.forEach(function (r) { var k = _ocgNorm(r.cod); var pu = Number(r.precio_unit) || 0; precio[k] = { pu: pu, uxb: Number(r.uxb) || 1, desc: r.descripcion || "", ok: pu > 0 && pu !== 8888 }; });
-  var vendDe = {}; cv.forEach(function (r) { vendDe[String(r.cod_cliente).trim()] = String(r.vend || "").trim(); });
-  var rsDe = {}; fac.forEach(function (r) { var n = pickNormNp(r.np); if (n && r.razon_social && !rsDe[n]) rsDe[n] = r.razon_social; });
-  _pp.rows = ent.map(function (r) { return { codN: _ocgNorm(r.cod_art), cod: String(r.cod_art || "").trim(), cajas: Number(r.cajas_falto) || 0, ped: Number(r.cajas_pedidas) || 0, ent: Number(r.cajas_entregadas) || 0, fecha: _ppFecha10(r.fecha_salida), cli: String(r.cod_cliente || "").trim(), np: pickNormNp(r.np) }; }).filter(function (r) { return r.cajas > 0; });
+  var ent = r[0] || [], pv = {}, cv = {}, fnp = {};
+  (r[1] || []).forEach(function (p) { var c = _ppNormCod(p.cod); if (c) pv[c] = p; });
+  (r[2] || []).forEach(function (c) { var k = (c.cod_cliente || "").trim(); if (k) cv[k] = (c.vend || "").trim(); });
+  (r[3] || []).forEach(function (f) { var k = (f.np || "").trim(); if (k) fnp[k] = f.razon_social || ""; });
+  return ent.map(function (e) {
+    var cod = _ppNormCod(e.cod_art), p = pv[cod] || {}, cli = (e.cod_cliente || "").trim(), np = (e.np || "").trim();
+    var pu = Number(p.precio_unit) || 0, uxb = Number(p.uxb) || 1;
+    return { np: e.np, cod: cod, cod_raw: (e.cod_art || "").trim(), cajas: Number(e.cajas_falto) || 0,
+      ped: Number(e.cajas_pedidas) || 0, ent: Number(e.cajas_entregadas) || 0,
+      fecha: (e.fecha_salida || "").slice(0, 10), cod_cliente: cli,
+      precio_unit: pu, uxb: uxb, descripcion: p.descripcion || "",
+      precio_ok: pu > 0 && pu !== 8888, vendedor: cv[cli] || "", razon_social: fnp[np] || "" };
+  });
+}
+function _ppNormCod(c) { return (c == null ? "" : String(c)).trim().toUpperCase().replace(/^0+(?=.)/, ""); }
+async function ppLoad() {
+  // v10.15: vista con timeout 12s; si falla, fallback a tablas directas.
+  var data;
+  try {
+    data = await Promise.race([
+      supaFetchAll(SUPABASE_URL + "/rest/v1/vista_plata_perdida",
+        "select=np,cod,cod_raw,cajas,ped,ent,fecha,cod_cliente,precio_unit,uxb,descripcion,precio_ok,vendedor,razon_social&cajas=gt.0"),
+      new Promise(function (_, rej) { setTimeout(function () { rej(new Error("timeout")); }, 12000); })
+    ]);
+  } catch (_e) {
+    console.warn("ppLoad: vista_plata_perdida falló (" + (_e.message || _e) + "), fallback a tablas directas");
+    data = await _ppFallbackLoad();
+  }
+  if (!data) data = [];
+  var precio = {}, vendDe = {}, rsDe = {};
+  data.forEach(function (r) {
+    var codN = r.cod || "";
+    if (r.precio_unit != null && !precio[codN]) {
+      var pu = Number(r.precio_unit) || 0;
+      precio[codN] = { pu: pu, uxb: Number(r.uxb) || 1, desc: r.descripcion || "", ok: pu > 0 && pu !== 8888 };
+    }
+    var cli = r.cod_cliente || "";
+    if (cli && r.vendedor != null && !vendDe[cli]) vendDe[cli] = String(r.vendedor).trim();
+    var np = pickNormNp(r.np);
+    if (np && r.razon_social && !rsDe[np]) rsDe[np] = r.razon_social;
+  });
+  _pp.rows = data.map(function (r) { return { codN: r.cod || "", cod: r.cod_raw || "", cajas: Number(r.cajas) || 0, ped: Number(r.ped) || 0, ent: Number(r.ent) || 0, fecha: r.fecha || "", cli: r.cod_cliente || "", np: pickNormNp(r.np) }; }).filter(function (r) { return r.cajas > 0; });
   _pp.precio = precio; _pp.vendDe = vendDe; _pp.rsDe = rsDe;
   // años CON DATOS (para el dropdown); por defecto el año actual si tiene datos, si no el más reciente.
   var ys = {}; _pp.rows.forEach(function (r) { var y = r.fecha ? r.fecha.slice(0, 4) : ""; if (/^\d{4}$/.test(y)) ys[y] = 1; });
@@ -30033,77 +30151,18 @@ function _corrFecha(s){
 /* v7.94 — enriquece el panel: razón social, stock (sec/ppal), lo que puso el operario
    (Entregas_Virgilio) y el estado (CORE events EP/TP/AP/TAP + Facturacion_NP). */
 async function facCorreccDataRich(){
-  const pend = await facCorreccData();
-  if (!pend.length) return [];
-  const nps = Array.from(new Set(pend.map(function(p){ return p.np; })));
-  const cods = Array.from(new Set(pend.reduce(function(a,p){ a.push(p.sec); a.push(p.ppal); return a; }, [])));
-  const inNps = nps.map(encodeURIComponent).join(",");
-  const inCods = cods.map(encodeURIComponent).join(",");
+  /* v10.10 — reemplaza 5+ fetches secuenciales por 1 fetch de vista_correcciones_pedido_rich.
+     La vista ya resuelve PPP/stock/entregas/facturación/estado de tanda en el server.
+     PKC (detalle picking por artículo) no está en la vista — se muestra 0/false para esos campos. */
   const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
-  const q = function(url){ return fetch(url, { headers: H, cache: "no-store" }).then(function(r){ return r.ok ? r.json() : []; }).catch(function(){ return []; }); };
-  const res = await Promise.all([
-    q(SUPABASE_PPP_PROG_ENDPOINT + "?np=in.(" + inNps + ")&select=np,tanda,razon_social,fecha_entrega&limit=8000"),
-    q(SUPABASE_URL + "/rest/v1/vista_saldos_stock?cod_art=in.(" + inCods + ")&select=cod_art,terminado,excedente,a_guardar,racks,racks_ch,para_envasar"),
-    q(SUPABASE_URL + "/rest/v1/Entregas_Virgilio?np=in.(" + inNps + ")&select=np,cod_art,cajas_pedidas,cajas_entregadas,cajas_falto,fecha_salida&limit=8000"),
-    q(SUPABASE_FACTURACION_NP_ENDPOINT + "?np=in.(" + inNps + ")&select=np,razon_social,tanda&limit=8000")
-  ]);
-  const ppp = res[0], saldos = res[1], entregas = res[2], fact = res[3];
-  const npInfo = {}; ppp.forEach(function(r){ const n = pickNormNp(r.np); if (n && !npInfo[n]) npInfo[n] = { tanda: String(r.tanda||"").trim().toUpperCase(), rs: r.razon_social||"", fecha: String(r.fecha_entrega||"").trim() }; });
-  const stk = {}; saldos.forEach(function(r){ stk[_ocgNorm(r.cod_art)] = _corrStk(r); });
-  const ent = {}, fechaEnt = {}; entregas.forEach(function(r){ const n = pickNormNp(r.np); ent[n+"|"+_ocgNorm(r.cod_art)] = { ped: Number(r.cajas_pedidas)||0, entr: Number(r.cajas_entregadas)||0, falto: Number(r.cajas_falto)||0 }; if (r.fecha_salida && !fechaEnt[n]) fechaEnt[n] = String(r.fecha_salida).trim(); });
-  // Facturacion_NP: set de facturados + respaldo de razón social/tanda para NP que ya salieron del PPP.
-  const factSet = {}, rsFact = {}, tandaFact = {};
-  fact.forEach(function(r){ const n = pickNormNp(r.np); factSet[n] = true; if (r.razon_social && !rsFact[n]) rsFact[n] = r.razon_social; if (r.tanda && !tandaFact[n]) tandaFact[n] = String(r.tanda).trim().toUpperCase(); });
-  // Estado por tanda (últimos EP/TP y AP/TAP; excluye legajos 0/1 de prueba).
-  const tandas = Array.from(new Set(nps.map(function(n){ return (npInfo[n]||{}).tanda; }).filter(Boolean)));
-  const estadoTanda = {};
-  if (tandas.length){
-    const evs = await q(SUPABASE_TABLE_ENDPOINT + "?opcion=in.(EP,TP,AP,TAP)&texto=in.(" + tandas.map(encodeURIComponent).join(",") + ")&order=ts_cliente.asc&select=opcion,texto,legajo&limit=5000");
-    const lastP = {}, lastA = {};
-    evs.forEach(function(e){ const lg = String(e.legajo); if (lg==="0"||lg==="1") return; const t = String(e.texto||"").trim().toUpperCase(); if (!t) return; if (e.opcion==="EP"||e.opcion==="TP") lastP[t]=e.opcion; else if (e.opcion==="AP"||e.opcion==="TAP") lastA[t]=e.opcion; });
-    tandas.forEach(function(t){ const p=lastP[t], a=lastA[t]; estadoTanda[t] = !p ? "sinpickear" : (p==="EP" ? "enpicking" : (p==="TP" && a==="TAP" ? "afacturar" : "pickeado")); });
-  }
-  // v8.xx — traer PKC (detalle de picking por artículo) para tandas con picking
-  // iniciado/terminado, así se muestra la cantidad pickeada aunque Entregas_Virgilio
-  // no esté aún (se escribe recién al armar/TAP).
-  const pkcByTandaCod = {};   // "TANDA|COD" → reales (última marca gana)
-  const tandasPkc = tandas.filter(function(t){ var e = estadoTanda[t]; return e === "enpicking" || e === "pickeado"; });
-  if (tandasPkc.length){
-    const pkcRows = await q(SUPABASE_TABLE_ENDPOINT + "?opcion=eq.PKC&texto=like.*" + encodeURIComponent(tandasPkc[0]) + "*&select=texto&limit=10000"
-      // para múltiples tandas, repetir el fetch
-    ).catch(function(){ return []; });
-    // si hay más de una tanda, traer las demás en paralelo
-    const extraPkc = tandasPkc.length > 1
-      ? await Promise.all(tandasPkc.slice(1).map(function(t){ return q(SUPABASE_TABLE_ENDPOINT + "?opcion=eq.PKC&texto=like.*" + encodeURIComponent(t) + "*&select=texto&limit=10000").catch(function(){ return []; }); }))
-      : [];
-    var allPkc = pkcRows;
-    extraPkc.forEach(function(arr){ allPkc = allPkc.concat(arr); });
-    allPkc.forEach(function(r){
-      var parts = String((r && r.texto) || "").split("|");
-      if (parts.length < 4) return;
-      var t = String(parts[0]).trim().toUpperCase();
-      var cod = String(parts[1]).trim().toUpperCase();
-      var real = Number(parts[3]);
-      if (t && cod) pkcByTandaCod[t + "|" + cod] = isNaN(real) ? 0 : real;
-    });
-  }
-  pend.forEach(function(p){
-    const info = npInfo[p.np] || { tanda:"", rs:"" };
-    p.rs = info.rs || rsFact[p.np] || "";
-    p.tanda = info.tanda || tandaFact[p.np] || "";
-    p.fecha = info.fecha || fechaEnt[p.np] || "";
-    p.stkSec = stk[_ocgNorm(p.sec)] || 0;
-    p.stkPpal = stk[_ocgNorm(p.ppal)] || 0;
-    p.oper = ent[p.np+"|"+_ocgNorm(p.sec)] || ent[p.np+"|"+_ocgNorm(p.ppal)] || null;
-    p.estado = factSet[p.np] ? "facturado" : (estadoTanda[info.tanda] || "sinpickear");
-    // PKC: cantidad pickeada del artículo en la tanda (puede ser sec o ppal)
-    var tU = String(p.tanda).trim().toUpperCase();
-    var pkcSec = pkcByTandaCod[tU + "|" + String(p.sec).trim().toUpperCase()];
-    var pkcPpal = pkcByTandaCod[tU + "|" + String(p.ppal).trim().toUpperCase()];
-    p.pkcReal = (pkcSec != null ? pkcSec : 0) + (pkcPpal != null ? pkcPpal : 0);
-    p.pkcHay = pkcSec != null || pkcPpal != null;   // true si hubo al menos un PKC
+  const rows = await fetch(SUPABASE_URL + "/rest/v1/vista_correcciones_pedido_rich?select=np,sec,ppal,descripcion,cajas,razon_social,tanda,fecha,stk_sec,stk_ppal,ent_ped,ent_entr,ent_falto,estado&limit=10000", { headers: H, cache: "no-store" }).then(function(r){ return r.ok ? r.json() : []; });
+  return (rows || []).map(function(r){
+    var oper = (r.ent_ped != null || r.ent_entr != null) ? { ped: Number(r.ent_ped)||0, entr: Number(r.ent_entr)||0, falto: Number(r.ent_falto)||0 } : null;
+    return { np: r.np, sec: r.sec, ppal: r.ppal, desc: r.descripcion||"", cajas: Number(r.cajas)||0,
+             rs: r.razon_social||"", tanda: r.tanda||"", fecha: r.fecha||"",
+             stkSec: Number(r.stk_sec)||0, stkPpal: Number(r.stk_ppal)||0,
+             oper: oper, estado: r.estado||"sinpickear", pkcReal: 0, pkcHay: false };
   });
-  return pend;
 }
 async function facCorreccRefreshCount(){
   try {
