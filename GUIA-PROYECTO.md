@@ -4,7 +4,26 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-12 · Versión app al documentar: **v10.05**
+> Última actualización: 2026-08-12 · Versión app al documentar: **v10.16**
+>
+> Nota **v10.16 — Módulo "Faltantes facturados sin completar"** (botón 📉 en el panel supervisor).
+> Cierra el agujero que destapó el caso de las NPs 98140/98142/98155: el pickeador registra un
+> **PKC con `real < esp`** (no encontró todo), la tanda se **factura entera** igual, y **nadie corre
+> "Completar Pedido" (CP)**. Si esas cajas igual salieron, el stock queda **inflado**: sin bajada de
+> góndola el artículo nunca entra a `separar_pedidos` ni a `a_facturar`, así que la ETAPA 3 del
+> pipeline no tiene nada que drenar. **No lo detectaba nadie** — el caso testigo (art 234, 8 cajas)
+> se descubrió 3 semanas tarde y a mano.
+> **Backend:** vista **`vista_faltantes_sin_completar`** (migración homónima; `grant select` a anon)
+> = PKC con `real<esp` post-cutoff (excluye legajos 0/1) ∩ tandas con **todas** sus NP en
+> `Facturacion_NP`, menos las que ya tienen un `cp` de ese artículo en alguna NP de la tanda, menos
+> las que ya se ajustaron a mano (`tipo='ajuste'` con `ref` `'<tanda>|…'`). Devuelve tanda · cod ·
+> cajas · NPs · clientes · fecha_entrega · ts_pkc. Un caso **se borra solo** de la lista al
+> resolverlo (CP o ajuste), así el listado se vacía en vez de crecer.
+> **Front:** `stkOpenFaltFact` — tabla caso-por-caso, toggle **"Agrupar por artículo"** y export a
+> Excel. **Solo lista, no ajusta:** ⚠ **no todos los casos son fuga** — si al cliente se le facturó
+> **de menos**, la factura refleja lo que salió y el stock está bien; hay que cotejar contra el ERP.
+> Estado al crearlo: **372 casos · 135 tandas · 1.638 cajas**, concentrado en 870E (344), 224 (107),
+> 546 (97), 323E (70), 580E (59). Smoke `tests/falt-fact.cjs`.
 >
 > Nota **v10.05 — front conectado a vistas/RPCs backend.** Las funciones
 > `stkFcsFetch()`, `openAbastecimiento()`, `facCorreccDataRich()` (index.html) y
