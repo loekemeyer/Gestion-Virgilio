@@ -6310,8 +6310,91 @@ vistas/funciones server-side. El front consume estas vistas en un solo fetch cad
   Columnas: `tanda`, `last_pick_op`, `pick_legajo`, `pick_start_ts`, `last_arm_op`,
   `arm_legajo`, `arm_start_ts`, `estado`. **No conectada al front todavía** (prioridad media).
 
-Rollback: `rollback_alta_prioridad_20260812.sql` en el scratchpad del agente.
+Rollback batch 1: `rollback_alta_prioridad_20260812.sql` en el scratchpad del agente.
 Backup de `vista_stock_procesada` pre-cambios: `backup_vista_stock_procesada_matview_20260812.sql`.
+
+#### Batch 2 — objetos ALTA prioridad (v10.10b, 2026-08-12)
+
+Segundo lote de migración front→back. Objetos creados, **aún no conectados al front**:
+
+- **`generar_inconsistencias(p_dia date)`** — RPC (VOLATILE, SECURITY DEFINER).
+  Reemplaza `computeInconsistencias()` (~135 líneas de motor de reglas, 5k events).
+  Todas las reglas replicadas: pedido duplicado, FJ duplicado, evento post-FJ,
+  jornada sin FJ (solo días pasados), jornada >12h, duración excesiva (TP/TAP >8h,
+  toggles >3h, comida >90min), múltiples comidas, cierre sin apertura, abierto sin
+  cerrar (con threshold 3h para hoy), pedido inválido (no en PPP), hueco >90min.
+  Excluye legajos 0/1 (test). Devuelve `(sev, cat, legajo, hora, detalle)`.
+  Front: `refreshInconsistencias()` en index.html.
+
+- **`vista_faltante_catalogo`** — VIEW. 1 fila por artículo con stock (neto/bruto),
+  proveedor (con reparto P1/P2), flag discontinuo, última entrega (fecha/cajas),
+  OC pendiente (cajas/fecha/prov), notas (día resolución/motivo). Pre-joinea
+  `vista_saldos_stock` + `vista_generador_oc` + `OC_Maximos` + `Movimientos_Stock`
+  + `Ordenes_Compra` + `Faltantes_Notas`. Reemplaza 6 de los 13 fetches de
+  `stkFaltLoad()`.
+
+- **`vista_faltante_demanda`** — VIEW. 1 fila por (NP, artículo) con empresa-split
+  (437E/438E/439E/809E → LK/CH), estado picking por tanda (sinpickear/enpicking/
+  preparado), fecha armado (día hábil previo vía `dia_armado()`), fecha salida,
+  razón social, es_super. Pre-joinea `PPP_Programacion_Diaria` + `PPP_Base_Pedidos`
+  + EP/TP de `Registros_Produccion_Virgilio`, excluye NPs facturadas/entregadas/
+  canceladas. Reemplaza 5 de los 13 fetches de `stkFaltLoad()`.
+
+- **`vista_faltante_real`** — VIEW. Faltante real del picking: último PKC por
+  (tanda, artículo), ESP−REAL > 0. Solo tandas "preparado" (con TP). Con empresa-
+  split. Reemplaza los 2 fetches de PKC de `stkFaltLoad()`.
+
+- **`vista_avisar_programacion`** — VIEW. Reemplaza 5 fetches de `avpLoad()`.
+  Agrupa PPP pendiente por (cliente, fecha_salida) = 1 envío, pre-joinea teléfonos
+  (whatsapp_clientes), vendedor (clientes_vendedor), teléfono/nombre vendedor
+  (whatsapp_vendedores), último aviso al cliente (envio_programacion_log), flag
+  ya-enviado al vendedor. Columnas: `grp_key`, `cod`, `rs`, `fppp`, `fped`, `dias`,
+  `nps` (array), `tel_cli`, `vend`, `tel_vend`, `vend_nombre`, `last_cli_ts`,
+  `last_cli_quien`, `vend_sent`.
+
+- **`vista_racks_bajadas_pendientes`** — VIEW. Reemplaza fetch de 20k filas en
+  `renderBajadasRacks()`. Joinea `Racks_Bajadas` (estado='propuesta') con
+  `Articulos Virgilio X Tallerista` para cajas_x_master y uni_x_caja.
+
+- **`gondola_return_check(p_items jsonb)`** — RPC (STABLE). Reemplaza 3 fetches
+  de `gondReturnCheck()`. Recibe `[{cod, cajas}]`, devuelve flags `exceso_gondola`
+  (stock+cajas > cap×1.2) y `baja_rotacion` (proyección < 50).
+
+- **`vista_plata_perdida`** — VIEW. Reemplaza 4 fetches/200k filas de `ppLoad()`.
+  Columnas: `np`, `cod`, `cajas`, `ped`, `ent`, `fecha`, `cod_cliente`, `precio_unit`,
+  `uxb`, `descripcion`, `precio_ok`, `plata`, `vendedor`, `razon_social`.
+
+- **`dia_armado(date)`** — función `IMMUTABLE`. Último día hábil antes de una fecha
+  (sáb/dom → viernes). Helper para `vista_faltante_demanda`.
+- **`prox_habil(date)`** — función `IMMUTABLE`. Próximo día hábil después de una fecha.
+
+Rollback batch 2: `sql/rollback_alta_batch2_20260812.sql`.
+
+#### Batch 3 — objetos MEDIA prioridad (v10.10c, 2026-08-12)
+
+Tercer lote. Objetos creados, **aún no conectados al front**:
+
+- **`vista_entidades_recepcion`** — VIEW. Reemplaza 2 fetches de `cargarEntidades()`
+  (recepcion.js). Une talleristas (Codigos X Tallerista, agrupados por nombre con
+  cod_lk/cod_ch) + proveedores AT (Tall_ProvAT_PS, activos con rec_virg).
+
+- **`vista_historial_entregas`** — VIEW. Reemplaza 2 fetches paralelos de `histLoad()`
+  (recepcion.js). Unifica `Entregas Tallerista Virgilio` + `Entregas Prov AT` con
+  columnas normalizadas (fuente, fecha, cod_art, cajas, quien, remito). El cliente
+  filtra por cod/quien/remito/fechas con PostgREST.
+
+- **`vista_articulos_prov_at`** — VIEW. Reemplaza 2 fetches secuenciales de
+  `renderArticulos()` (rama prov_at, recepcion.js). Pre-joinea `Articulos x Prov AT`
+  (activos) con `Articulos Virgilio X Tallerista` para la línea LK/CH. El cliente
+  filtra por proveedor y linea.
+
+- **`vista_control_remitos`** — VIEW. Reemplaza 5 fetches de `fetchCRData()`.
+  Consolida CCN/TAL/CRN/FSS (últimos 7 días) con metadatos PPP/Entregados. Ya
+  excluye controlados (CRN) y sin salida (FSS), ordena vencidos primero. Columnas:
+  np, tanda, lios, cod_cliente, rs, vencido, first_load, last_ccn.
+
+**Pendiente MEDIA**: `prodLoad/prodCompute` — RPC parametrizado por rango de fechas,
+cálculo de productividad con m³ y factores. Complejidad alta, dejado para después.
 
 ---
 

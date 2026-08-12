@@ -5600,17 +5600,15 @@ async function getActivityStatus(force) {
   };
   try {
     const since = new Date(Date.now() - ACTIVITY_LOOKBACK_DAYS*24*60*60*1000).toISOString();
-    const url = SUPABASE_TABLE_ENDPOINT +
-      "?opcion=in.(EP,TP,AP,TAP)" +
+    // v10.06: usa supaFetchAll para paginar con Range — el fetch directo con
+    // limit=20000 solo traía max-rows (~1000) y con 3400+ registros en 180 días
+    // los TP/AP recientes quedaban truncados → tandas pickeadas no aparecían
+    // en la lista de armado.
+    const data = await supaFetchAll(SUPABASE_TABLE_ENDPOINT,
+      "opcion=in.(EP,TP,AP,TAP)" +
       "&ts_cliente=gte." + encodeURIComponent(since) +
       "&order=ts_cliente.asc" +
-      "&limit=20000" +
-      "&select=opcion,texto,ts_cliente,legajo";
-    const r = await fetch(url, {
-      headers: { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY }
-    });
-    if (!r.ok) throw new Error("Supabase HTTP " + r.status);
-    const data = await r.json();
+      "&select=opcion,texto,ts_cliente,legajo");
     const lastPick       = new Map();   // normalizado
     const lastPickStrict = new Map();   // texto exacto
     const lastArm        = new Map();   // normalizado
