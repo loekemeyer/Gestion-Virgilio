@@ -6420,7 +6420,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v10.06";
+const APP_VERSION = "v10.07";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -10872,8 +10872,8 @@ async function ocgFetchImportados() {
   // v10.05 — VOLUMEN de la MASTER caja (m³) por código, editable (tabla Importados_Volumen).
   const volMaster = {};
   try {
-    const vm = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Importados_Volumen", "select=cod,largo_cm,ancho_cm,alto_cm,m3_master");
-    (vm || []).forEach(function (r) { volMaster[String(r.cod).toUpperCase().trim()] = { m3: Number(r.m3_master) || 0, l: Number(r.largo_cm) || 0, a: Number(r.ancho_cm) || 0, h: Number(r.alto_cm) || 0 }; });
+    const vm = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Importados_Volumen", "select=cod,largo_cm,ancho_cm,alto_cm,m3_master,uni_master");
+    (vm || []).forEach(function (r) { volMaster[String(r.cod).toUpperCase().trim()] = { m3: Number(r.m3_master) || 0, um: Number(r.uni_master) || 0, l: Number(r.largo_cm) || 0, a: Number(r.ancho_cm) || 0, h: Number(r.alto_cm) || 0 }; });
   } catch (_e) {}
   const items = [];
   Object.keys(by).forEach(function (k) {
@@ -10887,15 +10887,20 @@ async function ocgFetchImportados() {
     const stockTot = o.stockUni + stockParteU;   // el stock de la parte cuenta como stock del terminado
     const objetivoUni = Math.round(proyUni * meses);
     const aPedirUni = Math.max(0, Math.ceil(objetivoUni - stockTot - o.enCurso));
-    const aPedirCajas = (o.uxc > 0) ? Math.ceil(aPedirUni / o.uxc) : null;
-    // v10.05 — m³ del pedido = master cajas a pedir (enteras) × m³ por master caja
+    // v10.07 — MASTER CAJAS: el divisor correcto es uni_master (del Excel/Importados_Volumen), NO
+    // uni_x_caja (que es la caja INNER). Si no hay uni_master cargado, caemos a uni_x_caja como aprox.
     const vm = volMaster[kk] || null;
+    const uniMaster = (vm && vm.um > 0) ? vm.um : 0;
+    const divisorCaja = uniMaster > 0 ? uniMaster : o.uxc;
+    const cajasEsMaster = uniMaster > 0;
+    const aPedirCajas = (divisorCaja > 0) ? Math.ceil(aPedirUni / divisorCaja) : null;   // master cajas enteras
+    // m³ del pedido = master cajas a pedir (enteras) × m³ por master caja
     const m3Master = vm ? vm.m3 : 0;
     const m3Total = (aPedirCajas != null && m3Master > 0) ? (aPedirCajas * m3Master) : 0;
     // v10.06 — cotización USD = unidades a pedir × FOB unitario (por ítem; el total se suma en el render)
     const fobUni = o.fob || 0;
     const usdTotal = (fobUni > 0) ? (aPedirUni * fobUni) : 0;
-    items.push({ cod: o.cod, desc: o.desc, prov: o.prov, proyUni: Math.round(proyUni), meses: meses, objetivoUni: objetivoUni, stockUni: Math.round(stockTot), stockPropio: Math.round(o.stockUni), stockParteU: Math.round(stockParteU), stockParteCods: (sp ? sp.partes : ""), enCurso: Math.round(o.enCurso), aPedirUni: aPedirUni, uxc: o.uxc, aPedirCajas: aPedirCajas, fobUni: fobUni, usdTotal: usdTotal, m3Master: m3Master, m3Dims: vm ? { l: vm.l, a: vm.a, h: vm.h } : null, m3Total: m3Total, esParte: esParte, parteDet: (pp ? pp.detalle : null), det: o.det || [] });
+    items.push({ cod: o.cod, desc: o.desc, prov: o.prov, proyUni: Math.round(proyUni), meses: meses, objetivoUni: objetivoUni, stockUni: Math.round(stockTot), stockPropio: Math.round(o.stockUni), stockParteU: Math.round(stockParteU), stockParteCods: (sp ? sp.partes : ""), enCurso: Math.round(o.enCurso), aPedirUni: aPedirUni, uxc: o.uxc, uniMaster: uniMaster, cajasEsMaster: cajasEsMaster, aPedirCajas: aPedirCajas, fobUni: fobUni, usdTotal: usdTotal, m3Master: m3Master, m3Dims: vm ? { l: vm.l, a: vm.a, h: vm.h } : null, m3Total: m3Total, esParte: esParte, parteDet: (pp ? pp.detalle : null), det: o.det || [] });
   });
   return { items: items, meses: meses };
 }
@@ -13041,9 +13046,9 @@ function _pedImpRender() {
       const totM3 = arr.reduce(function (s, it) { return s + (Number(it.m3Total) || 0); }, 0);   // v10.05
       const totUsd = arr.reduce(function (s, it) { return s + (Number(it.usdTotal) || 0); }, 0);  // v10.06
       h += '<div class="stkpop-hint" style="margin:8px 0 3px;font-weight:700">' + escapeHtml(prov) + ' · ' + arr.length + ' ítem(s)' + (totCaj ? ' · ' + totCaj + ' cajas' : '') + (totUsd > 0 ? ' · <span style="color:#065f46">u$s ' + Math.round(totUsd).toLocaleString("es-AR") + '</span>' : '') + (totM3 > 0 ? ' · <span style="color:#0369a1">' + (Math.round(totM3 * 100) / 100) + ' m³</span>' : '') + '</div>';
-      h += '<div class="mva-tblwrap"><table class="mva-tbl"><thead><tr><th>Código</th><th>Descripción</th><th class="num">Proy u/mes</th><th class="num">Objetivo</th><th class="num">Stock</th><th class="num">En curso</th><th class="num">A pedir u</th><th class="num">Cajas</th><th class="num" title="FOB unitario (USD) del maestro Importados">FOB u$s/u</th><th class="num" title="Cotización del ítem = unidades a pedir × FOB unitario">u$s pedido</th><th class="num" title="m³ de UNA master caja (medidas cargadas a mano). Tocá el ✏ para cargar/editar.">m³/master</th><th class="num" title="m³ del pedido = master cajas a pedir × m³ por master">m³ pedido</th><th>Acciones</th></tr></thead><tbody>';
+      h += '<div class="mva-tblwrap"><table class="mva-tbl"><thead><tr><th>Código</th><th>Descripción</th><th class="num">Proy u/mes</th><th class="num">Objetivo</th><th class="num">Stock</th><th class="num">En curso</th><th class="num">A pedir u</th><th class="num" title="Master cajas = ceil(a pedir ÷ uni por master). Siempre enteras. Un ~ marca que no hay uni_master cargado y se aproximó con la caja inner.">Master cjs</th><th class="num" title="FOB unitario (USD) del maestro Importados">FOB u$s/u</th><th class="num" title="Cotización del ítem = unidades a pedir × FOB unitario">u$s pedido</th><th class="num" title="m³ de UNA master caja (medidas cargadas a mano). Tocá el ✏ para cargar/editar.">m³/master</th><th class="num" title="m³ del pedido = master cajas a pedir × m³ por master">m³ pedido</th><th>Acciones</th></tr></thead><tbody>';
       arr.sort(function (a, b) { return b.aPedirUni - a.aPedirUni; }).forEach(function (it) {
-        const cajTxt = (it.aPedirCajas == null) ? '<span style="color:#94a3b8" title="Sin uni×caja cargado">—</span>' : String(it.aPedirCajas);
+        const cajTxt = (it.aPedirCajas == null) ? '<span style="color:#94a3b8" title="Sin uni×caja cargado">—</span>' : (String(it.aPedirCajas) + (it.cajasEsMaster ? '' : '<span style="color:#f59e0b" title="Sin uni_master cargado: aprox con caja inner">~</span>'));
         const badge = it.esParte ? ' <span style="color:#7c3aed" title="Parte">🧩</span>' : '';
         // v10.02 — stock negativo (más pedidos que stock) se muestra como 0 (no negativo), pedido del usuario.
         const _stkShow = Math.max(0, Number(it.stockUni) || 0);
@@ -13099,7 +13104,7 @@ function pedImpExportExcel() {
   });
   var html = '<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"><style>td,th{border:1px solid #ccc;padding:3px 7px;font-family:Calibri,Arial,sans-serif;} th{background:#166534;color:#fff;text-align:left;}</style></head><body>';
   html += '<h3>Pedidos Importación — Producción Virgilio (' + esc(fecha) + ', índice ' + (data.meses || 10) + ' meses)</h3>';
-  html += '<table><tr><th>Importador</th><th>Proveedor</th><th>Codigo</th><th>Descripcion</th><th>Proy u/mes</th><th>Objetivo</th><th>Stock</th><th>En curso</th><th>A pedir u</th><th>Cajas</th><th>FOB u$s/u</th><th>u$s pedido</th><th>m3/master</th><th>m3 pedido</th></tr>';
+  html += '<table><tr><th>Importador</th><th>Proveedor</th><th>Codigo</th><th>Descripcion</th><th>Proy u/mes</th><th>Objetivo</th><th>Stock</th><th>En curso</th><th>A pedir u</th><th>Master cjs</th><th>FOB u$s/u</th><th>u$s pedido</th><th>m3/master</th><th>m3 pedido</th></tr>';
   var _totM3 = 0, _totUsd = 0;
   items.forEach(function (it) {
     var imp = _IMPORTADOR_DE[it.prov || ""] || "(sin importador)";

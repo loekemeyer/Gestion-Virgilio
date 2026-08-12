@@ -261,16 +261,23 @@
 > Cajas por pila, Sueltas, Contado (cajas), **Stock del sistema** (góndola+excedente, mismo cálculo
 > que la comparación), Diferencia y En proceso. Formato Excel es-AR (BOM utf-8, `;`, coma decimal).
 >
-> Nota **v10.06** — **Pedidos Importación: cotización en USD (FOB) + volumen (m³).** Cada ítem
-> del módulo "📦 Pedidos Importación" ahora muestra: **FOB u$s/u** (editable ✏ → `Importados.fob_uni`,
-> USD por unidad del proveedor), **u$s pedido** (= unidades a pedir × FOB), **m³/master** (editable ✏
-> → tabla nueva `Importados_Volumen`: se cargan las medidas de la master en cm `Largo×Ancho×Alto` y
-> calcula m³ = L·A·H/1e6, o se ingresa el m³ directo) y **m³ pedido** (= master cajas a pedir enteras
-> × m³/master). Arriba hay dos tarjetas con el **TOTAL del pedido**: USD (Σ) y m³ (Σ), con aviso de
-> cuántos ítems no tienen FOB/volumen cargado. Subtotales por proveedor (cajas · u$s · m³) y todo baja
-> al Excel (columnas FOB, u$s, m³/master, m³ pedido + fila TOTALES). Las master cajas del pedido salen
-> de convertir las unidades a cajas enteras (`ceil(a_pedir / uni_x_caja)`, sin decimales). **Todo vive
-> en Supabase** (`Importados.fob_uni` + `Importados_Volumen`), sin dependencia de ningún Excel externo.
+> Nota **v10.07** — **Pedidos Importación: cotización USD (FOB) + volumen (m³), todo en Supabase.**
+> Cada ítem del módulo "📦 Pedidos Importación" muestra: **FOB u$s/u** (editable ✏ → `Importados.fob_uni`,
+> USD/unidad del proveedor), **u$s pedido** (= unidades a pedir × FOB), **Master cjs** (master cajas
+> enteras), **m³/master** (editable ✏ → tabla `Importados_Volumen`) y **m³ pedido** (= master cjs ×
+> m³/master). Arriba, dos tarjetas con el **TOTAL del pedido**: USD (Σ) y m³ (Σ), con aviso de ítems
+> sin FOB/volumen. Subtotales por proveedor (cajas · u$s · m³) y todo baja al Excel + fila TOTALES.
+> - ⚠ **Master caja ≠ inner caja.** `Importados.uni_x_caja` es la caja **inner**; el divisor correcto
+>   para master cajas es **`Importados_Volumen.uni_master`** (del Excel). Master cjs = `ceil(a_pedir /
+>   uni_master)` (sin decimales); si un ítem no tiene `uni_master` cargado, cae a `uni_x_caja` como
+>   aprox y se marca con `~`.
+> - **Tabla `Importados_Volumen`** (RLS anon select/insert/update): `cod` (PK, = `cod_art` en mayúsculas),
+>   `largo_cm`, `ancho_cm`, `alto_cm`, `m3_master`, `uni_master`, `uni_inner`, `fuente`. El ✏ de m³/master
+>   pide `Largo×Ancho×Alto` (cm) y calcula m³ = L·A·H/1e6, o acepta el m³ directo.
+> - **Carga inicial (2026-08-12)**: se subió el Excel "QUIEBRE ART IMP 11-08" (hojas `Todos` +
+>   `TRAZABILIDAD`) a Supabase: **149 códigos** en `Importados_Volumen` (medidas + m³ + uni_master) y
+>   **144** FOB actualizados en `Importados`. Backup del FOB previo en `sql/backup_importados_fob_20260812.sql`.
+>   **La app no toca el Excel**: todo corre de Supabase. Para re-cargar (nuevo Excel), repetir el upsert.
 >
 > Nota **v9.29** — **Pedidos Importación operable (editar en curso + marcar llegada).** El módulo
 > "📦 Pedidos Importación" era solo-lectura; ahora cada fila tiene **✏️** (editar unidades EN CURSO
