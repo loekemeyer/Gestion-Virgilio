@@ -1984,7 +1984,8 @@ button.pk-anular small{ display:block; font-size:12px; font-weight:700; opacity:
 .ppp-tanda.ppp-open .ppp-tablewrap{ display:block; }
 .ppp-tablewrap{ overflow-x:auto; }
 .ppp-tbl{ width:100%; border-collapse:collapse; font-size:13px; white-space:nowrap; table-layout:auto; }
-.ppp-tbl td:nth-child(7), .ppp-tbl th:nth-child(7), .ppp-tbl td:nth-child(9), .ppp-tbl th:nth-child(9){ white-space:normal; overflow-wrap:anywhere; }   /* Localidad y Zona: envuelven → nunca fuerzan scroll */
+.ppp-tbl th:nth-child(7), .ppp-tbl th:nth-child(9){ white-space:nowrap; }   /* títulos Localidad/Zona en UNA línea (nunca verticales) */
+.ppp-tbl td:nth-child(7), .ppp-tbl td:nth-child(9){ white-space:normal; overflow-wrap:normal; word-break:keep-all; min-width:82px; max-width:150px; }   /* v9.77: envuelven por PALABRA, no letra por letra */
 .ppp-tbl td.ppp-acc{ white-space:nowrap; text-align:right; }
 .ppp-tbl th{ text-align:left; padding:5px 7px; background:#f8fafc; color:#475569; border-bottom:1px solid #e2e8f0; font-size:11px; text-transform:uppercase; letter-spacing:.2px; }
 .ppp-tbl th.num{ text-align:right; } .ppp-tbl td{ padding:5px 7px; border-bottom:1px solid #f1f5f9; color:#0f172a; } .ppp-tbl td.num{ text-align:right; }
@@ -6404,7 +6405,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v9.76";
+const APP_VERSION = "v9.77";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -14340,7 +14341,10 @@ function stkBodyFaltante() {
       cod: codShow, key: key, esFam: esFam, miembros: miembrosDisp,
       desc: descFam || artNombre(codShow, ""), prov: provMap[key] || provMap[String(key).replace(/\s+(LK|CH)$/, "")] || provMap[members[0]] || "",
       stock: Math.round(stockFam), totalDem: Math.round(totalDem),
-      realFalt: Math.round(realFam), realDia: realDiaFam, realWin: realWin,
+      // v9.77 — faltó-al-armar PENDIENTE: se netea contra el stock sobrante (stock − demanda).
+      // Si ya llegó mercadería que cubre todo (ej. 508: stock 92 ≥ 58 ped), el "faltó al armar"
+      // queda cubierto y NO cuenta como quiebre → la fila desaparece (pedido del usuario).
+      realFalt: Math.round(realFam), realFaltPend: Math.max(0, Math.round(realFam) - Math.max(0, Math.round(stockFam) - Math.round(totalDem))), realDia: realDiaFam, realWin: realWin,
       faltS1: Math.round(faltS1), faltS2: Math.round(faltS2), faltResto: Math.round(faltResto),
       faltSinFecha: Math.round(faltSinFecha),
       diasFalt: diasFalt, diasFaltSuper: diasFaltSuper, diasFaltCli: diasFaltCli,
@@ -14381,13 +14385,13 @@ function stkBodyFaltante() {
     return codCanon(a.cod).localeCompare(codCanon(b.cod), undefined, { numeric: true });
   });
 
-  // Mostrar artículos con demanda proyectada O con faltante real ya armado
-  arts = arts.filter(function (a) { return a.totalDem > 0 || (a.realFalt || 0) > 0; });
+  // Mostrar artículos con demanda proyectada O con faltante real ya armado TODAVÍA sin cubrir
+  arts = arts.filter(function (a) { return a.totalDem > 0 || (a.realFaltPend || 0) > 0; });
 
   // v8.02 — resumen (sobre TODOS los con demanda, antes de "solo quiebre")
-  var _hayQ = function (a) { return (a.realFalt || 0) > 0 || a.faltS1 > 0 || a.faltS2 > 0 || (a.faltResto || 0) > 0 || diasCols.some(function (d) { return (a.diasFalt[d] || 0) > 0; }); };
+  var _hayQ = function (a) { return (a.realFaltPend || 0) > 0 || a.faltS1 > 0 || a.faltS2 > 0 || (a.faltResto || 0) > 0 || diasCols.some(function (d) { return (a.diasFalt[d] || 0) > 0; }); };
   var sumNQ = 0, sumCajS1 = 0, sumNQ2 = 0, sumCambio = 0, sumRealN = 0, sumRealCj = 0;
-  arts.forEach(function (a) { if (a.faltS1 > 0) { sumNQ++; sumCajS1 += a.faltS1; } if (a.faltS2 > 0) sumNQ2++; if (a.subCambio > 0) sumCambio++; if ((a.realFalt || 0) > 0) { sumRealN++; sumRealCj += a.realFalt; } });
+  arts.forEach(function (a) { if (a.faltS1 > 0) { sumNQ++; sumCajS1 += a.faltS1; } if (a.faltS2 > 0) sumNQ2++; if (a.subCambio > 0) sumCambio++; if ((a.realFaltPend || 0) > 0) { sumRealN++; sumRealCj += a.realFaltPend; } });
 
   // v8.02 — "solo quiebre": esconde los que no faltan (ruido)
   if (F.soloQuiebre) arts = arts.filter(_hayQ);
