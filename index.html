@@ -6453,7 +6453,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v10.14";
+const APP_VERSION = "v10.15";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -26687,10 +26687,43 @@ async function openPlataPerdida() {
   await ppLoad();
 }
 function ppClose() { var ov = document.getElementById("ppOverlay"); if (ov) ov.style.display = "none"; }
+/* v10.15 — fallback: lee las 4 tablas directas y arma el join en JS (igual que pre-v10.09). */
+async function _ppFallbackLoad() {
+  var r = await Promise.all([
+    supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Entregas_Virgilio", "select=np,cod_art,cajas_falto,cajas_pedidas,cajas_entregadas,fecha_salida,cod_cliente&cajas_falto=gt.0"),
+    supaFetchAllSafe(SUPABASE_URL + "/rest/v1/precios_venta", "select=cod,precio_unit,uxb,descripcion"),
+    supaFetchAllSafe(SUPABASE_URL + "/rest/v1/clientes_vendedor", "select=cod_cliente,vend"),
+    supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Facturacion_NP", "select=np,razon_social")
+  ]);
+  var ent = r[0] || [], pv = {}, cv = {}, fnp = {};
+  (r[1] || []).forEach(function (p) { var c = _ppNormCod(p.cod); if (c) pv[c] = p; });
+  (r[2] || []).forEach(function (c) { var k = (c.cod_cliente || "").trim(); if (k) cv[k] = (c.vend || "").trim(); });
+  (r[3] || []).forEach(function (f) { var k = (f.np || "").trim(); if (k) fnp[k] = f.razon_social || ""; });
+  return ent.map(function (e) {
+    var cod = _ppNormCod(e.cod_art), p = pv[cod] || {}, cli = (e.cod_cliente || "").trim(), np = (e.np || "").trim();
+    var pu = Number(p.precio_unit) || 0, uxb = Number(p.uxb) || 1;
+    return { np: e.np, cod: cod, cod_raw: (e.cod_art || "").trim(), cajas: Number(e.cajas_falto) || 0,
+      ped: Number(e.cajas_pedidas) || 0, ent: Number(e.cajas_entregadas) || 0,
+      fecha: (e.fecha_salida || "").slice(0, 10), cod_cliente: cli,
+      precio_unit: pu, uxb: uxb, descripcion: p.descripcion || "",
+      precio_ok: pu > 0 && pu !== 8888, vendedor: cv[cli] || "", razon_social: fnp[np] || "" };
+  });
+}
+function _ppNormCod(c) { return (c == null ? "" : String(c)).trim().toUpperCase().replace(/^0+(?=.)/, ""); }
 async function ppLoad() {
-  // v10.09: 1 fetch a vista_plata_perdida reemplaza 4 tablas crudas (~200k filas).
-  var data = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/vista_plata_perdida",
-    "select=np,cod,cod_raw,cajas,ped,ent,fecha,cod_cliente,precio_unit,uxb,descripcion,precio_ok,vendedor,razon_social&cajas=gt.0");
+  // v10.15: vista con timeout 12s; si falla, fallback a tablas directas.
+  var data;
+  try {
+    data = await Promise.race([
+      supaFetchAll(SUPABASE_URL + "/rest/v1/vista_plata_perdida",
+        "select=np,cod,cod_raw,cajas,ped,ent,fecha,cod_cliente,precio_unit,uxb,descripcion,precio_ok,vendedor,razon_social&cajas=gt.0"),
+      new Promise(function (_, rej) { setTimeout(function () { rej(new Error("timeout")); }, 12000); })
+    ]);
+  } catch (_e) {
+    console.warn("ppLoad: vista_plata_perdida falló (" + (_e.message || _e) + "), fallback a tablas directas");
+    data = await _ppFallbackLoad();
+  }
+  if (!data) data = [];
   var precio = {}, vendDe = {}, rsDe = {};
   data.forEach(function (r) {
     var codN = r.cod || "";
