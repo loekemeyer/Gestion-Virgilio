@@ -6412,7 +6412,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v9.85";
+const APP_VERSION = "v9.86";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -26401,7 +26401,7 @@ function avpRender() {
     var editTel = '<button class="avp-mini" onclick="event.stopPropagation();avpEditTel(\'' + encodeURIComponent(g.key) + '\')" title="' + (g.telCli ? "Editar" : "Cargar") + ' teléfono">✎</button>';
     // v9.84 — cliente SIN WhatsApp pero CON vendedor real: botón para sumarlo IGUAL al resumen
     // del vendedor (aclarando que va a salir una alerta de aviso a Damián).
-    var addVend = (g.vend && !_avpNoVend(g.vend)) ? '<button class="avp-mini avp-addvend" onclick="event.stopPropagation();avpAddVend(\'' + encodeURIComponent(g.key) + '\')" title="Sin WhatsApp del cliente: sumarlo igual al resumen del vendedor (sale alerta a Damián)">➕ a vend</button>' : '';
+    var addVend = (g.vend && !_avpNoVend(g.vend)) ? '<button class="avp-mini avp-addvend" onclick="event.stopPropagation();avpAddVend(\'' + encodeURIComponent(g.key) + '\')" title="Sin WhatsApp del cliente: sumarlo igual al resumen del vendedor (sale alerta a Damián por Telegram)">➕ a vend</button>' : '';
     var cliCell = _avpNoCliente(g.vend)
       ? '<span class="avp-vpill fab" title="Vend 20 (super) = somos nosotros → no se avisa">🏢 nosotros</span>'
       : (g.telCli
@@ -26506,16 +26506,41 @@ async function avpEditTel(keyEnc) {
 /* v9.84 — cliente SIN WhatsApp pero CON vendedor real: sumarlo IGUAL al resumen del vendedor.
    Aclara que va a salir una alerta de aviso a Damián. (Persistencia/mensaje real a Damián:
    por ahora es en la sesión + aclaración; si se define el nº de Damián, se cablea el envío.) */
-function avpAddVend(keyEnc) {
+async function avpAddVend(keyEnc) {
   if (!_avp) return;
   var g = _avpGroup(decodeURIComponent(keyEnc)); if (!g) return;
   if (!g.vend || _avpNoVend(g.vend)) { try { alert("Este cliente no tiene vendedor con resumen."); } catch (_e) {} return; }
   var nom = g.rs || ("cliente " + g.cod);
-  try { if (!confirm("⚠ " + nom + " NO tiene WhatsApp.\n\nLo sumo igual al resumen del VENDEDOR (Vend " + g.vend + (g.vendNombre ? " · " + g.vendNombre : "") + ") y va a SALIR UNA ALERTA DE AVISO A DAMIÁN.\n\n¿Confirmás?")) return; } catch (_e) { return; }
+  try { if (!confirm("⚠ " + nom + " NO tiene WhatsApp.\n\nLo sumo igual al resumen del VENDEDOR (Vend " + g.vend + (g.vendNombre ? " · " + g.vendNombre : "") + ") y va a SALIR UNA ALERTA A DAMIÁN POR TELEGRAM.\n\n¿Confirmás?")) return; } catch (_e) { return; }
   if (!_avp.vendNotified[g.vend]) _avp.vendNotified[g.vend] = {};
   _avp.vendNotified[g.vend][g.key] = { rs: g.rs, fppp: g.fppp, cod: g.cod };
   avpRender();
-  try { alert("✓ " + nom + " sumado al resumen de Vend " + g.vend + ". (Alerta a Damián: aclarada.)"); } catch (_e) {}
+  // v9.86 — aviso REAL a Telegram (grupo "Faltantes Virgilio"), taggeando a Damián. Va por
+  // telegram_outbox (pending) igual que el resto de alertas; dedup por cliente/vend/día.
+  try {
+    var nps = (g.nps || []).map(function (n) { return String(n).trim(); }).filter(Boolean);
+    var msg = "📣 *SUMAR A RESUMEN DE VENDEDOR* — para Damián\n" +
+      "Cliente: *" + String(nom) + "* (cod " + String(g.cod) + ") *sin WhatsApp*\n" +
+      "Vendedor: " + String(g.vend) + (g.vendNombre ? " · " + String(g.vendNombre) : "") + "\n" +
+      (nps.length ? "NP: " + nps.join(", ") + "\n" : "") +
+      (g.fppp ? "Fecha PPP: " + String(g.fppp) + "\n" : "") +
+      "_Se sumó al resumen del vendedor porque el cliente no tiene WhatsApp._";
+    await fetch(SUPABASE_URL + "/rest/v1/telegram_outbox", {
+      method: "POST",
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" },
+      body: JSON.stringify({
+        chat_id: "-1002231959863",
+        text: msg,
+        parse_mode: "Markdown",
+        status: "pending",
+        dedup_key: "avp_addvend_" + String(g.cod).trim() + "_" + String(g.vend).trim() + "_" + _faltHoy()
+      }),
+      cache: "no-store"
+    });
+    try { alert("✓ " + nom + " sumado al resumen de Vend " + g.vend + ".\nAlerta enviada a Damián por Telegram."); } catch (_e) {}
+  } catch (_e) {
+    try { alert("✓ " + nom + " sumado al resumen de Vend " + g.vend + ".\n⚠ No se pudo enviar la alerta a Telegram (sin conexión)."); } catch (_e2) {}
+  }
 }
 /* v9.62 — deshacer un aviso a cliente: borra la(s) fila(s) del log (tipo='cliente') de las NP del
    grupo y saca la marca. El pedido vuelve a "pendientes". No toca el resumen ya enviado al vendedor. */
