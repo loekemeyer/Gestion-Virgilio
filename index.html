@@ -14200,195 +14200,59 @@ async function stkFaltLoad() {
   if (!_stk) return;
   _stk.faltLoaded = "loading"; stkRender();
   try {
+    // v10.09: 3 vistas reemplazan 13 fetches crudos.
     var res = await Promise.all([
-      supaFetchAllSafe(SUPABASE_PPP_PROG_ENDPOINT, "select=np,fecha_entrega,razon_social,tanda,cod,zona"),
-      fetchPickingBase(),
-      supaFetchAllSafe(SUPABASE_FACTURACION_NP_ENDPOINT, "select=np"),
-      // v8.17 — "Fabricante" espeja el GENERADOR DE OCs: proveedor(es) de vista_generador_oc
-      // (mismo dato que se ve en Generar OCs), no OC_Maximos crudo.
-      supaFetchAllSafe(SUPABASE_GENERADOR_ENDPOINT, "select=cod,proveedor,tiene_prov_real,proveedor2,pr2&activo=eq.true"),
-      supaFetchAllSafe(SUPABASE_URL + "/rest/v1/vista_saldos_stock",
-        "select=cod_art,descripcion,terminado,excedente,a_guardar,racks,racks_ch,para_envasar,separar_pedidos,a_facturar,insumos"),
-      // v8.38 — códigos DISCONTINUOS (activo=false en OC_Maximos): no se muestran en Faltantes.
-      supaFetchAllSafe(SUPABASE_OCMAX_ENDPOINT, "select=cod&activo=eq.false"),
-      // v9.34 — NP ya ENTREGADAS (completadas) y CANCELADAS: no son faltante (igual que ocgDemanda).
-      supaFetchAllSafe(SUPABASE_URL + "/rest/v1/PPP_Entregados_Meta", "select=np"),
-      supaFetchAllSafe(SUPABASE_URL + "/rest/v1/NP_Canceladas", "select=np"),
-      // v9.85 — ÚLTIMA ENTREGA (recepción a góndola): fecha + cajas de la última recepción por código.
-      supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Movimientos_Stock", "select=cod_art,delta,ts&tipo=eq.recepcion&deposito=eq.a_guardar&delta=gt.0"),
-      // v9.85 — OC pendiente de esta semana (Ordenes_Compra) por código/proveedor.
-      supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Ordenes_Compra", "select=codigo,cantidad,cantidad_recibida,fecha,proveedor&estado=eq.pendiente"),
-      // v9.85 — notas editables (Día resolución / Motivo) para el reporte al gerente.
-      supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Faltantes_Notas", "select=cod,dia_resolucion,motivo")
+      supaFetchAllSafe(SUPABASE_URL + "/rest/v1/vista_faltante_catalogo",
+        "select=cod,descripcion,stock_neto,stock_bruto,proveedor,discontinuo,ult_entrega_fecha,ult_entrega_cajas,oc_pend_cajas,oc_pend_fecha,oc_pend_prov,nota_dia,nota_motivo"),
+      supaFetchAllSafe(SUPABASE_URL + "/rest/v1/vista_faltante_demanda",
+        "select=cod,np,rs,cod_cliente,cajas,fecha_salida,fecha_armado,tanda,estado_picking,es_super"),
+      supaFetchAllSafe(SUPABASE_URL + "/rest/v1/vista_faltante_real",
+        "select=cod,tanda,np,rs,cajas_falto,cod_raw,fecha_salida")
     ]);
-    var ppp = res[0] || [], base = res[1], facRows = res[2] || [], genProv = res[3] || [], saldos = res[4] || [], discRows = res[5] || [], entRows = res[6] || [], canRows = res[7] || [], ultRows = res[8] || [], ocRows = res[9] || [], notaRows = res[10] || [];
-    // Set de códigos discontinuos (normalizados) → se filtran de la tabla.
-    var discont = {};
-    discRows.forEach(function (r) { var k = _ocgNorm(r.cod); if (k) discont[k] = true; });
-    // Set de NPs que YA NO son faltante: facturadas + entregadas (completadas) + canceladas ("no va").
-    // v9.34 — antes solo miraba facturadas; las entregadas/canceladas seguían apareciendo como
-    // "faltante que no falta" aunque el pedido ya estaba cumplido o dado de baja.
-    var facSet = {};
-    facRows.forEach(function (r) { var n = pickNormNp(r.np); if (n) facSet[n] = true; });
-    entRows.forEach(function (r) { var n = pickNormNp(r.np); if (n) facSet[n] = true; });
-    canRows.forEach(function (r) { var n = pickNormNp(r.np); if (n) facSet[n] = true; });
-    // Mapa proveedor por código normalizado, igual que el generador de OCs: proveedor real
-    // (ignora "(sin proveedor)"); si hay reparto a un 2° proveedor, se muestra "P1 / P2".
-    var provMap = {};
-    genProv.forEach(function (r) {
-      var k = _ocgNorm(r.cod); if (!k) return;
-      var p1 = String(r.proveedor || "").trim();
-      if (!r.tiene_prov_real || p1 === "(sin proveedor)") p1 = "";
-      var p2 = String(r.proveedor2 || "").trim();
-      if (p2 && p2 !== "(sin proveedor)" && (Number(r.pr2) || 0) > 0) p1 = p1 ? (p1 + " / " + p2) : p2;
-      if (p1) provMap[k] = p1;
-    });
-    // Mapa saldos por código normalizado → stock.
-    //  · total     = NETO disponible para la PROYECCIÓN (depósitos NO comprometidos con picking):
-    //                góndola+exc+a_guardar+racks+racks_ch+envasar. NO cuenta separar_pedidos (ya
-    //                pickeado) ni a_facturar (ya facturable) → se balancea con la demanda sin-pickear.
-    //  · totalGross = STOCK TOTAL (v9.85): suma TAMBIÉN separar_pedidos + a_facturar. Es el número
-    //                que se MUESTRA en la columna Stock, para que coincida con la solapa Stocks y el
-    //                controlador no desconfíe ("stock total", pedido del usuario).
-    var saldoMap = {};
-    saldos.forEach(function (r) {
-      var k = _ocgNorm(r.cod_art); if (!k) return;
-      var neto = (Number(r.terminado) || 0) + (Number(r.excedente) || 0) + (Number(r.a_guardar) || 0) +
-                 (Number(r.racks) || 0) + (Number(r.racks_ch) || 0) + (Number(r.para_envasar) || 0);
-      saldoMap[k] = {
-        total: neto,
-        totalGross: neto + (Number(r.separar_pedidos) || 0) + (Number(r.a_facturar) || 0),
-        desc: r.descripcion || ""
-      };
-    });
-    // v9.85 — ÚLTIMA ENTREGA por código: fecha (día AR) + cajas de la última recepción a góndola.
-    // Se toma la fecha más reciente y se SUMAN las cajas recibidas ESE día (varios movimientos = 1 entrega).
-    var ultEnt = {};
-    ultRows.forEach(function (r) {
-      var k = _ocgNorm(r.cod_art); if (!k) return;
-      var dia = String(r.ts || "").slice(0, 10);   // ts ya viene UTC-3 al guardarse; día calendario
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(dia)) return;
-      var cur = ultEnt[k];
-      if (!cur || dia > cur.fecha) ultEnt[k] = { fecha: dia, cajas: Number(r.delta) || 0 };
-      else if (dia === cur.fecha) cur.cajas += (Number(r.delta) || 0);
-    });
-    // v9.85 — OC PENDIENTE por código: cajas pendientes (cantidad − recibida) + fecha más reciente + proveedor.
-    var ocMap = {};
-    ocRows.forEach(function (r) {
-      var k = _ocgNorm(r.codigo); if (!k) return;
-      var pend = (Number(r.cantidad) || 0) - (Number(r.cantidad_recibida) || 0);
-      if (pend <= 0) return;
-      var f = String(r.fecha || "").slice(0, 10);
-      if (!ocMap[k]) ocMap[k] = { cajas: 0, fecha: f, prov: String(r.proveedor || "").trim() };
-      ocMap[k].cajas += pend;
-      if (f && f > (ocMap[k].fecha || "")) ocMap[k].fecha = f;
-    });
-    // v9.85 — notas editables (Día resolución / Motivo) por código.
-    var notasMap = {};
-    notaRows.forEach(function (r) {
-      var k = String(r.cod || "").trim(); if (!k) return;
-      notasMap[k] = { dia: String(r.dia_resolucion || ""), motivo: String(r.motivo || "") };
-    });
-    // NPs pendientes con fecha_entrega
-    var npInfo = {};
-    ppp.forEach(function (r) {
-      var np = pickNormNp(r.np); if (!np) return;
-      if (facSet[np]) return;
-      npInfo[np] = { fecha: String(r.fecha_entrega || "").trim().slice(0, 10), rs: r.razon_social || "", tanda: String(r.tanda || "").trim().toUpperCase(), cliente: String(r.cod || "").trim(), esSuper: String(r.zona || "").trim().toLowerCase() === "super" };
+    var catRows = res[0] || [], demRows = res[1] || [], realRows = res[2] || [];
+
+    // CATÁLOGO: 1 fila por código → provMap, saldoMap, discont, ultEnt, ocMap, notasMap
+    var provMap = {}, saldoMap = {}, discont = {}, ultEnt = {}, ocMap = {}, notasMap = {};
+    catRows.forEach(function (r) {
+      var k = r.cod || ""; if (!k) return;
+      if (r.discontinuo) { discont[k] = true; return; }
+      if (r.proveedor) provMap[k] = r.proveedor;
+      saldoMap[k] = { total: Number(r.stock_neto) || 0, totalGross: Number(r.stock_bruto) || 0, desc: r.descripcion || "" };
+      if (r.ult_entrega_fecha) ultEnt[k] = { fecha: r.ult_entrega_fecha, cajas: Number(r.ult_entrega_cajas) || 0 };
+      var oc = Number(r.oc_pend_cajas) || 0;
+      if (oc > 0) ocMap[k] = { cajas: oc, fecha: r.oc_pend_fecha || "", prov: r.oc_pend_prov || "" };
+      if (r.nota_dia || r.nota_motivo) notasMap[k] = { dia: r.nota_dia || "", motivo: r.nota_motivo || "" };
     });
 
-    // v8.14 — separar "ya preparado" de "aún no preparado" (día de armado):
-    //  · Estado de picking por TANDA (EP/TP): sin pickear · en picking · preparado(TP).
-    //  · La PROYECCIÓN (demanda futura vs stock) solo cuenta las NPs SIN pickear. Las que ya
-    //    empezaron a pickearse movieron su stock a separar_pedidos (fuera del total) → contarlas
-    //    también en la demanda era un DOBLE-CONTEO (faltante inflado). Ahora quedan afuera.
-    //  · El faltante REAL de lo ya preparado (TP) NO se proyecta: sale de los PKC como
-    //    Σ(ESP−REAL) = lo que el pickeador no encontró en el rack. Es dato, no pronóstico.
-    var estadoTanda = {};   // TANDA → 'sinpickear'|'enpicking'|'preparado'
-    var tandaNp = {};       // TANDA → una NP representativa (para resolver empresa del código)
-    Object.keys(npInfo).forEach(function (np) {
-      var t = npInfo[np].tanda; if (!t) return;
-      if (!(t in tandaNp)) tandaNp[t] = np;
+    // DEMANDA: 1 fila por (código, NP)
+    var demanda = {}, demTotDet = {}, enCursoSet = {};
+    demRows.forEach(function (r) {
+      var cod = r.cod || "", np = r.np || ""; if (!cod) return;
+      var cj = Number(r.cajas) || 0, est = r.estado_picking || "sinpickear";
+      // demTotDet: TODAS las NPs (bruto, para el drill de "Total Pedidos")
+      (demTotDet[cod] = demTotDet[cod] || []).push({ np: np, rs: r.rs || "", cliente: r.cod_cliente || "", cajas: cj, fechaSalida: r.fecha_salida || "", estado: est });
+      // enCurso: tandas en picking
+      if (est === "enpicking" && r.tanda) enCursoSet[r.tanda] = true;
+      // demanda (PROYECCIÓN): solo sin pickear
+      if (est !== "sinpickear") return;
+      if (!demanda[cod]) demanda[cod] = [];
+      demanda[cod].push({ fecha: r.fecha_armado || "", fechaSalida: r.fecha_salida || "", np: np, rs: r.rs || "", cliente: r.cod_cliente || "", cajas: cj, cod: cod, esSuper: !!r.es_super });
     });
-    var tandas = Object.keys(tandaNp);
-    var realFalt = {};      // codNorm(suffijado) → cajas que faltaron al ARMAR (real, TP)
-    var realFaltDia = {};   // v9.44 — codNorm → { 'YYYY-MM-DD' (fecha SALIDA): cajas } para ubicarlo en el calendario
-    var realDet = {};       // codNorm → [{tanda, np, rs, cod, falto}] (detalle para el drill)
-    var enCurso = {};       // TANDAs en picking (para el contador "en curso")
-    if (tandas.length) {
-      var inT = tandas.map(encodeURIComponent).join(",");
-      var _cut = new Date(Date.now() - 45 * 86400000).toISOString();
-      var ev = await Promise.all([
-        supaFetchAllSafe(SUPABASE_TABLE_ENDPOINT, "opcion=in.(EP,TP)&texto=in.(" + inT + ")&select=opcion,texto,legajo"),
-        supaFetchAllSafe(SUPABASE_TABLE_ENDPOINT, "opcion=eq.PKC&ts_cliente=gte." + encodeURIComponent(_cut) + "&select=texto,ts_cliente")
-      ]);
-      var epV = ev[0] || [], pkcV = ev[1] || [];
-      var hasEP = {}, hasTP = {};
-      epV.forEach(function (e) {
-        var lg = String(e.legajo); if (lg === "0" || lg === "1") return;   // legajos de prueba
-        var t = String(e.texto || "").trim().toUpperCase(); if (!t) return;
-        if (e.opcion === "EP") hasEP[t] = true; else if (e.opcion === "TP") hasTP[t] = true;
-      });
-      tandas.forEach(function (t) {
-        estadoTanda[t] = hasTP[t] ? "preparado" : (hasEP[t] ? "enpicking" : "sinpickear");
-        if (estadoTanda[t] === "enpicking") enCurso[t] = true;
-      });
-      // Faltante real: por (tanda,art) tomar el ÚLTIMO PKC (ESP−REAL); solo tandas preparadas.
-      var lastPk = {};
-      pkcV.forEach(function (r) {
-        var p = String(r.texto || "").split("|");
-        var t = String(p[0] || "").trim().toUpperCase(), c = String(p[1] || "").trim();
-        if (!t || !c || estadoTanda[t] !== "preparado") return;
-        var k = t + "|" + c.toUpperCase();
-        if (!lastPk[k] || r.ts_cliente > lastPk[k].ts) {
-          lastPk[k] = {
-            esp: parseInt(String(p[2] || "").replace(/[^0-9-]/g, ""), 10) || 0,
-            real: parseInt(String(p[3] || "").replace(/[^0-9-]/g, ""), 10) || 0,
-            ts: r.ts_cliente, t: t, c: c
-          };
-        }
-      });
-      Object.keys(lastPk).forEach(function (k) {
-        var o = lastPk[k], falto = o.esp - o.real; if (falto <= 0) return;
-        var np = tandaNp[o.t];
-        var cod = _ocgNorm(codEmpSplit(o.c, np)); if (!cod) return;
-        realFalt[cod] = (realFalt[cod] || 0) + falto;
-        (realDet[cod] = realDet[cod] || []).push({ tanda: o.t, np: np, rs: (npInfo[np] || {}).rs || "", cod: o.c, falto: falto });
-        var _sal = String((npInfo[np] || {}).fecha || "").slice(0, 10);   // v9.44 — fecha de SALIDA de la tanda
-        if (_sal) { (realFaltDia[cod] = realFaltDia[cod] || {})[_sal] = (realFaltDia[cod][_sal] || 0) + falto; }
-      });
-    }
 
-    // Demanda por artículo (PROYECCIÓN): solo NPs SIN pickear. cod → [{fecha, np, rs, cajas}]
-    // v9.85 — además demTotal = TOTAL PEDIDOS (bruto): TODAS las NPs no facturadas, incluyendo las
-    // ya pickeadas/armadas, hasta que se facturen. Es el número que se MUESTRA en "Total Pedidos"
-    // (las 7 cajas del 922 que salen y aún no se facturaron deben sumar; mismo criterio p/ todos).
-    // demTotDet = detalle de TODAS las NPs (para el drill del Total Pedidos), cada una con su
-    // estado de picking → así el drill del total bruto muestra todo y marca lo ya pickeado.
-    var demanda = {}, demTotDet = {};
-    Object.keys(npInfo).forEach(function (np) {
-      var info = npInfo[np];
-      var est = estadoTanda[info.tanda];
-      var sinPickear = !(est && est !== "sinpickear");   // proyección solo cuenta lo sin pickear
-      var items = base.get(np) || [];
-      items.forEach(function (it) {
-        // v8.11 — key por código SUFIJADO por empresa (437E/438E/439E/809E → "438E LK"/"438E CH")
-        // para que la demanda case con el stock que también está suffijado por empresa. Los códigos
-        // no-split quedan pelados (el codEmpSplit los devuelve tal cual).
-        var cod = _ocgNorm(codEmpSplit(it.art, np)); if (!cod) return;
-        var cj = Number(it.cajas) || 0;
-        (demTotDet[cod] = demTotDet[cod] || []).push({ np: np, rs: info.rs, cliente: info.cliente, cajas: cj, fechaSalida: info.fecha, estado: est || "sinpickear" });
-        if (!sinPickear) return;                     // ya preparado / en picking → fuera de la proyección
-        if (!demanda[cod]) demanda[cod] = [];
-        // v8.08 — el faltante se cuenta el DÍA DE ARMADO (día hábil anterior a la salida),
-        // no el día de la PPP. Guardo también la fecha de salida para el drill.
-        demanda[cod].push({ fecha: _faltDiaArmado(info.fecha), fechaSalida: info.fecha, np: np, rs: info.rs, cliente: info.cliente, cajas: cj, cod: cod, esSuper: !!info.esSuper });
-      });
+    // FALTANTE REAL (PKC): 1 fila por (código, tanda, NP) con cajas_falto
+    var realFalt = {}, realFaltDia = {}, realDet = {};
+    realRows.forEach(function (r) {
+      var cod = r.cod || "", falto = Number(r.cajas_falto) || 0; if (!cod || falto <= 0) return;
+      realFalt[cod] = (realFalt[cod] || 0) + falto;
+      (realDet[cod] = realDet[cod] || []).push({ tanda: r.tanda || "", np: r.np || "", rs: r.rs || "", cod: r.cod_raw || "", falto: falto });
+      var sal = String(r.fecha_salida || "").slice(0, 10);
+      if (sal) { (realFaltDia[cod] = realFaltDia[cod] || {})[sal] = (realFaltDia[cod][sal] || 0) + falto; }
     });
+
     _stk.falt = {
       demanda: demanda, demTotDet: demTotDet, provMap: provMap, saldoMap: saldoMap, discont: discont,
       ultEnt: ultEnt, ocMap: ocMap, notasMap: notasMap,
-      realFalt: realFalt, realFaltDia: realFaltDia, realDet: realDet, enCurso: Object.keys(enCurso).length,
+      realFalt: realFalt, realFaltDia: realFaltDia, realDet: realDet, enCurso: Object.keys(enCursoSet).length,
       ajustes: {}, filtro: "s1", openCell: null, search: "",
       // v8.71 — por defecto: orden fabricante→faltó armado + los 3 botones activos.
       ordenFab: true, soloQuiebre: true, sinE: true, verDias: true
@@ -26579,58 +26443,36 @@ function _avpShell(inner) {
   return '<div class="avp-card"><div class="avp-head"><b>📲 Avisar programación</b><span class="avp-who">👤 ' + escapeHtml((_avp && _avp.quien) || "") + '</span><button class="avp-x" onclick="avpClose()">Cerrar</button></div><div id="avpBody" class="avp-body">' + inner + '</div></div>';
 }
 async function avpLoad() {
-  var H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
-  var q = function (u) { return fetch(SUPABASE_URL + "/rest/v1/" + u, { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; }); };
-  var res = await Promise.all([
-    q("vista_ppp_programacion_pendiente?select=np,cod_cliente,razon_social,fecha_recep,fecha_entrega&limit=20000"),
-    q("whatsapp_clientes?select=cod_cliente,telefono&limit=20000"),
-    q("whatsapp_vendedores?select=vend,telefono,nombre&limit=2000"),
-    q("clientes_vendedor?select=cod_cliente,vend&limit=30000"),
-    q("envio_programacion_log?select=np,cod_cliente,vend,tipo,quien,ts&order=ts.desc&limit=30000")
-  ]);
-  var ped = res[0], wc = res[1], wv = res[2], cv = res[3], log = res[4];
-  var telCli = {}; wc.forEach(function (r) { telCli[String(r.cod_cliente).trim()] = r.telefono; });
-  var vendW = {}; wv.forEach(function (r) { vendW[String(r.vend).trim()] = { tel: r.telefono, nombre: r.nombre }; });
-  var vendDe = {}; cv.forEach(function (r) { vendDe[String(r.cod_cliente).trim()] = String(r.vend || "").trim(); });
-  // AGRUPAR: mismo cliente + misma fecha de salida = 1 solo envío/mensaje (une sus NPs).
-  var gm = {};
-  ped.forEach(function (p) {
-    if (!_avpFechaDMY(p.fecha_entrega)) return;                 // solo programados (con fecha de salida)
-    var cod = String(p.cod_cliente || "").trim();
-    var key = cod + "|" + String(p.fecha_entrega).slice(0, 10);
-    var g = gm[key];
-    if (!g) {
-      var vend = vendDe[cod] || "", vw = vendW[vend] || {};
-      g = gm[key] = { key: key, cod: cod, rs: p.razon_social || "", fppp: p.fecha_entrega, fped: p.fecha_recep, vend: vend, telCli: telCli[cod] || "", telVend: vw.tel || "", vendNombre: vw.nombre || "", nps: [] };
+  // v10.09: 1 fetch a vista_avisar_programacion reemplaza 5 fetches crudos.
+  var data = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/vista_avisar_programacion",
+    "select=grp_key,cod,rs,fppp,fped,dias,nps,tel_cli,vend,tel_vend,vend_nombre,last_cli_ts,last_cli_quien,vend_sent");
+  var groups = [], lastCli = {}, vendNotified = {}, vendSent = {}, vendW = {};
+  data.forEach(function (r) {
+    var g = {
+      key: r.grp_key, cod: r.cod || "", rs: r.rs || "", fppp: r.fppp || "",
+      fped: r.fped || "", dias: r.dias, nps: r.nps || [],
+      telCli: r.tel_cli || "", vend: r.vend || "",
+      telVend: r.tel_vend || "", vendNombre: r.vend_nombre || ""
+    };
+    groups.push(g);
+    // vendW (para avpSendVendedor — necesita tel y nombre por vend)
+    if (g.vend && !vendW[g.vend]) vendW[g.vend] = { tel: g.telVend, nombre: g.vendNombre };
+    // lastCli: último aviso a cliente
+    if (r.last_cli_ts) lastCli[g.key] = { ts: r.last_cli_ts, quien: r.last_cli_quien || "" };
+    // vendSent: grupos ya mandados al vendedor
+    if (r.vend_sent && g.vend) {
+      if (!vendSent[g.vend]) vendSent[g.vend] = {};
+      vendSent[g.vend][g.key] = true;
     }
-    var np = String(p.np || "").trim(); if (np && g.nps.indexOf(np) < 0) g.nps.push(np);
-    if (!g.rs && p.razon_social) g.rs = p.razon_social;
-    if (p.fecha_recep && (!g.fped || String(p.fecha_recep) < String(g.fped))) g.fped = p.fecha_recep;  // fecha pedido = la más vieja
+    // vendNotified: avisados al cliente pero NO al vendedor → armar resumen pendiente
+    if (r.last_cli_ts && g.vend && !_avpNoVend(g.vend)) {
+      if (!(vendSent[g.vend] && vendSent[g.vend][g.key])) {
+        if (!vendNotified[g.vend]) vendNotified[g.vend] = {};
+        vendNotified[g.vend][g.key] = { rs: g.rs, fppp: g.fppp, cod: g.cod };
+      }
+    }
   });
-  var groups = Object.keys(gm).map(function (k) { var g = gm[k]; g.dias = _avpDias(g.fped, g.fppp); return g; });
   groups.sort(function (a, b) { return String(a.fppp).localeCompare(String(b.fppp)) || String(a.rs).localeCompare(String(b.rs)); });
-  var keyMap = {}, npKey = {};
-  groups.forEach(function (g) { keyMap[g.key] = g; g.nps.forEach(function (n) { npKey[n] = g.key; }); });
-  // estado desde el log: última marca de aviso a cliente por grupo + resumen pendiente por vendedor.
-  // v9.59 — vendSent = grupos que YA se le mandaron al vendedor (log tipo='vendedor' con np). Esos NO
-  // reaparecen en el resumen del vendedor los días siguientes (no re-mandar la misma programación).
-  var lastCli = {}, vendNotified = {}, vendSent = {};
-  // pass 1: qué grupos ya se le enviaron a cada vendedor
-  log.forEach(function (r) {
-    if (r.tipo !== "vendedor" || r.np == null || !r.vend) return;
-    var key = npKey[String(r.np)]; if (!key) return;
-    (vendSent[r.vend] || (vendSent[r.vend] = {}))[key] = true;
-  });
-  // pass 2: avisos a cliente → estado + resumen del vendedor (excluye lo ya mandado al vendedor)
-  log.forEach(function (r) {
-    if (r.tipo !== "cliente") return;
-    var key = npKey[r.np != null ? String(r.np) : ""]; if (!key) return;
-    if (!lastCli[key]) lastCli[key] = r;                        // log viene ts desc → primero = más reciente
-    var g = keyMap[key]; if (!g || !g.vend || _avpNoVend(g.vend)) return;
-    if (vendSent[g.vend] && vendSent[g.vend][key]) return;      // ya se lo mandé al vendedor → no reaparece
-    if (!vendNotified[g.vend]) vendNotified[g.vend] = {};
-    if (!vendNotified[g.vend][key]) vendNotified[g.vend][key] = { rs: g.rs, fppp: g.fppp, cod: g.cod };
-  });
   _avp.groups = groups; _avp.lastCli = lastCli; _avp.vendNotified = vendNotified; _avp.vendSent = vendSent; _avp.vendW = vendW;
   avpRender();
 }
@@ -26859,19 +26701,22 @@ async function openPlataPerdida() {
 }
 function ppClose() { var ov = document.getElementById("ppOverlay"); if (ov) ov.style.display = "none"; }
 async function ppLoad() {
-  var H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
-  var q = function (u) { return fetch(SUPABASE_URL + "/rest/v1/" + u, { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; }); };
-  var res = await Promise.all([
-    q("Entregas_Virgilio?select=np,cod_art,cajas_falto,cajas_pedidas,cajas_entregadas,fecha_salida,cod_cliente&cajas_falto=gt.0&limit=100000"),
-    q("precios_venta?select=cod,precio_unit,uxb,descripcion&limit=5000"),
-    q("clientes_vendedor?select=cod_cliente,vend&limit=30000"),
-    q("Facturacion_NP?select=np,razon_social&limit=100000")
-  ]);
-  var ent = res[0], pv = res[1], cv = res[2], fac = res[3];
-  var precio = {}; pv.forEach(function (r) { var k = _ocgNorm(r.cod); var pu = Number(r.precio_unit) || 0; precio[k] = { pu: pu, uxb: Number(r.uxb) || 1, desc: r.descripcion || "", ok: pu > 0 && pu !== 8888 }; });
-  var vendDe = {}; cv.forEach(function (r) { vendDe[String(r.cod_cliente).trim()] = String(r.vend || "").trim(); });
-  var rsDe = {}; fac.forEach(function (r) { var n = pickNormNp(r.np); if (n && r.razon_social && !rsDe[n]) rsDe[n] = r.razon_social; });
-  _pp.rows = ent.map(function (r) { return { codN: _ocgNorm(r.cod_art), cod: String(r.cod_art || "").trim(), cajas: Number(r.cajas_falto) || 0, ped: Number(r.cajas_pedidas) || 0, ent: Number(r.cajas_entregadas) || 0, fecha: _ppFecha10(r.fecha_salida), cli: String(r.cod_cliente || "").trim(), np: pickNormNp(r.np) }; }).filter(function (r) { return r.cajas > 0; });
+  // v10.09: 1 fetch a vista_plata_perdida reemplaza 4 tablas crudas (~200k filas).
+  var data = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/vista_plata_perdida",
+    "select=np,cod,cod_raw,cajas,ped,ent,fecha,cod_cliente,precio_unit,uxb,descripcion,precio_ok,vendedor,razon_social&cajas=gt.0");
+  var precio = {}, vendDe = {}, rsDe = {};
+  data.forEach(function (r) {
+    var codN = r.cod || "";
+    if (r.precio_unit != null && !precio[codN]) {
+      var pu = Number(r.precio_unit) || 0;
+      precio[codN] = { pu: pu, uxb: Number(r.uxb) || 1, desc: r.descripcion || "", ok: pu > 0 && pu !== 8888 };
+    }
+    var cli = r.cod_cliente || "";
+    if (cli && r.vendedor != null && !vendDe[cli]) vendDe[cli] = String(r.vendedor).trim();
+    var np = pickNormNp(r.np);
+    if (np && r.razon_social && !rsDe[np]) rsDe[np] = r.razon_social;
+  });
+  _pp.rows = data.map(function (r) { return { codN: r.cod || "", cod: r.cod_raw || "", cajas: Number(r.cajas) || 0, ped: Number(r.ped) || 0, ent: Number(r.ent) || 0, fecha: r.fecha || "", cli: r.cod_cliente || "", np: pickNormNp(r.np) }; }).filter(function (r) { return r.cajas > 0; });
   _pp.precio = precio; _pp.vendDe = vendDe; _pp.rsDe = rsDe;
   // años CON DATOS (para el dropdown); por defecto el año actual si tiene datos, si no el más reciente.
   var ys = {}; _pp.rows.forEach(function (r) { var y = r.fecha ? r.fecha.slice(0, 4) : ""; if (/^\d{4}$/.test(y)) ys[y] = 1; });
