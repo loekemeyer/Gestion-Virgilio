@@ -20289,19 +20289,13 @@ async function _stockNetoDepTanda(deposito, tanda) {
 /* Al TERMINAR ARMADO (TAP): las cajas pasan de "a separar" a "a facturar" (NO
    salen del stock todavía). Dedup por (tipo='separado', ref=tanda). */
 async function stockSepararAFacturar(tanda, legajo) {
-  try {
-    const t = String(tanda || "").trim().toUpperCase(); if (!t) return;
-    const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
-    const chk = await fetch(SUPABASE_STOCK_ENDPOINT + "?tipo=eq.separado&ref=eq." + encodeURIComponent(t) + "&select=id&limit=1", { headers: H, cache: "no-store" });
-    if (chk.ok) { const ex = await chk.json(); if (ex && ex.length) return; }   // ya movido a facturar
-    const net = await _stockNetoDepTanda("separar_pedidos", t);
-    const rows = [];
-    Object.keys(net).forEach(function (k) { const n = Math.round(net[k].sum * 1000) / 1000; if (n > 0) {
-      rows.push({ cod_art: k, descripcion: net[k].desc, deposito: "separar_pedidos", delta: -n, tipo: "separado", ref: t, legajo: String(legajo || "") });
-      rows.push({ cod_art: k, descripcion: net[k].desc, deposito: "a_facturar",       delta:  n, tipo: "separado", ref: t, legajo: String(legajo || "") });
-    } });
-    if (rows.length) stockMove(rows);
-  } catch (_e) {}
+  // v10.16 — NEUTRALIZADO. El pase separar_pedidos → a_facturar lo hace ahora el BACKEND
+  // (reconciliar_pipeline_stock_etapa2, disparado por el trigger de Entregas_Virgilio + el cron),
+  // que RECONCILIA contra lo realmente entregado: a a_facturar solo lo entregado y lo pickeado
+  // que no salió (faltó / no iba) vuelve a góndola. El fast-path del front movía TODO el
+  // separar_pedidos a a_facturar sin mirar el armado → dejaba la caja "que no iba" como fantasma
+  // en a_facturar y la góndola en negativo. Se deja la función como no-op para no romper la llamada.
+  return;
 }
 /* v5.96 — Remanente REAL de a_facturar de una tanda: separado (ref=tanda) MENOS
    todos los facturado (ref=tanda del barrido + ref=tanda|NP de los drenajes por NP).

@@ -1,0 +1,43 @@
+-- =====================================================================
+-- pipeline_etapa2_reconciliada_20260812.sql — v10.16
+--
+-- ROOT CAUSE (confirmado con el usuario): al volver al modelo de stock por-PKC
+-- (picking_incremental_pkc, v8.00) el flujo de stock quedó DESACOPLADO del armado.
+-- La ETAPA 2 del pipeline (y el fast-path del front stockSepararAFacturar) movían
+-- TODO el neto de separar_pedidos → a_facturar mirando SOLO el saldo de picking,
+-- ignorando lo que el armador marcó como "de menos / no iba". Resultado: una caja
+-- pickeada que no salía quedaba como FANTASMA en a_facturar y la góndola en NEGATIVO
+-- (caso 366E / NP 98237 / D20A: góndola −1, a_facturar +1).
+--
+-- FIX (backend, elegido por el usuario): la ETAPA 2 ahora RECONCILIA contra
+-- Entregas_Virgilio (lo realmente entregado por el armado):
+--   • a a_facturar va SOLO lo entregado (sum cajas_entregadas por tanda+código).
+--   • lo pickeado que NO se entregó (picked − entregado) VUELVE A GÓNDOLA (terminado).
+--   • separar_pedidos queda en 0 para la tanda.
+-- Reparte el "entregado" entre las variantes de marca del mismo código base
+-- (438E / 438E CH; Entregas nunca lleva marca) con una window function, sin
+-- sobre-acreditar. Señal de "armado hecho" = TAP o existencia de Entregas de la
+-- tanda; sin Entregas para un código → entregado=net (comportamiento viejo).
+--
+-- COMPONENTES (migraciones Supabase aplicadas 2026-08-12):
+--   1) reconciliar_pipeline_stock_etapa2()  — ETAPA 2 reconciliada, delegada
+--      (igual patrón que _etapa1). SECURITY DEFINER, revoke anon/authenticated.
+--   2) reconciliar_pipeline_stock()          — su ETAPA 2 ahora llama a _etapa2().
+--      Etapas 1/3/4 SIN cambios. ETAPA 3 sigue drenando por 'separado' de a_facturar,
+--      que ahora ya vale "entregado" (la devolución a góndola va en deposito=terminado,
+--      tipo='separado', que la ETAPA 3 ignora). No hace falta tocar ETAPA 3.
+--   3) trg_entregas_reconciliar() + trigger trg_entregas_reconciliar_stock
+--      AFTER INSERT FOR EACH STATEMENT on Entregas_Virgilio → corre _etapa2() en el
+--      acto (misma transacción del guardado del armado). Nunca frena el INSERT.
+--   4) FRONT: stockSepararAFacturar() neutralizado (no-op) — ya no hace el pase sin
+--      reconciliar (si no, le ganaba al backend por el guard not-exists-separado).
+--
+-- Dedup: índice único mov_stock_pipeline_dedup (ref, cod, deposito, tipo) para
+-- tipo in ('picking','separado','facturado'); las 3 filas nuevas (separar−, a_facturar+,
+-- terminado+) son tipo='separado' con deposito distinto → idempotente con ON CONFLICT
+-- DO NOTHING + guard not-exists-separado por tanda.
+--
+-- Solo afecta armados NUEVOS (las tandas ya con 'separado' no se reprocesan). Validado
+-- con transacción + ROLLBACK (sintético 366E faltante + split 438E/438E CH + 505 OK) y
+-- con el trigger disparando end-to-end. La definición viva está en las migraciones.
+-- =====================================================================
