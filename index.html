@@ -6406,7 +6406,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v9.82";
+const APP_VERSION = "v10.00";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -9791,6 +9791,16 @@ function stockComputeSaldos(movs, cutoff, asOf) {
   });
   return m;
 }
+// v10.00: construye saldos directamente desde vista_stock_procesada (sin recalcular desde movimientos)
+function _stkSaldosFromView(rows) {
+  var m = {};
+  (rows || []).forEach(function (r) {
+    var k = String(r.cod || "");
+    if (!k) return;
+    m[k] = { cod: k, desc: r.descripcion || "", terminado: Number(r.terminado) || 0, excedente: Number(r.excedente) || 0, separar_pedidos: Number(r.separar_pedidos) || 0, a_facturar: Number(r.a_facturar) || 0, a_guardar: Number(r.a_guardar) || 0, racks: Number(r.racks) || 0, racks_ch: Number(r.racks_ch) || 0, para_envasar: Number(r.para_envasar) || 0, insumos: Number(r.insumos_dep) || 0, _uni: "", _ubi: "" };
+  });
+  return m;
+}
 function stockFmtTs(ts) { try { return new Date(ts).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }); } catch (_e) { return String(ts); } }
 let _stk = null;
 /* v4.43 — NOMBRES por artículo desde Supabase. Fuente única: la vista
@@ -9902,22 +9912,27 @@ async function openStockAdmin(soloConteo) {
   ov.classList.add("show");
   ov.innerHTML = '<div class="stk-card"><div class="stk-head"><span class="stk-title">' + (_solo ? "📋 Conteo de stock" : "📦 Stock y Compras") + '</span><button class="stk-close" onclick="closeStockAdmin()">Cerrar</button></div><div class="stk-tabs" id="stkTabs"></div><div class="stk-body" id="stkBody"><div class="stk-loading">Cargando…</div></div></div>';
   try {
-    const res = await Promise.all([stockFetchMovs(), stockGetCutoff(), stockFetchArtFactors(), racksFetchOrdenes(), racksFetchBajadas(), loadArtNombres(), supaFetchAllSafe(SUPABASE_URL + "/rest/v1/v_cajas_pedidas", "select=articulo,cajas_pedidas").then(function(rows) { var dem = {}; (rows || []).forEach(function(r) { var k = _ocgNorm(r.articulo); if (k) dem[k] = (dem[k] || 0) + (Number(r.cajas_pedidas) || 0); }); return dem; }).catch(function(){ return {}; }),   /* v9.25: demanda desde vista SQL (siempre excluye canceladas) */
+    const res = await Promise.all([stockFetchMovs(), stockGetCutoff(), stockFetchArtFactors(), racksFetchOrdenes(), racksFetchBajadas(), loadArtNombres(), supaFetchAllSafe(SUPABASE_URL + "/rest/v1/vista_stock_procesada", "select=cod,cod_base,descripcion,linea,familia_principal,es_secundario,terminado,excedente,separar_pedidos,a_facturar,a_guardar,racks,racks_ch,para_envasar,insumos_dep,stock_total,cajas_pedidas,proy_cajas_mes,capacidad_gondola,es_insumo,visible_en_stock").catch(function(){ return []; }),   /* v10.00: todo desde vista SQL procesada */
       supaFetchAllSafe(SUPABASE_CAPACIDAD_ENDPOINT, "select=sector,cod,cajas_max"),
       fetch(SUPABASE_URL + "/rest/v1/Stock_Config?clave=in.(guardado_cajas_por_hora,guardado_incluir_racks)&select=clave,valor", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; }),
       (_solo ? Promise.resolve({ pend: {}, porArt: {} }) : stkFcsFetch().catch(function () { return { pend: {}, porArt: {} }; })),   // v6.70: FC s/Salida como columna
-      supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Insumos", "select=cod").catch(function () { return []; }),
-      ocLoadLineas().catch(function () { return {}; }),   // v7.73: cargar códigos de insumos para filtrarlos de Stock + v7.89: LK/CH
+      Promise.resolve([]),   // v10.00: insumos viene de vista_stock_procesada (es_insumo)
+      ocLoadLineas().catch(function () { return {}; }),   // v7.89: LK/CH
       rkbFetchCxM().catch(function () { return { cxm: {} }; }),   // v8.52: inner×master de racks (backlog capacity-aware)
-      supaFetchAllSafe(SUPABASE_URL + "/rest/v1/proyeccion_madre", "select=cod,proy_cajas_mes").catch(function () { return []; })]);   // v9.49: proyección caj/mes (antes del índice de las OCs)
+      Promise.resolve([])]);   // v10.00: proyección viene de vista_stock_procesada (proy_cajas_mes)
     // v8.90: cxm primario = planimetría; fallback = Articulos.Cajas_x_Master (para códigos sin posición en racks)
     var _cxmPlani = (res[11] && res[11].cxm) || {}, _cxmMerge = {};
     Object.keys(_cxmPlani).forEach(function (k) { _cxmMerge[k] = _cxmPlani[k]; });
     var _fac = res[2] || {};
     Object.keys(_fac).forEach(function (k) { var kN = _cpNorm(k); if (!_cxmMerge[kN] && _fac[k].cajasXMaster > 0) _cxmMerge[kN] = _fac[k].cajasXMaster; });
-    var _proyMap = {};   // v9.49: proyección caj/mes por código normalizado (antes del índice de las OCs)
-    (Array.isArray(res[13]) ? res[13] : []).forEach(function (x) { var k = _ocgNorm(x.cod); if (k) _proyMap[k] = Number(x.proy_cajas_mes) || 0; });
-    _stk = { movs: res[0] || [], cutoff: res[1], factors: _fac, ordenes: res[3] || [], bajadas: res[4] || [], tab: _solo ? "conteo" : "stocks", soloConteo: _solo, filtro: "", openArt: null, ingMode: "remito", asOf: null, asOfInput: "", dem: res[6] || {}, cap: res[7] || [], gConf: res[8] || [], fcs: res[9] || { pend: {}, porArt: {} }, fcsLoaded: true, insumosCods: (res[10] || []).map(function(i) { return String(i.cod || "").trim().toUpperCase(); }), cxm: _cxmMerge, proy: _proyMap };
+    // v10.00: construir mapas de demanda/proyección/insumos desde vista_stock_procesada (res[6])
+    var _viewRows = res[6] || [];
+    var _demFromView = {};
+    _viewRows.forEach(function (r) { var k = _ocgNorm(r.cod); if (k && Number(r.cajas_pedidas) > 0) _demFromView[k] = Number(r.cajas_pedidas); });
+    var _proyMap = {};
+    _viewRows.forEach(function (r) { var k = _ocgNorm(r.cod); if (k && Number(r.proy_cajas_mes) > 0) _proyMap[k] = Number(r.proy_cajas_mes); });
+    var _insFromView = _viewRows.filter(function (r) { return r.es_insumo; }).map(function (r) { return String(r.cod).trim().toUpperCase(); });
+    _stk = { movs: res[0] || [], cutoff: res[1], factors: _fac, ordenes: res[3] || [], bajadas: res[4] || [], tab: _solo ? "conteo" : "stocks", soloConteo: _solo, filtro: "", openArt: null, ingMode: "remito", asOf: null, asOfInput: "", dem: _demFromView, cap: res[7] || [], gConf: res[8] || [], fcs: res[9] || { pend: {}, porArt: {} }, fcsLoaded: true, insumosCods: _insFromView, cxm: _cxmMerge, proy: _proyMap, viewRows: _viewRows };
     stkRender();
   } catch (e) { const b = document.getElementById("stkBody"); if (b) b.innerHTML = '<div class="stk-loading">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
 }
@@ -12226,7 +12241,8 @@ function stkGuardadoToggleRacks() {
 }
 function stkBodyStocks() {
   if (_stk.sectDetail) return stkBodySectDetail();   // v4.35: detalle de un sector (click en un total)
-  const saldos = stockComputeSaldos(_stk.movs, _stk.cutoff, _stk.asOf);
+  // v10.00: modo normal → saldos desde vista SQL; modo As-Of → recalcular desde movimientos
+  const saldos = _stk.asOf ? stockComputeSaldos(_stk.movs, _stk.cutoff, _stk.asOf) : _stkSaldosFromView(_stk.viewRows);
   const dem = _stk.dem || {};
   // Capacidad MÁXIMA de góndola por artículo = suma de sus celdas en Capacidad_Sector
   // (un artículo puede estar en varias celdas; ej. el 506 = total de cajas que entran).
@@ -13771,7 +13787,8 @@ function stkOpenGondola() {
 // v7.77: descargar tabla de stock en Excel (.xlsx real vía SheetJS)
 function stkDescargarExcel() {
   if (!_stk) return;
-  const saldos = stockComputeSaldos(_stk.movs, _stk.cutoff, _stk.asOf);
+  // v10.00: modo normal → saldos desde vista SQL; modo As-Of → recalcular desde movimientos
+  const saldos = _stk.asOf ? stockComputeSaldos(_stk.movs, _stk.cutoff, _stk.asOf) : _stkSaldosFromView(_stk.viewRows);
   const dem = _stk.dem || {};
   const capByCod = {};
   (_stk.cap || []).forEach(function (r) { const k = _ocgNorm(r.cod); if (!k) return; capByCod[k] = (capByCod[k] || 0) + (Number(r.cajas_max) || 0); });
