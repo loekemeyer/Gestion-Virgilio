@@ -261,6 +261,12 @@
 > Cajas por pila, Sueltas, Contado (cajas), **Stock del sistema** (góndola+excedente, mismo cálculo
 > que la comparación), Diferencia y En proceso. Formato Excel es-AR (BOM utf-8, `;`, coma decimal).
 >
+> Nota **v10.12** — **Completar: ubicación del pedido separado por NP.** En el wizard Completar,
+> el paso de armar líos (`_compRenderLios`) ahora muestra, por cada NP, un banner 📦 con **dónde
+> quedó/lo dejó el picking** (`_comp.pickUbic`, del evento PUB más reciente), además del que ya
+> estaba en el header del paso Separar. Así el armador sabe dónde ir a buscar el pedido. (Pendiente,
+> idea usuario **3688**: sacar mercadería de excedente moviendo stock.)
+>
 > Nota **v10.11** — **Un solo código de verificación (recepción), sacado del guardado.** (1) El
 > **Guardado a Góndola** (MG, `mgConfirmar`) YA NO pide la "Verificación de Góndola" (código de 4
 > dígitos que había que escribir en la góndola) — se confirma directo. (2) La **Recepción**
