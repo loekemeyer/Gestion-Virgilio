@@ -6453,7 +6453,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v10.13";
+const APP_VERSION = "v10.14";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -9444,10 +9444,12 @@ function _compDifResolve(tipo, gond) {
   // seguía entero → el operario tenía que armar/facturar cajas que no estaban. Ahora se
   // reduce el código en los líos y se registra el faltante para el cruce de facturación.
   if (tipo === "menos" && qty > 0) {
+    // v10.14 — descontar SOLO en este código, SIN reconstruir la data de líos (antes se ponía
+    // _comp._liosDirty=true, que hacía _compBuildLiosData y BORRABA todo lo separado + los líos de
+    // TODAS las NPs). Se reduce sale/rest de este código; el resto del avance queda intacto.
     c.sale = Math.max(0, (Number(c.sale) || 0) - qty);
     c.rest = Math.max(0, (Number(c.rest) || 0) - qty);
     if (c.sale === 0) c.sep = true;                              // nada que separar → queda marcado
-    if (n.liosArr && n.liosArr.length) _comp._liosDirty = true;  // si ya había líos armados, forzar rearme
     _compAddFaltManual(n.np, c.cod, qty, n.cod, n.rs);           // faltante → Entregas_Virgilio (no factura)
     try { _compLioMark(n); } catch (_e) {}
   }

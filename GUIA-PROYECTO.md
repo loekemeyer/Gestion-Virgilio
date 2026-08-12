@@ -261,6 +261,13 @@
 > Cajas por pila, Sueltas, Contado (cajas), **Stock del sistema** (góndola+excedente, mismo cálculo
 > que la comparación), Diferencia y En proceso. Formato Excel es-AR (BOM utf-8, `;`, coma decimal).
 >
+> Nota **v10.14** — **FIX regresión: "avisar que pickearon mal" borraba separado + líos.** El fix de
+> v10.10 (`_compDifResolve` "de menos") ponía `_comp._liosDirty = true` cuando la NP ya tenía líos
+> armados, lo que hacía `_compBuildLiosData()` en el próximo `_compRenderSep()` y **reconstruía todo
+> desde cero** → se perdía lo separado y los líos de TODAS las NPs. Ahora el descuento reduce sólo el
+> `sale`/`rest` de ese código (y registra el faltante para Entregas), **sin** forzar el rebuild. El
+> resto del avance queda intacto.
+>
 > Nota **v10.13** — **Completar Pedido (CP): feedback del lío destino.** En "📦➕ Completar Pedido"
 > (`showCPModal` → `cpRenderStep2`/`cpConfirm`), al completar un faltante el destino por defecto ya
 > era **lío nuevo** (`_cp.lioSel = "__new__"`, y `cpUpdateLio` con lioSel no-numérico empuja un lío
