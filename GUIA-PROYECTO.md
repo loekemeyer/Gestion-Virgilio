@@ -261,6 +261,14 @@
 > Cajas por pila, Sueltas, Contado (cajas), **Stock del sistema** (góndola+excedente, mismo cálculo
 > que la comparación), Diferencia y En proceso. Formato Excel es-AR (BOM utf-8, `;`, coma decimal).
 >
+> Nota **v10.11** — **Un solo código de verificación (recepción), sacado del guardado.** (1) El
+> **Guardado a Góndola** (MG, `mgConfirmar`) YA NO pide la "Verificación de Góndola" (código de 4
+> dígitos que había que escribir en la góndola) — se confirma directo. (2) La **Recepción**
+> (`opEnviar` en `recepcion.js`) daba DOS códigos: uno a escribir en el remito ANTES de enviar
+> (`showVerificationModal`) y el **código de confirmación** del final (`pendGenCodigo`, guardado en
+> `Control_Modo_OP.codigo` para el checklist). Se sacó el primero → **un solo código, el de
+> confirmación al terminar de recibir**. `showVerificationModal` queda definida pero sin uso.
+>
 > Nota **v10.10** — **FIX Completar/Separar: "de menos" ahora se descuenta del pedido.** En el
 > wizard Completar (Separar → Líos), cuando el armador reporta que un artículo **difiere de la mesa
 > "de menos"** (hay menos que lo que marcó el picking, ej. "el 366 no estaba en lo que pidieron"),

@@ -1346,10 +1346,8 @@ if (typeof window !== "undefined") {
 
 /* ============== Enviar (graba todo) ============== */
 async function opEnviar() {
-  // v9.26: Verificación de código antes de enviar
-  const verified = await showVerificationModal();
-  if (!verified) return;
-
+  // v10.11 — SACADA la "Verificación de Remito" (código a escribir en el remito ANTES de enviar):
+  // la recepción da UN SOLO código, el de confirmación del final (pendGenCodigo, más abajo).
   const descPorCod = {};
   (opState.articulos || []).forEach(a => { descPorCod[a.Cod_Art] = a.Desc || ""; });
   const items = Object.entries(opState.cargas)
