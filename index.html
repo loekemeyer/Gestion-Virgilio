@@ -6460,7 +6460,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v10.18";
+const APP_VERSION = "v10.19";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -25201,10 +25201,25 @@ function _rtSplitTrucks(ordered, cap) {
   if (cur.length) trucks.push(cur);
   return trucks;
 }
-function _rtMapsUrl(depot, ordered) {
+/* v10.19 — Google Maps corta la URL en ~9 waypoints intermedios; una ruta de 16 paradas
+   abría solo 9. Ahora la partimos en TRAMOS de hasta 9 waypoints cada uno, ENCADENADOS
+   (el destino de un tramo es el origen del siguiente), empezando y terminando en el depósito.
+   Devuelve un array de URLs (una por tramo). */
+function _rtMapsUrls(depot, ordered) {
   const pt = function (p) { return p.lat.toFixed(6) + "," + p.lng.toFixed(6); };
-  const wp = ordered.map(pt).join("|");
-  return "https://www.google.com/maps/dir/?api=1&origin=" + pt(depot) + "&destination=" + pt(depot) + "&travelmode=driving&waypoints=" + encodeURIComponent(wp);
+  const nodes = [depot].concat(ordered).concat([depot]);   // depósito → paradas → depósito
+  const MAXWP = 9;                                          // waypoints intermedios por tramo
+  const urls = [];
+  let i = 0;
+  while (i < nodes.length - 1) {
+    const j = Math.min(i + MAXWP + 1, nodes.length - 1);   // índice del destino del tramo
+    const wp = nodes.slice(i + 1, j).map(pt).join("|");
+    let url = "https://www.google.com/maps/dir/?api=1&origin=" + pt(nodes[i]) + "&destination=" + pt(nodes[j]) + "&travelmode=driving";
+    if (wp) url += "&waypoints=" + encodeURIComponent(wp);
+    urls.push(url);
+    i = j;                                                 // el destino es el origen del próximo tramo
+  }
+  return urls;
 }
 async function _rtGeocode(dir, barrio) {
   const q = dir + (barrio ? ", " + barrio : "") + ", Ciudad Autónoma de Buenos Aires, Argentina";
@@ -25408,7 +25423,7 @@ function prodSetRuteoFecha(v) { if (v && _ruteo) { _ruteo.fecha = v; ruteoLoad()
 async function openRuteo() {
   if (!document.getElementById("ruteoCss")) {
     const s = document.createElement("style"); s.id = "ruteoCss";
-    s.textContent = "#ruteoOverlay{display:none;position:fixed;inset:0;z-index:1300;background:rgba(2,6,23,.74);overflow:auto;padding:14px;}#ruteoOverlay.show{display:block;}.rt-card{background:#f8fafc;max-width:760px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.rt-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 16px;background:linear-gradient(90deg,#0f766e,#0b3b36);color:#fff;}.rt-title{font-size:19px;font-weight:800;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.rt-close{background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;width:auto;flex-shrink:0;}.rt-body{padding:14px 16px;}.rt-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px;background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:9px 12px;}.rt-bar label{font-size:12px;font-weight:700;color:#64748b;}.rt-bar input[type=date]{padding:5px 7px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;color:#0f172a;width:auto;}.rt-recalc{background:#0f766e;color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;font-size:12.5px;cursor:pointer;width:auto;}.rt-empty,.rt-loading{padding:24px;text-align:center;color:#64748b;}.rt-note{font-size:11.5px;color:#64748b;background:#f1f5f9;border-radius:8px;padding:8px 11px;margin-bottom:12px;}.rt-ruta{border:1px solid #e2e8f0;border-radius:12px;background:#fff;margin-bottom:12px;overflow:hidden;}.rt-ruta-h{display:flex;align-items:baseline;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:10px 13px;background:#ecfeff;border-bottom:1px solid #cffafe;}.rt-ruta-n{font-size:15px;font-weight:800;color:#0f766e;}.rt-ruta-s{font-size:12px;color:#475569;font-variant-numeric:tabular-nums;}.rt-truck{padding:10px 13px;border-top:1px dashed #e2e8f0;}.rt-truck:first-child{border-top:none;}.rt-truck-h{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:8px;}.rt-truck-t{font-size:13.5px;font-weight:800;color:#0f172a;}.rt-truck-m{font-size:12px;color:#64748b;font-variant-numeric:tabular-nums;}.rt-maps{display:inline-flex;align-items:center;gap:6px;background:#1a73e8;color:#fff;border:none;border-radius:9px;padding:8px 13px;font-size:12.5px;font-weight:800;cursor:pointer;text-decoration:none;width:auto;}.rt-maps:active{transform:scale(.97);}.rt-stop{display:flex;align-items:baseline;gap:9px;padding:5px 0;border-top:1px solid #f1f5f9;}.rt-stop:first-child{border-top:none;}.rt-stop-n{flex:0 0 auto;width:22px;height:22px;border-radius:50%;background:#0f766e;color:#fff;font-size:12px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;}.rt-stop-b{min-width:0;flex:1;}.rt-stop-cli{display:block;font-size:13.5px;font-weight:700;color:#0f172a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.rt-stop-dir{display:block;font-size:12px;color:#64748b;}.rt-stop-m3{flex:0 0 auto;font-size:12px;font-weight:800;color:#0f766e;font-variant-numeric:tabular-nums;}.rt-warn{background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:10px 13px;margin-bottom:12px;font-size:12.5px;color:#92400e;}.rt-warn b{color:#78350f;}.rt-warn ul{margin:6px 0 0;padding-left:18px;}.rt-prog{height:8px;background:#e2e8f0;border-radius:999px;overflow:hidden;margin-top:8px;}.rt-prog-b{height:100%;background:#0f766e;transition:width .2s;}";
+    s.textContent = "#ruteoOverlay{display:none;position:fixed;inset:0;z-index:1300;background:rgba(2,6,23,.74);overflow:auto;padding:14px;}#ruteoOverlay.show{display:block;}.rt-card{background:#f8fafc;max-width:760px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.rt-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 16px;background:linear-gradient(90deg,#0f766e,#0b3b36);color:#fff;}.rt-title{font-size:19px;font-weight:800;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.rt-close{background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;width:auto;flex-shrink:0;}.rt-body{padding:14px 16px;}.rt-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px;background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:9px 12px;}.rt-bar label{font-size:12px;font-weight:700;color:#64748b;}.rt-bar input[type=date]{padding:5px 7px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;color:#0f172a;width:auto;}.rt-recalc{background:#0f766e;color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;font-size:12.5px;cursor:pointer;width:auto;}.rt-empty,.rt-loading{padding:24px;text-align:center;color:#64748b;}.rt-note{font-size:11.5px;color:#64748b;background:#f1f5f9;border-radius:8px;padding:8px 11px;margin-bottom:12px;}.rt-ruta{border:1px solid #e2e8f0;border-radius:12px;background:#fff;margin-bottom:12px;overflow:hidden;}.rt-ruta-h{display:flex;align-items:baseline;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:10px 13px;background:#ecfeff;border-bottom:1px solid #cffafe;}.rt-ruta-n{font-size:15px;font-weight:800;color:#0f766e;}.rt-ruta-s{font-size:12px;color:#475569;font-variant-numeric:tabular-nums;}.rt-truck{padding:10px 13px;border-top:1px dashed #e2e8f0;}.rt-truck:first-child{border-top:none;}.rt-truck-h{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:8px;}.rt-truck-t{font-size:13.5px;font-weight:800;color:#0f172a;}.rt-truck-m{font-size:12px;color:#64748b;font-variant-numeric:tabular-nums;}.rt-maps{display:inline-flex;align-items:center;gap:6px;background:#1a73e8;color:#fff;border:none;border-radius:9px;padding:8px 13px;font-size:12.5px;font-weight:800;cursor:pointer;text-decoration:none;width:auto;}.rt-maps:active{transform:scale(.97);}.rt-maps-note{font-size:12px;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:7px 10px;margin:2px 0 7px;}.rt-maps-col{display:flex;flex-direction:column;align-items:flex-start;gap:7px;}.rt-stop{display:flex;align-items:baseline;gap:9px;padding:5px 0;border-top:1px solid #f1f5f9;}.rt-stop:first-child{border-top:none;}.rt-stop-n{flex:0 0 auto;width:22px;height:22px;border-radius:50%;background:#0f766e;color:#fff;font-size:12px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;}.rt-stop-b{min-width:0;flex:1;}.rt-stop-cli{display:block;font-size:13.5px;font-weight:700;color:#0f172a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.rt-stop-dir{display:block;font-size:12px;color:#64748b;}.rt-stop-m3{flex:0 0 auto;font-size:12px;font-weight:800;color:#0f766e;font-variant-numeric:tabular-nums;}.rt-warn{background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:10px 13px;margin-bottom:12px;font-size:12.5px;color:#92400e;}.rt-warn b{color:#78350f;}.rt-warn ul{margin:6px 0 0;padding-left:18px;}.rt-prog{height:8px;background:#e2e8f0;border-radius:999px;overflow:hidden;margin-top:8px;}.rt-prog-b{height:100%;background:#0f766e;transition:width .2s;}";
     document.head.appendChild(s);
   }
   let ov = document.getElementById("ruteoOverlay");
@@ -25482,12 +25497,22 @@ function ruteoRender() {
   _ruteo.rutas.forEach(function (R) {
     h += '<div class="rt-ruta"><div class="rt-ruta-h"><span class="rt-ruta-n">' + escapeHtml(R.nombre) + '</span><span class="rt-ruta-s">' + R.paradas + ' parada(s) · ' + (Math.round(R.m3 * 10) / 10) + ' m³ · ' + R.trucks.length + ' camión(es)</span></div>';
     R.trucks.forEach(function (t, ti) {
-      const url = _rtMapsUrl(_ruteo.depot, t.stops);
+      const urls = _rtMapsUrls(_ruteo.depot, t.stops);
       h += '<div class="rt-truck"><div class="rt-truck-h"><span class="rt-truck-t">🚚 Camión ' + (ti + 1) + '</span><span class="rt-truck-m">' + t.stops.length + ' paradas · ' + (Math.round(t.m3 * 10) / 10) + ' m³ · ~' + Math.round(t.km) + ' km</span></div>';
       t.stops.forEach(function (s, si) {
         h += '<div class="rt-stop"><span class="rt-stop-n">' + (si + 1) + '</span><span class="rt-stop-b"><span class="rt-stop-cli">' + escapeHtml(s.cli) + '</span><span class="rt-stop-dir">' + escapeHtml(s.dir + (s.barrio ? " · " + s.barrio : "")) + '</span></span><span class="rt-stop-m3">' + (Math.round(s.m3 * 100) / 100) + ' m³</span></div>';
       });
-      h += '<a class="rt-maps" href="' + url + '" target="_blank" rel="noopener">🗺️ Abrir en Google Maps</a></div>';
+      // v10.19 — un botón por TRAMO (Google Maps corta en ~9 paradas). Si hay 1 solo, va sin numerar.
+      if (urls.length <= 1) {
+        h += '<a class="rt-maps" href="' + (urls[0] || "#") + '" target="_blank" rel="noopener">🗺️ Abrir en Google Maps</a>';
+      } else {
+        h += '<div class="rt-maps-note">⚠ Google Maps abre hasta ~9 paradas por link. Esta ruta va en <b>' + urls.length + ' tramos</b> (cada uno arranca donde terminó el anterior):</div><div class="rt-maps-col">';
+        urls.forEach(function (u, k) {
+          h += '<a class="rt-maps" href="' + u + '" target="_blank" rel="noopener">🗺️ Abrir tramo ' + (k + 1) + ' / ' + urls.length + '</a>';
+        });
+        h += '</div>';
+      }
+      h += '</div>';
     });
     h += '</div>';
   });

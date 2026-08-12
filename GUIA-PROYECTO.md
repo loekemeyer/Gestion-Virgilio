@@ -315,6 +315,13 @@
 > Cajas por pila, Sueltas, Contado (cajas), **Stock del sistema** (góndola+excedente, mismo cálculo
 > que la comparación), Diferencia y En proceso. Formato Excel es-AR (BOM utf-8, `;`, coma decimal).
 >
+> Nota **v10.19** — **Ruteo: "Abrir en Google Maps" en tramos (>9 paradas).** El link de Maps
+> (`_rtMapsUrl`, ahora `_rtMapsUrls`) mandaba TODAS las paradas como `waypoints`, pero Google Maps
+> corta en **~9 waypoints**: una ruta de 16 paradas abría solo 9. Ahora la ruta se parte en **tramos
+> de ≤9 waypoints**, encadenados (el destino de un tramo es el origen del siguiente), empezando y
+> terminando en el depósito. `_rtMapsUrls()` devuelve un array de URLs; el render muestra **un botón
+> por tramo** ("Abrir tramo 1/2…") con un aviso; si hay uno solo, va el botón único de siempre.
+>
 > Nota **v10.18** — **Hoja "Góndola < 25%" en Stock y Compras (auditoría).** Tab nueva **🔍 Góndola
 > <25%** en el módulo Stocks (`openStockAdmin`) → `stkBodyAuditGon` (datos por `agLoad` desde
 > `vista_generador_oc`). Lista los artículos cuya **ocupación de góndola = (stock total de todos los
