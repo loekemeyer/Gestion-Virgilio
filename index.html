@@ -6420,7 +6420,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v10.05";
+const APP_VERSION = "v10.06";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -10833,18 +10833,19 @@ const SUPABASE_IMPORTADOS_OC_ENDPOINT = SUPABASE_URL + "/rest/v1/v_importados_or
 async function ocgFetchImportados() {
   let rows = [];
   try {
-    rows = await supaFetchAllSafe(SUPABASE_IMPORTADOS_OC_ENDPOINT, "select=id,cod_art,marca,proveedor,descripcion,uni_x_caja,est_madre_eff,meses_objetivo,stock_actual,pedido_curso,principal,activo&principal=eq.true&activo=eq.true");
+    rows = await supaFetchAllSafe(SUPABASE_IMPORTADOS_OC_ENDPOINT, "select=id,cod_art,marca,proveedor,descripcion,uni_x_caja,fob_uni,est_madre_eff,meses_objetivo,stock_actual,pedido_curso,principal,activo&principal=eq.true&activo=eq.true");
   } catch (_e) { return { items: [], meses: 10 }; }
   const by = {};
   let meses = 10;
   (rows || []).forEach(function (r) {
     const cod = String(r.cod_art || "").trim(); if (!cod) return;
     const k = cod.toUpperCase();
-    if (!by[k]) by[k] = { cod: cod, desc: r.descripcion || "", prov: String(r.proveedor || "").trim() || "(sin proveedor)", uxc: 0, proyUni: 0, stockUni: 0, enCurso: 0, det: [] };
+    if (!by[k]) by[k] = { cod: cod, desc: r.descripcion || "", prov: String(r.proveedor || "").trim() || "(sin proveedor)", uxc: 0, fob: 0, proyUni: 0, stockUni: 0, enCurso: 0, det: [] };
     const o = by[k];
     o.proyUni += Number(r.est_madre_eff) || 0;
     o.stockUni += Number(r.stock_actual) || 0;
     o.enCurso += Number(r.pedido_curso) || 0;
+    const fb = Number(r.fob_uni) || 0; if (fb > 0 && !o.fob) o.fob = fb;   // v10.06 — FOB USD/unidad (del maestro Importados)
     // filas subyacentes (por marca/planta) para poder editar "en curso" y marcar llegada por Importados.id
     if (r.id != null) o.det.push({ id: r.id, marca: String(r.marca || "").trim(), prov: String(r.proveedor || "").trim(), curso: Number(r.pedido_curso) || 0, uxc: Number(r.uni_x_caja) || 0 });
     const u = Number(r.uni_x_caja) || 0; if (u > o.uxc) o.uxc = u;
@@ -10891,7 +10892,10 @@ async function ocgFetchImportados() {
     const vm = volMaster[kk] || null;
     const m3Master = vm ? vm.m3 : 0;
     const m3Total = (aPedirCajas != null && m3Master > 0) ? (aPedirCajas * m3Master) : 0;
-    items.push({ cod: o.cod, desc: o.desc, prov: o.prov, proyUni: Math.round(proyUni), meses: meses, objetivoUni: objetivoUni, stockUni: Math.round(stockTot), stockPropio: Math.round(o.stockUni), stockParteU: Math.round(stockParteU), stockParteCods: (sp ? sp.partes : ""), enCurso: Math.round(o.enCurso), aPedirUni: aPedirUni, uxc: o.uxc, aPedirCajas: aPedirCajas, m3Master: m3Master, m3Dims: vm ? { l: vm.l, a: vm.a, h: vm.h } : null, m3Total: m3Total, esParte: esParte, parteDet: (pp ? pp.detalle : null), det: o.det || [] });
+    // v10.06 — cotización USD = unidades a pedir × FOB unitario (por ítem; el total se suma en el render)
+    const fobUni = o.fob || 0;
+    const usdTotal = (fobUni > 0) ? (aPedirUni * fobUni) : 0;
+    items.push({ cod: o.cod, desc: o.desc, prov: o.prov, proyUni: Math.round(proyUni), meses: meses, objetivoUni: objetivoUni, stockUni: Math.round(stockTot), stockPropio: Math.round(o.stockUni), stockParteU: Math.round(stockParteU), stockParteCods: (sp ? sp.partes : ""), enCurso: Math.round(o.enCurso), aPedirUni: aPedirUni, uxc: o.uxc, aPedirCajas: aPedirCajas, fobUni: fobUni, usdTotal: usdTotal, m3Master: m3Master, m3Dims: vm ? { l: vm.l, a: vm.a, h: vm.h } : null, m3Total: m3Total, esParte: esParte, parteDet: (pp ? pp.detalle : null), det: o.det || [] });
   });
   return { items: items, meses: meses };
 }
@@ -12978,6 +12982,16 @@ function _pedImpRender() {
   let h = '<div class="stkpop-hint">Pedidos a los proveedores chinos (motor <code>v_importados_ordenes</code>, índice <b>' + (data.meses || 10) + ' meses</b>). Separado de las OC de talleristas. 🧩 = parte (proyección = suma de sus terminados).<br><b>✏️</b> editar unidades en curso (lo ya pedido/en camino) · <b>📥</b> marcar que el pedido llegó (suma al stock y baja de en curso).</div>';
   h += '<div style="margin-bottom:10px;display:flex;gap:8px;flex-wrap:wrap;"><button class="mva-clear" style="' + (_stkPop.soloPedir ? 'background:#0f766e;color:#fff;border-color:#0f766e' : '') + '" onclick="pedImpToggle()">' + (_stkPop.soloPedir ? '✓ ' : '') + 'Solo lo que hay que pedir</button>' +
     '<button class="mva-clear" style="background:#166534;color:#fff;border-color:#166534" onclick="pedImpExportExcel()" title="Bajar a Excel lo que se está viendo">📥 Bajar a Excel</button></div>';
+  // v10.06 — TOTAL del pedido (lo que se está viendo): USD (Σ unidades×FOB) + m³ (Σ master cajas×m³/master)
+  const _gUsd = items.reduce(function (s, it) { return s + (Number(it.usdTotal) || 0); }, 0);
+  const _gM3 = items.reduce(function (s, it) { return s + (Number(it.m3Total) || 0); }, 0);
+  const _gUsdFmt = "u$s " + Math.round(_gUsd).toLocaleString("es-AR");
+  const _nSinFob = items.filter(function (it) { return it.aPedirUni > 0 && !(it.fobUni > 0); }).length;
+  const _nSinVol = items.filter(function (it) { return it.aPedirUni > 0 && !(it.m3Master > 0); }).length;
+  h += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">' +
+    '<div style="flex:1;min-width:150px;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:10px;padding:10px 14px"><div style="font-size:11px;color:#047857;font-weight:700;text-transform:uppercase;letter-spacing:.4px">Total pedido (FOB)</div><div style="font-size:22px;font-weight:800;color:#065f46">' + _gUsdFmt + '</div>' + (_nSinFob ? '<div style="font-size:11px;color:#b45309">⚠ ' + _nSinFob + ' ítem(s) sin FOB cargado</div>' : '') + '</div>' +
+    '<div style="flex:1;min-width:150px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:10px 14px"><div style="font-size:11px;color:#1d4ed8;font-weight:700;text-transform:uppercase;letter-spacing:.4px">Volumen total</div><div style="font-size:22px;font-weight:800;color:#1e3a8a">' + (Math.round(_gM3 * 100) / 100).toLocaleString("es-AR") + ' m³</div>' + (_nSinVol ? '<div style="font-size:11px;color:#b45309">⚠ ' + _nSinVol + ' ítem(s) sin volumen cargado</div>' : '') + '</div>' +
+    '</div>';
   const impOrder = ["Chef", "Tierra Nativa", "(sin importador)"];
   Object.keys(byImp).forEach(function (k) { if (impOrder.indexOf(k) < 0) impOrder.push(k); });
   let algo = false;
@@ -12989,8 +13003,9 @@ function _pedImpRender() {
       const arr = provs[prov];
       const totCaj = arr.reduce(function (s, it) { return s + (it.aPedirCajas || 0); }, 0);
       const totM3 = arr.reduce(function (s, it) { return s + (Number(it.m3Total) || 0); }, 0);   // v10.05
-      h += '<div class="stkpop-hint" style="margin:8px 0 3px;font-weight:700">' + escapeHtml(prov) + ' · ' + arr.length + ' ítem(s)' + (totCaj ? ' · ' + totCaj + ' cajas' : '') + (totM3 > 0 ? ' · <span style="color:#0369a1">' + (Math.round(totM3 * 100) / 100) + ' m³</span>' : '') + '</div>';
-      h += '<div class="mva-tblwrap"><table class="mva-tbl"><thead><tr><th>Código</th><th>Descripción</th><th class="num">Proy u/mes</th><th class="num">Objetivo</th><th class="num">Stock</th><th class="num">En curso</th><th class="num">A pedir u</th><th class="num">Cajas</th><th class="num" title="m³ de UNA master caja (medidas cargadas a mano). Tocá el ✏ para cargar/editar.">m³/master</th><th class="num" title="m³ del pedido = master cajas a pedir × m³ por master">m³ pedido</th><th>Acciones</th></tr></thead><tbody>';
+      const totUsd = arr.reduce(function (s, it) { return s + (Number(it.usdTotal) || 0); }, 0);  // v10.06
+      h += '<div class="stkpop-hint" style="margin:8px 0 3px;font-weight:700">' + escapeHtml(prov) + ' · ' + arr.length + ' ítem(s)' + (totCaj ? ' · ' + totCaj + ' cajas' : '') + (totUsd > 0 ? ' · <span style="color:#065f46">u$s ' + Math.round(totUsd).toLocaleString("es-AR") + '</span>' : '') + (totM3 > 0 ? ' · <span style="color:#0369a1">' + (Math.round(totM3 * 100) / 100) + ' m³</span>' : '') + '</div>';
+      h += '<div class="mva-tblwrap"><table class="mva-tbl"><thead><tr><th>Código</th><th>Descripción</th><th class="num">Proy u/mes</th><th class="num">Objetivo</th><th class="num">Stock</th><th class="num">En curso</th><th class="num">A pedir u</th><th class="num">Cajas</th><th class="num" title="FOB unitario (USD) del maestro Importados">FOB u$s/u</th><th class="num" title="Cotización del ítem = unidades a pedir × FOB unitario">u$s pedido</th><th class="num" title="m³ de UNA master caja (medidas cargadas a mano). Tocá el ✏ para cargar/editar.">m³/master</th><th class="num" title="m³ del pedido = master cajas a pedir × m³ por master">m³ pedido</th><th>Acciones</th></tr></thead><tbody>';
       arr.sort(function (a, b) { return b.aPedirUni - a.aPedirUni; }).forEach(function (it) {
         const cajTxt = (it.aPedirCajas == null) ? '<span style="color:#94a3b8" title="Sin uni×caja cargado">—</span>' : String(it.aPedirCajas);
         const badge = it.esParte ? ' <span style="color:#7c3aed" title="Parte">🧩</span>' : '';
@@ -13015,7 +13030,13 @@ function _pedImpRender() {
           ? '<span style="cursor:pointer" title="' + (_dimTip ? escapeHtml(_dimTip) + ' — ' : '') + 'tocá para editar" onclick="pedImpEditVol(\'' + _codEncV + '\')">' + (Math.round(_m3m * 10000) / 10000) + ' <span style="color:#94a3b8;font-size:11px">✏️</span></span>'
           : '<span style="cursor:pointer;color:#cbd5e1" title="Cargar medidas de la master (cm) para calcular m³" onclick="pedImpEditVol(\'' + _codEncV + '\')">✏️</span>';
         var m3TotTxt = (Number(it.m3Total) || 0) > 0 ? '<b style="color:#0369a1">' + (Math.round(it.m3Total * 100) / 100) + '</b>' : '<span style="color:#cbd5e1">—</span>';
-        h += '<tr><td><b>' + escapeHtml(codCanon(it.cod)) + '</b>' + badge + '</td><td style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escapeHtml(it.desc || "") + '">' + escapeHtml(artNombre(it.cod, it.desc)) + '</td><td class="num">' + it.proyUni + '</td><td class="num">' + it.objetivoUni + '</td><td class="num">' + stockTxt + '</td><td class="num">' + it.enCurso + '</td><td class="num" style="font-weight:800;color:#b45309">' + it.aPedirUni + '</td><td class="num">' + cajTxt + '</td><td class="num">' + m3MasterTxt + '</td><td class="num">' + m3TotTxt + '</td><td>' + actHtml + '</td></tr>';
+        // v10.06 — FOB unitario (editable ✏) + cotización USD del ítem
+        var _fob = Number(it.fobUni) || 0;
+        var fobTxt = _fob > 0
+          ? '<span style="cursor:pointer" title="Tocá para editar el FOB" onclick="pedImpEditFob(\'' + _codEncV + '\')">' + _fob.toFixed(3) + ' <span style="color:#94a3b8;font-size:11px">✏️</span></span>'
+          : '<span style="cursor:pointer;color:#cbd5e1" title="Cargar FOB unitario (USD)" onclick="pedImpEditFob(\'' + _codEncV + '\')">✏️</span>';
+        var usdTxt = (Number(it.usdTotal) || 0) > 0 ? '<b style="color:#065f46">u$s ' + Math.round(it.usdTotal).toLocaleString("es-AR") + '</b>' : '<span style="color:#cbd5e1">—</span>';
+        h += '<tr><td><b>' + escapeHtml(codCanon(it.cod)) + '</b>' + badge + '</td><td style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escapeHtml(it.desc || "") + '">' + escapeHtml(artNombre(it.cod, it.desc)) + '</td><td class="num">' + it.proyUni + '</td><td class="num">' + it.objetivoUni + '</td><td class="num">' + stockTxt + '</td><td class="num">' + it.enCurso + '</td><td class="num" style="font-weight:800;color:#b45309">' + it.aPedirUni + '</td><td class="num">' + cajTxt + '</td><td class="num">' + fobTxt + '</td><td class="num">' + usdTxt + '</td><td class="num">' + m3MasterTxt + '</td><td class="num">' + m3TotTxt + '</td><td>' + actHtml + '</td></tr>';
       });
       h += '</tbody></table></div>';
     });
@@ -13042,16 +13063,17 @@ function pedImpExportExcel() {
   });
   var html = '<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"><style>td,th{border:1px solid #ccc;padding:3px 7px;font-family:Calibri,Arial,sans-serif;} th{background:#166534;color:#fff;text-align:left;}</style></head><body>';
   html += '<h3>Pedidos Importación — Producción Virgilio (' + esc(fecha) + ', índice ' + (data.meses || 10) + ' meses)</h3>';
-  html += '<table><tr><th>Importador</th><th>Proveedor</th><th>Codigo</th><th>Descripcion</th><th>Proy u/mes</th><th>Objetivo</th><th>Stock</th><th>En curso</th><th>A pedir u</th><th>Cajas</th><th>m3/master</th><th>m3 pedido</th></tr>';
-  var _totM3 = 0;
+  html += '<table><tr><th>Importador</th><th>Proveedor</th><th>Codigo</th><th>Descripcion</th><th>Proy u/mes</th><th>Objetivo</th><th>Stock</th><th>En curso</th><th>A pedir u</th><th>Cajas</th><th>FOB u$s/u</th><th>u$s pedido</th><th>m3/master</th><th>m3 pedido</th></tr>';
+  var _totM3 = 0, _totUsd = 0;
   items.forEach(function (it) {
     var imp = _IMPORTADOR_DE[it.prov || ""] || "(sin importador)";
     var stk = Math.max(0, Number(it.stockUni) || 0);   // negativo → 0 (igual que pantalla)
     var caj = (it.aPedirCajas == null) ? "" : it.aPedirCajas;
     var m3m = Number(it.m3Master) || 0, m3t = Number(it.m3Total) || 0; _totM3 += m3t;
-    html += '<tr><td>' + esc(imp) + '</td><td>' + esc(it.prov || "") + '</td><td>' + esc(codCanon(it.cod)) + '</td><td>' + esc(artNombre(it.cod, it.desc)) + '</td><td>' + (it.proyUni || 0) + '</td><td>' + (it.objetivoUni || 0) + '</td><td>' + stk + '</td><td>' + (it.enCurso || 0) + '</td><td>' + (it.aPedirUni || 0) + '</td><td>' + caj + '</td><td>' + (m3m > 0 ? m3m : "") + '</td><td>' + (m3t > 0 ? (Math.round(m3t * 100) / 100) : "") + '</td></tr>';
+    var fob = Number(it.fobUni) || 0, usd = Number(it.usdTotal) || 0; _totUsd += usd;
+    html += '<tr><td>' + esc(imp) + '</td><td>' + esc(it.prov || "") + '</td><td>' + esc(codCanon(it.cod)) + '</td><td>' + esc(artNombre(it.cod, it.desc)) + '</td><td>' + (it.proyUni || 0) + '</td><td>' + (it.objetivoUni || 0) + '</td><td>' + stk + '</td><td>' + (it.enCurso || 0) + '</td><td>' + (it.aPedirUni || 0) + '</td><td>' + caj + '</td><td>' + (fob > 0 ? fob : "") + '</td><td>' + (usd > 0 ? Math.round(usd) : "") + '</td><td>' + (m3m > 0 ? m3m : "") + '</td><td>' + (m3t > 0 ? (Math.round(m3t * 100) / 100) : "") + '</td></tr>';
   });
-  html += '<tr><td colspan="11"><b>TOTAL m³</b></td><td><b>' + (Math.round(_totM3 * 100) / 100) + '</b></td></tr>';
+  html += '<tr><td colspan="11"><b>TOTALES</b></td><td><b>' + Math.round(_totUsd) + '</b></td><td></td><td><b>' + (Math.round(_totM3 * 100) / 100) + '</b></td></tr>';
   html += '</table></body></html>';
   try {
     var blob = new Blob(["﻿" + html], { type: "application/vnd.ms-excel" });
@@ -13110,6 +13132,30 @@ async function pedImpEditVol(codEnc) {
     });
     await pedImpReload();
   } catch (e) { try { alert("No se pudo guardar el volumen: " + (e.message || e)); } catch (_e) {} }
+}
+/* v10.06 — editar el FOB unitario (USD) de un importado. Escribe fob_uni en TODAS las filas del
+   código en Importados (todas las marcas/plantas comparten el mismo FOB del proveedor). */
+async function pedImpEditFob(codEnc) {
+  var cod = decodeURIComponent(codEnc);
+  var cur = 0;
+  try {
+    var data = (_stkPop && _stkPop.data) || {};
+    (data.items || []).some(function (it) { if (String(it.cod).toUpperCase().trim() === cod.toUpperCase().trim()) { cur = Number(it.fobUni) || 0; return true; } return false; });
+  } catch (_e) {}
+  var val = prompt("FOB unitario (USD por unidad) de " + codCanon(cod) + ":", cur > 0 ? String(cur) : "");
+  if (val === null) return;
+  val = String(val).trim().replace(/,/g, ".").replace(/[^0-9.]/g, "");
+  var fob = parseFloat(val);
+  if (isNaN(fob) || fob < 0) { try { alert("FOB inválido."); } catch (_e) {} return; }
+  fob = Math.round(fob * 100000) / 100000;
+  try {
+    await fetch(SUPABASE_URL + "/rest/v1/Importados?cod_art=eq." + encodeURIComponent(cod), {
+      method: "PATCH",
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" },
+      body: JSON.stringify({ fob_uni: fob, actualizado: new Date().toISOString() })
+    });
+    await pedImpReload();
+  } catch (e) { try { alert("No se pudo guardar el FOB: " + (e.message || e)); } catch (_e) {} }
 }
 async function pedImpSetCurso(id, codEnc, curso) {
   var cod = decodeURIComponent(codEnc);

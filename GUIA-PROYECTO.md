@@ -250,6 +250,17 @@
 > Cajas por pila, Sueltas, Contado (cajas), **Stock del sistema** (góndola+excedente, mismo cálculo
 > que la comparación), Diferencia y En proceso. Formato Excel es-AR (BOM utf-8, `;`, coma decimal).
 >
+> Nota **v10.06** — **Pedidos Importación: cotización en USD (FOB) + volumen (m³).** Cada ítem
+> del módulo "📦 Pedidos Importación" ahora muestra: **FOB u$s/u** (editable ✏ → `Importados.fob_uni`,
+> USD por unidad del proveedor), **u$s pedido** (= unidades a pedir × FOB), **m³/master** (editable ✏
+> → tabla nueva `Importados_Volumen`: se cargan las medidas de la master en cm `Largo×Ancho×Alto` y
+> calcula m³ = L·A·H/1e6, o se ingresa el m³ directo) y **m³ pedido** (= master cajas a pedir enteras
+> × m³/master). Arriba hay dos tarjetas con el **TOTAL del pedido**: USD (Σ) y m³ (Σ), con aviso de
+> cuántos ítems no tienen FOB/volumen cargado. Subtotales por proveedor (cajas · u$s · m³) y todo baja
+> al Excel (columnas FOB, u$s, m³/master, m³ pedido + fila TOTALES). Las master cajas del pedido salen
+> de convertir las unidades a cajas enteras (`ceil(a_pedir / uni_x_caja)`, sin decimales). **Todo vive
+> en Supabase** (`Importados.fob_uni` + `Importados_Volumen`), sin dependencia de ningún Excel externo.
+>
 > Nota **v9.29** — **Pedidos Importación operable (editar en curso + marcar llegada).** El módulo
 > "📦 Pedidos Importación" era solo-lectura; ahora cada fila tiene **✏️** (editar unidades EN CURSO
 > = lo pedido/en camino → `Importados.pedido_curso`, que el motor resta de "a pedir") y **📥**
