@@ -3610,7 +3610,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
     <h1 class="sup-title">Administración</h1>
     <!-- GRANDES: uso diario (orden definido por el usuario). "Stock y Compras" = Stocks + OC en un solo botón. -->
     <div class="sup-actions sup-primary">
-      <button class="sup-action-btn" onclick="openFacturacion()"><span class="sup-ico">📋</span><span>Facturación</span></button>
+      <button class="sup-action-btn" onclick="openFacturacion()" style="position:relative;"><span class="sup-ico">📋</span><span>Facturación</span><span id="facBadge" class="dp-badge" style="display:none;" title="Pedidos listos para facturar (picking + separado terminados, todavía sin facturar)"></span></button>
       <button class="sup-action-btn" onclick="openPPP()"><span id="pppAlertBadge" class="ppp-alert-badge"></span><span class="sup-ico">🗓️</span><span>PPP</span></button>
       <button class="sup-action-btn" onclick="openRecepcionAdmin()" style="position:relative;"><span class="sup-ico">🏭</span><span>Carga Recepción Mercadería</span><span id="recepBadge" class="dp-badge" style="display:none;min-width:26px;height:26px;line-height:26px;font-size:15px;padding:0 6px;border-radius:13px;" title="Pendiente en Recepción: remitos por cargar + bajadas de racks por aprobar"></span></button>
       <button class="sup-action-btn" onclick="showFaltAvisar()"><span class="sup-ico">📦➕</span><span>Completar Pedido</span></button>
@@ -6403,7 +6403,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v9.68";
+const APP_VERSION = "v9.69";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -30398,6 +30398,37 @@ async function facTick(){
   }
 }
 
+/* v9.69 — badge del botón "Facturación": cantidad de PEDIDOS (NP) listos para facturar =
+   NPs en tandas FC (picking + separado terminados) que TODAVÍA no se facturaron. Mismo criterio
+   que la lista del módulo (facTick), sin el modo fallback. Fire-and-forget al abrir el panel. */
+async function facLoadBadge(){
+  try{
+    let sheetMap;
+    if (_pppCache && (Date.now() - _pppCacheTs) < PPP_TTL_MS) sheetMap = _pppCache;
+    else { sheetMap = await fetchMonitorSheet(); _pppCache = sheetMap; _pppCacheTs = Date.now(); }
+    const tandasPlan = [...sheetMap.values()].filter(t => t.opIsSi && t.pedidos.length > 0);
+    const keys = tandasPlan.map(t => t._key || t.tanda.toUpperCase());
+    const res = await Promise.all([
+      facFetchFcKeys(keys).catch(function(){ return new Set(); }),
+      fetchFacturadosTodos(true).catch(function(){ return new Set(); })
+    ]);
+    const fcKeys = res[0] || new Set();
+    const facN = new Set(); (res[1] || new Set()).forEach(function(v){ const k = pickNormNp(v); if (k) facN.add(k); });
+    const tandasFC = tandasPlan.filter(t => fcKeys.has(t._key || t.tanda.toUpperCase()));
+    const seen = {}; let n = 0;
+    tandasFC.forEach(function(t){
+      (t.pedidos || []).forEach(function(p){
+        String(p.np || "").split(/[,/]/).forEach(function(part){
+          const np = pickNormNp(part);
+          if (!np || seen[np]) return; seen[np] = 1;
+          if (!facN.has(np)) n++;
+        });
+      });
+    });
+    supSetBadge("facBadge", n);
+  } catch(_e){}
+}
+
 /* Cierre Marianela: crea row en Facturacion_Cierres → PATCH cierre_id en
    todos los NPs facturados → genera PDF. Si algún paso falla, abortamos
    y avisamos. Los NPs no quedan "huérfanos" porque el PATCH es atomico
@@ -31183,6 +31214,7 @@ function showSupervisor(email) {
   try { npFaltanLoadBadge(); } catch (_e) {}
   try { qbpLoadBadge(); } catch (_e) {}   // badge SOS de "Qué bajar primero"
   try { recepLoadBadge(); } catch (_e) {}   // v9.53: badge remitos pendientes de cargar (Recepción)
+  try { facLoadBadge(); } catch (_e) {}   // v9.69: badge pedidos listos para facturar
   try { if (typeof pppAlertPollStart === "function") pppAlertPollStart(); } catch (_e) {}
 }
 
