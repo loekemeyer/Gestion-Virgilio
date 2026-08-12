@@ -3613,7 +3613,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       <button class="sup-action-btn" onclick="openFacturacion()" style="position:relative;"><span class="sup-ico">📋</span><span>Facturación</span><span id="facBadge" class="dp-badge" style="display:none;" title="Pedidos listos para facturar (picking + separado terminados, todavía sin facturar)"></span></button>
       <button class="sup-action-btn" onclick="openPPP()"><span id="pppAlertBadge" class="ppp-alert-badge"></span><span class="sup-ico">🗓️</span><span>PPP</span></button>
       <button class="sup-action-btn" onclick="openRecepcionAdmin()" style="position:relative;"><span class="sup-ico">🏭</span><span>Carga Recepción Mercadería</span><span id="recepBadge" class="dp-badge" style="display:none;min-width:26px;height:26px;line-height:26px;font-size:15px;padding:0 6px;border-radius:13px;" title="Pendiente en Recepción: remitos por cargar + bajadas de racks por aprobar"></span></button>
-      <button class="sup-action-btn" onclick="showFaltAvisar()"><span class="sup-ico">📦➕</span><span>Completar Pedido</span></button>
+      <button class="sup-action-btn" onclick="showFaltAvisar()" style="position:relative;"><span class="sup-ico">📦➕</span><span>Completar Pedido</span><span id="cpBadge" class="dp-badge" style="display:none;" title="Pedidos con faltante que tiene stock para completarse"></span></button>
       <button class="sup-action-btn" onclick="openStockAdmin()"><span class="sup-ico">📦</span><span>Stock y Compras</span></button>
       <button class="sup-action-btn" onclick="openPanelWebLK()"><span class="sup-ico">🌐</span><span>Panel Web LK</span></button>
       <button class="sup-action-btn" onclick="openRemitosAdmin()"><span class="sup-ico">🚚</span><span>Recepción Remitos (RR)</span></button>
@@ -6403,7 +6403,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v9.69";
+const APP_VERSION = "v9.70";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -19481,6 +19481,19 @@ async function showFaltAvisar() {
   } catch (e) { const b = document.getElementById("faltAvBody"); if (b) b.innerHTML = '<div class="fav-empty">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
 }
 function closeFaltAvisar() { const ov = document.getElementById("faltAvModal"); if (ov) ov.classList.remove("show"); }
+/* v9.70 — badge del botón "Completar Pedido": cantidad de NPs con faltante que TIENE stock para
+   completarse (mismo criterio que showFaltAvisar: góndola + a_guardar + excedente + racks > 0). */
+async function favLoadBadge(){
+  try{
+    const res = await Promise.all([cpLoadFaltantes(), stockFetchSaldos()]);
+    const falt = res[0] || [], saldos = res[1] || {};
+    const sN = {}; Object.keys(saldos).forEach(function(k){ sN[_cpNorm(k)] = saldos[k]; });
+    const disp = function(cod){ const s = sN[_cpNorm(cod)] || {}; return Math.round((Number(s.terminado)||0)+(Number(s.a_guardar)||0)+(Number(s.excedente)||0)+(Number(s.racks)||0)); };
+    const nps = {};
+    (falt||[]).forEach(function(e){ if (disp(e.cod_art) <= 0) return; nps[_faltNpNorm(e.np)] = 1; });
+    supSetBadge("cpBadge", Object.keys(nps).length);
+  } catch(_e){}
+}
 function faltAvRender(falt, activas, saldosN) {
   const body = document.getElementById("faltAvBody"); if (!body) return;
   const sN = saldosN || {};
@@ -28460,6 +28473,7 @@ let _facTickedLocal   = new Set();
 // de cierre (_facNpsHoy), así que los cerrados volvían a la lista, se podían
 // re-tildar (reabriéndolos) y cada cierre nuevo dejaba huérfano al anterior.
 let _facNpsTodos      = new Set();
+let _facNpsHoyReal    = new Set();   // v9.70: NPs facturadas HOY (por facturado_at), para "Ya tildados hoy"
 let _facNpsTodosTs    = 0;
 let _facNpsTodosInflight = null;
 // v6.71 — set de NP DESPACHADAS (cargadas al camión = CCN, salvo que un FSS más
@@ -29148,6 +29162,8 @@ async function fetchFacturadosTodos(force){
       _facCountHoy = data.reduce(function (n, x) {
         return n + ((x.facturado_at && new Date(x.facturado_at).getTime() >= _hoyMs) ? 1 : 0);
       }, 0);
+      // v9.70: set de NPs facturadas HOY (por fecha), para la lista "Ya tildados hoy" (no las viejas sin cerrar)
+      _facNpsHoyReal = new Set(data.filter(function (x) { return x.facturado_at && new Date(x.facturado_at).getTime() >= _hoyMs; }).map(function (x) { return String(x.np); }));
       _facNpsTodosTs = Date.now();
       return _facNpsTodos;
     } finally {
@@ -29771,7 +29787,9 @@ window.facToggleSoloFalt = facToggleSoloFalt;
 function facRenderTicked(){
   const box = document.getElementById("facTickedList");
   if (!box) return;
-  const nps = Array.from(_facNpsHoy || []);
+  // v9.70 — "tildados HOY" = facturadas por fecha de hoy (_facNpsHoyReal), NO todas las sin cerrar
+  // (_facNpsHoy incluía viejas nunca cerradas de días atrás).
+  const nps = Array.from(_facNpsHoyReal || []);
   if (!nps.length){ box.style.display = "none"; box.innerHTML = ""; return; }
   const info = new Map();
   (_facLastTandas || []).forEach(function(t){
@@ -31215,6 +31233,7 @@ function showSupervisor(email) {
   try { qbpLoadBadge(); } catch (_e) {}   // badge SOS de "Qué bajar primero"
   try { recepLoadBadge(); } catch (_e) {}   // v9.53: badge remitos pendientes de cargar (Recepción)
   try { facLoadBadge(); } catch (_e) {}   // v9.69: badge pedidos listos para facturar
+  try { favLoadBadge(); } catch (_e) {}   // v9.70: badge Completar Pedido (faltantes con stock)
   try { if (typeof pppAlertPollStart === "function") pppAlertPollStart(); } catch (_e) {}
 }
 
