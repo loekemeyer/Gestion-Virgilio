@@ -261,6 +261,17 @@
 > Cajas por pila, Sueltas, Contado (cajas), **Stock del sistema** (góndola+excedente, mismo cálculo
 > que la comparación), Diferencia y En proceso. Formato Excel es-AR (BOM utf-8, `;`, coma decimal).
 >
+> Nota **v10.10** — **FIX Completar/Separar: "de menos" ahora se descuenta del pedido.** En el
+> wizard Completar (Separar → Líos), cuando el armador reporta que un artículo **difiere de la mesa
+> "de menos"** (hay menos que lo que marcó el picking, ej. "el 366 no estaba en lo que pidieron"),
+> antes SOLO emitía el aviso NPD (`Picking difiere de mesa`) y seguía **entero**: se armaba en los
+> líos y se facturaba completo. Ahora `_compDifResolve('menos',…)` además **descuenta** ese faltante
+> del armado (`c.sale`/`c.rest`) y lo registra como faltante manual en `_comp.arts` (helper nuevo
+> `_compAddFaltManual`, NP normalizada con `pickNormNp`), de modo que `compTerminar` lo reste también
+> de `Entregas_Virgilio` (`cajas_falto`) → **no se factura lo que no estaba**. El "de más" no cambia
+> (las que sobran se re-guardan; el pedido no crece). Es todo front-end (el wizard calcula líos y FAL
+> en el cliente). El aviso NPD por Telegram/Agentes se mantiene igual.
+>
 > Nota **v10.09** — **Botón "Ver módulo operarios" en el panel admin.** En el panel de
 > Administración (`#supervisorPanel`, sección "Reportes y configuración") hay un botón nuevo
 > **👁️ Ver módulo operarios** (`openOperarioView()`) que abre la grilla completa del operario
