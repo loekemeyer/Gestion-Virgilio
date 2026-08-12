@@ -335,6 +335,17 @@
 > Cajas por pila, Sueltas, Contado (cajas), **Stock del sistema** (góndola+excedente, mismo cálculo
 > que la comparación), Diferencia y En proceso. Formato Excel es-AR (BOM utf-8, `;`, coma decimal).
 >
+> Nota **v10.18** — **Hoja "Góndola < 25%" en Stock y Compras (auditoría).** Tab nueva **🔍 Góndola
+> <25%** en el módulo Stocks (`openStockAdmin`) → `stkBodyAuditGon` (datos por `agLoad` desde
+> `vista_generador_oc`). Lista los artículos cuya **ocupación de góndola = (stock total de todos los
+> estadios − pedidos) ÷ proyección** es **< 25%**. Ordenado por **tallerista** (proveedor, con banda de
+> grupo fija al scrollear) y dentro por **familia**. Columnas: Código, Descripción, % góndola, Stock
+> total, Proyección, Pedidos, Familia. Letra grande (auditor con mala visión de cerca), encabezado +
+> tallerista **sticky**, scroll vertical. Baja a **Excel** (`agExportExcel`) y a **PDF** (`agExportPdf`,
+> ventana de impresión). ⚠ **Familia = 1ª palabra de la descripción** (proxy): no hay familia de
+> producto real en Supabase (la categoría "Cat.Art" vivía en el Excel Madre, sin sincronizar). Si se
+> carga una tabla de familias, se cambia el `agFamilia()` por ese cruce.
+>
 > Nota **v10.17** — **Completar Pedido (operario) muestra todos los faltantes con stock (sin depender
 > de "Avisar").** El CP del operario (`showCPModal`) filtraba angosto: solo faltantes cuyo artículo
 > estuviera **a guardar** (`a_guardar>0`) o **guardado hoy**. Por eso faltantes completables desde

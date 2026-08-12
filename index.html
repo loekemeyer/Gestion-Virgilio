@@ -11354,7 +11354,7 @@ function stkAsOfApply() {
   stkRender();
 }
 function stkAsOfLive() { if (!_stk) return; _stk.asOf = null; _stk.openArt = null; stkRender(); }
-function stkTab(t) { if (!_stk) return; if (t === "compras") { openOCAdmin(); return; } _stk.tab = t; _stk.filtro = ""; _stk.openArt = null; if (t === "capacidad" && !_stk.capLoaded) { stkCapLoad(); return; } if (t === "racks" && !_stk.planiLoaded) { stkPlaniLoad(); return; } if (t === "insumos" && !_stk.insLoaded) { stkInsLoad(); return; } if (t === "faltante" && !_stk.faltLoaded) { stkFaltLoad(); return; } stkRender(); }
+function stkTab(t) { if (!_stk) return; if (t === "compras") { openOCAdmin(); return; } _stk.tab = t; _stk.filtro = ""; _stk.openArt = null; if (t === "capacidad" && !_stk.capLoaded) { stkCapLoad(); return; } if (t === "racks" && !_stk.planiLoaded) { stkPlaniLoad(); return; } if (t === "insumos" && !_stk.insLoaded) { stkInsLoad(); return; } if (t === "faltante" && !_stk.faltLoaded) { stkFaltLoad(); return; } if (t === "auditgon" && !_stk.agLoaded) { agLoad(); return; } stkRender(); }
 function stkRender() {
   if (!_stk) return;
   if (_stk.soloConteo) {   // rol "solo conteo": sin solapas, directo al conteo físico
@@ -11362,12 +11362,127 @@ function stkRender() {
     const body0 = document.getElementById("stkBody"); if (body0) _renderKeepFocus(body0, stkBodyConteo());
     return;
   }
-  const tabs = [["stocks", "📊 Stocks"], ["faltante", "📉 Faltantes x día"], ["racks", "🏗 Racks"], ["conteo", "📋 Conteo"], ["capacidad", "📐 Capacidad"], ["insumos", "🧰 Insumos"], ["ajustes", "⚙ Ajustes"], ["compras", "📑 Compras (OCs)"]];
+  const tabs = [["stocks", "📊 Stocks"], ["auditgon", "🔍 Góndola <25%"], ["faltante", "📉 Faltantes x día"], ["racks", "🏗 Racks"], ["conteo", "📋 Conteo"], ["capacidad", "📐 Capacidad"], ["insumos", "🧰 Insumos"], ["ajustes", "⚙ Ajustes"], ["compras", "📑 Compras (OCs)"]];
   const tb = document.getElementById("stkTabs");
   if (tb) tb.innerHTML = tabs.map(function (t) { return '<button class="stk-tab' + (_stk.tab === t[0] ? " on" : "") + '" onclick="stkTab(\'' + t[0] + '\')">' + t[1] + '</button>'; }).join("");
   const body = document.getElementById("stkBody"); if (!body) return;
-  _renderKeepFocus(body, _stk.tab === "faltante" ? stkBodyFaltante() : _stk.tab === "proceso" ? stkBodyProceso() : _stk.tab === "conteo" ? stkBodyConteo() : _stk.tab === "capacidad" ? stkBodyCapacidad() : _stk.tab === "racks" ? stkBodyRacks() : _stk.tab === "insumos" ? stkBodyInsumos() : _stk.tab === "ajustes" ? stkBodyAjustes() : stkBodyStocksTab());
+  _renderKeepFocus(body, _stk.tab === "faltante" ? stkBodyFaltante() : _stk.tab === "auditgon" ? stkBodyAuditGon() : _stk.tab === "proceso" ? stkBodyProceso() : _stk.tab === "conteo" ? stkBodyConteo() : _stk.tab === "capacidad" ? stkBodyCapacidad() : _stk.tab === "racks" ? stkBodyRacks() : _stk.tab === "insumos" ? stkBodyInsumos() : _stk.tab === "ajustes" ? stkBodyAjustes() : stkBodyStocksTab());
   _stkInsCatPopupRefresh();   // v9.32: refresca popup de categoría si está abierto
+}
+/* ===== v10.18 — AUDITORÍA "Góndola < 25% de la proyección" =====================
+   Hoja para auditar artículos con MUY POCA góndola respecto a lo que se proyecta vender.
+   Ocupación = (stock TOTAL de todos los estadios − pedidos) ÷ proyección. Muestra los que
+   están por debajo del 25%. Ordenado por TALLERISTA (proveedor) y, dentro, por FAMILIA
+   (1ª palabra de la descripción — no hay familia de producto real cargada en Supabase).
+   Fuente: vista_generador_oc (stock=suma de los 8 depósitos, proy, pedidos, proveedor).
+   Pensada para lectura a distancia (letra grande, encabezado + tallerista fijos al scrollear).
+   Baja a Excel y a PDF (imprimir). ===== */
+const SUPABASE_AG_ENDPOINT = SUPABASE_URL + "/rest/v1/vista_generador_oc";
+function agFamilia(desc) {
+  var d = String(desc == null ? "" : desc).trim();
+  if (!d) return "(sin desc)";
+  var w = d.split(/\s+/)[0].replace(/[^0-9A-Za-zÁÉÍÓÚÑáéíóúñ]/g, "");
+  if (!w) return "(sin desc)";
+  return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+}
+function agEnsureCss() {
+  if (document.getElementById("agCss")) return;
+  var s = document.createElement("style"); s.id = "agCss";
+  s.textContent =
+    ".ag-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:4px 0 8px}" +
+    ".ag-title{font-size:21px;font-weight:800;color:#0f172a}" +
+    ".ag-btns{display:flex;gap:8px}" +
+    ".ag-btn{border:none;border-radius:10px;padding:11px 18px;font-size:17px;font-weight:800;cursor:pointer;color:#fff}" +
+    ".ag-btn.xls{background:#166534}.ag-btn.pdf{background:#b45309}" +
+    ".ag-note{font-size:13px;color:#64748b;margin-bottom:8px;line-height:1.35}" +
+    ".ag-wrap{max-height:calc(100vh - 215px);overflow:auto;border:1px solid #e2e8f0;border-radius:10px}" +
+    ".ag-tbl{width:100%;border-collapse:collapse;font-size:22px}" +
+    ".ag-tbl thead th{position:sticky;top:0;background:#1e3a8a;color:#fff;font-size:18px;font-weight:800;padding:13px 12px;text-align:left;z-index:3}" +
+    ".ag-tbl thead th.num{text-align:right}" +
+    ".ag-tbl td{padding:13px 12px;border-bottom:1px solid #e5e7eb;font-weight:600;color:#0f172a}" +
+    ".ag-tbl td.num{text-align:right;font-variant-numeric:tabular-nums;font-weight:800}" +
+    ".ag-tbl .ag-cod{font-weight:900;font-family:Consolas,Menlo,monospace}" +
+    ".ag-tbl .ag-desc{max-width:420px}" +
+    ".ag-tbl .ag-grp td{background:#dbeafe;color:#1e3a8a;font-size:19px;font-weight:900;position:sticky;top:48px;z-index:2;padding:10px 12px}" +
+    ".ag-neg{color:#b91c1c}.ag-lo{color:#dc2626}.ag-mid{color:#b45309}";
+  document.head.appendChild(s);
+}
+async function agLoad() {
+  agEnsureCss();
+  var body = document.getElementById("stkBody"); if (body) body.innerHTML = '<div class="stk-loading">Cargando auditoría de góndola…</div>';
+  try {
+    var rows = await supaFetchAllSafe(SUPABASE_AG_ENDPOINT, "select=cod,descripcion,proveedor,stock,proy,pedidos&proy=gt.0");
+    var items = [];
+    (rows || []).forEach(function (r) {
+      var proy = Number(r.proy) || 0; if (proy <= 0) return;
+      var stock = Number(r.stock) || 0, pedidos = Number(r.pedidos) || 0;
+      var neta = stock - pedidos;
+      var pct = neta / proy;
+      if (pct >= 0.25) return;   // solo < 25%
+      items.push({ cod: r.cod, desc: r.descripcion || "", tall: (String(r.proveedor || "").trim() || "(sin tallerista)"),
+        fam: agFamilia(r.descripcion), stock: stock, proy: proy, pedidos: pedidos, pct: pct });
+    });
+    items.sort(function (a, b) { return String(a.tall).localeCompare(String(b.tall)) || String(a.fam).localeCompare(String(b.fam)) || (a.pct - b.pct); });
+    if (_stk) { _stk.agData = items; _stk.agLoaded = true; }
+    stkRender();
+  } catch (e) { if (body) body.innerHTML = '<div class="stk-loading">Error cargando: ' + escapeHtml(e.message || String(e)) + '</div>'; }
+}
+function stkBodyAuditGon() {
+  var items = (_stk && _stk.agData) || [];
+  var n = items.length;
+  var h = '<div class="ag-bar"><div class="ag-title">🔍 Góndola &lt; 25% de la proyección · <b>' + n + '</b> ítem(s)</div>' +
+    '<div class="ag-btns"><button class="ag-btn xls" onclick="agExportExcel()">📥 Excel</button><button class="ag-btn pdf" onclick="agExportPdf()">🖨 PDF</button></div></div>';
+  h += '<div class="ag-note">Ocupación = (stock total de <b>todos los estadios</b> − <b>pedidos</b>) ÷ <b>proyección</b>. Ordenado por <b>tallerista</b> y, dentro, por <b>familia</b> (familia = 1ª palabra de la descripción; no hay familia de producto real cargada en el sistema).</div>';
+  if (!n) { h += '<div class="stk-loading">No hay ítems por debajo del 25%. 👍</div>'; return h; }
+  h += '<div class="ag-wrap"><table class="ag-tbl"><thead><tr>' +
+    '<th>Código</th><th>Descripción</th><th class="num">% góndola</th><th class="num">Stock total</th><th class="num">Proyección</th><th class="num">Pedidos</th><th>Familia</th>' +
+    '</tr></thead><tbody>';
+  var lastTall = null;
+  items.forEach(function (it) {
+    if (it.tall !== lastTall) { lastTall = it.tall; h += '<tr class="ag-grp"><td colspan="7">🏭 ' + escapeHtml(it.tall) + '</td></tr>'; }
+    var p = Math.round(it.pct * 100);
+    var pcls = p < 0 ? "ag-neg" : (p < 10 ? "ag-lo" : "ag-mid");
+    h += '<tr>' +
+      '<td class="ag-cod">' + escapeHtml(codCanon(it.cod)) + '</td>' +
+      '<td class="ag-desc">' + escapeHtml(it.desc) + '</td>' +
+      '<td class="num ' + pcls + '">' + p + '%</td>' +
+      '<td class="num">' + (Math.round(it.stock * 10) / 10) + '</td>' +
+      '<td class="num">' + (Math.round(it.proy * 10) / 10) + '</td>' +
+      '<td class="num">' + Math.round(it.pedidos) + '</td>' +
+      '<td>' + escapeHtml(it.fam) + '</td>' +
+    '</tr>';
+  });
+  h += '</tbody></table></div>';
+  return h;
+}
+function agExportExcel() {
+  var items = (_stk && _stk.agData) || []; if (!items.length) { try { alert("No hay datos para exportar."); } catch (_e) {} return; }
+  var esc = function (s) { return String(s == null ? "" : s).replace(/[&<>]/g, function (m) { return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[m]; }); };
+  var html = '<html><head><meta charset="utf-8"></head><body><table border="1"><tr><th>Tallerista</th><th>Codigo</th><th>Descripcion</th><th>% gondola</th><th>Stock total</th><th>Proyeccion</th><th>Pedidos</th><th>Familia</th></tr>';
+  items.forEach(function (it) {
+    html += '<tr><td>' + esc(it.tall) + '</td><td>' + esc(codCanon(it.cod)) + '</td><td>' + esc(it.desc) + '</td><td>' + Math.round(it.pct * 100) + '%</td><td>' + (Math.round(it.stock * 10) / 10) + '</td><td>' + (Math.round(it.proy * 10) / 10) + '</td><td>' + Math.round(it.pedidos) + '</td><td>' + esc(it.fam) + '</td></tr>';
+  });
+  html += '</table></body></html>';
+  try {
+    var blob = new Blob(["﻿" + html], { type: "application/vnd.ms-excel" });
+    var a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "gondola_bajo_25.xls";
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  } catch (_e) { try { alert("No se pudo generar el Excel."); } catch (_e2) {} }
+}
+function agExportPdf() {
+  var items = (_stk && _stk.agData) || []; if (!items.length) { try { alert("No hay datos para exportar."); } catch (_e) {} return; }
+  var esc = function (s) { return String(s == null ? "" : s).replace(/[&<>]/g, function (m) { return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[m]; }); };
+  var rows = "", lastT = null;
+  items.forEach(function (it) {
+    if (it.tall !== lastT) { lastT = it.tall; rows += '<tr class="grp"><td colspan="7">' + esc(it.tall) + '</td></tr>'; }
+    rows += '<tr><td>' + esc(codCanon(it.cod)) + '</td><td>' + esc(it.desc) + '</td><td class="num">' + Math.round(it.pct * 100) + '%</td><td class="num">' + (Math.round(it.stock * 10) / 10) + '</td><td class="num">' + (Math.round(it.proy * 10) / 10) + '</td><td class="num">' + Math.round(it.pedidos) + '</td><td>' + esc(it.fam) + '</td></tr>';
+  });
+  var w = window.open("", "_blank"); if (!w) { try { alert("Habilitá los pop-ups para generar el PDF."); } catch (_e) {} return; }
+  w.document.write('<html><head><meta charset="utf-8"><title>Gondola menor a 25%</title><style>body{font-family:Arial;margin:14px;color:#0f172a}h1{font-size:20px;margin:0 0 10px}table{width:100%;border-collapse:collapse;font-size:15px}th{background:#1e3a8a;color:#fff;padding:8px;text-align:left}th.num{text-align:right}td{padding:6px 8px;border-bottom:1px solid #ccc}td.num{text-align:right}.grp td{background:#dbeafe;color:#1e3a8a;font-weight:800;font-size:16px}</style></head><body>' +
+    '<h1>Góndola &lt; 25% de la proyección · ' + items.length + ' ítems</h1>' +
+    '<table><thead><tr><th>Código</th><th>Descripción</th><th class="num">% góndola</th><th class="num">Stock total</th><th class="num">Proyección</th><th class="num">Pedidos</th><th>Familia</th></tr></thead><tbody>' + rows + '</tbody></table></body></html>');
+  w.document.close(); w.focus();
+  setTimeout(function () { try { w.print(); } catch (_e) {} }, 400);
 }
 /* ===== v6.47 — FC s/SALIDA: NPs FACTURADAS (tick de la operadora en Facturación =
    fila en Facturacion_NP) que TODAVÍA NO se cargaron al camión (sin evento CCN del
