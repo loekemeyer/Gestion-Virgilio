@@ -6174,8 +6174,12 @@ Además del log de eventos, el stock físico y las compras viven en tablas propi
   `a_facturar`/`a_guardar`/`para_envasar`/`racks_ch`…), `delta`, `tipo`
   (`inicial`/`recepcion`/`guardado`/`picking`/`separado`/`facturado`/`ajuste`/…),
   `ts`, y opcional `ubicacion`/`unidad`/`ref`. El saldo se calcula con
-  `stockComputeSaldos(movs, cutoff, asOf)` (front) y la vista `vista_saldos_stock`
-  (server). `tipo='inicial'` es baseline y **siempre** cuenta; el **cutoff**
+  `stockComputeSaldos(movs, cutoff, asOf)` (front, solo para modo As-Of) y la
+  vista `vista_saldos_stock` (server). Desde **v10.00** el front lee
+  **`vista_stock_procesada`** (vista SQL que une saldos + demanda + proyección +
+  capacidad + config OC en una sola query) y solo cae a `stockComputeSaldos`
+  cuando el usuario activa "A una fecha" (As-Of). Helper: `_stkSaldosFromView(rows)`.
+  `tipo='inicial'` es baseline y **siempre** cuenta; el **cutoff**
   ("marcar inicio", `Stock_Config.cutoff_ts`) desconsidera los movimientos reales previos.
 - **`Stock_Config`** — flags/config del stock (cutoff, alertas, toggles), keyed por
   `clave` (upsert `merge-duplicates`).
