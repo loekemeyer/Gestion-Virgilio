@@ -6453,7 +6453,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v10.13";
+const APP_VERSION = "v10.14";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -15535,28 +15535,22 @@ async function stkInsRefresh() {
   try {
     await insLoadMeta(true);
     const r = await Promise.all([
-      supaFetchAll(SUPABASE_URL + "/rest/v1/Insumos", "select=cod,nombre,categoria,ubicacion,isis,creado_por,creado"),
+      supaFetchAll(SUPABASE_URL + "/rest/v1/vista_insumos", "select=cod,nombre,categoria,ubicacion,isis,creado_por,creado"),
       insFetchSaldosXUni(),
-      _stkInsHistFetch(),
-      supaFetchAllSafe(SUPABASE_INS_UBIC_ENDPOINT, "select=id,cod,sector,cantidad,capacidad,unidad,notas")  // v8.72
+      _stkInsHistFetch()
     ]);
-    // v8.72 — agrupar ubicaciones por cod
-    var _ubMap = {};
-    (r[3] || []).forEach(function (u) { var k = String(u.cod || "").trim().toUpperCase(); if (!_ubMap[k]) _ubMap[k] = []; _ubMap[k].push(u); });
+    // v10.10 — ubicación viene de vista_insumos (lee Racks_Planimetria), read-only
     _stkIns.items = (r[0] || []).map(function (c) {
-      var ck = String(c.cod).trim().toUpperCase();
       return { cod: String(c.cod), nombre: c.nombre || "", cat: c.categoria || "", ubic: c.ubicacion || "",
                isis: c.isis || "", por: c.creado_por || "", xuni: r[1][String(c.cod)] || null,
-               ubics: _ubMap[ck] || [] };
+               ubics: [] };
     });
     _stkIns.items.sort(_insSortCod);
     _stkIns.hist = r[2] || [];
   } catch (e) { _stkIns.items = []; _stkIns.msg = "⚠ Error cargando: " + (e.message || e); }
 }
-/* v8.72 — mostrar ubicaciones múltiples en 1 línea (read-only). Usa Insumos_Ubicaciones
-   si hay, sino fallback al campo viejo Insumos.ubicacion. */
+/* v10.10 — ubicación read-only desde vista_insumos (Racks_Planimetria). */
 function _stkInsUbicStr(it) {
-  if (it.ubics && it.ubics.length) return it.ubics.map(function (u) { return u.sector; }).join(" · ");
   return it.ubic || "";
 }
 /* v8.72 — HTML para editar ubicaciones múltiples inline (mini-lista con botón +/x).
@@ -15886,7 +15880,7 @@ function _stkInsListado(k, items) {
         '<td><input class="stk-inp" id="edCod_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.cod) + '" style="width:88px;" title="Código conocido (clave del stock)"></td>' +
         '<td><input class="stk-inp" id="edIsis_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.isis || "") + '" placeholder="isis" style="width:78px;color:#64748b;" title="Código del sistema (isis)"></td>' +
         '<td><input class="stk-inp" id="edNom_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.nombre) + '" style="width:150px;"><br><span class="stk-sub">cat:</span> ' + _stkInsCatSel("edCat_" + it.cod, it.cat) + '</td>' +
-        '<td>' + _stkInsUbicEdit(it.cod, it.ubics) + '</td>' +
+        '<td style="color:#64748b;font-size:11px;" title="Ubicación desde Racks (read-only)">' + escapeHtml(_stkInsUbicStr(it)) + '</td>' +
         '<td style="border-left:1px solid #eef2f7;"><input class="stk-inp" id="edQty_' + escapeHtml(it.cod) + '" type="number" step="any" value="' + escapeHtml(u.saldo) + '" style="width:70px;" oninput="stkInsAutoSec(\'' + escapeHtml(it.cod) + '\',\'qty\')" title="Cantidad primaria (en la unidad base)"></td>' +
         '<td>' + _stkInsUniSel("edUni_" + it.cod, du.uniP || _stkInsUniMostrar(it)) + '</td>' +
         '<td style="border-left:1px solid #eef2f7;"><input class="stk-inp" id="edSecQty_' + escapeHtml(it.cod) + '" type="number" step="any" value="' + escapeHtml(du.cantS) + '" style="width:66px;" placeholder="cant" oninput="stkInsAutoSec(\'' + escapeHtml(it.cod) + '\',\'sec\')" title="Cargá Cant secundaria O el Factor: el otro se completa solo"></td>' +
@@ -15974,7 +15968,7 @@ function _stkInsTodos(items) {
         '<input class="stk-inp" id="edIsis_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.isis || "") + '" placeholder="isis (sistema)" style="width:100px;margin-top:3px;color:#64748b;" title="Código del sistema (isis) — informativo, no toca el stock"></td>' +
         '<td><input class="stk-inp" id="edNom_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.nombre) + '" style="width:140px;"></td>' +
         '<td>' + _stkInsCatSel("edCat_" + it.cod, it.cat) + '</td>' +
-        '<td>' + _stkInsUbicEdit(it.cod, it.ubics) + '</td>' +
+        '<td style="color:#64748b;font-size:11px;" title="Ubicación desde Racks (read-only)">' + escapeHtml(_stkInsUbicStr(it)) + '</td>' +
         '<td><input class="stk-inp" id="edQty_' + escapeHtml(it.cod) + '" type="number" step="any" value="' + escapeHtml(u.saldo) + '" style="width:82px;"></td>' +
         '<td>' + _stkInsUniSel("edUni_" + it.cod, _stkInsUniMostrar(it)) + '</td>' +
         '<td><button class="stk-btn" onclick="stkInsGuardar(\'' + escapeHtml(it.cod) + '\')">✓ Guardar</button> ' +
@@ -16362,8 +16356,7 @@ async function stkInsGuardar(cod) {
   if (!it) return;
   const nuevoCod = _stkInsVal("edCod_" + cod), nom = _stkInsVal("edNom_" + cod);
   const cat = _stkInsVal("edCat_" + cod);
-  const ubics = _stkInsUbicLeer(cod);  // v8.72 — ubicaciones múltiples
-  const ubi = ubics.join(" · ");       // v8.72 — fallback para el campo viejo
+  // v10.10 — ubicación es read-only (viene de Racks_Planimetria), no se guarda desde acá
   const uni = _stkInsVal("edUni_" + cod), qty = _stkInsVal("edQty_" + cod);
   const isis = _stkInsVal("edIsis_" + cod);   // v8.28 — código del sistema (informativo)
   if (!nuevoCod) { alert("El código no puede quedar vacío."); return; }
@@ -16381,7 +16374,6 @@ async function stkInsGuardar(cod) {
     const cambios = {};
     if (nom !== it.nombre) cambios.p_nombre = nom || null;
     if ((cat || "") !== (it.cat || "")) cambios.p_categoria = cat || null;
-    if (ubi !== it.ubic) cambios.p_ubicacion = ubi || null;
     if ((isis || "") !== (it.isis || "")) cambios.p_isis = isis ? isis : "__sin__";   // v8.28
     if (Object.keys(cambios).length) {
       cambios.p_cod = cod;
@@ -16408,10 +16400,6 @@ async function stkInsGuardar(cod) {
       ]});
       await insFetchFactores();
     }
-    // v8.72 — sincronizar ubicaciones múltiples en Insumos_Ubicaciones
-    if (ubics.length || (it.ubics && it.ubics.length)) {
-      await _stkInsUbicSync(finalCod, ubics);
-    }
     _stkIns.edit = null; _stkIns.edUbics = {}; _stkIns.msg = msg;
     await stkInsRefresh(); stkRender();
   } catch (e) { alert("No se pudo: " + (e.message || e)); }
@@ -16429,13 +16417,9 @@ async function stkInsAlta(k) {
   const uni = _stkInsVal("nvUni") || null;
   if (qty && !uni) { alert("Elegí la unidad para la cantidad inicial."); return; }
   try {
-    var ubiAlta = _stkInsVal("nvUbi") || null;
     const nom = _stkInsVal("nvNom") || null;
-    await _stkInsRpc("insumo_alta", { p_cod: cod, p_nombre: nom, p_categoria: k === "?" ? null : k, p_ubicacion: ubiAlta, p_legajo: "admin" });
-    // v8.72 — si se cargó ubicación en el alta, crear la fila en Insumos_Ubicaciones también
-    if (ubiAlta) {
-      await _stkInsUbicSync(cod, [ubiAlta]);
-    }
+    // v10.10 — ubicación ya no se carga en el alta de insumos (viene de Racks_Planimetria)
+    await _stkInsRpc("insumo_alta", { p_cod: cod, p_nombre: nom, p_categoria: k === "?" ? null : k, p_ubicacion: null, p_legajo: "admin" });
     if (qty > 0) {
       const r = await fetch(SUPABASE_URL + "/rest/v1/Movimientos_Stock", {
         method: "POST",
