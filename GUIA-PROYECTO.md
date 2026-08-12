@@ -4,7 +4,20 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-11 · Versión app al documentar: **v9.59**
+> Última actualización: 2026-08-12 · Versión app al documentar: **v9.60**
+>
+> Nota **v9.60 — fix: el botón "Enviar" nunca aparecía en Recepción → Pendientes.**
+> Desde **v8.83** `opEnviar()` genera el código de 4 dígitos **al crear** la fila de
+> `Control_Modo_OP` (para que el operario lo vea y lo escriba en el remito físico), pero
+> `pendCard()` seguía con la semántica vieja: `if (r.codigo)` → mostraba el código y **no
+> dibujaba el botón Enviar**, asumiendo "ya procesada". Como la lista filtra
+> `estado='pendiente'`, toda fila nueva nacía con código y **nada podía salir de Pendientes**
+> (10 filas trabadas, incl. Pintos RTO 0426 y Carriero RTO 1735 con el checklist completo).
+> **Fix:** la tarjeta muestra el código **y** el botón Enviar (habilitado solo con
+> `pendRowComplete` = ISIS + partes + faltantes + foto); `sentRow` ya no se aplica al
+> renderizar. Además `pendEnviar()` **reusa** el código existente en vez de generar otro
+> (antes quedaban dos códigos distintos para la misma recepción: el del remito físico y el
+> del checklist).
 >
 > Nota **v9.55–v9.59** — **Avisar programación** (varias): (a) badge de Recepción suma remitos por
 > cargar + bajadas de racks; (b) fix 401 al marcar Discontinuo (RLS `Articulos_Discontinuados`);
