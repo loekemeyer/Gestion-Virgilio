@@ -3638,6 +3638,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       <button class="sup-action-btn" onclick="openCorreccPanel()" style="position:relative;"><span class="sup-ico">🔀</span><span>Corregir códigos de NPs</span><span id="corrBadgeGreen" class="dp-badge" style="left:2px;right:auto;background:#16a34a;display:none;" title="Se pueden corregir pero NO es obligatorio (hay stock del secundario)"></span><span id="corrBadge" class="dp-badge" style="display:none;" title="Hay que corregir SÍ o SÍ (el secundario no tiene stock)"></span></button>
       <button class="sup-action-btn" onclick="openNpConsulta()"><span class="sup-ico">🔎</span><span>Consultar NP / Líos</span></button>
       <button class="sup-action-btn" onclick="stkOpenNpFaltan()" style="position:relative;"><span class="sup-ico">⚠️</span><span>Pedidos sin cargar en PPP</span><span id="npFaltanBadge" class="dp-badge" style="display:none;"></span></button>
+      <button class="sup-action-btn" onclick="stkOpenFaltFact()"><span class="sup-ico">📉</span><span>Faltantes facturados sin completar</span></button>
       <button class="sup-action-btn" onclick="stkOpenProvImp()"><span class="sup-ico">🏭</span><span>Proveedor de importación</span></button>
       <button class="sup-action-btn" onclick="openPedidosImportacion()"><span class="sup-ico">📦</span><span>Pedidos Importación</span></button>
       <button class="sup-action-btn" onclick="openAvisoProg()"><span class="sup-ico">📲</span><span>Avisar programación</span></button>
@@ -6453,7 +6454,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v10.15";
+const APP_VERSION = "v10.16";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -13001,6 +13002,93 @@ function stkNpFaltanExport() {
   html += '</table></body></html>';
   const blob = new Blob([html], { type: "application/vnd.ms-excel" });
   const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "NP-sin-programar-" + fecha + ".xls";
+  document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+}
+/* v10.16 — Módulo "Faltantes facturados sin completar". Detecta una fuga de stock SILENCIOSA:
+   el pickeador registró un PKC con `real < esp` (no encontró todo), la tanda igual se facturó
+   ENTERA, y nadie corrió "Completar Pedido" (CP). Si esas cajas igual SALIERON, el stock quedó
+   inflado — nunca se descontaron, porque sin bajada de góndola el pipeline no tiene nada que
+   drenar (el artículo no entra a separar_pedidos ni a a_facturar, así que la ETAPA 3 lo ignora).
+   Caso testigo: art 234 en D05B/D06B (NPs 98140/98142/98155), 8 cajas, detectado 3 semanas tarde.
+   ⚠ OJO: NO todos los casos son fuga. Si al cliente se le facturó DE MENOS, la factura refleja lo
+   que salió y el stock está bien. Hay que cotejar contra la factura del ERP — por eso el módulo
+   LISTA y no ajusta solo. Lee `vista_faltantes_sin_completar` (backend). Un caso desaparece de la
+   lista cuando se le hace el CP, o cuando se ajusta a mano con ref '<tanda>|FIX...'. */
+async function stkOpenFaltFact() {
+  _stkPopShell("📉 Faltantes facturados sin completar", "stkPopBody");
+  const body = document.getElementById("stkPopBody"); if (!body) return;
+  body.innerHTML = '<div class="stkpop-empty">Cargando…</div>';
+  const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+  let rows = [];
+  // El módulo se abre desde el panel supervisor, donde `_artNombres` puede no estar cargado
+  // todavía (lo carga openStockAdmin). Sin esto la columna Descripción sale vacía.
+  try { await loadArtNombres(); } catch (_e) {}
+  try {
+    rows = await fetch(SUPABASE_URL + "/rest/v1/vista_faltantes_sin_completar?select=tanda,cod,cajas,nps_lista,clientes,fecha_entrega,ts_pkc&order=cajas.desc&limit=2000",
+      { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; });
+  } catch (_e) {}
+  _stkPop = { kind: "faltFact", rows: rows, porArt: false };
+  _stkFaltFactRender();
+}
+function stkFaltFactToggleArt() { if (!_stkPop || _stkPop.kind !== "faltFact") return; _stkPop.porArt = !_stkPop.porArt; _stkFaltFactRender(); }
+function _stkFaltFactRender() {
+  const body = document.getElementById("stkPopBody"); if (!body || !_stkPop || _stkPop.kind !== "faltFact") return;
+  const rows = _stkPop.rows || [];
+  const round1 = function (n) { return Math.round((Number(n) || 0) * 10) / 10; };
+  if (!rows.length) { body.innerHTML = '<div class="stkpop-empty">✅ No hay faltantes de picking facturados sin completar.</div>'; return; }
+  const totCajas = rows.reduce(function (s, r) { return s + (Number(r.cajas) || 0); }, 0);
+  const tandas = {}; rows.forEach(function (r) { tandas[r.tanda] = true; });
+  let h = '<div class="stkpop-hint"><b>' + rows.length + ' casos</b> en <b>' + Object.keys(tandas).length + ' tandas</b>: el picking registró que <b>faltaron cajas</b> (PKC real &lt; esperado), la tanda se <b>facturó igual</b> y <b>nadie hizo "Completar Pedido"</b>. <b>Total: ' + round1(totCajas) + ' cajas.</b>' +
+    '<br><small style="color:#94a3b8">Si esas cajas <b>salieron</b> → el stock está inflado y hay que ajustarlo. Si al cliente se le <b>facturó de menos</b> → está bien, no toques nada. <b>Cotejá contra la factura.</b> Un caso sale de esta lista al hacerle el CP o un ajuste.</small></div>';
+  h += '<div style="margin-bottom:10px;display:flex;gap:8px;flex-wrap:wrap">' +
+    '<button class="mva-clear" style="background:#166534;color:#fff;border-color:#166534" onclick="stkFaltFactExport()">⬇ Exportar a Excel</button>' +
+    '<button class="mva-clear" onclick="stkFaltFactToggleArt()">' + (_stkPop.porArt ? "📋 Ver caso por caso" : "📦 Agrupar por artículo") + '</button></div>';
+  if (_stkPop.porArt) {
+    const byArt = {};
+    rows.forEach(function (r) {
+      const k = String(r.cod || "—");
+      if (!byArt[k]) byArt[k] = { cajas: 0, tandas: {} };
+      byArt[k].cajas += Number(r.cajas) || 0; byArt[k].tandas[r.tanda] = true;
+    });
+    const arr = Object.keys(byArt).map(function (k) { return { cod: k, cajas: byArt[k].cajas, tandas: Object.keys(byArt[k].tandas).length }; })
+      .sort(function (a, b) { return b.cajas - a.cajas; });
+    h += '<div class="mva-tblwrap"><table class="mva-tbl"><thead><tr><th>Código</th><th>Descripción</th><th class="num">Cajas</th><th class="num">Tandas</th></tr></thead><tbody>';
+    h += arr.map(function (a) {
+      return '<tr><td><b>' + escapeHtml(a.cod) + '</b></td><td style="font-size:12px;color:#475569">' + escapeHtml(artNombre(a.cod, "") || "—") + '</td><td class="num"><b>' + round1(a.cajas) + '</b></td><td class="num">' + a.tandas + '</td></tr>';
+    }).join("") + '</tbody>';
+    h += '<tfoot><tr style="font-weight:800;border-top:2px solid #334155"><td colspan="2">TOTAL (' + arr.length + ' códigos)</td><td class="num">' + round1(totCajas) + '</td><td></td></tr></tfoot></table></div>';
+  } else {
+    h += '<div class="mva-tblwrap"><table class="mva-tbl"><thead><tr><th>Tanda</th><th>Código</th><th class="num">Cajas</th><th>NP</th><th>Cliente</th><th>Entrega</th></tr></thead><tbody>';
+    h += rows.map(function (r) {
+      return '<tr><td><b>' + escapeHtml(r.tanda) + '</b></td>' +
+        '<td><b>' + escapeHtml(r.cod) + '</b></td>' +
+        '<td class="num"><b>' + round1(r.cajas) + '</b></td>' +
+        '<td style="font-size:12px">' + escapeHtml(r.nps_lista || "—") + '</td>' +
+        '<td style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escapeHtml(r.clientes || "") + '">' + escapeHtml(r.clientes || "—") + '</td>' +
+        '<td style="font-size:12px">' + escapeHtml(_stkFmtFechaNP(r.fecha_entrega) || r.fecha_entrega || "—") + '</td></tr>';
+    }).join("") + '</tbody>';
+    h += '<tfoot><tr style="font-weight:800;border-top:2px solid #334155"><td colspan="2">TOTAL (' + rows.length + ' casos)</td><td class="num">' + round1(totCajas) + '</td><td colspan="3"></td></tr></tfoot></table></div>';
+  }
+  body.innerHTML = h;
+}
+function stkFaltFactExport() {
+  if (!_stkPop || _stkPop.kind !== "faltFact" || !_stkPop.rows || !_stkPop.rows.length) { try { alert("Abrí primero el módulo de faltantes facturados."); } catch (_e) {} return; }
+  const rows = _stkPop.rows;
+  const esc = function (s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); };
+  const fecha = (function () { try { return new Date().toLocaleDateString("en-CA", { timeZone: "America/Argentina/Buenos_Aires" }); } catch (_e) { return "hoy"; } })();
+  let total = 0; rows.forEach(function (r) { total += Number(r.cajas) || 0; });
+  let html = '<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"><style>td,th{border:1px solid #ccc;padding:3px 7px;font-family:Calibri,Arial,sans-serif;} th{background:#B45309;color:#fff;text-align:left;}</style></head><body>';
+  html += '<h3>Faltantes de picking facturados sin completar — Producción Virgilio (' + esc(fecha) + ')</h3>';
+  html += '<p>El picking registró que faltaron cajas (PKC real &lt; esperado), la tanda se facturó igual y nadie hizo "Completar Pedido". Si las cajas salieron, el stock está inflado. Cotejar contra la factura.</p>';
+  html += '<table><tr><th>Tanda</th><th>Codigo</th><th>Descripcion</th><th>Cajas</th><th>NP</th><th>Cliente</th><th>Fecha Entrega</th></tr>';
+  rows.forEach(function (r) {
+    html += '<tr><td>' + esc(r.tanda) + '</td><td>' + esc(r.cod) + '</td><td>' + esc(artNombre(r.cod, "") || "") + '</td><td>' +
+      (Math.round((Number(r.cajas) || 0) * 10) / 10) + '</td><td>' + esc(r.nps_lista) + '</td><td>' + esc(r.clientes) + '</td><td>' + esc(r.fecha_entrega) + '</td></tr>';
+  });
+  html += '<tr><td colspan="3"><b>TOTAL (' + rows.length + ' casos)</b></td><td><b>' + (Math.round(total * 10) / 10) + '</b></td><td colspan="3"></td></tr>';
+  html += '</table></body></html>';
+  const blob = new Blob([html], { type: "application/vnd.ms-excel" });
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "Faltantes-facturados-sin-completar-" + fecha + ".xls";
   document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
 }
 /* v9.11/v9.12 — Módulo "Proveedor de importación": revisar/corregir el proveedor chino de cada
