@@ -279,6 +279,19 @@
 > Cajas por pila, Sueltas, Contado (cajas), **Stock del sistema** (góndola+excedente, mismo cálculo
 > que la comparación), Diferencia y En proceso. Formato Excel es-AR (BOM utf-8, `;`, coma decimal).
 >
+> Nota **v10.16** — **FIX raíz (backend): stock del armado reconciliado contra Entregas.** Al volver
+> al modelo de stock por-PKC, el pase **separar_pedidos → a_facturar** (ETAPA 2 del pipeline + el
+> fast-path del front `stockSepararAFacturar`) movía TODO lo pickeado a `a_facturar` sin mirar el
+> armado → una caja pickeada que el armador marcaba "de menos / no iba" quedaba **fantasma en
+> a_facturar** y la góndola en **negativo** (caso 366E/98237/D20A). Ahora la **ETAPA 2 reconcilia
+> contra `Entregas_Virgilio`**: a `a_facturar` va **solo lo entregado**, y lo pickeado no entregado
+> **vuelve a góndola** (`terminado`). Componentes: `reconciliar_pipeline_stock_etapa2()` (delegada,
+> reparte entre variantes de marca con window function), `reconciliar_pipeline_stock()` la llama
+> (etapas 1/3/4 intactas), trigger **`trg_entregas_reconciliar_stock`** AFTER INSERT statement en
+> `Entregas_Virgilio` que la corre en el acto, y el **front `stockSepararAFacturar` neutralizado**
+> (no-op). Solo afecta armados nuevos; validado con ROLLBACK sintético + trigger end-to-end. Doc en
+> `sql/pipeline_etapa2_reconciliada_20260812.sql`. (El caso 366E viejo se había ajustado a mano.)
+>
 > Nota **v10.15** — **Histórico de bajadas de racks (Recepción).** Nuevo botón **📥 Histórico
 > bajadas de racks** en el menú de "Carga Recepción Mercadería" (`renderMenu` en `recepcion.js`) →
 > `renderHistoricoBajadas()`. Módulo SOLO LECTURA sobre la tabla `Racks_Bajadas` (id, ts, cod_art,
