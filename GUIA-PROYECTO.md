@@ -6,6 +6,17 @@
 >
 > Última actualización: 2026-08-12 · Versión app al documentar: **v9.73**
 >
+> Nota **normalización cod_art (2026-08-12)** — Para que no vuelvan los códigos fantasma:
+> (1) se **enganchó el trigger `trg_canon_cod_art`** (`fn_canon_cod_art`) en `Movimientos_Stock`
+> — antes la función existía pero no estaba attachada. Al **insertar un artículo de STOCK**
+> canoniza el `cod_art` (OC_Maximos curado, o numérico sin ceros a la izq con mínimo 3 dígitos,
+> nunca trunca). **Saltea insumos** (usan su catálogo `Insumos.cod`; su espacio numérico pisa el
+> de stock: `0027`="Caja Nº 1" canonizado sería `027`=Colador) y los tipos del pipeline
+> (picking/separado/facturado, dedup del cron). (2) `vista_saldos_stock` ahora **agrupa por clave
+> canónica** (variantes con cero a la izq caen en una fila); con los datos de hoy es no-op
+> (0 fusiones), solo red de seguridad. La prevención de insumos sigue siendo el alta con código
+> `TMP-NNNN` (idea 5572). `sql/normalizacion_cod_art_20260812.sql`.
+>
 > Nota **v9.73** — **Fix "Cajas Pedidas" (columna en Stock quedaba vacía).** La vista
 > `v_cajas_pedidas` restaba `facturadas` **y** `entregadas` por separado; una NP facturada
 > **y** entregada se restaba dos veces → `cajas_pedidas` negativo → fila filtrada. Se rompió
