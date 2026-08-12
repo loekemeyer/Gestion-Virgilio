@@ -350,6 +350,14 @@
 > Cajas por pila, Sueltas, Contado (cajas), **Stock del sistema** (góndola+excedente, mismo cálculo
 > que la comparación), Diferencia y En proceso. Formato Excel es-AR (BOM utf-8, `;`, coma decimal).
 >
+> Nota **v10.20** — **Ruteo: sacar de la ruta lo ya cargado al camión (y confirmar que Retira no
+> entra).** El armado de rutas (`ruteoLoad`) leía `PPP_Programacion_Diaria` y ruteaba todos los
+> pedidos del día. Ahora, además de tomar **solo zonas geográficas** (Z1..Z7 — Retira/Súper/Expo ya
+> quedaban afuera por el filtro `^zona`), **excluye los pedidos ya cargados al camión**: `_rtFetchCargadas()`
+> arma un Set de NPs con evento **CCN** (Carga Camión NP, `texto = NP|TANDA`, últimos 30 días) y el filtro
+> saca esos NP. Muestra un aviso "🚛 N pedido(s) ya cargados al camión — fuera de la ruta". Así el
+> repartidor no ve como parada lo que ya subió al camión.
+>
 > Nota **v10.19** — **Ruteo: "Abrir en Google Maps" en tramos (>9 paradas).** El link de Maps
 > (`_rtMapsUrl`, ahora `_rtMapsUrls`) mandaba TODAS las paradas como `waypoints`, pero Google Maps
 > corta en **~9 waypoints**: una ruta de 16 paradas abría solo 9. Ahora la ruta se parte en **tramos
