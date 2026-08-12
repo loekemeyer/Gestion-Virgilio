@@ -6406,7 +6406,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v9.79";
+const APP_VERSION = "v9.80";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -24571,9 +24571,12 @@ function pppResTgl(dk, zkeyEnc) {
 }
 function pppResumenHtml(prog) {
   const conF = prog.filter(function (p) { return (p.fecha_entrega || "").trim(); });
-  const sinF = prog.length - conF.length;
+  // v9.80 — Retira NO lleva fecha de entrega (el cliente retira del depósito, sin camión):
+  // no es un error, así que NO cuenta como "sin Fecha de Entrega" (antes inflaba el aviso).
+  const _esRetira = function (p) { const z = String(p.zona || "").trim() || pppZonaDeBarrio(p.localidad || ""); return String(z).toLowerCase() === "retira"; };
+  const sinF = prog.filter(function (p) { return !(p.fecha_entrega || "").trim() && !_esRetira(p); }).length;
   let head = '';
-  if (sinF) head += '<div class="ppp-res-note">⏳ ' + sinF + ' pedido(s) sin Fecha de Entrega — no entran al resumen.</div>';
+  if (sinF) head += '<div class="ppp-res-note">⏳ ' + sinF + ' pedido(s) sin Fecha de Entrega — no entran al resumen. <span style="opacity:.7">(Retira no cuenta)</span></div>';
   if (!conF.length) return head + '<div class="planim-empty">Sin pedidos con Fecha de Entrega todavía.</div>';
   const CAP = pppGetCfg().dayCap > 0 ? pppGetCfg().dayCap : 6;
   const byD = {};
