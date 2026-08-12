@@ -6403,7 +6403,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v9.71";
+const APP_VERSION = "v9.72";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -22077,6 +22077,7 @@ function openPPP() {
   pppRefreshEntregado();
   pppRefreshControlado();   // controlados (CRN) + chequeo de carga sin controlar vencida (alarma + Telegram)
   pppRefreshDelivered();    // v6.97: lista durable de Pedidos Entregados (badge correcto al abrir)
+  pppRefreshMetaEntSet();   // v9.72: set de entregadas (hoja) para separar "En viaje" de "Entregados"
   pppAutoRenderStatus();    // auto-carga (File System Access): estado + arranque del chequeo
   pppAutoStart();
   pppRenderPdfDirStatus();  // estado de la carpeta de PDF (ISIS) para imprimir pedidos
@@ -22664,7 +22665,7 @@ function _pppSearchStr(p) { return [p.np, p.cod, p.razon_social, p.tanda, p.loca
 function pppSetSearch(v) { _pppSearch = String(v == null ? "" : v).trim(); pppRenderProg(); }
 function pppLoadEntregados() { if (_pppEntregados) return _pppEntregados; let a = []; try { a = JSON.parse(localStorage.getItem(PPP_ENT_KEY) || "[]"); } catch (_e) {} _pppEntregados = new Set(Array.isArray(a) ? a.map(String) : []); return _pppEntregados; }
 function pppSaveEntregados() { try { localStorage.setItem(PPP_ENT_KEY, JSON.stringify(Array.from(pppLoadEntregados()))); } catch (_e) {} }
-function pppTab(t) { _pppTab = t; pppRenderProg(); if (t === "plan" || t === "ent" || t === "resumen") { pppRefreshArmado(); pppRefreshEntregado(); pppRefreshControlado(); } if (t === "ent") pppRefreshDelivered(); if (t === "ocup") pppRefreshOcupacion(); }
+function pppTab(t) { _pppTab = t; pppRenderProg(); if (t === "plan" || t === "ent" || t === "resumen") { pppRefreshArmado(); pppRefreshEntregado(); pppRefreshControlado(); } if (t === "ent" || t === "enviaje") { pppRefreshDelivered(); pppRefreshMetaEntSet(); } if (t === "ocup") pppRefreshOcupacion(); }
 /* "Controlado" (manual, lo marca la operadora) → recién ahí el pedido pasa a Pedidos
    Entregados. _pppEntregados = NPs controlados (persistido en vir_ppp_entregados). */
 function pppControlar(np) { pppLoadEntregados().add(String(np)); pppSaveEntregados(); pppRenderProg(); }
@@ -22766,6 +22767,41 @@ let _pppDelivered = null;       // vista rica de la app
 let _pppDeliveredFull = null;   // espejo completo del Excel (NP+cliente)
 let _pppEntMode = "app";        // "app" | "excel"
 function pppEntMode(m) { _pppEntMode = m; if (m === "excel" && _pppDeliveredFull == null) pppRefreshEntregadosFull(); pppRenderProg(); }
+/* v9.72 — MÓDULO "En viaje". Los facturados (vista_ppp_pedidos_entregados) se parten en dos:
+   ENTREGADOS = confirmados (control de remito CRN o presentes en la hoja PPP_Entregados_Meta);
+   EN VIAJE = facturados/cargados que salieron pero TODAVÍA no se confirmó la entrega. Así un
+   pedido que salió (aunque no se controló el remito) queda visible "en viaje" y no desaparece. */
+let _pppMetaEntSet = null;      // NPs ya entregadas según la hoja (PPP_Entregados_Meta)
+async function pppRefreshMetaEntSet() {
+  try {
+    const rows = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/PPP_Entregados_Meta", "select=np");
+    const s = new Set();
+    (rows || []).forEach(function (r) { const np = String(r.np == null ? "" : r.np).trim().replace(/\.0+$/, ""); if (np) s.add(np); });
+    _pppMetaEntSet = s;
+    if (typeof pppRenderProg === "function") pppRenderProg();
+  } catch (_e) { if (!_pppMetaEntSet) _pppMetaEntSet = new Set(); }
+}
+function _pppNpNorm(s) { return String(s == null ? "" : s).trim().replace(/\.0+$/, ""); }
+function _pppConfirmadas() {
+  const s = new Set();
+  try { pppLoadEntregados().forEach(function (np) { s.add(_pppNpNorm(np)); }); } catch (_e) {}   // CRN (control remito)
+  if (_pppMetaEntSet) _pppMetaEntSet.forEach(function (np) { s.add(np); });                        // hoja de entregados
+  return s;
+}
+function _pppSplitDelivered() {
+  const conf = _pppConfirmadas();
+  const enViaje = [], entregados = [];
+  (_pppDelivered || []).forEach(function (p) { (conf.has(_pppNpNorm(p.np)) ? entregados : enViaje).push(p); });
+  return { enViaje: enViaje, entregados: entregados };
+}
+function _pppEnViajeHtml() {
+  if (_pppDelivered == null || _pppMetaEntSet == null) return '<div class="planim-empty">Cargando pedidos en viaje…</div>';
+  const list = _pppEntFilter(_pppSplitDelivered().enViaje);
+  if (!list.length) return '<div class="ppp-ent-note">' + (_pppSearch ? "Sin coincidencias." : "No hay pedidos en viaje (todos los facturados están confirmados como entregados).") + '</div>';
+  let totM3 = 0; for (const p of list) totM3 += (p.m3 || 0);
+  const r = _pppEntGroupedHtml(list, true, 0);
+  return '<div class="ppp-ent-note">🚛 Pedidos <b>en viaje</b> — salieron (facturados/cargados) pero <b>todavía no se confirmó la entrega</b> (ni control de remito ni en la hoja de entregados). <b>' + list.length + '</b> pedido(s) · <b>' + totM3.toFixed(2) + '</b> m³.</div>' + r.html;
+}
 function _pppYmdKey(s) { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s || "")); return m ? (m[1] + m[2] + m[3]) : ""; }
 async function pppRefreshDelivered() {
   try {
@@ -22867,8 +22903,8 @@ function _pppEntFilter(list) {
 }
 function _pppEntAppHtml() {
   if (_pppDelivered == null) return '<div class="planim-empty">Cargando pedidos entregados…</div>';
-  const list = _pppEntFilter(_pppDelivered);
-  if (!list.length) return '<div class="ppp-ent-note">' + (_pppSearch ? "Sin coincidencias." : "Todavía no hay pedidos entregados (facturados y cerrados en reparto).") + '</div>';
+  const list = _pppEntFilter(_pppSplitDelivered().entregados);   // v9.72 — solo los CONFIRMADOS (CRN o en la hoja)
+  if (!list.length) return '<div class="ppp-ent-note">' + (_pppSearch ? "Sin coincidencias." : "Todavía no hay pedidos con entrega confirmada (control de remito o hoja de entregados). Los que salieron están en «En viaje».") + '</div>';
   let totM3 = 0, nDisc = 0; for (const p of list) { totM3 += (p.m3 || 0); if (p.discrep) nDisc++; }
   const r = _pppEntGroupedHtml(list, true, 0);
   return '<div class="ppp-ent-note">🚚 Pedidos <b>entregados</b>, con <b>fecha de salida</b> (carga camión; si no hay, la de la PPP), cliente, m³ y cajas. <b>' + list.length + '</b> pedido(s) · <b>' + totM3.toFixed(2) + '</b> m³.' +
@@ -24846,12 +24882,15 @@ function pppRenderProg() {
     const mt = function (p) { return _pppSearchStr(p).indexOf(q) >= 0; };
     programados = programados.filter(mt); aProgramar = aProgramar.filter(mt); entreg = entreg.filter(mt);
   }
+  // v9.72 — split de facturados en "En viaje" (sin confirmar entrega) y "Entregados" (confirmados)
+  const _pppSplit = (_pppDelivered != null && _pppMetaEntSet != null) ? _pppSplitDelivered() : null;
   let html =
     '<div class="ppp-tabs">' +
       '<button class="ppp-tab ' + (_pppTab === "prog" ? "on" : "") + '" onclick="pppTab(\'prog\')">📥 A Programar (' + aProgramar.length + ')</button>' +
       '<button class="ppp-tab ' + (_pppTab === "plan" ? "on" : "") + '" onclick="pppTab(\'plan\')">🗓️ Programación (' + programados.length + ')</button>' +
+      '<button class="ppp-tab ' + (_pppTab === "enviaje" ? "on" : "") + '" onclick="pppTab(\'enviaje\')">🚛 En viaje (' + (_pppSplit ? _pppSplit.enViaje.length : "…") + ')</button>' +
       '<button class="ppp-tab ' + (_pppTab === "resumen" ? "on" : "") + '" onclick="pppTab(\'resumen\')">🚚 Resumen</button>' +
-      '<button class="ppp-tab ' + (_pppTab === "ent" ? "on" : "") + '" onclick="pppTab(\'ent\')">✅ Pedidos Entregados (' + (_pppDelivered ? _pppDelivered.length : entreg.length) + ')</button>' +
+      '<button class="ppp-tab ' + (_pppTab === "ent" ? "on" : "") + '" onclick="pppTab(\'ent\')">✅ Pedidos Entregados (' + (_pppSplit ? _pppSplit.entregados.length : (_pppDelivered ? _pppDelivered.length : entreg.length)) + ')</button>' +
       '<button class="ppp-tab ' + (_pppTab === "ocup" ? "on" : "") + '" onclick="pppTab(\'ocup\')">📦 Ocupación</button>' +
     '</div>';
   html += '<div class="ppp-search"><input id="pppSearchInp" type="search" autocomplete="off" placeholder="🔎 Buscar: NP, cliente, cód, tanda, localidad, zona, fecha…" value="' + escapeHtml(_pppSearch) + '" oninput="pppSetSearch(this.value)">' + (_pppSearch ? '<button class="ppp-search-clr" onclick="pppSetSearch(\'\')" title="Limpiar búsqueda">✕</button><span class="ppp-search-n">' + (programados.length + aProgramar.length + entreg.length) + ' coincidencia(s)</span>' : '') + '</div>';
@@ -24891,7 +24930,14 @@ function pppRenderProg() {
     html += pppOcupHtml(); _renderKeepFocus(box, html);
     return;
   }
-  if (_pppTab === "ent") { html += _pppEntBodyHtml(); _renderKeepFocus(box, html); return; }
+  if (_pppTab === "enviaje") {   // v9.72 — módulo "En viaje" (facturados sin confirmar entrega)
+    if (_pppMetaEntSet == null) { try { pppRefreshMetaEntSet(); } catch (_e) {} }
+    html += _pppEnViajeHtml(); _renderKeepFocus(box, html); return;
+  }
+  if (_pppTab === "ent") {
+    if (_pppMetaEntSet == null) { try { pppRefreshMetaEntSet(); } catch (_e) {} }
+    html += _pppEntBodyHtml(); _renderKeepFocus(box, html); return;
+  }
   if (_pppTab === "plan") {
     // PROGRAMACIÓN — pedidos programados, agrupados por Fecha de Entrega → por tanda.
     // (La columna "Listo FC" se actualiza sola: pppRefreshArmado se llama al entrar al tab.)
