@@ -64,8 +64,9 @@
 --        DELETE FROM "Movimientos_Stock" WHERE client_id = 'faltres_<tanda>_<cod>';
 --        DELETE FROM "Faltantes_Revisados" WHERE tanda = '<TANDA>' AND cod = '<COD>';
 --      (en minúsculas el client_id, en mayúsculas tanda/cod).
---    - No hay aviso por Telegram de casos nuevos: se decidió hacer primero el
---      cierre, porque avisar sobre una pila que no se puede vaciar no sirve.
+--    - (RESUELTO) El aviso por Telegram de casos nuevos se agregó después; ver
+--      la sección de abajo. Se hizo en ese orden a propósito: avisar sobre una
+--      pila que todavía no se podía vaciar no servía de nada.
 -- =====================================================================
 
 -- =====================================================================
