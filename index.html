@@ -3751,6 +3751,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
         <button class="ppp-imp-toggle" onclick="pppExportExcel()" title="Baja un Excel de 2 hojas (Programación Diaria pendiente + Pedidos Entregados), en vivo desde Supabase.">⬇ Exportar Excel</button>
         <button class="ppp-imp-toggle ppp-sup-toggle" onclick="openPppSupers()" title="Agregar/quitar clientes súper">🛒 Clientes súper</button>
         <button class="ppp-imp-toggle ppp-pdf-toggle" onclick="pppConnectPdfDir()" title="Conectar las carpetas con los PDF de ISIS (ej. X:\PDF_ISIS y X:\PDF_ISISCHEF). Podés agregar VARIAS: tocá una vez por carpeta. Elegí la subcarpeta, NO el disco entero (Chrome bloquea raíces de disco y carpetas del sistema). Necesita Chrome/Edge en PC.">🖨️ Carpeta(s) PDF</button>
+        <button class="ppp-imp-toggle" onclick="openZonasMapa()" title="Geocodifica las direcciones (OpenStreetMap) y las muestra en un mapa por zona, marcando desajustes. Sirve para parametrizar bien las zonas.">📍 Mapa de zonas</button>
       </div>
       <span id="pppPdfDirStatus" class="ppp-pdfdir-status"></span>
       <div id="pppPreview" class="ppp-preview"></div>
@@ -6405,7 +6406,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v9.78";
+const APP_VERSION = "v9.79";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
