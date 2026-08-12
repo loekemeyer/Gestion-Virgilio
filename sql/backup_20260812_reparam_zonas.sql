@@ -15,3 +15,7 @@ UPDATE "PPP_Programacion_Diaria" SET zona='Zona 2 - CABA Centro' WHERE btrim(np)
 -- ---- Ajuste 2 (23:53) — Villa Luro Z1 Sur -> Z3 Oeste (era geograficamente Oeste) ----
 UPDATE "Zonas_Barrios" SET zona='Zona 1 - CABA Sur' WHERE barrio_norm='villa luro';
 UPDATE "PPP_Programacion_Diaria" SET zona='Zona 1 - CABA Sur' WHERE btrim(np) IN ('98221','98223');  -- Multi Bazar, Bazar Y Cia
+
+-- ---- Ajuste 3 (23:54) — Villa Bosch Z5 Oeste -> Z6 Norte (pedido del usuario) ----
+UPDATE "Zonas_Barrios" SET zona='Zona 5 - GBA Oeste' WHERE barrio_norm='villa bosch';
+UPDATE "PPP_Programacion_Diaria" SET zona='Zona 5 - GBA Oeste' WHERE btrim(np)='98241';  -- Manig S.R.L
