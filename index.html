@@ -6420,7 +6420,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v10.04";
+const APP_VERSION = "v10.05";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -10868,6 +10868,12 @@ async function ocgFetchImportados() {
     const sp = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/vista_importados_stock_parte", "select=cod,stock_parte,partes");
     (sp || []).forEach(function (r) { stockParte[String(r.cod).toUpperCase().trim()] = { u: Number(r.stock_parte) || 0, partes: r.partes || "" }; });
   } catch (_e) {}
+  // v10.05 — VOLUMEN de la MASTER caja (m³) por código, editable (tabla Importados_Volumen).
+  const volMaster = {};
+  try {
+    const vm = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Importados_Volumen", "select=cod,largo_cm,ancho_cm,alto_cm,m3_master");
+    (vm || []).forEach(function (r) { volMaster[String(r.cod).toUpperCase().trim()] = { m3: Number(r.m3_master) || 0, l: Number(r.largo_cm) || 0, a: Number(r.ancho_cm) || 0, h: Number(r.alto_cm) || 0 }; });
+  } catch (_e) {}
   const items = [];
   Object.keys(by).forEach(function (k) {
     const o = by[k];
@@ -10881,7 +10887,11 @@ async function ocgFetchImportados() {
     const objetivoUni = Math.round(proyUni * meses);
     const aPedirUni = Math.max(0, Math.ceil(objetivoUni - stockTot - o.enCurso));
     const aPedirCajas = (o.uxc > 0) ? Math.ceil(aPedirUni / o.uxc) : null;
-    items.push({ cod: o.cod, desc: o.desc, prov: o.prov, proyUni: Math.round(proyUni), meses: meses, objetivoUni: objetivoUni, stockUni: Math.round(stockTot), stockPropio: Math.round(o.stockUni), stockParteU: Math.round(stockParteU), stockParteCods: (sp ? sp.partes : ""), enCurso: Math.round(o.enCurso), aPedirUni: aPedirUni, uxc: o.uxc, aPedirCajas: aPedirCajas, esParte: esParte, parteDet: (pp ? pp.detalle : null), det: o.det || [] });
+    // v10.05 — m³ del pedido = master cajas a pedir (enteras) × m³ por master caja
+    const vm = volMaster[kk] || null;
+    const m3Master = vm ? vm.m3 : 0;
+    const m3Total = (aPedirCajas != null && m3Master > 0) ? (aPedirCajas * m3Master) : 0;
+    items.push({ cod: o.cod, desc: o.desc, prov: o.prov, proyUni: Math.round(proyUni), meses: meses, objetivoUni: objetivoUni, stockUni: Math.round(stockTot), stockPropio: Math.round(o.stockUni), stockParteU: Math.round(stockParteU), stockParteCods: (sp ? sp.partes : ""), enCurso: Math.round(o.enCurso), aPedirUni: aPedirUni, uxc: o.uxc, aPedirCajas: aPedirCajas, m3Master: m3Master, m3Dims: vm ? { l: vm.l, a: vm.a, h: vm.h } : null, m3Total: m3Total, esParte: esParte, parteDet: (pp ? pp.detalle : null), det: o.det || [] });
   });
   return { items: items, meses: meses };
 }
@@ -12978,8 +12988,9 @@ function _pedImpRender() {
     Object.keys(provs).sort().forEach(function (prov) {
       const arr = provs[prov];
       const totCaj = arr.reduce(function (s, it) { return s + (it.aPedirCajas || 0); }, 0);
-      h += '<div class="stkpop-hint" style="margin:8px 0 3px;font-weight:700">' + escapeHtml(prov) + ' · ' + arr.length + ' ítem(s)' + (totCaj ? ' · ' + totCaj + ' cajas' : '') + '</div>';
-      h += '<div class="mva-tblwrap"><table class="mva-tbl"><thead><tr><th>Código</th><th>Descripción</th><th class="num">Proy u/mes</th><th class="num">Objetivo</th><th class="num">Stock</th><th class="num">En curso</th><th class="num">A pedir u</th><th class="num">Cajas</th><th>Acciones</th></tr></thead><tbody>';
+      const totM3 = arr.reduce(function (s, it) { return s + (Number(it.m3Total) || 0); }, 0);   // v10.05
+      h += '<div class="stkpop-hint" style="margin:8px 0 3px;font-weight:700">' + escapeHtml(prov) + ' · ' + arr.length + ' ítem(s)' + (totCaj ? ' · ' + totCaj + ' cajas' : '') + (totM3 > 0 ? ' · <span style="color:#0369a1">' + (Math.round(totM3 * 100) / 100) + ' m³</span>' : '') + '</div>';
+      h += '<div class="mva-tblwrap"><table class="mva-tbl"><thead><tr><th>Código</th><th>Descripción</th><th class="num">Proy u/mes</th><th class="num">Objetivo</th><th class="num">Stock</th><th class="num">En curso</th><th class="num">A pedir u</th><th class="num">Cajas</th><th class="num" title="m³ de UNA master caja (medidas cargadas a mano). Tocá el ✏ para cargar/editar.">m³/master</th><th class="num" title="m³ del pedido = master cajas a pedir × m³ por master">m³ pedido</th><th>Acciones</th></tr></thead><tbody>';
       arr.sort(function (a, b) { return b.aPedirUni - a.aPedirUni; }).forEach(function (it) {
         const cajTxt = (it.aPedirCajas == null) ? '<span style="color:#94a3b8" title="Sin uni×caja cargado">—</span>' : String(it.aPedirCajas);
         const badge = it.esParte ? ' <span style="color:#7c3aed" title="Parte">🧩</span>' : '';
@@ -12996,7 +13007,15 @@ function _pedImpRender() {
             '<button class="stk-btn" style="padding:3px 7px;font-size:12px" title="Editar unidades en curso (pedido en camino)" onclick="pedImpSetCurso(' + d.id + ',\'' + codEnc + '\',' + (d.curso || 0) + ')">✏️</button> ' +
             '<button class="stk-btn ok" style="padding:3px 7px;font-size:12px" title="Marcar que el pedido llegó: suma al stock y baja de en curso" onclick="pedImpLlego(' + d.id + ',\'' + codEnc + '\',' + (d.curso || 0) + ')">📥</button></div>';
         }).join('');
-        h += '<tr><td><b>' + escapeHtml(codCanon(it.cod)) + '</b>' + badge + '</td><td style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escapeHtml(it.desc || "") + '">' + escapeHtml(artNombre(it.cod, it.desc)) + '</td><td class="num">' + it.proyUni + '</td><td class="num">' + it.objetivoUni + '</td><td class="num">' + stockTxt + '</td><td class="num">' + it.enCurso + '</td><td class="num" style="font-weight:800;color:#b45309">' + it.aPedirUni + '</td><td class="num">' + cajTxt + '</td><td>' + actHtml + '</td></tr>';
+        // v10.05 — m³/master (editable) + m³ del pedido
+        var _codEncV = encodeURIComponent(it.cod);
+        var _m3m = Number(it.m3Master) || 0;
+        var _dimTip = it.m3Dims && it.m3Dims.l ? (it.m3Dims.l + '×' + it.m3Dims.a + '×' + it.m3Dims.h + ' cm') : '';
+        var m3MasterTxt = _m3m > 0
+          ? '<span style="cursor:pointer" title="' + (_dimTip ? escapeHtml(_dimTip) + ' — ' : '') + 'tocá para editar" onclick="pedImpEditVol(\'' + _codEncV + '\')">' + (Math.round(_m3m * 10000) / 10000) + ' <span style="color:#94a3b8;font-size:11px">✏️</span></span>'
+          : '<span style="cursor:pointer;color:#cbd5e1" title="Cargar medidas de la master (cm) para calcular m³" onclick="pedImpEditVol(\'' + _codEncV + '\')">✏️</span>';
+        var m3TotTxt = (Number(it.m3Total) || 0) > 0 ? '<b style="color:#0369a1">' + (Math.round(it.m3Total * 100) / 100) + '</b>' : '<span style="color:#cbd5e1">—</span>';
+        h += '<tr><td><b>' + escapeHtml(codCanon(it.cod)) + '</b>' + badge + '</td><td style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escapeHtml(it.desc || "") + '">' + escapeHtml(artNombre(it.cod, it.desc)) + '</td><td class="num">' + it.proyUni + '</td><td class="num">' + it.objetivoUni + '</td><td class="num">' + stockTxt + '</td><td class="num">' + it.enCurso + '</td><td class="num" style="font-weight:800;color:#b45309">' + it.aPedirUni + '</td><td class="num">' + cajTxt + '</td><td class="num">' + m3MasterTxt + '</td><td class="num">' + m3TotTxt + '</td><td>' + actHtml + '</td></tr>';
       });
       h += '</tbody></table></div>';
     });
@@ -13023,13 +13042,16 @@ function pedImpExportExcel() {
   });
   var html = '<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"><style>td,th{border:1px solid #ccc;padding:3px 7px;font-family:Calibri,Arial,sans-serif;} th{background:#166534;color:#fff;text-align:left;}</style></head><body>';
   html += '<h3>Pedidos Importación — Producción Virgilio (' + esc(fecha) + ', índice ' + (data.meses || 10) + ' meses)</h3>';
-  html += '<table><tr><th>Importador</th><th>Proveedor</th><th>Codigo</th><th>Descripcion</th><th>Proy u/mes</th><th>Objetivo</th><th>Stock</th><th>En curso</th><th>A pedir u</th><th>Cajas</th></tr>';
+  html += '<table><tr><th>Importador</th><th>Proveedor</th><th>Codigo</th><th>Descripcion</th><th>Proy u/mes</th><th>Objetivo</th><th>Stock</th><th>En curso</th><th>A pedir u</th><th>Cajas</th><th>m3/master</th><th>m3 pedido</th></tr>';
+  var _totM3 = 0;
   items.forEach(function (it) {
     var imp = _IMPORTADOR_DE[it.prov || ""] || "(sin importador)";
     var stk = Math.max(0, Number(it.stockUni) || 0);   // negativo → 0 (igual que pantalla)
     var caj = (it.aPedirCajas == null) ? "" : it.aPedirCajas;
-    html += '<tr><td>' + esc(imp) + '</td><td>' + esc(it.prov || "") + '</td><td>' + esc(codCanon(it.cod)) + '</td><td>' + esc(artNombre(it.cod, it.desc)) + '</td><td>' + (it.proyUni || 0) + '</td><td>' + (it.objetivoUni || 0) + '</td><td>' + stk + '</td><td>' + (it.enCurso || 0) + '</td><td>' + (it.aPedirUni || 0) + '</td><td>' + caj + '</td></tr>';
+    var m3m = Number(it.m3Master) || 0, m3t = Number(it.m3Total) || 0; _totM3 += m3t;
+    html += '<tr><td>' + esc(imp) + '</td><td>' + esc(it.prov || "") + '</td><td>' + esc(codCanon(it.cod)) + '</td><td>' + esc(artNombre(it.cod, it.desc)) + '</td><td>' + (it.proyUni || 0) + '</td><td>' + (it.objetivoUni || 0) + '</td><td>' + stk + '</td><td>' + (it.enCurso || 0) + '</td><td>' + (it.aPedirUni || 0) + '</td><td>' + caj + '</td><td>' + (m3m > 0 ? m3m : "") + '</td><td>' + (m3t > 0 ? (Math.round(m3t * 100) / 100) : "") + '</td></tr>';
   });
+  html += '<tr><td colspan="11"><b>TOTAL m³</b></td><td><b>' + (Math.round(_totM3 * 100) / 100) + '</b></td></tr>';
   html += '</table></body></html>';
   try {
     var blob = new Blob(["﻿" + html], { type: "application/vnd.ms-excel" });
@@ -13053,6 +13075,41 @@ async function _pedImpRpc(fn, body) {
 }
 async function pedImpReload() {
   try { var data = await ocgFetchImportados(); if (_stkPop && _stkPop.kind === "pedImp") { _stkPop.data = data; _pedImpRender(); } } catch (_e) {}
+}
+/* v10.05 — cargar/editar el VOLUMEN de la master caja de un importado. Pide las medidas en cm
+   (Largo x Ancho x Alto), calcula m³ = L×A×H/1.000.000 y lo guarda en Importados_Volumen (upsert).
+   Se puede ingresar directamente el m³ escribiendo un solo número (ej. 0.045). */
+async function pedImpEditVol(codEnc) {
+  var cod = decodeURIComponent(codEnc);
+  var cur = null;
+  try {
+    var data = (_stkPop && _stkPop.data) || {};
+    (data.items || []).some(function (it) { if (String(it.cod).toUpperCase().trim() === cod.toUpperCase().trim()) { cur = it; return true; } return false; });
+  } catch (_e) {}
+  var prev = (cur && cur.m3Dims && cur.m3Dims.l) ? (cur.m3Dims.l + "x" + cur.m3Dims.a + "x" + cur.m3Dims.h) : (cur && cur.m3Master > 0 ? String(cur.m3Master) : "");
+  var val = prompt("Medidas de la MASTER caja de " + codCanon(cod) + " en cm (Largo x Ancho x Alto).\nEj: 60x40x30\n\n(O escribí directo el m³ de la master, ej: 0.072)", prev);
+  if (val === null) return;
+  val = String(val).trim().toLowerCase().replace(/,/g, ".");
+  var l = 0, a = 0, h = 0, m3 = 0;
+  var parts = val.split(/[x*×]/).map(function (s) { return parseFloat(s.replace(/[^0-9.]/g, "")); }).filter(function (n) { return !isNaN(n); });
+  if (parts.length >= 3) {
+    l = parts[0]; a = parts[1]; h = parts[2];
+    m3 = (l * a * h) / 1000000;
+  } else if (parts.length === 1) {
+    m3 = parts[0];   // ingresó el m³ directo
+  } else {
+    try { alert("No entendí las medidas. Usá 60x40x30 (cm) o un m³ directo como 0.072."); } catch (_e) {}
+    return;
+  }
+  m3 = Math.round(m3 * 1000000) / 1000000;
+  try {
+    await fetch(SUPABASE_URL + "/rest/v1/Importados_Volumen?on_conflict=cod", {
+      method: "POST",
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" },
+      body: JSON.stringify({ cod: cod, largo_cm: l || null, ancho_cm: a || null, alto_cm: h || null, m3_master: m3, actualizado: new Date().toISOString() })
+    });
+    await pedImpReload();
+  } catch (e) { try { alert("No se pudo guardar el volumen: " + (e.message || e)); } catch (_e) {} }
 }
 async function pedImpSetCurso(id, codEnc, curso) {
   var cod = decodeURIComponent(codEnc);
