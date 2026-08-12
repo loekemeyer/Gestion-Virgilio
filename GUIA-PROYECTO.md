@@ -4,7 +4,26 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-12 · Versión app al documentar: **v10.18**
+> Última actualización: 2026-08-12 · Versión app al documentar: **v10.19**
+>
+> Nota **v10.19 — La TV del depósito ya no dice "Sin conexión" cada minuto.**
+> Síntoma: en el stick tipo Chromecast saltaba el cartel amarillo ⚠ cada ~1 min, con el
+> **WiFi vivo**. Causa: `refreshMonitor` mostraba el cartel ante **UN SOLO** fetch fallado, y
+> `supaFetchAll` **no tiene ni timeout ni reintento** — así que cualquier hipo normal de un
+> stick barato (ahorro de energía del WiFi, DNS lento, TLS) lo disparaba. No era la red.
+> **Fix en 3 capas:** (1) **`_monReintentar`** — cada ciclo reintenta `MON_REINTENTOS`(3) veces
+> con backoff 1,2s/2,4s, así el hipo se recupera dentro del mismo ciclo y nadie ve nada;
+> (2) **tolerancia** — el cartel grande recién tras `MON_FALLOS_P_CARTEL`(4) ciclos SEGUIDOS
+> fallando (**~2 min** con el refresh de 30s), y el texto pasó a *"Sin actualizar desde las
+> HH:MM (N min) — reintentando"*, que es lo cierto; el indicador chico "● desactualizado" sigue
+> mostrando cada fallo y **los datos viejos nunca se borran de la pantalla**;
+> (3) **watchdog** — si pasan `MON_RELOAD_MS`(10 min) sin un solo refresh bueno no es la red,
+> es un cuelgue → `location.reload()`. **Solo en modo kiosko** (`window.__tvKioskMode`): nunca
+> se le recarga la página a un supervisor que la está usando, y exige un refresh OK previo para
+> que un arranque sin red no entre en loop de recargas.
+> El refresco sigue siendo cada **30 s** (`MONITOR_REFRESH_MS`). Smoke `tests/monitor-red-tolerante.cjs`.
+> ⚠ Las constantes son `const` de nivel script: existen como globales léxicas pero **NO** cuelgan
+> de `window` (los tests deben usarlas por nombre pelado, no `window.MON_...`).
 >
 > Nota **2026-08-12 — Aviso por Telegram de "faltantes facturados sin completar".**
 > Función `notificar_faltantes_sin_completar_telegram()` + cron **`faltantes-sin-completar`**

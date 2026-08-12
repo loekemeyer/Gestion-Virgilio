@@ -6460,7 +6460,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v10.18";
+const APP_VERSION = "v10.19";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -21288,6 +21288,19 @@ let historicInflight   = null;   // Promise para evitar fetch en paralelo
 
 const MONITOR_REFRESH_MS = 30000;    // ciclo principal — 30s para bajar consumo Supabase
 const PPP_TTL_MS         = 3000;     // PPP (Google Sheet) cacheado este tiempo
+/* v10.19 — TOLERANCIA DE RED DEL MONITOR (la TV del depósito).
+   Síntoma: en el stick de TV saltaba "⚠ Sin conexión" cada ~1 minuto, pero el WiFi
+   NO se caía. Causa: `refreshMonitor` mostraba el cartel ante UN SOLO fetch fallado
+   — y `supaFetchAll` no tiene ni timeout ni reintento, así que cualquier hipo normal
+   de un stick barato (ahorro de energía del WiFi, DNS lento, TLS) lo disparaba.
+   Ahora: (1) cada ciclo reintenta solo antes de darse por vencido, (2) el cartel
+   recién aparece tras varios ciclos seguidos fallando —los datos viejos quedan en
+   pantalla igual, que es lo que el operario necesita ver—, y (3) si pasa demasiado
+   tiempo sin un refresh bueno, la TV se recarga sola (saca de cualquier cuelgue). */
+const MON_REINTENTOS       = 3;        // intentos por ciclo (con backoff 1,2s / 2,4s)
+const MON_FALLOS_P_CARTEL  = 4;        // ciclos seguidos fallando antes de mostrar el cartel (~2 min)
+const MON_RELOAD_MS        = 10 * 60000;  // sin ningún refresh bueno en 10 min → recargar (solo TV)
+let _monFallosSeguidos = 0;
 let monitorIntervalId = null;
 let _monitorCountdownIntervalId = null;
 let monitorLastOkTs   = 0;
@@ -28941,6 +28954,20 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
 
 }
 
+/* v10.19 — reintenta una operación de red del monitor antes de darla por fallada.
+   Backoff corto (1,2s → 2,4s): un hipo de WiFi se recupera solo dentro del mismo
+   ciclo y el operario nunca ve nada raro. */
+async function _monReintentar(fn, intentos) {
+  let ultimo;
+  for (let i = 0; i < intentos; i++) {
+    try { return await fn(); }
+    catch (e) {
+      ultimo = e;
+      if (i < intentos - 1) await new Promise(function (r) { setTimeout(r, 1200 * (i + 1)); });
+    }
+  }
+  throw ultimo;
+}
 async function refreshMonitor() {
   const refrEl = document.getElementById("monitorRefresh");
   try {
@@ -28952,7 +28979,7 @@ async function refreshMonitor() {
     if (_pppCache && (nowMs - _pppCacheTs) < PPP_TTL_MS) {
       sheetMap = _pppCache;
     } else {
-      sheetMap = await fetchMonitorSheet();
+      sheetMap = await _monReintentar(fetchMonitorSheet, MON_REINTENTOS);   // v10.19
       _pppCache = sheetMap;
       _pppCacheTs = Date.now();
     }
@@ -28965,7 +28992,7 @@ async function refreshMonitor() {
       if (wideTargetSet.has(v.fechaEntregaRaw)) targetTandaKeys.push(k);
     }
     // 2) Eventos: status por tanda + alertas de hoy + empleados de hoy + 5 días anteriores
-    const { statusMap, alertasOffSheet, empleadosHoy, pastDays, fichadasResumen, enSilencio, currentActivity } = await fetchMonitorEvents(targetTandaKeys, sheetMap);
+    const { statusMap, alertasOffSheet, empleadosHoy, pastDays, fichadasResumen, enSilencio, currentActivity } = await _monReintentar(function () { return fetchMonitorEvents(targetTandaKeys, sheetMap); }, MON_REINTENTOS);   // v10.19
     _monActividad = currentActivity || [];   // v7.55: lo lee renderMonitor para el panel "En este momento"
     monitorLastOkTs = Date.now();
     // 3) Decidir cuántos días mostrar: por default los próximos 3. Pero si en
@@ -29012,9 +29039,11 @@ async function refreshMonitor() {
       }
     } catch (_e) {}
     if (refrEl) { refrEl.textContent = "● al día"; refrEl.classList.remove("stale"); }
+    _monFallosSeguidos = 0;   // v10.19
     // Si el fetch anda, ocultar banner offline (puede que estuviera mostrándose).
     document.getElementById("monitorOfflineBanner").classList.add("hidden");
   } catch (e) {
+    _monFallosSeguidos++;   // v10.19
     if (refrEl) {
       const ageSec = monitorLastOkTs ? Math.round((Date.now()-monitorLastOkTs)/1000) : -1;
       refrEl.textContent = monitorLastOkTs
@@ -29022,14 +29051,18 @@ async function refreshMonitor() {
         : `● error: ${e.message}`;
       refrEl.classList.add("stale");
     }
-    // Banner amarillo bien visible — mantenemos el último estado en pantalla.
+    /* v10.19 — el cartel grande recién a partir de MON_FALLOS_P_CARTEL ciclos SEGUIDOS
+       fallando (~2 min). Un fallo aislado ya no molesta a nadie: el indicador chico
+       ("● desactualizado") lo muestra igual, y los datos viejos siguen en pantalla,
+       que es lo que el operario necesita ver. */
     const offlineBanner = document.getElementById("monitorOfflineBanner");
     if (offlineBanner) {
-      if (monitorLastOkTs) {
+      if (monitorLastOkTs && _monFallosSeguidos >= MON_FALLOS_P_CARTEL) {
         const d = new Date(monitorLastOkTs);
         const hh = String(d.getHours()).padStart(2, "0");
         const mm = String(d.getMinutes()).padStart(2, "0");
-        offlineBanner.textContent = `⚠ Sin conexión — datos al ${hh}:${mm} (${Math.round((Date.now()-monitorLastOkTs)/1000)}s)`;
+        const min = Math.round((Date.now() - monitorLastOkTs) / 60000);
+        offlineBanner.textContent = `⚠ Sin actualizar desde las ${hh}:${mm} (${min} min) — reintentando`;
         offlineBanner.classList.remove("hidden");
       } else {
         offlineBanner.classList.add("hidden");
@@ -29038,6 +29071,13 @@ async function refreshMonitor() {
     if (!monitorLastOkTs) {
       document.getElementById("monitorContent").innerHTML =
         `<div class="monitor-error">No se pudo cargar: ${escapeHtml(e.message)}</div>`;
+    }
+    /* v10.19 — watchdog: si la TV lleva MON_RELOAD_MS sin un solo refresh bueno, no es
+       un hipo de red — algo se colgó (JS, memoria del stick, sesión). Se recarga sola.
+       SOLO en modo kiosko: nunca le recargamos la página a un supervisor que la está
+       usando. Necesita un refresh OK previo, así un arranque sin red no entra en loop. */
+    if (window.__tvKioskMode && monitorLastOkTs && (Date.now() - monitorLastOkTs) > MON_RELOAD_MS) {
+      try { location.reload(); } catch (_e) {}
     }
   }
   if (typeof window._monitorSetNextRefresh === "function") window._monitorSetNextRefresh();
