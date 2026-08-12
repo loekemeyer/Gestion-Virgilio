@@ -6460,7 +6460,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v10.20";
+const APP_VERSION = "v10.21";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -29943,6 +29943,7 @@ function openPrintStation(){
   ov.innerHTML = '<div class="ps-wrap"><div class="ps-head"><span class="ps-title">🖨️ Cola de impresión de remitos</span><button class="ps-close" onclick="closePrintStation()">Cerrar</button></div><div class="ps-body" id="psBody"></div></div>';
   ov.classList.add("show");
   try { etlLoadGlobal(); } catch (_e) {}   // sincroniza el switch GLOBAL de etiquetas de lío antes de mostrarlo
+  try { facPrintCfgLoad().then(function(){ if (document.getElementById("psBody")) psRender(); }); } catch (_e) {}   // v10.21 — trae el switch FACTURADO global (Supabase) y re-renderiza
   if (psIsAuto()) psStart(); else psRender();
 }
 function closePrintStation(){ const ov = document.getElementById("printStationModal"); if (ov) ov.classList.remove("show"); }
@@ -29958,7 +29959,7 @@ function psRender(){
   const fon = facPrintIsOn();
   h += '<div class="ps-toggle-card"><div class="ps-tc-top"><span class="ps-tc-t">🧾 Auto-imprimir remito FACTURADO al tildar Facturación</span>' +
     '<span class="sup-sw' + (fon ? " on" : "") + '" onclick="facPrintToggle()" role="switch"><span class="sup-sw-k"></span></span></div>' +
-    '<div class="ps-status ' + (fon ? "on" : "") + '">' + (fon ? "🟢 Activo — imprime el FACTURADO en esta PC al tildar" : "⚪ Apagado — no imprime el facturado (se auto-pregunta en el 1er tic)") + '</div></div>';
+    '<div class="ps-status ' + (fon ? "on" : "") + '">' + (fon ? "🟢 Activo — imprime el FACTURADO al tildar (ajuste guardado; los celulares nunca imprimen)" : "⚪ Apagado — no imprime el facturado") + '</div></div>';
   const elon = (typeof etlOn === "function") && etlOn();
   h += '<div class="ps-toggle-card"><div class="ps-tc-top"><span class="ps-tc-t">🏷️ Etiqueta de lío automática (PILOTO)</span>' +
     '<span class="sup-sw' + (elon ? " on" : "") + '" onclick="etlToggleGlobal()" role="switch"><span class="sup-sw-k"></span></span></div>' +
@@ -29991,11 +29992,29 @@ function psRender(){
    recuerda); con Chrome en --kiosk-printing + impresora predeterminada sale sin diálogo.
    Reusa el mismo molde que el ARMADO: armadoRemitoData + armadoRemitoInnerHtml(d,"FACTURADO")
    (agrega el recuadro "Controlado / Legajo") + remitoPrintDoc (iframe aislado). ===== */
-var FAC_PRINT_KEY = "fac_print_facturado_virgilio";
-function facPrintPref(){ try { return localStorage.getItem(FAC_PRINT_KEY); } catch(_e){ return null; } }
-function facPrintSetPref(v){ try { localStorage.setItem(FAC_PRINT_KEY, v); } catch(_e){} }
-function facPrintIsOn(){ return facPrintPref() === "1"; }
-function facPrintToggle(){ facPrintSetPref(facPrintIsOn() ? "0" : "1"); psRender(); }
+/* v10.21 — el switch de auto-imprimir FACTURADO pasó de localStorage (se borraba con la
+   TWA/PWA → se apagaba solo) a un ajuste GLOBAL en Supabase (Stock_Config.fac_print_facturado),
+   igual patrón que etiqueta_lio. Persiste para siempre. Los CELULARES nunca imprimen (guard
+   _facIsMobile), así se mantiene "solo la PC de la operadora imprime" aunque el switch sea global. */
+var FAC_PRINT_KEY = "fac_print_facturado";   // clave en Stock_Config (global)
+var _facPrintGlobal = null;                  // cache local: "1" / "0" / null (sin setear)
+function _facIsMobile(){ try { return /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent || ""); } catch(_e){ return false; } }
+async function facPrintCfgLoad(){
+  try {
+    const r = await fetch(SUPABASE_URL + "/rest/v1/Stock_Config?clave=eq." + FAC_PRINT_KEY + "&select=valor", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+    if (r.ok){ const a = await r.json(); _facPrintGlobal = (a && a[0]) ? String(a[0].valor) : null; }
+  } catch(_e){}
+  return _facPrintGlobal;
+}
+function facPrintPref(){ return _facPrintGlobal; }     // "1"/"0"/null (global, cacheado)
+function facPrintIsOn(){ return _facPrintGlobal === "1"; }
+async function facPrintSetPref(v){
+  _facPrintGlobal = String(v);
+  try {
+    await fetch(SUPABASE_URL + "/rest/v1/Stock_Config?on_conflict=clave", { method:"POST", headers:{ apikey:SUPABASE_KEY, Authorization:"Bearer "+SUPABASE_KEY, "Content-Type":"application/json", Prefer:"resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ clave: FAC_PRINT_KEY, valor: String(v) }) });
+  } catch(_e){}
+}
+function facPrintToggle(){ facPrintSetPref(facPrintIsOn() ? "0" : "1").then(function(){ psRender(); }); }
 async function facPrintFacturado(np, tanda){
   try {
     const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
@@ -30033,15 +30052,17 @@ async function facPrintFacturado(np, tanda){
 /* Se llama en facTickNP tras marcar la NP facturada. En el 1er tic de una PC pregunta
    UNA vez si querés que imprima ahí (y guarda la respuesta); después imprime solo. */
 async function facMaybePrintFacturado(np, tanda){
+  if (_facIsMobile()) return;                      // v10.21 — celulares NUNCA imprimen
+  if (_facPrintGlobal === null) { try { await facPrintCfgLoad(); } catch(_e){} }   // asegurar el cache global
   const pref = facPrintPref();
-  if (pref === "0") return;                       // apagado en esta PC
-  if (pref !== "1"){                               // 1er tic en esta PC → configurar una vez
+  if (pref === "0") return;                        // apagado (ajuste global)
+  if (pref !== "1"){                               // 1ª vez → configurar una vez (queda GLOBAL en Supabase)
     const ok = confirm(
-      "🖨️ ¿Imprimir el remito FACTURADO en ESTA computadora cada vez que tildás facturación?\n\n" +
+      "🖨️ ¿Imprimir el remito FACTURADO cada vez que tildás facturación?\n\n" +
       "La 1ª vez se abre el diálogo para ELEGIR la impresora; después queda configurado.\n" +
-      "Prendelo SOLO en la PC que está al lado de la impresora (no en el celular)."
+      "Este ajuste queda guardado (Supabase). Los celulares nunca imprimen."
     );
-    facPrintSetPref(ok ? "1" : "0");
+    await facPrintSetPref(ok ? "1" : "0");
     if (!ok) return;
   }
   await facPrintFacturado(np, tanda);

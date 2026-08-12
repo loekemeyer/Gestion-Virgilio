@@ -350,6 +350,16 @@
 > Cajas por pila, Sueltas, Contado (cajas), **Stock del sistema** (góndola+excedente, mismo cálculo
 > que la comparación), Diferencia y En proceso. Formato Excel es-AR (BOM utf-8, `;`, coma decimal).
 >
+> Nota **v10.21** — **Switch "auto-imprimir FACTURADO" ahora en Supabase (no se apaga solo).** El
+> toggle de auto-imprimir el remito facturado (Cola de impresión) estaba en `localStorage`
+> (`fac_print_facturado_virgilio`) → la TWA/PWA lo borraba y aparecía apagado al volver. Ahora es un
+> ajuste **global en `Stock_Config.fac_print_facturado`** (mismo patrón que `etiqueta_lio`), cacheado
+> en `_facPrintGlobal`, cargado con `facPrintCfgLoad()` al abrir la Cola de impresión y en el gate
+> `facMaybePrintFacturado`. Persiste para siempre. Para mantener "solo la PC imprime", el gate tiene un
+> **guard de celular** (`_facIsMobile`): los móviles nunca auto-imprimen aunque el switch global esté
+> ON. (Los otros dos switches del módulo —auto-print de armado `psIsAuto` y etiqueta de lío— no se
+> tocaron; el de armado sigue per-dispositivo a propósito para no duplicar impresiones.)
+>
 > Nota **v10.20** — **Ruteo: sacar de la ruta lo ya cargado al camión (y confirmar que Retira no
 > entra).** El armado de rutas (`ruteoLoad`) leía `PPP_Programacion_Diaria` y ruteaba todos los
 > pedidos del día. Ahora, además de tomar **solo zonas geográficas** (Z1..Z7 — Retira/Súper/Expo ya
