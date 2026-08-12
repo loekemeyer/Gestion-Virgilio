@@ -11,3 +11,7 @@ DELETE FROM "Zonas_Barrios" WHERE barrio_norm='lanus';                          
 -- (2) Zona ANTERIOR de los pedidos movidos:
 UPDATE "PPP_Programacion_Diaria" SET zona='Zona 2 - CABA Centro' WHERE btrim(np) IN ('97889','97964','98109');  -- Burzaco (Matiz SA)
 UPDATE "PPP_Programacion_Diaria" SET zona='Zona 2 - CABA Centro' WHERE btrim(np) IN ('98213','98214');           -- V.Devoto (Regalitos SRL Suc.3)
+
+-- ---- Ajuste 2 (23:53) — Villa Luro Z1 Sur -> Z3 Oeste (era geograficamente Oeste) ----
+UPDATE "Zonas_Barrios" SET zona='Zona 1 - CABA Sur' WHERE barrio_norm='villa luro';
+UPDATE "PPP_Programacion_Diaria" SET zona='Zona 1 - CABA Sur' WHERE btrim(np) IN ('98221','98223');  -- Multi Bazar, Bazar Y Cia
