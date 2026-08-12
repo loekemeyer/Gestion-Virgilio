@@ -67,3 +67,35 @@
 --    - No hay aviso por Telegram de casos nuevos: se decidió hacer primero el
 --      cierre, porque avisar sobre una pila que no se puede vaciar no sirve.
 -- =====================================================================
+
+-- =====================================================================
+--  AVISO POR TELEGRAM (agregado 2026-08-12)
+--    Función `notificar_faltantes_sin_completar_telegram()` + cron
+--    `faltantes-sin-completar`, **'45 12 * * 1-5'** = 09:45 AR de lunes a
+--    viernes (UTC-3 fijo; días hábiles porque el finde nadie lo acciona).
+--
+--  DIGEST, NO UNO POR CASO
+--    Junta los casos que aparecieron desde el último aviso y manda UN mensaje
+--    (top 12 por cajas + total). Si no hay nada nuevo **no dice nada** — mismo
+--    criterio que el resto de los `notificar_*_telegram`.
+--
+--  QUÉ CUENTA COMO "NUEVO" — tabla `Faltantes_Avisados` (PK tanda+cod)
+--    Un caso se avisa UNA sola vez. Al mandarlo se inserta ahí, después de
+--    encolar (si fallara el enqueue, no se pierde).
+--    RLS on y **sin policies**: solo la escribe la función (SECURITY DEFINER),
+--    la app no la necesita.
+--
+--  ⚠ EL BACKLOG SE SEMBRÓ COMO "YA AVISADO"
+--    Al crear esto había **372 casos históricos**. Se insertaron todos en
+--    `Faltantes_Avisados` en la misma migración, así el primer disparo NO manda
+--    una avalancha. El aviso sirve para enterarse de lo NUEVO; los 372 viejos se
+--    trabajan desde el módulo 📉. Si alguna vez se quisiera re-avisar uno:
+--      DELETE FROM "Faltantes_Avisados" WHERE tanda='<TANDA>' AND cod='<COD>';
+--
+--  dedup_key = 'faltsincompletar_<YYYYMMDD>'. **No** usar 'faltfact_': ya lo usa
+--  `notificar_falta_facturacion_telegram` ('faltfact_hoy_…' / 'faltfact_manana_…')
+--  y se presta a confusión.
+--
+--  Verificado al crearlo: corrida en seco → 0 casos nuevos, 0 encolados, ningún
+--  mensaje mandado al grupo. El texto se previsualizó por SQL sin encolar.
+-- =====================================================================
