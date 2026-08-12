@@ -6412,7 +6412,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v10.01";
+const APP_VERSION = "v10.02";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -12145,14 +12145,10 @@ function stkBodySectDetail() {
   return h;
 }
 function stkBodyStocksTab() {
-  const view = _stk.stkView || "stocks";
-  const seg = function (v, label) { return '<button class="stk-segb' + (view === v ? " on" : "") + '" onclick="stkSetView(\'' + v + '\')">' + label + '</button>'; };
-  let h = '<div class="stk-seg">' + seg("stocks", "📊 Stock") + seg("ingresos", "📥 Ingresos") + seg("salidas", "📤 Salidas") + '</div>';   // v6.70: FC s/Salida pasó a ser una COLUMNA de la tabla (no un segmento)
-  // v8.92 — el botón "Excedentes por ubicación" se movió a la fila "Ver stock" (stkAsOfControl) para
-  // ahorrar una fila. En ingresos/salidas (sin esa fila) se muestra acá compacto, alineado a la derecha.
-  if (view !== "stocks") h += '<div style="display:flex;justify-content:flex-end;margin-bottom:10px;">' + stkExcedentesBtn() + '</div>';
-  h += (view === "ingresos") ? stkBodyIngresos() : (view === "salidas") ? stkBodySalidas() : stkBodyStocks();
-  return h;
+  // v10.02 — se sacaron los 3 botones de segmento (Stock / Ingresos / Salidas): no tenían sentido
+  // desde esta solapa (pedido del usuario). La solapa muestra directo el Stock. Ingresos/Salidas
+  // (stkBodyIngresos/stkBodySalidas) siguen definidos por si se re-enganchan desde otro lado.
+  return stkBodyStocks();
 }
 /* Descarga un Excel (.xls, tabla HTML → lo abre Excel; sin librería) del depósito
    "excedente" ORDENADO POR UBICACIÓN: una fila por (ubicación, código) — si un código
@@ -12423,6 +12419,14 @@ function stkBodyStocks() {
   }); });
   let h = "";   // banner "Stock contado desde…" sacado a pedido del usuario
   h += stkAsOfControl();   // En vivo / a una fecha y hora determinada
+  // v10.02 — símbolo ROJO arriba con la cantidad de códigos en negativo (problema de integridad).
+  // Tocarlo filtra la tabla a solo esos códigos (mismo toggle que el botón "🔴 Negativos"). Pedido del usuario.
+  if (_stkNegCount > 0) {
+    h += '<div onclick="stkToggleSoloNeg()" title="Códigos con saldo NEGATIVO en algún depósito — no debería pasar. Tocá para verlos." ' +
+      'style="cursor:pointer;display:flex;align-items:center;gap:8px;background:' + (_stk.soloNeg ? "#dc2626" : "#fef2f2") + ';color:' + (_stk.soloNeg ? "#fff" : "#b91c1c") + ';border:1.5px solid #dc2626;border-radius:10px;padding:8px 12px;margin-bottom:10px;font-weight:800;font-size:13.5px;">' +
+      '🔴 <span>' + _stkNegCount + ' código' + (_stkNegCount > 1 ? "s" : "") + ' con stock NEGATIVO</span>' +
+      '<span style="margin-left:auto;font-weight:700;font-size:12px;opacity:.85;">' + (_stk.soloNeg ? "✕ quitar filtro" : "tocá para verlos ›") + '</span></div>';
+  }
   // v8.95 — la tira de totales de arriba (Góndola/Excedente/…/Pedidas/Capacidad) se sacó a
   // pedido del usuario. Ahora se filtra tocando el header de cada columna (ver _thNum abajo).
   // v8.91 — la tarjeta "horas de guardado pendientes" se movió al pop-up "¿Qué bajar primero?"
@@ -12487,7 +12491,9 @@ function stkBodyStocks() {
     // sale del propio código (no de OC_Maximos); y en CÓDIGO se muestra el base.
     const _codSuffix = String(a.cod || "").match(/\s+(LK|CH|LOKE)$/i);
     const _lin = _codSuffix ? _codSuffix[1].toUpperCase().replace("LOKE", "LK") : ocLinea(a.cod);
-    const _codDisplay = _codSuffix ? codBase(a.cod) : a.cod;
+    // v10.02 — mostrar SIEMPRE el código canónico con cero(s) a la izquierda (026, 035E). La vista
+    // vista_stock_procesada (v10.00) devuelve el código sin ceros ("26"), así que se re-pad acá.
+    const _codDisplay = codCanon(_codSuffix ? codBase(a.cod) : a.cod);
     // v7.90 — marca de familia de equivalentes: principal (⭐) / secundario (⇄ va al principal).
     const _fam = equivFam(a.cod);
     let _famTag = "";
@@ -12952,7 +12958,8 @@ function _pedImpRender() {
     byImp[imp][prov].push(it);
   });
   let h = '<div class="stkpop-hint">Pedidos a los proveedores chinos (motor <code>v_importados_ordenes</code>, índice <b>' + (data.meses || 10) + ' meses</b>). Separado de las OC de talleristas. 🧩 = parte (proyección = suma de sus terminados).<br><b>✏️</b> editar unidades en curso (lo ya pedido/en camino) · <b>📥</b> marcar que el pedido llegó (suma al stock y baja de en curso).</div>';
-  h += '<div style="margin-bottom:10px"><button class="mva-clear" style="' + (_stkPop.soloPedir ? 'background:#0f766e;color:#fff;border-color:#0f766e' : '') + '" onclick="pedImpToggle()">' + (_stkPop.soloPedir ? '✓ ' : '') + 'Solo lo que hay que pedir</button></div>';
+  h += '<div style="margin-bottom:10px;display:flex;gap:8px;flex-wrap:wrap;"><button class="mva-clear" style="' + (_stkPop.soloPedir ? 'background:#0f766e;color:#fff;border-color:#0f766e' : '') + '" onclick="pedImpToggle()">' + (_stkPop.soloPedir ? '✓ ' : '') + 'Solo lo que hay que pedir</button>' +
+    '<button class="mva-clear" style="background:#166534;color:#fff;border-color:#166534" onclick="pedImpExportExcel()" title="Bajar a Excel lo que se está viendo">📥 Bajar a Excel</button></div>';
   const impOrder = ["Chef", "Tierra Nativa", "(sin importador)"];
   Object.keys(byImp).forEach(function (k) { if (impOrder.indexOf(k) < 0) impOrder.push(k); });
   let algo = false;
@@ -12968,9 +12975,11 @@ function _pedImpRender() {
       arr.sort(function (a, b) { return b.aPedirUni - a.aPedirUni; }).forEach(function (it) {
         const cajTxt = (it.aPedirCajas == null) ? '<span style="color:#94a3b8" title="Sin uni×caja cargado">—</span>' : String(it.aPedirCajas);
         const badge = it.esParte ? ' <span style="color:#7c3aed" title="Parte">🧩</span>' : '';
+        // v10.02 — stock negativo (más pedidos que stock) se muestra como 0 (no negativo), pedido del usuario.
+        const _stkShow = Math.max(0, Number(it.stockUni) || 0);
         const stockTxt = (it.stockParteU > 0)
-          ? it.stockUni + ' <span style="color:#7c3aed;font-weight:700;font-size:11px" title="Incluye ' + it.stockParteU + ' u de la parte ' + escapeHtml(it.stockParteCods || '') + ' (' + it.stockPropio + ' propio + ' + it.stockParteU + ' parte)">🔧+' + it.stockParteU + '</span>'
-          : String(it.stockUni);
+          ? _stkShow + ' <span style="color:#7c3aed;font-weight:700;font-size:11px" title="Incluye ' + it.stockParteU + ' u de la parte ' + escapeHtml(it.stockParteCods || '') + ' (' + it.stockPropio + ' propio + ' + it.stockParteU + ' parte)">🔧+' + it.stockParteU + '</span>'
+          : String(_stkShow);
         var actHtml = (it.det || []).map(function (d) {
           var multi = (it.det || []).length > 1;
           var lbl = (multi && d.marca) ? ('<span style="font-size:10px;color:#64748b;margin-right:2px">' + escapeHtml(d.marca) + '</span>') : '';
@@ -12986,6 +12995,41 @@ function _pedImpRender() {
   });
   if (!algo) h += '<div class="stkpop-empty">No hay importados ' + (_stkPop.soloPedir ? 'para pedir (todo en o sobre el objetivo)' : 'cargados') + '.</div>';
   body.innerHTML = h;
+}
+/* v10.02 — Bajar a Excel los Pedidos Importación (lo que se está viendo, respeta "Solo lo que hay
+   que pedir"). Stock negativo se exporta como 0 (igual que en pantalla). Sin librería (.xls = tabla HTML). */
+function pedImpExportExcel() {
+  if (!_stkPop || _stkPop.kind !== "pedImp") return;
+  var data = _stkPop.data || { items: [] };
+  var items = (data.items || []).slice();
+  if (_stkPop.soloPedir) items = items.filter(function (it) { return it.aPedirUni > 0; });
+  if (!items.length) { try { alert("No hay ítems para exportar."); } catch (_e) {} return; }
+  var esc = function (s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); };
+  var fecha = (function () { try { return new Date().toLocaleDateString("en-CA", { timeZone: "America/Argentina/Buenos_Aires" }); } catch (_e) { return "hoy"; } })();
+  // Orden: por importador, proveedor, y dentro por A pedir desc (como en pantalla)
+  items.sort(function (a, b) {
+    var ia = _IMPORTADOR_DE[a.prov || ""] || "(sin importador)", ib = _IMPORTADOR_DE[b.prov || ""] || "(sin importador)";
+    if (ia !== ib) return ia < ib ? -1 : 1;
+    var pa = a.prov || "", pb = b.prov || ""; if (pa !== pb) return pa < pb ? -1 : 1;
+    return (b.aPedirUni || 0) - (a.aPedirUni || 0);
+  });
+  var html = '<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"><style>td,th{border:1px solid #ccc;padding:3px 7px;font-family:Calibri,Arial,sans-serif;} th{background:#166534;color:#fff;text-align:left;}</style></head><body>';
+  html += '<h3>Pedidos Importación — Producción Virgilio (' + esc(fecha) + ', índice ' + (data.meses || 10) + ' meses)</h3>';
+  html += '<table><tr><th>Importador</th><th>Proveedor</th><th>Codigo</th><th>Descripcion</th><th>Proy u/mes</th><th>Objetivo</th><th>Stock</th><th>En curso</th><th>A pedir u</th><th>Cajas</th></tr>';
+  items.forEach(function (it) {
+    var imp = _IMPORTADOR_DE[it.prov || ""] || "(sin importador)";
+    var stk = Math.max(0, Number(it.stockUni) || 0);   // negativo → 0 (igual que pantalla)
+    var caj = (it.aPedirCajas == null) ? "" : it.aPedirCajas;
+    html += '<tr><td>' + esc(imp) + '</td><td>' + esc(it.prov || "") + '</td><td>' + esc(codCanon(it.cod)) + '</td><td>' + esc(artNombre(it.cod, it.desc)) + '</td><td>' + (it.proyUni || 0) + '</td><td>' + (it.objetivoUni || 0) + '</td><td>' + stk + '</td><td>' + (it.enCurso || 0) + '</td><td>' + (it.aPedirUni || 0) + '</td><td>' + caj + '</td></tr>';
+  });
+  html += '</table></body></html>';
+  try {
+    var blob = new Blob(["﻿" + html], { type: "application/vnd.ms-excel" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a"); a.href = url; a.download = "Pedidos_Importacion_" + fecha + ".xls";
+    document.body.appendChild(a); a.click();
+    setTimeout(function () { try { document.body.removeChild(a); URL.revokeObjectURL(url); } catch (_e) {} }, 1500);
+  } catch (e) { try { alert("No se pudo generar el Excel: " + (e.message || e)); } catch (_e) {} }
 }
 /* v9.29 — Pedidos Importación operable: editar "en curso" y marcar llegada.
    Ambas acciones van por RPC SECURITY DEFINER (sql/importados_pedidos_rpc.sql) apuntando
