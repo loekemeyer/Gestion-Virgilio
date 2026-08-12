@@ -16989,9 +16989,13 @@ async function showBajarRacks(ordenId) {
   ov.classList.add("show");
   ov.innerHTML = '<div class="br-card"><div class="br-head"><span class="br-title">📦 Bajar racks → góndola</span><button class="br-close" onclick="closeBajarRacks()">Cerrar</button></div><div class="br-body" id="brBody"><div class="br-loading">Cargando stock de racks…</div></div></div>';
   try {
-    const res = await Promise.all([stockFetchSaldos(), stockFetchArtFactors(), loadArtNombres()]);
+    const res = await Promise.all([stockFetchSaldos(), stockFetchArtFactors(), loadArtNombres(),
+      supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Racks_Planimetria", "select=cod_art,sector&estado=eq.ocupado")]);
     const saldos = res[0] || {};
-    const items = Object.keys(saldos).map(function (k) { return saldos[k]; }).filter(function (a) { return (a.racks || 0) > 0; }).sort(function (a, b) { return (parseInt(a.cod, 10) || 0) - (parseInt(b.cod, 10) || 0); }).map(function (a) { return { cod: a.cod, desc: artNombre(a.cod, a.desc), disponible: a.racks, bajar: 0 }; });
+    // v10.15: mapa cod→sectores para grabar de qué rack se baja
+    var _brSecs = {};
+    (res[3] || []).forEach(function (r) { var c = _ocgNorm(r.cod_art || ""); if (c) { if (!_brSecs[c]) _brSecs[c] = []; _brSecs[c].push(r.sector); } });
+    const items = Object.keys(saldos).map(function (k) { return saldos[k]; }).filter(function (a) { return (a.racks || 0) > 0; }).sort(function (a, b) { return (parseInt(a.cod, 10) || 0) - (parseInt(b.cod, 10) || 0); }).map(function (a) { var c = _ocgNorm(a.cod); return { cod: a.cod, desc: artNombre(a.cod, a.desc), disponible: a.racks, bajar: 0, secs: (_brSecs[c] || []).sort() }; });
     _br = { ordenId: ordenId, legajo: String((typeof legajoInput !== "undefined" && legajoInput && legajoInput.value) || "").trim(), factors: res[1] || {}, items: items };
     brRender();
   } catch (e) { const b = document.getElementById("brBody"); if (b) b.innerHTML = '<div class="br-loading">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
@@ -17018,7 +17022,8 @@ function brConfirmar() {
   // el stock ya se mueve acá (racks − / góndola +) y la fila queda 'aprobada' directo, para que
   // NO aparezca en la cola "Bajadas Racks → góndola". La operadora ya no aprueba nada.
   const _brNowIso = new Date().toISOString();
-  const rows = sel.map(function (it) { return { orden_id: _br.ordenId || null, cod_art: it.cod, descripcion: it.desc || null, cajas: it.bajar, estado: "aprobada", aprobada_at: _brNowIso, creada_por: _br.legajo || null }; });
+  // v10.15: sector(es) del artículo van en la fila de Racks_Bajadas y en el ref del movimiento
+  const rows = sel.map(function (it) { return { orden_id: _br.ordenId || null, cod_art: it.cod, descripcion: it.desc || null, cajas: it.bajar, estado: "aprobada", aprobada_at: _brNowIso, creada_por: _br.legajo || null, sector: (it.secs || []).join(" · ") || null }; });
   const n = sel.reduce(function (s, it) { return s + it.bajar; }, 0);
   closeBajarRacks();
   // v8.73 — mover stock INMEDIATAMENTE (racks → góndola) al registrar la bajada,
@@ -17026,8 +17031,9 @@ function brConfirmar() {
   // en el sistema contable (ERP), no debe bloquear el stock.
   var stkRows = [];
   sel.forEach(function (it) {
-    stkRows.push({ cod_art: it.cod, descripcion: it.desc || null, deposito: "racks", delta: -it.bajar, tipo: "baja_racks", ref: "orden " + (_br.ordenId || ""), legajo: _br.legajo || "0" });
-    stkRows.push({ cod_art: it.cod, descripcion: it.desc || null, deposito: "terminado", delta: it.bajar, tipo: "baja_racks", ref: "orden " + (_br.ordenId || ""), legajo: _br.legajo || "0" });
+    var _ref = (it.secs && it.secs.length) ? "rack " + it.secs.join(" · ") : "orden " + (_br.ordenId || "");
+    stkRows.push({ cod_art: it.cod, descripcion: it.desc || null, deposito: "racks", delta: -it.bajar, tipo: "baja_racks", ref: _ref, legajo: _br.legajo || "0" });
+    stkRows.push({ cod_art: it.cod, descripcion: it.desc || null, deposito: "terminado", delta: it.bajar, tipo: "baja_racks", ref: _ref, legajo: _br.legajo || "0" });
   });
   stockMove(stkRows);
   fetch(SUPABASE_RACKS_BAJ_ENDPOINT, { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" }, body: JSON.stringify(rows) })
