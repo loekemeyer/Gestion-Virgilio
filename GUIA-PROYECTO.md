@@ -117,6 +117,18 @@
 > Nota **v9.52** — **Date pickers con `min="2025-01-01"`**: los selectores de fecha
 > (movimientos de stock, producción, OC, fecha de tanda, ruteo) ya no ofrecen años previos a 2025.
 >
+> Nota **v9.85** — **Faltantes x día: números totales + columnas de referencia + notas editables + imprimir.**
+> (a) **Stock** ahora muestra el **stock TOTAL** (todos los depósitos, incluye `separar_pedidos` +
+> `a_facturar`) = igual que la solapa Stocks — la PROYECCIÓN de faltante sigue usando el neto no
+> comprometido. (b) **Total Pedidos** = **todas** las cajas pedidas **hasta facturar** (incluye
+> pickeadas/armadas); el drill del total marca "Armado ✓ / En picking / Sin pickear". (c) Nuevas
+> columnas: **Última entrega** (fecha + cajas de la última recepción a góndola, de `Movimientos_Stock`
+> `tipo=recepcion deposito=a_guardar`), **OC pend.** (cajas + fecha de `Ordenes_Compra estado=pendiente`),
+> y **Día resol.** + **Motivo falta** editables (✏, persisten en tabla nueva `Faltantes_Notas`
+> (cod PK, dia_resolucion, motivo, actualizado; RLS anon select/insert/update)). (d) Botón **🖨 Imprimir**:
+> abre el módulo tal como está filtrado en ventana nueva + una **observación** al pie de qué NO se muestra
+> (solo quiebre / sin E / filtro por columna / búsqueda) → reporte para el gerente. `index.html`.
+>
 > Nota **v9.49** — **Pestaña Stocks: nueva columna "Proy. caj/mes"** (antes de *Total Stock*).
 > Muestra la **proyección de venta en cajas/mes** por código, tomada de `proyeccion_madre.proy_cajas_mes`
 > (el mismo valor "antes del índice" que usa el generador de OCs). Header clickeable como las demás
