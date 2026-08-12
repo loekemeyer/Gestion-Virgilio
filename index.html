@@ -6460,7 +6460,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v10.21";
+const APP_VERSION = "v10.22";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -23359,12 +23359,12 @@ function _pppSplitDelivered() {
   return { enViaje: enViaje, entregados: entregados };
 }
 function _pppEnViajeHtml() {
-  if (_pppDelivered == null || _pppMetaEntSet == null) return '<div class="planim-empty">Cargando pedidos en viaje…</div>';
+  if (_pppDelivered == null || _pppMetaEntSet == null) return '<div class="planim-empty">Cargando pedidos en salida…</div>';
   const list = _pppEntFilter(_pppSplitDelivered().enViaje);
-  if (!list.length) return '<div class="ppp-ent-note">' + (_pppSearch ? "Sin coincidencias." : "No hay pedidos en viaje (todos los facturados están confirmados como entregados).") + '</div>';
+  if (!list.length) return '<div class="ppp-ent-note">' + (_pppSearch ? "Sin coincidencias." : "No hay pedidos en salida (todos los facturados están confirmados como entregados).") + '</div>';
   let totM3 = 0; for (const p of list) totM3 += (p.m3 || 0);
   const r = _pppEntGroupedHtml(list, true, 0);
-  return '<div class="ppp-ent-note">🚛 Pedidos <b>en viaje</b> — salieron (facturados/cargados) pero <b>todavía no se confirmó la entrega</b> (ni control de remito ni en la hoja de entregados). <b>' + list.length + '</b> pedido(s) · <b>' + totM3.toFixed(2) + '</b> m³.</div>' + r.html;
+  return '<div class="ppp-ent-note">🚚 Pedidos <b>en salida</b> — ya se <b>facturaron</b> (salieron de la programación) pero <b>todavía no se confirmó la entrega</b> (sin control de remito ni en la hoja de entregados). Incluye lo facturado sin cargar y lo cargado sin controlar. <b>' + list.length + '</b> pedido(s) · <b>' + totM3.toFixed(2) + '</b> m³.</div>' + r.html;
 }
 function _pppYmdKey(s) { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s || "")); return m ? (m[1] + m[2] + m[3]) : ""; }
 async function pppRefreshDelivered() {
@@ -23468,7 +23468,7 @@ function _pppEntFilter(list) {
 function _pppEntAppHtml() {
   if (_pppDelivered == null) return '<div class="planim-empty">Cargando pedidos entregados…</div>';
   const list = _pppEntFilter(_pppSplitDelivered().entregados);   // v9.72 — solo los CONFIRMADOS (CRN o en la hoja)
-  if (!list.length) return '<div class="ppp-ent-note">' + (_pppSearch ? "Sin coincidencias." : "Todavía no hay pedidos con entrega confirmada (control de remito o hoja de entregados). Los que salieron están en «En viaje».") + '</div>';
+  if (!list.length) return '<div class="ppp-ent-note">' + (_pppSearch ? "Sin coincidencias." : "Todavía no hay pedidos con entrega confirmada (control de remito o hoja de entregados). Los que salieron están en «En Salida».") + '</div>';
   let totM3 = 0, nDisc = 0; for (const p of list) { totM3 += (p.m3 || 0); if (p.discrep) nDisc++; }
   const r = _pppEntGroupedHtml(list, true, 0);
   return '<div class="ppp-ent-note">🚚 Pedidos <b>entregados</b>, con <b>fecha de salida</b> (carga camión; si no hay, la de la PPP), cliente, m³ y cajas. <b>' + list.length + '</b> pedido(s) · <b>' + totM3.toFixed(2) + '</b> m³.' +
@@ -25720,7 +25720,7 @@ function pppRenderProg() {
     '<div class="ppp-tabs">' +
       '<button class="ppp-tab ' + (_pppTab === "prog" ? "on" : "") + '" onclick="pppTab(\'prog\')">📥 A Programar (' + aProgramar.length + ')</button>' +
       '<button class="ppp-tab ' + (_pppTab === "plan" ? "on" : "") + '" onclick="pppTab(\'plan\')">🗓️ Programación (' + programados.length + ')</button>' +
-      '<button class="ppp-tab ' + (_pppTab === "enviaje" ? "on" : "") + '" onclick="pppTab(\'enviaje\')">🚛 En viaje (' + (_pppSplit ? _pppSplit.enViaje.length : "…") + ')</button>' +
+      '<button class="ppp-tab ' + (_pppTab === "enviaje" ? "on" : "") + '" onclick="pppTab(\'enviaje\')">🚚 En Salida (' + (_pppSplit ? _pppSplit.enViaje.length : "…") + ')</button>' +
       '<button class="ppp-tab ' + (_pppTab === "resumen" ? "on" : "") + '" onclick="pppTab(\'resumen\')">🚚 Resumen</button>' +
       '<button class="ppp-tab ' + (_pppTab === "ent" ? "on" : "") + '" onclick="pppTab(\'ent\')">✅ Pedidos Entregados (' + (_pppSplit ? _pppSplit.entregados.length : (_pppDelivered ? _pppDelivered.length : entreg.length)) + ')</button>' +
       '<button class="ppp-tab ' + (_pppTab === "ocup" ? "on" : "") + '" onclick="pppTab(\'ocup\')">📦 Ocupación</button>' +

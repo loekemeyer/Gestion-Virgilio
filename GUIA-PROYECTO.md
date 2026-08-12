@@ -350,6 +350,13 @@
 > Cajas por pila, Sueltas, Contado (cajas), **Stock del sistema** (góndola+excedente, mismo cálculo
 > que la comparación), Diferencia y En proceso. Formato Excel es-AR (BOM utf-8, `;`, coma decimal).
 >
+> Nota **v10.22** — **PPP: "En viaje" renombrado a "En Salida".** El tab del PPP que junta los
+> pedidos **facturados** que ya salieron de la Programación pero sin entrega confirmada (`_pppEnViajeHtml`,
+> tab key interno sigue `enviaje`) pasó a llamarse **"🚚 En Salida"**. Incluye lo facturado sin cargar y
+> lo cargado sin controlar remito. Los facturados ya se excluyen de la Programación (`programados =
+> notEnt.filter(...)` en modo normal) y aparecen acá. Solo cambió el rótulo y el texto de ayuda; la
+> discriminación fina por sub-estado sigue en los módulos "FC s/salida" y "Recepción Remitos (RR)".
+>
 > Nota **v10.21** — **Switch "auto-imprimir FACTURADO" ahora en Supabase (no se apaga solo).** El
 > toggle de auto-imprimir el remito facturado (Cola de impresión) estaba en `localStorage`
 > (`fac_print_facturado_virgilio`) → la TWA/PWA lo borraba y aparecía apagado al volver. Ahora es un
