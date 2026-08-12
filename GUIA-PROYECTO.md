@@ -261,6 +261,15 @@
 > Cajas por pila, Sueltas, Contado (cajas), **Stock del sistema** (góndola+excedente, mismo cálculo
 > que la comparación), Diferencia y En proceso. Formato Excel es-AR (BOM utf-8, `;`, coma decimal).
 >
+> Nota **v10.09** — **Botón "Ver módulo operarios" en el panel admin.** En el panel de
+> Administración (`#supervisorPanel`, sección "Reportes y configuración") hay un botón nuevo
+> **👁️ Ver módulo operarios** (`openOperarioView()`) que abre la grilla completa del operario
+> (`#optionsScreen`, EP/TP/AP/MG/etc.) para que el supervisor la recorra sin desloguearse. Entra
+> con el **legajo de PRUEBAS (1)** (test/basura, excluido de reportes) — así cualquier toque queda
+> como prueba y no ensucia datos — y muestra un banner ámbar con botón "← Volver al panel". Como
+> `goToOptions()` oculta todo `#legajoScreen` (que contiene el panel admin), al volver reaparece el
+> panel solo; se restaura el "último legajo" para no dejar el 1 pegado en el login por legajo.
+>
 > Nota **v10.08** — **Guardado a Góndola muestra la ubicación del artículo.** En el módulo "📥 Guardar
 > a góndola" (MG), cada fila ahora muestra un chip 📍 con **dónde va el artículo en góndola** (primera
 > celda destacada + las siguientes entre paréntesis) y **cuántas ubicaciones tiene** (ej. `📍 Va en P39

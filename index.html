@@ -3642,6 +3642,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       <button class="sup-action-btn" onclick="openPlataPerdida()"><span class="sup-ico">💸</span><span>Plata perdida de facturar</span></button>
       <button class="sup-action-btn" onclick="openDatosProducto()" style="position:relative;"><span class="sup-ico">🚦</span><span>Completar datos producto</span><span id="dpBadge" class="dp-badge" style="display:none;"></span></button>
       <button class="sup-action-btn" onclick="openConfiguracion()"><span class="sup-ico">⚙️</span><span>Configuración</span></button>
+      <button class="sup-action-btn" onclick="openOperarioView()"><span class="sup-ico">👁️</span><span>Ver módulo operarios</span></button>
     </div>
     <style id="ssgSwCss">
       .sup-cfg{max-width:520px;margin:14px auto 0;background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:11px 14px;}
@@ -5518,6 +5519,38 @@ function backToLegajo() {
   renderLegajoHistory(legajoInput.value);
 }
 
+/* v10.09 — VER MÓDULO OPERARIOS desde el panel admin. Abre la grilla completa del
+   operario (optionsScreen) para que el supervisor la recorra tal cual la ve un operario,
+   sin desloguearse. Usa el legajo de PRUEBAS (1) — test/basura, excluido de reportes — así
+   cualquier toque queda como prueba y no ensucia datos. goToOptions() oculta todo
+   #legajoScreen (que contiene el panel admin), por eso al volver reaparece el panel solo.
+   Restauramos el "último legajo" para no dejar el 1 pegado en el login por legajo. */
+function openOperarioView() {
+  var prevLast = "";
+  try { prevLast = localStorage.getItem(LAST_LEGAJO_KEY) || ""; } catch (_e) {}
+  window._supPreview = true;
+  legajoInput.value = "1";
+  goToOptions();
+  try { saveLastLegajo(prevLast); } catch (_e) {}
+  try {
+    var os = document.getElementById("optionsScreen");
+    var b = document.getElementById("supPreviewBanner");
+    if (!b) {
+      b = document.createElement("div");
+      b.id = "supPreviewBanner";
+      b.style.cssText = "background:#fef3c7;border:1.5px solid #f59e0b;color:#92400e;border-radius:10px;padding:9px 12px;margin:8px 0;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;";
+      os.insertBefore(b, os.firstChild);
+    }
+    b.innerHTML = '👁️ <span>Vista de supervisor — módulo de operarios (legajo de <b>prueba</b>). Lo que toques queda como PRUEBA.</span> <button onclick="supExitOperarioView()" style="background:#92400e;color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;flex:0 0 auto;">← Volver al panel</button>';
+    b.style.display = "flex";
+  } catch (_e) {}
+}
+function supExitOperarioView() {
+  window._supPreview = false;
+  var b = document.getElementById("supPreviewBanner"); if (b) b.style.display = "none";
+  backToLegajo();
+}
+
 /* Lista de tandas planificadas (Op=SI) del PPP — fetched cuando el operario
    abre EP/TP/AP/TAP/CC para que pueda tocar una en vez de tipearla.
    Cache 30 s, se rinde solo si la fetch falla. */
@@ -6418,7 +6451,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v10.08";
+const APP_VERSION = "v10.09";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
