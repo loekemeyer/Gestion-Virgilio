@@ -5530,6 +5530,14 @@ let _activityStatusTs    = 0;
 const PPP_OPERATOR_TTL_MS     = 30000;
 const ACTIVITY_STATUS_TTL_MS  = 10000;
 const TANDAS_LIST_VISIBLE_DAYS = 3;
+/* v10.03 — ventana de getActivityStatus. Era 7 días y generaba TANDAS ZOMBIE: una tanda
+   pickeada hace más de una semana salía de la ventana, `pickingStarted` dejaba de tenerla y
+   el filtro "notStarted" de EP la volvía a ofrecer PARA SIEMPRE. Caso real (12/08): C89A
+   (TP 23/07), C99F (TP 30/07) y D16A (TP 04/08) reaparecían en EP como pendientes, y como la
+   lista agrupa por fecha ASCENDENTE y solo muestra TANDAS_LIST_VISIBLE_DAYS grupos, esas
+   zombies de julio tapaban las tandas reales. 180 días ≈ 3.100 filas (bien por debajo del
+   limit), y una tanda sin actividad en 6 meses está muerta de verdad. */
+const ACTIVITY_LOOKBACK_DAYS  = 180;
 
 /* Devuelve TODAS las tandas reales del PPP (con fecha de entrega válida,
    excluyendo "S/Tanda"). Cada item lleva su flag opIsSi para que cada modo
@@ -5564,7 +5572,7 @@ async function getPppTandasForOperator() {
   }
 }
 
-/* Trae el estado de Picking y Armado de los últimos 7 días. Devuelve sets:
+/* Trae el estado de Picking y Armado de los últimos ACTIVITY_LOOKBACK_DAYS días. Devuelve sets:
      pickingStarted:    tandas con cualquier EP o TP (normalizado: trim+upper)
      pickingDone:       último EP/TP es TP (normalizado, ✅ en columna Picking)
      pickingDoneStrict: idem pickingDone pero texto EXACTO (sin trim). Usado
@@ -5591,12 +5599,12 @@ async function getActivityStatus(force) {
     armadoEnCursoBy:   new Map()    // v5.74: tanda EN CURSO (AP sin TAP) -> legajo que la arrancó
   };
   try {
-    const since = new Date(Date.now() - 7*24*60*60*1000).toISOString();
+    const since = new Date(Date.now() - ACTIVITY_LOOKBACK_DAYS*24*60*60*1000).toISOString();
     const url = SUPABASE_TABLE_ENDPOINT +
       "?opcion=in.(EP,TP,AP,TAP)" +
       "&ts_cliente=gte." + encodeURIComponent(since) +
       "&order=ts_cliente.asc" +
-      "&limit=10000" +
+      "&limit=20000" +
       "&select=opcion,texto,ts_cliente,legajo";
     const r = await fetch(url, {
       headers: { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY }
@@ -6412,7 +6420,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v10.02";
+const APP_VERSION = "v10.04";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco

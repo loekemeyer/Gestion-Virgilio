@@ -4,7 +4,35 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-12 · Versión app al documentar: **v9.78**
+> Última actualización: 2026-08-12 · Versión app al documentar: **v10.03**
+>
+> Nota **v10.03 — fix: tandas ZOMBIE en la lista de EP.** `getActivityStatus()` miraba solo
+> los **últimos 7 días** de eventos EP/TP/AP/TAP. Una tanda pickeada hace más de una semana
+> salía de esa ventana, `pickingStarted` dejaba de tenerla y el filtro `notStarted` de **EP la
+> volvía a ofrecer para siempre**. Caso real (12/08): al operario le aparecían **C89A** (TP
+> 23/07), **C99F** (TP 30/07) y **D16A** (TP 04/08) como pendientes. Peor: la lista agrupa por
+> fecha **ascendente** y solo muestra `TANDAS_LIST_VISIBLE_DAYS`(3) grupos, así que esas
+> zombies de julio **tapaban** las tandas reales. **Fix:** constante `ACTIVITY_LOOKBACK_DAYS`
+> = **180** días (≈3.100 filas, muy por debajo del limit, que además subió a 20.000). Afecta a
+> todos los consumidores de `getActivityStatus` (EP/TP/AP/TAP, monitor, facturación), siempre
+> para mejor. **No relacionado:** que el Monitor muestre pocas tandas a armar **no es un bug** —
+> depende de la columna **`Op`** del Sheet: solo 17 tandas tienen `Op=SI` y 15 ya están a FC;
+> las 56 tandas desde el 13/08 tienen `Op` vacío, así que ni el monitor ni EP las ofrecen.
+>
+> Nota **v10.02 — fix: el botón "Enviar" nunca aparecía en Recepción → Pendientes.**
+> Desde **v8.83** `opEnviar()` genera el código de 4 dígitos **al crear** la fila de
+> `Control_Modo_OP` (para que el operario lo vea y lo escriba en el remito físico), pero
+> `pendCard()` seguía con la semántica vieja: `if (r.codigo)` → mostraba el código y **no
+> dibujaba el botón Enviar**, asumiendo "ya procesada". Como la lista filtra
+> `estado='pendiente'`, toda fila nueva nacía con código y **nada podía salir de Pendientes**
+> (10 filas trabadas, incl. Pintos RTO 0426 y Carriero RTO 1735 con el checklist completo).
+> **Fix:** la tarjeta muestra el código **y** el botón Enviar (habilitado solo con
+> `pendRowComplete` = ISIS + partes + faltantes + foto); `sentRow` ya no se aplica al
+> renderizar. Además `pendEnviar()` **reusa** el código existente en vez de generar otro
+> (antes quedaban dos códigos distintos para la misma recepción: el del remito físico y el
+> del checklist).
+>
+> Nota anterior · Versión app al documentar: **v9.78**
 >
 > Nota **v9.78** — **Zonas paso 2 (diagnóstico coord→zona).** En "📍 Mapa de zonas": la
 > geocodificación ahora guarda los **componentes oficiales** (`PPP_Geo.comp`) y re-geocodifica

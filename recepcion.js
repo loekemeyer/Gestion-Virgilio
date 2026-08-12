@@ -2004,7 +2004,7 @@ function pendTickElapsed() {
 }
 function pendCard(r) {
   const id = r.id;
-  _pendRows[id] = { isis: !!r.isis, partes: r.control_partes || null, faltantes: !!r.faltantes, foto_url: r.foto_url || null, sent: false };
+  _pendRows[id] = { isis: !!r.isis, partes: r.control_partes || null, faltantes: !!r.faltantes, foto_url: r.foto_url || null, codigo: r.codigo || null, sent: false };
   const tsMs = r.created_at ? new Date(r.created_at).getTime() : 0;
   const card = document.createElement("div"); card.className = "pendCard"; card.setAttribute("data-id", String(id));
   const head = document.createElement("div"); head.className = "pcHead";
@@ -2032,15 +2032,19 @@ function pendCard(r) {
   acts.appendChild(pendFotoRow(id));
   card.appendChild(acts);
   const foot = document.createElement("div"); foot.className = "pcFoot";
+  /* v10.02 — el código lo genera opEnviar() AL CREAR la fila (v8.83), para que el operario
+     lo vea y lo escriba en el remito físico. Por eso tener `codigo` NO significa "ya
+     procesada": esta lista trae SOLO estado='pendiente'. Antes el `if (r.codigo)` tapaba
+     el botón Enviar en toda fila nueva y nada podía salir de Pendientes. Ahora se muestra
+     el código (para cotejar contra el remito) Y el botón al lado. */
   if (r.codigo) {
     const lab = document.createElement("span"); lab.className = "pcLbl"; lab.textContent = "Código:";
     const c = document.createElement("div"); c.className = "codigoBox"; c.textContent = r.codigo;
-    foot.appendChild(lab); foot.appendChild(c); card.classList.add("sentRow");
-  } else {
-    const b = document.createElement("button"); b.type = "button"; b.className = "enviarBtn"; b.textContent = "Enviar"; b.disabled = !pendRowComplete(id);
-    b.onclick = function () { pendEnviar(id, foot); };
-    foot.appendChild(b);
+    foot.appendChild(lab); foot.appendChild(c);
   }
+  const b = document.createElement("button"); b.type = "button"; b.className = "enviarBtn"; b.textContent = "Enviar"; b.disabled = !pendRowComplete(id);
+  b.onclick = function () { pendEnviar(id, foot); };
+  foot.appendChild(b);
   card.appendChild(foot);
   return card;
 }
@@ -2134,9 +2138,12 @@ async function pendEnviar(id, foot) {
   if (!pendRowComplete(id) || _pendRows[id].sent) return;
   const b = foot.querySelector(".enviarBtn"); if (b) { b.disabled = true; b.textContent = "Enviando…"; }
   try {
-    const codigo = await pendGenCodigo();
+    /* v10.02 — REUSAR el código que la fila ya trae (el que el operario escribió en el remito
+       físico al cargarla). Generar uno nuevo acá dejaba dos códigos distintos para la misma
+       recepción. Solo se genera si la fila es vieja (anterior a v8.83) y no tiene. */
+    const codigo = _pendRows[id].codigo || await pendGenCodigo();
     await pendPersist(id, { estado: "procesado", procesado_at: new Date().toISOString(), codigo: codigo });
-    _pendRows[id].sent = true;
+    _pendRows[id].sent = true; _pendRows[id].codigo = codigo;
     foot.innerHTML = "";
     const lab = document.createElement("span"); lab.className = "pcLbl"; lab.textContent = "Código:";
     const c = document.createElement("div"); c.className = "codigoBox"; c.textContent = codigo;
