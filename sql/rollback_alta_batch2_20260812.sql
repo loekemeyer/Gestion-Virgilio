@@ -11,3 +11,9 @@ DROP FUNCTION IF EXISTS generar_inconsistencias(date);
 DROP FUNCTION IF EXISTS gondola_return_check(jsonb);
 DROP FUNCTION IF EXISTS dia_armado(date);
 DROP FUNCTION IF EXISTS prox_habil(date);
+
+-- Batch 3 (MEDIA)
+DROP VIEW IF EXISTS vista_control_remitos;
+DROP VIEW IF EXISTS vista_articulos_prov_at;
+DROP VIEW IF EXISTS vista_historial_entregas;
+DROP VIEW IF EXISTS vista_entidades_recepcion;

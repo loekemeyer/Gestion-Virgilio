@@ -6362,6 +6362,32 @@ Segundo lote de migración front→back. Objetos creados, **aún no conectados a
 
 Rollback batch 2: `sql/rollback_alta_batch2_20260812.sql`.
 
+#### Batch 3 — objetos MEDIA prioridad (v10.10c, 2026-08-12)
+
+Tercer lote. Objetos creados, **aún no conectados al front**:
+
+- **`vista_entidades_recepcion`** — VIEW. Reemplaza 2 fetches de `cargarEntidades()`
+  (recepcion.js). Une talleristas (Codigos X Tallerista, agrupados por nombre con
+  cod_lk/cod_ch) + proveedores AT (Tall_ProvAT_PS, activos con rec_virg).
+
+- **`vista_historial_entregas`** — VIEW. Reemplaza 2 fetches paralelos de `histLoad()`
+  (recepcion.js). Unifica `Entregas Tallerista Virgilio` + `Entregas Prov AT` con
+  columnas normalizadas (fuente, fecha, cod_art, cajas, quien, remito). El cliente
+  filtra por cod/quien/remito/fechas con PostgREST.
+
+- **`vista_articulos_prov_at`** — VIEW. Reemplaza 2 fetches secuenciales de
+  `renderArticulos()` (rama prov_at, recepcion.js). Pre-joinea `Articulos x Prov AT`
+  (activos) con `Articulos Virgilio X Tallerista` para la línea LK/CH. El cliente
+  filtra por proveedor y linea.
+
+- **`vista_control_remitos`** — VIEW. Reemplaza 5 fetches de `fetchCRData()`.
+  Consolida CCN/TAL/CRN/FSS (últimos 7 días) con metadatos PPP/Entregados. Ya
+  excluye controlados (CRN) y sin salida (FSS), ordena vencidos primero. Columnas:
+  np, tanda, lios, cod_cliente, rs, vencido, first_load, last_ccn.
+
+**Pendiente MEDIA**: `prodLoad/prodCompute` — RPC parametrizado por rango de fechas,
+cálculo de productividad con m³ y factores. Complejidad alta, dejado para después.
+
 ---
 
 ## 4. Códigos de acción (`opcion`)
