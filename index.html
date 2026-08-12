@@ -6453,7 +6453,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v10.16";
+const APP_VERSION = "v10.17";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -19312,16 +19312,16 @@ async function showCPModal(legajo, _resume, focusNp) {
       .sort(function (a, b) { return String(a.fecha_salida).localeCompare(String(b.fecha_salida)); });
     let fr = falt.filter(function (e) { const d = String(e.fecha_salida || "").slice(0, 10); return !d || !cut || d >= cut; });
     fr.forEach(function (e) { e.desc = artNombreEmp(e.cod_art, e.np, ""); e._saldo = sN[_cpNorm(e.cod_art)] || null; e._guardadoHoy = guardadoHoy.has(_cpNorm(e.cod_art)); });
-    // v6.18: el CP muestra un faltante si el artículo está EN "a guardar" (a_guardar>0) O se
-    // GUARDÓ HOY (aunque ya esté en góndola) — lo que llegó/se guardó hoy es lo que se completa
-    // en los pedidos ya armados. Si no está a guardar ni se guardó hoy, no figura (faltante de
-    // picking viejo). Excepción: enfoque en una NP puntual (focusNp, "Cargar las cajas").
-    // v6.19: si guardadoHoy, verificar que haya stock real (a_guardar + terminado > 0).
+    // v10.17 — el CP del operario ahora muestra TODOS los faltantes CON STOCK para completarse
+    // (góndola + a guardar + excedente + racks), MISMO criterio que el módulo admin
+    // (showFaltAvisar). Antes filtraba angosto (solo a_guardar>0 o guardado hoy), así que
+    // faltantes completables desde góndola/excedente NO le aparecían al operario y dependían de
+    // que Marianela apretara "Avisar". Ahora aparecen solos. (El marcador _guardadoHoy se
+    // conserva para destacar lo recién llegado.) Excepción: enfoque en una NP puntual (focusNp).
     if (!focusNp) fr = fr.filter(function (e) {
       const sal = e._saldo || {};
-      const ag = Number(sal.a_guardar) || 0;
-      const go = Number(sal.terminado) || 0;
-      return ag > 0 || (e._guardadoHoy && (ag + go) > 0);
+      const disp = (Number(sal.terminado) || 0) + (Number(sal.a_guardar) || 0) + (Number(sal.excedente) || 0) + (Number(sal.racks) || 0);
+      return disp > 0;
     });
     // v6.19: detectar faltantes que tienen stock en racks (prioridad 1: faltantes + racks sin góndola)
     fr.forEach(function (e) {
@@ -19345,7 +19345,7 @@ function cpRender() {
   if (_cp.step === 2) { cpRenderStep2(body); return; }
   let h = '';
   if (_cp.justDone) h += '<div class="cp-done">' + escapeHtml(_cp.justDone) + '</div>';
-  h += '<div class="cp-hint">Artículos que están <b>a guardar</b> o que se <b>guardaron hoy</b>, y tienen un pedido con <b>faltante</b>. Tocá la NP → cargá lo que pusiste → va al lío y queda <b>a facturar</b>.</div>';
+  h += '<div class="cp-hint">Pedidos con un <b>faltante</b> que todavía no salió ni se facturó y que <b>tienen stock para completarse</b> (góndola / a guardar / excedente / racks). Tocá la NP → cargá lo que pusiste → va al lío y queda <b>a facturar</b>.</div>';
   if (_cp.pickPend && _cp.pickPend.length) {
     h += '<div class="cp-pend">⏳ <b>' + _cp.pickPend.length + '</b> tanda(s) pickeadas SIN armar todavía — sus faltantes van a aparecer acá cuando se <b>termine el armado</b>: ' +
       _cp.pickPend.map(function (p) { return '<b>' + escapeHtml(p.tanda) + '</b>'; }).join(", ") + '</div>';
