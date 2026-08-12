@@ -4,9 +4,9 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-12 · Versión app al documentar: **v9.60**
+> Última actualización: 2026-08-12 · Versión app al documentar: **v10.02**
 >
-> Nota **v9.60 — fix: el botón "Enviar" nunca aparecía en Recepción → Pendientes.**
+> Nota **v10.02 — fix: el botón "Enviar" nunca aparecía en Recepción → Pendientes.**
 > Desde **v8.83** `opEnviar()` genera el código de 4 dígitos **al crear** la fila de
 > `Control_Modo_OP` (para que el operario lo vea y lo escriba en el remito físico), pero
 > `pendCard()` seguía con la semántica vieja: `if (r.codigo)` → mostraba el código y **no
@@ -18,6 +18,92 @@
 > renderizar. Además `pendEnviar()` **reusa** el código existente en vez de generar otro
 > (antes quedaban dos códigos distintos para la misma recepción: el del remito físico y el
 > del checklist).
+>
+> Nota anterior · Versión app al documentar: **v9.78**
+>
+> Nota **v9.78** — **Zonas paso 2 (diagnóstico coord→zona).** En "📍 Mapa de zonas": la
+> geocodificación ahora guarda los **componentes oficiales** (`PPP_Geo.comp`) y re-geocodifica
+> las viejas que no los tenían. `_zgZonaSug` aplica **tu** mapeo `pppZonaDeBarrio` (PPP_BARRIO_ZONA
+> + overrides) al **nombre oficial** (barrio/partido) que devuelve Nominatim → zona sugerida.
+> El mapa **marca los desajustes** (anillo negro) donde la zona ACTUAL ≠ la oficial, y lista
+> "actual → oficial". Es diagnóstico (no aplica cambios todavía): sirve para ver qué direcciones
+> están mal zonificadas. Falta el paso de **aplicar** las correcciones (a definir tras revisar).
+>
+> Nota anterior · Versión app al documentar: **v9.75**
+>
+> Nota **v9.75** — **📍 Mapa de zonas (geocoding).** Botón nuevo en el cierre de Facturación
+> (al lado de "Armar ruta"). Geocodifica TODAS las direcciones de la programación con
+> **Nominatim/OpenStreetMap** (gratis, 1/seg, cache en tabla `PPP_Geo`) y las muestra en un
+> **mapa Leaflet/OSM** coloreadas por su **zona actual** (`PPP_ZONA`), para detectar direcciones
+> mal zonificadas. `_zgGeocode` usa `addressdetails=1` y NO fuerza CABA (bug del viejo
+> `_rtGeocode`), guardando los **componentes oficiales** (partido/barrio) en `PPP_Geo.comp`
+> (jsonb nuevo) para el **paso 2**: asignación híbrida de zona por coordenadas (componentes
+> oficiales + polígonos en los bordes). Migración `ppp_geo_comp_y_update_policy` (columna
+> `comp` + policy UPDATE anon para upsert). Leaflet desde cdnjs. Funciones `openZonasMapa`,
+> `_zg*`. **Pendiente (paso 2):** la regla coord→zona híbrida (todavía no toca `pppZonaDeBarrio`).
+>
+> Nota anterior · Versión app al documentar: **v9.74**
+>
+> Nota **v9.74** — **Sugerir tandas: empaque BALANCEADO.** Antes empacaba por cliente hasta
+> un cap (0.8) y el cierre final dejaba restos chicos (tandas de 0.20). Ahora, por zona (NUNCA
+> mezcla zonas), reparte balanceado: **mínimo 0.60 · ideal 0.80 · máximo 1.00 m³**. Ej: 1.60 →
+> 2×0.80 (no 1.0+0.6). Un cliente (todas sus NPs juntas) que pesa > 1.00 va en tanda propia
+> (indivisible). Lo que no llega a 0.60 en su zona sin mezclar queda **PENDIENTE** (no se
+> programa, espera volumen). **Súper** = 1 tanda por **razón social**, van solos (sin mínimo).
+> Helper `_pppBalancearZona` (LPT balanceado); usado por `pppSugerirTandas` (escribe) y
+> `_pppComputeSugerencia` (vista). El ideal sale de `cfg.tandaCap` (0.80 por defecto).
+>
+> Nota anterior · Versión app al documentar: **v9.73**
+>
+> Nota **normalización cod_art (2026-08-12)** — Para que no vuelvan los códigos fantasma:
+> (1) se **enganchó el trigger `trg_canon_cod_art`** (`fn_canon_cod_art`) en `Movimientos_Stock`
+> — antes la función existía pero no estaba attachada. Al **insertar un artículo de STOCK**
+> canoniza el `cod_art` (OC_Maximos curado, o numérico sin ceros a la izq con mínimo 3 dígitos,
+> nunca trunca). **Saltea insumos** (usan su catálogo `Insumos.cod`; su espacio numérico pisa el
+> de stock: `0027`="Caja Nº 1" canonizado sería `027`=Colador) y los tipos del pipeline
+> (picking/separado/facturado, dedup del cron). (2) `vista_saldos_stock` ahora **agrupa por clave
+> canónica** (variantes con cero a la izq caen en una fila); con los datos de hoy es no-op
+> (0 fusiones), solo red de seguridad. La prevención de insumos sigue siendo el alta con código
+> `TMP-NNNN` (idea 5572). `sql/normalizacion_cod_art_20260812.sql`.
+>
+> Nota **v9.73** — **Fix "Cajas Pedidas" (columna en Stock quedaba vacía).** La vista
+> `v_cajas_pedidas` restaba `facturadas` **y** `entregadas` por separado; una NP facturada
+> **y** entregada se restaba dos veces → `cajas_pedidas` negativo → fila filtrada. Se rompió
+> al poblarse `PPP_Entregados_Meta` (759 NPs). Ahora resta la **unión** (facturadas ∪ entregadas
+> ∪ canceladas) UNA sola vez (260 filas / 9353 cajas). `sql/backup_20260812_cajaspedidas_0027.sql`
+> guarda la def anterior. También: **eliminado el código fantasma `0027`** ("Caja Nº 1", movs
+> neteaban 0) de `Movimientos_Stock` + `Insumos`; y **sacado el cartel "NP que faltan (sin cargar
+> en PPP)"** de la tabla de Stock (el módulo sigue en el botón "Pedidos sin cargar en PPP" del
+> panel supervisor).
+>
+> Nota anterior · Versión app al documentar: **v9.65**
+>
+> Nota **v9.65** — **Generador de OCs: `stock` = TODO el módulo Stocks.** `vista_generador_oc`
+> ahora suma los 8 depósitos (terminado + a_guardar + racks + excedente + separar_pedidos +
+> a_facturar + para_envasar + racks_ch, NO insumos), igual que la columna "Total Stock". Antes
+> solo góndola + a_guardar + racks + excedente. Fórmula intacta (A pedir = máx(0, máximo + pedidos
+> − stock)). `sql/vista_generador_oc.sql`. (v9.64: acceso a Avisar programación restringido a 3
+> personas — Tomas Gonzalez, Marianela Becker, Giuliana.)
+>
+> Nota anterior · Versión app al documentar: **v9.63**
+>
+> Nota **v9.61–v9.63** — **Avisar programación:** (v9.61) `_avpTel` normaliza el teléfono al
+> formato **wa.me** (54 9 + área sin 0 + número sin 15) — antes los números locales daban links
+> rotos; (v9.62) **cargar/editar teléfono inline** (`avpEditTel` → `whatsapp_clientes`) y **deshacer
+> aviso** (`avpUndoCliente` → borra el log, policy `epl_del`). **Recepción (idea 3239, v9.63):**
+> `gondReturnCheck` avisa (no bloquea) al recibir si un artículo no estaba en la OC + no entra en
+> góndola (×1.20) + baja rotación (<50 caj/mes) → pedir autorización. `recepcion.js?v=9.63`.
+>
+> Nota anterior · Versión app al documentar: **v9.60**
+>
+> Nota **v9.60** — **Bajada de racks del operario = INMEDIATA.** El flujo `rkbSubmit`
+> (botón RKB del operario) ahora mueve el stock al instante (`stockMove`: racks − / góndola +)
+> y deja la fila en `Racks_Bajadas` como **'aprobada'** — ya NO espera la aprobación de la
+> operadora ni entra a la cola "Bajadas Racks → góndola" (por eso tampoco se cuenta doble). El
+> otro flujo `brConfirmar` (orden de racks) ya movía inmediato desde v8.73. La bajada AUTO
+> (`creada_por='auto'`) sigue como 'propuesta' (sugerencia, requiere aprobación).
+>
+> Nota anterior · Versión app al documentar: **v9.59**
 >
 > Nota **v9.55–v9.59** — **Avisar programación** (varias): (a) badge de Recepción suma remitos por
 > cargar + bajadas de racks; (b) fix 401 al marcar Discontinuo (RLS `Articulos_Discontinuados`);
@@ -45,6 +131,18 @@
 >
 > Nota **v9.52** — **Date pickers con `min="2025-01-01"`**: los selectores de fecha
 > (movimientos de stock, producción, OC, fecha de tanda, ruteo) ya no ofrecen años previos a 2025.
+>
+> Nota **v9.85** — **Faltantes x día: números totales + columnas de referencia + notas editables + imprimir.**
+> (a) **Stock** ahora muestra el **stock TOTAL** (todos los depósitos, incluye `separar_pedidos` +
+> `a_facturar`) = igual que la solapa Stocks — la PROYECCIÓN de faltante sigue usando el neto no
+> comprometido. (b) **Total Pedidos** = **todas** las cajas pedidas **hasta facturar** (incluye
+> pickeadas/armadas); el drill del total marca "Armado ✓ / En picking / Sin pickear". (c) Nuevas
+> columnas: **Última entrega** (fecha + cajas de la última recepción a góndola, de `Movimientos_Stock`
+> `tipo=recepcion deposito=a_guardar`), **OC pend.** (cajas + fecha de `Ordenes_Compra estado=pendiente`),
+> y **Día resol.** + **Motivo falta** editables (✏, persisten en tabla nueva `Faltantes_Notas`
+> (cod PK, dia_resolucion, motivo, actualizado; RLS anon select/insert/update)). (d) Botón **🖨 Imprimir**:
+> abre el módulo tal como está filtrado en ventana nueva + una **observación** al pie de qué NO se muestra
+> (solo quiebre / sin E / filtro por columna / búsqueda) → reporte para el gerente. `index.html`.
 >
 > Nota **v9.49** — **Pestaña Stocks: nueva columna "Proy. caj/mes"** (antes de *Total Stock*).
 > Muestra la **proyección de venta en cajas/mes** por código, tomada de `proyeccion_madre.proy_cajas_mes`
@@ -6091,8 +6189,18 @@ Además del log de eventos, el stock físico y las compras viven en tablas propi
   `a_facturar`/`a_guardar`/`para_envasar`/`racks_ch`…), `delta`, `tipo`
   (`inicial`/`recepcion`/`guardado`/`picking`/`separado`/`facturado`/`ajuste`/…),
   `ts`, y opcional `ubicacion`/`unidad`/`ref`. El saldo se calcula con
-  `stockComputeSaldos(movs, cutoff, asOf)` (front) y la vista `vista_saldos_stock`
-  (server). `tipo='inicial'` es baseline y **siempre** cuenta; el **cutoff**
+  `stockComputeSaldos(movs, cutoff, asOf)` (front, solo para modo As-Of) y la
+  vista `vista_saldos_stock` (server). Desde **v10.00** el front lee
+  **`vista_stock_procesada`** (**MATERIALIZED VIEW** desde 2026-08-12; antes era
+  VIEW regular) que une saldos + demanda + proyección + capacidad + config OC en
+  una sola query. Se refresca automáticamente cada 2 min vía **pg_cron** (job 55:
+  `REFRESH MATERIALIZED VIEW CONCURRENTLY vista_stock_procesada`) y bajo demanda
+  con la RPC **`refresh_stock_view()`** (SECURITY DEFINER). Tiene índice único
+  `idx_vista_stock_procesada_cod` sobre `(cod)` (requerido por CONCURRENTLY).
+  Lectura: ~0.2 ms (vs ~215 ms como VIEW regular). El front solo cae a
+  `stockComputeSaldos` cuando el usuario activa "A una fecha" (As-Of).
+  Helper: `_stkSaldosFromView(rows)`.
+  `tipo='inicial'` es baseline y **siempre** cuenta; el **cutoff**
   ("marcar inicio", `Stock_Config.cutoff_ts`) desconsidera los movimientos reales previos.
 - **`Stock_Config`** — flags/config del stock (cutoff, alertas, toggles), keyed por
   `clave` (upsert `merge-duplicates`).

@@ -1984,7 +1984,8 @@ button.pk-anular small{ display:block; font-size:12px; font-weight:700; opacity:
 .ppp-tanda.ppp-open .ppp-tablewrap{ display:block; }
 .ppp-tablewrap{ overflow-x:auto; }
 .ppp-tbl{ width:100%; border-collapse:collapse; font-size:13px; white-space:nowrap; table-layout:auto; }
-.ppp-tbl td:nth-child(7), .ppp-tbl th:nth-child(7), .ppp-tbl td:nth-child(9), .ppp-tbl th:nth-child(9){ white-space:normal; overflow-wrap:anywhere; }   /* Localidad y Zona: envuelven → nunca fuerzan scroll */
+.ppp-tbl th:nth-child(7), .ppp-tbl th:nth-child(9){ white-space:nowrap; }   /* títulos Localidad/Zona en UNA línea (nunca verticales) */
+.ppp-tbl td:nth-child(7), .ppp-tbl td:nth-child(9){ white-space:normal; overflow-wrap:normal; word-break:keep-all; min-width:82px; max-width:150px; }   /* v9.77: envuelven por PALABRA, no letra por letra */
 .ppp-tbl td.ppp-acc{ white-space:nowrap; text-align:right; }
 .ppp-tbl th{ text-align:left; padding:5px 7px; background:#f8fafc; color:#475569; border-bottom:1px solid #e2e8f0; font-size:11px; text-transform:uppercase; letter-spacing:.2px; }
 .ppp-tbl th.num{ text-align:right; } .ppp-tbl td{ padding:5px 7px; border-bottom:1px solid #f1f5f9; color:#0f172a; } .ppp-tbl td.num{ text-align:right; }
@@ -3157,6 +3158,12 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
 .falt-tbl th.falt-cod { z-index:4; }
 .falt-tbl td.falt-desc { color:#475569; max-width:180px; overflow:hidden; text-overflow:ellipsis; }
 .falt-tbl td.falt-fab { color:#6b7280; font-size:11px; max-width:110px; overflow:hidden; text-overflow:ellipsis; }
+/* v9.85 — columnas de referencia + notas editables */
+.falt-tbl th.falt-ult, .falt-tbl th.falt-oc, .falt-tbl th.falt-resol { background:#0f766e; }
+.falt-tbl th.falt-motivo { background:#0f766e; }
+.falt-tbl td.falt-ult, .falt-tbl td.falt-oc, .falt-tbl td.falt-resol { border-left:1px solid #ccfbf1; }
+.falt-tbl td.falt-motivo { max-width:160px; overflow:hidden; text-overflow:ellipsis; color:#334155; }
+.falt-tbl td.falt-resol:hover, .falt-tbl td.falt-motivo:hover { background:#ecfeff; }
 .falt-tbl td.falt-ok { background:#f0fdf4; color:#16a34a; }
 .falt-tbl td.falt-warn { background:#fef9c3; color:#854d0e; }
 .falt-tbl td.falt-bad { background:#fee2e2; color:#991b1b; font-weight:700; }
@@ -3422,6 +3429,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
     </div>
     <button class="fac-btn-cierre" id="facBtnCierre" disabled onclick="generateFacturacionPDF()">Terminé — Generar PDF</button>
     <button onclick="openRuteo()" style="width:100%;margin-top:8px;padding:13px;border:none;border-radius:10px;background:#0f766e;color:#fff;font-size:15px;font-weight:800;cursor:pointer">🗺️ Armar ruta de reparto de mañana</button>
+    <button onclick="openZonasMapa()" title="Geocodifica todas las direcciones (OpenStreetMap) y las muestra en un mapa por zona, para parametrizar bien las zonas" style="width:100%;margin-top:6px;padding:11px;border:1px solid #0f766e;border-radius:10px;background:#ecfeff;color:#0f766e;font-size:14px;font-weight:800;cursor:pointer">📍 Mapa de zonas (geocodificar)</button>
     <div id="facTickedList" class="fac-ticked-list" style="display:none"></div>
     <button onclick="facNCOpen()" title="Anular una factura ya emitida con una Nota de Crédito" style="flex:0 0 100%;width:100%;margin-top:4px;padding:9px;border:1px solid #fecaca;border-radius:10px;background:#fff;color:#b91c1c;font-size:13px;font-weight:800;cursor:pointer">🧾 Anular factura (Nota de Crédito)</button>
   </div>
@@ -3519,7 +3527,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      #rcpRoot, con su propio cliente Supabase (login anónimo). Portado de la app
      Control-Carga-Remitos-FC. Suma las cajas del día a localStorage para que RT
      se cierre con esa cantidad sin pedirla a mano. -->
-<script type="module" src="recepcion.js?v=3.80"></script>
+<script type="module" src="recepcion.js?v=9.63"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -3610,13 +3618,13 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
     <h1 class="sup-title">Administración</h1>
     <!-- GRANDES: uso diario (orden definido por el usuario). "Stock y Compras" = Stocks + OC en un solo botón. -->
     <div class="sup-actions sup-primary">
-      <button class="sup-action-btn" onclick="openFacturacion()"><span class="sup-ico">📋</span><span>Facturación</span></button>
+      <button class="sup-action-btn" onclick="openFacturacion()" style="position:relative;"><span class="sup-ico">📋</span><span>Facturación</span><span id="facBadge" class="dp-badge" style="display:none;" title="Pedidos listos para facturar (picking + separado terminados, todavía sin facturar)"></span></button>
       <button class="sup-action-btn" onclick="openPPP()"><span id="pppAlertBadge" class="ppp-alert-badge"></span><span class="sup-ico">🗓️</span><span>PPP</span></button>
       <button class="sup-action-btn" onclick="openRecepcionAdmin()" style="position:relative;"><span class="sup-ico">🏭</span><span>Carga Recepción Mercadería</span><span id="recepBadge" class="dp-badge" style="display:none;min-width:26px;height:26px;line-height:26px;font-size:15px;padding:0 6px;border-radius:13px;" title="Pendiente en Recepción: remitos por cargar + bajadas de racks por aprobar"></span></button>
-      <button class="sup-action-btn" onclick="showFaltAvisar()"><span class="sup-ico">📦➕</span><span>Completar Pedido</span></button>
+      <button class="sup-action-btn" onclick="showFaltAvisar()" style="position:relative;"><span class="sup-ico">📦➕</span><span>Completar Pedido</span><span id="cpBadge" class="dp-badge" style="display:none;" title="Pedidos con faltante que tiene stock para completarse"></span></button>
       <button class="sup-action-btn" onclick="openStockAdmin()"><span class="sup-ico">📦</span><span>Stock y Compras</span></button>
       <button class="sup-action-btn" onclick="openPanelWebLK()"><span class="sup-ico">🌐</span><span>Panel Web LK</span></button>
-      <button class="sup-action-btn" onclick="openRemitosAdmin()"><span class="sup-ico">🚚</span><span>Recepción Remitos (RR)</span></button>
+      <button class="sup-action-btn" onclick="openRemitosAdmin()" style="position:relative;"><span class="sup-ico">🚚</span><span>Recepción Remitos (RR)</span><span id="rrBadge" class="dp-badge" style="display:none;" title="Remitos cargados al camión sin controlar todavía"></span></button>
     </div>
     <div class="sup-sec-label">Reportes y configuración</div>
     <!-- CHICOS: uso ocasional. -->
@@ -3749,6 +3757,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
         <button class="ppp-imp-toggle" onclick="pppExportExcel()" title="Baja un Excel de 2 hojas (Programación Diaria pendiente + Pedidos Entregados), en vivo desde Supabase.">⬇ Exportar Excel</button>
         <button class="ppp-imp-toggle ppp-sup-toggle" onclick="openPppSupers()" title="Agregar/quitar clientes súper">🛒 Clientes súper</button>
         <button class="ppp-imp-toggle ppp-pdf-toggle" onclick="pppConnectPdfDir()" title="Conectar las carpetas con los PDF de ISIS (ej. X:\PDF_ISIS y X:\PDF_ISISCHEF). Podés agregar VARIAS: tocá una vez por carpeta. Elegí la subcarpeta, NO el disco entero (Chrome bloquea raíces de disco y carpetas del sistema). Necesita Chrome/Edge en PC.">🖨️ Carpeta(s) PDF</button>
+        <button class="ppp-imp-toggle" onclick="openZonasMapa()" title="Geocodifica las direcciones (OpenStreetMap) y las muestra en un mapa por zona, marcando desajustes. Sirve para parametrizar bien las zonas.">📍 Mapa de zonas</button>
       </div>
       <span id="pppPdfDirStatus" class="ppp-pdfdir-status"></span>
       <div id="pppPreview" class="ppp-preview"></div>
@@ -6403,7 +6412,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v9.60";
+const APP_VERSION = "v10.02";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -9788,6 +9797,16 @@ function stockComputeSaldos(movs, cutoff, asOf) {
   });
   return m;
 }
+// v10.00: construye saldos directamente desde vista_stock_procesada (sin recalcular desde movimientos)
+function _stkSaldosFromView(rows) {
+  var m = {};
+  (rows || []).forEach(function (r) {
+    var k = String(r.cod || "");
+    if (!k) return;
+    m[k] = { cod: k, desc: r.descripcion || "", terminado: Number(r.terminado) || 0, excedente: Number(r.excedente) || 0, separar_pedidos: Number(r.separar_pedidos) || 0, a_facturar: Number(r.a_facturar) || 0, a_guardar: Number(r.a_guardar) || 0, racks: Number(r.racks) || 0, racks_ch: Number(r.racks_ch) || 0, para_envasar: Number(r.para_envasar) || 0, insumos: Number(r.insumos_dep) || 0, _uni: "", _ubi: "" };
+  });
+  return m;
+}
 function stockFmtTs(ts) { try { return new Date(ts).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }); } catch (_e) { return String(ts); } }
 let _stk = null;
 /* v4.43 — NOMBRES por artículo desde Supabase. Fuente única: la vista
@@ -9891,7 +9910,7 @@ async function openStockAdmin(soloConteo) {
   const _solo = soloConteo === true;   // rol "solo conteo" (Giuliana): solo la solapa Conteo
   if (!document.getElementById("stkCss")) {
     const s = document.createElement("style"); s.id = "stkCss";
-    s.textContent = "#stockAdminOverlay{display:none;position:fixed;inset:0;z-index:1280;background:rgba(2,6,23,.74);overflow:auto;padding:14px;}#stockAdminOverlay.show{display:block;}.stk-card{background:#f8fafc;max-width:min(1500px,97vw);margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.stk-head{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:linear-gradient(90deg,#1e6bd6,#1e3a8a);color:#fff;}.stk-title{font-size:19px;font-weight:800;}.stk-close{background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;width:auto;}.stk-body{padding:14px 16px;}.stk-loading,.stk-empty{padding:24px;text-align:center;color:#64748b;}.stk-sec{margin:16px 0 6px;font-size:14px;font-weight:900;color:#0f172a;display:flex;align-items:center;gap:7px;}.stk-secn{background:#e2e8f0;color:#475569;border-radius:999px;padding:1px 9px;font-size:11.5px;font-weight:800;}.stk-inp{border:1px solid #cbd5e1;border-radius:8px;padding:6px 8px;font-size:13px;font-family:inherit;background:#fff;}.stk-sub{font-size:10.5px;color:#94a3b8;font-weight:700;}.stk-nuevo{display:inline-flex;flex-wrap:wrap;align-items:center;gap:6px;}.stk-btn-x{color:#b91c1c;border-color:#fecaca;}.stk-scroll{overflow-x:auto;}.stk-catbox{border:1px solid #cbd5e1;border-radius:11px;padding:10px 11px;margin-bottom:8px;background:#fff;}.stk-catrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}.stk-catuni{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:7px;}.stk-catlist{margin-top:10px;padding-top:10px;border-top:1px dashed #e2e8f0;}.stk-catdesc{margin-top:5px;font-size:12px;color:#475569;line-height:1.35;}.stk-tbl tr.stk-filtros th{background:#f8fafc;padding:5px 9px;text-transform:none;}.stk-secbtn{width:100%;text-align:left;background:#eef2ff;border:1px solid #c7d2fe;border-radius:10px;padding:9px 12px;cursor:pointer;margin:16px 0 8px;}.stk-caret{display:inline-block;width:16px;color:#4f46e5;font-weight:900;}.stk-tbl tr.stk-viejo td{background:#fffbeb;}input.stk-inp.stk-neg{color:#b91c1c;font-weight:800;}.stk-cut{background:#fffbeb;border:1px solid #fcd34d;color:#92400e;border-radius:9px;padding:8px 11px;font-size:12.5px;font-weight:700;margin-bottom:10px;}.stk-filtro{flex:1;min-width:180px;height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 11px;font-size:14px;}.stk-btn{background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:8px 12px;font-size:13px;font-weight:800;cursor:pointer;width:auto;}.stk-btn.ok{background:#16a34a;color:#fff;border-color:#16a34a;}.stk-btn.danger{background:#fff;color:#b91c1c;border-color:#fca5a5;}.stk-tbl{width:100%;border-collapse:collapse;font-size:13.5px;}.stk-tbl.stk-tbl-fit{width:auto;max-width:100%;}.stk-tbl.stk-tbl-fit td.stk-desc{max-width:210px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.stk-tbl.stk-tbl-sect td.stk-desc{max-width:140px;}.stk-tbl.stk-tbl-fit th.num,.stk-tbl.stk-tbl-fit td.num{text-align:right;padding-left:9px;padding-right:9px;}.stk-tblwrap{overflow-x:auto;overflow-y:auto;max-width:100%;max-height:60vh;}.stk-tbl.stk-tbl-fit th.num{vertical-align:bottom;line-height:1.15;}.stk-tbl th{background:#f1f5f9;color:#475569;text-align:left;padding:7px 9px;font-size:11px;text-transform:uppercase;border-bottom:1px solid #cbd5e1;position:sticky;top:0;z-index:10;}.stk-tbl td{padding:7px 9px;}.stk-tbl th.num,.stk-tbl td.num{text-align:right;font-variant-numeric:tabular-nums;}.stk-row{cursor:pointer;border-bottom:1px solid #eef2f7;}.stk-row:hover{background:#eff6ff;}.stk-row td{padding:7px 9px;}.stk-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#1e6bd6;}.stk-desc{color:#475569;}.stk-neg{color:#b91c1c;font-weight:800;}.stk-pick-cell{cursor:pointer;color:#1e6bd6;font-weight:800;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px;}.stk-pick-cell:hover{background:#eff6ff;}.stk-tbl td.stk-hist0{color:#94a3b8;font-weight:700;}.stk-tbl td.stk-hist0:hover{background:#f1f5f9;color:#475569;}.stk-caret{color:#94a3b8;}.stk-detrow td{padding:0 9px 9px;background:#f8fafc;}.stk-det{border-left:3px solid #cbd5e1;padding:6px 0 6px 10px;}.stk-mv{display:flex;gap:9px;font-size:12px;padding:3px 0;align-items:center;}.stk-mv-old{opacity:.45;}.stk-mv-ts{color:#64748b;min-width:96px;}.stk-mv-tipo{font-weight:800;min-width:78px;}.stk-mv-dep{color:#64748b;min-width:74px;}.stk-mv-d{font-weight:800;min-width:44px;text-align:right;}.stk-mv-d.pos{color:#15803d;}.stk-mv-d.neg{color:#b91c1c;}.stk-mv-ref{color:#94a3b8;}.stk-ini-txt{width:100%;border:1px solid #cbd5e1;border-radius:9px;padding:9px;font-family:Consolas,Menlo,monospace;font-size:14px;}.stk-ini-btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}.stk-ini-warn{font-size:12px;color:#92400e;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:8px;margin-top:10px;}.stk-tabs{display:flex;gap:4px;padding:8px 12px 0;background:#1e3a8a;flex-wrap:wrap;}.stk-tab{flex:0 1 auto;width:auto;white-space:nowrap;background:rgba(255,255,255,.12);color:#cbd5e1;border:none;border-radius:9px 9px 0 0;padding:9px 13px;font-size:12.5px;font-weight:800;cursor:pointer;}.stk-tab.on{background:#f8fafc;color:#1e3a8a;}.stk-seg{display:flex;gap:6px;margin-bottom:10px;}.stk-segb{flex:1;background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:7px;font-size:13px;font-weight:800;cursor:pointer;}.stk-segb.on{background:#1e6bd6;color:#fff;border-color:#1e6bd6;}.stk-grp{margin-bottom:10px;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;}.stk-grp-h{background:#f1f5f9;padding:7px 10px;font-weight:800;font-size:13px;}.stk-grp-tot{color:#15803d;font-weight:800;margin-left:6px;}.stk-ing{display:flex;gap:9px;align-items:center;padding:5px 10px;border-top:1px solid #f1f5f9;font-size:12.5px;}.stk-ing-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#1e6bd6;}.stk-ing-desc{flex:1;color:#475569;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.stk-ing-rto{color:#94a3b8;font-size:11px;}.stk-aj-sec{border:1px solid #e2e8f0;border-radius:12px;padding:12px;margin-bottom:12px;}.stk-aj-h{font-size:15px;font-weight:800;margin-bottom:6px;}.stk-aj-hint{font-size:12px;color:#64748b;margin-bottom:7px;}.stk-aj-form{display:flex;gap:7px;flex-wrap:wrap;}.stk-aj-inp{flex:1;min-width:90px;height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 10px;font-size:14px;text-align:center;}.cnt-in{height:32px;border:1px solid #cbd5e1;border-radius:7px;padding:0 6px;font-size:13px;box-sizing:border-box;margin:0;width:auto;}.stk-aj-dep{margin-bottom:12px;font-size:13px;font-weight:800;}.stk-aj-dep select{height:36px;border:1px solid #cbd5e1;border-radius:8px;padding:0 8px;font-size:14px;font-weight:700;}.stk-rk-orden{background:#f1f5f9;border-radius:10px;padding:10px 12px;font-size:13px;margin-bottom:10px;}.stk-rk-orden.pend{background:#fffbeb;border:1.5px solid #fcd34d;color:#92400e;}.stk-rk-baj{display:flex;align-items:center;gap:10px;border:1px solid #e2e8f0;border-radius:11px;padding:9px 11px;margin-bottom:8px;background:#fff;}.stk-rk-baji{flex:1;min-width:0;}.stk-rk-q{font-size:12px;color:#1e6bd6;font-weight:700;margin-top:2px;}.stk-catgrid{display:flex;flex-wrap:wrap;gap:10px;}.stk-catbtn{position:relative;min-width:150px;flex:1 1 150px;max-width:240px;min-height:100px;background:linear-gradient(135deg,#eef2ff,#e0e7ff);border:2px solid #c7d2fe;border-radius:14px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:18px 16px 36px;transition:border-color .15s,box-shadow .15s;}.stk-catbtn:hover{border-color:#818cf8;box-shadow:0 4px 16px rgba(99,102,241,.18);}.stk-catbtn-sincat{background:linear-gradient(135deg,#fef9c3,#fef3c7);border-color:#fcd34d;}.stk-catbtn-sincat:hover{border-color:#f59e0b;box-shadow:0 4px 16px rgba(245,158,11,.18);}.stk-catbtn-lbl{font-size:18px;font-weight:800;color:#1e3a8a;text-align:center;line-height:1.3;word-break:break-word;}.stk-catbtn-n{position:absolute;top:7px;right:9px;background:#6366f1;color:#fff;border-radius:999px;padding:1px 8px;font-size:11px;font-weight:800;}.stk-catbtn-ed,.stk-catbtn-del{position:absolute;bottom:6px;background:rgba(255,255,255,.85);border:1px solid #cbd5e1;border-radius:7px;padding:3px 7px;font-size:13px;cursor:pointer;line-height:1;transition:background .15s;width:auto;}.stk-catbtn-ed:hover,.stk-catbtn-del:hover{background:#fff;border-color:#818cf8;}.stk-catbtn-ed{left:8px;}.stk-catbtn-del{right:8px;}";
+    s.textContent = "#stockAdminOverlay{display:none;position:fixed;inset:0;z-index:1280;background:rgba(2,6,23,.74);overflow:auto;padding:14px;}#stockAdminOverlay.show{display:block;}.stk-card{background:#f8fafc;max-width:min(1500px,97vw);margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.stk-head{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:linear-gradient(90deg,#1e6bd6,#1e3a8a);color:#fff;}.stk-title{font-size:19px;font-weight:800;}.stk-close{background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;width:auto;}.stk-body{padding:14px 16px;}.stk-loading,.stk-empty{padding:24px;text-align:center;color:#64748b;}.stk-sec{margin:16px 0 6px;font-size:14px;font-weight:900;color:#0f172a;display:flex;align-items:center;gap:7px;}.stk-secn{background:#e2e8f0;color:#475569;border-radius:999px;padding:1px 9px;font-size:11.5px;font-weight:800;}.stk-inp{border:1px solid #cbd5e1;border-radius:8px;padding:6px 8px;font-size:13px;font-family:inherit;background:#fff;}.stk-sub{font-size:10.5px;color:#94a3b8;font-weight:700;}.stk-nuevo{display:inline-flex;flex-wrap:wrap;align-items:center;gap:6px;}.stk-btn-x{color:#b91c1c;border-color:#fecaca;}.stk-scroll{overflow-x:auto;}.stk-catbox{border:1px solid #cbd5e1;border-radius:11px;padding:10px 11px;margin-bottom:8px;background:#fff;}.stk-catrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}.stk-catuni{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:7px;}.stk-catlist{margin-top:10px;padding-top:10px;border-top:1px dashed #e2e8f0;}.stk-catdesc{margin-top:5px;font-size:12px;color:#475569;line-height:1.35;}.stk-tbl tr.stk-filtros th{background:#f8fafc;padding:5px 9px;text-transform:none;}.stk-secbtn{width:100%;text-align:left;background:#eef2ff;border:1px solid #c7d2fe;border-radius:10px;padding:9px 12px;cursor:pointer;margin:16px 0 8px;}.stk-caret{display:inline-block;width:16px;color:#4f46e5;font-weight:900;}.stk-tbl tr.stk-viejo td{background:#fffbeb;}input.stk-inp.stk-neg{color:#b91c1c;font-weight:800;}.stk-cut{background:#fffbeb;border:1px solid #fcd34d;color:#92400e;border-radius:9px;padding:8px 11px;font-size:12.5px;font-weight:700;margin-bottom:10px;}.stk-filtro{flex:1;min-width:180px;height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 11px;font-size:14px;}.stk-btn{background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:8px 12px;font-size:13px;font-weight:800;cursor:pointer;width:auto;}.stk-btn.ok{background:#16a34a;color:#fff;border-color:#16a34a;}.stk-btn.danger{background:#fff;color:#b91c1c;border-color:#fca5a5;}.stk-tbl{width:100%;border-collapse:collapse;font-size:13.5px;}.stk-tbl.stk-tbl-fit{width:auto;max-width:100%;}.stk-tbl.stk-tbl-fit td.stk-desc{max-width:210px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.stk-tbl.stk-tbl-sect td.stk-desc{max-width:140px;}.stk-tbl.stk-tbl-fit th.num,.stk-tbl.stk-tbl-fit td.num{text-align:right;padding-left:9px;padding-right:9px;}.stk-tblwrap{overflow-x:auto;overflow-y:auto;max-width:100%;max-height:60vh;}.stk-tbl.stk-tbl-fit th.num{vertical-align:bottom;line-height:1.15;}.stk-tbl th{background:#f1f5f9;color:#475569;text-align:left;padding:7px 9px;font-size:11px;text-transform:uppercase;border-bottom:1px solid #cbd5e1;position:sticky;top:0;z-index:10;}.stk-tbl td{padding:7px 9px;}.stk-tbl th.num,.stk-tbl td.num{text-align:right;font-variant-numeric:tabular-nums;}.stk-row{cursor:pointer;border-bottom:1px solid #eef2f7;}.stk-row:hover{background:#eff6ff;}.stk-row td{padding:7px 9px;}.stk-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#1e6bd6;}.stk-desc{color:#475569;}.stk-neg{color:#b91c1c;font-weight:800;}.stk-pick-cell{cursor:pointer;color:#1e6bd6;font-weight:800;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px;}.stk-pick-cell:hover{background:#eff6ff;}.stk-tbl td.stk-hist0{color:#94a3b8;font-weight:700;}.stk-tbl td.stk-hist0:hover{background:#f1f5f9;color:#475569;}.stk-caret{color:#94a3b8;}.stk-detrow td{padding:0 9px 9px;background:#f8fafc;}.stk-det{border-left:3px solid #cbd5e1;padding:6px 0 6px 10px;}.stk-mv{display:flex;gap:9px;font-size:12px;padding:3px 0;align-items:center;}.stk-mv-old{opacity:.45;}.stk-mv-ts{color:#64748b;min-width:96px;}.stk-mv-tipo{font-weight:800;min-width:78px;}.stk-mv-dep{color:#64748b;min-width:74px;}.stk-mv-d{font-weight:800;min-width:44px;text-align:right;}.stk-mv-d.pos{color:#15803d;}.stk-mv-d.neg{color:#b91c1c;}.stk-mv-ref{color:#94a3b8;}.stk-ini-txt{width:100%;border:1px solid #cbd5e1;border-radius:9px;padding:9px;font-family:Consolas,Menlo,monospace;font-size:14px;}.stk-ini-btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}.stk-ini-warn{font-size:12px;color:#92400e;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:8px;margin-top:10px;}.stk-tabs{display:flex;gap:4px;padding:8px 12px 0;background:#1e3a8a;flex-wrap:wrap;}.stk-tab{flex:0 1 auto;width:auto;white-space:nowrap;background:rgba(255,255,255,.12);color:#cbd5e1;border:none;border-radius:9px 9px 0 0;padding:9px 13px;font-size:12.5px;font-weight:800;cursor:pointer;}.stk-tab.on{background:#f8fafc;color:#1e3a8a;}.stk-seg{display:flex;gap:6px;margin-bottom:10px;}.stk-segb{flex:1;background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:7px;font-size:13px;font-weight:800;cursor:pointer;}.stk-segb.on{background:#1e6bd6;color:#fff;border-color:#1e6bd6;}.stk-grp{margin-bottom:10px;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;}.stk-grp-h{background:#f1f5f9;padding:7px 10px;font-weight:800;font-size:13px;}.stk-grp-tot{color:#15803d;font-weight:800;margin-left:6px;}.stk-ing{display:flex;gap:9px;align-items:center;padding:5px 10px;border-top:1px solid #f1f5f9;font-size:12.5px;}.stk-ing-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#1e6bd6;}.stk-ing-desc{flex:1;color:#475569;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.stk-ing-rto{color:#94a3b8;font-size:11px;}.stk-aj-sec{border:1px solid #e2e8f0;border-radius:12px;padding:12px;margin-bottom:12px;}.stk-aj-h{font-size:15px;font-weight:800;margin-bottom:6px;}.stk-aj-hint{font-size:12px;color:#64748b;margin-bottom:7px;}.stk-aj-form{display:flex;gap:7px;flex-wrap:wrap;}.stk-aj-inp{flex:1;min-width:90px;height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 10px;font-size:14px;text-align:center;}.cnt-in{height:32px;border:1px solid #cbd5e1;border-radius:7px;padding:0 6px;font-size:13px;box-sizing:border-box;margin:0;width:auto;}.stk-aj-dep{margin-bottom:12px;font-size:13px;font-weight:800;}.stk-aj-dep select{height:36px;border:1px solid #cbd5e1;border-radius:8px;padding:0 8px;font-size:14px;font-weight:700;}.stk-rk-orden{background:#f1f5f9;border-radius:10px;padding:10px 12px;font-size:13px;margin-bottom:10px;}.stk-rk-orden.pend{background:#fffbeb;border:1.5px solid #fcd34d;color:#92400e;}.stk-rk-baj{display:flex;align-items:center;gap:10px;border:1px solid #e2e8f0;border-radius:11px;padding:9px 11px;margin-bottom:8px;background:#fff;}.stk-rk-baji{flex:1;min-width:0;}.stk-rk-q{font-size:12px;color:#1e6bd6;font-weight:700;margin-top:2px;}.stk-catgrid{display:flex;flex-wrap:wrap;gap:10px;}.stk-catbtn{position:relative;min-width:150px;flex:1 1 150px;max-width:240px;min-height:50px;background:linear-gradient(135deg,#eef2ff,#e0e7ff);border:2px solid #c7d2fe;border-radius:14px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:9px 12px 30px;transition:border-color .15s,box-shadow .15s;}.stk-catbtn:hover{border-color:#818cf8;box-shadow:0 4px 16px rgba(99,102,241,.18);}.stk-catbtn-sincat{background:linear-gradient(135deg,#fef9c3,#fef3c7);border-color:#fcd34d;}.stk-catbtn-sincat:hover{border-color:#f59e0b;box-shadow:0 4px 16px rgba(245,158,11,.18);}.stk-catbtn-lbl{font-size:18px;font-weight:800;color:#1e3a8a;text-align:center;line-height:1.3;word-break:break-word;}.stk-catbtn-n{position:absolute;top:7px;right:9px;background:#6366f1;color:#fff;border-radius:999px;padding:1px 8px;font-size:11px;font-weight:800;}.stk-catbtn-ed,.stk-catbtn-del{position:absolute;bottom:6px;background:rgba(255,255,255,.85);border:1px solid #cbd5e1;border-radius:7px;padding:3px 7px;font-size:13px;cursor:pointer;line-height:1;transition:background .15s;width:auto;}.stk-catbtn-ed:hover,.stk-catbtn-del:hover{background:#fff;border-color:#818cf8;}.stk-catbtn-ed{left:8px;}.stk-catbtn-del{right:8px;}";
     document.head.appendChild(s);
   }
   let ov = document.getElementById("stockAdminOverlay");
@@ -9899,22 +9918,27 @@ async function openStockAdmin(soloConteo) {
   ov.classList.add("show");
   ov.innerHTML = '<div class="stk-card"><div class="stk-head"><span class="stk-title">' + (_solo ? "📋 Conteo de stock" : "📦 Stock y Compras") + '</span><button class="stk-close" onclick="closeStockAdmin()">Cerrar</button></div><div class="stk-tabs" id="stkTabs"></div><div class="stk-body" id="stkBody"><div class="stk-loading">Cargando…</div></div></div>';
   try {
-    const res = await Promise.all([stockFetchMovs(), stockGetCutoff(), stockFetchArtFactors(), racksFetchOrdenes(), racksFetchBajadas(), loadArtNombres(), supaFetchAllSafe(SUPABASE_URL + "/rest/v1/v_cajas_pedidas", "select=articulo,cajas_pedidas").then(function(rows) { var dem = {}; (rows || []).forEach(function(r) { var k = _ocgNorm(r.articulo); if (k) dem[k] = (dem[k] || 0) + (Number(r.cajas_pedidas) || 0); }); return dem; }).catch(function(){ return {}; }),   /* v9.25: demanda desde vista SQL (siempre excluye canceladas) */
+    const res = await Promise.all([stockFetchMovs(), stockGetCutoff(), stockFetchArtFactors(), racksFetchOrdenes(), racksFetchBajadas(), loadArtNombres(), supaFetchAllSafe(SUPABASE_URL + "/rest/v1/vista_stock_procesada", "select=cod,cod_base,descripcion,linea,familia_principal,es_secundario,terminado,excedente,separar_pedidos,a_facturar,a_guardar,racks,racks_ch,para_envasar,insumos_dep,stock_total,cajas_pedidas,proy_cajas_mes,capacidad_gondola,es_insumo,visible_en_stock").catch(function(){ return []; }),   /* v10.00: todo desde vista SQL procesada */
       supaFetchAllSafe(SUPABASE_CAPACIDAD_ENDPOINT, "select=sector,cod,cajas_max"),
       fetch(SUPABASE_URL + "/rest/v1/Stock_Config?clave=in.(guardado_cajas_por_hora,guardado_incluir_racks)&select=clave,valor", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; }),
       (_solo ? Promise.resolve({ pend: {}, porArt: {} }) : stkFcsFetch().catch(function () { return { pend: {}, porArt: {} }; })),   // v6.70: FC s/Salida como columna
-      supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Insumos", "select=cod").catch(function () { return []; }),
-      ocLoadLineas().catch(function () { return {}; }),   // v7.73: cargar códigos de insumos para filtrarlos de Stock + v7.89: LK/CH
+      Promise.resolve([]),   // v10.00: insumos viene de vista_stock_procesada (es_insumo)
+      ocLoadLineas().catch(function () { return {}; }),   // v7.89: LK/CH
       rkbFetchCxM().catch(function () { return { cxm: {} }; }),   // v8.52: inner×master de racks (backlog capacity-aware)
-      supaFetchAllSafe(SUPABASE_URL + "/rest/v1/proyeccion_madre", "select=cod,proy_cajas_mes").catch(function () { return []; })]);   // v9.49: proyección caj/mes (antes del índice de las OCs)
+      Promise.resolve([])]);   // v10.00: proyección viene de vista_stock_procesada (proy_cajas_mes)
     // v8.90: cxm primario = planimetría; fallback = Articulos.Cajas_x_Master (para códigos sin posición en racks)
     var _cxmPlani = (res[11] && res[11].cxm) || {}, _cxmMerge = {};
     Object.keys(_cxmPlani).forEach(function (k) { _cxmMerge[k] = _cxmPlani[k]; });
     var _fac = res[2] || {};
     Object.keys(_fac).forEach(function (k) { var kN = _cpNorm(k); if (!_cxmMerge[kN] && _fac[k].cajasXMaster > 0) _cxmMerge[kN] = _fac[k].cajasXMaster; });
-    var _proyMap = {};   // v9.49: proyección caj/mes por código normalizado (antes del índice de las OCs)
-    (Array.isArray(res[13]) ? res[13] : []).forEach(function (x) { var k = _ocgNorm(x.cod); if (k) _proyMap[k] = Number(x.proy_cajas_mes) || 0; });
-    _stk = { movs: res[0] || [], cutoff: res[1], factors: _fac, ordenes: res[3] || [], bajadas: res[4] || [], tab: _solo ? "conteo" : "stocks", soloConteo: _solo, filtro: "", openArt: null, ingMode: "remito", asOf: null, asOfInput: "", dem: res[6] || {}, cap: res[7] || [], gConf: res[8] || [], fcs: res[9] || { pend: {}, porArt: {} }, fcsLoaded: true, insumosCods: (res[10] || []).map(function(i) { return String(i.cod || "").trim().toUpperCase(); }), cxm: _cxmMerge, proy: _proyMap };
+    // v10.00: construir mapas de demanda/proyección/insumos desde vista_stock_procesada (res[6])
+    var _viewRows = res[6] || [];
+    var _demFromView = {};
+    _viewRows.forEach(function (r) { var k = _ocgNorm(r.cod); if (k && Number(r.cajas_pedidas) > 0) _demFromView[k] = Number(r.cajas_pedidas); });
+    var _proyMap = {};
+    _viewRows.forEach(function (r) { var k = _ocgNorm(r.cod); if (k && Number(r.proy_cajas_mes) > 0) _proyMap[k] = Number(r.proy_cajas_mes); });
+    var _insFromView = _viewRows.filter(function (r) { return r.es_insumo; }).map(function (r) { return String(r.cod).trim().toUpperCase(); });
+    _stk = { movs: res[0] || [], cutoff: res[1], factors: _fac, ordenes: res[3] || [], bajadas: res[4] || [], tab: _solo ? "conteo" : "stocks", soloConteo: _solo, filtro: "", openArt: null, ingMode: "remito", asOf: null, asOfInput: "", dem: _demFromView, cap: res[7] || [], gConf: res[8] || [], fcs: res[9] || { pend: {}, porArt: {} }, fcsLoaded: true, insumosCods: _insFromView, cxm: _cxmMerge, proy: _proyMap, viewRows: _viewRows };
     stkRender();
   } catch (e) { const b = document.getElementById("stkBody"); if (b) b.innerHTML = '<div class="stk-loading">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
 }
@@ -10570,8 +10594,10 @@ async function ocNuevaCrear() {
 }
 
 /* ===== GENERADOR DE OCs (v4.13): replica la lógica del Excel "Pedidos Talleristas/Prov".
-   Por artículo: A pedir = max(0, Máximo + Pedidos − (Góndola + Racks)). Máximo y Proveedor salen de
-   OC_Maximos (config importada del Excel); Stock de Movimientos_Stock (góndola+racks, NO "a guardar");
+   Por artículo: A pedir = max(0, Máximo + Pedidos − Stock). Stock (vista_generador_oc, v9.65) =
+   TODO el módulo Stocks = terminado + a_guardar + racks + excedente + separar_pedidos + a_facturar
+   + para_envasar + racks_ch (NO insumos). Todo lo que hay en mano cuenta → no se re-pide; los
+   pedidos se descuentan vía la fórmula. Máximo y Proveedor salen de OC_Maximos (config del Excel);
    Pedidos (demanda) = Σ cajas por artículo en los pedidos del PPP (PPP_Programacion_Diaria) según la
    base de picking (PPP_Base_Pedidos). Agrupa por proveedor y, al confirmar, escribe las OCs en
    Ordenes_Compra (escritura: sesión de supervisor). v7.65: "Log/ Fabr" (fábrica) SÍ genera OC
@@ -11190,14 +11216,15 @@ function stkExcedentesBtn() {
 function stkAsOfControl() {
   if (!_stk) return "";
   const on = !!_stk.asOf;
-  let h = '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin-bottom:10px;background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:8px 10px;">';
-  h += '<span style="font-size:12px;font-weight:800;color:#475569;">Ver stock:</span>';
-  h += '<button class="stk-btn' + (on ? '' : ' ok') + '" onclick="stkAsOfLive()">🔴 En vivo</button>';
-  h += '<input type="datetime-local" id="stkAsOfInp" value="' + escapeHtml(_stk.asOfInput || '') + '" onchange="if(_stk){_stk.asOfInput=this.value;}" style="height:36px;border:1px solid #cbd5e1;border-radius:8px;padding:0 8px;font-size:13px;">';
-  h += '<button class="stk-btn" onclick="stkAsOfApply()">📅 A esa fecha/hora</button>';
-  if (on) h += '<span style="font-size:12.5px;font-weight:800;color:#92400e;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:5px 9px;">📅 Stock al <b>' + escapeHtml(stockFmtTs(_stk.asOf)) + '</b> hs (histórico, no el actual)</span>';
-  h += '<span style="margin-left:auto;">' + stkExcedentesBtn() + '</span>';   // v8.92 — Excedentes a la derecha, misma fila
+  // v9.76 — una sola fila (nowrap): el input se achica (flex) y los botones no se parten.
+  // Excedentes a Excel se sacó de acá (pedido del usuario); sigue en Ingresos/Salidas.
+  let h = '<div style="display:flex;flex-wrap:nowrap;align-items:center;gap:6px;margin-bottom:10px;background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:8px 10px;">';
+  h += '<span style="font-size:12px;font-weight:800;color:#475569;flex:0 0 auto;">Ver stock:</span>';
+  h += '<button class="stk-btn' + (on ? '' : ' ok') + '" onclick="stkAsOfLive()" style="flex:0 0 auto;white-space:nowrap;">🔴 En vivo</button>';
+  h += '<input type="datetime-local" id="stkAsOfInp" value="' + escapeHtml(_stk.asOfInput || '') + '" onchange="if(_stk){_stk.asOfInput=this.value;}" style="flex:1 1 40px;min-width:0;height:36px;border:1px solid #cbd5e1;border-radius:8px;padding:0 6px;font-size:12px;">';
+  h += '<button class="stk-btn" onclick="stkAsOfApply()" style="flex:0 0 auto;white-space:nowrap;">📅 A esa fecha/hora</button>';
   h += '</div>';
+  if (on) h += '<div style="margin:-4px 0 10px;font-size:12.5px;font-weight:800;color:#92400e;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:5px 9px;">📅 Stock al <b>' + escapeHtml(stockFmtTs(_stk.asOf)) + '</b> hs (histórico, no el actual)</div>';
   return h;
 }
 function stkAsOfApply() {
@@ -12220,7 +12247,8 @@ function stkGuardadoToggleRacks() {
 }
 function stkBodyStocks() {
   if (_stk.sectDetail) return stkBodySectDetail();   // v4.35: detalle de un sector (click en un total)
-  const saldos = stockComputeSaldos(_stk.movs, _stk.cutoff, _stk.asOf);
+  // v10.00: modo normal → saldos desde vista SQL; modo As-Of → recalcular desde movimientos
+  const saldos = _stk.asOf ? stockComputeSaldos(_stk.movs, _stk.cutoff, _stk.asOf) : _stkSaldosFromView(_stk.viewRows);
   const dem = _stk.dem || {};
   // Capacidad MÁXIMA de góndola por artículo = suma de sus celdas en Capacidad_Sector
   // (un artículo puede estar en varias celdas; ej. el 506 = total de cajas que entran).
@@ -12415,8 +12443,9 @@ function stkBodyStocks() {
     '<button type="button" onclick="stkToggleSoloLow()" title="Mostrar sólo los códigos donde la suma de depósitos (góndola+excedente+pickeados+a facturar+a guardar+racks) es MENOR que lo pedido" style="width:auto;margin:0;flex:0 0 auto;padding:0 11px;height:38px;border:1.5px solid ' + (_stk.soloLow ? "#dc2626" : "#cbd5e1") + ';border-radius:9px;background:' + (_stk.soloLow ? "#fef2f2" : "#fff") + ';color:' + (_stk.soloLow ? "#b91c1c" : "#334155") + ';font-weight:800;font-size:13px;cursor:pointer;white-space:nowrap;">' + (_stk.soloLow ? "☑" : "☐") + ' ⚠ Stock bajo' + (_stkLowCount ? " (" + _stkLowCount + ")" : "") + '</button>' +
     '<button type="button" onclick="stkToggleSoloPin()" title="Mostrar sólo los códigos que fijaste (📌). Se guardan aunque cierres la app." style="width:auto;margin:0;flex:0 0 auto;padding:0 11px;height:38px;border:1.5px solid ' + (_stk.soloPin ? "#b45309" : "#cbd5e1") + ';border-radius:9px;background:' + (_stk.soloPin ? "#fffbeb" : "#fff") + ';color:' + (_stk.soloPin ? "#b45309" : "#334155") + ';font-weight:800;font-size:13px;cursor:pointer;white-space:nowrap;">' + (_stk.soloPin ? "☑" : "📌") + ' Fijados' + ((_stk.pins || []).length ? " (" + _stk.pins.length + ")" : "") + '</button>' +
     '</div>';
-  // v9.06 — botón aparte (fila propia) para el módulo "NP que faltan" (pedidos en la base sin cargar en el PPP).
-  h += '<div style="margin-bottom:10px;"><button type="button" onclick="stkOpenNpFaltan()" title="Revisar los pedidos que están en la base pero NO se cargaron/programaron en el PPP. Muestra NP · Fecha · Razón Social · Cajas, y permite marcar los que no van." style="width:auto;margin:0;padding:9px 15px;border:1.5px solid #f59e0b;border-radius:10px;background:#fffbeb;color:#b45309;font-weight:800;font-size:13.5px;cursor:pointer;white-space:nowrap;">⚠️ NP que faltan (sin cargar en PPP)</button></div>';
+  // v9.73 — se saca el cartel "NP que faltan (sin cargar en PPP)" de la tabla de Stock
+  // (pedido del dueño). El módulo sigue accesible desde el botón "Pedidos sin cargar
+  // en PPP" del panel supervisor (stkOpenNpFaltan).
   // Columnas: sectores fijos (menos insumos, que va en su sección). Los `extra`
   // (p/envasar, racks CH) SOLO se muestran como columna si algún artículo visible
   // tiene saldo ahí — así no agregan 2 columnas al pedo en el celular (v7.03).
@@ -13764,7 +13793,8 @@ function stkOpenGondola() {
 // v7.77: descargar tabla de stock en Excel (.xlsx real vía SheetJS)
 function stkDescargarExcel() {
   if (!_stk) return;
-  const saldos = stockComputeSaldos(_stk.movs, _stk.cutoff, _stk.asOf);
+  // v10.00: modo normal → saldos desde vista SQL; modo As-Of → recalcular desde movimientos
+  const saldos = _stk.asOf ? stockComputeSaldos(_stk.movs, _stk.cutoff, _stk.asOf) : _stkSaldosFromView(_stk.viewRows);
   const dem = _stk.dem || {};
   const capByCod = {};
   (_stk.cap || []).forEach(function (r) { const k = _ocgNorm(r.cod); if (!k) return; capByCod[k] = (capByCod[k] || 0) + (Number(r.cajas_max) || 0); });
@@ -13940,9 +13970,15 @@ async function stkFaltLoad() {
       supaFetchAllSafe(SUPABASE_OCMAX_ENDPOINT, "select=cod&activo=eq.false"),
       // v9.34 — NP ya ENTREGADAS (completadas) y CANCELADAS: no son faltante (igual que ocgDemanda).
       supaFetchAllSafe(SUPABASE_URL + "/rest/v1/PPP_Entregados_Meta", "select=np"),
-      supaFetchAllSafe(SUPABASE_URL + "/rest/v1/NP_Canceladas", "select=np")
+      supaFetchAllSafe(SUPABASE_URL + "/rest/v1/NP_Canceladas", "select=np"),
+      // v9.85 — ÚLTIMA ENTREGA (recepción a góndola): fecha + cajas de la última recepción por código.
+      supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Movimientos_Stock", "select=cod_art,delta,ts&tipo=eq.recepcion&deposito=eq.a_guardar&delta=gt.0"),
+      // v9.85 — OC pendiente de esta semana (Ordenes_Compra) por código/proveedor.
+      supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Ordenes_Compra", "select=codigo,cantidad,cantidad_recibida,fecha,proveedor&estado=eq.pendiente"),
+      // v9.85 — notas editables (Día resolución / Motivo) para el reporte al gerente.
+      supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Faltantes_Notas", "select=cod,dia_resolucion,motivo")
     ]);
-    var ppp = res[0] || [], base = res[1], facRows = res[2] || [], genProv = res[3] || [], saldos = res[4] || [], discRows = res[5] || [], entRows = res[6] || [], canRows = res[7] || [];
+    var ppp = res[0] || [], base = res[1], facRows = res[2] || [], genProv = res[3] || [], saldos = res[4] || [], discRows = res[5] || [], entRows = res[6] || [], canRows = res[7] || [], ultRows = res[8] || [], ocRows = res[9] || [], notaRows = res[10] || [];
     // Set de códigos discontinuos (normalizados) → se filtran de la tabla.
     var discont = {};
     discRows.forEach(function (r) { var k = _ocgNorm(r.cod); if (k) discont[k] = true; });
@@ -13964,15 +14000,51 @@ async function stkFaltLoad() {
       if (p2 && p2 !== "(sin proveedor)" && (Number(r.pr2) || 0) > 0) p1 = p1 ? (p1 + " / " + p2) : p2;
       if (p1) provMap[k] = p1;
     });
-    // Mapa saldos por código normalizado → stock total (todos los depósitos)
+    // Mapa saldos por código normalizado → stock.
+    //  · total     = NETO disponible para la PROYECCIÓN (depósitos NO comprometidos con picking):
+    //                góndola+exc+a_guardar+racks+racks_ch+envasar. NO cuenta separar_pedidos (ya
+    //                pickeado) ni a_facturar (ya facturable) → se balancea con la demanda sin-pickear.
+    //  · totalGross = STOCK TOTAL (v9.85): suma TAMBIÉN separar_pedidos + a_facturar. Es el número
+    //                que se MUESTRA en la columna Stock, para que coincida con la solapa Stocks y el
+    //                controlador no desconfíe ("stock total", pedido del usuario).
     var saldoMap = {};
     saldos.forEach(function (r) {
       var k = _ocgNorm(r.cod_art); if (!k) return;
+      var neto = (Number(r.terminado) || 0) + (Number(r.excedente) || 0) + (Number(r.a_guardar) || 0) +
+                 (Number(r.racks) || 0) + (Number(r.racks_ch) || 0) + (Number(r.para_envasar) || 0);
       saldoMap[k] = {
-        total: (Number(r.terminado) || 0) + (Number(r.excedente) || 0) + (Number(r.a_guardar) || 0) +
-               (Number(r.racks) || 0) + (Number(r.racks_ch) || 0) + (Number(r.para_envasar) || 0),
+        total: neto,
+        totalGross: neto + (Number(r.separar_pedidos) || 0) + (Number(r.a_facturar) || 0),
         desc: r.descripcion || ""
       };
+    });
+    // v9.85 — ÚLTIMA ENTREGA por código: fecha (día AR) + cajas de la última recepción a góndola.
+    // Se toma la fecha más reciente y se SUMAN las cajas recibidas ESE día (varios movimientos = 1 entrega).
+    var ultEnt = {};
+    ultRows.forEach(function (r) {
+      var k = _ocgNorm(r.cod_art); if (!k) return;
+      var dia = String(r.ts || "").slice(0, 10);   // ts ya viene UTC-3 al guardarse; día calendario
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dia)) return;
+      var cur = ultEnt[k];
+      if (!cur || dia > cur.fecha) ultEnt[k] = { fecha: dia, cajas: Number(r.delta) || 0 };
+      else if (dia === cur.fecha) cur.cajas += (Number(r.delta) || 0);
+    });
+    // v9.85 — OC PENDIENTE por código: cajas pendientes (cantidad − recibida) + fecha más reciente + proveedor.
+    var ocMap = {};
+    ocRows.forEach(function (r) {
+      var k = _ocgNorm(r.codigo); if (!k) return;
+      var pend = (Number(r.cantidad) || 0) - (Number(r.cantidad_recibida) || 0);
+      if (pend <= 0) return;
+      var f = String(r.fecha || "").slice(0, 10);
+      if (!ocMap[k]) ocMap[k] = { cajas: 0, fecha: f, prov: String(r.proveedor || "").trim() };
+      ocMap[k].cajas += pend;
+      if (f && f > (ocMap[k].fecha || "")) ocMap[k].fecha = f;
+    });
+    // v9.85 — notas editables (Día resolución / Motivo) por código.
+    var notasMap = {};
+    notaRows.forEach(function (r) {
+      var k = String(r.cod || "").trim(); if (!k) return;
+      notasMap[k] = { dia: String(r.dia_resolucion || ""), motivo: String(r.motivo || "") };
     });
     // NPs pendientes con fecha_entrega
     var npInfo = {};
@@ -14045,25 +14117,34 @@ async function stkFaltLoad() {
     }
 
     // Demanda por artículo (PROYECCIÓN): solo NPs SIN pickear. cod → [{fecha, np, rs, cajas}]
-    var demanda = {};
+    // v9.85 — además demTotal = TOTAL PEDIDOS (bruto): TODAS las NPs no facturadas, incluyendo las
+    // ya pickeadas/armadas, hasta que se facturen. Es el número que se MUESTRA en "Total Pedidos"
+    // (las 7 cajas del 922 que salen y aún no se facturaron deben sumar; mismo criterio p/ todos).
+    // demTotDet = detalle de TODAS las NPs (para el drill del Total Pedidos), cada una con su
+    // estado de picking → así el drill del total bruto muestra todo y marca lo ya pickeado.
+    var demanda = {}, demTotDet = {};
     Object.keys(npInfo).forEach(function (np) {
       var info = npInfo[np];
       var est = estadoTanda[info.tanda];
-      if (est && est !== "sinpickear") return;   // ya preparado / en picking → fuera de la proyección
+      var sinPickear = !(est && est !== "sinpickear");   // proyección solo cuenta lo sin pickear
       var items = base.get(np) || [];
       items.forEach(function (it) {
         // v8.11 — key por código SUFIJADO por empresa (437E/438E/439E/809E → "438E LK"/"438E CH")
         // para que la demanda case con el stock que también está suffijado por empresa. Los códigos
         // no-split quedan pelados (el codEmpSplit los devuelve tal cual).
         var cod = _ocgNorm(codEmpSplit(it.art, np)); if (!cod) return;
+        var cj = Number(it.cajas) || 0;
+        (demTotDet[cod] = demTotDet[cod] || []).push({ np: np, rs: info.rs, cliente: info.cliente, cajas: cj, fechaSalida: info.fecha, estado: est || "sinpickear" });
+        if (!sinPickear) return;                     // ya preparado / en picking → fuera de la proyección
         if (!demanda[cod]) demanda[cod] = [];
         // v8.08 — el faltante se cuenta el DÍA DE ARMADO (día hábil anterior a la salida),
         // no el día de la PPP. Guardo también la fecha de salida para el drill.
-        demanda[cod].push({ fecha: _faltDiaArmado(info.fecha), fechaSalida: info.fecha, np: np, rs: info.rs, cliente: info.cliente, cajas: Number(it.cajas) || 0, cod: cod, esSuper: !!info.esSuper });
+        demanda[cod].push({ fecha: _faltDiaArmado(info.fecha), fechaSalida: info.fecha, np: np, rs: info.rs, cliente: info.cliente, cajas: cj, cod: cod, esSuper: !!info.esSuper });
       });
     });
     _stk.falt = {
-      demanda: demanda, provMap: provMap, saldoMap: saldoMap, discont: discont,
+      demanda: demanda, demTotDet: demTotDet, provMap: provMap, saldoMap: saldoMap, discont: discont,
+      ultEnt: ultEnt, ocMap: ocMap, notasMap: notasMap,
       realFalt: realFalt, realFaltDia: realFaltDia, realDet: realDet, enCurso: Object.keys(enCurso).length,
       ajustes: {}, filtro: "s1", openCell: null, search: "",
       // v8.71 — por defecto: orden fabricante→faltó armado + los 3 botones activos.
@@ -14072,7 +14153,7 @@ async function stkFaltLoad() {
     _stk.faltLoaded = true;
   } catch (e) {
     console.error("stkFaltLoad:", e);
-    _stk.falt = { demanda: {}, provMap: {}, saldoMap: {}, discont: {}, realFalt: {}, realDet: {}, enCurso: 0, ajustes: {}, filtro: "s1", openCell: null, search: "", ordenFab: true, soloQuiebre: true, sinE: true, verDias: true };
+    _stk.falt = { demanda: {}, demTotDet: {}, provMap: {}, saldoMap: {}, discont: {}, ultEnt: {}, ocMap: {}, notasMap: {}, realFalt: {}, realDet: {}, enCurso: 0, ajustes: {}, filtro: "s1", openCell: null, search: "", ordenFab: true, soloQuiebre: true, sinE: true, verDias: true };
     _stk.faltLoaded = true;
   }
   if (_stk) stkRender();
@@ -14165,6 +14246,10 @@ function stkBodyFaltante() {
   if (!_stk || !_stk.falt) return '<div class="stk-loading">Cargando faltante…</div>';
   if (_stk.faltLoaded === "loading") return '<div class="stk-loading">Cargando demanda PPP + stock…</div>';
   var F = _stk.falt, dem = F.demanda, sMap = F.saldoMap, provMap = F.provMap, ajustes = F.ajustes || (F.ajustes = {});
+  var demTotDet = F.demTotDet || {};   // v9.85 — detalle de todos los pedidos (bruto, hasta facturar)
+  var ultEnt = F.ultEnt || {};       // v9.85 — última entrega por código
+  var ocMap = F.ocMap || {};         // v9.85 — OC pendiente por código
+  var notasMap = F.notasMap || (F.notasMap = {});   // v9.85 — notas editables (día resol / motivo)
   var realFalt = F.realFalt || {};   // v8.14 — faltante REAL (ya preparado / TP) por código
   var realFaltDia = F.realFaltDia || {};   // v9.44 — realFalt por fecha de salida (para el calendario)
   var discont = F.discont || {};     // v8.38 — códigos discontinuos (activo=false): no se muestran
@@ -14226,8 +14311,27 @@ function stkBodyFaltante() {
     var fam = equivFam(key);
     var esFam = members.length > 1 || !!fam;
     // Stock combinado + descripción/proveedor
-    var stockFam = 0, descFam = "";
-    members.forEach(function (m) { var s = sMap[m] || { total: 0, desc: "" }; stockFam += s.total; if (!descFam && s.desc) descFam = s.desc; });
+    //  · stockFam      = NETO (proyección) · stockFamGross = TOTAL a mostrar (v9.85)
+    var stockFam = 0, stockFamGross = 0, descFam = "";
+    members.forEach(function (m) { var s = sMap[m] || { total: 0, totalGross: 0, desc: "" }; stockFam += s.total; stockFamGross += (s.totalGross || 0); if (!descFam && s.desc) descFam = s.desc; });
+    // v9.85 — total pedidos BRUTO combinado (todos, hasta facturar)
+    var totalDemGross = 0;
+    members.forEach(function (m) { (demTotDet[m] || []).forEach(function (e) { totalDemGross += (Number(e.cajas) || 0); }); });
+    // v9.85 — última entrega combinada: la fecha más reciente entre los miembros (suma cajas de ese día)
+    var ultEntFam = null;
+    members.forEach(function (m) {
+      var u = ultEnt[m]; if (!u) return;
+      if (!ultEntFam || u.fecha > ultEntFam.fecha) ultEntFam = { fecha: u.fecha, cajas: u.cajas };
+      else if (u.fecha === ultEntFam.fecha) ultEntFam.cajas += u.cajas;
+    });
+    // v9.85 — OC pendiente combinada de la familia
+    var ocFam = null;
+    members.forEach(function (m) {
+      var o = ocMap[m]; if (!o) return;
+      if (!ocFam) ocFam = { cajas: 0, fecha: o.fecha, prov: o.prov };
+      ocFam.cajas += o.cajas;
+      if (o.fecha && o.fecha > (ocFam.fecha || "")) ocFam.fecha = o.fecha;
+    });
     // v8.14 — faltante REAL combinado (lo que ya faltó al armar en tandas pickeadas)
     var realFam = 0;
     members.forEach(function (m) { realFam += (realFalt[m] || 0); });
@@ -14335,7 +14439,12 @@ function stkBodyFaltante() {
       cod: codShow, key: key, esFam: esFam, miembros: miembrosDisp,
       desc: descFam || artNombre(codShow, ""), prov: provMap[key] || provMap[String(key).replace(/\s+(LK|CH)$/, "")] || provMap[members[0]] || "",
       stock: Math.round(stockFam), totalDem: Math.round(totalDem),
-      realFalt: Math.round(realFam), realDia: realDiaFam, realWin: realWin,
+      // v9.85 — valores a MOSTRAR: stock total (bruto) + total pedidos bruto + última entrega + OC pendiente
+      stockGross: Math.round(stockFamGross), totalDemGross: Math.round(totalDemGross), ultEnt: ultEntFam, oc: ocFam,
+      // v9.77 — faltó-al-armar PENDIENTE: se netea contra el stock sobrante (stock − demanda).
+      // Si ya llegó mercadería que cubre todo (ej. 508: stock 92 ≥ 58 ped), el "faltó al armar"
+      // queda cubierto y NO cuenta como quiebre → la fila desaparece (pedido del usuario).
+      realFalt: Math.round(realFam), realFaltPend: Math.max(0, Math.round(realFam) - Math.max(0, Math.round(stockFam) - Math.round(totalDem))), realDia: realDiaFam, realWin: realWin,
       faltS1: Math.round(faltS1), faltS2: Math.round(faltS2), faltResto: Math.round(faltResto),
       faltSinFecha: Math.round(faltSinFecha),
       diasFalt: diasFalt, diasFaltSuper: diasFaltSuper, diasFaltCli: diasFaltCli,
@@ -14376,13 +14485,13 @@ function stkBodyFaltante() {
     return codCanon(a.cod).localeCompare(codCanon(b.cod), undefined, { numeric: true });
   });
 
-  // Mostrar artículos con demanda proyectada O con faltante real ya armado
-  arts = arts.filter(function (a) { return a.totalDem > 0 || (a.realFalt || 0) > 0; });
+  // Mostrar artículos con demanda proyectada O con faltante real ya armado TODAVÍA sin cubrir
+  arts = arts.filter(function (a) { return a.totalDem > 0 || (a.realFaltPend || 0) > 0; });
 
   // v8.02 — resumen (sobre TODOS los con demanda, antes de "solo quiebre")
-  var _hayQ = function (a) { return (a.realFalt || 0) > 0 || a.faltS1 > 0 || a.faltS2 > 0 || (a.faltResto || 0) > 0 || diasCols.some(function (d) { return (a.diasFalt[d] || 0) > 0; }); };
+  var _hayQ = function (a) { return (a.realFaltPend || 0) > 0 || a.faltS1 > 0 || a.faltS2 > 0 || (a.faltResto || 0) > 0 || diasCols.some(function (d) { return (a.diasFalt[d] || 0) > 0; }); };
   var sumNQ = 0, sumCajS1 = 0, sumNQ2 = 0, sumCambio = 0, sumRealN = 0, sumRealCj = 0;
-  arts.forEach(function (a) { if (a.faltS1 > 0) { sumNQ++; sumCajS1 += a.faltS1; } if (a.faltS2 > 0) sumNQ2++; if (a.subCambio > 0) sumCambio++; if ((a.realFalt || 0) > 0) { sumRealN++; sumRealCj += a.realFalt; } });
+  arts.forEach(function (a) { if (a.faltS1 > 0) { sumNQ++; sumCajS1 += a.faltS1; } if (a.faltS2 > 0) sumNQ2++; if (a.subCambio > 0) sumCambio++; if ((a.realFaltPend || 0) > 0) { sumRealN++; sumRealCj += a.realFaltPend; } });
 
   // v8.02 — "solo quiebre": esconde los que no faltan (ruido)
   if (F.soloQuiebre) arts = arts.filter(_hayQ);
@@ -14420,6 +14529,7 @@ function stkBodyFaltante() {
     (F.colFiltro ? '<button class="falt-fbtn on" onclick="stkFaltColFiltro(\'' + F.colFiltro + '\')" title="Viendo solo la columna. Tocá para quitar el filtro (o tocá otro header para cambiarlo).">✕ Filtro: ' + escapeHtml(_faltColLabel(F.colFiltro)) + '</button>' : '') +
     '<button class="falt-fbtn' + (F.sinE ? " on" : "") + '" onclick="stkFaltSinE()" title="Ocultar códigos importados (E) que no tienen equivalente nacional para reponer. Mantiene los 94xE y las familias con nacional (574E/590E/809E CH/etc.).">' + (F.sinE ? "☑" : "☐") + ' Sin E</button>' +
     '<button class="falt-fbtn' + (F.verDias ? " on" : "") + '" onclick="stkFaltVerDias()" title="Mostrar el detalle día por día (agrega las columnas de cada día — puede necesitar scroll lateral).">' + (F.verDias ? "☑" : "☐") + ' 📅 Ver días</button>' +
+    '<button class="falt-fbtn" onclick="stkFaltImprimir()" title="Imprimir el módulo tal como está filtrado (reporte para el gerente). Abajo aclara qué NO se está mostrando.">🖨 Imprimir</button>' +
     '</div>' +
     '<input class="falt-search" type="text" inputmode="numeric" enterkeyhint="search" autocomplete="off" placeholder="🔎 Buscar código" value="' +
     escapeHtml(F.search || "") + '" oninput="stkFaltSearch(this.value)">' +
@@ -14438,7 +14548,12 @@ function stkBodyFaltante() {
     _faltSemTh(F, rs, "s1", "Falt S1", "la primer semana (S1)") +
     _faltSemTh(F, rs, "s2", "Falt S2", "la segunda semana (S2)") +
     _faltSemTh(F, rs, "resto", "Resto", "Resto (salidas más allá de la S2)") +
-    _faltSemTh(F, rs, "sinfecha", "Sin<br>fecha", "Sin fecha PPP (o pasada)");
+    _faltSemTh(F, rs, "sinfecha", "Sin<br>fecha", "Sin fecha PPP (o pasada)") +
+    // v9.85 — columnas de referencia + notas editables (a la derecha del bloque fijo)
+    '<th class="falt-ult"' + rs + ' title="Última entrega recibida a góndola (fecha + cajas). Sirve para saber si ya entró mercadería aunque el programa aún no la refleje.">Última<br>entrega</th>' +
+    '<th class="falt-oc"' + rs + ' title="OC pendiente para ese proveedor/artículo (cajas + fecha de la OC).">OC<br>pend.</th>' +
+    '<th class="falt-resol"' + rs + ' title="Día de resolución (editable). Tocá el ✏ para cargar.">Día<br>resol.</th>' +
+    '<th class="falt-motivo"' + rs + ' title="Motivo de la falta (editable). Tocá el ✏ para cargar.">Motivo<br>falta</th>';
   // v8.56 — columnas de día SOLO si "📅 Ver días" está activo (por defecto ocultas → sin scroll lateral).
   if (F.verDias) {
     h += '<th class="falt-sep"' + rs + '></th>';
@@ -14461,7 +14576,7 @@ function stkBodyFaltante() {
   h += '</tr></thead><tbody>';
 
   if (arts.length === 0) {
-    h += '<tr><td colspan="' + (9 + (F.verDias ? (1 + diasCols.length + superDays.length) : 0)) + '" style="text-align:center;padding:20px;color:#94a3b8;">Sin artículos con demanda pendiente</td></tr>';
+    h += '<tr><td colspan="' + (13 + (F.verDias ? (1 + diasCols.length + superDays.length) : 0)) + '" style="text-align:center;padding:20px;color:#94a3b8;">Sin artículos con demanda pendiente</td></tr>';
   }
 
   arts.forEach(function (a) {
@@ -14479,10 +14594,10 @@ function stkBodyFaltante() {
     h += '<tr data-fkey="' + escapeHtml(a.key) + '"><td class="falt-cod">' + codCell + '</td>' +
       '<td class="falt-desc" title="' + escapeHtml(a.desc) + '">' + escapeHtml(a.desc) + '</td>' +
       '<td class="falt-fab" title="' + escapeHtml(a.prov) + '">' + escapeHtml(a.prov || "—") + '</td>' +
-      '<td class="num" style="font-weight:700">' + a.stock + '</td>' +
-      (a.totalDem > 0
-        ? '<td class="num falt-cell" style="font-weight:700;color:#334155;cursor:pointer;" onclick="stkFaltDrillPed(\'' + a.key + '\',event)" title="Tocá para ver cada pedido: NP, cliente, cajas, fecha PPP y a qué franja (S1/S2/Resto) cae.">' + a.totalDem + '</td>'
-        : '<td class="num" style="font-weight:700;color:#334155;">' + a.totalDem + '</td>');
+      '<td class="num" style="font-weight:700" title="Stock TOTAL (todos los depósitos, igual que la solapa Stocks).">' + a.stockGross + '</td>' +
+      (a.totalDemGross > 0
+        ? '<td class="num falt-cell" style="font-weight:700;color:#334155;cursor:pointer;" onclick="stkFaltDrillPed(\'' + a.key + '\',event)" title="Total de cajas pedidas (todas, hasta que se facturen). Tocá para ver cada pedido: NP, cliente, cajas, estado y franja.">' + a.totalDemGross + '</td>'
+        : '<td class="num" style="font-weight:700;color:#334155;">' + a.totalDemGross + '</td>');
     // v8.79 — columna "Faltó armado" quitada del módulo (pedido del usuario). El dato real (realFalt)
     // se sigue usando para el resumen (🔴 faltaron al armar) y como desempate del orden.
     // Faltante S1 / S2 / Resto (proyección de lo aún no pickeado) — clickeable para ver las NPs
@@ -14498,6 +14613,21 @@ function stkBodyFaltante() {
     h += (_sf > 0 || _sfReal > 0)
       ? '<td class="num falt-cell ' + _sfCls + '" style="font-weight:800;cursor:pointer;" onclick="stkFaltDrillSinF(\'' + a.key + '\',event)" title="' + _sf + ' cajas de pedidos SIN fecha PPP (o con fecha pasada) que el stock no alcanza a cubrir. Tocá para ver las NPs.">' + (_sf > 0 ? _sf : "—") + _sfBadge + '</td>'
       : '<td class="num falt-ok">—</td>';
+    // v9.85 — Última entrega (fecha + cajas de la última recepción a góndola)
+    var _ue = a.ultEnt;
+    h += '<td class="falt-ult" style="text-align:center;font-size:11px;">' +
+      (_ue ? '<b>' + _faltFechaCorta(_ue.fecha) + '</b><br><span style="color:#059669;font-weight:700;">' + Math.round(_ue.cajas) + ' cj</span>' : '<span style="color:#cbd5e1;">—</span>') + '</td>';
+    // v9.85 — OC pendiente (cajas + fecha)
+    var _oc = a.oc;
+    h += '<td class="falt-oc" style="text-align:center;font-size:11px;">' +
+      (_oc && _oc.cajas > 0 ? '<b style="color:#1e40af;">' + Math.round(_oc.cajas) + ' cj</b>' + (_oc.fecha ? '<br><span style="color:#64748b;">' + _faltFechaCorta(_oc.fecha) + '</span>' : '') : '<span style="color:#cbd5e1;">—</span>') + '</td>';
+    // v9.85 — Día de resolución + Motivo (editables con ✏, persisten en Faltantes_Notas)
+    var _nt = notasMap[a.key] || {};
+    var _keyJs = a.key.replace(/'/g, "\\'");
+    h += '<td class="falt-resol" style="font-size:11px;cursor:pointer;" onclick="stkFaltEditNota(\'' + _keyJs + '\',\'dia\')" title="Tocá para cargar el día de resolución">' +
+      (_nt.dia ? escapeHtml(_nt.dia) : '<span style="color:#cbd5e1;">✏</span>') + '</td>';
+    h += '<td class="falt-motivo" style="font-size:11px;cursor:pointer;text-align:left;" onclick="stkFaltEditNota(\'' + _keyJs + '\',\'motivo\')" title="Tocá para cargar el motivo de la falta">' +
+      (_nt.motivo ? escapeHtml(_nt.motivo) : '<span style="color:#cbd5e1;">✏</span>') + '</td>';
     // v8.57 — columna "Cambio NP" quitada del módulo (pedido del usuario)
     // v8.56 — celdas de día SOLO con "📅 Ver días" activo
     if (F.verDias) {
@@ -14519,8 +14649,78 @@ function stkBodyFaltante() {
   });
 
   h += '</tbody></table></div>';
-  h += '<div class="falt-foot">' + arts.length + ' artículos con demanda. Stock = góndola+exc+racks+a_guardar+envasar.</div>';
+  h += '<div class="falt-foot">' + arts.length + ' artículos con demanda. Stock = stock TOTAL (todos los depósitos). Total Pedidos = todas las cajas pedidas hasta facturar. Falt S1/S2/Resto = proyección (solo lo aún sin pickear) + lo que faltó al armar (🔴).</div>';
   return h;
+}
+/* v9.85 — texto de lo que el filtro actual DEJA AFUERA (observación para el reporte impreso). */
+function _faltObsFiltros(F) {
+  var obs = [];
+  if (F.soloQuiebre) obs.push('Solo se muestran artículos EN QUIEBRE (los que no faltan están ocultos).');
+  if (F.sinE) obs.push('Ocultos los importados (E) sin equivalente nacional para reponer.');
+  if (F.colFiltro) obs.push('Filtrado por columna: ' + _faltColLabel(F.colFiltro) + ' (solo artículos con faltante en esa franja).');
+  if (F.search) obs.push('Búsqueda activa: "' + F.search + '".');
+  return obs;
+}
+/* v9.85 — cargar/editar nota (día de resolución / motivo) → persiste en Faltantes_Notas. */
+async function stkFaltEditNota(key, campo) {
+  if (!_stk || !_stk.falt) return;
+  var nm = _stk.falt.notasMap || (_stk.falt.notasMap = {});
+  var cur = nm[key] || { dia: "", motivo: "" };
+  var label = campo === "dia" ? "Día de resolución (ej. 14/8 o 'lun 18')" : "Motivo de la falta";
+  var val = prompt(label + ":", campo === "dia" ? (cur.dia || "") : (cur.motivo || ""));
+  if (val === null) return;   // canceló
+  val = String(val).trim();
+  var next = { dia: cur.dia || "", motivo: cur.motivo || "" };
+  if (campo === "dia") next.dia = val; else next.motivo = val;
+  nm[key] = next;
+  stkRender();
+  // Persistir (upsert por cod)
+  try {
+    await fetch(SUPABASE_URL + "/rest/v1/Faltantes_Notas?on_conflict=cod", {
+      method: "POST",
+      headers: {
+        "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY,
+        "Content-Type": "application/json", "Prefer": "resolution=merge-duplicates,return=minimal"
+      },
+      body: JSON.stringify({ cod: key, dia_resolucion: next.dia, motivo: next.motivo, actualizado: new Date().toISOString() })
+    });
+  } catch (e) { console.warn("stkFaltEditNota persist:", e); }
+}
+/* v9.85 — imprimir el módulo TAL COMO ESTÁ FILTRADO, con la observación de lo que no se muestra. */
+function stkFaltImprimir() {
+  var wrap = document.querySelector(".falt-wrap");
+  if (!wrap || !_stk || !_stk.falt) { alert("No hay tabla para imprimir."); return; }
+  var F = _stk.falt;
+  var obs = _faltObsFiltros(F);
+  var hoy = _faltHoy();
+  var d = new Date(Date.now() - 3 * 3600000);
+  var hora = ("0" + d.getUTCHours()).slice(-2) + ":" + ("0" + d.getUTCMinutes()).slice(-2);
+  var tabla = wrap.querySelector("table");
+  if (!tabla) { alert("No hay tabla para imprimir."); return; }
+  var css = '<style>' +
+    'body{font-family:Arial,Helvetica,sans-serif;margin:16px;color:#111;}' +
+    'h2{margin:0 0 2px;font-size:18px;} .sub{color:#555;font-size:12px;margin-bottom:10px;}' +
+    'table{border-collapse:collapse;width:100%;font-size:10px;}' +
+    'th,td{border:1px solid #cbd5e1;padding:2px 4px;text-align:center;}' +
+    'th{background:#1e293b;color:#fff;} td.falt-desc,td.falt-motivo{text-align:left;}' +
+    '.falt-crit{background:#dc2626;color:#fff;font-weight:700;} .falt-bad{background:#fca5a5;}' +
+    '.falt-warn{background:#fef3c7;} .falt-ok{color:#cbd5e1;}' +
+    '.obs{margin-top:14px;font-size:11px;color:#334155;border-top:1px solid #cbd5e1;padding-top:8px;}' +
+    '.obs b{color:#b45309;} .obs li{margin:2px 0;}' +
+    '@media print{@page{size:landscape;margin:8mm;}}' +
+    '</style>';
+  var obsHtml = '<div class="obs"><b>⚠ Observación — este reporte NO muestra:</b><ul>' +
+    (obs.length ? obs.map(function (o) { return '<li>' + escapeHtml(o) + '</li>'; }).join("") : '<li>Nada: se están mostrando todos los artículos con demanda (sin filtros).</li>') +
+    '</ul></div>';
+  var html = '<!doctype html><html><head><meta charset="utf-8"><title>Faltantes x día — ' + hoy + '</title>' + css + '</head><body>' +
+    '<h2>Faltantes por día — Reporte</h2>' +
+    '<div class="sub">Generado ' + hoy + ' ' + hora + ' hs · ' + escapeHtml((tabla.querySelectorAll("tbody tr")||[]).length + " filas") + '</div>' +
+    tabla.outerHTML + obsHtml + '</body></html>';
+  var w = window.open("", "_blank");
+  if (!w) { alert("El navegador bloqueó la ventana de impresión. Permití pop-ups."); return; }
+  w.document.write(html);
+  w.document.close();
+  setTimeout(function () { try { w.focus(); w.print(); } catch (e) {} }, 300);
 }
 
 function _faltCelda(falt, esSem, cod, fecha, esPrimer, winKey, real) {
@@ -14648,16 +14848,15 @@ function _faltDrillOpen(cod, kind, key, evt) {
   var lista = [], title = "", sub = "", allowExcl = true, esReal = false, esPed = false;
 
   if (kind === "ped") {
-    // v8.37 — TODOS los pedidos que forman "Total Pedidos" (demanda sin pickear), cada uno con
-    // su franja (S1/S2/Resto/sin fecha/pasada). Explica por qué el total no cae siempre en S1/S2.
+    // v9.85 — TODOS los pedidos que forman "Total Pedidos" (bruto: hasta facturar), cada uno con
+    // su franja (S1/S2/Resto/sin fecha/pasada) y su estado de picking. Marca lo ya pickeado/armado.
     esPed = true; allowExcl = false;
     var hoyP = _faltHoy(), finS1P = _faltAddHabiles(hoyP, 5), lunesS2P = _faltAddHabiles(finS1P, 1), finS2P = _faltAddHabiles(finS1P, 5);
     var byNpP = {};
     mems.forEach(function (m) {
-      (F.demanda[m] || []).forEach(function (e) {
-        if (!byNpP[e.np]) byNpP[e.np] = { np: e.np, rs: e.rs, cliente: e.cliente || "", cajas: 0, fechaSalida: e.fechaSalida || "", cods: {} };
+      ((F.demTotDet && F.demTotDet[m]) || []).forEach(function (e) {
+        if (!byNpP[e.np]) byNpP[e.np] = { np: e.np, rs: e.rs, cliente: e.cliente || "", cajas: 0, fechaSalida: e.fechaSalida || "", cods: {}, estado: e.estado || "" };
         byNpP[e.np].cajas += (Number(e.cajas) || 0);
-        if (e.cod) byNpP[e.np].cods[codCanon(e.cod)] = true;
       });
     });
     lista = Object.keys(byNpP).map(function (k) {
@@ -14673,7 +14872,7 @@ function _faltDrillOpen(cod, kind, key, evt) {
     });
     var _tot = lista.reduce(function (ac, o) { return ac + o.cajas; }, 0);
     title = escapeHtml(codCanon(cod)) + " — Total pedidos: " + Math.round(_tot) + " cj";
-    sub = lista.length + " NP" + (lista.length > 1 ? "s" : "") + " sin pickear. La franja sale de la fecha PPP: por eso lo que cae en <b>sin fecha</b> o <b>pasada</b> no aparece en S1/S2/Resto.";
+    sub = lista.length + " NP" + (lista.length > 1 ? "s" : "") + " (todos, hasta facturar). Los <b>ya pickeados/armados</b> se marcan; no entran en la proyección de faltante pero sí en el total.";
   } else if (kind === "real") {
     esReal = true; allowExcl = false;
     var byNpR = {};
@@ -14743,7 +14942,7 @@ function _faltDrillOpen(cod, kind, key, evt) {
         '<td class="rs" title="' + escapeHtml(it.rs) + '">' + escapeHtml(it.rs || "—") + '</td>' +
         '<td class="num" style="font-weight:700;">' + Math.round(it.cajas) + '</td>' +
         '<td>' + fppp + '</td>' +
-        '<td style="color:#0369a1;">Sin pickear</td>' +
+        '<td style="' + (it.estado === "preparado" ? "color:#059669;font-weight:700;" : it.estado === "enpicking" ? "color:#b45309;font-weight:700;" : "color:#0369a1;") + '">' + (it.estado === "preparado" ? "Armado ✓" : it.estado === "enpicking" ? "En picking" : "Sin pickear") + '</td>' +
         '<td style="font-weight:800;color:' + it.franja.color + ';">' + it.franja.label + '</td>' +
         '</tr>';
     });
@@ -16689,7 +16888,11 @@ function brConfirmar() {
   if (!_br) return;
   const sel = _br.items.filter(function (it) { return it.bajar > 0; });
   if (!sel.length) return;
-  const rows = sel.map(function (it) { return { orden_id: _br.ordenId || null, cod_art: it.cod, descripcion: it.desc || null, cajas: it.bajar, estado: "propuesta", creada_por: _br.legajo || null }; });
+  // v9.82 — la bajada del operario NO necesita aprobación de la operadora (pedido del dueño):
+  // el stock ya se mueve acá (racks − / góndola +) y la fila queda 'aprobada' directo, para que
+  // NO aparezca en la cola "Bajadas Racks → góndola". La operadora ya no aprueba nada.
+  const _brNowIso = new Date().toISOString();
+  const rows = sel.map(function (it) { return { orden_id: _br.ordenId || null, cod_art: it.cod, descripcion: it.desc || null, cajas: it.bajar, estado: "aprobada", aprobada_at: _brNowIso, creada_por: _br.legajo || null }; });
   const n = sel.reduce(function (s, it) { return s + it.bajar; }, 0);
   closeBajarRacks();
   // v8.73 — mover stock INMEDIATAMENTE (racks → góndola) al registrar la bajada,
@@ -18130,7 +18333,7 @@ async function showRacksBajarModal(legajo, _resume) {
 }
 function rkbRender() {
   if (!_rkb) return; const body = document.getElementById("rkbBody"); if (!body) return;
-  let h = '<div class="rkb-hint">Bajás en <b>master cajas</b> (lo que físicamente movés del rack). Aparece <b>ordenado por código</b>. Los que dicen <b>“cajas”</b> todavía no tienen el master cargado. Si algo que tenés físicamente <b>no figura</b>, buscalo y tocá <b>➕</b> (avisa por Telegram). <b>Lo aprueba Marianela</b> en Recepción y recién ahí pasa a góndola.</div>';
+  let h = '<div class="rkb-hint">Bajás en <b>master cajas</b> (lo que físicamente movés del rack). Aparece <b>ordenado por código</b>. Los que dicen <b>“cajas”</b> todavía no tienen el master cargado. Si algo que tenés físicamente <b>no figura</b>, buscalo y tocá <b>➕</b> (avisa por Telegram). Al registrar, <b>el stock pasa a góndola al instante</b> (no espera aprobación).</div>';
   h += '<input id="rkbSearch" class="rkb-search" type="search" autocomplete="off" placeholder="🔎 Buscar código…" value="' + escapeHtml(_rkb.filtro || "") + '" oninput="rkbSearchInput(this.value)">';
   const fq = String(_rkb.filtro || "").trim(), fLo = fq.toLowerCase(), fUp = fq.toUpperCase();
   const shown = fq ? _rkb.items.filter(function (it) { return String(it.cod).toLowerCase().indexOf(fLo) >= 0; }) : _rkb.items;
@@ -18213,13 +18416,18 @@ async function rkbConfirmar() {
     };
     document.getElementById("rkbVerifyOk").focus();
   }));
-  // v5.30: la bajada del operario queda PROPUESTA en Racks_Bajadas (cola de aprobación de
-  // Marianela en Recepción → "Bajadas Racks → góndola"). El stock recién se mueve al APROBAR
-  // (racksAprobarBaja), igual que la bajada de las OCs. Antes movía el stock directo y no
-  // entraba a la cola. cajas = INNER (si baja en master, convierto master × CxM).
-  const rows = sel.map(function (it) {
+  // v9.60 — la bajada del operario mueve el stock INMEDIATAMENTE (racks − / góndola +), sin
+  // esperar la aprobación de la operadora (pedido del dueño). La fila queda en Racks_Bajadas como
+  // 'aprobada' (registro/historial) → NO entra a la cola de aprobación y no se cuenta doble.
+  // cajas = INNER (si baja en master, convierto master × CxM). Mismo patrón que brConfirmar (v8.73).
+  var _rkbNowIso = new Date().toISOString();
+  const rows = [], _rkbMovs = [];
+  sel.forEach(function (it) {
     const inner = (it.cxm > 0 && !it.manual) ? (it.baja * it.cxm) : it.baja;
-    return { orden_id: null, cod_art: it.cod, descripcion: it.desc || null, cajas: inner, estado: "propuesta", creada_por: _rkb.legajo || null, sector: it.sec || null };
+    const _ref = "rack " + (it.sec || "s/sector");
+    rows.push({ orden_id: null, cod_art: it.cod, descripcion: it.desc || null, cajas: inner, estado: "aprobada", aprobada_at: _rkbNowIso, creada_por: _rkb.legajo || null, sector: it.sec || null });
+    _rkbMovs.push({ cod_art: it.cod, descripcion: it.desc || null, deposito: "racks", delta: -inner, tipo: "baja_racks", ref: _ref, legajo: String(_rkb.legajo || "0") });
+    _rkbMovs.push({ cod_art: it.cod, descripcion: it.desc || null, deposito: "terminado", delta: inner, tipo: "baja_racks", ref: _ref, legajo: String(_rkb.legajo || "0") });
   });
   // Planimetría viva (v5.22): descontar de la UBICACIÓN elegida. Best-effort:
   // si la RPC todavía no existe en Supabase, falla silencioso (queda el ledger).
@@ -18239,10 +18447,11 @@ async function rkbConfirmar() {
   const totInner = rows.reduce(function (s, r) { return s + Number(r.cajas || 0); }, 0);
   try { opDraftClear(_rkb && _rkb.legajo); } catch (_e) {}
   closeRkb();
+  try { stockMove(_rkbMovs); } catch (_e) {}   // v9.60 — mueve el stock YA (racks → góndola), offline-safe
   fetch(SUPABASE_RACKS_BAJ_ENDPOINT, { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" }, body: JSON.stringify(rows) })
     .then(function (r) { if (r.ok || (r.status >= 400 && r.status < 500)) return; throw new Error("HTTP " + r.status); })
     .catch(function () { try { const p = JSON.parse(localStorage.getItem("vir_racks_pend") || "[]"); p.push.apply(p, rows); localStorage.setItem("vir_racks_pend", JSON.stringify(p.slice(-2000))); } catch (_e) {} });
-  try { alert("✓ Registraste " + totInner + " caja(s) para bajar.\nMarianela lo aprueba en Recepción y ahí pasa a góndola."); } catch (_e) {}
+  try { alert("✓ Bajaste " + totInner + " caja(s) de racks — el stock ya pasó a góndola."); } catch (_e) {}
 }
 function rkbEmitFueraLista(cod, cajas, legajo) {
   const payload = {
@@ -19473,6 +19682,19 @@ async function showFaltAvisar() {
   } catch (e) { const b = document.getElementById("faltAvBody"); if (b) b.innerHTML = '<div class="fav-empty">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
 }
 function closeFaltAvisar() { const ov = document.getElementById("faltAvModal"); if (ov) ov.classList.remove("show"); }
+/* v9.70 — badge del botón "Completar Pedido": cantidad de NPs con faltante que TIENE stock para
+   completarse (mismo criterio que showFaltAvisar: góndola + a_guardar + excedente + racks > 0). */
+async function favLoadBadge(){
+  try{
+    const res = await Promise.all([cpLoadFaltantes(), stockFetchSaldos()]);
+    const falt = res[0] || [], saldos = res[1] || {};
+    const sN = {}; Object.keys(saldos).forEach(function(k){ sN[_cpNorm(k)] = saldos[k]; });
+    const disp = function(cod){ const s = sN[_cpNorm(cod)] || {}; return Math.round((Number(s.terminado)||0)+(Number(s.a_guardar)||0)+(Number(s.excedente)||0)+(Number(s.racks)||0)); };
+    const nps = {};
+    (falt||[]).forEach(function(e){ if (disp(e.cod_art) <= 0) return; nps[_faltNpNorm(e.np)] = 1; });
+    supSetBadge("cpBadge", Object.keys(nps).length);
+  } catch(_e){}
+}
 function faltAvRender(falt, activas, saldosN) {
   const body = document.getElementById("faltAvBody"); if (!body) return;
   const sN = saldosN || {};
@@ -20040,6 +20262,11 @@ function ccReleaseWakeLock() { try { if (_ccWakeLock) { _ccWakeLock.release(); _
    NO se muestran. De acá en adelante: todo NP facturado+cerrado que NO se haya
    cargado (sin CCN) aparece, hasta que se cargue (sin ventana de tiempo). v3.50. */
 const CC_REPARTO_DESDE_ISO = "2026-06-22T00:00:00-03:00";
+/* v9.68 — el reparto (Carga Camión) muestra lo que REALMENTE falta cargar: facturado + NO cargado
+   (CCN) + NO entregado. El estado terminal del flujo es "Pedido entregado" (PPP_Entregados_Meta),
+   así que ese es el corte: sale del CC al cargarse (CCN) o al entregarse (aunque olvidaran el CCN).
+   Lo que queda = facturado sin cargar sin entregar, incluidos los olvidados (así se ven, no se
+   esconden). Reemplaza el filtro por Programación Diaria (v9.67) y la ventana de días (v9.66). */
 
 /* Arma el REPARTO del CC: NP facturados Y CERRADOS (cierre_id no nulo = pasaron
    por "Generar PDF") desde CC_REPARTO_DESDE_ISO, MENOS los ya cargados al camión
@@ -20048,12 +20275,17 @@ const CC_REPARTO_DESDE_ISO = "2026-06-22T00:00:00-03:00";
 async function fetchCCData() {
   const headers = { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY };
   const sinceTal = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
+  const desdeIso = CC_REPARTO_DESDE_ISO;   // ancla fija (piso); la frescura la da la Programación Diaria
   const repUrl = SUPABASE_FACTURACION_NP_ENDPOINT
-    + "?cierre_id=not.is.null&facturado_at=gte." + encodeURIComponent(CC_REPARTO_DESDE_ISO)
+    + "?cierre_id=not.is.null&facturado_at=gte." + encodeURIComponent(desdeIso)
     + "&select=np,tanda,razon_social&limit=20000";
   const ccnUrl = SUPABASE_TABLE_ENDPOINT
-    + "?opcion=eq.CCN&ts_cliente=gte." + encodeURIComponent(CC_REPARTO_DESDE_ISO)
+    + "?opcion=eq.CCN&ts_cliente=gte." + encodeURIComponent(desdeIso)
     + "&select=texto,ts_cliente&limit=20000";
+  // v9.68 — NP ya ENTREGADAS (estado terminal del flujo, tabla propia). Se sacan del reparto:
+  // el pedido sale del CC al cargarse (CCN) o, si olvidaron el CCN, al entregarse. Lo que queda es
+  // lo que REALMENTE falta cargar (facturado, sin cargar, sin entregar) — incluidos los olvidados.
+  const entrUrl = SUPABASE_URL + "/rest/v1/PPP_Entregados_Meta?select=np&limit=100000";
   // Líos por NP: eventos TAL (anotados al terminar armado). Mismo origen que usa Recepción Remitos.
   const talUrl = SUPABASE_TABLE_ENDPOINT
     + "?opcion=eq.TAL&ts_cliente=gte." + encodeURIComponent(sinceTal)
@@ -20062,9 +20294,13 @@ async function fetchCCData() {
     fetch(repUrl, { headers, cache: "no-store" }).then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); }),
     fetch(ccnUrl, { headers, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }),
     fetch(talUrl, { headers, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }),
-    fetchSinSalidaMap(CC_REPARTO_DESDE_ISO)
+    fetchSinSalidaMap(desdeIso),
+    fetch(entrUrl, { headers, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; })
   ]);
-  const repR = _par[0], ccnR = _par[1], talR = _par[2], fssMap = _par[3];
+  const repR = _par[0], ccnR = _par[1], talR = _par[2], fssMap = _par[3], entrR = _par[4];
+  // v9.68 — set de NP ya ENTREGADAS. Si el fetch falla queda vacío → NO filtramos por entrega
+  // (degradación segura: mejor mostrar de más que ocultar un reparto real).
+  const entregadas = new Set((entrR || []).map(function (p) { return String(p.np || "").trim().replace(/\.0+$/, ""); }));
   // Última carga (CCN) por NP; una NP está "cargada" salvo que haya un FSS más reciente
   // (volvió al depósito) → reaparece en Carga Camión para re-despacharla. v6.66.
   const maxCcn = new Map();
@@ -20086,6 +20322,7 @@ async function fetchCCData() {
   for (const row of repR) {
     const np = String(row.np || "").trim().replace(/\.0+$/, "");
     if (!np || seen.has(np) || cargados.has(np)) continue;   // ya cargado → fuera
+    if (entregadas.has(np)) continue;                        // v9.68: ya entregado (estado terminal) → fuera
     seen.add(np);
     items.push({ np: np, tanda: (String(row.tanda || "").trim() || "—"), rs: row.razon_social || "", lios: lios.has(np) ? lios.get(np) : null });
   }
@@ -20304,6 +20541,27 @@ async function fetchSinSalidaMap(sinceISO) {
 /* Junta lo necesario para CR: CCN (NP cargadas + cuándo + tanda), TAL (líos por NP),
    CRN (NP ya controladas), el PPP del día (cód + razón por NP) y, para los NP que ya
    NO están en la PPP del día, "Pedidos Entregados" (fetchEntregadosMeta) como fallback. */
+/* v9.71 — badge del botón "Recepción Remitos (RR)": remitos cargados al camión (CCN) que
+   todavía NO se controlaron (sin CRN) y que no volvieron al depósito (FSS). Versión liviana
+   (sin leer la hoja), mismo criterio que la lista de showControlRemitos. */
+async function rrLoadBadge() {
+  try {
+    const since = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
+    const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+    const res = await Promise.all([
+      fetch(SUPABASE_TABLE_ENDPOINT + "?opcion=eq.CCN&ts_cliente=gte." + encodeURIComponent(since) + "&select=texto,ts_cliente&limit=20000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; }),
+      fetch(SUPABASE_TABLE_ENDPOINT + "?opcion=eq.CRN&ts_cliente=gte." + encodeURIComponent(since) + "&select=texto&limit=20000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; }),
+      fetchSinSalidaMap(since).catch(function () { return new Map(); })
+    ]);
+    const ccnR = res[0] || [], crnR = res[1] || [], fss = res[2] || new Map();
+    const loaded = new Map();
+    ccnR.forEach(function (ev) { const np = String(ev.texto || "").split("|")[0].trim().replace(/\.0+$/, ""); if (!np) return; const ms = ev.ts_cliente ? new Date(ev.ts_cliente).getTime() : 0; const p = loaded.get(np) || 0; if (ms > p) loaded.set(np, ms); });
+    const controlled = new Set(); crnR.forEach(function (ev) { const np = String(ev.texto || "").split("|")[0].trim().replace(/\.0+$/, ""); if (np) controlled.add(np); });
+    let n = 0;
+    loaded.forEach(function (lastMs, np) { if (controlled.has(np)) return; const f = fss.get(np) || 0; if (f && f > lastMs) return; n++; });
+    supSetBadge("rrBadge", n);
+  } catch (_e) {}
+}
 async function fetchCRData() {
   const since = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
   const headers = { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY };
@@ -22020,6 +22278,7 @@ function openPPP() {
   pppRefreshEntregado();
   pppRefreshControlado();   // controlados (CRN) + chequeo de carga sin controlar vencida (alarma + Telegram)
   pppRefreshDelivered();    // v6.97: lista durable de Pedidos Entregados (badge correcto al abrir)
+  pppRefreshMetaEntSet();   // v9.72: set de entregadas (hoja) para separar "En viaje" de "Entregados"
   pppAutoRenderStatus();    // auto-carga (File System Access): estado + arranque del chequeo
   pppAutoStart();
   pppRenderPdfDirStatus();  // estado de la carpeta de PDF (ISIS) para imprimir pedidos
@@ -22607,7 +22866,7 @@ function _pppSearchStr(p) { return [p.np, p.cod, p.razon_social, p.tanda, p.loca
 function pppSetSearch(v) { _pppSearch = String(v == null ? "" : v).trim(); pppRenderProg(); }
 function pppLoadEntregados() { if (_pppEntregados) return _pppEntregados; let a = []; try { a = JSON.parse(localStorage.getItem(PPP_ENT_KEY) || "[]"); } catch (_e) {} _pppEntregados = new Set(Array.isArray(a) ? a.map(String) : []); return _pppEntregados; }
 function pppSaveEntregados() { try { localStorage.setItem(PPP_ENT_KEY, JSON.stringify(Array.from(pppLoadEntregados()))); } catch (_e) {} }
-function pppTab(t) { _pppTab = t; pppRenderProg(); if (t === "plan" || t === "ent" || t === "resumen") { pppRefreshArmado(); pppRefreshEntregado(); pppRefreshControlado(); } if (t === "ent") pppRefreshDelivered(); if (t === "ocup") pppRefreshOcupacion(); }
+function pppTab(t) { _pppTab = t; pppRenderProg(); if (t === "plan" || t === "ent" || t === "resumen") { pppRefreshArmado(); pppRefreshEntregado(); pppRefreshControlado(); } if (t === "ent" || t === "enviaje") { pppRefreshDelivered(); pppRefreshMetaEntSet(); } if (t === "ocup") pppRefreshOcupacion(); }
 /* "Controlado" (manual, lo marca la operadora) → recién ahí el pedido pasa a Pedidos
    Entregados. _pppEntregados = NPs controlados (persistido en vir_ppp_entregados). */
 function pppControlar(np) { pppLoadEntregados().add(String(np)); pppSaveEntregados(); pppRenderProg(); }
@@ -22709,6 +22968,41 @@ let _pppDelivered = null;       // vista rica de la app
 let _pppDeliveredFull = null;   // espejo completo del Excel (NP+cliente)
 let _pppEntMode = "app";        // "app" | "excel"
 function pppEntMode(m) { _pppEntMode = m; if (m === "excel" && _pppDeliveredFull == null) pppRefreshEntregadosFull(); pppRenderProg(); }
+/* v9.72 — MÓDULO "En viaje". Los facturados (vista_ppp_pedidos_entregados) se parten en dos:
+   ENTREGADOS = confirmados (control de remito CRN o presentes en la hoja PPP_Entregados_Meta);
+   EN VIAJE = facturados/cargados que salieron pero TODAVÍA no se confirmó la entrega. Así un
+   pedido que salió (aunque no se controló el remito) queda visible "en viaje" y no desaparece. */
+let _pppMetaEntSet = null;      // NPs ya entregadas según la hoja (PPP_Entregados_Meta)
+async function pppRefreshMetaEntSet() {
+  try {
+    const rows = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/PPP_Entregados_Meta", "select=np");
+    const s = new Set();
+    (rows || []).forEach(function (r) { const np = String(r.np == null ? "" : r.np).trim().replace(/\.0+$/, ""); if (np) s.add(np); });
+    _pppMetaEntSet = s;
+    if (typeof pppRenderProg === "function") pppRenderProg();
+  } catch (_e) { if (!_pppMetaEntSet) _pppMetaEntSet = new Set(); }
+}
+function _pppNpNorm(s) { return String(s == null ? "" : s).trim().replace(/\.0+$/, ""); }
+function _pppConfirmadas() {
+  const s = new Set();
+  try { pppLoadEntregados().forEach(function (np) { s.add(_pppNpNorm(np)); }); } catch (_e) {}   // CRN (control remito)
+  if (_pppMetaEntSet) _pppMetaEntSet.forEach(function (np) { s.add(np); });                        // hoja de entregados
+  return s;
+}
+function _pppSplitDelivered() {
+  const conf = _pppConfirmadas();
+  const enViaje = [], entregados = [];
+  (_pppDelivered || []).forEach(function (p) { (conf.has(_pppNpNorm(p.np)) ? entregados : enViaje).push(p); });
+  return { enViaje: enViaje, entregados: entregados };
+}
+function _pppEnViajeHtml() {
+  if (_pppDelivered == null || _pppMetaEntSet == null) return '<div class="planim-empty">Cargando pedidos en viaje…</div>';
+  const list = _pppEntFilter(_pppSplitDelivered().enViaje);
+  if (!list.length) return '<div class="ppp-ent-note">' + (_pppSearch ? "Sin coincidencias." : "No hay pedidos en viaje (todos los facturados están confirmados como entregados).") + '</div>';
+  let totM3 = 0; for (const p of list) totM3 += (p.m3 || 0);
+  const r = _pppEntGroupedHtml(list, true, 0);
+  return '<div class="ppp-ent-note">🚛 Pedidos <b>en viaje</b> — salieron (facturados/cargados) pero <b>todavía no se confirmó la entrega</b> (ni control de remito ni en la hoja de entregados). <b>' + list.length + '</b> pedido(s) · <b>' + totM3.toFixed(2) + '</b> m³.</div>' + r.html;
+}
 function _pppYmdKey(s) { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s || "")); return m ? (m[1] + m[2] + m[3]) : ""; }
 async function pppRefreshDelivered() {
   try {
@@ -22810,8 +23104,8 @@ function _pppEntFilter(list) {
 }
 function _pppEntAppHtml() {
   if (_pppDelivered == null) return '<div class="planim-empty">Cargando pedidos entregados…</div>';
-  const list = _pppEntFilter(_pppDelivered);
-  if (!list.length) return '<div class="ppp-ent-note">' + (_pppSearch ? "Sin coincidencias." : "Todavía no hay pedidos entregados (facturados y cerrados en reparto).") + '</div>';
+  const list = _pppEntFilter(_pppSplitDelivered().entregados);   // v9.72 — solo los CONFIRMADOS (CRN o en la hoja)
+  if (!list.length) return '<div class="ppp-ent-note">' + (_pppSearch ? "Sin coincidencias." : "Todavía no hay pedidos con entrega confirmada (control de remito o hoja de entregados). Los que salieron están en «En viaje».") + '</div>';
   let totM3 = 0, nDisc = 0; for (const p of list) { totM3 += (p.m3 || 0); if (p.discrep) nDisc++; }
   const r = _pppEntGroupedHtml(list, true, 0);
   return '<div class="ppp-ent-note">🚚 Pedidos <b>entregados</b>, con <b>fecha de salida</b> (carga camión; si no hay, la de la PPP), cliente, m³ y cajas. <b>' + list.length + '</b> pedido(s) · <b>' + totM3.toFixed(2) + '</b> m³.' +
@@ -23181,8 +23475,60 @@ async function pppAutoBaseN() {
   _pppRenderBaseNote();
   return String(base);
 }
+/* v9.74 — Empaque BALANCEADO de una zona en tandas. Cada "cliente" es un bloque
+   indivisible (todas sus NPs juntas). Reparte apuntando a IDEAL, sin pasar MAX ni
+   bajar de MIN, y BALANCEA para no dejar restos chicos (1.60 → 2×0.80, no 1.0+0.6).
+   Un cliente que ya pesa > MAX va en tanda propia (no hay cómo partirlo). Lo que no
+   llega a MIN sin mezclar zona queda PENDIENTE (no se programa). NO mezcla zonas: se
+   llama por zona. Devuelve { tandas:[[pedidos]], pend:[pedidos] }. */
+function _pppBalancearZona(clientes, MIN, IDEAL, MAX) {
+  const EPS = 1e-9, tandas = [], pend = [], chicos = [];
+  clientes.forEach(function (c) { if (c.m3 > MAX + EPS) tandas.push(c.pedidos.slice()); else chicos.push(c); });
+  let T = 0; chicos.forEach(function (c) { T += c.m3; });
+  if (chicos.length && T < MIN - EPS) { chicos.forEach(function (c) { pend.push.apply(pend, c.pedidos); }); return { tandas: tandas, pend: pend }; }
+  if (chicos.length) {
+    let n = Math.max(1, Math.round(T / IDEAL));
+    n = Math.max(n, Math.ceil(T / MAX - EPS));
+    n = Math.min(n, Math.max(1, Math.floor(T / MIN + EPS)));
+    const desc = chicos.slice().sort(function (a, b) { return b.m3 - a.m3; });
+    let buckets = [];
+    for (let guard = 0; guard < 60; guard++) {
+      buckets = []; for (let i = 0; i < n; i++) buckets.push({ m3: 0, peds: [] });
+      let over = false;
+      for (const c of desc) {
+        let best = -1;
+        for (let i = 0; i < buckets.length; i++) {
+          if (buckets[i].m3 + c.m3 > MAX + EPS) continue;
+          if (best < 0 || buckets[i].m3 < buckets[best].m3) best = i;
+        }
+        if (best < 0) { over = true; break; }   // no entra en ninguno → hace falta una tanda más
+        buckets[best].m3 += c.m3; buckets[best].peds.push.apply(buckets[best].peds, c.pedidos);
+      }
+      if (!over) break;
+      n++;
+    }
+    // MIN: levantar los buckets < MIN fusionándolos (entre sí o con otro) hasta SOFT (1.10);
+    // lo que no se pueda queda pendiente. El usuario aceptó tandas de hasta 1.10 en el borde
+    // (ej. dos clientes de 0.55 → una tanda de 1.10, en vez de dejarlos pendientes).
+    const SOFT = 1.10;
+    let arr = buckets.filter(function (b) { return b.peds.length; });
+    let changed = true;
+    while (changed) {
+      changed = false;
+      arr.sort(function (a, b) { return a.m3 - b.m3; });
+      let s = null; for (const b of arr) { if (b.m3 < MIN - EPS) { s = b; break; } }
+      if (!s) break;
+      let best = null;
+      for (const t of arr) { if (t === s) continue; if (s.m3 + t.m3 <= SOFT + EPS) { if (!best || t.m3 > best.m3) best = t; } }
+      if (!best) break;
+      best.m3 += s.m3; best.peds.push.apply(best.peds, s.peds); arr.splice(arr.indexOf(s), 1); changed = true;
+    }
+    for (const b of arr) { if (b.m3 >= MIN - EPS) tandas.push(b.peds); else pend.push.apply(pend, b.peds); }
+  }
+  return { tandas: tandas, pend: pend };
+}
 function pppSugerirTandas() {
-  const cfg = pppGetCfg(), cap = cfg.tandaCap > 0 ? cfg.tandaCap : 0.8;
+  const cfg = pppGetCfg(); const T_MIN = 0.60, T_MAX = 1.00; let T_IDEAL = cfg.tandaCap > 0 ? cfg.tandaCap : 0.80; if (T_IDEAL < T_MIN) T_IDEAL = T_MIN; if (T_IDEAL > T_MAX) T_IDEAL = T_MAX;
   if (!_pppEntregados) _pppEntregados = new Set();
   const ed = pppLoadEdits();
   const tandaDe = function (p) { const e = ed[String(p.np)]; const t = (e && e.tanda != null) ? e.tanda : (p.tanda || ""); return (t && t !== "—") ? t : ""; };
@@ -23206,13 +23552,14 @@ function pppSugerirTandas() {
   const assign = function (ps, code) { for (const p of ps) (ed[String(p.np)] = ed[String(p.np)] || {}).tanda = code; };
   let nT = 0;
 
-  // Súper: una tanda por cliente.
+  // Súper: una tanda por cliente (por RAZÓN SOCIAL). v9.74.
+  let nPend = 0;
   const sup = pend.filter(pppEsSuper), bySupC = {}, supOrd = [];
-  for (const p of sup) { const k = String(p.cod || p.razon_social); if (!(k in bySupC)) supOrd.push(k); (bySupC[k] = bySupC[k] || []).push(p); }
+  for (const p of sup) { const k = String(p.razon_social || p.cod); if (!(k in bySupC)) supOrd.push(k); (bySupC[k] = bySupC[k] || []).push(p); }
   if (sup.length) nextZone();
   for (const k of supOrd) { assign(bySupC[k], next()); nT++; }
 
-  // Resto CON zona: por zona, ordenar por fecha de recepción, empacar por cliente ≤ cap.
+  // Resto CON zona: por zona, BALANCEAR en tandas T_MIN–T_MAX (ideal T_IDEAL), sin mezclar zonas. v9.74.
   const resto = pend.filter(function (p) { return !pppEsSuper(p) && pppZonaDeBarrio(p.localidad); });
   const byZ = {}; for (const p of resto) { const z = pppZonaDeBarrio(p.localidad); (byZ[z] = byZ[z] || []).push(p); }
   const zorder = Object.keys(byZ).sort(function (a, b) { const ia = PPP_ZONAS.indexOf(a), ib = PPP_ZONAS.indexOf(b); return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib); });
@@ -23221,19 +23568,14 @@ function pppSugerirTandas() {
     const byC = {}, cord = [];
     for (const p of byZ[z]) { const k = String(p.cod || p.razon_social); if (!(k in byC)) cord.push(k); (byC[k] = byC[k] || []).push(p); }
     cord.sort(function (a, b) { const fa = Math.min.apply(null, byC[a].map(function (p) { return +_pppFechaKey(p.fecha); })); const fb = Math.min.apply(null, byC[b].map(function (p) { return +_pppFechaKey(p.fecha); })); return fa - fb; });
-    let bucket = [], bm3 = 0;
-    const flush = function () { if (bucket.length) { assign(bucket, next()); nT++; bucket = []; bm3 = 0; } };
-    for (const k of cord) {
-      const ps = byC[k], m3 = _pppM3Sum(ps);
-      if (bucket.length && (bm3 + m3) > cap) flush();
-      bucket = bucket.concat(ps); bm3 += m3;
-      if (bm3 >= cap) flush();
-    }
-    flush();
+    const clientes = cord.map(function (k) { return { m3: _pppM3Sum(byC[k]), pedidos: byC[k] }; });
+    const bal = _pppBalancearZona(clientes, T_MIN, T_IDEAL, T_MAX);
+    for (const t of bal.tandas) { assign(t, next()); nT++; }
+    nPend += bal.pend.length;
   }
   pppSaveEdits(); pppRenderProg();
   const sinZona = pend.filter(function (p) { return !pppEsSuper(p) && !pppZonaDeBarrio(p.localidad); }).length;
-  pppSetStatus("🪄 " + nT + " tandas sugeridas" + (sinZona ? " · " + sinZona + " quedaron sin zona (asigná el barrio)" : "") + ". Revisá y ajustá.", true);
+  pppSetStatus("🪄 " + nT + " tandas sugeridas" + (nPend ? " · " + nPend + " ped. pendientes (no llegan a " + T_MIN.toFixed(2) + " m³ sin mezclar zona)" : "") + (sinZona ? " · " + sinZona + " sin zona (asigná el barrio)" : "") + ". Revisá y ajustá.", true);
 }
 function pppLimpiarTandas() {
   if (!confirm("¿Borrar TODAS las tandas y la programación? Los pedidos vuelven a 'Pedidos a Programar'.")) return;
@@ -23245,7 +23587,7 @@ function pppLimpiarTandas() {
    PERO no escribe nada: devuelve la sugerencia para verla e imprimirla. ===== */
 let _pppSugCache = null;
 function _pppComputeSugerencia() {
-  const cfg = pppGetCfg(), cap = cfg.tandaCap > 0 ? cfg.tandaCap : 0.8;
+  const cfg = pppGetCfg(); const T_MIN = 0.60, T_MAX = 1.00; let T_IDEAL = cfg.tandaCap > 0 ? cfg.tandaCap : 0.80; if (T_IDEAL < T_MIN) T_IDEAL = T_MIN; if (T_IDEAL > T_MAX) T_IDEAL = T_MAX;
   const ent = pppLoadEntregados();
   const pend = (_pppParsed.prog || []).filter(function (p) { return !ent.has(String(p.np)) && !_pppTieneTanda(p) && !p.programmed; });
   const out = [];
@@ -23265,8 +23607,9 @@ function _pppComputeSugerencia() {
     return code;
   };
 
+  const pendientes = [];
   const sup = pend.filter(pppEsSuper), bySupC = {}, supOrd = [];
-  for (const p of sup) { const k = String(p.cod || p.razon_social); if (!(k in bySupC)) supOrd.push(k); (bySupC[k] = bySupC[k] || []).push(p); }
+  for (const p of sup) { const k = String(p.razon_social || p.cod); if (!(k in bySupC)) supOrd.push(k); (bySupC[k] = bySupC[k] || []).push(p); }
   if (sup.length) nextZone();
   for (const k of supOrd) out.push({ code: nextTanda(), sup: true, pedidos: bySupC[k] });
 
@@ -23278,18 +23621,18 @@ function _pppComputeSugerencia() {
     const byC = {}, cord = [];
     for (const p of byZ[z]) { const k = String(p.cod || p.razon_social); if (!(k in byC)) cord.push(k); (byC[k] = byC[k] || []).push(p); }
     cord.sort(function (a, b) { const fa = Math.min.apply(null, byC[a].map(function (p) { return +_pppFechaKey(p.fecha); })); const fb = Math.min.apply(null, byC[b].map(function (p) { return +_pppFechaKey(p.fecha); })); return fa - fb; });
-    let bucket = [], bm3 = 0;
-    const flush = function () { if (bucket.length) { out.push({ code: nextTanda(), zona: z, pedidos: bucket }); bucket = []; bm3 = 0; } };
-    for (const k of cord) { const ps = byC[k], m3 = _pppM3Sum(ps); if (bucket.length && (bm3 + m3) > cap) flush(); bucket = bucket.concat(ps); bm3 += m3; if (bm3 >= cap) flush(); }
-    flush();
+    const clientes = cord.map(function (k) { return { m3: _pppM3Sum(byC[k]), pedidos: byC[k] }; });
+    const bal = _pppBalancearZona(clientes, T_MIN, T_IDEAL, T_MAX);
+    for (const t of bal.tandas) out.push({ code: nextTanda(), zona: z, pedidos: t });
+    pendientes.push.apply(pendientes, bal.pend);
   }
   const sinZona = pend.filter(function (p) { return !pppEsSuper(p) && !pppZonaDeBarrio(p.localidad); });
-  return { tandas: out, sinZona: sinZona, cap: cap };
+  return { tandas: out, sinZona: sinZona, pendientes: pendientes, ideal: T_IDEAL, min: T_MIN, max: T_MAX };
 }
 function _pppSugHtml(s) {
   let tot = 0, np = 0;
   let h = '<div class="ppp-sug-doc"><h2>🪄 Sugerencia de tandas — cargar a mano en el Excel</h2>' +
-    '<div class="ppp-sug-sub">' + s.tandas.length + ' tandas sugeridas · objetivo ' + s.cap + ' m³/tanda. Es una <b>sugerencia</b>: la PPP no cambia, programá en el Excel.</div>';
+    '<div class="ppp-sug-sub">' + s.tandas.length + ' tandas sugeridas · objetivo ' + Number(s.ideal).toFixed(2) + ' m³ (rango ' + Number(s.min).toFixed(2) + '–' + Number(s.max).toFixed(2) + '). Es una <b>sugerencia</b>: la PPP no cambia, programá en el Excel.</div>';
   for (const t of s.tandas) {
     const m3 = _pppM3Sum(t.pedidos); tot += m3; np += t.pedidos.length;
     h += '<table class="ppp-sug-tbl"><thead>' +
@@ -23299,6 +23642,7 @@ function _pppSugHtml(s) {
     h += '</tbody></table>';
   }
   if (s.sinZona && s.sinZona.length) h += '<div class="ppp-sug-sinzona">⚠ ' + s.sinZona.length + ' pedido(s) SIN ZONA quedaron fuera (asigná el barrio en el Excel): ' + s.sinZona.map(function (p) { return escapeHtml(String(p.np)) + " (" + escapeHtml(pppLocDisp(p.localidad) || "?") + ")"; }).join(" · ") + '</div>';
+  if (s.pendientes && s.pendientes.length) h += '<div class="ppp-sug-sinzona">⏳ ' + s.pendientes.length + ' pedido(s) PENDIENTES: no llegan al mínimo ' + Number(s.min).toFixed(2) + ' m³ en su zona sin mezclar. Esperan más volumen: ' + s.pendientes.map(function (p) { return escapeHtml(String(p.np)) + " (" + escapeHtml(pppLocDisp(p.localidad) || "?") + ")"; }).join(" · ") + '</div>';
   h += '<div class="ppp-sug-tot">TOTAL: ' + np + ' pedidos · ' + s.tandas.length + ' tandas · ' + tot.toFixed(2) + ' m³</div></div>';
   return h;
 }
@@ -24420,9 +24764,12 @@ function pppResTgl(dk, zkeyEnc) {
 }
 function pppResumenHtml(prog) {
   const conF = prog.filter(function (p) { return (p.fecha_entrega || "").trim(); });
-  const sinF = prog.length - conF.length;
+  // v9.80 — Retira NO lleva fecha de entrega (el cliente retira del depósito, sin camión):
+  // no es un error, así que NO cuenta como "sin Fecha de Entrega" (antes inflaba el aviso).
+  const _esRetira = function (p) { const z = String(p.zona || "").trim() || pppZonaDeBarrio(p.localidad || ""); return String(z).toLowerCase() === "retira"; };
+  const sinF = prog.filter(function (p) { return !(p.fecha_entrega || "").trim() && !_esRetira(p); }).length;
   let head = '';
-  if (sinF) head += '<div class="ppp-res-note">⏳ ' + sinF + ' pedido(s) sin Fecha de Entrega — no entran al resumen.</div>';
+  if (sinF) head += '<div class="ppp-res-note">⏳ ' + sinF + ' pedido(s) sin Fecha de Entrega — no entran al resumen. <span style="opacity:.7">(Retira no cuenta)</span></div>';
   if (!conF.length) return head + '<div class="planim-empty">Sin pedidos con Fecha de Entrega todavía.</div>';
   const CAP = pppGetCfg().dayCap > 0 ? pppGetCfg().dayCap : 6;
   const byD = {};
@@ -24554,6 +24901,174 @@ async function _rtGeocode(dir, barrio) {
     if (j && j.length && j[0].lat) { const c = { lat: +j[0].lat, lng: +j[0].lon }; if (isFinite(c.lat) && isFinite(c.lng)) return c; }
   } catch (e) { }
   return null;
+}
+/* ===== v9.75 — 📍 Mapa de zonas: geocodifica TODAS las direcciones de la programación
+   (Nominatim/OSM, cache en PPP_Geo) y las pinta en un mapa (Leaflet/OSM) coloreadas por su
+   ZONA ACTUAL, para ver cuáles están mal zonificadas antes de parametrizar zonas por coords.
+   Guarda también los componentes oficiales (address de Nominatim) en PPP_Geo.comp para el
+   paso 2 (asignación híbrida partido/barrio → zona). ===== */
+let _zg = null;
+const ZG_COLORS = {
+  "Zona 1 - CABA Sur": "#ef4444", "Zona 2 - CABA Centro": "#f59e0b", "Zona 3 - CABA Oeste": "#eab308",
+  "Zona 4 - GBA Sur": "#22c55e", "Zona 5 - GBA Oeste": "#06b6d4", "Zona 6 - GBA Norte": "#3b82f6",
+  "Zona 7 - GBA Norte Lejos": "#8b5cf6", "Super": "#ec4899", "Retira": "#0ea5e9", "Expo": "#a16207"
+};
+function _zgColor(z) { return ZG_COLORS[z] || "#94a3b8"; }   // gris = sin zona
+function _zgShortZ(z) { return (typeof PPP_ZONA_SHORT !== "undefined" && PPP_ZONA_SHORT[z]) ? PPP_ZONA_SHORT[z] : z; }
+/* Geocode con addressdetails (partido/barrio oficiales) + viewbox sesgado a AMBA. NO fuerza CABA. */
+async function _zgGeocode(dir, barrio) {
+  const base = String(dir || "").trim(); if (!base) return null;
+  const q = base + (barrio ? ", " + barrio : "") + ", Buenos Aires, Argentina";
+  const url = "https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=1&countrycodes=ar&viewbox=-58.80,-34.40,-58.05,-34.85&q=" + encodeURIComponent(q);
+  try {
+    const r = await fetch(url, { headers: { "Accept": "application/json" } });
+    if (!r.ok) return null;
+    const j = await r.json();
+    if (j && j.length && j[0].lat) { const lat = +j[0].lat, lng = +j[0].lon; if (isFinite(lat) && isFinite(lng)) return { lat: lat, lng: lng, comp: j[0].address || null }; }
+  } catch (e) { }
+  return null;
+}
+function _zgLoadLeaflet() {
+  return new Promise(function (res, rej) {
+    if (window.L) return res();
+    if (!document.getElementById("zgLeafCss")) { const c = document.createElement("link"); c.id = "zgLeafCss"; c.rel = "stylesheet"; c.href = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"; document.head.appendChild(c); }
+    const s = document.createElement("script"); s.src = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js";
+    s.onload = function () { res(); }; s.onerror = function () { rej(new Error("No se pudo cargar el mapa (Leaflet)")); };
+    document.head.appendChild(s);
+  });
+}
+async function _zgFetchAddrs() {
+  const url = SUPABASE_URL + "/rest/v1/PPP_Programacion_Diaria?select=np,razon_social,direccion,barrio,zona&limit=20000";
+  const r = await fetch(url, { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+  const rows = r.ok ? await r.json() : [];
+  const seen = {}, out = [];
+  for (const p of rows) {
+    const dir = String(p.direccion || "").trim(); if (!dir) continue;
+    const k = _rtDirKey(p.direccion, p.barrio);
+    if (seen[k]) continue; seen[k] = 1;
+    out.push({ key: k, dir: dir, barrio: String(p.barrio || ""), zona: String(p.zona || "").trim(), rs: String(p.razon_social || ""), np: String(p.np || "") });
+  }
+  return out;
+}
+async function _zgCachePut(key, dir, barrio, c) {
+  try {
+    await fetch(SUPABASE_URL + "/rest/v1/PPP_Geo?on_conflict=dir_key", { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ dir_key: key, direccion: dir, barrio: barrio, lat: c.lat, lng: c.lng, comp: c.comp || null }) });
+  } catch (e) { }
+}
+/* cache con componentes oficiales (comp) para la regla de zona. */
+async function _zgCacheAll() {
+  const out = {};
+  try {
+    const r = await fetch(SUPABASE_URL + "/rest/v1/PPP_Geo?select=dir_key,lat,lng,comp&limit=20000", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+    if (r.ok) { const d = await r.json(); for (const row of d) out[row.dir_key] = { lat: +row.lat, lng: +row.lng, comp: row.comp || null }; }
+  } catch (e) { }
+  return out;
+}
+/* Nombres OFICIALES candidatos del geocoder, del más específico (barrio) al más general (partido). */
+function _zgOfficialNames(comp) {
+  if (!comp) return [];
+  const keys = ["neighbourhood", "suburb", "quarter", "city_district", "town", "village", "city", "municipality", "county", "state_district"];
+  const out = [];
+  keys.forEach(function (k) { if (comp[k] && out.indexOf(String(comp[k])) < 0) out.push(String(comp[k])); });
+  return out;
+}
+/* Zona SUGERIDA por los componentes oficiales: aplica TU mapeo barrio→zona (pppZonaDeBarrio,
+   que ya incluye overrides + Supabase + PPP_BARRIO_ZONA) al nombre oficial más específico que
+   matchee. Devuelve "" si ningún nombre oficial está en el mapeo (partido nuevo a cargar). */
+function _zgZonaSug(a) {
+  const c = _zg && _zg.cache[a.key]; if (!c || !c.comp) return "";
+  const names = _zgOfficialNames(c.comp);
+  for (const nm of names) { const z = pppZonaDeBarrio(nm); if (z) return z; }
+  return "";
+}
+/* Zonas OPERATIVAS (no geográficas): un Súper/Retira/Expo se asigna por categoría, no por
+   dónde cae en el mapa → nunca es un "desajuste" geográfico (v9.81). */
+const ZG_OPERATIVAS = { "Super": 1, "Retira": 1, "Expo": 1 };
+/* Lista de desajustes: dirección con zona ACTUAL ≠ zona oficial sugerida (ambas GEOGRÁFICAS). */
+function _zgMismatches() {
+  if (!_zg) return [];
+  return _zg.addrs.map(function (a) { return { a: a, sug: _zgZonaSug(a) }; })
+    .filter(function (x) { return x.sug && x.a.zona && x.sug !== x.a.zona && !ZG_OPERATIVAS[x.a.zona] && !ZG_OPERATIVAS[x.sug]; });
+}
+async function openZonasMapa() {
+  if (!document.getElementById("zgCss")) {
+    const st = document.createElement("style"); st.id = "zgCss";
+    st.textContent = "#zgOverlay{display:none;position:fixed;inset:0;z-index:1350;background:rgba(2,6,23,.8);padding:10px;overflow:auto}#zgOverlay.show{display:block}.zg-card{background:#f8fafc;max-width:980px;margin:0 auto;border-radius:14px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5)}.zg-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 15px;background:linear-gradient(90deg,#0f766e,#0b3b36);color:#fff}.zg-title{font-size:18px;font-weight:800}.zg-close{background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 13px;font-weight:800;cursor:pointer;width:auto}.zg-body{padding:12px 14px}#zgMap{height:60vh;min-height:340px;border-radius:12px;overflow:hidden;border:1px solid #e2e8f0}.zg-bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}.zg-btn{background:#0f766e;color:#fff;border:none;border-radius:8px;padding:7px 12px;font-weight:800;font-size:13px;cursor:pointer;width:auto}.zg-leg{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0;font-size:12px;color:#334155}.zg-leg span{display:inline-flex;align-items:center;gap:5px}.zg-dot{width:12px;height:12px;border-radius:50%;display:inline-block;border:1px solid rgba(0,0,0,.25)}.zg-prog{height:8px;background:#e2e8f0;border-radius:999px;overflow:hidden;margin:8px 0}.zg-prog-b{height:100%;background:#0f766e;transition:width .2s}.zg-msg{font-size:12.5px;color:#475569;margin:6px 0}.zg-mism{background:#fffbeb;border:1px solid #fcd34d;border-radius:9px;padding:8px 11px;margin:8px 0;font-size:12px;color:#92400e}.zg-mism ul{margin:5px 0 0;padding-left:18px}.zg-mism li{margin:2px 0}";
+    document.head.appendChild(st);
+  }
+  let ov = document.getElementById("zgOverlay");
+  if (!ov) { ov = document.createElement("div"); ov.id = "zgOverlay"; document.body.appendChild(ov); }
+  ov.classList.add("show");
+  ov.innerHTML = '<div class="zg-card"><div class="zg-head"><span class="zg-title">📍 Mapa de zonas</span><button class="zg-close" onclick="closeZonasMapa()">Cerrar</button></div><div class="zg-body" id="zgBody"><div class="zg-msg">Cargando mapa y direcciones…</div></div></div>';
+  _zg = { addrs: [], cache: {}, map: null, prog: 0, progTot: 0, msg: "" };
+  try {
+    await _zgLoadLeaflet();
+    _zg.cache = await _zgCacheAll();
+    _zg.addrs = await _zgFetchAddrs();
+    _zgRender();
+  } catch (e) {
+    const b = document.getElementById("zgBody"); if (b) b.innerHTML = '<div class="zg-msg" style="color:#b91c1c">Error: ' + escapeHtml(e.message || String(e)) + '</div>';
+  }
+}
+function closeZonasMapa() { const ov = document.getElementById("zgOverlay"); if (ov) ov.classList.remove("show"); if (_zg && _zg.map) { try { _zg.map.remove(); } catch (e) { } _zg.map = null; } }
+function _zgRender() {
+  const b = document.getElementById("zgBody"); if (!b || !_zg) return;
+  const total = _zg.addrs.length;
+  const ubic = _zg.addrs.filter(function (a) { return _zg.cache[a.key]; }).length;
+  const falt = _zg.addrs.filter(function (a) { return a.dir && (!_zg.cache[a.key] || !_zg.cache[a.key].comp); }).length;
+  const mism = _zgMismatches();
+  let h = '<div class="zg-bar"><button class="zg-btn" onclick="zgGeocodeFaltantes()"' + (falt ? '' : ' disabled style="opacity:.5"') + '>📡 Geocodificar faltantes (' + falt + ')</button>' +
+    '<span class="zg-msg" style="margin:0"><b>' + ubic + '</b> / ' + total + ' ubicadas</span></div>';
+  if (_zg.msg) h += '<div class="zg-msg">' + escapeHtml(_zg.msg) + '</div>';
+  if (mism.length) {
+    h += '<div class="zg-mism"><b>⚠ ' + mism.length + ' desajuste(s)</b> — la zona ACTUAL no coincide con la que sugiere el barrio/partido OFICIAL del mapa:<ul>' +
+      mism.slice(0, 30).map(function (x) { return '<li>' + escapeHtml((x.a.rs || x.a.dir).slice(0, 34)) + ' — actual <b>' + escapeHtml(_zgShortZ(x.a.zona)) + '</b> → oficial <b>' + escapeHtml(_zgShortZ(x.sug)) + '</b></li>'; }).join('') + '</ul>' +
+      (mism.length > 30 ? '<div class="zg-msg" style="margin:2px 0 0">…y ' + (mism.length - 30) + ' más.</div>' : '') + '</div>';
+  } else if (falt === 0 && ubic > 0) {
+    h += '<div class="zg-msg" style="color:#166534">✓ Sin desajustes: la zona actual coincide con el barrio/partido oficial en todas las direcciones geocodificadas.</div>';
+  }
+  h += '<div class="zg-leg">' + PPP_ZONAS.map(function (z) { return '<span><i class="zg-dot" style="background:' + _zgColor(z) + '"></i>' + escapeHtml(_zgShortZ(z)) + '</span>'; }).join('') + '<span><i class="zg-dot" style="background:#94a3b8"></i>(sin zona)</span><span><i class="zg-dot" style="background:#fff;border:3px solid #111"></i>desajuste</span></div>';
+  h += '<div id="zgMap"></div>';
+  b.innerHTML = h;
+  _zgDrawMap();
+}
+function _zgDrawMap() {
+  const el = document.getElementById("zgMap"); if (!el || !window.L) return;
+  if (_zg.map) { try { _zg.map.remove(); } catch (e) { } _zg.map = null; }
+  const map = L.map(el).setView([-34.62, -58.44], 11);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap" }).addTo(map);
+  const mismKeys = {}; _zgMismatches().forEach(function (x) { mismKeys[x.a.key] = x.sug; });
+  const pts = [];
+  for (const a of _zg.addrs) {
+    const c = _zg.cache[a.key]; if (!c) continue;
+    const isM = mismKeys[a.key];
+    L.circleMarker([c.lat, c.lng], { radius: isM ? 7 : 6, color: isM ? "#111" : "#00000099", weight: isM ? 3 : 1, fillColor: _zgColor(a.zona), fillOpacity: .9 })
+      .bindPopup("<b>" + escapeHtml(a.rs || a.dir) + "</b><br>" + escapeHtml(a.dir) + (a.barrio ? ", " + escapeHtml(a.barrio) : "") + "<br>Zona: <b>" + escapeHtml(a.zona || "(sin zona)") + "</b>" + (isM ? "<br>⚠ oficial sugiere: <b>" + escapeHtml(_zgShortZ(isM)) + "</b>" : ""))
+      .addTo(map);
+    pts.push([c.lat, c.lng]);
+  }
+  const dep = _zg.cache[RT_DEPOT_KEY]; if (dep) L.marker([dep.lat, dep.lng]).addTo(map).bindPopup("🏭 Depósito Virgilio");
+  if (pts.length) { try { map.fitBounds(pts, { padding: [30, 30] }); } catch (e) { } }
+  _zg.map = map;
+  setTimeout(function () { try { map.invalidateSize(); } catch (e) { } }, 120);
+}
+async function zgGeocodeFaltantes() {
+  if (!_zg) return;
+  const falt = _zg.addrs.filter(function (a) { return a.dir && (!_zg.cache[a.key] || !_zg.cache[a.key].comp); });
+  if (!falt.length) { _zg.msg = "Todo geocodificado."; _zgRender(); return; }
+  // vista de progreso (sin redibujar el mapa cada segundo)
+  const b = document.getElementById("zgBody");
+  if (b) b.innerHTML = '<div class="zg-msg" id="zgProgMsg">Ubicando direcciones…</div><div class="zg-prog"><div class="zg-prog-b" id="zgProgBar" style="width:0%"></div></div><div class="zg-msg" style="color:#94a3b8">Nominatim / OpenStreetMap · 1 por segundo (respetando el límite gratuito).</div>';
+  for (let i = 0; i < falt.length; i++) {
+    const mE = document.getElementById("zgProgMsg"), bE = document.getElementById("zgProgBar");
+    if (mE) mE.textContent = "Ubicando… " + (i + 1) + "/" + falt.length + " — " + falt[i].dir;
+    if (bE) bE.style.width = Math.round(100 * i / falt.length) + "%";
+    const a = falt[i], c = await _zgGeocode(a.dir, a.barrio);
+    if (c) { _zg.cache[a.key] = c; await _zgCachePut(a.key, a.dir, a.barrio, c); }
+    if (i < falt.length - 1) await new Promise(function (r) { setTimeout(r, 1100); });
+  }
+  _zg.msg = "✓ " + falt.length + " direcciones geocodificadas.";
+  _zgRender();
 }
 async function _rtCacheAll() {
   const out = {};
@@ -24789,12 +25304,15 @@ function pppRenderProg() {
     const mt = function (p) { return _pppSearchStr(p).indexOf(q) >= 0; };
     programados = programados.filter(mt); aProgramar = aProgramar.filter(mt); entreg = entreg.filter(mt);
   }
+  // v9.72 — split de facturados en "En viaje" (sin confirmar entrega) y "Entregados" (confirmados)
+  const _pppSplit = (_pppDelivered != null && _pppMetaEntSet != null) ? _pppSplitDelivered() : null;
   let html =
     '<div class="ppp-tabs">' +
       '<button class="ppp-tab ' + (_pppTab === "prog" ? "on" : "") + '" onclick="pppTab(\'prog\')">📥 A Programar (' + aProgramar.length + ')</button>' +
       '<button class="ppp-tab ' + (_pppTab === "plan" ? "on" : "") + '" onclick="pppTab(\'plan\')">🗓️ Programación (' + programados.length + ')</button>' +
+      '<button class="ppp-tab ' + (_pppTab === "enviaje" ? "on" : "") + '" onclick="pppTab(\'enviaje\')">🚛 En viaje (' + (_pppSplit ? _pppSplit.enViaje.length : "…") + ')</button>' +
       '<button class="ppp-tab ' + (_pppTab === "resumen" ? "on" : "") + '" onclick="pppTab(\'resumen\')">🚚 Resumen</button>' +
-      '<button class="ppp-tab ' + (_pppTab === "ent" ? "on" : "") + '" onclick="pppTab(\'ent\')">✅ Pedidos Entregados (' + (_pppDelivered ? _pppDelivered.length : entreg.length) + ')</button>' +
+      '<button class="ppp-tab ' + (_pppTab === "ent" ? "on" : "") + '" onclick="pppTab(\'ent\')">✅ Pedidos Entregados (' + (_pppSplit ? _pppSplit.entregados.length : (_pppDelivered ? _pppDelivered.length : entreg.length)) + ')</button>' +
       '<button class="ppp-tab ' + (_pppTab === "ocup" ? "on" : "") + '" onclick="pppTab(\'ocup\')">📦 Ocupación</button>' +
     '</div>';
   html += '<div class="ppp-search"><input id="pppSearchInp" type="search" autocomplete="off" placeholder="🔎 Buscar: NP, cliente, cód, tanda, localidad, zona, fecha…" value="' + escapeHtml(_pppSearch) + '" oninput="pppSetSearch(this.value)">' + (_pppSearch ? '<button class="ppp-search-clr" onclick="pppSetSearch(\'\')" title="Limpiar búsqueda">✕</button><span class="ppp-search-n">' + (programados.length + aProgramar.length + entreg.length) + ' coincidencia(s)</span>' : '') + '</div>';
@@ -24834,7 +25352,14 @@ function pppRenderProg() {
     html += pppOcupHtml(); _renderKeepFocus(box, html);
     return;
   }
-  if (_pppTab === "ent") { html += _pppEntBodyHtml(); _renderKeepFocus(box, html); return; }
+  if (_pppTab === "enviaje") {   // v9.72 — módulo "En viaje" (facturados sin confirmar entrega)
+    if (_pppMetaEntSet == null) { try { pppRefreshMetaEntSet(); } catch (_e) {} }
+    html += _pppEnViajeHtml(); _renderKeepFocus(box, html); return;
+  }
+  if (_pppTab === "ent") {
+    if (_pppMetaEntSet == null) { try { pppRefreshMetaEntSet(); } catch (_e) {} }
+    html += _pppEntBodyHtml(); _renderKeepFocus(box, html); return;
+  }
   if (_pppTab === "plan") {
     // PROGRAMACIÓN — pedidos programados, agrupados por Fecha de Entrega → por tanda.
     // (La columna "Listo FC" se actualiza sola: pppRefreshArmado se llama al entrar al tab.)
@@ -25732,18 +26257,59 @@ function _avpTs(ts) {
   try { return new Date(ts).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }); }
   catch (_e) { return String(ts || ""); }
 }
-function _avpTel(t) { return String(t || "").replace(/[^\d]/g, ""); }
+/* v9.61 — normaliza el teléfono al formato que necesita wa.me: 54 + 9 + área (sin 0) + número
+   (sin 15). Antes solo sacaba lo no-numérico, así que los números en formato local (0341…, 11…,
+   15…) generaban links ROTOS y el aviso al cliente no salía. Best-effort argentino:
+   - con "+" y país ≠ 54 (ej. +591) → se deja tal cual (extranjero);
+   - ya con 54 (país) → se asegura el 9 de celular;
+   - nacional → saca el 0 de trunk, resuelve 15xxxxxxxx / 8 dígitos como CABA (11) y antepone 549. */
+function _avpTel(t) {
+  var s = String(t || "");
+  var hasPlus = s.indexOf("+") >= 0;
+  var d = s.replace(/[^\d]/g, "");
+  if (!d) return "";
+  d = d.replace(/^00/, "");
+  if (hasPlus && d.indexOf("54") !== 0) return d;            // extranjero (+591…) → tal cual
+  if (d.length >= 12 && d.indexOf("54") === 0) {             // ya trae 54 (país)
+    if (d.charAt(2) !== "9") d = "549" + d.slice(2);         // celular argentino lleva 9 tras 54
+    return d;
+  }
+  if (d.charAt(0) === "0") d = d.slice(1);                   // sacar 0 de trunk nacional
+  if (/^15\d{8}$/.test(d)) d = "11" + d.slice(2);            // 15xxxxxxxx (CABA sin área) → 11
+  else if (d.length === 8) d = "11" + d;                     // 8 dígitos sin área → CABA (11)
+  return "549" + d;                                          // celular argentino
+}
 function _avpWa(tel, msg) { return "https://wa.me/" + _avpTel(tel) + "?text=" + encodeURIComponent(msg); }
 function _avpGroup(key) { var g = _avp ? (_avp.groups || []) : []; for (var i = 0; i < g.length; i++) if (g[i].key === key) return g[i]; return null; }
+/* v9.64 — SOLO estas 3 personas pueden entrar al módulo de Avisar programación (pedido del dueño).
+   El nombre elegido queda registrado en cada aviso (envio_programacion_log.quien). */
+var AVP_QUIEN = ["Tomas Gonzalez", "Marianela Becker", "Giuliana"];
+function _avpPickQuien() {
+  return new Promise(function (resolve) {
+    var ov = document.createElement("div");
+    ov.style.cssText = "position:fixed;inset:0;z-index:1500;background:rgba(2,6,23,.72);display:flex;align-items:center;justify-content:center;padding:16px;";
+    ov.innerHTML = '<div style="background:#fff;border-radius:14px;max-width:360px;width:100%;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5);">' +
+      '<div style="padding:14px 16px;background:linear-gradient(90deg,#0f766e,#0b3b36);color:#fff;font-weight:800;font-size:16px;">📲 ¿Quién entra?</div>' +
+      '<div style="padding:14px;display:flex;flex-direction:column;gap:8px;">' +
+      AVP_QUIEN.map(function (n, i) { return '<button data-q="' + i + '" style="width:100%;padding:13px;border:1px solid #cbd5e1;border-radius:10px;background:#f0fdfa;color:#0f172a;font-size:15px;font-weight:800;cursor:pointer;">' + escapeHtml(n) + '</button>'; }).join("") +
+      '<button data-cancel="1" style="width:100%;padding:10px;border:none;border-radius:10px;background:#f1f5f9;color:#64748b;font-size:13px;font-weight:700;cursor:pointer;margin-top:4px;">Cancelar</button>' +
+      '</div></div>';
+    document.body.appendChild(ov);
+    ov.addEventListener("click", function (e) {
+      var t = e.target;
+      if (t === ov || (t.getAttribute && t.getAttribute("data-cancel"))) { ov.remove(); resolve(null); return; }
+      var q = t.getAttribute && t.getAttribute("data-q");
+      if (q != null) { ov.remove(); resolve(AVP_QUIEN[+q] || null); }
+    });
+  });
+}
 async function openAvisoProg() {
   try { if (typeof requireSupervisor === "function" && !requireSupervisor()) return; } catch (_e) {}
-  var quien; try { quien = prompt("¿Quién entra a este módulo? (tu nombre — queda registrado en cada aviso que mandes)", ""); } catch (_e) { return; }
-  if (quien == null) return;
-  quien = String(quien).trim();
-  if (!quien) { try { alert("Poné tu nombre para entrar."); } catch (_e) {} return; }
+  var quien = await _avpPickQuien();
+  if (!quien) return;
   if (!document.getElementById("avpCss")) {
     var st = document.createElement("style"); st.id = "avpCss";
-    st.textContent = "#avpOverlay .avp-card{max-width:960px;margin:0 auto;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5);display:flex;flex-direction:column;max-height:92vh;}.avp-head{display:flex;align-items:center;gap:12px;padding:13px 16px;background:linear-gradient(90deg,#0f766e,#0b3b36);color:#fff;flex:0 0 auto;}.avp-head b{font-size:17px;flex:0 0 auto;}.avp-who{flex:1;font-size:13px;opacity:.9;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.avp-x{width:auto;background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;}.avp-body{padding:14px 16px;display:flex;flex-direction:column;min-height:0;flex:1;}.avp-hint{font-size:12.5px;color:#64748b;margin-bottom:8px;flex:0 0 auto;}.avp-filtro{width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid #cbd5e1;border-radius:9px;margin-bottom:8px;font-size:13px;flex:0 0 auto;}.avp-vend{flex:0 0 auto;max-height:30vh;overflow:auto;border:1px solid #cdeee7;border-radius:10px;padding:8px 10px;background:#f0fdfa;margin-bottom:8px;}.avp-vend-h{font-weight:800;font-size:12.5px;color:#0f766e;margin-bottom:4px;}.avp-vgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;margin-top:6px;}.avp-vcard{display:flex;flex-direction:column;gap:4px;padding:7px 8px;border:1px solid #cdeee7;border-radius:9px;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.05);}.avp-vname{font-weight:800;font-size:12px;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}.avp-vlist{font-size:10px;color:#64748b;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;min-height:25px;}.avp-vcard .avp-btn{width:100%;padding:5px 6px;font-size:11px;}.avp-vcard .avp-notel{text-align:center;padding:4px 0;}.avp-empty{text-align:center;color:#94a3b8;padding:22px;}.avp-tblwrap{overflow:auto;flex:1;min-height:0;}.avp-tbl{width:100%;border-collapse:collapse;font-size:13px;}.avp-tbl th,.avp-tbl td{border-bottom:1px solid #eef2f7;padding:6px 8px;text-align:left;vertical-align:top;}.avp-tbl th{background:#f8fafc;font-size:11.5px;color:#475569;position:sticky;top:0;}.avp-tbl .num{text-align:right;}.avp-rs{max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.avp-btn{width:auto;border:none;border-radius:8px;padding:6px 10px;font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap;color:#fff;}.avp-btn.cli{background:#16a34a;}.avp-btn.ven{background:#2563eb;}.avp-notel{font-size:11px;color:#94a3b8;}.avp-fab{font-size:11px;color:#b45309;font-weight:700;}.avp-vtag{font-size:11px;color:#334155;font-weight:700;}.avp-npn{font-size:10px;color:#7c3aed;font-weight:700;}.avp-done{font-size:10.5px;color:#166534;margin-top:3px;font-weight:700;}.avp-avis{margin-top:10px;}.avp-avis>summary{cursor:pointer;font-weight:800;font-size:12.5px;color:#166534;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:9px;padding:8px 12px;list-style:none;}.avp-avis>summary::-webkit-details-marker{display:none;}.avp-avis[open]>summary{margin-bottom:8px;}";
+    st.textContent = "#avpOverlay .avp-card{max-width:960px;margin:0 auto;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5);display:flex;flex-direction:column;max-height:92vh;}.avp-head{display:flex;align-items:center;gap:12px;padding:13px 16px;background:linear-gradient(90deg,#0f766e,#0b3b36);color:#fff;flex:0 0 auto;}.avp-head b{font-size:17px;flex:0 0 auto;}.avp-who{flex:1;font-size:13px;opacity:.9;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.avp-x{width:auto;background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;}.avp-body{padding:14px 16px;display:flex;flex-direction:column;min-height:0;flex:1;}.avp-hint{font-size:12.5px;color:#64748b;margin-bottom:8px;flex:0 0 auto;}.avp-filtro{width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid #cbd5e1;border-radius:9px;margin-bottom:8px;font-size:13px;flex:0 0 auto;}.avp-vend{flex:0 0 auto;max-height:30vh;overflow:auto;border:1px solid #cdeee7;border-radius:10px;padding:8px 10px;background:#f0fdfa;margin-bottom:8px;}.avp-vend-h{font-weight:800;font-size:12.5px;color:#0f766e;margin-bottom:4px;}.avp-vgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;margin-top:6px;}.avp-vcard{display:flex;flex-direction:column;gap:4px;padding:7px 8px;border:1px solid #cdeee7;border-radius:9px;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.05);}.avp-vname{font-weight:800;font-size:12px;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}.avp-vlist{font-size:10px;color:#64748b;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;min-height:25px;}.avp-vcard .avp-btn{width:100%;padding:5px 6px;font-size:11px;}.avp-vcard .avp-notel{text-align:center;padding:4px 0;}.avp-empty{text-align:center;color:#94a3b8;padding:22px;}.avp-tblwrap{overflow:auto;flex:1;min-height:0;}.avp-tbl{width:100%;border-collapse:collapse;font-size:13px;}.avp-tbl th,.avp-tbl td{border-bottom:1px solid #eef2f7;padding:6px 8px;text-align:left;vertical-align:top;}.avp-tbl th{background:#f8fafc;font-size:11.5px;color:#475569;position:sticky;top:0;}.avp-tbl .num{text-align:right;}.avp-rs{max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.avp-btn{width:auto;min-width:104px;justify-content:center;text-align:center;border:none;border-radius:8px;padding:6px 10px;font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap;color:#fff;}.avp-btn.cli{background:#16a34a;}.avp-btn.ven{background:#2563eb;}.avp-btn.tel{background:#64748b;}.avp-cliwrap{display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;}.avp-mini{width:auto;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:6px;padding:3px 8px;font-size:12px;cursor:pointer;color:#334155;vertical-align:middle;line-height:1;}.avp-mini:hover{background:#e2e8f0;}.avp-addvend{background:#fffbeb;border-color:#fcd34d;color:#b45309;font-weight:800;}.avp-addvend:hover{background:#fef3c7;}.avp-notel{font-size:11px;color:#94a3b8;}.avp-vpill{display:inline-block;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:800;white-space:nowrap;line-height:1.5;}.avp-vpill.fab{background:#fef3c7;color:#b45309;}.avp-vpill.vend{background:#e0e7ff;color:#3730a3;}.avp-vpill.none{background:#f1f5f9;color:#94a3b8;}.avp-fab{font-size:11px;color:#b45309;font-weight:700;}.avp-vtag{font-size:11px;color:#334155;font-weight:700;}.avp-npn{font-size:10px;color:#7c3aed;font-weight:700;}.avp-done{font-size:10.5px;color:#166534;margin-top:3px;font-weight:700;}.avp-avis{margin-top:10px;}.avp-avis>summary{cursor:pointer;font-weight:800;font-size:12.5px;color:#166534;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:9px;padding:8px 12px;list-style:none;}.avp-avis>summary::-webkit-details-marker{display:none;}.avp-avis[open]>summary{margin-bottom:8px;}";
     document.head.appendChild(st);
   }
   _avp = { quien: quien, groups: [], lastCli: {}, vendNotified: {}, vendW: {}, filtro: "" };
@@ -25816,7 +26382,7 @@ async function avpLoad() {
 /* v9.58 — vendedores INTERNOS ("somos nosotros"): 7 = fábrica, 20 = super. A vend 20 NO se
    le avisa NI al cliente NI al vendedor (son pedidos nuestros). A vend 7 (fábrica) no se arma
    resumen de vendedor, pero el cliente igual puede recibir aviso. */
-function _avpNoVend(v) { return v === "7" || v === "20"; }   // no arma resumen de vendedor
+function _avpNoVend(v) { return v === "4" || v === "5" || v === "7" || v === "14" || v === "20"; }   // v9.84 — no arma resumen de vendedor (4/5/7/14 = fábrica/internos, 20 = super)
 function _avpNoCliente(v) { return v === "20"; }             // tampoco se avisa al cliente (super = nosotros)
 function avpRender() {
   var body = document.getElementById("avpBody"); if (!body || !_avp) return;
@@ -25846,13 +26412,19 @@ function avpRender() {
   // v9.58 — fila de la tabla (reutilizada por pendientes y avisados)
   var _avpTr = function (g) {
     var lc = _avp.lastCli[g.key];
-    var cliDone = lc ? '<div class="avp-done">✅ ' + escapeHtml(_avpTs(lc.ts)) + ' · ' + escapeHtml(lc.quien || "") + '</div>' : '';
+    // v9.62 — botón ↩ para DESHACER el aviso (borra el log → vuelve a pendientes)
+    var cliDone = lc ? '<div class="avp-done">✅ ' + escapeHtml(_avpTs(lc.ts)) + ' · ' + escapeHtml(lc.quien || "") + ' <button class="avp-mini" onclick="event.stopPropagation();avpUndoCliente(\'' + encodeURIComponent(g.key) + '\')" title="Deshacer aviso — vuelve a pendientes">↩</button></div>' : '';
+    // v9.62 — ✎ editar teléfono; ➕ tel cargar teléfono (escribe a whatsapp_clientes)
+    var editTel = '<button class="avp-mini" onclick="event.stopPropagation();avpEditTel(\'' + encodeURIComponent(g.key) + '\')" title="' + (g.telCli ? "Editar" : "Cargar") + ' teléfono">✎</button>';
+    // v9.84 — cliente SIN WhatsApp pero CON vendedor real: botón para sumarlo IGUAL al resumen
+    // del vendedor (aclarando que va a salir una alerta de aviso a Damián).
+    var addVend = (g.vend && !_avpNoVend(g.vend)) ? '<button class="avp-mini avp-addvend" onclick="event.stopPropagation();avpAddVend(\'' + encodeURIComponent(g.key) + '\')" title="Sin WhatsApp del cliente: sumarlo igual al resumen del vendedor (sale alerta a Damián por Telegram)">➕ a vend</button>' : '';
     var cliCell = _avpNoCliente(g.vend)
-      ? '<span class="avp-fab" title="Vend 20 (super) = somos nosotros → no se avisa">🏢 nosotros</span>'
+      ? '<span class="avp-vpill fab" title="Vend 20 (super) = somos nosotros → no se avisa">🏢 nosotros</span>'
       : (g.telCli
-        ? '<button class="avp-btn cli" onclick="avpSendCliente(\'' + encodeURIComponent(g.key) + '\')">📲 Cliente</button>' + cliDone
-        : '<span class="avp-notel">sin tel</span>' + cliDone);
-    var venLbl = g.vend === "7" ? '<span class="avp-fab">🏭 fábrica</span>' : (g.vend === "20" ? '<span class="avp-fab">🏢 super (nosotros)</span>' : (!g.vend ? '<span class="avp-notel">— sin vend —</span>' : '<span class="avp-vtag">Vend ' + escapeHtml(g.vend) + '</span>'));
+        ? '<div class="avp-cliwrap"><button class="avp-btn cli" onclick="avpSendCliente(\'' + encodeURIComponent(g.key) + '\')">📲 Cliente</button>' + editTel + '</div>' + cliDone
+        : '<div class="avp-cliwrap"><button class="avp-btn tel" onclick="avpEditTel(\'' + encodeURIComponent(g.key) + '\')" title="Cargar teléfono">➕ tel</button>' + addVend + '</div>' + cliDone);
+    var venLbl = g.vend === "7" ? '<span class="avp-vpill fab">🏭 fábrica</span>' : (g.vend === "20" ? '<span class="avp-vpill fab">🏢 super</span>' : (!g.vend ? '<span class="avp-vpill none">— sin vend —</span>' : '<span class="avp-vpill vend">Vend ' + escapeHtml(g.vend) + '</span>'));
     var npNote = g.nps.length > 1 ? ' <span class="avp-npn">(' + g.nps.length + ' NP)</span>' : '';
     return '<tr><td><b>' + escapeHtml(g.cod) + '</b>' + npNote + '</td><td class="avp-rs" title="' + escapeHtml(g.rs) + '">' + escapeHtml(g.rs) + '</td><td>' + escapeHtml(_avpFechaDMY(g.fped)) + '</td><td><b>' + escapeHtml(_avpFechaDMY(g.fppp)) + '</b></td><td class="num">' + (g.dias == null ? "—" : g.dias) + '</td><td>' + cliCell + '</td><td>' + venLbl + '</td></tr>';
   };
@@ -25927,6 +26499,82 @@ async function avpSendVendedor(vendEnc) {
   _avp.vendNotified[v] = {};                                   // ya enviado → resumen vuelve a 0
   avpRender();
   window.open(_avpWa(meta.tel, avpMsgVendedor(meta.nombre, lines)), "_blank");
+}
+/* v9.62 — cargar/editar teléfono del cliente inline (escribe a whatsapp_clientes). Así no hay
+   que cargarlo por SQL. Actualiza en memoria TODOS los grupos del mismo cod_cliente. */
+async function avpEditTel(keyEnc) {
+  if (!_avp) return;
+  var g = _avpGroup(decodeURIComponent(keyEnc)); if (!g) return;
+  var cur = g.telCli || "";
+  var v; try { v = prompt("📞 Teléfono (WhatsApp) de " + (g.rs || ("cliente " + g.cod)) + ":", cur); } catch (_e) { return; }
+  if (v == null) return;
+  v = String(v).trim();
+  try {
+    var r = await fetch(SUPABASE_URL + "/rest/v1/whatsapp_clientes?on_conflict=cod_cliente", {
+      method: "POST",
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" },
+      body: JSON.stringify({ cod_cliente: String(g.cod), telefono: v || null })
+    });
+    if (!r.ok && r.status !== 409) { try { alert("No se pudo guardar el teléfono (HTTP " + r.status + ")."); } catch (_e) {} return; }
+  } catch (_e) { try { alert("No se pudo guardar el teléfono (sin conexión)."); } catch (_e2) {} return; }
+  (_avp.groups || []).forEach(function (x) { if (String(x.cod) === String(g.cod)) x.telCli = v || ""; });
+  avpRender();
+}
+/* v9.84 — cliente SIN WhatsApp pero CON vendedor real: sumarlo IGUAL al resumen del vendedor.
+   Aclara que va a salir una alerta de aviso a Damián. (Persistencia/mensaje real a Damián:
+   por ahora es en la sesión + aclaración; si se define el nº de Damián, se cablea el envío.) */
+async function avpAddVend(keyEnc) {
+  if (!_avp) return;
+  var g = _avpGroup(decodeURIComponent(keyEnc)); if (!g) return;
+  if (!g.vend || _avpNoVend(g.vend)) { try { alert("Este cliente no tiene vendedor con resumen."); } catch (_e) {} return; }
+  var nom = g.rs || ("cliente " + g.cod);
+  try { if (!confirm("⚠ " + nom + " NO tiene WhatsApp.\n\nLo sumo igual al resumen del VENDEDOR (Vend " + g.vend + (g.vendNombre ? " · " + g.vendNombre : "") + ") y va a SALIR UNA ALERTA A DAMIÁN POR TELEGRAM.\n\n¿Confirmás?")) return; } catch (_e) { return; }
+  if (!_avp.vendNotified[g.vend]) _avp.vendNotified[g.vend] = {};
+  _avp.vendNotified[g.vend][g.key] = { rs: g.rs, fppp: g.fppp, cod: g.cod };
+  avpRender();
+  // v9.86 — aviso REAL a Telegram (grupo "Faltantes Virgilio"), taggeando a Damián. Va por
+  // telegram_outbox (pending) igual que el resto de alertas; dedup por cliente/vend/día.
+  try {
+    var nps = (g.nps || []).map(function (n) { return String(n).trim(); }).filter(Boolean);
+    var msg = "📣 *SUMAR A RESUMEN DE VENDEDOR* — para Damián\n" +
+      "Cliente: *" + String(nom) + "* (cod " + String(g.cod) + ") *sin WhatsApp*\n" +
+      "Vendedor: " + String(g.vend) + (g.vendNombre ? " · " + String(g.vendNombre) : "") + "\n" +
+      (nps.length ? "NP: " + nps.join(", ") + "\n" : "") +
+      (g.fppp ? "Fecha PPP: " + String(g.fppp) + "\n" : "") +
+      "_Se sumó al resumen del vendedor porque el cliente no tiene WhatsApp._";
+    await fetch(SUPABASE_URL + "/rest/v1/telegram_outbox", {
+      method: "POST",
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" },
+      body: JSON.stringify({
+        chat_id: "-1002231959863",
+        text: msg,
+        parse_mode: "Markdown",
+        status: "pending",
+        dedup_key: "avp_addvend_" + String(g.cod).trim() + "_" + String(g.vend).trim() + "_" + _faltHoy()
+      }),
+      cache: "no-store"
+    });
+    try { alert("✓ " + nom + " sumado al resumen de Vend " + g.vend + ".\nAlerta enviada a Damián por Telegram."); } catch (_e) {}
+  } catch (_e) {
+    try { alert("✓ " + nom + " sumado al resumen de Vend " + g.vend + ".\n⚠ No se pudo enviar la alerta a Telegram (sin conexión)."); } catch (_e2) {}
+  }
+}
+/* v9.62 — deshacer un aviso a cliente: borra la(s) fila(s) del log (tipo='cliente') de las NP del
+   grupo y saca la marca. El pedido vuelve a "pendientes". No toca el resumen ya enviado al vendedor. */
+async function avpUndoCliente(keyEnc) {
+  if (!_avp) return;
+  var g = _avpGroup(decodeURIComponent(keyEnc)); if (!g) return;
+  try { if (!confirm("¿Deshacer el aviso de " + (g.rs || ("cliente " + g.cod)) + "?\nVuelve a la lista de pendientes.")) return; } catch (_e) {}
+  var nps = (g.nps || []).map(function (n) { return String(n); }).filter(Boolean);
+  try {
+    var q = SUPABASE_URL + "/rest/v1/envio_programacion_log?tipo=eq.cliente&cod_cliente=eq." + encodeURIComponent(String(g.cod));
+    if (nps.length) q += "&np=in.(" + nps.map(function (n) { return encodeURIComponent(n); }).join(",") + ")";
+    var r = await fetch(q, { method: "DELETE", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, Prefer: "return=minimal" } });
+    if (!r.ok) { try { alert("No se pudo deshacer (HTTP " + r.status + ")."); } catch (_e) {} return; }
+  } catch (_e) { try { alert("No se pudo deshacer (sin conexión)."); } catch (_e2) {} return; }
+  delete _avp.lastCli[g.key];
+  if (_avp.vendNotified[g.vend]) delete _avp.vendNotified[g.vend][g.key];
+  avpRender();
 }
 
 /* ===== v9.37 — MÓDULO "💸 Plata perdida de facturar" =================================
@@ -28356,6 +29004,7 @@ let _facTickedLocal   = new Set();
 // de cierre (_facNpsHoy), así que los cerrados volvían a la lista, se podían
 // re-tildar (reabriéndolos) y cada cierre nuevo dejaba huérfano al anterior.
 let _facNpsTodos      = new Set();
+let _facNpsHoyReal    = new Set();   // v9.70: NPs facturadas HOY (por facturado_at), para "Ya tildados hoy"
 let _facNpsTodosTs    = 0;
 let _facNpsTodosInflight = null;
 // v6.71 — set de NP DESPACHADAS (cargadas al camión = CCN, salvo que un FSS más
@@ -29044,6 +29693,8 @@ async function fetchFacturadosTodos(force){
       _facCountHoy = data.reduce(function (n, x) {
         return n + ((x.facturado_at && new Date(x.facturado_at).getTime() >= _hoyMs) ? 1 : 0);
       }, 0);
+      // v9.70: set de NPs facturadas HOY (por fecha), para la lista "Ya tildados hoy" (no las viejas sin cerrar)
+      _facNpsHoyReal = new Set(data.filter(function (x) { return x.facturado_at && new Date(x.facturado_at).getTime() >= _hoyMs; }).map(function (x) { return String(x.np); }));
       _facNpsTodosTs = Date.now();
       return _facNpsTodos;
     } finally {
@@ -29667,7 +30318,9 @@ window.facToggleSoloFalt = facToggleSoloFalt;
 function facRenderTicked(){
   const box = document.getElementById("facTickedList");
   if (!box) return;
-  const nps = Array.from(_facNpsHoy || []);
+  // v9.70 — "tildados HOY" = facturadas por fecha de hoy (_facNpsHoyReal), NO todas las sin cerrar
+  // (_facNpsHoy incluía viejas nunca cerradas de días atrás).
+  const nps = Array.from(_facNpsHoyReal || []);
   if (!nps.length){ box.style.display = "none"; box.innerHTML = ""; return; }
   const info = new Map();
   (_facLastTandas || []).forEach(function(t){
@@ -30292,6 +30945,37 @@ async function facTick(){
     facSetStatus(false, "Error: " + e.message);
     console.error("[fac]", e);
   }
+}
+
+/* v9.69 — badge del botón "Facturación": cantidad de PEDIDOS (NP) listos para facturar =
+   NPs en tandas FC (picking + separado terminados) que TODAVÍA no se facturaron. Mismo criterio
+   que la lista del módulo (facTick), sin el modo fallback. Fire-and-forget al abrir el panel. */
+async function facLoadBadge(){
+  try{
+    let sheetMap;
+    if (_pppCache && (Date.now() - _pppCacheTs) < PPP_TTL_MS) sheetMap = _pppCache;
+    else { sheetMap = await fetchMonitorSheet(); _pppCache = sheetMap; _pppCacheTs = Date.now(); }
+    const tandasPlan = [...sheetMap.values()].filter(t => t.opIsSi && t.pedidos.length > 0);
+    const keys = tandasPlan.map(t => t._key || t.tanda.toUpperCase());
+    const res = await Promise.all([
+      facFetchFcKeys(keys).catch(function(){ return new Set(); }),
+      fetchFacturadosTodos(true).catch(function(){ return new Set(); })
+    ]);
+    const fcKeys = res[0] || new Set();
+    const facN = new Set(); (res[1] || new Set()).forEach(function(v){ const k = pickNormNp(v); if (k) facN.add(k); });
+    const tandasFC = tandasPlan.filter(t => fcKeys.has(t._key || t.tanda.toUpperCase()));
+    const seen = {}; let n = 0;
+    tandasFC.forEach(function(t){
+      (t.pedidos || []).forEach(function(p){
+        String(p.np || "").split(/[,/]/).forEach(function(part){
+          const np = pickNormNp(part);
+          if (!np || seen[np]) return; seen[np] = 1;
+          if (!facN.has(np)) n++;
+        });
+      });
+    });
+    supSetBadge("facBadge", n);
+  } catch(_e){}
 }
 
 /* Cierre Marianela: crea row en Facturacion_Cierres → PATCH cierre_id en
@@ -31079,6 +31763,9 @@ function showSupervisor(email) {
   try { npFaltanLoadBadge(); } catch (_e) {}
   try { qbpLoadBadge(); } catch (_e) {}   // badge SOS de "Qué bajar primero"
   try { recepLoadBadge(); } catch (_e) {}   // v9.53: badge remitos pendientes de cargar (Recepción)
+  try { facLoadBadge(); } catch (_e) {}   // v9.69: badge pedidos listos para facturar
+  try { favLoadBadge(); } catch (_e) {}   // v9.70: badge Completar Pedido (faltantes con stock)
+  try { rrLoadBadge(); } catch (_e) {}   // v9.71: badge Recepción Remitos (cargados sin controlar)
   try { if (typeof pppAlertPollStart === "function") pppAlertPollStart(); } catch (_e) {}
 }
 
