@@ -4,7 +4,20 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-12 · Versión app al documentar: **v9.74**
+> Última actualización: 2026-08-12 · Versión app al documentar: **v9.75**
+>
+> Nota **v9.75** — **📍 Mapa de zonas (geocoding).** Botón nuevo en el cierre de Facturación
+> (al lado de "Armar ruta"). Geocodifica TODAS las direcciones de la programación con
+> **Nominatim/OpenStreetMap** (gratis, 1/seg, cache en tabla `PPP_Geo`) y las muestra en un
+> **mapa Leaflet/OSM** coloreadas por su **zona actual** (`PPP_ZONA`), para detectar direcciones
+> mal zonificadas. `_zgGeocode` usa `addressdetails=1` y NO fuerza CABA (bug del viejo
+> `_rtGeocode`), guardando los **componentes oficiales** (partido/barrio) en `PPP_Geo.comp`
+> (jsonb nuevo) para el **paso 2**: asignación híbrida de zona por coordenadas (componentes
+> oficiales + polígonos en los bordes). Migración `ppp_geo_comp_y_update_policy` (columna
+> `comp` + policy UPDATE anon para upsert). Leaflet desde cdnjs. Funciones `openZonasMapa`,
+> `_zg*`. **Pendiente (paso 2):** la regla coord→zona híbrida (todavía no toca `pppZonaDeBarrio`).
+>
+> Nota anterior · Versión app al documentar: **v9.74**
 >
 > Nota **v9.74** — **Sugerir tandas: empaque BALANCEADO.** Antes empacaba por cliente hasta
 > un cap (0.8) y el cierre final dejaba restos chicos (tandas de 0.20). Ahora, por zona (NUNCA

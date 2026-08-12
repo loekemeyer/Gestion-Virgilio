@@ -3422,6 +3422,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
     </div>
     <button class="fac-btn-cierre" id="facBtnCierre" disabled onclick="generateFacturacionPDF()">Terminé — Generar PDF</button>
     <button onclick="openRuteo()" style="width:100%;margin-top:8px;padding:13px;border:none;border-radius:10px;background:#0f766e;color:#fff;font-size:15px;font-weight:800;cursor:pointer">🗺️ Armar ruta de reparto de mañana</button>
+    <button onclick="openZonasMapa()" title="Geocodifica todas las direcciones (OpenStreetMap) y las muestra en un mapa por zona, para parametrizar bien las zonas" style="width:100%;margin-top:6px;padding:11px;border:1px solid #0f766e;border-radius:10px;background:#ecfeff;color:#0f766e;font-size:14px;font-weight:800;cursor:pointer">📍 Mapa de zonas (geocodificar)</button>
     <div id="facTickedList" class="fac-ticked-list" style="display:none"></div>
     <button onclick="facNCOpen()" title="Anular una factura ya emitida con una Nota de Crédito" style="flex:0 0 100%;width:100%;margin-top:4px;padding:9px;border:1px solid #fecaca;border-radius:10px;background:#fff;color:#b91c1c;font-size:13px;font-weight:800;cursor:pointer">🧾 Anular factura (Nota de Crédito)</button>
   </div>
@@ -6403,7 +6404,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v9.74";
+const APP_VERSION = "v9.75";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -24693,6 +24694,128 @@ async function _rtGeocode(dir, barrio) {
     if (j && j.length && j[0].lat) { const c = { lat: +j[0].lat, lng: +j[0].lon }; if (isFinite(c.lat) && isFinite(c.lng)) return c; }
   } catch (e) { }
   return null;
+}
+/* ===== v9.75 — 📍 Mapa de zonas: geocodifica TODAS las direcciones de la programación
+   (Nominatim/OSM, cache en PPP_Geo) y las pinta en un mapa (Leaflet/OSM) coloreadas por su
+   ZONA ACTUAL, para ver cuáles están mal zonificadas antes de parametrizar zonas por coords.
+   Guarda también los componentes oficiales (address de Nominatim) en PPP_Geo.comp para el
+   paso 2 (asignación híbrida partido/barrio → zona). ===== */
+let _zg = null;
+const ZG_COLORS = {
+  "Zona 1 - CABA Sur": "#ef4444", "Zona 2 - CABA Centro": "#f59e0b", "Zona 3 - CABA Oeste": "#eab308",
+  "Zona 4 - GBA Sur": "#22c55e", "Zona 5 - GBA Oeste": "#06b6d4", "Zona 6 - GBA Norte": "#3b82f6",
+  "Zona 7 - GBA Norte Lejos": "#8b5cf6", "Super": "#ec4899", "Retira": "#0ea5e9", "Expo": "#a16207"
+};
+function _zgColor(z) { return ZG_COLORS[z] || "#94a3b8"; }   // gris = sin zona
+/* Geocode con addressdetails (partido/barrio oficiales) + viewbox sesgado a AMBA. NO fuerza CABA. */
+async function _zgGeocode(dir, barrio) {
+  const base = String(dir || "").trim(); if (!base) return null;
+  const q = base + (barrio ? ", " + barrio : "") + ", Buenos Aires, Argentina";
+  const url = "https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=1&countrycodes=ar&viewbox=-58.80,-34.40,-58.05,-34.85&q=" + encodeURIComponent(q);
+  try {
+    const r = await fetch(url, { headers: { "Accept": "application/json" } });
+    if (!r.ok) return null;
+    const j = await r.json();
+    if (j && j.length && j[0].lat) { const lat = +j[0].lat, lng = +j[0].lon; if (isFinite(lat) && isFinite(lng)) return { lat: lat, lng: lng, comp: j[0].address || null }; }
+  } catch (e) { }
+  return null;
+}
+function _zgLoadLeaflet() {
+  return new Promise(function (res, rej) {
+    if (window.L) return res();
+    if (!document.getElementById("zgLeafCss")) { const c = document.createElement("link"); c.id = "zgLeafCss"; c.rel = "stylesheet"; c.href = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"; document.head.appendChild(c); }
+    const s = document.createElement("script"); s.src = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js";
+    s.onload = function () { res(); }; s.onerror = function () { rej(new Error("No se pudo cargar el mapa (Leaflet)")); };
+    document.head.appendChild(s);
+  });
+}
+async function _zgFetchAddrs() {
+  const url = SUPABASE_URL + "/rest/v1/PPP_Programacion_Diaria?select=np,razon_social,direccion,barrio,zona&limit=20000";
+  const r = await fetch(url, { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+  const rows = r.ok ? await r.json() : [];
+  const seen = {}, out = [];
+  for (const p of rows) {
+    const dir = String(p.direccion || "").trim(); if (!dir) continue;
+    const k = _rtDirKey(p.direccion, p.barrio);
+    if (seen[k]) continue; seen[k] = 1;
+    out.push({ key: k, dir: dir, barrio: String(p.barrio || ""), zona: String(p.zona || "").trim(), rs: String(p.razon_social || ""), np: String(p.np || "") });
+  }
+  return out;
+}
+async function _zgCachePut(key, dir, barrio, c) {
+  try {
+    await fetch(SUPABASE_URL + "/rest/v1/PPP_Geo?on_conflict=dir_key", { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ dir_key: key, direccion: dir, barrio: barrio, lat: c.lat, lng: c.lng, comp: c.comp || null }) });
+  } catch (e) { }
+}
+async function openZonasMapa() {
+  if (!document.getElementById("zgCss")) {
+    const st = document.createElement("style"); st.id = "zgCss";
+    st.textContent = "#zgOverlay{display:none;position:fixed;inset:0;z-index:1350;background:rgba(2,6,23,.8);padding:10px;overflow:auto}#zgOverlay.show{display:block}.zg-card{background:#f8fafc;max-width:980px;margin:0 auto;border-radius:14px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5)}.zg-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 15px;background:linear-gradient(90deg,#0f766e,#0b3b36);color:#fff}.zg-title{font-size:18px;font-weight:800}.zg-close{background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 13px;font-weight:800;cursor:pointer;width:auto}.zg-body{padding:12px 14px}#zgMap{height:60vh;min-height:340px;border-radius:12px;overflow:hidden;border:1px solid #e2e8f0}.zg-bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}.zg-btn{background:#0f766e;color:#fff;border:none;border-radius:8px;padding:7px 12px;font-weight:800;font-size:13px;cursor:pointer;width:auto}.zg-leg{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0;font-size:12px;color:#334155}.zg-leg span{display:inline-flex;align-items:center;gap:5px}.zg-dot{width:12px;height:12px;border-radius:50%;display:inline-block;border:1px solid rgba(0,0,0,.25)}.zg-prog{height:8px;background:#e2e8f0;border-radius:999px;overflow:hidden;margin:8px 0}.zg-prog-b{height:100%;background:#0f766e;transition:width .2s}.zg-msg{font-size:12.5px;color:#475569;margin:6px 0}";
+    document.head.appendChild(st);
+  }
+  let ov = document.getElementById("zgOverlay");
+  if (!ov) { ov = document.createElement("div"); ov.id = "zgOverlay"; document.body.appendChild(ov); }
+  ov.classList.add("show");
+  ov.innerHTML = '<div class="zg-card"><div class="zg-head"><span class="zg-title">📍 Mapa de zonas</span><button class="zg-close" onclick="closeZonasMapa()">Cerrar</button></div><div class="zg-body" id="zgBody"><div class="zg-msg">Cargando mapa y direcciones…</div></div></div>';
+  _zg = { addrs: [], cache: {}, map: null, prog: 0, progTot: 0, msg: "" };
+  try {
+    await _zgLoadLeaflet();
+    _zg.cache = await _rtCacheAll();
+    _zg.addrs = await _zgFetchAddrs();
+    _zgRender();
+  } catch (e) {
+    const b = document.getElementById("zgBody"); if (b) b.innerHTML = '<div class="zg-msg" style="color:#b91c1c">Error: ' + escapeHtml(e.message || String(e)) + '</div>';
+  }
+}
+function closeZonasMapa() { const ov = document.getElementById("zgOverlay"); if (ov) ov.classList.remove("show"); if (_zg && _zg.map) { try { _zg.map.remove(); } catch (e) { } _zg.map = null; } }
+function _zgRender() {
+  const b = document.getElementById("zgBody"); if (!b || !_zg) return;
+  const total = _zg.addrs.length;
+  const geoc = _zg.addrs.filter(function (a) { return _zg.cache[a.key]; }).length;
+  const falt = total - geoc;
+  let h = '<div class="zg-bar"><button class="zg-btn" onclick="zgGeocodeFaltantes()"' + (falt ? '' : ' disabled style="opacity:.5"') + '>📡 Geocodificar faltantes (' + falt + ')</button>' +
+    '<span class="zg-msg" style="margin:0"><b>' + geoc + '</b> / ' + total + ' direcciones ubicadas</span></div>';
+  if (_zg.msg) h += '<div class="zg-msg">' + escapeHtml(_zg.msg) + '</div>';
+  h += '<div class="zg-leg">' + PPP_ZONAS.map(function (z) { return '<span><i class="zg-dot" style="background:' + _zgColor(z) + '"></i>' + escapeHtml((typeof PPP_ZONA_SHORT !== "undefined" && PPP_ZONA_SHORT[z]) ? PPP_ZONA_SHORT[z] : z) + '</span>'; }).join('') + '<span><i class="zg-dot" style="background:#94a3b8"></i>(sin zona)</span></div>';
+  h += '<div id="zgMap"></div>';
+  b.innerHTML = h;
+  _zgDrawMap();
+}
+function _zgDrawMap() {
+  const el = document.getElementById("zgMap"); if (!el || !window.L) return;
+  if (_zg.map) { try { _zg.map.remove(); } catch (e) { } _zg.map = null; }
+  const map = L.map(el).setView([-34.62, -58.44], 11);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap" }).addTo(map);
+  const pts = [];
+  for (const a of _zg.addrs) {
+    const c = _zg.cache[a.key]; if (!c) continue;
+    L.circleMarker([c.lat, c.lng], { radius: 6, color: "#00000099", weight: 1, fillColor: _zgColor(a.zona), fillOpacity: .9 })
+      .bindPopup("<b>" + escapeHtml(a.rs || a.dir) + "</b><br>" + escapeHtml(a.dir) + (a.barrio ? ", " + escapeHtml(a.barrio) : "") + "<br>Zona: <b>" + escapeHtml(a.zona || "(sin zona)") + "</b>")
+      .addTo(map);
+    pts.push([c.lat, c.lng]);
+  }
+  const dep = _zg.cache[RT_DEPOT_KEY]; if (dep) L.marker([dep.lat, dep.lng]).addTo(map).bindPopup("🏭 Depósito Virgilio");
+  if (pts.length) { try { map.fitBounds(pts, { padding: [30, 30] }); } catch (e) { } }
+  _zg.map = map;
+  setTimeout(function () { try { map.invalidateSize(); } catch (e) { } }, 120);
+}
+async function zgGeocodeFaltantes() {
+  if (!_zg) return;
+  const falt = _zg.addrs.filter(function (a) { return !_zg.cache[a.key] && a.dir; });
+  if (!falt.length) { _zg.msg = "Todo geocodificado."; _zgRender(); return; }
+  // vista de progreso (sin redibujar el mapa cada segundo)
+  const b = document.getElementById("zgBody");
+  if (b) b.innerHTML = '<div class="zg-msg" id="zgProgMsg">Ubicando direcciones…</div><div class="zg-prog"><div class="zg-prog-b" id="zgProgBar" style="width:0%"></div></div><div class="zg-msg" style="color:#94a3b8">Nominatim / OpenStreetMap · 1 por segundo (respetando el límite gratuito).</div>';
+  for (let i = 0; i < falt.length; i++) {
+    const mE = document.getElementById("zgProgMsg"), bE = document.getElementById("zgProgBar");
+    if (mE) mE.textContent = "Ubicando… " + (i + 1) + "/" + falt.length + " — " + falt[i].dir;
+    if (bE) bE.style.width = Math.round(100 * i / falt.length) + "%";
+    const a = falt[i], c = await _zgGeocode(a.dir, a.barrio);
+    if (c) { _zg.cache[a.key] = c; await _zgCachePut(a.key, a.dir, a.barrio, c); }
+    if (i < falt.length - 1) await new Promise(function (r) { setTimeout(r, 1100); });
+  }
+  _zg.msg = "✓ " + falt.length + " direcciones geocodificadas.";
+  _zgRender();
 }
 async function _rtCacheAll() {
   const out = {};
