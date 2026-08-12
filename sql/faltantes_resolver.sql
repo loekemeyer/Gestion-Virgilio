@@ -1,0 +1,69 @@
+-- =====================================================================
+--  faltantes_resolver.sql — diseño del cierre de "Faltantes facturados sin completar"
+--  (la definición viva está en la migración homónima en Supabase; este archivo es
+--   la documentación, según la convención de sql/).
+--
+--  EL PROBLEMA
+--    El pickeador registra un PKC con `real < esp` (no encontró todo). El sistema
+--    NO descuenta stock, y hace bien: si no salió de góndola, no hay qué descontar.
+--    Pero después la mercadería aparece, se carga y se FACTURA, y nadie corre
+--    "Completar Pedido" (CP). El stock queda contando cajas que ya no están.
+--    Caso testigo: art 234 en D05B/D06B (NPs 98140/98142/98155), 8 cajas,
+--    detectado 3 semanas tarde y a mano (ver sql/ajuste_234_D05B_D06B_20260812.sql).
+--
+--  LA DETECCIÓN — vista `vista_faltantes_sin_completar`
+--    PKC con real<esp post-cutoff (excluye legajos 0/1)
+--      ∩ tandas con TODAS sus NP en Facturacion_NP
+--      − (a) las que ya tienen un `cp` de ese artículo en alguna NP de la tanda
+--      − (b) las que ya se ajustaron a mano (`tipo='ajuste'`, ref '<tanda>|…')
+--      − (c) las ya revisadas desde el módulo (tabla Faltantes_Revisados)
+--
+--  EL CIERRE — tabla `Faltantes_Revisados` + RPC `faltante_resolver`
+--    Cada caso se cierra de UNA de dos formas:
+--      'descontar' → las cajas SALIERON y se facturaron. Inserta un ajuste
+--                    (`tipo='ajuste'`, depósito `terminado`, delta = -cajas,
+--                    ref '<tanda>|FALTANTE_RESUELTO', client_id
+--                    'faltres_<tanda>_<cod>') y registra la revisión.
+--      'ok'        → al cliente se le facturó DE MENOS: la factura refleja lo que
+--                    salió, el stock ya está bien. Solo registra la revisión.
+--    En los dos casos el caso desaparece de la vista por la exclusión (c).
+--
+--  ⚠ POR QUÉ RPC Y NO ESCRITURA DEL FRONT
+--    Esto ESCRIBE STOCK. La policy `mst_insert` de Movimientos_Stock tiene
+--    `with_check = true`, o sea la anon key puede insertar cualquier movimiento.
+--    Y el repo ya se quemó con escrituras de stock del cliente: v5.76 desactivó el
+--    "fast path" del picking porque el guard chequear-y-después-insertar no es
+--    atómico y duplicó ~486 cajas en 4 tandas (C81B/C87A/C87F/C87H).
+--    Por eso: la RPC es SECURITY DEFINER, el front manda SOLO (tanda, cod, acción,
+--    legajo, motivo) y **la cantidad la calcula el server** leyendo la vista. Un
+--    doble-tap o un bug de front no puede inventar un ajuste.
+--
+--  IDEMPOTENCIA (tres capas)
+--    1. La RPC lee la vista primero: si el caso ya no está → devuelve 'ya_resuelto'
+--       y no toca nada.
+--    2. `Faltantes_Revisados` tiene PK (tanda, cod) + ON CONFLICT DO NOTHING.
+--    3. El INSERT del ajuste va envuelto en un handler de `unique_violation`
+--       (el índice `mov_stock_clientid_dedup` sobre client_id lo respalda).
+--    Verificado: dos llamadas seguidas → 'ok' y 'ya_resuelto', UN solo movimiento.
+--
+--  DEPÓSITO 'terminado': el artículo nunca entró al circuito picking→a_facturar
+--  (por eso está en la lista), así que las cajas quedaron en el bucket vendible.
+--
+--  PERMISOS
+--    Faltantes_Revisados: RLS on, policy SELECT para anon/authenticated.
+--    SIN policy de INSERT a propósito — la única vía de escritura es la RPC.
+--    faltante_resolver: revoke a public, execute a anon/authenticated.
+--
+--  FRONT: `stkFaltFactAsk` / `stkFaltFactDo` en index.html (módulo 📉 del panel
+--  supervisor). Motivos por acción, para saber después por qué se archivó cada
+--  caso. Smoke `tests/falt-fact.cjs` (verifica, entre otras cosas, que el body
+--  del POST NO lleve la cantidad).
+--
+--  PENDIENTE / NO HECHO
+--    - No hay "deshacer" desde la app. Para revertir un caso:
+--        DELETE FROM "Movimientos_Stock" WHERE client_id = 'faltres_<tanda>_<cod>';
+--        DELETE FROM "Faltantes_Revisados" WHERE tanda = '<TANDA>' AND cod = '<COD>';
+--      (en minúsculas el client_id, en mayúsculas tanda/cod).
+--    - No hay aviso por Telegram de casos nuevos: se decidió hacer primero el
+--      cierre, porque avisar sobre una pila que no se puede vaciar no sirve.
+-- =====================================================================

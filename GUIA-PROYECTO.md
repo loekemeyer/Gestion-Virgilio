@@ -4,7 +4,27 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-12 · Versión app al documentar: **v10.17**
+> Última actualización: 2026-08-12 · Versión app al documentar: **v10.18**
+>
+> Nota **v10.18 — "Faltantes facturados sin completar": ahora se RESUELVE desde el módulo.**
+> El listado (v10.16) solo mostraba; cerrar un caso había que hacerlo a mano por SQL. Ahora cada
+> fila tiene dos botones: **📉 "Salió"** (las cajas salieron y se facturaron → ajuste de stock) y
+> **✓ "Está bien"** (al cliente se le facturó de menos → el stock ya está bien, solo se archiva).
+> Los dos piden **motivo** (lista corta + "Otro" con texto libre), que queda guardado para saber
+> después por qué se cerró cada caso — mismo patrón que el 🚫 "No va" de NP que faltan.
+> **Backend:** tabla **`Faltantes_Revisados`** (PK tanda+cod; RLS con SELECT para anon y **sin
+> policy de INSERT a propósito**) + RPC **`faltante_resolver(tanda, cod, accion, legajo, motivo)`**
+> (SECURITY DEFINER). La vista suma la exclusión **(c) ya revisado**, así el caso desaparece solo.
+> ⚠ **El front NO manda la cantidad**: la calcula el server leyendo la vista. Es a propósito —
+> esto escribe stock, la policy `mst_insert` tiene `with_check = true` (la anon key puede insertar
+> cualquier movimiento) y el repo ya se quemó con el fast-path del cliente en v5.76 (~486 cajas
+> duplicadas en 4 tandas). **Idempotencia en 3 capas:** la RPC lee la vista primero y devuelve
+> `ya_resuelto` si el caso no está + PK de `Faltantes_Revisados` + handler de `unique_violation`
+> sobre `client_id` (`faltres_<tanda>_<cod>`). Probado contra un caso real (C58A/035E): dos
+> llamadas seguidas → `ok` y `ya_resuelto`, **un solo** movimiento de −1; después se revirtió.
+> **No hay "deshacer" en la app** — para revertir, los DELETE están en `sql/faltantes_resolver.sql`.
+> Smoke `tests/falt-fact.cjs` (verifica que el POST no lleve la cantidad). Diseño en
+> `sql/faltantes_resolver.sql`.
 >
 > Nota **v10.17 — Facturación: el tilde de una NP EN PROGRESO va NARANJA.** Mismo criterio que
 > ya pintaba la fila de amarillo (`tr.fac-en-progreso`, de `facTareaActiva(np)` = le están
