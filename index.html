@@ -3404,6 +3404,12 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
   tr.fac-en-progreso{ background:#fefce8 !important; }
   tr.fac-en-progreso > td:first-child{ box-shadow: inset 4px 0 0 #eab308; }
   tr.fac-en-progreso .fac-np-cell{ color:#854d0e; font-weight:800; }
+  /* v10.17 — el TILDE de una NP en progreso va NARANJA (mismo criterio que pinta la fila de
+     amarillo: `fac-en-progreso`). El ✓ verde se lee como "listo para facturar" y en estas filas
+     NO lo está — le están agregando cajas en este momento. El naranja frena la mano antes de
+     tickear. Es solo color: el botón sigue habilitado, la operadora decide. */
+  tr.fac-en-progreso .fac-btn-tick{ background:#ea580c; }
+  tr.fac-en-progreso .fac-btn-tick:hover{ background:#c2410c; }
 </style>
 <div id="facturacionModal">
   <div class="fac-banner" id="facBanner" style="display:none"></div>
