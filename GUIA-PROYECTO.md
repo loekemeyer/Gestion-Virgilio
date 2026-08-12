@@ -261,6 +261,14 @@
 > Cajas por pila, Sueltas, Contado (cajas), **Stock del sistema** (góndola+excedente, mismo cálculo
 > que la comparación), Diferencia y En proceso. Formato Excel es-AR (BOM utf-8, `;`, coma decimal).
 >
+> Nota **v10.08** — **Guardado a Góndola muestra la ubicación del artículo.** En el módulo "📥 Guardar
+> a góndola" (MG), cada fila ahora muestra un chip 📍 con **dónde va el artículo en góndola** (primera
+> celda destacada + las siguientes entre paréntesis) y **cuántas ubicaciones tiene** (ej. `📍 Va en P39
+> (A12, B03) · 3 ubicaciones`). Sale de `Capacidad_Sector.sector` vía la función nueva `ocgFetchCeldas()`
+> (cod → [sectores], ignora celdas `Libre`, mismo `_ocgNorm` que la capacidad). Si el código no tiene
+> celda fija cargada → `📍 sin ubicación fija cargada`. Es solo lectura/ayuda visual para el operario;
+> no cambia el flujo de guardado ni la ubicación del **excedente** (que sigue siendo un input aparte).
+>
 > Nota **v10.07** — **Pedidos Importación: cotización USD (FOB) + volumen (m³), todo en Supabase.**
 > Cada ítem del módulo "📦 Pedidos Importación" muestra: **FOB u$s/u** (editable ✏ → `Importados.fob_uni`,
 > USD/unidad del proveedor), **u$s pedido** (= unidades a pedir × FOB), **Master cjs** (master cajas
