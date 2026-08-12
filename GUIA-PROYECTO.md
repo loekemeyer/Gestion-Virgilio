@@ -4,7 +4,18 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-12 · Versión app al documentar: **v10.03**
+> Última actualización: 2026-08-12 · Versión app al documentar: **v10.05**
+>
+> Nota **v10.05 — front conectado a vistas/RPCs backend.** Las funciones
+> `stkFcsFetch()`, `openAbastecimiento()`, `facCorreccDataRich()` (index.html) y
+> `cargarOCVigentes()` (recepcion.js) ahora hacen **1 fetch** cada una contra las
+> vistas/RPCs server-side (`vista_fc_sin_salida`, `vista_abastecimiento`,
+> `vista_correcciones_pedido_rich`, `oc_vigentes_por_proveedor`) en vez de múltiples
+> fetches + lógica client-side. El drill-down mensual de Abastecimiento carga lazy
+> (por cod, al expandir). `abastCompute()` se mantiene para el módulo OC. Helpers:
+> `norm_cod(text)`, `norm_nombre(text)`. Ver § 3 → "Vistas y funciones backend".
+>
+> Nota anterior · Versión app al documentar: **v10.03**
 >
 > Nota **v10.03 — fix: tandas ZOMBIE en la lista de EP.** `getActivityStatus()` miraba solo
 > los **últimos 7 días** de eventos EP/TP/AP/TAP. Una tanda pickeada hace más de una semana
@@ -6247,6 +6258,46 @@ RLS `anon` (hardening 2026-07): lectura + escritura **acotada por tabla** — in
 siempre; update sólo donde la app lo usa; **sin delete** salvo `Envasar_Ubicaciones`.
 Ver `sql/agente_propuestas.sql` y las notas de seguridad.
 
+### Vistas y funciones backend (v10.10, 2026-08-12)
+
+Desde v10.10, lógica que antes se hacía con múltiples fetches en el front se movió a
+vistas/funciones server-side. El front consume estas vistas en un solo fetch cada una:
+
+- **`norm_cod(text)`** — función `IMMUTABLE`. Normaliza códigos de artículo:
+  `regexp_replace(upper(trim(coalesce(c,''))), '^0+(?=.)', '')`. Usada por
+  `vista_stock_procesada` (exclusión de insumos puros) y otras vistas.
+- **`norm_nombre(text)`** — función `IMMUTABLE`. Normaliza nombres para matching
+  fuzzy: `lower(trim(…))`, quita acentos con `translate`, reemplaza `.`, `,`, `'`
+  por espacio, colapsa espacios múltiples. Usada por `oc_vigentes_por_proveedor`.
+- **`vista_fc_sin_salida`** — VIEW. Reemplaza 6 fetches de `stkFcsFetch()`:
+  NPs facturadas no cargadas a camión. Columnas: `cod`, `cajas`, `cant_nps`,
+  `detalle_nps` (jsonb: `[{np, cajas, tanda, rs, fecha}]`). Front: `stkFcsFetch()`.
+- **`vista_abastecimiento`** — VIEW. Reemplaza 3 fetches + `abastCompute()` (~120k
+  filas) del módulo Abastecimiento. Columnas principales: `cod`, `descripcion`,
+  `rec_avg`, `rec_ult`, `ven_avg`, `ven_ult`, `bal_avg`, `bal_ult`, `n_prov`,
+  `stock`, `pedidos`, `nps_ped`, 8 columnas de depósito, `falta`, `cap_falla`,
+  `stk_falla`, `provs_ult_detalle` (jsonb), `mes_ultimo`, `es_importado`.
+  Front: `openAbastecimiento()`. Detalle mensual por artículo se carga lazy
+  desde `vista_recepcion_mensual` / `vista_venta_mensual` al expandir la fila.
+  Nota: `abastCompute()` sigue existiendo — la usa el módulo OC (línea ~10114).
+- **`vista_correcciones_pedido_rich`** — VIEW. Reemplaza 5+ fetches secuenciales
+  de `facCorreccDataRich()` para el panel de correcciones. Columnas: `np`, `sec`,
+  `ppal`, `descripcion`, `cajas`, `razon_social`, `tanda`, `fecha`, `stk_sec`,
+  `stk_ppal`, `ent_ped`, `ent_entr`, `ent_falto`, `estado`.
+  Front: `facCorreccDataRich()`. Nota: `pkcReal`/`pkcHay` no están en la vista
+  (se hardcodean a 0/false en el front — solo afectan drill-down de enpicking).
+- **`oc_vigentes_por_proveedor(p_nombre text)`** — RPC (SECURITY INVOKER). Reemplaza
+  fetch de 5000 filas + filtrado client-side de `cargarOCVigentes()` en `recepcion.js`.
+  Recibe nombre de proveedor, maneja alias (Pettofrezza→Rafael), splits por
+  `/,+& y`, prefix match con ≤2 chars de slack. Columnas: `cod`, `fecha`, `ped`,
+  `rec`, `pend` (bigint). Front: `cargarOCVigentes()` en `recepcion.js`.
+- **`vista_tanda_status`** — VIEW. Estado de tandas para el monitor + correcciones.
+  Columnas: `tanda`, `last_pick_op`, `pick_legajo`, `pick_start_ts`, `last_arm_op`,
+  `arm_legajo`, `arm_start_ts`, `estado`. **No conectada al front todavía** (prioridad media).
+
+Rollback: `rollback_alta_prioridad_20260812.sql` en el scratchpad del agente.
+Backup de `vista_stock_procesada` pre-cambios: `backup_vista_stock_procesada_matview_20260812.sql`.
+
 ---
 
 ## 4. Códigos de acción (`opcion`)
@@ -6433,11 +6484,11 @@ En `showDayBreakdown` (monitor, por operario por día):
 
 ## 10. Versionado y cache
 
-- `index.html`: `APP_VERSION = "v6.65"`. Badge en pantalla `#versionBadge`:
-  `"v6.65 ✓"` (sin cola), `"v6.65 ⏳ N"` (pendientes), `"v6.65 ⚠ N"` (error).
+- `index.html`: `APP_VERSION = "v10.05"`. Badge en pantalla `#versionBadge`:
+  `"v10.05 ✓"` (sin cola), `"v10.05 ⏳ N"` (pendientes), `"v10.05 ⚠ N"` (error).
   **Sirve para confirmar qué versión cargó cada pantalla** (mirá el badge en la TV
   para saber si está al día).
-- `sw.js`: `SW_VERSION = "v6.65-vir"`. **No precachea nada**; el handler de `fetch`
+- `sw.js`: `SW_VERSION = "v10.05-vir"`. **No precachea nada**; el handler de `fetch`
   está vacío. Usa `skipWaiting()` + `clients.claim()`. La página hace
   `reg.update()` cada 60 s con `updateViaCache:"none"` (esto **sólo actualiza el
   SW**; NO recarga la app ni cambia lo que se ve en pantalla).
