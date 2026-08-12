@@ -6419,6 +6419,15 @@ Segundo lote de migración front→back. Objetos creados, **aún no conectados a
 
 Rollback batch 2: `sql/rollback_alta_batch2_20260812.sql`.
 
+- **`vista_insumos`** — VIEW. Pestaña Insumos lee ubicación como read-only desde
+  esta vista (v10.10+). COALESCE de 3 fuentes en orden de prioridad:
+  (1) `Racks_Planimetria` (sectores ocupados, para producto terminado en racks),
+  (2) `Insumos_Ubicaciones` (tabla relacional de piezas/flejes),
+  (3) `Insumos.ubicacion` (campo legacy directo).
+  Columnas: id, cod, nombre, categoria, isis, creado_por, creado, orden, ubicacion.
+  Ubicación es read-only en el front; cambios solo vía "Mover Racks" o edición
+  directa de las tablas fuente.
+
 #### Batch 3 — objetos MEDIA prioridad (v10.10c, 2026-08-12)
 
 Tercer lote. Objetos creados, **aún no conectados al front**:
