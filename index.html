@@ -6406,7 +6406,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v9.81";
+const APP_VERSION = "v9.82";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -16699,7 +16699,11 @@ function brConfirmar() {
   if (!_br) return;
   const sel = _br.items.filter(function (it) { return it.bajar > 0; });
   if (!sel.length) return;
-  const rows = sel.map(function (it) { return { orden_id: _br.ordenId || null, cod_art: it.cod, descripcion: it.desc || null, cajas: it.bajar, estado: "propuesta", creada_por: _br.legajo || null }; });
+  // v9.82 — la bajada del operario NO necesita aprobación de la operadora (pedido del dueño):
+  // el stock ya se mueve acá (racks − / góndola +) y la fila queda 'aprobada' directo, para que
+  // NO aparezca en la cola "Bajadas Racks → góndola". La operadora ya no aprueba nada.
+  const _brNowIso = new Date().toISOString();
+  const rows = sel.map(function (it) { return { orden_id: _br.ordenId || null, cod_art: it.cod, descripcion: it.desc || null, cajas: it.bajar, estado: "aprobada", aprobada_at: _brNowIso, creada_por: _br.legajo || null }; });
   const n = sel.reduce(function (s, it) { return s + it.bajar; }, 0);
   closeBajarRacks();
   // v8.73 — mover stock INMEDIATAMENTE (racks → góndola) al registrar la bajada,
