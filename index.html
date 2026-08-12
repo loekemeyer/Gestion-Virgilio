@@ -6460,7 +6460,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v10.19";
+const APP_VERSION = "v10.23";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -21288,7 +21288,7 @@ let historicInflight   = null;   // Promise para evitar fetch en paralelo
 
 const MONITOR_REFRESH_MS = 30000;    // ciclo principal — 30s para bajar consumo Supabase
 const PPP_TTL_MS         = 3000;     // PPP (Google Sheet) cacheado este tiempo
-/* v10.19 — TOLERANCIA DE RED DEL MONITOR (la TV del depósito).
+/* v10.23 — TOLERANCIA DE RED DEL MONITOR (la TV del depósito).
    Síntoma: en el stick de TV saltaba "⚠ Sin conexión" cada ~1 minuto, pero el WiFi
    NO se caía. Causa: `refreshMonitor` mostraba el cartel ante UN SOLO fetch fallado
    — y `supaFetchAll` no tiene ni timeout ni reintento, así que cualquier hipo normal
@@ -23372,12 +23372,12 @@ function _pppSplitDelivered() {
   return { enViaje: enViaje, entregados: entregados };
 }
 function _pppEnViajeHtml() {
-  if (_pppDelivered == null || _pppMetaEntSet == null) return '<div class="planim-empty">Cargando pedidos en viaje…</div>';
+  if (_pppDelivered == null || _pppMetaEntSet == null) return '<div class="planim-empty">Cargando pedidos en salida…</div>';
   const list = _pppEntFilter(_pppSplitDelivered().enViaje);
-  if (!list.length) return '<div class="ppp-ent-note">' + (_pppSearch ? "Sin coincidencias." : "No hay pedidos en viaje (todos los facturados están confirmados como entregados).") + '</div>';
+  if (!list.length) return '<div class="ppp-ent-note">' + (_pppSearch ? "Sin coincidencias." : "No hay pedidos en salida (todos los facturados están confirmados como entregados).") + '</div>';
   let totM3 = 0; for (const p of list) totM3 += (p.m3 || 0);
   const r = _pppEntGroupedHtml(list, true, 0);
-  return '<div class="ppp-ent-note">🚛 Pedidos <b>en viaje</b> — salieron (facturados/cargados) pero <b>todavía no se confirmó la entrega</b> (ni control de remito ni en la hoja de entregados). <b>' + list.length + '</b> pedido(s) · <b>' + totM3.toFixed(2) + '</b> m³.</div>' + r.html;
+  return '<div class="ppp-ent-note">🚚 Pedidos <b>en salida</b> — ya se <b>facturaron</b> (salieron de la programación) pero <b>todavía no se confirmó la entrega</b> (sin control de remito ni en la hoja de entregados). Incluye lo facturado sin cargar y lo cargado sin controlar. <b>' + list.length + '</b> pedido(s) · <b>' + totM3.toFixed(2) + '</b> m³.</div>' + r.html;
 }
 function _pppYmdKey(s) { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s || "")); return m ? (m[1] + m[2] + m[3]) : ""; }
 async function pppRefreshDelivered() {
@@ -23481,7 +23481,7 @@ function _pppEntFilter(list) {
 function _pppEntAppHtml() {
   if (_pppDelivered == null) return '<div class="planim-empty">Cargando pedidos entregados…</div>';
   const list = _pppEntFilter(_pppSplitDelivered().entregados);   // v9.72 — solo los CONFIRMADOS (CRN o en la hoja)
-  if (!list.length) return '<div class="ppp-ent-note">' + (_pppSearch ? "Sin coincidencias." : "Todavía no hay pedidos con entrega confirmada (control de remito o hoja de entregados). Los que salieron están en «En viaje».") + '</div>';
+  if (!list.length) return '<div class="ppp-ent-note">' + (_pppSearch ? "Sin coincidencias." : "Todavía no hay pedidos con entrega confirmada (control de remito o hoja de entregados). Los que salieron están en «En Salida».") + '</div>';
   let totM3 = 0, nDisc = 0; for (const p of list) { totM3 += (p.m3 || 0); if (p.discrep) nDisc++; }
   const r = _pppEntGroupedHtml(list, true, 0);
   return '<div class="ppp-ent-note">🚚 Pedidos <b>entregados</b>, con <b>fecha de salida</b> (carga camión; si no hay, la de la PPP), cliente, m³ y cajas. <b>' + list.length + '</b> pedido(s) · <b>' + totM3.toFixed(2) + '</b> m³.' +
@@ -25262,10 +25262,25 @@ function _rtSplitTrucks(ordered, cap) {
   if (cur.length) trucks.push(cur);
   return trucks;
 }
-function _rtMapsUrl(depot, ordered) {
+/* v10.23 — Google Maps corta la URL en ~9 waypoints intermedios; una ruta de 16 paradas
+   abría solo 9. Ahora la partimos en TRAMOS de hasta 9 waypoints cada uno, ENCADENADOS
+   (el destino de un tramo es el origen del siguiente), empezando y terminando en el depósito.
+   Devuelve un array de URLs (una por tramo). */
+function _rtMapsUrls(depot, ordered) {
   const pt = function (p) { return p.lat.toFixed(6) + "," + p.lng.toFixed(6); };
-  const wp = ordered.map(pt).join("|");
-  return "https://www.google.com/maps/dir/?api=1&origin=" + pt(depot) + "&destination=" + pt(depot) + "&travelmode=driving&waypoints=" + encodeURIComponent(wp);
+  const nodes = [depot].concat(ordered).concat([depot]);   // depósito → paradas → depósito
+  const MAXWP = 9;                                          // waypoints intermedios por tramo
+  const urls = [];
+  let i = 0;
+  while (i < nodes.length - 1) {
+    const j = Math.min(i + MAXWP + 1, nodes.length - 1);   // índice del destino del tramo
+    const wp = nodes.slice(i + 1, j).map(pt).join("|");
+    let url = "https://www.google.com/maps/dir/?api=1&origin=" + pt(nodes[i]) + "&destination=" + pt(nodes[j]) + "&travelmode=driving";
+    if (wp) url += "&waypoints=" + encodeURIComponent(wp);
+    urls.push(url);
+    i = j;                                                 // el destino es el origen del próximo tramo
+  }
+  return urls;
 }
 async function _rtGeocode(dir, barrio) {
   const q = dir + (barrio ? ", " + barrio : "") + ", Ciudad Autónoma de Buenos Aires, Argentina";
@@ -25465,11 +25480,24 @@ async function _rtFetchPeds(fecha) {
   if (!r.ok) throw new Error("No se pudo leer la programación (" + r.status + ")");
   return await r.json();
 }
+function _rtNpNorm(n) { return String(n == null ? "" : n).trim().replace(/\.0+$/, "").toUpperCase(); }
+/* v10.20 — NPs YA CARGADAS al camión (evento CCN, texto = NP|TANDA). Se sacan de la ruta:
+   una vez que el pedido subió al camión no tiene que seguir apareciendo como parada a repartir. */
+async function _rtFetchCargadas() {
+  const set = new Set();
+  try {
+    const since = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
+    const url = SUPABASE_TABLE_ENDPOINT + "?opcion=eq.CCN&ts_cliente=gte." + encodeURIComponent(since) + "&select=texto&limit=20000";
+    const r = await fetch(url, { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+    if (r.ok) { const rows = await r.json(); (rows || []).forEach(function (x) { const np = _rtNpNorm(String(x.texto || "").split("|")[0]); if (np) set.add(np); }); }
+  } catch (_e) {}
+  return set;
+}
 function prodSetRuteoFecha(v) { if (v && _ruteo) { _ruteo.fecha = v; ruteoLoad(); } }
 async function openRuteo() {
   if (!document.getElementById("ruteoCss")) {
     const s = document.createElement("style"); s.id = "ruteoCss";
-    s.textContent = "#ruteoOverlay{display:none;position:fixed;inset:0;z-index:1300;background:rgba(2,6,23,.74);overflow:auto;padding:14px;}#ruteoOverlay.show{display:block;}.rt-card{background:#f8fafc;max-width:760px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.rt-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 16px;background:linear-gradient(90deg,#0f766e,#0b3b36);color:#fff;}.rt-title{font-size:19px;font-weight:800;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.rt-close{background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;width:auto;flex-shrink:0;}.rt-body{padding:14px 16px;}.rt-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px;background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:9px 12px;}.rt-bar label{font-size:12px;font-weight:700;color:#64748b;}.rt-bar input[type=date]{padding:5px 7px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;color:#0f172a;width:auto;}.rt-recalc{background:#0f766e;color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;font-size:12.5px;cursor:pointer;width:auto;}.rt-empty,.rt-loading{padding:24px;text-align:center;color:#64748b;}.rt-note{font-size:11.5px;color:#64748b;background:#f1f5f9;border-radius:8px;padding:8px 11px;margin-bottom:12px;}.rt-ruta{border:1px solid #e2e8f0;border-radius:12px;background:#fff;margin-bottom:12px;overflow:hidden;}.rt-ruta-h{display:flex;align-items:baseline;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:10px 13px;background:#ecfeff;border-bottom:1px solid #cffafe;}.rt-ruta-n{font-size:15px;font-weight:800;color:#0f766e;}.rt-ruta-s{font-size:12px;color:#475569;font-variant-numeric:tabular-nums;}.rt-truck{padding:10px 13px;border-top:1px dashed #e2e8f0;}.rt-truck:first-child{border-top:none;}.rt-truck-h{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:8px;}.rt-truck-t{font-size:13.5px;font-weight:800;color:#0f172a;}.rt-truck-m{font-size:12px;color:#64748b;font-variant-numeric:tabular-nums;}.rt-maps{display:inline-flex;align-items:center;gap:6px;background:#1a73e8;color:#fff;border:none;border-radius:9px;padding:8px 13px;font-size:12.5px;font-weight:800;cursor:pointer;text-decoration:none;width:auto;}.rt-maps:active{transform:scale(.97);}.rt-stop{display:flex;align-items:baseline;gap:9px;padding:5px 0;border-top:1px solid #f1f5f9;}.rt-stop:first-child{border-top:none;}.rt-stop-n{flex:0 0 auto;width:22px;height:22px;border-radius:50%;background:#0f766e;color:#fff;font-size:12px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;}.rt-stop-b{min-width:0;flex:1;}.rt-stop-cli{display:block;font-size:13.5px;font-weight:700;color:#0f172a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.rt-stop-dir{display:block;font-size:12px;color:#64748b;}.rt-stop-m3{flex:0 0 auto;font-size:12px;font-weight:800;color:#0f766e;font-variant-numeric:tabular-nums;}.rt-warn{background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:10px 13px;margin-bottom:12px;font-size:12.5px;color:#92400e;}.rt-warn b{color:#78350f;}.rt-warn ul{margin:6px 0 0;padding-left:18px;}.rt-prog{height:8px;background:#e2e8f0;border-radius:999px;overflow:hidden;margin-top:8px;}.rt-prog-b{height:100%;background:#0f766e;transition:width .2s;}";
+    s.textContent = "#ruteoOverlay{display:none;position:fixed;inset:0;z-index:1300;background:rgba(2,6,23,.74);overflow:auto;padding:14px;}#ruteoOverlay.show{display:block;}.rt-card{background:#f8fafc;max-width:760px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.rt-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 16px;background:linear-gradient(90deg,#0f766e,#0b3b36);color:#fff;}.rt-title{font-size:19px;font-weight:800;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.rt-close{background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;width:auto;flex-shrink:0;}.rt-body{padding:14px 16px;}.rt-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px;background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:9px 12px;}.rt-bar label{font-size:12px;font-weight:700;color:#64748b;}.rt-bar input[type=date]{padding:5px 7px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;color:#0f172a;width:auto;}.rt-recalc{background:#0f766e;color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;font-size:12.5px;cursor:pointer;width:auto;}.rt-empty,.rt-loading{padding:24px;text-align:center;color:#64748b;}.rt-note{font-size:11.5px;color:#64748b;background:#f1f5f9;border-radius:8px;padding:8px 11px;margin-bottom:12px;}.rt-ruta{border:1px solid #e2e8f0;border-radius:12px;background:#fff;margin-bottom:12px;overflow:hidden;}.rt-ruta-h{display:flex;align-items:baseline;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:10px 13px;background:#ecfeff;border-bottom:1px solid #cffafe;}.rt-ruta-n{font-size:15px;font-weight:800;color:#0f766e;}.rt-ruta-s{font-size:12px;color:#475569;font-variant-numeric:tabular-nums;}.rt-truck{padding:10px 13px;border-top:1px dashed #e2e8f0;}.rt-truck:first-child{border-top:none;}.rt-truck-h{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:8px;}.rt-truck-t{font-size:13.5px;font-weight:800;color:#0f172a;}.rt-truck-m{font-size:12px;color:#64748b;font-variant-numeric:tabular-nums;}.rt-maps{display:inline-flex;align-items:center;gap:6px;background:#1a73e8;color:#fff;border:none;border-radius:9px;padding:8px 13px;font-size:12.5px;font-weight:800;cursor:pointer;text-decoration:none;width:auto;}.rt-maps:active{transform:scale(.97);}.rt-maps-note{font-size:12px;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:7px 10px;margin:2px 0 7px;}.rt-maps-col{display:flex;flex-direction:column;align-items:flex-start;gap:7px;}.rt-stop{display:flex;align-items:baseline;gap:9px;padding:5px 0;border-top:1px solid #f1f5f9;}.rt-stop:first-child{border-top:none;}.rt-stop-n{flex:0 0 auto;width:22px;height:22px;border-radius:50%;background:#0f766e;color:#fff;font-size:12px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;}.rt-stop-b{min-width:0;flex:1;}.rt-stop-cli{display:block;font-size:13.5px;font-weight:700;color:#0f172a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.rt-stop-dir{display:block;font-size:12px;color:#64748b;}.rt-stop-m3{flex:0 0 auto;font-size:12px;font-weight:800;color:#0f766e;font-variant-numeric:tabular-nums;}.rt-warn{background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:10px 13px;margin-bottom:12px;font-size:12.5px;color:#92400e;}.rt-warn b{color:#78350f;}.rt-warn ul{margin:6px 0 0;padding-left:18px;}.rt-prog{height:8px;background:#e2e8f0;border-radius:999px;overflow:hidden;margin-top:8px;}.rt-prog-b{height:100%;background:#0f766e;transition:width .2s;}";
     document.head.appendChild(s);
   }
   let ov = document.getElementById("ruteoOverlay");
@@ -25484,9 +25512,17 @@ async function ruteoLoad() {
   _ruteo.cargando = true; _ruteo.rutas = []; _ruteo.noUbic = []; _ruteo.prog = 0; _ruteo.progTot = 0; _ruteo.msg = "Leyendo pedidos…"; ruteoRender();
   const CAP = pppGetCfg().dayCap > 0 ? pppGetCfg().dayCap : 6;
   try {
-    const peds = await _rtFetchPeds(_ruteo.fecha);
-    // sólo zonas geográficas (Z1..Z7). Retira/Súper/Expo se entregan aparte → fuera.
-    const routable = peds.filter(function (p) { return /^zona\s/.test(_rtNorm(p.zona)); });
+    const _pr = await Promise.all([_rtFetchPeds(_ruteo.fecha), _rtFetchCargadas()]);
+    const peds = _pr[0], cargadas = _pr[1] || new Set();
+    // v10.20 — sólo zonas geográficas (Z1..Z7): Retira/Súper/Expo se entregan aparte → fuera.
+    // Y se SACAN los pedidos que YA se cargaron al camión (evento CCN): dejan de ser parada a repartir.
+    let _nCargados = 0;
+    const routable = peds.filter(function (p) {
+      if (!/^zona\s/.test(_rtNorm(p.zona))) return false;
+      if (cargadas.has(_rtNpNorm(p.np))) { _nCargados++; return false; }
+      return true;
+    });
+    _ruteo.nCargados = _nCargados;
     if (!routable.length) { _ruteo.cargando = false; _ruteo.msg = ""; ruteoRender(); return; }
     // direcciones distintas a geocodificar (+ depósito)
     const cache = await _rtCacheAll();
@@ -25533,8 +25569,9 @@ function ruteoRender() {
     h += '<div class="rt-loading">' + escapeHtml(_ruteo.msg || "Calculando…") + (_ruteo.progTot ? '<div class="rt-prog"><div class="rt-prog-b" style="width:' + pct + '%"></div></div><div style="font-size:11px;margin-top:6px;color:#94a3b8">La primera vez geocodifica las direcciones (~1/seg). Después queda cacheado y es instantáneo.</div>' : '') + '</div>';
     body.innerHTML = h; return;
   }
-  if (!_ruteo.rutas || !_ruteo.rutas.length) { body.innerHTML = h + '<div class="rt-empty">No hay pedidos con entrega ese día en zonas que entregamos nosotros.<br><small>Retira / Súper / Expo se entregan aparte y no entran al ruteo.</small></div>'; return; }
-  h += '<div class="rt-note">Orden óptimo de paradas por camión desde el depósito (Virgilio 2788). Tocá <b>Abrir en Google Maps</b> y el celular navega la ruta. Tope <b>' + _ruteo.cap + ' m³</b>/camión. El orden es una sugerencia (distancia en línea recta); ajustalo si conocés mejor el barrio.</div>';
+  var _cargNote = (_ruteo.nCargados > 0) ? '<div class="rt-note" style="background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0">🚛 <b>' + _ruteo.nCargados + '</b> pedido(s) ya cargados al camión — fuera de la ruta.</div>' : '';
+  if (!_ruteo.rutas || !_ruteo.rutas.length) { body.innerHTML = h + _cargNote + '<div class="rt-empty">No hay pedidos por repartir ese día en zonas que entregamos nosotros.<br><small>Retira / Súper / Expo se entregan aparte, y lo ya cargado al camión no aparece.</small></div>'; return; }
+  h += _cargNote + '<div class="rt-note">Orden óptimo de paradas por camión desde el depósito (Virgilio 2788). Tocá <b>Abrir en Google Maps</b> y el celular navega la ruta. Tope <b>' + _ruteo.cap + ' m³</b>/camión. El orden es una sugerencia (distancia en línea recta); ajustalo si conocés mejor el barrio. <b>No aparecen</b> los pedidos ya cargados al camión ni los de Retira.</div>';
   if (_ruteo.noUbic && _ruteo.noUbic.length) {
     h += '<div class="rt-warn">⚠ <b>' + _ruteo.noUbic.length + ' dirección(es) no se pudieron ubicar</b> (no entran a la ruta — revisá que estén bien escritas en la PPP):<ul>';
     _ruteo.noUbic.slice(0, 12).forEach(function (p) { h += '<li>' + escapeHtml((p.razon_social || "—") + " — " + (p.direccion || "(sin dirección)") + (p.barrio ? ", " + p.barrio : "")) + '</li>'; });
@@ -25543,12 +25580,22 @@ function ruteoRender() {
   _ruteo.rutas.forEach(function (R) {
     h += '<div class="rt-ruta"><div class="rt-ruta-h"><span class="rt-ruta-n">' + escapeHtml(R.nombre) + '</span><span class="rt-ruta-s">' + R.paradas + ' parada(s) · ' + (Math.round(R.m3 * 10) / 10) + ' m³ · ' + R.trucks.length + ' camión(es)</span></div>';
     R.trucks.forEach(function (t, ti) {
-      const url = _rtMapsUrl(_ruteo.depot, t.stops);
+      const urls = _rtMapsUrls(_ruteo.depot, t.stops);
       h += '<div class="rt-truck"><div class="rt-truck-h"><span class="rt-truck-t">🚚 Camión ' + (ti + 1) + '</span><span class="rt-truck-m">' + t.stops.length + ' paradas · ' + (Math.round(t.m3 * 10) / 10) + ' m³ · ~' + Math.round(t.km) + ' km</span></div>';
       t.stops.forEach(function (s, si) {
         h += '<div class="rt-stop"><span class="rt-stop-n">' + (si + 1) + '</span><span class="rt-stop-b"><span class="rt-stop-cli">' + escapeHtml(s.cli) + '</span><span class="rt-stop-dir">' + escapeHtml(s.dir + (s.barrio ? " · " + s.barrio : "")) + '</span></span><span class="rt-stop-m3">' + (Math.round(s.m3 * 100) / 100) + ' m³</span></div>';
       });
-      h += '<a class="rt-maps" href="' + url + '" target="_blank" rel="noopener">🗺️ Abrir en Google Maps</a></div>';
+      // v10.23 — un botón por TRAMO (Google Maps corta en ~9 paradas). Si hay 1 solo, va sin numerar.
+      if (urls.length <= 1) {
+        h += '<a class="rt-maps" href="' + (urls[0] || "#") + '" target="_blank" rel="noopener">🗺️ Abrir en Google Maps</a>';
+      } else {
+        h += '<div class="rt-maps-note">⚠ Google Maps abre hasta ~9 paradas por link. Esta ruta va en <b>' + urls.length + ' tramos</b> (cada uno arranca donde terminó el anterior):</div><div class="rt-maps-col">';
+        urls.forEach(function (u, k) {
+          h += '<a class="rt-maps" href="' + u + '" target="_blank" rel="noopener">🗺️ Abrir tramo ' + (k + 1) + ' / ' + urls.length + '</a>';
+        });
+        h += '</div>';
+      }
+      h += '</div>';
     });
     h += '</div>';
   });
@@ -25686,7 +25733,7 @@ function pppRenderProg() {
     '<div class="ppp-tabs">' +
       '<button class="ppp-tab ' + (_pppTab === "prog" ? "on" : "") + '" onclick="pppTab(\'prog\')">📥 A Programar (' + aProgramar.length + ')</button>' +
       '<button class="ppp-tab ' + (_pppTab === "plan" ? "on" : "") + '" onclick="pppTab(\'plan\')">🗓️ Programación (' + programados.length + ')</button>' +
-      '<button class="ppp-tab ' + (_pppTab === "enviaje" ? "on" : "") + '" onclick="pppTab(\'enviaje\')">🚛 En viaje (' + (_pppSplit ? _pppSplit.enViaje.length : "…") + ')</button>' +
+      '<button class="ppp-tab ' + (_pppTab === "enviaje" ? "on" : "") + '" onclick="pppTab(\'enviaje\')">🚚 En Salida (' + (_pppSplit ? _pppSplit.enViaje.length : "…") + ')</button>' +
       '<button class="ppp-tab ' + (_pppTab === "resumen" ? "on" : "") + '" onclick="pppTab(\'resumen\')">🚚 Resumen</button>' +
       '<button class="ppp-tab ' + (_pppTab === "ent" ? "on" : "") + '" onclick="pppTab(\'ent\')">✅ Pedidos Entregados (' + (_pppSplit ? _pppSplit.entregados.length : (_pppDelivered ? _pppDelivered.length : entreg.length)) + ')</button>' +
       '<button class="ppp-tab ' + (_pppTab === "ocup" ? "on" : "") + '" onclick="pppTab(\'ocup\')">📦 Ocupación</button>' +
@@ -28954,7 +29001,7 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
 
 }
 
-/* v10.19 — reintenta una operación de red del monitor antes de darla por fallada.
+/* v10.23 — reintenta una operación de red del monitor antes de darla por fallada.
    Backoff corto (1,2s → 2,4s): un hipo de WiFi se recupera solo dentro del mismo
    ciclo y el operario nunca ve nada raro. */
 async function _monReintentar(fn, intentos) {
@@ -28979,7 +29026,7 @@ async function refreshMonitor() {
     if (_pppCache && (nowMs - _pppCacheTs) < PPP_TTL_MS) {
       sheetMap = _pppCache;
     } else {
-      sheetMap = await _monReintentar(fetchMonitorSheet, MON_REINTENTOS);   // v10.19
+      sheetMap = await _monReintentar(fetchMonitorSheet, MON_REINTENTOS);   // v10.23
       _pppCache = sheetMap;
       _pppCacheTs = Date.now();
     }
@@ -28992,7 +29039,7 @@ async function refreshMonitor() {
       if (wideTargetSet.has(v.fechaEntregaRaw)) targetTandaKeys.push(k);
     }
     // 2) Eventos: status por tanda + alertas de hoy + empleados de hoy + 5 días anteriores
-    const { statusMap, alertasOffSheet, empleadosHoy, pastDays, fichadasResumen, enSilencio, currentActivity } = await _monReintentar(function () { return fetchMonitorEvents(targetTandaKeys, sheetMap); }, MON_REINTENTOS);   // v10.19
+    const { statusMap, alertasOffSheet, empleadosHoy, pastDays, fichadasResumen, enSilencio, currentActivity } = await _monReintentar(function () { return fetchMonitorEvents(targetTandaKeys, sheetMap); }, MON_REINTENTOS);   // v10.23
     _monActividad = currentActivity || [];   // v7.55: lo lee renderMonitor para el panel "En este momento"
     monitorLastOkTs = Date.now();
     // 3) Decidir cuántos días mostrar: por default los próximos 3. Pero si en
@@ -29039,11 +29086,11 @@ async function refreshMonitor() {
       }
     } catch (_e) {}
     if (refrEl) { refrEl.textContent = "● al día"; refrEl.classList.remove("stale"); }
-    _monFallosSeguidos = 0;   // v10.19
+    _monFallosSeguidos = 0;   // v10.23
     // Si el fetch anda, ocultar banner offline (puede que estuviera mostrándose).
     document.getElementById("monitorOfflineBanner").classList.add("hidden");
   } catch (e) {
-    _monFallosSeguidos++;   // v10.19
+    _monFallosSeguidos++;   // v10.23
     if (refrEl) {
       const ageSec = monitorLastOkTs ? Math.round((Date.now()-monitorLastOkTs)/1000) : -1;
       refrEl.textContent = monitorLastOkTs
@@ -29051,7 +29098,7 @@ async function refreshMonitor() {
         : `● error: ${e.message}`;
       refrEl.classList.add("stale");
     }
-    /* v10.19 — el cartel grande recién a partir de MON_FALLOS_P_CARTEL ciclos SEGUIDOS
+    /* v10.23 — el cartel grande recién a partir de MON_FALLOS_P_CARTEL ciclos SEGUIDOS
        fallando (~2 min). Un fallo aislado ya no molesta a nadie: el indicador chico
        ("● desactualizado") lo muestra igual, y los datos viejos siguen en pantalla,
        que es lo que el operario necesita ver. */
@@ -29072,7 +29119,7 @@ async function refreshMonitor() {
       document.getElementById("monitorContent").innerHTML =
         `<div class="monitor-error">No se pudo cargar: ${escapeHtml(e.message)}</div>`;
     }
-    /* v10.19 — watchdog: si la TV lleva MON_RELOAD_MS sin un solo refresh bueno, no es
+    /* v10.23 — watchdog: si la TV lleva MON_RELOAD_MS sin un solo refresh bueno, no es
        un hipo de red — algo se colgó (JS, memoria del stick, sesión). Se recarga sola.
        SOLO en modo kiosko: nunca le recargamos la página a un supervisor que la está
        usando. Necesita un refresh OK previo, así un arranque sin red no entra en loop. */
@@ -29936,6 +29983,7 @@ function openPrintStation(){
   ov.innerHTML = '<div class="ps-wrap"><div class="ps-head"><span class="ps-title">🖨️ Cola de impresión de remitos</span><button class="ps-close" onclick="closePrintStation()">Cerrar</button></div><div class="ps-body" id="psBody"></div></div>';
   ov.classList.add("show");
   try { etlLoadGlobal(); } catch (_e) {}   // sincroniza el switch GLOBAL de etiquetas de lío antes de mostrarlo
+  try { facPrintCfgLoad().then(function(){ if (document.getElementById("psBody")) psRender(); }); } catch (_e) {}   // v10.21 — trae el switch FACTURADO global (Supabase) y re-renderiza
   if (psIsAuto()) psStart(); else psRender();
 }
 function closePrintStation(){ const ov = document.getElementById("printStationModal"); if (ov) ov.classList.remove("show"); }
@@ -29951,7 +29999,7 @@ function psRender(){
   const fon = facPrintIsOn();
   h += '<div class="ps-toggle-card"><div class="ps-tc-top"><span class="ps-tc-t">🧾 Auto-imprimir remito FACTURADO al tildar Facturación</span>' +
     '<span class="sup-sw' + (fon ? " on" : "") + '" onclick="facPrintToggle()" role="switch"><span class="sup-sw-k"></span></span></div>' +
-    '<div class="ps-status ' + (fon ? "on" : "") + '">' + (fon ? "🟢 Activo — imprime el FACTURADO en esta PC al tildar" : "⚪ Apagado — no imprime el facturado (se auto-pregunta en el 1er tic)") + '</div></div>';
+    '<div class="ps-status ' + (fon ? "on" : "") + '">' + (fon ? "🟢 Activo — imprime el FACTURADO al tildar (ajuste guardado; los celulares nunca imprimen)" : "⚪ Apagado — no imprime el facturado") + '</div></div>';
   const elon = (typeof etlOn === "function") && etlOn();
   h += '<div class="ps-toggle-card"><div class="ps-tc-top"><span class="ps-tc-t">🏷️ Etiqueta de lío automática (PILOTO)</span>' +
     '<span class="sup-sw' + (elon ? " on" : "") + '" onclick="etlToggleGlobal()" role="switch"><span class="sup-sw-k"></span></span></div>' +
@@ -29984,11 +30032,29 @@ function psRender(){
    recuerda); con Chrome en --kiosk-printing + impresora predeterminada sale sin diálogo.
    Reusa el mismo molde que el ARMADO: armadoRemitoData + armadoRemitoInnerHtml(d,"FACTURADO")
    (agrega el recuadro "Controlado / Legajo") + remitoPrintDoc (iframe aislado). ===== */
-var FAC_PRINT_KEY = "fac_print_facturado_virgilio";
-function facPrintPref(){ try { return localStorage.getItem(FAC_PRINT_KEY); } catch(_e){ return null; } }
-function facPrintSetPref(v){ try { localStorage.setItem(FAC_PRINT_KEY, v); } catch(_e){} }
-function facPrintIsOn(){ return facPrintPref() === "1"; }
-function facPrintToggle(){ facPrintSetPref(facPrintIsOn() ? "0" : "1"); psRender(); }
+/* v10.21 — el switch de auto-imprimir FACTURADO pasó de localStorage (se borraba con la
+   TWA/PWA → se apagaba solo) a un ajuste GLOBAL en Supabase (Stock_Config.fac_print_facturado),
+   igual patrón que etiqueta_lio. Persiste para siempre. Los CELULARES nunca imprimen (guard
+   _facIsMobile), así se mantiene "solo la PC de la operadora imprime" aunque el switch sea global. */
+var FAC_PRINT_KEY = "fac_print_facturado";   // clave en Stock_Config (global)
+var _facPrintGlobal = null;                  // cache local: "1" / "0" / null (sin setear)
+function _facIsMobile(){ try { return /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent || ""); } catch(_e){ return false; } }
+async function facPrintCfgLoad(){
+  try {
+    const r = await fetch(SUPABASE_URL + "/rest/v1/Stock_Config?clave=eq." + FAC_PRINT_KEY + "&select=valor", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+    if (r.ok){ const a = await r.json(); _facPrintGlobal = (a && a[0]) ? String(a[0].valor) : null; }
+  } catch(_e){}
+  return _facPrintGlobal;
+}
+function facPrintPref(){ return _facPrintGlobal; }     // "1"/"0"/null (global, cacheado)
+function facPrintIsOn(){ return _facPrintGlobal === "1"; }
+async function facPrintSetPref(v){
+  _facPrintGlobal = String(v);
+  try {
+    await fetch(SUPABASE_URL + "/rest/v1/Stock_Config?on_conflict=clave", { method:"POST", headers:{ apikey:SUPABASE_KEY, Authorization:"Bearer "+SUPABASE_KEY, "Content-Type":"application/json", Prefer:"resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ clave: FAC_PRINT_KEY, valor: String(v) }) });
+  } catch(_e){}
+}
+function facPrintToggle(){ facPrintSetPref(facPrintIsOn() ? "0" : "1").then(function(){ psRender(); }); }
 async function facPrintFacturado(np, tanda){
   try {
     const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
@@ -30026,15 +30092,17 @@ async function facPrintFacturado(np, tanda){
 /* Se llama en facTickNP tras marcar la NP facturada. En el 1er tic de una PC pregunta
    UNA vez si querés que imprima ahí (y guarda la respuesta); después imprime solo. */
 async function facMaybePrintFacturado(np, tanda){
+  if (_facIsMobile()) return;                      // v10.21 — celulares NUNCA imprimen
+  if (_facPrintGlobal === null) { try { await facPrintCfgLoad(); } catch(_e){} }   // asegurar el cache global
   const pref = facPrintPref();
-  if (pref === "0") return;                       // apagado en esta PC
-  if (pref !== "1"){                               // 1er tic en esta PC → configurar una vez
+  if (pref === "0") return;                        // apagado (ajuste global)
+  if (pref !== "1"){                               // 1ª vez → configurar una vez (queda GLOBAL en Supabase)
     const ok = confirm(
-      "🖨️ ¿Imprimir el remito FACTURADO en ESTA computadora cada vez que tildás facturación?\n\n" +
+      "🖨️ ¿Imprimir el remito FACTURADO cada vez que tildás facturación?\n\n" +
       "La 1ª vez se abre el diálogo para ELEGIR la impresora; después queda configurado.\n" +
-      "Prendelo SOLO en la PC que está al lado de la impresora (no en el celular)."
+      "Este ajuste queda guardado (Supabase). Los celulares nunca imprimen."
     );
-    facPrintSetPref(ok ? "1" : "0");
+    await facPrintSetPref(ok ? "1" : "0");
     if (!ok) return;
   }
   await facPrintFacturado(np, tanda);

@@ -1,4 +1,4 @@
-/* Tolerancia de red del monitor de TV (v10.19).
+/* Tolerancia de red del monitor de TV (v10.23).
    Reproduce lo que pasa en el stick del depósito: fetches que fallan de a ratos
    con el WiFi VIVO. Verifica que:
      (a) _monReintentar se recupere solo si un intento intermedio anda,

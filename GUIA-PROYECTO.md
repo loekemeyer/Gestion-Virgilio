@@ -4,9 +4,9 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-12 · Versión app al documentar: **v10.19**
+> Última actualización: 2026-08-12 · Versión app al documentar: **v10.23**
 >
-> Nota **v10.19 — La TV del depósito ya no dice "Sin conexión" cada minuto.**
+> Nota **v10.23 — La TV del depósito ya no dice "Sin conexión" cada minuto.**
 > Síntoma: en el stick tipo Chromecast saltaba el cartel amarillo ⚠ cada ~1 min, con el
 > **WiFi vivo**. Causa: `refreshMonitor` mostraba el cartel ante **UN SOLO** fetch fallado, y
 > `supaFetchAll` **no tiene ni timeout ni reintento** — así que cualquier hipo normal de un
@@ -368,6 +368,38 @@
 > **⬇ Exportar CSV** (`cntExportCsv`) que baja el conteo con columnas: Sector, Código, Pilas,
 > Cajas por pila, Sueltas, Contado (cajas), **Stock del sistema** (góndola+excedente, mismo cálculo
 > que la comparación), Diferencia y En proceso. Formato Excel es-AR (BOM utf-8, `;`, coma decimal).
+>
+> Nota **v10.22** — **PPP: "En viaje" renombrado a "En Salida".** El tab del PPP que junta los
+> pedidos **facturados** que ya salieron de la Programación pero sin entrega confirmada (`_pppEnViajeHtml`,
+> tab key interno sigue `enviaje`) pasó a llamarse **"🚚 En Salida"**. Incluye lo facturado sin cargar y
+> lo cargado sin controlar remito. Los facturados ya se excluyen de la Programación (`programados =
+> notEnt.filter(...)` en modo normal) y aparecen acá. Solo cambió el rótulo y el texto de ayuda; la
+> discriminación fina por sub-estado sigue en los módulos "FC s/salida" y "Recepción Remitos (RR)".
+>
+> Nota **v10.21** — **Switch "auto-imprimir FACTURADO" ahora en Supabase (no se apaga solo).** El
+> toggle de auto-imprimir el remito facturado (Cola de impresión) estaba en `localStorage`
+> (`fac_print_facturado_virgilio`) → la TWA/PWA lo borraba y aparecía apagado al volver. Ahora es un
+> ajuste **global en `Stock_Config.fac_print_facturado`** (mismo patrón que `etiqueta_lio`), cacheado
+> en `_facPrintGlobal`, cargado con `facPrintCfgLoad()` al abrir la Cola de impresión y en el gate
+> `facMaybePrintFacturado`. Persiste para siempre. Para mantener "solo la PC imprime", el gate tiene un
+> **guard de celular** (`_facIsMobile`): los móviles nunca auto-imprimen aunque el switch global esté
+> ON. (Los otros dos switches del módulo —auto-print de armado `psIsAuto` y etiqueta de lío— no se
+> tocaron; el de armado sigue per-dispositivo a propósito para no duplicar impresiones.)
+>
+> Nota **v10.20** — **Ruteo: sacar de la ruta lo ya cargado al camión (y confirmar que Retira no
+> entra).** El armado de rutas (`ruteoLoad`) leía `PPP_Programacion_Diaria` y ruteaba todos los
+> pedidos del día. Ahora, además de tomar **solo zonas geográficas** (Z1..Z7 — Retira/Súper/Expo ya
+> quedaban afuera por el filtro `^zona`), **excluye los pedidos ya cargados al camión**: `_rtFetchCargadas()`
+> arma un Set de NPs con evento **CCN** (Carga Camión NP, `texto = NP|TANDA`, últimos 30 días) y el filtro
+> saca esos NP. Muestra un aviso "🚛 N pedido(s) ya cargados al camión — fuera de la ruta". Así el
+> repartidor no ve como parada lo que ya subió al camión.
+>
+> Nota **v10.23** — **Ruteo: "Abrir en Google Maps" en tramos (>9 paradas).** El link de Maps
+> (`_rtMapsUrl`, ahora `_rtMapsUrls`) mandaba TODAS las paradas como `waypoints`, pero Google Maps
+> corta en **~9 waypoints**: una ruta de 16 paradas abría solo 9. Ahora la ruta se parte en **tramos
+> de ≤9 waypoints**, encadenados (el destino de un tramo es el origen del siguiente), empezando y
+> terminando en el depósito. `_rtMapsUrls()` devuelve un array de URLs; el render muestra **un botón
+> por tramo** ("Abrir tramo 1/2…") con un aviso; si hay uno solo, va el botón único de siempre.
 >
 > Nota **v10.18** — **Hoja "Góndola < 25%" en Stock y Compras (auditoría).** Tab nueva **🔍 Góndola
 > <25%** en el módulo Stocks (`openStockAdmin`) → `stkBodyAuditGon` (datos por `agLoad` desde
