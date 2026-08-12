@@ -4,7 +4,19 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-11 · Versión app al documentar: **v9.65**
+> Última actualización: 2026-08-12 · Versión app al documentar: **v9.73**
+>
+> Nota **v9.73** — **Fix "Cajas Pedidas" (columna en Stock quedaba vacía).** La vista
+> `v_cajas_pedidas` restaba `facturadas` **y** `entregadas` por separado; una NP facturada
+> **y** entregada se restaba dos veces → `cajas_pedidas` negativo → fila filtrada. Se rompió
+> al poblarse `PPP_Entregados_Meta` (759 NPs). Ahora resta la **unión** (facturadas ∪ entregadas
+> ∪ canceladas) UNA sola vez (260 filas / 9353 cajas). `sql/backup_20260812_cajaspedidas_0027.sql`
+> guarda la def anterior. También: **eliminado el código fantasma `0027`** ("Caja Nº 1", movs
+> neteaban 0) de `Movimientos_Stock` + `Insumos`; y **sacado el cartel "NP que faltan (sin cargar
+> en PPP)"** de la tabla de Stock (el módulo sigue en el botón "Pedidos sin cargar en PPP" del
+> panel supervisor).
+>
+> Nota anterior · Versión app al documentar: **v9.65**
 >
 > Nota **v9.65** — **Generador de OCs: `stock` = TODO el módulo Stocks.** `vista_generador_oc`
 > ahora suma los 8 depósitos (terminado + a_guardar + racks + excedente + separar_pedidos +

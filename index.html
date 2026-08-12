@@ -6403,7 +6403,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v9.72";
+const APP_VERSION = "v9.73";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -12417,8 +12417,9 @@ function stkBodyStocks() {
     '<button type="button" onclick="stkToggleSoloLow()" title="Mostrar sólo los códigos donde la suma de depósitos (góndola+excedente+pickeados+a facturar+a guardar+racks) es MENOR que lo pedido" style="width:auto;margin:0;flex:0 0 auto;padding:0 11px;height:38px;border:1.5px solid ' + (_stk.soloLow ? "#dc2626" : "#cbd5e1") + ';border-radius:9px;background:' + (_stk.soloLow ? "#fef2f2" : "#fff") + ';color:' + (_stk.soloLow ? "#b91c1c" : "#334155") + ';font-weight:800;font-size:13px;cursor:pointer;white-space:nowrap;">' + (_stk.soloLow ? "☑" : "☐") + ' ⚠ Stock bajo' + (_stkLowCount ? " (" + _stkLowCount + ")" : "") + '</button>' +
     '<button type="button" onclick="stkToggleSoloPin()" title="Mostrar sólo los códigos que fijaste (📌). Se guardan aunque cierres la app." style="width:auto;margin:0;flex:0 0 auto;padding:0 11px;height:38px;border:1.5px solid ' + (_stk.soloPin ? "#b45309" : "#cbd5e1") + ';border-radius:9px;background:' + (_stk.soloPin ? "#fffbeb" : "#fff") + ';color:' + (_stk.soloPin ? "#b45309" : "#334155") + ';font-weight:800;font-size:13px;cursor:pointer;white-space:nowrap;">' + (_stk.soloPin ? "☑" : "📌") + ' Fijados' + ((_stk.pins || []).length ? " (" + _stk.pins.length + ")" : "") + '</button>' +
     '</div>';
-  // v9.06 — botón aparte (fila propia) para el módulo "NP que faltan" (pedidos en la base sin cargar en el PPP).
-  h += '<div style="margin-bottom:10px;"><button type="button" onclick="stkOpenNpFaltan()" title="Revisar los pedidos que están en la base pero NO se cargaron/programaron en el PPP. Muestra NP · Fecha · Razón Social · Cajas, y permite marcar los que no van." style="width:auto;margin:0;padding:9px 15px;border:1.5px solid #f59e0b;border-radius:10px;background:#fffbeb;color:#b45309;font-weight:800;font-size:13.5px;cursor:pointer;white-space:nowrap;">⚠️ NP que faltan (sin cargar en PPP)</button></div>';
+  // v9.73 — se saca el cartel "NP que faltan (sin cargar en PPP)" de la tabla de Stock
+  // (pedido del dueño). El módulo sigue accesible desde el botón "Pedidos sin cargar
+  // en PPP" del panel supervisor (stkOpenNpFaltan).
   // Columnas: sectores fijos (menos insumos, que va en su sección). Los `extra`
   // (p/envasar, racks CH) SOLO se muestran como columna si algún artículo visible
   // tiene saldo ahí — así no agregan 2 columnas al pedo en el celular (v7.03).
