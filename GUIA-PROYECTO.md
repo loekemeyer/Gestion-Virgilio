@@ -261,6 +261,15 @@
 > Cajas por pila, Sueltas, Contado (cajas), **Stock del sistema** (góndola+excedente, mismo cálculo
 > que la comparación), Diferencia y En proceso. Formato Excel es-AR (BOM utf-8, `;`, coma decimal).
 >
+> Nota **v10.15** — **Histórico de bajadas de racks (Recepción).** Nuevo botón **📥 Histórico
+> bajadas de racks** en el menú de "Carga Recepción Mercadería" (`renderMenu` en `recepcion.js`) →
+> `renderHistoricoBajadas()`. Módulo SOLO LECTURA sobre la tabla `Racks_Bajadas` (id, ts, cod_art,
+> descripcion, cajas, sector, estado, creada_por, aprobada_at), con buscador por **fecha** (Desde/Hasta
+> + chips Hoy/7 días/Este mes/Todo) y por **código / descripción / sector / quién** (un solo campo, `.or`
+> ilike). Tabla con Fecha, Código (+desc), Sector, Cajas, Quién y Estado (verde aprobada / ámbar
+> propuesta / rojo rechazada) y total de cajas. Reusa el estilo del "Histórico de recepción" (clases
+> `hist*`). RLS `rb_select` anon. Sin cambios de datos, es consulta.
+>
 > Nota **v10.14** — **FIX regresión: "avisar que pickearon mal" borraba separado + líos.** El fix de
 > v10.10 (`_compDifResolve` "de menos") ponía `_comp._liosDirty = true` cuando la NP ya tenía líos
 > armados, lo que hacía `_compBuildLiosData()` en el próximo `_compRenderSep()` y **reconstruía todo

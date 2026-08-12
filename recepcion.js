@@ -458,7 +458,7 @@ function closeOp() {
 opClose.onclick = closeOp;
 
 opBack.onclick = () => {
-  if (opState.step === "tipo" || opState.step === "pend" || opState.step === "racks" || opState.step === "hist") renderMenu();
+  if (opState.step === "tipo" || opState.step === "pend" || opState.step === "racks" || opState.step === "hist" || opState.step === "histbaj") renderMenu();
   else if (opState.step === "lista") renderTipoElegir();
   else if (opState.step === "linea") renderLista(opState.tipo);
   else if (opState.step === "remito") renderLinea();
@@ -1626,7 +1626,11 @@ function renderMenu() {
   bh.type = "button"; bh.className = "opTipoBtn opBtnSm";
   bh.textContent = "📜 Histórico de recepción";
   bh.onclick = () => renderHistorico();
-  cont.appendChild(bp); cont.appendChild(br); cont.appendChild(bc); cont.appendChild(bh);
+  const bhb = document.createElement("button");   // v10.15 — histórico de bajadas de racks
+  bhb.type = "button"; bhb.className = "opTipoBtn opBtnSm";
+  bhb.textContent = "📥 Histórico bajadas de racks";
+  bhb.onclick = () => renderHistoricoBajadas();
+  cont.appendChild(bp); cont.appendChild(br); cont.appendChild(bc); cont.appendChild(bh); cont.appendChild(bhb);
   opBody.appendChild(cont);
   // Contadores en los botones: remitos pendientes de cargar + bajadas por aprobar.
   pendBadgePend(bp);
@@ -1817,6 +1821,108 @@ function histRender(rows, CAP, capped) {
       '<td class="histCaj">' + r.cajas + '</td>' +
       '<td class="histWho">' + who + '</td>' +
       '<td class="histRto">' + escapeHtmlRcp(r.remito || "—") + '</td>' +
+    '</tr>';
+  });
+  html += '</tbody></table></div>';
+  box.innerHTML = html;
+}
+/* ===== HISTÓRICO de BAJADAS DE RACKS (v10.15) — todas las bajadas de rack a góndola
+   (tabla Racks_Bajadas), SOLO LECTURA, filtrable por fecha y por código / descripción /
+   sector / quién la hizo. Reusa el estilo del histórico de recepción (clases hist*). ===== */
+let _hbReqSeq = 0;
+function renderHistoricoBajadas() {
+  opState.step = "histbaj";
+  opPage.classList.remove("pendWide");
+  opSetBack(true);
+  opTitle.textContent = "Histórico de Bajadas de Racks";
+  opSubtitle.textContent = "Bajadas de rack a góndola — filtrá por fecha y/o código, sector o quién";
+  opActions.innerHTML = "";
+  opBody.innerHTML =
+    '<div class="histBar">' +
+      '<div class="histField"><label for="hbDesde">Desde</label><input type="date" id="hbDesde" class="histDate"></div>' +
+      '<div class="histField"><label for="hbHasta">Hasta</label><input type="date" id="hbHasta" class="histDate"></div>' +
+      '<div class="histField"><label for="hbCod">Código, sector o quién</label><input type="text" id="hbCod" class="histCod" placeholder="ej. 590, A12 o Rafael" autocomplete="off"></div>' +
+      '<div class="histBtns"><button class="histBtn pri" id="hbBuscar">Buscar</button><button class="histBtn" id="hbLimpiar">Limpiar</button></div>' +
+    '</div>' +
+    '<div class="histPresets">' +
+      '<button class="histChip" data-preset="hoy">Hoy</button>' +
+      '<button class="histChip" data-preset="7">7 días</button>' +
+      '<button class="histChip" data-preset="mes">Este mes</button>' +
+      '<button class="histChip" data-preset="todo">Todo</button>' +
+    '</div>' +
+    '<div id="hbResults"><div class="histLoading">Cargando…</div></div>';
+  document.getElementById("hbBuscar").onclick = () => hbBuscar();
+  document.getElementById("hbLimpiar").onclick = () => {
+    ["hbDesde", "hbHasta", "hbCod"].forEach(function (id) { const el = document.getElementById(id); if (el) el.value = ""; });
+    hbBuscar();
+  };
+  document.getElementById("hbCod").onkeydown = (e) => { if (e.key === "Enter") hbBuscar(); };
+  document.getElementById("hbDesde").onchange = () => hbBuscar();
+  document.getElementById("hbHasta").onchange = () => hbBuscar();
+  opBody.querySelectorAll(".histChip").forEach(function (ch) {
+    ch.onclick = function () {
+      const p = ch.getAttribute("data-preset");
+      const desde = document.getElementById("hbDesde"), hasta = document.getElementById("hbHasta");
+      if (p === "hoy") { desde.value = opTodayStr(); hasta.value = opTodayStr(); }
+      else if (p === "7") { desde.value = histShiftYmd(-6); hasta.value = opTodayStr(); }
+      else if (p === "mes") { desde.value = histMonthStartYmd(); hasta.value = opTodayStr(); }
+      else if (p === "todo") { desde.value = ""; hasta.value = ""; }
+      hbBuscar();
+    };
+  });
+  hbBuscar();
+}
+function hbBuscar() {
+  const v = function (id) { return ((document.getElementById(id) || {}).value || "").trim(); };
+  hbLoad({ desde: v("hbDesde"), hasta: v("hbHasta"), cod: v("hbCod") });
+}
+async function hbLoad(f) {
+  const box = document.getElementById("hbResults");
+  if (box) box.innerHTML = '<div class="histLoading">Cargando…</div>';
+  const myseq = ++_hbReqSeq;
+  await sessionReady;
+  if (myseq !== _hbReqSeq) return;
+  const HARD = 2000;
+  const term = f.cod ? f.cod.toUpperCase().replace(/[,()]/g, " ").trim() : "";
+  try {
+    let q = supabase.from("Racks_Bajadas").select("id,ts,aprobada_at,cod_art,descripcion,cajas,sector,estado,creada_por");
+    if (f.desde) q = q.gte("ts", f.desde);
+    if (f.hasta) q = q.lte("ts", f.hasta + "T23:59:59.999-03:00");
+    if (term) q = q.or("cod_art.ilike.%" + term + "%,descripcion.ilike.%" + term + "%,sector.ilike.%" + term + "%,creada_por.ilike.%" + term + "%");
+    q = q.order("ts", { ascending: false }).limit(HARD);
+    const r = await q;
+    if (myseq !== _hbReqSeq) return;
+    if (r && r.error) throw r.error;
+    hbRender((r && r.data) || [], HARD);
+  } catch (e) {
+    if (myseq !== _hbReqSeq) return;
+    console.warn("hbLoad error:", e);
+    if (box) box.innerHTML = '<div class="histEmpty">No se pudo cargar el histórico de bajadas. Probá de nuevo.</div>';
+  }
+}
+function hbRender(rows, HARD) {
+  const box = document.getElementById("hbResults");
+  if (!box) return;
+  const n = rows.length;
+  if (!n) { box.innerHTML = '<div class="histEmpty">No hay bajadas de racks para ese filtro.</div>'; return; }
+  const total = rows.reduce(function (s, r) { return s + (Number(r.cajas) || 0); }, 0);
+  let html = '<div class="histSummary">' + n + ' bajada' + (n === 1 ? '' : 's') + ' · <b>' + total + ' cajas</b></div>';
+  if (n >= HARD) html += '<div class="histNote">⚠ Hay muchas filas; se muestran las más recientes. Acotá por fecha para ver el resto.</div>';
+  html += '<div class="histTblWrap"><table class="histTbl"><thead><tr>' +
+    '<th>Fecha</th><th>Código</th><th>Sector</th><th style="text-align:right">Cajas</th><th>Quién</th><th>Estado</th>' +
+    '</tr></thead><tbody>';
+  const fmt = function (ts) { if (!ts) return "—"; const d = new Date(ts); if (isNaN(d.getTime())) return "—"; const p = function (x) { return String(x).padStart(2, "0"); }; return p(d.getDate()) + "/" + p(d.getMonth() + 1) + " " + p(d.getHours()) + ":" + p(d.getMinutes()); };
+  const estColor = { aprobada: "#15803d", propuesta: "#b45309", rechazada: "#b91c1c" };
+  rows.forEach(function (r) {
+    const est = String(r.estado || "—");
+    const col = estColor[est] || "#64748b";
+    html += '<tr>' +
+      '<td class="histFe">' + escapeHtmlRcp(fmt(r.ts)) + '</td>' +
+      '<td class="histCodCell">' + escapeHtmlRcp(r.cod_art || "—") + (r.descripcion ? '<br><small style="color:#94a3b8">' + escapeHtmlRcp(r.descripcion) + '</small>' : '') + '</td>' +
+      '<td>' + escapeHtmlRcp(r.sector || "—") + '</td>' +
+      '<td class="histCaj">' + (Number(r.cajas) || 0) + '</td>' +
+      '<td class="histWho">' + escapeHtmlRcp(displayName(r.creada_por || "—")) + '</td>' +
+      '<td style="font-weight:800;color:' + col + '">' + escapeHtmlRcp(est) + '</td>' +
     '</tr>';
   });
   html += '</tbody></table></div>';
