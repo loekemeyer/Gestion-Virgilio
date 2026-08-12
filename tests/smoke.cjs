@@ -15,7 +15,7 @@ catch (_e) {
   p.on("pageerror", (e) => errs.push(e.message));
   await p.goto("file://" + path.join(root, "index.html"), { waitUntil: "domcontentloaded" });
   const r = await p.evaluate(() => {
-    const need = ["stockComputeSaldos", "stkBodyStocks", "stkBodyStocksTab", "stkBodyConteo", "stkBodyCapacidad", "openAgentesAdmin", "agtRender", "openProductividad", "prodRender",
+    const need = ["stockComputeSaldos", "_stkSaldosFromView", "stkDescargarExcel", "openStockAdmin", "stockFetchMovs", "stkBodyStocks", "stkBodyStocksTab", "stkBodyConteo", "stkBodyCapacidad", "openAgentesAdmin", "agtRender", "openProductividad", "prodRender",
       "prodCompute", "prodLoad", "prodExportCsv", "prodSetMeta", "_pvPremio", "_pvMetas",
       "stkBodyRacks", "stkRacksCapCompute", "stkRacksCapSummary", "stkPlnSet", "stkPlaniLoad", "stkBodyStocksTab", "stkExportExcedentes",
       "stkAutoBajadaCompute", "stkAutoBajadaSection", "stkToggleAutoBajada", "stkAutoBajadaGenerar",
