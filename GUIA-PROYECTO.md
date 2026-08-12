@@ -4,7 +4,17 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-12 · Versión app al documentar: **v9.75**
+> Última actualización: 2026-08-12 · Versión app al documentar: **v9.78**
+>
+> Nota **v9.78** — **Zonas paso 2 (diagnóstico coord→zona).** En "📍 Mapa de zonas": la
+> geocodificación ahora guarda los **componentes oficiales** (`PPP_Geo.comp`) y re-geocodifica
+> las viejas que no los tenían. `_zgZonaSug` aplica **tu** mapeo `pppZonaDeBarrio` (PPP_BARRIO_ZONA
+> + overrides) al **nombre oficial** (barrio/partido) que devuelve Nominatim → zona sugerida.
+> El mapa **marca los desajustes** (anillo negro) donde la zona ACTUAL ≠ la oficial, y lista
+> "actual → oficial". Es diagnóstico (no aplica cambios todavía): sirve para ver qué direcciones
+> están mal zonificadas. Falta el paso de **aplicar** las correcciones (a definir tras revisar).
+>
+> Nota anterior · Versión app al documentar: **v9.75**
 >
 > Nota **v9.75** — **📍 Mapa de zonas (geocoding).** Botón nuevo en el cierre de Facturación
 > (al lado de "Armar ruta"). Geocodifica TODAS las direcciones de la programación con

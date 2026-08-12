@@ -6405,7 +6405,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v9.77";
+const APP_VERSION = "v9.78";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -24717,6 +24717,7 @@ const ZG_COLORS = {
   "Zona 7 - GBA Norte Lejos": "#8b5cf6", "Super": "#ec4899", "Retira": "#0ea5e9", "Expo": "#a16207"
 };
 function _zgColor(z) { return ZG_COLORS[z] || "#94a3b8"; }   // gris = sin zona
+function _zgShortZ(z) { return (typeof PPP_ZONA_SHORT !== "undefined" && PPP_ZONA_SHORT[z]) ? PPP_ZONA_SHORT[z] : z; }
 /* Geocode con addressdetails (partido/barrio oficiales) + viewbox sesgado a AMBA. NO fuerza CABA. */
 async function _zgGeocode(dir, barrio) {
   const base = String(dir || "").trim(); if (!base) return null;
@@ -24757,10 +24758,42 @@ async function _zgCachePut(key, dir, barrio, c) {
     await fetch(SUPABASE_URL + "/rest/v1/PPP_Geo?on_conflict=dir_key", { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ dir_key: key, direccion: dir, barrio: barrio, lat: c.lat, lng: c.lng, comp: c.comp || null }) });
   } catch (e) { }
 }
+/* cache con componentes oficiales (comp) para la regla de zona. */
+async function _zgCacheAll() {
+  const out = {};
+  try {
+    const r = await fetch(SUPABASE_URL + "/rest/v1/PPP_Geo?select=dir_key,lat,lng,comp&limit=20000", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+    if (r.ok) { const d = await r.json(); for (const row of d) out[row.dir_key] = { lat: +row.lat, lng: +row.lng, comp: row.comp || null }; }
+  } catch (e) { }
+  return out;
+}
+/* Nombres OFICIALES candidatos del geocoder, del más específico (barrio) al más general (partido). */
+function _zgOfficialNames(comp) {
+  if (!comp) return [];
+  const keys = ["neighbourhood", "suburb", "quarter", "city_district", "town", "village", "city", "municipality", "county", "state_district"];
+  const out = [];
+  keys.forEach(function (k) { if (comp[k] && out.indexOf(String(comp[k])) < 0) out.push(String(comp[k])); });
+  return out;
+}
+/* Zona SUGERIDA por los componentes oficiales: aplica TU mapeo barrio→zona (pppZonaDeBarrio,
+   que ya incluye overrides + Supabase + PPP_BARRIO_ZONA) al nombre oficial más específico que
+   matchee. Devuelve "" si ningún nombre oficial está en el mapeo (partido nuevo a cargar). */
+function _zgZonaSug(a) {
+  const c = _zg && _zg.cache[a.key]; if (!c || !c.comp) return "";
+  const names = _zgOfficialNames(c.comp);
+  for (const nm of names) { const z = pppZonaDeBarrio(nm); if (z) return z; }
+  return "";
+}
+/* Lista de desajustes: dirección con zona ACTUAL ≠ zona oficial sugerida (ambas no vacías). */
+function _zgMismatches() {
+  if (!_zg) return [];
+  return _zg.addrs.map(function (a) { return { a: a, sug: _zgZonaSug(a) }; })
+    .filter(function (x) { return x.sug && x.a.zona && x.sug !== x.a.zona; });
+}
 async function openZonasMapa() {
   if (!document.getElementById("zgCss")) {
     const st = document.createElement("style"); st.id = "zgCss";
-    st.textContent = "#zgOverlay{display:none;position:fixed;inset:0;z-index:1350;background:rgba(2,6,23,.8);padding:10px;overflow:auto}#zgOverlay.show{display:block}.zg-card{background:#f8fafc;max-width:980px;margin:0 auto;border-radius:14px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5)}.zg-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 15px;background:linear-gradient(90deg,#0f766e,#0b3b36);color:#fff}.zg-title{font-size:18px;font-weight:800}.zg-close{background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 13px;font-weight:800;cursor:pointer;width:auto}.zg-body{padding:12px 14px}#zgMap{height:60vh;min-height:340px;border-radius:12px;overflow:hidden;border:1px solid #e2e8f0}.zg-bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}.zg-btn{background:#0f766e;color:#fff;border:none;border-radius:8px;padding:7px 12px;font-weight:800;font-size:13px;cursor:pointer;width:auto}.zg-leg{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0;font-size:12px;color:#334155}.zg-leg span{display:inline-flex;align-items:center;gap:5px}.zg-dot{width:12px;height:12px;border-radius:50%;display:inline-block;border:1px solid rgba(0,0,0,.25)}.zg-prog{height:8px;background:#e2e8f0;border-radius:999px;overflow:hidden;margin:8px 0}.zg-prog-b{height:100%;background:#0f766e;transition:width .2s}.zg-msg{font-size:12.5px;color:#475569;margin:6px 0}";
+    st.textContent = "#zgOverlay{display:none;position:fixed;inset:0;z-index:1350;background:rgba(2,6,23,.8);padding:10px;overflow:auto}#zgOverlay.show{display:block}.zg-card{background:#f8fafc;max-width:980px;margin:0 auto;border-radius:14px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5)}.zg-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 15px;background:linear-gradient(90deg,#0f766e,#0b3b36);color:#fff}.zg-title{font-size:18px;font-weight:800}.zg-close{background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 13px;font-weight:800;cursor:pointer;width:auto}.zg-body{padding:12px 14px}#zgMap{height:60vh;min-height:340px;border-radius:12px;overflow:hidden;border:1px solid #e2e8f0}.zg-bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}.zg-btn{background:#0f766e;color:#fff;border:none;border-radius:8px;padding:7px 12px;font-weight:800;font-size:13px;cursor:pointer;width:auto}.zg-leg{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0;font-size:12px;color:#334155}.zg-leg span{display:inline-flex;align-items:center;gap:5px}.zg-dot{width:12px;height:12px;border-radius:50%;display:inline-block;border:1px solid rgba(0,0,0,.25)}.zg-prog{height:8px;background:#e2e8f0;border-radius:999px;overflow:hidden;margin:8px 0}.zg-prog-b{height:100%;background:#0f766e;transition:width .2s}.zg-msg{font-size:12.5px;color:#475569;margin:6px 0}.zg-mism{background:#fffbeb;border:1px solid #fcd34d;border-radius:9px;padding:8px 11px;margin:8px 0;font-size:12px;color:#92400e}.zg-mism ul{margin:5px 0 0;padding-left:18px}.zg-mism li{margin:2px 0}";
     document.head.appendChild(st);
   }
   let ov = document.getElementById("zgOverlay");
@@ -24770,7 +24803,7 @@ async function openZonasMapa() {
   _zg = { addrs: [], cache: {}, map: null, prog: 0, progTot: 0, msg: "" };
   try {
     await _zgLoadLeaflet();
-    _zg.cache = await _rtCacheAll();
+    _zg.cache = await _zgCacheAll();
     _zg.addrs = await _zgFetchAddrs();
     _zgRender();
   } catch (e) {
@@ -24781,12 +24814,20 @@ function closeZonasMapa() { const ov = document.getElementById("zgOverlay"); if 
 function _zgRender() {
   const b = document.getElementById("zgBody"); if (!b || !_zg) return;
   const total = _zg.addrs.length;
-  const geoc = _zg.addrs.filter(function (a) { return _zg.cache[a.key]; }).length;
-  const falt = total - geoc;
+  const ubic = _zg.addrs.filter(function (a) { return _zg.cache[a.key]; }).length;
+  const falt = _zg.addrs.filter(function (a) { return a.dir && (!_zg.cache[a.key] || !_zg.cache[a.key].comp); }).length;
+  const mism = _zgMismatches();
   let h = '<div class="zg-bar"><button class="zg-btn" onclick="zgGeocodeFaltantes()"' + (falt ? '' : ' disabled style="opacity:.5"') + '>📡 Geocodificar faltantes (' + falt + ')</button>' +
-    '<span class="zg-msg" style="margin:0"><b>' + geoc + '</b> / ' + total + ' direcciones ubicadas</span></div>';
+    '<span class="zg-msg" style="margin:0"><b>' + ubic + '</b> / ' + total + ' ubicadas</span></div>';
   if (_zg.msg) h += '<div class="zg-msg">' + escapeHtml(_zg.msg) + '</div>';
-  h += '<div class="zg-leg">' + PPP_ZONAS.map(function (z) { return '<span><i class="zg-dot" style="background:' + _zgColor(z) + '"></i>' + escapeHtml((typeof PPP_ZONA_SHORT !== "undefined" && PPP_ZONA_SHORT[z]) ? PPP_ZONA_SHORT[z] : z) + '</span>'; }).join('') + '<span><i class="zg-dot" style="background:#94a3b8"></i>(sin zona)</span></div>';
+  if (mism.length) {
+    h += '<div class="zg-mism"><b>⚠ ' + mism.length + ' desajuste(s)</b> — la zona ACTUAL no coincide con la que sugiere el barrio/partido OFICIAL del mapa:<ul>' +
+      mism.slice(0, 30).map(function (x) { return '<li>' + escapeHtml((x.a.rs || x.a.dir).slice(0, 34)) + ' — actual <b>' + escapeHtml(_zgShortZ(x.a.zona)) + '</b> → oficial <b>' + escapeHtml(_zgShortZ(x.sug)) + '</b></li>'; }).join('') + '</ul>' +
+      (mism.length > 30 ? '<div class="zg-msg" style="margin:2px 0 0">…y ' + (mism.length - 30) + ' más.</div>' : '') + '</div>';
+  } else if (falt === 0 && ubic > 0) {
+    h += '<div class="zg-msg" style="color:#166534">✓ Sin desajustes: la zona actual coincide con el barrio/partido oficial en todas las direcciones geocodificadas.</div>';
+  }
+  h += '<div class="zg-leg">' + PPP_ZONAS.map(function (z) { return '<span><i class="zg-dot" style="background:' + _zgColor(z) + '"></i>' + escapeHtml(_zgShortZ(z)) + '</span>'; }).join('') + '<span><i class="zg-dot" style="background:#94a3b8"></i>(sin zona)</span><span><i class="zg-dot" style="background:#fff;border:3px solid #111"></i>desajuste</span></div>';
   h += '<div id="zgMap"></div>';
   b.innerHTML = h;
   _zgDrawMap();
@@ -24796,11 +24837,13 @@ function _zgDrawMap() {
   if (_zg.map) { try { _zg.map.remove(); } catch (e) { } _zg.map = null; }
   const map = L.map(el).setView([-34.62, -58.44], 11);
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap" }).addTo(map);
+  const mismKeys = {}; _zgMismatches().forEach(function (x) { mismKeys[x.a.key] = x.sug; });
   const pts = [];
   for (const a of _zg.addrs) {
     const c = _zg.cache[a.key]; if (!c) continue;
-    L.circleMarker([c.lat, c.lng], { radius: 6, color: "#00000099", weight: 1, fillColor: _zgColor(a.zona), fillOpacity: .9 })
-      .bindPopup("<b>" + escapeHtml(a.rs || a.dir) + "</b><br>" + escapeHtml(a.dir) + (a.barrio ? ", " + escapeHtml(a.barrio) : "") + "<br>Zona: <b>" + escapeHtml(a.zona || "(sin zona)") + "</b>")
+    const isM = mismKeys[a.key];
+    L.circleMarker([c.lat, c.lng], { radius: isM ? 7 : 6, color: isM ? "#111" : "#00000099", weight: isM ? 3 : 1, fillColor: _zgColor(a.zona), fillOpacity: .9 })
+      .bindPopup("<b>" + escapeHtml(a.rs || a.dir) + "</b><br>" + escapeHtml(a.dir) + (a.barrio ? ", " + escapeHtml(a.barrio) : "") + "<br>Zona: <b>" + escapeHtml(a.zona || "(sin zona)") + "</b>" + (isM ? "<br>⚠ oficial sugiere: <b>" + escapeHtml(_zgShortZ(isM)) + "</b>" : ""))
       .addTo(map);
     pts.push([c.lat, c.lng]);
   }
@@ -24811,7 +24854,7 @@ function _zgDrawMap() {
 }
 async function zgGeocodeFaltantes() {
   if (!_zg) return;
-  const falt = _zg.addrs.filter(function (a) { return !_zg.cache[a.key] && a.dir; });
+  const falt = _zg.addrs.filter(function (a) { return a.dir && (!_zg.cache[a.key] || !_zg.cache[a.key].comp); });
   if (!falt.length) { _zg.msg = "Todo geocodificado."; _zgRender(); return; }
   // vista de progreso (sin redibujar el mapa cada segundo)
   const b = document.getElementById("zgBody");
