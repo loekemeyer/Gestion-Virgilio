@@ -6453,7 +6453,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v10.12";
+const APP_VERSION = "v10.13";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -19406,6 +19406,7 @@ function cpRenderStep2(body) {
     '<button class="cp-opt' + (_cp.origen === "terminado" ? " on" : "") + '" onclick="cpOrigen(\'terminado\')">Góndola<small>hay ' + gon + '</small></button>' +
     '</div></div>';
   h += '<div class="cp-fld"><div class="cp-lbl">¿A qué lío va?</div>';
+  let _destTxt = "Lío nuevo";   // v10.13 — destino visible en el botón/mensaje
   if (_cp.liosLoading) h += '<div class="cp-liosload">cargando líos…</div>';
   else {
     const info = _cp._liosInfo || { resumen: "" };
@@ -19418,10 +19419,11 @@ function cpRenderStep2(body) {
     chips += '<button class="cp-lio cp-lio-new' + (_cp.lioSel === "__new__" ? " on" : "") + '" onclick="cpLio(\'__new__\')">🆕 Lío nuevo</button>';
     h += '<div class="cp-lios">' + chips + '</div>';
     if (!lios.length) h += '<div class="cp-note">Sin líos con detalle en este pedido — se crea uno nuevo.</div>';
+    _destTxt = (typeof _cp.lioSel === "number" && lios[_cp.lioSel]) ? ("Lío " + labels[_cp.lioSel]) : ("Lío NUEVO " + cpLioLetter(lios.length));
   }
   h += '</div>';
   const ok = _cp.qty > 0 && !_cp.liosLoading;
-  h += '<button class="cp-fin"' + (ok ? "" : " disabled") + ' onclick="cpConfirm()">✓ Completar ' + _cp.qty + ' caja(s) → a facturar</button>';
+  h += '<button class="cp-fin"' + (ok ? "" : " disabled") + ' onclick="cpConfirm()">✓ Completar ' + _cp.qty + ' caja(s) → <b>' + escapeHtml(_destTxt) + '</b></button>';
   _renderKeepFocus(body, h);
 }
 function cpBack() { if (!_cp) return; _cp.step = 1; _cp.sel = null; cpRender(); }
@@ -19524,7 +19526,11 @@ async function cpConfirm() {
   try { await cpCerrarTareaSiCompleta(String(s.np)); } catch (_e) {}   // v6.19: cierra la tarea aunque NO se haya tomado por pop-up
   try { opDraftClear(leg); } catch (_e) {}
   if (!_cp) return;
-  _cp.justDone = "✓ " + qty + " caja(s) de " + s.cod_art + " → NP " + s.np + " (a facturar)";
+  // v10.13 — feedback explícito del lío destino (nuevo o existente) para que se vea qué pasó en la NP.
+  var _liosB = cpParseResumen((info && info.resumen) || "");
+  var _wasNew = !(typeof lioSel === "number" && _liosB[lioSel]);
+  var _destLbl = _wasNew ? cpLioLetter(_liosB.length) : (liosLabels(_liosB)[lioSel] || "");
+  _cp.justDone = "✓ " + qty + " caja(s) de " + s.cod_art + " → NP " + s.np + " · " + (_wasNew ? "Lío NUEVO " : "Lío ") + _destLbl + " (a facturar)";
   _cp.sel = null; _cp.step = 1; _cp.liosLoading = false; _cp._liosInfo = null;
   try { _cp.falt = await cpReloadFaltantes(); } catch (_e) {}
   if (_cp) cpRender();

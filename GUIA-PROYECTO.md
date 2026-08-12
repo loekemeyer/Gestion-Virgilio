@@ -261,6 +261,14 @@
 > Cajas por pila, Sueltas, Contado (cajas), **Stock del sistema** (góndola+excedente, mismo cálculo
 > que la comparación), Diferencia y En proceso. Formato Excel es-AR (BOM utf-8, `;`, coma decimal).
 >
+> Nota **v10.13** — **Completar Pedido (CP): feedback del lío destino.** En "📦➕ Completar Pedido"
+> (`showCPModal` → `cpRenderStep2`/`cpConfirm`), al completar un faltante el destino por defecto ya
+> era **lío nuevo** (`_cp.lioSel = "__new__"`, y `cpUpdateLio` con lioSel no-numérico empuja un lío
+> nuevo). El problema era de **feedback**: el botón decía sólo "→ a facturar" y el mensaje de éxito no
+> nombraba el lío, así que el operario no sabía si se agregaba como lío nuevo. Ahora el botón muestra
+> el destino (**"→ Lío NUEVO X"** o **"→ Lío A"** si eligió uno existente) y el mensaje de éxito lo
+> confirma ("· Lío NUEVO X (a facturar)"). No cambia la lógica, sólo lo hace explícito.
+>
 > Nota **v10.12** — **Completar: ubicación del pedido separado por NP.** En el wizard Completar,
 > el paso de armar líos (`_compRenderLios`) ahora muestra, por cada NP, un banner 📦 con **dónde
 > quedó/lo dejó el picking** (`_comp.pickUbic`, del evento PUB más reciente), además del que ya
