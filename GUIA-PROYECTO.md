@@ -6,6 +6,24 @@
 >
 > Última actualización: 2026-08-12 · Versión app al documentar: **v10.03**
 >
+> Nota **2026-08-12 — Fuga de stock: "faltó en el picking pero se facturó igual" (sin CP).**
+> Caso testigo NPs **98140/98142/98155** (tandas D05B/D06B). El pickeador registró
+> `PKC D05B|234|5|0` y `PKC D06B|234|3|0` — es decir **real=0**, no encontró ninguna caja del
+> art 234. El pipeline hizo lo correcto: sin bajada de góndola, el 234 nunca entró a
+> `separar_pedidos` ni a `a_facturar`, y la ETAPA 3 no tuvo nada que drenar (por eso el 234 no
+> tiene NINGÚN movimiento en esas tandas, mientras el resto sí: D05B `facturado` −160, D06B
+> −112). Pero las cajas **salieron y se facturaron**, y nadie corrió **"Completar Pedido" (CP)**
+> — el mecanismo previsto para esto. Quedaron **8 cajas fantasma** de más en el stock.
+> Ajuste aplicado en `sql/ajuste_234_D05B_D06B_20260812.sql` (`tipo='ajuste'`,
+> `legajo='reconcilia'`, depósito `terminado`, revert por `client_id`): terminado 10 → 2.
+> **No es un caso aislado ni un bug del pipeline:** el mismo patrón (faltó en el picking +
+> tanda facturada + sin CP) da **1.651 cajas en 136 tandas** desde el cutoff; otras **553 en 36
+> tandas** sí se resolvieron con CP. **Ojo:** no todas son fuga — sólo lo son las que
+> efectivamente salieron; si al cliente se le facturó de menos, el stock está bien. Hay que
+> cotejar contra la factura. Concentración: 870E (344 cajas), 224 (107), 546 (97), 323E (70),
+> 580E (59). **Falta un control** que avise cuando una NP se factura con un PKC `real<esp` sin
+> CP asociado — hoy no lo detecta nadie.
+>
 > Nota **v10.03 — fix: tandas ZOMBIE en la lista de EP.** `getActivityStatus()` miraba solo
 > los **últimos 7 días** de eventos EP/TP/AP/TAP. Una tanda pickeada hace más de una semana
 > salía de esa ventana, `pickingStarted` dejaba de tenerla y el filtro `notStarted` de **EP la
