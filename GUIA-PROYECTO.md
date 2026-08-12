@@ -20,10 +20,8 @@
 > Antes en CH solo tenía 700 y 839; ahora 5 códigos. No hizo falta tocar `Codigos X Tallerista`
 > (ya tenía código CH y ya está en `ORDEN_TALL` de recepcion.js, así que aparecía en la lista con
 > el botón Chef habilitado). SQL + revert en `sql/alta_garcia_ch_coladores_20260812.sql`.
-> ⚠ **Supuesto:** el pedido decía "Bryan Garcia" y en el maestro hay un solo "Garcia" (sin
-> "Bryan"); se asumió que es el mismo — el maestro guarda solo apellidos y **Garcia LK ya tenía
-> exactamente esos tres códigos**. Si fuera otra persona, revertir y darlo de alta como tallerista
-> nuevo (hace falta su código del ERP).
+> **"Bryan Garcia" = el mismo Garcia** (confirmado por el usuario): el maestro guarda solo
+> apellidos, por eso "Bryan" no figura. No hay tallerista nuevo que dar de alta.
 >
 > Nota **v10.16 — Módulo "Faltantes facturados sin completar"** (botón 📉 en el panel supervisor).
 > Cierra el agujero que destapó el caso de las NPs 98140/98142/98155: el pickeador registra un

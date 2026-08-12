@@ -7,16 +7,13 @@
 --    "agregar a recepcion de remitos al tallerista bryan garcia en chef
 --     el art 438E 437E y 439E"
 --
---  ⚠ SUPUESTO (verificar si aparece un Garcia distinto)
---    En el maestro `Codigos X Tallerista` hay UN solo "Garcia":
---       CH → código 3915     LK → código 4317
---    No existe ningún "Bryan" ni "Brian". Se asume que "Bryan Garcia" es ese
---    mismo Garcia (el maestro guarda solo el apellido: Poly, Martin, Lucho,
---    Carlos, Garcia…), sobre todo porque **Garcia LK ya tiene exactamente esos
---    tres códigos** — o sea, ya hace los coladores y ahora también en Chef.
---    Si en realidad es OTRA persona, esto hay que revertirlo y darlo de alta
---    como tallerista nuevo — hace falta su código de tallerista del ERP, que
---    no se puede inventar.
+--  QUIÉN ES (confirmado por el usuario el 2026-08-12)
+--    "Bryan Garcia" es el MISMO "Garcia" que ya estaba en el maestro
+--    `Codigos X Tallerista`:   CH → código 3915     LK → código 4317
+--    No hay que dar de alta ningún tallerista nuevo. El maestro guarda solo el
+--    apellido (Poly, Martin, Lucho, Carlos, Garcia…), por eso "Bryan" no
+--    figura; y Garcia LK ya tenía exactamente estos tres códigos — o sea ya
+--    hacía los coladores, y ahora también para Chef.
 --
 --  QUÉ SE HACE
 --    Espejar a CH las 3 filas que Garcia ya tiene en LK, cambiando Linea y
