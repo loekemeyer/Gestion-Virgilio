@@ -4,7 +4,31 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-12 · Versión app al documentar: **v10.23**
+> Última actualización: 2026-08-12 · Versión app al documentar: **v10.24**
+>
+> Nota **v10.24 — Las librerías se sirven desde el repo (`vendor/`), no de CDNs de terceros.**
+> Antes la app bajaba 7 librerías de 4 hosts ajenos en cada carga. **6 ya están adentro**
+> (bajadas de **npm**, que es la fuente oficial de cada paquete; los CDN estaban bloqueados por
+> el proxy del entorno):
+> `jspdf.umd.min.js` (2.5.1) · `jspdf.plugin.autotable.min.js` (3.8.2) · `chart.umd.min.js`
+> (4.4.1) · `leaflet.min.js`+`.css` (1.9.4) + **`vendor/images/`** · `supabase.umd.js` (2.112.3).
+> **Las imágenes de Leaflet hacen falta**: el mapa pone un `L.marker` para el depósito y Leaflet
+> busca los íconos relativo a dónde cargó su script (`vendor/images/`); sin eso el marcador sale roto.
+> **supabase-js cambió de forma**: era `import ... from "https://esm.sh/@supabase/supabase-js@2"`
+> dentro de `recepcion.js` — **si esm.sh fallaba, Recepción no abría**. Ahora `index.html` carga el
+> build **UMD** con un `<script>` clásico **antes** del módulo (los módulos son diferidos, así que
+> `window.supabase` ya existe) y `recepcion.js` hace
+> `const { createClient } = window.supabase` con un throw claro si falta. Se usa el UMD porque es el
+> único autocontenido: `dist/index.mjs` trae imports "bare" (`@supabase/auth-js`…) y necesitaría bundler.
+> Efecto colateral bueno: la versión queda **fijada** (antes `@2` resolvía a la última v2, o sea la app
+> cambiaba de versión sola).
+> ⚠ **`xlsx` (SheetJS 0.20.3) sigue viniendo del CDN, a propósito.** SheetJS dejó de publicar en npm
+> en la **0.18.5** y sólo distribuye por `cdn.sheetjs.com`. Bajar a la 0.18.5 **no es opción**:
+> arrastra vulnerabilidades corregidas en 0.19.3 (prototype pollution) y 0.20.2 (ReDoS). Impacto
+> acotado: se carga **a demanda** (importar PPP / exportar Excel de Stock), no en cada arranque.
+> Smoke **`tests/vendor-sin-cdn.cjs`**: sirve la app por HTTP en localhost (los módulos ES no corren
+> bajo `file://` por CORS) con **toda** salida a internet abortada, y verifica que jsPDF, autotable,
+> Chart, Leaflet, supabase-js y `recepcion.js` funcionen igual.
 >
 > Nota **v10.23 — La TV del depósito ya no dice "Sin conexión" cada minuto.**
 > Síntoma: en el stick tipo Chromecast saltaba el cartel amarillo ⚠ cada ~1 min, con el

@@ -18,7 +18,12 @@
    lo lee al "Terminar Día" para cerrar RT con esa cantidad sin pedirla a mano.
    La app llama window.openRecepcionOp(legajo, dayKey).
    ========================================================= */
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+/* v10.24 — supabase-js se sirve desde el repo (vendor/supabase.umd.js), no de esm.sh.
+   Lo carga index.html con un <script> clasico ANTES de este modulo, asi que el global
+   `supabase` ya esta. Antes esto era un `import` a esm.sh: si ese CDN fallaba, Recepcion
+   NO abria. */
+const { createClient } = (typeof window !== "undefined" && window.supabase) || {};
+if (!createClient) throw new Error("Falta vendor/supabase.umd.js (cargalo antes de recepcion.js)");
 
 const SUPABASE_URL = "https://hrxfctzncixxqmpfhskv.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_BqpAgZH6ty-9wft10_YMhw_0rcIPuWT";
