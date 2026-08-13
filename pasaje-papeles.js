@@ -1,12 +1,13 @@
 /**
  * Módulo Pasaje de Papeles
  * Lista toda la documentación registrada en Pasaje_Papeles (Virgilio).
- * v2.0 - Lista unificada, sin tabs ni Cervantes
+ * v3.0 - Lista unificada + timer "tiempo sin enviar" + checkbox enviado
  */
 
 let _ppState = {
   data: [],
-  loading: false
+  loading: false,
+  timerInterval: null
 };
 
 /* Helper: headers para Supabase REST con anon key */
@@ -33,6 +34,50 @@ function closePasajePapeles() {
   var modal = document.getElementById('pasajePapelesModal');
   if (!modal) return;
   modal.classList.remove('show');
+  _ppStopTimer();
+}
+
+/** Arranca el timer que actualiza los relojes cada segundo */
+function _ppStartTimer() {
+  _ppStopTimer();
+  _ppState.timerInterval = setInterval(_ppTickTimers, 1000);
+}
+
+/** Para el timer */
+function _ppStopTimer() {
+  if (_ppState.timerInterval) {
+    clearInterval(_ppState.timerInterval);
+    _ppState.timerInterval = null;
+  }
+}
+
+/** Actualiza todos los <span> con clase pp-timer */
+function _ppTickTimers() {
+  var spans = document.querySelectorAll('.pp-timer[data-ts]');
+  var now = Date.now();
+  spans.forEach(function (sp) {
+    var ts = parseInt(sp.getAttribute('data-ts'), 10);
+    if (!ts) return;
+    sp.textContent = _ppFormatElapsed(now - ts);
+  });
+}
+
+/**
+ * Formatea milisegundos a "XD XH XM XS"
+ */
+function _ppFormatElapsed(ms) {
+  if (ms < 0) ms = 0;
+  var totalSec = Math.floor(ms / 1000);
+  var d = Math.floor(totalSec / 86400);
+  var h = Math.floor((totalSec % 86400) / 3600);
+  var m = Math.floor((totalSec % 3600) / 60);
+  var s = totalSec % 60;
+  var parts = [];
+  if (d > 0) parts.push(d + 'D');
+  if (h > 0 || d > 0) parts.push(h + 'H');
+  if (m > 0 || h > 0 || d > 0) parts.push(m + 'M');
+  parts.push(s + 'S');
+  return parts.join(' ');
 }
 
 /**
@@ -82,11 +127,13 @@ function ppRenderList() {
   var data = _ppState.data;
   if (!data.length) {
     container.innerHTML = '<div class="pp-empty">Sin documentación registrada</div>';
+    _ppStopTimer();
     return;
   }
 
   var html = '<div class="pp-tblwrap"><table class="pp-tbl"><thead><tr>' +
     '<th>Fecha</th><th>Tipo</th><th>N° Remito</th><th>N° Factura</th><th>Proveedor</th><th>Contenido</th>' +
+    '<th>Tiempo sin enviar</th><th>Enviado</th>' +
     '</tr></thead><tbody>';
 
   data.forEach(function (row) {
@@ -106,18 +153,83 @@ function ppRenderList() {
       : row.tipo_contenido === 'insumo' ? 'Insumo'
       : (row.tipo_contenido || '—');
 
-    html += '<tr>' +
+    // Timer: si no está enviado, mostrar reloj vivo. Si enviado, "✓ Enviado"
+    var enviado = !!row.enviado;
+    var timerCell = '';
+    if (enviado) {
+      timerCell = '<span style="color:#16a34a;font-weight:600;">✓ Enviado</span>';
+    } else {
+      var tsMs = row.created_at ? new Date(row.created_at).getTime() : 0;
+      timerCell = '<span class="pp-timer" data-ts="' + tsMs + '" style="font-variant-numeric:tabular-nums;font-size:13px;color:#dc2626;font-weight:600;">' +
+        _ppFormatElapsed(Date.now() - tsMs) + '</span>';
+    }
+
+    // Checkbox
+    var rowId = row.id;
+    var checkCell = '<label style="display:flex;align-items:center;justify-content:center;cursor:pointer;margin:0;">' +
+      '<input type="checkbox" ' + (enviado ? 'checked' : '') +
+      ' onchange="ppToggleEnviado(' + rowId + ', this.checked)" ' +
+      'style="width:20px;height:20px;cursor:pointer;accent-color:#16a34a;">' +
+      '</label>';
+
+    html += '<tr data-ppid="' + rowId + '" style="' + (enviado ? 'opacity:0.55;' : '') + '">' +
       '<td>' + ppFormatDate(row.created_at) + '</td>' +
       '<td>' + tipoLabel + '</td>' +
       '<td>' + nroRto + '</td>' +
       '<td>' + nroFc + '</td>' +
       '<td>' + (row.razon_social || '—') + '</td>' +
       '<td>' + contenido + '</td>' +
+      '<td style="text-align:center;white-space:nowrap;">' + timerCell + '</td>' +
+      '<td style="text-align:center;">' + checkCell + '</td>' +
     '</tr>';
   });
 
   html += '</tbody></table></div>';
   container.innerHTML = html;
+
+  // Arrancar timer para los relojes vivos
+  _ppStartTimer();
+}
+
+/**
+ * Marca/desmarca un documento como enviado en Supabase
+ */
+async function ppToggleEnviado(id, checked) {
+  // Actualizar estado local inmediatamente para feedback visual
+  var row = _ppState.data.find(function (r) { return r.id === id; });
+  if (row) row.enviado = checked;
+
+  // Re-renderizar la fila sin recargar todo
+  var tr = document.querySelector('tr[data-ppid="' + id + '"]');
+  if (tr) {
+    tr.style.opacity = checked ? '0.55' : '1';
+    // Actualizar celda del timer
+    var timerTd = tr.children[6]; // 7ma columna (0-based = 6)
+    if (timerTd) {
+      if (checked) {
+        timerTd.innerHTML = '<span style="color:#16a34a;font-weight:600;">✓ Enviado</span>';
+      } else {
+        var tsMs = row && row.created_at ? new Date(row.created_at).getTime() : 0;
+        timerTd.innerHTML = '<span class="pp-timer" data-ts="' + tsMs + '" style="font-variant-numeric:tabular-nums;font-size:13px;color:#dc2626;font-weight:600;">' +
+          _ppFormatElapsed(Date.now() - tsMs) + '</span>';
+      }
+    }
+  }
+
+  // Persistir en Supabase
+  try {
+    var res = await fetch(SUPABASE_URL + '/rest/v1/Pasaje_Papeles?id=eq.' + id, {
+      method: 'PATCH',
+      headers: _ppHeaders({ Prefer: 'return=minimal' }),
+      body: JSON.stringify({ enviado: checked })
+    });
+    if (!res.ok) console.warn('ppToggleEnviado HTTP', res.status);
+  } catch (e) {
+    console.warn('ppToggleEnviado error:', e);
+    // Revertir estado local si falló
+    if (row) row.enviado = !checked;
+    ppRenderList();
+  }
 }
 
 /**
@@ -276,7 +388,8 @@ async function _ppSaveToSupabase(tipoContenido, data) {
       fecha_remito: data.fechaRemito || null,
       fecha_factura: data.fechaFactura || null,
       fecha_emision: data.fechaRemito || data.fechaFactura || null,
-      legajo_usuario: (typeof legajoInput !== 'undefined' && legajoInput && legajoInput.value) ? legajoInput.value : null
+      legajo_usuario: (typeof legajoInput !== 'undefined' && legajoInput && legajoInput.value) ? legajoInput.value : null,
+      enviado: false
     };
 
     var res = await fetch(SUPABASE_URL + '/rest/v1/Pasaje_Papeles', {
@@ -301,6 +414,7 @@ window.ppRenderList = ppRenderList;
 window.ppShowCaptureDialog = ppShowCaptureDialog;
 window.ppCloseCaptureDialog = ppCloseCaptureDialog;
 window.ppSaveDocument = ppSaveDocument;
+window.ppToggleEnviado = ppToggleEnviado;
 window._ppCapRenderStep1 = _ppCapRenderStep1;
 window._ppCapRenderStep2 = _ppCapRenderStep2;
 window._ppCapSave = _ppCapSave;
