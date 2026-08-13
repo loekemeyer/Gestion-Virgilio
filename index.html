@@ -18188,6 +18188,16 @@ function insConfirmar() {
   closeIns();
   window._insUbicacion = null;  // limpiar
   stockMove(rows);   // offline-safe (vir_stock_pend)
+
+  // v1.1 — Pasaje de Papeles: mostrar pop-up para capturar documentación (solo si es ingreso)
+  if (isIn) {
+    try {
+      if (typeof window.ppShowCaptureDialog === 'function') {
+        window.ppShowCaptureDialog('insumo');
+      }
+    } catch (_e) { /* no-op si el módulo no está cargado */ }
+  }
+
   try { alert("✓ " + (isIn ? "Entrada" : "Salida") + " registrada: " + sel.length + " insumo(s)." + (ubic ? "\n" + (isIn ? "Origen" : "Destino") + ": " + ubic : "")); } catch (_e) {}
 }
 function insHasProgress() { return !!(_ins && _ins.items && _ins.items.some(function (it) { return (it.qty > 0); })); }
