@@ -182,7 +182,7 @@ async function ppMarkSent(docId) {
     ppLoadData();
   } catch (e) {
     console.error('ppMarkSent error:', e);
-    alert('Error al marcar como enviado');
+    // silencioso — no interrumpir al operador
   }
 }
 
@@ -199,7 +199,7 @@ async function ppMarkReceived(docId) {
     ppLoadData();
   } catch (e) {
     console.error('ppMarkReceived error:', e);
-    alert('Error al confirmar recepción');
+    // silencioso — no interrumpir al operador
   }
 }
 
@@ -244,10 +244,17 @@ async function ppSaveDocument(tipoContenido) {
   const tipoDoc = document.getElementById('ppCaptureDocType') ? document.getElementById('ppCaptureDocType').value : '';
   const razonSocial = document.getElementById('ppCaptureRazonSocial') ? document.getElementById('ppCaptureRazonSocial').value : '';
 
-  if (!fecha || !tipoDoc || !razonSocial) {
-    alert('Completá todos los campos');
-    return;
-  }
+  // Si faltan campos, marcar los vacíos en rojo pero no bloquear
+  var _ppMissing = false;
+  ['ppCaptureDate', 'ppCaptureDocType', 'ppCaptureRazonSocial'].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (!el || !el.value) { _ppMissing = true; if (el) el.style.borderColor = '#dc2626'; }
+    else if (el) el.style.borderColor = '#cbd5e1';
+  });
+  if (_ppMissing) return;  // no cierra, que completen
+
+  // Cerrar primero — el operador sigue trabajando, el save es best-effort en background
+  ppCloseCaptureDialog();
 
   try {
     var res = await fetch(SUPABASE_URL + '/rest/v1/Pasaje_Papeles', {
@@ -262,17 +269,9 @@ async function ppSaveDocument(tipoContenido) {
         legajo_usuario: (typeof legajoInput !== 'undefined' && legajoInput && legajoInput.value) ? legajoInput.value : null
       })
     });
-
-    if (!res.ok) {
-      var errText = await res.text().catch(function () { return 'HTTP ' + res.status; });
-      throw new Error(errText);
-    }
-
-    ppCloseCaptureDialog();
-    openPasajePapeles();
+    if (!res.ok) console.warn('ppSaveDocument HTTP', res.status);
   } catch (e) {
-    console.error('ppSaveDocument error:', e);
-    alert('Error al guardar: ' + (e.message || 'error desconocido'));
+    console.warn('ppSaveDocument error (silencioso):', e);
   }
 }
 
