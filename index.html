@@ -6546,7 +6546,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v10.41";
+const APP_VERSION = "v10.43";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -14256,8 +14256,14 @@ async function stkOpenMovsArt(codEnc, dep, titulo, icono) {
   _stkPop = { kind: "movsArt", cod: cod, codN: _stkNormCod(cod), dep: dep, titulo: titulo || dep, icono: icono || "🔁", desde: "", hasta: "", npByTanda: {} };
   _stkPopShell((icono || "🔁") + " " + (titulo || dep) + " — " + escapeHtml(codBase(cod)), "stkPopBody");
   // v10.42: fetch fresco de movimientos SOLO de este artículo (no depender de _stk.movs que puede estar viejo)
+  // v10.43: stocks_carga_rapida guarda cod SIN ceros (26, 7, 35E) pero Movimientos_Stock
+  //         guarda CON ceros (026, 007, 035E). Query con ambos formatos via or().
   try {
-    var _freshMovs = await supaFetchAllSafe(SUPABASE_URL + '/rest/v1/Movimientos_Stock', 'select=id,cod_art,deposito,tipo,delta,ref,ts,legajo,descripcion,ubicacion&cod_art=eq.' + encodeURIComponent(cod) + '&order=ts.asc&limit=50000');
+    var _codPad = cod.replace(/^(\d+)/, function (m) { return m.padStart(3, "0"); });
+    var _codFilter = (_codPad !== cod)
+      ? "or=(cod_art.eq." + encodeURIComponent(cod) + ",cod_art.eq." + encodeURIComponent(_codPad) + ")"
+      : "cod_art=eq." + encodeURIComponent(cod);
+    var _freshMovs = await supaFetchAllSafe(SUPABASE_URL + '/rest/v1/Movimientos_Stock', 'select=id,cod_art,deposito,tipo,delta,ref,ts,legajo,descripcion,ubicacion&' + _codFilter + '&order=ts.asc&limit=50000');
     if (_freshMovs && Array.isArray(_freshMovs) && _stkPop && _stkPop.cod === cod) {
       _stkPop._freshMovs = _freshMovs;
     }
