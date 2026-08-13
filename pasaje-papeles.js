@@ -212,14 +212,26 @@ async function ppMarkReceived(docId) {
  * Se llama desde recepcion.js cuando se completa una recepción
  * @param tipoContenido - 'mercaderia' o 'insumo'
  */
-function ppShowCaptureDialog(tipoContenido) {
+function ppShowCaptureDialog(tipoContenido, prefill) {
+  var pf = prefill || {};
+  // Mapear tipoEntrega de recepcion → tipo_documento de Pasaje_Papeles
+  var preDocType = '';
+  if (pf.tipoEntrega === 'remito') preDocType = 'remito';
+  else if (pf.tipoEntrega === 'remito_factura') preDocType = 'ambos';
+  var preDate = pf.fechaRto || '';
+
   const titulo = tipoContenido === 'mercaderia' ? 'Nueva documentación — Mercadería recibida' : 'Nueva documentación — Insumo recibido';
+
+  // Preselección del select
+  var optRemito = preDocType === 'remito' ? ' selected' : '';
+  var optAmbos = preDocType === 'ambos' ? ' selected' : '';
+  var optFactura = preDocType === 'factura' ? ' selected' : '';
 
   const html = '<div style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;" onclick="if(event.target===this)ppCloseCaptureDialog()">' +
     '<div style="background:#fff;border-radius:12px;padding:24px;max-width:480px;width:100%;box-shadow:0 20px 25px rgba(0,0,0,.15);">' +
     '<h2 style="margin:0 0 16px;font-size:18px;color:#0f172a;">' + titulo + '</h2>' +
-    '<div style="margin-bottom:14px;"><label style="display:block;font-size:13px;font-weight:600;color:#475569;margin-bottom:4px;">Fecha de emisión *</label><input type="date" id="ppCaptureDate" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;box-sizing:border-box;font-size:14px;"></div>' +
-    '<div style="margin-bottom:14px;"><label style="display:block;font-size:13px;font-weight:600;color:#475569;margin-bottom:4px;">Tipo de documento *</label><select id="ppCaptureDocType" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;box-sizing:border-box;font-size:14px;"><option value="">Seleccionar...</option><option value="factura">Factura</option><option value="remito">Remito</option><option value="ambos">Factura + Remito</option></select></div>' +
+    '<div style="margin-bottom:14px;"><label style="display:block;font-size:13px;font-weight:600;color:#475569;margin-bottom:4px;">Fecha de emisión *</label><input type="date" id="ppCaptureDate" value="' + preDate + '" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;box-sizing:border-box;font-size:14px;"></div>' +
+    '<div style="margin-bottom:14px;"><label style="display:block;font-size:13px;font-weight:600;color:#475569;margin-bottom:4px;">Tipo de documento *</label><select id="ppCaptureDocType" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;box-sizing:border-box;font-size:14px;"><option value="">Seleccionar...</option><option value="factura"' + optFactura + '>Factura</option><option value="remito"' + optRemito + '>Remito</option><option value="ambos"' + optAmbos + '>Factura + Remito</option></select></div>' +
     '<div style="margin-bottom:20px;"><label style="display:block;font-size:13px;font-weight:600;color:#475569;margin-bottom:4px;">Razón Social *</label><input type="text" id="ppCaptureRazonSocial" placeholder="Nombre del proveedor" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;box-sizing:border-box;font-size:14px;"></div>' +
     '<div style="display:flex;gap:10px;justify-content:flex-end;">' +
     '<button onclick="ppCloseCaptureDialog()" style="padding:10px 20px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#334155;font-weight:600;cursor:pointer;">Cancelar</button>' +

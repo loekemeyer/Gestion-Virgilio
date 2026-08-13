@@ -1465,7 +1465,10 @@ async function opEnviar() {
   // v1.1 — Pasaje de Papeles: mostrar pop-up para capturar documentación
   try {
     if (typeof window.ppShowCaptureDialog === 'function') {
-      window.ppShowCaptureDialog('mercaderia');
+      window.ppShowCaptureDialog('mercaderia', {
+        tipoEntrega: opState.tipoEntrega || '',
+        fechaRto: opState.fechaRto || ''
+      });
     }
   } catch (_e) { /* no-op si el módulo no está cargado */ }
 
