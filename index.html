@@ -14255,12 +14255,20 @@ async function stkOpenMovsArt(codEnc, dep, titulo, icono) {
   const cod = decodeURIComponent(codEnc);
   _stkPop = { kind: "movsArt", cod: cod, codN: _stkNormCod(cod), dep: dep, titulo: titulo || dep, icono: icono || "🔁", desde: "", hasta: "", npByTanda: {} };
   _stkPopShell((icono || "🔁") + " " + (titulo || dep) + " — " + escapeHtml(codBase(cod)), "stkPopBody");
-  stkMovsArtRender();   // render inmediato (el NP de cada picking aparece cuando llega el fetch)
+  // v10.42: fetch fresco de movimientos SOLO de este artículo (no depender de _stk.movs que puede estar viejo)
+  try {
+    var _freshMovs = await supaFetchAllSafe(SUPABASE_URL + '/rest/v1/Movimientos_Stock', 'select=id,cod_art,deposito,tipo,delta,ref,ts,legajo,descripcion,ubicacion&cod_art=eq.' + encodeURIComponent(cod) + '&order=ts.asc&limit=50000');
+    if (_freshMovs && Array.isArray(_freshMovs) && _stkPop && _stkPop.cod === cod) {
+      _stkPop._freshMovs = _freshMovs;
+    }
+  } catch (_e) {}
+  stkMovsArtRender();
   _stkQuienLoad(stkMovsArtRender);   // v6.66 — 👤 siglas + legajo (nombres + sesiones de RT)
   // v8.71 — resolver "pipeline" al operario real: cargar TP/TAP de las tandas con legajo='pipeline'.
   try {
     const tandas = {};
-    _stk.movs.forEach(function (mv) {
+    var _pipeMovs = (_stkPop && _stkPop._freshMovs) ? _stkPop._freshMovs : _stk.movs;
+    _pipeMovs.forEach(function (mv) {
       if (_stkNormCod(mv.cod_art) !== _stkPop.codN || mv.deposito !== dep) return;
       if (String(mv.legajo || "").trim() !== "pipeline") return;
       const ref = String(mv.ref || "").toUpperCase().split("|")[0]; if (ref) tandas[ref] = true;
@@ -14476,7 +14484,9 @@ function _stkMovsBlock() {
     : function (d) { return d === dep; };
   const desdeT = _stkPop.desde ? new Date(_stkPop.desde + "T00:00:00").getTime() : 0;
   const hastaT = _stkPop.hasta ? new Date(_stkPop.hasta + "T23:59:59").getTime() : 0;
-  const list = _stk.movs.filter(function (mv) {
+  // v10.42: usar movimientos frescos del artículo si están disponibles, sino fallback a _stk.movs
+  const _movsSource = (_stkPop && _stkPop._freshMovs) ? _stkPop._freshMovs : _stk.movs;
+  const list = _movsSource.filter(function (mv) {
     if (!_depMatch(mv.deposito) || _stkNormCod(mv.cod_art) !== codN || !_stkWin(mv, true)) return false;
     if (Number(mv.delta) === 0) return false;   // v8.90: ocultar movimientos con cantidad 0 (ruido)
     const t = new Date(mv.ts).getTime();
