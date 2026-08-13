@@ -23022,7 +23022,7 @@ function pppLoadXlsx() {
        conocidas corregidas en 0.19.3 (prototype pollution) y 0.20.2 (ReDoS). Se queda
        en el CDN hasta bajar el tarball oficial a mano. Impacto acotado: sólo se carga
        cuando se importa la PPP o se exporta el Excel de Stock, no en cada arranque. */
-    s.src = "https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js";
+    s.src = "vendor/xlsx.full.min.js";
     s.onload = function () { window.XLSX ? res(window.XLSX) : rej(new Error("SheetJS no cargó")); };
     s.onerror = function () { _pppXlsxP = null; rej(new Error("No pude cargar SheetJS (revisá internet)")); };
     document.head.appendChild(s);
