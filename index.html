@@ -709,28 +709,10 @@ button {
    (DESACTIVADO POR AHORA: la columna "Fecha Salida" ya muestra (F Pk)
    como indicador; descomentar estos bloques para volver al rojo) */
 /*
-.monitor-table tr.row-missing-si td{
-  background: #fee2e2;
-  color: #991b1b;
-  font-weight: bold;
-}
-.monitor-table tr.row-curso.row-missing-si td{
-  background: #fecaca;
-  color: #7f1d1d;
-}
 */
 
 /* #monitorModal.tv .monitor-table tr.row-curso td{ background: #422006; color: #fde68a; } */
 /*
-#monitorModal.tv .monitor-table tr.row-missing-si td{
-  background: #7f1d1d;
-  color: #fecaca;
-  font-weight: bold;
-}
-#monitorModal.tv .monitor-table tr.row-curso.row-missing-si td{
-  background: #991b1b;
-  color: #fee2e2;
-}
 */
 
 /* Flash verde de 2s cuando una tanda cambia de estado (⏰ → ✅ o similar).
@@ -5598,11 +5580,13 @@ const TANDAS_LIST_VISIBLE_DAYS = 3;
 const ACTIVITY_LOOKBACK_DAYS  = 180;
 
 /* Devuelve TODAS las tandas reales del PPP (con fecha de entrega válida,
-   excluyendo "S/Tanda"). Cada item lleva su flag opIsSi para que cada modo
-   decida si lo necesita o no:
-     EP / TP / CC → exigen opIsSi=true (solo planificadas)
-     AP / TAP     → no exigen Op=SI (incluyen tandas con actividad sin SI,
-                    como C04G que está siendo trabajada pero le falta el SI) */
+   excluyendo "S/Tanda").
+   v10.28 — el flag `opIsSi` (columna Op del Excel) YA NO FILTRA NADA. Era requisito
+   para que una tanda apareciera en el celular y en la tele, y eso dejaba tandas
+   reales invisibles para el operario cuando nadie marcaba la columna (caso real:
+   36 tandas sin ver). Ahora todos los modos las traen todas; lo que acota la lista
+   son los topes que ya existían: la ventana de fechas y MAX_PLANNED_NO_ACT.
+   El flag se sigue parseando por si alguna vez se quiere volver a usar. */
 async function getPppTandasForOperator() {
   const now = Date.now();
   if (_pppOperatorCache && (now - _pppOperatorTs) < PPP_OPERATOR_TTL_MS) {
@@ -5736,7 +5720,7 @@ async function populateTandasList(filterMode) {
   let filtered;
   if (_tandasListMode === "notStarted") {
     const s = await getActivityStatus();
-    filtered = items.filter(it => it.opIsSi && !s.pickingStarted.has(it.tanda.toUpperCase()));
+    filtered = items.filter(it => !s.pickingStarted.has(it.tanda.toUpperCase()));   // v10.28: sin exigir Op=SI
   } else if (_tandasListMode === "pickingCurso") {
     const s = await getActivityStatus();
     // pickingStarted: lenient (cualquier EP/TP entra como "empezado").
@@ -5764,7 +5748,7 @@ async function populateTandasList(filterMode) {
       return s.armadoStarted.has(k) && !s.armadoDone.has(k);
     });
   } else {
-    filtered = items.filter(it => it.opIsSi);
+    filtered = items.slice();   // v10.28: sin exigir Op=SI
   }
   if (!filtered.length) {
     const msg = _tandasListMode === "pickingDone"
@@ -6476,7 +6460,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v10.27";
+const APP_VERSION = "v10.28";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -22603,8 +22587,7 @@ async function refreshAnalisisDayTotals(){
     // No restringimos a tandas con ambas terminadas (no usamos "m3 FC").
     let todayPick = 0, todaySep = 0;
     for (const [k, v] of sheetMap) {
-      if (!v.opIsSi) continue;
-      const ev = statusMap.get(k);
+      const ev = statusMap.get(k);   // v10.28: sin exigir Op=SI
       if (!ev) continue;
       if (ev.doneTodayP) todayPick += v.m3;
       if (ev.doneTodayA) todaySep  += v.m3;
@@ -27943,7 +27926,7 @@ function targetDeliveryDates(sheetMap, futureCount) {
   // Solo fechas que tienen al menos una tanda con Op=SI
   const datesPlanned = new Set();
   for (const v of sheetMap.values()) {
-    if (v.fechaEntregaRaw && v.opIsSi) datesPlanned.add(v.fechaEntregaRaw);
+    if (v.fechaEntregaRaw) datesPlanned.add(v.fechaEntregaRaw);   // v10.28: sin exigir Op=SI
   }
   const all = [...datesPlanned].sort();
   const past   = all.filter(x => x <= todayKey);          // todas las pasadas/hoy
@@ -28596,10 +28579,10 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
   // Filtro principal: SOLO tandas cuya Fecha Entrega esté en las próximas 3
   // fechas del sheet (saltea días vacíos: feriados, weekends, sin planificar).
   const targetSet = new Set(targetDates);
-  // Reglas de visibilidad:
-  //   - Op=SI                                  -> aparece SIEMPRE
-  //   - Op vacío + cualquier evento histórico  -> aparece marcado missingSi (rojo)
-  //   - Op vacío + sin eventos                 -> NO aparece
+  // Reglas de visibilidad (v10.28 — la columna Op dejó de importar):
+  //   - toda tanda con fecha dentro de la ventana -> aparece
+  //   - el tope de las que NO tienen actividad lo pone MAX_PLANNED_NO_ACT
+  //   (antes: sin Op=SI no aparecía, o aparecía en rojo marcada "missingSi")
   // Status (picking/separado) usa TODOS los eventos históricos de la tanda
   // (no solo hoy) — si EP/TP/AP/TAP existieron antes, el tilde aparece igual.
   // v6.71 — sacar del monitor las tandas ya FACTURADAS y DESPACHADAS (todas sus NP
@@ -28623,8 +28606,7 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
     if (_tandaDespachada(v)) continue;   // v6.71: facturada + despachada → fuera del monitor
     const ev = statusMap.get(k) || { picking: null, separado: null, doneTodayP: false, doneTodayA: false, pickLegajo: null, sepLegajo: null };
     const hasAny = (ev.picking !== null || ev.separado !== null);
-    if (!v.opIsSi && !hasAny) continue;
-    tandas.push(Object.assign({}, v, { ev: ev, missingSi: !v.opIsSi }));
+    tandas.push(Object.assign({}, v, { ev: ev }));   // v10.28: entran todas; el tope lo ponen la ventana de fechas y MAX_PLANNED_NO_ACT
   }
 
   // Orden:
@@ -28665,10 +28647,8 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
 
   for (const t of tandas) {
     const ev = t.ev;
-    if (!t.missingSi) {
-      if (ev.doneTodayP) totPickToday += t.m3;
-      if (ev.doneTodayA) totSepToday  += t.m3;
-    }
+    if (ev.doneTodayP) totPickToday += t.m3;   // v10.28: cuentan todas
+    if (ev.doneTodayA) totSepToday  += t.m3;
     // Total por día — desglosado por camión (cada número de tanda agrupa
     // las que comparten el mismo número: C03A + C03B = camión 03).
     {
@@ -28690,7 +28670,7 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
       if (ev.separado === "done") c.tandasArmadas++;
     }
     const bothDone = (ev.picking === "done" && ev.separado === "done");
-    if (bothDone && !t.missingSi) {
+    if (bothDone) {   // v10.28
       tandasFC.push(t);
       continue;       // las terminadas no van a la tabla principal
     }
@@ -28705,12 +28685,9 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
     const isCurso = (ev.picking === "curso" || ev.separado === "curso");
     const cls = [];
     if (isCurso)        cls.push("row-curso");
-    if (t.missingSi)    cls.push("row-missing-si");
     if (changedTandas.has(t.tanda.toUpperCase())) cls.push("row-flash");
     const m3Txt = t.m3.toFixed(1).replace(".", ",");
-    const feTxt = t.missingSi
-      ? `${escapeHtml(t.fechaEntrega)}<br>(F Pk)`
-      : escapeHtml(t.fechaEntrega);
+    const feTxt = escapeHtml(t.fechaEntrega);   // v10.28: se fue el (F Pk) — el Op=SI ya no es norma
     const _monSearch = [t.tanda, ev.pickLegajo, ev.sepLegajo,
       ev.pickLegajo ? (_empleadosNombres.get(String(ev.pickLegajo)) || "") : "",
       ev.sepLegajo ? (_empleadosNombres.get(String(ev.sepLegajo)) || "") : ""
@@ -28731,7 +28708,7 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
   {
     const _fcKeys = new Set(tandasFC.map(function (t) { return t._key || t.tanda; }));
     for (const [k, v] of sheetMap) {
-      if (!v || !v.opIsSi) continue;
+      if (!v) continue;   // v10.28: sin exigir Op=SI
       const key = v._key || v.tanda;
       if (_fcKeys.has(key)) continue;
       const ev2 = statusMap.get(k);
@@ -28847,7 +28824,7 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
   let beyondTotalTandas = 0;
   let beyondTotalM3 = 0;
   for (const [k, v] of sheetMap) {
-    if (!v.opIsSi || !v.fechaEntregaRaw) continue;
+    if (!v.fechaEntregaRaw) continue;   // v10.28: sin exigir Op=SI
     if (!maxTarget || v.fechaEntregaRaw <= maxTarget) continue;
     // v5.99: las terminadas ya aparecen en "Tandas a FC" (todas) → NO contarlas acá.
     // "Fuera de ventana" = trabajo PENDIENTE más lejano de los 3 días.
@@ -29079,7 +29056,7 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
   // v6.26: TOTAL de tandas PROGRAMADAS (Op=SI en el PPP, TODA fecha) — antes solo se
   // veía el conteo de la ventana visible ("N entrega <fechas>"), no el total global.
   let totalProgramadas = 0;
-  for (const [, v] of sheetMap) { if (v && v.opIsSi) totalProgramadas++; }
+  for (const [, v] of sheetMap) { if (v && v.tanda) totalProgramadas++; }   // v10.28: todas, no solo Op=SI
   const _mm = document.getElementById("monitorModal");
   // Resolución del viewport sale al lado del status "● al día" (no en la
   // barra meta). Acá solo dejamos los conteos.
@@ -31416,7 +31393,7 @@ async function facTick(){
     }
 
     // Filtra a planificadas (Op=SI) con NPs
-    const tandasPlan = [...sheetMap.values()].filter(t => t.opIsSi && t.pedidos.length > 0);
+    const tandasPlan = [...sheetMap.values()].filter(t => t.pedidos.length > 0);   // v10.28: sin exigir Op=SI
     const keys = tandasPlan.map(t => t._key || t.tanda.toUpperCase());
 
     // Paralelo: tandas FC + NPs ya facturados. Promise.all con .catch por
@@ -31490,7 +31467,7 @@ async function facLoadBadge(){
     let sheetMap;
     if (_pppCache && (Date.now() - _pppCacheTs) < PPP_TTL_MS) sheetMap = _pppCache;
     else { sheetMap = await fetchMonitorSheet(); _pppCache = sheetMap; _pppCacheTs = Date.now(); }
-    const tandasPlan = [...sheetMap.values()].filter(t => t.opIsSi && t.pedidos.length > 0);
+    const tandasPlan = [...sheetMap.values()].filter(t => t.pedidos.length > 0);   // v10.28: sin exigir Op=SI
     const keys = tandasPlan.map(t => t._key || t.tanda.toUpperCase());
     const res = await Promise.all([
       facFetchFcKeys(keys).catch(function(){ return new Set(); }),

@@ -4,7 +4,33 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-12 · Versión app al documentar: **v10.25**
+> Última actualización: 2026-08-12 · Versión app al documentar: **v10.28**
+>
+> Nota **v10.28 — La columna `Op` del Excel DEJÓ DE SER REQUISITO para mostrar tandas.**
+> Hasta acá, una tanda sin `Op=SI` **no aparecía** ni en el monitor de TV ni en las pantallas
+> del operario (EP/TP/CC) ni en Facturación. Como nadie mantenía esa columna, quedaban **36
+> tandas reales invisibles** para el depósito. **Decisión del usuario: el SI ya no es norma.**
+> Se sacaron los **13 filtros** por `opIsSi` (celular, monitor y Facturación) y también el
+> marcador **`missingSi`** —la fila roja con "(F Pk)"— que señalaba "le falta el SI": si el SI
+> no es norma, ese aviso es ruido (habrían salido 35 filas rojas). Se borró su CSS, que quedó muerto.
+> **Lo que acota la lista son los topes que YA existían** (el usuario pidió respetarlos):
+> `MAX_PLANNED_NO_ACT` = 6 tandas sin actividad en la tabla del monitor, `TANDAS_LIST_VISIBLE_DAYS`
+> = 3 grupos de días en el celular, y la ventana de próximos 3 días hábiles.
+> **Medido antes de aplicar:** las 35 tandas que entran son todas de entrega **19/08 → 16/09**,
+> o sea **ninguna** cae hoy en la ventana de 3 días — no hay avalancha; van a aparecer solas
+> cuando se acerque su fecha. El flag `opIsSi` se sigue **parseando** (por si se quiere volver
+> atrás) pero no filtra nada. Smoke **`tests/sin-op-si.cjs`**, que falla si alguien repone un filtro.
+>
+> Nota **v10.28 — Los códigos de tanda mal tipeados se corrigen solos.** Alguien cargó **`D27A:`**
+> (con dos puntos) y para el sistema era un código DISTINTO de `D27A`: no matcheaba con el picking,
+> ni con los m³, ni con el stock. **Fix en la base** (elección del usuario: limpiar en el origen, no
+> en cada pantalla): función `fn_norm_tanda()` + triggers **BEFORE INSERT/UPDATE** en
+> `PPP_Programacion_Diaria` y `PPP_Entregados_Meta`. **Regla:** trim + sacar símbolos **pegados al
+> principio o al final**; los del **medio NO se tocan a propósito**, porque hay tandas legítimas
+> como **`S/Tanda`**, **`T 06/04`** y **`LA ANONIMA`** que se romperían. Probado contra todos los
+> códigos existentes: el **único** que cambia es `D27A:` → `D27A`. Las filas ya cargadas se
+> corrigieron en la misma migración. Verificado con una fila de prueba: `"  Z99Z:. "` entra como `Z99Z`.
+> Mismo patrón que `fn_canon_cod_art` (el trigger que ya normaliza `cod_art`).
 >
 > Nota **v10.25 — Un solo espejo del Sheet "Pedidos Entregados" (se eliminó el duplicado).**
 > Esa hoja se estaba espejando **DOS VECES**: (a) el Apps Script la empujaba a
