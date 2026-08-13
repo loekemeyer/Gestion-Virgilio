@@ -6546,7 +6546,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v10.40";
+const APP_VERSION = "v10.41";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -15497,6 +15497,9 @@ function stkFaltFiltro(f) {
 function stkFaltOrdenFab() {
   if (!_stk || !_stk.falt) return;
   _stk.falt.ordenFab = !_stk.falt.ordenFab;
+  // v10.41 — el filtro por columna (S1/S2/…) tapaba el orden por fabricante (cortaba el sort antes).
+  // Al activar el orden por fabricante, se saca el filtro de columna para que realmente ordene.
+  if (_stk.falt.ordenFab) _stk.falt.colFiltro = null;
   _stk.falt.openCell = null;
   stkRender();
 }
