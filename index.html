@@ -6609,22 +6609,20 @@ function updatePendingIndicator() {
 }
 
 /**
- * v10.34 — Inicializa badge de Stock y Compras en page load
- * Carga saldos neteados de Stock_Saldos (table lightweight, 346 filas)
+ * v10.41 — Inicializa badge de Stock y Compras en page load
+ * Carga saldos neteados de stocks_carga_rapida (tabla lightweight, ~346 filas)
+ * Chequea negativos por columna: terminado, excedente, separar_pedidos,
+ * a_facturar, a_guardar, racks
  */
 async function initStkBadge() {
   try {
     if (!_stk) {
       _stk = {};
     }
-    // Stock_Saldos es 1/100 del peso de vista_stock_procesada
-    const saldos = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Stock_Saldos", "select=cod,stock_total");
+    var saldos = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/stocks_carga_rapida", "select=cod,cod_base,descripcion,linea,familia_principal,es_secundario,terminado,excedente,separar_pedidos,a_facturar,a_guardar,racks,racks_ch,para_envasar,insumos_dep,stock_total,cajas_pedidas,proy_cajas_mes,capacidad_gondola,es_insumo,visible_en_stock");
     if (saldos && Array.isArray(saldos) && saldos.length > 0) {
       _stk.viewRows = saldos;
-      console.log('initStkBadge: cargados', saldos.length, 'registros');
       updateStkBadge();
-    } else {
-      console.warn('initStkBadge: saldos vacío o inválido', saldos);
     }
   } catch (e) {
     console.error('initStkBadge error:', e);
@@ -6632,26 +6630,26 @@ async function initStkBadge() {
 }
 
 /**
- * v10.34 — Actualiza badge de Stock y Compras
- * Si hay negativos: muestra badge con número rojo
- * Si todo OK: muestra tilde verde
+ * v10.41 — Actualiza badge de Stock y Compras
+ * Chequea si CUALQUIER columna de saldo está en negativo (no solo stock_total)
+ * Si hay negativos: badge rojo con cantidad de códigos
+ * Si todo OK: tilde verde
  */
 function updateStkBadge() {
-  const stkBadge = document.getElementById('stkBadge');
-  const stkOkBadge = document.getElementById('stkOkBadge');
+  var stkBadge = document.getElementById('stkBadge');
+  var stkOkBadge = document.getElementById('stkOkBadge');
+  if (!stkBadge || !stkOkBadge) return;
+  if (!_stk || !_stk.viewRows) return;
 
-  if (!stkBadge || !stkOkBadge) {
-    console.warn('updateStkBadge: elementos del DOM no encontrados', { stkBadge: !!stkBadge, stkOkBadge: !!stkOkBadge });
-    return;
-  }
-  if (!_stk || !_stk.viewRows) {
-    console.warn('updateStkBadge: _stk o viewRows no existe', { _stk: !!_stk, viewRows: _stk ? !!_stk.viewRows : 'N/A' });
-    return;
-  }
-
-  const negativos = _stk.viewRows.filter(r => (r.stock_total || 0) < 0);
-  const count = negativos.length;
-  console.log('updateStkBadge: encontrados', count, 'códigos negativos de', _stk.viewRows.length);
+  var negativos = _stk.viewRows.filter(function (r) {
+    return (Number(r.terminado) || 0) < 0 ||
+           (Number(r.excedente) || 0) < 0 ||
+           (Number(r.separar_pedidos) || 0) < 0 ||
+           (Number(r.a_facturar) || 0) < 0 ||
+           (Number(r.a_guardar) || 0) < 0 ||
+           (Number(r.racks) || 0) < 0;
+  });
+  var count = negativos.length;
 
   if (count > 0) {
     stkBadge.textContent = count;
@@ -10141,10 +10139,10 @@ async function openStockAdmin(soloConteo) {
   ov.innerHTML = '<div class="stk-card"><div class="stk-head"><span class="stk-title">' + (_solo ? "📋 Conteo de stock" : "📦 Stock y Compras") + '</span><button class="stk-close" onclick="closeStockAdmin()">Cerrar</button></div><div class="stk-tabs" id="stkTabs"></div><div class="stk-body" id="stkBody"><div class="stk-loading">Cargando…</div></div></div>';
 
   try {
-    // v10.34: Cargar Stock_Saldos primero (fast) y renderizar instant
-    const saldosRapido = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Stock_Saldos", "select=cod,cod_base,descripcion,linea,familia_principal,es_secundario,terminado,excedente,separar_pedidos,a_facturar,a_guardar,racks,racks_ch,para_envasar,insumos_dep,stock_total,cajas_pedidas,proy_cajas_mes,capacidad_gondola,es_insumo,visible_en_stock").catch(function(){ return []; });
+    // v10.41: Cargar stocks_carga_rapida primero (fast) y renderizar instant
+    var saldosRapido = (_stk && _stk.viewRows && _stk.viewRows.length > 0) ? _stk.viewRows : await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/stocks_carga_rapida", "select=cod,cod_base,descripcion,linea,familia_principal,es_secundario,terminado,excedente,separar_pedidos,a_facturar,a_guardar,racks,racks_ch,para_envasar,insumos_dep,stock_total,cajas_pedidas,proy_cajas_mes,capacidad_gondola,es_insumo,visible_en_stock").catch(function(){ return []; });
 
-    // v10.34: Inicializar _stk con Stock_Saldos para renderizar instant (sin esperar Promise.all())
+    // v10.41: Inicializar _stk con stocks_carga_rapida para renderizar instant (sin esperar Promise.all())
     var _demFromView_Rápido = {};
     var _proyMap_Rápido = {};
     (saldosRapido || []).forEach(function (r) {
@@ -10155,7 +10153,7 @@ async function openStockAdmin(soloConteo) {
     var _insFromView_Rápido = (saldosRapido || []).filter(function (r) { return r.es_insumo; }).map(function (r) { return String(r.cod).trim().toUpperCase(); });
 
     _stk = { movs: [], cutoff: {}, factors: {}, ordenes: [], bajadas: [], tab: _solo ? "conteo" : "stocks", soloConteo: _solo, filtro: "", openArt: null, ingMode: "remito", asOf: null, asOfInput: "", dem: _demFromView_Rápido, cap: [], gConf: [], fcs: { pend: {}, porArt: {} }, fcsLoaded: false, insumosCods: _insFromView_Rápido, cxm: {}, proy: _proyMap_Rápido, viewRows: saldosRapido, alertas: [] };
-    stkRender();  // Renderizar instant con Stock_Saldos
+    stkRender();  // Renderizar instant con stocks_carga_rapida
 
     // v10.34: Cargar datos completos en background (sin bloquear)
     Promise.all([stockFetchMovs(), stockGetCutoff(), stockFetchArtFactors(), racksFetchOrdenes(), racksFetchBajadas(), loadArtNombres(), supaFetchAllSafe(SUPABASE_URL + "/rest/v1/vista_stock_procesada", "select=cod,cod_base,descripcion,linea,familia_principal,es_secundario,terminado,excedente,separar_pedidos,a_facturar,a_guardar,racks,racks_ch,para_envasar,insumos_dep,stock_total,cajas_pedidas,proy_cajas_mes,capacidad_gondola,es_insumo,visible_en_stock").catch(function(){ return []; }),
