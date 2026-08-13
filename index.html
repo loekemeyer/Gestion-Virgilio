@@ -3505,6 +3505,90 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
   <div id="npcContainer"><div class="fac-empty">Cargando…</div></div>
 </div>
 
+<!-- ============================================================
+     PASAJE DE PAPELES — Módulo para registrar documentación
+     intercambiada entre Virgilio y Cervantes.
+     ============================================================ -->
+<style id="pasajePapelesCss">
+  #pasajePapelesModal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #f1f5f9; z-index: 200; overflow: auto; padding: 12px; }
+  #pasajePapelesModal.show { display: block; }
+
+  .pp-container { max-width: 1200px; margin: 0 auto; }
+  .pp-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+  .pp-header h1 { font-size: 24px; margin: 0; display: flex; align-items: center; gap: 10px; color: #0f172a; }
+  .pp-close-btn { width: auto; margin: 0; padding: 9px 18px; font-size: 14px; border-radius: 9px; background: #e2e8f0; color: #334155; border: none; cursor: pointer; font-weight: 600; }
+  .pp-close-btn:hover { background: #cbd5e1; }
+
+  /* Tabs */
+  .pp-tabs { display: flex; gap: 12px; margin-bottom: 16px; border-bottom: 2px solid #e2e8f0; }
+  .pp-tab { padding: 12px 20px; cursor: pointer; background: none; border: none; font-size: 15px; font-weight: 600; color: #64748b; border-bottom: 3px solid transparent; margin-bottom: -2px; transition: color .2s, border-color .2s; }
+  .pp-tab:hover { color: #334155; }
+  .pp-tab.active { color: #1e6bd6; border-bottom-color: #1e6bd6; }
+
+  /* Tab content */
+  .pp-tab-content { display: none; }
+  .pp-tab-content.active { display: block; }
+
+  /* Documentación list */
+  .pp-list { display: flex; flex-direction: column; gap: 10px; }
+  .pp-doc-item { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px; display: flex; align-items: center; justify-content: space-between; }
+  .pp-doc-item:hover { border-color: #cbd5e1; box-shadow: 0 2px 8px rgba(0,0,0,.04); }
+
+  .pp-doc-info { flex: 1; }
+  .pp-doc-title { font-size: 15px; font-weight: 700; color: #0f172a; margin-bottom: 4px; }
+  .pp-doc-desc { font-size: 13px; color: #64748b; margin-bottom: 2px; }
+  .pp-doc-date { font-size: 12px; color: #94a3b8; }
+
+  .pp-doc-action { display: flex; gap: 8px; flex-shrink: 0; align-items: center; }
+  .pp-btn-sm { padding: 8px 14px; font-size: 12px; font-weight: 700; border: 1px solid #cbd5e1; border-radius: 7px; background: #fff; color: #334155; cursor: pointer; }
+  .pp-btn-sm:hover { background: #f1f5f9; border-color: #94a3b8; }
+  .pp-btn-sm.sent { background: #dbeafe; color: #1e40af; border-color: #93c5fd; }
+  .pp-btn-sm.received { background: #dcfce7; color: #166534; border-color: #86efac; }
+
+  .pp-empty { text-align: center; padding: 40px 20px; color: #64748b; font-size: 14px; }
+
+  /* Responsive */
+  @media (max-width: 640px) {
+    .pp-header h1 { font-size: 18px; }
+    .pp-doc-item { flex-direction: column; align-items: flex-start; gap: 12px; }
+    .pp-doc-action { width: 100%; }
+  }
+</style>
+
+<div id="pasajePapelesModal">
+  <div class="pp-container">
+    <div class="pp-header">
+      <h1><img class="hdr-logo" src="icon.svg" alt="" style="width:28px;height:28px;">Pasaje de Papeles</h1>
+      <button class="pp-close-btn" onclick="closePasajePapeles()">Cerrar</button>
+    </div>
+
+    <div class="pp-tabs">
+      <button class="pp-tab active" onclick="ppSwitchTab('virgilio')">📄 Virgilio</button>
+      <button class="pp-tab" onclick="ppSwitchTab('cervantes')">📄 Cervantes</button>
+    </div>
+
+    <!-- TAB: Virgilio (documentación recibida → enviar a Cervantes) -->
+    <div id="ppTabVirgilio" class="pp-tab-content active">
+      <div style="margin-bottom:16px;padding:12px;background:#eff6ff;border-radius:9px;border:1px solid #bfdbfe;font-size:13px;color:#1e40af;">
+        <b>Documentación recibida</b> — Listado de todos los papeles que Virgilio recibió y puede marcar como enviados a Cervantes para su procesamiento.
+      </div>
+      <div id="ppVirgilioList" class="pp-list">
+        <div class="pp-empty">Cargando documentación…</div>
+      </div>
+    </div>
+
+    <!-- TAB: Cervantes (documentación enviada por Virgilio → constatar recepción) -->
+    <div id="ppTabCervantes" class="pp-tab-content">
+      <div style="margin-bottom:16px;padding:12px;background:#f0fdf4;border-radius:9px;border:1px solid #bbf7d0;font-size:13px;color:#166534;">
+        <b>Documentación de Virgilio</b> — Listado de papeles que envió Virgilio y deben ser marcados como recibidos por Cervantes.
+      </div>
+      <div id="ppCervantesList" class="pp-list">
+        <div class="pp-empty">Cargando documentación…</div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Badge de versión + estado de cola (abajo a la izquierda) -->
 <div id="versionBadge"></div><!-- vacío a propósito: lo llena el JS (updatePendingIndicator) con APP_VERSION. Si queda VACÍO en pantalla = el JS NO corrió (navegador no soporta el código / error de parseo). NO hardcodear una versión acá: engaña el diagnóstico. -->
 
@@ -3519,6 +3603,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      que ande sin internet en el depósito. -->
 <script src="qrcode.js"></script>
 <script src="planimetria.js?v=3.73"></script>
+<script src="pasaje-papeles.js?v=1.0"></script>
 <!-- Modo OP de Recepción de Mercadería (se abre al tocar RT). Módulo aislado bajo
      #rcpRoot, con su propio cliente Supabase (login anónimo). Portado de la app
      Control-Carga-Remitos-FC. Suma las cajas del día a localStorage para que RT
@@ -3636,6 +3721,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       <button class="sup-action-btn" onclick="showGuardarOrden('')" style="position:relative;"><span class="sup-ico">📋</span><span>Qué bajar primero</span><span id="qbpBadge" class="dp-badge" style="display:none;" title="Urgentes (SOS): góndola < 20% con stock atrás para bajar"></span></button>
       <button class="sup-action-btn" onclick="openCorreccPanel()" style="position:relative;"><span class="sup-ico">🔀</span><span>Corregir códigos de NPs</span><span id="corrBadgeGreen" class="dp-badge" style="left:2px;right:auto;background:#16a34a;display:none;" title="Se pueden corregir pero NO es obligatorio (hay stock del secundario)"></span><span id="corrBadge" class="dp-badge" style="display:none;" title="Hay que corregir SÍ o SÍ (el secundario no tiene stock)"></span></button>
       <button class="sup-action-btn" onclick="openNpConsulta()"><span class="sup-ico">🔎</span><span>Consultar NP / Líos</span></button>
+      <button class="sup-action-btn" onclick="openPasajePapeles()"><span class="sup-ico">📄</span><span>Pasaje de Papeles</span></button>
       <button class="sup-action-btn" onclick="stkOpenNpFaltan()" style="position:relative;"><span class="sup-ico">⚠️</span><span>Pedidos sin cargar en PPP</span><span id="npFaltanBadge" class="dp-badge" style="display:none;"></span></button>
       <button class="sup-action-btn" onclick="stkOpenFaltFact()"><span class="sup-ico">📉</span><span>Faltantes facturados sin completar</span></button>
       <button class="sup-action-btn" onclick="stkOpenProvImp()"><span class="sup-ico">🏭</span><span>Proveedor de importación</span></button>
