@@ -1,0 +1,16 @@
+-- PASAJE DE PAPELES — Alerta Telegram 48h hábiles (2026-08-13)
+--
+-- Función: notificar_pasaje_papeles_48h()
+-- Cron: pasaje-papeles-48h (L-V 10:00 AR = 13:00 UTC)
+--
+-- Busca documentos en Pasaje_Papeles con enviado=false que tengan ≥2 días
+-- hábiles desde created_at. Días hábiles = excluye sáb/dom + planify.feriados.
+-- Manda UN mensaje digest al grupo Faltantes Virgilio (top 10 + total).
+-- dedup_key = 'pp48h_YYYYMMDD' → un aviso por día como máximo.
+--
+-- Columna agregada: Pasaje_Papeles.enviado (boolean, default false)
+--
+-- Para re-avisar un día: DELETE FROM telegram_outbox WHERE dedup_key = 'pp48h_YYYYMMDD';
+-- Para desactivar: SELECT cron.unschedule('pasaje-papeles-48h');
+
+-- La función ya fue deployada con execute_sql. Este archivo es documentación.
