@@ -1,0 +1,51 @@
+-- =====================================================================
+--  fix_trigger_stock_saldos_duplicado_20260813.sql
+--  Arregla el HTTP 400 al ajustar stock (📦 Stock y Compras → Ajustes).
+--
+--  SÍNTOMA
+--    Los botones "Aplicar" y "Fijar" de Ajustes tiraban "Error: HTTP 400" con
+--    CUALQUIER código. No era la app: todo INSERT en Movimientos_Stock fallaba.
+--
+--  CAUSA
+--    Sobre Movimientos_Stock había DOS triggers que actualizan Stock_Saldos:
+--      · trigger_actualizar_saldo_stock → actualizar_saldo_trigger()   ← BUENO
+--        (usa la columna real `cod` y recalcula todos los depósitos)
+--      · trigger_actualizar_saldos      → actualizar_stock_saldos()    ← ROTO
+--        (hace INSERT ... (cod_art, deposito, ...) en Stock_Saldos, pero esa
+--         tabla NO tiene columna `cod_art` — su clave es `cod`). Explotaba con
+--         "column cod_art of relation Stock_Saldos does not exist" → 400.
+--    El roto quedó colgado y rompía todos los inserts. Apareció el 13/08
+--    (el último ajuste manual OK fue ese mismo día 09:11).
+--
+--  FIX
+--    Borrar el trigger roto (y su función, que no la usa nadie más — verificado
+--    con pg_trigger). El bueno queda y mantiene los saldos igual que antes.
+--    NO toca datos: Stock_Saldos se sigue actualizando por el trigger bueno.
+--
+--  BACKUP de la función rota (para restore) — se guarda al pie de este archivo.
+-- =====================================================================
+
+DROP TRIGGER IF EXISTS trigger_actualizar_saldos ON public."Movimientos_Stock";
+DROP FUNCTION IF EXISTS public.actualizar_stock_saldos();
+
+-- ---------- RESTORE (si alguna vez hiciera falta volver atrás) ----------
+-- La función rota era, textual:
+--
+-- CREATE OR REPLACE FUNCTION public.actualizar_stock_saldos()
+--  RETURNS trigger LANGUAGE plpgsql AS $function$
+-- BEGIN
+--   INSERT INTO "Stock_Saldos" (cod_art, deposito, saldo_total, actualizado_en)
+--   VALUES (
+--     NEW.cod_art, NEW.deposito,
+--     (SELECT SUM(CAST(delta AS NUMERIC)) FROM "Movimientos_Stock"
+--      WHERE cod_art = NEW.cod_art AND deposito = NEW.deposito),
+--     NOW())
+--   ON CONFLICT (cod_art, deposito) DO UPDATE SET
+--     saldo_total = EXCLUDED.saldo_total, actualizado_en = NOW();
+--   RETURN NEW;
+-- END; $function$;
+-- CREATE TRIGGER trigger_actualizar_saldos AFTER INSERT OR UPDATE
+--   ON public."Movimientos_Stock" FOR EACH ROW
+--   EXECUTE FUNCTION public.actualizar_stock_saldos();
+-- (⚠ ojo: referenciaba columnas cod_art que Stock_Saldos NO tiene — por eso rompía.)
+-- =====================================================================
