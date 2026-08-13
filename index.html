@@ -6546,7 +6546,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v10.39";
+const APP_VERSION = "v10.40";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -12934,7 +12934,10 @@ function stkBodyStocks() {
     '<input class="stk-filtro" style="margin:0;flex:1 1 170px;min-width:120px;max-width:300px;" type="text" enterkeyhint="search" autocomplete="off" placeholder="🔎 códigos (varios: 026 031 508)" value="' + escapeHtml(_stk.filtro) + '" oninput="if(_stk){_stk.filtro=this.value;stkRender();}">' +
     '<button type="button" onclick="stkFiltroToggleE()" title="Agregar/quitar la E (importado)" style="width:auto;margin:0;flex:0 0 auto;padding:0 14px;height:38px;border:1.5px solid #cbd5e1;border-radius:9px;background:#fff;font-weight:800;font-size:16px;cursor:pointer;">E</button>' +
     _linBtn("LK") + _linBtn("CH") +
-    '<button type="button" onclick="stkToggleSoloNeg()" title="Mostrar sólo los artículos con saldo NEGATIVO en algún depósito (góndola, racks, a facturar, etc.)" style="width:auto;margin:0;flex:0 0 auto;padding:0 11px;height:38px;border:1.5px solid ' + (_stk.soloNeg ? "#dc2626" : "#cbd5e1") + ';border-radius:9px;background:' + (_stk.soloNeg ? "#fef2f2" : "#fff") + ';color:' + (_stk.soloNeg ? "#b91c1c" : "#334155") + ';font-weight:800;font-size:13px;cursor:pointer;white-space:nowrap;">' + (_stk.soloNeg ? "☑" : "☐") + ' 🔴 Negativos' + (_stkNegCount ? " (" + _stkNegCount + ")" : "") + '</button>' +
+    // v10.40 — el botón Negativos solo se puede tocar si HAY negativos; si no, queda deshabilitado (gris).
+    (_stkNegCount > 0
+      ? '<button type="button" onclick="stkToggleSoloNeg()" title="Mostrar sólo los artículos con saldo NEGATIVO en algún depósito (góndola, racks, a facturar, etc.)" style="width:auto;margin:0;flex:0 0 auto;padding:0 11px;height:38px;border:1.5px solid ' + (_stk.soloNeg ? "#dc2626" : "#cbd5e1") + ';border-radius:9px;background:' + (_stk.soloNeg ? "#fef2f2" : "#fff") + ';color:' + (_stk.soloNeg ? "#b91c1c" : "#334155") + ';font-weight:800;font-size:13px;cursor:pointer;white-space:nowrap;">' + (_stk.soloNeg ? "☑" : "☐") + ' 🔴 Negativos (' + _stkNegCount + ')</button>'
+      : '<button type="button" disabled title="No hay stock negativo — nada para filtrar" style="width:auto;margin:0;flex:0 0 auto;padding:0 11px;height:38px;border:1.5px solid #e2e8f0;border-radius:9px;background:#f8fafc;color:#cbd5e1;font-weight:800;font-size:13px;cursor:default;white-space:nowrap;">☐ 🔴 Negativos</button>') +
     '<button type="button" onclick="stkToggleSoloLow()" title="Mostrar sólo los códigos donde la suma de depósitos (góndola+excedente+pickeados+a facturar+a guardar+racks) es MENOR que lo pedido" style="width:auto;margin:0;flex:0 0 auto;padding:0 11px;height:38px;border:1.5px solid ' + (_stk.soloLow ? "#dc2626" : "#cbd5e1") + ';border-radius:9px;background:' + (_stk.soloLow ? "#fef2f2" : "#fff") + ';color:' + (_stk.soloLow ? "#b91c1c" : "#334155") + ';font-weight:800;font-size:13px;cursor:pointer;white-space:nowrap;">' + (_stk.soloLow ? "☑" : "☐") + ' ⚠ Stock bajo' + (_stkLowCount ? " (" + _stkLowCount + ")" : "") + '</button>' +
     '<button type="button" onclick="stkToggleSoloPin()" title="Mostrar sólo los códigos que fijaste (📌). Se guardan aunque cierres la app." style="width:auto;margin:0;flex:0 0 auto;padding:0 11px;height:38px;border:1.5px solid ' + (_stk.soloPin ? "#b45309" : "#cbd5e1") + ';border-radius:9px;background:' + (_stk.soloPin ? "#fffbeb" : "#fff") + ';color:' + (_stk.soloPin ? "#b45309" : "#334155") + ';font-weight:800;font-size:13px;cursor:pointer;white-space:nowrap;">' + (_stk.soloPin ? "☑" : "📌") + ' Fijados' + ((_stk.pins || []).length ? " (" + _stk.pins.length + ")" : "") + '</button>' +
     '</div>';
@@ -12974,6 +12977,14 @@ function stkBodyStocks() {
     _stk._histDeps = hs;
   }
   const _histDeps = _stk._histDeps;
+  // v10.40 — orden: FIJADOS siempre arriba; y si hay NEGATIVOS, primero de todo (para verlos apenas se entra).
+  shown.sort(function (a, b) {
+    const an = _stkArtHasNeg(a) ? 1 : 0, bn = _stkArtHasNeg(b) ? 1 : 0;
+    if (an !== bn) return bn - an;                       // negativos primero
+    const ap = _pinSet.has(String(a.cod).trim().toUpperCase()) ? 1 : 0, bp = _pinSet.has(String(b.cod).trim().toUpperCase()) ? 1 : 0;
+    if (ap !== bp) return bp - ap;                       // fijados arriba
+    return 0;                                            // resto: orden original (sort estable)
+  });
   shown.forEach(function (a) {
     const _tot = SECTKEYS.reduce(function (s, k) { return s + (Number(a[k]) || 0); }, 0) + (Number(a.racks_ch) || 0);  // v7.54: racks_ch sumado al total
     const _ped = _demOf(a.cod);
