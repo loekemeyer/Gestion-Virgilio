@@ -28146,10 +28146,20 @@ if (window.__pendingMonitorParam && (_keyValid || _kioskEnrolled)) {
   // auto-abrimos DIRECTO la vista que pide la URL (?monitor=tv/fc/incons): es
   // una pantalla de pared, no queremos que alguien tenga que tocar el botón en
   // cada recarga. Si esa vista se cierra, queda el panel detrás para elegir otra.
-  window.addEventListener("load", () => {
+  // v10.34: ejecutar en load O si ya pasó
+  const runOnLoad = () => {
     try { showKioskAdminPanel(); } catch (_e) {}
     try { if (typeof window.maybeAutoOpenMonitor === "function") window.maybeAutoOpenMonitor(); } catch (_e) {}
-    initStkBadge().catch(_e => console.error('initStkBadge error:', _e));  // v10.34: carga badge de stock en page load
+    console.log('runOnLoad: iniciando initStkBadge');
+    initStkBadge().catch(_e => console.error('initStkBadge error:', _e));
+  };
+  if (document.readyState === 'complete' || document.readyState === 'loaded') {
+    console.log('runOnLoad: documento ya cargado, ejecutando ahora');
+    runOnLoad();
+  } else {
+    console.log('runOnLoad: esperando load event');
+    window.addEventListener("load", runOnLoad);
+  }
     // v5.94: la TV de pared es un aparato barato (poca RAM). Corriendo 24/7 la
     // memoria se llena y Chrome mata la pestaña ("¡Vaya!"/Aw-Snap) cada ~15 min.
     // Se recarga sola cada 10 min → arranca limpia antes de llenarse (reload de
