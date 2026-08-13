@@ -1,7 +1,7 @@
 /**
  * Módulo Pasaje de Papeles
  * Gestiona documentación intercambiada entre Virgilio y Cervantes
- * v1.1 - Conexión Supabase + Pop-up de captura
+ * v1.2 - Usa fetch + REST (no depende de sb del scope de initAuth)
  */
 
 let _ppState = {
@@ -10,6 +10,13 @@ let _ppState = {
   cervantesData: [],
   loading: false
 };
+
+/* Helper: headers para Supabase REST con anon key */
+function _ppHeaders(extra) {
+  var h = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' };
+  if (extra) Object.keys(extra).forEach(function (k) { h[k] = extra[k]; });
+  return h;
+}
 
 /**
  * Abre el modal de Pasaje de Papeles
@@ -31,26 +38,16 @@ function closePasajePapeles() {
 }
 
 /**
- * Cambia entre pestañas (Virgilio/Cervantes)
+ * Cambia de pestaña
  */
-function ppSwitchTab(tabName) {
-  _ppState.activeTab = tabName;
-
-  // Actualizar botones de tab
-  document.querySelectorAll('.pp-tab').forEach(btn => {
-    btn.classList.remove('active');
-  });
-  event.target.classList.add('active');
-
-  // Mostrar/ocultar contenido
-  document.getElementById('ppTabVirgilio').classList.remove('active');
-  document.getElementById('ppTabCervantes').classList.remove('active');
-
-  if (tabName === 'virgilio') {
-    document.getElementById('ppTabVirgilio').classList.add('active');
-  } else {
-    document.getElementById('ppTabCervantes').classList.add('active');
-  }
+function ppSwitchTab(tab) {
+  _ppState.activeTab = tab;
+  document.querySelectorAll('.pp-tab').forEach(function (el) { el.classList.remove('active'); });
+  var activeBtn = document.querySelector('.pp-tab[data-tab="' + tab + '"]');
+  if (activeBtn) activeBtn.classList.add('active');
+  document.querySelectorAll('.pp-tab-content').forEach(function (el) { el.style.display = 'none'; });
+  var activeContent = document.getElementById('ppTab_' + tab);
+  if (activeContent) activeContent.style.display = 'block';
 }
 
 /**
@@ -62,23 +59,16 @@ async function ppLoadData() {
 
   try {
     // Cargar Virgilio (mercadería + insumos recibidos, pendientes de enviar a Cervantes)
-    const virRes = await sb.from('Pasaje_Papeles')
-      .select('*')
-      .eq('planta', 'virgilio')
-      .order('created_at', { ascending: false })
-      .limit(1000);
-
-    _ppState.virgilioData = virRes.data || [];
+    var virRes = await fetch(SUPABASE_URL + '/rest/v1/Pasaje_Papeles?planta=eq.virgilio&order=created_at.desc&limit=1000&select=*', {
+      headers: _ppHeaders(), cache: 'no-store'
+    }).then(function (r) { return r.ok ? r.json() : []; });
+    _ppState.virgilioData = virRes || [];
 
     // Cargar Cervantes (documentación enviada por Virgilio, pendiente de confirmar)
-    const cerRes = await sb.from('Pasaje_Papeles')
-      .select('*')
-      .eq('planta', 'cervantes')
-      .eq('enviado_a_cervantes', true)
-      .order('created_at', { ascending: false })
-      .limit(1000);
-
-    _ppState.cervantesData = cerRes.data || [];
+    var cerRes = await fetch(SUPABASE_URL + '/rest/v1/Pasaje_Papeles?planta=eq.cervantes&enviado_a_cervantes=eq.true&order=created_at.desc&limit=1000&select=*', {
+      headers: _ppHeaders(), cache: 'no-store'
+    }).then(function (r) { return r.ok ? r.json() : []; });
+    _ppState.cervantesData = cerRes || [];
   } catch (e) {
     console.error('ppLoadData error:', e);
   }
@@ -94,56 +84,45 @@ async function ppLoadData() {
 function ppFormatDate(dateStr) {
   if (!dateStr) return '—';
   try {
-    const d = new Date(dateStr);
-    return d.toLocaleDateString('es-AR');
-  } catch {
-    return dateStr;
-  }
+    return new Date(dateStr).toLocaleDateString('es-AR', {
+      timeZone: 'America/Argentina/Buenos_Aires',
+      day: '2-digit', month: '2-digit', year: 'numeric'
+    });
+  } catch (e) { return dateStr; }
 }
 
 /**
- * Renderiza la pestaña de Virgilio
- * Muestra documentación recibida que puede marcar como enviada a Cervantes
+ * Renderiza tabla Virgilio
  */
 function ppRenderVirgilio() {
-  const container = document.getElementById('ppVirgilioList');
+  const container = document.getElementById('ppTab_virgilio');
   if (!container) return;
 
-  if (_ppState.virgilioData.length === 0) {
-    container.innerHTML = '<div class="pp-empty">Sin documentación registrada todavía</div>';
+  const data = _ppState.virgilioData;
+  if (!data.length) {
+    container.innerHTML = '<div style="padding:20px;text-align:center;color:#64748b;">Sin documentación pendiente</div>';
     return;
   }
 
-  let html = '<table style="width:100%;border-collapse:collapse;font-size:13px;">' +
-    '<thead style="background:#f1f5f9;sticky;top:0;">' +
-    '<tr>' +
-      '<th style="padding:10px;text-align:left;border-bottom:1px solid #cbd5e1;">Fecha Emisión</th>' +
-      '<th style="padding:10px;text-align:left;border-bottom:1px solid #cbd5e1;">Fecha Recepción</th>' +
-      '<th style="padding:10px;text-align:left;border-bottom:1px solid #cbd5e1;">Tipo Doc</th>' +
-      '<th style="padding:10px;text-align:left;border-bottom:1px solid #cbd5e1;">Razón Social</th>' +
-      '<th style="padding:10px;text-align:left;border-bottom:1px solid #cbd5e1;">Tipo</th>' +
-      '<th style="padding:10px;text-align:left;border-bottom:1px solid #cbd5e1;">Fecha DDJJ</th>' +
-      '<th style="padding:10px;text-align:center;border-bottom:1px solid #cbd5e1;">Acción</th>' +
-    '</tr>' +
-    '</thead><tbody>';
+  let html = '<table class="stk-tbl" style="font-size:13px;"><thead><tr>' +
+    '<th>Fecha</th><th>Tipo Doc</th><th>Razón Social</th><th>Contenido</th><th>Estado</th><th></th>' +
+    '</tr></thead><tbody>';
 
-  _ppState.virgilioData.forEach(doc => {
-    const status = doc.enviado_a_cervantes ? 'sent' : '';
-    const btnText = doc.enviado_a_cervantes ? '✓ Enviado' : 'Marcar enviado';
-    const btnClass = status ? 'pp-btn-sm sent' : 'pp-btn-sm';
+  data.forEach(function (row) {
+    const estado = row.enviado_a_cervantes
+      ? '<span style="color:#16a34a;font-weight:700;">✅ Enviado</span>'
+      : '<span style="color:#dc2626;font-weight:700;">⏳ Pendiente</span>';
+    const acciones = row.enviado_a_cervantes
+      ? ''
+      : '<button class="stk-btn ok" onclick="ppMarkSent(' + row.id + ')" style="font-size:12px;padding:4px 10px;">Marcar enviado</button>';
 
     html += '<tr>' +
-      '<td style="padding:10px;border-bottom:1px solid #e2e8f0;">' + ppFormatDate(doc.fecha_emision) + '</td>' +
-      '<td style="padding:10px;border-bottom:1px solid #e2e8f0;">' + ppFormatDate(doc.fecha_recepcion) + '</td>' +
-      '<td style="padding:10px;border-bottom:1px solid #e2e8f0;">' + (doc.tipo_documento || '—') + '</td>' +
-      '<td style="padding:10px;border-bottom:1px solid #e2e8f0;">' + (doc.razon_social || '—') + '</td>' +
-      '<td style="padding:10px;border-bottom:1px solid #e2e8f0;">' + (doc.tipo_contenido || '—') + '</td>' +
-      '<td style="padding:10px;border-bottom:1px solid #e2e8f0;">' + ppFormatDate(doc.fecha_ddjj) + '</td>' +
-      '<td style="padding:10px;border-bottom:1px solid #e2e8f0;text-align:center;">' +
-        '<button class="' + btnClass + '" onclick="ppMarkSent(' + doc.id + ')" ' + (doc.enviado_a_cervantes ? 'disabled' : '') + '>' +
-          btnText +
-        '</button>' +
-      '</td>' +
+      '<td>' + ppFormatDate(row.fecha_emision) + '</td>' +
+      '<td>' + (row.tipo_documento || '—') + '</td>' +
+      '<td>' + (row.razon_social || '—') + '</td>' +
+      '<td>' + (row.tipo_contenido || '—') + '</td>' +
+      '<td>' + estado + '</td>' +
+      '<td>' + acciones + '</td>' +
     '</tr>';
   });
 
@@ -152,46 +131,37 @@ function ppRenderVirgilio() {
 }
 
 /**
- * Renderiza la pestaña de Cervantes
- * Muestra documentación enviada por Virgilio para confirmar recepción
+ * Renderiza tabla Cervantes
  */
 function ppRenderCervantes() {
-  const container = document.getElementById('ppCervantesList');
+  const container = document.getElementById('ppTab_cervantes');
   if (!container) return;
 
-  if (_ppState.cervantesData.length === 0) {
-    container.innerHTML = '<div class="pp-empty">Sin documentación pendiente de Virgilio</div>';
+  const data = _ppState.cervantesData;
+  if (!data.length) {
+    container.innerHTML = '<div style="padding:20px;text-align:center;color:#64748b;">Sin documentación pendiente de confirmar</div>';
     return;
   }
 
-  let html = '<table style="width:100%;border-collapse:collapse;font-size:13px;">' +
-    '<thead style="background:#f0fdf4;sticky;top:0;">' +
-    '<tr>' +
-      '<th style="padding:10px;text-align:left;border-bottom:1px solid #bbf7d0;">Fecha Emisión</th>' +
-      '<th style="padding:10px;text-align:left;border-bottom:1px solid #bbf7d0;">Enviado por V.</th>' +
-      '<th style="padding:10px;text-align:left;border-bottom:1px solid #bbf7d0;">Tipo Doc</th>' +
-      '<th style="padding:10px;text-align:left;border-bottom:1px solid #bbf7d0;">Razón Social</th>' +
-      '<th style="padding:10px;text-align:left;border-bottom:1px solid #bbf7d0;">Tipo</th>' +
-      '<th style="padding:10px;text-align:center;border-bottom:1px solid #bbf7d0;">Acción</th>' +
-    '</tr>' +
-    '</thead><tbody>';
+  let html = '<table class="stk-tbl" style="font-size:13px;"><thead><tr>' +
+    '<th>Fecha</th><th>Tipo Doc</th><th>Razón Social</th><th>Contenido</th><th>Estado</th><th></th>' +
+    '</tr></thead><tbody>';
 
-  _ppState.cervantesData.forEach(doc => {
-    const status = doc.confirmado ? 'received' : '';
-    const btnText = doc.confirmado ? '✓ Confirmado' : 'Confirmar recepción';
-    const btnClass = status ? 'pp-btn-sm received' : 'pp-btn-sm';
+  data.forEach(function (row) {
+    const estado = row.confirmado
+      ? '<span style="color:#16a34a;font-weight:700;">✅ Confirmado</span>'
+      : '<span style="color:#f59e0b;font-weight:700;">📨 Recibido (sin confirmar)</span>';
+    const acciones = row.confirmado
+      ? ''
+      : '<button class="stk-btn ok" onclick="ppMarkReceived(' + row.id + ')" style="font-size:12px;padding:4px 10px;">Confirmar recepción</button>';
 
-    html += '<tr style="background:' + (doc.confirmado ? '#f0fdf4' : '#fff') + ';">' +
-      '<td style="padding:10px;border-bottom:1px solid #bbf7d0;">' + ppFormatDate(doc.fecha_emision) + '</td>' +
-      '<td style="padding:10px;border-bottom:1px solid #bbf7d0;">' + ppFormatDate(doc.fecha_recepcion) + '</td>' +
-      '<td style="padding:10px;border-bottom:1px solid #bbf7d0;">' + (doc.tipo_documento || '—') + '</td>' +
-      '<td style="padding:10px;border-bottom:1px solid #bbf7d0;">' + (doc.razon_social || '—') + '</td>' +
-      '<td style="padding:10px;border-bottom:1px solid #bbf7d0;">' + (doc.tipo_contenido || '—') + '</td>' +
-      '<td style="padding:10px;border-bottom:1px solid #bbf7d0;text-align:center;">' +
-        '<button class="' + btnClass + '" onclick="ppMarkReceived(' + doc.id + ')" ' + (doc.confirmado ? 'disabled' : '') + '>' +
-          btnText +
-        '</button>' +
-      '</td>' +
+    html += '<tr>' +
+      '<td>' + ppFormatDate(row.fecha_emision) + '</td>' +
+      '<td>' + (row.tipo_documento || '—') + '</td>' +
+      '<td>' + (row.razon_social || '—') + '</td>' +
+      '<td>' + (row.tipo_contenido || '—') + '</td>' +
+      '<td>' + estado + '</td>' +
+      '<td>' + acciones + '</td>' +
     '</tr>';
   });
 
@@ -204,9 +174,11 @@ function ppRenderCervantes() {
  */
 async function ppMarkSent(docId) {
   try {
-    await sb.from('Pasaje_Papeles')
-      .update({ enviado_a_cervantes: true })
-      .eq('id', docId);
+    await fetch(SUPABASE_URL + '/rest/v1/Pasaje_Papeles?id=eq.' + docId, {
+      method: 'PATCH',
+      headers: _ppHeaders({ Prefer: 'return=minimal' }),
+      body: JSON.stringify({ enviado_a_cervantes: true })
+    });
     ppLoadData();
   } catch (e) {
     console.error('ppMarkSent error:', e);
@@ -219,12 +191,11 @@ async function ppMarkSent(docId) {
  */
 async function ppMarkReceived(docId) {
   try {
-    await sb.from('Pasaje_Papeles')
-      .update({
-        confirmado: true,
-        fecha_confirmacion: new Date().toISOString()
-      })
-      .eq('id', docId);
+    await fetch(SUPABASE_URL + '/rest/v1/Pasaje_Papeles?id=eq.' + docId, {
+      method: 'PATCH',
+      headers: _ppHeaders({ Prefer: 'return=minimal' }),
+      body: JSON.stringify({ confirmado: true, fecha_confirmacion: new Date().toISOString() })
+    });
     ppLoadData();
   } catch (e) {
     console.error('ppMarkReceived error:', e);
@@ -240,38 +211,16 @@ async function ppMarkReceived(docId) {
 function ppShowCaptureDialog(tipoContenido) {
   const titulo = tipoContenido === 'mercaderia' ? 'Nueva documentación — Mercadería recibida' : 'Nueva documentación — Insumo recibido';
 
-  const html = `
-    <div style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;" onclick="if(event.target===this)ppCloseCaptureDialog()">
-      <div style="background:#fff;border-radius:12px;padding:24px;max-width:480px;width:100%;box-shadow:0 20px 25px rgba(0,0,0,.15);">
-        <h2 style="margin:0 0 16px;font-size:18px;color:#0f172a;">${titulo}</h2>
-
-        <div style="margin-bottom:14px;">
-          <label style="display:block;font-size:13px;font-weight:600;color:#475569;margin-bottom:4px;">Fecha de emisión *</label>
-          <input type="date" id="ppCaptureDate" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;box-sizing:border-box;font-size:14px;">
-        </div>
-
-        <div style="margin-bottom:14px;">
-          <label style="display:block;font-size:13px;font-weight:600;color:#475569;margin-bottom:4px;">Tipo de documento *</label>
-          <select id="ppCaptureDocType" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;box-sizing:border-box;font-size:14px;">
-            <option value="">Seleccionar...</option>
-            <option value="factura">Factura</option>
-            <option value="remito">Remito</option>
-            <option value="ambos">Factura + Remito</option>
-          </select>
-        </div>
-
-        <div style="margin-bottom:20px;">
-          <label style="display:block;font-size:13px;font-weight:600;color:#475569;margin-bottom:4px;">Razón Social *</label>
-          <input type="text" id="ppCaptureRazonSocial" placeholder="Nombre del proveedor" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;box-sizing:border-box;font-size:14px;">
-        </div>
-
-        <div style="display:flex;gap:10px;justify-content:flex-end;">
-          <button onclick="ppCloseCaptureDialog()" style="padding:10px 20px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#334155;font-weight:600;cursor:pointer;">Cancelar</button>
-          <button onclick="ppSaveDocument('${tipoContenido}')" style="padding:10px 20px;border:none;border-radius:8px;background:#1e6bd6;color:#fff;font-weight:600;cursor:pointer;">Guardar</button>
-        </div>
-      </div>
-    </div>
-  `;
+  const html = '<div style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;" onclick="if(event.target===this)ppCloseCaptureDialog()">' +
+    '<div style="background:#fff;border-radius:12px;padding:24px;max-width:480px;width:100%;box-shadow:0 20px 25px rgba(0,0,0,.15);">' +
+    '<h2 style="margin:0 0 16px;font-size:18px;color:#0f172a;">' + titulo + '</h2>' +
+    '<div style="margin-bottom:14px;"><label style="display:block;font-size:13px;font-weight:600;color:#475569;margin-bottom:4px;">Fecha de emisión *</label><input type="date" id="ppCaptureDate" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;box-sizing:border-box;font-size:14px;"></div>' +
+    '<div style="margin-bottom:14px;"><label style="display:block;font-size:13px;font-weight:600;color:#475569;margin-bottom:4px;">Tipo de documento *</label><select id="ppCaptureDocType" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;box-sizing:border-box;font-size:14px;"><option value="">Seleccionar...</option><option value="factura">Factura</option><option value="remito">Remito</option><option value="ambos">Factura + Remito</option></select></div>' +
+    '<div style="margin-bottom:20px;"><label style="display:block;font-size:13px;font-weight:600;color:#475569;margin-bottom:4px;">Razón Social *</label><input type="text" id="ppCaptureRazonSocial" placeholder="Nombre del proveedor" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;box-sizing:border-box;font-size:14px;"></div>' +
+    '<div style="display:flex;gap:10px;justify-content:flex-end;">' +
+    '<button onclick="ppCloseCaptureDialog()" style="padding:10px 20px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#334155;font-weight:600;cursor:pointer;">Cancelar</button>' +
+    '<button onclick="ppSaveDocument(\'' + tipoContenido + '\')" style="padding:10px 20px;border:none;border-radius:8px;background:#1e6bd6;color:#fff;font-weight:600;cursor:pointer;">Guardar</button>' +
+    '</div></div></div>';
 
   const container = document.createElement('div');
   container.id = 'ppCaptureOverlay';
@@ -291,9 +240,9 @@ function ppCloseCaptureDialog() {
  * Guarda el documento capturado en Supabase
  */
 async function ppSaveDocument(tipoContenido) {
-  const fecha = document.getElementById('ppCaptureDate')?.value;
-  const tipoDoc = document.getElementById('ppCaptureDocType')?.value;
-  const razonSocial = document.getElementById('ppCaptureRazonSocial')?.value;
+  const fecha = document.getElementById('ppCaptureDate') ? document.getElementById('ppCaptureDate').value : '';
+  const tipoDoc = document.getElementById('ppCaptureDocType') ? document.getElementById('ppCaptureDocType').value : '';
+  const razonSocial = document.getElementById('ppCaptureRazonSocial') ? document.getElementById('ppCaptureRazonSocial').value : '';
 
   if (!fecha || !tipoDoc || !razonSocial) {
     alert('Completá todos los campos');
@@ -301,14 +250,23 @@ async function ppSaveDocument(tipoContenido) {
   }
 
   try {
-    await sb.from('Pasaje_Papeles').insert({
-      planta: 'virgilio',
-      tipo_documento: tipoDoc,
-      razon_social: razonSocial,
-      tipo_contenido: tipoContenido,
-      fecha_emision: fecha,
-      legajo_usuario: (typeof legajoInput !== 'undefined' && legajoInput?.value) || null
+    var res = await fetch(SUPABASE_URL + '/rest/v1/Pasaje_Papeles', {
+      method: 'POST',
+      headers: _ppHeaders({ Prefer: 'return=minimal' }),
+      body: JSON.stringify({
+        planta: 'virgilio',
+        tipo_documento: tipoDoc,
+        razon_social: razonSocial,
+        tipo_contenido: tipoContenido,
+        fecha_emision: fecha,
+        legajo_usuario: (typeof legajoInput !== 'undefined' && legajoInput && legajoInput.value) ? legajoInput.value : null
+      })
     });
+
+    if (!res.ok) {
+      var errText = await res.text().catch(function () { return 'HTTP ' + res.status; });
+      throw new Error(errText);
+    }
 
     ppCloseCaptureDialog();
     openPasajePapeles();
