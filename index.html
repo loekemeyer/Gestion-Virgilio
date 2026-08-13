@@ -10203,7 +10203,23 @@ async function openStockAdmin(soloConteo) {
       _stk.insumosCods = _insFromView;
       _stk.cxm = _cxmMerge;
       _stk.proy = _proyMap;
-      _stk.viewRows = _viewRows;  // Actualizar con vista_stock_procesada completa
+      // v10.42: NO pisar viewRows — stocks_carga_rapida es la fuente principal
+      // (saldos instantáneos vía trigger + realtime). La vista se guarda aparte
+      // para detalle/historial y para actualizar campos derivados en viewRows.
+      _stk._vistaRows = _viewRows;
+      // Actualizar campos derivados (cajas_pedidas, proy, cap, linea, desc) en viewRows desde la vista
+      var _vistaMap = {};
+      _viewRows.forEach(function (r) { _vistaMap[_ocgNorm(r.cod)] = r; });
+      (_stk.viewRows || []).forEach(function (r) {
+        var vr = _vistaMap[_ocgNorm(r.cod)];
+        if (vr) {
+          r.cajas_pedidas = vr.cajas_pedidas;
+          r.proy_cajas_mes = vr.proy_cajas_mes;
+          r.capacidad_gondola = vr.capacidad_gondola;
+          if (vr.descripcion) r.descripcion = vr.descripcion;
+          if (vr.linea) r.linea = vr.linea;
+        }
+      });
       _stk.alertas = res[13] || [];
       _stk._mergeComplete = true;
       stkRender();  // Render suave (mantiene scroll/focus)
@@ -12867,7 +12883,7 @@ function stkBodyStocks() {
   // v8.88: también detecta marca del sufijo del código (desconcatenación)
   if (_stk.filLinea) shown = shown.filter(function (a) {
     var _sfx = String(a.cod || "").match(/\s+(LK|CH|LOKE)$/i);
-    var _marca = _sfx ? _sfx[1].toUpperCase().replace("LOKE", "LK") : ocLinea(a.cod);
+    var _marca = _sfx ? _sfx[1].toUpperCase().replace("LOKE", "LK") : (ocLinea(a.cod) || String(a.linea || "").toUpperCase().trim() || "");
     return _marca === _stk.filLinea;
   });
   // v8.95 — filtro rápido por columna: tocar el header de una columna muestra solo las filas
@@ -13011,7 +13027,7 @@ function stkBodyStocks() {
     // v8.88 — desconcatenación: si el código tiene sufijo LK/CH/LOKE, la marca
     // sale del propio código (no de OC_Maximos); y en CÓDIGO se muestra el base.
     const _codSuffix = String(a.cod || "").match(/\s+(LK|CH|LOKE)$/i);
-    const _lin = _codSuffix ? _codSuffix[1].toUpperCase().replace("LOKE", "LK") : ocLinea(a.cod);
+    const _lin = _codSuffix ? _codSuffix[1].toUpperCase().replace("LOKE", "LK") : (ocLinea(a.cod) || String(a.linea || "").toUpperCase().trim() || "");
     // v10.02 — mostrar SIEMPRE el código canónico con cero(s) a la izquierda (026, 035E). La vista
     // vista_stock_procesada (v10.00) devuelve el código sin ceros ("26"), así que se re-pad acá.
     const _codDisplay = codCanon(_codSuffix ? codBase(a.cod) : a.cod);
