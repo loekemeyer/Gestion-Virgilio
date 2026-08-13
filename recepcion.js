@@ -466,8 +466,10 @@ opBack.onclick = () => {
   if (opState.step === "tipo" || opState.step === "pend" || opState.step === "racks" || opState.step === "hist" || opState.step === "histbaj") renderMenu();
   else if (opState.step === "lista") renderTipoElegir();
   else if (opState.step === "linea") renderLista(opState.tipo);
+  else if (opState.step === "tipoDoc") renderLinea();
+  else if (opState.step === "docFields") renderTipoDoc();
   else if (opState.step === "remito") renderLinea();
-  else if (opState.step === "articulos") renderRemito();
+  else if (opState.step === "articulos") renderDocFields();
   else if (opState.step === "resumen") renderArticulos();
 };
 
@@ -708,7 +710,7 @@ function renderLinea() {
       if (opState.linea !== lineCode) { opState.articulos = null; opState.cargas = {}; }
       opState.linea = lineCode;
       if (opState.tipo === 'tallerista') opState.tallCod = cods[lineCode];
-      renderRemito();
+      renderTipoDoc();
     };
     row.appendChild(b);
   });
@@ -716,97 +718,124 @@ function renderLinea() {
   rcpDraftSave();
 }
 
-/* ============== Paso 3: N° RTO/FC ============== */
-function renderRemito() {
-  opState.step = "remito";
+/* ============== Paso 3: ¿Qué documentación recibís? ============== */
+function renderTipoDoc() {
+  opState.step = "tipoDoc";
   opSetBack(true);
   opTitle.textContent = displayName(opState.tallNombre);
   opSubtitle.textContent = opState.linea + " · " + fechaCorta(opState.fecha);
-
   opBody.innerHTML = "";
 
-  const actRow = document.createElement("div");
-  actRow.style.display = "flex";
-  actRow.style.justifyContent = "flex-end";
-  actRow.style.marginBottom = "16px";
-  const cont = document.createElement("button");
-  cont.className = "btnSend btnBig";
-  cont.textContent = "Continuar";
-  cont.disabled = opState.remito.length === 0;
-  cont.onclick = () => { if (opState.remito.length > 0) renderArticulos(); };
-  actRow.appendChild(cont);
-  opBody.appendChild(actRow);
+  const heading = document.createElement("div");
+  heading.style.cssText = "font-size:15px;font-weight:700;color:#475569;margin-bottom:14px;";
+  heading.textContent = "¿Qué documentación recibís?";
+  opBody.appendChild(heading);
 
-  // --- Tipo de entrega: Remito / Remito+Factura ---
-  const tipoField = document.createElement("div");
-  tipoField.className = "opField";
-  tipoField.innerHTML = '<label>Qué entrega</label>';
-  const tipoBtns = document.createElement("div");
-  tipoBtns.style.cssText = "display:flex;gap:10px;margin-top:6px;";
-  if (!opState.tipoEntrega) opState.tipoEntrega = "";
-  const _ppTipos = [
-    { key: "remito", label: "Remito" },
-    { key: "remito_factura", label: "Remito + Factura" }
+  const tipos = [
+    { key: "remito", label: "📄 Remito", color: "#4f46e5" },
+    { key: "factura", label: "🧾 Factura", color: "#0d9488" },
+    { key: "remito_factura", label: "📄🧾 Remito y Factura", color: "#1e6bd6" }
   ];
-  _ppTipos.forEach(t => {
+  tipos.forEach(t => {
     const b = document.createElement("button");
     b.type = "button";
     b.textContent = t.label;
-    const on = opState.tipoEntrega === t.key;
-    b.style.cssText = "flex:1;padding:12px 8px;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;border:2px solid " + (on ? "#1e6bd6" : "#cbd5e1") + ";background:" + (on ? "#eff6ff" : "#fff") + ";color:" + (on ? "#1e40af" : "#334155") + ";";
-    b.onclick = () => { opState.tipoEntrega = t.key; renderRemito(); };
-    tipoBtns.appendChild(b);
+    b.style.cssText = "width:100%;padding:18px;margin-bottom:10px;border:none;border-radius:12px;background:" + t.color + ";color:#fff;font-size:17px;font-weight:800;cursor:pointer;text-align:left;";
+    b.onclick = () => { opState.tipoDoc = t.key; renderDocFields(); };
+    opBody.appendChild(b);
   });
-  tipoField.appendChild(tipoBtns);
-  opBody.appendChild(tipoField);
-
-  // --- N° RTO/FC ---
-  const field = document.createElement("div");
-  field.className = "opField";
-  field.innerHTML = '<label for="opRto">N° RTO/FC</label>';
-  const inp = document.createElement("input");
-  inp.id = "opRto";
-  inp.className = "opRtoInput";
-  inp.type = "text";
-  inp.inputMode = "numeric";
-  inp.maxLength = 5;
-  inp.value = opState.remito;
-  inp.oninput = () => {
-    inp.value = inp.value.replace(/\D/g, "").slice(0, 5);
-    opState.remito = inp.value;
-    _ppUpdateCont();
-  };
-  field.appendChild(inp);
-  opBody.appendChild(field);
-
-  // --- Fecha de RTO/FC ---
-  const fechaField = document.createElement("div");
-  fechaField.className = "opField";
-  fechaField.innerHTML = '<label for="opFechaRto">Fecha de RTO/FC</label>';
-  const fechaInp = document.createElement("input");
-  fechaInp.id = "opFechaRto";
-  fechaInp.type = "date";
-  fechaInp.style.cssText = "width:100%;padding:12px;border:1.5px solid #cbd5e1;border-radius:10px;font-size:16px;box-sizing:border-box;background:#fff;";
-  if (!opState.fechaRto) {
-    // Default: hoy en zona Argentina
-    try { opState.fechaRto = new Date().toLocaleDateString("sv-SE", { timeZone: "America/Argentina/Buenos_Aires" }); } catch (_e) { opState.fechaRto = ""; }
-  }
-  fechaInp.value = opState.fechaRto;
-  fechaInp.onchange = () => { opState.fechaRto = fechaInp.value; _ppUpdateCont(); };
-  fechaField.appendChild(fechaInp);
-  opBody.appendChild(fechaField);
-
-  // Habilitar Continuar solo si tiene remito + tipo + fecha
-  function _ppUpdateCont() {
-    const ok = opState.remito.length > 0 && opState.tipoEntrega && opState.fechaRto;
-    cont.disabled = !ok;
-    cont.classList.toggle("enabled", !!ok);
-  }
-  _ppUpdateCont();
 
   opActions.innerHTML = "";
   rcpDraftSave();
 }
+
+/* ============== Paso 3b: Campos de documentación ============== */
+function renderDocFields() {
+  opState.step = "docFields";
+  opSetBack(true);
+  opTitle.textContent = displayName(opState.tallNombre);
+  opSubtitle.textContent = opState.linea + " · " + fechaCorta(opState.fecha);
+  opBody.innerHTML = "";
+
+  const hasRemito = opState.tipoDoc === 'remito' || opState.tipoDoc === 'remito_factura';
+  const hasFactura = opState.tipoDoc === 'factura' || opState.tipoDoc === 'remito_factura';
+
+  // Defaults hoy AR
+  var _hoyAR = "";
+  try { _hoyAR = new Date().toLocaleDateString("sv-SE", { timeZone: "America/Argentina/Buenos_Aires" }); } catch (_e) {}
+  if (hasRemito && !opState.nroRemito) opState.nroRemito = "";
+  if (hasRemito && !opState.fechaRemito) opState.fechaRemito = _hoyAR;
+  if (hasFactura && !opState.nroFactura) opState.nroFactura = "";
+  if (hasFactura && !opState.fechaFactura) opState.fechaFactura = _hoyAR;
+
+  // Botón Continuar arriba a la derecha
+  const actRow = document.createElement("div");
+  actRow.style.cssText = "display:flex;justify-content:flex-end;margin-bottom:16px;";
+  const cont = document.createElement("button");
+  cont.className = "btnSend btnBig";
+  cont.textContent = "Continuar";
+  cont.disabled = true;
+  cont.onclick = () => {
+    // Backwards compat: opState.remito para dedup/ref
+    opState.remito = opState.nroRemito || opState.nroFactura || "";
+    renderArticulos();
+  };
+  actRow.appendChild(cont);
+  opBody.appendChild(actRow);
+
+  function _updateCont() {
+    var ok = true;
+    if (hasRemito && (!opState.nroRemito || !opState.fechaRemito)) ok = false;
+    if (hasFactura && (!opState.nroFactura || !opState.fechaFactura)) ok = false;
+    cont.disabled = !ok;
+    cont.classList.toggle("enabled", ok);
+  }
+
+  if (hasRemito) {
+    var f1 = document.createElement("div"); f1.className = "opField";
+    f1.innerHTML = '<label for="opNroRemito">N° de Remito</label>';
+    var inp1 = document.createElement("input"); inp1.id = "opNroRemito";
+    inp1.type = "text"; inp1.inputMode = "numeric";
+    inp1.style.cssText = "width:100%;padding:12px;border:1.5px solid #cbd5e1;border-radius:10px;font-size:16px;box-sizing:border-box;background:#fff;";
+    inp1.value = opState.nroRemito;
+    inp1.oninput = () => { opState.nroRemito = inp1.value.replace(/\D/g, ""); inp1.value = opState.nroRemito; _updateCont(); };
+    f1.appendChild(inp1); opBody.appendChild(f1);
+
+    var f2 = document.createElement("div"); f2.className = "opField";
+    f2.innerHTML = '<label for="opFechaRemito">Fecha de Remito</label>';
+    var inp2 = document.createElement("input"); inp2.id = "opFechaRemito"; inp2.type = "date";
+    inp2.style.cssText = "width:100%;padding:12px;border:1.5px solid #cbd5e1;border-radius:10px;font-size:16px;box-sizing:border-box;background:#fff;";
+    inp2.value = opState.fechaRemito;
+    inp2.onchange = () => { opState.fechaRemito = inp2.value; _updateCont(); };
+    f2.appendChild(inp2); opBody.appendChild(f2);
+  }
+
+  if (hasFactura) {
+    var f3 = document.createElement("div"); f3.className = "opField";
+    f3.innerHTML = '<label for="opNroFactura">N° de Factura</label>';
+    var inp3 = document.createElement("input"); inp3.id = "opNroFactura";
+    inp3.type = "text"; inp3.inputMode = "numeric";
+    inp3.style.cssText = "width:100%;padding:12px;border:1.5px solid #cbd5e1;border-radius:10px;font-size:16px;box-sizing:border-box;background:#fff;";
+    inp3.value = opState.nroFactura;
+    inp3.oninput = () => { opState.nroFactura = inp3.value.replace(/\D/g, ""); inp3.value = opState.nroFactura; _updateCont(); };
+    f3.appendChild(inp3); opBody.appendChild(f3);
+
+    var f4 = document.createElement("div"); f4.className = "opField";
+    f4.innerHTML = '<label for="opFechaFactura">Fecha de Factura</label>';
+    var inp4 = document.createElement("input"); inp4.id = "opFechaFactura"; inp4.type = "date";
+    inp4.style.cssText = "width:100%;padding:12px;border:1.5px solid #cbd5e1;border-radius:10px;font-size:16px;box-sizing:border-box;background:#fff;";
+    inp4.value = opState.fechaFactura;
+    inp4.onchange = () => { opState.fechaFactura = inp4.value; _updateCont(); };
+    f4.appendChild(inp4); opBody.appendChild(f4);
+  }
+
+  _updateCont();
+  opActions.innerHTML = "";
+  rcpDraftSave();
+}
+
+/* Compat: renderRemito redirige al nuevo flujo */
+function renderRemito() { renderTipoDoc(); }
 
 /* ============== Órdenes de Compra vigentes (v7.07) ==============
    El operario, al marcar la mercadería que recibe, ve en cada botón de código
@@ -1414,8 +1443,10 @@ async function opEnviar() {
       Descripcion: i.desc,
       Cantidad: i.cajas,
       Remito: opState.remito,
-      Tipo_Entrega: opState.tipoEntrega || null,
-      Fecha_RTO: opState.fechaRto || null
+      Tipo_Entrega: opState.tipoDoc || null,
+      Fecha_RTO: opState.fechaRemito || null,
+      Numero_Factura: opState.nroFactura || null,
+      Fecha_Factura: opState.fechaFactura || null
     }));
   } else {
     tabla = "Entregas Tallerista Virgilio";
@@ -1426,8 +1457,10 @@ async function opEnviar() {
       Cod: i.cod,
       Cajas: i.cajas,
       Remito: opState.remito,
-      Tipo_Entrega: opState.tipoEntrega || null,
-      Fecha_RTO: opState.fechaRto || null
+      Tipo_Entrega: opState.tipoDoc || null,
+      Fecha_RTO: opState.fechaRemito || null,
+      Numero_Factura: opState.nroFactura || null,
+      Fecha_Factura: opState.fechaFactura || null
     }));
   }
 
@@ -1470,8 +1503,12 @@ async function opEnviar() {
   try {
     if (typeof window.ppShowCaptureDialog === 'function') {
       window.ppShowCaptureDialog('mercaderia', {
-        tipoEntrega: opState.tipoEntrega || '',
-        fechaRto: opState.fechaRto || ''
+        tipoDoc: opState.tipoDoc || '',
+        nroRemito: opState.nroRemito || '',
+        nroFactura: opState.nroFactura || '',
+        fechaRemito: opState.fechaRemito || '',
+        fechaFactura: opState.fechaFactura || '',
+        proveedor: opState.tallNombre || ''
       });
     }
   } catch (_e) { /* no-op si el módulo no está cargado */ }
