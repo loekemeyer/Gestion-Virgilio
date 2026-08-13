@@ -1,13 +1,14 @@
 /**
  * Módulo Pasaje de Papeles
  * Lista toda la documentación registrada en Pasaje_Papeles (Virgilio).
- * v3.0 - Lista unificada + timer "tiempo sin enviar" + checkbox enviado
+ * v4.0 - Dos secciones colapsables: Pendiente / Enviada + timer + checkbox
  */
 
 let _ppState = {
   data: [],
   loading: false,
-  timerInterval: null
+  timerInterval: null,
+  collapsed: { pendiente: false, enviada: true } // enviada arranca colapsada
 };
 
 /* Helper: headers para Supabase REST con anon key */
@@ -117,104 +118,153 @@ function ppFormatDate(dateStr) {
   } catch (e) { return dateStr; }
 }
 
+/** Toggle de sección colapsable */
+function ppToggleSection(section) {
+  _ppState.collapsed[section] = !_ppState.collapsed[section];
+  var body = document.getElementById('ppSec_' + section);
+  var arrow = document.getElementById('ppArrow_' + section);
+  if (body) body.style.display = _ppState.collapsed[section] ? 'none' : '';
+  if (arrow) arrow.textContent = _ppState.collapsed[section] ? '▶' : '▼';
+}
+
 /**
- * Renderiza la lista unificada de documentos en ppDocList
+ * Genera el HTML de una sección colapsable con header y tabla
+ */
+function _ppBuildSection(key, icon, title, rows, showTimer) {
+  var collapsed = _ppState.collapsed[key];
+  var count = rows.length;
+  var headerColor = key === 'pendiente' ? '#dc2626' : '#16a34a';
+
+  var html = '<div style="margin-bottom:16px;">';
+
+  // Header colapsable
+  html += '<div onclick="ppToggleSection(\'' + key + '\')" style="display:flex;align-items:center;gap:8px;padding:10px 14px;' +
+    'background:' + (key === 'pendiente' ? '#fef2f2' : '#f0fdf4') + ';border:1px solid ' + (key === 'pendiente' ? '#fecaca' : '#bbf7d0') + ';' +
+    'border-radius:8px;cursor:pointer;user-select:none;">' +
+    '<span id="ppArrow_' + key + '" style="font-size:12px;color:#64748b;width:14px;">' + (collapsed ? '▶' : '▼') + '</span>' +
+    '<span style="font-size:16px;">' + icon + '</span>' +
+    '<span style="font-weight:700;font-size:15px;color:#0f172a;">' + title + '</span>' +
+    '<span style="margin-left:auto;background:' + headerColor + ';color:#fff;font-size:12px;font-weight:700;' +
+    'padding:2px 8px;border-radius:10px;min-width:20px;text-align:center;">' + count + '</span>' +
+    '</div>';
+
+  // Cuerpo (tabla)
+  html += '<div id="ppSec_' + key + '" style="' + (collapsed ? 'display:none;' : '') + 'margin-top:6px;">';
+
+  if (!count) {
+    html += '<div style="padding:12px 14px;color:#94a3b8;font-size:14px;font-style:italic;">' +
+      (key === 'pendiente' ? 'Sin documentación pendiente' : 'Sin documentación enviada') + '</div>';
+  } else {
+    html += '<div class="pp-tblwrap"><table class="pp-tbl"><thead><tr>' +
+      '<th>Fecha</th><th>Tipo</th><th>N° Remito</th><th>N° Factura</th><th>Razón Social</th><th>Contenido</th>';
+    if (showTimer) html += '<th>Tiempo sin enviar</th>';
+    html += '<th>Enviado</th></tr></thead><tbody>';
+
+    rows.forEach(function (row) {
+      html += _ppBuildRow(row, showTimer);
+    });
+
+    html += '</tbody></table></div>';
+  }
+
+  html += '</div></div>';
+  return html;
+}
+
+/**
+ * Genera el HTML de una fila
+ */
+function _ppBuildRow(row, showTimer) {
+  var tipoLabel = row.tipo_documento === 'ambos' ? 'Rto + Fc'
+    : row.tipo_documento === 'remito' ? 'Remito'
+    : row.tipo_documento === 'factura' ? 'Factura'
+    : (row.tipo_documento || '—');
+
+  var nroRto = row.numero_remito
+    ? row.numero_remito + (row.fecha_remito ? '<br><small>' + ppFormatDate(row.fecha_remito) + '</small>' : '')
+    : '—';
+  var nroFc = row.numero_factura
+    ? row.numero_factura + (row.fecha_factura ? '<br><small>' + ppFormatDate(row.fecha_factura) + '</small>' : '')
+    : '—';
+
+  var contenido = row.tipo_contenido === 'mercaderia' ? 'Mercadería'
+    : row.tipo_contenido === 'insumo' ? 'Insumo'
+    : (row.tipo_contenido || '—');
+
+  var enviado = !!row.enviado;
+  var rowId = row.id;
+
+  // Checkbox
+  var checkCell = '<label style="display:flex;align-items:center;justify-content:center;cursor:pointer;margin:0;">' +
+    '<input type="checkbox" ' + (enviado ? 'checked' : '') +
+    ' onchange="ppToggleEnviado(' + rowId + ', this.checked)" ' +
+    'style="width:20px;height:20px;cursor:pointer;accent-color:#16a34a;">' +
+    '</label>';
+
+  var proveedor = row.razon_social || '—';
+  if (row.cuit) {
+    proveedor += '<br><small>' + row.cuit + '</small>';
+  }
+
+  var html = '<tr data-ppid="' + rowId + '">' +
+    '<td>' + ppFormatDate(row.created_at) + '</td>' +
+    '<td>' + tipoLabel + '</td>' +
+    '<td>' + nroRto + '</td>' +
+    '<td>' + nroFc + '</td>' +
+    '<td>' + proveedor + '</td>' +
+    '<td>' + contenido + '</td>';
+
+  if (showTimer) {
+    var tsMs = row.created_at ? new Date(row.created_at).getTime() : 0;
+    html += '<td style="text-align:center;white-space:nowrap;">' +
+      '<span class="pp-timer" data-ts="' + tsMs + '" style="font-variant-numeric:tabular-nums;font-size:13px;color:#dc2626;font-weight:600;">' +
+      _ppFormatElapsed(Date.now() - tsMs) + '</span></td>';
+  }
+
+  html += '<td style="text-align:center;">' + checkCell + '</td></tr>';
+  return html;
+}
+
+/**
+ * Renderiza las dos secciones colapsables en ppDocList
  */
 function ppRenderList() {
   var container = document.getElementById('ppDocList');
   if (!container) return;
 
   var data = _ppState.data;
-  if (!data.length) {
-    container.innerHTML = '<div class="pp-empty">Sin documentación registrada</div>';
-    _ppStopTimer();
-    return;
-  }
 
-  var html = '<div class="pp-tblwrap"><table class="pp-tbl"><thead><tr>' +
-    '<th>Fecha</th><th>Tipo</th><th>N° Remito</th><th>N° Factura</th><th>Proveedor</th><th>Contenido</th>' +
-    '<th>Tiempo sin enviar</th><th>Enviado</th>' +
-    '</tr></thead><tbody>';
-
+  // Separar pendientes vs enviados (siempre, incluso si data está vacío)
+  var pendientes = [];
+  var enviados = [];
   data.forEach(function (row) {
-    var tipoLabel = row.tipo_documento === 'ambos' ? 'Rto + Fc'
-      : row.tipo_documento === 'remito' ? 'Remito'
-      : row.tipo_documento === 'factura' ? 'Factura'
-      : (row.tipo_documento || '—');
-
-    var nroRto = row.numero_remito
-      ? row.numero_remito + (row.fecha_remito ? '<br><small>' + ppFormatDate(row.fecha_remito) + '</small>' : '')
-      : '—';
-    var nroFc = row.numero_factura
-      ? row.numero_factura + (row.fecha_factura ? '<br><small>' + ppFormatDate(row.fecha_factura) + '</small>' : '')
-      : '—';
-
-    var contenido = row.tipo_contenido === 'mercaderia' ? 'Mercadería'
-      : row.tipo_contenido === 'insumo' ? 'Insumo'
-      : (row.tipo_contenido || '—');
-
-    // Timer: si no está enviado, mostrar reloj vivo. Si enviado, "✓ Enviado"
-    var enviado = !!row.enviado;
-    var timerCell = '';
-    if (enviado) {
-      timerCell = '<span style="color:#16a34a;font-weight:600;">✓ Enviado</span>';
-    } else {
-      var tsMs = row.created_at ? new Date(row.created_at).getTime() : 0;
-      timerCell = '<span class="pp-timer" data-ts="' + tsMs + '" style="font-variant-numeric:tabular-nums;font-size:13px;color:#dc2626;font-weight:600;">' +
-        _ppFormatElapsed(Date.now() - tsMs) + '</span>';
-    }
-
-    // Checkbox
-    var rowId = row.id;
-    var checkCell = '<label style="display:flex;align-items:center;justify-content:center;cursor:pointer;margin:0;">' +
-      '<input type="checkbox" ' + (enviado ? 'checked' : '') +
-      ' onchange="ppToggleEnviado(' + rowId + ', this.checked)" ' +
-      'style="width:20px;height:20px;cursor:pointer;accent-color:#16a34a;">' +
-      '</label>';
-
-    html += '<tr data-ppid="' + rowId + '" style="' + (enviado ? 'opacity:0.55;' : '') + '">' +
-      '<td>' + ppFormatDate(row.created_at) + '</td>' +
-      '<td>' + tipoLabel + '</td>' +
-      '<td>' + nroRto + '</td>' +
-      '<td>' + nroFc + '</td>' +
-      '<td>' + (row.razon_social || '—') + '</td>' +
-      '<td>' + contenido + '</td>' +
-      '<td style="text-align:center;white-space:nowrap;">' + timerCell + '</td>' +
-      '<td style="text-align:center;">' + checkCell + '</td>' +
-    '</tr>';
+    if (row.enviado) enviados.push(row);
+    else pendientes.push(row);
   });
 
-  html += '</tbody></table></div>';
+  var html = _ppBuildSection('pendiente', '⏳', 'Documentación pendiente', pendientes, true) +
+             _ppBuildSection('enviada', '✅', 'Documentación enviada', enviados, false);
+
   container.innerHTML = html;
 
-  // Arrancar timer para los relojes vivos
-  _ppStartTimer();
+  // Badge del botón en el panel supervisor
+  _ppUpdateBadge(pendientes.length);
+
+  // Arrancar timer si hay pendientes
+  if (pendientes.length) _ppStartTimer();
+  else _ppStopTimer();
 }
 
 /**
  * Marca/desmarca un documento como enviado en Supabase
  */
 async function ppToggleEnviado(id, checked) {
-  // Actualizar estado local inmediatamente para feedback visual
+  // Actualizar estado local inmediatamente
   var row = _ppState.data.find(function (r) { return r.id === id; });
   if (row) row.enviado = checked;
 
-  // Re-renderizar la fila sin recargar todo
-  var tr = document.querySelector('tr[data-ppid="' + id + '"]');
-  if (tr) {
-    tr.style.opacity = checked ? '0.55' : '1';
-    // Actualizar celda del timer
-    var timerTd = tr.children[6]; // 7ma columna (0-based = 6)
-    if (timerTd) {
-      if (checked) {
-        timerTd.innerHTML = '<span style="color:#16a34a;font-weight:600;">✓ Enviado</span>';
-      } else {
-        var tsMs = row && row.created_at ? new Date(row.created_at).getTime() : 0;
-        timerTd.innerHTML = '<span class="pp-timer" data-ts="' + tsMs + '" style="font-variant-numeric:tabular-nums;font-size:13px;color:#dc2626;font-weight:600;">' +
-          _ppFormatElapsed(Date.now() - tsMs) + '</span>';
-      }
-    }
-  }
+  // Re-renderizar completo (la fila cambia de sección)
+  ppRenderList();
 
   // Persistir en Supabase
   try {
@@ -371,12 +421,35 @@ function ppCloseCaptureDialog() {
 }
 
 /**
+ * Busca el CUIT de un proveedor por razón social.
+ * Intenta primero en Proveedores (art terminado), luego en otras fuentes.
+ */
+async function _ppFetchCuit(razonSocial) {
+  if (!razonSocial) return null;
+  try {
+    var rs = razonSocial.trim();
+    // Buscar en Proveedores (art terminado, tiene CUIT)
+    var res = await fetch(
+      SUPABASE_URL + '/rest/v1/Proveedores?razon_social=ilike.' + encodeURIComponent('%' + rs + '%') + '&select=cuit&limit=1',
+      { headers: _ppHeaders(), cache: 'no-store' }
+    ).then(function (r) { return r.ok ? r.json() : []; });
+    if (res && res[0] && res[0].cuit) return res[0].cuit;
+
+    // Si no encontró en Proveedores, no hay CUIT disponible (talleristas, insumos, etc. no tienen CUIT en el sistema)
+    return null;
+  } catch (_e) { return null; }
+}
+
+/**
  * Graba documentación en Pasaje_Papeles (best-effort, silencioso)
  */
 async function _ppSaveToSupabase(tipoContenido, data) {
   try {
     var tipoDocLabel = data.tipoDoc;
     if (tipoDocLabel === 'remito_factura') tipoDocLabel = 'ambos';
+
+    // Buscar CUIT del proveedor (async, no bloquea)
+    var cuit = await _ppFetchCuit(data.proveedor);
 
     var payload = {
       planta: 'virgilio',
@@ -389,7 +462,8 @@ async function _ppSaveToSupabase(tipoContenido, data) {
       fecha_factura: data.fechaFactura || null,
       fecha_emision: data.fechaRemito || data.fechaFactura || null,
       legajo_usuario: (typeof legajoInput !== 'undefined' && legajoInput && legajoInput.value) ? legajoInput.value : null,
-      enviado: false
+      enviado: false,
+      cuit: cuit
     };
 
     var res = await fetch(SUPABASE_URL + '/rest/v1/Pasaje_Papeles', {
@@ -406,6 +480,40 @@ async function _ppSaveToSupabase(tipoContenido, data) {
 /* Compat: ppSaveDocument redirige a la nueva función */
 async function ppSaveDocument(tipoContenido) { _ppCapSave(tipoContenido); }
 
+/**
+ * Actualiza el badge del botón "Pasaje de Papeles" en el panel supervisor
+ */
+function _ppUpdateBadge(pendCount) {
+  if (typeof supSetBadge === 'function') {
+    supSetBadge('ppBadge', pendCount);
+  } else {
+    // Fallback manual si supSetBadge no existe
+    var b = document.getElementById('ppBadge');
+    if (!b) return;
+    if (pendCount > 0) {
+      b.textContent = String(pendCount);
+      b.style.display = '';
+      b.className = 'dp-badge';
+    } else {
+      b.style.display = 'none';
+    }
+  }
+}
+
+/**
+ * Carga solo el conteo de pendientes para el badge (sin abrir el modal).
+ * Se llama al cargar el panel supervisor.
+ */
+async function ppLoadBadge() {
+  try {
+    var res = await fetch(
+      SUPABASE_URL + '/rest/v1/Pasaje_Papeles?enviado=eq.false&select=id',
+      { headers: _ppHeaders(), cache: 'no-store' }
+    ).then(function (r) { return r.ok ? r.json() : []; });
+    _ppUpdateBadge((res || []).length);
+  } catch (_e) {}
+}
+
 // Exportar globalmente
 window.openPasajePapeles = openPasajePapeles;
 window.closePasajePapeles = closePasajePapeles;
@@ -415,6 +523,8 @@ window.ppShowCaptureDialog = ppShowCaptureDialog;
 window.ppCloseCaptureDialog = ppCloseCaptureDialog;
 window.ppSaveDocument = ppSaveDocument;
 window.ppToggleEnviado = ppToggleEnviado;
+window.ppToggleSection = ppToggleSection;
+window.ppLoadBadge = ppLoadBadge;
 window._ppCapRenderStep1 = _ppCapRenderStep1;
 window._ppCapRenderStep2 = _ppCapRenderStep2;
 window._ppCapSave = _ppCapSave;
