@@ -6609,6 +6609,25 @@ function updatePendingIndicator() {
 }
 
 /**
+ * v10.32 — Inicializa badge de Stock y Compras en page load
+ * Carga datos de stock mínimos para mostrar el estado del badge
+ */
+async function initStkBadge() {
+  try {
+    if (!_stk) {
+      _stk = {};
+    }
+    const viewRows = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/vista_stock_procesada", "select=cod,stock_total");
+    if (viewRows) {
+      _stk.viewRows = viewRows;
+      updateStkBadge();
+    }
+  } catch (e) {
+    console.error('initStkBadge error:', e);
+  }
+}
+
+/**
  * v10.32 — Actualiza badge de Stock y Compras
  * Si hay negativos: muestra badge con número rojo
  * Si todo OK: muestra tilde verde
@@ -28009,6 +28028,7 @@ if (window.__pendingMonitorParam && (_keyValid || _kioskEnrolled)) {
   window.addEventListener("load", () => {
     try { showKioskAdminPanel(); } catch (_e) {}
     try { if (typeof window.maybeAutoOpenMonitor === "function") window.maybeAutoOpenMonitor(); } catch (_e) {}
+    try { initStkBadge(); } catch (_e) {}  // v10.32: carga badge de stock en page load
     // v5.94: la TV de pared es un aparato barato (poca RAM). Corriendo 24/7 la
     // memoria se llena y Chrome mata la pestaña ("¡Vaya!"/Aw-Snap) cada ~15 min.
     // Se recarga sola cada 10 min → arranca limpia antes de llenarse (reload de
