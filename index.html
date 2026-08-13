@@ -3603,7 +3603,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      que ande sin internet en el depósito. -->
 <script src="qrcode.js"></script>
 <script src="planimetria.js?v=3.73"></script>
-<script src="pasaje-papeles.js?v=1.2"></script>
+<script src="pasaje-papeles.js?v=2.0"></script>
 <!-- Modo OP de Recepción de Mercadería (se abre al tocar RT). Módulo aislado bajo
      #rcpRoot, con su propio cliente Supabase (login anónimo). Portado de la app
      Control-Carga-Remitos-FC. Suma las cajas del día a localStorage para que RT
@@ -17928,9 +17928,102 @@ function insUbicOk(mode) {
     return;
   }
   insUbicCancel();
-  // Guardar la ubicación en el toggle data y abrir el modal de insumos
+  // Guardar la ubicación en el toggle data
   window._insUbicacion = ubicacion;  // Estado temporal
+
+  // RI (recepción): pedir documentación antes de abrir el modal de insumos
+  if (mode === "RI") {
+    askInsDocumentacion(mode, ubicacion);
+    return;
+  }
   selectOption(mode);
+}
+
+/* Paso intermedio RI: capturar datos de documentación (remito/factura) antes de
+   abrir el modal de insumos. Mismo flujo de 3 botones que mercadería. */
+function askInsDocumentacion(mode, proveedor) {
+  var ov = document.getElementById("insDocModal");
+  if (!ov) { ov = document.createElement("div"); ov.id = "insDocModal"; ov.style.cssText = "position:fixed;inset:0;z-index:1298;background:rgba(2,6,23,.78);display:flex;align-items:center;justify-content:center;padding:16px;"; document.body.appendChild(ov); }
+
+  // Estado temporal para la documentación de insumos
+  window._insDocState = { tipoDoc: '', nroRemito: '', nroFactura: '', fechaRemito: '', fechaFactura: '', proveedor: proveedor || '' };
+
+  ov.innerHTML = '<div style="background:#f8fafc;max-width:420px;width:100%;border-radius:16px;padding:20px;box-shadow:0 24px 70px rgba(0,0,0,.5);box-sizing:border-box;">' +
+    '<div style="font-size:18px;font-weight:800;margin-bottom:3px;">📄 Documentación recibida</div>' +
+    '<div style="font-size:13px;color:#64748b;margin-bottom:16px;">¿Qué documentación recibís?</div>' +
+    '<div id="insDocBody"></div>' +
+    '</div>';
+  ov.style.display = "flex";
+
+  _insDocStep1(mode);
+}
+
+function _insDocStep1(mode) {
+  var body = document.getElementById("insDocBody");
+  if (!body) return;
+  var btn = "width:100%;margin-bottom:10px;padding:16px;border:none;border-radius:12px;color:#fff;font-size:16px;font-weight:800;cursor:pointer;text-align:left;";
+  body.innerHTML =
+    '<button onclick="window._insDocState.tipoDoc=\'remito\';_insDocStep2(\'' + mode + '\')" style="' + btn + 'background:#4f46e5;">📄 Remito</button>' +
+    '<button onclick="window._insDocState.tipoDoc=\'factura\';_insDocStep2(\'' + mode + '\')" style="' + btn + 'background:#0d9488;">🧾 Factura</button>' +
+    '<button onclick="window._insDocState.tipoDoc=\'remito_factura\';_insDocStep2(\'' + mode + '\')" style="' + btn + 'background:#1e6bd6;">📄🧾 Remito y Factura</button>' +
+    '<button onclick="insDocCancel()" style="width:100%;padding:11px;border:none;border-radius:10px;background:#e2e8f0;color:#475569;font-weight:700;cursor:pointer;">Cancelar</button>';
+}
+
+function _insDocStep2(mode) {
+  var body = document.getElementById("insDocBody");
+  if (!body) return;
+  var st = window._insDocState;
+  var hasR = st.tipoDoc === 'remito' || st.tipoDoc === 'remito_factura';
+  var hasF = st.tipoDoc === 'factura' || st.tipoDoc === 'remito_factura';
+  var hoyAR = '';
+  try { hoyAR = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Argentina/Buenos_Aires' }); } catch (_e) {}
+
+  var html = '';
+  if (hasR) {
+    html += '<div style="margin-bottom:12px;"><label style="display:block;font-size:13px;font-weight:600;color:#475569;margin-bottom:4px;">N° de Remito</label><input type="text" inputmode="numeric" id="insDocNroRemito" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;box-sizing:border-box;font-size:14px;"></div>';
+    html += '<div style="margin-bottom:12px;"><label style="display:block;font-size:13px;font-weight:600;color:#475569;margin-bottom:4px;">Fecha de Remito</label><input type="date" id="insDocFechaRemito" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;box-sizing:border-box;font-size:14px;" value="' + hoyAR + '"></div>';
+  }
+  if (hasF) {
+    html += '<div style="margin-bottom:12px;"><label style="display:block;font-size:13px;font-weight:600;color:#475569;margin-bottom:4px;">N° de Factura</label><input type="text" inputmode="numeric" id="insDocNroFactura" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;box-sizing:border-box;font-size:14px;"></div>';
+    html += '<div style="margin-bottom:12px;"><label style="display:block;font-size:13px;font-weight:600;color:#475569;margin-bottom:4px;">Fecha de Factura</label><input type="date" id="insDocFechaFactura" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;box-sizing:border-box;font-size:14px;" value="' + hoyAR + '"></div>';
+  }
+  html += '<div style="display:flex;gap:10px;margin-top:14px;">' +
+    '<button onclick="_insDocStep1(\'' + mode + '\')" style="flex:1;padding:14px;border:none;border-radius:10px;background:#e2e8f0;color:#475569;font-weight:700;cursor:pointer;font-size:16px;">‹ Atrás</button>' +
+    '<button onclick="insDocOk(\'' + mode + '\')" style="flex:1;padding:14px;border:none;border-radius:10px;background:#4f46e5;color:#fff;font-weight:700;cursor:pointer;font-size:16px;">Continuar</button>' +
+    '</div>';
+  body.innerHTML = html;
+}
+
+function insDocOk(mode) {
+  var st = window._insDocState;
+  var hasR = st.tipoDoc === 'remito' || st.tipoDoc === 'remito_factura';
+  var hasF = st.tipoDoc === 'factura' || st.tipoDoc === 'remito_factura';
+  var ok = true;
+  if (hasR) {
+    var elNR = document.getElementById("insDocNroRemito");
+    var elFR = document.getElementById("insDocFechaRemito");
+    st.nroRemito = elNR ? elNR.value.replace(/\D/g, '') : '';
+    st.fechaRemito = elFR ? elFR.value : '';
+    if (!st.nroRemito) { ok = false; if (elNR) elNR.style.borderColor = '#dc2626'; }
+  }
+  if (hasF) {
+    var elNF = document.getElementById("insDocNroFactura");
+    var elFF = document.getElementById("insDocFechaFactura");
+    st.nroFactura = elNF ? elNF.value.replace(/\D/g, '') : '';
+    st.fechaFactura = elFF ? elFF.value : '';
+    if (!st.nroFactura) { ok = false; if (elNF) elNF.style.borderColor = '#dc2626'; }
+  }
+  if (!ok) return;
+
+  // Cerrar modal y continuar al modal de insumos
+  insDocCancel();
+  selectOption(mode);
+}
+
+function insDocCancel() {
+  var ov = document.getElementById("insDocModal");
+  if (ov) ov.style.display = "none";
+  window._insDocState = null;
 }
 /* El CSS del modal de insumos lo usa también la solapa "Insumos" de Stock y Compras
    (chips de categoría), así que la inyección va aparte. */
@@ -18393,11 +18486,23 @@ function insConfirmar() {
   window._insUbicacion = null;  // limpiar
   stockMove(rows);   // offline-safe (vir_stock_pend)
 
-  // v1.1 — Pasaje de Papeles: mostrar pop-up para capturar documentación (solo si es ingreso)
+  // v1.3 — Pasaje de Papeles: guardar documentación capturada en el paso previo
   if (isIn) {
     try {
       if (typeof window.ppShowCaptureDialog === 'function') {
-        window.ppShowCaptureDialog('insumo');
+        var _docSt = window._insDocState;
+        if (_docSt && _docSt.tipoDoc) {
+          // Datos ya capturados en askInsDocumentacion → guardar directo
+          window.ppShowCaptureDialog('insumo', {
+            tipoDoc: _docSt.tipoDoc,
+            nroRemito: _docSt.nroRemito || '',
+            nroFactura: _docSt.nroFactura || '',
+            fechaRemito: _docSt.fechaRemito || '',
+            fechaFactura: _docSt.fechaFactura || '',
+            proveedor: _docSt.proveedor || window._insUbicacion || ''
+          });
+        }
+        window._insDocState = null;
       }
     } catch (_e) { /* no-op si el módulo no está cargado */ }
   }
