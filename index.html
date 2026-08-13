@@ -2269,6 +2269,10 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .cc-rs{ font-size: 13px; color: #64748b; margin-left: auto; text-align: right; }
 .cc-lios{ flex: 0 0 auto; font-size: 14px; font-weight: 800; color: #b45309; white-space: nowrap; }
 .cc-lios.cc-lios0{ color: #94a3b8; font-weight: 600; }
+/* v10.23 — orden de carga (inverso de la ruta) + ubicación física por NP (AUB). */
+.cc-ruta{ font-size: 12.5px; font-weight: 800; color: #0f766e; background:#ecfeff; border:1px solid #cffafe; border-radius:8px; padding:6px 9px; margin: 14px 0 6px; }
+.cc-pos{ flex:0 0 auto; width:22px; height:22px; border-radius:50%; background:#0f766e; color:#fff; font-size:12px; font-weight:800; display:inline-flex; align-items:center; justify-content:center; }
+.cc-ubic{ flex:0 0 auto; font-size:12px; font-weight:800; color:#7c3aed; background:#faf5ff; border:1px solid #e9d5ff; border-radius:7px; padding:2px 7px; white-space:nowrap; }
 
 /* Control Remitos (CR): TABLA de los NP cargados al camión (CCN) pendientes de
    control. Columnas: NP · Cod Cliente · Razón Social · Líos · Controlado (tic).
@@ -2283,6 +2287,8 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .cr-row:active > td{ background: #f1f5f9; }
 .cr-row.cc-on > td{ background: #ecfdf5; }
 .cr-td-np{ font-size: 16px; font-weight: 800; color: #0f172a; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cr-cc-date{ font-size: 11px; font-weight: 700; color: #0f766e; margin-top: 2px; white-space: nowrap; }
+.cr-row.cr-venc .cr-cc-date{ color: #b91c1c; }
 .cr-td-cod{ font-size: 13px; font-weight: 700; color: #475569; font-family: ui-monospace, Menlo, Consolas, monospace; white-space: nowrap; }
 .cr-td-rs{ font-size: 13px; color: #334155; max-width: 120px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cr-td-lios{ text-align: center; font-size: 15px; font-weight: 800; color: #b45309; white-space: nowrap; }
@@ -6470,7 +6476,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v10.25";
+const APP_VERSION = "v10.27";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -20699,6 +20705,60 @@ async function fetchCCData() {
     seen.add(np);
     items.push({ np: np, tanda: (String(row.tanda || "").trim() || "—"), rs: row.razon_social || "", lios: lios.has(np) ? lios.get(np) : null });
   }
+  try { await _ccAttachUbicYOrden(items); } catch (_e) {}
+  return items;
+}
+
+/* v10.23 — enriquece el reparto (Carga Camión) con:
+   (a) UBICACIÓN física por NP = evento AUB (dónde quedó armado ese pedido: AB8/AA4…),
+       la última carga gana.
+   (b) ORDEN DE CARGA al camión = INVERSO de la ruta de reparto (el último destino de
+       cada camión se carga primero). Reusa la geocodificación ya cacheada en PPP_Geo
+       (la que llena "Armar ruta de reparto") + el mismo optimizador del ruteo, agrupando
+       por las mismas RUTAS/zonas. NO geocodifica nada nuevo (solo lee la cache), así es
+       instantáneo en el celular. Una NP sin dirección geocodificada queda "sin orden"
+       (se muestra igual, aparte). Todo best-effort: si algo falla, el reparto se muestra
+       sin orden ni ubicación. */
+async function _ccAttachUbicYOrden(items) {
+  if (!items || !items.length) return items;
+  const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+  const nps = items.map(function (it) { return it.np; });
+  // (a) ubicación por NP (AUB)
+  try {
+    const aubUrl = SUPABASE_TABLE_ENDPOINT + "?opcion=eq.AUB&texto=in.(" + nps.map(encodeURIComponent).join(",") + ")&select=texto,descripcion,ts_cliente&order=ts_cliente.asc&limit=8000";
+    const rowsA = await fetch(aubUrl, { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; });
+    const ubicByNp = {};
+    rowsA.forEach(function (x) { const n = _rtNpNorm(String(x.texto || "").split("|")[0]); if (n) ubicByNp[n] = String(x.descripcion || "").trim(); });
+    items.forEach(function (it) { it.ubic = ubicByNp[_rtNpNorm(it.np)] || ""; });
+  } catch (_e) {}
+  // (b) orden de carga = inverso de la ruta
+  try {
+    const pedUrl = SUPABASE_URL + "/rest/v1/PPP_Programacion_Diaria?select=np,zona,direccion,barrio,m3&np=in.(" + nps.map(encodeURIComponent).join(",") + ")&limit=20000";
+    const _p = await Promise.all([
+      fetch(pedUrl, { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }),
+      _rtCacheAll()
+    ]);
+    const peds = _p[0] || [], cache = _p[1] || {};
+    const geoByNp = {};
+    peds.forEach(function (p) {
+      const n = _rtNpNorm(p.np); if (!n || geoByNp[n]) return;
+      const c = cache[_rtDirKey(p.direccion, p.barrio)];
+      geoByNp[n] = { zona: String(p.zona || "").trim(), lat: c ? c.lat : null, lng: c ? c.lng : null, m3: Number(p.m3) || 0 };
+    });
+    items.forEach(function (it) { const g = geoByNp[_rtNpNorm(it.np)]; if (g) { it.zona = g.zona; it.lat = g.lat; it.lng = g.lng; it.m3 = g.m3; } });
+    const depot = cache[RT_DEPOT_KEY] || null;
+    if (depot) {
+      let seq = 0;
+      RT_RUTAS.forEach(function (R) {
+        const grp = items.filter(function (it) { return it.lat != null && it.zona && R.zonas.indexOf(it.zona) >= 0; });
+        if (!grp.length) return;
+        const ordered = _rtOptimize(depot, grp);   // orden de ENTREGA (cercano → lejano)
+        ordered.reverse();                          // orden de CARGA: último destino primero
+        ordered.forEach(function (it) { it.loadIdx = seq++; it.ruta = R.nombre; });
+      });
+    }
+  } catch (_e) {}
+  items.forEach(function (it) { if (it.loadIdx == null) it.loadIdx = Infinity; });
   return items;
 }
 
@@ -20711,7 +20771,9 @@ async function showCargaCamion(legajo) {
   ccWakeLock();
   try {
     const items = await fetchCCData();
-    items.sort((a, b) => String(a.tanda).localeCompare(String(b.tanda)) || a.np.localeCompare(b.np));
+    // v10.23 — ordenar por ORDEN DE CARGA (inverso de la ruta); las NP sin orden van al final.
+    const _li = function (x) { return (x.loadIdx == null || !isFinite(x.loadIdx)) ? Number.MAX_SAFE_INTEGER : x.loadIdx; };
+    items.sort((a, b) => (_li(a) - _li(b)) || String(a.tanda).localeCompare(String(b.tanda)) || a.np.localeCompare(b.np));
     if (!items.length) {
       _cc = null; ccReleaseWakeLock();
       m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">No hay reparto pendiente de cargar.<br><small>Aparece cuando Ventas genera el PDF de facturación.</small></div><button class="pk-btn pk-ok" onclick="ccEndWithoutLoading('${leg}')">✓ Terminar Carga Camión (sin cargar por app)</button><button class="pk-btn pk-cancel" onclick="ccClose()">Cerrar (sigo después)</button>`;
@@ -20728,22 +20790,34 @@ async function showCargaCamion(legajo) {
 
 function ccRender() {
   const m = document.getElementById("tandaModal"); if (!m || !_cc) return;
-  const byTanda = {};
-  for (const it of _cc.items) (byTanda[it.tanda] = byTanda[it.tanda] || []).push(it);
-  let html = `<div class="cc-sub">NP del <b>reparto</b> — tocá los que <b>cargaste al camión</b>:</div>`;
-  for (const tanda of Object.keys(byTanda).sort()) {
-    html += `<div class="cc-tanda">Tanda ${escapeHtml(tanda)}</div>`;
-    for (const it of byTanda[tanda]) {
-      const on = _cc.checked.has(it.np);
-      const liosNull = (it.lios == null);
-      const liosTxt = liosNull ? "—" : String(it.lios);
-      const liosCls = (liosNull || it.lios === 0) ? " cc-lios0" : "";
-      html += `<div class="cc-np${on ? " cc-on" : ""}" onclick="ccToggle('${String(it.np).replace(/[^0-9A-Za-z]/g, "")}')">` +
-              `<span class="cc-chk">${on ? "✓" : ""}</span>` +
-              `<span class="cc-npnum">${escapeHtml(it.np)}</span>` +
-              `<span class="cc-rs">${escapeHtml(it.rs)}</span>` +
-              `<span class="cc-lios${liosCls}" title="líos">📦 ${liosTxt}</span></div>`;
+  // v10.23 — se renderiza en ORDEN DE CARGA (los items ya vienen ordenados por loadIdx).
+  // Encabezado por RUTA; posición 1,2,3… = orden de carga (último destino del camión primero).
+  // Las NP sin ubicación en ruta caen en una sección aparte, ordenadas por tanda.
+  const hasOrden = _cc.items.some(function (it) { return isFinite(it.loadIdx); });
+  let html = `<div class="cc-sub">NP del <b>reparto</b> — tocá los que <b>cargaste al camión</b>.` +
+             (hasOrden ? ` Están en <b>orden de carga</b>: el <b>último destino</b> de cada camión se carga <b>primero</b> (1 = primero en subir).` : ``) + `</div>`;
+  let curSec = null;
+  let pos = 0;
+  for (const it of _cc.items) {
+    const enRuta = isFinite(it.loadIdx);
+    const secKey = enRuta ? ("R:" + (it.ruta || "Ruta")) : "__sin__";
+    if (secKey !== curSec) {
+      curSec = secKey; pos = 0;
+      html += `<div class="cc-ruta">${enRuta ? "🚚 " + escapeHtml(it.ruta || "Ruta") + " · orden de carga" : "📍 Sin ubicación en ruta — cargar aparte"}</div>`;
     }
+    pos++;
+    const on = _cc.checked.has(it.np);
+    const liosNull = (it.lios == null);
+    const liosTxt = liosNull ? "—" : String(it.lios);
+    const liosCls = (liosNull || it.lios === 0) ? " cc-lios0" : "";
+    const ubic = it.ubic ? `<span class="cc-ubic" title="dónde quedó armado">📌 ${escapeHtml(it.ubic)}</span>` : "";
+    html += `<div class="cc-np${on ? " cc-on" : ""}" onclick="ccToggle('${String(it.np).replace(/[^0-9A-Za-z]/g, "")}')">` +
+            (enRuta ? `<span class="cc-pos">${pos}</span>` : "") +
+            `<span class="cc-chk">${on ? "✓" : ""}</span>` +
+            `<span class="cc-npnum">${escapeHtml(it.np)}</span>` +
+            ubic +
+            `<span class="cc-rs">${escapeHtml(it.rs)}</span>` +
+            `<span class="cc-lios${liosCls}" title="líos">📦 ${liosTxt}</span></div>`;
   }
   html += `<button class="pk-btn pk-ok" onclick="ccFinish()">🚛 Terminé Carga Camión (${_cc.checked.size} cargadas)</button>` +
           `<button class="pk-btn pk-cancel" onclick="ccClose()">Cerrar (sigo después)</button>`;
@@ -20867,6 +20941,8 @@ function crDeadline(loadMs) {
   return dl;
 }
 function crVencido(loadMs) { return loadMs > 0 && Date.now() > crDeadline(loadMs); }
+/* v10.27 — fecha/hora de la carga al camión (CCN) → "DD/MM HH:mm" en hora AR (UTC-3). */
+function crFmtCC(ms) { if (!ms) return ""; const d = new Date(ms - 3 * 3600000); const p = function (n) { return n < 10 ? "0" + n : "" + n; }; return p(d.getUTCDate()) + "/" + p(d.getUTCMonth() + 1) + " " + p(d.getUTCHours()) + ":" + p(d.getUTCMinutes()); }
 
 /* "Pedidos Entregados" → Map NP -> { cod, rs }. Para que Recepción Remitos muestre el
    cliente de los NP que YA salieron de la PPP del día (arrastrados de días anteriores).
@@ -21024,7 +21100,7 @@ function crRender() {
     const liosTxt = liosNull ? "—" : String(it.lios);
     const liosCls = (liosNull || it.lios === 0) ? " cr-lios0" : "";
     rows += `<tr class="cr-row${on ? " cc-on" : ""}${it.venc ? " cr-venc" : ""}" onclick="crToggle('${npc}')">` +
-            `<td class="cr-td-np">${escapeHtml(it.np)}</td>` +
+            `<td class="cr-td-np">${escapeHtml(it.np)}${it.loadMs ? `<div class="cr-cc-date">🚚 ${crFmtCC(it.loadMs)}</div>` : ""}</td>` +
             `<td class="cr-td-cod">${it.cod ? escapeHtml(it.cod) : "—"}</td>` +
             `<td class="cr-td-rs">${escapeHtml(it.rs || "—")}${it.venc ? `<span class="cr-venc-tag">VENCIDO</span>` : ""}</td>` +
             `<td class="cr-td-lios${liosCls}">${liosTxt}</td>` +
@@ -30517,6 +30593,9 @@ function _corrEstado(e){
   const M = { sinpickear:["Sin pickear","#64748b","#f1f5f9"], enpicking:["En picking","#1e40af","#eff6ff"], pickeado:["Pickeado","#b45309","#fffbeb"], afacturar:["A facturar","#166534","#f0fdf4"], facturado:["Facturado","#065f46","#d1fae5"] };
   return M[e] || M.sinpickear;
 }
+/* v10.27 — ¿este ítem obliga a cambiar la NP? SÍ si el stock del código SECUNDARIO no
+   cubre lo pedido (stkSec < cajas). Si el secundario alcanza, se manda tal cual (no urgente). */
+function _corrItemUrgente(p){ return (Number(p && p.stkSec)||0) < (Number(p && p.cajas)||0); }
 /* v8.06 — fecha de salida (PPP fecha_entrega / Entregas fecha_salida) → "DD/MM". */
 function _corrFecha(s){
   s = String(s || "").trim(); if (!s) return "";
@@ -30579,23 +30658,36 @@ function facCorreccRender(){
   const rows = _facCorrRows;
   if (rows === null){ body.innerHTML = '<div style="text-align:center;color:#64748b;padding:20px;">Cargando…</div>'; return; }
   facCorreccRefreshCount();
-  // Pestañas de filtro por estado (con conteo)
-  const TABS = [["todo","Todo"],["facturado","Facturado"],["afacturar","Para facturar"],["pickeado","Pickeado"],["enpicking","En picking"],["sinpickear","Sin pickear"]];
+  // v10.27 — URGENTE = una NP que SÍ o SÍ hay que corregir: el secundario NO cubre lo pedido
+  // (stkSec < cajas). Si el secundario alcanza (stkSec >= cajas) se manda tal cual → NO urgente.
+  const urgentNps = {};
+  rows.forEach(function(p){ if (_corrItemUrgente(p)) urgentNps[p.np] = 1; });
+  // Pestañas de filtro por estado (con conteo) — "🔴 Urgentes" cruza todos los estados.
+  const TABS = [["todo","Todo"],["urgente","🔴 Urgentes"],["facturado","Facturado"],["afacturar","Para facturar"],["pickeado","Pickeado"],["enpicking","En picking"],["sinpickear","Sin pickear"]];
   // v8.44 — contar NPs DISTINTAS a corregir (unidad de acción: se cambia una vez por NP en el ERP),
   // no la cantidad de ítems (una NP puede tener varias líneas en código secundario).
   const npsBy = {}, allNps = {};
   rows.forEach(function(p){ allNps[p.np] = 1; (npsBy[p.estado] = npsBy[p.estado] || {})[p.np] = 1; });
-  const cntOf = function(k){ return k==="todo" ? Object.keys(allNps).length : Object.keys(npsBy[k]||{}).length; };
+  const cntOf = function(k){ return k==="todo" ? Object.keys(allNps).length : k==="urgente" ? Object.keys(urgentNps).length : Object.keys(npsBy[k]||{}).length; };
   let h = '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">';
   TABS.forEach(function(t){
     const on = _facCorrFiltro === t[0];
-    h += '<button onclick="facCorreccFiltro(\'' + t[0] + '\')" style="width:auto;flex:0 0 auto;padding:6px 11px;border-radius:999px;border:1px solid ' + (on?'#1e6bd6':'#cbd5e1') + ';background:' + (on?'#1e6bd6':'#fff') + ';color:' + (on?'#fff':'#334155') + ';font-size:12px;font-weight:800;cursor:pointer;">' + t[1] + ' (' + cntOf(t[0]) + ')</button>';
+    const isU = t[0] === "urgente";
+    const accent = isU ? "#dc2626" : "#1e6bd6";
+    const bd = on ? accent : (isU ? "#fca5a5" : "#cbd5e1");
+    const bg = on ? accent : (isU ? "#fef2f2" : "#fff");
+    const fg = on ? "#fff" : (isU ? "#b91c1c" : "#334155");
+    h += '<button onclick="facCorreccFiltro(\'' + t[0] + '\')" style="width:auto;flex:0 0 auto;padding:6px 11px;border-radius:999px;border:1px solid ' + bd + ';background:' + bg + ';color:' + fg + ';font-size:12px;font-weight:800;cursor:pointer;">' + t[1] + ' (' + cntOf(t[0]) + ')</button>';
   });
   h += '</div>';
   if (!rows.length){ body.innerHTML = h + '<div style="text-align:center;color:#16a34a;padding:24px;font-weight:700;">✅ No hay códigos para corregir.</div>'; return; }
-  const pend = _facCorrFiltro === "todo" ? rows : rows.filter(function(p){ return p.estado === _facCorrFiltro; });
-  h += '<div style="font-size:12.5px;color:#64748b;margin-bottom:10px;">Estos pedidos entraron en un código <b>secundario</b>. Cambiá la NP en el ERP al principal y confirmá acá — el picking va a levantar el principal.</div>';
-  if (!pend.length){ body.innerHTML = h + '<div style="text-align:center;color:#94a3b8;padding:20px;">No hay pedidos en este estado.</div>'; return; }
+  const pend = _facCorrFiltro === "todo" ? rows
+             : _facCorrFiltro === "urgente" ? rows.filter(function(p){ return urgentNps[p.np]; })
+             : rows.filter(function(p){ return p.estado === _facCorrFiltro; });
+  h += '<div style="font-size:12.5px;color:#64748b;margin-bottom:10px;">' + (_facCorrFiltro === "urgente"
+        ? '🔴 <b>Urgentes</b>: el código secundario <b>no alcanza</b> para lo pedido → hay que cambiar la NP al principal SÍ o SÍ (los que el secundario cubre no aparecen acá).'
+        : 'Estos pedidos entraron en un código <b>secundario</b>. Cambiá la NP en el ERP al principal y confirmá acá — el picking va a levantar el principal.') + '</div>';
+  if (!pend.length){ body.innerHTML = h + '<div style="text-align:center;color:#16a34a;padding:20px;font-weight:700;">' + (_facCorrFiltro === "urgente" ? '✅ No hay urgentes — el secundario cubre todo lo pedido.' : 'No hay pedidos en este estado.') + '</div>'; return; }
   // Agrupar por NP: 1 cambio → botón directo; varios → un solo botón que abre pop-up con checkboxes.
   const BTN = 'width:auto;flex:0 0 auto;background:#16a34a;color:#fff;border:none;border-radius:9px;padding:9px 13px;font-size:13px;font-weight:800;cursor:pointer;white-space:nowrap;';
   const order = [], byNp = {};
