@@ -1,0 +1,1068 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Productividad Virgilio</title>
+<style>
+:root {
+  --surface-page: #111118;
+  --surface-card: #1a1a24;
+  --surface-card-hover: #22222e;
+  --surface-input: #14141e;
+  --text-primary: #eeeef0;
+  --text-secondary: #a0a0b0;
+  --text-muted: #6a6a7a;
+  --border: #2a2a38;
+  --border-focus: #3987e5;
+  --accent: #3987e5;
+  --accent-dim: rgba(57,135,229,0.15);
+  --good: #199e70;
+  --bad: #d95926;
+  --warn: #c98500;
+  --c-pick: #3987e5;
+  --c-arm: #d95926;
+  --c-cc: #199e70;
+  --c-guard: #9085e9;
+  --c-recep: #c98500;
+  --c-dead: #555566;
+  --radius: 6px;
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --surface-page: #f0f0ed;
+    --surface-card: #ffffff;
+    --surface-card-hover: #f7f7f4;
+    --surface-input: #f5f5f2;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted: #898781;
+    --border: #d8d8d0;
+    --border-focus: #2a78d6;
+    --accent: #2a78d6;
+    --accent-dim: rgba(42,120,214,0.1);
+    --good: #008a00;
+    --bad: #c04a20;
+    --warn: #9a7000;
+    --c-pick: #2a78d6;
+    --c-arm: #eb6834;
+    --c-cc: #1baf7a;
+    --c-guard: #4a3aa7;
+    --c-recep: #eda100;
+    --c-dead: #898781;
+    color-scheme: light;
+  }
+}
+:root[data-theme="light"] {
+  --surface-page: #f0f0ed;
+  --surface-card: #ffffff;
+  --surface-card-hover: #f7f7f4;
+  --surface-input: #f5f5f2;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #898781;
+  --border: #d8d8d0;
+  --border-focus: #2a78d6;
+  --accent: #2a78d6;
+  --accent-dim: rgba(42,120,214,0.1);
+  --good: #008a00;
+  --bad: #c04a20;
+  --warn: #9a7000;
+  --c-pick: #2a78d6;
+  --c-arm: #eb6834;
+  --c-cc: #1baf7a;
+  --c-guard: #4a3aa7;
+  --c-recep: #eda100;
+  --c-dead: #898781;
+  color-scheme: light;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: var(--font);
+  background: var(--surface-page);
+  color: var(--text-primary);
+  line-height: 1.5;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+.app-header {
+  padding: 16px 20px 12px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+.app-header h1 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  display: flex; align-items: center; gap: 8px;
+}
+.app-header h1 .subtitle {
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: var(--text-muted);
+  margin-left: 4px;
+}
+
+.controls {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: flex-end;
+}
+.control-group { display: flex; flex-direction: column; gap: 4px; }
+.control-group label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.control-group input, .control-group select {
+  font-family: var(--font);
+  font-size: 0.85rem;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-input);
+  color: var(--text-primary);
+  outline: none;
+  min-width: 130px;
+}
+.control-group input:focus, .control-group select:focus {
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 2px var(--accent-dim);
+}
+.btn {
+  font-family: var(--font);
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 7px 18px;
+  border: none;
+  border-radius: var(--radius);
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn:hover { opacity: 0.9; }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-sm {
+  font-size: 0.75rem;
+  padding: 4px 12px;
+}
+
+.emp-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.emp-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.8rem;
+  padding: 4px 10px;
+  border-radius: 20px;
+  background: var(--accent-dim);
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  font-weight: 500;
+}
+.emp-chip .x {
+  cursor: pointer;
+  font-size: 0.7rem;
+  opacity: 0.6;
+  margin-left: 2px;
+}
+.emp-chip .x:hover { opacity: 1; }
+
+.emp-tabs {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px 4px;
+  display: flex;
+  gap: 2px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.emp-tab {
+  font-family: var(--font);
+  font-size: 0.82rem;
+  font-weight: 500;
+  padding: 8px 16px;
+  border: none;
+  border-radius: var(--radius) var(--radius) 0 0;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s, border-color 0.15s;
+}
+.emp-tab:hover { color: var(--text-secondary); }
+.emp-tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  background: var(--surface-card);
+}
+
+.main {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px 40px;
+}
+
+.card {
+  background: var(--surface-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+
+.summary-wrap { overflow-x: auto; }
+table.summary {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+table.summary th {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  padding: 10px 8px;
+  text-align: right;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+  background: var(--surface-card);
+}
+table.summary th:first-child { text-align: left; padding-left: 14px; }
+table.summary td {
+  padding: 7px 8px;
+  text-align: right;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+table.summary td:first-child {
+  text-align: left;
+  padding-left: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+table.summary tr:hover td { background: var(--surface-card-hover); }
+table.summary tr.totals td {
+  font-weight: 700;
+  border-top: 2px solid var(--border);
+  border-bottom: none;
+  cursor: default;
+}
+table.summary .val-good { color: var(--good); }
+table.summary .val-bad { color: var(--bad); }
+table.summary .val-na { color: var(--text-muted); font-style: italic; }
+table.summary .cell-metric {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+  line-height: 1.2;
+}
+table.summary .cell-metric .rate { font-weight: 600; }
+table.summary .cell-metric .sub {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+}
+
+.detail-panel {
+  padding: 14px;
+  animation: fadeIn 0.15s ease;
+}
+@keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+
+.detail-panel h3 {
+  font-size: 0.85rem;
+  font-weight: 700;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.detail-panel .close-detail {
+  font-family: var(--font);
+  font-size: 0.7rem;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-muted);
+  padding: 2px 8px;
+  cursor: pointer;
+  margin-left: auto;
+}
+.detail-panel .close-detail:hover { color: var(--text-primary); border-color: var(--text-muted); }
+
+.timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.tl-item {
+  display: grid;
+  grid-template-columns: 60px 1fr 80px;
+  gap: 8px;
+  align-items: center;
+  font-size: 0.78rem;
+  padding: 5px 8px;
+  border-radius: 4px;
+  border-left: 3px solid var(--c-dead);
+}
+.tl-item.tl-pick { border-left-color: var(--c-pick); }
+.tl-item.tl-arm { border-left-color: var(--c-arm); }
+.tl-item.tl-cc { border-left-color: var(--c-cc); }
+.tl-item.tl-guard { border-left-color: var(--c-guard); }
+.tl-item.tl-recep { border-left-color: var(--c-recep); }
+.tl-item .tl-time { color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.tl-item .tl-desc { color: var(--text-secondary); }
+.tl-item .tl-val { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.metric-detail-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.md-row {
+  display: grid;
+  grid-template-columns: 1fr 80px 60px 70px;
+  gap: 6px;
+  font-size: 0.78rem;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: var(--surface-page);
+}
+.md-row.md-header {
+  font-weight: 600;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: transparent;
+}
+
+.loading-overlay {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 20px;
+  gap: 16px;
+}
+.spinner {
+  width: 32px; height: 32px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-text { color: var(--text-muted); font-size: 0.85rem; }
+
+.error-msg {
+  padding: 16px;
+  color: var(--bad);
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.legend-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 8px 14px;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.legend-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+.stat-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+  padding: 14px;
+}
+.stat-tile {
+  text-align: center;
+  padding: 10px 8px;
+  border-radius: var(--radius);
+  background: var(--surface-page);
+}
+.stat-tile .stat-label {
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+.stat-tile .stat-value {
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+
+.no-data {
+  padding: 40px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+@media (max-width: 640px) {
+  .controls { flex-direction: column; align-items: stretch; }
+  .control-group input, .control-group select { min-width: 100%; }
+  table.summary { font-size: 0.72rem; }
+  table.summary th, table.summary td { padding: 6px 5px; }
+  .stat-row { grid-template-columns: repeat(2, 1fr); }
+  .md-row { grid-template-columns: 1fr 60px 50px 60px; font-size: 0.72rem; }
+}
+</style>
+</head>
+<body>
+
+<div class="app-header">
+  <h1>Productividad Virgilio <span class="subtitle">Deposito</span></h1>
+</div>
+
+<div class="controls" id="controls">
+  <div class="control-group">
+    <label>Desde</label>
+    <input type="date" id="dateFrom">
+  </div>
+  <div class="control-group">
+    <label>Hasta</label>
+    <input type="date" id="dateTo">
+  </div>
+  <div class="control-group">
+    <label>Agregar empleado</label>
+    <div style="display:flex;gap:4px;">
+      <input type="text" id="empSearch" placeholder="Legajo o nombre..." list="empSuggestions" autocomplete="off">
+      <datalist id="empSuggestions"></datalist>
+      <button class="btn btn-sm" id="btnAddEmp" onclick="addEmployeeFromSearch()">+</button>
+    </div>
+  </div>
+  <button class="btn" onclick="loadData()">Cargar</button>
+</div>
+
+<div id="empChips" class="controls" style="padding-top:0;">
+  <div class="emp-picker" id="empPicker"></div>
+</div>
+
+<div class="emp-tabs" id="empTabs"></div>
+
+<div class="main" id="mainContent">
+  <div class="loading-overlay" id="loadingState">
+    <div class="spinner"></div>
+    <div class="loading-text">Cargando datos...</div>
+  </div>
+</div>
+
+<script>
+const SUPA_URL = 'https://hrxfctzncixxqmpfhskv.supabase.co';
+const SUPA_KEY = 'sb_publishable_BqpAgZH6ty-9wft10_YMhw_0rcIPuWT';
+const HEADERS = { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY };
+
+const TARGETS = { TP: 1.60, TAP: 0.70 };
+const ACT_LABELS = { TP: 'Pick', TAP: 'Armado', CC: 'Carga', MG: 'Guardado', RT: 'Recepcion' };
+const ACT_EMOJI = { TP: '\u{1F6D2}', TAP: '\u{1F4E6}', CC: '\u{1F69B}', MG: '\u{1F4E5}', RT: '\u{1F4CB}' };
+const ACT_UNIT = { TP: 'm³/h', TAP: 'm³/h', CC: 'líos/h', MG: 'caj/h', RT: 'caj/h' };
+const DEAD_LABELS = { PB: 'Baño', PC: 'Comida', AT: 'Timbre', CT: 'Conteo', Limp: 'Limpieza', Perm: 'Permiso' };
+const CSS_CLASS = { TP: 'tl-pick', TAP: 'tl-arm', CC: 'tl-cc', MG: 'tl-guard', RT: 'tl-recep' };
+
+let selectedLegajos = [];
+let allEmps = {};
+let DATA = {};
+let activeTab = null;
+
+async function supaFetch(table, params) {
+  const url = new URL(SUPA_URL + '/rest/v1/' + table);
+  Object.entries(params).forEach(([k,v]) => url.searchParams.set(k, v));
+  const res = await fetch(url, { headers: HEADERS });
+  if (!res.ok) throw new Error('Error ' + res.status + ': ' + (await res.text()));
+  return res.json();
+}
+
+async function supaRpc(fn, body) {
+  const res = await fetch(SUPA_URL + '/rest/v1/rpc/' + fn, {
+    method: 'POST', headers: {...HEADERS, 'Content-Type': 'application/json'}, body: JSON.stringify(body)
+  });
+  if (!res.ok) throw new Error('Error ' + res.status);
+  return res.json();
+}
+
+// Load all employees for autocomplete
+async function loadAllEmployees() {
+  try {
+    const data = await supaFetch('Empleados', { select: 'Legajo,Empleado', order: 'Empleado.asc', limit: '500' });
+    data.forEach(e => { allEmps[e.Legajo] = e.Empleado; });
+    updateSuggestions();
+  } catch(e) { console.error('Error loading employees:', e); }
+}
+
+function updateSuggestions() {
+  const dl = document.getElementById('empSuggestions');
+  dl.innerHTML = '';
+  Object.entries(allEmps).forEach(([leg, name]) => {
+    if (leg === '0' || leg === '1') return;
+    if (selectedLegajos.includes(leg)) return;
+    const opt = document.createElement('option');
+    opt.value = leg + ' - ' + name;
+    dl.appendChild(opt);
+  });
+}
+
+function renderChips() {
+  const picker = document.getElementById('empPicker');
+  picker.innerHTML = '';
+  selectedLegajos.forEach(leg => {
+    const name = allEmps[leg] || 'Leg. ' + leg;
+    const shortName = name.split(' ').slice(0,2).join(' ');
+    const chip = document.createElement('span');
+    chip.className = 'emp-chip';
+    chip.innerHTML = shortName + ' <span class="x" onclick="removeEmp(\'' + leg + '\')">✕</span>';
+    picker.appendChild(chip);
+  });
+}
+
+function removeEmp(leg) {
+  selectedLegajos = selectedLegajos.filter(l => l !== leg);
+  renderChips();
+  updateSuggestions();
+  if (Object.keys(DATA).length) renderTabs();
+}
+
+function addEmployeeFromSearch() {
+  const input = document.getElementById('empSearch');
+  const val = input.value.trim();
+  let leg = val.split(' ')[0].replace(/\D/g, '');
+  if (!leg) return;
+  if (leg === '0' || leg === '1') { alert('Legajos 0 y 1 son de prueba'); return; }
+  if (!selectedLegajos.includes(leg)) {
+    selectedLegajos.push(leg);
+    renderChips();
+    updateSuggestions();
+  }
+  input.value = '';
+}
+
+document.getElementById('empSearch').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); addEmployeeFromSearch(); }
+});
+
+async function loadData() {
+  const from = document.getElementById('dateFrom').value;
+  const to = document.getElementById('dateTo').value;
+  if (!from || !to) { alert('Seleccionar fechas'); return; }
+  if (!selectedLegajos.length) { alert('Agregar al menos un empleado'); return; }
+
+  const main = document.getElementById('mainContent');
+  main.innerHTML = '<div class="loading-overlay"><div class="spinner"></div><div class="loading-text">Consultando Supabase...</div></div>';
+
+  const legFilter = 'in.(' + selectedLegajos.join(',') + ')';
+  const toDate = new Date(to);
+  toDate.setDate(toDate.getDate() + 1);
+  const toStr = toDate.toISOString().split('T')[0];
+
+  try {
+    // PostgREST range: ts_cliente between [from midnight, to+1 midnight) in UTC-3
+    const tsRange = 'and(gte.' + from + 'T00:00:00-03:00,lt.' + toStr + 'T00:00:00-03:00)';
+
+    const [productive, tandaM3, talEvents, ccnEvents, guardado, deadTime, fjEvents, empNames] = await Promise.all([
+      supaFetch('Registros_Produccion_Virgilio', {
+        select: 'opcion,legajo,texto,ts_inicio,ts_cliente',
+        'opcion': 'in.(TP,TAP,CC,MG,RT)',
+        'legajo': legFilter,
+        'ts_cliente': tsRange,
+        'ts_inicio': 'not.is.null',
+        order: 'legajo.asc,ts_cliente.asc',
+        limit: '5000'
+      }),
+      supaFetch('vista_tanda_m3', { select: 'tanda,m3', limit: '2000' }),
+      supaFetch('Registros_Produccion_Virgilio', {
+        select: 'legajo,texto,ts_cliente',
+        'opcion': 'eq.TAL',
+        'legajo': legFilter,
+        'ts_cliente': tsRange,
+        limit: '5000'
+      }),
+      supaFetch('Registros_Produccion_Virgilio', {
+        select: 'legajo,texto,ts_cliente',
+        'opcion': 'eq.CCN',
+        'legajo': legFilter,
+        'ts_cliente': tsRange,
+        limit: '5000'
+      }),
+      supaFetch('Movimientos_Stock', {
+        select: 'legajo,ts,delta',
+        'tipo': 'eq.guardado',
+        'legajo': legFilter,
+        'ts': tsRange,
+        limit: '5000'
+      }),
+      supaFetch('Registros_Produccion_Virgilio', {
+        select: 'opcion,legajo,ts_inicio,ts_cliente',
+        'opcion': 'in.(PB,PC,AT,CT,Limp,Perm)',
+        'legajo': legFilter,
+        'ts_cliente': tsRange,
+        'ts_inicio': 'not.is.null',
+        limit: '5000'
+      }),
+      supaFetch('Registros_Produccion_Virgilio', {
+        select: 'legajo,ts_cliente',
+        'opcion': 'eq.FJ',
+        'legajo': legFilter,
+        'ts_cliente': tsRange,
+        order: 'legajo.asc,ts_cliente.asc',
+        limit: '1000'
+      }),
+      supaFetch('Empleados', {
+        select: 'Legajo,Empleado',
+        'Legajo': legFilter
+      })
+    ]);
+
+    empNames.forEach(e => { allEmps[e.Legajo] = e.Empleado; });
+    renderChips();
+
+    // Build m3 lookup
+    const m3Map = {};
+    tandaM3.forEach(t => { m3Map[t.tanda] = parseFloat(t.m3) || 0; });
+
+    // Build TAL lookup: NP -> lios from texto = NP|LIOS|TANDA
+    const talByNp = {};
+    talEvents.forEach(t => {
+      const parts = (t.texto || '').split('|');
+      if (parts.length >= 2) {
+        const np = parts[0];
+        const lios = parseInt(parts[1]) || 0;
+        talByNp[np] = lios;
+      }
+    });
+
+    // Build CCN lookup: legajo+day -> [NP]
+    const ccnByLegDay = {};
+    ccnEvents.forEach(c => {
+      const parts = (c.texto || '').split('|');
+      const np = parts[0];
+      const dia = toLocalDate(c.ts_cliente);
+      const key = c.legajo + '|' + dia;
+      if (!ccnByLegDay[key]) ccnByLegDay[key] = [];
+      ccnByLegDay[key].push(np);
+    });
+
+    // Build guardado lookup: legajo+day -> cajas
+    const guardByLegDay = {};
+    guardado.forEach(g => {
+      const dia = toLocalDate(g.ts);
+      const key = g.legajo + '|' + dia;
+      if (!guardByLegDay[key]) guardByLegDay[key] = 0;
+      guardByLegDay[key] += Math.abs(parseFloat(g.delta) || 0);
+    });
+
+    // Process productive events
+    DATA = {};
+    selectedLegajos.forEach(leg => { DATA[leg] = {}; });
+
+    // Track which legajo+day combos already got CC/MG output assigned
+    const ccOutputAssigned = new Set();
+    const mgOutputAssigned = new Set();
+
+    productive.forEach(ev => {
+      if (!DATA[ev.legajo]) DATA[ev.legajo] = {};
+      const dia = toLocalDate(ev.ts_cliente);
+      const horas = diffHours(ev.ts_inicio, ev.ts_cliente);
+
+      // Filter anomalous same-day events > 4h
+      const diaInicio = toLocalDate(ev.ts_inicio);
+      if (diaInicio === dia && horas > 4) return;
+      // Cross-day: assign to closing day, cap at reasonable
+      if (diaInicio !== dia && horas > 12) return;
+
+      if (!DATA[ev.legajo][dia]) DATA[ev.legajo][dia] = { events: [], dead: [] };
+
+      let output = 0;
+      let outputUnit = '';
+      let detail = ev.texto || '';
+
+      if (ev.opcion === 'TP' || ev.opcion === 'TAP') {
+        const tanda = ev.texto || '';
+        output = m3Map[tanda] || 0;
+        outputUnit = 'm³';
+      } else if (ev.opcion === 'CC') {
+        outputUnit = 'lios';
+        const ccKey = ev.legajo + '|' + dia;
+        // Assign daily lios only to first CC event of the day
+        if (!ccOutputAssigned.has(ccKey)) {
+          ccOutputAssigned.add(ccKey);
+          const nps = ccnByLegDay[ccKey] || [];
+          let totalLios = 0;
+          nps.forEach(np => { totalLios += (talByNp[np] || 0); });
+          output = totalLios;
+          detail = nps.length + ' NPs, ' + totalLios + ' lios';
+        } else {
+          detail = '(sesion cont.)';
+        }
+      } else if (ev.opcion === 'MG') {
+        outputUnit = 'cajas';
+        const mgKey = ev.legajo + '|' + dia;
+        // Assign daily cajas only to first MG event of the day
+        if (!mgOutputAssigned.has(mgKey)) {
+          mgOutputAssigned.add(mgKey);
+          output = guardByLegDay[mgKey] || 0;
+        }
+      } else if (ev.opcion === 'RT') {
+        const txt = (ev.texto || '').replace(/\s*CAJAS?\s*/i, '');
+        output = parseInt(txt) || 0;
+        outputUnit = 'cajas';
+      }
+
+      DATA[ev.legajo][dia].events.push({
+        opcion: ev.opcion,
+        ts_inicio: ev.ts_inicio,
+        ts_cliente: ev.ts_cliente,
+        horas: horas,
+        output: output,
+        outputUnit: outputUnit,
+        detail: detail
+      });
+    });
+
+    // Process dead time
+    deadTime.forEach(ev => {
+      const dia = toLocalDate(ev.ts_cliente);
+      const horas = diffHours(ev.ts_inicio, ev.ts_cliente);
+      if (horas > 4) return;
+      selectedLegajos.forEach(leg => {
+        if (ev.legajo !== leg) return;
+        if (!DATA[leg]) DATA[leg] = {};
+        if (!DATA[leg][dia]) DATA[leg][dia] = { events: [], dead: [] };
+        DATA[leg][dia].dead.push({
+          opcion: ev.opcion,
+          ts_inicio: ev.ts_inicio,
+          ts_cliente: ev.ts_cliente,
+          horas: horas
+        });
+      });
+    });
+
+    renderTabs();
+
+  } catch(err) {
+    main.innerHTML = '<div class="error-msg">Error: ' + escHtml(err.message) + '</div>';
+    console.error(err);
+  }
+}
+
+function toLocalDate(ts) {
+  // Parse and get date in UTC-3
+  const d = new Date(ts);
+  const utc3 = new Date(d.getTime() - 3*3600000);
+  return utc3.toISOString().split('T')[0];
+}
+
+function toLocalTime(ts) {
+  const d = new Date(ts);
+  const utc3 = new Date(d.getTime() - 3*3600000);
+  return utc3.toISOString().split('T')[1].substring(0,5);
+}
+
+function diffHours(ts1, ts2) {
+  return (new Date(ts2) - new Date(ts1)) / 3600000;
+}
+
+function fmtNum(n, dec) { return n.toFixed(dec === undefined ? 2 : dec); }
+
+function escHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function fmtDate(d) {
+  const parts = d.split('-');
+  return parts[2] + '/' + parts[1];
+}
+
+function dayName(d) {
+  const days = ['Dom','Lun','Mar','Mie','Jue','Vie','Sab'];
+  const dt = new Date(d + 'T12:00:00');
+  return days[dt.getDay()];
+}
+
+function renderTabs() {
+  const tabs = document.getElementById('empTabs');
+  tabs.innerHTML = '';
+  const activeLegajos = selectedLegajos.filter(l => DATA[l] && Object.keys(DATA[l]).length > 0);
+  if (!activeLegajos.length) {
+    document.getElementById('mainContent').innerHTML = '<div class="no-data">Sin datos para los empleados/fechas seleccionados.</div>';
+    return;
+  }
+  if (!activeTab || !activeLegajos.includes(activeTab)) activeTab = activeLegajos[0];
+
+  activeLegajos.forEach(leg => {
+    const btn = document.createElement('button');
+    btn.className = 'emp-tab' + (leg === activeTab ? ' active' : '');
+    const name = allEmps[leg] || 'Leg. ' + leg;
+    const short = name.split(' ').slice(0, 2).join(' ');
+    btn.textContent = short;
+    btn.onclick = () => { activeTab = leg; renderTabs(); };
+    tabs.appendChild(btn);
+  });
+
+  renderEmployeeView(activeTab);
+}
+
+function renderEmployeeView(legajo) {
+  const main = document.getElementById('mainContent');
+  const empData = DATA[legajo] || {};
+  const days = Object.keys(empData).sort();
+
+  if (!days.length) {
+    main.innerHTML = '<div class="no-data">Sin datos para este empleado.</div>';
+    return;
+  }
+
+  // Build summary
+  let html = '';
+  html += '<div class="card">';
+  html += '<div class="legend-row">';
+  html += '<div class="legend-item"><span class="legend-swatch" style="background:var(--c-pick)"></span> Pick</div>';
+  html += '<div class="legend-item"><span class="legend-swatch" style="background:var(--c-arm)"></span> Armado</div>';
+  html += '<div class="legend-item"><span class="legend-swatch" style="background:var(--c-cc)"></span> Carga</div>';
+  html += '<div class="legend-item"><span class="legend-swatch" style="background:var(--c-guard)"></span> Guardado</div>';
+  html += '<div class="legend-item"><span class="legend-swatch" style="background:var(--c-recep)"></span> Recepcion</div>';
+  html += '</div>';
+
+  // Compute stats per day
+  const dayStats = [];
+  let totals = { TP: {h:0,o:0}, TAP: {h:0,o:0}, CC: {h:0,o:0}, MG: {h:0,o:0}, RT: {h:0,o:0}, dead: 0 };
+
+  days.forEach(day => {
+    const d = empData[day];
+    const stats = { TP: {h:0,o:0,evts:[]}, TAP: {h:0,o:0,evts:[]}, CC: {h:0,o:0,evts:[]}, MG: {h:0,o:0,evts:[]}, RT: {h:0,o:0,evts:[]}, dead: 0, deadEvts: [] };
+
+    d.events.forEach(ev => {
+      if (stats[ev.opcion]) {
+        stats[ev.opcion].h += ev.horas;
+        stats[ev.opcion].o += ev.output;
+        stats[ev.opcion].evts.push(ev);
+        totals[ev.opcion].h += ev.horas;
+        totals[ev.opcion].o += ev.output;
+      }
+    });
+
+    d.dead.forEach(ev => {
+      stats.dead += ev.horas;
+      stats.deadEvts.push(ev);
+      totals.dead += ev.horas;
+    });
+
+    dayStats.push({ day, stats });
+  });
+
+  // Summary table
+  html += '<div class="summary-wrap"><table class="summary">';
+  html += '<thead><tr>';
+  html += '<th>Dia</th>';
+  html += '<th>\u{1F6D2} Pick</th>';
+  html += '<th>\u{1F4E6} Arm</th>';
+  html += '<th>\u{1F69B} CC</th>';
+  html += '<th>\u{1F4E5} Guard</th>';
+  html += '<th>\u{1F4CB} Recep</th>';
+  html += '<th>⏸ Muerta</th>';
+  html += '</tr></thead><tbody>';
+
+  dayStats.forEach(({day, stats}, idx) => {
+    html += '<tr>';
+    html += '<td onclick="showDayDetail(\'' + legajo + '\',\'' + day + '\')">' + dayName(day) + ' ' + fmtDate(day) + '</td>';
+
+    ['TP','TAP','CC','MG','RT'].forEach(op => {
+      const s = stats[op];
+      if (s.h < 0.001) {
+        html += '<td class="val-na" onclick="showMetricDetail(\'' + legajo + '\',\'' + day + '\',\'' + op + '\')">-</td>';
+      } else {
+        const rate = s.o / s.h;
+        let cls = '';
+        if (TARGETS[op]) cls = rate >= TARGETS[op] ? 'val-good' : 'val-bad';
+        html += '<td class="' + cls + '" onclick="showMetricDetail(\'' + legajo + '\',\'' + day + '\',\'' + op + '\')">';
+        html += '<div class="cell-metric">';
+        html += '<span class="rate">' + fmtNum(rate) + '</span>';
+        html += '<span class="sub">' + fmtNum(s.o, 1) + ' / ' + fmtNum(s.h, 1) + 'h</span>';
+        html += '</div></td>';
+      }
+    });
+
+    if (stats.dead < 0.001) {
+      html += '<td class="val-na">-</td>';
+    } else {
+      html += '<td onclick="showDayDetail(\'' + legajo + '\',\'' + day + '\')">' + fmtNum(stats.dead, 1) + 'h</td>';
+    }
+    html += '</tr>';
+  });
+
+  // Totals row
+  html += '<tr class="totals"><td>TOTAL (' + days.length + 'd)</td>';
+  ['TP','TAP','CC','MG','RT'].forEach(op => {
+    const t = totals[op];
+    if (t.h < 0.001) {
+      html += '<td class="val-na">-</td>';
+    } else {
+      const rate = t.o / t.h;
+      let cls = '';
+      if (TARGETS[op]) cls = rate >= TARGETS[op] ? 'val-good' : 'val-bad';
+      html += '<td class="' + cls + '"><div class="cell-metric">';
+      html += '<span class="rate">' + fmtNum(rate) + '</span>';
+      html += '<span class="sub">' + fmtNum(t.o, 1) + ' / ' + fmtNum(t.h, 1) + 'h</span>';
+      html += '</div></td>';
+    }
+  });
+  html += '<td>' + fmtNum(totals.dead, 1) + 'h</td>';
+  html += '</tr></tbody></table></div></div>';
+
+  // Stat tiles
+  html += '<div class="card"><div class="stat-row">';
+  const totalProdH = totals.TP.h + totals.TAP.h + totals.CC.h + totals.MG.h + totals.RT.h;
+  html += '<div class="stat-tile"><div class="stat-label">Hs Productivas</div><div class="stat-value">' + fmtNum(totalProdH, 1) + '</div></div>';
+  html += '<div class="stat-tile"><div class="stat-label">Hs Muertas</div><div class="stat-value">' + fmtNum(totals.dead, 1) + '</div></div>';
+  const pct = totalProdH > 0 ? (totalProdH / (totalProdH + totals.dead) * 100) : 0;
+  html += '<div class="stat-tile"><div class="stat-label">% Productivo</div><div class="stat-value" style="color:' + (pct >= 70 ? 'var(--good)' : 'var(--bad)') + '">' + fmtNum(pct, 0) + '%</div></div>';
+  html += '<div class="stat-tile"><div class="stat-label">Dias Trabajados</div><div class="stat-value">' + days.length + '</div></div>';
+  html += '</div></div>';
+
+  html += '<div id="detailContainer"></div>';
+  main.innerHTML = html;
+}
+
+function showDayDetail(legajo, day) {
+  const d = DATA[legajo][day];
+  if (!d) return;
+
+  // Merge all events and sort by time
+  const allEvts = [];
+  d.events.forEach(ev => {
+    allEvts.push({ ...ev, type: 'prod' });
+  });
+  d.dead.forEach(ev => {
+    allEvts.push({ ...ev, type: 'dead', output: 0, outputUnit: '' });
+  });
+  allEvts.sort((a, b) => new Date(a.ts_inicio) - new Date(b.ts_inicio));
+
+  let html = '<div class="card"><div class="detail-panel">';
+  html += '<h3>' + dayName(day) + ' ' + fmtDate(day) + ' - Timeline';
+  html += '<button class="close-detail" onclick="closeDetail()">Cerrar</button></h3>';
+  html += '<div class="timeline">';
+
+  allEvts.forEach(ev => {
+    const cls = ev.type === 'prod' ? (CSS_CLASS[ev.opcion] || '') : '';
+    const label = ev.type === 'prod' ? (ACT_EMOJI[ev.opcion] + ' ' + ACT_LABELS[ev.opcion]) : ('⏸ ' + (DEAD_LABELS[ev.opcion] || ev.opcion));
+    const valStr = ev.type === 'prod' && ev.output > 0 ? fmtNum(ev.output, 1) + ' ' + ev.outputUnit : '';
+
+    html += '<div class="tl-item ' + cls + '">';
+    html += '<span class="tl-time">' + toLocalTime(ev.ts_inicio) + '-' + toLocalTime(ev.ts_cliente) + '</span>';
+    html += '<span class="tl-desc">' + label + ' <span style="color:var(--text-muted)">' + fmtNum(ev.horas * 60, 0) + 'min</span>';
+    if (ev.detail && ev.type === 'prod') html += ' <span style="font-size:0.7rem;color:var(--text-muted)">' + escHtml(ev.detail) + '</span>';
+    html += '</span>';
+    html += '<span class="tl-val">' + valStr + '</span>';
+    html += '</div>';
+  });
+
+  html += '</div></div></div>';
+  document.getElementById('detailContainer').innerHTML = html;
+  document.getElementById('detailContainer').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function showMetricDetail(legajo, day, opcion) {
+  const d = DATA[legajo][day];
+  if (!d) return;
+
+  const evts = d.events.filter(e => e.opcion === opcion);
+  if (!evts.length) { closeDetail(); return; }
+
+  let html = '<div class="card"><div class="detail-panel">';
+  html += '<h3>' + ACT_EMOJI[opcion] + ' ' + ACT_LABELS[opcion] + ' - ' + dayName(day) + ' ' + fmtDate(day);
+  html += '<button class="close-detail" onclick="closeDetail()">Cerrar</button></h3>';
+
+  html += '<div class="metric-detail-list">';
+  html += '<div class="md-row md-header"><span>Detalle</span><span>Tiempo</span><span>Salida</span><span>Ritmo</span></div>';
+
+  let totalH = 0, totalO = 0;
+  evts.forEach(ev => {
+    totalH += ev.horas;
+    totalO += ev.output;
+    const rate = ev.horas > 0 ? ev.output / ev.horas : 0;
+    html += '<div class="md-row">';
+    html += '<span>' + toLocalTime(ev.ts_inicio) + '-' + toLocalTime(ev.ts_cliente) + ' ' + escHtml(ev.detail) + '</span>';
+    html += '<span style="text-align:right">' + fmtNum(ev.horas * 60, 0) + ' min</span>';
+    html += '<span style="text-align:right">' + fmtNum(ev.output, 2) + ' ' + ev.outputUnit + '</span>';
+    html += '<span style="text-align:right;font-weight:600">' + fmtNum(rate) + '</span>';
+    html += '</div>';
+  });
+
+  // Total
+  const totalRate = totalH > 0 ? totalO / totalH : 0;
+  let rateCls = '';
+  if (TARGETS[opcion]) rateCls = totalRate >= TARGETS[opcion] ? 'val-good' : 'val-bad';
+  html += '<div class="md-row" style="font-weight:700;border-top:2px solid var(--border);margin-top:4px;padding-top:6px;">';
+  html += '<span>Total (' + evts.length + ' eventos)</span>';
+  html += '<span style="text-align:right">' + fmtNum(totalH * 60, 0) + ' min</span>';
+  html += '<span style="text-align:right">' + fmtNum(totalO, 2) + ' ' + (evts[0]||{}).outputUnit + '</span>';
+  html += '<span style="text-align:right" class="' + rateCls + '">' + fmtNum(totalRate) + ' ' + ACT_UNIT[opcion] + '</span>';
+  html += '</div>';
+
+  html += '</div></div></div>';
+  document.getElementById('detailContainer').innerHTML = html;
+  document.getElementById('detailContainer').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function closeDetail() {
+  document.getElementById('detailContainer').innerHTML = '';
+}
+
+// Init — fechas dinámicas (hoy y 30 días atrás, Argentina UTC-3)
+(function initDates() {
+  const now = new Date();
+  const ar = new Date(now.getTime() - 3*3600000);
+  const toISO = d => d.toISOString().split('T')[0];
+  document.getElementById('dateTo').value = toISO(ar);
+  const desde = new Date(ar.getTime() - 30*86400000);
+  document.getElementById('dateFrom').value = toISO(desde);
+})();
+
+loadAllEmployees();
+renderChips();
+// No auto-load sin empleados seleccionados
+document.getElementById('mainContent').innerHTML = '<div class="no-data">Agregá un empleado y presioná Cargar.</div>';
+</script>
+</body>
+</html>
