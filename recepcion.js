@@ -1413,7 +1413,9 @@ async function opEnviar() {
       Cod_Art: i.cod,
       Descripcion: i.desc,
       Cantidad: i.cajas,
-      Remito: opState.remito
+      Remito: opState.remito,
+      Tipo_Entrega: opState.tipoEntrega || null,
+      Fecha_RTO: opState.fechaRto || null
     }));
   } else {
     tabla = "Entregas Tallerista Virgilio";
@@ -1423,7 +1425,9 @@ async function opEnviar() {
       Nombre_Tall: opState.tallNombre,
       Cod: i.cod,
       Cajas: i.cajas,
-      Remito: opState.remito
+      Remito: opState.remito,
+      Tipo_Entrega: opState.tipoEntrega || null,
+      Fecha_RTO: opState.fechaRto || null
     }));
   }
 
