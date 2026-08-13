@@ -6545,7 +6545,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v10.34";
+const APP_VERSION = "v10.35";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -11587,10 +11587,17 @@ async function agLoad() {
   agEnsureCss();
   var body = document.getElementById("stkBody"); if (body) body.innerHTML = '<div class="stk-loading">Cargando auditoría de góndola…</div>';
   try {
-    var rows = await supaFetchAllSafe(SUPABASE_AG_ENDPOINT, "select=cod,descripcion,proveedor,stock,proy,pedidos,activo&proy=gt.0");
+    var _agPar = await Promise.all([
+      supaFetchAllSafe(SUPABASE_AG_ENDPOINT, "select=cod,descripcion,proveedor,stock,proy,pedidos,activo&proy=gt.0"),
+      supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Articulos_Discontinuados", "select=cod").catch(function () { return []; })
+    ]);
+    var rows = _agPar[0] || [];
+    // v10.34 — set de discontinuados marcados a mano (además de activo=false).
+    var _agDisc = {}; (_agPar[1] || []).forEach(function (d) { var k = _ocgNorm(d.cod); if (k) _agDisc[k] = true; });
     var items = [];
     (rows || []).forEach(function (r) {
-      if (r.activo === false) return;   // v10.30 — discontinuos (activo=false) no se muestran acá
+      if (r.activo === false) return;                 // v10.30 — discontinuos por OC_Maximos (activo=false)
+      if (_agDisc[_ocgNorm(r.cod)]) return;           // v10.34 — discontinuos marcados a mano (Articulos_Discontinuados)
       var proy = Number(r.proy) || 0; if (proy <= 0) return;
       var stock = Number(r.stock) || 0, pedidos = Number(r.pedidos) || 0;
       var neta = stock - pedidos;
