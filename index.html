@@ -10023,7 +10023,7 @@ function _stkSaldosFromView(rows) {
   (rows || []).forEach(function (r) {
     var k = String(r.cod || "");
     if (!k) return;
-    m[k] = { cod: k, desc: r.descripcion || "", terminado: Number(r.terminado) || 0, excedente: Number(r.excedente) || 0, separar_pedidos: Number(r.separar_pedidos) || 0, a_facturar: Number(r.a_facturar) || 0, a_guardar: Number(r.a_guardar) || 0, racks: Number(r.racks) || 0, racks_ch: Number(r.racks_ch) || 0, para_envasar: Number(r.para_envasar) || 0, insumos: Number(r.insumos_dep) || 0, _uni: "", _ubi: "" };
+    m[k] = { cod: k, desc: r.descripcion || "", linea: r.linea || "", terminado: Number(r.terminado) || 0, excedente: Number(r.excedente) || 0, separar_pedidos: Number(r.separar_pedidos) || 0, a_facturar: Number(r.a_facturar) || 0, a_guardar: Number(r.a_guardar) || 0, racks: Number(r.racks) || 0, racks_ch: Number(r.racks_ch) || 0, para_envasar: Number(r.para_envasar) || 0, insumos: Number(r.insumos_dep) || 0, _uni: "", _ubi: "" };
   });
   return m;
 }
