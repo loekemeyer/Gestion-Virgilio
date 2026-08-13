@@ -6546,7 +6546,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v10.38";
+const APP_VERSION = "v10.39";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -11626,9 +11626,17 @@ async function agLoad() {
   agEnsureCss();
   var body = document.getElementById("stkBody"); if (body) body.innerHTML = '<div class="stk-loading">Cargando auditoría de góndola…</div>';
   try {
-    var rows = await supaFetchAllSafe(SUPABASE_AG_ENDPOINT, "select=cod,descripcion,proveedor,stock,proy,pedidos&proy=gt.0");
+    var _agPar = await Promise.all([
+      supaFetchAllSafe(SUPABASE_AG_ENDPOINT, "select=cod,descripcion,proveedor,stock,proy,pedidos,activo&proy=gt.0"),
+      supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Articulos_Discontinuados", "select=cod").catch(function () { return []; })
+    ]);
+    var rows = _agPar[0] || [];
+    // v10.35 — set de discontinuados marcados a mano (además de activo=false).
+    var _agDisc = {}; (_agPar[1] || []).forEach(function (d) { var k = _ocgNorm(d.cod); if (k) _agDisc[k] = true; });
     var items = [];
     (rows || []).forEach(function (r) {
+      if (r.activo === false) return;                 // v10.30 — discontinuos por OC_Maximos (activo=false)
+      if (_agDisc[_ocgNorm(r.cod)]) return;           // v10.35 — discontinuos marcados a mano (Articulos_Discontinuados)
       var proy = Number(r.proy) || 0; if (proy <= 0) return;
       var stock = Number(r.stock) || 0, pedidos = Number(r.pedidos) || 0;
       var neta = stock - pedidos;
@@ -11637,7 +11645,8 @@ async function agLoad() {
       items.push({ cod: r.cod, desc: r.descripcion || "", tall: (String(r.proveedor || "").trim() || "(sin tallerista)"),
         fam: agFamilia(r.descripcion), stock: stock, proy: proy, pedidos: pedidos, pct: pct });
     });
-    items.sort(function (a, b) { return String(a.tall).localeCompare(String(b.tall)) || String(a.fam).localeCompare(String(b.fam)) || (a.pct - b.pct); });
+    // v10.30 — dentro de cada tallerista, de MENOR a MAYOR por % de góndola (el peor primero).
+    items.sort(function (a, b) { return String(a.tall).localeCompare(String(b.tall)) || (a.pct - b.pct); });
     if (_stk) { _stk.agData = items; _stk.agLoaded = true; }
     stkRender();
   } catch (e) { if (body) body.innerHTML = '<div class="stk-loading">Error cargando: ' + escapeHtml(e.message || String(e)) + '</div>'; }
@@ -11647,7 +11656,7 @@ function stkBodyAuditGon() {
   var n = items.length;
   var h = '<div class="ag-bar"><div class="ag-title">🔍 Góndola &lt; 25% de la proyección · <b>' + n + '</b> ítem(s)</div>' +
     '<div class="ag-btns"><button class="ag-btn xls" onclick="agExportExcel()">📥 Excel</button><button class="ag-btn pdf" onclick="agExportPdf()">🖨 PDF</button></div></div>';
-  h += '<div class="ag-note">Ocupación = (stock total de <b>todos los estadios</b> − <b>pedidos</b>) ÷ <b>proyección</b>. Ordenado por <b>tallerista</b> y, dentro, por <b>familia</b> (familia = 1ª palabra de la descripción; no hay familia de producto real cargada en el sistema).</div>';
+  h += '<div class="ag-note">Ocupación = (stock total de <b>todos los estadios</b> − <b>pedidos</b>) ÷ <b>proyección</b>. Ordenado por <b>tallerista</b> y, dentro, por <b>% de góndola de menor a mayor</b> (el peor primero). Los <b>discontinuos</b> (activo=false o marcados a mano) no se muestran.</div>';
   if (!n) { h += '<div class="stk-loading">No hay ítems por debajo del 25%. 👍</div>'; return h; }
   h += '<div class="ag-wrap"><table class="ag-tbl"><thead><tr>' +
     '<th>Código</th><th>Descripción</th><th class="num">% góndola</th><th class="num">Stock total</th><th class="num">Proyección</th><th class="num">Pedidos</th><th>Familia</th>' +
@@ -18939,12 +18948,14 @@ function renderGuardarOrden() {
   // ahora a góndola (totCajas del filtro activo), misma base que muestra la tabla → siempre fresco.
   const _gRate = (_gorden && _gorden.rate > 0) ? _gorden.rate : stkGRate();
   const _gHoras = _gRate > 0 ? Math.round((totCajas / _gRate) * 10) / 10 : 0;
+  // v10.36 — si es menos de 1 hora, mostrarlo en minutos (más claro para el operario).
+  const _gDisp = (_gRate > 0 && _gHoras > 0 && _gHoras < 1) ? (Math.round((totCajas / _gRate) * 60) + ' min') : (_gHoras + ' h');
   const _gCol = _gHoras > 6 ? "#b91c1c" : (_gHoras >= 4 ? "#b45309" : "#166534");
   const _gBg = _gHoras > 6 ? "#fef2f2" : (_gHoras >= 4 ? "#fffbeb" : "#f0fdf4");
   const _gBd = _gHoras > 6 ? "#fca5a5" : (_gHoras >= 4 ? "#fcd34d" : "#86efac");
   h += '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:' + _gBg + ';border:1.5px solid ' + _gBd + ';border-radius:12px;padding:10px 14px;margin-bottom:10px;">' +
     '<div style="flex:0 1 auto;min-width:0;"><span style="font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:#64748b;font-weight:800;">⏱ Horas de guardado pendientes</span><br>' +
-    '<span style="font-size:26px;font-weight:800;color:' + _gCol + ';font-variant-numeric:tabular-nums;">' + _gHoras + ' h</span> ' +
+    '<span style="font-size:26px;font-weight:800;color:' + _gCol + ';font-variant-numeric:tabular-nums;">' + _gDisp + '</span> ' +
     '<span style="font-size:12.5px;color:#64748b;">' + totCajas + ' cajas ÷ ' + Math.round(_gRate) + ' cajas/h</span>' +
     (_gHoras > 6 ? '<br><span style="font-size:12px;font-weight:800;color:#b91c1c;">🆘 Más de 6 h — pedir personal a Cervantes</span>' : '') +
     '</div></div>';
@@ -30907,6 +30918,9 @@ let _facCorrRows = null;
 async function facCorreccReload(){
   _facCorrRows = null;
   try { _facCorrRows = await facCorreccDataRich(); } catch(_e){ _facCorrRows = []; }
+  // v10.37 — solo se muestran los cambios URGENTES (el secundario está en 0). Si el secundario
+  // tiene stock, se manda tal cual sin tocar la NP → no aparece acá (pedido del usuario).
+  _facCorrRows = (_facCorrRows || []).filter(function(p){ return _corrItemUrgente(p); });
   facCorreccRender();
 }
 function facCorreccFiltro(f){ _facCorrFiltro = f; facCorreccRender(); }
@@ -30915,36 +30929,23 @@ function facCorreccRender(){
   const rows = _facCorrRows;
   if (rows === null){ body.innerHTML = '<div style="text-align:center;color:#64748b;padding:20px;">Cargando…</div>'; return; }
   facCorreccRefreshCount();
-  // v10.27 — URGENTE = una NP que SÍ o SÍ hay que corregir: el secundario NO cubre lo pedido
-  // (stkSec < cajas). Si el secundario alcanza (stkSec >= cajas) se manda tal cual → NO urgente.
-  const urgentNps = {};
-  rows.forEach(function(p){ if (_corrItemUrgente(p)) urgentNps[p.np] = 1; });
-  // Pestañas de filtro por estado (con conteo) — "🔴 Urgentes" cruza todos los estados.
-  const TABS = [["todo","Todo"],["urgente","🔴 Urgentes"],["facturado","Facturado"],["afacturar","Para facturar"],["pickeado","Pickeado"],["enpicking","En picking"],["sinpickear","Sin pickear"]];
+  // v10.37 — el módulo ya viene filtrado a URGENTES (secundario en 0). Las pestañas separan por estado.
+  const TABS = [["todo","Todo"],["facturado","Facturado"],["afacturar","Para facturar"],["pickeado","Pickeado"],["enpicking","En picking"],["sinpickear","Sin pickear"]];
   // v8.44 — contar NPs DISTINTAS a corregir (unidad de acción: se cambia una vez por NP en el ERP),
   // no la cantidad de ítems (una NP puede tener varias líneas en código secundario).
   const npsBy = {}, allNps = {};
   rows.forEach(function(p){ allNps[p.np] = 1; (npsBy[p.estado] = npsBy[p.estado] || {})[p.np] = 1; });
-  const cntOf = function(k){ return k==="todo" ? Object.keys(allNps).length : k==="urgente" ? Object.keys(urgentNps).length : Object.keys(npsBy[k]||{}).length; };
+  const cntOf = function(k){ return k==="todo" ? Object.keys(allNps).length : Object.keys(npsBy[k]||{}).length; };
   let h = '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">';
   TABS.forEach(function(t){
     const on = _facCorrFiltro === t[0];
-    const isU = t[0] === "urgente";
-    const accent = isU ? "#dc2626" : "#1e6bd6";
-    const bd = on ? accent : (isU ? "#fca5a5" : "#cbd5e1");
-    const bg = on ? accent : (isU ? "#fef2f2" : "#fff");
-    const fg = on ? "#fff" : (isU ? "#b91c1c" : "#334155");
-    h += '<button onclick="facCorreccFiltro(\'' + t[0] + '\')" style="width:auto;flex:0 0 auto;padding:6px 11px;border-radius:999px;border:1px solid ' + bd + ';background:' + bg + ';color:' + fg + ';font-size:12px;font-weight:800;cursor:pointer;">' + t[1] + ' (' + cntOf(t[0]) + ')</button>';
+    h += '<button onclick="facCorreccFiltro(\'' + t[0] + '\')" style="width:auto;flex:0 0 auto;padding:6px 11px;border-radius:999px;border:1px solid ' + (on?'#1e6bd6':'#cbd5e1') + ';background:' + (on?'#1e6bd6':'#fff') + ';color:' + (on?'#fff':'#334155') + ';font-size:12px;font-weight:800;cursor:pointer;">' + t[1] + ' (' + cntOf(t[0]) + ')</button>';
   });
   h += '</div>';
-  if (!rows.length){ body.innerHTML = h + '<div style="text-align:center;color:#16a34a;padding:24px;font-weight:700;">✅ No hay códigos para corregir.</div>'; return; }
-  const pend = _facCorrFiltro === "todo" ? rows
-             : _facCorrFiltro === "urgente" ? rows.filter(function(p){ return urgentNps[p.np]; })
-             : rows.filter(function(p){ return p.estado === _facCorrFiltro; });
-  h += '<div style="font-size:12.5px;color:#64748b;margin-bottom:10px;">' + (_facCorrFiltro === "urgente"
-        ? '🔴 <b>Urgentes</b>: el código secundario está en <b>0</b> (sin stock) → hay que cambiar la NP al principal SÍ o SÍ (los que tienen algo de secundario no aparecen acá).'
-        : 'Estos pedidos entraron en un código <b>secundario</b>. Cambiá la NP en el ERP al principal y confirmá acá — el picking va a levantar el principal.') + '</div>';
-  if (!pend.length){ body.innerHTML = h + '<div style="text-align:center;color:#16a34a;padding:20px;font-weight:700;">' + (_facCorrFiltro === "urgente" ? '✅ No hay urgentes — todos tienen algo de stock del secundario.' : 'No hay pedidos en este estado.') + '</div>'; return; }
+  if (!rows.length){ body.innerHTML = h + '<div style="text-align:center;color:#16a34a;padding:24px;font-weight:700;">✅ No hay cambios urgentes. Los que tienen stock del secundario se mandan tal cual (no aparecen acá).</div>'; return; }
+  const pend = _facCorrFiltro === "todo" ? rows : rows.filter(function(p){ return p.estado === _facCorrFiltro; });
+  h += '<div style="font-size:12.5px;color:#64748b;margin-bottom:10px;">🔴 <b>Solo urgentes</b>: el código secundario está en <b>0</b> → hay que cambiar la NP al principal SÍ o SÍ. Los que el secundario cubre se mandan tal cual y no aparecen acá.</div>';
+  if (!pend.length){ body.innerHTML = h + '<div style="text-align:center;color:#94a3b8;padding:20px;">No hay urgentes en este estado.</div>'; return; }
   // Agrupar por NP: 1 cambio → botón directo; varios → un solo botón que abre pop-up con checkboxes.
   const BTN = 'width:auto;flex:0 0 auto;background:#16a34a;color:#fff;border:none;border-radius:9px;padding:9px 13px;font-size:13px;font-weight:800;cursor:pointer;white-space:nowrap;';
   const order = [], byNp = {};
