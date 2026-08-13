@@ -6619,7 +6619,7 @@ async function initStkBadge() {
     if (!_stk) {
       _stk = {};
     }
-    var saldos = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/stocks_carga_rapida", "select=cod,cod_base,descripcion,linea,familia_principal,es_secundario,terminado,excedente,separar_pedidos,a_facturar,a_guardar,racks,racks_ch,para_envasar,insumos_dep,stock_total,cajas_pedidas,proy_cajas_mes,capacidad_gondola,es_insumo,visible_en_stock");
+    var saldos = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/stocks_carga_rapida", "select=cod,cod_base,descripcion,linea,familia_principal,es_secundario,terminado,excedente,separar_pedidos,a_facturar,a_guardar,racks,racks_ch,para_envasar,insumos_dep,stock_total,cajas_pedidas,proy_cajas_mes,capacidad_gondola,es_insumo,visible_en_stock,fc_sin_salida");
     if (saldos && Array.isArray(saldos) && saldos.length > 0) {
       _stk.viewRows = saldos;
       updateStkBadge();
@@ -10140,19 +10140,23 @@ async function openStockAdmin(soloConteo) {
 
   try {
     // v10.41: Cargar stocks_carga_rapida primero (fast) y renderizar instant
-    var saldosRapido = (_stk && _stk.viewRows && _stk.viewRows.length > 0) ? _stk.viewRows : await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/stocks_carga_rapida", "select=cod,cod_base,descripcion,linea,familia_principal,es_secundario,terminado,excedente,separar_pedidos,a_facturar,a_guardar,racks,racks_ch,para_envasar,insumos_dep,stock_total,cajas_pedidas,proy_cajas_mes,capacidad_gondola,es_insumo,visible_en_stock").catch(function(){ return []; });
+    var saldosRapido = (_stk && _stk.viewRows && _stk.viewRows.length > 0) ? _stk.viewRows : await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/stocks_carga_rapida", "select=cod,cod_base,descripcion,linea,familia_principal,es_secundario,terminado,excedente,separar_pedidos,a_facturar,a_guardar,racks,racks_ch,para_envasar,insumos_dep,stock_total,cajas_pedidas,proy_cajas_mes,capacidad_gondola,es_insumo,visible_en_stock,fc_sin_salida").catch(function(){ return []; });
 
-    // v10.41: Inicializar _stk con stocks_carga_rapida para renderizar instant (sin esperar Promise.all())
+    // v10.41: Inicializar _stk con stocks_carga_rapida para renderizar instant
     var _demFromView_Rápido = {};
     var _proyMap_Rápido = {};
+    var _capRápido = [];
+    var _fcsRápido = { pend: {}, porArt: {} };
     (saldosRapido || []).forEach(function (r) {
       var k = _ocgNorm(r.cod);
       if (k && Number(r.cajas_pedidas) > 0) _demFromView_Rápido[k] = Number(r.cajas_pedidas);
       if (k && Number(r.proy_cajas_mes) > 0) _proyMap_Rápido[k] = Number(r.proy_cajas_mes);
+      if (k && Number(r.capacidad_gondola) > 0) _capRápido.push({ cod: r.cod, cajas_max: Number(r.capacidad_gondola) });
+      if (k && Number(r.fc_sin_salida) > 0) _fcsRápido.porArt[k] = { cod: r.cod, cajas: Number(r.fc_sin_salida) };
     });
     var _insFromView_Rápido = (saldosRapido || []).filter(function (r) { return r.es_insumo; }).map(function (r) { return String(r.cod).trim().toUpperCase(); });
 
-    _stk = { movs: [], cutoff: {}, factors: {}, ordenes: [], bajadas: [], tab: _solo ? "conteo" : "stocks", soloConteo: _solo, filtro: "", openArt: null, ingMode: "remito", asOf: null, asOfInput: "", dem: _demFromView_Rápido, cap: [], gConf: [], fcs: { pend: {}, porArt: {} }, fcsLoaded: false, insumosCods: _insFromView_Rápido, cxm: {}, proy: _proyMap_Rápido, viewRows: saldosRapido, alertas: [] };
+    _stk = { movs: [], cutoff: {}, factors: {}, ordenes: [], bajadas: [], tab: _solo ? "conteo" : "stocks", soloConteo: _solo, filtro: "", openArt: null, ingMode: "remito", asOf: null, asOfInput: "", dem: _demFromView_Rápido, cap: _capRápido, gConf: [], fcs: _fcsRápido, fcsLoaded: false, insumosCods: _insFromView_Rápido, cxm: {}, proy: _proyMap_Rápido, viewRows: saldosRapido, alertas: [] };
     stkRender();  // Renderizar instant con stocks_carga_rapida
 
     // v10.34: Cargar datos completos en background (sin bloquear)
