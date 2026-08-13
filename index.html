@@ -10033,9 +10033,51 @@ async function openStockAdmin(soloConteo) {
     var _insFromView = _viewRows.filter(function (r) { return r.es_insumo; }).map(function (r) { return String(r.cod).trim().toUpperCase(); });
     _stk = { movs: res[0] || [], cutoff: res[1], factors: _fac, ordenes: res[3] || [], bajadas: res[4] || [], tab: _solo ? "conteo" : "stocks", soloConteo: _solo, filtro: "", openArt: null, ingMode: "remito", asOf: null, asOfInput: "", dem: _demFromView, cap: res[7] || [], gConf: res[8] || [], fcs: res[9] || { pend: {}, porArt: {} }, fcsLoaded: true, insumosCods: _insFromView, cxm: _cxmMerge, proy: _proyMap, viewRows: _viewRows, alertas: res[13] || [] };
     stkRender();
+    stkSubscribeRealtime();
   } catch (e) { const b = document.getElementById("stkBody"); if (b) b.innerHTML = '<div class="stk-loading">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
 }
-function closeStockAdmin() { const ov = document.getElementById("stockAdminOverlay"); if (ov) ov.classList.remove("show"); _stk = null; }
+/* v10.30: Suscripción realtime a cambios de stock (PKC descuentos tiempo real). */
+let _stkRtSub = null;
+function stkSubscribeRealtime() {
+  if (!_stk || _stkRtSub) return;   // si ya está suscrito o _stk es null, no hacer nada
+  try {
+    // Suscribirse a cambios en Movimientos_Stock (filtro: tipo en picking/separado, post-activación)
+    _stkRtSub = SUPABASE_CLIENT.from("Movimientos_Stock")
+      .on("*", function (payload) {
+        if (!_stk) { if (_stkRtSub) _stkRtSub.unsubscribe(); _stkRtSub = null; return; }
+        const mv = payload.new || payload.old;
+        if (!mv) return;
+        const cod = String(mv.cod_art || "").toUpperCase();
+        const tipo = String(mv.tipo || "").toLowerCase();
+        // Solo actualizar si es picking/separado (rutas que importan para la vista)
+        if (!["picking", "separado"].includes(tipo)) return;
+        // Buscar fila del código en la tabla actual
+        const row = document.querySelector('tr.stk-row[data-stk-cod="' + escapeHtml(cod) + '"]');
+        if (!row) return;   // no está en la tabla abierta
+        // Refrescar la tabla: recargar saldos del servidor y re-renderizar
+        // (es más simple que actualizar celda por celda y garantiza consistencia)
+        (async function() {
+          try {
+            const updated = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/vista_stock_procesada", "select=*");
+            if (!_stk) return;
+            _stk.viewRows = updated || [];
+            // Recalcular mapas de demanda/proyección
+            var _demFromView = {}, _proyMap = {};
+            (updated || []).forEach(function (r) {
+              var k = _ocgNorm(r.cod);
+              if (k && Number(r.cajas_pedidas) > 0) _demFromView[k] = Number(r.cajas_pedidas);
+              if (k && Number(r.proy_cajas_mes) > 0) _proyMap[k] = Number(r.proy_cajas_mes);
+            });
+            _stk.dem = _demFromView;
+            _stk.proy = _proyMap;
+            stkRender();   // re-renderizar conservando focus
+          } catch (_e) {}
+        })();
+      })
+      .subscribe();
+  } catch (_e) {}
+}
+function closeStockAdmin() { const ov = document.getElementById("stockAdminOverlay"); if (ov) ov.classList.remove("show"); if (_stkRtSub) { _stkRtSub.unsubscribe(); _stkRtSub = null; } _stk = null; }
 
 /* ===== ÓRDENES DE COMPRA (v4.11): visualización/carga de OCs y match recibido vs pedido.
    Usa la tabla EXISTENTE Ordenes_Compra (plana: una fila por artículo pedido — codigo,
@@ -12809,7 +12851,7 @@ function stkBodyStocks() {
     }
     const _pinned = _pinSet.has(String(a.cod).trim().toUpperCase());
     tds += '<td class="stk-caret" style="white-space:nowrap;"><span onclick="event.stopPropagation();stkTogglePin(\'' + encodeURIComponent(a.cod) + '\')" title="' + (_pinned ? "Soltar" : "Fijar") + ' este código (se guarda)" style="cursor:pointer;margin-right:7px;' + (_pinned ? "" : "opacity:.28;") + '">📌</span>' + (_stk.openArt === a.cod ? "▾" : "✚") + '</td>';
-    h += '<tr class="stk-row" onclick="stockToggleArt(\'' + encodeURIComponent(a.cod) + '\')">' + tds + '</tr>';
+    h += '<tr class="stk-row" data-stk-cod="' + escapeHtml(String(a.cod).toUpperCase()) + '" onclick="stockToggleArt(\'' + encodeURIComponent(a.cod) + '\')">' + tds + '</tr>';
     if (_stk.openArt === a.cod) {
       const _lim = _stk.asOf ? new Date(_stk.asOf).getTime() : 0;
       const det = _stk.movs.filter(function (mv) { return String(mv.cod_art) === a.cod && !(_stk.cutoff && new Date(mv.ts).getTime() < new Date(_stk.cutoff).getTime()) && !(_lim && new Date(mv.ts).getTime() > _lim); });
