@@ -4,7 +4,67 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-12 · Versión app al documentar: **v10.18**
+> Última actualización: 2026-08-12 · Versión app al documentar: **v10.25**
+>
+> Nota **v10.25 — Un solo espejo del Sheet "Pedidos Entregados" (se eliminó el duplicado).**
+> Esa hoja se estaba espejando **DOS VECES**: (a) el Apps Script la empujaba a
+> `PPP_Pedidos_Entregados` (solo `tanda`+`mt3`), y (b) la función Postgres
+> `sync_ppp_entregados_meta()` la baja sola cada 30 min a `PPP_Entregados_Meta` (np, cod, rs,
+> tanda, m3, fecha_entrega). La (b) es **superconjunto** de la (a). Se dejó solo la (b).
+> **Verificado ANTES de tocar**, sobre las **942 tandas realmente trabajadas** (EP/TP/AP/TAP):
+> cobertura **883 → 883** (0 perdidas, 0 ganadas) y **880 de 883** con el m³ idéntico; las 3 que
+> difieren son de feb–may y por **< 0,6 m³**. Las dos tablas ya coincidían en 983 de 987 tandas.
+> **Cambios:** `vista_tanda_m3` lee `PPP_Entregados_Meta` (y de paso **excluye la tanda vacía**,
+> que la versión anterior colaba como una fila más); `SUPABASE_PPP_ENTREGADOS_ENDPOINT` en
+> index.html apunta a la tabla nueva y la columna pasa de `mt3` a **`m3`**; se sacó la línea
+> `'PPP Excel Pedidos Entregados 2026'` del `PPP_SUPABASE_MAP` en `apps-script/sync-ppp-supabase.gs`.
+> ⚠ **PENDIENTE MANUAL:** hay que **re-pegar el `.gs` en el proyecto de Apps Script** para que deje
+> de empujar. Hasta que se haga, sigue escribiendo la tabla vieja — es inofensivo (ya nadie la lee).
+> **La tabla `PPP_Pedidos_Entregados` NO se borró todavía**, a propósito: queda de red de seguridad
+> hasta confirmar que el Apps Script se actualizó. Recrearla está en `sql/ppp_supabase.sql`.
+>
+> Nota **v10.24 — Las librerías se sirven desde el repo (`vendor/`), no de CDNs de terceros.**
+> Antes la app bajaba 7 librerías de 4 hosts ajenos en cada carga. **6 ya están adentro**
+> (bajadas de **npm**, que es la fuente oficial de cada paquete; los CDN estaban bloqueados por
+> el proxy del entorno):
+> `jspdf.umd.min.js` (2.5.1) · `jspdf.plugin.autotable.min.js` (3.8.2) · `chart.umd.min.js`
+> (4.4.1) · `leaflet.min.js`+`.css` (1.9.4) + **`vendor/images/`** · `supabase.umd.js` (2.112.3).
+> **Las imágenes de Leaflet hacen falta**: el mapa pone un `L.marker` para el depósito y Leaflet
+> busca los íconos relativo a dónde cargó su script (`vendor/images/`); sin eso el marcador sale roto.
+> **supabase-js cambió de forma**: era `import ... from "https://esm.sh/@supabase/supabase-js@2"`
+> dentro de `recepcion.js` — **si esm.sh fallaba, Recepción no abría**. Ahora `index.html` carga el
+> build **UMD** con un `<script>` clásico **antes** del módulo (los módulos son diferidos, así que
+> `window.supabase` ya existe) y `recepcion.js` hace
+> `const { createClient } = window.supabase` con un throw claro si falta. Se usa el UMD porque es el
+> único autocontenido: `dist/index.mjs` trae imports "bare" (`@supabase/auth-js`…) y necesitaría bundler.
+> Efecto colateral bueno: la versión queda **fijada** (antes `@2` resolvía a la última v2, o sea la app
+> cambiaba de versión sola).
+> ⚠ **`xlsx` (SheetJS 0.20.3) sigue viniendo del CDN, a propósito.** SheetJS dejó de publicar en npm
+> en la **0.18.5** y sólo distribuye por `cdn.sheetjs.com`. Bajar a la 0.18.5 **no es opción**:
+> arrastra vulnerabilidades corregidas en 0.19.3 (prototype pollution) y 0.20.2 (ReDoS). Impacto
+> acotado: se carga **a demanda** (importar PPP / exportar Excel de Stock), no en cada arranque.
+> Smoke **`tests/vendor-sin-cdn.cjs`**: sirve la app por HTTP en localhost (los módulos ES no corren
+> bajo `file://` por CORS) con **toda** salida a internet abortada, y verifica que jsPDF, autotable,
+> Chart, Leaflet, supabase-js y `recepcion.js` funcionen igual.
+>
+> Nota **v10.23 — La TV del depósito ya no dice "Sin conexión" cada minuto.**
+> Síntoma: en el stick tipo Chromecast saltaba el cartel amarillo ⚠ cada ~1 min, con el
+> **WiFi vivo**. Causa: `refreshMonitor` mostraba el cartel ante **UN SOLO** fetch fallado, y
+> `supaFetchAll` **no tiene ni timeout ni reintento** — así que cualquier hipo normal de un
+> stick barato (ahorro de energía del WiFi, DNS lento, TLS) lo disparaba. No era la red.
+> **Fix en 3 capas:** (1) **`_monReintentar`** — cada ciclo reintenta `MON_REINTENTOS`(3) veces
+> con backoff 1,2s/2,4s, así el hipo se recupera dentro del mismo ciclo y nadie ve nada;
+> (2) **tolerancia** — el cartel grande recién tras `MON_FALLOS_P_CARTEL`(4) ciclos SEGUIDOS
+> fallando (**~2 min** con el refresh de 30s), y el texto pasó a *"Sin actualizar desde las
+> HH:MM (N min) — reintentando"*, que es lo cierto; el indicador chico "● desactualizado" sigue
+> mostrando cada fallo y **los datos viejos nunca se borran de la pantalla**;
+> (3) **watchdog** — si pasan `MON_RELOAD_MS`(10 min) sin un solo refresh bueno no es la red,
+> es un cuelgue → `location.reload()`. **Solo en modo kiosko** (`window.__tvKioskMode`): nunca
+> se le recarga la página a un supervisor que la está usando, y exige un refresh OK previo para
+> que un arranque sin red no entre en loop de recargas.
+> El refresco sigue siendo cada **30 s** (`MONITOR_REFRESH_MS`). Smoke `tests/monitor-red-tolerante.cjs`.
+> ⚠ Las constantes son `const` de nivel script: existen como globales léxicas pero **NO** cuelgan
+> de `window` (los tests deben usarlas por nombre pelado, no `window.MON_...`).
 >
 > Nota **2026-08-12 — Aviso por Telegram de "faltantes facturados sin completar".**
 > Función `notificar_faltantes_sin_completar_telegram()` + cron **`faltantes-sin-completar`**
@@ -350,7 +410,7 @@
 > Cajas por pila, Sueltas, Contado (cajas), **Stock del sistema** (góndola+excedente, mismo cálculo
 > que la comparación), Diferencia y En proceso. Formato Excel es-AR (BOM utf-8, `;`, coma decimal).
 >
-> Nota **v10.23** — **Carga Camión (CC): orden de carga (inverso de la ruta) + ubicación física por NP.**
+> Nota **v10.26** — **Carga Camión (CC): orden de carga (inverso de la ruta) + ubicación física por NP.**
 > Cierra el follow-up de v5.86 ("mostrar la ubicación por NP en carga de camión"). El reparto de
 > Carga Camión (`fetchCCData` → `showCargaCamion`/`ccRender`) ahora enriquece cada NP con dos cosas
 > vía la función nueva **`_ccAttachUbicYOrden(items)`**: **(a) UBICACIÓN física** = último evento
@@ -365,7 +425,7 @@
 > Retira/Súper/Expo) caen en una sección aparte **"📍 Sin ubicación en ruta — cargar aparte"** al final.
 > Todo **best-effort**: si falla el fetch de AUB, PPP o la cache de geo, el reparto se muestra igual
 > (sin orden ni ubicación, orden viejo por tanda como fallback). Solo front (lee eventos/tablas ya
-> existentes; sin cambios de backend). Bump `APP_VERSION` + `SW_VERSION` `v10.23`.
+> existentes; sin cambios de backend). Bump `APP_VERSION` + `SW_VERSION` `v10.26`.
 >
 > Nota **v10.22** — **PPP: "En viaje" renombrado a "En Salida".** El tab del PPP que junta los
 > pedidos **facturados** que ya salieron de la Programación pero sin entrega confirmada (`_pppEnViajeHtml`,
@@ -392,7 +452,7 @@
 > saca esos NP. Muestra un aviso "🚛 N pedido(s) ya cargados al camión — fuera de la ruta". Así el
 > repartidor no ve como parada lo que ya subió al camión.
 >
-> Nota **v10.19** — **Ruteo: "Abrir en Google Maps" en tramos (>9 paradas).** El link de Maps
+> Nota **v10.23** — **Ruteo: "Abrir en Google Maps" en tramos (>9 paradas).** El link de Maps
 > (`_rtMapsUrl`, ahora `_rtMapsUrls`) mandaba TODAS las paradas como `waypoints`, pero Google Maps
 > corta en **~9 waypoints**: una ruta de 16 paradas abría solo 9. Ahora la ruta se parte en **tramos
 > de ≤9 waypoints**, encadenados (el destino de un tramo es el origen del siguiente), empezando y

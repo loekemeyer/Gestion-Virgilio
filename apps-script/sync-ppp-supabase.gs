@@ -30,9 +30,17 @@
  *  app (index.html): Programación y Base por posición, Entregados por header.
  * ===================================================================== */
 
+/* v10.25 (2026-08-12) — SE SACÓ 'PPP Excel Pedidos Entregados 2026'.
+ * Esa hoja se estaba espejando DOS VECES: por acá (→ PPP_Pedidos_Entregados, solo
+ * tanda+mt3) y por la función Postgres `sync_ppp_entregados_meta()`, que la baja sola
+ * cada 30 min (→ PPP_Entregados_Meta, con np, cod, rs, tanda, m3 y fecha_entrega).
+ * La segunda es superconjunto de la primera, así que se dejó solo esa.
+ * Verificado antes de sacarla: sobre las 942 tandas trabajadas, la cobertura de m³ es
+ * idéntica (883 → 883, 0 perdidas) y 880 coinciden al decimal.
+ * ⚠ Si algún día se quiere volver atrás, alcanza con reponer la línea acá y recrear la
+ * tabla (ver sql/ppp_supabase.sql). */
 var PPP_SUPABASE_MAP = {
   'PPP Excel Programacion Diaria':     'PPP_Programacion_Diaria',
-  'PPP Excel Pedidos Entregados 2026': 'PPP_Pedidos_Entregados',
   'PPP Excel Base Datos Pedidos':      'PPP_Base_Pedidos'
 };
 
