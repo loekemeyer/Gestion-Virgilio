@@ -10229,11 +10229,11 @@ function stkSubscribeRealtime() {
         // Buscar fila del código en la tabla actual
         const row = document.querySelector('tr.stk-row[data-stk-cod="' + escapeHtml(cod) + '"]');
         if (!row) return;   // no está en la tabla abierta
-        // Refrescar la tabla: recargar saldos del servidor y re-renderizar
-        // (es más simple que actualizar celda por celda y garantiza consistencia)
+        // v10.42: recargar desde stocks_carga_rapida (saldos instantáneos vía trigger)
+        // en vez de vista_stock_procesada (materializada cada 5 min)
         (async function() {
           try {
-            const updated = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/vista_stock_procesada", "select=*");
+            const updated = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/stocks_carga_rapida", "select=cod,cod_base,descripcion,linea,familia_principal,es_secundario,terminado,excedente,separar_pedidos,a_facturar,a_guardar,racks,racks_ch,para_envasar,insumos_dep,stock_total,cajas_pedidas,proy_cajas_mes,capacidad_gondola,es_insumo,visible_en_stock,fc_sin_salida");
             if (!_stk) return;
             _stk.viewRows = updated || [];
             // Recalcular mapas de demanda/proyección
@@ -10245,7 +10245,8 @@ function stkSubscribeRealtime() {
             });
             _stk.dem = _demFromView;
             _stk.proy = _proyMap;
-            stkRender();   // re-renderizar conservando focus
+            updateStkBadge();  // actualizar badge también
+            stkRender();
           } catch (_e) {}
         })();
       })
