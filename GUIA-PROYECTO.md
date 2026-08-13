@@ -59,6 +59,19 @@
 > (ajustes `FIX_AFACT_NEG_D20A_98237` y `FIX_STOCK_ZERO_366E_D20E`) porque físicamente había 0.
 > Bump `APP_VERSION` + `SW_VERSION` `v10.29`.
 >
+> Nota **v10.38 — Importación → Pedidos: rediseño (ventanas por proveedor, pedido en master cajas editable, PDF para el chino).**
+> Rediseño de `_pedImpRender` (dentro de "📦 Importación" → solapa Pedidos). Cambios: **(1)** filtro con
+> dos botones **Solo Pedido / Ver Todo** (reemplaza el toggle "Solo lo que hay que pedir"). **(2)** Cada
+> **proveedor** es una **tarjeta/ventana** propia (borde + header con subtotales) en vez de una lista
+> corrida. **(3)** El pedido va en **master cajas REDONDAS**: columna **uni/master** (unidades por master
+> caja, de `Importados_Volumen.uni_master`) + columna **MC pedido EDITABLE** (`<input>`, `pedImpSetMC` →
+> `_stkPop.mcOverride[cod]`; poné **0** para no pedir, vacío = vuelve al calculado) + **Unidades = MC ×
+> uni/master**. u$s y m³ se recalculan del MC editado. **(4)** Botón **🖨 PDF pedido** por proveedor
+> (`pedImpPdfProv` vía `remitoPrintDoc`): imprime solo **Código · Master Cajas · Unidades**, **sin FOB**,
+> para mandarle al proveedor chino a cotizar. **(5)** En `ocgFetchImportados`, alias `IMP_ALIAS` que suma
+> **865ED dentro de 865E** (se piden juntos). Helpers nuevos: `_pedImpMcOf/_pedImpUniOf/_pedImpUsdOf/
+> _pedImpM3Of`, `pedImpSetFiltro`. Todo front. Bump `APP_VERSION` + `SW_VERSION` `v10.38`.
+>
 > Nota **v10.25 — Un solo espejo del Sheet "Pedidos Entregados" (se eliminó el duplicado).**
 > Esa hoja se estaba espejando **DOS VECES**: (a) el Apps Script la empujaba a
 > `PPP_Pedidos_Entregados` (solo `tanda`+`mt3`), y (b) la función Postgres

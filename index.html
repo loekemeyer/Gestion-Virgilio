@@ -6545,7 +6545,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v10.37";
+const APP_VERSION = "v10.38";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -11099,10 +11099,14 @@ async function ocgFetchImportados() {
   try {
     rows = await supaFetchAllSafe(SUPABASE_IMPORTADOS_OC_ENDPOINT, "select=id,cod_art,marca,proveedor,descripcion,uni_x_caja,fob_uni,est_madre_eff,meses_objetivo,stock_actual,pedido_curso,principal,activo&principal=eq.true&activo=eq.true");
   } catch (_e) { return { items: [], meses: 10 }; }
+  // v10.38 — alias de códigos que se piden JUNTOS (misma master caja / mismo pedido al chino):
+  // 865ED se suma dentro de 865E (pedido del usuario). Agregar acá futuros pares si hacen falta.
+  const IMP_ALIAS = { "865ED": "865E" };
   const by = {};
   let meses = 10;
   (rows || []).forEach(function (r) {
-    const cod = String(r.cod_art || "").trim(); if (!cod) return;
+    const codRaw = String(r.cod_art || "").trim(); if (!codRaw) return;
+    const cod = IMP_ALIAS[codRaw.toUpperCase()] || codRaw;   // canónico (865ED → 865E)
     const k = cod.toUpperCase();
     if (!by[k]) by[k] = { cod: cod, desc: r.descripcion || "", prov: String(r.proveedor || "").trim() || "(sin proveedor)", uxc: 0, fob: 0, proyUni: 0, stockUni: 0, enCurso: 0, det: [] };
     const o = by[k];
@@ -13540,85 +13544,133 @@ async function openPedidosImportacion() {
   _stkPop = { kind: "pedImp", data: data, soloPedir: true };
   _pedImpRender();
 }
+/* v10.38 — filtro Solo Pedido / Ver Todo. */
+function pedImpSetFiltro(solo) { if (!_stkPop || _stkPop.kind !== "pedImp") return; _stkPop.soloPedir = !!solo; _pedImpRender(); }
 function pedImpToggle() { if (!_stkPop || _stkPop.kind !== "pedImp") return; _stkPop.soloPedir = !_stkPop.soloPedir; _pedImpRender(); }
+/* v10.38 — MASTER CAJAS del pedido, editable por código (se puede poner 0). Vacío = vuelve al
+   calculado. El pedido se cuenta en master cajas REDONDAS → unidades = MC × uni_master. */
+function pedImpSetMC(codEnc, val) {
+  if (!_stkPop || _stkPop.kind !== "pedImp") return;
+  const cod = decodeURIComponent(codEnc);
+  if (!_stkPop.mcOverride) _stkPop.mcOverride = {};
+  const raw = String(val == null ? "" : val).trim();
+  if (raw === "") delete _stkPop.mcOverride[cod];
+  else _stkPop.mcOverride[cod] = Math.max(0, Math.floor(Number(raw)) || 0);
+  _pedImpRender();
+}
+/* v10.38 — MC efectivo (override o el calculado) y unidades en master cajas redondas. */
+function _pedImpMcOf(it) {
+  const ov = (_stkPop && _stkPop.mcOverride) ? _stkPop.mcOverride[it.cod] : undefined;
+  if (ov != null) return ov;
+  return (it.aPedirCajas != null) ? it.aPedirCajas : 0;
+}
+function _pedImpUniOf(it) { const mc = _pedImpMcOf(it); return (it.uniMaster > 0) ? mc * it.uniMaster : (mc > 0 ? (it.aPedirUni || 0) : 0); }
+function _pedImpUsdOf(it) { return (it.fobUni > 0) ? _pedImpUniOf(it) * it.fobUni : 0; }
+function _pedImpM3Of(it) { return (it.m3Master > 0) ? _pedImpMcOf(it) * it.m3Master : 0; }
 function _pedImpRender() {
   const body = document.getElementById("stkPopBody"); if (!body || !_stkPop || _stkPop.kind !== "pedImp") return;
   const data = _stkPop.data || { items: [], meses: 10 };
-  let items = data.items || [];
-  if (_stkPop.soloPedir) items = items.filter(function (it) { return it.aPedirUni > 0; });
-  const byImp = {};
-  items.forEach(function (it) {
-    const prov = it.prov || "(sin proveedor)";
-    const imp = _IMPORTADOR_DE[prov] || "(sin importador)";
-    if (!byImp[imp]) byImp[imp] = {};
-    if (!byImp[imp][prov]) byImp[imp][prov] = [];
-    byImp[imp][prov].push(it);
-  });
+  if (!_stkPop.mcOverride) _stkPop.mcOverride = {};
+  const soloPedir = _stkPop.soloPedir !== false;   // default: Solo Pedido
+  let items = (data.items || []);
+  if (soloPedir) items = items.filter(function (it) { return _pedImpMcOf(it) > 0; });
+  // ventanas POR PROVEEDOR (cada proveedor = una tarjeta con su tabla, subtotal y botón PDF).
+  const byProv = {}, provOrder = [];
+  items.forEach(function (it) { const prov = it.prov || "(sin proveedor)"; if (!byProv[prov]) { byProv[prov] = []; provOrder.push(prov); } byProv[prov].push(it); });
+  provOrder.sort(function (a, b) { const ia = _IMPORTADOR_DE[a] || "zz", ib = _IMPORTADOR_DE[b] || "zz"; return String(ia).localeCompare(String(ib)) || String(a).localeCompare(String(b)); });
   let h = _impTabsHtml('ped');
-  h += '<div class="stkpop-hint">Pedidos a los proveedores chinos (motor <code>v_importados_ordenes</code>, índice <b>' + (data.meses || 10) + ' meses</b>). Separado de las OC de talleristas. 🧩 = parte (proyección = suma de sus terminados).<br><b>✏️</b> editar unidades en curso (lo ya pedido/en camino) · <b>📥</b> marcar que el pedido llegó (suma al stock y baja de en curso).</div>';
-  h += '<div style="margin-bottom:10px;display:flex;gap:8px;flex-wrap:wrap;"><button class="mva-clear" style="' + (_stkPop.soloPedir ? 'background:#0f766e;color:#fff;border-color:#0f766e' : '') + '" onclick="pedImpToggle()">' + (_stkPop.soloPedir ? '✓ ' : '') + 'Solo lo que hay que pedir</button>' +
-    '<button class="mva-clear" style="background:#166534;color:#fff;border-color:#166534" onclick="pedImpExportExcel()" title="Bajar a Excel lo que se está viendo">📥 Bajar a Excel</button></div>';
-  // v10.06 — TOTAL del pedido (lo que se está viendo): USD (Σ unidades×FOB) + m³ (Σ master cajas×m³/master)
-  const _gUsd = items.reduce(function (s, it) { return s + (Number(it.usdTotal) || 0); }, 0);
-  const _gM3 = items.reduce(function (s, it) { return s + (Number(it.m3Total) || 0); }, 0);
-  const _gUsdFmt = "u$s " + Math.round(_gUsd).toLocaleString("es-AR");
-  const _nSinFob = items.filter(function (it) { return it.aPedirUni > 0 && !(it.fobUni > 0); }).length;
-  const _nSinVol = items.filter(function (it) { return it.aPedirUni > 0 && !(it.m3Master > 0); }).length;
+  h += '<div class="stkpop-hint">Pedidos a los proveedores chinos (índice <b>' + (data.meses || 10) + ' meses</b>). El pedido va en <b>master cajas redondas</b> — tocá la celda <b>MC</b> para ajustarlo (poné <b>0</b> para no pedir). <b>Unidades = MC × uni/master</b>. 🧩 = parte. <b>✏️</b> en curso · <b>📥</b> llegó · <b>🖨</b> PDF por proveedor (Cód · MC · Unidades, sin FOB) para que el chino cotice.</div>';
+  // filtro Solo Pedido / Ver Todo + Excel
+  const _fbtn = function (on) { return 'width:auto;flex:0 0 auto;padding:8px 14px;border-radius:999px;border:1px solid ' + (on ? '#0f766e' : '#cbd5e1') + ';background:' + (on ? '#0f766e' : '#fff') + ';color:' + (on ? '#fff' : '#334155') + ';font-size:13px;font-weight:800;cursor:pointer'; };
+  h += '<div style="margin-bottom:10px;display:flex;gap:8px;flex-wrap:wrap;">' +
+    '<button style="' + _fbtn(soloPedir) + '" onclick="pedImpSetFiltro(true)">Solo Pedido</button>' +
+    '<button style="' + _fbtn(!soloPedir) + '" onclick="pedImpSetFiltro(false)">Ver Todo</button>' +
+    '<button class="mva-clear" style="background:#166534;color:#fff;border-color:#166534" onclick="pedImpExportExcel()" title="Bajar a Excel lo que se está viendo">📥 Excel</button></div>';
+  // totales (respetan el MC editado)
+  const _gUsd = items.reduce(function (s, it) { return s + _pedImpUsdOf(it); }, 0);
+  const _gM3 = items.reduce(function (s, it) { return s + _pedImpM3Of(it); }, 0);
+  const _nSinFob = items.filter(function (it) { return _pedImpMcOf(it) > 0 && !(it.fobUni > 0); }).length;
+  const _nSinVol = items.filter(function (it) { return _pedImpMcOf(it) > 0 && !(it.m3Master > 0); }).length;
   h += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">' +
-    '<div style="flex:1;min-width:150px;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:10px;padding:10px 14px"><div style="font-size:11px;color:#047857;font-weight:700;text-transform:uppercase;letter-spacing:.4px">Total pedido (FOB)</div><div style="font-size:22px;font-weight:800;color:#065f46">' + _gUsdFmt + '</div>' + (_nSinFob ? '<div style="font-size:11px;color:#b45309">⚠ ' + _nSinFob + ' ítem(s) sin FOB cargado</div>' : '') + '</div>' +
+    '<div style="flex:1;min-width:150px;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:10px;padding:10px 14px"><div style="font-size:11px;color:#047857;font-weight:700;text-transform:uppercase;letter-spacing:.4px">Total pedido (FOB)</div><div style="font-size:22px;font-weight:800;color:#065f46">u$s ' + Math.round(_gUsd).toLocaleString("es-AR") + '</div>' + (_nSinFob ? '<div style="font-size:11px;color:#b45309">⚠ ' + _nSinFob + ' ítem(s) sin FOB cargado</div>' : '') + '</div>' +
     '<div style="flex:1;min-width:150px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:10px 14px"><div style="font-size:11px;color:#1d4ed8;font-weight:700;text-transform:uppercase;letter-spacing:.4px">Volumen total</div><div style="font-size:22px;font-weight:800;color:#1e3a8a">' + (Math.round(_gM3 * 100) / 100).toLocaleString("es-AR") + ' m³</div>' + (_nSinVol ? '<div style="font-size:11px;color:#b45309">⚠ ' + _nSinVol + ' ítem(s) sin volumen cargado</div>' : '') + '</div>' +
     '</div>';
-  const impOrder = ["Chef", "Tierra Nativa", "(sin importador)"];
-  Object.keys(byImp).forEach(function (k) { if (impOrder.indexOf(k) < 0) impOrder.push(k); });
   let algo = false;
-  impOrder.forEach(function (imp) {
-    const provs = byImp[imp]; if (!provs || !Object.keys(provs).length) return;
+  provOrder.forEach(function (prov) {
+    const arr = byProv[prov]; if (!arr || !arr.length) return;
     algo = true;
-    h += '<div style="margin-top:16px;font-size:15px;font-weight:800;color:#0f172a;border-bottom:2px solid #e2e8f0;padding-bottom:4px">🏭 ' + escapeHtml(imp) + '</div>';
-    Object.keys(provs).sort().forEach(function (prov) {
-      const arr = provs[prov];
-      const totCaj = arr.reduce(function (s, it) { return s + (it.aPedirCajas || 0); }, 0);
-      const totM3 = arr.reduce(function (s, it) { return s + (Number(it.m3Total) || 0); }, 0);   // v10.05
-      const totUsd = arr.reduce(function (s, it) { return s + (Number(it.usdTotal) || 0); }, 0);  // v10.06
-      h += '<div class="stkpop-hint" style="margin:8px 0 3px;font-weight:700">' + escapeHtml(prov) + ' · ' + arr.length + ' ítem(s)' + (totCaj ? ' · ' + totCaj + ' cajas' : '') + (totUsd > 0 ? ' · <span style="color:#065f46">u$s ' + Math.round(totUsd).toLocaleString("es-AR") + '</span>' : '') + (totM3 > 0 ? ' · <span style="color:#0369a1">' + (Math.round(totM3 * 100) / 100) + ' m³</span>' : '') + '</div>';
-      h += '<div class="mva-tblwrap"><table class="mva-tbl"><thead><tr><th>Código</th><th>Descripción</th><th class="num">Proy u/mes</th><th class="num">Objetivo</th><th class="num">Stock</th><th class="num">En curso</th><th class="num">A pedir u</th><th class="num" title="Master cajas = ceil(a pedir ÷ uni por master). Siempre enteras. Un ~ marca que no hay uni_master cargado y se aproximó con la caja inner.">Master cjs</th><th class="num" title="FOB unitario (USD) del maestro Importados">FOB u$s/u</th><th class="num" title="Cotización del ítem = unidades a pedir × FOB unitario">u$s pedido</th><th class="num" title="m³ de UNA master caja (medidas cargadas a mano). Tocá el ✏ para cargar/editar.">m³/master</th><th class="num" title="m³ del pedido = master cajas a pedir × m³ por master">m³ pedido</th><th>Acciones</th></tr></thead><tbody>';
-      arr.sort(function (a, b) { return b.aPedirUni - a.aPedirUni; }).forEach(function (it) {
-        const cajTxt = (it.aPedirCajas == null) ? '<span style="color:#94a3b8" title="Sin uni×caja cargado">—</span>' : (String(it.aPedirCajas) + (it.cajasEsMaster ? '' : '<span style="color:#f59e0b" title="Sin uni_master cargado: aprox con caja inner">~</span>'));
-        const badge = it.esParte ? ' <span style="color:#7c3aed" title="Parte">🧩</span>' : '';
-        // v10.02 — stock negativo (más pedidos que stock) se muestra como 0 (no negativo), pedido del usuario.
-        const _stkShow = Math.max(0, Number(it.stockUni) || 0);
-        const stockTxt = (it.stockParteU > 0)
-          ? _stkShow + ' <span style="color:#7c3aed;font-weight:700;font-size:11px" title="Incluye ' + it.stockParteU + ' u de la parte ' + escapeHtml(it.stockParteCods || '') + ' (' + it.stockPropio + ' propio + ' + it.stockParteU + ' parte)">🔧+' + it.stockParteU + '</span>'
-          : String(_stkShow);
-        var actHtml = (it.det || []).map(function (d) {
-          var multi = (it.det || []).length > 1;
-          var lbl = (multi && d.marca) ? ('<span style="font-size:10px;color:#64748b;margin-right:2px">' + escapeHtml(d.marca) + '</span>') : '';
-          var codEnc = encodeURIComponent(it.cod);
-          return '<div style="white-space:nowrap;margin:1px 0">' + lbl +
-            '<button class="stk-btn" style="padding:3px 7px;font-size:12px" title="Editar unidades en curso (pedido en camino)" onclick="pedImpSetCurso(' + d.id + ',\'' + codEnc + '\',' + (d.curso || 0) + ')">✏️</button> ' +
-            '<button class="stk-btn ok" style="padding:3px 7px;font-size:12px" title="Marcar que el pedido llegó: suma al stock y baja de en curso" onclick="pedImpLlego(' + d.id + ',\'' + codEnc + '\',' + (d.curso || 0) + ')">📥</button></div>';
-        }).join('');
-        // v10.05 — m³/master (editable) + m³ del pedido
-        var _codEncV = encodeURIComponent(it.cod);
-        var _m3m = Number(it.m3Master) || 0;
-        var _dimTip = it.m3Dims && it.m3Dims.l ? (it.m3Dims.l + '×' + it.m3Dims.a + '×' + it.m3Dims.h + ' cm') : '';
-        var m3MasterTxt = _m3m > 0
-          ? '<span style="cursor:pointer" title="' + (_dimTip ? escapeHtml(_dimTip) + ' — ' : '') + 'tocá para editar" onclick="pedImpEditVol(\'' + _codEncV + '\')">' + (Math.round(_m3m * 10000) / 10000) + ' <span style="color:#94a3b8;font-size:11px">✏️</span></span>'
-          : '<span style="cursor:pointer;color:#cbd5e1" title="Cargar medidas de la master (cm) para calcular m³" onclick="pedImpEditVol(\'' + _codEncV + '\')">✏️</span>';
-        var m3TotTxt = (Number(it.m3Total) || 0) > 0 ? '<b style="color:#0369a1">' + (Math.round(it.m3Total * 100) / 100) + '</b>' : '<span style="color:#cbd5e1">—</span>';
-        // v10.06 — FOB unitario (editable ✏) + cotización USD del ítem
-        var _fob = Number(it.fobUni) || 0;
-        var fobTxt = _fob > 0
-          ? '<span style="cursor:pointer" title="Tocá para editar el FOB" onclick="pedImpEditFob(\'' + _codEncV + '\')">' + _fob.toFixed(3) + ' <span style="color:#94a3b8;font-size:11px">✏️</span></span>'
-          : '<span style="cursor:pointer;color:#cbd5e1" title="Cargar FOB unitario (USD)" onclick="pedImpEditFob(\'' + _codEncV + '\')">✏️</span>';
-        var usdTxt = (Number(it.usdTotal) || 0) > 0 ? '<b style="color:#065f46">u$s ' + Math.round(it.usdTotal).toLocaleString("es-AR") + '</b>' : '<span style="color:#cbd5e1">—</span>';
-        h += '<tr><td><b>' + escapeHtml(codCanon(it.cod)) + '</b>' + badge + '</td><td style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escapeHtml(it.desc || "") + '">' + escapeHtml(artNombre(it.cod, it.desc)) + '</td><td class="num">' + it.proyUni + '</td><td class="num">' + it.objetivoUni + '</td><td class="num">' + stockTxt + '</td><td class="num">' + it.enCurso + '</td><td class="num" style="font-weight:800;color:#b45309">' + it.aPedirUni + '</td><td class="num">' + cajTxt + '</td><td class="num">' + fobTxt + '</td><td class="num">' + usdTxt + '</td><td class="num">' + m3MasterTxt + '</td><td class="num">' + m3TotTxt + '</td><td>' + actHtml + '</td></tr>';
-      });
-      h += '</tbody></table></div>';
+    const imp = _IMPORTADOR_DE[prov] || "(sin importador)";
+    const totMC = arr.reduce(function (s, it) { return s + _pedImpMcOf(it); }, 0);
+    const totU = arr.reduce(function (s, it) { return s + _pedImpUniOf(it); }, 0);
+    const totM3 = arr.reduce(function (s, it) { return s + _pedImpM3Of(it); }, 0);
+    const totUsd = arr.reduce(function (s, it) { return s + _pedImpUsdOf(it); }, 0);
+    const provEnc = encodeURIComponent(prov);
+    h += '<div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:14px;background:#fff">';
+    h += '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:10px 13px;background:#f8fafc;border-bottom:1px solid #e2e8f0">' +
+      '<div style="min-width:0"><span style="font-size:16px;font-weight:800;color:#0f172a">🏭 ' + escapeHtml(prov) + '</span> <span style="font-size:11px;color:#94a3b8;font-weight:700">· ' + escapeHtml(imp) + '</span><div style="font-size:12px;color:#475569;margin-top:2px">' + arr.length + ' ítem(s) · <b>' + totMC + '</b> master cajas · <b>' + totU.toLocaleString("es-AR") + '</b> u' + (totUsd > 0 ? ' · <span style="color:#065f46">u$s ' + Math.round(totUsd).toLocaleString("es-AR") + '</span>' : '') + (totM3 > 0 ? ' · <span style="color:#0369a1">' + (Math.round(totM3 * 100) / 100) + ' m³</span>' : '') + '</div></div>' +
+      '<button class="mva-clear" style="background:#1e6bd6;color:#fff;border-color:#1e6bd6;flex:0 0 auto" onclick="pedImpPdfProv(\'' + provEnc + '\')" title="PDF del pedido de este proveedor: solo Código, Master Cajas y Unidades (sin FOB)">🖨 PDF pedido</button>' +
+      '</div>';
+    h += '<div class="mva-tblwrap"><table class="mva-tbl"><thead><tr><th>Código</th><th>Descripción</th><th class="num">Proy u/mes</th><th class="num">Objetivo</th><th class="num">Stock</th><th class="num">En curso</th><th class="num">A pedir u</th><th class="num" title="Unidades por master caja (del Excel de quiebres / Importados_Volumen). Tocá el ✏ para editar el volumen.">uni/master</th><th class="num" title="Master cajas a pedir (editable). Poné 0 para no pedir. Vacío = vuelve al calculado.">MC pedido</th><th class="num" title="Unidades = MC × uni/master (master cajas redondas)">Unidades</th><th class="num" title="FOB unitario (USD)">FOB u$s/u</th><th class="num" title="u$s = unidades × FOB">u$s</th><th class="num" title="m³ = MC × m³/master">m³</th><th>Acciones</th></tr></thead><tbody>';
+    arr.sort(function (a, b) { return _pedImpUniOf(b) - _pedImpUniOf(a) || (b.aPedirUni - a.aPedirUni); }).forEach(function (it) {
+      const badge = it.esParte ? ' <span style="color:#7c3aed" title="Parte">🧩</span>' : '';
+      const _stkShow = Math.max(0, Number(it.stockUni) || 0);
+      const stockTxt = (it.stockParteU > 0)
+        ? _stkShow + ' <span style="color:#7c3aed;font-weight:700;font-size:11px" title="Incluye ' + it.stockParteU + ' u de la parte ' + escapeHtml(it.stockParteCods || '') + '">🔧+' + it.stockParteU + '</span>'
+        : String(_stkShow);
+      const _codEncV = encodeURIComponent(it.cod);
+      const actHtml = (it.det || []).map(function (d) {
+        const multi = (it.det || []).length > 1;
+        const lbl = (multi && d.marca) ? ('<span style="font-size:10px;color:#64748b;margin-right:2px">' + escapeHtml(d.marca) + '</span>') : '';
+        return '<div style="white-space:nowrap;margin:1px 0">' + lbl +
+          '<button class="stk-btn" style="padding:3px 7px;font-size:12px" title="Editar unidades en curso" onclick="pedImpSetCurso(' + d.id + ',\'' + _codEncV + '\',' + (d.curso || 0) + ')">✏️</button> ' +
+          '<button class="stk-btn ok" style="padding:3px 7px;font-size:12px" title="Marcar que llegó" onclick="pedImpLlego(' + d.id + ',\'' + _codEncV + '\',' + (d.curso || 0) + ')">📥</button></div>';
+      }).join('');
+      const _m3m = Number(it.m3Master) || 0;
+      const _dimTip = it.m3Dims && it.m3Dims.l ? (it.m3Dims.l + '×' + it.m3Dims.a + '×' + it.m3Dims.h + ' cm') : '';
+      const umTxt = (it.uniMaster > 0)
+        ? '<span style="cursor:pointer" title="' + (_dimTip ? escapeHtml(_dimTip) + ' — ' : '') + 'tocá para editar el volumen/uni por master" onclick="pedImpEditVol(\'' + _codEncV + '\')">' + it.uniMaster + ' <span style="color:#94a3b8;font-size:11px">✏️</span></span>'
+        : '<span style="cursor:pointer;color:#f59e0b" title="Falta uni por master (cargá el volumen). Sin esto no se puede redondear a master caja." onclick="pedImpEditVol(\'' + _codEncV + '\')">⚠ ✏️</span>';
+      const mc = _pedImpMcOf(it);
+      const mcInput = '<input type="number" inputmode="numeric" min="0" value="' + mc + '" onchange="pedImpSetMC(\'' + _codEncV + '\',this.value)" onclick="event.stopPropagation()" style="width:64px;text-align:center;padding:5px 4px;border:2px solid ' + (mc > 0 ? '#0f766e' : '#cbd5e1') + ';border-radius:8px;font-size:14px;font-weight:800;color:#0f172a;background:' + (mc > 0 ? '#f0fdfa' : '#fff') + '">';
+      const uni = _pedImpUniOf(it);
+      const uniTxt = uni > 0 ? '<b style="color:#b45309">' + uni.toLocaleString("es-AR") + '</b>' : '<span style="color:#cbd5e1">0</span>';
+      const _fob = Number(it.fobUni) || 0;
+      const fobTxt = _fob > 0
+        ? '<span style="cursor:pointer" title="Tocá para editar el FOB" onclick="pedImpEditFob(\'' + _codEncV + '\')">' + _fob.toFixed(3) + ' <span style="color:#94a3b8;font-size:11px">✏️</span></span>'
+        : '<span style="cursor:pointer;color:#cbd5e1" title="Cargar FOB unitario (USD)" onclick="pedImpEditFob(\'' + _codEncV + '\')">✏️</span>';
+      const _usd = _pedImpUsdOf(it);
+      const usdTxt = _usd > 0 ? '<b style="color:#065f46">u$s ' + Math.round(_usd).toLocaleString("es-AR") + '</b>' : '<span style="color:#cbd5e1">—</span>';
+      const _m3 = _pedImpM3Of(it);
+      const m3Txt = _m3 > 0 ? '<b style="color:#0369a1">' + (Math.round(_m3 * 100) / 100) + '</b>' : '<span style="color:#cbd5e1">—</span>';
+      h += '<tr><td><b>' + escapeHtml(codCanon(it.cod)) + '</b>' + badge + '</td><td style="font-size:12px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escapeHtml(it.desc || "") + '">' + escapeHtml(artNombre(it.cod, it.desc)) + '</td><td class="num">' + it.proyUni + '</td><td class="num">' + it.objetivoUni + '</td><td class="num">' + stockTxt + '</td><td class="num">' + it.enCurso + '</td><td class="num" style="color:#94a3b8">' + it.aPedirUni + '</td><td class="num">' + umTxt + '</td><td class="num">' + mcInput + '</td><td class="num">' + uniTxt + '</td><td class="num">' + fobTxt + '</td><td class="num">' + usdTxt + '</td><td class="num">' + m3Txt + '</td><td>' + actHtml + '</td></tr>';
     });
+    h += '</tbody></table></div></div>';
   });
-  if (!algo) h += '<div class="stkpop-empty">No hay importados ' + (_stkPop.soloPedir ? 'para pedir (todo en o sobre el objetivo)' : 'cargados') + '.</div>';
+  if (!algo) h += '<div class="stkpop-empty">No hay importados ' + (soloPedir ? 'para pedir (todo en o sobre el objetivo)' : 'cargados') + '.</div>';
   body.innerHTML = h;
+}
+/* v10.38 — PDF del pedido de UN proveedor: solo Código · Master Cajas · Unidades (SIN FOB),
+   para mandarle al proveedor chino a cotizar. Respeta el MC editado (0 = no va). */
+function pedImpPdfProv(provEnc) {
+  const prov = decodeURIComponent(provEnc);
+  const data = (_stkPop && _stkPop.data) || { items: [] };
+  const arr = (data.items || []).filter(function (it) { return (it.prov || "(sin proveedor)") === prov && _pedImpMcOf(it) > 0; })
+    .sort(function (a, b) { return String(codCanon(a.cod)).localeCompare(String(codCanon(b.cod)), undefined, { numeric: true }); });
+  if (!arr.length) { try { alert("No hay ítems con pedido (MC > 0) para " + prov + "."); } catch (_e) {} return; }
+  const fecha = new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10);
+  const th = 'border:1px solid #333;padding:7px 10px;background:#eaeaea;text-align:left;font-weight:800';
+  const td = 'border:1px solid #333;padding:7px 10px';
+  const tdc = td + ';text-align:center;font-weight:700';
+  let filas = arr.map(function (it) {
+    return '<tr><td style="' + td + '"><b>' + escapeHtml(codCanon(it.cod)) + '</b></td><td style="' + tdc + '">' + _pedImpMcOf(it) + '</td><td style="' + tdc + '">' + _pedImpUniOf(it) + '</td></tr>';
+  }).join("");
+  const totMC = arr.reduce(function (s, it) { return s + _pedImpMcOf(it); }, 0);
+  const totU = arr.reduce(function (s, it) { return s + _pedImpUniOf(it); }, 0);
+  filas += '<tr><td style="' + td + ';font-weight:800;background:#f4f4f4">TOTAL</td><td style="' + tdc + ';background:#f4f4f4">' + totMC + '</td><td style="' + tdc + ';background:#f4f4f4">' + totU.toLocaleString("es-AR") + '</td></tr>';
+  const inner = '<div style="text-align:center;font-weight:800;font-size:1.5em;margin-bottom:2px">PEDIDO · ' + escapeHtml(prov) + '</div>' +
+    '<div style="text-align:center;color:#555;margin-bottom:12px">Producción Virgilio — ' + fecha + ' — ' + arr.length + ' artículo(s)</div>' +
+    '<table style="width:100%;border-collapse:collapse;font-size:1.05em"><thead><tr><th style="' + th + '">Código</th><th style="' + th + ';text-align:center">Master Cajas</th><th style="' + th + ';text-align:center">Unidades</th></tr></thead><tbody>' + filas + '</tbody></table>';
+  remitoPrintDoc(inner);
 }
 /* v10.02 — Bajar a Excel los Pedidos Importación (lo que se está viendo, respeta "Solo lo que hay
    que pedir"). Stock negativo se exporta como 0 (igual que en pantalla). Sin librería (.xls = tabla HTML). */
