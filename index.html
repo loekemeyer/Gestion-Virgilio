@@ -6476,7 +6476,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v10.27";
+const APP_VERSION = "v10.28";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -30593,9 +30593,10 @@ function _corrEstado(e){
   const M = { sinpickear:["Sin pickear","#64748b","#f1f5f9"], enpicking:["En picking","#1e40af","#eff6ff"], pickeado:["Pickeado","#b45309","#fffbeb"], afacturar:["A facturar","#166534","#f0fdf4"], facturado:["Facturado","#065f46","#d1fae5"] };
   return M[e] || M.sinpickear;
 }
-/* v10.27 — ¿este ítem obliga a cambiar la NP? SÍ si el stock del código SECUNDARIO no
-   cubre lo pedido (stkSec < cajas). Si el secundario alcanza, se manda tal cual (no urgente). */
-function _corrItemUrgente(p){ return (Number(p && p.stkSec)||0) < (Number(p && p.cajas)||0); }
+/* v10.28 — ¿este ítem obliga a cambiar la NP? SÍ o SÍ solo si el código SECUNDARIO está
+   en 0 (sin stock): ahí hay que pasar la NP al principal. Si el secundario tiene ALGO de
+   stock se manda tal cual (no urgente), sin importar el stock del principal. */
+function _corrItemUrgente(p){ return (Number(p && p.stkSec)||0) <= 0; }
 /* v8.06 — fecha de salida (PPP fecha_entrega / Entregas fecha_salida) → "DD/MM". */
 function _corrFecha(s){
   s = String(s || "").trim(); if (!s) return "";
@@ -30685,9 +30686,9 @@ function facCorreccRender(){
              : _facCorrFiltro === "urgente" ? rows.filter(function(p){ return urgentNps[p.np]; })
              : rows.filter(function(p){ return p.estado === _facCorrFiltro; });
   h += '<div style="font-size:12.5px;color:#64748b;margin-bottom:10px;">' + (_facCorrFiltro === "urgente"
-        ? '🔴 <b>Urgentes</b>: el código secundario <b>no alcanza</b> para lo pedido → hay que cambiar la NP al principal SÍ o SÍ (los que el secundario cubre no aparecen acá).'
+        ? '🔴 <b>Urgentes</b>: el código secundario está en <b>0</b> (sin stock) → hay que cambiar la NP al principal SÍ o SÍ (los que tienen algo de secundario no aparecen acá).'
         : 'Estos pedidos entraron en un código <b>secundario</b>. Cambiá la NP en el ERP al principal y confirmá acá — el picking va a levantar el principal.') + '</div>';
-  if (!pend.length){ body.innerHTML = h + '<div style="text-align:center;color:#16a34a;padding:20px;font-weight:700;">' + (_facCorrFiltro === "urgente" ? '✅ No hay urgentes — el secundario cubre todo lo pedido.' : 'No hay pedidos en este estado.') + '</div>'; return; }
+  if (!pend.length){ body.innerHTML = h + '<div style="text-align:center;color:#16a34a;padding:20px;font-weight:700;">' + (_facCorrFiltro === "urgente" ? '✅ No hay urgentes — todos tienen algo de stock del secundario.' : 'No hay pedidos en este estado.') + '</div>'; return; }
   // Agrupar por NP: 1 cambio → botón directo; varios → un solo botón que abre pop-up con checkboxes.
   const BTN = 'width:auto;flex:0 0 auto;background:#16a34a;color:#fff;border:none;border-radius:9px;padding:9px 13px;font-size:13px;font-weight:800;cursor:pointer;white-space:nowrap;';
   const order = [], byNp = {};
