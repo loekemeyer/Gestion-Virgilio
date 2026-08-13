@@ -6545,7 +6545,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v10.35";
+const APP_VERSION = "v10.36";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -18871,6 +18871,8 @@ function renderGuardarOrden() {
   // ahora a góndola (totCajas del filtro activo), misma base que muestra la tabla → siempre fresco.
   const _gRate = (_gorden && _gorden.rate > 0) ? _gorden.rate : stkGRate();
   const _gHoras = _gRate > 0 ? Math.round((totCajas / _gRate) * 10) / 10 : 0;
+  // v10.36 — si es menos de 1 hora, mostrarlo en minutos (más claro para el operario).
+  const _gDisp = (_gRate > 0 && _gHoras > 0 && _gHoras < 1) ? (Math.round((totCajas / _gRate) * 60) + ' min') : (_gHoras + ' h');
   const _gCol = _gHoras > 6 ? "#b91c1c" : (_gHoras >= 4 ? "#b45309" : "#166534");
   const _gBg = _gHoras > 6 ? "#fef2f2" : (_gHoras >= 4 ? "#fffbeb" : "#f0fdf4");
   const _gBd = _gHoras > 6 ? "#fca5a5" : (_gHoras >= 4 ? "#fcd34d" : "#86efac");
