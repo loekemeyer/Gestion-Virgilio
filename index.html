@@ -3559,7 +3559,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      que ande sin internet en el depósito. -->
 <script src="qrcode.js"></script>
 <script src="planimetria.js?v=3.73"></script>
-<script src="pasaje-papeles.js?v=2.0"></script>
+<script src="pasaje-papeles.js?v=4.0"></script>
 <!-- Modo OP de Recepción de Mercadería (se abre al tocar RT). Módulo aislado bajo
      #rcpRoot, con su propio cliente Supabase (login anónimo). Portado de la app
      Control-Carga-Remitos-FC. Suma las cajas del día a localStorage para que RT
@@ -3677,7 +3677,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       <button class="sup-action-btn" onclick="showGuardarOrden('')" style="position:relative;"><span class="sup-ico">📋</span><span>Qué bajar primero</span><span id="qbpBadge" class="dp-badge" style="display:none;" title="Urgentes (SOS): góndola < 20% con stock atrás para bajar"></span></button>
       <button class="sup-action-btn" onclick="openCorreccPanel()" style="position:relative;"><span class="sup-ico">🔀</span><span>Corregir códigos de NPs</span><span id="corrBadgeGreen" class="dp-badge" style="left:2px;right:auto;background:#16a34a;display:none;" title="Se pueden corregir pero NO es obligatorio (hay stock del secundario)"></span><span id="corrBadge" class="dp-badge" style="display:none;" title="Hay que corregir SÍ o SÍ (el secundario no tiene stock)"></span></button>
       <button class="sup-action-btn" onclick="openNpConsulta()"><span class="sup-ico">🔎</span><span>Consultar NP / Líos</span></button>
-      <button class="sup-action-btn" onclick="openPasajePapeles()"><span class="sup-ico">📄</span><span>Pasaje de Papeles</span></button>
+      <button class="sup-action-btn" onclick="openPasajePapeles()" style="position:relative;"><span class="sup-ico">📄</span><span>Pasaje de Papeles</span><span id="ppBadge" class="dp-badge" style="display:none;" title="Documentos pendientes de enviar a Cervantes"></span></button>
       <button class="sup-action-btn" onclick="stkOpenNpFaltan()" style="position:relative;"><span class="sup-ico">⚠️</span><span>Pedidos sin cargar en PPP</span><span id="npFaltanBadge" class="dp-badge" style="display:none;"></span></button>
       <button class="sup-action-btn" onclick="stkOpenFaltFact()"><span class="sup-ico">📉</span><span>Faltantes facturados sin completar</span></button>
       <button class="sup-action-btn" onclick="stkOpenProvImp()"><span class="sup-ico">🏭</span><span>Proveedor de importación</span></button>
@@ -32716,6 +32716,7 @@ function showSupervisor(email) {
   try { favLoadBadge(); } catch (_e) {}   // v9.70: badge Completar Pedido (faltantes con stock)
   try { rrLoadBadge(); } catch (_e) {}   // v9.71: badge Recepción Remitos (cargados sin controlar)
   try { initStkBadge(); } catch (_e) {}   // v10.41: badge Stock y Compras (negativos)
+  try { ppLoadBadge(); } catch (_e) {}   // v10.48: badge Pasaje de Papeles (pendientes de enviar)
   try { if (typeof pppAlertPollStart === "function") pppAlertPollStart(); } catch (_e) {}
 }
 

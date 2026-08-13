@@ -228,13 +228,8 @@ function ppRenderList() {
   if (!container) return;
 
   var data = _ppState.data;
-  if (!data.length) {
-    container.innerHTML = '<div class="pp-empty">Sin documentación registrada</div>';
-    _ppStopTimer();
-    return;
-  }
 
-  // Separar pendientes vs enviados
+  // Separar pendientes vs enviados (siempre, incluso si data está vacío)
   var pendientes = [];
   var enviados = [];
   data.forEach(function (row) {
@@ -246,6 +241,9 @@ function ppRenderList() {
              _ppBuildSection('enviada', '✅', 'Documentación enviada', enviados, false);
 
   container.innerHTML = html;
+
+  // Badge del botón en el panel supervisor
+  _ppUpdateBadge(pendientes.length);
 
   // Arrancar timer si hay pendientes
   if (pendientes.length) _ppStartTimer();
@@ -453,6 +451,40 @@ async function _ppSaveToSupabase(tipoContenido, data) {
 /* Compat: ppSaveDocument redirige a la nueva función */
 async function ppSaveDocument(tipoContenido) { _ppCapSave(tipoContenido); }
 
+/**
+ * Actualiza el badge del botón "Pasaje de Papeles" en el panel supervisor
+ */
+function _ppUpdateBadge(pendCount) {
+  if (typeof supSetBadge === 'function') {
+    supSetBadge('ppBadge', pendCount);
+  } else {
+    // Fallback manual si supSetBadge no existe
+    var b = document.getElementById('ppBadge');
+    if (!b) return;
+    if (pendCount > 0) {
+      b.textContent = String(pendCount);
+      b.style.display = '';
+      b.className = 'dp-badge';
+    } else {
+      b.style.display = 'none';
+    }
+  }
+}
+
+/**
+ * Carga solo el conteo de pendientes para el badge (sin abrir el modal).
+ * Se llama al cargar el panel supervisor.
+ */
+async function ppLoadBadge() {
+  try {
+    var res = await fetch(
+      SUPABASE_URL + '/rest/v1/Pasaje_Papeles?enviado=eq.false&select=id',
+      { headers: _ppHeaders(), cache: 'no-store' }
+    ).then(function (r) { return r.ok ? r.json() : []; });
+    _ppUpdateBadge((res || []).length);
+  } catch (_e) {}
+}
+
 // Exportar globalmente
 window.openPasajePapeles = openPasajePapeles;
 window.closePasajePapeles = closePasajePapeles;
@@ -463,6 +495,7 @@ window.ppCloseCaptureDialog = ppCloseCaptureDialog;
 window.ppSaveDocument = ppSaveDocument;
 window.ppToggleEnviado = ppToggleEnviado;
 window.ppToggleSection = ppToggleSection;
+window.ppLoadBadge = ppLoadBadge;
 window._ppCapRenderStep1 = _ppCapRenderStep1;
 window._ppCapRenderStep2 = _ppCapRenderStep2;
 window._ppCapSave = _ppCapSave;
