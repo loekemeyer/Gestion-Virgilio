@@ -10023,6 +10023,18 @@ async function openStockAdmin(soloConteo) {
     _viewRows.forEach(function (r) { var k = _ocgNorm(r.cod); if (k && Number(r.cajas_pedidas) > 0) _demFromView[k] = Number(r.cajas_pedidas); });
     var _proyMap = {};
     _viewRows.forEach(function (r) { var k = _ocgNorm(r.cod); if (k && Number(r.proy_cajas_mes) > 0) _proyMap[k] = Number(r.proy_cajas_mes); });
+    // v10.25: consolidar proyección de secundarios al default de la familia.
+    // Ej: 580E (sec, proy 39) + 580 (def, proy 0) → 580 queda con 39, 580E con 0.
+    EQUIV_FAMILIAS.forEach(function (f) {
+      var defN = _ocgNorm(f.def);
+      (f.cods || []).forEach(function (c) {
+        var cn = _ocgNorm(c);
+        if (cn !== defN && _proyMap[cn]) {
+          _proyMap[defN] = (_proyMap[defN] || 0) + _proyMap[cn];
+          delete _proyMap[cn];
+        }
+      });
+    });
     var _insFromView = _viewRows.filter(function (r) { return r.es_insumo; }).map(function (r) { return String(r.cod).trim().toUpperCase(); });
     _stk = { movs: res[0] || [], cutoff: res[1], factors: _fac, ordenes: res[3] || [], bajadas: res[4] || [], tab: _solo ? "conteo" : "stocks", soloConteo: _solo, filtro: "", openArt: null, ingMode: "remito", asOf: null, asOfInput: "", dem: _demFromView, cap: res[7] || [], gConf: res[8] || [], fcs: res[9] || { pend: {}, porArt: {} }, fcsLoaded: true, insumosCods: _insFromView, cxm: _cxmMerge, proy: _proyMap, viewRows: _viewRows };
     stkRender();
@@ -10762,6 +10774,14 @@ async function ocgFetchProyeccion() {
     const rows = r.ok ? await r.json() : [];
     const m = {};
     rows.forEach(function (x) { const k = _ocgNorm(x.cod); if (k) m[k] = Number(x.proy_cajas_mes) || 0; });
+    // v10.25: consolidar proyección de secundarios al default de la familia
+    EQUIV_FAMILIAS.forEach(function (f) {
+      var defN = _ocgNorm(f.def);
+      (f.cods || []).forEach(function (c) {
+        var cn = _ocgNorm(c);
+        if (cn !== defN && m[cn]) { m[defN] = (m[defN] || 0) + m[cn]; delete m[cn]; }
+      });
+    });
     return m;
   } catch (_e) { return {}; }
 }
