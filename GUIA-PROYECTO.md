@@ -18,10 +18,15 @@
 > que la versión anterior colaba como una fila más); `SUPABASE_PPP_ENTREGADOS_ENDPOINT` en
 > index.html apunta a la tabla nueva y la columna pasa de `mt3` a **`m3`**; se sacó la línea
 > `'PPP Excel Pedidos Entregados 2026'` del `PPP_SUPABASE_MAP` en `apps-script/sync-ppp-supabase.gs`.
-> ⚠ **PENDIENTE MANUAL:** hay que **re-pegar el `.gs` en el proyecto de Apps Script** para que deje
-> de empujar. Hasta que se haga, sigue escribiendo la tabla vieja — es inofensivo (ya nadie la lee).
-> **La tabla `PPP_Pedidos_Entregados` NO se borró todavía**, a propósito: queda de red de seguridad
-> hasta confirmar que el Apps Script se actualizó. Recrearla está en `sql/ppp_supabase.sql`.
+> **La tabla `PPP_Pedidos_Entregados` se BORRÓ** (2026-08-12). Antes se repuntó su último
+> consumidor oculto: **`vista_productividad_semanal`**, que la usaba en su CTE de m³ (no estaba
+> en el repo, vive sólo en la DB — apareció al chequear `pg_depend`). Se reescribió desde su
+> definición viva reemplazando sólo la fuente, y su salida quedó **idéntica** (29 filas,
+> arm_m3 153.50, pick_m3 192.14, 223/224 tandas). Backup completo de las 2.465 filas, con DDL,
+> policy y `setval`, en **`sql/backup_ppp_pedidos_entregados_20260812.sql`** (restore = ejecutarlo).
+> ⚠ **PENDIENTE MANUAL:** **re-pegar el `.gs` en el proyecto de Apps Script**. Hasta que se haga
+> va a intentar escribir una tabla que ya no existe; **no rompe nada** — el llamador lo tiene
+> envuelto en `try/catch` y el sync del Sheet sigue igual — pero deja error en el log de Apps Script.
 >
 > Nota **v10.24 — Las librerías se sirven desde el repo (`vendor/`), no de CDNs de terceros.**
 > Antes la app bajaba 7 librerías de 4 hosts ajenos en cada carga. **6 ya están adentro**
