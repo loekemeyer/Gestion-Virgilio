@@ -509,36 +509,28 @@ function fechaCorta(yyyymmdd) {
 
 /* ============== Carga de entidades ============== */
 async function cargarEntidades() {
-  const [tallRes, provRes] = await Promise.all([
-    supabase.from("Codigos X Tallerista").select("Codigo,Nombre,Linea").order("Nombre"),
-    supabase.from("Tall_ProvAT_PS").select("nombre,cod_factura")
-      .eq("prov_at", true).eq("rec_virg", true).eq("activo", true).order("nombre")
-  ]);
-  if (tallRes.error) { opState.entidades = null; return tallRes.error.message; }
+  // v10.25: usa vista_entidades_recepcion (join talleristas + proveedores hecho en backend)
+  const res = await supabase
+    .from("vista_entidades_recepcion")
+    .select("tipo,nombre,cod_lk,cod_ch,cod_default,cod_factura")
+    .order("nombre");
+  if (res.error) { opState.entidades = null; return res.error.message; }
 
-  const porNombre = new Map();
-  (tallRes.data || []).forEach(r => {
-    const nom = aliasNombre((r.Nombre || r.Codigo || "").trim());
-    if (!nom || !r.Codigo) return;
-    if (!porNombre.has(nom)) porNombre.set(nom, { tipo: 'tallerista', Nombre: nom, cods: {} });
-    const e = porNombre.get(nom).cods;
-    const linea = (r.Linea || "").trim().toUpperCase();
-    if (linea === "LK") e.LK = r.Codigo;
-    else if (linea === "CH") e.CH = r.Codigo;
-    else { e.LK = e.LK || r.Codigo; e.CH = e.CH || r.Codigo; }
-  });
-  const entidades = [...porNombre.values()];
-
+  const entidades = [];
   const vistosProv = new Set();
-  if (!provRes.error) {
-    (provRes.data || []).forEach(r => {
-      const nom = aliasNombre((r.nombre || "").trim());
-      if (nom && !vistosProv.has(opNorm(nom))) {
-        vistosProv.add(opNorm(nom));
-        entidades.push({ tipo: 'prov_at', Nombre: nom, cod: r.cod_factura, cods: { LK: true, CH: true } });
-      }
-    });
-  }
+  (res.data || []).forEach(r => {
+    const nom = aliasNombre((r.nombre || "").trim());
+    if (!nom) return;
+    if (r.tipo === 'tallerista') {
+      entidades.push({
+        tipo: 'tallerista', Nombre: nom,
+        cods: { LK: r.cod_lk || r.cod_default || null, CH: r.cod_ch || r.cod_default || null }
+      });
+    } else if (r.tipo === 'prov_at' && !vistosProv.has(opNorm(nom))) {
+      vistosProv.add(opNorm(nom));
+      entidades.push({ tipo: 'prov_at', Nombre: nom, cod: r.cod_factura, cods: { LK: true, CH: true } });
+    }
+  });
 
   PROV_MANUAL.forEach(p => {
     if (vistosProv.has(opNorm(p.nombre))) return;
@@ -925,27 +917,16 @@ async function renderArticulos() {
     if (opState.articulosManual) {
       lista = opState.articulosManual.map(a => ({ Cod_Art: a.Cod_Art, Desc: a.Desc || "" }));
     } else if (opState.tipo === 'prov_at') {
+      // v10.25: usa vista_articulos_prov_at (join ya hecho en el backend)
       const res = await supabase
-        .from("Articulos x Prov AT")
-        .select("Cod_Art,Descripcion")
-        .eq("Proveedor", opState.tallNombre)
-        .eq("Activo", true)
-        .order("Cod_Art");
+        .from("vista_articulos_prov_at")
+        .select("cod_art,descripcion")
+        .eq("proveedor", opState.tallNombre)
+        .eq("linea", opState.linea)
+        .order("cod_art");
       error = res.error;
       if (res.data) {
-        const todos = res.data.map(r => ({ Cod_Art: r.Cod_Art, Desc: r.Descripcion }));
-        const cods = todos.map(r => r.Cod_Art).filter(c => c);
-        const lineaPorCod = {};
-        if (cods.length > 0) {
-          const lr = await supabase
-            .from("Articulos Virgilio X Tallerista")
-            .select("Cod_Art,Linea")
-            .in("Cod_Art", cods);
-          if (!lr.error && lr.data) {
-            lr.data.forEach(r => { if (r.Cod_Art && !(r.Cod_Art in lineaPorCod)) lineaPorCod[r.Cod_Art] = r.Linea; });
-          }
-        }
-        lista = todos.filter(r => lineaPorCod[r.Cod_Art] === opState.linea);
+        lista = res.data.map(r => ({ Cod_Art: r.cod_art, Desc: r.descripcion || "" }));
       }
     } else {
       const res = await supabase
@@ -1433,6 +1414,13 @@ async function opEnviar() {
   recpAddCajas(totalCajas);
   rcpDraftClear();   // v7.12: ya se envió, no hay nada que reanudar
 
+  // v1.1 — Pasaje de Papeles: mostrar pop-up para capturar documentación
+  try {
+    if (typeof window.ppShowCaptureDialog === 'function') {
+      window.ppShowCaptureDialog('mercaderia');
+    }
+  } catch (_e) { /* no-op si el módulo no está cargado */ }
+
   // v4.06: STOCK — lo recibido ENTRA a "Mercadería a guardar" (Movimientos_Stock).
   // Best-effort; si falla, queda en vir_stock_pend y lo reintenta index.html (stockFlushPend).
   // idea 5490: un client_id ESTABLE por fila; el mismo id se usa en el insert y en la
@@ -1750,54 +1738,33 @@ async function histLoad(f) {
   // Se sanea el término (sin comas/paréntesis) porque va dentro de un filtro .or() de PostgREST.
   const codN = f.cod ? f.cod.toUpperCase().replace(/[,()]/g, " ").trim() : "";
   try {
-    let qt = supabase.from("Entregas Tallerista Virgilio").select("Fecha,created_at,Cod,Cajas,Nombre_Tall,Remito");
-    if (f.desde) qt = qt.gte("Fecha", f.desde);
-    if (f.hasta) qt = qt.lte("Fecha", f.hasta);
-    if (codN) qt = qt.or("Cod.ilike.%" + codN + "%,Nombre_Tall.ilike.%" + codN + "%");
-    if (f.quien) qt = qt.ilike("Nombre_Tall", "%" + f.quien + "%");
-    if (f.remito) qt = qt.ilike("Remito", "%" + f.remito + "%");
-    if (f.cajasMin > 0) qt = qt.gte("Cajas", f.cajasMin);
-    qt = qt.order("Fecha", { ascending: false }).order("created_at", { ascending: false }).limit(HARD);
-    let qp = supabase.from("Entregas Prov AT").select("Dia_mes,Proveedor,Cod_Art,Descripcion,Cantidad,Remito");
-    if (codN) qp = qp.or("Cod_Art.ilike.%" + codN + "%,Proveedor.ilike.%" + codN + "%");
-    if (f.quien) qp = qp.ilike("Proveedor", "%" + f.quien + "%");
-    if (f.remito) qp = qp.ilike("Remito", "%" + f.remito + "%");
-    if (f.cajasMin > 0) qp = qp.gte("Cantidad", f.cajasMin);
-    qp = qp.limit(HARD);
+    // v10.26: una sola query a vista_historial_entregas (antes 2 queries separadas).
+    // La vista ya convierte DD-MM → YYYY-MM-DD para prov_at.
+    let q = supabase.from("vista_historial_entregas")
+      .select("fuente,fecha,created_at,cod_art,descripcion,cajas,quien,remito");
+    if (f.desde) q = q.gte("fecha", f.desde);
+    if (f.hasta) q = q.lte("fecha", f.hasta);
+    if (codN) q = q.or("cod_art.ilike.%" + codN + "%,quien.ilike.%" + codN + "%");
+    if (f.quien) q = q.ilike("quien", "%" + f.quien + "%");
+    if (f.remito) q = q.ilike("remito", "%" + f.remito + "%");
+    if (f.cajasMin > 0) q = q.gte("cajas", f.cajasMin);
+    q = q.order("fecha", { ascending: false }).order("created_at", { ascending: false, nullsFirst: false }).limit(HARD);
 
-    const [rt, rp] = await Promise.all([qt, qp]);
+    const res = await q;
     if (myseq !== _histReqSeq) return;
-    if (rt && rt.error) throw rt.error;
+    if (res.error) throw res.error;
 
-    const rows = [];
-    const curYear = new Date().getFullYear();
-    // v6.54: fecha SIEMPRE "dd/mm" (antes mezclaba "04/jun/26" y "04/jun").
     const ddmm = function (ymd) { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd || ""); return m ? (m[3] + "/" + m[2]) : (ymd || "—"); };
-    ((rt && rt.data) || []).forEach(function (r) {
-      rows.push({
-        ymd: r.Fecha || "", ms: r.created_at ? Date.parse(r.created_at) : 0,
-        fechaTxt: ddmm(r.Fecha), cod: r.Cod || "—", desc: "",
-        cajas: Number(r.Cajas) || 0, quien: displayName(r.Nombre_Tall || "—"),
-        remito: r.Remito || "", origen: "tall"
-      });
-    });
-    ((rp && rp.data) || []).forEach(function (r) {
-      const dm = /^(\d{2})-(\d{2})$/.exec(r.Dia_mes || "");
-      const ymd = dm ? (curYear + "-" + dm[2] + "-" + dm[1]) : "";
-      // filtro de fecha para prov (best-effort: sin año en Dia_mes)
-      if ((f.desde || f.hasta) && !ymd) return;
-      if (f.desde && ymd && ymd < f.desde) return;
-      if (f.hasta && ymd && ymd > f.hasta) return;
-      rows.push({
-        ymd: ymd, ms: 0,
-        fechaTxt: dm ? (dm[1] + "/" + dm[2]) : (r.Dia_mes || "—"),
-        cod: r.Cod_Art || "—", desc: r.Descripcion || "",
-        cajas: Number(r.Cantidad) || 0, quien: r.Proveedor || "—",
-        remito: r.Remito || "", origen: "prov"
-      });
+    const rows = ((res.data) || []).map(function (r) {
+      return {
+        ymd: r.fecha || "", ms: r.created_at ? Date.parse(r.created_at) : 0,
+        fechaTxt: ddmm(r.fecha), cod: r.cod_art || "—", desc: r.descripcion || "",
+        cajas: Number(r.cajas) || 0, quien: r.fuente === "tallerista" ? displayName(r.quien || "—") : (r.quien || "—"),
+        remito: r.remito || "", origen: r.fuente === "tallerista" ? "tall" : "prov"
+      };
     });
     rows.sort(function (a, b) { if (a.ymd !== b.ymd) return a.ymd < b.ymd ? 1 : -1; return b.ms - a.ms; });
-    histRender(rows, CAP, !!(rt && rt.data && rt.data.length >= HARD));
+    histRender(rows, CAP, rows.length >= HARD);
   } catch (e) {
     if (myseq !== _histReqSeq) return;
     console.warn("histLoad error:", e);

@@ -1,0 +1,68 @@
+-- =====================================================================
+--  anular_circuito_D19J_20260813.sql
+--  Anulación de TODO el circuito posterior al picking de la tanda D19J
+--  (NPs 44529 y 44530). Ejecutado el 2026-08-13.
+--
+--  QUÉ PASÓ
+--    El usuario confirmó que el pedido **NO se armó, NO se cargó al camión y
+--    NO se facturó**: estaba todo mal marcado. Los eventos se emitieron sin que
+--    el trabajo se hiciera, y el pipeline de stock los tomó como reales.
+--    Lo único que SÍ se hizo fue el PICKING.
+--
+--  QUÉ SE BORRÓ
+--    · Armado: AP + TAP + los 2 TAL (líos por NP) — ver
+--      sql/backup_armado_D19J_20260813.sql (paso previo, mismo día).
+--    · Carga al camión: 4 eventos CRA ("Carga sin control (vencido)"), los 2 del
+--      12/08 11:12 y los 2 del **13/08 10:40** — alguien las volvió a cargar hoy.
+--    · Carga camión NP: 2 eventos CCN del 11/08 (con la tanda vieja D19A).
+--    · Facturación: las 2 filas de `Facturacion_NP`.
+--    · Stock: las 54 filas de `Movimientos_Stock` con ref D19J de tipo
+--      **'separado'** (36, las movió el armado falso) y **'facturado'** (18).
+--
+--  QUÉ SE DEJÓ, A PROPÓSITO
+--    · EP / TP / PUB ("Carro") y las 54 filas de stock tipo **'picking'**:
+--      el picking sí se hizo. Además el filtro de AP EXIGE picking terminado —
+--      si se borraba, la tanda tampoco aparecería para armar.
+--    · El evento APU del 12/08 09:30, que es la nota de auditoría de una
+--      reversión anterior.
+--
+--  ESTADO RESULTANTE (verificado)
+--    Eventos:  APU | EP 10:18 | TP 10:32 | PUB 10:32
+--    Facturadas: NO · Entregadas: no
+--    Stock D19J: terminado −34 · excedente −1 · **separar_pedidos +35**
+--      → las 35 cajas quedaron SEPARADAS esperando armado. Es el estado correcto.
+--    Las 4 condiciones para ofrecerla en "Empecé Armado" dan OK.
+--
+--  BACKUP — los datos están en TABLAS dentro de la misma base (copia exacta,
+--  sin transcripción manual):
+--    public."_bkp_D19J_20260813_eventos"   (6 filas: CRA x4 + CCN x2)
+--    public."_bkp_D19J_20260813_movs"      (54 filas: separado + facturado)
+--    public."_bkp_D19J_20260813_fact"      (2 filas: Facturacion_NP)
+--
+--  RESTORE (si hiciera falta volver atrás):
+--    INSERT INTO "Registros_Produccion_Virgilio" SELECT * FROM "_bkp_D19J_20260813_eventos";
+--    INSERT INTO "Facturacion_NP"                SELECT * FROM "_bkp_D19J_20260813_fact";
+--    INSERT INTO "Movimientos_Stock"             SELECT * FROM "_bkp_D19J_20260813_movs";
+--    -- y el armado, desde sql/backup_armado_D19J_20260813.sql
+--
+--  ⚠ Cuando se confirme que quedó bien, estas 3 tablas de backup se pueden borrar:
+--    DROP TABLE public."_bkp_D19J_20260813_eventos",
+--               public."_bkp_D19J_20260813_movs",
+--               public."_bkp_D19J_20260813_fact";
+-- =====================================================================
+
+-- ---------- LO QUE SE EJECUTÓ ----------
+-- create table public."_bkp_D19J_20260813_eventos" as
+--   select * from "Registros_Produccion_Virgilio"
+--   where opcion in ('CRA','CCN') and (texto like '44529|%' or texto like '44530|%');
+-- create table public."_bkp_D19J_20260813_movs" as
+--   select * from "Movimientos_Stock"
+--   where split_part(upper(trim(ref)),'|',1)='D19J' and tipo in ('separado','facturado');
+-- create table public."_bkp_D19J_20260813_fact" as
+--   select * from "Facturacion_NP" where np::text in ('44529','44530');
+--
+-- delete from "Registros_Produccion_Virgilio"
+--  where opcion in ('CRA','CCN') and (texto like '44529|%' or texto like '44530|%');
+-- delete from "Facturacion_NP" where np::text in ('44529','44530');
+-- delete from "Movimientos_Stock"
+--  where split_part(upper(trim(ref)),'|',1)='D19J' and tipo in ('separado','facturado');
