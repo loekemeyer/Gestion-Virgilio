@@ -32592,6 +32592,7 @@ function showSupervisor(email) {
   try { facLoadBadge(); } catch (_e) {}   // v9.69: badge pedidos listos para facturar
   try { favLoadBadge(); } catch (_e) {}   // v9.70: badge Completar Pedido (faltantes con stock)
   try { rrLoadBadge(); } catch (_e) {}   // v9.71: badge Recepción Remitos (cargados sin controlar)
+  try { initStkBadge(); } catch (_e) {}   // v10.41: badge Stock y Compras (negativos)
   try { if (typeof pppAlertPollStart === "function") pppAlertPollStart(); } catch (_e) {}
 }
 
