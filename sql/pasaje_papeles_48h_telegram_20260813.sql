@@ -1,16 +1,18 @@
--- PASAJE DE PAPELES — Alerta Telegram 48h hábiles (2026-08-13)
+-- PASAJE DE PAPELES — Alerta Telegram diaria (2026-08-13)
 --
 -- Función: notificar_pasaje_papeles_48h()
--- Cron: pasaje-papeles-48h (L-V 10:00 AR = 13:00 UTC)
+-- Cron: pasaje-papeles-pendientes (L-V 16:00 AR = 19:00 UTC, días NO feriados)
 --
--- Busca documentos en Pasaje_Papeles con enviado=false que tengan ≥2 días
--- hábiles desde created_at. Días hábiles = excluye sáb/dom + planify.feriados.
--- Manda UN mensaje digest al grupo Faltantes Virgilio (top 10 + total).
--- dedup_key = 'pp48h_YYYYMMDD' → un aviso por día como máximo.
+-- Simple: si hay documentos con enviado=false, manda "📄 Tenés X documentos
+-- sin enviar a Cervantes. Revisá Pasaje de Papeles."
+-- No envía si la cantidad es 0.
+-- No envía si hoy es feriado (planify.feriados).
+--
+-- dedup_key = 'pp_pend_YYYYMMDD' → un aviso por día como máximo.
 --
 -- Columna agregada: Pasaje_Papeles.enviado (boolean, default false)
 --
--- Para re-avisar un día: DELETE FROM telegram_outbox WHERE dedup_key = 'pp48h_YYYYMMDD';
--- Para desactivar: SELECT cron.unschedule('pasaje-papeles-48h');
+-- Para re-avisar un día: DELETE FROM telegram_outbox WHERE dedup_key = 'pp_pend_YYYYMMDD';
+-- Para desactivar: SELECT cron.unschedule('pasaje-papeles-pendientes');
 
 -- La función ya fue deployada con execute_sql. Este archivo es documentación.
