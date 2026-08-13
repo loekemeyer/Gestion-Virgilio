@@ -4,7 +4,24 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-12 · Versión app al documentar: **v10.24**
+> Última actualización: 2026-08-12 · Versión app al documentar: **v10.25**
+>
+> Nota **v10.25 — Un solo espejo del Sheet "Pedidos Entregados" (se eliminó el duplicado).**
+> Esa hoja se estaba espejando **DOS VECES**: (a) el Apps Script la empujaba a
+> `PPP_Pedidos_Entregados` (solo `tanda`+`mt3`), y (b) la función Postgres
+> `sync_ppp_entregados_meta()` la baja sola cada 30 min a `PPP_Entregados_Meta` (np, cod, rs,
+> tanda, m3, fecha_entrega). La (b) es **superconjunto** de la (a). Se dejó solo la (b).
+> **Verificado ANTES de tocar**, sobre las **942 tandas realmente trabajadas** (EP/TP/AP/TAP):
+> cobertura **883 → 883** (0 perdidas, 0 ganadas) y **880 de 883** con el m³ idéntico; las 3 que
+> difieren son de feb–may y por **< 0,6 m³**. Las dos tablas ya coincidían en 983 de 987 tandas.
+> **Cambios:** `vista_tanda_m3` lee `PPP_Entregados_Meta` (y de paso **excluye la tanda vacía**,
+> que la versión anterior colaba como una fila más); `SUPABASE_PPP_ENTREGADOS_ENDPOINT` en
+> index.html apunta a la tabla nueva y la columna pasa de `mt3` a **`m3`**; se sacó la línea
+> `'PPP Excel Pedidos Entregados 2026'` del `PPP_SUPABASE_MAP` en `apps-script/sync-ppp-supabase.gs`.
+> ⚠ **PENDIENTE MANUAL:** hay que **re-pegar el `.gs` en el proyecto de Apps Script** para que deje
+> de empujar. Hasta que se haga, sigue escribiendo la tabla vieja — es inofensivo (ya nadie la lee).
+> **La tabla `PPP_Pedidos_Entregados` NO se borró todavía**, a propósito: queda de red de seguridad
+> hasta confirmar que el Apps Script se actualizó. Recrearla está en `sql/ppp_supabase.sql`.
 >
 > Nota **v10.24 — Las librerías se sirven desde el repo (`vendor/`), no de CDNs de terceros.**
 > Antes la app bajaba 7 librerías de 4 hosts ajenos en cada carga. **6 ya están adentro**

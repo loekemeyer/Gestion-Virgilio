@@ -4044,7 +4044,12 @@ const SUPABASE_LK_KEY =
    ─────────────────────────────────────────────────────────────────────────── */
 const PPP_SOURCE = "supabase";   // v5.33: solo Supabase — se cortó la dependencia de Google Sheets
 const SUPABASE_PPP_PROG_ENDPOINT       = SUPABASE_URL + "/rest/v1/PPP_Programacion_Diaria";
-const SUPABASE_PPP_ENTREGADOS_ENDPOINT = SUPABASE_URL + "/rest/v1/PPP_Pedidos_Entregados";
+/* v10.25 — apunta a PPP_Entregados_Meta. Antes era PPP_Pedidos_Entregados: las DOS son
+   espejo de la MISMA hoja ("PPP Pedidos Entregados 2026"), leída por dos vías (Apps Script
+   empujaba a la primera; el cron `sync_ppp_entregados_meta` tira a la segunda cada 30 min).
+   Entregados_Meta es superconjunto: trae np, cod, rs y fecha_entrega además de tanda+m3.
+   Se unificó para poder sacar esa hoja del Apps Script y borrar la tabla chica. */
+const SUPABASE_PPP_ENTREGADOS_ENDPOINT = SUPABASE_URL + "/rest/v1/PPP_Entregados_Meta";
 const SUPABASE_PPP_BASE_ENDPOINT       = SUPABASE_URL + "/rest/v1/PPP_Base_Pedidos";
 const SUPABASE_FACTURACION_CIERRES_ENDPOINT =
   SUPABASE_URL + "/rest/v1/Facturacion_Cierres";
@@ -6465,7 +6470,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v10.24";
+const APP_VERSION = "v10.25";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -7481,7 +7486,7 @@ setInterval(updateMonitorClock, 30000);   // refresca cada 30s
    ========================================================= */
 /* (v5.34) URLs gviz de la PPP (programación e histórico) eliminadas: la app ya no
    lee Google Sheets — la programación sale de PPP_Programacion_Diaria y el m³
-   histórico de PPP_Pedidos_Entregados (Supabase). */
+   histórico de PPP_Entregados_Meta (Supabase). */
 const HISTORIC_REFRESH_MS = 5 * 60 * 1000;
 let historicMap        = null;   // Map<tandaUpper, m3 sumado>
 let historicLastFetch  = 0;
@@ -27930,7 +27935,7 @@ async function fetchMonitorFromSupabase() {
 /* (v5.34) fetchHistoricFromSheets eliminado: el histórico se lee de Supabase
    (fetchHistoricFromSupabase). */
 
-/* Dispatcher histórico (ver PPP_SOURCE): Supabase (PPP_Pedidos_Entregados) o
+/* Dispatcher histórico (ver PPP_SOURCE): Supabase (PPP_Entregados_Meta) o
    Sheets. Suma m³ por tanda y persiste el m³ visto, venga de donde venga. v2.80. */
 async function fetchHistoricSheet() {
   const acc = await fetchHistoricFromSupabase();
@@ -27939,15 +27944,15 @@ async function fetchHistoricSheet() {
   return acc;
 }
 
-/* Suma mt3 por tanda desde PPP_Pedidos_Entregados (mt3 numérico en la DB → se
+/* Suma m3 por tanda desde PPP_Entregados_Meta (m3 numérico en la DB → se
    lee directo, sin monitorParseM3). Devuelve Map<tandaUpper, m3 total>. v2.80. */
 async function fetchHistoricFromSupabase() {
-  const rows = await supaFetchAll(SUPABASE_PPP_ENTREGADOS_ENDPOINT, "select=tanda,mt3");
+  const rows = await supaFetchAll(SUPABASE_PPP_ENTREGADOS_ENDPOINT, "select=tanda,m3");   // v10.25: la col es m3
   const acc = new Map();
   for (let i = 0; i < rows.length; i++) {
     const tanda = (rows[i].tanda == null ? "" : String(rows[i].tanda)).trim();
     if (!tanda) continue;
-    const m3 = Number(rows[i].mt3) || 0;
+    const m3 = Number(rows[i].m3) || 0;
     const key = tanda.toUpperCase();
     acc.set(key, (acc.get(key) || 0) + m3);
   }
