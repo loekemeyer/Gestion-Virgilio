@@ -10225,9 +10225,7 @@ function stkSubscribeRealtime() {
         const mv = payload.new || payload.old;
         if (!mv) return;
         const cod = String(mv.cod_art || "").toUpperCase();
-        const tipo = String(mv.tipo || "").toLowerCase();
-        // Solo actualizar si es picking/separado (rutas que importan para la vista)
-        if (!["picking", "separado"].includes(tipo)) return;
+        // v10.42: escuchar TODOS los tipos de movimiento (picking, separado, armado, facturado, guardado, racks, etc.)
         // Buscar fila del código en la tabla actual
         const row = document.querySelector('tr.stk-row[data-stk-cod="' + escapeHtml(cod) + '"]');
         if (!row) return;   // no está en la tabla abierta
