@@ -509,36 +509,28 @@ function fechaCorta(yyyymmdd) {
 
 /* ============== Carga de entidades ============== */
 async function cargarEntidades() {
-  const [tallRes, provRes] = await Promise.all([
-    supabase.from("Codigos X Tallerista").select("Codigo,Nombre,Linea").order("Nombre"),
-    supabase.from("Tall_ProvAT_PS").select("nombre,cod_factura")
-      .eq("prov_at", true).eq("rec_virg", true).eq("activo", true).order("nombre")
-  ]);
-  if (tallRes.error) { opState.entidades = null; return tallRes.error.message; }
+  // v10.25: usa vista_entidades_recepcion (join talleristas + proveedores hecho en backend)
+  const res = await supabase
+    .from("vista_entidades_recepcion")
+    .select("tipo,nombre,cod_lk,cod_ch,cod_default,cod_factura")
+    .order("nombre");
+  if (res.error) { opState.entidades = null; return res.error.message; }
 
-  const porNombre = new Map();
-  (tallRes.data || []).forEach(r => {
-    const nom = aliasNombre((r.Nombre || r.Codigo || "").trim());
-    if (!nom || !r.Codigo) return;
-    if (!porNombre.has(nom)) porNombre.set(nom, { tipo: 'tallerista', Nombre: nom, cods: {} });
-    const e = porNombre.get(nom).cods;
-    const linea = (r.Linea || "").trim().toUpperCase();
-    if (linea === "LK") e.LK = r.Codigo;
-    else if (linea === "CH") e.CH = r.Codigo;
-    else { e.LK = e.LK || r.Codigo; e.CH = e.CH || r.Codigo; }
-  });
-  const entidades = [...porNombre.values()];
-
+  const entidades = [];
   const vistosProv = new Set();
-  if (!provRes.error) {
-    (provRes.data || []).forEach(r => {
-      const nom = aliasNombre((r.nombre || "").trim());
-      if (nom && !vistosProv.has(opNorm(nom))) {
-        vistosProv.add(opNorm(nom));
-        entidades.push({ tipo: 'prov_at', Nombre: nom, cod: r.cod_factura, cods: { LK: true, CH: true } });
-      }
-    });
-  }
+  (res.data || []).forEach(r => {
+    const nom = aliasNombre((r.nombre || "").trim());
+    if (!nom) return;
+    if (r.tipo === 'tallerista') {
+      entidades.push({
+        tipo: 'tallerista', Nombre: nom,
+        cods: { LK: r.cod_lk || r.cod_default || null, CH: r.cod_ch || r.cod_default || null }
+      });
+    } else if (r.tipo === 'prov_at' && !vistosProv.has(opNorm(nom))) {
+      vistosProv.add(opNorm(nom));
+      entidades.push({ tipo: 'prov_at', Nombre: nom, cod: r.cod_factura, cods: { LK: true, CH: true } });
+    }
+  });
 
   PROV_MANUAL.forEach(p => {
     if (vistosProv.has(opNorm(p.nombre))) return;
@@ -925,27 +917,16 @@ async function renderArticulos() {
     if (opState.articulosManual) {
       lista = opState.articulosManual.map(a => ({ Cod_Art: a.Cod_Art, Desc: a.Desc || "" }));
     } else if (opState.tipo === 'prov_at') {
+      // v10.25: usa vista_articulos_prov_at (join ya hecho en el backend)
       const res = await supabase
-        .from("Articulos x Prov AT")
-        .select("Cod_Art,Descripcion")
-        .eq("Proveedor", opState.tallNombre)
-        .eq("Activo", true)
-        .order("Cod_Art");
+        .from("vista_articulos_prov_at")
+        .select("cod_art,descripcion")
+        .eq("proveedor", opState.tallNombre)
+        .eq("linea", opState.linea)
+        .order("cod_art");
       error = res.error;
       if (res.data) {
-        const todos = res.data.map(r => ({ Cod_Art: r.Cod_Art, Desc: r.Descripcion }));
-        const cods = todos.map(r => r.Cod_Art).filter(c => c);
-        const lineaPorCod = {};
-        if (cods.length > 0) {
-          const lr = await supabase
-            .from("Articulos Virgilio X Tallerista")
-            .select("Cod_Art,Linea")
-            .in("Cod_Art", cods);
-          if (!lr.error && lr.data) {
-            lr.data.forEach(r => { if (r.Cod_Art && !(r.Cod_Art in lineaPorCod)) lineaPorCod[r.Cod_Art] = r.Linea; });
-          }
-        }
-        lista = todos.filter(r => lineaPorCod[r.Cod_Art] === opState.linea);
+        lista = res.data.map(r => ({ Cod_Art: r.cod_art, Desc: r.descripcion || "" }));
       }
     } else {
       const res = await supabase
