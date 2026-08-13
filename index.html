@@ -6502,7 +6502,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v10.48";
+const APP_VERSION = "v10.49";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -11535,9 +11535,10 @@ function stkAsOfControl() {
   if (!_stk) return "";
   const on = !!_stk.asOf;
   let h = '<span style="font-size:12px;font-weight:800;color:#475569;flex:0 0 auto;">Ver stock:</span>';
-  h += '<button class="stk-btn' + (on ? '' : ' ok') + '" onclick="stkAsOfLive()" style="flex:0 0 auto;white-space:nowrap;padding:6px 10px;">🔴 En vivo</button>';
-  h += '<input type="datetime-local" id="stkAsOfInp" value="' + escapeHtml(_stk.asOfInput || '') + '" onchange="if(_stk){_stk.asOfInput=this.value;}" style="flex:0 0 auto;width:158px;min-width:0;height:36px;border:1px solid #cbd5e1;border-radius:8px;padding:0 4px;font-size:11px;">';
-  h += '<button class="stk-btn" onclick="stkAsOfApply()" style="flex:0 0 auto;white-space:nowrap;padding:6px 8px;">📅 A esa fecha</button>';
+  // v10.49 — TODO a 38px de alto (mismo nivel que los chips E/LK/CH/Negativos/…).
+  h += '<button class="stk-btn' + (on ? '' : ' ok') + '" onclick="stkAsOfLive()" style="flex:0 0 auto;white-space:nowrap;height:38px;padding:0 12px;box-sizing:border-box;">🔴 En vivo</button>';
+  h += '<input type="datetime-local" id="stkAsOfInp" value="' + escapeHtml(_stk.asOfInput || '') + '" onchange="if(_stk){_stk.asOfInput=this.value;}" style="flex:0 0 auto;width:158px;min-width:0;height:38px;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:8px;padding:0 6px;font-size:11px;">';
+  h += '<button class="stk-btn" onclick="stkAsOfApply()" style="flex:0 0 auto;white-space:nowrap;height:38px;padding:0 12px;box-sizing:border-box;">📅 A esa fecha</button>';
   return h;
 }
 function stkAsOfApply() {
@@ -31071,37 +31072,48 @@ function facCorreccClose(){ const ov = document.getElementById("facCorreccOverla
 /* v7.95 — filtro por estado + carga cacheada (cambiar de pestaña no re-consulta). */
 let _facCorrFiltro = "todo";
 let _facCorrRows = null;
+let _facCorrSoloUrg = true;   // v10.49 — switch: true = solo urgentes (default), false = ver todos
 async function facCorreccReload(){
   _facCorrRows = null;
   try { _facCorrRows = await facCorreccDataRich(); } catch(_e){ _facCorrRows = []; }
-  // v10.37 — solo se muestran los cambios URGENTES (el secundario está en 0). Si el secundario
-  // tiene stock, se manda tal cual sin tocar la NP → no aparece acá (pedido del usuario).
-  _facCorrRows = (_facCorrRows || []).filter(function(p){ return _corrItemUrgente(p); });
+  // v10.49 — guardamos TODOS los ítems (urgentes + los que el secundario cubre). El switch
+  // "🔴 Urgentes / Ver todos" de arriba decide cuáles se muestran (default: urgentes).
+  _facCorrRows = (_facCorrRows || []);
   facCorreccRender();
 }
 function facCorreccFiltro(f){ _facCorrFiltro = f; facCorreccRender(); }
+// v10.49 — switch urgentes / ver todos (pedido del usuario: poder ver también los no-urgentes).
+function facCorreccSoloUrg(v){ _facCorrSoloUrg = !!v; facCorreccRender(); }
 function facCorreccRender(){
   const body = document.getElementById("facCorreccBody"); if (!body) return;
-  const rows = _facCorrRows;
-  if (rows === null){ body.innerHTML = '<div style="text-align:center;color:#64748b;padding:20px;">Cargando…</div>'; return; }
+  const allRows = _facCorrRows;
+  if (allRows === null){ body.innerHTML = '<div style="text-align:center;color:#64748b;padding:20px;">Cargando…</div>'; return; }
   facCorreccRefreshCount();
-  // v10.37 — el módulo ya viene filtrado a URGENTES (secundario en 0). Las pestañas separan por estado.
+  // v10.49 — switch Urgentes / Ver todos. Urgente = secundario en 0 (hay que cambiar la NP SÍ o SÍ);
+  // el resto el secundario lo cubre y se manda tal cual, pero ahora se pueden ver si el usuario quiere.
+  const urgRows = allRows.filter(function(p){ return _corrItemUrgente(p); });
+  const rows = _facCorrSoloUrg ? urgRows : allRows;
+  const _npsN = function(arr){ const s = {}; arr.forEach(function(p){ s[p.np] = 1; }); return Object.keys(s).length; };
+  const nUrg = _npsN(urgRows), nAll = _npsN(allRows);
+  const _swBtn = function(v, lbl){ const on = _facCorrSoloUrg === v; return '<button onclick="facCorreccSoloUrg(' + v + ')" style="width:auto;flex:0 0 auto;padding:7px 15px;border-radius:999px;border:1.5px solid ' + (on?'#1e6bd6':'#cbd5e1') + ';background:' + (on?'#1e6bd6':'#fff') + ';color:' + (on?'#fff':'#334155') + ';font-size:12.5px;font-weight:800;cursor:pointer;">' + lbl + '</button>'; };
+  let h = '<div style="display:flex;gap:8px;margin-bottom:10px;">' + _swBtn(true, '🔴 Urgentes (' + nUrg + ')') + _swBtn(false, 'Ver todos (' + nAll + ')') + '</div>';
+  // Pestañas por estado (cuentan NPs DISTINTAS del set visible — unidad de acción: se cambia una vez por NP).
   const TABS = [["todo","Todo"],["facturado","Facturado"],["afacturar","Para facturar"],["pickeado","Pickeado"],["enpicking","En picking"],["sinpickear","Sin pickear"]];
-  // v8.44 — contar NPs DISTINTAS a corregir (unidad de acción: se cambia una vez por NP en el ERP),
-  // no la cantidad de ítems (una NP puede tener varias líneas en código secundario).
   const npsBy = {}, allNps = {};
   rows.forEach(function(p){ allNps[p.np] = 1; (npsBy[p.estado] = npsBy[p.estado] || {})[p.np] = 1; });
   const cntOf = function(k){ return k==="todo" ? Object.keys(allNps).length : Object.keys(npsBy[k]||{}).length; };
-  let h = '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">';
+  h += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">';
   TABS.forEach(function(t){
     const on = _facCorrFiltro === t[0];
     h += '<button onclick="facCorreccFiltro(\'' + t[0] + '\')" style="width:auto;flex:0 0 auto;padding:6px 11px;border-radius:999px;border:1px solid ' + (on?'#1e6bd6':'#cbd5e1') + ';background:' + (on?'#1e6bd6':'#fff') + ';color:' + (on?'#fff':'#334155') + ';font-size:12px;font-weight:800;cursor:pointer;">' + t[1] + ' (' + cntOf(t[0]) + ')</button>';
   });
   h += '</div>';
-  if (!rows.length){ body.innerHTML = h + '<div style="text-align:center;color:#16a34a;padding:24px;font-weight:700;">✅ No hay cambios urgentes. Los que tienen stock del secundario se mandan tal cual (no aparecen acá).</div>'; return; }
+  if (!rows.length){ body.innerHTML = h + '<div style="text-align:center;color:#16a34a;padding:24px;font-weight:700;">' + (_facCorrSoloUrg ? '✅ No hay cambios urgentes. Tocá <b>Ver todos</b> para los que el secundario cubre.' : 'No hay pedidos en código secundario.') + '</div>'; return; }
   const pend = _facCorrFiltro === "todo" ? rows : rows.filter(function(p){ return p.estado === _facCorrFiltro; });
-  h += '<div style="font-size:12.5px;color:#64748b;margin-bottom:10px;">🔴 <b>Solo urgentes</b>: el código secundario está en <b>0</b> → hay que cambiar la NP al principal SÍ o SÍ. Los que el secundario cubre se mandan tal cual y no aparecen acá.</div>';
-  if (!pend.length){ body.innerHTML = h + '<div style="text-align:center;color:#94a3b8;padding:20px;">No hay urgentes en este estado.</div>'; return; }
+  h += '<div style="font-size:12.5px;color:#64748b;margin-bottom:10px;">' + (_facCorrSoloUrg
+      ? '🔴 <b>Solo urgentes</b>: el código secundario está en <b>0</b> → hay que cambiar la NP al principal SÍ o SÍ.'
+      : '📋 <b>Todos</b>: en <span style="color:#166534;font-weight:800;">verde</span> los que el secundario cubre (mandalos tal cual, sin tocar NP) y en <span style="color:#991b1b;font-weight:800;">rojo</span> los urgentes (secundario en 0).') + '</div>';
+  if (!pend.length){ body.innerHTML = h + '<div style="text-align:center;color:#94a3b8;padding:20px;">No hay ' + (_facCorrSoloUrg ? 'urgentes' : 'pedidos') + ' en este estado.</div>'; return; }
   // Agrupar por NP: 1 cambio → botón directo; varios → un solo botón que abre pop-up con checkboxes.
   const BTN = 'width:auto;flex:0 0 auto;background:#16a34a;color:#fff;border:none;border-radius:9px;padding:9px 13px;font-size:13px;font-weight:800;cursor:pointer;white-space:nowrap;';
   const order = [], byNp = {};
