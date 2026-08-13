@@ -6460,7 +6460,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v10.28";
+const APP_VERSION = "v10.30";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -10006,7 +10006,7 @@ async function openStockAdmin(soloConteo) {
       Promise.resolve([]),   // v10.00: insumos viene de vista_stock_procesada (es_insumo)
       ocLoadLineas().catch(function () { return {}; }),   // v7.89: LK/CH
       rkbFetchCxM().catch(function () { return { cxm: {} }; }),   // v8.52: inner×master de racks (backlog capacity-aware)
-      Promise.resolve([])]);   // v10.00: proyección viene de vista_stock_procesada (proy_cajas_mes)
+      supaFetchAllSafe(SUPABASE_CONTEO_ALERTAS_ENDPOINT, "select=id,sesion,legajo,cod,sector,cajas_conteo,cajas_sistema,diferencia,tipo_alerta,procesada&procesada=eq.false&order=created_at.desc").catch(function(){ return []; })]);   // v10.27: alertas de conteos con discrepancias
     // v8.90: cxm primario = planimetría; fallback = Articulos.Cajas_x_Master (para códigos sin posición en racks)
     var _cxmPlani = (res[11] && res[11].cxm) || {}, _cxmMerge = {};
     Object.keys(_cxmPlani).forEach(function (k) { _cxmMerge[k] = _cxmPlani[k]; });
@@ -10018,12 +10018,66 @@ async function openStockAdmin(soloConteo) {
     _viewRows.forEach(function (r) { var k = _ocgNorm(r.cod); if (k && Number(r.cajas_pedidas) > 0) _demFromView[k] = Number(r.cajas_pedidas); });
     var _proyMap = {};
     _viewRows.forEach(function (r) { var k = _ocgNorm(r.cod); if (k && Number(r.proy_cajas_mes) > 0) _proyMap[k] = Number(r.proy_cajas_mes); });
+    // v10.25: consolidar proyección de secundarios al default de la familia.
+    // Ej: 580E (sec, proy 39) + 580 (def, proy 0) → 580 queda con 39, 580E con 0.
+    EQUIV_FAMILIAS.forEach(function (f) {
+      var defN = _ocgNorm(f.def);
+      (f.cods || []).forEach(function (c) {
+        var cn = _ocgNorm(c);
+        if (cn !== defN && _proyMap[cn]) {
+          _proyMap[defN] = (_proyMap[defN] || 0) + _proyMap[cn];
+          delete _proyMap[cn];
+        }
+      });
+    });
     var _insFromView = _viewRows.filter(function (r) { return r.es_insumo; }).map(function (r) { return String(r.cod).trim().toUpperCase(); });
-    _stk = { movs: res[0] || [], cutoff: res[1], factors: _fac, ordenes: res[3] || [], bajadas: res[4] || [], tab: _solo ? "conteo" : "stocks", soloConteo: _solo, filtro: "", openArt: null, ingMode: "remito", asOf: null, asOfInput: "", dem: _demFromView, cap: res[7] || [], gConf: res[8] || [], fcs: res[9] || { pend: {}, porArt: {} }, fcsLoaded: true, insumosCods: _insFromView, cxm: _cxmMerge, proy: _proyMap, viewRows: _viewRows };
+    _stk = { movs: res[0] || [], cutoff: res[1], factors: _fac, ordenes: res[3] || [], bajadas: res[4] || [], tab: _solo ? "conteo" : "stocks", soloConteo: _solo, filtro: "", openArt: null, ingMode: "remito", asOf: null, asOfInput: "", dem: _demFromView, cap: res[7] || [], gConf: res[8] || [], fcs: res[9] || { pend: {}, porArt: {} }, fcsLoaded: true, insumosCods: _insFromView, cxm: _cxmMerge, proy: _proyMap, viewRows: _viewRows, alertas: res[13] || [] };
     stkRender();
+    stkSubscribeRealtime();
   } catch (e) { const b = document.getElementById("stkBody"); if (b) b.innerHTML = '<div class="stk-loading">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
 }
-function closeStockAdmin() { const ov = document.getElementById("stockAdminOverlay"); if (ov) ov.classList.remove("show"); _stk = null; }
+/* v10.30: Suscripción realtime a cambios de stock (PKC descuentos tiempo real). */
+let _stkRtSub = null;
+function stkSubscribeRealtime() {
+  if (!_stk || _stkRtSub) return;   // si ya está suscrito o _stk es null, no hacer nada
+  try {
+    // Suscribirse a cambios en Movimientos_Stock (filtro: tipo en picking/separado, post-activación)
+    _stkRtSub = SUPABASE_CLIENT.from("Movimientos_Stock")
+      .on("*", function (payload) {
+        if (!_stk) { if (_stkRtSub) _stkRtSub.unsubscribe(); _stkRtSub = null; return; }
+        const mv = payload.new || payload.old;
+        if (!mv) return;
+        const cod = String(mv.cod_art || "").toUpperCase();
+        const tipo = String(mv.tipo || "").toLowerCase();
+        // Solo actualizar si es picking/separado (rutas que importan para la vista)
+        if (!["picking", "separado"].includes(tipo)) return;
+        // Buscar fila del código en la tabla actual
+        const row = document.querySelector('tr.stk-row[data-stk-cod="' + escapeHtml(cod) + '"]');
+        if (!row) return;   // no está en la tabla abierta
+        // Refrescar la tabla: recargar saldos del servidor y re-renderizar
+        // (es más simple que actualizar celda por celda y garantiza consistencia)
+        (async function() {
+          try {
+            const updated = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/vista_stock_procesada", "select=*");
+            if (!_stk) return;
+            _stk.viewRows = updated || [];
+            // Recalcular mapas de demanda/proyección
+            var _demFromView = {}, _proyMap = {};
+            (updated || []).forEach(function (r) {
+              var k = _ocgNorm(r.cod);
+              if (k && Number(r.cajas_pedidas) > 0) _demFromView[k] = Number(r.cajas_pedidas);
+              if (k && Number(r.proy_cajas_mes) > 0) _proyMap[k] = Number(r.proy_cajas_mes);
+            });
+            _stk.dem = _demFromView;
+            _stk.proy = _proyMap;
+            stkRender();   // re-renderizar conservando focus
+          } catch (_e) {}
+        })();
+      })
+      .subscribe();
+  } catch (_e) {}
+}
+function closeStockAdmin() { const ov = document.getElementById("stockAdminOverlay"); if (ov) ov.classList.remove("show"); if (_stkRtSub) { _stkRtSub.unsubscribe(); _stkRtSub = null; } _stk = null; }
 
 /* ===== ÓRDENES DE COMPRA (v4.11): visualización/carga de OCs y match recibido vs pedido.
    Usa la tabla EXISTENTE Ordenes_Compra (plana: una fila por artículo pedido — codigo,
@@ -10049,8 +10103,7 @@ async function ocFetchRows() {
    (ventana [fecha_OC, fecha_OC_siguiente)) para no atribuir dos veces la misma entrega.
    Las dos tablas de entregas tienen select_all para anon → la lectura va con la anon key.
    Best-effort: si algo falla, el visualizador cae al recibido manual (cantidad_recibida). */
-const SUPABASE_ENTREGAS_TALL_ENDPOINT = SUPABASE_URL + "/rest/v1/" + encodeURIComponent("Entregas Tallerista Virgilio");
-const SUPABASE_ENTREGAS_PROVAT_ENDPOINT = SUPABASE_URL + "/rest/v1/" + encodeURIComponent("Entregas Prov AT");
+// v10.26: endpoints individuales reemplazados por vista_historial_entregas (ocFetchRecepcion).
 /* Clave de proveedor/tallerista: saca acentos, minúsculas, saca espacios/guiones/barras/puntos
    (mismo criterio que claveTall de recepcion.js). */
 function _ocProvNorm(s) { return String(s == null ? "" : s).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[\s\-\/.]/g, ""); }
@@ -10072,29 +10125,16 @@ function _ocProvKeysMatch(ocKeys, entKey) {
     return corto.length >= 3 && largo.length - corto.length <= 2 && largo.indexOf(corto) === 0;
   });
 }
-/* "DD-MM" (Entregas Prov AT, sin año) → "YYYY-MM-DD" asumiendo el año en curso
-   (best-effort, igual que el Histórico de Recepción v6.50). "YYYY-MM-DD" queda igual. */
-function _ocRecepYmd(v) {
-  const s = String(v == null ? "" : v).trim();
-  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); if (m) return m[1] + "-" + m[2] + "-" + m[3];
-  m = s.match(/^(\d{1,2})[-\/](\d{1,2})$/); if (m) return String(new Date().getFullYear()) + "-" + String(m[2]).padStart(2, "0") + "-" + String(m[1]).padStart(2, "0");
-  return s;
-}
-/* Carga las entregas de las dos tablas → lista normalizada {provKeys, codKey, fecha(YMD), cajas}. */
+// v10.26: _ocRecepYmd eliminada — la conversión DD-MM → YYYY-MM-DD ahora la hace la vista.
+/* Carga las entregas → lista normalizada {provKeys, codKey, fecha(YMD), cajas}.
+   v10.26: una sola query a vista_historial_entregas (antes 2 queries separadas). */
 async function ocFetchRecepcion() {
   const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, out = [];
   try {
-    const r = await fetch(SUPABASE_ENTREGAS_TALL_ENDPOINT + "?select=Nombre_Tall,Cod,Cajas,Fecha&limit=50000", { headers: H, cache: "no-store" });
+    const r = await fetch(SUPABASE_URL + "/rest/v1/vista_historial_entregas?select=quien,cod_art,cajas,fecha&limit=50000", { headers: H, cache: "no-store" });
     if (r.ok) (await r.json()).forEach(function (e) {
-      const ck = _ocgNorm(e.Cod); if (!ck) return;
-      out.push({ provKeys: _ocProvKeys(e.Nombre_Tall), codKey: ck, fecha: _ocRecepYmd(e.Fecha), cajas: Number(e.Cajas) || 0 });
-    });
-  } catch (_e) {}
-  try {
-    const r = await fetch(SUPABASE_ENTREGAS_PROVAT_ENDPOINT + "?select=Proveedor,Cod_Art,Cantidad,Dia_mes&limit=50000", { headers: H, cache: "no-store" });
-    if (r.ok) (await r.json()).forEach(function (e) {
-      const ck = _ocgNorm(e.Cod_Art); if (!ck) return;
-      out.push({ provKeys: _ocProvKeys(e.Proveedor), codKey: ck, fecha: _ocRecepYmd(e.Dia_mes), cajas: Number(e.Cantidad) || 0 });
+      const ck = _ocgNorm(e.cod_art); if (!ck) return;
+      out.push({ provKeys: _ocProvKeys(e.quien), codKey: ck, fecha: e.fecha || "", cajas: Number(e.cajas) || 0 });
     });
   } catch (_e) {}
   return out;
@@ -10757,6 +10797,14 @@ async function ocgFetchProyeccion() {
     const rows = r.ok ? await r.json() : [];
     const m = {};
     rows.forEach(function (x) { const k = _ocgNorm(x.cod); if (k) m[k] = Number(x.proy_cajas_mes) || 0; });
+    // v10.25: consolidar proyección de secundarios al default de la familia
+    EQUIV_FAMILIAS.forEach(function (f) {
+      var defN = _ocgNorm(f.def);
+      (f.cods || []).forEach(function (c) {
+        var cn = _ocgNorm(c);
+        if (cn !== defN && m[cn]) { m[defN] = (m[defN] || 0) + m[cn]; delete m[cn]; }
+      });
+    });
     return m;
   } catch (_e) { return {}; }
 }
@@ -12803,7 +12851,7 @@ function stkBodyStocks() {
     }
     const _pinned = _pinSet.has(String(a.cod).trim().toUpperCase());
     tds += '<td class="stk-caret" style="white-space:nowrap;"><span onclick="event.stopPropagation();stkTogglePin(\'' + encodeURIComponent(a.cod) + '\')" title="' + (_pinned ? "Soltar" : "Fijar") + ' este código (se guarda)" style="cursor:pointer;margin-right:7px;' + (_pinned ? "" : "opacity:.28;") + '">📌</span>' + (_stk.openArt === a.cod ? "▾" : "✚") + '</td>';
-    h += '<tr class="stk-row" onclick="stockToggleArt(\'' + encodeURIComponent(a.cod) + '\')">' + tds + '</tr>';
+    h += '<tr class="stk-row" data-stk-cod="' + escapeHtml(String(a.cod).toUpperCase()) + '" onclick="stockToggleArt(\'' + encodeURIComponent(a.cod) + '\')">' + tds + '</tr>';
     if (_stk.openArt === a.cod) {
       const _lim = _stk.asOf ? new Date(_stk.asOf).getTime() : 0;
       const det = _stk.movs.filter(function (mv) { return String(mv.cod_art) === a.cod && !(_stk.cutoff && new Date(mv.ts).getTime() < new Date(_stk.cutoff).getTime()) && !(_lim && new Date(mv.ts).getTime() > _lim); });
@@ -15639,6 +15687,7 @@ function stkCapSort() { if (!_stk) return; _stk.capSort = (_stk.capSort === "cod
    Se compara el contado (físico de góndola) contra el sistema (góndola+excedente)
    y se muestra lo "en proceso" (Pickeados + A facturar). Guarda en Conteo_Stock. */
 const SUPABASE_CONTEO_ENDPOINT = SUPABASE_URL + "/rest/v1/Conteo_Stock";
+const SUPABASE_CONTEO_ALERTAS_ENDPOINT = SUPABASE_URL + "/rest/v1/Conteo_Alertas";
 function _cntCajas(r) { return (Number(r.pilas) || 0) * (Number(r.cxp) || 0) + (Number(r.sueltas) || 0); }
 function cntSet(i, f, v) {
   if (!_stk || !_stk.conteo) return; const r = _stk.conteo.rows[i]; if (!r) return; r[f] = v;
@@ -15646,7 +15695,42 @@ function cntSet(i, f, v) {
 }
 function cntAddRow() { if (!_stk || !_stk.conteo) return; _stk.conteo.rows.push({ sector: "", cod: "", pilas: "", cxp: "", sueltas: "" }); stkRender(); }
 function cntDelRow(i) { if (!_stk || !_stk.conteo) return; _stk.conteo.rows.splice(i, 1); if (!_stk.conteo.rows.length) _stk.conteo.rows.push({ sector: "", cod: "", pilas: "", cxp: "", sueltas: "" }); stkRender(); }
-function cntCompara() { if (!_stk || !_stk.conteo) return; _stk.conteo.showComp = true; stkRender(); }
+function cntCompara() {
+  if (!_stk || !_stk.conteo) return;
+  _stk.conteo.showComp = true;
+  _stk.conteo.pickLoading = true;
+  stkRender();
+  // v10.29 — con el descuento movido al TP, un picking EN CURSO (PKC sin TP) todavía no
+  // descontó, pero las cajas ya se están sacando de la góndola → hay que avisarlo al contar.
+  _cntLoadPickingEnCurso().then(function (pe) {
+    if (_stk && _stk.conteo) { _stk.conteo.pickEnCurso = pe; _stk.conteo.pickLoading = false; stkRender(); }
+  }).catch(function () { if (_stk && _stk.conteo) { _stk.conteo.pickLoading = false; stkRender(); } });
+}
+/* v10.29 — picking EN CURSO por código: tandas con PKC pero SIN TP todavía. Devuelve
+   { byCod: {codNorm: qty}, tandasByCod: {codNorm: [{tanda, qty}]} }. Solo lee eventos (front). */
+async function _cntLoadPickingEnCurso() {
+  const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+  const desde = new Date(Date.now() - 4 * 24 * 3600 * 1000).toISOString();
+  const _par = await Promise.all([
+    fetch(SUPABASE_TABLE_ENDPOINT + "?opcion=eq.PKC&ts_cliente=gte." + encodeURIComponent(desde) + "&select=texto&limit=20000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; }),
+    fetch(SUPABASE_TABLE_ENDPOINT + "?opcion=eq.TP&ts_cliente=gte." + encodeURIComponent(desde) + "&select=texto&limit=20000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; })
+  ]);
+  const pkcR = _par[0] || [], tpR = _par[1] || [];
+  const cerradas = new Set();
+  tpR.forEach(function (r) { const t = String(r.texto || "").split("|")[0].trim().toUpperCase(); if (t) cerradas.add(t); });
+  const byCod = {}, tandasByCod = {};
+  pkcR.forEach(function (r) {
+    const p = String(r.texto || "").split("|");
+    const tanda = (p[0] || "").trim().toUpperCase();
+    const cod = (p[1] || "").trim();
+    const picked = parseInt(String(p[3] || "").replace(/[^0-9-]/g, ""), 10) || 0;
+    if (!tanda || !cod || picked <= 0 || cerradas.has(tanda)) return;
+    const k = _ocgNorm(cod);
+    byCod[k] = (byCod[k] || 0) + picked;
+    (tandasByCod[k] = tandasByCod[k] || []).push({ tanda: tanda, qty: picked });
+  });
+  return { byCod: byCod, tandasByCod: tandasByCod };
+}
 /* v9.30 — Exporta el conteo físico a CSV, con la columna "Stock del sistema" (góndola +
    excedente, mismo cálculo que "Comparar con el sistema") para cotejar afuera. Formato
    Excel es-AR: BOM utf-8, separador ; y coma decimal (igual que prodExportCsv). */
@@ -15692,6 +15776,26 @@ function cntGuardar() {
     })
     .catch(function () { try { alert("Sin conexión — no se guardó."); } catch (_e) {} });
 }
+/* v10.27: Marcar alerta como procesada */
+async function stkMarcarAlertaProcesada(idAlerta) {
+  try {
+    const r = await fetch(SUPABASE_CONTEO_ALERTAS_ENDPOINT + "?id=eq." + idAlerta, {
+      method: "PATCH",
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" },
+      body: JSON.stringify({ procesada: true, procesada_en: new Date().toISOString() })
+    });
+    if (r.ok) {
+      if (_stk && _stk.alertas) {
+        _stk.alertas = _stk.alertas.filter(function (a) { return a.id !== idAlerta; });
+        stkRender();
+      }
+    } else {
+      alert("Error marcando alerta (" + r.status + ").");
+    }
+  } catch (e) {
+    alert("Error: " + (e.message || e));
+  }
+}
 function stkBodyConteo() {
   if (!_stk.conteo) _stk.conteo = { rows: [{ sector: "", cod: "", pilas: "", cxp: "", sueltas: "" }], legajo: "", showComp: false };
   const c = _stk.conteo;
@@ -15717,13 +15821,28 @@ function stkBodyConteo() {
     const saldos = stockComputeSaldos(_stk.movs, _stk.cutoff);
     const sys = {};
     Object.keys(saldos).forEach(function (cc) { const k = _ocgNorm(cc); if (!sys[k]) sys[k] = { cod: saldos[cc].cod, desc: saldos[cc].desc, gond: 0, exc: 0, proc: 0 }; sys[k].gond += Number(saldos[cc].terminado) || 0; sys[k].exc += Number(saldos[cc].excedente) || 0; sys[k].proc += (Number(saldos[cc].separar_pedidos) || 0) + (Number(saldos[cc].a_facturar) || 0); });
+    // v10.29 — picking EN CURSO (PKC sin TP): esas cajas ya se están sacando de la góndola
+    // pero el sistema todavía no las descontó (el descuento va al TP). Aviso al contar.
+    const pe = (c.pickEnCurso && c.pickEnCurso.byCod) ? c.pickEnCurso : { byCod: {}, tandasByCod: {} };
+    const encursoDeContados = Object.keys(cont).filter(function (k) { return (pe.byCod[k] || 0) > 0; });
+    if (c.pickLoading) {
+      h += '<div class="stk-cut" style="margin-top:14px;background:#f1f5f9;border:1px solid #e2e8f0;color:#64748b;">🔄 Buscando pickings en curso…</div>';
+    } else if (encursoDeContados.length) {
+      h += '<div class="stk-cut" style="margin-top:14px;background:#fffbeb;border:1px solid #fcd34d;color:#92400e;"><b>⚠ Hay picking EN CURSO de códigos que estás contando.</b> Esas cajas ya se están sacando de la góndola pero el sistema todavía no las descontó (el descuento va al terminar el picking). Tenelo en cuenta:<ul style="margin:6px 0 0;padding-left:18px;">' +
+        encursoDeContados.sort(function (a, b) { return String(a).localeCompare(String(b), undefined, { numeric: true }); }).map(function (k) {
+          const s0 = sys[k] || { cod: k }; const det = (pe.tandasByCod[k] || []).map(function (x) { return x.tanda + " (" + x.qty + ")"; }).join(", ");
+          return '<li><b>' + escapeHtml(codBase(s0.cod || k)) + '</b>: ' + (pe.byCod[k]) + ' caja(s) en picking — tanda ' + escapeHtml(det) + '</li>';
+        }).join("") + '</ul></div>';
+    }
     h += '<div class="stk-aj-h" style="margin-top:14px">📊 Contado vs Sistema (góndola + excedente)</div>';
-    h += '<div class="stk-tblwrap"><table class="stk-tbl stk-tbl-fit"><thead><tr><th>Código</th><th class="num">Contado</th><th class="num">Sistema</th><th class="num">Dif</th><th class="num">En proceso</th></tr></thead><tbody>';
+    h += '<div class="stk-tblwrap"><table class="stk-tbl stk-tbl-fit"><thead><tr><th>Código</th><th class="num">Contado</th><th class="num">Sistema</th><th class="num">Dif</th><th class="num">En proceso</th><th class="num">🔄 En picking</th></tr></thead><tbody>';
     Object.keys(cont).sort(function (a, b) { return String(a).localeCompare(String(b), undefined, { numeric: true }); }).forEach(function (k) {
       const s = sys[k] || { cod: k, gond: 0, exc: 0, proc: 0 };
       const sysv = (s.gond || 0) + (s.exc || 0); const dif = Math.round((cont[k] - sysv) * 100) / 100;
       const col = dif === 0 ? "#15803d" : (dif < 0 ? "#b91c1c" : "#b45309");
-      h += '<tr><td class="stk-cod">' + escapeHtml(codBase(s.cod || k)) + '</td><td class="num"><b>' + (Math.round(cont[k] * 10) / 10) + '</b></td><td class="num">' + (Math.round(sysv * 10) / 10) + '</td><td class="num" style="color:' + col + ';font-weight:800">' + (dif > 0 ? "+" : "") + dif + '</td><td class="num" style="color:#94a3b8">' + (s.proc > 0 ? Math.round(s.proc * 10) / 10 : "—") + '</td></tr>';
+      const enc = pe.byCod[k] || 0;
+      const encTit = enc > 0 ? (' title="' + escapeHtml((pe.tandasByCod[k] || []).map(function (x) { return x.tanda + " (" + x.qty + ")"; }).join(", ")) + '"') : "";
+      h += '<tr><td class="stk-cod">' + escapeHtml(codBase(s.cod || k)) + '</td><td class="num"><b>' + (Math.round(cont[k] * 10) / 10) + '</b></td><td class="num">' + (Math.round(sysv * 10) / 10) + '</td><td class="num" style="color:' + col + ';font-weight:800">' + (dif > 0 ? "+" : "") + dif + '</td><td class="num" style="color:#94a3b8">' + (s.proc > 0 ? Math.round(s.proc * 10) / 10 : "—") + '</td><td class="num"' + encTit + ' style="color:' + (enc > 0 ? "#b45309;font-weight:800" : "#cbd5e1") + '">' + (enc > 0 ? "🔄 " + Math.round(enc * 10) / 10 : "—") + '</td></tr>';
     });
     h += '</tbody></table></div>';
   }
@@ -16768,8 +16887,28 @@ async function stkInsUniSacar(u) {
     await stkInsRefresh(); stkRender();
   } catch (e) { alert("No se pudo: " + (e.message || e)); }
 }
+/* v10.27: Alertas de conteos con discrepancias */
+function stkBodyAlertas() {
+  if (!_stk || !_stk.alertas || !_stk.alertas.length) return '';
+  let h = '<div style="background:#fef2f2;border:2px solid #fca5a5;border-radius:12px;padding:12px;margin-bottom:14px;"><div style="font-weight:800;color:#991b1b;margin-bottom:8px;">⚠ Alertas de Conteo (' + _stk.alertas.length + ')</div>';
+  h += '<div style="font-size:12px;max-height:200px;overflow-y:auto;">';
+  _stk.alertas.forEach(function (alerta) {
+    const dif = Math.round((alerta.diferencia || 0) * 10) / 10;
+    const col = dif > 0 ? '#b45309' : '#b91c1c';
+    h += '<div style="display:flex;align-items:center;gap:8px;padding:6px;border-bottom:1px solid #fecaca;font-size:11.5px;">' +
+      '<span style="flex:1;"><b>' + escapeHtml(alerta.cod) + '</b>' + (alerta.sector ? ' (' + escapeHtml(alerta.sector) + ')' : '') + '</span>' +
+      '<span>Conteo: ' + alerta.cajas_conteo + '</span>' +
+      '<span>Sistema: ' + alerta.cajas_sistema + '</span>' +
+      '<span style="color:' + col + ';font-weight:800;">' + (dif > 0 ? '+' : '') + dif + '</span>' +
+      '<button class="stk-btn" style="padding:2px 8px;font-size:10px;" onclick="stkMarcarAlertaProcesada(' + alerta.id + ')">✓</button>' +
+      '</div>';
+  });
+  h += '</div></div>';
+  return h;
+}
 function stkBodyAjustes() {
-  let h = '<div class="stk-aj-dep">Depósito: <select id="stkAjDep" onchange="stkIniHintUpdate()"><option value="terminado">Artículo Terminado (góndola)</option><option value="excedente">Excedente</option><option value="racks">Racks</option><option value="racks_ch">Racks CH</option><option value="insumos">Insumos</option><option value="separar_pedidos">A Separar (pedidos)</option><option value="a_facturar">A Facturar</option><option value="a_guardar">Mercadería a guardar</option><option value="para_envasar">Para envasar</option></select></div>';
+  let h = stkBodyAlertas();  // v10.27: mostrar alertas arriba
+  h += '<div class="stk-aj-dep">Depósito: <select id="stkAjDep" onchange="stkIniHintUpdate()"><option value="terminado">Artículo Terminado (góndola)</option><option value="excedente">Excedente</option><option value="racks">Racks</option><option value="racks_ch">Racks CH</option><option value="insumos">Insumos</option><option value="separar_pedidos">A Separar (pedidos)</option><option value="a_facturar">A Facturar</option><option value="a_guardar">Mercadería a guardar</option><option value="para_envasar">Para envasar</option></select></div>';
   h += '<div class="stk-aj-sec"><div class="stk-aj-h">⚙ Ajustar stock</div>';
   h += '<div class="stk-aj-hint">Sumá o restá con signo: <code>+10</code> / <code>-3</code>.</div><div class="stk-aj-form"><input id="stkAjCod" class="stk-aj-inp" style="flex:0 0 auto;width:150px" placeholder="Código"><input id="stkAjCant" class="stk-aj-inp" style="flex:0 0 auto;width:110px" type="number" placeholder="+/- cajas"><button class="stk-btn ok" onclick="stockAjustar()">Aplicar</button></div>';
   h += '<div class="stk-aj-hint" style="margin-top:10px">O dejá el stock exacto:</div><div class="stk-aj-form"><input id="stkAjCod2" class="stk-aj-inp" style="flex:0 0 auto;width:150px" placeholder="Código"><input id="stkAjFijar" class="stk-aj-inp" style="flex:0 0 auto;width:110px" type="number" placeholder="Fijar en…"><button class="stk-btn" onclick="stockFijar()">Fijar</button></div></div>';
@@ -20974,68 +21113,30 @@ async function fetchSinSalidaMap(sinceISO) {
 /* Junta lo necesario para CR: CCN (NP cargadas + cuándo + tanda), TAL (líos por NP),
    CRN (NP ya controladas), el PPP del día (cód + razón por NP) y, para los NP que ya
    NO están en la PPP del día, "Pedidos Entregados" (fetchEntregadosMeta) como fallback. */
-/* v9.71 — badge del botón "Recepción Remitos (RR)": remitos cargados al camión (CCN) que
-   todavía NO se controlaron (sin CRN) y que no volvieron al depósito (FSS). Versión liviana
-   (sin leer la hoja), mismo criterio que la lista de showControlRemitos. */
+/* v10.25: badge RR usa vista_control_remitos (count). Antes hacía 3 fetches + join JS. */
 async function rrLoadBadge() {
   try {
-    const since = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
-    const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
-    const res = await Promise.all([
-      fetch(SUPABASE_TABLE_ENDPOINT + "?opcion=eq.CCN&ts_cliente=gte." + encodeURIComponent(since) + "&select=texto,ts_cliente&limit=20000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; }),
-      fetch(SUPABASE_TABLE_ENDPOINT + "?opcion=eq.CRN&ts_cliente=gte." + encodeURIComponent(since) + "&select=texto&limit=20000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; }),
-      fetchSinSalidaMap(since).catch(function () { return new Map(); })
-    ]);
-    const ccnR = res[0] || [], crnR = res[1] || [], fss = res[2] || new Map();
-    const loaded = new Map();
-    ccnR.forEach(function (ev) { const np = String(ev.texto || "").split("|")[0].trim().replace(/\.0+$/, ""); if (!np) return; const ms = ev.ts_cliente ? new Date(ev.ts_cliente).getTime() : 0; const p = loaded.get(np) || 0; if (ms > p) loaded.set(np, ms); });
-    const controlled = new Set(); crnR.forEach(function (ev) { const np = String(ev.texto || "").split("|")[0].trim().replace(/\.0+$/, ""); if (np) controlled.add(np); });
-    let n = 0;
-    loaded.forEach(function (lastMs, np) { if (controlled.has(np)) return; const f = fss.get(np) || 0; if (f && f > lastMs) return; n++; });
+    const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, Prefer: "count=exact" };
+    const res = await fetch(SUPABASE_URL + "/rest/v1/vista_control_remitos?select=np&limit=1", { headers: H, cache: "no-store" });
+    const range = res.headers.get("content-range");
+    const n = range ? parseInt(range.split("/").pop()) || 0 : 0;
     supSetBadge("rrBadge", n);
   } catch (_e) {}
 }
+/* v10.25: fetchCRData usa vista_control_remitos. Antes hacía 5 fetches + 40 líneas de join JS. */
 async function fetchCRData() {
-  const since = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
-  const headers = { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY };
-  const ccnUrl = SUPABASE_TABLE_ENDPOINT + "?opcion=eq.CCN&ts_cliente=gte." + encodeURIComponent(since) + "&select=texto,ts_cliente&order=ts_cliente.asc&limit=20000";
-  const talUrl = SUPABASE_TABLE_ENDPOINT + "?opcion=eq.TAL&ts_cliente=gte." + encodeURIComponent(since) + "&select=texto&order=ts_cliente.asc&limit=20000";  // idea 3016: orden cronologico -> el ultimo lios.set gana (TAL mas reciente)
-  const crnUrl = SUPABASE_TABLE_ENDPOINT + "?opcion=eq.CRN&ts_cliente=gte." + encodeURIComponent(since) + "&select=texto&limit=20000";
-  const [ccnR, talR, crnR, sheetMap, sinSalida] = await Promise.all([
-    fetch(ccnUrl, { headers, cache: "no-store" }).then(r => r.ok ? r.json() : []),
-    fetch(talUrl, { headers, cache: "no-store" }).then(r => r.ok ? r.json() : []),
-    fetch(crnUrl, { headers, cache: "no-store" }).then(r => r.ok ? r.json() : []),
-    fetchMonitorSheet().catch(() => new Map()),
-    fetchSinSalidaMap(since)
-  ]);
-  const loaded = new Map();   // NP -> { tanda, loadMs (primera carga), lastCcnMs (última carga) }
-  for (const ev of ccnR) {
-    const parts = String(ev.texto || "").split("|");
-    const np = parts[0].trim().replace(/\.0+$/, "");
-    const tanda = (parts[1] || "").trim().toUpperCase();
-    if (!np) continue;
-    const ms = ev.ts_cliente ? new Date(ev.ts_cliente).getTime() : 0;
-    const prev = loaded.get(np);
-    if (!prev) loaded.set(np, { tanda: tanda || "—", loadMs: ms, lastCcnMs: ms });
-    else { if (tanda && prev.tanda === "—") prev.tanda = tanda; if (ms && (!prev.loadMs || ms < prev.loadMs)) prev.loadMs = ms; if (ms > (prev.lastCcnMs || 0)) prev.lastCcnMs = ms; }
-  }
-  const lios = new Map();      // NP -> cantidad de líos
-  for (const ev of talR) { const p = String(ev.texto || "").split("|"); const np = p[0].trim().replace(/\.0+$/, ""); const v = parseInt(p[1], 10); if (np && !isNaN(v)) lios.set(np, v); }
-  const controlled = new Set();// NP ya controladas (CRN)
-  for (const ev of crnR) { const np = String(ev.texto || "").split("|")[0].trim().replace(/\.0+$/, ""); if (np) controlled.add(np); }
-  const meta = {};             // NP -> { cod, rs } desde el PPP del día
-  for (const [, entry] of sheetMap) { if (!entry || !entry.pedidos) continue; for (const p of entry.pedidos) { for (const part of String(p.np || "").split(/[,/]/)) { const np = part.trim().replace(/\.0+$/, ""); if (np && /\d/.test(np) && !meta[np]) meta[np] = { cod: p.cod || "", rs: p.razonSocial || "" }; } } }
-  // Arrastrados: NP cargados que ya NO están en la PPP del día → buscar el cliente en
-  // "Pedidos Entregados" (histórica). Solo si falta alguno (evita leer la hoja en vano).
-  const faltan = [];
-  for (const [np] of loaded) { const mm = meta[np]; if (!mm || (!mm.cod && !mm.rs)) faltan.push(np); }
-  if (faltan.length) {
-    try {
-      const ent = await fetchEntregadosMeta();
-      for (const np of faltan) { if (ent[np]) meta[np] = ent[np]; }
-    } catch (_e) { /* sin red / hoja caída: quedan en "—" */ }
-  }
-  return { loaded, lios, controlled, meta, sinSalida };
+  const H = { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY };
+  const res = await fetch(SUPABASE_URL + "/rest/v1/vista_control_remitos?select=np,tanda,first_load,lios,cod_cliente,rs", {
+    headers: H, cache: "no-store"
+  });
+  if (!res.ok) throw new Error("HTTP " + res.status);
+  const rows = await res.json();
+  return rows.map(r => ({
+    np: r.np, tanda: r.tanda || "—", cod: r.cod_cliente || "", rs: r.rs || "",
+    lios: r.lios != null ? r.lios : null,
+    loadMs: r.first_load ? new Date(r.first_load).getTime() : 0,
+    venc: crVencido(r.first_load ? new Date(r.first_load).getTime() : 0)
+  }));
 }
 
 async function showControlRemitos(legajo, isAdmin) {
@@ -21046,16 +21147,8 @@ async function showControlRemitos(legajo, isAdmin) {
   m.classList.add("show");
   crWakeLock();
   try {
-    const data = await fetchCRData();
-    const items = [];
-    for (const [np, info] of data.loaded) {
-      if (data.controlled.has(np)) continue;   // ya controlado → fuera (ya pasó a Entregados)
-      const fss = data.sinSalida ? (data.sinSalida.get(np) || 0) : 0;
-      if (fss && fss > (info.lastCcnMs || 0)) continue;   // volvió al depósito (FSS más reciente que la carga) → fuera de RR
-      const meta = data.meta[np] || {};
-      items.push({ np: np, tanda: info.tanda || "—", cod: meta.cod || "", rs: meta.rs || "", lios: data.lios.has(np) ? data.lios.get(np) : null, loadMs: info.loadMs || 0, venc: crVencido(info.loadMs || 0) });
-    }
-    // Vencidos primero (los molestos arriba), después por tanda y NP.
+    // v10.25: fetchCRData retorna items directos desde vista_control_remitos
+    const items = await fetchCRData();
     items.sort((a, b) => (b.venc ? 1 : 0) - (a.venc ? 1 : 0) || String(a.tanda).localeCompare(String(b.tanda)) || a.np.localeCompare(b.np));
     if (!items.length) {
       _cr = null; crReleaseWakeLock();
@@ -28205,18 +28298,17 @@ async function fetchMonitorEvents(targetTandaKeys, sheetMap) {
   const start6DaysIso = new Date(startTodayMs - 10*24*60*60*1000).toISOString();
   const headers = { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY };
 
-  // Query A: status por tanda (todos los eventos para target tandas)
-  let dataA = [];
+  // Query A: status por tanda — v10.26: usa vista_tanda_status (antes procesaba
+  // hasta 5000 eventos crudos). La vista ya filtra legajo 0/1.
+  let statusRows = [];
   if (targetTandaKeys.length) {
-    const urlA = SUPABASE_TABLE_ENDPOINT +
-      "?opcion=in.(EP,TP,AP,TAP)" +
-      "&texto=in.(" + targetTandaKeys.join(",") + ")" +
-      "&order=ts_cliente.asc" +
-      "&limit=5000" +
-      "&select=opcion,texto,ts_cliente,legajo";
+    const filterA = targetTandaKeys.map(t => encodeURIComponent(t)).join(",");
+    const urlA = SUPABASE_URL + "/rest/v1/vista_tanda_status" +
+      "?tanda=in.(" + filterA + ")" +
+      "&select=tanda,last_pick_op,pick_legajo,pick_start_ts,last_arm_op,arm_legajo,arm_start_ts";
     const rA = await fetch(urlA, { headers });
     if (!rA.ok) throw new Error("Supabase HTTP " + rA.status + " (status query)");
-    dataA = await rA.json();
+    statusRows = await rA.json();
   }
 
   // Query B: eventos EP/TP/AP/TAP de los últimos 6 días — totales/alertas de
@@ -28302,55 +28394,21 @@ async function fetchMonitorEvents(targetTandaKeys, sheetMap) {
     sinLegajo: fichadosSinLeg.length
   };
 
-  // Procesar A: último evento de Picking (EP/TP) y Armado (AP/TAP) por tanda.
-  // startPick/startArm guardan el legajo del que EMPEZÓ (último EP / último AP)
-  // para mostrarlo al lado del ✅/⏰ en el monitor.
-  const lastPick = new Map();
-  const lastArm  = new Map();
-  const startPick = new Map();   // tanda -> { legajo, ts }  (último EP)
-  const startArm  = new Map();   // tanda -> { legajo, ts }  (último AP)
-  for (const ev of dataA) {
-    const t = (ev.texto || "").trim().toUpperCase();
-    if (!t) continue;
-    const ts  = ev.ts_cliente;
-    const leg = String(ev.legajo || "").trim();
-    // v7.36: legajo 0/1 = PRUEBAS (test/basura). NO marcan una tanda como iniciada / en
-    // curso ni terminada en el monitor. Sin esto, un AP de prueba (caso real: D06C,
-    // legajo 0) hacía figurar la tanda "armada por 0". Mismo filtro que el resto del
-    // monitor (fichadas, silencios) y que getActivityStatus.
-    if (leg === "0" || leg === "1") continue;
-    if (ev.opcion === "EP" || ev.opcion === "TP") {
-      const cur = lastPick.get(t);
-      if (!cur || ts > cur.ts) lastPick.set(t, { opcion: ev.opcion, ts });
-      if (ev.opcion === "EP") {
-        const cs = startPick.get(t);
-        if (!cs || ts > cs.ts) startPick.set(t, { legajo: leg, ts });
-      }
-    } else if (ev.opcion === "AP" || ev.opcion === "TAP") {
-      const cur = lastArm.get(t);
-      if (!cur || ts > cur.ts) lastArm.set(t, { opcion: ev.opcion, ts });
-      if (ev.opcion === "AP") {
-        const cs = startArm.get(t);
-        if (!cs || ts > cs.ts) startArm.set(t, { legajo: leg, ts });
-      }
-    }
-  }
+  // Procesar A: v10.26 — statusMap directo desde vista_tanda_status.
+  // La vista ya calcula último EP/TP, AP/TAP, legajo y ts por tanda (excluye legajo 0/1).
   const statusMap = new Map();
-  const tandas = new Set([...lastPick.keys(), ...lastArm.keys()]);
-  for (const t of tandas) {
-    const p = lastPick.get(t);
-    const a = lastArm.get(t);
-    const sp = startPick.get(t);
-    const sa = startArm.get(t);
+  for (const row of statusRows) {
+    const t = (row.tanda || "").trim().toUpperCase();
+    if (!t) continue;
     statusMap.set(t, {
-      picking:  !p ? null : (p.opcion === "TP"  ? "done" : "curso"),
-      separado: !a ? null : (a.opcion === "TAP" ? "done" : "curso"),
+      picking:  !row.last_pick_op ? null : (row.last_pick_op === "TP"  ? "done" : "curso"),
+      separado: !row.last_arm_op  ? null : (row.last_arm_op  === "TAP" ? "done" : "curso"),
       doneTodayP: false,
       doneTodayA: false,
-      pickLegajo: sp ? sp.legajo : null,
-      sepLegajo:  sa ? sa.legajo : null,
-      pickStartTs: sp ? sp.ts : null,   // idea 4283: ts del EP/AP abierto para mostrar "en curso hace X"
-      sepStartTs:  sa ? sa.ts : null
+      pickLegajo:  row.pick_legajo  || null,
+      sepLegajo:   row.arm_legajo   || null,
+      pickStartTs: row.pick_start_ts || null,
+      sepStartTs:  row.arm_start_ts  || null
     });
   }
 
@@ -29287,6 +29345,8 @@ async function inconsValidTandas() {
   return s;
 }
 
+// DEPRECADA v10.25: la lógica ahora vive en RPC generar_inconsistencias().
+// Se conserva para rollback de emergencia.
 function computeInconsistencias(events, dayKey, validTandas) {
   const hoy = isTodayKey(dayKey);
   const nowMs = Date.now();
@@ -29495,13 +29555,29 @@ async function refreshInconsistencias() {
   const cont = document.getElementById("inconsContent");
   if (!cont) return;
   try {
-    const [events, validTandas] = await Promise.all([
-      fetchInconsEvents(dayKey),
-      inconsValidTandas(),
+    // v10.25: usa RPC generar_inconsistencias (toda la lógica vive en Supabase)
+    const dayStartIso = new Date(`${dayKey}T00:00:00-03:00`).toISOString();
+    const dayEndIso   = new Date(`${dayKey}T23:59:59-03:00`).toISOString();
+    const H = { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY };
+    const [rpcRes, countRes] = await Promise.all([
+      fetch(SUPABASE_URL + "/rest/v1/rpc/generar_inconsistencias", {
+        method: "POST",
+        headers: { ...H, "Content-Type": "application/json" },
+        body: JSON.stringify({ p_dia: dayKey })
+      }),
+      fetch(SUPABASE_TABLE_ENDPOINT +
+        "?ts_cliente=gte." + encodeURIComponent(dayStartIso) +
+        "&ts_cliente=lte." + encodeURIComponent(dayEndIso) +
+        "&select=opcion&limit=1", {
+        headers: { ...H, "Prefer": "count=exact" }
+      }),
       getEmpleadosNombres().catch(() => null)
     ]);
-    const rows = computeInconsistencias(events, dayKey, validTandas);
-    renderInconsistencias(rows, dayKey, events.length);
+    if (!rpcRes.ok) throw new Error("RPC HTTP " + rpcRes.status);
+    const rows = await rpcRes.json();
+    const range = countRes.headers.get("content-range");
+    const totalEv = range ? parseInt(range.split("/").pop()) || 0 : 0;
+    renderInconsistencias(rows, dayKey, totalEv);
   } catch (e) {
     if (_inconsActive) {
       cont.innerHTML = inconsDaySelectorHtml(dayKey) +
@@ -30318,45 +30394,21 @@ function facSetStatus(ok, txt){
 }
 
 /* Determina qué tandas están en estado FC (picking + separado done).
-   Hace una query similar a fetchMonitorEvents pero acotada y simplificada:
-   solo necesitamos último EP/TP y último AP/TAP por tanda. */
+   v10.26: usa vista_tanda_status (antes procesaba eventos crudos). La vista
+   ya filtra legajo 0/1 y calcula estado='completo' = TP + TAP. */
 async function facFetchFcKeys(targetTandaKeys){
   if (!targetTandaKeys.length) return new Set();
-  // Filtro texto=in.(...) con tandas target — evita el limit de 1000
   const filter = targetTandaKeys.map(t => encodeURIComponent(t)).join(",");
-  const url = SUPABASE_TABLE_ENDPOINT
-    + "?opcion=in.(EP,TP,AP,TAP)"
-    + "&texto=in.(" + filter + ")"
-    + "&order=ts_cliente.asc"
-    + "&select=opcion,texto,ts_cliente,legajo"
-    + "&limit=2000";
+  const url = SUPABASE_URL + "/rest/v1/vista_tanda_status"
+    + "?tanda=in.(" + filter + ")"
+    + "&estado=eq.completo"
+    + "&select=tanda";
   const r = await fetch(url, {
     headers: { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY }
   });
   if (!r.ok) throw new Error("Supabase HTTP " + r.status);
   const data = await r.json();
-  const lastP = new Map(), lastA = new Map();
-  for (const ev of data){
-    const t = (ev.texto || "").trim().toUpperCase();
-    if (!t) continue;
-    // v7.36: legajo 0/1 = PRUEBAS. Un AP/TAP de prueba no debe alterar el estado FC
-    // (p.ej. un AP fantasma de legajo 0 tras un TAP real des-marcaría la tanda como FC).
-    const _fcLeg = String(ev.legajo || "").trim();
-    if (_fcLeg === "0" || _fcLeg === "1") continue;
-    if (ev.opcion === "EP" || ev.opcion === "TP"){
-      const cur = lastP.get(t);
-      if (!cur || ev.ts_cliente > cur.ts) lastP.set(t, { op: ev.opcion, ts: ev.ts_cliente });
-    } else if (ev.opcion === "AP" || ev.opcion === "TAP"){
-      const cur = lastA.get(t);
-      if (!cur || ev.ts_cliente > cur.ts) lastA.set(t, { op: ev.opcion, ts: ev.ts_cliente });
-    }
-  }
-  const fc = new Set();
-  for (const k of targetTandaKeys){
-    const p = lastP.get(k), a = lastA.get(k);
-    if (p && p.op === "TP" && a && a.op === "TAP") fc.add(k);
-  }
-  return fc;
+  return new Set(data.map(d => d.tanda));
 }
 
 /* Líos por NP (de los eventos TAL = NP|LÍOS|TANDA), para la columna Líos del
