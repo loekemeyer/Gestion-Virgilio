@@ -6476,7 +6476,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v10.28";
+const APP_VERSION = "v10.29";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -15662,7 +15662,42 @@ function cntSet(i, f, v) {
 }
 function cntAddRow() { if (!_stk || !_stk.conteo) return; _stk.conteo.rows.push({ sector: "", cod: "", pilas: "", cxp: "", sueltas: "" }); stkRender(); }
 function cntDelRow(i) { if (!_stk || !_stk.conteo) return; _stk.conteo.rows.splice(i, 1); if (!_stk.conteo.rows.length) _stk.conteo.rows.push({ sector: "", cod: "", pilas: "", cxp: "", sueltas: "" }); stkRender(); }
-function cntCompara() { if (!_stk || !_stk.conteo) return; _stk.conteo.showComp = true; stkRender(); }
+function cntCompara() {
+  if (!_stk || !_stk.conteo) return;
+  _stk.conteo.showComp = true;
+  _stk.conteo.pickLoading = true;
+  stkRender();
+  // v10.29 — con el descuento movido al TP, un picking EN CURSO (PKC sin TP) todavía no
+  // descontó, pero las cajas ya se están sacando de la góndola → hay que avisarlo al contar.
+  _cntLoadPickingEnCurso().then(function (pe) {
+    if (_stk && _stk.conteo) { _stk.conteo.pickEnCurso = pe; _stk.conteo.pickLoading = false; stkRender(); }
+  }).catch(function () { if (_stk && _stk.conteo) { _stk.conteo.pickLoading = false; stkRender(); } });
+}
+/* v10.29 — picking EN CURSO por código: tandas con PKC pero SIN TP todavía. Devuelve
+   { byCod: {codNorm: qty}, tandasByCod: {codNorm: [{tanda, qty}]} }. Solo lee eventos (front). */
+async function _cntLoadPickingEnCurso() {
+  const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+  const desde = new Date(Date.now() - 4 * 24 * 3600 * 1000).toISOString();
+  const _par = await Promise.all([
+    fetch(SUPABASE_TABLE_ENDPOINT + "?opcion=eq.PKC&ts_cliente=gte." + encodeURIComponent(desde) + "&select=texto&limit=20000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; }),
+    fetch(SUPABASE_TABLE_ENDPOINT + "?opcion=eq.TP&ts_cliente=gte." + encodeURIComponent(desde) + "&select=texto&limit=20000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; })
+  ]);
+  const pkcR = _par[0] || [], tpR = _par[1] || [];
+  const cerradas = new Set();
+  tpR.forEach(function (r) { const t = String(r.texto || "").split("|")[0].trim().toUpperCase(); if (t) cerradas.add(t); });
+  const byCod = {}, tandasByCod = {};
+  pkcR.forEach(function (r) {
+    const p = String(r.texto || "").split("|");
+    const tanda = (p[0] || "").trim().toUpperCase();
+    const cod = (p[1] || "").trim();
+    const picked = parseInt(String(p[3] || "").replace(/[^0-9-]/g, ""), 10) || 0;
+    if (!tanda || !cod || picked <= 0 || cerradas.has(tanda)) return;
+    const k = _ocgNorm(cod);
+    byCod[k] = (byCod[k] || 0) + picked;
+    (tandasByCod[k] = tandasByCod[k] || []).push({ tanda: tanda, qty: picked });
+  });
+  return { byCod: byCod, tandasByCod: tandasByCod };
+}
 /* v9.30 — Exporta el conteo físico a CSV, con la columna "Stock del sistema" (góndola +
    excedente, mismo cálculo que "Comparar con el sistema") para cotejar afuera. Formato
    Excel es-AR: BOM utf-8, separador ; y coma decimal (igual que prodExportCsv). */
@@ -15733,13 +15768,28 @@ function stkBodyConteo() {
     const saldos = stockComputeSaldos(_stk.movs, _stk.cutoff);
     const sys = {};
     Object.keys(saldos).forEach(function (cc) { const k = _ocgNorm(cc); if (!sys[k]) sys[k] = { cod: saldos[cc].cod, desc: saldos[cc].desc, gond: 0, exc: 0, proc: 0 }; sys[k].gond += Number(saldos[cc].terminado) || 0; sys[k].exc += Number(saldos[cc].excedente) || 0; sys[k].proc += (Number(saldos[cc].separar_pedidos) || 0) + (Number(saldos[cc].a_facturar) || 0); });
+    // v10.29 — picking EN CURSO (PKC sin TP): esas cajas ya se están sacando de la góndola
+    // pero el sistema todavía no las descontó (el descuento va al TP). Aviso al contar.
+    const pe = (c.pickEnCurso && c.pickEnCurso.byCod) ? c.pickEnCurso : { byCod: {}, tandasByCod: {} };
+    const encursoDeContados = Object.keys(cont).filter(function (k) { return (pe.byCod[k] || 0) > 0; });
+    if (c.pickLoading) {
+      h += '<div class="stk-cut" style="margin-top:14px;background:#f1f5f9;border:1px solid #e2e8f0;color:#64748b;">🔄 Buscando pickings en curso…</div>';
+    } else if (encursoDeContados.length) {
+      h += '<div class="stk-cut" style="margin-top:14px;background:#fffbeb;border:1px solid #fcd34d;color:#92400e;"><b>⚠ Hay picking EN CURSO de códigos que estás contando.</b> Esas cajas ya se están sacando de la góndola pero el sistema todavía no las descontó (el descuento va al terminar el picking). Tenelo en cuenta:<ul style="margin:6px 0 0;padding-left:18px;">' +
+        encursoDeContados.sort(function (a, b) { return String(a).localeCompare(String(b), undefined, { numeric: true }); }).map(function (k) {
+          const s0 = sys[k] || { cod: k }; const det = (pe.tandasByCod[k] || []).map(function (x) { return x.tanda + " (" + x.qty + ")"; }).join(", ");
+          return '<li><b>' + escapeHtml(codBase(s0.cod || k)) + '</b>: ' + (pe.byCod[k]) + ' caja(s) en picking — tanda ' + escapeHtml(det) + '</li>';
+        }).join("") + '</ul></div>';
+    }
     h += '<div class="stk-aj-h" style="margin-top:14px">📊 Contado vs Sistema (góndola + excedente)</div>';
-    h += '<div class="stk-tblwrap"><table class="stk-tbl stk-tbl-fit"><thead><tr><th>Código</th><th class="num">Contado</th><th class="num">Sistema</th><th class="num">Dif</th><th class="num">En proceso</th></tr></thead><tbody>';
+    h += '<div class="stk-tblwrap"><table class="stk-tbl stk-tbl-fit"><thead><tr><th>Código</th><th class="num">Contado</th><th class="num">Sistema</th><th class="num">Dif</th><th class="num">En proceso</th><th class="num">🔄 En picking</th></tr></thead><tbody>';
     Object.keys(cont).sort(function (a, b) { return String(a).localeCompare(String(b), undefined, { numeric: true }); }).forEach(function (k) {
       const s = sys[k] || { cod: k, gond: 0, exc: 0, proc: 0 };
       const sysv = (s.gond || 0) + (s.exc || 0); const dif = Math.round((cont[k] - sysv) * 100) / 100;
       const col = dif === 0 ? "#15803d" : (dif < 0 ? "#b91c1c" : "#b45309");
-      h += '<tr><td class="stk-cod">' + escapeHtml(codBase(s.cod || k)) + '</td><td class="num"><b>' + (Math.round(cont[k] * 10) / 10) + '</b></td><td class="num">' + (Math.round(sysv * 10) / 10) + '</td><td class="num" style="color:' + col + ';font-weight:800">' + (dif > 0 ? "+" : "") + dif + '</td><td class="num" style="color:#94a3b8">' + (s.proc > 0 ? Math.round(s.proc * 10) / 10 : "—") + '</td></tr>';
+      const enc = pe.byCod[k] || 0;
+      const encTit = enc > 0 ? (' title="' + escapeHtml((pe.tandasByCod[k] || []).map(function (x) { return x.tanda + " (" + x.qty + ")"; }).join(", ")) + '"') : "";
+      h += '<tr><td class="stk-cod">' + escapeHtml(codBase(s.cod || k)) + '</td><td class="num"><b>' + (Math.round(cont[k] * 10) / 10) + '</b></td><td class="num">' + (Math.round(sysv * 10) / 10) + '</td><td class="num" style="color:' + col + ';font-weight:800">' + (dif > 0 ? "+" : "") + dif + '</td><td class="num" style="color:#94a3b8">' + (s.proc > 0 ? Math.round(s.proc * 10) / 10 : "—") + '</td><td class="num"' + encTit + ' style="color:' + (enc > 0 ? "#b45309;font-weight:800" : "#cbd5e1") + '">' + (enc > 0 ? "🔄 " + Math.round(enc * 10) / 10 : "—") + '</td></tr>';
     });
     h += '</tbody></table></div>';
   }

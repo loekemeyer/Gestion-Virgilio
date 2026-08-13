@@ -6,6 +6,23 @@
 >
 > Última actualización: 2026-08-12 · Versión app al documentar: **v10.25**
 >
+> Nota **v10.29 — Stock: el descuento del picking vuelve a hacerse SOLO al terminar (TP) + aviso de picking en curso al contar.**
+> **Motivo:** con el descuento incremental (por cada PKC, v8.00/branch FORWARD) un operario que
+> pickeaba de más y volvía para atrás dejaba un FANTASMA: el PKC final quedaba en 0 pero el
+> movimiento de stock (+N) no se revertía (el pipeline solo actualizaba con `picked>0`, saltaba el 0).
+> **Fix backend (config, reversible):** `Stock_Config.etapa1_pkc_desde` volvió a **`infinity`** → se
+> desactiva el branch FORWARD de `reconciliar_pipeline_stock_etapa1()` y el descuento vuelve a
+> dispararse **una sola vez al TP** (branch histórico, gated en TP, con los números finales del
+> picking). Un pickeo deshecho a 0 ya no descuenta nada. Valor anterior (para revertir): `2026-08-08
+> 23:39:18.348275-03`. **Fix front (compensación, `stkBodyConteo`/`cntCompara`/`_cntLoadPickingEnCurso`):**
+> como ahora el stock no baja hasta el TP, un **picking EN CURSO** (tandas con `PKC` pero sin `TP`)
+> saca cajas de la góndola sin descontarlas todavía → al **Comparar** en el Conteo se muestra una
+> columna **"🔄 En picking"** y un **aviso** con los códigos/tandas/cantidades en curso, para que el
+> conteo físico no dé "diferencia" por eso. Se leyó de `Registros_Produccion_Virgilio` (PKC menos TP,
+> ventana 4 días). **Limpieza puntual de datos (366E):** se dejó 366E en 0 en todos los depósitos
+> (ajustes `FIX_AFACT_NEG_D20A_98237` y `FIX_STOCK_ZERO_366E_D20E`) porque físicamente había 0.
+> Bump `APP_VERSION` + `SW_VERSION` `v10.29`.
+>
 > Nota **v10.25 — Un solo espejo del Sheet "Pedidos Entregados" (se eliminó el duplicado).**
 > Esa hoja se estaba espejando **DOS VECES**: (a) el Apps Script la empujaba a
 > `PPP_Pedidos_Entregados` (solo `tanda`+`mt3`), y (b) la función Postgres
