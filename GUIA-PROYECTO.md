@@ -350,6 +350,23 @@
 > Cajas por pila, Sueltas, Contado (cajas), **Stock del sistema** (góndola+excedente, mismo cálculo
 > que la comparación), Diferencia y En proceso. Formato Excel es-AR (BOM utf-8, `;`, coma decimal).
 >
+> Nota **v10.23** — **Carga Camión (CC): orden de carga (inverso de la ruta) + ubicación física por NP.**
+> Cierra el follow-up de v5.86 ("mostrar la ubicación por NP en carga de camión"). El reparto de
+> Carga Camión (`fetchCCData` → `showCargaCamion`/`ccRender`) ahora enriquece cada NP con dos cosas
+> vía la función nueva **`_ccAttachUbicYOrden(items)`**: **(a) UBICACIÓN física** = último evento
+> **`AUB`** de esa NP (dónde quedó armada: AB8/AA4…, la que eligió el armador al TAP), mostrada como
+> badge violeta `📌`; **(b) ORDEN DE CARGA** = **inverso de la ruta de reparto** — el último destino
+> de cada camión se carga primero (1 = primero en subir). Reusa la geocodificación ya cacheada en
+> **`PPP_Geo`** (la que llena "Armar ruta de reparto"), el optimizador `_rtOptimize` y las mismas
+> **`RT_RUTAS`**/zonas; **no geocodifica nada nuevo** (solo lee cache → instantáneo en el celular).
+> Direcciones/zona/m³ salen de `PPP_Programacion_Diaria` por NP. `ccRender` pasó de agrupar por
+> **tanda** a renderizar **en orden de carga** con encabezado por ruta, número de posición (`.cc-pos`)
+> y el badge de ubicación (`.cc-ubic`). Las NP **sin dirección geocodificada** (o sin zona geográfica:
+> Retira/Súper/Expo) caen en una sección aparte **"📍 Sin ubicación en ruta — cargar aparte"** al final.
+> Todo **best-effort**: si falla el fetch de AUB, PPP o la cache de geo, el reparto se muestra igual
+> (sin orden ni ubicación, orden viejo por tanda como fallback). Solo front (lee eventos/tablas ya
+> existentes; sin cambios de backend). Bump `APP_VERSION` + `SW_VERSION` `v10.23`.
+>
 > Nota **v10.22** — **PPP: "En viaje" renombrado a "En Salida".** El tab del PPP que junta los
 > pedidos **facturados** que ya salieron de la Programación pero sin entrega confirmada (`_pppEnViajeHtml`,
 > tab key interno sigue `enviaje`) pasó a llamarse **"🚚 En Salida"**. Incluye lo facturado sin cargar y
