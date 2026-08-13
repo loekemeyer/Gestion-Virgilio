@@ -6465,7 +6465,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v10.26";
+const APP_VERSION = "v10.27";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -10011,7 +10011,7 @@ async function openStockAdmin(soloConteo) {
       Promise.resolve([]),   // v10.00: insumos viene de vista_stock_procesada (es_insumo)
       ocLoadLineas().catch(function () { return {}; }),   // v7.89: LK/CH
       rkbFetchCxM().catch(function () { return { cxm: {} }; }),   // v8.52: inner×master de racks (backlog capacity-aware)
-      Promise.resolve([])]);   // v10.00: proyección viene de vista_stock_procesada (proy_cajas_mes)
+      supaFetchAllSafe(SUPABASE_CONTEO_ALERTAS_ENDPOINT, "select=id,sesion,legajo,cod,sector,cajas_conteo,cajas_sistema,diferencia,tipo_alerta,procesada&procesada=eq.false&order=created_at.desc").catch(function(){ return []; })]);   // v10.27: alertas de conteos con discrepancias
     // v8.90: cxm primario = planimetría; fallback = Articulos.Cajas_x_Master (para códigos sin posición en racks)
     var _cxmPlani = (res[11] && res[11].cxm) || {}, _cxmMerge = {};
     Object.keys(_cxmPlani).forEach(function (k) { _cxmMerge[k] = _cxmPlani[k]; });
@@ -10036,7 +10036,7 @@ async function openStockAdmin(soloConteo) {
       });
     });
     var _insFromView = _viewRows.filter(function (r) { return r.es_insumo; }).map(function (r) { return String(r.cod).trim().toUpperCase(); });
-    _stk = { movs: res[0] || [], cutoff: res[1], factors: _fac, ordenes: res[3] || [], bajadas: res[4] || [], tab: _solo ? "conteo" : "stocks", soloConteo: _solo, filtro: "", openArt: null, ingMode: "remito", asOf: null, asOfInput: "", dem: _demFromView, cap: res[7] || [], gConf: res[8] || [], fcs: res[9] || { pend: {}, porArt: {} }, fcsLoaded: true, insumosCods: _insFromView, cxm: _cxmMerge, proy: _proyMap, viewRows: _viewRows };
+    _stk = { movs: res[0] || [], cutoff: res[1], factors: _fac, ordenes: res[3] || [], bajadas: res[4] || [], tab: _solo ? "conteo" : "stocks", soloConteo: _solo, filtro: "", openArt: null, ingMode: "remito", asOf: null, asOfInput: "", dem: _demFromView, cap: res[7] || [], gConf: res[8] || [], fcs: res[9] || { pend: {}, porArt: {} }, fcsLoaded: true, insumosCods: _insFromView, cxm: _cxmMerge, proy: _proyMap, viewRows: _viewRows, alertas: res[13] || [] };
     stkRender();
   } catch (e) { const b = document.getElementById("stkBody"); if (b) b.innerHTML = '<div class="stk-loading">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
 }
@@ -15650,6 +15650,7 @@ function stkCapSort() { if (!_stk) return; _stk.capSort = (_stk.capSort === "cod
    Se compara el contado (físico de góndola) contra el sistema (góndola+excedente)
    y se muestra lo "en proceso" (Pickeados + A facturar). Guarda en Conteo_Stock. */
 const SUPABASE_CONTEO_ENDPOINT = SUPABASE_URL + "/rest/v1/Conteo_Stock";
+const SUPABASE_CONTEO_ALERTAS_ENDPOINT = SUPABASE_URL + "/rest/v1/Conteo_Alertas";
 function _cntCajas(r) { return (Number(r.pilas) || 0) * (Number(r.cxp) || 0) + (Number(r.sueltas) || 0); }
 function cntSet(i, f, v) {
   if (!_stk || !_stk.conteo) return; const r = _stk.conteo.rows[i]; if (!r) return; r[f] = v;
@@ -15702,6 +15703,26 @@ function cntGuardar() {
       else { try { alert("Error guardando (" + r.status + ")."); } catch (_e) {} }
     })
     .catch(function () { try { alert("Sin conexión — no se guardó."); } catch (_e) {} });
+}
+/* v10.27: Marcar alerta como procesada */
+async function stkMarcarAlertaProcesada(idAlerta) {
+  try {
+    const r = await fetch(SUPABASE_CONTEO_ALERTAS_ENDPOINT + "?id=eq." + idAlerta, {
+      method: "PATCH",
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" },
+      body: JSON.stringify({ procesada: true, procesada_en: new Date().toISOString() })
+    });
+    if (r.ok) {
+      if (_stk && _stk.alertas) {
+        _stk.alertas = _stk.alertas.filter(function (a) { return a.id !== idAlerta; });
+        stkRender();
+      }
+    } else {
+      alert("Error marcando alerta (" + r.status + ").");
+    }
+  } catch (e) {
+    alert("Error: " + (e.message || e));
+  }
 }
 function stkBodyConteo() {
   if (!_stk.conteo) _stk.conteo = { rows: [{ sector: "", cod: "", pilas: "", cxp: "", sueltas: "" }], legajo: "", showComp: false };
@@ -16779,8 +16800,28 @@ async function stkInsUniSacar(u) {
     await stkInsRefresh(); stkRender();
   } catch (e) { alert("No se pudo: " + (e.message || e)); }
 }
+/* v10.27: Alertas de conteos con discrepancias */
+function stkBodyAlertas() {
+  if (!_stk || !_stk.alertas || !_stk.alertas.length) return '';
+  let h = '<div style="background:#fef2f2;border:2px solid #fca5a5;border-radius:12px;padding:12px;margin-bottom:14px;"><div style="font-weight:800;color:#991b1b;margin-bottom:8px;">⚠ Alertas de Conteo (' + _stk.alertas.length + ')</div>';
+  h += '<div style="font-size:12px;max-height:200px;overflow-y:auto;">';
+  _stk.alertas.forEach(function (alerta) {
+    const dif = Math.round((alerta.diferencia || 0) * 10) / 10;
+    const col = dif > 0 ? '#b45309' : '#b91c1c';
+    h += '<div style="display:flex;align-items:center;gap:8px;padding:6px;border-bottom:1px solid #fecaca;font-size:11.5px;">' +
+      '<span style="flex:1;"><b>' + escapeHtml(alerta.cod) + '</b>' + (alerta.sector ? ' (' + escapeHtml(alerta.sector) + ')' : '') + '</span>' +
+      '<span>Conteo: ' + alerta.cajas_conteo + '</span>' +
+      '<span>Sistema: ' + alerta.cajas_sistema + '</span>' +
+      '<span style="color:' + col + ';font-weight:800;">' + (dif > 0 ? '+' : '') + dif + '</span>' +
+      '<button class="stk-btn" style="padding:2px 8px;font-size:10px;" onclick="stkMarcarAlertaProcesada(' + alerta.id + ')">✓</button>' +
+      '</div>';
+  });
+  h += '</div></div>';
+  return h;
+}
 function stkBodyAjustes() {
-  let h = '<div class="stk-aj-dep">Depósito: <select id="stkAjDep" onchange="stkIniHintUpdate()"><option value="terminado">Artículo Terminado (góndola)</option><option value="excedente">Excedente</option><option value="racks">Racks</option><option value="racks_ch">Racks CH</option><option value="insumos">Insumos</option><option value="separar_pedidos">A Separar (pedidos)</option><option value="a_facturar">A Facturar</option><option value="a_guardar">Mercadería a guardar</option><option value="para_envasar">Para envasar</option></select></div>';
+  let h = stkBodyAlertas();  // v10.27: mostrar alertas arriba
+  h += '<div class="stk-aj-dep">Depósito: <select id="stkAjDep" onchange="stkIniHintUpdate()"><option value="terminado">Artículo Terminado (góndola)</option><option value="excedente">Excedente</option><option value="racks">Racks</option><option value="racks_ch">Racks CH</option><option value="insumos">Insumos</option><option value="separar_pedidos">A Separar (pedidos)</option><option value="a_facturar">A Facturar</option><option value="a_guardar">Mercadería a guardar</option><option value="para_envasar">Para envasar</option></select></div>';
   h += '<div class="stk-aj-sec"><div class="stk-aj-h">⚙ Ajustar stock</div>';
   h += '<div class="stk-aj-hint">Sumá o restá con signo: <code>+10</code> / <code>-3</code>.</div><div class="stk-aj-form"><input id="stkAjCod" class="stk-aj-inp" style="flex:0 0 auto;width:150px" placeholder="Código"><input id="stkAjCant" class="stk-aj-inp" style="flex:0 0 auto;width:110px" type="number" placeholder="+/- cajas"><button class="stk-btn ok" onclick="stockAjustar()">Aplicar</button></div>';
   h += '<div class="stk-aj-hint" style="margin-top:10px">O dejá el stock exacto:</div><div class="stk-aj-form"><input id="stkAjCod2" class="stk-aj-inp" style="flex:0 0 auto;width:150px" placeholder="Código"><input id="stkAjFijar" class="stk-aj-inp" style="flex:0 0 auto;width:110px" type="number" placeholder="Fijar en…"><button class="stk-btn" onclick="stockFijar()">Fijar</button></div></div>';
