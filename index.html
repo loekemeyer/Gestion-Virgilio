@@ -6545,7 +6545,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v10.36";
+const APP_VERSION = "v10.37";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -30841,6 +30841,9 @@ let _facCorrRows = null;
 async function facCorreccReload(){
   _facCorrRows = null;
   try { _facCorrRows = await facCorreccDataRich(); } catch(_e){ _facCorrRows = []; }
+  // v10.37 — solo se muestran los cambios URGENTES (el secundario está en 0). Si el secundario
+  // tiene stock, se manda tal cual sin tocar la NP → no aparece acá (pedido del usuario).
+  _facCorrRows = (_facCorrRows || []).filter(function(p){ return _corrItemUrgente(p); });
   facCorreccRender();
 }
 function facCorreccFiltro(f){ _facCorrFiltro = f; facCorreccRender(); }
@@ -30849,36 +30852,23 @@ function facCorreccRender(){
   const rows = _facCorrRows;
   if (rows === null){ body.innerHTML = '<div style="text-align:center;color:#64748b;padding:20px;">Cargando…</div>'; return; }
   facCorreccRefreshCount();
-  // v10.27 — URGENTE = una NP que SÍ o SÍ hay que corregir: el secundario NO cubre lo pedido
-  // (stkSec < cajas). Si el secundario alcanza (stkSec >= cajas) se manda tal cual → NO urgente.
-  const urgentNps = {};
-  rows.forEach(function(p){ if (_corrItemUrgente(p)) urgentNps[p.np] = 1; });
-  // Pestañas de filtro por estado (con conteo) — "🔴 Urgentes" cruza todos los estados.
-  const TABS = [["todo","Todo"],["urgente","🔴 Urgentes"],["facturado","Facturado"],["afacturar","Para facturar"],["pickeado","Pickeado"],["enpicking","En picking"],["sinpickear","Sin pickear"]];
+  // v10.37 — el módulo ya viene filtrado a URGENTES (secundario en 0). Las pestañas separan por estado.
+  const TABS = [["todo","Todo"],["facturado","Facturado"],["afacturar","Para facturar"],["pickeado","Pickeado"],["enpicking","En picking"],["sinpickear","Sin pickear"]];
   // v8.44 — contar NPs DISTINTAS a corregir (unidad de acción: se cambia una vez por NP en el ERP),
   // no la cantidad de ítems (una NP puede tener varias líneas en código secundario).
   const npsBy = {}, allNps = {};
   rows.forEach(function(p){ allNps[p.np] = 1; (npsBy[p.estado] = npsBy[p.estado] || {})[p.np] = 1; });
-  const cntOf = function(k){ return k==="todo" ? Object.keys(allNps).length : k==="urgente" ? Object.keys(urgentNps).length : Object.keys(npsBy[k]||{}).length; };
+  const cntOf = function(k){ return k==="todo" ? Object.keys(allNps).length : Object.keys(npsBy[k]||{}).length; };
   let h = '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">';
   TABS.forEach(function(t){
     const on = _facCorrFiltro === t[0];
-    const isU = t[0] === "urgente";
-    const accent = isU ? "#dc2626" : "#1e6bd6";
-    const bd = on ? accent : (isU ? "#fca5a5" : "#cbd5e1");
-    const bg = on ? accent : (isU ? "#fef2f2" : "#fff");
-    const fg = on ? "#fff" : (isU ? "#b91c1c" : "#334155");
-    h += '<button onclick="facCorreccFiltro(\'' + t[0] + '\')" style="width:auto;flex:0 0 auto;padding:6px 11px;border-radius:999px;border:1px solid ' + bd + ';background:' + bg + ';color:' + fg + ';font-size:12px;font-weight:800;cursor:pointer;">' + t[1] + ' (' + cntOf(t[0]) + ')</button>';
+    h += '<button onclick="facCorreccFiltro(\'' + t[0] + '\')" style="width:auto;flex:0 0 auto;padding:6px 11px;border-radius:999px;border:1px solid ' + (on?'#1e6bd6':'#cbd5e1') + ';background:' + (on?'#1e6bd6':'#fff') + ';color:' + (on?'#fff':'#334155') + ';font-size:12px;font-weight:800;cursor:pointer;">' + t[1] + ' (' + cntOf(t[0]) + ')</button>';
   });
   h += '</div>';
-  if (!rows.length){ body.innerHTML = h + '<div style="text-align:center;color:#16a34a;padding:24px;font-weight:700;">✅ No hay códigos para corregir.</div>'; return; }
-  const pend = _facCorrFiltro === "todo" ? rows
-             : _facCorrFiltro === "urgente" ? rows.filter(function(p){ return urgentNps[p.np]; })
-             : rows.filter(function(p){ return p.estado === _facCorrFiltro; });
-  h += '<div style="font-size:12.5px;color:#64748b;margin-bottom:10px;">' + (_facCorrFiltro === "urgente"
-        ? '🔴 <b>Urgentes</b>: el código secundario está en <b>0</b> (sin stock) → hay que cambiar la NP al principal SÍ o SÍ (los que tienen algo de secundario no aparecen acá).'
-        : 'Estos pedidos entraron en un código <b>secundario</b>. Cambiá la NP en el ERP al principal y confirmá acá — el picking va a levantar el principal.') + '</div>';
-  if (!pend.length){ body.innerHTML = h + '<div style="text-align:center;color:#16a34a;padding:20px;font-weight:700;">' + (_facCorrFiltro === "urgente" ? '✅ No hay urgentes — todos tienen algo de stock del secundario.' : 'No hay pedidos en este estado.') + '</div>'; return; }
+  if (!rows.length){ body.innerHTML = h + '<div style="text-align:center;color:#16a34a;padding:24px;font-weight:700;">✅ No hay cambios urgentes. Los que tienen stock del secundario se mandan tal cual (no aparecen acá).</div>'; return; }
+  const pend = _facCorrFiltro === "todo" ? rows : rows.filter(function(p){ return p.estado === _facCorrFiltro; });
+  h += '<div style="font-size:12.5px;color:#64748b;margin-bottom:10px;">🔴 <b>Solo urgentes</b>: el código secundario está en <b>0</b> → hay que cambiar la NP al principal SÍ o SÍ. Los que el secundario cubre se mandan tal cual y no aparecen acá.</div>';
+  if (!pend.length){ body.innerHTML = h + '<div style="text-align:center;color:#94a3b8;padding:20px;">No hay urgentes en este estado.</div>'; return; }
   // Agrupar por NP: 1 cambio → botón directo; varios → un solo botón que abre pop-up con checkboxes.
   const BTN = 'width:auto;flex:0 0 auto;background:#16a34a;color:#fff;border:none;border-radius:9px;padding:9px 13px;font-size:13px;font-weight:800;cursor:pointer;white-space:nowrap;';
   const order = [], byNp = {};
