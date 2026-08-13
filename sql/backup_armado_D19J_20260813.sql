@@ -53,3 +53,18 @@ VALUES
 --                '9725cbd2-96d8-42d5-9e5d-8a420b70d5a0',
 --                '18f43fea-51b6-4bba-8080-6e36108e5b78',
 --                '47e9ff52-a1e2-454a-9a04-9e7b67617b90');
+
+-- =====================================================================
+--  ACTUALIZACIÓN 2026-08-13 — RESTAURADO
+--    El usuario confirmó que D19J SÍ está armada (armado físico real). Los
+--    eventos AP/TAP/TAL de arriba se RE-INSERTARON tal cual (mismo INSERT del
+--    bloque de restore). Motivo: Entregas_Virgilio (20 filas) y el stock en
+--    a_facturar (35 cajas) ya reflejaban ese armado; solo faltaban estos
+--    eventos para que vista_tanda_status diera 'completo' y la tanda apareciera
+--    en Facturación — NPs a FC.
+--    NO se restauró la carga al camión (CRA/CCN) ni la facturación: siguen
+--    anuladas a propósito (ver anular_circuito_D19J_20260813.sql), porque el
+--    pedido está armado pero todavía NO cargado ni facturado — justo el estado
+--    para que la operadora lo tilde en Facturación.
+--    Verificado: vista_tanda_status = 'completo', Facturacion_NP sin 44529/44530.
+-- =====================================================================
