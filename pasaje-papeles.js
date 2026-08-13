@@ -42,12 +42,16 @@ function closePasajePapeles() {
  */
 function ppSwitchTab(tab) {
   _ppState.activeTab = tab;
-  document.querySelectorAll('.pp-tab').forEach(function (el) { el.classList.remove('active'); });
-  var activeBtn = document.querySelector('.pp-tab[data-tab="' + tab + '"]');
-  if (activeBtn) activeBtn.classList.add('active');
-  document.querySelectorAll('.pp-tab-content').forEach(function (el) { el.style.display = 'none'; });
-  var activeContent = document.getElementById('ppTab_' + tab);
-  if (activeContent) activeContent.style.display = 'block';
+  // Tabs: los botones no tienen data-tab, determinar activo por posición
+  var tabs = document.querySelectorAll('#pasajePapelesModal .pp-tab');
+  tabs.forEach(function (el) { el.classList.remove('active'); });
+  if (tab === 'virgilio' && tabs[0]) tabs[0].classList.add('active');
+  if (tab === 'cervantes' && tabs[1]) tabs[1].classList.add('active');
+  // Contenido
+  var vTab = document.getElementById('ppTabVirgilio');
+  var cTab = document.getElementById('ppTabCervantes');
+  if (vTab) vTab.style.display = tab === 'virgilio' ? 'block' : 'none';
+  if (cTab) cTab.style.display = tab === 'cervantes' ? 'block' : 'none';
 }
 
 /**
@@ -95,7 +99,7 @@ function ppFormatDate(dateStr) {
  * Renderiza tabla Virgilio
  */
 function ppRenderVirgilio() {
-  const container = document.getElementById('ppTab_virgilio');
+  const container = document.getElementById('ppVirgilioList');
   if (!container) return;
 
   const data = _ppState.virgilioData;
@@ -134,7 +138,7 @@ function ppRenderVirgilio() {
  * Renderiza tabla Cervantes
  */
 function ppRenderCervantes() {
-  const container = document.getElementById('ppTab_cervantes');
+  const container = document.getElementById('ppCervantesList');
   if (!container) return;
 
   const data = _ppState.cervantesData;
