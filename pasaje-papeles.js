@@ -156,7 +156,7 @@ function _ppBuildSection(key, icon, title, rows, showTimer) {
       (key === 'pendiente' ? 'Sin documentación pendiente' : 'Sin documentación enviada') + '</div>';
   } else {
     html += '<div class="pp-tblwrap"><table class="pp-tbl"><thead><tr>' +
-      '<th>Fecha</th><th>Tipo</th><th>N° Remito</th><th>N° Factura</th><th>Proveedor</th><th>Contenido</th>';
+      '<th>Fecha</th><th>Tipo</th><th>N° Remito</th><th>N° Factura</th><th>Proveedor / CUIT</th><th>Contenido</th>';
     if (showTimer) html += '<th>Tiempo sin enviar</th>';
     html += '<th>Enviado</th></tr></thead><tbody>';
 
@@ -201,12 +201,17 @@ function _ppBuildRow(row, showTimer) {
     'style="width:20px;height:20px;cursor:pointer;accent-color:#16a34a;">' +
     '</label>';
 
+  var proveedor = row.razon_social || '—';
+  if (row.cuit) {
+    proveedor += '<br><small>' + row.cuit + '</small>';
+  }
+
   var html = '<tr data-ppid="' + rowId + '">' +
     '<td>' + ppFormatDate(row.created_at) + '</td>' +
     '<td>' + tipoLabel + '</td>' +
     '<td>' + nroRto + '</td>' +
     '<td>' + nroFc + '</td>' +
-    '<td>' + (row.razon_social || '—') + '</td>' +
+    '<td>' + proveedor + '</td>' +
     '<td>' + contenido + '</td>';
 
   if (showTimer) {
@@ -416,12 +421,30 @@ function ppCloseCaptureDialog() {
 }
 
 /**
+ * Busca el CUIT de un proveedor por razón social
+ */
+async function _ppFetchCuit(razonSocial) {
+  if (!razonSocial) return null;
+  try {
+    var encoded = encodeURIComponent(razonSocial.trim());
+    var res = await fetch(
+      SUPABASE_URL + '/rest/v1/Proveedores?razon_social=eq.' + encoded + '&select=cuit',
+      { headers: _ppHeaders(), cache: 'no-store' }
+    ).then(function (r) { return r.ok ? r.json() : []; });
+    return (res && res[0] && res[0].cuit) || null;
+  } catch (_e) { return null; }
+}
+
+/**
  * Graba documentación en Pasaje_Papeles (best-effort, silencioso)
  */
 async function _ppSaveToSupabase(tipoContenido, data) {
   try {
     var tipoDocLabel = data.tipoDoc;
     if (tipoDocLabel === 'remito_factura') tipoDocLabel = 'ambos';
+
+    // Buscar CUIT del proveedor (async, no bloquea)
+    var cuit = await _ppFetchCuit(data.proveedor);
 
     var payload = {
       planta: 'virgilio',
@@ -434,7 +457,8 @@ async function _ppSaveToSupabase(tipoContenido, data) {
       fecha_factura: data.fechaFactura || null,
       fecha_emision: data.fechaRemito || data.fechaFactura || null,
       legajo_usuario: (typeof legajoInput !== 'undefined' && legajoInput && legajoInput.value) ? legajoInput.value : null,
-      enviado: false
+      enviado: false,
+      cuit: cuit
     };
 
     var res = await fetch(SUPABASE_URL + '/rest/v1/Pasaje_Papeles', {
