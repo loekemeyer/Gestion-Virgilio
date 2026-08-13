@@ -410,6 +410,18 @@
 > Cajas por pila, Sueltas, Contado (cajas), **Stock del sistema** (góndola+excedente, mismo cálculo
 > que la comparación), Diferencia y En proceso. Formato Excel es-AR (BOM utf-8, `;`, coma decimal).
 >
+> Nota **v10.27** — **RR: fecha del CC (carga al camión) + Corregir códigos: pestaña "🔴 Urgentes".**
+> Dos pedidos del dueño. **(1) Recepción Remitos (RR)** (`crRender`): bajo el número de NP ahora se
+> muestra la **fecha/hora en que se cargó al camión** (`🚚 DD/MM HH:mm`, hora AR vía `crFmtCC` sobre
+> `it.loadMs` = primer evento **CCN** de esa NP; en rojo si está vencido). Es el dato que ya se usaba
+> para calcular el vencimiento (+30 hs), ahora visible. **(2) Corregir códigos (secundario → principal)**
+> (`facCorreccRender`): pestaña nueva **"🔴 Urgentes"** (estilada en rojo) que cruza TODOS los estados y
+> muestra solo las NP que **SÍ o SÍ** hay que cambiar en el ERP = alguna línea donde el stock del código
+> **secundario no cubre lo pedido** (`_corrItemUrgente`: `stkSec < cajas`). Las NP cuyo secundario alcanza
+> ("mandalo tal cual, sin tocar NP") no aparecen. Misma idea que el badge ROJO del botón (v9.38), ahora
+> filtrable dentro del panel. Todo **front** (lee `it.loadMs` ya cargado y `_facCorrRows`; sin backend).
+> Bump `APP_VERSION` + `SW_VERSION` `v10.27`.
+>
 > Nota **v10.26** — **Carga Camión (CC): orden de carga (inverso de la ruta) + ubicación física por NP.**
 > Cierra el follow-up de v5.86 ("mostrar la ubicación por NP en carga de camión"). El reparto de
 > Carga Camión (`fetchCCData` → `showCargaCamion`/`ccRender`) ahora enriquece cada NP con dos cosas

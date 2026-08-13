@@ -2287,6 +2287,8 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .cr-row:active > td{ background: #f1f5f9; }
 .cr-row.cc-on > td{ background: #ecfdf5; }
 .cr-td-np{ font-size: 16px; font-weight: 800; color: #0f172a; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cr-cc-date{ font-size: 11px; font-weight: 700; color: #0f766e; margin-top: 2px; white-space: nowrap; }
+.cr-row.cr-venc .cr-cc-date{ color: #b91c1c; }
 .cr-td-cod{ font-size: 13px; font-weight: 700; color: #475569; font-family: ui-monospace, Menlo, Consolas, monospace; white-space: nowrap; }
 .cr-td-rs{ font-size: 13px; color: #334155; max-width: 120px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cr-td-lios{ text-align: center; font-size: 15px; font-weight: 800; color: #b45309; white-space: nowrap; }
@@ -6474,7 +6476,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v10.26";
+const APP_VERSION = "v10.27";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -20939,6 +20941,8 @@ function crDeadline(loadMs) {
   return dl;
 }
 function crVencido(loadMs) { return loadMs > 0 && Date.now() > crDeadline(loadMs); }
+/* v10.27 — fecha/hora de la carga al camión (CCN) → "DD/MM HH:mm" en hora AR (UTC-3). */
+function crFmtCC(ms) { if (!ms) return ""; const d = new Date(ms - 3 * 3600000); const p = function (n) { return n < 10 ? "0" + n : "" + n; }; return p(d.getUTCDate()) + "/" + p(d.getUTCMonth() + 1) + " " + p(d.getUTCHours()) + ":" + p(d.getUTCMinutes()); }
 
 /* "Pedidos Entregados" → Map NP -> { cod, rs }. Para que Recepción Remitos muestre el
    cliente de los NP que YA salieron de la PPP del día (arrastrados de días anteriores).
@@ -21096,7 +21100,7 @@ function crRender() {
     const liosTxt = liosNull ? "—" : String(it.lios);
     const liosCls = (liosNull || it.lios === 0) ? " cr-lios0" : "";
     rows += `<tr class="cr-row${on ? " cc-on" : ""}${it.venc ? " cr-venc" : ""}" onclick="crToggle('${npc}')">` +
-            `<td class="cr-td-np">${escapeHtml(it.np)}</td>` +
+            `<td class="cr-td-np">${escapeHtml(it.np)}${it.loadMs ? `<div class="cr-cc-date">🚚 ${crFmtCC(it.loadMs)}</div>` : ""}</td>` +
             `<td class="cr-td-cod">${it.cod ? escapeHtml(it.cod) : "—"}</td>` +
             `<td class="cr-td-rs">${escapeHtml(it.rs || "—")}${it.venc ? `<span class="cr-venc-tag">VENCIDO</span>` : ""}</td>` +
             `<td class="cr-td-lios${liosCls}">${liosTxt}</td>` +
@@ -30589,6 +30593,9 @@ function _corrEstado(e){
   const M = { sinpickear:["Sin pickear","#64748b","#f1f5f9"], enpicking:["En picking","#1e40af","#eff6ff"], pickeado:["Pickeado","#b45309","#fffbeb"], afacturar:["A facturar","#166534","#f0fdf4"], facturado:["Facturado","#065f46","#d1fae5"] };
   return M[e] || M.sinpickear;
 }
+/* v10.27 — ¿este ítem obliga a cambiar la NP? SÍ si el stock del código SECUNDARIO no
+   cubre lo pedido (stkSec < cajas). Si el secundario alcanza, se manda tal cual (no urgente). */
+function _corrItemUrgente(p){ return (Number(p && p.stkSec)||0) < (Number(p && p.cajas)||0); }
 /* v8.06 — fecha de salida (PPP fecha_entrega / Entregas fecha_salida) → "DD/MM". */
 function _corrFecha(s){
   s = String(s || "").trim(); if (!s) return "";
@@ -30651,23 +30658,36 @@ function facCorreccRender(){
   const rows = _facCorrRows;
   if (rows === null){ body.innerHTML = '<div style="text-align:center;color:#64748b;padding:20px;">Cargando…</div>'; return; }
   facCorreccRefreshCount();
-  // Pestañas de filtro por estado (con conteo)
-  const TABS = [["todo","Todo"],["facturado","Facturado"],["afacturar","Para facturar"],["pickeado","Pickeado"],["enpicking","En picking"],["sinpickear","Sin pickear"]];
+  // v10.27 — URGENTE = una NP que SÍ o SÍ hay que corregir: el secundario NO cubre lo pedido
+  // (stkSec < cajas). Si el secundario alcanza (stkSec >= cajas) se manda tal cual → NO urgente.
+  const urgentNps = {};
+  rows.forEach(function(p){ if (_corrItemUrgente(p)) urgentNps[p.np] = 1; });
+  // Pestañas de filtro por estado (con conteo) — "🔴 Urgentes" cruza todos los estados.
+  const TABS = [["todo","Todo"],["urgente","🔴 Urgentes"],["facturado","Facturado"],["afacturar","Para facturar"],["pickeado","Pickeado"],["enpicking","En picking"],["sinpickear","Sin pickear"]];
   // v8.44 — contar NPs DISTINTAS a corregir (unidad de acción: se cambia una vez por NP en el ERP),
   // no la cantidad de ítems (una NP puede tener varias líneas en código secundario).
   const npsBy = {}, allNps = {};
   rows.forEach(function(p){ allNps[p.np] = 1; (npsBy[p.estado] = npsBy[p.estado] || {})[p.np] = 1; });
-  const cntOf = function(k){ return k==="todo" ? Object.keys(allNps).length : Object.keys(npsBy[k]||{}).length; };
+  const cntOf = function(k){ return k==="todo" ? Object.keys(allNps).length : k==="urgente" ? Object.keys(urgentNps).length : Object.keys(npsBy[k]||{}).length; };
   let h = '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">';
   TABS.forEach(function(t){
     const on = _facCorrFiltro === t[0];
-    h += '<button onclick="facCorreccFiltro(\'' + t[0] + '\')" style="width:auto;flex:0 0 auto;padding:6px 11px;border-radius:999px;border:1px solid ' + (on?'#1e6bd6':'#cbd5e1') + ';background:' + (on?'#1e6bd6':'#fff') + ';color:' + (on?'#fff':'#334155') + ';font-size:12px;font-weight:800;cursor:pointer;">' + t[1] + ' (' + cntOf(t[0]) + ')</button>';
+    const isU = t[0] === "urgente";
+    const accent = isU ? "#dc2626" : "#1e6bd6";
+    const bd = on ? accent : (isU ? "#fca5a5" : "#cbd5e1");
+    const bg = on ? accent : (isU ? "#fef2f2" : "#fff");
+    const fg = on ? "#fff" : (isU ? "#b91c1c" : "#334155");
+    h += '<button onclick="facCorreccFiltro(\'' + t[0] + '\')" style="width:auto;flex:0 0 auto;padding:6px 11px;border-radius:999px;border:1px solid ' + bd + ';background:' + bg + ';color:' + fg + ';font-size:12px;font-weight:800;cursor:pointer;">' + t[1] + ' (' + cntOf(t[0]) + ')</button>';
   });
   h += '</div>';
   if (!rows.length){ body.innerHTML = h + '<div style="text-align:center;color:#16a34a;padding:24px;font-weight:700;">✅ No hay códigos para corregir.</div>'; return; }
-  const pend = _facCorrFiltro === "todo" ? rows : rows.filter(function(p){ return p.estado === _facCorrFiltro; });
-  h += '<div style="font-size:12.5px;color:#64748b;margin-bottom:10px;">Estos pedidos entraron en un código <b>secundario</b>. Cambiá la NP en el ERP al principal y confirmá acá — el picking va a levantar el principal.</div>';
-  if (!pend.length){ body.innerHTML = h + '<div style="text-align:center;color:#94a3b8;padding:20px;">No hay pedidos en este estado.</div>'; return; }
+  const pend = _facCorrFiltro === "todo" ? rows
+             : _facCorrFiltro === "urgente" ? rows.filter(function(p){ return urgentNps[p.np]; })
+             : rows.filter(function(p){ return p.estado === _facCorrFiltro; });
+  h += '<div style="font-size:12.5px;color:#64748b;margin-bottom:10px;">' + (_facCorrFiltro === "urgente"
+        ? '🔴 <b>Urgentes</b>: el código secundario <b>no alcanza</b> para lo pedido → hay que cambiar la NP al principal SÍ o SÍ (los que el secundario cubre no aparecen acá).'
+        : 'Estos pedidos entraron en un código <b>secundario</b>. Cambiá la NP en el ERP al principal y confirmá acá — el picking va a levantar el principal.') + '</div>';
+  if (!pend.length){ body.innerHTML = h + '<div style="text-align:center;color:#16a34a;padding:20px;font-weight:700;">' + (_facCorrFiltro === "urgente" ? '✅ No hay urgentes — el secundario cubre todo lo pedido.' : 'No hay pedidos en este estado.') + '</div>'; return; }
   // Agrupar por NP: 1 cambio → botón directo; varios → un solo botón que abre pop-up con checkboxes.
   const BTN = 'width:auto;flex:0 0 auto;background:#16a34a;color:#fff;border:none;border-radius:9px;padding:9px 13px;font-size:13px;font-weight:800;cursor:pointer;white-space:nowrap;';
   const order = [], byNp = {};
