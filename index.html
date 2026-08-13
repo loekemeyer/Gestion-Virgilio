@@ -6502,7 +6502,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v10.45";
+const APP_VERSION = "v10.46";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -15961,14 +15961,16 @@ function cntCompara() {
   _stk.conteo.showComp = true;
   _stk.conteo.pickLoading = true;
   stkRender();
-  // v10.29 — con el descuento movido al TP, un picking EN CURSO (PKC sin TP) todavía no
-  // descontó, pero las cajas ya se están sacando de la góndola → hay que avisarlo al contar.
+  // v10.46 — con el descuento FORWARD (al PKC), el stock ya refleja lo pickeado. La carga
+  // sigue siendo útil para INFORMAR qué códigos se están pickeando ahora (no para compensar).
   _cntLoadPickingEnCurso().then(function (pe) {
     if (_stk && _stk.conteo) { _stk.conteo.pickEnCurso = pe; _stk.conteo.pickLoading = false; stkRender(); }
   }).catch(function () { if (_stk && _stk.conteo) { _stk.conteo.pickLoading = false; stkRender(); } });
 }
-/* v10.29 — picking EN CURSO por código: tandas con PKC pero SIN TP todavía. Devuelve
-   { byCod: {codNorm: qty}, tandasByCod: {codNorm: [{tanda, qty}]} }. Solo lee eventos (front). */
+/* v10.46 — picking EN CURSO por código: tandas con PKC pero SIN TP todavía. Devuelve
+   { byCod: {codNorm: qty}, tandasByCod: {codNorm: [{tanda, qty}]} }. Informativo: con el
+   descuento FORWARD (al PKC) el stock ya refleja lo pickeado; esto muestra QUÉ se está
+   pickeando, no una compensación pendiente. Solo lee eventos (front). */
 async function _cntLoadPickingEnCurso() {
   const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
   const desde = new Date(Date.now() - 4 * 24 * 3600 * 1000).toISOString();
@@ -16082,14 +16084,14 @@ function stkBodyConteo() {
     const saldos = stockComputeSaldos(_stk.movs, _stk.cutoff);
     const sys = {};
     Object.keys(saldos).forEach(function (cc) { const k = _ocgNorm(cc); if (!sys[k]) sys[k] = { cod: saldos[cc].cod, desc: saldos[cc].desc, gond: 0, exc: 0, proc: 0 }; sys[k].gond += Number(saldos[cc].terminado) || 0; sys[k].exc += Number(saldos[cc].excedente) || 0; sys[k].proc += (Number(saldos[cc].separar_pedidos) || 0) + (Number(saldos[cc].a_facturar) || 0); });
-    // v10.29 — picking EN CURSO (PKC sin TP): esas cajas ya se están sacando de la góndola
-    // pero el sistema todavía no las descontó (el descuento va al TP). Aviso al contar.
+    // v10.46 — picking EN CURSO (PKC sin TP): el stock ya refleja lo pickeado (descuento
+    // FORWARD al PKC). La info es solo para contexto — el saldo ya está descontado.
     const pe = (c.pickEnCurso && c.pickEnCurso.byCod) ? c.pickEnCurso : { byCod: {}, tandasByCod: {} };
     const encursoDeContados = Object.keys(cont).filter(function (k) { return (pe.byCod[k] || 0) > 0; });
     if (c.pickLoading) {
       h += '<div class="stk-cut" style="margin-top:14px;background:#f1f5f9;border:1px solid #e2e8f0;color:#64748b;">🔄 Buscando pickings en curso…</div>';
     } else if (encursoDeContados.length) {
-      h += '<div class="stk-cut" style="margin-top:14px;background:#fffbeb;border:1px solid #fcd34d;color:#92400e;"><b>⚠ Hay picking EN CURSO de códigos que estás contando.</b> Esas cajas ya se están sacando de la góndola pero el sistema todavía no las descontó (el descuento va al terminar el picking). Tenelo en cuenta:<ul style="margin:6px 0 0;padding-left:18px;">' +
+      h += '<div class="stk-cut" style="margin-top:14px;background:#eff6ff;border:1px solid #93c5fd;color:#1e40af;"><b>ℹ Hay picking EN CURSO de códigos que estás contando.</b> El stock del sistema ya refleja lo pickeado hasta ahora. Si ves diferencias, puede ser que el operario esté sacando cajas en este momento:<ul style="margin:6px 0 0;padding-left:18px;">' +
         encursoDeContados.sort(function (a, b) { return String(a).localeCompare(String(b), undefined, { numeric: true }); }).map(function (k) {
           const s0 = sys[k] || { cod: k }; const det = (pe.tandasByCod[k] || []).map(function (x) { return x.tanda + " (" + x.qty + ")"; }).join(", ");
           return '<li><b>' + escapeHtml(codBase(s0.cod || k)) + '</b>: ' + (pe.byCod[k]) + ' caja(s) en picking — tanda ' + escapeHtml(det) + '</li>';

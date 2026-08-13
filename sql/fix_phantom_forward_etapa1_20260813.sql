@@ -1,0 +1,39 @@
+-- FIX PHANTOM — v10.46 (2026-08-13)
+--
+-- PROBLEMA (bug v10.29):
+-- La rama FORWARD de reconciliar_pipeline_stock_etapa1() filtraba `p.picked > 0`.
+-- Cuando un operario pickeaba N cajas y después volvía atrás y dejaba el artículo en 0
+-- (deshacía), la query no generaba fila para ese artículo → el movimiento viejo con
+-- delta=N quedaba en Movimientos_Stock → stock fantasma en separar_pedidos y góndola
+-- descontada sin razón.
+--
+-- FIX:
+-- Cambiar `p.picked > 0` → `p.picked >= 0` en la CTE `fwd` de la rama FORWARD.
+-- Cuando picked=0, el UPSERT (DO UPDATE SET delta = excluded.delta) pone delta=0 en
+-- los 3 depósitos (separar_pedidos, excedente, terminado), revirtiendo la baja.
+-- El trigger actualizar_saldo_trigger se dispara en el UPDATE y recalcula
+-- stocks_carga_rapida → el monitor ve la reversión en realtime.
+--
+-- EDGE CASES CUBIERTOS:
+-- 1. Operario pickea 10, vuelve atrás, pone 5 → UPSERT actualiza delta de 10 a 5 ✓
+-- 2. Operario pickea 10, vuelve atrás, pone 0 → UPSERT pone delta=0 (reversa total) ✓
+-- 3. Operario anula picking → anular_picking_virgilio() pone delta=0 directamente ✓
+--    (no depende de este fix; UPDATE directo a Movimientos_Stock con delta=0)
+-- 4. Sin Stock (real=0) → picked=0, no genera movimiento nuevo (si no existía) ✓
+--    (UPSERT ON CONFLICT no afecta si no hay fila previa)
+--
+-- IMPACTO EN OTRAS ETAPAS:
+-- Etapa 2 (armado): ninguno — gate por TAP/Entregas la protege
+-- Etapa 3 (facturación): ninguno — lee de a_facturar
+-- Etapa 4 (CP): ninguno — independiente
+--
+-- FRONT-END:
+-- _cntLoadPickingEnCurso (conteo): cambia de "compensación pendiente" a "info de
+-- picking en curso". El stock ya refleja lo pickeado (FORWARD), así que el conteo
+-- no necesita compensar. El mensaje pasa de ⚠ a ℹ.
+--
+-- LÍNEA CAMBIADA (rama FORWARD, CTE fwd):
+-- ANTES: where p.picked>0 and l.last_pk >= v_desde
+-- AHORA: where p.picked>=0 and l.last_pk >= v_desde
+
+-- La función ya fue deployada con execute_sql. Este archivo es documentación.
