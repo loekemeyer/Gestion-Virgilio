@@ -3708,7 +3708,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       <button class="sup-action-btn" onclick="openPPP()"><span id="pppAlertBadge" class="ppp-alert-badge"></span><span class="sup-ico">🗓️</span><span>PPP</span></button>
       <button class="sup-action-btn" onclick="openRecepcionAdmin()" style="position:relative;"><span class="sup-ico">🏭</span><span>Carga Recepción Mercadería</span><span id="recepBadge" class="dp-badge" style="display:none;min-width:26px;height:26px;line-height:26px;font-size:15px;padding:0 6px;border-radius:13px;" title="Pendiente en Recepción: remitos por cargar + bajadas de racks por aprobar"></span></button>
       <button class="sup-action-btn" onclick="showFaltAvisar()" style="position:relative;"><span class="sup-ico">📦➕</span><span>Completar Pedido</span><span id="cpBadge" class="dp-badge" style="display:none;" title="Pedidos con faltante que tiene stock para completarse"></span></button>
-      <button class="sup-action-btn" onclick="openStockAdmin()"><span class="sup-ico">📦</span><span>Stock y Compras</span></button>
+      <button class="sup-action-btn" onclick="openStockAdmin()" style="position:relative;"><span class="sup-ico">📦</span><span>Stock y Compras</span><span id="stkBadge" class="dp-badge" style="display:none;" title="Códigos con stock negativo"></span><span id="stkOkBadge" style="display:none;position:absolute;top:2px;right:2px;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:#16a34a;color:#fff;font-size:10px;font-weight:800;line-height:18px;text-align:center;pointer-events:none;">✓</span></button>
       <button class="sup-action-btn" onclick="openPanelWebLK()"><span class="sup-ico">🌐</span><span>Panel Web LK</span></button>
       <button class="sup-action-btn" onclick="openRemitosAdmin()" style="position:relative;"><span class="sup-ico">🚚</span><span>Recepción Remitos (RR)</span><span id="rrBadge" class="dp-badge" style="display:none;" title="Remitos cargados al camión sin controlar todavía"></span></button>
     </div>
@@ -6605,6 +6605,29 @@ function updatePendingIndicator() {
       vb.textContent = `${APP_VERSION} ⏳ ${count}`;
       vb.className = "pending";
     }
+  }
+}
+
+/**
+ * v10.32 — Actualiza badge de Stock y Compras
+ * Si hay negativos: muestra badge con número rojo
+ * Si todo OK: muestra tilde verde
+ */
+function updateStkBadge() {
+  const stkBadge = document.getElementById('stkBadge');
+  const stkOkBadge = document.getElementById('stkOkBadge');
+  if (!stkBadge || !stkOkBadge || !_stk || !_stk.viewRows) return;
+
+  const negativos = _stk.viewRows.filter(r => (r.stock_total || 0) < 0);
+  const count = negativos.length;
+
+  if (count > 0) {
+    stkBadge.textContent = count;
+    stkBadge.style.display = 'block';
+    stkOkBadge.style.display = 'none';
+  } else {
+    stkBadge.style.display = 'none';
+    stkOkBadge.style.display = 'block';
   }
 }
 
@@ -11502,6 +11525,7 @@ function stkRender() {
   const body = document.getElementById("stkBody"); if (!body) return;
   _renderKeepFocus(body, _stk.tab === "faltante" ? stkBodyFaltante() : _stk.tab === "auditgon" ? stkBodyAuditGon() : _stk.tab === "proceso" ? stkBodyProceso() : _stk.tab === "conteo" ? stkBodyConteo() : _stk.tab === "capacidad" ? stkBodyCapacidad() : _stk.tab === "racks" ? stkBodyRacks() : _stk.tab === "insumos" ? stkBodyInsumos() : _stk.tab === "ajustes" ? stkBodyAjustes() : stkBodyStocksTab());
   _stkInsCatPopupRefresh();   // v9.32: refresca popup de categoría si está abierto
+  updateStkBadge();   // v10.32: actualiza badge de negativos en botón Stock y Compras
 }
 /* ===== v10.18 — AUDITORÍA "Góndola < 25% de la proyección" =====================
    Hoja para auditar artículos con MUY POCA góndola respecto a lo que se proyecta vender.
