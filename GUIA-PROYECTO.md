@@ -32,6 +32,16 @@
 > corrigieron en la misma migración. Verificado con una fila de prueba: `"  Z99Z:. "` entra como `Z99Z`.
 > Mismo patrón que `fn_canon_cod_art` (el trigger que ya normaliza `cod_art`).
 >
+> Nota **v10.30 — Importación: los dos botones se unificaron + Góndola<25%: sin discontinuos y ordenada.**
+> **(1)** Los botones **"🏭 Proveedor de importación"** y **"📦 Pedidos Importación"** del panel supervisor
+> se unificaron en **un solo botón "📦 Importación"** que abre una pantalla con **dos solapas**
+> (`_impTabsHtml`): **📦 Pedidos** (`openPedidosImportacion`/`_pedImpRender`) y **🏭 Proveedores**
+> (`stkOpenProvImp`/`_provImpRender`). Mismo título de shell "📦 Importación" en las dos; el resto de
+> la lógica no cambió. **(2) Hoja "Góndola < 25%"** (`agLoad`/`stkBodyAuditGon`): ahora **excluye los
+> discontinuos** (`vista_generador_oc.activo = false`) y ordena, dentro de cada tallerista, por
+> **% de góndola de menor a mayor** (el peor primero) en vez de por familia. Todo front. Bump
+> `APP_VERSION` + `SW_VERSION` `v10.30`.
+>
 > Nota **v10.29 — Stock: el descuento del picking vuelve a hacerse SOLO al terminar (TP) + aviso de picking en curso al contar.**
 > **Motivo:** con el descuento incremental (por cada PKC, v8.00/branch FORWARD) un operario que
 > pickeaba de más y volvía para atrás dejaba un FANTASMA: el PKC final quedaba en 0 pero el
