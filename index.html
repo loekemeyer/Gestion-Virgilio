@@ -3559,7 +3559,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      que ande sin internet en el depósito. -->
 <script src="qrcode.js"></script>
 <script src="planimetria.js?v=3.73"></script>
-<script src="pasaje-papeles.js?v=2.0"></script>
+<script src="pasaje-papeles.js?v=4.0"></script>
 <!-- Modo OP de Recepción de Mercadería (se abre al tocar RT). Módulo aislado bajo
      #rcpRoot, con su propio cliente Supabase (login anónimo). Portado de la app
      Control-Carga-Remitos-FC. Suma las cajas del día a localStorage para que RT
@@ -3677,7 +3677,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       <button class="sup-action-btn" onclick="showGuardarOrden('')" style="position:relative;"><span class="sup-ico">📋</span><span>Qué bajar primero</span><span id="qbpBadge" class="dp-badge" style="display:none;" title="Urgentes (SOS): góndola < 20% con stock atrás para bajar"></span></button>
       <button class="sup-action-btn" onclick="openCorreccPanel()" style="position:relative;"><span class="sup-ico">🔀</span><span>Corregir códigos de NPs</span><span id="corrBadgeGreen" class="dp-badge" style="left:2px;right:auto;background:#16a34a;display:none;" title="Se pueden corregir pero NO es obligatorio (hay stock del secundario)"></span><span id="corrBadge" class="dp-badge" style="display:none;" title="Hay que corregir SÍ o SÍ (el secundario no tiene stock)"></span></button>
       <button class="sup-action-btn" onclick="openNpConsulta()"><span class="sup-ico">🔎</span><span>Consultar NP / Líos</span></button>
-      <button class="sup-action-btn" onclick="openPasajePapeles()"><span class="sup-ico">📄</span><span>Pasaje de Papeles</span></button>
+      <button class="sup-action-btn" onclick="openPasajePapeles()" style="position:relative;"><span class="sup-ico">📄</span><span>Pasaje de Papeles</span><span id="ppBadge" class="dp-badge" style="display:none;" title="Documentos pendientes de enviar a Cervantes"></span></button>
       <button class="sup-action-btn" onclick="stkOpenNpFaltan()" style="position:relative;"><span class="sup-ico">⚠️</span><span>Pedidos sin cargar en PPP</span><span id="npFaltanBadge" class="dp-badge" style="display:none;"></span></button>
       <button class="sup-action-btn" onclick="stkOpenFaltFact()"><span class="sup-ico">📉</span><span>Faltantes facturados sin completar</span></button>
       <button class="sup-action-btn" onclick="stkOpenProvImp()"><span class="sup-ico">🏭</span><span>Proveedor de importación</span></button>
@@ -6502,7 +6502,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v10.46";
+const APP_VERSION = "v10.48";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -11529,18 +11529,15 @@ async function ocCfgProvSave() {
 function stkExcedentesBtn() {
   return '<button class="stk-btn" style="width:auto;margin:0;background:#fffbeb;border-color:#fcd34d;color:#92400e;font-weight:800;white-space:nowrap;" onclick="stkExportExcedentes()">⬇ Excedentes por ubicación (Excel)</button>';
 }
+// v10.44 — devuelve SOLO los controles de fecha (sin wrapper), para meterlos en la
+// barra única de filtros de Stocks. El aviso de "histórico" lo pinta stkBodyStocks aparte.
 function stkAsOfControl() {
   if (!_stk) return "";
   const on = !!_stk.asOf;
-  // v9.76 — una sola fila (nowrap): el input se achica (flex) y los botones no se parten.
-  // Excedentes a Excel se sacó de acá (pedido del usuario); sigue en Ingresos/Salidas.
-  let h = '<div style="display:flex;flex-wrap:nowrap;align-items:center;gap:6px;margin-bottom:10px;background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:8px 10px;">';
-  h += '<span style="font-size:12px;font-weight:800;color:#475569;flex:0 0 auto;">Ver stock:</span>';
-  h += '<button class="stk-btn' + (on ? '' : ' ok') + '" onclick="stkAsOfLive()" style="flex:0 0 auto;white-space:nowrap;">🔴 En vivo</button>';
-  h += '<input type="datetime-local" id="stkAsOfInp" value="' + escapeHtml(_stk.asOfInput || '') + '" onchange="if(_stk){_stk.asOfInput=this.value;}" style="flex:1 1 40px;min-width:0;height:36px;border:1px solid #cbd5e1;border-radius:8px;padding:0 6px;font-size:12px;">';
-  h += '<button class="stk-btn" onclick="stkAsOfApply()" style="flex:0 0 auto;white-space:nowrap;">📅 A esa fecha/hora</button>';
-  h += '</div>';
-  if (on) h += '<div style="margin:-4px 0 10px;font-size:12.5px;font-weight:800;color:#92400e;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:5px 9px;">📅 Stock al <b>' + escapeHtml(stockFmtTs(_stk.asOf)) + '</b> hs (histórico, no el actual)</div>';
+  let h = '<span style="font-size:12px;font-weight:800;color:#475569;flex:0 0 auto;">Ver stock:</span>';
+  h += '<button class="stk-btn' + (on ? '' : ' ok') + '" onclick="stkAsOfLive()" style="flex:0 0 auto;white-space:nowrap;padding:6px 10px;">🔴 En vivo</button>';
+  h += '<input type="datetime-local" id="stkAsOfInp" value="' + escapeHtml(_stk.asOfInput || '') + '" onchange="if(_stk){_stk.asOfInput=this.value;}" style="flex:0 0 auto;width:158px;min-width:0;height:36px;border:1px solid #cbd5e1;border-radius:8px;padding:0 4px;font-size:11px;">';
+  h += '<button class="stk-btn" onclick="stkAsOfApply()" style="flex:0 0 auto;white-space:nowrap;padding:6px 8px;">📅 A esa fecha</button>';
   return h;
 }
 function stkAsOfApply() {
@@ -12895,7 +12892,8 @@ function stkBodyStocks() {
     totals[s.key] = (totals[s.key] || 0) + val;
   }); });
   let h = "";   // banner "Stock contado desde…" sacado a pedido del usuario
-  h += stkAsOfControl();   // En vivo / a una fecha y hora determinada
+  // v10.44 — los controles de fecha (Ver stock / En vivo / A esa fecha) ahora van DENTRO de la
+  // barra única de filtros de abajo (ver stkAsOfControl()), no en su propia fila.
   // v10.02 — símbolo ROJO arriba con la cantidad de códigos en negativo (problema de integridad).
   // Tocarlo filtra la tabla a solo esos códigos (mismo toggle que el botón "🔴 Negativos"). Pedido del usuario.
   if (_stkNegCount > 0) {
@@ -12916,8 +12914,12 @@ function stkBodyStocks() {
     const on = _stk.filLinea === l, col = l === "LK" ? "#b91c1c" : "#1e40af";
     return '<button type="button" onclick="stkFiltroLinea(\'' + l + '\')" title="Mostrar sólo línea ' + l + '" style="width:auto;margin:0;flex:0 0 auto;padding:0 13px;height:38px;border:1.5px solid ' + (on ? col : "#cbd5e1") + ';border-radius:9px;background:' + (on ? col : "#fff") + ';color:' + (on ? "#fff" : col) + ';font-weight:800;font-size:13px;cursor:pointer;">' + l + '</button>';
   };
-  h += '<div style="display:flex;gap:6px;margin-bottom:10px;align-items:center;flex-wrap:wrap;">' +
-    '<input class="stk-filtro" style="margin:0;flex:1 1 170px;min-width:120px;max-width:300px;" type="text" enterkeyhint="search" autocomplete="off" placeholder="🔎 códigos (varios: 026 031 508)" value="' + escapeHtml(_stk.filtro) + '" oninput="if(_stk){_stk.filtro=this.value;stkRender();}">' +
+  // v10.44 — UNA sola fila con TODO: fecha + búsqueda + chips. nowrap + scroll horizontal si no entra
+  // (así no se apila en dos filas y no hay cosas anchas al pedo). Input de fecha y búsqueda achicados.
+  h += '<div style="display:flex;gap:6px;margin-bottom:10px;align-items:center;flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px;">' +
+    stkAsOfControl() +
+    '<span style="flex:0 0 auto;width:1px;height:26px;background:#e2e8f0;margin:0 2px;"></span>' +
+    '<input class="stk-filtro" style="margin:0;flex:1 1 140px;min-width:110px;max-width:230px;" type="text" enterkeyhint="search" autocomplete="off" placeholder="🔎 códigos (varios: 026 031 508)" value="' + escapeHtml(_stk.filtro) + '" oninput="if(_stk){_stk.filtro=this.value;stkRender();}">' +
     '<button type="button" onclick="stkFiltroToggleE()" title="Agregar/quitar la E (importado)" style="width:auto;margin:0;flex:0 0 auto;padding:0 14px;height:38px;border:1.5px solid #cbd5e1;border-radius:9px;background:#fff;font-weight:800;font-size:16px;cursor:pointer;">E</button>' +
     _linBtn("LK") + _linBtn("CH") +
     // v10.40 — el botón Negativos solo se puede tocar si HAY negativos; si no, queda deshabilitado (gris).
@@ -12932,6 +12934,8 @@ function stkBodyStocks() {
         : '<svg width="22" height="22" viewBox="0 0 22 22" style="animation:stkSpin 1s linear infinite"><circle cx="11" cy="11" r="9" fill="none" stroke="#e2e8f0" stroke-width="2.5"/><circle cx="11" cy="11" r="9" fill="none" stroke="#3b82f6" stroke-width="2.5" stroke-dasharray="40 60" stroke-linecap="round"/></svg>') +
     '</span>' +
     '</div>';
+  // v10.44 — aviso "histórico" (cuando se mira stock a una fecha pasada), debajo de la barra única.
+  if (_stk.asOf) h += '<div style="margin:0 0 10px;font-size:12.5px;font-weight:800;color:#92400e;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:5px 9px;">📅 Stock al <b>' + escapeHtml(stockFmtTs(_stk.asOf)) + '</b> hs (histórico, no el actual)</div>';
   // v9.73 — se saca el cartel "NP que faltan (sin cargar en PPP)" de la tabla de Stock
   // (pedido del dueño). El módulo sigue accesible desde el botón "Pedidos sin cargar
   // en PPP" del panel supervisor (stkOpenNpFaltan).
@@ -32712,6 +32716,7 @@ function showSupervisor(email) {
   try { favLoadBadge(); } catch (_e) {}   // v9.70: badge Completar Pedido (faltantes con stock)
   try { rrLoadBadge(); } catch (_e) {}   // v9.71: badge Recepción Remitos (cargados sin controlar)
   try { initStkBadge(); } catch (_e) {}   // v10.41: badge Stock y Compras (negativos)
+  try { ppLoadBadge(); } catch (_e) {}   // v10.48: badge Pasaje de Papeles (pendientes de enviar)
   try { if (typeof pppAlertPollStart === "function") pppAlertPollStart(); } catch (_e) {}
 }
 
