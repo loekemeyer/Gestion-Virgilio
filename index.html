@@ -28062,7 +28062,7 @@ if (window.__pendingMonitorParam && (_keyValid || _kioskEnrolled)) {
   window.addEventListener("load", () => {
     try { showKioskAdminPanel(); } catch (_e) {}
     try { if (typeof window.maybeAutoOpenMonitor === "function") window.maybeAutoOpenMonitor(); } catch (_e) {}
-    try { initStkBadge(); } catch (_e) {}  // v10.32: carga badge de stock en page load
+    initStkBadge().catch(_e => console.error('initStkBadge error:', _e));  // v10.34: carga badge de stock en page load
     // v5.94: la TV de pared es un aparato barato (poca RAM). Corriendo 24/7 la
     // memoria se llena y Chrome mata la pestaña ("¡Vaya!"/Aw-Snap) cada ~15 min.
     // Se recarga sola cada 10 min → arranca limpia antes de llenarse (reload de
