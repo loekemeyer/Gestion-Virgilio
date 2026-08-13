@@ -156,7 +156,7 @@ function _ppBuildSection(key, icon, title, rows, showTimer) {
       (key === 'pendiente' ? 'Sin documentación pendiente' : 'Sin documentación enviada') + '</div>';
   } else {
     html += '<div class="pp-tblwrap"><table class="pp-tbl"><thead><tr>' +
-      '<th>Fecha</th><th>Tipo</th><th>N° Remito</th><th>N° Factura</th><th>Proveedor / CUIT</th><th>Contenido</th>';
+      '<th>Fecha</th><th>Tipo</th><th>N° Remito</th><th>N° Factura</th><th>Razón Social</th><th>Contenido</th>';
     if (showTimer) html += '<th>Tiempo sin enviar</th>';
     html += '<th>Enviado</th></tr></thead><tbody>';
 
@@ -421,17 +421,22 @@ function ppCloseCaptureDialog() {
 }
 
 /**
- * Busca el CUIT de un proveedor por razón social
+ * Busca el CUIT de un proveedor por razón social.
+ * Intenta primero en Proveedores (art terminado), luego en otras fuentes.
  */
 async function _ppFetchCuit(razonSocial) {
   if (!razonSocial) return null;
   try {
-    var encoded = encodeURIComponent(razonSocial.trim());
+    var rs = razonSocial.trim();
+    // Buscar en Proveedores (art terminado, tiene CUIT)
     var res = await fetch(
-      SUPABASE_URL + '/rest/v1/Proveedores?razon_social=eq.' + encoded + '&select=cuit',
+      SUPABASE_URL + '/rest/v1/Proveedores?razon_social=ilike.' + encodeURIComponent('%' + rs + '%') + '&select=cuit&limit=1',
       { headers: _ppHeaders(), cache: 'no-store' }
     ).then(function (r) { return r.ok ? r.json() : []; });
-    return (res && res[0] && res[0].cuit) || null;
+    if (res && res[0] && res[0].cuit) return res[0].cuit;
+
+    // Si no encontró en Proveedores, no hay CUIT disponible (talleristas, insumos, etc. no tienen CUIT en el sistema)
+    return null;
   } catch (_e) { return null; }
 }
 
