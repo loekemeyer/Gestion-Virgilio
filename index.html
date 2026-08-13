@@ -6619,9 +6619,12 @@ async function initStkBadge() {
     }
     // Stock_Saldos es 1/100 del peso de vista_stock_procesada
     const saldos = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Stock_Saldos", "select=cod,stock_total");
-    if (saldos) {
+    if (saldos && Array.isArray(saldos) && saldos.length > 0) {
       _stk.viewRows = saldos;
+      console.log('initStkBadge: cargados', saldos.length, 'registros');
       updateStkBadge();
+    } else {
+      console.warn('initStkBadge: saldos vacío o inválido', saldos);
     }
   } catch (e) {
     console.error('initStkBadge error:', e);
@@ -6629,17 +6632,26 @@ async function initStkBadge() {
 }
 
 /**
- * v10.32 — Actualiza badge de Stock y Compras
+ * v10.34 — Actualiza badge de Stock y Compras
  * Si hay negativos: muestra badge con número rojo
  * Si todo OK: muestra tilde verde
  */
 function updateStkBadge() {
   const stkBadge = document.getElementById('stkBadge');
   const stkOkBadge = document.getElementById('stkOkBadge');
-  if (!stkBadge || !stkOkBadge || !_stk || !_stk.viewRows) return;
+
+  if (!stkBadge || !stkOkBadge) {
+    console.warn('updateStkBadge: elementos del DOM no encontrados', { stkBadge: !!stkBadge, stkOkBadge: !!stkOkBadge });
+    return;
+  }
+  if (!_stk || !_stk.viewRows) {
+    console.warn('updateStkBadge: _stk o viewRows no existe', { _stk: !!_stk, viewRows: _stk ? !!_stk.viewRows : 'N/A' });
+    return;
+  }
 
   const negativos = _stk.viewRows.filter(r => (r.stock_total || 0) < 0);
   const count = negativos.length;
+  console.log('updateStkBadge: encontrados', count, 'códigos negativos de', _stk.viewRows.length);
 
   if (count > 0) {
     stkBadge.textContent = count;
