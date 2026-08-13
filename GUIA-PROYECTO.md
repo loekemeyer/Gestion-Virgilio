@@ -4,7 +4,7 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-12 · Versión app al documentar: **v10.28**
+> Última actualización: 2026-08-13 · Versión app al documentar: **v10.46**
 >
 > Nota **v10.28 — La columna `Op` del Excel DEJÓ DE SER REQUISITO para mostrar tandas.**
 > Hasta acá, una tanda sin `Op=SI` **no aparecía** ni en el monitor de TV ni en las pantallas
@@ -41,6 +41,39 @@
 > discontinuos** (`vista_generador_oc.activo = false`) y ordena, dentro de cada tallerista, por
 > **% de góndola de menor a mayor** (el peor primero) en vez de por familia. Todo front. Bump
 > `APP_VERSION` + `SW_VERSION` `v10.30`.
+>
+> Nota **v10.46 — Stock: se reactivó el descuento incremental por PKC (FORWARD) + fix del bug FANTASMA.**
+> **Contexto:** v8.00 introdujo el descuento incremental (por cada artículo confirmado, PKC) via
+> la rama FORWARD de `reconciliar_pipeline_stock_etapa1()`. v10.29 lo desactivó (`etapa1_pkc_desde =
+> infinity`) porque un operario que volvía atrás y dejaba un artículo en 0 producía un fantasma
+> (el movimiento de +N no se revertía, porque la CTE `fwd` filtraba `picked>0` y se salteaba el 0).
+> **Fix (1 carácter):** en la rama FORWARD, CTE `fwd`, se cambió `p.picked>0` → `p.picked>=0`.
+> Ahora cuando picked=0, el UPSERT pone `delta=0` en los 3 depósitos (separar_pedidos, excedente,
+> terminado), revirtiendo la baja fantasma. El trigger `actualizar_saldo_trigger` recalcula
+> `stocks_carga_rapida` y el monitor ve la reversión en realtime.
+> **Rama HISTORIC no se tocó** (sigue con `picked>0`, correcto: está gated en TP y usa DO NOTHING).
+> **Edge cases verificados:** (1) pickea 10 → cambia a 5 → UPSERT actualiza delta de 10 a 5 ✓;
+> (2) pickea 10 → vuelve atrás → pone 0 → delta=0 (reversa total) ✓;
+> (3) Anular picking → `anular_picking_virgilio()` pone delta=0 directamente (mecanismo independiente) ✓;
+> (4) Sin Stock (real=0) → picked=0, no genera movimiento nuevo si no existía ✓.
+> **Impacto en otras etapas:** ninguno — Etapa 2 protegida por gate TAP/Entregas, Etapa 3 lee de
+> a_facturar, Etapa 4 independiente.
+> **Config reactivada:** `Stock_Config.etapa1_pkc_desde` = `2026-08-13 09:41:32` (FORWARD activo).
+> **Front-end:** `_cntLoadPickingEnCurso` pasó de compensación (⚠ amarillo "el sistema todavía no
+> las descontó") a informativo (ℹ azul "El stock ya refleja lo pickeado") — con FORWARD el stock
+> ya baja al PKC, el conteo no necesita compensar.
+> Documentación del fix: `sql/fix_phantom_forward_etapa1_20260813.sql`.
+> Bump `APP_VERSION` + `SW_VERSION` `v10.46`.
+>
+> Nota **v10.45 — Pasaje de Papeles: simplificación a lista única.**
+> El módulo Pasaje de Papeles (`pasaje-papeles.js`) se simplificó: se eliminaron las solapas
+> Virgilio/Cervantes (`ppSwitchTab`, `ppRenderVirgilio`, `ppRenderCervantes`, `ppMarkSent`,
+> `ppMarkReceived`), dejando una **lista unificada** que muestra todos los documentos de la tabla
+> `Pasaje_Papeles` ordenados por fecha (desc, limit 500). La tabla tiene columnas: Fecha, Tipo,
+> N° Remito, N° Factura, Proveedor, Contenido. Se eliminaron los documentos de prueba de la tabla.
+> El HTML del modal (`pasajePapelesModal`) se simplificó a un solo contenedor `ppDocList` sin tabs.
+> Funciones de captura (popup para insumos, guardado directo para mercadería) intactas.
+> Bump `APP_VERSION` `v10.45` (intermedio, luego v10.46).
 >
 > Nota **v10.29 — Stock: el descuento del picking vuelve a hacerse SOLO al terminar (TP) + aviso de picking en curso al contar.**
 > **Motivo:** con el descuento incremental (por cada PKC, v8.00/branch FORWARD) un operario que

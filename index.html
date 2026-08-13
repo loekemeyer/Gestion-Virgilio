@@ -3506,85 +3506,41 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
 </div>
 
 <!-- ============================================================
-     PASAJE DE PAPELES — Módulo para registrar documentación
-     intercambiada entre Virgilio y Cervantes.
+     PASAJE DE PAPELES — Registro de documentación recibida en Virgilio
      ============================================================ -->
 <style id="pasajePapelesCss">
   #pasajePapelesModal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #f1f5f9; z-index: 200; overflow: auto; padding: 12px; }
   #pasajePapelesModal.show { display: block; }
 
   .pp-container { max-width: 1200px; margin: 0 auto; }
-  .pp-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
-  .pp-header h1 { font-size: 24px; margin: 0; display: flex; align-items: center; gap: 10px; color: #0f172a; }
+  .pp-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .pp-header h1 { font-size: 22px; margin: 0; display: flex; align-items: center; gap: 10px; color: #0f172a; }
   .pp-close-btn { width: auto; margin: 0; padding: 9px 18px; font-size: 14px; border-radius: 9px; background: #e2e8f0; color: #334155; border: none; cursor: pointer; font-weight: 600; }
   .pp-close-btn:hover { background: #cbd5e1; }
 
-  /* Tabs */
-  .pp-tabs { display: flex; gap: 12px; margin-bottom: 16px; border-bottom: 2px solid #e2e8f0; }
-  .pp-tab { padding: 12px 20px; cursor: pointer; background: none; border: none; font-size: 15px; font-weight: 600; color: #64748b; border-bottom: 3px solid transparent; margin-bottom: -2px; transition: color .2s, border-color .2s; }
-  .pp-tab:hover { color: #334155; }
-  .pp-tab.active { color: #1e6bd6; border-bottom-color: #1e6bd6; }
-
-  /* Tab content */
-  .pp-tab-content { display: none; }
-  .pp-tab-content.active { display: block; }
-
-  /* Documentación list */
-  .pp-list { display: flex; flex-direction: column; gap: 10px; }
-  .pp-doc-item { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px; display: flex; align-items: center; justify-content: space-between; }
-  .pp-doc-item:hover { border-color: #cbd5e1; box-shadow: 0 2px 8px rgba(0,0,0,.04); }
-
-  .pp-doc-info { flex: 1; }
-  .pp-doc-title { font-size: 15px; font-weight: 700; color: #0f172a; margin-bottom: 4px; }
-  .pp-doc-desc { font-size: 13px; color: #64748b; margin-bottom: 2px; }
-  .pp-doc-date { font-size: 12px; color: #94a3b8; }
-
-  .pp-doc-action { display: flex; gap: 8px; flex-shrink: 0; align-items: center; }
-  .pp-btn-sm { padding: 8px 14px; font-size: 12px; font-weight: 700; border: 1px solid #cbd5e1; border-radius: 7px; background: #fff; color: #334155; cursor: pointer; }
-  .pp-btn-sm:hover { background: #f1f5f9; border-color: #94a3b8; }
-  .pp-btn-sm.sent { background: #dbeafe; color: #1e40af; border-color: #93c5fd; }
-  .pp-btn-sm.received { background: #dcfce7; color: #166534; border-color: #86efac; }
-
   .pp-empty { text-align: center; padding: 40px 20px; color: #64748b; font-size: 14px; }
 
-  /* Responsive */
+  .pp-tblwrap { overflow-x: auto; border: 1px solid #e2e8f0; border-radius: 10px; }
+  .pp-tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .pp-tbl thead th { position: sticky; top: 0; background: #1e3a8a; color: #fff; font-size: 12px; font-weight: 700; padding: 10px 8px; text-align: left; white-space: nowrap; }
+  .pp-tbl tbody td { padding: 9px 8px; border-bottom: 1px solid #e5e7eb; color: #0f172a; font-weight: 500; }
+  .pp-tbl tbody tr:hover { background: #f8fafc; }
+
   @media (max-width: 640px) {
     .pp-header h1 { font-size: 18px; }
-    .pp-doc-item { flex-direction: column; align-items: flex-start; gap: 12px; }
-    .pp-doc-action { width: 100%; }
+    .pp-tbl { font-size: 12px; }
+    .pp-tbl thead th, .pp-tbl tbody td { padding: 7px 5px; }
   }
 </style>
 
 <div id="pasajePapelesModal">
   <div class="pp-container">
     <div class="pp-header">
-      <h1><img class="hdr-logo" src="icon.svg" alt="" style="width:28px;height:28px;">Pasaje de Papeles</h1>
+      <h1>📄 Pasaje de Papeles</h1>
       <button class="pp-close-btn" onclick="closePasajePapeles()">Cerrar</button>
     </div>
-
-    <div class="pp-tabs">
-      <button class="pp-tab active" onclick="ppSwitchTab('virgilio')">📄 Virgilio</button>
-      <button class="pp-tab" onclick="ppSwitchTab('cervantes')">📄 Cervantes</button>
-    </div>
-
-    <!-- TAB: Virgilio (documentación recibida → enviar a Cervantes) -->
-    <div id="ppTabVirgilio" class="pp-tab-content active">
-      <div style="margin-bottom:16px;padding:12px;background:#eff6ff;border-radius:9px;border:1px solid #bfdbfe;font-size:13px;color:#1e40af;">
-        <b>Documentación recibida</b> — Listado de todos los papeles que Virgilio recibió y puede marcar como enviados a Cervantes para su procesamiento.
-      </div>
-      <div id="ppVirgilioList" class="pp-list">
-        <div class="pp-empty">Cargando documentación…</div>
-      </div>
-    </div>
-
-    <!-- TAB: Cervantes (documentación enviada por Virgilio → constatar recepción) -->
-    <div id="ppTabCervantes" class="pp-tab-content">
-      <div style="margin-bottom:16px;padding:12px;background:#f0fdf4;border-radius:9px;border:1px solid #bbf7d0;font-size:13px;color:#166534;">
-        <b>Documentación de Virgilio</b> — Listado de papeles que envió Virgilio y deben ser marcados como recibidos por Cervantes.
-      </div>
-      <div id="ppCervantesList" class="pp-list">
-        <div class="pp-empty">Cargando documentación…</div>
-      </div>
+    <div id="ppDocList">
+      <div class="pp-empty">Cargando documentación…</div>
     </div>
   </div>
 </div>
@@ -6546,7 +6502,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v10.45";
+const APP_VERSION = "v10.48";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -16009,14 +15965,16 @@ function cntCompara() {
   _stk.conteo.showComp = true;
   _stk.conteo.pickLoading = true;
   stkRender();
-  // v10.29 — con el descuento movido al TP, un picking EN CURSO (PKC sin TP) todavía no
-  // descontó, pero las cajas ya se están sacando de la góndola → hay que avisarlo al contar.
+  // v10.46 — con el descuento FORWARD (al PKC), el stock ya refleja lo pickeado. La carga
+  // sigue siendo útil para INFORMAR qué códigos se están pickeando ahora (no para compensar).
   _cntLoadPickingEnCurso().then(function (pe) {
     if (_stk && _stk.conteo) { _stk.conteo.pickEnCurso = pe; _stk.conteo.pickLoading = false; stkRender(); }
   }).catch(function () { if (_stk && _stk.conteo) { _stk.conteo.pickLoading = false; stkRender(); } });
 }
-/* v10.29 — picking EN CURSO por código: tandas con PKC pero SIN TP todavía. Devuelve
-   { byCod: {codNorm: qty}, tandasByCod: {codNorm: [{tanda, qty}]} }. Solo lee eventos (front). */
+/* v10.46 — picking EN CURSO por código: tandas con PKC pero SIN TP todavía. Devuelve
+   { byCod: {codNorm: qty}, tandasByCod: {codNorm: [{tanda, qty}]} }. Informativo: con el
+   descuento FORWARD (al PKC) el stock ya refleja lo pickeado; esto muestra QUÉ se está
+   pickeando, no una compensación pendiente. Solo lee eventos (front). */
 async function _cntLoadPickingEnCurso() {
   const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
   const desde = new Date(Date.now() - 4 * 24 * 3600 * 1000).toISOString();
@@ -16130,14 +16088,14 @@ function stkBodyConteo() {
     const saldos = stockComputeSaldos(_stk.movs, _stk.cutoff);
     const sys = {};
     Object.keys(saldos).forEach(function (cc) { const k = _ocgNorm(cc); if (!sys[k]) sys[k] = { cod: saldos[cc].cod, desc: saldos[cc].desc, gond: 0, exc: 0, proc: 0 }; sys[k].gond += Number(saldos[cc].terminado) || 0; sys[k].exc += Number(saldos[cc].excedente) || 0; sys[k].proc += (Number(saldos[cc].separar_pedidos) || 0) + (Number(saldos[cc].a_facturar) || 0); });
-    // v10.29 — picking EN CURSO (PKC sin TP): esas cajas ya se están sacando de la góndola
-    // pero el sistema todavía no las descontó (el descuento va al TP). Aviso al contar.
+    // v10.46 — picking EN CURSO (PKC sin TP): el stock ya refleja lo pickeado (descuento
+    // FORWARD al PKC). La info es solo para contexto — el saldo ya está descontado.
     const pe = (c.pickEnCurso && c.pickEnCurso.byCod) ? c.pickEnCurso : { byCod: {}, tandasByCod: {} };
     const encursoDeContados = Object.keys(cont).filter(function (k) { return (pe.byCod[k] || 0) > 0; });
     if (c.pickLoading) {
       h += '<div class="stk-cut" style="margin-top:14px;background:#f1f5f9;border:1px solid #e2e8f0;color:#64748b;">🔄 Buscando pickings en curso…</div>';
     } else if (encursoDeContados.length) {
-      h += '<div class="stk-cut" style="margin-top:14px;background:#fffbeb;border:1px solid #fcd34d;color:#92400e;"><b>⚠ Hay picking EN CURSO de códigos que estás contando.</b> Esas cajas ya se están sacando de la góndola pero el sistema todavía no las descontó (el descuento va al terminar el picking). Tenelo en cuenta:<ul style="margin:6px 0 0;padding-left:18px;">' +
+      h += '<div class="stk-cut" style="margin-top:14px;background:#eff6ff;border:1px solid #93c5fd;color:#1e40af;"><b>ℹ Hay picking EN CURSO de códigos que estás contando.</b> El stock del sistema ya refleja lo pickeado hasta ahora. Si ves diferencias, puede ser que el operario esté sacando cajas en este momento:<ul style="margin:6px 0 0;padding-left:18px;">' +
         encursoDeContados.sort(function (a, b) { return String(a).localeCompare(String(b), undefined, { numeric: true }); }).map(function (k) {
           const s0 = sys[k] || { cod: k }; const det = (pe.tandasByCod[k] || []).map(function (x) { return x.tanda + " (" + x.qty + ")"; }).join(", ");
           return '<li><b>' + escapeHtml(codBase(s0.cod || k)) + '</b>: ' + (pe.byCod[k]) + ' caja(s) en picking — tanda ' + escapeHtml(det) + '</li>';
