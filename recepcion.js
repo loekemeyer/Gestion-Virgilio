@@ -737,6 +737,30 @@ function renderRemito() {
   actRow.appendChild(cont);
   opBody.appendChild(actRow);
 
+  // --- Tipo de entrega: Remito / Remito+Factura ---
+  const tipoField = document.createElement("div");
+  tipoField.className = "opField";
+  tipoField.innerHTML = '<label>Qué entrega</label>';
+  const tipoBtns = document.createElement("div");
+  tipoBtns.style.cssText = "display:flex;gap:10px;margin-top:6px;";
+  if (!opState.tipoEntrega) opState.tipoEntrega = "";
+  const _ppTipos = [
+    { key: "remito", label: "Remito" },
+    { key: "remito_factura", label: "Remito + Factura" }
+  ];
+  _ppTipos.forEach(t => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = t.label;
+    const on = opState.tipoEntrega === t.key;
+    b.style.cssText = "flex:1;padding:12px 8px;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;border:2px solid " + (on ? "#1e6bd6" : "#cbd5e1") + ";background:" + (on ? "#eff6ff" : "#fff") + ";color:" + (on ? "#1e40af" : "#334155") + ";";
+    b.onclick = () => { opState.tipoEntrega = t.key; renderRemito(); };
+    tipoBtns.appendChild(b);
+  });
+  tipoField.appendChild(tipoBtns);
+  opBody.appendChild(tipoField);
+
+  // --- N° RTO/FC ---
   const field = document.createElement("div");
   field.className = "opField";
   field.innerHTML = '<label for="opRto">N° RTO/FC</label>';
@@ -750,11 +774,35 @@ function renderRemito() {
   inp.oninput = () => {
     inp.value = inp.value.replace(/\D/g, "").slice(0, 5);
     opState.remito = inp.value;
-    cont.disabled = opState.remito.length === 0;
-    cont.classList.toggle("enabled", opState.remito.length > 0);
+    _ppUpdateCont();
   };
   field.appendChild(inp);
   opBody.appendChild(field);
+
+  // --- Fecha de RTO/FC ---
+  const fechaField = document.createElement("div");
+  fechaField.className = "opField";
+  fechaField.innerHTML = '<label for="opFechaRto">Fecha de RTO/FC</label>';
+  const fechaInp = document.createElement("input");
+  fechaInp.id = "opFechaRto";
+  fechaInp.type = "date";
+  fechaInp.style.cssText = "width:100%;padding:12px;border:1.5px solid #cbd5e1;border-radius:10px;font-size:16px;box-sizing:border-box;background:#fff;";
+  if (!opState.fechaRto) {
+    // Default: hoy en zona Argentina
+    try { opState.fechaRto = new Date().toLocaleDateString("sv-SE", { timeZone: "America/Argentina/Buenos_Aires" }); } catch (_e) { opState.fechaRto = ""; }
+  }
+  fechaInp.value = opState.fechaRto;
+  fechaInp.onchange = () => { opState.fechaRto = fechaInp.value; _ppUpdateCont(); };
+  fechaField.appendChild(fechaInp);
+  opBody.appendChild(fechaField);
+
+  // Habilitar Continuar solo si tiene remito + tipo + fecha
+  function _ppUpdateCont() {
+    const ok = opState.remito.length > 0 && opState.tipoEntrega && opState.fechaRto;
+    cont.disabled = !ok;
+    cont.classList.toggle("enabled", !!ok);
+  }
+  _ppUpdateCont();
 
   opActions.innerHTML = "";
   rcpDraftSave();
