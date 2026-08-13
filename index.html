@@ -3603,7 +3603,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      que ande sin internet en el depósito. -->
 <script src="qrcode.js"></script>
 <script src="planimetria.js?v=3.73"></script>
-<script src="pasaje-papeles.js?v=1.0"></script>
+<script src="pasaje-papeles.js?v=2.0"></script>
 <!-- Modo OP de Recepción de Mercadería (se abre al tocar RT). Módulo aislado bajo
      #rcpRoot, con su propio cliente Supabase (login anónimo). Portado de la app
      Control-Carga-Remitos-FC. Suma las cajas del día a localStorage para que RT
@@ -6546,7 +6546,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v10.42";
+const APP_VERSION = "v10.44";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -6609,22 +6609,20 @@ function updatePendingIndicator() {
 }
 
 /**
- * v10.34 — Inicializa badge de Stock y Compras en page load
- * Carga saldos neteados de Stock_Saldos (table lightweight, 346 filas)
+ * v10.41 — Inicializa badge de Stock y Compras en page load
+ * Carga saldos neteados de stocks_carga_rapida (tabla lightweight, ~346 filas)
+ * Chequea negativos por columna: terminado, excedente, separar_pedidos,
+ * a_facturar, a_guardar, racks
  */
 async function initStkBadge() {
   try {
     if (!_stk) {
       _stk = {};
     }
-    // Stock_Saldos es 1/100 del peso de vista_stock_procesada
-    const saldos = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Stock_Saldos", "select=cod,stock_total");
+    var saldos = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/stocks_carga_rapida", "select=cod,cod_base,descripcion,linea,familia_principal,es_secundario,terminado,excedente,separar_pedidos,a_facturar,a_guardar,racks,racks_ch,para_envasar,insumos_dep,stock_total,cajas_pedidas,proy_cajas_mes,capacidad_gondola,es_insumo,visible_en_stock,fc_sin_salida");
     if (saldos && Array.isArray(saldos) && saldos.length > 0) {
       _stk.viewRows = saldos;
-      console.log('initStkBadge: cargados', saldos.length, 'registros');
       updateStkBadge();
-    } else {
-      console.warn('initStkBadge: saldos vacío o inválido', saldos);
     }
   } catch (e) {
     console.error('initStkBadge error:', e);
@@ -6632,26 +6630,26 @@ async function initStkBadge() {
 }
 
 /**
- * v10.34 — Actualiza badge de Stock y Compras
- * Si hay negativos: muestra badge con número rojo
- * Si todo OK: muestra tilde verde
+ * v10.41 — Actualiza badge de Stock y Compras
+ * Chequea si CUALQUIER columna de saldo está en negativo (no solo stock_total)
+ * Si hay negativos: badge rojo con cantidad de códigos
+ * Si todo OK: tilde verde
  */
 function updateStkBadge() {
-  const stkBadge = document.getElementById('stkBadge');
-  const stkOkBadge = document.getElementById('stkOkBadge');
+  var stkBadge = document.getElementById('stkBadge');
+  var stkOkBadge = document.getElementById('stkOkBadge');
+  if (!stkBadge || !stkOkBadge) return;
+  if (!_stk || !_stk.viewRows) return;
 
-  if (!stkBadge || !stkOkBadge) {
-    console.warn('updateStkBadge: elementos del DOM no encontrados', { stkBadge: !!stkBadge, stkOkBadge: !!stkOkBadge });
-    return;
-  }
-  if (!_stk || !_stk.viewRows) {
-    console.warn('updateStkBadge: _stk o viewRows no existe', { _stk: !!_stk, viewRows: _stk ? !!_stk.viewRows : 'N/A' });
-    return;
-  }
-
-  const negativos = _stk.viewRows.filter(r => (r.stock_total || 0) < 0);
-  const count = negativos.length;
-  console.log('updateStkBadge: encontrados', count, 'códigos negativos de', _stk.viewRows.length);
+  var negativos = _stk.viewRows.filter(function (r) {
+    return (Number(r.terminado) || 0) < 0 ||
+           (Number(r.excedente) || 0) < 0 ||
+           (Number(r.separar_pedidos) || 0) < 0 ||
+           (Number(r.a_facturar) || 0) < 0 ||
+           (Number(r.a_guardar) || 0) < 0 ||
+           (Number(r.racks) || 0) < 0;
+  });
+  var count = negativos.length;
 
   if (count > 0) {
     stkBadge.textContent = count;
@@ -10025,7 +10023,7 @@ function _stkSaldosFromView(rows) {
   (rows || []).forEach(function (r) {
     var k = String(r.cod || "");
     if (!k) return;
-    m[k] = { cod: k, desc: r.descripcion || "", terminado: Number(r.terminado) || 0, excedente: Number(r.excedente) || 0, separar_pedidos: Number(r.separar_pedidos) || 0, a_facturar: Number(r.a_facturar) || 0, a_guardar: Number(r.a_guardar) || 0, racks: Number(r.racks) || 0, racks_ch: Number(r.racks_ch) || 0, para_envasar: Number(r.para_envasar) || 0, insumos: Number(r.insumos_dep) || 0, _uni: "", _ubi: "" };
+    m[k] = { cod: k, desc: r.descripcion || "", linea: r.linea || "", terminado: Number(r.terminado) || 0, excedente: Number(r.excedente) || 0, separar_pedidos: Number(r.separar_pedidos) || 0, a_facturar: Number(r.a_facturar) || 0, a_guardar: Number(r.a_guardar) || 0, racks: Number(r.racks) || 0, racks_ch: Number(r.racks_ch) || 0, para_envasar: Number(r.para_envasar) || 0, insumos: Number(r.insumos_dep) || 0, _uni: "", _ubi: "" };
   });
   return m;
 }
@@ -10132,7 +10130,7 @@ async function openStockAdmin(soloConteo) {
   const _solo = soloConteo === true;   // rol "solo conteo" (Giuliana): solo la solapa Conteo
   if (!document.getElementById("stkCss")) {
     const s = document.createElement("style"); s.id = "stkCss";
-    s.textContent = "#stockAdminOverlay{display:none;position:fixed;inset:0;z-index:1280;background:rgba(2,6,23,.74);overflow:auto;padding:14px;}#stockAdminOverlay.show{display:block;}.stk-card{background:#f8fafc;max-width:min(1500px,97vw);margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.stk-head{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:linear-gradient(90deg,#1e6bd6,#1e3a8a);color:#fff;}.stk-title{font-size:19px;font-weight:800;}.stk-close{background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;width:auto;}.stk-body{padding:14px 16px;}.stk-loading,.stk-empty{padding:24px;text-align:center;color:#64748b;}.stk-sec{margin:16px 0 6px;font-size:14px;font-weight:900;color:#0f172a;display:flex;align-items:center;gap:7px;}.stk-secn{background:#e2e8f0;color:#475569;border-radius:999px;padding:1px 9px;font-size:11.5px;font-weight:800;}.stk-inp{border:1px solid #cbd5e1;border-radius:8px;padding:6px 8px;font-size:13px;font-family:inherit;background:#fff;}.stk-sub{font-size:10.5px;color:#94a3b8;font-weight:700;}.stk-nuevo{display:inline-flex;flex-wrap:wrap;align-items:center;gap:6px;}.stk-btn-x{color:#b91c1c;border-color:#fecaca;}.stk-scroll{overflow-x:auto;}.stk-catbox{border:1px solid #cbd5e1;border-radius:11px;padding:10px 11px;margin-bottom:8px;background:#fff;}.stk-catrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}.stk-catuni{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:7px;}.stk-catlist{margin-top:10px;padding-top:10px;border-top:1px dashed #e2e8f0;}.stk-catdesc{margin-top:5px;font-size:12px;color:#475569;line-height:1.35;}.stk-tbl tr.stk-filtros th{background:#f8fafc;padding:5px 9px;text-transform:none;}.stk-secbtn{width:100%;text-align:left;background:#eef2ff;border:1px solid #c7d2fe;border-radius:10px;padding:9px 12px;cursor:pointer;margin:16px 0 8px;}.stk-caret{display:inline-block;width:16px;color:#4f46e5;font-weight:900;}.stk-tbl tr.stk-viejo td{background:#fffbeb;}input.stk-inp.stk-neg{color:#b91c1c;font-weight:800;}.stk-cut{background:#fffbeb;border:1px solid #fcd34d;color:#92400e;border-radius:9px;padding:8px 11px;font-size:12.5px;font-weight:700;margin-bottom:10px;}.stk-filtro{flex:1;min-width:180px;height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 11px;font-size:14px;}.stk-btn{background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:8px 12px;font-size:13px;font-weight:800;cursor:pointer;width:auto;}.stk-btn.ok{background:#16a34a;color:#fff;border-color:#16a34a;}.stk-btn.danger{background:#fff;color:#b91c1c;border-color:#fca5a5;}.stk-tbl{width:100%;border-collapse:collapse;font-size:13.5px;}.stk-tbl.stk-tbl-fit{width:auto;max-width:100%;}.stk-tbl.stk-tbl-fit td.stk-desc{max-width:210px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.stk-tbl.stk-tbl-sect td.stk-desc{max-width:140px;}.stk-tbl.stk-tbl-fit th.num,.stk-tbl.stk-tbl-fit td.num{text-align:right;padding-left:9px;padding-right:9px;}.stk-tblwrap{overflow-x:auto;overflow-y:auto;max-width:100%;max-height:60vh;}.stk-tbl.stk-tbl-fit th.num{vertical-align:bottom;line-height:1.15;}.stk-tbl th{background:#f1f5f9;color:#475569;text-align:left;padding:7px 9px;font-size:11px;text-transform:uppercase;border-bottom:1px solid #cbd5e1;position:sticky;top:0;z-index:10;}.stk-tbl td{padding:7px 9px;}.stk-tbl th.num,.stk-tbl td.num{text-align:right;font-variant-numeric:tabular-nums;}.stk-row{cursor:pointer;border-bottom:1px solid #eef2f7;}.stk-row:hover{background:#eff6ff;}.stk-row td{padding:7px 9px;}.stk-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#1e6bd6;}.stk-desc{color:#475569;}.stk-neg{color:#b91c1c;font-weight:800;}.stk-pick-cell{cursor:pointer;color:#1e6bd6;font-weight:800;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px;}.stk-pick-cell:hover{background:#eff6ff;}.stk-tbl td.stk-hist0{color:#94a3b8;font-weight:700;}.stk-tbl td.stk-hist0:hover{background:#f1f5f9;color:#475569;}.stk-caret{color:#94a3b8;}.stk-detrow td{padding:0 9px 9px;background:#f8fafc;}.stk-det{border-left:3px solid #cbd5e1;padding:6px 0 6px 10px;}.stk-mv{display:flex;gap:9px;font-size:12px;padding:3px 0;align-items:center;}.stk-mv-old{opacity:.45;}.stk-mv-ts{color:#64748b;min-width:96px;}.stk-mv-tipo{font-weight:800;min-width:78px;}.stk-mv-dep{color:#64748b;min-width:74px;}.stk-mv-d{font-weight:800;min-width:44px;text-align:right;}.stk-mv-d.pos{color:#15803d;}.stk-mv-d.neg{color:#b91c1c;}.stk-mv-ref{color:#94a3b8;}.stk-ini-txt{width:100%;border:1px solid #cbd5e1;border-radius:9px;padding:9px;font-family:Consolas,Menlo,monospace;font-size:14px;}.stk-ini-btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}.stk-ini-warn{font-size:12px;color:#92400e;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:8px;margin-top:10px;}.stk-tabs{display:flex;gap:4px;padding:8px 12px 0;background:#1e3a8a;flex-wrap:wrap;}.stk-tab{flex:0 1 auto;width:auto;white-space:nowrap;background:rgba(255,255,255,.12);color:#cbd5e1;border:none;border-radius:9px 9px 0 0;padding:9px 13px;font-size:12.5px;font-weight:800;cursor:pointer;}.stk-tab.on{background:#f8fafc;color:#1e3a8a;}.stk-seg{display:flex;gap:6px;margin-bottom:10px;}.stk-segb{flex:1;background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:7px;font-size:13px;font-weight:800;cursor:pointer;}.stk-segb.on{background:#1e6bd6;color:#fff;border-color:#1e6bd6;}.stk-grp{margin-bottom:10px;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;}.stk-grp-h{background:#f1f5f9;padding:7px 10px;font-weight:800;font-size:13px;}.stk-grp-tot{color:#15803d;font-weight:800;margin-left:6px;}.stk-ing{display:flex;gap:9px;align-items:center;padding:5px 10px;border-top:1px solid #f1f5f9;font-size:12.5px;}.stk-ing-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#1e6bd6;}.stk-ing-desc{flex:1;color:#475569;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.stk-ing-rto{color:#94a3b8;font-size:11px;}.stk-aj-sec{border:1px solid #e2e8f0;border-radius:12px;padding:12px;margin-bottom:12px;}.stk-aj-h{font-size:15px;font-weight:800;margin-bottom:6px;}.stk-aj-hint{font-size:12px;color:#64748b;margin-bottom:7px;}.stk-aj-form{display:flex;gap:7px;flex-wrap:wrap;}.stk-aj-inp{flex:1;min-width:90px;height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 10px;font-size:14px;text-align:center;}.cnt-in{height:32px;border:1px solid #cbd5e1;border-radius:7px;padding:0 6px;font-size:13px;box-sizing:border-box;margin:0;width:auto;}.stk-aj-dep{margin-bottom:12px;font-size:13px;font-weight:800;}.stk-aj-dep select{height:36px;border:1px solid #cbd5e1;border-radius:8px;padding:0 8px;font-size:14px;font-weight:700;}.stk-rk-orden{background:#f1f5f9;border-radius:10px;padding:10px 12px;font-size:13px;margin-bottom:10px;}.stk-rk-orden.pend{background:#fffbeb;border:1.5px solid #fcd34d;color:#92400e;}.stk-rk-baj{display:flex;align-items:center;gap:10px;border:1px solid #e2e8f0;border-radius:11px;padding:9px 11px;margin-bottom:8px;background:#fff;}.stk-rk-baji{flex:1;min-width:0;}.stk-rk-q{font-size:12px;color:#1e6bd6;font-weight:700;margin-top:2px;}.stk-catgrid{display:flex;flex-wrap:wrap;gap:10px;}.stk-catbtn{position:relative;min-width:150px;flex:1 1 150px;max-width:240px;min-height:50px;background:linear-gradient(135deg,#eef2ff,#e0e7ff);border:2px solid #c7d2fe;border-radius:14px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:9px 12px 30px;transition:border-color .15s,box-shadow .15s;}.stk-catbtn:hover{border-color:#818cf8;box-shadow:0 4px 16px rgba(99,102,241,.18);}.stk-catbtn-sincat{background:linear-gradient(135deg,#fef9c3,#fef3c7);border-color:#fcd34d;}.stk-catbtn-sincat:hover{border-color:#f59e0b;box-shadow:0 4px 16px rgba(245,158,11,.18);}.stk-catbtn-lbl{font-size:18px;font-weight:800;color:#1e3a8a;text-align:center;line-height:1.3;word-break:break-word;}.stk-catbtn-n{position:absolute;top:7px;right:9px;background:#6366f1;color:#fff;border-radius:999px;padding:1px 8px;font-size:11px;font-weight:800;}.stk-catbtn-ed,.stk-catbtn-del{position:absolute;bottom:6px;background:rgba(255,255,255,.85);border:1px solid #cbd5e1;border-radius:7px;padding:3px 7px;font-size:13px;cursor:pointer;line-height:1;transition:background .15s;width:auto;}.stk-catbtn-ed:hover,.stk-catbtn-del:hover{background:#fff;border-color:#818cf8;}.stk-catbtn-ed{left:8px;}.stk-catbtn-del{right:8px;}";
+    s.textContent = "#stockAdminOverlay{display:none;position:fixed;inset:0;z-index:1280;background:rgba(2,6,23,.74);overflow:auto;padding:14px;}#stockAdminOverlay.show{display:block;}.stk-card{background:#f8fafc;max-width:min(1500px,97vw);margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.stk-head{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:linear-gradient(90deg,#1e6bd6,#1e3a8a);color:#fff;}.stk-title{font-size:19px;font-weight:800;}.stk-close{background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;width:auto;}.stk-body{padding:14px 16px;}.stk-loading,.stk-empty{padding:24px;text-align:center;color:#64748b;}.stk-sec{margin:16px 0 6px;font-size:14px;font-weight:900;color:#0f172a;display:flex;align-items:center;gap:7px;}.stk-secn{background:#e2e8f0;color:#475569;border-radius:999px;padding:1px 9px;font-size:11.5px;font-weight:800;}.stk-inp{border:1px solid #cbd5e1;border-radius:8px;padding:6px 8px;font-size:13px;font-family:inherit;background:#fff;}.stk-sub{font-size:10.5px;color:#94a3b8;font-weight:700;}.stk-nuevo{display:inline-flex;flex-wrap:wrap;align-items:center;gap:6px;}.stk-btn-x{color:#b91c1c;border-color:#fecaca;}.stk-scroll{overflow-x:auto;}.stk-catbox{border:1px solid #cbd5e1;border-radius:11px;padding:10px 11px;margin-bottom:8px;background:#fff;}.stk-catrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}.stk-catuni{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:7px;}.stk-catlist{margin-top:10px;padding-top:10px;border-top:1px dashed #e2e8f0;}.stk-catdesc{margin-top:5px;font-size:12px;color:#475569;line-height:1.35;}.stk-tbl tr.stk-filtros th{background:#f8fafc;padding:5px 9px;text-transform:none;}.stk-secbtn{width:100%;text-align:left;background:#eef2ff;border:1px solid #c7d2fe;border-radius:10px;padding:9px 12px;cursor:pointer;margin:16px 0 8px;}.stk-caret{display:inline-block;width:16px;color:#4f46e5;font-weight:900;}.stk-tbl tr.stk-viejo td{background:#fffbeb;}input.stk-inp.stk-neg{color:#b91c1c;font-weight:800;}.stk-cut{background:#fffbeb;border:1px solid #fcd34d;color:#92400e;border-radius:9px;padding:8px 11px;font-size:12.5px;font-weight:700;margin-bottom:10px;}.stk-filtro{flex:1;min-width:180px;height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 11px;font-size:14px;}.stk-btn{background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:8px 12px;font-size:13px;font-weight:800;cursor:pointer;width:auto;}.stk-btn.ok{background:#16a34a;color:#fff;border-color:#16a34a;}.stk-btn.danger{background:#fff;color:#b91c1c;border-color:#fca5a5;}.stk-tbl{width:100%;border-collapse:collapse;font-size:13.5px;}.stk-tbl.stk-tbl-fit{width:auto;max-width:100%;}.stk-tbl.stk-tbl-fit td.stk-desc{max-width:210px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.stk-tbl.stk-tbl-sect td.stk-desc{max-width:140px;}.stk-tbl.stk-tbl-fit th.num,.stk-tbl.stk-tbl-fit td.num{text-align:right;padding-left:9px;padding-right:9px;}.stk-tblwrap{overflow-x:auto;overflow-y:auto;max-width:100%;max-height:60vh;}.stk-tbl.stk-tbl-fit th.num{vertical-align:bottom;line-height:1.15;}.stk-tbl th{background:#f1f5f9;color:#475569;text-align:left;padding:7px 9px;font-size:11px;text-transform:uppercase;border-bottom:1px solid #cbd5e1;position:sticky;top:0;z-index:10;}.stk-tbl td{padding:7px 9px;}.stk-tbl th.num,.stk-tbl td.num{text-align:right;font-variant-numeric:tabular-nums;}.stk-row{cursor:pointer;border-bottom:1px solid #eef2f7;}.stk-row:hover{background:#eff6ff;}.stk-row td{padding:7px 9px;}.stk-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#1e6bd6;}.stk-desc{color:#475569;}.stk-neg{color:#b91c1c;font-weight:800;}.stk-pick-cell{cursor:pointer;color:#1e6bd6;font-weight:800;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px;}.stk-pick-cell:hover{background:#eff6ff;}.stk-tbl td.stk-hist0{color:#94a3b8;font-weight:700;}.stk-tbl td.stk-hist0:hover{background:#f1f5f9;color:#475569;}.stk-caret{color:#94a3b8;}.stk-detrow td{padding:0 9px 9px;background:#f8fafc;}.stk-det{border-left:3px solid #cbd5e1;padding:6px 0 6px 10px;}.stk-mv{display:flex;gap:9px;font-size:12px;padding:3px 0;align-items:center;}.stk-mv-old{opacity:.45;}.stk-mv-ts{color:#64748b;min-width:96px;}.stk-mv-tipo{font-weight:800;min-width:78px;}.stk-mv-dep{color:#64748b;min-width:74px;}.stk-mv-d{font-weight:800;min-width:44px;text-align:right;}.stk-mv-d.pos{color:#15803d;}.stk-mv-d.neg{color:#b91c1c;}.stk-mv-ref{color:#94a3b8;}.stk-ini-txt{width:100%;border:1px solid #cbd5e1;border-radius:9px;padding:9px;font-family:Consolas,Menlo,monospace;font-size:14px;}.stk-ini-btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}.stk-ini-warn{font-size:12px;color:#92400e;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:8px;margin-top:10px;}.stk-tabs{display:flex;gap:4px;padding:8px 12px 0;background:#1e3a8a;flex-wrap:wrap;}.stk-tab{flex:0 1 auto;width:auto;white-space:nowrap;background:rgba(255,255,255,.12);color:#cbd5e1;border:none;border-radius:9px 9px 0 0;padding:9px 13px;font-size:12.5px;font-weight:800;cursor:pointer;}.stk-tab.on{background:#f8fafc;color:#1e3a8a;}.stk-seg{display:flex;gap:6px;margin-bottom:10px;}.stk-segb{flex:1;background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:7px;font-size:13px;font-weight:800;cursor:pointer;}.stk-segb.on{background:#1e6bd6;color:#fff;border-color:#1e6bd6;}.stk-grp{margin-bottom:10px;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;}.stk-grp-h{background:#f1f5f9;padding:7px 10px;font-weight:800;font-size:13px;}.stk-grp-tot{color:#15803d;font-weight:800;margin-left:6px;}.stk-ing{display:flex;gap:9px;align-items:center;padding:5px 10px;border-top:1px solid #f1f5f9;font-size:12.5px;}.stk-ing-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#1e6bd6;}.stk-ing-desc{flex:1;color:#475569;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.stk-ing-rto{color:#94a3b8;font-size:11px;}.stk-aj-sec{border:1px solid #e2e8f0;border-radius:12px;padding:12px;margin-bottom:12px;}.stk-aj-h{font-size:15px;font-weight:800;margin-bottom:6px;}.stk-aj-hint{font-size:12px;color:#64748b;margin-bottom:7px;}.stk-aj-form{display:flex;gap:7px;flex-wrap:wrap;}.stk-aj-inp{flex:1;min-width:90px;height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 10px;font-size:14px;text-align:center;}.cnt-in{height:32px;border:1px solid #cbd5e1;border-radius:7px;padding:0 6px;font-size:13px;box-sizing:border-box;margin:0;width:auto;}.stk-aj-dep{margin-bottom:12px;font-size:13px;font-weight:800;}.stk-aj-dep select{height:36px;border:1px solid #cbd5e1;border-radius:8px;padding:0 8px;font-size:14px;font-weight:700;}.stk-rk-orden{background:#f1f5f9;border-radius:10px;padding:10px 12px;font-size:13px;margin-bottom:10px;}.stk-rk-orden.pend{background:#fffbeb;border:1.5px solid #fcd34d;color:#92400e;}.stk-rk-baj{display:flex;align-items:center;gap:10px;border:1px solid #e2e8f0;border-radius:11px;padding:9px 11px;margin-bottom:8px;background:#fff;}.stk-rk-baji{flex:1;min-width:0;}.stk-rk-q{font-size:12px;color:#1e6bd6;font-weight:700;margin-top:2px;}.stk-catgrid{display:flex;flex-wrap:wrap;gap:10px;}.stk-catbtn{position:relative;min-width:150px;flex:1 1 150px;max-width:240px;min-height:50px;background:linear-gradient(135deg,#eef2ff,#e0e7ff);border:2px solid #c7d2fe;border-radius:14px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:9px 12px 30px;transition:border-color .15s,box-shadow .15s;}.stk-catbtn:hover{border-color:#818cf8;box-shadow:0 4px 16px rgba(99,102,241,.18);}.stk-catbtn-sincat{background:linear-gradient(135deg,#fef9c3,#fef3c7);border-color:#fcd34d;}.stk-catbtn-sincat:hover{border-color:#f59e0b;box-shadow:0 4px 16px rgba(245,158,11,.18);}.stk-catbtn-lbl{font-size:18px;font-weight:800;color:#1e3a8a;text-align:center;line-height:1.3;word-break:break-word;}.stk-catbtn-n{position:absolute;top:7px;right:9px;background:#6366f1;color:#fff;border-radius:999px;padding:1px 8px;font-size:11px;font-weight:800;}.stk-catbtn-ed,.stk-catbtn-del{position:absolute;bottom:6px;background:rgba(255,255,255,.85);border:1px solid #cbd5e1;border-radius:7px;padding:3px 7px;font-size:13px;cursor:pointer;line-height:1;transition:background .15s;width:auto;}.stk-catbtn-ed:hover,.stk-catbtn-del:hover{background:#fff;border-color:#818cf8;}.stk-catbtn-ed{left:8px;}.stk-catbtn-del{right:8px;}@keyframes stkSpin{to{transform:rotate(360deg)}}";
     document.head.appendChild(s);
   }
   let ov = document.getElementById("stockAdminOverlay");
@@ -10141,21 +10139,25 @@ async function openStockAdmin(soloConteo) {
   ov.innerHTML = '<div class="stk-card"><div class="stk-head"><span class="stk-title">' + (_solo ? "📋 Conteo de stock" : "📦 Stock y Compras") + '</span><button class="stk-close" onclick="closeStockAdmin()">Cerrar</button></div><div class="stk-tabs" id="stkTabs"></div><div class="stk-body" id="stkBody"><div class="stk-loading">Cargando…</div></div></div>';
 
   try {
-    // v10.34: Cargar Stock_Saldos primero (fast) y renderizar instant
-    const saldosRapido = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Stock_Saldos", "select=cod,cod_base,descripcion,linea,familia_principal,es_secundario,terminado,excedente,separar_pedidos,a_facturar,a_guardar,racks,racks_ch,para_envasar,insumos_dep,stock_total,cajas_pedidas,proy_cajas_mes,capacidad_gondola,es_insumo,visible_en_stock").catch(function(){ return []; });
+    // v10.41: Cargar stocks_carga_rapida primero (fast) y renderizar instant
+    var saldosRapido = (_stk && _stk.viewRows && _stk.viewRows.length > 0) ? _stk.viewRows : await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/stocks_carga_rapida", "select=cod,cod_base,descripcion,linea,familia_principal,es_secundario,terminado,excedente,separar_pedidos,a_facturar,a_guardar,racks,racks_ch,para_envasar,insumos_dep,stock_total,cajas_pedidas,proy_cajas_mes,capacidad_gondola,es_insumo,visible_en_stock,fc_sin_salida").catch(function(){ return []; });
 
-    // v10.34: Inicializar _stk con Stock_Saldos para renderizar instant (sin esperar Promise.all())
+    // v10.41: Inicializar _stk con stocks_carga_rapida para renderizar instant
     var _demFromView_Rápido = {};
     var _proyMap_Rápido = {};
+    var _capRápido = [];
+    var _fcsRápido = { pend: {}, porArt: {} };
     (saldosRapido || []).forEach(function (r) {
       var k = _ocgNorm(r.cod);
       if (k && Number(r.cajas_pedidas) > 0) _demFromView_Rápido[k] = Number(r.cajas_pedidas);
       if (k && Number(r.proy_cajas_mes) > 0) _proyMap_Rápido[k] = Number(r.proy_cajas_mes);
+      if (k && Number(r.capacidad_gondola) > 0) _capRápido.push({ cod: r.cod, cajas_max: Number(r.capacidad_gondola) });
+      if (k && Number(r.fc_sin_salida) > 0) _fcsRápido.porArt[k] = { cod: r.cod, cajas: Number(r.fc_sin_salida) };
     });
     var _insFromView_Rápido = (saldosRapido || []).filter(function (r) { return r.es_insumo; }).map(function (r) { return String(r.cod).trim().toUpperCase(); });
 
-    _stk = { movs: [], cutoff: {}, factors: {}, ordenes: [], bajadas: [], tab: _solo ? "conteo" : "stocks", soloConteo: _solo, filtro: "", openArt: null, ingMode: "remito", asOf: null, asOfInput: "", dem: _demFromView_Rápido, cap: [], gConf: [], fcs: { pend: {}, porArt: {} }, fcsLoaded: false, insumosCods: _insFromView_Rápido, cxm: {}, proy: _proyMap_Rápido, viewRows: saldosRapido, alertas: [] };
-    stkRender();  // Renderizar instant con Stock_Saldos
+    _stk = { movs: [], cutoff: {}, factors: {}, ordenes: [], bajadas: [], tab: _solo ? "conteo" : "stocks", soloConteo: _solo, filtro: "", openArt: null, ingMode: "remito", asOf: null, asOfInput: "", dem: _demFromView_Rápido, cap: _capRápido, gConf: [], fcs: _fcsRápido, fcsLoaded: false, insumosCods: _insFromView_Rápido, cxm: {}, proy: _proyMap_Rápido, viewRows: saldosRapido, alertas: [] };
+    stkRender();  // Renderizar instant con stocks_carga_rapida
 
     // v10.34: Cargar datos completos en background (sin bloquear)
     Promise.all([stockFetchMovs(), stockGetCutoff(), stockFetchArtFactors(), racksFetchOrdenes(), racksFetchBajadas(), loadArtNombres(), supaFetchAllSafe(SUPABASE_URL + "/rest/v1/vista_stock_procesada", "select=cod,cod_base,descripcion,linea,familia_principal,es_secundario,terminado,excedente,separar_pedidos,a_facturar,a_guardar,racks,racks_ch,para_envasar,insumos_dep,stock_total,cajas_pedidas,proy_cajas_mes,capacidad_gondola,es_insumo,visible_en_stock").catch(function(){ return []; }),
@@ -10201,8 +10203,25 @@ async function openStockAdmin(soloConteo) {
       _stk.insumosCods = _insFromView;
       _stk.cxm = _cxmMerge;
       _stk.proy = _proyMap;
-      _stk.viewRows = _viewRows;  // Actualizar con vista_stock_procesada completa
+      // v10.42: NO pisar viewRows — stocks_carga_rapida es la fuente principal
+      // (saldos instantáneos vía trigger + realtime). La vista se guarda aparte
+      // para detalle/historial y para actualizar campos derivados en viewRows.
+      _stk._vistaRows = _viewRows;
+      // Actualizar campos derivados (cajas_pedidas, proy, cap, linea, desc) en viewRows desde la vista
+      var _vistaMap = {};
+      _viewRows.forEach(function (r) { _vistaMap[_ocgNorm(r.cod)] = r; });
+      (_stk.viewRows || []).forEach(function (r) {
+        var vr = _vistaMap[_ocgNorm(r.cod)];
+        if (vr) {
+          r.cajas_pedidas = vr.cajas_pedidas;
+          r.proy_cajas_mes = vr.proy_cajas_mes;
+          r.capacidad_gondola = vr.capacidad_gondola;
+          if (vr.descripcion) r.descripcion = vr.descripcion;
+          if (vr.linea) r.linea = vr.linea;
+        }
+      });
       _stk.alertas = res[13] || [];
+      _stk._mergeComplete = true;
       stkRender();  // Render suave (mantiene scroll/focus)
       stkSubscribeRealtime();
     }).catch(function(e) { console.error('Background data load error:', e); });
@@ -10222,17 +10241,15 @@ function stkSubscribeRealtime() {
         const mv = payload.new || payload.old;
         if (!mv) return;
         const cod = String(mv.cod_art || "").toUpperCase();
-        const tipo = String(mv.tipo || "").toLowerCase();
-        // Solo actualizar si es picking/separado (rutas que importan para la vista)
-        if (!["picking", "separado"].includes(tipo)) return;
+        // v10.42: escuchar TODOS los tipos de movimiento (picking, separado, armado, facturado, guardado, racks, etc.)
         // Buscar fila del código en la tabla actual
         const row = document.querySelector('tr.stk-row[data-stk-cod="' + escapeHtml(cod) + '"]');
         if (!row) return;   // no está en la tabla abierta
-        // Refrescar la tabla: recargar saldos del servidor y re-renderizar
-        // (es más simple que actualizar celda por celda y garantiza consistencia)
+        // v10.42: recargar desde stocks_carga_rapida (saldos instantáneos vía trigger)
+        // en vez de vista_stock_procesada (materializada cada 5 min)
         (async function() {
           try {
-            const updated = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/vista_stock_procesada", "select=*");
+            const updated = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/stocks_carga_rapida", "select=cod,cod_base,descripcion,linea,familia_principal,es_secundario,terminado,excedente,separar_pedidos,a_facturar,a_guardar,racks,racks_ch,para_envasar,insumos_dep,stock_total,cajas_pedidas,proy_cajas_mes,capacidad_gondola,es_insumo,visible_en_stock,fc_sin_salida");
             if (!_stk) return;
             _stk.viewRows = updated || [];
             // Recalcular mapas de demanda/proyección
@@ -10244,7 +10261,8 @@ function stkSubscribeRealtime() {
             });
             _stk.dem = _demFromView;
             _stk.proy = _proyMap;
-            stkRender();   // re-renderizar conservando focus
+            updateStkBadge();  // actualizar badge también
+            stkRender();
           } catch (_e) {}
         })();
       })
@@ -12865,7 +12883,7 @@ function stkBodyStocks() {
   // v8.88: también detecta marca del sufijo del código (desconcatenación)
   if (_stk.filLinea) shown = shown.filter(function (a) {
     var _sfx = String(a.cod || "").match(/\s+(LK|CH|LOKE)$/i);
-    var _marca = _sfx ? _sfx[1].toUpperCase().replace("LOKE", "LK") : ocLinea(a.cod);
+    var _marca = _sfx ? _sfx[1].toUpperCase().replace("LOKE", "LK") : (ocLinea(a.cod) || String(a.linea || "").toUpperCase().trim() || "");
     return _marca === _stk.filLinea;
   });
   // v8.95 — filtro rápido por columna: tocar el header de una columna muestra solo las filas
@@ -12952,6 +12970,11 @@ function stkBodyStocks() {
       : '<button type="button" disabled title="No hay stock negativo — nada para filtrar" style="width:auto;margin:0;flex:0 0 auto;padding:0 11px;height:38px;border:1.5px solid #e2e8f0;border-radius:9px;background:#f8fafc;color:#cbd5e1;font-weight:800;font-size:13px;cursor:default;white-space:nowrap;">☐ 🔴 Negativos</button>') +
     '<button type="button" onclick="stkToggleSoloLow()" title="Mostrar sólo los códigos donde la suma de depósitos (góndola+excedente+pickeados+a facturar+a guardar+racks) es MENOR que lo pedido" style="width:auto;margin:0;flex:0 0 auto;padding:0 11px;height:38px;border:1.5px solid ' + (_stk.soloLow ? "#dc2626" : "#cbd5e1") + ';border-radius:9px;background:' + (_stk.soloLow ? "#fef2f2" : "#fff") + ';color:' + (_stk.soloLow ? "#b91c1c" : "#334155") + ';font-weight:800;font-size:13px;cursor:pointer;white-space:nowrap;">' + (_stk.soloLow ? "☑" : "☐") + ' ⚠ Stock bajo' + (_stkLowCount ? " (" + _stkLowCount + ")" : "") + '</button>' +
     '<button type="button" onclick="stkToggleSoloPin()" title="Mostrar sólo los códigos que fijaste (📌). Se guardan aunque cierres la app." style="width:auto;margin:0;flex:0 0 auto;padding:0 11px;height:38px;border:1.5px solid ' + (_stk.soloPin ? "#b45309" : "#cbd5e1") + ';border-radius:9px;background:' + (_stk.soloPin ? "#fffbeb" : "#fff") + ';color:' + (_stk.soloPin ? "#b45309" : "#334155") + ';font-weight:800;font-size:13px;cursor:pointer;white-space:nowrap;">' + (_stk.soloPin ? "☑" : "📌") + ' Fijados' + ((_stk.pins || []).length ? " (" + _stk.pins.length + ")" : "") + '</button>' +
+    '<span id="stkMergeStatus" title="' + (_stk._mergeComplete ? 'Datos completos cargados' : 'Cargando datos completos…') + '" style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;flex:0 0 auto;">' +
+      (_stk._mergeComplete
+        ? '<svg width="22" height="22" viewBox="0 0 22 22"><circle cx="11" cy="11" r="10" fill="#16a34a" stroke="none"/><path d="M6.5 11.5 L9.5 14.5 L15.5 8" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+        : '<svg width="22" height="22" viewBox="0 0 22 22" style="animation:stkSpin 1s linear infinite"><circle cx="11" cy="11" r="9" fill="none" stroke="#e2e8f0" stroke-width="2.5"/><circle cx="11" cy="11" r="9" fill="none" stroke="#3b82f6" stroke-width="2.5" stroke-dasharray="40 60" stroke-linecap="round"/></svg>') +
+    '</span>' +
     '</div>';
   // v9.73 — se saca el cartel "NP que faltan (sin cargar en PPP)" de la tabla de Stock
   // (pedido del dueño). El módulo sigue accesible desde el botón "Pedidos sin cargar
@@ -13004,7 +13027,7 @@ function stkBodyStocks() {
     // v8.88 — desconcatenación: si el código tiene sufijo LK/CH/LOKE, la marca
     // sale del propio código (no de OC_Maximos); y en CÓDIGO se muestra el base.
     const _codSuffix = String(a.cod || "").match(/\s+(LK|CH|LOKE)$/i);
-    const _lin = _codSuffix ? _codSuffix[1].toUpperCase().replace("LOKE", "LK") : ocLinea(a.cod);
+    const _lin = _codSuffix ? _codSuffix[1].toUpperCase().replace("LOKE", "LK") : (ocLinea(a.cod) || String(a.linea || "").toUpperCase().trim() || "");
     // v10.02 — mostrar SIEMPRE el código canónico con cero(s) a la izquierda (026, 035E). La vista
     // vista_stock_procesada (v10.00) devuelve el código sin ceros ("26"), así que se re-pad acá.
     const _codDisplay = codCanon(_codSuffix ? codBase(a.cod) : a.cod);
@@ -14232,12 +14255,26 @@ async function stkOpenMovsArt(codEnc, dep, titulo, icono) {
   const cod = decodeURIComponent(codEnc);
   _stkPop = { kind: "movsArt", cod: cod, codN: _stkNormCod(cod), dep: dep, titulo: titulo || dep, icono: icono || "🔁", desde: "", hasta: "", npByTanda: {} };
   _stkPopShell((icono || "🔁") + " " + (titulo || dep) + " — " + escapeHtml(codBase(cod)), "stkPopBody");
-  stkMovsArtRender();   // render inmediato (el NP de cada picking aparece cuando llega el fetch)
+  // v10.42: fetch fresco de movimientos SOLO de este artículo (no depender de _stk.movs que puede estar viejo)
+  // v10.43: stocks_carga_rapida guarda cod SIN ceros (26, 7, 35E) pero Movimientos_Stock
+  //         guarda CON ceros (026, 007, 035E). Query con ambos formatos via or().
+  try {
+    var _codPad = cod.replace(/^(\d+)/, function (m) { return m.padStart(3, "0"); });
+    var _codFilter = (_codPad !== cod)
+      ? "or=(cod_art.eq." + encodeURIComponent(cod) + ",cod_art.eq." + encodeURIComponent(_codPad) + ")"
+      : "cod_art=eq." + encodeURIComponent(cod);
+    var _freshMovs = await supaFetchAllSafe(SUPABASE_URL + '/rest/v1/Movimientos_Stock', 'select=id,cod_art,deposito,tipo,delta,ref,ts,legajo,descripcion,ubicacion&' + _codFilter + '&order=ts.asc&limit=50000');
+    if (_freshMovs && Array.isArray(_freshMovs) && _stkPop && _stkPop.cod === cod) {
+      _stkPop._freshMovs = _freshMovs;
+    }
+  } catch (_e) {}
+  stkMovsArtRender();
   _stkQuienLoad(stkMovsArtRender);   // v6.66 — 👤 siglas + legajo (nombres + sesiones de RT)
   // v8.71 — resolver "pipeline" al operario real: cargar TP/TAP de las tandas con legajo='pipeline'.
   try {
     const tandas = {};
-    _stk.movs.forEach(function (mv) {
+    var _pipeMovs = (_stkPop && _stkPop._freshMovs) ? _stkPop._freshMovs : _stk.movs;
+    _pipeMovs.forEach(function (mv) {
       if (_stkNormCod(mv.cod_art) !== _stkPop.codN || mv.deposito !== dep) return;
       if (String(mv.legajo || "").trim() !== "pipeline") return;
       const ref = String(mv.ref || "").toUpperCase().split("|")[0]; if (ref) tandas[ref] = true;
@@ -14453,7 +14490,9 @@ function _stkMovsBlock() {
     : function (d) { return d === dep; };
   const desdeT = _stkPop.desde ? new Date(_stkPop.desde + "T00:00:00").getTime() : 0;
   const hastaT = _stkPop.hasta ? new Date(_stkPop.hasta + "T23:59:59").getTime() : 0;
-  const list = _stk.movs.filter(function (mv) {
+  // v10.42: usar movimientos frescos del artículo si están disponibles, sino fallback a _stk.movs
+  const _movsSource = (_stkPop && _stkPop._freshMovs) ? _stkPop._freshMovs : _stk.movs;
+  const list = _movsSource.filter(function (mv) {
     if (!_depMatch(mv.deposito) || _stkNormCod(mv.cod_art) !== codN || !_stkWin(mv, true)) return false;
     if (Number(mv.delta) === 0) return false;   // v8.90: ocultar movimientos con cantidad 0 (ruido)
     const t = new Date(mv.ts).getTime();
@@ -17904,9 +17943,102 @@ function insUbicOk(mode) {
     return;
   }
   insUbicCancel();
-  // Guardar la ubicación en el toggle data y abrir el modal de insumos
+  // Guardar la ubicación en el toggle data
   window._insUbicacion = ubicacion;  // Estado temporal
+
+  // RI (recepción): pedir documentación antes de abrir el modal de insumos
+  if (mode === "RI") {
+    askInsDocumentacion(mode, ubicacion);
+    return;
+  }
   selectOption(mode);
+}
+
+/* Paso intermedio RI: capturar datos de documentación (remito/factura) antes de
+   abrir el modal de insumos. Mismo flujo de 3 botones que mercadería. */
+function askInsDocumentacion(mode, proveedor) {
+  var ov = document.getElementById("insDocModal");
+  if (!ov) { ov = document.createElement("div"); ov.id = "insDocModal"; ov.style.cssText = "position:fixed;inset:0;z-index:1298;background:rgba(2,6,23,.78);display:flex;align-items:center;justify-content:center;padding:16px;"; document.body.appendChild(ov); }
+
+  // Estado temporal para la documentación de insumos
+  window._insDocState = { tipoDoc: '', nroRemito: '', nroFactura: '', fechaRemito: '', fechaFactura: '', proveedor: proveedor || '' };
+
+  ov.innerHTML = '<div style="background:#f8fafc;max-width:420px;width:100%;border-radius:16px;padding:20px;box-shadow:0 24px 70px rgba(0,0,0,.5);box-sizing:border-box;">' +
+    '<div style="font-size:18px;font-weight:800;margin-bottom:3px;">📄 Documentación recibida</div>' +
+    '<div style="font-size:13px;color:#64748b;margin-bottom:16px;">¿Qué documentación recibís?</div>' +
+    '<div id="insDocBody"></div>' +
+    '</div>';
+  ov.style.display = "flex";
+
+  _insDocStep1(mode);
+}
+
+function _insDocStep1(mode) {
+  var body = document.getElementById("insDocBody");
+  if (!body) return;
+  var btn = "width:100%;margin-bottom:10px;padding:16px;border:none;border-radius:12px;color:#fff;font-size:16px;font-weight:800;cursor:pointer;text-align:left;";
+  body.innerHTML =
+    '<button onclick="window._insDocState.tipoDoc=\'remito\';_insDocStep2(\'' + mode + '\')" style="' + btn + 'background:#4f46e5;">📄 Remito</button>' +
+    '<button onclick="window._insDocState.tipoDoc=\'factura\';_insDocStep2(\'' + mode + '\')" style="' + btn + 'background:#0d9488;">🧾 Factura</button>' +
+    '<button onclick="window._insDocState.tipoDoc=\'remito_factura\';_insDocStep2(\'' + mode + '\')" style="' + btn + 'background:#1e6bd6;">📄🧾 Remito y Factura</button>' +
+    '<button onclick="insDocCancel()" style="width:100%;padding:11px;border:none;border-radius:10px;background:#e2e8f0;color:#475569;font-weight:700;cursor:pointer;">Cancelar</button>';
+}
+
+function _insDocStep2(mode) {
+  var body = document.getElementById("insDocBody");
+  if (!body) return;
+  var st = window._insDocState;
+  var hasR = st.tipoDoc === 'remito' || st.tipoDoc === 'remito_factura';
+  var hasF = st.tipoDoc === 'factura' || st.tipoDoc === 'remito_factura';
+  var hoyAR = '';
+  try { hoyAR = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Argentina/Buenos_Aires' }); } catch (_e) {}
+
+  var html = '';
+  if (hasR) {
+    html += '<div style="margin-bottom:12px;"><label style="display:block;font-size:13px;font-weight:600;color:#475569;margin-bottom:4px;">N° de Remito</label><input type="text" inputmode="numeric" id="insDocNroRemito" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;box-sizing:border-box;font-size:14px;"></div>';
+    html += '<div style="margin-bottom:12px;"><label style="display:block;font-size:13px;font-weight:600;color:#475569;margin-bottom:4px;">Fecha de Remito</label><input type="date" id="insDocFechaRemito" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;box-sizing:border-box;font-size:14px;" value="' + hoyAR + '"></div>';
+  }
+  if (hasF) {
+    html += '<div style="margin-bottom:12px;"><label style="display:block;font-size:13px;font-weight:600;color:#475569;margin-bottom:4px;">N° de Factura</label><input type="text" inputmode="numeric" id="insDocNroFactura" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;box-sizing:border-box;font-size:14px;"></div>';
+    html += '<div style="margin-bottom:12px;"><label style="display:block;font-size:13px;font-weight:600;color:#475569;margin-bottom:4px;">Fecha de Factura</label><input type="date" id="insDocFechaFactura" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;box-sizing:border-box;font-size:14px;" value="' + hoyAR + '"></div>';
+  }
+  html += '<div style="display:flex;gap:10px;margin-top:14px;">' +
+    '<button onclick="_insDocStep1(\'' + mode + '\')" style="flex:1;padding:14px;border:none;border-radius:10px;background:#e2e8f0;color:#475569;font-weight:700;cursor:pointer;font-size:16px;">‹ Atrás</button>' +
+    '<button onclick="insDocOk(\'' + mode + '\')" style="flex:1;padding:14px;border:none;border-radius:10px;background:#4f46e5;color:#fff;font-weight:700;cursor:pointer;font-size:16px;">Continuar</button>' +
+    '</div>';
+  body.innerHTML = html;
+}
+
+function insDocOk(mode) {
+  var st = window._insDocState;
+  var hasR = st.tipoDoc === 'remito' || st.tipoDoc === 'remito_factura';
+  var hasF = st.tipoDoc === 'factura' || st.tipoDoc === 'remito_factura';
+  var ok = true;
+  if (hasR) {
+    var elNR = document.getElementById("insDocNroRemito");
+    var elFR = document.getElementById("insDocFechaRemito");
+    st.nroRemito = elNR ? elNR.value.replace(/\D/g, '') : '';
+    st.fechaRemito = elFR ? elFR.value : '';
+    if (!st.nroRemito) { ok = false; if (elNR) elNR.style.borderColor = '#dc2626'; }
+  }
+  if (hasF) {
+    var elNF = document.getElementById("insDocNroFactura");
+    var elFF = document.getElementById("insDocFechaFactura");
+    st.nroFactura = elNF ? elNF.value.replace(/\D/g, '') : '';
+    st.fechaFactura = elFF ? elFF.value : '';
+    if (!st.nroFactura) { ok = false; if (elNF) elNF.style.borderColor = '#dc2626'; }
+  }
+  if (!ok) return;
+
+  // Cerrar modal y continuar al modal de insumos
+  insDocCancel();
+  selectOption(mode);
+}
+
+function insDocCancel() {
+  var ov = document.getElementById("insDocModal");
+  if (ov) ov.style.display = "none";
+  window._insDocState = null;
 }
 /* El CSS del modal de insumos lo usa también la solapa "Insumos" de Stock y Compras
    (chips de categoría), así que la inyección va aparte. */
@@ -18369,11 +18501,23 @@ function insConfirmar() {
   window._insUbicacion = null;  // limpiar
   stockMove(rows);   // offline-safe (vir_stock_pend)
 
-  // v1.1 — Pasaje de Papeles: mostrar pop-up para capturar documentación (solo si es ingreso)
+  // v1.3 — Pasaje de Papeles: guardar documentación capturada en el paso previo
   if (isIn) {
     try {
       if (typeof window.ppShowCaptureDialog === 'function') {
-        window.ppShowCaptureDialog('insumo');
+        var _docSt = window._insDocState;
+        if (_docSt && _docSt.tipoDoc) {
+          // Datos ya capturados en askInsDocumentacion → guardar directo
+          window.ppShowCaptureDialog('insumo', {
+            tipoDoc: _docSt.tipoDoc,
+            nroRemito: _docSt.nroRemito || '',
+            nroFactura: _docSt.nroFactura || '',
+            fechaRemito: _docSt.fechaRemito || '',
+            fechaFactura: _docSt.fechaFactura || '',
+            proveedor: _docSt.proveedor || window._insUbicacion || ''
+          });
+        }
+        window._insDocState = null;
       }
     } catch (_e) { /* no-op si el módulo no está cargado */ }
   }
@@ -32609,6 +32753,7 @@ function showSupervisor(email) {
   try { facLoadBadge(); } catch (_e) {}   // v9.69: badge pedidos listos para facturar
   try { favLoadBadge(); } catch (_e) {}   // v9.70: badge Completar Pedido (faltantes con stock)
   try { rrLoadBadge(); } catch (_e) {}   // v9.71: badge Recepción Remitos (cargados sin controlar)
+  try { initStkBadge(); } catch (_e) {}   // v10.41: badge Stock y Compras (negativos)
   try { if (typeof pppAlertPollStart === "function") pppAlertPollStart(); } catch (_e) {}
 }
 
