@@ -6546,7 +6546,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v10.41";
+const APP_VERSION = "v10.42";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -14795,9 +14795,11 @@ async function stkFaltLoad() {
       supaFetchAllSafe(SUPABASE_URL + "/rest/v1/vista_faltante_demanda",
         "select=cod,np,rs,cod_cliente,cajas,fecha_salida,fecha_armado,tanda,estado_picking,es_super"),
       supaFetchAllSafe(SUPABASE_URL + "/rest/v1/vista_faltante_real",
-        "select=cod,tanda,np,rs,cajas_falto,cod_raw,fecha_salida")
+        "select=cod,tanda,np,rs,cajas_falto,cod_raw,fecha_salida"),
+      // v10.42 — stock por familia: para sumar el stock del SECUNDARIO dentro del PRINCIPAL.
+      supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Stock_Saldos", "select=cod_base,familia_principal,es_secundario,stock_total").catch(function () { return []; })
     ]);
-    var catRows = res[0] || [], demRows = res[1] || [], realRows = res[2] || [];
+    var catRows = res[0] || [], demRows = res[1] || [], realRows = res[2] || [], famRows = res[3] || [];
 
     // CATÁLOGO: 1 fila por código → provMap, saldoMap, discont, ultEnt, ocMap, notasMap
     var provMap = {}, saldoMap = {}, discont = {}, ultEnt = {}, ocMap = {}, notasMap = {};
@@ -14810,6 +14812,19 @@ async function stkFaltLoad() {
       var oc = Number(r.oc_pend_cajas) || 0;
       if (oc > 0) ocMap[k] = { cajas: oc, fecha: r.oc_pend_fecha || "", prov: r.oc_pend_prov || "" };
       if (r.nota_dia || r.nota_motivo) notasMap[k] = { dia: r.nota_dia || "", motivo: r.nota_motivo || "" };
+    });
+    // v10.42 — SUMAR el stock del código SECUNDARIO dentro del PRINCIPAL (misma pieza, código viejo),
+    // así un principal con stock en su secundario NO aparece como faltante/vacío. Mismo criterio que
+    // el generador de OC (que ya los cuenta juntos). Ej.: 945E (góndola 2) + 332 (40) = 42 → sin faltante.
+    var secExtra = {};
+    famRows.forEach(function (r) {
+      if (!r.es_secundario) return;
+      var p = _ocgNorm(r.familia_principal); if (!p) return;
+      secExtra[p] = (secExtra[p] || 0) + (Number(r.stock_total) || 0);
+    });
+    Object.keys(saldoMap).forEach(function (k) {
+      var add = secExtra[_ocgNorm(k)] || 0;
+      if (add > 0) { saldoMap[k].total += add; saldoMap[k].totalGross += add; saldoMap[k].secAdd = add; }
     });
 
     // DEMANDA: 1 fila por (código, NP)
@@ -28185,7 +28200,6 @@ if (window.__pendingMonitorParam && (_keyValid || _kioskEnrolled)) {
         } catch (_e) { try { location.reload(); } catch (_e2) {} }
       }, 60 * 1000);
     }
-  });
 }
 
 /* Muestra el panel Administración en modo kiosko (TV, sin login). Replica el
