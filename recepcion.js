@@ -2033,7 +2033,34 @@ async function renderBajadasRacks() {
   const rows = res.data || [];
   _racksFactors = {};
   ((fres && fres.data) || []).forEach(function (x) { const k = String(x.Cod_Art || "").toUpperCase(); if (k && !_racksFactors[k]) _racksFactors[k] = { cajasXMaster: Number(x.Cajas_x_Master) || 0, uniXCaja: Number(x.Uni_x_Caja) || 0 }; });
-  if (!rows.length) { opBody.innerHTML = '<div class="opOk">✓ No hay bajadas pendientes de aprobar.</div>'; return; }
+  if (!rows.length) {
+    opBody.innerHTML = '<div class="opOk">✓ No hay bajadas pendientes de aprobar.</div>';
+    // Mostrar histórico de aprobadas recientes (últimas 2h) para confirmar que se procesaron
+    try {
+      const twoHoursAgo = new Date(Date.now() - 2*60*60*1000).toISOString();
+      const approved = await supabase.from("Racks_Bajadas").select("id,cod_art,cajas,aprobada_at,creada_por").eq("estado", "aprobada").gt("aprobada_at", twoHoursAgo).order("aprobada_at", { ascending: false }).limit(20);
+      if (approved.data && approved.data.length) {
+        const hist = document.createElement("div");
+        hist.style.cssText = "margin-top:20px;padding-top:15px;border-top:1px solid #e2e8f0;";
+        const title = document.createElement("div");
+        title.style.cssText = "font-size:13px;color:#64748b;font-weight:700;margin-bottom:8px;";
+        title.textContent = "Aprobadas en las últimas 2h:";
+        hist.appendChild(title);
+        const list = document.createElement("div");
+        list.style.cssText = "font-size:12px;color:#475569;line-height:1.6;";
+        approved.data.forEach(function (a) {
+          const row = document.createElement("div");
+          row.style.cssText = "padding:4px 0;";
+          const at = a.aprobada_at ? new Date(a.aprobada_at).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", hour: "2-digit", minute: "2-digit", hour12: false }) : "—";
+          row.textContent = a.cod_art + " · " + a.cajas + " cajas · " + at;
+          list.appendChild(row);
+        });
+        hist.appendChild(list);
+        opBody.appendChild(hist);
+      }
+    } catch (_e) {}
+    return;
+  }
   opBody.innerHTML = "";
   const list = document.createElement("div"); list.className = "pendCards";
   rows.forEach(function (b) { list.appendChild(racksBajaCard(b)); });
