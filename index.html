@@ -6502,7 +6502,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v10.52";
+const APP_VERSION = "v10.53";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -31006,22 +31006,14 @@ function facCambioCod(np){
   const npN = String(np).trim().replace(/\.0+$/, "");
   const list = _facSecByNp.get(npN);
   if (!list || !list.length) return "";
-  // v10.51 — separar URGENTES (secundario sin stock) de los que el secundario CUBRE.
-  const urg = [], ok = [];
-  list.forEach(function(x){ (_facCorrSecStk(x.sec) <= 0 ? urg : ok).push(x); });
-  let h = "";
-  if (urg.length){
-    h += urg.map(function(x){
-      return '<span title="Secundario ' + escapeHtml(x.sec) + ' SIN stock → cambiá la NP en el ERP a ' + escapeHtml(x.ppal) + ' (el picking levanta el principal al confirmar)." style="color:#b91c1c;font-weight:800;">' + escapeHtml(x.sec) + ' → <b>' + escapeHtml(x.ppal) + '</b>' + (x.cajas ? ' (' + x.cajas + ')' : '') + '</span>';
-    }).join("<br>");
-    // El botón confirma SOLO los urgentes (los que alcanzan no se tocan).
-    h += '<br><button onclick="event.stopPropagation();facCambioCodConfirm(\'' + encodeURIComponent(npN) + '\')" style="width:auto;margin-top:4px;background:#16a34a;color:#fff;border:none;border-radius:7px;padding:3px 9px;font-size:11px;font-weight:800;cursor:pointer;">✓ Ya lo cambié</button>';
-  }
-  if (ok.length){
-    h += (urg.length ? '<br>' : '') + ok.map(function(x){
-      return '<span title="Secundario ' + escapeHtml(x.sec) + ' tiene stock — se manda tal cual, no hace falta tocar la NP." style="color:#166534;font-size:11px;">✔ ' + escapeHtml(x.sec) + ' (' + (x.cajas||0) + ') alcanza</span>';
-    }).join("<br>");
-  }
+  // v10.53 — SOLO urgentes (secundario sin stock → cambiar SÍ o SÍ). Los que el secundario cubre
+  // se mandan tal cual y NO se muestran acá (pedido del usuario: si no hace falta cambiar, no va).
+  const urg = list.filter(function(x){ return _facCorrSecStk(x.sec) <= 0; });
+  if (!urg.length) return "";
+  let h = urg.map(function(x){
+    return '<span title="Secundario ' + escapeHtml(x.sec) + ' SIN stock → cambiá la NP en el ERP a ' + escapeHtml(x.ppal) + ' (el picking levanta el principal al confirmar)." style="color:#b91c1c;font-weight:800;">' + escapeHtml(x.sec) + ' → <b>' + escapeHtml(x.ppal) + '</b>' + (x.cajas ? ' (' + x.cajas + ')' : '') + '</span>';
+  }).join("<br>");
+  h += '<br><button onclick="event.stopPropagation();facCambioCodConfirm(\'' + encodeURIComponent(npN) + '\')" style="width:auto;margin-top:4px;background:#16a34a;color:#fff;border:none;border-radius:7px;padding:3px 9px;font-size:11px;font-weight:800;cursor:pointer;">✓ Ya lo cambié</button>';
   return h;
 }
 /* v8.03 — confirma inline (desde la columna Cambiar cód) todos los cambios de esa NP. */
