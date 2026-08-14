@@ -6502,7 +6502,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v10.53";
+const APP_VERSION = "v10.54";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -30961,6 +30961,13 @@ async function facFetchFaltantes(){
   return _facFalt;
 }
 function facFaltInfo(np){ return _facFalt.get(String(np).trim().replace(/\.0+$/, "")) || null; }
+/* v10.54 — ¿este artículo faltante se puede COMPLETAR ahora? Hay stock para agregar a la NP:
+   en 'a guardar', en RACKS (se baja de racks), o se guardó hoy. Antes solo miraba 'a guardar'
+   → un artículo con stock SOLO en racks (ej. 583E = 200 en racks) no se marcaba como completable. */
+function _facItemCompletable(cod){
+  const kn = _cpNorm(cod); const s = _facSaldosN[kn] || {};
+  return (Number(s.a_guardar) || 0) > 0 || (Number(s.racks) || 0) > 0 || _facGuardadoHoy.has(kn);
+}
 function facFaltBadge(np){
   const f = facFaltInfo(np);
   if (!f || !f.cajas) return "";
@@ -30983,8 +30990,7 @@ function facFaltDist(np){
   // v10.52 — SUBRAYAR (azul) solo los artículos que se están COMPLETANDO (tienen stock en
   // 'a guardar' o se guardaron hoy). El resto se factura corto — así se ve cuál falta completar.
   return f.items.map(function(it){
-    const kn = _cpNorm(it.cod); const s = _facSaldosN[kn] || {};
-    const comp = (Number(s.a_guardar) || 0) > 0 || _facGuardadoHoy.has(kn);
+    const comp = _facItemCompletable(it.cod);
     const txt = escapeHtml(it.cod) + "×" + it.falto;
     return comp
       ? '<span style="text-decoration:underline;text-decoration-color:#1e40af;text-decoration-thickness:2px;text-underline-offset:2px;font-weight:800;" title="Se está completando (hay stock para agregar a esta NP).">' + txt + '</span>'
@@ -31316,8 +31322,7 @@ function facTareaBadge(np){
   if (f.items && f.items.length) {
     cjCompletando = 0;
     f.items.forEach(function (it) {
-      const kn = _cpNorm(it.cod); const s = _facSaldosN[kn] || {};
-      if ((Number(s.a_guardar) || 0) > 0 || _facGuardadoHoy.has(kn)) cjCompletando += (Number(it.falto) || 0);
+      if (_facItemCompletable(it.cod)) cjCompletando += (Number(it.falto) || 0);
     });
     if (cjCompletando <= 0) return "";   // nada completable → no se muestra el aviso
   }
@@ -31529,12 +31534,13 @@ function _facEsOperadora(){
   } catch (_e){ return false; }
 }
 /* ¿Algún artículo faltante de la NP se puede COMPLETAR? = hay stock en "a guardar",
-   en góndola (terminado) o se guardó hoy. Devuelve la lista de items recuperables. */
+   en góndola (terminado), en RACKS (se baja) o se guardó hoy. Devuelve los items recuperables.
+   v10.54 — racks agregado (583E y cía. tienen stock solo en racks). */
 function _facFaltRecuperables(falt){
   if (!falt || !falt.items) return [];
   return falt.items.filter(function(it){
     const kn = _cpNorm(it.cod); const s = _facSaldosN[kn] || {};
-    return (Number(s.a_guardar) || 0) > 0 || (Number(s.terminado) || 0) > 0 || _facGuardadoHoy.has(kn);
+    return (Number(s.a_guardar) || 0) > 0 || (Number(s.terminado) || 0) > 0 || (Number(s.racks) || 0) > 0 || _facGuardadoHoy.has(kn);
   });
 }
 /* Emite el evento FCO (operadora facturó corto pese a stock recuperable) → Telegram
