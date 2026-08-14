@@ -6502,7 +6502,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v10.50";
+const APP_VERSION = "v10.51";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -30986,20 +30986,41 @@ function facFaltDist(np){
    (de vista_pedidos_secundarios, sin los ya confirmados). Se arma en facTick a
    _facSecByNp. Muestra "secundario → principal". */
 let _facSecByNp = new Map();
+/* v10.51 — stock FÍSICO del código secundario (desde _facSaldosN, por depósito). Sirve para
+   saber si el cambio es URGENTE (secundario en 0 → cambiar SÍ o SÍ) o si el secundario cubre
+   el pedido (se manda tal cual, sin tocar la NP). */
+function _facCorrSecStk(cod){
+  const s = _facSaldosN[_cpNorm(cod)] || {};
+  return (Number(s.terminado)||0)+(Number(s.excedente)||0)+(Number(s.separar_pedidos)||0)+(Number(s.a_facturar)||0)+(Number(s.a_guardar)||0)+(Number(s.racks)||0);
+}
 function facCambioCod(np){
   const npN = String(np).trim().replace(/\.0+$/, "");
   const list = _facSecByNp.get(npN);
   if (!list || !list.length) return "";
-  const txt = list.map(function(x){
-    return '<span title="Pedido en secundario ' + escapeHtml(x.sec) + '. Cambiá la NP en el ERP a ' + escapeHtml(x.ppal) + ' — el picking levanta el principal al confirmar.">' + escapeHtml(x.sec) + ' → <b>' + escapeHtml(x.ppal) + '</b>' + (x.cajas ? ' <span style="color:#64748b;">(' + x.cajas + ')</span>' : '') + '</span>';
-  }).join("<br>");
-  // v8.03 — confirmar inline (sin abrir el panel): marca los cambios de esta NP como hechos.
-  return txt + '<br><button onclick="event.stopPropagation();facCambioCodConfirm(\'' + encodeURIComponent(npN) + '\')" style="width:auto;margin-top:4px;background:#16a34a;color:#fff;border:none;border-radius:7px;padding:3px 9px;font-size:11px;font-weight:800;cursor:pointer;">✓ Ya lo cambié</button>';
+  // v10.51 — separar URGENTES (secundario sin stock) de los que el secundario CUBRE.
+  const urg = [], ok = [];
+  list.forEach(function(x){ (_facCorrSecStk(x.sec) <= 0 ? urg : ok).push(x); });
+  let h = "";
+  if (urg.length){
+    h += urg.map(function(x){
+      return '<span title="Secundario ' + escapeHtml(x.sec) + ' SIN stock → cambiá la NP en el ERP a ' + escapeHtml(x.ppal) + ' (el picking levanta el principal al confirmar)." style="color:#b91c1c;font-weight:800;">' + escapeHtml(x.sec) + ' → <b>' + escapeHtml(x.ppal) + '</b>' + (x.cajas ? ' (' + x.cajas + ')' : '') + '</span>';
+    }).join("<br>");
+    // El botón confirma SOLO los urgentes (los que alcanzan no se tocan).
+    h += '<br><button onclick="event.stopPropagation();facCambioCodConfirm(\'' + encodeURIComponent(npN) + '\')" style="width:auto;margin-top:4px;background:#16a34a;color:#fff;border:none;border-radius:7px;padding:3px 9px;font-size:11px;font-weight:800;cursor:pointer;">✓ Ya lo cambié</button>';
+  }
+  if (ok.length){
+    h += (urg.length ? '<br>' : '') + ok.map(function(x){
+      return '<span title="Secundario ' + escapeHtml(x.sec) + ' tiene stock — se manda tal cual, no hace falta tocar la NP." style="color:#166534;font-size:11px;">✔ ' + escapeHtml(x.sec) + ' (' + (x.cajas||0) + ') alcanza</span>';
+    }).join("<br>");
+  }
+  return h;
 }
 /* v8.03 — confirma inline (desde la columna Cambiar cód) todos los cambios de esa NP. */
 async function facCambioCodConfirm(npE){
   const np = decodeURIComponent(npE);
-  const list = (_facSecByNp.get(np) || []).slice();
+  // v10.51 — confirmar SOLO los urgentes (secundario en 0). Los que el secundario cubre se
+  // mandan tal cual, no se convierten al principal.
+  const list = (_facSecByNp.get(np) || []).filter(function(x){ return _facCorrSecStk(x.sec) <= 0; });
   if (!list.length) return;
   if (!confirm("Confirmás que ya cambiaste en el ERP:\n\n" + list.map(function(x){ return "NP " + np + ": " + x.sec + " → " + x.ppal + " (" + x.cajas + " cajas)"; }).join("\n") + "\n\nEl picking va a levantar el principal.")) return;
   try {
@@ -31896,7 +31917,10 @@ async function facTick(){
       const _sec = _facPar[10] || [];
       _sec.forEach(function(p){ const k = String(p.np).trim().replace(/\.0+$/, ""); if (!_facSecByNp.has(k)) _facSecByNp.set(k, []); _facSecByNp.get(k).push({ sec: p.sec, ppal: p.ppal, cajas: p.cajas }); });
       const chip = document.getElementById("facChipCorr"), nEl = document.getElementById("facCntCorr");
-      if (nEl) nEl.textContent = _sec.length;
+      // v10.51 — el número del chip cuenta SOLO los urgentes (secundario en 0). El chip sigue
+      // visible si hay cualquier corrección (los no-urgentes se ven con "Ver todos" en el modal).
+      const _urgN = _sec.filter(function(x){ return _facCorrSecStk(x.sec) <= 0; }).length;
+      if (nEl) nEl.textContent = _urgN;
       if (chip) chip.style.display = _sec.length ? "" : "none";
     } catch(_e){ _facSecByNp = new Map(); }
 
