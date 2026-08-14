@@ -6502,7 +6502,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v10.55";
+const APP_VERSION = "v10.56";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -20152,6 +20152,18 @@ function cpRender() {
   let h = '';
   if (_cp.justDone) h += '<div class="cp-done">' + escapeHtml(_cp.justDone) + '</div>';
   h += '<div class="cp-hint">Pedidos con un <b>faltante</b> que todavía no salió ni se facturó y que <b>tienen stock para completarse</b> (góndola / a guardar / excedente / racks). Tocá la NP → cargá lo que pusiste → va al lío y queda <b>a facturar</b>.</div>';
+  // v10.56 — resumen ARRIBA de todo: cuántas cajas hay que levantar de góndola en TOTAL (y por
+  // código), para juntarlas de una antes de ir completando pedido por pedido. Pedido del usuario.
+  if (_cp.falt && _cp.falt.length) {
+    var _cpByCod = {}, _cpTot = 0;
+    _cp.falt.forEach(function (e) { var c = String(e.cod_art || "?"); var q = Math.round(Number(e.cajas_falto) || 0); _cpByCod[c] = (_cpByCod[c] || 0) + q; _cpTot += q; });
+    var _cpDet = Object.keys(_cpByCod).sort().map(function (c) { return '<span style="white-space:nowrap;"><b>' + escapeHtml(c) + '</b> ' + _cpByCod[c] + '</span>'; }).join(' · ');
+    h += '<div style="background:#eff6ff;border:1.5px solid #93c5fd;border-radius:12px;padding:11px 13px;margin-bottom:11px;">' +
+      '<div style="font-size:15px;font-weight:900;color:#1e3a8a;">📥 Levantá de góndola <span style="font-size:20px;">' + _cpTot + '</span> cajas en total</div>' +
+      '<div style="font-size:13px;color:#1e40af;margin-top:5px;line-height:1.6;">' + _cpDet + '</div>' +
+      '<div style="font-size:11px;color:#64748b;margin-top:4px;">Para completar los ' + _cp.falt.length + ' pedido(s) de abajo. Juntá todo y después andá tildando uno por uno.</div>' +
+      '</div>';
+  }
   if (_cp.pickPend && _cp.pickPend.length) {
     h += '<div class="cp-pend">⏳ <b>' + _cp.pickPend.length + '</b> tanda(s) pickeadas SIN armar todavía — sus faltantes van a aparecer acá cuando se <b>termine el armado</b>: ' +
       _cp.pickPend.map(function (p) { return '<b>' + escapeHtml(p.tanda) + '</b>'; }).join(", ") + '</div>';
