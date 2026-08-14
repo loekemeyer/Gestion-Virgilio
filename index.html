@@ -10112,7 +10112,7 @@ async function openStockAdmin(soloConteo) {
     });
     var _insFromView_Rápido = (saldosRapido || []).filter(function (r) { return r.es_insumo; }).map(function (r) { return String(r.cod).trim().toUpperCase(); });
 
-    _stk = { movs: [], cutoff: {}, factors: {}, ordenes: [], bajadas: [], tab: _solo ? "conteo" : "stocks", soloConteo: _solo, filtro: "", openArt: null, ingMode: "remito", asOf: null, asOfInput: "", dem: _demFromView_Rápido, cap: _capRápido, gConf: [], fcs: _fcsRápido, fcsLoaded: false, insumosCods: _insFromView_Rápido, cxm: {}, proy: _proyMap_Rápido, viewRows: saldosRapido, alertas: [], discSet: {}, ocultarDisc: false };
+    _stk = { movs: [], cutoff: {}, factors: {}, ordenes: [], bajadas: [], tab: _solo ? "conteo" : "stocks", soloConteo: _solo, filtro: "", openArt: null, ingMode: "remito", asOf: null, asOfInput: "", dem: _demFromView_Rápido, cap: _capRápido, gConf: [], fcs: _fcsRápido, fcsLoaded: false, insumosCods: _insFromView_Rápido, cxm: {}, proy: _proyMap_Rápido, viewRows: saldosRapido, alertas: [], discSet: {}, ocultarDisc: false, conteosUI: { pendientes: [], historico: null } };
     stkRender();  // Renderizar instant con stocks_carga_rapida
     stkLoadDiscSet();   // v10.50 — set de discontinuados (para el chip "🚫 Ocultar discontinuos")
 
@@ -10124,7 +10124,8 @@ async function openStockAdmin(soloConteo) {
       Promise.resolve([]),
       ocLoadLineas().catch(function () { return {}; }),
       rkbFetchCxM().catch(function () { return { cxm: {} }; }),
-      supaFetchAllSafe(SUPABASE_CONTEO_ALERTAS_ENDPOINT, "select=id,sesion,legajo,cod,sector,cajas_conteo,cajas_sistema,diferencia,tipo_alerta,procesada&procesada=eq.false&order=created_at.desc").catch(function(){ return []; })]).then(function(res) {
+      supaFetchAllSafe(SUPABASE_CONTEO_ALERTAS_ENDPOINT, "select=id,sesion,legajo,cod,sector,cajas_conteo,cajas_sistema,diferencia,tipo_alerta,procesada&procesada=eq.false&order=created_at.desc").catch(function(){ return []; }),
+      supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Conteo_Stock", "select=*&estado=eq.pendiente&order=created_at.desc").catch(function(){ return []; })]).then(function(res) {
       if (!_stk) return;  // Si cerró el modal, no actualizar
       var _cxmPlani = (res[11] && res[11].cxm) || {}, _cxmMerge = {};
       Object.keys(_cxmPlani).forEach(function (k) { _cxmMerge[k] = _cxmPlani[k]; });
@@ -10178,6 +10179,7 @@ async function openStockAdmin(soloConteo) {
         }
       });
       _stk.alertas = res[13] || [];
+      _stk.conteosUI.pendientes = res[14] || [];
       _stk._mergeComplete = true;
       stkRender();  // Render suave (mantiene scroll/focus)
       stkSubscribeRealtime();
@@ -16090,6 +16092,109 @@ async function stkMarcarAlertaProcesada(idAlerta) {
     alert("Error: " + (e.message || e));
   }
 }
+
+/* v11.0: Conteos Realizados — sub-módulo en Ajustes */
+async function stkAceptarConteo(id) {
+  try {
+    const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" };
+    const res = await fetch(SUPABASE_URL + "/rest/v1/rpc/aceptar_conteo",
+      { method: "POST", headers: H, body: JSON.stringify({ p_conteo_id: id, p_admin_legajo: "admin" }) }).then(r => r.ok ? r.json() : null);
+    if (res && res.ok) {
+      alert("✓ Conteo aceptado");
+      if (_stk && _stk.conteosUI) {
+        _stk.conteosUI.pendientes = (_stk.conteosUI.pendientes || []).filter(c => c.id !== id);
+        stkRender();
+      }
+    } else if (res && res.error === "Unidades no coinciden") {
+      alert("❌ Unidades no coinciden.\nEsperado: " + res.esperado + "\nContaste en: " + res.contado_en + "\n\nRechaza el conteo o cambia la configuración del insumo.");
+    } else {
+      alert("Error: " + (res ? res.error : "desconocido"));
+    }
+  } catch (e) {
+    alert("Error al aceptar: " + e.message);
+  }
+}
+
+async function stkRechazarConteo(id) {
+  const razon = prompt("Motivo de rechazo (opcional):", "");
+  if (razon === null) return;
+  try {
+    const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" };
+    const res = await fetch(SUPABASE_URL + "/rest/v1/rpc/rechazar_conteo",
+      { method: "POST", headers: H, body: JSON.stringify({ p_conteo_id: id, p_admin_legajo: "admin", p_razon: razon || null }) }).then(r => r.ok ? r.json() : null);
+    if (res && res.ok) {
+      alert("✓ Conteo rechazado");
+      if (_stk && _stk.conteosUI) {
+        _stk.conteosUI.pendientes = (_stk.conteosUI.pendientes || []).filter(c => c.id !== id);
+        stkRender();
+      }
+    } else {
+      alert("Error: " + (res ? res.error : "desconocido"));
+    }
+  } catch (e) {
+    alert("Error al rechazar: " + e.message);
+  }
+}
+
+async function stkShowConteHistorico() {
+  try {
+    const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+    const res = await fetch(SUPABASE_URL + "/rest/v1/Conteo_Stock?order=created_at.desc&limit=100",
+      { headers: H, cache: "no-store" }).then(r => r.ok ? r.json() : []);
+    let html = '<div style="max-height:400px;overflow-y:auto;"><table style="width:100%;border-collapse:collapse;font-size:0.9em">' +
+      '<thead><tr style="background:#f0f0f0;"><th style="border:1px solid #ddd;padding:4px">Código</th>' +
+      '<th style="border:1px solid #ddd;padding:4px">Contado</th>' +
+      '<th style="border:1px solid #ddd;padding:4px">Estado</th>' +
+      '<th style="border:1px solid #ddd;padding:4px">Procesado por</th>' +
+      '<th style="border:1px solid #ddd;padding:4px">Fecha</th>' +
+      '<th style="border:1px solid #ddd;padding:4px">Nota</th></tr></thead><tbody>';
+    (res || []).forEach(row => {
+      const estado_col = row.estado === 'aceptado' ? '<span style="color:green">✓ Aceptado</span>' :
+                        (row.estado === 'rechazado' ? '<span style="color:red">✕ Rechazado</span>' : '<span style="color:orange">⏳ Pendiente</span>');
+      const cant = row.cantidad || row.cajas || "—";
+      const fecha = new Date(row.created_at).toLocaleDateString('es-AR');
+      html += '<tr><td style="border:1px solid #ddd;padding:4px">' + escapeHtml(row.cod) + '</td>' +
+        '<td style="border:1px solid #ddd;padding:4px;text-align:right">' + escapeHtml(String(cant)) + '</td>' +
+        '<td style="border:1px solid #ddd;padding:4px">' + estado_col + '</td>' +
+        '<td style="border:1px solid #ddd;padding:4px">' + escapeHtml(row.procesado_por || '—') + '</td>' +
+        '<td style="border:1px solid #ddd;padding:4px;font-size:0.85em">' + fecha + '</td>' +
+        '<td style="border:1px solid #ddd;padding:4px;font-size:0.85em">' + escapeHtml(row.razon_rechazo || '—') + '</td></tr>';
+    });
+    html += '</tbody></table></div>';
+    const popup = document.createElement('div');
+    popup.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border:2px solid #333;padding:16px;border-radius:8px;z-index:9999;max-width:90%;box-shadow:0 4px 12px rgba(0,0,0,0.3)';
+    popup.innerHTML = '<h3 style="margin-top:0">📋 Histórico de Conteos</h3>' + html +
+      '<div style="text-align:right;margin-top:12px"><button onclick="this.parentElement.parentElement.remove()" class="stk-btn ok" style="padding:6px 12px">Cerrar</button></div>';
+    document.body.appendChild(popup);
+  } catch (e) {
+    alert("Error al cargar histórico: " + e.message);
+  }
+}
+
+function stkBodyConteosRealizados() {
+  if (!_stk || !_stk.conteosUI) return '';
+  let h = '<div class="stk-aj-sec"><div class="stk-aj-h">📋 Conteos Realizados</div>';
+  h += '<div style="margin-bottom:8px"><button class="stk-btn" onclick="stkShowConteHistorico()">📋 Ver Histórico</button></div>';
+  if (!_stk.conteosUI.pendientes || !_stk.conteosUI.pendientes.length) {
+    h += '<div class="stk-empty">No hay conteos pendientes de procesar.</div>';
+  } else {
+    h += '<div class="stk-tblwrap"><table class="stk-tbl stk-tbl-fit"><thead><tr><th>Código</th><th>Depósito</th><th class="num">Contado</th><th>Unidad</th><th></th></tr></thead><tbody>';
+    (_stk.conteosUI.pendientes || []).forEach(row => {
+      const contado = row.deposito === 'insumos' ? row.cantidad : row.cajas;
+      const uni = row.deposito === 'insumos' ? row.unidad : '—';
+      const safeId = (row.id + '').replace(/'/g, "\\'");
+      h += '<tr><td><b>' + escapeHtml(row.cod) + '</b></td>' +
+        '<td>' + (row.deposito === 'insumos' ? '📋 Insumos' : '📦 Mercadería') + '</td>' +
+        '<td class="num">' + escapeHtml(String(contado)) + '</td>' +
+        '<td style="font-size:0.9em;color:#666">' + escapeHtml(uni || '—') + '</td>' +
+        '<td><button class="stk-btn" style="padding:4px 9px;color:#1e40af;border:1px solid #1e40af" onclick="stkAceptarConteo(\'' + safeId + '\')">✓ Aceptar</button> <button class="stk-btn" style="padding:4px 9px;color:#dc2626;border:1px solid #dc2626" onclick="stkRechazarConteo(\'' + safeId + '\')">✕ Rechazar</button></td></tr>';
+    });
+    h += '</tbody></table></div>';
+  }
+  h += '</div>';
+  return h;
+}
+
 function stkBodyConteo() {
   if (!_stk.conteo) _stk.conteo = { rows: [{ sector: "", cod: "", pilas: "", cxp: "", sueltas: "" }], legajo: "", showComp: false };
   const c = _stk.conteo;
@@ -17202,6 +17307,7 @@ function stkBodyAlertas() {
 }
 function stkBodyAjustes() {
   let h = stkBodyAlertas();  // v10.27: mostrar alertas arriba
+  h += stkBodyConteosRealizados();  // v11.0: Conteos Realizados
   h += '<div class="stk-aj-dep">Depósito: <select id="stkAjDep" onchange="stkIniHintUpdate()"><option value="terminado">Artículo Terminado (góndola)</option><option value="excedente">Excedente</option><option value="racks">Racks</option><option value="racks_ch">Racks CH</option><option value="insumos">Insumos</option><option value="separar_pedidos">A Separar (pedidos)</option><option value="a_facturar">A Facturar</option><option value="a_guardar">Mercadería a guardar</option><option value="para_envasar">Para envasar</option></select></div>';
   h += '<div class="stk-aj-sec"><div class="stk-aj-h">⚙ Ajustar stock</div>';
   h += '<div class="stk-aj-hint">Sumá o restá con signo: <code>+10</code> / <code>-3</code>.</div><div class="stk-aj-form"><input id="stkAjCod" class="stk-aj-inp" style="flex:0 0 auto;width:150px" placeholder="Código"><input id="stkAjCant" class="stk-aj-inp" style="flex:0 0 auto;width:110px" type="number" placeholder="+/- cajas"><button class="stk-btn ok" onclick="stockAjustar()">Aplicar</button></div>';
