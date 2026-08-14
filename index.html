@@ -6503,7 +6503,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v11.01";
+const APP_VERSION = "v11.02";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -20407,8 +20407,28 @@ async function cpCerrarTareaSiCompleta(np) {
 }
 async function cpConfirm() {
   if (!_cp || !_cp.sel) return;
-  const s = _cp.sel, qty = _cp.qty, origen = _cp.origen, leg = _cp.legajo, lioSel = _cp.lioSel, info = _cp._liosInfo || { resumen: "", tanda: s.tanda || "" };
+  const s = _cp.sel; let qty = _cp.qty; const origen = _cp.origen, leg = _cp.legajo, lioSel = _cp.lioSel, info = _cp._liosInfo || { resumen: "", tanda: s.tanda || "" };
   if (qty <= 0) return;
+  // v11.02 — BAJAR EL FALTANTE PRIMERO Y CON TOPE (RPC atómica cp_reducir_faltante_cap): devuelve
+  // cuánto se pudo aplicar (nunca más de lo que falta). El stock se mueve SOLO por lo aplicado, así
+  // un doble-tap NO descuenta de más (el 2do intento aplica 0). Antes: stock durable + baja del
+  // faltante sin reintento → si la baja fallaba, el operario re-completaba y descontaba doble (NP 44551).
+  // Sin red / fila inexistente: seguimos con qty para no bloquear el trabajo offline.
+  if (!esOperadorPrueba()) {
+    var _applied = null;
+    try {
+      var _rr = await fetch(SUPABASE_URL + "/rest/v1/rpc/cp_reducir_faltante_cap", { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" }, body: JSON.stringify({ p_id: Number(s.id), p_qty: Number(qty) }) });
+      if (_rr.ok) { _applied = Number(await _rr.text()); }
+    } catch (_e) { _applied = null; }
+    if (_applied === 0) {   // ya estaba completo → NO mover stock, avisar y refrescar la lista
+      try { alert("Ese faltante de " + s.cod_art + " (NP " + s.np + ") ya está completo. No se descontó de nuevo."); } catch (_e2) {}
+      _cp.sel = null; _cp.step = 1; _cp.liosLoading = false; _cp._liosInfo = null;
+      try { _cp.falt = await cpReloadFaltantes(); } catch (_e3) {}
+      if (_cp) cpRender();
+      return;
+    }
+    if (_applied != null && _applied > 0 && _applied < qty) qty = _applied;   // topeado a lo que faltaba
+  }
   const dep = origen === "terminado" ? "terminado" : "a_guardar";
   const rows = [
     { cod_art: s.cod_art, descripcion: s.desc || null, deposito: dep, delta: -qty, tipo: "cp", ref: String(s.np), legajo: leg || null },
@@ -20437,9 +20457,8 @@ async function cpConfirm() {
   } catch (_e) {}
   cpUpdateLio(leg, s, qty, lioSel, info);
   try { updatePendingIndicator(); } catch (_e) {}
-  // Bajar el faltante (RPC) y REFRESCAR la lista para que el completado DESAPAREZCA a la
-  // vista (y se puedan completar varios seguidos sin cerrar el modal).
-  await cpReduceFaltante(s, qty);
+  // v11.02 — el faltante YA se bajó arriba (con tope, ANTES de mover stock). Acá solo cerramos tareas
+  // y refrescamos la lista para que el completado desaparezca (y se puedan completar varios seguidos).
   try { faltMaybeCompletar(String(s.np)); } catch (_e) {}   // v5.71: si era una tarea asignada y ya no falta nada, la cierra
   try { await cpCerrarTareaSiCompleta(String(s.np)); } catch (_e) {}   // v6.19: cierra la tarea aunque NO se haya tomado por pop-up
   try { opDraftClear(leg); } catch (_e) {}
