@@ -6502,7 +6502,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v10.51";
+const APP_VERSION = "v10.52";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -30980,7 +30980,16 @@ function facFaltDist(np){
   if (!f || !f.cajas) return "";
   // v7.92: solo la distribución cod×faltó. La sugerencia de cambio de código
   // (secundario→principal) se movió a su propia columna "Cambiar cód".
-  return f.items.map(function(it){ return escapeHtml(it.cod) + "×" + it.falto; }).join(", ");
+  // v10.52 — SUBRAYAR (azul) solo los artículos que se están COMPLETANDO (tienen stock en
+  // 'a guardar' o se guardaron hoy). El resto se factura corto — así se ve cuál falta completar.
+  return f.items.map(function(it){
+    const kn = _cpNorm(it.cod); const s = _facSaldosN[kn] || {};
+    const comp = (Number(s.a_guardar) || 0) > 0 || _facGuardadoHoy.has(kn);
+    const txt = escapeHtml(it.cod) + "×" + it.falto;
+    return comp
+      ? '<span style="text-decoration:underline;text-decoration-color:#1e40af;text-decoration-thickness:2px;text-underline-offset:2px;font-weight:800;" title="Se está completando (hay stock para agregar a esta NP).">' + txt + '</span>'
+      : txt;
+  }).join(", ");
 }
 /* v7.92 — Columna "Cambiar cód": pedidos de la NP cargados en código SECUNDARIO
    (de vista_pedidos_secundarios, sin los ya confirmados). Se arma en facTick a
@@ -31308,11 +31317,19 @@ function facTareaBadge(np){
   if (!f || !(Number(f.cajas) > 0)) return "";
   // v6.18: el aviso solo si algún artículo faltante de la NP está EN "a guardar" (a_guardar>0) O
   // se guardó HOY — que es lo que aparece en el CP para completar. Si no, no se muestra (se factura corto).
+  // v10.52 — el número cuenta SOLO las cajas de los artículos que se están completando (con stock
+  // para completar), no TODO el faltante de la NP. Ej.: si de "763×1, 922×2, 911×2" solo el 922 se
+  // completa, dice "faltan 2 cj", no 5.
+  let cjCompletando = Number(f.cajas) || 0;
   if (f.items && f.items.length) {
-    const hayStock = f.items.some(function (it) { const kn = _cpNorm(it.cod); const s = _facSaldosN[kn] || {}; return (Number(s.a_guardar) || 0) > 0 || _facGuardadoHoy.has(kn); });
-    if (!hayStock) return "";
+    cjCompletando = 0;
+    f.items.forEach(function (it) {
+      const kn = _cpNorm(it.cod); const s = _facSaldosN[kn] || {};
+      if ((Number(s.a_guardar) || 0) > 0 || _facGuardadoHoy.has(kn)) cjCompletando += (Number(it.falto) || 0);
+    });
+    if (cjCompletando <= 0) return "";   // nada completable → no se muestra el aviso
   }
-  const est = 'faltan ' + f.cajas + ' cj';
+  const est = 'faltan ' + cjCompletando + ' cj';
   const quien = (t.estado === 'asignado') ? (' · lo hace ' + escapeHtml(t.asignado_nombre || ('leg ' + (t.asignado_legajo || '?')))) : ' · sin asignar aún';
   return '<div class="fac-progreso-badge" title="Están agregando cajas a esta NP (faltante que llegó). Esperá a que terminen antes de facturar.">⏳ Completando · ' + escapeHtml(est) + quien + '</div>';
 }
