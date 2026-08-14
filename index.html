@@ -16154,7 +16154,7 @@ async function stkShowConteHistorico() {
       const cant = row.cantidad || row.cajas || "—";
       const fecha = new Date(row.created_at).toLocaleDateString('es-AR');
       html += '<tr><td style="border:1px solid #ddd;padding:4px">' + escapeHtml(row.cod) + '</td>' +
-        '<td style="border:1px solid #ddd;padding:4px;text-align:right">' + cant + '</td>' +
+        '<td style="border:1px solid #ddd;padding:4px;text-align:right">' + escapeHtml(String(cant)) + '</td>' +
         '<td style="border:1px solid #ddd;padding:4px">' + estado_col + '</td>' +
         '<td style="border:1px solid #ddd;padding:4px">' + escapeHtml(row.procesado_por || '—') + '</td>' +
         '<td style="border:1px solid #ddd;padding:4px;font-size:0.85em">' + fecha + '</td>' +
@@ -16182,11 +16182,12 @@ function stkBodyConteosRealizados() {
     (_stk.conteosUI.pendientes || []).forEach(row => {
       const contado = row.deposito === 'insumos' ? row.cantidad : row.cajas;
       const uni = row.deposito === 'insumos' ? row.unidad : '—';
+      const safeId = (row.id + '').replace(/'/g, "\\'");
       h += '<tr><td><b>' + escapeHtml(row.cod) + '</b></td>' +
         '<td>' + (row.deposito === 'insumos' ? '📋 Insumos' : '📦 Mercadería') + '</td>' +
-        '<td class="num">' + contado + '</td>' +
+        '<td class="num">' + escapeHtml(String(contado)) + '</td>' +
         '<td style="font-size:0.9em;color:#666">' + escapeHtml(uni || '—') + '</td>' +
-        '<td><button class="stk-btn" style="padding:4px 9px;color:#1e40af;border:1px solid #1e40af" onclick="stkAceptarConteo(' + row.id + ')">✓ Aceptar</button> <button class="stk-btn" style="padding:4px 9px;color:#dc2626;border:1px solid #dc2626" onclick="stkRechazarConteo(' + row.id + ')">✕ Rechazar</button></td></tr>';
+        '<td><button class="stk-btn" style="padding:4px 9px;color:#1e40af;border:1px solid #1e40af" onclick="stkAceptarConteo(\'' + safeId + '\')">✓ Aceptar</button> <button class="stk-btn" style="padding:4px 9px;color:#dc2626;border:1px solid #dc2626" onclick="stkRechazarConteo(\'' + safeId + '\')">✕ Rechazar</button></td></tr>';
     });
     h += '</tbody></table></div>';
   }
