@@ -6502,7 +6502,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v10.54";
+const APP_VERSION = "v10.55";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -31012,12 +31012,15 @@ function facCambioCod(np){
   const npN = String(np).trim().replace(/\.0+$/, "");
   const list = _facSecByNp.get(npN);
   if (!list || !list.length) return "";
-  // v10.53 — SOLO urgentes (secundario sin stock → cambiar SÍ o SÍ). Los que el secundario cubre
-  // se mandan tal cual y NO se muestran acá (pedido del usuario: si no hace falta cambiar, no va).
-  const urg = list.filter(function(x){ return _facCorrSecStk(x.sec) <= 0; });
+  // v10.55 — SOLO mostrar el cambio de código si el secundario ES un FALTANTE de esta NP.
+  // Si el pedido en secundario se sirvió OK (no faltó), no hace falta tocar nada (pedido del usuario:
+  // "si es faltante ponelo, sino no"). Antes salía por cada línea en secundario aunque no faltara.
+  const _falt = facFaltInfo(npN);
+  const _faltCods = new Set((( _falt && _falt.items) || []).map(function(it){ return _cpNorm(it.cod); }));
+  const urg = list.filter(function(x){ return _faltCods.has(_cpNorm(x.sec)); });
   if (!urg.length) return "";
   let h = urg.map(function(x){
-    return '<span title="Secundario ' + escapeHtml(x.sec) + ' SIN stock → cambiá la NP en el ERP a ' + escapeHtml(x.ppal) + ' (el picking levanta el principal al confirmar)." style="color:#b91c1c;font-weight:800;">' + escapeHtml(x.sec) + ' → <b>' + escapeHtml(x.ppal) + '</b>' + (x.cajas ? ' (' + x.cajas + ')' : '') + '</span>';
+    return '<span title="Faltó ' + escapeHtml(x.sec) + ' (secundario). Cambiá la NP en el ERP a ' + escapeHtml(x.ppal) + ' para completarlo con el principal." style="color:#b91c1c;font-weight:800;">' + escapeHtml(x.sec) + ' → <b>' + escapeHtml(x.ppal) + '</b>' + (x.cajas ? ' (' + x.cajas + ')' : '') + '</span>';
   }).join("<br>");
   h += '<br><button onclick="event.stopPropagation();facCambioCodConfirm(\'' + encodeURIComponent(npN) + '\')" style="width:auto;margin-top:4px;background:#16a34a;color:#fff;border:none;border-radius:7px;padding:3px 9px;font-size:11px;font-weight:800;cursor:pointer;">✓ Ya lo cambié</button>';
   return h;
@@ -31025,9 +31028,10 @@ function facCambioCod(np){
 /* v8.03 — confirma inline (desde la columna Cambiar cód) todos los cambios de esa NP. */
 async function facCambioCodConfirm(npE){
   const np = decodeURIComponent(npE);
-  // v10.51 — confirmar SOLO los urgentes (secundario en 0). Los que el secundario cubre se
-  // mandan tal cual, no se convierten al principal.
-  const list = (_facSecByNp.get(np) || []).filter(function(x){ return _facCorrSecStk(x.sec) <= 0; });
+  // v10.55 — confirmar SOLO los que son faltante de esta NP (los mismos que se muestran).
+  const _falt = facFaltInfo(np);
+  const _faltCods = new Set((( _falt && _falt.items) || []).map(function(it){ return _cpNorm(it.cod); }));
+  const list = (_facSecByNp.get(np) || []).filter(function(x){ return _faltCods.has(_cpNorm(x.sec)); });
   if (!list.length) return;
   if (!confirm("Confirmás que ya cambiaste en el ERP:\n\n" + list.map(function(x){ return "NP " + np + ": " + x.sec + " → " + x.ppal + " (" + x.cajas + " cajas)"; }).join("\n") + "\n\nEl picking va a levantar el principal.")) return;
   try {
