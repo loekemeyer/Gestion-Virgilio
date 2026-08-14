@@ -13033,7 +13033,8 @@ function stkBodyStocks() {
       // v7.54: racks suma racks + racks_ch para mostrar una sola columna "Racks"
       let _clk = "";
       const _hasHist = _histDeps.has(_stkNormCod(a.cod) + "|" + c.key) || (c.racksKey && _histDeps.has(_stkNormCod(a.cod) + "|racks_ch"));
-      if (v > 0.05 || v < -0.05 || _hasHist) {
+      // v10.31: Clickeable siempre (incluido saldo 0 sin movimientos) para ver histórico vacío si es necesario
+      if (true) {  // Antes: if (v > 0.05 || v < -0.05 || _hasHist)
         const _ce = encodeURIComponent(a.cod);
         if (c.key === "separar_pedidos") _clk = "stkOpenMovsArt('" + _ce + "','separar_pedidos','Pickeados','🛒')";   // v6.47: ver movimientos (como góndola)
         else if (c.key === "a_facturar") _clk = "stkOpenMovsArt('" + _ce + "','a_facturar','A facturar','🧾')";       // v6.47
