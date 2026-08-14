@@ -158,10 +158,11 @@ function _ppBuildSection(key, icon, title, rows, showTimer) {
     html += '<div class="pp-tblwrap"><table class="pp-tbl"><thead><tr>' +
       '<th>Fecha</th><th>Tipo</th><th>N° Remito</th><th>N° Factura</th><th>Razón Social</th><th>Contenido</th>';
     if (showTimer) html += '<th>Tiempo sin enviar</th>';
+    if (key === 'enviada') html += '<th>Confirmar recepción</th>';
     html += '<th>Enviado</th></tr></thead><tbody>';
 
     rows.forEach(function (row) {
-      html += _ppBuildRow(row, showTimer);
+      html += _ppBuildRow(row, showTimer, key === 'enviada');
     });
 
     html += '</tbody></table></div>';
@@ -174,7 +175,7 @@ function _ppBuildSection(key, icon, title, rows, showTimer) {
 /**
  * Genera el HTML de una fila
  */
-function _ppBuildRow(row, showTimer) {
+function _ppBuildRow(row, showTimer, showConfirm) {
   var tipoLabel = row.tipo_documento === 'ambos' ? 'Rto + Fc'
     : row.tipo_documento === 'remito' ? 'Remito'
     : row.tipo_documento === 'factura' ? 'Factura'
@@ -219,6 +220,20 @@ function _ppBuildRow(row, showTimer) {
     html += '<td style="text-align:center;white-space:nowrap;">' +
       '<span class="pp-timer" data-ts="' + tsMs + '" style="font-variant-numeric:tabular-nums;font-size:13px;color:#dc2626;font-weight:600;">' +
       _ppFormatElapsed(Date.now() - tsMs) + '</span></td>';
+  }
+
+  // Columna "Confirmar recepción" solo para enviada
+  if (showConfirm) {
+    if (row.recibido_en) {
+      // Ya fue recibido: mostrar fecha
+      html += '<td style="text-align:center;font-size:13px;color:#16a34a;font-weight:600;">' +
+        'Recibido el ' + ppFormatDate(row.recibido_en) + '</td>';
+    } else {
+      // No recibido aún: mostrar botón
+      var btnHtml = '<button data-row-id="' + rowId + '" onclick="ppConfirmarRecepcion(this.getAttribute(' + "'" + 'data-row-id' + "'" + '))" ' +
+        'style="padding:6px 12px;border:none;border-radius:6px;background:#0d9488;color:#fff;font-weight:600;cursor:pointer;font-size:13px;">OK?</button>';
+      html += '<td style="text-align:center;">' + btnHtml + '</td>';
+    }
   }
 
   html += '<td style="text-align:center;">' + checkCell + '</td></tr>';
@@ -514,6 +529,113 @@ async function ppLoadBadge() {
   } catch (_e) {}
 }
 
+/**
+ * Determina si un proveedor es tallerista
+ * Por ahora, usa una lista hardcodeada. Puede extenderse con llamada a Supabase.
+ */
+function _ppEsTallerista(razonSocial) {
+  if (!razonSocial) return false;
+  var rs = razonSocial.toLowerCase().trim();
+  // Lista de talleristas conocidos (se puede expandir)
+  var talleristas = ['taller', 'cobertor', 'estampado', 'confeccion', 'costura', 'bordado', 'tejido'];
+  return talleristas.some(function (t) { return rs.indexOf(t) >= 0; });
+}
+
+/**
+ * Determina el número de carpeta (1, 2, o 3) basado en:
+ * - Carpeta 1: remitos y facturas de prov (art term + insumos) → tipo_documento === 'ambos'
+ * - Carpeta 2: remitos sin factura de prov (art term + insumos) → tipo_documento === 'remito'
+ * - Carpeta 3: remitos con/sin factura de talleristas
+ */
+function _ppGetFolderNumber(row) {
+  if (!row) return null;
+
+  // Si es tallerista → Carpeta 3
+  if (_ppEsTallerista(row.razon_social)) {
+    return 3;
+  }
+
+  // Si es proveedor regular:
+  // Ambos (remito + factura) → Carpeta 1
+  if (row.tipo_documento === 'ambos') {
+    return 1;
+  }
+  // Solo remito → Carpeta 2
+  if (row.tipo_documento === 'remito') {
+    return 2;
+  }
+  // Solo factura sin remito → Carpeta 2 (por defecto, ya que no tiene remito)
+  if (row.tipo_documento === 'factura') {
+    return 2;
+  }
+
+  return null;
+}
+
+/**
+ * Confirma la recepción de un documento
+ * Actualiza recibido_en con la fecha actual y muestra el número de carpeta
+ */
+async function ppConfirmarRecepcion(rowId) {
+  // Buscar el row en el estado
+  var row = _ppState.data.find(function (r) { return r.id === parseInt(rowId, 10); });
+  if (!row) {
+    alert('Error: Documento no encontrado');
+    return;
+  }
+
+  if (row.recibido_en) {
+    alert('Este documento ya fue confirmado como recibido el ' + ppFormatDate(row.recibido_en));
+    return;
+  }
+
+  // Determinar carpeta
+  var folder = _ppGetFolderNumber(row);
+  if (!folder) {
+    alert('Error: No se pudo determinar la carpeta para este documento');
+    return;
+  }
+
+  // Confirmar con usuario
+  var hoy = new Date().toLocaleDateString('es-AR', {
+    timeZone: 'America/Argentina/Buenos_Aires',
+    day: '2-digit', month: '2-digit', year: 'numeric'
+  });
+  var msg = 'Confirmar recepción para documentación enviada el ' + ppFormatDate(row.created_at) + '?\n\n' +
+    'Se marcará como:\n' +
+    '  Recibido el ' + hoy + '\n' +
+    '  Guardar en Carpeta ' + folder;
+
+  if (!confirm(msg)) return;
+
+  // Actualizar estado local
+  row.recibido_en = new Date().toISOString();
+
+  // Re-renderizar tabla
+  ppRenderList();
+
+  // Persistir en Supabase
+  try {
+    var res = await fetch(SUPABASE_URL + '/rest/v1/Pasaje_Papeles?id=eq.' + rowId, {
+      method: 'PATCH',
+      headers: _ppHeaders({ Prefer: 'return=minimal' }),
+      body: JSON.stringify({ recibido_en: row.recibido_en })
+    });
+    if (!res.ok) {
+      console.warn('ppConfirmarRecepcion HTTP', res.status);
+      alert('Aviso: Los datos locales se actualizaron, pero hubo un error al sincronizar con el servidor.');
+    } else {
+      alert('✓ Recepción confirmada.\nGuardar en Carpeta ' + folder);
+    }
+  } catch (e) {
+    console.warn('ppConfirmarRecepcion error:', e);
+    alert('Aviso: Los datos locales se actualizaron, pero hubo un error al sincronizar con el servidor.');
+    // Revertir si falla
+    row.recibido_en = null;
+    ppRenderList();
+  }
+}
+
 // Exportar globalmente
 window.openPasajePapeles = openPasajePapeles;
 window.closePasajePapeles = closePasajePapeles;
@@ -525,6 +647,7 @@ window.ppSaveDocument = ppSaveDocument;
 window.ppToggleEnviado = ppToggleEnviado;
 window.ppToggleSection = ppToggleSection;
 window.ppLoadBadge = ppLoadBadge;
+window.ppConfirmarRecepcion = ppConfirmarRecepcion;
 window._ppCapRenderStep1 = _ppCapRenderStep1;
 window._ppCapRenderStep2 = _ppCapRenderStep2;
 window._ppCapSave = _ppCapSave;
