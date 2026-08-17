@@ -1,5 +1,12 @@
 // arca-wsfe — Edge Function (Deno) para facturación electrónica propia contra ARCA (ex AFIP).
 //
+// ⚠ 2026-08-17 — ESTE ARCHIVO ESTÁ DESACTUALIZADO vs. lo DEPLOYADO (v23, verify_jwt=off).
+//   Producción tiene además las acciones `emitir_nc` y `emitir_nd` (notas de crédito/débito),
+//   agregadas desde el dashboard y NUNCA commiteadas acá. NO redeployar este archivo tal cual:
+//   regresaría esas acciones. Antes de tocar la función, traer la fuente real con
+//   get_edge_function / dashboard y reconciliar. El pricing de cobranzas (loke + Chef + súper)
+//   ya vive en las RPC de sql/cobranzas.sql; `preciar` sigue siendo el camino del neto exacto.
+//
 // v2 (2026-07-30): WSAA + WSFE **IMPLEMENTADOS** (firma CMS con node-forge, cache del TA en
 // la tabla ARCA_TA, FECompUltimoAutorizado y FECAESolicitar, log en Comprobantes_ARCA).
 // Sigue **GATEADA**: sin los secrets responde qué falta, y `emitir` exige ARCA_EMITIR=on.
@@ -14,8 +21,6 @@
 //             alic_id?, total?, np?, tanda?} → CAE. Solo con ARCA_EMITIR=on.
 //   preciar → {np, tanda?} → calcula el importe de una NP (ítems de Entregas_Virgilio ×
 //             precios del proyecto web, neto = list_price×(1−dto_vol)×(1−2%), IVA 21%).
-//             Precios de products ∪ loke_products (línea Loeke). NP de Chef (4xxxx) →
-//             {empresa:"ch", lista_no_disponible:true}, no se valoriza con lista LK.
 //             NO emite (no requiere ARCA_EMITIR). Sirve de preview. Necesita WEB_SERVICE_KEY.
 //   emitir_np → {np, tanda?, tipo_cbte?=1} → precia la NP y pide el CAE (Factura A por defecto,
 //             receptor Responsable Inscripto por CUIT). Requiere ARCA_EMITIR=on + WEB_SERVICE_KEY.
@@ -257,14 +262,6 @@ async function webRest(c: Cfg, path: string): Promise<unknown[]> {
 async function preciarNp(c: Cfg, np: string, tanda: string): Promise<any> {
   np = String(np || "").trim();
   if (!np) throw new Error("Falta el número de NP.");
-  // Empresa por numeración: 9xxxx = Loekemeyer, 4xxxx = Chef (numeraciones
-  // independientes). Chef no se factura por acá y su lista de precios NO vive
-  // en el proyecto web LK, así que se corta sin intentar valorizarla con LK
-  // (mismo código = otro artículo en cada empresa → daría un número errado).
-  if (/^4/.test(np.replace(/\D/g, ""))) {
-    return { np, tanda: tanda || null, empresa: "ch", lista_no_disponible: true,
-             nota: "NP de Chef: lista de precios no disponible en el proyecto web LK." };
-  }
   // 1) ítems ENTREGADOS de la NP (Virgilio, service role propio)
   let q = sbUrl("Entregas_Virgilio") + "?select=cod_cliente,cod_art,cajas_entregadas&np=eq." + encodeURIComponent(np) + "&cajas_entregadas=gt.0";
   if (tanda) q += "&tanda=eq." + encodeURIComponent(tanda);
@@ -286,16 +283,9 @@ async function preciarNp(c: Cfg, np: string, tanda: string): Promise<any> {
   // 3) precios (web): productos activos, match por código canónico (066↔66)
   // deno-lint-ignore no-explicit-any
   const prods: any[] = await webRest(c, "products?select=cod,list_price,uxb,active&active=eq.true&limit=2000");
-  // 3b) línea Loeke: los artículos Loeke NO están en `products`, viven en
-  // `loke_products` (sin columna `active`). Sin este fallback caían todos en
-  // `faltan` y la NP quedaba subvaluada.
-  // deno-lint-ignore no-explicit-any
-  const lokes: any[] = await webRest(c, "loke_products?select=cod,list_price,uxb&limit=2000");
   // deno-lint-ignore no-explicit-any
   const pmap: Record<string, any> = {};
   for (const p of prods) { const k = canonCod(p.cod); if (k && !(k in pmap)) pmap[k] = p; }
-  // products manda; loke_products solo rellena los códigos que faltan
-  for (const p of lokes) { const k = canonCod(p.cod); if (k && !(k in pmap)) pmap[k] = p; }
   // 4) calcular neto
   // deno-lint-ignore no-explicit-any
   const detalle: any[] = []; const faltan: string[] = []; let neto = 0;
