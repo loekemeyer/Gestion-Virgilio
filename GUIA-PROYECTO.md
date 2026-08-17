@@ -27,9 +27,15 @@
 > `discontinuado` (`Articulos_Discontinuados` ∪ `OC_Maximos.activo=false`) y `sin_precio`
 > (lo único realmente a cargar en LK). De las 17 líneas LK sin precio, solo **8 son
 > `sin_precio` real** (códigos 580 y 67); el resto son especiales/loke/discontinuados.
-> `cobranzas_resumen` expone `sin_precio_real` para no alarmar por lo esperado. Chef:
-> 38 NP sin valorizar (falta la lista). `precios_venta` se re-sincroniza a mano desde LK
-> (patrón de `plata_perdida.sql`); backup en `precios_venta_backup_20260817`.
+> `cobranzas_resumen` expone `sin_precio_real` para no alarmar por lo esperado.
+> **Alias de código** (`cobranzas_alias`): cuando el código activo en pedidos difiere del
+> que tiene precio por grafía (mismo artículo). NO se toca la "E" automáticamente porque
+> hay pares distintos (`323`≠`323E`). Confirmados: `580`→`580E` (activo 580). Con eso el
+> faltante real LK baja a **1 línea** (código 67). **Chef**: precios en tabla aparte
+> `precios_venta_chef` (código Chef ≠ LK); se cargan con `sql/cobranzas_chef_sync.sql`
+> (correr en el proyecto Chef, pegar el INSERT en Virgilio). Los precios efectivos salen
+> de la vista `cobranzas_precios` (LK+Chef+alias). `precios_venta` se re-sincroniza a mano
+> desde LK; backup en `precios_venta_backup_20260817`.
 >
 > Nota **v10.28 — La columna `Op` del Excel DEJÓ DE SER REQUISITO para mostrar tandas.**
 > Hasta acá, una tanda sin `Op=SI` **no aparecía** ni en el monitor de TV ni en las pantallas
