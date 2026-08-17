@@ -41,7 +41,11 @@
 > detalle). ⚠ La lista **especial de supers** (`precios_super` de LK) no está en Virgilio →
 > para clientes de súper el valor con lista LK normal **sobreestima**. Cobertura NP en curso:
 > **LK ~100%, Chef 98,8%**. `precios_venta` se re-sincroniza a mano desde LK; backup en
-> `precios_venta_backup_20260817`.
+> `precios_venta_backup_20260817`. **Front-end (v11.04)**: botón **💵 Cobranzas — valor por
+> NP** en el panel supervisor (overlay `#cobOverlay`, molde de Plata perdida) que llama a
+> `cobranzas_resumen` (tabla de NP con valor y cobertura, filtro por empresa + búsqueda) y a
+> `cobranzas_valorizar_np` al tocar una NP (detalle por artículo, origen LK/Chef, estimado
+> c/ IVA). Es solo VISTA: `valor_lista` sin dto; el neto exacto sigue en arca-wsfe/preciar.
 >
 > Nota **v10.28 — La columna `Op` del Excel DEJÓ DE SER REQUISITO para mostrar tandas.**
 > Hasta acá, una tanda sin `Op=SI` **no aparecía** ni en el monitor de TV ni en las pantallas
