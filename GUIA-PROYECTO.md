@@ -33,9 +33,15 @@
 > hay pares distintos (`323`≠`323E`). Confirmados: `580`→`580E` (activo 580). Con eso el
 > faltante real LK baja a **1 línea** (código 67). **Chef**: precios en tabla aparte
 > `precios_venta_chef` (código Chef ≠ LK); se cargan con `sql/cobranzas_chef_sync.sql`
-> (correr en el proyecto Chef, pegar el INSERT en Virgilio). Los precios efectivos salen
-> de la vista `cobranzas_precios` (LK+Chef+alias). `precios_venta` se re-sincroniza a mano
-> desde LK; backup en `precios_venta_backup_20260817`.
+> (correr en el proyecto Chef, pegar el INSERT en Virgilio — 101 códigos, sin loke). Los
+> precios efectivos salen de la vista `cobranzas_precios` (LK+Chef+alias). **Chef con
+> fallback a lista LK**: en Chef se venden productos Loeke a clientes puntuales (supers =
+> lista especial; FC E = lista LK normal), y esas líneas llevan código de fábrica LK que no
+> está en el catálogo Chef, así que se valorizan con la lista de LK (`origen='lk'` en el
+> detalle). ⚠ La lista **especial de supers** (`precios_super` de LK) no está en Virgilio →
+> para clientes de súper el valor con lista LK normal **sobreestima**. Cobertura NP en curso:
+> **LK ~100%, Chef 98,8%**. `precios_venta` se re-sincroniza a mano desde LK; backup en
+> `precios_venta_backup_20260817`.
 >
 > Nota **v10.28 — La columna `Op` del Excel DEJÓ DE SER REQUISITO para mostrar tandas.**
 > Hasta acá, una tanda sin `Op=SI` **no aparecía** ni en el monitor de TV ni en las pantallas

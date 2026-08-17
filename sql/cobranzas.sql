@@ -19,6 +19,14 @@
 --  los precios de Chef viven en `precios_venta_chef` (tabla aparte) y NO se
 --  mezclan con los de LK.
 --
+--  CHEF vende TAMBIÉN productos LOEKE a clientes puntuales (supers = lista
+--  especial; clientes con FC E = lista LK normal). Esas líneas llevan código
+--  de fábrica LK y no están en el catálogo comercial de Chef → se valorizan
+--  con FALLBACK a la lista de LK. Por eso, para una NP de Chef, el precio se
+--  busca primero en la lista de Chef y, si no está, en la de LK.
+--  ⚠ La lista ESPECIAL de supers (precios_super de LK) NO está en Virgilio:
+--  para clientes de supermercado el valor con lista LK normal SOBREESTIMA.
+--
 --  ⚠ precio 8888 = placeholder (sin precio real) → NO valoriza.
 --
 --  CLASIFICACIÓN DEL FALTANTE (regla del dueño): que un artículo no tenga
@@ -116,77 +124,88 @@ where not exists (select 1 from base b2 where b2.empresa=a.empresa and b2.nc=pub
 grant select on public.cobranzas_precios to anon, authenticated;
 
 -- ── 6) Valorizar UNA NP ─────────────────────────────────────────────
+--  Precio de la empresa de la NP; para Chef, FALLBACK a la lista LK. En Chef
+--  se venden productos LOEKE a clientes puntuales (supers = lista especial,
+--  clientes con FC E = lista LK normal): esas líneas llevan código de fábrica
+--  LK y no están en el catálogo comercial de Chef, así que se valorizan con la
+--  lista de LK. `origen` marca de qué lista salió el precio ('ch'/'lk').
+--  ⚠ Los supers pagan la lista ESPECIAL (precios_super de LK), que no está en
+--  Virgilio: para esos clientes el valor LK normal SOBREESTIMA.
 create or replace function public.cobranzas_valorizar_np(p_np text)
 returns jsonb language plpgsql security definer set search_path = public as $$
-declare v_emp text := public.cob_empresa_np(p_np); v_rs text; v_cod text; v_res jsonb; v_hay_ch boolean;
+declare v_emp text := public.cob_empresa_np(p_np); v_rs text; v_cod text; v_res jsonb;
 begin
   select max(razon_social), max(cod) into v_rs, v_cod
   from public."PPP_Programacion_Diaria"
   where regexp_replace(coalesce(np,''),'\D','','g') = regexp_replace(coalesce(p_np,''),'\D','','g');
 
-  if v_emp = 'ch' then
-    select exists(select 1 from public.cobranzas_precios where empresa='ch') into v_hay_ch;
-  end if;
-
   with lineas as (
-    select b.articulo, sum(b.cajas) as cajas, px.precio_unit, px.uxb,
+    select b.articulo, sum(b.cajas) as cajas, px.precio_unit, px.uxb, px.origen,
            (px.precio_unit is not null) as con_precio,
-           case when px.precio_unit is not null then null
-                else public.cob_estado_articulo(b.articulo) end as motivo
+           case when px.precio_unit is not null then null else public.cob_estado_articulo(b.articulo) end as motivo
     from public."PPP_Base_Pedidos" b
-    left join public.cobranzas_precios px
-           on px.empresa=v_emp and px.nc=public.cob_norm_cod(b.articulo)
+    left join lateral (
+      select p.precio_unit, p.uxb, p.empresa as origen
+      from public.cobranzas_precios p
+      where p.nc = public.cob_norm_cod(b.articulo) and p.empresa in (v_emp,'lk')
+      order by (p.empresa = v_emp) desc
+      limit 1
+    ) px on true
     where regexp_replace(coalesce(b.pedido,''),'\D','','g') = regexp_replace(coalesce(p_np,''),'\D','','g')
-    group by b.articulo, px.precio_unit, px.uxb
+    group by b.articulo, px.precio_unit, px.uxb, px.origen
   )
   select jsonb_build_object('np',p_np,'empresa',v_emp,'cod_cliente',v_cod,'cliente',v_rs,
-    'lista_no_disponible', (v_emp='ch' and not coalesce(v_hay_ch,false)),
     'valor_lista', coalesce(round(sum(case when con_precio then precio_unit*uxb*cajas end)::numeric,2),0),
     'estimado_con_iva', coalesce(round(sum(case when con_precio then precio_unit*uxb*cajas end)::numeric*0.98*1.21,2),0),
     'cajas', coalesce(sum(cajas),0), 'lineas_total', count(*),
     'lineas_con_precio', count(*) filter (where con_precio),
-    'sin_precio_real',   count(*) filter (where motivo='sin_precio'),
-    'especiales',        count(*) filter (where motivo='especial'),
-    'loke_sin_precio',   count(*) filter (where motivo='loke'),
-    'discontinuados',    count(*) filter (where motivo='discontinuado'),
+    'via_lista_lk', count(*) filter (where con_precio and origen='lk' and v_emp='ch'),
+    'sin_precio_real', count(*) filter (where motivo='sin_precio'),
     'cobertura_pct', round(100.0*count(*) filter (where con_precio)/nullif(count(*),0),1),
-    'cobertura_util_pct', round(100.0*count(*) filter (where con_precio)/nullif(count(*) filter (where con_precio or motivo='sin_precio'),0),1),
     'a_cargar', coalesce(jsonb_agg(articulo) filter (where motivo='sin_precio'),'[]'::jsonb),
-    'detalle', coalesce(jsonb_agg(jsonb_build_object('articulo',articulo,'cajas',cajas,'precio_unit',precio_unit,'uxb',uxb,'motivo',motivo,
+    'detalle', coalesce(jsonb_agg(jsonb_build_object('articulo',articulo,'cajas',cajas,'precio_unit',precio_unit,'uxb',uxb,
+                 'origen',origen,'motivo',motivo,
                  'valor_lista', case when con_precio then round((precio_unit*uxb*cajas)::numeric,2) end)
                  order by (case when con_precio then precio_unit*uxb*cajas else 0 end) desc),'[]'::jsonb),
-    'nota','valor_lista = lista sin dto (incluye alias). Neto exacto: arca-wsfe/preciar.') into v_res
+    'nota','valor_lista = lista sin dto. Chef con fallback a lista LK (Loeke via Chef). Supers van con lista especial (no cargada). Neto exacto LK: arca-wsfe/preciar.') into v_res
   from lineas;
   return v_res;
 end $$;
 
 -- ── 7) Resumen de cobranzas de las NP en curso ──────────────────────
+--  Solo las NP presentes en PPP_Programacion_Diaria (universo "en curso").
 create or replace function public.cobranzas_resumen()
 returns table (np text, empresa text, cod_cliente text, cliente text, cajas numeric,
   valor_lista numeric, lineas_total bigint, lineas_sin_precio bigint, sin_precio_real bigint,
-  cobertura_pct numeric, lista_no_disponible boolean)
+  cobertura_pct numeric, via_lista_lk bigint)
 language sql security definer set search_path = public as $$
   with prog as (
     select regexp_replace(coalesce(np,''),'\D','','g') as npk, max(np) np, max(cod) cod, max(razon_social) rs
     from public."PPP_Programacion_Diaria" group by 1
   ),
-  hay as (select empresa, count(*)>0 tiene from public.cobranzas_precios group by empresa),
-  lin as (
-    select regexp_replace(coalesce(b.pedido,''),'\D','','g') as npk,
-           sum(b.cajas) cajas, count(*) lineas,
-           count(*) filter (where px.precio_unit is not null) con_precio,
-           count(*) filter (where px.precio_unit is null and public.cob_estado_articulo(b.articulo)='sin_precio') sin_precio_real,
-           sum(case when px.precio_unit is not null then px.precio_unit*px.uxb*b.cajas end) valor
+  px as (
+    select regexp_replace(coalesce(b.pedido,''),'\D','','g') as npk, b.articulo, b.cajas,
+           public.cob_empresa_np(b.pedido) emp, pr.precio_unit, pr.uxb, pr.origen
     from public."PPP_Base_Pedidos" b
-    left join public.cobranzas_precios px
-           on px.empresa=public.cob_empresa_np(b.pedido) and px.nc=public.cob_norm_cod(b.articulo)
-    group by 1
+    left join lateral (
+      select p.precio_unit, p.uxb, p.empresa origen
+      from public.cobranzas_precios p
+      where p.nc=public.cob_norm_cod(b.articulo) and p.empresa in (public.cob_empresa_np(b.pedido),'lk')
+      order by (p.empresa=public.cob_empresa_np(b.pedido)) desc limit 1
+    ) pr on true
+  ),
+  lin as (
+    select npk, sum(cajas) cajas, count(*) lineas,
+           count(*) filter (where precio_unit is not null) con_precio,
+           count(*) filter (where precio_unit is not null and origen='lk' and emp='ch') via_lk,
+           count(*) filter (where precio_unit is null and public.cob_estado_articulo(articulo)='sin_precio') sin_precio_real,
+           sum(case when precio_unit is not null then precio_unit*uxb*cajas end) valor
+    from px group by npk
   )
   select p.np, public.cob_empresa_np(p.np), p.cod, p.rs, coalesce(l.cajas,0),
          round(coalesce(l.valor,0)::numeric,2),
          coalesce(l.lineas,0), coalesce(l.lineas,0)-coalesce(l.con_precio,0), coalesce(l.sin_precio_real,0),
-         round(100.0*coalesce(l.con_precio,0)/nullif(l.lineas,0),1),
-         (public.cob_empresa_np(p.np)='ch' and not coalesce((select tiene from hay where empresa='ch'),false))
+         round(100.0*coalesce(l.con_precio,0)/nullif(l.lineas,0),1), coalesce(l.via_lk,0)
   from prog p left join lin l using (npk)
   order by coalesce(l.valor,0) desc nulls last;
 $$;
@@ -206,6 +225,8 @@ grant execute on function public.cobranzas_resumen()           to anon, authenti
 --           (nkhzocgdpwtgrmwleihr) y ejecutar el INSERT resultante acá,
 --           contra public.precios_venta_chef.
 --
---   Estado 2026-08-17: LK 231 códigos (7 placeholder). Chef sin cargar.
+--   Estado 2026-08-17: LK 231 códigos (7 placeholder). Chef 101 códigos
+--   (products, sin loke — Chef no tiene línea Loeke propia).
+--   Cobertura NP en curso: LK ~100%, Chef 98,8% (con fallback a lista LK).
 --   Backup previo de precios_venta en public.precios_venta_backup_20260817.
 -- --------------------------------------------------------------
