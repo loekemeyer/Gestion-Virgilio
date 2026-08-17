@@ -4,7 +4,28 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-13 · Versión app al documentar: **v10.46**
+> Última actualización: 2026-08-17 · Versión app al documentar: **v11.03**
+>
+> Nota **2026-08-17 — Cobranzas: valorizar una NP sin ver la factura.** Objetivo del
+> usuario: que Virgilio sepa cuánta plata se le facturó a cada NP/cliente sin tener la
+> factura a la vista. Hay **dos niveles de precio**, a propósito:
+> **(1) Valor de LISTA** — en la base, al toque y en lote (`sql/cobranzas.sql`):
+> `cobranzas_valorizar_np(np)` y `cobranzas_resumen()` cruzan `PPP_Base_Pedidos`
+> (artículo × cajas) con **`precios_venta`** (snapshot de la lista general de LK,
+> `products` ∪ `loke_products`), con match por código canónico (`cob_norm_cod`:
+> upper+trim+saca ceros a izq, así `948e`/`029` matchean). **NO aplica dto por cliente**
+> porque `precios_venta` es anon-readable y copiar el padrón de descuentos de LK acá lo
+> filtraría. **(2) NETO exacto por NP** — la Edge Function `arca-wsfe` acción `preciar`
+> lee LK **en vivo** (service_role) y aplica `list_price×(1−dto_vol)×(1−2%)+IVA 21%`;
+> ahora también con fallback a `loke_products`. **Empresa por numeración**: 9xxxx = LK,
+> 4xxxx = Chef → las NP de Chef salen `lista_no_disponible` (la lista de Chef vive en
+> otro Supabase, no está en Virgilio; mismo código = otro artículo en cada empresa).
+> **Cobertura medida (NPs en curso)**: LK 145 NP, valor lista ≈ $196,9 M, cobertura
+> 96,4% de líneas; quedan **17 líneas LK sin precio** porque esos códigos (55215, 55219,
+> 55289, 198E y varios con `list_price=0`) **no están cargados en el catálogo de LK** →
+> a cargar allá. Chef: 38 NP sin valorizar (falta la lista). `precios_venta` se
+> re-sincroniza a mano desde LK (patrón de `plata_perdida.sql`); backup en
+> `precios_venta_backup_20260817`.
 >
 > Nota **v10.28 — La columna `Op` del Excel DEJÓ DE SER REQUISITO para mostrar tandas.**
 > Hasta acá, una tanda sin `Op=SI` **no aparecía** ni en el monitor de TV ni en las pantallas
