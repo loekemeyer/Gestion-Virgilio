@@ -6504,7 +6504,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v11.04";
+const APP_VERSION = "v11.05";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -27720,7 +27720,7 @@ async function openCobranzas() {
   try { if (typeof requireSupervisor === "function" && !requireSupervisor()) return; } catch (_e) {}
   if (!document.getElementById("cobCss")) {
     var st = document.createElement("style"); st.id = "cobCss";
-    st.textContent = "#cobOverlay .cob-card{max-width:940px;margin:0 auto;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5);display:flex;flex-direction:column;max-height:92vh;}.cob-head{display:flex;align-items:center;gap:12px;padding:13px 16px;background:linear-gradient(90deg,#065f46,#022c22);color:#fff;flex:0 0 auto;}.cob-head b{font-size:17px;}.cob-x{margin-left:auto;width:auto;background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;}.cob-body{padding:14px 16px;display:flex;flex-direction:column;min-height:0;flex:1;}.cob-ctrl{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px;flex:0 0 auto;font-size:12.5px;color:#475569;}.cob-tab{width:auto;padding:6px 12px;border-radius:999px;border:1px solid #cbd5e1;background:#fff;color:#334155;font-size:12.5px;font-weight:800;cursor:pointer;}.cob-tab.on{background:#065f46;border-color:#065f46;color:#fff;}.cob-q{flex:1;min-width:150px;padding:6px 10px;border:1px solid #cbd5e1;border-radius:8px;font-size:12.5px;}.cob-kpis{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;flex:0 0 auto;}.cob-kpi{background:#ecfdf5;border:1.5px solid #6ee7b7;border-radius:12px;padding:9px 14px;flex:1;min-width:150px;}.cob-kpi small{font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;color:#047857;font-weight:800;}.cob-kpi b{display:block;font-size:22px;color:#065f46;font-variant-numeric:tabular-nums;}.cob-tblwrap{overflow:auto;flex:1;min-height:0;}.cob-tbl{width:100%;border-collapse:collapse;font-size:13px;}.cob-tbl th,.cob-tbl td{border-bottom:1px solid #eef2f7;padding:6px 8px;text-align:left;}.cob-tbl th{background:#f8fafc;font-size:11.5px;color:#475569;position:sticky;top:0;}.cob-tbl .num{text-align:right;font-variant-numeric:tabular-nums;}.cob-badge{display:inline-block;font-size:10px;font-weight:800;padding:1px 6px;border-radius:999px;}.cob-lk{background:#dbeafe;color:#1d4ed8;}.cob-ch{background:#fef3c7;color:#b45309;}.cob-warn{font-size:11px;color:#b45309;font-weight:700;}.cob-clk{cursor:pointer;}.cob-clk:hover{background:#f0fdf4;}.cob-back{width:auto;background:#065f46;color:#fff;border:none;border-radius:8px;padding:5px 12px;font-weight:800;cursor:pointer;font-size:12.5px;}";
+    st.textContent = "#cobOverlay .cob-card{max-width:940px;margin:0 auto;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5);display:flex;flex-direction:column;max-height:92vh;}.cob-head{display:flex;align-items:center;gap:12px;padding:13px 16px;background:linear-gradient(90deg,#065f46,#022c22);color:#fff;flex:0 0 auto;}.cob-head b{font-size:17px;}.cob-x{margin-left:auto;width:auto;background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;}.cob-body{padding:14px 16px;display:flex;flex-direction:column;min-height:0;flex:1;}.cob-ctrl{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px;flex:0 0 auto;font-size:12.5px;color:#475569;}.cob-tab{width:auto;padding:6px 12px;border-radius:999px;border:1px solid #cbd5e1;background:#fff;color:#334155;font-size:12.5px;font-weight:800;cursor:pointer;}.cob-tab.on{background:#065f46;border-color:#065f46;color:#fff;}.cob-q{flex:1;min-width:150px;padding:6px 10px;border:1px solid #cbd5e1;border-radius:8px;font-size:12.5px;}.cob-kpis{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;flex:0 0 auto;}.cob-kpi{background:#ecfdf5;border:1.5px solid #6ee7b7;border-radius:12px;padding:9px 14px;flex:1;min-width:150px;}.cob-kpi small{font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;color:#047857;font-weight:800;}.cob-kpi b{display:block;font-size:22px;color:#065f46;font-variant-numeric:tabular-nums;}.cob-tblwrap{overflow:auto;flex:1;min-height:0;}.cob-tbl{width:100%;border-collapse:collapse;font-size:13px;}.cob-tbl th,.cob-tbl td{border-bottom:1px solid #eef2f7;padding:6px 8px;text-align:left;}.cob-tbl th{background:#f8fafc;font-size:11.5px;color:#475569;position:sticky;top:0;}.cob-tbl .num{text-align:right;font-variant-numeric:tabular-nums;}.cob-badge{display:inline-block;font-size:10px;font-weight:800;padding:1px 6px;border-radius:999px;}.cob-lk{background:#dbeafe;color:#1d4ed8;}.cob-ch{background:#fef3c7;color:#b45309;}.cob-super{background:#ede9fe;color:#6d28d9;}.cob-warn{font-size:11px;color:#b45309;font-weight:700;}.cob-clk{cursor:pointer;}.cob-clk:hover{background:#f0fdf4;}.cob-back{width:auto;background:#065f46;color:#fff;border:none;border-radius:8px;padding:5px 12px;font-weight:800;cursor:pointer;font-size:12.5px;}";
     document.head.appendChild(st);
   }
   _cob = { emp: "todos", q: "", rows: [], view: "list", det: null };
@@ -27774,7 +27774,7 @@ function cobRender() {
       var cobColor = (Number(r.cobertura_pct) >= 95) ? "#16a34a" : (Number(r.cobertura_pct) >= 80 ? "#d97706" : "#dc2626");
       return '<tr class="cob-clk" onclick="cobOpenDetail(\'' + encodeURIComponent(r.np) + '\')">' +
         '<td style="font-weight:700;">' + escapeHtml(r.np || "") + '</td>' +
-        '<td>' + _cobEmpBadge(r.empresa) + '</td>' +
+        '<td>' + _cobEmpBadge(r.empresa) + (r.cadena ? ' <span class="cob-badge cob-super">🛒</span>' : '') + '</td>' +
         '<td>' + escapeHtml(r.cliente || r.cod_cliente || "—") + '</td>' +
         '<td class="num">' + Math.round(Number(r.cajas) || 0) + '</td>' +
         '<td class="num" style="font-weight:800;color:#065f46;">' + _cobMoney(r.valor_lista) + '</td>' +
@@ -27800,6 +27800,7 @@ function cobRenderDet() {
   var h = '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;">' +
     '<button class="cob-back" onclick="cobBackList()">← Volver</button>' +
     '<b style="font-size:16px;">NP ' + escapeHtml(d.np || "") + '</b> ' + _cobEmpBadge(d.empresa) +
+    (d.cadena ? ' <span class="cob-badge cob-super">🛒 ' + escapeHtml(d.cadena) + '</span>' : '') +
     '<span style="color:#475569;">' + escapeHtml(d.cliente || d.cod_cliente || "") + '</span></div>';
   h += '<div class="cob-kpis">' +
     '<div class="cob-kpi"><small>Valor lista (sin IVA)</small><b>' + _cobMoney(d.valor_lista) + '</b></div>' +
@@ -27810,7 +27811,9 @@ function cobRenderDet() {
   if (d.a_cargar && d.a_cargar.length) h += '<div class="cob-warn" style="margin-bottom:6px;">⚠ Sin precio: ' + d.a_cargar.map(function (c) { return escapeHtml(c); }).join(", ") + '</div>';
   h += '<div class="cob-tblwrap"><table class="cob-tbl"><thead><tr><th>Artículo</th><th class="num">Cajas</th><th class="num">$ unit</th><th class="num">uxb</th><th class="num">Valor lista</th><th>Origen</th></tr></thead><tbody>';
   h += det.map(function (l) {
-    var org = l.motivo ? ('<span class="cob-warn">' + escapeHtml(l.motivo) + '</span>') : (l.origen === "lk" && d.empresa === "ch" ? '<span class="cob-badge cob-lk">vía LK</span>' : _cobEmpBadge(l.origen));
+    var org = l.motivo ? ('<span class="cob-warn">' + escapeHtml(l.motivo) + '</span>')
+      : (String(l.origen || "").indexOf("super:") === 0 ? '<span class="cob-badge cob-super">' + escapeHtml(String(l.origen).slice(6)) + '</span>'
+      : (l.origen === "lk" && d.empresa === "ch" ? '<span class="cob-badge cob-lk">vía LK</span>' : _cobEmpBadge(l.origen)));
     return '<tr><td>' + escapeHtml(l.articulo || "") + '</td>' +
       '<td class="num">' + Math.round(Number(l.cajas) || 0) + '</td>' +
       '<td class="num">' + (l.precio_unit != null ? _cobMoney(l.precio_unit) : "—") + '</td>' +

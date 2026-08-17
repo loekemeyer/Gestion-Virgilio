@@ -2,62 +2,50 @@
 --  Módulo Cobranzas — valorizar una NP sin ver la factura
 --  Proyecto Supabase: Control Partes Talleristas (hrxfctzncixxqmpfhskv)
 --
---  OBJETIVO: que Virgilio sepa cuánta plata se le facturó a cada NP /
---  cliente sin tener la factura a la vista, cruzando el detalle de líneas
---  (PPP_Base_Pedidos: artículo × cajas) con la lista de precios.
+--  OBJETIVO: que Virgilio sepa cuánta plata se le facturó a cada NP / cliente
+--  sin tener la factura a la vista, cruzando el detalle (PPP_Base_Pedidos:
+--  artículo × cajas) con la lista de precios que corresponda.
 --
---  DOS NIVELES DE PRECIO (a propósito):
---   1) VALOR DE LISTA — en la base, al toque y en lote (este archivo). Sale
---      de `precios_venta` (LK: products+loke_products) y `precios_venta_chef`
---      (Chef). NO aplica dto por cliente: `precios_venta*` son anon-readable
---      y copiar el padrón de descuentos de LK acá lo filtraría.
---   2) NETO EXACTO por NP — Edge Function `arca-wsfe` acción `preciar`, lee
---      LK EN VIVO (service_role): list_price×(1−dto_vol)×(1−2%)+IVA 21%.
+--  TRES LISTAS, EN ESTE ORDEN DE PRIORIDAD por NP:
+--   1) SÚPER — si el cliente de la NP es una cadena de supermercado con lista
+--      especial cargada (cobranzas_cliente_cadena → precios_super_lk). Precio
+--      final negociado, SIN descuento por cliente; algunas cadenas tienen
+--      item_discount (Diarco 10%).
+--   2) EMPRESA — lista normal de la empresa de la NP: LK (precios_venta) o
+--      Chef (precios_venta_chef). Numeraciones INDEPENDIENTES: el mismo código
+--      es otro artículo en cada empresa, por eso Chef va en tabla aparte.
+--   3) LK (fallback) — para NP de Chef cuyos artículos son productos LOEKE
+--      vendidos vía Chef (código de fábrica LK, no está en el catálogo Chef).
 --
---  EMPRESA por NP: 9xxxx = Loekemeyer, 4xxxx = Chef. Numeraciones
---  INDEPENDIENTES: el mismo código es OTRO artículo en cada empresa, por eso
---  los precios de Chef viven en `precios_venta_chef` (tabla aparte) y NO se
---  mezclan con los de LK.
+--  valor_lista = precio de lista SIN dto por cliente. El NETO exacto por NP
+--  (con dto_vol del cliente + 2% web + IVA) sale online de la Edge Function
+--  arca-wsfe acción `preciar`.
 --
---  CHEF vende TAMBIÉN productos LOEKE a clientes puntuales (supers = lista
---  especial; clientes con FC E = lista LK normal). Esas líneas llevan código
---  de fábrica LK y no están en el catálogo comercial de Chef → se valorizan
---  con FALLBACK a la lista de LK. Por eso, para una NP de Chef, el precio se
---  busca primero en la lista de Chef y, si no está, en la de LK.
---  ⚠ La lista ESPECIAL de supers (precios_super de LK) NO está en Virgilio:
---  para clientes de supermercado el valor con lista LK normal SOBREESTIMA.
---
+--  EMPRESA por NP: 9xxxx = Loekemeyer, 4xxxx = Chef.
 --  ⚠ precio 8888 = placeholder (sin precio real) → NO valoriza.
 --
---  CLASIFICACIÓN DEL FALTANTE (regla del dueño): que un artículo no tenga
---  precio de lista casi nunca es un hueco a cargar (`cob_estado_articulo`):
---    · discontinuado — `Articulos_Discontinuados` o `OC_Maximos.activo=false`.
---    · especial      — código de 5 dígitos = artículo de UN solo cliente.
---    · loke          — código que empieza con 1 = lista Loke, no se ofrece a cualquiera.
---    · sin_precio     — lo único realmente a cargar.
+--  CLASIFICACIÓN DEL FALTANTE (`cob_estado_articulo`): que un artículo no
+--  tenga precio casi nunca es un hueco a cargar → discontinuado
+--  (Articulos_Discontinuados / OC_Maximos.activo=false), especial (5 dígitos =
+--  1 solo cliente), loke (empieza con 1 = lista Loke) o sin_precio (lo único
+--  a cargar).
 --
---  ALIAS DE CÓDIGO (`cobranzas_alias`): cuando el código ACTIVO en los
---  pedidos difiere del que tiene el precio cargado por grafía (misma pieza,
---  otra escritura). NO se resuelve con un fallback automático de la "E"
---  porque hay pares NNN/NNNE que son productos DISTINTOS con precio distinto
---  (p.ej. 323 Rallador Cilíndrico $1355 vs 323E Rallador Mini $1295). Solo
---  los pares confirmados a mano entran acá.
+--  ALIAS (`cobranzas_alias`): código activo de pedido → código con precio
+--  cuando difieren por grafía (NO se toca la "E" automático: 323≠323E).
 -- ============================================================
 
--- ── 1) Normalización canónica de código ─────────────────────────────
+-- ── Helpers ─────────────────────────────────────────────────────────
 create or replace function public.cob_norm_cod(p text)
 returns text language sql immutable as $$
   select nullif(regexp_replace(upper(btrim(coalesce(p,''))), '^0+(?=.)', ''), '')
 $$;
 
--- ── 2) Empresa de una NP por su numeración ──────────────────────────
 create or replace function public.cob_empresa_np(p_np text)
 returns text language sql immutable as $$
   select case left(regexp_replace(coalesce(p_np,''),'\D','','g'),1)
            when '9' then 'lk' when '4' then 'ch' else 'otro' end
 $$;
 
--- ── 3) Por qué un artículo no tiene precio de lista ─────────────────
 create or replace function public.cob_estado_articulo(p_cod text)
 returns text language sql stable set search_path=public as $$
   select case
@@ -72,41 +60,70 @@ returns text language sql stable set search_path=public as $$
   end
 $$;
 
--- ── 4) Tablas de precio ─────────────────────────────────────────────
---  LK: public.precios_venta (ya existe, de plata_perdida.sql).
---  Chef: tabla aparte (código Chef ≠ código LK).
+-- ── Tablas de precio ────────────────────────────────────────────────
+-- LK normal: public.precios_venta (de plata_perdida.sql).
+-- Chef normal:
 create table if not exists public.precios_venta_chef (
-  cod text primary key, precio_unit numeric, uxb integer, descripcion text,
-  actualizado timestamptz default now()
+  cod text primary key, precio_unit numeric, uxb integer, descripcion text, actualizado timestamptz default now()
 );
-alter table public.precios_venta_chef enable row level security;
-drop policy if exists pvc_sel on public.precios_venta_chef;
-create policy pvc_sel on public.precios_venta_chef for select to anon, authenticated using (true);
-drop policy if exists pvc_wr on public.precios_venta_chef;
-create policy pvc_wr on public.precios_venta_chef for all to authenticated using (true) with check (true);
-
--- Alias de código (código de pedido → código con precio). Editable a mano.
+-- Listas de supermercado (espejo de precios_super del proyecto LK):
+create table if not exists public.precios_super_lk (
+  super_key text not null, cod text not null, price numeric not null, primary key (super_key, cod)
+);
+-- Config por cadena (item_discount, y si va con lista general en vez de especial):
+create table if not exists public.cobranzas_super_cadena (
+  super_key text primary key, label text, item_discount numeric not null default 0,
+  usa_lista_general boolean not null default false
+);
+-- Mapeo cliente → cadena (de precios_super.cadena.cod_cliente_lk / cod_cliente_chef en LK):
+create table if not exists public.cobranzas_cliente_cadena (
+  empresa text not null, cod_cliente text not null, super_key text not null, primary key (empresa, cod_cliente)
+);
+-- uxb de todo el padrón LK (products ∪ loke_products), para valorizar cajas de
+-- artículos que solo están en la lista de súper (no en la lista normal):
+create table if not exists public.cob_uxb_lk (cod text primary key, uxb integer);
+-- Alias de código:
 create table if not exists public.cobranzas_alias (
-  empresa text not null default 'lk',
-  cod_prod text not null,
-  cod_precio text not null,
-  nota text,
+  empresa text not null default 'lk', cod_prod text not null, cod_precio text not null, nota text,
   primary key (empresa, cod_prod)
 );
-alter table public.cobranzas_alias enable row level security;
-drop policy if exists ca_sel on public.cobranzas_alias;
-create policy ca_sel on public.cobranzas_alias for select to anon, authenticated using (true);
-drop policy if exists ca_wr on public.cobranzas_alias;
-create policy ca_wr on public.cobranzas_alias for all to authenticated using (true) with check (true);
 
--- Correcciones confirmadas por el dueño (2026-08-17):
---   580 es el código ACTIVO; el precio vive bajo 580E (mismo artículo, Batidor Mini).
---   (574: el activo es 574E; ambos ya están cargados a $2770, no hace falta alias.)
+-- RLS (anon-readable; valor de LISTA no es sensible):
+do $$ declare t text;
+begin
+  foreach t in array array['precios_venta_chef','precios_super_lk','cobranzas_super_cadena',
+                           'cobranzas_cliente_cadena','cob_uxb_lk','cobranzas_alias'] loop
+    execute format('alter table public.%I enable row level security', t);
+    execute format('drop policy if exists %I_sel on public.%I', t, t);
+    execute format('create policy %I_sel on public.%I for select to anon, authenticated using (true)', t, t);
+    execute format('drop policy if exists %I_wr on public.%I', t, t);
+    execute format('create policy %I_wr on public.%I for all to authenticated using (true) with check (true)', t, t);
+  end loop;
+end $$;
+
+-- Config de cadenas (item_discount / usa_lista_general):
+insert into public.cobranzas_super_cadena (super_key,label,item_discount,usa_lista_general) values
+ ('abastecedor','El Abastecedor (Tecnolar)',0,false),('alberdi','Alberdi',0,false),
+ ('cencosud','Cencosud (Jumbo/Disco/Vea)',0,false),('coto','Coto',0,false),('dia','Día',0,false),
+ ('diarco','Diarco',0.10,false),('dorinka','Dorinka (Walmart)',0,false),('inc','Carrefour (INC)',0,false),
+ ('laanonima','La Anónima',0,false),('libertad','Libertad',0,false),('messina','Messina Hnos',0,true),
+ ('toledo','Supermercados Toledo',0,false)
+on conflict (super_key) do update set label=excluded.label, item_discount=excluded.item_discount, usa_lista_general=excluded.usa_lista_general;
+
+-- Mapeo cliente → cadena (cod_cliente_lk 9xxxx / cod_cliente_chef 4xxxx):
+insert into public.cobranzas_cliente_cadena (empresa,cod_cliente,super_key) values
+ ('lk','4051','abastecedor'),('lk','2320','alberdi'),('lk','801','coto'),('lk','3947','dia'),
+ ('lk','4112','diarco'),('lk','1651','inc'),('lk','771','laanonima'),('lk','325','libertad'),
+ ('lk','1573','messina'),('lk','1947','toledo'),('ch','2444','cencosud'),('ch','2686','dorinka')
+on conflict (empresa,cod_cliente) do update set super_key=excluded.super_key;
+
+-- Alias confirmados por el dueño (2026-08-17):
 insert into public.cobranzas_alias (empresa, cod_prod, cod_precio, nota) values
   ('lk','580','580E','activo 580, precio bajo 580E')
 on conflict (empresa, cod_prod) do update set cod_precio=excluded.cod_precio, nota=excluded.nota;
 
--- ── 5) Vista única de precios efectivos por empresa (directo + alias) ─
+-- ── Vistas de precios efectivos ─────────────────────────────────────
+-- Lista normal por empresa (directo + alias):
 create or replace view public.cobranzas_precios as
 with base as (
   select 'lk'::text empresa, public.cob_norm_cod(cod) nc, precio_unit, uxb
@@ -121,23 +138,32 @@ select a.empresa, public.cob_norm_cod(a.cod_prod), b.precio_unit, b.uxb
 from public.cobranzas_alias a
 join base b on b.empresa=a.empresa and b.nc=public.cob_norm_cod(a.cod_precio)
 where not exists (select 1 from base b2 where b2.empresa=a.empresa and b2.nc=public.cob_norm_cod(a.cod_prod));
-grant select on public.cobranzas_precios to anon, authenticated;
 
--- ── 6) Valorizar UNA NP ─────────────────────────────────────────────
---  Precio de la empresa de la NP; para Chef, FALLBACK a la lista LK. En Chef
---  se venden productos LOEKE a clientes puntuales (supers = lista especial,
---  clientes con FC E = lista LK normal): esas líneas llevan código de fábrica
---  LK y no están en el catálogo comercial de Chef, así que se valorizan con la
---  lista de LK. `origen` marca de qué lista salió el precio ('ch'/'lk').
---  ⚠ Los supers pagan la lista ESPECIAL (precios_super de LK), que no está en
---  Virgilio: para esos clientes el valor LK normal SOBREESTIMA.
+-- Lista de súper (precio × (1-item_discount); uxb del padrón LK):
+create or replace view public.cobranzas_precios_super as
+select s.super_key, s.nc, (s.price * (1 - coalesce(c.item_discount,0)))::numeric as precio_unit,
+       coalesce(u.uxb, pv.uxb) as uxb
+from (select super_key, public.cob_norm_cod(cod) nc, price from public.precios_super_lk) s
+join public.cobranzas_super_cadena c on c.super_key=s.super_key and not c.usa_lista_general
+left join (select public.cob_norm_cod(cod) nc, max(uxb) uxb from public.cob_uxb_lk group by 1) u on u.nc=s.nc
+left join lateral (select uxb from public.cobranzas_precios p where p.empresa='lk' and p.nc=s.nc limit 1) pv on true;
+
+grant select on public.cobranzas_precios, public.cobranzas_precios_super to anon, authenticated;
+
+-- ── Valorizar UNA NP ────────────────────────────────────────────────
 create or replace function public.cobranzas_valorizar_np(p_np text)
 returns jsonb language plpgsql security definer set search_path = public as $$
-declare v_emp text := public.cob_empresa_np(p_np); v_rs text; v_cod text; v_res jsonb;
+declare v_emp text := public.cob_empresa_np(p_np); v_rs text; v_cod text; v_cad text; v_res jsonb;
 begin
   select max(razon_social), max(cod) into v_rs, v_cod
   from public."PPP_Programacion_Diaria"
   where regexp_replace(coalesce(np,''),'\D','','g') = regexp_replace(coalesce(p_np,''),'\D','','g');
+
+  -- cadena de súper del cliente (si aplica lista especial)
+  select cc.super_key into v_cad
+  from public.cobranzas_cliente_cadena cc
+  join public.cobranzas_super_cadena sc on sc.super_key=cc.super_key and not sc.usa_lista_general
+  where cc.empresa=v_emp and cc.cod_cliente=btrim(coalesce(v_cod,''));
 
   with lineas as (
     select b.articulo, sum(b.cajas) as cajas, px.precio_unit, px.uxb, px.origen,
@@ -145,21 +171,26 @@ begin
            case when px.precio_unit is not null then null else public.cob_estado_articulo(b.articulo) end as motivo
     from public."PPP_Base_Pedidos" b
     left join lateral (
-      select p.precio_unit, p.uxb, p.empresa as origen
-      from public.cobranzas_precios p
-      where p.nc = public.cob_norm_cod(b.articulo) and p.empresa in (v_emp,'lk')
-      order by (p.empresa = v_emp) desc
-      limit 1
+      select precio_unit, uxb, origen from (
+        select ps.precio_unit, ps.uxb, ('super:'||v_cad) origen, 1 prio
+          from public.cobranzas_precios_super ps
+          where v_cad is not null and ps.super_key=v_cad and ps.nc=public.cob_norm_cod(b.articulo) and ps.precio_unit is not null
+        union all
+        select p.precio_unit, p.uxb, p.empresa, 2
+          from public.cobranzas_precios p
+          where p.nc=public.cob_norm_cod(b.articulo) and p.empresa in (v_emp,'lk')
+      ) q order by prio, (origen=v_emp) desc limit 1
     ) px on true
     where regexp_replace(coalesce(b.pedido,''),'\D','','g') = regexp_replace(coalesce(p_np,''),'\D','','g')
     group by b.articulo, px.precio_unit, px.uxb, px.origen
   )
-  select jsonb_build_object('np',p_np,'empresa',v_emp,'cod_cliente',v_cod,'cliente',v_rs,
+  select jsonb_build_object('np',p_np,'empresa',v_emp,'cod_cliente',v_cod,'cliente',v_rs,'cadena',v_cad,
     'valor_lista', coalesce(round(sum(case when con_precio then precio_unit*uxb*cajas end)::numeric,2),0),
     'estimado_con_iva', coalesce(round(sum(case when con_precio then precio_unit*uxb*cajas end)::numeric*0.98*1.21,2),0),
     'cajas', coalesce(sum(cajas),0), 'lineas_total', count(*),
     'lineas_con_precio', count(*) filter (where con_precio),
     'via_lista_lk', count(*) filter (where con_precio and origen='lk' and v_emp='ch'),
+    'via_lista_super', count(*) filter (where con_precio and origen like 'super:%'),
     'sin_precio_real', count(*) filter (where motivo='sin_precio'),
     'cobertura_pct', round(100.0*count(*) filter (where con_precio)/nullif(count(*),0),1),
     'a_cargar', coalesce(jsonb_agg(articulo) filter (where motivo='sin_precio'),'[]'::jsonb),
@@ -167,31 +198,44 @@ begin
                  'origen',origen,'motivo',motivo,
                  'valor_lista', case when con_precio then round((precio_unit*uxb*cajas)::numeric,2) end)
                  order by (case when con_precio then precio_unit*uxb*cajas else 0 end) desc),'[]'::jsonb),
-    'nota','valor_lista = lista sin dto. Chef con fallback a lista LK (Loeke via Chef). Supers van con lista especial (no cargada). Neto exacto LK: arca-wsfe/preciar.') into v_res
+    'nota','valor_lista sin dto. Supers con lista especial; Chef con fallback a lista LK. Neto exacto LK: arca-wsfe/preciar.') into v_res
   from lineas;
   return v_res;
 end $$;
 
--- ── 7) Resumen de cobranzas de las NP en curso ──────────────────────
---  Solo las NP presentes en PPP_Programacion_Diaria (universo "en curso").
+-- ── Resumen de cobranzas de las NP en curso ─────────────────────────
 create or replace function public.cobranzas_resumen()
 returns table (np text, empresa text, cod_cliente text, cliente text, cajas numeric,
   valor_lista numeric, lineas_total bigint, lineas_sin_precio bigint, sin_precio_real bigint,
-  cobertura_pct numeric, via_lista_lk bigint)
+  cobertura_pct numeric, via_lista_lk bigint, cadena text)
 language sql security definer set search_path = public as $$
   with prog as (
     select regexp_replace(coalesce(np,''),'\D','','g') as npk, max(np) np, max(cod) cod, max(razon_social) rs
     from public."PPP_Programacion_Diaria" group by 1
   ),
+  npc as (
+    select p.npk, public.cob_empresa_np(p.np) emp, cc.super_key cad
+    from prog p
+    left join public.cobranzas_cliente_cadena cc
+      on cc.empresa=public.cob_empresa_np(p.np) and cc.cod_cliente=btrim(coalesce(p.cod,''))
+    left join public.cobranzas_super_cadena sc on sc.super_key=cc.super_key
+    where sc.super_key is null or not sc.usa_lista_general
+  ),
   px as (
     select regexp_replace(coalesce(b.pedido,''),'\D','','g') as npk, b.articulo, b.cajas,
-           public.cob_empresa_np(b.pedido) emp, pr.precio_unit, pr.uxb, pr.origen
+           n.emp, pr.precio_unit, pr.uxb, pr.origen
     from public."PPP_Base_Pedidos" b
+    join npc n on n.npk=regexp_replace(coalesce(b.pedido,''),'\D','','g')
     left join lateral (
-      select p.precio_unit, p.uxb, p.empresa origen
-      from public.cobranzas_precios p
-      where p.nc=public.cob_norm_cod(b.articulo) and p.empresa in (public.cob_empresa_np(b.pedido),'lk')
-      order by (p.empresa=public.cob_empresa_np(b.pedido)) desc limit 1
+      select precio_unit, uxb, origen from (
+        select ps.precio_unit, ps.uxb, 'super' origen, 1 prio
+          from public.cobranzas_precios_super ps
+          where n.cad is not null and ps.super_key=n.cad and ps.nc=public.cob_norm_cod(b.articulo) and ps.precio_unit is not null
+        union all
+        select p.precio_unit, p.uxb, p.empresa, 2
+          from public.cobranzas_precios p
+          where p.nc=public.cob_norm_cod(b.articulo) and p.empresa in (n.emp,'lk')
+      ) q order by prio, (origen=n.emp) desc limit 1
     ) pr on true
   ),
   lin as (
@@ -205,12 +249,11 @@ language sql security definer set search_path = public as $$
   select p.np, public.cob_empresa_np(p.np), p.cod, p.rs, coalesce(l.cajas,0),
          round(coalesce(l.valor,0)::numeric,2),
          coalesce(l.lineas,0), coalesce(l.lineas,0)-coalesce(l.con_precio,0), coalesce(l.sin_precio_real,0),
-         round(100.0*coalesce(l.con_precio,0)/nullif(l.lineas,0),1), coalesce(l.via_lk,0)
-  from prog p left join lin l using (npk)
+         round(100.0*coalesce(l.con_precio,0)/nullif(l.lineas,0),1), coalesce(l.via_lk,0), n.cad
+  from prog p left join lin l using (npk) left join npc n using (npk)
   order by coalesce(l.valor,0) desc nulls last;
 $$;
 
--- Permisos
 grant execute on function public.cob_norm_cod(text)            to anon, authenticated;
 grant execute on function public.cob_empresa_np(text)          to anon, authenticated;
 grant execute on function public.cob_estado_articulo(text)     to anon, authenticated;
@@ -218,15 +261,15 @@ grant execute on function public.cobranzas_valorizar_np(text)  to anon, authenti
 grant execute on function public.cobranzas_resumen()           to anon, authenticated;
 
 -- --------------------------------------------------------------
--- SYNC precios (sin FDW, manual — patrón de plata_perdida.sql):
---   · LK:   correr el generador de plata_perdida.sql / cobranzas ampliado a
---           products ∪ loke_products; upsert en public.precios_venta.
---   · Chef: correr sql/cobranzas_chef_sync.sql EN EL PROYECTO CHEF
---           (nkhzocgdpwtgrmwleihr) y ejecutar el INSERT resultante acá,
---           contra public.precios_venta_chef.
+-- SYNC de precios (sin FDW, manual — patrón de plata_perdida.sql):
+--   · LK normal  → public.precios_venta (products ∪ loke_products).
+--   · Chef       → public.precios_venta_chef (sql/cobranzas_chef_sync.sql,
+--                  correr en el proyecto Chef nkhzocgdpwtgrmwleihr).
+--   · Súper      → public.precios_super_lk + cobranzas_super_cadena +
+--                  cobranzas_cliente_cadena (de precios_super.* del proyecto LK).
+--   · uxb        → public.cob_uxb_lk (products ∪ loke_products, todo uxb).
 --
---   Estado 2026-08-17: LK 231 códigos (7 placeholder). Chef 101 códigos
---   (products, sin loke — Chef no tiene línea Loeke propia).
---   Cobertura NP en curso: LK ~100%, Chef 98,8% (con fallback a lista LK).
---   Backup previo de precios_venta en public.precios_venta_backup_20260817.
+--   Estado 2026-08-17: LK 231, Chef 101, súper 483 (9 cadenas), uxb ~260.
+--   Cobertura NP en curso: LK ~100%, Chef 98,8%. Supers en curso: Diarco, INC.
+--   Backup de precios_venta en public.precios_venta_backup_20260817.
 -- --------------------------------------------------------------

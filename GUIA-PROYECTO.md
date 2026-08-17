@@ -47,6 +47,19 @@
 > `cobranzas_valorizar_np` al tocar una NP (detalle por artículo, origen LK/Chef, estimado
 > c/ IVA). Es solo VISTA: `valor_lista` sin dto; el neto exacto sigue en arca-wsfe/preciar.
 >
+> Nota **v11.05 — Cobranzas: listas de SÚPER (lista especial por cadena).** Tercera lista,
+> con prioridad sobre la normal: si el cliente de la NP es una cadena de supermercado con
+> lista cargada, cada línea se valoriza con `precios_super_lk` (precio final negociado, sin
+> dto; Diarco lleva `item_discount` 10%). El mapeo cliente→cadena sale de
+> `cobranzas_cliente_cadena` (sembrado de `precios_super.cadena.cod_cliente_lk/chef` del
+> proyecto LK: Coto=801, INC=1651, Diarco=4112, Libertad=325, etc.). El `uxb` de artículos
+> que solo están en la lista de súper sale de `cob_uxb_lk` (padrón LK completo). Orden de
+> precio por NP: **súper → empresa (LK/Chef) → LK fallback**. `messina` va con lista general
+> (`usa_lista_general`), no especial. Hoy hay NP de Diarco e INC en curso valorizadas así.
+> El front muestra un badge 🛒 en la NP y la cadena en el detalle. **arca-wsfe NO se
+> redeployó**: la función deployada (v23) está adelante del repo (tiene `emitir_nc`/`emitir_nd`
+> sin commitear); redeployar el repo la regresaría. El pricing de cobranzas vive en las RPC.
+>
 > Nota **v10.28 — La columna `Op` del Excel DEJÓ DE SER REQUISITO para mostrar tandas.**
 > Hasta acá, una tanda sin `Op=SI` **no aparecía** ni en el monitor de TV ni en las pantallas
 > del operario (EP/TP/CC) ni en Facturación. Como nadie mantenía esa columna, quedaban **36
