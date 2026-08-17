@@ -21,11 +21,15 @@
 > 4xxxx = Chef → las NP de Chef salen `lista_no_disponible` (la lista de Chef vive en
 > otro Supabase, no está en Virgilio; mismo código = otro artículo en cada empresa).
 > **Cobertura medida (NPs en curso)**: LK 145 NP, valor lista ≈ $196,9 M, cobertura
-> 96,4% de líneas; quedan **17 líneas LK sin precio** porque esos códigos (55215, 55219,
-> 55289, 198E y varios con `list_price=0`) **no están cargados en el catálogo de LK** →
-> a cargar allá. Chef: 38 NP sin valorizar (falta la lista). `precios_venta` se
-> re-sincroniza a mano desde LK (patrón de `plata_perdida.sql`); backup en
-> `precios_venta_backup_20260817`.
+> 96,4% de líneas. El faltante se **clasifica** (`cob_estado_articulo`) porque casi
+> nunca es un hueco a cargar: `especial` (código de 5 díg = artículo de un solo cliente,
+> "no van"), `loke` (código que empieza con 1 = lista Loke, no se ofrece a cualquiera),
+> `discontinuado` (`Articulos_Discontinuados` ∪ `OC_Maximos.activo=false`) y `sin_precio`
+> (lo único realmente a cargar en LK). De las 17 líneas LK sin precio, solo **8 son
+> `sin_precio` real** (códigos 580 y 67); el resto son especiales/loke/discontinuados.
+> `cobranzas_resumen` expone `sin_precio_real` para no alarmar por lo esperado. Chef:
+> 38 NP sin valorizar (falta la lista). `precios_venta` se re-sincroniza a mano desde LK
+> (patrón de `plata_perdida.sql`); backup en `precios_venta_backup_20260817`.
 >
 > Nota **v10.28 — La columna `Op` del Excel DEJÓ DE SER REQUISITO para mostrar tandas.**
 > Hasta acá, una tanda sin `Op=SI` **no aparecía** ni en el monitor de TV ni en las pantallas
