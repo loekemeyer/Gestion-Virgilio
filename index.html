@@ -3684,6 +3684,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       <button class="sup-action-btn" onclick="openPedidosImportacion()"><span class="sup-ico">📦</span><span>Pedidos Importación</span></button>
       <button class="sup-action-btn" onclick="openAvisoProg()"><span class="sup-ico">📲</span><span>Avisar programación</span></button>
       <button class="sup-action-btn" onclick="openPlataPerdida()"><span class="sup-ico">💸</span><span>Plata perdida de facturar</span></button>
+      <button class="sup-action-btn" onclick="openCobranzas()"><span class="sup-ico">💵</span><span>Cobranzas — valor por NP</span></button>
       <button class="sup-action-btn" onclick="openDatosProducto()" style="position:relative;"><span class="sup-ico">🚦</span><span>Completar datos producto</span><span id="dpBadge" class="dp-badge" style="display:none;"></span></button>
       <button class="sup-action-btn" onclick="openConfiguracion()"><span class="sup-ico">⚙️</span><span>Configuración</span></button>
       <button class="sup-action-btn" onclick="openOperarioView()"><span class="sup-ico">👁️</span><span>Ver módulo operarios</span></button>
@@ -6503,7 +6504,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v11.03";
+const APP_VERSION = "v11.04";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -27694,6 +27695,132 @@ async function avpUndoCliente(keyEnc) {
   delete _avp.lastCli[g.key];
   if (_avp.vendNotified[g.vend]) delete _avp.vendNotified[g.vend][g.key];
   avpRender();
+}
+
+/* ===== v11.04 — MÓDULO "💵 Cobranzas — valor facturado por NP" ========================
+   Muestra cuánta plata se le facturó a cada NP en curso SIN ver la factura, cruzando el
+   detalle (PPP_Base_Pedidos) con la lista de precios. Lee las RPC:
+     · cobranzas_resumen()            → tabla de NP en curso (valor de lista, cobertura)
+     · cobranzas_valorizar_np(p_np)   → detalle por línea de una NP
+   valor_lista = precio de LISTA sin dto por cliente (el neto exacto por NP sale online de
+   la Edge Function arca-wsfe/preciar). Chef usa fallback a la lista LK (Loeke via Chef);
+   ⚠ los supers pagan lista especial (no cargada), así que ese valor sobreestima. */
+var _cob = null;
+function _cobMoney(n) { return '$' + Math.round(n || 0).toLocaleString('es-AR'); }
+async function _cobRpc(fn, body) {
+  var r = await fetch(SUPABASE_URL + "/rest/v1/rpc/" + fn, {
+    method: "POST",
+    headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify(body || {})
+  });
+  if (!r.ok) { var t = ""; try { t = await r.text(); } catch (_e) {} throw new Error("HTTP " + r.status + (t ? (" — " + t) : "")); }
+  try { return await r.json(); } catch (_e) { return null; }
+}
+async function openCobranzas() {
+  try { if (typeof requireSupervisor === "function" && !requireSupervisor()) return; } catch (_e) {}
+  if (!document.getElementById("cobCss")) {
+    var st = document.createElement("style"); st.id = "cobCss";
+    st.textContent = "#cobOverlay .cob-card{max-width:940px;margin:0 auto;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5);display:flex;flex-direction:column;max-height:92vh;}.cob-head{display:flex;align-items:center;gap:12px;padding:13px 16px;background:linear-gradient(90deg,#065f46,#022c22);color:#fff;flex:0 0 auto;}.cob-head b{font-size:17px;}.cob-x{margin-left:auto;width:auto;background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;}.cob-body{padding:14px 16px;display:flex;flex-direction:column;min-height:0;flex:1;}.cob-ctrl{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px;flex:0 0 auto;font-size:12.5px;color:#475569;}.cob-tab{width:auto;padding:6px 12px;border-radius:999px;border:1px solid #cbd5e1;background:#fff;color:#334155;font-size:12.5px;font-weight:800;cursor:pointer;}.cob-tab.on{background:#065f46;border-color:#065f46;color:#fff;}.cob-q{flex:1;min-width:150px;padding:6px 10px;border:1px solid #cbd5e1;border-radius:8px;font-size:12.5px;}.cob-kpis{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;flex:0 0 auto;}.cob-kpi{background:#ecfdf5;border:1.5px solid #6ee7b7;border-radius:12px;padding:9px 14px;flex:1;min-width:150px;}.cob-kpi small{font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;color:#047857;font-weight:800;}.cob-kpi b{display:block;font-size:22px;color:#065f46;font-variant-numeric:tabular-nums;}.cob-tblwrap{overflow:auto;flex:1;min-height:0;}.cob-tbl{width:100%;border-collapse:collapse;font-size:13px;}.cob-tbl th,.cob-tbl td{border-bottom:1px solid #eef2f7;padding:6px 8px;text-align:left;}.cob-tbl th{background:#f8fafc;font-size:11.5px;color:#475569;position:sticky;top:0;}.cob-tbl .num{text-align:right;font-variant-numeric:tabular-nums;}.cob-badge{display:inline-block;font-size:10px;font-weight:800;padding:1px 6px;border-radius:999px;}.cob-lk{background:#dbeafe;color:#1d4ed8;}.cob-ch{background:#fef3c7;color:#b45309;}.cob-warn{font-size:11px;color:#b45309;font-weight:700;}.cob-clk{cursor:pointer;}.cob-clk:hover{background:#f0fdf4;}.cob-back{width:auto;background:#065f46;color:#fff;border:none;border-radius:8px;padding:5px 12px;font-weight:800;cursor:pointer;font-size:12.5px;}";
+    document.head.appendChild(st);
+  }
+  _cob = { emp: "todos", q: "", rows: [], view: "list", det: null };
+  var ov = document.getElementById("cobOverlay");
+  if (!ov) { ov = document.createElement("div"); ov.id = "cobOverlay"; ov.style.cssText = "position:fixed;inset:0;z-index:1400;background:rgba(2,6,23,.72);overflow:auto;padding:14px;"; document.body.appendChild(ov); }
+  ov.style.display = "block";
+  ov.innerHTML = '<div class="cob-card"><div class="cob-head"><b>💵 Cobranzas — valor facturado por NP</b><button class="cob-x" onclick="cobClose()">Cerrar</button></div><div id="cobBody" class="cob-body"><div style="text-align:center;color:#94a3b8;padding:24px;">Cargando…</div></div></div>';
+  await cobLoad();
+}
+function cobClose() { var ov = document.getElementById("cobOverlay"); if (ov) ov.style.display = "none"; }
+async function cobLoad() {
+  try { _cob.rows = (await _cobRpc("cobranzas_resumen", {})) || []; }
+  catch (e) { var b = document.getElementById("cobBody"); if (b) b.innerHTML = '<div style="color:#dc2626;padding:20px;text-align:center;">Error cargando: ' + escapeHtml(e.message || String(e)) + '</div>'; return; }
+  cobRender();
+}
+function cobSet(k, v) { if (!_cob) return; _cob[k] = v; cobRender(); }
+function _cobFilt() {
+  var q = (_cob.q || "").trim().toLowerCase();
+  return (_cob.rows || []).filter(function (r) {
+    if (_cob.emp !== "todos" && (r.empresa || "") !== _cob.emp) return false;
+    if (q) { var hay = ((r.np || "") + " " + (r.cliente || "") + " " + (r.cod_cliente || "")).toLowerCase(); if (hay.indexOf(q) < 0) return false; }
+    return true;
+  });
+}
+function _cobEmpBadge(e) { return e === "lk" ? '<span class="cob-badge cob-lk">LK</span>' : e === "ch" ? '<span class="cob-badge cob-ch">CH</span>' : escapeHtml(e || ""); }
+function cobRender() {
+  var body = document.getElementById("cobBody"); if (!body || !_cob) return;
+  if (_cob.view === "det") { cobRenderDet(); return; }
+  var rows = _cobFilt();
+  var totLk = 0, totCh = 0, nLk = 0, nCh = 0, faltan = 0;
+  (_cob.rows || []).forEach(function (r) {
+    if (r.empresa === "lk") { totLk += Number(r.valor_lista) || 0; nLk++; }
+    else if (r.empresa === "ch") { totCh += Number(r.valor_lista) || 0; nCh++; }
+    faltan += Number(r.sin_precio_real) || 0;
+  });
+  var h = '<div class="cob-kpis">' +
+    '<div class="cob-kpi"><small>💵 Total valor lista</small><b>' + _cobMoney(totLk + totCh) + '</b></div>' +
+    '<div class="cob-kpi"><small>LK · ' + nLk + ' NP</small><b>' + _cobMoney(totLk) + '</b></div>' +
+    '<div class="cob-kpi"><small>Chef · ' + nCh + ' NP</small><b>' + _cobMoney(totCh) + '</b></div>' +
+    '</div>';
+  h += '<div class="cob-ctrl">' +
+    ["todos", "lk", "ch"].map(function (e) { var l = e === "todos" ? "Todas" : e === "lk" ? "LK" : "Chef"; return '<button class="cob-tab' + (_cob.emp === e ? " on" : "") + '" onclick="cobSet(\'emp\',\'' + e + '\')">' + l + '</button>'; }).join("") +
+    '<input class="cob-q" placeholder="Buscar NP / cliente / código…" value="' + escapeHtml(_cob.q) + '" oninput="cobSet(\'q\',this.value)"></div>';
+  if (faltan > 0) h += '<div class="cob-warn" style="margin-bottom:8px;">⚠ ' + faltan + ' línea(s) sin precio real (código sin precio en la lista). El resto (especiales/discontinuados) no cuenta.</div>';
+  h += '<div style="font-size:11.5px;color:#94a3b8;margin:2px 0 6px;">👆 Tocá una NP para ver el detalle por artículo. valor_lista = precio de lista sin descuento por cliente.</div>';
+  h += '<div class="cob-tblwrap"><table class="cob-tbl"><thead><tr><th>NP</th><th></th><th>Cliente</th><th class="num">Cajas</th><th class="num">Valor lista</th><th class="num">Cob.</th></tr></thead><tbody>';
+  if (!rows.length) { h += '<tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:18px;">Sin NP en curso.</td></tr>'; }
+  else {
+    h += rows.map(function (r) {
+      var cob = r.cobertura_pct == null ? "—" : (Math.round(Number(r.cobertura_pct)) + "%");
+      var cobColor = (Number(r.cobertura_pct) >= 95) ? "#16a34a" : (Number(r.cobertura_pct) >= 80 ? "#d97706" : "#dc2626");
+      return '<tr class="cob-clk" onclick="cobOpenDetail(\'' + encodeURIComponent(r.np) + '\')">' +
+        '<td style="font-weight:700;">' + escapeHtml(r.np || "") + '</td>' +
+        '<td>' + _cobEmpBadge(r.empresa) + '</td>' +
+        '<td>' + escapeHtml(r.cliente || r.cod_cliente || "—") + '</td>' +
+        '<td class="num">' + Math.round(Number(r.cajas) || 0) + '</td>' +
+        '<td class="num" style="font-weight:800;color:#065f46;">' + _cobMoney(r.valor_lista) + '</td>' +
+        '<td class="num" style="color:' + cobColor + ';font-weight:700;">' + cob + '</td></tr>';
+    }).join("");
+  }
+  h += '</tbody></table></div>';
+  body.innerHTML = h;
+}
+async function cobOpenDetail(npEnc) {
+  var np = decodeURIComponent(npEnc);
+  _cob.view = "det"; _cob.det = null;
+  var body = document.getElementById("cobBody"); if (body) body.innerHTML = '<div style="text-align:center;color:#94a3b8;padding:24px;">Calculando NP ' + escapeHtml(np) + '…</div>';
+  try { _cob.det = await _cobRpc("cobranzas_valorizar_np", { p_np: np }); }
+  catch (e) { if (body) body.innerHTML = '<div style="padding:16px;"><button class="cob-back" onclick="cobBackList()">← Volver</button><div style="color:#dc2626;padding:16px 0;">Error: ' + escapeHtml(e.message || String(e)) + '</div></div>'; return; }
+  cobRender();
+}
+function cobBackList() { _cob.view = "list"; _cob.det = null; cobRender(); }
+function cobRenderDet() {
+  var body = document.getElementById("cobBody"); if (!body || !_cob) return;
+  var d = _cob.det || {};
+  var det = (d.detalle || []);
+  var h = '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;">' +
+    '<button class="cob-back" onclick="cobBackList()">← Volver</button>' +
+    '<b style="font-size:16px;">NP ' + escapeHtml(d.np || "") + '</b> ' + _cobEmpBadge(d.empresa) +
+    '<span style="color:#475569;">' + escapeHtml(d.cliente || d.cod_cliente || "") + '</span></div>';
+  h += '<div class="cob-kpis">' +
+    '<div class="cob-kpi"><small>Valor lista (sin IVA)</small><b>' + _cobMoney(d.valor_lista) + '</b></div>' +
+    '<div class="cob-kpi"><small>Estimado c/ IVA (−2% +21%)</small><b>' + _cobMoney(d.estimado_con_iva) + '</b></div>' +
+    '<div class="cob-kpi"><small>Cajas · cobertura</small><b>' + Math.round(Number(d.cajas) || 0) + ' · ' + (d.cobertura_pct == null ? "—" : Math.round(Number(d.cobertura_pct)) + "%") + '</b></div>' +
+    '</div>';
+  if (d.empresa === "ch" && Number(d.via_lista_lk) > 0) h += '<div class="cob-warn" style="margin-bottom:6px;">ℹ ' + d.via_lista_lk + ' línea(s) valorizadas con lista LK (producto Loeke vía Chef). Si el cliente es súper, paga lista especial → este valor sobreestima.</div>';
+  if (d.a_cargar && d.a_cargar.length) h += '<div class="cob-warn" style="margin-bottom:6px;">⚠ Sin precio: ' + d.a_cargar.map(function (c) { return escapeHtml(c); }).join(", ") + '</div>';
+  h += '<div class="cob-tblwrap"><table class="cob-tbl"><thead><tr><th>Artículo</th><th class="num">Cajas</th><th class="num">$ unit</th><th class="num">uxb</th><th class="num">Valor lista</th><th>Origen</th></tr></thead><tbody>';
+  h += det.map(function (l) {
+    var org = l.motivo ? ('<span class="cob-warn">' + escapeHtml(l.motivo) + '</span>') : (l.origen === "lk" && d.empresa === "ch" ? '<span class="cob-badge cob-lk">vía LK</span>' : _cobEmpBadge(l.origen));
+    return '<tr><td>' + escapeHtml(l.articulo || "") + '</td>' +
+      '<td class="num">' + Math.round(Number(l.cajas) || 0) + '</td>' +
+      '<td class="num">' + (l.precio_unit != null ? _cobMoney(l.precio_unit) : "—") + '</td>' +
+      '<td class="num">' + (l.uxb != null ? l.uxb : "—") + '</td>' +
+      '<td class="num" style="font-weight:700;">' + (l.valor_lista != null ? _cobMoney(l.valor_lista) : "—") + '</td>' +
+      '<td>' + org + '</td></tr>';
+  }).join("");
+  h += '</tbody></table></div>';
+  h += '<div style="font-size:11px;color:#94a3b8;margin-top:8px;">' + escapeHtml(d.nota || "") + '</div>';
+  body.innerHTML = h;
 }
 
 /* ===== v9.37 — MÓDULO "💸 Plata perdida de facturar" =================================

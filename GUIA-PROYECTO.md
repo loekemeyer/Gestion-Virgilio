@@ -4,7 +4,48 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-13 · Versión app al documentar: **v10.46**
+> Última actualización: 2026-08-17 · Versión app al documentar: **v11.03**
+>
+> Nota **2026-08-17 — Cobranzas: valorizar una NP sin ver la factura.** Objetivo del
+> usuario: que Virgilio sepa cuánta plata se le facturó a cada NP/cliente sin tener la
+> factura a la vista. Hay **dos niveles de precio**, a propósito:
+> **(1) Valor de LISTA** — en la base, al toque y en lote (`sql/cobranzas.sql`):
+> `cobranzas_valorizar_np(np)` y `cobranzas_resumen()` cruzan `PPP_Base_Pedidos`
+> (artículo × cajas) con **`precios_venta`** (snapshot de la lista general de LK,
+> `products` ∪ `loke_products`), con match por código canónico (`cob_norm_cod`:
+> upper+trim+saca ceros a izq, así `948e`/`029` matchean). **NO aplica dto por cliente**
+> porque `precios_venta` es anon-readable y copiar el padrón de descuentos de LK acá lo
+> filtraría. **(2) NETO exacto por NP** — la Edge Function `arca-wsfe` acción `preciar`
+> lee LK **en vivo** (service_role) y aplica `list_price×(1−dto_vol)×(1−2%)+IVA 21%`;
+> ahora también con fallback a `loke_products`. **Empresa por numeración**: 9xxxx = LK,
+> 4xxxx = Chef → las NP de Chef salen `lista_no_disponible` (la lista de Chef vive en
+> otro Supabase, no está en Virgilio; mismo código = otro artículo en cada empresa).
+> **Cobertura medida (NPs en curso)**: LK 145 NP, valor lista ≈ $196,9 M, cobertura
+> 96,4% de líneas. El faltante se **clasifica** (`cob_estado_articulo`) porque casi
+> nunca es un hueco a cargar: `especial` (código de 5 díg = artículo de un solo cliente,
+> "no van"), `loke` (código que empieza con 1 = lista Loke, no se ofrece a cualquiera),
+> `discontinuado` (`Articulos_Discontinuados` ∪ `OC_Maximos.activo=false`) y `sin_precio`
+> (lo único realmente a cargar en LK). De las 17 líneas LK sin precio, solo **8 son
+> `sin_precio` real** (códigos 580 y 67); el resto son especiales/loke/discontinuados.
+> `cobranzas_resumen` expone `sin_precio_real` para no alarmar por lo esperado.
+> **Alias de código** (`cobranzas_alias`): cuando el código activo en pedidos difiere del
+> que tiene precio por grafía (mismo artículo). NO se toca la "E" automáticamente porque
+> hay pares distintos (`323`≠`323E`). Confirmados: `580`→`580E` (activo 580). Con eso el
+> faltante real LK baja a **1 línea** (código 67). **Chef**: precios en tabla aparte
+> `precios_venta_chef` (código Chef ≠ LK); se cargan con `sql/cobranzas_chef_sync.sql`
+> (correr en el proyecto Chef, pegar el INSERT en Virgilio — 101 códigos, sin loke). Los
+> precios efectivos salen de la vista `cobranzas_precios` (LK+Chef+alias). **Chef con
+> fallback a lista LK**: en Chef se venden productos Loeke a clientes puntuales (supers =
+> lista especial; FC E = lista LK normal), y esas líneas llevan código de fábrica LK que no
+> está en el catálogo Chef, así que se valorizan con la lista de LK (`origen='lk'` en el
+> detalle). ⚠ La lista **especial de supers** (`precios_super` de LK) no está en Virgilio →
+> para clientes de súper el valor con lista LK normal **sobreestima**. Cobertura NP en curso:
+> **LK ~100%, Chef 98,8%**. `precios_venta` se re-sincroniza a mano desde LK; backup en
+> `precios_venta_backup_20260817`. **Front-end (v11.04)**: botón **💵 Cobranzas — valor por
+> NP** en el panel supervisor (overlay `#cobOverlay`, molde de Plata perdida) que llama a
+> `cobranzas_resumen` (tabla de NP con valor y cobertura, filtro por empresa + búsqueda) y a
+> `cobranzas_valorizar_np` al tocar una NP (detalle por artículo, origen LK/Chef, estimado
+> c/ IVA). Es solo VISTA: `valor_lista` sin dto; el neto exacto sigue en arca-wsfe/preciar.
 >
 > Nota **v10.28 — La columna `Op` del Excel DEJÓ DE SER REQUISITO para mostrar tandas.**
 > Hasta acá, una tanda sin `Op=SI` **no aparecía** ni en el monitor de TV ni en las pantallas
