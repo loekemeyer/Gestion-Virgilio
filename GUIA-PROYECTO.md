@@ -777,6 +777,27 @@
 > movimiento que dejó el saldo del depósito en 0). Deployado + `sql/stock_estancado.sql` actualizado.
 > Verificado sobre stock actual: ~50 códigos re-atribuidos a su tanda vieja real (D09B/D08A/D07B/D15A…).
 >
+> Nota: **v11.09/v11.10 — FIX stock fantasma por picking_difiere + fix conteos + fix 102E insumo.**
+> Tres arreglos:
+> **(1) Doble reversal picking_difiere** (v11.09): `_compDifResolve` ajustaba `terminado +ret` sin
+> tocar `separar_pedidos` → la etapa 2 (trigger `trg_entregas_reconciliar_stock`) volvía a devolver
+> las mismas cajas a `terminado` porque `separar_pedidos` seguía lleno → **góndola +1 fantasma** (caso
+> real 584E). Fix: el ajuste ahora mueve **ambos lados** (`terminado +ret` + `separar_pedidos −ret`).
+> **(2) Race condition** (v11.09): el `stockMove` fire-and-forget de `_compDifResolve` podía llegar
+> DESPUÉS del trigger de etapa 2 (que lee `separar_pedidos` en la misma transacción que el INSERT de
+> Entregas). Fix v11.09: acumular en `_comp._difMovs` y flush síncrono (`await stockMove`) ANTES de
+> `_compSaveEntregas`. **v11.10 mejora**: **dual-send** — cada fila lleva un `client_id` pre-asignado
+> (`_stockClientId()`); se manda fire-and-forget inmediato (actualización en **tiempo real**) Y se
+> acumula en `_difMovs` para el flush síncrono (safety net). Si ambos llegan, `ON CONFLICT DO NOTHING`
+> vía `mov_stock_clientid_dedup` deduplica. Si el armado se cancela antes de `compTerminar`, el ajuste
+> inmediato ya corrigió la góndola negativa (es correcto: el picking la dejó negativa).
+> **(3) Fix Conteo_Stock** (v11.10): la tabla tiene columna `ts` (no `created_at`); 3 lugares del
+> front usaban `created_at` → PostgREST fallaba silencioso y los conteos no se veían en ajustes.
+> **(4) Fix 102E es_insumo** (server-side): `vista_stock_procesada` clasificaba como insumo a
+> cualquier código en la tabla `Insumos` (102E = ABRELATAS MARIPOSA, id 13); ahora solo es insumo si
+> además **no tiene stock de mercadería** (`terminado+racks+racks_ch+excedente+a_guardar = 0`).
+> Recreada la materialized view + índice + refresh.
+>
 > Nota SERVER (sin bump de app): **FIX stock — pedidos Chef facturados afuera dejaban stock LK trabado.**
 > Los pedidos de **Chef (NP 44xxx)** facturan mercadería **LK** afuera de la app (Cencosud/Chef, lo del
 > sufijo "L"). La **ETAPA 3** de `reconciliar_pipeline_stock()` drenaba `a_facturar` **solo si la tanda
@@ -7050,8 +7071,8 @@ En `showDayBreakdown` (monitor, por operario por día):
 
 ## 10. Versionado y cache
 
-- `index.html`: `APP_VERSION = "v10.05"`. Badge en pantalla `#versionBadge`:
-  `"v10.05 ✓"` (sin cola), `"v10.05 ⏳ N"` (pendientes), `"v10.05 ⚠ N"` (error).
+- `index.html`: `APP_VERSION = "v11.10"`. Badge en pantalla `#versionBadge`:
+  `"v11.10 ✓"` (sin cola), `"v11.10 ⏳ N"` (pendientes), `"v11.10 ⚠ N"` (error).
   **Sirve para confirmar qué versión cargó cada pantalla** (mirá el badge en la TV
   para saber si está al día).
 - `sw.js`: `SW_VERSION = "v10.05-vir"`. **No precachea nada**; el handler de `fetch`
