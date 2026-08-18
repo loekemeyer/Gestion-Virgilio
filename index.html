@@ -6504,7 +6504,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v11.10";
+const APP_VERSION = "v11.11";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -16176,7 +16176,9 @@ async function stkAceptarConteo(id) {
     const res = await fetch(SUPABASE_URL + "/rest/v1/rpc/aceptar_conteo",
       { method: "POST", headers: H, body: JSON.stringify({ p_conteo_id: id, p_admin_legajo: "admin" }) }).then(r => r.ok ? r.json() : null);
     if (res && res.ok) {
-      alert("✓ Conteo aceptado");
+      var msg = "✓ " + (res.mensaje || "Conteo aceptado");
+      if (res.delta && res.delta !== 0) msg += "\n\nSistema: " + res.saldo_sistema + " → Contado: " + res.contado + " → Ajuste: " + (res.delta > 0 ? "+" : "") + res.delta;
+      alert(msg);
       if (_stk && _stk.conteosUI) {
         _stk.conteosUI.pendientes = (_stk.conteosUI.pendientes || []).filter(c => c.id !== id);
         stkRender();
@@ -17411,6 +17413,7 @@ function stkBodyAjustes() {
   h += '<div class="stk-aj-dep">Depósito: <select id="stkAjDep" onchange="stkIniHintUpdate()"><option value="terminado">Artículo Terminado (góndola)</option><option value="excedente">Excedente</option><option value="racks">Racks</option><option value="racks_ch">Racks CH</option><option value="insumos">Insumos</option><option value="separar_pedidos">A Separar (pedidos)</option><option value="a_facturar">A Facturar</option><option value="a_guardar">Mercadería a guardar</option><option value="para_envasar">Para envasar</option></select></div>';
   h += '<div class="stk-aj-sec"><div class="stk-aj-h">⚙ Ajustar stock</div>';
   h += '<div class="stk-aj-hint">Sumá o restá con signo: <code>+10</code> / <code>-3</code>.</div><div class="stk-aj-form"><input id="stkAjCod" class="stk-aj-inp" style="flex:0 0 auto;width:150px" placeholder="Código"><input id="stkAjCant" class="stk-aj-inp" style="flex:0 0 auto;width:110px" type="number" placeholder="+/- cajas"><button class="stk-btn ok" onclick="stockAjustar()">Aplicar</button></div>';
+  h += '<div class="stk-aj-form" style="margin-top:4px"><input id="stkAjComent" class="stk-aj-inp" style="flex:1;min-width:200px" placeholder="Comentario (opcional — queda en el historial)"></div>';
   h += '<div class="stk-aj-hint" style="margin-top:10px">O dejá el stock exacto:</div><div class="stk-aj-form"><input id="stkAjCod2" class="stk-aj-inp" style="flex:0 0 auto;width:150px" placeholder="Código"><input id="stkAjFijar" class="stk-aj-inp" style="flex:0 0 auto;width:110px" type="number" placeholder="Fijar en…"><button class="stk-btn" onclick="stockFijar()">Fijar</button></div></div>';
   h += '<div class="stk-aj-sec"><div class="stk-aj-h">➕ Stock inicial</div><div class="stk-aj-hint" id="stkIniHint">Una linea por articulo: <b>CODIGO CANTIDAD</b> (en el deposito de arriba). El stock inicial <b>siempre cuenta</b> como base.</div><textarea id="stkIniTxt" class="stk-ini-txt" rows="6" placeholder="544 30&#10;546 12"></textarea><div class="stk-ini-btns"><button class="stk-btn ok" onclick="stockGuardarInicial()">Guardar inicial</button><button class="stk-btn danger" onclick="stockMarcarInicio()">🔄 Marcar inicio (resetear)</button></div><div class="stk-ini-warn">⚠ Pasos: 1) carga el inicial de cada deposito (cambias el deposito de arriba y repetis); 2) tocas <b>Marcar inicio</b> una sola vez. Desde ahi los movimientos REALES anteriores (de prueba) dejan de sumar — quedan guardados, no se borran.</div></div>';
   h += stkBodyHistAjustes();
@@ -17534,8 +17537,10 @@ async function stockAjustar() {
   if (!codRaw || isNaN(cant) || cant === 0) { alert("Pone un codigo y una cantidad (+/-)."); return; }
   var cod = _stkResolveDual(codRaw);
   if (!cod) return;
+  var comentario = ((document.getElementById("stkAjComent") || {}).value || "").trim();
   const sd = stockComputeSaldos(_stk.movs, _stk.cutoff)[cod], dep = _stkDep();
-  await stkInsertMov([{ cod_art: cod, descripcion: (sd && sd.desc) || null, deposito: dep, delta: cant, tipo: "ajuste", ref: "ajuste manual", legajo: "0" }], "Ajuste " + cod + " (" + dep + "): " + (cant > 0 ? "+" : "") + cant);
+  var ref = "ajuste manual" + (comentario ? " | " + comentario : "");
+  await stkInsertMov([{ cod_art: cod, descripcion: comentario || ((sd && sd.desc) || null), deposito: dep, delta: cant, tipo: "ajuste", ref: ref, legajo: "0" }], "Ajuste " + cod + " (" + dep + "): " + (cant > 0 ? "+" : "") + cant);
 }
 async function stockFijar() {
   var codRaw = ((document.getElementById("stkAjCod2") || {}).value || "").trim().toUpperCase();
@@ -17543,10 +17548,12 @@ async function stockFijar() {
   if (!codRaw || isNaN(fijar)) { alert("Pone un codigo y el stock a fijar."); return; }
   var cod = _stkResolveDual(codRaw);
   if (!cod) return;
+  var comentario = ((document.getElementById("stkAjComent") || {}).value || "").trim();
   const sd = stockComputeSaldos(_stk.movs, _stk.cutoff)[cod], dep = _stkDep();
   const actual = (sd && sd[dep]) || 0; const delta = fijar - actual;
   if (delta === 0) { alert("El stock de " + cod + " (" + dep + ") ya es " + fijar + "."); return; }
-  await stkInsertMov([{ cod_art: cod, descripcion: (sd && sd.desc) || null, deposito: dep, delta: delta, tipo: "ajuste", ref: "fijar en " + fijar, legajo: "0" }], "Stock de " + cod + " (" + dep + ") fijado en " + fijar + " (ajuste " + (delta > 0 ? "+" : "") + delta + ")");
+  var ref = "fijar en " + fijar + (comentario ? " | " + comentario : "");
+  await stkInsertMov([{ cod_art: cod, descripcion: comentario || ((sd && sd.desc) || null), deposito: dep, delta: delta, tipo: "ajuste", ref: ref, legajo: "0" }], "Stock de " + cod + " (" + dep + ") fijado en " + fijar + " (ajuste " + (delta > 0 ? "+" : "") + delta + ")");
 }
 async function stockGuardarInicial() {
   const ta = document.getElementById("stkIniTxt"); const txt = (ta && ta.value) || "";
