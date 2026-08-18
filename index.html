@@ -16227,19 +16227,27 @@ async function stkShowConteHistorico() {
     let html = '<div style="max-height:400px;overflow-y:auto;"><table style="width:100%;border-collapse:collapse;font-size:0.9em">' +
       '<thead><tr style="background:#f0f0f0;"><th style="border:1px solid #ddd;padding:4px">Código</th>' +
       '<th style="border:1px solid #ddd;padding:4px">Contado</th>' +
+      '<th style="border:1px solid #ddd;padding:4px">Sistema</th>' +
+      '<th style="border:1px solid #ddd;padding:4px">Dif</th>' +
       '<th style="border:1px solid #ddd;padding:4px">Estado</th>' +
-      '<th style="border:1px solid #ddd;padding:4px">Procesado por</th>' +
+      '<th style="border:1px solid #ddd;padding:4px">Procesado</th>' +
       '<th style="border:1px solid #ddd;padding:4px">Fecha</th>' +
-      '<th style="border:1px solid #ddd;padding:4px">Nota</th></tr></thead><tbody>';
+      '<th style="border:1px solid #ddd;padding:4px">Motivo rechazo</th></tr></thead><tbody>';
     (res || []).forEach(row => {
       const estado_col = row.estado === 'aceptado' ? '<span style="color:green">✓ Aceptado</span>' :
                         (row.estado === 'rechazado' ? '<span style="color:red">✕ Rechazado</span>' : '<span style="color:orange">⏳ Pendiente</span>');
       const cant = row.cantidad || row.cajas || "—";
+      const sis = row.stock_sistema != null ? row.stock_sistema : '—';
+      const dif = row.stock_sistema != null ? (Number(cant) || 0) - Number(row.stock_sistema) : null;
+      const difTxt = dif !== null ? ((dif > 0 ? '+' : '') + dif) : '—';
+      const difCol = dif !== null ? (dif > 0 ? 'green' : dif < 0 ? 'red' : '#666') : '#999';
       const fecha = new Date(row.ts).toLocaleDateString('es-AR');
       html += '<tr><td style="border:1px solid #ddd;padding:4px">' + escapeHtml(row.cod) + '</td>' +
         '<td style="border:1px solid #ddd;padding:4px;text-align:right">' + escapeHtml(String(cant)) + '</td>' +
+        '<td style="border:1px solid #ddd;padding:4px;text-align:right;color:#666">' + escapeHtml(String(sis)) + '</td>' +
+        '<td style="border:1px solid #ddd;padding:4px;text-align:right;font-weight:800;color:' + difCol + '">' + difTxt + '</td>' +
         '<td style="border:1px solid #ddd;padding:4px">' + estado_col + '</td>' +
-        '<td style="border:1px solid #ddd;padding:4px">' + escapeHtml(row.procesado_por || '—') + '</td>' +
+        '<td style="border:1px solid #ddd;padding:4px;font-size:0.85em">' + escapeHtml(row.procesado_por || '—') + '</td>' +
         '<td style="border:1px solid #ddd;padding:4px;font-size:0.85em">' + fecha + '</td>' +
         '<td style="border:1px solid #ddd;padding:4px;font-size:0.85em">' + escapeHtml(row.razon_rechazo || '—') + '</td></tr>';
     });
