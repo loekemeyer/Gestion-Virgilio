@@ -6504,7 +6504,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v11.08";
+const APP_VERSION = "v11.09";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -9540,7 +9540,10 @@ function _compDifResolve(tipo, gond) {
     (async function () {
       let ret = 0;
       try { const sal = await _stkGondolaSaldoVivo(c.cod); if (sal != null && sal < 0) ret = Math.min(qty, -sal); } catch (_e) { ret = 0; }
-      if (ret > 0) { try { stockMove([{ cod_art: c.cod, descripcion: "", deposito: "terminado", delta: ret, tipo: "ajuste", ref: "picking_difiere", legajo: _comp.legajo }]); } catch (_e) {} }
+      if (ret > 0) { try { stockMove([
+        { cod_art: c.cod, descripcion: "", deposito: "terminado",        delta:  ret, tipo: "ajuste", ref: "picking_difiere", legajo: _comp.legajo },
+        { cod_art: c.cod, descripcion: "", deposito: "separar_pedidos",  delta: -ret, tipo: "ajuste", ref: _comp.tanda || "picking_difiere", legajo: _comp.legajo }
+      ]); } catch (_e) {} }
     })();
   }
   // v10.10 — FIX: "de menos" (lo que no estaba en el pedido) ahora SÍ se descuenta del
