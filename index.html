@@ -6504,7 +6504,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v11.11";
+const APP_VERSION = "v11.12";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -16128,17 +16128,22 @@ function cntGuardar() {
     return !(_artNombres && _artNombres[_ocgNorm(cod)]);
   });
   if (invalidos.length) { try { alert("Hay códigos que no existen: " + invalidos.map(function (r) { return r.cod; }).join(", ") + ". Solo se pueden contar códigos existentes."); } catch (_e) {} return; }
+  // v11.12: snapshot del stock del sistema al momento del conteo (para diferencia dinámica)
+  var saldos = stockComputeSaldos(_stk.movs, _stk.cutoff);
   const rows = c.rows.filter(function (r) {
     var cod = String(r.cod || "").trim(); if (!cod) return false;
     return r.isInsumo ? (Number(r.cantidad) || 0) > 0 : _cntCajas(r) > 0;
   }).map(function (r) {
+    var k = _ocgNorm(r.cod), sd = saldos[k] || {};
     if (r.isInsumo) {
+      var sysIns = Number(sd.insumos) || 0;
       return { sesion: ses, legajo: c.legajo || null, cod: String(r.cod).toUpperCase().trim(), sector: String(r.sector || "").trim() || null,
                deposito: "insumos", cantidad: Number(r.cantidad) || 0, unidad: r.unidad || null,
-               pilas: 0, cjas_x_pila: 0, sueltas: 0, cajas: 0 };
+               pilas: 0, cjas_x_pila: 0, sueltas: 0, cajas: 0, stock_sistema: sysIns };
     }
+    var sysMerc = (Number(sd.terminado) || 0) + (Number(sd.excedente) || 0);
     return { sesion: ses, legajo: c.legajo || null, cod: String(r.cod).toUpperCase().trim(), sector: String(r.sector || "").trim() || null,
-             deposito: "terminado", pilas: Number(r.pilas) || 0, cjas_x_pila: Number(r.cxp) || 0, sueltas: Number(r.sueltas) || 0, cajas: _cntCajas(r) };
+             deposito: "terminado", pilas: Number(r.pilas) || 0, cjas_x_pila: Number(r.cxp) || 0, sueltas: Number(r.sueltas) || 0, cajas: _cntCajas(r), stock_sistema: sysMerc };
   });
   if (!rows.length) { try { alert("No hay filas con código y cantidad."); } catch (_e) {} return; }
   fetch(SUPABASE_CONTEO_ENDPOINT, { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" }, body: JSON.stringify(rows) })
@@ -16177,7 +16182,7 @@ async function stkAceptarConteo(id) {
       { method: "POST", headers: H, body: JSON.stringify({ p_conteo_id: id, p_admin_legajo: "admin" }) }).then(r => r.ok ? r.json() : null);
     if (res && res.ok) {
       var msg = "✓ " + (res.mensaje || "Conteo aceptado");
-      if (res.delta && res.delta !== 0) msg += "\n\nSistema: " + res.saldo_sistema + " → Contado: " + res.contado + " → Ajuste: " + (res.delta > 0 ? "+" : "") + res.delta;
+      if (res.delta && res.delta !== 0) msg += "\n\nContado: " + res.contado + " — Sistema al conteo: " + res.stock_al_conteo + " → Ajuste: " + (res.delta > 0 ? "+" : "") + res.delta;
       alert(msg);
       if (_stk && _stk.conteosUI) {
         _stk.conteosUI.pendientes = (_stk.conteosUI.pendientes || []).filter(c => c.id !== id);
@@ -16251,26 +16256,61 @@ async function stkShowConteHistorico() {
 
 function stkBodyConteosRealizados() {
   if (!_stk || !_stk.conteosUI) return '';
+  // v11.12: separar pendientes con diferencia vs sin diferencia
+  var pend = _stk.conteosUI.pendientes || [];
+  var conDif = [], sinDif = [];
+  pend.forEach(function (row) {
+    var contado = Number(row.deposito === 'insumos' ? row.cantidad : row.cajas) || 0;
+    var sistema = (row.stock_sistema != null) ? Number(row.stock_sistema) : null;
+    if (sistema !== null && contado === sistema) sinDif.push(row);
+    else conDif.push(row);
+  });
+  // Auto-aceptar los que coinciden (sin diferencia) — fire-and-forget
+  if (sinDif.length && !_stk.conteosUI._autoAceptando) {
+    _stk.conteosUI._autoAceptando = true;
+    Promise.all(sinDif.map(function (row) {
+      return stkAceptarConteoSilent(row.id);
+    })).then(function () {
+      if (_stk && _stk.conteosUI) {
+        var sinDifIds = new Set(sinDif.map(function (r) { return r.id; }));
+        _stk.conteosUI.pendientes = (_stk.conteosUI.pendientes || []).filter(function (r) { return !sinDifIds.has(r.id); });
+        _stk.conteosUI._autoAceptando = false;
+        stkRender();
+      }
+    }).catch(function () { if (_stk && _stk.conteosUI) _stk.conteosUI._autoAceptando = false; });
+  }
   let h = '<div class="stk-aj-sec"><div class="stk-aj-h">📋 Conteos Realizados</div>';
   h += '<div style="margin-bottom:8px"><button class="stk-btn" onclick="stkShowConteHistorico()">📋 Ver Histórico</button></div>';
-  if (!_stk.conteosUI.pendientes || !_stk.conteosUI.pendientes.length) {
-    h += '<div class="stk-empty">No hay conteos pendientes de procesar.</div>';
+  if (!conDif.length) {
+    h += '<div class="stk-empty">No hay conteos con diferencia pendientes de procesar.' + (sinDif.length ? ' (' + sinDif.length + ' exacto(s) auto-aceptados)' : '') + '</div>';
   } else {
-    h += '<div class="stk-tblwrap"><table class="stk-tbl stk-tbl-fit"><thead><tr><th>Código</th><th>Depósito</th><th class="num">Contado</th><th>Unidad</th><th></th></tr></thead><tbody>';
-    (_stk.conteosUI.pendientes || []).forEach(row => {
-      const contado = row.deposito === 'insumos' ? row.cantidad : row.cajas;
-      const uni = row.deposito === 'insumos' ? row.unidad : '—';
-      const idAttr = escapeHtml(String(row.id));
+    h += '<div class="stk-tblwrap"><table class="stk-tbl stk-tbl-fit"><thead><tr><th>Código</th><th>Depósito</th><th class="num">Contado</th><th class="num">Sistema</th><th class="num">Dif</th><th></th></tr></thead><tbody>';
+    conDif.forEach(function (row) {
+      var contado = Number(row.deposito === 'insumos' ? row.cantidad : row.cajas) || 0;
+      var sistema = (row.stock_sistema != null) ? Number(row.stock_sistema) : null;
+      var dif = sistema !== null ? contado - sistema : null;
+      var difTxt = dif !== null ? ((dif > 0 ? '+' : '') + dif) : '?';
+      var difCol = dif !== null ? (dif > 0 ? '#16a34a' : dif < 0 ? '#dc2626' : '#64748b') : '#94a3b8';
+      var idAttr = escapeHtml(String(row.id));
       h += '<tr><td><b>' + escapeHtml(row.cod) + '</b></td>' +
-        '<td>' + (row.deposito === 'insumos' ? '📋 Insumos' : '📦 Mercadería') + '</td>' +
-        '<td class="num">' + escapeHtml(String(contado)) + '</td>' +
-        '<td style="font-size:0.9em;color:#666">' + escapeHtml(uni || '—') + '</td>' +
+        '<td>' + (row.deposito === 'insumos' ? '📋 Ins' : '📦 Merc') + '</td>' +
+        '<td class="num">' + contado + '</td>' +
+        '<td class="num" style="color:#64748b">' + (sistema !== null ? sistema : '?') + '</td>' +
+        '<td class="num" style="color:' + difCol + ';font-weight:800">' + difTxt + '</td>' +
         '<td><button class="stk-btn" style="padding:4px 9px;color:#1e40af;border:1px solid #1e40af" data-conteo-id="' + idAttr + '" onclick="stkAceptarConteo(this.getAttribute(\'data-conteo-id\'))">✓ Aceptar</button> <button class="stk-btn" style="padding:4px 9px;color:#dc2626;border:1px solid #dc2626" data-conteo-id="' + idAttr + '" onclick="stkRechazarConteo(this.getAttribute(\'data-conteo-id\'))">✕ Rechazar</button></td></tr>';
     });
     h += '</tbody></table></div>';
   }
   h += '</div>';
   return h;
+}
+/* v11.12: auto-aceptar conteo silencioso (sin alert, para los que coinciden) */
+async function stkAceptarConteoSilent(id) {
+  try {
+    const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" };
+    await fetch(SUPABASE_URL + "/rest/v1/rpc/aceptar_conteo",
+      { method: "POST", headers: H, body: JSON.stringify({ p_conteo_id: id, p_admin_legajo: "auto" }) }).then(function (r) { return r.ok ? r.json() : null; });
+  } catch (_e) {}
 }
 
 function stkBodyConteo() {
