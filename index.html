@@ -10163,9 +10163,9 @@ async function openStockAdmin(soloConteo) {
       _stk.insumosCods = _insFromView;
       _stk.cxm = _cxmMerge;
       _stk.proy = _proyMap;
-      // v10.42: NO pisar viewRows — stocks_carga_rapida es la fuente principal
-      // (saldos instantáneos vía trigger + realtime). La vista se guarda aparte
-      // para detalle/historial y para actualizar campos derivados en viewRows.
+      // v11.08: NO pisar viewRows — stocks_carga_rapida es la fuente principal
+      // (saldos instantáneos vía trigger + realtime vía sb.channel). La vista se
+      // guarda aparte para detalle/historial y campos derivados en viewRows.
       _stk._vistaRows = _viewRows;
       // Actualizar campos derivados (cajas_pedidas, proy, cap, linea, desc) en viewRows desde la vista
       var _vistaMap = {};
@@ -10209,45 +10209,49 @@ async function stkLoadDiscSet() {
 // v10.50 — chip "🚫 Ocultar discontinuos" (off por defecto: se ven).
 function stkToggleOcultarDisc() { if (_stk) { _stk.ocultarDisc = !_stk.ocultarDisc; stkRender(); } }
 let _stkRtSub = null;
+/* v11.08: suscripción realtime DIRECTA a stocks_carga_rapida (tabla publicada en
+   supabase_realtime con REPLICA IDENTITY FULL). Antes escuchaba Movimientos_Stock
+   con SUPABASE_CLIENT (nunca definido → código muerto). Ahora usa sb (v2 API) y
+   recibe la fila actualizada directo sin re-fetch. */
 function stkSubscribeRealtime() {
-  if (!_stk || _stkRtSub) return;   // si ya está suscrito o _stk es null, no hacer nada
+  if (!_stk || _stkRtSub) return;
   try {
-    // Suscribirse a cambios en Movimientos_Stock (filtro: tipo en picking/separado, post-activación)
-    _stkRtSub = SUPABASE_CLIENT.from("Movimientos_Stock")
-      .on("*", function (payload) {
-        if (!_stk) { if (_stkRtSub) _stkRtSub.unsubscribe(); _stkRtSub = null; return; }
-        const mv = payload.new || payload.old;
-        if (!mv) return;
-        const cod = String(mv.cod_art || "").toUpperCase();
-        // v10.42: escuchar TODOS los tipos de movimiento (picking, separado, armado, facturado, guardado, racks, etc.)
-        // Buscar fila del código en la tabla actual
-        const row = document.querySelector('tr.stk-row[data-stk-cod="' + escapeHtml(cod) + '"]');
-        if (!row) return;   // no está en la tabla abierta
-        // v10.42: recargar desde stocks_carga_rapida (saldos instantáneos vía trigger)
-        // en vez de vista_stock_procesada (materializada cada 5 min)
-        (async function() {
-          try {
-            const updated = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/stocks_carga_rapida", "select=cod,cod_base,descripcion,linea,familia_principal,es_secundario,terminado,excedente,separar_pedidos,a_facturar,a_guardar,racks,racks_ch,para_envasar,insumos_dep,stock_total,cajas_pedidas,proy_cajas_mes,capacidad_gondola,es_insumo,visible_en_stock,fc_sin_salida");
-            if (!_stk) return;
-            _stk.viewRows = updated || [];
-            // Recalcular mapas de demanda/proyección
-            var _demFromView = {}, _proyMap = {};
-            (updated || []).forEach(function (r) {
-              var k = _ocgNorm(r.cod);
-              if (k && Number(r.cajas_pedidas) > 0) _demFromView[k] = Number(r.cajas_pedidas);
-              if (k && Number(r.proy_cajas_mes) > 0) _proyMap[k] = Number(r.proy_cajas_mes);
-            });
-            _stk.dem = _demFromView;
-            _stk.proy = _proyMap;
-            updateStkBadge();  // actualizar badge también
-            stkRender();
-          } catch (_e) {}
-        })();
-      })
+    if (typeof sb === "undefined") return;
+    _stkRtSub = sb.channel("stk-rt")
+      .on("postgres_changes",
+        { event: "UPDATE", schema: "public", table: "stocks_carga_rapida" },
+        function (payload) {
+          if (!_stk) { stkUnsubscribeRealtime(); return; }
+          var nw = payload.new;
+          if (!nw || !nw.cod) return;
+          var codN = _ocgNorm(nw.cod);
+          // Parchear la fila en viewRows en lugar de re-fetch completo
+          var found = false;
+          for (var i = 0; i < (_stk.viewRows || []).length; i++) {
+            if (_ocgNorm(_stk.viewRows[i].cod) === codN) {
+              _stk.viewRows[i] = nw;
+              found = true;
+              break;
+            }
+          }
+          if (!found) _stk.viewRows.push(nw);
+          // Actualizar mapas de demanda/proyección para este código
+          if (codN) {
+            if (Number(nw.cajas_pedidas) > 0) _stk.dem[codN] = Number(nw.cajas_pedidas);
+            else delete _stk.dem[codN];
+            if (Number(nw.proy_cajas_mes) > 0) _stk.proy[codN] = Number(nw.proy_cajas_mes);
+            else delete _stk.proy[codN];
+          }
+          updateStkBadge();
+          stkRender();
+        })
       .subscribe();
-  } catch (_e) {}
+  } catch (_e) { console.warn("[stk-rt] subscribe error:", _e); }
 }
-function closeStockAdmin() { const ov = document.getElementById("stockAdminOverlay"); if (ov) ov.classList.remove("show"); if (_stkRtSub) { _stkRtSub.unsubscribe(); _stkRtSub = null; } _stk = null; }
+function stkUnsubscribeRealtime() {
+  if (_stkRtSub) { try { sb.removeChannel(_stkRtSub); } catch(_e){} _stkRtSub = null; }
+}
+function closeStockAdmin() { const ov = document.getElementById("stockAdminOverlay"); if (ov) ov.classList.remove("show"); stkUnsubscribeRealtime(); _stk = null; }
 
 /* ===== ÓRDENES DE COMPRA (v4.11): visualización/carga de OCs y match recibido vs pedido.
    Usa la tabla EXISTENTE Ordenes_Compra (plana: una fila por artículo pedido — codigo,
