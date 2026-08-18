@@ -6504,7 +6504,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v11.07";
+const APP_VERSION = "v11.08";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -17390,7 +17390,75 @@ function stkBodyAjustes() {
   h += '<div class="stk-aj-sec"><div class="stk-aj-h">⚙ Ajustar stock</div>';
   h += '<div class="stk-aj-hint">Sumá o restá con signo: <code>+10</code> / <code>-3</code>.</div><div class="stk-aj-form"><input id="stkAjCod" class="stk-aj-inp" style="flex:0 0 auto;width:150px" placeholder="Código"><input id="stkAjCant" class="stk-aj-inp" style="flex:0 0 auto;width:110px" type="number" placeholder="+/- cajas"><button class="stk-btn ok" onclick="stockAjustar()">Aplicar</button></div>';
   h += '<div class="stk-aj-hint" style="margin-top:10px">O dejá el stock exacto:</div><div class="stk-aj-form"><input id="stkAjCod2" class="stk-aj-inp" style="flex:0 0 auto;width:150px" placeholder="Código"><input id="stkAjFijar" class="stk-aj-inp" style="flex:0 0 auto;width:110px" type="number" placeholder="Fijar en…"><button class="stk-btn" onclick="stockFijar()">Fijar</button></div></div>';
-  h += '<div class="stk-aj-sec"><div class="stk-aj-h">➕ Stock inicial</div><div class="stk-aj-hint" id="stkIniHint">Una línea por artículo: <b>CÓDIGO CANTIDAD</b> (en el depósito de arriba). El stock inicial <b>siempre cuenta</b> como base.</div><textarea id="stkIniTxt" class="stk-ini-txt" rows="6" placeholder="544 30&#10;546 12"></textarea><div class="stk-ini-btns"><button class="stk-btn ok" onclick="stockGuardarInicial()">Guardar inicial</button><button class="stk-btn danger" onclick="stockMarcarInicio()">🔄 Marcar inicio (resetear)</button></div><div class="stk-ini-warn">⚠ Pasos: 1) cargá el inicial de cada depósito (cambiás el depósito de arriba y repetís); 2) tocás <b>Marcar inicio</b> una sola vez. Desde ahí los movimientos REALES anteriores (de prueba) dejan de sumar — quedan guardados, no se borran.</div></div>';
+  h += '<div class="stk-aj-sec"><div class="stk-aj-h">➕ Stock inicial</div><div class="stk-aj-hint" id="stkIniHint">Una linea por articulo: <b>CODIGO CANTIDAD</b> (en el deposito de arriba). El stock inicial <b>siempre cuenta</b> como base.</div><textarea id="stkIniTxt" class="stk-ini-txt" rows="6" placeholder="544 30&#10;546 12"></textarea><div class="stk-ini-btns"><button class="stk-btn ok" onclick="stockGuardarInicial()">Guardar inicial</button><button class="stk-btn danger" onclick="stockMarcarInicio()">🔄 Marcar inicio (resetear)</button></div><div class="stk-ini-warn">⚠ Pasos: 1) carga el inicial de cada deposito (cambias el deposito de arriba y repetis); 2) tocas <b>Marcar inicio</b> una sola vez. Desde ahi los movimientos REALES anteriores (de prueba) dejan de sumar — quedan guardados, no se borran.</div></div>';
+  h += stkBodyHistAjustes();
+  return h;
+}
+/* v11.07: Historial de ajustes manuales — colapsable, con búsqueda por código, fecha, depósito */
+function stkBodyHistAjustes() {
+  if (!_stk || !_stk.movs) return '';
+  var open = _stk._histAjOpen || false;
+  var h = '<div class="stk-aj-sec" style="margin-top:14px;">';
+  h += '<div class="stk-aj-h" style="cursor:pointer;user-select:none;" onclick="if(_stk){_stk._histAjOpen=!_stk._histAjOpen;stkRender();}">' + (open ? '▼' : '▶') + ' 📜 Historial de ajustes</div>';
+  if (!open) return h + '</div>';
+  // Filtros
+  var fCod = (_stk._histAjFiltCod || '').toUpperCase();
+  var fDep = _stk._histAjFiltDep || '';
+  var fDesde = _stk._histAjFiltDesde || '';
+  var fHasta = _stk._histAjFiltHasta || '';
+  var fRef = (_stk._histAjFiltRef || '').toLowerCase();
+  h += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin:8px 0;align-items:center;">';
+  h += '<input class="stk-aj-inp" style="width:120px" placeholder="Codigo" value="' + escapeHtml(fCod) + '" oninput="if(_stk){_stk._histAjFiltCod=this.value;stkRender();}">';
+  h += '<select class="stk-aj-inp" style="width:140px;height:32px" onchange="if(_stk){_stk._histAjFiltDep=this.value;stkRender();}">';
+  h += '<option value="">Todo deposito</option>';
+  var deps = ["terminado","excedente","racks","racks_ch","insumos","separar_pedidos","a_facturar","a_guardar","para_envasar"];
+  deps.forEach(function(d) { h += '<option value="' + d + '"' + (fDep === d ? ' selected' : '') + '>' + escapeHtml(d) + '</option>'; });
+  h += '</select>';
+  h += '<input class="stk-aj-inp" type="date" style="width:130px" value="' + escapeHtml(fDesde) + '" oninput="if(_stk){_stk._histAjFiltDesde=this.value;stkRender();}" title="Desde">';
+  h += '<input class="stk-aj-inp" type="date" style="width:130px" value="' + escapeHtml(fHasta) + '" oninput="if(_stk){_stk._histAjFiltHasta=this.value;stkRender();}" title="Hasta">';
+  h += '<input class="stk-aj-inp" style="width:140px" placeholder="Referencia / motivo" value="' + escapeHtml(_stk._histAjFiltRef || '') + '" oninput="if(_stk){_stk._histAjFiltRef=this.value;stkRender();}">';
+  h += '</div>';
+  // Filtrar movimientos tipo ajuste
+  var ajustes = _stk.movs.filter(function(mv) { return mv.tipo === 'ajuste'; });
+  if (fCod) ajustes = ajustes.filter(function(mv) { return String(mv.cod_art || '').toUpperCase().indexOf(fCod) >= 0; });
+  if (fDep) ajustes = ajustes.filter(function(mv) { return mv.deposito === fDep; });
+  if (fDesde) { var dD = new Date(fDesde + 'T00:00:00-03:00').getTime(); ajustes = ajustes.filter(function(mv) { return new Date(mv.ts).getTime() >= dD; }); }
+  if (fHasta) { var dH = new Date(fHasta + 'T23:59:59-03:00').getTime(); ajustes = ajustes.filter(function(mv) { return new Date(mv.ts).getTime() <= dH; }); }
+  if (fRef) ajustes = ajustes.filter(function(mv) { return String(mv.ref || '').toLowerCase().indexOf(fRef) >= 0; });
+  // Ordenar por fecha desc
+  ajustes.sort(function(a, b) { return new Date(b.ts) - new Date(a.ts); });
+  var total = ajustes.length;
+  var PAGE = 50;
+  var page = _stk._histAjPage || 0;
+  var shown = ajustes.slice(page * PAGE, (page + 1) * PAGE);
+  h += '<div style="font-size:12px;color:#64748b;margin-bottom:4px;">' + total + ' ajuste(s)' + (total > PAGE ? ' — pagina ' + (page + 1) + '/' + Math.ceil(total / PAGE) : '') + '</div>';
+  if (!shown.length) { h += '<div class="stk-empty">Sin ajustes con esos filtros.</div></div>'; return h; }
+  h += '<div class="stk-tblwrap"><table class="stk-tbl"><thead><tr><th>Fecha</th><th>Codigo</th><th>Descripcion</th><th>Deposito</th><th class="num">Delta</th><th>Referencia</th><th>Quien</th></tr></thead><tbody>';
+  shown.forEach(function(mv) {
+    var d = new Date(mv.ts);
+    var dd = String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0') + '/' + d.getFullYear();
+    var hh = String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+    var delta = Number(mv.delta) || 0;
+    var col = delta > 0 ? '#16a34a' : delta < 0 ? '#dc2626' : '#64748b';
+    var leg = mv.legajo || '';
+    var nom = (typeof _empleadosNombres !== 'undefined' && _empleadosNombres && _empleadosNombres.get(String(leg))) || '';
+    var quien = nom ? escapeHtml(nom) + ' <span style="color:#94a3b8">(L' + escapeHtml(leg) + ')</span>' : (leg ? 'L' + escapeHtml(leg) : '—');
+    h += '<tr><td style="white-space:nowrap;font-size:0.85em;">' + dd + ' ' + hh + '</td>' +
+      '<td><b>' + escapeHtml(codBase(mv.cod_art || '')) + '</b></td>' +
+      '<td style="font-size:0.85em;color:#475569;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(mv.descripcion || '') + '</td>' +
+      '<td style="font-size:0.85em;">' + escapeHtml(mv.deposito || '') + '</td>' +
+      '<td class="num" style="color:' + col + ';font-weight:800">' + (delta > 0 ? '+' : '') + delta + '</td>' +
+      '<td style="font-size:0.85em;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(mv.ref || '') + '</td>' +
+      '<td style="font-size:0.85em;">' + quien + '</td></tr>';
+  });
+  h += '</tbody></table></div>';
+  if (total > PAGE) {
+    h += '<div style="display:flex;gap:8px;margin-top:6px;justify-content:center;">';
+    if (page > 0) h += '<button class="stk-btn" onclick="if(_stk){_stk._histAjPage=' + (page - 1) + ';stkRender();}">← Anterior</button>';
+    if ((page + 1) * PAGE < total) h += '<button class="stk-btn" onclick="if(_stk){_stk._histAjPage=' + (page + 1) + ';stkRender();}">Siguiente →</button>';
+    h += '</div>';
+  }
+  h += '</div>';
   return h;
 }
 /* v6.24: el instructivo + placeholder del "Stock inicial" cambian según el depósito.
