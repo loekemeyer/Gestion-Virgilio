@@ -159,7 +159,8 @@ function _ppBuildSection(key, icon, title, rows, showTimer) {
       '<th>Fecha</th><th>Tipo</th><th>N° Remito</th><th>N° Factura</th><th>Razón Social</th><th>Contenido</th>';
     if (showTimer) html += '<th>Tiempo sin enviar</th>';
     if (key === 'enviada') html += '<th>Confirmar recepción</th>';
-    html += '<th>Enviado</th></tr></thead><tbody>';
+    if (key !== 'enviada') html += '<th>Enviado</th>';
+    html += '</tr></thead><tbody>';
 
     rows.forEach(function (row) {
       html += _ppBuildRow(row, showTimer, key === 'enviada');
@@ -236,7 +237,8 @@ function _ppBuildRow(row, showTimer, showConfirm) {
     }
   }
 
-  html += '<td style="text-align:center;">' + checkCell + '</td></tr>';
+  if (!showConfirm) html += '<td style="text-align:center;">' + checkCell + '</td>';
+  html += '</tr>';
   return html;
 }
 
