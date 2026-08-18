@@ -6504,7 +6504,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v11.09";
+const APP_VERSION = "v11.10";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -9537,19 +9537,23 @@ function _compDifResolve(tipo, gond) {
   // Ahora se lee el saldo VIVO y se devuelve, a lo sumo, lo justo para llevar góndola a 0 (nunca
   // por encima). Si la góndola ya está en 0 o + → no se toca. Sin dato de saldo → no se toca.
   // "Sí, agarro de góndola" NO descuenta (ya lo descontó el picking). "De más" (sobra): nada.
-  // v11.09: acumular en _comp._difMovs en vez de stockMove fire-and-forget.
-  // Se mandan SINCRONO antes de Entregas_Virgilio en _compTerminar, para que etapa 2
-  // (trigger trg_entregas_reconciliar_stock) ya vea el separar_pedidos reducido y no
-  // devuelva a terminado lo que picking_difiere ya devolvió (race #2).
+  // v11.10: dual-send — actualiza stock en TIEMPO REAL (fire-and-forget) Y acumula en
+  // _comp._difMovs para flush síncrono antes de Entregas (safety net contra race #2).
+  // Cada fila lleva un client_id PRE-ASIGNADO: si el fire-and-forget llega primero, el
+  // flush síncrono es un no-op (ON CONFLICT DO NOTHING vía mov_stock_clientid_dedup).
+  // Si el fire-and-forget falla (offline), el flush síncrono lo aterriza. Si el armado
+  // se cancela antes de compTerminar, el ajuste inmediato ya corrigió la góndola negativa
+  // (comportamiento correcto: el picking la dejó negativa, la corrección es válida).
   if (tipo === "menos" && gond === "no" && typeof stockMove === "function") {
     (async function () {
       let ret = 0;
       try { const sal = await _stkGondolaSaldoVivo(c.cod); if (sal != null && sal < 0) ret = Math.min(qty, -sal); } catch (_e) { ret = 0; }
-      if (ret > 0 && _comp && _comp._difMovs) {
-        _comp._difMovs.push(
-          { cod_art: c.cod, descripcion: "", deposito: "terminado",        delta:  ret, tipo: "ajuste", ref: "picking_difiere", legajo: _comp.legajo },
-          { cod_art: c.cod, descripcion: "", deposito: "separar_pedidos",  delta: -ret, tipo: "ajuste", ref: _comp.tanda || "picking_difiere", legajo: _comp.legajo }
-        );
+      if (ret > 0) {
+        var cid1 = _stockClientId(), cid2 = _stockClientId();
+        var r1 = { cod_art: c.cod, descripcion: "", deposito: "terminado",        delta:  ret, tipo: "ajuste", ref: "picking_difiere", legajo: (_comp && _comp.legajo) || "", client_id: cid1 };
+        var r2 = { cod_art: c.cod, descripcion: "", deposito: "separar_pedidos",  delta: -ret, tipo: "ajuste", ref: (_comp && _comp.tanda) || "picking_difiere", legajo: (_comp && _comp.legajo) || "", client_id: cid2 };
+        try { stockMove([r1, r2]); } catch (_e) {}   // fire-and-forget: realtime
+        if (_comp && _comp._difMovs) { _comp._difMovs.push(r1, r2); }   // safety net: flush síncrono en compTerminar
       }
     })();
   }
@@ -10141,7 +10145,7 @@ async function openStockAdmin(soloConteo) {
       ocLoadLineas().catch(function () { return {}; }),
       rkbFetchCxM().catch(function () { return { cxm: {} }; }),
       supaFetchAllSafe(SUPABASE_CONTEO_ALERTAS_ENDPOINT, "select=id,sesion,legajo,cod,sector,cajas_conteo,cajas_sistema,diferencia,tipo_alerta,procesada&procesada=eq.false&order=created_at.desc").catch(function(){ return []; }),
-      supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Conteo_Stock", "select=*&estado=eq.pendiente&order=created_at.desc").catch(function(){ return []; })]).then(function(res) {
+      supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Conteo_Stock", "select=*&estado=eq.pendiente&order=ts.desc").catch(function(){ return []; })]).then(function(res) {
       if (!_stk) return;  // Si cerró el modal, no actualizar
       var _cxmPlani = (res[11] && res[11].cxm) || {}, _cxmMerge = {};
       Object.keys(_cxmPlani).forEach(function (k) { _cxmMerge[k] = _cxmPlani[k]; });
@@ -16211,7 +16215,7 @@ async function stkRechazarConteo(id) {
 async function stkShowConteHistorico() {
   try {
     const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
-    const res = await fetch(SUPABASE_URL + "/rest/v1/Conteo_Stock?order=created_at.desc&limit=100",
+    const res = await fetch(SUPABASE_URL + "/rest/v1/Conteo_Stock?order=ts.desc&limit=100",
       { headers: H, cache: "no-store" }).then(r => r.ok ? r.json() : []);
     let html = '<div style="max-height:400px;overflow-y:auto;"><table style="width:100%;border-collapse:collapse;font-size:0.9em">' +
       '<thead><tr style="background:#f0f0f0;"><th style="border:1px solid #ddd;padding:4px">Código</th>' +
@@ -16224,7 +16228,7 @@ async function stkShowConteHistorico() {
       const estado_col = row.estado === 'aceptado' ? '<span style="color:green">✓ Aceptado</span>' :
                         (row.estado === 'rechazado' ? '<span style="color:red">✕ Rechazado</span>' : '<span style="color:orange">⏳ Pendiente</span>');
       const cant = row.cantidad || row.cajas || "—";
-      const fecha = new Date(row.created_at).toLocaleDateString('es-AR');
+      const fecha = new Date(row.ts).toLocaleDateString('es-AR');
       html += '<tr><td style="border:1px solid #ddd;padding:4px">' + escapeHtml(row.cod) + '</td>' +
         '<td style="border:1px solid #ddd;padding:4px;text-align:right">' + escapeHtml(String(cant)) + '</td>' +
         '<td style="border:1px solid #ddd;padding:4px">' + estado_col + '</td>' +
