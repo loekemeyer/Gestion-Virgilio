@@ -17484,17 +17484,43 @@ async function stkInsertMov(rows, okMsg) {
     alert("✓ " + okMsg); openStockAdmin();
   } catch (e) { alert("Error: " + (e.message || e)); }
 }
+/* v11.08: resolver codigo dual (LK/CH) antes de ajustar. Si el codigo base esta en
+   EMPRESA_SPLIT_CODS, pregunta a cual empresa va. Devuelve el codigo final o null si cancela. */
+function _stkResolveDual(codRaw) {
+  var k = _ocgNorm(codRaw);
+  if (!k || typeof EMPRESA_SPLIT_CODS === "undefined" || !EMPRESA_SPLIT_CODS[k]) return codRaw;
+  var info = (typeof PICK_UBIC_DUAL !== "undefined" && PICK_UBIC_DUAL[k]) || null;
+  var msg = "El codigo " + k + " tiene stock separado por empresa.\n\n";
+  if (info) {
+    msg += "  1) LK (Loeke) — gondola " + (info.loeke.rango || info.loeke.sector) + "\n";
+    msg += "  2) CH (Chef)  — gondola " + (info.chef.rango || info.chef.sector) + "\n\n";
+  } else {
+    msg += "  1) LK (Loeke)\n  2) CH (Chef)\n\n";
+  }
+  msg += "Escribi 1 o 2 (o cancela):";
+  var resp = prompt(msg);
+  if (!resp) return null;
+  resp = resp.trim();
+  if (resp === "1" || resp.toUpperCase() === "LK" || resp.toUpperCase() === "LOEKE") return k + " LK";
+  if (resp === "2" || resp.toUpperCase() === "CH" || resp.toUpperCase() === "CHEF") return k + " CH";
+  alert("Opcion no reconocida. Usa 1 (LK) o 2 (CH).");
+  return null;
+}
 async function stockAjustar() {
-  const cod = ((document.getElementById("stkAjCod") || {}).value || "").trim().toUpperCase();
+  var codRaw = ((document.getElementById("stkAjCod") || {}).value || "").trim().toUpperCase();
   const cant = parseInt(((document.getElementById("stkAjCant") || {}).value || ""), 10);
-  if (!cod || isNaN(cant) || cant === 0) { alert("Poné un código y una cantidad (+/-)."); return; }
+  if (!codRaw || isNaN(cant) || cant === 0) { alert("Pone un codigo y una cantidad (+/-)."); return; }
+  var cod = _stkResolveDual(codRaw);
+  if (!cod) return;
   const sd = stockComputeSaldos(_stk.movs, _stk.cutoff)[cod], dep = _stkDep();
   await stkInsertMov([{ cod_art: cod, descripcion: (sd && sd.desc) || null, deposito: dep, delta: cant, tipo: "ajuste", ref: "ajuste manual", legajo: "0" }], "Ajuste " + cod + " (" + dep + "): " + (cant > 0 ? "+" : "") + cant);
 }
 async function stockFijar() {
-  const cod = ((document.getElementById("stkAjCod2") || {}).value || "").trim().toUpperCase();
+  var codRaw = ((document.getElementById("stkAjCod2") || {}).value || "").trim().toUpperCase();
   const fijar = parseInt(((document.getElementById("stkAjFijar") || {}).value || ""), 10);
-  if (!cod || isNaN(fijar)) { alert("Poné un código y el stock a fijar."); return; }
+  if (!codRaw || isNaN(fijar)) { alert("Pone un codigo y el stock a fijar."); return; }
+  var cod = _stkResolveDual(codRaw);
+  if (!cod) return;
   const sd = stockComputeSaldos(_stk.movs, _stk.cutoff)[cod], dep = _stkDep();
   const actual = (sd && sd[dep]) || 0; const delta = fijar - actual;
   if (delta === 0) { alert("El stock de " + cod + " (" + dep + ") ya es " + fijar + "."); return; }
