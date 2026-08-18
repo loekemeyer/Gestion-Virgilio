@@ -8943,6 +8943,7 @@ async function showCompletarWizard(legajo, codigo) {
     const _savedC = _compRestore(tanda);
     if (_savedC && _savedC.nps && _savedC.nps.length) {
       _comp = _savedC;
+      if (!_comp._difMovs) _comp._difMovs = [];   // v11.09: armados persistidos pre-v11.09 no tienen el array
       _comp.pickUbic = _pickUbic; _comp.dirByNp = _dirByNp;
       try { etlLoadGlobal(); } catch (_e) {}   // idea 5290 (fix): retomar un armado en curso NO se saltea el refresco del switch/legajos — si no, queda pegado con el mirror viejo (o vacío) para siempre
       const t0 = document.getElementById("compTanda"); if (t0) t0.textContent = "Tanda " + tanda + (_comp.nps[0] && _comp.nps[0].rs ? " · " + _comp.nps[0].rs : "");
@@ -8999,7 +9000,7 @@ async function showCompletarWizard(legajo, codigo) {
       }
     }
     const hayFalt = arts.some(a => a.nps.length);
-    _comp = { legajo: String(legajo || "").trim(), tanda: tanda, fecha: fecha, nps: nps, arts: arts, pedidoFull: pedidoFull, hayFalt: hayFalt, step: 2, pickUbic: _pickUbic, dirByNp: _dirByNp };   // v8.75 (idea 9849): step=2 desde el arranque (Paso 1 borrado)
+    _comp = { legajo: String(legajo || "").trim(), tanda: tanda, fecha: fecha, nps: nps, arts: arts, pedidoFull: pedidoFull, hayFalt: hayFalt, step: 2, pickUbic: _pickUbic, dirByNp: _dirByNp, _difMovs: [] };   // v8.75 (idea 9849): step=2 desde el arranque (Paso 1 borrado). v11.09: _difMovs acumula ajustes picking_difiere para flush síncrono antes de Entregas
     try { etlLoadGlobal(); } catch (_e) {}   // idea 5290: traer el ajuste GLOBAL de etiquetas de lío para este armado
     const t = document.getElementById("compTanda"); if (t) t.textContent = "Tanda " + tanda + (nps[0] && nps[0].rs ? " · " + nps[0].rs : "");
     const d2 = document.getElementById("compD2"), ln = document.getElementById("compLine");
@@ -9536,14 +9537,20 @@ function _compDifResolve(tipo, gond) {
   // Ahora se lee el saldo VIVO y se devuelve, a lo sumo, lo justo para llevar góndola a 0 (nunca
   // por encima). Si la góndola ya está en 0 o + → no se toca. Sin dato de saldo → no se toca.
   // "Sí, agarro de góndola" NO descuenta (ya lo descontó el picking). "De más" (sobra): nada.
+  // v11.09: acumular en _comp._difMovs en vez de stockMove fire-and-forget.
+  // Se mandan SINCRONO antes de Entregas_Virgilio en _compTerminar, para que etapa 2
+  // (trigger trg_entregas_reconciliar_stock) ya vea el separar_pedidos reducido y no
+  // devuelva a terminado lo que picking_difiere ya devolvió (race #2).
   if (tipo === "menos" && gond === "no" && typeof stockMove === "function") {
     (async function () {
       let ret = 0;
       try { const sal = await _stkGondolaSaldoVivo(c.cod); if (sal != null && sal < 0) ret = Math.min(qty, -sal); } catch (_e) { ret = 0; }
-      if (ret > 0) { try { stockMove([
-        { cod_art: c.cod, descripcion: "", deposito: "terminado",        delta:  ret, tipo: "ajuste", ref: "picking_difiere", legajo: _comp.legajo },
-        { cod_art: c.cod, descripcion: "", deposito: "separar_pedidos",  delta: -ret, tipo: "ajuste", ref: _comp.tanda || "picking_difiere", legajo: _comp.legajo }
-      ]); } catch (_e) {} }
+      if (ret > 0 && _comp && _comp._difMovs) {
+        _comp._difMovs.push(
+          { cod_art: c.cod, descripcion: "", deposito: "terminado",        delta:  ret, tipo: "ajuste", ref: "picking_difiere", legajo: _comp.legajo },
+          { cod_art: c.cod, descripcion: "", deposito: "separar_pedidos",  delta: -ret, tipo: "ajuste", ref: _comp.tanda || "picking_difiere", legajo: _comp.legajo }
+        );
+      }
     })();
   }
   // v10.10 — FIX: "de menos" (lo que no estaba en el pedido) ahora SÍ se descuenta del
@@ -9713,9 +9720,13 @@ async function compTerminar() {
     });
   });
   const nFalt = Object.keys(faltMap).length;
+  // v11.09: flush síncrono de ajustes picking_difiere ANTES de Entregas (para que el
+  // trigger trg_entregas_reconciliar_stock vea separar_pedidos ya reducido).
+  const _difPend = (_comp._difMovs && _comp._difMovs.length) ? _comp._difMovs.slice() : [];
   _compClearPersist(tanda);   // v4.04: completado → borrar el avance persistido
   _comp = null;
   const ov = document.getElementById("completarModal"); if (ov) ov.classList.remove("show");
+  if (_difPend.length) { try { await stockMove(_difPend); } catch (_e) {} }   // v11.09: llega ANTES de Entregas
   if (rows.length) { _compSaveEntregas(rows); try { _armadoRegistrado.add(String(tanda).trim().toUpperCase()); } catch (_e) {} }   // v7.74: marca la tanda como armado registrado
   try { alert("✓ Completado: líos guardados" + (nFalt ? " · " + nFalt + " artículo(s) con faltante" : "") + ". Entregas registradas: " + rows.length + "."); } catch (_e) {}
 
