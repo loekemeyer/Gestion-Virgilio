@@ -9,11 +9,6 @@
 -- + para_envasar + racks_ch (NO insumos). Antes solo contaba góndola + a_guardar + racks +
 -- excedente. Los pedidos se descuentan vía la fórmula (+ pedidos - stock). Así nada de lo que
 -- ya está en el depósito se vuelve a pedir.
---
--- v11.06 — PEDIDOS (dem) consolida secundarios al principal: misma lógica que stk y proy.
--- Si un pedido entra con código secundario (ej 702EN), se remapea al principal (702E) vía
--- Equivalencias_Familia antes de calcular "A pedir". Así no se generan OCs fantasma para
--- códigos secundarios. Rollback: restaurar backup_vista_generador_oc_20260818.sql.
 -- ============================================================
 
 create or replace view public.vista_generador_oc as
@@ -83,19 +78,13 @@ create or replace view public.vista_generador_oc as
           WHERE NOT (btrim(p.np) IN ( SELECT btrim("Facturacion_NP".np) AS btrim
                    FROM "Facturacion_NP")) AND NOT (upper(btrim(COALESCE(p.tanda, ''::text))) IN ( SELECT pickeadas.tanda
                    FROM pickeadas))
-        ), dem_raw AS (
+        ), dem AS (
          SELECT regexp_replace(upper(btrim(b.articulo)), '^0+(?=.)'::text, ''::text) AS codn,
             sum(COALESCE(b.cajas, 0::numeric)) AS pedidos
            FROM "PPP_Base_Pedidos" b
              JOIN pend_np n ON btrim(b.pedido) = n.np
           WHERE NULLIF(btrim(b.articulo), ''::text) IS NOT NULL
           GROUP BY (regexp_replace(upper(btrim(b.articulo)), '^0+(?=.)'::text, ''::text))
-        ), dem AS (
-         SELECT COALESCE(f.ppal, dr.codn) AS codn,
-            sum(dr.pedidos) AS pedidos
-           FROM dem_raw dr
-             LEFT JOIN fam f ON f.sec = dr.codn
-          GROUP BY (COALESCE(f.ppal, dr.codn))
         ), ncaja AS (
          SELECT DISTINCT ON (t.codn) t.codn,
             t.n_caja
@@ -197,5 +186,4 @@ create or replace view public.vista_generador_oc as
     n_caja,
     maximo,
     GREATEST(0::numeric, ceil(maximo + pedidos - stock))::integer AS total
-   FROM conmax cm
-  WHERE NOT EXISTS (SELECT 1 FROM fam f2 WHERE f2.sec = cm.codn);
+   FROM conmax cm;
