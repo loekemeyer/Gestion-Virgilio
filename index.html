@@ -6507,7 +6507,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v11.15";
+const APP_VERSION = "v11.16";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -31523,8 +31523,10 @@ function facFaltDist(np){
     const codTxt = comp
       ? '<span style="text-decoration:underline;text-decoration-color:#1e40af;text-decoration-thickness:2px;text-underline-offset:2px;font-weight:800;" title="Se está completando (hay stock para agregar a esta NP).">' + escapeHtml(it.cod) + '</span>'
       : escapeHtml(it.cod);
+    // v11.16: si no se entrega nada (ent=0), no decir "FC 0" — solo el faltante.
+    const fc = ent > 0 ? ' <b class="fac-fact-ok">FC ' + ent + '</b>' : '';
     return '<span class="fac-fact-item" title="Pidió ' + ped + ' · se entrega ' + ent + ' · faltó ' + falto + '">' + codTxt +
-      ' <b class="fac-fact-ok">FC ' + ent + '</b><span class="fac-fact-falt">−' + falto + '</span></span>';
+      fc + '<span class="fac-fact-falt">−' + falto + '</span></span>';
   }).join(", ");
 }
 /* v7.92 — Columna "Cambiar cód": pedidos de la NP cargados en código SECUNDARIO
