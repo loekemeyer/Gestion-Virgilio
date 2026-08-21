@@ -56,10 +56,10 @@ catch (_e) {
     // por artículo (cod×faltó), sin el total "FALTA N cj".
     const _row500 = document.querySelector('#facContainer tr[data-fac-np="500"]');
     const _fc500 = _row500 ? _row500.querySelector("td.fac-falta-col") : null;
-    // v11.14: la columna ahora dice "cod → facturar N · falta M" (N = pedidas − faltó)
+    // v11.14: la columna ahora dice "cod FC N −M" (N = pedidas − faltó, M = faltó)
     out.faltDist500 = /315/.test((_fc500 || {}).innerHTML || "") &&
-      /facturar\s*12/.test((_fc500 || {}).innerHTML || "") &&
-      /falta\s*8/.test((_fc500 || {}).innerHTML || "");
+      /FC\s*12/.test((_fc500 || {}).innerHTML || "") &&
+      /−8/.test((_fc500 || {}).innerHTML || "");
     out.noTotalInDist = !/FALTA|cj/.test((_fc500 || {}).innerHTML || "");      // NO el total "FALTA N cj"
     out.faltColExists = !!_fc500;
     if (_fc500) {
