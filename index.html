@@ -31524,7 +31524,7 @@ function facFaltDist(np){
       ? '<span style="text-decoration:underline;text-decoration-color:#1e40af;text-decoration-thickness:2px;text-underline-offset:2px;font-weight:800;" title="Se está completando (hay stock para agregar a esta NP).">' + escapeHtml(it.cod) + '</span>'
       : escapeHtml(it.cod);
     return '<span class="fac-fact-item" title="Pidió ' + ped + ' · se entrega ' + ent + ' · faltó ' + falto + '">' + codTxt +
-      ' <b class="fac-fact-ok">FC ' + ent + '</b><span class="fac-fact-falt">−' + falto + '</span></span>';
+      ' <b class="fac-fact-ok">FC ' + ent + '</b><span class="fac-fact-falt">−' + falto + '</span></span>';
   }).join(", ");
 }
 /* v7.92 — Columna "Cambiar cód": pedidos de la NP cargados en código SECUNDARIO
