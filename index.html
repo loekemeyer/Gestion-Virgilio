@@ -3683,8 +3683,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       <button class="sup-action-btn" onclick="openPasajePapeles()" style="position:relative;"><span class="sup-ico">📄</span><span>Pasaje de Papeles</span><span id="ppBadge" class="dp-badge" style="display:none;" title="Documentos pendientes de enviar a Cervantes"></span></button>
       <button class="sup-action-btn" onclick="stkOpenNpFaltan()" style="position:relative;"><span class="sup-ico">⚠️</span><span>Pedidos sin cargar en PPP</span><span id="npFaltanBadge" class="dp-badge" style="display:none;"></span></button>
       <button class="sup-action-btn" onclick="stkOpenFaltFact()"><span class="sup-ico">📉</span><span>Faltantes facturados sin completar</span></button>
-      <button class="sup-action-btn" onclick="stkOpenProvImp()"><span class="sup-ico">🏭</span><span>Proveedor de importación</span></button>
-      <button class="sup-action-btn" onclick="openPedidosImportacion()"><span class="sup-ico">📦</span><span>Pedidos Importación</span></button>
+      <button class="sup-action-btn" onclick="openPedidosImportacion()"><span class="sup-ico">📦</span><span>Importación — pedidos y proveedores</span></button>
       <button class="sup-action-btn" onclick="openAvisoProg()"><span class="sup-ico">📲</span><span>Avisar programación</span></button>
       <button class="sup-action-btn" onclick="openPlataPerdida()"><span class="sup-ico">💸</span><span>Plata perdida de facturar</span></button>
       <button class="sup-action-btn" onclick="openCobranzas()"><span class="sup-ico">💵</span><span>Cobranzas — valor por NP</span></button>
@@ -6507,7 +6506,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v11.16";
+const APP_VERSION = "v11.17";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -13557,6 +13556,15 @@ function stkFaltFactExport() {
    maestro alimenta el circuito de OC de importados (v_importados_ordenes, índice = 10 meses en
    Importados_Config). García NO está: reenvasa lo de insumos, no importa. */
 const _PROV_IMP_LISTA = ["Fujian", "Hugo Wong", "Becky", "Kangli", "Ownland", "Zhixin", "Frontier"];
+/* v11.17 — Un solo botón "Importación" en el panel: adentro, solapas para cambiar entre
+   📦 Pedidos (openPedidosImportacion) y 🏭 Proveedores (stkOpenProvImp). La llamada
+   _impTabsHtml('ped') existía desde v10.42 pero la función nunca se definió (popup roto). */
+function _impTabsHtml(cur) {
+  const t = function (on) { return 'flex:0 0 auto;padding:7px 14px;border-radius:999px;border:1px solid ' + (on ? '#1d4ed8' : '#cbd5e1') + ';background:' + (on ? '#1d4ed8' : '#fff') + ';color:' + (on ? '#fff' : '#334155') + ';font-size:13px;font-weight:800;cursor:pointer'; };
+  return '<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">' +
+    '<button style="' + t(cur === 'ped') + '" onclick="openPedidosImportacion()">📦 Pedidos</button>' +
+    '<button style="' + t(cur === 'prov') + '" onclick="stkOpenProvImp()">🏭 Proveedores</button></div>';
+}
 async function stkOpenProvImp() {
   _stkPopShell("🏭 Proveedor de importación", "stkPopBody");
   const body = document.getElementById("stkPopBody"); if (!body) return;
@@ -13579,7 +13587,8 @@ function _provImpRender() {
   let rows = all;
   if (_stkPop.soloSin) rows = rows.filter(function (r) { return !r.proveedor; });
   if (q) rows = rows.filter(function (r) { return String(r.cod).toUpperCase().indexOf(q) >= 0 || String(r.descripcion || "").toUpperCase().indexOf(q) >= 0; });
-  let h = '<div class="stkpop-hint"><b>' + all.length + '</b> artículos importados (' + conProv + ' con proveedor). Tocá el desplegable para <b>corregir el proveedor chino</b> de cada uno (se guarda al instante en el maestro <code>Importados</code>, que alimenta la OC de importados). <small style="color:#94a3b8">García no está: reenvasa lo de insumos, no importa.</small></div>';
+  let h = _impTabsHtml('prov');
+  h += '<div class="stkpop-hint"><b>' + all.length + '</b> artículos importados (' + conProv + ' con proveedor). Tocá el desplegable para <b>corregir el proveedor chino</b> de cada uno (se guarda al instante en el maestro <code>Importados</code>, que alimenta la OC de importados). <small style="color:#94a3b8">García no está: reenvasa lo de insumos, no importa.</small></div>';
   h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center">';
   h += '<input id="provImpQ" placeholder="Buscar código o descripción…" value="' + escapeHtml(_stkPop.q || "") + '" oninput="provImpSearch(this.value)" style="flex:1;min-width:150px;padding:6px 10px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px">';
   h += '<button class="mva-clear" style="' + (_stkPop.soloSin ? 'background:#b45309;color:#fff;border-color:#b45309' : '') + '" onclick="provImpToggleSin()">' + (_stkPop.soloSin ? '✓ ' : '') + 'Solo sin proveedor</button>';
