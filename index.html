@@ -6506,7 +6506,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v11.18";
+const APP_VERSION = "v11.19";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -12984,10 +12984,10 @@ function stkBodyStocks() {
   };
   // v10.44 — UNA sola fila con TODO: fecha + búsqueda + chips. nowrap + scroll horizontal si no entra
   // (así no se apila en dos filas y no hay cosas anchas al pedo). Input de fecha y búsqueda achicados.
+  // v11.19 — orden pedido por el dueño: 1º BÚSQUEDA (lo más importante, bien ancho),
+  // 2º filtros de estado, 3º grupo fecha al final.
   h += '<div class="stk-filtbar" style="display:flex;gap:6px;margin-bottom:10px;align-items:center;flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px;">' +
-    stkAsOfControl() +
-    '<span style="flex:0 0 auto;width:1px;height:26px;background:#e2e8f0;margin:0 2px;"></span>' +
-    '<input class="stk-filtro" style="margin:0;flex:1 1 140px;min-width:110px;max-width:230px;" type="text" enterkeyhint="search" autocomplete="off" placeholder="🔎 códigos (varios: 026 031 508)" value="' + escapeHtml(_stk.filtro) + '" oninput="if(_stk){_stk.filtro=this.value;stkRender();}">' +
+    '<input class="stk-filtro" style="margin:0;flex:1 1 220px;min-width:170px;max-width:340px;" type="text" enterkeyhint="search" autocomplete="off" placeholder="🔎 códigos (varios: 026 031 508)" value="' + escapeHtml(_stk.filtro) + '" oninput="if(_stk){_stk.filtro=this.value;stkRender();}">' +
     '<button type="button" onclick="stkFiltroToggleE()" title="Agregar/quitar la E (importado)" style="width:auto;margin:0;flex:0 0 auto;padding:0 14px;height:38px;border:1.5px solid #cbd5e1;border-radius:9px;background:#fff;font-weight:800;font-size:16px;cursor:pointer;">E</button>' +
     _linBtn("LK") + _linBtn("CH") +
     // v10.40 — el botón Negativos solo se puede tocar si HAY negativos; si no, queda deshabilitado (gris).
@@ -12998,6 +12998,8 @@ function stkBodyStocks() {
     '<button type="button" onclick="stkToggleSoloPin()" title="Mostrar sólo los códigos que fijaste (📌). Se guardan aunque cierres la app." style="width:auto;margin:0;flex:0 0 auto;padding:0 11px;height:38px;border:1.5px solid ' + (_stk.soloPin ? "#b45309" : "#cbd5e1") + ';border-radius:9px;background:' + (_stk.soloPin ? "#fffbeb" : "#fff") + ';color:' + (_stk.soloPin ? "#b45309" : "#334155") + ';font-weight:800;font-size:13px;cursor:pointer;white-space:nowrap;">' + (_stk.soloPin ? "☑" : "📌") + ' Fijados' + ((_stk.pins || []).length ? " (" + _stk.pins.length + ")" : "") + '</button>' +
     // v10.50 — chip "🚫 Ocultar discontinuos" (off por defecto: se ven).
     '<button type="button" onclick="stkToggleOcultarDisc()" title="Ocultar los códigos DISCONTINUADOS (OC_Maximos activo=false o marcados a mano). Por defecto se ven." style="width:auto;margin:0;flex:0 0 auto;padding:0 11px;height:38px;border:1.5px solid ' + (_stk.ocultarDisc ? "#7c3aed" : "#cbd5e1") + ';border-radius:9px;background:' + (_stk.ocultarDisc ? "#f5f3ff" : "#fff") + ';color:' + (_stk.ocultarDisc ? "#6d28d9" : "#334155") + ';font-weight:800;font-size:13px;cursor:pointer;white-space:nowrap;">' + (_stk.ocultarDisc ? "☑" : "☐") + ' 🚫 Discontinuos' + (_stkDiscCount ? " (" + _stkDiscCount + ")" : "") + '</button>' +
+    '<span style="flex:0 0 auto;width:1px;height:26px;background:#e2e8f0;margin:0 2px;"></span>' +
+    stkAsOfControl() +
     '<span id="stkMergeStatus" title="' + (_stk._mergeComplete ? 'Datos completos cargados' : 'Cargando datos completos…') + '" style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;flex:0 0 auto;">' +
       (_stk._mergeComplete
         ? '<svg width="22" height="22" viewBox="0 0 22 22"><circle cx="11" cy="11" r="10" fill="#16a34a" stroke="none"/><path d="M6.5 11.5 L9.5 14.5 L15.5 8" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
