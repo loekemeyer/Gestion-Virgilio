@@ -92,10 +92,16 @@ async function ppLoadData() {
   if (container) container.innerHTML = '<div class="pp-empty">Cargando documentación…</div>';
 
   try {
-    var res = await fetch(SUPABASE_URL + '/rest/v1/Pasaje_Papeles?order=created_at.desc&limit=500&select=*', {
-      headers: _ppHeaders(), cache: 'no-store'
-    }).then(function (r) { return r.ok ? r.json() : []; });
-    _ppState.data = res || [];
+    // v4.2 — dos consultas: TODOS los pendientes (paginado, nunca se caen del corte
+    // aunque sean viejos) + los últimos 500 enviados. Antes un solo limit=500 mezclado
+    // podía dejar un pendiente viejo fuera de la lista aunque el badge lo contara.
+    var res = await Promise.all([
+      supaFetchAllSafe(SUPABASE_URL + '/rest/v1/Pasaje_Papeles', 'enviado=eq.false&order=created_at.desc&select=*'),
+      fetch(SUPABASE_URL + '/rest/v1/Pasaje_Papeles?enviado=eq.true&order=created_at.desc&limit=500&select=*', {
+        headers: _ppHeaders(), cache: 'no-store'
+      }).then(function (r) { return r.ok ? r.json() : []; })
+    ]);
+    _ppState.data = (res[0] || []).concat(res[1] || []);
   } catch (e) {
     console.error('ppLoadData error:', e);
     _ppState.data = [];

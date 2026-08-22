@@ -4,7 +4,33 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-17 · Versión app al documentar: **v11.03**
+> Última actualización: 2026-08-22 · Versión app al documentar: **v11.23**
+>
+> Nota **2026-08-22 — jornada v11.14→v11.23 (resumen).** **(1) Facturación:** columna
+> "A facturar / Falta" — cada artículo con faltante muestra `cod FC N −M` (N = pedidas−faltó,
+> verde; solo si N>0) en vez de solo el faltante (v11.14-16). **(2)** Botones "Proveedor de
+> importación" y "Pedidos Importación" unificados en uno con solapas; de paso se arregló
+> `_impTabsHtml` sin definir desde v10.42 que rompía el popup de Pedidos (v11.17).
+> **(3) BUG SISTÉMICO — PostgREST corta TODA respuesta REST en 1000 filas** aunque se pida
+> `limit=50000`. Mordió a las OCs (recepción de talleristas invisible → "Falta = Pedido" en
+> todo; v11.20 fix + banner de error v11.18) y se corrigieron preventivamente: Carga Camión
+> (PPP_Entregados_Meta, 2300+ filas — entregadas reaparecían como pendientes), % Entregas,
+> Consulta NP (corpus TAL), export Excel PPP, Pasaje de Papeles (pendientes viejos fuera del
+> corte) y catálogo talleristas (v11.23). **Regla: todo fetch sin filtro acotado va con
+> `supaFetchAll`.** **(4) NP salteadas:** chips clickeables "no interesa" → tabla
+> `NP_Secuencia_Revisadas`, la vista las excluye (v11.21). **(5) Pasaje de Papeles v4.2:**
+> columnas "Demora carga" (fecha doc → cargado; verde<24h/ámbar/rojo>2d) y "Carpeta" (1: Rto+Fc
+> prov · 2: solo Rto/Fc · 3: talleristas). **(6) AUTO-CORRECCIÓN SECUNDARIO→PRINCIPAL:**
+> trigger `trg_corregir_secundario_auto` en PPP_Base_Pedidos inserta en Correcciones_Pedido
+> con `origen='auto'` apenas entra un pedido en código secundario → el picking levanta el
+> PRINCIPAL sin esperar a la operadora. El aviso "Cambiar cód" en Facturación sigue vivo hasta
+> que ella confirme el ERP (solo `origen='operadora'` lo apaga; upsert merge en `_correccPost`).
+> **(7) Seguridad (auditoría):** RLS en 8 tablas planify (admin expuesto a la anon key) +
+> 5 tablas public sin RLS; `security_invoker` en vista_saldos_stock y
+> vista_np_faltantes_secuencia; secret del sync LK movido al Vault
+> (`virgilio_entrega_sync_secret`; rotación pendiente, requiere tocar la Edge Fn LK).
+> **(8) Datos:** 589E uxb 12→24 (Importados + OC_Maximos). **(9) Planimetría:** solape de
+> orden isla-I vs L/M corregido (+26 a L/M/Ñ) y sector J9→J09.
 >
 > Nota **2026-08-17 — Cobranzas: valorizar una NP sin ver la factura.** Objetivo del
 > usuario: que Virgilio sepa cuánta plata se le facturó a cada NP/cliente sin tener la

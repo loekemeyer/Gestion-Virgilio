@@ -158,7 +158,8 @@ async function tallArtStep1Next() {
 async function tallArtLoadArts() {
   const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
   try {
-    const arts = await fetch(SUPABASE_URL + "/rest/v1/Articulos%20Virgilio%20X%20Tallerista?select=Cod_Art,Desc,Uni_x_Caja&limit=20000", { headers: H }).then(r => r.json()).catch(() => []);
+    // v11.23 — paginado (PostgREST corta en 1000 filas; la tabla tiene ~350 y crece)
+    const arts = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Articulos%20Virgilio%20X%20Tallerista", "select=Cod_Art,Desc,Uni_x_Caja");
     _tallArtState.allArts = arts || [];
     tallArtFilterArts();
   } catch (e) {
