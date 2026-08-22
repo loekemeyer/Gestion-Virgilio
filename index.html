@@ -6506,7 +6506,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v11.20";
+const APP_VERSION = "v11.21";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -13330,14 +13330,33 @@ function _stkNpGapsHtml() {
   var gaps = (_stkPop && _stkPop.gaps) || [];
   if (!gaps.length) return "";
   var shown = gaps.slice(0, 150);
+  // v11.21 — chips clickeables: marcar "no interesa" (tabla NP_Secuencia_Revisadas;
+  // la vista las excluye para siempre). Huecos legítimos: ej. remito mal impreso →
+  // pedido duplicado para re-facturar → NP suelta.
   var chips = shown.map(function (g) {
-    return '<span title="hueco entre ' + escapeHtml(String(g.anterior)) + ' y ' + escapeHtml(String(g.siguiente)) + '" style="display:inline-block;background:#fff;border:1px solid #fde68a;border-radius:7px;padding:2px 7px;margin:2px;font-size:11.5px;font-weight:800;color:#92400e;">' + escapeHtml(String(g.np_faltante)) + '</span>';
+    var np = escapeHtml(String(g.np_faltante));
+    return '<span onclick="npGapMarcar(\'' + np + '\')" title="Hueco entre ' + escapeHtml(String(g.anterior)) + ' y ' + escapeHtml(String(g.siguiente)) + '. Tocá para marcar NO INTERESA (deja de aparecer)." style="display:inline-block;background:#fff;border:1px solid #fde68a;border-radius:7px;padding:2px 7px;margin:2px;font-size:11.5px;font-weight:800;color:#92400e;cursor:pointer;">' + np + ' <span style="color:#d97706;font-weight:900;">✕</span></span>';
   }).join("");
   var extra = gaps.length > shown.length ? '<span style="font-size:11px;color:#92400e;font-weight:700;"> … y ' + (gaps.length - shown.length) + ' más</span>' : '';
   return '<div style="background:#fffbeb;border:1.5px solid #fde68a;border-radius:12px;padding:9px 12px;margin-bottom:12px;">' +
     '<div style="font-weight:800;color:#92400e;font-size:13.5px;margin-bottom:3px;">🔢 ' + gaps.length + ' NP salteada(s) en la secuencia</div>' +
-    '<div style="font-size:11px;color:#7c5b12;margin-bottom:6px;">Números que faltan entre NPs que <b>sí</b> existen (hueco ≤5). Puede ser un pedido que <b>no se cargó</b> o una NP <b>anulada</b> en el ERP. Revisá si alguna debería estar.</div>' +
+    '<div style="font-size:11px;color:#7c5b12;margin-bottom:6px;">Números que faltan entre NPs que <b>sí</b> existen (hueco ≤5). Puede ser un pedido que <b>no se cargó</b>, una NP <b>anulada</b> en el ERP, o un <b>duplicado</b> por re-facturación. <b>Tocá una NP para marcarla "no interesa"</b> — desaparece para siempre (en todos los dispositivos).</div>' +
     '<div style="max-height:130px;overflow:auto;">' + chips + extra + '</div></div>';
+}
+/* v11.21 — marca una NP salteada como "no interesa" (upsert en NP_Secuencia_Revisadas). */
+async function npGapMarcar(np) {
+  np = String(np || "").trim(); if (!np) return;
+  if (!confirm('¿Marcar la NP ' + np + ' como "NO INTERESA"?\n\nDeja de aparecer en la lista de salteadas (para todos).')) return;
+  try {
+    const r = await fetch(SUPABASE_URL + "/rest/v1/NP_Secuencia_Revisadas?on_conflict=np", {
+      method: "POST",
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" },
+      body: JSON.stringify({ np: np, estado: "no_interesa" })
+    });
+    if (!r.ok) { alert("No se pudo guardar (HTTP " + r.status + ")."); return; }
+  } catch (_e) { alert("No se pudo guardar (sin conexión)."); return; }
+  if (_stkPop && _stkPop.gaps) _stkPop.gaps = _stkPop.gaps.filter(function (g) { return String(g.np_faltante) !== np; });
+  _stkNpFaltanRender();
 }
 function _stkNpFaltanRender() {
   const body = document.getElementById("stkPopBody"); if (!body || !_stkPop || _stkPop.kind !== "npFaltan") return;
