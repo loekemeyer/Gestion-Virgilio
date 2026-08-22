@@ -158,6 +158,9 @@ function _ppBuildSection(key, icon, title, rows, showTimer) {
     html += '<div class="pp-tblwrap"><table class="pp-tbl"><thead><tr>' +
       '<th>Fecha</th><th>Tipo</th><th>N° Remito</th><th>N° Factura</th><th>Razón Social</th><th>Contenido</th>';
     if (showTimer) html += '<th>Tiempo sin enviar</th>';
+    // v4.1 — demora entre la fecha del documento y cuándo se cargó al sistema + carpeta destino
+    html += '<th title="Cuánto tardó en cargarse al sistema desde la fecha del documento">Demora carga</th>';
+    if (key === 'enviada') html += '<th title="Carpeta 1: Rto+Fc de proveedores · Carpeta 2: solo remito o solo factura · Carpeta 3: talleristas">Carpeta</th>';
     if (key === 'enviada') html += '<th>Confirmar recepción</th>';
     if (key !== 'enviada') html += '<th>Enviado</th>';
     html += '</tr></thead><tbody>';
@@ -171,6 +174,26 @@ function _ppBuildSection(key, icon, title, rows, showTimer) {
 
   html += '</div></div>';
   return html;
+}
+
+/**
+ * v4.1 — Demora entre la fecha del documento (remito o factura, la más vieja) y
+ * cuándo se cargó al sistema (created_at). La fecha del doc no tiene hora → se
+ * toma 00:00 hora Argentina. Verde <24h · ámbar 1-2 días · rojo >2 días.
+ */
+function _ppDemoraCargaHtml(row) {
+  var base = row.fecha_remito || row.fecha_factura || row.fecha_emision;
+  if (!base || !row.created_at) return '<span style="color:#94a3b8;">—</span>';
+  var m = String(base).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return '<span style="color:#94a3b8;">—</span>';
+  var t0 = new Date(m[1] + '-' + m[2] + '-' + m[3] + 'T00:00:00-03:00').getTime();
+  var ms = new Date(row.created_at).getTime() - t0;
+  if (isNaN(ms) || ms < 0) ms = 0;
+  var totalH = Math.floor(ms / 3600000);
+  var d = Math.floor(totalH / 24), h = totalH % 24;
+  var txt = d > 0 ? d + 'd ' + h + 'h' : h + 'h';
+  var col = d >= 2 ? '#dc2626' : (d >= 1 ? '#b45309' : '#16a34a');
+  return '<span style="font-weight:800;color:' + col + ';font-variant-numeric:tabular-nums;">' + txt + '</span>';
 }
 
 /**
@@ -221,6 +244,15 @@ function _ppBuildRow(row, showTimer, showConfirm) {
     html += '<td style="text-align:center;white-space:nowrap;">' +
       '<span class="pp-timer" data-ts="' + tsMs + '" style="font-variant-numeric:tabular-nums;font-size:13px;color:#dc2626;font-weight:600;">' +
       _ppFormatElapsed(Date.now() - tsMs) + '</span></td>';
+  }
+
+  // v4.1 — Demora de carga: fecha del documento (remito/factura, 00:00 AR) → created_at.
+  html += '<td style="text-align:center;white-space:nowrap;">' + _ppDemoraCargaHtml(row) + '</td>';
+
+  // v4.1 — Carpeta destino (solo sección enviada): la misma lógica del confirm, visible en la tabla.
+  if (showConfirm) {
+    var carp = _ppGetFolderNumber(row);
+    html += '<td style="text-align:center;font-weight:800;color:#1e40af;">' + (carp ? '📁 ' + carp : '—') + '</td>';
   }
 
   // Columna "Confirmar recepción" solo para enviada
