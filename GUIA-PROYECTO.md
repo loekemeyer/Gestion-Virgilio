@@ -32,8 +32,17 @@
 > eventos EP/TP/AP/TAP con `texto` vacío → la vista ahora ignora tanda vacía (ni cuenta esos
 > eventos ni matchea con `''`). Se **borraron 18 eventos EP/TP/AP/TAP huérfanos** (tanda vacía,
 > ene–ago) de `Registros_Produccion_Virgilio` (backup en `~/pp_backups/`). **(5) Duplicación de
-> info detectada** (marca/línea, uxb, descripción en varias tablas/fuentes) — pendiente unificar
-> con fuente única por atributo (ver REGLA DE ORO). **Regla nueva: NUNCA EMPARCHAR** (arriba).
+> info detectada** (marca/línea, uxb, descripción en varias tablas/fuentes). **Marca/línea
+> unificada** → vista `vista_marca_articulo` (OC_Maximos.linea → Articulos_Cajas.Marca) + función
+> `artMarca(cod)` en el front (el sufijo " LK"/" CH" manda); el stock ya la usa. **UxB: NO se
+> unifica globalmente — es DEPENDIENTE DEL CONTEXTO:** venta = `precios_venta.uxb` (lo que usan
+> los cálculos de plata/facturación, CORRECTO), depósito/empaque = `Articulos_Cajas.Uni_x_Caja`,
+> compras = `OC_Maximos.uni_x_caja`. Pueden diferir legítimamente (ej. 724: 24 depósito / 4 venta).
+> Existe `vista_uxb_articulo` + `artUxb()` como canónica de la uxb de **depósito** (no tocar los
+> cálculos de plata con ella). **Descripción:** canónica `artNombre`/`vista_nombres_articulos`;
+> Recepción de talleristas usa a propósito el `Desc` del tallerista (más útil al operario, no
+> tocar). **Anon key:** vive en 3 archivos (index.html, sw.js, recepcion.js) — rotar los 3.
+> **Regla nueva: NUNCA EMPARCHAR** (arriba).
 >
 > Nota **2026-08-22 — jornada v11.14→v11.23 (resumen).** **(1) Facturación:** columna
 > "A facturar / Falta" — cada artículo con faltante muestra `cod FC N −M` (N = pedidas−faltó,
