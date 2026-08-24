@@ -6506,7 +6506,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v11.42";
+const APP_VERSION = "v11.43";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -10662,6 +10662,9 @@ function ocBodyList() {
 }
 function ocOpenFecha(feEnc) { if (!_oc) return; _oc.openFecha = decodeURIComponent(feEnc); _oc.view = "fecha"; ocRender(); }
 function ocBackFechas() { if (!_oc) return; _oc.view = "list"; _oc.openFecha = null; _oc.openKey = null; ocRender(); }
+/* v11.43 — % de recepción (Recibido / Pedido). Verde ≥90 · ámbar 50-89 · rojo <50. */
+function _ocPct(rec, ped) { return ped > 0 ? Math.round(rec / ped * 100) : 0; }
+function _ocPctCol(p) { return p >= 90 ? "#16a34a" : (p >= 50 ? "#d97706" : "#dc2626"); }
 function ocBodyFecha() {
   const g = ocGroups(), fe = _oc.openFecha;
   let groups = Object.keys(g).map(function (k) { return { key: k, x: g[k] }; }).filter(function (o) { return (o.x.fecha || "") === fe; });
@@ -10670,7 +10673,8 @@ function ocBodyFecha() {
   let tPed = 0, tRec = 0, tItems = 0;
   groups.forEach(function (o) { o.st = ocGroupStats(o.x); tPed += o.st.ped; tRec += o.st.rec; tItems += o.x.rows.length; });
   groups.sort(function (a, b) { return (b.st.falta - a.st.falta) || (a.x.proveedor || "").localeCompare(b.x.proveedor || ""); });
-  h += '<div class="oc-meta">📄 OC del <b>' + escapeHtml(_ocDdmm(fe)) + '</b> (' + escapeHtml(fe || "s/fecha") + ') — <b>' + groups.length + '</b> tallerista(s) · <b>' + tItems + '</b> ítem(s) · Pedido <b>' + tPed + '</b> · Falta <b class="oc-falt">' + Math.max(0, tPed - tRec) + '</b></div>';
+  var pctGen = _ocPct(tRec, tPed);
+  h += '<div class="oc-meta">📄 OC del <b>' + escapeHtml(_ocDdmm(fe)) + '</b> (' + escapeHtml(fe || "s/fecha") + ') — <b>' + groups.length + '</b> tallerista(s) · <b>' + tItems + '</b> ítem(s) · Pedido <b>' + tPed + '</b> · Recibido <b>' + tRec + '</b> · Falta <b class="oc-falt">' + Math.max(0, tPed - tRec) + '</b> · Recepción <b style="color:' + _ocPctCol(pctGen) + '">' + pctGen + '%</b></div>';
   h += '<div class="oc-boxgrid">';
   groups.forEach(function (o) {
     const x = o.x, st = o.st, falta = st.falta;
@@ -10681,6 +10685,7 @@ function ocBodyFecha() {
       '<div class="oc-box-row">Pedido <b>' + st.ped + '</b></div>' +
       '<div class="oc-box-row">Recibido <b>' + st.rec + '</b></div>' +
       '<div class="oc-box-row">Falta <b class="' + (falta > 0 ? "oc-falt" : "oc-ok") + '">' + (falta > 0 ? falta : 0) + '</b></div>' +
+      '<div class="oc-box-row">Recepción <b style="color:' + _ocPctCol(_ocPct(st.rec, st.ped)) + '">' + _ocPct(st.rec, st.ped) + '%</b></div>' +
       '<div class="oc-box-foot"><span class="oc-pill ' + st.estado + '">' + st.estado + '</span><span class="oc-box-go">abrir →</span></div>' +
       '</div>';
   });
@@ -10700,7 +10705,7 @@ function ocBodyDetail() {
   h += '<button class="oc-btn" onclick="ocPrintDetalle(false)" title="Para enviarle al tallerista (sin Cajas Recibidas)">🖨 Tallerista</button>';
   h += '<button class="oc-btn" onclick="ocWhatsappTallerista()" title="Copia la OC como imagen y abre WhatsApp del tallerista">📲 WhatsApp</button>';
   h += '</div>';
-  h += '<div class="oc-meta">Proveedor <b>' + escapeHtml(x.proveedor || "—") + '</b> · Fecha <b>' + escapeHtml(x.fecha || "—") + '</b> · Rubro <b>' + escapeHtml(x.rubro || "—") + '</b> · Pedido <b>' + st.ped + '</b> · Recibido <b class="oc-ok">' + st.rec + '</b> · Falta <b class="' + (st.falta > 0 ? "oc-falt" : "oc-ok") + '">' + (st.falta > 0 ? st.falta : 0) + '</b></div>';
+  h += '<div class="oc-meta">Proveedor <b>' + escapeHtml(x.proveedor || "—") + '</b> · Fecha <b>' + escapeHtml(x.fecha || "—") + '</b> · Rubro <b>' + escapeHtml(x.rubro || "—") + '</b> · Pedido <b>' + st.ped + '</b> · Recibido <b class="oc-ok">' + st.rec + '</b> · Falta <b class="' + (st.falta > 0 ? "oc-falt" : "oc-ok") + '">' + (st.falta > 0 ? st.falta : 0) + '</b> · Recepción <b style="color:' + _ocPctCol(_ocPct(st.rec, st.ped)) + '">' + _ocPct(st.rec, st.ped) + '%</b></div>';
   h += '<div class="oc-note" style="margin-top:0;margin-bottom:8px"><b>Recibido</b> = lo que registró la Recepción de Mercadería para este tallerista y código, <b>dentro del período de esta OC</b> (no acumula entregas anteriores ni de otra OC). Se alimenta solo.</div>';
   h += '<div class="oc-tblwrap"><table class="oc-tbl oc-tbl-det"><thead><tr><th>Código</th><th>Descripción</th><th>Unidad</th><th class="num">Pedido</th><th class="num">Recibido</th><th class="num">Falta</th></tr></thead><tbody>';
   x.rows.forEach(function (r) {
