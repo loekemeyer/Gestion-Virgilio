@@ -6506,7 +6506,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v11.38";
+const APP_VERSION = "v11.39";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -10028,6 +10028,23 @@ async function loadArtNombres() {
   _artNombres = m; return m;
 }
 function artNombre(cod, fb) { const n = _artNombres && _artNombres[_ocgNorm(cod)]; return n || fb || ""; }
+/* v11.39 — MARCA/LÍNEA (LK/CH), fuente ÚNICA: vista Supabase `vista_marca_articulo`
+   (prioridad OC_Maximos.linea → Articulos_Cajas.Marca). El sufijo del propio código
+   (" LK"/" CH"/" LOKE") manda por encima (código dual empresa-split). Reemplaza las
+   cadenas de resolución sueltas que había por pantalla (regla: fuente única). */
+let _artMarcas = null;
+async function loadArtMarcas() {
+  if (_artMarcas) return _artMarcas;
+  const m = {}, H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+  try { const r = await fetch(SUPABASE_URL + "/rest/v1/vista_marca_articulo?select=cod,marca&limit=20000", { headers: H, cache: "no-store" }); if (r.ok) (await r.json()).forEach(function (x) { const k = _ocgNorm(x.cod), v = String(x.marca || "").toUpperCase().trim(); if (k && v) m[k] = v; }); } catch (_e) {}
+  _artMarcas = m; return m;
+}
+function artMarca(cod) {
+  const s = String(cod == null ? "" : cod).match(/\s+(LK|CH|LOKE)$/i);
+  if (s) return s[1].toUpperCase().replace("LOKE", "LK");
+  return (_artMarcas && _artMarcas[_ocgNorm(cod)]) || "";
+}
+window.loadArtMarcas = loadArtMarcas; window.artMarca = artMarca;
 /* v7.99 — NOMBRE por EMPRESA (Paquete B): códigos que son PRODUCTOS DISTINTOS según la
    empresa. La empresa la dice la NP (empresaDeNp). Ej. 809E: Loeke=Corta Pizza, Chef=Corta
    Queso. Los coladores 437E/438E/439E son el MISMO producto en las dos → NO van acá. */
@@ -10154,7 +10171,8 @@ async function openStockAdmin(soloConteo) {
       ocLoadLineas().catch(function () { return {}; }),
       rkbFetchCxM().catch(function () { return { cxm: {} }; }),
       supaFetchAllSafe(SUPABASE_CONTEO_ALERTAS_ENDPOINT, "select=id,sesion,legajo,cod,sector,cajas_conteo,cajas_sistema,diferencia,tipo_alerta,procesada&procesada=eq.false&order=created_at.desc").catch(function(){ return []; }),
-      supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Conteo_Stock", "select=*&estado=eq.pendiente&order=ts.desc").catch(function(){ return []; })]).then(function(res) {
+      supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Conteo_Stock", "select=*&estado=eq.pendiente&order=ts.desc").catch(function(){ return []; }),
+      loadArtMarcas().catch(function(){ return {}; })]).then(function(res) {   // v11.39 — marca fuente única
       if (!_stk) return;  // Si cerró el modal, no actualizar
       var _cxmPlani = (res[11] && res[11].cxm) || {}, _cxmMerge = {};
       Object.keys(_cxmPlani).forEach(function (k) { _cxmMerge[k] = _cxmPlani[k]; });
@@ -12936,8 +12954,8 @@ function stkBodyStocks() {
   // v8.52 — filtro por línea LK / CH (empresa)
   // v8.88: también detecta marca del sufijo del código (desconcatenación)
   if (_stk.filLinea) shown = shown.filter(function (a) {
-    var _sfx = String(a.cod || "").match(/\s+(LK|CH|LOKE)$/i);
-    var _marca = _sfx ? _sfx[1].toUpperCase().replace("LOKE", "LK") : (ocLinea(a.cod) || String(a.linea || "").toUpperCase().trim() || "");
+    // v11.39 — marca fuente única (artMarca); a.linea como último recurso.
+    var _marca = artMarca(a.cod) || String(a.linea || "").toUpperCase().trim() || "";
     return _marca === _stk.filLinea;
   });
   // v8.95 — filtro rápido por columna: tocar el header de una columna muestra solo las filas
@@ -13092,7 +13110,8 @@ function stkBodyStocks() {
     // v8.88 — desconcatenación: si el código tiene sufijo LK/CH/LOKE, la marca
     // sale del propio código (no de OC_Maximos); y en CÓDIGO se muestra el base.
     const _codSuffix = String(a.cod || "").match(/\s+(LK|CH|LOKE)$/i);
-    const _lin = _codSuffix ? _codSuffix[1].toUpperCase().replace("LOKE", "LK") : (ocLinea(a.cod) || String(a.linea || "").toUpperCase().trim() || "");
+    // v11.39 — marca fuente única (artMarca ← vista_marca_articulo); a.linea como último recurso.
+    const _lin = artMarca(a.cod) || String(a.linea || "").toUpperCase().trim() || "";
     // v10.02 — mostrar SIEMPRE el código canónico con cero(s) a la izquierda (026, 035E). La vista
     // vista_stock_procesada (v10.00) devuelve el código sin ceros ("26"), así que se re-pad acá.
     const _codDisplay = codCanon(_codSuffix ? codBase(a.cod) : a.cod);
