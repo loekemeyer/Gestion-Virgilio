@@ -116,6 +116,12 @@ async function ppLoadData() {
  */
 function ppFormatDate(dateStr) {
   if (!dateStr) return '—';
+  // Fecha "pelada" (YYYY-MM-DD, sin hora): formatear con las partes tal cual.
+  // Si se la pasa a new Date() se interpreta como medianoche UTC y al mostrarla
+  // en hora Argentina (UTC-3) retrocede un día → mostraba el remito/factura un
+  // día antes que la fecha real cargada.
+  var d = String(dateStr).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (d) return d[3] + '/' + d[2] + '/' + d[1];
   try {
     return new Date(dateStr).toLocaleDateString('es-AR', {
       timeZone: 'America/Argentina/Buenos_Aires',
