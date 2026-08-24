@@ -6506,7 +6506,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v11.41";
+const APP_VERSION = "v11.42";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -27866,7 +27866,7 @@ async function avpLoad() {
 /* v9.58 — vendedores INTERNOS ("somos nosotros"): 7 = fábrica, 20 = super. A vend 20 NO se
    le avisa NI al cliente NI al vendedor (son pedidos nuestros). A vend 7 (fábrica) no se arma
    resumen de vendedor, pero el cliente igual puede recibir aviso. */
-function _avpNoVend(v) { return v === "4" || v === "5" || v === "7" || v === "14" || v === "20"; }   // v9.84 — no arma resumen de vendedor (4/5/7/14 = fábrica/internos, 20 = super)
+function _avpNoVend(v) { return v === "4" || v === "5" || v === "7" || v === "14" || v === "17" || v === "20"; }   // v11.42 — no arma resumen de vendedor (4/5/7/14 = fábrica/internos, 20 = super, 17 = vendedor fallecido: sus clientes se avisan igual pero no se le manda resumen)
 function _avpNoCliente(v) { return v === "20"; }             // tampoco se avisa al cliente (super = nosotros)
 function avpRender() {
   var body = document.getElementById("avpBody"); if (!body || !_avp) return;
