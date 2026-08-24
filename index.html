@@ -6506,7 +6506,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v11.36";
+const APP_VERSION = "v11.37";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -11608,12 +11608,30 @@ function stkExcedentesBtn() {
 function stkAsOfControl() {
   if (!_stk) return "";
   const on = !!_stk.asOf;
+  // v11.37 — el selector de fecha/hora solo se muestra al tocar "A esa fecha" (o si ya
+  // se está mirando un histórico). Así la fila "Ver stock" queda compacta y en línea.
+  const showPicker = on || !!_stk.asOfPicking;
   let h = '<span style="font-size:12px;font-weight:800;color:#475569;flex:0 0 auto;">Ver stock:</span>';
   // v10.49 — TODO a 38px de alto (mismo nivel que los chips E/LK/CH/Negativos/…).
   h += '<button class="stk-btn' + (on ? '' : ' ok') + '" onclick="stkAsOfLive()" style="flex:0 0 auto;white-space:nowrap;height:38px;padding:0 12px;box-sizing:border-box;">🔴 En vivo</button>';
-  h += '<input type="datetime-local" id="stkAsOfInp" value="' + escapeHtml(_stk.asOfInput || '') + '" onchange="if(_stk){_stk.asOfInput=this.value;}" style="flex:0 0 auto;width:158px;min-width:0;height:38px;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:8px;padding:0 6px;font-size:11px;">';
-  h += '<button class="stk-btn" onclick="stkAsOfApply()" style="flex:0 0 auto;white-space:nowrap;height:38px;padding:0 12px;box-sizing:border-box;">📅 A esa fecha</button>';
+  if (showPicker) {
+    h += '<input type="datetime-local" id="stkAsOfInp" value="' + escapeHtml(_stk.asOfInput || '') + '" onchange="if(_stk){_stk.asOfInput=this.value;}" style="flex:0 0 auto;width:158px;min-width:0;height:38px;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:8px;padding:0 6px;font-size:11px;">';
+  }
+  h += '<button class="stk-btn" onclick="stkAsOfDateBtn()" style="flex:0 0 auto;white-space:nowrap;height:38px;padding:0 12px;box-sizing:border-box;">📅 A esa fecha</button>';
   return h;
+}
+/* v11.37 — 1er toque "A esa fecha": revela el selector de fecha/hora. 2º toque (ya visible
+   y con valor): aplica el histórico. */
+function stkAsOfDateBtn() {
+  if (!_stk) return;
+  const inp = document.getElementById("stkAsOfInp");
+  if (!inp) {   // selector oculto → mostrarlo y enfocarlo
+    _stk.asOfPicking = true;
+    stkRender();
+    setTimeout(function () { const el = document.getElementById("stkAsOfInp"); if (el) { try { el.focus(); if (el.showPicker) el.showPicker(); } catch (_e) {} } }, 0);
+    return;
+  }
+  stkAsOfApply();
 }
 function stkAsOfApply() {
   if (!_stk) return;
@@ -11625,7 +11643,7 @@ function stkAsOfApply() {
   _stk.openArt = null;
   stkRender();
 }
-function stkAsOfLive() { if (!_stk) return; _stk.asOf = null; _stk.openArt = null; stkRender(); }
+function stkAsOfLive() { if (!_stk) return; _stk.asOf = null; _stk.asOfPicking = false; _stk.openArt = null; stkRender(); }
 function stkTab(t) { if (!_stk) return; if (t === "compras") { openOCAdmin(); return; } _stk.tab = t; _stk.filtro = ""; _stk.openArt = null; if (t === "capacidad" && !_stk.capLoaded) { stkCapLoad(); return; } if (t === "racks" && !_stk.planiLoaded) { stkPlaniLoad(); return; } if (t === "insumos" && !_stk.insLoaded) { stkInsLoad(); return; } if (t === "faltante" && !_stk.faltLoaded) { stkFaltLoad(); return; } if (t === "auditgon" && !_stk.agLoaded) { agLoad(); return; } stkRender(); }
 function stkRender() {
   if (!_stk) return;
