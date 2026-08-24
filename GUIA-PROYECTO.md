@@ -12,7 +12,28 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-08-22 · Versión app al documentar: **v11.23**
+> Última actualización: 2026-08-24 · Versión app al documentar: **v11.38**
+>
+> Nota **2026-08-24 — jornada v11.33→v11.38 (resumen).** **(1) Pasaje de Papeles:** header
+> de la 1ª columna → "Fecha DDJJ"; se corrigió la fecha de remito/factura que se mostraba
+> corrida un día (bug TZ: `new Date("YYYY-MM-DD")` = medianoche UTC → en AR retrocede; ahora
+> las fechas peladas se formatean por partes). Badge del botón = cuenta `confirmado=false`
+> (pendientes + sin confirmar) → tic verde solo cuando no queda nada por confirmar; antes solo
+> contaba pendientes de enviar. **Nueva columna `enviado_en`** (timestamptz) → día/hora de
+> envío en la sección "Documentación enviada". **Fix confirmar recepción:** usaba `recibido_en`
+> (columna inexistente) → no persistía; ahora usa `confirmado` + `fecha_confirmacion`.
+> **(2) Completar datos producto:** convención para códigos que terminan en **E** → `N_Caja=99`
+> y `Uni_x_Caja` desde `precios_venta.uxb` (backfill masivo en `Articulos_Cajas`). **(3) Ver
+> stock:** el selector de fecha/hora se muestra **solo** al tocar "A esa fecha" (1er toque
+> revela, 2º aplica); botones "En vivo/A esa fecha" nivelados al molde de los chips. **(4)
+> `vista_correcciones_pedido_rich` — 2 fixes:** (a) solo la corrección de la **operadora**
+> (`origen<>'auto'`) apaga el aviso — antes cualquier corrección lo dejaba en 0 (badge vs popup
+> desincronizados); (b) **falso "Pickeado"**: NP sin tanda quedaban con tanda `''` y matcheaban
+> eventos EP/TP/AP/TAP con `texto` vacío → la vista ahora ignora tanda vacía (ni cuenta esos
+> eventos ni matchea con `''`). Se **borraron 18 eventos EP/TP/AP/TAP huérfanos** (tanda vacía,
+> ene–ago) de `Registros_Produccion_Virgilio` (backup en `~/pp_backups/`). **(5) Duplicación de
+> info detectada** (marca/línea, uxb, descripción en varias tablas/fuentes) — pendiente unificar
+> con fuente única por atributo (ver REGLA DE ORO). **Regla nueva: NUNCA EMPARCHAR** (arriba).
 >
 > Nota **2026-08-22 — jornada v11.14→v11.23 (resumen).** **(1) Facturación:** columna
 > "A facturar / Falta" — cada artículo con faltante muestra `cod FC N −M` (N = pedidas−faltó,
