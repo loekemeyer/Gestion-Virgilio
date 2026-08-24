@@ -8,7 +8,7 @@ let _ppState = {
   data: [],
   loading: false,
   timerInterval: null,
-  collapsed: { pendiente: false, enviada: true } // enviada arranca colapsada
+  collapsed: { pendiente: false, enviada: true, recibida: true } // enviada y recibida arrancan colapsadas
 };
 
 /* Helper: headers para Supabase REST con anon key */
@@ -158,6 +158,9 @@ function _ppBuildSection(key, icon, title, rows, showTimer) {
   var collapsed = _ppState.collapsed[key];
   var count = rows.length;
   var headerColor = key === 'pendiente' ? '#dc2626' : '#16a34a';
+  // v4.6 — 'recibida' (ya confirmados) usa las mismas columnas que 'enviada'
+  // pero en su propia sección (no se mezclan con los que faltan confirmar).
+  var esEnviada = (key === 'enviada' || key === 'recibida');
 
   var html = '<div style="margin-bottom:16px;">';
 
@@ -177,21 +180,23 @@ function _ppBuildSection(key, icon, title, rows, showTimer) {
 
   if (!count) {
     html += '<div style="padding:12px 14px;color:#94a3b8;font-size:14px;font-style:italic;">' +
-      (key === 'pendiente' ? 'Sin documentación pendiente' : 'Sin documentación enviada') + '</div>';
+      (key === 'pendiente' ? 'Sin documentación pendiente'
+        : key === 'recibida' ? 'Sin documentación recibida'
+        : 'Sin documentación enviada') + '</div>';
   } else {
     html += '<div class="pp-tblwrap"><table class="pp-tbl"><thead><tr>' +
       '<th>Fecha DDJJ</th><th>Tipo</th><th>N° Remito</th><th>N° Factura</th><th>Razón Social</th><th>Contenido</th>';
     if (showTimer) html += '<th>Tiempo sin enviar</th>';
     // v4.1 — demora entre la fecha del documento y cuándo se cargó al sistema + carpeta destino
     html += '<th title="Cuánto tardó en cargarse al sistema desde la fecha del documento">Demora carga</th>';
-    if (key === 'enviada') html += '<th>Enviado</th>';
-    if (key === 'enviada') html += '<th title="Carpeta 1: Rto+Fc de proveedores · Carpeta 2: solo remito o solo factura · Carpeta 3: talleristas">Carpeta</th>';
-    if (key === 'enviada') html += '<th>Confirmar recepción</th>';
-    if (key !== 'enviada') html += '<th>Enviado</th>';
+    if (esEnviada) html += '<th>Enviado</th>';
+    if (esEnviada) html += '<th title="Carpeta 1: Rto+Fc de proveedores · Carpeta 2: solo remito o solo factura · Carpeta 3: talleristas">Carpeta</th>';
+    if (esEnviada) html += '<th>Confirmar recepción</th>';
+    if (!esEnviada) html += '<th>Enviado</th>';
     html += '</tr></thead><tbody>';
 
     rows.forEach(function (row) {
-      html += _ppBuildRow(row, showTimer, key === 'enviada');
+      html += _ppBuildRow(row, showTimer, esEnviada);
     });
 
     html += '</tbody></table></div>';
@@ -314,16 +319,20 @@ function ppRenderList() {
 
   var data = _ppState.data;
 
-  // Separar pendientes vs enviados (siempre, incluso si data está vacío)
+  // v4.6 — tres grupos: pendiente de enviar · enviado SIN confirmar · recibido (confirmado).
+  // Cuando marcan "Recibido" pasa a su propia sección, no queda en "enviada".
   var pendientes = [];
-  var enviados = [];
+  var enviados = [];   // enviados pero todavía sin confirmar recepción
+  var recibidos = [];  // ya confirmados como recibidos
   data.forEach(function (row) {
-    if (row.enviado) enviados.push(row);
-    else pendientes.push(row);
+    if (!row.enviado) pendientes.push(row);
+    else if (row.confirmado) recibidos.push(row);
+    else enviados.push(row);
   });
 
   var html = _ppBuildSection('pendiente', '⏳', 'Documentación pendiente', pendientes, true) +
-             _ppBuildSection('enviada', '✅', 'Documentación enviada', enviados, false);
+             _ppBuildSection('enviada', '✅', 'Documentación enviada', enviados, false) +
+             _ppBuildSection('recibida', '📥', 'Recibidos (confirmados)', recibidos, false);
 
   container.innerHTML = html;
 
