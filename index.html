@@ -6506,7 +6506,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v11.23";
+const APP_VERSION = "v11.33";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -16428,7 +16428,9 @@ function stkBodyConteo() {
   if (c.showComp) {
     const cont = {};
     c.rows.forEach(function (r) { const k = _ocgNorm(r.cod); if (!k) return; cont[k] = (cont[k] || 0) + (r.isInsumo ? (Number(r.cantidad) || 0) : _cntCajas(r)); });
-    const saldos = stockComputeSaldos(_stk.movs, _stk.cutoff);
+    // v11.33: usar vista LIVE (viewRows) en vez de movs cacheados, igual que STOCK/RACKS.
+    // Solo fallback a movs cuando hay time-travel (asOf). Evita mostrar saldos desactualizados.
+    const saldos = _stk.asOf ? stockComputeSaldos(_stk.movs, _stk.cutoff, _stk.asOf) : _stkSaldosFromView(_stk.viewRows);
     const sys = {};
     Object.keys(saldos).forEach(function (cc) { const k = _ocgNorm(cc); if (!sys[k]) sys[k] = { cod: saldos[cc].cod, desc: saldos[cc].desc, gond: 0, exc: 0, proc: 0 }; sys[k].gond += Number(saldos[cc].terminado) || 0; sys[k].exc += Number(saldos[cc].excedente) || 0; sys[k].proc += (Number(saldos[cc].separar_pedidos) || 0) + (Number(saldos[cc].a_facturar) || 0); });
     // v10.46 — picking EN CURSO (PKC sin TP): el stock ya refleja lo pickeado (descuento
