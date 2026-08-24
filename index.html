@@ -6506,7 +6506,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v11.37";
+const APP_VERSION = "v11.38";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -11611,13 +11611,16 @@ function stkAsOfControl() {
   // v11.37 — el selector de fecha/hora solo se muestra al tocar "A esa fecha" (o si ya
   // se está mirando un histórico). Así la fila "Ver stock" queda compacta y en línea.
   const showPicker = on || !!_stk.asOfPicking;
-  let h = '<span style="font-size:12px;font-weight:800;color:#475569;flex:0 0 auto;">Ver stock:</span>';
-  // v10.49 — TODO a 38px de alto (mismo nivel que los chips E/LK/CH/Negativos/…).
-  h += '<button class="stk-btn' + (on ? '' : ' ok') + '" onclick="stkAsOfLive()" style="flex:0 0 auto;white-space:nowrap;height:38px;padding:0 12px;box-sizing:border-box;">🔴 En vivo</button>';
+  // v11.38 — MISMO molde que los chips (E/LK/CH/…): borde 1.5px, radio 9px, alto 38px,
+  // centrado con inline-flex. Antes usaban .stk-btn (borde 1px, sin flex) y quedaban
+  // desnivelados respecto a los chips.
+  const _pill = 'width:auto;margin:0;flex:0 0 auto;padding:0 12px;height:38px;border-radius:9px;font-weight:800;font-size:13px;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;line-height:1;';
+  let h = '<span style="font-size:12px;font-weight:800;color:#475569;flex:0 0 auto;display:inline-flex;align-items:center;">Ver stock:</span>';
+  h += '<button onclick="stkAsOfLive()" style="' + _pill + 'border:1.5px solid ' + (on ? '#cbd5e1' : '#16a34a') + ';background:' + (on ? '#fff' : '#16a34a') + ';color:' + (on ? '#334155' : '#fff') + ';">🔴 En vivo</button>';
   if (showPicker) {
-    h += '<input type="datetime-local" id="stkAsOfInp" value="' + escapeHtml(_stk.asOfInput || '') + '" onchange="if(_stk){_stk.asOfInput=this.value;}" style="flex:0 0 auto;width:158px;min-width:0;height:38px;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:8px;padding:0 6px;font-size:11px;">';
+    h += '<input type="datetime-local" id="stkAsOfInp" value="' + escapeHtml(_stk.asOfInput || '') + '" onchange="if(_stk){_stk.asOfInput=this.value;}" style="flex:0 0 auto;width:158px;min-width:0;height:38px;box-sizing:border-box;border:1.5px solid #cbd5e1;border-radius:9px;padding:0 6px;font-size:11px;">';
   }
-  h += '<button class="stk-btn" onclick="stkAsOfDateBtn()" style="flex:0 0 auto;white-space:nowrap;height:38px;padding:0 12px;box-sizing:border-box;">📅 A esa fecha</button>';
+  h += '<button onclick="stkAsOfDateBtn()" style="' + _pill + 'border:1.5px solid ' + (on ? '#16a34a' : '#cbd5e1') + ';background:#fff;color:#334155;">📅 A esa fecha</button>';
   return h;
 }
 /* v11.37 — 1er toque "A esa fecha": revela el selector de fecha/hora. 2º toque (ya visible
