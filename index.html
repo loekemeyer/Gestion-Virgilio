@@ -6506,7 +6506,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v11.43";
+const APP_VERSION = "v11.44";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -10456,7 +10456,7 @@ async function openOCAdmin() {
   } catch (e) { const b = document.getElementById("ocBody"); if (b) b.innerHTML = '<div class="oc-loading">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
 }
 function closeOCAdmin() { const ov = document.getElementById("ocAdminOverlay"); if (ov) ov.classList.remove("show"); _oc = null; }
-function ocRender() { if (!_oc) return; const body = document.getElementById("ocBody"); if (!body) return; _renderKeepFocus(body, _oc.view === "detail" ? ocBodyDetail() : _oc.view === "fecha" ? ocBodyFecha() : _oc.view === "nueva" ? ocBodyNueva() : _oc.view === "gen" ? ocBodyGen() : _oc.view === "cfg" ? ocBodyCfg() : _oc.view === "entregas" ? ocBodyEntregas() : _oc.view === "trazar" ? ocBodyTrazar() : ocBodyList()); }
+function ocRender() { if (!_oc) return; const body = document.getElementById("ocBody"); if (!body) return; _renderKeepFocus(body, _oc.view === "detail" ? ocBodyDetail() : _oc.view === "general" ? ocBodyGeneral() : _oc.view === "fecha" ? ocBodyFecha() : _oc.view === "nueva" ? ocBodyNueva() : _oc.view === "gen" ? ocBodyGen() : _oc.view === "cfg" ? ocBodyCfg() : _oc.view === "entregas" ? ocBodyEntregas() : _oc.view === "trazar" ? ocBodyTrazar() : ocBodyList()); }
 /* v4.40 — % DE ENTREGAS: cruza lo PEDIDO (Ordenes_Compra.cantidad) contra lo
    ENTREGADO (cantidad_recibida) por artículo y global. Detalle del cumplimiento
    de los proveedores. (Ordenes_Compra retiene el histórico de OCs.) */
@@ -10668,7 +10668,7 @@ function _ocPctCol(p) { return p >= 90 ? "#16a34a" : (p >= 50 ? "#d97706" : "#dc
 function ocBodyFecha() {
   const g = ocGroups(), fe = _oc.openFecha;
   let groups = Object.keys(g).map(function (k) { return { key: k, x: g[k] }; }).filter(function (o) { return (o.x.fecha || "") === fe; });
-  let h = '<div class="oc-tools"><button class="oc-btn" onclick="ocBackFechas()">← Volver a fechas</button></div>';
+  let h = '<div class="oc-tools"><button class="oc-btn" onclick="ocBackFechas()">← Volver a fechas</button><button class="oc-btn" onclick="ocOpenGeneral()" title="Ver la composición ítem por ítem de TODA la OC (todos los proveedores juntos)">📊 General</button></div>';
   if (!groups.length) { _oc.view = "list"; _oc.openFecha = null; return ocBodyList(); }
   let tPed = 0, tRec = 0, tItems = 0;
   groups.forEach(function (o) { o.st = ocGroupStats(o.x); tPed += o.st.ped; tRec += o.st.rec; tItems += o.x.rows.length; });
@@ -10691,6 +10691,36 @@ function ocBodyFecha() {
   });
   h += '</div>';
   return h;
+}
+/* v11.44 — Vista GENERAL: composición ítem por ítem de TODA la OC de una fecha
+   (todos los proveedores juntos), con la misma info que al abrir un proveedor. */
+function ocOpenGeneral() { if (!_oc) return; _oc.view = "general"; _oc.filtro = ""; ocRender(); }
+function ocBodyGeneral() {
+  const g = ocGroups(), fe = _oc.openFecha;
+  let groups = Object.keys(g).map(function (k) { return g[k]; }).filter(function (x) { return (x.fecha || "") === fe; });
+  let h = '<div class="oc-tools"><button class="oc-btn" onclick="ocBackFechas()">← Volver a fechas</button>' +
+    '<input class="oc-filtro" type="search" placeholder="🔎 Buscar proveedor / código / descripción" value="' + escapeHtml(_oc.filtro || "") + '" oninput="if(_oc){_oc.filtro=this.value;ocRender();}"></div>';
+  // Aplanar todos los ítems con su proveedor
+  let items = [];
+  groups.forEach(function (x) {
+    x.rows.forEach(function (r) {
+      const ped = Number(r.cantidad) || 0, rec = ocRecEff(r), falt = ped - rec;
+      items.push({ prov: x.proveedor || "—", cod: codCanon(r.codigo) || "—", desc: artNombre(r.codigo, r.descripcion) || "", uni: r.unidad || "", ped: ped, rec: rec, falt: falt });
+    });
+  });
+  const f = (_oc.filtro || "").trim().toLowerCase();
+  if (f) items = items.filter(function (it) { return (it.prov + " " + it.cod + " " + it.desc).toLowerCase().indexOf(f) >= 0; });
+  // Orden: proveedor, y dentro por falta desc
+  items.sort(function (a, b) { return (a.prov || "").localeCompare(b.prov || "") || (b.falt - a.falt); });
+  let tPed = 0, tRec = 0;
+  items.forEach(function (it) { tPed += it.ped; tRec += it.rec; });
+  h += '<div class="oc-meta">📊 <b>General</b> — OC del <b>' + escapeHtml(_ocDdmm(fe)) + '</b> · <b>' + items.length + '</b> ítem(s) · Pedido <b>' + tPed + '</b> · Recibido <b class="oc-ok">' + tRec + '</b> · Falta <b class="oc-falt">' + Math.max(0, tPed - tRec) + '</b> · Recepción <b style="color:' + _ocPctCol(_ocPct(tRec, tPed)) + '">' + _ocPct(tRec, tPed) + '%</b></div>';
+  h += '<div class="oc-tblwrap"><table class="oc-tbl oc-tbl-det"><thead><tr><th>Proveedor</th><th>Código</th><th>Descripción</th><th>Unidad</th><th class="num">Pedido</th><th class="num">Recibido</th><th class="num">Falta</th></tr></thead><tbody>';
+  items.forEach(function (it) {
+    h += '<tr><td>' + escapeHtml(it.prov) + '</td><td class="oc-cod">' + escapeHtml(it.cod) + '</td><td>' + escapeHtml(it.desc) + '</td><td>' + escapeHtml(it.uni) + '</td><td class="num">' + it.ped + '</td><td class="num ' + (it.rec > 0 ? "oc-ok" : "") + '">' + it.rec + '</td><td class="num ' + (it.falt > 0 ? "oc-falt" : "oc-ok") + '">' + (it.falt !== 0 ? it.falt : "0") + '</td></tr>';
+  });
+  if (!items.length) h += '<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:14px;">Sin ítems</td></tr>';
+  return h + "</tbody></table></div>";
 }
 function ocOpen(kEnc) { if (!_oc) return; _oc.openKey = decodeURIComponent(kEnc); const g = ocGroups(), x = g[_oc.openKey]; if (x && x.fecha) _oc.openFecha = x.fecha; _oc.view = "detail"; ocRender(); }
 function ocBack() { if (!_oc) return; if (_oc.view === "detail") { _oc.view = _oc.openFecha ? "fecha" : "list"; _oc.openKey = null; } else { _oc.view = "list"; _oc.openKey = null; _oc.openFecha = null; } ocRender(); }
