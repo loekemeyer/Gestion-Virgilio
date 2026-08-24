@@ -4,6 +4,14 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
+> ⚠️ **REGLA DE ORO — NUNCA EMPARCHAR.** Nada se resuelve con un parche/band-aid:
+> siempre se arregla **en el lugar donde está la causa** (la tabla, la vista, la
+> función o el módulo que corresponde). Nada de tapar el síntoma en otra capa
+> (ej. corregir en el front lo que está mal en una vista, o duplicar un dato en
+> otra tabla para que "se vea bien"). Si un dato ya existe, se lee de su **fuente
+> única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
+> de raíz**.
+>
 > Última actualización: 2026-08-22 · Versión app al documentar: **v11.23**
 >
 > Nota **2026-08-22 — jornada v11.14→v11.23 (resumen).** **(1) Facturación:** columna
