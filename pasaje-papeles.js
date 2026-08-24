@@ -116,12 +116,30 @@ async function ppLoadData() {
  */
 function ppFormatDate(dateStr) {
   if (!dateStr) return '—';
+  // Fecha "pelada" (YYYY-MM-DD, sin hora): formatear con las partes tal cual.
+  // Si se la pasa a new Date() se interpreta como medianoche UTC y al mostrarla
+  // en hora Argentina (UTC-3) retrocede un día → mostraba el remito/factura un
+  // día antes que la fecha real cargada.
+  var d = String(dateStr).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (d) return d[3] + '/' + d[2] + '/' + d[1];
   try {
     return new Date(dateStr).toLocaleDateString('es-AR', {
       timeZone: 'America/Argentina/Buenos_Aires',
       day: '2-digit', month: '2-digit', year: 'numeric'
     });
   } catch (e) { return dateStr; }
+}
+
+/** Formatea un timestamp a "DD/MM/AAAA HH:MM" (hora Argentina). */
+function ppFormatDateTime(ts) {
+  if (!ts) return '—';
+  try {
+    return new Date(ts).toLocaleString('es-AR', {
+      timeZone: 'America/Argentina/Buenos_Aires',
+      day: '2-digit', month: '2-digit', year: 'numeric',
+      hour: '2-digit', minute: '2-digit', hour12: false
+    }).replace(',', '');
+  } catch (e) { return String(ts); }
 }
 
 /** Toggle de sección colapsable */
@@ -162,10 +180,11 @@ function _ppBuildSection(key, icon, title, rows, showTimer) {
       (key === 'pendiente' ? 'Sin documentación pendiente' : 'Sin documentación enviada') + '</div>';
   } else {
     html += '<div class="pp-tblwrap"><table class="pp-tbl"><thead><tr>' +
-      '<th>Fecha</th><th>Tipo</th><th>N° Remito</th><th>N° Factura</th><th>Razón Social</th><th>Contenido</th>';
+      '<th>Fecha DDJJ</th><th>Tipo</th><th>N° Remito</th><th>N° Factura</th><th>Razón Social</th><th>Contenido</th>';
     if (showTimer) html += '<th>Tiempo sin enviar</th>';
     // v4.1 — demora entre la fecha del documento y cuándo se cargó al sistema + carpeta destino
     html += '<th title="Cuánto tardó en cargarse al sistema desde la fecha del documento">Demora carga</th>';
+    if (key === 'enviada') html += '<th>Enviado</th>';
     if (key === 'enviada') html += '<th title="Carpeta 1: Rto+Fc de proveedores · Carpeta 2: solo remito o solo factura · Carpeta 3: talleristas">Carpeta</th>';
     if (key === 'enviada') html += '<th>Confirmar recepción</th>';
     if (key !== 'enviada') html += '<th>Enviado</th>';
@@ -255,6 +274,12 @@ function _ppBuildRow(row, showTimer, showConfirm) {
   // v4.1 — Demora de carga: fecha del documento (remito/factura, 00:00 AR) → created_at.
   html += '<td style="text-align:center;white-space:nowrap;">' + _ppDemoraCargaHtml(row) + '</td>';
 
+  // Día/hora en que se marcó como enviado (solo sección enviada).
+  if (showConfirm) {
+    html += '<td style="text-align:center;white-space:nowrap;font-size:12.5px;color:#334155;font-variant-numeric:tabular-nums;">' +
+      ppFormatDateTime(row.enviado_en) + '</td>';
+  }
+
   // v4.1 — Carpeta destino (solo sección enviada): la misma lógica del confirm, visible en la tabla.
   if (showConfirm) {
     var carp = _ppGetFolderNumber(row);
@@ -263,10 +288,10 @@ function _ppBuildRow(row, showTimer, showConfirm) {
 
   // Columna "Confirmar recepción" solo para enviada
   if (showConfirm) {
-    if (row.recibido_en) {
-      // Ya fue recibido: mostrar fecha
+    if (row.confirmado) {
+      // Ya fue recibido: mostrar fecha de confirmación
       html += '<td style="text-align:center;font-size:13px;color:#16a34a;font-weight:600;">' +
-        'Recibido el ' + ppFormatDate(row.recibido_en) + '</td>';
+        'Recibido el ' + ppFormatDateTime(row.fecha_confirmacion) + '</td>';
     } else {
       // No recibido aún: mostrar botón
       var btnHtml = '<button data-row-id="' + rowId + '" onclick="ppConfirmarRecepcion(this.getAttribute(' + "'" + 'data-row-id' + "'" + '))" ' +
@@ -302,8 +327,11 @@ function ppRenderList() {
 
   container.innerHTML = html;
 
-  // Badge del botón en el panel supervisor
-  _ppUpdateBadge(pendientes.length);
+  // Badge del botón en el panel supervisor: cuenta pendientes de enviar +
+  // enviados sin confirmar recepción (los "OK?" abiertos). El tic verde solo
+  // aparece cuando NO queda nada por confirmar adentro.
+  var sinConfirmar = data.filter(function (r) { return !r.confirmado; }).length;
+  _ppUpdateBadge(sinConfirmar);
 
   // Arrancar timer si hay pendientes
   if (pendientes.length) _ppStartTimer();
@@ -316,23 +344,25 @@ function ppRenderList() {
 async function ppToggleEnviado(id, checked) {
   // Actualizar estado local inmediatamente
   var row = _ppState.data.find(function (r) { return r.id === id; });
-  if (row) row.enviado = checked;
+  var prevEnviadoEn = row ? row.enviado_en : null;
+  var nuevoEnviadoEn = checked ? new Date().toISOString() : null;
+  if (row) { row.enviado = checked; row.enviado_en = nuevoEnviadoEn; }
 
   // Re-renderizar completo (la fila cambia de sección)
   ppRenderList();
 
-  // Persistir en Supabase
+  // Persistir en Supabase (enviado + día/hora de envío)
   try {
     var res = await fetch(SUPABASE_URL + '/rest/v1/Pasaje_Papeles?id=eq.' + id, {
       method: 'PATCH',
       headers: _ppHeaders({ Prefer: 'return=minimal' }),
-      body: JSON.stringify({ enviado: checked })
+      body: JSON.stringify({ enviado: checked, enviado_en: nuevoEnviadoEn })
     });
     if (!res.ok) console.warn('ppToggleEnviado HTTP', res.status);
   } catch (e) {
     console.warn('ppToggleEnviado error:', e);
     // Revertir estado local si falló
-    if (row) row.enviado = !checked;
+    if (row) { row.enviado = !checked; row.enviado_en = prevEnviadoEn; }
     ppRenderList();
   }
 }
@@ -562,7 +592,7 @@ function _ppUpdateBadge(pendCount) {
 async function ppLoadBadge() {
   try {
     var res = await fetch(
-      SUPABASE_URL + '/rest/v1/Pasaje_Papeles?enviado=eq.false&select=id',
+      SUPABASE_URL + '/rest/v1/Pasaje_Papeles?confirmado=eq.false&select=id',
       { headers: _ppHeaders(), cache: 'no-store' }
     ).then(function (r) { return r.ok ? r.json() : []; });
     _ppUpdateBadge((res || []).length);
@@ -614,7 +644,7 @@ function _ppGetFolderNumber(row) {
 
 /**
  * Confirma la recepción de un documento
- * Actualiza recibido_en con la fecha actual y muestra el número de carpeta
+ * Marca confirmado=true y fecha_confirmacion=now, y muestra el número de carpeta
  */
 async function ppConfirmarRecepcion(rowId) {
   // Buscar el row en el estado
@@ -624,8 +654,8 @@ async function ppConfirmarRecepcion(rowId) {
     return;
   }
 
-  if (row.recibido_en) {
-    alert('Este documento ya fue confirmado como recibido el ' + ppFormatDate(row.recibido_en));
+  if (row.confirmado) {
+    alert('Este documento ya fue confirmado como recibido el ' + ppFormatDateTime(row.fecha_confirmacion));
     return;
   }
 
@@ -649,7 +679,8 @@ async function ppConfirmarRecepcion(rowId) {
   if (!confirm(msg)) return;
 
   // Actualizar estado local
-  row.recibido_en = new Date().toISOString();
+  row.confirmado = true;
+  row.fecha_confirmacion = new Date().toISOString();
 
   // Re-renderizar tabla
   ppRenderList();
@@ -659,7 +690,7 @@ async function ppConfirmarRecepcion(rowId) {
     var res = await fetch(SUPABASE_URL + '/rest/v1/Pasaje_Papeles?id=eq.' + rowId, {
       method: 'PATCH',
       headers: _ppHeaders({ Prefer: 'return=minimal' }),
-      body: JSON.stringify({ recibido_en: row.recibido_en })
+      body: JSON.stringify({ confirmado: true, fecha_confirmacion: row.fecha_confirmacion })
     });
     if (!res.ok) {
       console.warn('ppConfirmarRecepcion HTTP', res.status);
@@ -671,7 +702,8 @@ async function ppConfirmarRecepcion(rowId) {
     console.warn('ppConfirmarRecepcion error:', e);
     alert('Aviso: Los datos locales se actualizaron, pero hubo un error al sincronizar con el servidor.');
     // Revertir si falla
-    row.recibido_en = null;
+    row.confirmado = false;
+    row.fecha_confirmacion = null;
     ppRenderList();
   }
 }
