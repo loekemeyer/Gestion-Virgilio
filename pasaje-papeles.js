@@ -162,7 +162,7 @@ function _ppBuildSection(key, icon, title, rows, showTimer) {
       (key === 'pendiente' ? 'Sin documentación pendiente' : 'Sin documentación enviada') + '</div>';
   } else {
     html += '<div class="pp-tblwrap"><table class="pp-tbl"><thead><tr>' +
-      '<th>Fecha</th><th>Tipo</th><th>N° Remito</th><th>N° Factura</th><th>Razón Social</th><th>Contenido</th>';
+      '<th>Fecha DDJJ</th><th>Tipo</th><th>N° Remito</th><th>N° Factura</th><th>Razón Social</th><th>Contenido</th>';
     if (showTimer) html += '<th>Tiempo sin enviar</th>';
     // v4.1 — demora entre la fecha del documento y cuándo se cargó al sistema + carpeta destino
     html += '<th title="Cuánto tardó en cargarse al sistema desde la fecha del documento">Demora carga</th>';
@@ -302,8 +302,11 @@ function ppRenderList() {
 
   container.innerHTML = html;
 
-  // Badge del botón en el panel supervisor
-  _ppUpdateBadge(pendientes.length);
+  // Badge del botón en el panel supervisor: cuenta pendientes de enviar +
+  // enviados sin confirmar recepción (los "OK?" abiertos). El tic verde solo
+  // aparece cuando NO queda nada por confirmar adentro.
+  var sinConfirmar = data.filter(function (r) { return !r.recibido_en; }).length;
+  _ppUpdateBadge(sinConfirmar);
 
   // Arrancar timer si hay pendientes
   if (pendientes.length) _ppStartTimer();
@@ -562,7 +565,7 @@ function _ppUpdateBadge(pendCount) {
 async function ppLoadBadge() {
   try {
     var res = await fetch(
-      SUPABASE_URL + '/rest/v1/Pasaje_Papeles?enviado=eq.false&select=id',
+      SUPABASE_URL + '/rest/v1/Pasaje_Papeles?recibido_en=is.null&select=id',
       { headers: _ppHeaders(), cache: 'no-store' }
     ).then(function (r) { return r.ok ? r.json() : []; });
     _ppUpdateBadge((res || []).length);
