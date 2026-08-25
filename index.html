@@ -3679,7 +3679,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
     <div class="sup-sec-label">Reportes y configuración</div>
     <!-- CHICOS: uso ocasional. -->
     <div class="sup-actions sup-secondary">
-      <button class="sup-action-btn" onclick="openDeuda()"><span class="sup-ico">💰</span><span>Deuda a cobrar</span></button>
+      <button class="sup-action-btn" onclick="openCobros()"><span class="sup-ico">💰</span><span>Deuda a cobrar / Cobranzas</span></button>
       <button class="sup-action-btn" onclick="openAgentesAdmin()"><span class="sup-ico">🤖</span><span>Agentes</span></button>
       <button class="sup-action-btn" onclick="openMonitor()"><span class="sup-ico">📊</span><span>Monitor / Análisis / Inconsistencias</span></button>
       <button class="sup-action-btn" onclick="showGuardarOrden('')" style="position:relative;"><span class="sup-ico">📋</span><span>Qué bajar primero</span><span id="qbpBadge" class="dp-badge" style="display:none;" title="Urgentes (SOS): góndola < 20% con stock atrás para bajar"></span></button>
@@ -3692,7 +3692,6 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       <button class="sup-action-btn" onclick="openPedidosImportacion()"><span class="sup-ico">📦</span><span>Importación — pedidos y proveedores</span></button>
       <button class="sup-action-btn" onclick="openAvisoProg()"><span class="sup-ico">📲</span><span>Avisar programación</span></button>
       <button class="sup-action-btn" onclick="openPlataPerdida()"><span class="sup-ico">💸</span><span>Plata perdida de facturar</span></button>
-      <button class="sup-action-btn" onclick="openCobranzas()"><span class="sup-ico">💵</span><span>Cobranzas — valor por NP</span></button>
       <button class="sup-action-btn" onclick="openDatosProducto()" style="position:relative;"><span class="sup-ico">🚦</span><span>Completar datos producto</span><span id="dpBadge" class="dp-badge" style="display:none;"></span></button>
       <button class="sup-action-btn" onclick="openConfiguracion()"><span class="sup-ico">⚙️</span><span>Configuración</span></button>
       <button class="sup-action-btn" onclick="openOperarioView()"><span class="sup-ico">👁️</span><span>Ver módulo operarios</span></button>
@@ -6512,7 +6511,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v11.67";
+const APP_VERSION = "v11.68";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -28525,13 +28524,16 @@ async function _cobRpc(fn, body) {
   if (!r.ok) { var t = ""; try { t = await r.text(); } catch (_e) {} throw new Error("HTTP " + r.status + (t ? (" — " + t) : "")); }
   try { return await r.json(); } catch (_e) { return null; }
 }
-async function openCobranzas() {
-  try { if (typeof requireSupervisor === "function" && !requireSupervisor()) return; } catch (_e) {}
+function _cobEnsureCss() {
   if (!document.getElementById("cobCss")) {
     var st = document.createElement("style"); st.id = "cobCss";
     st.textContent = "#cobOverlay .cob-card{max-width:940px;margin:0 auto;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5);display:flex;flex-direction:column;max-height:92vh;}.cob-head{display:flex;align-items:center;gap:12px;padding:13px 16px;background:linear-gradient(90deg,#065f46,#022c22);color:#fff;flex:0 0 auto;}.cob-head b{font-size:17px;}.cob-x{margin-left:auto;width:auto;background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;}.cob-body{padding:14px 16px;display:flex;flex-direction:column;min-height:0;flex:1;}.cob-ctrl{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px;flex:0 0 auto;font-size:12.5px;color:#475569;}.cob-tab{width:auto;padding:6px 12px;border-radius:999px;border:1px solid #cbd5e1;background:#fff;color:#334155;font-size:12.5px;font-weight:800;cursor:pointer;}.cob-tab.on{background:#065f46;border-color:#065f46;color:#fff;}.cob-q{flex:1;min-width:150px;padding:6px 10px;border:1px solid #cbd5e1;border-radius:8px;font-size:12.5px;}.cob-kpis{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;flex:0 0 auto;}.cob-kpi{background:#ecfdf5;border:1.5px solid #6ee7b7;border-radius:12px;padding:9px 14px;flex:1;min-width:150px;}.cob-kpi small{font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;color:#047857;font-weight:800;}.cob-kpi b{display:block;font-size:22px;color:#065f46;font-variant-numeric:tabular-nums;}.cob-tblwrap{overflow:auto;flex:1;min-height:0;}.cob-tbl{width:100%;border-collapse:collapse;font-size:13px;}.cob-tbl th,.cob-tbl td{border-bottom:1px solid #eef2f7;padding:6px 8px;text-align:left;}.cob-tbl th{background:#f8fafc;font-size:11.5px;color:#475569;position:sticky;top:0;}.cob-tbl .num{text-align:right;font-variant-numeric:tabular-nums;}.cob-badge{display:inline-block;font-size:10px;font-weight:800;padding:1px 6px;border-radius:999px;}.cob-lk{background:#dbeafe;color:#1d4ed8;}.cob-ch{background:#fef3c7;color:#b45309;}.cob-super{background:#ede9fe;color:#6d28d9;}.cob-warn{font-size:11px;color:#b45309;font-weight:700;}.cob-clk{cursor:pointer;}.cob-clk:hover{background:#f0fdf4;}.cob-back{width:auto;background:#065f46;color:#fff;border:none;border-radius:8px;padding:5px 12px;font-weight:800;cursor:pointer;font-size:12.5px;}";
     document.head.appendChild(st);
   }
+}
+async function openCobranzas() {
+  try { if (typeof requireSupervisor === "function" && !requireSupervisor()) return; } catch (_e) {}
+  _cobEnsureCss();
   _cob = { emp: "todos", q: "", rows: [], view: "list", det: null };
   var ov = document.getElementById("cobOverlay");
   if (!ov) { ov = document.createElement("div"); ov.id = "cobOverlay"; ov.style.cssText = "position:fixed;inset:0;z-index:1400;background:rgba(2,6,23,.72);overflow:auto;padding:14px;"; document.body.appendChild(ov); }
@@ -34449,6 +34451,61 @@ function deudaAbrirCobro(codOpt) {
     });
 }
 window.deudaAbrirCobro = deudaAbrirCobro;
+
+/* ---------- v11.68 — Módulo UNIFICADO: Deuda a cobrar + Cobranzas (valor por NP) ----------
+   Un solo botón / una sola pantalla con 2 pestañas. Reusa la lógica existente:
+   pestaña "Deuda" = deudaRefresh/deudaRender; pestaña "Valor por NP" = cobLoad/cobRender.
+   No duplica render: solo aporta el shell con las pestañas y los contenedores que cada
+   render espera (#deudaResumen/#deudaTabla y #cobBody). */
+var _cobrosTab = "deuda";
+function cobrosClose() { var ov = document.getElementById("cobrosOverlay"); if (ov) ov.style.display = "none"; }
+window.cobrosClose = cobrosClose;
+function _cobrosTabCss(on) { return "padding:6px 14px;border-radius:999px;border:none;font-weight:800;cursor:pointer;font-size:13px;" + (on ? "background:#fff;color:#065f46;" : "background:rgba(255,255,255,.18);color:#fff;"); }
+async function openCobros(tab) {
+  try { if (typeof requireSupervisor === "function" && !requireSupervisor()) return; } catch (_e) {}
+  _cobEnsureCss();
+  var ov = document.getElementById("cobrosOverlay");
+  if (!ov) { ov = document.createElement("div"); ov.id = "cobrosOverlay"; ov.style.cssText = "position:fixed;inset:0;background:#fff;z-index:9500;overflow:hidden;font-family:Arial,sans-serif;display:flex;flex-direction:column;"; document.body.appendChild(ov); }
+  ov.style.display = "flex";
+  ov.innerHTML =
+    '<div style="display:flex;align-items:center;gap:12px;padding:12px 16px;background:linear-gradient(90deg,#065f46,#022c22);color:#fff;flex:0 0 auto;flex-wrap:wrap;">' +
+      '<b style="font-size:17px;">💰 Deuda / Cobranzas</b>' +
+      '<div style="display:flex;gap:6px;margin-left:4px;">' +
+        '<button id="cobrosTabDeuda" onclick="cobrosSetTab(\'deuda\')">💰 Deuda a cobrar</button>' +
+        '<button id="cobrosTabCob" onclick="cobrosSetTab(\'cob\')">💵 Valor por NP</button>' +
+      '</div>' +
+      '<button onclick="cobrosClose()" style="margin-left:auto;background:#dc2626;color:#fff;border:none;border-radius:8px;padding:7px 16px;font-weight:800;cursor:pointer;">Cerrar</button>' +
+    '</div>' +
+    '<div id="cobrosBody" style="flex:1;overflow:auto;padding:14px 16px;min-height:0;"></div>';
+  cobrosSetTab(tab === "cob" ? "cob" : "deuda");
+}
+window.openCobros = openCobros;
+function cobrosSetTab(tab) {
+  _cobrosTab = (tab === "cob") ? "cob" : "deuda";
+  var bd = document.getElementById("cobrosBody"); if (!bd) return;
+  var td = document.getElementById("cobrosTabDeuda"), tc = document.getElementById("cobrosTabCob");
+  if (td) td.style.cssText = _cobrosTabCss(_cobrosTab === "deuda");
+  if (tc) tc.style.cssText = _cobrosTabCss(_cobrosTab === "cob");
+  if (_cobrosTab === "deuda") {
+    bd.innerHTML =
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:8px;flex-wrap:wrap;">' +
+        '<h1 style="margin:0;font-size:20px;">💰 Deuda a cobrar</h1>' +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
+          '<input id="deudaQ" placeholder="🔎 Cliente / razón social / NP" style="padding:8px;font-size:14px;border:1px solid #cbd5e1;border-radius:6px;min-width:220px;" oninput="_deudaState.q=this.value;deudaRender();">' +
+          '<button onclick="deudaAbrirCobro()" style="padding:8px 14px;background:#059669;color:#fff;border:none;border-radius:6px;cursor:pointer;">+ Registrar cobro</button>' +
+          '<button onclick="deudaRefresh()" style="padding:8px 12px;background:#1e6bd6;color:#fff;border:none;border-radius:6px;cursor:pointer;">↻ Refrescar</button>' +
+        '</div>' +
+      '</div>' +
+      '<div id="deudaResumen" style="margin-bottom:10px;color:#64748b;font-size:13px;">Cargando…</div>' +
+      '<div id="deudaTabla"></div>';
+    deudaRefresh();
+  } else {
+    _cob = { emp: "todos", q: "", rows: [], view: "list", det: null };
+    bd.innerHTML = '<div id="cobBody"><div style="text-align:center;color:#94a3b8;padding:24px;">Cargando…</div></div>';
+    cobLoad();
+  }
+}
+window.cobrosSetTab = cobrosSetTab;
 /* ============================================================================ */
 
 })();
