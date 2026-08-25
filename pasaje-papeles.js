@@ -92,12 +92,7 @@ async function ppLoadData() {
   if (container) container.innerHTML = '<div class="pp-empty">Cargando documentación…</div>';
 
   try {
-    // v4.7 — materializa los remitos de VENTA conformados en Recepción Remitos (RR) como
-    // filas de Pasaje_Papeles (backend: RPC sync_pasaje_rr, origen='rr'), para pasar sus
-    // papeles desde acá. Idempotente (dedup por np); best-effort — un cron los sincroniza igual.
-    try {
-      await fetch(SUPABASE_URL + '/rest/v1/rpc/sync_pasaje_rr', { method: 'POST', headers: _ppHeaders(), cache: 'no-store' });
-    } catch (_syncErr) { /* el cron lo cubre */ }
+    // (v4.7 traía acá los remitos de VENTA/RR vía sync_pasaje_rr; se quitó por pedido del usuario.)
     // v4.2 — dos consultas: TODOS los pendientes (paginado, nunca se caen del corte
     // aunque sean viejos) + los últimos 500 enviados. Antes un solo limit=500 mezclado
     // podía dejar un pendiente viejo fuera de la lista aunque el badge lo contara.
@@ -337,35 +332,29 @@ function ppRenderList() {
 
   var data = _ppState.data;
 
-  // v4.8 — 2×2 por dos ejes:
-  //  · Responsabilidad VIRGILIO = ENVÍO (lo que falta mandar → enviado=false). Módulos por tipo:
-  //      «Envío remitos Prov» (talleristas, origen != 'rr') · «Envío remitos Venta» (RR, origen == 'rr').
-  //  · Responsabilidad CERVANTES = RECEPCIÓN (lo ya enviado, que Cervantes recibe/confirma → enviado=true):
-  //      «Recepción remitos Prov» · «Recepción remitos Venta». El "Recibido el…" se ve en cada fila.
-  //  Tipo: Prov = remito de proveedor/tallerista · Venta = remito de venta conformado en RR.
-  var esVenta = function (r) { return r.origen === 'rr'; };
-  var pick = function (enviado, venta) {
-    return data.filter(function (r) { return (!!r.enviado === enviado) && (esVenta(r) === venta); });
-  };
-  var vProv  = pick(false, false), vVenta = pick(false, true);   // Virgilio (envío)
-  var cProv  = pick(true,  false), cVenta = pick(true,  true);   // Cervantes (recepción)
+  // Lista única (como antes): pendiente de enviar · enviado sin confirmar · recibido (confirmado).
+  // (Los remitos de VENTA/RR se sacaron por pedido del usuario — se materializaban con origen='rr'.)
+  var pendientes = [];
+  var enviados = [];   // enviados pero todavía sin confirmar recepción
+  var recibidos = [];  // ya confirmados como recibidos
+  data.forEach(function (row) {
+    if (!row.enviado) pendientes.push(row);
+    else if (row.confirmado) recibidos.push(row);
+    else enviados.push(row);
+  });
 
   var html =
-    _ppGroupHeader('🏭 Responsabilidad Virgilio', '📤 Envío de remitos') +
-    _ppBuildSection('v_prov',  'pendiente', '📦', 'Envío remitos Prov',  vProv,  true) +
-    _ppBuildSection('v_venta', 'pendiente', '🧾', 'Envío remitos Venta', vVenta, true) +
-    _ppGroupHeader('🏢 Responsabilidad Cervantes', '📥 Recepción de remitos') +
-    _ppBuildSection('c_prov',  'enviada', '📦', 'Recepción remitos Prov',  cProv,  false) +
-    _ppBuildSection('c_venta', 'enviada', '🧾', 'Recepción remitos Venta', cVenta, false);
+    _ppBuildSection('pendiente', 'pendiente', '⏳', 'Documentación pendiente', pendientes, true) +
+    _ppBuildSection('enviada', 'enviada', '✅', 'Documentación enviada', enviados, false) +
+    _ppBuildSection('recibida', 'enviada', '📥', 'Recibidos (confirmados)', recibidos, false);
 
   container.innerHTML = html;
 
-  // Badge del botón en el panel supervisor: lo no confirmado (falta enviar + enviados sin confirmar).
+  // Badge: lo no confirmado (pendientes de enviar + enviados sin confirmar).
   var sinConfirmar = data.filter(function (r) { return !r.confirmado; }).length;
   _ppUpdateBadge(sinConfirmar);
 
-  // Timer si hay algo pendiente de ENVIAR (responsabilidad Virgilio).
-  if (vProv.length || vVenta.length) _ppStartTimer();
+  if (pendientes.length) _ppStartTimer();
   else _ppStopTimer();
 }
 
