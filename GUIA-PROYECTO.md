@@ -12,7 +12,20 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-08-25 · Versión app al documentar: **v11.52**
+> Última actualización: 2026-08-25 · Versión app al documentar: **v11.54**
+>
+> Nota **2026-08-25 — v11.54 (Pasaje de Papeles: remitos de venta conformados en RR).** Los remitos
+> de **venta** que el operario controla en **Recepción Remitos (RR)** (eventos **CRN**) ahora también
+> aparecen en **Pasaje de Papeles** para pasar sus papeles. **Backend:** RPC **`sync_pasaje_rr()`**
+> (SECURITY DEFINER, anon EXECUTE) **materializa** cada NP conformada como fila real de `Pasaje_Papeles`
+> (`tipo_documento='remito'`, `tipo_contenido='mercaderia'`, `numero_remito`=NP, `razon_social` de
+> `Facturacion_NP`/`PPP_Entregados_Meta`, `fecha_emision`/`fecha_remito`=`fecha_salida`, `created_at`=ts
+> del control, **`origen='rr'`** — nueva columna para distinguir de las capturadas en Recepción de
+> Mercadería, `origen` NULL/'recepcion'). Se materializa (no vista) para que entren al MISMO flujo
+> enviar/confirmar (el front actualiza por `id`). **Idempotente** (dedup por `origen='rr'` + `numero_remito`).
+> **Ancla** `2026-08-25` (solo de esa fecha en adelante; evita inundar «pendiente» con ~700 históricos
+> cuyos papeles ya se pasaron — subir la constante en la función para ampliar). Se dispara por **cron**
+> `sync_pasaje_rr_10min` (cada 10 min) **y** desde el front al abrir el módulo (`ppLoadData`, `pasaje-papeles.js?v=4.7`).
 >
 > Nota **2026-08-25 — v11.49→v11.52 (varios OC/Stocks).** **(v11.49)** Reporte «Góndola <25%»:
 > columna «% góndola» renombrada a **«% Ocup Virgilio»** (tabla + Excel + PDF; solo rótulo).

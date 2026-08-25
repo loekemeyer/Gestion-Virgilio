@@ -92,6 +92,12 @@ async function ppLoadData() {
   if (container) container.innerHTML = '<div class="pp-empty">Cargando documentación…</div>';
 
   try {
+    // v4.7 — materializa los remitos de VENTA conformados en Recepción Remitos (RR) como
+    // filas de Pasaje_Papeles (backend: RPC sync_pasaje_rr, origen='rr'), para pasar sus
+    // papeles desde acá. Idempotente (dedup por np); best-effort — un cron los sincroniza igual.
+    try {
+      await fetch(SUPABASE_URL + '/rest/v1/rpc/sync_pasaje_rr', { method: 'POST', headers: _ppHeaders(), cache: 'no-store' });
+    } catch (_syncErr) { /* el cron lo cubre */ }
     // v4.2 — dos consultas: TODOS los pendientes (paginado, nunca se caen del corte
     // aunque sean viejos) + los últimos 500 enviados. Antes un solo limit=500 mezclado
     // podía dejar un pendiente viejo fuera de la lista aunque el badge lo contara.
