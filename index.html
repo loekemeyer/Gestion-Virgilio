@@ -6511,7 +6511,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v11.51";
+const APP_VERSION = "v11.52";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -10329,7 +10329,7 @@ function _ocGroupKey(r) { return [r.proveedor || "", r.fecha || "", r.rubro || "
 async function ocFetchRows() {
   // v11.20 — paginado con supaFetchAll: PostgREST corta en 1000 filas por request
   // (el limit=20000 de antes era ilusorio; el histórico de OCs va a pasar las 1000).
-  return supaFetchAllSafe(SUPABASE_OC_ENDPOINT, "select=id,fecha,rubro,proveedor,proveedor_telefono,codigo,descripcion,cantidad,cantidad_recibida,unidad,estado,oc_max,oc_pedidos,oc_stock,oc_uni_caja,oc_ncaja&order=fecha.desc,proveedor.asc,codigo.asc");
+  return supaFetchAllSafe(SUPABASE_OC_ENDPOINT, "select=id,fecha,rubro,proveedor,proveedor_telefono,codigo,descripcion,cantidad,cantidad_recibida,unidad,estado,oc_max,oc_pedidos,oc_stock,oc_proy,oc_uni_caja,oc_ncaja&order=fecha.desc,proveedor.asc,codigo.asc");
 }
 /* ===== RECEPCIÓN → OC (v7.49, pedido del usuario / backlog v4.11 punto b) =====
    El visualizador se ALIMENTA de lo realmente recibido en Recepción de Mercadería
@@ -10732,22 +10732,7 @@ function ocBodyGeneral() {
   if (!items.length) h += '<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:14px;">Sin ítems</td></tr>';
   return h + "</tbody></table></div>";
 }
-function ocOpen(kEnc) { if (!_oc) return; _oc.openKey = decodeURIComponent(kEnc); const g = ocGroups(), x = g[_oc.openKey]; if (x && x.fecha) _oc.openFecha = x.fecha; _oc.view = "detail"; ocRender(); ocEnsureGenMap(); }
-/* v11.51 — Mapa stock/máximo/proyección por código (vista_generador_oc, la misma fuente
-   del generador de OCs). Se usa SOLO en la tabla en pantalla del detalle de OC (no en los
-   impresos Operador/Tallerista/WhatsApp). Se trae una vez por apertura del módulo y re-render. */
-async function ocEnsureGenMap() {
-  if (!_oc || _oc.genMap || _oc._genLoading) return;
-  _oc._genLoading = true;
-  try {
-    const rows = await supaFetchAllSafe(SUPABASE_GENERADOR_ENDPOINT, "select=cod,stock,maximo,proy&activo=eq.true");
-    const m = {};
-    (rows || []).forEach(function (r) { const k = _ocgNorm(r.cod); if (k) m[k] = { stock: Number(r.stock) || 0, max: Number(r.maximo) || 0, proy: Number(r.proy) || 0 }; });
-    _oc.genMap = m;
-  } catch (_e) { _oc.genMap = {}; }
-  _oc._genLoading = false;
-  if (_oc && _oc.view === "detail") ocRender();
-}
+function ocOpen(kEnc) { if (!_oc) return; _oc.openKey = decodeURIComponent(kEnc); const g = ocGroups(), x = g[_oc.openKey]; if (x && x.fecha) _oc.openFecha = x.fecha; _oc.view = "detail"; ocRender(); }
 function ocBack() { if (!_oc) return; if (_oc.view === "detail") { _oc.view = _oc.openFecha ? "fecha" : "list"; _oc.openKey = null; } else { _oc.view = "list"; _oc.openKey = null; _oc.openFecha = null; } ocRender(); }
 function ocBodyDetail() {
   const g = ocGroups(), x = g[_oc.openKey];
@@ -10762,22 +10747,21 @@ function ocBodyDetail() {
   h += '</div>';
   h += '<div class="oc-meta">Proveedor <b>' + escapeHtml(x.proveedor || "—") + '</b> · Fecha <b>' + escapeHtml(x.fecha || "—") + '</b> · Rubro <b>' + escapeHtml(x.rubro || "—") + '</b> · Pedido <b>' + st.ped + '</b> · Recibido <b class="oc-ok">' + st.rec + '</b> · Falta <b class="' + (st.falta > 0 ? "oc-falt" : "oc-ok") + '">' + (st.falta > 0 ? st.falta : 0) + '</b> · Recepción <b style="color:' + _ocPctCol(_ocPct(st.rec, st.ped)) + '">' + _ocPct(st.rec, st.ped) + '%</b></div>';
   h += '<div class="oc-note" style="margin-top:0;margin-bottom:8px"><b>Recibido</b> = lo que registró la Recepción de Mercadería para este tallerista y código, <b>dentro del período de esta OC</b> (no acumula entregas anteriores ni de otra OC). Se alimenta solo.</div>';
-  // v11.51 — 3 columnas SOLO-PANTALLA (no van a los impresos): Stock · Máximo · Proyección
-  // (fuente vista_generador_oc vía ocEnsureGenMap). "…" mientras carga, "—" si no hay dato.
-  const _gm = (_oc.genMap && typeof _oc.genMap === "object") ? _oc.genMap : null;
-  const _gmLoading = !_gm;
+  // v11.52 — 3 columnas SOLO-PANTALLA (no van a los impresos): Stock · Máximo · Proyección
+  // AL MOMENTO DE GENERAR LA OC (snapshots oc_stock/oc_max/oc_proy guardados en la fila,
+  // igual criterio que el impreso). Así el "Pedido" y el contexto son de la MISMA foto.
+  // OCs viejas sin snapshot → "—" (oc_proy recién se guarda desde v11.52).
   const _gv = function (r, campo, cls) {
-    if (_gmLoading) return '<td class="num oc-xtra' + (cls || "") + '">…</td>';
-    const g = _gm[_ocgNorm(r.codigo)];
-    if (!g) return '<td class="num oc-xtra' + (cls || "") + '">—</td>';
-    return '<td class="num oc-xtra' + (cls || "") + '">' + Math.round(Number(g[campo]) || 0) + '</td>';
+    const v = r[campo];
+    if (v == null || v === "") return '<td class="num oc-xtra' + (cls || "") + '">—</td>';
+    return '<td class="num oc-xtra' + (cls || "") + '">' + Math.round(Number(v) || 0) + '</td>';
   };
-  h += '<div class="oc-tblwrap"><table class="oc-tbl oc-tbl-det"><thead><tr><th>Código</th><th>Descripción</th><th>Unidad</th><th class="num">Pedido</th><th class="num">Recibido</th><th class="num">Falta</th><th class="num oc-xtra oc-xtra-first">Stock</th><th class="num oc-xtra">Máximo</th><th class="num oc-xtra">Proyección</th></tr></thead><tbody>';
+  h += '<div class="oc-tblwrap"><table class="oc-tbl oc-tbl-det"><thead><tr><th>Código</th><th>Descripción</th><th>Unidad</th><th class="num">Pedido</th><th class="num">Recibido</th><th class="num">Falta</th><th class="num oc-xtra oc-xtra-first" title="Al generar la OC">Stock</th><th class="num oc-xtra" title="Al generar la OC">Máximo</th><th class="num oc-xtra" title="Al generar la OC">Proyección</th></tr></thead><tbody>';
   x.rows.forEach(function (r) {
     const ped = Number(r.cantidad) || 0, rec = ocRecEff(r), falt = ped - rec;
-    h += '<tr><td class="oc-cod">' + escapeHtml(codCanon(r.codigo) || "—") + '</td><td>' + escapeHtml(artNombre(r.codigo, r.descripcion) || "") + '</td><td>' + escapeHtml(r.unidad || "") + '</td><td class="num">' + ped + '</td><td class="num ' + (rec > 0 ? "oc-ok" : "") + '">' + rec + '</td><td class="num ' + (falt > 0 ? "oc-falt" : "oc-ok") + '">' + (falt !== 0 ? falt : "0") + '</td>' + _gv(r, "stock", " oc-xtra-first") + _gv(r, "max", "") + _gv(r, "proy", "") + '</tr>';
+    h += '<tr><td class="oc-cod">' + escapeHtml(codCanon(r.codigo) || "—") + '</td><td>' + escapeHtml(artNombre(r.codigo, r.descripcion) || "") + '</td><td>' + escapeHtml(r.unidad || "") + '</td><td class="num">' + ped + '</td><td class="num ' + (rec > 0 ? "oc-ok" : "") + '">' + rec + '</td><td class="num ' + (falt > 0 ? "oc-falt" : "oc-ok") + '">' + (falt !== 0 ? falt : "0") + '</td>' + _gv(r, "oc_stock", " oc-xtra-first") + _gv(r, "oc_max", "") + _gv(r, "oc_proy", "") + '</tr>';
   });
-  return h + "</tbody></table></div>";
+  return h + '</tbody></table></div><div class="oc-note" style="margin-top:8px">Las columnas <b style="color:#6d28d9">Stock · Máximo · Proyección</b> son del <b>momento en que se generó la OC</b> (no de hoy). Las OC generadas antes de esta versión no guardaron la proyección → «—».</div>';
 }
 /* v6.41 — IMPRIMIR OC: hoja print-friendly de la OC abierta (1 proveedor · fecha · rubro).
    Reusa el patrón de pppPrintSug (window.open + document.write + auto-print).
@@ -11495,7 +11479,7 @@ async function ocgGenerar() {
   const rows = []; let sinProv = 0;
   Object.keys(g).forEach(function (k) {
     if (k === "(sin proveedor)") { sinProv += g[k].items.length; return; }   // no se envían sin proveedor
-    g[k].items.forEach(function (it) { rows.push({ proveedor: it.prov, fecha: _oc.gen.fecha, rubro: "Art Term", codigo: codCanon(it.cod), descripcion: it.desc || null, cantidad: it.falta, cantidad_recibida: 0, unidad: "Cajas", estado: "pendiente", oc_max: it.max, oc_pedidos: it.demanda, oc_stock: it.stock, oc_uni_caja: it.uni, oc_ncaja: (it.ncaja != null ? it.ncaja : null) }); });
+    g[k].items.forEach(function (it) { rows.push({ proveedor: it.prov, fecha: _oc.gen.fecha, rubro: "Art Term", codigo: codCanon(it.cod), descripcion: it.desc || null, cantidad: it.falta, cantidad_recibida: 0, unidad: "Cajas", estado: "pendiente", oc_max: it.max, oc_pedidos: it.demanda, oc_stock: it.stock, oc_proy: (it.proy != null ? Math.round(Number(it.proy)) : null), oc_uni_caja: it.uni, oc_ncaja: (it.ncaja != null ? it.ncaja : null) }); });
   });
   if (!rows.length) { alert(sinProv ? ("No hay OCs con proveedor para generar. Hay " + sinProv + " ítem(s) SIN proveedor: asignáselo en ⚙ Configuraciones.") : "No hay OCs para generar."); return; }
   if (!confirm("Vas a generar " + rows.length + " línea(s) de OC en Ordenes_Compra" + (sinProv ? " (se omiten " + sinProv + " sin proveedor)" : "") + ". ¿Seguro?")) return;
