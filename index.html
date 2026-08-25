@@ -6512,7 +6512,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v11.63";
+const APP_VERSION = "v11.64";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -16054,7 +16054,7 @@ function stkGondRender() {
     }).join("");
     if (list.length > MAX) h += '<div class="stkpop-empty">Mostrando ' + MAX + ' de ' + list.length + ' — filtrá o buscá para acotar.</div>';
   }
-  body.innerHTML = h;
+  _renderKeepFocus(body, h);   // v11.64 — preservar foco del buscador (antes innerHTML pelado → perdía el cursor)
 }
 /* v4.29 — CAPACIDAD POR SECTOR: cuántas cajas de cada artículo entran en góndola
 /* v4.29 — CAPACIDAD POR SECTOR: cuántas cajas de cada artículo entran en góndola
@@ -16971,7 +16971,9 @@ function _stkInsCatPopupRefresh() {
   if (!_stkIns || !_stkIns.abierta) return;
   const body = document.getElementById("stkInsCatPopBody");
   if (!body) return;
-  body.innerHTML = _stkInsListado(_stkIns.abierta, _stkIns.items);
+  // v11.64 — _renderKeepFocus (no innerHTML pelado): el buscador se re-renderiza en cada
+  // tecla (oninput→stkRender→acá); sin preservar foco perdía el cursor tras 1 carácter.
+  _renderKeepFocus(body, _stkInsListado(_stkIns.abierta, _stkIns.items));
 }
 /* v8.31 — dos unidades para la planilla: primaria = base; secundaria = la unidad no-base de
    mayor factor; + el factor. Sin factores → una sola unidad en primaria. */
