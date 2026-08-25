@@ -2255,6 +2255,11 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .cc-ruta{ font-size: 12.5px; font-weight: 800; color: #0f766e; background:#ecfeff; border:1px solid #cffafe; border-radius:8px; padding:6px 9px; margin: 14px 0 6px; }
 .cc-pos{ flex:0 0 auto; width:22px; height:22px; border-radius:50%; background:#0f766e; color:#fff; font-size:12px; font-weight:800; display:inline-flex; align-items:center; justify-content:center; }
 .cc-ubic{ flex:0 0 auto; font-size:12px; font-weight:800; color:#7c3aed; background:#faf5ff; border:1px solid #e9d5ff; border-radius:7px; padding:2px 7px; white-space:nowrap; }
+/* v11.47 — nombre del camionero (autocompletado desde el maestro Camioneros). */
+.cc-camionero-wrap{ display:flex; align-items:center; gap:9px; margin:2px 0 12px; padding:10px 11px; background:#f8fafc; border:2px solid #e2e8f0; border-radius:10px; }
+.cc-camionero-lbl{ flex:0 0 auto; font-size:13px; font-weight:800; color:#334155; white-space:nowrap; }
+.cc-camionero-inp{ flex:1 1 auto; min-width:0; font-size:16px; font-weight:700; color:#0f172a; padding:9px 10px; border:2px solid #cbd5e1; border-radius:8px; background:#fff; }
+.cc-camionero-inp:focus{ outline:none; border-color:#2563eb; }
 
 /* Control Remitos (CR): TABLA de los NP cargados al camión (CCN) pendientes de
    control. Columnas: NP · Cod Cliente · Razón Social · Líos · Controlado (tic).
@@ -6506,7 +6511,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v11.46";
+const APP_VERSION = "v11.47";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -21705,8 +21710,31 @@ function _compClearPersist(tanda) { try { localStorage.removeItem(_compPersistKe
    mano). Mismo patrón que Control Remitos (cargados − controlados), un paso
    antes. Reutiliza #tandaModal. v3.50.
    ========================================================= */
-let _cc = null;   // { legajo, items:[{tanda,np,rs}], checked:Set<np> }
+let _cc = null;   // { legajo, mode:'camion'|'retira', camionero, items:[{tanda,np,rs,esRetira}], checked:Set<np> }
 let _ccWakeLock = null;
+/* v11.47 — Camioneros: maestro de nombres para autocompletar (que siempre se escriba
+   igual "Guille" vs "Guillermo" → análisis limpio). GET para el datalist; upsert (ignore
+   duplicates, la PK nombre dedupe) al terminar la carga. Best-effort, no bloquea el flujo. */
+async function ccFetchCamioneros() {
+  try {
+    const r = await fetch(SUPABASE_URL + "/rest/v1/Camioneros?select=nombre&order=nombre.asc&limit=1000",
+      { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+    if (!r.ok) return [];
+    const a = await r.json();
+    return (Array.isArray(a) ? a : []).map(function (x) { return String(x.nombre || "").trim(); }).filter(Boolean);
+  } catch (_e) { return []; }
+}
+function ccUpsertCamionero(nombre) {
+  const n = String(nombre || "").trim();
+  if (!n) return;
+  try {
+    fetch(SUPABASE_URL + "/rest/v1/Camioneros?on_conflict=nombre", {
+      method: "POST",
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "resolution=ignore-duplicates,return=minimal" },
+      body: JSON.stringify({ nombre: n })
+    }).catch(function () {});
+  } catch (_e) {}
+}
 function _ccKey(legajo) { return "vir_cc_checked_" + legajo + "_" + getTodayKey(); }
 function ccSaveChecked(legajo, set) { try { localStorage.setItem(_ccKey(legajo), JSON.stringify(Array.from(set || []))); } catch (_e) {} }
 function ccLoadChecked(legajo) { try { const a = JSON.parse(localStorage.getItem(_ccKey(legajo)) || "[]"); return new Set(Array.isArray(a) ? a.map(String) : []); } catch (_e) { return new Set(); } }
@@ -21770,22 +21798,32 @@ async function fetchCCData() {
   }
   const cargados = new Set();
   for (const [np, ms] of maxCcn) { const fss = fssMap.get(np) || 0; if (!(fss && fss > ms)) cargados.add(np); }
-  const lios = new Map();
+  const lios = new Map(); const clase = new Map();   // v11.47 — clase [4] (lio|etiqueta|nada) para separar retira/camión
   for (const ev of talR) {
     const p = String(ev.texto || "").split("|");
     const np = p[0].trim().replace(/\.0+$/, "");
     const v = parseInt(p[1], 10);
     if (np && !isNaN(v)) lios.set(np, v);
+    if (np) clase.set(np, String(p[4] || "").toLowerCase().trim());   // último gana (orden asc)
   }
+  // v11.47 — cajas por NP (para RETIRA sin líos: se cuentan en cajas con "c").
+  let cajas = new Map(); try { cajas = await facFetchCajas(); } catch (_e) {}
   const items = []; const seen = new Set();
   for (const row of repR) {
     const np = String(row.np || "").trim().replace(/\.0+$/, "");
     if (!np || seen.has(np) || cargados.has(np)) continue;   // ya cargado → fuera
     if (entregadas.has(np)) continue;                        // v9.68: ya entregado (estado terminal) → fuera
     seen.add(np);
-    items.push({ np: np, tanda: (String(row.tanda || "").trim() || "—"), rs: row.razon_social || "", lios: lios.has(np) ? lios.get(np) : null });
+    items.push({ np: np, tanda: (String(row.tanda || "").trim() || "—"), rs: row.razon_social || "",
+      lios: lios.has(np) ? lios.get(np) : null,
+      clase: clase.get(np) || "",
+      cajas: cajas.has(np) ? Math.round(cajas.get(np)) : null });
   }
   try { await _ccAttachUbicYOrden(items); } catch (_e) {}
+  // v11.47 — RETIRA = zona "Retira" (Programación) O clase TAL 'nada'. El resto = camión.
+  items.forEach(function (it) {
+    it.esRetira = (String(it.zona || "").toLowerCase() === "retira") || (String(it.clase || "").toLowerCase() === "nada");
+  });
   return items;
 }
 
@@ -21842,64 +21880,92 @@ async function _ccAttachUbicYOrden(items) {
   return items;
 }
 
-async function showCargaCamion(legajo) {
+/* v11.47 — al tocar CC, primero se elige RETIRA o CAMIÓN. Camión = todos los pedidos
+   salvo los retira, con nombre de camionero (autocompletado). Retira = solo los retira,
+   contados en cajas, sin camionero. */
+async function showCargaCamion(legajo, mode) {
   const m = document.getElementById("tandaModal"); if (!m) return;
   const leg = String(legajo || "").trim();
-  m.querySelector(".tanda-modal-title").textContent = "🚛 Carga Camión — reparto";
-  m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">Cargando reparto…</div>`;
   m.classList.add("show");
+  if (!mode) { ccRenderChooser(leg); return; }   // sin modo → preguntar retira o camión
+  const esRetira = (mode === "retira");
+  m.querySelector(".tanda-modal-title").textContent = esRetira ? "🚶 Carga — Retira" : "🚛 Carga Camión — reparto";
+  m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">Cargando ${esRetira ? "retiras" : "reparto"}…</div>`;
   ccWakeLock();
   try {
-    const items = await fetchCCData();
+    const _both = await Promise.all([ fetchCCData(), esRetira ? Promise.resolve([]) : ccFetchCamioneros() ]);
+    let items = _both[0]; const camioneros = _both[1] || [];
+    items = items.filter(function (it) { return esRetira ? it.esRetira : !it.esRetira; });   // camión = todos salvo retira
     // v10.23 — ordenar por ORDEN DE CARGA (inverso de la ruta); las NP sin orden van al final.
     const _li = function (x) { return (x.loadIdx == null || !isFinite(x.loadIdx)) ? Number.MAX_SAFE_INTEGER : x.loadIdx; };
     items.sort((a, b) => (_li(a) - _li(b)) || String(a.tanda).localeCompare(String(b.tanda)) || a.np.localeCompare(b.np));
     if (!items.length) {
       _cc = null; ccReleaseWakeLock();
-      m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">No hay reparto pendiente de cargar.<br><small>Aparece cuando Ventas genera el PDF de facturación.</small></div><button class="pk-btn pk-ok" onclick="ccEndWithoutLoading('${leg}')">✓ Terminar Carga Camión (sin cargar por app)</button><button class="pk-btn pk-cancel" onclick="ccClose()">Cerrar (sigo después)</button>`;
+      m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">No hay ${esRetira ? "retiras" : "reparto"} pendiente de cargar.<br><small>${esRetira ? "Los retira aparecen cuando Ventas genera el PDF." : "Aparece cuando Ventas genera el PDF de facturación."}</small></div><button class="pk-btn pk-ok" onclick="ccEndWithoutLoading('${leg}')">✓ Terminar Carga Camión (sin cargar por app)</button><button class="pk-btn pk-cancel" onclick="showCargaCamion('${leg}')">← Volver</button>`;
       return;
     }
     const saved = ccLoadChecked(leg);
-    _cc = { legajo: leg, items: items, checked: new Set(items.filter(it => saved.has(it.np)).map(it => it.np)) };
+    _cc = { legajo: leg, mode: mode, camionero: "", camioneros: camioneros, items: items, checked: new Set(items.filter(it => saved.has(it.np)).map(it => it.np)) };
     ccRender();
   } catch (e) {
     _cc = null; ccReleaseWakeLock();
-    m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">No se pudo cargar (¿sin conexión?).<br><small>${escapeHtml(e.message || "")}</small></div><button class="pk-btn pk-ok" onclick="ccEndWithoutLoading('${leg}')">✓ Terminar Carga Camión (sin cargar por app)</button><button class="pk-btn pk-cancel" onclick="ccClose()">Cerrar (sigo después)</button>`;
+    m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">No se pudo cargar (¿sin conexión?).<br><small>${escapeHtml(e.message || "")}</small></div><button class="pk-btn pk-ok" onclick="ccEndWithoutLoading('${leg}')">✓ Terminar Carga Camión (sin cargar por app)</button><button class="pk-btn pk-cancel" onclick="showCargaCamion('${leg}')">← Volver</button>`;
   }
+}
+/* Pantalla inicial: ¿retira o camión? */
+function ccRenderChooser(leg) {
+  const m = document.getElementById("tandaModal"); if (!m) return;
+  m.querySelector(".tanda-modal-title").textContent = "🚛 Carga Camión";
+  m.querySelector(".tanda-modal-body").innerHTML =
+    `<div class="cc-sub" style="margin-bottom:14px;">¿Qué vas a cargar?</div>` +
+    `<button class="pk-btn pk-ok" style="font-size:19px;padding:18px;" onclick="showCargaCamion('${leg}','camion')">🚛 Camión <small style="font-weight:700;opacity:.85;display:block;font-size:12px;margin-top:3px;">Todos los pedidos, salvo los retira. Pedís el camionero.</small></button>` +
+    `<button class="pk-btn pk-ok" style="font-size:19px;padding:18px;background:#475569;" onclick="showCargaCamion('${leg}','retira')">🚶 Retira <small style="font-weight:700;opacity:.85;display:block;font-size:12px;margin-top:3px;">Solo los retira, contados en cajas.</small></button>` +
+    `<button class="pk-btn pk-cancel" onclick="ccClose()">Cerrar</button>`;
 }
 
 function ccRender() {
   const m = document.getElementById("tandaModal"); if (!m || !_cc) return;
+  const esRetira = (_cc.mode === "retira");
   // v10.23 — se renderiza en ORDEN DE CARGA (los items ya vienen ordenados por loadIdx).
   // Encabezado por RUTA; posición 1,2,3… = orden de carga (último destino del camión primero).
   // Las NP sin ubicación en ruta caen en una sección aparte, ordenadas por tanda.
   const hasOrden = _cc.items.some(function (it) { return isFinite(it.loadIdx); });
-  let html = `<div class="cc-sub">NP del <b>reparto</b> — tocá los que <b>cargaste al camión</b>.` +
-             (hasOrden ? ` Están en <b>orden de carga</b>: el <b>último destino</b> de cada camión se carga <b>primero</b> (1 = primero en subir).` : ``) + `</div>`;
+  let html = `<div class="cc-sub">${esRetira ? "Pedidos <b>retira</b> — tocá los que <b>entregaste</b> (se cuentan en <b>cajas</b>)." : "NP del <b>reparto</b> — tocá los que <b>cargaste al camión</b>."}` +
+             (!esRetira && hasOrden ? ` Están en <b>orden de carga</b>: el <b>último destino</b> de cada camión se carga <b>primero</b> (1 = primero en subir).` : ``) + `</div>`;
+  // v11.47 — camión: nombre del camionero con autocompletado (maestro Camioneros).
+  if (!esRetira) {
+    const opts = (_cc.camioneros || []).map(function (n) { return `<option value="${escapeHtml(n)}"></option>`; }).join("");
+    html += `<div class="cc-camionero-wrap"><label class="cc-camionero-lbl">🧑‍✈️ Camionero</label>` +
+            `<input id="ccCamioneroInput" class="cc-camionero-inp" list="ccCamioneroList" autocomplete="off" placeholder="Nombre del camionero…" value="${escapeHtml(_cc.camionero || "")}" oninput="_cc && (_cc.camionero = this.value)" />` +
+            `<datalist id="ccCamioneroList">${opts}</datalist></div>`;
+  }
   let curSec = null;
   let pos = 0;
   for (const it of _cc.items) {
     const enRuta = isFinite(it.loadIdx);
     const secKey = enRuta ? ("R:" + (it.ruta || "Ruta")) : "__sin__";
-    if (secKey !== curSec) {
+    if (secKey !== curSec && !esRetira) {
       curSec = secKey; pos = 0;
       html += `<div class="cc-ruta">${enRuta ? "🚚 " + escapeHtml(it.ruta || "Ruta") + " · orden de carga" : "📍 Sin ubicación en ruta — cargar aparte"}</div>`;
     }
     pos++;
     const on = _cc.checked.has(it.np);
-    const liosNull = (it.lios == null);
-    const liosTxt = liosNull ? "—" : String(it.lios);
-    const liosCls = (liosNull || it.lios === 0) ? " cc-lios0" : "";
+    const cell = esRetira ? _liosCajasCell(it) : null;
+    const liosTxt = esRetira ? cell.txt : (it.lios == null ? "—" : String(it.lios));
+    const liosCls = esRetira ? ((cell.txt === "—") ? " cc-lios0" : "") : ((it.lios == null || it.lios === 0) ? " cc-lios0" : "");
+    const liosIcon = esRetira ? (cell.esCajas ? "🧺" : "📦") : "📦";
+    const liosTtl = esRetira ? (cell.esCajas ? "cajas (retira)" : "líos") : "líos";
     const ubic = it.ubic ? `<span class="cc-ubic" title="dónde quedó armado">📌 ${escapeHtml(it.ubic)}</span>` : "";
     html += `<div class="cc-np${on ? " cc-on" : ""}" onclick="ccToggle('${String(it.np).replace(/[^0-9A-Za-z]/g, "")}')">` +
-            (enRuta ? `<span class="cc-pos">${pos}</span>` : "") +
+            (!esRetira && enRuta ? `<span class="cc-pos">${pos}</span>` : "") +
             `<span class="cc-chk">${on ? "✓" : ""}</span>` +
             `<span class="cc-npnum">${escapeHtml(it.np)}</span>` +
             ubic +
             `<span class="cc-rs">${escapeHtml(it.rs)}</span>` +
-            `<span class="cc-lios${liosCls}" title="líos">📦 ${liosTxt}</span></div>`;
+            `<span class="cc-lios${liosCls}" title="${liosTtl}">${liosIcon} ${escapeHtml(liosTxt)}</span></div>`;
   }
-  html += `<button class="pk-btn pk-ok" onclick="ccFinish()">🚛 Terminé Carga Camión (${_cc.checked.size} cargadas)</button>` +
+  html += `<button class="pk-btn pk-ok" onclick="ccFinish()">${esRetira ? "🚶 Terminé Retira" : "🚛 Terminé Carga Camión"} (${_cc.checked.size} ${esRetira ? "entregados" : "cargadas"})</button>` +
+          `<button class="pk-btn pk-cancel" onclick="showCargaCamion('${_cc.legajo}')">← Volver (retira/camión)</button>` +
           `<button class="pk-btn pk-cancel" onclick="ccClose()">Cerrar (sigo después)</button>`;
   m.querySelector(".tanda-modal-body").innerHTML = html;
 }
@@ -21927,12 +21993,23 @@ function ccEndWithoutLoading(legajo) {
 function ccFinish() {
   if (!_cc) return;
   const legajo = _cc.legajo;
+  const esRetira = (_cc.mode === "retira");
+  // v11.47 — camión: nombre del camionero (leído del input en vivo por si oninput no corrió).
+  let camionero = "";
+  if (!esRetira) {
+    try { const inp = document.getElementById("ccCamioneroInput"); if (inp) _cc.camionero = inp.value; } catch (_e) {}
+    camionero = String(_cc.camionero || "").trim();
+    if (!camionero) {
+      try { if (!confirm("No pusiste el nombre del camionero.\n¿Terminar igual sin camionero?")) return; } catch (_e) {}
+    }
+  }
   const sel = _cc.items.filter(it => _cc.checked.has(it.np));
-  for (const it of sel) ccSendDetail(legajo, it.np, it.tanda);   // CCN por cada NP cargada
-  ccSendClose(legajo);                                           // cierre CC
+  for (const it of sel) ccSendDetail(legajo, it.np, it.tanda, camionero);   // CCN por cada NP cargada (con camionero)
+  if (camionero) ccUpsertCamionero(camionero);                  // guarda el nombre en el maestro Camioneros
+  ccSendClose(legajo);                                          // cierre CC
   ccClearChecked(legajo);
   _cc = null; ccReleaseWakeLock(); closeTandaModal();
-  try { alert("🚛 Carga Camión terminada. " + sel.length + " NP cargadas."); } catch (_e) {}
+  try { alert((esRetira ? "🚶 Retira terminado. " : "🚛 Carga Camión terminada. ") + sel.length + (esRetira ? " retira(s) entregados." : " NP cargadas.") + (camionero ? "\nCamionero: " + camionero : "")); } catch (_e) {}
 }
 function ccSendClose(legajo) {
   const st = getLegajoState(legajo);
@@ -21944,11 +22021,15 @@ function ccSendClose(legajo) {
   try { enqueueReport(payload); if (typeof trySendOneReport === "function") trySendOneReport(payload).then(r => { if (r && r.ok) removeFromQueue(payload.id); }).catch(() => {}); } catch (_e) {}
   try { updatePendingIndicator(); updateCoreButtonsState(); } catch (_e) {}
 }
-function ccSendDetail(legajo, np, tanda) {
+function ccSendDetail(legajo, np, tanda, camionero) {
   const nowMs = Date.now();
+  // v11.47 — CCN texto: NP|TANDA|CAMIONERO. El camionero solo va en camión (en retira queda vacío).
+  // Las vistas leen split_part [1]=np, [2]=tanda → el 3er campo no las afecta.
+  const cam = String(camionero || "").trim();
+  const texto = (String(np) + "|" + String(tanda)).toUpperCase() + "|" + cam;
   const payload = {
     legajo: legajo, opcion: "CCN", descripcion: "Carga Camión NP",
-    texto: (String(np) + "|" + String(tanda)).toUpperCase(),
+    texto: texto,
     ts: nowMs,
     id: ("ccn_" + legajo + "_" + np + "_" + getTodayKey()).replace(/[^a-zA-Z0-9_\-]/g, ""),
     ts_inicio_iso: null
@@ -22083,7 +22164,7 @@ async function rrLoadBadge() {
 /* v10.25: fetchCRData usa vista_control_remitos. Antes hacía 5 fetches + 40 líneas de join JS. */
 async function fetchCRData() {
   const H = { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY };
-  const res = await fetch(SUPABASE_URL + "/rest/v1/vista_control_remitos?select=np,tanda,first_load,lios,cod_cliente,rs", {
+  const res = await fetch(SUPABASE_URL + "/rest/v1/vista_control_remitos?select=np,tanda,first_load,lios,clase,cajas,cod_cliente,rs", {
     headers: H, cache: "no-store"
   });
   if (!res.ok) throw new Error("HTTP " + res.status);
@@ -22091,6 +22172,7 @@ async function fetchCRData() {
   return rows.map(r => ({
     np: r.np, tanda: r.tanda || "—", cod: r.cod_cliente || "", rs: r.rs || "",
     lios: r.lios != null ? r.lios : null,
+    clase: r.clase || "", cajas: (r.cajas != null ? Number(r.cajas) : null),
     loadMs: r.first_load ? new Date(r.first_load).getTime() : 0,
     venc: crVencido(r.first_load ? new Date(r.first_load).getTime() : 0)
   }));
@@ -22130,14 +22212,14 @@ function crRender() {
   for (const it of _cr.items) {
     const on = _cr.checked.has(it.np);
     const npc = String(it.np).replace(/[^0-9A-Za-z]/g, "");
-    const liosNull = (it.lios == null);
-    const liosTxt = liosNull ? "—" : String(it.lios);
-    const liosCls = (liosNull || it.lios === 0) ? " cr-lios0" : "";
+    const cell = _liosCajasCell(it);
+    const liosCls = (cell.txt === "—") ? " cr-lios0" : "";
+    const liosTtl = cell.esCajas ? "cajas (retira)" : "líos";
     rows += `<tr class="cr-row${on ? " cc-on" : ""}${it.venc ? " cr-venc" : ""}" onclick="crToggle('${npc}')">` +
             `<td class="cr-td-np">${escapeHtml(it.np)}${it.loadMs ? `<div class="cr-cc-date">🚚 ${crFmtCC(it.loadMs)}</div>` : ""}</td>` +
             `<td class="cr-td-cod">${it.cod ? escapeHtml(it.cod) : "—"}</td>` +
             `<td class="cr-td-rs">${escapeHtml(it.rs || "—")}${it.venc ? `<span class="cr-venc-tag">VENCIDO</span>` : ""}</td>` +
-            `<td class="cr-td-lios${liosCls}">${liosTxt}</td>` +
+            `<td class="cr-td-lios${liosCls}" title="${liosTtl}">${escapeHtml(cell.txt)}</td>` +
             `<td class="cr-td-ctrl"><span class="cr-chk">${on ? "✓" : ""}</span></td>` +
             `<td class="cr-td-act"><button class="cr-sinsal-btn" onclick="event.stopPropagation();crMarkSinSalida('${npc}')" title="El cliente no recibió — la mercadería volvió al depósito. Sale de acá y queda en «FC s/Salida» (Stocks).">↩ s/salida</button></td></tr>`;
   }
@@ -22308,7 +22390,7 @@ async function fetchCCRData() {
 /* v11.46 — celda "líos" unificada: muestra líos, salvo RETIRA (clase 'nada') sin líos →
    muestra las CAJAS con una "c" (ej. "12c"). Devuelve { txt, esCajas }. */
 function _liosCajasCell(it) {
-  var esRetira = (String(it.clase || "").toLowerCase() === "nada");
+  var esRetira = (it.esRetira != null) ? !!it.esRetira : (String(it.clase || "").toLowerCase() === "nada");
   var sinLios = (it.lios == null || it.lios === 0);
   if (esRetira && sinLios) {
     var c = (it.cajas == null) ? null : it.cajas;

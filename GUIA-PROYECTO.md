@@ -12,7 +12,30 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-08-24 · Versión app al documentar: **v11.38**
+> Última actualización: 2026-08-25 · Versión app al documentar: **v11.47**
+>
+> Nota **2026-08-25 — jornada v11.46→v11.47 (Carga Camión: retira/camión + camionero · líos).**
+> **(1) Carga Camión (CC) — pregunta primero RETIRA o CAMIÓN.** Al tocar CC ahora aparece un
+> selector (`ccRenderChooser`): **🚛 Camión** = todos los pedidos **salvo los retira**, con
+> **nombre del camionero** (input con `<datalist>` autocompletado desde el maestro **`Camioneros`**
+> — así "Guille"/"Guillermo" siempre se escribe igual para el análisis); **🚶 Retira** = **solo**
+> los retira, contados en **cajas** (no piden camionero). **Retira** = `zona="Retira"` (Programación
+> Diaria) **o** `clase` del último `TAL` = `'nada'` (`fetchCCData` setea `it.esRetira`). **(2) CCN
+> lleva camionero:** el `texto` del evento **`CCN`** pasó de `NP|TANDA` a **`NP|TANDA|CAMIONERO`**
+> (3er campo vacío en retira). Las vistas leen `split_part [1]=np, [2]=tanda` → el 3er campo no las
+> afecta. Maestro `Camioneros(nombre PK, creado_en)` con RLS anon `SELECT`+`INSERT`; upsert
+> `ignore-duplicates` (`ccUpsertCamionero`) al terminar. **(3) Bug de conteo de líos al completar
+> faltante (RAÍZ).** `cpUpdateLio` recalculaba el conteo desde el largo del resumen parseado (que
+> venía incompleto/vacío) → al completar un faltante que **creaba un lío nuevo**, el total **no
+> subía**. Ahora parte del conteo **guardado** en el último `TAL` (`info.count`, campo `[1]`):
+> lío nuevo → `max(guardado+1, largo)`, suma a lío existente → `max(guardado, largo)`. Además
+> preserva la **clase** (`[4]`) en el re-emit (`liosSend` 6º arg). Corrige el número en **Control
+> de Remitos, Recepción de Remitos y Facturación** (los tres leen `TAL[1]`). **(4) Líos, no cajas.**
+> En **Control** y **Recepción** de Remitos se habla **solo de líos**; el único caso con cajas es
+> **retira** (que no arma líos): en **la misma columna** se muestran las cajas con sufijo **"c"**
+> (ej. `12c`) vía `_liosCajasCell` (retira sin líos → `cajas+"c"`, icono 🧺; si no, líos 📦). **Misma
+> regla en Facturación** (columna Líos). `vista_control_remitos` ahora expone **`clase`** (de
+> `TAL[4]`) y **`cajas`** (Σ `Entregas_Virgilio.cajas_pedidas` por NP) — appended al final del SELECT.
 >
 > Nota **2026-08-24 — jornada v11.33→v11.38 (resumen).** **(1) Pasaje de Papeles:** header
 > de la 1ª columna → "Fecha DDJJ"; se corrigió la fecha de remito/factura que se mostraba
