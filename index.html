@@ -6512,7 +6512,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v11.61";
+const APP_VERSION = "v11.62";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -21951,7 +21951,11 @@ async function _ccAttachUbicYOrden(items) {
       geoByNp[n] = { zona: String(p.zona || "").trim(), lat: c ? c.lat : null, lng: c ? c.lng : null, m3: Number(p.m3) || 0 };
     });
     items.forEach(function (it) { const g = geoByNp[_rtNpNorm(it.np)]; if (g) { it.zona = g.zona; it.lat = g.lat; it.lng = g.lng; it.m3 = g.m3; } });
-    const depot = cache[RT_DEPOT_KEY] || null;
+    // v11.62 — si el DEPÓSITO no está geocodificado en PPP_Geo, el orden de ruta no corría y
+    // TODAS las NP caían en «sin ubicación en ruta». Lo geocodificamos on-demand (Nominatim en el
+    // navegador) y lo cacheamos → se auto-repara la 1ª vez y queda para siempre.
+    let depot = cache[RT_DEPOT_KEY] || null;
+    if (!depot) { try { depot = await _rtEnsureDepot(cache); } catch (_e) {} }
     if (depot) {
       let seq = 0;
       RT_RUTAS.forEach(function (R) {
@@ -26776,6 +26780,22 @@ async function _zgCachePut(key, dir, barrio, c) {
   try {
     await fetch(SUPABASE_URL + "/rest/v1/PPP_Geo?on_conflict=dir_key", { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ dir_key: key, direccion: dir, barrio: barrio, lat: c.lat, lng: c.lng, comp: c.comp || null }) });
   } catch (e) { }
+}
+/* v11.62 — asegura que el DEPÓSITO esté geocodificado en PPP_Geo. Si falta, lo geocodifica
+   (Nominatim en el navegador) y lo guarda. Devuelve {lat,lng} o null. Lo usa Carga Camión
+   para el orden de ruta (sin esto, el orden no corre y todo cae en «cargar aparte»). */
+async function _rtEnsureDepot(cache) {
+  if (cache && cache[RT_DEPOT_KEY]) return cache[RT_DEPOT_KEY];
+  try {
+    const c = await _rtGeocode(RT_DEPOT_DIR, "");
+    if (c && isFinite(c.lat) && isFinite(c.lng)) {
+      const d = { lat: c.lat, lng: c.lng };
+      if (cache) cache[RT_DEPOT_KEY] = d;
+      try { await _zgCachePut(RT_DEPOT_KEY, "Virgilio 2788", "", c); } catch (_e) {}
+      return d;
+    }
+  } catch (_e) {}
+  return (cache && cache[RT_DEPOT_KEY]) || null;
 }
 /* cache con componentes oficiales (comp) para la regla de zona. */
 async function _zgCacheAll() {

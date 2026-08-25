@@ -12,7 +12,18 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-08-25 · Versión app al documentar: **v11.60**
+> Última actualización: 2026-08-25 · Versión app al documentar: **v11.62**
+>
+> Nota **2026-08-25 — v11.62 (Carga Camión: fix «todo sin ubicación en ruta»).** El orden de ruta de
+> Carga Camión (`_ccAttachUbicYOrden`) solo corre si el **depósito** está geocodificado en `PPP_Geo`
+> (`dir_key='__deposito_virgilio_2788__'`). Estaba **ausente** → `if (depot)` era falso → **ninguna** NP
+> se ordenaba y **todas** caían en «📍 Sin ubicación en ruta — cargar aparte» (aunque tuvieran zona y
+> dirección geocodificada). Fix: nuevo **`_rtEnsureDepot(cache)`** geocodifica el depósito on-demand
+> (Nominatim en el navegador) y lo cachea en `PPP_Geo`; Carga Camión lo llama si falta → se **auto-repara**
+> la 1ª vez que se abre y queda cacheado. (No confundir con la ubicación física 📌 AUB por NP, que es otro
+> dato y sí funcionaba.)
+>
+> Nota **2026-08-25 — v11.60 (Cola de impresión de NP armadas).**
 >
 > Nota **2026-08-25 — v11.60 (Cola de impresión de NP armadas).** Nuevo botón en el panel supervisor
 > **«🖨️ Cola de impresión NP»** (`openColaImpresion`). El operario, al **terminar armado**, emite un `TAL`
