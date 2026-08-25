@@ -6512,7 +6512,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v11.64";
+const APP_VERSION = "v11.65";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -10733,7 +10733,16 @@ function ocBodyGeneral() {
   if (!items.length) h += '<tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:14px;">Sin ítems</td></tr>';
   return h + "</tbody></table></div>";
 }
-function ocOpen(kEnc) { if (!_oc) return; _oc.openKey = decodeURIComponent(kEnc); const g = ocGroups(), x = g[_oc.openKey]; if (x && x.fecha) _oc.openFecha = x.fecha; _oc.view = "detail"; ocRender(); }
+function ocOpen(kEnc) { if (!_oc) return; _oc.openKey = decodeURIComponent(kEnc); const g = ocGroups(), x = g[_oc.openKey]; if (x && x.fecha) _oc.openFecha = x.fecha; _oc.view = "detail"; ocRender(); ocEnsureProyHoy(); }
+/* v11.65 — proyección de HOY (proyeccion_madre) para caer en OC viejas sin snapshot oc_proy.
+   Se trae una vez por apertura del módulo y re-renderiza el detalle. */
+async function ocEnsureProyHoy() {
+  if (!_oc || _oc.proyHoy || _oc._proyLoading) return;
+  _oc._proyLoading = true;
+  try { _oc.proyHoy = await ocgFetchProyeccion(); } catch (_e) { _oc.proyHoy = {}; }
+  _oc._proyLoading = false;
+  if (_oc && _oc.view === "detail") ocRender();
+}
 function ocBack() { if (!_oc) return; if (_oc.view === "detail") { _oc.view = _oc.openFecha ? "fecha" : "list"; _oc.openKey = null; } else { _oc.view = "list"; _oc.openKey = null; _oc.openFecha = null; } ocRender(); }
 function ocBodyDetail() {
   const g = ocGroups(), x = g[_oc.openKey];
@@ -10757,12 +10766,21 @@ function ocBodyDetail() {
     if (v == null || v === "") return '<td class="num oc-xtra' + (cls || "") + '">—</td>';
     return '<td class="num oc-xtra' + (cls || "") + '">' + Math.round(Number(v) || 0) + '</td>';
   };
-  h += '<div class="oc-tblwrap"><table class="oc-tbl oc-tbl-det"><thead><tr><th>Código</th><th class="oc-desc">Descripción</th><th class="num">Pedido</th><th class="num">Recibido</th><th class="num">Falta</th><th class="num oc-xtra oc-xtra-first" title="Al generar la OC">Stock</th><th class="num oc-xtra" title="Al generar la OC">Máximo</th><th class="num oc-xtra" title="Al generar la OC">Proyección</th></tr></thead><tbody>';
+  // v11.65 — Proyección: si la OC guardó el snapshot (oc_proy) se muestra; si es una OC vieja
+  // (sin snapshot), se cae a la proyección de HOY (proyeccion_madre, casi no cambia en días),
+  // marcada con «~» + itálica para que se note que no es la foto exacta de esa fecha.
+  const _pm = (_oc.proyHoy && typeof _oc.proyHoy === "object") ? _oc.proyHoy : null;
+  const _proyCell = function (r) {
+    if (r.oc_proy != null && r.oc_proy !== "") return '<td class="num oc-xtra">' + Math.round(Number(r.oc_proy) || 0) + '</td>';
+    if (_pm) { const v = _pm[_ocgNorm(r.codigo)]; if (v != null && v > 0) return '<td class="num oc-xtra" style="opacity:.72;font-style:italic;" title="Proyección de HOY (esta OC es previa a guardar la proyección al generarla)">~' + Math.round(v) + '</td>'; }
+    return '<td class="num oc-xtra">' + (_pm ? '—' : '…') + '</td>';
+  };
+  h += '<div class="oc-tblwrap"><table class="oc-tbl oc-tbl-det"><thead><tr><th>Código</th><th class="oc-desc">Descripción</th><th class="num">Pedido</th><th class="num">Recibido</th><th class="num">Falta</th><th class="num oc-xtra oc-xtra-first" title="Al generar la OC">Stock</th><th class="num oc-xtra" title="Al generar la OC">Máximo</th><th class="num oc-xtra" title="Al generar la OC (viejas: ~ = proyección de hoy)">Proyección</th></tr></thead><tbody>';
   x.rows.forEach(function (r) {
     const ped = Number(r.cantidad) || 0, rec = ocRecEff(r), falt = ped - rec;
-    h += '<tr><td class="oc-cod">' + escapeHtml(codCanon(r.codigo) || "—") + '</td><td class="oc-desc">' + escapeHtml(artNombre(r.codigo, r.descripcion) || "") + '</td><td class="num">' + ped + '</td><td class="num ' + (rec > 0 ? "oc-ok" : "") + '">' + rec + '</td><td class="num ' + (falt > 0 ? "oc-falt" : "oc-ok") + '">' + (falt !== 0 ? falt : "0") + '</td>' + _gv(r, "oc_stock", " oc-xtra-first") + _gv(r, "oc_max", "") + _gv(r, "oc_proy", "") + '</tr>';
+    h += '<tr><td class="oc-cod">' + escapeHtml(codCanon(r.codigo) || "—") + '</td><td class="oc-desc">' + escapeHtml(artNombre(r.codigo, r.descripcion) || "") + '</td><td class="num">' + ped + '</td><td class="num ' + (rec > 0 ? "oc-ok" : "") + '">' + rec + '</td><td class="num ' + (falt > 0 ? "oc-falt" : "oc-ok") + '">' + (falt !== 0 ? falt : "0") + '</td>' + _gv(r, "oc_stock", " oc-xtra-first") + _gv(r, "oc_max", "") + _proyCell(r) + '</tr>';
   });
-  return h + '</tbody></table></div><div class="oc-note" style="margin-top:8px">Las columnas <b style="color:#6d28d9">Stock · Máximo · Proyección</b> son del <b>momento en que se generó la OC</b> (no de hoy). Las OC generadas antes de esta versión no guardaron la proyección → «—».</div>';
+  return h + '</tbody></table></div><div class="oc-note" style="margin-top:8px">Las columnas <b style="color:#6d28d9">Stock · Máximo · Proyección</b> son del <b>momento en que se generó la OC</b> (no de hoy). En OC viejas (previas a guardar el dato) la <b>Proyección</b> muestra la de <b>hoy</b> con «<b>~</b>» (la proyección casi no cambia en días); Stock y Máximo viejos quedan en «—».</div>';
 }
 /* v6.41 — IMPRIMIR OC: hoja print-friendly de la OC abierta (1 proveedor · fecha · rubro).
    Reusa el patrón de pppPrintSug (window.open + document.write + auto-print).
