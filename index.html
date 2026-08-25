@@ -6511,7 +6511,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v11.48";
+const APP_VERSION = "v11.49";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -11805,10 +11805,10 @@ function stkBodyAuditGon() {
   var n = items.length;
   var h = '<div class="ag-bar"><div class="ag-title">🔍 Góndola &lt; 25% de la proyección · <b>' + n + '</b> ítem(s)</div>' +
     '<div class="ag-btns"><button class="ag-btn xls" onclick="agExportExcel()">📥 Excel</button><button class="ag-btn pdf" onclick="agExportPdf()">🖨 PDF</button></div></div>';
-  h += '<div class="ag-note">Ocupación = (stock total de <b>todos los estadios</b> − <b>pedidos</b>) ÷ <b>proyección</b>. Ordenado por <b>tallerista</b> y, dentro, por <b>% de góndola de menor a mayor</b> (el peor primero). Los <b>discontinuos</b> (activo=false o marcados a mano) no se muestran.</div>';
+  h += '<div class="ag-note">Ocupación = (stock total de <b>todos los estadios</b> − <b>pedidos</b>) ÷ <b>proyección</b>. Ordenado por <b>tallerista</b> y, dentro, por <b>% Ocup Virgilio de menor a mayor</b> (el peor primero). Los <b>discontinuos</b> (activo=false o marcados a mano) no se muestran.</div>';
   if (!n) { h += '<div class="stk-loading">No hay ítems por debajo del 25%. 👍</div>'; return h; }
   h += '<div class="ag-wrap"><table class="ag-tbl"><thead><tr>' +
-    '<th>Código</th><th>Descripción</th><th class="num">% góndola</th><th class="num">Stock total</th><th class="num">Proyección</th><th class="num">Pedidos</th><th>Familia</th>' +
+    '<th>Código</th><th>Descripción</th><th class="num">% Ocup Virgilio</th><th class="num">Stock total</th><th class="num">Proyección</th><th class="num">Pedidos</th><th>Familia</th>' +
     '</tr></thead><tbody>';
   var lastTall = null;
   items.forEach(function (it) {
@@ -11831,7 +11831,7 @@ function stkBodyAuditGon() {
 function agExportExcel() {
   var items = (_stk && _stk.agData) || []; if (!items.length) { try { alert("No hay datos para exportar."); } catch (_e) {} return; }
   var esc = function (s) { return String(s == null ? "" : s).replace(/[&<>]/g, function (m) { return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[m]; }); };
-  var html = '<html><head><meta charset="utf-8"></head><body><table border="1"><tr><th>Tallerista</th><th>Codigo</th><th>Descripcion</th><th>% gondola</th><th>Stock total</th><th>Proyeccion</th><th>Pedidos</th><th>Familia</th></tr>';
+  var html = '<html><head><meta charset="utf-8"></head><body><table border="1"><tr><th>Tallerista</th><th>Codigo</th><th>Descripcion</th><th>% Ocup Virgilio</th><th>Stock total</th><th>Proyeccion</th><th>Pedidos</th><th>Familia</th></tr>';
   items.forEach(function (it) {
     html += '<tr><td>' + esc(it.tall) + '</td><td>' + esc(codCanon(it.cod)) + '</td><td>' + esc(it.desc) + '</td><td>' + Math.round(it.pct * 100) + '%</td><td>' + (Math.round(it.stock * 10) / 10) + '</td><td>' + (Math.round(it.proy * 10) / 10) + '</td><td>' + Math.round(it.pedidos) + '</td><td>' + esc(it.fam) + '</td></tr>';
   });
@@ -11853,7 +11853,7 @@ function agExportPdf() {
   var w = window.open("", "_blank"); if (!w) { try { alert("Habilitá los pop-ups para generar el PDF."); } catch (_e) {} return; }
   w.document.write('<html><head><meta charset="utf-8"><title>Gondola menor a 25%</title><style>body{font-family:Arial;margin:14px;color:#0f172a}h1{font-size:20px;margin:0 0 10px}table{width:100%;border-collapse:collapse;font-size:15px}th{background:#1e3a8a;color:#fff;padding:8px;text-align:left}th.num{text-align:right}td{padding:6px 8px;border-bottom:1px solid #ccc}td.num{text-align:right}.grp td{background:#dbeafe;color:#1e3a8a;font-weight:800;font-size:16px}</style></head><body>' +
     '<h1>Góndola &lt; 25% de la proyección · ' + items.length + ' ítems</h1>' +
-    '<table><thead><tr><th>Código</th><th>Descripción</th><th class="num">% góndola</th><th class="num">Stock total</th><th class="num">Proyección</th><th class="num">Pedidos</th><th>Familia</th></tr></thead><tbody>' + rows + '</tbody></table></body></html>');
+    '<table><thead><tr><th>Código</th><th>Descripción</th><th class="num">% Ocup Virgilio</th><th class="num">Stock total</th><th class="num">Proyección</th><th class="num">Pedidos</th><th>Familia</th></tr></thead><tbody>' + rows + '</tbody></table></body></html>');
   w.document.close(); w.focus();
   setTimeout(function () { try { w.print(); } catch (_e) {} }, 400);
 }
