@@ -271,7 +271,10 @@ function _ppBuildRow(row, showTimer, showConfirm) {
     'style="width:20px;height:20px;cursor:pointer;accent-color:#16a34a;">' +
     '</label>';
 
-  var proveedor = row.razon_social || '—';
+  // v4.8 — código del proveedor/tallerista (remitos de recepción) como chip antes del nombre.
+  var proveedor = (row.cod_proveedor
+      ? '<span title="Código de proveedor" style="display:inline-block;background:#eef2ff;border:1px solid #c7d2fe;color:#3730a3;border-radius:6px;padding:0 6px;font-weight:800;font-size:11.5px;margin-right:6px;font-variant-numeric:tabular-nums;">' + row.cod_proveedor + '</span>'
+      : '') + (row.razon_social || '—');
   if (row.cuit) {
     proveedor += '<br><small>' + row.cuit + '</small>';
   }
@@ -570,6 +573,7 @@ async function _ppSaveToSupabase(tipoContenido, data) {
       tipo_documento: tipoDocLabel,
       tipo_contenido: tipoContenido,
       razon_social: data.proveedor || null,
+      cod_proveedor: data.codProveedor || null,   // v4.8 — código del proveedor/tallerista (recepción)
       numero_remito: data.nroRemito || null,
       numero_factura: data.nroFactura || null,
       fecha_remito: data.fechaRemito || null,

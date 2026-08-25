@@ -12,7 +12,19 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-08-25 · Versión app al documentar: **v11.54**
+> Última actualización: 2026-08-25 · Versión app al documentar: **v11.57**
+>
+> Nota **2026-08-25 — v11.55→v11.57 (Pasaje de Papeles).** **(v11.55-56)** El módulo se reorganizó en
+> **2 responsabilidades** (encabezado `_ppGroupHeader`), 2 módulos cada una (Pendiente + Enviada; los
+> confirmados se ven dentro de Enviada con «Recibido el…»): **🏭 Responsabilidad Virgilio** = remitos de
+> **recepción** (talleristas, `origen != 'rr'`) · **🚚 Responsabilidad Logística** = remitos de **entrega**
+> (venta conformada en RR, `origen == 'rr'`). `_ppBuildSection(key, kind, …)` separa `kind`
+> (comportamiento) del `key` (id de colapso único, para repetir Pendiente/Enviada por responsabilidad).
+> **(v11.57)** En los remitos de **recepción** se muestra el **código del proveedor/tallerista** (chip azul
+> antes de la razón social). Nueva columna `Pasaje_Papeles.cod_proveedor`: se **captura** en Recepción de
+> Mercadería (`recepcion.js` pasa `opState.tallCod`) y se **backfilleó** por nombre vía
+> `vista_entidades_recepcion` (coalesce `cod_default/cod_lk/cod_ch/cod_factura`). Insumos pueden quedar sin
+> código (no siempre está). `pasaje-papeles.js?v=5.0`, `recepcion.js?v=10.25`.
 >
 > Nota **2026-08-25 — v11.54 (Pasaje de Papeles: remitos de venta conformados en RR).** Los remitos
 > de **venta** que el operario controla en **Recepción Remitos (RR)** (eventos **CRN**) ahora también

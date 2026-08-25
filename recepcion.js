@@ -1509,7 +1509,8 @@ async function opEnviar() {
         nroFactura: opState.nroFactura || '',
         fechaRemito: opState.fechaRemito || '',
         fechaFactura: opState.fechaFactura || '',
-        proveedor: opState.tallNombre || ''
+        proveedor: opState.tallNombre || '',
+        codProveedor: opState.tallCod || ''   // v1.2 — código del tallerista/prov. AT (para Pasaje de Papeles)
       });
     }
   } catch (_e) { /* no-op si el módulo no está cargado */ }
