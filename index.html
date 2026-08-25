@@ -6511,7 +6511,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v11.49";
+const APP_VERSION = "v11.50";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -10665,7 +10665,7 @@ function ocBodyList() {
   h += '</div><div class="oc-note">Tocá una fecha para ver las OCs de ese día separadas por tallerista.</div>';
   return h;
 }
-function ocOpenFecha(feEnc) { if (!_oc) return; _oc.openFecha = decodeURIComponent(feEnc); _oc.view = "fecha"; ocRender(); }
+function ocOpenFecha(feEnc) { if (!_oc) return; _oc.openFecha = decodeURIComponent(feEnc); _oc.filtro = ""; _oc.view = "fecha"; ocRender(); }
 function ocBackFechas() { if (!_oc) return; _oc.view = "list"; _oc.openFecha = null; _oc.openKey = null; ocRender(); }
 /* v11.43 — % de recepción (Recibido / Pedido). Verde ≥90 · ámbar 50-89 · rojo <50. */
 function _ocPct(rec, ped) { return ped > 0 ? Math.round(rec / ped * 100) : 0; }
@@ -10673,13 +10673,18 @@ function _ocPctCol(p) { return p >= 90 ? "#16a34a" : (p >= 50 ? "#d97706" : "#dc
 function ocBodyFecha() {
   const g = ocGroups(), fe = _oc.openFecha;
   let groups = Object.keys(g).map(function (k) { return { key: k, x: g[k] }; }).filter(function (o) { return (o.x.fecha || "") === fe; });
-  let h = '<div class="oc-tools"><button class="oc-btn" onclick="ocBackFechas()">← Volver a fechas</button><button class="oc-btn" onclick="ocOpenGeneral()" title="Ver la composición ítem por ítem de TODA la OC (todos los proveedores juntos)">📊 General</button></div>';
+  let h = '<div class="oc-tools"><button class="oc-btn" onclick="ocBackFechas()">← Volver a fechas</button><button class="oc-btn" onclick="ocOpenGeneral()" title="Ver la composición ítem por ítem de TODA la OC (todos los proveedores juntos)">📊 General</button>' +
+    '<input class="oc-filtro" type="search" placeholder="🔎 Buscar tallerista por nombre" value="' + escapeHtml(_oc.filtro || "") + '" oninput="if(_oc){_oc.filtro=this.value;ocRender();}"></div>';
   if (!groups.length) { _oc.view = "list"; _oc.openFecha = null; return ocBodyList(); }
+  // v11.50 — buscador por nombre de tallerista (filtra las tarjetas por proveedor/rubro).
+  const _fTall = (_oc.filtro || "").trim().toLowerCase();
+  if (_fTall) groups = groups.filter(function (o) { return ((o.x.proveedor || "") + " " + (o.x.rubro || "")).toLowerCase().indexOf(_fTall) >= 0; });
   let tPed = 0, tRec = 0, tItems = 0;
   groups.forEach(function (o) { o.st = ocGroupStats(o.x); tPed += o.st.ped; tRec += o.st.rec; tItems += o.x.rows.length; });
   groups.sort(function (a, b) { return (b.st.falta - a.st.falta) || (a.x.proveedor || "").localeCompare(b.x.proveedor || ""); });
   var pctGen = _ocPct(tRec, tPed);
   h += '<div class="oc-meta">📄 OC del <b>' + escapeHtml(_ocDdmm(fe)) + '</b> (' + escapeHtml(fe || "s/fecha") + ') — <b>' + groups.length + '</b> tallerista(s) · <b>' + tItems + '</b> ítem(s) · Pedido <b>' + tPed + '</b> · Recibido <b>' + tRec + '</b> · Falta <b class="oc-falt">' + Math.max(0, tPed - tRec) + '</b> · Recepción <b style="color:' + _ocPctCol(pctGen) + '">' + pctGen + '%</b></div>';
+  if (!groups.length) return h + '<div class="oc-empty" style="text-align:center;color:#94a3b8;padding:22px;">Ningún tallerista coincide con «' + escapeHtml(_oc.filtro || "") + '».</div>';
   h += '<div class="oc-boxgrid">';
   groups.forEach(function (o) {
     const x = o.x, st = o.st, falta = st.falta;
