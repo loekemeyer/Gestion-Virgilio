@@ -2255,6 +2255,11 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .cc-ruta{ font-size: 12.5px; font-weight: 800; color: #0f766e; background:#ecfeff; border:1px solid #cffafe; border-radius:8px; padding:6px 9px; margin: 14px 0 6px; }
 .cc-pos{ flex:0 0 auto; width:22px; height:22px; border-radius:50%; background:#0f766e; color:#fff; font-size:12px; font-weight:800; display:inline-flex; align-items:center; justify-content:center; }
 .cc-ubic{ flex:0 0 auto; font-size:12px; font-weight:800; color:#7c3aed; background:#faf5ff; border:1px solid #e9d5ff; border-radius:7px; padding:2px 7px; white-space:nowrap; }
+/* v11.47 — nombre del camionero (autocompletado desde el maestro Camioneros). */
+.cc-camionero-wrap{ display:flex; align-items:center; gap:9px; margin:2px 0 12px; padding:10px 11px; background:#f8fafc; border:2px solid #e2e8f0; border-radius:10px; }
+.cc-camionero-lbl{ flex:0 0 auto; font-size:13px; font-weight:800; color:#334155; white-space:nowrap; }
+.cc-camionero-inp{ flex:1 1 auto; min-width:0; font-size:16px; font-weight:700; color:#0f172a; padding:9px 10px; border:2px solid #cbd5e1; border-radius:8px; background:#fff; }
+.cc-camionero-inp:focus{ outline:none; border-color:#2563eb; }
 
 /* Control Remitos (CR): TABLA de los NP cargados al camión (CCN) pendientes de
    control. Columnas: NP · Cod Cliente · Razón Social · Líos · Controlado (tic).
@@ -6506,7 +6511,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v11.46";
+const APP_VERSION = "v11.50";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -10660,7 +10665,7 @@ function ocBodyList() {
   h += '</div><div class="oc-note">Tocá una fecha para ver las OCs de ese día separadas por tallerista.</div>';
   return h;
 }
-function ocOpenFecha(feEnc) { if (!_oc) return; _oc.openFecha = decodeURIComponent(feEnc); _oc.view = "fecha"; ocRender(); }
+function ocOpenFecha(feEnc) { if (!_oc) return; _oc.openFecha = decodeURIComponent(feEnc); _oc.filtro = ""; _oc.view = "fecha"; ocRender(); }
 function ocBackFechas() { if (!_oc) return; _oc.view = "list"; _oc.openFecha = null; _oc.openKey = null; ocRender(); }
 /* v11.43 — % de recepción (Recibido / Pedido). Verde ≥90 · ámbar 50-89 · rojo <50. */
 function _ocPct(rec, ped) { return ped > 0 ? Math.round(rec / ped * 100) : 0; }
@@ -10668,13 +10673,18 @@ function _ocPctCol(p) { return p >= 90 ? "#16a34a" : (p >= 50 ? "#d97706" : "#dc
 function ocBodyFecha() {
   const g = ocGroups(), fe = _oc.openFecha;
   let groups = Object.keys(g).map(function (k) { return { key: k, x: g[k] }; }).filter(function (o) { return (o.x.fecha || "") === fe; });
-  let h = '<div class="oc-tools"><button class="oc-btn" onclick="ocBackFechas()">← Volver a fechas</button><button class="oc-btn" onclick="ocOpenGeneral()" title="Ver la composición ítem por ítem de TODA la OC (todos los proveedores juntos)">📊 General</button></div>';
+  let h = '<div class="oc-tools"><button class="oc-btn" onclick="ocBackFechas()">← Volver a fechas</button><button class="oc-btn" onclick="ocOpenGeneral()" title="Ver la composición ítem por ítem de TODA la OC (todos los proveedores juntos)">📊 General</button>' +
+    '<input class="oc-filtro" type="search" placeholder="🔎 Buscar tallerista por nombre" value="' + escapeHtml(_oc.filtro || "") + '" oninput="if(_oc){_oc.filtro=this.value;ocRender();}"></div>';
   if (!groups.length) { _oc.view = "list"; _oc.openFecha = null; return ocBodyList(); }
+  // v11.50 — buscador por nombre de tallerista (filtra las tarjetas por proveedor/rubro).
+  const _fTall = (_oc.filtro || "").trim().toLowerCase();
+  if (_fTall) groups = groups.filter(function (o) { return ((o.x.proveedor || "") + " " + (o.x.rubro || "")).toLowerCase().indexOf(_fTall) >= 0; });
   let tPed = 0, tRec = 0, tItems = 0;
   groups.forEach(function (o) { o.st = ocGroupStats(o.x); tPed += o.st.ped; tRec += o.st.rec; tItems += o.x.rows.length; });
   groups.sort(function (a, b) { return (b.st.falta - a.st.falta) || (a.x.proveedor || "").localeCompare(b.x.proveedor || ""); });
   var pctGen = _ocPct(tRec, tPed);
   h += '<div class="oc-meta">📄 OC del <b>' + escapeHtml(_ocDdmm(fe)) + '</b> (' + escapeHtml(fe || "s/fecha") + ') — <b>' + groups.length + '</b> tallerista(s) · <b>' + tItems + '</b> ítem(s) · Pedido <b>' + tPed + '</b> · Recibido <b>' + tRec + '</b> · Falta <b class="oc-falt">' + Math.max(0, tPed - tRec) + '</b> · Recepción <b style="color:' + _ocPctCol(pctGen) + '">' + pctGen + '%</b></div>';
+  if (!groups.length) return h + '<div class="oc-empty" style="text-align:center;color:#94a3b8;padding:22px;">Ningún tallerista coincide con «' + escapeHtml(_oc.filtro || "") + '».</div>';
   h += '<div class="oc-boxgrid">';
   groups.forEach(function (o) {
     const x = o.x, st = o.st, falta = st.falta;
@@ -11800,10 +11810,10 @@ function stkBodyAuditGon() {
   var n = items.length;
   var h = '<div class="ag-bar"><div class="ag-title">🔍 Góndola &lt; 25% de la proyección · <b>' + n + '</b> ítem(s)</div>' +
     '<div class="ag-btns"><button class="ag-btn xls" onclick="agExportExcel()">📥 Excel</button><button class="ag-btn pdf" onclick="agExportPdf()">🖨 PDF</button></div></div>';
-  h += '<div class="ag-note">Ocupación = (stock total de <b>todos los estadios</b> − <b>pedidos</b>) ÷ <b>proyección</b>. Ordenado por <b>tallerista</b> y, dentro, por <b>% de góndola de menor a mayor</b> (el peor primero). Los <b>discontinuos</b> (activo=false o marcados a mano) no se muestran.</div>';
+  h += '<div class="ag-note">Ocupación = (stock total de <b>todos los estadios</b> − <b>pedidos</b>) ÷ <b>proyección</b>. Ordenado por <b>tallerista</b> y, dentro, por <b>% Ocup Virgilio de menor a mayor</b> (el peor primero). Los <b>discontinuos</b> (activo=false o marcados a mano) no se muestran.</div>';
   if (!n) { h += '<div class="stk-loading">No hay ítems por debajo del 25%. 👍</div>'; return h; }
   h += '<div class="ag-wrap"><table class="ag-tbl"><thead><tr>' +
-    '<th>Código</th><th>Descripción</th><th class="num">% góndola</th><th class="num">Stock total</th><th class="num">Proyección</th><th class="num">Pedidos</th><th>Familia</th>' +
+    '<th>Código</th><th>Descripción</th><th class="num">% Ocup Virgilio</th><th class="num">Stock total</th><th class="num">Proyección</th><th class="num">Pedidos</th><th>Familia</th>' +
     '</tr></thead><tbody>';
   var lastTall = null;
   items.forEach(function (it) {
@@ -11826,7 +11836,7 @@ function stkBodyAuditGon() {
 function agExportExcel() {
   var items = (_stk && _stk.agData) || []; if (!items.length) { try { alert("No hay datos para exportar."); } catch (_e) {} return; }
   var esc = function (s) { return String(s == null ? "" : s).replace(/[&<>]/g, function (m) { return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[m]; }); };
-  var html = '<html><head><meta charset="utf-8"></head><body><table border="1"><tr><th>Tallerista</th><th>Codigo</th><th>Descripcion</th><th>% gondola</th><th>Stock total</th><th>Proyeccion</th><th>Pedidos</th><th>Familia</th></tr>';
+  var html = '<html><head><meta charset="utf-8"></head><body><table border="1"><tr><th>Tallerista</th><th>Codigo</th><th>Descripcion</th><th>% Ocup Virgilio</th><th>Stock total</th><th>Proyeccion</th><th>Pedidos</th><th>Familia</th></tr>';
   items.forEach(function (it) {
     html += '<tr><td>' + esc(it.tall) + '</td><td>' + esc(codCanon(it.cod)) + '</td><td>' + esc(it.desc) + '</td><td>' + Math.round(it.pct * 100) + '%</td><td>' + (Math.round(it.stock * 10) / 10) + '</td><td>' + (Math.round(it.proy * 10) / 10) + '</td><td>' + Math.round(it.pedidos) + '</td><td>' + esc(it.fam) + '</td></tr>';
   });
@@ -11848,7 +11858,7 @@ function agExportPdf() {
   var w = window.open("", "_blank"); if (!w) { try { alert("Habilitá los pop-ups para generar el PDF."); } catch (_e) {} return; }
   w.document.write('<html><head><meta charset="utf-8"><title>Gondola menor a 25%</title><style>body{font-family:Arial;margin:14px;color:#0f172a}h1{font-size:20px;margin:0 0 10px}table{width:100%;border-collapse:collapse;font-size:15px}th{background:#1e3a8a;color:#fff;padding:8px;text-align:left}th.num{text-align:right}td{padding:6px 8px;border-bottom:1px solid #ccc}td.num{text-align:right}.grp td{background:#dbeafe;color:#1e3a8a;font-weight:800;font-size:16px}</style></head><body>' +
     '<h1>Góndola &lt; 25% de la proyección · ' + items.length + ' ítems</h1>' +
-    '<table><thead><tr><th>Código</th><th>Descripción</th><th class="num">% góndola</th><th class="num">Stock total</th><th class="num">Proyección</th><th class="num">Pedidos</th><th>Familia</th></tr></thead><tbody>' + rows + '</tbody></table></body></html>');
+    '<table><thead><tr><th>Código</th><th>Descripción</th><th class="num">% Ocup Virgilio</th><th class="num">Stock total</th><th class="num">Proyección</th><th class="num">Pedidos</th><th>Familia</th></tr></thead><tbody>' + rows + '</tbody></table></body></html>');
   w.document.close(); w.focus();
   setTimeout(function () { try { w.print(); } catch (_e) {} }, 400);
 }
@@ -13170,7 +13180,7 @@ function stkBodyStocks() {
       else _famTag = ' <span title="SECUNDARIO — no deben entrar pedidos acá. El principal es ' + escapeHtml(_equivDisp(_fam, _fam._defN)) + '." style="color:#1e40af;font-size:10px;font-weight:800;">⇄' + escapeHtml(_equivDisp(_fam, _fam._defN)) + '</span>';
     }
     const _proy = _proyOf(a.cod);
-    let tds = '<td class="stk-cod">' + escapeHtml(_codDisplay) + _famTag + '</td><td style="text-align:center;font-weight:800;font-size:11px;padding:3px 4px;color:' + (_lin === "LK" ? "#b91c1c" : (_lin === "CH" ? "#1e40af" : "#94a3b8")) + ';">' + (_lin || "—") + '</td><td class="stk-desc">' + escapeHtml(artNombre(a.cod, a.desc) || "—") + '</td>' + (_proy > 0.05 ? '<td class="num" style="background:#faf5ff;color:#6d28d9" title="Proyección de venta: ' + fmtCajas(_proy) + ' caj/mes (antes del índice de las OCs)">' + Math.round(_proy) + '</td>' : '<td class="num" style="background:#faf5ff;color:#c4b5fd">—</td>') + '<td class="num ' + (_tot < 0 ? "stk-neg" : "") + '" style="background:#f8fafc"><b>' + fmtCajas(_tot) + '</b></td>' + (_ped ? '<td class="num stk-pick-cell" style="background:#fffbeb;color:#92400e" onclick="event.stopPropagation();stkOpenCajasPedidasArt(\'' + encodeURIComponent(a.cod) + '\')" title="Todas las cajas pedidas (programadas o no) todavía no facturadas. Tocá para ver el detalle por NP"><b>' + fmtCajas(_ped) + '</b>' + (_demSPOf(a.cod) > 0.05 ? ' <span title="⚠ ' + fmtCajas(_demSPOf(a.cod)) + ' caja(s) pedidas están en la base de pedidos pero SIN programar en el PPP (Programación Diaria)" style="cursor:help">⚠️</span>' : '') + '</td>' : '<td class="num" style="background:#fffbeb;color:#92400e"></td>') + (_cap ? '<td class="num stk-pick-cell" style="background:#f0fdf4;color:#166534" onclick="event.stopPropagation();stkOpenCapArt(\'' + encodeURIComponent(a.cod) + '\')" title="Ubicaciones y capacidad de góndola"><b>' + fmtCajas(_cap) + '</b></td>' : '<td class="num" style="background:#f0fdf4;color:#166534">—</td>');
+    let tds = '<td class="stk-cod">' + escapeHtml(_codDisplay) + _famTag + '</td><td style="text-align:center;font-weight:800;font-size:11px;padding:3px 4px;color:' + (_lin === "LK" ? "#b91c1c" : (_lin === "CH" ? "#1e40af" : "#94a3b8")) + ';">' + (_lin || "—") + '</td><td class="stk-desc">' + escapeHtml(artNombre(a.cod, a.desc) || "—") + '</td>' + '<td class="num stk-pick-cell" style="background:#faf5ff;color:' + (_proy > 0.05 ? '#6d28d9' : '#c4b5fd') + ';cursor:pointer" onclick="event.stopPropagation();stkShowProyVentas(\'' + encodeURIComponent(a.cod) + '\',' + (Math.round((_proy || 0) * 100) / 100) + ')" title="Tocá para ver de dónde surge (ventas facturadas de los últimos 6 meses)">' + (_proy > 0.05 ? Math.round(_proy) : '—') + '</td>' + '<td class="num ' + (_tot < 0 ? "stk-neg" : "") + '" style="background:#f8fafc"><b>' + fmtCajas(_tot) + '</b></td>' + (_ped ? '<td class="num stk-pick-cell" style="background:#fffbeb;color:#92400e" onclick="event.stopPropagation();stkOpenCajasPedidasArt(\'' + encodeURIComponent(a.cod) + '\')" title="Todas las cajas pedidas (programadas o no) todavía no facturadas. Tocá para ver el detalle por NP"><b>' + fmtCajas(_ped) + '</b>' + (_demSPOf(a.cod) > 0.05 ? ' <span title="⚠ ' + fmtCajas(_demSPOf(a.cod)) + ' caja(s) pedidas están en la base de pedidos pero SIN programar en el PPP (Programación Diaria)" style="cursor:help">⚠️</span>' : '') + '</td>' : '<td class="num" style="background:#fffbeb;color:#92400e"></td>') + (_cap ? '<td class="num stk-pick-cell" style="background:#f0fdf4;color:#166534" onclick="event.stopPropagation();stkOpenCapArt(\'' + encodeURIComponent(a.cod) + '\')" title="Ubicaciones y capacidad de góndola"><b>' + fmtCajas(_cap) + '</b></td>' : '<td class="num" style="background:#f0fdf4;color:#166534">—</td>');
     cols.forEach(function (c) {
       const v = (c.racksKey ? ((Number(a[c.key]) || 0) + (Number(a.racks_ch) || 0)) : (Number(a[c.key]) || 0));
       // v5.82: columnas clickeables → detalle. Pickeados/A facturar → NPs; Excedente/Racks → ubicación.
@@ -13388,7 +13398,15 @@ var STK_POP_CSS =
   ".mva-rto-it b{color:#1e1b4b;}.mva-rto-it.on{background:#dcfce7;border-color:#86efac;color:#166534;}.mva-rto-it.on b{color:#14532d;}" +
   ".mva-ts{color:#94a3b8;font-size:11px;}.mva-ref{color:#64748b;font-family:Consolas,Menlo,monospace;}" +
   ".mva-in{color:#15803d;}.mva-out{color:#b91c1c;}.mva-sal{color:#1e3a8a;}" +
-  ".stkpop-ubic{color:#7c3aed;font-weight:800;white-space:nowrap;}";
+  ".stkpop-ubic{color:#7c3aed;font-weight:800;white-space:nowrap;}" +
+  // v11.48 — mini bar-chart de ventas facturadas por mes (pop-up de proyección).
+  ".proyv-chart{display:flex;flex-direction:column;gap:6px;}" +
+  ".proyv-row{display:flex;align-items:center;gap:9px;}" +
+  ".proyv-mes{flex:0 0 52px;font-size:12px;font-weight:800;color:#475569;text-transform:capitalize;}" +
+  ".proyv-track{flex:1 1 auto;height:20px;background:#f1f5f9;border-radius:6px;overflow:hidden;}" +
+  ".proyv-bar{display:block;height:100%;background:linear-gradient(90deg,#8b5cf6,#6d28d9);border-radius:6px;}" +
+  ".proyv-val{flex:0 0 auto;min-width:42px;text-align:right;font-size:12.5px;font-weight:800;color:#4c1d95;font-variant-numeric:tabular-nums;}" +
+  ".proyv-foot{margin-top:10px;font-size:12px;color:#334155;line-height:1.5;border-top:1px dashed #cbd5e1;padding-top:8px;}";
 function _stkPopShell(title, bodyId) {
   if (!document.getElementById("stkPopCss")) { const st = document.createElement("style"); st.id = "stkPopCss"; st.textContent = STK_POP_CSS; document.head.appendChild(st); }
   let ov = document.getElementById("stkPopModal");
@@ -13397,6 +13415,70 @@ function _stkPopShell(title, bodyId) {
   ov.innerHTML = '<div class="stkpop-card"><div class="stkpop-head"><span class="stkpop-title">' + title + '</span><button class="stkpop-close" onclick="stkPopClose()">Cerrar</button></div><div class="stkpop-body" id="' + bodyId + '"></div></div>';
 }
 function stkPopClose() { const ov = document.getElementById("stkPopModal"); if (ov) ov.classList.remove("show"); _stkPop = null; }
+/* v11.48 — Pop-up "de dónde surge la proyección": al tocar el número de PROY. CAJ/MES muestra
+   la explicación del cálculo + las CAJAS FACTURADAS reales de los últimos 6 meses (fuente: ventas
+   sales_lines de PáginaLK, las mismas que alimentan la proyección). Cruce backend: RPC de Virgilio
+   `ventas_mensuales_cod` → http a LK `fn_ventas_mensuales_virgilio`. La proyección NO es el promedio
+   simple de las barras: se calcula por CLIENTE (desde su 1ª compra) descartando meses-pico. */
+var _STK_MES_ABR = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+function _stkFmtMes(ym) {
+  var m = String(ym || "").match(/^(\d{4})-(\d{2})$/); if (!m) return String(ym || "");
+  return _STK_MES_ABR[parseInt(m[2], 10) - 1] + " " + m[1].slice(2);
+}
+async function stkShowProyVentas(codEnc, proy) {
+  var cod = decodeURIComponent(codEnc);
+  var codB = codBase(cod);
+  var sfx = String(cod || "").match(/\s+(LK|CH|LOKE)$/i);
+  var emp = sfx ? sfx[1].toUpperCase().replace("LOKE", "LK") : "";
+  var empTag = emp ? ' <span style="font-size:14px;font-weight:800;color:' + (emp === "LK" ? "#b91c1c" : "#1e40af") + ';">' + emp + '</span>' : '';
+  _stkPopShell("📈 Proyección — " + escapeHtml(codCanon(codB)) + empTag, "stkPopBody");
+  var body = document.getElementById("stkPopBody"); if (!body) return;
+  var nombre = artNombre(cod, "") || "";
+  var fc = function (n) { n = Number(n) || 0; return String(Math.round(n * 10) / 10); };
+  body.innerHTML = '<div class="stkpop-empty">Cargando ventas facturadas de los últimos 6 meses…</div>';
+  var rows = [];
+  try {
+    var r = await fetch(SUPABASE_URL + "/rest/v1/rpc/ventas_mensuales_cod", {
+      method: "POST",
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ p_cod: codB, p_meses: 6 }), cache: "no-store"
+    });
+    if (r.ok) rows = await r.json();
+  } catch (_e) {}
+  rows = (Array.isArray(rows) ? rows : []).map(function (x) { return { mes: String(x.mes || ""), cajas: Number(x.cajas) || 0 }; });
+  var proyN = Number(proy) || 0;
+  var h = '<div class="stkpop-hint">' + (nombre ? '<b>' + escapeHtml(nombre) + '</b> · ' : '') +
+    'Proyección: <b style="color:#6d28d9">' + (proyN > 0.05 ? fc(proyN) : '—') + ' caj/mes</b></div>';
+  // De dónde surge (explicación fija)
+  h += '<div class="stkpop-grp" style="background:#faf5ff;border-color:#e9d5ff">' +
+       '<div style="font-size:12.5px;color:#4c1d95;line-height:1.5;">' +
+       '<b>¿De dónde surge?</b> La proyección es el <b>promedio mensual de cajas facturadas</b> ' +
+       '(ventas reales de PáginaLK, <b>Loeke + Chef</b>). Se calcula <b>por cliente</b> —desde su primera compra en la ventana— ' +
+       'y <b>descarta los meses-pico atípicos</b> (compras one-off), sumando todos los clientes. Ventana: <b>6 meses</b> ' +
+       '(si no hay ventas, cae a 12). <b>No</b> es el promedio simple de las barras de abajo.' +
+       '</div></div>';
+  if (!rows.length) {
+    h += '<div class="stkpop-empty">Sin ventas facturadas en los últimos 6 meses para <b>' + escapeHtml(codCanon(codB)) + '</b>' + (emp ? ' (' + emp + ')' : '') + '.<br><small style="color:#94a3b8">(o el motor de PáginaLK no respondió)</small></div>';
+    body.innerHTML = h; return;
+  }
+  var tot = rows.reduce(function (s, x) { return s + x.cajas; }, 0);
+  var prom = rows.length ? (tot / rows.length) : 0;
+  var mx = rows.reduce(function (s, x) { return Math.max(s, x.cajas); }, 0) || 1;
+  h += '<div class="stkpop-grp"><div style="font-size:12px;font-weight:800;color:#334155;margin-bottom:8px;">🧾 Cajas facturadas — últimos ' + rows.length + ' meses</div>';
+  h += '<div class="proyv-chart">';
+  rows.forEach(function (x) {
+    var pct = Math.max(2, Math.round(x.cajas / mx * 100));
+    h += '<div class="proyv-row">' +
+         '<span class="proyv-mes">' + escapeHtml(_stkFmtMes(x.mes)) + '</span>' +
+         '<span class="proyv-track"><span class="proyv-bar" style="width:' + pct + '%"></span></span>' +
+         '<span class="proyv-val">' + fc(x.cajas) + '</span></div>';
+  });
+  h += '</div>';
+  h += '<div class="proyv-foot">Total 6m: <b>' + fc(tot) + '</b> cajas · Promedio simple: <b>' + fc(Math.round(prom)) + '</b> caj/mes' +
+       (proyN > 0.05 ? ' · Proyección (depurada): <b style="color:#6d28d9">' + fc(proyN) + '</b>' : '') + '</div>';
+  h += '</div>';
+  body.innerHTML = h;
+}
 /* v9.02/9.04 — Módulo "NP que faltan": pedidos que están en la base (PPP_Base_Pedidos) pero NO en
    Programación Diaria, y que no se facturaron ni entregaron. Los que disparan el ⚠ de Cajas
    Pedidas. Lee vista_np_sin_programar (NP · Fecha · Razón Social/Cliente · Cajas). La operadora
@@ -21705,8 +21787,31 @@ function _compClearPersist(tanda) { try { localStorage.removeItem(_compPersistKe
    mano). Mismo patrón que Control Remitos (cargados − controlados), un paso
    antes. Reutiliza #tandaModal. v3.50.
    ========================================================= */
-let _cc = null;   // { legajo, items:[{tanda,np,rs}], checked:Set<np> }
+let _cc = null;   // { legajo, mode:'camion'|'retira', camionero, items:[{tanda,np,rs,esRetira}], checked:Set<np> }
 let _ccWakeLock = null;
+/* v11.47 — Camioneros: maestro de nombres para autocompletar (que siempre se escriba
+   igual "Guille" vs "Guillermo" → análisis limpio). GET para el datalist; upsert (ignore
+   duplicates, la PK nombre dedupe) al terminar la carga. Best-effort, no bloquea el flujo. */
+async function ccFetchCamioneros() {
+  try {
+    const r = await fetch(SUPABASE_URL + "/rest/v1/Camioneros?select=nombre&order=nombre.asc&limit=1000",
+      { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+    if (!r.ok) return [];
+    const a = await r.json();
+    return (Array.isArray(a) ? a : []).map(function (x) { return String(x.nombre || "").trim(); }).filter(Boolean);
+  } catch (_e) { return []; }
+}
+function ccUpsertCamionero(nombre) {
+  const n = String(nombre || "").trim();
+  if (!n) return;
+  try {
+    fetch(SUPABASE_URL + "/rest/v1/Camioneros?on_conflict=nombre", {
+      method: "POST",
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "resolution=ignore-duplicates,return=minimal" },
+      body: JSON.stringify({ nombre: n })
+    }).catch(function () {});
+  } catch (_e) {}
+}
 function _ccKey(legajo) { return "vir_cc_checked_" + legajo + "_" + getTodayKey(); }
 function ccSaveChecked(legajo, set) { try { localStorage.setItem(_ccKey(legajo), JSON.stringify(Array.from(set || []))); } catch (_e) {} }
 function ccLoadChecked(legajo) { try { const a = JSON.parse(localStorage.getItem(_ccKey(legajo)) || "[]"); return new Set(Array.isArray(a) ? a.map(String) : []); } catch (_e) { return new Set(); } }
@@ -21770,22 +21875,32 @@ async function fetchCCData() {
   }
   const cargados = new Set();
   for (const [np, ms] of maxCcn) { const fss = fssMap.get(np) || 0; if (!(fss && fss > ms)) cargados.add(np); }
-  const lios = new Map();
+  const lios = new Map(); const clase = new Map();   // v11.47 — clase [4] (lio|etiqueta|nada) para separar retira/camión
   for (const ev of talR) {
     const p = String(ev.texto || "").split("|");
     const np = p[0].trim().replace(/\.0+$/, "");
     const v = parseInt(p[1], 10);
     if (np && !isNaN(v)) lios.set(np, v);
+    if (np) clase.set(np, String(p[4] || "").toLowerCase().trim());   // último gana (orden asc)
   }
+  // v11.47 — cajas por NP (para RETIRA sin líos: se cuentan en cajas con "c").
+  let cajas = new Map(); try { cajas = await facFetchCajas(); } catch (_e) {}
   const items = []; const seen = new Set();
   for (const row of repR) {
     const np = String(row.np || "").trim().replace(/\.0+$/, "");
     if (!np || seen.has(np) || cargados.has(np)) continue;   // ya cargado → fuera
     if (entregadas.has(np)) continue;                        // v9.68: ya entregado (estado terminal) → fuera
     seen.add(np);
-    items.push({ np: np, tanda: (String(row.tanda || "").trim() || "—"), rs: row.razon_social || "", lios: lios.has(np) ? lios.get(np) : null });
+    items.push({ np: np, tanda: (String(row.tanda || "").trim() || "—"), rs: row.razon_social || "",
+      lios: lios.has(np) ? lios.get(np) : null,
+      clase: clase.get(np) || "",
+      cajas: cajas.has(np) ? Math.round(cajas.get(np)) : null });
   }
   try { await _ccAttachUbicYOrden(items); } catch (_e) {}
+  // v11.47 — RETIRA = zona "Retira" (Programación) O clase TAL 'nada'. El resto = camión.
+  items.forEach(function (it) {
+    it.esRetira = (String(it.zona || "").toLowerCase() === "retira") || (String(it.clase || "").toLowerCase() === "nada");
+  });
   return items;
 }
 
@@ -21842,64 +21957,92 @@ async function _ccAttachUbicYOrden(items) {
   return items;
 }
 
-async function showCargaCamion(legajo) {
+/* v11.47 — al tocar CC, primero se elige RETIRA o CAMIÓN. Camión = todos los pedidos
+   salvo los retira, con nombre de camionero (autocompletado). Retira = solo los retira,
+   contados en cajas, sin camionero. */
+async function showCargaCamion(legajo, mode) {
   const m = document.getElementById("tandaModal"); if (!m) return;
   const leg = String(legajo || "").trim();
-  m.querySelector(".tanda-modal-title").textContent = "🚛 Carga Camión — reparto";
-  m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">Cargando reparto…</div>`;
   m.classList.add("show");
+  if (!mode) { ccRenderChooser(leg); return; }   // sin modo → preguntar retira o camión
+  const esRetira = (mode === "retira");
+  m.querySelector(".tanda-modal-title").textContent = esRetira ? "🚶 Carga — Retira" : "🚛 Carga Camión — reparto";
+  m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">Cargando ${esRetira ? "retiras" : "reparto"}…</div>`;
   ccWakeLock();
   try {
-    const items = await fetchCCData();
+    const _both = await Promise.all([ fetchCCData(), esRetira ? Promise.resolve([]) : ccFetchCamioneros() ]);
+    let items = _both[0]; const camioneros = _both[1] || [];
+    items = items.filter(function (it) { return esRetira ? it.esRetira : !it.esRetira; });   // camión = todos salvo retira
     // v10.23 — ordenar por ORDEN DE CARGA (inverso de la ruta); las NP sin orden van al final.
     const _li = function (x) { return (x.loadIdx == null || !isFinite(x.loadIdx)) ? Number.MAX_SAFE_INTEGER : x.loadIdx; };
     items.sort((a, b) => (_li(a) - _li(b)) || String(a.tanda).localeCompare(String(b.tanda)) || a.np.localeCompare(b.np));
     if (!items.length) {
       _cc = null; ccReleaseWakeLock();
-      m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">No hay reparto pendiente de cargar.<br><small>Aparece cuando Ventas genera el PDF de facturación.</small></div><button class="pk-btn pk-ok" onclick="ccEndWithoutLoading('${leg}')">✓ Terminar Carga Camión (sin cargar por app)</button><button class="pk-btn pk-cancel" onclick="ccClose()">Cerrar (sigo después)</button>`;
+      m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">No hay ${esRetira ? "retiras" : "reparto"} pendiente de cargar.<br><small>${esRetira ? "Los retira aparecen cuando Ventas genera el PDF." : "Aparece cuando Ventas genera el PDF de facturación."}</small></div><button class="pk-btn pk-ok" onclick="ccEndWithoutLoading('${leg}')">✓ Terminar Carga Camión (sin cargar por app)</button><button class="pk-btn pk-cancel" onclick="showCargaCamion('${leg}')">← Volver</button>`;
       return;
     }
     const saved = ccLoadChecked(leg);
-    _cc = { legajo: leg, items: items, checked: new Set(items.filter(it => saved.has(it.np)).map(it => it.np)) };
+    _cc = { legajo: leg, mode: mode, camionero: "", camioneros: camioneros, items: items, checked: new Set(items.filter(it => saved.has(it.np)).map(it => it.np)) };
     ccRender();
   } catch (e) {
     _cc = null; ccReleaseWakeLock();
-    m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">No se pudo cargar (¿sin conexión?).<br><small>${escapeHtml(e.message || "")}</small></div><button class="pk-btn pk-ok" onclick="ccEndWithoutLoading('${leg}')">✓ Terminar Carga Camión (sin cargar por app)</button><button class="pk-btn pk-cancel" onclick="ccClose()">Cerrar (sigo después)</button>`;
+    m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">No se pudo cargar (¿sin conexión?).<br><small>${escapeHtml(e.message || "")}</small></div><button class="pk-btn pk-ok" onclick="ccEndWithoutLoading('${leg}')">✓ Terminar Carga Camión (sin cargar por app)</button><button class="pk-btn pk-cancel" onclick="showCargaCamion('${leg}')">← Volver</button>`;
   }
+}
+/* Pantalla inicial: ¿retira o camión? */
+function ccRenderChooser(leg) {
+  const m = document.getElementById("tandaModal"); if (!m) return;
+  m.querySelector(".tanda-modal-title").textContent = "🚛 Carga Camión";
+  m.querySelector(".tanda-modal-body").innerHTML =
+    `<div class="cc-sub" style="margin-bottom:14px;">¿Qué vas a cargar?</div>` +
+    `<button class="pk-btn pk-ok" style="font-size:19px;padding:18px;" onclick="showCargaCamion('${leg}','camion')">🚛 Camión <small style="font-weight:700;opacity:.85;display:block;font-size:12px;margin-top:3px;">Todos los pedidos, salvo los retira. Pedís el camionero.</small></button>` +
+    `<button class="pk-btn pk-ok" style="font-size:19px;padding:18px;background:#475569;" onclick="showCargaCamion('${leg}','retira')">🚶 Retira <small style="font-weight:700;opacity:.85;display:block;font-size:12px;margin-top:3px;">Solo los retira, contados en cajas.</small></button>` +
+    `<button class="pk-btn pk-cancel" onclick="ccClose()">Cerrar</button>`;
 }
 
 function ccRender() {
   const m = document.getElementById("tandaModal"); if (!m || !_cc) return;
+  const esRetira = (_cc.mode === "retira");
   // v10.23 — se renderiza en ORDEN DE CARGA (los items ya vienen ordenados por loadIdx).
   // Encabezado por RUTA; posición 1,2,3… = orden de carga (último destino del camión primero).
   // Las NP sin ubicación en ruta caen en una sección aparte, ordenadas por tanda.
   const hasOrden = _cc.items.some(function (it) { return isFinite(it.loadIdx); });
-  let html = `<div class="cc-sub">NP del <b>reparto</b> — tocá los que <b>cargaste al camión</b>.` +
-             (hasOrden ? ` Están en <b>orden de carga</b>: el <b>último destino</b> de cada camión se carga <b>primero</b> (1 = primero en subir).` : ``) + `</div>`;
+  let html = `<div class="cc-sub">${esRetira ? "Pedidos <b>retira</b> — tocá los que <b>entregaste</b> (se cuentan en <b>cajas</b>)." : "NP del <b>reparto</b> — tocá los que <b>cargaste al camión</b>."}` +
+             (!esRetira && hasOrden ? ` Están en <b>orden de carga</b>: el <b>último destino</b> de cada camión se carga <b>primero</b> (1 = primero en subir).` : ``) + `</div>`;
+  // v11.47 — camión: nombre del camionero con autocompletado (maestro Camioneros).
+  if (!esRetira) {
+    const opts = (_cc.camioneros || []).map(function (n) { return `<option value="${escapeHtml(n)}"></option>`; }).join("");
+    html += `<div class="cc-camionero-wrap"><label class="cc-camionero-lbl">🧑‍✈️ Camionero</label>` +
+            `<input id="ccCamioneroInput" class="cc-camionero-inp" list="ccCamioneroList" autocomplete="off" placeholder="Nombre del camionero…" value="${escapeHtml(_cc.camionero || "")}" oninput="_cc && (_cc.camionero = this.value)" />` +
+            `<datalist id="ccCamioneroList">${opts}</datalist></div>`;
+  }
   let curSec = null;
   let pos = 0;
   for (const it of _cc.items) {
     const enRuta = isFinite(it.loadIdx);
     const secKey = enRuta ? ("R:" + (it.ruta || "Ruta")) : "__sin__";
-    if (secKey !== curSec) {
+    if (secKey !== curSec && !esRetira) {
       curSec = secKey; pos = 0;
       html += `<div class="cc-ruta">${enRuta ? "🚚 " + escapeHtml(it.ruta || "Ruta") + " · orden de carga" : "📍 Sin ubicación en ruta — cargar aparte"}</div>`;
     }
     pos++;
     const on = _cc.checked.has(it.np);
-    const liosNull = (it.lios == null);
-    const liosTxt = liosNull ? "—" : String(it.lios);
-    const liosCls = (liosNull || it.lios === 0) ? " cc-lios0" : "";
+    const cell = esRetira ? _liosCajasCell(it) : null;
+    const liosTxt = esRetira ? cell.txt : (it.lios == null ? "—" : String(it.lios));
+    const liosCls = esRetira ? ((cell.txt === "—") ? " cc-lios0" : "") : ((it.lios == null || it.lios === 0) ? " cc-lios0" : "");
+    const liosIcon = esRetira ? (cell.esCajas ? "🧺" : "📦") : "📦";
+    const liosTtl = esRetira ? (cell.esCajas ? "cajas (retira)" : "líos") : "líos";
     const ubic = it.ubic ? `<span class="cc-ubic" title="dónde quedó armado">📌 ${escapeHtml(it.ubic)}</span>` : "";
     html += `<div class="cc-np${on ? " cc-on" : ""}" onclick="ccToggle('${String(it.np).replace(/[^0-9A-Za-z]/g, "")}')">` +
-            (enRuta ? `<span class="cc-pos">${pos}</span>` : "") +
+            (!esRetira && enRuta ? `<span class="cc-pos">${pos}</span>` : "") +
             `<span class="cc-chk">${on ? "✓" : ""}</span>` +
             `<span class="cc-npnum">${escapeHtml(it.np)}</span>` +
             ubic +
             `<span class="cc-rs">${escapeHtml(it.rs)}</span>` +
-            `<span class="cc-lios${liosCls}" title="líos">📦 ${liosTxt}</span></div>`;
+            `<span class="cc-lios${liosCls}" title="${liosTtl}">${liosIcon} ${escapeHtml(liosTxt)}</span></div>`;
   }
-  html += `<button class="pk-btn pk-ok" onclick="ccFinish()">🚛 Terminé Carga Camión (${_cc.checked.size} cargadas)</button>` +
+  html += `<button class="pk-btn pk-ok" onclick="ccFinish()">${esRetira ? "🚶 Terminé Retira" : "🚛 Terminé Carga Camión"} (${_cc.checked.size} ${esRetira ? "entregados" : "cargadas"})</button>` +
+          `<button class="pk-btn pk-cancel" onclick="showCargaCamion('${_cc.legajo}')">← Volver (retira/camión)</button>` +
           `<button class="pk-btn pk-cancel" onclick="ccClose()">Cerrar (sigo después)</button>`;
   m.querySelector(".tanda-modal-body").innerHTML = html;
 }
@@ -21927,12 +22070,23 @@ function ccEndWithoutLoading(legajo) {
 function ccFinish() {
   if (!_cc) return;
   const legajo = _cc.legajo;
+  const esRetira = (_cc.mode === "retira");
+  // v11.47 — camión: nombre del camionero (leído del input en vivo por si oninput no corrió).
+  let camionero = "";
+  if (!esRetira) {
+    try { const inp = document.getElementById("ccCamioneroInput"); if (inp) _cc.camionero = inp.value; } catch (_e) {}
+    camionero = String(_cc.camionero || "").trim();
+    if (!camionero) {
+      try { if (!confirm("No pusiste el nombre del camionero.\n¿Terminar igual sin camionero?")) return; } catch (_e) {}
+    }
+  }
   const sel = _cc.items.filter(it => _cc.checked.has(it.np));
-  for (const it of sel) ccSendDetail(legajo, it.np, it.tanda);   // CCN por cada NP cargada
-  ccSendClose(legajo);                                           // cierre CC
+  for (const it of sel) ccSendDetail(legajo, it.np, it.tanda, camionero);   // CCN por cada NP cargada (con camionero)
+  if (camionero) ccUpsertCamionero(camionero);                  // guarda el nombre en el maestro Camioneros
+  ccSendClose(legajo);                                          // cierre CC
   ccClearChecked(legajo);
   _cc = null; ccReleaseWakeLock(); closeTandaModal();
-  try { alert("🚛 Carga Camión terminada. " + sel.length + " NP cargadas."); } catch (_e) {}
+  try { alert((esRetira ? "🚶 Retira terminado. " : "🚛 Carga Camión terminada. ") + sel.length + (esRetira ? " retira(s) entregados." : " NP cargadas.") + (camionero ? "\nCamionero: " + camionero : "")); } catch (_e) {}
 }
 function ccSendClose(legajo) {
   const st = getLegajoState(legajo);
@@ -21944,11 +22098,15 @@ function ccSendClose(legajo) {
   try { enqueueReport(payload); if (typeof trySendOneReport === "function") trySendOneReport(payload).then(r => { if (r && r.ok) removeFromQueue(payload.id); }).catch(() => {}); } catch (_e) {}
   try { updatePendingIndicator(); updateCoreButtonsState(); } catch (_e) {}
 }
-function ccSendDetail(legajo, np, tanda) {
+function ccSendDetail(legajo, np, tanda, camionero) {
   const nowMs = Date.now();
+  // v11.47 — CCN texto: NP|TANDA|CAMIONERO. El camionero solo va en camión (en retira queda vacío).
+  // Las vistas leen split_part [1]=np, [2]=tanda → el 3er campo no las afecta.
+  const cam = String(camionero || "").trim();
+  const texto = (String(np) + "|" + String(tanda)).toUpperCase() + "|" + cam;
   const payload = {
     legajo: legajo, opcion: "CCN", descripcion: "Carga Camión NP",
-    texto: (String(np) + "|" + String(tanda)).toUpperCase(),
+    texto: texto,
     ts: nowMs,
     id: ("ccn_" + legajo + "_" + np + "_" + getTodayKey()).replace(/[^a-zA-Z0-9_\-]/g, ""),
     ts_inicio_iso: null
@@ -22083,7 +22241,7 @@ async function rrLoadBadge() {
 /* v10.25: fetchCRData usa vista_control_remitos. Antes hacía 5 fetches + 40 líneas de join JS. */
 async function fetchCRData() {
   const H = { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY };
-  const res = await fetch(SUPABASE_URL + "/rest/v1/vista_control_remitos?select=np,tanda,first_load,lios,cod_cliente,rs", {
+  const res = await fetch(SUPABASE_URL + "/rest/v1/vista_control_remitos?select=np,tanda,first_load,lios,clase,cajas,cod_cliente,rs", {
     headers: H, cache: "no-store"
   });
   if (!res.ok) throw new Error("HTTP " + res.status);
@@ -22091,6 +22249,7 @@ async function fetchCRData() {
   return rows.map(r => ({
     np: r.np, tanda: r.tanda || "—", cod: r.cod_cliente || "", rs: r.rs || "",
     lios: r.lios != null ? r.lios : null,
+    clase: r.clase || "", cajas: (r.cajas != null ? Number(r.cajas) : null),
     loadMs: r.first_load ? new Date(r.first_load).getTime() : 0,
     venc: crVencido(r.first_load ? new Date(r.first_load).getTime() : 0)
   }));
@@ -22130,14 +22289,14 @@ function crRender() {
   for (const it of _cr.items) {
     const on = _cr.checked.has(it.np);
     const npc = String(it.np).replace(/[^0-9A-Za-z]/g, "");
-    const liosNull = (it.lios == null);
-    const liosTxt = liosNull ? "—" : String(it.lios);
-    const liosCls = (liosNull || it.lios === 0) ? " cr-lios0" : "";
+    const cell = _liosCajasCell(it);
+    const liosCls = (cell.txt === "—") ? " cr-lios0" : "";
+    const liosTtl = cell.esCajas ? "cajas (retira)" : "líos";
     rows += `<tr class="cr-row${on ? " cc-on" : ""}${it.venc ? " cr-venc" : ""}" onclick="crToggle('${npc}')">` +
             `<td class="cr-td-np">${escapeHtml(it.np)}${it.loadMs ? `<div class="cr-cc-date">🚚 ${crFmtCC(it.loadMs)}</div>` : ""}</td>` +
             `<td class="cr-td-cod">${it.cod ? escapeHtml(it.cod) : "—"}</td>` +
             `<td class="cr-td-rs">${escapeHtml(it.rs || "—")}${it.venc ? `<span class="cr-venc-tag">VENCIDO</span>` : ""}</td>` +
-            `<td class="cr-td-lios${liosCls}">${liosTxt}</td>` +
+            `<td class="cr-td-lios${liosCls}" title="${liosTtl}">${escapeHtml(cell.txt)}</td>` +
             `<td class="cr-td-ctrl"><span class="cr-chk">${on ? "✓" : ""}</span></td>` +
             `<td class="cr-td-act"><button class="cr-sinsal-btn" onclick="event.stopPropagation();crMarkSinSalida('${npc}')" title="El cliente no recibió — la mercadería volvió al depósito. Sale de acá y queda en «FC s/Salida» (Stocks).">↩ s/salida</button></td></tr>`;
   }
@@ -22308,7 +22467,7 @@ async function fetchCCRData() {
 /* v11.46 — celda "líos" unificada: muestra líos, salvo RETIRA (clase 'nada') sin líos →
    muestra las CAJAS con una "c" (ej. "12c"). Devuelve { txt, esCajas }. */
 function _liosCajasCell(it) {
-  var esRetira = (String(it.clase || "").toLowerCase() === "nada");
+  var esRetira = (it.esRetira != null) ? !!it.esRetira : (String(it.clase || "").toLowerCase() === "nada");
   var sinLios = (it.lios == null || it.lios === 0);
   if (esRetira && sinLios) {
     var c = (it.cajas == null) ? null : it.cajas;
