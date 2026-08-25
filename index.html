@@ -6512,7 +6512,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v11.66";
+const APP_VERSION = "v11.67";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -11378,16 +11378,18 @@ async function ocgEnter() {
     // Máximo = proy×índice o capacidad como objetivo, stock con empresa mergeada, pedidos,
     // uni×caja y config de proveedor). El front solo trae total>0 y activos, y hace el
     // reparto por proveedor. Se muestran también los "(sin proveedor)" para asignarlos.
-    const rows = await supaFetchAllSafe(SUPABASE_GENERADOR_ENDPOINT, "select=cod,descripcion,proveedor,tiene_prov_real,pr1,proveedor2,pr2,indice,proy,cap,maximo,pedidos,stock,uni_x_caja,n_caja,total&activo=eq.true&total=gt.0&order=total.desc");
+    // v11.67 — traemos TODO el universo activo (SIN total=gt.0) para poder ofrecer la vista
+    // "Por tallerista" con TODOS los artículos que hace cada tallerista, incluso a pedir = 0.
+    //   itemsAll = todo (incl. falta 0)  ·  items = solo a pedir > 0 (lo que se genera/manda).
+    const rows = await supaFetchAllSafe(SUPABASE_GENERADOR_ENDPOINT, "select=cod,descripcion,proveedor,tiene_prov_real,pr1,proveedor2,pr2,indice,proy,cap,maximo,pedidos,stock,uni_x_caja,n_caja,total&activo=eq.true&order=total.desc");
     if (!_oc) return;   // se cerró el generador mientras calculaba
-    const items = [];
+    const itemsAll = [];
     (rows || []).forEach(function (r) {
       const cod = String(r.cod).toUpperCase().trim();
       const maxCajas = Math.round(Number(r.maximo) || 0);
       const demanda = Math.round(Number(r.pedidos) || 0);
       const stock = Math.round(Number(r.stock) || 0);
       const totalFalta = Math.round(Number(r.total) || 0);
-      if (totalFalta <= 0) return;
       const pc = Number(r.proy) || 0;                 // proyección cajas/mes (0 = sin ventas)
       const indice = (Number(r.indice) > 0) ? Number(r.indice) : OCG_FACTOR_MAXIMO;
       const cap = Number(r.cap) || 0;
@@ -11406,54 +11408,96 @@ async function ocgEnter() {
         const faltaSub = sub.resto ? (totalFalta - acc) : Math.round(totalFalta * sub.prop / 100);
         if (!sub.resto) acc += faltaSub;
         if (_ocgExcluido(sub.prov)) return;   // Racks no va al generador (se importa por otra vía)
-        if (faltaSub <= 0) return;
         const k = sub.prop / 100;
-        items.push({ cod: cod, desc: r.descripcion || "", prov: sub.prov, max: Math.round(maxCajas * k), fuente: fuente, indice: indice, proy: (pc > 0 ? pc : null), demanda: Math.round(demanda * k), stock: Math.round(stock * k), falta: faltaSub, cap: (cap > 0 ? cap : null), capped: capped, uni: Number(r.uni_x_caja) || 0, ncaja: (r.n_caja != null ? r.n_caja : null), prop: sub.prop, sinProv: (sub.prov === "(sin proveedor)") });
+        // v11.67 — se incluyen también los de falta 0 (para la vista Por tallerista). El armado
+        // de `items` (a pedir > 0) filtra después, así lo que se genera/manda queda idéntico.
+        itemsAll.push({ cod: cod, desc: r.descripcion || "", prov: sub.prov, max: Math.round(maxCajas * k), fuente: fuente, indice: indice, proy: (pc > 0 ? pc : null), demanda: Math.round(demanda * k), stock: Math.round(stock * k), falta: Math.max(0, faltaSub), cap: (cap > 0 ? cap : null), capped: capped, uni: Number(r.uni_x_caja) || 0, ncaja: (r.n_caja != null ? r.n_caja : null), prop: sub.prop, sinProv: (sub.prov === "(sin proveedor)") });
       });
     });
-    _oc.gen = { items: items, fecha: new Date().toISOString().slice(0, 10) };
+    const items = itemsAll.filter(function (it) { return it.falta > 0; });
+    _oc.gen = { items: items, itemsAll: itemsAll, fecha: new Date().toISOString().slice(0, 10) };
     ocRender();
     ocgStartCountdown();   // v7.67: contador vivo dentro del botón "Generar las OCs"
     // v9.12 — sección de importados (circuito propio). No rompe el generador nacional si falla.
     try { const imp = await ocgFetchImportados(); if (_oc && _oc.gen) { _oc.gen.imp = imp; ocRender(); } } catch (_e) {}
   } catch (e) { if (_oc) { _oc.gen = { error: String(e.message || e), items: [] }; ocRender(); } }
 }
-function ocgGroups() {
+function ocgGroups(list) {
   const g = {};
-  ((_oc.gen && _oc.gen.items) || []).forEach(function (it) { const k = it.prov; if (!g[k]) g[k] = { prov: k, items: [], total: 0 }; g[k].items.push(it); g[k].total += it.falta; });
+  (list || (_oc.gen && _oc.gen.items) || []).forEach(function (it) { const k = it.prov; if (!g[k]) g[k] = { prov: k, items: [], total: 0 }; g[k].items.push(it); g[k].total += it.falta; });
   return g;
 }
+function ocgSetMode(m) { if (_oc) { _oc.genMode = (m === "tall" ? "tall" : "art"); ocRender(); } }
+// ordena proveedores dejando "(sin proveedor)" al final
+function _ocgProvSort(a, b) { if (a === "(sin proveedor)") return 1; if (b === "(sin proveedor)") return -1; return a.localeCompare(b); }
 function ocBodyGen() {
   const gen = _oc.gen;
-  const g = (gen && !gen.error) ? ocgGroups() : {};
-  const keys = Object.keys(g).sort(function (a, b) { return a.localeCompare(b); });
+  const mode = (_oc.genMode === "tall") ? "tall" : "art";
+  const canGen = ((gen && gen.items) || []).length > 0;
   // v7.66: botón grande "Generar las OCs" arriba, a la altura del ← Volver (pedido del usuario).
-  const genBtn = keys.length ? '<button class="oc-btn ok" style="font-size:15px;padding:8px 20px;font-weight:800;line-height:1.2;text-align:center" onclick="ocgGenerar()">✓ Generar las OCs<br><span id="ocgCountdown" style="font-size:10.5px;font-weight:600;opacity:.9">' + escapeHtml(_ocgAutoEnTxt()) + '</span></button>' : '';
+  const genBtn = canGen ? '<button class="oc-btn ok" style="font-size:15px;padding:8px 20px;font-weight:800;line-height:1.2;text-align:center" onclick="ocgGenerar()">✓ Generar las OCs<br><span id="ocgCountdown" style="font-size:10.5px;font-weight:600;opacity:.9">' + escapeHtml(_ocgAutoEnTxt()) + '</span></button>' : '';
   let h = '<div class="oc-tools"><button class="oc-btn" onclick="ocBack()">← Volver</button>' + genBtn + '<button class="oc-btn" onclick="ocgEnterCfg()">⚙ Configuraciones</button><input class="oc-filtro" type="search" placeholder="🔎 Buscar código / descripción / proveedor" value="' + escapeHtml(_oc.genFiltro || "") + '" oninput="if(_oc){_oc.genFiltro=this.value;ocRender();}"></div>';
+  // v11.67 — toggle de vista: Por artículo (lista plana, solo a pedir>0) · Por tallerista (agrupado, TODOS los artículos incl. a pedir 0).
+  h += '<div class="oc-viewtoggle" style="display:flex;gap:6px;margin:2px 0 8px">' +
+    '<button class="oc-btn' + (mode === "art" ? " ok" : "") + '" onclick="ocgSetMode(\'art\')">📦 Por artículo</button>' +
+    '<button class="oc-btn' + (mode === "tall" ? " ok" : "") + '" onclick="ocgSetMode(\'tall\')">👷 Por tallerista</button></div>';
   if (!gen) return h + '<div class="oc-loading">Calculando (stock + demanda PPP + proyección × índice)…</div>';
   if (gen.error) return h + '<div class="oc-empty" style="color:#b91c1c">Error: ' + escapeHtml(gen.error) + '</div>';
-  if (!keys.length) return h + '<div class="oc-empty">No hay nada para pedir (todo está en o sobre el máximo).<br><small>Con el stock en 0, va a dar todo para pedir cuando lo cargues.</small></div>';
+  return h + (mode === "tall" ? ocBodyGenTall() : ocBodyGenArt());
+}
+// Vista "Por artículo": lista plana (un renglón por artículo·proveedor), solo a pedir > 0, ordenada por a pedir.
+function ocBodyGenArt() {
+  const gen = _oc.gen;
+  const items = (gen && gen.items) || [];
   const gf = (_oc.genFiltro || "").toLowerCase().trim();
-  const totItems = keys.reduce(function (s, k) { return s + g[k].items.length; }, 0);
-  const sinG = g["(sin proveedor)"]; const nReal = keys.filter(function (k) { return k !== "(sin proveedor)"; }).length;
-  h += '<div class="oc-meta">Fecha <b>' + escapeHtml(gen.fecha) + '</b> · <b>' + nReal + '</b> proveedor(es) · <b>' + totItems + '</b> ítem(s) a pedir' + (sinG ? ' · <b style="color:#b45309">' + sinG.items.length + ' sin proveedor</b>' : '') + '.</div>';
+  const fitems = (gf ? items.filter(function (it) { return (codCanon(it.cod) + " " + (it.desc || "") + " " + (it.prov || "")).toLowerCase().indexOf(gf) !== -1; }) : items.slice())
+    .sort(function (a, b) { return b.falta - a.falta; });
+  if (!fitems.length) return '<div class="oc-empty">' + (gf ? "Nada coincide con la búsqueda." : "No hay nada para pedir (todo está en o sobre el máximo).<br><small>Con el stock en 0, va a dar todo para pedir cuando lo cargues.</small>") + '</div>' + ocBodyGenImportados();
+  const totCajas = fitems.reduce(function (s, it) { return s + it.falta; }, 0);
+  const sinN = fitems.filter(function (it) { return it.sinProv; }).length;
+  let h = '<div class="oc-meta">Fecha <b>' + escapeHtml(gen.fecha) + '</b> · <b>' + fitems.length + '</b> ítem(s) a pedir · <b>' + totCajas + '</b> cajas' + (sinN ? ' · <b style="color:#b45309">' + sinN + ' sin proveedor</b>' : '') + '.</div>';
+  h += '<div class="oc-tblwrap"><table class="oc-tbl"><thead><tr><th>Código</th><th>Descripción</th><th>Tallerista</th><th class="num">Proy</th><th class="num">Índice</th><th class="num">Máx</th><th class="num">Pedidos</th><th class="num">Stock</th><th class="num">A pedir</th></tr></thead><tbody>';
+  fitems.forEach(function (it) {
+    const proyTxt = (it.fuente === "proy") ? (Math.round(it.proy) + "") : '<span style="color:#94a3b8" title="Sin ventas (proyección 0) → el Máximo sale de la capacidad de góndola">0</span>';
+    const maxTxt = it.max + (it.capped ? ' <span style="color:#b45309;font-weight:800" title="Topado a la capacidad de góndola (' + it.cap + ' cajas) — proy×índice daba más">⤓</span>' : '');
+    const provTxt = it.sinProv ? '<span style="color:#b45309;font-weight:700" title="Asigná proveedor en ⚙ Configuraciones (así no se envía)">(sin proveedor)</span>' : escapeHtml(it.prov);
+    h += '<tr><td class="oc-cod">' + escapeHtml(codCanon(it.cod)) + '</td><td>' + escapeHtml(artNombre(it.cod, it.desc)) + '</td><td>' + provTxt + '</td><td class="num">' + proyTxt + '</td><td class="num">' + it.indice + '</td><td class="num">' + maxTxt + '</td><td class="num">' + it.demanda + '</td><td class="num">' + it.stock + '</td><td class="num oc-falt">' + it.falta + '</td></tr>';
+  });
+  h += '</tbody></table></div>';
+  return h + ocBodyGenImportados();
+}
+// Vista "Por tallerista": agrupada por proveedor, muestra TODOS los artículos de cada tallerista (incluye a pedir 0).
+function ocBodyGenTall() {
+  const gen = _oc.gen;
+  const all = (gen && gen.itemsAll) || [];
+  if (!all.length) return '<div class="oc-empty">No hay artículos configurados.</div>';
+  const g = ocgGroups(all);
+  const keys = Object.keys(g).sort(_ocgProvSort);
+  const gf = (_oc.genFiltro || "").toLowerCase().trim();
+  const nReal = keys.filter(function (k) { return k !== "(sin proveedor)"; }).length;
+  let h = '<div class="oc-meta">Fecha <b>' + escapeHtml(gen.fecha) + '</b> · <b>' + nReal + '</b> tallerista(s) · <b>todos</b> los artículos de cada uno (incluye los de <b>a pedir 0</b>).</div>';
+  let shown = 0;
   keys.forEach(function (k) {
     const x = g[k];
     const sinP = (k === "(sin proveedor)");
-    // v9.34: filtrar items si hay búsqueda activa
-    const fitems = gf ? x.items.filter(function (it) { return (codCanon(it.cod) + " " + (it.desc || "") + " " + (it.prov || "")).toLowerCase().indexOf(gf) !== -1; }) : x.items;
-    if (gf && !fitems.length) return;   // ocultar proveedor entero si ningún item matchea
+    const fitems = (gf ? x.items.filter(function (it) { return (codCanon(it.cod) + " " + (it.desc || "") + " " + (it.prov || "")).toLowerCase().indexOf(gf) !== -1; }) : x.items.slice())
+      .sort(function (a, b) { return (b.falta - a.falta) || codCanon(a.cod).localeCompare(codCanon(b.cod)); });
+    if (!fitems.length) return;   // ocultar tallerista entero si nada matchea el filtro
+    shown++;
     const fTotal = fitems.reduce(function (s, it) { return s + it.falta; }, 0);
-    h += '<div class="oc-meta" style="margin-top:12px;margin-bottom:4px' + (sinP ? ';color:#b45309' : '') + '"><b>' + escapeHtml(k) + '</b> · ' + fitems.length + ' ítem(s) · ' + fTotal + ' cajas' + (sinP ? ' &nbsp;<span style="font-weight:800">⚠ asigná proveedor en ⚙ Configuraciones para poder generarlas (así no se envían)</span>' : '') + '</div>';
+    const nPedir = fitems.filter(function (it) { return it.falta > 0; }).length;
+    h += '<div class="oc-meta" style="margin-top:12px;margin-bottom:4px' + (sinP ? ';color:#b45309' : '') + '"><b>' + escapeHtml(k) + '</b> · ' + fitems.length + ' artículo(s) · <b>' + nPedir + '</b> a pedir · ' + fTotal + ' cajas' + (sinP ? ' &nbsp;<span style="font-weight:800">⚠ asigná proveedor en ⚙ Configuraciones</span>' : '') + '</div>';
     h += '<div class="oc-tblwrap"><table class="oc-tbl"><thead><tr><th>Código</th><th>Descripción</th><th class="num">Proy</th><th class="num">Índice</th><th class="num">Máx</th><th class="num">Pedidos</th><th class="num">Stock</th><th class="num">A pedir</th></tr></thead><tbody>';
-    fitems.sort(function (a, b) { return b.falta - a.falta; }).forEach(function (it) {
-      const proyTxt = (it.fuente === "proy") ? (Math.round(it.proy) + "") : '<span style="color:#94a3b8" title="Sin ventas (proyección 0) → el Máximo sale de la capacidad de góndola">0</span>';
-      const maxTxt = it.max + (it.capped ? ' <span style="color:#b45309;font-weight:800" title="Topado a la capacidad de góndola (' + it.cap + ' cajas) — proy×índice daba más">⤓</span>' : '');
-      h += '<tr><td class="oc-cod">' + escapeHtml(codCanon(it.cod)) + '</td><td>' + escapeHtml(artNombre(it.cod, it.desc)) + '</td><td class="num">' + proyTxt + '</td><td class="num">' + it.indice + '</td><td class="num">' + maxTxt + '</td><td class="num">' + it.demanda + '</td><td class="num">' + it.stock + '</td><td class="num oc-falt">' + it.falta + '</td></tr>';
+    fitems.forEach(function (it) {
+      const proyTxt = (it.fuente === "proy") ? (Math.round(it.proy) + "") : '<span style="color:#94a3b8" title="Sin ventas (proyección 0)">0</span>';
+      const maxTxt = it.max + (it.capped ? ' <span style="color:#b45309;font-weight:800" title="Topado a la capacidad de góndola (' + it.cap + ' cajas)">⤓</span>' : '');
+      const faltCls = it.falta > 0 ? " oc-falt" : "";
+      const faltTxt = it.falta > 0 ? it.falta : '<span style="color:#cbd5e1">0</span>';
+      h += '<tr><td class="oc-cod">' + escapeHtml(codCanon(it.cod)) + '</td><td>' + escapeHtml(artNombre(it.cod, it.desc)) + '</td><td class="num">' + proyTxt + '</td><td class="num">' + it.indice + '</td><td class="num">' + maxTxt + '</td><td class="num">' + it.demanda + '</td><td class="num">' + it.stock + '</td><td class="num' + faltCls + '">' + faltTxt + '</td></tr>';
     });
     h += '</tbody></table></div>';
   });
-  h += ocBodyGenImportados();
+  if (!shown) h += '<div class="oc-empty">Nada coincide con la búsqueda.</div>';
   return h;
 }
 /* v9.12 — Sección "Importados (por proveedor chino)" dentro de Generar OCs. Vista previa del
