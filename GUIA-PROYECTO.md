@@ -12,7 +12,18 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-08-25 · Versión app al documentar: **v11.57**
+> Última actualización: 2026-08-25 · Versión app al documentar: **v11.60**
+>
+> Nota **2026-08-25 — v11.60 (Cola de impresión de NP armadas).** Nuevo botón en el panel supervisor
+> **«🖨️ Cola de impresión NP»** (`openColaImpresion`). El operario, al **terminar armado**, emite un `TAL`
+> por cada NP → la vista **`vista_cola_impresion`** junta las NP armadas (desde el ancla `2026-08-25 12:10`)
+> que **todavía no se imprimieron** (`Impresion_NP` = marcador de impresas, PK np, RLS anon select+insert).
+> El supervisor toca **«Imprimir todas»** y salen en cola a la impresora conectada reusando la infra de PDF
+> ISIS (`pppGetPdfDirs`/`_pppIndexDirs`/`_pppPrintPdf`; con Chrome `--kiosk-printing` salen solas). Cada NP
+> con PDF encontrado se marca en `Impresion_NP` y sale de la cola; las que no tienen PDF quedan. **Alarma:**
+> `vencido = armado hace +24 h` → badge **rojo** con ⚠ (`colaImpLoadBadge`, cargado con los demás badges del
+> panel). La cola es **per-NP** vía TAL (se emite al terminar armado, incluye retira/súper con clase). Para
+> ampliar/limpiar: subir el ancla en la vista, o borrar filas de `Impresion_NP`.
 >
 > Nota **2026-08-25 — v11.55→v11.58 (Pasaje de Papeles).** El módulo se reorganizó en **2×2** (encabezado
 > `_ppGroupHeader`; `_ppBuildSection(key, kind, …)` separa `kind` = comportamiento del `key` = id de colapso).
