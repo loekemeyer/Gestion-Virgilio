@@ -2255,6 +2255,11 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .cc-ruta{ font-size: 12.5px; font-weight: 800; color: #0f766e; background:#ecfeff; border:1px solid #cffafe; border-radius:8px; padding:6px 9px; margin: 14px 0 6px; }
 .cc-pos{ flex:0 0 auto; width:22px; height:22px; border-radius:50%; background:#0f766e; color:#fff; font-size:12px; font-weight:800; display:inline-flex; align-items:center; justify-content:center; }
 .cc-ubic{ flex:0 0 auto; font-size:12px; font-weight:800; color:#7c3aed; background:#faf5ff; border:1px solid #e9d5ff; border-radius:7px; padding:2px 7px; white-space:nowrap; }
+/* v11.47 — nombre del camionero (autocompletado desde el maestro Camioneros). */
+.cc-camionero-wrap{ display:flex; align-items:center; gap:9px; margin:2px 0 12px; padding:10px 11px; background:#f8fafc; border:2px solid #e2e8f0; border-radius:10px; }
+.cc-camionero-lbl{ flex:0 0 auto; font-size:13px; font-weight:800; color:#334155; white-space:nowrap; }
+.cc-camionero-inp{ flex:1 1 auto; min-width:0; font-size:16px; font-weight:700; color:#0f172a; padding:9px 10px; border:2px solid #cbd5e1; border-radius:8px; background:#fff; }
+.cc-camionero-inp:focus{ outline:none; border-color:#2563eb; }
 
 /* Control Remitos (CR): TABLA de los NP cargados al camión (CCN) pendientes de
    control. Columnas: NP · Cod Cliente · Razón Social · Líos · Controlado (tic).
@@ -3562,7 +3567,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      que ande sin internet en el depósito. -->
 <script src="qrcode.js"></script>
 <script src="planimetria.js?v=3.73"></script>
-<script src="pasaje-papeles.js?v=4.1"></script>
+<script src="pasaje-papeles.js?v=5.2"></script>
 <!-- Modo OP de Recepción de Mercadería (se abre al tocar RT). Módulo aislado bajo
      #rcpRoot, con su propio cliente Supabase (login anónimo). Portado de la app
      Control-Carga-Remitos-FC. Suma las cajas del día a localStorage para que RT
@@ -3572,7 +3577,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=10.24"></script>
+<script type="module" src="recepcion.js?v=10.25"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -3669,24 +3674,24 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       <button class="sup-action-btn" onclick="showFaltAvisar()" style="position:relative;"><span class="sup-ico">📦➕</span><span>Completar Pedido</span><span id="cpBadge" class="dp-badge" style="display:none;" title="Pedidos con faltante que tiene stock para completarse"></span></button>
       <button class="sup-action-btn" onclick="openStockAdmin()" style="position:relative;"><span class="sup-ico">📦</span><span>Stock y Compras</span><span id="stkBadge" class="dp-badge" style="display:none;" title="Códigos con stock negativo"></span><span id="stkOkBadge" style="display:none;position:absolute;top:2px;right:2px;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:#16a34a;color:#fff;font-size:10px;font-weight:800;line-height:18px;text-align:center;pointer-events:none;">✓</span></button>
       <button class="sup-action-btn" onclick="openPanelWebLK()"><span class="sup-ico">🌐</span><span>Panel Web LK</span></button>
-      <button class="sup-action-btn" onclick="openRemitosAdmin()" style="position:relative;"><span class="sup-ico">🚚</span><span>Recepción Remitos (RR)</span><span id="rrBadge" class="dp-badge" style="display:none;" title="Remitos cargados al camión sin controlar todavía"></span></button>
+      <button class="sup-action-btn" onclick="openRemitosAdmin()" style="position:relative;"><span class="sup-ico">🚚</span><span>Recepción Remitos (RR)</span><span id="rrBadge" class="dp-badge" style="display:none;" title="Remitos cargados al camión sin controlar todavía"></span><span id="rrAlertBadge" style="display:none;position:absolute;top:2px;left:2px;min-width:26px;height:26px;line-height:26px;padding:0 5px;border-radius:13px;background:#dc2626;color:#fff;font-size:15px;font-weight:800;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.35);" title="Hay remitos VENCIDOS (cargados hace +30 h sin controlar)">⚠️</span></button>
     </div>
     <div class="sup-sec-label">Reportes y configuración</div>
     <!-- CHICOS: uso ocasional. -->
     <div class="sup-actions sup-secondary">
-      <button class="sup-action-btn" onclick="openDeuda()"><span class="sup-ico">💰</span><span>Deuda a cobrar</span></button>
+      <button class="sup-action-btn" onclick="openCobros()"><span class="sup-ico">💰</span><span>Deuda a cobrar / Cobranzas</span></button>
       <button class="sup-action-btn" onclick="openAgentesAdmin()"><span class="sup-ico">🤖</span><span>Agentes</span></button>
       <button class="sup-action-btn" onclick="openMonitor()"><span class="sup-ico">📊</span><span>Monitor / Análisis / Inconsistencias</span></button>
       <button class="sup-action-btn" onclick="showGuardarOrden('')" style="position:relative;"><span class="sup-ico">📋</span><span>Qué bajar primero</span><span id="qbpBadge" class="dp-badge" style="display:none;" title="Urgentes (SOS): góndola < 20% con stock atrás para bajar"></span></button>
       <button class="sup-action-btn" onclick="openCorreccPanel()" style="position:relative;"><span class="sup-ico">🔀</span><span>Corregir códigos de NPs</span><span id="corrBadgeGreen" class="dp-badge" style="left:2px;right:auto;background:#16a34a;display:none;" title="Se pueden corregir pero NO es obligatorio (hay stock del secundario)"></span><span id="corrBadge" class="dp-badge" style="display:none;" title="Hay que corregir SÍ o SÍ (el secundario no tiene stock)"></span></button>
       <button class="sup-action-btn" onclick="openNpConsulta()"><span class="sup-ico">🔎</span><span>Consultar NP / Líos</span></button>
       <button class="sup-action-btn" onclick="openPasajePapeles()" style="position:relative;"><span class="sup-ico">📄</span><span>Pasaje de Papeles</span><span id="ppBadge" class="dp-badge" style="display:none;" title="Documentos pendientes de enviar a Cervantes"></span></button>
+      <button class="sup-action-btn" onclick="openColaImpresion()" style="position:relative;"><span class="sup-ico">🖨️</span><span>Cola de impresión NP</span><span id="colaImpBadge" class="dp-badge" style="display:none;" title="Notas de pedido armadas pendientes de imprimir (rojo = alguna hace +24 h)"></span></button>
       <button class="sup-action-btn" onclick="stkOpenNpFaltan()" style="position:relative;"><span class="sup-ico">⚠️</span><span>Pedidos sin cargar en PPP</span><span id="npFaltanBadge" class="dp-badge" style="display:none;"></span></button>
       <button class="sup-action-btn" onclick="stkOpenFaltFact()"><span class="sup-ico">📉</span><span>Faltantes facturados sin completar</span></button>
       <button class="sup-action-btn" onclick="openPedidosImportacion()"><span class="sup-ico">📦</span><span>Importación — pedidos y proveedores</span></button>
       <button class="sup-action-btn" onclick="openAvisoProg()"><span class="sup-ico">📲</span><span>Avisar programación</span></button>
       <button class="sup-action-btn" onclick="openPlataPerdida()"><span class="sup-ico">💸</span><span>Plata perdida de facturar</span></button>
-      <button class="sup-action-btn" onclick="openCobranzas()"><span class="sup-ico">💵</span><span>Cobranzas — valor por NP</span></button>
       <button class="sup-action-btn" onclick="openDatosProducto()" style="position:relative;"><span class="sup-ico">🚦</span><span>Completar datos producto</span><span id="dpBadge" class="dp-badge" style="display:none;"></span></button>
       <button class="sup-action-btn" onclick="openConfiguracion()"><span class="sup-ico">⚙️</span><span>Configuración</span></button>
       <button class="sup-action-btn" onclick="openOperarioView()"><span class="sup-ico">👁️</span><span>Ver módulo operarios</span></button>
@@ -6506,7 +6511,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v11.34";
+const APP_VERSION = "v11.69";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -10028,6 +10033,35 @@ async function loadArtNombres() {
   _artNombres = m; return m;
 }
 function artNombre(cod, fb) { const n = _artNombres && _artNombres[_ocgNorm(cod)]; return n || fb || ""; }
+/* v11.39 — MARCA/LÍNEA (LK/CH), fuente ÚNICA: vista Supabase `vista_marca_articulo`
+   (prioridad OC_Maximos.linea → Articulos_Cajas.Marca). El sufijo del propio código
+   (" LK"/" CH"/" LOKE") manda por encima (código dual empresa-split). Reemplaza las
+   cadenas de resolución sueltas que había por pantalla (regla: fuente única). */
+let _artMarcas = null;
+async function loadArtMarcas() {
+  if (_artMarcas) return _artMarcas;
+  const m = {}, H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+  try { const r = await fetch(SUPABASE_URL + "/rest/v1/vista_marca_articulo?select=cod,marca&limit=20000", { headers: H, cache: "no-store" }); if (r.ok) (await r.json()).forEach(function (x) { const k = _ocgNorm(x.cod), v = String(x.marca || "").toUpperCase().trim(); if (k && v) m[k] = v; }); } catch (_e) {}
+  _artMarcas = m; return m;
+}
+function artMarca(cod) {
+  const s = String(cod == null ? "" : cod).match(/\s+(LK|CH|LOKE)$/i);
+  if (s) return s[1].toUpperCase().replace("LOKE", "LK");
+  return (_artMarcas && _artMarcas[_ocgNorm(cod)]) || "";
+}
+window.loadArtMarcas = loadArtMarcas; window.artMarca = artMarca;
+/* v11.40 — UxB (unidades por caja), fuente ÚNICA: vista `vista_uxb_articulo`
+   (prioridad Articulos_Cajas → OC_Maximos → precios_venta). Reemplaza las 6 fuentes
+   sueltas. Devuelve número, o el fallback pasado si no hay dato. */
+let _artUxbs = null;
+async function loadArtUxb() {
+  if (_artUxbs) return _artUxbs;
+  const m = {}, H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+  try { const r = await fetch(SUPABASE_URL + "/rest/v1/vista_uxb_articulo?select=cod,uxb&limit=20000", { headers: H, cache: "no-store" }); if (r.ok) (await r.json()).forEach(function (x) { const k = _ocgNorm(x.cod), u = Number(x.uxb); if (k && u > 0) m[k] = u; }); } catch (_e) {}
+  _artUxbs = m; return m;
+}
+function artUxb(cod, fb) { const u = _artUxbs && _artUxbs[_ocgNorm(cod)]; return (u && u > 0) ? u : (fb != null ? fb : null); }
+window.loadArtUxb = loadArtUxb; window.artUxb = artUxb;
 /* v7.99 — NOMBRE por EMPRESA (Paquete B): códigos que son PRODUCTOS DISTINTOS según la
    empresa. La empresa la dice la NP (empresaDeNp). Ej. 809E: Loeke=Corta Pizza, Chef=Corta
    Queso. Los coladores 437E/438E/439E son el MISMO producto en las dos → NO van acá. */
@@ -10154,7 +10188,8 @@ async function openStockAdmin(soloConteo) {
       ocLoadLineas().catch(function () { return {}; }),
       rkbFetchCxM().catch(function () { return { cxm: {} }; }),
       supaFetchAllSafe(SUPABASE_CONTEO_ALERTAS_ENDPOINT, "select=id,sesion,legajo,cod,sector,cajas_conteo,cajas_sistema,diferencia,tipo_alerta,procesada&procesada=eq.false&order=created_at.desc").catch(function(){ return []; }),
-      supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Conteo_Stock", "select=*&estado=eq.pendiente&order=ts.desc").catch(function(){ return []; })]).then(function(res) {
+      supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Conteo_Stock", "select=*&estado=eq.pendiente&order=ts.desc").catch(function(){ return []; }),
+      loadArtMarcas().catch(function(){ return {}; })]).then(function(res) {   // v11.39 — marca fuente única
       if (!_stk) return;  // Si cerró el modal, no actualizar
       var _cxmPlani = (res[11] && res[11].cxm) || {}, _cxmMerge = {};
       Object.keys(_cxmPlani).forEach(function (k) { _cxmMerge[k] = _cxmPlani[k]; });
@@ -10294,7 +10329,7 @@ function _ocGroupKey(r) { return [r.proveedor || "", r.fecha || "", r.rubro || "
 async function ocFetchRows() {
   // v11.20 — paginado con supaFetchAll: PostgREST corta en 1000 filas por request
   // (el limit=20000 de antes era ilusorio; el histórico de OCs va a pasar las 1000).
-  return supaFetchAllSafe(SUPABASE_OC_ENDPOINT, "select=id,fecha,rubro,proveedor,proveedor_telefono,codigo,descripcion,cantidad,cantidad_recibida,unidad,estado,oc_max,oc_pedidos,oc_stock,oc_uni_caja,oc_ncaja&order=fecha.desc,proveedor.asc,codigo.asc");
+  return supaFetchAllSafe(SUPABASE_OC_ENDPOINT, "select=id,fecha,rubro,proveedor,proveedor_telefono,codigo,descripcion,cantidad,cantidad_recibida,unidad,estado,oc_max,oc_pedidos,oc_stock,oc_proy,oc_uni_caja,oc_ncaja&order=fecha.desc,proveedor.asc,codigo.asc");
 }
 /* ===== RECEPCIÓN → OC (v7.49, pedido del usuario / backlog v4.11 punto b) =====
    El visualizador se ALIMENTA de lo realmente recibido en Recepción de Mercadería
@@ -10411,7 +10446,7 @@ function ocRecEff(r) { return (_oc && _oc.recepByRow && _oc.recepByRow[r && r.id
 async function openOCAdmin() {
   if (!document.getElementById("ocCss")) {
     const s = document.createElement("style"); s.id = "ocCss";
-    s.textContent = "#ocAdminOverlay{display:none;position:fixed;inset:0;z-index:1281;background:rgba(2,6,23,.74);overflow:auto;padding:14px;}#ocAdminOverlay.show{display:block;}.oc-card{background:#f8fafc;max-width:860px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.oc-head{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:linear-gradient(90deg,#0f766e,#134e4a);color:#fff;}.oc-title{font-size:19px;font-weight:800;}.oc-close{background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;width:auto;}.oc-body{padding:14px 16px;}.oc-loading,.oc-empty{padding:24px;text-align:center;color:#64748b;}.oc-tools{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center;}.oc-btn{background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:8px 13px;font-size:13px;font-weight:800;cursor:pointer;width:auto;}.oc-btn.ok{background:#0f766e;color:#fff;border-color:#0f766e;}.oc-btn.danger{background:#fff;color:#b91c1c;border-color:#fca5a5;}.oc-filtro{flex:1;min-width:160px;height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 11px;font-size:14px;}.oc-tbl{width:100%;border-collapse:collapse;font-size:13.5px;}.oc-tbl th{background:#f1f5f9;color:#475569;text-align:left;padding:7px 9px;font-size:11px;text-transform:uppercase;border-bottom:1px solid #cbd5e1;}.oc-tbl th.num,.oc-tbl td.num{text-align:right;font-variant-numeric:tabular-nums;padding-left:14px;padding-right:14px;}.oc-tblwrap{overflow-x:auto;max-width:100%;-webkit-overflow-scrolling:touch;}.oc-tbl td{padding:7px 9px;border-bottom:1px solid #eef2f7;}.oc-rowc{cursor:pointer;}.oc-rowc:hover{background:#ecfdf5;}.oc-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#0f766e;}.oc-pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11px;font-weight:800;}.oc-pill.pendiente{background:#fef3c7;color:#92400e;}.oc-pill.recibida{background:#dcfce7;color:#166534;}.oc-pill.parcial{background:#dbeafe;color:#1e40af;}.oc-falt{color:#b91c1c;font-weight:800;}.oc-ok{color:#166534;font-weight:800;}.oc-rinp{width:78px;height:34px;text-align:center;border:1px solid #cbd5e1;border-radius:8px;padding:0;font-size:14px;font-weight:700;}.oc-form{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;}.oc-inp{height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 10px;font-size:14px;}.oc-meta{font-size:13px;color:#475569;margin-bottom:10px;}.oc-meta b{color:#0f172a;}.oc-additm{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-top:8px;}.oc-note{font-size:12px;color:#64748b;margin-top:10px;}@media (max-width:460px){.oc-tbl-det th:nth-child(3),.oc-tbl-det td:nth-child(3){display:none;}.oc-tbl-det td:nth-child(2){max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.oc-tbl-det th.num,.oc-tbl-det td.num{padding-left:6px;padding-right:6px;}.oc-tbl-det{font-size:12.5px;}.oc-tbl-det .oc-rinp{width:60px;height:32px;}}.oc-boxgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}.oc-box{background:#fff;border:1px solid #cbd5e1;border-left:5px solid #0f766e;border-radius:12px;padding:12px 13px;cursor:pointer;transition:box-shadow .12s,transform .12s;}.oc-box:hover{box-shadow:0 6px 18px rgba(15,118,110,.16);transform:translateY(-1px);}.oc-box-t{font-size:16px;font-weight:800;color:#0f172a;display:flex;align-items:center;gap:6px;margin-bottom:5px;}.oc-box-sub{font-size:12px;color:#64748b;margin-bottom:7px;}.oc-box-row{display:flex;justify-content:space-between;font-size:12.5px;padding:1px 0;color:#475569;}.oc-box-row b{color:#0f172a;font-variant-numeric:tabular-nums;}.oc-box-foot{display:flex;justify-content:space-between;align-items:center;margin-top:8px;}.oc-box-go{font-size:12px;font-weight:800;color:#0f766e;}.oc-cd{background:#ecfdf5;border:1px solid #99f6e4;color:#065f46;border-radius:10px;padding:9px 12px;margin-bottom:10px;font-size:12.5px;}.oc-cd b{color:#065f46;}.oc-cd-num{font-variant-numeric:tabular-nums;font-weight:900;}.oc-tbl th.oc-grp{text-align:center;background:#ede9fe;color:#5b21b6;font-size:10px;}.oc-tbl th.oc-sep,.oc-tbl td.oc-sep{border-left:2px solid #c7d2fe;}.oc-neg{color:#b91c1c;font-weight:800;}.oc-pos{color:#15803d;font-weight:700;}.oc-chip{display:inline-block;border-radius:999px;padding:1px 8px;font-size:11px;font-weight:800;white-space:nowrap;}.oc-chip.bad{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;}.oc-chip.warn{background:#fffbeb;color:#b45309;border:1px solid #fde68a;}.oc-chip.ok{background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0;}.oc-chip.mut{background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0;}.oc-ent-hint{font-size:11.5px;color:#64748b;margin-top:8px;}@media(max-width:640px){.oc-boxgrid{grid-template-columns:repeat(2,1fr);}}@media(max-width:420px){.oc-boxgrid{grid-template-columns:1fr;}}";
+    s.textContent = "#ocAdminOverlay{display:none;position:fixed;inset:0;z-index:1281;background:rgba(2,6,23,.74);overflow:auto;padding:14px;}#ocAdminOverlay.show{display:block;}.oc-card{background:#f8fafc;max-width:860px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.oc-head{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:linear-gradient(90deg,#0f766e,#134e4a);color:#fff;}.oc-title{font-size:19px;font-weight:800;}.oc-close{background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;width:auto;}.oc-body{padding:14px 16px;}.oc-loading,.oc-empty{padding:24px;text-align:center;color:#64748b;}.oc-tools{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center;}.oc-btn{background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:8px 13px;font-size:13px;font-weight:800;cursor:pointer;width:auto;}.oc-btn.ok{background:#0f766e;color:#fff;border-color:#0f766e;}.oc-btn.danger{background:#fff;color:#b91c1c;border-color:#fca5a5;}.oc-filtro{flex:1;min-width:160px;height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 11px;font-size:14px;}.oc-tbl{width:100%;border-collapse:collapse;font-size:13.5px;}.oc-tbl th{background:#f1f5f9;color:#475569;text-align:left;padding:7px 9px;font-size:11px;text-transform:uppercase;border-bottom:1px solid #cbd5e1;}.oc-tbl th.num,.oc-tbl td.num{text-align:right;font-variant-numeric:tabular-nums;padding-left:14px;padding-right:14px;}.oc-tblwrap{overflow-x:auto;max-width:100%;-webkit-overflow-scrolling:touch;}.oc-tbl td{padding:7px 9px;border-bottom:1px solid #eef2f7;}.oc-rowc{cursor:pointer;}.oc-rowc:hover{background:#ecfdf5;}.oc-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#0f766e;}.oc-pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11px;font-weight:800;}.oc-pill.pendiente{background:#fef3c7;color:#92400e;}.oc-pill.recibida{background:#dcfce7;color:#166534;}.oc-pill.parcial{background:#dbeafe;color:#1e40af;}.oc-falt{color:#b91c1c;font-weight:800;}.oc-ok{color:#166534;font-weight:800;}.oc-rinp{width:78px;height:34px;text-align:center;border:1px solid #cbd5e1;border-radius:8px;padding:0;font-size:14px;font-weight:700;}.oc-form{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;}.oc-inp{height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 10px;font-size:14px;}.oc-meta{font-size:13px;color:#475569;margin-bottom:10px;}.oc-meta b{color:#0f172a;}.oc-additm{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-top:8px;}.oc-note{font-size:12px;color:#64748b;margin-top:10px;}@media (max-width:460px){.oc-tbl-det td.oc-desc{max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.oc-tbl-det th.num,.oc-tbl-det td.num{padding-left:6px;padding-right:6px;}.oc-tbl-det{font-size:12.5px;}.oc-tbl-det .oc-rinp{width:60px;height:32px;}}.oc-boxgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}.oc-box{background:#fff;border:1px solid #cbd5e1;border-left:5px solid #0f766e;border-radius:12px;padding:12px 13px;cursor:pointer;transition:box-shadow .12s,transform .12s;}.oc-box:hover{box-shadow:0 6px 18px rgba(15,118,110,.16);transform:translateY(-1px);}.oc-box-t{font-size:16px;font-weight:800;color:#0f172a;display:flex;align-items:center;gap:6px;margin-bottom:5px;}.oc-box-sub{font-size:12px;color:#64748b;margin-bottom:7px;}.oc-box-row{display:flex;justify-content:space-between;font-size:12.5px;padding:1px 0;color:#475569;}.oc-box-row b{color:#0f172a;font-variant-numeric:tabular-nums;}.oc-box-foot{display:flex;justify-content:space-between;align-items:center;margin-top:8px;}.oc-box-go{font-size:12px;font-weight:800;color:#0f766e;}.oc-cd{background:#ecfdf5;border:1px solid #99f6e4;color:#065f46;border-radius:10px;padding:9px 12px;margin-bottom:10px;font-size:12.5px;}.oc-cd b{color:#065f46;}.oc-cd-num{font-variant-numeric:tabular-nums;font-weight:900;}.oc-tbl th.oc-grp{text-align:center;background:#ede9fe;color:#5b21b6;font-size:10px;}.oc-tbl th.oc-sep,.oc-tbl td.oc-sep{border-left:2px solid #c7d2fe;}.oc-neg{color:#b91c1c;font-weight:800;}.oc-pos{color:#15803d;font-weight:700;}.oc-chip{display:inline-block;border-radius:999px;padding:1px 8px;font-size:11px;font-weight:800;white-space:nowrap;}.oc-chip.bad{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;}.oc-chip.warn{background:#fffbeb;color:#b45309;border:1px solid #fde68a;}.oc-chip.ok{background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0;}.oc-chip.mut{background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0;}.oc-ent-hint{font-size:11.5px;color:#64748b;margin-top:8px;}@media(max-width:640px){.oc-boxgrid{grid-template-columns:repeat(2,1fr);}}@media(max-width:420px){.oc-boxgrid{grid-template-columns:1fr;}}.oc-tbl-det th,.oc-tbl-det td{padding-top:5px;padding-bottom:5px;padding-left:6px;padding-right:6px;}.oc-tbl-det th.num,.oc-tbl-det td.num{padding-left:7px;padding-right:7px;}.oc-tbl-det td.oc-xtra{color:#6d28d9;background:#faf5ff;font-weight:700;}.oc-tbl-det th.oc-xtra{color:#6d28d9;background:#f5f3ff;border-left:2px solid #ddd6fe;}.oc-tbl-det td.oc-xtra.oc-xtra-first{border-left:2px solid #ddd6fe;}";
     document.head.appendChild(s);
   }
   let ov = document.getElementById("ocAdminOverlay");
@@ -10426,7 +10461,7 @@ async function openOCAdmin() {
   } catch (e) { const b = document.getElementById("ocBody"); if (b) b.innerHTML = '<div class="oc-loading">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
 }
 function closeOCAdmin() { const ov = document.getElementById("ocAdminOverlay"); if (ov) ov.classList.remove("show"); _oc = null; }
-function ocRender() { if (!_oc) return; const body = document.getElementById("ocBody"); if (!body) return; _renderKeepFocus(body, _oc.view === "detail" ? ocBodyDetail() : _oc.view === "fecha" ? ocBodyFecha() : _oc.view === "nueva" ? ocBodyNueva() : _oc.view === "gen" ? ocBodyGen() : _oc.view === "cfg" ? ocBodyCfg() : _oc.view === "entregas" ? ocBodyEntregas() : _oc.view === "trazar" ? ocBodyTrazar() : ocBodyList()); }
+function ocRender() { if (!_oc) return; const body = document.getElementById("ocBody"); if (!body) return; _renderKeepFocus(body, _oc.view === "detail" ? ocBodyDetail() : _oc.view === "general" ? ocBodyGeneral() : _oc.view === "fecha" ? ocBodyFecha() : _oc.view === "nueva" ? ocBodyNueva() : _oc.view === "gen" ? ocBodyGen() : _oc.view === "cfg" ? ocBodyCfg() : _oc.view === "entregas" ? ocBodyEntregas() : _oc.view === "trazar" ? ocBodyTrazar() : ocBodyList()); }
 /* v4.40 — % DE ENTREGAS: cruza lo PEDIDO (Ordenes_Compra.cantidad) contra lo
    ENTREGADO (cantidad_recibida) por artículo y global. Detalle del cumplimiento
    de los proveedores. (Ordenes_Compra retiene el histórico de OCs.) */
@@ -10630,17 +10665,26 @@ function ocBodyList() {
   h += '</div><div class="oc-note">Tocá una fecha para ver las OCs de ese día separadas por tallerista.</div>';
   return h;
 }
-function ocOpenFecha(feEnc) { if (!_oc) return; _oc.openFecha = decodeURIComponent(feEnc); _oc.view = "fecha"; ocRender(); }
+function ocOpenFecha(feEnc) { if (!_oc) return; _oc.openFecha = decodeURIComponent(feEnc); _oc.filtro = ""; _oc.view = "fecha"; ocRender(); }
 function ocBackFechas() { if (!_oc) return; _oc.view = "list"; _oc.openFecha = null; _oc.openKey = null; ocRender(); }
+/* v11.43 — % de recepción (Recibido / Pedido). Verde ≥90 · ámbar 50-89 · rojo <50. */
+function _ocPct(rec, ped) { return ped > 0 ? Math.round(rec / ped * 100) : 0; }
+function _ocPctCol(p) { return p >= 90 ? "#16a34a" : (p >= 50 ? "#d97706" : "#dc2626"); }
 function ocBodyFecha() {
   const g = ocGroups(), fe = _oc.openFecha;
   let groups = Object.keys(g).map(function (k) { return { key: k, x: g[k] }; }).filter(function (o) { return (o.x.fecha || "") === fe; });
-  let h = '<div class="oc-tools"><button class="oc-btn" onclick="ocBackFechas()">← Volver a fechas</button></div>';
+  let h = '<div class="oc-tools"><button class="oc-btn" onclick="ocBackFechas()">← Volver a fechas</button><button class="oc-btn" onclick="ocOpenGeneral()" title="Ver la composición ítem por ítem de TODA la OC (todos los proveedores juntos)">📊 General</button>' +
+    '<input class="oc-filtro" type="search" placeholder="🔎 Buscar tallerista por nombre" value="' + escapeHtml(_oc.filtro || "") + '" oninput="if(_oc){_oc.filtro=this.value;ocRender();}"></div>';
   if (!groups.length) { _oc.view = "list"; _oc.openFecha = null; return ocBodyList(); }
+  // v11.50 — buscador por nombre de tallerista (filtra las tarjetas por proveedor/rubro).
+  const _fTall = (_oc.filtro || "").trim().toLowerCase();
+  if (_fTall) groups = groups.filter(function (o) { return ((o.x.proveedor || "") + " " + (o.x.rubro || "")).toLowerCase().indexOf(_fTall) >= 0; });
   let tPed = 0, tRec = 0, tItems = 0;
   groups.forEach(function (o) { o.st = ocGroupStats(o.x); tPed += o.st.ped; tRec += o.st.rec; tItems += o.x.rows.length; });
   groups.sort(function (a, b) { return (b.st.falta - a.st.falta) || (a.x.proveedor || "").localeCompare(b.x.proveedor || ""); });
-  h += '<div class="oc-meta">📄 OC del <b>' + escapeHtml(_ocDdmm(fe)) + '</b> (' + escapeHtml(fe || "s/fecha") + ') — <b>' + groups.length + '</b> tallerista(s) · <b>' + tItems + '</b> ítem(s) · Pedido <b>' + tPed + '</b> · Falta <b class="oc-falt">' + Math.max(0, tPed - tRec) + '</b></div>';
+  var pctGen = _ocPct(tRec, tPed);
+  h += '<div class="oc-meta">📄 OC del <b>' + escapeHtml(_ocDdmm(fe)) + '</b> (' + escapeHtml(fe || "s/fecha") + ') — <b>' + groups.length + '</b> tallerista(s) · <b>' + tItems + '</b> ítem(s) · Pedido <b>' + tPed + '</b> · Recibido <b>' + tRec + '</b> · Falta <b class="oc-falt">' + Math.max(0, tPed - tRec) + '</b> · Recepción <b style="color:' + _ocPctCol(pctGen) + '">' + pctGen + '%</b></div>';
+  if (!groups.length) return h + '<div class="oc-empty" style="text-align:center;color:#94a3b8;padding:22px;">Ningún tallerista coincide con «' + escapeHtml(_oc.filtro || "") + '».</div>';
   h += '<div class="oc-boxgrid">';
   groups.forEach(function (o) {
     const x = o.x, st = o.st, falta = st.falta;
@@ -10651,13 +10695,53 @@ function ocBodyFecha() {
       '<div class="oc-box-row">Pedido <b>' + st.ped + '</b></div>' +
       '<div class="oc-box-row">Recibido <b>' + st.rec + '</b></div>' +
       '<div class="oc-box-row">Falta <b class="' + (falta > 0 ? "oc-falt" : "oc-ok") + '">' + (falta > 0 ? falta : 0) + '</b></div>' +
+      '<div class="oc-box-row">Recepción <b style="color:' + _ocPctCol(_ocPct(st.rec, st.ped)) + '">' + _ocPct(st.rec, st.ped) + '%</b></div>' +
       '<div class="oc-box-foot"><span class="oc-pill ' + st.estado + '">' + st.estado + '</span><span class="oc-box-go">abrir →</span></div>' +
       '</div>';
   });
   h += '</div>';
   return h;
 }
-function ocOpen(kEnc) { if (!_oc) return; _oc.openKey = decodeURIComponent(kEnc); const g = ocGroups(), x = g[_oc.openKey]; if (x && x.fecha) _oc.openFecha = x.fecha; _oc.view = "detail"; ocRender(); }
+/* v11.44 — Vista GENERAL: composición ítem por ítem de TODA la OC de una fecha
+   (todos los proveedores juntos), con la misma info que al abrir un proveedor. */
+function ocOpenGeneral() { if (!_oc) return; _oc.view = "general"; _oc.filtro = ""; ocRender(); }
+function ocBodyGeneral() {
+  const g = ocGroups(), fe = _oc.openFecha;
+  let groups = Object.keys(g).map(function (k) { return g[k]; }).filter(function (x) { return (x.fecha || "") === fe; });
+  let h = '<div class="oc-tools"><button class="oc-btn" onclick="ocBackFechas()">← Volver a fechas</button>' +
+    '<input class="oc-filtro" type="search" placeholder="🔎 Buscar proveedor / código / descripción" value="' + escapeHtml(_oc.filtro || "") + '" oninput="if(_oc){_oc.filtro=this.value;ocRender();}"></div>';
+  // Aplanar todos los ítems con su proveedor
+  let items = [];
+  groups.forEach(function (x) {
+    x.rows.forEach(function (r) {
+      const ped = Number(r.cantidad) || 0, rec = ocRecEff(r), falt = ped - rec;
+      items.push({ prov: x.proveedor || "—", cod: codCanon(r.codigo) || "—", desc: artNombre(r.codigo, r.descripcion) || "", uni: r.unidad || "", ped: ped, rec: rec, falt: falt });
+    });
+  });
+  const f = (_oc.filtro || "").trim().toLowerCase();
+  if (f) items = items.filter(function (it) { return (it.prov + " " + it.cod + " " + it.desc).toLowerCase().indexOf(f) >= 0; });
+  // Orden: proveedor, y dentro por falta desc
+  items.sort(function (a, b) { return (a.prov || "").localeCompare(b.prov || "") || (b.falt - a.falt); });
+  let tPed = 0, tRec = 0;
+  items.forEach(function (it) { tPed += it.ped; tRec += it.rec; });
+  h += '<div class="oc-meta">📊 <b>General</b> — OC del <b>' + escapeHtml(_ocDdmm(fe)) + '</b> · <b>' + items.length + '</b> ítem(s) · Pedido <b>' + tPed + '</b> · Recibido <b class="oc-ok">' + tRec + '</b> · Falta <b class="oc-falt">' + Math.max(0, tPed - tRec) + '</b> · Recepción <b style="color:' + _ocPctCol(_ocPct(tRec, tPed)) + '">' + _ocPct(tRec, tPed) + '%</b></div>';
+  h += '<div class="oc-tblwrap"><table class="oc-tbl oc-tbl-det"><thead><tr><th>Proveedor</th><th>Código</th><th class="oc-desc">Descripción</th><th class="num">Pedido</th><th class="num">Recibido</th><th class="num">Falta</th></tr></thead><tbody>';
+  items.forEach(function (it) {
+    h += '<tr><td>' + escapeHtml(it.prov) + '</td><td class="oc-cod">' + escapeHtml(it.cod) + '</td><td class="oc-desc">' + escapeHtml(it.desc) + '</td><td class="num">' + it.ped + '</td><td class="num ' + (it.rec > 0 ? "oc-ok" : "") + '">' + it.rec + '</td><td class="num ' + (it.falt > 0 ? "oc-falt" : "oc-ok") + '">' + (it.falt !== 0 ? it.falt : "0") + '</td></tr>';
+  });
+  if (!items.length) h += '<tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:14px;">Sin ítems</td></tr>';
+  return h + "</tbody></table></div>";
+}
+function ocOpen(kEnc) { if (!_oc) return; _oc.openKey = decodeURIComponent(kEnc); const g = ocGroups(), x = g[_oc.openKey]; if (x && x.fecha) _oc.openFecha = x.fecha; _oc.view = "detail"; ocRender(); ocEnsureProyHoy(); }
+/* v11.65 — proyección de HOY (proyeccion_madre) para caer en OC viejas sin snapshot oc_proy.
+   Se trae una vez por apertura del módulo y re-renderiza el detalle. */
+async function ocEnsureProyHoy() {
+  if (!_oc || _oc.proyHoy || _oc._proyLoading) return;
+  _oc._proyLoading = true;
+  try { _oc.proyHoy = await ocgFetchProyeccion(); } catch (_e) { _oc.proyHoy = {}; }
+  _oc._proyLoading = false;
+  if (_oc && _oc.view === "detail") ocRender();
+}
 function ocBack() { if (!_oc) return; if (_oc.view === "detail") { _oc.view = _oc.openFecha ? "fecha" : "list"; _oc.openKey = null; } else { _oc.view = "list"; _oc.openKey = null; _oc.openFecha = null; } ocRender(); }
 function ocBodyDetail() {
   const g = ocGroups(), x = g[_oc.openKey];
@@ -10670,14 +10754,32 @@ function ocBodyDetail() {
   h += '<button class="oc-btn" onclick="ocPrintDetalle(false)" title="Para enviarle al tallerista (sin Cajas Recibidas)">🖨 Tallerista</button>';
   h += '<button class="oc-btn" onclick="ocWhatsappTallerista()" title="Copia la OC como imagen y abre WhatsApp del tallerista">📲 WhatsApp</button>';
   h += '</div>';
-  h += '<div class="oc-meta">Proveedor <b>' + escapeHtml(x.proveedor || "—") + '</b> · Fecha <b>' + escapeHtml(x.fecha || "—") + '</b> · Rubro <b>' + escapeHtml(x.rubro || "—") + '</b> · Pedido <b>' + st.ped + '</b> · Recibido <b class="oc-ok">' + st.rec + '</b> · Falta <b class="' + (st.falta > 0 ? "oc-falt" : "oc-ok") + '">' + (st.falta > 0 ? st.falta : 0) + '</b></div>';
+  h += '<div class="oc-meta">Proveedor <b>' + escapeHtml(x.proveedor || "—") + '</b> · Fecha <b>' + escapeHtml(x.fecha || "—") + '</b> · Rubro <b>' + escapeHtml(x.rubro || "—") + '</b> · Pedido <b>' + st.ped + '</b> · Recibido <b class="oc-ok">' + st.rec + '</b> · Falta <b class="' + (st.falta > 0 ? "oc-falt" : "oc-ok") + '">' + (st.falta > 0 ? st.falta : 0) + '</b> · Recepción <b style="color:' + _ocPctCol(_ocPct(st.rec, st.ped)) + '">' + _ocPct(st.rec, st.ped) + '%</b></div>';
   h += '<div class="oc-note" style="margin-top:0;margin-bottom:8px"><b>Recibido</b> = lo que registró la Recepción de Mercadería para este tallerista y código, <b>dentro del período de esta OC</b> (no acumula entregas anteriores ni de otra OC). Se alimenta solo.</div>';
-  h += '<div class="oc-tblwrap"><table class="oc-tbl oc-tbl-det"><thead><tr><th>Código</th><th>Descripción</th><th>Unidad</th><th class="num">Pedido</th><th class="num">Recibido</th><th class="num">Falta</th></tr></thead><tbody>';
+  // v11.52 — 3 columnas SOLO-PANTALLA (no van a los impresos): Stock · Máximo · Proyección
+  // AL MOMENTO DE GENERAR LA OC (snapshots oc_stock/oc_max/oc_proy guardados en la fila,
+  // igual criterio que el impreso). Así el "Pedido" y el contexto son de la MISMA foto.
+  // OCs viejas sin snapshot → "—" (oc_proy recién se guarda desde v11.52).
+  const _gv = function (r, campo, cls) {
+    const v = r[campo];
+    if (v == null || v === "") return '<td class="num oc-xtra' + (cls || "") + '">—</td>';
+    return '<td class="num oc-xtra' + (cls || "") + '">' + Math.round(Number(v) || 0) + '</td>';
+  };
+  // v11.65 — Proyección: si la OC guardó el snapshot (oc_proy) se muestra; si es una OC vieja
+  // (sin snapshot), se cae a la proyección de HOY (proyeccion_madre, casi no cambia en días),
+  // marcada con «~» + itálica para que se note que no es la foto exacta de esa fecha.
+  const _pm = (_oc.proyHoy && typeof _oc.proyHoy === "object") ? _oc.proyHoy : null;
+  const _proyCell = function (r) {
+    if (r.oc_proy != null && r.oc_proy !== "") return '<td class="num oc-xtra">' + Math.round(Number(r.oc_proy) || 0) + '</td>';
+    if (_pm) { const v = _pm[_ocgNorm(r.codigo)]; if (v != null && v > 0) return '<td class="num oc-xtra" style="opacity:.72;font-style:italic;" title="Proyección de HOY (esta OC es previa a guardar la proyección al generarla)">~' + Math.round(v) + '</td>'; }
+    return '<td class="num oc-xtra">' + (_pm ? '—' : '…') + '</td>';
+  };
+  h += '<div class="oc-tblwrap"><table class="oc-tbl oc-tbl-det"><thead><tr><th>Código</th><th class="oc-desc">Descripción</th><th class="num">Pedido</th><th class="num">Recibido</th><th class="num">Falta</th><th class="num oc-xtra oc-xtra-first" title="Stock al generar la OC">Stock</th><th class="num oc-xtra" title="Máximo al generar la OC">Máximo</th><th class="num oc-xtra" title="Pedidos pendientes (demanda) al generar la OC">Pedidos</th><th class="num oc-xtra" title="Al generar la OC (viejas: ~ = proyección de hoy)">Proyección</th></tr></thead><tbody>';
   x.rows.forEach(function (r) {
     const ped = Number(r.cantidad) || 0, rec = ocRecEff(r), falt = ped - rec;
-    h += '<tr><td class="oc-cod">' + escapeHtml(codCanon(r.codigo) || "—") + '</td><td>' + escapeHtml(artNombre(r.codigo, r.descripcion) || "") + '</td><td>' + escapeHtml(r.unidad || "") + '</td><td class="num">' + ped + '</td><td class="num ' + (rec > 0 ? "oc-ok" : "") + '">' + rec + '</td><td class="num ' + (falt > 0 ? "oc-falt" : "oc-ok") + '">' + (falt !== 0 ? falt : "0") + '</td></tr>';
+    h += '<tr><td class="oc-cod">' + escapeHtml(codCanon(r.codigo) || "—") + '</td><td class="oc-desc">' + escapeHtml(artNombre(r.codigo, r.descripcion) || "") + '</td><td class="num">' + ped + '</td><td class="num ' + (rec > 0 ? "oc-ok" : "") + '">' + rec + '</td><td class="num ' + (falt > 0 ? "oc-falt" : "oc-ok") + '">' + (falt !== 0 ? falt : "0") + '</td>' + _gv(r, "oc_stock", " oc-xtra-first") + _gv(r, "oc_max", "") + _gv(r, "oc_pedidos", "") + _proyCell(r) + '</tr>';
   });
-  return h + "</tbody></table></div>";
+  return h + '</tbody></table></div><div class="oc-note" style="margin-top:8px">Las columnas <b style="color:#6d28d9">Stock · Máximo · Pedidos · Proyección</b> son del <b>momento en que se generó la OC</b> (no de hoy) — así se ve por qué se pidió lo que se pidió (a pedir ≈ Máximo − Stock − Pedidos). En OC viejas (previas a guardar el dato) la <b>Proyección</b> muestra la de <b>hoy</b> con «<b>~</b>»; Stock/Máximo/Pedidos viejos quedan en «—».</div>';
 }
 /* v6.41 — IMPRIMIR OC: hoja print-friendly de la OC abierta (1 proveedor · fecha · rubro).
    Reusa el patrón de pppPrintSug (window.open + document.write + auto-print).
@@ -11275,16 +11377,18 @@ async function ocgEnter() {
     // Máximo = proy×índice o capacidad como objetivo, stock con empresa mergeada, pedidos,
     // uni×caja y config de proveedor). El front solo trae total>0 y activos, y hace el
     // reparto por proveedor. Se muestran también los "(sin proveedor)" para asignarlos.
-    const rows = await supaFetchAllSafe(SUPABASE_GENERADOR_ENDPOINT, "select=cod,descripcion,proveedor,tiene_prov_real,pr1,proveedor2,pr2,indice,proy,cap,maximo,pedidos,stock,uni_x_caja,n_caja,total&activo=eq.true&total=gt.0&order=total.desc");
+    // v11.67 — traemos TODO el universo activo (SIN total=gt.0) para poder ofrecer la vista
+    // "Por tallerista" con TODOS los artículos que hace cada tallerista, incluso a pedir = 0.
+    //   itemsAll = todo (incl. falta 0)  ·  items = solo a pedir > 0 (lo que se genera/manda).
+    const rows = await supaFetchAllSafe(SUPABASE_GENERADOR_ENDPOINT, "select=cod,descripcion,proveedor,tiene_prov_real,pr1,proveedor2,pr2,indice,proy,cap,maximo,pedidos,stock,uni_x_caja,n_caja,total&activo=eq.true&order=total.desc");
     if (!_oc) return;   // se cerró el generador mientras calculaba
-    const items = [];
+    const itemsAll = [];
     (rows || []).forEach(function (r) {
       const cod = String(r.cod).toUpperCase().trim();
       const maxCajas = Math.round(Number(r.maximo) || 0);
       const demanda = Math.round(Number(r.pedidos) || 0);
       const stock = Math.round(Number(r.stock) || 0);
       const totalFalta = Math.round(Number(r.total) || 0);
-      if (totalFalta <= 0) return;
       const pc = Number(r.proy) || 0;                 // proyección cajas/mes (0 = sin ventas)
       const indice = (Number(r.indice) > 0) ? Number(r.indice) : OCG_FACTOR_MAXIMO;
       const cap = Number(r.cap) || 0;
@@ -11303,54 +11407,96 @@ async function ocgEnter() {
         const faltaSub = sub.resto ? (totalFalta - acc) : Math.round(totalFalta * sub.prop / 100);
         if (!sub.resto) acc += faltaSub;
         if (_ocgExcluido(sub.prov)) return;   // Racks no va al generador (se importa por otra vía)
-        if (faltaSub <= 0) return;
         const k = sub.prop / 100;
-        items.push({ cod: cod, desc: r.descripcion || "", prov: sub.prov, max: Math.round(maxCajas * k), fuente: fuente, indice: indice, proy: (pc > 0 ? pc : null), demanda: Math.round(demanda * k), stock: Math.round(stock * k), falta: faltaSub, cap: (cap > 0 ? cap : null), capped: capped, uni: Number(r.uni_x_caja) || 0, ncaja: (r.n_caja != null ? r.n_caja : null), prop: sub.prop, sinProv: (sub.prov === "(sin proveedor)") });
+        // v11.67 — se incluyen también los de falta 0 (para la vista Por tallerista). El armado
+        // de `items` (a pedir > 0) filtra después, así lo que se genera/manda queda idéntico.
+        itemsAll.push({ cod: cod, desc: r.descripcion || "", prov: sub.prov, max: Math.round(maxCajas * k), fuente: fuente, indice: indice, proy: (pc > 0 ? pc : null), demanda: Math.round(demanda * k), stock: Math.round(stock * k), falta: Math.max(0, faltaSub), cap: (cap > 0 ? cap : null), capped: capped, uni: Number(r.uni_x_caja) || 0, ncaja: (r.n_caja != null ? r.n_caja : null), prop: sub.prop, sinProv: (sub.prov === "(sin proveedor)") });
       });
     });
-    _oc.gen = { items: items, fecha: new Date().toISOString().slice(0, 10) };
+    const items = itemsAll.filter(function (it) { return it.falta > 0; });
+    _oc.gen = { items: items, itemsAll: itemsAll, fecha: new Date().toISOString().slice(0, 10) };
     ocRender();
     ocgStartCountdown();   // v7.67: contador vivo dentro del botón "Generar las OCs"
     // v9.12 — sección de importados (circuito propio). No rompe el generador nacional si falla.
     try { const imp = await ocgFetchImportados(); if (_oc && _oc.gen) { _oc.gen.imp = imp; ocRender(); } } catch (_e) {}
   } catch (e) { if (_oc) { _oc.gen = { error: String(e.message || e), items: [] }; ocRender(); } }
 }
-function ocgGroups() {
+function ocgGroups(list) {
   const g = {};
-  ((_oc.gen && _oc.gen.items) || []).forEach(function (it) { const k = it.prov; if (!g[k]) g[k] = { prov: k, items: [], total: 0 }; g[k].items.push(it); g[k].total += it.falta; });
+  (list || (_oc.gen && _oc.gen.items) || []).forEach(function (it) { const k = it.prov; if (!g[k]) g[k] = { prov: k, items: [], total: 0 }; g[k].items.push(it); g[k].total += it.falta; });
   return g;
 }
+function ocgSetMode(m) { if (_oc) { _oc.genMode = (m === "tall" ? "tall" : "art"); ocRender(); } }
+// ordena proveedores dejando "(sin proveedor)" al final
+function _ocgProvSort(a, b) { if (a === "(sin proveedor)") return 1; if (b === "(sin proveedor)") return -1; return a.localeCompare(b); }
 function ocBodyGen() {
   const gen = _oc.gen;
-  const g = (gen && !gen.error) ? ocgGroups() : {};
-  const keys = Object.keys(g).sort(function (a, b) { return a.localeCompare(b); });
+  const mode = (_oc.genMode === "tall") ? "tall" : "art";
+  const canGen = ((gen && gen.items) || []).length > 0;
   // v7.66: botón grande "Generar las OCs" arriba, a la altura del ← Volver (pedido del usuario).
-  const genBtn = keys.length ? '<button class="oc-btn ok" style="font-size:15px;padding:8px 20px;font-weight:800;line-height:1.2;text-align:center" onclick="ocgGenerar()">✓ Generar las OCs<br><span id="ocgCountdown" style="font-size:10.5px;font-weight:600;opacity:.9">' + escapeHtml(_ocgAutoEnTxt()) + '</span></button>' : '';
+  const genBtn = canGen ? '<button class="oc-btn ok" style="font-size:15px;padding:8px 20px;font-weight:800;line-height:1.2;text-align:center" onclick="ocgGenerar()">✓ Generar las OCs<br><span id="ocgCountdown" style="font-size:10.5px;font-weight:600;opacity:.9">' + escapeHtml(_ocgAutoEnTxt()) + '</span></button>' : '';
   let h = '<div class="oc-tools"><button class="oc-btn" onclick="ocBack()">← Volver</button>' + genBtn + '<button class="oc-btn" onclick="ocgEnterCfg()">⚙ Configuraciones</button><input class="oc-filtro" type="search" placeholder="🔎 Buscar código / descripción / proveedor" value="' + escapeHtml(_oc.genFiltro || "") + '" oninput="if(_oc){_oc.genFiltro=this.value;ocRender();}"></div>';
+  // v11.67 — toggle de vista: Por artículo (lista plana, solo a pedir>0) · Por tallerista (agrupado, TODOS los artículos incl. a pedir 0).
+  h += '<div class="oc-viewtoggle" style="display:flex;gap:6px;margin:2px 0 8px">' +
+    '<button class="oc-btn' + (mode === "art" ? " ok" : "") + '" onclick="ocgSetMode(\'art\')">📦 Por artículo</button>' +
+    '<button class="oc-btn' + (mode === "tall" ? " ok" : "") + '" onclick="ocgSetMode(\'tall\')">👷 Por tallerista</button></div>';
   if (!gen) return h + '<div class="oc-loading">Calculando (stock + demanda PPP + proyección × índice)…</div>';
   if (gen.error) return h + '<div class="oc-empty" style="color:#b91c1c">Error: ' + escapeHtml(gen.error) + '</div>';
-  if (!keys.length) return h + '<div class="oc-empty">No hay nada para pedir (todo está en o sobre el máximo).<br><small>Con el stock en 0, va a dar todo para pedir cuando lo cargues.</small></div>';
+  return h + (mode === "tall" ? ocBodyGenTall() : ocBodyGenArt());
+}
+// Vista "Por artículo": lista plana (un renglón por artículo·proveedor), solo a pedir > 0, ordenada por a pedir.
+function ocBodyGenArt() {
+  const gen = _oc.gen;
+  const items = (gen && gen.items) || [];
   const gf = (_oc.genFiltro || "").toLowerCase().trim();
-  const totItems = keys.reduce(function (s, k) { return s + g[k].items.length; }, 0);
-  const sinG = g["(sin proveedor)"]; const nReal = keys.filter(function (k) { return k !== "(sin proveedor)"; }).length;
-  h += '<div class="oc-meta">Fecha <b>' + escapeHtml(gen.fecha) + '</b> · <b>' + nReal + '</b> proveedor(es) · <b>' + totItems + '</b> ítem(s) a pedir' + (sinG ? ' · <b style="color:#b45309">' + sinG.items.length + ' sin proveedor</b>' : '') + '.</div>';
+  const fitems = (gf ? items.filter(function (it) { return (codCanon(it.cod) + " " + (it.desc || "") + " " + (it.prov || "")).toLowerCase().indexOf(gf) !== -1; }) : items.slice())
+    .sort(function (a, b) { return b.falta - a.falta; });
+  if (!fitems.length) return '<div class="oc-empty">' + (gf ? "Nada coincide con la búsqueda." : "No hay nada para pedir (todo está en o sobre el máximo).<br><small>Con el stock en 0, va a dar todo para pedir cuando lo cargues.</small>") + '</div>' + ocBodyGenImportados();
+  const totCajas = fitems.reduce(function (s, it) { return s + it.falta; }, 0);
+  const sinN = fitems.filter(function (it) { return it.sinProv; }).length;
+  let h = '<div class="oc-meta">Fecha <b>' + escapeHtml(gen.fecha) + '</b> · <b>' + fitems.length + '</b> ítem(s) a pedir · <b>' + totCajas + '</b> cajas' + (sinN ? ' · <b style="color:#b45309">' + sinN + ' sin proveedor</b>' : '') + '.</div>';
+  h += '<div class="oc-tblwrap"><table class="oc-tbl"><thead><tr><th>Código</th><th>Descripción</th><th>Tallerista</th><th class="num">Proy</th><th class="num">Índice</th><th class="num">Máx</th><th class="num">Pedidos</th><th class="num">Stock</th><th class="num">A pedir</th></tr></thead><tbody>';
+  fitems.forEach(function (it) {
+    const proyTxt = (it.fuente === "proy") ? (Math.round(it.proy) + "") : '<span style="color:#94a3b8" title="Sin ventas (proyección 0) → el Máximo sale de la capacidad de góndola">0</span>';
+    const maxTxt = it.max + (it.capped ? ' <span style="color:#b45309;font-weight:800" title="Topado a la capacidad de góndola (' + it.cap + ' cajas) — proy×índice daba más">⤓</span>' : '');
+    const provTxt = it.sinProv ? '<span style="color:#b45309;font-weight:700" title="Asigná proveedor en ⚙ Configuraciones (así no se envía)">(sin proveedor)</span>' : escapeHtml(it.prov);
+    h += '<tr><td class="oc-cod">' + escapeHtml(codCanon(it.cod)) + '</td><td>' + escapeHtml(artNombre(it.cod, it.desc)) + '</td><td>' + provTxt + '</td><td class="num">' + proyTxt + '</td><td class="num">' + it.indice + '</td><td class="num">' + maxTxt + '</td><td class="num">' + it.demanda + '</td><td class="num">' + it.stock + '</td><td class="num oc-falt">' + it.falta + '</td></tr>';
+  });
+  h += '</tbody></table></div>';
+  return h + ocBodyGenImportados();
+}
+// Vista "Por tallerista": agrupada por proveedor, muestra TODOS los artículos de cada tallerista (incluye a pedir 0).
+function ocBodyGenTall() {
+  const gen = _oc.gen;
+  const all = (gen && gen.itemsAll) || [];
+  if (!all.length) return '<div class="oc-empty">No hay artículos configurados.</div>';
+  const g = ocgGroups(all);
+  const keys = Object.keys(g).sort(_ocgProvSort);
+  const gf = (_oc.genFiltro || "").toLowerCase().trim();
+  const nReal = keys.filter(function (k) { return k !== "(sin proveedor)"; }).length;
+  let h = '<div class="oc-meta">Fecha <b>' + escapeHtml(gen.fecha) + '</b> · <b>' + nReal + '</b> tallerista(s) · <b>todos</b> los artículos de cada uno (incluye los de <b>a pedir 0</b>).</div>';
+  let shown = 0;
   keys.forEach(function (k) {
     const x = g[k];
     const sinP = (k === "(sin proveedor)");
-    // v9.34: filtrar items si hay búsqueda activa
-    const fitems = gf ? x.items.filter(function (it) { return (codCanon(it.cod) + " " + (it.desc || "") + " " + (it.prov || "")).toLowerCase().indexOf(gf) !== -1; }) : x.items;
-    if (gf && !fitems.length) return;   // ocultar proveedor entero si ningún item matchea
+    const fitems = (gf ? x.items.filter(function (it) { return (codCanon(it.cod) + " " + (it.desc || "") + " " + (it.prov || "")).toLowerCase().indexOf(gf) !== -1; }) : x.items.slice())
+      .sort(function (a, b) { return (b.falta - a.falta) || codCanon(a.cod).localeCompare(codCanon(b.cod)); });
+    if (!fitems.length) return;   // ocultar tallerista entero si nada matchea el filtro
+    shown++;
     const fTotal = fitems.reduce(function (s, it) { return s + it.falta; }, 0);
-    h += '<div class="oc-meta" style="margin-top:12px;margin-bottom:4px' + (sinP ? ';color:#b45309' : '') + '"><b>' + escapeHtml(k) + '</b> · ' + fitems.length + ' ítem(s) · ' + fTotal + ' cajas' + (sinP ? ' &nbsp;<span style="font-weight:800">⚠ asigná proveedor en ⚙ Configuraciones para poder generarlas (así no se envían)</span>' : '') + '</div>';
+    const nPedir = fitems.filter(function (it) { return it.falta > 0; }).length;
+    h += '<div class="oc-meta" style="margin-top:12px;margin-bottom:4px' + (sinP ? ';color:#b45309' : '') + '"><b>' + escapeHtml(k) + '</b> · ' + fitems.length + ' artículo(s) · <b>' + nPedir + '</b> a pedir · ' + fTotal + ' cajas' + (sinP ? ' &nbsp;<span style="font-weight:800">⚠ asigná proveedor en ⚙ Configuraciones</span>' : '') + '</div>';
     h += '<div class="oc-tblwrap"><table class="oc-tbl"><thead><tr><th>Código</th><th>Descripción</th><th class="num">Proy</th><th class="num">Índice</th><th class="num">Máx</th><th class="num">Pedidos</th><th class="num">Stock</th><th class="num">A pedir</th></tr></thead><tbody>';
-    fitems.sort(function (a, b) { return b.falta - a.falta; }).forEach(function (it) {
-      const proyTxt = (it.fuente === "proy") ? (Math.round(it.proy) + "") : '<span style="color:#94a3b8" title="Sin ventas (proyección 0) → el Máximo sale de la capacidad de góndola">0</span>';
-      const maxTxt = it.max + (it.capped ? ' <span style="color:#b45309;font-weight:800" title="Topado a la capacidad de góndola (' + it.cap + ' cajas) — proy×índice daba más">⤓</span>' : '');
-      h += '<tr><td class="oc-cod">' + escapeHtml(codCanon(it.cod)) + '</td><td>' + escapeHtml(artNombre(it.cod, it.desc)) + '</td><td class="num">' + proyTxt + '</td><td class="num">' + it.indice + '</td><td class="num">' + maxTxt + '</td><td class="num">' + it.demanda + '</td><td class="num">' + it.stock + '</td><td class="num oc-falt">' + it.falta + '</td></tr>';
+    fitems.forEach(function (it) {
+      const proyTxt = (it.fuente === "proy") ? (Math.round(it.proy) + "") : '<span style="color:#94a3b8" title="Sin ventas (proyección 0)">0</span>';
+      const maxTxt = it.max + (it.capped ? ' <span style="color:#b45309;font-weight:800" title="Topado a la capacidad de góndola (' + it.cap + ' cajas)">⤓</span>' : '');
+      const faltCls = it.falta > 0 ? " oc-falt" : "";
+      const faltTxt = it.falta > 0 ? it.falta : '<span style="color:#cbd5e1">0</span>';
+      h += '<tr><td class="oc-cod">' + escapeHtml(codCanon(it.cod)) + '</td><td>' + escapeHtml(artNombre(it.cod, it.desc)) + '</td><td class="num">' + proyTxt + '</td><td class="num">' + it.indice + '</td><td class="num">' + maxTxt + '</td><td class="num">' + it.demanda + '</td><td class="num">' + it.stock + '</td><td class="num' + faltCls + '">' + faltTxt + '</td></tr>';
     });
     h += '</tbody></table></div>';
   });
-  h += ocBodyGenImportados();
+  if (!shown) h += '<div class="oc-empty">Nada coincide con la búsqueda.</div>';
   return h;
 }
 /* v9.12 — Sección "Importados (por proveedor chino)" dentro de Generar OCs. Vista previa del
@@ -11395,7 +11541,7 @@ async function ocgGenerar() {
   const rows = []; let sinProv = 0;
   Object.keys(g).forEach(function (k) {
     if (k === "(sin proveedor)") { sinProv += g[k].items.length; return; }   // no se envían sin proveedor
-    g[k].items.forEach(function (it) { rows.push({ proveedor: it.prov, fecha: _oc.gen.fecha, rubro: "Art Term", codigo: codCanon(it.cod), descripcion: it.desc || null, cantidad: it.falta, cantidad_recibida: 0, unidad: "Cajas", estado: "pendiente", oc_max: it.max, oc_pedidos: it.demanda, oc_stock: it.stock, oc_uni_caja: it.uni, oc_ncaja: (it.ncaja != null ? it.ncaja : null) }); });
+    g[k].items.forEach(function (it) { rows.push({ proveedor: it.prov, fecha: _oc.gen.fecha, rubro: "Art Term", codigo: codCanon(it.cod), descripcion: it.desc || null, cantidad: it.falta, cantidad_recibida: 0, unidad: "Cajas", estado: "pendiente", oc_max: it.max, oc_pedidos: it.demanda, oc_stock: it.stock, oc_proy: (it.proy != null ? Math.round(Number(it.proy)) : null), oc_uni_caja: it.uni, oc_ncaja: (it.ncaja != null ? it.ncaja : null) }); });
   });
   if (!rows.length) { alert(sinProv ? ("No hay OCs con proveedor para generar. Hay " + sinProv + " ítem(s) SIN proveedor: asignáselo en ⚙ Configuraciones.") : "No hay OCs para generar."); return; }
   if (!confirm("Vas a generar " + rows.length + " línea(s) de OC en Ordenes_Compra" + (sinProv ? " (se omiten " + sinProv + " sin proveedor)" : "") + ". ¿Seguro?")) return;
@@ -11535,8 +11681,15 @@ async function ocCfgSave() {
       if (patch.proveedor2 != null && !String(patch.proveedor2).trim()) patch.proveedor2 = null;   // "" → null
       if (row && !row.en_config) {
         // v7.68: código NUEVO (venía de stock, no estaba en OC_Maximos) → INSERT (cod + defaults + cambios).
+        // v11.66 — `linea` es NOT NULL sin default en OC_Maximos → si no se manda, el INSERT
+        // daba HTTP 400 al alta de códigos nuevos (ej. 231/232/233). Se deriva de la marca
+        // (artMarca ← vista_marca_articulo), fallback a la línea de la fila, fallback "LK".
+        // `max_cajas` (NOT NULL, default 0) se manda explícito por las dudas.
+        const _linea = String(row.linea || "").toUpperCase().trim() ||
+          ((typeof artMarca === "function" ? (artMarca(row.cod || c) || "") : "")) || "LK";
         const body = Object.assign({
-          cod: (row.cod || c), descripcion: row.descripcion || null,
+          cod: (row.cod || c), descripcion: row.descripcion || null, linea: _linea,
+          max_cajas: (row.max_cajas == null ? 0 : row.max_cajas),
           proveedor: (String(row.proveedor || "").trim() || null), prop_prov1: (row.prop_prov1 == null ? 100 : row.prop_prov1),
           proveedor2: (String(row.proveedor2 || "").trim() || null), prop_prov2: (row.prop_prov2 == null ? 0 : row.prop_prov2),
           indice: (row.indice == null ? 1.5 : row.indice), activo: (row.activo !== false)
@@ -11608,12 +11761,33 @@ function stkExcedentesBtn() {
 function stkAsOfControl() {
   if (!_stk) return "";
   const on = !!_stk.asOf;
-  let h = '<span style="font-size:12px;font-weight:800;color:#475569;flex:0 0 auto;">Ver stock:</span>';
-  // v10.49 — TODO a 38px de alto (mismo nivel que los chips E/LK/CH/Negativos/…).
-  h += '<button class="stk-btn' + (on ? '' : ' ok') + '" onclick="stkAsOfLive()" style="flex:0 0 auto;white-space:nowrap;height:38px;padding:0 12px;box-sizing:border-box;">🔴 En vivo</button>';
-  h += '<input type="datetime-local" id="stkAsOfInp" value="' + escapeHtml(_stk.asOfInput || '') + '" onchange="if(_stk){_stk.asOfInput=this.value;}" style="flex:0 0 auto;width:158px;min-width:0;height:38px;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:8px;padding:0 6px;font-size:11px;">';
-  h += '<button class="stk-btn" onclick="stkAsOfApply()" style="flex:0 0 auto;white-space:nowrap;height:38px;padding:0 12px;box-sizing:border-box;">📅 A esa fecha</button>';
+  // v11.37 — el selector de fecha/hora solo se muestra al tocar "A esa fecha" (o si ya
+  // se está mirando un histórico). Así la fila "Ver stock" queda compacta y en línea.
+  const showPicker = on || !!_stk.asOfPicking;
+  // v11.38 — MISMO molde que los chips (E/LK/CH/…): borde 1.5px, radio 9px, alto 38px,
+  // centrado con inline-flex. Antes usaban .stk-btn (borde 1px, sin flex) y quedaban
+  // desnivelados respecto a los chips.
+  const _pill = 'width:auto;margin:0;flex:0 0 auto;padding:0 12px;height:38px;border-radius:9px;font-weight:800;font-size:13px;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;line-height:1;';
+  let h = '<span style="font-size:12px;font-weight:800;color:#475569;flex:0 0 auto;display:inline-flex;align-items:center;">Ver stock:</span>';
+  h += '<button onclick="stkAsOfLive()" style="' + _pill + 'border:1.5px solid ' + (on ? '#cbd5e1' : '#16a34a') + ';background:' + (on ? '#fff' : '#16a34a') + ';color:' + (on ? '#334155' : '#fff') + ';">🔴 En vivo</button>';
+  if (showPicker) {
+    h += '<input type="datetime-local" id="stkAsOfInp" value="' + escapeHtml(_stk.asOfInput || '') + '" onchange="if(_stk){_stk.asOfInput=this.value;}" style="flex:0 0 auto;width:158px;min-width:0;height:38px;box-sizing:border-box;border:1.5px solid #cbd5e1;border-radius:9px;padding:0 6px;font-size:11px;">';
+  }
+  h += '<button onclick="stkAsOfDateBtn()" style="' + _pill + 'border:1.5px solid ' + (on ? '#16a34a' : '#cbd5e1') + ';background:#fff;color:#334155;">📅 A esa fecha</button>';
   return h;
+}
+/* v11.37 — 1er toque "A esa fecha": revela el selector de fecha/hora. 2º toque (ya visible
+   y con valor): aplica el histórico. */
+function stkAsOfDateBtn() {
+  if (!_stk) return;
+  const inp = document.getElementById("stkAsOfInp");
+  if (!inp) {   // selector oculto → mostrarlo y enfocarlo
+    _stk.asOfPicking = true;
+    stkRender();
+    setTimeout(function () { const el = document.getElementById("stkAsOfInp"); if (el) { try { el.focus(); if (el.showPicker) el.showPicker(); } catch (_e) {} } }, 0);
+    return;
+  }
+  stkAsOfApply();
 }
 function stkAsOfApply() {
   if (!_stk) return;
@@ -11625,7 +11799,7 @@ function stkAsOfApply() {
   _stk.openArt = null;
   stkRender();
 }
-function stkAsOfLive() { if (!_stk) return; _stk.asOf = null; _stk.openArt = null; stkRender(); }
+function stkAsOfLive() { if (!_stk) return; _stk.asOf = null; _stk.asOfPicking = false; _stk.openArt = null; stkRender(); }
 function stkTab(t) { if (!_stk) return; if (t === "compras") { openOCAdmin(); return; } _stk.tab = t; _stk.filtro = ""; _stk.openArt = null; if (t === "capacidad" && !_stk.capLoaded) { stkCapLoad(); return; } if (t === "racks" && !_stk.planiLoaded) { stkPlaniLoad(); return; } if (t === "insumos" && !_stk.insLoaded) { stkInsLoad(); return; } if (t === "faltante" && !_stk.faltLoaded) { stkFaltLoad(); return; } if (t === "auditgon" && !_stk.agLoaded) { agLoad(); return; } stkRender(); }
 function stkRender() {
   if (!_stk) return;
@@ -11714,10 +11888,10 @@ function stkBodyAuditGon() {
   var n = items.length;
   var h = '<div class="ag-bar"><div class="ag-title">🔍 Góndola &lt; 25% de la proyección · <b>' + n + '</b> ítem(s)</div>' +
     '<div class="ag-btns"><button class="ag-btn xls" onclick="agExportExcel()">📥 Excel</button><button class="ag-btn pdf" onclick="agExportPdf()">🖨 PDF</button></div></div>';
-  h += '<div class="ag-note">Ocupación = (stock total de <b>todos los estadios</b> − <b>pedidos</b>) ÷ <b>proyección</b>. Ordenado por <b>tallerista</b> y, dentro, por <b>% de góndola de menor a mayor</b> (el peor primero). Los <b>discontinuos</b> (activo=false o marcados a mano) no se muestran.</div>';
+  h += '<div class="ag-note">Ocupación = (stock total de <b>todos los estadios</b> − <b>pedidos</b>) ÷ <b>proyección</b>. Ordenado por <b>tallerista</b> y, dentro, por <b>% Ocup Virgilio de menor a mayor</b> (el peor primero). Los <b>discontinuos</b> (activo=false o marcados a mano) no se muestran.</div>';
   if (!n) { h += '<div class="stk-loading">No hay ítems por debajo del 25%. 👍</div>'; return h; }
   h += '<div class="ag-wrap"><table class="ag-tbl"><thead><tr>' +
-    '<th>Código</th><th>Descripción</th><th class="num">% góndola</th><th class="num">Stock total</th><th class="num">Proyección</th><th class="num">Pedidos</th><th>Familia</th>' +
+    '<th>Código</th><th>Descripción</th><th class="num">% Ocup Virgilio</th><th class="num">Stock total</th><th class="num">Proyección</th><th class="num">Pedidos</th><th>Familia</th>' +
     '</tr></thead><tbody>';
   var lastTall = null;
   items.forEach(function (it) {
@@ -11740,7 +11914,7 @@ function stkBodyAuditGon() {
 function agExportExcel() {
   var items = (_stk && _stk.agData) || []; if (!items.length) { try { alert("No hay datos para exportar."); } catch (_e) {} return; }
   var esc = function (s) { return String(s == null ? "" : s).replace(/[&<>]/g, function (m) { return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[m]; }); };
-  var html = '<html><head><meta charset="utf-8"></head><body><table border="1"><tr><th>Tallerista</th><th>Codigo</th><th>Descripcion</th><th>% gondola</th><th>Stock total</th><th>Proyeccion</th><th>Pedidos</th><th>Familia</th></tr>';
+  var html = '<html><head><meta charset="utf-8"></head><body><table border="1"><tr><th>Tallerista</th><th>Codigo</th><th>Descripcion</th><th>% Ocup Virgilio</th><th>Stock total</th><th>Proyeccion</th><th>Pedidos</th><th>Familia</th></tr>';
   items.forEach(function (it) {
     html += '<tr><td>' + esc(it.tall) + '</td><td>' + esc(codCanon(it.cod)) + '</td><td>' + esc(it.desc) + '</td><td>' + Math.round(it.pct * 100) + '%</td><td>' + (Math.round(it.stock * 10) / 10) + '</td><td>' + (Math.round(it.proy * 10) / 10) + '</td><td>' + Math.round(it.pedidos) + '</td><td>' + esc(it.fam) + '</td></tr>';
   });
@@ -11762,7 +11936,7 @@ function agExportPdf() {
   var w = window.open("", "_blank"); if (!w) { try { alert("Habilitá los pop-ups para generar el PDF."); } catch (_e) {} return; }
   w.document.write('<html><head><meta charset="utf-8"><title>Gondola menor a 25%</title><style>body{font-family:Arial;margin:14px;color:#0f172a}h1{font-size:20px;margin:0 0 10px}table{width:100%;border-collapse:collapse;font-size:15px}th{background:#1e3a8a;color:#fff;padding:8px;text-align:left}th.num{text-align:right}td{padding:6px 8px;border-bottom:1px solid #ccc}td.num{text-align:right}.grp td{background:#dbeafe;color:#1e3a8a;font-weight:800;font-size:16px}</style></head><body>' +
     '<h1>Góndola &lt; 25% de la proyección · ' + items.length + ' ítems</h1>' +
-    '<table><thead><tr><th>Código</th><th>Descripción</th><th class="num">% góndola</th><th class="num">Stock total</th><th class="num">Proyección</th><th class="num">Pedidos</th><th>Familia</th></tr></thead><tbody>' + rows + '</tbody></table></body></html>');
+    '<table><thead><tr><th>Código</th><th>Descripción</th><th class="num">% Ocup Virgilio</th><th class="num">Stock total</th><th class="num">Proyección</th><th class="num">Pedidos</th><th>Familia</th></tr></thead><tbody>' + rows + '</tbody></table></body></html>');
   w.document.close(); w.focus();
   setTimeout(function () { try { w.print(); } catch (_e) {} }, 400);
 }
@@ -12915,8 +13089,8 @@ function stkBodyStocks() {
   // v8.52 — filtro por línea LK / CH (empresa)
   // v8.88: también detecta marca del sufijo del código (desconcatenación)
   if (_stk.filLinea) shown = shown.filter(function (a) {
-    var _sfx = String(a.cod || "").match(/\s+(LK|CH|LOKE)$/i);
-    var _marca = _sfx ? _sfx[1].toUpperCase().replace("LOKE", "LK") : (ocLinea(a.cod) || String(a.linea || "").toUpperCase().trim() || "");
+    // v11.39 — marca fuente única (artMarca); a.linea como último recurso.
+    var _marca = artMarca(a.cod) || String(a.linea || "").toUpperCase().trim() || "";
     return _marca === _stk.filLinea;
   });
   // v8.95 — filtro rápido por columna: tocar el header de una columna muestra solo las filas
@@ -13071,7 +13245,8 @@ function stkBodyStocks() {
     // v8.88 — desconcatenación: si el código tiene sufijo LK/CH/LOKE, la marca
     // sale del propio código (no de OC_Maximos); y en CÓDIGO se muestra el base.
     const _codSuffix = String(a.cod || "").match(/\s+(LK|CH|LOKE)$/i);
-    const _lin = _codSuffix ? _codSuffix[1].toUpperCase().replace("LOKE", "LK") : (ocLinea(a.cod) || String(a.linea || "").toUpperCase().trim() || "");
+    // v11.39 — marca fuente única (artMarca ← vista_marca_articulo); a.linea como último recurso.
+    const _lin = artMarca(a.cod) || String(a.linea || "").toUpperCase().trim() || "";
     // v10.02 — mostrar SIEMPRE el código canónico con cero(s) a la izquierda (026, 035E). La vista
     // vista_stock_procesada (v10.00) devuelve el código sin ceros ("26"), así que se re-pad acá.
     const _codDisplay = codCanon(_codSuffix ? codBase(a.cod) : a.cod);
@@ -13083,7 +13258,7 @@ function stkBodyStocks() {
       else _famTag = ' <span title="SECUNDARIO — no deben entrar pedidos acá. El principal es ' + escapeHtml(_equivDisp(_fam, _fam._defN)) + '." style="color:#1e40af;font-size:10px;font-weight:800;">⇄' + escapeHtml(_equivDisp(_fam, _fam._defN)) + '</span>';
     }
     const _proy = _proyOf(a.cod);
-    let tds = '<td class="stk-cod">' + escapeHtml(_codDisplay) + _famTag + '</td><td style="text-align:center;font-weight:800;font-size:11px;padding:3px 4px;color:' + (_lin === "LK" ? "#b91c1c" : (_lin === "CH" ? "#1e40af" : "#94a3b8")) + ';">' + (_lin || "—") + '</td><td class="stk-desc">' + escapeHtml(artNombre(a.cod, a.desc) || "—") + '</td>' + (_proy > 0.05 ? '<td class="num" style="background:#faf5ff;color:#6d28d9" title="Proyección de venta: ' + fmtCajas(_proy) + ' caj/mes (antes del índice de las OCs)">' + Math.round(_proy) + '</td>' : '<td class="num" style="background:#faf5ff;color:#c4b5fd">—</td>') + '<td class="num ' + (_tot < 0 ? "stk-neg" : "") + '" style="background:#f8fafc"><b>' + fmtCajas(_tot) + '</b></td>' + (_ped ? '<td class="num stk-pick-cell" style="background:#fffbeb;color:#92400e" onclick="event.stopPropagation();stkOpenCajasPedidasArt(\'' + encodeURIComponent(a.cod) + '\')" title="Todas las cajas pedidas (programadas o no) todavía no facturadas. Tocá para ver el detalle por NP"><b>' + fmtCajas(_ped) + '</b>' + (_demSPOf(a.cod) > 0.05 ? ' <span title="⚠ ' + fmtCajas(_demSPOf(a.cod)) + ' caja(s) pedidas están en la base de pedidos pero SIN programar en el PPP (Programación Diaria)" style="cursor:help">⚠️</span>' : '') + '</td>' : '<td class="num" style="background:#fffbeb;color:#92400e"></td>') + (_cap ? '<td class="num stk-pick-cell" style="background:#f0fdf4;color:#166534" onclick="event.stopPropagation();stkOpenCapArt(\'' + encodeURIComponent(a.cod) + '\')" title="Ubicaciones y capacidad de góndola"><b>' + fmtCajas(_cap) + '</b></td>' : '<td class="num" style="background:#f0fdf4;color:#166534">—</td>');
+    let tds = '<td class="stk-cod">' + escapeHtml(_codDisplay) + _famTag + '</td><td style="text-align:center;font-weight:800;font-size:11px;padding:3px 4px;color:' + (_lin === "LK" ? "#b91c1c" : (_lin === "CH" ? "#1e40af" : "#94a3b8")) + ';">' + (_lin || "—") + '</td><td class="stk-desc">' + escapeHtml(artNombre(a.cod, a.desc) || "—") + '</td>' + '<td class="num stk-pick-cell" style="background:#faf5ff;color:' + (_proy > 0.05 ? '#6d28d9' : '#c4b5fd') + ';cursor:pointer" onclick="event.stopPropagation();stkShowProyVentas(\'' + encodeURIComponent(a.cod) + '\',' + (Math.round((_proy || 0) * 100) / 100) + ')" title="Tocá para ver de dónde surge (ventas facturadas de los últimos 6 meses)">' + (_proy > 0.05 ? Math.round(_proy) : '—') + '</td>' + '<td class="num ' + (_tot < 0 ? "stk-neg" : "") + '" style="background:#f8fafc"><b>' + fmtCajas(_tot) + '</b></td>' + (_ped ? '<td class="num stk-pick-cell" style="background:#fffbeb;color:#92400e" onclick="event.stopPropagation();stkOpenCajasPedidasArt(\'' + encodeURIComponent(a.cod) + '\')" title="Todas las cajas pedidas (programadas o no) todavía no facturadas. Tocá para ver el detalle por NP"><b>' + fmtCajas(_ped) + '</b>' + (_demSPOf(a.cod) > 0.05 ? ' <span title="⚠ ' + fmtCajas(_demSPOf(a.cod)) + ' caja(s) pedidas están en la base de pedidos pero SIN programar en el PPP (Programación Diaria)" style="cursor:help">⚠️</span>' : '') + '</td>' : '<td class="num" style="background:#fffbeb;color:#92400e"></td>') + (_cap ? '<td class="num stk-pick-cell" style="background:#f0fdf4;color:#166534" onclick="event.stopPropagation();stkOpenCapArt(\'' + encodeURIComponent(a.cod) + '\')" title="Ubicaciones y capacidad de góndola"><b>' + fmtCajas(_cap) + '</b></td>' : '<td class="num" style="background:#f0fdf4;color:#166534">—</td>');
     cols.forEach(function (c) {
       const v = (c.racksKey ? ((Number(a[c.key]) || 0) + (Number(a.racks_ch) || 0)) : (Number(a[c.key]) || 0));
       // v5.82: columnas clickeables → detalle. Pickeados/A facturar → NPs; Excedente/Racks → ubicación.
@@ -13301,7 +13476,15 @@ var STK_POP_CSS =
   ".mva-rto-it b{color:#1e1b4b;}.mva-rto-it.on{background:#dcfce7;border-color:#86efac;color:#166534;}.mva-rto-it.on b{color:#14532d;}" +
   ".mva-ts{color:#94a3b8;font-size:11px;}.mva-ref{color:#64748b;font-family:Consolas,Menlo,monospace;}" +
   ".mva-in{color:#15803d;}.mva-out{color:#b91c1c;}.mva-sal{color:#1e3a8a;}" +
-  ".stkpop-ubic{color:#7c3aed;font-weight:800;white-space:nowrap;}";
+  ".stkpop-ubic{color:#7c3aed;font-weight:800;white-space:nowrap;}" +
+  // v11.48 — mini bar-chart de ventas facturadas por mes (pop-up de proyección).
+  ".proyv-chart{display:flex;flex-direction:column;gap:6px;}" +
+  ".proyv-row{display:flex;align-items:center;gap:9px;}" +
+  ".proyv-mes{flex:0 0 52px;font-size:12px;font-weight:800;color:#475569;text-transform:capitalize;}" +
+  ".proyv-track{flex:1 1 auto;height:20px;background:#f1f5f9;border-radius:6px;overflow:hidden;}" +
+  ".proyv-bar{display:block;height:100%;background:linear-gradient(90deg,#8b5cf6,#6d28d9);border-radius:6px;}" +
+  ".proyv-val{flex:0 0 auto;min-width:42px;text-align:right;font-size:12.5px;font-weight:800;color:#4c1d95;font-variant-numeric:tabular-nums;}" +
+  ".proyv-foot{margin-top:10px;font-size:12px;color:#334155;line-height:1.5;border-top:1px dashed #cbd5e1;padding-top:8px;}";
 function _stkPopShell(title, bodyId) {
   if (!document.getElementById("stkPopCss")) { const st = document.createElement("style"); st.id = "stkPopCss"; st.textContent = STK_POP_CSS; document.head.appendChild(st); }
   let ov = document.getElementById("stkPopModal");
@@ -13310,6 +13493,70 @@ function _stkPopShell(title, bodyId) {
   ov.innerHTML = '<div class="stkpop-card"><div class="stkpop-head"><span class="stkpop-title">' + title + '</span><button class="stkpop-close" onclick="stkPopClose()">Cerrar</button></div><div class="stkpop-body" id="' + bodyId + '"></div></div>';
 }
 function stkPopClose() { const ov = document.getElementById("stkPopModal"); if (ov) ov.classList.remove("show"); _stkPop = null; }
+/* v11.48 — Pop-up "de dónde surge la proyección": al tocar el número de PROY. CAJ/MES muestra
+   la explicación del cálculo + las CAJAS FACTURADAS reales de los últimos 6 meses (fuente: ventas
+   sales_lines de PáginaLK, las mismas que alimentan la proyección). Cruce backend: RPC de Virgilio
+   `ventas_mensuales_cod` → http a LK `fn_ventas_mensuales_virgilio`. La proyección NO es el promedio
+   simple de las barras: se calcula por CLIENTE (desde su 1ª compra) descartando meses-pico. */
+var _STK_MES_ABR = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+function _stkFmtMes(ym) {
+  var m = String(ym || "").match(/^(\d{4})-(\d{2})$/); if (!m) return String(ym || "");
+  return _STK_MES_ABR[parseInt(m[2], 10) - 1] + " " + m[1].slice(2);
+}
+async function stkShowProyVentas(codEnc, proy) {
+  var cod = decodeURIComponent(codEnc);
+  var codB = codBase(cod);
+  var sfx = String(cod || "").match(/\s+(LK|CH|LOKE)$/i);
+  var emp = sfx ? sfx[1].toUpperCase().replace("LOKE", "LK") : "";
+  var empTag = emp ? ' <span style="font-size:14px;font-weight:800;color:' + (emp === "LK" ? "#b91c1c" : "#1e40af") + ';">' + emp + '</span>' : '';
+  _stkPopShell("📈 Proyección — " + escapeHtml(codCanon(codB)) + empTag, "stkPopBody");
+  var body = document.getElementById("stkPopBody"); if (!body) return;
+  var nombre = artNombre(cod, "") || "";
+  var fc = function (n) { n = Number(n) || 0; return String(Math.round(n * 10) / 10); };
+  body.innerHTML = '<div class="stkpop-empty">Cargando ventas facturadas de los últimos 6 meses…</div>';
+  var rows = [];
+  try {
+    var r = await fetch(SUPABASE_URL + "/rest/v1/rpc/ventas_mensuales_cod", {
+      method: "POST",
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ p_cod: codB, p_meses: 6 }), cache: "no-store"
+    });
+    if (r.ok) rows = await r.json();
+  } catch (_e) {}
+  rows = (Array.isArray(rows) ? rows : []).map(function (x) { return { mes: String(x.mes || ""), cajas: Number(x.cajas) || 0 }; });
+  var proyN = Number(proy) || 0;
+  var h = '<div class="stkpop-hint">' + (nombre ? '<b>' + escapeHtml(nombre) + '</b> · ' : '') +
+    'Proyección: <b style="color:#6d28d9">' + (proyN > 0.05 ? fc(proyN) : '—') + ' caj/mes</b></div>';
+  // De dónde surge (explicación fija)
+  h += '<div class="stkpop-grp" style="background:#faf5ff;border-color:#e9d5ff">' +
+       '<div style="font-size:12.5px;color:#4c1d95;line-height:1.5;">' +
+       '<b>¿De dónde surge?</b> La proyección es el <b>promedio mensual de cajas facturadas</b> ' +
+       '(ventas reales de PáginaLK, <b>Loeke + Chef</b>). Se calcula <b>por cliente</b> —desde su primera compra en la ventana— ' +
+       'y <b>descarta los meses-pico atípicos</b> (compras one-off), sumando todos los clientes. Ventana: <b>6 meses</b> ' +
+       '(si no hay ventas, cae a 12). <b>No</b> es el promedio simple de las barras de abajo.' +
+       '</div></div>';
+  if (!rows.length) {
+    h += '<div class="stkpop-empty">Sin ventas facturadas en los últimos 6 meses para <b>' + escapeHtml(codCanon(codB)) + '</b>' + (emp ? ' (' + emp + ')' : '') + '.<br><small style="color:#94a3b8">(o el motor de PáginaLK no respondió)</small></div>';
+    body.innerHTML = h; return;
+  }
+  var tot = rows.reduce(function (s, x) { return s + x.cajas; }, 0);
+  var prom = rows.length ? (tot / rows.length) : 0;
+  var mx = rows.reduce(function (s, x) { return Math.max(s, x.cajas); }, 0) || 1;
+  h += '<div class="stkpop-grp"><div style="font-size:12px;font-weight:800;color:#334155;margin-bottom:8px;">🧾 Cajas facturadas — últimos ' + rows.length + ' meses</div>';
+  h += '<div class="proyv-chart">';
+  rows.forEach(function (x) {
+    var pct = Math.max(2, Math.round(x.cajas / mx * 100));
+    h += '<div class="proyv-row">' +
+         '<span class="proyv-mes">' + escapeHtml(_stkFmtMes(x.mes)) + '</span>' +
+         '<span class="proyv-track"><span class="proyv-bar" style="width:' + pct + '%"></span></span>' +
+         '<span class="proyv-val">' + fc(x.cajas) + '</span></div>';
+  });
+  h += '</div>';
+  h += '<div class="proyv-foot">Total 6m: <b>' + fc(tot) + '</b> cajas · Promedio simple: <b>' + fc(Math.round(prom)) + '</b> caj/mes' +
+       (proyN > 0.05 ? ' · Proyección (depurada): <b style="color:#6d28d9">' + fc(proyN) + '</b>' : '') + '</div>';
+  h += '</div>';
+  body.innerHTML = h;
+}
 /* v9.02/9.04 — Módulo "NP que faltan": pedidos que están en la base (PPP_Base_Pedidos) pero NO en
    Programación Diaria, y que no se facturaron ni entregaron. Los que disparan el ⚠ de Cajas
    Pedidas. Lee vista_np_sin_programar (NP · Fecha · Razón Social/Cliente · Cajas). La operadora
@@ -15875,7 +16122,7 @@ function stkGondRender() {
     }).join("");
     if (list.length > MAX) h += '<div class="stkpop-empty">Mostrando ' + MAX + ' de ' + list.length + ' — filtrá o buscá para acotar.</div>';
   }
-  body.innerHTML = h;
+  _renderKeepFocus(body, h);   // v11.64 — preservar foco del buscador (antes innerHTML pelado → perdía el cursor)
 }
 /* v4.29 — CAPACIDAD POR SECTOR: cuántas cajas de cada artículo entran en góndola
 /* v4.29 — CAPACIDAD POR SECTOR: cuántas cajas de cada artículo entran en góndola
@@ -16842,7 +17089,9 @@ function _stkInsCatPopupRefresh() {
   if (!_stkIns || !_stkIns.abierta) return;
   const body = document.getElementById("stkInsCatPopBody");
   if (!body) return;
-  body.innerHTML = _stkInsListado(_stkIns.abierta, _stkIns.items);
+  // v11.64 — _renderKeepFocus (no innerHTML pelado): el buscador se re-renderiza en cada
+  // tecla (oninput→stkRender→acá); sin preservar foco perdía el cursor tras 1 carácter.
+  _renderKeepFocus(body, _stkInsListado(_stkIns.abierta, _stkIns.items));
 }
 /* v8.31 — dos unidades para la planilla: primaria = base; secundaria = la unidad no-base de
    mayor factor; + el factor. Sin factores → una sola unidad en primaria. */
@@ -20493,7 +20742,7 @@ async function cpLoadLios(np) {
     for (let i = 0; i < rows.length; i++) {
       const p = String(rows[i].texto || "").split("|");
       if (String(p[0]).trim().replace(/\.0+$/, "") === npU) {
-        return { count: parseInt(p[1], 10) || 0, tanda: p[2] || "", resumen: p[3] || "" };
+        return { count: parseInt(p[1], 10) || 0, tanda: p[2] || "", resumen: p[3] || "", clase: p[4] || "" };
       }
     }
   } catch (_e) {}
@@ -20721,13 +20970,20 @@ function cpUpdateLio(leg, s, qty, lioSel, info) {
   let lios = cpParseResumen((info && info.resumen) || "");
   const codU = String(s.cod_art).toUpperCase();
   const idx = (typeof lioSel === "number") ? lioSel : -1;   // v5.39: selección por índice (los rótulos ya no son 1 letra por lío)
+  // v11.45 — el conteo se basa en el conteo GUARDADO del último TAL ([1]), no en cuántos
+  // líos parsea el resumen (que puede venir incompleto/vacío y hacía que el número no subiera
+  // o bajara al completar un faltante). También se preserva la CLASE ([4]) en el re-emit.
+  const stored = Math.max(0, (info && info.count) || 0);
+  let nuevoConteo;
   if (lioSel !== "__new__" && idx >= 0 && lios[idx]) {
     const ex = lios[idx].items.filter(function (it) { return String(it.cod).toUpperCase() === codU; })[0];
     if (ex) ex.qty += qty; else lios[idx].items.push({ cod: codU, qty: qty });
+    nuevoConteo = Math.max(stored, lios.length);            // suma a un lío existente → el conteo NO cambia
   } else {
     lios.push({ items: [{ cod: codU, qty: qty }], suelta: false });
+    nuevoConteo = Math.max(stored + 1, lios.length);        // lío NUEVO → +1 sobre el conteo real
   }
-  try { liosSend(String(leg || ""), s.np, lios.length, (info && info.tanda) || s.tanda || "", cpBuildResumen(lios)); } catch (_e) {}
+  try { liosSend(String(leg || ""), s.np, nuevoConteo, (info && info.tanda) || s.tanda || "", cpBuildResumen(lios), (info && info.clase) || ""); } catch (_e) {}
 }
 /* Baja cajas_falto (y sube cajas_entregadas) del faltante en Entregas_Virgilio →
    cuando llega a 0 deja de disparar la alerta #28 (falta_llego). */
@@ -20819,6 +21075,7 @@ async function cpConfirm() {
     if (_fr.ok && ((await _fr.json()) || []).length) { await stockDrenarCPFacturado(_n, leg); }
   } catch (_e) {}
   cpUpdateLio(leg, s, qty, lioSel, info);
+  try { _facLiosTs = 0; } catch (_e) {}   // v11.45 — invalida el caché de líos de Facturación para que el nuevo conteo se vea al toque
   try { updatePendingIndicator(); } catch (_e) {}
   // v11.02 — el faltante YA se bajó arriba (con tope, ANTES de mover stock). Acá solo cerramos tareas
   // y refrescamos la lista para que el completado desaparezca (y se puedan completar varios seguidos).
@@ -21662,8 +21919,31 @@ function _compClearPersist(tanda) { try { localStorage.removeItem(_compPersistKe
    mano). Mismo patrón que Control Remitos (cargados − controlados), un paso
    antes. Reutiliza #tandaModal. v3.50.
    ========================================================= */
-let _cc = null;   // { legajo, items:[{tanda,np,rs}], checked:Set<np> }
+let _cc = null;   // { legajo, mode:'camion'|'retira', camionero, items:[{tanda,np,rs,esRetira}], checked:Set<np> }
 let _ccWakeLock = null;
+/* v11.47 — Camioneros: maestro de nombres para autocompletar (que siempre se escriba
+   igual "Guille" vs "Guillermo" → análisis limpio). GET para el datalist; upsert (ignore
+   duplicates, la PK nombre dedupe) al terminar la carga. Best-effort, no bloquea el flujo. */
+async function ccFetchCamioneros() {
+  try {
+    const r = await fetch(SUPABASE_URL + "/rest/v1/Camioneros?select=nombre&order=nombre.asc&limit=1000",
+      { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+    if (!r.ok) return [];
+    const a = await r.json();
+    return (Array.isArray(a) ? a : []).map(function (x) { return String(x.nombre || "").trim(); }).filter(Boolean);
+  } catch (_e) { return []; }
+}
+function ccUpsertCamionero(nombre) {
+  const n = String(nombre || "").trim();
+  if (!n) return;
+  try {
+    fetch(SUPABASE_URL + "/rest/v1/Camioneros?on_conflict=nombre", {
+      method: "POST",
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "resolution=ignore-duplicates,return=minimal" },
+      body: JSON.stringify({ nombre: n })
+    }).catch(function () {});
+  } catch (_e) {}
+}
 function _ccKey(legajo) { return "vir_cc_checked_" + legajo + "_" + getTodayKey(); }
 function ccSaveChecked(legajo, set) { try { localStorage.setItem(_ccKey(legajo), JSON.stringify(Array.from(set || []))); } catch (_e) {} }
 function ccLoadChecked(legajo) { try { const a = JSON.parse(localStorage.getItem(_ccKey(legajo)) || "[]"); return new Set(Array.isArray(a) ? a.map(String) : []); } catch (_e) { return new Set(); } }
@@ -21727,22 +22007,32 @@ async function fetchCCData() {
   }
   const cargados = new Set();
   for (const [np, ms] of maxCcn) { const fss = fssMap.get(np) || 0; if (!(fss && fss > ms)) cargados.add(np); }
-  const lios = new Map();
+  const lios = new Map(); const clase = new Map();   // v11.47 — clase [4] (lio|etiqueta|nada) para separar retira/camión
   for (const ev of talR) {
     const p = String(ev.texto || "").split("|");
     const np = p[0].trim().replace(/\.0+$/, "");
     const v = parseInt(p[1], 10);
     if (np && !isNaN(v)) lios.set(np, v);
+    if (np) clase.set(np, String(p[4] || "").toLowerCase().trim());   // último gana (orden asc)
   }
+  // v11.47 — cajas por NP (para RETIRA sin líos: se cuentan en cajas con "c").
+  let cajas = new Map(); try { cajas = await facFetchCajas(); } catch (_e) {}
   const items = []; const seen = new Set();
   for (const row of repR) {
     const np = String(row.np || "").trim().replace(/\.0+$/, "");
     if (!np || seen.has(np) || cargados.has(np)) continue;   // ya cargado → fuera
     if (entregadas.has(np)) continue;                        // v9.68: ya entregado (estado terminal) → fuera
     seen.add(np);
-    items.push({ np: np, tanda: (String(row.tanda || "").trim() || "—"), rs: row.razon_social || "", lios: lios.has(np) ? lios.get(np) : null });
+    items.push({ np: np, tanda: (String(row.tanda || "").trim() || "—"), rs: row.razon_social || "",
+      lios: lios.has(np) ? lios.get(np) : null,
+      clase: clase.get(np) || "",
+      cajas: cajas.has(np) ? Math.round(cajas.get(np)) : null });
   }
   try { await _ccAttachUbicYOrden(items); } catch (_e) {}
+  // v11.47 — RETIRA = zona "Retira" (Programación) O clase TAL 'nada'. El resto = camión.
+  items.forEach(function (it) {
+    it.esRetira = (String(it.zona || "").toLowerCase() === "retira") || (String(it.clase || "").toLowerCase() === "nada");
+  });
   return items;
 }
 
@@ -21783,7 +22073,11 @@ async function _ccAttachUbicYOrden(items) {
       geoByNp[n] = { zona: String(p.zona || "").trim(), lat: c ? c.lat : null, lng: c ? c.lng : null, m3: Number(p.m3) || 0 };
     });
     items.forEach(function (it) { const g = geoByNp[_rtNpNorm(it.np)]; if (g) { it.zona = g.zona; it.lat = g.lat; it.lng = g.lng; it.m3 = g.m3; } });
-    const depot = cache[RT_DEPOT_KEY] || null;
+    // v11.62 — si el DEPÓSITO no está geocodificado en PPP_Geo, el orden de ruta no corría y
+    // TODAS las NP caían en «sin ubicación en ruta». Lo geocodificamos on-demand (Nominatim en el
+    // navegador) y lo cacheamos → se auto-repara la 1ª vez y queda para siempre.
+    let depot = cache[RT_DEPOT_KEY] || null;
+    if (!depot) { try { depot = await _rtEnsureDepot(cache); } catch (_e) {} }
     if (depot) {
       let seq = 0;
       RT_RUTAS.forEach(function (R) {
@@ -21799,64 +22093,92 @@ async function _ccAttachUbicYOrden(items) {
   return items;
 }
 
-async function showCargaCamion(legajo) {
+/* v11.47 — al tocar CC, primero se elige RETIRA o CAMIÓN. Camión = todos los pedidos
+   salvo los retira, con nombre de camionero (autocompletado). Retira = solo los retira,
+   contados en cajas, sin camionero. */
+async function showCargaCamion(legajo, mode) {
   const m = document.getElementById("tandaModal"); if (!m) return;
   const leg = String(legajo || "").trim();
-  m.querySelector(".tanda-modal-title").textContent = "🚛 Carga Camión — reparto";
-  m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">Cargando reparto…</div>`;
   m.classList.add("show");
+  if (!mode) { ccRenderChooser(leg); return; }   // sin modo → preguntar retira o camión
+  const esRetira = (mode === "retira");
+  m.querySelector(".tanda-modal-title").textContent = esRetira ? "🚶 Carga — Retira" : "🚛 Carga Camión — reparto";
+  m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">Cargando ${esRetira ? "retiras" : "reparto"}…</div>`;
   ccWakeLock();
   try {
-    const items = await fetchCCData();
+    const _both = await Promise.all([ fetchCCData(), esRetira ? Promise.resolve([]) : ccFetchCamioneros() ]);
+    let items = _both[0]; const camioneros = _both[1] || [];
+    items = items.filter(function (it) { return esRetira ? it.esRetira : !it.esRetira; });   // camión = todos salvo retira
     // v10.23 — ordenar por ORDEN DE CARGA (inverso de la ruta); las NP sin orden van al final.
     const _li = function (x) { return (x.loadIdx == null || !isFinite(x.loadIdx)) ? Number.MAX_SAFE_INTEGER : x.loadIdx; };
     items.sort((a, b) => (_li(a) - _li(b)) || String(a.tanda).localeCompare(String(b.tanda)) || a.np.localeCompare(b.np));
     if (!items.length) {
       _cc = null; ccReleaseWakeLock();
-      m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">No hay reparto pendiente de cargar.<br><small>Aparece cuando Ventas genera el PDF de facturación.</small></div><button class="pk-btn pk-ok" onclick="ccEndWithoutLoading('${leg}')">✓ Terminar Carga Camión (sin cargar por app)</button><button class="pk-btn pk-cancel" onclick="ccClose()">Cerrar (sigo después)</button>`;
+      m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">No hay ${esRetira ? "retiras" : "reparto"} pendiente de cargar.<br><small>${esRetira ? "Los retira aparecen cuando Ventas genera el PDF." : "Aparece cuando Ventas genera el PDF de facturación."}</small></div><button class="pk-btn pk-ok" onclick="ccEndWithoutLoading('${leg}')">✓ Terminar Carga Camión (sin cargar por app)</button><button class="pk-btn pk-cancel" onclick="showCargaCamion('${leg}')">← Volver</button>`;
       return;
     }
     const saved = ccLoadChecked(leg);
-    _cc = { legajo: leg, items: items, checked: new Set(items.filter(it => saved.has(it.np)).map(it => it.np)) };
+    _cc = { legajo: leg, mode: mode, camionero: "", camioneros: camioneros, items: items, checked: new Set(items.filter(it => saved.has(it.np)).map(it => it.np)) };
     ccRender();
   } catch (e) {
     _cc = null; ccReleaseWakeLock();
-    m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">No se pudo cargar (¿sin conexión?).<br><small>${escapeHtml(e.message || "")}</small></div><button class="pk-btn pk-ok" onclick="ccEndWithoutLoading('${leg}')">✓ Terminar Carga Camión (sin cargar por app)</button><button class="pk-btn pk-cancel" onclick="ccClose()">Cerrar (sigo después)</button>`;
+    m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">No se pudo cargar (¿sin conexión?).<br><small>${escapeHtml(e.message || "")}</small></div><button class="pk-btn pk-ok" onclick="ccEndWithoutLoading('${leg}')">✓ Terminar Carga Camión (sin cargar por app)</button><button class="pk-btn pk-cancel" onclick="showCargaCamion('${leg}')">← Volver</button>`;
   }
+}
+/* Pantalla inicial: ¿retira o camión? */
+function ccRenderChooser(leg) {
+  const m = document.getElementById("tandaModal"); if (!m) return;
+  m.querySelector(".tanda-modal-title").textContent = "🚛 Carga Camión";
+  m.querySelector(".tanda-modal-body").innerHTML =
+    `<div class="cc-sub" style="margin-bottom:14px;">¿Qué vas a cargar?</div>` +
+    `<button class="pk-btn pk-ok" style="font-size:19px;padding:18px;" onclick="showCargaCamion('${leg}','camion')">🚛 Camión <small style="font-weight:700;opacity:.85;display:block;font-size:12px;margin-top:3px;">Todos los pedidos, salvo los retira. Pedís el camionero.</small></button>` +
+    `<button class="pk-btn pk-ok" style="font-size:19px;padding:18px;background:#475569;" onclick="showCargaCamion('${leg}','retira')">🚶 Retira <small style="font-weight:700;opacity:.85;display:block;font-size:12px;margin-top:3px;">Solo los retira, contados en cajas.</small></button>` +
+    `<button class="pk-btn pk-cancel" onclick="ccClose()">Cerrar</button>`;
 }
 
 function ccRender() {
   const m = document.getElementById("tandaModal"); if (!m || !_cc) return;
+  const esRetira = (_cc.mode === "retira");
   // v10.23 — se renderiza en ORDEN DE CARGA (los items ya vienen ordenados por loadIdx).
   // Encabezado por RUTA; posición 1,2,3… = orden de carga (último destino del camión primero).
   // Las NP sin ubicación en ruta caen en una sección aparte, ordenadas por tanda.
   const hasOrden = _cc.items.some(function (it) { return isFinite(it.loadIdx); });
-  let html = `<div class="cc-sub">NP del <b>reparto</b> — tocá los que <b>cargaste al camión</b>.` +
-             (hasOrden ? ` Están en <b>orden de carga</b>: el <b>último destino</b> de cada camión se carga <b>primero</b> (1 = primero en subir).` : ``) + `</div>`;
+  let html = `<div class="cc-sub">${esRetira ? "Pedidos <b>retira</b> — tocá los que <b>entregaste</b> (se cuentan en <b>cajas</b>)." : "NP del <b>reparto</b> — tocá los que <b>cargaste al camión</b>."}` +
+             (!esRetira && hasOrden ? ` Están en <b>orden de carga</b>: el <b>último destino</b> de cada camión se carga <b>primero</b> (1 = primero en subir).` : ``) + `</div>`;
+  // v11.47 — camión: nombre del camionero con autocompletado (maestro Camioneros).
+  if (!esRetira) {
+    const opts = (_cc.camioneros || []).map(function (n) { return `<option value="${escapeHtml(n)}"></option>`; }).join("");
+    html += `<div class="cc-camionero-wrap"><label class="cc-camionero-lbl">🧑‍✈️ Camionero</label>` +
+            `<input id="ccCamioneroInput" class="cc-camionero-inp" list="ccCamioneroList" autocomplete="off" placeholder="Nombre del camionero…" value="${escapeHtml(_cc.camionero || "")}" oninput="_cc && (_cc.camionero = this.value)" />` +
+            `<datalist id="ccCamioneroList">${opts}</datalist></div>`;
+  }
   let curSec = null;
   let pos = 0;
   for (const it of _cc.items) {
     const enRuta = isFinite(it.loadIdx);
     const secKey = enRuta ? ("R:" + (it.ruta || "Ruta")) : "__sin__";
-    if (secKey !== curSec) {
+    if (secKey !== curSec && !esRetira) {
       curSec = secKey; pos = 0;
       html += `<div class="cc-ruta">${enRuta ? "🚚 " + escapeHtml(it.ruta || "Ruta") + " · orden de carga" : "📍 Sin ubicación en ruta — cargar aparte"}</div>`;
     }
     pos++;
     const on = _cc.checked.has(it.np);
-    const liosNull = (it.lios == null);
-    const liosTxt = liosNull ? "—" : String(it.lios);
-    const liosCls = (liosNull || it.lios === 0) ? " cc-lios0" : "";
+    const cell = esRetira ? _liosCajasCell(it) : null;
+    const liosTxt = esRetira ? cell.txt : (it.lios == null ? "—" : String(it.lios));
+    const liosCls = esRetira ? ((cell.txt === "—") ? " cc-lios0" : "") : ((it.lios == null || it.lios === 0) ? " cc-lios0" : "");
+    const liosIcon = esRetira ? (cell.esCajas ? "🧺" : "📦") : "📦";
+    const liosTtl = esRetira ? (cell.esCajas ? "cajas (retira)" : "líos") : "líos";
     const ubic = it.ubic ? `<span class="cc-ubic" title="dónde quedó armado">📌 ${escapeHtml(it.ubic)}</span>` : "";
     html += `<div class="cc-np${on ? " cc-on" : ""}" onclick="ccToggle('${String(it.np).replace(/[^0-9A-Za-z]/g, "")}')">` +
-            (enRuta ? `<span class="cc-pos">${pos}</span>` : "") +
+            (!esRetira && enRuta ? `<span class="cc-pos">${pos}</span>` : "") +
             `<span class="cc-chk">${on ? "✓" : ""}</span>` +
             `<span class="cc-npnum">${escapeHtml(it.np)}</span>` +
             ubic +
             `<span class="cc-rs">${escapeHtml(it.rs)}</span>` +
-            `<span class="cc-lios${liosCls}" title="líos">📦 ${liosTxt}</span></div>`;
+            `<span class="cc-lios${liosCls}" title="${liosTtl}">${liosIcon} ${escapeHtml(liosTxt)}</span></div>`;
   }
-  html += `<button class="pk-btn pk-ok" onclick="ccFinish()">🚛 Terminé Carga Camión (${_cc.checked.size} cargadas)</button>` +
+  html += `<button class="pk-btn pk-ok" onclick="ccFinish()">${esRetira ? "🚶 Terminé Retira" : "🚛 Terminé Carga Camión"} (${_cc.checked.size} ${esRetira ? "entregados" : "cargadas"})</button>` +
+          `<button class="pk-btn pk-cancel" onclick="showCargaCamion('${_cc.legajo}')">← Volver (retira/camión)</button>` +
           `<button class="pk-btn pk-cancel" onclick="ccClose()">Cerrar (sigo después)</button>`;
   m.querySelector(".tanda-modal-body").innerHTML = html;
 }
@@ -21884,12 +22206,23 @@ function ccEndWithoutLoading(legajo) {
 function ccFinish() {
   if (!_cc) return;
   const legajo = _cc.legajo;
+  const esRetira = (_cc.mode === "retira");
+  // v11.47 — camión: nombre del camionero (leído del input en vivo por si oninput no corrió).
+  let camionero = "";
+  if (!esRetira) {
+    try { const inp = document.getElementById("ccCamioneroInput"); if (inp) _cc.camionero = inp.value; } catch (_e) {}
+    camionero = String(_cc.camionero || "").trim();
+    if (!camionero) {
+      try { if (!confirm("No pusiste el nombre del camionero.\n¿Terminar igual sin camionero?")) return; } catch (_e) {}
+    }
+  }
   const sel = _cc.items.filter(it => _cc.checked.has(it.np));
-  for (const it of sel) ccSendDetail(legajo, it.np, it.tanda);   // CCN por cada NP cargada
-  ccSendClose(legajo);                                           // cierre CC
+  for (const it of sel) ccSendDetail(legajo, it.np, it.tanda, camionero);   // CCN por cada NP cargada (con camionero)
+  if (camionero) ccUpsertCamionero(camionero);                  // guarda el nombre en el maestro Camioneros
+  ccSendClose(legajo);                                          // cierre CC
   ccClearChecked(legajo);
   _cc = null; ccReleaseWakeLock(); closeTandaModal();
-  try { alert("🚛 Carga Camión terminada. " + sel.length + " NP cargadas."); } catch (_e) {}
+  try { alert((esRetira ? "🚶 Retira terminado. " : "🚛 Carga Camión terminada. ") + sel.length + (esRetira ? " retira(s) entregados." : " NP cargadas.") + (camionero ? "\nCamionero: " + camionero : "")); } catch (_e) {}
 }
 function ccSendClose(legajo) {
   const st = getLegajoState(legajo);
@@ -21901,11 +22234,15 @@ function ccSendClose(legajo) {
   try { enqueueReport(payload); if (typeof trySendOneReport === "function") trySendOneReport(payload).then(r => { if (r && r.ok) removeFromQueue(payload.id); }).catch(() => {}); } catch (_e) {}
   try { updatePendingIndicator(); updateCoreButtonsState(); } catch (_e) {}
 }
-function ccSendDetail(legajo, np, tanda) {
+function ccSendDetail(legajo, np, tanda, camionero) {
   const nowMs = Date.now();
+  // v11.47 — CCN texto: NP|TANDA|CAMIONERO. El camionero solo va en camión (en retira queda vacío).
+  // Las vistas leen split_part [1]=np, [2]=tanda → el 3er campo no las afecta.
+  const cam = String(camionero || "").trim();
+  const texto = (String(np) + "|" + String(tanda)).toUpperCase() + "|" + cam;
   const payload = {
     legajo: legajo, opcion: "CCN", descripcion: "Carga Camión NP",
-    texto: (String(np) + "|" + String(tanda)).toUpperCase(),
+    texto: texto,
     ts: nowMs,
     id: ("ccn_" + legajo + "_" + np + "_" + getTodayKey()).replace(/[^a-zA-Z0-9_\-]/g, ""),
     ts_inicio_iso: null
@@ -22027,20 +22364,26 @@ async function fetchSinSalidaMap(sinceISO) {
 /* Junta lo necesario para CR: CCN (NP cargadas + cuándo + tanda), TAL (líos por NP),
    CRN (NP ya controladas), el PPP del día (cód + razón por NP) y, para los NP que ya
    NO están en la PPP del día, "Pedidos Entregados" (fetchEntregadosMeta) como fallback. */
-/* v10.25: badge RR usa vista_control_remitos (count). Antes hacía 3 fetches + join JS. */
+/* v10.25: badge RR usa vista_control_remitos (count). Antes hacía 3 fetches + join JS.
+   v11.63: además del número, un ⚠ aparte si hay VENCIDOS (cargados +30 h sin controlar). */
 async function rrLoadBadge() {
   try {
-    const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, Prefer: "count=exact" };
-    const res = await fetch(SUPABASE_URL + "/rest/v1/vista_control_remitos?select=np&limit=1", { headers: H, cache: "no-store" });
-    const range = res.headers.get("content-range");
-    const n = range ? parseInt(range.split("/").pop()) || 0 : 0;
+    const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+    const rows = await fetch(SUPABASE_URL + "/rest/v1/vista_control_remitos?select=vencido&limit=5000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; });
+    const n = (rows || []).length;
+    const venc = (rows || []).filter(function (r) { return r.vencido; }).length;
     supSetBadge("rrBadge", n);
+    const a = document.getElementById("rrAlertBadge");
+    if (a) {
+      if (venc > 0) { a.style.display = ""; a.title = venc + " remito(s) VENCIDO(s) — cargados hace +30 h sin controlar"; }
+      else { a.style.display = "none"; }
+    }
   } catch (_e) {}
 }
 /* v10.25: fetchCRData usa vista_control_remitos. Antes hacía 5 fetches + 40 líneas de join JS. */
 async function fetchCRData() {
   const H = { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY };
-  const res = await fetch(SUPABASE_URL + "/rest/v1/vista_control_remitos?select=np,tanda,first_load,lios,cod_cliente,rs", {
+  const res = await fetch(SUPABASE_URL + "/rest/v1/vista_control_remitos?select=np,tanda,first_load,lios,clase,cajas,cod_cliente,rs", {
     headers: H, cache: "no-store"
   });
   if (!res.ok) throw new Error("HTTP " + res.status);
@@ -22048,6 +22391,7 @@ async function fetchCRData() {
   return rows.map(r => ({
     np: r.np, tanda: r.tanda || "—", cod: r.cod_cliente || "", rs: r.rs || "",
     lios: r.lios != null ? r.lios : null,
+    clase: r.clase || "", cajas: (r.cajas != null ? Number(r.cajas) : null),
     loadMs: r.first_load ? new Date(r.first_load).getTime() : 0,
     venc: crVencido(r.first_load ? new Date(r.first_load).getTime() : 0)
   }));
@@ -22087,14 +22431,14 @@ function crRender() {
   for (const it of _cr.items) {
     const on = _cr.checked.has(it.np);
     const npc = String(it.np).replace(/[^0-9A-Za-z]/g, "");
-    const liosNull = (it.lios == null);
-    const liosTxt = liosNull ? "—" : String(it.lios);
-    const liosCls = (liosNull || it.lios === 0) ? " cr-lios0" : "";
+    const cell = _liosCajasCell(it);
+    const liosCls = (cell.txt === "—") ? " cr-lios0" : "";
+    const liosTtl = cell.esCajas ? "cajas (retira)" : "líos";
     rows += `<tr class="cr-row${on ? " cc-on" : ""}${it.venc ? " cr-venc" : ""}" onclick="crToggle('${npc}')">` +
             `<td class="cr-td-np">${escapeHtml(it.np)}${it.loadMs ? `<div class="cr-cc-date">🚚 ${crFmtCC(it.loadMs)}</div>` : ""}</td>` +
             `<td class="cr-td-cod">${it.cod ? escapeHtml(it.cod) : "—"}</td>` +
             `<td class="cr-td-rs">${escapeHtml(it.rs || "—")}${it.venc ? `<span class="cr-venc-tag">VENCIDO</span>` : ""}</td>` +
-            `<td class="cr-td-lios${liosCls}">${liosTxt}</td>` +
+            `<td class="cr-td-lios${liosCls}" title="${liosTtl}">${escapeHtml(cell.txt)}</td>` +
             `<td class="cr-td-ctrl"><span class="cr-chk">${on ? "✓" : ""}</span></td>` +
             `<td class="cr-td-act"><button class="cr-sinsal-btn" onclick="event.stopPropagation();crMarkSinSalida('${npc}')" title="El cliente no recibió — la mercadería volvió al depósito. Sale de acá y queda en «FC s/Salida» (Stocks).">↩ s/salida</button></td></tr>`;
   }
@@ -22240,21 +22584,38 @@ async function fetchCCRData() {
     const np = String(ev.texto || "").split("|")[0].trim().replace(/\.0+$/, "");
     if (np) controlados.add(np);
   }
-  const lios = new Map();
+  const lios = new Map(); const clase = new Map();   // v11.46 — clase [4] (lio|etiqueta|nada) para retira
   for (const ev of talR) {
     const p = String(ev.texto || "").split("|");
     const np = p[0].trim().replace(/\.0+$/, "");
     const v = parseInt(p[1], 10);
     if (np && !isNaN(v)) lios.set(np, v);
+    if (np) clase.set(np, String(p[4] || "").toLowerCase().trim());   // último gana (orden asc)
   }
+  // v11.46 — cajas por NP (para los RETIRA que no arman líos: se muestran cajas con "c").
+  let cajas = new Map(); try { cajas = await facFetchCajas(); } catch (_e) {}
   const items = []; const seen = new Set();
   for (const row of repR) {
     const np = String(row.np || "").trim().replace(/\.0+$/, "");
     if (!np || seen.has(np) || controlados.has(np)) continue;   // ya controlado en CR → fuera
     seen.add(np);
-    items.push({ np: np, tanda: (String(row.tanda || "").trim() || "—"), rs: row.razon_social || "", lios: lios.has(np) ? lios.get(np) : null });
+    items.push({ np: np, tanda: (String(row.tanda || "").trim() || "—"), rs: row.razon_social || "",
+      lios: lios.has(np) ? lios.get(np) : null,
+      clase: clase.get(np) || "",
+      cajas: cajas.has(np) ? Math.round(cajas.get(np)) : null });
   }
   return items;
+}
+/* v11.46 — celda "líos" unificada: muestra líos, salvo RETIRA (clase 'nada') sin líos →
+   muestra las CAJAS con una "c" (ej. "12c"). Devuelve { txt, esCajas }. */
+function _liosCajasCell(it) {
+  var esRetira = (it.esRetira != null) ? !!it.esRetira : (String(it.clase || "").toLowerCase() === "nada");
+  var sinLios = (it.lios == null || it.lios === 0);
+  if (esRetira && sinLios) {
+    var c = (it.cajas == null) ? null : it.cajas;
+    return { txt: (c == null ? "—" : (c + "c")), esCajas: true };
+  }
+  return { txt: (it.lios == null ? "—" : String(it.lios)), esCajas: false };
 }
 
 async function showControlRemitosCR(legajo) {
@@ -22290,14 +22651,15 @@ function ccrRender() {
     html += `<div class="cc-tanda">Tanda ${escapeHtml(tanda)}</div>`;
     for (const it of byTanda[tanda]) {
       const on = _ccr.checked.has(it.np);
-      const liosNull = (it.lios == null);
-      const liosTxt = liosNull ? "—" : String(it.lios);
-      const liosCls = (liosNull || it.lios === 0) ? " cc-lios0" : "";
+      const cell = _liosCajasCell(it);
+      const liosCls = (cell.txt === "—") ? " cc-lios0" : "";
+      const icon = cell.esCajas ? "🧺" : "📦";
+      const ttl = cell.esCajas ? "cajas (retira)" : "líos";
       html += `<div class="cc-np${on ? " cc-on" : ""}" onclick="ccrToggle('${String(it.np).replace(/[^0-9A-Za-z]/g, "")}')">` +
               `<span class="cc-chk">${on ? "✓" : ""}</span>` +
               `<span class="cc-npnum">${escapeHtml(it.np)}</span>` +
               `<span class="cc-rs">${escapeHtml(it.rs)}</span>` +
-              `<span class="cc-lios${liosCls}" title="líos">📦 ${liosTxt}</span></div>`;
+              `<span class="cc-lios${liosCls}" title="${ttl}">${icon} ${escapeHtml(cell.txt)}</span></div>`;
     }
   }
   html += `<button class="pk-btn pk-ok" onclick="ccrFinish()">✓ Terminé Control (${_ccr.checked.size} controlados)</button>` +
@@ -25696,6 +26058,124 @@ async function pppPrintTanda(npsCsv) {
   } catch (e) { pppSetStatus("Error al imprimir la tanda: " + (e && e.message ? e.message : e), false); }
   finally { _pdfDirBusy = false; }
 }
+
+/* ===== v11.60 — COLA DE IMPRESIÓN DE NP (armadas) =====
+   El operario, al TERMINAR ARMADO, emite un TAL por cada NP → la vista `vista_cola_impresion`
+   junta las NP armadas (desde el ancla) que TODAVÍA no se imprimieron. El supervisor entra acá,
+   toca «Imprimir todas» y salen en cola a la impresora conectada (Chrome --kiosk-printing las
+   manda solas; si no, un diálogo por PDF). Cada NP con PDF encontrado se marca en `Impresion_NP`
+   y sale de la cola; las que no tienen PDF quedan. ALARMA (badge rojo) si alguna quedó +24 h sin
+   imprimir. Reusa la infra de PDF ISIS (pppGetPdfDirs / _pppIndexDirs / _pppPrintPdf). */
+var _colaImp = null;
+async function colaImpLoadBadge() {
+  try {
+    var H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+    var rows = await fetch(SUPABASE_URL + "/rest/v1/vista_cola_impresion?select=np,vencido&limit=5000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; });
+    var n = (rows || []).length, venc = (rows || []).filter(function (r) { return r.vencido; }).length;
+    var b = document.getElementById("colaImpBadge"); if (!b) return;
+    if (!n) { b.style.display = "none"; return; }
+    b.style.display = ""; b.className = "dp-badge"; b.textContent = (venc ? "⚠ " : "") + n;
+    b.style.background = venc ? "#b91c1c" : "#2563eb";
+    b.title = venc ? (venc + " nota(s) de pedido hace +24 h sin imprimir") : (n + " nota(s) de pedido armadas sin imprimir");
+  } catch (_e) {}
+}
+function colaImpModal() {
+  var ov = document.getElementById("colaImpOv");
+  if (!ov) {
+    ov = document.createElement("div"); ov.id = "colaImpOv";
+    ov.style.cssText = "display:none;position:fixed;inset:0;z-index:1290;background:rgba(2,6,23,.72);overflow:auto;padding:14px;";
+    ov.addEventListener("click", function (e) { if (e.target === ov) colaImpClose(); });
+    ov.innerHTML = '<div style="background:#f8fafc;max-width:780px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:linear-gradient(90deg,#1e3a8a,#1e40af);color:#fff;">' +
+      '<span style="font-size:18px;font-weight:800;">🖨️ Cola de impresión — NP armadas</span>' +
+      '<button onclick="colaImpClose()" style="background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;width:auto;">Cerrar</button></div>' +
+      '<div id="colaImpBody" style="padding:14px 16px;max-height:calc(100vh - 120px);overflow:auto;"></div></div>';
+    document.body.appendChild(ov);
+  }
+  return ov;
+}
+function colaImpClose() { var ov = document.getElementById("colaImpOv"); if (ov) ov.style.display = "none"; }
+function colaImpStatus(msg, ok) { var el = document.getElementById("colaImpStatus"); if (el) { el.textContent = msg; el.style.color = ok === false ? "#b91c1c" : (ok ? "#166534" : "#334155"); } }
+function _colaImpHace(ts) {
+  if (!ts) return "";
+  var ms = Date.now() - new Date(ts).getTime(); if (ms < 0) ms = 0;
+  var h = Math.floor(ms / 3600000), m = Math.floor((ms % 3600000) / 60000);
+  return h > 0 ? (h + "h " + m + "m") : (m + "m");
+}
+async function openColaImpresion(keepOpen) {
+  var ov = colaImpModal(); ov.style.display = "block";
+  var body = document.getElementById("colaImpBody");
+  if (body && !keepOpen) body.innerHTML = '<div style="padding:24px;text-align:center;color:#64748b;">Cargando cola…</div>';
+  try {
+    var H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+    var rows = await fetch(SUPABASE_URL + "/rest/v1/vista_cola_impresion?select=np,tanda,razon_social,armado_ts,vencido,resumen,armador_leg&order=armado_ts.asc&limit=5000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; });
+    _colaImp = { items: rows || [] };
+    colaImpRender();
+  } catch (e) { if (body) body.innerHTML = '<div style="padding:20px;color:#b91c1c;">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
+}
+function colaImpRender() {
+  var body = document.getElementById("colaImpBody"); if (!body || !_colaImp) return;
+  var items = _colaImp.items || [];
+  var venc = items.filter(function (x) { return x.vencido; }).length;
+  var h = '';
+  h += '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px;">' +
+    '<button onclick="colaImprimirTodas()" style="background:#1e40af;color:#fff;border:none;border-radius:9px;padding:11px 18px;font-size:15px;font-weight:800;cursor:pointer;width:auto;">🖨️ Imprimir todas (' + items.length + ')</button>' +
+    '<button onclick="openColaImpresion()" style="background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:9px 13px;font-weight:800;cursor:pointer;width:auto;">↻ Actualizar</button></div>';
+  h += '<div style="font-size:12px;color:#64748b;margin-bottom:8px;">Imprime el <b>remito de armado</b> de cada NP (se genera en la app desde lo armado — no usa la carpeta de PDF). Con Chrome en modo <b>--kiosk-printing</b> salen solas a la impresora predeterminada; si no, un diálogo por hoja.</div>';
+  h += '<div id="colaImpStatus" style="font-size:12.5px;color:#334155;margin-bottom:8px;min-height:16px;"></div>';
+  if (venc) h += '<div style="background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;border-radius:9px;padding:9px 12px;font-weight:800;margin-bottom:10px;">⚠ ' + venc + ' nota(s) de pedido hace +24 h sin imprimir.</div>';
+  if (!items.length) { body.innerHTML = h + '<div style="padding:20px;text-align:center;color:#94a3b8;">No hay notas de pedido pendientes de imprimir. 👍</div>'; return; }
+  var thc = 'text-align:left;padding:7px 9px;background:#f1f5f9;color:#475569;font-size:11px;text-transform:uppercase;border-bottom:1px solid #cbd5e1;';
+  h += '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13.5px;"><thead><tr>' +
+    '<th style="' + thc + '">NP</th><th style="' + thc + '">Tanda</th><th style="' + thc + '">Razón Social</th>' +
+    '<th style="' + thc + 'text-align:right;">Armado hace</th></tr></thead><tbody>';
+  items.forEach(function (x) {
+    h += '<tr' + (x.vencido ? ' style="background:#fef2f2;"' : '') + '>' +
+      '<td style="padding:7px 9px;border-bottom:1px solid #eef2f7;font-weight:800;font-family:Consolas,Menlo,monospace;color:#0f172a;">' + escapeHtml(x.np) + (x.vencido ? ' <span style="color:#b91c1c;">⚠</span>' : '') + '</td>' +
+      '<td style="padding:7px 9px;border-bottom:1px solid #eef2f7;">' + escapeHtml(x.tanda || "—") + '</td>' +
+      '<td style="padding:7px 9px;border-bottom:1px solid #eef2f7;">' + escapeHtml(x.razon_social || "—") + '</td>' +
+      '<td style="padding:7px 9px;border-bottom:1px solid #eef2f7;text-align:right;color:' + (x.vencido ? '#b91c1c' : '#64748b') + ';font-weight:' + (x.vencido ? '800' : '600') + ';">' + _colaImpHace(x.armado_ts) + '</td></tr>';
+  });
+  h += '</tbody></table></div>';
+  body.innerHTML = h;
+}
+/* Imprime el REMITO DE ARMADO (generado en la app desde el resumen del TAL, mismo formato
+   que la estación de auto-impresión) de cada NP de la cola, uno tras otro. NO usa PDF: reusa
+   armadoRemitoData/InnerHtml + remitoPrintDoc. Con Chrome --kiosk-printing salen solas. */
+var _colaImpBusy = false;
+async function colaImprimirTodas() {
+  if (_colaImpBusy) { alert("Esperá, ya hay una impresión en curso."); return; }
+  var items0 = (_colaImp && _colaImp.items) ? _colaImp.items.slice() : [];
+  items0 = items0.filter(function (x) { return x && x.resumen; });   // sin resumen no hay remito
+  if (!items0.length) { alert("No hay notas de pedido con armado (resumen) para imprimir."); return; }
+  _colaImpBusy = true;
+  try {
+    colaImpStatus("Preparando " + items0.length + " remito(s)…");
+    var items = items0.map(function (x) { return { np: x.np, tanda: (x.tanda === "—" ? "" : x.tanda), resumen: x.resumen, armadorLeg: x.armador_leg || "" }; });
+    var ds = await _armadoRemitoDataForItems(items);
+    // imprimir serializado (1 hoja cada ~2.6 s, como la estación); con kiosk salen solas.
+    var k = 0;
+    var next = function () { if (k >= ds.length) return; try { remitoPrintDoc(armadoRemitoInnerHtml(ds[k])); } catch (_e) {} k++; if (k < ds.length) setTimeout(next, 2600); };
+    next();
+    colaImpMarcarImpresas(items.map(function (it) { return it.np; }));
+    colaImpStatus("🖨️ Mandé a imprimir " + ds.length + " remito(s) de armado.", true);
+    setTimeout(function () { colaImpLoadBadge(); openColaImpresion(true); }, 1600);
+  } catch (e) { colaImpStatus("Error: " + (e && e.message ? e.message : e), false); }
+  finally { _colaImpBusy = false; }
+}
+/* Marca en Impresion_NP las NP que se mandaron a imprimir (idempotente, PK np). */
+function colaImpMarcarImpresas(nps) {
+  if (!nps || !nps.length) return;
+  var leg = (typeof legajoInput !== "undefined" && legajoInput && legajoInput.value) ? legajoInput.value : null;
+  var rows = nps.map(function (np) { return { np: String(np), legajo: leg }; });
+  try {
+    fetch(SUPABASE_URL + "/rest/v1/Impresion_NP?on_conflict=np", {
+      method: "POST",
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "resolution=ignore-duplicates,return=minimal" },
+      body: JSON.stringify(rows)
+    }).catch(function () {});
+  } catch (_e) {}
+}
 /* ===== v7.16 — CHEQUEO DE GÓNDOLA (botón 📦 al lado del 🖨 de cada pedido) =====
    Responde "¿tengo en góndola todo lo que necesito para armar este pedido?" y, si
    falta algo, lo DETALLA artículo por artículo. El mismo botón está en la franja de
@@ -26428,6 +26908,22 @@ async function _zgCachePut(key, dir, barrio, c) {
   try {
     await fetch(SUPABASE_URL + "/rest/v1/PPP_Geo?on_conflict=dir_key", { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ dir_key: key, direccion: dir, barrio: barrio, lat: c.lat, lng: c.lng, comp: c.comp || null }) });
   } catch (e) { }
+}
+/* v11.62 — asegura que el DEPÓSITO esté geocodificado en PPP_Geo. Si falta, lo geocodifica
+   (Nominatim en el navegador) y lo guarda. Devuelve {lat,lng} o null. Lo usa Carga Camión
+   para el orden de ruta (sin esto, el orden no corre y todo cae en «cargar aparte»). */
+async function _rtEnsureDepot(cache) {
+  if (cache && cache[RT_DEPOT_KEY]) return cache[RT_DEPOT_KEY];
+  try {
+    const c = await _rtGeocode(RT_DEPOT_DIR, "");
+    if (c && isFinite(c.lat) && isFinite(c.lng)) {
+      const d = { lat: c.lat, lng: c.lng };
+      if (cache) cache[RT_DEPOT_KEY] = d;
+      try { await _zgCachePut(RT_DEPOT_KEY, "Virgilio 2788", "", c); } catch (_e) {}
+      return d;
+    }
+  } catch (_e) {}
+  return (cache && cache[RT_DEPOT_KEY]) || null;
 }
 /* cache con componentes oficiales (comp) para la regla de zona. */
 async function _zgCacheAll() {
@@ -27866,7 +28362,7 @@ async function avpLoad() {
 /* v9.58 — vendedores INTERNOS ("somos nosotros"): 7 = fábrica, 20 = super. A vend 20 NO se
    le avisa NI al cliente NI al vendedor (son pedidos nuestros). A vend 7 (fábrica) no se arma
    resumen de vendedor, pero el cliente igual puede recibir aviso. */
-function _avpNoVend(v) { return v === "4" || v === "5" || v === "7" || v === "14" || v === "20"; }   // v9.84 — no arma resumen de vendedor (4/5/7/14 = fábrica/internos, 20 = super)
+function _avpNoVend(v) { return v === "4" || v === "5" || v === "7" || v === "14" || v === "17" || v === "20"; }   // v11.42 — no arma resumen de vendedor (4/5/7/14 = fábrica/internos, 20 = super, 17 = vendedor fallecido: sus clientes se avisan igual pero no se le manda resumen)
 function _avpNoCliente(v) { return v === "20"; }             // tampoco se avisa al cliente (super = nosotros)
 function avpRender() {
   var body = document.getElementById("avpBody"); if (!body || !_avp) return;
@@ -28080,13 +28576,16 @@ async function _cobRpc(fn, body) {
   if (!r.ok) { var t = ""; try { t = await r.text(); } catch (_e) {} throw new Error("HTTP " + r.status + (t ? (" — " + t) : "")); }
   try { return await r.json(); } catch (_e) { return null; }
 }
-async function openCobranzas() {
-  try { if (typeof requireSupervisor === "function" && !requireSupervisor()) return; } catch (_e) {}
+function _cobEnsureCss() {
   if (!document.getElementById("cobCss")) {
     var st = document.createElement("style"); st.id = "cobCss";
     st.textContent = "#cobOverlay .cob-card{max-width:940px;margin:0 auto;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5);display:flex;flex-direction:column;max-height:92vh;}.cob-head{display:flex;align-items:center;gap:12px;padding:13px 16px;background:linear-gradient(90deg,#065f46,#022c22);color:#fff;flex:0 0 auto;}.cob-head b{font-size:17px;}.cob-x{margin-left:auto;width:auto;background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;}.cob-body{padding:14px 16px;display:flex;flex-direction:column;min-height:0;flex:1;}.cob-ctrl{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px;flex:0 0 auto;font-size:12.5px;color:#475569;}.cob-tab{width:auto;padding:6px 12px;border-radius:999px;border:1px solid #cbd5e1;background:#fff;color:#334155;font-size:12.5px;font-weight:800;cursor:pointer;}.cob-tab.on{background:#065f46;border-color:#065f46;color:#fff;}.cob-q{flex:1;min-width:150px;padding:6px 10px;border:1px solid #cbd5e1;border-radius:8px;font-size:12.5px;}.cob-kpis{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;flex:0 0 auto;}.cob-kpi{background:#ecfdf5;border:1.5px solid #6ee7b7;border-radius:12px;padding:9px 14px;flex:1;min-width:150px;}.cob-kpi small{font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;color:#047857;font-weight:800;}.cob-kpi b{display:block;font-size:22px;color:#065f46;font-variant-numeric:tabular-nums;}.cob-tblwrap{overflow:auto;flex:1;min-height:0;}.cob-tbl{width:100%;border-collapse:collapse;font-size:13px;}.cob-tbl th,.cob-tbl td{border-bottom:1px solid #eef2f7;padding:6px 8px;text-align:left;}.cob-tbl th{background:#f8fafc;font-size:11.5px;color:#475569;position:sticky;top:0;}.cob-tbl .num{text-align:right;font-variant-numeric:tabular-nums;}.cob-badge{display:inline-block;font-size:10px;font-weight:800;padding:1px 6px;border-radius:999px;}.cob-lk{background:#dbeafe;color:#1d4ed8;}.cob-ch{background:#fef3c7;color:#b45309;}.cob-super{background:#ede9fe;color:#6d28d9;}.cob-warn{font-size:11px;color:#b45309;font-weight:700;}.cob-clk{cursor:pointer;}.cob-clk:hover{background:#f0fdf4;}.cob-back{width:auto;background:#065f46;color:#fff;border:none;border-radius:8px;padding:5px 12px;font-weight:800;cursor:pointer;font-size:12.5px;}";
     document.head.appendChild(st);
   }
+}
+async function openCobranzas() {
+  try { if (typeof requireSupervisor === "function" && !requireSupervisor()) return; } catch (_e) {}
+  _cobEnsureCss();
   _cob = { emp: "todos", q: "", rows: [], view: "list", det: null };
   var ov = document.getElementById("cobOverlay");
   if (!ov) { ov = document.createElement("div"); ov.id = "cobOverlay"; ov.style.cssText = "position:fixed;inset:0;z-index:1400;background:rgba(2,6,23,.72);overflow:auto;padding:14px;"; document.body.appendChild(ov); }
@@ -31100,7 +31599,11 @@ function _psPollInfoText(){
   return "esperando primera revisión…";
 }
 function _psUpdatePollInfo(){ const el = document.getElementById("psPollInfo"); if (el) { el.textContent = _psPollInfoText(); el.style.color = (_ps && _ps.lastErr) ? "#b91c1c" : "#64748b"; } }
-async function psPrintBatch(items){
+/* v11.61 — construye los datos del remito ARMADO para una lista de items
+   [{np, tanda, resumen, armadorLeg}] enriqueciendo con PPP (cliente/fecha), faltantes
+   (Entregas), el picker por tanda (TP) y nombres. Devuelve [d] (armadoRemitoData) alineado
+   con items. Lo reusa la estación de impresión (psPrintBatch) y la Cola de impresión NP. */
+async function _armadoRemitoDataForItems(items){
   const npIn = items.map(function (x){ return encodeURIComponent(x.np); }).join(",");
   const tandas = items.map(function (x){ return String(x.tanda || "").toUpperCase(); }).filter(function (t, i, a){ return t && a.indexOf(t) === i; });
   const tIn = tandas.map(function (t){ return encodeURIComponent(t); }).join(",");
@@ -31118,13 +31621,18 @@ async function psPrintBatch(items){
     (res[1] || []).forEach(function (x){ const np = String(x.np || "").trim().replace(/\.0+$/, ""); const fl = Number(x.cajas_falto) || 0; if (np && fl > 0){ (faltMap[np] = faltMap[np] || []).push({ cod: String(x.cod_art || "").trim(), cajas: fl }); } });
     (res[2] || []).forEach(function (x){ const t = String(x.texto || "").trim().toUpperCase(); if (t && !pickByTanda[t]) pickByTanda[t] = String(x.legajo || ""); });   // order desc → el último TP gana
   } catch (_e){}
-  items.forEach(function (it){
+  return items.map(function (it){
     const pd = ppMap[it.np] || {};
     const tanda = it.tanda || pd.tanda || "";
     const row = { np: it.np, tanda: tanda, cod: pd.cod || "", rs: pd.rs || "", salePpp: pd.fecha || "", fecha: pd.fecha || "", resumen: it.resumen,
       armadorLeg: it.armadorLeg || "", pickerLeg: pickByTanda[String(tanda).toUpperCase()] || "", faltantes: faltMap[it.np] || [] };
-    const d = armadoRemitoData(row);
-    psMarkPrinted(it.np);   // marcar ANTES de encolar → si hay 2 pestañas abiertas, no imprimen doble
+    return armadoRemitoData(row);
+  });
+}
+async function psPrintBatch(items){
+  const ds = await _armadoRemitoDataForItems(items);
+  ds.forEach(function (d){
+    psMarkPrinted(d.np);   // marcar ANTES de encolar → si hay 2 pestañas abiertas, no imprimen doble
     psEnqueuePrint(d);
     psLog(d);
   });
@@ -31468,17 +31976,19 @@ async function facFetchFcKeys(targetTandaKeys){
 /* Líos por NP (de los eventos TAL = NP|LÍOS|TANDA), para la columna Líos del
    monitor de Facturación. Mismo parseo que Control Remitos (~línea 7154).
    Cache de 30s para no pegarle a Supabase en cada refresh del monitor. */
-let _facLios = new Map(); let _facLiosTs = 0;
+let _facLios = new Map(); let _facLiosTs = 0; let _facClase = new Map();   // v11.46 — clase [4] por NP
 async function facFetchLios(){
   const now = Date.now();
   if (_facLiosTs && (now - _facLiosTs) < 30000) return _facLios;   // cache 30s
   try {
     const since = new Date(now - 7 * 24 * 3600 * 1000).toISOString();
-    const url = SUPABASE_TABLE_ENDPOINT + "?opcion=eq.TAL&ts_cliente=gte." + encodeURIComponent(since) + "&select=texto&limit=20000";
+    // v11.45 — order=ts_cliente.asc para que el "último gana" tome el TAL MÁS RECIENTE
+    // (antes sin order el re-emit del "completar faltante" no se reflejaba en el conteo).
+    const url = SUPABASE_TABLE_ENDPOINT + "?opcion=eq.TAL&ts_cliente=gte." + encodeURIComponent(since) + "&select=texto,ts_cliente&order=ts_cliente.asc&limit=20000";
     const rows = await fetch(url, { headers: { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY }, cache: "no-store" }).then(r => r.ok ? r.json() : []);
-    const m = new Map();
-    for (const ev of rows) { const p = String(ev.texto || "").split("|"); const np = p[0].trim().replace(/\.0+$/, ""); const v = parseInt(p[1], 10); if (np && !isNaN(v)) m.set(np, v); }
-    _facLios = m; _facLiosTs = now;
+    const m = new Map(); const mc = new Map();
+    for (const ev of rows) { const p = String(ev.texto || "").split("|"); const np = p[0].trim().replace(/\.0+$/, ""); const v = parseInt(p[1], 10); if (np && !isNaN(v)) m.set(np, v); if (np) mc.set(np, String(p[4] || "").toLowerCase().trim()); }
+    _facLios = m; _facClase = mc; _facLiosTs = now;
   } catch (_e) { /* sin red: queda el último cache */ }
   return _facLios;
 }
@@ -32098,7 +32608,11 @@ function facRender(tandas){
         <td style="white-space:normal;font-size:11px;font-weight:800;color:#1e40af;line-height:1.3;">${facCambioCod(f.np)}</td>
         <td class="fac-lios-cell">${(() => {
           const np = String(f.np).trim().replace(/\.0+$/, "");
-          const v = _facLios.get(np); return (v == null) ? '<span class="fac-lios0">—</span>' : escapeHtml(String(v));
+          const v = _facLios.get(np);
+          const cl = (_facClase.get(np) || "");
+          // v11.46 — RETIRA (clase 'nada') sin líos → cajas con "c" (ej. 12c) en la misma columna.
+          if (cl === "nada" && (v == null || v === 0)) { const c = _facCajas.get(np); return (!c) ? '<span class="fac-lios0">—</span>' : escapeHtml(Math.round(c) + 'c'); }
+          return (v == null) ? '<span class="fac-lios0">—</span>' : escapeHtml(String(v));
         })()}</td>
         <td class="fac-cajas-cell">${(() => {
           const np = String(f.np).trim().replace(/\.0+$/, "");
@@ -33439,6 +33953,7 @@ function showSupervisor(email) {
   try { rrLoadBadge(); } catch (_e) {}   // v9.71: badge Recepción Remitos (cargados sin controlar)
   try { initStkBadge(); } catch (_e) {}   // v10.41: badge Stock y Compras (negativos)
   try { ppLoadBadge(); } catch (_e) {}   // v10.48: badge Pasaje de Papeles (pendientes de enviar)
+  try { colaImpLoadBadge(); } catch (_e) {}   // v11.60: badge Cola de impresión NP (armadas sin imprimir; rojo si +24h)
   try { if (typeof pppAlertPollStart === "function") pppAlertPollStart(); } catch (_e) {}
 }
 
@@ -33988,6 +34503,61 @@ function deudaAbrirCobro(codOpt) {
     });
 }
 window.deudaAbrirCobro = deudaAbrirCobro;
+
+/* ---------- v11.68 — Módulo UNIFICADO: Deuda a cobrar + Cobranzas (valor por NP) ----------
+   Un solo botón / una sola pantalla con 2 pestañas. Reusa la lógica existente:
+   pestaña "Deuda" = deudaRefresh/deudaRender; pestaña "Valor por NP" = cobLoad/cobRender.
+   No duplica render: solo aporta el shell con las pestañas y los contenedores que cada
+   render espera (#deudaResumen/#deudaTabla y #cobBody). */
+var _cobrosTab = "deuda";
+function cobrosClose() { var ov = document.getElementById("cobrosOverlay"); if (ov) ov.style.display = "none"; }
+window.cobrosClose = cobrosClose;
+function _cobrosTabCss(on) { return "padding:6px 14px;border-radius:999px;border:none;font-weight:800;cursor:pointer;font-size:13px;" + (on ? "background:#fff;color:#065f46;" : "background:rgba(255,255,255,.18);color:#fff;"); }
+async function openCobros(tab) {
+  try { if (typeof requireSupervisor === "function" && !requireSupervisor()) return; } catch (_e) {}
+  _cobEnsureCss();
+  var ov = document.getElementById("cobrosOverlay");
+  if (!ov) { ov = document.createElement("div"); ov.id = "cobrosOverlay"; ov.style.cssText = "position:fixed;inset:0;background:#fff;z-index:9500;overflow:hidden;font-family:Arial,sans-serif;display:flex;flex-direction:column;"; document.body.appendChild(ov); }
+  ov.style.display = "flex";
+  ov.innerHTML =
+    '<div style="display:flex;align-items:center;gap:12px;padding:12px 16px;background:linear-gradient(90deg,#065f46,#022c22);color:#fff;flex:0 0 auto;flex-wrap:wrap;">' +
+      '<b style="font-size:17px;">💰 Deuda / Cobranzas</b>' +
+      '<div style="display:flex;gap:6px;margin-left:4px;">' +
+        '<button id="cobrosTabDeuda" onclick="cobrosSetTab(\'deuda\')">💰 Deuda a cobrar</button>' +
+        '<button id="cobrosTabCob" onclick="cobrosSetTab(\'cob\')">💵 Valor por NP</button>' +
+      '</div>' +
+      '<button onclick="cobrosClose()" style="margin-left:auto;background:#dc2626;color:#fff;border:none;border-radius:8px;padding:7px 16px;font-weight:800;cursor:pointer;">Cerrar</button>' +
+    '</div>' +
+    '<div id="cobrosBody" style="flex:1;overflow:auto;padding:14px 16px;min-height:0;"></div>';
+  cobrosSetTab(tab === "cob" ? "cob" : "deuda");
+}
+window.openCobros = openCobros;
+function cobrosSetTab(tab) {
+  _cobrosTab = (tab === "cob") ? "cob" : "deuda";
+  var bd = document.getElementById("cobrosBody"); if (!bd) return;
+  var td = document.getElementById("cobrosTabDeuda"), tc = document.getElementById("cobrosTabCob");
+  if (td) td.style.cssText = _cobrosTabCss(_cobrosTab === "deuda");
+  if (tc) tc.style.cssText = _cobrosTabCss(_cobrosTab === "cob");
+  if (_cobrosTab === "deuda") {
+    bd.innerHTML =
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:8px;flex-wrap:wrap;">' +
+        '<h1 style="margin:0;font-size:20px;">💰 Deuda a cobrar</h1>' +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
+          '<input id="deudaQ" placeholder="🔎 Cliente / razón social / NP" style="padding:8px;font-size:14px;border:1px solid #cbd5e1;border-radius:6px;min-width:220px;" oninput="_deudaState.q=this.value;deudaRender();">' +
+          '<button onclick="deudaAbrirCobro()" style="padding:8px 14px;background:#059669;color:#fff;border:none;border-radius:6px;cursor:pointer;">+ Registrar cobro</button>' +
+          '<button onclick="deudaRefresh()" style="padding:8px 12px;background:#1e6bd6;color:#fff;border:none;border-radius:6px;cursor:pointer;">↻ Refrescar</button>' +
+        '</div>' +
+      '</div>' +
+      '<div id="deudaResumen" style="margin-bottom:10px;color:#64748b;font-size:13px;">Cargando…</div>' +
+      '<div id="deudaTabla"></div>';
+    deudaRefresh();
+  } else {
+    _cob = { emp: "todos", q: "", rows: [], view: "list", det: null };
+    bd.innerHTML = '<div id="cobBody"><div style="text-align:center;color:#94a3b8;padding:24px;">Cargando…</div></div>';
+    cobLoad();
+  }
+}
+window.cobrosSetTab = cobrosSetTab;
 /* ============================================================================ */
 
 })();

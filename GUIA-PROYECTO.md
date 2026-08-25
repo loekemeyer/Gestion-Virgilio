@@ -4,7 +4,153 @@
 > salen los datos**, para poder responder preguntas con precisión y sin inventar.
 > **Mantener actualizada en cada cambio del proyecto** (ver § "Mantenimiento").
 >
-> Última actualización: 2026-08-22 · Versión app al documentar: **v11.23**
+> ⚠️ **REGLA DE ORO — NUNCA EMPARCHAR.** Nada se resuelve con un parche/band-aid:
+> siempre se arregla **en el lugar donde está la causa** (la tabla, la vista, la
+> función o el módulo que corresponde). Nada de tapar el síntoma en otra capa
+> (ej. corregir en el front lo que está mal en una vista, o duplicar un dato en
+> otra tabla para que "se vea bien"). Si un dato ya existe, se lee de su **fuente
+> única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
+> de raíz**.
+>
+> Última actualización: 2026-08-25 · Versión app al documentar: **v11.62**
+>
+> Nota **2026-08-25 — v11.62 (Carga Camión: fix «todo sin ubicación en ruta»).** El orden de ruta de
+> Carga Camión (`_ccAttachUbicYOrden`) solo corre si el **depósito** está geocodificado en `PPP_Geo`
+> (`dir_key='__deposito_virgilio_2788__'`). Estaba **ausente** → `if (depot)` era falso → **ninguna** NP
+> se ordenaba y **todas** caían en «📍 Sin ubicación en ruta — cargar aparte» (aunque tuvieran zona y
+> dirección geocodificada). Fix: nuevo **`_rtEnsureDepot(cache)`** geocodifica el depósito on-demand
+> (Nominatim en el navegador) y lo cachea en `PPP_Geo`; Carga Camión lo llama si falta → se **auto-repara**
+> la 1ª vez que se abre y queda cacheado. (No confundir con la ubicación física 📌 AUB por NP, que es otro
+> dato y sí funcionaba.)
+>
+> Nota **2026-08-25 — v11.60 (Cola de impresión de NP armadas).**
+>
+> Nota **2026-08-25 — v11.60 (Cola de impresión de NP armadas).** Nuevo botón en el panel supervisor
+> **«🖨️ Cola de impresión NP»** (`openColaImpresion`). El operario, al **terminar armado**, emite un `TAL`
+> por cada NP → la vista **`vista_cola_impresion`** junta las NP armadas (desde el ancla `2026-08-25 12:10`)
+> que **todavía no se imprimieron** (`Impresion_NP` = marcador de impresas, PK np, RLS anon select+insert).
+> El supervisor toca **«Imprimir todas»** e imprime el **REMITO DE ARMADO** de cada NP —generado en la app
+> desde el `resumen` del TAL, **mismo formato que la estación de auto-impresión** (`armadoRemitoData` →
+> `armadoRemitoInnerHtml` → `remitoPrintDoc`); **NO usa la carpeta de PDF ISIS**. La construcción se factoró
+> en **`_armadoRemitoDataForItems(items)`** (reusada por `psPrintBatch` de la estación y por la cola). La
+> vista expone `resumen` y `armador_leg` (del TAL) para armar cada remito. Con Chrome `--kiosk-printing`
+> salen solas. Cada NP impresa se marca en `Impresion_NP` y sale de la cola. **Alarma:**
+> `vencido = armado hace +24 h` → badge **rojo** con ⚠ (`colaImpLoadBadge`, cargado con los demás badges del
+> panel). La cola es **per-NP** vía TAL (se emite al terminar armado, incluye retira/súper con clase). Para
+> ampliar/limpiar: subir el ancla en la vista, o borrar filas de `Impresion_NP`.
+>
+> Nota **2026-08-25 — v11.55→v11.58 (Pasaje de Papeles).** El módulo se reorganizó en **2×2** (encabezado
+> `_ppGroupHeader`; `_ppBuildSection(key, kind, …)` separa `kind` = comportamiento del `key` = id de colapso).
+> **Eje responsabilidad:** **🏭 Virgilio = ENVÍO** (lo que falta mandar, `enviado=false`, con timer/checkbox) ·
+> **🏢 Cervantes = RECEPCIÓN** (lo ya enviado, `enviado=true`, con «Confirmar recepción» + «Recibido el…»
+> inline). **Eje tipo:** **Prov** (remito de proveedor/tallerista, `origen != 'rr'`) · **Venta** (remito de
+> venta conformado en RR, `origen == 'rr'`). Da 4 módulos: Virgilio → «Envío remitos Prov» + «Envío remitos
+> Venta»; Cervantes → «Recepción remitos Prov» + «Recepción remitos Venta». (v11.55-57 tuvieron modelos
+> intermedios equivocados — Alan, Logística, Virgilio=recepción — corregidos en v11.58.)
+> **v11.59 — se REVIRTIÓ:** por pedido del usuario se sacaron los remitos de **venta/RR** de Pasaje de
+> Papeles. El módulo volvió a la **lista única** de 3 secciones (Documentación pendiente · enviada ·
+> Recibidos), solo remitos de talleristas. Se **frenó el cron** `sync_pasaje_rr_10min` (unschedule), se
+> **borraron** las filas `origen='rr'` y se sacó la llamada al RPC en `ppLoadData`. Queda en pie (por si
+> se reactiva): función `sync_pasaje_rr()`, columna `origen` y `oc_proy`. **Se conserva** el chip de
+> **código de proveedor** (v11.57) en los remitos de recepción. `pasaje-papeles.js?v=5.2`.
+> **(v11.57)** En los remitos de **recepción** se muestra el **código del proveedor/tallerista** (chip azul
+> antes de la razón social). Nueva columna `Pasaje_Papeles.cod_proveedor`: se **captura** en Recepción de
+> Mercadería (`recepcion.js` pasa `opState.tallCod`) y se **backfilleó** por nombre vía
+> `vista_entidades_recepcion` (coalesce `cod_default/cod_lk/cod_ch/cod_factura`). Insumos pueden quedar sin
+> código (no siempre está). `pasaje-papeles.js?v=5.0`, `recepcion.js?v=10.25`.
+>
+> Nota **2026-08-25 — v11.54 (Pasaje de Papeles: remitos de venta conformados en RR).** Los remitos
+> de **venta** que el operario controla en **Recepción Remitos (RR)** (eventos **CRN**) ahora también
+> aparecen en **Pasaje de Papeles** para pasar sus papeles. **Backend:** RPC **`sync_pasaje_rr()`**
+> (SECURITY DEFINER, anon EXECUTE) **materializa** cada NP conformada como fila real de `Pasaje_Papeles`
+> (`tipo_documento='remito'`, `tipo_contenido='mercaderia'`, `numero_remito`=NP, `razon_social` de
+> `Facturacion_NP`/`PPP_Entregados_Meta`, `fecha_emision`/`fecha_remito`=`fecha_salida`, `created_at`=ts
+> del control, **`origen='rr'`** — nueva columna para distinguir de las capturadas en Recepción de
+> Mercadería, `origen` NULL/'recepcion'). Se materializa (no vista) para que entren al MISMO flujo
+> enviar/confirmar (el front actualiza por `id`). **Idempotente** (dedup por `origen='rr'` + `numero_remito`).
+> **Ancla** `2026-08-25` (solo de esa fecha en adelante; evita inundar «pendiente» con ~700 históricos
+> cuyos papeles ya se pasaron — subir la constante en la función para ampliar). Se dispara por **cron**
+> `sync_pasaje_rr_10min` (cada 10 min) **y** desde el front al abrir el módulo (`ppLoadData`, `pasaje-papeles.js?v=4.7`).
+>
+> Nota **2026-08-25 — v11.49→v11.52 (varios OC/Stocks).** **(v11.49)** Reporte «Góndola <25%»:
+> columna «% góndola» renombrada a **«% Ocup Virgilio»** (tabla + Excel + PDF; solo rótulo).
+> **(v11.50)** Vista de OC por fecha (tarjetas por tallerista): **buscador por nombre** (filtra
+> por proveedor/rubro, `_oc.filtro`). **(v11.51→v11.52)** Detalle de OC (al abrir un tallerista):
+> columnas más juntas + 3 columnas **solo-pantalla** (no van a los impresos Operador/Tallerista/
+> WhatsApp): **Stock · Máximo · Proyección**. Son del **momento en que se generó la OC**, no de hoy:
+> salen de los snapshots que la OC ya guardaba (`Ordenes_Compra.oc_stock`, `oc_max`) + **nueva
+> columna `oc_proy`** (proyección al generar; se empieza a guardar en v11.52, las OC previas quedan
+> «—»). El generador (`ocgEnter`) ya traía `proy` del item; el insert de OCs (`oc_stock/oc_max/…`)
+> ahora suma `oc_proy: it.proy`. Así el «Pedido» y el contexto (máximo−stock−pedidos) cuadran de la
+> misma foto (ej. cód 104: oc_max 40 − oc_stock 24 = 16 pedido).
+>
+> Nota **2026-08-25 — v11.48 (Stocks: pop-up "de dónde surge la proyección" + ventas 6m).**
+> En la hoja **Stocks** (Stock y Compras), el número de la columna **PROY. CAJ/MES** ahora es
+> **clickeable** (`stkShowProyVentas`): abre un pop-up que explica **de dónde surge** la proyección y
+> muestra las **cajas facturadas reales de los últimos 6 meses** (mini bar-chart por mes, total y
+> promedio simple). **Clave conceptual:** la proyección **NO** es el promedio simple de esas barras —
+> se calcula **por cliente** (promedio mensual desde su 1ª compra en la ventana) **descartando
+> meses-pico atípicos**, sumando Loeke + Chef, ventana 6m→12m (motor `_fn_proy_window` en LK). Por eso
+> p.ej. 315: ventas ~350/mes simples vs proyección depurada 285. **Fuente de las ventas:** `sales_lines`
+> de **PáginaLK** (las mismas que alimentan `proyeccion_madre`). **Cruce backend** (protocolo backend):
+> RPC Virgilio **`ventas_mensuales_cod(p_cod,p_meses)`** (SECURITY DEFINER, anon EXECUTE) → **http GET**
+> a LK **`fn_ventas_mensuales_virgilio(p_cod,p_meses)`** (anon, misma anon key de LK que usa
+> `refresh_proyeccion_madre`); el RPC de Virgilio **sanitiza** `p_cod` a `[A-Z0-9]` antes de armar la URL.
+> El LK RPC espeja la normalización de la proyección (código sin ceros, `sales_item_remap`,
+> `sales_excluded_items`, clientes 1/3878 fuera, empresas lk/chef) y rellena los 6 meses con ceros.
+>
+> Nota **2026-08-25 — jornada v11.46→v11.47 (Carga Camión: retira/camión + camionero · líos).**
+> **(1) Carga Camión (CC) — pregunta primero RETIRA o CAMIÓN.** Al tocar CC ahora aparece un
+> selector (`ccRenderChooser`): **🚛 Camión** = todos los pedidos **salvo los retira**, con
+> **nombre del camionero** (input con `<datalist>` autocompletado desde el maestro **`Camioneros`**
+> — así "Guille"/"Guillermo" siempre se escribe igual para el análisis); **🚶 Retira** = **solo**
+> los retira, contados en **cajas** (no piden camionero). **Retira** = `zona="Retira"` (Programación
+> Diaria) **o** `clase` del último `TAL` = `'nada'` (`fetchCCData` setea `it.esRetira`). **(2) CCN
+> lleva camionero:** el `texto` del evento **`CCN`** pasó de `NP|TANDA` a **`NP|TANDA|CAMIONERO`**
+> (3er campo vacío en retira). Las vistas leen `split_part [1]=np, [2]=tanda` → el 3er campo no las
+> afecta. Maestro `Camioneros(nombre PK, creado_en)` con RLS anon `SELECT`+`INSERT`; upsert
+> `ignore-duplicates` (`ccUpsertCamionero`) al terminar. **(3) Bug de conteo de líos al completar
+> faltante (RAÍZ).** `cpUpdateLio` recalculaba el conteo desde el largo del resumen parseado (que
+> venía incompleto/vacío) → al completar un faltante que **creaba un lío nuevo**, el total **no
+> subía**. Ahora parte del conteo **guardado** en el último `TAL` (`info.count`, campo `[1]`):
+> lío nuevo → `max(guardado+1, largo)`, suma a lío existente → `max(guardado, largo)`. Además
+> preserva la **clase** (`[4]`) en el re-emit (`liosSend` 6º arg). Corrige el número en **Control
+> de Remitos, Recepción de Remitos y Facturación** (los tres leen `TAL[1]`). **(4) Líos, no cajas.**
+> En **Control** y **Recepción** de Remitos se habla **solo de líos**; el único caso con cajas es
+> **retira** (que no arma líos): en **la misma columna** se muestran las cajas con sufijo **"c"**
+> (ej. `12c`) vía `_liosCajasCell` (retira sin líos → `cajas+"c"`, icono 🧺; si no, líos 📦). **Misma
+> regla en Facturación** (columna Líos). `vista_control_remitos` ahora expone **`clase`** (de
+> `TAL[4]`) y **`cajas`** (Σ `Entregas_Virgilio.cajas_pedidas` por NP) — appended al final del SELECT.
+>
+> Nota **2026-08-24 — jornada v11.33→v11.38 (resumen).** **(1) Pasaje de Papeles:** header
+> de la 1ª columna → "Fecha DDJJ"; se corrigió la fecha de remito/factura que se mostraba
+> corrida un día (bug TZ: `new Date("YYYY-MM-DD")` = medianoche UTC → en AR retrocede; ahora
+> las fechas peladas se formatean por partes). Badge del botón = cuenta `confirmado=false`
+> (pendientes + sin confirmar) → tic verde solo cuando no queda nada por confirmar; antes solo
+> contaba pendientes de enviar. **Nueva columna `enviado_en`** (timestamptz) → día/hora de
+> envío en la sección "Documentación enviada". **Fix confirmar recepción:** usaba `recibido_en`
+> (columna inexistente) → no persistía; ahora usa `confirmado` + `fecha_confirmacion`.
+> **(2) Completar datos producto:** convención para códigos que terminan en **E** → `N_Caja=99`
+> y `Uni_x_Caja` desde `precios_venta.uxb` (backfill masivo en `Articulos_Cajas`). **(3) Ver
+> stock:** el selector de fecha/hora se muestra **solo** al tocar "A esa fecha" (1er toque
+> revela, 2º aplica); botones "En vivo/A esa fecha" nivelados al molde de los chips. **(4)
+> `vista_correcciones_pedido_rich` — 2 fixes:** (a) solo la corrección de la **operadora**
+> (`origen<>'auto'`) apaga el aviso — antes cualquier corrección lo dejaba en 0 (badge vs popup
+> desincronizados); (b) **falso "Pickeado"**: NP sin tanda quedaban con tanda `''` y matcheaban
+> eventos EP/TP/AP/TAP con `texto` vacío → la vista ahora ignora tanda vacía (ni cuenta esos
+> eventos ni matchea con `''`). Se **borraron 18 eventos EP/TP/AP/TAP huérfanos** (tanda vacía,
+> ene–ago) de `Registros_Produccion_Virgilio` (backup en `~/pp_backups/`). **(5) Duplicación de
+> info detectada** (marca/línea, uxb, descripción en varias tablas/fuentes). **Marca/línea
+> unificada** → vista `vista_marca_articulo` (OC_Maximos.linea → Articulos_Cajas.Marca) + función
+> `artMarca(cod)` en el front (el sufijo " LK"/" CH" manda); el stock ya la usa. **UxB: NO se
+> unifica globalmente — es DEPENDIENTE DEL CONTEXTO:** venta = `precios_venta.uxb` (lo que usan
+> los cálculos de plata/facturación, CORRECTO), depósito/empaque = `Articulos_Cajas.Uni_x_Caja`,
+> compras = `OC_Maximos.uni_x_caja`. Pueden diferir legítimamente (ej. 724: 24 depósito / 4 venta).
+> Existe `vista_uxb_articulo` + `artUxb()` como canónica de la uxb de **depósito** (no tocar los
+> cálculos de plata con ella). **Descripción:** canónica `artNombre`/`vista_nombres_articulos`;
+> Recepción de talleristas usa a propósito el `Desc` del tallerista (más útil al operario, no
+> tocar). **Anon key:** vive en 3 archivos (index.html, sw.js, recepcion.js) — rotar los 3.
+> **Regla nueva: NUNCA EMPARCHAR** (arriba).
 >
 > Nota **2026-08-22 — jornada v11.14→v11.23 (resumen).** **(1) Facturación:** columna
 > "A facturar / Falta" — cada artículo con faltante muestra `cod FC N −M` (N = pedidas−faltó,

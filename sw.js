@@ -3,10 +3,12 @@
    Procesa la cola de envíos en background usando Background Sync API,
    incluso cuando la pestaña/app está cerrada.
 
-   ⚠ IMPORTANTE: SUPABASE_URL y SUPABASE_KEY están duplicados acá y en
-   index.html. Si rotás la publishable key, hay que actualizar AMBOS.
+   ⚠ IMPORTANTE: la publishable key vive en TRES archivos (contextos distintos que
+   no pueden compartir una variable JS): index.html (SUPABASE_KEY), sw.js (acá) y
+   recepcion.js (SUPABASE_PUBLISHABLE_KEY, para su createClient). Si rotás la key,
+   hay que actualizar LOS TRES. (Además admin/admin.js tiene la anon key del proyecto LK.)
    ========================================================= */
-const SW_VERSION = "v11.23-vir";
+const SW_VERSION = "v11.68-vir";
 /* nota: v7.68 — generador de OCs desde stock (vista_generador_oc). */
 
 const SUPABASE_URL = "https://hrxfctzncixxqmpfhskv.supabase.co";

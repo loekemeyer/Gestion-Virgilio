@@ -897,7 +897,8 @@ async function cargarOCVigentes() {
   const nombre = opState.tallNombre;
   try {
     await sessionReady;
-    const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" };
+    // v11.40 — usar la key propia del módulo (no la global de index.html) → self-contained, sin dependencia cruzada frágil.
+    const H = { apikey: SUPABASE_PUBLISHABLE_KEY, Authorization: "Bearer " + SUPABASE_PUBLISHABLE_KEY, "Content-Type": "application/json" };
     const res = await fetch(SUPABASE_URL + "/rest/v1/rpc/oc_vigentes_por_proveedor", {
       method: "POST", headers: H, cache: "no-store",
       body: JSON.stringify({ p_nombre: nombre })
@@ -1508,7 +1509,8 @@ async function opEnviar() {
         nroFactura: opState.nroFactura || '',
         fechaRemito: opState.fechaRemito || '',
         fechaFactura: opState.fechaFactura || '',
-        proveedor: opState.tallNombre || ''
+        proveedor: opState.tallNombre || '',
+        codProveedor: opState.tallCod || ''   // v1.2 — código del tallerista/prov. AT (para Pasaje de Papeles)
       });
     }
   } catch (_e) { /* no-op si el módulo no está cargado */ }
