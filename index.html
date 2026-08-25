@@ -6511,7 +6511,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v11.47";
+const APP_VERSION = "v11.48";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -13175,7 +13175,7 @@ function stkBodyStocks() {
       else _famTag = ' <span title="SECUNDARIO — no deben entrar pedidos acá. El principal es ' + escapeHtml(_equivDisp(_fam, _fam._defN)) + '." style="color:#1e40af;font-size:10px;font-weight:800;">⇄' + escapeHtml(_equivDisp(_fam, _fam._defN)) + '</span>';
     }
     const _proy = _proyOf(a.cod);
-    let tds = '<td class="stk-cod">' + escapeHtml(_codDisplay) + _famTag + '</td><td style="text-align:center;font-weight:800;font-size:11px;padding:3px 4px;color:' + (_lin === "LK" ? "#b91c1c" : (_lin === "CH" ? "#1e40af" : "#94a3b8")) + ';">' + (_lin || "—") + '</td><td class="stk-desc">' + escapeHtml(artNombre(a.cod, a.desc) || "—") + '</td>' + (_proy > 0.05 ? '<td class="num" style="background:#faf5ff;color:#6d28d9" title="Proyección de venta: ' + fmtCajas(_proy) + ' caj/mes (antes del índice de las OCs)">' + Math.round(_proy) + '</td>' : '<td class="num" style="background:#faf5ff;color:#c4b5fd">—</td>') + '<td class="num ' + (_tot < 0 ? "stk-neg" : "") + '" style="background:#f8fafc"><b>' + fmtCajas(_tot) + '</b></td>' + (_ped ? '<td class="num stk-pick-cell" style="background:#fffbeb;color:#92400e" onclick="event.stopPropagation();stkOpenCajasPedidasArt(\'' + encodeURIComponent(a.cod) + '\')" title="Todas las cajas pedidas (programadas o no) todavía no facturadas. Tocá para ver el detalle por NP"><b>' + fmtCajas(_ped) + '</b>' + (_demSPOf(a.cod) > 0.05 ? ' <span title="⚠ ' + fmtCajas(_demSPOf(a.cod)) + ' caja(s) pedidas están en la base de pedidos pero SIN programar en el PPP (Programación Diaria)" style="cursor:help">⚠️</span>' : '') + '</td>' : '<td class="num" style="background:#fffbeb;color:#92400e"></td>') + (_cap ? '<td class="num stk-pick-cell" style="background:#f0fdf4;color:#166534" onclick="event.stopPropagation();stkOpenCapArt(\'' + encodeURIComponent(a.cod) + '\')" title="Ubicaciones y capacidad de góndola"><b>' + fmtCajas(_cap) + '</b></td>' : '<td class="num" style="background:#f0fdf4;color:#166534">—</td>');
+    let tds = '<td class="stk-cod">' + escapeHtml(_codDisplay) + _famTag + '</td><td style="text-align:center;font-weight:800;font-size:11px;padding:3px 4px;color:' + (_lin === "LK" ? "#b91c1c" : (_lin === "CH" ? "#1e40af" : "#94a3b8")) + ';">' + (_lin || "—") + '</td><td class="stk-desc">' + escapeHtml(artNombre(a.cod, a.desc) || "—") + '</td>' + '<td class="num stk-pick-cell" style="background:#faf5ff;color:' + (_proy > 0.05 ? '#6d28d9' : '#c4b5fd') + ';cursor:pointer" onclick="event.stopPropagation();stkShowProyVentas(\'' + encodeURIComponent(a.cod) + '\',' + (Math.round((_proy || 0) * 100) / 100) + ')" title="Tocá para ver de dónde surge (ventas facturadas de los últimos 6 meses)">' + (_proy > 0.05 ? Math.round(_proy) : '—') + '</td>' + '<td class="num ' + (_tot < 0 ? "stk-neg" : "") + '" style="background:#f8fafc"><b>' + fmtCajas(_tot) + '</b></td>' + (_ped ? '<td class="num stk-pick-cell" style="background:#fffbeb;color:#92400e" onclick="event.stopPropagation();stkOpenCajasPedidasArt(\'' + encodeURIComponent(a.cod) + '\')" title="Todas las cajas pedidas (programadas o no) todavía no facturadas. Tocá para ver el detalle por NP"><b>' + fmtCajas(_ped) + '</b>' + (_demSPOf(a.cod) > 0.05 ? ' <span title="⚠ ' + fmtCajas(_demSPOf(a.cod)) + ' caja(s) pedidas están en la base de pedidos pero SIN programar en el PPP (Programación Diaria)" style="cursor:help">⚠️</span>' : '') + '</td>' : '<td class="num" style="background:#fffbeb;color:#92400e"></td>') + (_cap ? '<td class="num stk-pick-cell" style="background:#f0fdf4;color:#166534" onclick="event.stopPropagation();stkOpenCapArt(\'' + encodeURIComponent(a.cod) + '\')" title="Ubicaciones y capacidad de góndola"><b>' + fmtCajas(_cap) + '</b></td>' : '<td class="num" style="background:#f0fdf4;color:#166534">—</td>');
     cols.forEach(function (c) {
       const v = (c.racksKey ? ((Number(a[c.key]) || 0) + (Number(a.racks_ch) || 0)) : (Number(a[c.key]) || 0));
       // v5.82: columnas clickeables → detalle. Pickeados/A facturar → NPs; Excedente/Racks → ubicación.
@@ -13393,7 +13393,15 @@ var STK_POP_CSS =
   ".mva-rto-it b{color:#1e1b4b;}.mva-rto-it.on{background:#dcfce7;border-color:#86efac;color:#166534;}.mva-rto-it.on b{color:#14532d;}" +
   ".mva-ts{color:#94a3b8;font-size:11px;}.mva-ref{color:#64748b;font-family:Consolas,Menlo,monospace;}" +
   ".mva-in{color:#15803d;}.mva-out{color:#b91c1c;}.mva-sal{color:#1e3a8a;}" +
-  ".stkpop-ubic{color:#7c3aed;font-weight:800;white-space:nowrap;}";
+  ".stkpop-ubic{color:#7c3aed;font-weight:800;white-space:nowrap;}" +
+  // v11.48 — mini bar-chart de ventas facturadas por mes (pop-up de proyección).
+  ".proyv-chart{display:flex;flex-direction:column;gap:6px;}" +
+  ".proyv-row{display:flex;align-items:center;gap:9px;}" +
+  ".proyv-mes{flex:0 0 52px;font-size:12px;font-weight:800;color:#475569;text-transform:capitalize;}" +
+  ".proyv-track{flex:1 1 auto;height:20px;background:#f1f5f9;border-radius:6px;overflow:hidden;}" +
+  ".proyv-bar{display:block;height:100%;background:linear-gradient(90deg,#8b5cf6,#6d28d9);border-radius:6px;}" +
+  ".proyv-val{flex:0 0 auto;min-width:42px;text-align:right;font-size:12.5px;font-weight:800;color:#4c1d95;font-variant-numeric:tabular-nums;}" +
+  ".proyv-foot{margin-top:10px;font-size:12px;color:#334155;line-height:1.5;border-top:1px dashed #cbd5e1;padding-top:8px;}";
 function _stkPopShell(title, bodyId) {
   if (!document.getElementById("stkPopCss")) { const st = document.createElement("style"); st.id = "stkPopCss"; st.textContent = STK_POP_CSS; document.head.appendChild(st); }
   let ov = document.getElementById("stkPopModal");
@@ -13402,6 +13410,70 @@ function _stkPopShell(title, bodyId) {
   ov.innerHTML = '<div class="stkpop-card"><div class="stkpop-head"><span class="stkpop-title">' + title + '</span><button class="stkpop-close" onclick="stkPopClose()">Cerrar</button></div><div class="stkpop-body" id="' + bodyId + '"></div></div>';
 }
 function stkPopClose() { const ov = document.getElementById("stkPopModal"); if (ov) ov.classList.remove("show"); _stkPop = null; }
+/* v11.48 — Pop-up "de dónde surge la proyección": al tocar el número de PROY. CAJ/MES muestra
+   la explicación del cálculo + las CAJAS FACTURADAS reales de los últimos 6 meses (fuente: ventas
+   sales_lines de PáginaLK, las mismas que alimentan la proyección). Cruce backend: RPC de Virgilio
+   `ventas_mensuales_cod` → http a LK `fn_ventas_mensuales_virgilio`. La proyección NO es el promedio
+   simple de las barras: se calcula por CLIENTE (desde su 1ª compra) descartando meses-pico. */
+var _STK_MES_ABR = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+function _stkFmtMes(ym) {
+  var m = String(ym || "").match(/^(\d{4})-(\d{2})$/); if (!m) return String(ym || "");
+  return _STK_MES_ABR[parseInt(m[2], 10) - 1] + " " + m[1].slice(2);
+}
+async function stkShowProyVentas(codEnc, proy) {
+  var cod = decodeURIComponent(codEnc);
+  var codB = codBase(cod);
+  var sfx = String(cod || "").match(/\s+(LK|CH|LOKE)$/i);
+  var emp = sfx ? sfx[1].toUpperCase().replace("LOKE", "LK") : "";
+  var empTag = emp ? ' <span style="font-size:14px;font-weight:800;color:' + (emp === "LK" ? "#b91c1c" : "#1e40af") + ';">' + emp + '</span>' : '';
+  _stkPopShell("📈 Proyección — " + escapeHtml(codCanon(codB)) + empTag, "stkPopBody");
+  var body = document.getElementById("stkPopBody"); if (!body) return;
+  var nombre = artNombre(cod, "") || "";
+  var fc = function (n) { n = Number(n) || 0; return String(Math.round(n * 10) / 10); };
+  body.innerHTML = '<div class="stkpop-empty">Cargando ventas facturadas de los últimos 6 meses…</div>';
+  var rows = [];
+  try {
+    var r = await fetch(SUPABASE_URL + "/rest/v1/rpc/ventas_mensuales_cod", {
+      method: "POST",
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ p_cod: codB, p_meses: 6 }), cache: "no-store"
+    });
+    if (r.ok) rows = await r.json();
+  } catch (_e) {}
+  rows = (Array.isArray(rows) ? rows : []).map(function (x) { return { mes: String(x.mes || ""), cajas: Number(x.cajas) || 0 }; });
+  var proyN = Number(proy) || 0;
+  var h = '<div class="stkpop-hint">' + (nombre ? '<b>' + escapeHtml(nombre) + '</b> · ' : '') +
+    'Proyección: <b style="color:#6d28d9">' + (proyN > 0.05 ? fc(proyN) : '—') + ' caj/mes</b></div>';
+  // De dónde surge (explicación fija)
+  h += '<div class="stkpop-grp" style="background:#faf5ff;border-color:#e9d5ff">' +
+       '<div style="font-size:12.5px;color:#4c1d95;line-height:1.5;">' +
+       '<b>¿De dónde surge?</b> La proyección es el <b>promedio mensual de cajas facturadas</b> ' +
+       '(ventas reales de PáginaLK, <b>Loeke + Chef</b>). Se calcula <b>por cliente</b> —desde su primera compra en la ventana— ' +
+       'y <b>descarta los meses-pico atípicos</b> (compras one-off), sumando todos los clientes. Ventana: <b>6 meses</b> ' +
+       '(si no hay ventas, cae a 12). <b>No</b> es el promedio simple de las barras de abajo.' +
+       '</div></div>';
+  if (!rows.length) {
+    h += '<div class="stkpop-empty">Sin ventas facturadas en los últimos 6 meses para <b>' + escapeHtml(codCanon(codB)) + '</b>' + (emp ? ' (' + emp + ')' : '') + '.<br><small style="color:#94a3b8">(o el motor de PáginaLK no respondió)</small></div>';
+    body.innerHTML = h; return;
+  }
+  var tot = rows.reduce(function (s, x) { return s + x.cajas; }, 0);
+  var prom = rows.length ? (tot / rows.length) : 0;
+  var mx = rows.reduce(function (s, x) { return Math.max(s, x.cajas); }, 0) || 1;
+  h += '<div class="stkpop-grp"><div style="font-size:12px;font-weight:800;color:#334155;margin-bottom:8px;">🧾 Cajas facturadas — últimos ' + rows.length + ' meses</div>';
+  h += '<div class="proyv-chart">';
+  rows.forEach(function (x) {
+    var pct = Math.max(2, Math.round(x.cajas / mx * 100));
+    h += '<div class="proyv-row">' +
+         '<span class="proyv-mes">' + escapeHtml(_stkFmtMes(x.mes)) + '</span>' +
+         '<span class="proyv-track"><span class="proyv-bar" style="width:' + pct + '%"></span></span>' +
+         '<span class="proyv-val">' + fc(x.cajas) + '</span></div>';
+  });
+  h += '</div>';
+  h += '<div class="proyv-foot">Total 6m: <b>' + fc(tot) + '</b> cajas · Promedio simple: <b>' + fc(Math.round(prom)) + '</b> caj/mes' +
+       (proyN > 0.05 ? ' · Proyección (depurada): <b style="color:#6d28d9">' + fc(proyN) + '</b>' : '') + '</div>';
+  h += '</div>';
+  body.innerHTML = h;
+}
 /* v9.02/9.04 — Módulo "NP que faltan": pedidos que están en la base (PPP_Base_Pedidos) pero NO en
    Programación Diaria, y que no se facturaron ni entregaron. Los que disparan el ⚠ de Cajas
    Pedidas. Lee vista_np_sin_programar (NP · Fecha · Razón Social/Cliente · Cajas). La operadora

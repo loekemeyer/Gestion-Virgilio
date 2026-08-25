@@ -12,7 +12,22 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-08-25 · Versión app al documentar: **v11.47**
+> Última actualización: 2026-08-25 · Versión app al documentar: **v11.48**
+>
+> Nota **2026-08-25 — v11.48 (Stocks: pop-up "de dónde surge la proyección" + ventas 6m).**
+> En la hoja **Stocks** (Stock y Compras), el número de la columna **PROY. CAJ/MES** ahora es
+> **clickeable** (`stkShowProyVentas`): abre un pop-up que explica **de dónde surge** la proyección y
+> muestra las **cajas facturadas reales de los últimos 6 meses** (mini bar-chart por mes, total y
+> promedio simple). **Clave conceptual:** la proyección **NO** es el promedio simple de esas barras —
+> se calcula **por cliente** (promedio mensual desde su 1ª compra en la ventana) **descartando
+> meses-pico atípicos**, sumando Loeke + Chef, ventana 6m→12m (motor `_fn_proy_window` en LK). Por eso
+> p.ej. 315: ventas ~350/mes simples vs proyección depurada 285. **Fuente de las ventas:** `sales_lines`
+> de **PáginaLK** (las mismas que alimentan `proyeccion_madre`). **Cruce backend** (protocolo backend):
+> RPC Virgilio **`ventas_mensuales_cod(p_cod,p_meses)`** (SECURITY DEFINER, anon EXECUTE) → **http GET**
+> a LK **`fn_ventas_mensuales_virgilio(p_cod,p_meses)`** (anon, misma anon key de LK que usa
+> `refresh_proyeccion_madre`); el RPC de Virgilio **sanitiza** `p_cod` a `[A-Z0-9]` antes de armar la URL.
+> El LK RPC espeja la normalización de la proyección (código sin ceros, `sales_item_remap`,
+> `sales_excluded_items`, clientes 1/3878 fuera, empresas lk/chef) y rellena los 6 meses con ceros.
 >
 > Nota **2026-08-25 — jornada v11.46→v11.47 (Carga Camión: retira/camión + camionero · líos).**
 > **(1) Carga Camión (CC) — pregunta primero RETIRA o CAMIÓN.** Al tocar CC ahora aparece un
