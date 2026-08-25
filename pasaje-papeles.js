@@ -335,8 +335,8 @@ function ppRenderList() {
   var data = _ppState.data;
 
   // v4.7 — DOS responsabilidades, 2 módulos cada una (Pendiente + Enviada):
-  //  · Responsabilidad Virgilio = remitos de TALLERISTA (Recepción de Mercadería, origen != 'rr').
-  //  · Responsabilidad Alan     = remitos de VENTA conformados en RR (origen == 'rr').
+  //  · Responsabilidad Virgilio  = remitos de RECEPCIÓN (talleristas, Recepción de Mercadería, origen != 'rr').
+  //  · Responsabilidad Logística = remitos de ENTREGA (venta, conformados en RR, origen == 'rr').
   // 'Enviada' agrupa enviados + confirmados; el estado "Recibido el…" se ve en cada fila.
   var esRR = function (r) { return r.origen === 'rr'; };
   var split = function (rows) {
@@ -348,10 +348,10 @@ function ppRenderList() {
   var gA = split(data.filter(esRR));
 
   var html =
-    _ppGroupHeader('🏭 Responsabilidad Virgilio', 'Remitos de talleristas') +
+    _ppGroupHeader('🏭 Responsabilidad Virgilio', '📥 Remitos de recepción (talleristas)') +
     _ppBuildSection('v_pend', 'pendiente', '⏳', 'Documentación pendiente', gV.pend, true) +
     _ppBuildSection('v_env', 'enviada', '✅', 'Documentación enviada', gV.env, false) +
-    _ppGroupHeader('🚚 Responsabilidad Alan', 'Remitos de venta (RR)') +
+    _ppGroupHeader('🚚 Responsabilidad Logística', '📦 Remitos de entrega (venta/RR)') +
     _ppBuildSection('a_pend', 'pendiente', '⏳', 'Documentación pendiente', gA.pend, true) +
     _ppBuildSection('a_env', 'enviada', '✅', 'Documentación enviada', gA.env, false);
 
