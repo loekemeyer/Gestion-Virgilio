@@ -18,9 +18,12 @@
 > **«🖨️ Cola de impresión NP»** (`openColaImpresion`). El operario, al **terminar armado**, emite un `TAL`
 > por cada NP → la vista **`vista_cola_impresion`** junta las NP armadas (desde el ancla `2026-08-25 12:10`)
 > que **todavía no se imprimieron** (`Impresion_NP` = marcador de impresas, PK np, RLS anon select+insert).
-> El supervisor toca **«Imprimir todas»** y salen en cola a la impresora conectada reusando la infra de PDF
-> ISIS (`pppGetPdfDirs`/`_pppIndexDirs`/`_pppPrintPdf`; con Chrome `--kiosk-printing` salen solas). Cada NP
-> con PDF encontrado se marca en `Impresion_NP` y sale de la cola; las que no tienen PDF quedan. **Alarma:**
+> El supervisor toca **«Imprimir todas»** e imprime el **REMITO DE ARMADO** de cada NP —generado en la app
+> desde el `resumen` del TAL, **mismo formato que la estación de auto-impresión** (`armadoRemitoData` →
+> `armadoRemitoInnerHtml` → `remitoPrintDoc`); **NO usa la carpeta de PDF ISIS**. La construcción se factoró
+> en **`_armadoRemitoDataForItems(items)`** (reusada por `psPrintBatch` de la estación y por la cola). La
+> vista expone `resumen` y `armador_leg` (del TAL) para armar cada remito. Con Chrome `--kiosk-printing`
+> salen solas. Cada NP impresa se marca en `Impresion_NP` y sale de la cola. **Alarma:**
 > `vencido = armado hace +24 h` → badge **rojo** con ⚠ (`colaImpLoadBadge`, cargado con los demás badges del
 > panel). La cola es **per-NP** vía TAL (se emite al terminar armado, incluye retira/súper con clase). Para
 > ampliar/limpiar: subir el ancla en la vista, o borrar filas de `Impresion_NP`.

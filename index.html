@@ -6512,7 +6512,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v11.60";
+const APP_VERSION = "v11.61";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -25976,7 +25976,7 @@ async function openColaImpresion(keepOpen) {
   if (body && !keepOpen) body.innerHTML = '<div style="padding:24px;text-align:center;color:#64748b;">Cargando cola…</div>';
   try {
     var H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
-    var rows = await fetch(SUPABASE_URL + "/rest/v1/vista_cola_impresion?select=np,tanda,razon_social,armado_ts,vencido&order=armado_ts.asc&limit=5000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; });
+    var rows = await fetch(SUPABASE_URL + "/rest/v1/vista_cola_impresion?select=np,tanda,razon_social,armado_ts,vencido,resumen,armador_leg&order=armado_ts.asc&limit=5000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; });
     _colaImp = { items: rows || [] };
     colaImpRender();
   } catch (e) { if (body) body.innerHTML = '<div style="padding:20px;color:#b91c1c;">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
@@ -25988,9 +25988,8 @@ function colaImpRender() {
   var h = '';
   h += '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px;">' +
     '<button onclick="colaImprimirTodas()" style="background:#1e40af;color:#fff;border:none;border-radius:9px;padding:11px 18px;font-size:15px;font-weight:800;cursor:pointer;width:auto;">🖨️ Imprimir todas (' + items.length + ')</button>' +
-    '<button onclick="pppConnectPdfDir()" style="background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:9px 13px;font-weight:800;cursor:pointer;width:auto;">🗂️ Carpeta(s) PDF</button>' +
     '<button onclick="openColaImpresion()" style="background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:9px 13px;font-weight:800;cursor:pointer;width:auto;">↻ Actualizar</button></div>';
-  h += '<div style="font-size:12px;color:#64748b;margin-bottom:8px;">Salen a la impresora conectada a esta PC. Con Chrome en modo <b>--kiosk-printing</b> se imprimen solas; si no, aparece un diálogo por PDF. Las que no tengan PDF quedan en la cola.</div>';
+  h += '<div style="font-size:12px;color:#64748b;margin-bottom:8px;">Imprime el <b>remito de armado</b> de cada NP (se genera en la app desde lo armado — no usa la carpeta de PDF). Con Chrome en modo <b>--kiosk-printing</b> salen solas a la impresora predeterminada; si no, un diálogo por hoja.</div>';
   h += '<div id="colaImpStatus" style="font-size:12.5px;color:#334155;margin-bottom:8px;min-height:16px;"></div>';
   if (venc) h += '<div style="background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;border-radius:9px;padding:9px 12px;font-weight:800;margin-bottom:10px;">⚠ ' + venc + ' nota(s) de pedido hace +24 h sin imprimir.</div>';
   if (!items.length) { body.innerHTML = h + '<div style="padding:20px;text-align:center;color:#94a3b8;">No hay notas de pedido pendientes de imprimir. 👍</div>'; return; }
@@ -26008,29 +26007,29 @@ function colaImpRender() {
   h += '</tbody></table></div>';
   body.innerHTML = h;
 }
+/* Imprime el REMITO DE ARMADO (generado en la app desde el resumen del TAL, mismo formato
+   que la estación de auto-impresión) de cada NP de la cola, uno tras otro. NO usa PDF: reusa
+   armadoRemitoData/InnerHtml + remitoPrintDoc. Con Chrome --kiosk-printing salen solas. */
+var _colaImpBusy = false;
 async function colaImprimirTodas() {
-  if (_pdfDirBusy) { alert("Esperá, ya hay una impresión en curso."); return; }
-  var nps = (_colaImp && _colaImp.items) ? _colaImp.items.map(function (x) { return x.np; }) : [];
-  if (!nps.length) { alert("No hay notas de pedido en la cola."); return; }
-  _pdfDirBusy = true;
+  if (_colaImpBusy) { alert("Esperá, ya hay una impresión en curso."); return; }
+  var items0 = (_colaImp && _colaImp.items) ? _colaImp.items.slice() : [];
+  items0 = items0.filter(function (x) { return x && x.resumen; });   // sin resumen no hay remito
+  if (!items0.length) { alert("No hay notas de pedido con armado (resumen) para imprimir."); return; }
+  _colaImpBusy = true;
   try {
-    var dirs = await pppGetPdfDirs(true);
-    if (!dirs.length) { colaImpStatus("Conectá la carpeta de PDF (botón «Carpeta(s) PDF»).", false); return; }
-    colaImpStatus("Buscando " + nps.length + " PDF…");
-    var idx = await _pppIndexDirs(dirs);
-    var found = [], foundNps = [];
-    for (var i = 0; i < nps.length; i++) {
-      var e = idx.get(parseInt(String(nps[i]).replace(/\D/g, ""), 10));
-      if (e) { try { var f = await e.fh.getFile(); found.push({ buf: await f.arrayBuffer(), name: e.name }); foundNps.push(nps[i]); } catch (_e2) {} }
-    }
-    if (!found.length) { colaImpStatus("No encontré PDF para las NP de la cola.", false); alert("No encontré ningún PDF de las NP de la cola.\nRevisá que la carpeta correcta esté conectada (botón «Carpeta(s) PDF»)."); return; }
-    var k = 0; var next = function () { if (k >= found.length) return; _pppPrintPdf(found[k].buf, found[k].name); k++; if (k < found.length) setTimeout(next, 1500); }; next();
-    colaImpMarcarImpresas(foundNps);
-    var faltan = nps.length - found.length;
-    colaImpStatus("🖨️ Mandé a imprimir " + found.length + " NP" + (faltan > 0 ? " (⚠ " + faltan + " sin PDF, quedan en la cola)" : "") + ".", faltan === 0);
-    setTimeout(function () { colaImpLoadBadge(); openColaImpresion(true); }, 1500);
+    colaImpStatus("Preparando " + items0.length + " remito(s)…");
+    var items = items0.map(function (x) { return { np: x.np, tanda: (x.tanda === "—" ? "" : x.tanda), resumen: x.resumen, armadorLeg: x.armador_leg || "" }; });
+    var ds = await _armadoRemitoDataForItems(items);
+    // imprimir serializado (1 hoja cada ~2.6 s, como la estación); con kiosk salen solas.
+    var k = 0;
+    var next = function () { if (k >= ds.length) return; try { remitoPrintDoc(armadoRemitoInnerHtml(ds[k])); } catch (_e) {} k++; if (k < ds.length) setTimeout(next, 2600); };
+    next();
+    colaImpMarcarImpresas(items.map(function (it) { return it.np; }));
+    colaImpStatus("🖨️ Mandé a imprimir " + ds.length + " remito(s) de armado.", true);
+    setTimeout(function () { colaImpLoadBadge(); openColaImpresion(true); }, 1600);
   } catch (e) { colaImpStatus("Error: " + (e && e.message ? e.message : e), false); }
-  finally { _pdfDirBusy = false; }
+  finally { _colaImpBusy = false; }
 }
 /* Marca en Impresion_NP las NP que se mandaron a imprimir (idempotente, PK np). */
 function colaImpMarcarImpresas(nps) {
@@ -31449,7 +31448,11 @@ function _psPollInfoText(){
   return "esperando primera revisión…";
 }
 function _psUpdatePollInfo(){ const el = document.getElementById("psPollInfo"); if (el) { el.textContent = _psPollInfoText(); el.style.color = (_ps && _ps.lastErr) ? "#b91c1c" : "#64748b"; } }
-async function psPrintBatch(items){
+/* v11.61 — construye los datos del remito ARMADO para una lista de items
+   [{np, tanda, resumen, armadorLeg}] enriqueciendo con PPP (cliente/fecha), faltantes
+   (Entregas), el picker por tanda (TP) y nombres. Devuelve [d] (armadoRemitoData) alineado
+   con items. Lo reusa la estación de impresión (psPrintBatch) y la Cola de impresión NP. */
+async function _armadoRemitoDataForItems(items){
   const npIn = items.map(function (x){ return encodeURIComponent(x.np); }).join(",");
   const tandas = items.map(function (x){ return String(x.tanda || "").toUpperCase(); }).filter(function (t, i, a){ return t && a.indexOf(t) === i; });
   const tIn = tandas.map(function (t){ return encodeURIComponent(t); }).join(",");
@@ -31467,13 +31470,18 @@ async function psPrintBatch(items){
     (res[1] || []).forEach(function (x){ const np = String(x.np || "").trim().replace(/\.0+$/, ""); const fl = Number(x.cajas_falto) || 0; if (np && fl > 0){ (faltMap[np] = faltMap[np] || []).push({ cod: String(x.cod_art || "").trim(), cajas: fl }); } });
     (res[2] || []).forEach(function (x){ const t = String(x.texto || "").trim().toUpperCase(); if (t && !pickByTanda[t]) pickByTanda[t] = String(x.legajo || ""); });   // order desc → el último TP gana
   } catch (_e){}
-  items.forEach(function (it){
+  return items.map(function (it){
     const pd = ppMap[it.np] || {};
     const tanda = it.tanda || pd.tanda || "";
     const row = { np: it.np, tanda: tanda, cod: pd.cod || "", rs: pd.rs || "", salePpp: pd.fecha || "", fecha: pd.fecha || "", resumen: it.resumen,
       armadorLeg: it.armadorLeg || "", pickerLeg: pickByTanda[String(tanda).toUpperCase()] || "", faltantes: faltMap[it.np] || [] };
-    const d = armadoRemitoData(row);
-    psMarkPrinted(it.np);   // marcar ANTES de encolar → si hay 2 pestañas abiertas, no imprimen doble
+    return armadoRemitoData(row);
+  });
+}
+async function psPrintBatch(items){
+  const ds = await _armadoRemitoDataForItems(items);
+  ds.forEach(function (d){
+    psMarkPrinted(d.np);   // marcar ANTES de encolar → si hay 2 pestañas abiertas, no imprimen doble
     psEnqueuePrint(d);
     psLog(d);
   });
