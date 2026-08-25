@@ -12,7 +12,19 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-08-25 · Versión app al documentar: **v11.48**
+> Última actualización: 2026-08-25 · Versión app al documentar: **v11.52**
+>
+> Nota **2026-08-25 — v11.49→v11.52 (varios OC/Stocks).** **(v11.49)** Reporte «Góndola <25%»:
+> columna «% góndola» renombrada a **«% Ocup Virgilio»** (tabla + Excel + PDF; solo rótulo).
+> **(v11.50)** Vista de OC por fecha (tarjetas por tallerista): **buscador por nombre** (filtra
+> por proveedor/rubro, `_oc.filtro`). **(v11.51→v11.52)** Detalle de OC (al abrir un tallerista):
+> columnas más juntas + 3 columnas **solo-pantalla** (no van a los impresos Operador/Tallerista/
+> WhatsApp): **Stock · Máximo · Proyección**. Son del **momento en que se generó la OC**, no de hoy:
+> salen de los snapshots que la OC ya guardaba (`Ordenes_Compra.oc_stock`, `oc_max`) + **nueva
+> columna `oc_proy`** (proyección al generar; se empieza a guardar en v11.52, las OC previas quedan
+> «—»). El generador (`ocgEnter`) ya traía `proy` del item; el insert de OCs (`oc_stock/oc_max/…`)
+> ahora suma `oc_proy: it.proy`. Así el «Pedido» y el contexto (máximo−stock−pedidos) cuadran de la
+> misma foto (ej. cód 104: oc_max 40 − oc_stock 24 = 16 pedido).
 >
 > Nota **2026-08-25 — v11.48 (Stocks: pop-up "de dónde surge la proyección" + ventas 6m).**
 > En la hoja **Stocks** (Stock y Compras), el número de la columna **PROY. CAJ/MES** ahora es
