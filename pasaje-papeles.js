@@ -337,36 +337,35 @@ function ppRenderList() {
 
   var data = _ppState.data;
 
-  // v4.7 — DOS responsabilidades, 2 módulos cada una (Pendiente + Enviada):
-  //  · Responsabilidad Virgilio  = remitos de RECEPCIÓN (talleristas, Recepción de Mercadería, origen != 'rr').
-  //  · Responsabilidad Logística = remitos de ENTREGA (venta, conformados en RR, origen == 'rr').
-  // 'Enviada' agrupa enviados + confirmados; el estado "Recibido el…" se ve en cada fila.
-  var esRR = function (r) { return r.origen === 'rr'; };
-  var split = function (rows) {
-    var pend = [], env = [];
-    rows.forEach(function (r) { if (!r.enviado) pend.push(r); else env.push(r); });
-    return { pend: pend, env: env };
+  // v4.8 — 2×2 por dos ejes:
+  //  · Responsabilidad VIRGILIO = ENVÍO (lo que falta mandar → enviado=false). Módulos por tipo:
+  //      «Envío remitos Prov» (talleristas, origen != 'rr') · «Envío remitos Venta» (RR, origen == 'rr').
+  //  · Responsabilidad CERVANTES = RECEPCIÓN (lo ya enviado, que Cervantes recibe/confirma → enviado=true):
+  //      «Recepción remitos Prov» · «Recepción remitos Venta». El "Recibido el…" se ve en cada fila.
+  //  Tipo: Prov = remito de proveedor/tallerista · Venta = remito de venta conformado en RR.
+  var esVenta = function (r) { return r.origen === 'rr'; };
+  var pick = function (enviado, venta) {
+    return data.filter(function (r) { return (!!r.enviado === enviado) && (esVenta(r) === venta); });
   };
-  var gV = split(data.filter(function (r) { return !esRR(r); }));
-  var gA = split(data.filter(esRR));
+  var vProv  = pick(false, false), vVenta = pick(false, true);   // Virgilio (envío)
+  var cProv  = pick(true,  false), cVenta = pick(true,  true);   // Cervantes (recepción)
 
   var html =
-    _ppGroupHeader('🏭 Responsabilidad Virgilio', '📥 Remitos de recepción (talleristas)') +
-    _ppBuildSection('v_pend', 'pendiente', '⏳', 'Documentación pendiente', gV.pend, true) +
-    _ppBuildSection('v_env', 'enviada', '✅', 'Documentación enviada', gV.env, false) +
-    _ppGroupHeader('🚚 Responsabilidad Logística', '📦 Remitos de entrega (venta/RR)') +
-    _ppBuildSection('a_pend', 'pendiente', '⏳', 'Documentación pendiente', gA.pend, true) +
-    _ppBuildSection('a_env', 'enviada', '✅', 'Documentación enviada', gA.env, false);
+    _ppGroupHeader('🏭 Responsabilidad Virgilio', '📤 Envío de remitos') +
+    _ppBuildSection('v_prov',  'pendiente', '📦', 'Envío remitos Prov',  vProv,  true) +
+    _ppBuildSection('v_venta', 'pendiente', '🧾', 'Envío remitos Venta', vVenta, true) +
+    _ppGroupHeader('🏢 Responsabilidad Cervantes', '📥 Recepción de remitos') +
+    _ppBuildSection('c_prov',  'enviada', '📦', 'Recepción remitos Prov',  cProv,  false) +
+    _ppBuildSection('c_venta', 'enviada', '🧾', 'Recepción remitos Venta', cVenta, false);
 
   container.innerHTML = html;
 
-  // Badge del botón en el panel supervisor: cuenta lo no confirmado (pendientes de enviar +
-  // enviados sin confirmar recepción). El tic verde solo aparece cuando no queda nada.
+  // Badge del botón en el panel supervisor: lo no confirmado (falta enviar + enviados sin confirmar).
   var sinConfirmar = data.filter(function (r) { return !r.confirmado; }).length;
   _ppUpdateBadge(sinConfirmar);
 
-  // Arrancar timer si hay pendientes (en cualquiera de las dos responsabilidades)
-  if (gV.pend.length || gA.pend.length) _ppStartTimer();
+  // Timer si hay algo pendiente de ENVIAR (responsabilidad Virgilio).
+  if (vProv.length || vVenta.length) _ppStartTimer();
   else _ppStopTimer();
 }
 

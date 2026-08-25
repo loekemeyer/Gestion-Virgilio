@@ -14,12 +14,14 @@
 >
 > Última actualización: 2026-08-25 · Versión app al documentar: **v11.57**
 >
-> Nota **2026-08-25 — v11.55→v11.57 (Pasaje de Papeles).** **(v11.55-56)** El módulo se reorganizó en
-> **2 responsabilidades** (encabezado `_ppGroupHeader`), 2 módulos cada una (Pendiente + Enviada; los
-> confirmados se ven dentro de Enviada con «Recibido el…»): **🏭 Responsabilidad Virgilio** = remitos de
-> **recepción** (talleristas, `origen != 'rr'`) · **🚚 Responsabilidad Logística** = remitos de **entrega**
-> (venta conformada en RR, `origen == 'rr'`). `_ppBuildSection(key, kind, …)` separa `kind`
-> (comportamiento) del `key` (id de colapso único, para repetir Pendiente/Enviada por responsabilidad).
+> Nota **2026-08-25 — v11.55→v11.58 (Pasaje de Papeles).** El módulo se reorganizó en **2×2** (encabezado
+> `_ppGroupHeader`; `_ppBuildSection(key, kind, …)` separa `kind` = comportamiento del `key` = id de colapso).
+> **Eje responsabilidad:** **🏭 Virgilio = ENVÍO** (lo que falta mandar, `enviado=false`, con timer/checkbox) ·
+> **🏢 Cervantes = RECEPCIÓN** (lo ya enviado, `enviado=true`, con «Confirmar recepción» + «Recibido el…»
+> inline). **Eje tipo:** **Prov** (remito de proveedor/tallerista, `origen != 'rr'`) · **Venta** (remito de
+> venta conformado en RR, `origen == 'rr'`). Da 4 módulos: Virgilio → «Envío remitos Prov» + «Envío remitos
+> Venta»; Cervantes → «Recepción remitos Prov» + «Recepción remitos Venta». (v11.55-57 tuvieron modelos
+> intermedios equivocados — Alan, Logística, Virgilio=recepción — corregidos en v11.58.)
 > **(v11.57)** En los remitos de **recepción** se muestra el **código del proveedor/tallerista** (chip azul
 > antes de la razón social). Nueva columna `Pasaje_Papeles.cod_proveedor`: se **captura** en Recepción de
 > Mercadería (`recepcion.js` pasa `opState.tallCod`) y se **backfilleó** por nombre vía
