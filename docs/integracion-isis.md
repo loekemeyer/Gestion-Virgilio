@@ -1,5 +1,22 @@
 # Integración Facturación app → ISIS (contabilidad)
 
+> ⚠ **DESACTUALIZADO en su conclusión (2026-08-25).** El informe consolidado del ticket
+> **1159666** (reuniones del 10 y 11 de agosto de 2026) **reemplaza** el "Modelo A" que
+> se decide más abajo: ya **no** se crea un pedido por `/api/ISISPedido` ni entra el
+> módulo Balcony. El pedido **ya está cargado en ISIS**; lo que la app manda es el
+> **estado de preparación en JSON** (picking, stock, faltantes) e ISIS **identifica la NP
+> y dispara la facturación** con su circuito normal. El alcance además creció a 4 flujos
+> (facturación, ISIS→Virgilio con el N.º de NP, recepción de mercadería, completado).
+>
+> **Plan vigente: [`PLAN-INTEGRACION-ISIS-5547.md`](PLAN-INTEGRACION-ISIS-5547.md)**
+> (idea 5547). Lo de abajo queda como **histórico**: explica por qué se descartaron el
+> Comprobante Manual y el Modelo B, y sigue valiendo lo de conectividad on-premise.
+>
+> Efecto lateral bueno: al facturar ISIS un pedido normal (y no un pedido tipo Balcony),
+> se cae el bloqueante de **contado vs cuenta corriente** que figura más abajo —
+> confirmar igual con el proveedor.
+
+
 Snapshot: **2026-07-30**. Estado: **facturación electrónica real ya operativa** en la
 app (PV 11, prod). Falta el circuito para que esas facturas entren al ISIS para la
 contabilidad / libro IVA ventas.

@@ -311,7 +311,100 @@ Estas piezas NO se pueden construir hasta que ISIS responda:
 | ¿JSON como formato? | ✅ Acordado |
 | ¿Estructura del JSON? | ✅ Ejemplo en informe (pedido 98180) |
 | ¿ISIS desarrolla consumo? | ✅ Prometido |
-| ¿Transporte cloud→on-premise? | ❌ 3 alternativas sin elegir |
+| ¿Transporte cloud→on-premise? | ⚠ Ya se puede decidir — ver "Transporte" abajo |
 | ¿Formato respuesta ISIS→app? | ❌ Sin definir |
 | ¿Mapeo códigos proveedor? | ❌ Sin definir |
 | ¿NP de vuelta? | ❌ Sin definir |
+
+
+---
+
+## Transporte cloud → on-premise: ya se puede decidir (2026-08-25)
+
+El mensaje de Horacio del 25/8 (requisitos para usar la API del ISIS on-premise:
+Windows Server + IIS + IP pública + **abrir el puerto** + firewall/AV, sin soporte de
+QSA) aplica **solo si NOSOTROS llamamos al ISIS**.
+
+En las tres alternativas del informe (§11) el que consulta es **ISIS**, y una request
+**saliente** desde su LAN **no necesita nada de eso**: ni servidor nuevo, ni IP fija, ni
+puertos abiertos, ni superficie de ataque.
+
+**Recomendado — Alternativa B (ISIS consulta una API nuestra):**
+- Edge Function en Supabase con **token**: `GET` de pendientes + `POST` de acuse.
+- Da gratis lo que pide el §18 del informe: qué se recibió, qué se procesó, cuándo,
+  resultado, errores, reintentos, control de duplicados.
+- ISIS hace polling con la frecuencia que quiera. Nada expuesto del lado del depósito.
+
+**Plan B — Alternativa A (carpeta, Pieza 6):** el agente-local baja los JSON y los deja
+en `C:\ISIS\entrada\`. También es cero-puertos y es lo más simple para ellos, pero
+depende de que la PC esté prendida y el acuse hay que inventarlo (mover/marcar archivos).
+
+Queda como **Pieza 6-bis** por si ISIS prefiere leer disco antes que hacer HTTP.
+
+---
+
+## Riesgos / huecos detectados al releer el informe (2026-08-25)
+
+Ninguno de estos está en el informe de ISIS ni cubierto por las piezas de arriba.
+
+### 1. ⛔ El `ok` del JSON de ejemplo NO es el del Plan (Pieza 3)
+
+En el ejemplo que ya vio ISIS (pedido 98187, artículo **550**): `cajas: 1`,
+`stock_total: 28`, `falta_global: 9`, **`ok: false`**. Hay stock de sobra para ese
+pedido, pero el `ok` sale en false → el ejemplo deriva **`ok = (falta_global == 0)`**,
+o sea faltante **global** (todos los pedidos pendientes contra el stock), no
+`stock >= cajas` como dice la Pieza 3.
+
+Consecuencia: si se construye según la Pieza 3, el JSON **no coincide** con el que ISIS
+analizó. Y con el criterio global, un pedido con stock reservado **no se factura nunca**
+mientras globalmente falte para el resto.
+
+**A definir antes de codear:** ¿se factura por stock del pedido o por faltante global?
+
+### 2. ⛔ Equivalencias de código — la auto-facturación puede facturar el artículo equivocado
+
+Ya documentado en la guía (v5.10): la factura debe ir con el código **real** (437E), no
+con el del pedido (029). Hoy hay un agente que se lo avisa a Marianela por Telegram
+justamente porque la facturación es manual.
+
+Si ISIS auto-factura el pedido **tal como está cargado**, factura el código viejo. El
+JSON tiene que llevar el artículo **realmente preparado** (o el mapeo), y hay que definir
+si ISIS corrige la línea del pedido antes de facturar. **No está en el informe.**
+
+### 3. ⚠ Faltante: ¿pendiente o factura parcial? El informe se contradice
+
+§6 y §5.2 dicen que el pedido con faltante **no se factura** hasta completarse. Pero
+§13 (Flujo 4) habla de pedidos **"facturados parcialmente por presentar faltantes"** y
+completados después — que es como funciona hoy (facturación parcial + "Completar Pedido"
++ el reporte de faltantes facturados sin completar).
+
+Son dos circuitos operativos distintos. Definir cuál.
+
+### 4. ⚠ Cutover del CAE: quién emite
+
+Hoy la app emite Factura A por **PV 11** (`arca-wsfe`, prod). Si ISIS pasa a facturar,
+hay que **apagar la emisión propia el mismo día** o se emite CAE dos veces por la misma
+venta. Definir si PV 11 queda de respaldo (era la idea de julio) y quién lo apaga.
+
+### 5. ⚠ Trazabilidad: falta el estado del lado ISIS
+
+La tabla `isis_json_pendientes` (Pieza 5) solo sabe qué se **bajó** (`enviado_en`). No
+sabe si ISIS lo **procesó**, si generó factura, con qué número/CAE, o si falló. Sin eso
+no hay forma de garantizar que una NP no se facture dos veces — que es exactamente lo
+que pide el §17 del informe.
+
+Agregar a la Pieza 5: `procesado_en`, `resultado` (ok/error), `nro_comprobante`, `cae`,
+`error_detalle`, y clave única por `(tipo, np, empresa)`.
+
+### 6. ℹ El JSON de ejemplo no lleva `empresa`
+
+El §14 exige contemplar las **dos empresas** desde el diseño, pero el ejemplo enviado
+(98180/98187) no trae el campo. El Plan ya lo agrega (LK/CH derivada de la NP, misma
+regla que usan los PDF: 9xxxx→LK, 4xxxx→CH). Falta **confirmarle a ISIS el nombre del
+campo** y que lo acepte.
+
+### 7. ℹ Aclararle a ISIS qué es `falta_global`
+
+En el informe figura como "Cantidad faltante" a secas, lo que invita a leerlo como
+faltante **del pedido**. Es un número **global** (todos los pedidos pendientes vs stock).
+Si ISIS lo usa para decidir por línea, va a bloquear facturas que sí se pueden hacer.
