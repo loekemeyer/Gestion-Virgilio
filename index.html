@@ -6506,7 +6506,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v11.33";
+const APP_VERSION = "v11.34";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -16521,26 +16521,49 @@ async function stkInsLoad() {
   await stkInsRefresh();
   stkRender();
 }
+/* v11.34 — fetch ubicaciones con cantidad desde Insumos_Ubicaciones */
+async function _stkInsFetchUbics() {
+  try {
+    var r = await fetch(SUPABASE_INS_UBIC_ENDPOINT + "?select=id,cod,sector,cantidad&order=cod.asc,sector.asc&limit=5000",
+      { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+    return r.ok ? await r.json() : [];
+  } catch (_e) { return []; }
+}
 async function stkInsRefresh() {
   try {
     await insLoadMeta(true);
     const r = await Promise.all([
       supaFetchAll(SUPABASE_URL + "/rest/v1/vista_insumos", "select=cod,nombre,categoria,ubicacion,isis,creado_por,creado"),
       insFetchSaldosXUni(),
-      _stkInsHistFetch()
+      _stkInsHistFetch(),
+      _stkInsFetchUbics()
     ]);
-    // v10.10 — ubicación viene de vista_insumos (lee Racks_Planimetria), read-only
+    // v11.34 — armar mapa de ubicaciones por cod
+    var ubicsMap = {};
+    (r[3] || []).forEach(function (u) {
+      var k = String(u.cod || "").trim();
+      if (!ubicsMap[k]) ubicsMap[k] = [];
+      ubicsMap[k].push(u);
+    });
     _stkIns.items = (r[0] || []).map(function (c) {
-      return { cod: String(c.cod), nombre: c.nombre || "", cat: c.categoria || "", ubic: c.ubicacion || "",
-               isis: c.isis || "", por: c.creado_por || "", xuni: r[1][String(c.cod)] || null,
-               ubics: [] };
+      var ck = String(c.cod);
+      return { cod: ck, nombre: c.nombre || "", cat: c.categoria || "", ubic: c.ubicacion || "",
+               isis: c.isis || "", por: c.creado_por || "", xuni: r[1][ck] || null,
+               ubics: ubicsMap[ck] || [] };
     });
     _stkIns.items.sort(_insSortCod);
     _stkIns.hist = r[2] || [];
   } catch (e) { _stkIns.items = []; _stkIns.msg = "⚠ Error cargando: " + (e.message || e); }
 }
-/* v10.10 — ubicación read-only desde vista_insumos (Racks_Planimetria). */
+/* v11.34 — ubicación: si hay ubics (Insumos_Ubicaciones con cantidad), muestra
+   "sector (cant) · sector2 (cant2)"; si no, fallback a vista_insumos.ubicacion. */
 function _stkInsUbicStr(it) {
+  if (it.ubics && it.ubics.length) {
+    return it.ubics.map(function (u) {
+      var c = Number(u.cantidad || 0);
+      return u.sector + (c ? " (" + (Math.round(c * 1000) / 1000) + ")" : "");
+    }).join(" · ");
+  }
   return it.ubic || "";
 }
 /* v8.72 — HTML para editar ubicaciones múltiples inline (mini-lista con botón +/x).
@@ -16550,41 +16573,54 @@ function _stkInsUbicStr(it) {
 function _stkInsUbicEditInit(cod, ubics) {
   if (!_stkIns.edUbics) _stkIns.edUbics = {};
   if (!_stkIns.edUbics[cod]) {
-    _stkIns.edUbics[cod] = (ubics && ubics.length) ? ubics.map(function (u) { return u.sector || ""; }) : [];
+    _stkIns.edUbics[cod] = (ubics && ubics.length) ? ubics.map(function (u) {
+      return { sector: u.sector || "", cantidad: Number(u.cantidad || 0) };
+    }) : [];
   }
 }
 function _stkInsUbicEdit(cod, ubics) {
   _stkInsUbicEditInit(cod, ubics);
   var arr = _stkIns.edUbics[cod];
-  var h = '<div style="min-width:100px;">';
-  h += arr.map(function (sec, i) {
+  var h = '<div style="min-width:150px;">';
+  if (arr.length) h += '<div style="display:flex;gap:2px;margin-bottom:1px;font-size:10px;color:#94a3b8;"><span style="width:70px;">Sector</span><span style="width:55px;">Cant</span></div>';
+  h += arr.map(function (u, i) {
     return '<div style="display:flex;align-items:center;gap:2px;margin-bottom:2px;">' +
-      '<input class="stk-inp" value="' + escapeHtml(sec) + '" style="width:80px;" placeholder="sector" ' +
-      'oninput="stkInsUbicChg(\'' + escapeHtml(cod) + '\',' + i + ',this.value)">' +
+      '<input class="stk-inp" value="' + escapeHtml(u.sector) + '" style="width:70px;" placeholder="sector" ' +
+      'oninput="stkInsUbicChg(\'' + escapeHtml(cod) + '\',' + i + ',\'sector\',this.value)">' +
+      '<input class="stk-inp" type="number" step="any" value="' + (u.cantidad || "") + '" style="width:55px;" placeholder="cant" ' +
+      'oninput="stkInsUbicChg(\'' + escapeHtml(cod) + '\',' + i + ',\'cantidad\',this.value)">' +
       '<button class="stk-btn stk-btn-x" style="padding:1px 5px;font-size:11px;" ' +
-      'onclick="stkInsUbicQuitar(\'' + escapeHtml(cod) + '\',' + i + ')" title="Quitar">✕</button></div>';
+      'onclick="stkInsUbicQuitar(\'' + escapeHtml(cod) + '\',' + i + ')" title="Quitar sector">✕</button></div>';
   }).join("");
+  var total = arr.reduce(function (s, u) { return s + (Number(u.cantidad) || 0); }, 0);
+  if (arr.length > 1) h += '<div data-ubic-total="' + escapeHtml(cod) + '" style="font-size:11px;color:#475569;font-weight:700;margin-top:1px;">Total: ' + (Math.round(total * 1000) / 1000) + '</div>';
   h += '<button class="stk-btn" style="padding:1px 8px;font-size:11px;margin-top:2px;" ' +
-    'onclick="stkInsUbicAgregar(\'' + escapeHtml(cod) + '\')" title="Agregar ubicación">＋</button>';
+    'onclick="stkInsUbicAgregar(\'' + escapeHtml(cod) + '\')" title="Agregar sector">＋ sector</button>';
   h += '</div>';
   return h;
 }
-/* v8.72 — actualizar valor del input sin re-render (para no perder foco) */
-function stkInsUbicChg(cod, idx, val) {
+/* v11.34 — actualizar sector o cantidad del input sin re-render (para no perder foco) */
+function stkInsUbicChg(cod, idx, field, val) {
   if (!_stkIns || !_stkIns.edUbics || !_stkIns.edUbics[cod]) return;
-  _stkIns.edUbics[cod][idx] = val;
+  var u = _stkIns.edUbics[cod][idx]; if (!u) return;
+  if (field === "cantidad") {
+    u.cantidad = parseFloat(val) || 0;
+    var te = document.querySelector('[data-ubic-total="' + cod + '"]');
+    if (te) { var t = _stkIns.edUbics[cod].reduce(function (s, x) { return s + (Number(x.cantidad) || 0); }, 0); te.textContent = "Total: " + (Math.round(t * 1000) / 1000); }
+  } else {
+    u.sector = val;
+  }
 }
-/* v8.72 — agregar una línea de ubicación */
+/* v11.34 — agregar una línea de sector+cantidad */
 function stkInsUbicAgregar(cod) {
   if (!_stkIns) return;
   if (!_stkIns.edUbics) _stkIns.edUbics = {};
   if (!_stkIns.edUbics[cod]) _stkIns.edUbics[cod] = [];
-  _stkIns.edUbics[cod].push("");
+  _stkIns.edUbics[cod].push({ sector: "", cantidad: 0 });
   stkRender();
-  // Focus en el nuevo input (último)
   setTimeout(function () {
-    var inputs = document.querySelectorAll("[oninput*='stkInsUbicChg'][oninput*='" + cod + "']");
-    if (inputs.length) inputs[inputs.length - 1].focus();
+    var inputs = document.querySelectorAll("[oninput*='stkInsUbicChg'][oninput*=\"'" + cod + "'\"]");
+    if (inputs.length) inputs[inputs.length - 2 >= 0 ? inputs.length - 2 : 0].focus();
   }, 50);
 }
 /* v8.72 — quitar una línea de ubicación */
@@ -16593,31 +16629,45 @@ function stkInsUbicQuitar(cod, idx) {
   _stkIns.edUbics[cod].splice(idx, 1);
   stkRender();
 }
-/* v8.72 — leer las ubicaciones del estado → array de strings (para guardar) */
+/* v11.34 — leer las ubicaciones del estado → array de {sector, cantidad} (para guardar) */
 function _stkInsUbicLeer(cod) {
   if (!_stkIns || !_stkIns.edUbics || !_stkIns.edUbics[cod]) return [];
-  return _stkIns.edUbics[cod].filter(function (s) { return String(s || "").trim() !== ""; }).map(function (s) { return String(s).trim(); });
+  return _stkIns.edUbics[cod].filter(function (u) { return String(u.sector || "").trim() !== ""; })
+    .map(function (u) { return { sector: String(u.sector).trim(), cantidad: Number(u.cantidad) || 0 }; });
 }
-/* v8.72 — guardar ubicaciones múltiples en Insumos_Ubicaciones (CRUD sync) */
+/* v11.34 — guardar ubicaciones múltiples con cantidad en Insumos_Ubicaciones (CRUD sync).
+   `nuevas` = array de {sector, cantidad}. Borra las que ya no están, actualiza cantidad
+   de las que cambiaron, agrega las nuevas. */
 async function _stkInsUbicSync(cod, nuevas) {
   var hdr = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" };
   // Traer las actuales
   var act = [];
   try {
-    var r = await fetch(SUPABASE_INS_UBIC_ENDPOINT + "?cod=eq." + encodeURIComponent(cod) + "&select=id,sector", { headers: hdr, cache: "no-store" });
+    var r = await fetch(SUPABASE_INS_UBIC_ENDPOINT + "?cod=eq." + encodeURIComponent(cod) + "&select=id,sector,cantidad", { headers: hdr, cache: "no-store" });
     if (r.ok) act = await r.json();
   } catch (_e) {}
   var actMap = {}; act.forEach(function (u) { actMap[u.sector.toUpperCase()] = u; });
-  var nuevasMap = {}; nuevas.forEach(function (s) { nuevasMap[s.toUpperCase()] = s; });
+  var nuevasMap = {}; nuevas.forEach(function (u) { nuevasMap[u.sector.toUpperCase()] = u; });
   // Borrar las que ya no están
   var aBorrar = act.filter(function (u) { return !nuevasMap[u.sector.toUpperCase()]; });
   for (var i = 0; i < aBorrar.length; i++) {
     await fetch(SUPABASE_INS_UBIC_ENDPOINT + "?id=eq." + aBorrar[i].id, { method: "DELETE", headers: hdr });
   }
+  // Actualizar cantidad de las que cambiaron
+  for (var j = 0; j < nuevas.length; j++) {
+    var key = nuevas[j].sector.toUpperCase();
+    var existing = actMap[key];
+    if (existing && Number(existing.cantidad || 0) !== Number(nuevas[j].cantidad || 0)) {
+      await fetch(SUPABASE_INS_UBIC_ENDPOINT + "?id=eq." + existing.id, {
+        method: "PATCH", headers: hdr,
+        body: JSON.stringify({ cantidad: nuevas[j].cantidad || 0, updated_at: new Date().toISOString() })
+      });
+    }
+  }
   // Agregar las nuevas que no existían
-  var aAgregar = nuevas.filter(function (s) { return !actMap[s.toUpperCase()]; });
+  var aAgregar = nuevas.filter(function (u) { return !actMap[u.sector.toUpperCase()]; });
   if (aAgregar.length) {
-    var rows = aAgregar.map(function (s) { return { cod: cod, sector: s }; });
+    var rows = aAgregar.map(function (u) { return { cod: cod, sector: u.sector, cantidad: u.cantidad || 0 }; });
     await fetch(SUPABASE_INS_UBIC_ENDPOINT, { method: "POST", headers: hdr, body: JSON.stringify(rows) });
   }
 }
@@ -16870,7 +16920,7 @@ function _stkInsListado(k, items) {
         '<td><input class="stk-inp" id="edCod_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.cod) + '" style="width:88px;" title="Código conocido (clave del stock)"></td>' +
         '<td><input class="stk-inp" id="edIsis_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.isis || "") + '" placeholder="isis" style="width:78px;color:#64748b;" title="Código del sistema (isis)"></td>' +
         '<td><input class="stk-inp" id="edNom_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.nombre) + '" style="width:150px;"><br><span class="stk-sub">cat:</span> ' + _stkInsCatSel("edCat_" + it.cod, it.cat) + '</td>' +
-        '<td style="color:#64748b;font-size:11px;" title="Ubicación desde Racks (read-only)">' + escapeHtml(_stkInsUbicStr(it)) + '</td>' +
+        '<td>' + _stkInsUbicEdit(it.cod, it.ubics) + '</td>' +
         '<td style="border-left:1px solid #eef2f7;"><input class="stk-inp" id="edQty_' + escapeHtml(it.cod) + '" type="number" step="any" value="' + escapeHtml(u.saldo) + '" style="width:70px;" oninput="stkInsAutoSec(\'' + escapeHtml(it.cod) + '\',\'qty\')" title="Cantidad primaria (en la unidad base)"></td>' +
         '<td>' + _stkInsUniSel("edUni_" + it.cod, du.uniP || _stkInsUniMostrar(it)) + '</td>' +
         '<td style="border-left:1px solid #eef2f7;"><input class="stk-inp" id="edSecQty_' + escapeHtml(it.cod) + '" type="number" step="any" value="' + escapeHtml(du.cantS) + '" style="width:66px;" placeholder="cant" oninput="stkInsAutoSec(\'' + escapeHtml(it.cod) + '\',\'sec\')" title="Cargá Cant secundaria O el Factor: el otro se completa solo"></td>' +
@@ -16958,7 +17008,7 @@ function _stkInsTodos(items) {
         '<input class="stk-inp" id="edIsis_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.isis || "") + '" placeholder="isis (sistema)" style="width:100px;margin-top:3px;color:#64748b;" title="Código del sistema (isis) — informativo, no toca el stock"></td>' +
         '<td><input class="stk-inp" id="edNom_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.nombre) + '" style="width:140px;"></td>' +
         '<td>' + _stkInsCatSel("edCat_" + it.cod, it.cat) + '</td>' +
-        '<td style="color:#64748b;font-size:11px;" title="Ubicación desde Racks (read-only)">' + escapeHtml(_stkInsUbicStr(it)) + '</td>' +
+        '<td>' + _stkInsUbicEdit(it.cod, it.ubics) + '</td>' +
         '<td><input class="stk-inp" id="edQty_' + escapeHtml(it.cod) + '" type="number" step="any" value="' + escapeHtml(u.saldo) + '" style="width:82px;"></td>' +
         '<td>' + _stkInsUniSel("edUni_" + it.cod, _stkInsUniMostrar(it)) + '</td>' +
         '<td><button class="stk-btn" onclick="stkInsGuardar(\'' + escapeHtml(it.cod) + '\')">✓ Guardar</button> ' +
@@ -17346,7 +17396,8 @@ async function stkInsGuardar(cod) {
   if (!it) return;
   const nuevoCod = _stkInsVal("edCod_" + cod), nom = _stkInsVal("edNom_" + cod);
   const cat = _stkInsVal("edCat_" + cod);
-  // v10.10 — ubicación es read-only (viene de Racks_Planimetria), no se guarda desde acá
+  // v11.34 — ubicaciones editables (sector + cantidad)
+  const ubicsNuevas = _stkInsUbicLeer(cod);
   const uni = _stkInsVal("edUni_" + cod), qty = _stkInsVal("edQty_" + cod);
   const isis = _stkInsVal("edIsis_" + cod);   // v8.28 — código del sistema (informativo)
   if (!nuevoCod) { alert("El código no puede quedar vacío."); return; }
@@ -17373,6 +17424,7 @@ async function stkInsGuardar(cod) {
       await _stkInsRpc("insumo_editar", cambios);
     }
     await _stkInsAjustar(it, cod, qty, uni);            // cantidad / unidad, con asiento
+    await _stkInsUbicSync(cod, ubicsNuevas);             // v11.34 — sectores + cantidades
     let msg = "✓ " + cod + " actualizado.";
     if (nuevoCod !== cod) {                              // el rename va último
       const n = await _stkInsRpc("insumo_recodificar", { p_cod: cod, p_nuevo: nuevoCod });
