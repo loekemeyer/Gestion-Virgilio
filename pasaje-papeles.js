@@ -160,19 +160,30 @@ function ppToggleSection(section) {
 /**
  * Genera el HTML de una sección colapsable con header y tabla
  */
-function _ppBuildSection(key, icon, title, rows, showTimer) {
+// v4.7 — Encabezado de RESPONSABILIDAD (agrupa sus 2 módulos: Pendiente + Enviada).
+function _ppGroupHeader(title, sub) {
+  return '<div style="margin:4px 0 10px;padding:11px 15px;background:linear-gradient(90deg,#1e293b,#334155);' +
+    'color:#fff;border-radius:10px;display:flex;align-items:center;gap:10px;box-shadow:0 2px 8px rgba(2,6,23,.18);">' +
+    '<span style="font-weight:800;font-size:16px;letter-spacing:.02em;">' + title + '</span>' +
+    (sub ? '<span style="margin-left:auto;font-weight:600;font-size:12.5px;opacity:.85;">' + sub + '</span>' : '') +
+    '</div>';
+}
+// v4.7 — `kind` ('pendiente'|'enviada') decide el comportamiento (color, timer, columnas de
+// confirmación); `key` es el id único de colapso (para poder repetir Pendiente/Enviada por
+// responsabilidad — Virgilio y Alan). 'enviada' agrupa enviados + confirmados (el estado
+// "Recibido el…" se ve dentro de cada fila).
+function _ppBuildSection(key, kind, icon, title, rows, showTimer) {
   var collapsed = _ppState.collapsed[key];
   var count = rows.length;
-  var headerColor = key === 'pendiente' ? '#dc2626' : '#16a34a';
-  // v4.6 — 'recibida' (ya confirmados) usa las mismas columnas que 'enviada'
-  // pero en su propia sección (no se mezclan con los que faltan confirmar).
-  var esEnviada = (key === 'enviada' || key === 'recibida');
+  var esPend = (kind === 'pendiente');
+  var headerColor = esPend ? '#dc2626' : '#16a34a';
+  var esEnviada = (kind === 'enviada');
 
   var html = '<div style="margin-bottom:16px;">';
 
   // Header colapsable
   html += '<div onclick="ppToggleSection(\'' + key + '\')" style="display:flex;align-items:center;gap:8px;padding:10px 14px;' +
-    'background:' + (key === 'pendiente' ? '#fef2f2' : '#f0fdf4') + ';border:1px solid ' + (key === 'pendiente' ? '#fecaca' : '#bbf7d0') + ';' +
+    'background:' + (esPend ? '#fef2f2' : '#f0fdf4') + ';border:1px solid ' + (esPend ? '#fecaca' : '#bbf7d0') + ';' +
     'border-radius:8px;cursor:pointer;user-select:none;">' +
     '<span id="ppArrow_' + key + '" style="font-size:12px;color:#64748b;width:14px;">' + (collapsed ? '▶' : '▼') + '</span>' +
     '<span style="font-size:16px;">' + icon + '</span>' +
@@ -186,9 +197,7 @@ function _ppBuildSection(key, icon, title, rows, showTimer) {
 
   if (!count) {
     html += '<div style="padding:12px 14px;color:#94a3b8;font-size:14px;font-style:italic;">' +
-      (key === 'pendiente' ? 'Sin documentación pendiente'
-        : key === 'recibida' ? 'Sin documentación recibida'
-        : 'Sin documentación enviada') + '</div>';
+      (esPend ? 'Sin documentación pendiente' : 'Sin documentación enviada') + '</div>';
   } else {
     html += '<div class="pp-tblwrap"><table class="pp-tbl"><thead><tr>' +
       '<th>Fecha DDJJ</th><th>Tipo</th><th>N° Remito</th><th>N° Factura</th><th>Razón Social</th><th>Contenido</th>';
@@ -325,31 +334,36 @@ function ppRenderList() {
 
   var data = _ppState.data;
 
-  // v4.6 — tres grupos: pendiente de enviar · enviado SIN confirmar · recibido (confirmado).
-  // Cuando marcan "Recibido" pasa a su propia sección, no queda en "enviada".
-  var pendientes = [];
-  var enviados = [];   // enviados pero todavía sin confirmar recepción
-  var recibidos = [];  // ya confirmados como recibidos
-  data.forEach(function (row) {
-    if (!row.enviado) pendientes.push(row);
-    else if (row.confirmado) recibidos.push(row);
-    else enviados.push(row);
-  });
+  // v4.7 — DOS responsabilidades, 2 módulos cada una (Pendiente + Enviada):
+  //  · Responsabilidad Virgilio = remitos de TALLERISTA (Recepción de Mercadería, origen != 'rr').
+  //  · Responsabilidad Alan     = remitos de VENTA conformados en RR (origen == 'rr').
+  // 'Enviada' agrupa enviados + confirmados; el estado "Recibido el…" se ve en cada fila.
+  var esRR = function (r) { return r.origen === 'rr'; };
+  var split = function (rows) {
+    var pend = [], env = [];
+    rows.forEach(function (r) { if (!r.enviado) pend.push(r); else env.push(r); });
+    return { pend: pend, env: env };
+  };
+  var gV = split(data.filter(function (r) { return !esRR(r); }));
+  var gA = split(data.filter(esRR));
 
-  var html = _ppBuildSection('pendiente', '⏳', 'Documentación pendiente', pendientes, true) +
-             _ppBuildSection('enviada', '✅', 'Documentación enviada', enviados, false) +
-             _ppBuildSection('recibida', '📥', 'Recibidos (confirmados)', recibidos, false);
+  var html =
+    _ppGroupHeader('🏭 Responsabilidad Virgilio', 'Remitos de talleristas') +
+    _ppBuildSection('v_pend', 'pendiente', '⏳', 'Documentación pendiente', gV.pend, true) +
+    _ppBuildSection('v_env', 'enviada', '✅', 'Documentación enviada', gV.env, false) +
+    _ppGroupHeader('🚚 Responsabilidad Alan', 'Remitos de venta (RR)') +
+    _ppBuildSection('a_pend', 'pendiente', '⏳', 'Documentación pendiente', gA.pend, true) +
+    _ppBuildSection('a_env', 'enviada', '✅', 'Documentación enviada', gA.env, false);
 
   container.innerHTML = html;
 
-  // Badge del botón en el panel supervisor: cuenta pendientes de enviar +
-  // enviados sin confirmar recepción (los "OK?" abiertos). El tic verde solo
-  // aparece cuando NO queda nada por confirmar adentro.
+  // Badge del botón en el panel supervisor: cuenta lo no confirmado (pendientes de enviar +
+  // enviados sin confirmar recepción). El tic verde solo aparece cuando no queda nada.
   var sinConfirmar = data.filter(function (r) { return !r.confirmado; }).length;
   _ppUpdateBadge(sinConfirmar);
 
-  // Arrancar timer si hay pendientes
-  if (pendientes.length) _ppStartTimer();
+  // Arrancar timer si hay pendientes (en cualquiera de las dos responsabilidades)
+  if (gV.pend.length || gA.pend.length) _ppStartTimer();
   else _ppStopTimer();
 }
 
