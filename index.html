@@ -6512,7 +6512,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v11.65";
+const APP_VERSION = "v11.66";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -10775,12 +10775,12 @@ function ocBodyDetail() {
     if (_pm) { const v = _pm[_ocgNorm(r.codigo)]; if (v != null && v > 0) return '<td class="num oc-xtra" style="opacity:.72;font-style:italic;" title="Proyección de HOY (esta OC es previa a guardar la proyección al generarla)">~' + Math.round(v) + '</td>'; }
     return '<td class="num oc-xtra">' + (_pm ? '—' : '…') + '</td>';
   };
-  h += '<div class="oc-tblwrap"><table class="oc-tbl oc-tbl-det"><thead><tr><th>Código</th><th class="oc-desc">Descripción</th><th class="num">Pedido</th><th class="num">Recibido</th><th class="num">Falta</th><th class="num oc-xtra oc-xtra-first" title="Al generar la OC">Stock</th><th class="num oc-xtra" title="Al generar la OC">Máximo</th><th class="num oc-xtra" title="Al generar la OC (viejas: ~ = proyección de hoy)">Proyección</th></tr></thead><tbody>';
+  h += '<div class="oc-tblwrap"><table class="oc-tbl oc-tbl-det"><thead><tr><th>Código</th><th class="oc-desc">Descripción</th><th class="num">Pedido</th><th class="num">Recibido</th><th class="num">Falta</th><th class="num oc-xtra oc-xtra-first" title="Stock al generar la OC">Stock</th><th class="num oc-xtra" title="Máximo al generar la OC">Máximo</th><th class="num oc-xtra" title="Pedidos pendientes (demanda) al generar la OC">Pedidos</th><th class="num oc-xtra" title="Al generar la OC (viejas: ~ = proyección de hoy)">Proyección</th></tr></thead><tbody>';
   x.rows.forEach(function (r) {
     const ped = Number(r.cantidad) || 0, rec = ocRecEff(r), falt = ped - rec;
-    h += '<tr><td class="oc-cod">' + escapeHtml(codCanon(r.codigo) || "—") + '</td><td class="oc-desc">' + escapeHtml(artNombre(r.codigo, r.descripcion) || "") + '</td><td class="num">' + ped + '</td><td class="num ' + (rec > 0 ? "oc-ok" : "") + '">' + rec + '</td><td class="num ' + (falt > 0 ? "oc-falt" : "oc-ok") + '">' + (falt !== 0 ? falt : "0") + '</td>' + _gv(r, "oc_stock", " oc-xtra-first") + _gv(r, "oc_max", "") + _proyCell(r) + '</tr>';
+    h += '<tr><td class="oc-cod">' + escapeHtml(codCanon(r.codigo) || "—") + '</td><td class="oc-desc">' + escapeHtml(artNombre(r.codigo, r.descripcion) || "") + '</td><td class="num">' + ped + '</td><td class="num ' + (rec > 0 ? "oc-ok" : "") + '">' + rec + '</td><td class="num ' + (falt > 0 ? "oc-falt" : "oc-ok") + '">' + (falt !== 0 ? falt : "0") + '</td>' + _gv(r, "oc_stock", " oc-xtra-first") + _gv(r, "oc_max", "") + _gv(r, "oc_pedidos", "") + _proyCell(r) + '</tr>';
   });
-  return h + '</tbody></table></div><div class="oc-note" style="margin-top:8px">Las columnas <b style="color:#6d28d9">Stock · Máximo · Proyección</b> son del <b>momento en que se generó la OC</b> (no de hoy). En OC viejas (previas a guardar el dato) la <b>Proyección</b> muestra la de <b>hoy</b> con «<b>~</b>» (la proyección casi no cambia en días); Stock y Máximo viejos quedan en «—».</div>';
+  return h + '</tbody></table></div><div class="oc-note" style="margin-top:8px">Las columnas <b style="color:#6d28d9">Stock · Máximo · Pedidos · Proyección</b> son del <b>momento en que se generó la OC</b> (no de hoy) — así se ve por qué se pidió lo que se pidió (a pedir ≈ Máximo − Stock − Pedidos). En OC viejas (previas a guardar el dato) la <b>Proyección</b> muestra la de <b>hoy</b> con «<b>~</b>»; Stock/Máximo/Pedidos viejos quedan en «—».</div>';
 }
 /* v6.41 — IMPRIMIR OC: hoja print-friendly de la OC abierta (1 proveedor · fecha · rubro).
    Reusa el patrón de pppPrintSug (window.open + document.write + auto-print).
@@ -11638,8 +11638,15 @@ async function ocCfgSave() {
       if (patch.proveedor2 != null && !String(patch.proveedor2).trim()) patch.proveedor2 = null;   // "" → null
       if (row && !row.en_config) {
         // v7.68: código NUEVO (venía de stock, no estaba en OC_Maximos) → INSERT (cod + defaults + cambios).
+        // v11.66 — `linea` es NOT NULL sin default en OC_Maximos → si no se manda, el INSERT
+        // daba HTTP 400 al alta de códigos nuevos (ej. 231/232/233). Se deriva de la marca
+        // (artMarca ← vista_marca_articulo), fallback a la línea de la fila, fallback "LK".
+        // `max_cajas` (NOT NULL, default 0) se manda explícito por las dudas.
+        const _linea = String(row.linea || "").toUpperCase().trim() ||
+          ((typeof artMarca === "function" ? (artMarca(row.cod || c) || "") : "")) || "LK";
         const body = Object.assign({
-          cod: (row.cod || c), descripcion: row.descripcion || null,
+          cod: (row.cod || c), descripcion: row.descripcion || null, linea: _linea,
+          max_cajas: (row.max_cajas == null ? 0 : row.max_cajas),
           proveedor: (String(row.proveedor || "").trim() || null), prop_prov1: (row.prop_prov1 == null ? 100 : row.prop_prov1),
           proveedor2: (String(row.proveedor2 || "").trim() || null), prop_prov2: (row.prop_prov2 == null ? 0 : row.prop_prov2),
           indice: (row.indice == null ? 1.5 : row.indice), activo: (row.activo !== false)
