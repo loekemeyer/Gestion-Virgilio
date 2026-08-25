@@ -112,7 +112,7 @@ Archivo SQL: sql/integracion_isis.sql (mismo archivo que la RPC).
 ---
 ```
 
-### PIEZA 3: Derivar `stock_ok` por NP
+### PIEZA 3: Derivar `stock_ok` por NP + dos disparadores de facturación
 **Repo:** Produccion-Virgilio (Supabase `hrxfctzncixxqmpfhskv`)  
 **Tipo:** Backend (incluido en la RPC `generar_json_pedido`)
 
@@ -125,40 +125,50 @@ stock_ok = true CUANDO para CADA item del pedido:
   vista_saldos_stock.terminado(cod) >= PPP_Programacion_Diaria.cajas(np, cod)
 
 Es un ALL() sobre los items. Si alguno tiene stock < cajas → stock_ok = false
-y ese item va al array `faltantes[]`.
+y ese item va al array `faltantes[]` con { articulo, cajas_falta }.
 
-Este flag es el que dispara la auto-facturación en ISIS (P1 del informe).
-NO persistirlo — se calcula en vivo cada vez que se genera el JSON.
+`falta_global` es dato informativo (stock vs TODOS los pedidos pendientes), NO
+decide si se factura.
+
+DOS DISPARADORES de facturación (definidos por el usuario 2026-08-25):
+
+1. AUTOMÁTICO — cuando el operario termina de armar el pedido (picking completo)
+   y stock_ok = true (cero faltantes) → generar JSON + enviar a ISIS automático.
+   Trigger: el evento de picking completo en Registros_Produccion_Virgilio.
+
+2. MANUAL — botón de la operadora administrativa en el módulo de facturación.
+   Al hacer clic en un pedido con faltantes: genera JSON con SOLO lo que hay
+   (los items con stock). Los faltantes NO se incluyen en la factura — se
+   pierden (el cliente tendría que hacer otro pedido). Es factura PARCIAL.
+
+NO persistir stock_ok — se calcula en vivo cada vez que se genera el JSON.
 ---
 ```
 
-### PIEZA 4: Botón "Enviar JSON faltantes" en panel supervisor
+### PIEZA 4: Botón de facturación manual (operadora administrativa)
 **Repo:** Produccion-Virgilio (index.html)  
 **Tipo:** Frontend
 
 ```
 PROMPT COMPLETO:
 ---
-Agregar botón "📤 Enviar JSON faltantes" en el panel supervisor de Produccion-Virgilio
-(index.html), en la sección de Compras/OCs o en una sección nueva "Integración ISIS".
+Módulo de facturación para la operadora administrativa en Produccion-Virgilio.
 
-Flujo:
-1. Supervisor hace clic
-2. Se llama a una RPC nueva `generar_json_faltantes()` que devuelve el JSON
-   consolidado de TODOS los pedidos pendientes que tienen faltantes (stock_ok=false)
-3. El JSON se guarda en una tabla staging `isis_json_pendientes` (id, json, creado_en,
-   enviado_en null, tipo='faltantes')
-4. Feedback visual: "JSON generado — X pedidos con faltantes"
+Flujo (definido por el usuario 2026-08-25):
+1. La operadora ve los pedidos pendientes que tienen faltantes (stock_ok=false).
+2. Para cada pedido, ve los artículos con stock y los faltantes.
+3. Al hacer clic/tilde en un pedido: genera JSON con SOLO los items que tienen
+   stock (factura parcial). Los faltantes quedan afuera — no se entregan más.
+4. El JSON se guarda en `isis_json_pendientes` (tipo='pedido_parcial') y se
+   envía a ISIS.
+5. Feedback visual: "Factura enviada — X artículos de Y (Z faltantes descartados)"
 
-El agente-local (paso posterior) es el que baja de esa tabla y lo deja donde
-ISIS lo lea. El botón solo genera y guarda.
-
-También agregar botón "📤 Generar JSON pedido" que pida NP y genere el JSON
-individual (llama a generar_json_pedido).
+NOTA: los pedidos completos (cero faltantes) se envían AUTOMÁTICAMENTE cuando
+el picking termina — no pasan por este botón. Este módulo es solo para cerrar
+pedidos con faltantes.
 
 Estilo: seguir el patrón visual del panel supervisor existente.
-Preguntar al usuario si quiere estos botones en la sección de OCs o en una
-sección nueva.
+Preguntar al usuario si quiere este módulo en la sección existente o en una nueva.
 ---
 ```
 
@@ -316,6 +326,14 @@ Estas piezas NO se pueden construir hasta que ISIS responda:
 | ¿Mapeo códigos proveedor? | ❌ Sin definir |
 | ¿NP de vuelta? | ❌ Sin definir |
 
+### Decisiones del usuario (2026-08-25)
+
+| Pregunta | Decisión |
+|---|---|
+| ¿Criterio del `ok`? | **Por pedido** — `stock >= cajas` para cada item del pedido. `falta_global` es informativo. |
+| ¿Faltantes? | **Factura parcial** — se factura lo que hay, los faltantes se descartan (no se entregan más). |
+| ¿Quién dispara? | **Dos triggers:** (1) automático al completar picking sin faltantes, (2) clic manual de la operadora para cerrar con faltantes. |
+
 
 ---
 
@@ -347,19 +365,15 @@ Queda como **Pieza 6-bis** por si ISIS prefiere leer disco antes que hacer HTTP.
 
 Ninguno de estos está en el informe de ISIS ni cubierto por las piezas de arriba.
 
-### 1. ⛔ El `ok` del JSON de ejemplo NO es el del Plan (Pieza 3)
+### 1. ✅ RESUELTO — Criterio del `ok`: por pedido (definido 2026-08-25)
 
-En el ejemplo que ya vio ISIS (pedido 98187, artículo **550**): `cajas: 1`,
-`stock_total: 28`, `falta_global: 9`, **`ok: false`**. Hay stock de sobra para ese
-pedido, pero el `ok` sale en false → el ejemplo deriva **`ok = (falta_global == 0)`**,
-o sea faltante **global** (todos los pedidos pendientes contra el stock), no
-`stock >= cajas` como dice la Pieza 3.
+**Decisión del usuario:** `ok` se calcula **por pedido**, no global.
+`ok = true` cuando para CADA item del pedido `stock_terminado >= cajas_pedido`.
+`falta_global` se mantiene como dato informativo en el JSON, pero **no decide**
+si se factura o no. Aclararle a ISIS que el campo es informativo.
 
-Consecuencia: si se construye según la Pieza 3, el JSON **no coincide** con el que ISIS
-analizó. Y con el criterio global, un pedido con stock reservado **no se factura nunca**
-mientras globalmente falte para el resto.
-
-**A definir antes de codear:** ¿se factura por stock del pedido o por faltante global?
+El ejemplo que vio ISIS (550 con `ok:false` por falta global) **no aplica** como
+criterio de facturación — se usará el criterio por pedido.
 
 ### 2. ⛔ Equivalencias de código — la auto-facturación puede facturar el artículo equivocado
 
@@ -371,14 +385,14 @@ Si ISIS auto-factura el pedido **tal como está cargado**, factura el código vi
 JSON tiene que llevar el artículo **realmente preparado** (o el mapeo), y hay que definir
 si ISIS corrige la línea del pedido antes de facturar. **No está en el informe.**
 
-### 3. ⚠ Faltante: ¿pendiente o factura parcial? El informe se contradice
+### 3. ✅ RESUELTO — Faltantes: factura parcial (definido 2026-08-25)
 
-§6 y §5.2 dicen que el pedido con faltante **no se factura** hasta completarse. Pero
-§13 (Flujo 4) habla de pedidos **"facturados parcialmente por presentar faltantes"** y
-completados después — que es como funciona hoy (facturación parcial + "Completar Pedido"
-+ el reporte de faltantes facturados sin completar).
+**Decisión del usuario:** factura parcial. Cuando la operadora administrativa hace clic,
+se factura **solo lo que hay** en ese momento. Los artículos faltantes **no se entregan
+más** (se pierden, salvo que el cliente haga otro pedido). No se espera a completar.
 
-Son dos circuitos operativos distintos. Definir cuál.
+Ejemplo: pedido con 10 artículos, solo hay 9 → clic → se factura 9. El décimo queda
+afuera.
 
 ### 4. ⚠ Cutover del CAE: quién emite
 
