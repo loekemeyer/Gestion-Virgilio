@@ -16,6 +16,7 @@ hasta que el usuario la active**, y se mergea a `main` cuando el usuario dice el
 
 ## Ideas
 
+- [x] **7268** (2026-08-25) — Módulo Importación superpuesto: la tabla de Pedidos se pisaba y cortaba columnas — _hecha (v11.70, rama `claude/import-module-cleanup-o5r3w2`)_
 - [x] **4263** (2026-08-25) — Unificar "Deuda a cobrar" + "Cobranzas (valor por NP)" en un solo módulo — _hecha (v11.68)_
 
 - [x] **fac-a-facturar** (2026-08-21) — **Facturación: mostrar cuánto FACTURAR, no solo el faltante**. Si piden 10 y se pickean 4, la columna decía solo "falta 6" y pasó varias veces que se facturó 0 en vez de 4. Ahora cada artículo con faltante dice "cod → facturar N · falta M" (N = pedidas − faltó, verde protagonista). — _hecha (v11.14, rama claude/revision-planimetria-g5lzpj; código de 4 dígitos pendiente: Supabase MCP caído al registrar)_

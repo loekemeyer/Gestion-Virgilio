@@ -12,7 +12,34 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-08-25 · Versión app al documentar: **v11.62**
+> Última actualización: 2026-08-25 · Versión app al documentar: **v11.70**
+>
+> Nota **2026-08-25 — v11.70 (Importación: la tabla se pisaba entera).** El pop-up **📦 Pedidos
+> Importación** tiene **14 columnas**, pero heredaba el layout genérico de `.mva-tbl`
+> (`table-layout:fixed` + la regla `th.num{width:15%}`): 11 columnas numéricas × 15% = **165 %**
+> del ancho, así que el navegador achicaba **Código y Descripción casi a 0** (se imprimían una
+> encima de la otra) y `.mva-tblwrap{overflow-x:hidden}` **cortaba m³ y Acciones** (los botones
+> ✏️/📥 no se veían). Fix **solo de layout, sin tocar datos ni cálculos**: (a) modificador
+> `.mva-tbl.wide` + `.mva-tblwrap.wide` con anchos explícitos por `<colgroup>` (suman 1216 px),
+> scroll horizontal, header en 2 renglones y **columna Código fija** (sticky) al deslizar;
+> (b) `_stkPopShell(title, bodyId, wide)` — tercer parámetro opcional: la tarjeta pasa de 760 px
+> a `min(1280px,98vw)` **solo** en los dos pop-ups de Importación (📦 Pedidos y 🏭 Proveedores),
+> el resto queda igual; (c) la tabla de 🏭 Proveedores (3 columnas) lleva tope de 900 px para no
+> quedar estirada. De 1280 px de ancho para arriba entra **todo sin scroll**; abajo de eso
+> (celular) se desliza al costado con Código fijo. La columna **Descripción** es la única que
+> recorta con «…» (a propósito: tiene el nombre completo en el `title`; en monitor ancho se
+> queda con todo el sobrante). Aparecieron **tres roturas más del mismo módulo**, todas por el
+> `button{width:100%;padding:16px;font-size:22px;margin-top:14px}` **global** de la app:
+> **(1)** los botones `✏️`/`📥` de la columna Acciones se estiraban al 100 % de la celda porque
+> las reglas de `.stk-btn` viven en `#stkCss` — la CSS del módulo **Stocks**, que se inyecta
+> recién al abrir Stocks — y este pop-up se abre **directo** desde el panel supervisor; se
+> agregaron `.stkpop-body .stk-btn{...}` a `STK_POP_CSS` (mismos valores, acotados al pop-up).
+> **(2)** las solapas 📦 Pedidos / 🏭 Proveedores salían como dos barras apiladas de ancho
+> completo (`_impTabsHtml` no ponía `width:auto;margin:0`). **(3)** `.mva-clear` y
+> `.stkpop-close` no fijaban `font-size`, así que «📥 Excel», «🖨 PDF pedido» y «Cerrar»
+> heredaban 22 px y quedaban gigantes (esto último toca **todos** los pop-ups de Stocks: ahora
+> se ven proporcionados). Regresión cubierta por `tests/imp-tabla.cjs` (mide el layout real en
+> el navegador: ninguna celda más ancha que su columna, Acciones visible, sticky en celular).
 >
 > Nota **2026-08-25 — v11.62 (Carga Camión: fix «todo sin ubicación en ruta»).** El orden de ruta de
 > Carga Camión (`_ccAttachUbicYOrden`) solo corre si el **depósito** está geocodificado en `PPP_Geo`
