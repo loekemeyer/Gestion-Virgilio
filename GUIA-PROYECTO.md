@@ -12,7 +12,13 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-08-25 · Versión app al documentar: **v11.70**
+> Última actualización: 2026-08-25 · Versión app al documentar: **v11.71**
+>
+> Nota **2026-08-25 — v11.71 (OC pend: solo última OC por código).**
+> `vista_faltante_catalogo` CTE `oc_pend` sumaba todas las OCs pendientes por
+> código (`GROUP BY`). Ahora usa `ROW_NUMBER()` para mostrar solo la más reciente.
+> Ejemplo: 590E mostraba 207 cj (suma de 3 OCs) en vez de 59 (última OC del 19/08).
+> SQL guardado en `sql/vista_faltante_catalogo.sql`.
 >
 > Nota **2026-08-25 — v11.70 (Importación: la tabla se pisaba entera).** El pop-up **📦 Pedidos
 > Importación** tiene **14 columnas**, pero heredaba el layout genérico de `.mva-tbl`
@@ -7010,7 +7016,9 @@ Segundo lote de migración front→back. Objetos creados, **aún no conectados a
   OC pendiente (cajas/fecha/prov), notas (día resolución/motivo). Pre-joinea
   `vista_saldos_stock` + `vista_generador_oc` + `OC_Maximos` + `Movimientos_Stock`
   + `Ordenes_Compra` + `Faltantes_Notas`. Reemplaza 6 de los 13 fetches de
-  `stkFaltLoad()`.
+  `stkFaltLoad()`. **OC pend muestra solo la última OC** por código
+  (`ROW_NUMBER() OVER PARTITION BY cod ORDER BY fecha DESC, id DESC`), no la
+  suma de todas las pendientes (fix v11.71, 2026-08-25). SQL: `sql/vista_faltante_catalogo.sql`.
 
 - **`vista_faltante_demanda`** — VIEW. 1 fila por (NP, artículo) con empresa-split
   (437E/438E/439E/809E → LK/CH), estado picking por tanda (sinpickear/enpicking/
