@@ -2265,6 +2265,8 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
    control. Columnas: NP · Cod Cliente · Razón Social · Líos · Controlado (tic).
    Los que pasaron el plazo de control (30 hs, o viernes→lunes 12 hs) van en rojo
    y pulsando para llamar la atención. */
+/* v11.75 — RR más ancho: la tabla tiene 6 cols, 560px no alcanza en monitor. */
+.tanda-modal-card.cr-wide{ max-width: 900px; }
 .cr-tablewrap{ overflow-x: auto; -webkit-overflow-scrolling: touch; margin-top: 4px; }
 .cr-table{ width: 100%; border-collapse: collapse; font-size: 14px; }
 .cr-table th{ text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .3px; color: #64748b; font-weight: 800; padding: 8px 6px; border-bottom: 2px solid #e2e8f0; position: sticky; top: 0; background: #fff; z-index: 1; white-space: nowrap; }
@@ -2277,7 +2279,7 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .cr-cc-date{ font-size: 11px; font-weight: 700; color: #0f766e; margin-top: 2px; white-space: nowrap; }
 .cr-row.cr-venc .cr-cc-date{ color: #b91c1c; }
 .cr-td-cod{ font-size: 13px; font-weight: 700; color: #475569; font-family: ui-monospace, Menlo, Consolas, monospace; white-space: nowrap; }
-.cr-td-rs{ font-size: 13px; color: #334155; max-width: 120px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cr-td-rs{ font-size: 13px; color: #334155; max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cr-td-lios{ text-align: center; font-size: 15px; font-weight: 800; color: #b45309; white-space: nowrap; }
 .cr-td-lios.cr-lios0{ color: #94a3b8; font-weight: 600; }
 .fac-lios-cell{ text-align: center; font-weight: 800; color: #b45309; white-space: nowrap; }
@@ -6511,7 +6513,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v11.74";
+const APP_VERSION = "v11.75";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -22439,6 +22441,7 @@ async function showControlRemitos(legajo, isAdmin) {
   const leg = String(legajo || "").trim();
   m.querySelector(".tanda-modal-title").textContent = isAdmin ? "📋 Recepción Remitos (RR)" : "📋 Recepción Remitos — descarga";
   m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">Cargando pedidos cargados al camión…</div>`;
+  m.querySelector(".tanda-modal-card").classList.add("cr-wide");   // v11.75: más ancho para la tabla de 6 cols
   m.classList.add("show");
   crWakeLock();
   try {
@@ -22858,7 +22861,9 @@ function closeTandaModal() {
   // toggle sigue abierto en Supabase, así que re-tocar CC/CR vuelve a abrir el popup.
   if (_cc) { try { ccReleaseWakeLock(); } catch (_e) {} _cc = null; }
   if (_cr) { try { crReleaseWakeLock(); } catch (_e) {} _cr = null; }
-  document.getElementById("tandaModal").classList.remove("show");
+  const _tm = document.getElementById("tandaModal");
+  _tm.classList.remove("show");
+  try { _tm.querySelector(".tanda-modal-card").classList.remove("cr-wide"); } catch (_e) {}   // v11.75
 }
 
 /* Popup con el desglose por tanda al hacer click en una celda de la tabla
