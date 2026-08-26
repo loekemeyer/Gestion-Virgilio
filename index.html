@@ -8162,13 +8162,18 @@ function pkRender() {
       <div class="pk-big-col"><span class="pk-cod-lbl">${it.isExc ? "📦 UBICACIÓN" : "SECTOR"}</span>${sectorBig}</div>
       <div class="pk-big-col pk-big-right"><span class="pk-cod-lbl">${it.isExc ? "EXCEDENTE" : "CÓDIGO"}</span><span class="pk-cod-big">${escapeHtml(rec)}</span></div>
     </div>${equivHint}${famWarn}`;
+  // v11.78: códigos con decimales permitidos (cajas fraccionarias)
+  const _PK_CODS_DEC = ["55215","55219","55289"];
+  const _pkEsDec = _PK_CODS_DEC.indexOf(String(rec).replace(/\D/g,"")) >= 0;
+  const _pkIM = _pkEsDec ? "decimal" : "numeric";
+  const _pkStep = _pkEsDec ? ' step="any"' : '';
   if (_pk.mode === "fInput") {
     body.innerHTML = `<div class="pk-flow">${nav}
       ${bigRow}
       ${dualTag}
       <div class="pk-fq-q" style="text-align:center">¿Cuántas pusiste? <span class="pk-fq-esp">(pedidas: ${pkFmt(it.esp)})</span></div>
       <div class="pk-fq2">
-        <div class="pk-fq-col puse"><div class="pk-fq-lbl">PUSE</div><input id="pkFqty" class="pk-fq-input2" type="number" inputmode="numeric" min="0" value="${pkFmt(confirmed != null ? confirmed : it.esp)}" oninput="pkFaltanCalc(${it.esp})"></div>
+        <div class="pk-fq-col puse"><div class="pk-fq-lbl">PUSE</div><input id="pkFqty" class="pk-fq-input2" type="number" inputmode="${_pkIM}"${_pkStep} min="0" value="${pkFmt(confirmed != null ? confirmed : it.esp)}" oninput="pkFaltanCalc(${it.esp})"></div>
         <div class="pk-fq-col falt"><div class="pk-fq-lbl faltan">FALTAN</div><div id="pkFaltan" class="pk-fq-faltan${(it.esp - (confirmed != null ? confirmed : it.esp)) > 0 ? "" : " ok"}">${Math.max(0, Math.round((it.esp - (confirmed != null ? confirmed : it.esp)) * 10) / 10)}</div></div>
       </div>
       <button class="pk-btn pk-ok" onclick="pkConfirmF()">Confirmar</button>

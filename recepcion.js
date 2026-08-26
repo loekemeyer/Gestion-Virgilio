@@ -1232,6 +1232,8 @@ function openCajas(cod) {
       opCajasOc.innerHTML = "";
     }
   }
+  // v11.78: teclado con punto decimal para códigos fraccionarios
+  opCajasInput.inputMode = _esCodDecimal(cod) ? "decimal" : "numeric";
   opCajasModal.classList.add("open");
   setTimeout(() => { opCajasInput.focus(); _opCajasExceso(); }, 50);
 }
@@ -1246,7 +1248,7 @@ function _opCajasExceso() {
   if (!opCajasOc) return;
   const oc = opState.cajasOc;
   if (!oc || !(oc.pend > 0)) return;
-  const n = parseInt(opCajasInput.value, 10) || 0;
+  const n = _esCodDecimal(opState.cajasCod) ? (parseFloat(opCajasInput.value) || 0) : (parseInt(opCajasInput.value, 10) || 0);
   if (n > oc.pend) {
     opCajasOc.style.background = "#fef2f2"; opCajasOc.style.borderColor = "#fca5a5";
     opCajasOc.innerHTML = _opCajasOcBase(oc) + '<br><b style="color:#b91c1c;">⚠ Cargás ' + n + ' pero por OC faltan ' + oc.pend + '. Revisá que no sea un error de tipeo.</b>';
@@ -1256,7 +1258,17 @@ function _opCajasExceso() {
   }
 }
 function closeCajas() { opCajasModal.classList.remove("open"); opState.cajasCod = null; }
-opCajasInput.oninput = () => { opCajasInput.value = opCajasInput.value.replace(/\D/g, ""); _opCajasExceso(); };
+// v11.78: códigos con decimales permitidos (cajas fraccionarias)
+const _CODS_DECIMAL = ["55215","55219","55289"];
+const _esCodDecimal = (c) => _CODS_DECIMAL.indexOf(String(c).replace(/\D/g,"")) >= 0;
+opCajasInput.oninput = () => {
+  if (_esCodDecimal(opState.cajasCod)) {
+    opCajasInput.value = opCajasInput.value.replace(/[^0-9.]/g, "").replace(/(\..*)\./g, "$1");
+  } else {
+    opCajasInput.value = opCajasInput.value.replace(/\D/g, "");
+  }
+  _opCajasExceso();
+};
 opCajasInput.addEventListener("keydown", e => {
   if (e.key === "Enter") { e.preventDefault(); opCajasNext.click(); }
 });
@@ -1265,7 +1277,7 @@ opCajasClose.onclick = closeCajas;
 // solo si el empleado tarda en cargar / toca fuera sin querer — solo se cierra con
 // la ✕ o al cargar el número. (Pedido: "que se mantenga".)
 opCajasNext.onclick = () => {
-  const n = parseInt(opCajasInput.value, 10) || 0;
+  const n = _esCodDecimal(opState.cajasCod) ? (parseFloat(opCajasInput.value) || 0) : (parseInt(opCajasInput.value, 10) || 0);
   if (n > 0) opState.cargas[opState.cajasCod] = n;
   else delete opState.cargas[opState.cajasCod];
   closeCajas();
