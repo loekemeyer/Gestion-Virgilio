@@ -359,29 +359,72 @@ async function tallArtStep3Save() {
     var artCount = 0;
 
     if (tipo === "prov_at") {
-      // ─── Proveedor AT → Articulos x Prov AT ───
-      var artsToInsert = [];
-      Object.keys(_tallArtState.artsSelected).forEach(function(artId) {
-        var art = _tallArtState.artsSelected[artId];
-        var marcaEl = document.getElementById("marca_" + artId);
-        var marca = marcaEl ? marcaEl.value : "";
-        artsToInsert.push({
-          Proveedor: nombre, Cod_Art: artId, Descripcion: art.desc || "?",
-          Activo: true, N_Caja: art.uni || 1, marca: marca || null
+      // ─── Proveedor AT → OC_Maximos (con lógica de % = 100% al nuevo proveedor) ───
+      var codsToProcess = Object.keys(_tallArtState.artsSelected);
+      var warnings = [];
+
+      // Verificar si los códigos ya existen en OC_Maximos con otro proveedor
+      if (codsToProcess.length) {
+        var existingCodsRes = await fetch(
+          SUPABASE_URL + "/rest/v1/OC_Maximos?cod=in.(" + codsToProcess.map(encodeURIComponent).join(",") + ")&select=cod,proveedor,proveedor2",
+          { headers: H }
+        ).then(function(r) { return r.json(); }).catch(function() { return []; });
+
+        (existingCodsRes || []).forEach(function(row) {
+          var prov1 = String(row.proveedor || "").trim();
+          var prov2 = String(row.proveedor2 || "").trim();
+          if (prov1 || prov2) {
+            warnings.push("• " + row.cod + ": actualmente asignado a " + (prov1 ? prov1 : "") + (prov2 ? " y " + prov2 : ""));
+          }
         });
-      });
-      if (artsToInsert.length) {
-        var artRes = await fetch(SUPABASE_URL + "/rest/v1/Articulos%20x%20Prov%20AT", {
-          method: "POST",
-          headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", "Prefer": "return=minimal" },
-          body: JSON.stringify(artsToInsert)
-        });
-        if (!artRes.ok) {
-          var eBody = await artRes.text().catch(function() { return ""; });
-          throw new Error("No se pudieron guardar artículos (HTTP " + artRes.status + ")" + (eBody ? ": " + eBody : ""));
+      }
+
+      if (warnings.length) {
+        var msg = "Los siguientes códigos ya están asignados a otros proveedores:\n\n" + warnings.join("\n") +
+          "\n\nSe van a REEMPLAZAR asignándolos 100% a " + nombre + ".\n" +
+          "Si querés distribuir entre múltiples proveedores, editar después en ✏️ Editar.";
+        if (!confirm(msg)) {
+          alert("Cancelado.");
+          return;
         }
       }
-      artCount = artsToInsert.length;
+
+      // Insertar/actualizar en OC_Maximos
+      var upsertPromises = [];
+      Object.keys(_tallArtState.artsSelected).forEach(function(cod) {
+        var art = _tallArtState.artsSelected[cod];
+        var body = {
+          cod: cod, descripcion: art.desc || "?", proveedor: nombre,
+          prop_prov1: 100, proveedor2: null, prop_prov2: 0,
+          linea: "LK", max_cajas: 0, indice: 1.5, activo: true
+        };
+        upsertPromises.push(
+          fetch(SUPABASE_URL + "/rest/v1/OC_Maximos", {
+            method: "POST",
+            headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", "Prefer": "return=minimal" },
+            body: JSON.stringify(body)
+          }).then(function(r) {
+            if (r.status === 409) {
+              // Ya existe → PATCH
+              return fetch(SUPABASE_URL + "/rest/v1/OC_Maximos?cod=eq." + encodeURIComponent(cod), {
+                method: "PATCH",
+                headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", "Prefer": "return=minimal" },
+                body: JSON.stringify({ proveedor: nombre, prop_prov1: 100, proveedor2: null, prop_prov2: 0 })
+              });
+            }
+            return r;
+          }).then(function(r) {
+            if (!r.ok) throw new Error("HTTP " + r.status + " (" + cod + ")");
+          })
+        );
+      });
+
+      if (upsertPromises.length) {
+        await Promise.all(upsertPromises).catch(function(e) {
+          throw new Error("No se pudieron guardar códigos en OC_Maximos: " + (e.message || e));
+        });
+      }
+      artCount = Object.keys(_tallArtState.artsSelected).length;
 
     } else {
       // ─── Tallerista → Codigos X Tallerista + Articulos Virgilio X Tallerista ───
