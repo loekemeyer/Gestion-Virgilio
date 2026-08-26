@@ -2,11 +2,15 @@
 -- Creado v11.77 (2026-08-26)
 -- 1. Signo coherente: recepcion_insumo → delta≥0, entrega_insumo → delta≤0
 -- 2. Unidad default: si viene NULL y el insumo tiene base en Insumos_Factores, asignarla
+-- 3. Unidad vs categoría: si la categoría define unidades permitidas (array no vacío),
+--    rechaza unidades fuera de la lista. Array vacío [] = acepta cualquiera.
 
 CREATE OR REPLACE FUNCTION trg_validar_movimiento_insumo()
 RETURNS trigger AS $$
 DECLARE
   v_base text;
+  v_cat_clave text;
+  v_unis text[];
 BEGIN
   IF NEW.deposito <> 'insumos' THEN RETURN NEW; END IF;
 
@@ -26,6 +30,27 @@ BEGIN
     LIMIT 1;
     IF v_base IS NOT NULL THEN
       NEW.unidad := v_base;
+    END IF;
+  END IF;
+
+  -- Validar unidad vs categoría (array vacío = acepta cualquiera)
+  SELECT i.categoria INTO v_cat_clave
+  FROM "Insumos" i
+  WHERE i.cod = NEW.cod_art
+  LIMIT 1;
+
+  IF v_cat_clave IS NOT NULL THEN
+    SELECT c.unidades INTO v_unis
+    FROM "Insumos_Categorias" c
+    WHERE c.clave = v_cat_clave AND c.activa = true
+    LIMIT 1;
+
+    IF v_unis IS NOT NULL
+       AND array_length(v_unis, 1) > 0
+       AND NEW.unidad IS NOT NULL
+       AND NOT (NEW.unidad = ANY(v_unis)) THEN
+      RAISE EXCEPTION 'Unidad "%" no permitida para categoría "%" (permitidas: %)',
+        NEW.unidad, v_cat_clave, v_unis;
     END IF;
   END IF;
 
