@@ -156,11 +156,33 @@ async function tallArtStep1Next() {
 }
 
 async function tallArtLoadArts() {
-  const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
   try {
-    // v11.23 — paginado (PostgREST corta en 1000 filas; la tabla tiene ~350 y crece)
-    const arts = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Articulos%20Virgilio%20X%20Tallerista", "select=Cod_Art,Desc,Uni_x_Caja");
-    _tallArtState.allArts = arts || [];
+    // v11.77 — buscar en OC_Maximos (catálogo completo) + enriquecer con datos
+    // de Articulos Virgilio X Tallerista (Uni_x_Caja) si ya estaban asignados.
+    // Antes solo buscaba en la tabla de asignados y los artículos nuevos no aparecían.
+    const [ocArts, assigned] = await Promise.all([
+      supaFetchAllSafe(SUPABASE_URL + "/rest/v1/OC_Maximos", "select=cod,descripcion&activo=eq.true"),
+      supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Articulos%20Virgilio%20X%20Tallerista", "select=Cod_Art,Desc,Uni_x_Caja")
+    ]);
+    // Indexar asignados por cod para enriquecer
+    const assignedMap = {};
+    (assigned || []).forEach(function (a) { assignedMap[a.Cod_Art] = a; });
+    // Deduplicar: OC_Maximos es la fuente, enriquecido con Uni_x_Caja si existe
+    const seen = {};
+    const merged = [];
+    (ocArts || []).forEach(function (o) {
+      if (!o.cod || seen[o.cod]) return;
+      seen[o.cod] = true;
+      var a = assignedMap[o.cod];
+      merged.push({ Cod_Art: o.cod, Desc: (a && a.Desc) || o.descripcion || "", Uni_x_Caja: (a && a.Uni_x_Caja) || null });
+    });
+    // Agregar asignados que no estén en OC_Maximos (por si acaso)
+    (assigned || []).forEach(function (a) {
+      if (!a.Cod_Art || seen[a.Cod_Art]) return;
+      seen[a.Cod_Art] = true;
+      merged.push(a);
+    });
+    _tallArtState.allArts = merged;
     tallArtFilterArts();
   } catch (e) {
     console.error("Error cargando artículos:", e);
