@@ -51,7 +51,7 @@ async function tallEditInit() {
               <label>Buscar y agregar código:</label>
               <div style="display:flex;gap:8px;margin-bottom:12px;">
                 <input id="tallEditCodSearch" type="text" placeholder="🔎 código o descripción..." class="form-input" style="flex:1;" oninput="tallEditFilterCods()">
-                <button onclick="tallEditToggleCodList()" class="btn-primary" style="padding:6px 10px;font-size:12px;">Buscar</button>
+                <button onclick="tallEditToggleCodList()" class="btn-primary" style="padding:6px 8px;font-size:11px;width:60px;white-space:nowrap;">Buscar</button>
               </div>
             </div>
 
