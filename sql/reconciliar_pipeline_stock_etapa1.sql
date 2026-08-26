@@ -1,4 +1,8 @@
 -- reconciliar_pipeline_stock_etapa1.sql
+-- v11.73: B.2 excedente cambia DO NOTHING → DO UPDATE para recalcular cada corrida.
+--   Root cause: DO NOTHING preservaba asignaciones viejas; al cambiar el excedente
+--   disponible entre corridas, la window re-calculaba from_exc pero la fila existente
+--   no se actualizaba → drift acumulativo → excedente negativo (ej. art 546 → -4).
 -- v11.72: legajo real del PKC en vez de hardcodear 'pipeline'.
 -- Extrae el legajo del último registro PKC de la tanda (ts_cliente DESC).
 -- Aplica a sección A (histórico, last_pk < v_desde) y B (forward, >= v_desde).
@@ -59,6 +63,8 @@ begin
   -- ===== B) FORWARD (last_pk >= v_desde): por ARTÍCULO, sin gate de TP =====
   -- FIX 2026-08-24: split INSERT para NO reasignar excedente de tandas existentes.
   -- v11.72: legajo real del PKC en vez de 'pipeline'
+  -- v11.73: B.2 cambia DO NOTHING → DO UPDATE para recalcular excedente cada corrida
+  --         (fix drift acumulativo que causaba excedente negativo, ej. art 546 → -4).
 
   CREATE TEMP TABLE IF NOT EXISTS _fwd_alloc (tanda text, art text, picked numeric, from_exc numeric, leg text);
   TRUNCATE _fwd_alloc;
@@ -104,11 +110,12 @@ begin
   ON CONFLICT (upper(trim(ref)), upper(trim(cod_art)), deposito, tipo) WHERE tipo IN ('picking','separado','facturado')
   DO UPDATE SET delta = excluded.delta, legajo = excluded.legajo;
 
-  -- B.2: INSERT excedente — DO NOTHING preserva asignación existente
+  -- B.2: UPSERT excedente — recalcula asignación cada corrida
+  -- (v11.73: era DO NOTHING, causaba drift acumulativo → excedente negativo)
   INSERT INTO "Movimientos_Stock"(cod_art, deposito, delta, tipo, ref, legajo)
   SELECT art,'excedente', -from_exc,'picking', tanda, coalesce(leg,'pipeline') FROM _fwd_alloc
   ON CONFLICT (upper(trim(ref)), upper(trim(cod_art)), deposito, tipo) WHERE tipo IN ('picking','separado','facturado')
-  DO NOTHING;
+  DO UPDATE SET delta = excluded.delta, legajo = excluded.legajo;
 
   -- B.3: UPSERT terminado — balancea: delta = -(separar + exc) para que sumen 0
   INSERT INTO "Movimientos_Stock"(cod_art, deposito, delta, tipo, ref, legajo)

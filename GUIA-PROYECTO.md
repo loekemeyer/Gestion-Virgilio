@@ -12,7 +12,16 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-08-26 · Versión app al documentar: **v11.72**
+> Última actualización: 2026-08-26 · Versión app al documentar: **v11.73**
+>
+> Nota **2026-08-26 — v11.73 (Fix excedente negativo por drift acumulativo).**
+> `reconciliar_pipeline_stock_etapa1()` sección B.2 (excedente) usaba
+> `ON CONFLICT DO NOTHING`, lo que preservaba asignaciones viejas de excedente
+> entre corridas del cron. Al cambiar el excedente disponible (nuevas MGs, otros
+> pickings), la window recalculaba `from_exc` pero la fila existente no se
+> actualizaba → drift acumulativo → excedente negativo (ej. art 546 llegó a -4).
+> Fix: B.2 ahora usa `DO UPDATE SET delta = excluded.delta, legajo = excluded.legajo`
+> — misma semántica que B.1 y B.3. Se auto-sana en el próximo cron.
 >
 > Nota **2026-08-26 — v11.72 (Legajo real en pipeline stock etapa 1 y 2).**
 > `reconciliar_pipeline_stock_etapa1()` y `etapa2()` hardcodeaban `'pipeline'`
