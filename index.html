@@ -6515,7 +6515,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v11.80";
+const APP_VERSION = "v11.81";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -11584,7 +11584,7 @@ async function ocgEnterCfg() {
     // no de una lista cargada a mano. Acá solo se configura proveedor(es) + % + índice + activo.
     // uni×caja es read-only (maestro→backup→uxb). Ya no hay Objetivo ni alta manual.
     const res = await Promise.all([
-      supaFetchAllSafe(SUPABASE_GENERADOR_ENDPOINT, "select=cod,descripcion,proveedor,tiene_prov_real,pr1,proveedor2,pr2,indice,activo,uni_x_caja,en_config,total&order=tiene_prov_real.asc,total.desc,cod.asc"),
+      supaFetchAllSafe(SUPABASE_GENERADOR_ENDPOINT, "select=cod,descripcion,proveedor,tiene_prov_real,pr1,proveedor2,pr2,indice,activo,uni_x_caja,en_config,total,cap,llenar_gondola&order=tiene_prov_real.asc,total.desc,cod.asc"),
       ocgLoadProvs()
     ]);
     const rows = res[0] || [];
@@ -11595,6 +11595,7 @@ async function ocgEnterCfg() {
         prop_prov1: (x.pr1 == null ? 100 : Number(x.pr1)), proveedor2: x.proveedor2 || "", prop_prov2: (x.pr2 == null ? 0 : Number(x.pr2)),
         uni_x_caja: (x.uni_x_caja == null ? 0 : Number(x.uni_x_caja)),
         indice: (x.indice == null ? 1.5 : Number(x.indice)), activo: (x.activo !== false),
+        cap: (x.cap == null ? 0 : Number(x.cap)), llenar_gondola: (x.llenar_gondola === true),
         en_config: !!x.en_config, total: Number(x.total) || 0 };
     });
     ocRender();
@@ -11613,7 +11614,7 @@ function _ocProvOptions(current, provs, emptyLabel) {
 function _ocCfgChangedN() { return (_oc && _oc.cfg) ? Object.keys(_oc.cfg.changed).length : 0; }
 function ocBodyCfg() {
   let h = '<div class="oc-tools"><button class="oc-btn" onclick="ocgEnter()">← Volver al generador</button><button class="oc-btn ok" onclick="ocCfgProvOpen()">➕ Agregar proveedor</button></div>';
-  h += '<div class="oc-meta">Config del generador de OCs. La lista sale <b>sola de stock</b> (todos los productos terminados) — no se cargan a mano. Acá asignás <b>Proveedor 1/2</b> + <b>% Prov 1/2</b> (a qué tallerista(s) y en qué proporción al generar; los dos % suman <b>100</b>; un solo proveedor = 100% al Prov 1), el <b>Índice</b> (meses de stock objetivo, Máximo = proyección × índice, default 1,5) y si está <b>Activo</b>. Los <b style="color:#b45309">"(sin proveedor)"</b> aparecen arriba para que les asignes uno. <b>Uni×Caja</b> es solo lectura (sale del maestro del artículo).</div>';
+  h += '<div class="oc-meta">Config del generador de OCs. La lista sale <b>sola de stock</b> (todos los productos terminados) — no se cargan a mano. Acá asignás <b>Proveedor 1/2</b> + <b>% Prov 1/2</b> (a qué tallerista(s) y en qué proporción al generar; los dos % suman <b>100</b>; un solo proveedor = 100% al Prov 1), el <b>Índice</b> (meses de stock objetivo, Máximo = proyección × índice, default 1,5) y si está <b>Activo</b>. Tildá <b>Llenar góndola</b> para que el Máximo de ese artículo sea la <b>capacidad de góndola</b> (llena la góndola, ignora proyección×índice) — útil cuando la proyección es baja y las órdenes salen chicas. Los <b style="color:#b45309">"(sin proveedor)"</b> aparecen arriba para que les asignes uno. <b>Uni×Caja</b> es solo lectura (sale del maestro del artículo).</div>';
   if (!_oc.cfg || !_oc.cfg.rows) return h + '<div class="oc-loading">Cargando config…</div>';
   if (_oc.cfg.error) return h + '<div class="oc-empty" style="color:#b91c1c">Error: ' + escapeHtml(_oc.cfg.error) + '</div>';
   if (_oc.cfg.altaProv) h += _ocCfgProvForm();
@@ -11623,8 +11624,8 @@ function ocBodyCfg() {
   const provs = _oc.cfg.provs || [];
   const f = (_oc.cfg.filtro || "").toLowerCase().trim();
   const shown = f ? _oc.cfg.rows.filter(function (a) { return (a.cod + " " + a.descripcion + " " + a.proveedor + " " + a.proveedor2).toLowerCase().indexOf(f) >= 0; }) : _oc.cfg.rows;
-  h += '<div class="oc-tblwrap"><table class="oc-tbl"><thead><tr><th>Código</th><th>Descripción</th><th>Proveedor 1</th><th class="num">% P1</th><th>Proveedor 2</th><th class="num">% P2</th><th class="num">Uni×Caja</th><th class="num">Índice</th><th>Activo</th></tr></thead><tbody>';
-  if (!shown.length) h += '<tr><td colspan="9" class="oc-empty">Sin resultados.</td></tr>';
+  h += '<div class="oc-tblwrap"><table class="oc-tbl"><thead><tr><th>Código</th><th>Descripción</th><th>Proveedor 1</th><th class="num">% P1</th><th>Proveedor 2</th><th class="num">% P2</th><th class="num">Uni×Caja</th><th class="num" title="Capacidad de góndola (Capacidad_Sector)">Cap gónd.</th><th class="num" title="Si está tildado, el máximo = capacidad de góndola (llena la góndola), ignora proyección×índice">Llenar<br>góndola</th><th class="num">Índice</th><th>Activo</th></tr></thead><tbody>';
+  if (!shown.length) h += '<tr><td colspan="11" class="oc-empty">Sin resultados.</td></tr>';
   shown.forEach(function (a) {
     const i = _oc.cfg.rows.indexOf(a);
     const suma = (Number(a.prop_prov1) || 0) + ((a.proveedor2 || "").trim() ? (Number(a.prop_prov2) || 0) : 0);
@@ -11638,7 +11639,9 @@ function ocBodyCfg() {
       '<td><select class="oc-rinp" style="width:118px" onchange="ocCfgEdit(' + i + ',&quot;proveedor2&quot;,this.value)">' + _ocProvOptions(a.proveedor2, provs, "— (ninguno)") + '</select></td>' +
       '<td class="num"><input class="oc-rinp" style="width:56px"' + pctStyle + ' type="number" min="0" max="100" step="1" value="' + a.prop_prov2 + '" oninput="ocCfgEdit(' + i + ',&quot;prop_prov2&quot;,this.value)"' + ((a.proveedor2 || "").trim() ? '' : ' disabled title="Sin Proveedor 2"') + '></td>' +
       '<td class="num" title="Uni×Caja sale del maestro del artículo (packaging) — no se edita acá">' + (a.uni_x_caja || "—") + '</td>' +
-      '<td class="num"><input class="oc-rinp" type="number" min="0" step="0.1" value="' + a.indice + '" oninput="ocCfgEdit(' + i + ',&quot;indice&quot;,this.value)"></td>' +
+      '<td class="num" title="Capacidad de góndola (Capacidad_Sector)">' + (a.cap ? Math.round(a.cap) : "—") + '</td>' +
+      '<td style="text-align:center"><input type="checkbox" ' + (a.llenar_gondola ? 'checked' : '') + (a.cap ? '' : ' disabled title="Sin capacidad de góndola cargada"') + ' onchange="ocCfgEdit(' + i + ',&quot;llenar_gondola&quot;,this.checked)" title="Máximo = capacidad de góndola (ignora proyección×índice)"></td>' +
+      '<td class="num"><input class="oc-rinp" type="number" min="0" step="0.1" value="' + a.indice + '"' + (a.llenar_gondola ? ' disabled title="No aplica: el máximo lo fija la capacidad de góndola"' : '') + ' oninput="ocCfgEdit(' + i + ',&quot;indice&quot;,this.value)"></td>' +
       '<td style="text-align:center"><input type="checkbox" ' + (a.activo ? 'checked' : '') + ' onchange="ocCfgEdit(' + i + ',&quot;activo&quot;,this.checked)"></td></tr>';
   });
   h += '</tbody></table></div>';
@@ -11659,6 +11662,7 @@ function ocCfgEdit(i, field, v) {
   const a = _oc.cfg.rows[i]; if (!a) return;
   let val, reRender = false;
   if (field === "activo") val = !!v;
+  else if (field === "llenar_gondola") { val = !!v; reRender = true; }   // v11.81 — re-render: deshabilita/habilita el índice
   else if (field === "proveedor") val = String(v);
   else if (field === "proveedor2") { val = String(v); reRender = true; if (!val.trim()) { a.prop_prov2 = 0; a.prop_prov1 = 100; _oc.cfg.changed[a.cod] = Object.assign(_oc.cfg.changed[a.cod] || {}, { prop_prov2: 0, prop_prov1: 100 }); } }
   else if (field === "prop_prov1" || field === "prop_prov2") { val = Math.max(0, Math.min(100, parseFloat(v) || 0)); }
@@ -11707,7 +11711,8 @@ async function ocCfgSave() {
           max_cajas: (row.max_cajas == null ? 0 : row.max_cajas),
           proveedor: (String(row.proveedor || "").trim() || null), prop_prov1: (row.prop_prov1 == null ? 100 : row.prop_prov1),
           proveedor2: (String(row.proveedor2 || "").trim() || null), prop_prov2: (row.prop_prov2 == null ? 0 : row.prop_prov2),
-          indice: (row.indice == null ? 1.5 : row.indice), activo: (row.activo !== false)
+          indice: (row.indice == null ? 1.5 : row.indice), activo: (row.activo !== false),
+          llenar_gondola: (row.llenar_gondola === true)
         }, patch);
         return fetch(SUPABASE_OCMAX_ENDPOINT, { method: "POST", headers: headers, body: JSON.stringify(body) })
           .then(function (r) {
