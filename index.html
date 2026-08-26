@@ -6513,7 +6513,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v11.75";
+const APP_VERSION = "v11.77";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -17991,7 +17991,24 @@ async function stockAjustar() {
   var comentario = ((document.getElementById("stkAjComent") || {}).value || "").trim();
   const sd = stockComputeSaldos(_stk.movs, _stk.cutoff)[cod], dep = _stkDep();
   var ref = "ajuste manual" + (comentario ? " | " + comentario : "");
-  await stkInsertMov([{ cod_art: cod, descripcion: comentario || ((sd && sd.desc) || null), deposito: dep, delta: cant, tipo: "ajuste", ref: ref, legajo: "0" }], "Ajuste " + cod + " (" + dep + "): " + (cant > 0 ? "+" : "") + cant);
+  /* v11.76: insumos — incluir la unidad dominante para que el movimiento
+     caiga en el grupo correcto de la vista (mismo fix que stockFijar). */
+  var row = { cod_art: cod, descripcion: comentario || ((sd && sd.desc) || null), deposito: dep, delta: cant, tipo: "ajuste", ref: ref, legajo: "0" };
+  if (dep === "insumos") {
+    var ajUni = (sd && sd._uni) || null;
+    /* v11.77: si la unidad dominante no es la base, convertir delta a base
+       para que el movimiento caiga en el mismo grupo de la vista. */
+    var fDef = insFactDe(cod);
+    if (fDef && fDef.base) {
+      if (ajUni && !_insUEq(ajUni, fDef.base)) {
+        var fa = insFactorDe(cod, ajUni);
+        if (fa != null) { row.delta = cant * fa; ajUni = fDef.base; }
+      }
+      if (!ajUni) ajUni = fDef.base;
+    }
+    if (ajUni) row.unidad = ajUni;
+  }
+  await stkInsertMov([row], "Ajuste " + cod + " (" + dep + "): " + (cant > 0 ? "+" : "") + cant);
 }
 async function stockFijar() {
   var codRaw = ((document.getElementById("stkAjCod2") || {}).value || "").trim().toUpperCase();
@@ -18004,7 +18021,41 @@ async function stockFijar() {
   const actual = (sd && sd[dep]) || 0; const delta = fijar - actual;
   if (delta === 0) { alert("El stock de " + cod + " (" + dep + ") ya es " + fijar + "."); return; }
   var ref = "fijar en " + fijar + (comentario ? " | " + comentario : "");
+  /* v11.76: insumos — ceroizar cada unidad por separado (misma lógica que
+     _stkInsCerorear) para que el movimiento caiga en el grupo correcto de la
+     vista. Sin esto, el ajuste iba sin unidad → grupo null, y el saldo
+     original (en Kg u otra) quedaba intacto → el operario reintentaba. */
+  if (dep === "insumos") {
+    var uniS = _stkFijarUniSaldos(cod);
+    var rows = [], desc = comentario || ((sd && sd.desc) || null);
+    var uKeys = Object.keys(uniS);
+    // Ceroizar todas las unidades que tengan saldo
+    uKeys.forEach(function (uk) {
+      var s = uniS[uk];
+      if (Math.abs(s) > 0.0005) rows.push({ cod_art: cod, descripcion: desc, deposito: dep, delta: -s, tipo: "ajuste", ref: ref, legajo: "0", unidad: uk === "" ? null : uk });
+    });
+    // Si fijar > 0, poner el target en la unidad base (v11.77: preferir base de Insumos_Factores)
+    if (fijar !== 0) {
+      var fDef2 = insFactDe(cod);
+      var priUni = (fDef2 && fDef2.base) || (sd && sd._uni) || uKeys.find(function (u) { return u !== ""; }) || null;
+      rows.push({ cod_art: cod, descripcion: desc, deposito: dep, delta: fijar, tipo: "ajuste", ref: ref, legajo: "0", unidad: priUni });
+    }
+    if (!rows.length) { alert("El stock de " + cod + " ya es " + fijar + "."); return; }
+    await stkInsertMov(rows, "Stock de " + cod + " (insumos) fijado en " + fijar);
+    return;
+  }
   await stkInsertMov([{ cod_art: cod, descripcion: comentario || ((sd && sd.desc) || null), deposito: dep, delta: delta, tipo: "ajuste", ref: ref, legajo: "0" }], "Stock de " + cod + " (" + dep + ") fijado en " + fijar + " (ajuste " + (delta > 0 ? "+" : "") + delta + ")");
+}
+/* v11.76: calcula saldos por-unidad de un cod en depósito insumos, respetando cutoff */
+function _stkFijarUniSaldos(cod) {
+  var m = {}, cut = (_stk && _stk.cutoff) ? new Date(_stkNormTs(_stk.cutoff)).getTime() : 0;
+  (_stk.movs || []).forEach(function (mv) {
+    if (mv.cod_art !== cod || mv.deposito !== "insumos") return;
+    if (cut && mv.tipo !== "inicial" && new Date(mv.ts).getTime() < cut) return;
+    var uk = (mv.unidad || "").trim();
+    m[uk] = (m[uk] || 0) + (Number(mv.delta) || 0);
+  });
+  return m;
 }
 async function stockGuardarInicial() {
   const ta = document.getElementById("stkIniTxt"); const txt = (ta && ta.value) || "";
@@ -19241,7 +19292,19 @@ function insConfirmar() {
   }
   // v9.15: incluir la ubicación origen/destino (preguntada al inicio) en el ref de cada row
   const ubic = window._insUbicacion || null;
-  const rows = sel.map(function (it) { return { cod_art: it.cod, descripcion: it.nombre || null, deposito: "insumos", delta: isIn ? it.qty : -it.qty, tipo: isIn ? "recepcion_insumo" : "entrega_insumo", ref: ubic, legajo: _ins.legajo || null, unidad: it.unidad, ubicacion: it.ubic || it.sector || null }; });
+  /* v11.76: si el insumo tiene factor de conversión (Insumos_Factores) y la
+     unidad elegida NO es la base, convertir qty a la unidad base para que el
+     movimiento caiga en el mismo grupo de la vista.  Así no quedan saldos
+     duales (ej: Uni positivo + MC negativo) cuando se entrega en MC. */
+  const rows = sel.map(function (it) {
+    var fDef = insFactDe(it.cod);
+    var uni = it.unidad, qty = it.qty;
+    if (fDef && fDef.base && uni && !_insUEq(uni, fDef.base)) {
+      var fa = insFactorDe(it.cod, uni);
+      if (fa != null) { qty = qty * fa; uni = fDef.base; }
+    }
+    return { cod_art: it.cod, descripcion: it.nombre || null, deposito: "insumos", delta: isIn ? qty : -qty, tipo: isIn ? "recepcion_insumo" : "entrega_insumo", ref: ubic, legajo: _ins.legajo || null, unidad: uni, ubicacion: it.ubic || it.sector || null };
+  });
   const tot = sel.reduce(function (s, it) { return s + it.qty; }, 0);
   try { opDraftClear(_ins && _ins.legajo); } catch (_e) {}
   closeIns();
