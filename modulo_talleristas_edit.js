@@ -1,12 +1,16 @@
 /* =========================================================
    MÓDULO: Editar Talleristas / Proveedores AT
-   v1.0 — Cambiar nombre, teléfono, estado, agregar/quitar artículos.
+   v2.0 — Cambiar nombre, teléfono, estado + asignar/editar códigos con % (OC_Maximos).
+
+   Lógica igual a OCs Config:
+   - Un código puede tener 1 o 2 proveedores
+   - Si hay 1 prov: % = 100% en prov1, prov2 = null, % prov2 = 0%
+   - Si hay 2 prov: % prov1 + % prov2 = 100%
    ========================================================= */
 
 let _tallEditModal = null, _tallEditState = {};
 
 async function tallEditInit() {
-  // Crear modal si no existe
   if (!document.getElementById("tallEditModal")) {
     const modal = document.createElement("div");
     modal.id = "tallEditModal";
@@ -19,7 +23,7 @@ async function tallEditInit() {
         </div>
         <div class="modal-body">
 
-          <!-- PASO 1: Datos básicos -->
+          <!-- DATOS BÁSICOS -->
           <div id="tallEditStep1" class="tall-edit-step">
             <h3>Datos Básicos</h3>
             <div class="form-group">
@@ -36,20 +40,28 @@ async function tallEditInit() {
             <button onclick="tallEditStep1Save()" class="btn-primary" style="margin-top:12px;">💾 Guardar Datos</button>
           </div>
 
-          <!-- PASO 2: Artículos -->
+          <!-- CÓDIGOS ASIGNADOS -->
           <div id="tallEditStep2" class="tall-edit-step" style="margin-top:24px;">
-            <h3>Artículos</h3>
+            <h3>Códigos Asignados (OC_Maximos)</h3>
+            <p style="font-size:12px;color:#64748b;margin-bottom:12px;">
+              Un código puede tener 1 o 2 proveedores. Los porcentajes deben sumar 100%.
+            </p>
+
             <div class="form-group">
-              <label>Buscar artículos para agregar:</label>
-              <input id="tallEditArtSearch" type="text" placeholder="🔎 código, descripción..." class="form-input" oninput="tallEditFilterArts()">
+              <label>Buscar y agregar código:</label>
+              <div style="display:flex;gap:8px;margin-bottom:12px;">
+                <input id="tallEditCodSearch" type="text" placeholder="🔎 código o descripción..." class="form-input" style="flex:1;" oninput="tallEditFilterCods()">
+                <button onclick="tallEditToggleCodList()" class="btn-primary">Buscar</button>
+              </div>
             </div>
-            <div id="tallEditArtList" class="tall-edit-arts-list" style="max-height:200px; overflow-y:auto; border:1px solid #e2e8f0; border-radius:6px; padding:8px; margin-bottom:16px;">
-              <div class="loading">Cargando artículos...</div>
+
+            <div id="tallEditCodList" class="tall-edit-cod-list" style="max-height:200px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:6px;padding:8px;margin-bottom:16px;display:none;">
+              <div class="loading">Cargando códigos...</div>
             </div>
 
             <div style="margin-top:16px;">
-              <h4 style="margin-bottom:8px;">Artículos Actuales:</h4>
-              <div id="tallEditCurrentArts" style="border:1px solid #e2e8f0; border-radius:6px; padding:8px; max-height:250px; overflow-y:auto;">
+              <h4 style="margin-bottom:8px;">Códigos Actuales:</h4>
+              <div id="tallEditCurrentCods" style="border:1px solid #e2e8f0;border-radius:6px;padding:8px;max-height:350px;overflow-y:auto;">
                 <div class="loading">Cargando...</div>
               </div>
             </div>
@@ -64,23 +76,26 @@ async function tallEditInit() {
     _tallEditModal = modal;
   }
 
-  // Estilos
   if (!document.getElementById("tallEditStyles")) {
     const style = document.createElement("style");
     style.id = "tallEditStyles";
     style.textContent = `
-      .tall-edit-modal { min-width: 500px; max-width: 650px; }
+      .tall-edit-modal { min-width: 550px; max-width: 700px; }
       .tall-edit-step { display: block; }
       .tall-edit-step.hidden { display: none; }
-      .tall-edit-arts-list { border: 1px solid #e2e8f0; }
-      .tall-edit-art-item { padding: 8px; border-bottom: 1px solid #f0f0f0; cursor: pointer; border-radius: 4px; }
-      .tall-edit-art-item:hover { background: #f9fafb; }
-      .tall-edit-art-item.selected { background: #dbeafe; border-left: 4px solid #3b82f6; }
-      .tall-edit-art-item input { margin-right: 8px; }
-      .tall-edit-current-art { padding: 8px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; border-radius: 4px; }
-      .tall-edit-current-art:hover { background: #fffbeb; }
-      .tall-edit-current-art button { background: #ef4444; color: white; border: none; padding: 4px 8px; border-radius: 3px; cursor: pointer; font-size: 11px; }
-      .tall-edit-current-art button:hover { background: #dc2626; }
+      .tall-edit-cod-list { border: 1px solid #e2e8f0; }
+      .tall-edit-cod-item { padding: 10px; border-bottom: 1px solid #f0f0f0; cursor: pointer; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; }
+      .tall-edit-cod-item:hover { background: #f9fafb; }
+      .tall-edit-cod-item button { background: #3b82f6; color: white; border: none; padding: 4px 8px; border-radius: 3px; cursor: pointer; font-size: 11px; }
+      .tall-edit-cod-item button:hover { background: #2563eb; }
+      .tall-edit-current-cod { padding: 12px; border: 1px solid #e2e8f0; border-radius: 6px; margin-bottom: 8px; background: #fff; }
+      .tall-edit-current-cod-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-weight: 600; }
+      .tall-edit-current-cod-header button { background: #ef4444; color: white; border: none; padding: 4px 8px; border-radius: 3px; cursor: pointer; font-size: 11px; }
+      .tall-edit-current-cod-header button:hover { background: #dc2626; }
+      .tall-edit-prov-row { display: flex; gap: 12px; align-items: center; margin-bottom: 8px; font-size: 13px; }
+      .tall-edit-prov-row input { width: 60px; padding: 4px 6px; border: 1px solid #cbd5e1; border-radius: 4px; }
+      .tall-edit-prov-row .pct { font-weight: 600; }
+      .tall-edit-prov-row .bad { color: #b91c1c; font-weight: 800; }
       .modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 9999; }
       .modal.hidden { display: none; }
       .modal-content { background: white; border-radius: 8px; padding: 20px; max-height: 90vh; overflow-y: auto; }
@@ -101,12 +116,12 @@ async function tallEditInit() {
 
 async function tallEditOpen(nombre) {
   await tallEditInit();
-  _tallEditState = { nombre: nombre, telefono: "", activo: true, artsSelected: {}, allArts: [] };
+  _tallEditState = { nombre: nombre, telefono: "", activo: true, allCods: [], currentCods: {} };
 
   const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
 
   try {
-    // Cargar datos del tallerista desde Tall_ProvAT_PS
+    // 1. Cargar datos básicos de Tall_ProvAT_PS
     const tallRes = await fetch(
       SUPABASE_URL + "/rest/v1/Tall_ProvAT_PS?nombre=eq." + encodeURIComponent(nombre) + "&select=nombre,telefono,activo",
       { headers: H }
@@ -120,46 +135,38 @@ async function tallEditOpen(nombre) {
     _tallEditState.telefono = tall.telefono || "";
     _tallEditState.activo = tall.activo;
 
-    // Determinar tipo (tallerista o prov_at)
-    const typeRes = await fetch(
-      SUPABASE_URL + "/rest/v1/Tall_ProvAT_PS?nombre=eq." + encodeURIComponent(nombre) + "&select=prov_at",
+    // 2. Cargar TODOS los códigos de OC_Maximos
+    const allCodsRes = await fetch(
+      SUPABASE_URL + "/rest/v1/OC_Maximos?select=cod,descripcion,linea,uni_x_caja,proveedor,prop_prov1,proveedor2,prop_prov2,activo&order=cod.asc",
       { headers: H }
     );
-    const typeData = await typeRes.json();
-    _tallEditState.tipo = typeData[0]?.prov_at ? "prov_at" : "tallerista";
+    const allCods = await allCodsRes.json();
+    _tallEditState.allCods = allCods || [];
 
-    // Cargar artículos actuales
-    if (_tallEditState.tipo === "prov_at") {
-      const artsRes = await fetch(
-        SUPABASE_URL + "/rest/v1/Articulos%20x%20Prov%20AT?Proveedor=eq." + encodeURIComponent(nombre) + "&select=Cod_Art,Descripcion,N_Caja",
-        { headers: H }
-      );
-      const arts = await artsRes.json();
-      _tallEditState.currentArts = arts || [];
-    } else {
-      const artsRes = await fetch(
-        SUPABASE_URL + "/rest/v1/Articulos%20Virgilio%20X%20Tallerista?Tallerista=eq." + encodeURIComponent(nombre) + "&select=Cod_Art,Desc,Uni_x_Caja",
-        { headers: H }
-      );
-      const arts = await artsRes.json();
-      _tallEditState.currentArts = arts || [];
-    }
+    // 3. Cargar códigos asignados a ESTE tallerista
+    const asignedRes = await fetch(
+      SUPABASE_URL + "/rest/v1/OC_Maximos?select=cod,descripcion,linea,uni_x_caja,proveedor,prop_prov1,proveedor2,prop_prov2",
+      { headers: H }
+    );
+    const asigned = await asignedRes.json();
+    _tallEditState.currentCods = {};
+    (asigned || []).forEach(row => {
+      const prov1 = String(row.proveedor || "").trim();
+      const prov2 = String(row.proveedor2 || "").trim();
+      if (prov1 === nombre || prov2 === nombre) {
+        _tallEditState.currentCods[row.cod] = row;
+      }
+    });
 
-    // Cargar artículos disponibles para agregar
-    const ocArtsP = supaFetchAllSafe(SUPABASE_URL + "/rest/v1/OC_Maximos", "select=cod,descripcion&activo=eq.true");
-    const allArts = await ocArtsP;
-    _tallEditState.allArts = (allArts || []).map(a => ({ Cod_Art: a.cod, Desc: a.descripcion }));
-
-    // Llenar formulario
+    // 4. Llenar formulario
     document.getElementById("tallEditNombre").value = tall.nombre;
     document.getElementById("tallEditTelefono").value = _tallEditState.telefono;
     document.getElementById("tallEditActivo").checked = _tallEditState.activo;
 
-    // Mostrar modal
+    // 5. Mostrar modal
     document.getElementById("tallEditStep1").classList.remove("hidden");
     document.getElementById("tallEditStep2").classList.remove("hidden");
-    tallEditRenderCurrentArts();
-    tallEditFilterArts();
+    tallEditRenderCurrentCods();
 
     _tallEditModal.classList.remove("hidden");
   } catch (e) {
@@ -199,165 +206,235 @@ async function tallEditStep1Save() {
   }
 }
 
-function tallEditFilterArts() {
-  const q = (document.getElementById("tallEditArtSearch").value || "").toLowerCase().trim();
-  const arts = (_tallEditState.allArts || []).filter(a => {
-    const cod = String(a.Cod_Art || "").toLowerCase();
-    const desc = String(a.Desc || "").toLowerCase();
+function tallEditToggleCodList() {
+  const list = document.getElementById("tallEditCodList");
+  if (list.style.display === "none") {
+    list.style.display = "block";
+    tallEditFilterCods();
+  } else {
+    list.style.display = "none";
+  }
+}
+
+function tallEditFilterCods() {
+  const q = (document.getElementById("tallEditCodSearch").value || "").toLowerCase().trim();
+  const allCods = _tallEditState.allCods || [];
+  const currentCods = _tallEditState.currentCods || {};
+
+  const filtered = allCods.filter(c => {
+    if (currentCods[c.cod]) return false; // Ya asignado
+    const cod = String(c.cod || "").toLowerCase();
+    const desc = String(c.descripcion || "").toLowerCase();
     return q === "" || cod.includes(q) || desc.includes(q);
   });
 
-  const listEl = document.getElementById("tallEditArtList");
-  if (!arts.length) {
-    listEl.innerHTML = '<div class="loading">No se encontraron artículos.</div>';
-    return;
-  }
-
-  // Filtrar artículos que ya están asignados
-  const currentCods = (_tallEditState.currentArts || []).map(a => a.Cod_Art || a.cod);
-  const available = arts.filter(a => !currentCods.includes(a.Cod_Art));
-
-  if (!available.length) {
-    listEl.innerHTML = '<div class="loading">Todos los artículos ya están asignados.</div>';
+  const listEl = document.getElementById("tallEditCodList");
+  if (!filtered.length) {
+    listEl.innerHTML = '<div class="loading">No se encontraron códigos disponibles.</div>';
     return;
   }
 
   let html = '';
-  available.forEach(a => {
-    html += '<div class="tall-edit-art-item" onclick="tallEditAddArt(\'' + a.Cod_Art + '\', \'' + (a.Desc || '?').replace(/'/g, "\\'") + '\')">' +
-      '<b>' + a.Cod_Art + '</b> — ' + (a.Desc || '?') +
+  filtered.slice(0, 50).forEach(c => {
+    html += '<div class="tall-edit-cod-item">' +
+      '<span><b>' + escapeHtml(c.cod) + '</b> — ' + escapeHtml(c.descripcion || "?") + ' (' + (c.uni_x_caja || 1) + ' u/caja)</span>' +
+      '<button onclick="tallEditAssignCod(\'' + c.cod + '\')">Asignar</button>' +
       '</div>';
   });
   listEl.innerHTML = html;
 }
 
-async function tallEditAddArt(codArt, desc) {
-  const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+async function tallEditAssignCod(cod) {
   const nombre = _tallEditState.nombre;
-  const tipo = _tallEditState.tipo;
+  const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
 
   try {
-    if (tipo === "prov_at") {
-      // Insertar en Articulos x Prov AT
-      const artBody = { Proveedor: nombre, Cod_Art: codArt, Descripcion: desc, Activo: true, N_Caja: 1, marca: null };
-      const res = await fetch(SUPABASE_URL + "/rest/v1/Articulos%20x%20Prov%20AT", {
-        method: "POST",
-        headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", "Prefer": "return=minimal" },
-        body: JSON.stringify(artBody)
-      });
-      if (!res.ok) throw new Error("HTTP " + res.status);
+    // Obtener el código actual
+    const res = await fetch(
+      SUPABASE_URL + "/rest/v1/OC_Maximos?cod=eq." + encodeURIComponent(cod) + "&select=*",
+      { headers: H }
+    );
+    const rows = await res.json();
+    if (!rows.length) throw new Error("Código no encontrado");
+
+    const row = rows[0];
+    const prov1 = String(row.proveedor || "").trim();
+    const prov2 = String(row.proveedor2 || "").trim();
+
+    // Lógica: si no tiene proveedor, asignar a prov1 (100%). Si tiene prov1, asignar a prov2 (50/50).
+    let updateBody;
+    if (!prov1) {
+      updateBody = { proveedor: nombre, prop_prov1: 100 };
+    } else if (!prov2) {
+      updateBody = { proveedor2: nombre, prop_prov2: 50, prop_prov1: 50 };
     } else {
-      // Insertar en Articulos Virgilio X Tallerista (ambas líneas)
-      const codsRes = await fetch(
-        SUPABASE_URL + "/rest/v1/Codigos%20X%20Tallerista?Nombre=eq." + encodeURIComponent(nombre) + "&select=Linea,Codigo",
-        { headers: H }
-      );
-      const cods = await codsRes.json();
-      const codMap = {};
-      (cods || []).forEach(c => { codMap[c.Linea] = c.Codigo; });
-
-      const artRows = [];
-      ["LK", "CH"].forEach(l => {
-        if (codMap[l]) {
-          artRows.push({
-            Cod_Tallerista: codMap[l], Tallerista: nombre,
-            Cod_Art: codArt, Linea: l, Desc: desc,
-            Uni_x_Caja: 1
-          });
-        }
-      });
-
-      if (artRows.length) {
-        const res = await fetch(SUPABASE_URL + "/rest/v1/Articulos%20Virgilio%20X%20Tallerista", {
-          method: "POST",
-          headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", "Prefer": "return=minimal" },
-          body: JSON.stringify(artRows)
-        });
-        if (!res.ok) throw new Error("HTTP " + res.status);
-      }
+      alert("Este código ya tiene 2 proveedores. Quitá uno primero.");
+      return;
     }
 
-    // Recargar artículos actuales
-    await tallEditReloadCurrentArts();
-    document.getElementById("tallEditArtSearch").value = "";
-    tallEditFilterArts();
+    const patchRes = await fetch(
+      SUPABASE_URL + "/rest/v1/OC_Maximos?cod=eq." + encodeURIComponent(cod),
+      {
+        method: "PATCH",
+        headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+        body: JSON.stringify(updateBody)
+      }
+    );
+    if (!patchRes.ok) throw new Error("HTTP " + patchRes.status);
+
+    document.getElementById("tallEditCodSearch").value = "";
+    await tallEditReloadCurrentCods();
+    tallEditFilterCods();
   } catch (e) {
-    console.error("Error al agregar artículo:", e);
+    console.error("Error asignando código:", e);
     alert("Error: " + e.message);
   }
 }
 
-async function tallEditReloadCurrentArts() {
+async function tallEditReloadCurrentCods() {
   const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
   const nombre = _tallEditState.nombre;
-  const tipo = _tallEditState.tipo;
 
   try {
-    if (tipo === "prov_at") {
-      const artsRes = await fetch(
-        SUPABASE_URL + "/rest/v1/Articulos%20x%20Prov%20AT?Proveedor=eq." + encodeURIComponent(nombre) + "&select=Cod_Art,Descripcion,N_Caja",
-        { headers: H }
-      );
-      _tallEditState.currentArts = await artsRes.json();
-    } else {
-      const artsRes = await fetch(
-        SUPABASE_URL + "/rest/v1/Articulos%20Virgilio%20X%20Tallerista?Tallerista=eq." + encodeURIComponent(nombre) + "&select=Cod_Art,Desc,Uni_x_Caja",
-        { headers: H }
-      );
-      _tallEditState.currentArts = await artsRes.json();
-    }
-    tallEditRenderCurrentArts();
+    const asignedRes = await fetch(
+      SUPABASE_URL + "/rest/v1/OC_Maximos?select=cod,descripcion,linea,uni_x_caja,proveedor,prop_prov1,proveedor2,prop_prov2",
+      { headers: H }
+    );
+    const asigned = await asignedRes.json();
+    _tallEditState.currentCods = {};
+    (asigned || []).forEach(row => {
+      const prov1 = String(row.proveedor || "").trim();
+      const prov2 = String(row.proveedor2 || "").trim();
+      if (prov1 === nombre || prov2 === nombre) {
+        _tallEditState.currentCods[row.cod] = row;
+      }
+    });
+    tallEditRenderCurrentCods();
   } catch (e) {
-    console.error("Error recargando artículos:", e);
+    console.error("Error recargando códigos:", e);
   }
 }
 
-function tallEditRenderCurrentArts() {
-  const contEl = document.getElementById("tallEditCurrentArts");
-  const arts = _tallEditState.currentArts || [];
+function tallEditRenderCurrentCods() {
+  const contEl = document.getElementById("tallEditCurrentCods");
+  const cods = Object.values(_tallEditState.currentCods || {});
 
-  if (!arts.length) {
-    contEl.innerHTML = '<div style="color:#999; text-align:center; padding:16px;">Sin artículos asignados.</div>';
+  if (!cods.length) {
+    contEl.innerHTML = '<div style="color:#999;text-align:center;padding:16px;">Sin códigos asignados.</div>';
     return;
   }
 
+  const nombre = _tallEditState.nombre;
   let html = '';
-  arts.forEach(a => {
-    const cod = a.Cod_Art || a.cod;
-    const desc = a.Desc || a.Descripcion || "?";
-    html += '<div class="tall-edit-current-art">' +
-      '<span><b>' + cod + '</b> — ' + desc + '</span>' +
-      '<button onclick="tallEditRemoveArt(\'' + cod + '\')">Quitar</button>' +
+
+  cods.forEach(row => {
+    const cod = row.cod;
+    const prov1 = String(row.proveedor || "").trim();
+    const prov2 = String(row.proveedor2 || "").trim();
+    const p1 = row.prop_prov1 || 100;
+    const p2 = row.prop_prov2 || 0;
+    const suma = p1 + (prov2 ? p2 : 0);
+    const bad = Math.round(suma) !== 100;
+
+    let provRows = '';
+
+    // Proveedor 1
+    if (prov1) {
+      provRows += '<div class="tall-edit-prov-row">' +
+        '<span style="flex:1;"><b>' + escapeHtml(prov1) + '</b></span>' +
+        '<span class="pct' + (bad ? ' bad' : '') + '"><input type="number" min="0" max="100" step="1" value="' + p1 + '" onchange="tallEditUpdatePct(\'' + cod + '\', \'prov1\', this.value)"></span>' +
+        '<span>%</span>' +
+        (prov1 === nombre ? '<button onclick="tallEditRemoveProv(\'' + cod + '\', \'prov1\')">Quitar</button>' : '') +
+        '</div>';
+    }
+
+    // Proveedor 2
+    if (prov2) {
+      provRows += '<div class="tall-edit-prov-row">' +
+        '<span style="flex:1;"><b>' + escapeHtml(prov2) + '</b></span>' +
+        '<span class="pct' + (bad ? ' bad' : '') + '"><input type="number" min="0" max="100" step="1" value="' + p2 + '" onchange="tallEditUpdatePct(\'' + cod + '\', \'prov2\', this.value)"></span>' +
+        '<span>%</span>' +
+        (prov2 === nombre ? '<button onclick="tallEditRemoveProv(\'' + cod + '\', \'prov2\')">Quitar</button>' : '') +
+        '</div>';
+    }
+
+    html += '<div class="tall-edit-current-cod">' +
+      '<div class="tall-edit-current-cod-header">' +
+      '<span><b>' + escapeHtml(cod) + '</b> — ' + escapeHtml(row.descripcion || "?") + ' (' + (row.uni_x_caja || 1) + ' u/caja)</span>' +
+      '</div>' +
+      provRows +
+      (bad ? '<div style="color:#b91c1c;font-weight:600;font-size:12px;margin-top:6px;">⚠ Los % deben sumar 100%</div>' : '') +
       '</div>';
   });
+
   contEl.innerHTML = html;
 }
 
-async function tallEditRemoveArt(codArt) {
-  if (!confirm("¿Quitar artículo " + codArt + "?")) return;
+async function tallEditUpdatePct(cod, provPos, newVal) {
+  const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+  const pct = Math.max(0, Math.min(100, parseFloat(newVal) || 0));
+
+  try {
+    const updateBody = provPos === "prov1" ? { prop_prov1: pct } : { prop_prov2: pct };
+    const res = await fetch(
+      SUPABASE_URL + "/rest/v1/OC_Maximos?cod=eq." + encodeURIComponent(cod),
+      {
+        method: "PATCH",
+        headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+        body: JSON.stringify(updateBody)
+      }
+    );
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    await tallEditReloadCurrentCods();
+  } catch (e) {
+    console.error("Error actualizando porcentaje:", e);
+    alert("Error: " + e.message);
+  }
+}
+
+async function tallEditRemoveProv(cod, provPos) {
+  if (!confirm("¿Quitar este proveedor del código " + cod + "?")) return;
 
   const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
   const nombre = _tallEditState.nombre;
-  const tipo = _tallEditState.tipo;
 
   try {
-    if (tipo === "prov_at") {
-      const res = await fetch(
-        SUPABASE_URL + "/rest/v1/Articulos%20x%20Prov%20AT?Proveedor=eq." + encodeURIComponent(nombre) + "&Cod_Art=eq." + encodeURIComponent(codArt),
-        { method: "DELETE", headers: H }
-      );
-      if (!res.ok) throw new Error("HTTP " + res.status);
+    const res = await fetch(
+      SUPABASE_URL + "/rest/v1/OC_Maximos?cod=eq." + encodeURIComponent(cod) + "&select=proveedor,proveedor2,prop_prov1,prop_prov2",
+      { headers: H }
+    );
+    const rows = await res.json();
+    if (!rows.length) throw new Error("Código no encontrado");
+
+    const row = rows[0];
+    const prov1 = String(row.proveedor || "").trim();
+    const prov2 = String(row.proveedor2 || "").trim();
+
+    let updateBody;
+    if (provPos === "prov1") {
+      // Si quito prov1, muevo prov2 a prov1 si existe
+      if (prov2) {
+        updateBody = { proveedor: prov2, prop_prov1: 100, proveedor2: null, prop_prov2: 0 };
+      } else {
+        updateBody = { proveedor: null, prop_prov1: 0 };
+      }
     } else {
-      const res = await fetch(
-        SUPABASE_URL + "/rest/v1/Articulos%20Virgilio%20X%20Tallerista?Tallerista=eq." + encodeURIComponent(nombre) + "&Cod_Art=eq." + encodeURIComponent(codArt),
-        { method: "DELETE", headers: H }
-      );
-      if (!res.ok) throw new Error("HTTP " + res.status);
+      // Si quito prov2, prov1 sigue siendo 100
+      updateBody = { proveedor2: null, prop_prov2: 0, prop_prov1: 100 };
     }
 
-    await tallEditReloadCurrentArts();
+    const patchRes = await fetch(
+      SUPABASE_URL + "/rest/v1/OC_Maximos?cod=eq." + encodeURIComponent(cod),
+      {
+        method: "PATCH",
+        headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+        body: JSON.stringify(updateBody)
+      }
+    );
+    if (!patchRes.ok) throw new Error("HTTP " + patchRes.status);
+    await tallEditReloadCurrentCods();
   } catch (e) {
-    console.error("Error al quitar artículo:", e);
+    console.error("Error quitando proveedor:", e);
     alert("Error: " + e.message);
   }
 }
@@ -366,8 +443,10 @@ async function tallEditRemoveArt(codArt) {
 window.tallEditOpen = tallEditOpen;
 window.tallEditClose = tallEditClose;
 window.tallEditStep1Save = tallEditStep1Save;
-window.tallEditFilterArts = tallEditFilterArts;
-window.tallEditAddArt = tallEditAddArt;
-window.tallEditReloadCurrentArts = tallEditReloadCurrentArts;
-window.tallEditRenderCurrentArts = tallEditRenderCurrentArts;
-window.tallEditRemoveArt = tallEditRemoveArt;
+window.tallEditToggleCodList = tallEditToggleCodList;
+window.tallEditFilterCods = tallEditFilterCods;
+window.tallEditAssignCod = tallEditAssignCod;
+window.tallEditReloadCurrentCods = tallEditReloadCurrentCods;
+window.tallEditRenderCurrentCods = tallEditRenderCurrentCods;
+window.tallEditUpdatePct = tallEditUpdatePct;
+window.tallEditRemoveProv = tallEditRemoveProv;
