@@ -12,7 +12,16 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-08-25 · Versión app al documentar: **v11.71**
+> Última actualización: 2026-08-26 · Versión app al documentar: **v11.72**
+>
+> Nota **2026-08-26 — v11.72 (Legajo real en pipeline stock etapa 1 y 2).**
+> `reconciliar_pipeline_stock_etapa1()` y `etapa2()` hardcodeaban `'pipeline'`
+> como legajo en todos los `Movimientos_Stock` que creaban. Ahora extraen el
+> legajo real del operario: etapa1 del último PKC de la tanda, etapa2 del último
+> TAP de la tanda. Fallback a `'pipeline'` solo si el registro no tiene legajo.
+> Etapa 3 y 4 mantienen `'pipeline'` (el actor es facturación/sistema).
+> SQL guardado en `sql/reconciliar_pipeline_stock_etapa1.sql` y
+> `sql/reconciliar_pipeline_stock_etapa2.sql`.
 >
 > Nota **2026-08-25 — v11.71 (OC pend: solo última OC por código).**
 > `vista_faltante_catalogo` CTE `oc_pend` sumaba todas las OCs pendientes por

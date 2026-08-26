@@ -124,6 +124,24 @@
 --    `ref='<tanda>|FIX_CHEF_ESTANCADO_20260811'` (trazable/reversible). Verificado: sin
 --    a_facturar negativos.
 --
+--  v11.72 — LEGAJO REAL EN ETAPA 1 Y 2 (fix "legajo pipeline").
+--    Root cause: las etapas 1 y 2 hardcodeaban `'pipeline'` como legajo en TODOS
+--    los Movimientos_Stock que creaban. El operario que realmente pickeó/armó
+--    quedaba invisible en la trazabilidad — y las alertas de stock negativo decían
+--    "legajo pipeline" en vez de mostrar quién fue.
+--    FIX: ETAPA 1 (`reconciliar_pipeline_stock_etapa1`) ahora extrae el legajo
+--    real del PKC (último registro PKC de la tanda, por `ts_cliente DESC`) usando
+--    `(array_agg(r.legajo::text ORDER BY r.ts_cliente DESC NULLS LAST))[1]`.
+--    Aplica a ambas secciones A (histórico) y B (forward). Fallback a 'pipeline'
+--    si no hay legajo.
+--    ETAPA 2 (`reconciliar_pipeline_stock_etapa2`) ahora extrae el legajo real
+--    del TAP (último registro TAP de la tanda) con la misma mecánica. Se agrega
+--    CTE `tap_leg` y se joinea en `alloc`. Fallback a 'pipeline'.
+--    ETAPA 3 y 4 mantienen 'pipeline': el actor es el sistema/facturación, no un
+--    operario específico.
+--    Funciones fuente: `sql/reconciliar_pipeline_stock_etapa1.sql` y
+--    `sql/reconciliar_pipeline_stock_etapa2.sql`.
+--
 --  La definición viva de la función está en la migración homónima en Supabase.
 --  Este archivo es la documentación del diseño (convención de sql/).
 -- =====================================================================
