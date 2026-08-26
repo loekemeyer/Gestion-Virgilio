@@ -12,7 +12,22 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-08-26 · Versión app al documentar: **v11.81**
+> Última actualización: 2026-08-26 · Versión app al documentar: **v11.82**
+>
+> Nota **2026-08-26 — v11.82 (Ajuste "llenar góndola a N meses" en la OC puntual).**
+> En la vista de detalle de una OC (Compras → abrir OC) la columna **Pedido** ahora
+> es **editable** y hay una barra verde **⛽ Llenar góndola** con input de **meses**
+> (default **6**) + botón **⛽ Aplicar a todas** + **💾 Guardar cantidades**. Cada
+> línea tiene un botón **⛽** que setea la cantidad a `max(0, objetivo + pedidos −
+> stock)` con `objetivo = MENOR(capacidad de góndola, proyección × meses)` — usa los
+> snapshots de la fila (`oc_stock`/`oc_pedidos`/`oc_proy`, o proyección de hoy si la
+> OC es vieja) y la capacidad de HOY (`Capacidad_Sector`, cargada con `ocEnsureCap`).
+> Si `proy ≤ 0` o no hay capacidad → el botón no aplica (no llena a ciegas). Se agregó
+> la columna **Cap gónd.** al detalle. Guardar hace PATCH de `Ordenes_Compra.cantidad`
+> SOLO en esa OC (no toca la config permanente ni el cron). Todo front (index.html):
+> `ocDetTarget`/`ocDetFill`/`ocDetFillAll`/`ocDetSave`/`ocEnsureCap`. La casilla
+> permanente de v11.81 (llena a capacidad TOTAL) sigue existiendo pero para este caso
+> se prefiere el ajuste por-OC a N meses.
 >
 > Nota **2026-08-26 — v11.81 (Casilla "llenar góndola" en el generador de OCs).**
 > Problema: máximo = MENOR(proy×índice, capacidad); la capacidad de góndola era

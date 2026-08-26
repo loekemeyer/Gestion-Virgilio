@@ -6515,7 +6515,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v11.81";
+const APP_VERSION = "v11.82";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -10455,7 +10455,7 @@ function ocRecEff(r) { return (_oc && _oc.recepByRow && _oc.recepByRow[r && r.id
 async function openOCAdmin() {
   if (!document.getElementById("ocCss")) {
     const s = document.createElement("style"); s.id = "ocCss";
-    s.textContent = "#ocAdminOverlay{display:none;position:fixed;inset:0;z-index:1281;background:rgba(2,6,23,.74);overflow:auto;padding:14px;}#ocAdminOverlay.show{display:block;}.oc-card{background:#f8fafc;max-width:860px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.oc-head{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:linear-gradient(90deg,#0f766e,#134e4a);color:#fff;}.oc-title{font-size:19px;font-weight:800;}.oc-close{background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;width:auto;}.oc-body{padding:14px 16px;}.oc-loading,.oc-empty{padding:24px;text-align:center;color:#64748b;}.oc-tools{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center;}.oc-btn{background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:8px 13px;font-size:13px;font-weight:800;cursor:pointer;width:auto;}.oc-btn.ok{background:#0f766e;color:#fff;border-color:#0f766e;}.oc-btn.danger{background:#fff;color:#b91c1c;border-color:#fca5a5;}.oc-filtro{flex:1;min-width:160px;height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 11px;font-size:14px;}.oc-tbl{width:100%;border-collapse:collapse;font-size:13.5px;}.oc-tbl th{background:#f1f5f9;color:#475569;text-align:left;padding:7px 9px;font-size:11px;text-transform:uppercase;border-bottom:1px solid #cbd5e1;}.oc-tbl th.num,.oc-tbl td.num{text-align:right;font-variant-numeric:tabular-nums;padding-left:14px;padding-right:14px;}.oc-tblwrap{overflow-x:auto;max-width:100%;-webkit-overflow-scrolling:touch;}.oc-tbl td{padding:7px 9px;border-bottom:1px solid #eef2f7;}.oc-rowc{cursor:pointer;}.oc-rowc:hover{background:#ecfdf5;}.oc-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#0f766e;}.oc-pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11px;font-weight:800;}.oc-pill.pendiente{background:#fef3c7;color:#92400e;}.oc-pill.recibida{background:#dcfce7;color:#166534;}.oc-pill.parcial{background:#dbeafe;color:#1e40af;}.oc-falt{color:#b91c1c;font-weight:800;}.oc-ok{color:#166534;font-weight:800;}.oc-rinp{width:78px;height:34px;text-align:center;border:1px solid #cbd5e1;border-radius:8px;padding:0;font-size:14px;font-weight:700;}.oc-form{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;}.oc-inp{height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 10px;font-size:14px;}.oc-meta{font-size:13px;color:#475569;margin-bottom:10px;}.oc-meta b{color:#0f172a;}.oc-additm{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-top:8px;}.oc-note{font-size:12px;color:#64748b;margin-top:10px;}@media (max-width:460px){.oc-tbl-det td.oc-desc{max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.oc-tbl-det th.num,.oc-tbl-det td.num{padding-left:6px;padding-right:6px;}.oc-tbl-det{font-size:12.5px;}.oc-tbl-det .oc-rinp{width:60px;height:32px;}}.oc-boxgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}.oc-box{background:#fff;border:1px solid #cbd5e1;border-left:5px solid #0f766e;border-radius:12px;padding:12px 13px;cursor:pointer;transition:box-shadow .12s,transform .12s;}.oc-box:hover{box-shadow:0 6px 18px rgba(15,118,110,.16);transform:translateY(-1px);}.oc-box-t{font-size:16px;font-weight:800;color:#0f172a;display:flex;align-items:center;gap:6px;margin-bottom:5px;}.oc-box-sub{font-size:12px;color:#64748b;margin-bottom:7px;}.oc-box-row{display:flex;justify-content:space-between;font-size:12.5px;padding:1px 0;color:#475569;}.oc-box-row b{color:#0f172a;font-variant-numeric:tabular-nums;}.oc-box-foot{display:flex;justify-content:space-between;align-items:center;margin-top:8px;}.oc-box-go{font-size:12px;font-weight:800;color:#0f766e;}.oc-cd{background:#ecfdf5;border:1px solid #99f6e4;color:#065f46;border-radius:10px;padding:9px 12px;margin-bottom:10px;font-size:12.5px;}.oc-cd b{color:#065f46;}.oc-cd-num{font-variant-numeric:tabular-nums;font-weight:900;}.oc-tbl th.oc-grp{text-align:center;background:#ede9fe;color:#5b21b6;font-size:10px;}.oc-tbl th.oc-sep,.oc-tbl td.oc-sep{border-left:2px solid #c7d2fe;}.oc-neg{color:#b91c1c;font-weight:800;}.oc-pos{color:#15803d;font-weight:700;}.oc-chip{display:inline-block;border-radius:999px;padding:1px 8px;font-size:11px;font-weight:800;white-space:nowrap;}.oc-chip.bad{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;}.oc-chip.warn{background:#fffbeb;color:#b45309;border:1px solid #fde68a;}.oc-chip.ok{background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0;}.oc-chip.mut{background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0;}.oc-ent-hint{font-size:11.5px;color:#64748b;margin-top:8px;}@media(max-width:640px){.oc-boxgrid{grid-template-columns:repeat(2,1fr);}}@media(max-width:420px){.oc-boxgrid{grid-template-columns:1fr;}}.oc-tbl-det th,.oc-tbl-det td{padding-top:5px;padding-bottom:5px;padding-left:6px;padding-right:6px;}.oc-tbl-det th.num,.oc-tbl-det td.num{padding-left:7px;padding-right:7px;}.oc-tbl-det td.oc-xtra{color:#6d28d9;background:#faf5ff;font-weight:700;}.oc-tbl-det th.oc-xtra{color:#6d28d9;background:#f5f3ff;border-left:2px solid #ddd6fe;}.oc-tbl-det td.oc-xtra.oc-xtra-first{border-left:2px solid #ddd6fe;}.oc-fab-save{position:fixed;right:22px;bottom:22px;z-index:1300;background:#0f766e;color:#fff;border:none;border-radius:999px;padding:13px 22px;font-size:15px;font-weight:800;cursor:pointer;width:auto;box-shadow:0 10px 26px rgba(15,118,110,.45);display:flex;align-items:center;gap:8px;}.oc-fab-save:hover{background:#0d655e;}.oc-fab-save .oc-fab-dot{background:#fef3c7;color:#92400e;border-radius:999px;padding:1px 9px;font-size:13px;font-weight:900;}@media(max-width:460px){.oc-fab-save{right:14px;bottom:14px;padding:12px 18px;font-size:14px;}}";
+    s.textContent = "#ocAdminOverlay{display:none;position:fixed;inset:0;z-index:1281;background:rgba(2,6,23,.74);overflow:auto;padding:14px;}#ocAdminOverlay.show{display:block;}.oc-card{background:#f8fafc;max-width:860px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.oc-head{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:linear-gradient(90deg,#0f766e,#134e4a);color:#fff;}.oc-title{font-size:19px;font-weight:800;}.oc-close{background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;width:auto;}.oc-body{padding:14px 16px;}.oc-loading,.oc-empty{padding:24px;text-align:center;color:#64748b;}.oc-tools{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center;}.oc-btn{background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:8px 13px;font-size:13px;font-weight:800;cursor:pointer;width:auto;}.oc-btn.ok{background:#0f766e;color:#fff;border-color:#0f766e;}.oc-btn.danger{background:#fff;color:#b91c1c;border-color:#fca5a5;}.oc-filtro{flex:1;min-width:160px;height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 11px;font-size:14px;}.oc-tbl{width:100%;border-collapse:collapse;font-size:13.5px;}.oc-tbl th{background:#f1f5f9;color:#475569;text-align:left;padding:7px 9px;font-size:11px;text-transform:uppercase;border-bottom:1px solid #cbd5e1;}.oc-tbl th.num,.oc-tbl td.num{text-align:right;font-variant-numeric:tabular-nums;padding-left:14px;padding-right:14px;}.oc-tblwrap{overflow-x:auto;max-width:100%;-webkit-overflow-scrolling:touch;}.oc-tbl td{padding:7px 9px;border-bottom:1px solid #eef2f7;}.oc-rowc{cursor:pointer;}.oc-rowc:hover{background:#ecfdf5;}.oc-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#0f766e;}.oc-pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11px;font-weight:800;}.oc-pill.pendiente{background:#fef3c7;color:#92400e;}.oc-pill.recibida{background:#dcfce7;color:#166534;}.oc-pill.parcial{background:#dbeafe;color:#1e40af;}.oc-falt{color:#b91c1c;font-weight:800;}.oc-ok{color:#166534;font-weight:800;}.oc-rinp{width:78px;height:34px;text-align:center;border:1px solid #cbd5e1;border-radius:8px;padding:0;font-size:14px;font-weight:700;}.oc-form{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;}.oc-inp{height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 10px;font-size:14px;}.oc-meta{font-size:13px;color:#475569;margin-bottom:10px;}.oc-meta b{color:#0f172a;}.oc-additm{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-top:8px;}.oc-note{font-size:12px;color:#64748b;margin-top:10px;}@media (max-width:460px){.oc-tbl-det td.oc-desc{max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.oc-tbl-det th.num,.oc-tbl-det td.num{padding-left:6px;padding-right:6px;}.oc-tbl-det{font-size:12.5px;}.oc-tbl-det .oc-rinp{width:60px;height:32px;}}.oc-boxgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}.oc-box{background:#fff;border:1px solid #cbd5e1;border-left:5px solid #0f766e;border-radius:12px;padding:12px 13px;cursor:pointer;transition:box-shadow .12s,transform .12s;}.oc-box:hover{box-shadow:0 6px 18px rgba(15,118,110,.16);transform:translateY(-1px);}.oc-box-t{font-size:16px;font-weight:800;color:#0f172a;display:flex;align-items:center;gap:6px;margin-bottom:5px;}.oc-box-sub{font-size:12px;color:#64748b;margin-bottom:7px;}.oc-box-row{display:flex;justify-content:space-between;font-size:12.5px;padding:1px 0;color:#475569;}.oc-box-row b{color:#0f172a;font-variant-numeric:tabular-nums;}.oc-box-foot{display:flex;justify-content:space-between;align-items:center;margin-top:8px;}.oc-box-go{font-size:12px;font-weight:800;color:#0f766e;}.oc-cd{background:#ecfdf5;border:1px solid #99f6e4;color:#065f46;border-radius:10px;padding:9px 12px;margin-bottom:10px;font-size:12.5px;}.oc-cd b{color:#065f46;}.oc-cd-num{font-variant-numeric:tabular-nums;font-weight:900;}.oc-tbl th.oc-grp{text-align:center;background:#ede9fe;color:#5b21b6;font-size:10px;}.oc-tbl th.oc-sep,.oc-tbl td.oc-sep{border-left:2px solid #c7d2fe;}.oc-neg{color:#b91c1c;font-weight:800;}.oc-pos{color:#15803d;font-weight:700;}.oc-chip{display:inline-block;border-radius:999px;padding:1px 8px;font-size:11px;font-weight:800;white-space:nowrap;}.oc-chip.bad{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;}.oc-chip.warn{background:#fffbeb;color:#b45309;border:1px solid #fde68a;}.oc-chip.ok{background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0;}.oc-chip.mut{background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0;}.oc-ent-hint{font-size:11.5px;color:#64748b;margin-top:8px;}@media(max-width:640px){.oc-boxgrid{grid-template-columns:repeat(2,1fr);}}@media(max-width:420px){.oc-boxgrid{grid-template-columns:1fr;}}.oc-tbl-det th,.oc-tbl-det td{padding-top:5px;padding-bottom:5px;padding-left:6px;padding-right:6px;}.oc-tbl-det th.num,.oc-tbl-det td.num{padding-left:7px;padding-right:7px;}.oc-tbl-det td.oc-xtra{color:#6d28d9;background:#faf5ff;font-weight:700;}.oc-tbl-det th.oc-xtra{color:#6d28d9;background:#f5f3ff;border-left:2px solid #ddd6fe;}.oc-tbl-det td.oc-xtra.oc-xtra-first{border-left:2px solid #ddd6fe;}.oc-fab-save{position:fixed;right:22px;bottom:22px;z-index:1300;background:#0f766e;color:#fff;border:none;border-radius:999px;padding:13px 22px;font-size:15px;font-weight:800;cursor:pointer;width:auto;box-shadow:0 10px 26px rgba(15,118,110,.45);display:flex;align-items:center;gap:8px;}.oc-fab-save:hover{background:#0d655e;}.oc-fab-save .oc-fab-dot{background:#fef3c7;color:#92400e;border-radius:999px;padding:1px 9px;font-size:13px;font-weight:900;}@media(max-width:460px){.oc-fab-save{right:14px;bottom:14px;padding:12px 18px;font-size:14px;}}.oc-fillbtn{background:#ecfdf5;border:1px solid #99f6e4;border-radius:7px;padding:2px 6px;font-size:14px;line-height:1;cursor:pointer;width:auto;}.oc-fillbtn:hover{background:#d1fae5;}";
     document.head.appendChild(s);
   }
   let ov = document.getElementById("ocAdminOverlay");
@@ -10741,7 +10741,16 @@ function ocBodyGeneral() {
   if (!items.length) h += '<tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:14px;">Sin ítems</td></tr>';
   return h + "</tbody></table></div>";
 }
-function ocOpen(kEnc) { if (!_oc) return; _oc.openKey = decodeURIComponent(kEnc); const g = ocGroups(), x = g[_oc.openKey]; if (x && x.fecha) _oc.openFecha = x.fecha; _oc.view = "detail"; ocRender(); ocEnsureProyHoy(); }
+function ocOpen(kEnc) { if (!_oc) return; _oc.openKey = decodeURIComponent(kEnc); const g = ocGroups(), x = g[_oc.openKey]; if (x && x.fecha) _oc.openFecha = x.fecha; _oc.view = "detail"; _oc.detEdit = {}; if (_oc.detMeses == null) _oc.detMeses = 6; ocRender(); ocEnsureProyHoy(); ocEnsureCap(); }
+/* v11.82 — capacidad de góndola (Capacidad_Sector) por código, para el ajuste "llenar
+   a N meses" en la vista de la OC. Se trae una vez y re-renderiza el detalle. */
+async function ocEnsureCap() {
+  if (!_oc || _oc.capMap || _oc._capLoading) return;
+  _oc._capLoading = true;
+  try { _oc.capMap = await ocgFetchCapacidad(); } catch (_e) { _oc.capMap = {}; }
+  _oc._capLoading = false;
+  if (_oc && _oc.view === "detail") ocRender();
+}
 /* v11.65 — proyección de HOY (proyeccion_madre) para caer en OC viejas sin snapshot oc_proy.
    Se trae una vez por apertura del módulo y re-renderiza el detalle. */
 async function ocEnsureProyHoy() {
@@ -10763,6 +10772,16 @@ function ocBodyDetail() {
   h += '<button class="oc-btn" onclick="ocPrintDetalle(false)" title="Para enviarle al tallerista (sin Cajas Recibidas)">🖨 Tallerista</button>';
   h += '<button class="oc-btn" onclick="ocWhatsappTallerista()" title="Copia la OC como imagen y abre WhatsApp del tallerista">📲 WhatsApp</button>';
   h += '</div>';
+  // v11.82 — ajuste "llenar góndola a N meses" para ESTA OC (no toca la config permanente).
+  // objetivo = MENOR(capacidad de góndola, proyección × meses); cantidad = max(0, objetivo + pedidos − stock).
+  const _detCh = _ocDetChangedN();
+  h += '<div class="oc-tools" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:8px 10px">' +
+    '<span style="font-size:13px;font-weight:700;color:#065f46">⛽ Llenar góndola:</span>' +
+    '<span style="font-size:13px">hasta</span> <input id="ocDetMeses" class="oc-inp" style="width:64px" type="number" min="0.5" step="0.5" value="' + (Number(_oc.detMeses) || 6) + '" oninput="ocDetMeses(this.value)"> <span style="font-size:13px">meses de proyección</span>' +
+    '<button class="oc-btn" onclick="ocDetFillAll()" title="Recalcula la cantidad de TODAS las líneas con góndola a MENOR(capacidad, proy×meses) − stock">⛽ Aplicar a todas</button>' +
+    '<button id="ocDetSaveBtn" class="oc-btn ok" onclick="ocDetSave()"' + (_detCh ? '' : ' style="display:none"') + '>💾 Guardar cantidades' + (_detCh ? ' (' + _detCh + ')' : '') + '</button>' +
+    '<span style="flex-basis:100%;font-size:11.5px;color:#475569">Cambia solo esta OC. Objetivo = MENOR(capacidad de góndola, proyección × meses). Editá la cantidad a mano o usá ⛽ por línea.</span>' +
+    '</div>';
   h += '<div class="oc-meta">Proveedor <b>' + escapeHtml(x.proveedor || "—") + '</b> · Fecha <b>' + escapeHtml(x.fecha || "—") + '</b> · Rubro <b>' + escapeHtml(x.rubro || "—") + '</b> · Pedido <b>' + st.ped + '</b> · Recibido <b class="oc-ok">' + st.rec + '</b> · Falta <b class="' + (st.falta > 0 ? "oc-falt" : "oc-ok") + '">' + (st.falta > 0 ? st.falta : 0) + '</b> · Recepción <b style="color:' + _ocPctCol(_ocPct(st.rec, st.ped)) + '">' + _ocPct(st.rec, st.ped) + '%</b></div>';
   h += '<div class="oc-note" style="margin-top:0;margin-bottom:8px"><b>Recibido</b> = lo que registró la Recepción de Mercadería para este tallerista y código, <b>dentro del período de esta OC</b> (no acumula entregas anteriores ni de otra OC). Se alimenta solo.</div>';
   // v11.52 — 3 columnas SOLO-PANTALLA (no van a los impresos): Stock · Máximo · Proyección
@@ -10783,12 +10802,103 @@ function ocBodyDetail() {
     if (_pm) { const v = _pm[_ocgNorm(r.codigo)]; if (v != null && v > 0) return '<td class="num oc-xtra" style="opacity:.72;font-style:italic;" title="Proyección de HOY (esta OC es previa a guardar la proyección al generarla)">~' + Math.round(v) + '</td>'; }
     return '<td class="num oc-xtra">' + (_pm ? '—' : '…') + '</td>';
   };
-  h += '<div class="oc-tblwrap"><table class="oc-tbl oc-tbl-det"><thead><tr><th>Código</th><th class="oc-desc">Descripción</th><th class="num">Pedido</th><th class="num">Recibido</th><th class="num">Falta</th><th class="num oc-xtra oc-xtra-first" title="Stock al generar la OC">Stock</th><th class="num oc-xtra" title="Máximo al generar la OC">Máximo</th><th class="num oc-xtra" title="Pedidos pendientes (demanda) al generar la OC">Pedidos</th><th class="num oc-xtra" title="Al generar la OC (viejas: ~ = proyección de hoy)">Proyección</th></tr></thead><tbody>';
+  h += '<div class="oc-tblwrap"><table class="oc-tbl oc-tbl-det"><thead><tr><th>Código</th><th class="oc-desc">Descripción</th><th class="num">Pedido</th><th></th><th class="num">Recibido</th><th class="num">Falta</th><th class="num oc-xtra oc-xtra-first" title="Stock al generar la OC">Stock</th><th class="num oc-xtra" title="Máximo al generar la OC">Máximo</th><th class="num oc-xtra" title="Capacidad de góndola (Capacidad_Sector, hoy)">Cap gónd.</th><th class="num oc-xtra" title="Pedidos pendientes (demanda) al generar la OC">Pedidos</th><th class="num oc-xtra" title="Al generar la OC (viejas: ~ = proyección de hoy)">Proyección</th></tr></thead><tbody>';
   x.rows.forEach(function (r) {
-    const ped = Number(r.cantidad) || 0, rec = ocRecEff(r), falt = ped - rec;
-    h += '<tr><td class="oc-cod">' + escapeHtml(codCanon(r.codigo) || "—") + '</td><td class="oc-desc">' + escapeHtml(artNombre(r.codigo, r.descripcion) || "") + '</td><td class="num">' + ped + '</td><td class="num ' + (rec > 0 ? "oc-ok" : "") + '">' + rec + '</td><td class="num ' + (falt > 0 ? "oc-falt" : "oc-ok") + '">' + (falt !== 0 ? falt : "0") + '</td>' + _gv(r, "oc_stock", " oc-xtra-first") + _gv(r, "oc_max", "") + _gv(r, "oc_pedidos", "") + _proyCell(r) + '</tr>';
+    const ped = _ocDetCantEff(r), rec = ocRecEff(r), falt = ped - rec;
+    const ch = (_oc.detEdit && _oc.detEdit[r.id] != null && Number(_oc.detEdit[r.id]) !== (Number(r.cantidad) || 0));
+    const codn = _ocgNorm(r.codigo);
+    const cap = (_oc.capMap && _oc.capMap[codn] != null) ? Math.round(_oc.capMap[codn]) : null;
+    const sug = ocDetTarget(r);   // null si no se puede calcular (sin capacidad / sin datos)
+    const fillBtn = (sug == null) ? '<span title="No aplica: sin capacidad de góndola cargada o sin proyección" style="opacity:.4">⛽</span>'
+      : '<button class="oc-fillbtn" title="Llenar a ' + (Number(_oc.detMeses) || 6) + ' meses: cantidad = MENOR(cap ' + cap + ', proy×meses) − stock = ' + sug + '" onclick="ocDetFill(' + r.id + ')">⛽</button>';
+    h += '<tr><td class="oc-cod">' + escapeHtml(codCanon(r.codigo) || "—") + '</td><td class="oc-desc">' + escapeHtml(artNombre(r.codigo, r.descripcion) || "") + '</td>' +
+      '<td class="num"><input class="oc-rinp" style="width:64px' + (ch ? ';background:#fef3c7' : '') + '" type="number" min="0" inputmode="numeric" value="' + ped + '" oninput="ocDetEditCant(' + r.id + ',this.value)"></td>' +
+      '<td style="text-align:center;padding:0 2px">' + fillBtn + '</td>' +
+      '<td class="num ' + (rec > 0 ? "oc-ok" : "") + '">' + rec + '</td><td class="num ' + (falt > 0 ? "oc-falt" : "oc-ok") + '">' + (falt !== 0 ? falt : "0") + '</td>' +
+      _gv(r, "oc_stock", " oc-xtra-first") + _gv(r, "oc_max", "") +
+      '<td class="num oc-xtra">' + (cap == null ? "…" : (cap || "—")) + '</td>' +
+      _gv(r, "oc_pedidos", "") + _proyCell(r) + '</tr>';
   });
-  return h + '</tbody></table></div><div class="oc-note" style="margin-top:8px">Las columnas <b style="color:#6d28d9">Stock · Máximo · Pedidos · Proyección</b> son del <b>momento en que se generó la OC</b> (no de hoy) — así se ve por qué se pidió lo que se pidió (a pedir ≈ Máximo − Stock − Pedidos). En OC viejas (previas a guardar el dato) la <b>Proyección</b> muestra la de <b>hoy</b> con «<b>~</b>»; Stock/Máximo/Pedidos viejos quedan en «—».</div>';
+  return h + '</tbody></table></div><div class="oc-note" style="margin-top:8px">Las columnas <b style="color:#6d28d9">Stock · Máximo · Pedidos · Proyección</b> son del <b>momento en que se generó la OC</b> (no de hoy) — así se ve por qué se pidió lo que se pidió (a pedir ≈ Máximo − Stock − Pedidos). En OC viejas (previas a guardar el dato) la <b>Proyección</b> muestra la de <b>hoy</b> con «<b>~</b>»; Stock/Máximo/Pedidos viejos quedan en «—». <b>Cap gónd.</b> es la capacidad de HOY (Capacidad_Sector).</div>';
+}
+/* v11.82 — ajuste de cantidades en la OC puntual ("llenar góndola a N meses").
+   Objetivo = MENOR(capacidad de góndola, proyección × meses); cantidad a pedir =
+   max(0, objetivo + pedidos − stock), usando los snapshots de la fila (oc_stock/
+   oc_pedidos/oc_proy). Proy: snapshot oc_proy, o proyección de hoy si la OC es vieja.
+   Solo modifica ESTA OC (Ordenes_Compra.cantidad); no toca la config permanente. */
+function _ocDetCantEff(r) {
+  if (_oc && _oc.detEdit && _oc.detEdit[r.id] != null) return Math.max(0, Math.round(Number(_oc.detEdit[r.id]) || 0));
+  return Number(r.cantidad) || 0;
+}
+function ocDetTarget(r) {
+  if (!_oc || !_oc.capMap) return null;   // capacidad aún no cargó
+  const codn = _ocgNorm(r.codigo);
+  const cap = Number(_oc.capMap[codn]) || 0;
+  if (cap <= 0) return null;   // sin góndola cargada → no aplica "llenar góndola"
+  let proy = (r.oc_proy != null && r.oc_proy !== "") ? Number(r.oc_proy)
+    : ((_oc.proyHoy && _oc.proyHoy[codn] != null) ? Number(_oc.proyHoy[codn]) : 0);
+  proy = Number(proy) || 0;
+  if (proy <= 0) return null;   // sin proyección no hay "meses" que aplicar → no llenar a ciegas
+  const meses = Number(_oc.detMeses) || 6;
+  const stock = Number(r.oc_stock) || 0;
+  const pedidos = Number(r.oc_pedidos) || 0;
+  const objetivo = Math.min(cap, proy * meses);   // topado a la capacidad de góndola
+  return Math.max(0, Math.round(objetivo + pedidos - stock));
+}
+function _ocDetChangedN() {
+  if (!_oc || !_oc.detEdit || !_oc.openKey) return 0;
+  const g = ocGroups(), x = g[_oc.openKey]; if (!x) return 0;
+  let n = 0;
+  x.rows.forEach(function (r) { if (_oc.detEdit[r.id] != null && Number(_oc.detEdit[r.id]) !== (Number(r.cantidad) || 0)) n++; });
+  return n;
+}
+function _ocDetSyncSave() {
+  const b = document.getElementById("ocDetSaveBtn"); if (!b) return;
+  const n = _ocDetChangedN();
+  b.style.display = n ? "" : "none";
+  b.textContent = "💾 Guardar cantidades" + (n ? " (" + n + ")" : "");
+}
+function ocDetEditCant(id, v) {
+  if (!_oc) return; if (!_oc.detEdit) _oc.detEdit = {};
+  _oc.detEdit[id] = Math.max(0, Math.round(parseFloat(v) || 0));
+  _ocDetSyncSave();
+}
+function ocDetMeses(v) { if (!_oc) return; _oc.detMeses = Math.max(0.5, parseFloat(v) || 6); }
+function ocDetFill(id) {
+  if (!_oc || !_oc.openKey) return;
+  const g = ocGroups(), x = g[_oc.openKey]; if (!x) return;
+  const r = x.rows.find(function (a) { return a.id === id; }); if (!r) return;
+  const t = ocDetTarget(r); if (t == null) { alert("Ese código no tiene capacidad de góndola cargada (Capacidad_Sector)."); return; }
+  if (!_oc.detEdit) _oc.detEdit = {};
+  _oc.detEdit[r.id] = t;
+  ocRender();
+}
+function ocDetFillAll() {
+  if (!_oc || !_oc.openKey) return;
+  const g = ocGroups(), x = g[_oc.openKey]; if (!x) return;
+  if (!_oc.capMap) { alert("Esperá a que cargue la capacidad de góndola y probá de nuevo."); return; }
+  if (!_oc.detEdit) _oc.detEdit = {};
+  let n = 0;
+  x.rows.forEach(function (r) { const t = ocDetTarget(r); if (t != null) { _oc.detEdit[r.id] = t; n++; } });
+  ocRender();
+  if (!n) alert("Ninguna línea de esta OC tiene capacidad de góndola cargada.");
+}
+async function ocDetSave() {
+  if (!_oc || !_oc.openKey) return;
+  const g = ocGroups(), x = g[_oc.openKey]; if (!x) return;
+  const changed = x.rows.filter(function (r) { return _oc.detEdit && _oc.detEdit[r.id] != null && Number(_oc.detEdit[r.id]) !== (Number(r.cantidad) || 0); });
+  if (!changed.length) { alert("No hay cantidades para guardar."); return; }
+  const headers = await facAuthWriteHeaders({ "Prefer": "return=minimal" });
+  if (!headers) { alert(authNoSesionMsg("Para editar la OC necesitás iniciar sesión con Google (supervisor).")); return; }
+  try {
+    await Promise.all(changed.map(function (r) {
+      return fetch(SUPABASE_OC_ENDPOINT + "?id=eq." + r.id, { method: "PATCH", headers: headers, body: JSON.stringify({ cantidad: Number(_oc.detEdit[r.id]) || 0 }) })
+        .then(function (resp) { if (!resp.ok) throw new Error("HTTP " + resp.status + " (" + r.codigo + ")"); });
+    }));
+    _oc.detEdit = {};
+    _oc.rows = await ocFetchRows(); _oc.recepByRow = ocBuildRecep(); ocRender();
+    alert("✓ Guardadas " + changed.length + " cantidad(es) en esta OC.");
+  } catch (e) { alert("Error guardando: " + (e.message || e)); }
 }
 /* v6.41 — IMPRIMIR OC: hoja print-friendly de la OC abierta (1 proveedor · fecha · rubro).
    Reusa el patrón de pppPrintSug (window.open + document.write + auto-print).
