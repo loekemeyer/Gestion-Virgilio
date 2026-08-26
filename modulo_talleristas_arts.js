@@ -1,9 +1,10 @@
 /* =========================================================
    MÓDULO: Gestión de Talleristas / Proveedores AT con Artículos
-   v2.0 — Agregar tallerista o proveedor AT, asignar artículos.
+   v2.1 — Agregar tallerista o proveedor AT, asignar artículos + teléfono.
    v2.0: guarda en la tabla correcta según tipo:
      - prov_at   → Articulos x Prov AT
      - tallerista → Codigos X Tallerista + Articulos Virgilio X Tallerista
+   v2.1: + campo telefono en Tall_ProvAT_PS
    ========================================================= */
 
 let _tallArtModal = null, _tallArtState = {};
@@ -28,6 +29,10 @@ async function tallArtInit() {
             <div class="form-group">
               <label>Nombre del tallerista/proveedor:</label>
               <input id="tallArtNombre" type="text" placeholder="Ej: Cabral, Maspoli, etc" class="form-input">
+            </div>
+            <div class="form-group">
+              <label>Teléfono:</label>
+              <input id="tallArtTelefono" type="text" placeholder="Ej: +54 9 11 1234-5678" class="form-input">
             </div>
             <div class="form-group">
               <label>Tipo:</label>
@@ -146,6 +151,7 @@ async function tallArtStep1Next() {
   if (chk.length) { alert("Ya existe un tallerista/proveedor con ese nombre."); return; }
 
   _tallArtState.nombre = nombre;
+  _tallArtState.telefono = document.getElementById("tallArtTelefono").value.trim() || "";
   _tallArtState.tipo = document.querySelector('input[name="tallArtTipo"]:checked').value;
   _tallArtState.activo = document.getElementById("tallArtActivo").checked;
 
@@ -334,7 +340,7 @@ async function tallArtStep3Save() {
   try {
     // 1. Insertar en Tall_ProvAT_PS
     var tallBody = {
-      nombre: nombre, activo: activo, rec_virg: true, rec_cerv: false,
+      nombre: nombre, telefono: _tallArtState.telefono || null, activo: activo, rec_virg: true, rec_cerv: false,
       ctrl_tall: tipo === "tallerista", solo_grj: false, mostrar_grj: false,
       prov_at: tipo === "prov_at", interno: false, ps: false,
       notas: "Creado " + new Date().toLocaleDateString("es-AR")
