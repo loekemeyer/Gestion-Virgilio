@@ -234,6 +234,20 @@ const RCP_CSS = `
 #rcpRoot .fotoDrop{ display:inline-flex; align-items:center; justify-content:center; min-width:160px; min-height:46px; padding:8px 12px; border:2px dashed #cbd5e1; border-radius:10px; background:#fff; cursor:pointer; font-weight:800; font-size:13px; color:#475569; }
 #rcpRoot .fotoDrop.has{ border-style:solid; border-color:var(--ok); color:var(--ok); background:#eef7ee; }
 #rcpRoot .fotoDrop.drag{ border-color:#1e6bd6; background:#eff6ff; }
+/* v11.xx — Foto del operario en resumen */
+#rcpRoot .opFotoSection{ margin:16px 0 4px; text-align:center; }
+#rcpRoot .opFotoBtn{ width:100%; padding:18px; font-size:18px; font-weight:900; border:2px dashed #94a3b8; border-radius:14px; background:#fff; color:#475569; cursor:pointer; }
+#rcpRoot .opFotoBtn.has{ border-style:solid; border-color:var(--ok); color:var(--ok); background:#eef7ee; }
+#rcpRoot .opFotoPreview{ margin-top:10px; }
+#rcpRoot .opFotoPreview img{ max-width:100%; max-height:220px; border-radius:10px; border:2px solid var(--ok); }
+#rcpRoot .opFotoHint{ font-size:13px; color:#b91c1c; font-weight:700; margin-top:6px; }
+/* v11.xx — Admin: visor de foto (en pendientes) */
+#rcpRoot .fotoViewBtn{ display:inline-flex; align-items:center; gap:6px; padding:8px 14px; border:2px solid #cbd5e1; border-radius:10px; background:#fff; font-weight:800; font-size:13px; color:#475569; cursor:pointer; flex:1; justify-content:center; min-height:46px; }
+#rcpRoot .fotoViewBtn.viewed{ border-color:var(--ok); color:var(--ok); background:#eef7ee; }
+#rcpRoot .fotoViewBtn.noFoto{ border-color:#e5e7eb; color:#9ca3af; cursor:default; font-style:italic; }
+#rcpRoot .fotoOverlay{ position:fixed; inset:0; background:rgba(0,0,0,.88); display:flex; align-items:center; justify-content:center; z-index:1500; padding:16px; }
+#rcpRoot .fotoOverlay img{ max-width:100%; max-height:88vh; border-radius:8px; object-fit:contain; }
+#rcpRoot .fotoOverlayClose{ position:absolute; top:14px; right:14px; width:48px; height:48px; border-radius:50%; background:#fff; border:0; font-size:22px; font-weight:900; cursor:pointer; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 8px rgba(0,0,0,.3); }
 #rcpRoot .pcFoot{ margin-top:10px; display:flex; align-items:center; justify-content:flex-end; gap:12px; }
 #rcpRoot .enviarBtn{ padding:11px 22px; font-size:16px; font-weight:900; border:0; border-radius:11px; background:#111; color:#fff; cursor:pointer; }
 #rcpRoot .enviarBtn:disabled{ opacity:.4; cursor:default; }
@@ -414,6 +428,9 @@ function opResetState() {
   opState.linea = null; opState.fecha = opTodayStr();
   opState.remito = ""; opState.articulos = null; opState.cargas = {};
   opState.ocPorCod = null;
+  opState.fotoFile = null;
+  if (opState.fotoPreviewUrl) { try { URL.revokeObjectURL(opState.fotoPreviewUrl); } catch(_e){} }
+  opState.fotoPreviewUrl = null;
 }
 function openOp() {
   opResetState();
@@ -1197,6 +1214,43 @@ function renderResumen() {
   tot.textContent = "Total: " + items.length + " código(s) · " + totalCajas + " cajas";
   opBody.appendChild(tot);
 
+  // v11.xx — Foto obligatoria de la mercadería (se sube al confirmar)
+  const fotoSec = document.createElement("div");
+  fotoSec.className = "opFotoSection";
+  const fotoInput = document.createElement("input");
+  fotoInput.type = "file"; fotoInput.accept = "image/*";
+  fotoInput.setAttribute("capture", "environment");
+  fotoInput.style.display = "none";
+  const fotoBtn = document.createElement("button");
+  fotoBtn.type = "button"; fotoBtn.className = "opFotoBtn" + (opState.fotoFile ? " has" : "");
+  fotoBtn.textContent = opState.fotoFile ? "📷 ✓ Foto sacada — tocá para cambiar" : "📷 Sacar foto de la mercadería";
+  const fotoPreview = document.createElement("div");
+  fotoPreview.className = "opFotoPreview";
+  if (opState.fotoPreviewUrl) { const pi = document.createElement("img"); pi.src = opState.fotoPreviewUrl; fotoPreview.appendChild(pi); }
+  const fotoHint = document.createElement("div");
+  fotoHint.className = "opFotoHint";
+  fotoHint.textContent = opState.fotoFile ? "" : "Obligatorio: sacá una foto antes de enviar";
+  fotoHint.style.display = opState.fotoFile ? "none" : "";
+  fotoBtn.onclick = function() { fotoInput.click(); };
+  fotoInput.onchange = function() {
+    if (fotoInput.files && fotoInput.files[0]) {
+      opState.fotoFile = fotoInput.files[0];
+      fotoBtn.textContent = "📷 ✓ Foto sacada — tocá para cambiar";
+      fotoBtn.classList.add("has");
+      fotoHint.style.display = "none";
+      try {
+        if (opState.fotoPreviewUrl) URL.revokeObjectURL(opState.fotoPreviewUrl);
+        opState.fotoPreviewUrl = URL.createObjectURL(opState.fotoFile);
+        fotoPreview.innerHTML = "";
+        const pi = document.createElement("img"); pi.src = opState.fotoPreviewUrl; fotoPreview.appendChild(pi);
+      } catch(_e){}
+      const cb = document.getElementById("opConfirmar");
+      if (cb) cb.disabled = false;
+    }
+  };
+  fotoSec.appendChild(fotoInput); fotoSec.appendChild(fotoBtn); fotoSec.appendChild(fotoPreview); fotoSec.appendChild(fotoHint);
+  opBody.appendChild(fotoSec);
+
   opActions.innerHTML = "";
   const volver = document.createElement("button");
   volver.className = "btnCancel btnBig";
@@ -1207,6 +1261,7 @@ function renderResumen() {
   conf.id = "opConfirmar";
   conf.textContent = "✓ Confirmar y enviar";
   conf.onclick = opEnviar;
+  conf.disabled = !opState.fotoFile;
   opActions.appendChild(volver);
   opActions.appendChild(conf);
   rcpDraftSave();
@@ -1582,6 +1637,15 @@ async function opEnviar() {
     }
   } catch (_e) {}
 
+  // v11.xx — Subir foto de la mercadería ANTES del insert a Control_Modo_OP.
+  let fotoUrl = null;
+  if (opState.fotoFile) {
+    try {
+      const fId = "op_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 7);
+      fotoUrl = await pendUploadFoto(fId, opState.fotoFile);
+    } catch (e) { console.warn("Foto upload failed (sigue sin foto):", e); }
+  }
+
   // v8.83: generar código de 4 dígitos ANTES de insertar, así el operario lo ve de una.
   let codigoConf = null;
   try { codigoConf = await pendGenCodigo(); } catch (_e) {}
@@ -1601,6 +1665,7 @@ async function opEnviar() {
       cantidad_total: totalCajas,
       estado: 'pendiente'
     };
+    if (fotoUrl) insertObj.foto_url = fotoUrl;
     if (codigoConf) insertObj.codigo = codigoConf;
     const { data: regData, error: errReg } = await supabase.from("Control_Modo_OP").insert(insertObj).select("id").single();
     if (errReg) console.warn("Control_Modo_OP insert error (¿falta crear la tabla?):", errReg);
@@ -2148,7 +2213,7 @@ async function renderPendientes() {
   let res;
   try {
     res = await supabase.from("Control_Modo_OP")
-      .select("id,fecha,tipo,nombre,linea,remito,detalle,cantidad_total,created_at,isis,control_partes,faltantes,foto_url,codigo")
+      .select("id,fecha,tipo,nombre,linea,remito,detalle,cantidad_total,created_at,isis,control_partes,faltantes,foto_url,foto_vista,codigo")
       .eq("estado", "pendiente")
       .order("created_at", { ascending: true })
       .limit(300);
@@ -2194,7 +2259,7 @@ function pendTickElapsed() {
 }
 function pendCard(r) {
   const id = r.id;
-  _pendRows[id] = { isis: !!r.isis, partes: r.control_partes || null, faltantes: !!r.faltantes, foto_url: r.foto_url || null, codigo: r.codigo || null, sent: false };
+  _pendRows[id] = { isis: !!r.isis, partes: r.control_partes || null, faltantes: !!r.faltantes, foto_url: r.foto_url || null, foto_vista: !!r.foto_vista, codigo: r.codigo || null, sent: false };
   const tsMs = r.created_at ? new Date(r.created_at).getTime() : 0;
   const card = document.createElement("div"); card.className = "pendCard"; card.setAttribute("data-id", String(id));
   const head = document.createElement("div"); head.className = "pcHead";
@@ -2277,23 +2342,36 @@ function pendPartesRow(id) {
 }
 function pendFotoRow(id) {
   const row = document.createElement("div"); row.className = "pcRow pcFotoRow";
-  const lbl = document.createElement("span"); lbl.className = "pcLbl"; lbl.textContent = "Foto RTO";
-  const drop = document.createElement("label"); drop.className = "fotoDrop" + (_pendRows[id].foto_url ? " has" : "");
-  const input = document.createElement("input"); input.type = "file"; input.accept = "image/*"; input.style.display = "none";
-  const txt = document.createElement("span"); txt.className = "fotoTxt"; txt.textContent = _pendRows[id].foto_url ? "✓ Foto" : "📎 Adjuntar o arrastrar";
-  drop.appendChild(input); drop.appendChild(txt);
-  async function setFile(file) {
-    if (!file || _pendRows[id].sent) return;
-    txt.textContent = "Subiendo…";
-    try { const url = await pendUploadFoto(id, file); await pendPersist(id, { foto_url: url }); _pendRows[id].foto_url = url; drop.classList.add("has"); txt.textContent = "✓ Foto"; }
-    catch (e) { txt.textContent = _pendRows[id].foto_url ? "✓ Foto" : "📎 Adjuntar o arrastrar"; alert("No se pudo subir la foto: " + (e.message || e)); }
-    pendRefreshEnviar(id);
+  const lbl = document.createElement("span"); lbl.className = "pcLbl"; lbl.textContent = "Foto Mercadería";
+  const fotoUrl = _pendRows[id].foto_url;
+  if (!fotoUrl) {
+    // Legacy: item sin foto del operario — auto-check, no bloquea
+    const noF = document.createElement("span"); noF.className = "fotoViewBtn noFoto"; noF.textContent = "Sin foto";
+    _pendRows[id].foto_vista = true;
+    row.appendChild(lbl); row.appendChild(noF); return row;
   }
-  input.onchange = function () { if (input.files && input.files[0]) setFile(input.files[0]); };
-  drop.ondragover = function (e) { e.preventDefault(); drop.classList.add("drag"); };
-  drop.ondragleave = function () { drop.classList.remove("drag"); };
-  drop.ondrop = function (e) { e.preventDefault(); drop.classList.remove("drag"); const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; if (f) setFile(f); };
-  row.appendChild(lbl); row.appendChild(drop); return row;
+  const btn = document.createElement("button"); btn.type = "button";
+  btn.className = "fotoViewBtn" + (_pendRows[id].foto_vista ? " viewed" : "");
+  btn.textContent = _pendRows[id].foto_vista ? "✓ Foto vista" : "👁 Ver foto";
+  btn.onclick = function () {
+    if (_pendRows[id].sent) return;
+    const ov = document.createElement("div"); ov.className = "fotoOverlay";
+    const img = document.createElement("img"); img.src = fotoUrl; img.alt = "Foto mercadería";
+    const cl = document.createElement("button"); cl.className = "fotoOverlayClose"; cl.textContent = "✕";
+    cl.onclick = async function () {
+      ov.remove();
+      if (!_pendRows[id].foto_vista) {
+        _pendRows[id].foto_vista = true;
+        btn.classList.add("viewed"); btn.textContent = "✓ Foto vista";
+        try { await pendPersist(id, { foto_vista: true }); } catch(_e){}
+        pendRefreshEnviar(id);
+      }
+    };
+    ov.onclick = function (e) { if (e.target === ov) cl.click(); };
+    ov.appendChild(img); ov.appendChild(cl);
+    document.getElementById("rcpRoot").appendChild(ov);
+  };
+  row.appendChild(lbl); row.appendChild(btn); return row;
 }
 async function pendUploadFoto(id, file) {
   await sessionReady;
@@ -2318,7 +2396,7 @@ async function pendUploadFoto(id, file) {
   const pub = supabase.storage.from("remitos").getPublicUrl(path);
   return (pub && pub.data) ? pub.data.publicUrl : null;
 }
-function pendRowComplete(id) { const s = _pendRows[id]; return !!(s && s.isis && s.partes && s.faltantes && s.foto_url); }
+function pendRowComplete(id) { const s = _pendRows[id]; return !!(s && s.isis && s.partes && s.faltantes && s.foto_vista); }
 function pendRefreshEnviar(id) {
   const card = document.querySelector('#rcpRoot .pendCard[data-id="' + id + '"]');
   if (!card) return; const b = card.querySelector(".enviarBtn");
