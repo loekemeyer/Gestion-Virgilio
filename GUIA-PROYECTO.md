@@ -12,7 +12,23 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-08-26 · Versión app al documentar: **v11.74**
+> Última actualización: 2026-08-26 · Versión app al documentar: **v11.75**
+>
+> Nota **2026-08-26 — v11.75 (RR más ancho + fix mezcla tallerista/prov_at).**
+> (a) **Recepción Remitos (RR)**: el modal `#tandaModal` usaba `max-width:560px`
+> genérico y la tabla de 6 columnas quedaba con scroll horizontal en el monitor.
+> Se agregó la clase `.cr-wide` (`max-width:900px`) que `showControlRemitos()`
+> pone al abrir y `closeTandaModal()` saca al cerrar; además `.cr-td-rs`
+> (Razón Social) pasó de 120px a 220px. Todo front (index.html).
+> (b) **Vista `vista_entidades_recepcion`**: 9 entidades (Cabral, Carriero, Lopez
+> Jose, Manfer, Maspoli, Melinox, Paternal Goma, Pintos, The Plast) existían en
+> las dos tablas fuente y salían DUPLICADAS en recepción (tallerista + prov_at).
+> Entregan como **Prov AT**, no como tallerista (ej. Cabral entrega el Filtro de
+> Café 031 eventual; el proveedor principal de ese art es **Poly/Ijupa**). Fix
+> backend: la mitad tallerista de la vista agrega `NOT EXISTS` que excluye a los
+> Prov AT activos (`prov_at AND rec_virg AND activo`). Se auto-mantiene. Datos
+> intactos (no se borró nada; una FK desde `Articulos Virgilio X Tallerista` lo
+> impide). Talleristas 22 → 13. SQL en `sql/vista_entidades_recepcion.sql`.
 >
 > Nota **2026-08-26 — v11.74 (Fix OC vigentes no mostraba en recepción).**
 > `cargarOCVigentes()` usaba `fetch` manual con la publishable key como Bearer
