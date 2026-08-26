@@ -35,6 +35,20 @@ ir al backend y terminan implementados en el front.
 
 Aplica a **todos los chats** (nuevos y vigentes) sobre este repo.
 
+## ⚠ PROTOCOLO OBLIGATORIO: Lógica de negocio SIEMPRE en el backend
+
+**Conversiones, normalizaciones, validaciones y reglas de negocio que afectan
+datos persistidos van en Supabase (triggers, funciones, vistas), NO en el
+front-end.** El front puede duplicar la lógica como optimización UX (mostrar
+el dato convertido antes de que el servidor responda), pero la fuente de
+verdad es el backend. Si algo se implementa en el front, **siempre debe
+existir el equivalente en el backend** (trigger/función) que garantice la
+integridad aunque el front no lo haga.
+
+Ejemplo concreto: la conversión MC↔Uni de insumos (v11.77) vive en el trigger
+`normalizar_unidad_insumo` de `Movimientos_Stock`. El front también convierte
+como optimización, pero el trigger es el que manda.
+
 ## ⚠ PROTOCOLO OBLIGATORIO: Backups antes de tocar datos en Supabase
 
 **SIEMPRE que edites/alters/truncates/deletes en tablas de Supabase:**
