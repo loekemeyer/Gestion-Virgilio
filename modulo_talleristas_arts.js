@@ -1,7 +1,9 @@
 /* =========================================================
    MÓDULO: Gestión de Talleristas / Proveedores AT con Artículos
-   v1.0 — Agregar tallerista, asignar artículos automáticamente
-   con validación de marca (LK/CH) y detección de overlaps.
+   v2.0 — Agregar tallerista o proveedor AT, asignar artículos.
+   v2.0: guarda en la tabla correcta según tipo:
+     - prov_at   → Articulos x Prov AT
+     - tallerista → Codigos X Tallerista + Articulos Virgilio X Tallerista
    ========================================================= */
 
 let _tallArtModal = null, _tallArtState = {};
@@ -44,10 +46,7 @@ async function tallArtInit() {
           <div id="tallArtStep2" class="tall-art-step hidden">
             <h3>Paso 2: Asignar Artículos</h3>
             <p style="font-size:13px; color:#64748b; margin-bottom:12px;">
-              Busca y selecciona los artículos que ${(() => {
-                const tipo = document.querySelector('input[name="tallArtTipo"]:checked')?.value;
-                return tipo === 'prov_at' ? 'entrega este proveedor' : 'recibe este tallerista';
-              })()}. Los datos de descripción y unidades se cargan automáticamente.
+              Busca y selecciona los artículos. Los datos de descripción y unidades se cargan automáticamente.
             </p>
             <div class="form-group">
               <label>Buscar artículos:</label>
@@ -137,17 +136,29 @@ function tallArtClose() {
 }
 
 async function tallArtStep1Next() {
-  const nombre = document.getElementById("tallArtNombre").value.trim();
+  var nombre = document.getElementById("tallArtNombre").value.trim();
   if (!nombre) { alert("Ingresá el nombre del tallerista/proveedor."); return; }
 
-  // Verificar que no exista
-  const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
-  const chk = await fetch(SUPABASE_URL + "/rest/v1/Tall_ProvAT_PS?nombre=eq." + encodeURIComponent(nombre) + "&select=nombre", { headers: H }).then(r => r.json()).catch(() => []);
+  var H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+
+  // Verificar que no exista en Tall_ProvAT_PS
+  var chk = await fetch(SUPABASE_URL + "/rest/v1/Tall_ProvAT_PS?nombre=eq." + encodeURIComponent(nombre) + "&select=nombre", { headers: H }).then(function(r) { return r.json(); }).catch(function() { return []; });
   if (chk.length) { alert("Ya existe un tallerista/proveedor con ese nombre."); return; }
 
   _tallArtState.nombre = nombre;
   _tallArtState.tipo = document.querySelector('input[name="tallArtTipo"]:checked').value;
   _tallArtState.activo = document.getElementById("tallArtActivo").checked;
+
+  // Para talleristas, pre-cargar códigos existentes de Codigos X Tallerista
+  if (_tallArtState.tipo === "tallerista") {
+    var existCods = await fetch(
+      SUPABASE_URL + "/rest/v1/Codigos%20X%20Tallerista?Nombre=eq." + encodeURIComponent(nombre) + "&select=Linea,Codigo",
+      { headers: H }
+    ).then(function(r) { return r.json(); }).catch(function() { return []; });
+    var codMap = {};
+    (existCods || []).forEach(function(r) { codMap[r.Linea] = r.Codigo; });
+    _tallArtState.existingCodMap = codMap;
+  }
 
   // Ir al paso 2
   document.getElementById("tallArtStep1").classList.add("hidden");
@@ -159,25 +170,24 @@ async function tallArtLoadArts() {
   try {
     // v11.77 — buscar en OC_Maximos (catálogo completo) + enriquecer con datos
     // de Articulos Virgilio X Tallerista (Uni_x_Caja) si ya estaban asignados.
-    // Antes solo buscaba en la tabla de asignados y los artículos nuevos no aparecían.
-    const [ocArts, assigned] = await Promise.all([
-      supaFetchAllSafe(SUPABASE_URL + "/rest/v1/OC_Maximos", "select=cod,descripcion&activo=eq.true"),
-      supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Articulos%20Virgilio%20X%20Tallerista", "select=Cod_Art,Desc,Uni_x_Caja")
-    ]);
+    var ocArtsP = supaFetchAllSafe(SUPABASE_URL + "/rest/v1/OC_Maximos", "select=cod,descripcion&activo=eq.true");
+    var assignedP = supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Articulos%20Virgilio%20X%20Tallerista", "select=Cod_Art,Desc,Uni_x_Caja");
+    var results = await Promise.all([ocArtsP, assignedP]);
+    var ocArts = results[0], assigned = results[1];
     // Indexar asignados por cod para enriquecer
-    const assignedMap = {};
-    (assigned || []).forEach(function (a) { assignedMap[a.Cod_Art] = a; });
+    var assignedMap = {};
+    (assigned || []).forEach(function(a) { assignedMap[a.Cod_Art] = a; });
     // Deduplicar: OC_Maximos es la fuente, enriquecido con Uni_x_Caja si existe
-    const seen = {};
-    const merged = [];
-    (ocArts || []).forEach(function (o) {
+    var seen = {};
+    var merged = [];
+    (ocArts || []).forEach(function(o) {
       if (!o.cod || seen[o.cod]) return;
       seen[o.cod] = true;
       var a = assignedMap[o.cod];
       merged.push({ Cod_Art: o.cod, Desc: (a && a.Desc) || o.descripcion || "", Uni_x_Caja: (a && a.Uni_x_Caja) || null });
     });
     // Agregar asignados que no estén en OC_Maximos (por si acaso)
-    (assigned || []).forEach(function (a) {
+    (assigned || []).forEach(function(a) {
       if (!a.Cod_Art || seen[a.Cod_Art]) return;
       seen[a.Cod_Art] = true;
       merged.push(a);
@@ -191,29 +201,27 @@ async function tallArtLoadArts() {
 }
 
 function tallArtFilterArts() {
-  const q = (document.getElementById("tallArtArtSearch").value || "").toLowerCase().trim();
-  const arts = (_tallArtState.allArts || []).filter(a => {
-    const cod = String(a.Cod_Art || "").toLowerCase();
-    const desc = String(a.Desc || "").toLowerCase();
+  var q = (document.getElementById("tallArtArtSearch").value || "").toLowerCase().trim();
+  var arts = (_tallArtState.allArts || []).filter(function(a) {
+    var cod = String(a.Cod_Art || "").toLowerCase();
+    var desc = String(a.Desc || "").toLowerCase();
     return q === "" || cod.includes(q) || desc.includes(q);
   });
 
-  const listEl = document.getElementById("tallArtArtList");
+  var listEl = document.getElementById("tallArtArtList");
   if (!arts.length) {
     listEl.innerHTML = '<div class="loading">No se encontraron artículos.</div>';
     return;
   }
 
-  let html = '';
-  arts.forEach(a => {
-    const artId = a.Cod_Art;
-    const checked = _tallArtState.artsSelected[artId] ? 'checked' : '';
-    html += `
-      <div class="tall-art-art-item ${_tallArtState.artsSelected[artId] ? 'selected' : ''}">
-        <input type="checkbox" value="${artId}" ${checked} onchange="tallArtToggleArt('${artId}', this.checked)">
-        <b>${a.Cod_Art}</b> — ${a.Desc || '?'} <small>(${a.Uni_x_Caja || 1} u/caja)</small>
-      </div>
-    `;
+  var html = '';
+  arts.forEach(function(a) {
+    var artId = a.Cod_Art;
+    var checked = _tallArtState.artsSelected[artId] ? 'checked' : '';
+    html += '<div class="tall-art-art-item ' + (_tallArtState.artsSelected[artId] ? 'selected' : '') + '">' +
+      '<input type="checkbox" value="' + artId + '" ' + checked + ' onchange="tallArtToggleArt(\'' + artId + '\', this.checked)">' +
+      '<b>' + a.Cod_Art + '</b> — ' + (a.Desc || '?') + ' <small>(' + (a.Uni_x_Caja || 1) + ' u/caja)</small>' +
+      '</div>';
   });
   listEl.innerHTML = html;
   document.getElementById("tallArtSelCount").textContent = Object.keys(_tallArtState.artsSelected).length;
@@ -221,7 +229,7 @@ function tallArtFilterArts() {
 
 function tallArtToggleArt(artId, checked) {
   if (checked) {
-    const art = (_tallArtState.allArts || []).find(a => a.Cod_Art === artId);
+    var art = (_tallArtState.allArts || []).find(function(a) { return a.Cod_Art === artId; });
     if (art) {
       _tallArtState.artsSelected[artId] = { cod: artId, desc: art.Desc, uni: art.Uni_x_Caja || 1, marca: "" };
     }
@@ -237,28 +245,41 @@ function tallArtStep2Back() {
 }
 
 async function tallArtStep2Next() {
-  const arts = Object.keys(_tallArtState.artsSelected);
+  var arts = Object.keys(_tallArtState.artsSelected);
   if (!arts.length) { alert("Seleccioná al menos 1 artículo."); return; }
 
-  // Detectar overlaps
-  const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+  var H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+  var tipo = _tallArtState.tipo;
   try {
-    const existing = await fetch(SUPABASE_URL + "/rest/v1/Articulos%20x%20Prov%20AT?Cod_Art=in.(" + arts.map(encodeURIComponent).join(",") + ")&select=Cod_Art,Proveedor,marca", { headers: H }).then(r => r.json()).catch(() => []);
+    var existing = [];
+    if (tipo === "prov_at") {
+      // Proveedores AT: buscar overlaps en Articulos x Prov AT
+      existing = await fetch(
+        SUPABASE_URL + "/rest/v1/Articulos%20x%20Prov%20AT?Cod_Art=in.(" + arts.map(encodeURIComponent).join(",") + ")&select=Cod_Art,Proveedor,marca",
+        { headers: H }
+      ).then(function(r) { return r.json(); }).catch(function() { return []; });
+    } else {
+      // Talleristas: buscar overlaps en Articulos Virgilio X Tallerista
+      existing = await fetch(
+        SUPABASE_URL + "/rest/v1/Articulos%20Virgilio%20X%20Tallerista?Cod_Art=in.(" + arts.map(encodeURIComponent).join(",") + ")&select=Cod_Art,Tallerista,Linea",
+        { headers: H }
+      ).then(function(r) { return r.json(); }).catch(function() { return []; });
+    }
 
     _tallArtState.overlaps = {};
-    existing.forEach(row => {
-      if (!_tallArtState.overlaps[row.Cod_Art]) {
-        _tallArtState.overlaps[row.Cod_Art] = [];
+    (existing || []).forEach(function(row) {
+      if (!_tallArtState.overlaps[row.Cod_Art]) _tallArtState.overlaps[row.Cod_Art] = [];
+      if (tipo === "prov_at") {
+        _tallArtState.overlaps[row.Cod_Art].push({ prov: row.Proveedor, marca: row.marca });
+      } else {
+        _tallArtState.overlaps[row.Cod_Art].push({ prov: row.Tallerista, marca: row.Linea });
       }
-      _tallArtState.overlaps[row.Cod_Art].push({ prov: row.Proveedor, marca: row.marca });
     });
 
-    // Si hay overlaps, ir al paso 3; si no, guardar directamente
-    const hasOverlaps = Object.keys(_tallArtState.overlaps).length > 0;
+    var hasOverlaps = Object.keys(_tallArtState.overlaps).length > 0;
     if (hasOverlaps) {
       tallArtStep2ToStep3();
     } else {
-      // Sin overlaps, guardar directamente
       await tallArtStep3Save();
     }
   } catch (e) {
@@ -271,28 +292,29 @@ function tallArtStep2ToStep3() {
   document.getElementById("tallArtStep2").classList.add("hidden");
   document.getElementById("tallArtStep3").classList.remove("hidden");
 
-  let html = '';
-  const artsWithOverlap = Object.keys(_tallArtState.overlaps).filter(a => _tallArtState.overlaps[a].length > 0);
+  var tipo = _tallArtState.tipo;
+  var html = '';
+  var artsWithOverlap = Object.keys(_tallArtState.overlaps).filter(function(a) { return _tallArtState.overlaps[a].length > 0; });
 
-  artsWithOverlap.forEach(artId => {
-    const art = _tallArtState.artsSelected[artId];
-    const existing = _tallArtState.overlaps[artId];
-    const existingStr = existing.map(e => `${e.prov}${e.marca ? ' (' + e.marca + ')' : ''}`).join(', ');
+  artsWithOverlap.forEach(function(artId) {
+    var art = _tallArtState.artsSelected[artId];
+    var existing = _tallArtState.overlaps[artId];
+    var existingStr = existing.map(function(e) { return e.prov + (e.marca ? ' (' + e.marca + ')' : ''); }).join(', ');
 
-    html += `
-      <div class="tall-art-overlap-item">
-        <b>${artId}</b> — ${art.desc || '?'} <br>
-        <small style="color:#666;">Ya existe en: ${existingStr}</small>
-        <div style="margin-top:8px;">
-          <label>Marca para este proveedor:</label>
-          <select id="marca_${artId}" style="padding:6px; border:1px solid #cbd5e1; border-radius:4px; width:100%;">
-            <option value="">— Sin marca específica</option>
-            <option value="LK">LK (Loekemeyer)</option>
-            <option value="CH">CH (Chef)</option>
-          </select>
-        </div>
-      </div>
-    `;
+    html += '<div class="tall-art-overlap-item">' +
+      '<b>' + artId + '</b> — ' + (art.desc || '?') + '<br>' +
+      '<small style="color:#666;">Ya existe en: ' + existingStr + '</small>';
+
+    if (tipo === "prov_at") {
+      html += '<div style="margin-top:8px;">' +
+        '<label>Marca para este proveedor:</label>' +
+        '<select id="marca_' + artId + '" style="padding:6px; border:1px solid #cbd5e1; border-radius:4px; width:100%;">' +
+        '<option value="">— Sin marca específica</option>' +
+        '<option value="LK">LK (Loekemeyer)</option>' +
+        '<option value="CH">CH (Chef)</option>' +
+        '</select></div>';
+    }
+    html += '</div>';
   });
 
   document.getElementById("tallArtOverlapList").innerHTML = html || '<div style="color:#64748b;">Sin overlaps detectados.</div>';
@@ -304,68 +326,134 @@ function tallArtStep3Back() {
 }
 
 async function tallArtStep3Save() {
-  const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
-  const nombre = _tallArtState.nombre;
-  const tipo = _tallArtState.tipo;
-  const activo = _tallArtState.activo;
+  var H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+  var nombre = _tallArtState.nombre;
+  var tipo = _tallArtState.tipo;
+  var activo = _tallArtState.activo;
 
   try {
-    // 1. Insertar tallerista/proveedor
-    const tallRes = await fetch(SUPABASE_URL + "/rest/v1/Tall_ProvAT_PS", {
+    // 1. Insertar en Tall_ProvAT_PS
+    var tallBody = {
+      nombre: nombre, activo: activo, rec_virg: true, rec_cerv: false,
+      ctrl_tall: tipo === "tallerista", solo_grj: false, mostrar_grj: false,
+      prov_at: tipo === "prov_at", interno: false, ps: false,
+      notas: "Creado " + new Date().toLocaleDateString("es-AR")
+    };
+    var tallRes = await fetch(SUPABASE_URL + "/rest/v1/Tall_ProvAT_PS", {
       method: "POST",
-      headers: { ...H, "Content-Type": "application/json", "Prefer": "return=minimal" },
-      body: JSON.stringify({
-        nombre: nombre,
-        activo: activo,
-        rec_virg: true,
-        rec_cerv: false,
-        ctrl_tall: tipo === "tallerista",
-        solo_grj: false,
-        mostrar_grj: false,
-        prov_at: tipo === "prov_at",
-        interno: false,
-        ps: false,
-        notas: `Creado ${new Date().toLocaleDateString("es-AR")}`
-      })
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", "Prefer": "return=minimal" },
+      body: JSON.stringify(tallBody)
     });
-
-    if (!tallRes.ok) throw new Error("No se pudo guardar tallerista");
-
-    // 2. Insertar artículos
-    const artsToInsert = [];
-    Object.keys(_tallArtState.artsSelected).forEach(artId => {
-      const art = _tallArtState.artsSelected[artId];
-      const marca = document.getElementById(`marca_${artId}`)?.value || "";
-      artsToInsert.push({
-        "Proveedor": nombre,
-        "Cod_Art": artId,
-        "Descripcion": art.desc || "?",
-        "Activo": true,
-        "N_Caja": art.uni || 1,
-        marca: marca || null
-      });
-    });
-
-    if (artsToInsert.length) {
-      const artRes = await fetch(SUPABASE_URL + "/rest/v1/Articulos%20x%20Prov%20AT", {
-        method: "POST",
-        headers: { ...H, "Content-Type": "application/json", "Prefer": "return=minimal" },
-        body: JSON.stringify(artsToInsert)
-      });
-
-      if (!artRes.ok) throw new Error("No se pudieron guardar artículos");
+    if (!tallRes.ok) {
+      var errTxt = await tallRes.text().catch(function() { return ""; });
+      throw new Error("No se pudo guardar (HTTP " + tallRes.status + ")" + (errTxt ? ": " + errTxt : ""));
     }
 
-    alert(`✓ ${nombre} agregado con ${artsToInsert.length} artículos.`);
+    // 2. Insertar artículos en la tabla correcta según tipo
+    var artCount = 0;
+
+    if (tipo === "prov_at") {
+      // ─── Proveedor AT → Articulos x Prov AT ───
+      var artsToInsert = [];
+      Object.keys(_tallArtState.artsSelected).forEach(function(artId) {
+        var art = _tallArtState.artsSelected[artId];
+        var marcaEl = document.getElementById("marca_" + artId);
+        var marca = marcaEl ? marcaEl.value : "";
+        artsToInsert.push({
+          Proveedor: nombre, Cod_Art: artId, Descripcion: art.desc || "?",
+          Activo: true, N_Caja: art.uni || 1, marca: marca || null
+        });
+      });
+      if (artsToInsert.length) {
+        var artRes = await fetch(SUPABASE_URL + "/rest/v1/Articulos%20x%20Prov%20AT", {
+          method: "POST",
+          headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", "Prefer": "return=minimal" },
+          body: JSON.stringify(artsToInsert)
+        });
+        if (!artRes.ok) {
+          var eBody = await artRes.text().catch(function() { return ""; });
+          throw new Error("No se pudieron guardar artículos (HTTP " + artRes.status + ")" + (eBody ? ": " + eBody : ""));
+        }
+      }
+      artCount = artsToInsert.length;
+
+    } else {
+      // ─── Tallerista → Codigos X Tallerista + Articulos Virgilio X Tallerista ───
+      var lineas = ["LK", "CH"];
+
+      // a. Obtener o crear códigos en Codigos X Tallerista
+      var codMap = _tallArtState.existingCodMap || {};
+      var needCods = lineas.filter(function(l) { return !codMap[l]; });
+
+      if (needCods.length) {
+        // Buscar el máximo código numérico actual
+        var allCods = await fetch(
+          SUPABASE_URL + "/rest/v1/Codigos%20X%20Tallerista?select=Codigo",
+          { headers: H }
+        ).then(function(r) { return r.json(); }).catch(function() { return []; });
+        var maxCod = 4000;
+        (allCods || []).forEach(function(r) {
+          var n = parseInt(r.Codigo, 10);
+          if (!isNaN(n) && n > maxCod) maxCod = n;
+        });
+
+        var newCodRows = [];
+        needCods.forEach(function(l) {
+          maxCod++;
+          codMap[l] = String(maxCod);
+          newCodRows.push({ Nombre: nombre, Linea: l, Codigo: String(maxCod) });
+        });
+
+        var codRes = await fetch(SUPABASE_URL + "/rest/v1/Codigos%20X%20Tallerista", {
+          method: "POST",
+          headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", "Prefer": "return=minimal" },
+          body: JSON.stringify(newCodRows)
+        });
+        if (!codRes.ok) {
+          var eCod = await codRes.text().catch(function() { return ""; });
+          throw new Error("No se pudieron crear códigos de tallerista (HTTP " + codRes.status + ")" + (eCod ? ": " + eCod : ""));
+        }
+      }
+
+      // b. Insertar artículos en Articulos Virgilio X Tallerista (1 por art × línea)
+      var artRows = [];
+      Object.keys(_tallArtState.artsSelected).forEach(function(artId) {
+        var art = _tallArtState.artsSelected[artId];
+        lineas.forEach(function(l) {
+          if (codMap[l]) {
+            artRows.push({
+              Cod_Tallerista: codMap[l], Tallerista: nombre,
+              Cod_Art: artId, Linea: l, Desc: art.desc || "?",
+              Uni_x_Caja: art.uni || 1
+            });
+          }
+        });
+      });
+
+      if (artRows.length) {
+        var artRes2 = await fetch(SUPABASE_URL + "/rest/v1/Articulos%20Virgilio%20X%20Tallerista", {
+          method: "POST",
+          headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", "Prefer": "return=minimal" },
+          body: JSON.stringify(artRows)
+        });
+        if (!artRes2.ok) {
+          var eArt = await artRes2.text().catch(function() { return ""; });
+          throw new Error("No se pudieron guardar artículos (HTTP " + artRes2.status + ")" + (eArt ? ": " + eArt : ""));
+        }
+      }
+      artCount = Object.keys(_tallArtState.artsSelected).length;
+    }
+
+    alert("✓ " + nombre + " agregado con " + artCount + " artículos.");
     tallArtClose();
-    window.location.reload(); // Recargar para ver cambios
+    window.location.reload();
   } catch (e) {
     console.error("Error al guardar:", e);
     alert("Error al guardar: " + e.message);
   }
 }
 
-// Exposer globalmente
+// Exponer globalmente
 window.tallArtOpen = tallArtOpen;
 window.tallArtClose = tallArtClose;
 window.tallArtStep1Next = tallArtStep1Next;
