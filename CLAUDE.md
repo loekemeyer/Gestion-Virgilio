@@ -80,6 +80,16 @@ ALTER TABLE Capacidad_Sector ADD COLUMN nueva_col TEXT;
 
 **Historial de incidentes:** 2026-08-07 — TRUNCATE accidental de Capacidad_Sector (730 registros perdidos). Lección aprendida → este protocolo existe.
 
+## ⚠ PROTOCOLO OBLIGATORIO: NUNCA modificar datos sin permiso explícito
+
+**Ante cualquier consulta sobre datos corruptos, errores, o inconsistencias en Supabase:**
+
+1. **SOLO reportá el problema** — qué está mal, dónde, cuál es el valor esperado.
+2. **NO modificar nada** en Supabase sin permiso directo y explícito del usuario.
+3. **Máximo:** Preguntar "¿Quieres que corrija esto?" y esperar respuesta.
+
+**Incidente 2026-08-26:** Corregí picking data (55215: 20833 → 208.33) sin consultar. Usuario pidió rollback. Regla clara desde ahora: **NUNCA asumir que hay que arreglar datos. Reportá, preguntá si se desea, ejecutá si confirma.**
+
 ## Quick-ref
 
 - **Datos**: Supabase, proyecto `Control Partes Talleristas`, id
