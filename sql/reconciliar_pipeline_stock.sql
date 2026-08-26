@@ -124,6 +124,38 @@
 --    `ref='<tanda>|FIX_CHEF_ESTANCADO_20260811'` (trazable/reversible). Verificado: sin
 --    a_facturar negativos.
 --
+--  v11.73 — FIX EXCEDENTE NEGATIVO POR DRIFT ACUMULATIVO (B.2 DO NOTHING → DO UPDATE).
+--    Root cause: la sección B.2 de ETAPA 1 insertaba la fila de excedente con
+--    `ON CONFLICT DO NOTHING`. Al cambiar el excedente disponible entre corridas
+--    (nuevas MGs, nuevos pickings de otros artículos), la window function
+--    `exc_avail − sum(picked) OVER ...` recalculaba `from_exc` pero la fila ya
+--    existente en Movimientos_Stock NO se actualizaba → cada corrida sobre-asignaba
+--    excedente respecto al stock real → drift acumulativo → saldo excedente NEGATIVO.
+--    Caso testigo: art 546, excedente llegó a -4 (63 filas de picking acumularon
+--    drift). Fix: B.2 cambia de `DO NOTHING` a `DO UPDATE SET delta = excluded.delta,
+--    legajo = excluded.legajo` — la misma semántica que B.1 (separar_pedidos) y B.3
+--    (terminado), que ya eran UPSERT. El próximo cron recalcula TODAS las filas de
+--    excedente con el from_exc correcto y se auto-sana.
+--    Secciones A y B.1/B.3 sin cambios.
+--
+--  v11.72 — LEGAJO REAL EN ETAPA 1 Y 2 (fix "legajo pipeline").
+--    Root cause: las etapas 1 y 2 hardcodeaban `'pipeline'` como legajo en TODOS
+--    los Movimientos_Stock que creaban. El operario que realmente pickeó/armó
+--    quedaba invisible en la trazabilidad — y las alertas de stock negativo decían
+--    "legajo pipeline" en vez de mostrar quién fue.
+--    FIX: ETAPA 1 (`reconciliar_pipeline_stock_etapa1`) ahora extrae el legajo
+--    real del PKC (último registro PKC de la tanda, por `ts_cliente DESC`) usando
+--    `(array_agg(r.legajo::text ORDER BY r.ts_cliente DESC NULLS LAST))[1]`.
+--    Aplica a ambas secciones A (histórico) y B (forward). Fallback a 'pipeline'
+--    si no hay legajo.
+--    ETAPA 2 (`reconciliar_pipeline_stock_etapa2`) ahora extrae el legajo real
+--    del TAP (último registro TAP de la tanda) con la misma mecánica. Se agrega
+--    CTE `tap_leg` y se joinea en `alloc`. Fallback a 'pipeline'.
+--    ETAPA 3 y 4 mantienen 'pipeline': el actor es el sistema/facturación, no un
+--    operario específico.
+--    Funciones fuente: `sql/reconciliar_pipeline_stock_etapa1.sql` y
+--    `sql/reconciliar_pipeline_stock_etapa2.sql`.
+--
 --  La definición viva de la función está en la migración homónima en Supabase.
 --  Este archivo es la documentación del diseño (convención de sql/).
 -- =====================================================================

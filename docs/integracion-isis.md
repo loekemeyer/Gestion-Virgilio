@@ -1,5 +1,22 @@
 # Integración Facturación app → ISIS (contabilidad)
 
+> ⚠ **DESACTUALIZADO en su conclusión (2026-08-25).** El informe consolidado del ticket
+> **1159666** (reuniones del 10 y 11 de agosto de 2026) **reemplaza** el "Modelo A" que
+> se decide más abajo: ya **no** se crea un pedido por `/api/ISISPedido` ni entra el
+> módulo Balcony. El pedido **ya está cargado en ISIS**; lo que la app manda es el
+> **estado de preparación en JSON** (picking, stock, faltantes) e ISIS **identifica la NP
+> y dispara la facturación** con su circuito normal. El alcance además creció a 4 flujos
+> (facturación, ISIS→Virgilio con el N.º de NP, recepción de mercadería, completado).
+>
+> **Plan vigente: [`PLAN-INTEGRACION-ISIS-5547.md`](PLAN-INTEGRACION-ISIS-5547.md)**
+> (idea 5547). Lo de abajo queda como **histórico**: explica por qué se descartaron el
+> Comprobante Manual y el Modelo B, y sigue valiendo lo de conectividad on-premise.
+>
+> Efecto lateral bueno: al facturar ISIS un pedido normal (y no un pedido tipo Balcony),
+> se cae el bloqueante de **contado vs cuenta corriente** que figura más abajo —
+> confirmar igual con el proveedor.
+
+
 Snapshot: **2026-07-30**. Estado: **facturación electrónica real ya operativa** en la
 app (PV 11, prod). Falta el circuito para que esas facturas entren al ISIS para la
 contabilidad / libro IVA ventas.
@@ -178,6 +195,63 @@ app sería un "Balcony-like feeder" con las ventas propias.
   la facturación por API pueda ser cuenta corriente.**
 - 💰 **Costo:** `/api/ISISPedido` ¿viene solo o requiere el módulo **Balcony** (adicional
   pago) o un desarrollo? A confirmar con comercial.
+
+### Respuesta del proveedor (2026-08-25, Horacio Barbieri) — accesibilidad on-premise
+
+Contesta la **pregunta 3 de la ronda 3** ("¿la API es accesible desde internet o solo
+red local?"). Requisitos que pone QSA para usar la API del **ISIS on-premise**:
+
+- Windows Server.
+- Servicio **IIS** (Internet Information Services).
+- **IP pública** del proveedor de internet.
+- **Abrir el puerto** de acceso a la API.
+- Firewall + antivirus "no caseros ni los de Microsoft" (al abrir puertos quedás expuesto).
+- **QSA no da soporte** sobre configuración de IIS, ni sobre el funcionamiento de la API
+  (solo si hay algún error), ni se hace responsable del entorno local.
+
+**Lectura:** técnicamente se puede, pero **todo el costo y el riesgo quedan de nuestro
+lado** (servidor, licencia, IP fija, firewall/AV, y el server tiene que estar arriba
+24/7: si se cae internet o la luz en el depósito, deja de facturarse). Y sin soporte del
+proveedor sobre la parte expuesta.
+
+#### ⚠ No hace falta abrir ningún puerto — agente local (recomendado)
+
+Abrir el puerto asume que **la nube llama al depósito**. Se puede **invertir el sentido**
+y no exponer nada:
+
+1. Un **agente local** en la PC/servidor del depósito hace *polling* a Supabase por
+   HTTPS **saliente** (lee las NP pendientes de facturar).
+2. Ese mismo agente le pega a la API del ISIS **por red local** (`http://localhost/api/ISISPedido`
+   o la IP interna).
+3. Escribe la respuesta (CAE, nº de comprobante, error) de vuelta en Supabase.
+
+Ventajas: **cero puertos abiertos**, cero IP pública, cero superficie de ataque nueva; el
+IIS queda como está hoy (solo LAN) y el "QSA no da soporte sobre IIS" deja de importar.
+Si se cae la red, las facturas **quedan encoladas** en Supabase y salen cuando vuelve
+(la app ya es offline-first con cola).
+
+**Este patrón ya existe y está probado en este repo:** `agente-local/nc_ingest.py`
+(Python en el desktop, secret key de Supabase en variable de entorno, corre por el
+Programador de tareas de Windows). El feeder de facturación sería lo mismo al revés
+(en vez de leer PDFs y subir, lee pendientes y postea al ISIS).
+
+⚠ Además, si se expusiera la API a internet, **no se podría filtrar por IP en el
+firewall**: las Edge Functions de Supabase no garantizan IP de salida fija (confirmar en
+el plan actual), así que el puerto quedaría abierto a **todo internet** con un token como
+única defensa. Un argumento más para el agente local.
+
+Si igual se quiere acceso entrante, **Cloudflare Tunnel** (o Tailscale) es mejor que
+abrir el puerto: túnel **saliente**, sin IP pública, con TLS y WAF adelante.
+
+#### Lo que este mensaje NO contesta (siguen siendo los bloqueantes)
+
+1. **Doc real del endpoint `/api/ISISPedido`**: auth + payload. Sin esto no se codea.
+2. ¿Requiere el módulo **Balcony** (pago)? ¿Costo?
+3. ¿Soporta **cuenta corriente** o solo contado con ingreso de valores?
+
+Horacio contestó la **infraestructura**; los tres puntos de arriba son los que definen si
+el Modelo A se puede construir. Comparar contra **ISIS Cloud**: si la API viene accesible
+de fábrica, se ahorra el Windows Server + IP + firewall + AV y el riesgo de exponerlo.
 
 ### Estado: la base de conocimiento se agotó → hablar con un humano
 

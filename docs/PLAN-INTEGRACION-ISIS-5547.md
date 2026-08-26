@@ -112,7 +112,7 @@ Archivo SQL: sql/integracion_isis.sql (mismo archivo que la RPC).
 ---
 ```
 
-### PIEZA 3: Derivar `stock_ok` por NP
+### PIEZA 3: Derivar `stock_ok` por NP + dos disparadores de facturación
 **Repo:** Produccion-Virgilio (Supabase `hrxfctzncixxqmpfhskv`)  
 **Tipo:** Backend (incluido en la RPC `generar_json_pedido`)
 
@@ -125,40 +125,50 @@ stock_ok = true CUANDO para CADA item del pedido:
   vista_saldos_stock.terminado(cod) >= PPP_Programacion_Diaria.cajas(np, cod)
 
 Es un ALL() sobre los items. Si alguno tiene stock < cajas → stock_ok = false
-y ese item va al array `faltantes[]`.
+y ese item va al array `faltantes[]` con { articulo, cajas_falta }.
 
-Este flag es el que dispara la auto-facturación en ISIS (P1 del informe).
-NO persistirlo — se calcula en vivo cada vez que se genera el JSON.
+`falta_global` es dato informativo (stock vs TODOS los pedidos pendientes), NO
+decide si se factura.
+
+DOS DISPARADORES de facturación (definidos por el usuario 2026-08-25):
+
+1. AUTOMÁTICO — cuando el operario termina de armar el pedido (picking completo)
+   y stock_ok = true (cero faltantes) → generar JSON + enviar a ISIS automático.
+   Trigger: el evento de picking completo en Registros_Produccion_Virgilio.
+
+2. MANUAL — botón de la operadora administrativa en el módulo de facturación.
+   Al hacer clic en un pedido con faltantes: genera JSON con SOLO lo que hay
+   (los items con stock). Los faltantes NO se incluyen en la factura — se
+   pierden (el cliente tendría que hacer otro pedido). Es factura PARCIAL.
+
+NO persistir stock_ok — se calcula en vivo cada vez que se genera el JSON.
 ---
 ```
 
-### PIEZA 4: Botón "Enviar JSON faltantes" en panel supervisor
+### PIEZA 4: Botón de facturación manual (operadora administrativa)
 **Repo:** Produccion-Virgilio (index.html)  
 **Tipo:** Frontend
 
 ```
 PROMPT COMPLETO:
 ---
-Agregar botón "📤 Enviar JSON faltantes" en el panel supervisor de Produccion-Virgilio
-(index.html), en la sección de Compras/OCs o en una sección nueva "Integración ISIS".
+Módulo de facturación para la operadora administrativa en Produccion-Virgilio.
 
-Flujo:
-1. Supervisor hace clic
-2. Se llama a una RPC nueva `generar_json_faltantes()` que devuelve el JSON
-   consolidado de TODOS los pedidos pendientes que tienen faltantes (stock_ok=false)
-3. El JSON se guarda en una tabla staging `isis_json_pendientes` (id, json, creado_en,
-   enviado_en null, tipo='faltantes')
-4. Feedback visual: "JSON generado — X pedidos con faltantes"
+Flujo (definido por el usuario 2026-08-25):
+1. La operadora ve los pedidos pendientes que tienen faltantes (stock_ok=false).
+2. Para cada pedido, ve los artículos con stock y los faltantes.
+3. Al hacer clic/tilde en un pedido: genera JSON con SOLO los items que tienen
+   stock (factura parcial). Los faltantes quedan afuera — no se entregan más.
+4. El JSON se guarda en `isis_json_pendientes` (tipo='pedido_parcial') y se
+   envía a ISIS.
+5. Feedback visual: "Factura enviada — X artículos de Y (Z faltantes descartados)"
 
-El agente-local (paso posterior) es el que baja de esa tabla y lo deja donde
-ISIS lo lea. El botón solo genera y guarda.
-
-También agregar botón "📤 Generar JSON pedido" que pida NP y genere el JSON
-individual (llama a generar_json_pedido).
+NOTA: los pedidos completos (cero faltantes) se envían AUTOMÁTICAMENTE cuando
+el picking termina — no pasan por este botón. Este módulo es solo para cerrar
+pedidos con faltantes.
 
 Estilo: seguir el patrón visual del panel supervisor existente.
-Preguntar al usuario si quiere estos botones en la sección de OCs o en una
-sección nueva.
+Preguntar al usuario si quiere este módulo en la sección existente o en una nueva.
 ---
 ```
 
@@ -311,7 +321,104 @@ Estas piezas NO se pueden construir hasta que ISIS responda:
 | ¿JSON como formato? | ✅ Acordado |
 | ¿Estructura del JSON? | ✅ Ejemplo en informe (pedido 98180) |
 | ¿ISIS desarrolla consumo? | ✅ Prometido |
-| ¿Transporte cloud→on-premise? | ❌ 3 alternativas sin elegir |
+| ¿Transporte cloud→on-premise? | ⚠ Ya se puede decidir — ver "Transporte" abajo |
 | ¿Formato respuesta ISIS→app? | ❌ Sin definir |
 | ¿Mapeo códigos proveedor? | ❌ Sin definir |
 | ¿NP de vuelta? | ❌ Sin definir |
+
+### Decisiones del usuario (2026-08-25)
+
+| Pregunta | Decisión |
+|---|---|
+| ¿Criterio del `ok`? | **Por pedido** — `stock >= cajas` para cada item del pedido. `falta_global` es informativo. |
+| ¿Faltantes? | **Factura parcial** — se factura lo que hay, los faltantes se descartan (no se entregan más). |
+| ¿Quién dispara? | **Dos triggers:** (1) automático al completar picking sin faltantes, (2) clic manual de la operadora para cerrar con faltantes. |
+
+
+---
+
+## Transporte cloud → on-premise: ya se puede decidir (2026-08-25)
+
+El mensaje de Horacio del 25/8 (requisitos para usar la API del ISIS on-premise:
+Windows Server + IIS + IP pública + **abrir el puerto** + firewall/AV, sin soporte de
+QSA) aplica **solo si NOSOTROS llamamos al ISIS**.
+
+En las tres alternativas del informe (§11) el que consulta es **ISIS**, y una request
+**saliente** desde su LAN **no necesita nada de eso**: ni servidor nuevo, ni IP fija, ni
+puertos abiertos, ni superficie de ataque.
+
+**Recomendado — Alternativa B (ISIS consulta una API nuestra):**
+- Edge Function en Supabase con **token**: `GET` de pendientes + `POST` de acuse.
+- Da gratis lo que pide el §18 del informe: qué se recibió, qué se procesó, cuándo,
+  resultado, errores, reintentos, control de duplicados.
+- ISIS hace polling con la frecuencia que quiera. Nada expuesto del lado del depósito.
+
+**Plan B — Alternativa A (carpeta, Pieza 6):** el agente-local baja los JSON y los deja
+en `C:\ISIS\entrada\`. También es cero-puertos y es lo más simple para ellos, pero
+depende de que la PC esté prendida y el acuse hay que inventarlo (mover/marcar archivos).
+
+Queda como **Pieza 6-bis** por si ISIS prefiere leer disco antes que hacer HTTP.
+
+---
+
+## Riesgos / huecos detectados al releer el informe (2026-08-25)
+
+Ninguno de estos está en el informe de ISIS ni cubierto por las piezas de arriba.
+
+### 1. ✅ RESUELTO — Criterio del `ok`: por pedido (definido 2026-08-25)
+
+**Decisión del usuario:** `ok` se calcula **por pedido**, no global.
+`ok = true` cuando para CADA item del pedido `stock_terminado >= cajas_pedido`.
+`falta_global` se mantiene como dato informativo en el JSON, pero **no decide**
+si se factura o no. Aclararle a ISIS que el campo es informativo.
+
+El ejemplo que vio ISIS (550 con `ok:false` por falta global) **no aplica** como
+criterio de facturación — se usará el criterio por pedido.
+
+### 2. ⛔ Equivalencias de código — la auto-facturación puede facturar el artículo equivocado
+
+Ya documentado en la guía (v5.10): la factura debe ir con el código **real** (437E), no
+con el del pedido (029). Hoy hay un agente que se lo avisa a Marianela por Telegram
+justamente porque la facturación es manual.
+
+Si ISIS auto-factura el pedido **tal como está cargado**, factura el código viejo. El
+JSON tiene que llevar el artículo **realmente preparado** (o el mapeo), y hay que definir
+si ISIS corrige la línea del pedido antes de facturar. **No está en el informe.**
+
+### 3. ✅ RESUELTO — Faltantes: factura parcial (definido 2026-08-25)
+
+**Decisión del usuario:** factura parcial. Cuando la operadora administrativa hace clic,
+se factura **solo lo que hay** en ese momento. Los artículos faltantes **no se entregan
+más** (se pierden, salvo que el cliente haga otro pedido). No se espera a completar.
+
+Ejemplo: pedido con 10 artículos, solo hay 9 → clic → se factura 9. El décimo queda
+afuera.
+
+### 4. ⚠ Cutover del CAE: quién emite
+
+Hoy la app emite Factura A por **PV 11** (`arca-wsfe`, prod). Si ISIS pasa a facturar,
+hay que **apagar la emisión propia el mismo día** o se emite CAE dos veces por la misma
+venta. Definir si PV 11 queda de respaldo (era la idea de julio) y quién lo apaga.
+
+### 5. ⚠ Trazabilidad: falta el estado del lado ISIS
+
+La tabla `isis_json_pendientes` (Pieza 5) solo sabe qué se **bajó** (`enviado_en`). No
+sabe si ISIS lo **procesó**, si generó factura, con qué número/CAE, o si falló. Sin eso
+no hay forma de garantizar que una NP no se facture dos veces — que es exactamente lo
+que pide el §17 del informe.
+
+Agregar a la Pieza 5: `procesado_en`, `resultado` (ok/error), `nro_comprobante`, `cae`,
+`error_detalle`, y clave única por `(tipo, np, empresa)`.
+
+### 6. ℹ El JSON de ejemplo no lleva `empresa`
+
+El §14 exige contemplar las **dos empresas** desde el diseño, pero el ejemplo enviado
+(98180/98187) no trae el campo. El Plan ya lo agrega (LK/CH derivada de la NP, misma
+regla que usan los PDF: 9xxxx→LK, 4xxxx→CH). Falta **confirmarle a ISIS el nombre del
+campo** y que lo acepte.
+
+### 7. ℹ Aclararle a ISIS qué es `falta_global`
+
+En el informe figura como "Cantidad faltante" a secas, lo que invita a leerlo como
+faltante **del pedido**. Es un número **global** (todos los pedidos pendientes vs stock).
+Si ISIS lo usa para decidir por línea, va a bloquear facturas que sí se pueden hacer.
