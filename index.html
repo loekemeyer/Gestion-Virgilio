@@ -6515,7 +6515,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v11.78";
+const APP_VERSION = "v11.79";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -14476,7 +14476,24 @@ function stkOpenCapArt(codEnc) {
   const _sfxCap = String(cod || "").match(/\s+(LK|CH|LOKE)$/i);
   const _empCap = _sfxCap ? _sfxCap[1].toUpperCase().replace("LOKE", "LK") : "";
   _stkPopShell("📥 Capacidad de góndola — " + escapeHtml(_codB) + (_empCap ? ' <span style="font-size:14px;font-weight:800;color:' + (_empCap === "LK" ? "#b91c1c" : "#1e40af") + ';">' + _empCap + '</span>' : ''), "stkPopBody");
+  _stkPop = { kind: "capArt", codEnc: codEnc, codN: codN };
+  stkRenderCapArt(codEnc);
+  // v11.79 — la carga rápida (stocks_carga_rapida) trae la capacidad AGREGADA por código
+  // (una fila, cajas_max = suma, SIN sector) → el popup mostraba "1 ubicación · —".
+  // El detalle por sector (Capacidad_Sector: H19/H20/…) sólo llega con stkCapLoad, que
+  // corre al entrar al tab "capacidad". Si todavía no cargó, traelo y re-renderizá.
+  if (_stk.capLoaded !== true) {
+    stkCapLoad().then(function () {
+      if (_stkPop && _stkPop.kind === "capArt" && _stkPop.codEnc === codEnc) stkRenderCapArt(codEnc);
+    });
+  }
+}
+function stkRenderCapArt(codEnc) {
   const body = document.getElementById("stkPopBody"); if (!body) return;
+  const cod = decodeURIComponent(codEnc), codN = _ocgNorm(cod);
+  const _codB = codBase(cod), _codBN = _ocgNorm(_codB);
+  const _sfxCap = String(cod || "").match(/\s+(LK|CH|LOKE)$/i);
+  const _empCap = _sfxCap ? _sfxCap[1].toUpperCase().replace("LOKE", "LK") : "";
   var mine = (_stk.cap || []).filter(function (r) { return _ocgNorm(r.cod) === codN || _ocgNorm(r.cod) === _codBN; })
     .map(function (r) { return { sector: String(r.sector || "—").trim(), cajas: Number(r.cajas_max) || 0 }; })
     .sort(function (a, b) { return String(a.sector).localeCompare(String(b.sector), undefined, { numeric: true }); });
@@ -14486,10 +14503,13 @@ function stkOpenCapArt(codEnc) {
     var _sectorPfx = _empCap === "LK" ? String(_dual.loeke.sector || "").charAt(0).toUpperCase() : String(_dual.chef.sector || "").charAt(0).toUpperCase();
     if (_sectorPfx) mine = mine.filter(function (r) { return String(r.sector).charAt(0).toUpperCase() === _sectorPfx; });
   }
+  // v11.79 — mientras el detalle por sector aún carga, avisá en vez de mostrar "—".
+  var _cargandoSec = _stk.capLoaded !== true && mine.some(function (r) { return r.sector === "—"; });
   if (!mine.length) { body.innerHTML = '<div class="stkpop-empty">No hay capacidad de góndola cargada para ' + escapeHtml(_codB) + (_empCap ? ' (' + _empCap + ')' : '') + '.</div>'; return; }
   const tot = mine.reduce(function (s, r) { return s + r.cajas; }, 0);
-  let h = '<div class="stkpop-hint"><b>' + escapeHtml(_codB) + '</b>' + (_empCap ? ' <b style="color:' + (_empCap === "LK" ? "#b91c1c" : "#1e40af") + '">' + _empCap + '</b>' : '') + ' · capacidad de góndola: <b>' + tot + ' cajas</b> en ' + mine.length + ' ubicación(es).</div>';
-  h += '<div class="stkpop-grp"><div class="stkpop-nps">' + mine.map(function (r) { return '<span class="stkpop-np"><b>📍 ' + escapeHtml(r.sector) + '</b> · ' + r.cajas + ' cajas</span>'; }).join("") + '</div></div>';
+  let h = '<div class="stkpop-hint"><b>' + escapeHtml(_codB) + '</b>' + (_empCap ? ' <b style="color:' + (_empCap === "LK" ? "#b91c1c" : "#1e40af") + '">' + _empCap + '</b>' : '') + ' · capacidad de góndola: <b>' + tot + ' cajas</b> en ' + (_cargandoSec ? '?' : mine.length) + ' ubicación(es).</div>';
+  if (_cargandoSec) h += '<div class="stk-loading">Cargando ubicaciones…</div>';
+  else h += '<div class="stkpop-grp"><div class="stkpop-nps">' + mine.map(function (r) { return '<span class="stkpop-np"><b>📍 ' + escapeHtml(r.sector) + '</b> · ' + r.cajas + ' cajas</span>'; }).join("") + '</div></div>';
   body.innerHTML = h;
 }
 /* v5.103 — CAJAS PEDIDAS por artículo: qué NP pidió cuántas de ese código y si su
