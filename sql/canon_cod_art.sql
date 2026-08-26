@@ -28,6 +28,11 @@ declare
   c text;
 begin
   if NEW.cod_art is null then return NEW; end if;
+  -- v11.77: insumos — solo upper+trim (no buscar en OC_Maximos, sus códigos son propios)
+  if NEW.deposito = 'insumos' then
+    NEW.cod_art := upper(btrim(NEW.cod_art));
+    return NEW;
+  end if;
   if NEW.tipo in ('picking','separado','facturado') then return NEW; end if;   -- no tocar: dedup del cron
   k := regexp_replace(upper(btrim(NEW.cod_art)), '^0+(?=.)', '');               -- clave sin ceros a la izq
   if k = '' then return NEW; end if;
