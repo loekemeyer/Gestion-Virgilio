@@ -894,17 +894,14 @@ async function cargarOCVigentes() {
   /* v10.10 — reemplaza fetch de 5000 OC rows + filtro client-side por RPC server-side
      oc_vigentes_por_proveedor(nombre). La RPC aplica alias (Pettofrezza→Rafael),
      split por delimitadores (/,+& y), y prefix match con ≤2 chars de slack. */
+  /* v11.74 — usa supabase.rpc() en vez de fetch manual. El fetch usaba la publishable
+     key como Bearer token (no es JWT) → PostgREST podía rechazarlo silenciosamente.
+     supabase.rpc() usa el token de sesión real (de signInAnonymously). */
   const nombre = opState.tallNombre;
   try {
     await sessionReady;
-    // v11.40 — usar la key propia del módulo (no la global de index.html) → self-contained, sin dependencia cruzada frágil.
-    const H = { apikey: SUPABASE_PUBLISHABLE_KEY, Authorization: "Bearer " + SUPABASE_PUBLISHABLE_KEY, "Content-Type": "application/json" };
-    const res = await fetch(SUPABASE_URL + "/rest/v1/rpc/oc_vigentes_por_proveedor", {
-      method: "POST", headers: H, cache: "no-store",
-      body: JSON.stringify({ p_nombre: nombre })
-    });
-    if (!res.ok) throw new Error("RPC status " + res.status);
-    const rows = await res.json();
+    const { data: rows, error } = await supabase.rpc('oc_vigentes_por_proveedor', { p_nombre: nombre });
+    if (error) throw new Error(error.message);
     const porCod = {};
     (rows || []).forEach(function (r) {
       const k = String(r.cod || ""); if (!k) return;

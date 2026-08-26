@@ -12,7 +12,13 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-08-26 · Versión app al documentar: **v11.73**
+> Última actualización: 2026-08-26 · Versión app al documentar: **v11.74**
+>
+> Nota **2026-08-26 — v11.74 (Fix OC vigentes no mostraba en recepción).**
+> `cargarOCVigentes()` usaba `fetch` manual con la publishable key como Bearer
+> token (no es JWT → PostgREST podía rechazarlo). Reemplazado por `supabase.rpc()`
+> que usa el token de sesión real de `signInAnonymously`. Ahora "OC XX" aparece
+> en los botones de artículo de recepción.
 >
 > Nota **2026-08-26 — v11.73 (Fix excedente negativo por drift acumulativo).**
 > `reconciliar_pipeline_stock_etapa1()` sección B.2 (excedente) usaba
