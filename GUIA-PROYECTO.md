@@ -12,7 +12,35 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-08-26 · Versión app al documentar: **v11.75**
+> Última actualización: 2026-08-26 · Versión app al documentar: **v11.81**
+>
+> Nota **2026-08-26 — v11.81 (Casilla "llenar góndola" en el generador de OCs).**
+> Problema: máximo = MENOR(proy×índice, capacidad); la capacidad de góndola era
+> solo TECHO. Cuando la proyección es baja, la orden salía de muy pocas cajas
+> aunque la góndola fuera grande (ej. Martín C.: 043 Tres en Uno → proy 2 × 1,5 =
+> 3, con góndola de 180). Fix backend: nueva columna `OC_Maximos.llenar_gondola`
+> (bool, default false). En los artículos tildados, **máximo = capacidad de
+> góndola** (llena la góndola, ignora proy×índice); el resto sigue igual. La
+> primera rama del CASE de `maximo` en `vista_generador_oc` la aplica, así que el
+> cron (`generar_ocs_automaticas`) y el front reflejan solos. El operario elige
+> uno por uno con la casilla **Llenar góndola** en Compras (OCs) → ⚙
+> Configuraciones (columnas nuevas: Cap gónd. read-only + casilla; el índice se
+> deshabilita cuando está tildada). SQL en `sql/oc_llenar_gondola.sql`.
+>
+> Nota **2026-08-26 — v11.80 (Botón flotante "Guardar cambios" en config OCs).**
+> Los cambios de la config (proveedor/%/índice/activo/llenar góndola) no se
+> auto-guardan: se marcan en amarillo y hay que apretar 💾 Guardar. Ese botón
+> vivía solo arriba y se perdía al scrollear → se agregó un botón flotante fijo
+> (abajo der.) con el contador de pendientes, siempre visible. Llama al mismo
+> `ocCfgSave()`. Sincronizado vía `_ocCfgSyncBtns()`. Todo front.
+>
+> Nota **2026-08-26 — v11.79 (Popup capacidad de góndola trae las ubicaciones).**
+> El popup "Capacidad de góndola" del tab stocks leía `_stk.cap` de la carga
+> rápida (`stocks_carga_rapida`), que trae la capacidad AGREGADA por código (sin
+> sector) → mostraba "1 ubicación · —". El detalle por sector (`Capacidad_Sector`)
+> solo cargaba en el tab "capacidad" (`stkCapLoad`). Ahora `stkOpenCapArt`
+> lazy-carga ese detalle si falta y re-renderiza (`stkRenderCapArt`); mientras
+> carga muestra "Cargando ubicaciones…". Todo front.
 >
 > Nota **2026-08-26 — v11.75 (RR más ancho + fix mezcla tallerista/prov_at).**
 > (a) **Recepción Remitos (RR)**: el modal `#tandaModal` usaba `max-width:560px`
