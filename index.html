@@ -3621,7 +3621,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=11.93"></script>
+<script type="module" src="recepcion.js?v=11.97"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -6555,7 +6555,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v11.96";
+const APP_VERSION = "v11.97";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -7382,6 +7382,42 @@ renderLegajoHistory("");
 migrateClearMGToggle();
 
 updatePendingIndicator();
+
+/* v11.97 — Aviso de nueva versión. El SW no cachea, pero el navegador puede quedarse con
+   un index.html viejo en su caché HTTP; los celulares seguían con versiones viejas (ej. la
+   que dejaba cerrar recepciones sin foto). `version.json` se pide siempre fresco
+   (cache: no-store); si su versión != APP_VERSION cargada, mostramos un banner arriba con
+   botón "Actualizar" que recarga. Chequea al bootear y cada 5 minutos. */
+async function checkForUpdate() {
+  try {
+    const r = await fetch("version.json?_=" + Date.now(), { cache: "no-store" });
+    if (!r.ok) return;
+    const j = await r.json();
+    if (j && j.version && j.version !== APP_VERSION) showUpdateBanner(j.version);
+  } catch (_e) {}
+}
+function showUpdateBanner(newVer) {
+  if (document.getElementById("updateBanner")) return;
+  const b = document.createElement("div");
+  b.id = "updateBanner";
+  b.style.cssText =
+    "position:fixed;top:0;left:0;right:0;z-index:999999;background:#0a7d2c;color:#fff;" +
+    "padding:11px 14px;text-align:center;font-size:15px;font-weight:600;" +
+    "box-shadow:0 2px 8px rgba(0,0,0,.35);display:flex;gap:12px;" +
+    "align-items:center;justify-content:center;flex-wrap:wrap";
+  const txt = document.createElement("span");
+  txt.textContent = "🔄 Nueva versión " + newVer + " disponible.";
+  const btn = document.createElement("button");
+  btn.textContent = "Actualizar";
+  btn.style.cssText =
+    "background:#fff;color:#0a7d2c;border:0;border-radius:6px;padding:7px 16px;" +
+    "font-weight:700;font-size:15px;cursor:pointer";
+  btn.onclick = function () { location.reload(); };
+  b.appendChild(txt); b.appendChild(btn);
+  document.body.appendChild(b);
+}
+checkForUpdate();
+setInterval(checkForUpdate, 5 * 60 * 1000);
 
 /* v5.51: si esta PC es la estación de impresión (auto ON), retomar el loop al
    abrir/recargar la página. Deferido para no chocar con la TDZ de los const de
