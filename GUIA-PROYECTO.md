@@ -14,6 +14,17 @@
 >
 > Última actualización: 2026-08-27 · Versión app al documentar: **v11.94**
 >
+> Nota **2026-08-27 — Facturación neto/faltantes: cálculo centralizado en vistas (`sql/facturacion_neto.sql`).**
+> El neto y los faltantes dejan de vivir sólo en el front: el cálculo está en **vistas en vivo**
+> (no se persiste — es dato derivado, fuente única). Objetos: **`vista_facturacion_neto_items`**
+> (detalle por ítem CON dto → interna, **REVOKE anon**, protege el padrón); **`vista_facturacion_neto`**
+> (por NP: `neto`, `neto_original`, `falto_valor`, cajas ped/ent/falto, items_sin_precio — **pública**);
+> **`vista_facturacion_faltantes`** (por ítem con `cajas_falto>0` + `importe_falto` = $ no facturado —
+> **pública**). Las RPC `facturacion_neto_lote`/`_detalle` ahora **leen de la vista interna** (misma
+> fórmula, un solo lugar). Reusable en reportes/monitor/Telegram sin tocar el front. Las públicas
+> **no exponen `dto_vol`** (sólo importes/netos). Verificado NP 98557: neto 753.146,86 · original
+> 990.703,56 · faltó $237.556,70.
+>
 > Nota **2026-08-27 — v11.94 (Desglose Neto: faltantes en rojo + neto original).**
 > El modal 💵 Neto ahora también detalla los **faltantes** (productos que no salieron,
 > `Entregas_Virgilio.cajas_falto>0`) **en rojo** (código −cajas), y muestra **dos netos**:
