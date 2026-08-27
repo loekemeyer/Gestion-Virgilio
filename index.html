@@ -6555,7 +6555,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v11.99";
+const APP_VERSION = "v11.100";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -7434,22 +7434,18 @@ async function checkForUpdate() {
 }
 function showUpdateBanner(newVer) {
   if (document.getElementById("updateBanner")) return;
-  const b = document.createElement("div");
+  // Chip chiquito, esquina superior derecha. Discreto: no tapa botones ni molesta el
+  // trabajo. Un solo tap recarga. Título con la versión para el que quiera verla.
+  const b = document.createElement("button");
   b.id = "updateBanner";
+  b.type = "button";
+  b.title = "Nueva versión " + newVer + " — tocá para actualizar";
+  b.textContent = "🔄 Actualizar";
   b.style.cssText =
-    "position:fixed;top:0;left:0;right:0;z-index:999999;background:#0a7d2c;color:#fff;" +
-    "padding:11px 14px;text-align:center;font-size:15px;font-weight:600;" +
-    "box-shadow:0 2px 8px rgba(0,0,0,.35);display:flex;gap:12px;" +
-    "align-items:center;justify-content:center;flex-wrap:wrap";
-  const txt = document.createElement("span");
-  txt.textContent = "🔄 Nueva versión " + newVer + " disponible.";
-  const btn = document.createElement("button");
-  btn.textContent = "Actualizar";
-  btn.style.cssText =
-    "background:#fff;color:#0a7d2c;border:0;border-radius:6px;padding:7px 16px;" +
-    "font-weight:700;font-size:15px;cursor:pointer";
-  btn.onclick = function () { location.reload(); };
-  b.appendChild(txt); b.appendChild(btn);
+    "position:fixed;top:8px;right:8px;z-index:999999;background:#0a7d2c;color:#fff;" +
+    "border:0;border-radius:14px;padding:5px 11px;font-size:12px;font-weight:600;" +
+    "line-height:1;box-shadow:0 1px 5px rgba(0,0,0,.3);cursor:pointer;opacity:.95";
+  b.onclick = function () { location.reload(); };
   document.body.appendChild(b);
 }
 checkForUpdate();
