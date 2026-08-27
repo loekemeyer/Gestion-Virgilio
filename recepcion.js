@@ -273,6 +273,7 @@ const RCP_CSS = `
 #rcpRoot .histWho .provTag{ font-size:10px; font-weight:800; color:#a06000; background:#fff7e6; border:1px solid #ffd98a; border-radius:999px; padding:1px 7px; margin-right:5px; }
 #rcpRoot .histWho .histDesc{ color:#94a3b8; }
 #rcpRoot .histRto{ color:#64748b; font-variant-numeric:tabular-nums; white-space:nowrap; }
+#rcpRoot .histDem{ text-align:right; font-weight:800; color:#b45309; font-variant-numeric:tabular-nums; white-space:nowrap; }
 #rcpRoot .histLoading, #rcpRoot .histEmpty{ padding:26px; text-align:center; color:#64748b; font-weight:700; }
 `;
 
@@ -1844,7 +1845,7 @@ async function histLoad(f) {
     // v10.26: una sola query a vista_historial_entregas (antes 2 queries separadas).
     // La vista ya convierte DD-MM → YYYY-MM-DD para prov_at.
     let q = supabase.from("vista_historial_entregas")
-      .select("fuente,fecha,created_at,cod_art,descripcion,cajas,quien,remito");
+      .select("fuente,fecha,created_at,cod_art,descripcion,cajas,quien,remito,llegada,carga,demora_hs");
     if (f.desde) q = q.gte("fecha", f.desde);
     if (f.hasta) q = q.lte("fecha", f.hasta);
     if (codN) q = q.or("cod_art.ilike.%" + codN + "%,quien.ilike.%" + codN + "%");
@@ -1863,7 +1864,9 @@ async function histLoad(f) {
         ymd: r.fecha || "", ms: r.created_at ? Date.parse(r.created_at) : 0,
         fechaTxt: ddmm(r.fecha), cod: r.cod_art || "—", desc: r.descripcion || "",
         cajas: Number(r.cajas) || 0, quien: r.fuente === "tallerista" ? displayName(r.quien || "—") : (r.quien || "—"),
-        remito: r.remito || "", origen: r.fuente === "tallerista" ? "tall" : "prov"
+        remito: r.remito || "", origen: r.fuente === "tallerista" ? "tall" : "prov",
+        demoraHs: (r.demora_hs != null) ? Number(r.demora_hs) : null,
+        llegada: r.llegada || null, carga: r.carga || null
       };
     });
     rows.sort(function (a, b) { if (a.ymd !== b.ymd) return a.ymd < b.ymd ? 1 : -1; return b.ms - a.ms; });
@@ -1873,6 +1876,23 @@ async function histLoad(f) {
     console.warn("histLoad error:", e);
     if (box) box.innerHTML = '<div class="histEmpty">No se pudo cargar el histórico. Probá de nuevo.</div>';
   }
+}
+/* Demora de carga del remito (hora carga operadora − hora llegada), en texto compacto.
+   Viene de vista_historial_entregas.demora_hs. Solo existe para recepciones cargadas por
+   el flujo de Pendientes (Control_Modo_OP); las viejas o sin match dan "—". */
+function histFmtDemora(hs) {
+  if (hs == null || isNaN(hs)) return "—";
+  if (hs < 0) hs = 0;
+  if (hs < 1) return Math.round(hs * 60) + "m";
+  if (hs < 24) { const r = Math.round(hs * 10) / 10; return String(r).replace(".", ",") + "h"; }
+  const d = Math.round(hs / 24 * 10) / 10; return String(d).replace(".", ",") + "d";
+}
+function histHoraTip(r) {
+  if (!r.llegada || !r.carga) return "";
+  try {
+    const opt = { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit", timeZone: "America/Argentina/Buenos_Aires" };
+    return "Llegó " + new Date(r.llegada).toLocaleString("es-AR", opt) + " · Cargó " + new Date(r.carga).toLocaleString("es-AR", opt);
+  } catch (_e) { return ""; }
 }
 function histRender(rows, CAP, capped) {
   const box = document.getElementById("histResults");
@@ -1885,16 +1905,19 @@ function histRender(rows, CAP, capped) {
   if (capped) html += '<div class="histNote">⚠ Hay más de 1000 filas; se muestran las más recientes. Acotá por fecha para ver el resto.</div>';
   else if (n > CAP) html += '<div class="histNote">Mostrando las primeras ' + CAP + ' de ' + n + '. Acotá el filtro para ver menos.</div>';
   html += '<div class="histTblWrap"><table class="histTbl"><thead><tr>' +
-    '<th>Fecha</th><th>Código</th><th style="text-align:right">Cajas</th><th>Entregó</th><th>Remito</th>' +
+    '<th>Fecha</th><th>Código</th><th style="text-align:right">Cajas</th><th>Entregó</th><th style="text-align:right" title="Cuánto tardó en cargarse el remito: hora de carga de la operadora − hora de llegada del remito.">Demora</th><th>Remito</th>' +
     '</tr></thead><tbody>';
   shown.forEach(function (r) {
     // v6.54: sin badge "Prov" ni la descripción del artículo — solo el nombre (pedido del dueño).
     const who = escapeHtmlRcp(r.quien);
+    const demTxt = histFmtDemora(r.demoraHs);
+    const demTip = histHoraTip(r);
     html += '<tr>' +
       '<td class="histFe">' + escapeHtmlRcp(r.fechaTxt) + '</td>' +
       '<td class="histCodCell">' + escapeHtmlRcp(r.cod) + '</td>' +
       '<td class="histCaj">' + r.cajas + '</td>' +
       '<td class="histWho">' + who + '</td>' +
+      '<td class="histDem"' + (demTip ? ' title="' + escapeHtmlRcp(demTip) + '"' : '') + '>' + escapeHtmlRcp(demTxt) + '</td>' +
       '<td class="histRto">' + escapeHtmlRcp(r.remito || "—") + '</td>' +
     '</tr>';
   });

@@ -12,7 +12,19 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-08-27 · Versión app al documentar: **v11.86**
+> Última actualización: 2026-08-27 · Versión app al documentar: **v11.93**
+>
+> Nota **2026-08-27 — v11.93 (Histórico de Recepción: columna Demora de carga).**
+> El **Histórico de Recepción** (recepcion.js, `renderHistorico`) muestra una columna
+> **Demora** = cuánto tardó en cargarse el remito: **hora de carga de la operadora
+> (`Control_Modo_OP.procesado_at`) − hora de llegada del remito (`Control_Modo_OP.created_at`)**
+> — los mismos dos timestamps que ya usaba la pantalla **Pendientes** para el "⏱ Xhs" en vivo.
+> Backend (vista): `vista_historial_entregas` ahora hace `LEFT JOIN LATERAL` a `Control_Modo_OP`
+> (estado='procesado') por **remito + nombre** (LIMIT 1, no multiplica filas) y expone
+> `llegada`, `carga` y `demora_hs`. Andan talleristas **y** proveedores (la demora sale de
+> Control_Modo_OP, no de `created_at` de la entrega — que en proveedores es NULL). Recepciones
+> viejas (previas al flujo de Pendientes) o sin match → `demora_hs` NULL → el front muestra "—".
+> Front: helper `histFmtDemora` (m/h/d) + tooltip con las horas exactas (`histHoraTip`).
 >
 > Nota **2026-08-27 — v11.86 (Facturación: desglose por ítem del 💵 Neto, clickeable).**
 > Al tocar la celda **💵 Neto** de una NP se abre un modal con el **desglose por ítem**:
