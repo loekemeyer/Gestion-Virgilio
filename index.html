@@ -2302,6 +2302,10 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .facneto-tot .facneto-total{ font-size: 18px; font-weight: 800; color: #15803d; margin-top: 2px; }
 .facneto-tot .facneto-note{ font-size: 11px; color: #94a3b8; font-weight: 600; }
 table.facfc-tbl tr.facneto-falta td{ color: #b45309; }
+/* Faltantes (sin precio) abajo de todo, apenas tachaditos. */
+.facneto-faltantes{ margin-top: 10px; font-size: 11px; color: #94a3b8; line-height: 1.6; }
+.facneto-faltantes .facneto-falt-t{ font-weight: 700; text-transform: uppercase; letter-spacing: .3px; margin-right: 4px; }
+.facneto-faltantes .facneto-falt-item{ text-decoration: line-through; text-decoration-color: #cbd5e1; font-weight: 700; color: #94a3b8; margin-right: 8px; white-space: nowrap; }
 .cr-td-ctrl{ text-align: center; }
 .cr-td-act{ text-align: center; white-space: nowrap; }
 .cr-sinsal-btn{ font-size: 11px; font-weight: 800; color: #b91c1c; background: #fef2f2; border: 1px solid #fecaca; border-radius: 7px; padding: 6px 8px; cursor: pointer; white-space: nowrap; line-height: 1.1; }
@@ -6543,7 +6547,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v11.91";
+const APP_VERSION = "v11.92";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -32347,16 +32351,15 @@ window.facNetoDetalle = async function(np){
     return;
   }
   var dtoPct = Math.round((Number(rows[0].dto_vol) || 0) * 1000) / 10;
-  var subtotal = 0; var faltan = [];
+  var subtotal = 0; var faltan = []; var nOk = 0;
   var filas = rows.map(function(it){
-    var dto = Math.round((Number(it.dto_vol) || 0) * 1000) / 10;
     if (it.sin_precio || it.importe == null){
-      faltan.push(String(it.cod));
-      return '<tr class="facneto-falta"><td class="facfc-cod">' + escapeHtml(String(it.cod)) + '</td>' +
-        '<td class="num">' + it.cajas + '×' + (it.uxb || '?') + '</td>' +
-        '<td class="num">—</td><td class="num">⚠ sin precio</td></tr>';
+      faltan.push({ cod: String(it.cod), cajas: it.cajas, uxb: it.uxb });
+      return "";   // los sin-precio NO van en la tabla: se listan abajo de todo, tachaditos
     }
+    nOk++;
     subtotal += Number(it.importe) || 0;
+    var dto = Math.round((Number(it.dto_vol) || 0) * 1000) / 10;
     var des = 'lista ' + facFmtMoney(it.precio_lista) + (dto > 0 ? ' −' + dto + '%' : '');
     return '<tr><td class="facfc-cod">' + escapeHtml(String(it.cod)) + '</td>' +
       '<td class="num">' + it.cajas + '×' + it.uxb + '</td>' +
@@ -32366,15 +32369,22 @@ window.facNetoDetalle = async function(np){
   subtotal = Math.round(subtotal * 100) / 100;
   var neto = Math.round(subtotal * 0.98 * 100) / 100;
   var h = '';
-  h += '<div class="facfc-sub">NP ' + escapeHtml(np) + ' · ' + rows.length + ' ítem(s)' + (dtoPct > 0 ? ' · dto volumen ' + dtoPct + '%' : ' · sin dto volumen') + '</div>';
+  h += '<div class="facfc-sub">NP ' + escapeHtml(np) + ' · ' + nOk + ' ítem(s)' + (dtoPct > 0 ? ' · dto volumen ' + dtoPct + '%' : ' · sin dto volumen') + '</div>';
   h += '<div class="facfc-tblwrap"><table class="facfc-tbl"><thead><tr><th>Cód</th><th class="num">Cajas×u</th><th class="num">Lista</th><th class="num">Importe</th></tr></thead><tbody>' + filas + '</tbody></table></div>';
-  if (faltan.length) h += '<div class="facfc-warn">⚠ Sin precio en el maestro: <b>' + faltan.map(function(x){ return escapeHtml(x); }).join(", ") + '</b>. No entran en el subtotal.</div>';
   h += '<div class="facneto-tot">' +
     '<span>Subtotal (dto x ítem) ' + facFmtMoney(subtotal) + '</span>' +
     '<span>− 2% s/ subtotal ' + facFmtMoney(-(Math.round((subtotal - neto) * 100) / 100)) + '</span>' +
     '<span class="facneto-total">NETO ' + facFmtMoney(neto) + '</span>' +
     '<span class="facneto-note">sobre lo armado</span></div>';
   h += '<div class="facfc-actions"><button class="facfc-cancel" onclick="facNetoClose()">Cerrar</button></div>';
+  // Faltantes (sin precio en el maestro) abajo de todo, apenas tachaditos: no entran al neto.
+  if (faltan.length){
+    h += '<div class="facneto-faltantes"><span class="facneto-falt-t">Sin precio · no entran:</span> ' +
+      faltan.map(function(f){
+        var q = (f.cajas != null) ? ' ' + f.cajas + (f.uxb ? '×' + f.uxb : '') : '';
+        return '<span class="facneto-falt-item">' + escapeHtml(f.cod) + q + '</span>';
+      }).join(" ") + '</div>';
+  }
   body.innerHTML = h;
 };
 async function facFetchLios(){
