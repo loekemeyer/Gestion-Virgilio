@@ -32406,7 +32406,7 @@ window.facNetoDetalle = async function(np){
       nOk++; subtotalEnt += impEnt;
       filasArr.push('<tr><td class="facfc-cod">' + escapeHtml(String(it.cod)) + '</td>' +
         '<td class="num">' + ent + '×' + it.uxb + '</td>' +
-        '<td class="num">' + facFmtMoney(it.precio_lista) + '<div class="facfc-des">' + desLista + '</div></td>' +
+        '<td class="num">' + facFmtMoney(it.precio_lista) + '</td>' +
         '<td class="num">' + facFmtMoney(impEnt) + '</td></tr>');
     } else if (ent > 0 && (it.sin_precio || impEnt == null)){
       sinPrecio.push({ cod: String(it.cod), cajas: ent, uxb: it.uxb });
@@ -32417,7 +32417,7 @@ window.facNetoDetalle = async function(np){
       var faltoVal = (impPed != null && impEnt != null) ? Math.round((impPed - impEnt) * 100) / 100 : null;
       var impCell  = it.sin_precio ? '<span class="facneto-red">sin precio</span>'
                     : (faltoVal != null ? '<span class="facneto-red">' + facFmtMoney(faltoVal) + '</span>' : '—');
-      var listaCell = it.sin_precio ? '—' : (facFmtMoney(it.precio_lista) + '<div class="facfc-des">' + desLista + '</div>');
+      var listaCell = it.sin_precio ? '—' : facFmtMoney(it.precio_lista);
       filasArr.push('<tr class="facneto-row-falt"><td class="facfc-cod"><span class="facneto-red">' + escapeHtml(String(it.cod)) + '</span></td>' +
         '<td class="num"><span class="facneto-red">' + falto + '×' + (it.uxb || '?') + ' faltó</span></td>' +
         '<td class="num">' + listaCell + '</td>' +
