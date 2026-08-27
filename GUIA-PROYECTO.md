@@ -12,7 +12,21 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-08-27 · Versión app al documentar: **v11.85**
+> Última actualización: 2026-08-27 · Versión app al documentar: **v11.86**
+>
+> Nota **2026-08-27 — v11.86 (Facturación: desglose por ítem del 💵 Neto, clickeable).**
+> Al tocar la celda **💵 Neto** de una NP se abre un modal con el **desglose por ítem**:
+> por cada código `lista × uxb × cajas × (1 − dto_vol) = importe`, luego **subtotal**,
+> **− 2% sobre el subtotal** y **NETO**. Explicita la regla del dueño: **el dto x volumen
+> se aplica por ÍTEM; el 2% va sobre el subtotal** (el neto del lote ya redondeaba una sola
+> vez al final, así que numéricamente no cambió; ahora es explícito y auditable línea a línea).
+> Nueva RPC **`facturacion_neto_detalle(p_np text)`** (`SECURITY DEFINER`, anon EXECUTE):
+> devuelve `cod, cajas, uxb, precio_lista, dto_vol, importe, sin_precio` por ítem. La RPC
+> `facturacion_neto_lote` se reescribió con el mismo redondeo (importe_item redondeado a 2 →
+> `Σ × 0,98` → round) para que lote y detalle **siempre coincidan**. Front: la celda 💵 Neto
+> es clickeable (`facNetoDetalle`), modal reusa el molde `.facfc-`. ⚠ El detalle **sí muestra
+> el dto% del cliente de esa NP** — misma exposición que ya tenía el modal de facturar de
+> `arca-wsfe/preciar`; NO expone el padrón entero (sigue por NP puntual, `clientes_dto` con RLS).
 >
 > Nota **2026-08-27 — v11.85 (Facturación: columna 💵 Neto a facturar por NP).**
 > El módulo **Facturación — NPs a FC** muestra ahora, por fila, el **neto a facturar

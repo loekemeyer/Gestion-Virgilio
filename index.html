@@ -2294,6 +2294,13 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .fac-neto-cell .fac-neto-load{ color: #cbd5e1; font-weight: 700; }
 .fac-neto-cell .fac-neto-na{ color: #94a3b8; font-weight: 600; }
 .fac-neto-cell .fac-neto-falta{ display: block; font-size: 10px; font-weight: 700; color: #b45309; margin-top: 1px; white-space: nowrap; }
+.fac-neto-click{ cursor: pointer; }
+.fac-neto-click:hover .fac-neto-val{ text-decoration: underline; }
+/* v11.86 — Modal desglose por ítem (reusa .facfc-). */
+.facneto-tot{ display: flex; flex-direction: column; gap: 2px; align-items: flex-end; margin-top: 10px; padding-top: 8px; border-top: 2px solid #e2e8f0; font-size: 13px; color: #334155; }
+.facneto-tot .facneto-total{ font-size: 18px; font-weight: 800; color: #15803d; margin-top: 2px; }
+.facneto-tot .facneto-note{ font-size: 11px; color: #94a3b8; font-weight: 600; }
+table.facfc-tbl tr.facneto-falta td{ color: #b45309; }
 .cr-td-ctrl{ text-align: center; }
 .cr-td-act{ text-align: center; white-space: nowrap; }
 .cr-sinsal-btn{ font-size: 11px; font-weight: 800; color: #b91c1c; background: #fef2f2; border: 1px solid #fecaca; border-radius: 7px; padding: 6px 8px; cursor: pointer; white-space: nowrap; line-height: 1.1; }
@@ -6530,7 +6537,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v11.85";
+const APP_VERSION = "v11.86";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -32298,6 +32305,72 @@ function facPaintNeto(){
     cell.innerHTML = html;
   });
 }
+/* v11.86 — Desglose por ítem del neto a facturar (click en la celda 💵 Neto).
+   Muestra: por ítem lista × uxb × cajas × (1−dto del cliente) = importe; luego
+   subtotal, −2% y TOTAL neto. Reusa el molde .facfc- del modal de facturar. */
+function facNetoEnsureModal(){
+  var ov = document.getElementById("facNetoOverlay");
+  if (ov) return ov;
+  ov = document.createElement("div");
+  ov.id = "facNetoOverlay"; ov.className = "facfc-ov";
+  ov.innerHTML = '<div class="facfc-card"><div class="facfc-head" style="background:linear-gradient(90deg,#15803d,#16a34a)"><span class="facfc-title">💵 Neto a facturar — desglose</span><button class="facfc-x" onclick="facNetoClose()">✕</button></div><div class="facfc-body" id="facNetoBody"></div></div>';
+  ov.addEventListener("click", function(e){ if (e.target === ov) facNetoClose(); });
+  document.body.appendChild(ov);
+  return ov;
+}
+window.facNetoClose = function(){ var ov = document.getElementById("facNetoOverlay"); if (ov) ov.classList.remove("show"); };
+window.facNetoDetalle = async function(np){
+  np = String(np || "").trim().replace(/\.0+$/, "");
+  if (!np) return;
+  var ov = facNetoEnsureModal();
+  var body = document.getElementById("facNetoBody");
+  body.innerHTML = '<div class="facfc-loading">Calculando desglose de la NP ' + escapeHtml(np) + '…</div>';
+  ov.classList.add("show");
+  var rows = [];
+  try {
+    var r = await fetch(SUPABASE_URL + "/rest/v1/rpc/facturacion_neto_detalle", {
+      method: "POST",
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ p_np: np })
+    });
+    if (r.ok) rows = await r.json();
+  } catch (_e) {}
+  if (!rows || !rows.length){
+    body.innerHTML = '<div class="facfc-errbox"><div class="facfc-err-ico">—</div><div>La NP ' + escapeHtml(np) + ' todavía no tiene ítems armados para valorizar.</div>' +
+      '<div class="facfc-actions"><button class="facfc-cancel" onclick="facNetoClose()">Cerrar</button></div></div>';
+    return;
+  }
+  var dtoPct = Math.round((Number(rows[0].dto_vol) || 0) * 1000) / 10;
+  var subtotal = 0; var faltan = [];
+  var filas = rows.map(function(it){
+    var dto = Math.round((Number(it.dto_vol) || 0) * 1000) / 10;
+    if (it.sin_precio || it.importe == null){
+      faltan.push(String(it.cod));
+      return '<tr class="facneto-falta"><td class="facfc-cod">' + escapeHtml(String(it.cod)) + '</td>' +
+        '<td class="num">' + it.cajas + '×' + (it.uxb || '?') + '</td>' +
+        '<td class="num">—</td><td class="num">⚠ sin precio</td></tr>';
+    }
+    subtotal += Number(it.importe) || 0;
+    var des = 'lista ' + facFmtMoney(it.precio_lista) + (dto > 0 ? ' −' + dto + '%' : '');
+    return '<tr><td class="facfc-cod">' + escapeHtml(String(it.cod)) + '</td>' +
+      '<td class="num">' + it.cajas + '×' + it.uxb + '</td>' +
+      '<td class="num">' + facFmtMoney(it.precio_lista) + '<div class="facfc-des">' + des + '</div></td>' +
+      '<td class="num">' + facFmtMoney(it.importe) + '</td></tr>';
+  }).join("");
+  subtotal = Math.round(subtotal * 100) / 100;
+  var neto = Math.round(subtotal * 0.98 * 100) / 100;
+  var h = '';
+  h += '<div class="facfc-sub">NP ' + escapeHtml(np) + ' · ' + rows.length + ' ítem(s)' + (dtoPct > 0 ? ' · dto volumen ' + dtoPct + '%' : ' · sin dto volumen') + '</div>';
+  h += '<div class="facfc-tblwrap"><table class="facfc-tbl"><thead><tr><th>Cód</th><th class="num">Cajas×u</th><th class="num">Lista</th><th class="num">Importe</th></tr></thead><tbody>' + filas + '</tbody></table></div>';
+  if (faltan.length) h += '<div class="facfc-warn">⚠ Sin precio en el maestro: <b>' + faltan.map(function(x){ return escapeHtml(x); }).join(", ") + '</b>. No entran en el subtotal.</div>';
+  h += '<div class="facneto-tot">' +
+    '<span>Subtotal (dto x ítem) ' + facFmtMoney(subtotal) + '</span>' +
+    '<span>− 2% s/ subtotal ' + facFmtMoney(-(Math.round((subtotal - neto) * 100) / 100)) + '</span>' +
+    '<span class="facneto-total">NETO ' + facFmtMoney(neto) + '</span>' +
+    '<span class="facneto-note">sin IVA · sobre lo armado</span></div>';
+  h += '<div class="facfc-actions"><button class="facfc-cancel" onclick="facNetoClose()">Cerrar</button></div>';
+  body.innerHTML = h;
+};
 async function facFetchLios(){
   const now = Date.now();
   if (_facLiosTs && (now - _facLiosTs) < 30000) return _facLios;   // cache 30s
@@ -32946,7 +33019,7 @@ function facRender(tandas){
           const np = String(f.np).trim().replace(/\.0+$/, "");
           const c = _facCajas.get(np); return (!c) ? '<span class="fac-cajas0">—</span>' : escapeHtml(String(Math.round(c)));
         })()}</td>
-        <td class="center fac-neto-cell" id="fac-neto-${escapeHtml(String(f.np).trim().replace(/\.0+$/, ""))}"><span class="fac-neto-load">…</span></td>
+        <td class="center fac-neto-cell fac-neto-click" id="fac-neto-${escapeHtml(String(f.np).trim().replace(/\.0+$/, ""))}" onclick="facNetoDetalle('${escapeHtml(String(f.np).trim().replace(/\.0+$/, ""))}')" title="Ver desglose por ítem"><span class="fac-neto-load">…</span></td>
         <td class="center fac-accion-cell"><button class="fac-btn-tick" data-args='${args}' onclick="facTickNP(this)">✓</button></td>
       </tr>`;
   }).join("");
