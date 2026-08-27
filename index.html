@@ -6543,7 +6543,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v11.89";
+const APP_VERSION = "v11.90";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -32373,7 +32373,7 @@ window.facNetoDetalle = async function(np){
     '<span>Subtotal (dto x ítem) ' + facFmtMoney(subtotal) + '</span>' +
     '<span>− 2% s/ subtotal ' + facFmtMoney(-(Math.round((subtotal - neto) * 100) / 100)) + '</span>' +
     '<span class="facneto-total">NETO ' + facFmtMoney(neto) + '</span>' +
-    '<span class="facneto-note">sin IVA · sobre lo armado</span></div>';
+    '<span class="facneto-note">sobre lo armado</span></div>';
   h += '<div class="facfc-actions"><button class="facfc-cancel" onclick="facNetoClose()">Cerrar</button></div>';
   body.innerHTML = h;
 };
