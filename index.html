@@ -6555,7 +6555,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v11.97";
+const APP_VERSION = "v11.98";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -7193,6 +7193,38 @@ async function send() {
   // Por si quedaron otros pendientes acumulados de intentos previos.
   flushQueue();
 }
+
+/* v11.98: cierra el toggle RT automáticamente cuando el operario envía una
+   recepción desde el Modo OP (recepcion.js). Mismo patrón que ccSendClose.
+   Se llama desde opEnviar() tras el registro exitoso. */
+window.autoCloseRT = function (legajo) {
+  try {
+    const leg = String(legajo);
+    const st = getLegajoState(leg);
+    if (!st || !st.toggles || !st.toggles.RT) return;   // RT no está abierto
+    const openIso = (typeof st.toggles.RT === "string") ? st.toggles.RT : null;
+    const cajas = recepcionCajasDelDia(leg);
+    const texto = cajas > 0 ? String(cajas) : "";
+    toggleStartOrEnd(leg, "RT");   // cierra el toggle local
+    const nowMs = Date.now();
+    const payload = {
+      legajo: leg, opcion: "RT", descripcion: desc.RT || "Recepción Mercadería",
+      texto: texto, ts: nowMs,
+      id: nowMs.toString(36) + "_" + Math.random().toString(36).slice(2, 8),
+      ts_inicio_iso: openIso
+    };
+    try { pushHistoryForLegajo(leg, { ts: nowMs, opcion: "RT", descripcion: payload.descripcion, texto: texto, id: payload.id, ts_inicio_iso: openIso, status: "queued" }); } catch (_e) {}
+    try { enqueueReport(payload); if (typeof trySendOneReport === "function") trySendOneReport(payload).then(function (r) { if (r && r.ok) removeFromQueue(payload.id); }).catch(function () {}); } catch (_e) {}
+    try { updatePendingIndicator(); updateCoreButtonsState(); } catch (_e) {}
+    // Best-effort: reconciliar con total del servidor por si cargó en otro dispositivo.
+    recepcionCajasServerTotal(leg).then(function (srv) {
+      if (srv != null && srv > cajas && payload.id) {
+        // El cierre ya se emitió con el total local; la diferencia es despreciable y
+        // el admin ve el total real en el tablero. No re-emitimos.
+      }
+    }).catch(function () {});
+  } catch (e) { console.warn("autoCloseRT:", e); }
+};
 
 /* =========================================================
    SERVICE WORKER — registra sw.js y reconcilia LS ↔ IDB

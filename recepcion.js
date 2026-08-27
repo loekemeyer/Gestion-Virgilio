@@ -918,7 +918,7 @@ async function cargarOCVigentes() {
   const nombre = opState.tallNombre;
   try {
     await sessionReady;
-    const { data: rows, error } = await supabase.rpc('oc_vigentes_por_proveedor', { p_nombre: nombre });
+    const { data: rows, error } = await supabase.rpc('oc_vigentes_por_proveedor', { nombre_ent: nombre });
     if (error) throw new Error(error.message);
     const porCod = {};
     (rows || []).forEach(function (r) {
@@ -1563,6 +1563,9 @@ async function opEnviar() {
 
   // Suma al acumulador del día para que Producción cierre RT con esta cantidad.
   recpAddCajas(totalCajas);
+  // v11.98: cierra el toggle RT automáticamente (el operario ya no tiene que volver
+  // a la botonera para terminar el inicio→fin de Recepción Mercadería).
+  try { if (typeof window.autoCloseRT === "function") window.autoCloseRT(RECP.legajo); } catch (_e) {}
   rcpDraftClear();   // v7.12: ya se envió, no hay nada que reanudar
 
   // v1.1 — Pasaje de Papeles: mostrar pop-up para capturar documentación

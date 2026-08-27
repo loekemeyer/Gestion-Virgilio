@@ -8,7 +8,7 @@
    recepcion.js (SUPABASE_PUBLISHABLE_KEY, para su createClient). Si rotás la key,
    hay que actualizar LOS TRES. (Además admin/admin.js tiene la anon key del proyecto LK.)
    ========================================================= */
-const SW_VERSION = "v11.97-vir";
+const SW_VERSION = "v11.98-vir";
 /* nota: v7.68 — generador de OCs desde stock (vista_generador_oc). */
 
 const SUPABASE_URL = "https://hrxfctzncixxqmpfhskv.supabase.co";
