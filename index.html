@@ -7192,6 +7192,10 @@ async function send() {
 
   // Por si quedaron otros pendientes acumulados de intentos previos.
   flushQueue();
+
+  // v11.98: después de las 15:30, Moncayo (104) recibe un pop-up consolidado
+  // con TODOS los faltantes que tienen stock para completarse + ubicación.
+  if (legajoStr === "104") cpCheckFaltantesMoncayo();
 }
 
 /* v11.98: cierra el toggle RT automáticamente cuando el operario envía una
@@ -21656,7 +21660,62 @@ async function faltMaybeCompletar(np) {
     try { alert("✓ Pedido " + np + " completo. Marianela ya lo ve en el pedido."); } catch (_e) {}
   }
 }
-/* ---- Panel del SUPERVISOR: "Avisar que llegó un faltante" ---- */
+/* v11.98 — Pop-up consolidado de faltantes para Moncayo (legajo 104).
+   Se dispara al terminar cualquier acción (send()) después de las 15:30 AR.
+   Muestra TODOS los faltantes con stock de una, con total de cajas y ubicación
+   de cada NP (evento AUB). Solo una vez por sesión (no molesta en cada botón). */
+let _cpMoncayoShown = false;
+async function cpCheckFaltantesMoncayo() {
+  if (_cpMoncayoShown) return;
+  // ¿Pasaron las 15:30 AR (UTC-3)?
+  var ahora = new Date();
+  var horaAR = ahora.getUTCHours() - 3; if (horaAR < 0) horaAR += 24;
+  var minAR  = ahora.getUTCMinutes();
+  if (horaAR < 15 || (horaAR === 15 && minAR < 30)) return;
+  _cpMoncayoShown = true;
+  try {
+    var res = await Promise.all([cpLoadFaltantes(), stockFetchSaldos()]);
+    var falt = res[0] || [], saldos = res[1] || {};
+    var sN = {}; Object.keys(saldos).forEach(function (k) { sN[_cpNorm(k)] = saldos[k]; });
+    var disp = function (cod) {
+      var s = sN[_cpNorm(cod)] || {};
+      return Math.round((Number(s.terminado)||0) + (Number(s.a_guardar)||0) + (Number(s.excedente)||0) + (Number(s.racks)||0));
+    };
+    // Agrupar por NP (solo con stock disponible)
+    var porNp = {};
+    falt.forEach(function (e) {
+      if (disp(e.cod_art) <= 0) return;
+      var np = _faltNpNorm(e.np);
+      if (!porNp[np]) porNp[np] = { np: np, tanda: e.tanda || "", cliente: e.cod_cliente || "", arts: [], cajas: 0 };
+      porNp[np].arts.push({ cod: String(e.cod_art), falto: Number(e.cajas_falto) || 0 });
+      porNp[np].cajas += Number(e.cajas_falto) || 0;
+    });
+    var lista = Object.keys(porNp).map(function (k) { return porNp[k]; });
+    if (!lista.length) return;   // no hay nada para completar → no molestamos
+    // Traer ubicaciones (AUB)
+    var nps = lista.map(function (g) { return g.np; });
+    var ubicByNp = {};
+    try {
+      var aubUrl = SUPABASE_TABLE_ENDPOINT + "?opcion=eq.AUB&texto=in.(" + nps.map(encodeURIComponent).join(",") + ")&select=texto,descripcion,ts_cliente&order=ts_cliente.asc&limit=8000";
+      var rowsA = await fetch(aubUrl, { headers: _cpAuthH(), cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; });
+      rowsA.forEach(function (x) { var n = _faltNpNorm(String(x.texto || "").split("|")[0]); if (n) ubicByNp[n] = String(x.descripcion || "").trim(); });
+    } catch (_e) {}
+    // Total general
+    var totalCajas = 0;
+    lista.forEach(function (g) { totalCajas += g.cajas; });
+    // Armar texto del alert
+    var msg = "📦 FALTANTES PARA COMPLETAR\n\nAgarrá " + totalCajas + " caja(s) en total.\n\n";
+    lista.sort(function (a, b) { return String(a.np).localeCompare(String(b.np)); });
+    lista.forEach(function (g) {
+      var det = g.arts.map(function (a) { return a.cod + "×" + a.falto; }).join(", ");
+      var ubic = ubicByNp[g.np] || "sin ubicación";
+      msg += "• NP " + g.np + (g.tanda ? " · " + g.tanda : "") + " → " + g.cajas + " cj (" + det + ") — 📍 " + ubic + "\n";
+    });
+    alert(msg);
+  } catch (e) { console.warn("cpCheckFaltantesMoncayo:", e); }
+}
+
+/* ---- Panel del SUPERVISOR: "Completar Pedido — faltante que llegó" ---- */
 async function faltFetchActivasNps() {
   const s = {};
   try {
@@ -21681,11 +21740,11 @@ async function showFaltAvisar() {
   try {
     // v8.66 — traer saldos para filtrar: un faltante SOLO aparece si hay con qué
     // completarlo (stock en góndola / a guardar / excedente / racks). Si no hay
-    // en ninguno de esos, no tiene sentido ofrecer "Cargar yo" ni "Avisar".
-    const res = await Promise.all([cpLoadFaltantes(), faltFetchActivasNps(), stockFetchSaldos()]);
-    const falt = res[0] || [], activas = res[1] || {}, saldos = res[2] || {};
+    // en ninguno de esos, no tiene sentido ofrecer "Cargar yo".
+    const res = await Promise.all([cpLoadFaltantes(), stockFetchSaldos()]);
+    const falt = res[0] || [], saldos = res[1] || {};
     const sN = {}; Object.keys(saldos).forEach(function (k) { sN[_cpNorm(k)] = saldos[k]; });
-    faltAvRender(falt, activas, sN);
+    faltAvRender(falt, {}, sN);
   } catch (e) { const b = document.getElementById("faltAvBody"); if (b) b.innerHTML = '<div class="fav-empty">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
 }
 function closeFaltAvisar() { const ov = document.getElementById("faltAvModal"); if (ov) ov.classList.remove("show"); }
@@ -21721,15 +21780,14 @@ function faltAvRender(falt, activas, saldosN) {
     _faltAvData[np].cajas += Number(e.cajas_falto) || 0;
   });
   const list = Object.keys(_faltAvData).map(function (k) { return _faltAvData[k]; }).sort(function (a, b) { return String(a.np).localeCompare(String(b.np)); });
-  let h = '<div class="fav-hint">Pedidos con un <b>faltante</b> que todavía <b>no salió ni se facturó</b> y que <b>tienen stock para completarse</b> (góndola / a guardar / excedente / racks). Por cada uno: <b>📦➕ Cargar yo</b> (lo completás vos ahora) o <b>📢 Avisar</b> (les salta el pop-up a los celulares de Virgilio y lo completa alguien; solo uno lo toma).</div>';
+  let h = '<div class="fav-hint">Pedidos con un <b>faltante</b> que todavía <b>no salió ni se facturó</b> y que <b>tienen stock para completarse</b> (góndola / a guardar / excedente / racks). Tocá <b>📦➕ Cargar yo</b> para completarlo vos ahora.</div>';
   if (!list.length) { h += '<div class="fav-empty">No hay faltantes con stock para completar ahora. 👍</div>'; body.innerHTML = h; return; }
   h += list.map(function (g) {
     const det = g.arts.map(function (a) { return escapeHtml(a.cod) + '×' + a.falto; }).join(", ");
     const ya = activas[g.np];
     const cargarBtn = '<button class="fav-btn fav-btn-cargar" onclick="faltCargarYo(\'' + escapeHtml(g.np) + '\')">📦➕ Cargar yo</button>';
-    const avisarBtn = ya ? '<span class="fav-ya">✓ Avisado</span>' : '<button class="fav-btn" onclick="faltCrear(\'' + escapeHtml(g.np) + '\')">📢 Avisar</button>';
     return '<div class="fav-row"><div class="fav-info"><div class="fav-np">NP ' + escapeHtml(g.np) + (g.tanda ? ' · ' + escapeHtml(g.tanda) : '') + (g.cliente ? ' · cli ' + escapeHtml(g.cliente) : '') + '</div><div class="fav-arts">' + det + ' <b>(' + g.cajas + ' cj)</b></div></div>' +
-      '<div class="fav-actions">' + cargarBtn + avisarBtn + '</div></div>';
+      '<div class="fav-actions">' + cargarBtn + '</div></div>';
   }).join("");
   body.innerHTML = h;
 }
