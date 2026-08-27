@@ -2288,6 +2288,12 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .fac-lios-cell .fac-lios0{ color: #94a3b8; font-weight: 600; }
 .fac-cajas-cell{ text-align: center; font-weight: 800; color: #0369a1; white-space: nowrap; }
 .fac-cajas-cell .fac-cajas0{ color: #94a3b8; font-weight: 600; }
+/* v11.85 — Neto a facturar (sin IVA). Solo vista, calculado por RPC backend. */
+.fac-neto-cell{ text-align: center; white-space: nowrap; }
+.fac-neto-cell .fac-neto-val{ font-weight: 800; color: #15803d; font-variant-numeric: tabular-nums; }
+.fac-neto-cell .fac-neto-load{ color: #cbd5e1; font-weight: 700; }
+.fac-neto-cell .fac-neto-na{ color: #94a3b8; font-weight: 600; }
+.fac-neto-cell .fac-neto-falta{ display: block; font-size: 10px; font-weight: 700; color: #b45309; margin-top: 1px; white-space: nowrap; }
 .cr-td-ctrl{ text-align: center; }
 .cr-td-act{ text-align: center; white-space: nowrap; }
 .cr-sinsal-btn{ font-size: 11px; font-weight: 800; color: #b91c1c; background: #fef2f2; border: 1px solid #fecaca; border-radius: 7px; padding: 6px 8px; cursor: pointer; white-space: nowrap; line-height: 1.1; }
@@ -6524,7 +6530,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v11.84";
+const APP_VERSION = "v11.85";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -32253,6 +32259,45 @@ async function facFetchFcKeys(targetTandaKeys){
    monitor de Facturación. Mismo parseo que Control Remitos (~línea 7154).
    Cache de 30s para no pegarle a Supabase en cada refresh del monitor. */
 let _facLios = new Map(); let _facLiosTs = 0; let _facClase = new Map();   // v11.46 — clase [4] por NP
+// v11.85 — Neto a facturar por NP (lista × uxb × cajas armadas × (1−dto_vol) × (1−2%)),
+// vía RPC facturacion_neto_lote (backend; el dto_vol por cliente vive en clientes_dto con
+// RLS que anon no lee). _facNeto: np → { neto:number|null, faltan:[cod...] }. Solo VISTA.
+let _facNeto = new Map();
+async function facFetchNeto(nps){
+  const pend = (nps || []).map(function(n){ return String(n).trim().replace(/\.0+$/, ""); })
+    .filter(function(n){ return n && !_facNeto.has(n); });
+  if (!pend.length) return;
+  try {
+    const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/facturacion_neto_lote", {
+      method: "POST",
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ p_nps: pend })
+    });
+    if (!r.ok) return;
+    const rows = await r.json();
+    (rows || []).forEach(function(row){
+      const np = String(row.np).trim().replace(/\.0+$/, "");
+      _facNeto.set(np, { neto: Number(row.neto) || 0, faltan: row.faltan || [] });
+    });
+    // NPs que la RPC no devolvió (sin ítems armados aún) → marcar para no repreguntar.
+    pend.forEach(function(np){ if (!_facNeto.has(np)) _facNeto.set(np, { neto: null, faltan: [] }); });
+    facPaintNeto();
+  } catch (_e) {}
+}
+/* Pinta las celdas de neto ya resueltas (por id fac-neto-<np>), sin re-render de la tabla. */
+function facPaintNeto(){
+  _facNeto.forEach(function(v, np){
+    const cell = document.getElementById("fac-neto-" + np);
+    if (!cell) return;
+    if (v.neto == null){ cell.innerHTML = '<span class="fac-neto-na">—</span>'; return; }
+    let html = '<span class="fac-neto-val">' + facFmtMoney(v.neto) + '</span>';
+    if (v.faltan && v.faltan.length){
+      html += '<span class="fac-neto-falta" title="Sin precio en el maestro: ' +
+        escapeHtml(v.faltan.join(", ")) + '. El neto no incluye esos códigos.">⚠ falta precio</span>';
+    }
+    cell.innerHTML = html;
+  });
+}
 async function facFetchLios(){
   const now = Date.now();
   if (_facLiosTs && (now - _facLiosTs) < 30000) return _facLios;   // cache 30s
@@ -32901,6 +32946,7 @@ function facRender(tandas){
           const np = String(f.np).trim().replace(/\.0+$/, "");
           const c = _facCajas.get(np); return (!c) ? '<span class="fac-cajas0">—</span>' : escapeHtml(String(Math.round(c)));
         })()}</td>
+        <td class="center fac-neto-cell" id="fac-neto-${escapeHtml(String(f.np).trim().replace(/\.0+$/, ""))}"><span class="fac-neto-load">…</span></td>
         <td class="center fac-accion-cell"><button class="fac-btn-tick" data-args='${args}' onclick="facTickNP(this)">✓</button></td>
       </tr>`;
   }).join("");
@@ -32914,17 +32960,22 @@ function facRender(tandas){
             <th class="center" style="width:6%">Salida</th>
             <th style="width:8%">NP</th>
             <th style="width:6%">Cod</th>
-            <th style="width:22%">Razón Social</th>
-            <th style="width:16%">A facturar / Falta</th>
-            <th style="width:14%" title="Pedidos en código secundario a corregir (secundario → principal). Confirmá en 🔀 Corregir códigos.">Cambiar cód</th>
+            <th style="width:18%">Razón Social</th>
+            <th style="width:14%">A facturar / Falta</th>
+            <th style="width:12%" title="Pedidos en código secundario a corregir (secundario → principal). Confirmá en 🔀 Corregir códigos.">Cambiar cód</th>
             <th class="center" style="width:5%">Líos</th>
             <th class="center" style="width:5%">Cajas</th>
+            <th class="center" style="width:11%" title="Neto a facturar (sin IVA): precio de lista × unidades por caja × cajas armadas × (1 − dto por volumen del cliente) × (1 − 2%). Sobre lo ARMADO (ya neto de faltantes).">💵 Neto</th>
             <th class="center fac-accion-th" style="width:10%">Acción</th>
           </tr>
         </thead>
         <tbody>${rowsHtml}</tbody>
       </table>
     </div>`;
+
+  // v11.85 — Neto a facturar por NP: pinta lo cacheado y trae lo que falte (RPC backend).
+  facPaintNeto();
+  facFetchNeto(filasView.map(function(f){ return f.np; }));
 }
 
 /* Tick por NP — POST a Supabase.

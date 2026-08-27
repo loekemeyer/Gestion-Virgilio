@@ -12,7 +12,32 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-08-26 · Versión app al documentar: **v11.82**
+> Última actualización: 2026-08-27 · Versión app al documentar: **v11.85**
+>
+> Nota **2026-08-27 — v11.85 (Facturación: columna 💵 Neto a facturar por NP).**
+> El módulo **Facturación — NPs a FC** muestra ahora, por fila, el **neto a facturar
+> (sin IVA)** del pedido: `precio_lista × uxb × cajas_armadas × (1 − dto_vol) × (1 − 2%)`.
+> Es **sobre lo ARMADO** (`Entregas_Virgilio.cajas_entregadas`, ya neto de faltantes),
+> así el importe baja solo cuando el pedido salió corto. **Solo VISTA** (no emite; el
+> neto fiscal exacto al emitir sigue por `arca-wsfe/preciar`, sin tocar). **NO usa arca.**
+> **Backend (todo en Virgilio, aditivo):**
+> - **`clientes_dto`** (`cod_cliente`, `dto_vol`, `actualizado`) — espejo del `dto_vol`
+>   por cliente de LK (`customers.dto_vol`). **Sync manual** desde LK (mismo patrón que
+>   `precios_venta`): es fijo por cliente. **RLS ON sin policy + REVOKE anon/authenticated**
+>   → el padrón de descuentos **no es legible por anon** (evita filtrarlo). Sembrada con
+>   1271 clientes (560 con dto > 0) al crearla.
+> - **`facturacion_neto_lote(p_nps text[])`** — RPC `SECURITY DEFINER` que cruza
+>   `Entregas_Virgilio × precios_venta × clientes_dto` y devuelve **solo** `np → neto, faltan[]`
+>   (nunca expone dto_vol ni lista). `faltan` = códigos sin precio en `precios_venta` (el neto
+>   los excluye). anon tiene **EXECUTE** (definer lee por él), no SELECT sobre la tabla.
+> - **`canon_cod(text)`** — helper de normalización de códigos (upper, trim, saca ceros a
+>   la izq), igual que `canonCod` del front / `arca-wsfe`.
+> **Front (`index.html`, `facRender`):** columna nueva **"💵 Neto"**; al abrir Facturación
+> hace **1 llamada** a la RPC con las NP visibles (cache `_facNeto`, se pinta por id
+> `fac-neto-<np>` sin re-render). NP sin ítems armados → "—"; con códigos sin precio →
+> "⚠ falta precio". **Re-sync de `clientes_dto`**: cuando cambien descuentos en LK, correr
+> de nuevo el copiado (`SELECT string_agg(format('(%L,%s)', cod_cliente::text, COALESCE(dto_vol,0)::text), ',') FROM customers`
+> en LK → `INSERT ... ON CONFLICT (cod_cliente) DO UPDATE` en Virgilio).
 >
 > Nota **2026-08-26 — v11.82 (Ajuste "llenar góndola a N meses" en la OC puntual).**
 > En la vista de detalle de una OC (Compras → abrir OC) la columna **Pedido** ahora
