@@ -2955,9 +2955,14 @@ table.fac-np-tbl tbody tr.fac-tanda-alt:hover td{ background: #f1f5f9; }
   overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 1400px; margin: 0 auto;
 }
 /* v11.83 — módulo NC a Loeke compacto: clase propia para no forzar el min-width:980px
-   de la tabla grande de facturación. */
-table.fac-np-tbl.nc-tbl{ min-width: 0; font-size: 12.5px; }
+   de la tabla grande de facturación. v11.87 — min-width propio (no 0) para que la tabla
+   tenga aire y SCROLLEE en el celular dentro de .fac-table-wrap, en vez de comprimir las
+   columnas y que el header "Cajas" se pise con "Razón Social". */
+table.fac-np-tbl.nc-tbl{ min-width: 620px; font-size: 12.5px; }
 table.fac-np-tbl.nc-tbl td{ padding: 2px 8px; }
+/* El th de la tabla grande no trunca (para que "A facturar / Falta" etc. puedan bajar de
+   renglón); acá SÍ truncamos el header para que nunca se desborde sobre la columna vecina. */
+table.fac-np-tbl.nc-tbl th{ overflow: hidden; text-overflow: ellipsis; }
 .nc-head{ margin: 12px 0 4px; font-weight: 800; font-size: 13.5px; color: #92400e; }
 .nc-sub{ font-weight: 500; font-size: 11px; color: #64748b; margin-top: 1px; }
 .nc-btn{ background: #16a34a; color: #fff; border: none; border-radius: 6px; padding: 3px 10px; font-size: 12px; font-weight: 800; cursor: pointer; white-space: nowrap; width: auto; }
@@ -6537,7 +6542,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v11.86";
+const APP_VERSION = "v11.87";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -32453,7 +32458,7 @@ function facRenderNc(){
   box.innerHTML = '<div class="nc-head">🧾 NC a Loeke + stock a Chef — ' + list.length + ' pend.'
     + '<div class="nc-sub">Art. importados por Chef y facturados por Chef → hacé la NC a Loeke y pasá el stock. Tildá ✓ para no olvidarte. No afecta el camión.</div></div>'
     + '<div class="fac-table-wrap"><table class="fac-np-tbl nc-tbl"><thead><tr>'
-    + '<th style="width:12%">NP</th><th style="width:10%">Cód</th><th style="width:36%">Artículo</th><th class="center" style="width:8%">Cajas</th><th style="width:22%">Razón Social</th><th class="center" style="width:12%">Acción</th>'
+    + '<th style="width:12%">NP</th><th style="width:9%">Cód</th><th style="width:33%">Artículo</th><th class="center" style="width:9%">Cajas</th><th style="width:22%">Razón Social</th><th class="center" style="width:15%">Acción</th>'
     + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
   box.style.display = "";
 }
