@@ -2294,7 +2294,7 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .fac-neto-cell .fac-neto-load{ color: #cbd5e1; font-weight: 700; }
 .fac-neto-cell .fac-neto-na{ color: #94a3b8; font-weight: 600; }
 .fac-neto-cell .fac-neto-falta{ display: block; font-size: 10px; font-weight: 700; color: #b45309; margin-top: 1px; white-space: nowrap; }
-.fac-neto-cell .fac-neto-siva{ display: block; font-size: 9px; font-weight: 700; color: #94a3b8; letter-spacing: .3px; margin-top: -1px; text-transform: uppercase; }
+.fac-np-tbl th .fac-th-siva{ font-size: 9px; font-weight: 700; color: #94a3b8; }
 .fac-neto-click{ cursor: pointer; }
 .fac-neto-click:hover .fac-neto-val{ text-decoration: underline; }
 /* v11.86 — Modal desglose por ítem (reusa .facfc-). */
@@ -6543,7 +6543,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v11.88";
+const APP_VERSION = "v11.89";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -32303,7 +32303,7 @@ function facPaintNeto(){
     const cell = document.getElementById("fac-neto-" + np);
     if (!cell) return;
     if (v.neto == null){ cell.innerHTML = '<span class="fac-neto-na">—</span>'; return; }
-    let html = '<span class="fac-neto-val">' + facFmtMoney(v.neto) + '</span><span class="fac-neto-siva">s/ IVA</span>';
+    let html = '<span class="fac-neto-val">' + facFmtMoney(v.neto) + '</span>';
     if (v.faltan && v.faltan.length){
       html += '<span class="fac-neto-falta" title="Sin precio en el maestro: ' +
         escapeHtml(v.faltan.join(", ")) + '. El neto no incluye esos códigos.">⚠ falta precio</span>';
@@ -33044,7 +33044,7 @@ function facRender(tandas){
             <th style="width:12%" title="Pedidos en código secundario a corregir (secundario → principal). Confirmá en 🔀 Corregir códigos.">Cambiar cód</th>
             <th class="center" style="width:5%">Líos</th>
             <th class="center" style="width:5%">Cajas</th>
-            <th class="center" style="width:11%" title="Neto a facturar (sin IVA): precio de lista × unidades por caja × cajas armadas × (1 − dto por volumen del cliente) × (1 − 2%). Sobre lo ARMADO (ya neto de faltantes).">💵 Neto</th>
+            <th class="center" style="width:11%" title="Neto a facturar (sin IVA): precio de lista × unidades por caja × cajas armadas × (1 − dto por volumen del cliente) × (1 − 2%). Sobre lo ARMADO (ya neto de faltantes).">💵 Neto <span class="fac-th-siva">s/IVA</span></th>
             <th class="center fac-accion-th" style="width:10%">Acción</th>
           </tr>
         </thead>
