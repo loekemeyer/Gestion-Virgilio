@@ -12,7 +12,16 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-08-27 · Versión app al documentar: **v11.93**
+> Última actualización: 2026-08-27 · Versión app al documentar: **v11.94**
+>
+> Nota **2026-08-27 — v11.94 (Desglose Neto: faltantes en rojo + neto original).**
+> El modal 💵 Neto ahora también detalla los **faltantes** (productos que no salieron,
+> `Entregas_Virgilio.cajas_falto>0`) **en rojo** (código −cajas), y muestra **dos netos**:
+> **NETO a facturar** (sobre lo armado = `cajas_entregadas`, sin faltantes) y **Neto original
+> (pedido completo)** (sobre `cajas_pedidas`), más "Faltó facturar" = la diferencia. La RPC
+> `facturacion_neto_detalle` se reescribió (DROP+CREATE, cambió el tipo de retorno) para devolver
+> por ítem `cajas_ped/ent/falto`, `importe_ent` (armado) e `importe_ped` (pedido total). Los "sin
+> precio en el maestro" (armados sin precio) siguen abajo, tachaditos, aparte de los faltantes.
 >
 > Nota **2026-08-27 — v11.93 (Histórico de Recepción: columna Demora de carga).**
 > El **Histórico de Recepción** (recepcion.js, `renderHistorico`) muestra una columna
