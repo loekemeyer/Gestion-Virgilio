@@ -12,7 +12,26 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-08-27 · Versión app al documentar: **v11.94**
+> Última actualización: 2026-08-27 · Versión app al documentar: **v11.98**
+>
+> Nota **v11.98 — Auto-close RT al enviar + pop-up faltantes Moncayo 15:30 + saca botón Avisar + fix OC recepción.**
+> **(1) Auto-close RT:** al presionar **Enviar** en recepción (`opEnviar`, `recepcion.js`), el toggle de
+> **Recepción Mercadería (RT)** se cierra automáticamente (`window.autoCloseRT(legajo)` expuesta desde
+> `index.html`). El operario ya no necesita volver a la botonera para cerrar RT manualmente. La función
+> replica el patrón de `ccSendClose`: `toggleStartOrEnd` + payload con `ts_inicio_iso` + `enqueueReport` +
+> `trySendOneReport` + actualiza indicadores. RT se agregó a `AUTO_CLOSE_CODES`. **(2) Pop-up faltantes
+> Moncayo:** después de las **15:30 AR**, cuando el legajo **104** (Moncayo) termina cualquier acción
+> (`send()`), recibe un `alert` consolidado con **TODOS los faltantes** que tienen stock para completarse
+> (góndola + a_guardar + excedente + racks), el **total de cajas** y la **ubicación** de cada NP (evento
+> AUB). Solo dispara una vez por sesión (`_cpMoncayoShown`). Función `cpCheckFaltantesMoncayo()` reutiliza
+> `cpLoadFaltantes` + `stockFetchSaldos` + consulta AUB. Reemplaza el recordatorio de v6.20 (que solo
+> abría el CP sin mostrar datos). **(3) Botón "📢 Avisar" REMOVIDO** del panel Completar Pedido
+> (`faltAvRender`): queda solo **📦➕ Cargar yo**. El hint se actualizó. `showFaltAvisar` ya no llama
+> a `faltFetchActivasNps()`. La función `faltCrear` sigue definida (dead code). **(4) Fila precio en
+> facturación:** se sacó la fila `<div class="facfc-des">` que mostraba "lista $X −N%" debajo de cada
+> artículo. **(5) Fix OC en recepción:** `cargarOCVigentes()` llamaba al RPC `oc_vigentes_por_proveedor`
+> con parámetro `p_nombre` (incorrecto) → `nombre_ent` (correcto). Sin el fix las cantidades de OC no
+> aparecían en los botones de artículo.
 >
 > Nota **2026-08-27 — Facturación neto/faltantes: cálculo centralizado en vistas (`sql/facturacion_neto.sql`).**
 > El neto y los faltantes dejan de vivir sólo en el front: el cálculo está en **vistas en vivo**

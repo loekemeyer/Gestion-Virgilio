@@ -274,6 +274,8 @@ que en el momento pida verlo.
 
 ## Git
 
-- **Este es un repo de PRUEBA** (`tv-v`), espejo de Producción Virgilio. Trabajar
-  **directo en `main`**: commitear y pushear ahí sin preguntar.
+- **Trabajar SIEMPRE directo en `main`**: commitear y pushear ahí sin preguntar.
+  **NUNCA crear ni usar ramas** (ni feature branches, ni ramas de Claude).
+  Todo va a `main` directo. Si la plataforma crea una rama automáticamente,
+  mergear a `main` de inmediato y trabajar desde ahí.
 - Estilo de commits: `vX.YZ: descripción` cuando hay bump de versión.
