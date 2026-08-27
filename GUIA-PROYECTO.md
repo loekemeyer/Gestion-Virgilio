@@ -28,6 +28,20 @@
 > el dto% del cliente de esa NP** — misma exposición que ya tenía el modal de facturar de
 > `arca-wsfe/preciar`; NO expone el padrón entero (sigue por NP puntual, `clientes_dto` con RLS).
 >
+> Nota **2026-08-27 — v11.86-cron (clientes_dto: sync automático cada 14 días).**
+> `clientes_dto` ya **no es sync manual**: se refresca solo desde LK. Como Virgilio **no tiene
+> FDW/dblink** (solo la extensión `http` + `pg_net`), el patrón es **Edge Function + pg_cron**
+> (igual que los `planify_*` y `sync_ppp_entregados_meta`):
+> - **Edge Function `sync-clientes-dto`** (`verify_jwt=off`): lee `customers` de LK (paginado,
+>   PostgREST corta en 1000/pág) con `WEB_SERVICE_KEY` (service_role de LK, secret ya existente
+>   que usa arca-wsfe — el anon de LK NO puede leer `customers`, RLS lo protege) y hace upsert
+>   en `clientes_dto` con el service_role propio. Idempotente. Devuelve `{ok, sincronizados}`.
+> - **Cron `sync-clientes-dto-14d`** (jobid 61, `0 8 * * *` = 05:00 ART diario): dispara la
+>   función por `net.http_post` **solo si** `max(clientes_dto.actualizado) < now() − 14 días`.
+>   Así el intervalo es de **14 días exactos** y, si un día falla, reintenta al día siguiente
+>   (auto-recuperación) sin adelantar el ciclo. Trigger manual: `SELECT net.http_post(...)` o
+>   `http_post('.../functions/v1/sync-clientes-dto','{}','application/json')` (sincrónico).
+>
 > Nota **2026-08-27 — v11.85 (Facturación: columna 💵 Neto a facturar por NP).**
 > El módulo **Facturación — NPs a FC** muestra ahora, por fila, el **neto a facturar
 > (sin IVA)** del pedido: `precio_lista × uxb × cajas_armadas × (1 − dto_vol) × (1 − 2%)`.
@@ -36,10 +50,9 @@
 > neto fiscal exacto al emitir sigue por `arca-wsfe/preciar`, sin tocar). **NO usa arca.**
 > **Backend (todo en Virgilio, aditivo):**
 > - **`clientes_dto`** (`cod_cliente`, `dto_vol`, `actualizado`) — espejo del `dto_vol`
->   por cliente de LK (`customers.dto_vol`). **Sync manual** desde LK (mismo patrón que
->   `precios_venta`): es fijo por cliente. **RLS ON sin policy + REVOKE anon/authenticated**
->   → el padrón de descuentos **no es legible por anon** (evita filtrarlo). Sembrada con
->   1271 clientes (560 con dto > 0) al crearla.
+>   por cliente de LK (`customers.dto_vol`). **RLS ON sin policy + REVOKE anon/authenticated**
+>   → el padrón de descuentos **no es legible por anon** (evita filtrarlo). ~1272 clientes
+>   (560 con dto > 0). **Sync AUTOMÁTICO cada 14 días** (ver nota v11.86-cron abajo).
 > - **`facturacion_neto_lote(p_nps text[])`** — RPC `SECURITY DEFINER` que cruza
 >   `Entregas_Virgilio × precios_venta × clientes_dto` y devuelve **solo** `np → neto, faltan[]`
 >   (nunca expone dto_vol ni lista). `faltan` = códigos sin precio en `precios_venta` (el neto
@@ -49,9 +62,8 @@
 > **Front (`index.html`, `facRender`):** columna nueva **"💵 Neto"**; al abrir Facturación
 > hace **1 llamada** a la RPC con las NP visibles (cache `_facNeto`, se pinta por id
 > `fac-neto-<np>` sin re-render). NP sin ítems armados → "—"; con códigos sin precio →
-> "⚠ falta precio". **Re-sync de `clientes_dto`**: cuando cambien descuentos en LK, correr
-> de nuevo el copiado (`SELECT string_agg(format('(%L,%s)', cod_cliente::text, COALESCE(dto_vol,0)::text), ',') FROM customers`
-> en LK → `INSERT ... ON CONFLICT (cod_cliente) DO UPDATE` en Virgilio).
+> "⚠ falta precio". **Re-sync de `clientes_dto`**: automático cada 14 días (ver nota
+> v11.86-cron); para forzarlo al toque, disparar la Edge Function `sync-clientes-dto`.
 >
 > Nota **2026-08-26 — v11.82 (Ajuste "llenar góndola a N meses" en la OC puntual).**
 > En la vista de detalle de una OC (Compras → abrir OC) la columna **Pedido** ahora
