@@ -2308,6 +2308,8 @@ table.facfc-tbl tr.facneto-falta td{ color: #b45309; }
 .facneto-falt-box .facneto-falt-red{ font-weight: 800; color: #dc2626; white-space: nowrap; }
 .facneto-tot .facneto-orig{ margin-top: 4px; font-size: 12.5px; color: #64748b; font-weight: 700; }
 .facneto-tot .facneto-difrojo{ font-size: 12.5px; color: #dc2626; font-weight: 800; }
+.facneto-red{ color: #dc2626 !important; font-weight: 800; }
+table.facfc-tbl tr.facneto-row-falt td{ background: #fef2f2; }
 /* Faltantes (sin precio) abajo de todo, apenas tachaditos. */
 .facneto-faltantes{ margin-top: 10px; font-size: 11px; color: #94a3b8; line-height: 1.6; }
 .facneto-faltantes .facneto-falt-t{ font-weight: 700; text-transform: uppercase; letter-spacing: .3px; margin-right: 4px; }
@@ -6553,7 +6555,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v11.94";
+const APP_VERSION = "v11.95";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -32357,51 +32359,58 @@ window.facNetoDetalle = async function(np){
     return;
   }
   var dtoPct = Math.round((Number(rows[0].dto_vol) || 0) * 1000) / 10;
-  var subtotalEnt = 0, subtotalPed = 0, nOk = 0;
+  var subtotalEnt = 0, subtotalPed = 0, nOk = 0, nFalt = 0;
   var sinPrecio = [];   // armados sin precio en el maestro → tachaditos abajo
-  var faltantes = [];   // cajas_falto>0 → en ROJO, no salieron
-  var filas = rows.map(function(it){
+  var filasArr = [];
+  rows.forEach(function(it){
     var ent = Number(it.cajas_ent) || 0, falto = Number(it.cajas_falto) || 0;
     var impEnt = (it.importe_ent != null) ? Number(it.importe_ent) : null;
     var impPed = (it.importe_ped != null) ? Number(it.importe_ped) : null;
-    if (falto > 0) faltantes.push({ cod: String(it.cod), falto: falto });
-    if (impPed != null) subtotalPed += impPed;   // neto original = pedido total (haya salido o no)
-    if (it.sin_precio || impEnt == null){
-      if (ent > 0) sinPrecio.push({ cod: String(it.cod), cajas: ent, uxb: it.uxb });
-      return "";
-    }
-    if (ent <= 0) return "";   // con precio pero no armado → sólo cuenta como faltante (rojo)
-    nOk++;
-    subtotalEnt += impEnt;
     var dto = Math.round((Number(it.dto_vol) || 0) * 1000) / 10;
-    var des = 'lista ' + facFmtMoney(it.precio_lista) + (dto > 0 ? ' −' + dto + '%' : '');
-    return '<tr><td class="facfc-cod">' + escapeHtml(String(it.cod)) + '</td>' +
-      '<td class="num">' + ent + '×' + it.uxb + '</td>' +
-      '<td class="num">' + facFmtMoney(it.precio_lista) + '<div class="facfc-des">' + des + '</div></td>' +
-      '<td class="num">' + facFmtMoney(impEnt) + '</td></tr>';
-  }).join("");
+    var desLista = 'lista ' + facFmtMoney(it.precio_lista) + (dto > 0 ? ' −' + dto + '%' : '');
+    if (impPed != null) subtotalPed += impPed;   // neto original = pedido total (haya salido o no)
+    // Fila ARMADA (negra): lo entregado con precio.
+    if (ent > 0 && !it.sin_precio && impEnt != null){
+      nOk++; subtotalEnt += impEnt;
+      filasArr.push('<tr><td class="facfc-cod">' + escapeHtml(String(it.cod)) + '</td>' +
+        '<td class="num">' + ent + '×' + it.uxb + '</td>' +
+        '<td class="num">' + facFmtMoney(it.precio_lista) + '<div class="facfc-des">' + desLista + '</div></td>' +
+        '<td class="num">' + facFmtMoney(impEnt) + '</td></tr>');
+    } else if (ent > 0 && (it.sin_precio || impEnt == null)){
+      sinPrecio.push({ cod: String(it.cod), cajas: ent, uxb: it.uxb });
+    }
+    // Fila FALTANTE (roja): lo que NO salió. No entra al neto; el importe es lo que se dejó de facturar.
+    if (falto > 0){
+      nFalt++;
+      var faltoVal = (impPed != null && impEnt != null) ? Math.round((impPed - impEnt) * 100) / 100 : null;
+      var impCell  = it.sin_precio ? '<span class="facneto-red">sin precio</span>'
+                    : (faltoVal != null ? '<span class="facneto-red">' + facFmtMoney(faltoVal) + '</span>' : '—');
+      var listaCell = it.sin_precio ? '—' : (facFmtMoney(it.precio_lista) + '<div class="facfc-des">' + desLista + '</div>');
+      filasArr.push('<tr class="facneto-row-falt"><td class="facfc-cod"><span class="facneto-red">' + escapeHtml(String(it.cod)) + '</span></td>' +
+        '<td class="num"><span class="facneto-red">' + falto + '×' + (it.uxb || '?') + ' faltó</span></td>' +
+        '<td class="num">' + listaCell + '</td>' +
+        '<td class="num">' + impCell + '</td></tr>');
+    }
+  });
+  var filas = filasArr.join("");
   subtotalEnt = Math.round(subtotalEnt * 100) / 100;
   subtotalPed = Math.round(subtotalPed * 100) / 100;
   var neto     = Math.round(subtotalEnt * 0.98 * 100) / 100;   // sin faltantes (a facturar)
   var netoOrig = Math.round(subtotalPed * 0.98 * 100) / 100;   // pedido completo
-  var hayFalt = faltantes.length > 0 || netoOrig > neto;
+  var hayFalt = nFalt > 0 || netoOrig > neto;
   var h = '';
-  h += '<div class="facfc-sub">NP ' + escapeHtml(np) + ' · ' + nOk + ' ítem(s)' + (dtoPct > 0 ? ' · dto volumen ' + dtoPct + '%' : ' · sin dto volumen') + '</div>';
+  h += '<div class="facfc-sub">NP ' + escapeHtml(np) + ' · ' + nOk + ' ítem(s)' + (nFalt ? ' · ' + nFalt + ' faltó' : '') + (dtoPct > 0 ? ' · dto volumen ' + dtoPct + '%' : ' · sin dto volumen') + '</div>';
   h += '<div class="facfc-tblwrap"><table class="facfc-tbl"><thead><tr><th>Cód</th><th class="num">Cajas×u</th><th class="num">Lista</th><th class="num">Importe</th></tr></thead><tbody>' + filas + '</tbody></table></div>';
-  // Faltantes (no salieron) en ROJO, detallando código y cuántas cajas faltaron.
-  if (faltantes.length){
-    h += '<div class="facneto-falt-box"><span class="facneto-falt-h">⚠ Faltantes (no salieron):</span> ' +
-      faltantes.map(function(f){ return '<span class="facneto-falt-red">' + escapeHtml(f.cod) + ' −' + f.falto + '</span>'; }).join(", ") + '</div>';
-  }
+  // Orden pedido: subtotal → descuentos → neto original → faltó facturar → NETO a facturar.
   h += '<div class="facneto-tot">' +
-    '<span>Subtotal armado (dto x ítem) ' + facFmtMoney(subtotalEnt) + '</span>' +
-    '<span>− 2% s/ subtotal ' + facFmtMoney(-(Math.round((subtotalEnt - neto) * 100) / 100)) + '</span>' +
-    '<span class="facneto-total">NETO a facturar ' + facFmtMoney(neto) + '</span>' +
-    '<span class="facneto-note">sin faltantes · sobre lo armado</span>' +
+    '<span>Subtotal (dto x ítem) ' + facFmtMoney(subtotalEnt) + '</span>' +
+    '<span>Descuento −2% s/ subtotal ' + facFmtMoney(-(Math.round((subtotalEnt - neto) * 100) / 100)) + '</span>' +
     (hayFalt
       ? '<span class="facneto-orig">Neto original (pedido completo) ' + facFmtMoney(netoOrig) + '</span>' +
         '<span class="facneto-difrojo">Faltó facturar ' + facFmtMoney(Math.round((netoOrig - neto) * 100) / 100) + '</span>'
       : '') +
+    '<span class="facneto-total">NETO a facturar ' + facFmtMoney(neto) + '</span>' +
+    '<span class="facneto-note">sin faltantes · sobre lo armado</span>' +
     '</div>';
   h += '<div class="facfc-actions"><button class="facfc-cancel" onclick="facNetoClose()">Cerrar</button></div>';
   // Sin precio en el maestro (armados) abajo de todo, apenas tachaditos: no entran al neto.
