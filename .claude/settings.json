@@ -45,11 +45,11 @@
       "mcp__supabase__deploy_edge_function",
       "Bash(git push:*)",
       "Bash(curl:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "mcp__Supabase__apply_migration",
+      "mcp__supabase__apply_migration"
     ],
     "deny": [
-      "mcp__Supabase__apply_migration",
-      "mcp__supabase__apply_migration",
       "mcp__Supabase__create_branch",
       "mcp__Supabase__merge_branch",
       "mcp__Supabase__reset_branch",
