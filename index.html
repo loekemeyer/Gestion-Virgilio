@@ -6558,7 +6558,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.01";
+const APP_VERSION = "v12.02";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -11325,7 +11325,19 @@ const EQUIV_FAMILIAS = [
   // v8.11 — Corta Queso (Chef): 809 nacional ↔ 809E importado, ambos Chef. El 809E de Chef
   // vive suffijado ("809E CH"); el 809 nacional se guarda PELADO. Sólo agrupa el 809E de Chef
   // con el 809 pelado — el "809E LK" (cortapizza) NO entra acá y queda solo.
-  { desc: "Corta Queso (Chef)",       def: "809E CH", cods: ["809E CH", "809"] }
+  { desc: "Corta Queso (Chef)",       def: "809E CH", cods: ["809E CH", "809"] },
+  // v12.02 — Coladores: 029/030 son los códigos VIEJOS, ya DISCONTINUADOS
+  // (Articulos_Discontinuados: "reemplazado por 437E (Loeke) / 438E (Chef)"), y siguen
+  // entrando pedidos con ellos (029: 3 · 030: 1 en PPP_Base_Pedidos al 2026-08-28).
+  // El mapeo correcto es POR MEDIDA, como dice Equivalencias_Familia — 029 = Colador
+  // 16cm → 437E, 030 = Colador 20cm → 438E (el "motivo" de Articulos_Discontinuados
+  // está redactado en bloque para los 4 códigos y NO sirve para elegir cuál va a cuál).
+  // Confirmado por el dueño el 2026-08-28. Mismo patrón que el Grupo B: el nacional
+  // discontinuo se sustituye por el importado, y su proyección residual (proyeccion_madre
+  // tiene "29" con 1,6 caj/mes) se consolida en el default → el generador de OCs pide
+  // ese resto en 437E, que es lo que efectivamente se compra.
+  { desc: "Colador 16cm",             def: "437E", cods: ["437E", "029"] },
+  { desc: "Colador 20cm",             def: "438E", cods: ["438E", "030"] }
 ];
 let _equivIdx = null;
 function _equivBuild() {

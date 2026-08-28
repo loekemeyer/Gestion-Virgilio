@@ -7689,3 +7689,80 @@ tanda — se guardan como par open/close y el motor descuenta el `close` (la dur
 > del remito generan una sola tarea (no se recrea aunque Pagos ya la haya cerrado). Es el
 > primer cruce Virgilio→Planify (ambos schemas viven en el mismo Postgres
 > `hrxfctzncixxqmpfhskv`). DDL versionado en `sql/recepcion_tarea_pagos_planify.sql`.
+
+---
+
+## ⚠ EL CASO 809 — tres artículos distintos bajo el mismo número
+
+> Relevado contra datos reales el **2026-08-28**. Es la trampa más cara del proyecto:
+> **`809`, `809E LK` y `809E CH` NO son el mismo artículo**. Si se confunden, se pickea
+> mal, se factura mal y se compra mal. Leer esto ANTES de tocar cualquier cosa con 809.
+
+### Los tres artículos
+
+| Código en stock | Qué es | Empresa | Dónde está | Saldo (28/08) |
+|---|---|---|---|---|
+| **`809`** | Corta Queso Alambre **nacional** | Chef | góndola **M16** (cap. 80) | terminado 9 |
+| **`809E CH`** | Corta Queso **importado** | Chef | góndola **M13** (cap. 96; M14/M15 también) | terminado 177 · racks 336 · a_facturar 12 · separar 6 |
+| **`809E LK`** | **Corta Pizza Familiar** | Loekemeyer | góndola **J13** (cap. 50; J14 también) | terminado 47 · a_facturar 5 |
+
+**El punto que hay que tener grabado:** `809E` de Loekemeyer **no tiene nada que ver** con
+el Corta Queso. Es un Corta Pizza Familiar. Mismo número, producto distinto, góndola
+distinta, empresa distinta.
+
+### Cómo lo resuelve el sistema
+
+1. **La NP decide la empresa.** `empresaDeNp(np)` (`index.html:7360`): NP > 90000 → `LK`,
+   si no → `CH`. Verificado: las NP de Loekemeyer van 97428–98291 y las de Chef
+   44389–44547, así que "empieza con 9 / empieza con 4" y "> 90000" son la misma regla.
+2. **El pedido trae el código pelado** (`809E`) y el picking lo resuelve a la empresa:
+   `codEmpSplit` / `pkCodEmpresa` (`index.html:10200`, `7365`) → `809E LK` o `809E CH`.
+   `EMPRESA_SPLIT_CODS = {437E, 438E, 439E, 809E}`.
+   ⚠ El **`809` nacional NO entra** en ese split: es Chef-only y su stock se guarda
+   **pelado**, sin sufijo.
+3. **El nombre también cambia por empresa:** `NOMBRE_POR_EMPRESA`
+   (`index.html:10188`) = `{ "809E": { LK: "Corta Pizza Familiar", CH: "Corta Queso" } }`.
+   Los coladores 437E/438E/439E son el MISMO producto en las dos empresas → NO van ahí.
+4. **Al cruzar contra el pedido se vuelve al código pelado:** `codBase()`
+   (`index.html:7387`) saca el sufijo ` LK`/` CH`/` LOKE`, porque faltantes,
+   `Entregas_Virgilio` y facturación usan el código que pidió el cliente.
+5. **`809` (nacional) y `809E CH` (importado) son familia** — el nacional está
+   discontinuándose y se sustituye por el importado. En `EQUIV_FAMILIAS` la familia es
+   `def: "809E CH"`, `cods: ["809E CH", "809"]`. El `809E LK` **queda solo, fuera de la
+   familia** (es otro producto).
+6. **`Equivalencias_Codigos`** manda el pedido pelado al stock correcto:
+   `809E → 809E CH`, con la nota *"Corta Queso — el pedido pelado se levanta del stock de
+   Chef (planimetría M13). El 809E de Loekemeyer es Corta Pizza Familiar = 809E LK"*.
+7. **En la tabla de Stock, "Cajas pedidas" del `809E` se parte por empresa**
+   (`porEmpresa`, idea 9020) para no sumar Corta Queso con Corta Pizza. El **generador de
+   OCs lo llama SIN ese flag a propósito**, porque cruza contra `OC_Maximos`, que tiene el
+   código pelado.
+
+### Volumen real (28/08)
+
+`PPP_Base_Pedidos`: `809E` 81 pedidos / 361 cajas · `809` 4 pedidos / 57 cajas.
+`Entregas_Virgilio`: `809E` 62 líneas · `809` 2.
+
+### ⚠ Inconsistencias VIVAS (no resueltas — no las "arregles" sin preguntar)
+
+1. **`Equivalencias_Familia` dice que el principal es `809E` (sin sufijo), el front dice
+   `809E CH`.** Por eso el loader de familias (v11.102) **no adopta** esa fila de la tabla:
+   si lo hiciera, el código `809` quedaría en dos familias a la vez y `famOf["809"]` sería
+   indefinido según el orden de las claves. Hay que decidir cuál de los dos se corrige.
+2. **Los nombres se contradicen entre fuentes.** `vista_nombres_articulos` devuelve
+   `809E` = *"Corta Pizza Familiar"* (de `E. Madre LK`), mientras `OC_Maximos` tiene
+   `809E` = *"Corta Queso X 12"* con línea **CH**. Las dos "tienen razón" según la empresa;
+   el nombre plano por código es, para el 809E, **estructuralmente ambiguo**. Por eso
+   existe `artNombreEmp(cod, np)`: **nunca** mostrar el nombre del 809E sin la NP.
+3. **El picking puede escribir el código equivocado** — es la **idea 8606**, pendiente:
+   el pipeline saca el código del evento `PKC` (`texto = tanda|articulo|pedido|pickeado`),
+   y cuando el pedido referencia `809` en vez de `809E`, la app escribe `809` sin E ni
+   marca. Caso real: `PKC D29A|809|14|14` debía ser `D29A|809E CH|14|14` (ya corregido a
+   mano). Mientras 8606 no se haga, un pedido mal cargado arriba se propaga al stock.
+
+### Reglas prácticas
+
+- **Nunca** mostrar ni cruzar un `809E` sin saber la NP.
+- **Nunca** sumar `809E LK` + `809E CH`: son productos distintos, no un total.
+- El `809` pelado es **Chef nacional**; no lleva sufijo, y no es "el 809E sin la E".
+- Antes de tocar equivalencias, familias o planimetría del 809, releer esta sección.
