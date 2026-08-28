@@ -6558,7 +6558,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v11.101";
+const APP_VERSION = "v11.102";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -12380,14 +12380,46 @@ let _prodSort = { col: "tandas", dir: -1 };   // orden de la tabla
    (ritmo / meta − 1) × 100, con signo (puede ser NEGATIVO). Ej. meta 1.6: 1.6→0%,
    1.76→+10%, 1.44→−10%. Metas editables por el admin (persisten en localStorage). */
 var _PV_META_DEF = { pick: 1.6, arm: 0.7 };
+/* v11.102 — idea 7411 (normalización): las metas son un ajuste GLOBAL, no del dispositivo.
+   Viven en Stock_Config (claves meta_m3h_picking / meta_m3h_armado), mismo patrón que
+   etiqueta_lio y conteo_ciclico_gondola. localStorage 'prod_metas' queda SOLO como cache
+   offline (para pintar sin esperar la red y para seguir andando sin señal). Antes cada
+   pantalla admin veía sus propias metas → dos supervisores calculaban premios distintos. */
 function _pvMetas() {
   try { var s = JSON.parse(localStorage.getItem("prod_metas") || "null"); if (s && +s.pick > 0 && +s.arm > 0) return { pick: +s.pick, arm: +s.arm }; } catch (e) { }
   return { pick: _PV_META_DEF.pick, arm: _PV_META_DEF.arm };
 }
+/* Trae las metas del servidor (fuente de verdad) y refresca el cache local. */
+async function _pvMetasLoad() {
+  try {
+    const r = await fetch(SUPABASE_URL + "/rest/v1/Stock_Config?clave=in.(meta_m3h_picking,meta_m3h_armado)&select=clave,valor", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+    if (!r.ok) return _pvMetas();
+    const rows = await r.json();
+    if (!Array.isArray(rows) || !rows.length) return _pvMetas();
+    const m = _pvMetas();
+    rows.forEach(function (x) {
+      const v = parseFloat(String(x.valor).replace(",", "."));
+      if (!(v > 0)) return;
+      if (x.clave === "meta_m3h_picking") m.pick = v;
+      if (x.clave === "meta_m3h_armado") m.arm = v;
+    });
+    try { localStorage.setItem("prod_metas", JSON.stringify(m)); } catch (e) { }
+    return m;
+  } catch (_e) { return _pvMetas(); }
+}
 function _pvPremio(m3h, meta) { if (!(m3h > 0) || !(meta > 0)) return null; return Math.round((m3h / meta - 1) * 100); }
 function prodSetMeta(which, val) {
   var m = _pvMetas(), v = parseFloat(String(val).replace(",", "."));
-  if (v > 0) { m[which] = Math.round(v * 100) / 100; try { localStorage.setItem("prod_metas", JSON.stringify(m)); } catch (e) { } }
+  if (v > 0) {
+    m[which] = Math.round(v * 100) / 100;
+    try { localStorage.setItem("prod_metas", JSON.stringify(m)); } catch (e) { }
+    // fuente de verdad: Stock_Config (global). Si falla la red queda el cache local.
+    fetch(SUPABASE_URL + "/rest/v1/Stock_Config?on_conflict=clave", {
+      method: "POST",
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" },
+      body: JSON.stringify({ clave: which === "pick" ? "meta_m3h_picking" : "meta_m3h_armado", valor: String(m[which]), actualizado: new Date().toISOString() })
+    }).catch(function () { });
+  }
   prodRender();
 }
 function prodToggleVista() { _prodToggle = _prodToggle === "m3h" ? "minm3" : "m3h"; prodRender(); }
@@ -12600,7 +12632,8 @@ async function prodLoad() {
       supaFetchAll(SUPABASE_TABLE_ENDPOINT, evQuery).catch(function () { return []; }),
       getEmpleadosNombres().catch(function () { return new Map(); }),
       _pvFetchM3(),
-      fetchVolumenArticulos().catch(function () { return new Map(); })
+      fetchVolumenArticulos().catch(function () { return new Map(); }),
+      _pvMetasLoad().catch(function () { return null; })   // v11.102: metas globales (Stock_Config)
     ]);
     var rows = res[0] || [], events = [];
     for (var i = 0; i < rows.length; i++) { var x = rows[i], cli = Date.parse(x.ts_cliente); if (!cli) continue; events.push({ legajo: x.legajo, opcion: x.opcion, texto: (x.texto || "").trim().toUpperCase(), ini: x.ts_inicio ? Date.parse(x.ts_inicio) : null, cli: cli }); }
