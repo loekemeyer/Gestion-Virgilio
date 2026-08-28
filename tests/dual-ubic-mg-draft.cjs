@@ -61,6 +61,12 @@ catch (_e) {
     localStorage.clear();
     window.loadArtNombres = async function () { return {}; };
     window.stockFetchSaldos = async function () { return { "502": { cod: "502", desc: "X", a_guardar: 10, terminado: 0 } }; };
+    /* v8.40/v10.08 — showMGModal ahora también espera la capacidad de góndola y las
+       celdas (para ordenar por prioridad y decir dónde va cada código). Sin stub, esos
+       dos fetch salen a la red, el try/catch los come y _mg queda en null: el modal
+       mostraba "Error:" y mgSet no tenía items que tocar. */
+    window.ocgFetchCapacidad = async function () { return { "502": 20 }; };
+    window.ocgFetchCeldas = async function () { return { "502": ["A1"] }; };
     showMGModal("77");
     await new Promise(function (res) { setTimeout(res, 60); });
     out.draftAntes = !!opDraftLoad("77");            // false: sin progreso todavía

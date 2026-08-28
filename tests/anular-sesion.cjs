@@ -173,18 +173,24 @@ catch (_e) {
 
   // ===== 2ª parte: la barra roja dentro de recepcion.js (módulo aparte) =====
   const src = fs.readFileSync(path.join(root, "recepcion.js"), "utf8");
+  /* v10.24 — recepcion.js ya no importa supabase-js de esm.sh: toma `createClient` de
+     `window.supabase` (vendor/supabase.umd.js). El stub pasó de reemplazar el `import`
+     a definir ese global en un <script> clásico ANTES del módulo; si no, recepcion.js
+     tira "Falta vendor/supabase.umd.js" y window.__rcp nunca aparece (el test moría
+     por timeout en el waitForFunction). */
   const FAKE = `
 function __q() { const o = {}; ["select","gte","lte","eq","neq","in","not","or","ilike","order","limit","single","insert","update","delete"].forEach(function (m) { o[m] = function () { return o; }; });
   o.then = function (res, rej) { return Promise.resolve({ data: [], error: null }).then(res, rej); }; return o; }
-const createClient = function () { return { from: __q, rpc: function () { return Promise.resolve({ data: null, error: null }); },
+window.supabase = { createClient: function () { return { from: __q, rpc: function () { return Promise.resolve({ data: null, error: null }); },
   auth: { getSession: function () { return Promise.resolve({ data: { session: {} } }); },
-          signInAnonymously: function () { return Promise.resolve({ data: { session: {} }, error: null }); } } }; };
+          signInAnonymously: function () { return Promise.resolve({ data: { session: {} }, error: null }); } } }; } };
 `;
-  const patched = src.replace(/^import\s+\{[^}]*\}\s+from\s+"[^"]*";\s*$/m, FAKE) +
+  if (!/window\.supabase/.test(src)) { console.error("anular-sesion: recepcion.js ya no toma createClient de window.supabase — actualizá el stub."); process.exit(1); }
+  const patched = src +
     "\nwindow.__rcp = { opState: opState, RECP: RECP, renderMenu: renderMenu, drawArticulosGrid: drawArticulosGrid, el: { page: opPage, bar: opAnularBar } };\n";
   const p3 = await b.newPage();
   p3.on("pageerror", (e) => errs.push("recepcion.js: " + e.message));
-  const html3 = '<!doctype html><meta charset="utf-8"><body><script type="module">' + patched + "<\/script></body>";
+  const html3 = '<!doctype html><meta charset="utf-8"><body><script>' + FAKE + '<\/script><script type="module">' + patched + "<\/script></body>";
   await p3.route("http://rcp.test/**", (route) => route.fulfill({ status: 200, contentType: "text/html; charset=utf-8", body: html3 }));
   await p3.goto("http://rcp.test/");
   await p3.waitForFunction(() => !!window.__rcp, null, { timeout: 10000 });

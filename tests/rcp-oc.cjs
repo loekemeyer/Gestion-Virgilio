@@ -2,15 +2,23 @@
    los botones de código + aviso Telegram (evento ROC) cuando lo recibido excede la
    OC en más de 20%.
 
-   `recepcion.js` es un MÓDULO ES que importa supabase-js de esm.sh, así que no se
-   puede cargar tal cual desde file:// (sin red). El test lo parcha: reemplaza el
-   import por un cliente FALSO (devuelve filas fijas de "Ordenes_Compra" y anota los
+   ⚠ v10.10 — el ARMADO de las OCs vigentes se fue al backend: la RPC
+   `oc_vigentes_por_proveedor(nombre_ent)` hace el matcheo de proveedor (alias
+   Pettofrezza→Rafael, compartidos "Garcia / Lucho", prefijos con ≤2 chars de slack),
+   descarta lo 'recibida' / ya recibido entero, se queda con la generación más nueva y
+   devuelve `cod` ya normalizado (norm_cod). El front solo mapea esas filas. Por eso
+   este test dejó de armar filas de "Ordenes_Compra" y ahora stubea la RPC: lo que
+   verifica es el CONTRATO (cómo el front consume esas filas) y todo lo que sigue
+   siendo del navegador. El matcheo de proveedor se testea contra la base, no acá
+   (ocProvCoincide/ocSplitProv/ocDiaLimite quedaron sin uso en recepcion.js).
+
+   `recepcion.js` toma supabase-js de `window.supabase` (vendor/supabase.umd.js), así
+   que el test define ese global con un cliente FALSO (responde la RPC y anota los
    insert) y expone los internos en window.__rcp. Verifica:
-   - matcheo de proveedor: exacto, compartido ("Garcia / Lucho"), con inicial pegada
-     ("Martin C" = Martin), por alias (Pettofrezza = Rafael) y que NO matchee ajenos,
-   - agrupado: se toma SOLO la generación más nueva (no acumula OCs viejas), se suman
-     las líneas de esa fecha, se ignora 'recibida' / lo ya recibido entero, y el
-     código cruza normalizado ("057" de la OC = botón "57"),
+   - el front mapea cod/fecha/ped/rec/pend de la RPC, y un código que la RPC no
+     devuelve queda sin OC,
+   - el código cruza normalizado: la RPC devuelve "57" y el botón lo encuentra
+     también buscándolo como "057" / "0057",
    - el botón muestra "OC N" y el pop-up de cajas la OC vigente,
    - +20%: 120 sobre 100 NO dispara, 121 SÍ; con recibido parcial la referencia es lo
      que FALTA,
@@ -45,83 +53,67 @@ function __q(table) {
   };
   return o;
 }
-const createClient = function () {
+window.supabase = { createClient: function () {
   return {
     from: __q,
-    rpc: function () { return Promise.resolve({ data: null, error: null }); },
+    rpc: function (fn) {
+      if (fn === "oc_vigentes_por_proveedor") return Promise.resolve({ data: __fake.rows, error: null });
+      return Promise.resolve({ data: null, error: null });
+    },
     auth: {
       getSession: function () { return Promise.resolve({ data: { session: { fake: true } } }); },
       signInAnonymously: function () { return Promise.resolve({ data: { session: { fake: true } }, error: null }); }
     }
   };
-};
+} };
 `;
 
-const patched = src.replace(/^import\s+\{[^}]*\}\s+from\s+"[^"]*";\s*$/m, FAKE_CLIENT) + `
-window.__rcp = { opState: opState, ocProvCoincide: ocProvCoincide, ocSplitProv: ocSplitProv,
+const patched = src + `
+window.__rcp = { opState: opState,
   ocDeCod: ocDeCod, ocRef: ocRef, ocExcede: ocExcede, ocPctExceso: ocPctExceso,
-  ocDiaLimite: ocDiaLimite, cargarOCVigentes: cargarOCVigentes, drawArticulosGrid: drawArticulosGrid,
+  cargarOCVigentes: cargarOCVigentes, drawArticulosGrid: drawArticulosGrid,
   openCajas: openCajas, renderResumen: renderResumen, opEnviar: opEnviar, RECP: RECP,
   el: { body: opBody, cajasInput: opCajasInput, cajasNext: opCajasNext, cajasOc: opCajasOc } };
 `;
 
-if (patched.indexOf("esm.sh") >= 0) { console.error("rcp-oc: no pude parchear el import de supabase-js."); process.exit(1); }
+/* v10.24 — recepcion.js dejó de importar supabase-js de esm.sh: ahora toma
+   `createClient` de `window.supabase` (vendor/supabase.umd.js, servido desde el repo).
+   El stub pasó de reemplazar el `import` a definir ese global ANTES del módulo. El
+   guard viejo miraba si quedaba "esm.sh" en el fuente — y sigue quedando, pero en un
+   comentario, así que el test se abortaba solo. */
+if (!/window\.supabase/.test(src)) { console.error("rcp-oc: recepcion.js ya no toma createClient de window.supabase — actualizá el stub."); process.exit(1); }
 
 (async () => {
   const b = await chromium.launch();
   const p = await b.newPage();
   const errs = [];
   p.on("pageerror", (e) => errs.push(e.message));
-  await p.setContent('<!doctype html><meta charset="utf-8"><body><script type="module">' + patched + "<\/script></body>");
+  await p.setContent('<!doctype html><meta charset="utf-8"><body><script>' + FAKE_CLIENT + '<\/script><script type="module">' + patched + "<\/script></body>");
   await p.waitForFunction(() => !!window.__rcp, null, { timeout: 10000 });
 
   const r = await p.evaluate(async () => {
     const R = window.__rcp, S = R.opState, out = {};
 
-    // ---- 1) matcheo de proveedor ----
-    out.provOk = R.ocProvCoincide("Lucho", "Lucho")
-      && R.ocProvCoincide("Garcia / Lucho", "Lucho")
-      && R.ocProvCoincide("Garcia / Lucho", "Garcia")
-      && R.ocProvCoincide("Pintos / Maspoli", "Maspoli")
-      && R.ocProvCoincide("Martin C", "Martin")
-      && R.ocProvCoincide("Carlos E", "Carlos")
-      && R.ocProvCoincide("Pettofrezza", "Rafael")      // ALIAS_NOMBRE
-      && R.ocProvCoincide("Log/ Fabr", "Log/Fabr");     // claveTall saca espacios y "/"
-    out.provNo = !R.ocProvCoincide("Poly", "Lucho")
-      && !R.ocProvCoincide("Tierra Nativa", "Martin")
-      && !R.ocProvCoincide("Pintos", "Pedernera")
-      && !R.ocProvCoincide("", "Lucho")
-      && !R.ocProvCoincide("Lucho", "");
-
-    // ---- 2) carga/agrupado de OCs vigentes ----
+    // ---- 1) el front mapea lo que devuelve la RPC ----
+    /* Filas TAL COMO las devuelve oc_vigentes_por_proveedor("Lucho"): ya agrupadas por
+       código (generación más nueva), con el cod normalizado y ped/rec/pend calculados.
+       Lo que la RPC descarta (OC vieja, 'recibida', recibida entera, de otro proveedor)
+       directamente no aparece — por eso 725/809/999 no están en la lista. */
     window.__fakeRows([
-      // Lucho: generación VIEJA (no debe sumarse a la nueva)
-      { codigo: "518", cantidad: 900, cantidad_recibida: 0, proveedor: "Lucho", fecha: "2026-05-02", estado: "pendiente" },
-      // Lucho: generación NUEVA, dos líneas del mismo código → se suman (49 + 11 = 60)
-      { codigo: "518", cantidad: 49, cantidad_recibida: 0, proveedor: "Lucho", fecha: "2026-07-29", estado: "pendiente" },
-      { codigo: "518", cantidad: 11, cantidad_recibida: 0, proveedor: "Lucho", fecha: "2026-07-29", estado: "pendiente" },
-      // OC compartida → también es de Lucho
-      { codigo: "123", cantidad: 303, cantidad_recibida: 0, proveedor: "Garcia / Lucho", fecha: "2026-07-29", estado: "pendiente" },
-      // recibido parcial: referencia = lo que falta (100 - 60 = 40)
-      { codigo: "586", cantidad: 100, cantidad_recibida: 60, proveedor: "Lucho", fecha: "2026-07-29", estado: "pendiente" },
-      // código con cero adelante en la OC: tiene que cruzar con el botón "57"
-      { codigo: "057", cantidad: 34, cantidad_recibida: 0, proveedor: "Lucho", fecha: "2026-07-29", estado: "pendiente" },
-      // ya recibida entera / marcada recibida → NO vigentes
-      { codigo: "725", cantidad: 29, cantidad_recibida: 29, proveedor: "Lucho", fecha: "2026-07-29", estado: "pendiente" },
-      { codigo: "809", cantidad: 159, cantidad_recibida: 0, proveedor: "Lucho", fecha: "2026-07-29", estado: "recibida" },
-      // de otro proveedor → no es de Lucho
-      { codigo: "999", cantidad: 500, cantidad_recibida: 0, proveedor: "Poly", fecha: "2026-07-29", estado: "pendiente" }
+      { cod: "518", fecha: "2026-07-29", ped: 60,  rec: 0,  pend: 60 },   // dos líneas de la misma fecha ya sumadas
+      { cod: "123", fecha: "2026-07-29", ped: 303, rec: 0,  pend: 303 },  // OC compartida "Garcia / Lucho"
+      { cod: "586", fecha: "2026-07-29", ped: 100, rec: 60, pend: 40 },   // recibido parcial
+      { cod: "57",  fecha: "2026-07-29", ped: 34,  rec: 0,  pend: 34 }    // en la OC es "057"; norm_cod le saca el cero
     ]);
     S.tipo = "tallerista"; S.tallNombre = "Lucho"; S.linea = "LK"; S.fecha = "2026-08-04";
     S.remito = "12345"; S.cargas = {}; S.ocPorCod = null;
     await R.cargarOCVigentes();
     const oc518 = R.ocDeCod("518"), oc123 = R.ocDeCod("123"), oc586 = R.ocDeCod("586");
-    out.soloNueva = !!oc518 && oc518.ped === 60 && oc518.fecha === "2026-07-29";
-    out.compartida = !!oc123 && oc123.ped === 303;
+    out.mapeaRpc = !!oc518 && oc518.ped === 60 && oc518.rec === 0 && oc518.pend === 60 && oc518.fecha === "2026-07-29"
+      && !!oc123 && oc123.ped === 303;
     out.parcial = !!oc586 && oc586.ped === 100 && oc586.rec === 60 && oc586.pend === 40 && R.ocRef(oc586) === 40;
-    out.normCod = !!R.ocDeCod("57") && R.ocDeCod("57").ped === 34 && !!R.ocDeCod("0057");
+    out.normCod = !!R.ocDeCod("57") && R.ocDeCod("57").ped === 34 && !!R.ocDeCod("057") && !!R.ocDeCod("0057");
     out.fueraVigente = !R.ocDeCod("725") && !R.ocDeCod("809") && !R.ocDeCod("999");
-    out.diaLimite = /^\d{4}-\d{2}-\d{2}$/.test(R.ocDiaLimite());
 
     // ---- 3) umbral del +20% ----
     out.umbral = !R.ocExcede("518", 60) && !R.ocExcede("518", 72) && R.ocExcede("518", 73)   // ref 60 → tope 72

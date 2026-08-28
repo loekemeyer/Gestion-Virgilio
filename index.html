@@ -6502,7 +6502,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.05";
+const APP_VERSION = "v12.06";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -13559,15 +13559,11 @@ function stkBodyStocks() {
   th += _thNum("_fc", "FC<br>s/Salida", "background:#eef2ff;color:#1e3a8a;", "Facturado sin salida");   // v6.70
   h += '<div class="stk-tblwrap"><table class="stk-tbl stk-tbl-fit"><thead><tr>' + th + '<th></th></tr></thead><tbody>';
   if (!shown.length) h += '<tr><td colspan="' + ncol + '" class="stk-empty">' + (_stk.soloNeg ? "✅ No hay stock negativo en ningún depósito." : (_stk.soloLow ? "✅ Todo está en stock — no hay códigos con faltante." : "Sin stock todavía.")) + '</td></tr>';
-  // v6.67 — celdas de depósito clickeables AUNQUE el saldo sea 0, si el artículo TUVO
-  // movimientos ahí alguna vez (el pop-up muestra el historial que neteó a 0). Se cachea
-  // en _stk._histDeps (Set "codN|deposito") — O(movs) una sola vez, no por tecla.
-  if (!_stk._histDeps) {
-    const hs = new Set();
-    (_stk.movs || []).forEach(function (mv) { const c = _stkNormCod(mv.cod_art), dep = String(mv.deposito || ""); if (c && dep) hs.add(c + "|" + dep); });
-    _stk._histDeps = hs;
-  }
-  const _histDeps = _stk._histDeps;
+  // v6.67 → v10.31 — las celdas de depósito son clickeables SIEMPRE, tengan saldo o no.
+  // Antes se calculaba un Set _stk._histDeps ("codN|deposito") desde _stk.movs para
+  // habilitar solo las que habían tenido movimientos; quedó sin uso y encima mentía:
+  // el render rápido (v10.00) dibuja la tabla con `movs: []` y el Set se cacheaba vacío
+  // para siempre, así que después de cargar los movimientos nadie lo recalculaba.
   // v10.40 — orden: FIJADOS siempre arriba; y si hay NEGATIVOS, primero de todo (para verlos apenas se entra).
   shown.sort(function (a, b) {
     const an = _stkArtHasNeg(a) ? 1 : 0, bn = _stkArtHasNeg(b) ? 1 : 0;
@@ -13603,9 +13599,9 @@ function stkBodyStocks() {
       // v6.67: también con saldo 0 si TUVO movimientos en ese depósito (ver el historial).
       // v7.54: racks suma racks + racks_ch para mostrar una sola columna "Racks"
       let _clk = "";
-      const _hasHist = _histDeps.has(_stkNormCod(a.cod) + "|" + c.key) || (c.racksKey && _histDeps.has(_stkNormCod(a.cod) + "|racks_ch"));
-      // v10.31: Clickeable siempre (incluido saldo 0 sin movimientos) para ver histórico vacío si es necesario
-      if (true) {  // Antes: if (v > 0.05 || v < -0.05 || _hasHist)
+      // v10.31: clickeable siempre (incluido saldo 0 sin movimientos) para ver el histórico,
+      // aunque esté vacío. Antes: if (v > 0.05 || v < -0.05 || _hasHist).
+      {
         const _ce = encodeURIComponent(a.cod);
         if (c.key === "separar_pedidos") _clk = "stkOpenMovsArt('" + _ce + "','separar_pedidos','Pickeados','🛒')";   // v6.47: ver movimientos (como góndola)
         else if (c.key === "a_facturar") _clk = "stkOpenMovsArt('" + _ce + "','a_facturar','A facturar','🧾')";       // v6.47
@@ -13617,8 +13613,10 @@ function stkBodyStocks() {
         else if (c.key === "racks_ch") _clk = "stkOpenMovsArt('" + _ce + "','racks_ch','Racks CH','🗄️')";           // v7.03
       }
       if (_clk) {
-        const _zero = v <= 0.05;   // saldo 0 con historial → gris + tooltip distinto
-        tds += '<td class="num stk-pick-cell' + (_zero ? " stk-hist0" : "") + '" onclick="event.stopPropagation();' + _clk + '" title="' + (_zero ? "Saldo 0 ahora, pero tuvo movimientos — ver el historial" : "Ver detalle (NPs / ubicación)") + '">' + (c.key === "terminado" ? '<b>' + fmtCajas(v) + '</b>' : fmtCajas(v)) + '</td>';
+        const _zero = v <= 0.05;   // saldo 0 → gris + tooltip distinto
+        // El tooltip NO afirma que hubo movimientos: desde v10.31 la celda se habilita
+        // igual sin historial, y el render rápido dibuja antes de tener los movimientos.
+        tds += '<td class="num stk-pick-cell' + (_zero ? " stk-hist0" : "") + '" onclick="event.stopPropagation();' + _clk + '" title="' + (_zero ? "Saldo 0 — tocá para ver el historial de este depósito" : "Ver detalle (NPs / ubicación)") + '">' + (c.key === "terminado" ? '<b>' + fmtCajas(v) + '</b>' : fmtCajas(v)) + '</td>';
       } else {
         tds += '<td class="num ' + (v < 0 ? "stk-neg" : "") + '">' + (c.key === "terminado" ? '<b>' + fmtCajas(v) + '</b>' : fmtCajas(v)) + '</td>';
       }

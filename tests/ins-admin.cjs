@@ -104,6 +104,11 @@ catch (_e) {
         { id: 2, cod: "PP", sector: "AF1", cantidad: 0, capacidad: null, unidad: null, notas: null }
       ]);
       if (url.indexOf("Insumos_Factores") >= 0) return J([]);
+      // v11.xx — el catálogo dejó de leerse de la tabla /Insumos: ahora sale de la vista
+      // `vista_insumos` (cod, nombre, categoria, ubicacion, isis, creado_por, creado).
+      // El stub viejo solo matcheaba "/Insumos" (con I mayúscula) → devolvía [] y la
+      // solapa quedaba sin catálogo ni pendientes.
+      if (url.indexOf("vista_insumos") >= 0) return J(CAT);
       if (url.indexOf("/Insumos") >= 0) return J(CAT);
       if (url.indexOf("vista_saldos_insumos_x_unidad") >= 0) {
         return J([{ cod_art: "TMP-0001", unidad: "Bolsas", saldo: 7 }, { cod_art: "22", unidad: "kg", saldo: 1483.95 },
@@ -231,26 +236,34 @@ catch (_e) {
     await stkInsCatBorrar("cajas");
     out.catBorrarConNombre = rpc.some(function (x) { return x.fn === "insumo_cat_borrar" && x.body.p_clave === "cajas"; });
 
-    // 5) CATEGORÍAS: una caja por categoría, con sus unidades permitidas
+    /* 5) CATEGORÍAS — v11.xx: dejaron de dibujarse como cajas apiladas (.stk-catbox).
+       Ahora la sección es una GRILLA DE TARJETAS (.stk-catbtn, con el contador de
+       insumos en .stk-catbtn-n); el listado y el alta viven en un POP-UP que abre la
+       tarjeta (stkInsCatPopup → #stkInsCatPopBody), y el detalle + las unidades
+       permitidas aparecen al EDITAR la categoría (stkInsEdit('cat:…') → .stk-catbox). */
     stkInsSec("cats");   // abrir sección
-    const cajas = document.querySelectorAll("#stkBody .stk-catbox");
-    out.nCajasCat = cajas.length;                            // 6 categorías, ninguna es «a depurar»
+    const tarjetas = document.querySelectorAll("#stkBody .stk-catbtn");
+    out.nCajasCat = tarjetas.length;                         // 6 categorías, ninguna es «a depurar»
     out.sinDepurar = !/A depurar/.test(document.getElementById("stkBody").innerHTML);
-    out.catDetalle = /Cartón y embalaje/.test(document.getElementById("stkBody").innerHTML);
+    out.catCuentaInsumos = /^\d+$/.test((tarjetas[0].querySelector(".stk-catbtn-n") || {}).textContent || "");
+    // detalle y unidades permitidas: en la ficha de edición de la categoría
+    stkInsEdit("cat:cajas");
+    const caja = document.querySelector("#stkBody .stk-catbox");
+    out.catDetalle = !!caja && /Cartón y embalaje/.test(document.getElementById("stkBody").innerHTML);
     out.catMuestraUnis = /Unidades permitidas/.test(document.getElementById("stkBody").innerHTML);
-    out.catCuentaInsumos = /3 insumos|2 insumos|1 insumo/.test(cajas[0].textContent);
 
-    // 6) El listado de insumos y el alta viven ADENTRO de la categoría
-    out.listadoOculto = !document.getElementById("stkBody").innerHTML.match(/Agregar insumo a esta categor/);
-    stkInsAbrir("fleje");
-    out.listadoAbre = /Agregar insumo a esta categor/.test(document.getElementById("stkBody").innerHTML);
-    const tblF = document.querySelectorAll("#stkBody .stk-catlist table");
+    // 6) El listado de insumos y el alta viven ADENTRO de la categoría (pop-up)
+    const popBody = function () { const e = document.getElementById("stkInsCatPopBody"); return e ? e.innerHTML : ""; };
+    out.listadoOculto = !/Agregar insumo a esta categor/.test(document.getElementById("stkBody").innerHTML) && !/Agregar insumo a esta categor/.test(popBody());
+    stkInsCatPopup("fleje");
+    out.listadoAbre = /Agregar insumo a esta categor/.test(popBody());
+    const tblF = document.querySelectorAll("#stkInsCatPopBody .stk-catlist table");
     out.listadoFleje = tblF.length ? tblF[0].querySelectorAll("tbody tr").length : 0;   // 1 (solo 22; el 5 está en 0)
     out.listadoNoTraePP = tblF.length ? !/POLIPROPILENO/.test(tblF[0].innerHTML) : false;
     // v7.37: un código en 0 (fleje "5", 38 X 0,55) NO se lista en su categoría — no
     // ensucia la vista con lo que quedó neteado / sin stock.
     out.ceroOcultoEnCat = tblF.length ? !/38 X 0,55/.test(tblF[0].innerHTML) : false;
-    _stkIns.nuevoEn = "fleje"; stkRender();
+    _stkIns.nuevoEn = "fleje"; _stkInsCatPopupRefresh();
     document.getElementById("nvCod").value = "7654321";
     await stkInsAlta("fleje");
     const alta = rpc.filter(function (x) { return x.fn === "insumo_alta"; })[0];

@@ -34,8 +34,24 @@ const MOVS_SIN = [
   const errs = []; p.on("pageerror", (e) => errs.push(e.message));
   await p.goto("file://" + path.join(__dirname, "..", "index.html"), { waitUntil: "domcontentloaded" });
   const r = await p.evaluate(function (fix) {
+    /* v10.00 — stkBodyStocks dejó de sumar los movimientos en el navegador: en modo
+       normal lee los saldos ya calculados en `_stk.viewRows` (espejo de la vista
+       stocks_carga_rapida) y solo recalcula desde `_stk.movs` en modo As-Of. Estos
+       tests arman movimientos de laboratorio, así que los plegamos al formato de la
+       vista. Sin esto la tabla salía vacía y el test fallaba desde v10.00. */
+    function viewRowsDeMovs(movs) {
+      var m = {};
+      (movs || []).forEach(function (mv) {
+        var k = String(mv.cod_art || "").trim(); if (!k) return;
+        if (!m[k]) m[k] = { cod: k, descripcion: "", terminado: 0, excedente: 0, separar_pedidos: 0,
+                            a_facturar: 0, a_guardar: 0, racks: 0, racks_ch: 0, para_envasar: 0, insumos_dep: 0 };
+        if (mv.descripcion) m[k].descripcion = mv.descripcion;
+        if (Object.prototype.hasOwnProperty.call(m[k], mv.deposito)) m[k][mv.deposito] += Number(mv.delta) || 0;
+      });
+      return Object.keys(m).map(function (k) { return m[k]; });
+    }
     function render(movs) {
-      _stk = { movs: movs, cutoff: null, asOf: null, dem: {}, cap: [], fcs: { porArt: {}, pend: {} }, filtro: "", gConf: [] };
+      _stk = { movs: movs, viewRows: viewRowsDeMovs(movs), cutoff: null, asOf: null, dem: {}, cap: [], fcs: { porArt: {}, pend: {} }, filtro: "", gConf: [] };
       return stkBodyStocks();
     }
     const out = {};

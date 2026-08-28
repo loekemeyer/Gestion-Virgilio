@@ -64,8 +64,17 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     const hf = _stkRtoDetail(_stk.movs[0]);
     const fallback = hf.indexOf("no registrado") > 0 && hf.indexOf(">824 ") > 0 && hf.indexOf(">825 ") > 0;
 
-    // ---- v6.67: celdas de depósito en 0 clickeables si TUVO movimientos (stk-hist0) ----
-    _stk = { cutoff: null, asOf: null, tab: "stocks", filtro: "", openArt: null, factors: {}, dem: {}, cap: [], gConf: [], movs: [
+    // ---- v6.67 → v10.31: TODAS las celdas de depósito son clickeables, con saldo o sin él;
+    //      las que están en 0 van en gris (stk-hist0) y con un tooltip que NO afirma que
+    //      hubo movimientos (el render rápido dibuja antes de tener los movimientos). ----
+    /* v10.00 — stkBodyStocks toma los saldos de `_stk.viewRows` (espejo de la vista
+       stocks_carga_rapida) y solo recalcula desde `_stk.movs` en modo As-Of; sin
+       viewRows la tabla sale vacía y no hay celda que mirar. El "tuvo movimientos"
+       de la celda gris (stk-hist0) sí sigue saliendo de `_stk.movs`. */
+    _stk = { cutoff: null, asOf: null, tab: "stocks", filtro: "", openArt: null, factors: {}, dem: {}, cap: [], gConf: [],
+      viewRows: [{ cod: "026", descripcion: "", terminado: 334, excedente: 0, separar_pedidos: 0, a_facturar: 0,
+                   a_guardar: 0, racks: 0, racks_ch: 0, para_envasar: 0, insumos_dep: 0 }],
+      movs: [
       { cod_art: "026", deposito: "terminado", delta: 334, tipo: "inicial", ts: "2026-07-01T10:00:00" },
       { cod_art: "026", deposito: "a_facturar", delta: 8, tipo: "separado", ts: "2026-07-10T10:00:00" },
       { cod_art: "026", deposito: "a_facturar", delta: -8, tipo: "facturado", ts: "2026-07-11T10:00:00" },
@@ -76,8 +85,13 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     let hist0 = false;
     try {
       stkRender();
-      const cells = Array.from(document.querySelectorAll("#stkBody td.stk-hist0")).map((td) => td.textContent.trim());
-      hist0 = cells.length === 2 && cells.every((t) => t === "0");   // a_facturar y a_guardar en 0 pero con historial
+      const ceros = Array.from(document.querySelectorAll("#stkBody td.stk-hist0"));
+      const conSaldo = Array.from(document.querySelectorAll("#stkBody td.stk-pick-cell:not(.stk-hist0)"));
+      hist0 = ceros.length > 0
+        && ceros.every((td) => td.textContent.trim() === "0")                       // gris ⇔ saldo 0
+        && ceros.every((td) => td.getAttribute("onclick").indexOf("stkOpen") >= 0)  // y clickeable igual
+        && ceros.every((td) => (td.getAttribute("title") || "").indexOf("tuvo movimientos") < 0)
+        && conSaldo.some((td) => td.textContent.trim() === "334");                  // góndola con saldo, no gris
     } catch (_e) { hist0 = false; }
 
     return { exacto, deducido, superpuesta, sinDato, abierta, noInventa, enTabla, tienePlus, abreDet, traeProv, traeCods, resaltaActual, fallback, hist0 };

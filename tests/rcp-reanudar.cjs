@@ -41,7 +41,7 @@ function __q(table) {
   o.then = function (res, rej) { return Promise.resolve({ data: [], error: null }).then(res, rej); };
   return o;
 }
-const createClient = function () {
+window.supabase = { createClient: function () {
   return {
     from: __q,
     rpc: function () { return Promise.resolve({ data: null, error: null }); },
@@ -50,16 +50,21 @@ const createClient = function () {
       signInAnonymously: function () { return Promise.resolve({ data: { session: { fake: true } }, error: null }); }
     }
   };
-};
+} };
 `;
 
-const patched = src.replace(/^import\s+\{[^}]*\}\s+from\s+"[^"]*";\s*$/m, FAKE_CLIENT) + `
+const patched = src + `
 window.__rcp = { opState: opState, RECP: RECP, closeOp: closeOp, renderArticulos: renderArticulos,
   drawArticulosGrid: drawArticulosGrid, opEnviar: opEnviar, renderResumen: renderResumen,
   rcpDraftLoad: rcpDraftLoad, el: { page: opPage, body: opBody } };
 `;
 
-if (patched.indexOf("esm.sh") >= 0) { console.error("rcp-reanudar: no pude parchear el import."); process.exit(1); }
+/* v10.24 — recepcion.js dejó de importar supabase-js de esm.sh: ahora toma
+   `createClient` de `window.supabase` (vendor/supabase.umd.js, servido desde el repo).
+   El stub pasó de reemplazar el `import` a definir ese global ANTES del módulo. El
+   guard viejo miraba si quedaba "esm.sh" en el fuente — y sigue quedando, pero en un
+   comentario, así que el test se abortaba solo. */
+if (!/window\.supabase/.test(src)) { console.error("rcp-reanudar: recepcion.js ya no toma createClient de window.supabase — actualizá el stub."); process.exit(1); }
 
 (async () => {
   const b = await chromium.launch();
@@ -68,7 +73,7 @@ if (patched.indexOf("esm.sh") >= 0) { console.error("rcp-reanudar: no pude parch
   p.on("pageerror", (e) => errs.push(e.message));
   // Origen http REAL (no about:blank/data:) porque el borrador vive en localStorage
   // y los orígenes opacos lo bloquean. Se sirve con route(), sin levantar servidor.
-  const html = '<!doctype html><meta charset="utf-8"><body><script type="module">' + patched + "<\/script></body>";
+  const html = '<!doctype html><meta charset="utf-8"><body><script>' + FAKE_CLIENT + '<\/script><script type="module">' + patched + "<\/script></body>";
   await p.route("http://rcp.test/**", (route) => route.fulfill({ status: 200, contentType: "text/html; charset=utf-8", body: html }));
   await p.goto("http://rcp.test/");
   await p.waitForFunction(() => !!window.__rcp, null, { timeout: 10000 });

@@ -18,6 +18,22 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   const errs = []; p.on("pageerror", (e) => errs.push(e.message));
   await p.goto("file://" + path.join(__dirname, "..", "index.html"), { waitUntil: "domcontentloaded" });
   const r = await p.evaluate(async () => {
+    /* v10.00 — stkBodyStocks dejó de sumar los movimientos en el navegador: en modo
+       normal lee los saldos ya calculados en `_stk.viewRows` (espejo de la vista
+       stocks_carga_rapida) y solo recalcula desde `_stk.movs` en modo As-Of. Estos
+       tests arman movimientos de laboratorio, así que los plegamos al formato de la
+       vista. Sin esto la tabla salía vacía y el test fallaba desde v10.00. */
+    function viewRowsDeMovs(movs) {
+      var m = {};
+      (movs || []).forEach(function (mv) {
+        var k = String(mv.cod_art || "").trim(); if (!k) return;
+        if (!m[k]) m[k] = { cod: k, descripcion: "", terminado: 0, excedente: 0, separar_pedidos: 0,
+                            a_facturar: 0, a_guardar: 0, racks: 0, racks_ch: 0, para_envasar: 0, insumos_dep: 0 };
+        if (mv.descripcion) m[k].descripcion = mv.descripcion;
+        if (Object.prototype.hasOwnProperty.call(m[k], mv.deposito)) m[k][mv.deposito] += Number(mv.delta) || 0;
+      });
+      return Object.keys(m).map(function (k) { return m[k]; });
+    }
     const out = {};
     const ts = "2026-08-01T10:00:00Z";
     const movs = [
@@ -28,16 +44,21 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
       { cod_art: "437E LK", deposito: "terminado", delta: 100, tipo: "inicial", ts: ts }
     ];
     // demanda sobre los códigos BASE (así entran a la tabla como fila con 0 stock)
-    _stk = { movs: movs, cutoff: 0, dem: { "438E": 37, "439E": 28, "437E": 22 }, cap: [], fcs: {}, gConf: [], filtro: "", openArt: null, soloNeg: false };
+    _stk = { movs: movs, viewRows: viewRowsDeMovs(movs), cutoff: 0, dem: { "438E": 37, "439E": 28, "437E": 22 }, cap: [], fcs: {}, gConf: [], filtro: "", openArt: null, soloNeg: false };
     const html = stkBodyStocks();
 
-    out.veLK438 = html.indexOf('stk-cod">438E LK<') >= 0;
-    out.veCH438 = html.indexOf('stk-cod">438E CH<') >= 0;
-    out.veLK439 = html.indexOf('stk-cod">439E LK<') >= 0;
-    out.ocultaBase438 = html.indexOf('stk-cod">438E<') < 0;   // base sin sufijo → oculto
-    out.ocultaBase439 = html.indexOf('stk-cod">439E<') < 0;
-    out.ve437base = html.indexOf('stk-cod">437E<') >= 0;      // base CON stock propio → se ve
-    out.veLK437 = html.indexOf('stk-cod">437E LK<') >= 0;
+    /* v10.02 — la celda del código ya NO lleva el sufijo: muestra el código canónico
+       (codBase + ceros a la izquierda) y la empresa se fue a su propia columna "Línea".
+       Así que la fila se identifica por su `data-stk-cod`, que sí conserva el código
+       completo ("438E LK"). Antes esto se buscaba como 'stk-cod">438E LK<'. */
+    const veFila = function (cod) { return html.indexOf('data-stk-cod="' + cod + '"') >= 0; };
+    out.veLK438 = veFila("438E LK");
+    out.veCH438 = veFila("438E CH");
+    out.veLK439 = veFila("439E LK");
+    out.ocultaBase438 = !veFila("438E");   // base sin sufijo → oculto
+    out.ocultaBase439 = !veFila("439E");
+    out.ve437base = veFila("437E");        // base CON stock propio → se ve
+    out.veLK437 = veFila("437E LK");
     return out;
   });
   const pass = r.veLK438 && r.veCH438 && r.veLK439 && r.ocultaBase438 && r.ocultaBase439 &&
