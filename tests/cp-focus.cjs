@@ -29,10 +29,13 @@ catch (_e) {
       });
     }
     // 98114 tiene 2 artículos con faltante; 99999 tiene 1. Además 315/561/700.
+    // fecha_salida DINÁMICA (ayer): v8.64 tira a "huérfanos" los faltantes con
+    // salida > 21 días — con fecha fija el test se pudría solo con el calendario.
+    const AYER = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
     const FALT = [
-      { id: 1, np: "98114", cod_cliente: "771", cod_art: "315", cajas_pedidas: 80, cajas_entregadas: 20, cajas_falto: 60, tanda: "D02A", fecha_salida: "2026-07-24" },
-      { id: 2, np: "98114", cod_cliente: "771", cod_art: "561", cajas_pedidas: 90, cajas_entregadas: 30, cajas_falto: 60, tanda: "D02A", fecha_salida: "2026-07-24" },
-      { id: 3, np: "99999", cod_cliente: "800", cod_art: "700", cajas_pedidas: 10, cajas_entregadas: 5, cajas_falto: 5, tanda: "C97A", fecha_salida: "2026-07-24" }
+      { id: 1, np: "98114", cod_cliente: "771", cod_art: "315", cajas_pedidas: 80, cajas_entregadas: 20, cajas_falto: 60, tanda: "D02A", fecha_salida: AYER },
+      { id: 2, np: "98114", cod_cliente: "771", cod_art: "561", cajas_pedidas: 90, cajas_entregadas: 30, cajas_falto: 60, tanda: "D02A", fecha_salida: AYER },
+      { id: 3, np: "99999", cod_cliente: "800", cod_art: "700", cajas_pedidas: 10, cajas_entregadas: 5, cajas_falto: 5, tanda: "C97A", fecha_salida: AYER }
     ];
     // v6.18: el CP SIN foco filtra a "a_guardar>0 O guardado hoy". Para que la
     // sección 3 (lista completa) muestre 315 y 700, les damos saldo a_guardar.
