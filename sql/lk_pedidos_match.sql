@@ -1,6 +1,6 @@
 -- =============================================================================
 -- lk_pedidos_match.sql — Espejo local del string identificador de pedido web
--- (LK + CHEF), con la SUCURSAL DE ENTREGA (2026-08-28)
+-- (LK + CHEF), con SUCURSAL DE ENTREGA y MÉTODO DE PAGO (2026-08-28)
 -- =============================================================================
 -- Virgilio no tenía la sucursal de entrega de los pedidos; los portales web sí
 -- (orders.sheets_payload.sucursal_entrega). LK EMPUJA acá cada 15 min por su
@@ -36,6 +36,7 @@ create table if not exists public.lk_pedidos_match (
   hora_pedido      text,                    -- HH24:MI:SS hora argentina
   created_at       timestamptz,
   sucursal_entrega text,                    -- el dato que Virgilio no tenía
+  metodo_pago      text,                    -- orders.payment_method del portal web
   items_string     text,
   match_string     text,
   ambiguo          boolean default false,
@@ -67,8 +68,9 @@ grant select, insert, update, delete on public.lk_pedidos_match to lk_ppp_reader
 -- vista_np_sucursal — Resuelve la sucursal de entrega por NP.
 -- Cruza PPP_Programacion_Diaria (cod del cliente) con PPP_Base_Pedidos (fecha
 -- del pedido) contra lk_pedidos_match. El frontend la usa para mostrar la
--- sucursal en el wizard AP/TAP (Separar). Si un cod+fecha tiene más de una
--- sucursal distinta (ambiguo), devuelve la primera por orden_en_dia.
+-- sucursal en el wizard AP/TAP (Separar) y el método de pago en el monitor.
+-- Si un cod+fecha tiene más de una sucursal distinta (ambiguo), devuelve la
+-- primera por orden_en_dia.
 -- =============================================================================
 create or replace view public.vista_np_sucursal as
 with np_fecha as (
@@ -77,7 +79,8 @@ with np_fecha as (
 )
 select distinct on (p.np)
     p.np,
-    m.sucursal_entrega
+    m.sucursal_entrega,
+    m.metodo_pago
 from "PPP_Programacion_Diaria" p
 join np_fecha f on f.np = p.np
 join lk_pedidos_match m
