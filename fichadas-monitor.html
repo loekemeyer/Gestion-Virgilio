@@ -238,6 +238,7 @@
     (pg_cron cada 2 / 10 min). El monitor no lee Google. Refresh cada 60s.
   </footer>
 
+  <script src="supabase-config.js"></script>
   <script>
     // ============================================================
     // Monitor de Fichadas — 100% Supabase (v5.34)
@@ -259,8 +260,9 @@
 
     const REFRESH_MS = 60000;
 
-    const SUPABASE_URL = "https://hrxfctzncixxqmpfhskv.supabase.co";
-    const SUPABASE_KEY = "sb_publishable_BqpAgZH6ty-9wft10_YMhw_0rcIPuWT";
+    /* v11.101: URL + key viven en supabase-config.js (cargado arriba). */
+    const SUPABASE_URL = window.VIR_SUPABASE_URL;
+    const SUPABASE_KEY = window.VIR_SUPABASE_KEY;
     const HISTORICO_ENDPOINT   = SUPABASE_URL + "/rest/v1/Fichadas_Historico";
     const ESTRUCTURA_ENDPOINT  = SUPABASE_URL + "/rest/v1/Fichadas_Estructura";
     const SUPABASE_HEADERS = {

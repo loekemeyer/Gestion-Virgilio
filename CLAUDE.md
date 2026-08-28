@@ -98,12 +98,12 @@ ALTER TABLE Capacidad_Sector ADD COLUMN nueva_col TEXT;
 - **Tabla central**: `Registros_Produccion_Virgilio` (log de eventos; `opcion` =
   código de acción, `texto` = código de tanda/pedido, `ts_inicio` no nulo = cierre).
 - **m³ SÍ están en Supabase** (desde v5.33): `PPP_Programacion_Diaria.m3`,
-  `PPP_Pedidos_Entregados.mt3`, `PPP_Entregados_Meta.m3` (por NP, desde v6.99) y la
-  vista `vista_tanda_m3` — se calculan por SQL desde el sandbox. El **origen upstream**
-  sigue siendo el Google Sheet "PPP Pedidos Entregados 2026" (col `Mt3`, NO col H ni
-  "Mt3 FC"), espejado en dos vías: `PPP_Pedidos_Entregados` vía Apps Script
-  (`sync-ppp-supabase.gs`) y `PPP_Entregados_Meta` (np,cod,rs,tanda,m3,fecha_entrega)
-  vía función Postgres `sync_ppp_entregados_meta()` por cron (ver `sql/`).
+  `PPP_Entregados_Meta.m3` (por NP) y la vista `vista_tanda_m3` — se calculan por
+  SQL desde el sandbox. El **origen upstream** sigue siendo el Google Sheet
+  "PPP Pedidos Entregados 2026" (col `Mt3`, NO col H ni "Mt3 FC"), espejado en UNA
+  vía: `PPP_Entregados_Meta` (np,cod,rs,tanda,m3,fecha_entrega) vía función Postgres
+  `sync_ppp_entregados_meta()` por cron (ver `sql/`). La tabla `PPP_Pedidos_Entregados`
+  (espejo duplicado vía Apps Script) se **borró en v10.25** — no citarla.
 - **Zona horaria**: `America/Argentina/Buenos_Aires`, UTC-3 fijo.
 - **Versión**: `APP_VERSION` en `index.html` y `SW_VERSION` en `sw.js`.
 - Legajos `0` y `1` (Pruebas) son test/basura: excluir de reportes.

@@ -367,7 +367,10 @@
 > Existe `vista_uxb_articulo` + `artUxb()` como canónica de la uxb de **depósito** (no tocar los
 > cálculos de plata con ella). **Descripción:** canónica `artNombre`/`vista_nombres_articulos`;
 > Recepción de talleristas usa a propósito el `Desc` del tallerista (más útil al operario, no
-> tocar). **Anon key:** vive en 3 archivos (index.html, sw.js, recepcion.js) — rotar los 3.
+> tocar). **Anon key:** desde v11.101 vive en UN archivo: `supabase-config.js` (lo cargan
+index.html, sw.js vía importScripts, recepcion.js, fichada.html/fichada-config.js,
+fichadas-monitor.html y productividad.html) — rotar la key = editar solo ese archivo
+(+ bump de versiones). La key de LK es aparte (index.html `SUPABASE_LK_KEY` + admin/).
 > **Regla nueva: NUNCA EMPARCHAR** (arriba).
 >
 > Nota **2026-08-22 — jornada v11.14→v11.23 (resumen).** **(1) Facturación:** columna
@@ -6978,8 +6981,11 @@ del Apps Script → se permiten filas repetidas, fiel a la hoja.
   N° NP). Cols: `np`, `tanda`, `tipo`, `fecha_recep`, `cod`, `razon_social`,
   `m3` (numeric), `v`, `direccion`, `barrio`, `op`, `fecha_entrega`, `fecha_fc`,
   `zona`, `observaciones`.
-- **`PPP_Pedidos_Entregados`** ← hoja "PPP Excel Pedidos Entregados 2026" (m³
-  histórico). Cols: `tanda`, `mt3` (numeric, col Mt3 — NO "Mt3 FC").
+- ~~`PPP_Pedidos_Entregados`~~ **BORRADA en v10.25** (2026-08-12): era el espejo
+  duplicado de la hoja "PPP Excel Pedidos Entregados 2026" (solo `tanda`+`mt3`). El m³
+  entregado ahora sale de **`PPP_Entregados_Meta`** (`np`, `cod`, `rs`, `tanda`, `m3`,
+  `fecha_entrega` — superconjunto), que se sincroniza sola cada 30 min por la función
+  Postgres `sync_ppp_entregados_meta()` (col Mt3 — NO "Mt3 FC"). `vista_tanda_m3` ya la lee.
 - **`PPP_Base_Pedidos`** ← hoja "PPP Excel Base Datos Pedidos". Una fila por línea.
   Cols: `pedido`, `articulo`, `cajas` (numeric).
 
@@ -7420,9 +7426,9 @@ lo excluye de horas/productividad (guard `opcion==="LT"` en
 - El monitor ya calcula y muestra **m³ de picking / m³ de armado / total / m³ por
   hora por operario** en el modal **"Rendimiento del día"** (`showDayBreakdown`).
 - **v2.80 — m³ migrables a Supabase:** si `PPP_SOURCE` ≠ `"sheets"`, el m³ sale de
-  `PPP_Programacion_Diaria.m3` / `PPP_Pedidos_Entregados.mt3` (numérico) en vez del
-  Sheet → **se puede calcular por SQL** (§ 11). Por defecto sigue saliendo del Sheet;
-  la carga la hace la macro (ver `MIGRACION-SUPABASE-PPP.md`).
+  `PPP_Programacion_Diaria.m3` / `PPP_Entregados_Meta.m3` (numérico; hasta v10.25 era
+  `PPP_Pedidos_Entregados.mt3`, tabla borrada) en vez del Sheet → **se puede calcular
+  por SQL** (§ 11). Hoy `PPP_SOURCE = "supabase"` (desde v5.33).
 
 ---
 
@@ -7530,9 +7536,9 @@ monitor o exportar. **Desde v2.80**, si la macro ya cargó las tablas `PPP_*`, e
 select upper(tanda) tanda, round(sum(m3)::numeric,3) m3
 from "PPP_Programacion_Diaria" where coalesce(tanda,'')<>''
 group by upper(tanda) order by 1;
--- m³ histórico por tanda
-select upper(tanda) tanda, round(sum(mt3)::numeric,3) m3
-from "PPP_Pedidos_Entregados" group by upper(tanda) order by 1;
+-- m³ histórico (entregado) por tanda — PPP_Pedidos_Entregados se borró en v10.25
+select upper(tanda) tanda, round(sum(m3)::numeric,3) m3
+from "PPP_Entregados_Meta" group by upper(tanda) order by 1;
 ```
 
 **Notas de datos:** legajos `1` (= "Pruebas") y `0` son test/basura, excluirlos.

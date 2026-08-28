@@ -25,8 +25,10 @@
 const { createClient } = (typeof window !== "undefined" && window.supabase) || {};
 if (!createClient) throw new Error("Falta vendor/supabase.umd.js (cargalo antes de recepcion.js)");
 
-const SUPABASE_URL = "https://hrxfctzncixxqmpfhskv.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_BqpAgZH6ty-9wft10_YMhw_0rcIPuWT";
+/* v11.101: URL + key viven en supabase-config.js (index.html la carga con un
+   <script> clásico antes de este módulo, igual que vendor/supabase.umd.js). */
+const SUPABASE_URL = window.VIR_SUPABASE_URL;
+const SUPABASE_PUBLISHABLE_KEY = window.VIR_SUPABASE_KEY;
 // ⚠ storageKey PROPIA (v5.21): sin esto, este cliente comparte la key default
 // "sb-<ref>-auth-token" con el login Google de index.html y el signInAnonymously
 // de abajo PISABA la sesión del supervisor (deslogueos "de la nada"). Además:

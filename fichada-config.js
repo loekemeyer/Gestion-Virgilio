@@ -7,11 +7,11 @@
 // Editar SOLO los valores marcados con TODO antes de desplegar.
 window.FICHADA_CONFIG = {
   // ===== Supabase =====
-  // Esta URL y key tienen que ser las mismas que usa index.html / sw.js.
-  // La publishable key tiene permisos INSERT (RLS) sobre Fichadas_Virgilio
-  // y SELECT sobre Empleados.
-  supabaseUrl: "https://hrxfctzncixxqmpfhskv.supabase.co",
-  supabaseKey: "sb_publishable_BqpAgZH6ty-9wft10_YMhw_0rcIPuWT",
+  // v11.101: URL + key salen de supabase-config.js (fichada.html lo carga
+  // ANTES de este archivo). La publishable key tiene permisos INSERT (RLS)
+  // sobre Fichadas_Virgilio y SELECT sobre Empleados.
+  supabaseUrl: window.VIR_SUPABASE_URL,
+  supabaseKey: window.VIR_SUPABASE_KEY,
 
   // ===== TOTP / QR =====
   // Secreto compartido entre index.html (genera el QR) y fichada.html

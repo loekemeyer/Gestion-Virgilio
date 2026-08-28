@@ -3621,7 +3621,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=11.99"></script>
+<script type="module" src="recepcion.js?v=11.101"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -4073,15 +4073,18 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
 
 <!-- Modal: Planilla Conteo Cajas -->
 
+<script src="supabase-config.js?v=11101"></script>
 <script>
 /* =========================================================
    SUPABASE
    Org "Gestion Productiva" / Proyecto "Control Partes Talleristas".
    La publishable key es pública por diseño (va embebida en la HTML
    servida por GitHub Pages). La RLS permite SOLO INSERT con esta key.
+   v11.101: URL + key viven SOLO en supabase-config.js (idea
+   normalizar-datos TOP-10) — rotar la key = tocar ese archivo.
    ========================================================= */
-const SUPABASE_URL  = "https://hrxfctzncixxqmpfhskv.supabase.co";
-const SUPABASE_KEY  = "sb_publishable_BqpAgZH6ty-9wft10_YMhw_0rcIPuWT";
+const SUPABASE_URL  = window.VIR_SUPABASE_URL;
+const SUPABASE_KEY  = window.VIR_SUPABASE_KEY;
 const SUPABASE_TABLE_ENDPOINT =
   SUPABASE_URL + "/rest/v1/Registros_Produccion_Virgilio";
 /* Fichadas de ingreso vienen del QR (fichada.html → Supabase). El monitor
@@ -6555,7 +6558,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v11.100";
+const APP_VERSION = "v11.101";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -11342,6 +11345,36 @@ function equivFam(cod) { return _equivBuild().famOf[_ocgNorm(cod)] || null; }
 function equivFamKey(cod) { const f = equivFam(cod); return f ? f._defN : _ocgNorm(cod); }
 /* Miembros normalizados de la familia de un código (incluye el propio). */
 function equivMiembros(cod) { const f = equivFam(cod); return f ? f._codsN.slice() : [_ocgNorm(cod)]; }
+/* v11.101 — idea normalizar-datos (TOP-5): la fuente de verdad de las familias es la
+   tabla Equivalencias_Familia (cod_secundario→cod_principal); la const de arriba queda
+   como SEMILLA offline. Acá se reconstruye el array desde la tabla (unión conservadora:
+   una familia de la semilla cuyo default no aparezca en la tabla se conserva) y se
+   invalida el índice cacheado. Si el fetch falla, sigue la semilla tal cual. */
+async function equivFamiliasLoad() {
+  try {
+    const r = await fetch(SUPABASE_URL + "/rest/v1/Equivalencias_Familia?select=cod_secundario,cod_principal,descripcion&limit=2000",
+      { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+    if (!r.ok) return;
+    const rows = await r.json();
+    if (!Array.isArray(rows) || !rows.length) return;
+    const byDef = {};
+    rows.forEach(function (x) {
+      const def = String(x.cod_principal || "").trim(); if (!def) return;
+      const sec = String(x.cod_secundario || "").trim();
+      if (!byDef[def]) byDef[def] = { desc: String(x.descripcion || ""), def: def, cods: [def] };
+      if (sec && byDef[def].cods.indexOf(sec) < 0) byDef[def].cods.push(sec);
+      if (!byDef[def].desc && x.descripcion) byDef[def].desc = String(x.descripcion);
+    });
+    const defsN = {};
+    Object.keys(byDef).forEach(function (d) { defsN[_ocgNorm(d)] = 1; });
+    const semilla = EQUIV_FAMILIAS.slice();
+    semilla.forEach(function (f) { if (!defsN[_ocgNorm(f.def)]) byDef[f.def] = { desc: f.desc, def: f.def, cods: (f.cods || []).slice() }; });
+    EQUIV_FAMILIAS.length = 0;
+    Object.keys(byDef).forEach(function (d) { EQUIV_FAMILIAS.push(byDef[d]); });
+    _equivIdx = null;
+  } catch (_e) { /* offline → semilla */ }
+}
+try { equivFamiliasLoad(); } catch (_e) {}
 async function ocgFetchProyeccion() {
   try {
     const r = await fetch(SUPABASE_PROY_ENDPOINT + "?select=cod,proy_cajas_mes&limit=20000", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });

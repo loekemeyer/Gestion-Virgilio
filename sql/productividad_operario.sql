@@ -15,6 +15,10 @@
 --  Alimenta(ba) el módulo 📊 "Rendimiento de operarios" (openProductividad /
 --  prodRender en index.html). 100% Supabase: NO usa el Google Sheet. Los m³
 --  salen de PPP_Pedidos_Entregados (col mt3).
+-- ⚠ DESACTUALIZADO (2026-08-28): PPP_Pedidos_Entregados se BORRÓ en v10.25; la
+--  vista_tanda_m3 VIVA en la base ya lee PPP_Entregados_Meta (m3). Las definiciones
+--  de abajo que citan PPP_Pedidos_Entregados son la versión vieja — antes de
+--  re-aplicar algo de este archivo, traer la definición real de la base.
 --
 --  Proyecto: hrxfctzncixxqmpfhskv ("Control Partes Talleristas").
 --  Aplicada con apply_migration (migraciones:

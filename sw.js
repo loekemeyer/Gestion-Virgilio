@@ -3,16 +3,16 @@
    Procesa la cola de envíos en background usando Background Sync API,
    incluso cuando la pestaña/app está cerrada.
 
-   ⚠ IMPORTANTE: la publishable key vive en TRES archivos (contextos distintos que
-   no pueden compartir una variable JS): index.html (SUPABASE_KEY), sw.js (acá) y
-   recepcion.js (SUPABASE_PUBLISHABLE_KEY, para su createClient). Si rotás la key,
-   hay que actualizar LOS TRES. (Además admin/admin.js tiene la anon key del proyecto LK.)
+   La publishable key vive en UN solo archivo: supabase-config.js (v11.101,
+   idea normalizar-datos TOP-10). Rotar la key = editar SOLO ese archivo.
+   (Además admin/admin.js tiene la anon key del proyecto LK — esa es aparte.)
    ========================================================= */
-const SW_VERSION = "v11.100-vir";
+importScripts("supabase-config.js");
+const SW_VERSION = "v11.101-vir";
 /* nota: v7.68 — generador de OCs desde stock (vista_generador_oc). */
 
-const SUPABASE_URL = "https://hrxfctzncixxqmpfhskv.supabase.co";
-const SUPABASE_KEY = "sb_publishable_BqpAgZH6ty-9wft10_YMhw_0rcIPuWT";
+const SUPABASE_URL = self.VIR_SUPABASE_URL;
+const SUPABASE_KEY = self.VIR_SUPABASE_KEY;
 const SUPABASE_TABLE_ENDPOINT =
   SUPABASE_URL + "/rest/v1/Registros_Produccion_Virgilio";
 const AUDIT_ENDPOINT =

@@ -488,9 +488,11 @@ table.summary .cell-metric .sub {
   </div>
 </div>
 
+<script src="supabase-config.js"></script>
 <script>
-const SUPA_URL = 'https://hrxfctzncixxqmpfhskv.supabase.co';
-const SUPA_KEY = 'sb_publishable_BqpAgZH6ty-9wft10_YMhw_0rcIPuWT';
+/* v11.101: URL + key viven en supabase-config.js (cargado arriba). */
+const SUPA_URL = window.VIR_SUPABASE_URL;
+const SUPA_KEY = window.VIR_SUPABASE_KEY;
 const HEADERS = { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY };
 
 const TARGETS = { TP: 1.60, TAP: 0.70 };
