@@ -16,7 +16,7 @@ hasta que el usuario la active**, y se mergea a `main` cuando el usuario dice el
 
 ## Ideas
 
-- [ ] **normalizar-datos** (2026-08-28) — **Revisión general de datos duplicados / multi-fuente + plan de normalización de tablas**. Auditar vía agente todos los lugares donde el mismo dato vive repetido en varias tablas de Supabase o se lee de fuentes distintas (Sheet vs tabla, LK vs Virgilio, código vs tabla), y armar el plan para normalizar las tablas. — _en curso (código 4 dígitos pendiente: Supabase MCP esperando aprobación)_
+- [ ] **7411** (2026-08-28) — **Revisión general de datos duplicados / multi-fuente + plan de normalización de tablas**. Auditar vía agente todos los lugares donde el mismo dato vive repetido en varias tablas de Supabase o se lee de fuentes distintas (Sheet vs tabla, LK vs Virgilio, código vs tabla), y armar el plan para normalizar las tablas. Informe en `docs/AUDITORIA-DATOS-DUPLICADOS.md` (TOP 10 + 4 baldes + plan en 4 etapas). — _en curso: semana 1 hecha (v11.101: anon key en 1 archivo, EQUIV_FAMILIAS desde tabla, docs stale). Faltan etapas 2–4._
 - [x] **7268** (2026-08-25) — Módulo Importación superpuesto: la tabla de Pedidos se pisaba y cortaba columnas — _hecha (v11.70, rama `claude/import-module-cleanup-o5r3w2`)_
 - [x] **4263** (2026-08-25) — Unificar "Deuda a cobrar" + "Cobranzas (valor por NP)" en un solo módulo — _hecha (v11.68)_
 

@@ -34,6 +34,7 @@ begin
        and coalesce(e.cod_art,'') = coalesce(new.cod_art,'')
        and coalesce(e.cajas_entregadas, 0) = coalesce(new.cajas_entregadas, 0)
        and coalesce(e.cajas_falto, 0)      = coalesce(new.cajas_falto, 0)
+       and coalesce(e.cajas_pedidas, 0)    = coalesce(new.cajas_pedidas, 0)
   ) then
     return null;  -- duplicado exacto: descartar sin error (el reintento del front no duplica)
   end if;

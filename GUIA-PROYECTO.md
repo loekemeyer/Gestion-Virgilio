@@ -7655,3 +7655,25 @@ tanda — se guardan como par open/close y el motor descuenta el `close` (la dur
   versión del encabezado de esta guía.
 - Si se agrega una pantalla/pestaña (p. ej. la **hoja de inconsistencias**),
   documentarla en § 2 y sus reglas en § 12.
+
+> Nota **2026-08-28 — Hardening de seguridad + candados de facturación (ideas 4297, 9082,
+> 3362 + seguridad).** Backend Supabase (todo verificado):
+> - **4297** — `arca-wsfe` v26: candado de idempotencia en `emitir_np` (409 `ya_facturada`
+>   si la NP ya tiene FC autorizada sin NC que la anule; cuenta FC 1/6/11 − NC 3/8/13).
+>   Override `{forzar:true}`. Reconciliada la copia del repo con lo deployado (suma `emitir_nd`).
+> - **9082** — trigger `trg_revertir_drenaje_facturado` (AFTER DELETE en `Facturacion_NP`):
+>   al revertir una NP sin cierre, borra su drenaje `tipo=facturado` (refs `TANDA|NP` y
+>   `NP|CP`) → el stock vuelve y un re-tick re-drena.
+> - **3362** — trigger `trg_entregas_virgilio_dedup` (BEFORE INSERT): advisory lock por
+>   np|tanda|cod + descarte de duplicado EXACTO (retry offline / TOCTOU no duplican).
+> - **Seguridad aplicada:** 1037 (RLS+revoke en `Uni_x_Articulo_x_Caja` y 2 backups),
+>   5341 (`usuarios`: anon pierde `password_hash` y escritura; login sigue por
+>   `validar_login` definer), 2758 (search_path fijo en 7 funciones), 7240
+>   (`ppp_etapa_tanda` a security_invoker), 6932 (grants inertes de `planify.admin_kv/premios`
+>   limpiados; ya tenían RLS), 1542 parcial (revoke anon de 4 RPCs de notificación Telegram
+>   = anti-spam). Copia versionada en `sql/hardening_seguridad_20260828.sql`.
+> - **PENDIENTES de seguridad (apps externas / privilegios):** 8436 (http SSRF — la extensión
+>   la posee `supabase_admin`, `postgres` no puede revocar; mover a schema `extensions`),
+>   6738 (login Planify ignora password), 2221 (brute-force login texto plano), 1712
+>   (enumeración FichadaQR), 4072 (portal proveedores), 1431 (clave prode hardcodeada),
+>   5035 (triggers Telegram sin WHEN, eficiencia). Detalle en el .sql.
