@@ -474,6 +474,7 @@ window.reanudarRecepcionOp = function (legajo, dayKey) {
   else renderTipoElegir();
 };
 let _pendTimer = null;   // timer del "hace X hs" en vivo de Pendientes
+let _deepLinkRemito = null;  // remito a resaltar al abrir Pendientes desde Planify
 function closeOp() {
   rcpDraftSave();   // v7.12: salir NO pierde la recepción a medio cargar
   opAnularBarRender(false);
@@ -2272,6 +2273,22 @@ async function renderPendientes() {
   opBody.appendChild(list);
   if (_pendTimer) clearInterval(_pendTimer);
   _pendTimer = setInterval(pendTickElapsed, 30000);   // refresca "Demora" en vivo
+  // Deep-link desde Planify: resaltar y scrollear al remito específico
+  if (_deepLinkRemito) {
+    const hl = _deepLinkRemito;
+    _deepLinkRemito = null;
+    setTimeout(function () {
+      const card = Array.from(opBody.querySelectorAll(".pendCard")).find(function (c) {
+        const rto = c.querySelector(".pcRto");
+        return rto && rto.textContent.toUpperCase().includes(hl.toUpperCase());
+      });
+      if (card) {
+        card.scrollIntoView({ behavior: "smooth", block: "center" });
+        card.style.outline = "3px solid #2563eb";
+        setTimeout(function () { card.style.outline = ""; }, 3000);
+      }
+    }, 200);
+  }
 }
 function pendFmtFecha(fecha, tsMs) {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(fecha || ""));
@@ -2490,4 +2507,13 @@ window.openRecepcionMenu = function () {
   RECP.dayKey = opTodayStr();
   opPage.classList.add("open");
   renderMenu();
+};
+
+/* Deep-link desde Planify: abre el módulo directo en Pendientes y resalta el remito. */
+window.recepcionAbrirPendientes = async function (remito) {
+  _deepLinkRemito = remito || null;
+  RECP.legajo = null;
+  RECP.dayKey = opTodayStr();
+  opPage.classList.add("open");
+  await renderPendientes();
 };

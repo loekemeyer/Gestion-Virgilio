@@ -3621,7 +3621,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=12.01"></script>
+<script type="module" src="recepcion.js?v=12.04"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -4223,6 +4223,21 @@ const FERIADOS_AR = new Set([
    En Terminar Día, los abiertos de este grupo abren un input en el modal y
    no se puede confirmar sin completar todos los campos. */
 const CLOSE_NEEDS_INPUT_CODES = ["CC","RT","RI","EI"];
+
+/* =========================================================
+   DEEP-LINK DESDE PLANIFY
+   ?recpend=REMITO → al terminar el login, abrir Pendientes de Recepción
+   directo y resaltar la tarjeta del remito en cuestión.
+   ========================================================= */
+(function () {
+  try {
+    var p = new URLSearchParams(location.search).get("recpend");
+    if (p) {
+      sessionStorage.setItem("vir_deep_recpend", p);
+      history.replaceState(null, "", location.pathname + (location.hash || ""));
+    }
+  } catch (_e) {}
+})();
 
 /* =========================================================
    FECHA / TIMESTAMP
@@ -5615,6 +5630,17 @@ function goToOptions() {
   } catch (_e) {}
   // v5.71: pop-up en vivo de "faltante que llegó → completar" para los que están en Virgilio.
   try { faltPollStart(); } catch (_e) {}
+  // Deep-link desde Planify: abrir Pendientes directo para el que tomó la tarea.
+  try {
+    var rp = sessionStorage.getItem("vir_deep_recpend");
+    if (rp) {
+      sessionStorage.removeItem("vir_deep_recpend");
+      setTimeout(function () {
+        if (typeof window.recepcionAbrirPendientes === "function")
+          window.recepcionAbrirPendientes(rp);
+      }, 800);
+    }
+  } catch (_e) {}
 }
 
 function backToLegajo() {
@@ -6558,7 +6584,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.03";
+const APP_VERSION = "v12.04";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
