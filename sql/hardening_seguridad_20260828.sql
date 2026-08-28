@@ -76,3 +76,11 @@ revoke execute on function public.notificar_pasaje_papeles_48h()              fr
 --  · 5035 5 triggers Telegram sin WHEN (eficiencia, impacto bajo; las funciones ya
 --         auto-chequean). Agregar WHEN requiere leer cada función; se difiere.
 -- =====================================================================
+
+-- ✅ APLICADO 2026-08-28 — Idea 5035: WHEN clause en 5 triggers Telegram
+-- (migración triggers_telegram_add_when_clause)
+-- trg_carga_sin_control_telegram    → WHEN (NEW.opcion = 'CRA')
+-- trg_facturacion_override_telegram → WHEN (NEW.opcion = 'FCO')
+-- trg_ppp_error_telegram            → WHEN (NEW.opcion = 'PPE')
+-- trg_recepcion_sin_planim_telegram → WHEN (NEW.opcion = 'RSP')
+-- trg_sin_planim_telegram           → WHEN (NEW.opcion = 'PSP')
