@@ -1,0 +1,64 @@
+-- =============================================================================
+-- lk_pedidos_match.sql — Espejo local del string identificador de pedido web
+-- (LK + CHEF), con la SUCURSAL DE ENTREGA (2026-08-28)
+-- =============================================================================
+-- Virgilio no tenía la sucursal de entrega de los pedidos; los portales web sí
+-- (orders.sheets_payload.sucursal_entrega). LK EMPUJA acá cada 15 min por su
+-- FDW existente (server virgilio_db, rol lk_ppp_reader — el mismo del espejo
+-- PPP, ahora con permiso de escritura SOLO sobre esta tabla). Los pedidos de
+-- CHEF (portal gemelo en el proyecto Supabase de Chef) entran por el mismo
+-- camino: LK los lee por su FDW chef_db y los reenvía con empresa='chef'
+-- (⚠ requiere en el proyecto Chef: grant select on public.orders to loke_reader;
+-- hasta entonces solo se sincroniza LK). Virgilio lee su tabla LOCAL: cero FDW
+-- en el camino caliente. La empresa de una NP se deduce del número:
+-- 9xxxx = lk, 4xxxx = chef (numeraciones de cliente independientes).
+--
+--   match_string = cod_cliente | fecha (ART, YYYY-MM-DD) | items
+--   items        = cod_art x cajas, ordenado por cod_art, cajas sumadas por
+--                  código repetido (ej: "026x1,027x10,315x2")
+--
+-- `ambiguo` = ese mismo string aparece ese día con MÁS DE UNA sucursal
+-- distinta (mismo cliente, mismo día, mismo pedido exacto a dos sucursales:
+-- la única excepción que el string no resuelve — histórico: 17 pedidos de
+-- 977). `orden_en_dia` desempata por hora de alta. `order_id` es el
+-- order_number del portal web (el mismo que viaja al Sheet).
+--
+-- Lado LK: vista fuente + sync + cron en sql/pedidos_match_virgilio.sql del
+-- repo pagina-LK.
+-- =============================================================================
+
+create table if not exists public.lk_pedidos_match (
+  empresa          text not null default 'lk', -- 'lk' | 'chef' (NP 9xxxx = lk, 4xxxx = chef)
+  order_id         bigint,                  -- orders.id en el portal (= order_number del Sheet)
+  cod_cliente      text not null,
+  status           text,
+  fecha_pedido     date not null,           -- fecha del pedido en hora argentina
+  hora_pedido      text,                    -- HH24:MI:SS hora argentina
+  created_at       timestamptz,
+  sucursal_entrega text,                    -- el dato que Virgilio no tenía
+  items_string     text,
+  match_string     text,
+  ambiguo          boolean default false,
+  orden_en_dia     bigint,
+  synced_at        timestamptz default now(),
+  primary key (empresa, order_id)          -- los order_id de los dos portales pueden chocar
+);
+
+create index if not exists lk_pedidos_match_string_idx  on public.lk_pedidos_match (match_string);
+create index if not exists lk_pedidos_match_fecha_idx   on public.lk_pedidos_match (fecha_pedido);
+create index if not exists lk_pedidos_match_cliente_idx on public.lk_pedidos_match (empresa, cod_cliente, fecha_pedido);
+
+alter table public.lk_pedidos_match enable row level security;
+
+-- La app de Virgilio (anon) solo lee
+drop policy if exists lk_pedidos_match_select on public.lk_pedidos_match;
+create policy lk_pedidos_match_select on public.lk_pedidos_match
+  for select to anon, authenticated using (true);
+
+-- LK escribe vía FDW con lk_ppp_reader (única tabla donde ese rol escribe)
+drop policy if exists lk_pedidos_match_writer on public.lk_pedidos_match;
+create policy lk_pedidos_match_writer on public.lk_pedidos_match
+  for all to lk_ppp_reader using (true) with check (true);
+
+grant usage on schema public to lk_ppp_reader;
+grant select, insert, update, delete on public.lk_pedidos_match to lk_ppp_reader;
