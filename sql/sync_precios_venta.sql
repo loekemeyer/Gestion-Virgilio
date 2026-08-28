@@ -1,0 +1,83 @@
+-- ============================================================
+--  sync_precios_venta — cron que refresca precios_venta + cob_uxb_lk
+--  desde LK vía la Edge Function sync-precios-venta.
+--  Proyecto Supabase: Control Partes Talleristas (hrxfctzncixxqmpfhskv)
+--
+--  PATRÓN: idéntico a sync-clientes-dto-14d. pg_cron llama a la Edge
+--  Function por net.http_post; la función lee products + loke_products
+--  de LK via REST (WEB_SERVICE_KEY) y hace upsert en Virgilio.
+--
+--  FRECUENCIA: diaria a las 06:00 ART (09:00 UTC). Los precios cambian
+--  con poca frecuencia (actualizaciones de lista); una vez por día es
+--  más que suficiente y alinea con los otros syncs matutinos.
+--
+--  CONDICIÓN: solo dispara si el dato tiene más de 24 h de antigüedad
+--  (max(actualizado) < now() - interval '24 hours'), para no gastar un
+--  invocación si ya se sincronizó hoy por otro camino.
+--
+--  TABLAS DESTINO:
+--    precios_venta     — cod, precio_unit, uxb, descripcion (de products)
+--    cob_uxb_lk        — cod, uxb (de products ∪ loke_products)
+--
+--  CHEF (precios_venta_chef): NO está incluido. Requiere un secret propio
+--  (service_role del proyecto Chef nkhzocgdpwtgrmwleihr) que Virgilio no
+--  tiene. Agregar CHEF_SERVICE_KEY + CHEF_SUPABASE_URL al vault y extender
+--  la Edge Function cuando se tenga.
+--
+--  WATCHDOG: agregar el jobid al VALUES de watchdog_syncs_externos()
+--  con umbral de 2880 min (48 h, ~2x el período de 24 h).
+-- ============================================================
+
+-- La Edge Function se deploya manualmente (Dashboard o MCP).
+-- Nombre: sync-precios-venta, verify_jwt: OFF.
+
+-- Cron job:
+-- select cron.schedule(
+--   'sync-precios-venta',
+--   '0 9 * * *',          -- 09:00 UTC = 06:00 ART
+--   $$
+--   do $$
+--   declare v_fn_url text;
+--   begin
+--     if (select max(actualizado) from public.precios_venta) > now() - interval '24 hours' then
+--       raise notice 'sync-precios-venta: dato fresco (< 24 h), salteado';
+--       return;
+--     end if;
+--     v_fn_url := current_setting('app.settings.supabase_url', true)
+--                 || '/functions/v1/sync-precios-venta';
+--     perform net.http_post(
+--       url     := v_fn_url,
+--       headers := jsonb_build_object(
+--         'Content-Type', 'application/json',
+--         'Authorization', 'Bearer ' || current_setting('app.settings.service_role_key', true)
+--       ),
+--       body    := '{}'::jsonb
+--     );
+--   end $$;
+--   $$
+-- );
+--
+-- Para ver el jobid asignado:
+--   select jobid, jobname from cron.job where jobname = 'sync-precios-venta';
+--
+-- Agregar al watchdog (reemplazar NN por el jobid real):
+--   Sumar (NN, 2880) al VALUES de watchdog_syncs_externos().
+--
+-- Rollback:
+--   select cron.unschedule('sync-precios-venta');
+
+-- ============================================================
+--  Verificación post-deploy
+-- ============================================================
+-- 1. Invocar a mano:
+--    select net.http_post(
+--      url := '<SUPABASE_URL>/functions/v1/sync-precios-venta',
+--      headers := '{"Content-Type":"application/json","Authorization":"Bearer <SERVICE_ROLE_KEY>"}'::jsonb,
+--      body := '{}'::jsonb
+--    );
+-- 2. Esperar ~5 seg y chequear:
+--    select count(*), max(actualizado) from public.precios_venta;
+--    select count(*) from public.cob_uxb_lk;
+-- 3. Comparar contra LK (correr en el SQL Editor de LK):
+--    select count(*) from products where coalesce(list_price,0) > 0 and btrim(coalesce(cod,'')) <> '';
+-- 4. Los conteos deben coincidir (± productos con cod vacío o list_price = 0).
