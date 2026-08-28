@@ -7496,12 +7496,15 @@ En `showDayBreakdown` (monitor, por operario por día):
 - El QR in-app **está habilitado** (`QR_DISABLED = false`, desde v1.52). El monitor/TV
   muestra el QR rotativo abajo-derecha (sólo con el monitor abierto). El operario lo
   escanea → abre `fichada.html?t=<token>` → pone su email → registra el **ingreso** en
-  `Fichadas_Virgilio` (`tipo:"ingreso"`) + espejo a `Fichadas_Historico`
-  (`evento:"Entrada"`). El legajo se resuelve por email contra `Empleados`; si el email
-  no está cargado, igual ficha con `legajo=null` y el monitor lo marca "sin legajo".
-  Flujo verificado: RLS deja al rol `anon` insertar en ambas tablas.
-- `PC` y `FJ` se mandan desde la app principal y se espejan a `Fichadas_Historico`
+  `Fichadas_Virgilio` (`tipo:"ingreso"`). El trigger `trg_fichadas_virgilio_espejo`
+  lo copia server-side a `Fichadas_Historico` (`evento:"Entrada"`). El legajo se
+  resuelve por email contra `Empleados`; si el email no está cargado, igual ficha
+  con `legajo=null` y el monitor lo marca "sin legajo".
+- `PC` y `FJ` se escriben en `Registros_Produccion_Virgilio` y el trigger
+  `trg_registros_fichada_espejo` los copia server-side a `Fichadas_Historico`
   (`FJ→"Salida"`, `PC` abre→`"Comida Inicia"`, `PC` cierra→`"Comida Termina"`).
+  El front ya NO escribe directamente en `Fichadas_Historico` (eliminado en la
+  Fase 2 del espejo, 2026-08-28).
 
 ---
 

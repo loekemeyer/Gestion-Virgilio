@@ -4096,8 +4096,6 @@ const SUPABASE_TABLE_ENDPOINT =
    linkeado en la tabla). */
 const SUPABASE_FICHADAS_ENDPOINT =
   SUPABASE_URL + "/rest/v1/Fichadas_Virgilio";
-const SUPABASE_HISTORICO_ENDPOINT =
-  SUPABASE_URL + "/rest/v1/Fichadas_Historico";
 const SUPABASE_EMPLEADOS_ENDPOINT =
   SUPABASE_URL + "/rest/v1/Empleados";
 // Pantalla facturación: 1 row por NP facturado. cierre_id se llena cuando
@@ -6198,49 +6196,10 @@ function _enqueueReportRaw(payload) {
   updatePendingIndicator();
   registerBackgroundSync();   // pide al browser que despache aunque cerremos la app
 
-  // Mirror a Fichadas_Historico — tabla consolidada de fichadas
-  // (Entrada/Comida Inicia/Comida Termina/Salida) que combina los
-  // operarios Virgilio con los importados del Google Sheet legacy.
-  // Best-effort, fire-and-forget: si falla, el evento ya quedó en
-  // Registros_Produccion_Virgilio (fuente de verdad para producción).
-  mirrorOperatorEventToHistorico(payload).catch(() => {});
 }
 function enqueueReport(payload) {
   if (esOperadorPrueba()) { try { console.warn("[PRUEBA] evento NO persistido (legajo de prueba):", payload && payload.opcion); } catch (_e) {} return; }
   _enqueueReportRaw(payload);
-}
-
-/* =====================================================================
-   Mirror de eventos PC/FJ al Fichadas_Historico de Supabase.
-   ---------------------------------------------------------------------
-   Solo se mandan los eventos que representan una fichada de horario:
-   - PC apertura (toggle 1ra vez)  → 'Comida Inicia'
-   - PC cierre   (toggle 2da vez)  → 'Comida Termina'
-   - FJ                            → 'Salida'
-   - La Entrada la manda fichada.html directamente al hacer el QR.
-   Resuelve legajo -> email vía Empleados (cacheado por sesion).
-   ===================================================================== */
-const _legajoEmailCache = new Map();   // legajo -> email|null (null = no tiene)
-async function _resolveEmailForLegajo(legajo) {
-  if (!legajo) return null;
-  const key = String(legajo).trim();
-  if (!key) return null;
-  if (_legajoEmailCache.has(key)) return _legajoEmailCache.get(key);
-  try {
-    const url = SUPABASE_URL +
-      "/rest/v1/Empleados?Legajo=eq." + encodeURIComponent(key) +
-      "&select=email&limit=1";
-    const r = await fetch(url, {
-      headers: { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY }
-    });
-    if (!r.ok) return null;       // no cacheamos error: probamos de nuevo despues
-    const data = await r.json();
-    const email = (Array.isArray(data) && data.length && data[0].email)
-      ? String(data[0].email).trim()
-      : null;
-    _legajoEmailCache.set(key, email);
-    return email;
-  } catch (_e) { return null; }
 }
 
 /* Resuelve la hora_entrada (jornada) del legajo desde Empleados, cacheada por
@@ -6307,48 +6266,6 @@ async function maybeRegisterLateArrival(legajoStr, nowMs) {
     });
     enqueueReport(payload);
   } catch (_e) { /* best effort: nunca bloquea el reporte del operario */ }
-}
-
-function _mapOpcionToFichadaEvento(payload) {
-  if (!payload || !payload.opcion) return null;
-  if (payload.opcion === "FJ") return "Salida";
-  if (payload.opcion === "PC") {
-    // PC es toggle: 1ra vez sin ts_inicio_iso = apertura (Comida Inicia),
-    // 2da vez con ts_inicio_iso = cierre (Comida Termina).
-    return payload.ts_inicio_iso ? "Comida Termina" : "Comida Inicia";
-  }
-  return null;
-}
-
-async function mirrorOperatorEventToHistorico(payload) {
-  const evento = _mapOpcionToFichadaEvento(payload);
-  if (!evento) return;            // opcion fuera del scope (EP, TP, etc.)
-  const email = await _resolveEmailForLegajo(payload.legajo);
-  if (!email) return;             // sin email no podemos identificar al operario en la tabla
-  const tsIso = payload.ts ? new Date(payload.ts).toISOString() : new Date().toISOString();
-  const body = {
-    ts_evento: tsIso,
-    evento:    evento,
-    email:     email,
-    legajo:    String(payload.legajo)
-  };
-  try {
-    const r = await fetch(SUPABASE_HISTORICO_ENDPOINT, {
-      method: "POST",
-      headers: {
-        "apikey":        SUPABASE_KEY,
-        "Authorization": "Bearer " + SUPABASE_KEY,
-        "Content-Type":  "application/json",
-        "Prefer":        "return=minimal,resolution=ignore-duplicates"
-      },
-      body: JSON.stringify(body)
-    });
-    if (!r.ok && r.status !== 409) {
-      console.warn("[historico] HTTP", r.status, "para", evento, email);
-    }
-  } catch (e) {
-    console.warn("[historico] fetch fallo:", e && e.message);
-  }
 }
 
 /* Genera un cierre automático para un toggle que quedó abierto al cambiar
@@ -7544,8 +7461,8 @@ let _qrLastToken = null;
 
 /* QR de fichada rotativo (TOTP) — HABILITADO. El flujo end-to-end está
    verificado contra Supabase: fichada.html inserta el ingreso en
-   Fichadas_Virgilio y lo espeja en Fichadas_Historico (RLS: rol anon con
-   INSERT OK en ambas; imported_at/created_at tienen default now()), y el
+   Fichadas_Virgilio (el trigger trg_fichadas_virgilio_espejo lo copia
+   a Fichadas_Historico server-side; imported_at/created_at default now()), y el
    legajo se resuelve por email desde Empleados (anon SELECT OK).
    Si hubiera que frenarlo de nuevo, poner true: muestra "EN CONSTRUCCIÓN". */
 const QR_DISABLED = false;

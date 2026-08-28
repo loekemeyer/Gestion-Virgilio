@@ -163,7 +163,7 @@
 ## Plan de normalización sugerido (orden de ataque)
 
 1. **Semana 1 (todo bajo riesgo)**: TOP-6 (docs/SQL stale), TOP-10 (key en 1 archivo + corregir GUIA), TOP-5 (borrar `EQUIV_FAMILIAS` del front), 4.3/4.4 (limpiar np/tanda en el sync), legajos test a `Empleados.tipo`, metas a `Stock_Config`.
-2. **Semanas 2-3**: TOP-8 (cron de precios), TOP-4 (`empresa_de_np` + `Codigos_Duales` en SQL), TOP-7 (unificar sync PPP en pull server-side), fichadas a trigger server-side, tabla `Sync_Estado` con alerta.
+2. **Semanas 2-3**: TOP-8 (cron de precios), ~~TOP-4 (`empresa_de_np` + `Codigos_Duales` en SQL)~~ ✅, TOP-7 (unificar sync PPP en pull server-side), ~~fichadas a trigger server-side~~ ✅ (Phase 1+2: `trg_fichadas_virgilio_espejo` + `trg_registros_fichada_espejo`; front ya no escribe en `Fichadas_Historico`), ~~tabla `Sync_Estado` con alerta~~ ✅ (`watchdog_syncs_externos` lee `cron.job_run_details`).
 3. **Mes 2**: TOP-2 (canon de `cod_art` en el write + backfill, respetando el protocolo de backups del CLAUDE.md), TOP-3 (`Planimetria`/`Gondola_Celdas` única), 1.11 (zona).
 4. **Trimestre**: TOP-1 (tabla maestra `Articulos` absorbiendo descripción/marca/uxb-por-contexto/volumen; las vistas `vista_nombres/marca/uxb_articulo` pasan a leerla — el front no cambia), TOP-9 (faltantes), 4.2 (columna empresa vs sufijo — la más invasiva, dejarla última y con vista de compatibilidad).
 
