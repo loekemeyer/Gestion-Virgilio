@@ -9,10 +9,8 @@
 --     (NOMBRE_POR_EMPRESA: 809E = Corta Pizza Familiar en LK / Corta Queso en CH).
 -- Después de aplicar: las vistas SQL usan empresa_de_np()/Codigos_Duales, y el front
 -- puede fetchear Codigos_Duales al arrancar (las const quedan de semilla offline).
--- ⚠ NO aplicar sin revisar contra la base (nombres/valores) — borrador.
--- ⚠ ESTADO REAL (verificado 2026-08-28): **NO APLICADO**. Ni `empresa_de_np()` ni
---    `Codigos_Duales` existen en la base. La línea que decía "Aplicado como migración
---    empresa_de_np_codigos_duales" era falsa (se escribió junto al borrador, sin correrlo).
+-- ✅ APLICADO 2026-08-28 (migración `empresa_de_np_codigos_duales`).
+-- empresa_de_np() y Codigos_Duales existen en la base desde esa fecha.
 -- Alcance medido de la duplicación que este archivo viene a resolver: la regla LK/CH está
 -- re-escrita en **9 lugares** — 5 en el front (index.html:7360 `empresaDeNp`, :7973
 -- `PICK_UBIC_DUAL`, :7984 `pkNpEsLoeke`, :10188 `NOMBRE_POR_EMPRESA`, :10200
