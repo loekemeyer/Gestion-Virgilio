@@ -117,6 +117,15 @@
 
 ## Balde 4 — Normalizaciones y claves inconsistentes entre tablas
 
+> ⚠ **Regla del dueño (2026-08-28), manda sobre lo que sigue:** para los códigos de dos
+> dígitos, **el código ES con cero adelante** (`026`, `029`, `034`, `043`…) — "lo corregí
+> mil veces". Verificado: stock, capacidad, pedidos y OCs ya guardan la forma con cero, y
+> **no hay saldos partidos** entre variantes; las únicas tablas peladas son
+> `Articulos_Cajas` y `proyeccion_madre` (espejo del motor LK). Consecuencia: cualquier
+> normalización de escritura o backfill debe canonizar **HACIA la forma con cero**, nunca
+> sacándolo. Los normalizadores que quitan ceros (`_ocgNorm`, `canon_cod`, `norm_cod`)
+> valen solo para COMPARAR, no para guardar ni mostrar.
+
 ### 4.1 `cod_art`: ceros a la izquierda (el peor)
 - **La misma entidad** se guarda como `27` / `027` / `0027` según la fuente (E.Madre, Pedidos Talleristas, carga manual) — index.html:10204-10208. Consecuencia: saldo partido en `Movimientos_Stock` (incidente que motivó `sql/canon_cod_art.sql:4-7`).
 - **Mitigaciones actuales, fragmentadas**: trigger `fn_canon_cod_art` solo en `Movimientos_Stock` y **excluyendo** los tipos del pipeline (canon_cod_art.sql:36); funciones SQL `norm_cod` y `canon_cod` (dos, similares); en el front **7 normalizadores**: `_ocgNorm` (index.html:11294, ~140 usos; duplicado en recepcion.js:1165), `_stkNormCod` (14557, además quita espacios internos — ¡regla distinta!), `_cpNorm` (20997), `codBase` (7384), `codCanon`/`_padCod` (10231/10217), `_equivNorm`, `pkStripL`.
