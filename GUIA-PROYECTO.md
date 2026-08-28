@@ -6848,7 +6848,9 @@ de pedidos de un Google Sheet.
 - Se sirve desde **GitHub Pages**: `https://loekemeyer.github.io/Produccion-Virgilio/`
 - Repo: `loekemeyer/produccion-virgilio` · se publica desde la branch **`main`**
   (lo que llega a `main` queda online en ~1 min; cada pantalla lo ve al refrescar).
-- Branch de desarrollo actual: **`claude/fix-virgilio-production-GoGCS`**.
+- **No hay branch de desarrollo**: se trabaja y pushea **directo en `main`**. Las
+  ramas `idea/<código>` existen solo para propuestas de agentes pendientes de
+  aceptar (ver § Agentes).
 - **Play Store**: la PWA se publica como **TWA** (envoltorio Android que abre la
   web a pantalla completa). Cómo generar el `.aab` y publicar: ver
   **`PLAY-STORE.md`**. Config en `twa-manifest.json`; íconos PNG en `icons/`;
@@ -6861,8 +6863,9 @@ de pedidos de un Google Sheet.
 
 | Archivo | Rol |
 |---|---|
-| `index.html` | **La app completa** (~6.600 líneas): pantalla de operario + monitor + toda la lógica JS/CSS. Es el archivo central. |
-| `sw.js` | Service Worker. **NO cachea HTML/assets**: sólo hace Background Sync de la cola offline (IndexedDB). `SW_VERSION = "v6.65-vir"`. |
+| `index.html` | **La app completa** (~35.000 líneas): pantalla de operario + monitor + toda la lógica JS/CSS. Es el archivo central. |
+| `recepcion.js` | Módulo de **Recepción** (~2.600 líneas): control de remitos de talleristas/proveedores, checklist de Pendientes, OCs, fotos. Lo carga `index.html`. |
+| `sw.js` | Service Worker. **NO cachea HTML/assets**: sólo hace Background Sync de la cola offline (IndexedDB). `SW_VERSION = "vX.YZ-vir"` (la versión real acompaña a `APP_VERSION`). |
 | `manifest.json` | Manifiesto PWA. |
 | `fichada.html` / `fichada.js` / `fichada-config.js` / `fichada-totp.js` / `fichada.css` | Sistema de **fichada por QR rotativo (TOTP)**. La página `fichada.html` se abre escaneando el QR y registra el **ingreso**. |
 | `fichadas-monitor.html` | Tablero **independiente** "Monitor Fichadas Esnaola" (lee de `Fichadas_Historico` y sincroniza otro Google Sheet distinto). No está enlazado desde `index.html`. |
@@ -6884,11 +6887,13 @@ Todo vive en `index.html`, alternando con la clase `.hidden` (no hay router):
   (Supabase Auth, provider Google del proyecto `hrxfctzncixxqmpfhskv`). Arranca
   mostrando sólo el botón "Iniciar sesión con Google" (`#authBlock`). Tras loguear,
   el módulo de auth decide el **rol** por email y muestra la pantalla acorde:
-  - **Supervisor** (emails en `SUPERVISOR_EMAILS`: `loekemeyer.n8n@gmail.com`,
-    `loekemeyer.logistica@gmail.com`): ve `#supervisorPanel` con **4 botones grandes
-    centrados** (📊 Monitor de operarios, 📋 Facturación, ⚠ Inconsistencias,
-    📈 Análisis de productividad). No necesita estar en `Empleados` ni tiene legajo.
-    (Los antiguos botones flotantes de abajo se eliminaron.)
+  - **Supervisor** (emails fijos en `SUPERVISOR_EMAILS`: `loekemeyer.n8n@gmail.com`,
+    `loekemeyer.logistica@gmail.com`, `comexloekemeyer@gmail.com` — más los
+    remotos de la tabla `Supervisores_Mails`): ve `#supervisorPanel` con los
+    **botones grandes** del panel (hoy ~15 en varias filas: 📊 Monitor, 📋 Facturación,
+    ⚠ Inconsistencias, 📈 Análisis, 📦 Stocks, 🗓 PPP, 🖨️ Cola de impresión NP,
+    🌐 Panel Web LK, ⚙ Configuraciones, etc.). No necesita estar en `Empleados` ni
+    tiene legajo. (Los antiguos botones flotantes de abajo se eliminaron.)
   - **Operario** (email cargado en `Empleados`): se resuelve `email → {Legajo, Empleado}`
     (`select=Legajo,Empleado`). Ya **no se tipea el legajo** y **salta directo a la
     grilla de opciones** (EP/TP/...) vía `goToOptions()`. El **nombre** se muestra en
@@ -7333,8 +7338,8 @@ cálculo de productividad con m³ y factores. Complejidad alta, dejado para desp
 
 ## 4. Códigos de acción (`opcion`)
 
-Definidos en `index.html` (objeto `desc`, ~línea 1531). Los botones se arman en
-3 filas:
+Definidos en `index.html` (objeto `desc`; buscarlo por `const desc = {`). Los
+botones se arman en **5 filas** (`row1`…`row5` en el HTML de la grilla de opciones):
 
 | Código | Descripción | Grupo | ¿Captura `texto`? |
 |---|---|---|---|
@@ -7518,11 +7523,13 @@ En `showDayBreakdown` (monitor, por operario por día):
 
 ## 10. Versionado y cache
 
-- `index.html`: `APP_VERSION = "v11.10"`. Badge en pantalla `#versionBadge`:
-  `"v11.10 ✓"` (sin cola), `"v11.10 ⏳ N"` (pendientes), `"v11.10 ⚠ N"` (error).
+- `index.html`: `APP_VERSION = "vX.YZ"` (la versión vigente vive en el código, no
+  acá — no citar un número fijo en esta guía porque queda viejo). Badge en pantalla
+  `#versionBadge`: `"vX.YZ ✓"` (sin cola), `"vX.YZ ⏳ N"` (pendientes), `"vX.YZ ⚠ N"` (error).
   **Sirve para confirmar qué versión cargó cada pantalla** (mirá el badge en la TV
   para saber si está al día).
-- `sw.js`: `SW_VERSION = "v10.05-vir"`. **No precachea nada**; el handler de `fetch`
+- `sw.js`: `SW_VERSION = "vX.YZ-vir"` (misma base que `APP_VERSION`; el test
+  `version-sync.cjs` lo verifica). **No precachea nada**; el handler de `fetch`
   está vacío. Usa `skipWaiting()` + `clients.claim()`. La página hace
   `reg.update()` cada 60 s con `updateViaCache:"none"` (esto **sólo actualiza el
   SW**; NO recarga la app ni cambia lo que se ve en pantalla).
