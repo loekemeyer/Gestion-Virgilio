@@ -2509,7 +2509,9 @@ table.facfc-tbl tr.facneto-row-falt td{ background: #fef2f2; }
 .csep-np{ display:flex; flex-wrap:wrap; align-items:baseline; gap:2px 8px; font-size:14px; font-weight:800; color:#0f172a; margin-bottom:9px; }
 .csep-np small{ color:#64748b; font-weight:600; }
 .csep-dir{ font-size:11.5px; font-weight:600; color:#475569; margin-left:auto; text-align:right; }
+.csep-suc{ font-size:11px; font-weight:700; color:#0369a1; width:100%; }
 .csep-mxdir{ display:block; font-size:8.5px; font-weight:600; color:#94a3b8; line-height:1.05; white-space:normal; max-width:64px; margin:0 auto 2px; }
+.csep-mxsuc{ display:block; font-size:7.5px; font-weight:700; color:#0369a1; line-height:1.05; white-space:normal; max-width:64px; margin:0 auto 1px; }
 .csep-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
 .csep-card{ position:relative; border:2px solid #e8edf2; border-radius:13px; background:#fff; padding:10px 4px; display:flex; flex-direction:column; align-items:center; justify-content:center; cursor:pointer; -webkit-tap-highlight-color:transparent; }
 .csep-card:active{ transform:scale(.97); }
@@ -9073,12 +9075,23 @@ async function showCompletarWizard(legajo, codigo) {
         String(p.np || "").split(/[,/]/).forEach(function (part) { const k = part.trim(); if (k && !_dirByNp[k]) _dirByNp[k] = d; });
       });
     } catch (_e) {}
+    const _sucByNp = {};
+    try {
+      const _npList = [];
+      ((entry && entry.pedidos) || []).forEach(function (p) {
+        String(p.np || "").split(/[,/]/).forEach(function (part) { const k = part.trim(); if (k && /\d/.test(k) && _npList.indexOf(k) < 0) _npList.push(k); });
+      });
+      if (_npList.length) {
+        const _su = await fetch(SUPABASE_URL + "/rest/v1/vista_np_sucursal?np=in.(" + _npList.join(",") + ")&select=np,sucursal_entrega", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+        if (_su.ok) { const _sa = await _su.json(); (_sa || []).forEach(function (r) { if (r.sucursal_entrega) _sucByNp[r.np] = r.sucursal_entrega; }); }
+      }
+    } catch (_e) {}
     // v4.04: si hay avance guardado de esta tanda (el wizard que se abrió en AP), retomarlo.
     const _savedC = _compRestore(tanda);
     if (_savedC && _savedC.nps && _savedC.nps.length) {
       _comp = _savedC;
       if (!_comp._difMovs) _comp._difMovs = [];   // v11.09: armados persistidos pre-v11.09 no tienen el array
-      _comp.pickUbic = _pickUbic; _comp.dirByNp = _dirByNp;
+      _comp.pickUbic = _pickUbic; _comp.dirByNp = _dirByNp; _comp.sucByNp = _sucByNp;
       try { etlLoadGlobal(); } catch (_e) {}   // idea 5290 (fix): retomar un armado en curso NO se saltea el refresco del switch/legajos — si no, queda pegado con el mirror viejo (o vacío) para siempre
       const t0 = document.getElementById("compTanda"); if (t0) t0.textContent = "Tanda " + tanda + (_comp.nps[0] && _comp.nps[0].rs ? " · " + _comp.nps[0].rs : "");
       const d20 = document.getElementById("compD2"), ln0 = document.getElementById("compLine");
@@ -9134,7 +9147,7 @@ async function showCompletarWizard(legajo, codigo) {
       }
     }
     const hayFalt = arts.some(a => a.nps.length);
-    _comp = { legajo: String(legajo || "").trim(), tanda: tanda, fecha: fecha, nps: nps, arts: arts, pedidoFull: pedidoFull, hayFalt: hayFalt, step: 2, pickUbic: _pickUbic, dirByNp: _dirByNp, _difMovs: [] };   // v8.75 (idea 9849): step=2 desde el arranque (Paso 1 borrado). v11.09: _difMovs acumula ajustes picking_difiere para flush síncrono antes de Entregas
+    _comp = { legajo: String(legajo || "").trim(), tanda: tanda, fecha: fecha, nps: nps, arts: arts, pedidoFull: pedidoFull, hayFalt: hayFalt, step: 2, pickUbic: _pickUbic, dirByNp: _dirByNp, sucByNp: _sucByNp, _difMovs: [] };   // v8.75 (idea 9849): step=2 desde el arranque (Paso 1 borrado). v11.09: _difMovs acumula ajustes picking_difiere para flush síncrono antes de Entregas
     try { etlLoadGlobal(); } catch (_e) {}   // idea 5290: traer el ajuste GLOBAL de etiquetas de lío para este armado
     const t = document.getElementById("compTanda"); if (t) t.textContent = "Tanda " + tanda + (nps[0] && nps[0].rs ? " · " + nps[0].rs : "");
     const d2 = document.getElementById("compD2"), ln = document.getElementById("compLine");
@@ -9598,6 +9611,30 @@ function _compRenderSep() {
   const _newMx = el.querySelector(".csep-mxwrap"); if (_newMx && _mxTop) _newMx.scrollTop = _mxTop;
   if (_body && _bodyTop) _body.scrollTop = _bodyTop;
 }
+function _compSucShort(suc) {
+  if (!suc) return "";
+  var s = suc.trim();
+  if (s.toLowerCase() === "retira") return "Retira";
+  var parts = s.split(/\s*-\s*/);
+  var addr = parts.length > 1 ? parts.slice(0, -1).join("-").trim() : s;
+  var m = addr.match(/^(.+?)\s+(\d+)\s*$/);
+  if (!m) return addr;
+  var street = m[1], num = m[2];
+  var nps = (_comp && _comp.nps) || [], sucMap = (_comp && _comp.sucByNp) || {};
+  var cod = null;
+  for (var i = 0; i < nps.length; i++) { var o = sucMap[nps[i].np]; if (o === suc) { cod = nps[i].cod; break; } }
+  if (cod) {
+    for (var j = 0; j < nps.length; j++) {
+      if (nps[j].cod !== cod) continue;
+      var o2 = sucMap[nps[j].np];
+      if (!o2 || o2 === suc) continue;
+      var p2 = o2.split(/\s*-\s*/), a2 = p2.length > 1 ? p2.slice(0, -1).join("-").trim() : o2.trim();
+      var m2 = a2.match(/^(.+?)\s+(\d+)\s*$/);
+      if (m2 && m2[1].toLowerCase() === street.toLowerCase() && m2[2] !== num) return street + " " + num;
+    }
+  }
+  return street;
+}
 function _compSepPedido() {
   const nps = _comp.nps;
   if (_comp.sepNpIdx == null) _comp.sepNpIdx = 0;
@@ -9618,7 +9655,10 @@ function _compSepPedido() {
   const sepN = codes.filter(function (c) { return c.sep; }).length;
   const _dir = (_comp.dirByNp && _comp.dirByNp[n.np]) || n.dir || "";
   const dirHtml = _dir ? '<span class="csep-dir">📍 ' + escapeHtml(_dir) + '</span>' : '';
-  const np = '<div class="csep-np"><span>NP ' + escapeHtml(n.np) + ' <small>· ' + escapeHtml(n.rs || "") + '</small></span>' + dirHtml + '</div>';
+  const _sucRaw = (_comp.sucByNp && _comp.sucByNp[n.np]) || "";
+  const _sucShort = _compSucShort(_sucRaw);
+  const sucHtml = _sucShort ? '<span class="csep-suc">🚚 ' + escapeHtml(_sucShort) + '</span>' : '';
+  const np = '<div class="csep-np"><span>NP ' + escapeHtml(n.np) + ' <small>· ' + escapeHtml(n.rs || "") + '</small></span>' + dirHtml + sucHtml + '</div>';
   const armar = '<button class="csep-armar" onclick="_compSepArmar()">🔨 Armar líos con lo separado <span class="csep-n">' + sepN + '</span></button>';
   const dif = '<button class="csep-dif" onclick="_compDifStart()">⚠ Hay un artículo diferente a la mesa</button>';
   return chips + np + grid + armar + dif;
@@ -9627,7 +9667,7 @@ function _compSepMatrix() {
   const nps = _compSepLiveNps(), codSet = {}, codOrder = [];
   nps.forEach(function (n) { (n.codes || []).forEach(function (c) { if (c.sale > 0 && !codSet[c.cod]) { codSet[c.cod] = true; codOrder.push(c.cod); } }); });
   codOrder.sort(function (a, b) { return (parseInt(a, 10) || 0) - (parseInt(b, 10) || 0); });
-  const head = '<tr><th class="csep-mxc">Cod</th><th class="csep-mxt">Tot</th>' + nps.map(function (n) { const _d = (_comp.dirByNp && _comp.dirByNp[n.np]) || n.dir || ""; return '<th>' + (_d ? '<span class="csep-mxdir">' + escapeHtml(_d) + '</span>' : '') + escapeHtml(n.np) + '</th>'; }).join("") + '</tr>';
+  const head = '<tr><th class="csep-mxc">Cod</th><th class="csep-mxt">Tot</th>' + nps.map(function (n) { const _d = (_comp.dirByNp && _comp.dirByNp[n.np]) || n.dir || ""; const _ms = _compSucShort((_comp.sucByNp && _comp.sucByNp[n.np]) || ""); return '<th>' + (_d ? '<span class="csep-mxdir">' + escapeHtml(_d) + '</span>' : '') + (_ms ? '<span class="csep-mxsuc">' + escapeHtml(_ms) + '</span>' : '') + escapeHtml(n.np) + '</th>'; }).join("") + '</tr>';
   const body = codOrder.map(function (cod) {
     let tot = 0;
     const cells = nps.map(function (n) {

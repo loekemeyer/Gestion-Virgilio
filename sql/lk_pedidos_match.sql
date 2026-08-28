@@ -62,3 +62,33 @@ create policy lk_pedidos_match_writer on public.lk_pedidos_match
 
 grant usage on schema public to lk_ppp_reader;
 grant select, insert, update, delete on public.lk_pedidos_match to lk_ppp_reader;
+
+-- =============================================================================
+-- vista_np_sucursal — Resuelve la sucursal de entrega por NP.
+-- Cruza PPP_Programacion_Diaria (cod del cliente) con PPP_Base_Pedidos (fecha
+-- del pedido) contra lk_pedidos_match. El frontend la usa para mostrar la
+-- sucursal en el wizard AP/TAP (Separar). Si un cod+fecha tiene más de una
+-- sucursal distinta (ambiguo), devuelve la primera por orden_en_dia.
+-- =============================================================================
+create or replace view public.vista_np_sucursal as
+with np_fecha as (
+    select distinct pedido as np, fecha::date as fecha_pedido
+    from "PPP_Base_Pedidos"
+)
+select distinct on (p.np)
+    p.np,
+    m.sucursal_entrega
+from "PPP_Programacion_Diaria" p
+join np_fecha f on f.np = p.np
+join lk_pedidos_match m
+    on m.cod_cliente = p.cod
+    and m.fecha_pedido = f.fecha_pedido
+    and m.empresa = case
+        when p.np ~ '^9' then 'lk'
+        when p.np ~ '^4' then 'chef'
+        else 'lk'
+    end
+where m.sucursal_entrega is not null
+order by p.np, m.orden_en_dia;
+
+grant select on public.vista_np_sucursal to anon, authenticated;
