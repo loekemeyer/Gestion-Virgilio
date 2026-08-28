@@ -7768,3 +7768,26 @@ distinta, empresa distinta.
 - **Nunca** sumar `809E LK` + `809E CH`: son productos distintos, no un total.
 - El `809` pelado es **Chef nacional**; no lleva sufijo, y no es "el 809E sin la E".
 - Antes de tocar equivalencias, familias o planimetría del 809, releer esta sección.
+
+> Nota **2026-08-28 — Normalización PPP aplicada · prode eliminado · watchdog de syncs.**
+> - **Normalización al entrar (idea 7411, items 4.3/4.4)** — migración
+>   `norm_ppp_np_tanda_articulo_7411`. `fn_norm_tanda` ahora **uppercasea** (antes solo
+>   recortaba bordes) y hay 3 triggers BEFORE nuevos: `trg_norm_ppp_base`,
+>   `trg_norm_ppp_prog_np`, `trg_norm_ppp_meta_np`. Solo DDL, no tocó datos: las 3 tablas
+>   son full-replace, así que el próximo sync las deja limpias.
+>   **El motivo real** no era el `.0` (ya no existía: 0 de 11.954 filas, lo arreglaron
+>   upstream el Apps Script y el importador): eran **19 filas de `PPP_Base_Pedidos` con
+>   `articulo` en minúscula** (943e, 948e, 942e, 838e, 580e, 574e) que el front —que
+>   consulta con `codBase()` en mayúscula— **no veía**: 19 NPs y 36 cajas invisibles en
+>   "Cajas pedidas", que le faltaban al generador de OCs. Cuando el sync reescriba la
+>   tabla, las cajas pedidas de esos códigos **suben**; es dato que estaba escondido.
+>   ⚠ En `PPP_Entregados_Meta` NO se quitan ceros a la izquierda a propósito: `np` es PK y
+>   colapsar dos np distintos abortaría el INSERT completo del cron.
+> - **prode eliminado** (idea 1431 + pedido del dueño): no quedaban tablas ni crons, solo
+>   la función huérfana `prode_set_result` —que además apuntaba a una tabla inexistente y
+>   tenía la clave de admin hardcodeada con EXECUTE para anon—. Borrada; 0 objetos prode.
+> - **`watchdog_syncs_externos()`** (cron `watchdog-syncs-externos`, cada hora a los :23):
+>   avisa por Telegram si alguno de los 3 syncs de hojas de Google deja de correr
+>   (umbral ≈ 3× su período; dedup un aviso por sync por día). **No se creó tabla
+>   `Sync_Estado`**: `cron.job_run_details` ya tiene la verdad. DDL en
+>   `sql/watchdog_syncs_externos.sql`.

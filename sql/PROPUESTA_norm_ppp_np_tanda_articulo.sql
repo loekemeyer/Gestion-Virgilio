@@ -1,5 +1,10 @@
 -- =====================================================================
---  PROPUESTA — NO APLICADA. Requiere tu OK (apply_migration está en deny).
+--  ✅ APLICADA el 2026-08-28 (migración `norm_ppp_np_tanda_articulo_7411`),
+--  con OK explícito del dueño. Verificado post-aplicación: 3 triggers nuevos
+--  creados, fn_norm_tanda con upper(), y los conteos intactos —
+--  PPP_Base_Pedidos 11.954, vista_tanda_m3 1137, PPP_Entregados_Meta 2.728.
+--  Las 19 filas con `articulo` en minúscula se limpian solas en el próximo
+--  sync del Apps Script (las 3 tablas son full-replace).
 --  Normalización AL ENTRAR de las tablas espejo del Sheet PPP.
 --  Items 4.3 / 4.4 de docs/AUDITORIA-DATOS-DUPLICADOS.md (idea 7411).
 --  Relevado contra datos reales el 2026-08-28.
