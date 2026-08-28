@@ -6502,7 +6502,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.07";
+const APP_VERSION = "v12.08";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -32184,6 +32184,10 @@ async function psPrintBatch(items){
     psEnqueuePrint(d);
     psLog(d);
   });
+  // v12.08 — también marcar en Impresion_NP (server): si no, la Cola de impresión y su
+  // badge seguían acusando "sin imprimir" NPs que la estación ya imprimió sola.
+  try { colaImpMarcarImpresas(ds.map(function (d){ return String(d.np); })); } catch (_e) {}
+  setTimeout(function (){ try { colaImpLoadBadge(); } catch (_e) {} }, 1600);   // refresca el badge cuando el insert ya pegó
 }
 function psEnqueuePrint(d){ _psEnsure(); _ps.queue.push(d); psDrain(); }
 function psDrain(){
