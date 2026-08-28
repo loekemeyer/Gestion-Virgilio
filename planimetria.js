@@ -1,6 +1,12 @@
 /* Planimetría — código de artículo -> [sector, orden de picking].
-   Generado de la hoja "Picking" de AAA_PPP_Vigente.xlsm.
-   Para actualizar: re-subir el Excel y regenerar este archivo.
+   CACHE OFFLINE — la fuente de verdad es la tabla Planimetria en Supabase (360 filas).
+   Este archivo se carga al inicio como baseline y loadPlanimetriaRemote() lo
+   sobreescribe con los datos de la tabla. Sirve para que el picking funcione
+   sin conexión (PWA offline).
+   Generado originalmente de la hoja "Picking" de AAA_PPP_Vigente.xlsm.
+   Desde 2026-08-28: todos estos datos están también en la tabla Planimetria
+   (sql/planimetria_carga_base.sql). Para agregar/modificar picking order,
+   editar la tabla; este archivo es fallback offline.
    ⚠ Alias con cero adelante (v3.70–v3.72): el picking lee la base por /export y
    trae los códigos numéricos con cero adelante (026) pero acá estaban sin él. Por
    eso TODOS los códigos de 2 dígitos tienen además su alias "0XX" = "XX" (mismo
