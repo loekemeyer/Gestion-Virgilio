@@ -7382,8 +7382,11 @@ async function checkForUpdate() {
 }
 function showUpdateBanner(newVer) {
   if (document.getElementById("updateBanner")) return;
-  // Chip chiquito, esquina superior derecha. Discreto: no tapa botones ni molesta el
-  // trabajo. Un solo tap recarga. Título con la versión para el que quiera verla.
+  // Si el usuario ya tocó "Actualizar" en la última hora, no molestar de nuevo.
+  try {
+    const d = parseInt(sessionStorage.getItem("_upd_dismissed") || "0", 10);
+    if (d && (Date.now() - d) < 3600000) return;
+  } catch(_e) {}
   const b = document.createElement("button");
   b.id = "updateBanner";
   b.type = "button";
@@ -7393,9 +7396,22 @@ function showUpdateBanner(newVer) {
     "position:fixed;top:8px;right:8px;z-index:999999;background:#0a7d2c;color:#fff;" +
     "border:0;border-radius:14px;padding:5px 11px;font-size:12px;font-weight:600;" +
     "line-height:1;box-shadow:0 1px 5px rgba(0,0,0,.3);cursor:pointer;opacity:.95";
-  b.onclick = function () { location.reload(); };
+  b.onclick = function () {
+    // Guardamos que el usuario tocó el botón (suprime 1 h si el reload no resuelve).
+    try { sessionStorage.setItem("_upd_dismissed", String(Date.now())); } catch(_e) {}
+    // Forzamos fetch fresco de index.html cambiando la URL (evita caché HTTP del browser).
+    location.replace(location.pathname + "?_=" + Date.now());
+  };
   document.body.appendChild(b);
 }
+// Limpia el ?_= de la URL si venimos de un reload forzado por el banner.
+(function () {
+  try {
+    if (new URLSearchParams(location.search).has("_")) {
+      history.replaceState(null, "", location.pathname);
+    }
+  } catch(_e) {}
+})();
 checkForUpdate();
 setInterval(checkForUpdate, 5 * 60 * 1000);
 
