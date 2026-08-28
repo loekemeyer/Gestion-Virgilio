@@ -7677,3 +7677,15 @@ tanda — se guardan como par open/close y el motor descuenta el `close` (la dur
 >   6738 (login Planify ignora password), 2221 (brute-force login texto plano), 1712
 >   (enumeración FichadaQR), 4072 (portal proveedores), 1431 (clave prode hardcodeada),
 >   5035 (triggers Telegram sin WHEN, eficiencia). Detalle en el .sql.
+
+> Nota **2026-08-28 — Virgilio ↔ Planify: recepción de remito → tarea a Pagos (idea 4041).**
+> Pedido del usuario. Al recepcionar un **remito** en Virgilio, se crea una tarea en el
+> **Planify del sector Pagos** (`planify.tasks`, `department_id=6`, `assignment_type='department'`,
+> `system_generated=true` — mismo patrón que las tareas automáticas de Planify, ej.
+> cumpleaños→RRHH). Backend: trigger **`recepcion_crea_tarea_pagos`** (AFTER INSERT) en
+> **`Entregas Prov AT`** y **`Entregas Tallerista Virgilio`**. Ambos orígenes; **1 tarea por
+> remito** (con o sin factura); solo dispara **si hay `Remito`**. Dedup por marcador oculto
+> `[vrec:origen|REMITO|ENTIDAD]` al final de `note` + `pg_advisory_xact_lock` → los N artículos
+> del remito generan una sola tarea (no se recrea aunque Pagos ya la haya cerrado). Es el
+> primer cruce Virgilio→Planify (ambos schemas viven en el mismo Postgres
+> `hrxfctzncixxqmpfhskv`). DDL versionado en `sql/recepcion_tarea_pagos_planify.sql`.
