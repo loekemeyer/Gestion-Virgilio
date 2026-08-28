@@ -36,6 +36,15 @@
 > `v_pedidos_match` / `v_pedidos_match_chef` + `sync_pedidos_match_virgilio()` + cron
 > `sync-pedidos-match-virgilio`) en `sql/pedidos_match_virgilio.sql` del repo pagina-LK.
 >
+> Nota **v12.11** — **Detector de reloj desincronizado del celular (idea 9782, mejoras-virgilio).** Un
+> celular con el reloj corrido registra `ts_cliente` corridos → horas de picking/armado corruptas sin
+> que nadie lo note. Ahora `trySendOneReport` compara en cada envío el header **`Date`** que Supabase
+> devuelve (éxito o error, sin permiso ni endpoint extra) contra `Date.now()` (`_checkClockSkew`); si
+> el desfasaje supera **5 min** (`CLOCK_SKEW_THRESHOLD_MS`) aparece un **banner rojo dismissible** en
+> la pantalla de opciones (`#clockSkewBanner`: "El reloj de este celular está adelantado/atrasado ~N
+> min — avisá a un supervisor"). La ✕ lo descarta por sesión. No bloquea nada: solo avisa. Test
+> `tests/clock-skew.cjs`. (Venía de la rama `idea/9782`; re-aplicada a mano sobre el main actual.)
+>
 > Nota **v12.10** — **Dos fixes de render de revisor-render (ideas 4149 y 8628).** **(4149)** En la
 > tabla de **Stocks**, una celda de depósito con saldo **negativo** caía en la clase `stk-hist0`
 > (gris, tooltip «Saldo 0») porque el gate era `v <= 0.05` — un −15 se veía como saldo 0. Ahora
