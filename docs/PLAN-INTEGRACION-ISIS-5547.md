@@ -98,7 +98,7 @@ Columnas:
 - cod (artículo)
 - stock_terminado (de vista_saldos_stock.terminado)
 - total_pedido (suma de cajas de todos los pedidos pendientes en PPP_Programacion_Diaria
-  que NO estén en PPP_Pedidos_Entregados/ppp_facturacion)
+  que NO estén en ppp_facturacion — ⚠ PPP_Pedidos_Entregados BORRADA v10.25)
 - falta_global = GREATEST(0, total_pedido - stock_terminado)
 
 "Pendiente" = está en PPP_Programacion_Diaria y NO en ppp_facturacion (misma

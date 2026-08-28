@@ -33,7 +33,7 @@ Excel (VBA: SincronizarAhora / PushAllSheets → PushSheet)
 | Hoja Google (`sheetName`) | Tabla Supabase | Alimenta |
 |---|---|---|
 | PPP Excel Programacion Diaria | `PPP_Programacion_Diaria` | Monitor de tandas, m³, PDF facturación |
-| PPP Excel Pedidos Entregados 2026 | `PPP_Pedidos_Entregados` | m³ histórico (fallback) |
+| ~~PPP Excel Pedidos Entregados 2026~~ | ~~`PPP_Pedidos_Entregados`~~ | ~~m³ histórico~~ — **BORRADA v10.25**, reemplazada por `PPP_Entregados_Meta` |
 | PPP Excel Base Datos Pedidos | `PPP_Base_Pedidos` | Lista de picking (artículos × pedido) |
 
 Quedan **fuera**: `VolumenArticulos` y la planimetría.
@@ -122,9 +122,9 @@ select upper(tanda) tanda, round(sum(m3)::numeric, 3) m3
 from "PPP_Programacion_Diaria" where coalesce(tanda,'') <> ''
 group by upper(tanda) order by 1;
 
--- m³ histórico por tanda (pedidos entregados)
-select upper(tanda) tanda, round(sum(mt3)::numeric, 3) m3
-from "PPP_Pedidos_Entregados" group by upper(tanda) order by 1;
+-- m³ histórico por tanda (⚠ PPP_Pedidos_Entregados BORRADA v10.25 → usar PPP_Entregados_Meta)
+select upper(tanda) tanda, round(sum(m3)::numeric, 3) m3
+from "PPP_Entregados_Meta" group by upper(tanda) order by 1;
 
 -- artículos de un pedido (picking)
 select articulo, cajas from "PPP_Base_Pedidos" where pedido = '97754' order by 1;
