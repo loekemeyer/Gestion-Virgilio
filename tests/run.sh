@@ -168,4 +168,7 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== npf-prog-sin-base (v12.05: el módulo Pedidos sin cargar en PPP ve la NP programada sin base) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/npf-prog-sin-base.cjs
 
+echo "== rcp-foto-detalle (v12.07: el visor de foto de Pendientes muestra código→cajas junto a la foto) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/rcp-foto-detalle.cjs
+
 echo "== TODO OK =="

@@ -247,9 +247,28 @@ const RCP_CSS = `
 #rcpRoot .fotoViewBtn{ display:inline-flex; align-items:center; gap:6px; padding:8px 14px; border:2px solid #cbd5e1; border-radius:10px; background:#fff; font-weight:800; font-size:13px; color:#475569; cursor:pointer; flex:1; justify-content:center; min-height:46px; }
 #rcpRoot .fotoViewBtn.viewed{ border-color:var(--ok); color:var(--ok); background:#eef7ee; }
 #rcpRoot .fotoViewBtn.noFoto{ border-color:#e5e7eb; color:#9ca3af; cursor:default; font-style:italic; }
-#rcpRoot .fotoOverlay{ position:fixed; inset:0; background:rgba(0,0,0,.88); display:flex; align-items:center; justify-content:center; z-index:1500; padding:16px; }
+#rcpRoot .fotoOverlay{ position:fixed; inset:0; background:rgba(0,0,0,.88); display:flex; align-items:center; justify-content:center; z-index:1500; padding:16px; overflow:auto; }
 #rcpRoot .fotoOverlay img{ max-width:100%; max-height:88vh; border-radius:8px; object-fit:contain; }
-#rcpRoot .fotoOverlayClose{ position:absolute; top:14px; right:14px; width:48px; height:48px; border-radius:50%; background:#fff; border:0; font-size:22px; font-weight:900; cursor:pointer; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 8px rgba(0,0,0,.3); }
+#rcpRoot .fotoOverlayClose{ position:absolute; top:14px; right:14px; width:48px; height:48px; border-radius:50%; background:#fff; border:0; font-size:22px; font-weight:900; cursor:pointer; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 8px rgba(0,0,0,.3); z-index:2; }
+/* v12.07 — La foto y lo que cargó el operario, JUNTOS en el mismo visor. Antes había
+   que cerrar la foto para leer los códigos/cajas y volver a abrirla para cotejar. */
+#rcpRoot .fotoOverlayBox{ display:flex; align-items:center; justify-content:center; gap:14px; width:100%; max-width:1280px; margin:auto; }
+#rcpRoot .fotoOverlayImg{ flex:1 1 auto; min-width:0; display:flex; align-items:center; justify-content:center; }
+#rcpRoot .fotoOverlayInfo{ flex:0 0 330px; max-width:330px; max-height:88vh; overflow:auto; background:#fff; border-radius:12px; padding:14px 16px; box-shadow:0 2px 14px rgba(0,0,0,.4); }
+#rcpRoot .fovName{ font-size:19px; font-weight:900; color:#111; }
+#rcpRoot .fovMeta{ font-size:13px; font-weight:700; color:#475569; margin-top:2px; }
+#rcpRoot .fovRto{ font-size:14px; font-weight:900; color:#111; margin-top:4px; }
+#rcpRoot .fovTit{ font-size:12px; font-weight:900; color:#64748b; text-transform:uppercase; letter-spacing:.5px; margin:12px 0 6px; border-top:1px solid #e5e7eb; padding-top:10px; }
+#rcpRoot .fovItem{ display:flex; align-items:baseline; justify-content:space-between; gap:10px; padding:5px 0; border-bottom:1px dashed #eef2f7; font-variant-numeric:tabular-nums; }
+#rcpRoot .fovCod{ font-size:16px; font-weight:900; color:#111; word-break:break-word; }
+#rcpRoot .fovCaj{ font-size:17px; font-weight:900; color:#0a7a2f; white-space:nowrap; }
+#rcpRoot .fovTotal{ display:flex; align-items:baseline; justify-content:space-between; gap:10px; margin-top:10px; padding-top:9px; border-top:2px solid #111; font-size:17px; font-weight:900; color:#111; font-variant-numeric:tabular-nums; }
+#rcpRoot .fovRaw{ font-size:15px; font-weight:800; color:#111; word-break:break-word; }
+@media (max-width:860px){
+  #rcpRoot .fotoOverlayBox{ flex-direction:column; align-items:stretch; gap:10px; }
+  #rcpRoot .fotoOverlayInfo{ flex:0 0 auto; max-width:none; max-height:38vh; }
+  #rcpRoot .fotoOverlay img{ max-height:46vh; }
+}
 #rcpRoot .pcFoot{ margin-top:10px; display:flex; align-items:center; justify-content:flex-end; gap:12px; }
 #rcpRoot .enviarBtn{ padding:11px 22px; font-size:16px; font-weight:900; border:0; border-radius:11px; background:#111; color:#fff; cursor:pointer; }
 #rcpRoot .enviarBtn:disabled{ opacity:.4; cursor:default; }
@@ -2316,7 +2335,7 @@ function pendTickElapsed() {
 }
 function pendCard(r) {
   const id = r.id;
-  _pendRows[id] = { isis: !!r.isis, partes: r.control_partes || null, foto_url: r.foto_url || null, foto_vista: !!r.foto_vista, codigo: r.codigo || null, sent: false };
+  _pendRows[id] = { isis: !!r.isis, partes: r.control_partes || null, foto_url: r.foto_url || null, foto_vista: !!r.foto_vista, codigo: r.codigo || null, sent: false, row: r };
   const tsMs = r.created_at ? new Date(r.created_at).getTime() : 0;
   const card = document.createElement("div"); card.className = "pendCard"; card.setAttribute("data-id", String(id));
   const head = document.createElement("div"); head.className = "pcHead";
@@ -2416,10 +2435,14 @@ function pendFotoRow(id) {
   btn.onclick = function () {
     if (_pendRows[id].sent) return;
     const ov = document.createElement("div"); ov.className = "fotoOverlay";
+    const box = document.createElement("div"); box.className = "fotoOverlayBox";
+    const imgWrap = document.createElement("div"); imgWrap.className = "fotoOverlayImg";
     const img = document.createElement("img"); img.src = fotoUrl; img.alt = "Foto mercadería";
+    imgWrap.appendChild(img);
     const cl = document.createElement("button"); cl.className = "fotoOverlayClose"; cl.textContent = "✕";
     cl.onclick = async function () {
       ov.remove();
+      document.removeEventListener("keydown", esc);
       if (!_pendRows[id].foto_vista) {
         _pendRows[id].foto_vista = true;
         btn.classList.add("viewed"); btn.textContent = "✓ Foto vista";
@@ -2427,11 +2450,67 @@ function pendFotoRow(id) {
         pendRefreshEnviar(id);
       }
     };
-    ov.onclick = function (e) { if (e.target === ov) cl.click(); };
-    ov.appendChild(img); ov.appendChild(cl);
+    function esc(e) { if (e.key === "Escape") cl.click(); }
+    document.addEventListener("keydown", esc);
+    ov.onclick = function (e) { if (e.target === ov || e.target === box) cl.click(); };
+    box.appendChild(imgWrap);
+    box.appendChild(pendFotoInfoPanel(_pendRows[id].row));
+    ov.appendChild(box); ov.appendChild(cl);
     document.getElementById("rcpRoot").appendChild(ov);
   };
   row.appendChild(lbl); row.appendChild(btn); return row;
+}
+/* v12.07 — Panel que acompaña a la foto en el visor: quién entregó, qué remito y,
+   sobre todo, CÓDIGO → CAJAS tal cual lo cargó el operario. El detalle ya viene en
+   la fila (`Control_Modo_OP.detalle`, formato "COD → N · COD → N"); acá solo se
+   parsea para mostrarlo en columnas. Si algún día el formato cambia, se muestra el
+   texto crudo en vez de romper. */
+function pendFotoParseDetalle(det) {
+  const txt = String(det || "").trim();
+  if (!txt) return [];
+  const items = [];
+  txt.split(/\s*·\s*/).forEach(function (part) {
+    const p = part.trim(); if (!p) return;
+    const m = /^(.*?)\s*(?:→|->)\s*(.+)$/.exec(p);
+    if (m) items.push({ cod: m[1].trim(), cajas: m[2].trim() });
+    else items.push({ cod: p, cajas: "" });
+  });
+  return items;
+}
+function pendFotoInfoPanel(r) {
+  const box = document.createElement("div"); box.className = "fotoOverlayInfo";
+  r = r || {};
+  const tsMs = r.created_at ? new Date(r.created_at).getTime() : 0;
+  const nm = document.createElement("div"); nm.className = "fovName";
+  nm.textContent = (typeof displayName === "function" ? displayName(r.nombre || "") : (r.nombre || "")) || "—";
+  box.appendChild(nm);
+  const mp = [(r.tipo === "prov_at") ? "Prov. AT" : "Tallerista", pendFmtFecha(r.fecha, tsMs)];
+  if (tsMs) mp.push(pendFmtHora(tsMs));
+  if (r.linea) mp.push(r.linea);
+  const mt = document.createElement("div"); mt.className = "fovMeta"; mt.textContent = mp.filter(Boolean).join(" · ");
+  box.appendChild(mt);
+  if (r.remito) { const rt = document.createElement("div"); rt.className = "fovRto"; rt.textContent = "RTO/FC " + r.remito; box.appendChild(rt); }
+  const tit = document.createElement("div"); tit.className = "fovTit"; tit.textContent = "Cargado por el operario";
+  box.appendChild(tit);
+  const items = pendFotoParseDetalle(r.detalle);
+  if (!items.length) {
+    const raw = document.createElement("div"); raw.className = "fovRaw"; raw.textContent = r.detalle || "—";
+    box.appendChild(raw);
+  } else {
+    items.forEach(function (it) {
+      const rowEl = document.createElement("div"); rowEl.className = "fovItem";
+      const c = document.createElement("span"); c.className = "fovCod"; c.textContent = it.cod;
+      const q = document.createElement("span"); q.className = "fovCaj"; q.textContent = it.cajas ? (it.cajas + " cj") : "";
+      rowEl.appendChild(c); rowEl.appendChild(q); box.appendChild(rowEl);
+    });
+  }
+  if (r.cantidad_total != null) {
+    const tot = document.createElement("div"); tot.className = "fovTotal";
+    const l = document.createElement("span"); l.textContent = "Total";
+    const v = document.createElement("span"); v.textContent = r.cantidad_total + " cajas";
+    tot.appendChild(l); tot.appendChild(v); box.appendChild(tot);
+  }
+  return box;
 }
 async function pendUploadFoto(id, file) {
   await sessionReady;
