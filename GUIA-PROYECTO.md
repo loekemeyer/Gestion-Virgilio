@@ -2479,7 +2479,8 @@ fichadas-monitor.html y productividad.html) — rotar la key = editar solo ese a
 > buscador y del botón «E» hay un toggle **☐/☑ 🔴 Negativos (N)** que deja en la tabla **sólo los
 > artículos con saldo negativo en ALGÚN depósito** (góndola, excedente, pickeados, a facturar, a
 > guardar, racks, p/envasar, racks CH) — más los **insumos** negativos en su sección. El contador `(N)`
-> muestra cuántos hay. Se aplica **además** del buscador; con 0 negativos dice *«✅ No hay stock
+> muestra cuántos hay. (⚠ Desde **v7.85** el contador `(N)` cuenta **solo stock de producto** — los
+> insumos negativos ya NO suman al badge, para que el número coincida con lo que muestra el filtro.) Se aplica **además** del buscador; con 0 negativos dice *«✅ No hay stock
 > negativo en ningún depósito.»*. Los negativos ya salían en rojo (`.stk-neg`); esto agrega el **filtro
 > rápido** para cazarlos. Funciones `stkToggleSoloNeg` + estado `_stk.soloNeg`; helper `_stkArtHasNeg`
 > (compara el saldo **redondeado a lo que se muestra**). Smoke `tests/stk-solo-negativos.cjs`. Bump **v7.48**.
@@ -6996,8 +6997,9 @@ clave para casi todo). Cada fila = una acción de un operario:
 | `created_at` | timestamptz | insert en servidor |
 
 **`Fichadas_Virgilio`** — ingresos por QR: `legajo`, `email`, `tipo` (= `"ingreso"`),
-`ts_cliente`, `client_id`, `user_agent`, `ip_hint`, `created_at`. (Hoy está
-**muy poco usada** — pocos registros — porque el QR in-app está deshabilitado; ver § 9.)
+`ts_cliente`, `client_id`, `user_agent`, `ip_hint`, `created_at`. (El QR in-app
+está **habilitado** — `QR_DISABLED = false` desde v1.52, ver § 9 — aunque la tabla
+sigue con pocos registros.)
 
 **`Fichadas_Historico`** — espejo de marcas: `ts_evento`, `evento`
 (`Entrada` / `Salida` / `Comida Inicia` / `Comida Termina`), `email`, `legajo`,
@@ -7456,14 +7458,14 @@ lo excluye de horas/productividad (guard `opcion==="LT"` en
 
 ## 7. De dónde salen los metros cúbicos (m³)
 
-> **CRÍTICO (por defecto): los m³ NO están en Supabase.** Salen de un **Google
-> Sheet**, así que no se pueden calcular desde un entorno sin acceso a Google
-> (p. ej. el sandbox de Claude, que tiene Google fuera de la allowlist). La **app
-> sí** los muestra porque corre en el navegador.
->
-> **v2.80** prepara moverlos a Supabase (tablas `PPP_*`, flag `PPP_SOURCE`): una
-> vez que la macro las cargó y el flag está activo, **el m³ se consulta por SQL**
-> (§ 11). Ver `MIGRACION-SUPABASE-PPP.md`.
+> **Los m³ SÍ están en Supabase** (desde v5.33, `PPP_SOURCE=supabase`):
+> `PPP_Programacion_Diaria.m3`, `PPP_Entregados_Meta.m3` (por NP) y la vista
+> `vista_tanda_m3` — **se calculan por SQL** desde el sandbox (§ 11). El **origen
+> upstream** sigue siendo el Google Sheet (col `Mt3`), espejado en una sola vía a
+> `PPP_Entregados_Meta` por la función `sync_ppp_entregados_meta()` (cron, ver
+> `sql/`). Lo que sigue abajo describe ese Sheet de origen. (Histórico: hasta
+> v5.33 los m³ solo vivían en el Sheet y no se podían calcular sin Google;
+> `MIGRACION-SUPABASE-PPP.md` documenta la migración.)
 
 - Documento Sheet: `1-16YXe0xq6x9i-Yhk5cm5V3VqvQ0PWZtcDbm8OeeKW0`.
 - **Histórico** (todos los pedidos entregados): hoja "PPP Excel Pedidos Entregados
@@ -7647,14 +7649,17 @@ INCONSISTENCIAS"):
 - **Telegram (inmediato)**: triggers/cron llaman `tg_enqueue(text, dedup, chat)` → tabla `telegram_outbox`
   → `tg_outbox_flush()` (lee el token de **Vault**, secreto `telegram_bot_token`; envía con pg_net). Chat
   default `-1004379879565`.
-- **Agentes (panel, cada 2 h)**: cron jobid 14 corre `generar_reporte_agentes()` +
+- **Agentes (panel, 3×/día)**: cron jobid 14 (`0 11,15,19 * * *` UTC = 08/12/16 AR;
+  antes era cada 2 h) corre `generar_reporte_agentes()` +
   `reporte_agentes_recepcion_absurda()` + `reporte_agentes_faltante_articulo()` → llena la tabla
   `reporte_agentes` (DELETE+INSERT). El front (`openAgentesAdmin`/`agtRender`, botón 🤖) la lee; arriba
   muestra el **briefing "📅 Hoy"** (nudge del día + to-do) y el **termómetro de estabilidad** (cuenta
   errores de operario en 7 días: error_envio/picking_sin_stock/carga_sin_control/mg_fuera_lista/error_app).
   Solo se muestran las categorías **con datos** (las vacías no aparecen).
 
-**Las 20 categorías de `reporte_agentes`** (cada una = `categoria`; las con ⚡ también van a Telegram):
+**Las categorías de `reporte_agentes`** (cada una = `categoria`; las con ⚡ también van a
+Telegram; la lista canónica del front es el array `CATS` de `agtRender` en `index.html` —
+no citar un número fijo acá, queda viejo):
 
 | categoría | qué | fuente | Telegram |
 |---|---|---|---|
@@ -7678,6 +7683,13 @@ INCONSISTENCIAS"):
 | `error_app` | crashes JS de operarios (7 d) | `errores_cliente` | — |
 | `error_envio` | envíos de operarios que fallaron (7 d) | `Auditoria_*` | — |
 | `outbox` | Telegram trabado >15 min | `telegram_outbox` | ⚡ `notificar_outbox_salud` (cron) |
+| `equivalencia_facturar` | facturar con el código REAL (no el del pedido) — equivalencias | `PPP_Base_Pedidos`+`Equivalencias_Codigos` | ⚡ cron 14 (v5.10) |
+| `falta_llego` | llegó un faltante: completá antes de facturar | `Movimientos_Stock`+`Entregas_Virgilio` | ⚡ cron 14 (v4.98) |
+| `envio_recuperado` | envíos que fallaron por red pero ENTRARON (info) | `Auditoria_*`+`Registros` | — |
+| `rendimiento_anomalo` | m³/h por rol muy bajo/alto (relativo a la mediana o absoluto) | `reporte_agentes_rendimiento_anomalo()` | ⚡ 1×/semana por operario (v4.76) |
+| `zona_lista` | una zona juntó ≥1 m³ de pedidos SIN fecha → conviene programarla | `reporte_agentes_zona_lista()` | ⚡ |
+| `ppp_sin_zona` | llegó un pedido a la PPP con barrio sin zona asignada | `reporte_agentes_ppp_sin_zona()` | ⚡ |
+| `picking_difiere` | el armador marcó «de menos + no hay en góndola» (picking ≠ armado) | `Registros` (v11.x) | — |
 | — (sólo Telegram + PPP) | **pedido web anómalo** (score >= 5) | `Alertas_Pedidos_Web` (v8.83) | ⚡ `trg_alerta_pedido_telegram` (trigger INSERT) |
 
 **Para agregar una alerta nueva**: (1) si la detecta el cliente → emitir un evento `Registros` con un
