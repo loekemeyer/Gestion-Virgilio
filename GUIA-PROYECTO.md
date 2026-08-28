@@ -24,10 +24,17 @@
 > `sheets_payload.items`, exactamente lo que viajó al Sheet/ERP, así producción puede
 > reconstruir el mismo string. `ambiguo=true` marca la única excepción (mismo cliente,
 > mismo día, mismos ítems, DISTINTA sucursal: 17 de 977 pedidos históricos);
-> `orden_en_dia` desempata por hora de alta. La app todavía **no la consume** — falta
-> definir dónde se muestra. DDL en `sql/lk_pedidos_match.sql`; lado LK (vista
-> `v_pedidos_match` + `sync_pedidos_match_virgilio()` + cron `sync-pedidos-match-virgilio`)
-> en `sql/pedidos_match_virgilio.sql` del repo pagina-LK.
+> `orden_en_dia` desempata por hora de alta. **Cubre las dos empresas** (columna
+> `empresa`, `'lk'`/`'chef'`, PK compuesta con `order_id`): los pedidos web de Chef viven
+> en el proyecto Supabase de Chef (portal gemelo) y LK los reenvía por su FDW `chef_db` —
+> ⚠ **pendiente un grant en el proyecto Chef** (`grant select on public.orders to
+> loke_reader;`); hasta entonces solo se sincroniza LK. La empresa de una NP se deduce
+> del número: **9xxxx = lk, 4xxxx = chef** (numeraciones de cliente independientes: el
+> mismo cod es otro cliente en cada empresa, por eso todo cruce lleva `empresa` +
+> `match_string`). La app todavía **no la consume** — falta
+> definir dónde se muestra. DDL en `sql/lk_pedidos_match.sql`; lado LK (vistas
+> `v_pedidos_match` / `v_pedidos_match_chef` + `sync_pedidos_match_virgilio()` + cron
+> `sync-pedidos-match-virgilio`) en `sql/pedidos_match_virgilio.sql` del repo pagina-LK.
 >
 > Nota **v12.03** — **Recepción: se sacó el tilde "Faltantes x Día" del checklist de Pendientes** (pedido del usuario: ese programa ya no se hace). En `recepcion.js`, la tarjeta de un remito pendiente tenía 4 pasos (Carga ISIS · Control Partes Talleristas · Faltantes x Día · Foto) y el botón **Enviar** solo se habilitaba con los 4. Ahora son **3**: el tilde desapareció de la tarjeta y salió de `pendRowComplete`, así que ya no bloquea el envío. La columna `Control_Modo_OP.faltantes` **queda en la base** con lo ya cargado — no se borró ni se dejó de leer por otro lado; simplemente el front no la escribe ni la exige más. Ojo: la solapa **📉 Faltantes x día** del módulo **Stocks** (el reporte) NO se tocó — es otra cosa, solo comparte el nombre.
 
@@ -7085,9 +7092,12 @@ loguean en:
   `ARCA_CUIT`, `WEB_SERVICE_KEY`. Detalle en `docs/facturacion-arca.md`.
 
 **`lk_pedidos_match`** (2026-08-28) — espejo del **string identificador de pedido web**
-de LK, con la **sucursal de entrega** (dato que Virgilio no tenía). La llena LK cada
-15 min empujando por su FDW (rol `lk_ppp_reader`, único permiso de escritura de ese rol).
-Cols: `order_id` (= order_number del portal/Sheet), `cod_cliente`, `status`,
+de los DOS portales (LK y Chef), con la **sucursal de entrega** (dato que Virgilio no
+tenía). La llena LK cada 15 min empujando por su FDW (rol `lk_ppp_reader`, único permiso
+de escritura de ese rol); los pedidos de Chef los lee LK de su FDW `chef_db` y los
+reenvía (pendiente un grant en el proyecto Chef — hasta entonces solo hay filas `lk`).
+Cols: `empresa` (`'lk'`/`'chef'` — PK con `order_id`; NP 9xxxx = lk, 4xxxx = chef),
+`order_id` (= order_number del portal/Sheet), `cod_cliente`, `status`,
 `fecha_pedido` (date ART), `hora_pedido`, `created_at`, `sucursal_entrega`,
 `items_string`, `match_string` (`cod_cliente|fecha|items`, items = `cod`x`cajas`
 ordenado por código, cajas sumadas por código repetido), `ambiguo` (mismo string ese

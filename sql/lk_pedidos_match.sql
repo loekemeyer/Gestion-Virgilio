@@ -1,12 +1,17 @@
 -- =============================================================================
 -- lk_pedidos_match.sql — Espejo local del string identificador de pedido web
--- de LK, con la SUCURSAL DE ENTREGA (2026-08-28)
+-- (LK + CHEF), con la SUCURSAL DE ENTREGA (2026-08-28)
 -- =============================================================================
--- Virgilio no tenía la sucursal de entrega de los pedidos; LK sí
+-- Virgilio no tenía la sucursal de entrega de los pedidos; los portales web sí
 -- (orders.sheets_payload.sucursal_entrega). LK EMPUJA acá cada 15 min por su
 -- FDW existente (server virgilio_db, rol lk_ppp_reader — el mismo del espejo
--- PPP, ahora con permiso de escritura SOLO sobre esta tabla). Virgilio lee su
--- tabla LOCAL: cero FDW en el camino caliente.
+-- PPP, ahora con permiso de escritura SOLO sobre esta tabla). Los pedidos de
+-- CHEF (portal gemelo en el proyecto Supabase de Chef) entran por el mismo
+-- camino: LK los lee por su FDW chef_db y los reenvía con empresa='chef'
+-- (⚠ requiere en el proyecto Chef: grant select on public.orders to loke_reader;
+-- hasta entonces solo se sincroniza LK). Virgilio lee su tabla LOCAL: cero FDW
+-- en el camino caliente. La empresa de una NP se deduce del número:
+-- 9xxxx = lk, 4xxxx = chef (numeraciones de cliente independientes).
 --
 --   match_string = cod_cliente | fecha (ART, YYYY-MM-DD) | items
 --   items        = cod_art x cajas, ordenado por cod_art, cajas sumadas por
@@ -23,7 +28,8 @@
 -- =============================================================================
 
 create table if not exists public.lk_pedidos_match (
-  order_id         bigint primary key,      -- orders.id en LK (= order_number del Sheet)
+  empresa          text not null default 'lk', -- 'lk' | 'chef' (NP 9xxxx = lk, 4xxxx = chef)
+  order_id         bigint,                  -- orders.id en el portal (= order_number del Sheet)
   cod_cliente      text not null,
   status           text,
   fecha_pedido     date not null,           -- fecha del pedido en hora argentina
@@ -34,12 +40,13 @@ create table if not exists public.lk_pedidos_match (
   match_string     text,
   ambiguo          boolean default false,
   orden_en_dia     bigint,
-  synced_at        timestamptz default now()
+  synced_at        timestamptz default now(),
+  primary key (empresa, order_id)          -- los order_id de los dos portales pueden chocar
 );
 
 create index if not exists lk_pedidos_match_string_idx  on public.lk_pedidos_match (match_string);
 create index if not exists lk_pedidos_match_fecha_idx   on public.lk_pedidos_match (fecha_pedido);
-create index if not exists lk_pedidos_match_cliente_idx on public.lk_pedidos_match (cod_cliente, fecha_pedido);
+create index if not exists lk_pedidos_match_cliente_idx on public.lk_pedidos_match (empresa, cod_cliente, fecha_pedido);
 
 alter table public.lk_pedidos_match enable row level security;
 
