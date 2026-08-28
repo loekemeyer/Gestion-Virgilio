@@ -36,6 +36,17 @@
 > `v_pedidos_match` / `v_pedidos_match_chef` + `sync_pedidos_match_virgilio()` + cron
 > `sync-pedidos-match-virgilio`) en `sql/pedidos_match_virgilio.sql` del repo pagina-LK.
 >
+> Nota **v12.10** — **Dos fixes de render de revisor-render (ideas 4149 y 8628).** **(4149)** En la
+> tabla de **Stocks**, una celda de depósito con saldo **negativo** caía en la clase `stk-hist0`
+> (gris, tooltip «Saldo 0») porque el gate era `v <= 0.05` — un −15 se veía como saldo 0. Ahora
+> `v < -0.05` prioriza **`stk-neg`** (rojo) con tooltip «Saldo NEGATIVO — tocá para revisar los
+> movimientos»; la celda sigue clickeable. **(8628)** En **Insumos**, los botones de la fila en
+> edición (✓ Guardar · Cancelar · ＋unidad/⚖Unidades, en las DOS tablas que comparten el patrón)
+> iban sueltos en el `<td>` y en mobile (360–390px) se apilaban en 2–3 líneas agrandando la fila;
+> ahora van en un `<div>` flex `nowrap`. Assert nuevo `totalEditBtnsNowrap` en `tests/ins-admin.cjs`.
+> Las ideas venían de las ramas `idea/4149` / `idea/8628` (sin base común con main tras el reset de
+> historia) — se re-aplicaron a mano adaptadas al código actual (v12.06 había reescrito ambos lugares).
+>
 > Nota **v12.09** — **Limpieza de código muerto (ideas 6750/5877/9703 de auditor-consistencia).** Se
 > borraron 6 funciones sin ningún call-site en el repo — `pppSugerirView` (reemplazada por
 > `pppSugerirInline`), `facFaltBadge` (reemplazada por `facFaltDist`; también se sacó de los asserts de
