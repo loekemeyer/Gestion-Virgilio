@@ -11345,11 +11345,22 @@ function equivFam(cod) { return _equivBuild().famOf[_ocgNorm(cod)] || null; }
 function equivFamKey(cod) { const f = equivFam(cod); return f ? f._defN : _ocgNorm(cod); }
 /* Miembros normalizados de la familia de un código (incluye el propio). */
 function equivMiembros(cod) { const f = equivFam(cod); return f ? f._codsN.slice() : [_ocgNorm(cod)]; }
-/* v11.101 — idea normalizar-datos (TOP-5): la fuente de verdad de las familias es la
-   tabla Equivalencias_Familia (cod_secundario→cod_principal); la const de arriba queda
-   como SEMILLA offline. Acá se reconstruye el array desde la tabla (unión conservadora:
-   una familia de la semilla cuyo default no aparezca en la tabla se conserva) y se
-   invalida el índice cacheado. Si el fetch falla, sigue la semilla tal cual. */
+/* v11.101/v11.102 — idea 7411 (TOP-5): la fuente de verdad de las familias es la tabla
+   Equivalencias_Familia (cod_secundario→cod_principal); la const de arriba es la SEMILLA
+   offline. Acá se REFRESCA la semilla desde la tabla.
+
+   ⚠ CONSERVADOR A PROPÓSITO (v11.102): solo se adoptan de la tabla las familias cuyo
+   default YA existe en la semilla (refresco de miembros/descripción). Las familias que
+   existen SOLO en la tabla NO se adoptan solas, porque cambiarían números de negocio sin
+   que nadie lo apruebe. Dos casos reales encontrados el 2026-08-28:
+     · la tabla trae 029→437E y 030→438E, que NO están en la semilla. `proyeccion_madre`
+       tiene 29 y 437E como códigos SEPARADOS, así que adoptarlas consolidaría la
+       proyección (ocgFetchProyeccion) y cambiaría el "a pedir" del generador de OCs.
+     · la tabla dice principal 809E y la semilla dice 809E CH (el 809E de Loekemeyer es
+       Corta Pizza Familiar, no Corta Queso) → adoptarla mezclaba dos empresas y dejaba
+       famOf["809"] indefinido según el orden de las claves.
+   Las diferencias se dejan en window._equivFamDiff para poder revisarlas (y decidirlas
+   con el dueño) sin que la app cambie de comportamiento. Si el fetch falla, semilla. */
 async function equivFamiliasLoad() {
   try {
     const r = await fetch(SUPABASE_URL + "/rest/v1/Equivalencias_Familia?select=cod_secundario,cod_principal,descripcion&limit=2000",
@@ -11357,6 +11368,7 @@ async function equivFamiliasLoad() {
     if (!r.ok) return;
     const rows = await r.json();
     if (!Array.isArray(rows) || !rows.length) return;
+    // tabla → familias {def, cods[], desc}
     const byDef = {};
     rows.forEach(function (x) {
       const def = String(x.cod_principal || "").trim(); if (!def) return;
@@ -11365,12 +11377,19 @@ async function equivFamiliasLoad() {
       if (sec && byDef[def].cods.indexOf(sec) < 0) byDef[def].cods.push(sec);
       if (!byDef[def].desc && x.descripcion) byDef[def].desc = String(x.descripcion);
     });
-    const defsN = {};
-    Object.keys(byDef).forEach(function (d) { defsN[_ocgNorm(d)] = 1; });
-    const semilla = EQUIV_FAMILIAS.slice();
-    semilla.forEach(function (f) { if (!defsN[_ocgNorm(f.def)]) byDef[f.def] = { desc: f.desc, def: f.def, cods: (f.cods || []).slice() }; });
-    EQUIV_FAMILIAS.length = 0;
-    Object.keys(byDef).forEach(function (d) { EQUIV_FAMILIAS.push(byDef[d]); });
+    // índice de la semilla por default normalizado
+    const semIdx = {};
+    EQUIV_FAMILIAS.forEach(function (f, i) { semIdx[_ocgNorm(f.def)] = i; });
+    const soloTabla = [];
+    Object.keys(byDef).forEach(function (d) {
+      const i = semIdx[_ocgNorm(d)];
+      if (i == null) { soloTabla.push(byDef[d]); return; }   // familia nueva → NO adoptar sola
+      // refresco seguro: mismo default, se suman miembros que falten y la descripción
+      const f = EQUIV_FAMILIAS[i], t = byDef[d];
+      t.cods.forEach(function (c) { if ((f.cods || []).map(_ocgNorm).indexOf(_ocgNorm(c)) < 0) f.cods.push(c); });
+      if (t.desc) f.desc = t.desc;
+    });
+    window._equivFamDiff = { solo_en_tabla: soloTabla, nota: "familias que existen en Equivalencias_Familia pero no en la semilla del front; no se adoptan solas porque cambian números de negocio (OCs)." };
     _equivIdx = null;
   } catch (_e) { /* offline → semilla */ }
 }
