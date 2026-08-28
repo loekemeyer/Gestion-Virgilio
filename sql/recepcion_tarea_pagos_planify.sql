@@ -1,15 +1,21 @@
 -- idea 4041 (usuario) — Vincular Virgilio con las alarmas de Planify:
 -- al recepcionar un REMITO en Virgilio, crear una tarea en el Planify del sector PAGOS.
--- APLICADO en Supabase (migración recepcion_crea_tarea_pagos_planify). Copia versionada.
+-- APLICADO en Supabase (migraciones recepcion_crea_tarea_pagos_planify +
+-- recepcion_tarea_pagos_broadcast). Copia versionada.
 --
 -- Decisiones (confirmadas con el usuario):
 --  · Backend (trigger), no front.
 --  · Ambos orígenes: "Entregas Prov AT" (proveedores) + "Entregas Tallerista Virgilio".
 --  · 1 tarea por remito (con o sin factura). Solo si hay Remito (no null/vacío).
+--  · La tarea sale como AVISO CENTRADO del sector (broadcast=true, idea 6463): en vez
+--    de caer en la esquina como una alarma más, abre un cartel bloqueante en el medio
+--    de la pantalla de todos los de Pagos hasta que alguien aprieta "Me encargo yo"
+--    (RPC planify.planify_claim_task — gana el primero). Front en el repo Planify.
 --
 -- Modelo Planify (mismo Postgres, schema planify): tarea de departamento =
---  assignment_type='department', department_id=6 (Pagos), type='tarea', prio='normal',
---  date=YYYY-MM-DD (texto), system_generated=true, done=false. Mismo patrón que las
+--  assignment_type='department', department_id=6 (Pagos), type='tarea', prio='urgente',
+--  date=YYYY-MM-DD (texto), system_generated=true, broadcast=true, done=false. Mismo
+--  patrón que las
 --  tareas automáticas que Planify ya crea (cumpleaños → RRHH dept 7).
 --
 -- Dedup: marcador oculto [vrec:origen|REMITO|ENTIDAD] al final de tasks.note + advisory
@@ -73,10 +79,10 @@ begin
 
   insert into planify.tasks
     (name, type, prio, date, note, done, assignment_type, department_id,
-     employee_id, created_by, system_generated, created_at, updated_at)
+     employee_id, created_by, system_generated, broadcast, created_at, updated_at)
   values
-    (v_name, 'tarea', 'normal', v_hoy, v_note, false, 'department', 6,
-     null, null, true, now(), now());
+    (v_name, 'tarea', 'urgente', v_hoy, v_note, false, 'department', 6,
+     null, null, true, true, now(), now());
 
   return new;
 end;
