@@ -1,9 +1,11 @@
 /* Regresión — Conteo físico de góndola (solapa Stock y Compras › Conteo).
-   Cubre _cntCajas (pilas×cjas/pila + sueltas), cntSet (edición de fila + actualiza
-   el total en vivo en el DOM), cntAddRow/cntDelRow (nunca deja la grilla vacía),
-   cntCompara (contado vs sistema, dif con signo) y cntGuardar (filtra filas sin
-   código/cantidad, postea a Conteo_Stock, resetea la grilla conservando el legajo).
-   Sale 1 si falla. */
+   Cubre _cntCajas (pilas×cjas/pila + sueltas), cntSelectCod (v11.07: el código se valida
+   contra _artNombres y decide mercadería/insumo), cntSet (edición de fila + total en vivo
+   en el DOM), cntAddRow/cntDelRow (nunca deja la grilla vacía), cntCompara (contado vs
+   sistema con signo; v11.33: el sistema sale de _stk.viewRows vía _stkSaldosFromView) y
+   cntGuardar (valida códigos existentes, filtra filas sin código/cantidad, postea a
+   Conteo_Stock, resetea la grilla conservando el legajo). Sale 1 si falla.
+   [Reescrito al mergear la idea 2793: la versión original (Ago 8) era pre-v11.07/v11.33.] */
 const path = require("path");
 let chromium;
 try { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
@@ -21,7 +23,8 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     out.calc_soloSueltas = _cntCajas({ pilas: "", cxp: "", sueltas: 7 }) === 7;
     out.calc_noNumerico = _cntCajas({ pilas: "abc", cxp: 2, sueltas: 1 }) === 1;   // NaN → 0
 
-    // ---- setup DOM para probar cntSet actualizando el total en vivo ----
+    // ---- setup: catálogo de nombres (v11.07 valida contra _artNombres), estado y DOM ----
+    _artNombres = { "500": "Art Quinientos", "600": "Art Seiscientos", "700": "Art Setecientos" };
     document.body.insertAdjacentHTML("beforeend", '<div id="stkBody"></div>');
     const movs = [
       { cod_art: "500", deposito: "terminado", delta: 30, tipo: "inicial", ts: "2026-08-01T10:00:00Z" },
@@ -29,10 +32,22 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
       { cod_art: "500", deposito: "separar_pedidos", delta: 8, tipo: "picking", ts: "2026-08-01T10:00:00Z" },
       { cod_art: "600", deposito: "terminado", delta: 12, tipo: "inicial", ts: "2026-08-01T10:00:00Z" }
     ];
-    _stk = { movs: movs, cutoff: 0, conteo: { rows: [{ sector: "", cod: "", pilas: "", cxp: "", sueltas: "" }], legajo: "", showComp: false } };
-    document.getElementById("stkBody").innerHTML = stkBodyConteo();
+    // v11.33: la comparación usa la vista LIVE (viewRows), no los movs; los movs quedan
+    // para el snapshot de cntGuardar (stockComputeSaldos).
+    const viewRows = [
+      { cod: "500", terminado: 30, excedente: 5, separar_pedidos: 8 },
+      { cod: "600", terminado: 12 }
+    ];
+    _stk = { movs: movs, cutoff: 0, insumosCods: [], viewRows: viewRows,
+             conteo: { rows: [{ sector: "", cod: "", pilas: "", cxp: "", sueltas: "", isInsumo: false, cantidad: "", unidad: "" }], legajo: "", showComp: false } };
+    // cntSelectCod/cntAddRow/cntDelRow/cntCompara re-renderizan vía stkRender() (el shell
+    // completo de Stocks); acá solo probamos el módulo Conteo → stub que pinta stkBodyConteo.
+    window.stkRender = function () { const el = document.getElementById("stkBody"); if (el) el.innerHTML = stkBodyConteo(); };
+    stkRender();
 
-    cntSet(0, "cod", "500");
+    // ---- cntSelectCod + cntSet: código válido → aparecen los campos y el total vive ----
+    cntSelectCod(0, "500");
+    out.sel_codOk = _stk.conteo.rows[0].cod === "500" && _stk.conteo.rows[0].isInsumo === false;
     cntSet(0, "pilas", "2");
     cntSet(0, "cxp", "10");
     cntSet(0, "sueltas", "3");
@@ -42,14 +57,18 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     // ---- cntAddRow / cntDelRow ----
     cntAddRow();
     out.add_len = _stk.conteo.rows.length === 2;
-    cntSet(1, "cod", "600"); cntSet(1, "pilas", "1"); cntSet(1, "cxp", "12"); cntSet(1, "sueltas", "0");
+    cntSelectCod(1, "600"); cntSet(1, "pilas", "1"); cntSet(1, "cxp", "12"); cntSet(1, "sueltas", "0");
     cntDelRow(1);
     out.del_len = _stk.conteo.rows.length === 1;
     cntDelRow(0);   // borrar la última fila NO debe dejar la grilla en 0 filas
     out.del_nuncaVacio = _stk.conteo.rows.length === 1 && !_stk.conteo.rows[0].cod;
 
-    // ---- cntCompara: contado vs sistema con signo ----
-    _stk.conteo.rows = [{ sector: "A1", cod: "500", pilas: 2, cxp: 10, sueltas: 3 }, { sector: "B2", cod: "600", pilas: 1, cxp: 5, sueltas: 0 }];
+    // ---- cntCompara: contado vs sistema con signo (fetch del picking en curso, stubbeado) ----
+    window.fetch = function () { return Promise.resolve({ ok: true, status: 200, json: function () { return Promise.resolve([]); } }); };
+    _stk.conteo.rows = [
+      { sector: "A1", cod: "500", pilas: 2, cxp: 10, sueltas: 3, isInsumo: false },
+      { sector: "B2", cod: "600", pilas: 1, cxp: 5, sueltas: 0, isInsumo: false }
+    ];
     cntCompara();
     out.compara_showComp = _stk.conteo.showComp === true;
     const html = stkBodyConteo();
@@ -67,9 +86,9 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     let alertMsg = null;
     const origAlert = window.alert; window.alert = function (m) { alertMsg = m; };
     _stk.conteo = { rows: [
-      { sector: "A1", cod: "500", pilas: 2, cxp: 10, sueltas: 3 },   // válida → 23
-      { sector: "", cod: "", pilas: 1, cxp: 1, sueltas: 1 },          // sin código → descartada
-      { sector: "B2", cod: "700", pilas: 0, cxp: 0, sueltas: 0 }      // cajas=0 → descartada
+      { sector: "A1", cod: "500", pilas: 2, cxp: 10, sueltas: 3, isInsumo: false },   // válida → 23
+      { sector: "", cod: "", pilas: 1, cxp: 1, sueltas: 1, isInsumo: false },          // sin código → descartada
+      { sector: "B2", cod: "700", pilas: 0, cxp: 0, sueltas: 0, isInsumo: false }      // cajas=0 → descartada
     ], legajo: "122", showComp: true };
     cntGuardar();
     await new Promise(function (res) { setTimeout(res, 30); });
@@ -81,9 +100,16 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     out.guarda_conservaLegajo = _stk.conteo.legajo === "122";
     out.guarda_resetShowComp = _stk.conteo.showComp === false;
 
+    // ---- cntGuardar con código INEXISTENTE → alerta de validación, no postea (v11.07) ----
+    posted = null; alertMsg = null;
+    _stk.conteo = { rows: [{ sector: "A1", cod: "999", pilas: 1, cxp: 1, sueltas: 0, isInsumo: false }], legajo: "122", showComp: false };
+    cntGuardar();
+    out.guarda_invalido_noPost = posted === null;
+    out.guarda_invalido_alert = String(alertMsg || "").indexOf("no existen") >= 0;
+
     // ---- cntGuardar sin filas válidas → alert distinto, no postea ----
     posted = null; alertMsg = null;
-    _stk.conteo = { rows: [{ sector: "", cod: "", pilas: "", cxp: "", sueltas: "" }], legajo: "122", showComp: false };
+    _stk.conteo = { rows: [{ sector: "", cod: "", pilas: "", cxp: "", sueltas: "", isInsumo: false }], legajo: "122", showComp: false };
     cntGuardar();
     out.guarda_vacio_noPost = posted === null;
     out.guarda_vacio_alert = String(alertMsg || "").indexOf("No hay filas") >= 0;
@@ -92,9 +118,10 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     return out;
   });
   const pass = r.calc_normal && r.calc_vacio && r.calc_soloSueltas && r.calc_noNumerico &&
-    r.set_domLive && r.add_len && r.del_len && r.del_nuncaVacio &&
+    r.sel_codOk && r.set_domLive && r.add_len && r.del_len && r.del_nuncaVacio &&
     r.compara_showComp && r.compara_tieneTabla && r.compara_dif500 && r.compara_dif600 && r.compara_enProceso &&
     r.guarda_postUrl && r.guarda_soloUnaFila && r.guarda_alertOk && r.guarda_resetRows && r.guarda_conservaLegajo && r.guarda_resetShowComp &&
+    r.guarda_invalido_noPost && r.guarda_invalido_alert &&
     r.guarda_vacio_noPost && r.guarda_vacio_alert && errs.length === 0;
   console.log("stk-conteo-fisico:", JSON.stringify(r), "· pageerrors:", errs.length ? errs.join("|") : "none", "·", pass ? "✓ OK" : "✗ FAIL");
   await b.close(); process.exit(pass ? 0 : 1);
