@@ -12,8 +12,10 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-08-27 · Versión app al documentar: **v11.98**
+> Última actualización: 2026-08-28 · Versión app al documentar: **v12.03**
 >
+> Nota **v12.03** — **Recepción: se sacó el tilde "Faltantes x Día" del checklist de Pendientes** (pedido del usuario: ese programa ya no se hace). En `recepcion.js`, la tarjeta de un remito pendiente tenía 4 pasos (Carga ISIS · Control Partes Talleristas · Faltantes x Día · Foto) y el botón **Enviar** solo se habilitaba con los 4. Ahora son **3**: el tilde desapareció de la tarjeta y salió de `pendRowComplete`, así que ya no bloquea el envío. La columna `Control_Modo_OP.faltantes` **queda en la base** con lo ya cargado — no se borró ni se dejó de leer por otro lado; simplemente el front no la escribe ni la exige más. Ojo: la solapa **📉 Faltantes x día** del módulo **Stocks** (el reporte) NO se tocó — es otra cosa, solo comparte el nombre.
+
 > Nota **v11.98 — Auto-close RT al enviar + pop-up faltantes Moncayo 15:30 + saca botón Avisar + fix OC recepción.**
 > **(1) Auto-close RT:** al presionar **Enviar** en recepción (`opEnviar`, `recepcion.js`), el toggle de
 > **Recepción Mercadería (RT)** se cierra automáticamente (`window.autoCloseRT(legajo)` expuesta desde

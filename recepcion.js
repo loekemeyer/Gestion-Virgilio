@@ -2253,7 +2253,7 @@ async function renderPendientes() {
   let res;
   try {
     res = await supabase.from("Control_Modo_OP")
-      .select("id,fecha,tipo,nombre,linea,remito,detalle,cantidad_total,created_at,isis,control_partes,faltantes,foto_url,foto_vista,codigo")
+      .select("id,fecha,tipo,nombre,linea,remito,detalle,cantidad_total,created_at,isis,control_partes,foto_url,foto_vista,codigo")
       .eq("estado", "pendiente")
       .order("created_at", { ascending: true })
       .limit(300);
@@ -2299,7 +2299,7 @@ function pendTickElapsed() {
 }
 function pendCard(r) {
   const id = r.id;
-  _pendRows[id] = { isis: !!r.isis, partes: r.control_partes || null, faltantes: !!r.faltantes, foto_url: r.foto_url || null, foto_vista: !!r.foto_vista, codigo: r.codigo || null, sent: false };
+  _pendRows[id] = { isis: !!r.isis, partes: r.control_partes || null, foto_url: r.foto_url || null, foto_vista: !!r.foto_vista, codigo: r.codigo || null, sent: false };
   const tsMs = r.created_at ? new Date(r.created_at).getTime() : 0;
   const card = document.createElement("div"); card.className = "pendCard"; card.setAttribute("data-id", String(id));
   const head = document.createElement("div"); head.className = "pcHead";
@@ -2323,7 +2323,10 @@ function pendCard(r) {
   const acts = document.createElement("div"); acts.className = "pcActs";
   acts.appendChild(pendCheckRow(id, "isis", "Carga ISIS"));
   acts.appendChild(pendPartesRow(id));
-  acts.appendChild(pendCheckRow(id, "faltantes", "Faltantes x Día"));
+  /* v12.03 — se sacó el tilde "Faltantes x Día" (pedido del usuario): ese programa
+     ya no se hace, así que no hay nada que tildar y no puede seguir bloqueando el
+     botón Enviar. La columna Control_Modo_OP.faltantes queda en la base con lo ya
+     cargado — no se toca ni se borra, solo dejó de usarse desde acá. */
   acts.appendChild(pendFotoRow(id));
   card.appendChild(acts);
   const foot = document.createElement("div"); foot.className = "pcFoot";
@@ -2356,7 +2359,7 @@ function pendCheckRow(id, field, label) {
   b.onclick = async function () {
     if (_pendRows[id].sent) return;
     const nv = !_pendRows[id][field]; b.disabled = true;
-    try { await pendPersist(id, field === "isis" ? { isis: nv } : { faltantes: nv }); _pendRows[id][field] = nv; b.classList.toggle("on", nv); }
+    try { await pendPersist(id, { [field]: nv }); _pendRows[id][field] = nv; b.classList.toggle("on", nv); }
     catch (e) { alert("No se pudo guardar: " + (e.message || e)); }
     b.disabled = false; pendRefreshEnviar(id);
   };
@@ -2436,7 +2439,7 @@ async function pendUploadFoto(id, file) {
   const pub = supabase.storage.from("remitos").getPublicUrl(path);
   return (pub && pub.data) ? pub.data.publicUrl : null;
 }
-function pendRowComplete(id) { const s = _pendRows[id]; return !!(s && s.isis && s.partes && s.faltantes && s.foto_vista); }
+function pendRowComplete(id) { const s = _pendRows[id]; return !!(s && s.isis && s.partes && s.foto_vista); }
 function pendRefreshEnviar(id) {
   const card = document.querySelector('#rcpRoot .pendCard[data-id="' + id + '"]');
   if (!card) return; const b = card.querySelector(".enviarBtn");
