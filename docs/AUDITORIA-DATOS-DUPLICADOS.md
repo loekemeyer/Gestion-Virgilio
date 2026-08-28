@@ -125,6 +125,17 @@
 ### 4.2 Sufijo de empresa " LK"/" CH"/" LOKE"
 - El stock y la planimetría guardan `438E LK`/`438E CH`; pedido/faltantes/facturación usan el pelado `438E` (`codBase`, index.html:7379-7384). La misma entidad con 2 claves según la tabla → todo cruce stock↔pedido pasa por `codBase()` en el front y por lógica replicada en las vistas de faltante. **Propuesta**: columna `empresa` separada en `Movimientos_Stock`/`Racks_*` en lugar de sufijo embebido en la clave (migración con vista de compatibilidad). **Alto/alto** — alternativa barata: función SQL `cod_base(text)` + usarla en TODAS las vistas para que la regla exista una sola vez.
 
+> ⚠ **Corrección 2026-08-28 (verificado contra datos reales).** Dos afirmaciones de §4.3 y
+> §4.4 estaban mal: **(a)** el problema del `.0` **ya no existe** — 0 de 11.954 filas de
+> `PPP_Base_Pedidos`; lo arreglaron upstream el Apps Script y el importador del front, así
+> que el doble-query de `index.html:14022` es código muerto probado. **(b)** "toda vista
+> hace `upper(btrim(tanda))`" es falso: solo `vista_tanda_m3`; `ppp_etapa_tanda` compara
+> case-sensitive. Además ya existía un trigger `fn_norm_tanda` (recorta bordes, no
+> uppercasea). **Lo que sí es un bug real y medible**: 19 filas de `PPP_Base_Pedidos` tienen
+> `articulo` en minúscula (943e, 948e, 942e, 838e, 580e, 574e) y el front, que consulta con
+> `codBase()` en mayúscula, **no las ve** — 19 NPs y 36 cajas invisibles en "Cajas pedidas".
+> Propuesta de DDL (sin tocar datos) en `sql/PROPUESTA_norm_ppp_np_tanda_articulo.sql`.
+
 ### 4.3 NP como texto con basura `.0`
 - `PPP_Base_Pedidos.pedido` llega a veces como `97754.0` (float del Sheet): el front consulta `np` **y** `np+".0"` (index.html:13937) y limpia con `replace(/\.0+$/,"")` en ≥3 lugares (14515, 14600, 14605). `Facturacion_NP.np` y `Entregas_Virgilio.np` guardan el limpio. Misma entidad, dos formatos según tabla.
 - **Propuesta**: limpiar en el sync (Apps Script `_pppMapBasePedidos_` o trigger BEFORE INSERT en `PPP_Base_Pedidos`: `regexp_replace(pedido,'\.0+$','')`). **Bajo/bajo** — elimina el doble-query y los strips del front.
