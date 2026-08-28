@@ -4235,7 +4235,7 @@ const CLOSE_NEEDS_INPUT_CODES = ["CC","RT","RI","EI"];
   try {
     var p = new URLSearchParams(location.search).get("recpend");
     if (p) {
-      sessionStorage.setItem("vir_deep_recpend", p);
+      try { localStorage.setItem("vir_deep_recpend", p); } catch (_) {}
       history.replaceState(null, "", location.pathname + (location.hash || ""));
     }
   } catch (_e) {}
@@ -5634,9 +5634,9 @@ function goToOptions() {
   try { faltPollStart(); } catch (_e) {}
   // Deep-link desde Planify: abrir Pendientes directo para el que tomó la tarea.
   try {
-    var rp = sessionStorage.getItem("vir_deep_recpend");
+    var rp = (function(){ try{ return localStorage.getItem("vir_deep_recpend"); }catch(_){return null;} })();
     if (rp) {
-      sessionStorage.removeItem("vir_deep_recpend");
+      try { localStorage.removeItem("vir_deep_recpend"); } catch (_) {}
       setTimeout(function () {
         if (typeof window.recepcionAbrirPendientes === "function")
           window.recepcionAbrirPendientes(rp);
@@ -6586,7 +6586,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.04";
+const APP_VERSION = "v12.05";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
