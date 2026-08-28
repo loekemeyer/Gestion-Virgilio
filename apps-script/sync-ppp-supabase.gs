@@ -1,4 +1,18 @@
 /* =====================================================================
+ *  ⚠ DEPRECADO (2026-08-28) — REEMPLAZADO por pull server-side.
+ *  Las tablas PPP_Programacion_Diaria y PPP_Base_Pedidos ahora se
+ *  sincronizan desde funciones Postgres (sql/sync_ppp_pull_server_side.sql)
+ *  que leen el Sheet directamente vía http_get/export, sin necesidad de
+ *  la service_role key del Apps Script. PPP_Entregados_Meta ya se
+ *  sincronizaba por cron (sync_ppp_entregados_meta).
+ *
+ *  MIGRACIÓN: después de verificar que las funciones server-side corren
+ *  bien (ver verificación en sql/sync_ppp_pull_server_side.sql), comentar
+ *  la línea `try { pushPPPToSupabase_(...) }` en handleCargaPPPSync_ de
+ *  "Carga PPP.gs". Dejar el código comentado 1 semana como fallback.
+ *  Después revocar SUPABASE_VIRGILIO_SERVICE_KEY de las Script Properties.
+ * =====================================================================
+ *
  *  sync-ppp-supabase.gs  —  espeja las 3 hojas PPP en Supabase (Producción
  *  Virgilio) cada vez que el Apps Script las escribe.
  *
