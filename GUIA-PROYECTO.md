@@ -14,6 +14,28 @@
 >
 > Última actualización: 2026-08-28 · Versión app al documentar: **v12.03**
 >
+> Nota **2026-08-28 (solo datos, sin bump de versión) — Tabla nueva `lk_pedidos_match`: string identificador de pedido web + SUCURSAL DE ENTREGA.**
+> Virgilio no tenía la sucursal de entrega de los pedidos; LK sí (`orders.sheets_payload.sucursal_entrega`).
+> LK la **empuja** cada 15 min a la tabla local **`lk_pedidos_match`** por su FDW existente
+> (server `virgilio_db`, rol `lk_ppp_reader`, que ahora escribe SOLO esa tabla; sigue
+> solo-lectura para todo lo demás). El cruce va por **`match_string`** =
+> `cod_cliente|fecha ART|items` con `items` = `cod_art`x`cajas` ordenado por código y
+> cajas sumadas por código repetido (ej `4002|2026-08-27|026x1,027x1,315x2`) — sale de
+> `sheets_payload.items`, exactamente lo que viajó al Sheet/ERP, así producción puede
+> reconstruir el mismo string. `ambiguo=true` marca la única excepción (mismo cliente,
+> mismo día, mismos ítems, DISTINTA sucursal: 17 de 977 pedidos históricos);
+> `orden_en_dia` desempata por hora de alta. **Cubre las dos empresas** (columna
+> `empresa`, `'lk'`/`'chef'`, PK compuesta con `order_id`): los pedidos web de Chef viven
+> en el proyecto Supabase de Chef (portal gemelo) y LK los reenvía por su FDW `chef_db` —
+> ⚠ **pendiente un grant en el proyecto Chef** (`grant select on public.orders to
+> loke_reader;`); hasta entonces solo se sincroniza LK. La empresa de una NP se deduce
+> del número: **9xxxx = lk, 4xxxx = chef** (numeraciones de cliente independientes: el
+> mismo cod es otro cliente en cada empresa, por eso todo cruce lleva `empresa` +
+> `match_string`). La app todavía **no la consume** — falta
+> definir dónde se muestra. DDL en `sql/lk_pedidos_match.sql`; lado LK (vistas
+> `v_pedidos_match` / `v_pedidos_match_chef` + `sync_pedidos_match_virgilio()` + cron
+> `sync-pedidos-match-virgilio`) en `sql/pedidos_match_virgilio.sql` del repo pagina-LK.
+>
 > Nota **v12.03** — **Recepción: se sacó el tilde "Faltantes x Día" del checklist de Pendientes** (pedido del usuario: ese programa ya no se hace). En `recepcion.js`, la tarjeta de un remito pendiente tenía 4 pasos (Carga ISIS · Control Partes Talleristas · Faltantes x Día · Foto) y el botón **Enviar** solo se habilitaba con los 4. Ahora son **3**: el tilde desapareció de la tarjeta y salió de `pendRowComplete`, así que ya no bloquea el envío. La columna `Control_Modo_OP.faltantes` **queda en la base** con lo ya cargado — no se borró ni se dejó de leer por otro lado; simplemente el front no la escribe ni la exige más. Ojo: la solapa **📉 Faltantes x día** del módulo **Stocks** (el reporte) NO se tocó — es otra cosa, solo comparte el nombre.
 
 > Nota **v11.98 — Auto-close RT al enviar + pop-up faltantes Moncayo 15:30 + saca botón Avisar + fix OC recepción.**
@@ -7069,6 +7091,20 @@ loguean en:
   `ARCA_CERT`/`ARCA_KEY` (cert `virgilioapp`), `ARCA_ENV=prod`, `ARCA_PTO_VTA=11`,
   `ARCA_CUIT`, `WEB_SERVICE_KEY`. Detalle en `docs/facturacion-arca.md`.
 
+**`lk_pedidos_match`** (2026-08-28) — espejo del **string identificador de pedido web**
+de los DOS portales (LK y Chef), con la **sucursal de entrega** (dato que Virgilio no
+tenía). La llena LK cada 15 min empujando por su FDW (rol `lk_ppp_reader`, único permiso
+de escritura de ese rol); los pedidos de Chef los lee LK de su FDW `chef_db` y los
+reenvía (pendiente un grant en el proyecto Chef — hasta entonces solo hay filas `lk`).
+Cols: `empresa` (`'lk'`/`'chef'` — PK con `order_id`; NP 9xxxx = lk, 4xxxx = chef),
+`order_id` (= order_number del portal/Sheet), `cod_cliente`, `status`,
+`fecha_pedido` (date ART), `hora_pedido`, `created_at`, `sucursal_entrega`,
+`items_string`, `match_string` (`cod_cliente|fecha|items`, items = `cod`x`cajas`
+ordenado por código, cajas sumadas por código repetido), `ambiguo` (mismo string ese
+día con >1 sucursal distinta — el único caso que el string no resuelve), `orden_en_dia`
+(desempate por hora), `synced_at`. RLS: anon/authenticated SELECT; escribe solo
+`lk_ppp_reader`. Ver `sql/lk_pedidos_match.sql`.
+
 **`Alertas_Pedidos_Web`** (v8.83) — alertas de **pedidos web anómalos** detectados por el
 Mayorista. Una fila por alerta:
 
@@ -7768,3 +7804,26 @@ distinta, empresa distinta.
 - **Nunca** sumar `809E LK` + `809E CH`: son productos distintos, no un total.
 - El `809` pelado es **Chef nacional**; no lleva sufijo, y no es "el 809E sin la E".
 - Antes de tocar equivalencias, familias o planimetría del 809, releer esta sección.
+
+> Nota **2026-08-28 — Normalización PPP aplicada · prode eliminado · watchdog de syncs.**
+> - **Normalización al entrar (idea 7411, items 4.3/4.4)** — migración
+>   `norm_ppp_np_tanda_articulo_7411`. `fn_norm_tanda` ahora **uppercasea** (antes solo
+>   recortaba bordes) y hay 3 triggers BEFORE nuevos: `trg_norm_ppp_base`,
+>   `trg_norm_ppp_prog_np`, `trg_norm_ppp_meta_np`. Solo DDL, no tocó datos: las 3 tablas
+>   son full-replace, así que el próximo sync las deja limpias.
+>   **El motivo real** no era el `.0` (ya no existía: 0 de 11.954 filas, lo arreglaron
+>   upstream el Apps Script y el importador): eran **19 filas de `PPP_Base_Pedidos` con
+>   `articulo` en minúscula** (943e, 948e, 942e, 838e, 580e, 574e) que el front —que
+>   consulta con `codBase()` en mayúscula— **no veía**: 19 NPs y 36 cajas invisibles en
+>   "Cajas pedidas", que le faltaban al generador de OCs. Cuando el sync reescriba la
+>   tabla, las cajas pedidas de esos códigos **suben**; es dato que estaba escondido.
+>   ⚠ En `PPP_Entregados_Meta` NO se quitan ceros a la izquierda a propósito: `np` es PK y
+>   colapsar dos np distintos abortaría el INSERT completo del cron.
+> - **prode eliminado** (idea 1431 + pedido del dueño): no quedaban tablas ni crons, solo
+>   la función huérfana `prode_set_result` —que además apuntaba a una tabla inexistente y
+>   tenía la clave de admin hardcodeada con EXECUTE para anon—. Borrada; 0 objetos prode.
+> - **`watchdog_syncs_externos()`** (cron `watchdog-syncs-externos`, cada hora a los :23):
+>   avisa por Telegram si alguno de los 3 syncs de hojas de Google deja de correr
+>   (umbral ≈ 3× su período; dedup un aviso por sync por día). **No se creó tabla
+>   `Sync_Estado`**: `cron.job_run_details` ya tiene la verdad. DDL en
+>   `sql/watchdog_syncs_externos.sql`.
