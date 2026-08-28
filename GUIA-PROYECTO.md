@@ -36,6 +36,16 @@
 > `v_pedidos_match` / `v_pedidos_match_chef` + `sync_pedidos_match_virgilio()` + cron
 > `sync-pedidos-match-virgilio`) en `sql/pedidos_match_virgilio.sql` del repo pagina-LK.
 >
+> Nota **v12.09** — **Limpieza de código muerto (ideas 6750/5877/9703 de auditor-consistencia).** Se
+> borraron 6 funciones sin ningún call-site en el repo — `pppSugerirView` (reemplazada por
+> `pppSugerirInline`), `facFaltBadge` (reemplazada por `facFaltDist`; también se sacó de los asserts de
+> `tests/smoke.cjs` y `tests/fac-npc.cjs`, que eran su único uso), `pickParseCajas`, `_ocgNextAutoTxt`,
+> `_ocgNextAutoFecha` (reemplazadas por `_ocgAutoEnTxt`) — y 2 reglas CSS sin uso (`.cmpl-autobar`,
+> `.ppp-ent-grid`). `_pkItemCodes` (idea 5877) se **conservó**: no tiene call-site en la app pero la
+> cubre `tests/emp-np.cjs` (contrato de la idea 9020, "scanCodes") y queda reservada para el cruce
+> por escáner de la idea 8243 — se le actualizó el comentario para que lo diga. Cero cambio de
+> comportamiento; suite completa verde.
+>
 > Nota **v12.08** — **La estación de impresión ahora marca en `Impresion_NP` lo que imprime sola.** La estación (auto-print de remitos al terminar armado, `psPrintBatch`) deduplicaba solo en `localStorage` de la PC del kiosco: el server no se enteraba, así que la **Cola de impresión NP** y su badge seguían acusando como "sin imprimir" NPs que ya habían salido solas por la estación (falsa alarma permanente si conviven las dos cosas). Ahora `psPrintBatch` también llama a `colaImpMarcarImpresas()` (el mismo insert idempotente a `Impresion_NP`, `on_conflict=np`, que usa la Cola) y refresca el badge (`colaImpLoadBadge`, con 1.6 s de espera para que el insert pegue). El dedup local (`psMarkPrinted` en `localStorage`) sigue igual — evita doble impresión con 2 pestañas abiertas; la marca server es para que la Cola refleje la realidad. Sin cambio de esquema: `Impresion_NP` ya tenía RLS anon insert (v11.60).
 >
 > Nota **v12.07** — **Recepción / Pendientes: el visor de foto ahora muestra AL LADO lo que cargó el operario (código → cajas).** Antes, «👁 Ver foto» abría un overlay negro con la foto sola: tapaba la tarjeta, así que para cotejar la mercadería contra lo declarado había que **cerrar la foto, leer el detalle, volver a abrirla** (y así). Ahora el overlay es de **dos paneles** (`.fotoOverlayBox`): la foto y, al lado, una ficha blanca (`.fotoOverlayInfo`) con **nombre del tallerista/proveedor · tipo · fecha · hora · línea · RTO/FC** y la lista **CÓDIGO → CAJAS** una debajo de la otra, más el **Total**. En celular (≤860px) los dos paneles se **apilan** (foto arriba, ficha abajo, las dos visibles sin cerrar nada). No hay dato nuevo ni consulta nueva: el detalle ya venía en `Control_Modo_OP.detalle` (formato `"COD → N · COD → N"`, lo arma `opEnviar`) y `renderPendientes` ya lo traía en el `select`; lo único que se agregó es el parseo en el front (`pendFotoParseDetalle` + `pendFotoInfoPanel`) — **puramente visual, sin lógica de negocio**, por eso no hay contraparte en el backend. Si algún día cambia el formato de `detalle`, el panel muestra el texto crudo en vez de romper. También se cierra con **Escape**. Test `tests/rcp-foto-detalle.cjs` (PC y celular).

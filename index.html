@@ -1872,7 +1872,6 @@ button.pk-anular small{ display:block; font-size:12px; font-weight:700; opacity:
 .ppp-ent-row{ font-size:12.5px; color:#334155; padding:2px 0; }
 .ppp-ent-row b{ color:#0f172a; }
 .ppp-ent-m3{ color:#1e6bd6; font-weight:600; }
-.ppp-ent-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(155px,1fr)); gap:2px 12px; }
 .ppp-ent-cell{ font-size:12px; color:#334155; padding:2px 0; border-bottom:1px solid #f1f5f9; }
 .ppp-ent-cell b{ color:#0f172a; }
 /* v6.97 — Ocupación (m³ armado/programado por día) */
@@ -2460,7 +2459,6 @@ table.facfc-tbl tr.facneto-row-falt td{ background: #fef2f2; }
 .cmpl-min{ position:absolute; top:6px; right:6px; width:28px; height:28px; border-radius:8px; border:1.5px solid #fecaca; background:#fff; color:#b42318; font-size:18px; font-weight:800; line-height:1; padding:0; cursor:pointer; }
 .cmpl-auto{ position:absolute; top:6px; left:6px; height:24px; padding:0 8px; border-radius:8px; border:1.5px solid #fcd34d; background:#fffbeb; color:#92400e; font-size:12px; font-weight:800; line-height:1; cursor:pointer; margin:0; width:auto; }
 .cmpl-auto:active{ background:#fde68a; }
-.cmpl-autobar{ font-size:12.5px; color:#92400e; background:#fffbeb; border:1px solid #fcd34d; border-radius:9px; padding:7px 10px; margin:0 0 9px; line-height:1.35; }
 .cmpl-szinp{ width:48px; height:28px; text-align:center; font-size:15px; font-weight:800; border:1.5px solid #fcd34d; border-radius:7px; margin:0 2px; padding:0; -moz-appearance:textfield; }
 .cmpl-szinp::-webkit-outer-spin-button,.cmpl-szinp::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
 .cmpl-repbar{ display:flex; gap:8px; align-items:stretch; margin:0 0 10px; }
@@ -6502,7 +6500,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.08";
+const APP_VERSION = "v12.09";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -7683,11 +7681,6 @@ function pickNormNp(v) {
   if (/^\d+\.0+$/.test(s)) s = s.replace(/\.0+$/, "");   // "97754.0" -> "97754"
   return s;
 }
-function pickParseCajas(s) {
-  if (s == null) return 0;
-  const n = parseFloat(String(s).trim().replace(",", "."));
-  return isNaN(n) ? 0 : n;
-}
 
 /* Trae TODAS las filas de un endpoint PostgREST paginando con Range (Supabase
    corta a max-rows, ~1000). Usa Content-Range (Prefer: count=exact) para saber
@@ -8456,7 +8449,8 @@ function pkSinStock() {
 function pkF() { if (_pk) { _pk.mode = "fInput"; pkRender(); } }
 /* Todos los códigos con los que se puede identificar un ítem del picking: el propio,
    el real/elegido del par Nacional/Importado, y el PELADO cuando viene partido por
-   empresa (idea 9020: "438E LK" también matchea "438E"). Lo usa el cruce de códigos. */
+   empresa (idea 9020: "438E LK" también matchea "438E"). Sin call-site en la app todavía
+   (lo cubre tests/emp-np.cjs como "scanCodes"); reservada para el cruce por escáner (idea 8243). */
 function _pkItemCodes(it) {
   const out = [];
   [it.art, it.real, it.pick].forEach(function (c) { if (c) out.push(String(c).toUpperCase().trim()); });
@@ -11567,10 +11561,8 @@ function _ocgNextAuto() {
   const ms = d.getTime() - now.getTime();
   return { date: d, ms: ms, days: Math.floor(ms / 864e5), hours: Math.floor(ms % 864e5 / 36e5), mins: Math.floor(ms % 36e5 / 6e4) };
 }
-function _ocgNextAutoTxt() { const n = _ocgNextAuto(); return String(n.days).padStart(2, "0") + "d " + String(n.hours).padStart(2, "0") + "h " + String(n.mins).padStart(2, "0") + "m"; }
 /* v7.67 — texto del contador que va DENTRO del botón "Generar las OCs". */
 function _ocgAutoEnTxt() { const n = _ocgNextAuto(); return "se genera automáticamente en " + n.days + "D" + n.hours + "H" + n.mins + "M"; }
-function _ocgNextAutoFecha() { const n = _ocgNextAuto(); return "miércoles " + String(n.date.getUTCDate()).padStart(2, "0") + "/" + String(n.date.getUTCMonth() + 1).padStart(2, "0") + " 07:00"; }
 let _ocgCdTimer = null;
 function ocgStartCountdown() { if (_ocgCdTimer) return; _ocgCdTimer = setInterval(function () { const el = document.getElementById("ocgCountdown"); if (!el) { clearInterval(_ocgCdTimer); _ocgCdTimer = null; return; } el.textContent = _ocgAutoEnTxt(); }, 30000); }
 /* v9.12 — OC de IMPORTADOS (circuito propio, aparte del generador nacional). Lee la vista
@@ -26007,13 +25999,6 @@ function _pppSugHtml(s) {
   h += '<div class="ppp-sug-tot">TOTAL: ' + np + ' pedidos · ' + s.tandas.length + ' tandas · ' + tot.toFixed(2) + ' m³</div></div>';
   return h;
 }
-function pppSugerirView() {
-  const s = _pppComputeSugerencia();
-  if (!s.tandas.length && !(s.sinZona && s.sinZona.length)) { alert("No hay pedidos sin tanda para sugerir (todo lo de Supabase ya está programado)."); return; }
-  _pppSugCache = s;
-  const el = document.getElementById("pppSugContent"); if (el) el.innerHTML = _pppSugHtml(s);
-  const ov = document.getElementById("pppSugOverlay"); if (ov) ov.classList.add("show");
-}
 /* v5.59 — Sugerir tandas INLINE (sin popup): muestra la sugerencia en la MISMA vista
    (qué tanda va a ser cada pedido según m³ + reglas de zona). El pop-up (ventana de
    impresión) aparece SOLO al tocar "Exportar PDF". Pedido del dueño. */
@@ -32804,13 +32789,6 @@ function facFaltInfo(np){ return _facFalt.get(String(np).trim().replace(/\.0+$/,
 function _facItemCompletable(cod){
   const kn = _cpNorm(cod); const s = _facSaldosN[kn] || {};
   return (Number(s.a_guardar) || 0) > 0 || (Number(s.racks) || 0) > 0 || _facGuardadoHoy.has(kn);
-}
-function facFaltBadge(np){
-  const f = facFaltInfo(np);
-  if (!f || !f.cajas) return "";
-  const det = f.items.slice(0, 8).map(function(it){ return escapeHtml(it.cod) + "×" + it.falto; }).join(", ");
-  const mas = f.items.length > 8 ? " +" + (f.items.length - 8) : "";
-  return '<div class="fac-falta-badge" title="Faltan ' + f.cajas + ' cajas en ' + f.items.length + ' artículo(s) — facturá por lo ENTREGADO">⚠ FALTA ' + f.cajas + ' cj: ' + det + mas + '</div>';
 }
 /* v7.90 — código en formato display de un miembro normalizado dentro de su familia. */
 function _equivDisp(fam, kn){ if(!fam) return kn; const i = fam._codsN.indexOf(kn); return i>=0 ? fam.cods[i] : kn; }

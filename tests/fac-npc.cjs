@@ -79,8 +79,6 @@ catch (_e) {
     // ===== F1: faltantes badge + confirm guard =====
     await facFetchFaltantes();
     out.faltInfo = !!facFaltInfo("97957");
-    out.faltBadge = facFaltBadge("97957");     // "⚠ FALTA 11 cj: 315×10, 561×1"
-    out.faltBadgeEmpty = facFaltBadge("99999");
 
     let confirmMsg = "";
     window.confirm = function (m) { confirmMsg = String(m); return false; };
@@ -167,8 +165,7 @@ catch (_e) {
     return out;
   });
 
-  const okF1 = r.faltInfo === true && /FALTA/.test(r.faltBadge) && /11/.test(r.faltBadge) &&
-    r.faltBadgeEmpty === "" && r.confirmShown === true && r.postAfterCancel === 0 &&
+  const okF1 = r.faltInfo === true && r.confirmShown === true && r.postAfterCancel === 0 &&
     r.btnNotDisabled === true && r.postAfterOk === 1;
   const okF2 = r.rowCount === 2 && r.row57 && r.row57.tanda === "C75B" && r.row57.cod === "2533" &&
     /Osa/.test(r.row57.rs) && r.row57.fecha === "2026-07-15" && r.row57.lios === 28 && r.row57.falt === 11 &&

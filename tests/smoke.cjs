@@ -25,7 +25,7 @@ catch (_e) {
       "pppSugerirInline", "pppSugInlineClose", "_pppEsCiudadela",
       "stkBodyProceso", "ocBodyEntregas", "ocgEnter", "insRender", "mgRender", "mgConfirmar", "pkRender", "stockBajaPicking",
       "stockSepararAFacturar", "stockSalidaFacturado", "stockMove", "_stockNormRows",
-      "esLegajoPrueba", "esOperadorPrueba", "enqueueReport", "facFetchCajas", "facFaltBadge", "facToggleSoloFalt",
+      "esLegajoPrueba", "esOperadorPrueba", "enqueueReport", "facFetchCajas", "facToggleSoloFalt",
       "faltPoll", "faltPollStart", "faltDecidePopup", "faltAsignarme", "faltCompletar", "faltYaListo", "faltSoltar",
       "faltSnoozeId", "faltMaybeCompletar", "faltHtmlPend", "faltHtmlMine", "faltHtmlTaken", "showFaltAvisar", "faltCrear",
       "facFetchTareas", "facTareaActiva", "facTareaBadge", "_compTandaYaArmada",
