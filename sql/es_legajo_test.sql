@@ -1,7 +1,9 @@
--- ✅ APLICADO 2026-08-28 (migración `es_legajo_test_fn`) — FASE A únicamente.
--- FASE B (vistas): pendiente — aplicar de a una (vista_tanda_status → vista_faltante_demanda
---   → vista_faltante_real → vista_correcciones_pedido_rich → vista_productividad_semanal
---   → vista_productividad_diaria → vista_faltantes_sin_completar).
+-- ✅ APLICADO 2026-08-28 (migración `es_legajo_test_fn`) — FASE A.
+-- ✅ FASE B (vistas): APLICADA 2026-08-28 — 7 vistas migradas a `NOT es_legajo_test(...)`.
+--   Ver es_legajo_test_fase_b.sql para el detalle.
+-- ✅ FASE B-front (index.html): APLICADA 2026-08-28 — 4 checks inline reemplazados por
+--   esLegajoPrueba() (getActivityStatus, prodCompute, stock display, fetchMonitorEvents).
+--   generar_reporte_agentes_v2.sql: 3 exclusiones migradas a es_legajo_test().
 -- FASE C (UPDATE en Empleados.tipo): NO aplicar sin backup + permiso explícito del dueño.
 --
 -- Centraliza la detección de legajos de prueba/basura (0 y 1) que hoy está ad-hoc

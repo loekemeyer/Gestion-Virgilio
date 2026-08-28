@@ -37,7 +37,7 @@ begin
            a.opcion, a.motivo, a.legajo, coalesce(a.ts, a.ts_cliente) as ts_evt
     from public."Auditoria_Produccion_Virgilio" a
     where coalesce(a.ts, a.ts_cliente) > now() - interval '7 days'
-      and coalesce(a.legajo, '') not in ('0', '1')
+      and not public.es_legajo_test(a.legajo)
       and not exists (select 1 from public."Registros_Produccion_Virgilio" r
                       where r.client_id = a.client_id)
     order by coalesce(a.client_id, a.id::text), coalesce(a.ts, a.ts_cliente) desc
@@ -57,7 +57,7 @@ begin
          count(distinct a.client_id), max(coalesce(a.ts, a.ts_cliente))
   from public."Auditoria_Produccion_Virgilio" a
   where coalesce(a.ts, a.ts_cliente) > now() - interval '7 days'
-    and coalesce(a.legajo, '') not in ('0', '1')
+    and not public.es_legajo_test(a.legajo)
     and a.client_id is not null
     and exists (select 1 from public."Registros_Produccion_Virgilio" r where r.client_id = a.client_id)
   group by coalesce(nullif(trim(a.opcion), ''), '?'), coalesce(nullif(trim(a.legajo), ''), '?'),
@@ -71,7 +71,7 @@ begin
            || ' (faltan ' || ((split_part(texto, '|', 3))::numeric - (split_part(texto, '|', 4))::numeric) || ')',
          count(*), max(created_at)
   from public."Registros_Produccion_Virgilio"
-  where opcion = 'PKC' and created_at > now() - interval '7 days' and coalesce(legajo, '') not in ('0', '1')
+  where opcion = 'PKC' and created_at > now() - interval '7 days' and not public.es_legajo_test(legajo)
     and split_part(texto, '|', 3) ~ '^[0-9]+(\.[0-9]+)?$' and split_part(texto, '|', 4) ~ '^[0-9]+(\.[0-9]+)?$'
     and (split_part(texto, '|', 4))::numeric < (split_part(texto, '|', 3))::numeric
   group by texto order by max(created_at) desc limit 20;
