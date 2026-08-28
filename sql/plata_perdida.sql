@@ -25,7 +25,12 @@ create policy pv_wr on public.precios_venta for all to authenticated using (true
 
 -- --------------------------------------------------------------
 -- SYNC precios_venta desde LK (proyecto kwkclwhmoygunqmlegrg).
--- Correr en LK y ejecutar el INSERT resultante en Virgilio (misma técnica que clientes_vendedor):
+-- ✅ AUTOMATIZADO (2026-08-28): Edge Function sync-precios-venta + pg_cron
+-- diario a las 06:00 ART. También sincroniza cob_uxb_lk (uxb de todo el
+-- padrón LK). Ver sql/sync_precios_venta.sql para el cron y la verificación.
+--
+-- Receta MANUAL (obsoleta, conservada como fallback):
+--   Correr en LK y ejecutar el INSERT resultante en Virgilio:
 --   select 'insert into public.precios_venta (cod, precio_unit, uxb, descripcion) values ' ||
 --     string_agg('(' || quote_literal(btrim(cod)) || ',' || coalesce(list_price::text,'null') || ',' ||
 --                coalesce(uxb::text,'null') || ',' || quote_literal(coalesce(description,'')) || ')', ',') ||

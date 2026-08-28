@@ -26,7 +26,6 @@
   const SUPABASE_URL = cfg.supabaseUrl;
   const SUPABASE_KEY = cfg.supabaseKey;
   const FICHADAS_ENDPOINT  = SUPABASE_URL + "/rest/v1/Fichadas_Virgilio";
-  const HISTORICO_ENDPOINT = SUPABASE_URL + "/rest/v1/Fichadas_Historico";
   const EMPLEADOS_ENDPOINT = SUPABASE_URL + "/rest/v1/Empleados";
 
   init();
@@ -138,16 +137,8 @@
         legajo = null;
       }
 
-      // Doble write: Fichadas_Virgilio (tabla nativa del QR) +
-      // Fichadas_Historico (tabla consolidada que mergea los eventos de
-      // los operarios Virgilio con los del Google Form de las otras sedes).
-      // Si falla el primero, fallamos toda la fichada (Supabase es la
-      // fuente de verdad). El segundo es best-effort: si falla, igual
-      // sigue, ya que el primero asegura el registro principal.
       const tsEvento = new Date();
       await submitFichadaToSupabase(email, legajo, tsEvento);
-      submitToHistorico(email, legajo, "Entrada", tsEvento)
-        .catch((e) => console.warn("[historico] entrada fallo:", e && e.message));
 
       statusEl.dataset.state = "ok";
       statusEl.textContent = legajo
@@ -230,48 +221,6 @@
       "-" +
       Math.random().toString(36).slice(2, 10)
     );
-  }
-
-  // Mirror a la tabla consolidada Fichadas_Historico. Esa tabla concentra:
-  //   - Eventos de los operarios Virgilio (insertados desde acá y desde la
-  //     app principal: PC=Comida Inicia/Termina, FJ=Salida).
-  //   - Importados del Google Sheet legacy (Pellegrini, Esnaola, Home
-  //     Office, etc — históricamente y a futuro via sync).
-  // De acá lee el monitor de fichadas. Por eso es importante que cada
-  // evento del QR se replique acá ademas de Fichadas_Virgilio.
-  //
-  // El UNIQUE constraint (ts_evento, email, evento) en la tabla impide
-  // duplicados si se reintenta — usamos Prefer: resolution=ignore-duplicates
-  // para que sea idempotente (la 2da no falla, simplemente no inserta).
-  async function submitToHistorico(email, legajo, evento, tsEvento) {
-    const body = {
-      ts_evento: (tsEvento || new Date()).toISOString(),
-      evento:    evento,
-      email:     email,
-      legajo:    legajo
-    };
-    const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), 8000);
-    try {
-      const res = await fetch(HISTORICO_ENDPOINT, {
-        method: "POST",
-        headers: {
-          apikey:          SUPABASE_KEY,
-          Authorization:  "Bearer " + SUPABASE_KEY,
-          "Content-Type": "application/json",
-          Prefer:         "return=minimal,resolution=ignore-duplicates"
-        },
-        body: JSON.stringify(body),
-        signal: ctrl.signal
-      });
-      clearTimeout(t);
-      if (!res.ok && res.status !== 409) {
-        throw new Error("historico_server_" + res.status);
-      }
-    } catch (e) {
-      clearTimeout(t);
-      throw e;
-    }
   }
 
   function resetAfterSuccess() {

@@ -4096,8 +4096,6 @@ const SUPABASE_TABLE_ENDPOINT =
    linkeado en la tabla). */
 const SUPABASE_FICHADAS_ENDPOINT =
   SUPABASE_URL + "/rest/v1/Fichadas_Virgilio";
-const SUPABASE_HISTORICO_ENDPOINT =
-  SUPABASE_URL + "/rest/v1/Fichadas_Historico";
 const SUPABASE_EMPLEADOS_ENDPOINT =
   SUPABASE_URL + "/rest/v1/Empleados";
 // Pantalla facturación: 1 row por NP facturado. cierre_id se llena cuando
@@ -5799,8 +5797,7 @@ async function getActivityStatus(force) {
       // curso ni terminada. Sin esto, un EP de prueba (caso real: D05B, legajo 0) dejaba la
       // tanda "en picking hace 17 h" en el monitor para siempre. Misma regla que el resto
       // de los reportes y que el monitor de silencios.
-      const _legMon = String(ev.legajo == null ? "" : ev.legajo).trim();
-      if (_legMon === "0" || _legMon === "1") continue;
+      if (esLegajoPrueba(ev.legajo)) continue;
       const ts = ev.ts_cliente;
       if (ev.opcion === "EP" || ev.opcion === "TP") {
         status.pickingStarted.add(tNorm);
@@ -6224,49 +6221,10 @@ function _enqueueReportRaw(payload) {
   updatePendingIndicator();
   registerBackgroundSync();   // pide al browser que despache aunque cerremos la app
 
-  // Mirror a Fichadas_Historico — tabla consolidada de fichadas
-  // (Entrada/Comida Inicia/Comida Termina/Salida) que combina los
-  // operarios Virgilio con los importados del Google Sheet legacy.
-  // Best-effort, fire-and-forget: si falla, el evento ya quedó en
-  // Registros_Produccion_Virgilio (fuente de verdad para producción).
-  mirrorOperatorEventToHistorico(payload).catch(() => {});
 }
 function enqueueReport(payload) {
   if (esOperadorPrueba()) { try { console.warn("[PRUEBA] evento NO persistido (legajo de prueba):", payload && payload.opcion); } catch (_e) {} return; }
   _enqueueReportRaw(payload);
-}
-
-/* =====================================================================
-   Mirror de eventos PC/FJ al Fichadas_Historico de Supabase.
-   ---------------------------------------------------------------------
-   Solo se mandan los eventos que representan una fichada de horario:
-   - PC apertura (toggle 1ra vez)  → 'Comida Inicia'
-   - PC cierre   (toggle 2da vez)  → 'Comida Termina'
-   - FJ                            → 'Salida'
-   - La Entrada la manda fichada.html directamente al hacer el QR.
-   Resuelve legajo -> email vía Empleados (cacheado por sesion).
-   ===================================================================== */
-const _legajoEmailCache = new Map();   // legajo -> email|null (null = no tiene)
-async function _resolveEmailForLegajo(legajo) {
-  if (!legajo) return null;
-  const key = String(legajo).trim();
-  if (!key) return null;
-  if (_legajoEmailCache.has(key)) return _legajoEmailCache.get(key);
-  try {
-    const url = SUPABASE_URL +
-      "/rest/v1/Empleados?Legajo=eq." + encodeURIComponent(key) +
-      "&select=email&limit=1";
-    const r = await fetch(url, {
-      headers: { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY }
-    });
-    if (!r.ok) return null;       // no cacheamos error: probamos de nuevo despues
-    const data = await r.json();
-    const email = (Array.isArray(data) && data.length && data[0].email)
-      ? String(data[0].email).trim()
-      : null;
-    _legajoEmailCache.set(key, email);
-    return email;
-  } catch (_e) { return null; }
 }
 
 /* Resuelve la hora_entrada (jornada) del legajo desde Empleados, cacheada por
@@ -6333,48 +6291,6 @@ async function maybeRegisterLateArrival(legajoStr, nowMs) {
     });
     enqueueReport(payload);
   } catch (_e) { /* best effort: nunca bloquea el reporte del operario */ }
-}
-
-function _mapOpcionToFichadaEvento(payload) {
-  if (!payload || !payload.opcion) return null;
-  if (payload.opcion === "FJ") return "Salida";
-  if (payload.opcion === "PC") {
-    // PC es toggle: 1ra vez sin ts_inicio_iso = apertura (Comida Inicia),
-    // 2da vez con ts_inicio_iso = cierre (Comida Termina).
-    return payload.ts_inicio_iso ? "Comida Termina" : "Comida Inicia";
-  }
-  return null;
-}
-
-async function mirrorOperatorEventToHistorico(payload) {
-  const evento = _mapOpcionToFichadaEvento(payload);
-  if (!evento) return;            // opcion fuera del scope (EP, TP, etc.)
-  const email = await _resolveEmailForLegajo(payload.legajo);
-  if (!email) return;             // sin email no podemos identificar al operario en la tabla
-  const tsIso = payload.ts ? new Date(payload.ts).toISOString() : new Date().toISOString();
-  const body = {
-    ts_evento: tsIso,
-    evento:    evento,
-    email:     email,
-    legajo:    String(payload.legajo)
-  };
-  try {
-    const r = await fetch(SUPABASE_HISTORICO_ENDPOINT, {
-      method: "POST",
-      headers: {
-        "apikey":        SUPABASE_KEY,
-        "Authorization": "Bearer " + SUPABASE_KEY,
-        "Content-Type":  "application/json",
-        "Prefer":        "return=minimal,resolution=ignore-duplicates"
-      },
-      body: JSON.stringify(body)
-    });
-    if (!r.ok && r.status !== 409) {
-      console.warn("[historico] HTTP", r.status, "para", evento, email);
-    }
-  } catch (e) {
-    console.warn("[historico] fetch fallo:", e && e.message);
-  }
 }
 
 /* Genera un cierre automático para un toggle que quedó abierto al cambiar
@@ -7465,8 +7381,11 @@ async function checkForUpdate() {
 }
 function showUpdateBanner(newVer) {
   if (document.getElementById("updateBanner")) return;
-  // Chip chiquito, esquina superior derecha. Discreto: no tapa botones ni molesta el
-  // trabajo. Un solo tap recarga. Título con la versión para el que quiera verla.
+  // Si el usuario ya tocó "Actualizar" en la última hora, no molestar de nuevo.
+  try {
+    const d = parseInt(sessionStorage.getItem("_upd_dismissed") || "0", 10);
+    if (d && (Date.now() - d) < 3600000) return;
+  } catch(_e) {}
   const b = document.createElement("button");
   b.id = "updateBanner";
   b.type = "button";
@@ -7476,9 +7395,22 @@ function showUpdateBanner(newVer) {
     "position:fixed;top:8px;right:8px;z-index:999999;background:#0a7d2c;color:#fff;" +
     "border:0;border-radius:14px;padding:5px 11px;font-size:12px;font-weight:600;" +
     "line-height:1;box-shadow:0 1px 5px rgba(0,0,0,.3);cursor:pointer;opacity:.95";
-  b.onclick = function () { location.reload(); };
+  b.onclick = function () {
+    // Guardamos que el usuario tocó el botón (suprime 1 h si el reload no resuelve).
+    try { sessionStorage.setItem("_upd_dismissed", String(Date.now())); } catch(_e) {}
+    // Forzamos fetch fresco de index.html cambiando la URL (evita caché HTTP del browser).
+    location.replace(location.pathname + "?_=" + Date.now());
+  };
   document.body.appendChild(b);
 }
+// Limpia el ?_= de la URL si venimos de un reload forzado por el banner.
+(function () {
+  try {
+    if (new URLSearchParams(location.search).has("_")) {
+      history.replaceState(null, "", location.pathname);
+    }
+  } catch(_e) {}
+})();
 checkForUpdate();
 setInterval(checkForUpdate, 5 * 60 * 1000);
 
@@ -7570,8 +7502,8 @@ let _qrLastToken = null;
 
 /* QR de fichada rotativo (TOTP) — HABILITADO. El flujo end-to-end está
    verificado contra Supabase: fichada.html inserta el ingreso en
-   Fichadas_Virgilio y lo espeja en Fichadas_Historico (RLS: rol anon con
-   INSERT OK en ambas; imported_at/created_at tienen default now()), y el
+   Fichadas_Virgilio (el trigger trg_fichadas_virgilio_espejo lo copia
+   a Fichadas_Historico server-side; imported_at/created_at default now()), y el
    legajo se resuelve por email desde Empleados (anon SELECT OK).
    Si hubiera que frenarlo de nuevo, poner true: muestra "EN CONSTRUCCIÓN". */
 const QR_DISABLED = false;
@@ -12674,7 +12606,7 @@ function _pvOperator(evs, m3of, D1, D2) {
 function prodCompute(events, m3map, D1, D2, factorMap) {
   var fm = factorMap || {};
   var m3of = function (t) { var f = (fm[t] != null) ? fm[t] : 1; return (m3map[t] || 0) * f; }, byLeg = {}, i, e;
-  for (i = 0; i < events.length; i++) { e = events[i]; if (e.legajo === "0" || e.legajo === "1" || !e.legajo) continue; if (!byLeg[e.legajo]) byLeg[e.legajo] = []; byLeg[e.legajo].push(e); }
+  for (i = 0; i < events.length; i++) { e = events[i]; if (!e.legajo || esLegajoPrueba(e.legajo)) continue; if (!byLeg[e.legajo]) byLeg[e.legajo] = []; byLeg[e.legajo].push(e); }
   var out = {}; for (var leg in byLeg) out[leg] = _pvOperator(byLeg[leg], m3of, D1, D2);
   return out;
 }
@@ -15187,7 +15119,7 @@ function _stkQuienChip(mv) {
   if (!leg) return "";
   // v9.42 — legajo 0/1 (pruebas/admin) NO es un operario: mostrar "admin", no el nombre de prueba
   // (ej. antes los CP de supervisor quedaban "TL · 0"). Los CP nuevos ya guardan el legajo real.
-  if (leg === "0" || leg === "1") return ' <span class="mva-qui" title="Movimiento de administración / sistema (sin legajo de operario)">👤 <b>admin</b></span>';
+  if (esLegajoPrueba(leg)) return ' <span class="mva-qui" title="Movimiento de administración / sistema (sin legajo de operario)">👤 <b>admin</b></span>';
   const nom = (typeof _empleadosNombres !== "undefined" && _empleadosNombres) ? (_empleadosNombres.get(leg) || "") : "";
   const sig = (typeof initialsFromName === "function" ? initialsFromName(nom, leg) : "") || nom || leg;
   const tip = (nom || ("legajo " + leg)) + (aprox ? " — deducido por la sesión de RT (recepción vieja, sin legajo guardado)" : "");
@@ -26168,12 +26100,12 @@ function pppConfirmarProgramar() {
   pppSetStatus("✅ Programado: " + tlist.length + " tanda(s)" + (nSup ? " + " + nSup + " súper" : "") + (supSinFecha ? " · ⚠ " + supSinFecha + " súper sin fecha" : "") + ".", true);
 }
 /* ===== Zona automática desde el Barrio de entrega =====
-   Réplica de la lógica del Excel: la Zona NO se escribe a mano, sale del BARRIO
-   (col "Localidad/Barrio Entrega") buscado en la tabla 'Resumen Prog'!AC:AD (84
-   barrios → 10 zonas). Match normalizado (sin acentos/mayúsc/paréntesis). Los
-   barrios que no estén en la tabla se asignan a mano una vez y se recuerdan
-   (overrides locales), extendiendo la tabla igual que en el Excel. */
-const PPP_BARRIO_ZONA = {"almagro":"Zona 2 - CABA Centro", "avellaneda":"Zona 4 - GBA Sur", "balvanera":"Zona 2 - CABA Centro", "banfield":"Zona 4 - GBA Sur", "barracas":"Zona 1 - CABA Sur", "belgrano":"Zona 2 - CABA Centro", "bella vista":"Zona 6 - GBA Norte", "berazategui":"Zona 4 - GBA Sur", "bernal":"Zona 4 - GBA Sur", "boedo":"Zona 2 - CABA Centro", "burzaco":"Zona 2 - CABA Centro", "caballito":"Zona 2 - CABA Centro", "campo de mayo":"Super", "caseros":"Zona 5 - GBA Oeste", "chilavert":"Zona 6 - GBA Norte", "ciudadela":"Zona 5 - GBA Oeste", "constitucion":"Zona 1 - CABA Sur", "esteban echeverria":"Super", "f.varela":"Zona 4 - GBA Sur", "flores":"Zona 3 - CABA Oeste", "gregorio de laferrere":"Zona 5 - GBA Oeste", "guernica":"Zona 4 - GBA Sur", "hurlingham":"Zona 5 - GBA Oeste", "ituzaingo":"Zona 5 - GBA Oeste", "jose c paz":"Zona 6 - GBA Norte", "la boca":"Zona 1 - CABA Sur", "lanus":"Zona 3 - CABA Oeste", "lomas de zamora":"Zona 4 - GBA Sur", "lugano":"Zona 3 - CABA Oeste", "lujan":"Zona 5 - GBA Oeste", "martinez":"Zona 6 - GBA Norte", "mataderos":"Zona 3 - CABA Oeste", "mercado central":"Zona 5 - GBA Oeste", "merlo":"Zona 5 - GBA Oeste", "monserrat":"Zona 2 - CABA Centro", "monte grande":"Zona 4 - GBA Sur", "moreno":"Zona 5 - GBA Oeste", "moron":"Zona 5 - GBA Oeste", "muniz":"Zona 6 - GBA Norte", "nueva pompeya":"Zona 1 - CABA Sur", "nunez":"Zona 2 - CABA Centro", "once":"Zona 2 - CABA Centro", "p.patricios":"Zona 1 - CABA Sur", "palermo":"Zona 2 - CABA Centro", "palomar":"Zona 5 - GBA Oeste", "parque avellaneda":"Zona 1 - CABA Sur", "parque chacabuco":"Zona 3 - CABA Oeste", "parque patricios":"Zona 1 - CABA Sur", "paternal":"Zona 3 - CABA Oeste", "pilar":"Zona 7 - GBA Norte Lejos", "platanos":"Zona 4 - GBA Sur", "pompeya":"Zona 1 - CABA Sur", "puerto madero":"Zona 2 - CABA Centro", "quilmes":"Zona 4 - GBA Sur", "quilmes oeste":"Zona 4 - GBA Sur", "rafael calzada":"Zona 4 - GBA Sur", "recoleta":"Zona 2 - CABA Centro", "remedios de escalada":"Zona 4 - GBA Sur", "retira":"Retira", "retiro":"Zona 2 - CABA Centro", "san antonio de padua":"Zona 5 - GBA Oeste", "san cristobal":"Zona 2 - CABA Centro", "san isidro":"Zona 7 - GBA Norte Lejos", "san justo":"Zona 5 - GBA Oeste", "san martin":"Zona 6 - GBA Norte", "san miguel":"Zona 6 - GBA Norte", "santa cruz de la sierra":"Expo", "soldati":"Zona 1 - CABA Sur", "temperley":"Zona 4 - GBA Sur", "tigre":"Zona 7 - GBA Norte Lejos", "tortuguita":"Super", "tortuguitas":"Super", "v. maipu - san martin":"Zona 6 - GBA Norte", "v.alsina":"Zona 4 - GBA Sur", "vicente lopez":"Zona 7 - GBA Norte Lejos", "villa ballester":"Zona 6 - GBA Norte", "villa del parque":"Zona 3 - CABA Oeste", "villa general mitre":"Zona 3 - CABA Oeste", "villa lugano":"Zona 3 - CABA Oeste", "villa luro":"Zona 1 - CABA Sur", "villa lynch":"Zona 6 - GBA Norte", "villa ortuzar":"Zona 2 - CABA Centro", "villa soldati":"Zona 1 - CABA Sur", "villa urquiza":"Zona 2 - CABA Centro"};
+   Fuente de verdad: tabla Zonas_Barrios en Supabase (auto-learn via trigger
+   trg_ppp_autozona + manual via RPC zona_barrio_set). PPP_BARRIO_ZONA es el
+   FALLBACK OFFLINE (tier 3): solo se usa cuando no hay conexión y el barrio no
+   está en el override local. Sincronizado con Supabase 2026-08-28 (100 barrios,
+   10 zonas). Match normalizado (sin acentos/mayúsc/paréntesis). */
+const PPP_BARRIO_ZONA = {"adrogue":"Zona 4 - GBA Sur", "almagro":"Zona 2 - CABA Centro", "avellaneda":"Zona 4 - GBA Sur", "balvanera":"Zona 2 - CABA Centro", "banfield":"Zona 4 - GBA Sur", "barracas":"Zona 1 - CABA Sur", "belgrano":"Zona 2 - CABA Centro", "bella vista":"Zona 6 - GBA Norte", "berazategui":"Zona 4 - GBA Sur", "bernal":"Zona 4 - GBA Sur", "boedo":"Zona 2 - CABA Centro", "burzaco":"Zona 4 - GBA Sur", "caballito":"Zona 2 - CABA Centro", "campo de mayo":"Super", "caseros":"Zona 5 - GBA Oeste", "castelar":"Zona 5 - GBA Oeste", "chilavert":"Zona 6 - GBA Norte", "ciudadela":"Zona 5 - GBA Oeste", "colegiales":"Zona 2 - CABA Centro", "constitucion":"Zona 1 - CABA Sur", "devoto":"Zona 2 - CABA Centro", "esteban echeverria":"Super", "f.varela":"Zona 4 - GBA Sur", "flores":"Zona 3 - CABA Oeste", "gregorio de laferrere":"Zona 5 - GBA Oeste", "guernica":"Zona 4 - GBA Sur", "hurlingham":"Zona 5 - GBA Oeste", "ituzaingo":"Zona 5 - GBA Oeste", "jose c paz":"Zona 6 - GBA Norte", "jose leon suarez":"Zona 6 - GBA Norte", "la boca":"Zona 1 - CABA Sur", "lanus":"Zona 4 - GBA Sur", "lomas de zamora":"Zona 4 - GBA Sur", "lugano":"Zona 1 - CABA Sur", "lujan":"Zona 5 - GBA Oeste", "martinez":"Zona 6 - GBA Norte", "mataderos":"Zona 3 - CABA Oeste", "mercado central":"Zona 5 - GBA Oeste", "merlo":"Zona 5 - GBA Oeste", "micro centro":"Zona 2 - CABA Centro", "monserrat":"Zona 2 - CABA Centro", "monte grande":"Zona 4 - GBA Sur", "moreno":"Zona 5 - GBA Oeste", "moron":"Zona 5 - GBA Oeste", "muniz":"Zona 6 - GBA Norte", "munro":"Zona 6 - GBA Norte", "nueva pompeya":"Zona 1 - CABA Sur", "nunez":"Zona 2 - CABA Centro", "olivos":"Zona 7 - GBA Norte Lejos", "once":"Zona 2 - CABA Centro", "p.patricios":"Zona 1 - CABA Sur", "palermo":"Zona 2 - CABA Centro", "palomar":"Zona 5 - GBA Oeste", "parque avellaneda":"Zona 1 - CABA Sur", "parque chacabuco":"Zona 3 - CABA Oeste", "parque patricios":"Zona 1 - CABA Sur", "paternal":"Zona 3 - CABA Oeste", "pilar":"Zona 7 - GBA Norte Lejos", "platanos":"Zona 4 - GBA Sur", "pompeya":"Zona 1 - CABA Sur", "puerto madero":"Zona 2 - CABA Centro", "quilmes":"Zona 4 - GBA Sur", "quilmes oeste":"Zona 4 - GBA Sur", "rafael calzada":"Zona 4 - GBA Sur", "ramos mejia":"Zona 5 - GBA Oeste", "recoleta":"Zona 2 - CABA Centro", "remedios de escalada":"Zona 4 - GBA Sur", "retira":"Retira", "retiro":"Zona 2 - CABA Centro", "san antonio de padua":"Zona 5 - GBA Oeste", "san cristobal":"Zona 2 - CABA Centro", "san isidro":"Zona 7 - GBA Norte Lejos", "san justo":"Zona 5 - GBA Oeste", "san martin":"Zona 6 - GBA Norte", "san miguel":"Zona 6 - GBA Norte", "santa cruz de la sierra":"Expo", "soldati":"Zona 1 - CABA Sur", "temperley":"Zona 4 - GBA Sur", "tigre":"Zona 7 - GBA Norte Lejos", "tortuguita":"Super", "tortuguitas":"Super", "v. maipu - san martin":"Zona 6 - GBA Norte", "v.alsina":"Zona 4 - GBA Sur", "v.bosch":"Zona 5 - GBA Oeste", "v.devoto":"Zona 3 - CABA Oeste", "vicente lopez":"Zona 7 - GBA Norte Lejos", "villa ballester":"Zona 6 - GBA Norte", "villa bosch":"Zona 6 - GBA Norte", "villa crespo":"Zona 2 - CABA Centro", "villa del parque":"Zona 3 - CABA Oeste", "villa devoto":"Zona 2 - CABA Centro", "villa general mitre":"Zona 3 - CABA Oeste", "villa lugano":"Zona 1 - CABA Sur", "villa luro":"Zona 3 - CABA Oeste", "villa lynch":"Zona 6 - GBA Norte", "villa ortuzar":"Zona 2 - CABA Centro", "villa pueyrredon":"Zona 2 - CABA Centro", "villa sarmiento":"Zona 5 - GBA Oeste", "villa soldati":"Zona 1 - CABA Sur", "villa urquiza":"Zona 2 - CABA Centro"};
 const PPP_ZONAS = ["Zona 1 - CABA Sur", "Zona 2 - CABA Centro", "Zona 3 - CABA Oeste", "Zona 4 - GBA Sur", "Zona 5 - GBA Oeste", "Zona 6 - GBA Norte", "Zona 7 - GBA Norte Lejos", "Super", "Retira", "Expo"];
 const PPP_ZONA_SHORT = { "Zona 1 - CABA Sur": "Z1 Sur", "Zona 2 - CABA Centro": "Z2 Centro", "Zona 3 - CABA Oeste": "Z3 Oeste", "Zona 4 - GBA Sur": "Z4 GBA Sur", "Zona 5 - GBA Oeste": "Z5 GBA O", "Zona 6 - GBA Norte": "Z6 GBA N", "Zona 7 - GBA Norte Lejos": "Z7 Lejos", "Super": "Super", "Retira": "Retira", "Expo": "Expo" };
 function pppNormBarrio(s) { s = String(s == null ? "" : s).normalize("NFKD").replace(/[̀-ͯ]/g, ""); s = s.replace(/\([^)]*\)/g, ""); return s.replace(/\s+/g, " ").trim().toLowerCase(); }
@@ -30494,7 +30426,7 @@ async function fetchMonitorEvents(targetTandaKeys, sheetMap) {
   const perDayFJ      = new Map();   // dayKey -> Set<legajo> con FJ
   for (const ev of dataC) {
     const legajo = String(ev.legajo || "").trim();
-    if (!legajo || legajo === "0" || legajo === "1") continue;   // 0/1 = test/basura
+    if (!legajo || esLegajoPrueba(legajo)) continue;
     const dayKey = isoToDayKey(ev.ts_cliente);
     if (!perDayLegajos.has(dayKey)) perDayLegajos.set(dayKey, new Set());
     perDayLegajos.get(dayKey).add(legajo);

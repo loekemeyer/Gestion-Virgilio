@@ -1,9 +1,14 @@
 -- ============================================================
 --  Cobranzas — cargar los precios de CHEF en Virgilio
 --
+--  ⚠ SIGUE MANUAL (2026-08-28). Para automatizarlo hay que agregar los secrets
+--  CHEF_SERVICE_KEY (service_role del proyecto Chef nkhzocgdpwtgrmwleihr) y
+--  CHEF_SUPABASE_URL al vault de Virgilio, y extender la Edge Function
+--  sync-precios-venta para que también lea de Chef. Los precios de LK y
+--  cob_uxb_lk ya están automatizados (ver sql/sync_precios_venta.sql).
+--
 --  Chef vive en OTRO proyecto Supabase (nkhzocgdpwtgrmwleihr) y Virgilio no
---  tiene FDW contra él, así que el sync es en dos pasos (mismo patrón que la
---  lista de LK en plata_perdida.sql):
+--  tiene FDW contra él, así que el sync es en dos pasos:
 --
 --  PASO 1 — Correr ESTE SELECT en el SQL Editor del proyecto CHEF
 --           (nkhzocgdpwtgrmwleihr). Devuelve UNA fila con un texto: es un
