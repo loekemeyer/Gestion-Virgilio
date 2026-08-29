@@ -22,7 +22,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     const out = {};
     window.alert = function () {};
     function J(data) { return Promise.resolve({ ok: true, status: 200, headers: { get: function () { return null; } }, json: function () { return Promise.resolve(data); } }); }
-    const FALT = [{ id: 1, np: "98140", cod_cliente: "771", cod_art: "535", cajas_pedidas: 10, cajas_entregadas: 8, cajas_falto: 2, tanda: "D05B", fecha_salida: "2026-08-01" }];
+    const FALT = [{ id: 1, np: "98140", cod_cliente: "771", cod_art: "535", cajas_pedidas: 10, cajas_entregadas: 8, cajas_falto: 2, tanda: "D05B", fecha_salida: new Date().toISOString().slice(0, 10) }];
     let saldo535 = { cod_art: "535", descripcion: "", a_guardar: 4, terminado: 0, excedente: 0, separar_pedidos: 0, a_facturar: 0, racks: 0, insumos: 0 };
     let telegramPosts = [];
     window.fetch = function (url, opts) {
@@ -65,7 +65,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
 
     // ---- Caso con stock real en góndola: sin cartel, sin Telegram ----
     saldo535 = { cod_art: "535", descripcion: "", a_guardar: 0, terminado: 6, excedente: 0, separar_pedidos: 0, a_facturar: 0, racks: 0, insumos: 0 };
-    const FALT2 = [{ id: 2, np: "98141", cod_cliente: "771", cod_art: "535", cajas_pedidas: 10, cajas_entregadas: 8, cajas_falto: 2, tanda: "D05C", fecha_salida: "2026-08-01" }];
+    const FALT2 = [{ id: 2, np: "98141", cod_cliente: "771", cod_art: "535", cajas_pedidas: 10, cajas_entregadas: 8, cajas_falto: 2, tanda: "D05C", fecha_salida: new Date().toISOString().slice(0, 10) }];
     window.fetch = function (url, opts) {
       url = String(url);
       if (url.indexOf("Entregas_Virgilio") >= 0 && url.indexOf("cajas_falto=gt.0") >= 0) return J(FALT2);

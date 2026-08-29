@@ -36,6 +36,17 @@
 > `v_pedidos_match` / `v_pedidos_match_chef` + `sync_pedidos_match_virgilio()` + cron
 > `sync-pedidos-match-virgilio`) en `sql/pedidos_match_virgilio.sql` del repo pagina-LK.
 >
+> Nota **v12.13** — **Completar Pedido avisa si retira de GÓNDOLA con saldo 0 (idea 6497, del
+> usuario).** Si en el paso 2 del CP se elige origen **Góndola** y el saldo `terminado` está en 0,
+> hoy se retiraba igual sin avisar → góndola negativa "de la nada" hasta que otro pedido explota
+> como faltante inexplicable. Ahora: **(a)** cartel rojo en el paso 2 («Góndola está en 0 … queda
+> negativa. Se avisa por Telegram») y **(b)** `cpConfirm()` encola un aviso **Telegram** vía
+> `telegram_outbox` (`cpSendTelegramGondolaVacia`, mismo canal/patrón que la alerta racks→góndola;
+> `dedup_key` = `cp_gondola0_<np>_<cod>_<día>` para no spamear). No bloquea el retiro — el default
+> lo acordó el usuario: cartel + Telegram. Test `tests/cp-gondola-vacia.cjs` (5 asserts; fixture
+> con `fecha_salida` dinámica para no caer en el filtro de huérfanos de 21 días). (Rama
+> `idea/6497`, cherry-pick + fixture corregido.)
+>
 > Nota **v12.12** — **NPD «de menos + no hay en góndola» ahora descuenta las cajas fantasma de
 > `separar_pedidos` (idea 1569, bug reportado por el usuario — caso real 952E/D14B corregido a
 > mano).** El picking había movido `c.sale` cajas a `separar_pedidos`, pero en la mesa solo hay
