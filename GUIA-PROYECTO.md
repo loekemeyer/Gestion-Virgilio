@@ -36,6 +36,17 @@
 > `v_pedidos_match` / `v_pedidos_match_chef` + `sync_pedidos_match_virgilio()` + cron
 > `sync-pedidos-match-virgilio`) en `sql/pedidos_match_virgilio.sql` del repo pagina-LK.
 >
+> Nota **v12.15** — **El badge «en curso» del monitor cuenta horario LABORAL, no reloj de pared
+> (idea 2865, bug del usuario — D14B marcaba ~66 h).** `statusCell()` calculaba
+> `Date.now() − startTs` crudo: un AP abierto el viernes 19:04 sin cerrar marcaba ~66 h el lunes,
+> contando las noches y el finde entero como trabajo. Nueva **`businessDurSinceMs(startMs, legajo)`**:
+> dentro del mismo día sigue siendo la diferencia directa; si cruza días, solo cuenta horas dentro
+> de `horaEntrada`–`horaSalida` del operario (mismo criterio que `computeClosureDur` para tandas
+> cerradas) y saltea sábado/domingo/`FERIADOS_AR`. **Limitación conocida** (en el comentario del
+> código): un finde trabajado excepcionalmente no lo cuenta en vivo — se corrige al cerrar la
+> tanda, cuando `computeClosureDur` usa la fichada real. Test `tests/curso-dur-laboral.cjs`.
+> (Rama `idea/2865`, cherry-pick limpio.)
+>
 > Nota **v12.14** — **Guardar a Góndola: prioridad con DEMANDA del día + hint de MCs sin rebalsar
 > (idea 4926, del usuario).** v8.40 ya ordenaba por góndola÷capacidad; ahora la prioridad es
 > **(góndola − demanda del día) ÷ capacidad** (asc): un código con la góndola llena pero con muchos
