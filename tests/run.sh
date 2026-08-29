@@ -195,6 +195,9 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== pend-checklist (idea 5267: checklist de Pendientes — completitud, envío y código único) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pend-checklist.cjs
 
+echo "== ppp-errores (idea 5334: _pppComputeErrors — panel de errores de la PPP) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-errores.cjs
+
 echo "== equiv-resolve (idea 2260: equivResolve/equivLookup — resolución de códigos equivalentes) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/equiv-resolve.cjs
 echo "== stk-conteo-fisico (idea 2793: conteo físico de góndola — cálculo, comparación y guardado) =="
