@@ -36,6 +36,20 @@
 > `v_pedidos_match` / `v_pedidos_match_chef` + `sync_pedidos_match_virgilio()` + cron
 > `sync-pedidos-match-virgilio`) en `sql/pedidos_match_virgilio.sql` del repo pagina-LK.
 >
+> Nota **v12.12** — **NPD «de menos + no hay en góndola» ahora descuenta las cajas fantasma de
+> `separar_pedidos` (idea 1569, bug reportado por el usuario — caso real 952E/D14B corregido a
+> mano).** El picking había movido `c.sale` cajas a `separar_pedidos`, pero en la mesa solo hay
+> `real` (= `c.sale − qty`): esas `qty` nunca salieron físicamente de góndola y quedaban de
+> fantasma en Pickeados — y la **ETAPA 2** reparte el sobrante de `separar_pedidos` de vuelta a
+> **`terminado`** (`net − entregado`), inflando góndola. Ahora `_compDifResolve` **siempre**
+> descuenta `−qty` de `separar_pedidos` al resolver «de menos + no hay» (ref = tanda, dual-send
+> v11.10: realtime + `_difMovs`), con **`client_id` determinístico** (`npd_<tanda>_<np>_<cod>_…`)
+> para que el doble toque no descuente dos veces. La compensación de góndola negativa (v7.39)
+> sigue: `terminado +ret` clampeado a llevarla a 0 — pero el `−ret` de `separar_pedidos` que
+> había agregado v11.09 (r2) **se reemplazó** por este descuento upfront de `−qty` completo
+> (mantener ambos duplicaría). Test `comp-dif-nofantasma.cjs` reescrito (10 asserts, incluye
+> dedup por doble toque). (Venía de la rama `idea/1569`; re-aplicada integrándola al dual-send.)
+>
 > Nota **v12.11** — **Detector de reloj desincronizado del celular (idea 9782, mejoras-virgilio).** Un
 > celular con el reloj corrido registra `ts_cliente` corridos → horas de picking/armado corruptas sin
 > que nadie lo note. Ahora `trySendOneReport` compara en cada envío el header **`Date`** que Supabase

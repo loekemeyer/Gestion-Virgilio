@@ -6535,7 +6535,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.11";
+const APP_VERSION = "v12.12";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -9706,15 +9706,29 @@ function _compDifResolve(tipo, gond) {
   // se cancela antes de compTerminar, el ajuste inmediato ya corrigió la góndola negativa
   // (comportamiento correcto: el picking la dejó negativa, la corrección es válida).
   if (tipo === "menos" && gond === "no" && typeof stockMove === "function") {
+    // v12.12 (idea 1569): las `qty` cajas del "de menos" nunca salieron realmente de góndola
+    // (por eso acá no hay en góndola para completar) pero el picking las registró en
+    // separar_pedidos → son FANTASMA ahí, y la ETAPA 2 del cron reparte el sobrante de
+    // separar_pedidos de vuelta a `terminado` (net − entregado) como si existiera. SIEMPRE
+    // se descuentan −qty de separar_pedidos, con client_id DETERMINÍSTICO (no al azar): un
+    // doble toque del mismo caso no descuenta dos veces (mov_stock_clientid_dedup). El caso
+    // real que el usuario corrigió a mano: 952E/D14B. Dual-send como v11.10 (realtime +
+    // flush síncrono en compTerminar).
+    var rSep = { cod_art: c.cod, descripcion: "", deposito: "separar_pedidos", delta: -qty, tipo: "ajuste",
+                 ref: (_comp && _comp.tanda) || "picking_difiere", legajo: (_comp && _comp.legajo) || "",
+                 client_id: "npd_" + ((_comp && _comp.tanda) || "") + "_" + n.np + "_" + c.cod + "_" + tipo + "_" + gond + "_" + qty };
+    try { stockMove([rSep]); } catch (_e) {}
+    if (_comp && _comp._difMovs) { _comp._difMovs.push(rSep); }
     (async function () {
       let ret = 0;
       try { const sal = await _stkGondolaSaldoVivo(c.cod); if (sal != null && sal < 0) ret = Math.min(qty, -sal); } catch (_e) { ret = 0; }
       if (ret > 0) {
-        var cid1 = _stockClientId(), cid2 = _stockClientId();
-        var r1 = { cod_art: c.cod, descripcion: "", deposito: "terminado",        delta:  ret, tipo: "ajuste", ref: "picking_difiere", legajo: (_comp && _comp.legajo) || "", client_id: cid1 };
-        var r2 = { cod_art: c.cod, descripcion: "", deposito: "separar_pedidos",  delta: -ret, tipo: "ajuste", ref: (_comp && _comp.tanda) || "picking_difiere", legajo: (_comp && _comp.legajo) || "", client_id: cid2 };
-        try { stockMove([r1, r2]); } catch (_e) {}   // fire-and-forget: realtime
-        if (_comp && _comp._difMovs) { _comp._difMovs.push(r1, r2); }   // safety net: flush síncrono en compTerminar
+        // v12.12: el −separar_pedidos ya salió arriba por `qty` completo (que incluye a `ret`),
+        // así que acá solo se devuelve a góndola lo justo para llevarla a 0 (el viejo r2 de
+        // v11.09 se reemplazó por el descuento upfront; mantenerlo duplicaría el descuento).
+        var r1 = { cod_art: c.cod, descripcion: "", deposito: "terminado", delta: ret, tipo: "ajuste", ref: "picking_difiere", legajo: (_comp && _comp.legajo) || "", client_id: _stockClientId() };
+        try { stockMove([r1]); } catch (_e) {}   // fire-and-forget: realtime
+        if (_comp && _comp._difMovs) { _comp._difMovs.push(r1); }   // safety net: flush síncrono en compTerminar
       }
     })();
   }
