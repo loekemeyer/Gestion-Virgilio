@@ -177,6 +177,9 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== print-station (idea 5044: estación de impresión — seed, poll, dedup, drain, Impresion_NP) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/print-station.cjs
 
+echo "== mg-prioridad (idea 4926: Guardar a Góndola — prioridad con demanda + hint de MCs) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/mg-prioridad.cjs
+
 echo "== equiv-resolve (idea 2260: equivResolve/equivLookup — resolución de códigos equivalentes) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/equiv-resolve.cjs
 echo "== stk-conteo-fisico (idea 2793: conteo físico de góndola — cálculo, comparación y guardado) =="

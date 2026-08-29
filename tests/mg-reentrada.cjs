@@ -29,6 +29,10 @@ catch (_e) {
     window.emitGuardadoSesion = function () {};
     window.loadArtNombres = async function () { return {}; };
     window.stockFetchSaldos = async function () { return { "502": { cod: "502", desc: "X", a_guardar: 10, terminado: 0 } }; };
+    window.ocgFetchCapacidad = async function () { return {}; };
+    window.ocgFetchCeldas = async function () { return {}; };
+    window.ocgDemanda = async function () { return {}; };
+    window.rkbFetchCxM = async function () { return { cxm: {} }; };
     window.trySendOneReport = async function (pl) { sent.push(pl); return { ok: true }; };
 
     localStorage.clear();

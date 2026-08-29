@@ -67,6 +67,9 @@ catch (_e) {
        mostraba "Error:" y mgSet no tenía items que tocar. */
     window.ocgFetchCapacidad = async function () { return { "502": 20 }; };
     window.ocgFetchCeldas = async function () { return { "502": ["A1"] }; };
+    // v12.14 (idea 4926) — showMGModal ahora también pide demanda y cajas×MC (best-effort)
+    window.ocgDemanda = async function () { return {}; };
+    window.rkbFetchCxM = async function () { return { cxm: {} }; };
     showMGModal("77");
     await new Promise(function (res) { setTimeout(res, 60); });
     out.draftAntes = !!opDraftLoad("77");            // false: sin progreso todavía

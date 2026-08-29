@@ -36,6 +36,18 @@
 > `v_pedidos_match` / `v_pedidos_match_chef` + `sync_pedidos_match_virgilio()` + cron
 > `sync-pedidos-match-virgilio`) en `sql/pedidos_match_virgilio.sql` del repo pagina-LK.
 >
+> Nota **v12.14** — **Guardar a Góndola: prioridad con DEMANDA del día + hint de MCs sin rebalsar
+> (idea 4926, del usuario).** v8.40 ya ordenaba por góndola÷capacidad; ahora la prioridad es
+> **(góndola − demanda del día) ÷ capacidad** (asc): un código con la góndola llena pero con muchos
+> pedidos hoy también es urgente. La demanda sale de `ocgDemanda(true)` y las cajas×MC de
+> `rkbFetchCxM()` (planimetría), las dos **best-effort** en el `Promise.all` de `showMGModal` —
+> si fallan, el modal abre igual y ordena como antes. Además cada tarjeta muestra
+> **«📐 Máx sin rebalsar: N MC (N×cxm cajas)»** = `piso((capacidad − góndola) / cajas×MC)` —
+> informativo, NO limita el input (el tope real sigue siendo lo disponible en "a guardar"). Sin
+> capacidad va al final y sin cxm no hay hint. Se conservan las celdas v10.08 y el badge de % de
+> lleno. Test `tests/mg-prioridad.cjs`. (La rama `idea/4926` era pre-v8.40/v10.08; se integró a
+> mano el delta que faltaba: demanda + hint.)
+>
 > Nota **v12.13** — **Completar Pedido avisa si retira de GÓNDOLA con saldo 0 (idea 6497, del
 > usuario).** Si en el paso 2 del CP se elige origen **Góndola** y el saldo `terminado` está en 0,
 > hoy se retiraba igual sin avisar → góndola negativa "de la nada" hasta que otro pedido explota
