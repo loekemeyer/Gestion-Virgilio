@@ -201,6 +201,9 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== abast-compute (idea 9799: abastCompute — cálculo de Abastecimiento vs Venta) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/abast-compute.cjs
 
+echo "== rt-ruteo (idea 3812: _rtOptimize/_rtSplitTrucks/_rtMapsUrls — ruteo de camiones) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/rt-ruteo.cjs
+
 echo "== equiv-resolve (idea 2260: equivResolve/equivLookup — resolución de códigos equivalentes) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/equiv-resolve.cjs
 echo "== stk-conteo-fisico (idea 2793: conteo físico de góndola — cálculo, comparación y guardado) =="
