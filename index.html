@@ -6535,7 +6535,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.16";
+const APP_VERSION = "v12.17";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -33357,6 +33357,11 @@ function facRender(tandas){
       // optimista incluido) y _facNpsTodos = TODOS los de Facturacion_NP (también
       // los ya CERRADOS → no reaparecen ni se pueden re-tildar).
       if (_facNpsHoy.has(p.np) || _facNpsTodos.has(p.np)) continue;
+      // v12.01: Solo NPs con ítems armados (presentes en Entregas_Virgilio).
+      // Antes aparecían TODOS los NPs de una tanda completa aunque no tuvieran
+      // registros de armado → anomalías en el listado de facturación.
+      const _npN = String(p.np).trim().replace(/\.0+$/, "");
+      if (!_facCajas.has(_npN)) continue;
       filas.push({
         np: p.np,
         cod: p.cod || "",
@@ -33979,7 +33984,8 @@ async function facLoadBadge(){
     const keys = tandasPlan.map(t => t._key || t.tanda.toUpperCase());
     const res = await Promise.all([
       facFetchFcKeys(keys).catch(function(){ return new Set(); }),
-      fetchFacturadosTodos(true).catch(function(){ return new Set(); })
+      fetchFacturadosTodos(true).catch(function(){ return new Set(); }),
+      facFetchCajas().catch(function(){ return _facCajas; })   // v12.01: para filtrar no-armados del badge
     ]);
     const fcKeys = res[0] || new Set();
     const facN = new Set(); (res[1] || new Set()).forEach(function(v){ const k = pickNormNp(v); if (k) facN.add(k); });
@@ -33990,7 +33996,9 @@ async function facLoadBadge(){
         String(p.np || "").split(/[,/]/).forEach(function(part){
           const np = pickNormNp(part);
           if (!np || seen[np]) return; seen[np] = 1;
-          if (!facN.has(np)) n++;
+          if (facN.has(np)) return;                            // ya facturado
+          if (!_facCajas.has(np)) return;                      // v12.01: no armado aún
+          n++;
         });
       });
     });
