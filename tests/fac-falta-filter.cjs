@@ -33,6 +33,12 @@ catch (_e) {
       return J([]);
     };
     await facFetchFaltantes();
+    // v12.01/v12.18: el filtro de facRender esconde las NPs sin ítems armados
+    // (predicado facEstaArmada = está en _facCajas O en _facArmEv). El test no
+    // usa fetch para poblarlos → los inyectamos a mano para que las NPs 500/501
+    // se consideren "armadas" y aparezcan en la tabla.
+    try { _facCajas = new Map([["500", 20], ["501", 15], ["999", 3]]); } catch (_e) {}
+    try { _facArmEv = new Set(["500", "501", "999"]); } catch (_e) {}
 
     // Tandas fake con 2 NPs (500 con faltante, 501 sin). _facNpsHoy/_todos vacíos
     // en carga fresca → no se ocultan.

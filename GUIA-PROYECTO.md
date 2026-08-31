@@ -36,6 +36,40 @@
 > `v_pedidos_match` / `v_pedidos_match_chef` + `sync_pedidos_match_virgilio()` + cron
 > `sync-pedidos-match-virgilio`) en `sql/pedidos_match_virgilio.sql` del repo pagina-LK.
 >
+> Nota **v12.18** — **Fix Facturación no mostraba NPs armadas hoy + causa raíz del insert
+> roto en `Entregas_Virgilio` desde 28/8.** Bug reportado por el usuario esta tarde: las
+> NPs que los operarios armaron hoy no aparecían en Facturación. **Causa raíz:** el 28/8
+> se aplicó `sql/canon_cod_art_extendido.sql` (idea 7411, commit `5193af5`): crea
+> `canon_cod_art_val(text)` con `REVOKE EXECUTE FROM anon, authenticated` y le engancha
+> triggers BEFORE INSERT en 10 tablas — entre ellas `Entregas_Virgilio`. Las trigger fns
+> (`fn_canon_col_cod_art`, `fn_canon_col_cod`, `fn_canon_col_cod_art_quoted`,
+> `fn_canon_col_codigo`, `fn_canon_col_articulo`) corrían **SECURITY INVOKER**, así que
+> cuando `anon` hacía INSERT, Postgres tiraba **42501 permission denied for function
+> canon_cod_art_val**. Encima el `.catch` de `_compSaveEntregas` (index.html) tragaba
+> silenciosamente todo 4xx *"como error de datos"* — los armados se perdían sin encolar
+> siquiera en localStorage. Última fila real en `Entregas_Virgilio`: **28/8 09:42 -03**
+> (justo antes del deploy). No se notó porque las NPs seguían apareciendo en Facturación
+> hasta que **v12.17 (hoy)** agregó `if (!_facCajas.has(np)) continue;` — ahí el listado
+> quedó vacío para todo lo armado desde el 28/8. **Fix backend** (migración
+> `fix_canon_col_security_definer` + `fix_canon_col_revoke_rpc`): las 5 `fn_canon_col_*`
+> pasan a `SECURITY DEFINER SET search_path = public` (corren como `postgres`, que sí
+> tiene EXECUTE sobre `canon_cod_art_val`); se `REVOKE EXECUTE ... FROM public, anon,
+> authenticated` en las trigger fns para cerrar la superficie RPC (los triggers no
+> chequean EXECUTE del rol invocador, así que el insert de anon sigue funcionando). DDL
+> anterior guardado en `sql/backups/backup_fn_canon_col_20260831.sql`. **Fix front** en
+> `index.html`: (a) `_compSaveEntregas` ahora encola en `vir_entregas_pend` cualquier
+> no-2xx (antes tragaba 4xx) y muestra un toast rojo al operario; (b) nueva
+> `facFetchArmadosEventos()` trae NPs con `TAL/TAP` de los últimos 7 días desde
+> `Registros_Produccion_Virgilio` como **fallback** del filtro v12.01 — el predicado
+> unificado `facEstaArmada(np)` acepta filas en `Entregas_Virgilio` **o** evento
+> TAL/TAP reciente, así una futura falla de escritura no vuelve a esconder las NPs. Se
+> engancha en el `Promise.all` de `openFacturacion` y en `facLoadBadge`. Bump
+> `APP_VERSION` + `SW_VERSION` + `version.json` a `v12.18`. **Pendiente:** decidir si
+> se hace backfill de `Entregas_Virgilio` para el 28-31/8 (los armados están perdidos
+> porque el catch tragaba el error sin encolar; los operarios podrían re-terminar las
+> tandas desde el asistente — `_compTandaYaArmada` retorna false porque
+> `Entregas_Virgilio` sigue vacía para esas tandas).
+>
 > Nota **v12.16** — **Fix banner «🔄 Actualizar» clavado.** `version.json` quedó en v12.07
 > mientras `APP_VERSION` avanzó hasta v12.15 (nadie lo bumpeó desde entonces; ya había pasado
 > en v12.04): como `checkForUpdate()` comparaba con `!==`, a todos los que YA tenían la última

@@ -6535,7 +6535,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.17";
+const APP_VERSION = "v12.18";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -9987,7 +9987,24 @@ function compPausar() {
   try { alert("⏸ Armado en pausa" + (tanda ? " (tanda " + tanda + ")" : "") + ".\nSe guardó todo lo cargado. Cuando quieras retomalo con “▶ Seguir armado”.\nLa pausa NO cuenta en el tiempo del armado."); } catch (_e) {}
 }
 /* Guarda el pedido entero en la tabla Entregas_Virgilio (POST en bloque, 1 sola llamada).
-   Si no hay red, lo deja en localStorage para reintentar al volver online (_compFlushEntregas). */
+   Si no hay red o el server responde error, lo deja en localStorage para reintentar
+   (_compFlushEntregas). v12.18 (2026-08-31): antes se tragaban silenciosamente los
+   4xx (comentario "4xx = error de datos"), pero eso escondió el 42501 del trigger
+   canon del 28/8 → armados perdidos sin cola de reintento. Ahora TODO error encola,
+   se muestra un toast al operario y se persiste el conteo para el badge del header. */
+function _compEntregasPendCount() {
+  try { const pend = JSON.parse(localStorage.getItem("vir_entregas_pend") || "[]"); return pend.length; } catch (_e) { return 0; }
+}
+function _compEntregasToast(txt) {
+  // Toast simple sin depender de la librería de toasts de otros módulos.
+  try {
+    const t = document.createElement("div");
+    t.textContent = txt;
+    t.style.cssText = "position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:#dc2626;color:#fff;padding:10px 14px;border-radius:8px;font-size:14px;box-shadow:0 4px 12px rgba(0,0,0,.25);z-index:99999;max-width:92vw;text-align:center;";
+    document.body.appendChild(t);
+    setTimeout(function(){ try { t.remove(); } catch(_e){} }, 6000);
+  } catch (_e) {}
+}
 function _compSaveEntregas(rows) {
   // v7.69 — el operador de PRUEBA (legajo 0/1) NO persiste Entregas, igual que stockMove.
   // Sin esto, un armado de prueba creaba filas en Entregas_Virgilio y, como `_compTandaYaArmada`
@@ -9995,15 +10012,34 @@ function _compSaveEntregas(rows) {
   // (caso real D06C: 28 Entregas fantasma del legajo 0 → "La tanda D06C ya fue armada").
   if (typeof esOperadorPrueba === "function" && esOperadorPrueba()) { try { console.warn("[PRUEBA] Entregas NO persistidas (operador de prueba)"); } catch (_e) {} return; }
   const headers = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" };
+  function _enqueue(reason) {
+    try {
+      const pend = JSON.parse(localStorage.getItem("vir_entregas_pend") || "[]");
+      pend.push.apply(pend, rows);
+      localStorage.setItem("vir_entregas_pend", JSON.stringify(pend.slice(-5000)));
+    } catch (_e) {}
+    try { console.warn("[Entregas] encolado (" + reason + ") — pendientes: " + _compEntregasPendCount()); } catch (_e) {}
+    _compEntregasToast("⚠ Armado no confirmado en el servidor (" + reason + "). Encolado " + rows.length + " fila(s), se reintenta solo.");
+  }
   fetch(SUPABASE_ENTREGAS_ENDPOINT, { method: "POST", headers: headers, body: JSON.stringify(rows) })
-    .then(function (r) { if (r.ok || (r.status >= 400 && r.status < 500)) return; throw new Error("HTTP " + r.status); })   // 4xx = error de datos → no reintentar (evita loop)
-    .catch(function () { try { const pend = JSON.parse(localStorage.getItem("vir_entregas_pend") || "[]"); pend.push.apply(pend, rows); localStorage.setItem("vir_entregas_pend", JSON.stringify(pend.slice(-5000))); } catch (_e) {} });
+    .then(function (r) {
+      if (r.ok) return;
+      // Cualquier no-2xx (incluye 4xx) va a cola. Antes se tragaban los 4xx.
+      _enqueue("HTTP " + r.status);
+    })
+    .catch(function (_e) { _enqueue("red"); });
 }
 function _compFlushEntregas() {
   let pend = []; try { pend = JSON.parse(localStorage.getItem("vir_entregas_pend") || "[]"); } catch (_e) {}
   if (!pend.length) return;
   fetch(SUPABASE_ENTREGAS_ENDPOINT, { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" }, body: JSON.stringify(pend) })
-    .then(function (r) { if (r.ok) { try { localStorage.removeItem("vir_entregas_pend"); } catch (_e) {} } })
+    .then(function (r) {
+      if (r.ok) {
+        try { localStorage.removeItem("vir_entregas_pend"); } catch (_e) {}
+        try { console.info("[Entregas] flush OK — " + pend.length + " filas subidas"); } catch (_e) {}
+      }
+      // Si sigue fallando (4xx del trigger, red rota) → quedan en la cola para el próximo intento.
+    })
     .catch(function () {});
 }
 try { window.addEventListener("online", function () { try { _compFlushEntregas(); } catch (_e) {} }); _compFlushEntregas(); } catch (_e) {}
@@ -32836,6 +32872,39 @@ async function facFetchCajas(){
   } catch (_e) { /* sin red: queda el último cache */ }
   return _facCajas;
 }
+/* v12.18 (2026-08-31) — FALLBACK del "está armado" para el filtro v12.01: mira los
+   eventos TAL/TAP de los últimos 7 días en Registros_Produccion_Virgilio (el `texto`
+   del TAL arranca con la NP y separa con "|"; el TAP arranca con "NP|LEG|TANDA|..."
+   o directamente "NP|..."). Sirve cuando `Entregas_Virgilio` está incompleta o rota
+   (caso 28/8: trigger canon con REVOKE anon → 42501 → armados perdidos, escondía
+   TODO de Facturación por el filtro v12.01). El armado real sigue yendo por
+   `_facCajas`; esto es solo una red de contención para que la operadora vea la NP y
+   pueda facturar aunque falte la fila en Entregas_Virgilio. Cache 30s. */
+let _facArmEv = new Set(); let _facArmEvTs = 0;
+async function facFetchArmadosEventos(){
+  const now = Date.now();
+  if (_facArmEvTs && (now - _facArmEvTs) < 30000) return _facArmEv;
+  try {
+    const desde = new Date(Date.now() - 7*24*3600*1000).toISOString();
+    const url = SUPABASE_URL + "/rest/v1/Registros_Produccion_Virgilio?select=opcion,texto&opcion=in.(TAL,TAP)&created_at=gte." + encodeURIComponent(desde);
+    const rows = await fetch(url, { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" }).then(function(r){ return r.ok ? r.json() : []; });
+    const s = new Set();
+    (rows || []).forEach(function(r){
+      const t = String(r && r.texto || "").trim();
+      if (!t) return;
+      // La NP es siempre el primer campo antes de "|" en TAL y TAP.
+      const np = String(t.split("|", 1)[0] || "").trim().replace(/\.0+$/, "");
+      if (np && /^\d+$/.test(np)) s.add(np);
+    });
+    _facArmEv = s; _facArmEvTs = now;
+  } catch (_e) { /* sin red: queda el último cache */ }
+  return _facArmEv;
+}
+/* Predicado unificado: ¿está armada la NP? Verdad si tiene filas en Entregas_Virgilio
+   O si tiene evento TAL/TAP reciente (fallback anti-fallo de Entregas). */
+function facEstaArmada(npNorm){
+  return (_facCajas && _facCajas.has(npNorm)) || (_facArmEv && _facArmEv.has(npNorm));
+}
 /* Equivalencias por NP (vista_pedidos_equivalencia): NP → [{cod, real, nota}], para el
    cartel "facturá con el código REAL" en el módulo de Facturación (la factura se hace
    afuera de la app y debe ir con el código real, no el del pedido). Cache 60s. */
@@ -33360,8 +33429,10 @@ function facRender(tandas){
       // v12.01: Solo NPs con ítems armados (presentes en Entregas_Virgilio).
       // Antes aparecían TODOS los NPs de una tanda completa aunque no tuvieran
       // registros de armado → anomalías en el listado de facturación.
+      // v12.18: `facEstaArmada` acepta también evento TAL/TAP reciente como
+      // fallback cuando Entregas_Virgilio está incompleta (ver facFetchArmadosEventos).
       const _npN = String(p.np).trim().replace(/\.0+$/, "");
-      if (!_facCajas.has(_npN)) continue;
+      if (!facEstaArmada(_npN)) continue;
       filas.push({
         np: p.np,
         cod: p.cod || "",
@@ -33921,7 +33992,8 @@ async function facTick(){
       stockFetchSaldos().catch(function(){ return {}; }),             // v6.16: saldos → ocultar ⏳ si el faltante no tiene stock para completar
       cpLoadGuardadoHoy().catch(function(){ return new Set(); }),      // v6.18: guardados hoy → el ⏳ también aplica a lo guardado hoy
       facCorreccData().catch(function(){ return []; }),                // v7.92: pedidos en secundario por NP → columna "Cambiar cód" + chip
-      facFetchNcChef().catch(function(){ return _facNcPend; })          // v9.21: NCs Loeke→Chef pendientes → filas ✓ "NC hecha"
+      facFetchNcChef().catch(function(){ return _facNcPend; }),         // v9.21: NCs Loeke→Chef pendientes → filas ✓ "NC hecha"
+      facFetchArmadosEventos().catch(function(){ return _facArmEv; })   // v12.18: NPs con TAL/TAP recientes → fallback del filtro v12.01 (ver facEstaArmada)
     ]);
     const fcKeys = _facPar[0] || new Set();
     try { const _sal = _facPar[8] || {}; _facSaldosN = {}; Object.keys(_sal).forEach(function(k){ _facSaldosN[_cpNorm(k)] = _sal[k]; }); } catch(_e){ _facSaldosN = {}; }
@@ -33985,7 +34057,8 @@ async function facLoadBadge(){
     const res = await Promise.all([
       facFetchFcKeys(keys).catch(function(){ return new Set(); }),
       fetchFacturadosTodos(true).catch(function(){ return new Set(); }),
-      facFetchCajas().catch(function(){ return _facCajas; })   // v12.01: para filtrar no-armados del badge
+      facFetchCajas().catch(function(){ return _facCajas; }),   // v12.01: para filtrar no-armados del badge
+      facFetchArmadosEventos().catch(function(){ return _facArmEv; })   // v12.18: fallback TAL/TAP (ver facEstaArmada)
     ]);
     const fcKeys = res[0] || new Set();
     const facN = new Set(); (res[1] || new Set()).forEach(function(v){ const k = pickNormNp(v); if (k) facN.add(k); });
@@ -33997,7 +34070,7 @@ async function facLoadBadge(){
           const np = pickNormNp(part);
           if (!np || seen[np]) return; seen[np] = 1;
           if (facN.has(np)) return;                            // ya facturado
-          if (!_facCajas.has(np)) return;                      // v12.01: no armado aún
+          if (!facEstaArmada(np)) return;                      // v12.01 + v12.18: no armado aún (Entregas_Virgilio o TAL/TAP)
           n++;
         });
       });
