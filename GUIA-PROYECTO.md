@@ -779,6 +779,20 @@ fichadas-monitor.html y productividad.html) — rotar la key = editar solo ese a
 > faltante ya cerrado) **quedan con el tilde verde** — no se pidió cambiarlas. El botón sigue
 > habilitado: es un aviso visual, no un bloqueo.
 >
+> Nota **2026-08-31 — Alta: tallerista Oscar habilitado en Recepción (LK).** Oscar figuraba en
+> `Codigos X Tallerista` con `Codigo` NULL en LK y CH → su botón aparecía deshabilitado ("Este
+> tallerista no trabaja para...") y sus recepciones se cargaban por **Log/Fabr** (que sí tiene
+> código 0001). Además sus artículos en `Articulos Virgilio X Tallerista` estaban mezclados: unos
+> bajo el 0001 de Log/Fabr (por eso salían en esa grilla) y otros en NULL (invisibles). Se le
+> cargó su **código real 3709** en LK y se normalizaron sus 9 artículos LK a ese código:
+> **500, 506, 510, 555, 557, 558, 654, 658, 659** (el 658 se clonó del maestro de Log/Fabr; 3
+> duplicados bajo 0001 se borraron). SQL con backup y revert en `sql/alta_oscar_lk_20260831.sql`.
+> **Línea CH de Oscar sigue sin código** (botón CH deshabilitado); sus filas LK viejas fuera de la
+> lista (280, 759, 762, 764, 769) quedaron como estaban — algunas bajo 0001, siguen en la grilla
+> de Log/Fabr. El remito 37584 del 31/08 (557×60 + 558×5) ya cargado quedó bajo Log/Fabr (no se
+> re-asignó). No hizo falta tocar `recepcion.js`: Oscar ya venía en la lista del backend
+> (`vista_entidades_recepcion`); el botón se habilita solo al tener código.
+>
 > Nota **2026-08-12 — Alta: Garcia hace los coladores también en CHEF.** Recepción de remitos:
 > se habilitaron **437E / 438E / 439E** al tallerista **Garcia** en línea **CH** (código 3915),
 > espejando las filas que ya tenía en LK (4317) — misma Desc, Uni_x_Caja y Cajas_x_Master.
