@@ -36,6 +36,24 @@
 > `v_pedidos_match` / `v_pedidos_match_chef` + `sync_pedidos_match_virgilio()` + cron
 > `sync-pedidos-match-virgilio`) en `sql/pedidos_match_virgilio.sql` del repo pagina-LK.
 >
+> Nota **v12.19** — **Sobrevivientes del incidente canon: FAL server-side + stockMove
+> 4xx transient + doc de riesgo estructural.** Complementa v12.18. **(a)
+> `_compAddFaltManual`** ahora además de meter el faltante manual en `_comp.arts` emite
+> un evento **`opcion=FAL`** en `Registros_Produccion_Virgilio` con `texto =
+> NP|COD|CAJAS|LEG|TANDA|MANUAL` — segunda fuente de verdad independiente de que la
+> escritura a `Entregas_Virgilio` salga OK. Con esto, si algún día vuelve a romperse
+> Entregas (nuevo trigger, RLS mal, otra causa), el faltante manual queda igual y se
+> puede reconstruir; los faltantes automáticos del picking ya sobreviven vía PKC.
+> **(b) `stockMove`** distinguía "4xx = fila mal formada → drop" indiscriminadamente
+> — mismo agujero que rompió `_compSaveEntregas` con el 42501. Ahora lee el body de
+> respuesta y clasifica: 401/403/409/429 o mensaje con `42501`/`PERMISSION DENIED`/
+> `PGRST301`/`PGRST116` → **encola** en `vir_stock_pend` (como 5xx/red). 400/422 con
+> otro mensaje → sigue haciendo `console.error` + drop (evita veneno en la cola).
+> **(c)** Nueva doc `docs/RIESGO-ESTRUCTURAL-CANON.md` con las 4 capas de defensa
+> propuestas: test de smoke `anon puede escribir`, runbook de migraciones con REVOKE,
+> monitor Telegram de escrituras estancadas, grep pre-commit contra `.catch` silencioso.
+> Bump `APP_VERSION` + `SW_VERSION` + `version.json` a `v12.19`. Test suite verde.
+>
 > Nota **v12.18** — **Fix Facturación no mostraba NPs armadas hoy + causa raíz del insert
 > roto en `Entregas_Virgilio` desde 28/8.** Bug reportado por el usuario esta tarde: las
 > NPs que los operarios armaron hoy no aparecían en Facturación. **Causa raíz:** el 28/8

@@ -6535,7 +6535,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.18";
+const APP_VERSION = "v12.19";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -9762,7 +9762,12 @@ function _compDifResolve(tipo, gond) {
 /* v10.10 — faltante MANUAL reportado en Separar ("de menos" / no estaba en el pedido). Lo mete
    en _comp.arts (mismo formato que los faltantes automáticos del picking) para que se descuente
    TANTO del armado de líos (sale = pedido − faltMap) COMO de Entregas_Virgilio (cajas_falto) al
-   Terminar. La NP se normaliza (pickNormNp) para que matchee con pedidoFull en compTerminar. */
+   Terminar. La NP se normaliza (pickNormNp) para que matchee con pedidoFull en compTerminar.
+   v12.18 — además emitimos un evento FAL en Registros_Produccion_Virgilio (texto =
+   NP|COD|CAJAS|LEG|TANDA|MANUAL) como SEGUNDA FUENTE de verdad, independiente de que la
+   escritura a Entregas_Virgilio salga OK: si algún día se rompe Entregas (como el 28-31/8
+   con el trigger canon 42501), este evento queda igual y sirve para reconstruir. Los
+   faltantes automáticos del picking ya sobreviven via PKC — este cubre el caso manual. */
 function _compAddFaltManual(np, cod, cajas, codCli, rs) {
   if (!_comp || !(cajas > 0)) return;
   var npN = (typeof pickNormNp === "function") ? pickNormNp(np) : String(np);
@@ -9774,6 +9779,22 @@ function _compAddFaltManual(np, cod, cajas, codCli, rs) {
   nn.asig = (Number(nn.asig) || 0) + cajas;
   a.falta = (Number(a.falta) || 0) + cajas;
   _comp.hayFalt = true;
+  // v12.18 — evento FAL server-side (segunda fuente de verdad, redundancia contra
+  // fallos futuros de Entregas_Virgilio). Reusa enqueueReport → cola persistente,
+  // retries y descarte silencioso para el operador de prueba.
+  try {
+    var nowMs = Date.now();
+    var leg = (_comp && _comp.legajo) ? String(_comp.legajo).trim() : "";
+    var tanda = (_comp && _comp.tanda) ? String(_comp.tanda).trim() : "";
+    var texto = String(npN) + "|" + String(cod) + "|" + String(cajas) + "|" + leg + "|" + tanda + "|MANUAL";
+    var payload = {
+      legajo: leg, opcion: "FAL", descripcion: "Faltante manual", texto: texto,
+      ts: nowMs, id: nowMs.toString(36) + "_" + Math.random().toString(36).slice(2, 8),
+      ts_inicio_iso: null
+    };
+    enqueueReport(payload);
+    if (typeof trySendOneReport === "function") trySendOneReport(payload).then(function (r) { if (r && r.ok) removeFromQueue(payload.id); }).catch(function () {});
+  } catch (_e) { /* nunca romper el flujo del operario por el log */ }
 }
 function _compDifHtml() {
   const d = _comp.sepDif, n = _comp.nps[d.npIdx];
@@ -10087,11 +10108,26 @@ function stockMove(rows) {
   const norm = _stockNormRows(rows);
   const headers = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal,resolution=ignore-duplicates" };
   return fetch(SUPABASE_STOCK_ENDPOINT, { method: "POST", headers: headers, body: JSON.stringify(norm) })
-    .then(function (r) {
+    .then(async function (r) {
       if (r.ok) return;
-      // 4xx = fila mal formada: NO reintentar (sería veneno en la cola), pero dejar
-      // rastro en consola en vez de tragarlo mudo (así no se vuelve a esconder un bug).
-      if (r.status >= 400 && r.status < 500) { try { console.error("stockMove HTTP " + r.status + " — fila rechazada", norm); } catch (_e) {} return; }
+      // v12.18 — Distinción 4xx datos-malformados vs 4xx permisos/RLS.
+      // Antes: TODO 4xx era "fila mal formada, no reintentar". Escondía el caso
+      // 42501 (permission denied) — mismo bug que rompió Entregas_Virgilio el 28/8.
+      // Ahora: si el body indica permisos/RLS/serverside-catchable → ENCOLAR igual
+      // que 5xx/red (se retenta cuando el backend se arregle). Otros 4xx (400/422
+      // "datos malos") van al console.error y se descartan (evitar veneno).
+      let body = "";
+      try { body = (await r.text()) || ""; } catch (_e) {}
+      const bodyU = body.toUpperCase();
+      const isTransient = (
+        r.status === 401 || r.status === 403 || r.status === 409 || r.status === 429 ||
+        bodyU.indexOf("42501") >= 0 ||          // permission denied for function/table
+        bodyU.indexOf("PERMISSION DENIED") >= 0 ||
+        bodyU.indexOf("PGRST301") >= 0 ||        // JWT expired
+        bodyU.indexOf("PGRST116") >= 0           // RLS violation
+      );
+      if (isTransient) { throw new Error("HTTP " + r.status + " transient: " + body.slice(0, 120)); }
+      if (r.status >= 400 && r.status < 500) { try { console.error("stockMove HTTP " + r.status + " — fila rechazada", body.slice(0, 200), norm); } catch (_e) {} return; }
       throw new Error("HTTP " + r.status);
     })
     .catch(function () { try { const p = JSON.parse(localStorage.getItem("vir_stock_pend") || "[]"); p.push.apply(p, norm); localStorage.setItem("vir_stock_pend", JSON.stringify(p.slice(-5000))); } catch (_e) {} });
