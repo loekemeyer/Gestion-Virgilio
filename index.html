@@ -3436,6 +3436,11 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
   table.fac-np-tbl td.fac-falta-col .fac-fact-item{white-space:nowrap;font-size:11px;font-weight:700;color:#475569;}
   table.fac-np-tbl td.fac-falta-col .fac-fact-ok{color:#15803d;font-weight:800;}
   table.fac-np-tbl td.fac-falta-col .fac-fact-falt{color:#b91c1c;font-weight:700;margin-left:2px;}
+  /* v12.20 — "A facturar" (verde) separada de "Falta" (roja). Antes vivían mezcladas
+     en la misma celda ("609 FC 3−3, 760 −3, 859 −4") — la operadora se perdía. */
+  table.fac-np-tbl td.fac-facturar-col{white-space:normal;overflow:visible;font-size:11px;font-weight:800;color:#15803d;line-height:1.3;}
+  table.fac-np-tbl td.fac-facturar-col .fac-fact-item{white-space:nowrap;font-size:11px;font-weight:700;color:#475569;}
+  table.fac-np-tbl td.fac-facturar-col .fac-fact-ok{color:#15803d;font-weight:800;}
   tr.fac-has-falta{ background:#fff5f5 !important; }
   tr.fac-has-falta > td:first-child{ box-shadow: inset 4px 0 0 #dc2626; }
   tr.fac-has-falta .fac-np-cell{ color:#991b1b; font-weight:800; }
@@ -6535,7 +6540,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.19";
+const APP_VERSION = "v12.20";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -33053,28 +33058,42 @@ function _equivDisp(fam, kn){ if(!fam) return kn; const i = fam._codsN.indexOf(k
    la usa para facturar por lo ENTREGADO.
    v7.90 — si el código pedido es un SECUNDARIO de su familia (no el principal), avisa
    que hay que CAMBIAR LA NP en el ERP al principal. No queremos pedidos en el secundario. */
-function facFaltDist(np){
+/* v12.20 — Helper común: normaliza los ítems de faltantes de una NP. Antes cada
+   celda repetía la lógica; ahora facFactDist (verde, lo que va a factura) y
+   facFaltDist (rojo, lo que faltó) reusan esto. */
+function _facCompItems(np){
   const f = facFaltInfo(np);
-  if (!f || !f.cajas) return "";
-  // v7.92: solo la distribución cod×faltó. La sugerencia de cambio de código
-  // (secundario→principal) se movió a su propia columna "Cambiar cód".
-  // v10.52 — SUBRAYAR (azul) solo los artículos que se están COMPLETANDO (tienen stock en
-  // 'a guardar' o se guardaron hoy). El resto se factura corto — así se ve cuál falta completar.
-  // v11.14 — mostrar lo que hay que FACTURAR (verde, protagonista) = pedidas − faltó,
-  // no solo el faltante. Antes decía "cod×faltó" y la operadora facturaba 0 en vez de lo
-  // entregado. Ahora cada artículo dice "cod → facturar N · falta M".
+  if (!f || !f.cajas) return [];
   return f.items.map(function(it){
     const ped = Number(it.ped) || 0;
     const falto = Number(it.falto) || 0;
     const ent = Math.max(ped - falto, 0);
     const comp = _facItemCompletable(it.cod);
+    // v10.52 — SUBRAYAR (azul) solo los artículos que se están COMPLETANDO
+    // (tienen stock en 'a guardar' o se guardaron hoy).
     const codTxt = comp
       ? '<span style="text-decoration:underline;text-decoration-color:#1e40af;text-decoration-thickness:2px;text-underline-offset:2px;font-weight:800;" title="Se está completando (hay stock para agregar a esta NP).">' + escapeHtml(it.cod) + '</span>'
       : escapeHtml(it.cod);
-    // v11.16: si no se entrega nada (ent=0), no decir "FC 0" — solo el faltante.
-    const fc = ent > 0 ? ' <b class="fac-fact-ok">FC ' + ent + '</b>' : '';
-    return '<span class="fac-fact-item" title="Pidió ' + ped + ' · se entrega ' + ent + ' · faltó ' + falto + '">' + codTxt +
-      fc + '<span class="fac-fact-falt">−' + falto + '</span></span>';
+    const titulo = 'Pidió ' + ped + ' · se entrega ' + ent + ' · faltó ' + falto;
+    return { cod: it.cod, ped: ped, falto: falto, ent: ent, comp: comp, codTxt: codTxt, titulo: titulo };
+  });
+}
+/* v12.20 — "A facturar" (verde, protagonista): SOLO los ítems donde algo se entrega
+   (ent > 0). El operario factura por acá. Antes vivía mezclado con "Falta" en la
+   misma celda — "609 FC 3 −3, 760 −3, 859 −4" era confuso porque los "−N" (rojo)
+   se leían como parte del "FC" (verde). Split explícito. */
+function facFactDist(np){
+  return _facCompItems(np).filter(function(x){ return x.ent > 0; }).map(function(x){
+    return '<span class="fac-fact-item" title="' + x.titulo + '">' + x.codTxt +
+      ' <b class="fac-fact-ok">' + x.ent + '</b></span>';
+  }).join(", ");
+}
+/* v12.20 — "Falta" (rojo): SOLO los ítems con faltante (falto > 0). Antes esta
+   función devolvía ambas cosas — ahora es puro faltante. */
+function facFaltDist(np){
+  return _facCompItems(np).filter(function(x){ return x.falto > 0; }).map(function(x){
+    return '<span class="fac-fact-item" title="' + x.titulo + '">' + x.codTxt +
+      '<span class="fac-fact-falt">−' + x.falto + '</span></span>';
   }).join(", ");
 }
 /* v7.92 — Columna "Cambiar cód": pedidos de la NP cargados en código SECUNDARIO
@@ -33545,6 +33564,7 @@ function facRender(tandas){
         <td class="fac-np-cell">${escapeHtml(f.np)}</td>
         <td class="fac-cod-cell">${escapeHtml(f.cod)}</td>
         <td class="fac-rs-cell"><span class="fac-rs-name">${escapeHtml(f.rs)}</span>${_ft ? facTareaBadge(f.np) : ''}</td>
+        <td class="fac-facturar-col">${facFactDist(f.np)}</td>
         <td class="fac-falta-col">${facFaltDist(f.np)}</td>
         <td style="white-space:normal;font-size:11px;font-weight:800;color:#1e40af;line-height:1.3;">${facCambioCod(f.np)}</td>
         <td class="fac-lios-cell">${(() => {
@@ -33574,7 +33594,8 @@ function facRender(tandas){
             <th style="width:8%">NP</th>
             <th style="width:6%">Cod</th>
             <th style="width:18%">Razón Social</th>
-            <th style="width:14%">A facturar / Falta</th>
+            <th style="width:8%" title="Ítems que van a la factura (pedido menos faltante). Verde.">A facturar</th>
+            <th style="width:6%" title="Ítems que faltaron (se factura corto). Rojo.">Falta</th>
             <th style="width:12%" title="Pedidos en código secundario a corregir (secundario → principal). Confirmá en 🔀 Corregir códigos.">Cambiar cód</th>
             <th class="center" style="width:5%">Líos</th>
             <th class="center" style="width:5%">Cajas</th>

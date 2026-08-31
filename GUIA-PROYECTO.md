@@ -36,6 +36,20 @@
 > `v_pedidos_match` / `v_pedidos_match_chef` + `sync_pedidos_match_virgilio()` + cron
 > `sync-pedidos-match-virgilio`) en `sql/pedidos_match_virgilio.sql` del repo pagina-LK.
 >
+> Nota **v12.20** — **Facturación: "A facturar" y "Falta" en columnas separadas.**
+> Pedido del usuario (idea inline): en la tabla de Facturación la columna "A facturar /
+> Falta" mezclaba en la misma celda `"609 FC 3 −3, 760 −3, 859 −4"` — la operadora
+> se perdía porque los `−N` (rojo) se leían pegados a los `FC N` (verde). Ahora
+> son dos columnas: **A facturar** (verde, ítems con `ent > 0` → `cod N`) y **Falta**
+> (rojo, ítems con `falto > 0` → `cod −M`). Los parciales aparecen en las dos; los
+> completos, solo en "A facturar"; los que faltaron entero, solo en "Falta". Refactor:
+> helper común `_facCompItems(np)` que normaliza los ítems, `facFactDist` y
+> `facFaltDist` filtran del mismo set. CSS `td.fac-facturar-col` nuevo (color verde),
+> `td.fac-falta-col` sin cambio. Header pasa de 14% a 8%+6%. Test
+> `tests/fac-falta-filter.cjs` actualizado con `factDist500` que verifica que "A
+> facturar" tenga el cod + verde y NO tenga el `−`; `dist501empty` chequea ambas
+> columnas vacías cuando la NP no tiene faltantes. Bump v12.20. Suite verde.
+>
 > Nota **v12.19** — **Sobrevivientes del incidente canon: FAL server-side + stockMove
 > 4xx transient + doc de riesgo estructural.** Complementa v12.18. **(a)
 > `_compAddFaltManual`** ahora además de meter el faltante manual en `_comp.arts` emite

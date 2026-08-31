@@ -58,16 +58,22 @@ catch (_e) {
     out.chipShown = (document.getElementById("facChipFalt") || {}).style.display !== "none";    // true
     out.rowsAll   = nRows();                                                                    // 2
     out.class500  = /fac-has-falta/.test((document.querySelector('#facContainer tr[data-fac-np="500"]') || {}).className || "");
-    // v5.80: los faltantes van en COLUMNA aparte (.fac-falta-col), SOLO la distribución
-    // por artículo (cod×faltó), sin el total "FALTA N cj".
+    // v12.20: "A facturar" (fac-facturar-col, verde) y "Falta" (fac-falta-col, rojo)
+    // en columnas separadas. Antes ambas vivían en fac-falta-col ("609 FC 3 −3").
     const _row500 = document.querySelector('#facContainer tr[data-fac-np="500"]');
     const _fc500 = _row500 ? _row500.querySelector("td.fac-falta-col") : null;
-    // v11.14: la columna ahora dice "cod FC N −M" (N = pedidas − faltó, M = faltó)
+    const _fa500 = _row500 ? _row500.querySelector("td.fac-facturar-col") : null;
+    // La col Falta ahora dice "cod −M" (M = faltó), sin FC.
     out.faltDist500 = /315/.test((_fc500 || {}).innerHTML || "") &&
-      /FC\s*12/.test((_fc500 || {}).innerHTML || "") &&
-      /−8/.test((_fc500 || {}).innerHTML || "");
+      /−8/.test((_fc500 || {}).innerHTML || "") &&
+      !/FC/.test((_fc500 || {}).innerHTML || "");
+    // La col A facturar dice "cod N" (N = pedidas − faltó), sin −.
+    out.factDist500 = /315/.test((_fa500 || {}).innerHTML || "") &&
+      /fac-fact-ok/.test((_fa500 || {}).innerHTML || "") &&
+      /12/.test((_fa500 || {}).innerHTML || "") &&
+      !/−/.test((_fa500 || {}).innerHTML || "");
     out.noTotalInDist = !/FALTA|cj/.test((_fc500 || {}).innerHTML || "");      // NO el total "FALTA N cj"
-    out.faltColExists = !!_fc500;
+    out.faltColExists = !!_fc500 && !!_fa500;
     if (_fc500) {
       const br = _fc500.getBoundingClientRect();
       out.faltColWraps = getComputedStyle(_fc500).whiteSpace;                  // "normal" (no se corta)
@@ -77,9 +83,10 @@ catch (_e) {
     const _td500rs = _row500 ? _row500.querySelector("td.fac-rs-cell") : null;
     out.rsNoFaltaBadge = _td500rs ? !_td500rs.querySelector(".fac-falta-badge") : false;
     out.rsCellWraps = _td500rs ? getComputedStyle(_td500rs).whiteSpace : "";   // sigue "normal"
-    // la 501 (sin faltante) → columna vacía
+    // la 501 (sin faltante) → ambas columnas vacías
     const _row501 = document.querySelector('#facContainer tr[data-fac-np="501"]');
-    out.dist501empty = ((_row501 && _row501.querySelector("td.fac-falta-col") || {}).innerHTML || "") === "";
+    out.dist501empty = ((_row501 && _row501.querySelector("td.fac-falta-col") || {}).innerHTML || "") === "" &&
+      ((_row501 && _row501.querySelector("td.fac-facturar-col") || {}).innerHTML || "") === "";
     out.chipOffBefore = !(document.getElementById("facChipFalt") || { classList: { contains: function () { return false; } } }).classList.contains("on");
 
     // 2) Filtro ON: solo la 500
@@ -109,7 +116,7 @@ catch (_e) {
 
   const pass =
     r.chipCount === "1" && r.chipShown === true && r.rowsAll === 2 &&
-    r.faltDist500 === true && r.noTotalInDist === true && r.class500 === true && r.chipOffBefore === true &&
+    r.faltDist500 === true && r.factDist500 === true && r.noTotalInDist === true && r.class500 === true && r.chipOffBefore === true &&
     r.faltColExists === true && r.faltColWraps === "normal" && r.faltColNotClipped === true &&
     r.rsNoFaltaBadge === true && r.rsCellWraps === "normal" && r.dist501empty === true &&
     r.rowsFiltered === 1 && r.only500 === true && r.chipOnAfter === true &&
