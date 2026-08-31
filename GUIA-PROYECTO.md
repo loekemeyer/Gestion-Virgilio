@@ -36,6 +36,15 @@
 > `v_pedidos_match` / `v_pedidos_match_chef` + `sync_pedidos_match_virgilio()` + cron
 > `sync-pedidos-match-virgilio`) en `sql/pedidos_match_virgilio.sql` del repo pagina-LK.
 >
+> Nota **v12.16** — **Fix banner «🔄 Actualizar» clavado.** `version.json` quedó en v12.07
+> mientras `APP_VERSION` avanzó hasta v12.15 (nadie lo bumpeó desde entonces; ya había pasado
+> en v12.04): como `checkForUpdate()` comparaba con `!==`, a todos los que YA tenían la última
+> versión les aparecía el banner fijo y recargar no lo sacaba. Fix doble: (a) `version.json`
+> re-sincronizado, y (b) `checkForUpdate()` ahora solo muestra el banner si la versión del
+> server es **numéricamente más nueva** que la cargada (`_verNum()`: "v12.15" → 12015), así un
+> `version.json` que quede atrás nunca más molesta. **Regla al bumpear versión: tocar
+> `APP_VERSION` (index.html), `SW_VERSION` (sw.js) Y `version.json` juntos.**
+>
 > Nota **v12.15** — **El badge «en curso» del monitor cuenta horario LABORAL, no reloj de pared
 > (idea 2865, bug del usuario — D14B marcaba ~66 h).** `statusCell()` calculaba
 > `Date.now() − startTs` crudo: un AP abierto el viernes 19:04 sin cerrar marcaba ~66 h el lunes,

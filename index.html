@@ -6535,7 +6535,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.15";
+const APP_VERSION = "v12.16";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -7409,8 +7409,17 @@ async function checkForUpdate() {
     const r = await fetch("version.json?_=" + Date.now(), { cache: "no-store" });
     if (!r.ok) return;
     const j = await r.json();
-    if (j && j.version && j.version !== APP_VERSION) showUpdateBanner(j.version);
+    /* Solo molestar si el server tiene una versión MÁS NUEVA que la cargada. Con
+       "!==" a secas, un version.json que quedó atrás del APP_VERSION (pasó en
+       v12.04 y de nuevo en v12.15) le clavaba el banner fijo a TODOS los que ya
+       tenían la última versión, y recargar no lo sacaba. */
+    if (j && j.version && _verNum(j.version) > _verNum(APP_VERSION)) showUpdateBanner(j.version);
   } catch (_e) {}
+}
+/* "v12.15" → 12015 (major*1000 + minor). Formato desconocido → -1 (no banner). */
+function _verNum(v) {
+  const m = String(v || "").match(/^v?(\d+)\.(\d+)$/);
+  return m ? parseInt(m[1], 10) * 1000 + parseInt(m[2], 10) : -1;
 }
 function showUpdateBanner(newVer) {
   if (document.getElementById("updateBanner")) return;
