@@ -6540,7 +6540,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.20";
+const APP_VERSION = "v12.21";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -21311,14 +21311,17 @@ function cpBuildResumen(lios) {
   }).join(";");
 }
 async function cpLoadFaltantes() {
-  const H = _cpAuthH();
-  const url = SUPABASE_ENTREGAS_ENDPOINT + "?select=id,np,cod_cliente,cod_art,cajas_pedidas,cajas_entregadas,cajas_falto,tanda,fecha_salida&cajas_falto=gt.0&order=np";
-  const r = await fetch(url, { headers: H, cache: "no-store" });
-  const rows = r.ok ? await r.json() : [];
+  // v12.21 — paginar SIEMPRE con supaFetchAll: PostgREST corta en 1000 filas y
+  // Facturacion_NP ya pasó ese tope (1098+). El fetch plano traía sólo 1000 NPs
+  // facturadas → las que quedaban fuera del corte NO entraban a facSet y sus
+  // faltantes se contaban como "sin facturar" (badge CP inflado, ej. 32 vs 9 reales).
+  // Idem el fetch de faltantes (hoy <1000 pero mismo riesgo latente). supaFetchAll
+  // usa Range + count=exact y trae todas las páginas.
+  const rows = await supaFetchAllSafe(SUPABASE_ENTREGAS_ENDPOINT,
+    "select=id,np,cod_cliente,cod_art,cajas_pedidas,cajas_entregadas,cajas_falto,tanda,fecha_salida&cajas_falto=gt.0&order=np");
   let facSet = {};
   try {
-    const rf = await fetch(SUPABASE_FACTURACION_NP_ENDPOINT + "?select=np", { headers: H, cache: "no-store" });
-    const fac = rf.ok ? await rf.json() : [];
+    const fac = await supaFetchAllSafe(SUPABASE_FACTURACION_NP_ENDPOINT, "select=np");
     fac.forEach(function (x) { facSet[String(x.np).trim()] = 1; });
   } catch (_e) {}
   // v8.04 — resolver el código por EMPRESA (paquetes importados) y por CORRECCIÓN confirmada
