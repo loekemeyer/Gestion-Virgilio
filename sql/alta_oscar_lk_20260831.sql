@@ -10,7 +10,7 @@
 --
 -- Cambio (pedido del usuario): Oscar puede entregar, todos LK:
 --   500, 506, 510, 555, 557, 558, 654, 658, 659
--- Se le asigna código propio INTERNO '0002' (mismo criterio que Log/Fabr=0001;
+-- Se le asigna código propio REAL '3709' (dado por el usuario;
 -- si después aparece un código ISIS real, se cambia en las dos tablas y listo),
 -- se normalizan sus filas LK a ese código, se borran los duplicados que estaban
 -- bajo 0001, y se agrega el 658 (solo existía para Log/Fabr).
@@ -43,20 +43,20 @@
 begin;
 
 -- 1) Código propio para Oscar en LK → habilita su botón en Recepción.
-update "Codigos X Tallerista" set "Codigo"='0002'
+update "Codigos X Tallerista" set "Codigo"='3709'
  where "Nombre"='Oscar' and "Linea"='LK';
 
 -- 2) Sus artículos LK pasan a su código (estaban en NULL o en 0001).
-update "Articulos Virgilio X Tallerista" set "Cod_Tallerista"='0002'
+update "Articulos Virgilio X Tallerista" set "Cod_Tallerista"='3709'
  where id in (89,310,203,150,225,14,15,305);
 
--- 3) Duplicados LK bajo 0001 (misma fila que ya quedó en 0002): fuera.
+-- 3) Duplicados LK bajo 0001 (misma fila que ya quedó en 3709): fuera.
 delete from "Articulos Virgilio X Tallerista" where id in (590,617,542);
 
 -- 4) 658 no existía para Oscar: se clona del maestro de Log/Fabr LK.
 insert into "Articulos Virgilio X Tallerista"
   ("Linea","Cod_Art","Desc","Tallerista","Uni_x_Caja","Cod_Tallerista","Kg Recibido","destino_entrega","sector_factura","Cajas_x_Master")
-select "Linea","Cod_Art","Desc",'Oscar',"Uni_x_Caja",'0002',0,"destino_entrega","sector_factura","Cajas_x_Master"
+select "Linea","Cod_Art","Desc",'Oscar',"Uni_x_Caja",'3709',0,"destino_entrega","sector_factura","Cajas_x_Master"
   from "Articulos Virgilio X Tallerista"
  where "Linea"='LK' and "Cod_Art"='658' and "Tallerista"='Log/ Fabr'
  limit 1;
@@ -64,14 +64,14 @@ select "Linea","Cod_Art","Desc",'Oscar',"Uni_x_Caja",'0002',0,"destino_entrega",
 commit;
 
 -- ── VERIFICACIÓN ────────────────────────────────────────────────────────────
--- Debe dar: cod_oscar_lk='0002' y arts='500,506,510,555,557,558,654,658,659'
+-- Debe dar: cod_oscar_lk='3709' y arts='500,506,510,555,557,558,654,658,659'
 select (select "Codigo" from "Codigos X Tallerista" where "Nombre"='Oscar' and "Linea"='LK') as cod_oscar_lk,
        (select string_agg("Cod_Art", ',' order by "Cod_Art")
           from "Articulos Virgilio X Tallerista"
-         where "Cod_Tallerista"='0002' and "Linea"='LK') as arts;
+         where "Cod_Tallerista"='3709' and "Linea"='LK') as arts;
 
 -- ── PENDIENTE / NOTA ────────────────────────────────────────────────────────
 -- Quedan filas de Oscar SIN tocar (fuera de la lista del usuario): LK 280, 759,
 -- 762, 764, 769 (algunas bajo 0001 → siguen mostrándose en la grilla Log/Fabr)
 -- y todas sus filas CH. Si Oscar también entrega alguna de esas, repetir el
--- patrón de arriba (update a '0002' + borrar duplicado si lo hay).
+-- patrón de arriba (update a '3709' + borrar duplicado si lo hay).
