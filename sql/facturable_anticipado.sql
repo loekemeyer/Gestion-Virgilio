@@ -194,6 +194,14 @@ create index facturable_anticipado_reservas_articulo_idx
 create index facturable_anticipado_reservas_np_idx
   on public.facturable_anticipado_reservas (np, articulo) where liberado_at is null;
 
+-- Mismo día, follow-up: auditor-supabase encontró que las RPC que escriben
+-- (reservar/liberar) eran invocables por anon/authenticated SIN chequeo de
+-- identidad. Usan es_supervisor_virgilio() (definida en sql/deudores.sql, no
+-- se redefine acá) — valida contra la sesión REAL de Supabase Auth (Google
+-- OAuth) que ya usan los supervisores en el front, mismo criterio que
+-- isSupervisorEmail() de index.html. Verificado: anon y authenticated sin
+-- ser supervisor → rechazado; email supervisor real → pasa.
+--
 -- La vista se reemplaza completa (agrega reservado_propio/terminado_disponible
 -- antes de calcular cajas_cubribles, y expone reservado_propio como
 -- cajas_reservadas en el resultado final).
@@ -290,6 +298,9 @@ declare
   v_disponible numeric;
   v_id bigint;
 begin
+  if not public.es_supervisor_virgilio() then
+    raise exception 'No autorizado: se requiere sesión de supervisor.';
+  end if;
   if p_cajas is null or p_cajas <= 0 then
     raise exception 'cajas debe ser mayor a 0';
   end if;
@@ -316,11 +327,16 @@ grant execute on function public.facturable_anticipado_reservar(text, text, nume
 
 create function public.facturable_anticipado_liberar(p_id bigint, p_por text default null)
 returns void
-language sql security definer set search_path = public
+language plpgsql security definer set search_path = public
 as $$
+begin
+  if not public.es_supervisor_virgilio() then
+    raise exception 'No autorizado: se requiere sesión de supervisor.';
+  end if;
   update public.facturable_anticipado_reservas
   set liberado_at = now(), liberado_por = p_por
-  where id = p_id and liberado_at is null
+  where id = p_id and liberado_at is null;
+end;
 $$;
 grant execute on function public.facturable_anticipado_liberar(bigint, text) to anon, authenticated;
 

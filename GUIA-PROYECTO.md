@@ -12,7 +12,21 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-01 · Versión app al documentar: **v12.31**
+> Última actualización: 2026-09-01 · Versión app al documentar: **v12.32**
+>
+> Nota **v12.32** — **Gate real de backend para las 4 RPC que escriben dinero**
+> (`deuda_registrar_cobro`, `deuda_anular_cobro`, `facturable_anticipado_reservar`,
+> `facturable_anticipado_liberar`), decidido por el usuario tras el hallazgo de
+> `auditor-supabase` de v12.31 (ver más abajo). Se agregó `es_supervisor_virgilio()`
+> (`sql/deudores.sql`) — NO un secreto nuevo tipo `cp_is_admin`, sino un chequeo contra
+> la sesión REAL de Supabase Auth (Google OAuth) que ya usan los supervisores en el
+> front: `lower(auth.jwt()->>'email')` contra `SUPERVISOR_EMAILS` fijos + tabla
+> `Supervisores_Virgilio`, mismo criterio que `isSupervisorEmail()` de `index.html`. Las
+> 4 funciones ahora empiezan con `if not es_supervisor_virgilio() then raise exception`.
+> Verificado simulando `auth.jwt()`: `anon` → rechazado, `authenticated` con email
+> NO supervisor → rechazado, email supervisor real → pasa y ejecuta. `requireSupervisor()`
+> del front sigue estando (evita el viaje al servidor para el caso común), pero ya no es
+> la única barrera.
 >
 > Nota **v12.31** — **Dos huecos de diseño encontrados en auditoría propia sobre
 > v12.30, cerrados el mismo día.** (1) **Facturable Anticipado no reservaba stock**:
@@ -43,20 +57,8 @@
 > (explotación real con `SET LOCAL ROLE anon` confirmó 0 acceso), `search_path` fijado,
 > sin SQL dinámico.
 >
-> **⚠ Pendiente — AVISAR AL USUARIO cuando se toque este módulo**: el mismo audit
-> encontró que las 4 funciones que ESCRIBEN (`deuda_registrar_cobro`,
-> `deuda_anular_cobro`, `facturable_anticipado_reservar`, `facturable_anticipado_
-> liberar`) son ejecutables por `anon`/`authenticated` **sin ningún chequeo de
-> identidad backend** — cualquiera con la anon key pública (embebida en `index.html`/
-> `sw.js`) puede invocarlas directo, sin pasar por `requireSupervisor()` del front
-> (que es solo UI, no seguridad real). Es el mismo modelo de confianza que ya usa el
-> resto de la app (anon key compartida + gate client-side), pero acá pesa más porque
-> se toca directamente el saldo de cuentas por cobrar de un cliente — se puede
-> fabricar o anular un cobro sin dejar rastro de autoría verificable. Se agregó
-> `requireSupervisor()` en el front (consistente con el resto del módulo) pero **no**
-> se agregó un gate real en el backend (tipo `cp_is_admin(p_secret)`, patrón que ya
-> existe en este proyecto para `cp_admin_*`) — es una decisión de producto, no se
-> tomó sin preguntar. No resolver sin decisión explícita del usuario.
+> **Resuelto en v12.32** (ver nota arriba): el usuario decidió agregar el gate real de
+> backend. Ya no queda pendiente.
 >
 > Nota **v12.30** — **Facturable ya: qué mercadería se le puede facturar a un cliente
 > ANTES de cargar el camión.** Cuarta pestaña del overlay 💰 Deuda/Cobranzas

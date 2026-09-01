@@ -421,7 +421,42 @@ grant execute on function public.deudores_detalle(text) to anon, authenticated;
 -- reflejó; al anular, volvió a subir exacto. 0 privilegios abiertos a
 -- anon/authenticated (tabla con RLS + REVOKE ALL, solo se escribe vía las
 -- funciones SECURITY DEFINER de abajo).
+--
+-- Mismo día, follow-up: auditor-supabase encontró que esas funciones
+-- SECURITY DEFINER eran invocables por anon/authenticated SIN chequeo de
+-- identidad — cualquiera con la anon key pública podía fabricar/anular un
+-- cobro. Se agregó es_supervisor_virgilio(), que valida contra la sesión
+-- REAL de Supabase Auth (Google OAuth) que ya usan los supervisores en el
+-- front — no un secreto nuevo. Usa el mismo criterio que isSupervisorEmail()
+-- de index.html (SUPERVISOR_EMAILS fijos + tabla Supervisores_Virgilio).
+-- Verificado con auth.jwt() simulado: anon → rechazado, authenticated con
+-- email NO supervisor → rechazado, email supervisor real → pasa.
 -- ══════════════════════════════════════════════════════════════════════════
+
+create function public.es_supervisor_virgilio()
+returns boolean
+language sql stable security definer set search_path = public
+as $$
+  select coalesce(
+    lower(auth.jwt() ->> 'email') = any (array[
+      'loekemeyer.n8n@gmail.com', 'loekemeyer.logistica@gmail.com', 'comexloekemeyer@gmail.com'
+    ])
+    or exists (
+      select 1 from public."Supervisores_Virgilio" sv
+      where lower(sv.email) = lower(auth.jwt() ->> 'email')
+    ),
+    false
+  );
+$$;
+comment on function public.es_supervisor_virgilio() is
+  'Gate real de backend para las RPC que escriben dinero (deuda_cobros, '
+  'facturable_anticipado_reservas): true solo si el JWT de la sesión actual '
+  '(auth.jwt(), Supabase Auth vía Google OAuth) es un email de supervisor — '
+  'mismo criterio que isSupervisorEmail() del front. requireSupervisor() del '
+  'front es solo UI; esto es lo que de verdad bloquea a anon. Compartida con '
+  'sql/facturable_anticipado.sql, no se redefine ahí.';
+revoke all on function public.es_supervisor_virgilio() from anon, authenticated;
+grant execute on function public.es_supervisor_virgilio() to anon, authenticated;
 
 create table public.deuda_cobros (
   id            bigint generated always as identity primary key,
@@ -462,6 +497,9 @@ language plpgsql security definer set search_path = public
 as $$
 declare v_id bigint;
 begin
+  if not public.es_supervisor_virgilio() then
+    raise exception 'No autorizado: se requiere sesión de supervisor.';
+  end if;
   if p_monto is null or p_monto <= 0 then
     raise exception 'monto debe ser mayor a 0';
   end if;
@@ -478,10 +516,15 @@ grant execute on function public.deuda_registrar_cobro(text, numeric, text, bigi
 
 create function public.deuda_anular_cobro(p_id bigint, p_por text default null)
 returns void
-language sql security definer set search_path = public
+language plpgsql security definer set search_path = public
 as $$
+begin
+  if not public.es_supervisor_virgilio() then
+    raise exception 'No autorizado: se requiere sesión de supervisor.';
+  end if;
   update public.deuda_cobros set anulado_at = now(), anulado_por = p_por
-  where id = p_id and anulado_at is null
+  where id = p_id and anulado_at is null;
+end;
 $$;
 grant execute on function public.deuda_anular_cobro(bigint, text) to anon, authenticated;
 
