@@ -12,7 +12,22 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-01 · Versión app al documentar: **v12.24**
+> Última actualización: 2026-09-01 · Versión app al documentar: **v12.25**
+>
+> Nota **v12.25** — **Facturación: columna unificada "Faltantes y Agregados" + baja de "Cambiar cód".**
+> Cierre de la iteración de esta mañana sobre el módulo de Facturación. Cambios respecto de v12.23:
+>   - **Una sola columna "Faltantes y Agregados"** (`facFaltAgregDist`) reemplaza a la pareja
+>     "A facturar (anomalías)" + "Faltantes (no facturar)" — un mismo código aparecía en las dos
+>     cuando había un corto parcial (ej. `609 3/6` verde + `609 −3` rojo, la misma info). Ahora:
+>     rojo `cod −N` = faltante (restá o no factures), verde `cod +N` = agregado (sumá a la factura).
+>   - **Sacada la columna "Cambiar cód"** — su info sigue disponible en el chip `🔀 Corregir códigos`
+>     del header (que abre el panel dedicado). Mostrarla también por fila duplicaba la mano al mismo
+>     lugar y ocupaba 13% de ancho. Las funciones `facCambioCod`/`facCambioCodConfirm` quedan
+>     definidas por si vuelve o si el chip las reusa a futuro.
+> La tabla de Facturación pasa de las 11 columnas originales (v12.22) a **7 columnas**: NP · Cod ·
+> Razón Social · Faltantes y Agregados · Líos · Cajas · Subtotal · Acción. Tanda y Salida como
+> tooltip en NP; Cajas/Líos = lo armado (no el pedido). Test `fac-falta-filter.cjs` actualizado.
+> Suite verde.
 >
 > Nota **v12.24** — **Cola de impresión NP: imprime también los remitos sin `resumen` en el TAL (súper con etiqueta y NP cerradas con 0 líos).**
 > Pedido del usuario: en «🖨️ Cola de impresión — NP armadas» había 3 NP (98109 súper con etiqueta,
