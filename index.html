@@ -6538,7 +6538,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.26";
+const APP_VERSION = "v12.27";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -14081,17 +14081,44 @@ function _stkNpSinBaseHtml() {
   if (!sb.length) return "";
   var round1 = function (n) { return Math.round((Number(n) || 0) * 10) / 10; };
   var filas = sb.map(function (r) {
-    return '<tr><td><b>' + escapeHtml(String(r.np)) + '</b></td>' +
+    var np = escapeHtml(String(r.np));
+    return '<tr><td><b>' + np + '</b></td>' +
       '<td style="font-size:12px">' + escapeHtml(r.tanda || "—") + '</td>' +
       '<td style="font-size:12px">' + escapeHtml(_stkFmtFechaNP(r.fecha_entrega) || r.fecha_entrega || "—") + '</td>' +
       '<td style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escapeHtml(r.cliente || "—") + '</td>' +
-      '<td class="num">' + round1(r.m3) + '</td></tr>';
+      '<td class="num">' + round1(r.m3) + '</td>' +
+      // v12.27 — tachar: no todo caso es un error. Un cliente que pide con mucha
+      // anticipación cae fuera de la ventana del Sheet de la base y aparece acá sin
+      // que haya nada que arreglar.
+      '<td class="num"><span onclick="npSinBaseMarcar(\'' + np + '\')" title="No es un problema: tachar para que deje de aparecer (y de avisar por Telegram)" style="display:inline-block;background:#fff;border:1px solid #fdba74;border-radius:7px;padding:1px 7px;font-size:12px;font-weight:900;color:#c2410c;cursor:pointer;">✕</span></td></tr>';
   }).join("");
   return '<div style="background:#fff7ed;border:1.5px solid #fdba74;border-radius:12px;padding:9px 12px;margin-bottom:12px;">' +
     '<div style="font-weight:800;color:#9a3412;font-size:13.5px;margin-bottom:3px;">📭 ' + sb.length + ' NP programada(s) SIN artículos en la base</div>' +
-    '<div style="font-size:11px;color:#7c2d12;margin-bottom:6px;">Están en Programación Diaria pero <b>PPP_Base_Pedidos no tiene ni una línea</b> de esos pedidos → <b>no se puede armar el picking</b>. Hay que importar los artículos desde el ERP antes de que la tanda arranque.</div>' +
-    '<div class="mva-tblwrap" style="max-height:190px;overflow:auto;"><table class="mva-tbl"><thead><tr><th>NP</th><th>Tanda</th><th>Entrega</th><th>Razón Social</th><th class="num">m³</th></tr></thead><tbody>' +
+    '<div style="font-size:11px;color:#7c2d12;margin-bottom:6px;">Están en Programación Diaria pero <b>PPP_Base_Pedidos no tiene ni una línea</b> de esos pedidos → <b>no se puede armar el picking</b>. Hay que importar los artículos desde el ERP antes de que la tanda arranque.<br><b>Si no es un error</b> (ej. el cliente pidió con mucha anticipación y el pedido quedó fuera de la ventana de la base) → tocá la <b>✕</b> y deja de aparecer, para todos.</div>' +
+    '<div class="mva-tblwrap" style="max-height:190px;overflow:auto;"><table class="mva-tbl"><thead><tr><th>NP</th><th>Tanda</th><th>Entrega</th><th>Razón Social</th><th class="num">m³</th><th class="num">No es error</th></tr></thead><tbody>' +
     filas + '</tbody></table></div></div>';
+}
+/* v12.27 — tacha una NP "programada sin base" como que NO es un problema
+   (upsert en NP_Sin_Base_Revisadas). La vista vista_np_prog_sin_base la excluye,
+   así que también apaga la alerta de Telegram (el cron lee la misma vista). */
+async function npSinBaseMarcar(np) {
+  np = String(np || "").trim(); if (!np) return;
+  if (!confirm('¿Marcar la NP ' + np + ' como "NO ES UN ERROR"?\n\nDeja de aparecer acá y de avisar por Telegram (para todos).')) return;
+  var motivo = prompt("Motivo (opcional). Ej: el cliente pide con 3 meses de anticipación.", "") || null;
+  try {
+    // Mismo patrón que npGapMarcar: token de sesión real, no la publishable como Bearer.
+    const headers = await facAuthWriteHeaders({ Prefer: "resolution=merge-duplicates,return=minimal" });
+    if (!headers) { alert("Sin sesión — recargá la página e iniciá sesión."); return; }
+    const r = await fetch(SUPABASE_URL + "/rest/v1/NP_Sin_Base_Revisadas?on_conflict=np", {
+      method: "POST",
+      headers: headers,
+      body: JSON.stringify({ np: np, estado: "no_es_problema", motivo: motivo })
+    });
+    if (!r.ok) { alert("No se pudo guardar (HTTP " + r.status + ")."); return; }
+  } catch (_e) { alert("No se pudo guardar (sin conexión)."); return; }
+  if (_stkPop && _stkPop.sinBase) _stkPop.sinBase = _stkPop.sinBase.filter(function (s) { return String(s.np) !== np; });
+  _stkNpFaltanRender();
+  try { npFaltanLoadBadge(); } catch (_e) {}
 }
 /* v9.38 — sección "NP salteadas en la secuencia": números que faltan entre NPs que sí existen. */
 function _stkNpGapsHtml() {

@@ -12,7 +12,27 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-01 · Versión app al documentar: **v12.26**
+> Última actualización: 2026-09-01 · Versión app al documentar: **v12.27**
+>
+> Nota **v12.27** — **"Pedidos sin cargar en PPP": se puede tachar la NP que NO es un error.**
+> La tercera sección del módulo (`vista_np_prog_sin_base`, v12.05) avisa cuando una NP está en
+> Programación Diaria y `PPP_Base_Pedidos` no tiene ni una línea suya → no se puede armar el picking.
+> Asume que falta importar del ERP, pero **hay un caso donde no falta nada: el cliente pide con mucha
+> anticipación.** Testigo: **Matiz SA** (cod 4263) trabaja con ~85-90 días entre carga y entrega —
+> NP 97889 (OC 032112, carga 23/06, entrega 16/09, 9.25 m³), 97964 (03/07 → 07/10) y 98426 (13/08 →
+> 28/10). La hoja «PPP Excel Base Datos Pedidos» arrastra una ventana de **~2 meses por fecha de
+> CARGA** (al 01/09 va del 01/07 al 01/09): el 97889 se cargó el 23/06 y queda afuera aunque su
+> entrega no pasó; los otros dos entran. ⚠ **Esa ventana no se define en Virgilio**:
+> `sync_ppp_base_pedidos()` (`sql/sync_ppp_pull_server_side.sql`) trae la pestaña entera del Sheet
+> **sin filtro de fecha**; el recorte viene aguas arriba, en lo que escribe esa hoja. Por eso acá sólo
+> se silencia el aviso, no se recupera el dato. **Ahora cada fila lleva una ✕**
+> (`npSinBaseMarcar`) que hace upsert en la tabla nueva **`NP_Sin_Base_Revisadas`** (`np` PK, `estado`,
+> `motivo` opcional que se pide por `prompt`, `creado_en`; RLS anon/authenticated select+insert+update+
+> delete, mismo patrón que `NP_Secuencia_Revisadas` de v11.21) y la vista suma un tercer `not exists`
+> para excluirlas. Como el cron **`notificar_picking_sin_base`** lee la **misma vista**, el tachado
+> **también apaga el aviso de Telegram** — no hay dos lugares que puedan discrepar. El badge del panel
+> (`npFaltanLoadBadge`) baja solo. Destachar: `delete from "NP_Sin_Base_Revisadas" where np='…'`.
+> DDL en `sql/np_sin_base_revisadas.sql`; test `tests/npf-prog-sin-base.cjs` (caso D).
 >
 > Nota **v12.26** — **Facturación: la fila amarilla ("en progreso") siempre muestra el badge que la explica.**
 > Bug reportado por el usuario en NP 44591: la fila se pintaba amarilla (tarea de faltante activa en
