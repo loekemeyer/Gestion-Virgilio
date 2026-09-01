@@ -12,7 +12,7 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-08-28 · Versión app al documentar: **v12.03**
+> Última actualización: 2026-09-01 · Versión app al documentar: **v12.22**
 >
 > Nota **2026-08-28 (solo datos, sin bump de versión) — Tabla nueva `lk_pedidos_match`: string identificador de pedido web + SUCURSAL DE ENTREGA.**
 > Virgilio no tenía la sucursal de entrega de los pedidos; LK sí (`orders.sheets_payload.sucursal_entrega`).
@@ -36,6 +36,24 @@
 > `v_pedidos_match` / `v_pedidos_match_chef` + `sync_pedidos_match_virgilio()` + cron
 > `sync-pedidos-match-virgilio`) en `sql/pedidos_match_virgilio.sql` del repo pagina-LK.
 >
+> Nota **v12.22** — **El pop-up «🟡 Cajas pedidas» de un artículo no descontaba las NP CANCELADAS
+> (idea 6322, bug del usuario — NP 44458 con 18 cajas y sin nombre de cliente).** Una NP marcada 🚫
+> «no va» va a `NP_Canceladas` y deja de ser demanda: lo filtran la columna
+> (`vista_stock_procesada.cajas_pedidas`, CTE `cerradas`), `ocgDemanda()` y `vista_np_sin_programar`.
+> **`stkOpenCajasPedidasArt()` era el único lugar que NO**: descontaba `Facturacion_NP` y
+> `PPP_Entregados_Meta` y nada más, así que seguía mostrando las canceladas como cajas pendientes
+> (art 719: columna 40, pop-up 58) y encima las marcaba con el ⚠ «en la base pero SIN programar en el
+> PPP» — un ⚠ **siempre falso**, porque una NP cancelada nunca se programa. Efecto real al momento del
+> fix: **13 NP canceladas el 11/08/2026** (44456/44457/44458 de Dorinka, 97706, 97788, 98286, …)
+> inflaban el pop-up de **47 códigos** (55215 +583 cajas, 702E +118, 505 +110, 550 +60, 719 +18…).
+> Segundo bug del mismo pop-up: la **Razón Social** se leía sólo de `PPP_Programacion_Diaria`, así que
+> toda NP no programada salía con la celda vacía («un pedido con cajas y sin cliente») teniendo el
+> nombre a mano en `PPP_Base_Pedidos.cliente`. Fix: (a) fetch a `NP_Canceladas` sumado al `_facSet`
+> del pop-up, (b) `rs: info.rs || cliByNp[np] || ""` (el `select` de la base ahora trae `cliente`),
+> (c) el encabezado detalla por separado «N NP ya facturadas/entregadas · N NP canceladas (🚫 no va)».
+> **La alerta ya existía y estaba bien**: el botón ⚠️ «Pedidos sin cargar en PPP» del panel supervisor
+> (`vista_np_sin_programar`) sí excluye las canceladas — el que mentía era el pop-up. Test
+> `tests/cajped-canceladas.cjs`.
 > Nota **v12.20** — **Facturación: "A facturar" y "Falta" en columnas separadas.**
 > Pedido del usuario (idea inline): en la tabla de Facturación la columna "A facturar /
 > Falta" mezclaba en la misma celda `"609 FC 3 −3, 760 −3, 859 −4"` — la operadora

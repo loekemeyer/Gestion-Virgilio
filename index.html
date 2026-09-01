@@ -6540,7 +6540,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.21";
+const APP_VERSION = "v12.22";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -15019,13 +15019,17 @@ async function stkOpenCajasPedidasArt(codEnc) {
   const body = document.getElementById("stkPopBody"); if (body) body.innerHTML = '<div class="stkpop-empty">Cargando pedidos…</div>';
   const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
   let base = [];
-  try { base = await fetch(SUPABASE_URL + "/rest/v1/PPP_Base_Pedidos?articulo=eq." + encodeURIComponent(_codB) + "&select=pedido,cajas&limit=20000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }); } catch (_e) {}
-  const pedByNp = {};
+  // v12.22 — se trae también `cliente`: es el fallback de Razón Social para las NP que NO
+  // están en Programación Diaria (las sin programar salían con la celda vacía).
+  try { base = await fetch(SUPABASE_URL + "/rest/v1/PPP_Base_Pedidos?articulo=eq." + encodeURIComponent(_codB) + "&select=pedido,cajas,cliente&limit=20000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }); } catch (_e) {}
+  const pedByNp = {}, cliByNp = {};
   base.forEach(function (x) {
     const np = String(x.pedido || "").trim().replace(/\.0+$/, "");
     // Si el código tenía sufijo, filtrar solo NPs de esa marca
     if (_empFiltro && np) { var _e = empresaDeNp(np); if (_e && _e !== _empFiltro) return; }
-    if (np) pedByNp[np] = (pedByNp[np] || 0) + (Number(x.cajas) || 0);
+    if (!np) return;
+    pedByNp[np] = (pedByNp[np] || 0) + (Number(x.cajas) || 0);
+    if (!cliByNp[np]) { var _cli = String(x.cliente || "").trim(); if (_cli) cliByNp[np] = _cli; }
   });
   const npsAll = Object.keys(pedByNp).filter(function (np) { return pedByNp[np] > 0.05; });
   if (!npsAll.length) { if (body) body.innerHTML = '<div class="stkpop-empty">Ningún pedido pidió ' + escapeHtml(_codDisp) + (_empFiltro ? ' (' + _empFiltro + ')' : '') + ' en la base de picking.</div>'; return; }
@@ -15042,9 +15046,18 @@ async function stkOpenCajasPedidasArt(codEnc) {
     const ent = await fetch(SUPABASE_URL + "/rest/v1/PPP_Entregados_Meta?np=in.(" + npsAll.slice(0, 800).map(encodeURIComponent).join(",") + ")&select=np&limit=20000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; });
     ent.forEach(function (x) { const np = String(x.np || "").trim().replace(/\.0+$/, ""); if (np) _facSet[np] = true; });
   } catch (_e) {}
+  // v12.22 — y las NP CANCELADAS (la operadora las marcó 🚫 "no va" → NP_Canceladas). Es el
+  // filtro que FALTABA acá: la columna (vista_stock_procesada.cajas_pedidas) y ocgDemanda()
+  // ya las descuentan, este pop-up no, así que mostraba cajas fantasma de pedidos cancelados
+  // y encima las marcaba ⚠ "sin programar" (una NP cancelada nunca se programa en el PPP).
+  let _canN = 0;
+  try {
+    const can = await fetch(SUPABASE_URL + "/rest/v1/NP_Canceladas?np=in.(" + npsAll.slice(0, 800).map(encodeURIComponent).join(",") + ")&select=np&limit=20000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; });
+    can.forEach(function (x) { const np = String(x.np || "").trim().replace(/\.0+$/, ""); if (np && pedByNp[np] != null && !_facSet[np]) { _facSet[np] = true; _canN++; } });
+  } catch (_e) {}
   const nps = npsAll.filter(function (np) { return !_facSet[np]; });
-  const yaFact = npsAll.length - nps.length;
-  if (!nps.length) { if (body) body.innerHTML = '<div class="stkpop-empty">Todo lo que pidió ' + escapeHtml(_codDisp) + (_empFiltro ? ' (' + _empFiltro + ')' : '') + ' ya está <b>facturado o entregado</b> (' + yaFact + ' NP). El recorrido está en 🕓 Historial.</div>'; return; }
+  const yaFact = npsAll.length - nps.length - _canN;
+  if (!nps.length) { if (body) body.innerHTML = '<div class="stkpop-empty">Todo lo que pidió ' + escapeHtml(_codDisp) + (_empFiltro ? ' (' + _empFiltro + ')' : '') + ' ya está <b>facturado, entregado o cancelado</b> (' + yaFact + ' facturadas/entregadas' + (_canN ? ' + ' + _canN + ' canceladas' : '') + '). El recorrido está en 🕓 Historial.</div>'; return; }
   const npInfo = {};
   try {
     const prog = await fetch(SUPABASE_PPP_PROG_ENDPOINT + "?np=in.(" + nps.map(encodeURIComponent).join(",") + ")&select=np,tanda,razon_social,fecha_entrega&limit=8000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; });
@@ -15077,12 +15090,15 @@ async function stkOpenCajasPedidasArt(codEnc) {
   const round1 = function (n) { return Math.round(n * 10) / 10; };
   nps.sort(function (a, b) { return String(a).localeCompare(String(b), undefined, { numeric: true }); });
   const totP = round1(nps.reduce(function (s, np) { return s + pedByNp[np]; }, 0));
-  const rowsArr = nps.map(function (np) { const info = npInfo[np] || {}, t = info.tanda || ""; return { np: np, tanda: t, rs: info.rs || "", fecha: info.fecha || "", sinProg: !npInfo[np], pidio: round1(pedByNp[np]), pickeado: !!(t && pickTandas[t]), separado: !!(t && sepTandas[t]) }; });
+  const rowsArr = nps.map(function (np) { const info = npInfo[np] || {}, t = info.tanda || ""; return { np: np, tanda: t, rs: info.rs || cliByNp[np] || "", fecha: info.fecha || "", sinProg: !npInfo[np], pidio: round1(pedByNp[np]), pickeado: !!(t && pickTandas[t]), separado: !!(t && sepTandas[t]) }; });
   _stkPop = { kind: "cajasPed", cod: cod, rows: rowsArr };   // v5.104: guardar para el export a Excel
   // v8.98 — cuáles NP están SIN programar en el PPP (las que disparan el ⚠ de la columna). Es "el argumento".
   var _spRows = rowsArr.filter(function (r) { return r.sinProg; });
   var _cSP = round1(_spRows.reduce(function (s, r) { return s + r.pidio; }, 0));
-  let h = '<div class="stkpop-hint"><b>' + escapeHtml(_codDisp) + '</b>' + (_empFiltro ? ' <b style="color:' + (_empFiltro === "LK" ? "#b91c1c" : "#1e40af") + '">' + _empFiltro + '</b>' : '') + ' · pedido <b>PENDIENTE</b>: <b>' + totP + ' cajas</b> en ' + nps.length + ' NP(s)' + (yaFact ? ' <small style="color:#94a3b8">(+' + yaFact + ' NP ya facturadas/entregadas — no se muestran; verlas en 🕓 Historial)</small>' : '') + '.' + (_spRows.length > 0 ? '<br><small style="color:#b45309">⚠️ ' + _spRows.length + ' NP (' + _cSP + ' cajas) en la base pero SIN programar en el PPP — marcadas ⚠️ abajo (esto dispara el ⚠️ de la columna).</small>' : '') + '</div>';
+  // v12.22 — detalle de lo descontado: facturadas/entregadas y canceladas por separado.
+  var _yaArr = []; if (yaFact > 0) _yaArr.push(yaFact + " NP ya facturadas/entregadas"); if (_canN > 0) _yaArr.push(_canN + " NP canceladas (🚫 no va)");
+  var _yaTxt = _yaArr.join(" · ");
+  let h = '<div class="stkpop-hint"><b>' + escapeHtml(_codDisp) + '</b>' + (_empFiltro ? ' <b style="color:' + (_empFiltro === "LK" ? "#b91c1c" : "#1e40af") + '">' + _empFiltro + '</b>' : '') + ' · pedido <b>PENDIENTE</b>: <b>' + totP + ' cajas</b> en ' + nps.length + ' NP(s)' + (_yaTxt ? ' <small style="color:#94a3b8">(+' + _yaTxt + ' — no se muestran; verlas en 🕓 Historial)</small>' : '') + '.' + (_spRows.length > 0 ? '<br><small style="color:#b45309">⚠️ ' + _spRows.length + ' NP (' + _cSP + ' cajas) en la base pero SIN programar en el PPP — marcadas ⚠️ abajo (esto dispara el ⚠️ de la columna).</small>' : '') + '</div>';
   h += '<div style="margin-bottom:10px"><button class="mva-clear" style="background:#166534;color:#fff;border-color:#166534" onclick="stkCajasPedidasExport()">⬇ Exportar a Excel</button></div>';
   // v8.90: formato tabla en lugar de lista
   h += '<div class="mva-tblwrap"><table class="mva-tbl"><thead><tr><th>NP</th><th>Razón Social</th><th class="num">Cajas</th><th style="text-align:center">📦 Pick</th><th style="text-align:center">🧾 Arm</th></tr></thead><tbody>';

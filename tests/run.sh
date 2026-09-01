@@ -213,4 +213,7 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== curso-dur-laboral (idea 2865: badge 'en curso' horario-laboral-aware, no reloj de pared) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/curso-dur-laboral.cjs
 
+echo "== cajped-canceladas (v12.22: el pop-up Cajas pedidas descuenta NP canceladas + RS de la base) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/cajped-canceladas.cjs
+
 echo "== TODO OK =="
