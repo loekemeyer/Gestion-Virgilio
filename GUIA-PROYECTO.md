@@ -12,7 +12,32 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-01 · Versión app al documentar: **v12.29**
+> Última actualización: 2026-09-01 · Versión app al documentar: **v12.30**
+>
+> Nota **v12.30** — **Facturable ya: qué mercadería se le puede facturar a un cliente
+> ANTES de cargar el camión.** Cuarta pestaña del overlay 💰 Deuda/Cobranzas
+> (📦 Facturable ya). Pedido del usuario: de las NP que todavía no se armaron, ver qué
+> artículos ya tienen stock en depósito para facturar y entregar esa parte ya, sin
+> esperar a que la NP entera esté lista. **Backend** (`sql/facturable_anticipado.sql`):
+> `vista_facturable_anticipado` cruza `PPP_Base_Pedidos` (lo pedido, por artículo) de
+> las NP **pendientes** (no están en `Facturacion_NP`, no están en `NP_Canceladas`)
+> contra `vista_saldos_stock.terminado` (stock disponible). **El stock es un pool
+> COMPARTIDO** entre todas las NP pendientes que piden el mismo artículo — comparar
+> cada NP contra el stock total sobre-contaría si dos NP piden lo mismo. Se reparte
+> por **prioridad de `fecha_entrega`** (la NP con entrega más próxima primero, `np`
+> como desempate) con una suma acumulada por *window function*: si el stock no
+> alcanza para todas las NP que piden un artículo, a las de entrega más lejana les
+> toca cobertura parcial o ninguna — nunca "todo o nada" por NP. Expone
+> `cajas_cubribles` (cuánto de lo pedido se puede facturar YA) y `cubre_completo`
+> (si cubre el pedido entero de ese artículo o sólo una parte). Valorización: misma
+> fórmula que `vista_facturacion_neto` (`precios_venta × uxb × (1-dto_vol) × 0,98`) —
+> mismas limitaciones ya documentadas ahí (súper no modelado → `es_super`; sin precio
+> → `sin_precio`, no se inventa valor). RPC `facturable_anticipado_resumen` (agregado
+> por NP, ordenado por $ estimado desc) y `facturable_anticipado_detalle` (por
+> artículo), mismo patrón `SECURITY DEFINER` + `EXECUTE` a anon que el resto del
+> módulo. Medido al armar esto: **141 NP pendientes con algo facturable ya, ~$200 M
+> estimados, 97,7% de los artículos con cobertura completa** (no sólo parcial).
+> Sólo lee y sugiere — no factura ni arma nada solo, la decisión la toma una persona.
 >
 > Nota **v12.29** — **Cruce Facturación vs ISIS: lo que calculamos vs lo que se
 > facturó de verdad.** Tercera pestaña del overlay 💰 Deuda/Cobranzas: **🔍 Facturación

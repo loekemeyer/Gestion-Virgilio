@@ -6524,7 +6524,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.29";
+const APP_VERSION = "v12.30";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -35533,8 +35533,108 @@ function cruceRender() {
 }
 window.cruceRender = cruceRender;
 
-/* ---------- Pantalla unificada: Deuda a cobrar + Cobranzas (valor por NP) ----------
-   Un solo botón / una sola pantalla con 2 pestañas. Reusa la lógica existente:
+/* ============================================================================
+   PESTAÑA: FACTURABLE YA (2026-09-01) — de las NP que todavía NO se armaron,
+   qué artículos ya tienen stock en depósito para facturarse y entregarse
+   antes de cargar el camión completo. El stock es un pool COMPARTIDO entre
+   todas las NP pendientes de ese artículo — la vista lo reparte por prioridad
+   (fecha_entrega más próxima primero), no todo-o-nada por NP. No arma ni
+   factura nada solo: es una lista para que una persona decida.
+   Backend: sql/facturable_anticipado.sql.
+   ============================================================================ */
+var _antState = { rows: [], q: "", empresa: null, offset: 0, limit: 100, total: 0 };
+
+async function anticipadoRefresh(reset) {
+  if (reset !== false) { _antState.offset = 0; _antState.rows = []; }
+  var cont = document.getElementById("antTabla");
+  if (cont && !_antState.rows.length) cont.innerHTML = '<div style="padding:20px;color:#64748b;">Cargando…</div>';
+  var r = await sb.rpc("facturable_anticipado_resumen", {
+    p_empresa: _antState.empresa || null,
+    p_q: _antState.q || null,
+    p_limit: _antState.limit,
+    p_offset: _antState.offset
+  });
+  if (r.error) { if (cont) cont.innerHTML = '<div style="padding:20px;color:#b91c1c;">Error: ' + r.error.message + '</div>'; return; }
+  var data = r.data || [];
+  _antState.rows = _antState.offset ? _antState.rows.concat(data) : data;
+  _antState.total = data.length ? (Number(data[0].total_count) || data.length) : 0;
+  anticipadoRender();
+}
+window.anticipadoRefresh = anticipadoRefresh;
+
+function anticipadoCargarMas() {
+  _antState.offset += _antState.limit;
+  anticipadoRefresh(false);
+}
+window.anticipadoCargarMas = anticipadoCargarMas;
+
+function anticipadoRender() {
+  var cont = document.getElementById("antTabla");
+  var res  = document.getElementById("antResumen");
+  if (!cont) return;
+  var rows = _antState.rows;
+  var valorTotal = rows.reduce(function(a, r) { return a + (Number(r.valor_estimado_total) || 0); }, 0);
+  var cajasTotal = rows.reduce(function(a, r) { return a + (Number(r.cajas_cubribles_total) || 0); }, 0);
+  if (res) res.innerHTML =
+    '<b>' + _antState.total + '</b> NP sin armar con algo facturable ya · <b>' + cajasTotal.toLocaleString('es-AR') + '</b> cajas · <b>' + _fmtPlata(valorTotal) + '</b> estimado' +
+    '<div style="margin-top:4px;font-size:12px;color:#94a3b8;">⚠ El stock se reparte por orden de fecha de entrega — si dos NP piden lo mismo, no alcanza para las dos, la de entrega más próxima se lleva la cobertura. 🛒 = cliente de súper, el $ no es confiable (lista negociada aparte). El valor no incluye artículos sin precio cargado.</div>';
+  if (!rows.length) { cont.innerHTML = '<div style="padding:20px;color:#64748b;text-align:center;">Nada facturable por adelantado ahora mismo.</div>'; return; }
+  var h = '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">' +
+    '<thead style="background:#f1f5f9;position:sticky;top:0;"><tr>' +
+      '<th style="padding:8px;text-align:left;border-bottom:1px solid #cbd5e1;">NP</th>' +
+      '<th style="padding:8px;text-align:left;border-bottom:1px solid #cbd5e1;">Cliente</th>' +
+      '<th style="padding:8px;text-align:left;border-bottom:1px solid #cbd5e1;">Entrega</th>' +
+      '<th style="padding:8px;text-align:right;border-bottom:1px solid #cbd5e1;">Artículos</th>' +
+      '<th style="padding:8px;text-align:right;border-bottom:1px solid #cbd5e1;">Cajas ya cubiertas</th>' +
+      '<th style="padding:8px;text-align:right;border-bottom:1px solid #cbd5e1;">Valor estimado</th>' +
+      '<th style="padding:8px;border-bottom:1px solid #cbd5e1;"></th>' +
+    '</tr></thead><tbody>';
+  h += rows.map(function(r) {
+    var completos = Number(r.cant_articulos_completos) || 0;
+    var cubribles = Number(r.cant_articulos_cubribles) || 0;
+    var totalArt = Number(r.cant_articulos_np) || cubribles;
+    var artTxt = completos + '/' + totalArt + (cubribles > completos ? ' (' + (cubribles - completos) + ' parcial)' : '');
+    return '<tr>' +
+      '<td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;"><b>' + (r.np || '') + '</b></td>' +
+      '<td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;">' + (r.cod_cliente || '') + ' ' + (r.rs_virgilio || '—') + (r.es_super ? ' 🛒' : '') + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;font-size:12px;color:#64748b;">' + (r.fecha_entrega || '—') + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;text-align:right;">' + artTxt + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;text-align:right;font-weight:bold;">' + (Number(r.cajas_cubribles_total) || 0).toLocaleString('es-AR') + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;text-align:right;color:#059669;font-weight:bold;">' + _fmtPlata(r.valor_estimado_total) + (r.tiene_sin_precio ? ' *' : '') + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;text-align:center;white-space:nowrap;">' +
+        '<button onclick="anticipadoVerDetalle(\'' + String(r.np).replace(/'/g, "\\'") + '\')" style="padding:4px 8px;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:4px;cursor:pointer;font-size:12px;">Detalle</button>' +
+      '</td>' +
+    '</tr>';
+  }).join("");
+  h += '</tbody></table></div>';
+  if (_antState.rows.length < _antState.total) {
+    h += '<div style="text-align:center;padding:12px;"><button onclick="anticipadoCargarMas()" style="padding:8px 16px;background:#1e6bd6;color:#fff;border:none;border-radius:6px;cursor:pointer;">Cargar más (' + (_antState.total - _antState.rows.length) + ' restantes)</button></div>';
+  }
+  cont.innerHTML = h;
+}
+window.anticipadoRender = anticipadoRender;
+
+async function anticipadoVerDetalle(np) {
+  var r = await sb.rpc("facturable_anticipado_detalle", { p_np: np });
+  if (r.error) { alert("Error: " + r.error.message); return; }
+  var rows = r.data || [];
+  var cab = _antState.rows.find(function(x) { return x.np === np; });
+  var nombre = (cab && cab.rs_virgilio) || np;
+  var w = window.open("", "_blank", "width=780,height=600,resizable=yes,scrollbars=yes");
+  var h = '<html><head><title>Facturable ya — NP ' + np + '</title><style>body{font-family:Arial;margin:16px;font-size:13px}table{width:100%;border-collapse:collapse}th,td{padding:6px 8px;border-bottom:1px solid #e2e8f0;text-align:left}th{background:#f1f5f9}.p{text-align:right}.no{color:#b45309}</style></head><body>';
+  h += '<h2>NP ' + np + ' — ' + nombre + '</h2>';
+  h += '<table><thead><tr><th>Artículo</th><th class="p">Pedidas</th><th class="p">Cubribles ahora</th><th>¿Completo?</th><th class="p">Valor est.</th></tr></thead><tbody>';
+  h += rows.map(function(m) {
+    var cls = m.cubre_completo ? '' : 'no';
+    return '<tr class="' + cls + '"><td>' + (m.articulo || '') + '</td><td class="p">' + m.cajas_pedidas + '</td><td class="p">' + m.cajas_cubribles + '</td><td>' + (m.cubre_completo ? 'sí' : 'parcial') + '</td><td class="p">' + (m.sin_precio ? '—' : _fmtPlata(m.valor_estimado)) + '</td></tr>';
+  }).join("");
+  h += '</tbody></table><p style="color:#94a3b8;font-size:11px;">Naranja = sólo alcanza para una parte de lo pedido de ese artículo.</p></body></html>';
+  w.document.write(h); w.document.close();
+}
+window.anticipadoVerDetalle = anticipadoVerDetalle;
+
+/* ---------- Pantalla unificada: Deuda a cobrar + Cobranzas (valor por NP) + Cruce Facturación + Facturable ya ----------
+   Un solo botón / una sola pantalla con 4 pestañas. Reusa la lógica existente:
    pestaña "Deuda" = deudaRefresh/deudaRender; pestaña "Valor por NP" = cobLoad/cobRender.
    No duplica render: solo aporta el shell con las pestañas y los contenedores que cada
    render espera (#deudaResumen/#deudaTabla y #cobBody). */
@@ -35555,6 +35655,7 @@ async function openCobros(tab) {
         '<button id="cobrosTabDeuda" onclick="cobrosSetTab(\'deuda\')">💰 Deuda a cobrar</button>' +
         '<button id="cobrosTabCob" onclick="cobrosSetTab(\'cob\')">💵 Valor por NP</button>' +
         '<button id="cobrosTabCruce" onclick="cobrosSetTab(\'cruce\')">🔍 Facturación vs ISIS</button>' +
+        '<button id="cobrosTabAnticipado" onclick="cobrosSetTab(\'anticipado\')">📦 Facturable ya</button>' +
       '</div>' +
       '<button onclick="cobrosClose()" style="margin-left:auto;background:#dc2626;color:#fff;border:none;border-radius:8px;padding:7px 16px;font-weight:800;cursor:pointer;">Cerrar</button>' +
     '</div>' +
@@ -35563,13 +35664,29 @@ async function openCobros(tab) {
 }
 window.openCobros = openCobros;
 function cobrosSetTab(tab) {
-  _cobrosTab = (tab === "cob") ? "cob" : (tab === "cruce") ? "cruce" : "deuda";
+  _cobrosTab = (tab === "cob") ? "cob" : (tab === "cruce") ? "cruce" : (tab === "anticipado") ? "anticipado" : "deuda";
   var bd = document.getElementById("cobrosBody"); if (!bd) return;
-  var td = document.getElementById("cobrosTabDeuda"), tc = document.getElementById("cobrosTabCob"), tx = document.getElementById("cobrosTabCruce");
+  var td = document.getElementById("cobrosTabDeuda"), tc = document.getElementById("cobrosTabCob"), tx = document.getElementById("cobrosTabCruce"), ta = document.getElementById("cobrosTabAnticipado");
   if (td) td.style.cssText = _cobrosTabCss(_cobrosTab === "deuda");
   if (tc) tc.style.cssText = _cobrosTabCss(_cobrosTab === "cob");
   if (tx) tx.style.cssText = _cobrosTabCss(_cobrosTab === "cruce");
-  if (_cobrosTab === "cruce") {
+  if (ta) ta.style.cssText = _cobrosTabCss(_cobrosTab === "anticipado");
+  if (_cobrosTab === "anticipado") {
+    bd.innerHTML =
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:8px;flex-wrap:wrap;">' +
+        '<h1 style="margin:0;font-size:20px;">📦 Facturable ya</h1>' +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
+          '<input id="antQ" placeholder="🔎 Cliente / razón social / NP" style="padding:8px;font-size:14px;border:1px solid #cbd5e1;border-radius:6px;min-width:200px;" oninput="_antState.q=this.value;clearTimeout(window._antQT);window._antQT=setTimeout(function(){anticipadoRefresh();},400);">' +
+          '<select id="antEmp" style="padding:8px;font-size:14px;border:1px solid #cbd5e1;border-radius:6px;" onchange="_antState.empresa=this.value||null;anticipadoRefresh();">' +
+            '<option value="">Todas las empresas</option><option value="lk">Loekemeyer</option><option value="chef">Chef</option>' +
+          '</select>' +
+          '<button onclick="anticipadoRefresh()" style="padding:8px 12px;background:#1e6bd6;color:#fff;border:none;border-radius:6px;cursor:pointer;">↻ Refrescar</button>' +
+        '</div>' +
+      '</div>' +
+      '<div id="antResumen" style="margin-bottom:10px;color:#64748b;font-size:13px;">Cargando…</div>' +
+      '<div id="antTabla"></div>';
+    anticipadoRefresh();
+  } else if (_cobrosTab === "cruce") {
     bd.innerHTML =
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:8px;flex-wrap:wrap;">' +
         '<h1 style="margin:0;font-size:20px;">🔍 Facturación vs ISIS</h1>' +
