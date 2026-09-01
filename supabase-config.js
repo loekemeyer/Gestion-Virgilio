@@ -13,8 +13,9 @@
    - fichada.html      → carga esto antes de fichada-config.js
    - fichadas-monitor.html / productividad.html → <script src>
 
-   ⚠ La key de LK (kwkclwhmoygunqmlegrg) es OTRA y sigue en index.html
-   (SUPABASE_LK_KEY) + admin/admin.js — no la mezcla acá.
+   ⚠ La key de LK (kwkclwhmoygunqmlegrg) es OTRA y vive en admin/admin.js
+   (index.html tuvo una copia propia para el viejo módulo Deuda — se borró
+   2026-09-01 al reemplazarlo por Deudores, que no toca LK) — no la mezcla acá.
    ========================================================================= */
 (function (g) {
   g.VIR_SUPABASE_URL = "https://hrxfctzncixxqmpfhskv.supabase.co";

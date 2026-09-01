@@ -4107,20 +4107,6 @@ const SUPABASE_FACTURACION_NP_ENDPOINT =
   SUPABASE_URL + "/rest/v1/Facturacion_NP";
 
 /* ───────────────────────────────────────────────────────────────────────────
-   PROYECTO SUPABASE LK (kwkclwhmoygunqmlegrg) — segundo backend, SOLO para
-   valorizar la deuda al tickear una NP en Facturación. El browser lee
-   products (list_price, uxb) y customers (dto_vol) de LK y calcula el monto
-   línea por línea; después llama a la RPC deuda_registrar_facturado en
-   Virgilio con las líneas ya valorizadas. La anon key es la misma que ya
-   está en admin/admin.js y admin/*.js del propio repo — es la key pública
-   del proyecto LK, no rota nada extra. Si LK rota anon key, actualizar
-   también acá.
-   ─────────────────────────────────────────────────────────────────────────── */
-const SUPABASE_LK_URL = "https://kwkclwhmoygunqmlegrg.supabase.co";
-const SUPABASE_LK_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt3a2Nsd2htb3lndW5xbWxlZ3JnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk1MjA2NzUsImV4cCI6MjA4NTA5NjY3NX0.soqPY5hfA3RkAJ9jmIms8UtEGUc4WpZztpEbmDijOgU";
-
-/* ───────────────────────────────────────────────────────────────────────────
    FUENTE DE DATOS PPP (programación / pedidos / m³). Históricamente sale de
    Google Sheets (gviz CSV). Estas tablas espejan esas hojas en Supabase para
    sacar la dependencia de Google y poder calcular m³ por SQL. Las llena la
@@ -6538,7 +6524,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.24";
+const APP_VERSION = "v12.25";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -34004,12 +33990,9 @@ window.facTickNP = async function(btn){
     return;
   }
 
-  // v9.23: MÓDULO DEUDA — al tickear una NP, valorizar sus líneas contra el
-  // precio de lista de LK + descuento del cliente y sumar al saldo. Solo NP
-  // 9xxxx (Loekemeyer); Chef (4xxxx) queda fuera. Fire-and-forget: si falla,
-  // se loguea pero no bloquea la facturación (la NP ya se guardó arriba).
-  try { deudaRegistrarNP(np, cod, rs).catch(function(err){ console.warn("[deuda] fail:", np, err); }); }
-  catch(_e){ console.warn("[deuda] sync throw:", _e); }
+  // 2026-09-01: el registro manual de deuda por tick (v9.23) se dio de baja —
+  // el módulo Deudores nuevo lee isis_lk/isis_ch.documentos (la factura real
+  // del ISIS) directo, no hace falta anotar nada acá.
 
   // v5.95: drenar de "a facturar" los artículos de ESTA NP ya (no esperar al 100%).
   // Así una NP vacía o sin facturar no deja trabado el stock de las demás.
@@ -34060,11 +34043,7 @@ window.facRevertir = async function(){
       headers
     });
     if (!r.ok) throw new Error("HTTP " + r.status);
-    // v9.23: MÓDULO DEUDA — al revertir masivo, borrar también los asientos
-    // de deuda de esas NPs. Fire-and-forget por NP (paralelo, sin bloqueo).
-    _facNpsHoy.forEach(function(np){
-      deudaBorrarNP(np).catch(function(err){ console.warn("[deuda] revert fail:", np, err); });
-    });
+    // 2026-09-01: nada que revertir en Deudores — no registra por tick (ver arriba).
     // Los revertidos se borraron de Facturacion_NP → deben volver a "pendientes":
     // sacarlos también de _facNpsTodos y forzar su refresco en el próximo facTick.
     _facNpsHoy.forEach(function(np){ _facNpsTodos.delete(np); });
@@ -35305,242 +35284,135 @@ window.__authClientReady = true;   // el failsafe de arriba distingue "cliente v
 applyAuthState();
 
 /* ============================================================================
-   v9.23 — MÓDULO DEUDA A COBRAR
-   Se dispara al tickear una NP en Facturación. Valoriza línea por línea con
-   precios de LK (products.list_price × products.uxb, customers.dto_vol) + el
-   2% del descuento web y suma al saldo del cliente. Solo Loekemeyer (NP 9xxxx).
-   Cliente Supabase LK (segundo, anon key pública ya expuesta en /admin/).
-   Backend Virgilio: tabla deuda_movimientos + vista_deuda_saldo + 3 RPCs.
+   MÓDULO DEUDORES (2026-09-01) — reemplaza al v9.23/v11.68 "Deuda a cobrar".
+   El viejo dependía de tickear "Facturar" en el celular (deuda_movimientos,
+   0 filas en producción — fallaba en silencio, fire-and-forget) y revalorizaba
+   a mano con precios de LK, duplicando lo que ya hace vista_facturacion_neto.
+   Este lee isis_lk/isis_ch.documentos — las facturas reales que ya sube el
+   agente local del ISIS — así que no hay nada que registrar: la deuda existe
+   apenas se factura. Backend: sql/deudores.sql (vista_deudores_documentos,
+   deudores_resumen, deudores_detalle, cobranzas_escalones, deudores_condiciones,
+   cobranzas_excepciones). Fase 1: deuda BRUTA, sin cobros restados — por eso
+   el resumen se acota a los últimos 12 meses por defecto (sumar todo desde
+   2019 sin descontar pagos da un número que no significa nada).
    ============================================================================ */
-var _sbLK = null;
-function _getSbLK() {
-  if (_sbLK) return _sbLK;
-  try {
-    _sbLK = supabase.createClient(SUPABASE_LK_URL, SUPABASE_LK_KEY, {
-      auth: { persistSession: false, autoRefreshToken: false },
-      global: { headers: { "X-Client-Info": "virgilio-deuda" } }
-    });
-  } catch (e) { console.warn("[deuda] createClient LK failed:", e); return null; }
-  return _sbLK;
-}
+var _deudaState = { rows: [], q: "", empresa: null, tramo: null, offset: 0, limit: 200, total: 0 };
 
-// Cache in-memory de precios y descuentos de LK durante la sesión. Vive lo que
-// vive la pestaña — al recargar se vuelve a pedir. Simple y suficiente para el
-// caso de uso (ticks de facturación puntuales).
-var _lkPrecios  = {};   // { cod_art: { uxb, list_price } }
-var _lkClientes = {};   // { cod_cliente: { dto_vol, razon_social } }
-var LK_WEB_DTO = 0.02;  // app_settings.web_order_discount default (misma constante que usa LK)
-
-async function _lkGetPrecios(codArts) {
-  const faltan = codArts.filter(function(c){ return !(c in _lkPrecios); });
-  if (!faltan.length) return _lkPrecios;
-  const sb = _getSbLK(); if (!sb) return _lkPrecios;
-  // Traigo también los de loke_products (línea Loke) porque algunos códigos
-  // no están en products (los propios de la marca Loke).
-  const [pr, lp] = await Promise.all([
-    sb.from("products").select("cod,uxb,list_price").in("cod", faltan),
-    sb.from("loke_products").select("cod,uxb,list_price").in("cod", faltan),
-  ]);
-  (pr.data || []).forEach(function(r){ _lkPrecios[r.cod] = { uxb: Number(r.uxb)||0, list_price: Number(r.list_price)||0 }; });
-  (lp.data || []).forEach(function(r){ if (!_lkPrecios[r.cod]) _lkPrecios[r.cod] = { uxb: Number(r.uxb)||0, list_price: Number(r.list_price)||0 }; });
-  // Marcar los que no aparecieron para no re-pedirlos.
-  faltan.forEach(function(c){ if (!_lkPrecios[c]) _lkPrecios[c] = { uxb: 0, list_price: 0, _missing: true }; });
-  return _lkPrecios;
-}
-
-async function _lkGetCliente(cod) {
-  if (cod in _lkClientes) return _lkClientes[cod];
-  const sb = _getSbLK(); if (!sb) return { dto_vol: 0 };
-  const r = await sb.from("customers").select("cod_cliente,dto_vol,razon_social").eq("cod_cliente", cod).maybeSingle();
-  const row = r.data || {};
-  _lkClientes[cod] = { dto_vol: Number(row.dto_vol) || 0, razon_social: row.razon_social || null };
-  return _lkClientes[cod];
-}
-
-// Se llama desde el flow de facturación después del POST OK a Facturacion_NP.
-async function deudaRegistrarNP(np, codCliente, razonSocial) {
-  const npStr = String(np || "").trim();
-  if (!/^9/.test(npStr)) return;   // Solo Loekemeyer (NP 9xxxx). Chef fuera.
-  if (!codCliente) return;
-  // Leer líneas de la NP desde Virgilio.
-  const linRes = await sb.from("PPP_Base_Pedidos").select("articulo,cajas").eq("pedido", npStr);
-  if (linRes.error) throw linRes.error;
-  const lineasRaw = (linRes.data || []).filter(function(x){ return x.articulo && Number(x.cajas) > 0; });
-  if (!lineasRaw.length) return;
-  // Precios LK + descuento cliente.
-  const codArts = Array.from(new Set(lineasRaw.map(function(x){ return String(x.articulo).trim(); })));
-  const [precios, cliente] = await Promise.all([_lkGetPrecios(codArts), _lkGetCliente(String(codCliente))]);
-  const dtoVol = Number(cliente.dto_vol) || 0;
-  const rs2 = razonSocial || cliente.razon_social || null;
-  // Valorizar. Fórmula = misma que Ranking Inactivos de LK:
-  //   cajas × uxb × list_price × (1 − dto_vol) × (1 − web_order_discount)
-  const lineas = lineasRaw.map(function(x){
-    const cod = String(x.articulo).trim();
-    const cajas = Number(x.cajas) || 0;
-    const p = precios[cod] || { uxb: 0, list_price: 0 };
-    const sub = cajas * (p.uxb || 0) * (p.list_price || 0) * (1 - dtoVol) * (1 - LK_WEB_DTO);
-    return {
-      cod: cod, cajas: cajas,
-      uxb: p.uxb || 0, list_price: p.list_price || 0,
-      dto_vol: dtoVol, web_dto: LK_WEB_DTO,
-      subtotal: Math.round(sub * 100) / 100
-    };
+async function deudaRefresh(reset) {
+  if (reset !== false) { _deudaState.offset = 0; _deudaState.rows = []; }
+  var cont = document.getElementById("deudaTabla");
+  if (cont && !_deudaState.rows.length) cont.innerHTML = '<div style="padding:20px;color:#64748b;">Cargando saldos…</div>';
+  var r = await sb.rpc("deudores_resumen", {
+    p_empresa: _deudaState.empresa || null,
+    p_q: _deudaState.q || null,
+    p_tramo: _deudaState.tramo || null,
+    p_limit: _deudaState.limit,
+    p_offset: _deudaState.offset
   });
-  // Fallback razón social: la que vino del tick, o la del padrón LK, o el
-  // cliente que vino en PPP_Base_Pedidos (que a veces trae razón social en el
-  // campo "cliente" en vez de código — para NP nuevas sin match en LK).
-  const legajo = (typeof legajoInput !== "undefined" && legajoInput && legajoInput.value) || "admin";
-  const rpc = await sb.rpc("deuda_registrar_facturado", {
-    p_np: npStr, p_cod_cliente: String(codCliente),
-    p_razon_social: rs2, p_lineas: lineas, p_legajo: legajo
-  });
-  if (rpc.error) throw rpc.error;
-  return rpc.data && rpc.data[0];
-}
-
-async function deudaBorrarNP(np) {
-  const r = await sb.rpc("deuda_borrar_facturado", { p_np: String(np) });
-  if (r.error) throw r.error;
-  return r.data || 0;
-}
-
-/* ---------- Pantalla "Deuda a cobrar" ---------- */
-var _deudaState = { rows: [], q: "", sort: "saldo_desc" };
-
-async function openDeuda() {
-  if (typeof requireSupervisor === "function" && !requireSupervisor()) return;
-  // Reusa el patrón de otras pantallas: showSection("deuda") si tiene sección,
-  // o crea overlay al vuelo. Vamos con overlay para no meter markup en el HTML.
-  let host = document.getElementById("deudaOverlay");
-  if (!host) {
-    host = document.createElement("div");
-    host.id = "deudaOverlay";
-    host.style.cssText = "position:fixed;inset:0;background:#fff;z-index:9500;overflow:auto;padding:16px;font-family:Arial,sans-serif;";
-    document.body.appendChild(host);
-  }
-  host.style.display = "block";
-  host.innerHTML =
-    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:8px;flex-wrap:wrap;">' +
-      '<h1 style="margin:0;font-size:22px;">💰 Deuda a cobrar</h1>' +
-      '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
-        '<input id="deudaQ" placeholder="🔎 Cliente / razón social / NP" style="padding:8px;font-size:14px;border:1px solid #cbd5e1;border-radius:6px;min-width:220px;" oninput="_deudaState.q=this.value;deudaRender();">' +
-        '<button onclick="deudaAbrirCobro()" style="padding:8px 14px;background:#059669;color:#fff;border:none;border-radius:6px;cursor:pointer;">+ Registrar cobro</button>' +
-        '<button onclick="deudaRefresh()" style="padding:8px 12px;background:#1e6bd6;color:#fff;border:none;border-radius:6px;cursor:pointer;">↻ Refrescar</button>' +
-        '<button onclick="closeDeuda()" style="padding:8px 12px;background:#e2e8f0;color:#333;border:none;border-radius:6px;cursor:pointer;">Cerrar</button>' +
-      '</div>' +
-    '</div>' +
-    '<div id="deudaResumen" style="margin-bottom:10px;color:#64748b;font-size:13px;">Cargando…</div>' +
-    '<div id="deudaTabla"></div>';
-  await deudaRefresh();
-}
-window.openDeuda = openDeuda;
-
-function closeDeuda(){ const h = document.getElementById("deudaOverlay"); if (h) h.style.display = "none"; }
-window.closeDeuda = closeDeuda;
-
-async function deudaRefresh() {
-  const cont = document.getElementById("deudaTabla");
-  if (cont) cont.innerHTML = '<div style="padding:20px;color:#64748b;">Cargando saldos…</div>';
-  const r = await sb.from("vista_deuda_saldo").select("*").order("saldo", { ascending: false });
   if (r.error) { if (cont) cont.innerHTML = '<div style="padding:20px;color:#b91c1c;">Error: ' + r.error.message + '</div>'; return; }
-  _deudaState.rows = r.data || [];
+  var data = r.data || [];
+  _deudaState.rows = _deudaState.offset ? _deudaState.rows.concat(data) : data;
+  _deudaState.total = data.length ? (Number(data[0].total_count) || data.length) : 0;
   deudaRender();
 }
 window.deudaRefresh = deudaRefresh;
 
-function _fmtPlata(n){
-  const v = Number(n) || 0;
+function deudaCargarMas() {
+  _deudaState.offset += _deudaState.limit;
+  deudaRefresh(false);
+}
+window.deudaCargarMas = deudaCargarMas;
+
+function _fmtPlata(n) {
+  var v = Number(n) || 0;
   return v.toLocaleString("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 });
 }
+function _fmtFecha(s) {
+  if (!s) return "—";
+  var p = String(s).split("-");
+  return p.length === 3 ? (p[2] + "/" + p[1] + "/" + p[0].slice(2)) : s;
+}
+
+var TRAMO_LABEL = { por_vencer: "Por vencer", "1_30": "1-30 días", "31_60": "31-60 días", "61_90": "61-90 días", mas_90: "+90 días", sin_plazo: "Sin plazo" };
+var TRAMO_COLOR = { por_vencer: "#059669", "1_30": "#ca8a04", "31_60": "#d97706", "61_90": "#dc2626", mas_90: "#991b1b", sin_plazo: "#64748b" };
 
 function deudaRender() {
-  const cont = document.getElementById("deudaTabla");
-  const res  = document.getElementById("deudaResumen");
+  var cont = document.getElementById("deudaTabla");
+  var res  = document.getElementById("deudaResumen");
   if (!cont) return;
-  const q = (_deudaState.q || "").toLowerCase().trim();
-  const rows = _deudaState.rows.filter(function(r){
-    if (!q) return true;
-    return (r.cod_cliente + " " + (r.razon_social||"")).toLowerCase().indexOf(q) >= 0;
-  });
-  const totalFact = rows.reduce(function(a,r){ return a + (Number(r.facturado_total)||0); }, 0);
-  const totalCob  = rows.reduce(function(a,r){ return a + (Number(r.cobrado_total)||0); }, 0);
-  const totalSaldo = rows.reduce(function(a,r){ return a + (Number(r.saldo)||0); }, 0);
+  var rows = _deudaState.rows;
+  var totalSaldo = rows.reduce(function(a, r) { return a + (Number(r.saldo) || 0); }, 0);
+  var totalVencido = rows.reduce(function(a, r) {
+    return a + (Number(r.tramo_1_30) || 0) + (Number(r.tramo_31_60) || 0) + (Number(r.tramo_61_90) || 0) + (Number(r.tramo_mas_90) || 0);
+  }, 0);
+  var totalSinPlazo = rows.reduce(function(a, r) { return a + (Number(r.sin_plazo) || 0); }, 0);
   if (res) res.innerHTML =
-    '<b>' + rows.length + '</b> cliente(s) · Facturado <b>' + _fmtPlata(totalFact) + '</b> · Cobrado <b>' + _fmtPlata(totalCob) + '</b> · Saldo <b style="color:' + (totalSaldo > 0 ? '#b91c1c' : '#059669') + '">' + _fmtPlata(totalSaldo) + '</b>';
-  if (!rows.length) { cont.innerHTML = '<div style="padding:20px;color:#64748b;text-align:center;">Sin movimientos todavía. Tickeá una NP en Facturación y volvé.</div>'; return; }
-  let h = '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:14px;">' +
+    '<b>' + _deudaState.total + '</b> cliente(s) con factura en los últimos 12 meses · Bruto <b>' + _fmtPlata(totalSaldo) +
+    '</b> · Vencido <b style="color:#dc2626">' + _fmtPlata(totalVencido) + '</b> · Sin plazo <b style="color:#64748b">' + _fmtPlata(totalSinPlazo) + '</b>' +
+    '<div style="margin-top:4px;font-size:12px;color:#94a3b8;">⚠ Bruto: todavía no descuenta cobros (fase 1 — llega con la conciliación bancaria).</div>';
+  if (!rows.length) { cont.innerHTML = '<div style="padding:20px;color:#64748b;text-align:center;">Sin facturas en el período. Probá ampliar el filtro.</div>'; return; }
+  var h = '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">' +
     '<thead style="background:#f1f5f9;position:sticky;top:0;"><tr>' +
-      '<th style="padding:8px;text-align:left;border-bottom:1px solid #cbd5e1;">Código</th>' +
-      '<th style="padding:8px;text-align:left;border-bottom:1px solid #cbd5e1;">Razón social</th>' +
+      '<th style="padding:8px;text-align:left;border-bottom:1px solid #cbd5e1;">Cliente</th>' +
+      '<th style="padding:8px;text-align:left;border-bottom:1px solid #cbd5e1;">Emp.</th>' +
       '<th style="padding:8px;text-align:right;border-bottom:1px solid #cbd5e1;">Facturas</th>' +
-      '<th style="padding:8px;text-align:right;border-bottom:1px solid #cbd5e1;">Facturado</th>' +
-      '<th style="padding:8px;text-align:right;border-bottom:1px solid #cbd5e1;">Cobrado</th>' +
       '<th style="padding:8px;text-align:right;border-bottom:1px solid #cbd5e1;">Saldo</th>' +
-      '<th style="padding:8px;text-align:left;border-bottom:1px solid #cbd5e1;">Últ. fact.</th>' +
-      '<th style="padding:8px;text-align:left;border-bottom:1px solid #cbd5e1;">Últ. pago</th>' +
+      '<th style="padding:8px;text-align:left;border-bottom:1px solid #cbd5e1;">Peor tramo</th>' +
+      '<th style="padding:8px;text-align:left;border-bottom:1px solid #cbd5e1;">Próximo corte</th>' +
+      '<th style="padding:8px;text-align:left;border-bottom:1px solid #cbd5e1;">Últ. factura</th>' +
       '<th style="padding:8px;border-bottom:1px solid #cbd5e1;"></th>' +
     '</tr></thead><tbody>';
-  h += rows.map(function(r){
-    const sal = Number(r.saldo) || 0;
+  h += rows.map(function(r) {
+    var peor = 'por_vencer';
+    ['1_30', '31_60', '61_90', 'mas_90'].forEach(function(t) { if (Number(r['tramo_' + t] || 0) !== 0) peor = t; });
+    if (peor === 'por_vencer' && Number(r.sin_plazo || 0) !== 0) peor = 'sin_plazo';
+    var sal = Number(r.saldo) || 0;
+    var prox = r.escalon_vence
+      ? (Math.round((r.escalon_dto || 0) * 100) + '% hasta ' + _fmtFecha(r.escalon_vence))
+      : '—';
     return '<tr>' +
-      '<td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;"><b>' + (r.cod_cliente||'') + '</b></td>' +
-      '<td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;">' + (r.razon_social||'—') + '</td>' +
-      '<td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;text-align:right;">' + (r.cant_facturas||0) + '</td>' +
-      '<td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;text-align:right;">' + _fmtPlata(r.facturado_total) + '</td>' +
-      '<td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;text-align:right;color:#059669;">' + _fmtPlata(r.cobrado_total) + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;"><b>' + (r.cod_cliente || '') + '</b> ' + (r.razon_social || '—') + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;">' + (r.empresas || []).join(' + ') + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;text-align:right;">' + (r.cant_documentos || 0) + '</td>' +
       '<td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;text-align:right;font-weight:bold;color:' + (sal > 0 ? '#b91c1c' : '#059669') + '">' + _fmtPlata(sal) + '</td>' +
-      '<td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;font-size:12px;color:#64748b;">' + (r.ultima_factura||'—') + '</td>' +
-      '<td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;font-size:12px;color:#64748b;">' + (r.ultimo_pago||'—') + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;"><span style="color:' + TRAMO_COLOR[peor] + ';font-weight:600;">' + TRAMO_LABEL[peor] + '</span></td>' +
+      '<td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;font-size:12px;">' + prox + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;font-size:12px;color:#64748b;">' + _fmtFecha(r.ultima_factura) + '</td>' +
       '<td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;text-align:center;white-space:nowrap;">' +
-        '<button onclick="deudaVerDetalle(\'' + String(r.cod_cliente).replace(/'/g,"\\'") + '\')" style="padding:4px 8px;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:4px;cursor:pointer;font-size:12px;margin-right:4px;">Detalle</button>' +
-        '<button onclick="deudaAbrirCobro(\'' + String(r.cod_cliente).replace(/'/g,"\\'") + '\')" style="padding:4px 8px;background:#059669;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px;">Cobrar</button>' +
+        '<button onclick="deudaVerDetalle(\'' + String(r.deudor_id).replace(/'/g, "\\'") + '\')" style="padding:4px 8px;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:4px;cursor:pointer;font-size:12px;">Detalle</button>' +
       '</td>' +
     '</tr>';
   }).join("");
   h += '</tbody></table></div>';
+  if (_deudaState.rows.length < _deudaState.total) {
+    h += '<div style="text-align:center;padding:12px;"><button onclick="deudaCargarMas()" style="padding:8px 16px;background:#1e6bd6;color:#fff;border:none;border-radius:6px;cursor:pointer;">Cargar más (' + (_deudaState.total - _deudaState.rows.length) + ' restantes)</button></div>';
+  }
   cont.innerHTML = h;
 }
 window.deudaRender = deudaRender;
 
-async function deudaVerDetalle(cod) {
-  const r = await sb.from("deuda_movimientos").select("*").eq("cod_cliente", cod).order("ts", { ascending: false });
+async function deudaVerDetalle(deudorId) {
+  var r = await sb.rpc("deudores_detalle", { p_deudor_id: deudorId });
   if (r.error) { alert("Error: " + r.error.message); return; }
-  const rows = r.data || [];
-  const nombre = (rows[0] && rows[0].razon_social) || cod;
-  const w = window.open("", "_blank", "width=780,height=600,resizable=yes,scrollbars=yes");
-  let h = '<html><head><title>Deuda ' + cod + '</title><style>body{font-family:Arial;margin:16px;font-size:13px}table{width:100%;border-collapse:collapse}th,td{padding:6px 8px;border-bottom:1px solid #e2e8f0;text-align:left}th{background:#f1f5f9}.p{text-align:right}.pos{color:#b91c1c}.neg{color:#059669}</style></head><body>';
-  h += '<h2>' + nombre + ' <small style="color:#64748b;">(' + cod + ')</small></h2>';
-  h += '<table><thead><tr><th>Fecha</th><th>NP</th><th>Tipo</th><th class="p">Monto</th><th>Nota</th></tr></thead><tbody>';
-  h += rows.map(function(m){
-    const cls = Number(m.monto) > 0 ? 'pos' : 'neg';
-    const nota = m.tipo === 'facturado'
-      ? ((m.detalle && Array.isArray(m.detalle)) ? (m.detalle.length + ' líneas') : '')
-      : ((m.detalle && m.detalle.nota) || '');
-    return '<tr><td>' + (m.fecha||'') + '</td><td>' + (m.np||'—') + '</td><td>' + m.tipo + '</td><td class="p ' + cls + '">' + _fmtPlata(m.monto) + '</td><td>' + nota + '</td></tr>';
+  var rows = r.data || [];
+  var cab = _deudaState.rows.find(function(x) { return x.deudor_id === deudorId; });
+  var nombre = (cab && cab.razon_social) || deudorId;
+  var w = window.open("", "_blank", "width=880,height=640,resizable=yes,scrollbars=yes");
+  var h = '<html><head><title>Deuda ' + nombre + '</title><style>body{font-family:Arial;margin:16px;font-size:13px}table{width:100%;border-collapse:collapse}th,td{padding:6px 8px;border-bottom:1px solid #e2e8f0;text-align:left}th{background:#f1f5f9}.p{text-align:right}.neg{color:#059669}</style></head><body>';
+  h += '<h2>' + nombre + ' <small style="color:#64748b;">(CUIT ' + deudorId + ')</small></h2>';
+  h += '<table><thead><tr><th>Fecha</th><th>Emp.</th><th>Comprobante</th><th>Condición</th><th class="p">Importe</th><th>Vence</th><th>Tramo</th></tr></thead><tbody>';
+  h += rows.map(function(m) {
+    var cls = Number(m.importe) < 0 ? 'neg' : '';
+    return '<tr><td>' + (m.fecha || '') + '</td><td>' + m.empresa + '</td><td>' + (m.comprobante_id || '—') +
+      '</td><td>' + (m.condicion_venta || '—') + (m.tiene_excepcion ? ' ⭐' : '') + '</td><td class="p ' + cls + '">' + _fmtPlata(m.importe) +
+      '</td><td>' + (m.vence || (m.sin_plazo ? 'sin plazo' : '—')) + (m.plazo_estimado ? ' *' : '') + '</td><td>' + (TRAMO_LABEL[m.tramo] || m.tramo) + '</td></tr>';
   }).join("");
-  h += '</tbody></table></body></html>';
+  h += '</tbody></table><p style="color:#94a3b8;font-size:11px;">* vencimiento estimado por condición de venta, no viene del comprobante. ⭐ tiene excepción comercial.</p></body></html>';
   w.document.write(h); w.document.close();
 }
 window.deudaVerDetalle = deudaVerDetalle;
 
-function deudaAbrirCobro(codOpt) {
-  const cod = codOpt || prompt("Código del cliente:");
-  if (!cod) return;
-  const monto = prompt("Monto cobrado ($):");
-  if (!monto) return;
-  const m = Number(String(monto).replace(",", "."));
-  if (!isFinite(m) || m <= 0) { alert("Monto inválido."); return; }
-  const nota = prompt("Nota (opcional):") || null;
-  const legajo = (typeof legajoInput !== "undefined" && legajoInput && legajoInput.value) || "admin";
-  sb.rpc("deuda_registrar_cobrado", { p_cod_cliente: String(cod), p_monto: m, p_detalle: nota, p_legajo: legajo })
-    .then(function(r){
-      if (r.error) { alert("Error: " + r.error.message); return; }
-      deudaRefresh();
-    });
-}
-window.deudaAbrirCobro = deudaAbrirCobro;
-
-/* ---------- v11.68 — Módulo UNIFICADO: Deuda a cobrar + Cobranzas (valor por NP) ----------
+/* ---------- Pantalla unificada: Deuda a cobrar + Cobranzas (valor por NP) ----------
    Un solo botón / una sola pantalla con 2 pestañas. Reusa la lógica existente:
    pestaña "Deuda" = deudaRefresh/deudaRender; pestaña "Valor por NP" = cobLoad/cobRender.
    No duplica render: solo aporta el shell con las pestañas y los contenedores que cada
@@ -35579,8 +35451,14 @@ function cobrosSetTab(tab) {
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:8px;flex-wrap:wrap;">' +
         '<h1 style="margin:0;font-size:20px;">💰 Deuda a cobrar</h1>' +
         '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
-          '<input id="deudaQ" placeholder="🔎 Cliente / razón social / NP" style="padding:8px;font-size:14px;border:1px solid #cbd5e1;border-radius:6px;min-width:220px;" oninput="_deudaState.q=this.value;deudaRender();">' +
-          '<button onclick="deudaAbrirCobro()" style="padding:8px 14px;background:#059669;color:#fff;border:none;border-radius:6px;cursor:pointer;">+ Registrar cobro</button>' +
+          '<input id="deudaQ" placeholder="🔎 Cliente / razón social / CUIT" style="padding:8px;font-size:14px;border:1px solid #cbd5e1;border-radius:6px;min-width:220px;" oninput="_deudaState.q=this.value;clearTimeout(window._deudaQT);window._deudaQT=setTimeout(function(){deudaRefresh();},400);">' +
+          '<select id="deudaEmp" style="padding:8px;font-size:14px;border:1px solid #cbd5e1;border-radius:6px;" onchange="_deudaState.empresa=this.value||null;deudaRefresh();">' +
+            '<option value="">Todas las empresas</option><option value="lk">Loekemeyer</option><option value="chef">Chef</option>' +
+          '</select>' +
+          '<select id="deudaTramoSel" style="padding:8px;font-size:14px;border:1px solid #cbd5e1;border-radius:6px;" onchange="_deudaState.tramo=this.value||null;deudaRefresh();">' +
+            '<option value="">Todos los tramos</option><option value="por_vencer">Por vencer</option><option value="1_30">1-30 días</option>' +
+            '<option value="31_60">31-60 días</option><option value="61_90">61-90 días</option><option value="mas_90">+90 días</option><option value="sin_plazo">Sin plazo</option>' +
+          '</select>' +
           '<button onclick="deudaRefresh()" style="padding:8px 12px;background:#1e6bd6;color:#fff;border:none;border-radius:6px;cursor:pointer;">↻ Refrescar</button>' +
         '</div>' +
       '</div>' +
