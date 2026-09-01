@@ -33145,9 +33145,12 @@ function facFactDist(np){
   return parts.join(", ");
 }
 /* v12.20 — "Falta" (rojo): SOLO los ítems con faltante (falto > 0). Antes esta
-   función devolvía ambas cosas — ahora es puro faltante. */
+   función devolvía ambas cosas — ahora es puro faltante.
+   v12.23 — SOLO los ítems donde TODO faltó (ent === 0): si algo se armó, el
+   corto ya se ve en "A facturar" como `ent/ped` (mostrarlo también acá era
+   redundante — ej. "609 3/6" en verde + "609 −3" en rojo era la misma info). */
 function facFaltDist(np){
-  return _facCompItems(np).filter(function(x){ return x.falto > 0; }).map(function(x){
+  return _facCompItems(np).filter(function(x){ return x.falto > 0 && x.ent === 0; }).map(function(x){
     return '<span class="fac-fact-item" title="' + x.titulo + '">' + x.codTxt +
       '<span class="fac-fact-falt">−' + x.falto + '</span></span>';
   }).join(", ");
@@ -33649,7 +33652,7 @@ function facRender(tandas){
             <th style="width:7%">Cod</th>
             <th style="width:22%">Razón Social</th>
             <th style="width:11%" title="Ítems ANÓMALOS respecto del pedido original — asistencia para cargar la factura:&#10;• Faltó una parte del pedido: cod ent/ped (facturá lo entregado, no lo pedido). Verde.&#10;• AGREGADO que no estaba en el pedido: cod +N (sumá esta línea a la factura). Azul.&#10;Los ítems armados iguales al pedido no aparecen (no hay que hacer nada).">A facturar (anomalías)</th>
-            <th style="width:8%" title="Ítems que se armaron cortos: NO facturés estas cantidades. cod −N = faltaron N cajas del pedido. Rojo.">Faltantes (no facturar)</th>
+            <th style="width:8%" title="Ítems donde TODO faltó (nada armado): NO los pongas en la factura. cod −N = faltaron N cajas y no se pudo entregar ninguna. Rojo.&#10;Los cortos parciales (armó menos de lo pedido) NO aparecen acá — se ven en 'A facturar' como ent/ped.">Faltantes (no facturar)</th>
             <th style="width:13%" title="Pedidos en código secundario a corregir (secundario → principal). Confirmá en 🔀 Corregir códigos.">Cambiar cód</th>
             <th class="center" style="width:5%" title="Líos ARMADOS (los que se cargaron al camión). Refleja lo real, no el pedido original.">Líos</th>
             <th class="center" style="width:5%" title="Cajas ARMADAS (las que se cargaron al camión). Refleja lo real, no el pedido original.">Cajas</th>

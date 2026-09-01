@@ -60,18 +60,22 @@ catch (_e) {
     out.class500  = /fac-has-falta/.test((document.querySelector('#facContainer tr[data-fac-np="500"]') || {}).className || "");
     // v12.20: "A facturar" (fac-facturar-col, verde) y "Falta" (fac-falta-col, rojo)
     // en columnas separadas. Antes ambas vivían en fac-falta-col ("609 FC 3 −3").
+    // v12.23: los cortos PARCIALES (ent > 0) SOLO aparecen en "A facturar" como
+    // "cod ent/ped" — la col Faltantes queda vacía para ellos (antes se mostraba
+    // en ambas columnas → redundante). "Faltantes" solo muestra los ítems donde
+    // TODO faltó (ent === 0). Acá 315: ped=20, falto=8 → ent=12 (corto parcial),
+    // así que fac-falta-col NO tiene 315 y fac-facturar-col dice "315 12/20".
     const _row500 = document.querySelector('#facContainer tr[data-fac-np="500"]');
     const _fc500 = _row500 ? _row500.querySelector("td.fac-falta-col") : null;
     const _fa500 = _row500 ? _row500.querySelector("td.fac-facturar-col") : null;
-    // La col Falta ahora dice "cod −M" (M = faltó), sin FC.
-    out.faltDist500 = /315/.test((_fc500 || {}).innerHTML || "") &&
-      /−8/.test((_fc500 || {}).innerHTML || "") &&
-      !/FC/.test((_fc500 || {}).innerHTML || "");
-    // La col A facturar dice "cod N" (N = pedidas − faltó), sin −.
+    // v12.23: 315 fue corto parcial → NO está en la col Faltantes (queda vacía).
+    out.faltDist500 = ((_fc500 || {}).innerHTML || "") === "";
+    // La col A facturar dice "315 12/20" (ent/ped): 12 en fac-fact-ok, /20 en fac-fact-ped.
     out.factDist500 = /315/.test((_fa500 || {}).innerHTML || "") &&
       /fac-fact-ok/.test((_fa500 || {}).innerHTML || "") &&
       /12/.test((_fa500 || {}).innerHTML || "") &&
-      !/−/.test((_fa500 || {}).innerHTML || "");
+      /fac-fact-ped/.test((_fa500 || {}).innerHTML || "") &&
+      /20/.test((_fa500 || {}).innerHTML || "");
     out.noTotalInDist = !/FALTA|cj/.test((_fc500 || {}).innerHTML || "");      // NO el total "FALTA N cj"
     out.faltColExists = !!_fc500 && !!_fa500;
     if (_fc500) {
