@@ -55,6 +55,22 @@
 > excepciones reales, y la integración con Interbanking (o carga manual del extracto)
 > para pasar de deuda bruta a neta. `sql/deudores.sql` documenta todo el diseño.
 >
+> ⚠ **Hallazgo de seguridad del mismo pase (auditor-supabase), corregido**:
+> `cobranzas_escalones` nació con **INSERT/UPDATE/DELETE/TRUNCATE abiertos a
+> `anon`/`authenticated`** — no era un `GRANT` explícito, sino los **default
+> privileges del schema `public`** (`ALTER DEFAULT PRIVILEGES FOR ROLE postgres
+> ... GRANT ALL ON TABLES`), que le dan CRUD completo a **toda tabla nueva** que
+> cree el rol `postgres` salvo que se revoque a mano. Confirmado con
+> explotación real: con la anon key (pública, está en `index.html`/`sw.js`)
+> cualquiera podía `TRUNCATE` la escalera de descuento. Corregido con
+> `REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ... FROM anon,
+> authenticated` (ya en `sql/deudores.sql`). **La causa raíz sigue viva**: el
+> default privilege del schema no se tocó — toda tabla nueva que se cree desde
+> el SQL editor nace expuesta igual, salvo que alguien se acuerde de revocar a
+> mano. Pendiente evaluar `ALTER DEFAULT PRIVILEGES ... REVOKE` a nivel schema
+> (afectaría a todo objeto nuevo futuro, no sólo a este módulo — decisión del
+> usuario, no se aplica sin permiso explícito).
+>
 > Nota **v12.24** — **Cola de impresión NP: imprime también los remitos sin `resumen` en el TAL (súper con etiqueta y NP cerradas con 0 líos).**
 > Pedido del usuario: en «🖨️ Cola de impresión — NP armadas» había 3 NP (98109 súper con etiqueta,
 > 98582 y 98583 líos con 0 líos armados) que "no dejaba imprimir". Diagnóstico: el TAL de esas NP se

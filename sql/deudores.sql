@@ -61,6 +61,18 @@ insert into public.cobranzas_escalones (orden, escalon, dias, dto, label) values
   (6, 'echeq_120',     120, 0.00, 'E-cheq 120 días (anticipado)');
 
 grant select on public.cobranzas_escalones to anon, authenticated;
+-- ⚠ CRÍTICO (encontrado y corregido 2026-09-01, auditor-supabase): el GRANT
+-- SELECT de arriba era redundante — toda tabla nueva creada por el rol
+-- postgres nace con INSERT/UPDATE/DELETE/TRUNCATE YA abiertos a anon/
+-- authenticated por los default privileges del schema public
+-- (ALTER DEFAULT PRIVILEGES FOR ROLE postgres ... GRANT ALL ON TABLES).
+-- Confirmado con explotación real: un anon podía truncar la escalera de
+-- descuento. Toda tabla nueva de este archivo necesita este REVOKE explícito
+-- aunque el objetivo final sea "pública de solo lectura" — el default no lo
+-- da. La causa raíz (el default privilege del schema) sigue sin tocar,
+-- pendiente de una pasada aparte.
+revoke insert, update, delete, truncate, references, trigger
+  on public.cobranzas_escalones from anon, authenticated;
 
 -- ── 2. condicion_venta (texto del ISIS) → días de plazo ─────────────────────
 create table public.deudores_condiciones (
