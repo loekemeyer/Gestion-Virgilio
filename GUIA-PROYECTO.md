@@ -12,7 +12,51 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-01 · Versión app al documentar: **v12.30**
+> Última actualización: 2026-09-01 · Versión app al documentar: **v12.31**
+>
+> Nota **v12.31** — **Dos huecos de diseño encontrados en auditoría propia sobre
+> v12.30, cerrados el mismo día.** (1) **Facturable Anticipado no reservaba stock**:
+> `vista_saldos_stock.terminado` sale solo de `Movimientos_Stock` (eventos de
+> producción), sin ninguna relación con facturación ISIS — facturar anticipado desde
+> el módulo no bajaba el stock disponible, así que el mismo stock se le podía volver a
+> ofrecer a OTRO cliente en la misma pestaña antes de cargar el camión. Se agregó
+> `facturable_anticipado_reservas` (tabla) + `facturable_anticipado_reservar`/
+> `liberar`/`reservas_activas` (RPC): reservar resta el pool COMPARTIDO del artículo
+> (todas las NP) y la demanda pendiente de la NP propia; se libera a mano cuando el
+> movimiento físico real ya se registró. Verificado: reservar 50/200 cajas bajó el pool
+> a 150 para el resto de las NP, liberar lo devolvió a 200. UI: botón "📦 Reservar" y
+> lista de reservas activas con "Liberar" en el detalle de cada NP. (2) **Deudores
+> mostraba deuda BRUTA para siempre**: no existía ninguna tabla de cobros/pagos en toda
+> la base, así que un cliente que ya pagó seguía apareciendo como deudor sin límite. Se
+> agregó `deuda_cobros` (registro MANUAL, interino hasta la conciliación automática
+> contra el extracto de Interbanking, en diseño) + `deuda_registrar_cobro`/
+> `anular_cobro`/`cobros_lista` (RPC). Un cobro imputado a un `documento_id` puntual
+> netea el saldo de esa factura (`vista_deudores_documentos`); sin `documento_id` es un
+> cobro general que `deudores_resumen` resta del total (columna `cobros_generales`) sin
+> tocar un tramo específico. Verificado con un cobro real de prueba ($1.000.000 contra
+> Cencosud, anulado después): el saldo bajó y subió exacto. UI: botón "💰 Cobrar" por
+> factura y "💵 Registrar cobro general" en el detalle de cada deudor, con lista de
+> cobros y "Anular". Se evaluó usar `isis_lk/isis_ch.comprobantes_aplicados` como
+> fuente en vez de una tabla nueva — descartado: esa tabla vincula NC contra la factura
+> que corrige, no cobros (`importe` viene null en la mayoría de sus 19 filas). **Ambos
+> objetos nuevos verificados por `auditor-supabase`**: RLS + `REVOKE ALL` correctos
+> (explotación real con `SET LOCAL ROLE anon` confirmó 0 acceso), `search_path` fijado,
+> sin SQL dinámico.
+>
+> **⚠ Pendiente — AVISAR AL USUARIO cuando se toque este módulo**: el mismo audit
+> encontró que las 4 funciones que ESCRIBEN (`deuda_registrar_cobro`,
+> `deuda_anular_cobro`, `facturable_anticipado_reservar`, `facturable_anticipado_
+> liberar`) son ejecutables por `anon`/`authenticated` **sin ningún chequeo de
+> identidad backend** — cualquiera con la anon key pública (embebida en `index.html`/
+> `sw.js`) puede invocarlas directo, sin pasar por `requireSupervisor()` del front
+> (que es solo UI, no seguridad real). Es el mismo modelo de confianza que ya usa el
+> resto de la app (anon key compartida + gate client-side), pero acá pesa más porque
+> se toca directamente el saldo de cuentas por cobrar de un cliente — se puede
+> fabricar o anular un cobro sin dejar rastro de autoría verificable. Se agregó
+> `requireSupervisor()` en el front (consistente con el resto del módulo) pero **no**
+> se agregó un gate real en el backend (tipo `cp_is_admin(p_secret)`, patrón que ya
+> existe en este proyecto para `cp_admin_*`) — es una decisión de producto, no se
+> tomó sin preguntar. No resolver sin decisión explícita del usuario.
 >
 > Nota **v12.30** — **Facturable ya: qué mercadería se le puede facturar a un cliente
 > ANTES de cargar el camión.** Cuarta pestaña del overlay 💰 Deuda/Cobranzas

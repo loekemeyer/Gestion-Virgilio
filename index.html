@@ -6524,7 +6524,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.30";
+const APP_VERSION = "v12.31";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -35380,9 +35380,9 @@ function deudaRender() {
   }, 0);
   var totalSinPlazo = rows.reduce(function(a, r) { return a + (Number(r.sin_plazo) || 0); }, 0);
   if (res) res.innerHTML =
-    '<b>' + _deudaState.total + '</b> cliente(s) con factura en los últimos 12 meses · Bruto <b>' + _fmtPlata(totalSaldo) +
+    '<b>' + _deudaState.total + '</b> cliente(s) con factura en los últimos 12 meses · Saldo <b>' + _fmtPlata(totalSaldo) +
     '</b> · Vencido <b style="color:#dc2626">' + _fmtPlata(totalVencido) + '</b> · Sin plazo <b style="color:#64748b">' + _fmtPlata(totalSinPlazo) + '</b>' +
-    '<div style="margin-top:4px;font-size:12px;color:#94a3b8;">⚠ Bruto: todavía no descuenta cobros (fase 1 — llega con la conciliación bancaria).</div>';
+    '<div style="margin-top:4px;font-size:12px;color:#94a3b8;">⚠ Saldo neto de cobros registrados A MANO (botón 💰/💵 en el detalle). Todavía no hay conciliación automática contra el extracto bancario — un cobro que no cargues acá sigue apareciendo como deuda.</div>';
   if (!rows.length) { cont.innerHTML = '<div style="padding:20px;color:#64748b;text-align:center;">Sin facturas en el período. Probá ampliar el filtro.</div>'; return; }
   var h = '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">' +
     '<thead style="background:#f1f5f9;position:sticky;top:0;"><tr>' +
@@ -35424,23 +35424,73 @@ function deudaRender() {
 }
 window.deudaRender = deudaRender;
 
+async function deudaRegistrarCobro(deudorId, empresa, documentoId, sugerido) {
+  if (!requireSupervisor()) return;
+  var etiqueta = documentoId ? "para este comprobante" : "general (sin factura puntual — se resta del total)";
+  var montoStr = prompt("Monto cobrado " + etiqueta + ":", sugerido != null ? String(sugerido) : "");
+  if (montoStr == null) return;
+  var monto = Number(String(montoStr).trim().replace(/,/g, ".").replace(/[^0-9.]/g, ""));
+  if (!(monto > 0)) { alert("Monto inválido."); return; }
+  var medio = prompt("Medio de cobro (transferencia / efectivo / cheque / echeq / otro):", "transferencia");
+  if (medio == null) return;
+  var nota = prompt("Nota (opcional):", "") || null;
+  var r = await sb.rpc("deuda_registrar_cobro", {
+    p_deudor_id: deudorId, p_monto: monto, p_empresa: empresa || null,
+    p_documento_id: documentoId || null, p_medio: medio || null, p_nota: nota,
+    p_creado_por: _faltMiLegajo() || null
+  });
+  if (r.error) { alert("Error: " + r.error.message); return; }
+  alert("Cobro registrado ✔ — " + _fmtPlata(monto));
+  deudaVerDetalle(deudorId);
+  deudaRefresh(false);
+}
+window.deudaRegistrarCobro = deudaRegistrarCobro;
+
+async function deudaAnularCobro(id, deudorId) {
+  if (!requireSupervisor()) return;
+  if (!confirm("¿Anular este cobro? El saldo del deudor vuelve a subir.")) return;
+  var r = await sb.rpc("deuda_anular_cobro", { p_id: id, p_por: _faltMiLegajo() || null });
+  if (r.error) { alert("Error: " + r.error.message); return; }
+  deudaVerDetalle(deudorId);
+  deudaRefresh(false);
+}
+window.deudaAnularCobro = deudaAnularCobro;
+
 async function deudaVerDetalle(deudorId) {
-  var r = await sb.rpc("deudores_detalle", { p_deudor_id: deudorId });
+  var [r, rCob] = await Promise.all([
+    sb.rpc("deudores_detalle", { p_deudor_id: deudorId }),
+    sb.rpc("deuda_cobros_lista", { p_deudor_id: deudorId })
+  ]);
   if (r.error) { alert("Error: " + r.error.message); return; }
   var rows = r.data || [];
+  var cobros = rCob.error ? [] : (rCob.data || []).filter(function(c) { return !c.anulado_at; });
   var cab = _deudaState.rows.find(function(x) { return x.deudor_id === deudorId; });
   var nombre = (cab && cab.razon_social) || deudorId;
-  var w = window.open("", "_blank", "width=880,height=640,resizable=yes,scrollbars=yes");
-  var h = '<html><head><title>Deuda ' + nombre + '</title><style>body{font-family:Arial;margin:16px;font-size:13px}table{width:100%;border-collapse:collapse}th,td{padding:6px 8px;border-bottom:1px solid #e2e8f0;text-align:left}th{background:#f1f5f9}.p{text-align:right}.neg{color:#059669}</style></head><body>';
+  var w = window.open("", "deudaDetalleWin", "width=920,height=680,resizable=yes,scrollbars=yes");
+  var h = '<html><head><title>Deuda ' + nombre + '</title><style>body{font-family:Arial;margin:16px;font-size:13px}table{width:100%;border-collapse:collapse;margin-bottom:16px}th,td{padding:6px 8px;border-bottom:1px solid #e2e8f0;text-align:left}th{background:#f1f5f9}.p{text-align:right}.neg{color:#059669}button{cursor:pointer;padding:4px 8px;border-radius:4px;border:1px solid #cbd5e1;background:#f1f5f9;font-size:12px}</style></head><body>';
   h += '<h2>' + nombre + ' <small style="color:#64748b;">(CUIT ' + deudorId + ')</small></h2>';
-  h += '<table><thead><tr><th>Fecha</th><th>Emp.</th><th>Comprobante</th><th>Condición</th><th class="p">Importe</th><th>Vence</th><th>Tramo</th></tr></thead><tbody>';
+  h += '<p><button onclick="opener.deudaRegistrarCobro(\'' + deudorId + '\', null, null, null)">💵 Registrar cobro general</button> <span style="color:#94a3b8;font-size:11px;">(no imputado a una factura puntual — se resta del total)</span></p>';
+  h += '<table><thead><tr><th>Fecha</th><th>Emp.</th><th>Comprobante</th><th>Condición</th><th class="p">Importe</th><th class="p">Cobrado</th><th class="p">Saldo</th><th>Vence</th><th>Tramo</th><th></th></tr></thead><tbody>';
   h += rows.map(function(m) {
     var cls = Number(m.importe) < 0 ? 'neg' : '';
+    var puedeCobrar = m.familia === 'factura_venta' && Number(m.saldo) > 0;
     return '<tr><td>' + (m.fecha || '') + '</td><td>' + m.empresa + '</td><td>' + (m.comprobante_id || '—') +
       '</td><td>' + (m.condicion_venta || '—') + (m.tiene_excepcion ? ' ⭐' : '') + '</td><td class="p ' + cls + '">' + _fmtPlata(m.importe) +
-      '</td><td>' + (m.vence || (m.sin_plazo ? 'sin plazo' : '—')) + (m.plazo_estimado ? ' *' : '') + '</td><td>' + (TRAMO_LABEL[m.tramo] || m.tramo) + '</td></tr>';
+      '</td><td class="p">' + (m.cobrado ? _fmtPlata(m.cobrado) : '—') +
+      '</td><td class="p ' + cls + '">' + _fmtPlata(m.saldo) +
+      '</td><td>' + (m.vence || (m.sin_plazo ? 'sin plazo' : '—')) + (m.plazo_estimado ? ' *' : '') + '</td><td>' + (TRAMO_LABEL[m.tramo] || m.tramo) + '</td>' +
+      '<td>' + (puedeCobrar ? '<button onclick="opener.deudaRegistrarCobro(\'' + deudorId + '\',\'' + m.empresa + '\',' + m.documento_id + ',' + Number(m.saldo) + ')">💰 Cobrar</button>' : '') + '</td></tr>';
   }).join("");
-  h += '</tbody></table><p style="color:#94a3b8;font-size:11px;">* vencimiento estimado por condición de venta, no viene del comprobante. ⭐ tiene excepción comercial.</p></body></html>';
+  h += '</tbody></table><p style="color:#94a3b8;font-size:11px;">* vencimiento estimado por condición de venta, no viene del comprobante. ⭐ tiene excepción comercial.</p>';
+  if (cobros.length) {
+    h += '<h3>Cobros registrados</h3><table><thead><tr><th>Fecha</th><th>Medio</th><th class="p">Monto</th><th>Nota</th><th></th></tr></thead><tbody>';
+    h += cobros.map(function(c) {
+      return '<tr><td>' + c.fecha + '</td><td>' + (c.medio || '—') + (c.documento_id ? '' : ' (general)') + '</td><td class="p">' + _fmtPlata(c.monto) + '</td><td>' + (c.nota || '') + '</td>' +
+        '<td><button onclick="opener.deudaAnularCobro(' + c.id + ',\'' + deudorId + '\')">Anular</button></td></tr>';
+    }).join("");
+    h += '</tbody></table>';
+  }
+  h += '</body></html>';
   w.document.write(h); w.document.close();
 }
 window.deudaVerDetalle = deudaVerDetalle;
@@ -35614,21 +35664,60 @@ function anticipadoRender() {
 }
 window.anticipadoRender = anticipadoRender;
 
-async function anticipadoVerDetalle(np) {
-  var r = await sb.rpc("facturable_anticipado_detalle", { p_np: np });
+async function anticipadoReservar(np, articulo, disponible) {
+  if (!requireSupervisor()) return;
+  var input = prompt('¿Cuántas cajas de "' + articulo + '" (NP ' + np + ') reservás para facturar ya?\n(Disponible ahora: ' + disponible + ')', String(disponible));
+  if (input == null) return;
+  var cajas = Number(String(input).trim().replace(/,/g, ".").replace(/[^0-9.]/g, ""));
+  if (!(cajas > 0)) { alert("Cantidad inválida."); return; }
+  var r = await sb.rpc("facturable_anticipado_reservar", { p_np: np, p_articulo: articulo, p_cajas: cajas, p_creado_por: _faltMiLegajo() || null });
   if (r.error) { alert("Error: " + r.error.message); return; }
-  var rows = r.data || [];
+  alert("Reservado ✔ — " + cajas + " cajas de " + articulo + " para NP " + np + ".\nEse stock ya no se le va a ofrecer a otro cliente. Acordate de liberarla (o va a quedar reservada) cuando se cargue el camión de verdad.");
+  anticipadoVerDetalle(np);
+  anticipadoRefresh(false);
+}
+window.anticipadoReservar = anticipadoReservar;
+
+async function anticipadoLiberarReserva(id, np) {
+  if (!requireSupervisor()) return;
+  if (!confirm("¿Liberar esta reserva? El stock vuelve a estar disponible para ofrecerlo a otros clientes.")) return;
+  var r = await sb.rpc("facturable_anticipado_liberar", { p_id: id, p_por: _faltMiLegajo() || null });
+  if (r.error) { alert("Error: " + r.error.message); return; }
+  anticipadoVerDetalle(np);
+  anticipadoRefresh(false);
+}
+window.anticipadoLiberarReserva = anticipadoLiberarReserva;
+
+async function anticipadoVerDetalle(np) {
+  var [rDet, rRes] = await Promise.all([
+    sb.rpc("facturable_anticipado_detalle", { p_np: np }),
+    sb.rpc("facturable_anticipado_reservas_activas", { p_np: np })
+  ]);
+  if (rDet.error) { alert("Error: " + rDet.error.message); return; }
+  var rows = rDet.data || [];
+  var reservas = rRes.error ? [] : (rRes.data || []);
   var cab = _antState.rows.find(function(x) { return x.np === np; });
   var nombre = (cab && cab.rs_virgilio) || np;
-  var w = window.open("", "_blank", "width=780,height=600,resizable=yes,scrollbars=yes");
-  var h = '<html><head><title>Facturable ya — NP ' + np + '</title><style>body{font-family:Arial;margin:16px;font-size:13px}table{width:100%;border-collapse:collapse}th,td{padding:6px 8px;border-bottom:1px solid #e2e8f0;text-align:left}th{background:#f1f5f9}.p{text-align:right}.no{color:#b45309}</style></head><body>';
+  var w = window.open("", "antDetalleWin", "width=800,height=640,resizable=yes,scrollbars=yes");
+  var h = '<html><head><title>Facturable ya — NP ' + np + '</title><style>body{font-family:Arial;margin:16px;font-size:13px}table{width:100%;border-collapse:collapse;margin-bottom:16px}th,td{padding:6px 8px;border-bottom:1px solid #e2e8f0;text-align:left}th{background:#f1f5f9}.p{text-align:right}.no{color:#b45309}button{cursor:pointer;padding:4px 8px;border-radius:4px;border:1px solid #cbd5e1;background:#f1f5f9;font-size:12px}</style></head><body>';
   h += '<h2>NP ' + np + ' — ' + nombre + '</h2>';
-  h += '<table><thead><tr><th>Artículo</th><th class="p">Pedidas</th><th class="p">Cubribles ahora</th><th>¿Completo?</th><th class="p">Valor est.</th></tr></thead><tbody>';
+  h += '<table><thead><tr><th>Artículo</th><th class="p">Pedidas</th><th class="p">Reservadas</th><th class="p">Cubribles ahora</th><th>¿Completo?</th><th class="p">Valor est.</th><th></th></tr></thead><tbody>';
   h += rows.map(function(m) {
     var cls = m.cubre_completo ? '' : 'no';
-    return '<tr class="' + cls + '"><td>' + (m.articulo || '') + '</td><td class="p">' + m.cajas_pedidas + '</td><td class="p">' + m.cajas_cubribles + '</td><td>' + (m.cubre_completo ? 'sí' : 'parcial') + '</td><td class="p">' + (m.sin_precio ? '—' : _fmtPlata(m.valor_estimado)) + '</td></tr>';
+    var artEsc = String(m.articulo || '').replace(/'/g, "\\'");
+    return '<tr class="' + cls + '"><td>' + (m.articulo || '') + '</td><td class="p">' + m.cajas_pedidas + '</td><td class="p">' + (m.cajas_reservadas || 0) + '</td><td class="p">' + m.cajas_cubribles + '</td><td>' + (m.cubre_completo ? 'sí' : 'parcial') + '</td><td class="p">' + (m.sin_precio ? '—' : _fmtPlata(m.valor_estimado)) + '</td>' +
+      '<td>' + (Number(m.cajas_cubribles) > 0 ? '<button onclick="opener.anticipadoReservar(\'' + np + '\',\'' + artEsc + '\',' + Number(m.cajas_cubribles) + ')">📦 Reservar</button>' : '') + '</td></tr>';
   }).join("");
-  h += '</tbody></table><p style="color:#94a3b8;font-size:11px;">Naranja = sólo alcanza para una parte de lo pedido de ese artículo.</p></body></html>';
+  h += '</tbody></table><p style="color:#94a3b8;font-size:11px;">Naranja = sólo alcanza para una parte de lo pedido de ese artículo. "Reservadas" = cajas ya comprometidas acá mismo, no ofrecidas a otro cliente.</p>';
+  if (reservas.length) {
+    h += '<h3>Reservas activas de esta NP</h3><table><thead><tr><th>Artículo</th><th class="p">Cajas</th><th>Desde</th><th></th></tr></thead><tbody>';
+    h += reservas.map(function(rv) {
+      return '<tr><td>' + rv.articulo + '</td><td class="p">' + rv.cajas + '</td><td>' + (rv.dias_activa === 0 ? 'hoy' : (rv.dias_activa + ' día(s)')) + '</td>' +
+        '<td><button onclick="opener.anticipadoLiberarReserva(' + rv.id + ',\'' + np + '\')">Liberar</button></td></tr>';
+    }).join("");
+    h += '</tbody></table>';
+  }
+  h += '</body></html>';
   w.document.write(h); w.document.close();
 }
 window.anticipadoVerDetalle = anticipadoVerDetalle;

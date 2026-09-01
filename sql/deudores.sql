@@ -15,10 +15,16 @@
 -- GUIA-PROYECTO.md § "Esquemas isis_lk / isis_ch"). La deuda existe apenas
 -- se factura: no hay nada que registrar desde el front.
 --
--- Fase 1: deuda BRUTA (cobrado = 0 constante). El enganche para cuando el
--- agente del ISIS empiece a parsear recibos es isis_lk.comprobantes_aplicados
--- (hoy 19 filas) — saldo = importe - cobrado ya está escrito así, no hace
--- falta rehacer nada cuando llegue.
+-- Fase 1 (v12.25): deuda BRUTA (cobrado = 0 constante).
+--
+-- v12.31 (2026-09-01): agregado deuda_cobros, registro MANUAL de cobros —
+-- interino hasta la conciliación automática contra el extracto bancario de
+-- Interbanking (en diseño). saldo = importe - cobrado ya venía escrito así
+-- desde v12.25, así que sólo hizo falta sumar el join contra deuda_cobros.
+-- Se evaluó usar isis_lk/isis_ch.comprobantes_aplicados como fuente en su
+-- lugar, pero esa tabla vincula comprobantes (NC contra la factura que
+-- corrige), no cobros — `importe` viene null en la mayoría de sus 19 filas.
+-- No sirve para esto.
 --
 -- Objetos:
 --   cobranzas_escalones        — la escalera de descuento (pública, config).
@@ -27,6 +33,10 @@
 --   vista_deudores_documentos  — un comprobante = una fila (interna, REVOKE anon).
 --   deudores_resumen(...)      — agregado por deudor, paginado (RPC, EXECUTE anon).
 --   deudores_detalle(id)       — comprobantes de un deudor (RPC, EXECUTE anon).
+--   deuda_cobros               — registro manual de cobros (interna, REVOKE anon).
+--   deuda_registrar_cobro(...) — alta de un cobro (RPC, EXECUTE anon).
+--   deuda_anular_cobro(id)     — anula un cobro (RPC, EXECUTE anon).
+--   deuda_cobros_lista(id)     — cobros de un deudor (RPC, EXECUTE anon).
 --
 -- Deudor = CUIT normalizado (11 dígitos), no código de cliente: cruza LK y
 -- Chef sin tabla de mapeo (numeraciones independientes por diseño). Fallback
@@ -224,8 +234,10 @@ select
   r.cod_canon as cod_cliente,
   r.fecha, r.condicion_venta, r.tiene_excepcion,
   r.signo * r.total as importe,
-  0::numeric as cobrado,          -- fase 1: deuda bruta. Se llena cuando isis_lk.comprobantes_aplicados tenga datos.
-  r.signo * r.total as saldo,     -- saldo = importe - cobrado
+  coalesce(cob.cobrado, 0) as cobrado,
+  -- v12.31: netea contra deuda_cobros (registro manual, interino hasta que
+  -- exista la conciliación automática del extracto Interbanking).
+  (r.signo * r.total) - coalesce(cob.cobrado, 0) as saldo,
   coalesce(r.vto_factura, r.fecha + r.dias_plazo) as vence,
   (r.vto_factura is null and r.dias_plazo is not null) as plazo_estimado,
   (r.dias_plazo is null) as sin_plazo,
@@ -249,6 +261,11 @@ select
   esc.dto as escalon_dto, (r.fecha + esc.dias) as escalon_vence
 from resuelto r
 left join lateral (
+  select coalesce(sum(dc.monto), 0) as cobrado
+  from public.deuda_cobros dc
+  where dc.documento_id = r.id and dc.empresa = r.empresa and dc.anulado_at is null
+) cob on true
+left join lateral (
   select ce.escalon, ce.label,
          coalesce(r.exc_dto, ce.dto) as dto,
          case when r.tiene_excepcion and ce.escalon = r.exc_escalon then r.exc_dias else ce.dias end as dias
@@ -264,9 +281,13 @@ revoke all on public.vista_deudores_documentos from anon, authenticated;
 -- ── 5. RPC de pantalla ───────────────────────────────────────────────────────
 -- p_desde por defecto = últimos 12 meses: sumar TODO desde 2019 sin cobros
 -- restados da un "saldo" de miles de millones que no significa nada (una
--- factura pagada hace años sigue sumando). Es la fase 1: bruto de un período
--- razonable, no la deuda desde el origen.
-create or replace function public.deudores_resumen(
+-- factura pagada hace años sigue sumando). Neteado (v12.31) contra
+-- deuda_cobros: por documento puntual ya viene resuelto en vista_deudores_
+-- documentos.saldo; los cobros generales (sin documento_id, columna
+-- cobros_generales) se restan acá del total. La firma cambia de return type
+-- (agrega cobros_generales), por eso DROP + CREATE en vez de OR REPLACE.
+drop function if exists public.deudores_resumen(text,date,text,text,integer,integer);
+create function public.deudores_resumen(
   p_empresa text default null,
   p_desde   date default (current_date - interval '12 months')::date,
   p_q       text default null,
@@ -280,6 +301,7 @@ returns table (
   por_vencer numeric, tramo_1_30 numeric, tramo_31_60 numeric, tramo_61_90 numeric, tramo_mas_90 numeric, sin_plazo numeric,
   ultima_factura date,
   escalon_vigente text, escalon_label text, escalon_vence date, escalon_dto numeric,
+  cobros_generales numeric,
   total_count bigint
 )
 language sql security definer set search_path = public
@@ -315,19 +337,34 @@ as $$
     from base
     where escalon_vence is not null and escalon_vence >= current_date
     order by deudor_id, escalon_vence asc
+  ),
+  -- Cobros generales (sin documento_id puntual) del deudor, dentro de la
+  -- misma ventana. Se restan del total pero NO de un tramo específico (no
+  -- sabemos a qué factura corresponden) — por eso los tramos pueden no
+  -- sumar exacto contra "saldo" cuando hay alguno de estos.
+  cobros_generales as (
+    select deudor_id, coalesce(sum(monto), 0) as monto
+    from public.deuda_cobros
+    where documento_id is null and anulado_at is null
+      and (p_desde is null or fecha >= p_desde)
+      and (p_empresa is null or empresa is null or empresa = p_empresa)
+    group by deudor_id
   )
   select
     a.deudor_id,
     coalesce(a.cod_cliente_lk, a.cod_cliente_chef),
     a.razon_social, a.empresas,
-    a.saldo, a.cant_documentos::int,
+    a.saldo - coalesce(cg.monto, 0),
+    a.cant_documentos::int,
     coalesce(a.por_vencer,0), coalesce(a.tramo_1_30,0), coalesce(a.tramo_31_60,0),
     coalesce(a.tramo_61_90,0), coalesce(a.tramo_mas_90,0), coalesce(a.sin_plazo,0),
     a.ultima_factura,
     p.escalon_vigente, p.escalon_label, p.escalon_vence, p.escalon_dto,
+    coalesce(cg.monto, 0),
     count(*) over ()::bigint
   from agg a
   left join prox p on p.deudor_id = a.deudor_id
+  left join cobros_generales cg on cg.deudor_id = a.deudor_id
   where (p_q is null or p_q = ''
          or a.razon_social ilike '%'||p_q||'%' or a.deudor_id ilike '%'||p_q||'%'
          or a.cod_cliente_lk ilike '%'||p_q||'%' or a.cod_cliente_chef ilike '%'||p_q||'%')
@@ -338,7 +375,7 @@ as $$
          (p_tramo = '61_90'      and coalesce(a.tramo_61_90,0) <> 0) or
          (p_tramo = 'mas_90'     and coalesce(a.tramo_mas_90,0) <> 0) or
          (p_tramo = 'sin_plazo'  and coalesce(a.sin_plazo,0) <> 0))
-  order by a.saldo desc
+  order by (a.saldo - coalesce(cg.monto, 0)) desc
   limit greatest(p_limit, 1) offset greatest(p_offset, 0)
 $$;
 grant execute on function public.deudores_resumen(text, date, text, text, int, int) to anon, authenticated;
@@ -358,10 +395,107 @@ language sql security definer set search_path = public
 as $$
   select empresa, familia, documento_id, comprobante_id, cae, storage_path,
          fecha, condicion_venta, tiene_excepcion,
-         importe, saldo, vence, plazo_estimado, sin_plazo, dias_vencido, tramo,
+         importe, cobrado, saldo, vence, plazo_estimado, sin_plazo, dias_vencido, tramo,
          escalon_vigente, escalon_label, escalon_dto, escalon_vence
   from public.vista_deudores_documentos
   where deudor_id = p_deudor_id
   order by fecha desc
 $$;
 grant execute on function public.deudores_detalle(text) to anon, authenticated;
+
+-- ══════════════════════════════════════════════════════════════════════════
+-- v12.31 (2026-09-01). Registro MANUAL de cobros — interino hasta que exista
+-- la conciliación automática contra el extracto bancario de Interbanking (en
+-- diseño). Hallazgo de auditoría propia sobre la fase 1: sin esto la deuda
+-- mostrada es BRUTA para siempre (todo lo facturado, nunca baja aunque se
+-- haya cobrado) — no hay ninguna tabla de cobros/pagos en toda la base.
+--
+-- deuda_cobros: un cobro con documento_id imputa a esa factura puntual (neteo
+-- ya integrado en vista_deudores_documentos.saldo); sin documento_id es un
+-- cobro GENERAL del deudor que deudores_resumen resta del total pero no de
+-- un tramo específico (no se sabe a qué factura corresponde) — por eso los
+-- tramos pueden no sumar exacto contra "saldo" cuando hay alguno de estos.
+--
+-- Verificado con un cobro de prueba real ($1.000.000 contra Cencosud):
+-- deudores_resumen.saldo bajó exactamente ese monto y cobros_generales lo
+-- reflejó; al anular, volvió a subir exacto. 0 privilegios abiertos a
+-- anon/authenticated (tabla con RLS + REVOKE ALL, solo se escribe vía las
+-- funciones SECURITY DEFINER de abajo).
+-- ══════════════════════════════════════════════════════════════════════════
+
+create table public.deuda_cobros (
+  id            bigint generated always as identity primary key,
+  deudor_id     text not null,
+  empresa       text,                 -- 'lk' | 'chef' | null = cobro general del deudor
+  documento_id  bigint,               -- null = no imputado a una factura puntual
+  monto         numeric not null check (monto > 0),
+  fecha         date not null default current_date,
+  medio         text,                 -- transferencia | efectivo | cheque | echeq | otro
+  nota          text,
+  creado_por    text,
+  creado_at     timestamptz not null default now(),
+  anulado_at    timestamptz,
+  anulado_por   text
+);
+comment on table public.deuda_cobros is
+  'Registro MANUAL de cobros. Interino hasta que exista la conciliación '
+  'automática contra el extracto bancario de Interbanking (en diseño '
+  '2026-09-01). Neteo real de vista_deudores_documentos/deudores_resumen: sin '
+  'esto la deuda mostrada es BRUTA (todo lo facturado, nunca baja aunque se '
+  'haya cobrado). Un cobro con documento_id imputa a esa factura puntual; sin '
+  'documento_id es un cobro general del deudor que se resta del total en '
+  'deudores_resumen pero no de un tramo/documento específico.';
+
+alter table public.deuda_cobros enable row level security;
+revoke all on public.deuda_cobros from anon, authenticated;
+
+create index deuda_cobros_deudor_idx on public.deuda_cobros (deudor_id) where anulado_at is null;
+create index deuda_cobros_doc_idx on public.deuda_cobros (empresa, documento_id) where anulado_at is null and documento_id is not null;
+
+create function public.deuda_registrar_cobro(
+  p_deudor_id text, p_monto numeric, p_empresa text default null,
+  p_documento_id bigint default null, p_fecha date default current_date,
+  p_medio text default null, p_nota text default null, p_creado_por text default null
+)
+returns bigint
+language plpgsql security definer set search_path = public
+as $$
+declare v_id bigint;
+begin
+  if p_monto is null or p_monto <= 0 then
+    raise exception 'monto debe ser mayor a 0';
+  end if;
+  if p_documento_id is not null and p_empresa is null then
+    raise exception 'si imputás a un documento puntual, indicá la empresa (lk|chef)';
+  end if;
+  insert into public.deuda_cobros (deudor_id, empresa, documento_id, monto, fecha, medio, nota, creado_por)
+  values (p_deudor_id, p_empresa, p_documento_id, p_monto, coalesce(p_fecha, current_date), p_medio, p_nota, p_creado_por)
+  returning id into v_id;
+  return v_id;
+end;
+$$;
+grant execute on function public.deuda_registrar_cobro(text, numeric, text, bigint, date, text, text, text) to anon, authenticated;
+
+create function public.deuda_anular_cobro(p_id bigint, p_por text default null)
+returns void
+language sql security definer set search_path = public
+as $$
+  update public.deuda_cobros set anulado_at = now(), anulado_por = p_por
+  where id = p_id and anulado_at is null
+$$;
+grant execute on function public.deuda_anular_cobro(bigint, text) to anon, authenticated;
+
+create function public.deuda_cobros_lista(p_deudor_id text)
+returns table (
+  id bigint, empresa text, documento_id bigint, monto numeric, fecha date,
+  medio text, nota text, creado_por text, creado_at timestamptz,
+  anulado_at timestamptz, anulado_por text
+)
+language sql security definer set search_path = public
+as $$
+  select id, empresa, documento_id, monto, fecha, medio, nota, creado_por, creado_at, anulado_at, anulado_por
+  from public.deuda_cobros
+  where deudor_id = p_deudor_id
+  order by fecha desc, creado_at desc
+$$;
+grant execute on function public.deuda_cobros_lista(text) to anon, authenticated;
