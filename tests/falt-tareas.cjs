@@ -84,16 +84,19 @@ catch (_e) {
     // v6.19: faltante YA completado (cajas 0), la tarea sigue abierta → badge vacío
     _facFalt = new Map([["98114", { cajas: 0, items: [] }]]);
     const badgeCompletoVacio = facTareaBadge("98114") === "";
-    // v6.18: tarea + faltante con cajas pero SIN stock (a_guardar 0, no guardado hoy) → badge vacío
+    // v12.26 (antes v6.18): tarea + faltante con cajas pero SIN stock (a_guardar 0, no guardado hoy)
+    // ahora muestra un badge alternativo "⏳ Tarea abierta · sin stock ahora" (antes quedaba vacío
+    // y la fila amarilla sin explicación — inconsistente).
     _facFalt = new Map([["98114", { cajas: 10, items: [{ cod: "315", falto: 10, ped: 80 }] }]]);
     _facSaldosN = { "315": { a_guardar: 0, terminado: 0 } };
-    const badgeSinStockVacio = facTareaBadge("98114") === "";
-    return { active: !!t, hasCompletando: /Completando/.test(badge), hasPedro: /Pedro/.test(badge), noneForOther, badgeOtroVacio, badgeCompletoVacio, badgeSinStockVacio };
+    const _bSinStock = facTareaBadge("98114");
+    const badgeSinStockAviso = /Tarea abierta/.test(_bSinStock) && /sin stock ahora/.test(_bSinStock) && /Pedro/.test(_bSinStock);
+    return { active: !!t, hasCompletando: /Completando/.test(badge), hasPedro: /Pedro/.test(badge), noneForOther, badgeOtroVacio, badgeCompletoVacio, badgeSinStockAviso };
   });
 
   const okA = A.flagOff && A.pendHidden && A.asigHidden;
   const okE = E.hiddenForPrueba;
-  const okD = D.active && D.hasCompletando && D.hasPedro && D.noneForOther && D.badgeOtroVacio && D.badgeCompletoVacio && D.badgeSinStockVacio;
+  const okD = D.active && D.hasCompletando && D.hasPedro && D.noneForOther && D.badgeOtroVacio && D.badgeCompletoVacio && D.badgeSinStockAviso;
   const pass = okA && okE && okD && errs.length === 0;
   console.log("falt-tareas:", JSON.stringify({ A, E, D }));
   console.log("  pageerrors:", errs.length ? errs.join("|") : "none");
