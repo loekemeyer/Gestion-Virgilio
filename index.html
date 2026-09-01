@@ -3441,6 +3441,11 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
   table.fac-np-tbl td.fac-facturar-col{white-space:normal;overflow:visible;font-size:11px;font-weight:800;color:#15803d;line-height:1.3;}
   table.fac-np-tbl td.fac-facturar-col .fac-fact-item{white-space:nowrap;font-size:11px;font-weight:700;color:#475569;}
   table.fac-np-tbl td.fac-facturar-col .fac-fact-ok{color:#15803d;font-weight:800;}
+  /* v12.23 — "A facturar" muestra ent/ped para los cortos ("3/6": armados 3 de 6 pedidos)
+     y "+N" (azul) para los AGREGADOS que no estaban en el pedido original. */
+  table.fac-np-tbl td.fac-facturar-col .fac-fact-ped{color:#94a3b8;font-weight:700;}
+  table.fac-np-tbl td.fac-facturar-col .fac-fact-item.fac-fact-extra{background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;padding:1px 5px;}
+  table.fac-np-tbl td.fac-facturar-col .fac-fact-plus{color:#1e40af;font-weight:800;}
   tr.fac-has-falta{ background:#fff5f5 !important; }
   tr.fac-has-falta > td:first-child{ box-shadow: inset 4px 0 0 #dc2626; }
   tr.fac-has-falta .fac-np-cell{ color:#991b1b; font-weight:800; }
@@ -6540,7 +6545,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.22";
+const APP_VERSION = "v12.23";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -32917,21 +32922,40 @@ async function facFetchLios(){
   } catch (_e) { /* sin red: queda el último cache */ }
   return _facLios;
 }
-/* Cajas por NP (suma de cajas_pedidas en Entregas_Virgilio). Para los SÚPER, la
-   columna "Líos" muestra ESTO en vez de 0 (los súper van por etiqueta/cajas, no líos).
-   supaFetchAll pagina (Entregas > 1000 filas). Cache 30s. v5.68. */
+/* Cajas por NP (suma de cajas_ENTREGADAS en Entregas_Virgilio — v12.23: antes
+   sumaba cajas_pedidas y mostraba el pedido ORIGINAL; ahora refleja lo que se
+   ARMÓ realmente, que es la info que necesita la operadora para facturar).
+   Para los SÚPER, la columna "Líos" muestra ESTO en vez de 0 (los súper van
+   por etiqueta/cajas, no líos). Además carga `_facAgreg` con los ítems
+   AGREGADOS al camión que NO estaban en el pedido original (cajas_pedidas=0
+   y cajas_entregadas>0) — anomalías que la operadora debe SUMAR a la factura.
+   supaFetchAll pagina (Entregas > 1000 filas). Cache 30s. v5.68 / v12.23. */
 let _facCajas = new Map(); let _facCajasTs = 0;
+let _facAgreg = new Map();   // v12.23 — np → [{cod, ent}] ítems armados que NO estaban en el pedido original
 async function facFetchCajas(){
   const now = Date.now();
   if (_facCajasTs && (now - _facCajasTs) < 30000) return _facCajas;
   try {
-    const rows = await supaFetchAll(SUPABASE_ENTREGAS_ENDPOINT, "select=np,cajas_pedidas");
+    const rows = await supaFetchAll(SUPABASE_ENTREGAS_ENDPOINT, "select=np,cod_art,cajas_pedidas,cajas_entregadas");
     const m = new Map();
-    for (const x of rows){ const np = String(x.np || "").trim().replace(/\.0+$/, ""); if (!np) continue; m.set(np, (m.get(np) || 0) + (Number(x.cajas_pedidas) || 0)); }
-    _facCajas = m; _facCajasTs = now;
+    const ag = new Map();
+    for (const x of rows){
+      const np = String(x.np || "").trim().replace(/\.0+$/, ""); if (!np) continue;
+      const ent = Number(x.cajas_entregadas) || 0;
+      const ped = Number(x.cajas_pedidas) || 0;
+      m.set(np, (m.get(np) || 0) + ent);
+      // v12.23 — agregado: se armó algo que NO estaba en el pedido original (ped=0, ent>0).
+      // Es una anomalía que la operadora debe SUMAR a la factura.
+      if (ped <= 0 && ent > 0){
+        const it = { cod: String(x.cod_art || "").trim(), ent: ent };
+        const arr = ag.get(np) || []; arr.push(it); ag.set(np, arr);
+      }
+    }
+    _facCajas = m; _facCajasTs = now; _facAgreg = ag;
   } catch (_e) { /* sin red: queda el último cache */ }
   return _facCajas;
 }
+function facAgregInfo(np){ return _facAgreg.get(String(np).trim().replace(/\.0+$/, "")) || null; }
 /* v12.18 (2026-08-31) — FALLBACK del "está armado" para el filtro v12.01: mira los
    eventos TAL/TAP de los últimos 7 días en Registros_Produccion_Virgilio (el `texto`
    del TAL arranca con la NP y separa con "|"; el TAP arranca con "NP|LEG|TANDA|..."
@@ -33100,12 +33124,25 @@ function _facCompItems(np){
 /* v12.20 — "A facturar" (verde, protagonista): SOLO los ítems donde algo se entrega
    (ent > 0). El operario factura por acá. Antes vivía mezclado con "Falta" en la
    misma celda — "609 FC 3 −3, 760 −3, 859 −4" era confuso porque los "−N" (rojo)
-   se leían como parte del "FC" (verde). Split explícito. */
+   se leían como parte del "FC" (verde). Split explícito.
+   v12.23 — La celda muestra SÓLO ANOMALÍAS respecto del pedido original:
+     • Ítems del pedido que se armaron cortos → "cod ent/ped" (facturá `ent`, no `ped`).
+     • AGREGADOS al camión que NO estaban en el pedido → "cod +N" (agregá esta línea a la factura).
+   Los ítems armados iguales al pedido no aparecen: no hay que hacer nada con ellos. */
 function facFactDist(np){
-  return _facCompItems(np).filter(function(x){ return x.ent > 0; }).map(function(x){
-    return '<span class="fac-fact-item" title="' + x.titulo + '">' + x.codTxt +
-      ' <b class="fac-fact-ok">' + x.ent + '</b></span>';
-  }).join(", ");
+  const parts = [];
+  // 1) Faltantes parciales — mostrar entregado/pedido (ent < ped, algo se armó).
+  _facCompItems(np).filter(function(x){ return x.ent > 0; }).forEach(function(x){
+    parts.push('<span class="fac-fact-item" title="' + x.titulo + '">' + x.codTxt +
+      ' <b class="fac-fact-ok">' + x.ent + '</b><span class="fac-fact-ped">/' + x.ped + '</span></span>');
+  });
+  // 2) Agregados (no estaban en el pedido) — mostrar "+N" para que la operadora los sume.
+  const ag = facAgregInfo(np) || [];
+  ag.forEach(function(it){
+    parts.push('<span class="fac-fact-item fac-fact-extra" title="AGREGADO: no estaba en el pedido original. Sumá esta línea a la factura.">' +
+      escapeHtml(it.cod) + ' <b class="fac-fact-plus">+' + (Number(it.ent) || 0) + '</b></span>');
+  });
+  return parts.join(", ");
 }
 /* v12.20 — "Falta" (rojo): SOLO los ítems con faltante (falto > 0). Antes esta
    función devolvía ambas cosas — ahora es puro faltante. */
@@ -33576,11 +33613,11 @@ function facRender(tandas){
       .replace(/</g, "&lt;");
     const _ff = facFaltInfo(f.np);
     const _ft = facTareaActiva(f.np);
+    // v12.23 — tooltip en la celda NP: tanda + fecha de salida (reemplazan las columnas que sacamos).
+    const _npTip = 'Tanda ' + String(f.tanda || '—') + ' · Salida ' + String(f.fechaSalida || '—');
     return `
       <tr data-fac-np="${escapeHtml(f.np)}" class="${altFlag ? 'fac-tanda-alt' : ''}${_ft ? ' fac-en-progreso' : (_ff ? ' fac-has-falta' : '')}">
-        <td class="fac-tanda-col">${escapeHtml(f.tanda)}</td>
-        <td class="center">${escapeHtml(f.fechaSalida)}</td>
-        <td class="fac-np-cell">${escapeHtml(f.np)}</td>
+        <td class="fac-np-cell" title="${escapeHtml(_npTip)}">${escapeHtml(f.np)}</td>
         <td class="fac-cod-cell">${escapeHtml(f.cod)}</td>
         <td class="fac-rs-cell"><span class="fac-rs-name">${escapeHtml(f.rs)}</span>${_ft ? facTareaBadge(f.np) : ''}</td>
         <td class="fac-facturar-col">${facFactDist(f.np)}</td>
@@ -33608,18 +33645,16 @@ function facRender(tandas){
       <table class="fac-np-tbl">
         <thead>
           <tr>
-            <th style="width:8%">Tanda</th>
-            <th class="center" style="width:6%">Salida</th>
-            <th style="width:8%">NP</th>
-            <th style="width:6%">Cod</th>
-            <th style="width:18%">Razón Social</th>
-            <th style="width:8%" title="Ítems que van a la factura (pedido menos faltante). Verde.">A facturar</th>
-            <th style="width:6%" title="Ítems que faltaron (se factura corto). Rojo.">Falta</th>
-            <th style="width:12%" title="Pedidos en código secundario a corregir (secundario → principal). Confirmá en 🔀 Corregir códigos.">Cambiar cód</th>
-            <th class="center" style="width:5%">Líos</th>
-            <th class="center" style="width:5%">Cajas</th>
+            <th style="width:9%" title="Nota de pedido. Pasá el mouse sobre el número para ver Tanda y fecha de Salida.">NP</th>
+            <th style="width:7%">Cod</th>
+            <th style="width:22%">Razón Social</th>
+            <th style="width:11%" title="Ítems ANÓMALOS respecto del pedido original — asistencia para cargar la factura:&#10;• Faltó una parte del pedido: cod ent/ped (facturá lo entregado, no lo pedido). Verde.&#10;• AGREGADO que no estaba en el pedido: cod +N (sumá esta línea a la factura). Azul.&#10;Los ítems armados iguales al pedido no aparecen (no hay que hacer nada).">A facturar (anomalías)</th>
+            <th style="width:8%" title="Ítems que se armaron cortos: NO facturés estas cantidades. cod −N = faltaron N cajas del pedido. Rojo.">Falta (no facturar)</th>
+            <th style="width:13%" title="Pedidos en código secundario a corregir (secundario → principal). Confirmá en 🔀 Corregir códigos.">Cambiar cód</th>
+            <th class="center" style="width:5%" title="Líos ARMADOS (los que se cargaron al camión). Refleja lo real, no el pedido original.">Líos</th>
+            <th class="center" style="width:5%" title="Cajas ARMADAS (las que se cargaron al camión). Refleja lo real, no el pedido original.">Cajas</th>
             <th class="center" style="width:11%" title="Subtotal (dto x ítem): precio de lista × unidades por caja × cajas armadas × (1 − dto por volumen del cliente). Antes del descuento del 2%.">💵 Subtotal <span class="fac-th-siva">(dto x ítem)</span></th>
-            <th class="center fac-accion-th" style="width:10%">Acción</th>
+            <th class="center fac-accion-th" style="width:9%">Acción</th>
           </tr>
         </thead>
         <tbody>${rowsHtml}</tbody>

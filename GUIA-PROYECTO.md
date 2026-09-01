@@ -12,7 +12,25 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-01 · Versión app al documentar: **v12.22**
+> Última actualización: 2026-09-01 · Versión app al documentar: **v12.23**
+>
+> Nota **v12.23** — **Facturación: la tabla ahora refleja lo ARMADO, no el pedido original + tooltip Tanda/Salida en NP.**
+> Pedido del usuario: (a) las columnas **Cajas** y **Líos** mostraban el pedido original, deberían mostrar
+> lo que se armó realmente (suele haber faltantes); (b) las columnas "A facturar" y "Falta" son asistencia
+> para cargar la factura en el ERP — que sean más claras cuando falta algo o se agregó algo que no estaba
+> en el pedido; (c) sacar las columnas **Tanda** y **Salida**, mostrar esos datos como tooltip al pasar el
+> mouse por el número de NP. Cambios: **(a)** `facFetchCajas()` ahora suma `cajas_entregadas` en vez de
+> `cajas_pedidas` de `Entregas_Virgilio` — la columna "Cajas" refleja lo cargado al camión (Líos ya venía
+> del evento TAL, que es lo real, no se tocó). **(b)** Misma pasada trae los AGREGADOS (fila con
+> `cajas_pedidas=0 AND cajas_entregadas>0`) a un nuevo `Map _facAgreg`; `facFactDist()` los renderiza en la
+> columna "A facturar" como `cod +N` en cápsula azul con tooltip "AGREGADO: no estaba en el pedido original.
+> Sumá esta línea a la factura." Los ítems armados cortos ahora muestran `cod ent/ped` (ej. `609 3/6`) para
+> que la operadora vea de un pantallazo cuánto facturar vs cuánto pedía el pedido; el header pasa a "A
+> facturar (anomalías)" con tooltip largo explicando la semántica; el header "Falta" pasa a "Falta (no
+> facturar)" con tooltip aclaratorio. **(c)** El `<td>` de Tanda y el de Salida se sacan; el `<td>` de NP
+> ahora lleva `title="Tanda D47B · Salida 01/09"` para no perder la info. El header queda con 9 columnas
+> (antes 11) y el tooltip del header de NP avisa que la info está al pasar el mouse. Bump `APP_VERSION` +
+> `SW_VERSION` a `v12.23`. Suite de tests verde.
 >
 > Nota **2026-08-28 (solo datos, sin bump de versión) — Tabla nueva `lk_pedidos_match`: string identificador de pedido web + SUCURSAL DE ENTREGA.**
 > Virgilio no tenía la sucursal de entrega de los pedidos; LK sí (`orders.sheets_payload.sucursal_entrega`).
