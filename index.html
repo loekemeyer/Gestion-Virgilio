@@ -33632,7 +33632,6 @@ function facRender(tandas){
         <td class="fac-cod-cell">${escapeHtml(f.cod)}</td>
         <td class="fac-rs-cell"><span class="fac-rs-name">${escapeHtml(f.rs)}</span>${_ft ? facTareaBadge(f.np) : ''}</td>
         <td class="fac-falta-col">${facFaltAgregDist(f.np)}</td>
-        <td style="white-space:normal;font-size:11px;font-weight:800;color:#1e40af;line-height:1.3;">${facCambioCod(f.np)}</td>
         <td class="fac-lios-cell">${(() => {
           const np = String(f.np).trim().replace(/\.0+$/, "");
           const v = _facLios.get(np);
@@ -33655,14 +33654,13 @@ function facRender(tandas){
       <table class="fac-np-tbl">
         <thead>
           <tr>
-            <th style="width:10%" title="Nota de pedido. Pasá el mouse sobre el número para ver Tanda y fecha de Salida.">NP</th>
+            <th style="width:11%" title="Nota de pedido. Pasá el mouse sobre el número para ver Tanda y fecha de Salida.">NP</th>
             <th style="width:8%">Cod</th>
-            <th style="width:25%">Razón Social</th>
-            <th style="width:16%" title="Ajustes respecto del pedido original — asistencia para cargar la factura:&#10;• FALTANTE (rojo, cod −N): faltó, restá N cajas de la factura o no la pongas.&#10;• AGREGADO (verde, cod +N): se armó algo que no estaba en el pedido, sumá N cajas a la factura.&#10;Los ítems armados iguales al pedido no aparecen (no hay que ajustar nada).">Faltantes y Agregados</th>
-            <th style="width:13%" title="Pedidos en código secundario a corregir (secundario → principal). Confirmá en 🔀 Corregir códigos.">Cambiar cód</th>
+            <th style="width:28%">Razón Social</th>
+            <th style="width:20%" title="Ajustes respecto del pedido original — asistencia para cargar la factura:&#10;• FALTANTE (rojo, cod −N): faltó, restá N cajas de la factura o no la pongas.&#10;• AGREGADO (verde, cod +N): se armó algo que no estaba en el pedido, sumá N cajas a la factura.&#10;Los ítems armados iguales al pedido no aparecen (no hay que ajustar nada).">Faltantes y Agregados</th>
             <th class="center" style="width:5%" title="Líos ARMADOS (los que se cargaron al camión). Refleja lo real, no el pedido original.">Líos</th>
             <th class="center" style="width:5%" title="Cajas ARMADAS (las que se cargaron al camión). Refleja lo real, no el pedido original.">Cajas</th>
-            <th class="center" style="width:11%" title="Subtotal (dto x ítem): precio de lista × unidades por caja × cajas armadas × (1 − dto por volumen del cliente). Antes del descuento del 2%.">💵 Subtotal <span class="fac-th-siva">(dto x ítem)</span></th>
+            <th class="center" style="width:12%" title="Subtotal (dto x ítem): precio de lista × unidades por caja × cajas armadas × (1 − dto por volumen del cliente). Antes del descuento del 2%.">💵 Subtotal <span class="fac-th-siva">(dto x ítem)</span></th>
             <th class="center fac-accion-th" style="width:7%">Acción</th>
           </tr>
         </thead>
