@@ -12,7 +12,19 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-01 · Versión app al documentar: **v12.25**
+> Última actualización: 2026-09-01 · Versión app al documentar: **v12.26**
+>
+> Nota **v12.26** — **Facturación: la fila amarilla ("en progreso") siempre muestra el badge que la explica.**
+> Bug reportado por el usuario en NP 44591: la fila se pintaba amarilla (tarea de faltante activa en
+> `Faltantes_Tareas`) pero no aparecía el badge `⏳` al pasar el mouse — inconsistente. Causa raíz:
+> `facTareaBadge()` tenía dos guards que devolvían `""` (la fila seguía amarilla igual porque el
+> color de fila se decidía SOLO por `facTareaActiva`, no por la misma condición del badge):
+>   (a) `cjCompletando <= 0` (ningún ítem faltante tiene stock ahora en `a_guardar` / racks / guardado
+>       hoy) → antes escondía el badge; ahora muestra `⏳ Tarea abierta · sin stock ahora · lo hace X`.
+>   (b) `f.cajas === 0` (faltante completado, tarea todavía sin cerrar) → el badge sigue oculto pero
+>       ahora la fila TAMPOCO se pinta amarilla: `_ft` en el render usa `_ftRaw && _ff && _ff.cajas > 0`
+>       para sincronizar color y badge con el mismo predicado.
+> Sin cambios de fetch (`facFetchTareas` sigue igual). Suite verde.
 >
 > Nota **v12.25** — **Facturación: columna unificada "Faltantes y Agregados" + baja de "Cambiar cód".**
 > Cierre de la iteración de esta mañana sobre el módulo de Facturación. Cambios respecto de v12.23:

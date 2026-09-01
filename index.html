@@ -6538,7 +6538,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.25";
+const APP_VERSION = "v12.26";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -33489,8 +33489,8 @@ function facTareaBadge(np){
   // v6.19: si ya NO falta nada en la NP (faltante completado, aunque la tarea siga abierta), no
   // mostramos el aviso — la NP está lista para facturar. Corrige el "⏳ Completando · completo".
   if (!f || !(Number(f.cajas) > 0)) return "";
-  // v6.18: el aviso solo si algún artículo faltante de la NP está EN "a guardar" (a_guardar>0) O
-  // se guardó HOY — que es lo que aparece en el CP para completar. Si no, no se muestra (se factura corto).
+  const quien = (t.estado === 'asignado') ? (' · lo hace ' + escapeHtml(t.asignado_nombre || ('leg ' + (t.asignado_legajo || '?')))) : ' · sin asignar aún';
+  // v6.18: cuántas cajas hay stock para completar AHORA (a_guardar>0, en racks o guardado hoy).
   // v10.52 — el número cuenta SOLO las cajas de los artículos que se están completando (con stock
   // para completar), no TODO el faltante de la NP. Ej.: si de "763×1, 922×2, 911×2" solo el 922 se
   // completa, dice "faltan 2 cj", no 5.
@@ -33500,10 +33500,14 @@ function facTareaBadge(np){
     f.items.forEach(function (it) {
       if (_facItemCompletable(it.cod)) cjCompletando += (Number(it.falto) || 0);
     });
-    if (cjCompletando <= 0) return "";   // nada completable → no se muestra el aviso
+  }
+  // v12.26 — Antes: si `cjCompletando<=0` devolvíamos "" y la fila quedaba amarilla SIN aviso
+  // (usuario: "no aparece nada cuando paso el mouse por arriba" en NP 44591). Ahora mostramos un
+  // badge alternativo que explica el estado: tarea abierta pero sin stock inmediato.
+  if (cjCompletando <= 0) {
+    return '<div class="fac-progreso-badge" title="Hay una tarea abierta para completar el faltante de esta NP, pero AHORA MISMO no hay stock para agregar (nada en A guardar / racks / guardado hoy). Esperá que llegue reposición o facturá corto.">⏳ Tarea abierta · sin stock ahora' + quien + '</div>';
   }
   const est = 'faltan ' + cjCompletando + ' cj';
-  const quien = (t.estado === 'asignado') ? (' · lo hace ' + escapeHtml(t.asignado_nombre || ('leg ' + (t.asignado_legajo || '?')))) : ' · sin asignar aún';
   return '<div class="fac-progreso-badge" title="Están agregando cajas a esta NP (faltante que llegó). Esperá a que terminen antes de facturar.">⏳ Completando · ' + escapeHtml(est) + quien + '</div>';
 }
 /* v5.70: alterna el filtro "ver solo NPs con faltante" y re-dibuja. */
@@ -33623,7 +33627,11 @@ function facRender(tandas){
       .replace(/'/g, "&apos;")
       .replace(/</g, "&lt;");
     const _ff = facFaltInfo(f.np);
-    const _ft = facTareaActiva(f.np);
+    const _ftRaw = facTareaActiva(f.np);
+    // v12.26 — Fila amarilla ("en progreso") SOLO si además del `Faltantes_Tareas` activo la NP
+    // TODAVÍA tiene faltante remanente. Sin esto una tarea abierta pero ya completada dejaba
+    // la fila amarilla y sin badge (inconsistente): el mismo predicado del badge decide el color.
+    const _ft = (_ftRaw && _ff && Number(_ff.cajas || 0) > 0) ? _ftRaw : null;
     // v12.23 — tooltip en la celda NP: tanda + fecha de salida (reemplazan las columnas que sacamos).
     const _npTip = 'Tanda ' + String(f.tanda || '—') + ' · Salida ' + String(f.fechaSalida || '—');
     return `
