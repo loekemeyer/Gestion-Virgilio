@@ -58,26 +58,26 @@ catch (_e) {
     out.chipShown = (document.getElementById("facChipFalt") || {}).style.display !== "none";    // true
     out.rowsAll   = nRows();                                                                    // 2
     out.class500  = /fac-has-falta/.test((document.querySelector('#facContainer tr[data-fac-np="500"]') || {}).className || "");
-    // v12.20: "A facturar" (fac-facturar-col, verde) y "Falta" (fac-falta-col, rojo)
-    // en columnas separadas. Antes ambas vivían en fac-falta-col ("609 FC 3 −3").
-    // v12.23: los cortos PARCIALES (ent > 0) SOLO aparecen en "A facturar" como
-    // "cod ent/ped" — la col Faltantes queda vacía para ellos (antes se mostraba
-    // en ambas columnas → redundante). "Faltantes" solo muestra los ítems donde
-    // TODO faltó (ent === 0). Acá 315: ped=20, falto=8 → ent=12 (corto parcial),
-    // así que fac-falta-col NO tiene 315 y fac-facturar-col dice "315 12/20".
+    // v12.23: una sola columna "Faltantes y Agregados" (fac-falta-col) con ambos
+    // ajustes: faltantes en rojo (cod −N) y agregados en verde (cod +N). Antes eran
+    // dos columnas ("A facturar" verde + "Faltantes" rojo) y un mismo código aparecía
+    // en las dos (ej. 609 3/6 verde + 609 −3 rojo = misma info). Acá 315: ped=20,
+    // falto=8 → aparece en fac-falta-col como "315 −8" (rojo, fac-fact-falt).
     const _row500 = document.querySelector('#facContainer tr[data-fac-np="500"]');
     const _fc500 = _row500 ? _row500.querySelector("td.fac-falta-col") : null;
-    const _fa500 = _row500 ? _row500.querySelector("td.fac-facturar-col") : null;
-    // v12.23: 315 fue corto parcial → NO está en la col Faltantes (queda vacía).
-    out.faltDist500 = ((_fc500 || {}).innerHTML || "") === "";
-    // La col A facturar dice "315 12/20" (ent/ped): 12 en fac-fact-ok, /20 en fac-fact-ped.
-    out.factDist500 = /315/.test((_fa500 || {}).innerHTML || "") &&
-      /fac-fact-ok/.test((_fa500 || {}).innerHTML || "") &&
-      /12/.test((_fa500 || {}).innerHTML || "") &&
-      /fac-fact-ped/.test((_fa500 || {}).innerHTML || "") &&
-      /20/.test((_fa500 || {}).innerHTML || "");
+    // v12.23: la columna única muestra "315 −8" (fac-fact-falt = clase roja).
+    out.faltDist500 = /315/.test((_fc500 || {}).innerHTML || "") &&
+      /−8/.test((_fc500 || {}).innerHTML || "") &&
+      /fac-fact-falt/.test((_fc500 || {}).innerHTML || "") &&
+      !/FC/.test((_fc500 || {}).innerHTML || "");
+    // v12.23: no hay más columna "A facturar" (fac-facturar-col). El check se
+    // reemplaza por: la columna única NO tiene "ent/ped" (la operadora solo ve
+    // el ajuste, no el conteo completo). El "12" del ent no aparece.
+    out.factDist500 = !/\/20/.test((_fc500 || {}).innerHTML || "") &&
+      !/fac-fact-ped/.test((_fc500 || {}).innerHTML || "") &&
+      !/fac-fact-ok/.test((_fc500 || {}).innerHTML || "");
     out.noTotalInDist = !/FALTA|cj/.test((_fc500 || {}).innerHTML || "");      // NO el total "FALTA N cj"
-    out.faltColExists = !!_fc500 && !!_fa500;
+    out.faltColExists = !!_fc500;
     if (_fc500) {
       const br = _fc500.getBoundingClientRect();
       out.faltColWraps = getComputedStyle(_fc500).whiteSpace;                  // "normal" (no se corta)
@@ -87,10 +87,9 @@ catch (_e) {
     const _td500rs = _row500 ? _row500.querySelector("td.fac-rs-cell") : null;
     out.rsNoFaltaBadge = _td500rs ? !_td500rs.querySelector(".fac-falta-badge") : false;
     out.rsCellWraps = _td500rs ? getComputedStyle(_td500rs).whiteSpace : "";   // sigue "normal"
-    // la 501 (sin faltante) → ambas columnas vacías
+    // la 501 (sin faltante ni agregado) → columna única vacía
     const _row501 = document.querySelector('#facContainer tr[data-fac-np="501"]');
-    out.dist501empty = ((_row501 && _row501.querySelector("td.fac-falta-col") || {}).innerHTML || "") === "" &&
-      ((_row501 && _row501.querySelector("td.fac-facturar-col") || {}).innerHTML || "") === "";
+    out.dist501empty = ((_row501 && _row501.querySelector("td.fac-falta-col") || {}).innerHTML || "") === "";
     out.chipOffBefore = !(document.getElementById("facChipFalt") || { classList: { contains: function () { return false; } } }).classList.contains("on");
 
     // 2) Filtro ON: solo la 500

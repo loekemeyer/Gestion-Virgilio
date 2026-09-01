@@ -33,7 +33,21 @@
 > `sql/vista_cola_impresion_arts_fallback_20260901.sql`. Bump `APP_VERSION` + `SW_VERSION` a
 > `v12.24`. Smoke suite verde.
 >
-> Nota **v12.23** — **Facturación: la tabla ahora refleja lo ARMADO, no el pedido original + tooltip Tanda/Salida en NP.**
+> Nota **v12.23** — **Facturación: unificación "Faltantes y Agregados" en una sola columna (rojo −N / verde +N).**
+> Iteración sobre el fix de la mañana: las dos columnas separadas ("A facturar" verde con `ent/ped` +
+> "Faltantes" roja con `−N`) mostraban el mismo código dos veces cuando había un corto parcial
+> (ej. 609 ped=6 armó=3 → `609 3/6` verde Y `609 −3` rojo, la misma info). Redundante y confuso.
+> Solución: **una sola columna "Faltantes y Agregados"** (`fac-falta-col`) donde cada ítem aparece
+> una única vez con el ajuste que la operadora tiene que hacer en la factura:
+>   - **FALTANTE** (rojo, `cod −N`): faltó N cajas del pedido → NO facturarlas.
+>   - **AGREGADO** (verde, `cod +N`): se armó algo que NO estaba en el pedido → sumar N cajas a la factura.
+> Ni siquiera el `ent/ped` del corto parcial: es info que la operadora no necesita cargar (el sistema
+> de gestión ya tiene el pedido; ella solo ajusta la diferencia). El header pasó de dos
+> ("A facturar (anomalías)" + "Faltantes (no facturar)") a uno ("Faltantes y Agregados"). Funciones:
+> `facFactDist` y `facFaltDist` reemplazadas por `facFaltAgregDist`. Test `fac-falta-filter.cjs`
+> actualizado a la nueva semántica. Suite verde.
+>
+> Nota **v12.23 (temprano)** — **Facturación: la tabla ahora refleja lo ARMADO, no el pedido original + tooltip Tanda/Salida en NP.**
 > Pedido del usuario: (a) las columnas **Cajas** y **Líos** mostraban el pedido original, deberían mostrar
 > lo que se armó realmente (suele haber faltantes); (b) las columnas "A facturar" y "Falta" son asistencia
 > para cargar la factura en el ERP — que sean más claras cuando falta algo o se agregó algo que no estaba
