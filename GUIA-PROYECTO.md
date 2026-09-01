@@ -12,7 +12,26 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-01 · Versión app al documentar: **v12.23**
+> Última actualización: 2026-09-01 · Versión app al documentar: **v12.24**
+>
+> Nota **v12.24** — **Cola de impresión NP: imprime también los remitos sin `resumen` en el TAL (súper con etiqueta y NP cerradas con 0 líos).**
+> Pedido del usuario: en «🖨️ Cola de impresión — NP armadas» había 3 NP (98109 súper con etiqueta,
+> 98582 y 98583 líos con 0 líos armados) que "no dejaba imprimir". Diagnóstico: el TAL de esas NP se
+> encoló con el 4to campo (`resumen`) **vacío** (para 98109 es normal — el súper va con etiqueta, no
+> arma lío; para 98582/98583 el operario cerró con 0 líos en esas NP). `armadoRemitoData()` sólo
+> leía `row.resumen`, así que la tabla del remito quedaba en "— sin artículos —" y la Cola las
+> filtraba (`x.resumen` = falsy) → no imprimían. **Fix backend (fuente única de verdad):** la vista
+> `vista_cola_impresion` ahora expone también `arts_fallback` y `faltantes_fallback` (JSONB
+> agregado desde `Entregas_Virgilio` — `cajas_entregadas>0` y `cajas_falto>0` respectivamente). El
+> front (`openColaImpresion` + `colaImprimirTodas` + `_armadoRemitoDataForItems`) los pasa al
+> `armadoRemitoData`, que usa `row.artsFallback` como sección **Artículos** cuando el `resumen`
+> viene vacío; y `_armadoRemitoDataForItems` prefiere `faltantesFallback` cuando la Cola ya lo
+> trajo del server (evita depender del fetch a Entregas). El filtro previo (`items0.filter(...)`)
+> ahora acepta NP con `resumen` **o** con `arts_fallback.length>0` **o** con
+> `faltantes_fallback.length>0`. Backup previo de la vista en
+> `sql/backups/backup_vista_cola_impresion_20260901.sql`; DDL nueva en
+> `sql/vista_cola_impresion_arts_fallback_20260901.sql`. Bump `APP_VERSION` + `SW_VERSION` a
+> `v12.24`. Smoke suite verde.
 >
 > Nota **v12.23** — **Facturación: la tabla ahora refleja lo ARMADO, no el pedido original + tooltip Tanda/Salida en NP.**
 > Pedido del usuario: (a) las columnas **Cajas** y **Líos** mostraban el pedido original, deberían mostrar

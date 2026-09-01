@@ -6545,7 +6545,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.23";
+const APP_VERSION = "v12.24";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -26841,7 +26841,7 @@ async function openColaImpresion(keepOpen) {
   if (body && !keepOpen) body.innerHTML = '<div style="padding:24px;text-align:center;color:#64748b;">Cargando cola…</div>';
   try {
     var H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
-    var rows = await fetch(SUPABASE_URL + "/rest/v1/vista_cola_impresion?select=np,tanda,razon_social,armado_ts,vencido,resumen,armador_leg&order=armado_ts.asc&limit=5000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; });
+    var rows = await fetch(SUPABASE_URL + "/rest/v1/vista_cola_impresion?select=np,tanda,razon_social,armado_ts,vencido,resumen,armador_leg,arts_fallback,faltantes_fallback&order=armado_ts.asc&limit=5000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; });
     _colaImp = { items: rows || [] };
     colaImpRender();
   } catch (e) { if (body) body.innerHTML = '<div style="padding:20px;color:#b91c1c;">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
@@ -26879,12 +26879,21 @@ var _colaImpBusy = false;
 async function colaImprimirTodas() {
   if (_colaImpBusy) { alert("Esperá, ya hay una impresión en curso."); return; }
   var items0 = (_colaImp && _colaImp.items) ? _colaImp.items.slice() : [];
-  items0 = items0.filter(function (x) { return x && x.resumen; });   // sin resumen no hay remito
-  if (!items0.length) { alert("No hay notas de pedido con armado (resumen) para imprimir."); return; }
+  // v12.24 — imprimir aunque el TAL no traiga `resumen`: si hay artículos entregados o
+  // faltantes en Entregas_Virgilio (arts_fallback / faltantes_fallback de la vista),
+  // el remito igual se puede armar (caso súper con etiqueta y NP cerradas con 0 líos).
+  items0 = items0.filter(function (x) {
+    if (!x) return false;
+    if (x.resumen) return true;
+    var af = Array.isArray(x.arts_fallback) ? x.arts_fallback : [];
+    var ff = Array.isArray(x.faltantes_fallback) ? x.faltantes_fallback : [];
+    return af.length > 0 || ff.length > 0;
+  });
+  if (!items0.length) { alert("No hay notas de pedido con armado (resumen o entregas) para imprimir."); return; }
   _colaImpBusy = true;
   try {
     colaImpStatus("Preparando " + items0.length + " remito(s)…");
-    var items = items0.map(function (x) { return { np: x.np, tanda: (x.tanda === "—" ? "" : x.tanda), resumen: x.resumen, armadorLeg: x.armador_leg || "" }; });
+    var items = items0.map(function (x) { return { np: x.np, tanda: (x.tanda === "—" ? "" : x.tanda), resumen: x.resumen, armadorLeg: x.armador_leg || "", artsFallback: Array.isArray(x.arts_fallback) ? x.arts_fallback : [], faltantesFallback: Array.isArray(x.faltantes_fallback) ? x.faltantes_fallback : [] }; });
     var ds = await _armadoRemitoDataForItems(items);
     // imprimir serializado (1 hoja cada ~2.6 s, como la estación); con kiosk salen solas.
     var k = 0;
@@ -32203,8 +32212,17 @@ function armadoRemitoData(row){
       if (artMap[cod].lios.indexOf(lab) === -1) artMap[cod].lios.push(lab);
     });
   });
-  const arts = Object.keys(artMap).map(function(k){ return artMap[k]; });
+  let arts = Object.keys(artMap).map(function(k){ return artMap[k]; });
   arts.sort(function(a, b){ return _remitoCodKey(a.cod) - _remitoCodKey(b.cod) || String(a.cod).localeCompare(String(b.cod)); });
+  // Fallback (v12.24): si el TAL vino SIN resumen (súper con etiqueta, o NP cerrada
+  // con 0 líos), usamos artículos de Entregas_Virgilio (row.artsFallback, servido por
+  // vista_cola_impresion.arts_fallback) para poder imprimir igual el remito de armado.
+  // La columna "Lío" queda vacía porque efectivamente no hubo líos.
+  if (!arts.length && Array.isArray(row.artsFallback) && row.artsFallback.length){
+    arts = row.artsFallback.map(function(a){ return { cod: String(a.cod || ""), cajas: Number(a.cajas) || 0, lios: [] }; })
+                           .sort(function(a, b){ return _remitoCodKey(a.cod) - _remitoCodKey(b.cod) || String(a.cod).localeCompare(String(b.cod)); });
+    total = arts.reduce(function(s, a){ return s + (Number(a.cajas) || 0); }, 0);
+  }
   const liosOut = lios.map(function(l, k){
     return { label: labels[k], comp: (l.items || []).map(function(it){ return String(it.cod) + " ×" + it.qty; }).join(", ") + (l.suelta ? "  (suelta)" : "") };
   });
@@ -32409,8 +32427,16 @@ async function _armadoRemitoDataForItems(items){
   return items.map(function (it){
     const pd = ppMap[it.np] || {};
     const tanda = it.tanda || pd.tanda || "";
+    // v12.24 — si el caller ya trae los faltantes (p.ej. la Cola de impresión, que los
+    // recibe en JSON desde vista_cola_impresion.faltantes_fallback), preferimos esos y
+    // así el fallback funciona incluso si faltMap quedó vacío por alguna razón.
+    const faltPref = (Array.isArray(it.faltantesFallback) && it.faltantesFallback.length)
+                      ? it.faltantesFallback.map(function(f){ return { cod: String(f.cod || ""), cajas: Number(f.cajas) || 0 }; })
+                      : (faltMap[it.np] || []);
     const row = { np: it.np, tanda: tanda, cod: pd.cod || "", rs: pd.rs || "", salePpp: pd.fecha || "", fecha: pd.fecha || "", resumen: it.resumen,
-      armadorLeg: it.armadorLeg || "", pickerLeg: pickByTanda[String(tanda).toUpperCase()] || "", faltantes: faltMap[it.np] || [] };
+      armadorLeg: it.armadorLeg || "", pickerLeg: pickByTanda[String(tanda).toUpperCase()] || "",
+      faltantes: faltPref,
+      artsFallback: Array.isArray(it.artsFallback) ? it.artsFallback : [] };   // v12.24 — Entregas_Virgilio como fuente cuando el TAL vino sin resumen
     return armadoRemitoData(row);
   });
 }
