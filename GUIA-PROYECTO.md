@@ -12,7 +12,64 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-01 · Versión app al documentar: **v12.27**
+> Última actualización: 2026-09-01 · Versión app al documentar: **v12.28**
+>
+> Nota **v12.28** — **Módulo Deudores: reemplaza a "Deuda a cobrar" (v9.23/v11.68), que
+> tenía 0 filas en producción.** El viejo dependía de tickear "Facturar" en el celular
+> (`deuda_movimientos`, disparaba fire-and-forget y fallaba en silencio — nunca se vio
+> el error) y revalorizaba a mano con precios de LK, duplicando lo que ya calculaba
+> `vista_facturacion_neto`. Se **borraron** `deuda_movimientos`, `vista_deuda_saldo` y
+> las RPC `deuda_registrar_facturado`/`deuda_registrar_cobrado`/`deuda_borrar_facturado`
+> (0 filas, sin backup real que hacer — verificado antes de borrar). El módulo nuevo
+> **lee `isis_lk`/`isis_ch.documentos` directo** (ver § 3b, esquema hasta ahora sin
+> documentar): la deuda existe apenas se factura, no hace falta registrar nada.
+> **Backend** (`sql/deudores.sql`): `cobranzas_escalones` (la escalera de descuento por
+> pronto pago vigente — 14d 25%, 30d 20%, 45d 15%, 60d 10%, 90d 5% echeq, 120d 0% echeq
+> — pública, config no dato de cliente), `deudores_condiciones` (mapa
+> `condicion_venta`→días de plazo, sembrado con las 31 condiciones reales de las
+> facturas 2019-2026; `dias=NULL` = sin plazo derivable, no se inventa), `cobranzas_excepciones`
+> (plazo pactado por cliente que pisa la escalera general — vacía, pendiente que el
+> dueño la cargue), `vista_deudores_documentos` (interna, REVOKE anon: un comprobante =
+> una fila, deudor_id = **CUIT normalizado** — cruza LK y Chef sin tabla de mapeo,
+> verificado: 674 CUIT en LK + 144 en Chef + 50 en ambas, sólo 1 comparte código de
+> cliente), `deudores_resumen`/`deudores_detalle` (RPC `SECURITY DEFINER`, `EXECUTE`
+> a anon — gateo por `requireSupervisor()` en el front, mismo patrón que
+> `facturacion_neto_lote`/`cobranzas_resumen`). **Fase 1: deuda BRUTA** (no descuenta
+> cobros — `cobrado` es una constante 0, el enganche para cuando el agente del ISIS
+> empiece a parsear recibos es `isis_lk.comprobantes_aplicados`, hoy 19 filas). Por eso
+> `deudores_resumen` acota a los **últimos 12 meses por defecto**: sumar todo desde 2019
+> sin restar pagos da un número que no significa nada (se midió: **$8.900 M** sólo en el
+> tramo +90 de LK contando la historia completa). **Front** (`index.html`): el botón
+> **💰 Deuda a cobrar / Cobranzas** (ya existía) ahora pinta desde `deudores_resumen` —
+> tabla por cliente con saldo, peor tramo, próximo corte de descuento (escalón + fecha
+> + %) y filtro por empresa/tramo/búsqueda; "Detalle" abre el historial de comprobantes
+> de `deudores_detalle`. Se sacó el botón "+ Registrar cobro" (escribía a una tabla que
+> ya no existe) — vuelve cuando haya de dónde leer un cobro real (conciliación bancaria
+> / Interbanking, pendiente). Se sacaron los hooks muertos `deudaRegistrarNP`/
+> `deudaBorrarNP` del flujo de tickear/revertir Facturación (ya no hace falta registrar
+> nada ahí) y las constantes `SUPABASE_LK_URL`/`SUPABASE_LK_KEY` del front de Virgilio
+> (sin otro uso en el repo, verificado por grep — la key de LK sigue en `admin/admin.js`).
+> **Pendiente, no resuelto en este pase:** el bot de Cobranzas de WhatsApp que dispare el
+> reclamo (repo `GestOpClientes`, todavía no existe), el grant de `SELECT`+policy a
+> `lk_ppp_reader` para que LK lea `cobranzas_excepciones` por FDW, la carga de las
+> excepciones reales, y la integración con Interbanking (o carga manual del extracto)
+> para pasar de deuda bruta a neta. `sql/deudores.sql` documenta todo el diseño.
+>
+> ⚠ **Hallazgo de seguridad del mismo pase (auditor-supabase), corregido**:
+> `cobranzas_escalones` nació con **INSERT/UPDATE/DELETE/TRUNCATE abiertos a
+> `anon`/`authenticated`** — no era un `GRANT` explícito, sino los **default
+> privileges del schema `public`** (`ALTER DEFAULT PRIVILEGES FOR ROLE postgres
+> ... GRANT ALL ON TABLES`), que le dan CRUD completo a **toda tabla nueva** que
+> cree el rol `postgres` salvo que se revoque a mano. Confirmado con
+> explotación real: con la anon key (pública, está en `index.html`/`sw.js`)
+> cualquiera podía `TRUNCATE` la escalera de descuento. Corregido con
+> `REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ... FROM anon,
+> authenticated` (ya en `sql/deudores.sql`). **La causa raíz sigue viva**: el
+> default privilege del schema no se tocó — toda tabla nueva que se cree desde
+> el SQL editor nace expuesta igual, salvo que alguien se acuerde de revocar a
+> mano. Pendiente evaluar `ALTER DEFAULT PRIVILEGES ... REVOKE` a nivel schema
+> (afectaría a todo objeto nuevo futuro, no sólo a este módulo — decisión del
+> usuario, no se aplica sin permiso explícito).
 >
 > Nota **v12.27** — **"Pedidos sin cargar en PPP": se puede tachar la NP que NO es un error.**
 > La tercera sección del módulo (`vista_np_prog_sin_base`, v12.05) avisa cuando una NP está en
@@ -7446,6 +7503,49 @@ por `agente-local/nc_ingest.py` (parsea PDFs de Notas de Crédito/Débito) a dos
   `confirmado_at`, `confirmado_por`.
 - **`Comprobantes_NC_Items`** — líneas. Cols: `id`, `nc_id` (→ `Comprobantes_NC.id`),
   `cod_raw`, `cod_art`, `descripcion`, `cajas`, `unidades`, `importe`.
+
+### Esquemas `isis_lk` / `isis_ch` — facturación real del ISIS (sin documentar hasta v12.25)
+
+Dos esquemas (**no `public`**) que guardan los **comprobantes reales** del ERP ISIS,
+parseados de PDF: `isis_lk` (Loekemeyer) e `isis_ch` (Chef). Es la **fuente de verdad
+de facturación** — más confiable que cualquier cálculo del lado de Virgilio o de LK,
+porque es lo que efectivamente se facturó, con CAE y todo.
+
+- **Ingesta**: agente local en Python (mismo patrón que `agente-local/nc_ingest.py` de
+  las NC), corre en el desktop con acceso a las carpetas `PDF_ISIS`/`PDF_ISISCHEF`,
+  parsea con `pypdf` y sube con la secret key. Corre cada 1-2 min mientras hay PDF
+  nuevos — verificado 2026-09-01: última ingesta 31/08 17:12, ~30.700 documentos
+  cargados el 28/08 en una sola corrida (carga histórica) más el goteo diario.
+- **`isis_lk.documentos`** / **`isis_ch.documentos`** — un comprobante por fila.
+  Columnas clave: `familia` (`factura_venta`/`nc_venta`/`nd_venta`/`factura_compra`/…),
+  `tipo`, `letra`, `numero`, `punto_venta`, `fecha`, `vto_factura` (**sólo 4% de las
+  facturas de venta lo trae parseado**), `condicion_venta` (**100% cargado** — es el
+  texto libre del ISIS: `"30 FF"`, `"Pago Contado -25%"`, `"IMPORTADOR"`, etc., 31
+  variantes distintas verificadas), `condicion_pago` (NULL siempre, no lo trae el
+  parser), `contraparte_cuit`/`contraparte_codigo`/`contraparte_nombre`, `subtotal`,
+  `iva`/`iva_21`/`iva_105`, `total`, `cae`/`cae_vto`, `total_cajas`, `storage_path`
+  (PDF en el bucket privado `isis-lk`/`isis-ch`), `comprobante_id`. **RLS ON, revocado
+  a anon/authenticated** — sólo se lee vía vista/RPC (`vista_deudores_documentos` etc.),
+  igual criterio que `clientes_dto`.
+  ⚠ El `contraparte_codigo` viene con **dos grafías**: ceros a la izquierda
+  (`"001587"`) en facturas anteriores a mayo 2022, sin ceros después — pasar siempre
+  por `public.canon_cod()` antes de comparar/agrupar por código.
+- **`isis_lk.documento_items`** / **`documento_valores`** / **`comprobantes_aplicados`**
+  — líneas de detalle, valores de pago (cheques: banco, número, `fecha_valor`, 197
+  filas) e imputación recibo→factura (19 filas). El agente **todavía no parsea
+  recibos/cobranzas** — son las tablas donde va a entrar eso cuando lo haga (ver
+  módulo Deudores, nota v12.25).
+- **Volumen verificado (2026-09-01)**: 21.870 facturas + 8.941 NC + 146 ND de venta LK
+  (desde 2019-06); 6.122 facturas + 2.137 NC + 57 ND de venta Chef (desde 2019-08).
+- **Vistas que ya lo usan**: `comprobantes_venta` (LK+Chef unidas, con signo),
+  `vista_factura_metodo_pago` (cruza contra `Comprobantes_ARCA`/`vista_np_sucursal` —
+  ⚠ hoy pega mal: `Comprobantes_ARCA` sólo tiene 6 filas de la prueba de julio, así
+  que casi nada matchea), `vista_np_factura` (concilia el neto calculado de Virgilio
+  contra la factura real del ISIS por NP, ±5% y ±0,5 caja de tolerancia).
+- **CUIT cruza LK y Chef; el código de cliente NO** (numeraciones independientes por
+  diseño, ver § Panel Web LK / Clientes vinculados en el repo LK). Verificado sobre
+  facturas 2025-2026: 674 CUIT distintos en LK, 144 en Chef, 50 facturan en las dos
+  empresas y de esos **sólo 1** comparte el mismo código de cliente.
 
 ### Subsistema de stock / OC (event-sourced)
 
