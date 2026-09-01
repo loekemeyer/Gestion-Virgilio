@@ -6524,7 +6524,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.28";
+const APP_VERSION = "v12.29";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -35445,6 +35445,94 @@ async function deudaVerDetalle(deudorId) {
 }
 window.deudaVerDetalle = deudaVerDetalle;
 
+/* ============================================================================
+   PESTAÑA: FACTURACIÓN VS ISIS (2026-09-01) — cruza lo que Virgilio calculó
+   (vista_facturacion_neto, sobre lo armado) contra lo que efectivamente se
+   facturó en el ISIS (isis_lk/isis_ch.documentos, el mismo dato que ya usa
+   Deudores). Backend: sql/cruce_facturacion.sql. Sólo lee — no corrige nada
+   solo, cada diferencia queda para que la revise una persona.
+   ============================================================================ */
+var _cruceState = { rows: [], q: "", empresa: null, estado: null, offset: 0, limit: 100, total: 0 };
+var CRUCE_ESTADO_LABEL = { diff: "Diferencia", ambiguo: "Ambiguo", sin_factura: "Sin factura", sin_neto: "Sin neto calculado", ok: "OK" };
+var CRUCE_ESTADO_COLOR = { diff: "#dc2626", ambiguo: "#d97706", sin_factura: "#64748b", sin_neto: "#94a3b8", ok: "#059669" };
+
+async function cruceRefresh(reset) {
+  if (reset !== false) { _cruceState.offset = 0; _cruceState.rows = []; }
+  var cont = document.getElementById("cruceTabla");
+  if (cont && !_cruceState.rows.length) cont.innerHTML = '<div style="padding:20px;color:#64748b;">Cargando…</div>';
+  var r = await sb.rpc("cruce_facturacion_resumen", {
+    p_empresa: _cruceState.empresa || null,
+    p_estado: _cruceState.estado || null,
+    p_q: _cruceState.q || null,
+    p_limit: _cruceState.limit,
+    p_offset: _cruceState.offset
+  });
+  if (r.error) { if (cont) cont.innerHTML = '<div style="padding:20px;color:#b91c1c;">Error: ' + r.error.message + '</div>'; return; }
+  var data = r.data || [];
+  _cruceState.rows = _cruceState.offset ? _cruceState.rows.concat(data) : data;
+  _cruceState.total = data.length ? (Number(data[0].total_count) || data.length) : 0;
+  cruceRender();
+}
+window.cruceRefresh = cruceRefresh;
+
+function cruceCargarMas() {
+  _cruceState.offset += _cruceState.limit;
+  cruceRefresh(false);
+}
+window.cruceCargarMas = cruceCargarMas;
+
+function cruceRender() {
+  var cont = document.getElementById("cruceTabla");
+  var res  = document.getElementById("cruceResumen");
+  if (!cont) return;
+  var rows = _cruceState.rows;
+  var nDiff = rows.filter(function(r){ return r.estado === 'diff'; }).length;
+  var nAmbiguo = rows.filter(function(r){ return r.estado === 'ambiguo'; }).length;
+  var nSinFactura = rows.filter(function(r){ return r.estado === 'sin_factura'; }).length;
+  if (res) res.innerHTML =
+    '<b>' + _cruceState.total + '</b> NP en los últimos 30 días · ' +
+    '<span style="color:#dc2626;">' + nDiff + ' con diferencia</span> · ' +
+    '<span style="color:#d97706;">' + nAmbiguo + ' ambiguas</span> · ' +
+    '<span style="color:#64748b;">' + nSinFactura + ' sin factura encontrada</span>' +
+    '<div style="margin-top:4px;font-size:12px;color:#94a3b8;">⚠ Clientes de súper (🛒) no están bien modelados en el cálculo — su diferencia es esperada, no es necesariamente un error. Matchea por cliente+fecha±3 días+cajas; una factura que consolida varias NP puede salir "sin factura" o "diferencia" sin que haya nada mal.</div>';
+  if (!rows.length) { cont.innerHTML = '<div style="padding:20px;color:#64748b;text-align:center;">Sin NP en el período.</div>'; return; }
+  var h = '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">' +
+    '<thead style="background:#f1f5f9;position:sticky;top:0;"><tr>' +
+      '<th style="padding:8px;text-align:left;border-bottom:1px solid #cbd5e1;">NP</th>' +
+      '<th style="padding:8px;text-align:left;border-bottom:1px solid #cbd5e1;">Cliente</th>' +
+      '<th style="padding:8px;text-align:left;border-bottom:1px solid #cbd5e1;">Fecha</th>' +
+      '<th style="padding:8px;text-align:right;border-bottom:1px solid #cbd5e1;">Calculado (Virgilio)</th>' +
+      '<th style="padding:8px;text-align:right;border-bottom:1px solid #cbd5e1;">Real (ISIS)</th>' +
+      '<th style="padding:8px;text-align:right;border-bottom:1px solid #cbd5e1;">Diferencia</th>' +
+      '<th style="padding:8px;text-align:left;border-bottom:1px solid #cbd5e1;">Estado</th>' +
+      '<th style="padding:8px;border-bottom:1px solid #cbd5e1;"></th>' +
+    '</tr></thead><tbody>';
+  h += rows.map(function(r) {
+    var col = CRUCE_ESTADO_COLOR[r.estado] || '#334155';
+    var lbl = CRUCE_ESTADO_LABEL[r.estado] || r.estado;
+    return '<tr>' +
+      '<td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;"><b>' + (r.np || '') + '</b></td>' +
+      '<td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;">' + (r.cod_cliente || '') + ' ' + (r.rs_virgilio || '—') + (r.es_super ? ' 🛒' : '') + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;font-size:12px;color:#64748b;">' + (r.fecha_salida || '—') + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;text-align:right;">' + (r.neto_calculado != null ? _fmtPlata(r.neto_calculado) : '—') + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;text-align:right;">' + (r.factura_neto != null ? _fmtPlata(r.factura_neto) : '—') + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;text-align:right;font-weight:bold;color:' + (r.diff > 0 ? '#dc2626' : (r.diff < 0 ? '#b45309' : '#334155')) + '">' +
+        (r.diff != null ? (_fmtPlata(r.diff) + ' (' + (r.diff_pct > 0 ? '+' : '') + r.diff_pct + '%)') : '—') +
+      '</td>' +
+      '<td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;"><span style="color:' + col + ';font-weight:600;">' + lbl + '</span>' + (r.candidatos_cercanos > 1 ? ' (' + r.candidatos_cercanos + ' candidatos)' : '') + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;text-align:center;white-space:nowrap;">' +
+        (r.comprobante_id ? '<span style="font-size:11px;color:#64748b;" title="' + (r.storage_path || '') + '">' + r.comprobante_id + '</span>' : '') +
+      '</td>' +
+    '</tr>';
+  }).join("");
+  h += '</tbody></table></div>';
+  if (_cruceState.rows.length < _cruceState.total) {
+    h += '<div style="text-align:center;padding:12px;"><button onclick="cruceCargarMas()" style="padding:8px 16px;background:#1e6bd6;color:#fff;border:none;border-radius:6px;cursor:pointer;">Cargar más (' + (_cruceState.total - _cruceState.rows.length) + ' restantes)</button></div>';
+  }
+  cont.innerHTML = h;
+}
+window.cruceRender = cruceRender;
+
 /* ---------- Pantalla unificada: Deuda a cobrar + Cobranzas (valor por NP) ----------
    Un solo botón / una sola pantalla con 2 pestañas. Reusa la lógica existente:
    pestaña "Deuda" = deudaRefresh/deudaRender; pestaña "Valor por NP" = cobLoad/cobRender.
@@ -35466,6 +35554,7 @@ async function openCobros(tab) {
       '<div style="display:flex;gap:6px;margin-left:4px;">' +
         '<button id="cobrosTabDeuda" onclick="cobrosSetTab(\'deuda\')">💰 Deuda a cobrar</button>' +
         '<button id="cobrosTabCob" onclick="cobrosSetTab(\'cob\')">💵 Valor por NP</button>' +
+        '<button id="cobrosTabCruce" onclick="cobrosSetTab(\'cruce\')">🔍 Facturación vs ISIS</button>' +
       '</div>' +
       '<button onclick="cobrosClose()" style="margin-left:auto;background:#dc2626;color:#fff;border:none;border-radius:8px;padding:7px 16px;font-weight:800;cursor:pointer;">Cerrar</button>' +
     '</div>' +
@@ -35474,12 +35563,32 @@ async function openCobros(tab) {
 }
 window.openCobros = openCobros;
 function cobrosSetTab(tab) {
-  _cobrosTab = (tab === "cob") ? "cob" : "deuda";
+  _cobrosTab = (tab === "cob") ? "cob" : (tab === "cruce") ? "cruce" : "deuda";
   var bd = document.getElementById("cobrosBody"); if (!bd) return;
-  var td = document.getElementById("cobrosTabDeuda"), tc = document.getElementById("cobrosTabCob");
+  var td = document.getElementById("cobrosTabDeuda"), tc = document.getElementById("cobrosTabCob"), tx = document.getElementById("cobrosTabCruce");
   if (td) td.style.cssText = _cobrosTabCss(_cobrosTab === "deuda");
   if (tc) tc.style.cssText = _cobrosTabCss(_cobrosTab === "cob");
-  if (_cobrosTab === "deuda") {
+  if (tx) tx.style.cssText = _cobrosTabCss(_cobrosTab === "cruce");
+  if (_cobrosTab === "cruce") {
+    bd.innerHTML =
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:8px;flex-wrap:wrap;">' +
+        '<h1 style="margin:0;font-size:20px;">🔍 Facturación vs ISIS</h1>' +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
+          '<input id="cruceQ" placeholder="🔎 Cliente / razón social / NP" style="padding:8px;font-size:14px;border:1px solid #cbd5e1;border-radius:6px;min-width:200px;" oninput="_cruceState.q=this.value;clearTimeout(window._cruceQT);window._cruceQT=setTimeout(function(){cruceRefresh();},400);">' +
+          '<select id="cruceEmp" style="padding:8px;font-size:14px;border:1px solid #cbd5e1;border-radius:6px;" onchange="_cruceState.empresa=this.value||null;cruceRefresh();">' +
+            '<option value="">Todas las empresas</option><option value="lk">Loekemeyer</option><option value="chef">Chef</option>' +
+          '</select>' +
+          '<select id="cruceEstadoSel" style="padding:8px;font-size:14px;border:1px solid #cbd5e1;border-radius:6px;" onchange="_cruceState.estado=this.value||null;cruceRefresh();">' +
+            '<option value="">Todos los estados</option><option value="diff">Diferencia</option><option value="ambiguo">Ambiguo</option>' +
+            '<option value="sin_factura">Sin factura</option><option value="sin_neto">Sin neto calculado</option><option value="ok">OK</option>' +
+          '</select>' +
+          '<button onclick="cruceRefresh()" style="padding:8px 12px;background:#1e6bd6;color:#fff;border:none;border-radius:6px;cursor:pointer;">↻ Refrescar</button>' +
+        '</div>' +
+      '</div>' +
+      '<div id="cruceResumen" style="margin-bottom:10px;color:#64748b;font-size:13px;">Cargando…</div>' +
+      '<div id="cruceTabla"></div>';
+    cruceRefresh();
+  } else if (_cobrosTab === "deuda") {
     bd.innerHTML =
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:8px;flex-wrap:wrap;">' +
         '<h1 style="margin:0;font-size:20px;">💰 Deuda a cobrar</h1>' +

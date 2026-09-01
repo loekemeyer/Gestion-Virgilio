@@ -12,7 +12,44 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-01 · Versión app al documentar: **v12.28**
+> Última actualización: 2026-09-01 · Versión app al documentar: **v12.29**
+>
+> Nota **v12.29** — **Cruce Facturación vs ISIS: lo que calculamos vs lo que se
+> facturó de verdad.** Tercera pestaña del overlay 💰 Deuda/Cobranzas: **🔍 Facturación
+> vs ISIS**. Cruza, por NP, `vista_facturacion_neto.neto` (lo que Virgilio calcula
+> sobre lo armado — la misma fuente de la columna 💵 Neto de Facturación) contra el
+> `subt_gravado` real del comprobante emitido en el ISIS (`isis_lk`/`isis_ch.documentos`,
+> el mismo dato que usa Deudores). Comparación apples-to-apples: los dos son neto SIN
+> IVA (verificado: `subt_gravado + iva_21 + iva_105 = total`).
+> **Matching**: por cliente (`canon_cod`) + fecha (±3 días de `fecha_salida`, mismo
+> criterio que `vista_np_factura`) + cajas armadas vs cajas del comprobante, con
+> tolerancia **relativa** (≤1 caja o ≤15%, lo que sea mayor). Sin esa tolerancia la
+> vista elegía "el candidato menos malo" aunque no se pareciera en nada (llegó a
+> emparejar una NP de 1 caja con una factura de 21 cajas de otro pedido del mismo
+> cliente ese día) — daba diffs de hasta **16.940%**, puro ruido de matching. Con el
+> umbral, promedio de la bolsa "diff" bajó de 66% a un dígito/decenas — la anomalía de
+> julio (153% promedio ese mes) desapareció por completo, confirmando que era matching
+> malo, no un problema real de esos meses.
+> **Estados**: `ok` (dentro de tolerancia: máx($50, 1%)), `diff` (real y calculado
+> difieren de verdad — 197 casos sobre 1.112 NP al armar esto), `ambiguo` (más de un
+> comprobante candidato igual de cercano — no se adivina, se marca), `sin_factura`
+> (NP facturada acá pero sin comprobante matcheado en el ISIS — puede ser que el
+> agente local todavía no subió el PDF, o que la factura consolida varias NP y por
+> eso sus cajas no matchean 1:1 con ninguna), `sin_neto` (la NP no tiene neto
+> calculable — items sin precio, etc.). Se marca `es_super` (🛒) para los clientes de
+> cadena de supermercado (`cobranzas_cliente_cadena`): **su diferencia es esperada**,
+> `vista_facturacion_neto` no usa la lista negociada de súper (`precios_super`), sólo
+> explican 13 de los 197 "diff" — la mayoría (184) es señal real, sin explicar
+> todavía, para que alguien la abra caso por caso.
+> **Backend** (`sql/cruce_facturacion.sql`): `vista_cruce_facturacion` (interna,
+> REVOKE anon — un comprobante calculado-vs-real por NP), `cruce_facturacion_resumen`
+> / `cruce_facturacion_totales` (RPC `SECURITY DEFINER`, `EXECUTE` a anon, mismo
+> patrón que Deudores). Ventana por defecto: últimos 30 días (parámetros `p_desde`/
+> `p_hasta` para ampliar). **Limitación conocida, no resuelta**: una factura que
+> consolida varias NP del mismo cliente/día no matchea 1:1 contra ninguna
+> individual — puede salir `sin_factura` o `diff` sin que haya error real;
+> `candidatos_cercanos` en la vista ayuda a detectarlo. Sólo lee — no corrige nada
+> solo, cada caso lo revisa una persona.
 >
 > Nota **v12.28** — **Módulo Deudores: reemplaza a "Deuda a cobrar" (v9.23/v11.68), que
 > tenía 0 filas en producción.** El viejo dependía de tickear "Facturar" en el celular
