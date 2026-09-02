@@ -31,6 +31,20 @@
 --       actualizar_saldo_trigger reescrito (clave sufijada + filtro empresa).
 --    e2e: los 4 duales conservan stock_total exacto; reconciliacion corre sin abortar.
 --
+--  AJUSTE POST-CUTOVER 2026-09-01: filas fantasma de codigos-alias + insumos.
+--    (1) Los codigos con Equivalencias_Codigos (438EL->438E CH reenvasado x24,
+--        y los pelados 437E/438E/439E/809E->su empresa) aparecian como fila
+--        fantasma en la tabla (demanda con stock 0). FIX: funcion
+--        public.resolver_equiv(cod) + la matview vista_stock_procesada resuelve
+--        la equivalencia en dem_raw/dem_oc_raw (la demanda se consolida en el
+--        destino, la fila alias desaparece). El front ya resolvia asi (ocgDemanda);
+--        esto alinea el backend.
+--    (2) Residuo del cutover: 7 movimientos de INSUMO de duales quedaron sufijados
+--        (el backfill excluyo insumos) y colisionaban con el stock del mismo cod.
+--        FIX: el trigger ahora pela el sufijo tambien en insumos (sin empresa) +
+--        backfill de los 7 existentes. Sin este fix, (1) generaba duplicado de cod.
+--    Matview reemplazada por DROP CASCADE + recrear (indice unico + Stock_Saldos).
+--
 --  PENDIENTE (mejora, no urgente): migrar el FRONT (mostrar pelado+empresa, pelar
 --    Planimetria/Equivalencias/Stock_Ubicaciones) y el conteo fino de los 4 (D1=LK).
 --
