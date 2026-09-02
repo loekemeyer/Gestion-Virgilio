@@ -36,9 +36,11 @@ const RECIPIENT_EMAIL = "loekemeyer.n8n@gmail.com";
 
 // Proyecto Supabase de Producción Virgilio — usado por la acción "bridge" para
 // validar el access_token del supervisor contra SU propio auth (firma + expiración).
-// La anon (publishable) key es pública; sólo sirve para llamar /auth/v1/user.
+// Se usa la anon key LEGACY (JWT): GoTrue /auth/v1/user la acepta seguro como
+// apikey (el formato nuevo sb_publishable_ no siempre lo hace → daba 401). Es
+// pública; sólo sirve como apikey para llamar /auth/v1/user.
 const VIRGILIO_URL = "https://hrxfctzncixxqmpfhskv.supabase.co";
-const VIRGILIO_ANON_KEY = "sb_publishable_BqpAgZH6ty-9wft10_YMhw_0rcIPuWT";
+const VIRGILIO_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhyeGZjdHpuY2l4eHFtcGZoc2t2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI3MjQyNjEsImV4cCI6MjA4ODMwMDI2MX0.4L6wguch8UZGhC2VpzrWcCjJGUV-IkYsl9JoCWrOLUs";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -139,7 +141,11 @@ Deno.serve(async (req: Request) => {
       } catch (_) {
         return jsonResponse({ error: "verify_unreachable" }, 502);
       }
-      if (!vres.ok) return jsonResponse({ error: "invalid_token" }, 401);
+      if (!vres.ok) {
+        const vtxt = await vres.text().catch(() => "");
+        console.error("bridge verify failed:", vres.status, vtxt);
+        return jsonResponse({ error: "invalid_token", detail: "virgilio " + vres.status + ": " + vtxt.slice(0, 200) }, 401);
+      }
       const vuser = await vres.json().catch(() => ({}));
       const vemail = String(vuser?.email ?? "").toLowerCase();
       // Gate estricto: sólo el MISMO mail que el admin LK. No amplía acceso.
