@@ -106,7 +106,7 @@ insert into public.cobranzas_super_cadena (super_key,label,item_discount,usa_lis
  ('abastecedor','El Abastecedor (Tecnolar)',0,false),('alberdi','Alberdi',0,false),
  ('cencosud','Cencosud (Jumbo/Disco/Vea)',0,false),('coto','Coto',0,false),('dia','Día',0,false),
  ('diarco','Diarco',0.10,false),('dorinka','Dorinka (Walmart)',0,false),('inc','Carrefour (INC)',0,false),
- ('laanonima','La Anónima',0,false),('libertad','Libertad',0,false),('messina','Messina Hnos',0,true),
+ ('laanonima','La Anónima',0.19,false),('libertad','Libertad',0,false),('messina','Messina Hnos',0,true),
  ('toledo','Supermercados Toledo',0,false)
 on conflict (super_key) do update set label=excluded.label, item_discount=excluded.item_discount, usa_lista_general=excluded.usa_lista_general;
 
