@@ -304,6 +304,20 @@
 > (afectaría a todo objeto nuevo futuro, no sólo a este módulo — decisión del
 > usuario, no se aplica sin permiso explícito).
 >
+> Nota **v12.37 (2026-09-02)** — **Códigos con "L" final = artículo Loekemeyer que vende Chef → picking va a la góndola LOEKE, no Chef.**
+> Los códigos terminados en `L` (`438EL`, `439EL`) son artículos de **Loekemeyer** que **vende Chef**:
+> el pedido entra como **NP de Chef**, pero el stock se agarra de la góndola de **Loeke** (`438E LK`),
+> NO de la de Chef. Antes el front pelaba la `L` y re-derivaba la empresa por número de NP (Chef→`CH`),
+> mandando el picking a la góndola equivocada (`438E CH`). **Corrección:** `pkEmpresaArt(codOriginal, np)`
+> fuerza `empresa=LK` para cualquier código terminado en `L` y se pasa a `pkCodEmpresa` como `empForce`
+> (call sites `aggFrom` y `pppChkCompute`). **Regla sin excepción:** verificado 2026-09-02 que **ningún
+> código de Loekemeyer termina en `L`** (chequeado en `loke_products`, `chef_articulos_activos`,
+> `milver_products`, `chef_item_remap` y todo el pipeline de Virgilio). Backend alineado:
+> `Equivalencias_Codigos` `438EL → 438E LK` / `439EL → 439E LK` (antes apuntaban a `... CH`), matview
+> `vista_stock_procesada` refrescada + `stocks_carga_rapida` repoblada → la demanda de los `L`
+> consolida en la góndola Loeke. Backup: `stock_v2.bkp_equiv_20260902_lcodes`. ⚠ Deja obsoleta la
+> vieja explicación "reenvasado x24" de la nota v9.16 (ese ruteo a `... CH` era el bug).
+>
 > Nota SERVER **2026-09-01** — **Stock por empresa: el `cod_art` dejó de llevar el sufijo; ahora es código pelado + columna `empresa`.**
 > Antes, los 4 códigos que son **dos productos físicos distintos con el mismo número** (`437E`,
 > `438E`, `439E`, `809E` — góndolas separadas LK/CH) se guardaban en `Movimientos_Stock` como
