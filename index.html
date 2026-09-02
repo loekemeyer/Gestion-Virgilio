@@ -14087,9 +14087,11 @@ async function stkShowProyVentas(codEnc, proy) {
   h += '<div class="stkpop-grp" style="background:#faf5ff;border-color:#e9d5ff">' +
        '<div style="font-size:12.5px;color:#4c1d95;line-height:1.5;">' +
        '<b>¿De dónde surge?</b> La proyección es el <b>promedio mensual de cajas facturadas</b> ' +
-       '(ventas reales de PáginaLK, <b>Loeke + Chef</b>). Se calcula <b>por cliente</b> —desde su primera compra en la ventana— ' +
-       'y <b>descarta los meses-pico atípicos</b> (compras one-off), sumando todos los clientes. Ventana: <b>6 meses</b> ' +
-       '(si no hay ventas, cae a 12). <b>No</b> es el promedio simple de las barras de abajo.' +
+       '(ventas reales de PáginaLK, <b>Loeke + Chef</b>) sobre una ventana de <b>6 meses</b> ' +
+       '(si no hay ventas, cae a 12). Se calcula <b>por cliente</b> y se suma. A un pedido puntual muy ' +
+       'por encima del ritmo de ese cliente se le recorta <b>sólo el excedente</b>, y sólo si el cliente ' +
+       'compró en <b>2 o más meses</b> de la ventana: al que compra una vez cada tanto no se le toca nada, ' +
+       'porque no es un pico sino su forma de comprar. Por eso puede diferir del promedio simple de abajo.' +
        '</div></div>';
   if (!rows.length) {
     h += '<div class="stkpop-empty">Sin ventas facturadas en los últimos 6 meses para <b>' + escapeHtml(codCanon(codB)) + '</b>' + (emp ? ' (' + emp + ')' : '') + '.<br><small style="color:#94a3b8">(o el motor de PáginaLK no respondió)</small></div>';
