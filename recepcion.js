@@ -1615,6 +1615,12 @@ async function opEnviar() {
     cod_art: String(i.cod), descripcion: i.desc || null,
     deposito: 'a_guardar', delta: i.cajas, tipo: 'recepcion', ref: opState.remito || null,
     legajo: RECP.legajo || null,   // idea 7725: legajo para sumar el total del día cruzando dispositivos al cerrar RT
+    // v12.38 — empresa de la recepción = línea que eligió el operario (LK/CH). Para los
+    // códigos duales (437E/438E/439E/809E) esto ubica el stock recibido en la góndola
+    // correcta; para el resto el trigger zz_normalizar_empresa lo fuerza a 'Mixto'. Sin
+    // esto un dual recibido quedaba en limbo 'Mixto' (ni LK ni CH). La fuente de verdad
+    // sigue siendo el trigger en el backend; esto es la señal correcta que el front manda.
+    empresa: opState.linea || null,
     client_id: _cid()
   }));
   try {
