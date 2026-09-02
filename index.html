@@ -475,6 +475,19 @@ button {
   box-shadow: 0 6px 20px rgba(0,0,0,.25);
   cursor: pointer;
 }
+/* Estado CRÍTICO: el servidor RECHAZA los reportes (no es falta de señal).
+   Rojo sólido y pulsante para que nadie cierre/borre la app con la cola llena. */
+#pendingIndicator.critical{
+  background: #c62828;
+  color: #fff;
+  border-color: #7f0000;
+  font-size: 16px;
+  animation: pendCritPulse 1s ease-in-out infinite;
+}
+@keyframes pendCritPulse{
+  0%,100%{ box-shadow: 0 6px 20px rgba(0,0,0,.25); }
+  50%{ box-shadow: 0 0 0 4px rgba(198,40,40,.55), 0 6px 20px rgba(0,0,0,.25); }
+}
 
 /* Resumen de hoy: lista scrolleable con todos los reportes del día */
 .history-list{
@@ -6524,7 +6537,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.47";
+const APP_VERSION = "v12.48";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -6562,10 +6575,21 @@ function updatePendingIndicator() {
   const q = readQueue();
   const count = q.length;
   if (el) {
+    // "rechazados" = el servidor los rechazó (lastErr no empieza con "network").
+    // Esos NO se arreglan solos con esperar señal: hay un problema del servidor
+    // y hay que avisar, sin cerrar ni borrar la app (incidente legajo 277, 2026-09-02).
+    const rechazados = q.filter(x => x.lastErr && !String(x.lastErr).startsWith("network")).length;
     if (count > 0) {
       el.style.display = "block";
-      el.textContent = `⚠️ ${count} reporte(s) sin enviar — se reenviarán al volver la red`;
+      if (rechazados > 0) {
+        el.classList.add("critical");
+        el.textContent = `⛔ ${rechazados} reporte(s) RECHAZADOS por el servidor (NO es falta de señal). NO cierres ni borres la app. Tocá para reintentar y avisá a sistemas.`;
+      } else {
+        el.classList.remove("critical");
+        el.textContent = `⚠️ ${count} reporte(s) sin enviar — se reenviarán al volver la red`;
+      }
     } else {
+      el.classList.remove("critical");
       el.style.display = "none";
       el.textContent = "";
     }

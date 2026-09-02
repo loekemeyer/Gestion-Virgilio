@@ -12,7 +12,7 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-02 · Versión app al documentar: **v12.42**
+> Última actualización: 2026-09-02 · Versión app al documentar: **v12.48**
 >
 > Nota **2026-09-02** — **Legajo 277: 185 reportes atascados ("sin enviar") — NO era señal, era un timeout de 8 s en un trigger, y la cadena de stock EN VIVO documentada.**
 > **Síntoma:** el legajo 277 mostraba "185 reportes sin enviar" y la app trabada. Diagnóstico
@@ -58,9 +58,13 @@
 > pickear. Hacer una matview refrescar por-pick (`REFRESH MATERIALIZED VIEW`, recálculo completo de
 > segundos) es justo el anti-patrón que trababa el INSERT. `refresh_stocks_carga_rapida()` (cron
 > `*/5`) es un recálculo completo de respaldo contra drift del trigger incremental.
-> **Pendiente sugerido (no implementado sin OK):** en el front, ante `server_500` persistente (rechazo
-> real del server, no `network`), avisar más fuerte para que nadie cierre/borre en ese estado; hoy
-> reintenta callado y solo muestra "sin enviar".
+> **Cartel de alerta fuerte (HECHO, v12.46):** `updatePendingIndicator()` ahora distingue los
+> reportes RECHAZADOS por el servidor (los que tienen `lastErr` que NO empieza con `network`) de los
+> que solo esperan señal. Si hay alguno rechazado, el banner `#pendingIndicator` toma la clase
+> `.critical` (rojo sólido, pulsante) y el texto cambia a *"⛔ N reporte(s) RECHAZADOS por el servidor
+> (NO es falta de señal). NO cierres ni borres la app. Tocá para reintentar y avisá a sistemas."* Los
+> pendientes solo por falta de red siguen con el aviso ámbar de siempre. Se limpia solo cuando la cola
+> drena.
 >
 > Nota **v12.37** — **Facturación: descuento por VOLUMEN por empresa + listas de SÚPER/distribuidora.**
 > Dos arreglos al cálculo del 💵 Neto (`vista_facturacion_neto`, EN VIVO, `sql/facturacion_neto.sql`):
