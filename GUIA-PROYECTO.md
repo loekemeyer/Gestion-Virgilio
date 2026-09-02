@@ -1290,6 +1290,35 @@ fichadas-monitor.html y productividad.html) — rotar la key = editar solo ese a
 > (`virgilio_entrega_sync_secret`; rotación pendiente, requiere tocar la Edge Fn LK).
 > **(8) Datos:** 589E uxb 12→24 (Importados + OC_Maximos). **(9) Planimetría:** solape de
 > orden isla-I vs L/M corregido (+26 a L/M/Ñ) y sector J9→J09.
+> Nota **v11.13 — Facturación: Cód Cliente grande + columna "Facturar N" (parciales).**
+> Reordené el módulo **Facturación** (`openFacturacion`, monitor de ventas). Nuevo orden de
+> columnas: **Cód Cliente** primero y con letra mucho más grande (`.fac-cod-big`, 22px) →
+> **NP** → **Faltantes** → **Facturar** → resto a la derecha (Tanda, Salida, Razón Social,
+> Cambiar cód, Líos, Cajas, ✓). La columna nueva **Facturar** (`facFacturar(np)`) muestra,
+> por artículo que salió **parcial** (pidió X, agarró Y), un badge verde `cod: facturar Y`
+> (= `cajas_pedidas − cajas_falto`); **solo aparece si hubo parcial** (si faltó todo, nada).
+> **Por qué**: el badge de Faltantes solo mostraba lo que FALTÓ, y la operadora salteaba el
+> renglón entero sin facturar lo entregado (bug real NPs 98406/395, 44581/729E y 836 — cajas
+> pickeadas que no se facturaron). Es solo front: la data (pedidas + faltó) ya venía en
+> `facFetchFaltantes`; cero cambios de backend. Idea de usuario **6542**.
+> Además: el checklist **NC a Loeke→Chef** (`facRenderNc`, `vista_nc_loeke_chef` →
+> `NC_Loeke_Chef_Hechas`) pasó a ser **secundario y compacto** (fuente 11px, header chico,
+> `min-width` liberado, `#facNcList`) para que Facturación sea la parte protagonista. La
+> **lógica del NC no cambió** (se verificó que funciona).
+
+> Nota **v11.13 — Planimetría: auto-orden del sector (picking prolijo).** Al cargar un código
+> en un sector **nuevo** sin N° de orden quedaba `orden=0` → se iba al **principio del picking**
+> (caso 599E / sector J44 / tanda D43B). Ahora el **N° de orden se completa solo** en dos capas:
+> **(a) Backend** — trigger `trg_planimetria_autoorden` (`BEFORE INSERT/UPDATE ON "Planimetria"`,
+> función `planimetria_autoorden()`, `sql/planimetria_autoorden.sql`): si `orden` viene en 0/NULL
+> lo completa heredando de vecinos — mismo sector exacto → su orden; si no, interpola entre los
+> vecinos del **mismo pasillo** (misma letra inicial) por nombre de sector; si no hay, vecinos
+> globales; si no, `max+1`. Respeta el orden si vino explícito (>0). Cubre TODOS los caminos de
+> alta. Se recalcularon las filas existentes en 0 (599E/J44 → 128, al lado de J13=127).
+> **(b) Front** — el editor de planimetría (`openPlanimEditor`) **sugiere el orden editable**
+> mientras se tipea el sector (`planimSuggestOrden` replica la lógica del trigger; `planimFillOrden`
+> autocompleta el input en verde `.planim-ord-sug`, sin pisar un número puesto a mano). Backup:
+> `sql/backup_planimetria_20260820.sql`. `Planimetria (cod, sector, orden)` → `window.GONDOLA`.
 >
 > Nota **2026-08-17 — Cobranzas: valorizar una NP sin ver la factura.** Objetivo del
 > usuario: que Virgilio sepa cuánta plata se le facturó a cada NP/cliente sin tener la
