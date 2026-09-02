@@ -61,21 +61,47 @@ ALTER TABLE public."Movimientos_Stock"
   ADD COLUMN IF NOT EXISTS empresa text
   CHECK (empresa IN ('LK','CH','Mixto')) DEFAULT 'Mixto';
 
--- Trigger de normalizacion (D5): pela sufijo + setea empresa en TODA insercion.
--- Cubre fronts viejos Y permite que las funciones de reconciliacion sigan
--- insertando sufijado sin reescribir su logica interna.
+-- Requisito: public.empresa_de_np y public.codigos_duales (mover desde stock_v2).
+CREATE TABLE IF NOT EXISTS public.codigos_duales (
+  cod text PRIMARY KEY, nota text, creado timestamptz DEFAULT now());
+INSERT INTO public.codigos_duales(cod,nota) VALUES
+  ('437E','Colador 16cm — LK y CH productos distintos'),
+  ('438E','Colador 20cm — LK y CH productos distintos'),
+  ('439E','Colapasta/Colador pasta — LK y CH distintos'),
+  ('809E','CH=Corta Queso / LK=Corta Pizza Familiar — distintos')
+ON CONFLICT (cod) DO NOTHING;
+
+CREATE OR REPLACE FUNCTION public.empresa_de_np(p_np text)
+RETURNS text LANGUAGE sql IMMUTABLE AS $fn$
+  SELECT CASE
+    WHEN regexp_replace(coalesce(p_np,''),'\D','','g') = '' THEN NULL
+    WHEN (regexp_replace(p_np,'\D','','g'))::bigint > 90000 THEN 'LK'
+    ELSE 'CH' END;
+$fn$;
+
+-- Trigger de normalizacion (D5): el BACKEND es la fuente de verdad de la empresa.
+-- Pela sufijo (fronts viejos); si el codigo NO es dual, FUERZA Mixto (ignora lo
+-- que mande el front). Asi el front nunca necesita conocer la lista de duales,
+-- y las funciones de reconciliacion siguen insertando sufijado sin reescribir logica.
+-- (Validado en stock_v2: 355+CH->Mixto, 438E+CH->CH, 809+CH->Mixto, '438E CH'->438E+CH.)
 CREATE OR REPLACE FUNCTION public.trg_normalizar_empresa_stock()
 RETURNS trigger LANGUAGE plpgsql AS $fn$
+DECLARE v_base text; v_dual boolean;
 BEGIN
   IF NEW.deposito = 'insumos' THEN RETURN NEW; END IF;   -- insumos no llevan empresa
   IF NEW.cod_art ~ '\s+(LK|LOKE)$' THEN
-    NEW.empresa := 'LK';
-    NEW.cod_art := regexp_replace(NEW.cod_art,'\s+(LK|LOKE)$','');
+    NEW.empresa := 'LK'; NEW.cod_art := regexp_replace(NEW.cod_art,'\s+(LK|LOKE)$','');
   ELSIF NEW.cod_art ~ '\s+CH$' THEN
-    NEW.empresa := 'CH';
-    NEW.cod_art := regexp_replace(NEW.cod_art,'\s+CH$','');
+    NEW.empresa := 'CH'; NEW.cod_art := regexp_replace(NEW.cod_art,'\s+CH$','');
   END IF;
-  IF NEW.empresa IS NULL THEN NEW.empresa := 'Mixto'; END IF;
+  v_base := regexp_replace(upper(btrim(NEW.cod_art)),'^0+(?=.)','');
+  SELECT true INTO v_dual FROM public.codigos_duales
+    WHERE regexp_replace(upper(btrim(cod)),'^0+(?=.)','') = v_base LIMIT 1;
+  IF NOT COALESCE(v_dual,false) THEN
+    NEW.empresa := 'Mixto';            -- no-dual: siempre Mixto
+  ELSIF NEW.empresa IS NULL THEN
+    NEW.empresa := 'Mixto';            -- dual sin empresa (raro); D1 lo corrige
+  END IF;
   RETURN NEW;
 END;
 $fn$;
