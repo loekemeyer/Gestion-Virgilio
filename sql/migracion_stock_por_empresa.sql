@@ -351,3 +351,39 @@ ALTER TABLE public."Planimetria" ADD PRIMARY KEY (cod, empresa);
 -- a 0. El front NO filtra por visible_en_stock, así que muestra ese renglón vacío
 -- (ya sin negativo). Cierre completo = filtrar visible_en_stock en el front, o
 -- atribuir los Mixto 809E históricos a su empresa por NP (Tarea #6).
+
+-- =====================================================================
+--  ADENDA v12.43-44 (2026-09-02) — Negativos en duales: doble facturado (regresión de v12.40)
+-- =====================================================================
+-- Síntoma: 437E/438E mostraban a_facturar negativo (la fila pelada Mixto, que el front
+-- pinta con marca CH). Diagnóstico: NO era falta de separado — era DOBLE 'facturado'.
+-- Para una NP había dos facturado: uno ref='tanda' (empresa LK/CH, legajo=pipeline, de
+-- etapa3) y otro ref='tanda|NP' (Mixto, del emisor por-NP de facturación). Un separado
+-- contra dos facturado = drenaje doble = negativo.
+--
+-- Causa raíz (regresión que introdujo v12.40): al hacer las etapas empresa-aware se agregó
+-- `empresa` al GUARD de etapa2/etapa3 (not exists ... and empresa=s.empresa). Eso hizo que
+-- el guard dejara de bloquear contra un separado/facturado Mixto pre-existente (empresa
+-- distinta) y EMITIERA uno nuevo LK/CH → doble emisión.
+--
+-- Fix:
+--  (1) v12.44 — GUARD de etapa2 y etapa3 vuelve a ser por (tanda, artn) en CUALQUIER
+--      empresa (se quita `= s.empresa`). La empresa correcta la sigue llevando el INSERT
+--      desde el agrupado. Así no re-emite contra un Mixto histórico. etapa4 (CP) también
+--      suma guard `not exists facturado ref=np|CP`.
+--  (2) Se borraron los 3 facturado duplicados que v12.40 creó (ids 41341163/164/165,
+--      backup stock_v2.bkp_dup_facturado_20260902).
+--  (3) Re-atribución de los movimientos Mixto de duales a su empresa, por TANDA y cadena
+--      COMPLETA (picking+separado+facturado juntos), SOLO donde la tanda es inequívoca
+--      (una empresa por sus señales LK/CH + NP del ref); insumos y tandas mixtas/solo-Mixto
+--      quedan como están. Backup stock_v2.bkp_mixto_reatrib_20260902.
+--  (4) v12.43 — el trigger zz_normalizar_empresa, para un dual sin empresa explícita (llega
+--      NULL o el DEFAULT 'Mixto' de la columna), deriva la empresa del NP embebido en el
+--      ref ('tanda|NP', posición 2). Así el emisor por-NP de facturación queda bien
+--      atribuido para adelante. Test: 438E ref 'X|98499'->LK, 'X|44598'->CH, sin NP->Mixto,
+--      no-dual->Mixto.
+--
+-- Verificado: 0 negativos en TODO stocks_carga_rapida; 0 grupos con doble emisión tras
+-- re-correr el pipeline (guard OK); cuadre por dual conservado. Residuo conocido: queda
+-- stock 809E en 'Mixto' sin señal de empresa (ej. inicial/ingreso viejos, ~11 cajas) que
+-- se muestra como fila pelada positiva — no es negativo, es limpieza fina de Tarea #6.
