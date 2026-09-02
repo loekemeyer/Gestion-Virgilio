@@ -1025,6 +1025,17 @@
 > ahora suma `oc_proy: it.proy`. Así el «Pedido» y el contexto (máximo−stock−pedidos) cuadran de la
 > misma foto (ej. cód 104: oc_max 40 − oc_stock 24 = 16 pedido).
 >
+> Nota **2026-09-02 — v12.50: gate anti TAP-sin-Entregas en Fin de Jornada (rescatado de una rama nunca mergeada).**
+> Escrito el 31/08 en `claude/missing-prices` como "v12.17"; ese número lo usó otra sesión en
+> paralelo para otra cosa (*facturación solo muestra NPs con ítems armados*) y el gate nunca llegó
+> a `main`. En `confirmarTerminarDia()`: si el cierre es un **Armado** y esa tanda **no tiene
+> filas en `Entregas_Virgilio`** (`_compTandaYaArmada()` devuelve `false`), no se puede facturar,
+> así que se **aborta el Fin de Jornada**, se avisa y se abre el asistente **Completar** para que
+> el operario registre el armado primero. Mismo criterio que ya aplicaba `send()` desde v7.74 al
+> cerrar un TAP suelto. Exceptúa al operador de prueba y a las tandas ya registradas en
+> `_armadoRegistrado`. **Lección de la auditoría de ramas:** dos sesiones paralelas que parten del
+> mismo `main` y reusan el mismo número de versión se pisan y una pierde el trabajo.
+
 > Nota **2026-09-02 — limpieza: todo lo que hablaba de "estadística madre" y estaba de sobra (propuesta 2496).**
 > Inventario en los dos proyectos: 5 tablas, 2 vistas propias, 1 foránea, 17 funciones y 3 crons
 > hablaban de proyección / estadística madre. Se borró lo que no aportaba (backups en
