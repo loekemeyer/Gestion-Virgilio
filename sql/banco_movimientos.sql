@@ -176,9 +176,12 @@ as $$
 $$;
 grant execute on function public.banco_movimientos_pendientes(text, int, int) to anon, authenticated;
 
--- Acredita el movimiento como cobro (deuda_cobros, general — no imputado a un
--- documento puntual) y marca el movimiento como aplicado para que no se
--- pueda volver a usar dos veces.
+-- Acredita el movimiento como cobro (deuda_cobros) y marca el movimiento como
+-- aplicado para que no se pueda volver a usar dos veces. p_documento_id es
+-- opcional desde el diseño original (v12.33); a partir de v12.34 el front lo
+-- usa de verdad: al "Aplicar" un movimiento, si el deudor tiene facturas
+-- abiertas ofrece elegir a cuál imputarlo (mejor precisión de tramo) — sin
+-- elegir ninguna, sigue siendo un cobro general como antes.
 create function public.banco_movimiento_aplicar(
   p_movimiento_id bigint, p_empresa text default null, p_documento_id bigint default null, p_creado_por text default null
 )

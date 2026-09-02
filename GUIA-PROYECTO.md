@@ -12,7 +12,25 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-02 · Versión app al documentar: **v12.33**
+> Última actualización: 2026-09-02 · Versión app al documentar: **v12.34**
+>
+> Nota **v12.34** — **Dos pendientes chicos de Deudores/Extracto banco, resueltos.**
+> (1) **"📄 Ver factura"** en el detalle de Deudores: `storage_path` ya venía en
+> `deudores_detalle` desde v12.25 pero no había forma de abrirlo — los PDF del
+> ISIS viven en buckets PRIVADOS (`isis-lk`/`isis-ch`; verificado: los 31.433
+> documentos de `isis_lk.documentos` tienen `storage_path` y el archivo existe
+> de verdad en el bucket). Se agregaron 2 policies de `storage.objects`
+> (`sql/deudores.sql`) que reusan `es_supervisor_virgilio()` — mismo patrón que
+> ya usaba este proyecto para gatear storage por email (`planify_updates_download`,
+> preexistente, no inventado ahora). El front pide un signed URL de 60s
+> (`sb.storage.from(bucket).createSignedUrl(...)`) y lo abre en pestaña nueva.
+> Verificado con `auth.jwt()` simulado: anon/no-supervisor → 0 filas visibles,
+> supervisor real → 1. (2) **Extracto banco: "Aplicar" ahora puede imputar a
+> una factura puntual**, no solo cobro general — el backend ya lo soportaba
+> desde v12.33 (`banco_movimiento_aplicar` acepta `p_documento_id`) pero
+> faltaba la UI; ahora, si el deudor tiene facturas abiertas, ofrece elegirla
+> antes de aplicar (mejora la precisión del desglose por tramo con el tiempo).
+> Sin backend nuevo para esto — solo front.
 >
 > Nota **v12.33** — **Extracto banco: quinta pestaña del overlay 💰 Deuda/Cobranzas,
 > primer paso real hacia cobros automáticos por CUIT.** Objetivo final del usuario:

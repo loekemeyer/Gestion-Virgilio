@@ -6524,7 +6524,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.33";
+const APP_VERSION = "v12.34";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -35446,6 +35446,15 @@ async function deudaRegistrarCobro(deudorId, empresa, documentoId, sugerido) {
 }
 window.deudaRegistrarCobro = deudaRegistrarCobro;
 
+async function deudaAbrirFactura(empresa, storagePath) {
+  if (!requireSupervisor()) return;
+  var bucket = (empresa === "chef") ? "isis-ch" : "isis-lk";
+  var r = await sb.storage.from(bucket).createSignedUrl(storagePath, 60);
+  if (r.error) { alert("No se pudo abrir la factura: " + r.error.message); return; }
+  window.open(r.data.signedUrl, "_blank");
+}
+window.deudaAbrirFactura = deudaAbrirFactura;
+
 async function deudaAnularCobro(id, deudorId) {
   if (!requireSupervisor()) return;
   if (!confirm("¿Anular este cobro? El saldo del deudor vuelve a subir.")) return;
@@ -35479,7 +35488,10 @@ async function deudaVerDetalle(deudorId) {
       '</td><td class="p">' + (m.cobrado ? _fmtPlata(m.cobrado) : '—') +
       '</td><td class="p ' + cls + '">' + _fmtPlata(m.saldo) +
       '</td><td>' + (m.vence || (m.sin_plazo ? 'sin plazo' : '—')) + (m.plazo_estimado ? ' *' : '') + '</td><td>' + (TRAMO_LABEL[m.tramo] || m.tramo) + '</td>' +
-      '<td>' + (puedeCobrar ? '<button onclick="opener.deudaRegistrarCobro(\'' + deudorId + '\',\'' + m.empresa + '\',' + m.documento_id + ',' + Number(m.saldo) + ')">💰 Cobrar</button>' : '') + '</td></tr>';
+      '<td style="white-space:nowrap;">' +
+        (puedeCobrar ? '<button onclick="opener.deudaRegistrarCobro(\'' + deudorId + '\',\'' + m.empresa + '\',' + m.documento_id + ',' + Number(m.saldo) + ')">💰 Cobrar</button> ' : '') +
+        (m.storage_path ? '<button title="Ver factura" onclick="opener.deudaAbrirFactura(\'' + m.empresa + '\',\'' + String(m.storage_path).replace(/\\/g, "\\\\").replace(/'/g, "\\'") + '\')">📄</button>' : '') +
+      '</td></tr>';
   }).join("");
   h += '</tbody></table><p style="color:#94a3b8;font-size:11px;">* vencimiento estimado por condición de venta, no viene del comprobante. ⭐ tiene excepción comercial.</p>';
   if (cobros.length) {
@@ -35849,8 +35861,24 @@ window.bancoRender = bancoRender;
 async function bancoAplicar(id) {
   if (!requireSupervisor()) return;
   var row = _bancoState.rows.find(function (x) { return x.id === id; });
-  if (!confirm('¿Aplicar ' + (row ? _fmtPlata(row.importe) : '') + ' como cobro de ' + (row ? (row.deudor_razon_social || row.deudor_id) : '') + '?')) return;
-  var r = await sb.rpc("banco_movimiento_aplicar", { p_movimiento_id: id, p_creado_por: _faltMiLegajo() || null });
+  if (!row) return;
+  var pEmpresa = null, pDocumentoId = null;
+  if (row.deudor_id) {
+    var rd = await sb.rpc("deudores_detalle", { p_deudor_id: row.deudor_id });
+    var abiertas = (rd.error ? [] : (rd.data || [])).filter(function (m) { return m.familia === "factura_venta" && Number(m.saldo) > 0; });
+    if (abiertas.length) {
+      var listado = abiertas.map(function (m, i) { return (i + 1) + ") " + m.fecha + " · " + m.empresa + " · " + (m.comprobante_id || "s/n") + " · saldo " + _fmtPlata(m.saldo); }).join("\n");
+      var pick = prompt("¿A qué factura imputás " + _fmtPlata(row.importe) + "?\n\n" + listado +
+        "\n\n0) General (no imputar a ninguna factura puntual, resta del total)\n\nElegí un número:", "0");
+      if (pick == null) return;
+      var idx = parseInt(pick, 10);
+      if (!isNaN(idx) && idx >= 1 && idx <= abiertas.length) {
+        pEmpresa = abiertas[idx - 1].empresa; pDocumentoId = abiertas[idx - 1].documento_id;
+      }
+    }
+  }
+  if (!confirm('¿Aplicar ' + _fmtPlata(row.importe) + ' como cobro de ' + (row.deudor_razon_social || row.deudor_id) + (pDocumentoId ? ' (imputado a esa factura)' : ' (general)') + '?')) return;
+  var r = await sb.rpc("banco_movimiento_aplicar", { p_movimiento_id: id, p_empresa: pEmpresa, p_documento_id: pDocumentoId, p_creado_por: _faltMiLegajo() || null });
   if (r.error) { alert("Error: " + r.error.message); return; }
   bancoRefresh();
 }

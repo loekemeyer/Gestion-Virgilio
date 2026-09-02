@@ -37,6 +37,8 @@
 --   deuda_registrar_cobro(...) — alta de un cobro (RPC, EXECUTE anon).
 --   deuda_anular_cobro(id)     — anula un cobro (RPC, EXECUTE anon).
 --   deuda_cobros_lista(id)     — cobros de un deudor (RPC, EXECUTE anon).
+--   es_supervisor_virgilio()   — gate real de backend (auth.jwt(), v12.32).
+--   storage.objects policies   — "Ver factura" en isis-lk/isis-ch (v12.34).
 --
 -- Deudor = CUIT normalizado (11 dígitos), no código de cliente: cruza LK y
 -- Chef sin tabla de mapeo (numeraciones independientes por diseño). Fallback
@@ -457,6 +459,27 @@ comment on function public.es_supervisor_virgilio() is
   'sql/facturable_anticipado.sql, no se redefine ahí.';
 revoke all on function public.es_supervisor_virgilio() from anon, authenticated;
 grant execute on function public.es_supervisor_virgilio() to anon, authenticated;
+
+-- ══════════════════════════════════════════════════════════════════════════
+-- v12.34 (2026-09-02). "Ver factura" desde el detalle de Deudores.
+-- `storage_path` ya venía en deudores_detalle desde v12.25 pero no había forma
+-- de abrirlo: los PDF del ISIS viven en los buckets PRIVADOS `isis-lk`/`isis-ch`
+-- (verificado: los 31.433 documentos de isis_lk.documentos tienen
+-- storage_path, y el archivo existe de verdad en el bucket). Mismo patrón que
+-- ya usa este proyecto para gatear storage por email (`planify_updates_download`,
+-- preexistente) — reusa es_supervisor_virgilio() en vez de otra lista de mails.
+-- El front pide un signed URL (`sb.storage.from(bucket).createSignedUrl(...)`,
+-- 60s) que sólo se puede emitir si esta policy deja pasar el SELECT sobre
+-- storage.objects. Verificado con auth.jwt() simulado: anon y authenticated
+-- sin ser supervisor → 0 filas visibles; supervisor real → 1 fila (el objeto).
+-- ══════════════════════════════════════════════════════════════════════════
+create policy isis_lk_select_supervisor on storage.objects
+  for select to authenticated
+  using (bucket_id = 'isis-lk' and public.es_supervisor_virgilio());
+
+create policy isis_ch_select_supervisor on storage.objects
+  for select to authenticated
+  using (bucket_id = 'isis-ch' and public.es_supervisor_virgilio());
 
 create table public.deuda_cobros (
   id            bigint generated always as identity primary key,
