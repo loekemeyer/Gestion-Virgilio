@@ -23,7 +23,8 @@
 // Seguridad: sin JWT, así que el destinatario está HARDCODEADO (loekemeyer.n8n@gmail.com)
 // y se chequea que ese user esté en public.admins. Solo un mail posible, no es un
 // oráculo de existencia de mails. El "bridge" NO confía en el front: la prueba de
-// identidad es el JWT de Virgilio validado contra su propio /auth/v1/user.
+// identidad es el JWT de Virgilio validado contra su propio PostgREST
+// (RPC bridge_jwt_email) — valida firma+expiración sin depender de la sesión.
 //
 // Deploy (una vez): verify_jwt=false y depende de los secrets RESEND_API_KEY /
 // RESEND_FROM (opcional; fallback a onboarding@resend.dev, dominio verificado
@@ -35,10 +36,9 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const RECIPIENT_EMAIL = "loekemeyer.n8n@gmail.com";
 
 // Proyecto Supabase de Producción Virgilio — usado por la acción "bridge" para
-// validar el access_token del supervisor contra SU propio auth (firma + expiración).
-// Se usa la anon key LEGACY (JWT): GoTrue /auth/v1/user la acepta seguro como
-// apikey (el formato nuevo sb_publishable_ no siempre lo hace → daba 401). Es
-// pública; sólo sirve como apikey para llamar /auth/v1/user.
+// validar el access_token del supervisor contra SU PostgREST (RPC bridge_jwt_email).
+// Se usa la anon key LEGACY (JWT) como apikey del request a PostgREST (el formato
+// nuevo sb_publishable_ no siempre lo aceptan los endpoints de auth). Es pública.
 const VIRGILIO_URL = "https://hrxfctzncixxqmpfhskv.supabase.co";
 const VIRGILIO_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhyeGZjdHpuY2l4eHFtcGZoc2t2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI3MjQyNjEsImV4cCI6MjA4ODMwMDI2MX0.4L6wguch8UZGhC2VpzrWcCjJGUV-IkYsl9JoCWrOLUs";
 
@@ -133,10 +133,16 @@ Deno.serve(async (req: Request) => {
       const vjwt = String(body.vjwt ?? "").trim();
       if (!vjwt) return jsonResponse({ error: "missing_token" }, 400);
 
+      // Verificar vía PostgREST de Virgilio (RPC bridge_jwt_email): valida SOLO
+      // firma+expiración del JWT, sin mirar la sesión. GoTrue /auth/v1/user sí
+      // miraba la sesión y devolvía 403 session_not_found aunque el token fuera
+      // legítimo. La RPC devuelve el email del propio token.
       let vres: Response;
       try {
-        vres = await fetch(`${VIRGILIO_URL}/auth/v1/user`, {
-          headers: { apikey: VIRGILIO_ANON_KEY, Authorization: `Bearer ${vjwt}` },
+        vres = await fetch(`${VIRGILIO_URL}/rest/v1/rpc/bridge_jwt_email`, {
+          method: "POST",
+          headers: { apikey: VIRGILIO_ANON_KEY, Authorization: `Bearer ${vjwt}`, "Content-Type": "application/json" },
+          body: "{}",
         });
       } catch (_) {
         return jsonResponse({ error: "verify_unreachable" }, 502);
@@ -146,10 +152,9 @@ Deno.serve(async (req: Request) => {
         console.error("bridge verify failed:", vres.status, vtxt);
         return jsonResponse({ error: "invalid_token", detail: "virgilio " + vres.status + ": " + vtxt.slice(0, 200) }, 401);
       }
-      const vuser = await vres.json().catch(() => ({}));
-      const vemail = String(vuser?.email ?? "").toLowerCase();
+      const vemail = String((await vres.json().catch(() => "")) ?? "").toLowerCase();
       // Gate estricto: sólo el MISMO mail que el admin LK. No amplía acceso.
-      if (!vemail || vemail !== RECIPIENT_EMAIL) return jsonResponse({ error: "not_authorized" }, 403);
+      if (!vemail || vemail !== RECIPIENT_EMAIL) return jsonResponse({ error: "not_authorized", detail: "email=" + vemail }, 403);
 
       const tmpPassword = crypto.randomUUID();
       const updB = await admin.auth.admin.updateUserById(userId, { password: tmpPassword });
