@@ -285,3 +285,36 @@ ALTER TABLE public."Planimetria" ADD PRIMARY KEY (cod, empresa);
 -- movimiento con ese string, el trigger lo PARTE de vuelta en las dos columnas.
 -- El string concatenado nunca persiste. (Refactor front a par (cod,empresa)
 -- en todos los call sites = pendiente opcional, sin ganancia funcional.)
+
+-- =====================================================================
+--  ADENDA v12.40 (2026-09-02) — Empresa en TODO el recorrido de la reconciliación
+-- =====================================================================
+-- Bug detectado por el usuario: tanda D55A / 809E tenía picking en LK pero el
+-- 'separado' que genera la reconciliación cayó en 'Mixto' (split-brain): el +2
+-- del picking quedaba pegado en separar_pedidos LK y aparecía un -2 fantasma en
+-- Mixto. Causa: etapa1 (picking) era empresa-aware desde el cutover, pero las
+-- etapas 2 (separado), 3 (facturado) y 4 (CP) escribían los duales SIN empresa
+-- -> el trigger los mandaba a Mixto.
+--
+-- Fix (SECURITY: solo agrega 'empresa' al agrupado/insert; para no-duales no
+-- cambia nada porque el trigger igual fuerza Mixto):
+--  (1) reconciliar_pipeline_stock_etapa2: base agrupa por empresa; guard por
+--      (tanda, artn, empresa); ventanas particionadas por empresa; el INSERT del
+--      'separado' lleva la columna empresa (a.empresa).
+--  (2) reconciliar_pipeline_stock etapa3 (facturado): src agrupa por empresa;
+--      guard por empresa; INSERT lleva empresa.
+--  (3) reconciliar_pipeline_stock etapa4 (CP): grp agrupa por empresa; INSERT
+--      lleva empresa.
+--  (4) Data D55A: las 2 filas 'separado' Mixto -> LK (ids 29694578/79), así
+--      netea con el picking LK. Backup: stock_v2.bkp_d55a_20260902.
+--
+-- Verificado: 0 tandas con picking/separado en empresas distintas; 809E
+-- separar_pedidos = 0 en las 3 empresas (ledger balanceado); Movimientos_Stock
+-- NO crece al re-correr (49228->49228, el 'etapa1=NNNN' del return es un
+-- row_count engañoso de ON CONFLICT DO NOTHING, no inserta). Residuo: la matview
+-- deja un renglón pelado '809E' net-cero (separar -2 / a_facturar +2 /
+-- stock_total 0) con visible_en_stock=false -> NO se muestra en el front. Son
+-- movimientos Mixto históricos (pre-cutover, tanda entera Mixto); su limpieza
+-- fina (atribuir cada tanda vieja a su empresa por NP) queda para el conteo
+-- (Tarea #6), con cuidado porque 809E es producto ambiguo LK/CH.
+-- Backup defs viejas: stock_v2.bkp_defs_20260902_lcodes.

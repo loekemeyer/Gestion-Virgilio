@@ -304,6 +304,20 @@
 > (afectaría a todo objeto nuevo futuro, no sólo a este módulo — decisión del
 > usuario, no se aplica sin permiso explícito).
 >
+> Nota **v12.40 (2026-09-02)** — **Empresa en TODO el recorrido de la reconciliación (picking→separado→facturado→CP).**
+> Bug detectado por el usuario: la reconciliación arreglaba el `picking` por empresa (cutover) pero
+> las etapas **2 (separado)**, **3 (facturado)** y **4 (CP)** escribían los duales **sin empresa** →
+> el trigger los mandaba a `Mixto`. Síntoma: tanda D55A / 809E con picking en LK y separado en Mixto
+> (`separar_pedidos LK +2` pegado + `−2` fantasma en Mixto). **Fix backend:**
+> `reconciliar_pipeline_stock_etapa2` y las etapas 3/4 de `reconciliar_pipeline_stock` ahora agrupan
+> por `empresa`, guardan por `(tanda, artn, empresa)` y **propagan `empresa` al INSERT**. Para
+> no-duales no cambia nada (el trigger igual fuerza `Mixto`). Data D55A corregida (2 filas Mixto→LK,
+> backup `stock_v2.bkp_d55a_20260902`). Verificado: 0 tandas con picking/separado en empresas
+> distintas; 809E `separar_pedidos = 0` en las 3 empresas; `Movimientos_Stock` no crece al re-correr
+> (el `etapa1=NNNN` del return es un `row_count` engañoso de `ON CONFLICT DO NOTHING`, no inserta).
+> Residuo conocido: la matview deja un renglón pelado `809E` net-cero (`visible_en_stock=false`, NO se
+> muestra) de movimientos Mixto históricos pre-cutover; su limpieza fina queda para el conteo (Tarea #6).
+>
 > Nota **v12.38–v12.39 (2026-09-02)** — **Regla "L" aplicada de punta a punta (armado, faltantes, demanda, monitor) + recepción manda empresa.**
 > Completa la nota v12.37 (que sólo cableaba la lista de picking). **v12.38:** recepción manda
 > `empresa: opState.linea` (LK/CH) → duales recibidos van a su góndola en vez de `Mixto`.
