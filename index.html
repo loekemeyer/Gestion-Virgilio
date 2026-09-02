@@ -6524,7 +6524,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.41";
+const APP_VERSION = "v12.42";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -10469,6 +10469,10 @@ async function openStockAdmin(soloConteo) {
 
     _stk = { movs: [], cutoff: {}, factors: {}, ordenes: [], bajadas: [], tab: _solo ? "conteo" : "stocks", soloConteo: _solo, filtro: "", openArt: null, ingMode: "remito", asOf: null, asOfInput: "", dem: _demFromView_Rápido, cap: _capRápido, gConf: [], fcs: _fcsRápido, fcsLoaded: false, insumosCods: _insFromView_Rápido, cxm: {}, proy: _proyMap_Rápido, viewRows: saldosRapido, alertas: [], discSet: {}, ocultarDisc: false, conteosUI: { pendientes: [], historico: null } };
     stkRender();  // Renderizar instant con stocks_carga_rapida
+    // v12.42 — el código canónico (035E, no 35E) sale de OC_Maximos vía loadCodCanon().
+    // La tabla usa codCanon() pero este path nunca lo cargaba → mostraba el código sin
+    // ceros. Se carga en background y se re-renderiza cuando está listo (no bloquea el paint).
+    loadCodCanon().then(function () { if (_stk) stkRender(); }).catch(function () {});
     stkLoadDiscSet();   // v10.50 — set de discontinuados (para el chip "🚫 Ocultar discontinuos")
 
     // v10.34: Cargar datos completos en background (sin bloquear)
