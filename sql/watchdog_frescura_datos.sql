@@ -1,0 +1,28 @@
+-- =====================================================================
+-- watchdog_frescura_datos.sql — vigila la EDAD DEL DATO, no el cron.
+-- APLICADO 2026-09-02 (propuesta 2496). Cron: 'watchdog-frescura-datos', :43 de cada hora.
+--
+-- `watchdog_syncs_externos` mira cron.job_run_details, y eso NO alcanza para dos casos
+-- que ya pasaron de verdad:
+--   (a) el cron corre, reporta "succeeded" y NO escribe nada. `refresh_proyeccion_madre()`
+--       devolvia -1 sin recargar y el job quedaba verde: tres semanas congelada.
+--   (b) el cron que llena la tabla vive en OTRO proyecto. Desde 2026-09-02 la proyeccion
+--       la EMPUJA LK por FDW, asi que Virgilio no tiene su job_run_details.
+--
+-- Mirar la marca de tiempo del dato cubre los dos: no importa quien ni como escriba, si
+-- el dato quedo viejo, avisa.
+--
+-- Para agregar una tabla: sumarla al VALUES (tabla, que_es, umbral_h). Umbral ~1,3x el
+-- periodo esperado. OJO: hoy el SELECT de adentro esta fijo a proyeccion_madre; para una
+-- segunda tabla hay que hacerlo dinamico (o repetir el bloque).
+--
+-- tg_enqueue se llama con DOS argumentos a proposito: pasarle `null` al chat pisa su
+-- DEFAULT y rompe el NOT NULL de telegram_outbox.chat_id — el bug que tenia el otro
+-- watchdog. Y el fallo del aviso hace `raise warning`, no `then null`.
+--
+-- Cuerpo vivo: migracion `fix_watchdogs_tg_enqueue_null_chat`.
+--
+-- Prueba al aplicar: "watchdog frescura ok · avisos=0 · proyeccion_madre=0h".
+-- Rollback: select cron.unschedule('watchdog-frescura-datos');
+--           drop function if exists public.watchdog_frescura_datos();
+-- =====================================================================
