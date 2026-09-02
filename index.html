@@ -6524,7 +6524,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.38";
+const APP_VERSION = "v12.39";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -7352,6 +7352,15 @@ function pkEmpresaArt(codOriginal, np) {
    que ya sabe que un código con L va a la góndola Loeke. */
 function pkStripL(cod) {
   return String(cod == null ? "" : cod).trim().toUpperCase().replace(/([0-9E])L$/, "$1");
+}
+/* v12.39 — resolución canónica de un artículo de picking/armado a su código de
+   góndola/stock: pela la "L" final, resuelve la empresa (LK forzado para los códigos con
+   L, por NP para el resto) y le suma el sufijo si el código es dual. Es la MISMA
+   transformación que arma la clave de la lista de picking (aggFrom); centralizada acá para
+   que el armado, los faltantes y el picking coincidan. NO se usa para el código del PEDIDO
+   que va a Entregas_Virgilio/factura (ese se conserva crudo, ej. 438EL). */
+function pkResolveArt(art, np) {
+  return pkCodEmpresa(pkStripL(art), np, pkEmpresaArt(art, np));
 }
 /* Saca el sufijo de empresa. El sufijo vive SÓLO en el picking (para el sector) y
    en el stock (para el saldo); todo lo que se cruza contra el PEDIDO —faltantes,
@@ -9168,7 +9177,11 @@ function _compBuildLiosData() {
     items.forEach(function (it) {
       const ka = String(it.art).toUpperCase().replace(/E$/, "");
       const sale = Math.max(0, (Number(it.cajas) || 0) - (faltMap[npKey + "|" + ka] || 0));
-      if (sale > 0) codes.push({ cod: String(it.art), sale: sale, rest: sale, cur: 0, sep: false });
+      // v12.39 — el código que ve la operaria y que descuenta stock se resuelve a su
+      // góndola (438EL → 438E LK; duales por NP). El pedido crudo (438EL) queda en
+      // pedidoFull → Entregas_Virgilio/factura. `_stkGondolaSaldoVivo(c.cod)` necesita el
+      // código de góndola resuelto, no el crudo, para leer el saldo correcto.
+      if (sale > 0) codes.push({ cod: pkResolveArt(it.art, npKey), sale: sale, rest: sale, cur: 0, sep: false });
     });
     codes.sort(function (a, b) { return parseInt(a.cod, 10) - parseInt(b.cod, 10); });
     n.codes = codes; n.liosArr = []; n.lios = 0; n.liosDone = (codes.length === 0);
@@ -10347,10 +10360,15 @@ function artNombreEmp(cod, np, fb) {
 // (ambiguo Loeke cortapizza / Chef cortaqueso) y los coladores viven suffijados por empresa.
 const EMPRESA_SPLIT_CODS = { "437E": 1, "438E": 1, "439E": 1, "809E": 1 };
 function codEmpSplit(cod, np) {
-  const k = _ocgNorm(cod);
-  if (!EMPRESA_SPLIT_CODS[k]) return String(cod == null ? "" : cod).trim().toUpperCase();
-  const e = empresaDeNp(np);
-  return e ? (k + " " + e) : String(cod == null ? "" : cod).trim().toUpperCase();
+  const raw = String(cod == null ? "" : cod).trim().toUpperCase();
+  // v12.39 — código terminado en "L" (438EL) = artículo Loeke vendido por Chef: se pela la
+  // L y la empresa se fuerza a LK (no la dice la NP). Para el resto la empresa la da la NP.
+  const esL = /[0-9E]L$/.test(raw);
+  const base = esL ? raw.replace(/([0-9E])L$/, "$1") : raw;
+  const k = _ocgNorm(base);
+  if (!EMPRESA_SPLIT_CODS[k]) return base;
+  const e = esL ? "LK" : empresaDeNp(np);
+  return e ? (k + " " + e) : base;
 }
 /* v6.41 — CÓDIGO CANÓNICO. En las hojas fuente (E.Madre LK / "Pedidos Talleristas-Prov")
    un mismo artículo aparece con distinto relleno de ceros (ej. 27 / 027 / 0027). Todos
@@ -15069,13 +15087,19 @@ async function stkOpenCajasPedidasArt(codEnc) {
   let base = [];
   // v12.22 — se trae también `cliente`: es el fallback de Razón Social para las NP que NO
   // están en Programación Diaria (las sin programar salían con la celda vacía).
-  try { base = await fetch(SUPABASE_URL + "/rest/v1/PPP_Base_Pedidos?articulo=eq." + encodeURIComponent(_codB) + "&select=pedido,cajas,cliente&limit=20000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }); } catch (_e) {}
+  // v12.39 — también traer la variante con "L" (ej. 438EL): es un artículo de Loeke que
+  // vende Chef y su pedido cuenta en la fila LK. Se trae articulo IN (438E, 438EL) y la
+  // empresa de cada pedido se decide con la L (L → LK; el resto por NP).
+  const _codBL = _codB + "L";
+  try { base = await fetch(SUPABASE_URL + "/rest/v1/PPP_Base_Pedidos?articulo=in.(" + encodeURIComponent(_codB) + "," + encodeURIComponent(_codBL) + ")&select=pedido,cajas,cliente,articulo&limit=20000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }); } catch (_e) {}
   const pedByNp = {}, cliByNp = {};
   base.forEach(function (x) {
     const np = String(x.pedido || "").trim().replace(/\.0+$/, "");
-    // Si el código tenía sufijo, filtrar solo NPs de esa marca
-    if (_empFiltro && np) { var _e = empresaDeNp(np); if (_e && _e !== _empFiltro) return; }
     if (!np) return;
+    // Empresa del pedido: código con "L" (438EL) → LK sin importar la NP; el resto por NP.
+    const _art = String(x.articulo || "").toUpperCase();
+    const _e = /[0-9E]L$/.test(_art) ? "LK" : empresaDeNp(np);
+    if (_empFiltro && _e && _e !== _empFiltro) return;
     pedByNp[np] = (pedByNp[np] || 0) + (Number(x.cajas) || 0);
     if (!cliByNp[np]) { var _cli = String(x.cliente || "").trim(); if (_cli) cliByNp[np] = _cli; }
   });

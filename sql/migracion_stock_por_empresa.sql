@@ -246,3 +246,42 @@ ALTER TABLE public."Planimetria" ADD PRIMARY KEY (cod, empresa);
 -- R6. El editor de planimetria del front (DELETE+INSERT total) puede borrar la
 --     empresa si se despliega el front viejo -> desplegar front junto con ETAPA 3.
 -- R7. Empresa incorrecta en el limbo reproduce el bug 809 -> D1 LK (editable).
+
+-- =====================================================================
+--  ADENDA v12.39 (2026-09-02) — Regla "L" completa (backend + front)
+-- =====================================================================
+-- Contexto: los codigos terminados en "L" (438EL/439EL) son articulos de
+-- LOEKEMEYER que VENDE Chef -> el pedido entra como NP de Chef pero el stock
+-- se agarra de la gondola de Loeke (438E LK). Verificado 2026-09-02: NINGUN
+-- codigo de Loekemeyer termina en "L" (loke_products, chef_articulos_activos,
+-- milver_products, chef_item_remap, todo el pipeline) -> regla sin excepcion.
+-- Backup defs viejas: stock_v2.bkp_defs_20260902_lcodes.
+--
+-- (1) Equivalencias_Codigos: 438EL->438E LK, 439EL->439E LK (antes ...CH).
+-- (2) Trigger trg_normalizar_empresa_stock: agrega, DESPUES del manejo del
+--     sufijo " LK"/" CH", la normalizacion de la "L" final:
+--       IF NEW.cod_art ~ '[0-9E]L$' THEN
+--         NEW.empresa := 'LK';
+--         NEW.cod_art := regexp_replace(NEW.cod_art,'([0-9E])L$','\1');
+--       END IF;
+--     Asi CUALQUIER movimiento que llegue con 438EL (front viejo, armado,
+--     reconciliacion) se guarda cod_art='438E', empresa='LK'. Verificado con
+--     insert de test (438EL/empresa CH -> 438E/LK).
+-- (3) Vista v_cajas_pedidas: pela la "L" al agrupar
+--       regexp_replace(articulo,'([0-9Ee])[Ll]$','\1')
+--     en el SELECT y en el GROUP BY -> la demanda de 438EL consolida en 438E
+--     (que la fila 438E LK absorbe por codBase) y no aparece renglon fantasma
+--     al refrescar tras cancelar NP.
+-- (4) Front (v12.37/v12.39, duplicado UX): pkEmpresaArt (L->LK), pkResolveArt
+--     (pkCodEmpresa(pkStripL, np, pkEmpresaArt)) en aggFrom + armado (n.codes);
+--     codEmpSplit pela L + fuerza LK; popup "Cajas pedidas" trae articulo
+--     IN (base, baseL) y cuenta la variante L en la fila LK. El codigo del
+--     PEDIDO en Entregas_Virgilio/factura queda crudo (438EL).
+--
+-- NOTA de arquitectura: en el STORAGE la empresa es una COLUMNA aparte
+-- (cod_art='438E' + empresa='LK'). El "438E LK" que maneja el front es una
+-- CLAVE COMPUESTA transitoria (lookup en GONDOLA/_stk.dem, key = cod+' '+emp),
+-- reconstruida por vista_saldos_stock para compatibilidad. Al escribirse un
+-- movimiento con ese string, el trigger lo PARTE de vuelta en las dos columnas.
+-- El string concatenado nunca persiste. (Refactor front a par (cod,empresa)
+-- en todos los call sites = pendiente opcional, sin ganancia funcional.)

@@ -304,6 +304,24 @@
 > (afectaría a todo objeto nuevo futuro, no sólo a este módulo — decisión del
 > usuario, no se aplica sin permiso explícito).
 >
+> Nota **v12.38–v12.39 (2026-09-02)** — **Regla "L" aplicada de punta a punta (armado, faltantes, demanda, monitor) + recepción manda empresa.**
+> Completa la nota v12.37 (que sólo cableaba la lista de picking). **v12.38:** recepción manda
+> `empresa: opState.linea` (LK/CH) → duales recibidos van a su góndola en vez de `Mixto`.
+> **v12.39 — HÍBRIDO backend+front:**
+> - **Backend (fuente de verdad):** el trigger `trg_normalizar_empresa_stock` ahora pela la "L"
+>   final (`[0-9E]L$`) y **fuerza `empresa='LK'`** → CUALQUIER movimiento que llegue con `438EL`
+>   (front viejo, armado, reconciliación) se guarda como `cod_art='438E', empresa='LK'`. La vista
+>   `v_cajas_pedidas` pela la "L" al agrupar (438EL→438E) → sin renglón fantasma tras cancelar NP.
+> - **Front (duplicado UX):** helper `pkResolveArt(art,np)` (= `pkCodEmpresa(pkStripL, np, pkEmpresaArt)`);
+>   el **asistente Completar/armado** ahora muestra y descuenta `438E LK` (antes el crudo `438EL`);
+>   `codEmpSplit` pela la L + fuerza LK (faltantes); el popup "Cajas pedidas" trae la variante `L`
+>   (`articulo IN (438E,438EL)`) y la cuenta en la fila LK.
+> - **Se preserva:** el código del PEDIDO en `Entregas_Virgilio`/factura queda crudo `438EL`
+>   (`pedidoFull`, separado de `n.codes`). Modelo: stock/movimiento=`438E LK`, display=`438E LK`,
+>   factura=`438EL`. Efecto lateral bueno: el armado ahora también sufija los duales normales por
+>   empresa (438E→438E CH/LK), cortando un leak a `Mixto` que tenían los ajustes `picking_difiere`.
+> Backups: `stock_v2.bkp_defs_20260902_lcodes` (trigger+vista viejos), `stock_v2.bkp_equiv_20260902_lcodes`.
+>
 > Nota **v12.37 (2026-09-02)** — **Códigos con "L" final = artículo Loekemeyer que vende Chef → picking va a la góndola LOEKE, no Chef.**
 > Los códigos terminados en `L` (`438EL`, `439EL`) son artículos de **Loekemeyer** que **vende Chef**:
 > el pedido entra como **NP de Chef**, pero el stock se agarra de la góndola de **Loeke** (`438E LK`),
