@@ -6524,7 +6524,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.39";
+const APP_VERSION = "v12.41";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -10294,6 +10294,12 @@ function _stkSaldosFromView(rows) {
   (rows || []).forEach(function (r) {
     var k = String(r.cod || "");
     if (!k) return;
+    // v12.41 — no mostrar filas que la vista marcó ocultas Y que están vacías
+    // (stock 0 y sin pedidos): son bases peladas de un dual partido (ej. "809E"
+    // cuando existen "809E LK"/"809E CH") o insumos en 0. `visible_en_stock` ya
+    // lo resuelve el backend; acá se respeta. El filtro exige además saldo y
+    // demanda en 0 para no esconder nunca algo con stock o pedidos reales.
+    if (r.visible_en_stock === false && !(Number(r.stock_total) || 0) && !(Number(r.cajas_pedidas) || 0)) return;
     m[k] = { cod: k, desc: r.descripcion || "", linea: r.linea || "", terminado: Number(r.terminado) || 0, excedente: Number(r.excedente) || 0, separar_pedidos: Number(r.separar_pedidos) || 0, a_facturar: Number(r.a_facturar) || 0, a_guardar: Number(r.a_guardar) || 0, racks: Number(r.racks) || 0, racks_ch: Number(r.racks_ch) || 0, para_envasar: Number(r.para_envasar) || 0, insumos: Number(r.insumos_dep) || 0, _uni: "", _ubi: "" };
   });
   return m;
