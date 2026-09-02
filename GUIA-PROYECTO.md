@@ -1021,6 +1021,35 @@
 > ahora suma `oc_proy: it.proy`. Así el «Pedido» y el contexto (máximo−stock−pedidos) cuadran de la
 > misma foto (ej. cód 104: oc_max 40 − oc_stock 24 = 16 pedido).
 >
+> Nota **2026-09-02 — limpieza: todo lo que hablaba de "estadística madre" y estaba de sobra (propuesta 2496).**
+> Inventario en los dos proyectos: 5 tablas, 2 vistas propias, 1 foránea, 17 funciones y 3 crons
+> hablaban de proyección / estadística madre. Se borró lo que no aportaba (backups en
+> `sql/backups/backup_limpieza_virgilio_20260902.sql` y `…_estadistica_madre_import_20260506_LK.sql`):
+>
+> - **Virgilio · `E. Madre LK` / `E. Madre CH` traían una SEGUNDA estadística madre.** Una columna
+>   `"E. Madre"` con un número fijo por artículo cargado a mano el 12/03/2026, que
+>   `recalcular_maximo_por_cod/desc` usaba para fijar `Partes x Tallerista.maximo` y dos vistas
+>   (`v_piezas_por_tallerista_consumo_final`, `v_debug_piezas_consumo`) usaban como "consumo" de
+>   piezas. Estado real: 0 de 954 filas con `maximo > 0`, sin llamadores (front, cron, trigger,
+>   vista, doc), y las funciones ejecutables por `anon`. Se borraron las dos funciones, las dos
+>   vistas y **la columna**. **Las tablas quedan**: son la fuente prioritaria de **nombres** de
+>   artículo (`vista_nombres_articulos`, prioridad `E. Madre LK` > `Articulos Virgilio X Tallerista`
+>   > `OC_Maximos`) — por eso se tocó el 24/08 (alta del 599E). Tienen `comment` que lo dice.
+> - **Virgilio · `refresh_proyeccion_madre()`** borrada: el pull HTTP con la anon key que fallaba en
+>   silencio; no puede funcionar (anon no tiene `EXECUTE` en LK) y dejarla invitaba a correrla a
+>   mano creyendo que refresca. `sql/refresh_proyeccion_madre.sql` quedó marcado como histórico.
+> - **LK · `fn_proyeccion_madre_emp` y la firma `_fn_proy_window(p_meses, p_emp)`** borradas: sin
+>   llamadores. El motor tiene **una sola firma**, `_fn_proy_window(p_meses)`.
+> - **LK · `estadistica_madre_import_20260506`** (el último Excel, 294 filas) borrada de la base;
+>   queda sólo en el repo.
+> - `Pieza Madre` (75 filas) **no se tocó**: es matricería, comparte sólo la palabra.
+>
+> Lo que queda es exactamente la cadena: `sales_lines` → `_fn_proy_window` → `fn_proyeccion_oc_virgilio`
+> → `sync_proyeccion_madre_virgilio` → `proyeccion_madre` (Virgilio) y → `fn_proyeccion_madre` →
+> `refresh_estadistica_madre_cache` → `estadistica_madre_cache` → vista `estadistica_madre` (LK).
+> Verificado después de borrar: `vista_nombres_articulos` y `vista_generador_oc` siguen vivas,
+> 505 = 2.348,7 en todos lados, y los 3 md5 de `sql/fn_proyeccion_oc_virgilio.sql` = deploy.
+
 > Nota **2026-09-02 — v12.47: la proyección tiene UN solo criterio y UN solo número (propuesta 2496, v3).**
 > El usuario rechazó la v2 con el gráfico a la vista: *"si está por abajo de 4 de los últimos 6 meses
 > no es una proyección confiable. No puede ser diferente el criterio. Es solo UNA estadística

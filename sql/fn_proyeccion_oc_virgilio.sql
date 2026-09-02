@@ -72,11 +72,10 @@
 -- Verificado: 505 = 2.348,7 en motor, cache, vista estadistica_madre y proyeccion_madre de
 -- Virgilio; total 22.371 caj/mes; balance 2,02 meses por encima.
 -- ---------------------------------------------------------------------
--- Motor. DOS FIRMAS SIN DEFAULT a proposito: si la de 2 argumentos llevara
--- DEFAULT, toda llamada de 1 argumento seria ambigua entre las dos y Postgres
--- la rechazaria (mismo patron ya documentado para datos_cliente_empresa).
+-- Motor. UNA sola firma (limpieza 2026-09-02: la variante con p_emp existia solo para
+-- fn_proyeccion_madre_emp, que no tenia llamadores; las dos se borraron).
 -- ---------------------------------------------------------------------
-create or replace function public._fn_proy_window(p_meses int, p_emp text)
+create or replace function public._fn_proy_window(p_meses int)
  returns table(item text, proy_cajas numeric)
  language sql stable security definer set search_path to 'public' set statement_timeout to '60s'
 as $fn$
@@ -92,7 +91,7 @@ as $fn$
     from public.sales_lines sl, mm, vent
     where sl.invoice_date ~ '^\d{4}-\d{2}-\d{2}'
       and sl.customer_code is not null and sl.customer_code not in ('1','3878')
-      and (case when p_emp is null then sl.empresa in ('lk','chef') else sl.empresa = p_emp end)
+      and sl.empresa in ('lk','chef')
       and (extract(year from (sl.invoice_date)::date)::int*12 + extract(month from (sl.invoice_date)::date)::int)
           between mm.endm - (vent.meses - 1) and mm.endm
   ),
@@ -123,15 +122,6 @@ as $fn$
   from st;
 $fn$;
 
-create or replace function public._fn_proy_window(p_meses int)
- returns table(item text, proy_cajas numeric)
- language sql stable security definer set search_path to 'public' set statement_timeout to '60s'
-as $fn$
-  select item, proy_cajas from public._fn_proy_window(p_meses, null::text);
-$fn$;
-
-revoke execute on function public._fn_proy_window(int, text) from public, anon;
-
 create or replace function public.fn_proyeccion_oc_virgilio()
  returns table(cod text, proy_cajas_mes numeric, uxb integer, proy_uni_mes numeric)
  language sql stable security definer set search_path to 'public' set statement_timeout to '60s'
@@ -156,7 +146,7 @@ as $fn$
 $fn$;
 
 -- ---------------------------------------------------------------------
--- Las dos "madre" pasan a delegar en el mismo motor, ventana 6m.
+-- fn_proyeccion_madre delega en el mismo motor, ventana 6m (la usa refresh_estadistica_madre_cache).
 -- ---------------------------------------------------------------------
 create or replace function public.fn_proyeccion_madre()
  returns table(cod text, proy_cajas_mes numeric, uxb integer, proy_uni_mes numeric)
@@ -172,19 +162,7 @@ as $fn$
   order by w.proy_cajas desc;
 $fn$;
 
-create or replace function public.fn_proyeccion_madre_emp(p_emp text)
- returns table(cod text, proy_cajas_mes numeric, uxb integer, proy_uni_mes numeric)
- language sql stable security definer set search_path to 'public' set statement_timeout to '60s'
-as $fn$
-  select w.item as cod, w.proy_cajas as proy_cajas_mes,
-         coalesce(p.uxb, lk.uxb)::integer as uxb,
-         round(w.proy_cajas * coalesce(p.uxb, lk.uxb, 1))::numeric as proy_uni_mes
-  from public._fn_proy_window(6, p_emp) w
-  left join public.products p on regexp_replace(upper(p.cod),'^0+(?=.)','') = w.item
-  left join public.loke_products lk on regexp_replace(upper(lk.cod),'^0+(?=.)','') = w.item
-  where w.proy_cajas > 0
-  order by w.proy_cajas desc;
-$fn$;
+-- (fn_proyeccion_madre_emp se borro en la limpieza del 2026-09-02: sin llamadores.)
 
 -- WARNING El GRANT a anon esta COMENTADO a proposito. Un barrido de seguridad en LK le
 -- revoco el EXECUTE a anon, y eso dejo a `refresh_proyeccion_madre()` de Virgilio
