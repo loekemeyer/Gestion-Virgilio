@@ -1021,6 +1021,48 @@
 > ahora suma `oc_proy: it.proy`. Así el «Pedido» y el contexto (máximo−stock−pedidos) cuadran de la
 > misma foto (ej. cód 104: oc_max 40 − oc_stock 24 = 16 pedido).
 >
+> Nota **2026-09-02 — la proyección tenía DOS errores que se compensaban (propuesta 2496).**
+> Disparador: la proyección del **art. 505** daba 1667,6 caj/mes contra 5 de sus 6 meses reales
+> por encima (2134/2160/3609/2070/1421/2698). Un pronóstico por debajo de casi toda la serie
+> real no es un pronóstico.
+>
+> **(1) El filtro de anomalías anulaba a los clientes de compra ocasional.** Descartaba el mes
+> ENTERO si `v > 1.5×promedio AND ningún otro mes llega al 0.8×v AND el mes previo < 0.5×v`.
+> Para un cliente con **una sola compra** en la ventana las tres condiciones se cumplen **por
+> construcción** (`promedio = v/n`, `max_other = 0`, `prev = 0`): era imposible que zafara. En el
+> 505 eran **199 de 420 clientes anulados** y **5.621 de 14.092 cajas tiradas (40%)**. Golpeaba a
+> los artículos con muchos compradores esporádicos — la familia 5xx — dejando **29 de 316**
+> artículos por debajo de 5 o más de sus 6 meses.
+>
+> **(2) El divisor inflaba.** `n` era *"meses desde la primera compra del cliente"*, así que un
+> cliente que estrenaba el mes pasado (n=1) contaba su único pedido como ritmo mensual completo.
+> Sin ningún filtro el catálogo daba 33.208 caj/mes contra 21.935 de promedio real: **+51%**.
+> El filtro brutal venía cancelando esa inflación, mal y de forma despareja. **Arreglar solo (1)
+> destapaba (2) y subía las compras 40%** — por eso se arreglaron los dos juntos.
+>
+> **Arreglo:** la regla de descarte se extrajo a **`fn_proy_descarte()`** (LK) — antes estaba
+> COPIADA en 4 funciones SQL y 2 archivos JS, y ya habían divergido: el mismo 505 mostraba
+> **1667,6** en Virgilio, **2069,7** en el panel Estadística Madre y **2500** en la tabla
+> `estadistica_madre` (congelada desde mayo). Ahora se descarta **sólo el excedente**
+> (`v − 1.5×promedio`), sólo si el cliente compró en **≥ 2 meses**, y el divisor es la **ventana
+> completa**. `fn_proyeccion_madre` y `fn_proyeccion_madre_emp` delegan en el mismo motor
+> (y se les sacó un hack hardcodeado que metía ventas de Chef sólo para el 505 — parche puesto
+> para tapar este mismo bug). **Estadística Madre pasó de 24 a 6 meses** (pedido del usuario).
+>
+> **Verificado (385 artículos):** artículos rotos 29 → **6** (y 0 por debajo de los 6 meses);
+> balance 2,99 → **3,01** (ideal 3,0); total del catálogo 20.153 → **19.792** caj/mes (−1,8%, no
+> mueve el nivel de compras); **art. 505: 1667,6 → 2080,8**. Detalle y backup en
+> `sql/fn_proyeccion_oc_virgilio.sql` y `sql/backups/backup_proyeccion_LK_20260902.sql`.
+>
+> ⚠ **Hallazgo aparte: `refresh_proyeccion_madre()` venía fallando en SILENCIO desde el 12/08.**
+> Un barrido de seguridad en LK le revocó el `EXECUTE` a `anon` sobre `fn_proyeccion_oc_virgilio`,
+> así que el GET devolvía **401** y la función retornaba **−1 sin recargar**, con el cron marcando
+> "succeeded". Tres semanas con la proyección congelada sin que nadie se enterara. Se recargó a
+> mano (abrir permiso → refresh → volver a cerrarlo, seguridad igual que antes). **La plomería
+> definitiva está PENDIENTE de decisión:** re-abrir a `anon` (expone la proyección a cualquiera con
+> la anon key, que es pública) o dar vuelta el sentido y que **LK empuje** a Virgilio por el FDW
+> `virgilio_db` que ya existe (mismo patrón que `sync_pedidos_match_virgilio()`, no expone nada).
+
 > Nota **2026-08-25 — v11.48 (Stocks: pop-up "de dónde surge la proyección" + ventas 6m).**
 > En la hoja **Stocks** (Stock y Compras), el número de la columna **PROY. CAJ/MES** ahora es
 > **clickeable** (`stkShowProyVentas`): abre un pop-up que explica **de dónde surge** la proyección y
