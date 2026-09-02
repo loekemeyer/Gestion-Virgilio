@@ -318,3 +318,36 @@ ALTER TABLE public."Planimetria" ADD PRIMARY KEY (cod, empresa);
 -- fina (atribuir cada tanda vieja a su empresa por NP) queda para el conteo
 -- (Tarea #6), con cuidado porque 809E es producto ambiguo LK/CH.
 -- Backup defs viejas: stock_v2.bkp_defs_20260902_lcodes.
+
+-- =====================================================================
+--  ADENDA v12.41 (2026-09-02) — Fantasma 809E -2: refresh_stocks_carga_rapida
+--  no resincronizaba las columnas de SALDO
+-- =====================================================================
+-- Síntoma: el front (stocks_carga_rapida) mostraba 809E pelado con
+-- separar_pedidos=-2, pero la matview vista_stock_procesada y el ledger crudo
+-- decían 0.
+--
+-- Causa raíz: stocks_carga_rapida (tabla materializada) se mantiene por DOS vías:
+--   (a) trigger actualizar_saldo_trigger, en tiempo real por cada movimiento;
+--   (b) refresh_stocks_carga_rapida(), que resincroniza.
+-- El bug: refresh_stocks_carga_rapida() SOLO resincronizaba los campos DERIVADOS
+-- (cajas_pedidas, proy, capacidad, es_insumo, visible_en_stock, descripcion,
+-- linea, cod_base, familia, es_secundario) — NUNCA las columnas de saldo
+-- (terminado, separar_pedidos, a_facturar, etc.). Las daba por mantenidas por el
+-- trigger. Cuando se corrigió D55A moviendo 2 filas Mixto->LK con un UPDATE de la
+-- columna empresa (no un movimiento nuevo), el trigger recalculó LK/CH pero la
+-- fila pelada '809E' (Mixto) quedó huérfana congelada en su último valor (-2);
+-- ni el trigger ni el refresh la volvían a tocar. La matview (recalculada entera)
+-- daba 0; carga_rapida quedaba en -2.
+--
+-- Fix: refresh_stocks_carga_rapida() ahora TAMBIÉN resincroniza las columnas de
+-- saldo desde la matview (fuente calculada) en el UPDATE, y DELETE de filas
+-- huérfanas (existen en carga_rapida pero ya no en la matview). Self-healing.
+-- Verificado: 809E pelado separar_pedidos -2 -> 0. Backup def vieja en
+-- stock_v2.bkp_defs_20260902_lcodes.
+--
+-- Cosmético pendiente: el renglón pelado '809E' sigue existiendo con TODO en 0
+-- (visible_en_stock=false) porque quedan movimientos Mixto históricos que netean
+-- a 0. El front NO filtra por visible_en_stock, así que muestra ese renglón vacío
+-- (ya sin negativo). Cierre completo = filtrar visible_en_stock en el front, o
+-- atribuir los Mixto 809E históricos a su empresa por NP (Tarea #6).
