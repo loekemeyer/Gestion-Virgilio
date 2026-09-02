@@ -1036,9 +1036,19 @@
 >   (`v_piezas_por_tallerista_consumo_final`, `v_debug_piezas_consumo`) usaban como "consumo" de
 >   piezas. Estado real: 0 de 954 filas con `maximo > 0`, sin llamadores (front, cron, trigger,
 >   vista, doc), y las funciones ejecutables por `anon`. Se borraron las dos funciones, las dos
->   vistas y **la columna**. **Las tablas quedan**: son la fuente prioritaria de **nombres** de
->   artículo (`vista_nombres_articulos`, prioridad `E. Madre LK` > `Articulos Virgilio X Tallerista`
->   > `OC_Maximos`) — por eso se tocó el 24/08 (alta del 599E). Tienen `comment` que lo dice.
+>   vistas y la columna — **y la columna se RESTAURÓ una hora después**, con sus 592 valores
+>   desde el backup: los logs de la API de Supabase mostraron que **otra app**,
+>   `GestionProductivaEntero` (Vercel, `gestion-productiva-entero…vercel.app`), la pide **42 veces
+>   por día** (`select=Cod,"E. Madre"`) en **7 módulos** (Compras/cajas, Envíos y Control de
+>   talleristas, Stock flejes/cartones/cajas, Stock SP) como "consumo mensual" en unidades para
+>   comprar cajas y flejes y fijar máximos de talleristas. Es la tercera estadística madre, viva,
+>   con un número fijo de marzo, y encima cada módulo combina LK y CH distinto (suma / máximo / LK
+>   primero). **Lección:** el catálogo de un proyecto no dice quién lo consume desde otra app; hay
+>   que mirar `edge_logs` por `request.path` + `referer`. **Pendiente de decisión:** alimentar esa
+>   columna desde `proyeccion_madre.proy_uni_mes` (un solo criterio, sin tocar la app) o migrar la
+>   app. **Las tablas quedan**: son la fuente prioritaria de **nombres** de artículo
+>   (`vista_nombres_articulos`, prioridad `E. Madre LK` > `Articulos Virgilio X Tallerista` >
+>   `OC_Maximos`) — por eso se tocó el 24/08 (alta del 599E). Tienen `comment` que lo dice.
 > - **Virgilio · `refresh_proyeccion_madre()`** borrada: el pull HTTP con la anon key que fallaba en
 >   silencio; no puede funcionar (anon no tiene `EXECUTE` en LK) y dejarla invitaba a correrla a
 >   mano creyendo que refresca. `sql/refresh_proyeccion_madre.sql` quedó marcado como histórico.

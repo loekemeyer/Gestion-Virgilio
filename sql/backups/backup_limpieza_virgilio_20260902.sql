@@ -8,10 +8,12 @@
 --     llamadores (front, cron, trigger), 0 de 954 filas con maximo > 0, y ejecutables por anon.
 --   . refresh_proyeccion_madre: el pull HTTP con anon key que fallaba en silencio; lo
 --     reemplazo sync_proyeccion_madre_virgilio() (push desde LK). Ya sin cron.
---   . la columna "E. Madre" de las tablas E. Madre LK / E. Madre CH: era esa segunda
---     estadistica madre. Las TABLAS quedan (son la fuente prioritaria de NOMBRES de articulo
---     via vista_nombres_articulos); solo se va la columna. Abajo, los valores para restaurar
---     (primero: alter table ... add column "E. Madre" integer).
+--   . la columna "E. Madre" de las tablas E. Madre LK / E. Madre CH: se BORRO y se RESTAURO
+--     el mismo dia (2026-09-02, ~1 h despues) al descubrir por los logs de la API que la app
+--     GestionProductivaEntero (Vercel) la pide 42 veces por dia (select=Cod,"E. Madre") en
+--     7 modulos. Restaurada desde este archivo: LK 290 filas / 288 con valor / suma 299.111,
+--     CH 302 / 302 / 43.314 — identico al backup. La leccion: el catalogo de un proyecto no
+--     dice quien lo consume desde OTRA app; los logs de la API si.
 -- =====================================================================
 
 CREATE OR REPLACE FUNCTION public.recalcular_maximo_por_cod(p_cod text)
