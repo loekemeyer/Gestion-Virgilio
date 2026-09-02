@@ -1021,6 +1021,20 @@
 > ahora suma `oc_proy: it.proy`. Así el «Pedido» y el contexto (máximo−stock−pedidos) cuadran de la
 > misma foto (ej. cód 104: oc_max 40 − oc_stock 24 = 16 pedido).
 >
+> Nota **2026-09-02 — `estadistica_madre` (LK) deja de ser un Excel importado a mano.**
+> Era una tabla que se llenaba desde un Excel con un importador en Análisis Venta Cliente,
+> importada por última vez el **6/5/2026** (294 filas contra 521 del caché), y la leían el panel
+> **y el portal del cliente** (`script.js` de LK): las sugerencias al mayorista se ordenaban con
+> datos de mayo y 227 productos ni existían ahí. Decisión del usuario: *"el Excel ya no se
+> debería utilizar más; los datos de ventas salen de `sales_lines` y la proyección tiene que
+> salir internamente"*. Ahora es una **vista** sobre `estadistica_madre_cache` (cron diario, ya
+> con ventana de 6 meses y la regla única `fn_proy_descarte`) con la misma forma que la tabla, así
+> que ningún lector cambió. El Excel histórico quedó en `estadistica_madre_import_20260506`. El
+> importador se retiró de `admin.html` y `analisis-venta-cliente.js` en LK **y en el espejo
+> `/admin/` de este repo** (135 líneas de HTML y 353 de JS, idéntico en los dos). Con esto **la
+> proyección tiene una sola fuente en todo el sistema**: OCs, Estadística Madre y portal leen el
+> mismo número.
+
 > Nota **2026-09-02 — la proyección pasa de PULL a PUSH, y los watchdogs no avisaban.**
 > Al arreglar la proyección (nota de abajo) se descubrió que `refresh_proyeccion_madre()`
 > venía fallando **en silencio desde el 12/08**: un barrido de seguridad en LK le revocó el
