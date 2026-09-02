@@ -1021,6 +1021,32 @@
 > ahora suma `oc_proy: it.proy`. Así el «Pedido» y el contexto (máximo−stock−pedidos) cuadran de la
 > misma foto (ej. cód 104: oc_max 40 − oc_stock 24 = 16 pedido).
 >
+> Nota **2026-09-02 — v12.47: la proyección tiene UN solo criterio y UN solo número (propuesta 2496, v3).**
+> El usuario rechazó la v2 con el gráfico a la vista: *"si está por abajo de 4 de los últimos 6 meses
+> no es una proyección confiable. No puede ser diferente el criterio. Es solo UNA estadística
+> madre"*. Tenía razón dos veces: (1) cualquier descarte de picos resta volumen que ocurrió y empuja
+> la proyección por debajo de la mayoría de los meses — con la v2 lo violaban **70 de 385**
+> artículos; (2) las OCs (2080,8) y el panel Estadística Madre de LK (2016,1) daban distinto porque
+> el panel tenía su propia tubería en unidades.
+>
+> **Criterio único, en LK `_fn_proy_window`:** proyección = **promedio simple de cajas facturadas
+> de los últimos 6 meses** (LK+Chef, meses sin venta cuentan 0) **con piso en el 4.º mejor mes**,
+> así por construcción nunca queda por debajo de 4 de los 6. Medido: **0 violaciones** (el
+> promedio pelado tenía 28; la mediana también daba 0 pero sub-proyecta un 10% porque ignora los
+> picos). El piso aplica sólo a la ventana de 6; en el fallback de 12 va el promedio pelado, para
+> no proyectar el ritmo viejo de un artículo que dejó de venderse. Se eliminó `fn_proy_descarte`.
+> `refresh_estadistica_madre_cache` **ya no calcula**: toma la proyección de `fn_proyeccion_madre()`
+> → el mismo motor. Y `admin.js` (LK y espejo `/admin/`) **ya no calcula en JS**: tenía tres
+> fórmulas de fallback (por cliente con descarte de picos, y "promedio de los últimos 3 meses");
+> sin caché la columna queda vacía en vez de inventar un número.
+>
+> **Verificado:** 505 = **2.348,7** caj/mes en el motor, el caché, la vista `estadistica_madre` y
+> `proyeccion_madre` de Virgilio (antes 1.667,6 → 2.080,8 → 2.348,7). Total del catálogo
+> **22.371** caj/mes (+14% sobre los 19.593 de la v2; el nivel de compras SUBE, es lo que pide la
+> regla). Balance 2,02 meses por encima. Los 5 md5 de `sql/fn_proyeccion_oc_virgilio.sql`
+> coinciden con lo desplegado. Pop-up (v12.47): la línea gris "promedio 6m" sólo se dibuja cuando
+> difiere de la proyección (o sea, cuando actuó el piso), y el pie lo marca "(piso: 4.º mejor mes)".
+
 > Nota **2026-09-02 — v12.46 (idea 5766): el pop-up de proyección muestra un gráfico en vez del texto.**
 > El bloque "¿De dónde surge?" (explicación fija de la regla) se reemplazó por un **gráfico de
 > tendencia de 12 meses** (`_stkProyTrendSvg`, SVG inline sin librerías): línea + área de cajas

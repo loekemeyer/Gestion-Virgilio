@@ -6524,7 +6524,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.46";
+const APP_VERSION = "v12.47";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -14066,8 +14066,11 @@ function stkPopClose() { const ov = document.getElementById("stkPopModal"); if (
    (línea + área, SVG inline sin librerías) con la proyección y el promedio simple de la ventana como
    líneas de referencia, la ventana de 6 meses sombreada y cada mes coloreado según quede por encima
    (violeta) o por debajo (rojo) de la proyección. Abajo, las barras de la ventana de 6 meses llevan
-   la marca vertical de la proyección y el pie dice cuántos meses quedan por encima. La regla de
-   cálculo vive en LK (`fn_proy_descarte`, ver GUIA-PROYECTO.md 2026-09-02); acá sólo se dibuja. */
+   la marca vertical de la proyección y el pie dice cuántos meses quedan por encima.
+   v12.47 — criterio ÚNICO (propuesta 2496): proyección = promedio simple de los 6 meses con piso en el
+   4.º mejor mes, así nunca queda por debajo de 4 de los 6. Vive en LK (`_fn_proy_window`); acá sólo
+   se dibuja. La línea gris "promedio 6m" sólo se muestra si difiere de la proyección (o sea, cuando
+   actuó el piso). */
 var _STK_MES_ABR = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
 function _stkFmtMes(ym) {
   var m = String(ym || "").match(/^(\d{4})-(\d{2})$/); if (!m) return String(ym || "");
@@ -14096,7 +14099,10 @@ function _stkProyTrendSvg(rows, proyN, prom) {
   s += '<path d="' + area + '" fill="#8b5cf6" opacity=".13"/>';
   s += '<path d="' + line + '" fill="none" stroke="#6d28d9" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>';
   // Líneas de referencia. Si las etiquetas quedan muy juntas, se separan.
-  var yP = proyN > 0.05 ? ys(proyN) : null, yM = prom > 0 ? ys(prom) : null;
+  // v12.47 — el promedio simple ES la proyección salvo cuando actúa el piso: la línea gris sólo
+  // se dibuja si difiere más de 0,5%, para no pisar la violeta con otra igual.
+  var promDif = prom > 0 && proyN > 0.05 && Math.abs(prom - proyN) / proyN > 0.005;
+  var yP = proyN > 0.05 ? ys(proyN) : null, yM = promDif ? ys(prom) : null;
   var lyP = yP, lyM = yM;
   if (yP !== null && yM !== null && Math.abs(yP - yM) < 11) { if (yM < yP) lyM = yP - 11; else lyM = yP + 11; }
   if (yM !== null) {
@@ -14117,7 +14123,7 @@ function _stkProyTrendSvg(rows, proyN, prom) {
   s += '<div class="proyv-leg">' +
        '<span><i style="background:#6d28d9"></i>venta mensual</span>' +
        '<span><i class="dash"></i>proyección</span>' +
-       '<span><i class="dot"></i>promedio 6m</span>' +
+       (yM !== null ? '<span><i class="dot"></i>promedio 6m</span>' : '') +
        '<span><i style="background:#dc2626;width:8px;height:8px;border-radius:50%"></i>mes por debajo</span></div>';
   var d0 = _stkFmtMes(rows[0].mes), d1 = _stkFmtMes(rows[n - 1].mes);
   return '<div class="stkpop-grp" style="background:#faf5ff;border-color:#e9d5ff;padding:8px 8px 6px;">' +
@@ -14171,8 +14177,10 @@ async function stkShowProyVentas(codEnc, proy) {
          '<span class="proyv-val"' + (bajo ? ' style="color:#b91c1c"' : '') + '>' + fc(x.cajas) + '</span></div>';
   });
   h += '</div>';
-  h += '<div class="proyv-foot">Total 6m: <b>' + fc(tot) + '</b> cajas · Promedio simple: <b>' + fc(Math.round(prom)) + '</b> caj/mes' +
-       (proyN > 0.05 ? ' · Proyección: <b style="color:#6d28d9">' + fc(proyN) + '</b> · <b>' + arriba + ' de ' + win.length + '</b> meses por encima' : '') + '</div>';
+  var piso = proyN > 0.05 && prom > 0 && (proyN - prom) / prom > 0.005;   // actuó el piso del 4.º mejor mes
+  h += '<div class="proyv-foot">Total 6m: <b>' + fc(tot) + '</b> cajas · Promedio: <b>' + fc(Math.round(prom)) + '</b> caj/mes' +
+       (proyN > 0.05 ? ' · Proyección: <b style="color:#6d28d9">' + fc(proyN) + '</b>' + (piso ? ' <small style="color:#6d28d9">(piso: 4.º mejor mes)</small>' : '') +
+                       ' · <b>' + arriba + ' de ' + win.length + '</b> meses por encima' : '') + '</div>';
   h += '</div>';
   body.innerHTML = h;
 }

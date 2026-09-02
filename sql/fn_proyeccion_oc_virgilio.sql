@@ -10,7 +10,7 @@
 -- ultimos 12. Si en 12 sigue 0, queda en 0 (no se devuelve -> el generador lo trata como
 -- "sin proyeccion" y usa el objetivo de OC_Maximos). Combina Loekemeyer + Chef.
 --
--- == v2 (2026-09-02, propuesta 2496) - DOS ERRORES QUE SE COMPENSABAN =================
+-- == v2 (2026-09-02, propuesta 2496) - DOS ERRORES QUE SE COMPENSABAN (SUPERADA por v3, abajo) ==
 --
 -- Sintoma reportado: la proyeccion del art. 505 (1667,6 caj/mes) quedaba por debajo de
 -- 5 de los 6 meses reales de venta (2134/2160/3609/2070/1421/2698).
@@ -32,7 +32,7 @@
 --     solo (1) destapaba (2) y subia las compras 40%. Por eso se arreglan LOS DOS.
 --
 -- Solucion (opcion elegida por el usuario):
---   . La regla de descarte se extrae a `fn_proy_descarte()` - UNA sola definicion, que
+--   . (v2, ELIMINADA en v3) La regla de descarte se extrajo a `fn_proy_descarte()`, que
 --     ahora comparten este motor y `refresh_estadistica_madre_cache()`. Antes estaba
 --     COPIADA en 4 funciones SQL + 2 archivos JS, y ya habian divergido.
 --   . Solo se descarta el EXCEDENTE (v - 1.5*rawavg), no el mes entero.
@@ -56,31 +56,21 @@
 -- esta es la copia documentada para el repo.
 -- =====================================================================
 
--- ---------------------------------------------------------------------
--- REGLA UNICA de descarte de picos. Si cambia el criterio, se cambia ACA.
--- ---------------------------------------------------------------------
-create or replace function public.fn_proy_descarte(
-  p_v                numeric,   -- volumen del mes
-  p_rawavg           numeric,   -- promedio del cliente sobre la VENTANA COMPLETA
-  p_max_other        numeric,   -- mayor volumen del cliente en cualquier otro mes
-  p_prev_v           numeric,   -- volumen del mes anterior (0 si no es contiguo)
-  p_primer_mes       boolean,   -- es el primer mes con compra del cliente
-  p_meses_con_compra integer    -- en cuantos meses de la ventana compro
-) returns numeric
- language sql immutable parallel safe
-as $fn$
-  select case
-    when coalesce(p_meses_con_compra, 0) < 2 then 0
-    when p_v > 1.5 * p_rawavg
-     and p_max_other < 0.8 * p_v
-     and (coalesce(p_primer_mes, false) or coalesce(p_prev_v, 0) < 0.5 * p_v)
-    then greatest(p_v - 1.5 * p_rawavg, 0)
-    else 0
-  end;
-$fn$;
-
-revoke execute on function public.fn_proy_descarte(numeric,numeric,numeric,numeric,boolean,integer) from public, anon;
-
+-- == v3 (2026-09-02, mismo dia) - CRITERIO UNICO ======================================
+-- El usuario rechazo la v2: "si esta por abajo de 4 de los ultimos 6 meses, no es una
+-- proyeccion confiable. No puede ser diferente el criterio. Es solo UNA estadistica madre".
+-- Cualquier recorte de volumen que ocurrio (descarte de picos) empuja la proyeccion por
+-- debajo de la mayoria de los meses: con la v2 lo violaban 70 de 385 articulos.
+--
+-- Criterio: proyeccion = PROMEDIO SIMPLE de cajas facturadas de los ultimos 6 meses (LK+Chef,
+-- meses sin venta cuentan 0), con PISO en el 4.o mejor mes de esos 6 -> por construccion nunca
+-- queda por debajo de 4 de los 6. Medido: 0 violaciones (el promedio pelado tenia 28).
+-- El piso aplica SOLO a la ventana de 6: en el fallback de 12 se usa el promedio pelado, para
+-- no proyectar el ritmo viejo de un articulo que dejo de venderse.
+-- Se elimino fn_proy_descarte (ya no hay regla de descarte) y refresh_estadistica_madre_cache
+-- toma la proyeccion de fn_proyeccion_madre() -> este motor. UN numero en todo el sistema.
+-- Verificado: 505 = 2.348,7 en motor, cache, vista estadistica_madre y proyeccion_madre de
+-- Virgilio; total 22.371 caj/mes; balance 2,02 meses por encima.
 -- ---------------------------------------------------------------------
 -- Motor. DOS FIRMAS SIN DEFAULT a proposito: si la de 2 argumentos llevara
 -- DEFAULT, toda llamada de 1 argumento seria ambigua entre las dos y Postgres
@@ -90,13 +80,13 @@ create or replace function public._fn_proy_window(p_meses int, p_emp text)
  returns table(item text, proy_cajas numeric)
  language sql stable security definer set search_path to 'public' set statement_timeout to '60s'
 as $fn$
-  with vent as (select greatest(coalesce(p_meses,6),1)::numeric as meses),
+  with vent as (select greatest(coalesce(p_meses,6),1)::int as meses),
   mm as (
     select max(extract(year from (invoice_date)::date)::int*12 + extract(month from (invoice_date)::date)::int) as endm
     from public.sales_lines where invoice_date ~ '^\d{4}-\d{2}-\d{2}'
   ),
   norm as (
-    select regexp_replace(upper(sl.item_code),'^0+(?=.)','') as nitem, sl.customer_code as cust,
+    select regexp_replace(upper(sl.item_code),'^0+(?=.)','') as nitem,
            (extract(year from (sl.invoice_date)::date)::int*12 + extract(month from (sl.invoice_date)::date)::int) as midx,
            sl.boxes::numeric as v
     from public.sales_lines sl, mm, vent
@@ -104,39 +94,33 @@ as $fn$
       and sl.customer_code is not null and sl.customer_code not in ('1','3878')
       and (case when p_emp is null then sl.empresa in ('lk','chef') else sl.empresa = p_emp end)
       and (extract(year from (sl.invoice_date)::date)::int*12 + extract(month from (sl.invoice_date)::date)::int)
-          between mm.endm - (vent.meses::int - 1) and mm.endm
+          between mm.endm - (vent.meses - 1) and mm.endm
   ),
   base as (
-    select coalesce(r.to_code, nz.nitem) as item, nz.cust, nz.midx, sum(nz.v) as v
+    select coalesce(r.to_code, nz.nitem) as item, nz.midx, sum(nz.v) as v
     from norm nz
     left join public.sales_item_remap r on r.from_code = nz.nitem
     where not exists (select 1 from public.sales_excluded_items e where e.item_code = nz.nitem)
-    group by 1,2,3
+    group by 1,2
   ),
-  agg as (
-    -- divisor = VENTANA COMPLETA (no "meses desde la primera compra")
-    select item, cust, sum(v) as sumactive, min(midx) as firstm, count(*)::int as nmeses,
-           sum(v) / (select meses from vent) as rawavg
-    from base group by item, cust
+  -- serie completa: los meses sin venta cuentan 0
+  grid as (
+    select i.item, g as midx
+    from (select distinct item from base) i, mm, vent, generate_series(mm.endm - (vent.meses - 1), mm.endm) g
   ),
-  mo as (
-    select b.item, b.cust, b.v, a.sumactive, a.nmeses, a.rawavg,
-      (b.midx = a.firstm) as primer_mes,
-      case when lag(b.midx) over (partition by b.item,b.cust order by b.midx) = b.midx-1
-           then lag(b.v) over (partition by b.item,b.cust order by b.midx) else 0 end as prev_month_v,
-      greatest(
-        coalesce(max(b.v) over (partition by b.item,b.cust order by b.midx rows between unbounded preceding and 1 preceding),0),
-        coalesce(max(b.v) over (partition by b.item,b.cust order by b.midx rows between 1 following and unbounded following),0)
-      ) as max_other
-    from base b join agg a on a.item=b.item and a.cust=b.cust
+  serie as (
+    select g.item, g.midx, coalesce(b.v, 0) as v
+    from grid g left join base b on b.item = g.item and b.midx = g.midx
   ),
-  disr as (
-    select item, cust, sumactive,
-      sum(public.fn_proy_descarte(v, rawavg, max_other, prev_month_v, primer_mes, nmeses)) as disruptsum
-    from mo group by item, cust, sumactive
+  st as (
+    select item,
+           sum(v) / (select meses from vent) as media,
+           (array_agg(v order by v desc))[least(4, (select meses from vent))] as m4
+    from serie group by item
   )
-  select item, round(sum((sumactive - disruptsum) / (select meses from vent)), 2) as proy_cajas
-  from disr group by item;
+  select item,
+         round(case when (select meses from vent) <= 6 then greatest(media, coalesce(m4, 0)) else media end, 2) as proy_cajas
+  from st;
 $fn$;
 
 create or replace function public._fn_proy_window(p_meses int)
