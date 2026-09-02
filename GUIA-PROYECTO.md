@@ -12,7 +12,65 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-01 · Versión app al documentar: **v12.32**
+> Última actualización: 2026-09-02 · Versión app al documentar: **v12.33**
+>
+> Nota **v12.33** — **Extracto banco: quinta pestaña del overlay 💰 Deuda/Cobranzas,
+> primer paso real hacia cobros automáticos por CUIT.** Objetivo final del usuario:
+> que el extracto bancario de Interbanking se lea solo y acredite los cobros contra
+> Deudores sin intervención manual. Investigado (2026-09-01/02): Interbanking SÍ
+> tiene una API REST oficial para esto (`developers.interbanking.com.ar`, producto
+> "Extractos"/"Consulta de Movimientos", OAuth2) — pero el registro de desarrollador
+> está **cerrado al autoservicio** ("La incorporación de autoservicio está
+> inhabilitada para este sitio"), hace falta que Interbanking lo habilite a mano
+> (pedido en curso vía el chat de ayuda → InterAPIs → Ayuda en el ingreso →
+> Chatear con una persona, fuera de horario al momento de escribir esto). Mientras
+> se espera esa habilitación, se armó el mismo pipeline que va a usar la API el día
+> de mañana, pero alimentado A MANO: un supervisor exporta el extracto desde
+> Interbanking (Consultas → Extracto de cuenta → Excel) y lo sube en esta pestaña.
+>
+> **Backend** (`sql/banco_movimientos.sql`): tabla `banco_movimientos` (un
+> movimiento = una fila, `cuit_norm` normalizado igual que `deudor_id` en
+> Deudores) con dedupe real (índice único sobre cuenta+fecha+concepto+
+> comprobante+importe+descripción+cod op — resubir un período superpuesto no
+> duplica). `banco_movimientos_importar(...)` (alta en lote desde el Excel ya
+> parseado en el navegador), `banco_movimientos_pendientes(...)` (CREDITOS con
+> CUIT sin aplicar, con el deudor que matchea al frente si existe),
+> `banco_movimiento_aplicar(...)` (acredita como `deuda_cobros` general y marca
+> el movimiento usado — no se puede aplicar dos veces), `banco_movimiento_
+> ignorar(...)` (para lo que no es un cobro real, ej. transferencias entre
+> cuentas propias). Las 3 de escritura piden `es_supervisor_virgilio()` (v12.32).
+>
+> **Formato real del extracto** (verificado con un export real de Santander Río
+> vía Interbanking, cuenta de Tierra Nativa SA — empresa de prueba, no
+> Loekemeyer todavía): cabecera de metadata + tabla `Concepto/Cod.Op. | Fecha |
+> Comprobante | Sucursal | Importe | Descripción | Cod.Op.Bco. | CUIT |
+> Denominación | Saldo`. **El CUIT SOLO viene poblado en los `CREDITOS`**
+> (transferencias recibidas) — todo lo demás (impuestos, comisiones,
+> extracciones Banelco) lo trae vacío, así que el cruce sólo mira esas filas.
+>
+> **Validación real fuerte**: el CUIT de Tierra Nativa (30710305362) matcheó
+> con un cliente REAL de Loekemeyer ya cargado en `isis_lk` (cód. 3878, mismo
+> nombre) — confirma que el cruce por CUIT funciona de punta a punta contra
+> datos reales, no sólo en teoría. Como esos movimientos eran transferencias
+> entre cuentas propias de Tierra Nativa (no un cobro real de un cliente),
+> sirvieron también para probar el botón "Ignorar": aplicarlos de más dejó al
+> cliente con saldo **negativo** (-$2.500.000, en una transacción de prueba
+> con rollback) — la razón de que "Aplicar" e "Ignorar" sean decisiones
+> humanas y no automáticas todavía.
+>
+> **Front** (`index.html`): reusa el loader de SheetJS que ya tiene la PPP
+> (`pppLoadXlsx()` → `vendor/xlsx.full.min.js`, sin CDN externo). El parser
+> (`bancoParsearExtracto`) ubica la fila de encabezados por texto
+> ("Concepto/Cod.Op.") en vez de por número de fila fijo, así tolera que el
+> tamaño de la cabecera de metadata cambie. Pestaña con: input de archivo +
+> nombre de banco, resumen (cuántos matchean vs sin cliente conocido), tabla
+> con botones ✅ Aplicar / 🚫 Ignorar por fila.
+>
+> **Pendiente real**: el acceso a la API sigue sin confirmar del lado de
+> Interbanking — hasta que llegue, este flujo manual es el camino. Cuando
+> llegue, el reemplazo es sólo un cron/Edge Function que llame a
+> `banco_movimientos_importar` con `origen='api'` en vez del botón — nada del
+> resto del módulo cambia.
 >
 > Nota **v12.32** — **Gate real de backend para las 4 RPC que escriben dinero**
 > (`deuda_registrar_cobro`, `deuda_anular_cobro`, `facturable_anticipado_reservar`,

@@ -6524,7 +6524,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.32";
+const APP_VERSION = "v12.33";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -35722,6 +35722,150 @@ async function anticipadoVerDetalle(np) {
 }
 window.anticipadoVerDetalle = anticipadoVerDetalle;
 
+/* ============================================================================
+   PESTAÑA: EXTRACTO BANCO (2026-09-02) — mientras no esté el acceso a la API
+   de Interbanking, un supervisor sube a mano el .xlsx que exporta Interbanking
+   (Consultas → Extracto de cuenta). Parsea en el navegador con SheetJS
+   (mismo loader que usa la PPP, vendor/xlsx.full.min.js) y manda las filas ya
+   limpias a banco_movimientos_importar (dedupe server-side, no duplica si se
+   re-sube un período superpuesto). Sólo importan los CREDITOS con CUIT — el
+   resto (impuestos, comisiones, extracciones) el banco no lo cruza con nada.
+   Backend: sql/banco_movimientos.sql. El día que llegue la API, este mismo
+   flujo se reemplaza por un cron/Edge Function que llama a la misma RPC de
+   importar — nada de esto cambia.
+   ============================================================================ */
+function bancoParsearExtracto(rows) {
+  var cuenta = "";
+  for (var i = 0; i < rows.length; i++) {
+    if (String((rows[i] || [])[0] || "").trim() === "Tipo y Nro. de Cuenta") { cuenta = String(rows[i][1] || "").trim(); break; }
+  }
+  var headerIdx = -1;
+  for (var i = 0; i < rows.length; i++) {
+    if (String((rows[i] || [])[0] || "").trim() === "Concepto/Cod.Op.") { headerIdx = i; break; }
+  }
+  if (headerIdx === -1) return { cuenta: cuenta, filas: [], error: "No encontré la fila de encabezados (\"Concepto/Cod.Op.\") — ¿es un extracto de Interbanking exportado a Excel?" };
+  var filas = [];
+  for (var i = headerIdx + 1; i < rows.length; i++) {
+    var r = rows[i] || [];
+    var concepto = String(r[0] || "").trim();
+    var fechaStr = String(r[1] || "").trim();
+    var importeRaw = r[4];
+    if (!concepto || !fechaStr || importeRaw === "" || importeRaw == null || isNaN(Number(importeRaw))) continue;   // fila "Saldo Inicial"/"Saldo Final"/vacía
+    var m = fechaStr.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+    if (!m) continue;
+    var saldoRaw = r[9];
+    filas.push({
+      fecha: m[3] + "-" + m[2] + "-" + m[1],
+      concepto: concepto,
+      comprobante: String(r[2] || "").trim(),
+      sucursal: String(r[3] || "").trim(),
+      importe: Number(importeRaw),
+      descripcion: String(r[5] || "").trim(),
+      cod_op_bco: String(r[6] || "").trim(),
+      cuit: String(r[7] || "").trim(),
+      denominacion: String(r[8] || "").trim(),
+      saldo: (saldoRaw === "" || saldoRaw == null || isNaN(Number(saldoRaw))) ? null : Number(saldoRaw)
+    });
+  }
+  return { cuenta: cuenta, filas: filas };
+}
+async function bancoImportarArchivo(file) {
+  if (!requireSupervisor()) return;
+  var out = document.getElementById("bancoImportMsg");
+  if (out) out.textContent = "Leyendo " + file.name + "…";
+  try {
+    var XLSX = await pppLoadXlsx();
+    var buf = await file.arrayBuffer();
+    var wb = XLSX.read(buf, { type: "array" });
+    var ws = wb.Sheets[wb.SheetNames[0]];
+    var rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: "" });
+    var parsed = bancoParsearExtracto(rows);
+    if (parsed.error) { if (out) out.textContent = "⚠ " + parsed.error; return; }
+    if (!parsed.filas.length) { if (out) out.textContent = "No encontré movimientos en el archivo."; return; }
+    var bancoNombre = (document.getElementById("bancoBancoNombre") || {}).value || null;
+    var r = await sb.rpc("banco_movimientos_importar", {
+      p_cuenta: parsed.cuenta || "SIN_CUENTA", p_banco: bancoNombre, p_filas: parsed.filas,
+      p_archivo_nombre: file.name, p_creado_por: _faltMiLegajo() || null
+    });
+    if (r.error) { if (out) out.textContent = "Error: " + r.error.message; return; }
+    var res = (r.data && r.data[0]) || {};
+    if (out) out.textContent = "✓ " + file.name + " (cuenta " + (parsed.cuenta || "?") + "): " + (res.insertados || 0) + " nuevo(s) · " + (res.duplicados || 0) + " ya estaban.";
+    bancoRefresh();
+  } catch (e) {
+    if (out) out.textContent = "Error leyendo el Excel: " + (e.message || e);
+  }
+}
+window.bancoImportarArchivo = bancoImportarArchivo;
+
+var _bancoState = { rows: [], q: "" };
+async function bancoRefresh() {
+  var cont = document.getElementById("bancoTabla");
+  if (cont) cont.innerHTML = '<div style="padding:20px;color:#64748b;">Cargando…</div>';
+  var r = await sb.rpc("banco_movimientos_pendientes", { p_q: _bancoState.q || null, p_limit: 200, p_offset: 0 });
+  if (r.error) { if (cont) cont.innerHTML = '<div style="padding:20px;color:#b91c1c;">Error: ' + r.error.message + '</div>'; return; }
+  _bancoState.rows = r.data || [];
+  bancoRender();
+}
+window.bancoRefresh = bancoRefresh;
+
+function bancoRender() {
+  var cont = document.getElementById("bancoTabla");
+  var res = document.getElementById("bancoResumen");
+  if (!cont) return;
+  var rows = _bancoState.rows;
+  var nMatch = rows.filter(function (r) { return r.deudor_id; }).length;
+  if (res) res.innerHTML = '<b>' + rows.length + '</b> movimiento(s) de crédito con CUIT pendientes de revisar · ' +
+    '<span style="color:#059669;">' + nMatch + ' matchean con un deudor</span> · ' +
+    '<span style="color:#64748b;">' + (rows.length - nMatch) + ' sin cliente conocido (transferencias propias, etc. — ignorar)</span>';
+  if (!rows.length) { cont.innerHTML = '<div style="padding:20px;color:#64748b;text-align:center;">Sin movimientos pendientes. Subí un extracto arriba.</div>'; return; }
+  var h = '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">' +
+    '<thead style="background:#f1f5f9;"><tr>' +
+      '<th style="padding:8px;text-align:left;border-bottom:1px solid #cbd5e1;">Fecha</th>' +
+      '<th style="padding:8px;text-align:right;border-bottom:1px solid #cbd5e1;">Importe</th>' +
+      '<th style="padding:8px;text-align:left;border-bottom:1px solid #cbd5e1;">CUIT / Denominación (banco)</th>' +
+      '<th style="padding:8px;text-align:left;border-bottom:1px solid #cbd5e1;">Cliente matcheado</th>' +
+      '<th style="padding:8px;border-bottom:1px solid #cbd5e1;"></th>' +
+    '</tr></thead><tbody>';
+  h += rows.map(function (r) {
+    var match = r.deudor_id
+      ? '<b>' + (r.deudor_razon_social || r.deudor_id) + '</b> <span style="color:#64748b;font-size:11px;">(saldo hoy ' + _fmtPlata(r.deudor_saldo) + ')</span>'
+      : '<span style="color:#94a3b8;">sin cliente conocido con este CUIT</span>';
+    return '<tr>' +
+      '<td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;">' + (r.fecha || '') + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;text-align:right;color:#059669;font-weight:bold;">' + _fmtPlata(r.importe) + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;font-size:12px;">' + (r.cuit || '') + ' — ' + (r.denominacion || '') + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;">' + match + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;text-align:center;white-space:nowrap;">' +
+        (r.deudor_id ? '<button onclick="bancoAplicar(' + r.id + ')" style="padding:4px 8px;background:#059669;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px;margin-right:4px;">✅ Aplicar</button>' : '') +
+        '<button onclick="bancoIgnorar(' + r.id + ')" style="padding:4px 8px;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:4px;cursor:pointer;font-size:12px;">🚫 Ignorar</button>' +
+      '</td>' +
+    '</tr>';
+  }).join("");
+  h += '</tbody></table></div>';
+  cont.innerHTML = h;
+}
+window.bancoRender = bancoRender;
+
+async function bancoAplicar(id) {
+  if (!requireSupervisor()) return;
+  var row = _bancoState.rows.find(function (x) { return x.id === id; });
+  if (!confirm('¿Aplicar ' + (row ? _fmtPlata(row.importe) : '') + ' como cobro de ' + (row ? (row.deudor_razon_social || row.deudor_id) : '') + '?')) return;
+  var r = await sb.rpc("banco_movimiento_aplicar", { p_movimiento_id: id, p_creado_por: _faltMiLegajo() || null });
+  if (r.error) { alert("Error: " + r.error.message); return; }
+  bancoRefresh();
+}
+window.bancoAplicar = bancoAplicar;
+
+async function bancoIgnorar(id) {
+  if (!requireSupervisor()) return;
+  var motivo = prompt("¿Por qué se ignora este movimiento? (ej: transferencia entre cuentas propias)", "");
+  if (motivo == null) return;
+  var r = await sb.rpc("banco_movimiento_ignorar", { p_movimiento_id: id, p_motivo: motivo || null, p_por: _faltMiLegajo() || null });
+  if (r.error) { alert("Error: " + r.error.message); return; }
+  bancoRefresh();
+}
+window.bancoIgnorar = bancoIgnorar;
+
 /* ---------- Pantalla unificada: Deuda a cobrar + Cobranzas (valor por NP) + Cruce Facturación + Facturable ya ----------
    Un solo botón / una sola pantalla con 4 pestañas. Reusa la lógica existente:
    pestaña "Deuda" = deudaRefresh/deudaRender; pestaña "Valor por NP" = cobLoad/cobRender.
@@ -35745,6 +35889,7 @@ async function openCobros(tab) {
         '<button id="cobrosTabCob" onclick="cobrosSetTab(\'cob\')">💵 Valor por NP</button>' +
         '<button id="cobrosTabCruce" onclick="cobrosSetTab(\'cruce\')">🔍 Facturación vs ISIS</button>' +
         '<button id="cobrosTabAnticipado" onclick="cobrosSetTab(\'anticipado\')">📦 Facturable ya</button>' +
+        '<button id="cobrosTabBanco" onclick="cobrosSetTab(\'banco\')">🏦 Extracto banco</button>' +
       '</div>' +
       '<button onclick="cobrosClose()" style="margin-left:auto;background:#dc2626;color:#fff;border:none;border-radius:8px;padding:7px 16px;font-weight:800;cursor:pointer;">Cerrar</button>' +
     '</div>' +
@@ -35753,13 +35898,14 @@ async function openCobros(tab) {
 }
 window.openCobros = openCobros;
 function cobrosSetTab(tab) {
-  _cobrosTab = (tab === "cob") ? "cob" : (tab === "cruce") ? "cruce" : (tab === "anticipado") ? "anticipado" : "deuda";
+  _cobrosTab = (tab === "cob") ? "cob" : (tab === "cruce") ? "cruce" : (tab === "anticipado") ? "anticipado" : (tab === "banco") ? "banco" : "deuda";
   var bd = document.getElementById("cobrosBody"); if (!bd) return;
-  var td = document.getElementById("cobrosTabDeuda"), tc = document.getElementById("cobrosTabCob"), tx = document.getElementById("cobrosTabCruce"), ta = document.getElementById("cobrosTabAnticipado");
+  var td = document.getElementById("cobrosTabDeuda"), tc = document.getElementById("cobrosTabCob"), tx = document.getElementById("cobrosTabCruce"), ta = document.getElementById("cobrosTabAnticipado"), tbk = document.getElementById("cobrosTabBanco");
   if (td) td.style.cssText = _cobrosTabCss(_cobrosTab === "deuda");
   if (tc) tc.style.cssText = _cobrosTabCss(_cobrosTab === "cob");
   if (tx) tx.style.cssText = _cobrosTabCss(_cobrosTab === "cruce");
   if (ta) ta.style.cssText = _cobrosTabCss(_cobrosTab === "anticipado");
+  if (tbk) tbk.style.cssText = _cobrosTabCss(_cobrosTab === "banco");
   if (_cobrosTab === "anticipado") {
     bd.innerHTML =
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:8px;flex-wrap:wrap;">' +
@@ -35813,6 +35959,24 @@ function cobrosSetTab(tab) {
       '<div id="deudaResumen" style="margin-bottom:10px;color:#64748b;font-size:13px;">Cargando…</div>' +
       '<div id="deudaTabla"></div>';
     deudaRefresh();
+  } else if (_cobrosTab === "banco") {
+    bd.innerHTML =
+      '<h1 style="margin:0 0 8px;font-size:20px;">🏦 Extracto banco</h1>' +
+      '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;margin-bottom:12px;">' +
+        '<b>Importar extracto de Interbanking</b> <span style="color:#94a3b8;font-size:12px;">(Consultas → Extracto de cuenta → exportar Excel)</span><br>' +
+        '<input id="bancoBancoNombre" value="Santander Rio" placeholder="Banco" style="padding:6px;font-size:13px;border:1px solid #cbd5e1;border-radius:6px;margin-top:8px;margin-right:8px;width:160px;">' +
+        '<input id="bancoFileInput" type="file" accept=".xlsx,.xls" style="margin-top:8px;">' +
+        '<div id="bancoImportMsg" style="margin-top:8px;font-size:12.5px;color:#64748b;"></div>' +
+      '</div>' +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">' +
+        '<input id="bancoQ" placeholder="🔎 CUIT / razón social" style="padding:8px;font-size:14px;border:1px solid #cbd5e1;border-radius:6px;min-width:200px;" oninput="_bancoState.q=this.value;clearTimeout(window._bancoQT);window._bancoQT=setTimeout(function(){bancoRefresh();},400);">' +
+        '<button onclick="bancoRefresh()" style="padding:8px 12px;background:#1e6bd6;color:#fff;border:none;border-radius:6px;cursor:pointer;">↻ Refrescar</button>' +
+      '</div>' +
+      '<div id="bancoResumen" style="margin-bottom:10px;color:#64748b;font-size:13px;">Cargando…</div>' +
+      '<div id="bancoTabla"></div>';
+    var _bancoFi = document.getElementById("bancoFileInput");
+    if (_bancoFi) _bancoFi.onchange = function () { if (this.files && this.files[0]) bancoImportarArchivo(this.files[0]); };
+    bancoRefresh();
   } else {
     _cob = { emp: "todos", q: "", rows: [], view: "list", det: null };
     bd.innerHTML = '<div id="cobBody"><div style="text-align:center;color:#94a3b8;padding:24px;">Cargando…</div></div>';
