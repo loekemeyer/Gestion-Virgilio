@@ -108,9 +108,12 @@ insert into public.cobranzas_super_cadena (super_key,label,item_discount,usa_lis
  ('diarco','Diarco',0.10,false),('dorinka','Dorinka (Walmart)',0,false),('inc','Carrefour (INC)',0,false),
  ('laanonima','La Anónima',0.19,false),('libertad','Libertad',0,false),('messina','Messina Hnos',0,true),
  ('toledo','Supermercados Toledo',0,false),
- -- v12.37: distribuidora con lista propia (no supermercado, mismo mecanismo). Lista cargada
- -- a mano desde Excel del ERP (vta_listaprecios.xls), no espeja de LK. item_discount=0.
- ('gm','Distribuidora GM S.R.L.',0,false)
+ -- v12.37: distribuidoras/clientes con lista propia (no supermercado, mismo mecanismo). Listas
+ -- cargadas a mano desde Excel del ERP, no espejan de LK. item_discount=0.
+ ('gm','Distribuidora GM S.R.L.',0,false),
+ -- 'gigot' = Gigot Cosméticos (el ERP la llama "34 Lista Gigot"); el cliente la llama "Matiz".
+ -- cod lk 5000. Lista parcial (2 ítems, códigos 5 dígitos). cod 5000 no factura por Virgilio hoy.
+ ('gigot','Gigot Cosméticos (Matiz)',0,false)
 on conflict (super_key) do update set label=excluded.label, item_discount=excluded.item_discount, usa_lista_general=excluded.usa_lista_general;
 
 -- Mapeo cliente → cadena (cod_cliente_lk 9xxxx / cod_cliente_chef 4xxxx):
@@ -118,7 +121,7 @@ insert into public.cobranzas_cliente_cadena (empresa,cod_cliente,super_key) valu
  ('lk','4051','abastecedor'),('lk','2320','alberdi'),('lk','801','coto'),('lk','3947','dia'),
  ('lk','4112','diarco'),('lk','1651','inc'),('lk','771','laanonima'),('lk','325','libertad'),
  ('lk','1573','messina'),('lk','1947','toledo'),('ch','2444','cencosud'),('ch','2686','dorinka'),
- ('lk','4080','gm')
+ ('lk','4080','gm'),('lk','5000','gigot')
 on conflict (empresa,cod_cliente) do update set super_key=excluded.super_key;
 
 -- v12.37: lista de Distribuidora GM (super_key 'gm'). Origen: Excel del ERP
@@ -137,6 +140,19 @@ from (values
  ('504',10170),('508',17340),('510',6000),('516',59500),('523',57660),
  ('529E',19680),('544',12840),('546',18900),('561',29940),('562',15840),
  ('581',10380),('587',12060)) g(cod,pcaja)
+left join (select public.cob_norm_cod(cod) nc, max(uxb) uxb from public.cob_uxb_lk group by 1) u
+       on u.nc = public.cob_norm_cod(g.cod)
+left join lateral (select uxb from public.cobranzas_precios p where p.empresa='lk' and p.nc=public.cob_norm_cod(g.cod) limit 1) cp on true
+left join public.precios_venta pv on public.canon_cod(pv.cod)=public.canon_cod(g.cod)
+where g.pcaja > 0
+on conflict (super_key,cod) do update set price=excluded.price;
+
+-- v12.37: lista de Gigot Cosméticos (Matiz), super_key 'gigot'. Origen: Excel del ERP
+-- ("34 Lista Gigot"), precio POR CAJA → por unidad. Lista PARCIAL (2 ítems). cod lk 5000 no
+-- factura por Virgilio hoy, así que no tiene efecto todavía; queda preparada. Mismo cálculo de uxb.
+insert into public.precios_super_lk (super_key, cod, price)
+select 'gigot', g.cod, round(g.pcaja / coalesce(u.uxb, cp.uxb, pv.uxb, 1)::numeric, 6)
+from (values ('55215Z',23880),('55289',20280)) g(cod,pcaja)
 left join (select public.cob_norm_cod(cod) nc, max(uxb) uxb from public.cob_uxb_lk group by 1) u
        on u.nc = public.cob_norm_cod(g.cod)
 left join lateral (select uxb from public.cobranzas_precios p where p.empresa='lk' and p.nc=public.cob_norm_cod(g.cod) limit 1) cp on true
