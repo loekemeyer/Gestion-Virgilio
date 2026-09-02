@@ -6524,7 +6524,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.45";
+const APP_VERSION = "v12.46";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -14035,10 +14035,19 @@ var STK_POP_CSS =
   ".proyv-chart{display:flex;flex-direction:column;gap:6px;}" +
   ".proyv-row{display:flex;align-items:center;gap:9px;}" +
   ".proyv-mes{flex:0 0 52px;font-size:12px;font-weight:800;color:#475569;text-transform:capitalize;}" +
-  ".proyv-track{flex:1 1 auto;height:20px;background:#f1f5f9;border-radius:6px;overflow:hidden;}" +
+  ".proyv-track{flex:1 1 auto;height:20px;background:#f1f5f9;border-radius:6px;overflow:hidden;position:relative;}" +
   ".proyv-bar{display:block;height:100%;background:linear-gradient(90deg,#8b5cf6,#6d28d9);border-radius:6px;}" +
   ".proyv-val{flex:0 0 auto;min-width:42px;text-align:right;font-size:12.5px;font-weight:800;color:#4c1d95;font-variant-numeric:tabular-nums;}" +
-  ".proyv-foot{margin-top:10px;font-size:12px;color:#334155;line-height:1.5;border-top:1px dashed #cbd5e1;padding-top:8px;}";
+  ".proyv-foot{margin-top:10px;font-size:12px;color:#334155;line-height:1.5;border-top:1px dashed #cbd5e1;padding-top:8px;}" +
+  /* v12.46 — gráfico de tendencia + marca de la proyección en las barras (idea 5766) */
+  ".proyv-svg{display:block;width:100%;height:auto;}" +
+  ".proyv-leg{display:flex;flex-wrap:wrap;gap:3px 12px;margin:2px 0 0 2px;font-size:10.5px;color:#475569;}" +
+  ".proyv-leg span{display:inline-flex;align-items:center;gap:5px;}" +
+  ".proyv-leg i{display:inline-block;width:16px;height:3px;border-radius:2px;}" +
+  ".proyv-leg i.dash{background:repeating-linear-gradient(90deg,#6d28d9 0 5px,transparent 5px 8px);}" +
+  ".proyv-leg i.dot{background:repeating-linear-gradient(90deg,#94a3b8 0 2px,transparent 2px 5px);}" +
+  ".proyv-bar.bajo{background:linear-gradient(90deg,#f87171,#dc2626);}" +
+  ".proyv-mark{position:absolute;top:0;bottom:0;width:0;border-left:2px dashed #4c1d95;pointer-events:none;}";
 /* v11.70 — `wide`: tarjeta ancha (hasta 1340px) para los pop-ups con tablas de muchas
    columnas (Importación). Los demás llaman con 2 argumentos y quedan igual que siempre. */
 function _stkPopShell(title, bodyId, wide) {
@@ -14049,15 +14058,70 @@ function _stkPopShell(title, bodyId, wide) {
   ov.innerHTML = '<div class="stkpop-card' + (wide ? ' wide' : '') + '"><div class="stkpop-head"><span class="stkpop-title">' + title + '</span><button class="stkpop-close" onclick="stkPopClose()">Cerrar</button></div><div class="stkpop-body" id="' + bodyId + '"></div></div>';
 }
 function stkPopClose() { const ov = document.getElementById("stkPopModal"); if (ov) ov.classList.remove("show"); _stkPop = null; }
-/* v11.48 — Pop-up "de dónde surge la proyección": al tocar el número de PROY. CAJ/MES muestra
-   la explicación del cálculo + las CAJAS FACTURADAS reales de los últimos 6 meses (fuente: ventas
-   sales_lines de PáginaLK, las mismas que alimentan la proyección). Cruce backend: RPC de Virgilio
-   `ventas_mensuales_cod` → http a LK `fn_ventas_mensuales_virgilio`. La proyección NO es el promedio
-   simple de las barras: se calcula por CLIENTE (desde su 1ª compra) descartando meses-pico. */
+/* v11.48 — Pop-up "de dónde surge la proyección": al tocar el número de PROY. CAJ/MES muestra las
+   CAJAS FACTURADAS reales (fuente: ventas sales_lines de PáginaLK, las mismas que alimentan la
+   proyección). Cruce backend: RPC de Virgilio `ventas_mensuales_cod` → http a LK
+   `fn_ventas_mensuales_virgilio` (rellena con 0 los meses sin venta, así siempre vuelven N filas).
+   v12.46 (idea 5766) — se reemplazó el texto explicativo por un GRÁFICO: tendencia de 12 meses
+   (línea + área, SVG inline sin librerías) con la proyección y el promedio simple de la ventana como
+   líneas de referencia, la ventana de 6 meses sombreada y cada mes coloreado según quede por encima
+   (violeta) o por debajo (rojo) de la proyección. Abajo, las barras de la ventana de 6 meses llevan
+   la marca vertical de la proyección y el pie dice cuántos meses quedan por encima. La regla de
+   cálculo vive en LK (`fn_proy_descarte`, ver GUIA-PROYECTO.md 2026-09-02); acá sólo se dibuja. */
 var _STK_MES_ABR = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
 function _stkFmtMes(ym) {
   var m = String(ym || "").match(/^(\d{4})-(\d{2})$/); if (!m) return String(ym || "");
   return _STK_MES_ABR[parseInt(m[2], 10) - 1] + " " + m[1].slice(2);
+}
+/* Gráfico de tendencia: rows = [{mes:'YYYY-MM', cajas}], proyN = proyección caj/mes, prom = promedio
+   simple de la ventana. Devuelve el HTML del bloque (SVG + leyenda). Sin dependencias. */
+function _stkProyTrendSvg(rows, proyN, prom) {
+  var n = rows.length; if (n < 2) return "";
+  var W = 340, H = 134, L = 10, R = 54, T = 12, B = 24, iw = W - L - R, ih = H - T - B;
+  var vals = rows.map(function (x) { return x.cajas; });
+  var ymax = Math.max.apply(null, vals.concat([proyN, prom, 1])) * 1.08;
+  var xs = function (i) { return L + i * iw / (n - 1); };
+  var ys = function (v) { return T + ih - (v / ymax) * ih; };
+  var f1 = function (v) { return v.toFixed(1); };
+  var pts = rows.map(function (x, i) { return f1(xs(i)) + "," + f1(ys(x.cajas)); });
+  var line = "M" + pts.join(" L");
+  var area = line + " L" + f1(xs(n - 1)) + "," + f1(T + ih) + " L" + f1(xs(0)) + "," + f1(T + ih) + " Z";
+  var w0 = Math.max(0, n - 6);
+  var s = '<svg class="proyv-svg" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Tendencia de ventas y proyección">';
+  if (n > 6) {
+    s += '<rect x="' + f1(xs(w0)) + '" y="' + T + '" width="' + f1(xs(n - 1) - xs(w0)) + '" height="' + ih + '" rx="3" fill="#ddd6fe" opacity=".45"/>';
+    s += '<text x="' + f1(xs(w0) + 3) + '" y="' + (T + ih - 4) + '" font-size="8" font-weight="800" fill="#6d28d9">ventana 6m</text>';
+  }
+  s += '<line x1="' + L + '" y1="' + f1(T + ih) + '" x2="' + (L + iw) + '" y2="' + f1(T + ih) + '" stroke="#e2e8f0"/>';
+  s += '<path d="' + area + '" fill="#8b5cf6" opacity=".13"/>';
+  s += '<path d="' + line + '" fill="none" stroke="#6d28d9" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>';
+  // Líneas de referencia. Si las etiquetas quedan muy juntas, se separan.
+  var yP = proyN > 0.05 ? ys(proyN) : null, yM = prom > 0 ? ys(prom) : null;
+  var lyP = yP, lyM = yM;
+  if (yP !== null && yM !== null && Math.abs(yP - yM) < 11) { if (yM < yP) lyM = yP - 11; else lyM = yP + 11; }
+  if (yM !== null) {
+    s += '<line x1="' + L + '" x2="' + (L + iw) + '" y1="' + f1(yM) + '" y2="' + f1(yM) + '" stroke="#94a3b8" stroke-width="1" stroke-dasharray="2 3"/>';
+    s += '<text x="' + (L + iw + 4) + '" y="' + f1(lyM + 3.5) + '" font-size="9" fill="#64748b">prom ' + Math.round(prom) + '</text>';
+  }
+  if (yP !== null) {
+    s += '<line x1="' + L + '" x2="' + (L + iw) + '" y1="' + f1(yP) + '" y2="' + f1(yP) + '" stroke="#6d28d9" stroke-width="1.6" stroke-dasharray="5 3"/>';
+    s += '<text x="' + (L + iw + 4) + '" y="' + f1(lyP + 3.5) + '" font-size="9" font-weight="800" fill="#6d28d9">proy ' + Math.round(proyN) + '</text>';
+  }
+  rows.forEach(function (x, i) {
+    var bajo = proyN > 0.05 && x.cajas < proyN;
+    s += '<circle cx="' + f1(xs(i)) + '" cy="' + f1(ys(x.cajas)) + '" r="3.3" fill="' + (bajo ? "#dc2626" : "#6d28d9") + '" stroke="#fff" stroke-width="1.3"/>';
+    var m = String(x.mes).match(/^(\d{4})-(\d{2})$/);
+    s += '<text x="' + f1(xs(i)) + '" y="' + (H - 8) + '" font-size="8.5" text-anchor="middle" fill="' + (i >= w0 ? "#4c1d95" : "#94a3b8") + '"' + (i >= w0 ? ' font-weight="800"' : '') + '>' + (m ? _STK_MES_ABR[parseInt(m[2], 10) - 1] : "") + '</text>';
+  });
+  s += '</svg>';
+  s += '<div class="proyv-leg">' +
+       '<span><i style="background:#6d28d9"></i>venta mensual</span>' +
+       '<span><i class="dash"></i>proyección</span>' +
+       '<span><i class="dot"></i>promedio 6m</span>' +
+       '<span><i style="background:#dc2626;width:8px;height:8px;border-radius:50%"></i>mes por debajo</span></div>';
+  var d0 = _stkFmtMes(rows[0].mes), d1 = _stkFmtMes(rows[n - 1].mes);
+  return '<div class="stkpop-grp" style="background:#faf5ff;border-color:#e9d5ff;padding:8px 8px 6px;">' +
+         '<div style="font-size:12px;font-weight:800;color:#4c1d95;margin:0 0 2px 2px;">📈 Tendencia — ' + escapeHtml(d0) + ' → ' + escapeHtml(d1) + '</div>' + s + '</div>';
 }
 async function stkShowProyVentas(codEnc, proy) {
   var cod = decodeURIComponent(codEnc);
@@ -14069,13 +14133,13 @@ async function stkShowProyVentas(codEnc, proy) {
   var body = document.getElementById("stkPopBody"); if (!body) return;
   var nombre = artNombre(cod, "") || "";
   var fc = function (n) { n = Number(n) || 0; return String(Math.round(n * 10) / 10); };
-  body.innerHTML = '<div class="stkpop-empty">Cargando ventas facturadas de los últimos 6 meses…</div>';
+  body.innerHTML = '<div class="stkpop-empty">Cargando ventas facturadas de los últimos 12 meses…</div>';
   var rows = [];
   try {
     var r = await fetch(SUPABASE_URL + "/rest/v1/rpc/ventas_mensuales_cod", {
       method: "POST",
       headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
-      body: JSON.stringify({ p_cod: codB, p_meses: 6 }), cache: "no-store"
+      body: JSON.stringify({ p_cod: codB, p_meses: 12 }), cache: "no-store"
     });
     if (r.ok) rows = await r.json();
   } catch (_e) {}
@@ -14083,35 +14147,32 @@ async function stkShowProyVentas(codEnc, proy) {
   var proyN = Number(proy) || 0;
   var h = '<div class="stkpop-hint">' + (nombre ? '<b>' + escapeHtml(nombre) + '</b> · ' : '') +
     'Proyección: <b style="color:#6d28d9">' + (proyN > 0.05 ? fc(proyN) : '—') + ' caj/mes</b></div>';
-  // De dónde surge (explicación fija)
-  h += '<div class="stkpop-grp" style="background:#faf5ff;border-color:#e9d5ff">' +
-       '<div style="font-size:12.5px;color:#4c1d95;line-height:1.5;">' +
-       '<b>¿De dónde surge?</b> La proyección es el <b>promedio mensual de cajas facturadas</b> ' +
-       '(ventas reales de PáginaLK, <b>Loeke + Chef</b>) sobre una ventana de <b>6 meses</b> ' +
-       '(si no hay ventas, cae a 12). Se calcula <b>por cliente</b> y se suma. A un pedido puntual muy ' +
-       'por encima del ritmo de ese cliente se le recorta <b>sólo el excedente</b>, y sólo si el cliente ' +
-       'compró en <b>2 o más meses</b> de la ventana: al que compra una vez cada tanto no se le toca nada, ' +
-       'porque no es un pico sino su forma de comprar. Por eso puede diferir del promedio simple de abajo.' +
-       '</div></div>';
-  if (!rows.length) {
-    h += '<div class="stkpop-empty">Sin ventas facturadas en los últimos 6 meses para <b>' + escapeHtml(codCanon(codB)) + '</b>' + (emp ? ' (' + emp + ')' : '') + '.<br><small style="color:#94a3b8">(o el motor de PáginaLK no respondió)</small></div>';
+  if (!rows.length || !rows.some(function (x) { return x.cajas > 0; })) {
+    h += '<div class="stkpop-empty">Sin ventas facturadas en los últimos 12 meses para <b>' + escapeHtml(codCanon(codB)) + '</b>' + (emp ? ' (' + emp + ')' : '') + '.<br><small style="color:#94a3b8">(o el motor de PáginaLK no respondió)</small></div>';
     body.innerHTML = h; return;
   }
-  var tot = rows.reduce(function (s, x) { return s + x.cajas; }, 0);
-  var prom = rows.length ? (tot / rows.length) : 0;
-  var mx = rows.reduce(function (s, x) { return Math.max(s, x.cajas); }, 0) || 1;
-  h += '<div class="stkpop-grp"><div style="font-size:12px;font-weight:800;color:#334155;margin-bottom:8px;">🧾 Cajas facturadas — últimos ' + rows.length + ' meses</div>';
+  var win = rows.slice(-6);                                   // ventana de la proyección
+  var tot = win.reduce(function (s, x) { return s + x.cajas; }, 0);
+  var prom = win.length ? (tot / win.length) : 0;
+  var arriba = win.filter(function (x) { return x.cajas > proyN; }).length;
+  // ── Gráfico de tendencia (12 meses) ──
+  h += _stkProyTrendSvg(rows, proyN, prom);
+  // ── Barras de la ventana (6 meses) con la marca de la proyección ──
+  var mx = Math.max(proyN, win.reduce(function (s, x) { return Math.max(s, x.cajas); }, 0)) || 1;
+  h += '<div class="stkpop-grp"><div style="font-size:12px;font-weight:800;color:#334155;margin-bottom:8px;">🧾 Cajas facturadas — ventana de proyección (' + win.length + ' meses)</div>';
   h += '<div class="proyv-chart">';
-  rows.forEach(function (x) {
+  win.forEach(function (x) {
     var pct = Math.max(2, Math.round(x.cajas / mx * 100));
+    var bajo = proyN > 0.05 && x.cajas < proyN;
     h += '<div class="proyv-row">' +
          '<span class="proyv-mes">' + escapeHtml(_stkFmtMes(x.mes)) + '</span>' +
-         '<span class="proyv-track"><span class="proyv-bar" style="width:' + pct + '%"></span></span>' +
-         '<span class="proyv-val">' + fc(x.cajas) + '</span></div>';
+         '<span class="proyv-track"><span class="proyv-bar' + (bajo ? ' bajo' : '') + '" style="width:' + pct + '%"></span>' +
+         (proyN > 0.05 ? '<span class="proyv-mark" style="left:' + Math.round(proyN / mx * 100) + '%"></span>' : '') + '</span>' +
+         '<span class="proyv-val"' + (bajo ? ' style="color:#b91c1c"' : '') + '>' + fc(x.cajas) + '</span></div>';
   });
   h += '</div>';
   h += '<div class="proyv-foot">Total 6m: <b>' + fc(tot) + '</b> cajas · Promedio simple: <b>' + fc(Math.round(prom)) + '</b> caj/mes' +
-       (proyN > 0.05 ? ' · Proyección (depurada): <b style="color:#6d28d9">' + fc(proyN) + '</b>' : '') + '</div>';
+       (proyN > 0.05 ? ' · Proyección: <b style="color:#6d28d9">' + fc(proyN) + '</b> · <b>' + arriba + ' de ' + win.length + '</b> meses por encima' : '') + '</div>';
   h += '</div>';
   body.innerHTML = h;
 }

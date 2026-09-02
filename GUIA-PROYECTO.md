@@ -1021,6 +1021,19 @@
 > ahora suma `oc_proy: it.proy`. Así el «Pedido» y el contexto (máximo−stock−pedidos) cuadran de la
 > misma foto (ej. cód 104: oc_max 40 − oc_stock 24 = 16 pedido).
 >
+> Nota **2026-09-02 — v12.46 (idea 5766): el pop-up de proyección muestra un gráfico en vez del texto.**
+> El bloque "¿De dónde surge?" (explicación fija de la regla) se reemplazó por un **gráfico de
+> tendencia de 12 meses** (`_stkProyTrendSvg`, SVG inline sin librerías): línea + área de cajas
+> facturadas, la **proyección** (violeta, guiones) y el **promedio simple de la ventana** (gris,
+> puntos) como líneas de referencia, la **ventana de 6 meses sombreada** y cada mes coloreado según
+> quede por encima (violeta) o **por debajo (rojo)** de la proyección. Si las dos etiquetas de
+> referencia quedan a menos de 11 px, se separan. El RPC `ventas_mensuales_cod` ahora se pide con
+> `p_meses: 12` (rellena con 0 los meses sin venta, así siempre vuelven 12). Las barras de abajo
+> muestran sólo la ventana de 6 meses, con la **marca vertical de la proyección** y en rojo los
+> meses por debajo; el pie dice **cuántos de los 6 meses quedan por encima**, que es el chequeo de
+> sanidad que disparó toda la corrección de la proyección. La regla de cálculo sigue viviendo en LK
+> (`fn_proy_descarte`); acá sólo se dibuja. Verificado headless con los datos reales del 505.
+
 > Nota **2026-09-02 — `estadistica_madre` (LK) deja de ser un Excel importado a mano.**
 > Era una tabla que se llenaba desde un Excel con un importador en Análisis Venta Cliente,
 > importada por última vez el **6/5/2026** (294 filas contra 521 del caché), y la leían el panel
