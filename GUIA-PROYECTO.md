@@ -12,7 +12,31 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-02 · Versión app al documentar: **v12.36**
+> Última actualización: 2026-09-02 · Versión app al documentar: **v12.37**
+>
+> Nota **v12.37** — **Facturación: descuento por VOLUMEN por empresa + listas de SÚPER/distribuidora.**
+> Dos arreglos al cálculo del 💵 Neto (`vista_facturacion_neto`, EN VIVO, `sql/facturacion_neto.sql`):
+> **(1) `dto_vol` por `(cod_cliente, EMPRESA)`.** `clientes_dto` pasó a PK compuesta
+> `(cod_cliente, empresa)` y la Edge Function `sync-clientes-dto` ahora trae los DOS padrones
+> (LK `customers.dto_vol` → `'lk'`; Chef `customers.dto_vol` → `'chef'`, vía secreto
+> `CHEF_SERVICE_KEY` — el `customers` de Chef tiene RLS, la publishable key devuelve 0). Antes el
+> join era solo por código y una NP de Chef tomaba por AZAR el descuento del cliente LK con el mismo
+> número (numeraciones independientes). La empresa se deriva de la NP: `^9`=lk, resto=chef. Chef
+> tiene 430 clientes con dto (prom 12%), más fuerte que LK (7,5%).
+> **(2) Clientes de SÚPER/distribuidora se valorizan con su lista negociada**, no con lista general
+> × dto. Si el cliente está en `cobranzas_cliente_cadena` (cadena con lista especial), se usa
+> `cobranzas_precios_super` (que ya aplica `item_discount`), **SIN `dto_vol` y SIN el 2% web** — el
+> súper no paga el descuento web. Por eso el 2% ahora se aplica **por línea** (columna `factor_web`
+> = 1 súper / 0,98 resto) en vez de sobre el subtotal. Artículo fuera de su lista → cae a general.
+> Cadenas con `usa_lista_general=true` (ej. Messina) NO son súper acá: van como cliente normal.
+> Verificado contra ISIS (`isis_lk`/`isis_ch.documentos`): Coto/Diarco/INC/Abastecedor ≈ 0%;
+> **La Anónima** requirió cargar su `item_discount=0.19` en `cobranzas_super_cadena` (quedó ≈ 0%);
+> **GM** (Distribuidora GM S.R.L., cod lk 4080) es una **distribuidora con lista propia** cargada a
+> mano desde el Excel del ERP (por caja → convertida a por-unidad; NP 97890 pasó de −42% a −6,6%,
+> la lista parece ~6% desactualizada). **Pendiente de DATO** (la lógica ya está): Cencosud/Dorinka
+> (súper de Chef) sin lista de artículos cargada → caen a general; Toledo/Alberdi/Día/Libertad con
+> lista pero sin FC para validar. **Salud del cruce (2 meses): 89,3% de las NP matcheadas cuadran
+> ≤5% vs ISIS** (el ISIS parseado arranca en junio 2026; antes no hay con qué comparar).
 >
 > Nota **v12.36** — **Baja de racks → góndola ahora es ATÓMICA (backend).** Antes los
 > dos flujos de operario (`brConfirmar` = orden de racks; `rkbConfirmar` = RKB "De los
