@@ -1044,9 +1044,12 @@
 >   comprar cajas y flejes y fijar máximos de talleristas. Es la tercera estadística madre, viva,
 >   con un número fijo de marzo, y encima cada módulo combina LK y CH distinto (suma / máximo / LK
 >   primero). **Lección:** el catálogo de un proyecto no dice quién lo consume desde otra app; hay
->   que mirar `edge_logs` por `request.path` + `referer`. **Pendiente de decisión:** alimentar esa
->   columna desde `proyeccion_madre.proy_uni_mes` (un solo criterio, sin tocar la app) o migrar la
->   app. **Las tablas quedan**: son la fuente prioritaria de **nombres** de artículo
+>   que mirar `edge_logs` por `request.path` + `referer`. **Resuelto el mismo día:** la columna
+>   **se deriva de `proyeccion_madre.proy_uni_mes`** (`actualizar_e_madre_desde_proyeccion()`,
+>   trigger `AFTER INSERT` a nivel sentencia sobre `proyeccion_madre`, o sea después de cada push
+>   semanal desde LK). `E. Madre LK` recibe el número único LK+Chef y `E. Madre CH` queda en 0 salvo
+>   los códigos que sólo existen ahí, así suma / máximo / LK-primero dan lo mismo. La app no cambió.
+>   Ver `sql/e_madre_desde_proyeccion.sql`. **Las tablas quedan**: son la fuente prioritaria de **nombres** de artículo
 >   (`vista_nombres_articulos`, prioridad `E. Madre LK` > `Articulos Virgilio X Tallerista` >
 >   `OC_Maximos`) — por eso se tocó el 24/08 (alta del 599E). Tienen `comment` que lo dice.
 > - **Virgilio · `refresh_proyeccion_madre()`** borrada: el pull HTTP con la anon key que fallaba en
