@@ -6524,7 +6524,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.36";
+const APP_VERSION = "v12.37";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -7328,21 +7328,28 @@ function empresaDeNp(np) {
   if (isNaN(n)) return "";
   return n > 90000 ? "LK" : "CH";
 }
-function pkCodEmpresa(art, np) {
+function pkCodEmpresa(art, np, empForce) {
   const a = String(art == null ? "" : art).trim().toUpperCase();
-  const emp = empresaDeNp(np);
+  const emp = empForce || empresaDeNp(np);
   if (!a || !emp) return a;
   const G = (typeof window !== "undefined" && window.GONDOLA) ? window.GONDOLA : {};
   const cand = a + " " + emp;
   return G[cand] ? cand : a;
 }
-/* v9.16 — código con "L" final (reenvasado x24, ej. 438EL / 439EL / 957EL): para
-   nosotros es el MISMO artículo que su base (438E / 439E / 957E). La "L" nace del
-   circuito Chef→NC→tallerista (Brian envasa x24) y no debe crear un código aparte.
-   Se pela la L SOLO cuando viene pegada a dígito o "E" (505L, 438EL) — nunca toca
-   " LK"/" CH" (terminan en K/H). Después de pelar, la empresa (LK/CH) la pone
-   pkCodEmpresa por el número de NP, así el ruteo de góndola/stock queda igual que hoy
-   (438EL en NP Chef → 438E → 438E CH) y se tapan los códigos con L sin mapear (957EL). */
+/* v12.37 — código con "L" final (ej. 438EL / 439EL): es un artículo de LOEKEMEYER
+   que VENDE Chef. El pedido entra como NP de Chef, pero el stock se agarra de la
+   góndola de Loeke (438E LK), NO de la de Chef. Confirmado 2026-09-02: NINGÚN código
+   de Loekemeyer termina en "L" (verificado en loke_products, chef_articulos_activos,
+   milver_products, remaps y todo el pipeline), así que "termina en L → empresa LK"
+   es una regla segura y sin excepción. `pkEmpresaArt` fuerza LK para esos códigos y
+   deja que la NP decida el resto; se le pasa a `pkCodEmpresa` como `empForce`. */
+function pkEmpresaArt(codOriginal, np) {
+  const c = String(codOriginal == null ? "" : codOriginal).trim().toUpperCase();
+  return /[0-9E]L$/.test(c) ? "LK" : empresaDeNp(np);
+}
+/* Pela la "L" final SOLO cuando viene pegada a dígito o "E" (505L, 438EL) — nunca
+   toca " LK"/" CH" (terminan en K/H). La empresa la resuelve pkEmpresaArt (arriba),
+   que ya sabe que un código con L va a la góndola Loeke. */
 function pkStripL(cod) {
   return String(cod == null ? "" : cod).trim().toUpperCase().replace(/([0-9E])L$/, "$1");
 }
@@ -8021,7 +8028,7 @@ async function showPickingList(tanda, legajo, opts) {
       const a = {};
       // v7.91 — si la operadora confirmó la corrección de esa NP (secundario→principal),
       // el picking levanta el PRINCIPAL (corrArt) antes de partir por empresa.
-      for (const np of nps) for (const it of (base.get(np) || [])) { const k = pkCodEmpresa(corrArt(pkStripL(it.art), np, corrMap), np); a[k] = (a[k] || 0) + it.cajas; }
+      for (const np of nps) for (const it of (base.get(np) || [])) { const k = pkCodEmpresa(corrArt(pkStripL(it.art), np, corrMap), np, pkEmpresaArt(it.art, np)); a[k] = (a[k] || 0) + it.cajas; }
       return a;
     };
     let agg = aggFrom(pickBase);
@@ -27062,7 +27069,7 @@ function pppChkCompute(lineas, saldos, pendPorArt, maps) {
     const cj = Number(l.cajas) || 0;
     if (!ped || cj <= 0) return;
     const real = equivResolve(ped);
-    const cod = pkCodEmpresa(real, np);
+    const cod = pkCodEmpresa(real, np, pkEmpresaArt(ped, np));
     const k = _ocgNorm(cod);
     if (!need[k]) { need[k] = { k: k, cod: cod, ped: ped, real: real, need: 0, nps: [] }; orden.push(k); }
     need[k].need += cj;
