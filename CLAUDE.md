@@ -214,6 +214,11 @@ Al verificar setea un password temporal aleatorio en el user y el front hace
   en la función Y re-deployar; crear el nuevo user en LK y agregarlo a `admins`.
 - **Sensible: 73 chars rompen bcrypt.** El password temporal usa
   `crypto.randomUUID()` (36 chars). No concatenar dos UUIDs — pasa de 72 y falla.
+- **NO usar `listUsers` para resolver el recipient.** LK tiene >1200 usuarios
+  (clientes del sitio); el admin quedaba fuera de la primera página de 200 → 500
+  en OTP y bridge. La función resuelve el `user_id` con la RPC
+  `get_admin_login_user_id()` (SECURITY DEFINER, solo `service_role`; SQL en
+  `admin/supabase/admin-login-otp/get_admin_login_user_id.sql`).
 - **Acción `bridge` (v12.35):** entrada directa sin OTP desde Producción
   Virgilio. Recibe el `access_token` de la sesión del supervisor de Virgilio
   (`vjwt`), lo valida server-side contra el auth de Virgilio

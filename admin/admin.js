@@ -13709,18 +13709,29 @@ async function _lkOtpFn(action, code, vjwt) {
 async function lkTryBridge() {
   var vjwt = null;
   try { vjwt = sessionStorage.getItem("lk_bridge_vjwt"); } catch (_) {}
-  if (!vjwt) return false;
+  if (!vjwt) { console.log("[bridge] sin token en sessionStorage"); return false; }
   try { sessionStorage.removeItem("lk_bridge_vjwt"); } catch (_) {}
   var statusEl = document.getElementById("authStatus");
   if (statusEl) statusEl.textContent = "Entrando…";
   try {
     var r = await _lkOtpFn("bridge", null, vjwt);
-    if (!r.ok || !r.data || !r.data.tmp_password) return false;
+    console.log("[bridge] respuesta:", r.status, r.data);
+    if (!r.ok || !r.data || !r.data.tmp_password) {
+      var det = (r.data && (r.data.detail || r.data.error)) || ("HTTP " + r.status);
+      if (statusEl) statusEl.textContent = "Entrada directa falló (" + det + "). Usá el código.";
+      return false;
+    }
     var sr = await sb.auth.signInWithPassword({ email: r.data.email, password: r.data.tmp_password });
-    if (sr.error) return false;
+    if (sr.error) {
+      console.log("[bridge] signIn error:", sr.error);
+      if (statusEl) statusEl.textContent = "Entrada directa: login falló (" + sr.error.message + "). Usá el código.";
+      return false;
+    }
     location.reload();
     return true;
   } catch (e) {
+    console.log("[bridge] excepción:", e);
+    if (statusEl) statusEl.textContent = "Entrada directa: error de red. Usá el código.";
     return false;
   }
 }

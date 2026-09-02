@@ -109,12 +109,14 @@ Deno.serve(async (req: Request) => {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    // Resolver user_id del destinatario hardcodeado y chequear que esté en admins.
-    const uq = await admin.auth.admin.listUsers({ page: 1, perPage: 200 });
-    if (uq.error) return jsonResponse({ error: "list_failed", detail: uq.error.message }, 500);
-    const found = (uq.data?.users || []).find((u) => (u.email || "").toLowerCase() === RECIPIENT_EMAIL);
-    if (!found) return jsonResponse({ error: "recipient_not_registered" }, 500);
-    const userId = found.id;
+    // Resolver user_id del destinatario hardcodeado por mail, en O(1). NO usar
+    // listUsers: LK tiene >1200 usuarios y el recipient quedaba fuera de la
+    // primera página → 500. La RPC get_admin_login_user_id() (SECURITY DEFINER,
+    // solo service_role) lee auth.users por índice.
+    const uidRes = await admin.rpc("get_admin_login_user_id");
+    if (uidRes.error) return jsonResponse({ error: "lookup_failed", detail: uidRes.error.message }, 500);
+    if (!uidRes.data) return jsonResponse({ error: "recipient_not_registered" }, 500);
+    const userId = uidRes.data as string;
 
     const isAdmin = await admin.from("admins").select("auth_user_id").eq("auth_user_id", userId).maybeSingle();
     if (isAdmin.error || !isAdmin.data) return jsonResponse({ error: "not_admin" }, 403);
