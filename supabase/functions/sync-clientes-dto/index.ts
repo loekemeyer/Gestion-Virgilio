@@ -1,20 +1,23 @@
 // sync-clientes-dto — refresca public.clientes_dto (dto_vol por cliente) desde los DOS padrones:
-//   1. LK    customers.dto_vol (WEB_SERVICE_KEY, service_role de LK)  -> empresa='lk'
-//   2. Chef  customers.dto_vol (CHEF_KEY, publishable key de Chef)    -> empresa='chef'
+//   1. LK    customers.dto_vol (WEB_SERVICE_KEY, service_role de LK)   -> empresa='lk'
+//   2. Chef  customers.dto_vol (CHEF_SERVICE_KEY, service_role de Chef) -> empresa='chef'
 // Idempotente. Lo dispara pg_cron cada 14 dias (job sync-clientes-dto-14d).
 // clientes_dto tiene PK compuesta (cod_cliente, empresa): las numeraciones de LK y Chef son
 // INDEPENDIENTES (mismo codigo = otro cliente en cada empresa), asi que el dto se resuelve por
 // (codigo, empresa). El join de facturacion deriva la empresa de la NP (^9 = lk, resto = chef).
-// Secrets (ya existentes, los usan arca-wsfe / sync-precios-venta): WEB_SERVICE_KEY = service_role
-// de LK, WEB_SUPABASE_URL = url de LK, CHEF_SUPABASE_URL / CHEF_KEY = url + publishable key de Chef.
-// SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY los inyecta Supabase.
+// ⚠ Chef customers tiene RLS (son datos de clientes): la publishable key devuelve 0 filas. Hay
+// que leerlo con el SERVICE_ROLE de Chef -> CHEF_SERVICE_KEY. NUNCA hardcodear ese key: el repo es
+// publico (GitHub Pages). Va SOLO como secreto en Supabase. Si falta, Chef se saltea (LK sigue).
+// Secrets: WEB_SERVICE_KEY = service_role de LK, WEB_SUPABASE_URL = url de LK, CHEF_SUPABASE_URL =
+// url de Chef, CHEF_SERVICE_KEY = service_role de Chef (agregar a mano). SUPABASE_URL /
+// SUPABASE_SERVICE_ROLE_KEY los inyecta Supabase.
 // verify_jwt = OFF (endpoint interno idempotente; solo pulls -> upsert). Deploy manual/MCP.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 const LK_URL = Deno.env.get("WEB_SUPABASE_URL") || "https://kwkclwhmoygunqmlegrg.supabase.co";
 const LK_KEY = Deno.env.get("WEB_SERVICE_KEY") || "";
 const CHEF_URL = Deno.env.get("CHEF_SUPABASE_URL") || "https://nkhzocgdpwtgrmwleihr.supabase.co";
-const CHEF_KEY = Deno.env.get("CHEF_KEY") || "sb_publishable_aThHtJLBKytg9k_6UdH2Eg_Use7f1zH";
+const CHEF_KEY = Deno.env.get("CHEF_SERVICE_KEY") || "";
 const SB_URL = Deno.env.get("SUPABASE_URL") || "";
 const SB_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const PAGE = 1000;
@@ -63,9 +66,12 @@ Deno.serve(async (_req: Request): Promise<Response> => {
     if (CHEF_KEY) {
       try {
         chef = await fetchDtos(CHEF_URL, CHEF_KEY);
+        if (!chef.size) chefError = "Chef devolvio 0 clientes (¿CHEF_SERVICE_KEY no es service_role? customers tiene RLS)";
       } catch (e) {
         chefError = String((e as Error)?.message || e).slice(0, 200);
       }
+    } else {
+      chefError = "falta CHEF_SERVICE_KEY (secreto en Supabase); Chef salteado";
     }
 
     // ── 3) Filas con empresa; PK compuesta (cod_cliente, empresa) ──
