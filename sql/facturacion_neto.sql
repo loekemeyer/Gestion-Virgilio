@@ -10,6 +10,12 @@
 -- El padrón de descuentos (dto_vol) NO se expone: vive en la vista interna (sin grant
 -- a anon); las vistas públicas y las RPC devuelven solo importes/netos.
 --
+-- v12.36 (2026-09-02): dto_vol se resuelve por (cod_cliente, EMPRESA). clientes_dto
+-- pasó a PK compuesta (cod_cliente, empresa) y sync-clientes-dto trae los DOS padrones
+-- (LK customers.dto_vol → 'lk'; Chef customers.dto_vol → 'chef'). Antes el join era solo
+-- por código y una NP de Chef tomaba por azar el dto del cliente LK con el mismo número
+-- (numeraciones independientes). La empresa se deriva de la NP: ^9 = lk, resto = chef.
+--
 -- Objetos:
 --   vista_facturacion_neto_items  — detalle por ítem CON dto (interna, REVOKE anon).
 --   vista_facturacion_neto        — por NP: neto, neto_original, falto_valor (pública).
@@ -46,7 +52,13 @@ SELECT ent.np,
        (pv.precio_unit IS NULL OR pv.precio_unit <= 0) AS sin_precio,
        ent.cod_canon
 FROM ent
-LEFT JOIN public.clientes_dto  cd ON cd.cod_cliente = ent.cc
+-- dto_vol por (cliente, empresa): numeraciones LK/Chef son INDEPENDIENTES (mismo
+-- codigo = otro cliente en cada empresa), asi que el dto se resuelve por empresa,
+-- derivada de la NP (^9 = lk, resto = chef). Sin el filtro de empresa una NP de
+-- Chef tomaba por casualidad el dto del cliente LK con el mismo numero.
+LEFT JOIN public.clientes_dto  cd
+       ON cd.cod_cliente = ent.cc
+      AND cd.empresa = CASE WHEN ent.np ~ '^9' THEN 'lk' ELSE 'chef' END
 LEFT JOIN public.precios_venta pv ON public.canon_cod(pv.cod) = ent.cod_canon;
 
 REVOKE ALL ON public.vista_facturacion_neto_items FROM anon, authenticated;

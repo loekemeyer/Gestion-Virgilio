@@ -66,7 +66,9 @@ precio as (
          (pv.precio_unit is null or pv.precio_unit <= 0) as sin_precio
   from calc c
   left join public.precios_venta pv on public.canon_cod(pv.cod) = public.canon_cod(c.articulo)
-  left join public.clientes_dto cd on cd.cod_cliente = c.cod_cliente
+  -- dto_vol por (cliente, empresa): LK/Chef tienen numeraciones independientes,
+  -- la empresa ya viaja en c.empresa (derivada de la NP: ^9 = lk, resto = chef).
+  left join public.clientes_dto cd on cd.cod_cliente = c.cod_cliente and cd.empresa = c.empresa
 )
 select
   np, tanda, rs_virgilio, cod_cliente, empresa, fecha_entrega,
@@ -269,7 +271,9 @@ precio as (
          (pv.precio_unit is null or pv.precio_unit <= 0) as sin_precio
   from calc c
   left join public.precios_venta pv on public.canon_cod(pv.cod) = public.canon_cod(c.articulo)
-  left join public.clientes_dto cd on cd.cod_cliente = c.cod_cliente
+  -- dto_vol por (cliente, empresa): LK/Chef tienen numeraciones independientes,
+  -- la empresa ya viaja en c.empresa (derivada de la NP: ^9 = lk, resto = chef).
+  left join public.clientes_dto cd on cd.cod_cliente = c.cod_cliente and cd.empresa = c.empresa
 )
 select
   np, tanda, rs_virgilio, cod_cliente, empresa, fecha_entrega,
