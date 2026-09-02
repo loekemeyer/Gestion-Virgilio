@@ -107,15 +107,42 @@ insert into public.cobranzas_super_cadena (super_key,label,item_discount,usa_lis
  ('cencosud','Cencosud (Jumbo/Disco/Vea)',0,false),('coto','Coto',0,false),('dia','Día',0,false),
  ('diarco','Diarco',0.10,false),('dorinka','Dorinka (Walmart)',0,false),('inc','Carrefour (INC)',0,false),
  ('laanonima','La Anónima',0.19,false),('libertad','Libertad',0,false),('messina','Messina Hnos',0,true),
- ('toledo','Supermercados Toledo',0,false)
+ ('toledo','Supermercados Toledo',0,false),
+ -- v12.37: distribuidora con lista propia (no supermercado, mismo mecanismo). Lista cargada
+ -- a mano desde Excel del ERP (vta_listaprecios.xls), no espeja de LK. item_discount=0.
+ ('gm','Distribuidora GM S.R.L.',0,false)
 on conflict (super_key) do update set label=excluded.label, item_discount=excluded.item_discount, usa_lista_general=excluded.usa_lista_general;
 
 -- Mapeo cliente → cadena (cod_cliente_lk 9xxxx / cod_cliente_chef 4xxxx):
 insert into public.cobranzas_cliente_cadena (empresa,cod_cliente,super_key) values
  ('lk','4051','abastecedor'),('lk','2320','alberdi'),('lk','801','coto'),('lk','3947','dia'),
  ('lk','4112','diarco'),('lk','1651','inc'),('lk','771','laanonima'),('lk','325','libertad'),
- ('lk','1573','messina'),('lk','1947','toledo'),('ch','2444','cencosud'),('ch','2686','dorinka')
+ ('lk','1573','messina'),('lk','1947','toledo'),('ch','2444','cencosud'),('ch','2686','dorinka'),
+ ('lk','4080','gm')
 on conflict (empresa,cod_cliente) do update set super_key=excluded.super_key;
+
+-- v12.37: lista de Distribuidora GM (super_key 'gm'). Origen: Excel del ERP
+-- (vta_listaprecios.xls), precio POR CAJA. precios_super_lk guarda POR UNIDAD, así que
+-- se divide por el uxb que usará la valorización (cob_uxb_lk → cobranzas_precios → precios_venta).
+-- Verificado contra ISIS: NP 97890 pasó de -42% (lista general) a -6,6% (lista GM; la lista
+-- parece ~6% desactualizada respecto de la fecha de la FC). NO espeja de LK: es carga manual.
+insert into public.precios_super_lk (super_key, cod, price)
+select 'gm', g.cod, round(g.pcaja / coalesce(u.uxb, cp.uxb, pv.uxb, 1)::numeric, 6)
+from (values
+ ('026',20700),('027',18000),('029',55680),('030',79680),('031',11640),
+ ('101',17190),('102E',13200),('103',5580),('104',9840),('106E',15720),
+ ('108',13140),('110',19440),('111',16920),('112',120500),('113',82320),
+ ('114',8790),('115',11940),('116',14400),('119',17400),('121',17040),
+ ('123',9480),('315',19680),('395',13020),('501',17880),('502',18240),
+ ('504',10170),('508',17340),('510',6000),('516',59500),('523',57660),
+ ('529E',19680),('544',12840),('546',18900),('561',29940),('562',15840),
+ ('581',10380),('587',12060)) g(cod,pcaja)
+left join (select public.cob_norm_cod(cod) nc, max(uxb) uxb from public.cob_uxb_lk group by 1) u
+       on u.nc = public.cob_norm_cod(g.cod)
+left join lateral (select uxb from public.cobranzas_precios p where p.empresa='lk' and p.nc=public.cob_norm_cod(g.cod) limit 1) cp on true
+left join public.precios_venta pv on public.canon_cod(pv.cod)=public.canon_cod(g.cod)
+where g.pcaja > 0
+on conflict (super_key,cod) do update set price=excluded.price;
 
 -- Alias confirmados por el dueño (2026-08-17):
 insert into public.cobranzas_alias (empresa, cod_prod, cod_precio, nota) values
