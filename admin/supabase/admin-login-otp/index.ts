@@ -10,10 +10,20 @@
 //   { action: "verify", code }   → valida código; setea password temporal en
 //                                  el user y lo devuelve para que el front haga
 //                                  signInWithPassword y quede con sesión.
+//   { action: "bridge", vjwt }   → recibe el access_token de la sesión de
+//                                  Producción Virgilio (otro proyecto Supabase),
+//                                  lo VERIFICA server-side contra el auth de
+//                                  Virgilio y, sólo si el mail del token es el
+//                                  MISMO que RECIPIENT_EMAIL (mismo dueño, no
+//                                  amplía acceso a nadie), setea el password
+//                                  temporal igual que "verify". Permite entrar
+//                                  directo al admin desde el botón "Panel Web LK"
+//                                  sin volver a pedir OTP. (v12.35)
 //
 // Seguridad: sin JWT, así que el destinatario está HARDCODEADO (loekemeyer.n8n@gmail.com)
 // y se chequea que ese user esté en public.admins. Solo un mail posible, no es un
-// oráculo de existencia de mails.
+// oráculo de existencia de mails. El "bridge" NO confía en el front: la prueba de
+// identidad es el JWT de Virgilio validado contra su propio /auth/v1/user.
 //
 // Deploy (una vez): verify_jwt=false y depende de los secrets RESEND_API_KEY /
 // RESEND_FROM (opcional; fallback a onboarding@resend.dev, dominio verificado
@@ -23,6 +33,12 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const RECIPIENT_EMAIL = "loekemeyer.n8n@gmail.com";
+
+// Proyecto Supabase de Producción Virgilio — usado por la acción "bridge" para
+// validar el access_token del supervisor contra SU propio auth (firma + expiración).
+// La anon (publishable) key es pública; sólo sirve para llamar /auth/v1/user.
+const VIRGILIO_URL = "https://hrxfctzncixxqmpfhskv.supabase.co";
+const VIRGILIO_ANON_KEY = "sb_publishable_BqpAgZH6ty-9wft10_YMhw_0rcIPuWT";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -103,9 +119,36 @@ Deno.serve(async (req: Request) => {
     const isAdmin = await admin.from("admins").select("auth_user_id").eq("auth_user_id", userId).maybeSingle();
     if (isAdmin.error || !isAdmin.data) return jsonResponse({ error: "not_admin" }, 403);
 
-    let body: { action?: string; code?: string } = {};
+    let body: { action?: string; code?: string; vjwt?: string } = {};
     try { body = await req.json(); } catch (_) { return jsonResponse({ error: "invalid_body" }, 400); }
     const action = body.action;
+
+    if (action === "bridge") {
+      // Entrar directo desde Producción Virgilio (mismo dueño). La prueba es el
+      // access_token de la sesión de Virgilio, validado contra su propio auth.
+      const vjwt = String(body.vjwt ?? "").trim();
+      if (!vjwt) return jsonResponse({ error: "missing_token" }, 400);
+
+      let vres: Response;
+      try {
+        vres = await fetch(`${VIRGILIO_URL}/auth/v1/user`, {
+          headers: { apikey: VIRGILIO_ANON_KEY, Authorization: `Bearer ${vjwt}` },
+        });
+      } catch (_) {
+        return jsonResponse({ error: "verify_unreachable" }, 502);
+      }
+      if (!vres.ok) return jsonResponse({ error: "invalid_token" }, 401);
+      const vuser = await vres.json().catch(() => ({}));
+      const vemail = String(vuser?.email ?? "").toLowerCase();
+      // Gate estricto: sólo el MISMO mail que el admin LK. No amplía acceso.
+      if (!vemail || vemail !== RECIPIENT_EMAIL) return jsonResponse({ error: "not_authorized" }, 403);
+
+      const tmpPassword = crypto.randomUUID();
+      const updB = await admin.auth.admin.updateUserById(userId, { password: tmpPassword });
+      if (updB.error) return jsonResponse({ error: "set_password_failed", detail: updB.error.message }, 500);
+
+      return jsonResponse({ ok: true, email: RECIPIENT_EMAIL, tmp_password: tmpPassword });
+    }
 
     if (action === "send") {
       const resendKey = await getSecret(admin, "RESEND_API_KEY", "RESEND_API_KEY");

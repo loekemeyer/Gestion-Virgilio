@@ -12,7 +12,17 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-02 · Versión app al documentar: **v12.34**
+> Última actualización: 2026-09-02 · Versión app al documentar: **v12.35**
+>
+> Nota **v12.35** — **Panel Web LK: entrada directa sin OTP desde Virgilio.**
+> El botón "🌐 Panel Web LK" ahora pasa el `access_token` de la sesión del
+> supervisor (mismo origen, vía `sessionStorage` `lk_bridge_vjwt`) al admin LK.
+> La Edge Fn `admin-login-otp` gana la acción `bridge`: valida ese token
+> **server-side** contra el auth de Virgilio (`hrxfctzncixxqmpfhskv`) y, **sólo si
+> el mail == `loekemeyer.n8n@gmail.com`** (mismo dueño, no amplía acceso), setea
+> el password temporal y el admin entra sin pedir código. Si no hay token o el
+> mail no coincide, cae al login por OTP de siempre. Gate 100% en backend (el
+> front no puede falsear identidad). Detalle en `CLAUDE.md` § Panel Web LK.
 >
 > Nota **v12.34** — **Dos pendientes chicos de Deudores/Extracto banco, resueltos.**
 > (1) **"📄 Ver factura"** en el detalle de Deudores: `storage_path` ya venía en
