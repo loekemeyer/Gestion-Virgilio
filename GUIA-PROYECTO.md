@@ -12,7 +12,55 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-02 · Versión app al documentar: **v12.37**
+> Última actualización: 2026-09-02 · Versión app al documentar: **v12.42**
+>
+> Nota **2026-09-02** — **Legajo 277: 185 reportes atascados ("sin enviar") — NO era señal, era un timeout de 8 s en un trigger, y la cadena de stock EN VIVO documentada.**
+> **Síntoma:** el legajo 277 mostraba "185 reportes sin enviar" y la app trabada. Diagnóstico
+> sobre `Auditoria_Produccion_Virgilio`: 131 `client_id` distintos fallando con **`server_500`**
+> (no `network`), hasta 230 reintentos, y **0 de ellos en `Registros_Produccion_Virgilio`** → el
+> server los rechazaba de verdad. Eran picking (`PKC`) de la tanda **D56A**; el último PKC de 277
+> había entrado 10:50, los 500 arrancaron ~14:47.
+> **Causa raíz:** cada `INSERT` de PKC dispara reconciliación de stock. El trigger
+> `trg_pkc_reconciliar_stock` corría `reconciliar_pipeline_stock_etapa1()` — una reconciliación
+> **GLOBAL** (todos los artículos, path A histórico + path B forward) que medida en frío tarda
+> **~8,8 s**. El rol `authenticated`/`anon` corta a los **~8 s** (`statement_timeout`) → cada PKC
+> daba timeout → **500** → el reporte quedaba en la cola local del celular (`localStorage`
+> `legajo_queue_virgilio_v1`). A la mañana entraba (<8 s); cruzó el límite ~14:47 al crecer los datos.
+> Desde el SQL editor (rol `postgres`, sin ese timeout) el mismo INSERT entraba a los 8,87 s — por eso
+> "en la base sí, en la app no".
+> **Que NO se perdía data:** `Registros_Produccion_Virgilio.client_id` es UNIQUE y PKC va por
+> UPSERT (`?on_conflict=client_id`, `resolution=merge-duplicates`; 409 se trata como OK en
+> `trySendOneReport`). Reenviar es idempotente, no duplica. El único escenario real de pérdida era que
+> el operario **borrara datos / desinstalara** con la cola llena.
+> **Fix (de raíz, no parche):** la reconciliación global de 8,8 s **no va en el hot-path del
+> INSERT** — ya la corre el cron `reconciliar-pipeline-stock` (`*/10`, llama a
+> `reconciliar_pipeline_stock()` = etapa1+2+3+4). Se **desactivaron** los triggers
+> `trg_pkc_reconciliar_stock` y `trg_tp_reconciliar_stock` (la copia global redundante). Quedó
+> **ON** `trg_pkc_reconciliar_rt` → `reconciliar_stock_articulo_rt(tanda, art)`, que hace SOLO el
+> path forward acotado **al artículo pickeado** (~95–270 ms). Resultado: INSERT de PKC pasó de
+> **8872 ms → ~95 ms**, sin 500. Los **131/131** reportes trabados entraron solos al destrabar
+> (idempotencia). El histórico (picks anteriores a `Stock_Config.etapa1_pkc_desde` = 2026-08-13) lo
+> sigue cubriendo el cron; lo del día (forward) es en vivo.
+> **Cadena de STOCK EN VIVO (verificada end-to-end, pick de 7 movió `separar_pedidos` 5→12):**
+> (1) operario pickea → INSERT PKC; (2) `trg_pkc_reconciliar_rt` escribe el/los `Movimientos_Stock`
+> del artículo (misma tx); (3) `trigger_actualizar_saldo_stock` → `actualizar_saldo_trigger`
+> recalcula el saldo del código por depósito y lo **UPSERT-ea en la tabla `stocks_carga_rapida`**
+> (misma tx); (4) `stocks_carga_rapida` está en la publicación `supabase_realtime` (REPLICA IDENTITY
+> FULL) → el cambio se **empuja por websocket**; (5) el front (`stkSubscribeRealtime`, escucha
+> **`UPDATE`**) parchea la fila en `_stk.viewRows` y llama `stkRender()`. **La pantalla de Stocks lee
+> `stocks_carga_rapida` como fuente principal (saldos instantáneos), NO `vista_stock_procesada`.**
+> Con "En vivo" puesto y la pantalla abierta, PICKEADOS sube y GÓNDOLA baja al toque. Caveats: escucha
+> solo `UPDATE` (un código sin ningún movimiento previo entra como INSERT y no repinta hasta recargar);
+> solo en modo "En vivo" y con websocket conectado.
+> **`vista_stock_procesada` NO hace falta que sea "en vivo":** es una **vista materializada** (cron
+> `refresh-vista-stock-procesada` `*/2`) que el front usa solo para campos **derivados/lentos**
+> (cajas_pedidas, proy_cajas_mes, capacidad_gondola, línea, descripción) — nada de eso cambia al
+> pickear. Hacer una matview refrescar por-pick (`REFRESH MATERIALIZED VIEW`, recálculo completo de
+> segundos) es justo el anti-patrón que trababa el INSERT. `refresh_stocks_carga_rapida()` (cron
+> `*/5`) es un recálculo completo de respaldo contra drift del trigger incremental.
+> **Pendiente sugerido (no implementado sin OK):** en el front, ante `server_500` persistente (rechazo
+> real del server, no `network`), avisar más fuerte para que nadie cierre/borre en ese estado; hoy
+> reintenta callado y solo muestra "sin enviar".
 >
 > Nota **v12.37** — **Facturación: descuento por VOLUMEN por empresa + listas de SÚPER/distribuidora.**
 > Dos arreglos al cálculo del 💵 Neto (`vista_facturacion_neto`, EN VIVO, `sql/facturacion_neto.sql`):
