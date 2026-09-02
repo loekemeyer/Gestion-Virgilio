@@ -6524,7 +6524,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.34";
+const APP_VERSION = "v12.35";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -10143,6 +10143,36 @@ function stockFlushPend() {
     .catch(function () {});
 }
 try { window.addEventListener("online", function () { try { stockFlushPend(); } catch (_e) {} }); stockFlushPend(); } catch (_e) {}
+/* v12.35 — BAJA DE RACKS ATÓMICA. La fila de Racks_Bajadas y los 2 movimientos de
+   stock (racks − / góndola +) se escriben JUNTOS en el server vía el RPC
+   registrar_baja_racks (una sola transacción). Antes eran 2 POST sueltos y podían
+   quedar a medias → bajada 'aprobada' sin su par baja_racks (descuadre de racks,
+   corregido a mano el 2026-09-02 para 583E/582E/438E). Idempotente por client_id:
+   el reintento offline desde vir_baja_racks_pend NO duplica (ON CONFLICT en el RPC). */
+const SUPABASE_BAJARACKS_RPC = SUPABASE_URL + "/rest/v1/rpc/registrar_baja_racks";
+function _bajaRacksHeaders() { return { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" }; }
+function postBajaRacks(items) {
+  if (!items || !items.length) return Promise.resolve();
+  if (esOperadorPrueba()) { try { console.warn("[PRUEBA] baja de racks NO persistida (operador de prueba)"); } catch (_e) {} return Promise.resolve(); }
+  for (var _i = 0; _i < items.length; _i++) { if (!items[_i].cid) items[_i].cid = _stockClientId(); }   // idempotencia estable por ítem
+  return fetch(SUPABASE_BAJARACKS_RPC, { method: "POST", headers: _bajaRacksHeaders(), body: JSON.stringify({ p_items: items }) })
+    .then(function (r) {
+      if (r.ok) return;
+      // permiso/JWT/RPC-no-visible-aún/red/5xx → encolar y reintentar. 4xx de datos malos → descartar.
+      var transient = (r.status === 401 || r.status === 403 || r.status === 404 || r.status === 409 || r.status === 429 || r.status >= 500);
+      if (transient) throw new Error("HTTP " + r.status);
+      try { console.error("postBajaRacks HTTP " + r.status + " — descartado", items); } catch (_e) {}
+    })
+    .catch(function () { try { const p = JSON.parse(localStorage.getItem("vir_baja_racks_pend") || "[]"); p.push.apply(p, items); localStorage.setItem("vir_baja_racks_pend", JSON.stringify(p.slice(-2000))); } catch (_e) {} });
+}
+function bajaRacksFlushPend() {
+  let p = []; try { p = JSON.parse(localStorage.getItem("vir_baja_racks_pend") || "[]"); } catch (_e) {}
+  if (!p.length) return;
+  fetch(SUPABASE_BAJARACKS_RPC, { method: "POST", headers: _bajaRacksHeaders(), body: JSON.stringify({ p_items: p }) })
+    .then(function (r) { if (r.ok) { try { localStorage.removeItem("vir_baja_racks_pend"); } catch (_e) {} } })
+    .catch(function () {});
+}
+try { window.addEventListener("online", function () { try { bajaRacksFlushPend(); } catch (_e) {} }); bajaRacksFlushPend(); } catch (_e) {}
 
 /* ===== STOCK — módulo admin (v4.06): saldos + movimientos por artículo,
    cargar stock inicial y marcar el "corte" (desconsiderar lo anterior). ===== */
@@ -19058,24 +19088,18 @@ function brConfirmar() {
   // v9.82 — la bajada del operario NO necesita aprobación de la operadora (pedido del dueño):
   // el stock ya se mueve acá (racks − / góndola +) y la fila queda 'aprobada' directo, para que
   // NO aparezca en la cola "Bajadas Racks → góndola". La operadora ya no aprueba nada.
-  const _brNowIso = new Date().toISOString();
-  // v10.15: sector(es) del artículo van en la fila de Racks_Bajadas y en el ref del movimiento
-  const rows = sel.map(function (it) { return { orden_id: _br.ordenId || null, cod_art: it.cod, descripcion: it.desc || null, cajas: it.bajar, estado: "aprobada", aprobada_at: _brNowIso, creada_por: _br.legajo || null, sector: (it.secs || []).join(" · ") || null }; });
+  // v12.35 — baja ATÓMICA: la fila de Racks_Bajadas + los 2 movimientos de stock
+  // (racks − / góndola +) se escriben en UN solo RPC (una transacción, idempotente
+  // por client_id). Antes eran 2 POST sueltos y podían quedar a medias → bajada
+  // 'aprobada' sin descuento de racks. El stock igual se mueve YA (racks → góndola).
+  const items = sel.map(function (it) {
+    var _sec = (it.secs || []).join(" · ") || null;
+    var _ref = (it.secs && it.secs.length) ? "rack " + it.secs.join(" · ") : "orden " + (_br.ordenId || "");
+    return { cod_art: it.cod, descripcion: it.desc || null, cajas: it.bajar, sector: _sec, orden_id: _br.ordenId || null, legajo: _br.legajo || "0", ref: _ref };
+  });
   const n = sel.reduce(function (s, it) { return s + it.bajar; }, 0);
   closeBajarRacks();
-  // v8.73 — mover stock INMEDIATAMENTE (racks → góndola) al registrar la bajada,
-  // sin esperar la aprobación de la operadora. La aprobación es solo para la carga
-  // en el sistema contable (ERP), no debe bloquear el stock.
-  var stkRows = [];
-  sel.forEach(function (it) {
-    var _ref = (it.secs && it.secs.length) ? "rack " + it.secs.join(" · ") : "orden " + (_br.ordenId || "");
-    stkRows.push({ cod_art: it.cod, descripcion: it.desc || null, deposito: "racks", delta: -it.bajar, tipo: "baja_racks", ref: _ref, legajo: _br.legajo || "0" });
-    stkRows.push({ cod_art: it.cod, descripcion: it.desc || null, deposito: "terminado", delta: it.bajar, tipo: "baja_racks", ref: _ref, legajo: _br.legajo || "0" });
-  });
-  stockMove(stkRows);
-  fetch(SUPABASE_RACKS_BAJ_ENDPOINT, { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" }, body: JSON.stringify(rows) })
-    .then(function (r) { if (r.ok || (r.status >= 400 && r.status < 500)) return; throw new Error("HTTP " + r.status); })
-    .catch(function () { try { const p = JSON.parse(localStorage.getItem("vir_racks_pend") || "[]"); p.push.apply(p, rows); localStorage.setItem("vir_racks_pend", JSON.stringify(p.slice(-2000))); } catch (_e) {} });
+  postBajaRacks(items);
   try { alert("✓ Registraste " + n + " caja(s) bajadas de racks. El stock ya se actualizó."); } catch (_e) {}
 }
 function closeBajarRacks() { const ov = document.getElementById("brModal"); if (ov) ov.classList.remove("show"); _br = null; }
@@ -20709,14 +20733,11 @@ async function rkbConfirmar() {
   // esperar la aprobación de la operadora (pedido del dueño). La fila queda en Racks_Bajadas como
   // 'aprobada' (registro/historial) → NO entra a la cola de aprobación y no se cuenta doble.
   // cajas = INNER (si baja en master, convierto master × CxM). Mismo patrón que brConfirmar (v8.73).
-  var _rkbNowIso = new Date().toISOString();
-  const rows = [], _rkbMovs = [];
-  sel.forEach(function (it) {
+  // v12.35 — baja ATÓMICA vía RPC (una transacción, idempotente por client_id).
+  // cajas = INNER (si baja en master, convierto master × CxM). Mismo patrón que brConfirmar.
+  const items = sel.map(function (it) {
     const inner = (it.cxm > 0 && !it.manual) ? (it.baja * it.cxm) : it.baja;
-    const _ref = "rack " + (it.sec || "s/sector");
-    rows.push({ orden_id: null, cod_art: it.cod, descripcion: it.desc || null, cajas: inner, estado: "aprobada", aprobada_at: _rkbNowIso, creada_por: _rkb.legajo || null, sector: it.sec || null });
-    _rkbMovs.push({ cod_art: it.cod, descripcion: it.desc || null, deposito: "racks", delta: -inner, tipo: "baja_racks", ref: _ref, legajo: String(_rkb.legajo || "0") });
-    _rkbMovs.push({ cod_art: it.cod, descripcion: it.desc || null, deposito: "terminado", delta: inner, tipo: "baja_racks", ref: _ref, legajo: String(_rkb.legajo || "0") });
+    return { cod_art: it.cod, descripcion: it.desc || null, cajas: inner, sector: it.sec || null, orden_id: null, legajo: String(_rkb.legajo || "0"), ref: "rack " + (it.sec || "s/sector") };
   });
   // Planimetría viva (v5.22): descontar de la UBICACIÓN elegida. Best-effort:
   // si la RPC todavía no existe en Supabase, falla silencioso (queda el ledger).
@@ -20733,13 +20754,10 @@ async function rkbConfirmar() {
   });
   // alerta Telegram por cada bajada fuera de lista (no estaba en racks) — evento RKX
   sel.filter(function (it) { return it.manual; }).forEach(function (it) { try { rkbEmitFueraLista(it.cod, it.baja, _rkb.legajo); } catch (_e) {} });
-  const totInner = rows.reduce(function (s, r) { return s + Number(r.cajas || 0); }, 0);
+  const totInner = items.reduce(function (s, it) { return s + Number(it.cajas || 0); }, 0);
   try { opDraftClear(_rkb && _rkb.legajo); } catch (_e) {}
   closeRkb();
-  try { stockMove(_rkbMovs); } catch (_e) {}   // v9.60 — mueve el stock YA (racks → góndola), offline-safe
-  fetch(SUPABASE_RACKS_BAJ_ENDPOINT, { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" }, body: JSON.stringify(rows) })
-    .then(function (r) { if (r.ok || (r.status >= 400 && r.status < 500)) return; throw new Error("HTTP " + r.status); })
-    .catch(function () { try { const p = JSON.parse(localStorage.getItem("vir_racks_pend") || "[]"); p.push.apply(p, rows); localStorage.setItem("vir_racks_pend", JSON.stringify(p.slice(-2000))); } catch (_e) {} });
+  postBajaRacks(items);   // v12.35 — fila de bajada + movimientos racks→góndola en UNA transacción (offline-safe)
   try { alert("✓ Bajaste " + totInner + " caja(s) de racks — el stock ya pasó a góndola."); } catch (_e) {}
 }
 function rkbEmitFueraLista(cod, cajas, legajo) {

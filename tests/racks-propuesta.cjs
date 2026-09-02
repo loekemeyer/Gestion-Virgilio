@@ -1,12 +1,16 @@
-/* Regresión — MG "De los racks" (rkbConfirmar), semántica v9.60:
-   la bajada del operario mueve el stock INMEDIATAMENTE (racks − / terminado +,
-   vía stockMove) y deja la fila en Racks_Bajadas con estado='aprobada' (historial,
-   NO entra a la cola de aprobación). v9.27 además muestra un modal con código de
-   4 dígitos que hay que confirmar (#rkbVerifyOk) antes de que pase nada.
-   Verifica: 1 llamada a stockMove con los 2 movimientos en INNER (master × CxM),
-   POST a Racks_Bajadas con estado='aprobada' y cajas en INNER. Sale 1 si falla.
-   (Historia: hasta v9.59 esto PROPONÍA — estado='propuesta', sin stockMove — y el
-   test viejo validaba eso; se actualizó cuando v9.60 cambió el flujo a pedido del dueño.) */
+/* Regresión — MG "De los racks" (rkbConfirmar), semántica v12.35:
+   la bajada del operario se registra ATÓMICAMENTE en el server vía UN solo RPC
+   (registrar_baja_racks): la fila de Racks_Bajadas 'aprobada' + los 2 movimientos
+   de stock (racks − / terminado +, en INNER = master × CxM) en una transacción.
+   v9.27 muestra un modal con código de 4 dígitos que hay que confirmar (#rkbVerifyOk)
+   antes de que pase nada.
+   Verifica: NO llama stockMove ni postea directo a Racks_Bajadas; llama al RPC
+   registrar_baja_racks con p_items[0] = {cod_art:590E, cajas:24 (inner), orden_id
+   null}. Sale 1 si falla.
+   (Historia: hasta v9.59 esto PROPONÍA (estado='propuesta', sin mover stock); v9.60
+   pasó a mover stock al toque con 2 POST sueltos (stockMove + POST Racks_Bajadas);
+   v12.35 unificó esos 2 POST en un RPC atómico e idempotente para que no queden a
+   medias — bajada 'aprobada' sin descuento de racks era el descuadre que motivó el cambio.) */
 const path = require("path");
 let chromium;
 try { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
@@ -47,21 +51,18 @@ catch (_e) {
     okBtn.click();
     await done;
     await new Promise(function (res) { setTimeout(res, 10); });
-    const bajPost = fetches.find(function (f) { return f.url.indexOf("Racks_Bajadas") >= 0; });
-    let parsed = null; try { parsed = bajPost ? JSON.parse(bajPost.body) : null; } catch (_e) {}
-    return { stockMoveCalled: stockMoveCalled, movs: movs, postedToBajadas: !!bajPost, row: (parsed && parsed[0]) || null };
+    const rpcCall = fetches.find(function (f) { return f.url.indexOf("rpc/registrar_baja_racks") >= 0; });
+    let parsed = null; try { parsed = rpcCall ? JSON.parse(rpcCall.body) : null; } catch (_e) {}
+    const item = (parsed && parsed.p_items && parsed.p_items[0]) || null;
+    const directBaj = fetches.find(function (f) { return f.url.indexOf("/Racks_Bajadas") >= 0; });
+    return { stockMoveCalled: stockMoveCalled, rpcCalled: !!rpcCall, directBajPost: !!directBaj, item: item };
   });
   if (r.err) { console.log("racks-propuesta:", JSON.stringify(r), "· ✗ FAIL"); await b.close(); process.exit(1); }
-  const row = r.row || {};
-  const movs = r.movs || [];
-  const mRacks = movs.find(function (m) { return m.deposito === "racks"; }) || {};
-  const mGond  = movs.find(function (m) { return m.deposito === "terminado"; }) || {};
-  const pass = r.stockMoveCalled === 1 && movs.length === 2 &&
-    Number(mRacks.delta) === -24 && Number(mGond.delta) === 24 && mRacks.tipo === "baja_racks" &&
-    r.postedToBajadas === true &&
-    row.estado === "aprobada" && Number(row.cajas) === 24 && String(row.cod_art) === "590E" &&
-    (row.orden_id === null || row.orden_id === undefined) && !!row.aprobada_at && errs.length === 0;
-  console.log("racks-propuesta:", JSON.stringify({ stockMoveCalled: r.stockMoveCalled, movsLen: movs.length, racksDelta: mRacks.delta, gondDelta: mGond.delta, postedToBajadas: r.postedToBajadas, row: row }), "· pageerrors:", errs.length ? errs.join("|") : "none", "·", pass ? "✓ OK" : "✗ FAIL");
+  const item = r.item || {};
+  const pass = r.stockMoveCalled === 0 && r.rpcCalled === true && r.directBajPost === false &&
+    String(item.cod_art) === "590E" && Number(item.cajas) === 24 &&
+    (item.orden_id === null || item.orden_id === undefined) && errs.length === 0;
+  console.log("racks-propuesta:", JSON.stringify({ stockMoveCalled: r.stockMoveCalled, rpcCalled: r.rpcCalled, directBajPost: r.directBajPost, item: item }), "· pageerrors:", errs.length ? errs.join("|") : "none", "·", pass ? "✓ OK" : "✗ FAIL");
   await b.close();
   process.exit(pass ? 0 : 1);
 })();

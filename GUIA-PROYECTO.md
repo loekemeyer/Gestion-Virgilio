@@ -12,7 +12,22 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-02 · Versión app al documentar: **v12.34**
+> Última actualización: 2026-09-02 · Versión app al documentar: **v12.35**
+>
+> Nota **v12.35** — **Baja de racks → góndola ahora es ATÓMICA (backend).** Antes los
+> dos flujos de operario (`brConfirmar` = orden de racks; `rkbConfirmar` = RKB "De los
+> racks") hacían **dos POST sueltos**: `stockMove` (los 2 `Movimientos_Stock` racks−/góndola+)
+> por un lado y un POST a `Racks_Bajadas` por otro. Si uno impactaba y el otro no, la
+> bajada quedaba **'aprobada' sin su par `baja_racks`** → descuadre (racks inflado, góndola
+> corta). Detectado el 2026-09-02: 5 bajadas rotas (id 111·583E·96, 110·582E·48, 10·438E·63,
+> 9·438E·3, 5·438E·15), corregidas a mano insertando el par faltante (`client_id LIKE
+> 'fix-baja-racks-%'`). **Fix de fondo:** RPC `registrar_baja_racks(p_items jsonb)`
+> (SECURITY DEFINER, grant anon/authenticated) que inserta la fila de `Racks_Bajadas`
+> 'aprobada' + los 2 movimientos en **UNA transacción**, idempotente por `client_id`
+> (`Racks_Bajadas.client_id` nuevo + índice único parcial; `Movimientos_Stock` ya tenía
+> `mov_stock_clientid_dedup`; ambos con `ON CONFLICT DO NOTHING`). El front llama `postBajaRacks(items)`
+> (offline-safe, cola `vir_baja_racks_pend`, reintento en `online`). `cajas` del ítem = delta
+> del movimiento (INNER en RKB). Test `racks-propuesta.cjs` actualizado al nuevo contrato.
 >
 > Nota **v12.34** — **Dos pendientes chicos de Deudores/Extracto banco, resueltos.**
 > (1) **"📄 Ver factura"** en el detalle de Deudores: `storage_path` ya venía en
@@ -5755,8 +5770,11 @@ fichadas-monitor.html y productividad.html) — rotar la key = editar solo ese a
 > se muestran 3 unidades por artículo: **master ↔ caja ↔ unidad** vía `Cajas_x_Master` —columna nueva en
 > `Articulos Virgilio X Tallerista`, junto a `Uni_x_Caja`). Tablas nuevas: **`Racks_Ordenes`**
 > (`id, fecha, estado pendiente|bajado, creada_por, creada, cerrada_at`) y **`Racks_Bajadas`**
-> (`id, orden_id, cod_art, descripcion, cajas, estado propuesta|aprobada, creada_por, ts, aprobada_at`);
-> RLS abierta anon+authenticated. **Flujo**: (1) la operadora toca **"OCs generadas"** en el admin Stocks
+> (`id, orden_id, cod_art, descripcion, cajas, estado propuesta|aprobada, creada_por, ts, aprobada_at, client_id`);
+> RLS abierta anon+authenticated. **v12.35**: los flujos de operario (`brConfirmar`/`rkbConfirmar`)
+> ya NO postean la fila + los movimientos por separado — llaman al RPC atómico
+> `registrar_baja_racks(p_items)` (fila 'aprobada' + los 2 `Movimientos_Stock` en una
+> transacción, idempotente por `client_id`; front `postBajaRacks`, cola `vir_baja_racks_pend`). **Flujo**: (1) la operadora toca **"OCs generadas"** en el admin Stocks
 > (solapa 🏗 **Racks**) → crea una `Racks_Ordenes` **pendiente** (`racksCrearOrden`). (2) **Alarma en la
 > página**: mientras haya orden pendiente, a los operarios les aparece un banner en la botonera
 > (`#racksAlarma`, `racksCheckAlarma`, refresco 5′, llamado desde `goToOptions`). (3) **Operario baja**:
