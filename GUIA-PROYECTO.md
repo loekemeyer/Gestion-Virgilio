@@ -12,7 +12,7 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-02 · Versión app al documentar: **v12.42**
+> Última actualización: 2026-09-02 · Versión app al documentar: **v12.48**
 >
 > Nota **2026-09-02** — **Legajo 277: 185 reportes atascados ("sin enviar") — NO era señal, era un timeout de 8 s en un trigger, y la cadena de stock EN VIVO documentada.**
 > **Síntoma:** el legajo 277 mostraba "185 reportes sin enviar" y la app trabada. Diagnóstico
@@ -58,9 +58,13 @@
 > pickear. Hacer una matview refrescar por-pick (`REFRESH MATERIALIZED VIEW`, recálculo completo de
 > segundos) es justo el anti-patrón que trababa el INSERT. `refresh_stocks_carga_rapida()` (cron
 > `*/5`) es un recálculo completo de respaldo contra drift del trigger incremental.
-> **Pendiente sugerido (no implementado sin OK):** en el front, ante `server_500` persistente (rechazo
-> real del server, no `network`), avisar más fuerte para que nadie cierre/borre en ese estado; hoy
-> reintenta callado y solo muestra "sin enviar".
+> **Cartel de alerta fuerte (HECHO, v12.46):** `updatePendingIndicator()` ahora distingue los
+> reportes RECHAZADOS por el servidor (los que tienen `lastErr` que NO empieza con `network`) de los
+> que solo esperan señal. Si hay alguno rechazado, el banner `#pendingIndicator` toma la clase
+> `.critical` (rojo sólido, pulsante) y el texto cambia a *"⛔ N reporte(s) RECHAZADOS por el servidor
+> (NO es falta de señal). NO cierres ni borres la app. Tocá para reintentar y avisá a sistemas."* Los
+> pendientes solo por falta de red siguen con el aviso ámbar de siempre. Se limpia solo cuando la cola
+> drena.
 >
 > Nota **v12.37** — **Facturación: descuento por VOLUMEN por empresa + listas de SÚPER/distribuidora.**
 > Dos arreglos al cálculo del 💵 Neto (`vista_facturacion_neto`, EN VIVO, `sql/facturacion_neto.sql`):
@@ -1021,6 +1025,112 @@
 > ahora suma `oc_proy: it.proy`. Así el «Pedido» y el contexto (máximo−stock−pedidos) cuadran de la
 > misma foto (ej. cód 104: oc_max 40 − oc_stock 24 = 16 pedido).
 >
+> Nota **2026-09-02 — v12.50: gate anti TAP-sin-Entregas en Fin de Jornada (rescatado de una rama nunca mergeada).**
+> Escrito el 31/08 en `claude/missing-prices` como "v12.17"; ese número lo usó otra sesión en
+> paralelo para otra cosa (*facturación solo muestra NPs con ítems armados*) y el gate nunca llegó
+> a `main`. En `confirmarTerminarDia()`: si el cierre es un **Armado** y esa tanda **no tiene
+> filas en `Entregas_Virgilio`** (`_compTandaYaArmada()` devuelve `false`), no se puede facturar,
+> así que se **aborta el Fin de Jornada**, se avisa y se abre el asistente **Completar** para que
+> el operario registre el armado primero. Mismo criterio que ya aplicaba `send()` desde v7.74 al
+> cerrar un TAP suelto. Exceptúa al operador de prueba y a las tandas ya registradas en
+> `_armadoRegistrado`. **Lección de la auditoría de ramas:** dos sesiones paralelas que parten del
+> mismo `main` y reusan el mismo número de versión se pisan y una pierde el trabajo.
+
+> Nota **2026-09-02 — limpieza: todo lo que hablaba de "estadística madre" y estaba de sobra (propuesta 2496).**
+> Inventario en los dos proyectos: 5 tablas, 2 vistas propias, 1 foránea, 17 funciones y 3 crons
+> hablaban de proyección / estadística madre. Se borró lo que no aportaba (backups en
+> `sql/backups/backup_limpieza_virgilio_20260902.sql` y `…_estadistica_madre_import_20260506_LK.sql`):
+>
+> - **Virgilio · `E. Madre LK` / `E. Madre CH` traían una SEGUNDA estadística madre.** Una columna
+>   `"E. Madre"` con un número fijo por artículo cargado a mano el 12/03/2026, que
+>   `recalcular_maximo_por_cod/desc` usaba para fijar `Partes x Tallerista.maximo` y dos vistas
+>   (`v_piezas_por_tallerista_consumo_final`, `v_debug_piezas_consumo`) usaban como "consumo" de
+>   piezas. Estado real: 0 de 954 filas con `maximo > 0`, sin llamadores (front, cron, trigger,
+>   vista, doc), y las funciones ejecutables por `anon`. Se borraron las dos funciones, las dos
+>   vistas y la columna — **y la columna se RESTAURÓ una hora después**, con sus 592 valores
+>   desde el backup: los logs de la API de Supabase mostraron que **otra app**,
+>   `GestionProductivaEntero` (Vercel, `gestion-productiva-entero…vercel.app`), la pide **42 veces
+>   por día** (`select=Cod,"E. Madre"`) en **7 módulos** (Compras/cajas, Envíos y Control de
+>   talleristas, Stock flejes/cartones/cajas, Stock SP) como "consumo mensual" en unidades para
+>   comprar cajas y flejes y fijar máximos de talleristas. Es la tercera estadística madre, viva,
+>   con un número fijo de marzo, y encima cada módulo combina LK y CH distinto (suma / máximo / LK
+>   primero). **Lección:** el catálogo de un proyecto no dice quién lo consume desde otra app; hay
+>   que mirar `edge_logs` por `request.path` + `referer`. **Resuelto el mismo día:** la columna
+>   **se deriva de `proyeccion_madre.proy_uni_mes`** (`actualizar_e_madre_desde_proyeccion()`,
+>   trigger `AFTER INSERT` a nivel sentencia sobre `proyeccion_madre`, o sea después de cada push
+>   semanal desde LK). `E. Madre LK` recibe el número único LK+Chef y `E. Madre CH` queda en 0 salvo
+>   los códigos que sólo existen ahí, así suma / máximo / LK-primero dan lo mismo. La app no cambió.
+>   Ver `sql/e_madre_desde_proyeccion.sql`. **Las tablas quedan**: son la fuente prioritaria de **nombres** de artículo
+>   (`vista_nombres_articulos`, prioridad `E. Madre LK` > `Articulos Virgilio X Tallerista` >
+>   `OC_Maximos`) — por eso se tocó el 24/08 (alta del 599E). Tienen `comment` que lo dice.
+> - **Virgilio · `refresh_proyeccion_madre()`** borrada: el pull HTTP con la anon key que fallaba en
+>   silencio; no puede funcionar (anon no tiene `EXECUTE` en LK) y dejarla invitaba a correrla a
+>   mano creyendo que refresca. `sql/refresh_proyeccion_madre.sql` quedó marcado como histórico.
+> - **LK · `fn_proyeccion_madre_emp` y la firma `_fn_proy_window(p_meses, p_emp)`** borradas: sin
+>   llamadores. El motor tiene **una sola firma**, `_fn_proy_window(p_meses)`.
+> - **LK · `estadistica_madre_import_20260506`** (el último Excel, 294 filas) borrada de la base;
+>   queda sólo en el repo.
+> - `Pieza Madre` (75 filas) **no se tocó**: es matricería, comparte sólo la palabra.
+>
+> Lo que queda es exactamente la cadena: `sales_lines` → `_fn_proy_window` → `fn_proyeccion_oc_virgilio`
+> → `sync_proyeccion_madre_virgilio` → `proyeccion_madre` (Virgilio) y → `fn_proyeccion_madre` →
+> `refresh_estadistica_madre_cache` → `estadistica_madre_cache` → vista `estadistica_madre` (LK).
+> Verificado después de borrar: `vista_nombres_articulos` y `vista_generador_oc` siguen vivas,
+> 505 = 2.348,7 en todos lados, y los 3 md5 de `sql/fn_proyeccion_oc_virgilio.sql` = deploy.
+
+> Nota **2026-09-02 — v12.47: la proyección tiene UN solo criterio y UN solo número (propuesta 2496, v3).**
+> El usuario rechazó la v2 con el gráfico a la vista: *"si está por abajo de 4 de los últimos 6 meses
+> no es una proyección confiable. No puede ser diferente el criterio. Es solo UNA estadística
+> madre"*. Tenía razón dos veces: (1) cualquier descarte de picos resta volumen que ocurrió y empuja
+> la proyección por debajo de la mayoría de los meses — con la v2 lo violaban **70 de 385**
+> artículos; (2) las OCs (2080,8) y el panel Estadística Madre de LK (2016,1) daban distinto porque
+> el panel tenía su propia tubería en unidades.
+>
+> **Criterio único, en LK `_fn_proy_window`:** proyección = **promedio simple de cajas facturadas
+> de los últimos 6 meses** (LK+Chef, meses sin venta cuentan 0) **con piso en el 4.º mejor mes**,
+> así por construcción nunca queda por debajo de 4 de los 6. Medido: **0 violaciones** (el
+> promedio pelado tenía 28; la mediana también daba 0 pero sub-proyecta un 10% porque ignora los
+> picos). El piso aplica sólo a la ventana de 6; en el fallback de 12 va el promedio pelado, para
+> no proyectar el ritmo viejo de un artículo que dejó de venderse. Se eliminó `fn_proy_descarte`.
+> `refresh_estadistica_madre_cache` **ya no calcula**: toma la proyección de `fn_proyeccion_madre()`
+> → el mismo motor. Y `admin.js` (LK y espejo `/admin/`) **ya no calcula en JS**: tenía tres
+> fórmulas de fallback (por cliente con descarte de picos, y "promedio de los últimos 3 meses");
+> sin caché la columna queda vacía en vez de inventar un número.
+>
+> **Verificado:** 505 = **2.348,7** caj/mes en el motor, el caché, la vista `estadistica_madre` y
+> `proyeccion_madre` de Virgilio (antes 1.667,6 → 2.080,8 → 2.348,7). Total del catálogo
+> **22.371** caj/mes (+14% sobre los 19.593 de la v2; el nivel de compras SUBE, es lo que pide la
+> regla). Balance 2,02 meses por encima. Los 5 md5 de `sql/fn_proyeccion_oc_virgilio.sql`
+> coinciden con lo desplegado. Pop-up (v12.47): la línea gris "promedio 6m" sólo se dibuja cuando
+> difiere de la proyección (o sea, cuando actuó el piso), y el pie lo marca "(piso: 4.º mejor mes)".
+
+> Nota **2026-09-02 — v12.46 (idea 5766): el pop-up de proyección muestra un gráfico en vez del texto.**
+> El bloque "¿De dónde surge?" (explicación fija de la regla) se reemplazó por un **gráfico de
+> tendencia de 12 meses** (`_stkProyTrendSvg`, SVG inline sin librerías): línea + área de cajas
+> facturadas, la **proyección** (violeta, guiones) y el **promedio simple de la ventana** (gris,
+> puntos) como líneas de referencia, la **ventana de 6 meses sombreada** y cada mes coloreado según
+> quede por encima (violeta) o **por debajo (rojo)** de la proyección. Si las dos etiquetas de
+> referencia quedan a menos de 11 px, se separan. El RPC `ventas_mensuales_cod` ahora se pide con
+> `p_meses: 12` (rellena con 0 los meses sin venta, así siempre vuelven 12). Las barras de abajo
+> muestran sólo la ventana de 6 meses, con la **marca vertical de la proyección** y en rojo los
+> meses por debajo; el pie dice **cuántos de los 6 meses quedan por encima**, que es el chequeo de
+> sanidad que disparó toda la corrección de la proyección. La regla de cálculo sigue viviendo en LK
+> (`fn_proy_descarte`); acá sólo se dibuja. Verificado headless con los datos reales del 505.
+
+> Nota **2026-09-02 — `estadistica_madre` (LK) deja de ser un Excel importado a mano.**
+> Era una tabla que se llenaba desde un Excel con un importador en Análisis Venta Cliente,
+> importada por última vez el **6/5/2026** (294 filas contra 521 del caché), y la leían el panel
+> **y el portal del cliente** (`script.js` de LK): las sugerencias al mayorista se ordenaban con
+> datos de mayo y 227 productos ni existían ahí. Decisión del usuario: *"el Excel ya no se
+> debería utilizar más; los datos de ventas salen de `sales_lines` y la proyección tiene que
+> salir internamente"*. Ahora es una **vista** sobre `estadistica_madre_cache` (cron diario, ya
+> con ventana de 6 meses y la regla única `fn_proy_descarte`) con la misma forma que la tabla, así
+> que ningún lector cambió. El Excel histórico quedó en `estadistica_madre_import_20260506`. El
+> importador se retiró de `admin.html` y `analisis-venta-cliente.js` en LK **y en el espejo
+> `/admin/` de este repo** (135 líneas de HTML y 353 de JS, idéntico en los dos). Con esto **la
+> proyección tiene una sola fuente en todo el sistema**: OCs, Estadística Madre y portal leen el
+> mismo número.
+
 > Nota **2026-09-02 — la proyección pasa de PULL a PUSH, y los watchdogs no avisaban.**
 > Al arreglar la proyección (nota de abajo) se descubrió que `refresh_proyeccion_madre()`
 > venía fallando **en silencio desde el 12/08**: un barrido de seguridad en LK le revocó el
@@ -1191,6 +1301,35 @@ fichadas-monitor.html y productividad.html) — rotar la key = editar solo ese a
 > (`virgilio_entrega_sync_secret`; rotación pendiente, requiere tocar la Edge Fn LK).
 > **(8) Datos:** 589E uxb 12→24 (Importados + OC_Maximos). **(9) Planimetría:** solape de
 > orden isla-I vs L/M corregido (+26 a L/M/Ñ) y sector J9→J09.
+> Nota **v11.13 — Facturación: Cód Cliente grande + columna "Facturar N" (parciales).**
+> Reordené el módulo **Facturación** (`openFacturacion`, monitor de ventas). Nuevo orden de
+> columnas: **Cód Cliente** primero y con letra mucho más grande (`.fac-cod-big`, 22px) →
+> **NP** → **Faltantes** → **Facturar** → resto a la derecha (Tanda, Salida, Razón Social,
+> Cambiar cód, Líos, Cajas, ✓). La columna nueva **Facturar** (`facFacturar(np)`) muestra,
+> por artículo que salió **parcial** (pidió X, agarró Y), un badge verde `cod: facturar Y`
+> (= `cajas_pedidas − cajas_falto`); **solo aparece si hubo parcial** (si faltó todo, nada).
+> **Por qué**: el badge de Faltantes solo mostraba lo que FALTÓ, y la operadora salteaba el
+> renglón entero sin facturar lo entregado (bug real NPs 98406/395, 44581/729E y 836 — cajas
+> pickeadas que no se facturaron). Es solo front: la data (pedidas + faltó) ya venía en
+> `facFetchFaltantes`; cero cambios de backend. Idea de usuario **6542**.
+> Además: el checklist **NC a Loeke→Chef** (`facRenderNc`, `vista_nc_loeke_chef` →
+> `NC_Loeke_Chef_Hechas`) pasó a ser **secundario y compacto** (fuente 11px, header chico,
+> `min-width` liberado, `#facNcList`) para que Facturación sea la parte protagonista. La
+> **lógica del NC no cambió** (se verificó que funciona).
+
+> Nota **v11.13 — Planimetría: auto-orden del sector (picking prolijo).** Al cargar un código
+> en un sector **nuevo** sin N° de orden quedaba `orden=0` → se iba al **principio del picking**
+> (caso 599E / sector J44 / tanda D43B). Ahora el **N° de orden se completa solo** en dos capas:
+> **(a) Backend** — trigger `trg_planimetria_autoorden` (`BEFORE INSERT/UPDATE ON "Planimetria"`,
+> función `planimetria_autoorden()`, `sql/planimetria_autoorden.sql`): si `orden` viene en 0/NULL
+> lo completa heredando de vecinos — mismo sector exacto → su orden; si no, interpola entre los
+> vecinos del **mismo pasillo** (misma letra inicial) por nombre de sector; si no hay, vecinos
+> globales; si no, `max+1`. Respeta el orden si vino explícito (>0). Cubre TODOS los caminos de
+> alta. Se recalcularon las filas existentes en 0 (599E/J44 → 128, al lado de J13=127).
+> **(b) Front** — el editor de planimetría (`openPlanimEditor`) **sugiere el orden editable**
+> mientras se tipea el sector (`planimSuggestOrden` replica la lógica del trigger; `planimFillOrden`
+> autocompleta el input en verde `.planim-ord-sug`, sin pisar un número puesto a mano). Backup:
+> `sql/backup_planimetria_20260820.sql`. `Planimetria (cod, sector, orden)` → `window.GONDOLA`.
 >
 > Nota **2026-08-17 — Cobranzas: valorizar una NP sin ver la factura.** Objetivo del
 > usuario: que Virgilio sepa cuánta plata se le facturó a cada NP/cliente sin tener la

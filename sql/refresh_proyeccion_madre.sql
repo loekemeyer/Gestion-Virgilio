@@ -1,4 +1,13 @@
 -- =====================================================================
+-- RETIRADO 2026-09-02 (propuesta 2496). La funcion refresh_proyeccion_madre() se BORRO de la
+-- base: era el pull HTTP con la anon key de LK que fallaba en SILENCIO (anon perdio EXECUTE
+-- en LK -> 401 -> return -1 con el cron marcando "succeeded"; 3 semanas congelada). La
+-- reemplaza sync_proyeccion_madre_virgilio() en LK, que EMPUJA por el FDW virgilio_db
+-- (ver sql/sync_proyeccion_madre_push.sql). Backup de la definicion borrada:
+-- sql/backups/backup_limpieza_virgilio_20260902.sql. Lo de abajo es HISTORICO.
+-- =====================================================================
+
+-- =====================================================================
 -- refresh_proyeccion_madre.sql — la proyección que alimenta el generador de OCs
 --
 -- El Máximo del generador de OCs (manual y automático) es `proyección × índice`
