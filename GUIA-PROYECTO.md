@@ -1021,6 +1021,38 @@
 > ahora suma `oc_proy: it.proy`. Así el «Pedido» y el contexto (máximo−stock−pedidos) cuadran de la
 > misma foto (ej. cód 104: oc_max 40 − oc_stock 24 = 16 pedido).
 >
+> Nota **2026-09-02 — la proyección pasa de PULL a PUSH, y los watchdogs no avisaban.**
+> Al arreglar la proyección (nota de abajo) se descubrió que `refresh_proyeccion_madre()`
+> venía fallando **en silencio desde el 12/08**: un barrido de seguridad en LK le revocó el
+> `EXECUTE` a `anon` sobre `fn_proyeccion_oc_virgilio`, el GET pasó a dar **401**, la función
+> devolvía **−1 sin recargar** y el cron marcaba **"succeeded"**. Tres semanas con el Máximo
+> de las OCs calculado sobre una proyección congelada.
+>
+> **Arreglo — se dio vuelta el sentido.** Ahora **LK EMPUJA** con
+> `sync_proyeccion_madre_virgilio()` por el FDW `virgilio_db` (rol `lk_ppp_reader`, cron
+> `sync-proyeccion-madre-virgilio`, miércoles 09:20 UTC). Reusa la credencial que ya existía,
+> no expone nada, y deja a Virgilio leyendo una tabla **local**. Mismo patrón que
+> `sync_pedidos_match_virgilio()`. Se dio de baja el cron `refresh_proyeccion_madre`; la
+> función queda como fallback manual. Verificado: el push da un resultado **idéntico** al pull
+> (408 filas, md5 `b3d4ad71…`). Detalle en `sql/sync_proyeccion_madre_push.sql`.
+>
+> ⚠ **Y el watchdog tampoco servía.** `tg_enqueue` es
+> `(p_text, p_dedup default null, p_chat default '-1004379879565', p_parse_mode default null)`,
+> y `watchdog_syncs_externos` la llamaba como `tg_enqueue(msg, dedup, null, null)`. **El `null`
+> explícito pisa el DEFAULT del chat**, así que el insert violaba el `NOT NULL` de
+> `telegram_outbox.chat_id` — y como el `PERFORM` estaba envuelto en
+> `exception when others then null`, el error se tragaba entero. **El watchdog puesto para
+> cazar fallos silenciosos fallaba en silencio desde que se aplicó (28/08).** Corregido: se
+> llama con 2 argumentos y el `then null` pasó a `raise warning`.
+>
+> **Regla que sale de acá:** no pasar `null` explícito a un parámetro que tiene `DEFAULT`, y
+> no tragarse errores de un canal de aviso con `then null`.
+>
+> Se sumó **`watchdog_frescura_datos()`** (cron `watchdog-frescura-datos`, :43 de cada hora),
+> que vigila la **edad del dato** en vez del cron. Es lo único que hubiera cazado este fallo:
+> sirve aunque el cron reporte "succeeded" sin escribir, y aunque el cron viva en otro
+> proyecto. Hoy vigila `proyeccion_madre` (umbral 9 días). Ver `sql/watchdog_frescura_datos.sql`.
+
 > Nota **2026-09-02 — la proyección tenía DOS errores que se compensaban (propuesta 2496).**
 > Disparador: la proyección del **art. 505** daba 1667,6 caj/mes contra 5 de sus 6 meses reales
 > por encima (2134/2160/3609/2070/1421/2698). Un pronóstico por debajo de casi toda la serie

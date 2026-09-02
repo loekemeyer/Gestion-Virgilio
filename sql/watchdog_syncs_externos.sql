@@ -1,3 +1,32 @@
+-- =====================================================================
+-- FIX 2026-09-02 (propuesta 2496) — ESTE WATCHDOG NUNCA PUDO MANDAR UNA ALERTA.
+--
+-- `tg_enqueue` tiene la firma
+--   (p_text, p_dedup default null, p_chat default '-1004379879565', p_parse_mode default null)
+-- y aca se la llamaba como `tg_enqueue(v_msg, 'syncwd_...', null, null)`. El null EXPLICITO
+-- PISA el DEFAULT del chat, asi que el insert violaba el NOT NULL de telegram_outbox.chat_id.
+-- Y como el PERFORM esta envuelto en `exception when others then null` —puesto para que un
+-- fallo del aviso no rompa el watchdog— el error se tragaba entero.
+--
+-- O sea: el watchdog escrito para cazar fallos silenciosos fallaba en silencio, desde que
+-- se aplico el 2026-08-28. Es el MISMO patron que dejo `proyeccion_madre` congelada tres
+-- semanas sin que nadie se enterara.
+--
+-- Arreglado:
+--   . se llama con 2 argumentos y el chat lo resuelve el DEFAULT
+--   . el `exception when others then null` pasa a `raise warning`, asi un fallo del aviso
+--     al menos queda en los logs en vez de desaparecer
+--
+-- Probado encolando de verdad dentro de una transaccion que se aborta a proposito:
+-- el chat resuelve a -1004379879565 y no queda rastro en telegram_outbox.
+--
+-- REGLA GENERAL: no pasar `null` explicito a un parametro que tiene DEFAULT. Y no tragarse
+-- errores de un canal de aviso con `then null`.
+--
+-- La version viva de esta funcion (con el fix) esta en la migracion
+-- `fix_watchdogs_tg_enqueue_null_chat`. El cuerpo de abajo es el ORIGINAL, con el bug.
+-- =====================================================================
+
 -- Watchdog de los syncs externos — APLICADO 2026-08-28
 -- (migración `watchdog_syncs_externos`). Copia versionada.
 --
