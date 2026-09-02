@@ -10,8 +10,29 @@
 --    * La empresa del pedido/picking se deriva del rango de NP (>90000=LK).
 --    * 809 (Corta Queso Nacional) es un codigo propio, separado de 809E (D4).
 --
---  ESTADO: nucleo VALIDADO en el schema stock_v2 (ver mas abajo "YA VALIDADO").
---          Este archivo es el paquete de cutover. NO aplicar sin OK del dueno.
+--  ESTADO: >>> APLICADO EN PRODUCCION 2026-09-01 <<<  (cutover del BACK completo)
+--          Backup recuperable en stock_v2.bkp_* (mov_stock, equivalencias,
+--          planimetria, stock_ubic, carga_rapida, defs, cron).
+--
+--  Que se aplico (difiere del plan en 3 puntos, por menor riesgo):
+--    1) Movimientos_Stock: columna empresa + trigger zz_normalizar_empresa +
+--       backfill (sufijados->pelado+empresa; limbo 437E/438E/439E->LK) + indice
+--       dedup con empresa. Resultado: 0 cod_art sufijados, 48670 con empresa.
+--    2) El trigger consulta codigos_duales: fuerza Mixto para no-duales (backend
+--       fuente de verdad); el front no necesita conocer la lista de duales.
+--    3) vista_saldos_stock RECONSTRUYE el sufijo para duales en cod_art (438E CH)
+--       + expone columna empresa. Asi la matview y todos los consumidores siguen
+--       viendo el formato viejo -> NO se reescribio la matview de 200 lineas ni
+--       los satelites (Planimetria/Equivalencias/Stock_Ubicaciones): esos van con
+--       la migracion del FRONT (pendiente, desacoplada; el front viejo funciona
+--       porque el trigger normaliza toda insercion).
+--    Funciones: reconciliar_pipeline_stock_etapa1 (3 ON CONFLICT + subqueries B.3)
+--       y reconciliar_stock_articulo_rt (1 ON CONFLICT) con coalesce(empresa,'').
+--       actualizar_saldo_trigger reescrito (clave sufijada + filtro empresa).
+--    e2e: los 4 duales conservan stock_total exacto; reconciliacion corre sin abortar.
+--
+--  PENDIENTE (mejora, no urgente): migrar el FRONT (mostrar pelado+empresa, pelar
+--    Planimetria/Equivalencias/Stock_Ubicaciones) y el conteo fino de los 4 (D1=LK).
 --
 --  Decisiones del dueno (resueltas):
 --    D1: saldos pelados 437E/438E/439E -> empresa='LK' (editable despues).

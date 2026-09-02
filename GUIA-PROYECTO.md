@@ -14,6 +14,27 @@
 >
 > Última actualización: 2026-09-01 · Versión app al documentar: **v12.27**
 >
+> Nota SERVER **2026-09-01** — **Stock por empresa: el `cod_art` dejó de llevar el sufijo; ahora es código pelado + columna `empresa`.**
+> Antes, los 4 códigos que son **dos productos físicos distintos con el mismo número** (`437E`,
+> `438E`, `439E`, `809E` — góndolas separadas LK/CH) se guardaban en `Movimientos_Stock` como
+> `438E CH` / `438E LK`, y el saldo se partía por ese sufijo. La recepción no sufijaba → dejaba
+> stock pelado en un limbo (bug: `438E CH` en −10). **Modelo nuevo:** `cod_art` **siempre pelado**;
+> la empresa vive en la columna `Movimientos_Stock.empresa` ∈ `{LK, CH, Mixto}`. **`Mixto` es el
+> default** (mono-empresa y compartidos = una pila común); **solo los duales se separan** por
+> empresa. La lista de duales es la **fuente de verdad** `public.codigos_duales` (4 filas). La
+> empresa se deriva del **rango de NP** (`public.empresa_de_np(np)`, `>90000`=LK) en el picking, y
+> de la **selección del operario** en la recepción. El trigger **`zz_normalizar_empresa`** (BEFORE
+> INSERT en `Movimientos_Stock`) es la **red de seguridad y fuente de verdad**: pela el sufijo que
+> mande un front viejo y **fuerza `Mixto` a todo lo que no sea dual** (así el front no necesita
+> conocer la lista). `vista_saldos_stock` **reconstruye el sufijo** en `cod_art` para los duales
+> (`438E CH`) y expone la columna `empresa` → la matview `vista_stock_procesada`, `stocks_carga_rapida`
+> y todos los consumidores siguen viendo el formato de siempre (no se reescribió nada de eso).
+> `actualizar_saldo_trigger` usa la clave sufijada + filtro `empresa`; `reconciliar_pipeline_stock_etapa1`
+> y `_rt` llevan `empresa` en el `ON CONFLICT` (índice `mov_stock_pipeline_dedup`). **Pendiente
+> (desacoplado):** migrar el FRONT (mostrar pelado + columna empresa) y pelar `Planimetria` /
+> `Equivalencias_Codigos` / `Stock_Ubicaciones` — el front viejo funciona porque el trigger normaliza.
+> Paquete SQL: `sql/migracion_stock_por_empresa.sql`. Backup del cutover: `stock_v2.bkp_*`.
+>
 > Nota **v12.27** — **"Pedidos sin cargar en PPP": se puede tachar la NP que NO es un error.**
 > La tercera sección del módulo (`vista_np_prog_sin_base`, v12.05) avisa cuando una NP está en
 > Programación Diaria y `PPP_Base_Pedidos` no tiene ni una línea suya → no se puede armar el picking.
