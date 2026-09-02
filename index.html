@@ -6524,7 +6524,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.42";
+const APP_VERSION = "v12.45";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -7376,6 +7376,10 @@ async function loadEquivalencias() {
   } catch (_e) {}
 }
 loadEquivalencias();
+// v12.45 — precargar el mapa de código canónico (035E) para todas las pantallas. Se difiere
+// con setTimeout(0) porque `_codCanon` (let) se declara más abajo: llamarlo acá directo caería
+// en su zona muerta temporal ("Cannot access '_codCanon' before initialization").
+setTimeout(function () { try { loadCodCanon(); } catch (_e) {} }, 0);
 
 /* SW + IDB: registrar el SW, replicar la cola completa de LS a IDB para
    que el SW la vea, y volver a pedir un background sync si la cola tiene
@@ -10404,6 +10408,18 @@ async function loadCodCanon() {
 /* Devuelve el código canónico para mostrar (027, no 27/0027). Usa el mapa de OC_Maximos
    si ya se cargó; si no, cae al pad. Nunca rompe: siempre devuelve algo mostrable. */
 function codCanon(cod) { const k = _ocgNorm(cod); return (_codCanon && _codCanon[k]) || _padCod(cod); }
+/* v12.45 — código canónico CON sufijo de empresa: la forma ÚNICA de MOSTRAR un código en
+   toda la app. Canoniza la base (035E, 026 — vía el mapa OC_Maximos que carga loadCodCanon)
+   y le re-anexa " LK"/" CH" si el código lo trae ("438E LK" → "438E LK", "35E" → "035E").
+   NO usar para claves ni lookups: esos van SIEMPRE normalizados (_ocgNorm) para que
+   27/027/0027 matcheen. ⚠ Dependencia: el código canónico sale de OC_Maximos.cod (activo);
+   para cambiar cómo se muestra un artículo, se edita esa tabla. */
+function codCanonSuf(cod) {
+  var s = String(cod == null ? "" : cod).trim();
+  var m = s.match(/\s+(LK|CH|LOKE)$/i);
+  if (m) return codCanon(codBase(s)) + " " + m[1].toUpperCase().replace("LOKE", "LK");
+  return codCanon(s);
+}
 /* v7.49 — LÍNEA (LK/CH) por código, desde OC_Maximos (config). La usa el IMPRESO de OC
    para replicar la primera columna "Linea" de la planilla del tallerista (LK en rojo,
    CH en azul). Mapa clave normalizada → 'LK'/'CH'. Best-effort: si falla, la columna
@@ -13376,7 +13392,7 @@ function stkBodySectDetail() {
   if (!rows.length) return h + '<div class="stk-empty">No hay stock en ' + (LBL[d.key] || d.key) + '.</div>';
   h += '<div class="stk-tblwrap"><table class="stk-tbl stk-tbl-fit stk-tbl-sect"><thead><tr><th>Código</th><th class="num">Cajas</th><th>Descripción</th><th>Sector</th></tr></thead><tbody>';
   rows.forEach(function (r) {
-    h += '<tr><td class="stk-cod">' + escapeHtml(r.cod) + '</td><td class="num"><b>' + (Math.round(r.cant * 10) / 10) + '</b></td><td class="stk-desc">' + escapeHtml(artNombre(r.cod, r.desc) || "—") + '</td><td><b>' + escapeHtml(r.sector) + '</b></td></tr>';
+    h += '<tr><td class="stk-cod">' + escapeHtml(codCanonSuf(r.cod)) + '</td><td class="num"><b>' + (Math.round(r.cant * 10) / 10) + '</b></td><td class="stk-desc">' + escapeHtml(artNombre(r.cod, r.desc) || "—") + '</td><td><b>' + escapeHtml(r.sector) + '</b></td></tr>';
   });
   h += '</tbody></table></div>';
   return h;
@@ -13426,7 +13442,7 @@ function stkExportExcedentes() {
   let html = '<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"><style>td,th{border:1px solid #ccc;padding:3px 7px;font-family:Calibri,Arial,sans-serif;} th{background:#B45309;color:#fff;text-align:left;}</style></head><body>';
   html += '<h3>Excedentes por ubicación — Producción Virgilio (' + esc(fecha) + ')</h3>';
   html += '<table><tr><th>Ubicacion</th><th>Codigo</th><th>Cajas</th></tr>';
-  rows.forEach(function (r) { html += '<tr><td>' + esc(r.ubic) + '</td><td>' + esc(r.cod) + '</td><td>' + r.cajas + '</td></tr>'; });
+  rows.forEach(function (r) { html += '<tr><td>' + esc(r.ubic) + '</td><td>' + esc(codCanonSuf(r.cod)) + '</td><td>' + r.cajas + '</td></tr>'; });
   html += '<tr><td><b>TOTAL (' + rows.length + ' filas)</b></td><td></td><td><b>' + (Math.round(total * 10) / 10) + '</b></td></tr>';
   html += '</table></body></html>';
   try {
@@ -14350,7 +14366,7 @@ function _stkFaltFactRender() {
       .sort(function (a, b) { return b.cajas - a.cajas; });
     h += '<div class="mva-tblwrap"><table class="mva-tbl"><thead><tr><th>Código</th><th>Descripción</th><th class="num">Cajas</th><th class="num">Tandas</th></tr></thead><tbody>';
     h += arr.map(function (a) {
-      return '<tr><td><b>' + escapeHtml(a.cod) + '</b></td><td style="font-size:12px;color:#475569">' + escapeHtml(artNombre(a.cod, "") || "—") + '</td><td class="num"><b>' + round1(a.cajas) + '</b></td><td class="num">' + a.tandas + '</td></tr>';
+      return '<tr><td><b>' + escapeHtml(codCanonSuf(a.cod)) + '</b></td><td style="font-size:12px;color:#475569">' + escapeHtml(artNombre(a.cod, "") || "—") + '</td><td class="num"><b>' + round1(a.cajas) + '</b></td><td class="num">' + a.tandas + '</td></tr>';
     }).join("") + '</tbody>';
     h += '<tfoot><tr style="font-weight:800;border-top:2px solid #334155"><td colspan="2">TOTAL (' + arr.length + ' códigos)</td><td class="num">' + round1(totCajas) + '</td><td></td></tr></tfoot></table></div>';
   } else {
@@ -14372,7 +14388,7 @@ function _stkFaltFactRender() {
           '<button onclick="stkFaltFactAsk(\'' + kEnc + '\',\'ok\')" title="Al cliente se le facturó DE MENOS → el stock ya está bien, solo archivar el caso." style="width:auto;margin:0;padding:4px 9px;border:1px solid #86efac;border-radius:8px;background:#dcfce7;color:#166534;font-size:12px;font-weight:800;cursor:pointer;">✓ Está bien</button></div>';
       }
       return '<tr' + (_stkPop.act && _stkPop.act.key === key ? ' style="background:#fffbeb"' : '') + '><td><b>' + escapeHtml(r.tanda) + '</b></td>' +
-        '<td><b>' + escapeHtml(r.cod) + '</b></td>' +
+        '<td><b>' + escapeHtml(codCanonSuf(r.cod)) + '</b></td>' +
         '<td class="num"><b>' + round1(r.cajas) + '</b></td>' +
         '<td style="font-size:12px">' + escapeHtml(r.nps_lista || "—") + '</td>' +
         '<td style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escapeHtml(r.clientes || "") + '">' + escapeHtml(r.clientes || "—") + '</td>' +
@@ -14426,7 +14442,7 @@ function stkFaltFactExport() {
   html += '<p>El picking registró que faltaron cajas (PKC real &lt; esperado), la tanda se facturó igual y nadie hizo "Completar Pedido". Si las cajas salieron, el stock está inflado. Cotejar contra la factura.</p>';
   html += '<table><tr><th>Tanda</th><th>Codigo</th><th>Descripcion</th><th>Cajas</th><th>NP</th><th>Cliente</th><th>Fecha Entrega</th></tr>';
   rows.forEach(function (r) {
-    html += '<tr><td>' + esc(r.tanda) + '</td><td>' + esc(r.cod) + '</td><td>' + esc(artNombre(r.cod, "") || "") + '</td><td>' +
+    html += '<tr><td>' + esc(r.tanda) + '</td><td>' + esc(codCanonSuf(r.cod)) + '</td><td>' + esc(artNombre(r.cod, "") || "") + '</td><td>' +
       (Math.round((Number(r.cajas) || 0) * 10) / 10) + '</td><td>' + esc(r.nps_lista) + '</td><td>' + esc(r.clientes) + '</td><td>' + esc(r.fecha_entrega) + '</td></tr>';
   });
   html += '<tr><td colspan="3"><b>TOTAL (' + rows.length + ' casos)</b></td><td><b>' + (Math.round(total * 10) / 10) + '</b></td><td colspan="3"></td></tr>';
@@ -15442,7 +15458,7 @@ function _stkRtoDetail(mv) {
   else if (loading) head += ' · <span style="color:#94a3b8">cargando proveedor…</span>';
   else head += ' · <span style="color:#94a3b8">proveedor/tallerista no registrado</span>';
   if (ref) head += ' · <span class="mva-ref">RTO/FC ' + escapeHtml(ref) + '</span>';
-  const chips = items.map(function (it) { const on = _stkNormCod(it.cod) === codN; return '<span class="mva-rto-it' + (on ? " on" : "") + '">' + escapeHtml(it.cod) + ' <b>' + escapeHtml(it.caj) + '</b></span>'; }).join("");
+  const chips = items.map(function (it) { const on = _stkNormCod(it.cod) === codN; return '<span class="mva-rto-it' + (on ? " on" : "") + '">' + escapeHtml(codCanonSuf(it.cod)) + ' <b>' + escapeHtml(it.caj) + '</b></span>'; }).join("");
   return '<div class="mva-rto"><div class="mva-rto-h">' + head + '</div>' + (items.length ? '<div class="mva-rto-its">' + chips + '</div>' : '<div style="color:#94a3b8;font-size:11px">' + (loading ? "cargando…" : "Sin detalle de códigos.") + '</div>') + '</div>';
 }
 /* Bloque HTML de "movimientos por artículo de un depósito" (hint + rango de fechas +
@@ -15542,10 +15558,10 @@ function stkRacksArtRender() {
   if (mine.length) {
     const totInner = mine.reduce(function (s, x) { return s + (Number(x.innercajas) || 0); }, 0);
     const totMaster = mine.reduce(function (s, x) { return s + (Number(x.master_cajas) || 0); }, 0);
-    h += '<div class="stkpop-hint"><b>' + escapeHtml(codBase(_stkPop.cod)) + '</b> · racks (planimetría): <b>' + totInner + ' cajas</b>' + (totMaster ? ' · ' + totMaster + ' master' : '') + ' en ' + mine.length + ' posición(es).</div>';
+    h += '<div class="stkpop-hint"><b>' + escapeHtml(codCanonSuf(_stkPop.cod)) + '</b> · racks (planimetría): <b>' + totInner + ' cajas</b>' + (totMaster ? ' · ' + totMaster + ' master' : '') + ' en ' + mine.length + ' posición(es).</div>';
     h += '<div class="stkpop-grp"><div class="stkpop-nps">' + mine.map(function (x) { return '<span class="stkpop-np"><b>🏗 ' + escapeHtml(String(x.sector)) + '</b> · ' + (Number(x.innercajas) || 0) + ' cajas' + (Number(x.master_cajas) ? ' · ' + (Number(x.master_cajas)) + ' master' : '') + '</span>'; }).join("") + '</div></div>';
   } else {
-    h += '<div class="stkpop-hint">Sin posiciones de rack en la planimetría para ' + escapeHtml(codBase(_stkPop.cod)) + '.</div>';
+    h += '<div class="stkpop-hint">Sin posiciones de rack en la planimetría para ' + escapeHtml(codCanonSuf(_stkPop.cod)) + '.</div>';
   }
   h += '<div class="stkpop-hint" style="margin-top:8px;font-weight:800;color:#0f172a;">Movimientos de racks</div>';
   h += _stkMovsBlock();
@@ -16877,7 +16893,7 @@ function stkBodyCapacidad() {
     h += '<div style="background:#f1f5f9;border:1.5px solid #cbd5e1;border-radius:11px;padding:10px 12px;margin:0 0 12px;color:#475569;font-size:12.5px;line-height:1.4;">' +
       '<b>🚫 ' + discOcupa.length + ' discontinuado(s) que todavía ocupan lugar en góndola.</b> No se venden más — conviene <b>liberar el sector</b> (marcarlo “Libre” en Editar Planimetría) para reasignarlo.' +
       '<div style="margin-top:7px;">' + discOcupa.map(function (r) {
-        return '<span style="display:inline-block;background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:3px 8px;margin:0 4px 4px 0;font-family:Consolas,Menlo,monospace;"><b>' + escapeHtml(r.cod) + '</b> <span style="color:#64748b;font-family:system-ui;">(' + r.capacidad + ' cj · ' + escapeHtml((r.sectores || []).slice(0, 3).join(", ")) + ')</span></span>';
+        return '<span style="display:inline-block;background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:3px 8px;margin:0 4px 4px 0;font-family:Consolas,Menlo,monospace;"><b>' + escapeHtml(codCanonSuf(r.cod)) + '</b> <span style="color:#64748b;font-family:system-ui;">(' + r.capacidad + ' cj · ' + escapeHtml((r.sectores || []).slice(0, 3).join(", ")) + ')</span></span>';
       }).join("") + '</div></div>';
   }
   h += '<input class="stk-filtro" type="search" placeholder="🔎 Buscar código / sector" value="' + escapeHtml(_stk.filtro) + '" oninput="if(_stk){_stk.filtro=this.value;stkRender();}">';
@@ -16913,7 +16929,7 @@ function stkBodyCapacidad() {
     } else {
       secCell = escapeHtml(_secs.slice(0, 2).join(", ")) + ' <span style="color:#1e6bd6;cursor:pointer;font-weight:800;" title="Ver todas las ubicaciones" onclick="stkCapToggleSec(\'' + _enc + '\')">+' + (_secs.length - 2) + ' ubic.</span>';
     }
-    h += '<tr><td class="stk-cod">' + escapeHtml(r.cod) + '</td><td style="font-size:12px;color:#475569;max-width:240px;">' + secCell + '</td><td class="num"><b>' + r.capacidad + '</b></td><td class="num">' + (r.proyMes ? r.proyMes : "—") + '</td><td class="num">' + mesesCell + '</td><td class="num">' + (r.max != null ? r.max : "—") + '</td><td class="num">' + flag + '</td></tr>';
+    h += '<tr><td class="stk-cod">' + escapeHtml(codCanonSuf(r.cod)) + '</td><td style="font-size:12px;color:#475569;max-width:240px;">' + secCell + '</td><td class="num"><b>' + r.capacidad + '</b></td><td class="num">' + (r.proyMes ? r.proyMes : "—") + '</td><td class="num">' + mesesCell + '</td><td class="num">' + (r.max != null ? r.max : "—") + '</td><td class="num">' + flag + '</td></tr>';
   });
   h += '</tbody></table>';
   return h;
@@ -17196,7 +17212,7 @@ async function stkShowConteHistorico() {
       const difTxt = dif !== null ? ((dif > 0 ? '+' : '') + dif) : '—';
       const difCol = dif !== null ? (dif > 0 ? 'green' : dif < 0 ? 'red' : '#666') : '#999';
       const fecha = new Date(row.ts).toLocaleDateString('es-AR');
-      html += '<tr><td style="border:1px solid #ddd;padding:4px">' + escapeHtml(row.cod) + '</td>' +
+      html += '<tr><td style="border:1px solid #ddd;padding:4px">' + escapeHtml(codCanonSuf(row.cod)) + '</td>' +
         '<td style="border:1px solid #ddd;padding:4px;text-align:right">' + escapeHtml(String(cant)) + '</td>' +
         '<td style="border:1px solid #ddd;padding:4px;text-align:right;color:#666">' + escapeHtml(String(sis)) + '</td>' +
         '<td style="border:1px solid #ddd;padding:4px;text-align:right;font-weight:800;color:' + difCol + '">' + difTxt + '</td>' +
@@ -17254,7 +17270,7 @@ function stkBodyConteosRealizados() {
       var difTxt = dif !== null ? ((dif > 0 ? '+' : '') + dif) : '?';
       var difCol = dif !== null ? (dif > 0 ? '#16a34a' : dif < 0 ? '#dc2626' : '#64748b') : '#94a3b8';
       var idAttr = escapeHtml(String(row.id));
-      h += '<tr><td><b>' + escapeHtml(row.cod) + '</b></td>' +
+      h += '<tr><td><b>' + escapeHtml(codCanonSuf(row.cod)) + '</b></td>' +
         '<td>' + (row.deposito === 'insumos' ? '📋 Ins' : '📦 Merc') + '</td>' +
         '<td class="num">' + contado + '</td>' +
         '<td class="num" style="color:#64748b">' + (sistema !== null ? sistema : '?') + '</td>' +
@@ -17366,7 +17382,7 @@ function stkBodyIngresos() {
     const g = groups[k]; const tot = g.reduce(function (s, mv) { return s + Number(mv.delta || 0); }, 0);
     h += '<div class="stk-grp"><div class="stk-grp-h">' + (_stk.ingMode === "remito" ? "Remito " : "Código ") + escapeHtml(k) + ' <span class="stk-grp-tot">' + tot + " caja(s)</span></div>";
     h += g.sort(function (a, b) { return new Date(b.ts) - new Date(a.ts); }).map(function (mv) {
-      return '<div class="stk-ing"><span class="stk-mv-ts">' + escapeHtml(stockFmtTs(mv.ts)) + '</span><span class="stk-ing-cod">' + escapeHtml(mv.cod_art) + '</span><span class="stk-ing-desc">' + escapeHtml(mv.descripcion || "") + '</span>' + (_stk.ingMode === "codigo" ? '<span class="stk-ing-rto">rto ' + escapeHtml(mv.ref || "—") + "</span>" : "") + '<span class="stk-mv-d pos">+' + mv.delta + "</span></div>";
+      return '<div class="stk-ing"><span class="stk-mv-ts">' + escapeHtml(stockFmtTs(mv.ts)) + '</span><span class="stk-ing-cod">' + escapeHtml(codCanonSuf(mv.cod_art)) + '</span><span class="stk-ing-desc">' + escapeHtml(mv.descripcion || "") + '</span>' + (_stk.ingMode === "codigo" ? '<span class="stk-ing-rto">rto ' + escapeHtml(mv.ref || "—") + "</span>" : "") + '<span class="stk-mv-d pos">+' + mv.delta + "</span></div>";
     }).join("") + "</div>";
   });
   return h;
@@ -17384,7 +17400,7 @@ function stkBodySalidas() {
   if (!shown.length) h += '<tr><td colspan="5" class="stk-empty">Sin salidas.</td></tr>';
   shown.forEach(function (mv) {
     const dest = mv.tipo === "salida_cervantes" ? ("🚚 Cervantes" + (mv.ref ? " · " + escapeHtml(mv.ref) : "")) : ("tanda " + escapeHtml(mv.ref || "—"));
-    h += '<tr><td>' + escapeHtml(stockFmtTs(mv.ts)) + '</td><td class="stk-cod">' + escapeHtml(mv.cod_art) + '</td><td class="stk-desc">' + escapeHtml(mv.descripcion || "—") + '</td><td class="num stk-neg">' + mv.delta + '</td><td>' + dest + "</td></tr>";
+    h += '<tr><td>' + escapeHtml(stockFmtTs(mv.ts)) + '</td><td class="stk-cod">' + escapeHtml(codCanonSuf(mv.cod_art)) + '</td><td class="stk-desc">' + escapeHtml(mv.descripcion || "—") + '</td><td class="num stk-neg">' + mv.delta + '</td><td>' + dest + "</td></tr>";
   });
   return h + "</tbody></table>";
 }
@@ -18457,7 +18473,7 @@ function stkBodyAlertas() {
     const dif = Math.round((alerta.diferencia || 0) * 10) / 10;
     const col = dif > 0 ? '#b45309' : '#b91c1c';
     h += '<div style="display:flex;align-items:center;gap:8px;padding:6px;border-bottom:1px solid #fecaca;font-size:11.5px;">' +
-      '<span style="flex:1;"><b>' + escapeHtml(alerta.cod) + '</b>' + (alerta.sector ? ' (' + escapeHtml(alerta.sector) + ')' : '') + '</span>' +
+      '<span style="flex:1;"><b>' + escapeHtml(codCanonSuf(alerta.cod)) + '</b>' + (alerta.sector ? ' (' + escapeHtml(alerta.sector) + ')' : '') + '</span>' +
       '<span>Conteo: ' + alerta.cajas_conteo + '</span>' +
       '<span>Sistema: ' + alerta.cajas_sistema + '</span>' +
       '<span style="color:' + col + ';font-weight:800;">' + (dif > 0 ? '+' : '') + dif + '</span>' +
@@ -18529,7 +18545,7 @@ function stkBodyHistAjustes() {
     var nom = (typeof _empleadosNombres !== 'undefined' && _empleadosNombres && _empleadosNombres.get(String(leg))) || '';
     var quien = nom ? escapeHtml(nom) + ' <span style="color:#94a3b8">(L' + escapeHtml(leg) + ')</span>' : (leg ? 'L' + escapeHtml(leg) : '—');
     h += '<tr><td style="white-space:nowrap;font-size:0.85em;">' + dd + ' ' + hh + '</td>' +
-      '<td><b>' + escapeHtml(codBase(mv.cod_art || '')) + '</b></td>' +
+      '<td><b>' + escapeHtml(codCanonSuf(mv.cod_art || '')) + '</b></td>' +
       '<td style="font-size:0.85em;color:#475569;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(mv.descripcion || '') + '</td>' +
       '<td style="font-size:0.85em;">' + escapeHtml(mv.deposito || '') + '</td>' +
       '<td class="num" style="color:' + col + ';font-weight:800">' + (delta > 0 ? '+' : '') + delta + '</td>' +
@@ -18870,13 +18886,13 @@ function stkAutoBajadaSection() {
     h += '<div class="stk-tblwrap"><table class="stk-tbl"><thead><tr><th>Código</th><th class="num">Cap.</th><th class="num">Góndola</th><th class="num">Hueco</th><th class="num">Bajar</th><th class="num">Racks</th></tr></thead><tbody>';
     r.bajar.forEach(function (x) {
       totC += x.cajas; totM += x.masters;
-      h += '<tr><td class="stk-cod">' + escapeHtml(codBase(x.cod)) + '</td><td class="num">' + x.capg + '</td><td class="num">' + x.gond + '</td><td class="num">' + x.hueco + '</td><td class="num"><b>' + x.masters + ' mstr</b> · ' + x.cajas + ' cj</td><td class="num">' + x.racks + '</td></tr>';
+      h += '<tr><td class="stk-cod">' + escapeHtml(codCanonSuf(x.cod)) + '</td><td class="num">' + x.capg + '</td><td class="num">' + x.gond + '</td><td class="num">' + x.hueco + '</td><td class="num"><b>' + x.masters + ' mstr</b> · ' + x.cajas + ' cj</td><td class="num">' + x.racks + '</td></tr>';
     });
     h += '</tbody></table></div>';
     h += '<div style="font-size:12.5px;color:#334155;margin-top:6px;"><b>Total a bajar:</b> ' + totM + ' master · ' + totC + ' cajas.</div>';
     h += '<button class="stk-btn ok" style="width:100%;margin-top:10px;" onclick="stkAutoBajadaGenerar()">📋 Generar la bajada (queda para que Marianela apruebe)</button>';
   }
-  if (r.sinMaster.length) h += '<div style="font-size:11.5px;color:#92400e;margin-top:6px;">⚠ ' + r.sinMaster.length + ' con hueco y stock en racks pero <b>sin master (CxM) cargado</b> → no entran al automático: ' + r.sinMaster.map(function (x) { return escapeHtml(codBase(x.cod)); }).join(", ") + '.</div>';
+  if (r.sinMaster.length) h += '<div style="font-size:11.5px;color:#92400e;margin-top:6px;">⚠ ' + r.sinMaster.length + ' con hueco y stock en racks pero <b>sin master (CxM) cargado</b> → no entran al automático: ' + r.sinMaster.map(function (x) { return escapeHtml(codCanonSuf(x.cod)); }).join(", ") + '.</div>';
   return h + '<div style="height:14px;border-bottom:1px solid #e2e8f0;margin:12px 0;"></div>';
 }
 /* Zonas de racks reservadas para INSUMOS (regla del dueño): V01–V16 + V21/V22 y
@@ -19002,7 +19018,7 @@ function stkBodyRacks() {
   if (!arts.length) h += '<tr><td colspan="5" class="stk-empty">Sin stock en racks. Cargalo en ⚙ Ajustes (depósito = racks).</td></tr>';
   arts.forEach(function (a) {
     const f = _stk.factors[String(a.cod).toUpperCase()] || {}, M = f.cajasXMaster > 0 ? f.cajasXMaster : 0, U = f.uniXCaja > 0 ? f.uniXCaja : 0;
-    h += '<tr><td class="stk-cod">' + escapeHtml(codBase(a.cod)) + '</td><td class="stk-desc">' + escapeHtml(artNombre(a.cod, a.desc) || "—") + '</td><td class="num">' + (M ? (Math.round((a.racks / M) * 100) / 100) : "—") + '</td><td class="num"><b>' + a.racks + '</b></td><td class="num">' + (U ? (a.racks * U) : "—") + "</td></tr>";
+    h += '<tr><td class="stk-cod">' + escapeHtml(codCanonSuf(a.cod)) + '</td><td class="stk-desc">' + escapeHtml(artNombre(a.cod, a.desc) || "—") + '</td><td class="num">' + (M ? (Math.round((a.racks / M) * 100) / 100) : "—") + '</td><td class="num"><b>' + a.racks + '</b></td><td class="num">' + (U ? (a.racks * U) : "—") + "</td></tr>";
   });
   return h + "</tbody></table>";
 }
@@ -19114,7 +19130,7 @@ function brRender() {
   let h = '<div class="br-hint">Marcá cuántas <b>cajas</b> bajás de cada artículo. El stock se descuenta <b>al registrar</b>.</div>';
   h += _br.items.map(function (it, i) {
     const u = stkUnits(it.bajar, it.cod, _br.factors), ud = stkUnits(it.disponible, it.cod, _br.factors);
-    return '<div class="br-row"><div class="br-r1"><div class="br-info"><span class="br-cod">' + escapeHtml(it.cod) + '</span> <span class="br-desc">' + escapeHtml(it.desc || "") + '</span><div class="br-disp">en racks: ' + it.disponible + " cajas" + (ud ? " · " + ud : "") + '</div></div><div class="br-stp"><button class="br-sb" onclick="brChg(' + i + ',-1)">–</button><input class="br-inp" type="number" min="0" max="' + it.disponible + '" inputmode="numeric" value="' + it.bajar + '" oninput="brSet(' + i + ',this.value)"><button class="br-sb" onclick="brChg(' + i + ',1)">+</button></div></div>' + (it.bajar > 0 && u ? '<div class="br-conv">bajás: ' + it.bajar + " cajas · " + u + "</div>" : "") + "</div>";
+    return '<div class="br-row"><div class="br-r1"><div class="br-info"><span class="br-cod">' + escapeHtml(codCanonSuf(it.cod)) + '</span> <span class="br-desc">' + escapeHtml(it.desc || "") + '</span><div class="br-disp">en racks: ' + it.disponible + " cajas" + (ud ? " · " + ud : "") + '</div></div><div class="br-stp"><button class="br-sb" onclick="brChg(' + i + ',-1)">–</button><input class="br-inp" type="number" min="0" max="' + it.disponible + '" inputmode="numeric" value="' + it.bajar + '" oninput="brSet(' + i + ',this.value)"><button class="br-sb" onclick="brChg(' + i + ',1)">+</button></div></div>' + (it.bajar > 0 && u ? '<div class="br-conv">bajás: ' + it.bajar + " cajas · " + u + "</div>" : "") + "</div>";
   }).join("");
   const tot = _br.items.reduce(function (s, it) { return s + it.bajar; }, 0);
   h += '<button class="br-fin"' + (tot <= 0 ? " disabled" : "") + ' onclick="brConfirmar()">✓ Registrar bajada de ' + tot + " caja(s)</button>";
@@ -20036,7 +20052,7 @@ function scRender() {
   if (!shown.length) h += '<div class="sc-empty">No hay artículos que coincidan.</div>';
   else h += shown.map(function (it) {
     const i = _sc.items.indexOf(it);
-    return '<div class="sc-row"><div class="sc-info"><span class="sc-cod">' + escapeHtml(codBase(it.cod)) + '</span> <span class="sc-desc">' + escapeHtml(it.desc || "") + '</span><div class="sc-disp">en góndola: ' + it.disponible + ' cajas</div></div><div class="sc-stp"><button class="sc-sb" onclick="scChg(' + i + ',-1)">–</button><input class="sc-inp" type="number" min="0" max="' + it.disponible + '" inputmode="numeric" value="' + it.sacar + '" oninput="scSet(' + i + ',this.value)"><button class="sc-sb" onclick="scChg(' + i + ',1)">+</button></div></div>';
+    return '<div class="sc-row"><div class="sc-info"><span class="sc-cod">' + escapeHtml(codCanonSuf(it.cod)) + '</span> <span class="sc-desc">' + escapeHtml(it.desc || "") + '</span><div class="sc-disp">en góndola: ' + it.disponible + ' cajas</div></div><div class="sc-stp"><button class="sc-sb" onclick="scChg(' + i + ',-1)">–</button><input class="sc-inp" type="number" min="0" max="' + it.disponible + '" inputmode="numeric" value="' + it.sacar + '" oninput="scSet(' + i + ',this.value)"><button class="sc-sb" onclick="scChg(' + i + ',1)">+</button></div></div>';
   }).join("");
   const tot = _sc.items.reduce(function (s, it) { return s + it.sacar; }, 0);
   h += '<button class="sc-fin"' + (tot <= 0 ? " disabled" : "") + ' onclick="scConfirmar()">✓ Mandar ' + tot + ' caja(s) a Cervantes</button>';
@@ -20190,7 +20206,7 @@ function mgRender() {
         const _first = _cel[0], _rest = _cel.slice(1, 3).join(", ");
         const _more = _cel.length > 3 ? (" +" + (_cel.length - 3)) : "";
         const _restTxt = _cel.length > 1 ? (' <span style="opacity:.75">(' + escapeHtml(_rest + _more) + ')</span>') : '';
-        gfill += '<div class="mg-gfill loc" title="Ubicaciones en góndola de ' + escapeHtml(it.cod) + ': ' + escapeHtml(_cel.join(", ")) + '">📍 Va en <b>' + escapeHtml(_first) + '</b>' + _restTxt + ' · ' + _cel.length + (_cel.length === 1 ? ' ubicación' : ' ubicaciones') + '</div>';
+        gfill += '<div class="mg-gfill loc" title="Ubicaciones en góndola de ' + escapeHtml(codCanonSuf(it.cod)) + ': ' + escapeHtml(_cel.join(", ")) + '">📍 Va en <b>' + escapeHtml(_first) + '</b>' + _restTxt + ' · ' + _cel.length + (_cel.length === 1 ? ' ubicación' : ' ubicaciones') + '</div>';
       } else {
         gfill += '<div class="mg-gfill unk">📍 sin ubicación fija cargada</div>';
       }
@@ -20204,7 +20220,7 @@ function mgRender() {
     const mcHint = (!it.manual && it._maxMC != null && it._cxm)
       ? '<div class="mg-mchint-row"><span class="mg-mchint">📐 Máx sin rebalsar: <b>' + it._maxMC + ' MC</b> (' + (it._maxMC * it._cxm) + ' cajas)</span></div>' : '';
     return '<div class="mg-row">' +
-      '<div class="mg-headline"><div class="mg-info"><span class="mg-cod">' + escapeHtml(it.cod) + '</span> <span class="mg-desc">' + escapeHtml(it.desc || "") + '</span>' + gfill + '</div>' + head + '</div>' + mcHint +
+      '<div class="mg-headline"><div class="mg-info"><span class="mg-cod">' + escapeHtml(codCanonSuf(it.cod)) + '</span> <span class="mg-desc">' + escapeHtml(it.desc || "") + '</span>' + gfill + '</div>' + head + '</div>' + mcHint +
       (it.excOn
         ? '<div class="mg-exp"><div class="mg-col g"><div class="mg-lbl gond">Góndola</div>' + gondStp(false) + '</div>' +
             '<div class="mg-col e"><button class="mg-exc-hdr" onclick="mgToggleExc(' + i + ')">☑ Excedente</button>' + excStp + '</div></div>' +
@@ -20404,7 +20420,7 @@ function excRender() {
     const rest = it.disponible - it.bajar;
     const restTxt = '<span class="exc-rest' + (rest <= 0 ? ' ok' : '') + '">' + (rest <= 0 ? '✓ Todo' : 'Quedan ' + rest) + '</span>';
     return '<div class="exc-row">' +
-      '<div class="exc-headline"><div class="exc-info"><span class="exc-cod">' + escapeHtml(codBase(it.cod)) + '</span> <span class="exc-desc">' + escapeHtml(it.desc || "") + '</span>' + ubicHtml + '</div><span class="exc-av">excedente <b>' + it.disponible + '</b></span></div>' +
+      '<div class="exc-headline"><div class="exc-info"><span class="exc-cod">' + escapeHtml(codCanonSuf(it.cod)) + '</span> <span class="exc-desc">' + escapeHtml(it.desc || "") + '</span>' + ubicHtml + '</div><span class="exc-av">excedente <b>' + it.disponible + '</b></span></div>' +
       '<div class="exc-foot"><div class="exc-stp"><button class="exc-sb" onclick="excChg(' + i + ',-1)">–</button><input class="exc-inp" type="number" min="0" max="' + mx + '" inputmode="numeric" value="' + it.bajar + '" oninput="excSet(' + i + ',this.value)"><button class="exc-sb" onclick="excChg(' + i + ',1)">+</button></div>' + restTxt + '</div>' +
       '</div>';
   }).join("");
@@ -20589,7 +20605,7 @@ function renderGuardarOrden() {
       : (x.rk > 0 && it.cxm <= 0 ? ' <span style="color:#b45309;font-size:10.5px;font-weight:700;">· s/master</span>' : '');
     const bajarTxt = x.cajas > 0 ? ('<span style="font-weight:900;color:#0f172a;">' + x.cajas + '</span>' + mcTxt) : '<span style="color:#94a3b8;font-weight:700;">0 · góndola llena</span>';
     return '<tr style="border-bottom:1px solid #f1f5f9;' + (urg ? 'background:#fef2f2;' : '') + '">' +
-      '<td style="padding:6px;font-weight:800;font-family:Consolas,Menlo,monospace;">' + (urg ? '🆘 ' : '') + escapeHtml(codBase(it.cod)) + '</td>' +
+      '<td style="padding:6px;font-weight:800;font-family:Consolas,Menlo,monospace;">' + (urg ? '🆘 ' : '') + escapeHtml(codCanonSuf(it.cod)) + '</td>' +
       '<td style="padding:6px;color:#475569;">' + escapeHtml(it.desc || "") + '</td>' +
       '<td style="padding:6px;text-align:right;font-weight:800;color:#15803d;">' + x.disp + '</td>' +
       '<td style="padding:6px;text-align:right;">' + bajarTxt + '</td>' +
@@ -20612,7 +20628,7 @@ function gordenPrint() {
   const totDisp = rows.reduce(function (s, x) { return s + x.disp; }, 0);
   t += '<h1>Orden de guardado — ' + lblF + '</h1><div class="sub">' + escapeHtml(fecha) + ' · góndola más vacía primero · ' + rows.length + ' códigos · <b>hay para guardar: ' + totDisp + ' · entran ahora: ' + totCajas + ' cajas</b></div>';
   t += '<table><thead><tr><th>Cód</th><th>Descripción</th><th class="n">Hay p/ guardar</th><th class="n">Cajas a bajar</th><th class="n">Góndola</th><th class="n">Máximo</th></tr></thead><tbody>';
-  t += rows.map(function (x) { const it = x.it; const extra = x.mc > 0 ? (' (' + x.mc + ' MC)') : (x.rk > 0 && it.cxm <= 0 ? ' (s/master)' : ''); return '<tr><td>' + escapeHtml(codBase(it.cod)) + '</td><td>' + escapeHtml(it.desc || "") + '</td><td class="n">' + x.disp + '</td><td class="n">' + x.cajas + extra + '</td><td class="n">' + it.gond + '</td><td class="n">' + it.cap + '</td></tr>'; }).join("");
+  t += rows.map(function (x) { const it = x.it; const extra = x.mc > 0 ? (' (' + x.mc + ' MC)') : (x.rk > 0 && it.cxm <= 0 ? ' (s/master)' : ''); return '<tr><td>' + escapeHtml(codCanonSuf(it.cod)) + '</td><td>' + escapeHtml(it.desc || "") + '</td><td class="n">' + x.disp + '</td><td class="n">' + x.cajas + extra + '</td><td class="n">' + it.gond + '</td><td class="n">' + it.cap + '</td></tr>'; }).join("");
   t += '</tbody><tfoot><tr><th colspan="2" style="text-align:left;">TOTAL (' + rows.length + ')</th><th class="n">' + totDisp + '</th><th class="n">' + totCajas + '</th><th colspan="2"></th></tr></tfoot></table></body></html>';
   const w = window.open("", "_blank");
   if (!w) { alert("Habilitá las ventanas emergentes para poder imprimir."); return; }
@@ -20722,7 +20738,7 @@ function rkbRender() {
         return '<span class="rkb-loc' + on + '" onclick="rkbSetSec(' + i + ',\'' + escapeHtml(L.sector) + '\')">' + escapeHtml(L.sector) + " · " + q + "</span>";
       }).join("") + "</div>";
     }
-    return '<div class="rkb-row"><div class="rkb-info"><span class="rkb-cod">' + escapeHtml(codBase(it.cod)) + '</span> <span class="rkb-desc">' + escapeHtml(it.desc || "") + '</span><div>' + head + '</div>' + locsHtml + '</div>' +
+    return '<div class="rkb-row"><div class="rkb-info"><span class="rkb-cod">' + escapeHtml(codCanonSuf(it.cod)) + '</span> <span class="rkb-desc">' + escapeHtml(it.desc || "") + '</span><div>' + head + '</div>' + locsHtml + '</div>' +
       '<div class="rkb-stpcol"><span class="rkb-u">' + (usaMaster ? "master" : "cajas") + '</span><div class="rkb-stp"><button class="rkb-sb" onclick="rkbChg(' + i + ',-1)">–</button><input class="rkb-inp" type="number" min="0" max="' + mx + '" inputmode="numeric" value="' + it.baja + '" oninput="rkbSet(' + i + ',this.value)"><button class="rkb-sb" onclick="rkbChg(' + i + ',1)">+</button></div></div></div>';
   }).join("");
   const tot = _rkb.items.reduce(function (s, it) { return s + (it.baja || 0); }, 0);
@@ -20852,7 +20868,7 @@ function mvRender() {
   h += shown.map(function (r) {
     const inner = Number(r.innercajas) || 0, master = Number(r.master_cajas) || 0;
     return '<button class="mv-row" onclick="mvPickOrigen(\'' + encodeURIComponent(r.sector) + '\',\'' + encodeURIComponent(String(r.cod_art)) + '\')">' +
-      '<div class="mv-r1"><span class="mv-sec">' + escapeHtml(r.sector) + '</span> · <span class="mv-cod">' + escapeHtml(String(r.cod_art)) + '</span> <span class="mv-desc">' + escapeHtml(artNombre(r.cod_art, "") || "") + '</span></div>' +
+      '<div class="mv-r1"><span class="mv-sec">' + escapeHtml(r.sector) + '</span> · <span class="mv-cod">' + escapeHtml(codCanonSuf(String(r.cod_art))) + '</span> <span class="mv-desc">' + escapeHtml(artNombre(r.cod_art, "") || "") + '</span></div>' +
       '<div class="mv-av">' + inner + ' cajas' + (master ? ' · ' + master + ' master' : '') + '</div></button>';
   }).join("");
   _renderKeepFocus(body, h);
@@ -20880,11 +20896,11 @@ function mvRenderStep2(body) {
   const fd = _mv.filtroD.trim().toLowerCase();
   const dShown = fd ? dests.filter(function (r) { return String(r.sector).toLowerCase().indexOf(fd) >= 0; }) : dests;
   let h = '<button class="mv-back" onclick="mvBack()">← Volver</button>';
-  h += '<div class="mv-sel"><div class="mv-r1"><span class="mv-sec">' + escapeHtml(o.sector) + '</span> · <span class="mv-cod">' + escapeHtml(codBase(o.cod)) + '</span> <span class="mv-desc">' + escapeHtml(o.desc) + '</span></div><div class="mv-av">tiene ' + o.inner + ' cajas' + (o.master ? ' · ' + o.master + ' master' : '') + '</div></div>';
+  h += '<div class="mv-sel"><div class="mv-r1"><span class="mv-sec">' + escapeHtml(o.sector) + '</span> · <span class="mv-cod">' + escapeHtml(codCanonSuf(o.cod)) + '</span> <span class="mv-desc">' + escapeHtml(o.desc) + '</span></div><div class="mv-av">tiene ' + o.inner + ' cajas' + (o.master ? ' · ' + o.master + ' master' : '') + '</div></div>';
   h += '<div class="mv-fld"><div class="mv-lbl">¿Cuántas cajas movés?</div><div class="mv-stp"><button class="mv-sb" onclick="mvChg(-1)">–</button><input class="mv-inp" type="number" min="1" max="' + o.inner + '" inputmode="numeric" value="' + _mv.mover + '" oninput="mvSet(this.value)"><button class="mv-sb" onclick="mvChg(1)">+</button></div></div>';
   h += '<div class="mv-fld"><div class="mv-lbl">¿A qué ubicación?</div>';
   h += '<input class="mv-search" type="search" autocomplete="off" placeholder="🔎 Buscar ubicación…" value="' + escapeHtml(_mv.filtroD) + '" oninput="if(_mv){_mv.filtroD=this.value;mvRender();}">';
-  if (!dShown.length) h += '<div class="mv-empty">No hay ubicaciones libres ni con ' + escapeHtml(o.cod) + '.</div>';
+  if (!dShown.length) h += '<div class="mv-empty">No hay ubicaciones libres ni con ' + escapeHtml(codCanonSuf(o.cod)) + '.</div>';
   else h += '<div class="mv-dests">' + dShown.map(function (r) {
     const libre = r.estado !== "ocupado";
     const on = _mv.destino === r.sector;
@@ -20984,7 +21000,7 @@ function eaRender() {
       ? ubs.map(function (u) { return '<span class="ea-loc-chip" onclick="eaEditUbic(\'' + escapeHtml(it.cod) + '\',' + u.id + ')">' + escapeHtml(u.sector) + (u.inner ? ' · ' + u.inner : '') + '</span>'; }).join("")
       : '<span class="ea-loc-none">sin ubicación</span> ';
     loc += '<button class="ea-loc-add" onclick="eaEditUbic(\'' + escapeHtml(it.cod) + '\',0)">+ ubicación</button></div>';
-    return '<div class="ea-row"><div class="ea-info"><span class="ea-cod">' + escapeHtml(codBase(it.cod)) + '</span> <span class="ea-desc">' + escapeHtml(it.desc || "") + '</span><div class="ea-av">para envasar: <b>' + it.saldo + '</b> cajas</div>' + loc + '</div>' +
+    return '<div class="ea-row"><div class="ea-info"><span class="ea-cod">' + escapeHtml(codCanonSuf(it.cod)) + '</span> <span class="ea-desc">' + escapeHtml(it.desc || "") + '</span><div class="ea-av">para envasar: <b>' + it.saldo + '</b> cajas</div>' + loc + '</div>' +
       '<div class="ea-stpcol"><span class="ea-u">cajas</span><div class="ea-stp"><button class="ea-sb" onclick="eaChg(' + i + ',-1)">–</button><input class="ea-inp" type="number" min="0" max="' + mx + '" inputmode="numeric" value="' + it.baja + '" oninput="eaSet(' + i + ',this.value)"><button class="ea-sb" onclick="eaChg(' + i + ',1)">+</button></div></div></div>';
   }).join("");
   const tot = _ea.items.reduce(function (s, it) { return s + (it.baja || 0); }, 0);
@@ -20998,7 +21014,7 @@ function eaRenderEdit(body) {
   const e = _ea.edit, desc = artNombre(e.cod, "") || "";
   let h = '<button class="ea-back" onclick="eaUbicCancel()">← Volver</button>';
   h += '<div class="ea-ed">';
-  h += '<div class="ea-ed-fld"><div class="ea-ed-lbl">' + (e.id ? "Mover / editar" : "Nueva ubicación") + ' — ' + escapeHtml(e.cod) + '</div>';
+  h += '<div class="ea-ed-fld"><div class="ea-ed-lbl">' + (e.id ? "Mover / editar" : "Nueva ubicación") + ' — ' + escapeHtml(codCanonSuf(e.cod)) + '</div>';
   if (desc) h += '<div class="ea-desc" style="margin-bottom:9px">' + escapeHtml(desc) + '</div>';
   h += '<div class="ea-ed-lbl">Sector</div><input class="ea-ed-inp" id="eaEdSector" type="text" autocomplete="off" placeholder="ej. Y29" value="' + escapeHtml(e.sector || "") + '" oninput="eaEditSet(\'sector\',this.value)"></div>';
   h += '<div class="ea-ed-row"><div class="ea-ed-fld"><div class="ea-ed-lbl">Master</div><input class="ea-ed-inp ea-ed-num" type="number" min="0" inputmode="numeric" value="' + (Number(e.master) || 0) + '" oninput="eaEditSet(\'master\',this.value)"></div>';
@@ -21182,10 +21198,10 @@ function irRender() {
       + '<button class="ir-segb' + (_ir.origen === "excedente" ? " on" : "") + '" onclick="irSetOrigen(\'excedente\')">Excedente</button>'
       + '</div></div>';
     h += '<div class="ir-fld"><div class="ir-lbl">Código con stock en ' + origTxt + '</div><input id="irPick" class="ir-inp" type="text" autocomplete="off" placeholder="🔎 buscar código o nombre" value="' + escapeHtml(_ir.codPick || "") + '" oninput="irSetPick(this.value)"></div>';
-    if (_ir.cod) h += '<div class="ir-desc">Elegido: <b>' + escapeHtml(codBase(_ir.cod)) + '</b> ' + escapeHtml(nombre || "") + ' · <b>' + Math.round(disp) + '</b> cajas en ' + origTxt + '</div>';
+    if (_ir.cod) h += '<div class="ir-desc">Elegido: <b>' + escapeHtml(codCanonSuf(_ir.cod)) + '</b> ' + escapeHtml(nombre || "") + ' · <b>' + Math.round(disp) + '</b> cajas en ' + origTxt + '</div>';
     h += _irListaNac();
     h += '<div class="ir-fld"><div class="ir-lbl">Cajas a mover' + (_ir.cod ? ' (máx ' + Math.round(disp) + ')' : '') + '</div><div class="ir-stp"><button class="ir-sb" onclick="irChgI(-1)">–</button><input class="ir-inp ir-num" type="number" min="0" inputmode="numeric" value="' + (Number(_ir.inner) || 0) + '" oninput="irSetI(this.value)"><button class="ir-sb" onclick="irChgI(1)">+</button></div></div>';
-    if (_ir.cod && Number(_ir.inner) > disp) h += '<div class="ir-warn">⚠ No hay tantas: solo hay ' + Math.round(disp) + ' cajas de ' + escapeHtml(codBase(_ir.cod)) + ' en ' + origTxt + '.</div>';
+    if (_ir.cod && Number(_ir.inner) > disp) h += '<div class="ir-warn">⚠ No hay tantas: solo hay ' + Math.round(disp) + ' cajas de ' + escapeHtml(codCanonSuf(_ir.cod)) + ' en ' + origTxt + '.</div>';
   } else {
     h += '<div class="ir-hint">Cargá lo que llegó, <b>un palet por vez</b>: código, cuántos <b>masters</b> (te calcula las cajas si sé el CxM) y el <b>sector</b> (te sugiero uno libre). Se guarda en el mapa de racks y en el stock.</div>';
     h += '<div class="ir-fld"><div class="ir-lbl">Código</div><input id="irCod" class="ir-inp" type="text" autocomplete="off" placeholder="ej. 582E" value="' + escapeHtml(codBase(_ir.cod)) + '" oninput="irSetCod(this.value)"></div>';
@@ -21203,7 +21219,7 @@ function irRender() {
   h += '<button class="ir-fin"' + (ok ? "" : " disabled") + ' onclick="irRevisar()">Revisar carga →' + (secU && Number(_ir.inner) > 0 ? ' (' + (Number(_ir.inner) || 0) + ' cajas a ' + escapeHtml(secU) + ')' : '') + '</button>';
   if (_ir.done.length) {
     h += '<div class="ir-done-h">Cargados en esta sesión (' + _ir.done.length + ')</div>';
-    h += _ir.done.map(function (d) { return '<div class="ir-done-row"><span class="ir-done-sec">' + escapeHtml(d.sector) + '</span> <span class="ir-done-cod">' + escapeHtml(codBase(d.cod)) + '</span><span class="ir-done-q">' + d.inner + ' cajas' + (d.masters ? ' · ' + d.masters + ' master' : '') + (d.nac ? ' · 🏠 desde ' + escapeHtml(d.nac) : '') + '</span></div>'; }).join("");
+    h += _ir.done.map(function (d) { return '<div class="ir-done-row"><span class="ir-done-sec">' + escapeHtml(d.sector) + '</span> <span class="ir-done-cod">' + escapeHtml(codCanonSuf(d.cod)) + '</span><span class="ir-done-q">' + d.inner + ' cajas' + (d.masters ? ' · ' + d.masters + ' master' : '') + (d.nac ? ' · 🏠 desde ' + escapeHtml(d.nac) : '') + '</span></div>'; }).join("");
   }
   _renderKeepFocus(body, h);
 }
@@ -21238,7 +21254,7 @@ function _irListaNac() {
   arr.slice(0, 40).forEach(function (x) {
     const on = String(_ir.cod) === String(x.cod);
     h += '<button onclick="irPickCod(\'' + encodeURIComponent(x.cod) + '\')" style="display:flex;width:100%;align-items:baseline;gap:8px;padding:8px 10px;border:none;border-bottom:1px solid #f1f5f9;background:' + (on ? "#0e7490" : "#fff") + ';color:' + (on ? "#fff" : "#0f172a") + ';cursor:pointer;text-align:left;font-size:13.5px;">'
-      + '<span style="font-family:Consolas,Menlo,monospace;font-weight:800;">' + escapeHtml(codBase(x.cod)) + '</span>'
+      + '<span style="font-family:Consolas,Menlo,monospace;font-weight:800;">' + escapeHtml(codCanonSuf(x.cod)) + '</span>'
       + '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:' + (on ? "#e0f2fe" : "#475569") + ';">' + escapeHtml(x.nom || "—") + '</span>'
       + '<span style="font-weight:800;white-space:nowrap;">' + Math.round(x.q) + ' cj</span></button>';
   });
@@ -21272,7 +21288,7 @@ function irRenderConfirm(body) {
   let h = '<div class="ir-hint">Revisá que esté todo bien antes de confirmar. Si algo está mal, tocá <b>← Volver</b>.' + (nac ? ' <b>Nacional</b>: descuenta de <b>' + origTxt + '</b> y ocupa el rack (NO crea stock nuevo).' : '') + '</div>';
   h += '<div class="ir-rev">';
   h += '<div class="ir-rev-row"><span class="ir-rev-lbl">Tipo</span><span class="ir-rev-val ir-rev-txt">' + (nac ? '🏠 Nacional (traslado)' : '📦 Importación') + '</span></div>';
-  h += '<div class="ir-rev-row"><span class="ir-rev-lbl">Código</span><span class="ir-rev-val">' + escapeHtml(cod) + '</span></div>';
+  h += '<div class="ir-rev-row"><span class="ir-rev-lbl">Código</span><span class="ir-rev-val">' + escapeHtml(codCanonSuf(cod)) + '</span></div>';
   if (nombre) h += '<div class="ir-rev-row"><span class="ir-rev-lbl">Artículo</span><span class="ir-rev-val ir-rev-txt">' + escapeHtml(nombre) + '</span></div>';
   if (nac) h += '<div class="ir-rev-row"><span class="ir-rev-lbl">Origen</span><span class="ir-rev-val ir-rev-txt">' + escapeHtml(origTxt) + '</span></div>';
   h += '<div class="ir-rev-row"><span class="ir-rev-lbl">Sector</span><span class="ir-rev-val">' + escapeHtml(sector) + (suma ? ' <small class="ir-rev-sm">➕ suma a ' + escapeHtml(ocupadoPor) + '</small>' : '') + '</span></div>';
@@ -21615,7 +21631,7 @@ function cpRender() {
   if (_cp.falt && _cp.falt.length) {
     var _cpByCod = {}, _cpTot = 0;
     _cp.falt.forEach(function (e) { var c = String(e.cod_art || "?"); var q = Math.round(Number(e.cajas_falto) || 0); _cpByCod[c] = (_cpByCod[c] || 0) + q; _cpTot += q; });
-    var _cpDet = Object.keys(_cpByCod).sort().map(function (c) { return '<span style="white-space:nowrap;"><b>' + escapeHtml(c) + '</b> ' + _cpByCod[c] + '</span>'; }).join(' · ');
+    var _cpDet = Object.keys(_cpByCod).sort().map(function (c) { return '<span style="white-space:nowrap;"><b>' + escapeHtml(codCanonSuf(c)) + '</b> ' + _cpByCod[c] + '</span>'; }).join(' · ');
     h += '<div style="background:#eff6ff;border:1.5px solid #93c5fd;border-radius:12px;padding:11px 13px;margin-bottom:11px;">' +
       '<div style="font-size:15px;font-weight:900;color:#1e3a8a;">📥 Levantá de góndola <span style="font-size:20px;">' + _cpTot + '</span> cajas en total</div>' +
       '<div style="font-size:13px;color:#1e40af;margin-top:5px;line-height:1.6;">' + _cpDet + '</div>' +
@@ -21634,7 +21650,7 @@ function cpRender() {
     let stockTxt = ag > 0 ? ("a guardar: " + ag) : (e._guardadoHoy ? ("guardado hoy" + (go > 0 ? " · góndola: " + go : "")) : "");
     const racksWarning = racks > 0 ? " ⚠️ RACKS: " + racks : "";
     return '<button class="cp-frow" onclick="cpPickFalt(' + i + ')" style="' + (racks > 0 ? "background:#fef3c7;border-color:#fca5a5;" : "") + '">' +
-      '<div class="cp-frow-top"><span class="cp-cod">' + escapeHtml(String(e.cod_art)) + '</span> <span class="cp-fdesc">' + escapeHtml(e.desc || "") + '</span><span style="margin-left:auto;font-size:11.5px;font-weight:800;color:' + (racks > 0 ? "#dc2626" : "#0e7490") + ';white-space:nowrap;">' + escapeHtml(stockTxt + racksWarning) + '</span></div>' +
+      '<div class="cp-frow-top"><span class="cp-cod">' + escapeHtml(codCanonSuf(String(e.cod_art))) + '</span> <span class="cp-fdesc">' + escapeHtml(e.desc || "") + '</span><span style="margin-left:auto;font-size:11.5px;font-weight:800;color:' + (racks > 0 ? "#dc2626" : "#0e7490") + ';white-space:nowrap;">' + escapeHtml(stockTxt + racksWarning) + '</span></div>' +
       '<div class="cp-frow-bot"><span class="cp-np">NP ' + escapeHtml(String(e.np)) + (cli ? ' · ' + escapeHtml(cli) : '') + (e.tanda ? ' · ' + escapeHtml(String(e.tanda)) : '') + '</span><span class="cp-faltan">faltan ' + Math.round(Number(e.cajas_falto) || 0) + '</span></div>' +
       '</button>';
   }).join("");
@@ -21645,7 +21661,7 @@ function cpRender() {
       '<summary style="cursor:pointer;font-weight:800;color:#64748b;font-size:12.5px;">🗂️ ' + hh.length + ' faltante(s) viejos (&gt;21 días) sin completar — revisar</summary>' +
       '<div style="font-size:11.5px;color:#64748b;margin-top:6px;">Salieron hace más de 21 días y siguen con faltante sin facturar. No aparecen arriba ni en la alerta de agentes (7 días) — conviene cerrarlos o completarlos a mano.</div>' +
       '<div style="margin-top:6px;font-size:12px;">' + hh.slice(0, 40).map(function (e) {
-        return '<div style="padding:2px 0;border-bottom:1px solid #eef2f7;"><b style="font-family:Consolas,Menlo,monospace;">' + escapeHtml(String(e.cod_art)) + '</b> · NP ' + escapeHtml(String(e.np)) + ' · faltan ' + Math.round(Number(e.cajas_falto) || 0) + ' · salió ' + escapeHtml(String(e.fecha_salida || "").slice(0, 10)) + '</div>';
+        return '<div style="padding:2px 0;border-bottom:1px solid #eef2f7;"><b style="font-family:Consolas,Menlo,monospace;">' + escapeHtml(codCanonSuf(String(e.cod_art))) + '</b> · NP ' + escapeHtml(String(e.np)) + ' · faltan ' + Math.round(Number(e.cajas_falto) || 0) + ' · salió ' + escapeHtml(String(e.fecha_salida || "").slice(0, 10)) + '</div>';
       }).join("") + (hh.length > 40 ? '<div style="color:#94a3b8;margin-top:4px;">…y ' + (hh.length - 40) + ' más</div>' : '') + '</div>' +
       '</details>';
   }
@@ -21667,7 +21683,7 @@ function cpRenderStep2(body) {
   const sal = e._saldo || {}; const agu = Math.round(Number(sal.a_guardar) || 0), gon = Math.round(Number(sal.terminado) || 0);
   const maxQ = Math.max(1, Math.round(Number(e.cajas_falto) || 1));
   let h = '<button class="cp-back" onclick="cpBack()">← Volver</button>';
-  h += '<div class="cp-sel"><span class="cp-cod">' + escapeHtml(String(e.cod_art)) + '</span> <span class="cp-fdesc">' + escapeHtml(e.desc || "") + '</span><div class="cp-selnp">NP ' + escapeHtml(String(e.np)) + (e.tanda ? ' · ' + escapeHtml(String(e.tanda)) : '') + ' · faltan ' + maxQ + '</div></div>';
+  h += '<div class="cp-sel"><span class="cp-cod">' + escapeHtml(codCanonSuf(String(e.cod_art))) + '</span> <span class="cp-fdesc">' + escapeHtml(e.desc || "") + '</span><div class="cp-selnp">NP ' + escapeHtml(String(e.np)) + (e.tanda ? ' · ' + escapeHtml(String(e.tanda)) : '') + ' · faltan ' + maxQ + '</div></div>';
   h += '<div class="cp-fld"><div class="cp-lbl">¿Cuántas cajas llegaron?</div><div class="cp-stp"><button class="cp-sb" onclick="cpQty(-1)">–</button><input class="cp-inp" type="number" min="1" max="' + maxQ + '" inputmode="numeric" value="' + _cp.qty + '" oninput="cpQtySet(this.value)"><button class="cp-sb" onclick="cpQty(1)">+</button></div></div>';
   h += '<div class="cp-fld"><div class="cp-lbl">¿De dónde salen?</div><div class="cp-seg">' +
     '<button class="cp-opt' + (_cp.origen === "a_guardar" ? " on" : "") + '" onclick="cpOrigen(\'a_guardar\')">Tránsito<small>a guardar · ' + agu + '</small></button>' +
@@ -21694,7 +21710,7 @@ function cpRenderStep2(body) {
   // confirmar — sino se retira "de la nada" y la deja negativa sin que nadie se entere hasta
   // que otro pedido la necesite. cpConfirm() manda además el aviso a Telegram.
   if (_cp.origen === "terminado" && gon <= 0) {
-    h += '<div class="cp-pend" style="background:#fef2f2;border-color:#fca5a5;color:#991b1b;">⚠️ Góndola está en <b>0</b> para ' + escapeHtml(String(e.cod_art)) + ' — al completar se va a retirar sin stock real (queda negativa). Se avisa por Telegram.</div>';
+    h += '<div class="cp-pend" style="background:#fef2f2;border-color:#fca5a5;color:#991b1b;">⚠️ Góndola está en <b>0</b> para ' + escapeHtml(codCanonSuf(String(e.cod_art))) + ' — al completar se va a retirar sin stock real (queda negativa). Se avisa por Telegram.</div>';
   }
   const ok = _cp.qty > 0 && !_cp.liosLoading;
   h += '<button class="cp-fin"' + (ok ? "" : " disabled") + ' onclick="cpConfirm()">✓ Completar ' + _cp.qty + ' caja(s) → <b>' + escapeHtml(_destTxt) + '</b></button>';
@@ -21996,7 +22012,7 @@ function faltArtsHtml(t) {
   let arr = [];
   try { arr = Array.isArray(t.articulos) ? t.articulos : JSON.parse(t.articulos || "[]"); } catch (_e) { arr = []; }
   if (!arr.length) return "";
-  return '<div class="ftk-arts">' + arr.map(function (a) { return '<span class="ftk-art">' + escapeHtml(String(a.cod)) + ' ×' + (Number(a.falto) || 0) + '</span>'; }).join("") + '</div>';
+  return '<div class="ftk-arts">' + arr.map(function (a) { return '<span class="ftk-art">' + escapeHtml(codCanonSuf(String(a.cod))) + ' ×' + (Number(a.falto) || 0) + '</span>'; }).join("") + '</div>';
 }
 function faltHtmlPend(t, n) {
   // v5.90: si llegaron faltantes de VARIAS NPs, se avisa que hay varios y que salen de a uno.
@@ -22121,7 +22137,7 @@ async function cpCheckFaltantesMoncayo() {
     var msg = "📦 FALTANTES PARA COMPLETAR\n\nAgarrá " + totalCajas + " caja(s) en total.\n\n";
     lista.sort(function (a, b) { return String(a.np).localeCompare(String(b.np)); });
     lista.forEach(function (g) {
-      var det = g.arts.map(function (a) { return a.cod + "×" + a.falto; }).join(", ");
+      var det = g.arts.map(function (a) { return codCanonSuf(a.cod) + "×" + a.falto; }).join(", ");
       var ubic = ubicByNp[g.np] || "sin ubicación";
       msg += "• NP " + g.np + (g.tanda ? " · " + g.tanda : "") + " → " + g.cajas + " cj (" + det + ") — 📍 " + ubic + "\n";
     });
@@ -22197,7 +22213,7 @@ function faltAvRender(falt, activas, saldosN) {
   let h = '<div class="fav-hint">Pedidos con un <b>faltante</b> que todavía <b>no salió ni se facturó</b> y que <b>tienen stock para completarse</b> (góndola / a guardar / excedente / racks). Tocá <b>📦➕ Cargar yo</b> para completarlo vos ahora.</div>';
   if (!list.length) { h += '<div class="fav-empty">No hay faltantes con stock para completar ahora. 👍</div>'; body.innerHTML = h; return; }
   h += list.map(function (g) {
-    const det = g.arts.map(function (a) { return escapeHtml(a.cod) + '×' + a.falto; }).join(", ");
+    const det = g.arts.map(function (a) { return escapeHtml(codCanonSuf(a.cod)) + '×' + a.falto; }).join(", ");
     const ya = activas[g.np];
     const cargarBtn = '<button class="fav-btn fav-btn-cargar" onclick="faltCargarYo(\'' + escapeHtml(g.np) + '\')">📦➕ Cargar yo</button>';
     return '<div class="fav-row"><div class="fav-info"><div class="fav-np">NP ' + escapeHtml(g.np) + (g.tanda ? ' · ' + escapeHtml(g.tanda) : '') + (g.cliente ? ' · cli ' + escapeHtml(g.cliente) : '') + '</div><div class="fav-arts">' + det + ' <b>(' + g.cajas + ' cj)</b></div></div>' +
@@ -22256,7 +22272,7 @@ function rcRender() {
   if (!fs.length) { h += '<div class="rc-empty">No hay pedidos con faltantes sin facturar. 👍</div>'; _renderKeepFocus(body, h); return; }
   h += fs.map(function (e) {
     const dmy = npcDmy(String(e.fecha_salida || "").slice(0, 10));
-    return '<button class="rc-frow" onclick="rcPickUrgent(' + Number(e.id) + ')"><div class="rc-ftop"><span class="rc-cod">' + escapeHtml(String(e.cod_art)) + '</span> <span class="rc-fdesc">' + escapeHtml(artNombreEmp(e.cod_art, e.np, e.desc) || "") + '</span></div><div class="rc-fbot"><span class="rc-np">NP ' + escapeHtml(String(e.np)) + (e.tanda ? ' · ' + escapeHtml(String(e.tanda)) : '') + ' · sale <b>' + escapeHtml(dmy || "—") + '</b></span><span class="rc-faltan">faltan ' + (Math.round(Number(e.cajas_falto) || 0)) + '</span></div></button>';
+    return '<button class="rc-frow" onclick="rcPickUrgent(' + Number(e.id) + ')"><div class="rc-ftop"><span class="rc-cod">' + escapeHtml(codCanonSuf(String(e.cod_art))) + '</span> <span class="rc-fdesc">' + escapeHtml(artNombreEmp(e.cod_art, e.np, e.desc) || "") + '</span></div><div class="rc-fbot"><span class="rc-np">NP ' + escapeHtml(String(e.np)) + (e.tanda ? ' · ' + escapeHtml(String(e.tanda)) : '') + ' · sale <b>' + escapeHtml(dmy || "—") + '</b></span><span class="rc-faltan">faltan ' + (Math.round(Number(e.cajas_falto) || 0)) + '</span></div></button>';
   }).join("");
   _renderKeepFocus(body, h);
 }
@@ -22290,12 +22306,12 @@ function rcRenderStep2(body) {
   const s = _rc.sel; const dmy = npcDmy(String(s.fecha_salida || "").slice(0, 10));
   const maxFalt = Math.max(1, Math.round(Number(s.cajas_falto) || 1));
   let h = '<button class="rc-back" onclick="rcBack()">← Volver</button>';
-  h += '<div class="rc-sel"><span class="rc-cod">' + escapeHtml(String(s.cod_art)) + '</span> <span class="rc-fdesc">' + escapeHtml(artNombreEmp(s.cod_art, s.np, s.desc) || "") + '</span><div class="rc-selnp">🔥 Urgente: NP ' + escapeHtml(String(s.np)) + ' · sale ' + escapeHtml(dmy || "—") + ' · faltan ' + maxFalt + '</div></div>';
+  h += '<div class="rc-sel"><span class="rc-cod">' + escapeHtml(codCanonSuf(String(s.cod_art))) + '</span> <span class="rc-fdesc">' + escapeHtml(artNombreEmp(s.cod_art, s.np, s.desc) || "") + '</span><div class="rc-selnp">🔥 Urgente: NP ' + escapeHtml(String(s.np)) + ' · sale ' + escapeHtml(dmy || "—") + ' · faltan ' + maxFalt + '</div></div>';
   h += '<div class="rc-fld"><div class="rc-lbl">¿De qué pedido lo saco? (sugeridos: los que salen después)</div>';
-  if (_rc.donorsLoading) h += '<div class="rc-liosload">buscando pedidos con ' + escapeHtml(String(s.cod_art)) + '…</div>';
+  if (_rc.donorsLoading) h += '<div class="rc-liosload">buscando pedidos con ' + escapeHtml(codCanonSuf(String(s.cod_art))) + '…</div>';
   else {
     const ds = _rc.donors || [];
-    if (!ds.length) h += '<div class="rc-note">No hay otro pedido con <b>' + escapeHtml(String(s.cod_art)) + '</b> para sacar (ni armado ni pickeado). Si hay stock libre, usá "Completar Pedido".</div>';
+    if (!ds.length) h += '<div class="rc-note">No hay otro pedido con <b>' + escapeHtml(codCanonSuf(String(s.cod_art))) + '</b> para sacar (ni armado ni pickeado). Si hay stock libre, usá "Completar Pedido".</div>';
     else h += '<div class="rc-donors">' + ds.map(function (d, i) {
       const ddmy = npcDmy(String(d.fecha || "").slice(0, 10));
       const label = d.type === "armado" ? ("NP " + d.np) : ("Tanda " + d.tanda);

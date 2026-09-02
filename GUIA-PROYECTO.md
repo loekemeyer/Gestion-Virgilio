@@ -304,6 +304,19 @@
 > (afectaría a todo objeto nuevo futuro, no sólo a este módulo — decisión del
 > usuario, no se aplica sin permiso explícito).
 >
+> Nota **v12.45 (2026-09-02)** — **Código canónico para mostrar (`035E`, no `35E`) en toda la app + dependencia OC_Maximos.**
+> Los códigos se guardan/normalizan SIN ceros a la izquierda (`_ocgNorm`, para que `27`/`027`/`0027`
+> matcheen). Para MOSTRARLOS existe **`codCanon(cod)`** (base canónica desde `OC_Maximos.cod` activo, con
+> fallback `_padCod` que solo paddea numéricos puros) y ahora **`codCanonSuf(cod)`** = canoniza la base y
+> re-anexa el sufijo `LK`/`CH` (`35E`→`035E`, `438E LK`→`438E LK`). **`codCanonSuf` es la forma ÚNICA de
+> mostrar un código**; NO usar para claves/lookups (esos van normalizados). El mapa lo carga
+> `loadCodCanon()` (precargado global al arranque, v12.45). Se cablearon ~18 pantallas operativas que
+> mostraban el código crudo (Completar/armado, Mercadería a Góndola, Mover, Urgente, Envasar, Racks,
+> Capacidad, Ingresos/Salidas, Conteo, etc.). ⚠ **Dependencia: el código canónico sale de `OC_Maximos.cod`.**
+> Para cambiar cómo se muestra un artículo se edita esa tabla; varias pantallas (OCs, líneas, línea por
+> código, canónico) la leen, así que un cambio ahí impacta en todas. También se unificó una fila duplicada
+> en `Planimetria` (`26`→`026`, backup `stock_v2.bkp_planimetria_26_20260902`).
+>
 > Nota **v12.40 (2026-09-02)** — **Empresa en TODO el recorrido de la reconciliación (picking→separado→facturado→CP).**
 > Bug detectado por el usuario: la reconciliación arreglaba el `picking` por empresa (cutover) pero
 > las etapas **2 (separado)**, **3 (facturado)** y **4 (CP)** escribían los duales **sin empresa** →
