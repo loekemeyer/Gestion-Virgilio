@@ -17,6 +17,10 @@ async function checkAuth() {
 
   var result = await sb.auth.getSession();
   if (result.error || !result.data || !result.data.session) {
+    // v12.35: ¿vino un token puente desde Producción Virgilio (mismo origen)?
+    // Si el mail coincide con el admin LK, entramos directo sin pedir OTP.
+    var bridged = await lkTryBridge();
+    if (bridged) return true;   // lkTryBridge recarga al entrar
     // Sin sesión → mostrar login local CUIT+PIN (definido en admin.html).
     // El admin.html original de LK asumía que ya venías logueado desde
     // mayorista.html; acá lo servimos suelto en Producción Virgilio, así
@@ -13680,11 +13684,12 @@ var LK_ADMIN_EMAIL = "loekemeyer.n8n@gmail.com";
 // admin/supabase/admin-login-otp/index.ts. Deploy: verify_jwt = false.
 var LK_OTP_FN_URL = SUPABASE_URL + "/functions/v1/admin-login-otp";
 
-async function _lkOtpFn(action, code) {
+async function _lkOtpFn(action, code, vjwt) {
   // Aunque la función tenga verify_jwt=false, Supabase igual exige apikey en el header.
   var apikey = SUPABASE_ANON_KEY;
   var body = { action: action };
   if (code) body.code = code;
+  if (vjwt) body.vjwt = vjwt;
   var res = await fetch(LK_OTP_FN_URL, {
     method: "POST",
     headers: { apikey: apikey, "Content-Type": "application/json" },
@@ -13693,6 +13698,31 @@ async function _lkOtpFn(action, code) {
   var data = {};
   try { data = await res.json(); } catch (_) {}
   return { ok: res.ok, status: res.status, data: data };
+}
+
+// v12.35: entrada directa desde Producción Virgilio. openPanelWebLK() (index.html
+// de Virgilio) deja el access_token de la sesión del supervisor en sessionStorage
+// (mismo origen). Acá lo canjeamos: la Edge Function valida ese token contra el
+// auth de Virgilio y, sólo si el mail es el del admin LK, devuelve un password
+// temporal para iniciar sesión. Devuelve true si entró (y recarga); false si no
+// había token o el canje falló (se cae al login por OTP de siempre).
+async function lkTryBridge() {
+  var vjwt = null;
+  try { vjwt = sessionStorage.getItem("lk_bridge_vjwt"); } catch (_) {}
+  if (!vjwt) return false;
+  try { sessionStorage.removeItem("lk_bridge_vjwt"); } catch (_) {}
+  var statusEl = document.getElementById("authStatus");
+  if (statusEl) statusEl.textContent = "Entrando…";
+  try {
+    var r = await _lkOtpFn("bridge", null, vjwt);
+    if (!r.ok || !r.data || !r.data.tmp_password) return false;
+    var sr = await sb.auth.signInWithPassword({ email: r.data.email, password: r.data.tmp_password });
+    if (sr.error) return false;
+    location.reload();
+    return true;
+  } catch (e) {
+    return false;
+  }
 }
 
 async function lkSendOtp() {

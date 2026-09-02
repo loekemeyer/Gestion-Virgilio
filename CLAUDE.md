@@ -179,9 +179,14 @@ Al verificar setea un password temporal aleatorio en el user y el front hace
   (3 lugares), `historial.html`, `historial.js`, `sugerencias.html`,
   `sugerencias.js`, `analisis-venta-cliente.js` (2 lugares) — el original
   apunta a `mayorista.html` del sitio LK que no existe en Virgilio,
-  (g) `historial.html` usa `img/favicon.jpg` (no `.png`, no existe). Si al
-  re-sincronizar se pisa alguno, buscar por `LK_ADMIN_EMAIL`, `LK_OTP_FN_URL`,
-  `_lkOtpFn`, `lkLoginBox`, o `grep -r "/mayorista"` (no debe haber ninguno).
+  (g) `historial.html` usa `img/favicon.jpg` (no `.png`, no existe),
+  (h) **entrada directa sin OTP desde Virgilio** (v12.35): `admin.js` trae
+  `lkTryBridge()` y `checkAuth()` lo llama antes de mostrar el login; canjea el
+  `access_token` de la sesión Virgilio (dejado en `sessionStorage` como
+  `lk_bridge_vjwt` por `openPanelWebLK()` de Virgilio, mismo origen) por la
+  acción `bridge` de la Edge Fn `admin-login-otp`. Si al re-sincronizar se pisa
+  alguno, buscar por `LK_ADMIN_EMAIL`, `LK_OTP_FN_URL`, `_lkOtpFn`, `lkTryBridge`,
+  `lk_bridge_vjwt`, `lkLoginBox`, o `grep -r "/mayorista"` (no debe haber ninguno).
 
 ### Convenciones operativas
 
@@ -209,6 +214,14 @@ Al verificar setea un password temporal aleatorio en el user y el front hace
   en la función Y re-deployar; crear el nuevo user en LK y agregarlo a `admins`.
 - **Sensible: 73 chars rompen bcrypt.** El password temporal usa
   `crypto.randomUUID()` (36 chars). No concatenar dos UUIDs — pasa de 72 y falla.
+- **Acción `bridge` (v12.35):** entrada directa sin OTP desde Producción
+  Virgilio. Recibe el `access_token` de la sesión del supervisor de Virgilio
+  (`vjwt`), lo valida server-side contra el auth de Virgilio
+  (`hrxfctzncixxqmpfhskv`, anon key hardcodeada en la función) y **sólo si el
+  mail del token == `RECIPIENT_EMAIL`** (mismo dueño, no amplía acceso a nadie)
+  devuelve el mismo password temporal que `verify`. Gate 100% en backend: el
+  front no puede falsear identidad. Si mañana se quiere que otro supervisor
+  entre, ampliar el chequeo de `vemail` en la función (y crear su user en LK).
 
 ## Agentes + código de 4 dígitos (Telegram)
 

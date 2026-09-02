@@ -6524,7 +6524,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.34";
+const APP_VERSION = "v12.35";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -24812,8 +24812,16 @@ function openRemitosAdmin() {
    de LK (kwkclwhmoygunqmlegrg), distinto del de Virgilio. La sesión de admin
    la maneja el propio admin.js contra la tabla `admins` de LK; acá solo
    navegamos. Botón restringido a supervisores para no confundir a operarios. */
-function openPanelWebLK() {
+async function openPanelWebLK() {
   if (!requireSupervisor()) return;
+  // v12.35: pasar el access_token de la sesión Virgilio al admin LK (mismo
+  // origen) vía sessionStorage. Si el mail del supervisor coincide con el del
+  // admin LK, el admin entra directo sin volver a pedir OTP (la Edge Function
+  // valida el token server-side). Si no hay token o no coincide, cae al OTP.
+  try {
+    var tok = window.sbAuth && (await window.sbAuth.getAccessToken());
+    if (tok) sessionStorage.setItem("lk_bridge_vjwt", tok);
+  } catch (_e) {}
   location.href = "admin/admin.html";
 }
 
