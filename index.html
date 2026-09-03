@@ -2920,7 +2920,14 @@ table.facfc-tbl tr.facneto-row-falt td{ background: #fef2f2; }
   margin-bottom: 12px; flex-wrap: wrap; gap: 8px;
 }
 .fac-top h1{ font-size: 22px; margin: 0; color: #0f172a; }
-.fac-stats{ display: flex; gap: 6px; align-items: center; font-size: 13px; flex-wrap: wrap; }
+/* v12.53 — Los contadores y botones del encabezado de Facturación quedan OCULTOS por
+   pedido del dueño (celular: ocupaban media pantalla). No se borran del HTML a
+   propósito: el JS los sigue actualizando (facCntTandas/Pend/Done/Falt/Corr,
+   facBtnRevertir, facDot, facStatusTxt) y no hay que tocarlo. Para volver a
+   mostrarlos, sacar el display:none de acá.
+   ⚠ Con esto quedan sin acceso: el filtro "Con faltante", "Corregir códigos" y
+   "Revertir". Avisado y confirmado por el dueño. */
+.fac-stats{ display: none; gap: 6px; align-items: center; font-size: 13px; flex-wrap: wrap; }
 .fac-chip{ background: #fff; border: 1px solid #cbd5e1; border-radius: 6px; padding: 4px 10px; font-weight: bold; font-size: 12px; }
 .fac-chip.green{ border-color: #16a34a; color: #15803d; }
 .fac-chip.blue{ border-color: #1e6bd6; color: #1e3a8a; }
@@ -6558,7 +6565,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.52";
+const APP_VERSION = "v12.53";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
