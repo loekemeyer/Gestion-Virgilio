@@ -2920,6 +2920,15 @@ table.facfc-tbl tr.facneto-row-falt td{ background: #fef2f2; }
   margin-bottom: 12px; flex-wrap: wrap; gap: 8px;
 }
 .fac-top h1{ font-size: 22px; margin: 0; color: #0f172a; }
+/* Encabezado de Facturación: "Excel ISIS" y "Cerrar" van juntos en la misma línea.
+   Hace falta el contenedor porque el button{width:100%} global empujaba a Cerrar
+   a la línea de abajo en el celular. */
+.fac-top-acts{ display:flex; align-items:center; gap:8px; margin-left:auto; flex:0 0 auto; }
+.fac-top-acts #facBtnXlsIsis{
+  width:auto; flex:0 0 auto; margin:0; padding:8px 12px; font-size:13px; font-weight:800;
+  border:1px solid #fcd34d; border-radius:8px; background:#fffbeb; color:#78350f; cursor:pointer;
+}
+.fac-top-acts .fac-close-btn{ margin:0; }
 /* Casilla "marcar para el Excel de prueba de ISIS" en cada fila de Facturación.
    Grande a propósito: se toca con el dedo desde el celular. */
 .fac-xls-cell{ padding:4px 2px !important; }
@@ -3493,8 +3502,10 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       <button id="facBtnRevertir" class="fac-btn-revertir" disabled onclick="facRevertir()" title="Borra todos los ticks pendientes de cierre">↺ Revertir</button>
       <span class="fac-chip"><span class="fac-dot" id="facDot"></span><span id="facStatusTxt">Cargando…</span></span>
     </div>
-    <button id="facBtnXlsIsis" onclick="facXlsBajar()" title="PRUEBA: arma el mismo Excel que hoy sale por mail a las 12:30, pero con las cajas ENTREGADAS, para confirmar que ISIS lo importa. No se importa en produccion." style="margin-right:8px;padding:9px 13px;border:1px solid #fcd34d;border-radius:10px;background:#fffbeb;color:#78350f;font-size:13px;font-weight:800;cursor:pointer">⬇ Excel ISIS <span style="font-weight:600;opacity:.85">(prueba)</span></button>
-    <button class="fac-close-btn" onclick="closeFacturacion()">Cerrar</button>
+    <div class="fac-top-acts">
+      <button id="facBtnXlsIsis" onclick="facXlsBajar()" title="PRUEBA: arma el mismo Excel que hoy sale por mail a las 12:30, pero con las cajas ENTREGADAS, para confirmar que ISIS lo importa. No se importa en produccion.">⬇ Excel ISIS <span style="font-weight:600;opacity:.85">(prueba)</span></button>
+      <button class="fac-close-btn" onclick="closeFacturacion()">Cerrar</button>
+    </div>
   </div>
   <div id="facContainer">
     <div class="fac-empty">Cargando tandas…</div>
@@ -6569,7 +6580,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.54";
+const APP_VERSION = "v12.55";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
