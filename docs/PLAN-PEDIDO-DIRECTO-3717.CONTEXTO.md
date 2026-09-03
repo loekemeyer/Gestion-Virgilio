@@ -73,3 +73,52 @@ function rowsFromOrders(orders){
 // handler: pend = orders?enviado_a_compras_at=is.null&sheets_payload=not.is.null&order=id.asc ; si raw vacío → mail "no hubo nuevos pedidos" + log no_orders ;
 //          si no → processOrders → generateExcel → sendEmail → markEnviado(orderIds, now) (sólo si el mail dio 200) → logRun ok. Modo {dry:true} devuelve el Excel base64 sin mandar ni marcar.
 ```
+
+---
+
+## Hechos verificados el 2026-09-03 (corrigen el plan original)
+
+Salieron de cruzar el plan con dos ramas paralelas: `claude/idea-3717-final-plan-0f9gmo`
+(otra redacción del mismo plan) y `claude/order-billing-workflow-aulr3m` (generador de
+PPP en modo sombra, fase 1). Todo re-verificado contra `hrxfctzncixxqmpfhskv`.
+
+### 1. El tope de líneas por NP es 18 en Loekemeyer y **15 en Chef**
+
+| Empresa | NP | con 15 líneas | con 18 líneas | por encima del tope | máx. artículos distintos |
+|---|---|---|---|---|---|
+| Loekemeyer (`9xxxx`) | 700 | 25 | **253** | 2 (de 19 líneas) | 18 |
+| Chef (`4xxxx`) | 101 | **25** | 1 | 2 | 18 |
+
+Distribución de Chef: 15 → 25 NP · 14 → 8 · 13 → 9 · 12 → 6 · 11 → 3 · 10 → 7. Meseta
+inequívoca en 15. Las dos excepciones no son del canal web: `44603` es **tipo COT**
+(cotizador, 17 líneas, MULTIBAZAR SRL) y `44575` (18 líneas) ya no está en Programación
+Diaria. Las dos NP de Loekemeyer con 19 líneas tienen 18 artículos **distintos**: es un
+artículo repetido en el pedido (98293 y 98501), no un tope de 19.
+
+### 2. La partición es por **orden ascendente de código de artículo**, no por orden del carrito
+
+Cada NP contiene un bloque contiguo en orden de código. Verificado sobre pedidos partidos:
+
+| Cliente | Fecha | Ítems | NP y contenido |
+|---|---|---|---|
+| 1936 | 02/09 | 28 | `98680` = `031,056E,224,246,315,325,404E,441,501,502,504,505,507,510,513,531,537,544` (18) · `98681` = `546,550,562,565,566E,580,587,591,654,812E` (10) |
+| 989 | 02/09 | 21 | `98682` = los 18 primeros por código · `98683` = `589E,599E,659` |
+
+Importa porque con el orden equivocado coincide la **cantidad** de tramos pero no el
+**contenido**, y el renombre asignaría las líneas a la NP equivocada. El `items_string`
+de `lk_pedidos_match` ya viene ordenado por código por construcción de la vista, así que
+no sirve para deducir el orden del carrito: lo que manda es cómo quedó en ISIS.
+
+### 3. El generador en sombra existe, es de sólo lectura y no está desplegado
+
+`sql/ppp_shadow_generator.sql` (139 líneas, traído de la rama de implementación): tres
+vistas (`v_shadow_web_items`, `v_shadow_np_gen`, `v_shadow_ppp_compare`) que arman la PPP
+desde `lk_pedidos_match` + `Volumen_Articulos` y la comparan contra la PPP real por
+cliente y día. Ninguna de las tres existe hoy en la base. Resultados que reporta sobre 89
+cliente-día comparables: 89/89 en cantidad de NP, 86/89 en cajas totales, m³ dentro del
+5 % (98,5 % sobre 158 NP), con `Volumen_Articulos` cubriendo 312 de 320 artículos.
+
+**Límite de esa validación:** compara cuántas NP y cuántas cajas por cliente-día, no qué
+artículo cae en cada NP. La cantidad de tramos y el total de cajas son independientes del
+orden, así que ese 89/89 no prueba el punto 2. Tampoco aplica el corte por sucursal
+(≈9 % de cliente-día con más de un pedido) ni cubre el canal que no viene de la página.
