@@ -16,6 +16,9 @@
        (empieza con cero), celda vacía <Cell/>, hoja "Resumen" con la advertencia.
    F5) El archivo se llama PRUEBA_NO_IMPORTAR_* (esas NP ya están numeradas en ISIS).
    F6) La selección vive fuera del botón: se marca en la lista y sobrevive al refresh.
+   F9) El botón baja un .xlsx real (ZIP con XMLs), que se abre en el celular. El .xls
+       XML 2003 sigue disponible por la constante FAC_XLS_FORMATO: es el único probado
+       con ISIS. Sin pantallas intermedias: se marca en la lista y se baja.
 
    Todo con fetch stubbeado, sin red. Sale 1 si falla. */
 const path = require("path");
@@ -92,16 +95,6 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     out.f3_arts = byNp["98002"] ? byNp["98002"].lineas.map(function (l) { return l.art; }) : null;
     out.f3_parcial = byNp["98002"] ? byNp["98002"].lineas.filter(function (l) { return l.art === "029"; }).map(function (l) { return l.cajas; })[0] : null;
 
-    // F7: el botón abre la vista previa en pantalla (el .xls no lo abre el visor del
-    // iPhone sin Excel, así que los datos se pueden chequear acá y bajar en CSV).
-    _facXlsPrev = filas;
-    _facXlsPreviaRender();
-    const ov = document.getElementById("facXlsPrevOv");
-    out.f7_previaAbre = !!ov;
-    out.f7_previaFilas = ov ? ov.querySelectorAll("tbody tr").length : -1;
-    out.f7_tieneCsv = !!(ov && ov.innerHTML.indexOf("facXlsDescargarCsv") >= 0);
-    out.f7_tieneXls = !!(ov && ov.innerHTML.indexOf("facXlsDescargarXls") >= 0);
-
     // F4/F5: bajar y leer el XML
     let blob = null, nombre = "";
     const origCreate = URL.createObjectURL;
@@ -117,7 +110,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     // El .xls XML 2003 es el único probado con ISIS; el .xlsx está para probarlo.
     blob = null; nombre = "";
     URL.createObjectURL = function (x) { blob = x; return "blob:test"; };
-    facXlsDescargarXlsx();
+    _facXlsDescargarXlsx(filas);
     URL.createObjectURL = origCreate;
     out.f9_nombre = nombre;
     if (blob) {
@@ -131,17 +124,6 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
       out.f9_codTexto = txt.indexOf("<t xml:space=\"preserve\">029</t>") >= 0;   // 029 va como texto, no número
     }
 
-    // F8: el CSV alternativo (mismo contenido, para mirarlo desde el celular)
-    blob = null; nombre = "";
-    URL.createObjectURL = function (x) { blob = x; return "blob:test"; };
-    facXlsDescargarCsv();
-    URL.createObjectURL = origCreate;
-    out.f8_csvNombre = nombre;
-    out.csv = blob ? await blob.text() : "";
-    // .text() decodifica UTF-8 y se come el BOM: hay que mirar los bytes crudos.
-    out.f8_bom = blob ? (function (b) { return b[0] === 0xEF && b[1] === 0xBB && b[2] === 0xBF; })(new Uint8Array(await blob.arrayBuffer())) : false;
-    facXlsPreviaClose();
-    out.f7_cierra = !document.getElementById("facXlsPrevOv");
     return out;
   });
 
@@ -172,17 +154,6 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   // 2 pedidos por la de LK + 1 por la mixta + 2 por Chef = 5
   ck((xml.match(/<Data ss:Type="Number">5<\/Data>/g) || []).length >= 1, "F4: no se llegó al pedido nº 5 (el split no generó los 5 tramos)");
   ck(/^PRUEBA_NO_IMPORTAR_/.test(r.f5_nombre || ""), "F5: el archivo se llama '" + r.f5_nombre + "' (esperaba PRUEBA_NO_IMPORTAR_*)");
-  // F7: vista previa en pantalla
-  ck(r.f7_previaAbre === true, "F7: la vista previa no se abrió");
-  ck(r.f7_previaFilas === 39, "F7: la previa muestra " + r.f7_previaFilas + " filas (esperaba 39, las mismas del archivo)");
-  ck(r.f7_tieneXls === true, "F7: la previa no ofrece bajar el .xls");
-  ck(r.f7_tieneCsv === true, "F7: la previa no ofrece bajar el .csv");
-  ck(r.f7_cierra === true, "F7: la vista previa no se cierra");
-  // F8: CSV alternativo
-  ck(/\.csv$/.test(r.f8_csvNombre || ""), "F8: el CSV se llama '" + r.f8_csvNombre + "'");
-  ck(r.f8_bom === true, "F8: al CSV le falta el BOM (Excel/Numbers rompen los acentos)");
-  ck((r.csv || "").split("\r\n").length >= 40, "F8: el CSV tiene " + (r.csv || "").split("\r\n").length + " líneas (esperaba 39 + encabezado)");
-  ck((r.csv || "").indexOf(";") > 0, "F8: el CSV no usa punto y coma");
   // F9: .xlsx real
   ck(/\.xlsx$/.test(r.f9_nombre || ""), "F9: el xlsx se llama '" + r.f9_nombre + "'");
   ck(r.f9_esZip === true, "F9: el .xlsx no arranca con la firma de un ZIP");
@@ -193,5 +164,5 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
 
   await b.close();
   if (fails.length) { console.error("fac-excel-isis: FALLÓ\n - " + fails.join("\n - ")); process.exit(1); }
-  console.log("fac-excel-isis: OK (selección en la lista, dedup, split 18/15, orden por código, XML 2003, previa, CSV y xlsx real)");
+  console.log("fac-excel-isis: OK (selección en la lista, dedup, split 18/15, orden por código, XML 2003 y xlsx real)");
 })();
