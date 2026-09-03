@@ -8351,8 +8351,23 @@ lee **la misma tabla donde caen los pedidos de la página**, en vivo.
   `grant select on public.orders to loke_reader` que ya debe
   `sync_pedidos_match_virgilio`; el tope de 15 ya está contemplado.
 
-- **Falta**: la pantalla de programación en Gestión (asignar tanda, zona y fecha
-  de entrega). Sin eso los pedidos se ven pero no se pueden bajar a picking.
+- **La pantalla**: botón **🧾 PPP Web** en el panel supervisor (v12.59). Lee
+  `v_pedidos_web_np` de LK en vivo, resuelve el m³ contra `Volumen_Articulos` de
+  esta base y muestra las NP a programar. Por defecto filtra
+  `enviado_a_compras = false`, o sea **solo lo que todavía no salió por mail** —
+  que es lo que hoy no se puede trabajar hasta el día siguiente.
+  La sesión de LK sale del **mismo bridge** que abre el Panel Web LK
+  (`admin-login-otp` acción `bridge`), cacheada en memoria una hora.
+  Regresión: `tests/pweb-ppp-web.cjs`.
+
+- ⚠ **`PPP_Programacion_Diaria` NO se toca.** Gestión y Producción comparten el
+  MISMO proyecto Supabase (`hrxfctzncixxqmpfhskv`, los dos `supabase-config.js`
+  apuntan ahí), así que esa tabla es la que están usando los operarios: 161 filas,
+  61 tandas, entregas hasta el 28/10. La PPP Web es una vista aparte que no
+  escribe nada. Vaciar esa tabla para "empezar limpio" rompería Producción.
+
+- **Falta**: persistir la asignación de tanda, zona y fecha de entrega. Hoy la
+  pantalla muestra las NP pero todavía no se pueden bajar a picking.
 
 **Pendiente MEDIA**: `prodLoad/prodCompute` — RPC parametrizado por rango de fechas,
 cálculo de productividad con m³ y factores. Complejidad alta, dejado para después.

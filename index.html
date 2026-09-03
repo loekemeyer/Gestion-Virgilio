@@ -1767,6 +1767,22 @@ button.pk-anular small{ display:block; font-size:12px; font-weight:700; opacity:
 /* Overlay del panel Admin de Recepción embebido (v2.75) */
 .recp-admin-overlay{ display: none; position: fixed; inset: 0; z-index: 1250; background: #0b1220; flex-direction: column; }
 .recp-admin-overlay.show{ display: flex; }
+/* PPP Web (idea 3717) — la programación en vivo sobre los pedidos de la página. */
+.pweb-chk{ display:inline-flex; align-items:center; gap:6px; color:#cbd5e1; font-size:14px; }
+.pweb-resumen{ margin:8px 0; }
+.pweb-cards{ display:flex; gap:10px; flex-wrap:wrap; }
+.pweb-card{ background:#111c2f; border:1px solid #1e293b; border-radius:10px; padding:8px 14px; text-align:center; min-width:82px; }
+.pweb-card b{ display:block; font-size:20px; color:#e2e8f0; }
+.pweb-card span{ font-size:12px; color:#94a3b8; }
+.pweb-warn{ margin-top:8px; color:#fbbf24; font-size:13px; }
+.pweb-vacio{ color:#94a3b8; padding:14px 0; }
+.pweb-table{ width:100%; border-collapse:collapse; font-size:14px; color:#e2e8f0; }
+.pweb-table th{ position:sticky; top:0; background:#0f1a2c; color:#94a3b8; text-align:left;
+  font-weight:600; padding:7px 8px; border-bottom:1px solid #1e293b; white-space:nowrap; }
+.pweb-table td{ padding:7px 8px; border-bottom:1px solid #16233a; }
+.pweb-table tr:hover td{ background:#111c2f; }
+.pweb-np{ font-variant-numeric:tabular-nums; font-weight:600; color:#7dd3fc; white-space:nowrap; }
+.pweb-num{ text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
 /* v8.68 — grilla de botones del hub Configuración (2 columnas, angosto y centrado).
    Selector con doble clase (.sup-actions.cfg-actions) para ganarle en especificidad a
    .sup-actions.sup-secondary (que fuerza 7/3 columnas). */
@@ -3759,6 +3775,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       <button class="sup-action-btn" onclick="showFaltAvisar()" style="position:relative;"><span class="sup-ico">📦➕</span><span>Completar Pedido</span><span id="cpBadge" class="dp-badge" style="display:none;" title="Pedidos con faltante que tiene stock para completarse"></span></button>
       <button class="sup-action-btn" onclick="openStockAdmin()" style="position:relative;"><span class="sup-ico">📦</span><span>Stock y Compras</span><span id="stkBadge" class="dp-badge" style="display:none;" title="Códigos con stock negativo"></span><span id="stkOkBadge" style="display:none;position:absolute;top:2px;right:2px;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:#16a34a;color:#fff;font-size:10px;font-weight:800;line-height:18px;text-align:center;pointer-events:none;">✓</span></button>
       <button class="sup-action-btn" onclick="openPanelWebLK()"><span class="sup-ico">🌐</span><span>Panel Web LK</span></button>
+      <button class="sup-action-btn" onclick="openPppWeb()"><span class="sup-ico">🧾</span><span>PPP Web</span></button>
       <button class="sup-action-btn" onclick="openRemitosAdmin()" style="position:relative;"><span class="sup-ico">🚚</span><span>Recepción Remitos (RR)</span><span id="rrBadge" class="dp-badge" style="display:none;" title="Remitos cargados al camión sin controlar todavía"></span><span id="rrAlertBadge" style="display:none;position:absolute;top:2px;left:2px;min-width:26px;height:26px;line-height:26px;padding:0 5px;border-radius:13px;background:#dc2626;color:#fff;font-size:15px;font-weight:800;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.35);" title="Hay remitos VENCIDOS (cargados hace +30 h sin controlar)">⚠️</span></button>
     </div>
     <div class="sup-sec-label">Reportes y configuración</div>
@@ -3900,6 +3917,25 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       <span id="pppPdfDirStatus" class="ppp-pdfdir-status"></span>
       <div id="pppPreview" class="ppp-preview"></div>
       <div id="pppStatus" class="planim-status"></div>
+    </div>
+  </div>
+
+  <!-- PPP Web (idea 3717): la programación calculada EN VIVO sobre los pedidos que
+       llegan a la página LK. No hay tabla propia ni copia: se lee la vista
+       v_pedidos_web_np del proyecto LK y el m³ sale de Volumen_Articulos de acá. -->
+  <div id="pppWebOverlay" class="recp-admin-overlay">
+    <div class="recp-admin-bar">
+      <span class="recp-admin-title">🧾 PPP Web — a programar</span>
+      <button class="recp-admin-close" onclick="closePppWeb()">Cerrar</button>
+    </div>
+    <div class="planim-body">
+      <div class="ppp-btnrow">
+        <button class="ppp-imp-toggle" onclick="pwebCargar()">↻ Actualizar</button>
+        <label class="pweb-chk"><input type="checkbox" id="pwebSoloPend" checked onchange="pwebCargar()"> Solo los que todavía no salieron por mail</label>
+      </div>
+      <div id="pwebResumen" class="pweb-resumen"></div>
+      <div id="pwebTabla" class="ppp-preview"></div>
+      <div id="pwebStatus" class="planim-status"></div>
     </div>
   </div>
 
@@ -6580,7 +6616,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.58";
+const APP_VERSION = "v12.59";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -25071,6 +25107,168 @@ function closePPP() {
   const ov = document.getElementById("pppOverlay");
   if (ov) ov.classList.remove("show");
   pppAutoStop();
+}
+
+/* ===== PPP Web — idea 3717 ==========================================
+   La programación calculada EN VIVO sobre los pedidos que llegan a la página LK.
+
+   NO HAY COPIA NI TABLA PROPIA. Se probó con una tabla espejo alimentada por un
+   cron y se descartó: es otro lugar más donde el mismo dato puede quedar viejo.
+   Acá se lee la vista `v_pedidos_web_np` del proyecto LK, que parte el pedido en
+   NP con la MISMA regla que la Edge Function del Excel de las 12:30 (bloques de
+   18 líneas contiguas en el orden del carrito; 15 en Chef). Un pedido que entró
+   hace un minuto ya aparece.
+
+   PPP_Programacion_Diaria NO SE TOCA. Esa tabla es la que usa Producción (misma
+   base, mismos operarios, 61 tandas vivas); este módulo es una vista aparte.
+
+   La sesión de LK sale del MISMO bridge que abre el Panel Web LK: la Edge
+   Function `admin-login-otp` valida el token de Virgilio server-side y solo
+   devuelve credencial si el mail es el del admin de LK. El front no puede
+   falsear identidad, y del lado de LK las vistas van con `security_invoker`, así
+   que la RLS de `orders` es la que decide qué se ve.
+
+   El m³ NO viene de LK (no tiene el volumen por caja): sale de
+   `Volumen_Articulos` de esta base. De los 230 artículos que alguna vez se
+   pidieron por web, los 230 lo tienen cargado. */
+const PWEB_LK_URL  = "https://kwkclwhmoygunqmlegrg.supabase.co";
+const PWEB_LK_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt3a2Nsd2htb3lndW5xbWxlZ3JnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk1MjA2NzUsImV4cCI6MjA4NTA5NjY3NX0.soqPY5hfA3RkAJ9jmIms8UtEGUc4WpZztpEbmDijOgU";
+
+let _pwebTok = null, _pwebTokExp = 0;
+
+/* Canjea el JWT de Virgilio por uno de LK. Se cachea en memoria: el token dura
+   una hora y pedirlo en cada carga sería un viaje de más por nada. */
+async function pwebLkToken() {
+  if (_pwebTok && Date.now() < _pwebTokExp - 60000) return _pwebTok;
+  let vjwt = null;
+  try { if (window.sbAuth) vjwt = await window.sbAuth.getAccessToken(); } catch (_e) {}
+  if (!vjwt) throw new Error(authNoSesionMsg("Iniciá sesión para ver la PPP Web."));
+  const br = await fetch(PWEB_LK_URL + "/functions/v1/admin-login-otp", {
+    method: "POST",
+    headers: { apikey: PWEB_LK_ANON, "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "bridge", vjwt: vjwt })
+  });
+  let bd = {}; try { bd = await br.json(); } catch (_e) {}
+  if (!br.ok || !bd.tmp_password) {
+    throw new Error("No se pudo entrar a LK (" + (bd.detail || bd.error || ("HTTP " + br.status)) + ").");
+  }
+  const lr = await fetch(PWEB_LK_URL + "/auth/v1/token?grant_type=password", {
+    method: "POST",
+    headers: { apikey: PWEB_LK_ANON, "Content-Type": "application/json" },
+    body: JSON.stringify({ email: bd.email, password: bd.tmp_password })
+  });
+  let ld = {}; try { ld = await lr.json(); } catch (_e) {}
+  if (!lr.ok || !ld.access_token) {
+    throw new Error("Login LK falló (" + (ld.error_description || ("HTTP " + lr.status)) + ").");
+  }
+  _pwebTok = ld.access_token;
+  _pwebTokExp = Date.now() + ((ld.expires_in || 3600) * 1000);
+  return _pwebTok;
+}
+
+/* m³ por artículo, de ESTA base. Se piden solo los códigos que aparecen en los
+   pedidos que se están mostrando, no la tabla entera. */
+async function pwebVolumenes(cods) {
+  const out = {};
+  if (!cods.length) return out;
+  const url = SUPABASE_URL + "/rest/v1/Volumen_Articulos?select=codigo,m3&codigo=in.("
+            + cods.map(encodeURIComponent).join(",") + ")&limit=5000";
+  const r = await fetch(url, { headers: { apikey: SUPABASE_KEY } });
+  if (!r.ok) return out;
+  const rows = await r.json();
+  rows.forEach(function (x) { out[x.codigo] = Number(x.m3) || 0; });
+  return out;
+}
+
+function openPppWeb() {
+  if (!requireSupervisor()) return;
+  const ov = document.getElementById("pppWebOverlay");
+  if (ov) ov.classList.add("show");
+  pwebCargar();
+}
+function closePppWeb() {
+  const ov = document.getElementById("pppWebOverlay");
+  if (ov) ov.classList.remove("show");
+}
+
+async function pwebCargar() {
+  const st  = document.getElementById("pwebStatus");
+  const tb  = document.getElementById("pwebTabla");
+  const res = document.getElementById("pwebResumen");
+  if (st) st.textContent = "Buscando pedidos en la página…";
+  if (tb) tb.innerHTML = "";
+  if (res) res.innerHTML = "";
+  try {
+    const tok = await pwebLkToken();
+    const soloPend = !!(document.getElementById("pwebSoloPend") || {}).checked;
+    let url = PWEB_LK_URL + "/rest/v1/v_pedidos_web_np"
+            + "?select=np_prov,order_id,np_idx,cod,razon_social,fecha_recep,hora_recep,direccion,v,lineas,cajas,items,enviado_a_compras"
+            + "&order=order_id.asc,np_idx.asc&limit=2000";
+    if (soloPend) url += "&enviado_a_compras=eq.false";
+    const r = await fetch(url, { headers: { apikey: PWEB_LK_ANON, Authorization: "Bearer " + tok } });
+    if (!r.ok) throw new Error("LK respondió " + r.status + ": " + (await r.text()).slice(0, 200));
+    const nps = await r.json();
+
+    // m³: se resuelve acá, con los códigos que realmente aparecen.
+    const cods = {};
+    nps.forEach(function (n) { (n.items || []).forEach(function (i) { cods[i.art] = 1; }); });
+    const vol = await pwebVolumenes(Object.keys(cods));
+
+    let m3Tot = 0, cajasTot = 0, sinM3 = {};
+    nps.forEach(function (n) {
+      let m3 = 0;
+      (n.items || []).forEach(function (i) {
+        const v = vol[i.art];
+        if (v === undefined) { sinM3[i.art] = 1; return; }
+        m3 += (Number(i.cajas) || 0) * v;
+      });
+      n._m3 = m3;
+      m3Tot += m3;
+      cajasTot += Number(n.cajas) || 0;
+    });
+
+    if (!nps.length) {
+      if (res) res.innerHTML = '<div class="pweb-vacio">No hay pedidos web pendientes de programar.</div>';
+      if (st) st.textContent = "";
+      return;
+    }
+
+    const pedidos = {}; nps.forEach(function (n) { pedidos[n.order_id] = 1; });
+    const faltan = Object.keys(sinM3);
+    if (res) {
+      res.innerHTML =
+        '<div class="pweb-cards">'
+        + '<div class="pweb-card"><b>' + Object.keys(pedidos).length + '</b><span>pedidos</span></div>'
+        + '<div class="pweb-card"><b>' + nps.length + '</b><span>NP</span></div>'
+        + '<div class="pweb-card"><b>' + cajasTot + '</b><span>cajas</span></div>'
+        + '<div class="pweb-card"><b>' + m3Tot.toFixed(3) + '</b><span>m³</span></div>'
+        + '</div>'
+        + (faltan.length ? '<div class="pweb-warn">⚠ Sin m³ cargado: ' + faltan.join(", ") + '</div>' : '');
+    }
+
+    let h = '<table class="pweb-table"><thead><tr>'
+          + '<th>NP</th><th>Cliente</th><th>Razón social</th><th>Entrega</th>'
+          + '<th>Recibido</th><th>Líneas</th><th>Cajas</th><th>m³</th><th>Vend</th>'
+          + '</tr></thead><tbody>';
+    nps.forEach(function (n) {
+      h += '<tr title="' + (n.items || []).map(function (i) { return i.art + " x" + i.cajas; }).join(", ") + '">'
+         + '<td class="pweb-np">' + n.np_prov + '</td>'
+         + '<td>' + (n.cod || "") + '</td>'
+         + '<td>' + (n.razon_social || '<i>(sin razón social)</i>') + '</td>'
+         + '<td>' + (n.direccion || "") + '</td>'
+         + '<td>' + (n.fecha_recep || "") + " " + (n.hora_recep || "").slice(0, 5) + '</td>'
+         + '<td class="pweb-num">' + n.lineas + '</td>'
+         + '<td class="pweb-num">' + n.cajas + '</td>'
+         + '<td class="pweb-num">' + n._m3.toFixed(3) + '</td>'
+         + '<td>' + (n.v || "") + '</td>'
+         + '</tr>';
+    });
+    h += '</tbody></table>';
+    if (tb) tb.innerHTML = h;
+    if (st) st.textContent = "";
+  } catch (e) {
+    if (st) st.textContent = "⚠ " + (e && e.message ? e.message : e);
+  }
 }
 /* ===== Importador PPP (Fase 1). Lee el .xls en el navegador (SheetJS lazy desde
    CDN — el sandbox no puede vendorearlo, pero el navegador del supervisor sí lo

@@ -220,3 +220,6 @@ echo "== TODO OK =="
 
 echo "== fac-excel-isis (Paso 0 idea 3717: Excel de prueba para ISIS — dedup, split 18/15, orden por código) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/fac-excel-isis.cjs
+
+echo "== pweb-ppp-web (idea 3717: PPP Web — lee LK en vivo, m³ local, no toca la PPP de Producción) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pweb-ppp-web.cjs
