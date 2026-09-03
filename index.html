@@ -6580,7 +6580,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.55";
+const APP_VERSION = "v12.56";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -33051,7 +33051,13 @@ function facXlsBtnSync() {
   }
 }
 
-/* Baja el Excel con las NP marcadas. Sin pantalla intermedia. */
+/* Vista previa en pantalla + descarga en dos formatos.
+   El .xls que necesita ISIS es XML Spreadsheet 2003, y el visor del iPhone no lo
+   abre sin Excel instalado: por eso el contenido se puede mirar acá mismo y hay
+   una descarga en CSV, que el celular sí abre. El CSV es SÓLO para mirar; el que
+   se importa en ISIS es el .xls. */
+let _facXlsPrev = null;
+
 async function facXlsBajar() {
   if (!requireSupervisor()) return;
   const nps = Array.from(_facXlsSel);
@@ -33063,21 +33069,121 @@ async function facXlsBajar() {
   try {
     const filas = await _facXlsArmar(nps);
     if (!filas.length) { try { alert("Ninguna de las NP marcadas tiene artículos armados con cajas entregadas."); } catch (_e) {} return; }
-
-    const conExceso = filas.filter(function (r) { return r.excede; });
-    if (conExceso.length) {
-      const ok = confirm(
-        "Ojo: " + conExceso.length + " NP tienen más cajas armadas que pedidas (" +
-        conExceso.map(function (r) { return r.np; }).join(", ") + ").\n\n" +
-        "Suele pasar cuando la NP se armó dos veces. En el archivo va lo PEDIDO, no la suma.\n\n¿Bajo igual?");
-      if (!ok) return;
-    }
-    _facXlsDescargar(filas);
+    _facXlsPrev = filas;
+    _facXlsPreviaRender();
   } catch (e) {
     try { alert("No se pudo armar el Excel: " + ((e && e.message) || e)); } catch (_e) {}
   } finally {
     if (b) { b.disabled = false; b.innerHTML = txt; facXlsBtnSync(); }
   }
+}
+
+function facXlsPreviaClose() {
+  _facXlsPrev = null;
+  const el = document.getElementById("facXlsPrevOv");
+  if (el) el.remove();
+}
+
+/* Las mismas filas que van al archivo, para mirarlas antes de bajarlo. */
+function _facXlsFilasPlanas(filas) {
+  const items = [];
+  let n = 0;
+  filas.forEach(function (r) {
+    for (let i = 0; i < r.lineas.length; i += r.tope) {
+      n++;
+      r.lineas.slice(i, i + r.tope).forEach(function (l) {
+        items.push({
+          np: r.np, fecha: r.fechaTxt, N_Pedido: n, cliente: r.cod, vend: r.vend,
+          articulo: l.art, cajas: String(l.cajas),
+          uni: l.uxb ? String(l.cajas * l.uxb) : "",
+          sucursal: r.suc, leyenda2: "", condPago: "",
+          pctDto: "2% Descuento Web", numOC: ""
+        });
+      });
+    }
+  });
+  return items;
+}
+
+function _facXlsPreviaRender() {
+  const filas = _facXlsPrev || [];
+  const items = _facXlsFilasPlanas(filas);
+  const esc = function (s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); };
+  const nPed = items.length ? items[items.length - 1].N_Pedido : 0;
+  const conExceso = filas.filter(function (r) { return r.excede; });
+  const sinSuc = filas.filter(function (r) { return !r.suc; });
+
+  let ov = document.getElementById("facXlsPrevOv");
+  if (!ov) {
+    ov = document.createElement("div");
+    ov.id = "facXlsPrevOv";
+    ov.style.cssText = "position:fixed;inset:0;z-index:100000;background:rgba(15,23,42,.6);display:flex;align-items:flex-start;justify-content:center;padding:10px;overflow:auto;";
+    document.body.appendChild(ov);
+  }
+  let h = '<div style="background:#fff;border-radius:12px;max-width:min(1100px,98vw);width:100%;margin:auto;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,.35)">';
+  h += '<div style="background:#78350f;color:#fff;padding:11px 14px;display:flex;align-items:center;gap:10px">' +
+       '<b style="flex:1;font-size:15px">Así queda el archivo · ' + filas.length + ' NP · ' + items.length + ' líneas · ' + nPed + ' pedidos en ISIS</b>' +
+       '<button onclick="facXlsPreviaClose()" style="width:auto;background:#fff;color:#78350f;border:none;border-radius:8px;padding:6px 13px;font-weight:800;cursor:pointer">Cerrar</button>' +
+       '</div>';
+  h += '<div style="padding:12px 14px">';
+  h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">' +
+       '<button onclick="facXlsDescargarXls()" style="width:auto;flex:1 1 200px;padding:12px;border:none;border-radius:10px;background:#78350f;color:#fff;font-size:14px;font-weight:800;cursor:pointer">⬇ Bajar .xls <span style="font-weight:600;opacity:.85">(el que se importa en ISIS)</span></button>' +
+       '<button onclick="facXlsDescargarCsv()" style="width:auto;flex:1 1 200px;padding:12px;border:1px solid #78350f;border-radius:10px;background:#fff;color:#78350f;font-size:14px;font-weight:800;cursor:pointer">⬇ Bajar .csv <span style="font-weight:600;opacity:.8">(se abre en el celular)</span></button>' +
+       '</div>';
+  if (conExceso.length || sinSuc.length) {
+    h += '<div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:9px;padding:9px 11px;margin-bottom:10px;font-size:13px;line-height:1.5">';
+    if (conExceso.length) h += '<b>Ojo:</b> ' + conExceso.length + ' NP tienen más cajas armadas que pedidas (' + esc(conExceso.map(function (r) { return r.np; }).join(", ")) + '). Suele pasar cuando la NP se armó dos veces; en el archivo va lo <b>pedido</b>, no la suma.<br>';
+    if (sinSuc.length) h += '<b>Sin sucursal:</b> ' + esc(sinSuc.map(function (r) { return r.np; }).join(", ")) + '. La columna va vacía y se completa en ISIS.';
+    h += '</div>';
+  }
+  h += '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:9px;padding:9px 11px;margin-bottom:10px;font-size:12.5px;color:#475569;line-height:1.5">' +
+       'La columna <b>Nº pedido</b> es la que va al archivo: cada NP se corta de a 18 líneas en Loekemeyer y 15 en Chef, en orden de código, igual que hace ISIS al importar. ' +
+       '<b>Leyenda 2</b> y <b>Cond. pago</b> salen vacías porque esos datos viven sólo en la base de la página web.' +
+       '</div>';
+  h += '<div style="overflow:auto;max-height:60vh;border:1px solid #e2e8f0;border-radius:9px">';
+  h += '<table style="border-collapse:collapse;font-size:12px;white-space:nowrap"><thead><tr style="background:#f1f5f9;position:sticky;top:0">' +
+       ["NP (no va)", "Fecha", "Nº pedido", "Cliente", "Vend", "Artículo", "Cajas", "Unid.", "Sucursal", "Leyenda 2", "Cond. pago", "% Dto", "Nº OC"]
+         .map(function (t) { return '<th style="padding:6px 9px;text-align:left;border-bottom:1px solid #cbd5e1">' + t + "</th>"; }).join("") +
+       "</tr></thead><tbody>";
+  items.forEach(function (it, i) {
+    h += '<tr style="border-top:1px solid #eef2f7' + (i % 2 ? ';background:#fafafa' : '') + '">' +
+      '<td style="padding:5px 9px;color:#94a3b8">' + esc(it.np) + "</td>" +
+      '<td style="padding:5px 9px">' + esc(it.fecha) + "</td>" +
+      '<td style="padding:5px 9px;font-weight:800;color:#7c3aed">' + it.N_Pedido + "</td>" +
+      '<td style="padding:5px 9px">' + esc(it.cliente) + "</td>" +
+      '<td style="padding:5px 9px">' + esc(it.vend) + "</td>" +
+      '<td style="padding:5px 9px;font-weight:700">' + esc(it.articulo) + "</td>" +
+      '<td style="padding:5px 9px;text-align:right">' + esc(it.cajas) + "</td>" +
+      '<td style="padding:5px 9px;text-align:right">' + esc(it.uni) + "</td>" +
+      '<td style="padding:5px 9px">' + esc(it.sucursal) + "</td>" +
+      '<td style="padding:5px 9px"></td><td style="padding:5px 9px"></td>' +
+      '<td style="padding:5px 9px">' + esc(it.pctDto) + "</td>" +
+      '<td style="padding:5px 9px"></td></tr>';
+  });
+  h += "</tbody></table></div></div></div>";
+  ov.innerHTML = h;
+}
+
+function facXlsDescargarXls() { if (_facXlsPrev) _facXlsDescargar(_facXlsPrev); }
+
+/* CSV con punto y coma y BOM: así lo abren bien Numbers, Excel y el visor del celular. */
+function facXlsDescargarCsv() {
+  if (!_facXlsPrev) return;
+  const items = _facXlsFilasPlanas(_facXlsPrev);
+  const q = function (v) { const s = String(v == null ? "" : v); return /[";\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  const cab = ["NP (no va al archivo)", "Fecha", "N Pedido", "Cliente", "Vend", "Articulo", "Cajas", "Unidades", "Sucursal", "Leyenda 2", "Cond pago", "% Dto", "N OC"];
+  const filas = items.map(function (it) {
+    return [it.np, it.fecha, it.N_Pedido, it.cliente, it.vend, it.articulo, it.cajas, it.uni, it.sucursal, "", "", it.pctDto, ""].map(q).join(";");
+  });
+  const txt = "﻿" + cab.map(q).join(";") + "\r\n" + filas.join("\r\n") + "\r\n";
+  const hoy = _facXlsFechaAR(new Date());
+  const dd = _facXlsDDMMYYYY(hoy).replace(/\//g, "-").slice(0, 5) + "-" + hoy.slice(2, 4);
+  const blob = new Blob([txt], { type: "text/csv;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "PRUEBA_NO_IMPORTAR_" + dd + "_para-mirar.csv";
+  document.body.appendChild(a); a.click();
+  setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
 }
 
 /* Trae los datos de las NP marcadas y arma las líneas (dedup, tope contra lo pedido,
