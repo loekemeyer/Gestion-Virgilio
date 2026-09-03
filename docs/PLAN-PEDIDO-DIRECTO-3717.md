@@ -26,7 +26,7 @@
 
 ### 0.2 Qué se verificó y qué no
 
-Todo lo marcado **(v)** se corrió contra la base o contra el archivo, sólo lectura: el grueso el 2026-09-02 y las correcciones de esta fusión el 2026-09-03. Lo que no se pudo verificar dice **a verificar** y no se usa como premisa de ninguna decisión. Proyectos: Virgilio `hrxfctzncixxqmpfhskv`, LK `kwkclwhmoygunqmlegrg`. El proyecto Chef (`nkhzocgdpwtgrmwleihr`) **no es consultable directamente** desde acá, pero **sí indirectamente**: LK lo lee por el FDW `chef_db` (`chef_orders`, `chef_customers`, `chef_customer_delivery_addresses`, `chef_sales_lines`), que es por donde se verificaron los casos Chef de este plan (por ejemplo `chef_orders.id = 165`, §2). Lo que **no** se ve por ahí son sus `cron.job`, sus Edge Functions y su vault: eso sigue siendo precondición de la fase 8, no supuesto. Los números del generador en sombra (§7 fase 0-bis) los midió la rama de implementación el 2026-09-02 y **no se pudieron re-verificar** acá, porque sus vistas no están desplegadas.
+Todo lo marcado **(v)** se corrió contra la base o contra el archivo, sólo lectura: el grueso el 2026-09-02 y las correcciones de esta fusión el 2026-09-03. Lo que no se pudo verificar dice **a verificar** y no se usa como premisa de ninguna decisión. Proyectos: Virgilio `hrxfctzncixxqmpfhskv`, LK `kwkclwhmoygunqmlegrg`. El proyecto Chef (`nkhzocgdpwtgrmwleihr`) **no es consultable directamente** desde acá, pero **sí indirectamente**: LK lo lee por el FDW `chef_db` (`chef_orders`, `chef_customers`, `chef_customer_delivery_addresses`, `chef_sales_lines`), que es por donde se verificaron los casos Chef de este plan (por ejemplo `chef_orders.id = 165`, §2). Lo que **no** se ve por ahí son sus `cron.job`, sus Edge Functions y su vault: eso sigue siendo precondición de la fase 8, no supuesto. Los números de CANTIDAD del generador en sombra (§7 fase 0-bis) los midió la rama de implementación el 2026-09-02 y no se pudieron re-verificar, porque sus vistas no están desplegadas; los de **contenido**, que son los que importan, se midieron el 2026-09-03 corriendo la lógica como consulta suelta sobre LK, sin desplegar nada.
 
 ### 0.3 Cambios de diseño respecto del borrador (resumen)
 
@@ -88,7 +88,7 @@ El detalle completo está en el anexo de contexto (`docs/PLAN-PEDIDO-DIRECTO-371
 - **El corte respeta el orden del payload, NO el de código (v, 2026-09-03).** Los únicos pedidos que distinguen las dos reglas son aquellos cuyo payload **no** viene ya ordenado por código, y ahí el resultado es inequívoco. LK `orders.id = 888` (cod 2533, 02/07, 41 ítems, payload desordenado) → NP `97956` = ítems **1-18 del payload**, `97957` = 19-36 y `97958` = 37-41; `PPP_Base_Pedidos` ordenada por `id` reproduce el payload línea por línea. Chef `chef_orders.id = 165` (cod 1665, 04/07, 28 ítems, payload desordenado) → `44501` = ítems 1-15 y `44502` = 16-28; con corte por código ascendente la 44501 habría sido `{097,307,609,630,631,636,637,706,707,708,713,723,725E,764,802}`, que no se parece en nada a lo que ISIS produjo.
 - **Por qué este plan afirmó lo contrario hasta hoy, que es la lección metodológica.** El **95 % de los payloads ya viene ordenado por código** (524 de 552 pedidos LK con más de un ítem en 90 días), así que las dos reglas coinciden casi siempre. Los cuatro casos que el plan citaba como prueba — clientes **1936** (NP 98680/98681) y **989** (98682/98683), del 02/09 — son **todos de payloads ya ordenados**: son compatibles con las dos reglas y **no prueban ninguna**. Para separar dos reglas hay que buscar a propósito los casos donde difieren, no acumular casos donde coinciden. Medido hoy: **145 de las 801 NP de `PPP_Base_Pedidos` (18,1 %) no están en orden de código**.
 - **Todos los códigos de artículo de los pedidos web son de 3 dígitos** (16.105 líneas medidas, cero excepciones; re-chequeado hoy sobre los 10.631 ítems de payload de LK en 90 días, también cero), así que con el `padStart(3, "0")` de `padCodArt` el orden alfabético y el numérico **son el mismo**: donde se ordene por código no hace falta ningún comparador numérico. (El histórico de `PPP_Base_Pedidos` sí tiene 4 líneas con códigos de otra longitud — `66`, `55215`, `55219`, `55289` —, ninguna de origen web.)
-- El `items_string` de `lk_pedidos_match` viene **ordenado por código por construcción de la vista**, así que **no conserva** el orden del carrito y **no sirve** como fuente para reproducir la partición: para eso hay que ir al payload crudo (§7.1 y el comentario de `sql/ppp_shadow_generator.sql`).
+- El `items_string` de `lk_pedidos_match` viene **ordenado por código por construcción de la vista**, así que **no conserva** el orden del carrito y **no sirve** como fuente para reproducir la partición: para eso hay que ir al payload crudo. Verificado sobre el pedido `888`: el carrito arranca `512,511,584E,543…` y el `items_string` que llega a Virgilio arranca `057,246,280,315…`. **Es el motivo por el que el generador en sombra corre del lado de LK** y no de Virgilio (decisión del 03/09, §7.1).
 - Se cuentan **ítems**, no artículos distintos (fidelidad; consolidar es la pregunta D7). En 60 días: **414** pedidos, 180 con ≥18 líneas, **644** tramos **(v, 2026-09-03)**.
 
 **Excel.** XML Spreadsheet 2003; hoja 1 sin encabezado con 12 columnas `fecha, N_Pedido, cliente, vend, articulo, cajas, uni, sucursal, leyenda2, condPago, pctDto, numOC`; hoja 2 "Resumen". Tipo de celda `Number` si `/^-?\d+(\.\d+)?$/` y no empieza con `0` (salvo `0.`), si no `String`; vacío → `<Cell/>`. `numOC` viajó vacío en 1.013 de 1.013 pedidos desde marzo; `pctDto` es fijo `"2% Descuento Web"`. `condPago` viaja como **código** y `sheets_payload.condicion_pago_code` lo trae en el 100 % de los pedidos de 90 días **(v)** (8: 387, 9: 54, 18: 50, 11: 20, 3: 15, 10: 15, 1: 11, 13: 8, 12: 5, 14: 3, 2: 2). `v_pedidos_match` / `lk_pedidos_match` **no** lo llevan: sus columnas son `order_id, cod_cliente, status, fecha_pedido, hora_pedido, created_at, sucursal_entrega, items_string, match_string, ambiguo, orden_en_dia, synced_at, empresa, metodo_pago` **(v, 2026-09-03)** — `metodo_pago` es texto libre y no se mapea a ningún código.
@@ -557,7 +557,7 @@ Cada fase se verifica sola y no depende de la siguiente. Estimación relativa (S
 | Fase | Contenido | Criterio de "listo" | Est. | Branch |
 |---|---|---|---|---|
 | **0 — HECHA (v12.59, `b1984f19`)** | Botón **"⬇ Excel ISIS (prueba)"** en el **encabezado** de Facturación (`.fac-top-acts`), sólo supervisor, **100 % en el navegador**: cero funciones, tablas o columnas nuevas en Supabase. Selección por **casillas en la lista** (`input.fac-xls-chk`), sin pantalla intermedia. Lee `Facturacion_NP`, `Entregas_Virgilio`, `PPP_Base_Pedidos`, `vista_uxb_articulo`, `clientes_vendedor` y `lk_pedidos_match` con la anon key; dedup por `(NP, artículo)` quedándose con la última fila y topeando contra lo pedido; **split 18 (LK) / 15 (Chef)**; **orden real de las líneas** recuperado de `PPP_Base_Pedidos` por `id` (`_facXlsOrdenIsis`), con respaldo a código ascendente para las NP que no están ahí; archivo **`PRUEBA_NO_IMPORTAR_DD-MM-YY_HHMM.xlsx`** (`.xls` XML 2003 como rama alternativa). Test `tests/fac-excel-isis.cjs` (225 líneas, F1-F11) en `tests/run.sh` | **Cumplido en código y test** (suite en verde). **Pendiente lo que no es código:** (a) la **prueba real de importación con la persona de ISIS** (H1-H7); (b) `leyenda2` y `condPago` salen **vacíos** porque viven sólo en la base de LK → es exactamente la **pregunta D11**; (c) **cuál de los dos formatos acepta ISIS sigue sin confirmar**, y el que baja por defecto (`.xlsx`) **no es** el que hoy se manda por mail (`.xls` XML 2003) → §11.4 | S | — |
-| **0-bis** | **Generador de PPP en modo sombra** (read-only, no toca la operación): `sql/ppp_shadow_generator.sql`, 3 vistas — `v_shadow_web_items`, `v_shadow_np_gen`, `v_shadow_ppp_compare`. **No está desplegado** (verificado hoy: las 3 no existen en `hrxfctzncixxqmpfhskv`); correrlo sólo crea vistas de lectura | Ver el detalle abajo. **Criterio: empate sostenido por semanas antes de tocar nada** | S | No (es read-only sobre prod) |
+| **0-bis** | **Generador de PPP en modo sombra** (read-only, no toca la operación): `sql/ppp_shadow_generator.sql`, 5 vistas — `v_shadow_web_items`, `v_shadow_web_items_chef`, `v_shadow_np_gen`, `v_shadow_np_isis`, `v_shadow_ppp_compare`. **Corre en el proyecto LK** (decisión del 03/09, §7.1), no en Virgilio. **No está desplegado**; correrlo sólo crea vistas de lectura. **Primer paso de la fase: arreglar `sincronizar_ppp()`**, caído desde el 13/08, que deja el espejo 292 NP atrasado y hace que no haya contra qué comparar | Ver el detalle abajo. **Criterio: empate sostenido por semanas antes de tocar nada** | S | No (es read-only sobre prod) |
 | **1** | DDL aditivo: `Pedidos_Web`, `np_map`, `Facturacion_Export_*`, `np_rename_log`, `ppp_cuarentena_*`, `PPP_Historico_Web`, `ppp_config` (**con `tope_lineas_np = {"lk":18,"chef":15}`**), `sync_heartbeat`, columnas `origen/empresa/order_id/parte/uxb` y `PPP_Entregados_Meta.origen`, **índice único parcial**, triggers de §6.1 (`SECURITY DEFINER` + REVOKE, con la bandera de sesión de §4.1), vistas `v_pedidos_web_estado` y `v_np_map_lk`, **regla de empresa por primer dígito** (`empresa_de_np`, `vista_faltante_real`, `vista_faltante_demanda`, **`vista_nc_loeke_chef`**, `empresaDeNp`, `pkNpEsLoeke`), **`ALTER TRIGGER trigger_actualizar_saldo_stock … UPDATE OF`**, `REVOKE` a anon en todo lo nuevo | El push del Sheet sigue igual (conteos antes y después, y un push con una NP repetida a propósito en el branch **no** vacía la tabla); `pppSubir` igual; `tests/emp-np.cjs` ampliado con `9…` y `4…` de 9 dígitos; **`tests/anon-writes.cjs`** en verde contra el branch | M | Sí |
 | **2** | LK: columnas `enviado_a_virgilio_at`, `cancelado_at`, `version_virgilio`, `canal`; `pedidos_web_piloto`, `pedidos_web_estado`, `pedidos_web_push_log`; foreign tables nuevas; `sync_pedidos_web_virgilio()` (por fila, advisory lock, pull-back), cron `*/5`, heartbeat; **`ALTER SERVER virgilio_db`** (`connect_timeout`, `batch_size`); **policies `orders_delete_own` y `orders_update_own_sheets` con el sello**; triggers de des-sello; **`procesar-pedidos-db` v10 con filtro del piloto** y `enviar_pedidos_main()` llamando al push; `rollback_pedidos_web()` | Con el piloto vacío: 0 filas empujadas, heartbeat cada 5 min y mail de las 12:30 idéntico. Con 1 cliente de prueba: fila en `Pedidos_Web` con los 12 datos más dirección y barrio. **Simulación de Virgilio caído** (server a un puerto cerrado en un branch de LK): la corrida falla en ≤10 s, no apila jobs y el mail no se lleva al piloto. Un pedido roto no frena a los demás, verificado con un `exception` real dentro del loop con FDW | M | No (el FDW apunta a producción) |
 | **3** | Virgilio: `aplicar_pedidos_web()` (validaciones, **partición con tope por empresa, en el orden del payload**, `reenviado`, `cancelado`) + cron `*/2` + watchdog; `pppFindNpPdf`; prefijo visual "NPV" | Un pedido de prueba genera N tramos en `PPP_*` con `origen='web'`; **`tests/np-particion.sql`**: sobre los pedidos de 60 días la función da los mismos tramos que las NP reales de ISIS **en cantidad y en contenido**, partiendo **en el orden del payload** y comparando contra `PPP_Base_Pedidos` ordenada por `id` (partir por código falla en el 18,1 % de las NP históricas, §3.3), con casos LK de 19+ líneas y **un caso Chef de 16-17 líneas** (el que rompería con tope 18); m³ dentro del 5 % de ISIS; zona derivada; la PPP sobrevive a un push del Sheet; una fila inválida queda en `error` con aviso y **no** entra a la PPP | M | Sí (con `Pedidos_Web` sembrada a mano) |
@@ -570,28 +570,73 @@ Cada fase se verifica sola y no depende de la siguiente. Estimación relativa (S
 
 ### 7.1 Fase 0-bis en detalle — el generador en modo sombra
 
-**Qué es.** `sql/ppp_shadow_generator.sql` (139 líneas) genera la PPP — NP armadas y m³ — **directo desde los pedidos web** y la compara contra la PPP real que hoy produce ISIS. No alimenta producción, no escribe nada, es 100 % de sólo lectura: tres vistas.
+**DECISIÓN TOMADA (2026-09-03): el generador corre en el proyecto LK, no en Virgilio.** Era la
+opción **(B)** de las dos que estaban abiertas. El motivo: la partición depende del **orden** de las
+líneas, ese orden vive en `orders.sheets_payload`, y **Virgilio no lo ve** — lo único que cruza es
+`lk_pedidos_match.items_string`, que viene ordenada por código y por lo tanto ya lo perdió.
+Verificado sobre el pedido `888`: el carrito real arranca `512,511,584E,543…` y el `items_string`
+que llega a Virgilio arranca `057,246,280,315…`.
+
+La opción **(A)** era mandarle a Virgilio los ítems en orden como columna nueva de la sync de 15
+minutos. Se descartó: **LK ya tiene todo lo necesario de su lado**, así que (B) no obliga a tocar una
+sync que hoy corre en producción para hacer una prueba. Si algún día Virgilio tiene que partir
+pedidos por su cuenta, ahí sí hace falta (A) — pero eso es la fase de implementación (fase 3), no la
+de verificación.
+
+**Lo que hizo posible (B)** es que el espejo `ppp_base_pedidos` de LK **trae la columna `id`**, y ese
+`id` conserva el orden real de cada NP de ISIS. Verificado: la NP `97956` sale del espejo como
+`512,511,584E,543,…`, idéntica al payload. Sin esa columna no habría contra qué comparar.
+
+**Qué es.** `sql/ppp_shadow_generator.sql` reconstruye desde los pedidos web las NP que ISIS
+produciría y las compara contra las que ISIS produjo. No alimenta producción, no escribe nada, es
+100 % de sólo lectura.
 
 | Vista | Qué hace |
 |---|---|
-| `v_shadow_web_items` | Expande los ítems del payload con `jsonb_array_elements(...) with ordinality`, **conservando el orden del carrito**, y numera cada línea con ese ordinal, con `cap_lineas = case when empresa='chef' then 15 else 18 end`. **Ya no se alimenta de `lk_pedidos_match.items_string`**: esa cadena viene ordenada por código por construcción y no conserva el orden en que las líneas viajaron al Excel, así que servía para contar NP y cajas pero **nunca** para validar contenido. El cambio tiene un prerrequisito: el payload vive en `orders` de LK y hoy Virgilio no lo ve — hace falta **una columna** con los ítems en orden en `v_pedidos_match` + `lk_pedidos_match` (misma sync de 15 min, mismo tipo de decisión que D11), o desplegar esta vista del lado de LK. Está escrito como `-- TODO` bloqueante en el `.sql` |
-| `v_shadow_np_gen` | Corta cada pedido en bloques de `cap_lineas` (`ceil(linea_rn / cap_lineas)`), y por bloque calcula líneas, cajas, m³ (`Volumen_Articulos`) y una bandera `tiene_art_sin_volumen` |
-| `v_shadow_ppp_compare` | `full outer join` por **cliente-día** entre lo generado y la PPP real (`PPP_Programacion_Diaria` + `PPP_Base_Pedidos`), con un `estado`: `ok`, `ok_nps_dif_cajas`, `revisar`, `solo_isis` (canal no-web), `solo_web` (ISIS todavía no lo armó) |
+| `v_shadow_web_items` | Expande `orders.sheets_payload->'items'` con `jsonb_array_elements(...) with ordinality`, **conservando el orden del carrito**. Normaliza el código con el mismo criterio que `padCodArt` (3 dígitos + letras) para poder comparar. **Ya no se alimenta de `items_string`**, que venía ordenada por código y servía para contar NP y cajas pero **nunca** para validar contenido |
+| `v_shadow_web_items_chef` | Lo mismo para Chef, desde `chef_orders`, con tope 15. **Vista aparte a propósito**: `chef_orders` es foránea (FDW `chef_db`) y leerla cuesta segundos; separada, la de Loekemeyer no paga ese costo |
+| `v_shadow_np_gen` | Corta cada pedido en bloques contiguos de `cap_lineas` en el orden del payload y arma `arts`, la secuencia ordenada de códigos del bloque |
+| `v_shadow_np_isis` | La NP real, con sus artículos en el orden real (`order by id` sobre `ppp_base_pedidos`) |
+| `v_shadow_ppp_compare` | Compara **por firma**: si la secuencia ordenada del bloque generado existe tal cual como NP en ISIS, la partición es correcta. No necesita un vínculo pedido→NP, y es más fuerte que contar NP o cajas |
 
-**Estado:** **NO desplegado.** Verificado hoy contra `hrxfctzncixxqmpfhskv`: ninguna de las tres vistas existe. El propio archivo lo dice. Correrlo crea sólo vistas de lectura y no altera ninguna tabla.
+**Estado:** **NO desplegado.** Correrlo sólo crea vistas de lectura.
 
-**Qué mide y qué dio (medición de la rama de implementación, 2026-09-02, 89 cliente-día comparables):**
+**Medición del 2026-09-03 (la lógica corrida como consulta suelta, sin desplegar nada).** Por
+primera vez se midió **contenido**, no cantidad:
 
-| Métrica | Resultado |
-|---|---|
-| Mismo número de NP generadas | **89 / 89 (100 %)** |
-| Mismas cajas totales | 86 / 89 (97 %) |
-| m³ dentro del 5 % | **98,5 %** sobre 158 NP |
-| Cobertura de `Volumen_Articulos` | **312 / 320** artículos (faltan 8) |
+| Semana | Bloques | Empatan | % |
+|---|---|---|---|
+| 15/06 | 51 | 43 | 84,3 % |
+| 22/06 | 59 | 51 | 86,4 % |
+| 29/06 | 77 | 75 | **97,4 %** |
+| 06/07 | 47 | 47 | **100 %** |
+| 13/07 | 126 | 108 | 85,7 % |
+| 20/07 | 56 | 47 | 83,9 % |
+| 27/07 | 70 | 59 | 84,3 % |
+| 03/08 | 60 | 49 | 81,7 % |
 
-**Criterio de listo:** que ese empate se sostenga **por semanas**, no por una corrida. Mientras el tablero (`select estado, count(*) from v_shadow_ppp_compare group by estado`) no dé ~100 % durante ese período, **no se toca nada de la operación**. Es la condición de entrada de la fase 6, y es barata: correrlo no cuesta nada porque no escribe.
+**⚠ El espejo de la PPP en LK está VIEJO y hay que arreglarlo antes de seguir.** `sincronizar_ppp()`
+viene fallando desde el **13/08** (21 corridas caídas). Medido el 03/09: `ppp_base_pedidos` en LK
+llega a la NP **98392** y `PPP_Base_Pedidos` en Virgilio va por la **98684** — unas **292 NP de
+atraso**. Por eso de agosto en adelante el empate se derrumba (10/08 44 %, 17/08 8 %, 24/08 4 %,
+31/08 6 %): **no es la lógica, es que no hay contra qué comparar**. La línea de base real a superar
+es ese **82-100 %**, y el primer paso de esta fase es arreglar el cron.
 
-**Límite honesto de esa validación — hay que decirlo.** La comparación es **por cliente-día** y valida **cuántas NP y cuántas cajas**, no **qué artículo cae en cada NP**. El número de tramos y el total de cajas son **independientes del orden** en que se parte, así que ese 89/89 **no dice nada sobre el orden**: un generador que partiera por código y otro que partiera por el orden del carrito dan exactamente el mismo 89/89, y uno de los dos reparte mal los artículos. De hecho el generador tal como estaba escrito partía por código y por eso **no podía** validar contenido — es el mismo error que §13 F-2. **Extender la comparación al contenido tramo a tramo** — códigos de cada NP generada contra los de la NP real de ISIS, tomada de `PPP_Base_Pedidos` ordenada por `id` — es trabajo de esta fase, requiere alimentar la vista del payload crudo (ver la fila de `v_shadow_web_items` arriba) y es lo que después reusa `tests/np-particion.sql` (fase 3). Además, el generador de hoy **no aplica el corte por sucursal** (≈9 % de los cliente-día tienen más de un pedido, y falta decidir si ISIS los junta o los separa) y **no cubre el canal no-web** (esos cliente-día salen como `solo_isis`, que no es un error sino lo esperado). Los otros bordes a cerrar en sombra: cargar los 8 artículos sin volumen, limpiar las direcciones mezcladas cliente/expreso y definir con precisión qué cuenta como "línea".
+**Lo que esta versión no mide: m³.** LK no tiene `Volumen_Articulos` y `products` sólo trae `uxb`.
+No es lo que estaba en duda —el m³ ya se había validado aparte al **98,5 %** sobre 158 NP— y lo que
+sí estaba sin probar era el contenido, que es justamente lo que ahora se mide. Si se quisiera el m³
+del lado de LK, hay que espejar `Volumen_Articulos` (2.543 filas, tabla chica).
+
+**Criterio de listo:** que el empate de **contenido** se sostenga cerca del 100 % **por semanas**,
+no por una corrida, y con el espejo al día. Mientras eso no pase, **no se toca nada de la
+operación**. Es la condición de entrada de la fase 6, y es barata: correrlo no cuesta nada porque no
+escribe.
+
+**Lo que sigue faltando.** El generador **no aplica el corte por sucursal** (≈9 % de los cliente-día
+tienen más de un pedido, y falta decidir si ISIS los junta o los separa) — es la primera hipótesis
+para explicar el ~15 % que hoy no empata. Tampoco cubre el canal no-web, que es lo esperado. Los
+otros bordes: cargar los 8 artículos sin volumen, limpiar las direcciones mezcladas cliente/expreso
+y definir con precisión qué cuenta como "línea".
 
 ---
 
