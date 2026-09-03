@@ -2,7 +2,9 @@
    pedidos que llegan a la página LK. Verifica que pwebCargar():
    (a) pida a LK SOLO lo que todavía no salió por mail cuando el check está puesto,
    (b) resuelva el m³ contra Volumen_Articulos de ESTA base (LK no lo tiene),
-   (c) avise cuando un artículo no tiene m³ en vez de sumar 0 en silencio,
+   (c) trate una fila de Volumen_Articulos SIN VALOR como dato faltante —avisando y
+       marcando la NP— en vez de sumarle 0 en silencio (1.613 de 2.547 filas de esa
+       tabla están así, o sea que no es un caso raro),
    (d) NO toque PPP_Programacion_Diaria, que es la tabla viva de Producción. */
 const path = require("path");
 let chromium;
@@ -29,7 +31,8 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
           lineas: 3, cajas: 10, enviado_a_compras: false,
           items: [{ art: "027", cajas: 2 }, { art: "505", cajas: 5 }, { art: "ZZZ", cajas: 3 }] }
       ]);
-      if (u.includes("Volumen_Articulos"))     return json([{ codigo: "027", m3: 0.1 }, { codigo: "505", m3: 0.02 }]);
+      // ZZZ tiene FILA pero sin valor: no tiene que sumar 0 en silencio, tiene que avisar.
+      if (u.includes("Volumen_Articulos"))     return json([{ codigo: "027", m3: 0.1 }, { codigo: "505", m3: 0.02 }, { codigo: "ZZZ", m3: null }]);
       return json([]);
     };
     document.getElementById("pwebSoloPend").checked = true;
@@ -42,11 +45,14 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
       noTocaPppProd:  !urls.some(u => u.includes("PPP_Programacion_Diaria")),
       m3Correcto:      html.includes("0.300"),   // 2*0.1 + 5*0.02 = 0.30 ; ZZZ no suma
       avisaSinM3:      res.includes("ZZZ"),
+      marcaParcial:    html.includes("~0.300"),  // la NP queda marcada como incompleta
+      totalEsPiso:     res.includes("≥0.300"),   // el total se muestra como mínimo, no como valor
       muestraNp:       html.includes("900134201"),
       status:          document.getElementById("pwebStatus").textContent
     };
   });
-  const ok = r.pidePendientes && r.pideVolumen && r.noTocaPppProd && r.m3Correcto && r.avisaSinM3 && r.muestraNp && !r.status;
+  const ok = r.pidePendientes && r.pideVolumen && r.noTocaPppProd && r.m3Correcto && r.avisaSinM3
+          && r.marcaParcial && r.totalEsPiso && r.muestraNp && !r.status;
   console.log("pweb-ppp-web:", JSON.stringify(r), "· pageerrors:", errs.length ? errs.join("|") : "none", "·", (ok && !errs.length) ? "✓ OK" : "✗ FAIL");
   await b.close();
   process.exit((ok && !errs.length) ? 0 : 1);

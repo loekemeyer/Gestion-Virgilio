@@ -1783,6 +1783,8 @@ button.pk-anular small{ display:block; font-size:12px; font-weight:700; opacity:
 .pweb-table tr:hover td{ background:#111c2f; }
 .pweb-np{ font-variant-numeric:tabular-nums; font-weight:600; color:#7dd3fc; white-space:nowrap; }
 .pweb-num{ text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.pweb-parcial{ color:#fbbf24; }
+.pweb-card-parcial b{ color:#fbbf24; }
 /* v8.68 — grilla de botones del hub Configuración (2 columnas, angosto y centrado).
    Selector con doble clase (.sup-actions.cfg-actions) para ganarle en especificidad a
    .sup-actions.sup-secondary (que fuerza 7/3 columnas). */
@@ -6616,7 +6618,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.59";
+const APP_VERSION = "v12.60";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -25167,7 +25169,14 @@ async function pwebLkToken() {
 }
 
 /* m³ por artículo, de ESTA base. Se piden solo los códigos que aparecen en los
-   pedidos que se están mostrando, no la tabla entera. */
+   pedidos que se están mostrando, no la tabla entera.
+
+   ⚠ TENER LA FILA NO ES TENER EL DATO. `Volumen_Articulos` tiene 2.547 filas pero
+   1.613 con m³ nulo o cero: son códigos dados de alta sin medir. Por eso acá solo
+   entra al mapa el que tiene un valor POSITIVO — si no, un artículo sin medir
+   sumaría 0 y el m³ del pedido saldría de menos sin que nadie se entere, que es
+   peor que no mostrarlo. Del catálogo de la web hoy son 7: 071, 241, 242, 441Z,
+   442E, 444E y 446E. */
 async function pwebVolumenes(cods) {
   const out = {};
   if (!cods.length) return out;
@@ -25176,7 +25185,10 @@ async function pwebVolumenes(cods) {
   const r = await fetch(url, { headers: { apikey: SUPABASE_KEY } });
   if (!r.ok) return out;
   const rows = await r.json();
-  rows.forEach(function (x) { out[x.codigo] = Number(x.m3) || 0; });
+  rows.forEach(function (x) {
+    const v = Number(x.m3);
+    if (isFinite(v) && v > 0) out[x.codigo] = v;   // fila sin valor = como si no estuviera
+  });
   return out;
 }
 
@@ -25214,15 +25226,17 @@ async function pwebCargar() {
     nps.forEach(function (n) { (n.items || []).forEach(function (i) { cods[i.art] = 1; }); });
     const vol = await pwebVolumenes(Object.keys(cods));
 
-    let m3Tot = 0, cajasTot = 0, sinM3 = {};
+    let m3Tot = 0, cajasTot = 0, sinM3 = {}, npsParciales = 0;
     nps.forEach(function (n) {
-      let m3 = 0;
+      let m3 = 0, falta = false;
       (n.items || []).forEach(function (i) {
         const v = vol[i.art];
-        if (v === undefined) { sinM3[i.art] = 1; return; }
+        if (v === undefined) { sinM3[i.art] = 1; falta = true; return; }
         m3 += (Number(i.cajas) || 0) * v;
       });
       n._m3 = m3;
+      n._m3Parcial = falta;      // el número existe pero le faltan artículos: se marca
+      if (falta) npsParciales++;
       m3Tot += m3;
       cajasTot += Number(n.cajas) || 0;
     });
@@ -25241,9 +25255,14 @@ async function pwebCargar() {
         + '<div class="pweb-card"><b>' + Object.keys(pedidos).length + '</b><span>pedidos</span></div>'
         + '<div class="pweb-card"><b>' + nps.length + '</b><span>NP</span></div>'
         + '<div class="pweb-card"><b>' + cajasTot + '</b><span>cajas</span></div>'
-        + '<div class="pweb-card"><b>' + m3Tot.toFixed(3) + '</b><span>m³</span></div>'
+        + '<div class="pweb-card' + (npsParciales ? ' pweb-card-parcial' : '') + '"><b>'
+        + (npsParciales ? '≥' : '') + m3Tot.toFixed(3) + '</b><span>m³</span></div>'
         + '</div>'
-        + (faltan.length ? '<div class="pweb-warn">⚠ Sin m³ cargado: ' + faltan.join(", ") + '</div>' : '');
+        + (faltan.length
+            ? '<div class="pweb-warn">⚠ Sin m³ medido: ' + faltan.join(", ")
+              + ' — ' + npsParciales + (npsParciales === 1 ? ' NP queda' : ' NP quedan')
+              + ' con el m³ INCOMPLETO (marcadas con ~).</div>'
+            : '');
     }
 
     let h = '<table class="pweb-table"><thead><tr>'
@@ -25259,7 +25278,9 @@ async function pwebCargar() {
          + '<td>' + (n.fecha_recep || "") + " " + (n.hora_recep || "").slice(0, 5) + '</td>'
          + '<td class="pweb-num">' + n.lineas + '</td>'
          + '<td class="pweb-num">' + n.cajas + '</td>'
-         + '<td class="pweb-num">' + n._m3.toFixed(3) + '</td>'
+         + '<td class="pweb-num' + (n._m3Parcial ? ' pweb-parcial' : '') + '" title="'
+         + (n._m3Parcial ? 'Incompleto: hay artículos sin m³ medido' : '') + '">'
+         + (n._m3Parcial ? '~' : '') + n._m3.toFixed(3) + '</td>'
          + '<td>' + (n.v || "") + '</td>'
          + '</tr>';
     });

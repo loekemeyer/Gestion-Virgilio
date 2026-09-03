@@ -8343,15 +8343,36 @@ lee **la misma tabla donde caen los pedidos de la página**, en vivo.
   (9 = Loekemeyer, 4 = Chef). Pedido 1342 parte 1 → `900134201`.
 
 - **El m³ no sale de LK** (no tiene volumen por caja): lo resuelve Gestión contra
-  su propia `Volumen_Articulos`. De los 230 artículos que alguna vez se pidieron
-  por web, **los 230 tienen m³**. Del catálogo entero faltan 3, nunca pedidos por
-  web todavía: **442E, 444E y 446E** (Bowl Ac. Inox. Base Silicona 16/20/24 cm).
+  su propia `Volumen_Articulos`, como `Σ cajas × m3`.
+
+  **Está validado contra las NP reales**, no supuesto. Sobre 158 NP con m³ oficial
+  en `PPP_Programacion_Diaria`: total calculado **51,00 m³ contra 51,13 reales
+  (0,26% de diferencia)**, error mediano por NP de **0,8 litros**, p95 de 9,4 y
+  máximo de 124. 151 de 158 quedan por debajo de los 10 litros. Contra la otra
+  fuente, independiente —`PPP_Entregados_Meta`, que viene de la columna `Mt3` del
+  Sheet, 637 NP— el total da **1,75% abajo** y la mediana por NP 0,9985.
+  Los pocos desvíos porcentuales grandes son NP diminutas donde el propio dato
+  oficial está redondeado a 3 decimales (una NP de 0,002 m³ se va 20% con medio
+  milésimo de redondeo). Para repetir la medición, la consulta está en
+  `sql/pedidos_web_lk.sql`.
+
+  ⚠ **Tener la fila en `Volumen_Articulos` NO es tener el dato.** La tabla tiene
+  **2.547 filas pero 1.613 con m³ nulo o cero** — códigos dados de alta sin medir.
+  Por eso el módulo solo toma valores POSITIVOS: una fila vacía se trata como
+  faltante. Si no, un artículo sin medir sumaría 0 y el pedido saldría con m³ de
+  menos sin que nadie se entere. Las NP a las que les falta algún artículo se
+  muestran con `~` y el total con `≥`, porque son un piso y no un valor.
+
+  Del catálogo de la web hoy hay **7 sin m³ útil**: **071** (Bowl Multi Uso 330ml,
+  el único que ya se pidió por web — 6 veces, última el 11/07), **241**, **242**,
+  **441Z**, **442E**, **444E** y **446E** (Bowl Ac. Inox. Base Silicona 16/20/24).
+  Midiendo esos 7 el módulo queda sin agujeros.
 
 - **Alcance**: hoy solo Loekemeyer. Chef espera el mismo
   `grant select on public.orders to loke_reader` que ya debe
   `sync_pedidos_match_virgilio`; el tope de 15 ya está contemplado.
 
-- **La pantalla**: botón **🧾 PPP Web** en el panel supervisor (v12.59). Lee
+- **La pantalla**: botón **🧾 PPP Web** en el panel supervisor (v12.59, m³ endurecido en v12.60). Lee
   `v_pedidos_web_np` de LK en vivo, resuelve el m³ contra `Volumen_Articulos` de
   esta base y muestra las NP a programar. Por defecto filtra
   `enviado_a_compras = false`, o sea **solo lo que todavía no salió por mail** —

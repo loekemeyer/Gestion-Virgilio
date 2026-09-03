@@ -198,3 +198,42 @@ grant select on public.v_pedidos_web_np to authenticated;
 --     select count(*) from public.v_pedidos_web_np;
 --   rollback;
 -- ----------------------------------------------------------------------------
+
+-- ============================================================================
+-- ANEXO · Validación del m³  (correr en VIRGILIO, hrxfctzncixxqmpfhskv)
+-- ============================================================================
+-- El m³ de este módulo es `Σ cajas × Volumen_Articulos.m3`. Esta consulta lo
+-- contrasta contra el m³ oficial de las NP que ya pasaron por ISIS, que viene de
+-- la columna `Mt3` del Sheet. Medido el 2026-09-03 sobre 158 NP:
+--   total 51,00 m³ calculado contra 51,13 reales (0,26% de diferencia)
+--   error mediano por NP 0,0008 m³ · p95 0,0094 · máximo 0,1239
+--   151 de 158 por debajo de los 10 litros
+-- Contra `PPP_Entregados_Meta` (637 NP, la otra fuente): total 1,75% abajo,
+-- mediana por NP 0,9985.
+--
+-- ⚠ El filtro `v.m3 > 0` NO es cosmético: 1.613 de las 2.547 filas de
+--    `Volumen_Articulos` tienen m³ nulo o cero. Sin ese filtro, un artículo sin
+--    medir suma 0 y el resultado sale de menos sin avisar.
+--
+--   with calc as (
+--     select b.pedido as np,
+--            sum(b.cajas * v.m3) as m3_calc,
+--            count(*) filter (where v.codigo is null) as sin_m3
+--     from "PPP_Base_Pedidos" b
+--     left join "Volumen_Articulos" v on v.codigo = b.articulo and v.m3 > 0
+--     group by b.pedido),
+--   real as (
+--     select np, max(m3) as m3_real from "PPP_Programacion_Diaria"
+--      where m3 > 0 group by np)
+--   select count(*) as np,
+--          round(sum(c.m3_calc)::numeric, 2)                     as total_calculado,
+--          round(sum(r.m3_real)::numeric, 2)                     as total_real,
+--          round((percentile_cont(0.5) within group
+--                 (order by abs(c.m3_calc - r.m3_real)))::numeric, 4) as err_mediana_m3
+--     from calc c join real r on r.np = c.np
+--    where c.m3_calc > 0;
+--
+-- Artículos del catálogo de la web SIN m³ útil (al 2026-09-03): 071, 241, 242,
+-- 441Z, 442E, 444E, 446E. Para listarlos de nuevo:
+--   select codigo, m3 from "Volumen_Articulos" where m3 is null or m3 <= 0;
+-- ============================================================================
