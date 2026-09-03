@@ -8298,6 +8298,53 @@ Tercer lote. Objetos creados, **aún no conectados al front**:
   excluye controlados (CRN) y sin salida (FSS), ordena vencidos primero. Columnas:
   np, tanda, lios, cod_cliente, rs, vencido, first_load, last_ccn.
 
+### Pedidos web de LK dentro de Virgilio (idea 3717 · Paso 1)
+
+Desde 2026-09-03 los pedidos de la página LK llegan a Virgilio **sin pasar por
+ISIS ni por el mail de las 12:30**. Es el primer paso del flujo nuevo: la
+programación deja de salir del espejo de la PPP y pasa a salir del pedido web.
+
+- **`Pedidos_Web`** — TABLA. Espejo de los pedidos web de LK, **una fila por
+  línea**, con `linea_rn` = la posición del ítem dentro de `sheets_payload.items`
+  (o sea, el orden del carrito). Ese orden es lo que la regla de corte necesita
+  y es exactamente lo que `lk_pedidos_match` NO tiene, porque su `items_string`
+  viene ordenado por código.
+  ⚠ **Es un espejo puro: se borra y se reescribe entero cada 15 minutos.** No
+  agregarle columnas de trabajo (tanda, zona, operario, estado) — se perderían
+  en la próxima corrida. Eso va en la tabla de programación, que todavía no existe.
+
+- **`v_pedidos_web_np`** — VIEW. Las NP que Virgilio programaría, ya cortadas.
+  Regla: bloques de **18 líneas contiguas en el orden del carrito** (15 en Chef),
+  vía `ceil(linea_rn / 18)`. **No es una suposición**: está leída de
+  `processOrders` de la Edge Function `procesar-pedidos-db` de LK, que es la que
+  arma el Excel del mail. **Nunca ordenar por código de artículo acá** —
+  reordenar es el bug clásico de este módulo.
+  La **NP provisoria** son 9 dígitos, `<empresa><order_id 6><parte 2>`, con el
+  primer dígito marcando empresa igual que ISIS (9 = Loekemeyer, 4 = Chef): el
+  pedido 1342 parte 1 → `900134201`. Se renombra a la NP real cuando ISIS la
+  asigna.
+  El **m³ no viene de LK**: sale de `Volumen_Articulos` de Virgilio × cajas. El
+  join es LEFT a propósito, y `arts_sin_m3` cuenta el faltante para que se vea
+  en pantalla en vez de desaparecer una línea.
+
+- **Cómo llega**: LK **empuja** por el FDW `virgilio_db` con el rol
+  `lk_ppp_reader`, igual que `lk_pedidos_match`. En LK: vista `v_pedidos_web`
+  (revocada de anon/authenticated), función `sync_pedidos_web_virgilio()` y cron
+  `sync-pedidos-web-virgilio` cada 15 min, ventana móvil de 30 días con
+  delete+insert. Virgilio nunca toca el FDW.
+  Apagar sin borrar nada: `select cron.unschedule('sync-pedidos-web-virgilio');`
+
+- **Alcance**: solo `empresa = 'lk'`. Chef espera el mismo
+  `grant select on public.orders to loke_reader` que ya tiene pendiente
+  `sync_pedidos_match_virgilio`.
+
+- **Verificado el 2026-09-03**: 215 pedidos / 4.372 líneas, idéntico a LK; 350 NP
+  generadas, 0 con artículos sin m³, 0 pasadas de 18 líneas. El corte reproduce
+  el del Excel (pedido 1338, 44 ítems → 18/18/8). Quedan 6 NP sin razón social,
+  de los códigos 4284 y 4301, que no tienen ficha en `customers` de LK.
+
+- SQL completo, con verificación y vuelta atrás: `sql/pedidos_web_ingesta.sql`.
+
 **Pendiente MEDIA**: `prodLoad/prodCompute` — RPC parametrizado por rango de fechas,
 cálculo de productividad con m³ y factores. Complejidad alta, dejado para después.
 
